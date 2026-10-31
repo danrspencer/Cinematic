@@ -156,8 +156,9 @@ function ns.TriggerDeleted(key) return DeletedSet()[key] == true end
 -- The deleted ones, in the page's order.
 function ns.DeletedTriggers()
 	local list, set = {}, DeletedSet()
+	local hidden = ns.SceneGroupState and ns.SceneGroupState().hidden or {}
 	for _, trigger in ipairs(TRIGGERS) do
-		if set[trigger.key] then list[#list + 1] = trigger.key end
+		if set[trigger.key] and not hidden[trigger.key] then list[#list + 1] = trigger.key end
 	end
 	return list
 end
@@ -184,7 +185,11 @@ function ns.CameraRowOrder()
 	if ns.SyncCustomTriggers then ns.SyncCustomTriggers() end
 	local text = Rows().order
 	local deleted = DeletedSet()
-	if orderCache.text == text and orderCache.deleted == deleted and orderCache.list then return orderCache.list end
+	local groups = ns.SceneGroupState()
+	if orderCache.text == text and orderCache.deleted == deleted and orderCache.groups == groups.version
+		and orderCache.list then
+		return orderCache.list
+	end
 	local byTrigger, seen = {}, {}
 	for id in tostring(text or ""):gmatch("[^,]+") do
 		local trigger, copy = ns.CameraRowTrigger(id)
@@ -196,13 +201,13 @@ function ns.CameraRowOrder()
 	end
 	local list = {}
 	for _, trigger in ipairs(TRIGGERS) do
-		if not deleted[trigger.key] then
+		if not deleted[trigger.key] and not groups.hidden[trigger.key] then
 			local own = byTrigger[trigger.key] or {}
 			if not seen[trigger.key] then table.insert(own, 1, trigger.key) end
 			for _, id in ipairs(own) do list[#list + 1] = id end
 		end
 	end
-	orderCache.text, orderCache.deleted, orderCache.list = text, deleted, list
+	orderCache.text, orderCache.deleted, orderCache.groups, orderCache.list = text, deleted, groups.version, list
 	return list
 end
 -- A trigger's rows, in order.
@@ -350,6 +355,7 @@ end
 -- nil (no camera). Worked out once a frame for each trigger.
 local nowCache = { at = -1 }
 function ns.TriggerRowNow(key)
+	if ns.db and TRIGGER[key] then key = ns.SceneLead(key) end -- (a group's member: its lead's rows)
 	if not ns.db or not TRIGGER[key] or DeletedSet()[key] then return nil end
 	local now = GetTime()
 	if nowCache.at ~= now then
@@ -373,6 +379,7 @@ end
 function ns.CameraRowsChanged()
 	wipe(nowCache)
 	nowCache.at = -1
+	if ns.InvalidateSceneGroups then ns.InvalidateSceneGroups() end
 end
 
 -- A trigger's setting now (camera, music, cine), from the row it goes by:
@@ -395,6 +402,7 @@ end
 function ns.TriggerAnyRow(key, field)
 	local trigger = TRIGGER[key]
 	if not trigger or not ns.GetDB() then return false end
+	key = ns.SceneLead(key) -- (a group's member: its lead's rows)
 	for _, id in ipairs(ns.TriggerRowIds(key)) do
 		local value = ns.CameraRowOn(id) and ns.CameraRowValue(id, field or "camera")
 		if field and value then return true end
@@ -529,6 +537,148 @@ function ns.MoveCameraRow(id, by)
 		end
 	end
 	ns.SetCameraRowOrder(list)
+end
+
+-- Built-in scenes grouped by camera: built-in triggers that play the same
+-- camera with the same settings, differing only in what starts them, are one
+-- scene on the page, its row the first member's (the lead's). A member is in
+-- its group while its own row is set as the lead's (camera, music, CineMode,
+-- on or off, When) and it has no copies of its own; then it goes by the
+-- lead's rows (copies too). Set apart (another camera, say), it's a row of
+-- its own again. Changing a group writes every member (SyncSceneGroup), so
+-- they stay together, and each keeps its own settings for older versions.
+ns.SCENE_GROUPS = {
+	{ key = "Cozy", name = L["Cozy moments"],
+		members = { "Campfire", "SitButton", "Sleep", "Dance", "Kneel", "Chair", "Weapon", "Logout" } },
+	{ key = "Vista", name = L["Looking out"], members = { "Sit", "Stare" } },
+	{ key = "Away", name = L["Away"], members = { "AFK", "Still" } },
+	{ key = "Depart", name = L["Departing"], members = { "Hearth", "Teleport" } },
+	{ key = "QuestGivers", name = L["Quest givers"], members = { "Quest", "QuestGossip" } },
+}
+ns.OnLanguage(function() ns.TranslateFields(ns.SCENE_GROUPS, "name") end)
+
+local ROW_FIELDS = { "camera", "music", "cine" }
+local WHEN_ON = { combatShow = "IsCombatShowOn", calmShow = "IsCalmShowOn", quietShow = "IsQuietShowOn",
+	camShow = "IsCamShowOn", enemyShow = "IsEnemyShowOn", friendlyShow = "IsFriendlyShowOn" }
+-- A row's When in one list, as it goes by it (its camera's, while it follows it).
+local function WhenOf(id, list)
+	local leader = ns.CameraRowFollow(id)
+	local from = (leader and not OwnWhen(id)) and ("cam:" .. leader) or ROW_KEY[id]
+	local on = ns[WHEN_ON[list] or ""]
+	if on then return on(from) and true or false end
+	if list:find("Show$") then return ns.IsPlaceShowOn(list, from) and true or false end
+	local db = ns.db
+	return type(db[list]) == "table" and db[list][from] or nil
+end
+-- Whether a trigger has copies of its own (the row order's text, as saved).
+local function HasCopies(key)
+	return ("," .. tostring(Rows().order or "") .. ","):find("," .. key .. "[2-5],") ~= nil
+end
+local function SameRow(member, lead)
+	local deleted = DeletedSet()
+	if HasCopies(member) or deleted[member] ~= deleted[lead] then return false end
+	if ns.CameraRowOn(member) ~= ns.CameraRowOn(lead) then return false end
+	for _, field in ipairs(ROW_FIELDS) do
+		if ns.CameraRowValue(member, field) ~= ns.CameraRowValue(lead, field) then return false end
+	end
+	if ns.CameraRowAlways(member) ~= ns.CameraRowAlways(lead) or ns.CameraRowCalm(member) ~= ns.CameraRowCalm(lead) then
+		return false
+	end
+	for _, list in ipairs(ns.CAMERA_ROW_LISTS) do
+		if WhenOf(member, list) ~= WhenOf(lead, list) then return false end
+	end
+	return true
+end
+
+-- Who's in each group now: lead[key] (a member's lead), members[lead] (the
+-- lead and those with it), hidden[key] (members off the page). Worked out
+-- again after a change, or each second (a setting changed elsewhere); version
+-- counts the times it came out different. members stays as last worked out
+-- until then, for SyncSceneGroup after an edit.
+local groupState = { valid = false, at = -1, version = 0, sig = false, lead = {}, members = {}, hidden = {},
+	groupOf = {} }
+local function GroupState()
+	local rows, now = Rows(), GetTime()
+	if groupState.valid and groupState.rows == rows and now - groupState.at < 1 then return groupState end
+	groupState.valid, groupState.rows, groupState.at = true, rows, now
+	if not ns.db then return groupState end
+	local lead, members, hidden, groupOf, sig = {}, {}, {}, {}, {}
+	for _, group in ipairs(ns.SCENE_GROUPS) do
+		local first
+		for _, key in ipairs(group.members) do
+			if TRIGGER[key] then
+				if not first then
+					first = key
+					lead[key], members[key], groupOf[key] = key, { key }, group
+				elseif SameRow(key, first) then
+					lead[key], hidden[key] = first, true
+					table.insert(members[first], key)
+				end
+			end
+		end
+		if first then sig[#sig + 1] = table.concat(members[first], ",") end
+	end
+	sig = table.concat(sig, ";")
+	if sig ~= groupState.sig then
+		groupState.sig, groupState.version = sig, groupState.version + 1
+		groupState.lead, groupState.members, groupState.hidden, groupState.groupOf = lead, members, hidden, groupOf
+	end
+	return groupState
+end
+ns.SceneGroupState = GroupState
+function ns.InvalidateSceneGroups() groupState.valid = false end
+
+-- A trigger's lead: the one whose rows it goes by (itself, out of a group).
+function ns.SceneLead(key)
+	return GroupState().lead[key] or key
+end
+-- A lead's group (with more than itself in it), or nil.
+function ns.SceneGroupOf(key)
+	local state = GroupState()
+	local members = state.members[key]
+	return members and #members > 1 and state.groupOf[key] or nil
+end
+-- A lead and the members with it (as last worked out), or { key }.
+function ns.SceneGroupMembers(key)
+	return groupState.members[key] or { key }
+end
+
+-- Copies a lead's own row to the members with it: camera, music, CineMode,
+-- on or off, its When (as saved: following its camera stays so).
+function ns.SyncSceneGroup(key)
+	local list = groupState.members[key]
+	if not list or #list < 2 then return end
+	local db, rows = ns.GetDB(), ns.GetDB().cameraRows
+	for _, member in ipairs(list) do
+		if member ~= key then
+			for _, field in ipairs(ROW_FIELDS) do
+				if TRIGGER[member][field] then ns.SetCameraRowValue(member, field, ns.CameraRowValue(key, field)) end
+			end
+			for _, field in ipairs({ "off", "always", "calm" }) do
+				rows[member .. "." .. field] = rows[key .. "." .. field]
+			end
+			for _, each in ipairs(ns.CAMERA_ROW_LISTS) do
+				if type(db[each]) == "table" then db[each][ROW_KEY[member]] = db[each][ROW_KEY[key]] end
+			end
+		end
+	end
+end
+-- After a change on the page: every group's members follow their lead (as
+-- last worked out: a member set apart before the change stays apart).
+function ns.SyncAllSceneGroups()
+	for key in pairs(groupState.members) do ns.SyncSceneGroup(key) end
+end
+-- A change to a lead's own row (fn makes it) that its members follow.
+function ns.EditScene(key, fn)
+	GroupState() -- (who's with it now, before the change)
+	fn()
+	ns.SyncSceneGroup(key)
+	ns.CameraRowsChanged()
+end
+-- Deleting or bringing back a scene: a group's members with it.
+function ns.SetSceneDeleted(key, deleted)
+	GroupState()
+	for _, member in ipairs(ns.SceneGroupMembers(key)) do ns.SetTriggerDeleted(member, deleted) end
 end
 
 -- For /cine debug: each trigger's rows, and the one it goes by now.

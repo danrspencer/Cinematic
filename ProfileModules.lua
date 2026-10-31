@@ -411,13 +411,13 @@ ns.PROFILE_MODULES = {
 		end },
 
 	-- Cameras
-	{ key = "walk-run-music", name = "Music on walks and runs", scope = { "Cameras/Triggers" },
+	{ key = "walk-run-music", name = "Music on walks and runs", scope = { "Cameras/Scenes" },
 		tip = "Auto-walking and auto-running can start music.",
 		apply = function(set)
 			set("musicCamWalk", true)
 			set("musicCamRun", true)
 		end },
-	{ key = "lite-cameras", name = "Just a few cameras", scope = { "Cameras/Triggers" },
+	{ key = "lite-cameras", name = "Just a few cameras", scope = { "Cameras/Scenes" },
 		tip = "Just flights (and fly-bys), AFK, and your Hearthstone and teleports: no cozy, vista, fish, " ..
 		"RP walk, auto-run, death or quest cameras.",
 		apply = function(set)
@@ -428,7 +428,7 @@ ns.PROFILE_MODULES = {
 		apply = function(set)
 			CamsOff(set, { "flight", "idle", "cozy", "tele", "vista", "fish", "walk", "run", "death", "quest" })
 		end },
-	{ key = "cameras-bring-cinemode", name = "Cameras bring CineMode", scope = { "Cameras/Triggers",
+	{ key = "cameras-bring-cinemode", name = "Cameras bring CineMode", scope = { "Cameras/Scenes",
 		"Camera Settings/Death Cam", "Story Vision" },
 		tip = "Every camera brings CineMode on, standing still starts the AFK camera, every camera can start " ..
 		"music, and no death screen.",
@@ -448,7 +448,7 @@ ns.PROFILE_MODULES = {
 			set("musicCamWalk", true)
 			set("musicCamRun", true)
 		end },
-	{ key = "pure-cameras", name = "Pure: cameras", scope = { "Cameras/Triggers", "Camera Settings/Chat Cam",
+	{ key = "pure-cameras", name = "Pure: cameras", scope = { "Cameras/Scenes", "Camera Settings/Chat Cam",
 		"General/top" },
 		tip = "Standing still starts the AFK camera and every event's camera can start music; the cameras " ..
 		"don't wait for things to calm down after a fight, auto-run carries on in cities and instances (as RP " ..

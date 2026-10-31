@@ -10,7 +10,7 @@ function ns.CreateMyShotsPanel(kit)
 	title:SetPoint("TOPLEFT", 16, -16)
 	local intro = kit.PageIntro(content, title, L["A shot is one of the cameras that run while you stand still " ..
 		"(cozy, vista, fish or AFK) with numbers of your own for how it sways and zooms. Make one here, then pick " ..
-		"it as a trigger's camera on the Cameras page. A number you haven't changed follows the camera's own " ..
+		"it as a scene's camera on the Cameras page. A number you haven't changed follows the camera's own " ..
 		"settings."])
 
 	local selected -- (the shot shown)
@@ -63,20 +63,20 @@ function ns.CreateMyShotsPanel(kit)
 		"their Cameras page."], function()
 		if Shot() then ns.ShowCameraShare(ns.ExportShot(Shot()), (L["Share %s"]):format(ns.ShotName(Shot()))) end
 	end)
-	local import = Button(L["Import"], 64, L["Add a trigger or shot a friend shared (the text from their Share " ..
+	local import = Button(L["Import"], 64, L["Add a scene or shot a friend shared (the text from their Share " ..
 		"button)."], function()
 		ns.ShowCameraImport(function(id, kind)
 			if kind == "shot" then selected = id end
 			Changed()
 		end)
 	end)
-	local delete = Button(L["Delete"], 64, L["Delete this shot. Triggers that played it go back to its camera."],
+	local delete = Button(L["Delete"], 64, L["Delete this shot. Scenes that played it go back to its camera."],
 		function()
 			local id = Shot()
 			if not id then return end
 			if not StaticPopupDialogs.CINEMATIC_REMOVE_SHOT then
 				StaticPopupDialogs.CINEMATIC_REMOVE_SHOT = {
-					text = L["Delete the shot %s? Triggers that played it go back to its camera."],
+					text = L["Delete the shot %s? Scenes that played it go back to its camera."],
 					button1 = DELETE or L["Delete"], button2 = CANCEL or L["Cancel"],
 					OnAccept = function(_, data) data() end,
 					timeout = 0, whileDead = true, hideOnEscape = true,
@@ -220,7 +220,7 @@ function ns.CreateMyShotsPanel(kit)
 		local names = {}
 		for _, row in ipairs(ns.ShotUsers(id)) do names[#names + 1] = RowName(row) end
 		usedBy:SetText(#names > 0 and (L["Played by: %s"]):format(table.concat(names, ", "))
-			or L["No trigger plays it yet: pick it as a camera on the Cameras page."])
+			or L["No scene plays it yet: pick it as a scene's camera on the Cameras page."])
 		usedBy:ClearAllPoints()
 		usedBy:SetPoint("TOPLEFT", reset, "BOTTOMLEFT", 2, -10)
 		body:SetHeight(y + 40)

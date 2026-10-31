@@ -1,7 +1,7 @@
--- Cinematic: the Cameras page's editor for triggers of your own
--- (CustomTriggers.lua): the Starts and Ends lines in such a row's drawer,
--- and the window that shares a trigger or a shot (Shots.lua) as text, or
--- adds one someone shared.
+-- Cinematic: the Cameras page's editor for scenes (CustomTriggers.lua): the
+-- Triggers and Ends lines in a scene's drawer, the New scene panel, and the
+-- window that shares a scene or a shot (Shots.lua) as text, or adds one
+-- someone shared.
 local _, ns = ...
 local L = ns.L
 
@@ -88,26 +88,45 @@ function ns.NewShotFor(set)
 end
 ns.CUSTOM_CAMERA_TIP = "The camera it plays: one that runs where you stand, a camera script, or a shot of yours " ..
 	"(New shot... makes one and opens My Shots). The flight, RP walk, auto-run, quest and chat cameras aren't " ..
-	"here: they need you flying, walking or talking to an NPC, and have triggers of their own."
+	"here: they need you flying, walking or talking to an NPC, and have scenes of their own."
 
--- Where the lines read and write a trigger's settings (source, until, after,
--- name, camera, music, cine): a saved trigger's row (RowStore), or the New
--- trigger panel's draft, kept until Save (a plain table's).
+-- Where the lines read and write a scene's settings: list() its triggers (a
+-- copy), setList(list), and get/set for until, after, name, camera, music,
+-- cine. A saved scene's row (RowStore; a built-in scene's list is its extra
+-- triggers), or the New scene panel's draft, kept until Save (TableStore).
 local function RowStore(id)
 	return {
+		list = function()
+			local copy = {}
+			for i, source in ipairs(ns.SceneTriggers(id)) do copy[i] = source end
+			return copy
+		end,
+		setList = function(list) ns.SetSceneTriggers(id, list) end,
 		get = function(field) return ns.GetDB().cameraRows[id .. "." .. field] end,
 		set = function(field, value) ns.GetDB().cameraRows[id .. "." .. field] = value end,
 	}
 end
 local function TableStore(data)
-	return { get = function(field) return data[field] end, set = function(field, value) data[field] = value end }
+	return {
+		list = function()
+			local copy = {}
+			for i, source in ipairs(data.triggers) do copy[i] = source end
+			return copy
+		end,
+		setList = function(list) data.triggers = list end,
+		get = function(field) return data[field] end,
+		set = function(field, value) data[field] = value end,
+	}
 end
-local function Source(store)
-	local kind, what = tostring(store.get("source") or ""):match("^(%a+):(.*)$")
+-- Trigger i's kind and what.
+local function Source(store, i)
+	local kind, what = tostring(store.list()[i] or ""):match("^(%a+):(.*)$")
 	return kind or "emote", what or ""
 end
-local function SetSource(store, kind, what)
-	store.set("source", kind .. ":" .. what)
+local function SetSource(store, i, kind, what)
+	local list = store.list()
+	list[i] = kind .. ":" .. what
+	store.setList(list)
 end
 local function UntilKind(store)
 	local text = store.get("until")
@@ -123,12 +142,10 @@ local function CurrentPlace()
 	return type(name) == "string" and name or ""
 end
 
--- Each kind's first what and until, and the untils it can have.
+-- Each kind's first what and until.
 local KIND_START = { emote = { "cheer", "move" }, spell = { "", "ends" }, aura = { "", "ends" },
 	place = { "", "ends" }, moment = { "levelup", "time:5" }, state = { "mounted", "ends" }, key = { "1", "key" } }
-local UNTILS = { emote = { "move", "time" }, spell = { "ends", "move", "time" }, aura = { "ends", "move", "time" },
-	place = { "ends", "move", "time" }, moment = { "time", "move" }, state = { "ends", "move", "time" },
-	key = { "key", "move", "time" } }
+local ENDS_KINDS = { spell = true, aura = true, place = true, moment = true, state = true }
 local SECONDS = { 3, 5, 8, 10, 15, 20, 30, 60 }
 -- The priority list's places (Triggers.lua's built-in sources).
 local AFTER = { { "", "First, before everything" }, { "depart", "After Hearthstones and teleports" },
@@ -139,15 +156,29 @@ local AFTER = { { "", "First, before everything" }, { "depart", "After Hearthsto
 local HINTS = { emote = "cheer, /lol...", spell = "Fishing, or a spell ID", aura = "A buff's name or spell ID",
 	place = "A zone or subzone" }
 
+-- The untils a scene can have, by its triggers' kinds: It ends with any that
+-- ends on its own (named for it when they're all one kind), its key with a key.
 local function UntilChoices(store)
-	local kind = Source(store)
-	local ENDS = { spell = L["The cast ends"], aura = L["The buff fades"], place = L["You leave"],
-		state = L["It stops"] }
-	local TEXT = { move = L["You move"], ends = ENDS[kind] or L["It ends"], time = L["A set time"],
-		key = L["You press its key again"] }
-	local list = {}
-	for _, value in ipairs(UNTILS[kind] or UNTILS.emote) do list[#list + 1] = { value = value, text = TEXT[value] } end
+	local ends, key, only = false, false, nil
+	for i = 1, #store.list() do
+		local kind = Source(store, i)
+		ends = ends or ENDS_KINDS[kind] or false
+		key = key or kind == "key"
+		only = (only == nil or only == kind) and kind or false
+	end
+	local ENDS = { spell = L["The cast ends"], aura = L["The buff fades"], place = L["You leave"], state = L["It stops"] }
+	local list = { { value = "move", text = L["You move"] } }
+	if ends then list[#list + 1] = { value = "ends", text = only and ENDS[only] or L["It ends"] } end
+	list[#list + 1] = { value = "time", text = L["A set time"] }
+	if key then list[#list + 1] = { value = "key", text = L["You press its key again"] } end
 	return list
+end
+local function UntilFits(store)
+	local now = UntilKind(store)
+	for _, choice in ipairs(UntilChoices(store)) do
+		if choice.value == now then return true end
+	end
+	return false
 end
 -- (Made as the page is, once the language is known.)
 local SECOND_CHOICES, AFTER_CHOICES
@@ -158,136 +189,224 @@ local function MakeChoices()
 	for _, each in ipairs(AFTER) do AFTER_CHOICES[#AFTER_CHOICES + 1] = { value = each[1], text = L[each[2]] } end
 end
 
--- The Starts and Ends lines on parent for a store. kit: At(line, control, x),
--- Tooltip, AddControl (each control, refreshed with the page or panel),
--- x (where the lines' controls start), Saved() (after each change).
+-- A scene's lines on parent: its Ends line (a scene of yours: kit.At on
+-- "Ends"), then its Triggers, a line each, and a line for + Add trigger
+-- (kit.actions: more controls for that line, { control, x }). A built-in
+-- scene's own trigger comes first, locked (kit.builtinLabel). kit: At,
+-- BlockAt(line, control, x) (the Triggers lines, from 1), resize(lines) (the
+-- Triggers' lines shown now), Tooltip, AddControl, x, Saved(), typing(i, text).
 local function BuildLines(parent, store, kit)
-	local At, Tooltip, AddControl, x, Saved = kit.At, kit.Tooltip, kit.AddControl, kit.x, kit.Saved
+	local Tooltip, AddControl, x, Saved = kit.Tooltip, kit.AddControl, kit.x, kit.Saved
 	MakeChoices()
+	local offset = 0
+	local function Count() return #store.list() end
+	-- (A built-in scene's own triggers, locked, first: as many lines as they take.)
+	if kit.builtinLabel then
+		local own = parent:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+		own:SetWidth(440)
+		own:SetJustifyH("LEFT")
+		own:SetWordWrap(true)
+		own:SetText("|cff999999" .. L["Built in:"] .. "|r " .. kit.builtinLabel)
+		local textHeight = own:GetStringHeight()
+		offset = math.max(1, math.ceil(((type(textHeight) == "number" and textHeight or 0) + 8) / 34))
+		kit.BlockAt((offset + 1) / 2, own, x + 24)
+	end
 
-	-- Starts: the kind, then what (typed, or picked from its list).
-	local kind = At("Starts", Menu(parent, 130, ns.CUSTOM_TRIGGER_KINDS, function() return (Source(store)) end,
-		function(value)
-			local start = KIND_START[value] or KIND_START.emote
-			SetSource(store, value, value == "place" and CurrentPlace() or start[1])
-			store.set("until", start[2] ~= "move" and start[2] or nil)
+	if kit.At then
+		-- Ends: until when, how long, and its place in the priority list.
+		local untilMenu = kit.At("Ends", Menu(parent, 150, function() return UntilChoices(store) end,
+			function() return UntilKind(store) end,
+			function(value)
+				store.set("until", value == "time" and ("time:" .. Seconds(store)) or (value ~= "move" and value or nil))
+				Saved()
+			end), x)
+		Tooltip(untilMenu, L["When its camera stops. Moving always stops it too, as it does every camera that runs " ..
+			"while you stand still. It ends: when the trigger that started it ends (the cast, the buff, leaving the place)."])
+		AddControl(untilMenu)
+		local seconds = kit.At("Ends", Menu(parent, 80, SECOND_CHOICES, function() return Seconds(store) end,
+			function(value)
+				store.set("until", "time:" .. value)
+				Saved()
+			end), x + 160)
+		ShownWhile(seconds, function() return UntilKind(store) == "time" end)
+		Tooltip(seconds, L["How long its camera runs."])
+		AddControl(seconds)
+		local after = kit.At("Ends", Menu(parent, 210, AFTER_CHOICES,
+			function()
+				local value = store.get("after")
+				return value == nil and "emote" or value
+			end,
+			function(value)
+				store.set("after", value ~= "emote" and value or nil)
+				Saved()
+			end), x + 250)
+		Tooltip(after, L["Where it comes when other scenes are on at the same time: the first one on in this " ..
+			"order plays. Going AFK while doing an emote is the AFK scene, say."])
+		AddControl(after)
+	end
+
+	-- A line per trigger: "or", its kind, what (typed, or picked from its
+	-- list; Here for a place), and remove. Made for the most a scene can have,
+	-- shown for those it has.
+	local KIND_TIP = L["One thing that starts this scene: an emote you do, a spell you cast, a buff on you, a place " ..
+		"you're in, a moment (leveling up...), something you are (mounted...), or a key you press. Any one of a " ..
+		"scene's triggers starts it."]
+	for i = 1, ns.SCENE_TRIGGER_MAX do
+		local line = i + offset
+		local function Shown() return i <= Count() end
+		local orText = kit.BlockAt(line, parent:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall"), x)
+		orText:SetText(L["or"])
+		local kind = kit.BlockAt(line, Menu(parent, 130, ns.CUSTOM_TRIGGER_KINDS, function() return (Source(store, i)) end,
+			function(value)
+				local start = KIND_START[value] or KIND_START.emote
+				SetSource(store, i, value, value == "place" and CurrentPlace() or start[1])
+				-- (One trigger: its kind's until. More: kept, if it still fits.)
+				if Count() == 1 then
+					store.set("until", start[2] ~= "move" and start[2] or nil)
+				elseif not UntilFits(store) then
+					store.set("until", nil)
+				end
+				Saved()
+			end), x + 20)
+		local kindRefresh = kind.Refresh
+		kind.Refresh = function(self)
+			local shown = Shown()
+			self:SetShown(shown)
+			orText:SetShown(shown and line > 1)
+			if shown then kindRefresh(self) end
+		end
+		Tooltip(kind, KIND_TIP)
+		AddControl(kind)
+
+		local box = kit.BlockAt(line, ns.SkinEditBox(CreateFrame("EditBox", nil, parent, "InputBoxTemplate")), x + 166)
+		box:SetSize(190, 20)
+		box:SetAutoFocus(false)
+		box:SetMaxLetters(80)
+		box.searchSkip = true
+		local hint = box:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
+		hint:SetPoint("LEFT", 2, 0)
+		hint:SetPoint("RIGHT", -2, 0)
+		hint:SetJustifyH("LEFT")
+		hint:SetWordWrap(false)
+		box:SetScript("OnEnterPressed", function(self) self:ClearFocus() end)
+		box:SetScript("OnEditFocusLost", function(self)
+			if i > Count() then return end
+			local text = self:GetText():gsub("[%c|]", ""):match("^%s*(.-)%s*$")
+			local k = Source(store, i)
+			if k == "emote" then text = ns.EmoteToken(text) end
+			SetSource(store, i, k, text)
+			hint:SetShown(text == "")
 			Saved()
-		end), x)
-	Tooltip(kind, L["What starts this trigger's camera: an emote you do, a spell you cast, a buff on you, a place " ..
-		"you're in, a moment (leveling up...), something you are (mounted...), or a key you press."])
-	AddControl(kind)
+		end)
+		box:SetScript("OnEditFocusGained", function() hint:Hide() end)
+		box:SetScript("OnTextChanged", function(self, userInput)
+			if userInput and kit.typing then kit.typing(i, self:GetText()) end
+		end)
+		box:SetScript("OnEscapePressed", function(self)
+			self:SetText(select(2, Source(store, i)))
+			self:ClearFocus()
+		end)
+		box.Refresh = function(self)
+			if self:HasFocus() then return end
+			local k, what = Source(store, i)
+			self:SetText(what)
+			hint:SetText(L[HINTS[k] or ""])
+			hint:SetShown(what == "")
+		end
+		ShownWhile(box, function() return Shown() and HINTS[(Source(store, i))] ~= nil end)
+		Tooltip(box, L["Emotes: the command, with or without its slash. Spells and buffs: the name in your game " ..
+			"language, or a spell ID (works in any language). Places: the zone or subzone name as the game shows it."])
+		AddControl(box)
 
-	local function Typed() local k = Source(store) return HINTS[k] ~= nil end
-	local box = At("Starts", ns.SkinEditBox(CreateFrame("EditBox", nil, parent, "InputBoxTemplate")), x + 146)
-	box:SetSize(190, 20)
-	box:SetAutoFocus(false)
-	box:SetMaxLetters(80)
-	box.searchSkip = true
-	local hint = box:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
-	hint:SetPoint("LEFT", 2, 0)
-	hint:SetPoint("RIGHT", -2, 0)
-	hint:SetJustifyH("LEFT")
-	hint:SetWordWrap(false)
-	local function SaveBox(self)
-		local text = self:GetText():gsub("[%c|]", ""):match("^%s*(.-)%s*$")
-		local k = Source(store)
-		if k == "emote" then text = ns.EmoteToken(text) end
-		SetSource(store, k, text)
-		hint:SetShown(text == "")
+		local function Fixed()
+			local k = Source(store, i)
+			return k == "moment" and ns.CUSTOM_TRIGGER_MOMENTS or k == "state" and ns.CUSTOM_TRIGGER_STATES
+				or k == "key" and ns.CUSTOM_TRIGGER_KEYS or nil
+		end
+		local pick = kit.BlockAt(line, Menu(parent, 200, function() return Fixed() or {} end,
+			function() return (select(2, Source(store, i))) end,
+			function(value)
+				SetSource(store, i, (Source(store, i)), value)
+				Saved()
+			end), x + 160)
+		ShownWhile(pick, function() return Shown() and Fixed() ~= nil end)
+		Tooltip(pick, L["Which one. Key bindings are set in the game's Key Bindings, under Cinematic."])
+		AddControl(pick)
+
+		local here = kit.BlockAt(line, ns.PanelButton(parent), x + 364)
+		here:SetSize(54, 22)
+		here:SetText(L["Here"])
+		here.searchSkip = true
+		here:SetScript("OnClick", function()
+			SetSource(store, i, "place", CurrentPlace())
+			Saved()
+		end)
+		ShownWhile(here, function() return Shown() and Source(store, i) == "place" end)
+		Tooltip(here, L["Fill in the subzone you're in now (or the zone, where there's no subzone)."])
+		AddControl(here)
+
+		-- (A scene of yours keeps one trigger at least.)
+		local remove = kit.BlockAt(line, CreateFrame("Button", nil, parent), x + 424)
+		remove:SetSize(16, 16)
+		remove:SetNormalTexture("Interface\\Buttons\\UI-StopButton")
+		remove:SetHighlightTexture("Interface\\Buttons\\UI-Common-MouseHilight", "ADD")
+		remove:SetScript("OnClick", function()
+			local list = store.list()
+			table.remove(list, i)
+			store.setList(list)
+			if not UntilFits(store) then store.set("until", nil) end
+			Saved()
+		end)
+		remove.Refresh = function(self) self:SetShown(Shown() and (kit.builtinLabel ~= nil or Count() > 1)) end
+		Tooltip(remove, L["Remove this trigger."])
+		AddControl(remove)
+	end
+
+	-- + Add trigger, on the line after the last (with kit.actions beside it).
+	local add = ns.PanelButton(parent)
+	add:SetSize(120, 22)
+	add:SetText(L["+ Add trigger"])
+	add.searchSkip = true
+	add:SetScript("OnClick", function()
+		local list = store.list()
+		list[#list + 1] = "emote:" .. KIND_START.emote[1]
+		store.setList(list)
 		Saved()
-	end
-	box:SetScript("OnEnterPressed", function(self) self:ClearFocus() end)
-	box:SetScript("OnEditFocusLost", SaveBox)
-	box:SetScript("OnEditFocusGained", function() hint:Hide() end)
-	-- (Typing counts at once, for the panel's Save: the box is read as it changes.)
-	box:SetScript("OnTextChanged", function(self, userInput)
-		if userInput and kit.typing then kit.typing(self:GetText()) end
 	end)
-	box:SetScript("OnEscapePressed", function(self)
-		self:SetText(select(2, Source(store)))
-		self:ClearFocus()
-	end)
-	box.Refresh = function(self)
-		if self:HasFocus() then return end
-		local k, what = Source(store)
-		self:SetText(what)
-		hint:SetText(L[HINTS[k] or ""])
-		hint:SetShown(what == "")
+	Tooltip(add, L["Another thing that starts this scene: any one of its triggers starts it."])
+	local placed -- (the line the actions sit on now)
+	local block = CreateFrame("Frame", nil, parent)
+	block.Refresh = function()
+		local count = Count()
+		local line = offset + count + 1
+		add:SetShown(count < ns.SCENE_TRIGGER_MAX)
+		if line ~= placed then
+			placed = line
+			add:ClearAllPoints()
+			kit.BlockAt(line, add, x + 20)
+			for _, each in ipairs(kit.actions or {}) do
+				each[1]:ClearAllPoints()
+				kit.BlockAt(line, each[1], each[2])
+			end
+		end
+		kit.resize(line)
 	end
-	ShownWhile(box, Typed)
-	Tooltip(box, L["Emotes: the command, with or without its slash. Spells and buffs: the name in your game " ..
-		"language, or a spell ID (works in any language). Places: the zone or subzone name as the game shows it."])
-	AddControl(box)
-
-	local function Fixed()
-		local k = Source(store)
-		return k == "moment" and ns.CUSTOM_TRIGGER_MOMENTS or k == "state" and ns.CUSTOM_TRIGGER_STATES
-			or k == "key" and ns.CUSTOM_TRIGGER_KEYS or nil
-	end
-	local pick = At("Starts", Menu(parent, 200, function() return Fixed() or {} end,
-		function() return (select(2, Source(store))) end,
-		function(value)
-			SetSource(store, (Source(store)), value)
-			Saved()
-		end), x + 140)
-	ShownWhile(pick, Fixed)
-	Tooltip(pick, L["Which one. Key bindings are set in the game's Key Bindings, under Cinematic."])
-	AddControl(pick)
-
-	local here = At("Starts", ns.PanelButton(parent), x + 344)
-	here:SetSize(60, 22)
-	here:SetText(L["Here"])
-	here.searchSkip = true
-	here:SetScript("OnClick", function()
-		SetSource(store, "place", CurrentPlace())
-		Saved()
-	end)
-	ShownWhile(here, function() return Source(store) == "place" end)
-	Tooltip(here, L["Fill in the subzone you're in now (or the zone, where there's no subzone)."])
-	AddControl(here)
-
-	-- Ends: until when, how long, and its place in the priority list.
-	local untilMenu = At("Ends", Menu(parent, 150, function() return UntilChoices(store) end,
-		function() return UntilKind(store) end,
-		function(value)
-			store.set("until", value == "time" and ("time:" .. Seconds(store)) or (value ~= "move" and value or nil))
-			Saved()
-		end), x)
-	Tooltip(untilMenu, L["When its camera stops. Moving always stops it too, as it does every camera that runs " ..
-		"while you stand still."])
-	AddControl(untilMenu)
-
-	local seconds = At("Ends", Menu(parent, 80, SECOND_CHOICES, function() return Seconds(store) end,
-		function(value)
-			store.set("until", "time:" .. value)
-			Saved()
-		end), x + 160)
-	ShownWhile(seconds, function() return UntilKind(store) == "time" end)
-	Tooltip(seconds, L["How long its camera runs."])
-	AddControl(seconds)
-
-	local after = At("Ends", Menu(parent, 210, AFTER_CHOICES,
-		function()
-			local value = store.get("after")
-			return value == nil and "emote" or value
-		end,
-		function(value)
-			store.set("after", value ~= "emote" and value or nil)
-			Saved()
-		end), x + 250)
-	Tooltip(after, L["Where it comes when other triggers are on at the same time: the first one on in this " ..
-		"order plays. Going AFK while doing an emote is the AFK camera, say."])
-	AddControl(after)
+	AddControl(block)
 end
 
--- A saved trigger's drawer: its Starts and Ends lines, and a Share button
--- on its Name line. kit: At, Changed(), Tooltip, AddControl, x, shareX.
+-- A saved scene's drawer: a scene of yours' Ends and Triggers lines and a
+-- Share button on its Name line, or a built-in scene's Triggers (its own,
+-- then yours). kit: At, BlockAt, resize, Changed(), Tooltip, AddControl, x,
+-- shareX, builtinLabel (a built-in scene's own trigger's name).
 function ns.BuildCustomTriggerLines(drawer, id, kit)
-	BuildLines(drawer, RowStore(id), { At = kit.At, Tooltip = kit.Tooltip, AddControl = kit.AddControl, x = kit.x,
+	local custom = kit.builtinLabel == nil
+	BuildLines(drawer, RowStore(id), { At = custom and kit.At or nil, BlockAt = kit.BlockAt, resize = kit.resize,
+		Tooltip = kit.Tooltip, AddControl = kit.AddControl, x = kit.x, builtinLabel = kit.builtinLabel,
 		Saved = function()
 			ns.CustomTriggersChanged()
 			kit.Changed()
 		end })
+	if not custom then return end
 	local share = kit.At("Name", ns.PanelButton(drawer), kit.shareX)
 	share:SetSize(70, 22)
 	share:SetText(L["Share"])
@@ -295,19 +414,19 @@ function ns.BuildCustomTriggerLines(drawer, id, kit)
 	share:SetScript("OnClick", function()
 		ns.ShowCameraShare(ns.ExportCameraTrigger(id), (L["Share %s"]):format(ns.CustomTriggerLabel(id)))
 	end)
-	kit.Tooltip(share, L["Text to send a friend: they add this trigger (and the shot it plays) with Import on their " ..
+	kit.Tooltip(share, L["Text to send a friend: they add this scene (and the shot it plays) with Import on their " ..
 		"Cameras page. Where it may start (its When) stays with you."])
 end
 
--- The New trigger panel, above the Cameras page's rows: a trigger made in
--- it isn't one until Save, which adds it to the rows (where it sorts as the
+-- The New scene panel, above the Cameras page's rows: a scene made in it
+-- isn't one until Save, which adds it to the rows (where it sorts as the
 -- rest do). Cancel drops it. kit: width, Tooltip, onSaved(id), onShown(shown).
 -- Gives the panel; panel:Open() starts a fresh draft.
 function ns.BuildTriggerDraft(parent, kit)
-	local LINE_H, LABEL_W = 34, 62
-	local LINES = { "Name", "Camera", "Starts", "Ends", "Buttons" }
+	local LINE_H, LABEL_W, TOP = 34, 62, 26
+	local LINES = { "Name", "Camera", "Ends" }
 	local panel = CreateFrame("Frame", nil, parent)
-	panel:SetSize(kit.width, LINE_H * #LINES + 30)
+	panel:SetSize(kit.width, TOP + LINE_H * (#LINES + 2) + 8)
 	panel:Hide()
 	local back = panel:CreateTexture(nil, "BACKGROUND")
 	back:SetAllPoints()
@@ -319,28 +438,39 @@ function ns.BuildTriggerDraft(parent, kit)
 	edge:SetColorTexture(0.73, 0.89, 0.54, 0.8)
 	local title = panel:CreateFontString(nil, "OVERLAY", "GameFontNormal")
 	title:SetPoint("TOPLEFT", 10, -8)
-	title:SetText(L["New trigger"])
+	title:SetText(L["New scene"])
 
-	local data, store = {}, nil
+	local data = { triggers = {} }
+	local store = TableStore(data)
 	local own = {} -- (its controls, refreshed together)
 	local function RefreshAll() for _, control in ipairs(own) do control:Refresh() end end
 	local function At(line, control, x)
 		local index = 1
 		for i, each in ipairs(LINES) do if each == line then index = i end end
-		control:SetPoint("LEFT", panel, "TOPLEFT", x, -(26 + (index - 0.5) * LINE_H))
+		control:SetPoint("LEFT", panel, "TOPLEFT", x, -(TOP + (index - 0.5) * LINE_H))
 		return control
 	end
-	for _, line in ipairs({ "Name", "Camera", "Starts", "Ends" }) do
-		local label = At(line, panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall"), 10)
-		label:SetText(({ Name = L["Name"], Camera = L["Camera"], Starts = L["Starts"], Ends = L["Ends"] })[line])
+	local function BlockAt(line, control, x)
+		control:SetPoint("LEFT", panel, "TOPLEFT", x, -(TOP + (#LINES + line - 0.5) * LINE_H))
+		return control
 	end
+	for _, line in ipairs(LINES) do
+		local label = At(line, panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall"), 10)
+		label:SetText(({ Name = L["Name"], Camera = L["Camera"], Ends = L["Ends"] })[line])
+	end
+	BlockAt(1, panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall"), 10):SetText(L["Triggers"])
 
 	-- (What it's missing to be saved: a typed kind with nothing typed.)
-	local typed -- (the box's text as typed, before it's left)
+	local typed = {} -- (each box's text as typed, before it's left)
 	local function Ready()
-		local k, what = Source(store)
-		if HINTS[k] then what = typed or what end
-		return not HINTS[k] or (what and what:find("%S")) ~= nil
+		for i = 1, #data.triggers do
+			local k, what = Source(store, i)
+			if HINTS[k] then
+				what = typed[i] or what
+				if not what:find("%S") then return false end
+			end
+		end
+		return #data.triggers > 0
 	end
 	local save -- (below)
 
@@ -362,13 +492,13 @@ function ns.BuildTriggerDraft(parent, kit)
 	end)
 	name.Refresh = function(self)
 		if not self:HasFocus() then self:SetText(data.name or "") end
-		nameHint:SetText(ns.DescribeTriggerSource(data.source))
+		nameHint:SetText(ns.DescribeTriggerSource(data.triggers[1]))
 		nameHint:SetShown(not data.name and not self:HasFocus())
 	end
 	kit.Tooltip(name, L["A name of your own for it, shown on the rows. Empty: what starts it."])
 	own[#own + 1] = name
 
-	-- (Its camera: the standing-still ones, or a shot.)
+	-- (Its camera: the ones that run where you stand, scripts, shots.)
 	local camera = At("Camera", Menu(panel, 150, function()
 		local list = {}
 		for _, value in ipairs(ns.CameraChoiceValues(ns.CUSTOM_TRIGGER_CAMERAS)) do
@@ -407,29 +537,31 @@ function ns.BuildTriggerDraft(parent, kit)
 	Tick("CineMode", "cine", LABEL_W + 260, L["With \"Start in CineMode\" off (Cinematic's main page), its camera " ..
 		"starting brings CineMode on, and it ends with the camera."], function() return not ns.GetDB().fadeUI end)
 
-	BuildLines(panel, TableStore(data), {
-		At = At, Tooltip = kit.Tooltip, x = LABEL_W + 4,
-		AddControl = function(control) own[#own + 1] = control end,
-		Saved = function()
-			typed = nil
-			RefreshAll()
-		end,
-		typing = function(text)
-			typed = text
-			if save then save:Refresh() end
-		end,
-	})
-
-	save = At("Buttons", ns.PanelButton(panel), LABEL_W + 4)
-	save:SetSize(100, 22)
+	save = ns.PanelButton(panel)
+	save:SetSize(90, 22)
 	save:SetText(L["Save"])
 	save.Refresh = function(self) self:SetEnabled(Ready()) end
 	kit.Tooltip(save, L["Add it to the rows below, with its When set to anywhere but battlegrounds and arenas, " ..
 		"out of fights (open its row to change that)."])
-	own[#own + 1] = save
-	local cancel = At("Buttons", ns.PanelButton(panel), LABEL_W + 112)
-	cancel:SetSize(100, 22)
+	local cancel = ns.PanelButton(panel)
+	cancel:SetSize(90, 22)
 	cancel:SetText(CANCEL or L["Cancel"])
+
+	BuildLines(panel, store, {
+		At = At, BlockAt = BlockAt, Tooltip = kit.Tooltip, x = LABEL_W + 4,
+		AddControl = function(control) own[#own + 1] = control end,
+		actions = { { save, LABEL_W + 280 }, { cancel, LABEL_W + 376 } },
+		resize = function(lines) panel:SetHeight(TOP + LINE_H * (#LINES + lines) + 8) end,
+		Saved = function()
+			wipe(typed)
+			RefreshAll()
+		end,
+		typing = function(i, text)
+			typed[i] = text
+			save:Refresh()
+		end,
+	})
+	own[#own + 1] = save
 
 	function panel:Close()
 		self:Hide()
@@ -438,17 +570,17 @@ function ns.BuildTriggerDraft(parent, kit)
 	cancel:SetScript("OnClick", function() panel:Close() end)
 	save:SetScript("OnClick", function()
 		-- (The boxes as they are, even mid-typing.)
-		for _, box in ipairs({ name }) do if box:HasFocus() then box:ClearFocus() end end
 		for _, control in ipairs(own) do
 			if control.HasFocus and control:HasFocus() then control:ClearFocus() end
 		end
 		if not Ready() then return end
-		local id = ns.AddCustomTrigger(data.source, data["until"] or "move", data.camera, data.name)
+		local id = ns.AddCustomTrigger(data.triggers[1], data["until"] or "move", data.camera, data.name)
 		if not id then
-			ns.Print((L["You have %d triggers of your own already: delete one to make another."]):format(
+			ns.Print((L["You have %d scenes of your own already: delete one to make another."]):format(
 				ns.CUSTOM_TRIGGER_MAX))
 			return
 		end
+		ns.SetSceneTriggers(id, data.triggers)
 		local rows = ns.GetDB().cameraRows
 		rows[id .. ".after"] = data.after
 		rows[id .. ".music"] = data.music
@@ -458,15 +590,15 @@ function ns.BuildTriggerDraft(parent, kit)
 		kit.onSaved(id)
 	end)
 
-	-- A name to start with: My Trigger, or My Trigger (1), (2)... where one of
+	-- A name to start with: My Scene, or My Scene (1), (2)... where one of
 	-- yours has it. (You can still give two the same name.)
 	local function NextName()
 		local rows, taken = ns.GetDB().cameraRows, {}
 		for id in tostring(rows.custom or ""):gmatch("[^,]+") do
-			local own = rows[id .. ".name"]
-			if type(own) == "string" then taken[own] = true end
+			local mine = rows[id .. ".name"]
+			if type(mine) == "string" then taken[mine] = true end
 		end
-		local base = L["My Trigger"]
+		local base = L["My Scene"]
 		if not taken[base] then return base end
 		local n = 1
 		while taken[("%s (%d)"):format(base, n)] do n = n + 1 end
@@ -475,13 +607,12 @@ function ns.BuildTriggerDraft(parent, kit)
 
 	function panel:Open()
 		wipe(data)
-		data.source, data.camera, data.name = "emote:cheer", "cozy", NextName()
-		store, typed = TableStore(data), nil
+		data.triggers, data.camera, data.name = { "emote:cheer" }, "cozy", NextName()
+		wipe(typed)
 		self:Show()
-		kit.onShown(true)
 		RefreshAll()
+		kit.onShown(true)
 	end
-	store = TableStore(data)
 	return panel
 end
 
@@ -490,7 +621,7 @@ end
 function ns.ConfirmDeleteBuiltInTrigger(key, name, done)
 	if not StaticPopupDialogs.CINEMATIC_DELETE_BUILTIN_TRIGGER then
 		StaticPopupDialogs.CINEMATIC_DELETE_BUILTIN_TRIGGER = {
-			text = L["Delete the trigger %s? It starts no camera until you bring it back with Add back, above the " ..
+			text = L["Delete the scene %s? It starts no camera until you bring it back with Add back, above the " ..
 				"rows (its settings are kept)."],
 			button1 = DELETE or L["Delete"], button2 = CANCEL or L["Cancel"],
 			OnAccept = function(_, data) data() end,
@@ -498,20 +629,20 @@ function ns.ConfirmDeleteBuiltInTrigger(key, name, done)
 		}
 	end
 	StaticPopup_Show("CINEMATIC_DELETE_BUILTIN_TRIGGER", (tostring(name):gsub("|", "")), nil, function()
-		ns.SetTriggerDeleted(key, true)
+		ns.SetSceneDeleted(key, true) -- (a group's members with it)
 		done()
 	end)
 end
 
--- The Add back menu: the built-in triggers you've deleted, one to bring
+-- The Add back menu: the built-in scenes you've deleted, one to bring
 -- back (or all of them). Shown only while there are any. label(key): a
--- trigger's name; onChanged() after one comes back.
+-- scene's name; onChanged() after one comes back.
 function ns.BuildAddBackMenu(parent, label, onChanged)
 	local function Back(key)
 		if key == "all" then
-			for _, each in ipairs(ns.DeletedTriggers()) do ns.SetTriggerDeleted(each, false) end
+			for _, each in ipairs(ns.DeletedTriggers()) do ns.SetSceneDeleted(each, false) end
 		else
-			ns.SetTriggerDeleted(key, false)
+			ns.SetSceneDeleted(key, false)
 		end
 		onChanged()
 	end
@@ -545,7 +676,7 @@ end
 function ns.ConfirmRemoveCustomTrigger(id, done)
 	if not StaticPopupDialogs.CINEMATIC_REMOVE_CAMERA_TRIGGER then
 		StaticPopupDialogs.CINEMATIC_REMOVE_CAMERA_TRIGGER = {
-			text = L["Delete the trigger %s and its settings?"],
+			text = L["Delete the scene %s and its settings?"],
 			button1 = DELETE or L["Delete"], button2 = CANCEL or L["Cancel"],
 			OnAccept = function(_, data) data() end,
 			timeout = 0, whileDead = true, hideOnEscape = true,
@@ -563,9 +694,9 @@ end
 local window
 local WHY = {
 	newer = "This is from a newer Cinematic: update it to add this one.",
-	other = "That isn't a camera trigger or shot: profiles go on the Profiles page, wheels on Your wheels.",
+	other = "That isn't a scene or shot: profiles go on the Profiles page, wheels on Your wheels.",
 	broken = "That isn't all of it: copy it again, every letter.",
-	full = "No room for it: delete a trigger or shot first.",
+	full = "No room for it: delete a scene or shot first.",
 }
 local function Window()
 	if window then return window end
@@ -659,8 +790,10 @@ local function Window()
 			lines[1] = ("|cffffd100%s|r %s"):format(L["Shot:"], Safe(info.name or ""))
 			lines[2] = (L["Camera: %s"]):format(ns.CAMERA_NAMES[info.base] or info.base)
 		else
-			lines[1] = ("|cffffd100%s|r %s"):format(L["Trigger:"], Safe(info.name or ns.DescribeTriggerSource(info.source)))
-			lines[2] = (L["Starts: %s"]):format(Safe(ns.DescribeTriggerSource(info.source)))
+			lines[1] = ("|cffffd100%s|r %s"):format(L["Scene:"], Safe(info.name or ns.DescribeTriggerSource(info.source)))
+			local starts = {}
+			for _, source in ipairs(info.triggers or { info.source }) do starts[#starts + 1] = ns.DescribeTriggerSource(source) end
+			lines[2] = (L["Triggers: %s"]):format(Safe(table.concat(starts, ", ")))
 			lines[3] = (L["Camera: %s"]):format(info.shot and (L["%s (a shot of its own, added too)"]):format(
 				Safe(info.shot.name or ns.CAMERA_NAMES[info.shot.base])) or ns.CAMERA_NAMES[info.camera] or info.camera)
 		end
@@ -707,7 +840,7 @@ end
 function ns.ShowCameraImport(onAdded)
 	local w = Window()
 	w.mode, w.text, w.info, w.onAdded, w.reader = "import", nil, nil, onAdded, nil
-	w.title:SetText(L["Import a trigger or shot"])
+	w.title:SetText(L["Import a scene or shot"])
 	w.hint:SetText(L["Paste the text a friend sent (Ctrl+V). What it holds shows below before you add it."])
 	w.review:SetText("")
 	w.action:SetText(L["Add it"])

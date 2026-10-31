@@ -1,30 +1,36 @@
--- Cinematic: triggers of your own. Each starts one of the standing-still
--- cameras (cozy, vista, fish, AFK) when something happens: an emote, a spell
--- cast, a buff, a place, a moment (levelling up...), a state (mounted...) or
--- one of five key bindings. They're Cameras page rows like the built-in
--- triggers (CameraRows.lua: camera, music, CineMode, When, copies), and take
--- their place in the priority list (Triggers.lua) after a built-in source.
+-- Cinematic: scenes of your own, and triggers of yours on any scene. A scene
+-- (a Cameras page row: CameraRows.lua's camera, music, CineMode, When,
+-- copies) plays its camera when any of its triggers happens: an emote, a
+-- spell cast, a buff, a place, a moment (leveling up...), a state
+-- (mounted...) or one of five key bindings. Built-in scenes whose camera runs
+-- while you stand still can take triggers of yours beside their own. Each
+-- scene of yours takes its place in the priority list (Triggers.lua) after a
+-- built-in source; a built-in scene's extra triggers sit just after its own.
 --
 -- Saved in db.cameraRows with the rows (so profiles, Save/Reset and share
--- strings carry them): "custom" their ids (MineA, MineB...: letters only, as
--- a row id is a trigger key and a copy number), and per id:
---   source  "<kind>:<what>": emote:cheer, spell:7620 or spell:fishing,
---           aura:<id or name>, place:<zone or subzone name>,
---           moment:levelup|achievement|quest|boss|alive,
---           state:mounted|swimming|flying|indoors|outdoors|resting|stealthed|night,
---           key:1-5
---   until   move (nil), ends (as its state or cast ends), time:<sec>, key
---           (pressed again)
---   after   the built-in source it comes after (nil: "emote"; "": first)
+-- strings carry them): "custom" the ids of yours (MineA, MineB...: letters
+-- only, as a row id is a scene key and a copy number), "extras" the built-in
+-- scenes with triggers of yours, and per scene:
+--   triggers  "|" between sources, each "<kind>:<what>": emote:cheer,
+--             spell:7620 or spell:fishing, aura:<id or name>,
+--             place:<zone or subzone name>,
+--             moment:levelup|achievement|quest|boss|alive,
+--             state:mounted|swimming|flying|indoors|outdoors|resting|stealthed|night,
+--             key:1-5 (a scene of yours from before: one in "source")
+--   until     (yours) move (nil), ends (as the trigger that started it ends),
+--             time:<sec>, key (pressed again); a built-in scene's extra
+--             triggers end as their kind does on its own (KIND_UNTIL)
+--   after     (yours) the built-in source it comes after (nil: "emote"; "": first)
 --
--- Each is on for an episode: it starts as its thing happens (a state: as it
--- becomes true) and lasts until its until, or until you move (moving ends
--- every standing-still camera). A state still true after its episode ended
--- doesn't start another until it's been false.
+-- Each trigger is on for an episode: it starts as its thing happens (a state:
+-- as it becomes true) and lasts until its until, or until you move (moving
+-- ends every standing-still camera). A state still true after its episode
+-- ended doesn't start another until it's been false.
 local _, ns = ...
 local L = ns.L
 
-ns.CUSTOM_TRIGGER_MAX = 20
+ns.CUSTOM_TRIGGER_MAX = 20 -- (scenes of your own)
+ns.SCENE_TRIGGER_MAX = 6 -- (triggers in a scene)
 -- What can start one, in the editor's order (CameraTriggerEditor.lua), with
 -- the choices of the kinds that have a fixed list.
 ns.CUSTOM_TRIGGER_KINDS = {
@@ -164,55 +170,128 @@ function ns.EmoteToken(text)
 	return emoteTokens[slashed] or text:gsub("^/", "")
 end
 
--- What each trigger is doing: id -> { source, kind, what, spellID,
--- untilText, untilKind, secs, on, since, cond, done, casting, dirty, lookedAt }.
-local live = {}
-local liveOrder = {} -- (their ids in order)
-local syncedText = false
+-- A scene's triggers: a list of sources ("<kind>:<what>"). A scene of yours
+-- keeps them in "<id>.triggers" ("|" between; an older one's single
+-- "<id>.source" reads as a list of one); a built-in scene its extra ones (its
+-- own, the game's, isn't in the list), with "extras" naming those scenes.
+-- Worked out again only when the text changes; not to be changed in place.
+local listCache = {}
+local EMPTY = {}
+function ns.SceneTriggers(key)
+	local rows = Rows()
+	if not rows then return EMPTY end
+	local text = tostring(rows[key .. ".triggers"] or rows[key .. ".source"] or "")
+	local cached = listCache[key]
+	if cached and cached.text == text then return cached.list end
+	local list = {}
+	for source in text:gmatch("[^|]+") do
+		if #list < ns.SCENE_TRIGGER_MAX then list[#list + 1] = source end
+	end
+	listCache[key] = { text = text, list = list }
+	return list
+end
 
--- Reads a trigger's source and until (again only when their text changes).
-local function Parse(id, state)
+-- The built-in scenes that can take triggers of yours: those whose camera
+-- runs while you stand still (or the tele camera's, a Hearthstone's).
+function ns.SceneTakesTriggers(key)
+	local trigger = ns.CAMERA_TRIGGER and ns.CAMERA_TRIGGER[key]
+	if not trigger then return false end
+	if trigger.custom then return true end
+	for _, value in ipairs(trigger.cameras or EMPTY) do
+		if value == "cozy" or value == "tele" then return true end
+	end
+	return false
+end
+
+-- Sets a scene's triggers (a list of sources; a built-in scene's extra ones).
+function ns.SetSceneTriggers(key, list)
+	local rows = ns.GetDB().cameraRows
+	local clean = {}
+	for _, source in ipairs(list) do
+		source = tostring(source):gsub("|", "")
+		if source:find("^%a+:") and #clean < ns.SCENE_TRIGGER_MAX then clean[#clean + 1] = source end
+	end
+	rows[key .. ".triggers"] = #clean > 0 and table.concat(clean, "|") or nil
+	rows[key .. ".source"] = nil
+	local trigger = ns.CAMERA_TRIGGER[key]
+	if trigger and not trigger.custom then
+		local extras = {}
+		for _, each in ipairs(ns.CAMERA_TRIGGERS) do
+			if not each.custom and rows[each.key .. ".triggers"] then extras[#extras + 1] = each.key end
+		end
+		rows.extras = #extras > 0 and table.concat(extras, ",") or nil
+	end
+	ns.CustomTriggersChanged()
+end
+
+-- Each trigger of a scene is a unit, on for an episode of its own; a scene is
+-- on while any of its units is. Unit: { scene, index, custom (a scene of
+-- yours), source, kind, what, spellID, untilText, untilKind, secs, on, since,
+-- cond, done, casting, dirty, lookedAt, found, death, tele }.
+local units = {}
+local sceneUnits = {} -- scene key -> its units
+local needSync = false
+
+-- A built-in scene's extra trigger ends as its kind would on its own.
+local KIND_UNTIL = { emote = "move", spell = "ends", aura = "ends", place = "ends", moment = "time:5", state = "ends",
+	key = "key" }
+
+-- Reads a unit's source and until (again only when their text changes).
+local function Parse(unit)
 	local rows = Rows()
 	if not rows then return end
-	local source = tostring(rows[id .. ".source"] or "")
-	local untilText = tostring(rows[id .. ".until"] or "move")
-	if state.source == source and state.untilText == untilText then return end
-	state.source, state.untilText = source, untilText
-	local kind, what = source:match("^(%a+):(.*)$")
-	state.kind, state.what = kind, what and what:lower() or ""
-	if kind == "emote" then state.what = ns.EmoteToken(state.what) end
-	state.spellID = (kind == "spell" or kind == "aura") and tonumber(state.what) or nil
+	local source = ns.SceneTriggers(unit.scene)[unit.index]
+	if source ~= unit.source and unit.source ~= nil then
+		needSync = true -- (its scene's list changed under it: units made afresh)
+		return
+	end
+	local kind = tostring(source or ""):match("^(%a+):")
+	local untilText = unit.custom and tostring(rows[unit.scene .. ".until"] or "move") or KIND_UNTIL[kind] or "move"
+	if unit.parsed and unit.untilText == untilText then return end
+	unit.source, unit.untilText, unit.parsed = source, untilText, true
+	local what
+	kind, what = tostring(source or ""):match("^(%a+):(.*)$")
+	unit.kind, unit.what = kind, what and what:lower() or ""
+	if kind == "emote" then unit.what = ns.EmoteToken(unit.what) end
+	unit.spellID = (kind == "spell" or kind == "aura") and tonumber(unit.what) or nil
 	local secs = tonumber(untilText:match("^time:(%d+%.?%d*)$"))
-	state.untilKind = secs and "time" or untilText
-	state.secs = secs or DEFAULT_SECS
-	state.on, state.cond, state.done, state.dirty = false, nil, false, true
+	unit.untilKind = secs and "time" or untilText
+	unit.secs = secs or DEFAULT_SECS
+	unit.on, unit.cond, unit.done, unit.dirty = false, nil, false, true
 end
 
 -- Starting one: the tele camera needs a cast to spin and zoom over (a pretend
 -- one, its time long), the death camera runs as its test does (no event of
--- its own: Key leaves it out, or the AFK camera would run too).
-local function Start(state)
-	state.on, state.since, state.done = true, GetTime(), false
-	local camera = state.id and ns.TriggerSetting(state.id, "camera")
-	state.death, state.tele = camera == "death", camera == "tele"
+-- its own: SceneOn leaves it out, or the AFK camera would run too).
+local function Start(unit)
+	unit.on, unit.since, unit.done = true, GetTime(), false
+	local camera = ns.TriggerSetting(unit.scene, "camera")
+	unit.death, unit.tele = camera == "death", camera == "tele"
 	if camera == "tele" and ns.PretendDepartCast then
-		ns.PretendDepartCast(state.untilKind == "time" and state.secs or 10)
-	elseif state.death then
-		ns.deathTestUntil, ns.deathTestLoud = GetTime() + (state.untilKind == "time" and state.secs or DEATH_FOR), false
+		ns.PretendDepartCast(unit.untilKind == "time" and unit.secs or 10)
+	elseif unit.death then
+		ns.deathTestUntil, ns.deathTestLoud = GetTime() + (unit.untilKind == "time" and unit.secs or DEATH_FOR), false
 	end
 end
-local function Stop(state)
-	state.on, state.done = false, true
-	if state.death then
-		state.death = false
+local function Stop(unit)
+	unit.on, unit.done = false, true
+	if unit.death then
+		unit.death = false
 		ns.deathTestUntil = 0
 	end
+end
+-- A scene's key while one of its units is on (and not the death camera's).
+local function SceneOn(key)
+	for _, unit in ipairs(sceneUnits[key] or EMPTY) do
+		if unit.on and not unit.death then return key end
+	end
+	return nil
 end
 -- Whether one of these plays the tele camera now (its pretend cast holds
 -- while it does, Camera.lua's DepartTimeLeft).
 function ns.CustomTeleOn()
-	for _, id in ipairs(liveOrder) do
-		if live[id].on and live[id].tele then return true end
+	for _, unit in ipairs(units) do
+		if unit.on and unit.tele then return true end
 	end
 	return false
 end
@@ -220,27 +299,26 @@ end
 -- its own Die row needn't be set to it).
 function ns.CustomDeathOn()
 	if GetTime() >= (ns.deathTestUntil or 0) then return false end
-	for _, id in ipairs(liveOrder) do
-		if live[id].on and live[id].death then return true end
+	for _, unit in ipairs(units) do
+		if unit.on and unit.death then return true end
 	end
 	return false
 end
 
--- The game events the triggers need now, registered only while one does.
+-- The game events the units need now, registered only while one does.
 local watcher = CreateFrame("Frame")
 local function Watch()
 	watcher:UnregisterAllEvents()
 	local need = {}
-	for _, id in ipairs(liveOrder) do
-		local state = live[id]
-		if state.kind == "spell" then
+	for _, unit in ipairs(units) do
+		if unit.kind == "spell" then
 			for _, event in ipairs(SPELL_EVENTS) do need[event] = true end
-		elseif state.kind == "aura" then
+		elseif unit.kind == "aura" then
 			need.UNIT_AURA = true
-		elseif state.kind == "place" then
+		elseif unit.kind == "place" then
 			for _, event in ipairs(PLACE_EVENTS) do need[event] = true end
-		elseif state.kind == "moment" then
-			for _, event in ipairs(MOMENT_EVENTS[state.what] or {}) do need[event] = true end
+		elseif unit.kind == "moment" then
+			for _, event in ipairs(MOMENT_EVENTS[unit.what] or EMPTY) do need[event] = true end
 		end
 	end
 	for event in pairs(need) do
@@ -252,8 +330,8 @@ local function Watch()
 	end
 end
 
-local function MomentMatches(state, event, ...)
-	for _, each in ipairs(MOMENT_EVENTS[state.what] or {}) do
+local function MomentMatches(unit, event, ...)
+	for _, each in ipairs(MOMENT_EVENTS[unit.what] or EMPTY) do
 		if each == event then
 			if event == "ENCOUNTER_END" then return select(5, ...) == 1 end -- (won)
 			if event == "PLAYER_ALIVE" then return not ns.Flag(UnitIsDeadOrGhost("player")) end
@@ -265,53 +343,52 @@ end
 
 watcher:SetScript("OnEvent", function(_, event, ...)
 	local isCast = CAST_START[event] or CAST_END[event] or event == "UNIT_SPELLCAST_SUCCEEDED"
-	for _, id in ipairs(liveOrder) do
-		local state = live[id]
-		if state.kind == "spell" and isCast then
-			if Safe(pcall(ScanSpell, (select(3, ...)), state.spellID, state.what)) then
+	for _, unit in ipairs(units) do
+		if unit.kind == "spell" and isCast then
+			if Safe(pcall(ScanSpell, (select(3, ...)), unit.spellID, unit.what)) then
 				if CAST_START[event] then
-					state.casting = true
-					Start(state)
+					unit.casting = true
+					Start(unit)
 				elseif CAST_END[event] then
-					state.casting = false
-					if state.on and state.untilKind == "ends" then Stop(state) end
-				elseif not state.casting and not state.on then
-					Start(state) -- (an instant cast: "ends" times out, as a moment)
+					unit.casting = false
+					if unit.on and unit.untilKind == "ends" then Stop(unit) end
+				elseif not unit.casting and not unit.on then
+					Start(unit) -- (an instant cast: "ends" times out, as a moment)
 				end
 			end
-		elseif state.kind == "moment" and MomentMatches(state, event, ...) then
-			Start(state)
-		elseif state.kind == "aura" or state.kind == "place" then
-			state.dirty = true
+		elseif unit.kind == "moment" and MomentMatches(unit, event, ...) then
+			Start(unit)
+		elseif unit.kind == "aura" or unit.kind == "place" then
+			unit.dirty = true
 		end
 	end
 end)
 
 -- A state source's condition now (nil for the ones an event starts). Buffs
 -- and places are looked at again on their events, or every SLOW_LOOK.
-local function Condition(state, now)
-	local kind = state.kind
+local function Condition(unit, now)
+	local kind = unit.kind
 	if kind == "state" then
-		return StateNow(state.what)
+		return StateNow(unit.what)
 	elseif kind == "aura" or kind == "place" then
-		if state.dirty or not state.lookedAt or now - state.lookedAt >= SLOW_LOOK then
-			state.dirty, state.lookedAt = false, now
+		if unit.dirty or not unit.lookedAt or now - unit.lookedAt >= SLOW_LOOK then
+			unit.dirty, unit.lookedAt = false, now
 			if kind == "aura" then
-				state.found = Safe(pcall(ScanAuras, state.what, state.spellID))
+				unit.found = Safe(pcall(ScanAuras, unit.what, unit.spellID))
 			else
-				state.found = Safe(pcall(ScanPlace, state.what))
+				unit.found = Safe(pcall(ScanPlace, unit.what))
 			end
 		end
-		return state.found
+		return unit.found
 	end
 end
 
 -- Whether an episode on now has run its time: a set time, or "ends" for
 -- what has no end of its own (a moment, an instant cast).
-local function TimedOut(state, now)
-	local timed = state.untilKind == "time"
-		or (state.untilKind == "ends" and (state.kind == "moment" or (state.kind == "spell" and not state.casting)))
-	return timed and now - state.since >= state.secs
+local function TimedOut(unit, now)
+	local timed = unit.untilKind == "time"
+		or (unit.untilKind == "ends" and (unit.kind == "moment" or (unit.kind == "spell" and not unit.casting)))
+	return timed and now - unit.since >= unit.secs
 end
 
 local lastEmoteAt -- (the last emote's time already looked at)
@@ -321,27 +398,30 @@ local function Tick()
 	local newEmote = emote and emote.at ~= lastEmoteAt and type(emote.token) == "string" and emote.token:lower()
 	lastEmoteAt = emote and emote.at
 	local moving = ns.playerMoving and not (ns.OnTaxi and ns.OnTaxi())
-	for _, id in ipairs(liveOrder) do
-		local state = live[id]
-		Parse(id, state)
-		local cond = Condition(state, now)
+	for _, unit in ipairs(units) do
+		Parse(unit)
+		local cond = Condition(unit, now)
 		if cond ~= nil then
-			if cond and not state.cond and not state.done then Start(state) end
+			if cond and not unit.cond and not unit.done then Start(unit) end
 			if not cond then
-				if state.on and state.untilKind == "ends" then state.on = false end
-				state.done = false
+				if unit.on and unit.untilKind == "ends" then unit.on = false end
+				unit.done = false
 			end
-			state.cond = cond
+			unit.cond = cond
 		end
-		if newEmote and state.kind == "emote" then
+		if newEmote and unit.kind == "emote" then
 			-- (Another emote ends it, as the built-in emotes' cameras end.)
-			if newEmote == state.what then
-				Start(state)
-			elseif state.on then
-				Stop(state)
+			if newEmote == unit.what then
+				Start(unit)
+			elseif unit.on then
+				Stop(unit)
 			end
 		end
-		if state.on and (moving or TimedOut(state, now)) then Stop(state) end
+		if unit.on and (moving or TimedOut(unit, now)) then Stop(unit) end
+	end
+	if needSync then
+		needSync = false
+		ns.CustomTriggersChanged()
 	end
 end
 if ns.Profiled then Tick = ns.Profiled("CustomTriggers", Tick) end
@@ -357,8 +437,9 @@ ticker:SetScript("OnUpdate", function(_, elapsed)
 	end
 end)
 
--- Where a trigger sits in the priority list: just after the built-in source
--- it names, in the order the triggers are listed.
+-- Where a scene of yours sits in the priority list: just after the built-in
+-- source it names, in the order they're listed. A built-in scene's extra
+-- triggers sit just after its own source.
 local BUILT_IN_ORDER = {}
 for _, source in ipairs(ns.TRIGGER_SOURCES) do BUILT_IN_ORDER[source.id] = source.order end
 local function OrderOf(id, index)
@@ -366,51 +447,80 @@ local function OrderOf(id, index)
 	local base = after == "" and 0 or BUILT_IN_ORDER[after or "emote"] or BUILT_IN_ORDER.emote
 	return base + 1 + math.min(index, 98) / 100
 end
+local SCENE_SOURCE = { Hearth = "depart", Teleport = "depart", Logout = "logout", AFK = "afk", Weapon = "weapon",
+	Campfire = "campfire", Still = "still" }
+local function ExtraOrder(key)
+	return (BUILT_IN_ORDER[SCENE_SOURCE[key] or "emote"] or BUILT_IN_ORDER.emote) + 0.5
+end
 
--- Brings the registered triggers in line with the profile's list when it
--- changes (one added or taken off, a profile loaded).
-function ns.SyncCustomTriggers()
+-- Brings the scenes and their units in line with the profile when it
+-- changes (one added or taken off, a trigger added, a profile loaded).
+local synced = { rows = false }
+local registered = {} -- (our scenes on the page, and our priority sources)
+local sources = {}
+function ns.SyncCustomTriggers(force)
 	local rows = Rows()
 	if not rows then return end
-	local text = tostring(rows.custom or "")
-	if text == syncedText then return end
-	syncedText = text
+	if not force and synced.rows == rows and synced.custom == rows.custom and synced.extras == rows.extras then return end
+	synced.rows, synced.custom, synced.extras = rows, rows.custom, rows.extras
 	local ids, seen = {}, {}
-	for id in text:gmatch("[^,]+") do
-		-- (Never over a built-in trigger.)
+	for id in tostring(rows.custom or ""):gmatch("[^,]+") do
+		-- (Never over a built-in scene.)
 		local taken = ns.CAMERA_TRIGGER[id] and not ns.CAMERA_TRIGGER[id].custom
 		if id:find("^%a+$") and not taken and not seen[id] and #ids < ns.CUSTOM_TRIGGER_MAX then
 			seen[id] = true
 			ids[#ids + 1] = id
 		end
 	end
-	for _, id in ipairs(liveOrder) do
+	for id in pairs(registered) do
 		if not seen[id] then
 			ns.UnregisterCameraTrigger(id)
-			ns.UnregisterTriggerSource("custom:" .. id)
-			live[id] = nil
+			registered[id] = nil
 		end
 	end
-	wipe(liveOrder)
+	for _, id in ipairs(sources) do ns.UnregisterTriggerSource(id) end
+	wipe(sources)
+	-- (Units kept where their trigger's the same: an episode on carries on.)
+	local old = {}
+	for _, unit in ipairs(units) do old[unit.scene .. "#" .. unit.index .. "#" .. tostring(unit.source)] = unit end
+	wipe(units)
+	wipe(sceneUnits)
+	local function AddUnits(key, custom)
+		local list = {}
+		for index, source in ipairs(ns.SceneTriggers(key)) do
+			local unit = old[key .. "#" .. index .. "#" .. source] or { scene = key, index = index }
+			unit.custom = custom
+			list[#list + 1] = unit
+			units[#units + 1] = unit
+			Parse(unit)
+		end
+		sceneUnits[key] = list
+	end
 	for i, id in ipairs(ids) do
-		local state = live[id] or {}
-		live[id], liveOrder[i] = state, id
-		state.id = id
 		if not ns.CAMERA_TRIGGER[id] then
 			ns.RegisterCameraTrigger({ key = id, custom = true, cameras = CAMERAS, off = "none", music = true,
 				cine = true })
 		end
-		Parse(id, state)
+		registered[id] = true
+		AddUnits(id, true)
+		sources[#sources + 1] = "custom:" .. id
 		ns.RegisterTriggerSource({ id = "custom:" .. id, order = OrderOf(id, i), custom = id,
-			Key = function() return state.on and not state.death and id or nil end })
+			Key = function() return SceneOn(id) end })
+	end
+	for key in tostring(rows.extras or ""):gmatch("[^,]+") do
+		if ns.SceneTakesTriggers(key) and not sceneUnits[key] then
+			AddUnits(key, false)
+			sources[#sources + 1] = "extra:" .. key
+			ns.RegisterTriggerSource({ id = "extra:" .. key, order = ExtraOrder(key), extra = key,
+				Key = function() return SceneOn(key) end })
+		end
 	end
 	Watch()
-	ticker:SetShown(#liveOrder > 0)
+	ticker:SetShown(#units > 0)
 end
--- (A trigger's source or place in the list changed: worked out afresh.)
+-- (A scene's triggers or place in the list changed: worked out afresh.)
 function ns.CustomTriggersChanged()
-	syncedText = false
-	ns.SyncCustomTriggers()
+	ns.SyncCustomTriggers(true)
 end
 
 -- What starts a trigger, in words: "/cheer", "Cast Fishing", "Mounted"...
@@ -438,20 +548,19 @@ function ns.DescribeTriggerSource(source)
 	return tostring(source or "?")
 end
 
--- A trigger's name for the page and logs: your own, else what starts it.
+-- A scene of yours' name for the page and logs: your own, else what starts it.
 function ns.CustomTriggerLabel(id)
 	local rows = Rows()
 	local name = rows and rows[id .. ".name"]
 	if type(name) == "string" and name:find("%S") then return name end
-	return ns.DescribeTriggerSource(rows and rows[id .. ".source"])
+	return ns.DescribeTriggerSource(ns.SceneTriggers(id)[1])
 end
 
--- Whether a custom spell trigger is on with its cast going: the cast isn't
--- busy casting then (as fishing isn't), so its camera can run.
+-- Whether a spell trigger is on with its cast going: the cast isn't busy
+-- casting then (as fishing isn't), so its scene's camera can run.
 function ns.CustomCastCounts()
-	for _, id in ipairs(liveOrder) do
-		local state = live[id]
-		if state.kind == "spell" and state.on and state.casting and ns.TriggerHasCamera(id) then return true end
+	for _, unit in ipairs(units) do
+		if unit.kind == "spell" and unit.on and unit.casting and ns.TriggerHasCamera(unit.scene) then return true end
 	end
 	return false
 end
@@ -460,24 +569,28 @@ end
 -- to that key, or stop them if they're on.
 function Cinematic_CustomTrigger(n)
 	local what = tostring(n)
-	for _, id in ipairs(liveOrder) do
-		local state = live[id]
-		if state.kind == "key" and state.what == what then
-			if state.on then Stop(state) else Start(state) end
+	for _, unit in ipairs(units) do
+		if unit.kind == "key" and unit.what == what then
+			if unit.on then Stop(unit) else Start(unit) end
 		end
 	end
 end
 
--- For the camera mode log: what set a custom trigger off.
+-- For the camera mode log: what set a scene's trigger of yours off.
 function ns.CustomTriggerDetail(key)
-	local state = live[key]
-	if not state then return nil end
-	return ("custom %s (%s, until %s), %.0f sec in"):format(ns.CustomTriggerLabel(key), tostring(state.source),
-		tostring(state.untilText), state.since and GetTime() - state.since or 0)
+	for _, unit in ipairs(sceneUnits[key] or EMPTY) do
+		if unit.on then
+			return ("trigger %s of %s (until %s), %.0f sec in"):format(tostring(unit.source),
+				ns.CAMERA_TRIGGER[key] and ns.CAMERA_TRIGGER[key].custom and ns.CustomTriggerLabel(key) or key,
+				tostring(unit.untilText), GetTime() - (unit.since or GetTime()))
+		end
+	end
+	return nil
 end
 
--- A new trigger: its id (nil with all taken). Starts with the camera given
--- (cozy), no music, anywhere but battlegrounds and arenas, out of fights.
+-- A new scene of yours with one trigger: its id (nil with all taken). Starts
+-- with the camera given (cozy), no music, anywhere but battlegrounds and
+-- arenas, out of fights.
 function ns.AddCustomTrigger(source, untilText, camera, name)
 	local db = ns.GetDB()
 	local rows = db.cameraRows
@@ -496,7 +609,7 @@ function ns.AddCustomTrigger(source, untilText, camera, name)
 		end
 	end
 	if not id then return nil end
-	rows[id .. ".source"] = source
+	rows[id .. ".triggers"] = tostring(source):gsub("|", "")
 	rows[id .. ".until"] = untilText ~= "move" and untilText or nil
 	rows[id .. ".camera"] = camera or "cozy"
 	rows[id .. ".name"] = name
@@ -510,7 +623,7 @@ function ns.AddCustomTrigger(source, untilText, camera, name)
 	return id
 end
 
--- Takes a trigger off, with its copies and all their settings.
+-- Takes a scene of yours off, with its copies and all their settings.
 function ns.RemoveCustomTrigger(id)
 	local db = ns.GetDB()
 	local rows = db.cameraRows
@@ -519,7 +632,8 @@ function ns.RemoveCustomTrigger(id)
 			if each ~= id then ns.RemoveCameraRow(each) end
 		end
 	end
-	for _, field in ipairs({ "camera", "music", "cine", "name", "always", "calm", "off", "source", "until", "after" }) do
+	for _, field in ipairs({ "camera", "music", "cine", "name", "always", "calm", "off", "source", "triggers", "until",
+		"after" }) do
 		rows[id .. "." .. field] = nil
 	end
 	for _, list in ipairs(ns.CAMERA_ROW_LISTS) do
@@ -542,22 +656,21 @@ function ns.RemoveCustomTrigger(id)
 	end
 end
 
--- For /cine debug triggers: each one, what starts it, whether it's on and
--- why, its place in the priority list and the row it goes by.
+-- For /cine debug triggers: each trigger of yours (and the extra ones on
+-- built-in scenes), whether it's on and why, its scene's place in the
+-- priority list and the row it goes by.
 function ns.DescribeCustomTriggers()
 	local lines = {}
-	local rows = Rows() or {}
-	for _, id in ipairs(liveOrder) do
-		local state = live[id]
+	for _, unit in ipairs(units) do
 		local order = "-"
 		for _, each in ipairs(ns.TRIGGER_SOURCES) do
-			if each.custom == id then order = ("%.2f"):format(each.order) end
+			if each.custom == unit.scene or each.extra == unit.scene then order = ("%.2f"):format(each.order) end
 		end
-		lines[#lines + 1] = ("%s \"%s\": %s until %s, after %s (order %s) - %s%s%s, cond %s, row %s -> %s"):format(id,
-			ns.CustomTriggerLabel(id), tostring(state.source), tostring(state.untilText),
-			tostring(rows[id .. ".after"] or "emote"), order, state.on and "ON" or "off",
-			state.done and ", done" or "", state.casting and ", casting" or "", tostring(state.cond),
-			tostring(ns.TriggerRowNow(id)), tostring(ns.TriggerSetting(id, "camera")))
+		lines[#lines + 1] = ("%s #%d \"%s\": %s until %s (order %s) - %s%s%s, cond %s, row %s -> %s"):format(
+			unit.scene, unit.index, unit.custom and ns.CustomTriggerLabel(unit.scene) or "built-in", tostring(unit.source),
+			tostring(unit.untilText), order, unit.on and "ON" or "off", unit.done and ", done" or "",
+			unit.casting and ", casting" or "", tostring(unit.cond), tostring(ns.TriggerRowNow(unit.scene)),
+			tostring(ns.TriggerSetting(unit.scene, "camera")))
 	end
 	return lines
 end

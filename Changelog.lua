@@ -16,9 +16,10 @@ ns.CHANGELOG_FEATURES = {
 		"as you log in (\"Last time: Darkshore · 3 quests done · reached level 24\"), the time of day, a place " ..
 		"under attack, and the death banner, each with its own tick and a Test button. Combat Vision is now " ..
 		"called Battle Vision." },
-	{ date = "2026-10-31", page = "Cameras", title = "Triggers and shots of your own",
-		text = "Make your own camera triggers on the Cameras page: an emote, a spell, a buff, a place, a moment " ..
-		"or a key can start a camera. On My Shots, set how a camera sways and zooms, and share either with a " ..
+	{ date = "2026-10-31", page = "Cameras", title = "Scenes and shots of your own",
+		text = "Make your own camera scenes on the Cameras page: an emote, a spell, a buff, a place, a moment or " ..
+		"a key can start one, and a scene can have several triggers. The built-in ones are grouped by camera and " ..
+		"take triggers of yours too. On My Shots, set how a camera sways and zooms, and share either with a " ..
 		"friend." },
 	{ date = "2026-10-30", page = "Help", title = "Help page",
 		text = "Links to the guidebook, troubleshooting and the bug report form, how to send your log with " ..

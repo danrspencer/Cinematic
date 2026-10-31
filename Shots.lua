@@ -193,7 +193,10 @@ end
 function ns.RemoveShot(id)
 	local rows = ns.GetDB().cameraRows
 	local base = ns.ShotBaseOf(id)
-	for _, row in ipairs(ns.ShotUsers(id)) do ns.SetCameraRowValue(row, "camera", base) end
+	for _, row in ipairs(ns.ShotUsers(id)) do
+		-- (A group's row: its members too.)
+		ns.EditScene(row, function() ns.SetCameraRowValue(row, "camera", base) end)
+	end
 	rows[id .. ".name"], rows[id .. ".base"], rows[id .. ".num"] = nil, nil, nil
 	for _, setting in ipairs(ns.SHOT_SETTINGS) do rows[id .. "." .. setting.key] = nil end
 	local list = {}
@@ -328,7 +331,7 @@ local MAX_NAME, MAX_SOURCE = 40, 120
 local UNTIL_OK = { move = true, ends = true, key = true }
 local AFTER_OK = { [""] = true, depart = true, logout = true, afk = true, byFire = true, emote = true,
 	weapon = true, campfire = true, still = true }
-local CAMERA_OK = { cozy = true, vista = true, fish = true, afk = true, none = true }
+local CAMERA_OK = { cozy = true, vista = true, fish = true, afk = true, tele = true, death = true, none = true }
 
 local function ShotData(id)
 	local settings = {}
@@ -344,8 +347,13 @@ function ns.ExportCameraTrigger(id)
 	local rows = Rows()
 	local camera = ns.CameraRowValue(id, "camera")
 	local shot = ns.ShotOf(camera)
+	-- (Its triggers as t1, t2...: the text's tables take named keys. source:
+	-- the first, for a Cinematic from before scenes had several.)
+	local triggers = {}
+	for i, source in ipairs(ns.SceneTriggers(id)) do triggers["t" .. i] = source end
 	return Pack({
-		kind = "trigger", name = rows[id .. ".name"], source = rows[id .. ".source"], ["until"] = rows[id .. ".until"],
+		kind = "trigger", name = rows[id .. ".name"], source = ns.SceneTriggers(id)[1], triggers = triggers,
+		["until"] = rows[id .. ".until"],
 		after = rows[id .. ".after"], camera = shot and "shot" or camera,
 		music = ns.CameraRowValue(id, "music") and true or nil, cine = ns.CameraRowValue(id, "cine") and true or nil,
 		shot = shot and ShotData(shot) or nil,
@@ -381,15 +389,24 @@ function ns.ReadCameraShare(text)
 		shot.kind = "shot"
 		return shot
 	elseif data.kind == "trigger" then
-		local source = Clean(data.source, MAX_SOURCE)
-		if not source or not source:find("^%a+:.") then return nil, "broken" end
+		local triggers = {}
+		for i = 1, ns.SCENE_TRIGGER_MAX do
+			local source = Clean(type(data.triggers) == "table" and data.triggers["t" .. i] or nil, MAX_SOURCE)
+			if source and source:find("^%a+:.") then triggers[#triggers + 1] = source end
+		end
+		if #triggers == 0 then
+			local source = Clean(data.source, MAX_SOURCE)
+			if source and source:find("^%a+:.") then triggers[1] = source end
+		end
+		if #triggers == 0 then return nil, "broken" end
 		local untilText = data["until"]
 		if not (UNTIL_OK[untilText] or (type(untilText) == "string" and untilText:find("^time:%d+$"))) then
 			untilText = nil
 		end
 		local shot = data.camera == "shot" and CleanShot(data.shot) or nil
 		return {
-			kind = "trigger", name = Clean(data.name, MAX_NAME), source = source, ["until"] = untilText,
+			kind = "trigger", name = Clean(data.name, MAX_NAME), source = triggers[1], triggers = triggers,
+			["until"] = untilText,
 			after = AFTER_OK[data.after] and data.after or nil,
 			camera = shot and "shot" or (CAMERA_OK[data.camera] and data.camera or "cozy"),
 			music = data.music == true, cine = data.cine == true, shot = shot,
@@ -419,6 +436,7 @@ function ns.AddCameraShare(info)
 	end
 	local id = ns.AddCustomTrigger(info.source, info["until"] or "move", camera, info.name)
 	if not id then return nil, "full" end
+	ns.SetSceneTriggers(id, info.triggers or { info.source })
 	local rows = ns.GetDB().cameraRows
 	rows[id .. ".after"] = info.after
 	rows[id .. ".music"] = info.music or nil

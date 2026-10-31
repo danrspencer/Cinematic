@@ -172,6 +172,36 @@ if arg[1] then
 	if not back or ns.CameraRowValue("AFK", "camera") ~= afkCamera or ns.GetDB().cameraRows.deleted ~= nil then
 		Problem("Add back didn't bring it back as it was")
 	end
+	-- Built-in scenes grouped by camera (CameraRows' SCENE_GROUPS): the cozy
+	-- ones are one row to start with, an edit to it reaches every member, a
+	-- member set apart is a row of its own, and deleting the group lists it
+	-- once for Add back.
+	local function GroupProblem(text) print("problem\tScene groups: " .. text) end
+	local function Listed(id)
+		for _, each in ipairs(ns.CameraRowOrder()) do
+			if each == id then return true end
+		end
+	end
+	ns.SceneGroupState()
+	if not (Listed("Campfire") and not Listed("Dance") and ns.SceneLead("Dance") == "Campfire") then
+		GroupProblem("the cozy triggers aren't one scene to start with")
+	end
+	local danceCamera = ns.CameraRowValue("Dance", "camera")
+	ns.EditScene("Campfire", function() ns.SetCameraRowValue("Campfire", "music", true) end)
+	if ns.CameraRowValue("Dance", "music") ~= true or Listed("Dance") then GroupProblem("an edit didn't reach a member") end
+	ns.EditScene("Campfire", function() ns.SetCameraRowValue("Campfire", "music", ns.DEFAULTS.eventCampfireMusic) end)
+	ns.SetCameraRowValue("Dance", "camera", "fish")
+	ns.CameraRowsChanged()
+	if not Listed("Dance") then GroupProblem("a member set apart isn't a row of its own") end
+	ns.SetCameraRowValue("Dance", "camera", danceCamera)
+	ns.CameraRowsChanged()
+	ns.SetSceneDeleted("Campfire", true)
+	local deletedList = ns.DeletedTriggers()
+	if #deletedList ~= 1 or deletedList[1] ~= "Campfire" then
+		GroupProblem("Add back lists " .. table.concat(deletedList, ",") .. ", not the group once")
+	end
+	ns.SetSceneDeleted("Campfire", false)
+	if #ns.DeletedTriggers() ~= 0 or Listed("Dance") then GroupProblem("the group didn't come back whole") end
 	-- My Shots (Shots.lua): a shot follows its camera's numbers until given its
 	-- own, a row set to one goes by its camera's mode, a trigger shared with
 	-- its shot comes back whole, a tampered string is clamped or refused, and
