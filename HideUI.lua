@@ -6,6 +6,7 @@
 -- size and scale, then go back when UIParent shows again (by this key,
 -- Blizzard's own, or anything else).
 local _, ns = ...
+local L = ns.L
 
 local overlays = {}  -- frame -> { parent, strata, level }
 local holder
@@ -103,4 +104,61 @@ function ns.ToggleUI()
 	if UIParent:IsShown() then
 		Restore() -- shown, or the hide was blocked
 	end
+end
+
+-- The screenshot key: the shot as Hide UI would show it (tint, letterbox,
+-- vignette, depth of field, time-of-day title), then the UI straight back.
+-- Hidden by the Hide UI key (or the game's) already, it stays hidden after.
+--
+-- Hiding waits a frame before the shot so the hidden UI has been drawn. The
+-- game's "Screen captured" line comes once the shot is taken, so it's never
+-- in it; one still fading from the last shot is hidden first. Bringing the
+-- UI back waits for the game to say the shot is done (or failed), with a
+-- timeout in case it never says, so the UI can't be left hidden.
+local SHOT_TIMEOUT = 3 -- seconds
+local shotPending = false -- a shot asked for and not done yet
+local shotHidUI = false   -- ...and the UI hidden for it (to bring back)
+local shotTimer
+
+local function ShotDone()
+	if not shotPending then
+		return
+	end
+	shotPending = false
+	if shotTimer then
+		shotTimer:Cancel()
+		shotTimer = nil
+	end
+	-- (Unless something brought the UI back in the meantime: Blizzard's key.)
+	if shotHidUI and not UIParent:IsShown() then
+		ns.ToggleUI()
+	end
+	shotHidUI = false
+end
+
+local shotWatcher = CreateFrame("Frame")
+for _, event in ipairs({ "SCREENSHOT_SUCCEEDED", "SCREENSHOT_FAILED" }) do
+	pcall(shotWatcher.RegisterEvent, shotWatcher, event)
+end
+shotWatcher:SetScript("OnEvent", ShotDone)
+
+function ns.TakeScreenshot()
+	if shotPending then
+		return
+	end
+	-- (UIParent can't be hidden in a fight.)
+	if InCombatLockdown() then
+		ns.Print(L["can't hide the UI for a screenshot in a fight: try again once it's over"])
+		return
+	end
+	shotPending = true
+	if ActionStatus then
+		ActionStatus:Hide() -- (the game shows it again for this shot's line)
+	end
+	shotHidUI = UIParent:IsShown()
+	if shotHidUI then
+		ns.ToggleUI()
+	end
+	shotTimer = C_Timer.NewTimer(SHOT_TIMEOUT, ShotDone)
+	C_Timer.After(0, Screenshot)
 end
