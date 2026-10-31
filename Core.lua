@@ -1276,7 +1276,7 @@ for page, keys in pairs({
 	handleVision = { "minimapVisions", "handleHealVision", "questVision", "rollWindow", "duelPlates",
 		"lowHealth", "combatVision", "storyVision" },
 	duelPlates = { "duelCC" }, -- Duel Vision's page
-	storyVision = { "timeOfDayMessage", "timeOfDayChange", "chatAttackAlert", "deathBannerStyle" }, -- Story Vision's rows
+	storyVision = { "storyRecap", "timeOfDayMessage", "timeOfDayChange", "chatAttackAlert", "deathBannerStyle" }, -- Story Vision's rows
 	visualEffects = { "letterboxPage", "tintPage" }, -- (the Letterbox and Tint pages' switches)
 }) do
 	for _, key in ipairs(keys) do PAGE_SWITCH[key] = page end
@@ -6009,8 +6009,18 @@ ticker:SetScript("OnEvent", ns.Profiled("Core events", function(self, event, arg
 		C_Timer.After(1, CheckMoving) -- (the speed can read 0 for a moment while loading)
 		-- arg1 is isInitialLogin (a real login), arg2 isReloadingUi (a /reload).
 		-- Other loading screens never start straight in cinematic mode.
-		if (arg1 or arg2) and ns.Setting("timeOfDayMessage") and ns.ProfileChosen() then
-			ns.ShowTimeOfDayTitle()
+		-- Under the zone name: the time of day, and on a real login out of combat
+		-- what you did last time (Story Vision's rows; Recap.lua starts a new
+		-- session either way).
+		if arg1 or arg2 then
+			local recap = ns.RecapLogin and ns.RecapLogin(arg1)
+			if not ns.Setting("storyRecap") or InCombatLockdown() or UnitAffectingCombat("player") then
+				recap = nil
+			end
+			local timeOfDay = ns.Setting("timeOfDayMessage")
+			if (timeOfDay or recap) and ns.ProfileChosen() then
+				ns.ShowTimeOfDayTitle(timeOfDay, recap)
+			end
 		end
 		if arg1 or arg2 then
 			lastBusy = GetTime()

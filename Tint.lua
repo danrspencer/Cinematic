@@ -1458,12 +1458,17 @@ end)
 
 -- Time-of-day title: a line such as "Dusk" under the game's own zone name
 -- when you log in or reload. It's a child of the zone text frame, so it fades
--- in and out with it, and is cleared once the zone text hides.
+-- in and out with it, and is cleared once the zone text hides. Under it on a
+-- real login, smaller and dimmer, Story Vision's Last time line (Recap.lua),
+-- in the title's place if the title is off.
 local TIME_TITLES = {
 	{ 5, "Dawn" }, { 8, "Morning" }, { 12, "Midday" }, { 14, "Afternoon" },
 	{ 17, "Evening" }, { 19, "Dusk" }, { 21, "Night" },
 }
 local timeTitle
+local RECAP_SCALE = 0.5 -- the Last time line's size, of the subzone font's (the title's: 0.75)
+local RECAP_COLOR = { 0.92, 0.89, 0.82, 0.62 } -- soft white, dim: a footnote beside the zone's own colors
+local RECAP_GAP = 6 -- under the title
 
 local function TimeTitleAt(hour)
 	local title = "Night" -- before dawn
@@ -1501,9 +1506,11 @@ local function PlaceTimeTitle()
 			-- Scaled rather than set by file, which would keep only the Latin
 			-- letters (a Russian title on an English client showed boxes).
 			timeTitle.text:SetTextScale(0.75)
+			timeTitle.recap:SetTextScale(RECAP_SCALE)
 			timeTitle.sized = true
 		elseif font then
 			timeTitle.text:SetFont(font, math.floor(size * 0.75 + 0.5), flags)
+			timeTitle.recap:SetFont(font, math.floor(size * RECAP_SCALE + 0.5), flags)
 			timeTitle.sized = true
 		end
 	end
@@ -1516,9 +1523,21 @@ local function PlaceTimeTitle()
 		timeTitle.text:ClearAllPoints()
 		timeTitle.text:SetPoint("TOP", UIParent, "BOTTOM", 0, y)
 	end
+	-- The Last time line under the title, or in its place.
+	local underTitle = (timeTitle.text:GetText() or "") ~= ""
+	if timeTitle.recapUnder ~= underTitle or not underTitle and timeTitle.recapY ~= y then
+		timeTitle.recapUnder, timeTitle.recapY = underTitle, y
+		timeTitle.recap:ClearAllPoints()
+		if underTitle then
+			timeTitle.recap:SetPoint("TOP", timeTitle.text, "BOTTOM", 0, -RECAP_GAP)
+		else
+			timeTitle.recap:SetPoint("TOP", UIParent, "BOTTOM", 0, y)
+		end
+	end
 end
 
-function ns.ShowTimeOfDayTitle()
+-- showTime: the time of day's name; recap: the Last time line, or nil.
+function ns.ShowTimeOfDayTitle(showTime, recap)
 	if not (ZoneTextFrame and ZoneTextString) then
 		return
 	end
@@ -1530,23 +1549,37 @@ function ns.ShowTimeOfDayTitle()
 		-- then sizes it to match the zone text.
 		timeTitle.text:SetFontObject(_G.SubZoneTextFont or GameFontNormalLarge)
 		timeTitle.text:SetShadowOffset(1, -1)
-		ZoneTextFrame:HookScript("OnHide", function() timeTitle.text:SetText("") end)
+		timeTitle.recap = timeTitle:CreateFontString(nil, "OVERLAY")
+		timeTitle.recap:SetFontObject(_G.SubZoneTextFont or GameFontNormalLarge)
+		timeTitle.recap:SetShadowOffset(1, -1)
+		timeTitle.recap:SetTextColor(RECAP_COLOR[1], RECAP_COLOR[2], RECAP_COLOR[3])
+		timeTitle.recap:SetAlpha(RECAP_COLOR[4])
+		local function Clear()
+			timeTitle.text:SetText("")
+			timeTitle.recap:SetText("")
+		end
+		ZoneTextFrame:HookScript("OnHide", Clear)
+		-- Never in a fight: the Last time line goes as one starts.
+		timeTitle:RegisterEvent("PLAYER_REGEN_DISABLED")
+		timeTitle:SetScript("OnEvent", function() timeTitle.recap:SetText("") end)
+		timeTitle.Clear = Clear
 		-- Only runs while the zone title shows (this frame is its child).
 		timeTitle:SetScript("OnUpdate", function()
-			if (timeTitle.text:GetText() or "") ~= "" then
+			if (timeTitle.text:GetText() or "") ~= "" or (timeTitle.recap:GetText() or "") ~= "" then
 				PlaceTimeTitle()
 			end
 		end)
 	end
 	db = db or ns.GetDB()
 	local _, _, hour = TimeOfDayColor()
+	timeTitle.text:SetText(showTime and L[TimeTitleAt(hour)] or "")
+	timeTitle.recap:SetText(recap or "")
 	PlaceTimeTitle()
-	timeTitle.text:SetText(L[TimeTitleAt(hour)])
 	-- If the zone name never showed, don't leave the title waiting for the
 	-- next zone change.
 	C_Timer.After(10, function()
 		if not ns.Flag(ZoneTextFrame:IsShown()) then
-			timeTitle.text:SetText("")
+			timeTitle.Clear()
 		end
 	end)
 end

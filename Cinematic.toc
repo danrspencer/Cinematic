@@ -102,6 +102,7 @@ CombatSounds.lua
 CombatSoundRules.lua
 CombatVision.lua
 StoryVision.lua
+Recap.lua
 QuestTalkStyle.lua
 BubbleStyle.lua
 TooltipStyle.lua

@@ -1,8 +1,8 @@
 -- Story Vision: words that fade in on the screen at moments in your session
--- that aren't your own fights (those are Battle Vision's): the time of day,
--- a place under attack, your death. Each moment's code stays where it was
+-- that aren't your own fights (those are Battle Vision's): what you did last
+-- time, the time of day, a place under attack, your death. Each moment's code stays where it was
 -- (Tint.lua draws the titles and the death banner, Chat.lua hears the
--- attacks); this page gathers their switches, so you can find what shows on
+-- attacks, Recap.lua keeps the last session's counts); this page gathers their switches, so you can find what shows on
 -- your screen and turn it off in one place. Its rows are under storyVision
 -- (Core.lua's PAGE_SWITCH), itself under Enable Visions.
 
@@ -48,12 +48,24 @@ function ns.CreateStoryVisionPanel(kit)
 	local title = kit.Label(content, "GameFontNormalLarge", L["Story Vision"])
 	title:SetPoint("TOPLEFT", 16, -16)
 	local intro = kit.PageIntro(content, title,
-		L["Words that fade in on the screen at moments in your session that aren't your own fights: the " ..
-		"time of day, a place under attack, your death. (Fights and bosses: Battle Vision.)"])
+		L["Words that fade in on the screen at moments in your session that aren't your own fights: what " ..
+		"you did last time, the time of day, a place under attack, your death. (Fights and bosses: Battle " ..
+		"Vision.)"])
 	local switch = kit.PageSwitch(content, "storyVision", L["Enable Page"],
 		L["On: each moment below shows as ticked. Off: none of them do, and each keeps its tick for when you " ..
 		"turn this back on."], intro)
 	local stack = kit.Stack(switch, "check", true) -- (inline: the death banner's name beside its dropdown)
+
+	local recap = stack:Add(kit.Check(content, "storyRecap", L["Last time"],
+		L["On a real login (not a reload), a line under the zone name saying what you did last time you " ..
+		"played: where you spent the most time, quests done, a level reached and bosses killed, such as " ..
+		"\"Last time: Darkshore · 3 quests done · reached level 24\". Only what happened, and nothing if " ..
+		"nothing did; never in a fight, nor after more than two weeks away."]), "check")
+	local recapTest = TestButton(kit, content, recap, function()
+		local line = ns.RecapPreview()
+		ns.Print(line or L["Last time: nothing to say yet this session (no quests, level or bosses)."])
+	end)
+	kit.Tooltip(recapTest, L["Says in chat what your next login would show, from this session so far."])
 
 	stack:Add(kit.Check(content, "timeOfDayMessage", L["Time of day at login"],
 		L["Dawn, Morning, Midday, Afternoon, Evening, Dusk or Night, under the zone name when you log in or " ..

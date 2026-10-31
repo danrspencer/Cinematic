@@ -12,9 +12,10 @@ local _, ns = ...
 
 ns.CHANGELOG_FEATURES = {
 	{ date = "2026-10-31", page = "Story Vision", title = "Story Vision",
-		text = "A new Vision for the words that fade in on your screen between fights: the time of day at login " ..
-		"and as it changes, a place under attack, and the death banner, each with its own tick and a Test " ..
-		"button. Combat Vision is now called Battle Vision." },
+		text = "A new Vision for the words that fade in on your screen between fights: what you did last time " ..
+		"as you log in (\"Last time: Darkshore · 3 quests done · reached level 24\"), the time of day, a place " ..
+		"under attack, and the death banner, each with its own tick and a Test button. Combat Vision is now " ..
+		"called Battle Vision." },
 	{ date = "2026-10-31", page = "Cameras", title = "Triggers and shots of your own",
 		text = "Make your own camera triggers on the Cameras page: an emote, a spell, a buff, a place, a moment " ..
 		"or a key can start a camera. On My Shots, set how a camera sways and zooms, and share either with a " ..

@@ -177,6 +177,7 @@ local function PrintDebugHelp()
 	print("  /cine doftest [seconds|strength <0-100>] - show the depth-of-field edge haze (30; again to stop)")
 	print("  /cine timetest [name] - show the time-of-day change title now (all: each in turn)")
 	print("  /cine attacktest [text] - show a LocalDefense attack warning now")
+	print("  /cine recaptest - the Last time line your next login would show, and this session's counts")
 	print("  /cine tinttest [seconds] - each time of day's tint with its title, AFK camera on (8 each; again to stop)")
 	print("  /cine soundtest <id> - play a game sound by its ID (stops after 10 seconds)")
 	print("  /cine songtest [file ID] - play a random death song, or any music file (again to stop)")
@@ -771,6 +772,22 @@ local function HandleSlash(msg)
 		end
 		local text = arg ~= "" and (arg:gsub("^%l", string.upper)) or nil
 		ns.TestTimeChangeTitle(text)
+	elseif cmd == "recaptest" then
+		-- Story Vision's Last time: this session so far, as the next login would
+		-- show it, with the counts and whether it would show at all.
+		local line, session = ns.RecapPreview()
+		ns.Print("next login would show: " .. (line or "nothing (no quests, level or bosses yet)"))
+		if session then
+			local zones = {}
+			for name, seconds in pairs(session.zones or {}) do
+				zones[#zones + 1] = ("%s %dm"):format(name, seconds / 60)
+			end
+			print(("  quests %s, level %s, bosses %s, last zone %s, zones: %s"):format(tostring(session.quests),
+				tostring(session.level), tostring(session.bosses), tostring(session.lastZone),
+				#zones > 0 and table.concat(zones, ", ") or "none counted yet"))
+		end
+		print(("  Last time row %s, Story Vision %s, in combat %s"):format(tostring(ns.Setting("storyRecap")),
+			tostring(ns.Setting("storyVision")), tostring(InCombatLockdown())))
 	elseif cmd == "attacktest" then
 		-- Shows an attack warning now, as LocalDefense would (here, or the text given,
 		-- taken before lowercasing).

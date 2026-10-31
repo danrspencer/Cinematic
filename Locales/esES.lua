@@ -4435,7 +4435,17 @@ L["Bring back a built-in trigger you deleted, with its settings as they were."] 
 L["Story Vision"] = "Visión de historia"
 L["Opens the Story Vision page."] = "Abre la página de Visión de historia."
 L["Shows it now, to see how it looks."] = "Lo muestra ahora, para ver cómo queda."
-L["Words that fade in on the screen at moments in your session that aren't your own fights: the time of day, a place under attack, your death. (Fights and bosses: Battle Vision.)"] = "Palabras que aparecen en pantalla en momentos de tu sesión que no son tus propios combates: la hora del día, un lugar bajo ataque, tu muerte. (Combates y jefes: Visión de batalla.)"
+L["Words that fade in on the screen at moments in your session that aren't your own fights: what you did last time, the time of day, a place under attack, your death. (Fights and bosses: Battle Vision.)"] = "Palabras que aparecen en pantalla en momentos de tu sesión que no son tus propios combates: lo que hiciste la última vez, la hora del día, un lugar bajo ataque, tu muerte. (Combates y jefes: Visión de batalla.)"
+L["Last time"] = "La última vez"
+L["On a real login (not a reload), a line under the zone name saying what you did last time you played: where you spent the most time, quests done, a level reached and bosses killed, such as \"Last time: Darkshore · 3 quests done · reached level 24\". Only what happened, and nothing if nothing did; never in a fight, nor after more than two weeks away."] = "Al conectarte de verdad (no al recargar), una línea bajo el nombre de la zona que dice lo que hiciste la última vez que jugaste: dónde pasaste más tiempo, misiones completadas, un nivel alcanzado y jefes derrotados, como \"La última vez: Costa Oscura · 3 misiones completadas · nivel 24 alcanzado\". Solo lo que pasó, y nada si no pasó nada; nunca en combate, ni tras más de dos semanas sin jugar."
+L["Last time: nothing to say yet this session (no quests, level or bosses)."] = "La última vez: nada que decir aún en esta sesión (sin misiones, nivel ni jefes)."
+L["Says in chat what your next login would show, from this session so far."] = "Dice en el chat lo que mostraría tu próxima conexión, con lo que llevas de sesión."
+L["Last time: %s"] = "La última vez: %s"
+L["%d quest done"] = "%d misión completada"
+L["%d quests done"] = "%d misiones completadas"
+L["reached level %d"] = "nivel %d alcanzado"
+L["%d boss down"] = "%d jefe derrotado"
+L["%d bosses down"] = "%d jefes derrotados"
 L["On: each moment below shows as ticked. Off: none of them do, and each keeps its tick for when you turn this back on."] = "Activado: cada momento de abajo se muestra según esté marcado. Desactivado: ninguno, y cada uno conserva su marca para cuando lo vuelvas a activar."
 L["Time of day at login"] = "Hora del día al conectarte"
 L["Dawn, Morning, Midday, Afternoon, Evening, Dusk or Night, under the zone name when you log in or reload. Follows the clock picked on the Tint page."] = "Amanecer, Mañana, Mediodía, Tarde, Atardecer, Anochecer o Noche, bajo el nombre de la zona al conectarte o recargar. Sigue el reloj elegido en la página de Tinte."
@@ -4449,7 +4459,8 @@ L["Attacks shown on the screen:"] = "Ataques mostrados en pantalla:"
 L["The death banner:"] = "El rótulo de muerte:"
 
 -- What's new: Story Vision (its title: "Story Vision", above)
-L["A new Vision for the words that fade in on your screen between fights: the time of day at login and as it changes, a place under attack, and the death banner, each with its own tick and a Test button. Combat Vision is now called Battle Vision."] =
-	"Una visión nueva para las palabras que aparecen en tu pantalla entre combates: la hora del día al conectarte " ..
-	"y cuando cambia, un lugar bajo ataque y el rótulo de muerte, cada una con su propia marca y un botón Probar. " ..
-	"Visión de combate ahora se llama Visión de batalla."
+L["A new Vision for the words that fade in on your screen between fights: what you did last time as you log in (\"Last time: Darkshore · 3 quests done · reached level 24\"), the time of day, a place under attack, and the death banner, each with its own tick and a Test button. Combat Vision is now called Battle Vision."] =
+	"Una visión nueva para las palabras que aparecen en tu pantalla entre combates: lo que hiciste la última vez al " ..
+	"conectarte (\"La última vez: Costa Oscura · 3 misiones completadas · nivel 24 alcanzado\"), la hora del día, un " ..
+	"lugar bajo ataque y el rótulo de muerte, cada una con su propia marca y un botón Probar. Visión de combate " ..
+	"ahora se llama Visión de batalla."
