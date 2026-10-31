@@ -12143,9 +12143,9 @@ local KEYBINDS = {
 	{ action = "CINEMATIC_HIDEUI", label = L["Hide the UI"], section = L["General"],
 		tip = L["Like Blizzard's Alt+Z: hides the whole UI, but keeps the tint, letterbox " ..
 			"and time-of-day title. Press again (or Blizzard's key) to bring it back."] },
-	{ action = "CINEMATIC_SCREENSHOT", label = L["Take a screenshot"],
-		tip = L["Takes a screenshot without the UI but with the tint, letterbox, vignette, depth of field " ..
-			"and time-of-day title, then brings the UI straight back. Not in a fight."] },
+	{ action = "CINEMATIC_SCREENSHOT", label = L["Take a CineShot"],
+		tip = L["Hides the UI but keeps the tint and letterbox, takes a screenshot, then brings the UI " ..
+			"straight back. Not in a fight."] },
 	{ action = "CINEMATIC_TOGGLE", label = L["Toggle CineMode"],
 		tip = L["Turns CineMode on or off, like /cine."] },
 	{ action = "CINEMATIC_TOGGLEEFFECTS", label = L["Toggle visual effects"],

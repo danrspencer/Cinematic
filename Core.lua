@@ -16,7 +16,7 @@ BINDING_HEADER_CINEMATIC = "Cinematic"
 local function SetBindingNames()
 	BINDING_NAME_CINEMATIC_TOGGLE = "Cinematic: " .. L["Toggle CineMode"]
 	BINDING_NAME_CINEMATIC_HIDEUI = "Cinematic: " .. L["Hide the UI (keep the look)"]
-	BINDING_NAME_CINEMATIC_SCREENSHOT = "Cinematic: " .. L["Take a screenshot (keep the look)"]
+	BINDING_NAME_CINEMATIC_SCREENSHOT = "Cinematic: " .. L["Take a CineShot"]
 	BINDING_NAME_CINEMATIC_TOGGLEEFFECTS = "Cinematic: " .. L["Toggle visual effects"]
 	BINDING_NAME_CINEMATIC_CAMWHEEL = "Cinematic: " .. L["Camera wheel (hold)"]
 	BINDING_NAME_CINEMATIC_CAM_IDLE = "Cinematic: " .. L["Start the AFK camera"]

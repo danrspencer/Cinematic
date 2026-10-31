@@ -148,7 +148,7 @@ function ns.TakeScreenshot()
 	end
 	-- (UIParent can't be hidden in a fight.)
 	if InCombatLockdown() then
-		ns.Print(L["can't hide the UI for a screenshot in a fight: try again once it's over"])
+		ns.Print(L["can't take a CineShot in a fight: try again once it's over"])
 		return
 	end
 	shotPending = true
