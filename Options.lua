@@ -1554,7 +1554,8 @@ do
 		{ name = "Visions", colors = { Combat = { 0.85, 0.3, 0.25 }, World = { 0.35, 0.6, 0.9 } }, pages = {
 			{ "Vision", "Interface\\Icons\\Ability_EyeOfTheOwl", label = "General" },
 			{ "Heal Vision", "Interface\\Icons\\Spell_Holy_FlashHeal", section = "Combat" },
-			{ "Combat Vision", "Interface\\Icons\\Ability_Warrior_OffensiveStance", section = "Combat" },
+			{ "Combat Vision", "Interface\\Icons\\Ability_Warrior_OffensiveStance", section = "Combat",
+				label = "Battle Vision" }, -- (its old name kept as its ID: links, scopes)
 			-- (tabOf: no icon of its own, a folder tab on that page's (ns.PageTabs))
 			{ "Combat Style", "Interface\\Icons\\Ability_DualWield", tabOf = "Combat Vision" },
 			{ "Vitals Vision", "Interface\\Icons\\Spell_Shadow_LifeDrain02", section = "Combat" },
@@ -1565,6 +1566,7 @@ do
 			{ "Roll Vision", "Interface\\Icons\\INV_Misc_Dice_01", section = "World" },
 			{ "Roll Style", "Interface\\Icons\\INV_Misc_Dice_02", tabOf = "Roll Vision" },
 			{ "Duel Vision", "Interface\\Icons\\Ability_DualWield", section = "World" },
+			{ "Story Vision", "Interface\\Icons\\INV_Misc_Book_09", section = "World" },
 			{ "Wind Guide", "Interface\\Icons\\Spell_Nature_Cyclone", dev = true },
 		} },
 		{ name = "Quality of life", colors = { Helpers = { 0.3, 0.7, 0.5 } }, pages = {
@@ -3028,20 +3030,8 @@ local function CreateDeathPanel()
 	local function IfOn() return ns.TriggerAnyRow("Death") end
 
 	local stack = Stack(subtitle, "label", true)
-	local BANNER_TIP = L["Shortly after the death camera starts, words fade in across the middle of the " ..
-		"screen on a band, then fade away after a few seconds. \"YOU DIED\": dull red on a dark band with " ..
-		"soft edges. \"wasted\": red with a dark outline on a flat black band."]
-	local banner = Dropdown(content, "deathBannerStyle", {
-		{ value = "none", text = L["None"] },
-		{ value = "youdied", text = L["YOU DIED"] },
-		{ value = "wasted", text = L["wasted"] },
-	}, 180)
-	if banner then
-		banner.inlineName = L["Death banner"]
-		stack:Add(banner, "dropdown")
-		Tooltip(banner, BANNER_TIP)
-		GreyUnless(banner, IfOn)
-	end
+	-- (The death banner, "YOU DIED" across the screen: Story Vision's now.)
+	stack:Add(ns.StoryVisionLink(content, L["The death banner:"]), "label")
 
 	stack:Header(content, L["Starting"])
 	local delay = stack:Add(Slider(content, "deathOrbitDelay", L["Start after"], 0, 10, 0.5, L["%.1f sec"]), "slider")
@@ -3812,16 +3802,12 @@ local function CreateTintPanel()
 		L["For the Time of day and Zone + time of day presets, and the time of day message."])
 	timeHelp:SetPoint("TOPLEFT", timeHeader, "BOTTOMLEFT", 0, -6)
 
-	local timeMessage = Check(content, "timeOfDayMessage", L["Show the time of day"],
-		L["Dawn, Morning, Midday, Afternoon, Evening, Dusk or Night, under the zone name when " ..
-		"you log in or reload, and on its own when it changes during play (not in combat), " ..
-		"with a fitting sound: a rooster at dawn, a horse in the morning, your faction's bell " ..
-		"at midday, frogs in the evening, an owl at dusk and a wolf at night. Follows the clock " ..
-		"below."])
-	timeMessage:SetPoint("TOPLEFT", timeHelp, "BOTTOMLEFT", -2, -8)
+	-- (Its title on the screen, at login and as it changes: Story Vision's now.)
+	local timeMessage = ns.StoryVisionLink(content, L["The time of day's title and sound:"])
+	timeMessage:SetPoint("TOPLEFT", timeHelp, "BOTTOMLEFT", 0, -8)
 
 	local clockLabel = Label(content, "GameFontHighlight", L["Follows"])
-	clockLabel:SetPoint("TOPLEFT", timeMessage, "BOTTOMLEFT", 2, -10)
+	clockLabel:SetPoint("TOPLEFT", timeMessage, "BOTTOMLEFT", 0, -10)
 	local CLOCKS = {
 		{ value = "game", text = L["Game time (matches the game's day and night)"] },
 		{ value = "local", text = L["Your computer's clock"] },
@@ -9455,17 +9441,15 @@ do
 
 		-- Other: chat lines of Cinematic's own.
 		local otherBody = Section(L["Other"], "Other")
-		local attackAlert = Check(otherBody, "chatAttackAlert", L["Show attacks on the screen"],
-			L["When the LocalDefense channel says a place is under attack (\"Dun Algaz is under attack!\"), " ..
-			"it also shows in red where the zone name appears, with your faction's city bell. The same " ..
-			"place shows at most once every 90 seconds. /cine attacktest shows one."])
-		attackAlert:SetPoint("TOPLEFT", otherBody, "TOPLEFT", -2, -6)
+		-- (Attacks shown on the screen: Story Vision's now.)
+		local attackAlert = ns.StoryVisionLink(otherBody, L["Attacks shown on the screen:"])
+		attackAlert:SetPoint("TOPLEFT", otherBody, "TOPLEFT", 0, -6)
 		local updateNotice = Check(otherBody, "updateNotice", L["Get notified of updates"],
 			L["The first time you log in after Cinematic updates, a line in chat says so, with a " ..
 			"What's new link to what's been added. Chat shows for it while the UI is faded."] .. " "
 			.. L["Works with this page switched off too."])
 		updateNotice.pageSwitch = false -- (not greyed with the switch: see SwitchOf)
-		updateNotice:SetPoint("TOPLEFT", attackAlert, "BOTTOMLEFT", 0, -2)
+		updateNotice:SetPoint("TOPLEFT", attackAlert, "BOTTOMLEFT", -2, -4)
 
 		for _, section in ipairs(sections) do
 			ToPage(section.body)
@@ -10599,8 +10583,8 @@ local function CreateVisionPanel()
 		"on or off, and has what they share."])
 
 	local switch = PageSwitch(content, "handleVision", L["Enable Visions"],
-		L["On: every vision works as its page says. Off: none of them do (Heal, Quest, Roll, Duel, Vitals " ..
-		"and Combat Vision, and the Vision Helper), and each keeps its settings for when you turn this back on. " ..
+		L["On: every vision works as its page says. Off: none of them do (Heal, Quest, Roll, Duel, Vitals, " ..
+		"Battle and Story Vision, and the Vision Helper), and each keeps its settings for when you turn this back on. " ..
 		"The visions' pages grey out with it."], note, function()
 		if ns.RefreshRollWindow then ns.RefreshRollWindow() end
 		if ns.ApplyHealVisionFrames then ns.ApplyHealVisionFrames() end
@@ -13835,6 +13819,9 @@ ns.OnLanguage(function()
 	end
 	if ns.CreateCombatVisionPanel then -- (CombatVision.lua)
 		ns.CreateCombatVisionPanel(ns.lowHealthKit)
+	end
+	if ns.CreateStoryVisionPanel then -- (StoryVision.lua)
+		ns.CreateStoryVisionPanel(ns.lowHealthKit)
 	end
 	if ns.CreateWindGuidePanel then -- (WindGuide.lua: the dev copy only, CinematicDev.toc)
 		ns.CreateWindGuidePanel(ns.lowHealthKit)

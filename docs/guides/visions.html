@@ -142,7 +142,7 @@ dl.faq dd { margin: 2px 0 0; color: var(--muted) }
 
   <section>
     <div class="eyebrow">At a glance</div>
-    <h2>Five visions</h2>
+    <h2>Seven visions</h2>
     <p>Each vision has a page in the <b>Visions</b> group of Cinematic's settings, with an <b>Enable Page</b> switch at the top. Turning a page off keeps all its ticks for when you turn it back on. <b>Enable Visions</b> on the General page turns every vision on or off at once, each keeping its own settings.</p>
     <div class="cards">
       <article class="card"><a href="#heal"><div class="name"><i style="background:#59ff73"></i>Heal Vision</div></a>
@@ -155,8 +155,12 @@ dl.faq dd { margin: 2px 0 0; color: var(--muted) }
         <p class="muted">Two players dueling near you get their nameplates.</p><span class="tag">On to start with</span></article>
       <article class="card"><a href="#vitals"><div class="name"><i style="background:#ff4066"></i>Vitals Vision</div></a>
         <p class="muted">Your health at the screen's edges, with no portrait to read.</p><span class="tag">On in the Cinema level</span></article>
+      <article class="card"><a href="#battle"><div class="name"><i style="background:#d94d40"></i>Battle Vision</div></a>
+        <p class="muted">A cue on the screen as a fight starts and ends, and a boss&rsquo;s name as a title card.</p><span class="tag">On in the Cinema level</span></article>
+      <article class="card"><a href="#story"><div class="name"><i style="background:#e6c98a"></i>Story Vision</div></a>
+        <p class="muted">Words for the moments between fights: the time of day, a place under attack, your death.</p><span class="tag">On, except in the Subtle level</span></article>
     </div>
-    <p class="muted">Turn any of them on or off without opening the settings: the <a href="wheels.html">vision wheel</a> does it with one key, in a fight too, and each vision has a <b>Toggle</b> keybind of its own on the Keybinds page.</p>
+    <p class="muted">Turn Heal, Quest, Roll, Duel or Vitals Vision on or off without opening the settings: the <a href="wheels.html">vision wheel</a> does it with one key, in a fight too, and each vision has a <b>Toggle</b> keybind of its own on the Keybinds page.</p>
     <p class="muted"><b>Vision Helper</b> (on the General page): while a vision is doing something, Cinematic's minimap button glows in that vision's color, and its menu and tooltip list it with a link to its page.</p>
   </section>
 
@@ -264,6 +268,28 @@ dl.faq dd { margin: 2px 0 0; color: var(--muted) }
       <div class="opt"><span class="l">Our effects</span><span class="d">A <b>Heartbeat</b> that throbs from 60 to 140 beats a minute as you weaken, a <b>Flash on big hits</b>, <b>Sparks</b> (motes, stars, lightning and the drifting haze) and a <b>Ripple wave</b> of the game's art creeping in on each heartbeat.</span></div>
     </div>
     <p class="note">Some game versions keep your health secret from addons in fights. There the edges only fade in and out with it rather than following every point.</p>
+  </section>
+
+  <section id="battle">
+    <div class="eyebrow">For your fights</div>
+    <h2>Battle Vision</h2>
+    <p>A cue for a few seconds as you go into a fight and come out of it: a word on the screen or in a letterbox bar, a pulse round the screen&rsquo;s edges, an icon and sounds you pick for each kind of fight. Its look has a <b>Style</b> tab, with presets and a preview. (It was called Combat Vision.)</p>
+    <div class="opts">
+      <div class="opt"><span class="l">Combat</span><span class="d">The cue as a fight starts and ends, and where: <b>Always</b>, or only in certain places and fights. No cue after a fight shorter than <b>Not after fights under</b>.</span></div>
+      <div class="opt"><span class="l">Boss card</span><span class="d">A boss&rsquo;s name as a title card, with its dungeon and which boss it is: as its fight starts, as you first target it, or as you first come near.</span></div>
+    </div>
+  </section>
+
+  <section id="story">
+    <div class="eyebrow">For the moments between</div>
+    <h2>Story Vision</h2>
+    <p>Words that fade in on the screen at moments in your session that aren&rsquo;t your own fights. Each has its own tick, and a <b>Test</b> button to see it now.</p>
+    <div class="opts">
+      <div class="opt"><span class="l">Time of day at login</span><span class="d">Dawn, Morning, Midday, Afternoon, Evening, Dusk or Night under the zone name when you log in or reload. It follows the clock picked on the Tint page.</span></div>
+      <div class="opt"><span class="l">Time of day changes</span><span class="d">As the time of day changes during play (not in combat), its name fades in where the zone name shows, with a sound: a rooster at dawn, a horse in the morning, your faction&rsquo;s bell at midday, frogs in the evening, an owl at dusk and a wolf at night.</span></div>
+      <div class="opt"><span class="l">Under attack</span><span class="d">When the LocalDefense channel says a place is under attack, it shows in red where the zone name appears, with your faction&rsquo;s city bell; the same place at most once every 90 seconds.</span></div>
+      <div class="opt"><span class="l">Death banner</span><span class="d"><b>YOU DIED</b> or <b>wasted</b> across the screen shortly after the death camera starts, or <b>None</b>. Only with the death camera on (the Die row on the Cameras page).</span></div>
+    </div>
   </section>
 
   <section>

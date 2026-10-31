@@ -11,6 +11,10 @@
 local _, ns = ...
 
 ns.CHANGELOG_FEATURES = {
+	{ date = "2026-10-31", page = "Story Vision", title = "Story Vision",
+		text = "A new Vision for the words that fade in on your screen between fights: the time of day at login " ..
+		"and as it changes, a place under attack, and the death banner, each with its own tick and a Test " ..
+		"button. Combat Vision is now called Battle Vision." },
 	{ date = "2026-10-31", page = "Cameras", title = "Triggers and shots of your own",
 		text = "Make your own camera triggers on the Cameras page: an emote, a spell, a buff, a place, a moment " ..
 		"or a key can start a camera. On My Shots, set how a camera sways and zooms, and share either with a " ..
@@ -34,7 +38,7 @@ ns.CHANGELOG_FEATURES = {
 	{ date = "2026-10-30", page = "Combat Vision", title = "Boss cards",
 		text = "A boss's name as a title card, as its fight starts or as you first target it or come near: on " ..
 		"the screen, in a letterbox bar or low on the left like a film, with its dungeon and which boss it is. " ..
-		"Its look has its own tab on Combat Vision's Style page." },
+		"Its look has its own tab on Battle Vision's Style page." },
 	{ date = "2026-10-29", page = "Cameras", title = "Chat Cam",
 		text = "As NPCs talk, the camera zooms in and turns to whoever's speaking, then turns back and zooms " ..
 		"out once they're done. On in the Cinema profile; turn it on for NPCs you talk to or those chatting " ..
@@ -50,7 +54,7 @@ ns.CHANGELOG_FEATURES = {
 		"character, cast bars, tooltips, chat bubbles, quest talk, the loot roll window, the quest item button " ..
 		"and the letterbox, each with presets and a preview. A General page sets one bar texture, font and " ..
 		"border they all follow." },
-	{ date = "2026-10-29", page = "Combat Vision", title = "Combat Vision",
+	{ date = "2026-10-29", page = "Combat Vision", title = "Battle Vision",
 		text = "A cue as you go into a fight and come out of it: a word on the screen or in a letterbox bar, a " ..
 		"pulse round the edges, an icon, and sounds you pick for each kind of fight, like horns for a raid boss. " ..
 		"Its look has a page in the Style hub, with presets and a preview." },

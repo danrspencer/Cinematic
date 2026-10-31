@@ -692,7 +692,7 @@ end
 
 -- Whether a boss card may show now, by tick (combatBossPull...) and its Show in row, and why not.
 local function BossAllowed(db, tick)
-	if not ns.Setting("combatVision") then return false, "Combat Vision off" end
+	if not ns.Setting("combatVision") then return false, "Battle Vision off" end
 	if not db[tick] then return false, tick .. " off" end
 	ns.combatEdge, ns.combatEdgeCine = "enter", ns.lastCinematic and true or false
 	local ok, shows = pcall(ns.RowOnNow, BOSS_KEY, db.combatBossAlways, true)
@@ -1037,7 +1037,7 @@ end
 -- The Vision tab: turning it on, and when it shows.
 function ns.CreateCombatVisionPanel(kit)
 	local canvas, content = kit.CreateScrollPage()
-	local title = kit.Label(content, "GameFontNormalLarge", L["Combat Vision"])
+	local title = kit.Label(content, "GameFontNormalLarge", L["Battle Vision"])
 	CombatTabs(content, title, 1)
 	local intro = kit.PageIntro(content, title,
 		L["A cue for a few seconds as you go into a fight and come out of it: a word on the screen or in a " ..
@@ -1071,12 +1071,12 @@ function ns.CreateCombatVisionPanel(kit)
 					Edge("combatOnEnter", L["Entering combat"], L["The cue as a fight starts."]),
 					Edge("combatOnLeave", L["Leaving combat"], L["The cue as a fight ends."]),
 				} },
-			{ key = ROW_KEY, label = L["Combat Vision"], alwaysKey = "combatAlways",
+			{ key = ROW_KEY, label = L["Battle Vision"], alwaysKey = "combatAlways",
 				alwaysOn = function() return ns.GetDB().combatAlways end,
 				setAlways = function(value) ns.GetDB().combatAlways = value end,
 				alwaysTip = L["Shows wherever you are. (The other columns then have nothing to add.)"],
 				recordKeys = { "combatOnEnter", "combatOnLeave" } },
-		}, L["Combat Vision"])
+		}, L["Battle Vision"])
 		stack:Continue(lastRow, "label")
 
 		ns.CombatSoundRulesSection(kit, content, stack) -- (CombatSoundRules.lua)
@@ -1112,7 +1112,7 @@ function ns.CreateCombatVisionPanel(kit)
 
 	canvas:SetScript("OnShow", kit.PageShown(kit.Refresh, content))
 	canvas:Hide()
-	kit.RegisterSubpage(canvas, "Combat Vision")
+	kit.RegisterSubpage(canvas, "Combat Vision", L["Battle Vision"]) -- (shown as Battle Vision; its ID kept)
 end
 
 -- The look's settings a preset sets (the rest as the defaults; the colors
@@ -1197,7 +1197,7 @@ end
 -- The Style tab: how the cue looks, a preview at the top.
 function ns.CreateCombatStylePanel(kit)
 	local canvas, content = kit.CreateScrollPage()
-	local title = kit.Label(content, "GameFontNormalLarge", L["Combat Vision"])
+	local title = kit.Label(content, "GameFontNormalLarge", L["Battle Vision"])
 	CombatTabs(content, title, 2)
 	local intro = kit.PageIntro(content, title,
 		L["How the cue going into a fight and coming out of it looks. When it shows: the Vision tab. Changes " ..
@@ -1497,5 +1497,5 @@ function ns.CreateCombatStylePanel(kit)
 
 	canvas:SetScript("OnShow", kit.PageShown(kit.Refresh, content)) -- (its refresh plays the preview)
 	canvas:Hide()
-	kit.RegisterSubpage(canvas, "Combat Style", L["Combat Vision"])
+	kit.RegisterSubpage(canvas, "Combat Style", L["Battle Vision"])
 end

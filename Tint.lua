@@ -1074,9 +1074,9 @@ local function CreateDeathBanner()
 	frame:Hide()
 end
 
-local function ShowDeathBanner()
+local function ShowDeathBanner(style)
 	local height = UIParent:GetHeight()
-	local wasted = db.deathBannerStyle == "wasted"
+	local wasted = (style or db.deathBannerStyle) == "wasted"
 	banner.wastedStyle = wasted
 	banner.middle:SetShown(not wasted)
 	banner.top:SetShown(not wasted)
@@ -1108,8 +1108,10 @@ local function UpdateDeathBanner()
 	if not banner.frame then
 		return
 	end
-	local want = db.enabled and db.deathBannerStyle ~= "none" and ns.IsDeathCinematic and ns.IsDeathCinematic() or false
-	if want and banner.was == false then
+	local style = ns.Setting("deathBannerStyle") -- (false with Story Vision off)
+	local want = banner.testing or db.enabled and style and style ~= "none" and ns.IsDeathCinematic
+		and ns.IsDeathCinematic() or false
+	if want and banner.was == false and not banner.testing then
 		ShowDeathBanner()
 	end
 	banner.was = want -- (nil until the first check: dead at login, it doesn't show)
@@ -1123,7 +1125,7 @@ local function UpdateDeathBanner()
 	local t = GetTime() - banner.started - wait -- (below 0: still waiting, unseen)
 	local total = fadeIn + hold + fadeOut
 	if t >= total or not want then
-		banner.started = nil
+		banner.started, banner.testing = nil, nil
 		banner.frame:Hide()
 		return
 	end
@@ -1316,6 +1318,18 @@ local function UpdateTint(cinematic, elapsed, vignetteOn, weatherOn)
 	layerLevel.vignette = FadeLevel(layerLevel.vignette, vignetteWant, elapsed)
 	layerLevel.weather = FadeLevel(layerLevel.weather, weatherWant, elapsed)
 	ApplyTint(tintLevel, layerLevel.vignette, layerLevel.weather)
+end
+
+-- Story Vision's Test: the death banner now, alive or not, in the style picked
+-- ("YOU DIED" if that's None).
+function ns.TestDeathBanner()
+	db = db or ns.GetDB()
+	if not banner.frame then
+		return
+	end
+	local style = db.deathBannerStyle ~= "none" and db.deathBannerStyle or "youdied"
+	banner.testing = true
+	ShowDeathBanner(style)
 end
 
 -- Entry points for Core.lua and the options page
@@ -1698,9 +1712,7 @@ end
 
 local function ShowChangeTitle(text)
 	ShowTitle(L[text], 1, 0.86, 0.6)
-	if db and db.timeOfDayMessage and db.visualEffects ~= false then
-		PlayTimeSound(text)
-	end
+	PlayTimeSound(text)
 end
 
 -- Warnings from the game ("Dun Algaz is under attack!") in the same place,
@@ -1723,7 +1735,7 @@ C_Timer.NewTicker(CHANGE_CHECK, ns.Profiled("Time of day check", function()
 	end
 	local hour = GetClockTime()
 	local title = TimeTitleAt(hour)
-	if lastTitle and title ~= lastTitle and db.timeOfDayMessage and db.visualEffects ~= false
+	if lastTitle and title ~= lastTitle and ns.Setting("timeOfDayChange")
 		and not InCombatLockdown() and not (ZoneTextFrame and ns.Flag(ZoneTextFrame:IsShown())) then
 		ShowChangeTitle(title)
 	end

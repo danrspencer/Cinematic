@@ -602,7 +602,7 @@ function ns.HasUnreadWhisper()
 end
 
 -- LocalDefense warnings ("Dun Algaz is under attack!") also show as a title
--- where the zone name appears (db.chatAttackAlert). The channel is told by its
+-- where the zone name appears (Story Vision's chatAttackAlert). The channel is told by its
 -- zone channel number, which every language shares, or else its English name;
 -- the game sends these with no sender, so players' lines there are skipped.
 -- The same place repeats at most once every ATTACK_REPEAT seconds.
@@ -613,7 +613,7 @@ do
 
 	local function OnChannelMessage(_, _, text, _, _, channelString, _, _, zoneChannelID, _, channelBaseName,
 			_, _, guid)
-		if not (ns.db and ns.db.chatAttackAlert and ns.db.handleChat ~= false) or not Readable(text) then
+		if not ns.Setting("chatAttackAlert") or not Readable(text) then
 			return
 		end
 		if guid ~= nil and not (Readable(guid) and guid == "") then

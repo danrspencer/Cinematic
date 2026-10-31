@@ -1274,8 +1274,9 @@ for page, keys in pairs({
 	handleHunter = { "hunterAmmoSort", "hunterQuiverFill" },
 	-- Vision > General's Enable Visions: every vision's page switch, and its Vision Helper.
 	handleVision = { "minimapVisions", "handleHealVision", "questVision", "rollWindow", "duelPlates",
-		"lowHealth", "combatVision" },
+		"lowHealth", "combatVision", "storyVision" },
 	duelPlates = { "duelCC" }, -- Duel Vision's page
+	storyVision = { "timeOfDayMessage", "timeOfDayChange", "chatAttackAlert", "deathBannerStyle" }, -- Story Vision's rows
 	visualEffects = { "letterboxPage", "tintPage" }, -- (the Letterbox and Tint pages' switches)
 }) do
 	for _, key in ipairs(keys) do PAGE_SWITCH[key] = page end
@@ -4677,6 +4678,22 @@ ticker:SetScript("OnEvent", ns.Profiled("Core events", function(self, event, arg
 			end
 			ns.db.combatVisionProfileV1 = true
 		end
+		-- Story Vision gathers the time of day, attack and death banner text. Its
+		-- switch goes as your profile has it (off in Subtle), saved profiles drop
+		-- theirs; the time of day's changes, ticked with its login title until
+		-- now, get a tick of their own as that one is. Once.
+		if not ns.db.storyVisionV1 then
+			local base = ns.ProfileBase and ns.ProfileBase() or DEFAULTS
+			ns.db.storyVision = base.storyVision ~= false
+			ns.db.timeOfDayChange = ns.db.timeOfDayMessage ~= false
+			for _, saved in pairs(ns.db.profiles or {}) do
+				if type(saved) == "table" then
+					saved.storyVision = nil
+					if saved.timeOfDayMessage ~= nil then saved.timeOfDayChange = saved.timeOfDayMessage end
+				end
+			end
+			ns.db.storyVisionV1 = true
+		end
 		-- The Style pages' shared settings (bar texture, font, outline) follow
 		-- the Style hub's General page now: everyone's start on General, saved
 		-- profiles dropping theirs. Once.
@@ -5992,7 +6009,7 @@ ticker:SetScript("OnEvent", ns.Profiled("Core events", function(self, event, arg
 		C_Timer.After(1, CheckMoving) -- (the speed can read 0 for a moment while loading)
 		-- arg1 is isInitialLogin (a real login), arg2 isReloadingUi (a /reload).
 		-- Other loading screens never start straight in cinematic mode.
-		if (arg1 or arg2) and ns.db.timeOfDayMessage and ns.db.visualEffects and ns.ProfileChosen() then
+		if (arg1 or arg2) and ns.Setting("timeOfDayMessage") and ns.ProfileChosen() then
 			ns.ShowTimeOfDayTitle()
 		end
 		if arg1 or arg2 then

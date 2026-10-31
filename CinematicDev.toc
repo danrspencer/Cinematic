@@ -94,6 +94,7 @@ RollStyle.lua
 CombatSounds.lua
 CombatSoundRules.lua
 CombatVision.lua
+StoryVision.lua
 QuestTalkStyle.lua
 BubbleStyle.lua
 TooltipStyle.lua

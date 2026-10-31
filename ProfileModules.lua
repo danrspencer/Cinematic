@@ -370,8 +370,8 @@ ns.PROFILE_MODULES = {
 		apply = function(set)
 			set("questTalk", true)
 		end },
-	{ key = "combat-vision", name = "Combat Vision", scope = { "Combat Vision" },
-		tip = "Combat Vision on: a cue on the screen and sounds as you go into a fight and come out of it.",
+	{ key = "combat-vision", name = "Battle Vision", scope = { "Combat Vision" },
+		tip = "Battle Vision on: a cue on the screen and sounds as you go into a fight and come out of it.",
 		apply = function(set)
 			set("combatVision", true)
 		end },
@@ -382,8 +382,8 @@ ns.PROFILE_MODULES = {
 			set("bubblesOffTop", false)
 		end },
 	{ key = "no-visions", name = "No visions", scope = { "Heal Vision", "Quest Vision", "Vision", "Duel Vision", "Roll Vision",
-		"Vitals Vision", "Combat Vision" },
-		tip = "Every vision off: Heal, Quest, Duel, Roll, Vitals and Combat Vision.",
+		"Vitals Vision", "Combat Vision", "Story Vision" },
+		tip = "Every vision off: Heal, Quest, Duel, Roll, Vitals, Battle and Story Vision.",
 		apply = function(set)
 			set("handleHealVision", false)
 			set("questVision", false)
@@ -391,6 +391,7 @@ ns.PROFILE_MODULES = {
 			set("rollWindow", false)
 			set("lowHealth", false)
 			set("combatVision", false)
+			set("storyVision", false)
 		end },
 	{ key = "pure-tooltips", name = "Pure: tooltips", scope = { "Tooltips" },
 		tip = "The Tooltips page on: shown all through CineMode, fights too; no Mouse still.",
@@ -428,7 +429,7 @@ ns.PROFILE_MODULES = {
 			CamsOff(set, { "flight", "idle", "cozy", "tele", "vista", "fish", "walk", "run", "death", "quest" })
 		end },
 	{ key = "cameras-bring-cinemode", name = "Cameras bring CineMode", scope = { "Cameras/Triggers",
-		"Camera Settings/Death Cam" },
+		"Camera Settings/Death Cam", "Story Vision" },
 		tip = "Every camera brings CineMode on, standing still starts the AFK camera, every camera can start " ..
 		"music, and no death screen.",
 		apply = function(set)
@@ -489,9 +490,12 @@ ns.PROFILE_MODULES = {
 	{ key = "rain-view-distance", name = "Reduce view distance in rain", scope = { "Effects/Show in" },
 		tip = "In CineMode, rain pulls the view distance in from yours, all the way in a downpour.",
 		apply = function(set) set("rainViewScale", 1) end },
-	{ key = "no-time-message", name = "No time of day message", scope = { "Tint Style/Time of day" },
-		tip = "No time of day title under the zone name.",
-		apply = function(set) set("timeOfDayMessage", false) end },
+	{ key = "no-time-message", name = "No time of day message", scope = { "Story Vision" },
+		tip = "No time of day title under the zone name, nor as it changes.",
+		apply = function(set)
+			set("timeOfDayMessage", false)
+			set("timeOfDayChange", false)
+		end },
 	{ key = "vitals-vision", name = "Vitals Vision on", scope = { "Vitals Vision" },
 		tip = "Your health at the screen's edges, the picture drained toward grey and the personal resource " ..
 		"display fading in as it drops.",

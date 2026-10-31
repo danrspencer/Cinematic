@@ -33,7 +33,7 @@
     { section: "guides", path: "guides/music.html", title: "Music and sound",
       line: "Which cameras start music, music fatigue, muting by place, and your settings put back." },
     { section: "guides", path: "guides/visions.html", title: "Visions",
-      line: "Heal, Quest, Roll, Duel and Vitals Vision." },
+      line: "Heal, Quest, Roll, Duel, Vitals, Battle and Story Vision." },
     { section: "guides", path: "guides/wheels.html", title: "Wheels",
       line: "Camera, menu, marker and vision wheels, and wheels of your own." },
     { section: "guides", path: "guides/nameplates.html", title: "Nameplates and names",

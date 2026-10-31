@@ -650,8 +650,6 @@ L["Drift amount"] = "Cantidad de variación"
 L["The tint's strength slowly wanders up and down over a few minutes, so a still scene feels a little more alive: how far either way, as a share of the strength. Paused while the Style tab is open. Off: it stays put."] = "La intensidad del tinte sube y baja lentamente a lo largo de unos minutos, para que una escena quieta parezca un poco más viva: cuánto hacia cada lado, como parte de la intensidad. En pausa mientras la pestaña Estilo está abierta. Desactivado: se queda fija."
 L["Time of day"] = "Hora del día"
 L["For the Time of day and Zone + time of day presets, and the time of day message."] = "Para los preajustes Hora del día y Zona + hora del día, y el mensaje de la hora del día."
-L["Show the time of day"] = "Mostrar la hora del día"
-L["Dawn, Morning, Midday, Afternoon, Evening, Dusk or Night, under the zone name when you log in or reload, and on its own when it changes during play (not in combat), with a fitting sound: a rooster at dawn, a horse in the morning, your faction's bell at midday, frogs in the evening, an owl at dusk and a wolf at night. Follows the clock below."] = "Amanecer, Mañana, Mediodía, Tarde, Atardecer, Anochecer o Noche, bajo el nombre de la zona al conectarte o recargar, y por sí solo cuando cambia mientras juegas (no en combate), con un sonido a juego: un gallo al amanecer, un caballo por la mañana, la campana de tu facción a mediodía, ranas al atardecer, un búho al anochecer y un lobo por la noche. Sigue el reloj de abajo."
 L["Follows"] = "Sigue"
 L["Game time (matches the game's day and night)"] = "Hora del juego (coincide con el día y la noche del juego)"
 L["Your computer's clock"] = "El reloj de tu ordenador"
@@ -1099,8 +1097,6 @@ L["Shows a box where speech from behind you appears: drag it where you want the 
 L["Speech from behind you shows here."] = "Lo que se dice a tu espalda aparece aquí."
 L["Speech from behind you shows here.\nDrag it where you want it, left-click to set, right-click to reset."] = "Lo que se dice a tu espalda aparece aquí.\nArrástralo adonde quieras, clic izquierdo para fijar, clic derecho para restablecer."
 L["Says and yells (people's and NPCs') don't show chat when their chat bubble shows on your screen: you can read it there. Ones from out of view, or where bubbles are off, still do."] = "Lo que se dice y se grita (de jugadores y PNJ) no muestra el chat cuando su bocadillo aparece en tu pantalla: puedes leerlo ahí. Lo que llega desde fuera de la vista, o donde los bocadillos están desactivados, sí lo muestra."
-L["Show attacks on the screen"] = "Mostrar ataques en pantalla"
-L["When the LocalDefense channel says a place is under attack (\"Dun Algaz is under attack!\"), it also shows in red where the zone name appears, with your faction's city bell. The same place shows at most once every 90 seconds. /cine attacktest shows one."] = "Cuando el canal DefensaLocal avisa de que un lugar está siendo atacado (\"¡Dun Algaz está siendo atacado!\"), también aparece en rojo donde se muestra el nombre de la zona, con la campana de la ciudad de tu facción. El mismo lugar aparece como mucho una vez cada 90 segundos. /cine attacktest muestra uno."
 L["%s is under attack!"] = "¡%s está siendo atacado!"
 L["Conversation"] = "Conversación"
 L["The roles it shows chat for: untick one and typing brings up just the input box while you're that role (your specialization's, or the one picked in the group finder), whatever its ticks or rule say."] = "Los roles para los que muestra el chat: desmarca uno y al escribir solo aparece la caja de texto mientras tienes ese rol (el de tu especialización, o el elegido en el buscador de grupo), digan lo que digan sus casillas o su regla."
@@ -2102,10 +2098,10 @@ L["Ways of showing just what matters. Each vision has a page of its own: this on
 	"on or off, and has what they share."] = "Formas de mostrar solo lo que importa. Cada visión tiene su propia " ..
 	"página: esta las activa o desactiva todas, y tiene lo que comparten."
 L["Enable Visions"] = "Activar visiones"
-L["On: every vision works as its page says. Off: none of them do (Heal, Quest, Roll, Duel, Vitals " ..
-	"and Combat Vision, and the Vision Helper), and each keeps its settings for when you turn this back on. " ..
+L["On: every vision works as its page says. Off: none of them do (Heal, Quest, Roll, Duel, Vitals, " ..
+	"Battle and Story Vision, and the Vision Helper), and each keeps its settings for when you turn this back on. " ..
 	"The visions' pages grey out with it."] = "Activado: cada visión funciona como dice su página. Desactivado: " ..
-	"ninguna funciona (Heal Vision, las visiones de misión, tiradas, duelo, vital y combate, y el Ayudante de " ..
+	"ninguna funciona (Heal Vision, las visiones de misión, tiradas, duelo, vital, batalla e historia, y el Ayudante de " ..
 	"visiones), y cada una conserva sus ajustes para cuando lo vuelvas a activar. Las páginas de las visiones " ..
 	"se atenúan con él."
 L["Friendly players around you duel for 30 seconds, in pretend: their nameplates, " ..
@@ -3513,7 +3509,7 @@ L["Its height, next to the game's (nameplates only). The health bar and name rid
 L["Colors:"] = "Colores:"
 L["Interrupted"] = "Interrumpido"
 L["The icon's size, next to the game's. On nameplates, the health bar and name ride up on it."] = "El tamaño del icono, respecto al del juego. En las placas de nombre, la barra de salud y el nombre suben con él."
-L["Combat Vision"] = "Visión de combate"
+L["Battle Vision"] = "Visión de batalla"
 L["A cue for a few seconds as you go into a fight and come out of it: a word on the screen or in a letterbox bar, a pulse round the screen's edges, an icon and a sound. How it looks: the Style tab."] = "Un aviso durante unos segundos al entrar en un combate y al salir de él: una palabra en la pantalla o en una franja de cine, un pulso en los bordes de la pantalla, un icono y un sonido. Su aspecto: la pestaña Estilo."
 L["On: the cue shows as this page says. Off: never. Each setting keeps its value for when you turn this back on."] = "Activado: el aviso aparece como dice esta página. Desactivado: nunca. Cada ajuste conserva su valor para cuando vuelvas a activarlo."
 L["Where the text shows: in the middle of the screen, in a letterbox bar or in the lower third."] = "Dónde aparece el texto: en el centro de la pantalla, en una franja de cine o en el tercio inferior."
@@ -4019,10 +4015,10 @@ L["Whether this row's camera may start in a fight (unticked, one running stops w
 
 -- What's new: Boss cards
 L["Boss cards"] = "Tarjetas de jefe"
-L["A boss's name as a title card, as its fight starts or as you first target it or come near: on the screen, in a letterbox bar or low on the left like a film, with its dungeon and which boss it is. Its look has its own tab on Combat Vision's Style page."] =
+L["A boss's name as a title card, as its fight starts or as you first target it or come near: on the screen, in a letterbox bar or low on the left like a film, with its dungeon and which boss it is. Its look has its own tab on Battle Vision's Style page."] =
 	"El nombre de un jefe como tarjeta de título, al empezar su combate o la primera vez que lo seleccionas o te acercas: " ..
 	"en la pantalla, en una franja de cine o abajo a la izquierda como en una película, con su mazmorra y qué jefe es. " ..
-	"Su aspecto tiene su propia pestaña en la página de estilo de Visión de combate."
+	"Su aspecto tiene su propia pestaña en la página de estilo de Visión de batalla."
 
 -- Backups.lua: backups of profiles
 L["Backups"] = "Copias"
@@ -4435,3 +4431,26 @@ L["Add back"] = "Recuperar"
 L["All of them"] = "Todos"
 L["Add back all"] = "Recuperar todos"
 L["Bring back a built-in trigger you deleted, with its settings as they were."] = "Recupera un disparador incorporado que hayas borrado, con sus ajustes como estaban."
+
+-- StoryVision.lua
+L["Story Vision"] = "Visión de historia"
+L["Opens the Story Vision page."] = "Abre la página de Visión de historia."
+L["Shows it now, to see how it looks."] = "Lo muestra ahora, para ver cómo queda."
+L["Words that fade in on the screen at moments in your session that aren't your own fights: the time of day, a place under attack, your death. (Fights and bosses: Battle Vision.)"] = "Palabras que aparecen en pantalla en momentos de tu sesión que no son tus propios combates: la hora del día, un lugar bajo ataque, tu muerte. (Combates y jefes: Visión de batalla.)"
+L["On: each moment below shows as ticked. Off: none of them do, and each keeps its tick for when you turn this back on."] = "Activado: cada momento de abajo se muestra según esté marcado. Desactivado: ninguno, y cada uno conserva su marca para cuando lo vuelvas a activar."
+L["Time of day at login"] = "Hora del día al conectarte"
+L["Dawn, Morning, Midday, Afternoon, Evening, Dusk or Night, under the zone name when you log in or reload. Follows the clock picked on the Tint page."] = "Amanecer, Mañana, Mediodía, Tarde, Atardecer, Anochecer o Noche, bajo el nombre de la zona al conectarte o recargar. Sigue el reloj elegido en la página de Tinte."
+L["Time of day changes"] = "Cambios de la hora del día"
+L["When the time of day changes during play (not in combat), its name fades in where the zone name shows, with a fitting sound: a rooster at dawn, a horse in the morning, your faction's bell at midday, frogs in the evening, an owl at dusk and a wolf at night."] = "Cuando la hora del día cambia mientras juegas (no en combate), su nombre aparece donde se muestra el nombre de la zona, con un sonido a juego: un gallo al amanecer, un caballo por la mañana, la campana de tu facción a mediodía, ranas al atardecer, un búho al anochecer y un lobo por la noche."
+L["Under attack"] = "Bajo ataque"
+L["When the LocalDefense channel says a place is under attack (\"Dun Algaz is under attack!\"), it shows in red where the zone name appears, with your faction's city bell. The same place shows at most once every 90 seconds."] = "Cuando el canal DefensaLocal avisa de que un lugar está siendo atacado (\"¡Dun Algaz está siendo atacado!\"), aparece en rojo donde se muestra el nombre de la zona, con la campana de la ciudad de tu facción. El mismo lugar aparece como mucho una vez cada 90 segundos."
+L["Only with the death camera on (the Die row on the Cameras page)."] = "Solo con la cámara de muerte activada (la fila Morir de la página Cámaras)."
+L["The time of day's title and sound:"] = "El título y el sonido de la hora del día:"
+L["Attacks shown on the screen:"] = "Ataques mostrados en pantalla:"
+L["The death banner:"] = "El rótulo de muerte:"
+
+-- What's new: Story Vision (its title: "Story Vision", above)
+L["A new Vision for the words that fade in on your screen between fights: the time of day at login and as it changes, a place under attack, and the death banner, each with its own tick and a Test button. Combat Vision is now called Battle Vision."] =
+	"Una visión nueva para las palabras que aparecen en tu pantalla entre combates: la hora del día al conectarte " ..
+	"y cuando cambia, un lugar bajo ataque y el rótulo de muerte, cada una con su propia marca y un botón Probar. " ..
+	"Visión de combate ahora se llama Visión de batalla."
