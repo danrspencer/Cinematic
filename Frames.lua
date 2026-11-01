@@ -8215,7 +8215,10 @@ do
 		Name = { "TargetFrameContent.TargetFrameContentMain.Name",
 			"TargetFrameContent.TargetFrameContentMain.ReputationColor",
 			"@TextureFrameName", "@NameBackground" },
-		Health = { "TargetFrameContent.TargetFrameContentMain.HealthBarsContainer", "healthbar" },
+		-- (Older frames' "Dead" label over the bar with it: retail keeps its
+		-- own inside HealthBarsContainer.)
+		Health = { "TargetFrameContent.TargetFrameContentMain.HealthBarsContainer", "healthbar",
+			"@TextureFrameDeadText", "@TextureFrameUnconsciousText" },
 		Power = { "TargetFrameContent.TargetFrameContentMain.ManaBar", "manabar" },
 		Numbers = { "healthbar.TextString", "healthbar.LeftText", "healthbar.RightText",
 			"manabar.TextString", "manabar.LeftText", "manabar.RightText" },
