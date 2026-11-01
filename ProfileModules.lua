@@ -494,12 +494,6 @@ ns.PROFILE_MODULES = {
 	{ key = "rain-view-distance", name = "Reduce view distance in rain", scope = { "Effects/Show in" },
 		tip = "In CineMode, rain pulls the view distance in from yours, all the way in a downpour.",
 		apply = function(set) set("rainViewScale", 1) end },
-	{ key = "no-time-message", name = "No time of day message", scope = { "Story Vision" },
-		tip = "No time of day title under the zone name, nor as it changes.",
-		apply = function(set)
-			set("timeOfDayMessage", false)
-			set("timeOfDayChange", false)
-		end },
 	{ key = "vitals-vision", name = "Vitals Vision on", scope = { "Vitals Vision" },
 		tip = "Your health at the screen's edges, the picture drained toward grey and the personal resource " ..
 		"display fading in as it drops.",
@@ -986,6 +980,13 @@ function ns.SettingAddresses(key, row)
 		for _, address in ipairs(map.anyRow[row]) do list[#list + 1] = address end
 		for _, address in ipairs(map.rows[key] and map.rows[key][row] or {}) do list[#list + 1] = address end
 		return list
+	end
+	-- (A row only the rules and roles lists have, as the Nameplates page's:
+	-- where it is in any of them.)
+	if row ~= nil and ROW_RULE_LISTS[key] then
+		for list in pairs(ROW_RULE_LISTS) do
+			if map.rows[list] and map.rows[list][row] then return map.rows[list][row] end
+		end
 	end
 	if row ~= nil and map.rows[key] and map.rows[key][row] then return map.rows[key][row] end
 	return map.keys[key]
