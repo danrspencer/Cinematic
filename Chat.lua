@@ -431,6 +431,7 @@ local function SpeakOrPeek(line)
 		PeekWindow(chatFrame)
 	elseif ChatUnseen(chatFrame) then
 		ns.ShowSpeechBehind(line[4], line[5], line[2], line[6])
+		if ns.HideOffScreenBubble then ns.HideOffScreenBubble(line[2]) end
 	end
 	-- (Otherwise chat is up and the line is in it. Either way it doesn't keep
 	-- chat up: in a busy place the speech never stops, and chat never faded.)

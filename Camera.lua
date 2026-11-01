@@ -2068,7 +2068,12 @@ local function RaiseZoomMax()
 	end
 	ns.ApplyCVarSet(ZOOM_MAX_CVARS, true)
 end
-local ZOOM_MIN_CHANGE = 1           -- yards: smallest random zoom worth making
+-- (Camera scripts' zoom steps with Past max: CameraScripts.lua.)
+ns.RaiseZoomMax = RaiseZoomMax
+function ns.LowerZoomMax()
+	ns.ApplyCVarSet(ZOOM_MAX_CVARS, false)
+end
+local ZOOM_MIN_CHANGE = 1          -- yards: smallest random zoom worth making
 local ZOOM_CLOSEST = 1              -- yards: never zoom in past this
 
 -- The active zoom profile's value: idleZoom* standing still, taxiZoom* flying,
@@ -2460,11 +2465,14 @@ end
 -- Exit camera: a button under the release popup while the death camera's on
 -- (the popup isn't faded), stopping it for this death (ns.StopCamera), in a
 -- box drawn like the popup's. With no popup to find (a UI of its own, say),
--- it sits high in the middle. (Death Cam page: deathExitButton.)
+-- it sits high in the middle. (Death Cam page: deathExitButton.) Camera
+-- scripts with a Stop button have one of their own (ns.ExitCameraBox).
 do
-	local box
-	local function MakeBox()
-		box = CreateFrame("Frame", nil, UIParent)
+	-- A box with a button reading text, onClick when it's clicked (the box
+	-- hidden then). box:Place() puts it under the release popup, or high in
+	-- the middle, and shows it; gives whether it was hidden till then.
+	function ns.ExitCameraBox(text, onClick)
+		local box = CreateFrame("Frame", nil, UIParent)
 		box:SetFrameStrata("DIALOG")
 		box:SetSize(180, 48)
 		box:EnableMouse(true) -- (clicks on the box don't reach the world)
@@ -2485,41 +2493,47 @@ do
 		button:SetFrameLevel(box:GetFrameLevel() + 5)
 		button:SetSize(140, 22)
 		button:SetPoint("CENTER")
-		button:SetText(L["Exit camera"])
+		button:SetText(text)
 		button:SetScript("OnClick", function()
-			ns.StopCamera()
+			onClick()
 			box:Hide()
 		end)
 		box.anchor = false -- (placed below: nil is "no popup")
+		box:Hide()
 		ns.AddOverlay(box) -- (stays with the UI hidden, like the death screen)
+		function box:Place()
+			local found, popup = false, nil
+			if StaticPopup_FindVisible then
+				found, popup = pcall(StaticPopup_FindVisible, "DEATH")
+			end
+			popup = found and popup or nil
+			if popup ~= self.anchor then
+				self.anchor = popup
+				self:ClearAllPoints()
+				if popup then
+					self:SetPoint("TOP", popup, "BOTTOM", 0, -4)
+				else
+					self:SetPoint("TOP", UIParent, "TOP", 0, -260)
+				end
+			end
+			if self:IsShown() then return false end
+			self:Show()
+			return true
+		end
+		return box
 	end
+
+	local box
 	function ns.UpdateDeathExit(on)
 		if not (on and ns.db.deathExitButton) then
 			if box then box:Hide() end
 			return
 		end
-		if not box then
-			MakeBox()
-		end
-		local ok, popup = false, nil
-		if StaticPopup_FindVisible then
-			ok, popup = pcall(StaticPopup_FindVisible, "DEATH")
-		end
-		popup = ok and popup or nil
-		if popup ~= box.anchor then
-			box.anchor = popup
-			box:ClearAllPoints()
-			if popup then
-				box:SetPoint("TOP", popup, "BOTTOM", 0, -4)
-			else
-				box:SetPoint("TOP", UIParent, "TOP", 0, -260)
-			end
-		end
-		if not box:IsShown() then
-			box:Show()
+		box = box or ns.ExitCameraBox(L["Exit camera"], function() ns.StopCamera() end)
+		if box:Place() then
 			local left, top = box:GetLeft(), box:GetTop()
 			ns.DeathTestLog(("exit button: %s popup, visible %s, alpha %.2f, at %s,%s, strata %s, parent shown %s"):format(
-				popup and "under the" or "no", tostring(box:IsVisible()), box:GetEffectiveAlpha(),
+				box.anchor and "under the" or "no", tostring(box:IsVisible()), box:GetEffectiveAlpha(),
 				left and ("%d"):format(left) or "?", top and ("%d"):format(top) or "?", box:GetFrameStrata(),
 				tostring(UIParent:IsVisible())))
 		end

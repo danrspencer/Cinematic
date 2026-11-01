@@ -578,7 +578,7 @@ local function LiftText(inside, state)
 	-- (/cine debug bubbles drop: every bubble far down, to see the copy.)
 	if ns.bubbleDropTest then by = by + 200 end
 	local was = state.by
-	if by > 0 then
+	if by > 0 and not state.hidden then -- (hidden: ours shows off screen for it)
 		ShowCopy(inside, state, text, scale, by)
 	elseif was ~= 0 or (state.copy and state.copy:IsShown()) then
 		Release(inside, state)
@@ -659,6 +659,12 @@ local function HookBubbles()
 				-- (Gone or reused: our copy goes too, and the game's comes back.)
 				bubble:HookScript("OnHide", function()
 					local state = lifted[inside]
+					if state and state.hidden then
+						state.hidden = nil
+						inside:SetAlpha(1)
+						local skin = skins[bubble]
+						if skin then skin:SetAlpha(1) end
+					end
 					if state and state.copy then Release(inside, state) end
 				end)
 			end
@@ -738,25 +744,57 @@ function ns.IsBubbleOnScreen(text)
 			if state and state.copy and state.copy:IsShown() then
 				return true
 			end
-			-- (Its centre in the world frame's own units, inside the screen. Past
-			-- the top counts too while Keep bubbles on screen brings it down.)
-			local x, y = bubble:GetCenter()
-			local scale = bubble:GetEffectiveScale() / WorldFrame:GetEffectiveScale()
-			if type(x) == "number" and not (issecretvalue and issecretvalue(x)) then
-				x, y = x * scale, y * scale
+			-- (The whole of it - the box you see, its inside - in the world
+			-- frame's own units, inside the screen: one cut off at an edge can't
+			-- be read. Past the top counts too while Keep bubbles on screen
+			-- brings it down. Its centre where the edges can't be read.)
+			local box = inside and not (inside.IsForbidden and inside:IsForbidden()) and inside or bubble
+			local left, right, bottom, top = box:GetLeft(), box:GetRight(), box:GetBottom(), box:GetTop()
+			if not (Readable(left) and Readable(right) and Readable(bottom) and Readable(top)) then
+				local x, y = bubble:GetCenter()
+				box, left, right, bottom, top = bubble, x, x, y, y
+			end
+			local scale = box:GetEffectiveScale() / WorldFrame:GetEffectiveScale()
+			if Readable(left) and Readable(bottom) then
+				left, right, bottom, top = left * scale, right * scale, bottom * scale, top * scale
 				local lifting = ns.db and ns.db.handleBubbles and ns.db.bubblesOffTop
 				if ns.speechWatch and placeTold ~= text then
 					placeTold = text -- (once a line: this is asked each frame while chat waits)
-					ns.Print(("speech: its bubble at %.0f, %.0f of %.0f x %.0f%s"):format(x, y, width, height,
-						lifting and " (kept on screen)" or ""))
+					ns.Print(("speech: its bubble from %.0f, %.0f to %.0f, %.0f of %.0f x %.0f%s"):format(left, bottom,
+						right, top, width, height, lifting and " (kept on screen)" or ""))
 				end
-				if x >= 0 and x <= width and y >= 0 and (y <= height or lifting) then
+				if left >= 0 and right <= width and bottom >= 0 and (top <= height or lifting) then
 					return true
 				end
 			end
 		end
 	end
 	return false
+end
+
+-- Our off-screen bubble showing for this line (Speech.lua): the game's, cut off
+-- at the screen's edge, is hidden till it goes (or is reused), so its sliver
+-- doesn't show beside ours.
+function ns.HideOffScreenBubble(text)
+	if not (C_ChatBubbles and C_ChatBubbles.GetAllChatBubbles) then
+		return
+	end
+	HookBubbles() -- (its OnHide gives it back)
+	for _, bubble in ipairs(C_ChatBubbles.GetAllChatBubbles(false)) do
+		local inside = not (bubble.IsForbidden and bubble:IsForbidden()) and bubble:GetChildren()
+		if inside and hooked[bubble] and SaysText(bubble, text) then
+			local state = lifted[inside]
+			if not state then
+				state = { by = 0 }
+				lifted[inside] = state
+			end
+			if state.copy then Release(inside, state) end
+			state.hidden = true
+			inside:SetAlpha(0)
+			local skin = skins[bubble]
+			if skin then skin:SetAlpha(0) end
+		end
+	end
 end
 
 -- How many bubbles the game keeps from addons (in instances, on retail): their

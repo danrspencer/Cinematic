@@ -984,6 +984,7 @@ DEFAULTS.questTalkListY = 0.46 -- the list's top edge up the screen, till it's d
 DEFAULTS.duelPlates = true -- in CineMode, the nameplates of two players dueling near you show (see Effects)
 DEFAULTS.duelCC = true -- and crowd control on a duelist shows as an icon by their plate
 DEFAULTS.minimapVisions = true -- the minimap button glows and lists the visions in use (see MinimapButton)
+DEFAULTS.minimapCameras = true -- the minimap button's menu and tooltip list the camera in use (see MinimapButton)
 DEFAULTS.handleCooldowns = true -- the Cooldown Manager page's master switch (off: left alone)
 DEFAULTS.cooldownKeybinds = false -- its Show keybinds: each spell's key on its icon (Frames.lua)
 -- The other pages' master switches likewise (see ns.HANDLE_SWITCHES): off,
@@ -1278,6 +1279,7 @@ for page, keys in pairs({
 		"lowHealth", "combatVision", "storyVision" },
 	duelPlates = { "duelCC" }, -- Duel Vision's page
 	storyVision = { "storyRecap", "timeOfDayMessage", "timeOfDayChange", "chatAttackAlert", "deathBannerStyle" }, -- Story Vision's rows
+	cameraModes = { "minimapCameras" }, -- Cameras > General's Enable Cameras: its Camera Helper
 	visualEffects = { "letterboxPage", "tintPage" }, -- (the Letterbox and Tint pages' switches)
 }) do
 	for _, key in ipairs(keys) do PAGE_SWITCH[key] = page end

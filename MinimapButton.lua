@@ -50,6 +50,24 @@ local function VisionText(vision, text)
 		Byte(color[3]), text)
 end
 
+-- The camera running now (one at a time), as a vision-like line for the menu
+-- and tooltip, or nil: a script playing, else our camera mode by its script
+-- (ns.activeCam's keys, some not their script's id). Not with the Cameras
+-- page's Camera Helper (minimapCameras) unticked.
+local CAM_SCRIPT = { idle = "afk", chatcam = "chat" }
+local CAMERA_COLOR = { 0.55, 0.8, 1 }
+local function CameraInUse()
+	if not ns.Setting("minimapCameras") then return nil end
+	local script = ns.PlayingCameraScript and ns.PlayingCameraScript()
+	local cam = ns.activeCam
+	if not script and cam and ns.FindCameraScript then
+		script = ns.FindCameraScript(CAM_SCRIPT[cam] or cam)
+	end
+	if not script then return nil end
+	return { label = script.name, id = script.id, color = CAMERA_COLOR, trim = true,
+		icon = ns.CameraIcon and ns.CameraIcon(script) or ICON }
+end
+
 local function UpdateInUse()
 	wipe(inUse)
 	for _, vision in ipairs(ns.Setting("minimapVisions") and VISIONS or {}) do
@@ -170,7 +188,16 @@ local function ShowMenu(owner)
 	end
 	local menu = MenuUtil.CreateContextMenu(owner, function(_, root)
 		local db = ns.GetDB()
-		-- (The visions in use first, each a link to its page.)
+		-- (The camera in use first, a link to its tab on the Cameras page.)
+		local camera = CameraInUse()
+		if camera then
+			root:CreateTitle(L["Cameras in use"])
+			root:CreateButton(VisionText(camera, camera.label), function()
+				if ns.ShowCameraTab then ns.ShowCameraTab(camera.id) else ns.OpenOptions("Cameras") end
+			end)
+			root:CreateDivider()
+		end
+		-- (Then the visions in use, each a link to its page.)
 		UpdateInUse()
 		if inUse[1] then
 			root:CreateTitle(L["Visions in use"])
@@ -178,13 +205,6 @@ local function ShowMenu(owner)
 				local page = vision.page
 				root:CreateButton(VisionText(vision, L[vision.label]), function() ns.OpenOptions(page) end)
 			end
-			-- (Ticked whenever it shows: unticking turns this all off.)
-			root:CreateCheckbox(L["Vision Helper"], function() return ns.Setting("minimapVisions") end, function()
-				ns.GetDB().minimapVisions = false
-				UpdateInUse()
-				if ns.RefreshOptions then ns.RefreshOptions() end
-				Print(L["Vision Helper off. Turn it back on on the Vision page."])
-			end)
 			root:CreateDivider()
 		end
 		root:CreateTitle("Cinematic")
@@ -230,6 +250,10 @@ local function OnEnter(self)
 		GameTooltip:AddLine(L["Paused, %s"]:format(FormatTime(left)), 1, 0.8, 0.2)
 	else
 		GameTooltip:AddLine(L["On"], 0.3, 1, 0.3)
+	end
+	local camera = CameraInUse()
+	if camera then
+		GameTooltip:AddLine(VisionText(camera, L["%s in use"]:format(camera.label)))
 	end
 	for _, vision in ipairs(inUse) do
 		GameTooltip:AddLine(VisionText(vision, L["%s in use"]:format(L[vision.label])))

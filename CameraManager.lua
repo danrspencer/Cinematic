@@ -14,7 +14,7 @@ local NONE_COLOR = { 0.85, 0.35, 0.28 }
 -- Each built-in camera's icon (by script id); yours have one you pick, or
 -- the spyglass.
 local ICONS = {
-	afk = "Interface\\Icons\\Spell_Nature_Sleep", still = "Interface\\Icons\\Spell_Nature_TimeStop",
+	afk = "Interface\\Icons\\Spell_Nature_Sleep",
 	cozy = "Interface\\Icons\\Spell_Fire_Fire", vista = "Interface\\Icons\\Ability_EyeOfTheOwl",
 	fish = "Interface\\Icons\\Trade_Fishing", tele = "Interface\\Icons\\INV_Misc_Rune_01",
 	flight = "Interface\\Icons\\Ability_Mount_Wyvern_01", flyby = "Interface\\Icons\\Ability_Hunter_EagleEye",
@@ -25,15 +25,15 @@ local ICONS = {
 local MINE_ICON = "Interface\\Icons\\INV_Misc_Spyglass_02"
 local SCRIPT_ICON = "Interface\\Icons\\INV_Scroll_05"
 local function IconOf(script) return script.icon or ICONS[script.id] or MINE_ICON end
+ns.CameraIcon = IconOf -- (the minimap button's Cameras in use)
 
 -- A row's camera value and the script that is it (CameraRows.lua's values:
 -- a built-in camera's, true for the Die row's, "script:<id>" for a script).
 local VALUE_SCRIPT = { cozy = "cozy", vista = "vista", fish = "fish", afk = "afk", tele = "tele", flight = "flight",
 	quest = "quest", walk = "walk", run = "run", [true] = "death", death = "death", chat = "chat" }
 -- Scripts that run inside another camera's, not cameras of their own: a
--- flight's fly-bys, the AFK camera's standing-still zoom. Off the grid; on
--- their camera's tab under its script.
-local INSIDE = { flight = "flyby", afk = "still" }
+-- flight's fly-bys. Off the grid; on their camera's tab under its script.
+local INSIDE = { flight = "flyby" }
 local INNER = {}
 for _, id in pairs(INSIDE) do INNER[id] = true end
 
@@ -130,9 +130,10 @@ local function LinkRow(parent, kit)
 	return row
 end
 
--- canvas, content: the General page's; title, intro, switch: what's on it
+-- canvas, content: the General page's; title, intro, switch, helper (its
+-- Camera Helper tick): what's on it
 -- now (hidden while a camera's tab is open).
-function ns.CameraManager(kit, canvas, content, title, intro, switch)
+function ns.CameraManager(kit, canvas, content, title, intro, switch, helper)
 	local openId -- (the camera whose tab is open, or nil)
 	local Pick, Menu -- (below)
 
@@ -150,7 +151,8 @@ function ns.CameraManager(kit, canvas, content, title, intro, switch)
 	-- The General tab: every camera, built in then yours.
 	local grid = CreateFrame("Frame", nil, content)
 	grid:SetSize(WIDTH, 1)
-	grid:SetPoint("TOPLEFT", switch, "BOTTOMLEFT", 2, -16)
+	grid:SetPoint("LEFT", switch, "LEFT", 2, 0)
+	grid:SetPoint("TOP", helper or switch, "BOTTOM", 0, -16)
 	local builtInHead = kit.Label(grid, "GameFontNormal", L["Built in"])
 	local mineHead = kit.Label(grid, "GameFontNormal", L["Yours"])
 	local tiles = {}
@@ -445,6 +447,7 @@ function ns.CameraManager(kit, canvas, content, title, intro, switch)
 		title:SetShown(general)
 		intro:SetShown(general)
 		switch:SetShown(general)
+		if helper then helper:SetShown(general) end
 		grid:SetShown(general)
 		view:SetShown(not general)
 		if general then LayoutGrid() end
@@ -470,4 +473,10 @@ function ns.CameraManager(kit, canvas, content, title, intro, switch)
 	canvas:HookScript("OnHide", function()
 		if openId then Pick(1) end
 	end)
+
+	-- The settings open at a camera's tab (the minimap button's Cameras in use).
+	function ns.ShowCameraTab(id)
+		ns.OpenOptions("Cameras")
+		if id then Pick(2, id) end
+	end
 end

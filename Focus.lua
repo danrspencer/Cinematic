@@ -1,7 +1,8 @@
 -- Cinematic depth of field (faked): a soft haze around the screen edges, as if
 -- the camera had pulled focus onto you. Shown in the camera modes while
 -- cinematic mode is on (depthOfField, under visualEffects), at each mode's own strength (dof*,
--- set on its page, times Camera haze's dofScale). /cine doftest shows it on demand.
+-- set on its page, times Camera haze's dofScale; a camera script's own Edge
+-- haze while one runs). /cine doftest shows it on demand.
 local _, ns = ...
 
 local FOCUS_TEXTURE = "Interface\\AddOns\\Cinematic\\Textures\\Focus"
@@ -30,6 +31,9 @@ local function WantedStrength()
 		or not ns.lastCinematic then
 		return 0
 	end
+	-- (A camera script running: its own Edge haze.)
+	local scripted = ns.CameraScriptHaze and ns.CameraScriptHaze()
+	if scripted then return math.min(1, scripted * (db.dofScale or 1)) end
 	local mode = ns.CameraMode()
 	return mode and math.min(1, (db[MODE_KEY[mode]] or 0) * (db.dofScale or 1)) or 0
 end

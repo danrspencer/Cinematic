@@ -31,22 +31,25 @@ local COLORS = {
 }
 local KIND_COLOR = { rotate = "move", tilt = "move", zoom = "move", zoomRand = "move", lineup = "move",
 	wait = "wait", together = "flow", ["repeat"] = "flow", emote = "misc", putback = "misc", turnTo = "move",
-	sway = "move", tiltRand = "move", spin = "move", ["until"] = "flow", waitRand = "wait", follow = "misc", aim = "move", ending = "flow" }
+	sway = "move", tiltRand = "move", spin = "move", ["until"] = "flow", waitRand = "wait", follow = "misc", aim = "move", ending = "flow",
+	play = "flow" }
 local KIND_NAMES = { rotate = "Rotate", tilt = "Tilt", zoom = "Zoom", zoomRand = "Zoom at random",
 	lineup = "Line up", wait = "Wait", together = "Together", ["repeat"] = "Repeat", emote = "Emote",
 	putback = "Put back", turnTo = "Turn to", sway = "Sway", tiltRand = "Tilt at random", spin = "Spin",
-	["until"] = "Wait until", waitRand = "Wait at random", follow = "Follow", aim = "Aim at" }
+	["until"] = "Wait until", waitRand = "Wait at random", follow = "Follow", aim = "Aim at", play = "Play" }
 -- (A field's name: by its kind first, where the same key means something else there.)
 local FIELD_NAMES = { deg = "Degrees", secs = "Seconds", way = "Way", ease = "Ease", to = "Yards", min = "Nearest",
 	max = "Furthest", token = "Emote", times = "Times", of = "From", around = "Around", arc = "Arc", drift = "Drift",
 	pause = "Pause", favor = "Middle", down = "Down", up = "Up", accel = "Speed-up", ["turnTo.to"] = "To",
 	["sway.min"] = "At least", ["spin.max"] = "Top speed", ["tiltRand.deg"] = "Middle", what = "Until", after = "After",
-	fit = "Time", ["waitRand.min"] = "Shortest", ["waitRand.max"] = "Longest", at = "At", miss = "Not found" }
+	fit = "Time", ["waitRand.min"] = "Shortest", ["waitRand.max"] = "Longest", at = "At", miss = "Not found",
+	speed = "Top speed", past = "Past max", ["putback.zoom"] = "Zoom too", script = "Camera" }
 local CHOICE_NAMES = { left = "Left", right = "Right", random = "Either way", once = "Picked once",
 	smooth = "Smooth", gentle = "Gentle", steady = "Steady", yards = "You", yours = "Your zoom", behind = "Behind",
 	front = "In front", yes = "Favor", no = "Anywhere", cast = "The cast", landing = "Landing", alive = "Back to life",
 	time = "Seconds go by", secs = "Its seconds", talk = "Someone new talks", click = "Where you clicked",
-	speaker = "Who's talking", stay = "Stay" }
+	speaker = "Who's talking", stay = "Stay", look = "Look round", ["past.no"] = "No", ["past.yes"] = "Yes",
+	["zoom.no"] = "No", ["zoom.yes"] = "Yes" }
 local RULE_NAMES = { camera = "You move the camera", fight = "A fight starts", walk = "You walk", zoom = "You zoom",
 	ends = "Its trigger ends" }
 local ACTION_NAMES = { stop = "Stop, leave it there", putback = "Run When it ends", pause = "Pause, then carry on",
@@ -54,14 +57,14 @@ local ACTION_NAMES = { stop = "Stop, leave it there", putback = "Run When it end
 local HINTS = {
 	rotate = "Turns the view, as your Turn view left and right keys do. One turn at a time. Picked once: either way, the same for every such turn in the script.",
 	tilt = "Positive tilts the view down, negative up. It waits for a turn to finish: the game won't do both at once.",
-	zoom = "Zooms to this many yards from you, or (From: your zoom) this many further out than you were as it started (negative: closer).",
-	zoomRand = "Zooms somewhere between the two, picked each time it runs: yards from you, or from your distance as it started.",
+	zoom = "Zooms to this many yards from you, or (From: your zoom) this many further out than you were as it started (negative: closer). Top speed (yards a second): quicker if it gets there sooner, Seconds the longest it takes; 0 goes by Seconds. Past max: further out than the game's own limit lets you.",
+	zoomRand = "Zooms somewhere between the two, picked each time it runs: yards from you, or from your distance as it started. Top speed and Past max as for Zoom.",
 	lineup = "Turns back to straight behind you, however far round it is.",
 	wait = "Holds still. A short wait also gives the game a moment between moves.",
 	together = "Runs the steps inside it at once; it's done when the longest is. Pick it and add steps to put them inside.",
 	["repeat"] = "Runs the steps inside it again. 0 times: until the camera ends (the preview shows three).",
 	emote = "Your character does this emote (a word, like wave or cheer).",
-	putback = "Undoes every turn, tilt and zoom this script made.",
+	putback = "Undoes every turn, tilt and zoom this script made. Zoom too off: the zoom stays, for a Zoom beside it in a Together to bring back at its own speed.",
 	turnTo = "Behind: the game's camera follow brings it round behind you, as the vista camera lines up. In front: turns to face you, counted from where it started.",
 	sway = "A random spot within Arc of behind (or in front), At least that far on; then it creeps on at Drift degrees a second through Pause, easing off before the edge. Middle: favor spots near the middle.",
 	tiltRand = "A random height: Middle degrees down (negative: up), give or take Down and Up. It waits for a turn to finish.",
@@ -69,7 +72,8 @@ local HINTS = {
 	["until"] = "Waits until a Hearthstone or teleport cast is that many seconds from done, you're that many seconds from landing (on a route you've flown before), you're back to life, or the seconds go by. Steps inside it run meanwhile and ease to a stop when it's time.",
 	waitRand = "Waits somewhere between the two, picked each time.",
 	follow = "From here on, after you turn and hold still this many seconds, camera follow glides the camera back behind you, as the RP walk and auto-run cameras do.",
-	aim = "Where you clicked: turns Degrees toward the side of the screen you clicked who you're talking to, as the quest cam does. Who's talking: swings toward the NPC talking now by their chat bubble, leaving them Degrees off the middle, as Chat Cam does. Not found (opened with a key, no bubble on screen): a turn either way, or stay.",
+	aim = "Where you clicked: turns Degrees toward the side of the screen you clicked who you're talking to, as the quest cam does. Who's talking: swings toward the NPC talking now by their chat bubble, leaving them Degrees off the middle, as Chat Cam does. Not found (opened with a key, no bubble on screen): a turn either way, stay, or look round (a full turn at most) for their bubble. Top speed (degrees a second): slower than Seconds if the turn would go faster; 0 goes by Seconds.",
+	play = "Plays another camera's steps here, as they are now (a built-in one with your settings), then goes on. Not its stop rules or When it ends.",
 }
 local function Translate(map)
 	for key, text in pairs(map) do map[key] = L[text] end
@@ -151,10 +155,14 @@ local function StepText(step)
 			or L["Spin, speeding up to %s°/s, until it ends"]:format(Num(step.max)))
 	elseif k == "wait" then
 		return L["Wait %s s"]:format(Num(step.secs))
+	elseif k == "play" then
+		local played = ns.FindCameraScript(step.script)
+		return L["Play %s"]:format(played and played.name or step.script)
 	elseif k == "emote" then
 		return L["Do /%s"]:format(step.token)
 	elseif k == "putback" then
-		return L["Put everything back over %s s"]:format(Num(step.secs))
+		return (step.zoom == "no" and L["Put the turn and tilt back over %s s"] or L["Put everything back over %s s"]):format(
+			Num(step.secs))
 	elseif k == "together" then
 		return #step.steps == 0 and L["Together (empty: pick it and add steps)"] or L["Together: these at once"]
 	elseif k == "repeat" then
@@ -688,7 +696,7 @@ end
 -- script's id. own: a camera that isn't a script yet (its value in
 -- ns.CAMERA_NAMES, and the steps it waits for).
 local CAMERA_LIST = {
-	{ section = "At rest", color = { 0.3, 0.7, 0.5 }, items = { "cozy", "vista", "fish", "afk", "tele", "still" } },
+	{ section = "At rest", color = { 0.3, 0.7, 0.5 }, items = { "cozy", "vista", "fish", "afk", "tele" } },
 	{ section = "Travel", color = { 0.35, 0.6, 0.9 }, items = { "flight", "flyby", "walk", "run" } },
 	{ section = "Moments", color = { 0.65, 0.45, 0.9 }, items = { "quest", "chat", "death" } },
 	{ section = "Yours", color = { 0.92, 0.62, 0.3 }, mine = true },
@@ -762,13 +770,29 @@ local function MakeEditor(content)
 		end
 		slot.box:SetScript("OnEnterPressed", function(self) Commit(self) self:ClearFocus() end)
 		slot.box:SetScript("OnEditFocusLost", Commit)
-		slot.pick = Choice(editor, 98, function() return slot.field and slot.field[3] or {} end,
+		-- (A camera to play: every one but this, by name.)
+		local function Choices()
+			if not slot.field then return {} end
+			if slot.field[2] ~= "script" then return slot.field[3] end
+			local ids = {}
+			for _, script in ipairs(ns.CameraScripts()) do
+				if script.id ~= (page.script and page.script.id) then ids[#ids + 1] = script.id end
+			end
+			return ids
+		end
+		slot.pick = Choice(editor, 98, Choices,
 			function() return editor.step and slot.field and editor.step[slot.field[1]] end,
 			function(choice)
 				editor.step[slot.field[1]] = choice
 				slot.pick:Refresh()
 				page.Changed()
-			end, function(choice) return CHOICE_NAMES[choice] or choice end)
+			end, function(choice)
+				if slot.field and slot.field[2] == "script" then
+					local script = ns.FindCameraScript(choice)
+					return script and script.name or choice
+				end
+				return slot.field and CHOICE_NAMES[slot.field[1] .. "." .. choice] or CHOICE_NAMES[choice] or choice
+			end)
 		slot.pick:SetPoint("LEFT", slot.label, "RIGHT", 6, 0)
 		editor.slots[i] = slot
 	end
@@ -788,11 +812,12 @@ local function MakeEditor(content)
 			local field = not locked and fields[i]
 			slot.field = field or nil
 			slot.label:SetShown(field and true or false)
-			slot.box:SetShown(field and field[2] ~= "pick" or false)
-			slot.pick:SetShown(field and field[2] == "pick" or false)
+			local picked = field and (field[2] == "pick" or field[2] == "script") or false
+			slot.box:SetShown(field and not picked or false)
+			slot.pick:SetShown(picked)
 			if field then
 				slot.label:SetText(FIELD_NAMES[step.k .. "." .. field[1]] or FIELD_NAMES[field[1]] or field[1])
-				if field[2] == "pick" then
+				if picked then
 					slot.pick:Refresh()
 				else
 					slot.box:SetText(field[2] == "num" and Num(step[field[1]]) or step[field[1]])
@@ -1066,6 +1091,45 @@ function ns.CreateCameraScriptsPanel(kit)
 		row.rule = rule
 		page.ruleRows[i] = row
 	end
+	-- Below them, while it runs: its Edge haze (a percent) and a Stop button
+	-- (script.haze, script.button).
+	page.optHeader = kit.Label(content, "GameFontNormal", L["While it runs"])
+	page.optRows = {}
+	for i, key in ipairs({ "haze", "button" }) do
+		local row = CreateFrame("Frame", nil, content)
+		row:SetSize(WIDTH, 26)
+		row.key = key
+		row.label = kit.Label(row, "GameFontHighlightSmall", key == "haze" and L["Edge haze"] or L["Stop button"])
+		row.label:SetPoint("LEFT", 8, 0)
+		row.label:SetWidth(126)
+		if key == "haze" then
+			row.box = Box(row, 40)
+			row.box:SetPoint("LEFT", 136, 0)
+			row.unit = kit.Label(row, "GameFontHighlightSmall", "%")
+			row.unit:SetPoint("LEFT", row.box, "RIGHT", 4, 0)
+			local function Commit(box)
+				local value = tonumber(box:GetText())
+				if value and page.script and not page.locked then
+					page.script.haze = math.max(0, math.min(100, value)) / 100
+					page.Changed()
+				end
+				box:SetText(page.script and Num(page.script.haze * 100) or "")
+			end
+			row.box:SetScript("OnEnterPressed", function(self) Commit(self) self:ClearFocus() end)
+			row.box:SetScript("OnEditFocusLost", Commit)
+			kit.Tooltip(row.box, L["A soft haze round the edges of the screen while this camera runs, as if it had focused on you. 0 leaves it off. Needs Camera haze on the Visual Effects page, which also turns it up or down."])
+		else
+			row.pick = Choice(row, 150, function() return { "no", "yes" } end,
+				function() return page.script and (page.script.button and "yes" or "no") end,
+				function(choice)
+					page.script.button = choice == "yes" or nil
+					page.Changed()
+				end, function(choice) return choice == "yes" and L["Show it"] or L["No button"] end)
+			row.pick:SetPoint("LEFT", 136, 0)
+			kit.Tooltip(row.pick, L["A Stop camera button on screen while its steps run (under the release popup when you're dead): click it for your own view back, until what started it is over."])
+		end
+		page.optRows[i] = row
+	end
 
 	-- Picks a camera for the page: a script's id, or a list entry (a camera
 	-- that isn't a script yet).
@@ -1211,7 +1275,7 @@ function ns.CreateCameraScriptsPanel(kit)
 	local tabsPanel, tabs, ShowTab, tabsBase
 	tabsPanel, tabs, ShowTab, tabsBase = ns.FolderTabs(content, {
 		{ L["Script"], L["The camera's steps, in order, and what it does when it ends."] },
-		{ L["Stop rules"], L["What happens when you move the camera, a fight starts, you walk, you zoom or its trigger ends."] },
+		{ L["Stop rules"], L["What happens when you move the camera, a fight starts, you walk, you zoom or its trigger ends; and its edge haze and Stop button while it runs."] },
 	}, function(i)
 		page.tab, page.selected = i, nil
 		ShowTab(i)
@@ -1456,6 +1520,8 @@ function ns.CreateCameraScriptsPanel(kit)
 			page.tipStarts = nil
 			for _, bar in pairs(page.addBars) do bar:Hide() end
 			for _, row in ipairs(page.ruleRows) do row:Hide() end
+			for _, row in ipairs(page.optRows) do row:Hide() end
+			page.optHeader:Hide()
 			PlaceRuleSettings(nil)
 			HideTabs()
 			y = -84
@@ -1506,6 +1572,8 @@ function ns.CreateCameraScriptsPanel(kit)
 					y = y - 6 - page.addHeight
 				end
 				for _, row in ipairs(page.ruleRows) do row:Hide() end
+				for _, row in ipairs(page.optRows) do row:Hide() end
+				page.optHeader:Hide()
 			else
 				page.addBars.steps:Hide()
 				-- A dropdown each; a built-in camera's greyed (Copy it to change
@@ -1529,6 +1597,31 @@ function ns.CreateCameraScriptsPanel(kit)
 					end
 					y = y - 26
 					if set then y = PlaceRuleSettings(key, set, y) end
+				end
+				-- While it runs: the haze and the Stop button (a built-in
+				-- camera's made from settings: those instead).
+				page.optHeader:Show()
+				page.optHeader:SetPoint("TOPLEFT", COL + 8, y - 12)
+				y = y - 34
+				for _, row in ipairs(page.optRows) do
+					local set = page.locked and script.ruleSet and script.ruleSet[row.key]
+					row:Show()
+					row:SetPoint("TOPLEFT", COL, y)
+					local control = row.box or row.pick
+					control:SetShown(not set)
+					if row.unit then row.unit:SetShown(not set) end
+					if not set then
+						if row.box then
+							row.box:SetEnabled(not page.locked)
+							if not row.box:HasFocus() then row.box:SetText(Num(script.haze * 100)) end
+						else
+							row.pick:Refresh()
+							if row.pick.SetEnabled then row.pick:SetEnabled(not page.locked) end
+							row.pick:SetAlpha(page.locked and 0.6 or 1)
+						end
+					end
+					y = y - 26
+					if set then y = PlaceRuleSettings(row.key, set, y) end
 				end
 			end
 			tabsPanel:SetHeight(panelTop - y + 8)

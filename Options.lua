@@ -234,6 +234,7 @@ local function Stack(anchor, kind, inline)
 	-- place it sits (children of a checkbox); the next control is placed from it.
 	function stack:Add(control, controlKind, indent)
 		if Moved(control) then return control end
+		if self.moved then self.moved.left = true end -- (its section still has settings: a tab of its own)
 		if self.waiting then
 			local header = self.waiting
 			self.waiting = nil
@@ -2585,37 +2586,83 @@ local PLACES = {
 	{ "Raids", L["Raids"] }, { "PvP", L["PvP"] },
 }
 
--- The Camera Settings page: every camera's settings on one page, each in a
--- section that opens and closes with a click on its name (all closed to
--- start). Each camera is laid out on its section's body as it once was on a
--- page of its own; CameraSection gives the body and the title to build under.
+-- The Camera Settings page: the camera settings no Scripts page step uses
+-- yet, a folder tab for each camera that still has some (cameras whose
+-- settings have all moved get none). Each camera is laid out on its
+-- section's body as it once was on a page of its own; CameraSection gives
+-- the body and the title to build under. The tab last picked is kept across
+-- reloads (SectionState, its id "Camera Settings/tab", open the camera's key).
 local SECTION_HEADER = 30 -- height of a section's name row
 local SECTION_GAP = 6
--- In order: { frame, body, icon, reset, name, open }. cameraSections.focus: the
+-- In order: { frame, body, icon, reset, name, key, open }. cameraSections.focus: the
 -- one camera shown (its icon picked in the Camera hub), open, the rest hidden.
+-- cameraSections.tabs: the folder tabs (panel, tab buttons, Show), once made.
 local cameraSections = {}
 local cameraSettingsContent, cameraSettingsTop -- the page's content, and what the first section goes under
+local cameraTabPicked = { id = "Camera Settings/tab", open = false }
+
+-- Whether a section still has settings of its own (not all on the Scripts page).
+local function SectionHasSettings(section)
+	local moved = movedFrom[section.body]
+	return not moved or moved.left == true
+end
 
 local function LayoutCameraSections()
-	local focus = cameraSections.focus
+	local focus, tabs = cameraSections.focus, cameraSections.tabs
 	-- (one camera on its own: its name row is the page's title)
 	cameraSettingsTop:SetShown(not focus)
 	cameraSettingsTop.title:SetShown(not focus)
+	-- In tabs: the one picked (the first with settings, if none is yet).
+	local picked
+	if tabs and not focus then
+		SectionState.Restore(cameraTabPicked)
+		local first, saved
+		for i, section in ipairs(cameraSections) do
+			local has = SectionHasSettings(section)
+			tabs.buttons[i]:SetShown(has)
+			if has then
+				first = first or section
+				if section.key == cameraTabPicked.open then saved = section end
+			end
+		end
+		picked = saved or first
+		tabs.panel:SetShown(picked ~= nil)
+		tabs.empty:SetShown(picked == nil)
+		for i, section in ipairs(cameraSections) do
+			if section == picked then tabs.Show(i) end
+		end
+	else
+		if tabs then
+			tabs.panel:Hide()
+			tabs.empty:Hide()
+			for _, button in ipairs(tabs.buttons) do button:Hide() end
+		end
+	end
 	local above
 	for _, section in ipairs(cameraSections) do
 		SectionState.Restore(section)
-		local shown, open = not focus or focus == section, section.open or focus == section
+		local shown, open
+		if tabs and not focus then
+			shown, open = section == picked, section == picked
+		else
+			shown, open = not focus or focus == section, section.open or focus == section
+		end
 		section.frame:SetShown(shown)
 		if shown then
 			section.frame:ClearAllPoints()
-			if above then
-				section.frame:SetPoint("TOPLEFT", above, "BOTTOMLEFT", 0, -SECTION_GAP)
-			elseif focus then
-				section.frame:SetPoint("TOPLEFT", cameraSettingsContent, "TOPLEFT", 16, -12)
+			if tabs and not focus then
+				section.frame:SetPoint("TOPLEFT", tabs.panel, "TOPLEFT", 30, -12)
+				section.frame:SetPoint("RIGHT", tabs.panel, "RIGHT", -12, 0)
 			else
-				section.frame:SetPoint("TOPLEFT", cameraSettingsTop, "BOTTOMLEFT", 0, -16)
+				if above then
+					section.frame:SetPoint("TOPLEFT", above, "BOTTOMLEFT", 0, -SECTION_GAP)
+				elseif focus then
+					section.frame:SetPoint("TOPLEFT", cameraSettingsContent, "TOPLEFT", 16, -12)
+				else
+					section.frame:SetPoint("TOPLEFT", cameraSettingsTop, "BOTTOMLEFT", 0, -16)
+				end
+				section.frame:SetPoint("RIGHT", cameraSettingsContent, "RIGHT", -16, 0)
 			end
-			section.frame:SetPoint("RIGHT", cameraSettingsContent, "RIGHT", -16, 0)
 			above = section.frame
 		end
 		section.body:SetShown(open)
@@ -2624,10 +2671,14 @@ local function LayoutCameraSections()
 			height = math.max(height, (ContentDepth(section.body) or 0) + 12)
 		end
 		section.frame:SetHeight(height)
+		if tabs and not focus and section == picked then
+			tabs.panel:SetHeight(height + 24)
+		end
 		section.icon:SetTexture(open and "Interface\\Buttons\\UI-MinusButton-Up"
 			or "Interface\\Buttons\\UI-PlusButton-Up")
-		-- (on its own: it can't close, and the hub's Reset page resets it)
-		section.icon:SetShown(not focus)
+		-- (on its own or in a tab: it can't close; on its own the hub's Reset
+		-- page resets it)
+		section.icon:SetShown(not focus and not tabs)
 		section.reset:SetShown(not focus)
 		if section.test then
 			section.test:ClearAllPoints()
@@ -2661,7 +2712,7 @@ StaticPopupDialogs.CINEMATIC_RESET_SECTION = {
 -- title itself is in the name row). key: its name in English, for what's
 -- remembered of it.
 local function CameraSection(name, key)
-	local section = { open = false, id = "Camera Settings/" .. key }
+	local section = { open = false, id = "Camera Settings/" .. key, key = key }
 	local frame = CreateFrame("Frame", nil, cameraSettingsContent)
 	local previous = cameraSections[#cameraSections]
 	if previous then
@@ -2698,7 +2749,7 @@ local function CameraSection(name, key)
 	local title = Label(header, "GameFontNormalLarge", name)
 	title:SetPoint("LEFT", header, "LEFT", 18, 0)
 	header:SetScript("OnClick", function()
-		if cameraSections.focus then return end
+		if cameraSections.focus or cameraSections.tabs then return end
 		SectionState.Save(section, not section.open)
 		RelayoutCameraSections()
 	end)
@@ -2753,6 +2804,9 @@ local function CameraSection(name, key)
 	function body.openSection()
 		if section.selectTab then
 			section.selectTab()
+		elseif cameraSections.tabs then
+			SectionState.Save(cameraTabPicked, section.key)
+			RelayoutCameraSections()
 		elseif not section.open then
 			SectionState.Save(section, true)
 			RelayoutCameraSections()
@@ -3482,9 +3536,9 @@ local function CreateCameraSettingsPanel()
 	cameraSettingsContent = content
 	local title = Label(content, "GameFontNormalLarge", L["Camera Settings"])
 	title:SetPoint("TOPLEFT", 16, -16)
-	local subtitle = PageIntro(content, title, L["Each camera's own settings. Click a " ..
-		"camera's name to open its settings, and again to close them. The Scenes page has what " ..
-		"starts each one."])
+	local subtitle = PageIntro(content, title, L["Camera settings that aren't on the Scripts page yet, a tab " ..
+		"for each camera that has some. The rest of each camera's settings are on the Scripts page, under the steps " ..
+		"they make; the Scenes page has what starts each one."])
 	cameraSettingsTop = subtitle
 	subtitle.title = title
 	-- (Greyed with the camera modes' switch, which is on the Cameras page.)
@@ -3503,6 +3557,21 @@ local function CreateCameraSettingsPanel()
 	if ns.ChatCamCommand then -- (ChatCam.lua)
 		CreateChatCamPanel()
 	end
+
+	-- A folder tab for each camera (those with settings left: see
+	-- LayoutCameraSections), the picked one's section on the panel under them.
+	local tabList = {}
+	for i, section in ipairs(cameraSections) do tabList[i] = { section.name } end
+	local panel, buttons, Show, base, height = ns.FolderTabs(content, tabList, function(i)
+		SectionState.Save(cameraTabPicked, cameraSections[i].key)
+		RelayoutCameraSections()
+	end) -- (one row: only the cameras with settings left show)
+	panel:SetPoint("TOPLEFT", subtitle, "BOTTOMLEFT", -8, -(height + 16))
+	panel:SetPoint("RIGHT", content, "RIGHT", -16, 0)
+	base:SetPoint("TOPLEFT", panel, "TOPLEFT")
+	local empty = Label(content, "GameFontHighlight", L["Every camera's settings are on the Scripts page now."])
+	empty:SetPoint("TOPLEFT", subtitle, "BOTTOMLEFT", 0, -16)
+	cameraSections.tabs = { panel = panel, buttons = buttons, Show = Show, empty = empty }
 
 	canvas:SetScript("OnShow", function()
 		Refresh()
@@ -4636,8 +4705,13 @@ local function CreateCamerasPanel()
 		"by hand cancels them all, and everything goes back to normal when the UI returns."] .. "\n\n" ..
 		L["In the camera modes, the minimap and quest tracker hover holds and the buff and chat " ..
 		"peeks use their short default times, so they clear the view quickly."])
+	local switch = CameraModesSwitch(content, subtitle)
+	local stack = Stack(switch, "check")
+	local helper = stack:Add(Check(content, "minimapCameras", L["Camera Helper"],
+		L["While a camera is running, the minimap button's menu and tooltip list it with a link to its tab " ..
+		"on this page."]), "check")
 	-- (Every camera as an icon, each opening a tab of its own: CameraManager.lua.)
-	ns.CameraManager(ns.lowHealthKit, canvas, content, title, subtitle, CameraModesSwitch(content, subtitle))
+	ns.CameraManager(ns.lowHealthKit, canvas, content, title, subtitle, switch, helper)
 	canvas:SetScript("OnShow", PageShown(Refresh, content))
 	canvas:Hide()
 	RegisterSubpage(canvas, "Cameras")
