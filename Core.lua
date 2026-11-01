@@ -4706,6 +4706,15 @@ ticker:SetScript("OnEvent", ns.Profiled("Core events", function(self, event, arg
 			end
 			ns.db.storyVisionRowsV1 = true
 		end
+		-- The Zone name card is a chapter line now (the zone under its line):
+		-- the Title it started on goes over, saved profiles too. Once.
+		if not ns.db.storyZoneStyleV1 then
+			if ns.db.storyZoneStyle == "title" then ns.db.storyZoneStyle = "chapter" end
+			for _, saved in pairs(ns.db.profiles or {}) do
+				if type(saved) == "table" and saved.storyZoneStyle == "title" then saved.storyZoneStyle = "chapter" end
+			end
+			ns.db.storyZoneStyleV1 = true
+		end
 		-- The Style pages' shared settings (bar texture, font, outline) follow
 		-- the Style hub's General page now: everyone's start on General, saved
 		-- profiles dropping theirs. Once.

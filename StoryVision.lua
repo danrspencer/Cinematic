@@ -357,7 +357,7 @@ function ns.CreateStoryVisionPanel(kit)
 			"over the name."])
 		TestButton(kit, content, card, TESTS.zone)
 		local subzones = stack:Add(kit.Check(content, "storyZoneSubzones", L["Subzones too"],
-			L["A card as you come into a subzone (a town, a camp, a landing) too, the zone's name small over it."]),
+			L["A card as you come into a subzone (a town, a camp, a landing) too, the zone's name small under it."]),
 			"check")
 		kit.GreyUnless(subzones, function(db) return db.storyZoneCard end)
 	end)

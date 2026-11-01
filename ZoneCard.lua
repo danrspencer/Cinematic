@@ -14,7 +14,7 @@ local DEFAULTS = ns.DEFAULTS
 DEFAULTS.storyZoneCard = false        -- Story Vision's Zone name row (off: the game's own)
 DEFAULTS.storyZoneSubzones = true     -- ...a card as you come into a subzone, too
 DEFAULTS.storyZonePlace = "third"     -- "screen", "top" or "bottom" bar, "third" (Battle Vision's)
-DEFAULTS.storyZoneStyle = "title"     -- "title", "subtitle" or "chapter"
+DEFAULTS.storyZoneStyle = "chapter"   -- "title", "subtitle" or "chapter"
 DEFAULTS.storyZoneAnim = "track"      -- "fade", "reveal", "track" or "type"
 DEFAULTS.storyZoneAlign = "center"    -- in a bar: "left", "center" or "right"
 DEFAULTS.storyZoneSize = 36           -- the name's height on the screen
@@ -87,8 +87,8 @@ function ns.ZoneCardLook(look)
 end
 
 -- A card { name, sub, meta }: a new zone's name, its subzone and territory
--- under it; or a subzone's name, the zone over it. meta: over the name in
--- place of the zone (the time of day, at login). territory: nil, the game's.
+-- under it; or a subzone's name, the zone and territory under it. meta: over
+-- the name (the time of day, at login). territory: nil, the game's.
 function ns.ZoneCardText(look, zone, subzone, territory, newArea, meta)
 	look = look or ns.StyleLook("storyVision")
 	territory = territory or Text(PVPInfoTextString)
@@ -98,7 +98,7 @@ function ns.ZoneCardText(look, zone, subzone, territory, newArea, meta)
 		if subzone ~= "" and subzone ~= zone then under[#under + 1] = subzone end
 	else
 		name = subzone ~= "" and subzone or zone
-		meta = meta or (zone ~= name and zone or nil)
+		if zone ~= "" and zone ~= name then under[#under + 1] = zone end
 	end
 	if look.storyZoneTerritory and territory ~= "" then under[#under + 1] = territory end
 	if name == "" then return nil end
