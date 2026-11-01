@@ -11,6 +11,10 @@
 local _, ns = ...
 
 ns.CHANGELOG_FEATURES = {
+	{ date = "2026-11-01", title = "Why is it showing?",
+		text = "Type /cine why, or pick it from the minimap button's menu, then click any frame to see why it's " ..
+		"showing or hidden right now and which settings say so. It works on other addons' frames, Cinematic's " ..
+		"own (like quest talk), and the last tooltip too." },
 	{ date = "2026-10-31", page = "Cameras", title = "Every camera at a glance",
 		text = "The Camera hub's General page now shows every camera, built in and yours, as an icon. Click one " ..
 		"to open a tab with its script and the scenes that play it, and jump straight to either." },

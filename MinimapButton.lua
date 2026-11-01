@@ -220,6 +220,8 @@ local function ShowMenu(owner)
 				"\"Show minimap button\" option."])
 		end)
 		root:CreateDivider()
+		-- (A frame later: the menu's own click is done with by then.)
+		root:CreateButton(L["Why is it showing?"], function() C_Timer.After(0, ns.ToggleInspect) end)
 		root:CreateButton(L["Open settings"], ns.OpenOptions)
 	end)
 	-- The menu opens at the cursor and is only kept on screen; keep it a little

@@ -8,6 +8,7 @@
 -- Chat bubbles page's Text only, and at its text size. Newer lines push older
 -- ones up; each fades out after a while, longer for longer lines.
 local _, ns = ...
+local L = ns.L
 
 local MAX_LINES = 3
 local GAP = 4 -- between lines
@@ -196,6 +197,12 @@ local function NewLine()
 	text:SetFontObject(Font())
 	text:SetJustifyV("BOTTOM")
 	text:SetWordWrap(true)
+	-- (Inspect, Why.lua: its words, as the line's own frame is a pixel high.)
+	if ns.WhyRegister then
+		ns.WhyRegister(text, L["Off-screen bubble"], "Chat bubbles", {
+			L["Show off-screen bubbles is on: a say or yell from someone you can't see shows here " ..
+				"instead of bringing up the chat window"] })
+	end
 	return { frame = frame, text = text }
 end
 

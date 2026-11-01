@@ -7003,7 +7003,8 @@ function ns.UpdateFrames(cinematic, elapsed)
 	-- The raid-style party frames set apart from the raid frames (Standard
 	-- Frames page): their own rows (rspGroup) decide for them, not the raid frames'.
 	local ownPartyRows = ns.db.raidStylePartySame == false
-	if cinematic and ns.db.mouseover then
+	-- (Not while Inspect is picking frames, Why.lua: pointing at one would bring it up.)
+	if cinematic and ns.db.mouseover and not ns.whyPicking then
 		local mouseRows = wipe(tickTables.mouseRows)
 		-- (Asked of every faded frame, many times a second: with the mouse
 		-- still, on the same thing, each frame's answer stands, asked again a
@@ -7261,6 +7262,12 @@ function ns.UpdateFrames(cinematic, elapsed)
 			target = 0
 		elseif ns.previewRows and not immersive then
 			target = ns.previewRows[row] and 1 or 0
+		end
+		-- (Inspect, Why.lua: what decided it, for the frame being looked at.)
+		if ns.whyLook and ns.whyLook[entry] then
+			ns.WhyNote(entry, target, row, cinematic, hovered, triggered, tracking, listShown, fightingShown,
+				chatShowing, typingShown, deathFade, deathKept[row], immersive, follows, events, keepIndoors,
+				questTimerUp, durabilityUp, petUnhappyUp, hoverGroups, offWhen, combatShown)
 		end
 		if entry.frame == Minimap then
 			RedrawMinimapWhenShown()

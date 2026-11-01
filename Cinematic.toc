@@ -119,6 +119,7 @@ Focus.lua
 Tracking.lua
 NodeSweep.lua
 Slash.lua
+Why.lua
 ProfileModules.lua
 ProfileChoices.lua
 Profiles.lua

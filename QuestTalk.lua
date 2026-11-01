@@ -871,6 +871,12 @@ end
 
 local function CreateBubble()
 	bubble = CreateFrame("Button", "CinematicQuestTalkBubble", UIParent, BackdropTemplateMixin and "BackdropTemplate")
+	if ns.WhyRegister then
+		ns.WhyRegister(bubble, L["Quest talk"], "Quest Vision", {
+			L["Quest talk is on: talking to an NPC, what they say and what you can say back show here " ..
+				"instead of the game's window"],
+			L["Show the game's window brings the game's own window back for the rest of the conversation"] })
+	end
 	bubble:SetFrameStrata("HIGH")
 	bubble:SetClampedToScreen(true)
 	bubble:RegisterForClicks("LeftButtonUp", "RightButtonUp")
@@ -2028,6 +2034,12 @@ end
 
 local function CreatePanel()
 	panel = CreateFrame("Frame", "CinematicQuestTalkPanel", UIParent, BackdropTemplateMixin and "BackdropTemplate")
+	if ns.WhyRegister then
+		ns.WhyRegister(panel, L["Quest talk"], "Quest Vision", {
+			L["Quest talk is on: talking to an NPC, what they say and what you can say back show here " ..
+				"instead of the game's window"],
+			L["Show the game's window brings the game's own window back for the rest of the conversation"] })
+	end
 	panel:SetFrameStrata("HIGH")
 	panel:SetWidth(PANEL_WIDTH)
 	panel:SetClampedToScreen(true)

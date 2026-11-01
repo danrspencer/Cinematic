@@ -5,6 +5,7 @@
 -- line stays up as long as speech from behind you would (ns.SpeechLife); a
 -- new one takes its place.
 local _, ns = ...
+local L = ns.L
 
 local FADE_IN, FADE_OUT = 0.25, 0.4 -- seconds
 local WIDTH = 0.6  -- share of the screen's width the words wrap at
@@ -36,6 +37,12 @@ local function Slot(i)
 	text:SetWordWrap(true)
 	text:SetShadowColor(0, 0, 0, 1)
 	text:SetShadowOffset(1, -1)
+	-- (Inspect, Why.lua: its words, as the slot's own frame is a pixel.)
+	if ns.WhyRegister then
+		ns.WhyRegister(text, L["Chat Cam subtitle"], "Cameras", {
+			L["Chat Cam's Ultra immersive is on: while a conversation has the camera, says and yells " ..
+				"show as subtitles"] })
+	end
 	slots[i] = { frame = frame, name = name, text = text }
 	return slots[i]
 end

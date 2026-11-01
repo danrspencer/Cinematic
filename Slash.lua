@@ -52,6 +52,7 @@ local function PrintHelp()
 	Command("/cine add mode", L["pick up every frame you hover over, then again to fade them all"])
 	Command("/cine keep", L["always show it"])
 	Command("/cine list", L["show the extra faded frames"])
+	Command("/cine why", L["click any frame to see why it's showing or hidden"])
 	Heading(L["Camera"])
 	Command("/cine behind", L["swing the camera back behind your character"])
 	Command("/cine flyby", L["turn the camera slowly round to look back, then back behind you (again to stop)"])
@@ -165,6 +166,7 @@ local function PrintDebugHelp()
 	print("  /cine debug portrait - the portrait-until-full rule")
 	print("  /cine debug tracking - which tracking is active")
 	print("  /cine debug tooltip - trace the world tooltip hold-back (10 seconds)")
+	print("  /cine debug why - what Inspect (/cine why) finds under the cursor, the chat windows and the last tooltip")
 	print("  /cine debug <group> - faded frames in a group (hover first; default minimap)")
 	print("  /cine speed - your speed, two ways")
 	print("  /cine facing - whether turning can be detected (10 seconds)")
@@ -259,6 +261,10 @@ local function HandleSlash(msg)
 		end
 	elseif cmd == "remove" or cmd == "keep" then
 		ns.RemoveUnderMouse()
+	elseif cmd == "why" then
+		ns.ToggleInspect()
+	elseif cmd == "debug" and arg == "why" then
+		ns.DebugInspect()
 	elseif cmd == "button" then
 		ns.ToggleMinimapButton()
 	elseif cmd == "behind" then
