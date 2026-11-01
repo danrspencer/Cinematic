@@ -2,12 +2,12 @@
 -- the middle of the screen, standing still, brings up a campfire icon right
 -- under the cursor; clicking it sits, kneels or lies down (as ticked), so you
 -- needn't type the emote. Moving the cursor off it, or moving, puts it away.
--- (campfireSitButton, on the Quality of life page; WoW Forever only.)
+-- (campfireSitButton, on the Quality of life page.)
 local ADDON_NAME, ns = ...
 
 -- A campfire's name in each game language (the game's own, whatever language
--- Cinematic shows): any world tooltip with this in its first line counts, so
--- "Basic Campfire" (the one you light) does too.
+-- Cinematic shows): campfireNames' default. Any world tooltip with one of its
+-- words in its first line counts, so "Basic Campfire" (the one you light) does too.
 local CAMPFIRE_NAMES = {
 	enUS = "campfire", enGB = "campfire",
 	deDE = "lagerfeuer",
@@ -20,7 +20,23 @@ local CAMPFIRE_NAMES = {
 	zhCN = "篝火",
 	zhTW = "營火",
 }
-local campfireName = CAMPFIRE_NAMES[GetLocale()] or "campfire"
+local lastText -- (the world tooltip's first line, last looked at)
+ns.DEFAULTS.campfireNames = CAMPFIRE_NAMES[GetLocale()] or "campfire"
+
+-- campfireNames' words, lower case (worked out again only when it changes).
+local namesText, names = nil, {}
+local function CampfireNames()
+	local text = ns.db and ns.db.campfireNames or ns.DEFAULTS.campfireNames
+	if text ~= namesText then
+		namesText, names = text, {}
+		for word in (text or ""):gmatch("[^,]+") do
+			word = word:match("^%s*(.-)%s*$"):lower()
+			if word ~= "" then names[#names + 1] = word end
+		end
+		lastText = nil -- (the tooltip looked at again with the new words)
+	end
+	return names
+end
 
 local CENTER_REACH = 0.1 -- how near the middle the cursor must be: this much of the screen's height
 local OBJECT_REACH = 40  -- UI units the cursor may wander from where a hidden tooltip's campfire was found
@@ -67,7 +83,7 @@ local TENT_NAMES = { "camp tent", "tanning rack" }
 -- Whether a world tooltip is up and its first line can be read. What that line
 -- names (lastWasCampfire, lastWasTent) is worked out only when it changes, so
 -- looking often makes no garbage.
-local lastText, lastWasCampfire, lastWasTent
+local lastWasCampfire, lastWasTent
 local function LookAtTooltip()
 	if not ns.Flag(GameTooltip:IsShown()) then
 		return false
@@ -80,10 +96,17 @@ local function LookAtTooltip()
 	if not ok or type(text) ~= "string" or (issecretvalue and issecretvalue(text)) then
 		return false
 	end
+	local words = CampfireNames()
 	if text ~= lastText then
 		local lower = text:lower()
 		lastText = text
-		lastWasCampfire = lower:find(campfireName, 1, true) ~= nil
+		lastWasCampfire = false
+		for _, word in ipairs(words) do
+			if lower:find(word, 1, true) then
+				lastWasCampfire = true
+				break
+			end
+		end
 		lastWasTent = false
 		for _, name in ipairs(TENT_NAMES) do
 			if lower:find(name, 1, true) then
@@ -102,7 +125,7 @@ end
 
 -- Times you can't (or wouldn't) sit down by a fire.
 local function CanSit()
-	if ns.isRetail or not ns.Setting("campfireSitButton") then
+	if not ns.Setting("campfireSitButton") then
 		return false
 	end
 	if (ns.IsSitting and ns.IsSitting()) or InCombatLockdown() or ns.Flag(UnitAffectingCombat("player")) or ns.Flag(UnitIsDeadOrGhost("player"))
@@ -336,9 +359,10 @@ local function OnUpdate(_, elapsed)
 		if not CanSit() then
 			if alpha == 0 and not blockedLogged and ns.Setting("campfireSitButton") and TooltipIsCampfire() then
 				blockedLogged = true
-				ns.Log("campfire", ("on a campfire, but no button: sitting %s, combat %s, mounted %s"):format(
-					tostring(ns.IsSitting and ns.IsSitting()), tostring(InCombatLockdown()),
-					tostring(IsMounted and ns.Flag(IsMounted()))))
+				ns.Log("campfire", ("on a campfire, but no button: sitting %s, combat %s, mounted %s, dead %s, " ..
+					"taxi %s, vehicle %s"):format(tostring(ns.IsSitting and ns.IsSitting()), tostring(InCombatLockdown()),
+					tostring(IsMounted and ns.Flag(IsMounted())), tostring(ns.Flag(UnitIsDeadOrGhost("player"))),
+					tostring(ns.Flag(ns.OnTaxi())), tostring(UnitInVehicle and ns.Flag(UnitInVehicle("player")))))
 			end
 			lastSeen, dismissed, hoverSince = -math.huge, false, nil
 		elseif onFire and not ns.playerMoving and NearCenter(CursorPosition()) then
@@ -358,6 +382,11 @@ local function OnUpdate(_, elapsed)
 			end
 		else
 			hoverSince = nil
+			if onFire and alpha == 0 and not blockedLogged then
+				blockedLogged = true
+				ns.Log("campfire", ("on a campfire, but no button: moving %s, cursor near the middle %s"):format(
+					tostring(ns.playerMoving), tostring(NearCenter(CursorPosition()))))
+			end
 			if not onFire then
 				dismissed = false
 				blockedLogged = false
@@ -478,6 +507,22 @@ local CAMP_BENEFITS = 1229741 -- Camp Benefits' spell ID
 local RENEWED = 5 -- seconds its end must move later by to count as renewed
 local campBenefitsName -- (by name where the game can't look up an aura by ID)
 
+-- Whether this client has Camp Benefits at all (WoW Forever's Welcoming
+-- Campfire): the stand-up option shows only then.
+local hasCampBenefits -- (looked up once)
+function ns.HasCampBenefits()
+	if hasCampBenefits == nil then
+		local ok, name = pcall(function()
+			if C_Spell and C_Spell.GetSpellName then
+				return C_Spell.GetSpellName(CAMP_BENEFITS)
+			end
+			return (GetSpellInfo(CAMP_BENEFITS))
+		end)
+		hasCampBenefits = ok and type(name) == "string" and not (issecretvalue and issecretvalue(name))
+	end
+	return hasCampBenefits
+end
+
 local function Number(value)
 	if type(value) == "number" and not (issecretvalue and issecretvalue(value)) then
 		return value
@@ -527,7 +572,7 @@ local campWatcher = CreateFrame("Frame")
 campWatcher:RegisterUnitEvent("UNIT_AURA", "player")
 campWatcher:RegisterEvent("PLAYER_ENTERING_WORLD")
 campWatcher:SetScript("OnEvent", ns.Profiled("UNIT_AURA (camp benefits)", function(_, event)
-	if ns.isRetail then
+	if not ns.HasCampBenefits() then
 		return
 	end
 	local has, ends = CampBenefits()

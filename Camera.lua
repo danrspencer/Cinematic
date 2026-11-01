@@ -88,8 +88,8 @@ local turnKeys = { left = false, right = false }
 ns.EVENTS = {
 	{ key = "Campfire", label = L["Resting with a listed buff (campfire)"], camera = "cozy", stopsOnMove = true },
 	{ key = "Sit", label = L["/sit (or press the sit key)"], camera = "vista" },
-	-- Sitting down with Campfire.lua's Sit button (WoW Forever only: forever).
-	{ key = "SitButton", label = L["Campfire button"], camera = "cozy", forever = true },
+	-- Sitting down with Campfire.lua's Sit button.
+	{ key = "SitButton", label = L["Campfire button"], camera = "cozy" },
 	{ key = "Sleep", label = L["/sleep or /lie down"], camera = "cozy" },
 	{ key = "Dance", label = L["/dance"], camera = "cozy" },
 	{ key = "Kneel", label = L["/kneel"], camera = "cozy" },

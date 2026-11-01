@@ -291,6 +291,7 @@ local DEFAULTS = {
 	cozyBuffs = "Welcoming Campfire", -- the campfire event's buffs: names or spell IDs, comma-separated
 	cozyChairWords = "chair, bench, stool, seat, throne, pew", -- the chair event: words in a seat's name
 	campfireSitButton = true, -- the Campfire button on hovering a campfire near the middle of the screen (Campfire.lua)
+	campfireNames = "campfire", -- ...what counts as one: words in its name, comma-separated (your game language's by default)
 	campfireSit = true,       -- ...its emotes: sit, kneel, lie down (one of those ticked, at random)
 	campfireKneel = true,
 	campfireLie = true,

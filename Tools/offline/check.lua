@@ -53,11 +53,10 @@ if arg[1] then
 			end
 		end
 	end
-	-- The Cameras page's triggers, in the order they always had (a WoW Forever
-	-- one left out on retail, the chat camera's only where it's loaded).
+	-- The Cameras page's triggers, in the order they always had (the chat
+	-- camera's only where it's loaded).
 	local expected = { "Hearth", "Teleport", "Logout", "AFK", "Sit", "SitButton", "Sleep", "Dance", "Kneel", "Stare",
 		"Chair", "Weapon", "Campfire", "Fishing", "Still", "Flight", "Quest", "QuestGossip", "Walk", "Run", "Death" }
-	if client == "retail" then table.remove(expected, 6) end
 	if ns.ChatCamCommand then
 		expected[#expected + 1] = "Chat"
 		expected[#expected + 1] = "ChatNearby"

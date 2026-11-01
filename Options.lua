@@ -6314,8 +6314,8 @@ local function CreateQualityPanel()
 	end)
 
 	local stack = Stack(switch, "check")
-	-- (WoW Forever only: Campfire.lua.)
-	if not ns.isRetail then
+	-- (Campfire.lua.)
+	do
 		local sit = stack:Add(Check(content, "campfireSitButton", L["Campfire button"],
 			L["Hovering a campfire with the cursor near the middle of the screen shows a campfire icon where " ..
 			"the cursor is: click it to settle down by the fire (sit, kneel or lie down, as ticked below), " ..
@@ -6336,10 +6336,19 @@ local function CreateQualityPanel()
 			GreyUnless(check, function(db) return db.campfireSitButton end)
 			previous = check
 		end
-		local stand = stack:Add(Check(content, "campfireStandUp", L["Stand up once you get Camp Benefits"],
-			L["Sitting by a Welcoming Campfire for its minute gives you Camp Benefits: as it arrives, " ..
-			"you stand up again, ready to go."]), "check", 24)
-		GreyUnless(stand, function(db) return db.campfireSitButton end)
+		local NAMES_TIP = L["Words that mark a campfire when they're in the name its tooltip shows " ..
+			"(\"Campfire\"), separated by commas. Use words in your game language."]
+		local namesLabel = Label(content, "GameFontHighlightSmall", L["Campfire names:"])
+		stack:Add(namesLabel, "label", 24)
+		local names = stack:Add(ListBox(content, "campfireNames", 300, NAMES_TIP), "box", 24)
+		GreyUnless(names, function(db) return db.campfireSitButton end)
+		-- (Only where the game has Camp Benefits: WoW Forever.)
+		if ns.HasCampBenefits and ns.HasCampBenefits() then
+			local stand = stack:Add(Check(content, "campfireStandUp", L["Stand up once you get Camp Benefits"],
+				L["Sitting by a Welcoming Campfire for its minute gives you Camp Benefits: as it arrives, " ..
+				"you stand up again, ready to go."]), "check", 24)
+			GreyUnless(stand, function(db) return db.campfireSitButton end)
+		end
 	end
 	-- (DragEquip.lua.)
 	stack:Add(Check(content, "dragEquipCharacter", L["Open the character window when dragging gear out of your bags"],
