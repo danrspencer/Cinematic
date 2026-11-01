@@ -938,8 +938,53 @@ local function Wanted()
 		and ns.CombatWaitOver("quest", GetTime())
 end
 
--- The last click on the world (not on a window): when, and which half of the
--- screen it was on.
+local function PlainGuid(unit)
+	local guid = UnitGUID(unit)
+	if type(guid) == "string" and not (issecretvalue and issecretvalue(guid)) then return guid end
+end
+
+local function CursorShare()
+	return GetCursorPosition() / UIParent:GetEffectiveScale() / UIParent:GetWidth()
+end
+
+-- The mouse's pass over the unit it's on: how far left and right across the
+-- screen (shares of its width) it's been while on them. A click on an NPC
+-- near the middle can land on the edge the mouse came in by while most of
+-- them is on the other side; they cover at least the pass, so its middle
+-- says better where they stand than the click. (The game's nameplates can't
+-- be measured: this is all there is.) Only runs while the mouse is on a unit.
+local pass = {}
+local passWatcher = CreateFrame("Frame")
+passWatcher:Hide()
+passWatcher:RegisterEvent("UPDATE_MOUSEOVER_UNIT")
+passWatcher:SetScript("OnEvent", function(self)
+	local guid = PlainGuid("mouseover")
+	if not guid then
+		return
+	end
+	local x = CursorShare()
+	if guid ~= pass.guid then
+		pass.guid, pass.min, pass.max = guid, x, x
+	end
+	self:Show()
+end)
+passWatcher:SetScript("OnUpdate", function(self)
+	if not ns.Flag(UnitExists("mouseover")) then
+		pass.guid = nil
+		self:Hide()
+		return
+	end
+	local x = CursorShare()
+	if x < pass.min then
+		pass.min = x
+	elseif x > pass.max then
+		pass.max = x
+	end
+end)
+
+-- The last click on the world (not on a window): when, where across the
+-- screen (a share of its width) and, if it was on a unit, the mouse's pass
+-- over them.
 local lastClick = { at = -math.huge }
 local clickWatcher = CreateFrame("Frame")
 clickWatcher:RegisterEvent("GLOBAL_MOUSE_DOWN")
@@ -953,16 +998,32 @@ clickWatcher:SetScript("OnEvent", function()
 	if focus ~= nil and focus ~= WorldFrame then
 		return
 	end
-	local x = GetCursorPosition() / UIParent:GetEffectiveScale()
 	lastClick.at = GetTime()
-	lastClick.side = x > UIParent:GetWidth() / 2 and "right" or "left"
-	lastClick.x = x / UIParent:GetWidth()
+	lastClick.x = CursorShare()
+	local on = pass.guid and PlainGuid("mouseover") == pass.guid
+	lastClick.guid = on and pass.guid or nil
+	lastClick.min, lastClick.max = on and pass.min or nil, on and pass.max or nil
 end)
 
--- How far across the screen (a share of its width) the click that opened the
--- conversation was, or nil if it wasn't a click (Quest talk's Opposite clicked).
+-- Where across the screen the NPC you're talking to stands, from the click
+-- that opened it: the middle of the mouse's pass over them, else the click
+-- itself. Then a note of how it was read.
+local function ClickedNpcX()
+	if GetTime() - lastClick.at > CLICK_WINDOW then
+		return nil
+	end
+	if lastClick.guid and lastClick.guid == PlainGuid("npc") then
+		local x = (lastClick.min + lastClick.max) / 2
+		return x, ("click %.2f, pass %.2f-%.2f -> %.2f"):format(lastClick.x, lastClick.min, lastClick.max, x)
+	end
+	return lastClick.x, ("click %.2f (no pass)"):format(lastClick.x)
+end
+
+-- How far across the screen (a share of its width) the NPC was as you
+-- clicked them to start the conversation, or nil if it wasn't a click
+-- (Quest talk's Opposite clicked).
 function ns.ClickedX()
-	return GetTime() - lastClick.at <= CLICK_WINDOW and lastClick.x or nil
+	return (ClickedNpcX())
 end
 
 local OPENS = {
@@ -1084,7 +1145,12 @@ local function OnEvent(_, event)
 			cam.since, cam.cancelled, cam.test = now, nil, false -- a new conversation
 			cam.npcName, cam.leftNpc = NpcName(), nil
 			-- Opened by clicking them (not an interact key): the side they were on.
-			cam.clickSide = cam.since - lastClick.at <= CLICK_WINDOW and lastClick.side or nil
+			local clickX, how = ClickedNpcX()
+			cam.clickSide = clickX and (clickX > 0.5 and "right" or "left") or nil
+			if how then
+				Note(how)
+				ns.Log("questcam", "clicked: " .. how)
+			end
 			cam.left = PickSide()
 			cam.startAt = now + delay
 			cam.scriptsAt = cam.startAt -- (camera scripts' own wait: see ns.QuestTalkNow)

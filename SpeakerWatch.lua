@@ -40,7 +40,8 @@ end
 -- A frame's centre as a share of the screen from its middle, and the angle off
 -- the middle; nil and why if it can't be read.
 local function Where(frame)
-	-- (Retail won't measure nameplates: "Can't measure restricted regions".)
+	-- (Retail and Classic Era won't measure nameplates, nor a frame of ours
+	-- pinned to one: "Can't measure restricted regions".)
 	local ok, x, y = pcall(frame.GetCenter, frame)
 	if not ok then
 		return nil, "can't be measured"
@@ -186,6 +187,103 @@ watcher:SetScript("OnEvent", function(_, event, text, name, ...)
 	ns.Log("speakers", label .. ": " .. text)
 	watcher:SetScript("OnUpdate", OnUpdate)
 end)
+
+-- /cine debug target: where your target's plate is on screen, read as above,
+-- even faded out (our plates fade by alpha: the game still moves them).
+-- Logged every TARGET_STEP as it changes, printed at most every TARGET_PRINT.
+local TARGET_STEP = 0.1
+local TARGET_PRINT = 0.5
+local targetWatch = CreateFrame("Frame")
+local targetLast = { line = nil, logAt = 0, printAt = 0 }
+
+-- A dot of our own pinned to the plate's middle: can it be measured where the
+-- plate can't? (The game may pass the restriction on through the anchor.)
+local probe = CreateFrame("Frame", nil, UIParent)
+probe:SetSize(1, 1)
+
+local function ProbeWhere(plate)
+	probe:ClearAllPoints()
+	local ok, err = pcall(probe.SetPoint, probe, "CENTER", plate, "CENTER")
+	if not ok then
+		return "probe can't anchor (" .. Text(err) .. ")"
+	end
+	local where, why = Where(probe)
+	return where and ("probe " .. where) or ("probe " .. why)
+end
+
+-- The cursor's place, while the mouse is on your target (its feet to head,
+-- wherever the pointer is on them).
+local function CursorWhere()
+	local okOver, over = pcall(UnitIsUnit, "mouseover", "target")
+	if not (okOver and not Secret(over) and over) then
+		return "cursor not on it"
+	end
+	local x, y = GetCursorPosition()
+	local width, height = WorldFrame:GetWidth(), WorldFrame:GetHeight()
+	local scale = WorldFrame:GetEffectiveScale()
+	local sx, sy = (x / scale - width / 2) / (width / 2), (y / scale - height / 2) / (height / 2)
+	local angle = math.deg(math.atan(sx * math.tan(math.rad((FieldOfView())) / 2)))
+	return ("cursor on it x %+.2f y %+.2f, %+.0f deg"):format(sx, sy, angle)
+end
+
+local function TargetLine()
+	if not UnitExists("target") then
+		return "no target"
+	end
+	local okName, name = pcall(UnitName, "target")
+	local plate = C_NamePlate and C_NamePlate.GetNamePlateForUnit and C_NamePlate.GetNamePlateForUnit("target")
+	if not plate then
+		local okNpc, npcs = pcall(GetCVar, "nameplateShowFriendlyNPCs")
+		return ("%s: no plate (friendly NPC plates %s)"):format(Text(okName and name),
+			okNpc and Text(npcs) or "?")
+	end
+	local alpha = "?"
+	if plate.UnitFrame then
+		local okAlpha, value = pcall(plate.UnitFrame.GetAlpha, plate.UnitFrame)
+		alpha = okAlpha and type(value) == "number" and not Secret(value) and ("%.2f"):format(value) or "secret"
+	end
+	return ("%s: %s; %s; %s; alpha %s%s"):format(Text(okName and name), PlateWhere(plate), ProbeWhere(plate),
+		CursorWhere(), alpha, ns.Flag(InCombatLockdown()) and ", in combat" or "")
+end
+
+targetWatch:Hide()
+targetWatch:SetScript("OnUpdate", function()
+	local now = GetTime()
+	if now < targetLast.logAt then
+		return
+	end
+	targetLast.logAt = now + TARGET_STEP
+	local line = TargetLine()
+	if line == targetLast.line then
+		return
+	end
+	targetLast.line = line
+	-- (ns.Print logs it too.)
+	if now >= targetLast.printAt then
+		targetLast.printAt = now + TARGET_PRINT
+		ns.Print("target " .. line)
+	else
+		ns.Log("target", line)
+	end
+end)
+
+-- Returns whether it's on now.
+function ns.ToggleTargetWhere()
+	if targetWatch:IsShown() then
+		targetWatch:Hide()
+		probe:ClearAllPoints()
+		return false
+	end
+	targetLast.line, targetLast.logAt, targetLast.printAt = nil, 0, 0
+	local fov, guessed = FieldOfView()
+	local okOff, offscreen = pcall(GetCVar, "nameplateShowOffscreen")
+	local header = ("%s client, field of view %s%s, screen %.0f x %.0f, offscreen plates %s"):format(
+		ns.isRetail and "retail" or "classic", fov, guessed, WorldFrame:GetWidth(), WorldFrame:GetHeight(),
+		okOff and Text(offscreen) or "?")
+	ns.Print(header)
+	targetWatch:Show()
+	return true
+end
 
 -- Returns whether it's on now.
 function ns.ToggleSpeakerWatch()
