@@ -11,7 +11,8 @@ local TILE_W, TILE_H, TILE_GAP, PER_ROW = 88, 84, 8, 6
 local LINK_H = 40
 local NONE_COLOR = { 0.85, 0.35, 0.28 }
 
--- Each built-in camera's icon (by script id); yours share one.
+-- Each built-in camera's icon (by script id); yours have one you pick, or
+-- the spyglass.
 local ICONS = {
 	afk = "Interface\\Icons\\Spell_Nature_Sleep", still = "Interface\\Icons\\Spell_Nature_TimeStop",
 	cozy = "Interface\\Icons\\Spell_Fire_Fire", vista = "Interface\\Icons\\Ability_EyeOfTheOwl",
@@ -19,27 +20,29 @@ local ICONS = {
 	flight = "Interface\\Icons\\Ability_Mount_Wyvern_01", flyby = "Interface\\Icons\\Ability_Hunter_EagleEye",
 	walk = "Interface\\Icons\\INV_Boots_01", run = "Interface\\Icons\\Ability_Rogue_Sprint",
 	death = "Interface\\Icons\\Ability_Rogue_FeignDeath", quest = "Interface\\Icons\\INV_Misc_Note_01",
-	chat = "Interface\\Icons\\Ability_Warrior_RallyingCry",
+	chat = 132305, -- (a file ID: the blue face in flames, picked in game)
 }
 local MINE_ICON = "Interface\\Icons\\INV_Misc_Spyglass_02"
 local SCRIPT_ICON = "Interface\\Icons\\INV_Scroll_05"
-local function IconOf(script) return ICONS[script.id] or MINE_ICON end
+local function IconOf(script) return script.icon or ICONS[script.id] or MINE_ICON end
 
 -- A row's camera value and the script that is it (CameraRows.lua's values:
 -- a built-in camera's, true for the Die row's, "script:<id>" for a script).
 local VALUE_SCRIPT = { cozy = "cozy", vista = "vista", fish = "fish", afk = "afk", tele = "tele", flight = "flight",
 	quest = "quest", walk = "walk", run = "run", [true] = "death", death = "death", chat = "chat" }
--- Scripts that run as part of another camera: a flight's fly-bys, the AFK
--- camera's standing-still zoom.
-local PART_OF = { flight = "flyby", afk = "still" }
+-- Scripts that run inside another camera's, not cameras of their own: a
+-- flight's fly-bys, the AFK camera's standing-still zoom. Off the grid; on
+-- their camera's tab under its script.
+local INSIDE = { flight = "flyby", afk = "still" }
+local INNER = {}
+for _, id in pairs(INSIDE) do INNER[id] = true end
 
--- Every Scenes row that plays each script: uses[id] = { { row, via } ... }
--- (via: the camera it's part of, for a part).
+-- Every Scenes row that plays each script: uses[id] = { { row } ... }.
 local function Uses()
 	local uses = {}
-	local function Add(id, row, via)
+	local function Add(id, row)
 		uses[id] = uses[id] or {}
-		table.insert(uses[id], { row = row, via = via })
+		table.insert(uses[id], { row = row })
 	end
 	for _, row in ipairs(ns.CameraRowOrder()) do
 		local trigger = ns.CameraRowTrigger(row)
@@ -47,10 +50,7 @@ local function Uses()
 		if trigger and value ~= trigger.off then
 			if ns.ShotBase then value = ns.ShotBase(value) end
 			local id = ns.IsScriptCamera(value) and value:sub(8) or VALUE_SCRIPT[value]
-			if id then
-				Add(id, row)
-				if PART_OF[id] then Add(PART_OF[id], row, id) end
-			end
+			if id then Add(id, row) end
 		end
 	end
 	return uses
@@ -82,12 +82,18 @@ local function Tile(parent, kit, onClick)
 	if tile.name.SetMaxLines then tile.name:SetMaxLines(2) end
 	tile.count = kit.Label(tile, "GameFontDisableSmall", "")
 	tile.count:SetPoint("BOTTOM", 0, 4)
-	tile:SetScript("OnClick", function(self) onClick(self.script) end)
+	tile:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+	tile:SetScript("OnClick", function(self, button) onClick(self, button) end)
 	tile:SetScript("OnEnter", function(self)
 		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
 		GameTooltip:SetText(self.name:GetText() or "", 1, 0.82, 0)
+		if self.script and self.script.desc then GameTooltip:AddLine(self.script.desc, 1, 1, 1, true) end
 		GameTooltip:AddLine(self.script and L["Click to see its script and the scenes that play it."]
-			or L["A new camera of yours, with a few steps to start from."], 1, 1, 1, true)
+			or L["A new camera of yours, with a few steps to start from."], 0.8, 0.8, 0.8, true)
+		if self.script and MenuUtil and MenuUtil.CreateContextMenu then
+			GameTooltip:AddLine(L["Right-click: copy it, or rename, describe, change the icon of or delete one of yours."],
+				0.6, 0.6, 0.6, true)
+		end
 		GameTooltip:Show()
 	end)
 	tile:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -128,7 +134,7 @@ end
 -- now (hidden while a camera's tab is open).
 function ns.CameraManager(kit, canvas, content, title, intro, switch)
 	local openId -- (the camera whose tab is open, or nil)
-	local Pick -- (below)
+	local Pick, Menu -- (below)
 
 	-- The folder tabs: General, and the camera's (hidden while none is open).
 	local panel, tabs, ShowTab, base = ns.FolderTabs(content, { { L["General"] }, { "" } }, function(i) Pick(i) end)
@@ -154,16 +160,31 @@ function ns.CameraManager(kit, canvas, content, title, intro, switch)
 	view:SetSize(WIDTH, 1)
 	view:SetPoint("TOPLEFT", panel, "BOTTOMLEFT", 8, -14)
 	view:Hide()
-	local bigIcon = view:CreateTexture(nil, "ARTWORK")
-	bigIcon:SetSize(44, 44)
-	bigIcon:SetPoint("TOPLEFT")
+	-- (Its icon: a click opens the same menu as right-clicking its tile.)
+	local iconButton = CreateFrame("Button", nil, view)
+	iconButton:SetSize(44, 44)
+	iconButton:SetPoint("TOPLEFT")
+	iconButton:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+	local bigIcon = iconButton:CreateTexture(nil, "ARTWORK")
+	bigIcon:SetAllPoints()
 	bigIcon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
+	local iconHover = iconButton:CreateTexture(nil, "HIGHLIGHT")
+	iconHover:SetAllPoints()
+	iconHover:SetColorTexture(1, 1, 1, 0.15)
+	iconButton:SetScript("OnClick", function(self)
+		local script = openId and ns.FindCameraScript(openId)
+		if script then Menu(self, script) end
+	end)
+	kit.Tooltip(iconButton, L["Copy this camera, or rename, describe, change the icon of or delete it if it's yours."])
 	local camName = kit.Label(view, "GameFontNormalLarge", "")
 	camName:SetPoint("TOPLEFT", bigIcon, "TOPRIGHT", 10, -4)
 	local camKind = kit.Label(view, "GameFontDisableSmall", "")
 	camKind:SetPoint("TOPLEFT", camName, "BOTTOMLEFT", 0, -6)
+	local camDesc = kit.Label(view, "GameFontHighlightSmall", "")
+	camDesc:SetPoint("TOPLEFT", bigIcon, "BOTTOMLEFT", 0, -10)
+	camDesc:SetWidth(WIDTH)
+	camDesc:SetJustifyH("LEFT")
 	local scriptHead = kit.Label(view, "GameFontNormal", L["Script"])
-	scriptHead:SetPoint("TOPLEFT", bigIcon, "BOTTOMLEFT", 0, -18)
 	local scriptRow = LinkRow(view, kit)
 	scriptRow:SetPoint("TOPLEFT", scriptHead, "BOTTOMLEFT", 0, -6)
 	scriptRow.icon:SetTexture(SCRIPT_ICON)
@@ -171,8 +192,16 @@ function ns.CameraManager(kit, canvas, content, title, intro, switch)
 	scriptRow:SetScript("OnClick", function()
 		if openId and ns.ShowCameraScript then ns.ShowCameraScript(openId) end
 	end)
+	-- (The script played inside it, if any: its own row, under the script's.)
+	local innerRow = LinkRow(view, kit)
+	innerRow:SetPoint("TOPLEFT", scriptRow, "BOTTOMLEFT", 24, -4)
+	innerRow:SetWidth(WIDTH - 24)
+	innerRow.icon:SetTexture(SCRIPT_ICON)
+	innerRow.go:SetText(L["Open on Scripts >"])
+	innerRow:SetScript("OnClick", function()
+		if openId and INSIDE[openId] and ns.ShowCameraScript then ns.ShowCameraScript(INSIDE[openId]) end
+	end)
 	local scenesHead = kit.Label(view, "GameFontNormal", L["Played by"])
-	scenesHead:SetPoint("TOPLEFT", scriptRow, "BOTTOMLEFT", 0, -18)
 	local noScenes = kit.Label(view, "GameFontDisable", L["No scene plays this camera yet: pick it as a scene's camera on the Scenes page."])
 	noScenes:SetPoint("TOPLEFT", scenesHead, "BOTTOMLEFT", 0, -8)
 	noScenes:SetWidth(WIDTH)
@@ -217,7 +246,7 @@ function ns.CameraManager(kit, canvas, content, title, intro, switch)
 		local scripts, uses = ns.CameraScripts(), Uses()
 		local builtIn, mine = {}, {}
 		for _, script in ipairs(scripts) do
-			table.insert(script.builtin and builtIn or mine, script)
+			if not INNER[script.id] then table.insert(script.builtin and builtIn or mine, script) end
 		end
 		local used, y = 0, 0
 		local function Place(list, head, withNew)
@@ -227,7 +256,13 @@ function ns.CameraManager(kit, canvas, content, title, intro, switch)
 			local count = #list + (withNew and 1 or 0)
 			for i = 1, count do
 				used = used + 1
-				local tile = tiles[used] or Tile(grid, kit, function(script) Pick(2, script and script.id) end)
+				local tile = tiles[used] or Tile(grid, kit, function(self, button)
+				if button == "RightButton" then
+					if self.script then Menu(self, self.script) end
+				else
+					Pick(2, self.script and self.script.id)
+				end
+			end)
 				tiles[used] = tile
 				local script = list[i]
 				tile.script = script
@@ -266,9 +301,21 @@ function ns.CameraManager(kit, canvas, content, title, intro, switch)
 		local kind = script.builtin and L["Built-in camera"] or L["Your camera"]
 		camKind:SetText(kind .. " · " .. (#uses == 0 and L["in no scene"] or #uses == 1 and L["1 scene"]
 			or L["%d scenes"]:format(#uses)))
+		camDesc:SetText(script.desc or "")
+		camDesc:SetShown(script.desc ~= nil)
+		scriptHead:ClearAllPoints()
+		scriptHead:SetPoint("TOPLEFT", script.desc and camDesc or bigIcon, "BOTTOMLEFT", 0, script.desc and -14 or -18)
 		scriptRow.title:SetText(script.name)
 		scriptRow.sub:SetText(ns.CameraScriptSummary and ns.CameraScriptSummary(script) or "")
 		scriptRow:SetShown(ns.ShowCameraScript ~= nil)
+		local inner = INSIDE[openId] and ns.FindCameraScript(INSIDE[openId])
+		innerRow:SetShown(inner and ns.ShowCameraScript ~= nil or false)
+		if inner then
+			innerRow.title:SetText(L["Inside it: %s"]:format(inner.name))
+			innerRow.sub:SetText(ns.CameraScriptSummary and ns.CameraScriptSummary(inner) or "")
+		end
+		scenesHead:ClearAllPoints()
+		scenesHead:SetPoint("TOPLEFT", scriptRow, "BOTTOMLEFT", 0, (inner and -(LINK_H + 4) or 0) - 18)
 		local last = scenesHead
 		for i, use in ipairs(uses) do
 			local row = sceneRows[i] or LinkRow(view, kit)
@@ -277,10 +324,6 @@ function ns.CameraManager(kit, canvas, content, title, intro, switch)
 			local name = ns.SceneRowLabel and ns.SceneRowLabel(use.row) or trigger.key
 			if not ns.CameraRowOn(use.row) then name = name .. " " .. L["(off)"] end
 			local sub = ns.SceneRowTriggers and ns.SceneRowTriggers(use.row) or ""
-			if use.via then
-				local via = ns.FindCameraScript(use.via)
-				sub = L["With the %s"]:format(via and via.name or use.via) .. (sub ~= "" and " · " .. sub or "")
-			end
 			row.title:SetText(name)
 			row.sub:SetText(sub)
 			row.go:SetText(L["Open on Scenes >"])
@@ -309,6 +352,79 @@ function ns.CameraManager(kit, canvas, content, title, intro, switch)
 		return true
 	end
 
+	-- Right-clicking a camera: Open and Copy for any; Rename, Description,
+	-- Change icon and Delete for yours. (Ours: Copy it to change it.)
+	local function Changed()
+		ns.CameraScriptChanged()
+		grid.Refresh()
+	end
+	-- A copy of a camera, yours, with its picture, its tab opened.
+	local function CopyCamera(script)
+		local copied = script and ns.AddCameraScript(script)
+		if not copied then
+			ns.Print(L["You have 30 camera scripts already: delete one to add another."])
+			return
+		end
+		copied.icon = copied.icon or ICONS[script.id]
+		Pick(2, copied.id)
+	end
+	local picker = ns.IconBrowser(canvas, function(id, file) -- (every icon the game has: IconBrowser.lua)
+		local mine = ns.MyCameraScript(id)
+		if mine then
+			mine.icon = file
+			Changed()
+		end
+	end)
+	if ns.NamePopup and not StaticPopupDialogs.CINEMATIC_CAMERA_RENAME then
+		StaticPopupDialogs.CINEMATIC_CAMERA_RENAME = ns.NamePopup(L["Rename the camera:"], function(text, id)
+			local mine = ns.MyCameraScript(id)
+			text = text and text:gsub("|", ""):match("^%s*(.-)%s*$")
+			if not mine or not text or text == "" then return end
+			mine.name = text
+			Changed()
+		end, { initial = function(id) local mine = ns.MyCameraScript(id) return mine and mine.name or "" end,
+			maxLetters = 40 })
+		StaticPopupDialogs.CINEMATIC_CAMERA_DESC = ns.NamePopup(L["Describe the camera:"], function(text, id)
+			local mine = ns.MyCameraScript(id)
+			if not mine then return end
+			text = text and text:gsub("|", ""):match("^%s*(.-)%s*$")
+			mine.desc = text ~= "" and text or nil
+			Changed()
+		end, { initial = function(id) local mine = ns.MyCameraScript(id) return mine and mine.desc or "" end,
+			maxLetters = 200, width = 360 })
+		StaticPopupDialogs.CINEMATIC_CAMERA_DELETE = {
+			text = L["Delete the camera %s? Scenes set to it go back to no camera."],
+			button1 = YES, button2 = NO,
+			OnAccept = function(_, id)
+				ns.DeleteCameraScript(id)
+				if openId == id then Pick(1) else grid.Refresh() end
+			end,
+			timeout = 0, whileDead = true, hideOnEscape = true,
+		}
+	end
+	function Menu(owner, script)
+		if not (MenuUtil and MenuUtil.CreateContextMenu) then return end
+		local mine = ns.MyCameraScript(script.id) and true or false
+		MenuUtil.CreateContextMenu(owner, function(_, root)
+			root:CreateTitle(script.name)
+			root:CreateButton(L["Open"], function() Pick(2, script.id) end)
+			root:CreateButton(L["Copy"], function() CopyCamera(script) end)
+			if mine then
+				root:CreateButton(L["Rename"], function()
+					StaticPopup_Show("CINEMATIC_CAMERA_RENAME", nil, nil, script.id)
+				end)
+				root:CreateButton(L["Description"], function()
+					StaticPopup_Show("CINEMATIC_CAMERA_DESC", nil, nil, script.id)
+				end)
+				root:CreateButton(L["Change icon"], function() picker:Open(owner, script.id, IconOf(script)) end)
+				root:CreateDivider()
+				root:CreateButton("|cffff4040" .. L["Delete"] .. "|r", function()
+					StaticPopup_Show("CINEMATIC_CAMERA_DELETE", script.name, nil, script.id)
+				end)
+			end
+		end)
+	end
+
 	-- Tab 1: General (the camera's tab closes); tab 2: id's (a new camera of
 	-- yours for none), or the one open.
 	function Pick(i, id)
@@ -335,14 +451,7 @@ function ns.CameraManager(kit, canvas, content, title, intro, switch)
 		if canvas.scroll then canvas.scroll:SetVerticalScroll(0) end
 		Fit()
 	end
-	copy:SetScript("OnClick", function()
-		local script = ns.AddCameraScript(ns.FindCameraScript(openId))
-		if script then
-			Pick(2, script.id)
-		else
-			ns.Print(L["You have 30 camera scripts already: delete one to add another."])
-		end
-	end)
+	copy:SetScript("OnClick", function() CopyCamera(ns.FindCameraScript(openId)) end)
 
 	-- Kept up with the page's Refresh (a script added or renamed, a row's
 	-- camera changed), the tab that's showing.

@@ -197,6 +197,18 @@ local function CleanName(text)
 end
 
 -- A whole script made safe; its id kept if given. (keepSet: see CleanSteps.)
+-- An icon: a game icon's path (Interface\Icons\...) or file id, else nil.
+local function CleanIcon(icon)
+	if type(icon) == "number" and icon > 0 then return math.floor(icon) end
+	if type(icon) == "string" and icon:lower():find("^interface\\icons\\[^\\|]+$") then return icon end
+end
+-- A description: up to 200 letters, nil for none.
+local function CleanDesc(text)
+	if type(text) ~= "string" then return nil end
+	text = text:gsub("|", ""):sub(1, 200):match("^%s*(.-)%s*$")
+	return text ~= "" and text or nil
+end
+
 function ns.CleanCameraScript(script, id, keepSet)
 	if type(script) ~= "table" then return nil end
 	local budget = { left = MAX_STEPS }
@@ -214,6 +226,9 @@ function ns.CleanCameraScript(script, id, keepSet)
 		steps = CleanSteps(script.steps, 1, budget, keepSet),
 		ending = CleanSteps(script.ending, 1, budget, keepSet),
 		rules = rules,
+		-- (Yours: the icon and words the General page shows for it.)
+		icon = CleanIcon(script.icon),
+		desc = CleanDesc(script.desc),
 		-- (A built-in camera's stop rules made from settings: { [rule] = { keys } }.)
 		ruleSet = keepSet and type(script.ruleSet) == "table" and script.ruleSet or nil,
 	}

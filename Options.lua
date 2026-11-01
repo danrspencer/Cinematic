@@ -12742,6 +12742,8 @@ local function NameFree(name, old)
 	return true
 end
 
+-- (For the General page's cameras too: CameraManager.lua.)
+ns.NamePopup = NamePopup
 StaticPopupDialogs.CINEMATIC_PROFILE_RENAME = NamePopup(L["Rename the profile:"], function(name, old)
 	if not old or name == old then return end
 	if not NameFree(name, old) then return true end

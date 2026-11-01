@@ -659,7 +659,8 @@ local function ShowShare(export)
 	if export then
 		local script = page.script
 		window.text = ns.PackShared(SHARE_PREFIX, SHARE_FORMAT, { name = script.name, steps = script.steps,
-			ending = script.ending, rules = script.rules })
+			ending = script.ending, rules = script.rules,
+			icon = script.icon, desc = script.desc })
 		window.title:SetText(L["Share %s"]:format(script.name))
 		window.hint:SetText(L["Press Ctrl+C to copy this, then paste it wherever your friends will see it. They " ..
 			"add it with Import on their Scripts page."])
