@@ -122,6 +122,7 @@ Welcome.lua
 Layouts.lua
 ModuleEditor.lua
 CameraScriptsPage.lua
+CameraManager.lua
 Options.lua
 Changelog.lua
 ChangelogCommits.lua

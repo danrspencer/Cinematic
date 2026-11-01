@@ -11,6 +11,9 @@
 local _, ns = ...
 
 ns.CHANGELOG_FEATURES = {
+	{ date = "2026-10-31", page = "Cameras", title = "Every camera at a glance",
+		text = "The Camera hub's General page now shows every camera, built in and yours, as an icon. Click one " ..
+		"to open a tab with its script and the scenes that play it, and jump straight to either." },
 	{ date = "2026-10-31", page = "Camera Scripts", title = "Camera scripts",
 		text = "Every camera is now a script of steps (turn, zoom, sway, wait, follow...) on the new Scripts " ..
 		"page in the Camera hub. Pick one to see how it moves, change its steps and settings there, or copy it " ..

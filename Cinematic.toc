@@ -127,6 +127,7 @@ Backups.lua
 Welcome.lua
 Layouts.lua
 CameraScriptsPage.lua
+CameraManager.lua
 Options.lua
 Changelog.lua
 ChangelogCommits.lua

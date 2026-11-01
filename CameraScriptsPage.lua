@@ -1547,3 +1547,25 @@ function ns.CreateCameraScriptsPanel(kit)
 	canvas:Hide()
 	kit.RegisterSubpage(canvas, "Camera Scripts", L["Scripts"])
 end
+
+-- For the General page's camera tabs (CameraManager.lua): this page shown
+-- with a script picked, and a script's steps in a line (its top-level ones;
+-- a Repeat's or Together's in brackets).
+function ns.ShowCameraScript(id)
+	ns.ShowHubPage("Camera Scripts")
+	if page.Pick then page.Pick(id) end
+end
+function ns.CameraScriptSummary(script)
+	local function Names(list)
+		local names = {}
+		for _, step in ipairs(list or {}) do
+			local name = KIND_NAMES[step.k] or step.k
+			if step.steps and #step.steps > 0 and (step.k == "repeat" or step.k == "together") then
+				name = name .. " (" .. Names(step.steps) .. ")"
+			end
+			names[#names + 1] = name
+		end
+		return table.concat(names, ", ")
+	end
+	return Names(script.steps)
+end

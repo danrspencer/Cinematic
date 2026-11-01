@@ -4636,7 +4636,8 @@ local function CreateCamerasPanel()
 		"by hand cancels them all, and everything goes back to normal when the UI returns."] .. "\n\n" ..
 		L["In the camera modes, the minimap and quest tracker hover holds and the buff and chat " ..
 		"peeks use their short default times, so they clear the view quickly."])
-	CameraModesSwitch(content, subtitle)
+	-- (Every camera as an icon, each opening a tab of its own: CameraManager.lua.)
+	ns.CameraManager(ns.lowHealthKit, canvas, content, title, subtitle, CameraModesSwitch(content, subtitle))
 	canvas:SetScript("OnShow", PageShown(Refresh, content))
 	canvas:Hide()
 	RegisterSubpage(canvas, "Cameras")
@@ -5117,6 +5118,45 @@ local function CreateCamerasPanel()
 		grid:SetHeight(math.max(y, 1))
 	end
 	controls[#controls + 1] = grid
+	-- For the General page's camera tabs (CameraManager.lua): a row's name and
+	-- triggers, and the row shown here, its settings open, scrolled to and lit.
+	ns.SceneRowLabel = RowLabel
+	function ns.SceneRowTriggers(id)
+		local trigger, copy = ns.CameraRowTrigger(id)
+		if copy or trigger.custom then return TriggerName(trigger) end
+		return BuiltInNames(trigger.key)
+	end
+	function ns.ShowSceneRow(id)
+		opened[id] = true
+		ns.ShowHubPage("Scenes")
+		grid:Refresh()
+		local row = rows[id]
+		if not row then return end
+		if not row.flash then
+			row.flash = row:CreateTexture(nil, "BACKGROUND", nil, -7)
+			row.flash:SetAllPoints()
+			row.flash:SetColorTexture(1, 0.82, 0, 0.3)
+			local fade = row.flash:CreateAnimationGroup()
+			local alpha = fade:CreateAnimation("Alpha")
+			alpha:SetFromAlpha(1)
+			alpha:SetToAlpha(0)
+			alpha:SetStartDelay(0.4)
+			alpha:SetDuration(1.4)
+			fade:SetScript("OnFinished", function() row.flash:Hide() end)
+			row.flash.fade = fade
+		end
+		C_Timer.After(0.05, function() -- (once the page has fit its height)
+			local scroll = grid:GetParent():GetParent()
+			local top, rowTop = grid:GetParent():GetTop(), row:GetTop()
+			if scroll.SetVerticalScroll and top and rowTop then
+				local range = scroll:GetVerticalScrollRange() or 0
+				scroll:SetVerticalScroll(math.max(0, math.min(range, top - rowTop - 40)))
+			end
+			row.flash:Show()
+			row.flash.fade:Stop()
+			row.flash.fade:Play()
+		end)
+	end
 	-- What the page's Reset puts back (and the profile modules find here):
 	-- every row it can have, made or not, and the cameras' old rows their
 	-- triggers' own rows follow until set.
