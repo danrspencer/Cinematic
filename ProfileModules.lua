@@ -441,7 +441,8 @@ ns.PROFILE_MODULES = {
 			set("walkCine", true)
 			set("runCine", true)
 			set("deathCine", true)
-			set("deathScreen", false)
+			-- (Death Cam's page is dev-only.)
+			if ns.isDev then set("deathScreen", false) end
 			set("deathBannerStyle", "none")
 			set("eventStillCamera", "afk")
 			for _, event in ipairs(MUSIC_EVENTS) do set("event" .. event .. "Music", true) end
@@ -456,12 +457,13 @@ ns.PROFILE_MODULES = {
 		"those chatting nearby straight away, and it doesn't look round for speakers off screen. YOU DIED " ..
 		"shows as the death camera starts.",
 		apply = function(set)
-			-- (Chat Cam: off to start with, on here.)
+			-- (Chat Cam: off to start with, on here. Its look-round setting's
+			-- page is dev-only.)
 			if ns.DEFAULTS.chatCamSearch ~= nil then
 				set("chatCamera", "chat")
 				set("chatNearbyCamera", "chat")
 				set("chatNearbyDelay", 0)
-				set("chatCamSearch", false)
+				if ns.isDev then set("chatCamSearch", false) end
 			end
 			set("eventStillCamera", "afk")
 			for _, event in ipairs(MUSIC_EVENTS) do set("event" .. event .. "Music", true) end
