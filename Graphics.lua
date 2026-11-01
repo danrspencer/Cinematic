@@ -119,7 +119,7 @@ function ns.ApplyGraphicsPlus()
 	borrowed = false
 	for _, setting in ipairs(ns.GRAPHICS_PLUS) do
 		if Exists(setting.cvar) and not (setting.secure and InCombatLockdown()) then
-			local wanted = db.graphicsPlus and db[setting.key .. "On"] and db[setting.key] or nil
+			local wanted = ns.Setting("graphicsPlus") and db[setting.key .. "On"] and db[setting.key] or nil
 			ApplyOne(setting.cvar, wanted, false, saved, written)
 			for _, cvar in ipairs(setting.also or {}) do
 				if Exists(cvar) then

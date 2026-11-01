@@ -28,7 +28,7 @@ function ns.ApplyShoulderCam()
 		return
 	end
 	local yours = ns.db.shoulderCamYours
-	if ns.db.shoulderCam then
+	if ns.Setting("shoulderCam") then
 		yours = yours or {}
 		ns.db.shoulderCamYours = yours
 		for cvar, value in pairs(CVARS) do

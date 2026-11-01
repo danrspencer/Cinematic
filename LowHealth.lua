@@ -1544,7 +1544,7 @@ events:SetScript("OnEvent", function(_, event, _, action, _, amount)
 	Wake()
 end)
 
--- Is it showing now? (The minimap button's Vision Helper.) Only once your
+-- Is it showing now? (The minimap button's Minimap Glow Helper.) Only once your
 -- health is under Starts: secret health can't tell, so it stays dark.
 function ns.VitalsVisionActive()
 	return db ~= nil and ns.Setting("lowHealth") and db.lowHealthEdges and belowStart and level > 0

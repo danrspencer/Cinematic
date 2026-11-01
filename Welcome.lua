@@ -34,7 +34,7 @@ local LEVELS = ns.WELCOME_LEVELS
 -- (the profile of your own a change on a built-in starts: in your language here)
 local OWN_PROFILE = "My setup"
 local SECTIONS = {}
-local VISIONS = { label = "Visions", page = "Vision", question = "Which Visions do you want?",
+local VISIONS = { label = "Visions", page = "Heal Vision", question = "Which Visions do you want?",
 	visions = true }
 -- What each Vision does, in a line (the vision wheel's list: MarkerWheel.lua).
 local VISION_LINES = {

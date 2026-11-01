@@ -655,7 +655,7 @@ function ns.CreateProfilerPanel(kit)
 		if count == 0 then
 			empty:SetText(ns.ProfileGameMetric and ns.ProfileGameMetric("addon", "RecentAverageTime") == nil
 				and L["The game's profiler isn't on this client: use a recording below."]
-				or (PageOn() and L["No samples yet (one a second)."] or L["Off: turn on Enable Page to sample."]))
+				or (PageOn() and L["No samples yet (one a second)."] or L["Off: right-click the Profiler icon to sample."]))
 			empty:Show()
 		else
 			empty:Hide()
@@ -846,7 +846,7 @@ function ns.CreateProfilerPanel(kit)
 			wipe(filtered)
 		end
 		addonEmpty:SetText(on and L["The game's profiler isn't on this client."]
-			or L["Off: turn on Enable Page to sample."])
+			or L["Off: right-click the Profiler icon to sample."])
 		if on and next(addonFilter) then
 			wipe(filtered)
 			for _, addon in ipairs(list) do
@@ -1044,7 +1044,7 @@ function ns.CreateProfilerPanel(kit)
 		elseif PageOn() then
 			status:SetText(L["No recording yet."])
 		else
-			status:SetText(L["Turn on Enable Page to record."])
+			status:SetText(L["Right-click the Profiler icon to turn it on and record."])
 		end
 		local used = 0
 		for _, tile in ipairs(recordTiles) do

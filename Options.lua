@@ -644,11 +644,19 @@ local function Refresh()
 			RefreshControl(control, timing)
 		end
 	end
+	if ns.PaintPageSwitches then ns.PaintPageSwitches() end -- (the hub icons' Off marks)
 end
 
--- A page's master switch at the top (below anchor): "CineMode <page>".
+-- A page's master switch at the top (below anchor): "CineMode <page>". Not
+-- shown: a right-click on the page's icon (or folder tab) flips it, and the
+-- icon says whether it's on. (Kept, 1 high, for the page's layout and greying.)
 local function RegisterPageSwitch(content, key, check)
 	pageSwitches[content] = { key = key, check = check }
+	if check then
+		check:Hide()
+		check:SetHeight(1)
+		check.searchLabel = nil
+	end
 end
 local function PageSwitch(content, key, label, tip, anchor, onChange)
 	local check = Check(content, key, label, tip, function(value)
@@ -1331,11 +1339,17 @@ local function CreatePanel()
 		end)
 	minimapButton:SetPoint("TOPLEFT", fadeUI, "BOTTOMLEFT", 0, -2)
 
+	local glowHelper = Check(panel, "minimapHelper", L["Minimap Glow Helper"],
+		L["While a vision is doing something (Heal Vision fading frames, a duel being watched, the roll " ..
+		"window up...), the minimap button glows in its color. Its menu and tooltip list that vision, and " ..
+		"the camera running, with a link to its page."])
+	glowHelper:SetPoint("TOPLEFT", minimapButton, "BOTTOMLEFT", 0, -2)
+
 	-- The language Cinematic's text is in: for the account, not a profile, and
 	-- set as the addon loads (Locales.lua), so a change asks to reload. Each
 	-- language is named in itself.
 	local languageLabel = Label(panel, "GameFontHighlight", L["Language"])
-	languageLabel:SetPoint("TOPLEFT", minimapButton, "BOTTOMLEFT", 4, -14)
+	languageLabel:SetPoint("TOPLEFT", glowHelper, "BOTTOMLEFT", 4, -14)
 	local LANGUAGES = {
 		{ value = "auto", text = L["Game language"] },
 		{ value = "enUS", text = "English" },
@@ -1596,7 +1610,9 @@ do
 			{ "Chat bubbles", "Interface\\Icons\\Ability_Warrior_BattleShout", label = "Chat Bubbles", section = "Chat" },
 		} },
 		-- (Cameras: what everyone has; Dev: the dev copy's own, to the right)
-		{ name = "Camera", colors = { Cameras = { 0.35, 0.6, 0.9 }, Dev = { 0.85, 0.3, 0.25 } }, pages = {
+		-- (master: Enable Cameras; its pages with no switch of their own show Off with it)
+		{ name = "Camera", master = "cameraModes", colors = { Cameras = { 0.35, 0.6, 0.9 }, Dev = { 0.85, 0.3, 0.25 } },
+			pages = {
 			{ "Cameras", "Interface\\Icons\\INV_Misc_Spyglass_03", label = "General", section = "Cameras" },
 			{ "Scenes", "Interface\\Icons\\Spell_Holy_MindVision", section = "Cameras" }, -- (built with Cameras: CreateCamerasPanel)
 			{ "Camera Scripts", "Interface\\Icons\\INV_Scroll_05", label = "Scripts", section = "Cameras" }, -- (CameraScriptsPage.lua)
@@ -1638,7 +1654,6 @@ do
 		} },
 		-- (General and the dev copy's Wind Guide in no section: plain icons)
 		{ name = "Visions", colors = { Combat = { 0.85, 0.3, 0.25 }, World = { 0.35, 0.6, 0.9 } }, pages = {
-			{ "Vision", "Interface\\Icons\\Ability_EyeOfTheOwl", label = "General" },
 			{ "Heal Vision", "Interface\\Icons\\Spell_Holy_FlashHeal", section = "Combat" },
 			{ "Combat Vision", "Interface\\Icons\\Ability_Warrior_OffensiveStance", section = "Combat",
 				label = "Battle Vision" }, -- (its old name kept as its ID: links, scopes)
@@ -1653,6 +1668,7 @@ do
 			{ "Roll Style", "Interface\\Icons\\INV_Misc_Dice_02", tabOf = "Roll Vision" },
 			{ "Duel Vision", "Interface\\Icons\\Ability_DualWield", section = "World" },
 			{ "Story Vision", "Interface\\Icons\\INV_Misc_Book_09", section = "World" },
+			{ "Story Style", "Interface\\Icons\\INV_Misc_Book_09", tabOf = "Story Vision" },
 			{ "Wind Guide", "Interface\\Icons\\Spell_Nature_Cyclone", dev = true },
 		} },
 		{ name = "Quality of life", colors = { Helpers = { 0.3, 0.7, 0.5 } }, pages = {
@@ -1890,6 +1906,7 @@ do
 		frame:SetScript("OnShow", function()
 			Layout(hub)
 			if not hub.current and hub.tiles[1] then Select(hub.tiles[1]) end
+			ns.PaintPageSwitches()
 		end)
 		frame:Hide()
 		if category and Settings and Settings.RegisterCanvasLayoutSubcategory then
@@ -1905,6 +1922,76 @@ do
 			subpages[hub.name] = frame
 			if parentHub then parentHub.frame.collapsed = false end
 			if InterfaceOptions_AddCategory then InterfaceOptions_AddCategory(frame) end
+		end
+	end
+
+	-- A tile's page switch (its hidden Enable Page: RegisterPageSwitch), or nil.
+	-- A page with none in a hub with a master (hub.master: Enable Cameras)
+	-- follows that: Off on its icon with it, nothing to flip.
+	local function TileSwitch(tile)
+		local switch = pageSwitches[tile.resetContent or tile.canvas.content or false]
+		if switch and switch.check then return switch end
+		if tile.hub.master then
+			tile.follows = tile.follows or { key = tile.hub.master, follows = true }
+			return tile.follows
+		end
+	end
+	-- Whether a page's switch is on, and true second if it's off with the one
+	-- it's under (a vision's with Enable Visions): then it can't be flipped.
+	local function SwitchState(switch)
+		if switch.follows then
+			local on = ns.GetDB()[switch.key] ~= false
+			return on, not on
+		end
+		local master = ns.PageSwitchOf(switch.key)
+		if master and ns.GetDB()[master] == false then return false, true end
+		return KeyGet(switch.key) and true or false
+	end
+	-- Flips a page's switch as a click on its box would.
+	local function FlipSwitch(switch)
+		local on, held = SwitchState(switch)
+		if held or switch.follows then return end
+		switch.check:SetChecked(not on)
+		switch.check:GetScript("OnClick")(switch.check, "LeftButton")
+		if PlaySound and SOUNDKIT then
+			PlaySound(on and SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_OFF or SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
+		end
+	end
+	-- Its line on a tooltip: on or off, and what a right-click does.
+	local function SwitchLine(switch)
+		local on, held = SwitchState(switch)
+		if held then
+			GameTooltip:AddLine(L["Off with the General page's switch."], 1, 0.25, 0.25, true)
+		elseif switch.follows then
+			return
+		elseif on then
+			GameTooltip:AddLine(L["On. Right-click to turn this page off."], 0.25, 1, 0.25, true)
+		else
+			GameTooltip:AddLine(L["Off. Right-click to turn this page on."], 1, 0.25, 0.25, true)
+		end
+	end
+	-- A page's icon darkened, "Off" on it, while its switch is off.
+	local function PaintSwitch(tile)
+		local switch = TileSwitch(tile)
+		local off = switch and not SwitchState(switch) or false
+		if off and not tile.offMark then
+			tile.offMark = tile:CreateTexture(nil, "OVERLAY")
+			tile.offMark:SetAllPoints(tile.icon)
+			tile.offMark:SetColorTexture(0, 0, 0, 0.55)
+			tile.offText = tile:CreateFontString(nil, "OVERLAY", "GameFontRedSmall")
+			tile.offText:SetPoint("BOTTOM", tile.icon, "BOTTOM", 0, 2)
+			tile.offText.searchSkip = true
+		end
+		if tile.offMark then
+			tile.offText:SetText(L["Off"])
+			tile.offMark:SetShown(off)
+			tile.offText:SetShown(off)
+		end
+	end
+	function ns.PaintPageSwitches()
+		if not ns.GetDB() then return end
+		for _, hub in ipairs(HUBS) do
+			for _, tile in ipairs(hub.tiles or {}) do PaintSwitch(tile) end
 		end
 	end
 
@@ -1942,10 +2029,20 @@ do
 			if self.dev then
 				GameTooltip:AddLine("(dev only)", 1, 0.25, 0.25)
 			end
+			local switch = TileSwitch(self)
+			if switch then SwitchLine(switch) end
 			GameTooltip:Show()
 		end)
 		tile:SetScript("OnLeave", function() GameTooltip:Hide() end)
-		tile:SetScript("OnClick", function(self) Select(self) end)
+		-- (Right-click: its page's switch flipped, the page left as it is.)
+		tile:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+		tile:SetScript("OnClick", function(self, button)
+			if button ~= "RightButton" then return Select(self) end
+			local switch = TileSwitch(self)
+			if not switch then return end
+			FlipSwitch(switch)
+			if GameTooltip:IsOwned(self) then self:GetScript("OnEnter")(self) end
+		end)
 		return tile
 	end
 
@@ -2028,6 +2125,19 @@ do
 	-- A hub page shown, from inside the settings (its folder tab: ns.PageTabs).
 	function ns.ShowHubPage(name)
 		return HubTab(name)
+	end
+
+	-- A hub page's switch by its English name, flipped (its folder tab's
+	-- right-click), or its line added to owner's tooltip.
+	function ns.FlipPageSwitch(name)
+		local switch = byName[name] and TileSwitch(byName[name])
+		if switch then FlipSwitch(switch) end
+	end
+	function ns.PageSwitchTip(owner, name)
+		local switch = byName[name] and TileSwitch(byName[name])
+		if not (switch and GameTooltip:IsOwned(owner)) then return end
+		SwitchLine(switch)
+		GameTooltip:Show()
 	end
 
 	-- A hub page's icon by its English name (nil for a page with none).
@@ -2493,11 +2603,13 @@ local function BuildZoomControls(parent, stack, prefix)
 end
 
 -- The camera modes' switch, on the Cameras page: off, no camera mode
--- starts, and it and the Camera Settings page grey out.
+-- starts, Shoulder Cam lets go, and it and the Camera Settings page grey out.
 local function CameraModesSwitch(content, anchor)
 	return PageSwitch(content, "cameraModes", L["Enable Cameras"],
 		L["On: the cameras start as the rows below say. Off: none of them ever starts, and the camera is " ..
-		"left to you; CineMode still fades the UI."], anchor)
+		"left to you; CineMode still fades the UI."], anchor, function()
+			if ns.ApplyShoulderCam then ns.ApplyShoulderCam() end
+		end)
 end
 
 -- Camera rotation settings, built once per profile (taxiOrbit* for flights,
@@ -3665,12 +3777,13 @@ ns.OpenColorPicker = OpenColorPicker
 -- its own setting), and the tab's other controls grey out.
 local function VisualEffectsSwitch(content, anchor)
 	local master = Check(content, "visualEffects", L["Enable Visual Effects"],
-		L["Turns every visual effect on or off at once, these and the Tint tab's: the letterbox, tint, time " ..
-		"of day, zone tints, vignette, inn glow, weather and depth of field. Each keeps its own settings for " ..
+		L["Turns the whole Atmosphere hub on or off at once: the letterbox, tint, time of day, zone tints, " ..
+		"vignette, inn glow, weather, depth of field, Graphics+ and Audio. Each keeps its own settings for " ..
 		"when you turn this back on."], function(value)
 			ns.GetDB().visualEffects = value
 			ns.letterboxDirty = true
 			if ns.RefreshTint then ns.RefreshTint() end
+			if ns.ApplyGraphicsPlus then ns.ApplyGraphicsPlus() end
 			Refresh()
 		end)
 	master:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", -2, -14)
@@ -4706,12 +4819,8 @@ local function CreateCamerasPanel()
 		L["In the camera modes, the minimap and quest tracker hover holds and the buff and chat " ..
 		"peeks use their short default times, so they clear the view quickly."])
 	local switch = CameraModesSwitch(content, subtitle)
-	local stack = Stack(switch, "check")
-	local helper = stack:Add(Check(content, "minimapCameras", L["Camera Helper"],
-		L["While a camera is running, the minimap button's menu and tooltip list it with a link to its tab " ..
-		"on this page."]), "check")
 	-- (Every camera as an icon, each opening a tab of its own: CameraManager.lua.)
-	ns.CameraManager(ns.lowHealthKit, canvas, content, title, subtitle, switch, helper)
+	ns.CameraManager(ns.lowHealthKit, canvas, content, title, subtitle, switch)
 	canvas:SetScript("OnShow", PageShown(Refresh, content))
 	canvas:Hide()
 	RegisterSubpage(canvas, "Cameras")
@@ -5525,8 +5634,8 @@ local function CreateCamerasPanel()
 				Changed()
 			end)
 			music.Refresh = function(self) self:SetChecked(ns.CameraRowValue(id, "music") and true or false) end
-			GreyUnless(music, function(db)
-				return (key == "Death" or db.musicInCinematic) and (key == "AFK" or HasCamera(id))
+			GreyUnless(music, function()
+				return (key == "Death" or ns.Setting("musicInCinematic")) and (key == "AFK" or HasCamera(id))
 			end)
 			At("Camera", music, x)
 			x = x + 90
@@ -6757,7 +6866,7 @@ end
 -- shown, the base (the caller puts it at the panel's
 -- top left: the bottom row's bottom left) and how high the tabs reach above it.
 ns.FOLDER_TAB_HEIGHT = 24
-function ns.FolderTabs(parent, list, onClick, width, maxWidth)
+function ns.FolderTabs(parent, list, onClick, width, maxWidth, onRightClick)
 	local TAB_H, TAB_GAP = ns.FOLDER_TAB_HEIGHT, 3
 	local PANEL_BG, TAB_BG = { 0.12, 0.12, 0.13, 0.9 }, { 0.04, 0.04, 0.05, 0.9 }
 	local EDGE, DIM_EDGE = { 0.42, 0.42, 0.42, 1 }, { 0.22, 0.22, 0.22, 1 }
@@ -6820,7 +6929,13 @@ function ns.FolderTabs(parent, list, onClick, width, maxWidth)
 		hover:SetAllPoints()
 		hover:SetColorTexture(1, 1, 1, 0.06)
 		if each[2] then Tooltip(tab, each[2]) end
-		tab:SetScript("OnClick", function() onClick(i) end)
+		-- (onRightClick(i): a right-click on a tab, its tip shown again after)
+		if onRightClick then tab:RegisterForClicks("LeftButtonUp", "RightButtonUp") end
+		tab:SetScript("OnClick", function(self, button)
+			if button ~= "RightButton" then return onClick(i) end
+			onRightClick(i)
+			if GameTooltip:IsOwned(self) and self:GetScript("OnEnter") then self:GetScript("OnEnter")(self) end
+		end)
 		tabs[i] = tab
 	end
 	-- The rows of the tabs shown (a caller can hide some), as many on each as
@@ -7054,7 +7169,7 @@ local function CreatePlatesPanel()
 	-- on every tab (checked as the page shows).
 	local showAllWarning = Label(content, "GameFontRedSmall",
 		L["Blizzard's Always Show Nameplates is off, so nameplates only show in combat."])
-	showAllWarning:SetPoint("LEFT", handleCheck.Text or handleCheck.text or handleCheck, "RIGHT", 16, 0)
+	showAllWarning:SetPoint("LEFT", handleCheck, "LEFT", 2, 0) -- (the switch itself is hidden)
 	showAllWarning.Refresh = function(self)
 		self:SetShown(GetCVar("nameplateShowAll") == "0")
 	end
@@ -7564,13 +7679,20 @@ local function CreateNameStylePanel()
 		"plateNameShadowY", "plateNameShadowAlpha", "plateNameCloseSize", "plateNameCloseY", "plateNameFarSize",
 		"plateNameFarY" }
 	-- (The Style pages' Preset: row, greyed by this page's switch alone;
-	-- Custom while none matches.)
+	-- Custom while none matches, and picking it puts back your own settings
+	-- from before a preset, as rows.PresetMenu's.)
 	local function PresetValue(preset, key)
 		local value = preset[3][key]
 		if value == nil then value = ns.DEFAULTS[key] end
 		return value
 	end
-	local presetField = {
+	local KEPT_ID = "plateNameStyle:" .. PRESET_KEYS[1]
+	local function Kept()
+		local db = ns.GetDB()
+		return db and db.presetCustom and db.presetCustom[KEPT_ID]
+	end
+	local presetField
+	presetField = {
 		get = function()
 			local db = ns.GetDB()
 			if not (db and db.plateNameStyle) then return "custom" end
@@ -7584,9 +7706,24 @@ local function CreateNameStylePanel()
 			return "custom"
 		end,
 		set = function(i)
+			local db = ns.GetDB()
+			if i == "custom" then
+				local kept = Kept()
+				if not kept then return end
+				db.plateNameStyle = true
+				for _, key in ipairs(PRESET_KEYS) do
+					if kept[key] ~= nil then db[key] = kept[key] end
+				end
+				return
+			end
 			local preset = PRESETS[i]
 			if not preset then return end
-			local db = ns.GetDB()
+			if presetField.get() == "custom" then
+				local kept = {}
+				for _, key in ipairs(PRESET_KEYS) do kept[key] = db[key] end
+				db.presetCustom = db.presetCustom or {}
+				db.presetCustom[KEPT_ID] = kept
+			end
 			db.plateNameStyle = true
 			for _, key in ipairs(PRESET_KEYS) do db[key] = PresetValue(preset, key) end
 		end,
@@ -7594,10 +7731,12 @@ local function CreateNameStylePanel()
 	rows.Dropdown(L["Preset:"], presetField, function()
 		local list = {}
 		for i, preset in ipairs(PRESETS) do list[i] = { value = i, text = preset[1], tip = preset[2] } end
-		list[#list + 1] = { value = "custom", text = L["Custom"], tip = L["Your own settings, not a preset's."],
-			enabled = function() return false end }
+		list[#list + 1] = { value = "custom", text = L["Custom"],
+			tip = L["Your own settings, as they were before you picked a preset."],
+			enabled = function() return Kept() ~= nil end }
 		return list
-	end, L["A whole look in one pick. Changing a setting after it shows Custom."], On)
+	end, L["A whole look in one pick. Changing a setting after it shows Custom; picking Custom puts back " ..
+		"your own settings from before the preset."], On)
 
 	stack:Header(content, L["Text"])
 	rows.Look(L["Look:"], L["Names"], {
@@ -10111,7 +10250,6 @@ local function CreateMinimapPanel()
 	}
 	-- (In a row.)
 	local PLACE_COLUMN = 120
-	local firstPlace
 	for i, place in ipairs(PLACES) do
 		-- (PvP here is battlegrounds and arenas only, so it's named for them.)
 		local label = place[1] == "PvP" and L["BGs"] or place[2]
@@ -10119,26 +10257,6 @@ local function CreateMinimapPanel()
 			L["Tracking doesn't keep the minimap up here. Hovering it still shows it."])
 		check:SetPoint("TOPLEFT", exceptIn, "BOTTOMLEFT", 12 + (i - 1) * PLACE_COLUMN, -4)
 		GreyUnless(check, function(db) return db.minimapKeepGathering end)
-		firstPlace = firstPlace or check
-	end
-
-	-- Hide in camera modes: one box per camera (keys <cam>HideMinimap), in
-	-- four columns.
-	local hideInCams = Label(content, "GameFontHighlight", L["Hide in camera modes"])
-	hideInCams:SetPoint("TOPLEFT", firstPlace, "BOTTOMLEFT", -44, -14)
-	local CAM_ROWS, CAM_COLUMN = math.ceil(#ns.CAMERA_OFF_CAMS / 4), 140
-	local camAbove = {}
-	for i, cam in ipairs(ns.CAMERA_OFF_CAMS) do
-		local check = Check(content, cam[1] .. "HideMinimap", cam[2],
-			L["While the %s camera runs, the minimap and its header fade, even if they're set to " ..
-			"always show or tracking would keep them up. Hovering them still shows them."]:format(cam[2]))
-		local column, row = math.floor((i - 1) / CAM_ROWS), (i - 1) % CAM_ROWS
-		if row == 0 then
-			check:SetPoint("TOPLEFT", hideInCams, "BOTTOMLEFT", -2 + column * CAM_COLUMN, -4)
-		else
-			check:SetPoint("TOPLEFT", camAbove[column], "BOTTOMLEFT", 0, -2)
-		end
-		camAbove[column] = check
 	end
 	canvas:SetScript("OnShow", PageShown(Refresh, content))
 	canvas:Hide()
@@ -10881,44 +10999,14 @@ local function CreateCooldownPanel()
 end
 
 -- Sub-pages: the visions, each a way of showing just what matters, in a hub
--- of their own. General: what they share (the Vision Helper). Duel Vision: the
+-- of their own, each with its own switch (no General page). Duel Vision: the
 -- plates of two players dueling near you (see Effects). Roll Vision: a window
 -- of the group's loot rolls (RollWindow.lua). Heal Vision: the party and raid frames show only who
 -- needs healing (HealVisionFrames.lua). Quest Vision: what you still need for
 -- your quests (QuestMobs.lua, QuestGlow.lua).
 local function CreateVisionPanel()
-	local canvas, content = CreateScrollPage()
-
-	local title = Label(content, "GameFontNormalLarge", L["General"])
-	title:SetPoint("TOPLEFT", 16, -16)
-
-	local note = PageIntro(content, title,
-		L["Ways of showing just what matters. Each vision has a page of its own: this one turns them all " ..
-		"on or off, and has what they share."])
-
-	local switch = PageSwitch(content, "handleVision", L["Enable Visions"],
-		L["On: every vision works as its page says. Off: none of them do (Heal, Quest, Roll, Duel, Vitals, " ..
-		"Battle and Story Vision, and the Vision Helper), and each keeps its settings for when you turn this back on. " ..
-		"The visions' pages grey out with it."], note, function()
-		if ns.RefreshRollWindow then ns.RefreshRollWindow() end
-		if ns.ApplyHealVisionFrames then ns.ApplyHealVisionFrames() end
-		if ns.RefreshTargetQuestIcon then ns.RefreshTargetQuestIcon() end
-		if ns.UpdateQuestGlow then ns.UpdateQuestGlow() end
-		if ns.RefreshQuestItemButton then ns.RefreshQuestItemButton() end
-		if ns.RefreshLowHealth then ns.RefreshLowHealth() end
-	end)
-
-	local stack = Stack(switch, "check")
-	stack:Add(Check(content, "minimapVisions", L["Vision Helper"],
-		L["While a vision is doing something (Heal Vision fading frames, a duel being watched, the roll " ..
-		"window up...), the minimap button glows in its color, and its menu and tooltip list it with a " ..
-		"link to its page."]), "check")
-
-
-	canvas:SetScript("OnShow", PageShown(Refresh, content))
-	canvas:Hide()
-	-- (The Vision hub's first page: "General" there.)
-	RegisterSubpage(canvas, "Vision")
+	local canvas, content, title, note
+	local stack -- (the pages below each start their own)
 
 	-- Quest Vision: mobs and NPCs you still need for a quest objective (see
 	-- QuestMobs): their plates kept up, a quest icon on them and on the target frame.
@@ -14065,7 +14153,9 @@ ns.lowHealthKit = { CreateScrollPage = CreateScrollPage, Label = Label, PageShow
 	PageSwitch = PageSwitch, AddControl = function(control) controls[#controls + 1] = control end,
 	Header = Header, CreateKeybindButton = CreateKeybindButton, RefreshKeybinds = RefreshKeybinds,
 	StopListening = StopListening, IconPicker = IconPicker, FitContentHeight = FitContentHeight,
-	Choice = Choice, OpenColorPicker = OpenColorPicker, BoxLine = BoxLine, RecordKey = RecordKey }
+	Choice = Choice, OpenColorPicker = OpenColorPicker, BoxLine = BoxLine, RecordKey = RecordKey,
+	-- (fn after the page's Reset page has put its settings back)
+	OnReset = function(content, fn) resetHooks[content] = fn end }
 
 -- The pages are built once the language is known (Locales.lua): first the
 -- text this file made as it ran is translated again.
@@ -14123,8 +14213,9 @@ ns.OnLanguage(function()
 	if not ns.isRetail then
 		CreateSwingPanel()
 	end
-	-- (Only with a Cooldown Manager: the game's, on clients that have it, or the addon.)
-	if ns.AddOnInstalled("Blizzard_CooldownViewer") or ns.AddOnInstalled("ForeverEnhancedCooldownManager") then
+	-- (Only with a Cooldown Manager: the game's, on clients that have it, or the addon.
+	-- ProfileModules.lua.)
+	if ns.HasCooldownManager() then
 		CreateCooldownPanel()
 	end
 	CreateTooltipPanel()
@@ -14161,6 +14252,9 @@ ns.OnLanguage(function()
 	end
 	if ns.CreateCombatStylePanel then -- (CombatVision.lua)
 		ns.CreateCombatStylePanel(ns.lowHealthKit)
+	end
+	if ns.CreateStoryStylePanel then -- (StoryVision.lua)
+		ns.CreateStoryStylePanel(ns.lowHealthKit)
 	end
 	if ns.CreateVitalsStylePanel then -- (LowHealth.lua)
 		ns.CreateVitalsStylePanel(ns.lowHealthKit)

@@ -788,6 +788,15 @@ local function HandleSlash(msg)
 				tostring(session.level), tostring(session.bosses), tostring(session.lastZone),
 				#zones > 0 and table.concat(zones, ", ") or "none counted yet"))
 		end
+		-- How it's drawn beside the zone name, once the zone title has sized it.
+		C_Timer.After(1.5, function()
+			if ns.TimeTitleFontReport then
+				print("  fonts (1.5s later):")
+				for _, line in ipairs(ns.TimeTitleFontReport()) do
+					print(line)
+				end
+			end
+		end)
 		print(("  Last time row %s, Story Vision %s, in combat %s"):format(tostring(ns.Setting("storyRecap")),
 			tostring(ns.Setting("storyVision")), tostring(InCombatLockdown())))
 	elseif cmd == "attacktest" then

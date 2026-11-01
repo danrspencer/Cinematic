@@ -645,6 +645,8 @@ local function CreateTint()
 	end
 end
 
+local CLASSIC_BOOST = 1.4 -- the tint's strength with Classic boost on (classic clients)
+
 local function ApplyTint(level, vignetteLevel, weatherLevel)
 	local preset = TINT_BY_KEY[shownPreset] or TINT_BY_KEY.none
 	local isZone = preset.key == "zone" or preset.key == "zonetime"
@@ -652,16 +654,20 @@ local function ApplyTint(level, vignetteLevel, weatherLevel)
 		* level * presetFade * (1 - innLevel * INN_SOFTEN)
 
 	if preset.mode and strength > 0 then
+		-- Classic's brighter, more saturated world shows the same tint less:
+		-- the boost pushes it past the colour, each channel kept in range.
+		local boost = not ns.isRetail and db.tintClassicBoost and CLASSIC_BOOST or 1
 		local function grade(color)
-			if preset.mode == "ADD" then
-				return { color[1] * strength, color[2] * strength, color[3] * strength, 1 }
+			local out = { 1, 1, 1, 1 }
+			for c = 1, 3 do
+				if preset.mode == "ADD" then
+					out[c] = math.min(1, color[c] * strength * boost)
+				else
+					-- Multiply: blend from white (no change) toward the tint colour.
+					out[c] = math.max(0, 1 - (1 - color[c]) * strength * boost)
+				end
 			end
-			-- Multiply: blend from white (no change) toward the tint colour.
-			return {
-				1 - (1 - color[1]) * strength,
-				1 - (1 - color[2]) * strength,
-				1 - (1 - color[3]) * strength, 1,
-			}
+			return out
 		end
 		local top, bottom
 		if preset.key == "custom" then
@@ -1006,22 +1012,26 @@ end
 -- offset copies behind it bleed its edges. (A grain texture over it wore the
 -- band round the letters too, and looked dirty: tested.)
 local BANNER_WAIT = 2 -- seconds after the death camera starts
-local BANNER_IN, BANNER_HOLD, BANNER_OUT = 3, 4, 1.5 -- seconds
+local BANNER_IN, BANNER_OUT = 3, 1.5 -- seconds (how long it stays: Story Vision's storyBannerHold)
 local BANNER_HEIGHT, BANNER_EDGE = 0.1, 0.07 -- solid band, and each soft edge (shares of the screen height)
 local BANNER_ALPHA = 0.7
 local BANNER_SCALE = 3.3 -- the text's size (its font's, times this)
-local BANNER_COLOR = { 0.72, 0.11, 0.14 }
+local BANNER_COLOR = { 0.72, 0.11, 0.14 } -- (at first: then Story Vision's storyBannerR, G, B)
 local BANNER_BLEED = { { -0.7, 0 }, { 0.7, 0 }, { 0, -0.7 }, { 0, 0.7 }, { -0.4, 0.4 }, { 0.4, -0.4 } }
 local BANNER_BLEED_ALPHA, BANNER_TEXT_ALPHA = 0.16, 0.9
 -- Or "wasted" (a nod to crime-sandbox films and games): a flat black band with
 -- hard edges, "wasted" on it in red with a dark outline (a picture: drawn in
 -- Pricedown by Tools/wasted-banner/render.py; the font isn't shipped), in quicker
 -- and kept up longer. (The death screen's grey wash does the rest.)
-local WASTED_WAIT, WASTED_IN, WASTED_HOLD, WASTED_OUT = 1.5, 0.4, 5, 1 -- seconds
+local WASTED_WAIT, WASTED_IN, WASTED_OUT = 1.5, 0.4, 1 -- seconds (it stays a second past storyBannerHold)
 local WASTED_HEIGHT, WASTED_ALPHA = 0.16, 0.5 -- share of the screen height; band opacity
 local WASTED_TEXTURE = "Interface\\AddOns\\" .. ADDON_NAME .. "\\Textures\\Wasted"
 local WASTED_SIZE = 0.1 -- the picture's height, a share of the screen's (4:1 wide)
 local banner = { started = nil, was = nil, bleed = {} }
+-- (Its shape for Story Vision's preview, drawn there to scale.)
+ns.DEATH_BANNER_LOOK = { height = BANNER_HEIGHT, edge = BANNER_EDGE, alpha = BANNER_ALPHA, scale = BANNER_SCALE,
+	textAlpha = BANNER_TEXT_ALPHA, wastedHeight = WASTED_HEIGHT, wastedAlpha = WASTED_ALPHA,
+	wastedTexture = WASTED_TEXTURE, wastedSize = WASTED_SIZE, gradient = SetGradient }
 
 -- Story Vision's font (Style General's unless the page picks its own) for
 -- text at size pixels (flags: its outline), every alphabet's letters drawn,
@@ -1054,6 +1064,7 @@ local function StoryFont(text, object, size, flags)
 	if ns.SetTextShadow then ns.SetTextShadow(text, shadow) end
 	return true
 end
+ns.StoryFont = StoryFont -- (Story Vision's preview)
 
 local function CreateDeathBanner()
 	local frame = CreateFrame("Frame", nil, UIParent)
@@ -1130,11 +1141,12 @@ local function ShowDeathBanner(style)
 	banner.bottom:SetHeight(height * BANNER_EDGE)
 	-- (The font each time: Story Vision's may have changed.)
 	local _, size = GameFontNormalHuge:GetFont()
+	local look = ns.StyleLook("storyVision")
 	for _, text in ipairs({ banner.text, unpack(banner.bleed) }) do
 		if not StoryFont(text, GameFontNormalHuge, size) then
 			text:SetFontObject(GameFontNormalHuge)
 		end
-		text:SetTextColor(BANNER_COLOR[1], BANNER_COLOR[2], BANNER_COLOR[3], text.alpha)
+		text:SetTextColor(look.storyBannerR, look.storyBannerG, look.storyBannerB, text.alpha)
 		text:SetText(L["YOU DIED"])
 	end
 	banner.started = GetTime()
@@ -1156,9 +1168,10 @@ local function UpdateDeathBanner()
 	if not banner.started then
 		return
 	end
-	local wait, fadeIn, hold, fadeOut = BANNER_WAIT, BANNER_IN, BANNER_HOLD, BANNER_OUT
+	local hold = tonumber(ns.StyleLook("storyVision").storyBannerHold) or 4
+	local wait, fadeIn, fadeOut = BANNER_WAIT, BANNER_IN, BANNER_OUT
 	if banner.wastedStyle then
-		wait, fadeIn, hold, fadeOut = WASTED_WAIT, WASTED_IN, WASTED_HOLD, WASTED_OUT
+		wait, fadeIn, hold, fadeOut = WASTED_WAIT, WASTED_IN, hold + 1, WASTED_OUT
 	end
 	local t = GetTime() - banner.started - wait -- (below 0: still waiting, unseen)
 	local total = fadeIn + hold + fadeOut
@@ -1505,7 +1518,9 @@ local TIME_TITLES = {
 }
 local timeTitle
 local RECAP_SCALE = 0.5 -- the Last time line's size, of the subzone font's (the title's: 0.75)
-local RECAP_COLOR = { 0.92, 0.89, 0.82, 0.62 } -- soft white, dim: a footnote beside the zone's own colors
+-- Soft grey, dim: a footnote beside the zone's own colors. Dimmed by color,
+-- not alpha, which would fade its black outline too.
+local RECAP_COLOR = { 0.7, 0.67, 0.61 }
 local RECAP_GAP = 6 -- under the title
 
 local function TimeTitleAt(hour)
@@ -1543,7 +1558,20 @@ local function PlaceTimeTitle()
 		local object = _G.SubZoneTextFont or GameFontNormalLarge
 		if size and StoryFont(timeTitle.text, object, math.floor(size * 0.75 + 0.5), flags) then
 			StoryFont(timeTitle.recap, object, math.floor(size * RECAP_SCALE + 0.5), flags)
-			timeTitle.sized = true
+			timeTitle.sized = "Story Vision's font"
+		elseif font and size and ns.SetPlateNameFont then
+			-- The game's font at a real size, its outline full width (scaled
+			-- text thins it). A family, so Russian letters aren't boxes. An
+			-- outline is the same pixels at any size, so the half-size line
+			-- takes the next thinner one to look as heavy as the zone name's.
+			local thinner = (flags or ""):gsub("THICKOUTLINE", "OUTLINE")
+			for line, scale in pairs({ [timeTitle.text] = 0.75, [timeTitle.recap] = RECAP_SCALE }) do
+				if line.SetTextScale then line:SetTextScale(1) end
+				ns.SetPlateNameFont(line, object, font, size, scale, line == timeTitle.recap and thinner or flags)
+				line:SetShadowOffset(object:GetShadowOffset())
+				line:SetShadowColor(object:GetShadowColor())
+			end
+			timeTitle.sized = "game font, own size"
 		elseif timeTitle.text.SetTextScale then
 			-- (Back to the game's font, if Story Vision's was on it.)
 			timeTitle.text:SetFontObject(object)
@@ -1554,11 +1582,11 @@ local function PlaceTimeTitle()
 			-- letters (a Russian title on an English client showed boxes).
 			timeTitle.text:SetTextScale(0.75)
 			timeTitle.recap:SetTextScale(RECAP_SCALE)
-			timeTitle.sized = true
+			timeTitle.sized = "game font, scaled"
 		elseif font then
 			timeTitle.text:SetFont(font, math.floor(size * 0.75 + 0.5), flags)
 			timeTitle.recap:SetFont(font, math.floor(size * RECAP_SCALE + 0.5), flags)
-			timeTitle.sized = true
+			timeTitle.sized = "game font file"
 		end
 	end
 	timeTitle.text:SetTextColor(ZoneTextString:GetTextColor())
@@ -1584,6 +1612,32 @@ local function PlaceTimeTitle()
 	end
 end
 
+-- For /cine recaptest: how the zone lines and ours are drawn (font, size,
+-- outline, shadow, scale), to compare their look.
+function ns.TimeTitleFontReport()
+	local lines = { "  sized by: " .. tostring(timeTitle and timeTitle.sized) }
+	local function Describe(label, text)
+		if not text then
+			lines[#lines + 1] = ("  %s: none"):format(label)
+			return
+		end
+		local font, size, flags = text:GetFont()
+		local sx, sy = text:GetShadowOffset()
+		local _, _, _, sa = text:GetShadowColor()
+		local object = text:GetFontObject()
+		lines[#lines + 1] = ("  %s: %s %s [%s] shadow %s,%s a%s, scale %s, alpha %s, object %s"):format(label,
+			tostring(font), tostring(size and math.floor(size * 10 + 0.5) / 10), tostring(flags), tostring(sx),
+			tostring(sy), tostring(sa and math.floor(sa * 100 + 0.5) / 100),
+			tostring(text.GetTextScale and text:GetTextScale()), tostring(text:GetAlpha()),
+			tostring(object and object.GetName and object:GetName() or object))
+	end
+	Describe("zone", ZoneTextString)
+	Describe("subzone", SubZoneTextString)
+	Describe("time title", timeTitle and timeTitle.text)
+	Describe("last time", timeTitle and timeTitle.recap)
+	return lines
+end
+
 -- showTime: the time of day's name; recap: the Last time line, or nil.
 function ns.ShowTimeOfDayTitle(showTime, recap)
 	if not (ZoneTextFrame and ZoneTextString) then
@@ -1601,7 +1655,6 @@ function ns.ShowTimeOfDayTitle(showTime, recap)
 		timeTitle.recap:SetFontObject(_G.SubZoneTextFont or GameFontNormalLarge)
 		timeTitle.recap:SetShadowOffset(1, -1)
 		timeTitle.recap:SetTextColor(RECAP_COLOR[1], RECAP_COLOR[2], RECAP_COLOR[3])
-		timeTitle.recap:SetAlpha(RECAP_COLOR[4])
 		local function Clear()
 			timeTitle.text:SetText("")
 			timeTitle.recap:SetText("")
@@ -1709,7 +1762,7 @@ end
 
 -- When the time of day changes during play (Evening to Dusk, say), its name
 -- fades in on its own where the zone title appears, then fades out.
-local CHANGE_FADE_IN, CHANGE_HOLD, CHANGE_FADE_OUT = 1.5, 4, 2
+local CHANGE_FADE_IN, CHANGE_FADE_OUT = 1.5, 2 -- (how long it stays: Story Vision's storyTimeHold, storyAttackHold)
 local CHANGE_CHECK = 15 -- seconds between checks
 -- A sound for each time of day (Wowhead sound IDs), played with its title.
 -- Bells are your faction's city bell.
@@ -1752,8 +1805,9 @@ local function PlayTimeSound(title) -- (a time of day, or "bell")
 end
 local changeTitle, lastTitle
 
--- The title itself: text fades in where the zone title appears, in this colour.
-local function ShowTitle(text, r, g, b)
+-- The title itself: text fades in where the zone title appears, in this
+-- colour, staying hold seconds.
+local function ShowTitle(text, r, g, b, hold)
 	if not changeTitle then
 		changeTitle = CreateFrame("Frame", nil, UIParent)
 		changeTitle:SetSize(1, 1)
@@ -1768,10 +1822,10 @@ local function ShowTitle(text, r, g, b)
 			local t, alpha = self.t, 0
 			if t < CHANGE_FADE_IN then
 				alpha = t / CHANGE_FADE_IN
-			elseif t < CHANGE_FADE_IN + CHANGE_HOLD then
+			elseif t < CHANGE_FADE_IN + self.hold then
 				alpha = 1
-			elseif t < CHANGE_FADE_IN + CHANGE_HOLD + CHANGE_FADE_OUT then
-				alpha = 1 - (t - CHANGE_FADE_IN - CHANGE_HOLD) / CHANGE_FADE_OUT
+			elseif t < CHANGE_FADE_IN + self.hold + CHANGE_FADE_OUT then
+				alpha = 1 - (t - CHANGE_FADE_IN - self.hold) / CHANGE_FADE_OUT
 			else
 				self:Hide()
 			end
@@ -1792,20 +1846,22 @@ local function ShowTitle(text, r, g, b)
 	end
 	changeTitle.text:SetTextColor(r, g, b)
 	changeTitle.text:SetText(text)
-	changeTitle.t = 0
+	changeTitle.t, changeTitle.hold = 0, tonumber(hold) or 4
 	changeTitle:SetAlpha(0)
 	changeTitle:Show()
 end
 
 local function ShowChangeTitle(text)
-	ShowTitle(L[text], 1, 0.86, 0.6)
+	local look = ns.StyleLook("storyVision")
+	ShowTitle(L[text], look.storyTimeR, look.storyTimeG, look.storyTimeB, look.storyTimeHold)
 	PlayTimeSound(text)
 end
 
 -- Warnings from the game ("Dun Algaz is under attack!") in the same place,
 -- in red, with your faction's city bell.
 function ns.ShowAlertTitle(text)
-	ShowTitle(text, 1, 0.3, 0.2)
+	local look = ns.StyleLook("storyVision")
+	ShowTitle(text, look.storyAttackR, look.storyAttackG, look.storyAttackB, look.storyAttackHold)
 	PlayTimeSound("bell")
 end
 
@@ -1813,6 +1869,12 @@ end
 function ns.TestTimeChangeTitle(text)
 	db = db or ns.GetDB()
 	ShowChangeTitle(text or TimeTitleAt((GetClockTime())))
+end
+
+-- The time of day's title now, in your language (Story Vision's preview).
+function ns.TimeTitleNow()
+	db = db or ns.GetDB()
+	return L[TimeTitleAt((GetClockTime()))]
 end
 
 C_Timer.NewTicker(CHANGE_CHECK, ns.Profiled("Time of day check", function()

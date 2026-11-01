@@ -42,7 +42,8 @@ ns.PROFILE_SLOTS = {
 -- has), and its choices. A choice: part (its key, what profiles pick it
 -- by), label and line (what players read), client (only there),
 -- hidden (only for profiles, not offered; a client's name: not offered
--- there), made (a layout Cinematic makes
+-- there), noCDM (made for the Cooldown Manager: not offered without one,
+-- and a profile's pick of it is this choice there instead), made (a layout Cinematic makes
 -- and adds to Edit Mode for you, tagged so in Customize), and modules (each a module's key,
 -- or { forever = key, retail = key }).
 ns.SLOT_CHOICES = {
@@ -57,8 +58,8 @@ ns.SLOT_CHOICES = {
 			line = "Your resources in the middle, the Cooldown Manager above", modules = { "layout-pure" } },
 		{ part = "own", label = "Your own", line = "Cinematic leaves your Edit Mode layout as it is",
 			modules = {} },
-		{ part = "preset", client = "forever", label = "WoW Forever's", line = "The game's own layout",
-			modules = { "layout-preset" } },
+		{ part = "preset", client = "forever", label = ns.isClassicEra and "Classic's" or "WoW Forever's",
+			line = "The game's own layout", modules = { "layout-preset" } },
 	} },
 	frames = { label = "Interface", page = "Standard Frames", question = "When does your UI fade?",
 		default = "standard", choices = {
@@ -86,10 +87,11 @@ ns.SLOT_CHOICES = {
 			line = "Point at the bars, the menus or the XP bar", modules = { "retail-groups", "micro-off-in-fights" } },
 		{ part = "standard", client = "retail", label = "Action Bars (Retail Group)",
 			line = "Point at the bars, the menus or the XP bar", modules = { { retail = "retail-groups" } } },
-		{ part = "pure", label = "Cooldown Manager", line = "In fights just the Cooldown Manager: no bars or menus",
+		{ part = "pure", noCDM = "grouped", label = "Cooldown Manager",
+			line = "In fights just the Cooldown Manager: no bars or menus",
 			modules = { { retail = "retail-groups" }, "pure-cdm" } },
 		-- (Only the retired CDM profiles'.)
-		{ part = "cdm", hidden = true, label = "Cooldown Manager, pet and stance bars",
+		{ part = "cdm", hidden = true, noCDM = "grouped", label = "Cooldown Manager, pet and stance bars",
 			line = "The Cooldown Manager in fights, pet and stance bars too",
 			modules = { { retail = "retail-groups" }, "cdm", "micro-off-in-fights" } },
 	} },

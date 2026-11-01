@@ -4038,12 +4038,33 @@ do
 			return first
 		end
 	end
+	-- Whether an accepted quest made it into the tracker. The classic clients
+	-- don't always track a quest as it's picked up: revealing then would show
+	-- only the older tracked quests. Nil when there's no telling.
+	local function AcceptedTracked(questID)
+		local watchType = C_QuestLog and C_QuestLog.GetQuestWatchType
+		if watchType then
+			return watchType(questID) ~= nil
+		end
+		local index = GetQuestLogIndexByID and GetQuestLogIndexByID(questID)
+		if type(index) == "number" and not IsSecretValue(index) and index > 0 and IsQuestWatched then
+			return ns.Flag(IsQuestWatched(index)) and true or false
+		end
+	end
+	local ACCEPT_TRACK_WAIT = 0.3 -- (the game tracks it a moment after accepting)
 	questWatcher:SetScript("OnEvent", function(_, event, quest, second)
 		-- (Older clients give a quest log index: with "Show just that quest",
 		-- the quest log scan below reveals instead, knowing the quest.)
 		local scanReveals = event == "QUEST_WATCH_UPDATE" and not ns.isRetail and ns.db and ns.db.questRevealOnlyThat
 			and C_QuestLog and C_QuestLog.GetQuestObjectives
-		if not scanReveals then
+		local acceptedID = event == "QUEST_ACCEPTED" and AcceptedQuestID(quest, second)
+		if acceptedID and ns.db and ns.db.questRevealOnAccept then
+			C_Timer.After(ACCEPT_TRACK_WAIT, function()
+				if AcceptedTracked(acceptedID) ~= false then
+					Reveal("questRevealOnAccept", acceptedID)
+				end
+			end)
+		elseif not scanReveals then
 			Reveal(QUEST_REVEAL_EVENTS[event], event == "QUEST_WATCH_UPDATE" and quest or AcceptedQuestID(quest, second))
 		end
 		if event == "QUEST_ACCEPTED" or type(quest) ~= "number" or IsTracked(quest) then
@@ -7140,9 +7161,6 @@ function ns.UpdateFrames(cinematic, elapsed)
 	-- CineMode or not, hovering and all (typing still shows the input box).
 	local immersive = ns.ChatCamImmersive and ns.ChatCamImmersive() or false
 
-	-- Hide in camera modes (Minimap page): the camera running now fades the
-	-- minimap and its header, whatever would keep them up. Hovering still shows them.
-	local camHidesMinimap = minimapPage and ns.activeCam and ns.db[ns.activeCam .. "HideMinimap"]
 	-- Keep minimap open indoors (Minimap page): see RedrawMinimapWhenShown.
 	local keepIndoors = minimapPage and (ns.db.minimapIndoors and IsIndoors and ns.Flag(IsIndoors())
 		or ns.db.minimapKeepQuest and ns.HasTrackedQuest()
@@ -7236,11 +7254,6 @@ function ns.UpdateFrames(cinematic, elapsed)
 					tracking and not padReveal and "kept up " or ""))
 			end
 			entry.debugUp = up
-		end
-		-- (The header too: its bar, zone name, clock and buttons are groups of their own.)
-		if camHidesMinimap and GROUP_SWITCH[entry.group] == "handleMinimap"
-			and not hovered[row] and not pinged[row] then
-			target = 0
 		end
 		-- (Fading out for a profile's layout change, Layouts.lua; then a
 		-- profile's preview: just its group up, ns.PreviewProfile.)

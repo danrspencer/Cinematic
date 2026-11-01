@@ -121,7 +121,7 @@ ns.CHANGELOG_FEATURES = {
 	{ date = "2026-10-23", page = "Advanced Frames", client = "forever", title = "Naowh Forever support",
 		text = "Naowh Forever's top bar now fades in CineMode (a row on the Advanced Frames page), and its " ..
 		"RestedXP guide window fades with the Quest tracker row." },
-	{ date = "2026-10-23", page = "Vision", title = "Vision Helper",
+	{ date = "2026-10-23", page = "Heal Vision", title = "Vision Helper",
 		text = "The minimap button glows while a vision is doing something, and its menu lists the visions in " ..
 		"use with a link to each one's page." },
 	{ date = "2026-10-23", page = "Advanced Frames", title = "ElvUI, DBM and RestedXP support",
@@ -135,7 +135,7 @@ ns.CHANGELOG_FEATURES = {
 		text = "Hold a key to bring up a wheel of the visions and turn Heal, Quest, Duel or Roll Vision on or " ..
 		"off, even in a fight. It's on the master wheel too, and each vision has a toggle key of its own on " ..
 		"the Keybinds page." },
-	{ date = "2026-10-22", page = "Vision", title = "Roll Vision",
+	{ date = "2026-10-22", page = "Roll Vision", title = "Roll Vision",
 		text = "In a group, a window shows each item being rolled on, with everyone's pick and roll and the " ..
 		"winner on top, so you needn't read the rolls in chat. Turn it off in the Visions page." },
 	{ date = "2026-10-21", page = "Quest Vision", title = "Quest Vision",

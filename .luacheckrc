@@ -166,6 +166,7 @@ read_globals = {
 	"GetQuestTimers",
 	"GetNumQuestWatches",
 	"IsQuestWatched",
+	"GetQuestLogIndexByID",
 	"C_SuperTrack",
 	"C_Navigation", "CreateVector2D",
 	"GetInventoryAlertStatus",

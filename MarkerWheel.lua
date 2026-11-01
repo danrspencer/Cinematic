@@ -769,33 +769,31 @@ end
 ns.hasWorldMarkerWheel = CinematicWorldMarkerWheel ~= nil
 
 -- The visions: each one's switch, turned on and off by its keybind and the
--- vision wheel. Each is under Enable Visions (Vision > General, page):
--- turning one on turns that on too. Apply()
--- puts the change into effect, as the options pages do.
+-- vision wheel. Apply() puts the change into effect, as the options pages do.
 local VISIONS = {
-	{ key = "heal", setting = "handleHealVision", page = "handleVision", label = "Heal Vision",
+	{ key = "heal", setting = "handleHealVision", label = "Heal Vision",
 		icon = "Interface\\Icons\\Spell_Holy_FlashHeal", trim = true, color = { 0.35, 1, 0.45 },
 		Apply = function()
 			if ns.ApplyHealVisionFrames then ns.ApplyHealVisionFrames() end
 		end },
-	{ key = "quest", setting = "questVision", page = "handleVision", label = "Quest Vision",
+	{ key = "quest", setting = "questVision", label = "Quest Vision",
 		icon = "Interface\\Icons\\INV_Misc_Head_Dragon_01", trim = true, color = { 1, 0.82, 0 },
 		Apply = function()
 			if ns.RefreshTargetQuestIcon then ns.RefreshTargetQuestIcon() end
 			if ns.UpdateQuestGlow then ns.UpdateQuestGlow() end
 		end },
-	{ key = "duel", setting = "duelPlates", page = "handleVision", label = "Duel Vision",
+	{ key = "duel", setting = "duelPlates", label = "Duel Vision",
 		icon = "Interface\\Icons\\Ability_DualWield", trim = true, color = { 1, 0.35, 0.3 } },
 }
 -- (Only where the game has a loot history.)
 if ns.hasRollWindow then
-	VISIONS[#VISIONS + 1] = { key = "roll", setting = "rollWindow", page = "handleVision", label = "Roll Vision",
+	VISIONS[#VISIONS + 1] = { key = "roll", setting = "rollWindow", label = "Roll Vision",
 		icon = "Interface\\Icons\\INV_Misc_Dice_01", trim = true, color = { 0.45, 0.7, 1 },
 		Apply = function()
 			if ns.RefreshRollWindow then ns.RefreshRollWindow() end
 		end }
 end
-VISIONS[#VISIONS + 1] = { key = "vitals", setting = "lowHealth", page = "handleVision", label = "Vitals Vision",
+VISIONS[#VISIONS + 1] = { key = "vitals", setting = "lowHealth", label = "Vitals Vision",
 	icon = "Interface\\Icons\\Spell_Shadow_LifeDrain02", trim = true, color = { 1, 0.25, 0.4 },
 	Apply = function()
 		if ns.RefreshLowHealth then ns.RefreshLowHealth() end
@@ -819,9 +817,6 @@ local function ToggleVision(vision, quiet)
 		db[vision.setting] = false
 	else
 		db[vision.setting] = true
-		if vision.page then
-			db[vision.page] = true
-		end
 	end
 	if vision.Apply then
 		vision.Apply()

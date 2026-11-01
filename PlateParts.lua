@@ -562,7 +562,7 @@ local function ApplyPlate(plate, personal)
 	local nameFade = crossfading and (nameOnly and 1 - 2 * body or 2 * body - 1) or 1
 	local nameAlpha = nameOnly and kept * nameFade * (sight[plate] or 1) or 0
 	-- (Our own text in its place, with the Nameplates page's tick: see texts.)
-	local ours = nameOnly and plate ~= personal and Style("plateNameStyle")
+	local ours = nameOnly and plate ~= personal and ns.StyleOn() and Style("plateNameStyle")
 	CentreName(unitFrame, nameOnly and not ours)
 	OwnName(plate, ours and nameAlpha * Style("plateNameAlpha") or nil)
 	for _, part in ipairs(ns.PLATE_PARTS) do
@@ -2124,7 +2124,7 @@ local function RefreshTargetArrow(plate)
 	end
 	local unit = plate.namePlateUnitToken or (plate.UnitFrame and plate.UnitFrame.unit)
 	-- (None while the Style hub's Nameplates page is switched off.)
-	local level = plate ~= PersonalPlate() and Style("handlePlateStyle") and levels.TargetArrow or 0
+	local level = plate ~= PersonalPlate() and ns.StyleOn() and Style("handlePlateStyle") and levels.TargetArrow or 0
 	local kind, kinds, hovered, opacity, size
 	if level > 0 then
 		kind, kinds, hovered, opacity, size = PlateLook(plate, unit)
@@ -2173,7 +2173,7 @@ function ns.ReportTargetMarks()
 	end
 	ns.Print(("marks: client %s, combat %s, page %s, Target Indicator row %s, Height %s (no plate %s), target %s"):format(
 		ns.isRetail and "retail" or "forever", tostring(InCombatLockdown()),
-		Style("handlePlateStyle") and "on" or "off", Num(levels.TargetArrow),
+		ns.StyleOn() and Style("handlePlateStyle") and "on" or "off", Num(levels.TargetArrow),
 		tostring(Style("targetArrowY")), tostring(Style("targetArrowBareY")), tostring(UnitExists("target"))))
 	-- (The game's Show Offscreen Nameplates: the elite rules see only plates.)
 	local on, off = ns.OFFSCREEN_PLATE_CVARS, ns.NO_OFFSCREEN_PLATE_CVARS

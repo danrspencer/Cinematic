@@ -274,9 +274,13 @@ end
 function ns.PageTabs(content, list, picked)
 	local tabs = {}
 	for i, each in ipairs(list) do tabs[i] = { each[1], each[3] } end
-	local panel, _, Show, base = ns.FolderTabs(content, tabs, function(i)
+	local panel, tabFrames, Show, base = ns.FolderTabs(content, tabs, function(i)
 		if i ~= picked then ns.ShowHubPage(list[i][2]) end
-	end)
+	end, nil, nil, function(i) ns.FlipPageSwitch(list[i][2]) end)
+	-- (A right-click flips that tab's page switch: on or off on its tip.)
+	for i, tab in ipairs(tabFrames) do
+		tab:HookScript("OnEnter", function(self) ns.PageSwitchTip(self, list[i][2]) end)
+	end
 	base:SetPoint("TOPLEFT", content, "TOPLEFT", 8, -(ns.FOLDER_TAB_HEIGHT + 16))
 	-- (the panel: just its top edge, a line across the page under the tabs)
 	panel:SetPoint("TOPLEFT", base)
@@ -1360,9 +1364,17 @@ function ns.StyleRows(kit, content, stack, changed, switchKey, fieldOf)
 		return true
 	end
 	-- The presets as a dropdown (Preset:), each with its tip; Custom shows
-	-- (not to pick) while the settings match none.
+	-- while the settings match none. Picking a preset from your own settings
+	-- keeps them (db.presetCustom, by the page's switch and the menu's first
+	-- key: a page can have more than one menu), and Custom puts them back.
 	function rows.PresetMenu(presets, keys)
-		local field = {
+		local id = switchKey .. ":" .. tostring(keys[1])
+		local function Kept()
+			local db = ns.GetDB()
+			return db and db.presetCustom and db.presetCustom[id]
+		end
+		local field
+		field = {
 			get = function()
 				for i, preset in ipairs(presets) do
 					if Matches(preset, keys) then return i end
@@ -1370,9 +1382,25 @@ function ns.StyleRows(kit, content, stack, changed, switchKey, fieldOf)
 				return "custom"
 			end,
 			set = function(i)
+				local db = ns.GetDB()
+				if i == "custom" then
+					local kept = Kept()
+					if not kept then return end
+					db[switchKey] = true
+					for _, key in ipairs(keys) do
+						if kept[key] ~= nil then db[key] = kept[key] end
+					end
+					return
+				end
 				local preset = presets[i]
 				if not preset then return end
-				local db = ns.GetDB()
+				-- (Your own, before a preset goes over them.)
+				if field.get() == "custom" then
+					local kept = {}
+					for _, key in ipairs(keys) do kept[key] = db[key] end
+					db.presetCustom = db.presetCustom or {}
+					db.presetCustom[id] = kept
+				end
 				db[switchKey] = true
 				for _, key in ipairs(keys) do
 					local value = preset[3][key]
@@ -1385,9 +1413,11 @@ function ns.StyleRows(kit, content, stack, changed, switchKey, fieldOf)
 			local list = {}
 			for i, preset in ipairs(presets) do list[i] = { value = i, text = preset[1], tip = preset[2] } end
 			list[#list + 1] = { value = "custom", text = ns.L["Custom"],
-				tip = ns.L["Your own settings, not a preset's."], enabled = function() return false end }
+				tip = ns.L["Your own settings, as they were before you picked a preset."],
+				enabled = function() return Kept() ~= nil end }
 			return list
-		end, ns.L["A whole look in one pick. Changing a setting after it shows Custom."])
+		end, ns.L["A whole look in one pick. Changing a setting after it shows Custom; picking Custom puts back " ..
+			"your own settings from before the preset."])
 	end
 
 	-- A Look row: a button naming the part's look, and a click opens every

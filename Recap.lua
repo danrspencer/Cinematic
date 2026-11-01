@@ -1,7 +1,9 @@
--- Story Vision's Last time: as you log in, a line under the zone name (and
--- the time of day's title) saying what you did in your last session, such as
--- "Last time: Darkshore · 3 quests done · reached level 24". Tint.lua draws
--- it; this file keeps the counts.
+-- Story Vision's Last time: as you log in, what you did in your last session,
+-- such as "Last time: Darkshore · 3 quests done · reached level 24". Under
+-- the zone name (Tint.lua draws it), or a card of its own drawn as Battle
+-- Vision's boss card (ns.PlayVisionCard): its place, style, animation, heading
+-- and which details, all on Story Vision's Style tab. This file keeps the
+-- counts.
 --
 -- A session's counts live in CinematicCharDB.session and are written as they
 -- change (no polling: a few events), so a crash that skips PLAYER_LOGOUT
@@ -13,9 +15,33 @@ local L = ns.L
 local DEFAULTS = ns.DEFAULTS
 
 DEFAULTS.storyRecap = true -- Story Vision's Last time row
+-- Its look (the Style tab's Last time): "zone" under the zone name, else a
+-- card as Battle Vision's ("screen", "top" or "bottom" bar, "third").
+DEFAULTS.storyRecapPlace = "third"
+DEFAULTS.storyRecapStyle = "chapter"   -- the card's: "title", "subtitle" or "chapter"
+DEFAULTS.storyRecapAnim = "type"       -- ...and how it comes in: "fade", "reveal", "track" or "type"
+DEFAULTS.storyRecapAlign = "center"    -- ...in a bar: "left", "center" or "right"
+DEFAULTS.storyRecapSize = 30           -- ...its zone name's height on the screen
+DEFAULTS.storyRecapHold = 10           -- ...seconds it stays, between its fades
+DEFAULTS.storyRecapDelay = 2           -- ...seconds after the zone name comes in
+DEFAULTS.storyRecapR, DEFAULTS.storyRecapG, DEFAULTS.storyRecapB = 0.85, 0.78, 0.6 -- ...parchment
+DEFAULTS.storyRecapBook = false        -- ...a book icon before it
+DEFAULTS.storyRecapHeading = "lasttime" -- "lasttime", "previously", "previouslyon", "sofar" or "none"
+-- Which details (in this order), and a little icon before each.
+DEFAULTS.storyRecapZone = true
+DEFAULTS.storyRecapPlayed = true
+DEFAULTS.storyRecapQuests = true
+DEFAULTS.storyRecapLevel = true
+DEFAULTS.storyRecapBosses = true
+DEFAULTS.storyRecapDeaths = false
+DEFAULTS.storyRecapGold = false
+DEFAULTS.storyRecapIcons = false
+DEFAULTS.storyRecapSound = true        -- a page turning as it shows
 
 local MAX_AGE = 14 * 24 * 3600 -- seconds: an older last session isn't worth recalling
 local SEPARATOR = " · "
+local BOOK = "Interface\\Icons\\INV_Misc_Book_09"
+local PAGE_TURN = 836 -- (SOUNDKIT.IG_ABILITY_PAGE_TURN)
 
 -- The zone shown is the one you spent the most time in, not the last one:
 -- you often log out in a city or an inn, which says little about what you
@@ -23,11 +49,14 @@ local SEPARATOR = " · "
 -- you're in now goes in as soon as you leave it.
 local zoneNow, zoneSince
 local started -- (events before the login's RecapLogin are last session's business: left alone)
+local lastParts -- (the last session's, from the login: the card plays them)
 
 local function Session()
 	local chardb = ns.chardb
 	if not chardb then return nil end
-	chardb.session = chardb.session or { zones = {} }
+	if not chardb.session then
+		chardb.session = { zones = {}, begun = time(), moneyStart = GetMoney and GetMoney() or nil }
+	end
 	return chardb.session
 end
 
@@ -56,44 +85,181 @@ local function Count(key, by)
 	session[key] = (session[key] or 0) + (by or 1)
 end
 
--- The line for a finished session, or nil if nothing worth saying happened
--- (a quick look at the auction house) or it was too long ago.
-local function RecapLine(session)
+-- A finished session's counts, or nil if it was too long ago: the zone, quests,
+-- level reached, bosses, deaths, seconds played and copper earned.
+local function RecapParts(session)
 	if type(session) ~= "table" or not session.saved or time() - session.saved > MAX_AGE then
-		return nil
-	end
-	local parts = {}
-	local quests, bosses = session.quests or 0, session.bosses or 0
-	if quests > 0 then
-		parts[#parts + 1] = (quests == 1 and L["%d quest done"] or L["%d quests done"]):format(quests)
-	end
-	if session.level then
-		parts[#parts + 1] = L["reached level %d"]:format(session.level)
-	end
-	if bosses > 0 then
-		parts[#parts + 1] = (bosses == 1 and L["%d boss down"] or L["%d bosses down"]):format(bosses)
-	end
-	if #parts == 0 then
 		return nil
 	end
 	local zone, most = session.lastZone, 0
 	for name, seconds in pairs(session.zones or {}) do
 		if seconds > most then zone, most = name, seconds end
 	end
-	if zone then
-		table.insert(parts, 1, zone)
+	return { zone = zone, quests = session.quests or 0, level = session.level, bosses = session.bosses or 0,
+		deaths = session.deaths or 0, played = session.begun and session.saved - session.begun or nil,
+		gold = session.moneyStart and session.money and session.money - session.moneyStart or 0 }
+end
+
+-- Made up, for the Test and the preview while this session has nothing yet.
+local function SampleParts()
+	local zone = GetRealZoneText and GetRealZoneText() or ""
+	return { zone = zone ~= "" and zone or "Darkshore", quests = 3, level = UnitLevel("player") or 24, bosses = 1,
+		deaths = 2, played = 5400, gold = 123456 }
+end
+
+local function Icon(file) return ("|T%s:0|t "):format(file) end
+local ICONS = {
+	zone = "Interface\\Icons\\INV_Misc_Map_01", played = "Interface\\Icons\\INV_Misc_PocketWatch_01",
+	quests = "Interface\\GossipFrame\\ActiveQuestIcon", level = "Interface\\Icons\\Spell_Holy_InnerFire",
+	bosses = "Interface\\TargetingFrame\\UI-TargetingFrame-Skull", deaths = "Interface\\Icons\\Ability_Rogue_FeignDeath",
+	gold = "Interface\\Icons\\INV_Misc_Coin_01",
+}
+
+local function Played(seconds)
+	local minutes = math.floor(seconds / 60 + 0.5)
+	if minutes < 60 then return L["%d min played"]:format(math.max(minutes, 1)) end
+	return L["%s h played"]:format(("%.1f"):format(minutes / 60))
+end
+
+-- The details shown, in order (each with its icon, if ticked), without the
+-- zone if noZone; nil if none of what happened is shown.
+local function Details(parts, look, noZone)
+	local list, happened = {}, false
+	local function Add(key, text)
+		list[#list + 1] = (look.storyRecapIcons and Icon(ICONS[key]) or "") .. text
 	end
-	return L["Last time: %s"]:format(table.concat(parts, SEPARATOR))
+	if look.storyRecapZone and parts.zone and not noZone then Add("zone", parts.zone) end
+	if look.storyRecapPlayed and parts.played and parts.played >= 60 then Add("played", Played(parts.played)) end
+	if look.storyRecapQuests and parts.quests > 0 then
+		Add("quests", (parts.quests == 1 and L["%d quest done"] or L["%d quests done"]):format(parts.quests))
+		happened = true
+	end
+	if look.storyRecapLevel and parts.level then
+		Add("level", L["reached level %d"]:format(parts.level))
+		happened = true
+	end
+	if look.storyRecapBosses and parts.bosses > 0 then
+		Add("bosses", (parts.bosses == 1 and L["%d boss down"] or L["%d bosses down"]):format(parts.bosses))
+		happened = true
+	end
+	if look.storyRecapDeaths and parts.deaths > 0 then
+		Add("deaths", (parts.deaths == 1 and L["%d death"] or L["%d deaths"]):format(parts.deaths))
+		happened = true
+	end
+	if look.storyRecapGold and parts.gold > 0 then
+		local coins = GetCoinTextureString and GetCoinTextureString(parts.gold)
+			or ("%dg"):format(math.floor(parts.gold / 10000))
+		Add("gold", L["%s earned"]:format(coins))
+		happened = true
+	end
+	return happened and list or nil
+end
+
+-- The heading picked: "Last time", "Previously", "Previously, on <you>"...
+local function Heading(look)
+	local heading = look.storyRecapHeading
+	if heading == "none" then return nil end
+	if heading == "previously" then return L["Previously"] end
+	if heading == "previouslyon" then return L["Previously, on %s"]:format(UnitName("player") or "") end
+	if heading == "sofar" then return L["Your story so far"] end
+	return L["Last time"]
+end
+
+-- One line under the zone name, or nil.
+local function RecapText(parts, look)
+	local list = parts and Details(parts, look)
+	if not list then return nil end
+	local body, heading = table.concat(list, SEPARATOR), Heading(look)
+	if look.storyRecapHeading == "lasttime" or look.storyRecapHeading == nil then
+		return L["Last time: %s"]:format(body)
+	end
+	return heading and heading .. ": " .. body or body
+end
+
+-- (Story Vision's preview: the line under the zone name for parts.)
+function ns.RecapLineFor(parts)
+	return RecapText(parts, ns.StyleLook("storyVision"))
+end
+
+-- A card: the zone big, the heading over it, the rest under it (the heading
+-- big if the zone isn't shown); nil if nothing to say.
+function ns.RecapCardText(parts, look)
+	local zone = look.storyRecapZone and parts.zone or nil
+	local list = Details(parts, look, true)
+	if not list then return nil end
+	local heading = Heading(look)
+	local name = zone or heading or ""
+	return { name = name, sub = table.concat(list, SEPARATOR), meta = zone and heading or nil }
+end
+
+-- The Last time look, read as Battle Vision's cue settings (ns.PlayVisionCard).
+local CARD_FIELDS = {
+	combatPlace = "storyRecapPlace", combatStyle = "storyRecapStyle", combatAnim = "storyRecapAnim",
+	combatAlign = "storyRecapAlign", combatSize = "storyRecapSize", combatHoldIn = "storyRecapHold",
+	combatInR = "storyRecapR", combatInG = "storyRecapG", combatInB = "storyRecapB",
+	combatFont = "storyFont", combatOutline = "storyOutline", combatShadow = "storyShadow",
+	combatOutlineR = "storyOutlineR", combatOutlineG = "storyOutlineG", combatOutlineB = "storyOutlineB",
+	combatIconShowIn = "storyRecapBook",
+}
+local CARD_FIXED = { combatBarScale = 0.5, combatBarFallback = true, combatPulseIn = 0, combatIconIn = BOOK }
+function ns.RecapCardLook(look)
+	look = look or ns.StyleLook("storyVision")
+	return setmetatable({}, { __index = function(_, key)
+		if CARD_FIXED[key] ~= nil then return CARD_FIXED[key] end
+		local value = look[CARD_FIELDS[key] or key]
+		if key == "combatOutline" then value = tonumber(value) or 0 end
+		return value
+	end })
+end
+
+local function PageTurn()
+	if ns.StyleLook("storyVision").storyRecapSound then
+		pcall(PlaySound, SOUNDKIT and SOUNDKIT.IG_ABILITY_PAGE_TURN or PAGE_TURN, "SFX")
+	end
+end
+
+-- The real card, over the whole screen (an overlay, kept with the UI hidden).
+local screen, played = nil, 0
+-- Plays the Last time card for parts (default: the login's) if the Style tab
+-- puts it on one, a moment after the zone name; true if it did (then it isn't
+-- under the zone name). Under the zone name, the page turning just plays.
+function ns.RecapCard(parts)
+	parts = parts or lastParts
+	local look = ns.StyleLook("storyVision")
+	if look.storyRecapPlace == "zone" or not parts then
+		if parts then PageTurn() end
+		return false
+	end
+	local card = ns.RecapCardText(parts, look)
+	if not card or not ns.PlayVisionCard then return false end
+	if not screen then
+		screen = CreateFrame("Frame", "CinematicLastTime", UIParent)
+		screen:SetAllPoints(UIParent)
+		screen:SetFrameStrata("LOW")
+		screen:EnableMouse(false)
+		ns.AddOverlay(screen)
+	end
+	played = played + 1
+	local this = played
+	C_Timer.After(tonumber(look.storyRecapDelay) or 0, function()
+		if this ~= played or InCombatLockdown() then return end
+		ns.PlayVisionCard(screen, ns.RecapCardLook(), UIParent:GetWidth(), UIParent:GetHeight(), 1, card)
+		PageTurn()
+	end)
+	return true
 end
 
 -- Core.lua, at PLAYER_ENTERING_WORLD after a login or /reload. A real login
--- (initial) starts a new session and returns the last one's line, if any.
+-- (initial) starts a new session and returns the last one's line, if any
+-- (ns.RecapCard then plays it as a card, if it goes on one).
 function ns.RecapLogin(initial)
 	local chardb = ns.chardb
 	if not chardb then return nil end
 	local line
 	if initial then
-		line = RecapLine(chardb.session)
+		lastParts = RecapParts(chardb.session)
+		line = RecapText(lastParts, ns.StyleLook("storyVision"))
+		if not line then lastParts = nil end
 		chardb.session = nil
 	end
 	zoneNow, zoneSince, started = nil, nil, true
@@ -106,36 +272,42 @@ end
 function ns.RecapPreview()
 	CountZone()
 	local session = Session()
-	return RecapLine(session), session
+	return RecapText(RecapParts(session), ns.StyleLook("storyVision")), session
+end
+
+-- What the preview and the Test show: this session's so far, else made up
+-- (second: true).
+function ns.RecapPartsNow()
+	CountZone()
+	local look = ns.StyleLook("storyVision")
+	local parts = RecapParts(Session())
+	if parts and RecapText(parts, look) then return parts, false end
+	return SampleParts(), true
 end
 
 -- The Test button and /cine recaptest: plays the login now, without logging
 -- out: the zone name fades in as it does when you enter the world, with the
--- time of day (if ticked) and the Last time line under it. This session's
--- line if there is one, else a made-up one in the zone you're in (returned
--- second: true), so there's always something to look at.
+-- time of day (if ticked) and the Last time line under it, or its card. This
+-- session's if there is one, else a made-up one in the zone you're in
+-- (returned second: true), so there's always something to look at.
 function ns.RecapDemo()
-	local line = ns.RecapPreview()
-	local sample = not line
-	if sample then
-		local zone = GetRealZoneText and GetRealZoneText() or ""
-		line = L["Last time: %s"]:format(table.concat({ zone ~= "" and zone or "Darkshore",
-			L["%d quests done"]:format(3), L["reached level %d"]:format(UnitLevel("player") or 24) }, SEPARATOR))
-	end
+	local parts, sample = ns.RecapPartsNow()
+	local line = RecapText(parts, ns.StyleLook("storyVision")) or L["Last time: %s"]:format(parts.zone)
 	-- The game's own zone name, as at login (its frame is plain, not secure).
 	local onEvent = ZoneTextFrame and ZoneTextFrame:GetScript("OnEvent")
 	if onEvent then
 		pcall(onEvent, ZoneTextFrame, "ZONE_CHANGED_NEW_AREA")
 	end
+	local carded = ns.RecapCard(parts)
 	if ns.ShowTimeOfDayTitle then
-		ns.ShowTimeOfDayTitle(ns.Setting("timeOfDayMessage"), line)
+		ns.ShowTimeOfDayTitle(ns.Setting("timeOfDayMessage"), not carded and line or nil)
 	end
 	return line, sample
 end
 
 local frame = CreateFrame("Frame")
 for _, event in ipairs({ "ZONE_CHANGED_NEW_AREA", "QUEST_TURNED_IN", "PLAYER_LEVEL_UP", "ENCOUNTER_END",
-		"PLAYER_LOGOUT" }) do
+		"PLAYER_DEAD", "PLAYER_MONEY", "PLAYER_LOGOUT" }) do
 	frame:RegisterEvent(event)
 end
 frame:SetScript("OnEvent", ns.Profiled("Last time", function(_, event, ...)
@@ -143,6 +315,11 @@ frame:SetScript("OnEvent", ns.Profiled("Last time", function(_, event, ...)
 		return
 	elseif event == "QUEST_TURNED_IN" then
 		Count("quests")
+	elseif event == "PLAYER_DEAD" then
+		Count("deaths")
+	elseif event == "PLAYER_MONEY" then
+		local session = Session()
+		if session and GetMoney then session.money = GetMoney() end
 	elseif event == "PLAYER_LEVEL_UP" then
 		local level = ...
 		CountZone()

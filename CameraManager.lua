@@ -130,8 +130,8 @@ local function LinkRow(parent, kit)
 	return row
 end
 
--- canvas, content: the General page's; title, intro, switch, helper (its
--- Camera Helper tick): what's on it
+-- canvas, content: the General page's; title, intro, switch, helper (a tick
+-- under the switch, if any): what's on it
 -- now (hidden while a camera's tab is open).
 function ns.CameraManager(kit, canvas, content, title, intro, switch, helper)
 	local openId -- (the camera whose tab is open, or nil)

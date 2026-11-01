@@ -97,6 +97,7 @@ local REVEAL_OUT = 0.9             -- ...and to fade out, slower
 local LATE_FROM, LATE_FOR = 0.6, 0.6 -- ...a boss card's other lines coming in after the name
 local TRACK = 1.4                  -- Tracking in: seconds the letters take to close up
 local TRACK_FROM = 0.32            -- ...from this much apart (of the text's height)
+local TYPE_EACH = 0.07             -- Typewriter: seconds for each letter
 local PULSE_PEAK, PULSE_GONE = 0.12, 0.9
 local CUT_OUT = 0.25               -- a cue cut short (the fight's other edge came first) fades this fast
 local OUTLINES = { [0] = "", "OUTLINE", "THICKOUTLINE" }
@@ -364,32 +365,50 @@ local function Setup(cue, look, enter, width, height, scale, boss)
 	local pad = size * 0.5
 	clip:SetPoint(origin, text, origin, origin == "LEFT" and -pad or origin == "RIGHT" and pad or 0, 0)
 	clip:SetHeight(size * 2.5)
-	-- (Tracking in needs the words' letters: a secret name opens as Reveal.)
+	-- (Tracking in and Typewriter need the words' letters: a secret name opens
+	-- as Reveal.)
 	local anim = look.combatAnim
-	if anim == "track" and (secret or style == "none") then anim = "reveal" end
-	cue.reveal, cue.track = anim == "reveal", anim == "track"
+	if (anim == "track" or anim == "type") and (secret or style == "none") then anim = "reveal" end
+	cue.reveal, cue.track, cue.type = anim == "reveal", anim == "track", anim == "type"
 	cue.clipWidth = width
-	clip:SetWidth(cue.reveal and 1 or width)
-	cue.late, cue.rise = (cue.reveal or cue.track) and (subText ~= "" or metaText ~= ""), size * 0.15
-	-- Tracking in: a text for each letter, the same font and color, laid out
-	-- apart (Draw closes them up, then the words show whole again).
-	cue.letters = cue.letters or {}
-	local count = 0
-	if cue.track then
-		-- (Each letter's place: the words up to and with it, less the letter
-		-- itself, measured in the words' own font, so pairs keep their kerning.)
-		local flags = rimmed and "" or outline
+	clip:SetWidth((cue.reveal or cue.type) and 1 or width)
+	cue.late, cue.rise = (cue.reveal or cue.track or cue.type) and (subText ~= "" or metaText ~= ""), size * 0.15
+	cue.lateFrom, cue.typeTime = LATE_FROM, 0
+	-- The words' width up to a letter, measured in their own font, so pairs
+	-- keep their kerning.
+	local flags = rimmed and "" or outline
+	local function Width(part)
 		local measure = cue.measure
 		if not measure then
 			measure = cue.over:CreateFontString(nil, "OVERLAY", "GameFontNormalHuge")
 			measure:Hide()
 			cue.measure = measure
 		end
-		local function Width(part)
-			measure:SetText(part)
-			ns.SetPlateNameFont(measure, GameFontNormalHuge, FontFile(look), fontSize, 1, flags)
-			return measure:GetStringWidth()
+		measure:SetText(part)
+		ns.SetPlateNameFont(measure, GameFontNormalHuge, FontFile(look), fontSize, 1, flags)
+		return measure:GetStringWidth()
+	end
+	-- Typewriter: the window opens from the words' left a letter at a time
+	-- (cue.typeEnds: where each ends), the other lines rising in after.
+	if cue.type then
+		clip:ClearAllPoints()
+		clip:SetPoint("LEFT", text, "LEFT", -size * 0.1, 0)
+		cue.typeEnds = {}
+		local typed = ""
+		for char in word:gmatch("[%z\1-\127\194-\244][\128-\191]*") do
+			typed = typed .. char
+			cue.typeEnds[#cue.typeEnds + 1] = Width(typed) + size * 0.2
 		end
+		cue.typeTime = #cue.typeEnds * TYPE_EACH
+		cue.lateFrom = cue.typeTime
+	end
+	-- Tracking in: a text for each letter, the same font and color, laid out
+	-- apart (Draw closes them up, then the words show whole again).
+	cue.letters = cue.letters or {}
+	local count = 0
+	if cue.track then
+		-- (Each letter's place: the words up to and with it, less the letter
+		-- itself.)
 		cue.letterAt, cue.letterIndex = cue.letterAt or {}, cue.letterIndex or {}
 		cue.trackOrigin, cue.trackFrom = origin, size * TRACK_FROM
 		cue.wordsWidth = Width(word)
@@ -452,8 +471,8 @@ end
 -- length.
 local function Shown(cue, age)
 	local look = cue.look
-	local hold = cue.enter and look.combatHoldIn or look.combatHoldOut -- (a boss card's: BossLook's)
-	local fadeOut = (cue.reveal or cue.track) and REVEAL_OUT or FADE_OUT
+	local hold = (cue.enter and look.combatHoldIn or look.combatHoldOut) + (cue.typeTime or 0) -- (a boss card's: BossLook's)
+	local fadeOut = (cue.reveal or cue.track or cue.type) and REVEAL_OUT or FADE_OUT
 	local a
 	if age < FADE_IN then
 		a = age / FADE_IN
@@ -490,6 +509,11 @@ local function Draw(cue, age)
 	if cue.reveal then
 		open = 1 - (1 - math.min(age / REVEAL, 1)) ^ 4
 		cue.clip:SetWidth(math.max(cue.clipWidth * open, 1))
+	elseif cue.type then
+		local ends = cue.typeEnds
+		local n = math.min(#ends, math.floor(age / TYPE_EACH) + 1)
+		cue.clip:SetWidth(math.max(ends[n] or 1, 1))
+		open = n / math.max(#ends, 1)
 	elseif cue.track then
 		-- (Tracking in: the letters closing up, eased out; once together, the
 		-- words whole, with their kerning and outline.)
@@ -508,7 +532,7 @@ local function Draw(cue, age)
 	end
 	if cue.lineWidth then cue.line:SetWidth(math.max(cue.lineWidth * open, 0.01)) end
 	if cue.late then
-		local t = math.max(0, math.min((age - LATE_FROM) / LATE_FOR, 1))
+		local t = math.max(0, math.min((age - cue.lateFrom) / LATE_FOR, 1))
 		t = t * t * (3 - 2 * t)
 		for _, each in ipairs({ { cue.sub, cue.subAt }, { cue.meta, cue.metaAt } }) do
 			local at = each[2]
@@ -559,6 +583,14 @@ local function Play(frame, look, enter, width, height, scale, boss, after)
 			if after then after() end
 		end
 	end)
+end
+
+-- A card of another page's in the cue's look (Story Vision's Last time):
+-- look read as the cue's settings going in, card { name, sub, meta } as a
+-- boss card's. On frame (the screen's, or a preview's), width x height,
+-- scale next to the real screen.
+function ns.PlayVisionCard(frame, look, width, height, scale, card, after)
+	Play(frame, look, true, width, height, scale, card, after)
 end
 
 -- The real cue, over the whole screen (kept when the UI is hidden: an overlay).
@@ -869,19 +901,19 @@ watcher:SetScript("OnEvent", function(_, event, ...)
 	end
 end)
 
--- Both pages' tabs: the cue (Combat) and the Boss card, the one picked kept
--- for both. onPick(tab) after a pick. Gives Part(tab, build, group): what
+-- Folder tabs over the rest of a page (Battle Vision's two, Story Vision's).
+-- list: { now = the picked tab's id, { id, name, tip }, ... }, list.now kept
+-- as tabs are picked (shared by pages given the same list). onPick(tab) after a pick. Gives Part(tab, build, group): what
 -- build puts on content shows only on that tab (each tab's part of a group
 -- starts at the same place, so neither leaves a gap), and Finish() once the
 -- page is built. Folder tabs as Heal Vision's (Options.lua): the picked one
 -- taller, lit, a gold top, in the panel's colour with no line between, so
 -- they look one piece; the rest dark behind. The panel holds the rest of the
 -- page, its top edge either side of the picked tab.
-local tabNow = "combat"
 local TAB_W, TAB_H, TAB_GAP, PANEL_PAD = 100, 24, 4, 10
 local PANEL_BG, TAB_BG = { 0.12, 0.12, 0.13, 0.9 }, { 0.04, 0.04, 0.05, 0.9 }
 local EDGE, DIM_EDGE = { 0.42, 0.42, 0.42, 1 }, { 0.22, 0.22, 0.22, 1 }
-local function PageTabs(kit, content, stack, onPick)
+function ns.VisionFolderTabs(kit, content, stack, list, onPick)
 	local row = CreateFrame("Frame", nil, content)
 	row:SetSize(480, TAB_H + 4)
 	stack:Add(row, "label")
@@ -931,17 +963,14 @@ local function PageTabs(kit, content, stack, onPick)
 			topRight:SetPoint("TOPRIGHT", panel, "TOPRIGHT")
 		end
 	end
-	local TABS = {
-		{ "combat", L["Combat"], L["The cue going into a fight and coming out of it."] },
-		{ "boss", L["Boss"], L["A boss's name as a title card, as its fight starts or before it."] },
-	}
-	for i, info in ipairs(TABS) do
+	local x = 8
+	for _, info in ipairs(list) do
 		local tab = CreateFrame("Button", nil, content)
-		tab:SetSize(TAB_W, TAB_H)
 		tab.label = tab:CreateFontString(nil, "OVERLAY", "GameFontNormal")
 		tab.label:SetPoint("CENTER", 0, 1)
 		tab:SetFontString(tab.label)
 		tab:SetText(info[2])
+		tab:SetSize(math.max(TAB_W, math.ceil(tab.label:GetStringWidth()) + 16), TAB_H) -- (wider for a long name)
 		tab.bg = tab:CreateTexture(nil, "BACKGROUND")
 		tab.bg:SetAllPoints()
 		tab.left, tab.right, tab.top = Line(tab, EDGE), Line(tab, EDGE), Line(tab, EDGE)
@@ -957,14 +986,15 @@ local function PageTabs(kit, content, stack, onPick)
 		hover:SetAllPoints()
 		hover:SetColorTexture(1, 1, 1, 0.06)
 		-- (Bottoms on the panel's top, whatever their height.)
-		tab:SetPoint("BOTTOMLEFT", panel, "TOPLEFT", 8 + (i - 1) * (TAB_W + TAB_GAP), 0)
+		tab:SetPoint("BOTTOMLEFT", panel, "TOPLEFT", x, 0)
+		x = x + tab:GetWidth() + TAB_GAP
 		kit.Tooltip(tab, info[3])
 		tab:SetScript("OnClick", function()
-			tabNow = info[1]
-			if onPick then onPick(tabNow) end
+			list.now = info[1]
+			if onPick then onPick(list.now) end
 			kit.PageShown(kit.Refresh, content)()
 		end)
-		tab.Refresh = function(self) PaintTab(self, tabNow == info[1]) end
+		tab.Refresh = function(self) PaintTab(self, list.now == info[1]) end
 		tab.pageSwitch = false
 		kit.AddControl(tab)
 	end
@@ -1014,7 +1044,7 @@ local function PageTabs(kit, content, stack, onPick)
 		apply.Refresh = function()
 			Each(function(object)
 				local tab = owner[object]
-				if tab == tabNow then
+				if tab == list.now then
 					if hiddenByTab[object] then
 						hiddenByTab[object] = nil
 						object:Show()
@@ -1031,6 +1061,16 @@ local function PageTabs(kit, content, stack, onPick)
 		kit.AddControl(apply)
 	end
 	return parts
+end
+
+-- Both pages' folder tabs: the cue (Combat) and the Boss card, the one
+-- picked kept for both. (Its names as the pages are made: the language is
+-- applied after this file loads.)
+local TABS = { now = "combat" }
+local function TabList()
+	TABS[1] = { "combat", L["Combat"], L["The cue going into a fight and coming out of it."] }
+	TABS[2] = { "boss", L["Boss"], L["A boss's name as a title card, as its fight starts or before it."] }
+	return TABS
 end
 
 -- The pages' tabs: Vision (turning it on, when it shows) and Style (how it
@@ -1054,7 +1094,7 @@ function ns.CreateCombatVisionPanel(kit)
 		"this back on."], intro, Changed)
 	local stack = kit.Stack(switch, "check")
 	local rows = ns.StyleRows(kit, content, stack, Changed, "combatVision")
-	local parts = PageTabs(kit, content, stack)
+	local parts = ns.VisionFolderTabs(kit, content, stack, TabList())
 	local function Edge(key, name, tip)
 		return { name, function() return ns.GetDB()[key] and true or false end,
 			function() local db = ns.GetDB() db[key] = not db[key] end, nil, tip }
@@ -1211,7 +1251,7 @@ function ns.CreateCombatStylePanel(kit)
 
 	-- What the preview plays: the tab picked (on either page: they share it).
 	local preview
-	local function Kind() return tabNow == "boss" and "boss" or "in" end
+	local function Kind() return TABS.now == "boss" and "boss" or "in" end
 	local function Replay()
 		if preview then preview:Refresh() end
 	end
@@ -1230,9 +1270,9 @@ function ns.CreateCombatStylePanel(kit)
 		fields[key] = fields[key] or {
 			get = function()
 				local db = ns.GetDB()
-				return db and db[tabNow == "boss" and BOSS_FIELDS[key] or key]
+				return db and db[TABS.now == "boss" and BOSS_FIELDS[key] or key]
 			end,
-			set = function(value) ns.GetDB()[tabNow == "boss" and BOSS_FIELDS[key] or key] = value end,
+			set = function(value) ns.GetDB()[TABS.now == "boss" and BOSS_FIELDS[key] or key] = value end,
 		}
 		return fields[key]
 	end
@@ -1251,7 +1291,7 @@ function ns.CreateCombatStylePanel(kit)
 	kit.AddControl(preview)
 
 	-- The tabs under the preview: what follows is the cue's or the Boss card's.
-	local parts = PageTabs(kit, content, stack, Replay)
+	local parts = ns.VisionFolderTabs(kit, content, stack, TabList(), Replay)
 
 	-- Test: the preview's cue again, and on your screen (going in, then coming
 	-- out; or the Boss card).
@@ -1356,6 +1396,8 @@ function ns.CreateCombatStylePanel(kit)
 		{ "track", L["Tracking in"], L["The letters start spread apart and close up, as a film's title comes in; " ..
 			"a boss card's other lines rise in after the name. A boss's name that the game keeps secret (a card " ..
 			"before the fight, on retail) opens as Reveal instead."] },
+		{ "type", L["Typewriter"], L["The words come in a letter at a time from the left, as if typed; a boss " ..
+			"card's other lines rise in after them. A secret boss's name opens as Reveal instead."] },
 	}), L["How the text comes in."])
 	rows.Look(L["Look:"], L["Words"], {
 		font = { "combatFont", L["Words in Russian, Korean or Chinese keep the game's font, so their letters show."],

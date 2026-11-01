@@ -10,6 +10,9 @@ local L = ns.L
 -- Most differences are handled by checking whether an API or frame exists;
 -- this is for the few that differ by design (data files, retail-only options).
 ns.isRetail = WOW_PROJECT_ID ~= nil and WOW_PROJECT_ID == WOW_PROJECT_MAINLINE
+-- Classic Era (game 11509) rather than WoW Forever (16001): isRetail lumps
+-- them, this tells them apart where the names differ.
+ns.isClassicEra = not ns.isRetail and GetBuildInfo ~= nil and (select(4, GetBuildInfo()) or 0) < 20000
 
 BINDING_HEADER_CINEMATIC = "Cinematic"
 -- (Set again once the language is known: see Locales.lua.)
@@ -94,6 +97,7 @@ local DEFAULTS = {
 	calmFullAfter = 6,        -- ...this many seconds after they're full
 	tintPreset = "zonetime",   -- screen tint over the game world (see TINT_PRESETS)
 	tintStrength = 1,
+	tintClassicBoost = true, -- classic clients: the tint a little stronger, as their brighter world hides it (Tint.lua)
 	tintCustomR = 1, tintCustomG = 0.8, tintCustomB = 0.6,
 	tintDrift = true,      -- tint strength slowly wanders up and down over a few minutes
 	tintDriftAmount = 0.08, -- how far it wanders, as a fraction of the strength (0.08 = +/-8%)
@@ -563,13 +567,6 @@ for _, cam in ipairs(ns.CAMERA_OFF_CAMS) do
 		end
 	end
 end
--- The Minimap page's "Hide in camera modes": <cam>HideMinimap fades the
--- minimap while that camera runs, whatever would keep it up (hovering still
--- shows it).
--- Every camera but auto-run and the quest camera hides it.
-for _, cam in ipairs(ns.CAMERA_OFF_CAMS) do
-	DEFAULTS[cam[1] .. "HideMinimap"] = cam[1] ~= "run" and cam[1] ~= "quest"
-end
 -- No auto-run camera in capital cities or instances. RP walking is
 -- deliberate, so its camera runs everywhere.
 -- RP walk and auto-run start their cameras by themselves: "none" turns one
@@ -579,7 +576,7 @@ DEFAULTS.runCamera = "run"
 -- Seconds of auto-walking or auto-running before its camera starts (and its
 -- CineMode column with it); 0 is straight away.
 DEFAULTS.walkCameraDelay = 0
-DEFAULTS.runCameraDelay = 5
+DEFAULTS.runCameraDelay = 10
 DEFAULTS.walkOffInCities, DEFAULTS.walkOffInInstances = false, false
 DEFAULTS.runOffInCities, DEFAULTS.runOffInInstances = true, true
 DEFAULTS.deathOffInInstances = true -- (no death camera in dungeons and raids: the group's waiting)
@@ -983,8 +980,7 @@ DEFAULTS.questTalkPortrait = true -- the NPC's portrait on the bubble's corner
 DEFAULTS.questTalkListY = 0.46 -- the list's top edge up the screen, till it's dragged
 DEFAULTS.duelPlates = true -- in CineMode, the nameplates of two players dueling near you show (see Effects)
 DEFAULTS.duelCC = true -- and crowd control on a duelist shows as an icon by their plate
-DEFAULTS.minimapVisions = true -- the minimap button glows and lists the visions in use (see MinimapButton)
-DEFAULTS.minimapCameras = true -- the minimap button's menu and tooltip list the camera in use (see MinimapButton)
+DEFAULTS.minimapHelper = true -- Minimap Glow Helper: the minimap button glows and lists the visions and camera in use (see MinimapButton)
 DEFAULTS.handleCooldowns = true -- the Cooldown Manager page's master switch (off: left alone)
 DEFAULTS.cooldownKeybinds = false -- its Show keybinds: each spell's key on its icon (Frames.lua)
 -- The other pages' master switches likewise (see ns.HANDLE_SWITCHES): off,
@@ -1266,7 +1262,6 @@ DEFAULTS.handleUnitFrames = true -- the Unit Frames page's switch
 -- of them as its page's switch leaves it.
 DEFAULTS.handleQuality = true -- Quality of life > General
 DEFAULTS.handleHunter = true
-DEFAULTS.handleVision = true
 DEFAULTS.handleHealVision = true -- (read by ns.HealVisionHere; Quest Vision's switch is questVision)
 local PAGE_SWITCH = {}
 for page, keys in pairs({
@@ -1274,13 +1269,13 @@ for page, keys in pairs({
 		"centerPanels", "dragPanels", "chatCopyButton", "loginZoom",
 		"reloadButton", "reloadKeepWindows" },
 	handleHunter = { "hunterAmmoSort", "hunterQuiverFill" },
-	-- Vision > General's Enable Visions: every vision's page switch, and its Vision Helper.
-	handleVision = { "minimapVisions", "handleHealVision", "questVision", "rollWindow", "duelPlates",
-		"lowHealth", "combatVision", "storyVision" },
 	duelPlates = { "duelCC" }, -- Duel Vision's page
 	storyVision = { "storyRecap", "timeOfDayMessage", "timeOfDayChange", "chatAttackAlert", "deathBannerStyle" }, -- Story Vision's rows
-	cameraModes = { "minimapCameras" }, -- Cameras > General's Enable Cameras: its Camera Helper
-	visualEffects = { "letterboxPage", "tintPage" }, -- (the Letterbox and Tint pages' switches)
+	cameraModes = { "shoulderCam" }, -- Cameras > General's Enable Cameras: Shoulder Cam
+	visualEffects = { "letterboxPage", "tintPage", "graphicsPlus", "musicInCinematic" }, -- (the Atmosphere hub's pages' switches)
+	-- Style > General's Enable Style: the Style hub's pages' switches.
+	styleGeneral = { "ufStyle", "rfStyle", "prdStyle", "tooltipStyle", "handlePlateStyle", "plateNameStyle",
+		"plateCastStyle", "bubblesStyle" },
 }) do
 	for _, key in ipairs(keys) do PAGE_SWITCH[key] = page end
 end
@@ -3498,15 +3493,6 @@ ticker:SetScript("OnEvent", ns.Profiled("Core events", function(self, event, arg
 			end
 			ns.db.stillMusicV2 = true
 		end
-		-- Tracking's "Except when standing still or flying" (Minimap page) is now
-		-- Hide in camera modes, the Flight and AFK boxes.
-		if ns.db.trackingHideWhenIdle == false then
-			for _, key in ipairs({ "flightHideMinimap", "idleHideMinimap" }) do
-				if ns.db[key] == nil then
-					ns.db[key] = false
-				end
-			end
-		end
 		-- (The migrations below up to the rows' renaming use the old rows.)
 		local OLD_PLATE_KINDS = { "Mobs", "NPCs", "Own", "Other", "Pets", "Totems" }
 		local OLD_NAME_KEYS = { "Mobs", "NPCs", "Own", "Other", "Pets", "Minions", "Totems", "Self" }
@@ -4452,6 +4438,14 @@ ticker:SetScript("OnEvent", ns.Profiled("Core events", function(self, event, arg
 				if type(saved) == "table" then saved.runCameraDelay = 5 end
 			end
 			ns.db.runCameraDelayV1 = true
+		end
+		-- ...and now 10 seconds: into every profile too, whatever it had. Once.
+		if not ns.db.runCameraDelayV2 then
+			ns.db.runCameraDelay = 10
+			for _, saved in pairs(ns.db.profiles or {}) do
+				if type(saved) == "table" then saved.runCameraDelay = 10 end
+			end
+			ns.db.runCameraDelayV2 = true
 		end
 		-- Every camera mode is off in battlegrounds and arenas now: ticked in
 		-- every profile too, whatever it had. Once.
@@ -5824,7 +5818,7 @@ ticker:SetScript("OnEvent", ns.Profiled("Core events", function(self, event, arg
 			"musicCamIdle", "musicWhenAFK", "noMusicWhenAFK", -- (now eventAFKMusic)
 			"musicPauseOnLanding", "musicPauseFadeTime", -- (leaving the flight camera; the music fade time)
 			"musicOffOnFlights", -- (the flight camera's Music switch, Cameras page)
-			"trackingHideWhenIdle", -- (now flightHideMinimap, idleHideMinimap)
+			"trackingHideWhenIdle", -- (Hide in camera modes, Minimap page; removed)
 			"tintWhen", -- (now tintMoving, tintStill, tintFlight)
 			"combatPulse", "combatPulseStrength", -- (now combatPulseIn, combatPulseOut)
 			"combatIcon", -- (now combatIconShowIn, combatIconShowOut)
@@ -5849,6 +5843,11 @@ ticker:SetScript("OnEvent", ns.Profiled("Core events", function(self, event, arg
 		}) do
 			ns.db[key] = nil
 		end
+		-- The Minimap page's Hide in camera modes (<cam>HideMinimap) went: the
+		-- minimap's row (In a camera mode, or a rule's camera) says.
+		for key in pairs(ns.db) do
+			if type(key) == "string" and key:find("HideMinimap$") then ns.db[key] = nil end
+		end
 		-- Vision > General's switch turned off its page (the Vision Helper, and
 		-- Duel Vision before it had a page); it's Enable Visions now, over every
 		-- vision. Off, it's on again with those two off, as they were. Once.
@@ -5863,6 +5862,24 @@ ticker:SetScript("OnEvent", ns.Profiled("Core events", function(self, event, arg
 				if type(saved) == "table" then Keep(saved) end
 			end
 			ns.db.visionsMasterV1 = true
+		end
+		-- Enable Visions (Vision > General) went with its page: each vision has
+		-- only its own switch. Off, every vision is turned off instead. Once.
+		if not ns.db.visionsMasterV2 then
+			local function Spread(saved)
+				if saved.handleVision == false then
+					for _, key in ipairs({ "handleHealVision", "questVision", "rollWindow", "duelPlates",
+						"lowHealth", "combatVision", "storyVision" }) do
+						saved[key] = false
+					end
+				end
+				saved.handleVision = nil
+			end
+			Spread(ns.db)
+			for _, saved in pairs(ns.db.profiles or {}) do
+				if type(saved) == "table" then Spread(saved) end
+			end
+			ns.db.visionsMasterV2 = true
 		end
 		-- New settings start as the active profile has them (a built-in's
 		-- changes to the defaults included). A fresh install (or Reset addon)
@@ -6033,7 +6050,9 @@ ticker:SetScript("OnEvent", ns.Profiled("Core events", function(self, event, arg
 			end
 			local timeOfDay = ns.Setting("timeOfDayMessage")
 			if (timeOfDay or recap) and ns.ProfileChosen() then
-				ns.ShowTimeOfDayTitle(timeOfDay, recap)
+				-- (Last time on a card of its own, if Story Vision's Style tab says.)
+				if recap and ns.RecapCard and ns.RecapCard() then recap = nil end
+				if timeOfDay or recap then ns.ShowTimeOfDayTitle(timeOfDay, recap) end
 			end
 		end
 		if arg1 or arg2 then

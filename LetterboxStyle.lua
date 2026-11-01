@@ -42,6 +42,14 @@ EFFECT_PAGES.tint.More = function(kit, content, stack)
 	local strength = stack:Add(kit.Slider(content, "tintStrength", L["Strength"], 5, 100, 5, "%d%%", 100,
 		ns.RefreshTint), "slider")
 	kit.Tooltip(strength, L["How strongly the tint colors the world, for every preset."])
+	if not ns.isRetail then -- (retail's world shows the tint as it is)
+		stack:Add(kit.Check(content, "tintClassicBoost", L["Classic boost"],
+			L["Makes the tint stronger on this client, whose brighter, more colorful world shows the same tint " ..
+				"less than retail does. Off: the tint as the Strength slider sets it."], function(value)
+				ns.GetDB().tintClassicBoost = value
+				ns.RefreshTint()
+			end), "check")
+	end
 	local timeStrength = stack:Add(kit.Slider(content, "timeTintStrength", L["Time of day strength"], 0, 100, 5,
 		"%d%%", 100, ns.RefreshTint), "slider")
 	kit.Tooltip(timeStrength, L["How strongly the time-of-day color applies, in Time of day and " ..

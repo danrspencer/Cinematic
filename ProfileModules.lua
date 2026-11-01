@@ -381,7 +381,7 @@ ns.PROFILE_MODULES = {
 			set("chatSpeechBehind", false)
 			set("bubblesOffTop", false)
 		end },
-	{ key = "no-visions", name = "No visions", scope = { "Heal Vision", "Quest Vision", "Vision", "Duel Vision", "Roll Vision",
+	{ key = "no-visions", name = "No visions", scope = { "Heal Vision", "Quest Vision", "Duel Vision", "Roll Vision",
 		"Vitals Vision", "Combat Vision", "Story Vision" },
 		tip = "Every vision off: Heal, Quest, Duel, Roll, Vitals, Battle and Story Vision.",
 		apply = function(set)
@@ -496,10 +496,12 @@ ns.PROFILE_MODULES = {
 		apply = function(set) set("rainViewScale", 1) end },
 	{ key = "vitals-vision", name = "Vitals Vision on", scope = { "Vitals Vision" },
 		tip = "Your health at the screen's edges, the picture drained toward grey and the personal resource " ..
-		"display fading in as it drops.",
-		apply = function(set)
+		"display (or, in a game without one, your player frame) fading in as it drops.",
+		apply = function(set, client)
 			set("lowHealth", true)
 			set("lowHealthPrd", true)
+			-- (Classic Era has no personal resource display: the player frame instead.)
+			if client == ns.CLIENT and not ns.HasPersonalDisplay() then set("lowHealthPortrait", true) end
 		end },
 
 	-- Sound and chat
@@ -619,13 +621,30 @@ function ns.ChoiceHidden(choice, client)
 	return choice.hidden == true or choice.hidden == client
 end
 
--- A slot's choices players are offered on this client (not hidden), or nil
--- with fewer than two.
+-- Whether this client has a Cooldown Manager (the game's, or the Forever
+-- addon's): Classic Era has none. (Its 1.15.9 ships Blizzard_CooldownViewer
+-- but never loads it, so the game's counts only loaded. Offline, with no
+-- addon list: yes.)
+function ns.HasCooldownManager()
+	if not (C_AddOns or GetAddOnInfo) or not ns.AddOnInstalled then return true end
+	return ns.AddOnLoaded("Blizzard_CooldownViewer") or ns.AddOnInstalled("ForeverEnhancedCooldownManager")
+end
+
+-- Whether this game has a personal resource display (Classic Era has none).
+-- (Offline: yes.)
+function ns.HasPersonalDisplay()
+	if not (C_AddOns or GetAddOnInfo) then return true end
+	return _G.CinematicPersonalPower ~= nil
+end
+
+-- A slot's choices players are offered on this client (not hidden, and not
+-- one made for a Cooldown Manager it doesn't have), or nil with fewer than two.
 function ns.SlotChoices(slot)
 	local list = {}
 	local info = ns.SLOT_CHOICES and ns.SLOT_CHOICES[slot]
 	for _, choice in ipairs(info and info.choices or {}) do
-		if not ns.ChoiceHidden(choice, ns.CLIENT) and (not choice.client or choice.client == ns.CLIENT) then
+		if not ns.ChoiceHidden(choice, ns.CLIENT) and (not choice.client or choice.client == ns.CLIENT)
+			and not (choice.noCDM and not ns.HasCooldownManager()) then
 			list[#list + 1] = ns.GetChoice(slot, choice.part)
 		end
 	end
@@ -682,6 +701,10 @@ local function Picks(profile, client, byName, editOf)
 		local own = editOf and editOf(p.name) or p
 		for slot, pick in pairs(own.picks or {}) do
 			if type(pick) == "table" then pick = pick[client] end
+			-- (A choice made for the Cooldown Manager, in this game without
+			-- one: its noCDM choice in its place.)
+			local choice = pick and client == ns.CLIENT and ns.GetChoice(slot, pick)
+			if choice and choice.noCDM and not ns.HasCooldownManager() then pick = choice.noCDM end
 			if pick then picks[slot], by[slot] = pick, p.name end
 		end
 	end

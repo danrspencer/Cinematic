@@ -19,7 +19,7 @@ local PAGES = {
 	{ "Quest item button", "Quest Item Style", { "questItemFont", "questItemOutline", "questItemShadow", "questItemFrame" } },
 	{ "Roll Vision", "Roll Style", { "rollBarTexture", "rollFont", "rollOutline", "rollShadow" } },
 	{ "Battle Vision", "Combat Style", { "combatFont", "combatOutline", "combatShadow" } },
-	{ "Story Vision", "Story Vision", { "storyFont", "storyOutline", "storyShadow" } },
+	{ "Story Vision", "Story Style", { "storyFont", "storyOutline", "storyShadow" } },
 }
 local KIND_NAMES = { texture = "Texture", font = "Font", outline = "Outline", shadow = "Shadow", border = "Border" }
 
@@ -27,7 +27,7 @@ local KIND_NAMES = { texture = "Texture", font = "Font", outline = "Outline", sh
 local function RefreshAll()
 	for _, refresh in ipairs({ ns.RefreshPersonalStyle, ns.RefreshTooltipStyle, ns.RefreshBubbleStyle,
 		ns.RefreshQuestTalkStyle, ns.RefreshQuestItemStyle, ns.RefreshRollStyle, ns.RefreshPlateCastStyle,
-		ns.RefreshUnitStyle, ns.RefreshRaidStyle }) do
+		ns.RefreshUnitStyle, ns.RefreshRaidStyle, ns.RefreshTargetArrows, ns.RefreshPlateNameStyle }) do
 		if refresh then pcall(refresh) end
 	end
 end
@@ -336,7 +336,13 @@ function ns.CreateGeneralStylePanel(kit)
 	stack:Header(content, L["Pages"])
 	stack:Help(content, L["Which pages follow General. A page with a setting of its own shows which; Use " ..
 		"General puts them all back on General. The page's name opens it."])
+	-- (Only the pages this client has: one it lacks, like Roll Vision with no
+	-- loot history, never set its defaults.)
+	local pages = {}
 	for _, page in ipairs(PAGES) do
+		if ns.DEFAULTS[page[3][1]] ~= nil then pages[#pages + 1] = page end
+	end
+	for _, page in ipairs(pages) do
 		local row = CreateFrame("Frame", nil, content)
 		row:SetSize(480, 22)
 		stack:Add(row, "label")
@@ -377,6 +383,15 @@ function ns.CreateGeneralStylePanel(kit)
 		end
 		pageRows[#pageRows + 1] = row
 	end
+
+	-- (Reset page: the pages listed back on General too, as the profile has them.)
+	kit.OnReset(content, function()
+		local db, base = ns.GetDB(), ns.ResetBase()
+		for _, page in ipairs(pages) do
+			for _, key in ipairs(page[3]) do db[key] = base[key] end
+		end
+		Changed()
+	end)
 
 	local shown = kit.PageShown(kit.Refresh, content)
 	canvas:SetScript("OnShow", function()

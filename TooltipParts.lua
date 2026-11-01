@@ -604,6 +604,10 @@ function ns.HookTooltipParts()
 				OnObjectTooltip(tooltip)
 			end
 		end)
+	elseif GameTooltip:HasScript("OnTooltipSetUnit") then
+		-- (Classic: the game fills a mouseover unit's tooltip itself, past the
+		-- Lua SetUnit, so only this script hears it.)
+		GameTooltip:HookScript("OnTooltipSetUnit", OnUnitTooltip)
 	else
 		hooksecurefunc(GameTooltip, "SetUnit", OnUnitTooltip)
 	end

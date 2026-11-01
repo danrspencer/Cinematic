@@ -86,6 +86,7 @@ DEFAULTS.questTalkStyled = true
 DEFAULTS.questTalkAlpha = 1      -- the panels' opacity (their fill, edge and page)
 DEFAULTS.questTalkFont = "general" -- the words' font (ns.QUEST_ITEM_FONTS' names; game: each part's own; general: General's)
 DEFAULTS.questTalkTextSize = 1   -- ...times their usual size
+DEFAULTS.questTalkNumberAlpha = 0.5 -- the page count and key numbers' opacity
 DEFAULTS.questTalkOutline = -1   -- ...outline: 0 none, 1 thin, 2 thick (-1: General's)
 DEFAULTS.questTalkTextColor = "game" -- ...the bubble's words' color: "game" (the look's) or "custom"
 DEFAULTS.questTalkTextR, DEFAULTS.questTalkTextG, DEFAULTS.questTalkTextB = 1, 1, 1
@@ -816,7 +817,8 @@ local function ApplyLook()
 	bubble.text:SetTextColor(unpack(WordsColor(look.text)))
 	bubble.name:SetTextColor(unpack(look.name))
 	bubble.title:SetTextColor(unpack(look.title))
-	bubble.count:SetTextColor(look.name[1], look.name[2], look.name[3], 0.8)
+	bubble.count:SetTextColor(look.name[1], look.name[2], look.name[3])
+	bubble.count:SetAlpha(Styled("questTalkNumberAlpha"))
 	return look
 end
 
@@ -1130,6 +1132,7 @@ local function AddRow(entry)
 	-- (Its number: the key that picks it, shown only while the keys do.)
 	row.key:SetText(key and Setting("questTalkKeys") and tostring(key % 10) or "")
 	row.key:SetTextColor(unpack(ink == INK.parchment and ink.dim or GREY))
+	row.key:SetAlpha(Styled("questTalkNumberAlpha"))
 	row.icon:SetTexture(entry.icon)
 	row.icon:SetDesaturated(entry.dim or entry.locked or false)
 	row.icon:SetShown(entry.icon ~= nil)
@@ -1293,6 +1296,7 @@ local function SetButtons(first, second)
 				end
 			end
 			b.key:SetText(key and Setting("questTalkKeys") and tostring(key % 10) or "")
+			b.key:SetAlpha(Styled("questTalkNumberAlpha"))
 			b:Show()
 		end
 	end
@@ -2504,6 +2508,9 @@ function ns.MakeQuestTalkPreview(parent, width)
 	text:SetWidth(inner - 2 * PAD_X)
 	text:SetJustifyH("LEFT")
 	text:SetWordWrap(true)
+	-- (A page count as a long talk shows it, faded by questTalkNumberAlpha.)
+	local count = sample:CreateFontString(nil, "OVERLAY")
+	count:SetPoint("BOTTOM", 0, PAD_Y - 4)
 	local list = CreateFrame("Frame", nil, holder, BackdropTemplateMixin and "BackdropTemplate")
 	list:SetWidth(inner)
 	list:SetPoint("TOP", sample, "BOTTOM", 0, -FOLLOW_GAP)
@@ -2531,7 +2538,13 @@ function ns.MakeQuestTalkPreview(parent, width)
 		name:SetText(L["Farmer Brennick"])
 		text:SetText(L["Something has been taking the turnips at night, and nobody here is brave enough to " ..
 			"keep watch. Would you?"])
+		count:SetFontObject("GameFontNormalSmall")
+		Font(count)
+		count:SetTextColor(unpack(look.name))
+		count:SetAlpha(Styled("questTalkNumberAlpha"))
+		count:SetText("1 / 2")
 		local high = (Plain(name:GetStringHeight()) or 12) + 4 + (Plain(text:GetStringHeight()) or 40) + PAD_Y * 2
+			+ (Plain(count:GetStringHeight()) or 10) + 4
 		sample:SetHeight(high)
 		local art = sample.page:IsShown() and PageArt()
 		if art then SetArtFitted(sample.page, art, inner - 6, high - 6, "top") end
@@ -2551,11 +2564,13 @@ function ns.MakeQuestTalkPreview(parent, width)
 				line.text:SetShadowOffset(0, 0)
 			end
 			line.key:SetTextColor(unpack(colors.dim))
+			line.key:SetAlpha(Styled("questTalkNumberAlpha"))
 			line.text:SetTextColor(unpack(colors.text))
 			line.key:SetText(Setting("questTalkKeys") and tostring(i) or "")
 			line.text:SetText(L[line.words])
 			line.key:ClearAllPoints()
-			line.key:SetPoint("TOPLEFT", 10, y - (rowHeight - 12) / 2)
+			line.key:SetWidth(18)
+			line.key:SetPoint("LEFT", list, "TOPLEFT", 10, y - rowHeight / 2)
 			line.icon:ClearAllPoints()
 			line.icon:SetPoint("LEFT", list, "TOPLEFT", 30, y - rowHeight / 2)
 			line.text:ClearAllPoints()

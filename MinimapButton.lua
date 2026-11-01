@@ -23,7 +23,7 @@ end
 -- The visions: while one is in use (doing something now, not just switched
 -- on), the button glows in its colour, and the menu and tooltip list it with
 -- a link to its page, with its icon (as the vision wheel has them). Not
--- with the Vision page's Vision Helper (minimapVisions) unticked.
+-- with the main page's Minimap Glow Helper (minimapHelper) unticked.
 -- active: its file's ns function saying so. trim: an icon's edge cut off.
 local VISIONS = {
 	{ label = "Heal Vision", page = "Heal Vision", active = "HealVisionActive", color = { 0.35, 1, 0.45 },
@@ -52,12 +52,12 @@ end
 
 -- The camera running now (one at a time), as a vision-like line for the menu
 -- and tooltip, or nil: a script playing, else our camera mode by its script
--- (ns.activeCam's keys, some not their script's id). Not with the Cameras
--- page's Camera Helper (minimapCameras) unticked.
+-- (ns.activeCam's keys, some not their script's id). Not with the main
+-- page's Minimap Glow Helper (minimapHelper) unticked.
 local CAM_SCRIPT = { idle = "afk", chatcam = "chat" }
 local CAMERA_COLOR = { 0.55, 0.8, 1 }
 local function CameraInUse()
-	if not ns.Setting("minimapCameras") then return nil end
+	if not ns.Setting("minimapHelper") then return nil end
 	local script = ns.PlayingCameraScript and ns.PlayingCameraScript()
 	local cam = ns.activeCam
 	if not script and cam and ns.FindCameraScript then
@@ -70,7 +70,7 @@ end
 
 local function UpdateInUse()
 	wipe(inUse)
-	for _, vision in ipairs(ns.Setting("minimapVisions") and VISIONS or {}) do
+	for _, vision in ipairs(ns.Setting("minimapHelper") and VISIONS or {}) do
 		local Active = ns[vision.active]
 		if Active then
 			local ok, active = pcall(Active)

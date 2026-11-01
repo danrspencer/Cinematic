@@ -548,7 +548,7 @@ local function UpdateCombatMusic(elapsed, playerOverride)
 	-- Muted while fighting (if chosen) or in a place chosen under "Stop music".
 	-- Only when the addon handles music at all: with "Play music in cinematic
 	-- mode" off, the player's volumes are left alone (any ducking eases back).
-	local handlesMusic = ns.db.musicInCinematic
+	local handlesMusic = ns.Setting("musicInCinematic")
 	local now = GetTime()
 	if InCombatLockdown() or ns.Flag(UnitAffectingCombat("player")) then
 		combatMusic.lastFightAt = now
@@ -734,12 +734,12 @@ function ns.SetDeathSong(on)
 	-- With CineMode music off (musicInCinematic), music is never switched on:
 	-- the song plays only if your game music is on already.
 	local musicOn = GetCVar("Sound_EnableMusic") == "1"
-	deathSong.file = on and ns.TriggerSetting("Death", "music") and (musicOn or ns.db.musicInCinematic)
+	deathSong.file = on and ns.TriggerSetting("Death", "music") and (musicOn or ns.Setting("musicInCinematic"))
 		and ns.PickDeathSong() or nil
 	if on and ns.DeathTestLog then
 		ns.DeathTestLog(("death song: %s (song option %s, game music %s)"):format(
 			tostring(deathSong.file), tostring(ns.db.deathSong),
-			musicOn and "on" or ns.db.musicInCinematic and "off - switching it on"
+			musicOn and "on" or ns.Setting("musicInCinematic") and "off - switching it on"
 				or "off, and CineMode music off: no song"))
 	end
 end
@@ -861,7 +861,7 @@ function ns.UpdateMusic(cinematic, elapsed)
 	if deathSong.file then
 		return -- the death song has the music for now
 	end
-	local want = cinematic and ns.db.musicInCinematic
+	local want = cinematic and ns.Setting("musicInCinematic")
 	-- The player changed the music volume while the addon was fading or muting
 	-- it: that's their new volume, to play at now and come back to afterwards.
 	local playerVolume = PlayerMusicVolume()
@@ -3675,6 +3675,9 @@ function Cinematic_ToggleVisualEffects()
 	ns.letterboxDirty = true
 	if ns.RefreshTint then
 		ns.RefreshTint()
+	end
+	if ns.ApplyGraphicsPlus then
+		ns.ApplyGraphicsPlus()
 	end
 	ns.Print(ns.db.visualEffects and L["visual effects on"] or L["visual effects off"])
 	if ns.RefreshOptions then
