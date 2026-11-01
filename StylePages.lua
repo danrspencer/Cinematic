@@ -15,12 +15,14 @@ ns.DEFAULTS.styleGeneral = true
 ns.DEFAULTS.styleTexture = "game"
 ns.DEFAULTS.styleFont = "game"
 ns.DEFAULTS.styleOutline = -1
+ns.DEFAULTS.styleShadow = "game"     -- "game" (each page's own), "on" or "none" (ns.SetTextShadow)
 
 ns.DEFAULTS.styleBorder = "game"     -- "game" (each page's own), "none", "thin", "thick" or "custom":
 ns.DEFAULTS.styleBorderSize = 1      -- ...custom's thickness, in pixels
 ns.DEFAULTS.styleBorderR, ns.DEFAULTS.styleBorderG, ns.DEFAULTS.styleBorderB = 0, 0, 0 -- ...and color
 
-local GENERAL_KEYS = { texture = "styleTexture", font = "styleFont", outline = "styleOutline", border = "styleBorder",
+local GENERAL_KEYS = { texture = "styleTexture", font = "styleFont", outline = "styleOutline", shadow = "styleShadow",
+	border = "styleBorder",
 	borderSize = "styleBorderSize", borderR = "styleBorderR", borderG = "styleBorderG", borderB = "styleBorderB" }
 -- The pages' shared settings (each defaults to General in its own file):
 -- [key] = { kind, own: its value with General at the game's (its default
@@ -38,6 +40,9 @@ local shared = {
 	questItemFont = { kind = "font", own = "game" },
 	combatFont = { kind = "font", own = "game" },
 	combatBossFont = { kind = "font", own = "game" },
+	storyFont = { kind = "font", own = "game" },
+	storyOutline = { kind = "outline", own = -1 },
+	storyShadow = { kind = "shadow", own = "game" },
 	plateCastFont = { kind = "font", own = "game" },
 	bubblesOutline = { kind = "outline", own = 0 },
 	tooltipOutline = { kind = "outline", own = 0 },
@@ -47,6 +52,13 @@ local shared = {
 	combatOutline = { kind = "outline", own = 1 },
 	combatBossOutline = { kind = "outline", own = 1 },
 	plateCastOutline = { kind = "outline", own = "game", map = function(value) return CAST_OUTLINES[value] end },
+	tooltipShadow = { kind = "shadow", own = "game" },
+	questTalkShadow = { kind = "shadow", own = "game" },
+	rollShadow = { kind = "shadow", own = "game" },
+	questItemShadow = { kind = "shadow", own = "game" },
+	combatShadow = { kind = "shadow", own = "game" },
+	combatBossShadow = { kind = "shadow", own = "game" },
+	plateCastShadow = { kind = "shadow", own = "game" },
 }
 -- Borders: each page's border (its own default "own"), and its Custom's
 -- thickness and color (<key>Size, <key>R/G/B), which follow General's while
@@ -844,6 +856,166 @@ function ns.ReportPlateTextures(which)
 	if lines > 40 then ns.Print(("  ...and %d more."):format(lines - 40)) end
 end
 
+-- A text's shadow as a part's Shadow setting says: "on" a dark one down and
+-- right, "none" none, "game" (or nil) the text's own (put back if we changed
+-- it). Call it after the text's font is set: a font object brings its own.
+local function PlainNumber(value) return type(value) == "number" and not (issecretvalue and issecretvalue(value)) end
+function ns.SetTextShadow(text, value)
+	if not (text and text.SetShadowOffset) then return end
+	local own = text.cineShadow
+	if value == "on" or value == "none" then
+		if not own then
+			local _, x, y = pcall(text.GetShadowOffset, text)
+			local _, r, g, b, a = pcall(text.GetShadowColor, text)
+			own = PlainNumber(x) and PlainNumber(y) and PlainNumber(r) and PlainNumber(a) and { x, y, r, g, b, a } or { 1, -1, 0, 0, 0, 1 }
+			text.cineShadow = own
+		end
+		if value == "on" then
+			text:SetShadowOffset(1, -1)
+			text:SetShadowColor(0, 0, 0, 1)
+		else
+			text:SetShadowOffset(0, 0)
+		end
+	elseif own then
+		text:SetShadowOffset(own[1], own[2])
+		text:SetShadowColor(own[3], own[4], own[5], own[6])
+		text.cineShadow = nil
+	end
+end
+
+-- A text's color as a part's Text color setting says: "custom" r, g, b
+-- (its alpha kept), "game" (or nil) its own (put back if we changed it).
+-- Text and vertex color both: one and the same on WoW Forever.
+function ns.SetTextColorOf(text, value, r, g, b)
+	if not (text and text.SetTextColor) then return end
+	local own = text.cineColor
+	if value == "custom" then
+		if not own then
+			local _, or_, og, ob, oa = pcall(text.GetTextColor, text)
+			own = PlainNumber(or_) and PlainNumber(og) and PlainNumber(ob) and { or_, og, ob, PlainNumber(oa) and oa or 1 }
+				or { 1, 1, 1, 1 }
+			text.cineColor = own
+		end
+		text:SetTextColor(r or 1, g or 1, b or 1, own[4])
+		if text.SetVertexColor then text:SetVertexColor(r or 1, g or 1, b or 1, own[4]) end
+	elseif own then
+		text:SetTextColor(own[1], own[2], own[3], own[4])
+		if text.SetVertexColor then text:SetVertexColor(own[1], own[2], own[3], own[4]) end
+		text.cineColor = nil
+	end
+end
+
+-- A colored outline round a text (the game's is always black): the text
+-- again eight times behind it, nudged each way, in r, g, b, kept to its
+-- words, shown state and alpha. level 1 thin, 2 thick; 0 or nil: none.
+-- Call it after the text's font is set (without an outline of its own:
+-- the copies take its font as it is). As Battle Vision's rim.
+function ns.SetTextRim(text, level, r, g, b)
+	local rim = text and text.cineRim
+	if not (text and level and level > 0 and r) then
+		if rim then
+			rim.on = false
+			for _, each in ipairs(rim) do each:Hide() end
+		end
+		return
+	end
+	if not rim then
+		rim = {}
+		local parent = text:GetParent()
+		local layer, sub = text:GetDrawLayer()
+		for i = 1, 8 do
+			rim[i] = parent:CreateFontString(nil, layer)
+			rim[i]:SetDrawLayer(layer, math.max(-8, (sub or 0) - 1))
+		end
+		function rim.Sync()
+			if not rim.on then return end
+			local words, shown, alpha = text:GetText(), text:IsShown(), text:GetAlpha()
+			for _, each in ipairs(rim) do
+				each:SetText(words or "")
+				each:SetShown(shown)
+				each:SetAlpha(alpha)
+			end
+		end
+		for _, method in ipairs({ "SetText", "SetFormattedText", "Show", "Hide", "SetShown", "SetAlpha" }) do
+			if text[method] then hooksecurefunc(text, method, rim.Sync) end
+		end
+		text.cineRim = rim
+	end
+	rim.on = true
+	local file, size = text:GetFont()
+	local nudge = level >= 2 and 2 or 1
+	for i, each in ipairs(rim) do
+		local angle = (i - 1) * math.pi / 4
+		local dx, dy = math.cos(angle) * nudge, math.sin(angle) * nudge
+		each:ClearAllPoints()
+		each:SetPoint("TOPLEFT", text, "TOPLEFT", dx, dy)
+		each:SetPoint("BOTTOMRIGHT", text, "BOTTOMRIGHT", dx, dy)
+		each:SetJustifyH(text:GetJustifyH())
+		each:SetJustifyV(text:GetJustifyV())
+		if file and size then each:SetFont(file, size, "") end
+		each:SetShadowOffset(0, 0)
+		each:SetTextColor(r, g or 0, b or 0, 1)
+		if each.SetVertexColor then each:SetVertexColor(r, g or 0, b or 0, 1) end -- (one and the same on Forever)
+	end
+	rim.Sync()
+end
+
+-- The Look panel shown now (one at a time), and where it was popped out to
+-- (nil: docked beside the settings).
+local openLook
+local function LookSpot()
+	local db = ns.GetDB()
+	local spot = db and db.lookPanel
+	return type(spot) == "table" and tonumber(spot.x) and tonumber(spot.y) and spot or nil
+end
+
+-- Every way a part can be styled, in the order a Look box (rows.Look) shows
+-- them: { group's name, { { option, its name (the dev copy's red rows) } } }.
+local LOOK_GROUPS = {
+	{ "Bar", { { "texture", "Texture" }, { "barColor", "Color" }, { "ground", "Dark ground" } } },
+	{ "Text", { { "font", "Font" }, { "textSize", "Size" }, { "textColor", "Color" }, { "outline", "Outline" },
+		{ "outlineColor", "Outline color" }, { "shadow", "Shadow" } } },
+	{ "Border", { { "border", "Border" } } },
+	{ "Background", { { "backColor", "Color" }, { "backAlpha", "Opacity" } } },
+}
+-- The options a Look box makes from { key, tip, ... } (the rest, from a
+-- function of the page's): texture { label, test, tint, game }, font
+-- { test }, outline { names, max, test, own }, border { label, opts, test }.
+local LOOK_BUILD = {
+	texture = function(look, made)
+		return look.Texture(made.label or ns.L["Texture:"], made[1], made[2], made.test, made.tint, made.game)
+	end,
+	font = function(look, made) return look.Font(made[1], made[2], made.test) end,
+	outline = function(look, made)
+		return look.Outline(made[1], ns.L["Outline"], made.max or 2, made.names, made[2], made.test, made.own)
+	end,
+	border = function(look, made)
+		return look.Border(made.label or ns.L["Border:"], made[1], made.opts, made[2], made.test)
+	end,
+	-- (A Text color setting: "game" or "custom", its swatch's keys made.keys,
+	-- for ns.SetTextColorOf.)
+	textColor = function(look, made)
+		local last = look.Choices(ns.L["Color:"], made[1], {
+			{ "game", ns.L["The game's"] },
+			{ "custom", ns.L["Custom"], ns.L["A color of your own (the swatch)."] },
+		}, made.test)
+		return look.Swatch(last, made[1], made.keys, made[2] or ns.L["Pick the text's color."], made.test)
+	end,
+	-- (A Shadow setting: "game", "on" or "none", for ns.SetTextShadow;
+	-- General first where it's shared.)
+	shadow = function(look, made)
+		local list = {}
+		if shared[made[1]] then
+			list[1] = { "general", ns.L["General"], ns.L["As the Style hub's General page says."] }
+		end
+		list[#list + 1] = { "game", ns.L["The game's"] }
+		list[#list + 1] = { "on", ns.L["Shadow"], ns.L["A dark copy of the letters just behind them, down and to " ..
+			"the right."] }
+		list[#list + 1] = { "none", ns.L["None"] }
+		return look.Choices(ns.L["Shadow:"], made[1], list, made.test)
+	end,
+}
+
 -- The rows for a page: kit (Options.lua's ns.lowHealthKit), its content and
 -- stack, changed() after each change, and its switch's key. fieldOf: for a
 -- page with tabs (the Unit frames page), a setting's key -> the field its
@@ -922,8 +1094,8 @@ function ns.StyleRows(kit, content, stack, changed, switchKey, fieldOf)
 	end
 
 	-- A Font: row, its dropdown (ns.StyleFontChoices: ours, then other addons'
-	-- shared ones) just after the word; the row as tall as the dropdown, so
-	-- the next row clears it.
+	-- shared ones) lined up with the other rows' dropdowns; the row as tall as
+	-- the dropdown, so the next row clears it.
 	-- (A shared one: General first, named for the font it gives the page.)
 	function rows.Font(key, tip, test)
 		local font = kit.Dropdown(content, K(key), function()
@@ -940,9 +1112,9 @@ function ns.StyleRows(kit, content, stack, changed, switchKey, fieldOf)
 		end, 200, changed)
 		if not font then return end
 		local name = stack:Add(kit.Label(content, "GameFontHighlight", ns.L["Font:"]), "label")
-		name:SetHeight(30)
+		name:SetSize(150, 30)
 		name:SetJustifyV("MIDDLE")
-		font:SetPoint("LEFT", name, "RIGHT", 10, 0)
+		font:SetPoint("LEFT", name, "RIGHT", 4, 0)
 		kit.GreyUnless(font, test or On)
 		if tip then kit.Tooltip(font, tip) end
 		return font
@@ -1161,6 +1333,215 @@ function ns.StyleRows(kit, content, stack, changed, switchKey, fieldOf)
 				tip = ns.L["Your own settings, not a preset's."], enabled = function() return false end }
 			return list
 		end, ns.L["A whole look in one pick. Changing a setting after it shows Custom."])
+	end
+
+	-- A Look row: a button naming the part's look, and a click opens every
+	-- way to style it in a panel docked beside the settings (or popped out),
+	-- the same options in the same order on every page (LOOK_GROUPS). spec[option]:
+	-- { key, tip, ... } for the ones LOOK_BUILD makes, function(look)
+	-- making its rows with look (the box's own rows), or false: one that
+	-- can't apply to the part. A group shows if the part has any of its
+	-- options; the dev copy lists, in red, the ones of it the part lacks.
+	function rows.Look(label, title, spec)
+		local name = stack:Add(kit.Label(content, "GameFontHighlight", label), "label")
+		name:SetSize(150, 30)
+		name:SetJustifyV("MIDDLE")
+		local button = ns.PanelButton(content)
+		button:SetHeight(22)
+		button:SetPoint("LEFT", name, "RIGHT", 4, 0)
+		button.searchLabel = label
+		kit.Tooltip(button, ns.L["Every way to style this part, in a panel beside the settings. Pop out to drag " ..
+			"it anywhere; Escape or its X closes it."])
+
+		-- (Docked to the settings window's right, as the camera previewer is;
+		-- popped out, where it was dragged: one place for every Look panel.)
+		local canvas = content:GetParent() and content:GetParent():GetParent() or content
+		local pop = CreateFrame("Frame", nil, UIParent)
+		pop:SetFrameStrata("DIALOG")
+		pop:EnableMouse(true)
+		pop:SetSize(470, 400)
+		pop:Hide()
+		pop:SetMovable(true)
+		pop:SetClampedToScreen(true)
+		pop:RegisterForDrag("LeftButton")
+		pop:SetScript("OnDragStart", function(self)
+			if LookSpot() then self:StartMoving() end
+		end)
+		pop:SetScript("OnDragStop", function(self)
+			self:StopMovingOrSizing()
+			ns.GetDB().lookPanel = { x = self:GetLeft(), y = self:GetTop() }
+		end)
+		pop.recordAs = content -- (its settings are the page's: its Reset puts them back)
+		local bg = pop:CreateTexture(nil, "BACKGROUND")
+		bg:SetAllPoints()
+		bg:SetColorTexture(0.05, 0.05, 0.05, 0.97)
+		local edge = pop:CreateTexture(nil, "BACKGROUND", nil, -1)
+		edge:SetPoint("TOPLEFT", -1, 1)
+		edge:SetPoint("BOTTOMRIGHT", 1, -1)
+		edge:SetColorTexture(0.4, 0.4, 0.4, 1)
+		local heading = kit.Label(pop, "GameFontHighlightLarge", title)
+		heading:SetPoint("TOPLEFT", 12, -10)
+		local close = ns.SkinClose(CreateFrame("Button", nil, pop, "UIPanelCloseButton"))
+		close:SetPoint("TOPRIGHT", 0, 0)
+		local dock = ns.PanelButton(pop)
+		dock:SetSize(70, 20)
+		dock:SetPoint("TOPRIGHT", -28, -6)
+		kit.Tooltip(dock, ns.L["Pop out: drag the window anywhere (by its edge). Dock: back beside the settings."])
+		local popStack = kit.Stack(heading, "label") -- (a header's room under the title)
+		local look = ns.StyleRows(kit, pop, popStack, changed, switchKey, fieldOf)
+		for _, group in ipairs(LOOK_GROUPS) do
+			local has = false
+			for _, option in ipairs(group[2]) do has = has or (spec[option[1]] and true) end
+			if has then
+				popStack:Add(kit.Label(pop, "GameFontNormal", ns.L[group[1]]), "header")
+				for _, option in ipairs(group[2]) do
+					local made = spec[option[1]]
+					if type(made) == "function" then
+						made(look)
+					elseif made then
+						LOOK_BUILD[option[1]](look, made)
+					elseif made == nil and ns.isDev then
+						local missing = popStack:Add(kit.Label(pop, "GameFontHighlight",
+							option[2] .. ": not wired on this part (dev copy only)"), "label")
+						missing:SetHeight(22)
+						missing:SetTextColor(1, 0.25, 0.25)
+					end
+				end
+			end
+		end
+
+		-- Use General: the part's shared settings back on General (only where
+		-- it has some).
+		local sharedKeys = {}
+		for option in pairs(LOOK_BUILD) do
+			local made = spec[option]
+			if type(made) == "table" and shared[made[1]] then sharedKeys[#sharedKeys + 1] = made[1] end
+		end
+		if #sharedKeys > 0 then
+			local back = ns.PanelButton(pop)
+			back:SetSize(110, 20)
+			popStack:Add(back, "label")
+			back:SetText(ns.L["Use General"])
+			kit.Tooltip(back, ns.L["These settings back on General."])
+			back:SetScript("OnClick", function()
+				for _, key in ipairs(sharedKeys) do Put(key, shared[key].kind == "outline" and -1 or "general") end
+				changed()
+				kit.Refresh()
+			end)
+			back.Refresh = function() end
+			kit.GreyUnless(back, On)
+			kit.AddControl(back)
+		end
+
+		-- (As tall and wide as what's in it, once it's laid out.)
+		local function Fit()
+			local top, bottom = pop:GetTop(), popStack.last:GetBottom()
+			if top and bottom then pop:SetHeight(top - bottom + 12) end
+			local left, right = pop:GetLeft(), 0
+			if not left then return end
+			local function Reach(each)
+				if each ~= bg and each ~= edge and each ~= close and each ~= dock and each:IsShown() and each:GetRight() then
+					right = math.max(right, each:GetRight() + (each == heading and 100 or 0)) -- (the buttons past the title)
+				end
+			end
+			for _, child in ipairs({ pop:GetChildren() }) do
+				Reach(child)
+				if child.Text or child.text then Reach(child.Text or child.text) end -- (a check's words)
+			end
+			for _, region in ipairs({ pop:GetRegions() }) do Reach(region) end
+			pop:SetWidth(math.max(470, right - left + 12))
+		end
+		local function Place()
+			local spot = LookSpot()
+			pop:ClearAllPoints()
+			if spot then
+				pop:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", spot.x, spot.y)
+				dock:SetText(ns.L["Dock"])
+			else
+				local window = canvas
+				while window:GetParent() and window:GetParent() ~= UIParent do window = window:GetParent() end
+				pop:SetPoint("TOPLEFT", window, "TOPRIGHT", 4, 0)
+				dock:SetText(ns.L["Pop out"])
+			end
+		end
+		dock:SetScript("OnClick", function()
+			ns.GetDB().lookPanel = not LookSpot() and { x = pop:GetLeft() + 30, y = pop:GetTop() - 30 } or nil
+			Place()
+		end)
+		pop:SetScript("OnShow", function(self)
+			-- (One panel at a time.)
+			if openLook and openLook ~= self then openLook:Hide() end
+			openLook = self
+			Place()
+			-- (Titled with where the part is, the page's place dimmed before it:
+			-- known once the page is in its hub, after it's built.)
+			local path = canvas.hubPath or (canvas.name and { canvas.name })
+			if path then
+				heading:SetText("|cff9a9a9a" .. table.concat(path, " > ") .. " >|r " .. title)
+			end
+			Fit()
+			C_Timer.After(0, Fit)
+		end)
+		-- (Not while one of its menus or the color picker is open: theirs first.)
+		local function Busy()
+			local manager = Menu and Menu.GetManager and Menu.GetManager()
+			if manager and manager.GetOpenMenu and manager:GetOpenMenu() then return true end
+			return ColorPickerFrame and ColorPickerFrame:IsShown()
+		end
+		canvas:HookScript("OnHide", function() pop:Hide() end)
+		-- Escape closes it before the settings window (not in a fight, where
+		-- keys can't be held back; not while its menu or the color picker is
+		-- open: theirs first).
+		if pop.SetPropagateKeyboardInput then
+			pop:HookScript("OnShow", function(self)
+				if InCombatLockdown() then return end
+				self:EnableKeyboard(true)
+				self:SetPropagateKeyboardInput(true)
+			end)
+			pop:SetScript("OnKeyDown", function(self, key)
+				if key ~= "ESCAPE" or InCombatLockdown() or Busy() then return end
+				self:SetPropagateKeyboardInput(false)
+				self:Hide()
+				C_Timer.After(0, function()
+					if not InCombatLockdown() then self:SetPropagateKeyboardInput(true) end
+				end)
+			end)
+		end
+		button:SetScript("OnClick", function() pop:SetShown(not pop:IsShown()) end)
+
+		-- The button's words: what the part has that isn't the game's own.
+		local function Shown(key)
+			local value = ns.GetDB() and Get(key)
+			if IsGeneral(value) then value = ns.GeneralStyleValue(key) end
+			return value
+		end
+		local function Summary()
+			local parts = {}
+			local made = spec.texture
+			local value = type(made) == "table" and Shown(made[1])
+			if value and value ~= "game" then parts[#parts + 1] = TextureName(value) end
+			made = spec.font
+			value = type(made) == "table" and Shown(made[1])
+			if value and value ~= "game" then parts[#parts + 1] = ns.StyleFontName(value) end
+			made = spec.outline
+			value = type(made) == "table" and Shown(made[1])
+			if type(value) == "number" and value > 0 and made.names[value] then
+				parts[#parts + 1] = ns.L["%s outline"]:format(made.names[value])
+			end
+			made = spec.border
+			value = type(made) == "table" and Shown(made[1])
+			if value and value ~= "game" and value ~= "none" and BORDER_NAMES[value] then
+				parts[#parts + 1] = ns.L["%s border"]:format(ns.L[BORDER_NAMES[value]])
+			end
+			return #parts > 0 and table.concat(parts, " · ") or ns.L["The game's"]
+		end
+		button.Refresh = function(self)
+			self:SetText(Summary())
+			self:SetWidth(math.max(120, self:GetFontString():GetStringWidth() + 30))
+		end
+		kit.GreyUnless(button, On)
+		kit.AddControl(button)
+		return button, pop
 	end
 
 	return rows

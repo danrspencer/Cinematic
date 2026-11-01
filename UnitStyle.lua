@@ -79,10 +79,11 @@ local KEYS = {
 	ufFont = "general",          -- the name's font (ns.QUEST_ITEM_FONTS' names)
 	ufOutline = -1,              -- ...outline: 0 none, 1 thin, 2 thick (-1: General's)
 	ufNameSize = 1,              -- ...times its usual size
+	ufShadow = "general",        -- ...shadow: "game", "on" or "none" (ns.SetTextShadow; general: General's)
 	ufPortrait = "game",         -- "game" (their face) or "class" (a player's class icon)
 }
 local SHARED = { ufTexture = { "texture", "game" }, ufFont = { "font", "game" }, ufOutline = { "outline", 0 },
-	ufBorder = { "border", "game" } }
+	ufShadow = { "shadow", "game" }, ufBorder = { "border", "game" } }
 
 local function Share(key, suffix)
 	local entry = SHARED[key]
@@ -284,6 +285,7 @@ local function DressName(text, view, unit)
 			pcall(function() text:SetText(text:GetText()) end)
 			saved.fonted = nil
 		end
+		ns.SetTextShadow(text, view and view.ufShadow)
 		return
 	end
 	local object = saved.object
@@ -300,6 +302,7 @@ local function DressName(text, view, unit)
 		pcall(text.SetFont, text, file, height * size, flags or "")
 	end
 	saved.fonted = true
+	ns.SetTextShadow(text, view and view.ufShadow)
 end
 
 -- (For the Raid frames page, RaidStyle.lua: its own look read as these keys.)
@@ -560,6 +563,7 @@ function ns.MakeUnitStylePreview(parent, width, onPick)
 			end
 			if outline >= 0 and ns.OutlinedFlags then flags = ns.OutlinedFlags(flags, outline) end
 			if file and height then unit.name:SetFont(file, height * (tonumber(view.ufNameSize) or 1), flags or "") end
+			ns.SetTextShadow(unit.name, view.ufShadow)
 			unit.name:SetText(L[sample.name])
 			local nr, ng, nb = 1, 0.82, 0
 			if view.ufNameColor == "class" then
@@ -587,7 +591,7 @@ end
 
 -- The page itself.
 local PRESET_KEYS = { "ufTexture", "ufBorder", "ufBorderSize", "ufBorderR", "ufBorderG", "ufBorderB", "ufBack",
-	"ufHealthColor", "ufNameColor", "ufFont", "ufOutline", "ufNameSize", "ufPortrait" }
+	"ufHealthColor", "ufNameColor", "ufFont", "ufOutline", "ufNameSize", "ufShadow", "ufPortrait" }
 local TAB_NAMES = {}
 for _, info in ipairs(FRAMES) do TAB_NAMES[info[1]] = info[2] end
 
@@ -738,34 +742,45 @@ function ns.CreateUnitStylePanel(kit)
 	kit.GreyUnless(ownCheck, rows.On)
 	kit.AddControl(ownCheck)
 
-	stack:Header(content, L["Bars"])
-	rows.Texture(L["Texture:"], "ufTexture", L["The bars' fill. Below the game's own few: any other addon " ..
-		"shares (through LibSharedMedia)."], Editable, { 0.25, 0.75, 0.3 })
-	rows.Border(L["Border:"], "ufBorder", { game = true }, L["Round each bar: the game's frame alone, or a " ..
-		"border of ours (Custom: its thickness and color under it)."], Editable)
-	rows.Slider("ufBack", L["Background"], 0, 100, 5, "%d%%", 100,
-		L["How dark it is behind the bars, with a border of ours."], Editable)
-
-	stack:Header(content, L["Colors"])
-	local last = rows.Choices(L["Health:"], "ufHealthColor", {
-		{ "game", L["The game's"] },
-		{ "class", L["Class or reaction"], L["Players in their class color, everyone else red, yellow or " ..
-			"green by how they see you."] },
-		{ "custom", L["Custom"], L["A color of your own (the swatch)."] },
-	}, Editable)
-	rows.Swatch(last, "ufHealthColor", { "ufHealthR", "ufHealthG", "ufHealthB" }, L["The health bar's color, for Custom."],
-		Editable)
-	rows.Choices(L["Name:"], "ufNameColor", {
-		{ "game", L["The game's"] },
-		{ "class", L["Class or reaction"] },
-		{ "white", L["White"] },
-	}, Editable)
-
-	stack:Header(content, L["Name"])
-	rows.Font("ufFont", L["The name's font. Russian, Korean or Chinese names keep the game's, so their " ..
-		"letters show."], Editable)
-	rows.Outline("ufOutline", L["Outline"], 2, { [0] = L["None"], L["Thin"], L["Thick"] }, nil, Editable)
-	rows.Slider("ufNameSize", L["Size"], 50, 150, 5, "%d%%", 100, L["The name's size, next to the game's."], Editable)
+	stack:Header(content, L["Look"])
+	rows.Look(L["Bars:"], L["Bars"], {
+		texture = { "ufTexture", L["The bars' fill. Below the game's own few: any other addon shares (through " ..
+			"LibSharedMedia)."], test = Editable, tint = { 0.25, 0.75, 0.3 } },
+		barColor = function(look)
+			local last = look.Choices(L["Health:"], "ufHealthColor", {
+				{ "game", L["The game's"] },
+				{ "class", L["Class or reaction"], L["Players in their class color, everyone else red, yellow or " ..
+					"green by how they see you."] },
+				{ "custom", L["Custom"], L["A color of your own (the swatch)."] },
+			}, Editable)
+			look.Swatch(last, "ufHealthColor", { "ufHealthR", "ufHealthG", "ufHealthB" },
+				L["The health bar's color, for Custom."], Editable)
+		end,
+		border = { "ufBorder", L["Round each bar: the game's frame alone, or a border of ours (Custom: its " ..
+			"thickness and color under it)."], opts = { game = true }, test = Editable },
+		ground = function(look)
+			look.Slider("ufBack", L["Background"], 0, 100, 5, "%d%%", 100,
+				L["How dark it is behind the bars, with a border of ours."], Editable)
+		end,
+	})
+	rows.Look(L["Name:"], L["Name"], {
+		font = { "ufFont", L["The name's font. Russian, Korean or Chinese names keep the game's, so their " ..
+			"letters show."], test = Editable },
+		textSize = function(look)
+			look.Slider("ufNameSize", L["Size"], 50, 150, 5, "%d%%", 100, L["The name's size, next to the game's."],
+				Editable)
+		end,
+		textColor = function(look)
+			look.Choices(L["Color:"], "ufNameColor", {
+				{ "game", L["The game's"] },
+				{ "class", L["Class or reaction"] },
+				{ "white", L["White"] },
+			}, Editable)
+		end,
+		outline = { "ufOutline", nil, names = { [0] = L["None"], L["Thin"], L["Thick"] }, test = Editable },
+		outlineColor = false, -- (the game's text: its outline is always black)
+		shadow = { "ufShadow", test = Editable },
+	})
 
 	stack:Header(content, L["Portrait"])
 	rows.Choices(L["Portrait:"], "ufPortrait", {

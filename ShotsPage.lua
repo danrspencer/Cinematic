@@ -10,7 +10,7 @@ function ns.CreateMyShotsPanel(kit)
 	title:SetPoint("TOPLEFT", 16, -16)
 	local intro = kit.PageIntro(content, title, L["A shot is one of the cameras that run while you stand still " ..
 		"(cozy, vista, fish or AFK) with numbers of your own for how it sways and zooms. Make one here, then pick " ..
-		"it as a scene's camera on the Cameras page. A number you haven't changed follows the camera's own " ..
+		"it as a scene's camera on the Scenes page. A number you haven't changed follows the camera's own " ..
 		"settings."])
 
 	local selected -- (the shot shown)
@@ -60,7 +60,7 @@ function ns.CreateMyShotsPanel(kit)
 	local test = Button(L["Test"], 60, L["Play this shot now (stand still). Press it again, or move, to stop."],
 		function() if Shot() then ns.TestShot(Shot()) end end)
 	local share = Button(L["Share"], 64, L["Text to send a friend: they add this shot with Import here or on " ..
-		"their Cameras page."], function()
+		"their Scenes page."], function()
 		if Shot() then ns.ShowCameraShare(ns.ExportShot(Shot()), (L["Share %s"]):format(ns.ShotName(Shot()))) end
 	end)
 	local import = Button(L["Import"], 64, L["Add a scene or shot a friend shared (the text from their Share " ..
@@ -125,7 +125,7 @@ function ns.CreateMyShotsPanel(kit)
 	nameBox.Refresh = function(self)
 		if not self:HasFocus() then self:SetText(Shot() and ns.ShotName(Shot()) or "") end
 	end
-	kit.Tooltip(nameBox, L["The shot's name, as the Cameras page lists it."])
+	kit.Tooltip(nameBox, L["The shot's name, as the Scenes page lists it."])
 	kit.AddControl(nameBox)
 
 	local baseLabel = kit.Label(body, "GameFontNormalSmall", L["Camera"])
@@ -220,7 +220,7 @@ function ns.CreateMyShotsPanel(kit)
 		local names = {}
 		for _, row in ipairs(ns.ShotUsers(id)) do names[#names + 1] = RowName(row) end
 		usedBy:SetText(#names > 0 and (L["Played by: %s"]):format(table.concat(names, ", "))
-			or L["No scene plays it yet: pick it as a scene's camera on the Cameras page."])
+			or L["No scene plays it yet: pick it as a scene's camera on the Scenes page."])
 		usedBy:ClearAllPoints()
 		usedBy:SetPoint("TOPLEFT", reset, "BOTTOMLEFT", 2, -10)
 		body:SetHeight(y + 40)

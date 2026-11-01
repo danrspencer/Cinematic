@@ -24,6 +24,7 @@ DEFAULTS.combatFont = "general"        -- QUEST_ITEM_FONTS (QuestItemButton.lua;
 DEFAULTS.combatSize = 34               -- the text's height on the screen
 DEFAULTS.combatOutlineR, DEFAULTS.combatOutlineG, DEFAULTS.combatOutlineB = 0, 0, 0 -- (black: the game's own)
 DEFAULTS.combatOutline = -1            -- 0 none, 1 thin, 2 thick (-1: General's, thin at the game's)
+DEFAULTS.combatShadow = "general"      -- "game" (its own soft one), "on" or "none" (general: General's)
 DEFAULTS.combatInR, DEFAULTS.combatInG, DEFAULTS.combatInB = 0.89, 0.13, 0.22 -- #E32038
 DEFAULTS.combatOutR, DEFAULTS.combatOutG, DEFAULTS.combatOutB = 0.49, 0.67, 0.73
 -- The pulse's colors, going in and coming out.
@@ -59,6 +60,7 @@ DEFAULTS.combatBossStyle = "chapter"
 DEFAULTS.combatBossFont = "general"
 DEFAULTS.combatBossSize = 44
 DEFAULTS.combatBossOutline = -1
+DEFAULTS.combatBossShadow = "general"
 DEFAULTS.combatBossOutlineR, DEFAULTS.combatBossOutlineG, DEFAULTS.combatBossOutlineB = 0, 0, 0
 DEFAULTS.combatBossR, DEFAULTS.combatBossG, DEFAULTS.combatBossB = 0.85, 0.71, 0.35 -- #D9B45A
 DEFAULTS.combatBossPulse = 0
@@ -77,7 +79,7 @@ local BOSS_KEY = "vision:boss"
 local BOSS_FIELDS = {
 	combatPlace = "combatBossPlace", combatBarScale = "combatBossBarScale", combatAlign = "combatBossAlign",
 	combatStyle = "combatBossStyle", combatFont = "combatBossFont", combatSize = "combatBossSize",
-	combatOutline = "combatBossOutline", combatOutlineR = "combatBossOutlineR",
+	combatOutline = "combatBossOutline", combatShadow = "combatBossShadow", combatOutlineR = "combatBossOutlineR",
 	combatOutlineG = "combatBossOutlineG", combatOutlineB = "combatBossOutlineB",
 	combatInR = "combatBossR", combatInG = "combatBossG", combatInB = "combatBossB",
 	combatPulseIn = "combatBossPulse", combatPulseInR = "combatBossPulseR", combatPulseInG = "combatBossPulseG",
@@ -283,6 +285,7 @@ local function Setup(cue, look, enter, width, height, scale, boss)
 	local rimmed = outline ~= "" and or_ + og + ob > 0
 	local fontSize = math.floor(size + 0.5)
 	ns.SetPlateNameFont(text, GameFontNormalHuge, FontFile(look), fontSize, 1, rimmed and "" or outline)
+	ns.SetTextShadow(text, look.combatShadow)
 	text:SetTextColor(r, g, b, 1)
 	text:SetVertexColor(r, g, b, 1) -- (one and the same on Forever)
 	text:SetShown(style ~= "none")
@@ -324,6 +327,7 @@ local function Setup(cue, look, enter, width, height, scale, boss)
 	if subText ~= "" then
 		local subSize = cue.barSide and size * 0.7 or math.max(size * 0.42, 10 * scale)
 		ns.SetPlateNameFont(sub, GameFontNormalHuge, FontFile(look), math.floor(subSize + 0.5), 1, plain)
+		ns.SetTextShadow(sub, look.combatShadow)
 		sub:SetText(subText)
 		sub:SetTextColor(subR, subG, subB, 1)
 		sub:SetVertexColor(subR, subG, subB, 1)
@@ -343,6 +347,7 @@ local function Setup(cue, look, enter, width, height, scale, boss)
 	if metaText ~= "" then
 		local metaSize = math.max(size * 0.3, 8 * scale)
 		ns.SetPlateNameFont(meta, GameFontNormalHuge, FontFile(look), math.floor(metaSize + 0.5), 1, plain)
+		ns.SetTextShadow(meta, look.combatShadow)
 		meta:SetText(metaText)
 		meta:SetTextColor(0.8, 0.78, 0.72, 1)
 		meta:SetVertexColor(0.8, 0.78, 0.72, 1)
@@ -403,6 +408,7 @@ local function Setup(cue, look, enter, width, height, scale, boss)
 				letter:ClearAllPoints()
 				letter:SetText(char)
 				ns.SetPlateNameFont(letter, GameFontNormalHuge, FontFile(look), fontSize, 1, flags)
+				ns.SetTextShadow(letter, look.combatShadow)
 				letter:SetTextColor(r, g, b, 1)
 				letter:SetVertexColor(r, g, b, 1)
 				letter:Show()
@@ -1119,7 +1125,7 @@ end
 -- and words too).
 local PRESET_KEYS = { "combatPlace", "combatBarScale", "combatAlign", "combatStyle", "combatFont", "combatSize",
 	"combatAnim", "combatBarFallback",
-	"combatOutline", "combatOutlineR", "combatOutlineG", "combatOutlineB",
+	"combatOutline", "combatShadow", "combatOutlineR", "combatOutlineG", "combatOutlineB",
 	"combatHoldIn", "combatHoldOut", "combatPulseIn", "combatPulseOut", "combatIconShowIn", "combatIconShowOut",
 	"combatTextIn", "combatTextOut", "combatInR", "combatInG", "combatInB", "combatOutR", "combatOutG", "combatOutB",
 	"combatPulseInR", "combatPulseInG", "combatPulseInB", "combatPulseOutR", "combatPulseOutG", "combatPulseOutB" }
@@ -1203,9 +1209,10 @@ function ns.CreateCombatStylePanel(kit)
 		L["How the cue going into a fight and coming out of it looks. When it shows: the Vision tab. Changes " ..
 		"play at once in the preview."])
 
-	local preview, lastKind = nil, tabNow == "boss" and "boss" or "in"
-	local function Replay(kind)
-		if kind ~= nil then lastKind = kind end
+	-- What the preview plays: the tab picked (on either page: they share it).
+	local preview
+	local function Kind() return tabNow == "boss" and "boss" or "in" end
+	local function Replay()
 		if preview then preview:Refresh() end
 	end
 	local function Changed() Replay() end
@@ -1237,21 +1244,21 @@ function ns.CreateCombatStylePanel(kit)
 	local Get = rows.Get
 
 	-- The preview: the screen's shape, the scene behind, the cue played on it.
-	preview = ns.MakeCombatPreview(content, 480, nil, function() return lastKind end)
+	preview = ns.MakeCombatPreview(content, 480, nil, Kind)
 	preview.pageSwitch = false
 	stack:Add(preview, "label")
 	ns.StylePopout(preview, kit.Tooltip) -- (StylePages.lua)
 	kit.AddControl(preview)
 
 	-- The tabs under the preview: what follows is the cue's or the Boss card's.
-	local parts = PageTabs(kit, content, stack, function(tab) Replay(tab == "boss" and "boss" or "in") end)
+	local parts = PageTabs(kit, content, stack, Replay)
 
 	-- Test: the preview's cue again, and on your screen (going in, then coming
 	-- out; or the Boss card).
 	ns.StylePreviewTest(preview, kit, L["Plays the cue in the preview and on your screen, as it will look: " ..
 		"going in, then coming out (on the Boss tab, the card)."], function()
 			preview:Refresh()
-			if lastKind == "boss" then
+			if Kind() == "boss" then
 				ns.PlayCombatVision(true, nil, SampleBoss(ns.StyleLook("combatVision")))
 			else
 				ns.PlayCombatVision(true, nil, nil, function() ns.PlayCombatVision(false) end)
@@ -1350,36 +1357,27 @@ function ns.CreateCombatStylePanel(kit)
 			"a boss card's other lines rise in after the name. A boss's name that the game keeps secret (a card " ..
 			"before the fight, on retail) opens as Reveal instead."] },
 	}), L["How the text comes in."])
-	local font = rows.Font("combatFont", L["Words in Russian, Korean or Chinese keep the game's font, so " ..
-		"their letters show."], Words)
-	-- (In line with the dropdowns above it: its name as wide as theirs.)
-	local _, fontName
-	if font then _, fontName = font:GetPoint(1) end
-	if fontName and fontName.SetWidth then
-		fontName:SetWidth(150)
-		font:ClearAllPoints()
-		font:SetPoint("LEFT", fontName, "RIGHT", 4, 0)
-	end
-	-- Size: a number box.
-	local boxes = rows.Boxes()
-	boxes:Box(L["Size"], Field("combatSize"), 14, 64, 1, "%d", 1,
-		L["How tall the text is on the screen. (In a letterbox bar: Letterbox scale.)"],
-		function(db) return Words(db) and not InBar(db) end)
-	-- The outline: a dropdown (General first, named for what it gives), its
-	-- color's swatch after it.
-	local outline = rows.Outline("combatOutline", L["Outline"], 2, { [0] = L["None"], L["Thin"], L["Thick"] },
-		L["A border round the letters."], Words)
-	local outlineColor = rows.Swatch(outline or boxes, nil, { "combatOutlineR", "combatOutlineG", "combatOutlineB" },
-		L["Pick the outline's color."], function(db)
-			local value = Get("combatOutline")
-			if value == -1 then value = ns.GeneralStyleValue("combatOutline") end
-			return Words(db) and (value or 0) > 0
-		end)
-	-- (After the dropdown, not the words inside it.)
-	if outline then
-		outlineColor:ClearAllPoints()
-		outlineColor:SetPoint("LEFT", outline, "RIGHT", 10, 0)
-	end
+	rows.Look(L["Look:"], L["Words"], {
+		font = { "combatFont", L["Words in Russian, Korean or Chinese keep the game's font, so their letters show."],
+			test = Words },
+		textSize = function(look)
+			look.Boxes():Box(L["Size"], Field("combatSize"), 14, 64, 1, "%d", 1,
+				L["How tall the text is on the screen. (In a letterbox bar: Letterbox scale.)"],
+				function(db) return Words(db) and not InBar(db) end)
+		end,
+		outline = { "combatOutline", L["A border round the letters."], names = { [0] = L["None"], L["Thin"], L["Thick"] },
+			test = Words },
+		outlineColor = function(look)
+			look.Color(L["Outline color"], { "combatOutlineR", "combatOutlineG", "combatOutlineB" },
+				L["Pick the outline's color."], function(db)
+					local value = Get("combatOutline")
+					if value == -1 then value = ns.GeneralStyleValue("combatOutline") end
+					return Words(db) and (value or 0) > 0
+				end)
+		end,
+		textColor = false, -- (each cue's own: its row below)
+		shadow = { "combatShadow", test = Words },
+	})
 
 	-- Going in and coming out: a row each, its words, color, icon (a tick
 	-- for it at all, then a button opening every icon the game has:

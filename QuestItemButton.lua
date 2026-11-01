@@ -49,6 +49,10 @@ DEFAULTS.questItemNumbers = true       -- the seconds left in the middle while i
 DEFAULTS.questItemKey = true           -- its key binding in the corner
 DEFAULTS.questItemFont = "general"     -- its numbers' font (QUEST_ITEM_FONTS; general: General's)
 DEFAULTS.questItemOutline = -1         -- ...outline: 0 none, 1 thin, 2 thick (-1: General's)
+DEFAULTS.questItemOutlineR, DEFAULTS.questItemOutlineG, DEFAULTS.questItemOutlineB = 0, 0, 0 -- ...its color (black: the game's)
+DEFAULTS.questItemTextColor = "game"   -- ...color: "game" or "custom" (ns.SetTextColorOf)
+DEFAULTS.questItemTextR, DEFAULTS.questItemTextG, DEFAULTS.questItemTextB = 1, 1, 1
+DEFAULTS.questItemShadow = "general"   -- ...shadow: "game", "on" or "none" (ns.SetTextShadow; general: General's)
 
 function ns.QuestItemLook()
 	return ns.StyleLook("questItemStyle")
@@ -324,14 +328,21 @@ function ns.StyleQuestItem(parts, look, size)
 		end
 	end
 
-	-- The numbers: the font's file, sized to the button, outlined.
+	-- The numbers: the font's file, sized to the button, outlined (in a color:
+	-- copies behind them, ns.SetTextRim).
 	local SCALE = { [parts.count] = 14 / 52, [parts.hotkey] = 12 / 52, [parts.seconds] = 0.36 }
+	local outline = tonumber(look.questItemOutline) or 0
+	local or_, og, ob = look.questItemOutlineR or 0, look.questItemOutlineG or 0, look.questItemOutlineB or 0
+	local rimmed = outline > 0 and or_ + og + ob > 0
 	for text, base in pairs(parts.fonts) do
 		local file = ns.StyleFontFile(look.questItemFont) or base[1]
 		if file then
 			text:SetFont(file, math.max(6, math.floor(size * SCALE[text] + 0.5)),
-				ns.OutlinedFlags(base[3], look.questItemOutline))
+				rimmed and "" or ns.OutlinedFlags(base[3], look.questItemOutline))
 		end
+		ns.SetTextRim(text, rimmed and outline or 0, or_, og, ob)
+		ns.SetTextShadow(text, look.questItemShadow)
+		ns.SetTextColorOf(text, look.questItemTextColor, look.questItemTextR, look.questItemTextG, look.questItemTextB)
 	end
 	parts.hotkey:SetShown(look.questItemKey)
 	ns.QuestItemCooldown(parts, parts.start, parts.duration)

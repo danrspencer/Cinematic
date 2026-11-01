@@ -702,6 +702,10 @@ local function BubbleAngle(text)
 	end
 	return nil
 end
+-- (For camera scripts' Aim at: just the angle.)
+function ns.ChatBubbleAngle(text)
+	return (BubbleAngle(text))
+end
 
 -- Which side of the screen (1 right, -1 left) a bubble saying `text` is
 -- drawn off it, or nil (none, or it can't be read).
@@ -1032,7 +1036,7 @@ local function TakenOver()
 	elseif ns.CameraHolder("chatcam") and ns.CameraHolder("chatcam") ~= "you" then
 		return "the " .. ns.CameraHolder("chatcam") .. " camera has the view"
 	elseif not fake and ns.IsCameraOffHere("chatcam") then
-		return "turned off here (Cameras page)"
+		return "turned off here (Scenes page)"
 	elseif ns.CameraMode() then
 		return "camera mode " .. tostring(ns.CameraMode())
 	end
@@ -1621,7 +1625,7 @@ ns.CAMERA_TESTS = ns.CAMERA_TESTS or {}
 ns.CAMERA_TESTS["Chat Cam"] = {
 	start = function()
 		if not On() or ns.playerMoving or ns.IsSuspended() then
-			ns.Print(ns.L["Chat Cam can't start now: it's off (Cameras page), or you're moving."])
+			ns.Print(ns.L["Chat Cam can't start now: it's off (Scenes page), or you're moving."])
 			return false
 		end
 		if convo or leaving or turn.moving then

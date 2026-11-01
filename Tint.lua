@@ -1023,6 +1023,38 @@ local WASTED_TEXTURE = "Interface\\AddOns\\" .. ADDON_NAME .. "\\Textures\\Waste
 local WASTED_SIZE = 0.1 -- the picture's height, a share of the screen's (4:1 wide)
 local banner = { started = nil, was = nil, bleed = {} }
 
+-- Story Vision's font (Style General's unless the page picks its own) for
+-- text at size pixels (flags: its outline), every alphabet's letters drawn,
+-- with the page's outline and shadow (-1, "game": the text's own); false if
+-- it's all the game's, left for the caller to set.
+local function StoryFont(text, object, size, flags)
+	local look = ns.StyleLook and ns.StyleLook("storyVision")
+	local file = look and ns.StyleFontFile and ns.StyleFontFile(look.storyFont)
+	local outline = look and tonumber(look.storyOutline) or -1
+	local shadow = look and look.storyShadow
+	-- (An outline in a color: copies behind the text, ns.SetTextRim.)
+	local or_, og, ob = look and look.storyOutlineR or 0, look and look.storyOutlineG or 0, look and look.storyOutlineB or 0
+	local rimmed = outline > 0 and or_ + og + ob > 0
+	if not file and (outline >= 0 or (shadow and shadow ~= "game")) and object then
+		file = object:GetFont() -- (the game's font, outlined or shadowed)
+	end
+	if not (file and size and ns.SetPlateNameFont) then
+		text.cineShadow = nil -- (the caller's font object brings its own back)
+		if ns.SetTextRim then ns.SetTextRim(text, 0) end
+		return false
+	end
+	if text.SetTextScale then text:SetTextScale(1) end
+	if rimmed then
+		flags = ""
+	elseif outline >= 0 and ns.OutlinedFlags then
+		flags = ns.OutlinedFlags(flags or "", outline)
+	end
+	ns.SetPlateNameFont(text, object, file, size, 1, flags or "")
+	if ns.SetTextRim then ns.SetTextRim(text, rimmed and outline or 0, or_, og, ob) end
+	if ns.SetTextShadow then ns.SetTextShadow(text, shadow) end
+	return true
+end
+
 local function CreateDeathBanner()
 	local frame = CreateFrame("Frame", nil, UIParent)
 	frame:SetAllPoints(UIParent)
@@ -1051,6 +1083,7 @@ local function CreateDeathBanner()
 		text:SetFontObject(GameFontNormalHuge) -- (a font before any text)
 		text:SetShadowOffset(0, 0)
 		text:SetTextColor(BANNER_COLOR[1], BANNER_COLOR[2], BANNER_COLOR[3], alpha)
+		text.alpha = alpha
 		text:SetPoint("CENTER", x, y)
 		return text
 	end
@@ -1095,9 +1128,14 @@ local function ShowDeathBanner(style)
 	banner.middle:SetHeight(height * BANNER_HEIGHT)
 	banner.top:SetHeight(height * BANNER_EDGE)
 	banner.bottom:SetHeight(height * BANNER_EDGE)
-	banner.text:SetText(L["YOU DIED"])
-	for _, bleed in ipairs(banner.bleed) do
-		bleed:SetText(L["YOU DIED"])
+	-- (The font each time: Story Vision's may have changed.)
+	local _, size = GameFontNormalHuge:GetFont()
+	for _, text in ipairs({ banner.text, unpack(banner.bleed) }) do
+		if not StoryFont(text, GameFontNormalHuge, size) then
+			text:SetFontObject(GameFontNormalHuge)
+		end
+		text:SetTextColor(BANNER_COLOR[1], BANNER_COLOR[2], BANNER_COLOR[3], text.alpha)
+		text:SetText(L["YOU DIED"])
 	end
 	banner.started = GetTime()
 	banner.frame:SetAlpha(0)
@@ -1502,7 +1540,16 @@ local function PlaceTimeTitle()
 	end
 	if not timeTitle.sized then
 		local font, size, flags = (SubZoneTextString or ZoneTextString):GetFont()
-		if timeTitle.text.SetTextScale then
+		local object = _G.SubZoneTextFont or GameFontNormalLarge
+		if size and StoryFont(timeTitle.text, object, math.floor(size * 0.75 + 0.5), flags) then
+			StoryFont(timeTitle.recap, object, math.floor(size * RECAP_SCALE + 0.5), flags)
+			timeTitle.sized = true
+		elseif timeTitle.text.SetTextScale then
+			-- (Back to the game's font, if Story Vision's was on it.)
+			timeTitle.text:SetFontObject(object)
+			timeTitle.recap:SetFontObject(object)
+			timeTitle.text:SetText(timeTitle.text:GetText())
+			timeTitle.recap:SetText(timeTitle.recap:GetText())
 			-- Scaled rather than set by file, which would keep only the Latin
 			-- letters (a Russian title on an English client showed boxes).
 			timeTitle.text:SetTextScale(0.75)
@@ -1515,6 +1562,7 @@ local function PlaceTimeTitle()
 		end
 	end
 	timeTitle.text:SetTextColor(ZoneTextString:GetTextColor())
+	timeTitle.recap:SetTextColor(RECAP_COLOR[1], RECAP_COLOR[2], RECAP_COLOR[3]) -- (a new font can reset it)
 	-- Centred on the screen, a little below the lowest line (converted to this
 	-- text's own scale).
 	local y = lowest * lowestScale / timeTitle.text:GetEffectiveScale() - 12
@@ -1574,6 +1622,7 @@ function ns.ShowTimeOfDayTitle(showTime, recap)
 	local _, _, hour = TimeOfDayColor()
 	timeTitle.text:SetText(showTime and L[TimeTitleAt(hour)] or "")
 	timeTitle.recap:SetText(recap or "")
+	timeTitle.sized = nil -- (sized again: Story Vision's font may have changed)
 	PlaceTimeTitle()
 	-- If the zone name never showed, don't leave the title waiting for the
 	-- next zone change.
@@ -1735,6 +1784,11 @@ local function ShowTitle(text, r, g, b)
 		changeTitle:SetPoint("CENTER", ZoneTextString, "CENTER")
 	else
 		changeTitle:SetPoint("CENTER", UIParent, "TOP", 0, -200)
+	end
+	local object = _G.ZoneTextFont or GameFontNormalHuge or GameFontNormalLarge
+	local _, size, flags = object:GetFont()
+	if not StoryFont(changeTitle.text, object, size, flags) then
+		changeTitle.text:SetFontObject(object)
 	end
 	changeTitle.text:SetTextColor(r, g, b)
 	changeTitle.text:SetText(text)

@@ -88,6 +88,7 @@ CustomTriggers.lua
 Shots.lua
 CameraTriggerEditor.lua
 ShotsPage.lua
+CameraScripts.lua
 QuestTalk.lua
 CameraTests.lua
 Tint.lua
@@ -125,6 +126,7 @@ Share.lua
 Backups.lua
 Welcome.lua
 Layouts.lua
+CameraScriptsPage.lua
 Options.lua
 Changelog.lua
 ChangelogCommits.lua

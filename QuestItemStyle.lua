@@ -13,7 +13,9 @@ local L = ns.L
 -- glow color is kept, for a pick of Custom later).
 local PRESET_KEYS = { "questItemSize", "questItemShape", "questItemFrame", "questItemZoom", "questItemGlow",
 	"questItemGlowColor", "questItemCooldown", "questItemNumbers", "questItemKey", "questItemFont",
-	"questItemOutline" }
+	"questItemOutline", "questItemOutlineR", "questItemOutlineG", "questItemOutlineB",
+	"questItemShadow", "questItemTextColor", "questItemTextR",
+	"questItemTextG", "questItemTextB" }
 local SAMPLE_ICON = "Interface\\Icons\\INV_Misc_Bag_07"
 local SAMPLE_COOLDOWN = 8 -- seconds the cooling sample counts down, over and over
 
@@ -131,8 +133,10 @@ function ns.CreateQuestItemStylePanel(kit)
 		{ "square", L["Square"] },
 		{ "round", L["Round"] },
 	})
-	rows.Border(L["Frame:"], "questItemFrame", { game = true }, L["Round the button: the game's (the extra " ..
-		"ability button's frame), or one of ours (Custom: its thickness and color under it)."])
+	rows.Look(L["Look:"], L["Button"], {
+		border = { "questItemFrame", L["Round the button: the game's (the extra ability button's frame), or one of " ..
+			"ours (Custom: its thickness and color under it)."], label = L["Frame:"], opts = { game = true } },
+	})
 	rows.Check("questItemZoom", L["Zoom the icon in to cut its own border"],
 		L["Icons have a dark border of their own: zoomed in a little, it's cut off."])
 
@@ -161,10 +165,23 @@ function ns.CreateQuestItemStylePanel(kit)
 	stack:Header(content, L["Text"])
 	rows.Check("questItemKey", L["Its key binding in the corner"],
 		L["The key you've bound to it (Key Bindings, Cinematic: Use the quest item), in its top corner."])
-	rows.Font("questItemFont", nil)
-	local OUTLINES = { [0] = L["None"], L["Thin"], L["Thick"] }
-	rows.Outline("questItemOutline", L["Outline"], 2, OUTLINES,
-		L["A black border round its numbers."])
+	rows.Look(L["Look:"], L["Text"], {
+		font = { "questItemFont", nil },
+		outline = { "questItemOutline", L["A black border round its numbers."],
+			names = { [0] = L["None"], L["Thin"], L["Thick"] } },
+		textSize = false, -- (sized to the button)
+		outlineColor = function(look)
+			look.Color(L["Outline color"], { "questItemOutlineR", "questItemOutlineG", "questItemOutlineB" },
+				L["Pick the outline's color."], function(db)
+					local value = look.Get("questItemOutline")
+					if value == -1 then value = ns.GeneralStyleValue("questItemOutline") end
+					return look.On(db) and (tonumber(value) or 0) > 0
+				end)
+		end,
+		shadow = { "questItemShadow" },
+		textColor = { "questItemTextColor", L["Its numbers in a color of your own."],
+			keys = { "questItemTextR", "questItemTextG", "questItemTextB" } },
+	})
 
 	canvas:SetScript("OnShow", kit.PageShown(kit.Refresh, content))
 	canvas:Hide()

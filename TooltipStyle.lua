@@ -18,10 +18,14 @@ DEFAULTS.tooltipEdge = "general"      -- the edge: "game", "none", "thin", "thic
 DEFAULTS.tooltipFont = "general"      -- the words' font (ns.QUEST_ITEM_FONTS' names; general: General's)
 DEFAULTS.tooltipTextSize = 1          -- ...times their usual size
 DEFAULTS.tooltipOutline = -1          -- ...outline: 0 none, 1 thin, 2 thick (-1: General's)
+DEFAULTS.tooltipShadow = "general"    -- ...shadow: "game", "on" or "none" (ns.SetTextShadow; general: General's)
 DEFAULTS.tooltipNames = "game"        -- names: "game" or "class" (players' class, NPCs' reaction colors)
 DEFAULTS.tooltipBar = "under"         -- the health bar: "under" (the game's place), "top" (over the tooltip) or "none"
 DEFAULTS.tooltipBarTexture = "general" -- ...its texture: "game" or a texture (ns.StyleTexturePath; general: General's)
 DEFAULTS.tooltipBarHeight = 8         -- ...its height
+DEFAULTS.tooltipBarColor = "game"     -- ...its color: "game" (by the unit) or "custom"
+DEFAULTS.tooltipBarR, DEFAULTS.tooltipBarG, DEFAULTS.tooltipBarB = 0, 0.83, 0
+DEFAULTS.tooltipBarGround = 0         -- ...how dark it is behind it, 0 to 1
 
 local function Look()
 	return ns.StyleLook("tooltipStyle")
@@ -176,15 +180,34 @@ local function DressFonts(look)
 						ns.OutlinedFlags and ns.OutlinedFlags(own[3], tonumber(look.tooltipOutline) or 0) or own[3])
 				end
 			end
+			ns.SetTextShadow(font, look and look.tooltipShadow)
 		end
 	end
 end
 
 -- The health bar: its place, texture and height (the game's, as first seen,
--- put back with the look's as the game's).
+-- put back with the look's as the game's), its dark ground and color.
 local barOwn
+-- (A color of the page's own over the one the game gives it for each unit:
+-- put on again whenever the game sets its own.)
+local barLook, barBusy
+local function BarColor(bar)
+	local look = barLook
+	if barBusy or not (look and look.tooltipBarColor == "custom") then return end
+	barBusy = true
+	bar:SetStatusBarColor(look.tooltipBarR or 0, look.tooltipBarG or 0.83, look.tooltipBarB or 0)
+	barBusy = false
+end
 local function DressBar(bar, tooltip, look)
 	if not bar or (not look and not barOwn) then return end
+	if not bar.cineGround then
+		bar.cineGround = bar:CreateTexture(nil, "BACKGROUND", nil, -8)
+		bar.cineGround:SetAllPoints()
+		hooksecurefunc(bar, "SetStatusBarColor", BarColor)
+	end
+	bar.cineGround:SetColorTexture(0, 0, 0, look and tonumber(look.tooltipBarGround) or 0)
+	barLook = look
+	BarColor(bar)
 	if not barOwn then
 		local texture = bar:GetStatusBarTexture()
 		barOwn = { height = bar:GetHeight(), points = {},
@@ -433,7 +456,7 @@ end
 
 -- The page itself.
 local PRESET_KEYS = { "tooltipBack", "tooltipAlpha", "tooltipEdge", "tooltipFont", "tooltipTextSize", "tooltipOutline",
-	"tooltipNames", "tooltipBar", "tooltipBarTexture", "tooltipBarHeight" }
+	"tooltipShadow", "tooltipNames", "tooltipBar", "tooltipBarTexture", "tooltipBarHeight", "tooltipBarColor", "tooltipBarGround" }
 
 function ns.CreateTooltipStylePanel(kit)
 	local canvas, content = kit.CreateScrollPage()
@@ -473,31 +496,60 @@ function ns.CreateTooltipStylePanel(kit)
 				tooltipNames = "class", tooltipBar = "top", tooltipBarTexture = "smooth", tooltipBarHeight = 3 } },
 	}, PRESET_KEYS)
 
-	-- Each section: its choices first, then its sliders.
-	stack:Header(content, L["Panel"])
-	local last = rows.Choices(L["Background:"], "tooltipBack", {
-		{ "game", L["The game's"] },
-		{ "dark", L["Dark"] },
-		{ "custom", L["Custom"], L["A color of your own (the swatch)."] },
+	stack:Header(content, L["Look"])
+	rows.Look(L["Panel:"], L["Panel"], {
+		border = { "tooltipEdge", L["The tooltip's edge. In its color: a unit's class or reaction color, an item's " ..
+			"quality. Custom: its thickness and color under it."], label = L["Edge:"],
+			opts = { game = true, colored = true } },
+		backColor = function(look)
+			local last = look.Choices(L["Background:"], "tooltipBack", {
+				{ "game", L["The game's"] },
+				{ "dark", L["Dark"] },
+				{ "custom", L["Custom"], L["A color of your own (the swatch)."] },
+			})
+			look.Swatch(last, "tooltipBack", { "tooltipBackR", "tooltipBackG", "tooltipBackB" },
+				L["The background's color, for Custom."])
+		end,
+		backAlpha = function(look)
+			look.Slider("tooltipAlpha", L["Opacity"], 20, 100, 5, "%d%%", 100, L["How see-through the background is."])
+		end,
 	})
-	rows.Swatch(last, "tooltipBack", { "tooltipBackR", "tooltipBackG", "tooltipBackB" },
-		L["The background's color, for Custom."])
-	rows.Border(L["Edge:"], "tooltipEdge", { game = true, colored = true }, L["The tooltip's edge. In its color: " ..
-		"a unit's class or reaction color, an item's quality. Custom: its thickness and color under it."])
-	rows.Slider("tooltipAlpha", L["Opacity"], 20, 100, 5, "%d%%", 100, L["How see-through the background is."])
-
-	stack:Header(content, L["Words"])
-	rows.Font("tooltipFont", L["The words' font. Russian, Korean or Chinese text keeps the game's, so its letters show."])
-	rows.Choices(L["Name color:"], "tooltipNames", {
-		{ "game", L["The game's"] },
-		{ "class", L["Class or reaction"], L["Players' names in their class color, NPCs' in their reaction to " ..
-			"you (red, yellow or green)."] },
-	})
-	rows.Slider("tooltipTextSize", L["Text size"], 80, 140, 5, "%d%%", 100,
-		L["How big the words are, next to their usual size."])
 	local OUTLINES = { [0] = L["None"], L["Thin"], L["Thick"] }
-	rows.Outline("tooltipOutline", L["Outline"], 2, OUTLINES,
-		L["A black border round the letters, for see-through backgrounds."])
+	rows.Look(L["Words:"], L["Words"], {
+		font = { "tooltipFont", L["The words' font. Russian, Korean or Chinese text keeps the game's, so its " ..
+			"letters show."] },
+		textSize = function(look)
+			look.Slider("tooltipTextSize", L["Text size"], 80, 140, 5, "%d%%", 100,
+				L["How big the words are, next to their usual size."])
+		end,
+		textColor = function(look)
+			look.Choices(L["Name color:"], "tooltipNames", {
+				{ "game", L["The game's"] },
+				{ "class", L["Class or reaction"], L["Players' names in their class color, NPCs' in their reaction " ..
+					"to you (red, yellow or green)."] },
+			})
+		end,
+		outline = { "tooltipOutline", L["A black border round the letters, for see-through backgrounds."],
+			names = OUTLINES },
+		outlineColor = false, -- (the game's text: its outline is always black)
+		shadow = { "tooltipShadow" },
+	})
+	local function BarOn(db) return rows.On(db) and db.tooltipBar ~= "none" end
+	rows.Look(L["Health bar:"], L["Health bar"], {
+		texture = { "tooltipBarTexture", L["The health bar's fill. Below the game's own few: any other addon shares " ..
+			"(through LibSharedMedia)."], test = BarOn, tint = { 0, 0.83, 0 } },
+		barColor = function(look)
+			look.Swatch(look.Choices(L["Color:"], "tooltipBarColor", {
+				{ "game", L["The game's"], L["Green, or as the game colors it for the unit."] },
+				{ "custom", L["Custom"], L["A color of your own (the swatch)."] },
+			}, BarOn), "tooltipBarColor", { "tooltipBarR", "tooltipBarG", "tooltipBarB" },
+				L["The health bar's color, for Custom."], BarOn)
+		end,
+		ground = function(look)
+			look.Slider("tooltipBarGround", L["Dark ground"], 0, 100, 5, "%d%%", 100, L["How dark it is behind the bar."],
+				BarOn)
+		end,
+	})
 
 	stack:Header(content, L["Health bar"])
 	rows.Choices(L["Position:"], "tooltipBar", {
@@ -505,9 +557,6 @@ function ns.CreateTooltipStylePanel(kit)
 		{ "top", L["Along the top"] },
 		{ "none", L["None"] },
 	})
-	local function BarOn(db) return rows.On(db) and db.tooltipBar ~= "none" end
-	rows.Texture(L["Texture:"], "tooltipBarTexture", L["The health bar's fill. Below the game's own few: any " ..
-		"other addon shares (through LibSharedMedia)."], BarOn, { 0, 0.83, 0 })
 	rows.Slider("tooltipBarHeight", L["Height"], 2, 12, 1, "%d", nil, L["The health bar's height."], BarOn)
 
 	canvas:SetScript("OnShow", kit.PageShown(kit.Refresh, content))

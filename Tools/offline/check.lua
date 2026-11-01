@@ -256,6 +256,20 @@ if arg[1] then
 					tostring(db[key]), tostring(value)))
 			end
 		end
+		-- (Its look is the theme's, not a change: no "(changed)" on the Profiles
+		-- page. The profile's base given this theme, as picking it is a change.)
+		local baseTheme = base.lowHealthTheme
+		base.lowHealthTheme = theme.key
+		if ns.ProfileChanged() then
+			local fromTheme = db.lowHealthFromTheme and db.lowHealthFromTheme.values or {}
+			local diff = {}
+			for k in pairs(ns.DEFAULTS) do
+				if ns.IsProfileKey(k) and db[k] ~= base[k] and fromTheme[k] ~= db[k] then diff[#diff + 1] = k end
+			end
+			table.sort(diff)
+			print(("problem\tVitals theme %s: the profile shows (changed): %s"):format(theme.key, table.concat(diff, ", ")))
+		end
+		base.lowHealthTheme = baseTheme
 	end
 	return
 end

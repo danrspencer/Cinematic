@@ -38,11 +38,15 @@ DEFAULTS.plateCastText = true       -- the spell's name
 DEFAULTS.plateCastFont = "general" -- QUEST_ITEM_FONTS (QuestItemButton.lua; general: General's)
 DEFAULTS.plateCastTextSize = 1      -- times the game's size
 DEFAULTS.plateCastOutline = "general" -- "game", "none", "thin" or "thick" (general: General's)
+DEFAULTS.plateCastTextColor = "game" -- its text's color: "game" or "custom" (ns.SetTextColorOf)
+DEFAULTS.plateCastTextR, DEFAULTS.plateCastTextG, DEFAULTS.plateCastTextB = 1, 1, 1
+DEFAULTS.plateCastShadow = "general" -- "game", "on" or "none" (ns.SetTextShadow; general: General's)
 DEFAULTS.plateCastTimer = false     -- the seconds left at the bar's right end
 
 -- The look's settings a preset sets (the rest as the defaults; the colors are kept).
 local PRESET_KEYS = { "plateCastWidth", "plateCastHeight", "plateCastFill", "plateCastBack", "plateCastBorder", "plateCastSpark", "plateCastIcon", "plateCastIconSize",
-	"plateCastShield", "plateCastImportant", "plateCastTarget", "plateCastText", "plateCastFont", "plateCastTextSize", "plateCastOutline", "plateCastTimer" }
+	"plateCastShield", "plateCastImportant", "plateCastTarget", "plateCastText", "plateCastFont", "plateCastTextSize", "plateCastOutline", "plateCastShadow", "plateCastTextColor", "plateCastTextR", "plateCastTextG", "plateCastTextB",
+	"plateCastTimer" }
 
 local FILLS = {
 	flat = "Interface\\Buttons\\WHITE8X8",
@@ -307,7 +311,7 @@ end
 
 -- (Its size: the page's Text size, the timer's times the bar's height too,
 -- as it's on the bar.)
-local function SetFont(state, text, look, which)
+local function SetFontOnly(state, text, look, which)
 	local scale = (look.plateCastTextSize or 1) * (which == "timer" and look.plateCastHeight or 1)
 	local wanted = look.plateCastFont ~= "game" or look.plateCastOutline ~= "game"
 		or math.abs(scale - 1) > 0.001
@@ -344,6 +348,12 @@ local function SetFont(state, text, look, which)
 		ns.SetPlateNameFont(text, own.object, file, own.size, scale, flags)
 		own.ours, own.key = true, key
 	end
+end
+-- (Then its shadow, over what the font brought.)
+local function SetFont(state, text, look, which)
+	SetFontOnly(state, text, look, which)
+	ns.SetTextShadow(text, look.plateCastShadow)
+	ns.SetTextColorOf(text, look.plateCastTextColor, look.plateCastTextR, look.plateCastTextG, look.plateCastTextB)
 end
 
 -- The fill's color by what's cast, and the overlay for a secret answer.
@@ -1315,20 +1325,27 @@ function ns.CreatePlateCastStylePanel(kit)
 		if ns.IsGeneralStyle(fill) then fill = ns.GeneralStyleValue("plateCastFill") end
 		return Editable(db) and FILLS[fill] ~= nil
 	end
-	rows.Boxes():Box(L["Dark ground"], Field("plateCastBack"), 0, 100, 5, "%d", 100,
-		L["How dark it is behind the fill (with a fill of your own; the game's keeps its own)."], Filled, "%")
-	rows.Texture(L["Fill:"], "plateCastFill", L["The game's: its own fill, in its own colors. Below the " ..
-		"game's own few: any other addon shares (through LibSharedMedia)."], Editable, { 1, 0.7, 0 })
-	local lastColor = rows.Colors(L["Colors:"], {
-		{ L["Casting"], COLOR_KEYS.cast, L["Pick the color of a cast."] },
-		{ L["Channeling"], COLOR_KEYS.channel, L["Pick the color of a channel."] },
-		{ L["Can't be interrupted"], COLOR_KEYS.locked,
-			L["Pick the color of a cast or channel that can't be interrupted."] },
-		{ L["Interrupted"], COLOR_KEYS.stop,
-			L["Pick the color of a cast that was interrupted (when the game says: not in every fight)."] },
-	}, Filled)
-	rows.Border(L["Border:"], "plateCastBorder", { game = true }, L["The cast bar's border: the game's, or " ..
-		"one of ours (Custom: its thickness and color under it)."], Editable)
+	rows.Look(L["Look:"], L["Bar"], {
+		texture = { "plateCastFill", L["The game's: its own fill, in its own colors. Below the game's own few: " ..
+			"any other addon shares (through LibSharedMedia)."], label = L["Fill:"], test = Editable,
+			tint = { 1, 0.7, 0 } },
+		barColor = function(look)
+			look.Colors(L["Colors:"], {
+				{ L["Casting"], COLOR_KEYS.cast, L["Pick the color of a cast."] },
+				{ L["Channeling"], COLOR_KEYS.channel, L["Pick the color of a channel."] },
+				{ L["Can't be interrupted"], COLOR_KEYS.locked,
+					L["Pick the color of a cast or channel that can't be interrupted."] },
+				{ L["Interrupted"], COLOR_KEYS.stop,
+					L["Pick the color of a cast that was interrupted (when the game says: not in every fight)."] },
+			}, Filled)
+		end,
+		ground = function(look)
+			look.Boxes():Box(L["Dark ground"], Field("plateCastBack"), 0, 100, 5, "%d", 100,
+				L["How dark it is behind the fill (with a fill of your own; the game's keeps its own)."], Filled, "%")
+		end,
+		border = { "plateCastBorder", L["The cast bar's border: the game's, or one of ours (Custom: its thickness " ..
+			"and color under it)."], opts = { game = true }, test = Editable },
+	})
 	rows.Check("plateCastSpark", L["The spark at the fill's end"], nil, Editable)
 
 	stack:Header(content, L["Icon"])
@@ -1336,7 +1353,7 @@ function ns.CreatePlateCastStylePanel(kit)
 	rows.Boxes(icon):Box(L["Size"], Field("plateCastIconSize"), 50, 300, 10, "%d", 100,
 		L["The icon's size, next to the game's. On nameplates, the health bar and name ride up on it."],
 		Editable, "%")
-	rows.Check("plateCastShield", L["The shield on casts that can't be interrupted"],
+	local shield = rows.Check("plateCastShield", L["The shield on casts that can't be interrupted"],
 		L["The game's shield over the icon while the cast can't be interrupted."], Editable)
 	-- (Seen on retail's plates and game 11509's alike.)
 	rows.Check("plateCastImportant", L["The mark on important casts"],
@@ -1346,24 +1363,34 @@ function ns.CreatePlateCastStylePanel(kit)
 		L["The game's mark and name for who the spell is cast at."], Editable)
 
 	stack:Header(content, L["Text"])
-	local text = rows.Check("plateCastText", L["The spell's name"], nil, Editable)
-	rows.Boxes(text):Box(L["Size"], Field("plateCastTextSize"), 50, 300, 10, "%d", 100,
-		L["Its size, next to the game's."], Editable, "%")
-	rows.Font("plateCastFont", nil, Editable)
-	rows.Choices(L["Outline:"], "plateCastOutline", {
-		{ "general", L["General"], L["As the Style hub's General page says."] },
-		{ "game", L["The game's"] },
-		{ "none", L["None"] },
-		{ "thin", L["Thin"] },
-		{ "thick", L["Thick"] },
-	}, Editable)
+	rows.Check("plateCastText", L["The spell's name"], nil, Editable)
+	rows.Look(L["Look:"], L["Text"], {
+		font = { "plateCastFont", nil, test = Editable },
+		textSize = function(look)
+			look.Boxes():Box(L["Size"], Field("plateCastTextSize"), 50, 300, 10, "%d", 100,
+				L["Its size, next to the game's."], Editable, "%")
+		end,
+		outline = function(look)
+			look.Choices(L["Outline:"], "plateCastOutline", {
+				{ "general", L["General"], L["As the Style hub's General page says."] },
+				{ "game", L["The game's"] },
+				{ "none", L["None"] },
+				{ "thin", L["Thin"] },
+				{ "thick", L["Thick"] },
+			}, Editable)
+		end,
+		outlineColor = false, -- (the game's text: its outline is always black)
+		shadow = { "plateCastShadow", test = Editable },
+		textColor = { "plateCastTextColor", L["The spell's name and seconds left in a color of your own."],
+			keys = { "plateCastTextR", "plateCastTextG", "plateCastTextB" }, test = Editable },
+	})
 	local timer = rows.Check("plateCastTimer", L["Seconds left at its right end"],
 		L["The seconds left on the cast, at the bar's right end (in the same font). Hidden while the game " ..
 		"keeps them secret, in some fights."], Editable)
 	-- (The panel's bottom under the last row, its right past the widest, the
-	-- colors' row: its length goes with the language.)
+	-- shield's check: its length goes with the language.)
 	panel:SetPoint("BOTTOM", timer, "BOTTOM", 0, -12)
-	panel:SetPoint("RIGHT", lastColor, "RIGHT", 14, 0)
+	panel:SetPoint("RIGHT", shield.Text or shield.text or shield, "RIGHT", 14, 0)
 
 	canvas:SetScript("OnShow", kit.PageShown(kit.Refresh, content))
 	canvas:Hide()

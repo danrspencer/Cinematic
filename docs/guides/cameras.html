@@ -134,7 +134,7 @@ table.grid tr:last-child td { border-bottom: 0 }
   <section>
     <div class="eyebrow">Pick a camera</div>
     <h2>What starts each one</h2>
-    <p class="muted">Pick a camera to see what starts it, what ends it, and what it does. The gold tags are the triggers that pick it on the Cameras page before you change anything.</p>
+    <p class="muted">Pick a camera to see what starts it, what ends it, and what it does. The gold tags are the triggers that pick it on the Scenes page before you change anything.</p>
 
     <div class="win" id="cams">
       <div class="win-top">
@@ -160,7 +160,7 @@ table.grid tr:last-child td { border-bottom: 0 }
   </section>
 
   <section>
-    <div class="eyebrow">Cameras page</div>
+    <div class="eyebrow">Scenes page</div>
     <h2>Scenes: what starts what</h2>
     <p>The <b>Cameras</b> page has a row for each <b>scene</b>, named for what starts it (its <b>trigger</b>): resting at a campfire, <code>/sit</code>, the Campfire button (not on retail), <code>/sleep</code>, <code>/dance</code>, <code>/kneel</code>, a chair, drawing your weapon, your Hearthstone, a teleport, logging out, <code>/stare</code>, Fishing, going AFK, standing still, a flight, a quest giver, auto-walking, auto-running and dying. Each row shows its camera, and small tags for anything set apart from the usual, like music or where it's turned off. Untick the box at the start of a row to turn it off for now (its settings stay). The copy button near the end of a row makes another row for the same trigger, just below, with its own camera and When: a trigger tries its rows in order (move them with the arrows) and the first whose When fits picks the camera, so one can say "the vista camera in cities, the cozy camera elsewhere". The red button deletes a row: a copy, or a whole trigger. A deleted built-in trigger starts no camera and its rows go, but its settings are kept: <b>Add back</b>, beside Import above the rows, brings it back as it was (so does Reset page). Click a row to open its settings:</p>
     <div class="cards">
@@ -173,7 +173,7 @@ table.grid tr:last-child td { border-bottom: 0 }
   </section>
 
   <section>
-    <div class="eyebrow">Cameras page</div>
+    <div class="eyebrow">Scenes page</div>
     <h2>Scenes of your own</h2>
     <p><b>+ New scene</b>, above the rows, opens a panel for a scene of your own: its name (My Scene to start with), camera, Music and CineMode, when it ends, and its triggers. Nothing changes until you press <b>Save</b>, which adds it to the rows (tagged <b>Mine</b>, sorted with the rest); <b>Cancel</b> drops it. Open its row later to change any of it, and its When.</p>
     <div class="cards">
@@ -190,13 +190,13 @@ table.grid tr:last-child td { border-bottom: 0 }
     <div class="eyebrow">Camera hub</div>
     <h2>My Shots</h2>
     <p>A shot is one of the cameras that run while you stand still (cozy, vista, fish or AFK) with numbers of your own for how it sways and zooms: how far it sways either side (or, for the AFK camera, how far it turns each move), how far it tilts up and down, how long each move and each pause takes, its drift, and how far and how slowly it zooms in and out. Make one on the <b>My Shots</b> page with <b>+ New shot</b>, pick its camera, and move the sliders. A number you haven't changed follows that camera's own setting; <b>Use the camera's own numbers</b> puts them all back.</p>
-    <p>Then pick the shot as a camera on the Cameras page: it's in the camera list of every row that can pick the cozy camera, your own scenes' and the built-in ones' alike. <b>Test</b> plays it where you stand. Deleting a shot puts the rows that played it back on its camera.</p>
+    <p>Then pick the shot as a camera on the Scenes page: it's in the camera list of every row that can pick the cozy camera, your own scenes' and the built-in ones' alike. <b>Test</b> plays it where you stand. Deleting a shot puts the rows that played it back on its camera.</p>
   </section>
 
   <section>
     <div class="eyebrow">Sharing</div>
     <h2>Share a scene or a shot</h2>
-    <p><b>Share</b> on a scene of your own (on its Name line) or on the My Shots page gives you a line of text to copy and send. Your friend pastes it into <b>Import</b>, on their Cameras page or My Shots page, sees what it holds, and adds it. A scene comes with all its triggers and the shot it plays. Where it may start (its When) stays with you: it arrives set to anywhere but battlegrounds and arenas, out of fights.</p>
+    <p><b>Share</b> on a scene of your own (on its Name line) or on the My Shots page gives you a line of text to copy and send. Your friend pastes it into <b>Import</b>, on their Scenes page or My Shots page, sees what it holds, and adds it. A scene comes with all its triggers and the shot it plays. Where it may start (its When) stays with you: it arrives set to anywhere but battlegrounds and arenas, out of fights.</p>
   </section>
 
   <section>
@@ -268,13 +268,13 @@ table.grid tr:last-child td { border-bottom: 0 }
 <script>
 (function () {
   // Each camera: what starts it (events, with "tag" for the events that pick it on the
-  // Cameras page to start with), what ends it, and a line on what it does.
+  // Scenes page to start with), what ends it, and a line on what it does.
   var CAMS = [
     { name: "Flight", lead: "Swings round behind you as you take off, sways behind you on the way, and settles behind you before landing. Now and then a fly-by turns it round to look back past you.",
       starts: [{ l: "Take a flight", d: "Taking off on a flight path", tag: 1 }],
       ends: "Landing. Moving the camera yourself pauses it, and once you've moved it on a flight there are no more fly-bys on that flight." },
     { name: "AFK", lead: "Slowly pulls back, then sweeps around your character, pausing between sweeps and drifting in and out.",
-      starts: [{ l: "Go AFK", d: "Being flagged AFK (/afk, or away long enough)", tag: 1 }, { l: "Stand still", d: "Standing still for a while with nothing else going on. No camera to start with; the Cinema profile picks the AFK camera" }, { l: "Any emote you set to it", d: "On the Cameras page" }, { l: "Keybind or camera wheel", d: "Start the AFK camera" }],
+      starts: [{ l: "Go AFK", d: "Being flagged AFK (/afk, or away long enough)", tag: 1 }, { l: "Stand still", d: "Standing still for a while with nothing else going on. No camera to start with; the Cinema profile picks the AFK camera" }, { l: "Any emote you set to it", d: "On the Scenes page" }, { l: "Keybind or camera wheel", d: "Start the AFK camera" }],
       ends: "Moving." },
     { name: "Cozy", lead: "Swings slowly round to face you, comes down low and in close, then sways gently from side to side in front of you.",
       starts: [{ l: "Resting with a listed buff (campfire)", d: "Standing or sitting still with a buff like Welcoming Campfire", tag: 1 },
@@ -334,7 +334,7 @@ table.grid tr:last-child td { border-bottom: 0 }
       li.appendChild(l); li.appendChild(d);
       if (s.tag) {
         var t = document.createElement("span"); t.className = "tags";
-        var x = document.createElement("span"); x.textContent = "Cameras page"; t.appendChild(x);
+        var x = document.createElement("span"); x.textContent = "Scenes page"; t.appendChild(x);
         li.appendChild(t);
       }
       startsEl.appendChild(li);

@@ -1,53 +1,75 @@
 -- Cinematic: the Camera Scripts page (dev copy), where camera scripts are
 -- written (CameraScripts.lua runs them), and the preview window beside it.
 --
--- The page: a script picked at the top (the built-in examples, then yours:
--- New, Copy, Delete, a name, Share and Import), what starts it (the Cameras
--- page rows set to it, and Use for to set a trigger's own row), Run now and
--- Stop. Then its steps, a row each (Together and Repeat with theirs indented
+-- The page: the camera picked, by its name at the top: a click drops the
+-- list of every camera down over the page (the Camera hub's groups, then
+-- yours, New camera and Import), gone again as you pick one. Then Copy,
+-- Delete and Share, what starts it (the Scenes page rows set to it), Run
+-- now and Stop. Then its steps, a row each (Together and Repeat with theirs indented
 -- under them): a click picks one and opens its settings under it; the
 -- buttons below add a step after the one picked (inside it, for Together and
 -- Repeat). Then the stop rules, and When it ends, another list of steps.
 -- The built-in ones show their steps but don't change: Copy one first.
 --
 -- The preview window plays the script on a drawing (from above, and from
--- the side), no camera moving, with a bar of its steps in time. It sits
+-- the side), no camera moving, over and over, with a bar of its steps in
+-- time: a click on the drawing pauses it, on the bar jumps there. It sits
 -- beside the settings (docked) or anywhere you drag it (Pop out), and stays
--- up when they close.
+-- up when they close; its corner grip sizes it (the drawing grows with it).
 local _, ns = ...
 local L = ns.L
 
-local LEFT, WIDTH = 16, 568
+-- (The page: the camera picked, full width. The list of every camera drops
+-- down over it from the camera's name, LIST_W a column, two columns.)
+local LEFT, WIDTH, LIST_W = 16, 568, 206
+local COL = LEFT
 local ROW_H, INDENT = 22, 16
-local EDITOR_H = 52
+local EDITOR_H = 66
 local SHARE_PREFIX, SHARE_FORMAT = "CINES", 1
 local COLORS = {
 	move = { 0.4, 0.62, 1 }, wait = { 0.6, 0.62, 0.68 }, flow = { 0.68, 0.52, 0.95 }, misc = { 0.92, 0.62, 0.3 },
 }
 local KIND_COLOR = { rotate = "move", tilt = "move", zoom = "move", zoomRand = "move", lineup = "move",
-	wait = "wait", together = "flow", ["repeat"] = "flow", emote = "misc", putback = "misc" }
+	wait = "wait", together = "flow", ["repeat"] = "flow", emote = "misc", putback = "misc", turnTo = "move",
+	sway = "move", tiltRand = "move", spin = "move", ["until"] = "flow", waitRand = "wait", follow = "misc", aim = "move", ending = "flow" }
 local KIND_NAMES = { rotate = "Rotate", tilt = "Tilt", zoom = "Zoom", zoomRand = "Zoom at random",
 	lineup = "Line up", wait = "Wait", together = "Together", ["repeat"] = "Repeat", emote = "Emote",
-	putback = "Put back" }
+	putback = "Put back", turnTo = "Turn to", sway = "Sway", tiltRand = "Tilt at random", spin = "Spin",
+	["until"] = "Wait until", waitRand = "Wait at random", follow = "Follow", aim = "Aim at" }
+-- (A field's name: by its kind first, where the same key means something else there.)
 local FIELD_NAMES = { deg = "Degrees", secs = "Seconds", way = "Way", ease = "Ease", to = "Yards", min = "Nearest",
-	max = "Furthest", token = "Emote", times = "Times" }
-local CHOICE_NAMES = { left = "Left", right = "Right", random = "Either way", smooth = "Smooth", gentle = "Gentle",
-	steady = "Steady" }
+	max = "Furthest", token = "Emote", times = "Times", of = "From", around = "Around", arc = "Arc", drift = "Drift",
+	pause = "Pause", favor = "Middle", down = "Down", up = "Up", accel = "Speed-up", ["turnTo.to"] = "To",
+	["sway.min"] = "At least", ["spin.max"] = "Top speed", ["tiltRand.deg"] = "Middle", what = "Until", after = "After",
+	fit = "Time", ["waitRand.min"] = "Shortest", ["waitRand.max"] = "Longest", at = "At", miss = "Not found" }
+local CHOICE_NAMES = { left = "Left", right = "Right", random = "Either way", once = "Picked once",
+	smooth = "Smooth", gentle = "Gentle", steady = "Steady", yards = "You", yours = "Your zoom", behind = "Behind",
+	front = "In front", yes = "Favor", no = "Anywhere", cast = "The cast", landing = "Landing", alive = "Back to life",
+	time = "Seconds go by", secs = "Its seconds", talk = "Someone new talks", click = "Where you clicked",
+	speaker = "Who's talking", stay = "Stay" }
 local RULE_NAMES = { camera = "You move the camera", fight = "A fight starts", walk = "You walk", zoom = "You zoom",
 	ends = "Its trigger ends" }
 local ACTION_NAMES = { stop = "Stop, leave it there", putback = "Run When it ends", pause = "Pause, then carry on",
 	restart = "Start again", ignore = "Carry on" }
 local HINTS = {
-	rotate = "Turns the view, as your Turn view left and right keys do. One turn at a time.",
+	rotate = "Turns the view, as your Turn view left and right keys do. One turn at a time. Picked once: either way, the same for every such turn in the script.",
 	tilt = "Positive tilts the view down, negative up. It waits for a turn to finish: the game won't do both at once.",
-	zoom = "Zooms to this many yards from you.",
-	zoomRand = "Zooms somewhere between the two, picked each time it runs.",
+	zoom = "Zooms to this many yards from you, or (From: your zoom) this many further out than you were as it started (negative: closer).",
+	zoomRand = "Zooms somewhere between the two, picked each time it runs: yards from you, or from your distance as it started.",
 	lineup = "Turns back to straight behind you, however far round it is.",
 	wait = "Holds still. A short wait also gives the game a moment between moves.",
 	together = "Runs the steps inside it at once; it's done when the longest is. Pick it and add steps to put them inside.",
 	["repeat"] = "Runs the steps inside it again. 0 times: until the camera ends (the preview shows three).",
 	emote = "Your character does this emote (a word, like wave or cheer).",
 	putback = "Undoes every turn, tilt and zoom this script made.",
+	turnTo = "Behind: the game's camera follow brings it round behind you, as the vista camera lines up. In front: turns to face you, counted from where it started.",
+	sway = "A random spot within Arc of behind (or in front), At least that far on; then it creeps on at Drift degrees a second through Pause, easing off before the edge. Middle: favor spots near the middle.",
+	tiltRand = "A random height: Middle degrees down (negative: up), give or take Down and Up. It waits for a turn to finish.",
+	spin = "Round and round, speeding up by Speed-up degrees a second each second to Top speed. 0 seconds: until the camera ends.",
+	["until"] = "Waits until a Hearthstone or teleport cast is that many seconds from done, you're that many seconds from landing (on a route you've flown before), you're back to life, or the seconds go by. Steps inside it run meanwhile and ease to a stop when it's time.",
+	waitRand = "Waits somewhere between the two, picked each time.",
+	follow = "From here on, after you turn and hold still this many seconds, camera follow glides the camera back behind you, as the RP walk and auto-run cameras do.",
+	aim = "Where you clicked: turns Degrees toward the side of the screen you clicked who you're talking to, as the quest cam does. Who's talking: swings toward the NPC talking now by their chat bubble, leaving them Degrees off the middle, as Chat Cam does. Not found (opened with a key, no bubble on screen): a turn either way, or stay.",
 }
 local function Translate(map)
 	for key, text in pairs(map) do map[key] = L[text] end
@@ -60,15 +82,32 @@ local function Num(n)
 	return (("%.1f"):format(n):gsub("%.0$", ""))
 end
 
+-- (+2, -1.5: from your distance.)
+local function Signed(n)
+	return (n >= 0 and "+" or "-") .. Num(math.abs(n))
+end
+
 -- A step's line on the page.
 local function StepText(step)
+	if step.k == "ending" then
+		return #step.steps > 0 and L["When it ends"] or L["When it ends: nothing, it stays where it is"]
+	end
 	local k = step.k
-	if k == "rotate" then
-		local way = step.way == "random" and L["either way"] or step.way == "left" and L["left"] or L["right"]
+	if k == "zoom" and step.fit == "cast" then
+		return (step.of == "yours" and L["Zoom to your distance %s yd over the cast"]:format(Signed(step.to))
+			or L["Zoom to %s yd over the cast"]:format(Num(step.to)))
+	elseif k == "rotate" then
+		local way = step.way == "random" and L["either way"] or step.way == "once" and L["either way, the same each time"]
+			or step.way == "left" and L["left"] or L["right"]
 		return L["Rotate %s° %s over %s s"]:format(Num(step.deg), way, Num(step.secs))
 	elseif k == "tilt" then
 		if step.deg == 0 then return L["Tilt 0° (no tilt)"] end
 		return (step.deg > 0 and L["Tilt %s° down over %s s"] or L["Tilt %s° up over %s s"]):format(Num(math.abs(step.deg)),
+			Num(step.secs))
+	elseif k == "zoom" and step.of == "yours" then
+		return L["Zoom to your distance %s yd over %s s"]:format(Signed(step.to), Num(step.secs))
+	elseif k == "zoomRand" and step.of == "yours" then
+		return L["Zoom somewhere from your distance %s to %s yd over %s s"]:format(Signed(step.min), Signed(step.max),
 			Num(step.secs))
 	elseif k == "zoom" then
 		return L["Zoom to %s yd over %s s"]:format(Num(step.to), Num(step.secs))
@@ -76,6 +115,40 @@ local function StepText(step)
 		return L["Zoom somewhere from %s to %s yd over %s s"]:format(Num(step.min), Num(step.max), Num(step.secs))
 	elseif k == "lineup" then
 		return L["Line up behind you over %s s"]:format(Num(step.secs))
+	elseif k == "turnTo" and step.to == "front" and step.fit == "cast" then
+		return L["Turn to face you before the cast ends"]
+	elseif k == "turnTo" then
+		return (step.to == "front" and L["Turn to face you over %s s"] or L["Turn round behind you over %s s"]):format(
+			Num(step.secs))
+	elseif k == "until" then
+		local text = step.what == "cast" and (step.secs > 0 and L["Until the cast is %s s from done"]:format(Num(step.secs))
+			or L["Until the cast ends"])
+			or step.what == "landing" and L["Until %s s before landing"]:format(Num(step.secs))
+			or step.what == "alive" and L["Until you're back to life"]
+			or step.what == "talk" and L["Until someone new talks"]
+			or L["Until %s s go by"]:format(Num(step.secs))
+		return #step.steps > 0 and text .. L[", doing these"] or text
+	elseif k == "waitRand" then
+		return L["Wait %s to %s s"]:format(Num(math.min(step.min, step.max)), Num(math.max(step.min, step.max)))
+	elseif k == "follow" then
+		return L["Follow: after you turn, glide behind you (after %s s still)"]:format(Num(step.after))
+	elseif k == "aim" then
+		return (step.at == "click" and L["Turn %s° toward where you clicked them over %s s"]
+			or L["Swing to who's talking, %s° off the middle, over %s s"]):format(Num(step.deg), Num(step.secs))
+	elseif k == "sway" then
+		local text = (step.around == "front" and L["Sway within %s° of your front over %s s"]
+			or L["Sway within %s° of behind you over %s s"]):format(Num(step.arc), Num(step.secs))
+		if step.pause > 0 then
+			text = text .. ", " .. (step.drift > 0 and L["drift %s°/s for %s s"]:format(Num(step.drift), Num(step.pause))
+				or L["hold %s s"]:format(Num(step.pause)))
+		end
+		return text
+	elseif k == "tiltRand" then
+		return L["Tilt to %s° give or take %s/%s over %s s"]:format(Signed(step.deg), Num(step.down), Num(step.up),
+			Num(step.secs))
+	elseif k == "spin" then
+		return (step.secs > 0 and L["Spin, speeding up to %s°/s, for %s s"]:format(Num(step.max), Num(step.secs))
+			or L["Spin, speeding up to %s°/s, until it ends"]:format(Num(step.max)))
 	elseif k == "wait" then
 		return L["Wait %s s"]:format(Num(step.secs))
 	elseif k == "emote" then
@@ -265,7 +338,7 @@ local function DrawPreview()
 		math.floor(pitch + 0.5), Num(zoom), Num(w.t), Num(w.plan.total)))
 	w.head:ClearAllPoints()
 	w.head:SetPoint("LEFT", w.bar, "LEFT", (w.bar:GetWidth() - 2) * math.min(1, w.t / w.plan.total), 0)
-	w.status:SetText(w.message or "")
+	w.status:SetText(w.playing and "" or L["Paused: click the drawing to play."])
 	if page.active ~= active then
 		page.active = active
 		if page.Paint then page.Paint() end
@@ -298,33 +371,39 @@ function ns.RefreshCameraScriptPreview()
 	DrawPreview()
 end
 
-local function SimRule()
+-- The window's size: the drawing (ART_W by VIEW at scale 1) scaled to fill
+-- what's left of it after the title (TOP) and the readout, bar and paused
+-- line under it (UNDER); never smaller than at scale 1.
+local ART_W, TOP, UNDER, SIDES = VIEW + 8 + SIDE, 34, 58, 24
+local MIN_W, MIN_H = ART_W + SIDES, TOP + VIEW + UNDER
+local function FitPreview()
 	local w = preview
-	local rules = page.script.rules
-	local action = rules.camera
-	if not w.playing and w.t == 0 then
-		w.message = L["Press Play first."]
-	elseif action == "stop" then
-		w.playing = false
-		w.message = L["You moved the camera: it stops, and the camera's yours where it is."]
-	elseif action == "putback" then
-		w.t = math.max(w.t, w.plan.endStart)
-		w.message = L["You moved the camera: on to When it ends."]
-	elseif action == "pause" then
-		w.pausedLeft = rules.cameraSecs
-		w.message = L["You moved the camera: it waits %s s, then carries on."]:format(Num(rules.cameraSecs))
-	else
-		w.t = 0
-		w.message = L["You moved the camera: it starts again."]
-	end
-	w.play:SetText(w.playing and L["Pause"] or L["Play"])
-	DrawPreview()
+	local width, height = w:GetSize()
+	local scale = math.max(0.5, math.min((width - SIDES) / ART_W, (height - TOP - UNDER) / VIEW))
+	w.art:SetScale(scale)
+	w.art:ClearAllPoints()
+	w.art:SetPoint("TOP", w, "TOP", 0, -TOP / scale)
+	w.readout:ClearAllPoints()
+	w.readout:SetPoint("TOPLEFT", w, "TOPLEFT", 12, -(TOP + VIEW * scale + 8))
+	w.bar:ClearAllPoints()
+	w.bar:SetPoint("TOPLEFT", w.readout, "BOTTOMLEFT", 0, -6)
+	w.bar:SetPoint("RIGHT", w, "RIGHT", -12, 0)
+	w.status:SetWidth(width - SIDES)
 end
 
 local function MakePreview()
 	local w = CreateFrame("Frame", "CinematicScriptPreview", UIParent, "BackdropTemplate")
 	preview = w
-	w:SetSize(318, 372)
+	local size = Store().previewSize
+	w:SetSize(type(size) == "table" and tonumber(size.w) or MIN_W, type(size) == "table" and tonumber(size.h) or MIN_H)
+	w:SetResizable(true)
+	local most = { UIParent:GetWidth() * 0.9, UIParent:GetHeight() * 0.9 }
+	if w.SetResizeBounds then
+		w:SetResizeBounds(MIN_W, MIN_H, most[1], most[2])
+	elseif w.SetMinResize then
+		w:SetMinResize(MIN_W, MIN_H)
+		w:SetMaxResize(most[1], most[2])
+	end
 	w:SetFrameStrata("DIALOG")
 	w:SetClampedToScreen(true)
 	w:SetMovable(true)
@@ -365,9 +444,19 @@ local function MakePreview()
 	end)
 	ns.lowHealthKit.Tooltip(w.dock, L["Pop out: drag the window anywhere (by its edge). Dock: back beside the settings."])
 
-	local view = CreateFrame("Frame", nil, w)
+	-- The drawing: a click pauses or plays it.
+	w.art = CreateFrame("Frame", nil, w)
+	w.art:SetSize(ART_W, VIEW)
+	w.art:EnableMouse(true)
+	w.art:SetScript("OnMouseDown", function()
+		if not w.plan then return end
+		w.playing = not w.playing
+		DrawPreview()
+	end)
+	ns.lowHealthKit.Tooltip(w.art, L["Click to pause or play."])
+	local view = CreateFrame("Frame", nil, w.art)
 	view:SetSize(VIEW, VIEW)
-	view:SetPoint("TOPLEFT", 12, -34)
+	view:SetPoint("TOPLEFT")
 	local viewBg = view:CreateTexture(nil, "BACKGROUND")
 	viewBg:SetAllPoints()
 	viewBg:SetColorTexture(0, 0, 0, 0.45)
@@ -390,7 +479,7 @@ local function MakePreview()
 	w.cone = { NewLine(view, 1, 0.82, 0, 0.35), NewLine(view, 1, 0.82, 0, 0.35) }
 	w.camDot = Dot(view, 9, 1, 0.82, 0)
 
-	local side = CreateFrame("Frame", nil, w)
+	local side = CreateFrame("Frame", nil, w.art)
 	side:SetSize(SIDE, VIEW)
 	side:SetPoint("TOPLEFT", view, "TOPRIGHT", 8, 0)
 	local sideBg = side:CreateTexture(nil, "BACKGROUND")
@@ -409,10 +498,13 @@ local function MakePreview()
 	sideLabel:SetText(L["side"])
 
 	w.readout = w:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-	w.readout:SetPoint("TOPLEFT", view, "BOTTOMLEFT", 0, -8)
+	-- The bar: a click (or a drag along it) jumps there.
 	w.bar = CreateFrame("Frame", nil, w)
-	w.bar:SetSize(VIEW + 8 + SIDE, 12)
-	w.bar:SetPoint("TOPLEFT", w.readout, "BOTTOMLEFT", 0, -6)
+	w.bar:SetHeight(12)
+	w.bar:EnableMouse(true)
+	w.bar:SetScript("OnMouseDown", function() w.scrubbing = true end)
+	w.bar:SetScript("OnMouseUp", function() w.scrubbing = false end)
+	ns.lowHealthKit.Tooltip(w.bar, L["Click or drag along it to jump there."])
 	local barBg = w.bar:CreateTexture(nil, "BACKGROUND")
 	barBg:SetAllPoints()
 	barBg:SetColorTexture(0, 0, 0, 0.5)
@@ -421,51 +513,60 @@ local function MakePreview()
 	w.head:SetSize(2, 14)
 	w.segments = {}
 
-	w.play = Button(w, L["Play"], 70)
-	w.play:SetPoint("TOPLEFT", w.bar, "BOTTOMLEFT", 0, -8)
-	w.play:SetScript("OnClick", function()
-		if not w.plan then return end
-		if w.playing then
-			w.playing = false
-		else
-			if w.t >= w.plan.total then w.t = 0 end
-			w.playing, w.message, w.pausedLeft = true, nil, nil
-		end
-		w.play:SetText(w.playing and L["Pause"] or L["Play"])
-		DrawPreview()
-	end)
-	local moveCam = Button(w, L["You move the camera"], 140)
-	moveCam:SetPoint("LEFT", w.play, "RIGHT", 4, 0)
-	moveCam:SetScript("OnClick", SimRule)
-	ns.lowHealthKit.Tooltip(moveCam, L["What the script does when you move the camera yourself (its first stop rule)."])
-	local runNow = Button(w, L["Run in game"], 84)
-	runNow:SetPoint("LEFT", moveCam, "RIGHT", 4, 0)
-	runNow:SetScript("OnClick", function() page.RunNow() end)
-	ns.lowHealthKit.Tooltip(runNow, L["Moves the real camera through this script now (Stop on the page, or /cine script stop, ends it)."])
-
 	w.status = w:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-	w.status:SetPoint("TOPLEFT", w.play, "BOTTOMLEFT", 0, -8)
-	w.status:SetWidth(294)
+	w.status:SetPoint("TOPLEFT", w.bar, "BOTTOMLEFT", 0, -6)
 	w.status:SetJustifyH("LEFT")
 
+	-- The corner grip (the chat frames' own) sizes it.
+	local grip = CreateFrame("Button", nil, w)
+	grip:SetSize(16, 16)
+	grip:SetPoint("BOTTOMRIGHT", -3, 3)
+	grip:SetFrameLevel(w:GetFrameLevel() + 20)
+	grip:SetNormalTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up")
+	grip:SetPushedTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Down")
+	grip:SetHighlightTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Highlight")
+	grip:SetScript("OnMouseDown", function()
+		w.sizing = true
+		w:StartSizing("BOTTOMRIGHT")
+	end)
+	grip:SetScript("OnMouseUp", function()
+		w:StopMovingOrSizing()
+		w.sizing = nil
+		Store().previewSize = { w = math.floor(w:GetWidth() + 0.5), h = math.floor(w:GetHeight() + 0.5) }
+		PlacePreview() -- (sizing moved its anchor: back where it goes, docked or not)
+	end)
+	w:SetScript("OnSizeChanged", function()
+		FitPreview()
+		ns.RefreshCameraScriptPreview()
+	end)
+	FitPreview()
+
+	local END_HOLD = 1.5 -- seconds it holds at the end before playing again
 	w:SetScript("OnUpdate", function(_, elapsed)
-		if not w.playing or not w.plan then return end
-		if w.pausedLeft then
-			w.pausedLeft = w.pausedLeft - elapsed
-			if w.pausedLeft <= 0 then
-				w.pausedLeft, w.message = nil, L["Carried on where it left off."]
-			end
+		if not w.plan then return end
+		if w.scrubbing then
+			local x = GetCursorPosition() / w.bar:GetEffectiveScale()
+			local share = (x - w.bar:GetLeft()) / math.max(1, w.bar:GetWidth())
+			w.t, w.held = w.plan.total * math.max(0, math.min(1, share)), nil
+			DrawPreview()
+			return
+		end
+		if not w.playing then return end
+		if w.t >= w.plan.total then
+			w.held = (w.held or 0) + elapsed
+			if w.held < END_HOLD then return end
+			w.t, w.held = 0, nil
 		else
 			w.t = math.min(w.plan.total, w.t + elapsed)
-		end
-		if w.t >= w.plan.total then
-			w.playing = false
-			w.play:SetText(L["Play"])
 		end
 		DrawPreview()
 	end)
 	w:SetScript("OnHide", function()
-		w.playing = false
+		w.playing, w.scrubbing = false, false
+		if w.sizing then
+			w:StopMovingOrSizing()
+			w.sizing = nil
+		end
 		page.active = nil
 		if page.Paint then page.Paint() end
 	end)
@@ -476,8 +577,7 @@ function ns.ShowCameraScriptPreview()
 	if not preview then MakePreview() end
 	preview:Show()
 	PlacePreview()
-	preview.t, preview.playing, preview.message = 0, false, nil
-	preview.play:SetText(L["Play"])
+	preview.t, preview.playing, preview.held = 0, true, nil
 	ns.RefreshCameraScriptPreview()
 end
 
@@ -562,7 +662,7 @@ local function ShowShare(export)
 			ending = script.ending, rules = script.rules })
 		window.title:SetText(L["Share %s"]:format(script.name))
 		window.hint:SetText(L["Press Ctrl+C to copy this, then paste it wherever your friends will see it. They " ..
-			"add it with Import on their Camera Scripts page."])
+			"add it with Import on their Scripts page."])
 		window.accept:Hide()
 		window.status:SetText("")
 	else
@@ -583,6 +683,21 @@ end
 -- The page
 -- ---------------------------------------------------------------------------
 
+-- Every camera, in the Camera hub's groups, then yours. A string: a built-in
+-- script's id. own: a camera that isn't a script yet (its value in
+-- ns.CAMERA_NAMES, and the steps it waits for).
+local CAMERA_LIST = {
+	{ section = "At rest", color = { 0.3, 0.7, 0.5 }, items = { "cozy", "vista", "fish", "afk", "tele", "still" } },
+	{ section = "Travel", color = { 0.35, 0.6, 0.9 }, items = { "flight", "flyby", "walk", "run" } },
+	{ section = "Moments", color = { 0.65, 0.45, 0.9 }, items = { "quest", "chat", "death" } },
+	{ section = "Yours", color = { 0.92, 0.62, 0.3 }, mine = true },
+}
+ns.OnLanguage(function()
+	for _, group in ipairs(CAMERA_LIST) do group.section = L[group.section] end
+end)
+local LIST_ROW = 18
+local DOT = { script = { 0.3, 0.8, 0.5 }, own = { 0.6, 0.6, 0.65 }, mine = { 1, 0.62, 0.25 } }
+
 -- A step row (pooled): its line, colour strip, and up, down and delete.
 local function StepRow(content)
 	local row = CreateFrame("Button", nil, content)
@@ -600,10 +715,15 @@ local function StepRow(content)
 	hover:SetColorTexture(1, 1, 1, 0.06)
 	row.del = IconButton(row, "Interface\\Buttons\\UI-GroupLoot-Pass-Up", L["Remove this step"])
 	row.del:SetPoint("RIGHT", -4, 0)
-	row.down = IconButton(row, "Interface\\Buttons\\Arrow-Down-Up", L["Move down"])
-	row.down:SetPoint("RIGHT", row.del, "LEFT", -4, 0)
-	row.up = IconButton(row, "Interface\\Buttons\\Arrow-Up-Up", L["Move up"])
-	row.up:SetPoint("RIGHT", row.down, "LEFT", -4, 0)
+	-- (The scroll bar's arrows: the plain Arrow-Up/Down art sits off-center in
+	-- its square, the up one low and the down one high, so a pair looked uneven.)
+	-- (Bigger than the remove button: the art has a wide empty edge.)
+	row.down = IconButton(row, "Interface\\Buttons\\UI-ScrollBar-ScrollDownButton-Up", L["Move down"])
+	row.down:SetSize(24, 24)
+	row.down:SetPoint("RIGHT", row.del, "LEFT", 0, 0)
+	row.up = IconButton(row, "Interface\\Buttons\\UI-ScrollBar-ScrollUpButton-Up", L["Move up"])
+	row.up:SetSize(24, 24)
+	row.up:SetPoint("RIGHT", row.down, "LEFT", 2, 0)
 	row:SetScript("OnClick", function(self)
 		page.selected = page.selected ~= self.step and self.step or nil
 		page.Layout()
@@ -614,7 +734,9 @@ local function StepRow(content)
 	return row
 end
 
--- The settings of the step picked, under its row: up to four fields and a hint.
+-- The settings of the step picked, under its row: up to eight fields, two
+-- to a row, and a hint.
+local SLOTS, PER_ROW, SLOT_ROW, SLOT_W = 8, 2, 26, 186
 local function MakeEditor(content)
 	local editor = CreateFrame("Frame", nil, content)
 	editor:SetSize(WIDTH, EDITOR_H)
@@ -622,12 +744,14 @@ local function MakeEditor(content)
 	bg:SetAllPoints()
 	bg:SetColorTexture(1, 0.82, 0, 0.06)
 	editor.slots = {}
-	for i = 1, 4 do
+	for i = 1, SLOTS do
 		local slot = {}
 		slot.label = editor:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-		slot.label:SetPoint("TOPLEFT", 28 + (i - 1) * 136, -8)
+		slot.label:SetPoint("TOPLEFT", 14 + ((i - 1) % PER_ROW) * SLOT_W, -8 - math.floor((i - 1) / PER_ROW) * SLOT_ROW)
+		slot.label:SetWidth(70)
+		slot.label:SetJustifyH("LEFT")
 		slot.box = Box(editor, 54)
-		slot.box:SetPoint("LEFT", slot.label, "RIGHT", 8, 0)
+		slot.box:SetPoint("LEFT", slot.label, "RIGHT", 6, 0)
 		local function Commit(box)
 			local step, field = editor.step, slot.field
 			if not step or not field then return end
@@ -637,25 +761,28 @@ local function MakeEditor(content)
 		end
 		slot.box:SetScript("OnEnterPressed", function(self) Commit(self) self:ClearFocus() end)
 		slot.box:SetScript("OnEditFocusLost", Commit)
-		slot.pick = Choice(editor, 84, function() return slot.field and slot.field[3] or {} end,
+		slot.pick = Choice(editor, 98, function() return slot.field and slot.field[3] or {} end,
 			function() return editor.step and slot.field and editor.step[slot.field[1]] end,
 			function(choice)
 				editor.step[slot.field[1]] = choice
 				slot.pick:Refresh()
 				page.Changed()
 			end, function(choice) return CHOICE_NAMES[choice] or choice end)
-		slot.pick:SetPoint("LEFT", slot.label, "RIGHT", 8, 0)
+		slot.pick:SetPoint("LEFT", slot.label, "RIGHT", 6, 0)
 		editor.slots[i] = slot
 	end
 	editor.hint = editor:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-	editor.hint:SetPoint("BOTTOMLEFT", 28, 7)
-	editor.hint:SetWidth(WIDTH - 40)
+	editor.hint:SetPoint("BOTTOMLEFT", 14, 7)
+	editor.hint:SetWidth(WIDTH - 24)
 	editor.hint:SetJustifyH("LEFT")
-	editor.hint:SetWordWrap(false)
+	editor.hint:SetWordWrap(true)
+	if editor.hint.SetMaxLines then editor.hint:SetMaxLines(3) end
 
 	function editor:Edit(step, locked)
 		self.step = step
-		local fields = ns.CAMERA_SCRIPT_KINDS[step.k].fields
+		-- (When it ends: no settings of its own, just what it is.)
+		local kind = ns.CAMERA_SCRIPT_KINDS[step.k]
+		local fields = kind and kind.fields or {}
 		for i, slot in ipairs(self.slots) do
 			local field = not locked and fields[i]
 			slot.field = field or nil
@@ -663,7 +790,7 @@ local function MakeEditor(content)
 			slot.box:SetShown(field and field[2] ~= "pick" or false)
 			slot.pick:SetShown(field and field[2] == "pick" or false)
 			if field then
-				slot.label:SetText(FIELD_NAMES[field[1]] or field[1])
+				slot.label:SetText(FIELD_NAMES[step.k .. "." .. field[1]] or FIELD_NAMES[field[1]] or field[1])
 				if field[2] == "pick" then
 					slot.pick:Refresh()
 				else
@@ -672,65 +799,155 @@ local function MakeEditor(content)
 				end
 			end
 		end
-		self.hint:SetText(locked and L["A built-in example: Copy it to change it."] or HINTS[step.k] or "")
+		-- (A built-in camera's step: the settings it's made from, see
+		-- page.StepSettings.)
+		local settings = page.StepSettings and page.StepSettings(self, locked and step.set or nil) or 0
+		self.hint:SetText(settings > 0 and L["Made from these settings. Copy the camera to change the step itself."]
+			or step.k == "ending" and L["Runs when the camera ends, whatever ends it (its stop rules say which do). Every camera has it: it can't be removed. Pick it and add steps to put them inside."]
+			or locked and L["A built-in camera: Copy it to change it."] or HINTS[step.k] or "")
+		local rows = locked and 0 or math.ceil(#fields / PER_ROW)
+		self:SetHeight(rows * SLOT_ROW + settings + math.max(26, self.hint:GetStringHeight() + 14))
 	end
 	return editor
+end
+
+-- A row of the camera list (pooled): a dot for what it is, and its name.
+local function ListRow(parent)
+	local row = CreateFrame("Button", nil, parent)
+	row:SetSize(LIST_W, LIST_ROW)
+	row.bg = row:CreateTexture(nil, "BACKGROUND")
+	row.bg:SetAllPoints()
+	local hover = row:CreateTexture(nil, "HIGHLIGHT")
+	hover:SetAllPoints()
+	hover:SetColorTexture(1, 1, 1, 0.07)
+	row.dot = row:CreateTexture(nil, "ARTWORK")
+	row.dot:SetSize(7, 7)
+	row.dot:SetPoint("LEFT", 6, 0)
+	row.ring = row:CreateTexture(nil, "ARTWORK", nil, 1) -- (a hollow dot: a darker middle over the dot)
+	row.ring:SetSize(4, 4)
+	row.ring:SetPoint("CENTER", row.dot)
+	row.ring:SetColorTexture(0.05, 0.05, 0.07, 1)
+	row.text = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+	row.text:SetPoint("LEFT", 18, 0)
+	row.text:SetPoint("RIGHT", -4, 0)
+	row.text:SetJustifyH("LEFT")
+	row.text:SetWordWrap(false)
+	row:SetScript("OnClick", function(self)
+		page.OpenList(false)
+		page.Pick(self.entry)
+	end)
+	return row
+end
+
+-- The camera's name at the top of the page: a dot, its name, its group, and
+-- an arrow; a click drops the list down.
+local function CameraButton(content)
+	local button = ns.PanelButton(content)
+	button:SetSize(240, 26) -- (room beside it for Copy, Delete, Share, Run and Previewer)
+	button.dot = button:CreateTexture(nil, "OVERLAY")
+	button.dot:SetSize(8, 8)
+	button.dot:SetPoint("LEFT", 10, 0)
+	button.ring = button:CreateTexture(nil, "OVERLAY", nil, 1)
+	button.ring:SetSize(4, 4)
+	button.ring:SetPoint("CENTER", button.dot)
+	button.ring:SetColorTexture(0.05, 0.05, 0.07, 1)
+	button.arrow = button:CreateTexture(nil, "OVERLAY")
+	button.arrow:SetSize(14, 14)
+	button.arrow:SetPoint("RIGHT", -8, 0)
+	button.arrow:SetTexture("Interface\\Buttons\\Arrow-Down-Up")
+	button.group = button:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+	button.group:SetPoint("RIGHT", button.arrow, "LEFT", -6, 0)
+	button.name = button:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+	button.name:SetPoint("LEFT", button.dot, "RIGHT", 8, 0)
+	button.name:SetPoint("RIGHT", button.group, "LEFT", -6, 0)
+	button.name:SetJustifyH("LEFT")
+	button.name:SetWordWrap(false)
+	if button.GetFontString and button:GetFontString() then button:GetFontString():SetText("") end
+	button:SetScript("OnClick", function() page.OpenList(not page.list:IsShown()) end)
+	return button
 end
 
 function ns.CreateCameraScriptsPanel(kit)
 	local canvas, content = kit.CreateScrollPage(true)
 	page.canvas, page.content = canvas, content
-	local title = kit.Label(content, "GameFontNormalLarge", L["Camera Scripts"])
+	local title = kit.Label(content, "GameFontNormalLarge", L["Scripts"])
 	title:SetPoint("TOPLEFT", LEFT, -16)
-	kit.PageIntro(content, title, L["Cameras made of small steps: rotate, tilt, zoom, wait, and Together and " ..
-		"Repeat for steps at once or again. Stop rules say what happens when you move the camera, walk, zoom, a " ..
-		"fight starts or its trigger ends. A script is a camera: set a Cameras page row to it (or Use for, " ..
-		"below), or Run now. The built-in ones are the steps our own cameras take, with your settings: copy one " ..
-		"to make it yours. Dev copy only for now."])
+	kit.PageIntro(content, title, L["Every camera, made of small steps: rotate, tilt, zoom, sway, wait, and Together " ..
+		"and Repeat for steps at once or again. Stop rules say what happens when you move the camera, walk, zoom, a " ..
+		"fight starts or its trigger ends. The built-in ones are our own cameras' steps, with your settings: set a " ..
+		"row on the Scenes page to one to run it instead of the camera, or Copy it to make it yours. " ..
+		"A hollow dot: that camera isn't a script yet."])
 
-	-- The script, and New, Copy, Delete.
-	page.pick = Choice(content, 220, function()
-		local ids = {}
-		for _, script in ipairs(ns.CameraScripts()) do ids[#ids + 1] = script.id end
-		return ids
-	end, function() return page.id end, function(id) page.Pick(id) end, function(id)
-		local script = ns.FindCameraScript(id)
-		return script and (script.builtin and L["%s (built-in)"]:format(script.name) or script.name) or ""
+	-- The camera's name, and the list it drops down: over the page (a dim
+	-- layer under it takes a click outside to close it), every camera in two
+	-- columns, a box to find one, then yours, New camera and Import.
+	page.camButton = CameraButton(content)
+	page.camButton:SetPoint("TOPLEFT", LEFT, -46)
+	-- (Its tip: what this camera is and what starts it, then how to pick another.)
+	page.camButton:SetScript("OnEnter", function(self)
+		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+		GameTooltip:SetText(self.name:GetText() or "", 1, 0.82, 0)
+		if page.tipStatus then GameTooltip:AddLine(page.tipStatus, 1, 1, 1, true) end
+		if page.tipStarts then GameTooltip:AddLine(page.tipStarts, 0.8, 0.8, 0.8, true) end
+		GameTooltip:AddLine(L["Every camera, built in and yours: click to pick another."], 0.6, 0.6, 0.6, true)
+		GameTooltip:Show()
 	end)
-	page.pick:SetPoint("TOPLEFT", LEFT, -46)
-	local new = Button(content, L["New"], 70)
-	new:SetPoint("LEFT", page.pick, "RIGHT", 10, 0)
-	new:SetScript("OnClick", function()
+	page.camButton:SetScript("OnLeave", function() GameTooltip:Hide() end)
+	page.dim = CreateFrame("Button", nil, content)
+	page.dim:SetAllPoints(content)
+	page.dim:SetFrameLevel(content:GetFrameLevel() + 40)
+	local dimArt = page.dim:CreateTexture(nil, "BACKGROUND")
+	dimArt:SetAllPoints()
+	dimArt:SetColorTexture(0, 0, 0, 0.35)
+	page.dim:SetScript("OnClick", function() page.OpenList(false) end)
+	page.dim:Hide()
+	local list = CreateFrame("Frame", nil, content)
+	page.list = list
+	list:SetFrameLevel(content:GetFrameLevel() + 45)
+	list:SetPoint("TOPLEFT", page.camButton, "BOTTOMLEFT", 0, -4)
+	list:SetWidth(10 + LIST_W + 12 + LIST_W + 10)
+	list:EnableMouse(true) -- (a click on it isn't a click outside)
+	local listBg = list:CreateTexture(nil, "BACKGROUND")
+	listBg:SetAllPoints()
+	listBg:SetColorTexture(0.06, 0.06, 0.08, 0.97)
+	for i, sides in ipairs({ { "TOPLEFT", "TOPRIGHT" }, { "BOTTOMLEFT", "BOTTOMRIGHT" }, { "TOPLEFT", "BOTTOMLEFT" },
+		{ "TOPRIGHT", "BOTTOMRIGHT" } }) do
+		local edge = list:CreateTexture(nil, "BORDER")
+		edge:SetPoint(sides[1])
+		edge:SetPoint(sides[2])
+		if i <= 2 then edge:SetHeight(1) else edge:SetWidth(1) end
+		edge:SetColorTexture(1, 0.82, 0, 0.6)
+	end
+	page.find = Box(list, 200)
+	page.find:SetPoint("TOPLEFT", 15, -10)
+	page.find:SetScript("OnTextChanged", function() page.PlaceList() end)
+	page.find:SetScript("OnEscapePressed", function() page.OpenList(false) end)
+	page.findHint = kit.Label(list, "GameFontDisableSmall", L["Find a camera"])
+	page.findHint:SetPoint("LEFT", page.find, "LEFT", 2, 0)
+	local close = Button(list, L["Close"], 64)
+	close:SetPoint("TOPRIGHT", -10, -8)
+	close:SetScript("OnClick", function() page.OpenList(false) end)
+	list:Hide()
+	page.listRows, page.listHeads = {}, {}
+	page.newButton = Button(list, L["+ New camera"], LIST_W)
+	page.newButton:SetScript("OnClick", function()
+		page.OpenList(false)
 		local script = ns.AddCameraScript(nil, L["My camera %d"]:format(#(Store().list or {}) + 1))
 		if script then page.Pick(script.id) else ns.Print(L["You have 30 camera scripts already: delete one to add another."]) end
 	end)
-	kit.Tooltip(new, L["A new script of yours, with a few steps to start from."])
-	local copy = Button(content, L["Copy"], 70)
-	copy:SetPoint("LEFT", new, "RIGHT", 4, 0)
-	copy:SetScript("OnClick", function()
-		local script = ns.AddCameraScript(page.script)
-		if script then page.Pick(script.id) else ns.Print(L["You have 30 camera scripts already: delete one to add another."]) end
+	kit.Tooltip(page.newButton, L["A new script of yours, with a few steps to start from."])
+	page.importButton = Button(list, L["Import"], LIST_W)
+	page.importButton:SetScript("OnClick", function()
+		page.OpenList(false)
+		ShowShare(false)
 	end)
-	kit.Tooltip(copy, L["A copy of this script, yours to change."])
-	page.delete = Button(content, L["Delete"], 70)
-	page.delete:SetPoint("LEFT", copy, "RIGHT", 4, 0)
-	page.delete:SetScript("OnClick", function()
-		if page.confirmDelete == page.id then
-			ns.DeleteCameraScript(page.id)
-			page.confirmDelete = nil
-			page.Pick("orbit")
-		else
-			page.confirmDelete = page.id
-			page.delete:SetText(L["Sure?"])
-		end
-	end)
-	kit.Tooltip(page.delete, L["Deletes this script (click twice). Rows set to it go back to no camera."])
+	kit.Tooltip(page.importButton, L["Add a script someone shared with you."])
 
-	-- Its name, Share and Import.
-	local nameLabel = kit.Label(content, "GameFontNormal", L["Name"])
-	nameLabel:SetPoint("TOPLEFT", LEFT, -82)
+	-- The camera picked: its name, Copy, Delete, Share.
+	page.nameLabel = kit.Label(content, "GameFontNormalSmall", L["Name"])
+	page.nameLabel:SetPoint("TOPLEFT", COL, -84)
 	page.name = Box(content, 200)
-	page.name:SetPoint("LEFT", nameLabel, "RIGHT", 12, 0)
+	page.name:SetPoint("LEFT", page.nameLabel, "RIGHT", 10, 0)
 	page.name:SetMaxLetters(40)
 	page.name:SetScript("OnEditFocusLost", function(self)
 		local mine = page.script and ns.MyCameraScript(page.script.id)
@@ -738,84 +955,81 @@ function ns.CreateCameraScriptsPanel(kit)
 		if mine and text ~= "" then
 			mine.name = text
 			ns.CameraScriptChanged()
-			page.pick:Refresh()
+			page.Layout()
 			ns.RefreshCameraScriptPreview()
 		end
 		self:SetText(page.script and page.script.name or "")
 	end)
-	page.nameText = kit.Label(content, "GameFontHighlight", "")
-	page.nameText:SetPoint("LEFT", nameLabel, "RIGHT", 12, 0)
-	local shareButton = Button(content, L["Share"], 80)
-	shareButton:SetPoint("TOPLEFT", LEFT + 300, -78)
-	shareButton:SetScript("OnClick", function() ShowShare(true) end)
-	kit.Tooltip(shareButton, L["A string of this script to give to friends."])
-	local import = Button(content, L["Import"], 80)
-	import:SetPoint("LEFT", shareButton, "RIGHT", 4, 0)
-	import:SetScript("OnClick", function() ShowShare(false) end)
-	kit.Tooltip(import, L["Add a script someone shared with you."])
+	page.copy = Button(content, L["Copy"], 56)
+	page.copy:SetPoint("LEFT", page.camButton, "RIGHT", 8, 0)
+	page.copy:SetScript("OnClick", function()
+		local script = ns.AddCameraScript(page.script)
+		if script then page.Pick(script.id) else ns.Print(L["You have 30 camera scripts already: delete one to add another."]) end
+	end)
+	kit.Tooltip(page.copy, L["A copy of this script, yours to change."])
+	page.delete = Button(content, L["Delete"], 60)
+	page.delete:SetPoint("LEFT", page.copy, "RIGHT", 4, 0)
+	page.delete:SetScript("OnClick", function()
+		if page.confirmDelete == page.id then
+			ns.DeleteCameraScript(page.id)
+			page.confirmDelete = nil
+			page.Pick("cozy")
+		else
+			page.confirmDelete = page.id
+			page.delete:SetText(L["Sure?"])
+		end
+	end)
+	kit.Tooltip(page.delete, L["Deletes this script (click twice). Rows set to it go back to no camera."])
+	-- (After Delete; after Copy for a built-in one, which has no Delete: see Layout.)
+	page.share = Button(content, L["Share"], 56)
+	page.share:SetScript("OnClick", function() ShowShare(true) end)
+	kit.Tooltip(page.share, L["A string of this script to give to friends."])
 
-	-- What starts it, Use for, Run now, Stop, Preview.
-	page.starts = kit.Label(content, "GameFontHighlightSmall", "")
-	page.starts:SetPoint("TOPLEFT", LEFT, -112)
-	page.starts:SetWidth(WIDTH)
-	local ok, useFor = ns.MenuDropdown(content)
-	if ok and useFor and useFor.SetupMenu then
-		useFor:SetWidth(170)
-		useFor:SetupMenu(function(_, root)
-			root:CreateTitle(L["Start it on"])
-			for _, trigger in ipairs(ns.CAMERA_TRIGGERS) do
-				if ns.TriggerTakesScripts(trigger) and page.script then
-					local key = trigger.key
-					root:CreateCheckbox(ns.CameraTriggerName(key), function()
-						return ns.CameraRowValue(key, "camera") == "script:" .. page.script.id
-					end, function()
-						local on = ns.CameraRowValue(key, "camera") ~= "script:" .. page.script.id
-						ns.UseCameraScriptFor(key, page.script.id, on)
-						page.Layout()
-					end)
-				end
-			end
-		end)
-		if useFor.SetDefaultText then useFor:SetDefaultText(L["Use for..."]) end
-		useFor:SetPoint("TOPLEFT", LEFT, -136)
-		kit.Tooltip(useFor, L["Sets a trigger's own row on the Cameras page to this script (its copies there are " ..
-			"set on that page)."])
-		page.useFor = useFor
-	end
-	local runNow = Button(content, L["Run now"], 80)
-	runNow:SetPoint("TOPLEFT", LEFT + 190, -136)
+	-- Run and Previewer, beside Share. (What it is and what starts it: the
+	-- camera button's tip.)
+	-- Run, beside Share: moves the real camera through it; Stop while it's
+	-- the one running.
+	page.runNow = Button(content, L["Run"], 54)
+	page.runNow:SetPoint("LEFT", page.share, "RIGHT", 4, 0)
 	function page.RunNow()
 		local played, why = ns.PlayCameraScript(page.script)
 		if not played then ns.Print(why) end
 	end
-	runNow:SetScript("OnClick", page.RunNow)
-	kit.Tooltip(runNow, L["Moves the real camera through this script now. Its stop rules count, as for a trigger."])
-	local stop = Button(content, L["Stop"], 70)
-	stop:SetPoint("LEFT", runNow, "RIGHT", 4, 0)
-	stop:SetScript("OnClick", function() ns.StopCameraScript() end)
-	local previewButton = Button(content, L["Preview"], 80)
-	previewButton:SetPoint("LEFT", stop, "RIGHT", 4, 0)
-	previewButton:SetScript("OnClick", function()
+	local function Running()
+		local state = ns.CameraScriptState()
+		return state and page.script and state.script.id == page.script.id
+	end
+	page.runNow:SetScript("OnClick", function()
+		if Running() then ns.StopCameraScript() else page.RunNow() end
+	end)
+	local runningWas
+	page.runNow:SetScript("OnUpdate", function(self)
+		local running = Running() and true or false
+		if running ~= runningWas then
+			runningWas = running
+			self:SetText(running and L["Stop"] or L["Run"])
+		end
+	end)
+	kit.Tooltip(page.runNow, L["Moves the real camera through this script now (click again to stop it). Its stop rules count, as for a trigger."])
+	page.previewButton = Button(content, L["Previewer"], 76)
+	page.previewButton:SetPoint("LEFT", page.runNow, "RIGHT", 4, 0)
+	page.previewButton:SetScript("OnClick", function()
 		if preview and preview:IsShown() then preview:Hide() else ns.ShowCameraScriptPreview() end
 	end)
-	kit.Tooltip(previewButton, L["Plays the script on a drawing, in a window of its own: no camera moves."])
+	kit.Tooltip(page.previewButton, L["Plays the script on a drawing, in a window of its own: no camera moves."])
 
 	-- The lists and rules, laid out by Layout.
 	page.rows, page.used = {}, 0
 	page.editor = MakeEditor(content)
-	page.headers = {}
-	for _, key in ipairs({ "steps", "rules", "ending" }) do
-		page.headers[key] = kit.Label(content, "GameFontNormal", key == "steps" and L["Steps"] or key == "rules"
-			and L["Stop rules"] or L["When it ends"])
-	end
 	page.addBars = {}
-	for _, list in ipairs({ "steps", "ending" }) do
+	page.addHeight = math.ceil(#ns.CAMERA_SCRIPT_ADDABLE / 3) * 26
+	for _, list in ipairs({ "steps" }) do
 		local bar = CreateFrame("Frame", nil, content)
-		bar:SetSize(WIDTH, 50)
+		bar:SetSize(WIDTH, page.addHeight)
 		for i, kind in ipairs(ns.CAMERA_SCRIPT_ADDABLE) do
-			local add = Button(bar, "+ " .. KIND_NAMES[kind], 110)
-			add:SetPoint("TOPLEFT", ((i - 1) % 5) * 114, -math.floor((i - 1) / 5) * 26)
-			add:SetScript("OnClick", function() page.AddStep(kind, list) end)
+			local add = Button(bar, "+ " .. KIND_NAMES[kind], 126)
+			add:SetPoint("TOPLEFT", ((i - 1) % 3) * 130, -math.floor((i - 1) / 3) * 26)
+			add:SetScript("OnClick", function() page.AddStep(kind) end)
 		end
 		page.addBars[list] = bar
 	end
@@ -825,19 +1039,17 @@ function ns.CreateCameraScriptsPanel(kit)
 		row:SetSize(WIDTH, 26)
 		row.label = kit.Label(row, "GameFontHighlightSmall", RULE_NAMES[rule.key])
 		row.label:SetPoint("LEFT", 8, 0)
-		row.label:SetWidth(170)
-		row.pick = Choice(row, 180, function() return rule.actions end,
+		row.label:SetWidth(126)
+		row.pick = Choice(row, 150, function() return rule.actions end,
 			function() return page.script and page.script.rules[rule.key] end,
 			function(action)
 				page.script.rules[rule.key] = action
 				page.Changed()
 			end, function(action) return ACTION_NAMES[action] end)
-		row.pick:SetPoint("LEFT", 186, 0)
-		row.fixed = kit.Label(row, "GameFontHighlightSmall", "")
-		row.fixed:SetPoint("LEFT", 192, 0)
+		row.pick:SetPoint("LEFT", 136, 0)
 		row.secsLabel = kit.Label(row, "GameFontHighlightSmall", L["for"])
-		row.secsLabel:SetPoint("LEFT", row.pick, "RIGHT", 10, 0)
-		row.secs = Box(row, 40)
+		row.secsLabel:SetPoint("LEFT", row.pick, "RIGHT", 8, 0)
+		row.secs = Box(row, 34)
 		row.secs:SetPoint("LEFT", row.secsLabel, "RIGHT", 8, 0)
 		row.secsUnit = kit.Label(row, "GameFontHighlightSmall", L["s"])
 		row.secsUnit:SetPoint("LEFT", row.secs, "RIGHT", 4, 0)
@@ -854,15 +1066,22 @@ function ns.CreateCameraScriptsPanel(kit)
 		page.ruleRows[i] = row
 	end
 
-	-- Picks a script (by id) for the page.
-	function page.Pick(id)
-		local script = ns.MyCameraScript(id) or ns.FindCameraScript(id) or ns.FindCameraScript("orbit")
-		page.id, page.script, page.selected = script.id, script, nil
-		page.locked = script.builtin and true or false
-		page.confirmDelete = nil
+	-- Picks a camera for the page: a script's id, or a list entry (a camera
+	-- that isn't a script yet).
+	function page.Pick(entry)
+		page.selected, page.confirmDelete = nil, nil
 		page.delete:SetText(L["Delete"])
+		if type(entry) == "table" and entry.own then
+			page.own, page.id, page.script = entry, nil, nil
+		else
+			local id = type(entry) == "table" and entry.id or entry
+			local script = ns.MyCameraScript(id) or ns.FindCameraScript(id) or ns.FindCameraScript("cozy")
+			page.own, page.id, page.script = nil, script.id, script
+			page.locked = script.builtin and true or false
+			page.hasSettings = script.builtin and ns.CameraScriptSettingKeys(script.id) ~= nil
+		end
 		page.Layout()
-		ns.RefreshCameraScriptPreview()
+		if page.script then ns.RefreshCameraScriptPreview() elseif preview then preview:Hide() end
 	end
 
 	-- After a change: the page and the preview follow.
@@ -871,7 +1090,143 @@ function ns.CreateCameraScriptsPanel(kit)
 		ns.RefreshCameraScriptPreview()
 	end
 
-	function page.AddStep(kind, listKey)
+	-- A built-in camera's settings (its steps' step.set, CameraScripts.lua):
+	-- the same switches, sliders and dropdowns as its own page, two to a row.
+	-- A change remakes its steps from them (once a frame at most: a slider
+	-- drag sends many).
+	local VAR_COL, CHECK_ROW, SLIDER_ROW = 284, 28, 44
+	-- Where a step is in a script ({ list key, index, index... }), and the
+	-- step there in another (remade) one: nil if it isn't made from any of
+	-- the same settings as was.
+	local function StepPath(script, step)
+		local function Find(list, path)
+			for i, each in ipairs(list) do
+				path[#path + 1] = i
+				if each == step or (each.steps and Find(each.steps, path)) then return true end
+				path[#path] = nil
+			end
+		end
+		for _, key in ipairs({ "steps", "ending" }) do
+			local path = { key }
+			if Find(script[key], path) then return path end
+		end
+	end
+	local function StepAt(script, path, was)
+		local step = { steps = script[path[1]] }
+		for i = 2, #path do
+			step = step.steps and step.steps[path[i]]
+			if not step then return nil end
+		end
+		for _, key in ipairs(step.set or {}) do
+			for _, old in ipairs(was.set or {}) do
+				if key == old then return step end
+			end
+		end
+	end
+	local remake, PlaceRuleSettings, HideTabs
+	local function SettingChanged()
+		if remake then return end
+		remake = true
+		C_Timer.After(0, function()
+			remake = false
+			if not (page.id and page.locked and content:IsVisible()) then return end
+			local path = page.selected and StepPath(page.script, page.selected)
+			page.script = ns.FindCameraScript(page.id)
+			page.selected = path and StepAt(page.script, path, page.selected) or nil
+			kit.Refresh() -- (greyed settings, and the camera's own page)
+			page.Changed()
+		end)
+	end
+	-- A setting's control on parent, as its own page has it (Options.lua's
+	-- ns.SettingControl), made once for each place (made: a cache of them by
+	-- key), placed at x, y. Gives it and its row's height; nil for a setting
+	-- with no control.
+	local DROP_ROW = 30
+	local function SettingAt(made, parent, key, x, y)
+		local control = made[key]
+		if control == nil then
+			control = ns.SettingControl and ns.SettingControl(key, parent, function() SettingChanged() end) or false
+			if control and control.settingType == "DropdownButton" then
+				-- (Its name before it, as on its own page.)
+				control.nameLabel = control:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+				control.nameLabel:SetPoint("RIGHT", control, "LEFT", -8, 0)
+				control.nameLabel:SetText(control.settingName or "")
+			end
+			made[key] = control
+		end
+		if not control then return nil end
+		local kind = control.settingType
+		control:ClearAllPoints()
+		if kind == "CheckButton" then
+			control:SetPoint("TOPLEFT", x - 4, y)
+		elseif kind == "DropdownButton" then
+			control:SetPoint("TOPLEFT", x + (control.nameLabel:GetStringWidth() or 0) + 8, y - 2)
+		else
+			control:SetPoint("TOPLEFT", x, y - 18)
+		end
+		if control.Refresh then control:Refresh() end
+		control:Show()
+		return control, kind == "CheckButton" and CHECK_ROW or kind == "DropdownButton" and DROP_ROW or SLIDER_ROW
+	end
+	-- The step editor's settings for a built-in step (keys: its step.set, nil
+	-- for none): two to a row at its top. Gives their height.
+	local stepControls = {}
+	function page.StepSettings(editor, keys)
+		for _, control in pairs(stepControls) do
+			if control then control:Hide() end
+		end
+		if not keys then return 0 end
+		local y, col, rowH = -10, 0, 0
+		for _, key in ipairs(keys) do
+			local control, height = SettingAt(stepControls, editor, key, 14 + col * VAR_COL, y)
+			if control then
+				rowH = math.max(rowH, height)
+				col = col + 1
+				if col == 2 then y, col, rowH = y - rowH, 0, 0 end
+			end
+		end
+		if col > 0 then y = y - rowH end
+		return y == -10 and 0 or -y - 4
+	end
+
+	-- A built-in camera's stop rule made from settings (keys): them, under
+	-- its row at y (nil: all hidden). Gives the y under them.
+	local ruleControls = {}
+	function PlaceRuleSettings(rule, keys, y)
+		if not rule then
+			for _, control in pairs(ruleControls) do
+				if control then control:Hide() end
+			end
+			return y
+		end
+		for _, key in ipairs(keys) do
+			local control, height = SettingAt(ruleControls, content, key, COL + 14, y)
+			if control then y = y - height end
+		end
+		return y
+	end
+
+	-- The folder tabs: Script (1) and Stop rules (2). page.tab: the one picked.
+	local tabsPanel, tabs, ShowTab, tabsBase
+	tabsPanel, tabs, ShowTab, tabsBase = ns.FolderTabs(content, {
+		{ L["Script"], L["The camera's steps, in order, and what it does when it ends."] },
+		{ L["Stop rules"], L["What happens when you move the camera, a fight starts, you walk, you zoom or its trigger ends."] },
+	}, function(i)
+		page.tab, page.selected = i, nil
+		ShowTab(i)
+		page.Layout()
+	end)
+	tabsBase:SetPoint("TOPLEFT", tabsPanel, "TOPLEFT")
+	page.tab = 1
+	function HideTabs()
+		tabsPanel:Hide()
+		for _, tab in ipairs(tabs) do tab:Hide() end
+	end
+	HideTabs()
+
+	-- After the step picked (inside it, for Together, Repeat and When it
+	-- ends), or at the end of the steps.
+	function page.AddStep(kind)
 		local script = page.script
 		if page.locked or not script then return end
 		if CountSteps(script.steps) + CountSteps(script.ending) >= 80 then
@@ -881,13 +1236,14 @@ function ns.CreateCameraScriptsPanel(kit)
 		local step = ns.NewCameraScriptStep(kind)
 		local sel = page.selected
 		local list, at
-		if sel then list, at = FindStep(script[listKey], sel) end
-		if sel and list and sel.steps then
+		if sel then list, at = FindStep(script.steps, sel) end
+		if sel and not list then list, at = FindStep(script.ending, sel) end
+		if sel and sel.steps and (list or sel.k == "ending") then
 			table.insert(sel.steps, step)
 		elseif list then
 			table.insert(list, at + 1, step)
 		else
-			table.insert(script[listKey], step)
+			table.insert(script.steps, step)
 		end
 		page.selected = step
 		page.Changed()
@@ -926,9 +1282,97 @@ function ns.CreateCameraScriptsPanel(kit)
 		end
 	end
 
-	-- Everything below the top rows, placed down the page.
-	local function PlaceRows(list, depth, y)
-		for _, step in ipairs(list) do
+	-- The list, in its panel: At rest and Travel, then Moments and Yours (New
+	-- camera and Import under them); what's typed in the box narrows it.
+	function page.PlaceList()
+		local find = page.find:GetText():lower():match("^%s*(.-)%s*$")
+		page.findHint:SetShown(find == "")
+		local used, heads = 0, 0
+		local x, y, lowest = 10, -40, -40
+		local function Row(entry, name, kind)
+			if find ~= "" and not name:lower():find(find, 1, true) then return end
+			used = used + 1
+			local row = page.listRows[used]
+			if not row then
+				row = ListRow(list)
+				page.listRows[used] = row
+			end
+			row:SetWidth(LIST_W)
+			row.entry = entry
+			row:ClearAllPoints()
+			row:SetPoint("TOPLEFT", x, y)
+			row.text:SetText(name)
+			local c = DOT[kind]
+			row.dot:SetColorTexture(c[1], c[2], c[3], 1)
+			row.ring:SetShown(kind == "own")
+			local picked = (page.own and entry == page.own) or (not page.own and type(entry) ~= "table" and entry == page.id)
+				or (not page.own and type(entry) == "table" and entry.id == page.id)
+			row.bg:SetColorTexture(1, 0.82, 0, picked and 0.16 or 0)
+			row:Show()
+			y = y - LIST_ROW
+		end
+		for index, group in ipairs(CAMERA_LIST) do
+			if index == 3 then
+				lowest = math.min(lowest, y)
+				x, y = 10 + LIST_W + 12, -40
+			end
+			heads = heads + 1
+			local head = page.listHeads[heads]
+			if not head then
+				head = kit.Label(list, "GameFontNormalSmall", "")
+				page.listHeads[heads] = head
+			end
+			head:ClearAllPoints()
+			head:SetPoint("TOPLEFT", x + 4, y - 4)
+			head:SetText(group.section)
+			head:SetTextColor(group.color[1], group.color[2], group.color[3])
+			y = y - 20
+			if group.mine then
+				for _, script in ipairs(Store().list or {}) do
+					if type(script) == "table" and script.id then Row(script.id, script.name, "mine") end
+				end
+			else
+				for _, item in ipairs(group.items) do
+					if type(item) == "table" and item.own then
+						local name = item.name and L[item.name] or ns.CAMERA_NAMES[item.own] or tostring(item.own)
+						Row(item, name, "own")
+					else
+						local script = ns.FindCameraScript(type(item) == "table" and item.id or item)
+						if script then Row(item, script.name, "script") end
+					end
+				end
+			end
+		end
+		for i = used + 1, #page.listRows do page.listRows[i]:Hide() end
+		page.newButton:ClearAllPoints()
+		page.newButton:SetPoint("TOPLEFT", x, y - 6)
+		page.importButton:ClearAllPoints()
+		page.importButton:SetPoint("TOPLEFT", x, y - 32)
+		lowest = math.min(lowest, y - 56)
+		list:SetHeight(-lowest + 10)
+	end
+
+	-- Opens or closes the list (opening, the page scrolls to its top, where
+	-- the camera's name is).
+	function page.OpenList(open)
+		if open then
+			if canvas.scroll then canvas.scroll:SetVerticalScroll(0) end
+			page.find:SetText("")
+			page.PlaceList()
+			page.dim:Show()
+			list:Show()
+		else
+			page.find:ClearFocus()
+			page.dim:Hide()
+			list:Hide()
+		end
+		page.camButton.arrow:SetTexture(open and "Interface\\Buttons\\Arrow-Up-Up" or "Interface\\Buttons\\Arrow-Down-Up")
+	end
+
+	-- A list of steps, placed down the script's column.
+	-- (off: inside a step switched off, greyed too.)
+	local function PlaceRows(list, depth, y, off)
+		for i, step in ipairs(list) do
 			page.used = page.used + 1
 			local row = page.rows[page.used]
 			if not row then
@@ -937,85 +1381,157 @@ function ns.CreateCameraScriptsPanel(kit)
 			end
 			row.step = step
 			row:ClearAllPoints()
-			row:SetPoint("TOPLEFT", LEFT, y)
+			row:SetPoint("TOPLEFT", COL, y)
 			local c = COLORS[KIND_COLOR[step.k]] or COLORS.wait
 			row.strip:ClearAllPoints()
 			row.strip:SetPoint("LEFT", 4 + depth * INDENT, 0)
 			row.strip:SetColorTexture(c[1], c[2], c[3], 1)
 			row.text:ClearAllPoints()
-			row.text:SetPoint("LEFT", 14 + depth * INDENT, 0)
-			row.text:SetPoint("RIGHT", -64, 0)
-			row.text:SetText(("|cff%02x%02x%02x%s|r  %s"):format(math.floor(c[1] * 255), math.floor(c[2] * 255),
-				math.floor(c[3] * 255),
-				KIND_NAMES[step.k] or step.k, StepText(step)))
-			row.up:SetShown(not page.locked)
-			row.down:SetShown(not page.locked)
-			row.del:SetShown(not page.locked)
+			row.text:SetPoint("LEFT", 12 + depth * INDENT, 0)
+			row.text:SetPoint("RIGHT", (page.locked or step.k == "ending") and -4 or -72, 0)
+			-- (A built-in part switched off: greyed, "Off:" before it; its own
+			-- switch is in its settings, a click away.)
+			local greyed = off or step.off
+			row.text:SetText(step.off and L["Off: %s"]:format(StepText(step)) or StepText(step))
+			local shade = greyed and 0.5 or 1
+			row.text:SetTextColor(shade, shade, shade)
+			row.text:SetVertexColor(shade, shade, shade) -- (one on Forever)
+			-- (No arrow the way it can't go: up for the first in its list, down for the last.)
+			-- (When it ends: always last, and always there.)
+			local fixed = page.locked or step.k == "ending"
+			row.up:SetShown(not fixed and i > 1)
+			row.down:SetShown(not fixed and i < #list)
+			row.del:SetShown(not fixed)
 			row:Show()
 			y = y - ROW_H
 			if step == page.selected then
 				page.editor:ClearAllPoints()
-				page.editor:SetPoint("TOPLEFT", LEFT, y)
+				page.editor:SetPoint("TOPLEFT", COL, y)
 				page.editor:Edit(step, page.locked)
 				page.editor:Show()
 				page.editorShown = true
-				y = y - EDITOR_H - 2
+				y = y - page.editor:GetHeight() - 2
 			end
-			if step.steps then y = PlaceRows(step.steps, depth + 1, y) end
+			if step.steps then y = PlaceRows(step.steps, depth + 1, y, greyed) end
 		end
 		return y
 	end
 
+	-- The camera button: its name, dot, and the group it's in.
+	function page.SetCameraButton(name, kind)
+		local button = page.camButton
+		button.name:SetText(name)
+		local c = DOT[kind]
+		button.dot:SetColorTexture(c[1], c[2], c[3], 1)
+		button.ring:SetShown(kind == "own")
+		local group = ""
+		for _, each in ipairs(CAMERA_LIST) do
+			if each.mine and kind == "mine" then group = each.section end
+			for _, item in ipairs(each.items or {}) do
+				if item == page.own or item == page.id or (type(item) == "table" and item.id and item.id == page.id) then
+					group = each.section
+				end
+			end
+		end
+		button.group:SetText(group)
+	end
+
 	function page.Layout()
 		local script = page.script
-		if not script then return end
-		page.pick:Refresh()
-		page.name:SetShown(not page.locked)
-		page.nameText:SetShown(page.locked)
-		page.nameText:SetText(script.name)
-		if not page.name:HasFocus() then page.name:SetText(script.name) end
-		page.delete:SetShown(not page.locked)
-		local keys = ns.CameraScriptTriggers(script.id)
-		local names = {}
-		for _, key in ipairs(keys) do names[#names + 1] = ns.CameraTriggerName(key) end
-		page.starts:SetText(#names > 0 and L["Starts when: %s"]:format(table.concat(names, ", "))
-			or L["Starts when: no trigger yet. Pick one with Use for, or set a row on the Cameras page to it."])
-		if page.useFor then page.useFor:GenerateMenu() end
-
+		local scriptShown = script ~= nil
+		for _, widget in ipairs({ page.copy, page.share, page.runNow, page.previewButton }) do
+			if widget then widget:SetShown(scriptShown) end
+		end
 		page.used, page.editorShown = 0, false
-		local y = -172
-		page.headers.steps:SetPoint("TOPLEFT", LEFT, y)
-		y = PlaceRows(script.steps, 0, y - 20)
-		local bar = page.addBars.steps
-		bar:SetShown(not page.locked)
-		if not page.locked then
-			bar:SetPoint("TOPLEFT", LEFT, y - 6)
-			y = y - 6 - 52
-		end
-		page.headers.rules:SetPoint("TOPLEFT", LEFT, y - 14)
-		y = y - 34
-		for _, row in ipairs(page.ruleRows) do
-			local key = row.rule.key
-			row:SetPoint("TOPLEFT", LEFT, y)
-			row.pick:SetShown(not page.locked)
-			row.fixed:SetShown(page.locked)
-			row.fixed:SetText(ACTION_NAMES[script.rules[key]] or "")
-			if not page.locked then row.pick:Refresh() end
-			local pause = script.rules[key] == "pause"
-			row.secsLabel:SetShown(pause)
-			row.secs:SetShown(pause and not page.locked)
-			row.secsUnit:SetShown(pause)
-			if pause and not row.secs:HasFocus() then row.secs:SetText(Num(script.rules[key .. "Secs"])) end
-			y = y - 26
-		end
-		page.headers.ending:SetPoint("TOPLEFT", LEFT, y - 14)
-		y = y - 34
-		y = PlaceRows(script.ending, 0, y)
-		bar = page.addBars.ending
-		bar:SetShown(not page.locked)
-		if not page.locked then
-			bar:SetPoint("TOPLEFT", LEFT, y - 6)
-			y = y - 6 - 52
+		local y
+		if not script then
+			-- A camera that isn't a script yet: its name and what it waits for.
+			page.name:Hide()
+			page.nameLabel:Hide()
+			page.delete:Hide()
+			page.SetCameraButton(page.own.name and L[page.own.name] or ns.CAMERA_NAMES[page.own.own] or "", "own")
+			page.tipStatus = L["Not a script yet: it runs on its own code. Laying it out as steps needs %s, steps the runner doesn't have yet."]:format(
+				L[page.own.needs])
+			page.tipStarts = nil
+			for _, bar in pairs(page.addBars) do bar:Hide() end
+			for _, row in ipairs(page.ruleRows) do row:Hide() end
+			PlaceRuleSettings(nil)
+			HideTabs()
+			y = -84
+		else
+			page.name:SetShown(not page.locked)
+			page.nameLabel:SetShown(not page.locked)
+			if not page.name:HasFocus() then page.name:SetText(script.name) end
+			page.SetCameraButton(script.name, not page.locked and "mine" or "script")
+			local top = page.locked and -84 or -112
+			page.delete:SetShown(not page.locked)
+			page.share:ClearAllPoints()
+			page.share:SetPoint("LEFT", page.locked and page.copy or page.delete, "RIGHT", 4, 0)
+			page.tipStatus = not page.locked and L["Yours: change anything."]
+				or page.hasSettings and L["Built in: click a step to change the settings it's made from. The camera itself still runs on its own code: set a row to this script to use it instead."]
+				or L["Built in, from your settings. The camera itself still runs on its own code: set a row to this script to use it instead."]
+			y = top + 4
+			local keys = ns.CameraScriptTriggers(script.id)
+			local names = {}
+			for _, key in ipairs(keys) do names[#names + 1] = ns.CameraTriggerName(key) end
+			page.tipStarts = #names > 0 and L["Starts when: %s"]:format(table.concat(names, ", "))
+				or L["Starts when: no trigger yet. Set a row on the Scenes page to it."]
+			-- The tabs: Script (its steps, When it ends last) and Stop rules.
+			for _, tab in ipairs(tabs) do tab:Show() end
+			tabsPanel:Show()
+			y = y - ns.FOLDER_TAB_HEIGHT - 4
+			tabsPanel:ClearAllPoints()
+			tabsPanel:SetPoint("TOPLEFT", COL - 8, y)
+			tabsPanel:SetWidth(WIDTH + 16)
+			ShowTab(page.tab)
+			local panelTop = y
+			y = y - 12
+			local onScript = page.tab == 1
+			PlaceRuleSettings(nil)
+			if onScript then
+				-- (One When it ends row for the script, kept while it's the same
+				-- script, so it stays picked.)
+				if page.endFor ~= script.ending then
+					local was = page.endStep
+					page.endFor, page.endStep = script.ending, { k = "ending", steps = script.ending }
+					if page.selected == was and was then page.selected = page.endStep end
+				end
+				y = PlaceRows(script.steps, 0, y)
+				y = PlaceRows({ page.endStep }, 0, y)
+				local bar = page.addBars.steps
+				bar:SetShown(not page.locked)
+				if not page.locked then
+					bar:SetPoint("TOPLEFT", COL, y - 6)
+					y = y - 6 - page.addHeight
+				end
+				for _, row in ipairs(page.ruleRows) do row:Hide() end
+			else
+				page.addBars.steps:Hide()
+				-- A dropdown each; a built-in camera's greyed (Copy it to change
+				-- them). A rule made from a setting: its slider under the row.
+				for _, row in ipairs(page.ruleRows) do
+					local key = row.rule.key
+					row:Show()
+					row:SetPoint("TOPLEFT", COL, y)
+					row.pick:Refresh()
+					if row.pick.SetEnabled then row.pick:SetEnabled(not page.locked) end
+					row.pick:SetAlpha(page.locked and 0.6 or 1) -- (greyed whatever the dropdown's look)
+					local pause = script.rules[key] == "pause"
+					local set = page.locked and script.ruleSet and script.ruleSet[key]
+					local showSecs = pause and not set
+					row.secsLabel:SetShown(showSecs)
+					row.secs:SetShown(showSecs)
+					row.secsUnit:SetShown(showSecs)
+					if showSecs then
+						row.secs:SetEnabled(not page.locked)
+						if not row.secs:HasFocus() then row.secs:SetText(Num(script.rules[key .. "Secs"])) end
+					end
+					y = y - 26
+					if set then y = PlaceRuleSettings(key, set, y) end
+				end
+			end
+			tabsPanel:SetHeight(panelTop - y + 8)
+			y = y - 14
 		end
 		for i = page.used + 1, #page.rows do page.rows[i]:Hide() end
 		if not page.editorShown then page.editor:Hide() end
@@ -1023,9 +1539,11 @@ function ns.CreateCameraScriptsPanel(kit)
 		content:SetHeight(-y + 30)
 	end
 
+	canvas:HookScript("OnHide", function() page.OpenList(false) end)
 	canvas:SetScript("OnShow", kit.PageShown(function()
-		if not page.script then page.Pick("orbit") else page.Pick(page.id) end
+		if not page.script and not page.own then page.Pick("cozy") elseif page.own then page.Pick(page.own)
+		else page.Pick(page.id) end
 	end, content))
 	canvas:Hide()
-	kit.RegisterSubpage(canvas, "Camera Scripts")
+	kit.RegisterSubpage(canvas, "Camera Scripts", L["Scripts"])
 end

@@ -516,14 +516,38 @@ function ns.CreatePersonalStylePanel(kit)
 
 	-- The bars' look: their fill, their border (the game's, a line of ours
 	-- or none: its thickness and color), the dark behind ours.
-	stack:Header(content, L["Bars"])
-	rows.Texture(L["Texture:"], "prdTexture", L["The bars' fill. Below the game's own few: any other addon " ..
-		"shares (through LibSharedMedia)."], nil, { 0.25, 0.75, 0.3 })
-	rows.Border(L["Border:"], "prdBorder", { game = true }, L["The bars' border: the game's, or one of ours " ..
-		"(Custom: its thickness and color under it)."])
+	-- (Mana under the power bar, when it isn't your power: PersonalMana.lua;
+	-- turned on on the UI Manager's Personal Resources page.)
+	local function ManaOn(db) return rows.On(db) and db.prdMana end
 	local function Ours(db) return rows.On(db) and Look().prdBorder ~= "game" end
-	rows.Slider("prdBack", L["Background"], 0, 100, 5, "%d%%", 100,
-		L["How dark it is behind the bars, with a border of ours."], Ours)
+	stack:Header(content, L["Look"])
+	rows.Look(L["Bars:"], L["Bars"], {
+		texture = { "prdTexture", L["The bars' fill. Below the game's own few: any other addon shares (through " ..
+			"LibSharedMedia)."], tint = { 0.25, 0.75, 0.3 } },
+		barColor = function(look)
+			local last = look.Choices(L["Health:"], "prdHealthColor", {
+				{ "game", L["The game's"] },
+				{ "class", L["Class"], L["Your class's color."] },
+				{ "custom", L["Custom"], L["A color of your own (the swatch)."] },
+			})
+			look.Swatch(last, "prdHealthColor", { "prdHealthR", "prdHealthG", "prdHealthB" },
+				L["The health bar's color, for Custom."])
+			if ns.PERSONAL_MANA then
+				local manaLast = look.Choices(L["Mana bar:"], "prdManaColor", {
+					{ "game", L["The game's"] },
+					{ "custom", L["Custom"], L["A color of your own (the swatch)."] },
+				}, ManaOn)
+				look.Swatch(manaLast, "prdManaColor", { "prdManaR", "prdManaG", "prdManaB" },
+					L["The mana bar's color, for Custom."], ManaOn)
+			end
+		end,
+		ground = function(look)
+			look.Slider("prdBack", L["Background"], 0, 100, 5, "%d%%", 100,
+				L["How dark it is behind the bars, with a border of ours."], Ours)
+		end,
+		border = { "prdBorder", L["The bars' border: the game's, or one of ours (Custom: its thickness and color " ..
+			"under it)."], opts = { game = true } },
+	})
 
 	-- Each bar's size, next to the game's.
 	stack:Header(content, L["Sizes"])
@@ -534,32 +558,9 @@ function ns.CreatePersonalStylePanel(kit)
 		nil, "%")
 	sizes:Box(L["Class resource"], "prdPiecesScale", 0, 100, 5, "%d", 100,
 		L["How big your class resource is (combo points, holy power, runes and the like), next to the game's."], nil, "%")
-	-- (The mana bar's rows: while it's on, on the UI Manager's Personal Resources page.)
-	local function ManaOn(db) return rows.On(db) and db.prdMana end
 	if ns.PERSONAL_MANA then
 		sizes:Box(L["Mana"], "prdManaHeight", 0, 100, 5, "%d", 100,
 			L["The mana bar's height, next to the power bar's."], ManaOn, "%")
-	end
-
-	stack:Header(content, L["Health"])
-	local last = rows.Choices(L["Color:"], "prdHealthColor", {
-		{ "game", L["The game's"] },
-		{ "class", L["Class"], L["Your class's color."] },
-		{ "custom", L["Custom"], L["A color of your own (the swatch)."] },
-	})
-	rows.Swatch(last, "prdHealthColor", { "prdHealthR", "prdHealthG", "prdHealthB" },
-		L["The health bar's color, for Custom."])
-
-	-- Mana under the power bar, when it isn't your power (PersonalMana.lua;
-	-- turned on on the UI Manager's Personal Resources page).
-	if ns.PERSONAL_MANA then
-		stack:Header(content, L["Mana bar"])
-		local manaLast = rows.Choices(L["Color:"], "prdManaColor", {
-			{ "game", L["The game's"] },
-			{ "custom", L["Custom"], L["A color of your own (the swatch)."] },
-		}, ManaOn)
-		rows.Swatch(manaLast, "prdManaColor", { "prdManaR", "prdManaG", "prdManaB" },
-			L["The mana bar's color, for Custom."], ManaOn)
 	end
 
 	canvas:SetScript("OnShow", kit.PageShown(kit.Refresh, content))

@@ -45,6 +45,8 @@ end
 ns.StyleKeyGet, ns.StyleKeyPut = KeyGet, KeyPut
 
 local function RecordKey(parent, key, section)
+	-- (A Look popout's controls count as its page's: StylePages.lua.)
+	parent = parent and parent.recordAs or parent
 	if type(key) == "string" then
 		pageKeys[parent] = pageKeys[parent] or {}
 		if not pageKeys[parent][key] then pageKeys[parent][key] = section or SectionOf(parent) end
@@ -190,11 +192,54 @@ local STACK_GAP = { -- [kind being added][kind above it]
 -- inline: each slider (and each dropdown given an inlineName) goes on one
 -- line with its name, as on Graphics+: the bars lined up past the stack's
 -- longest name, each value to its bar's right.
+-- Every setting's control, by its key (the first made): how to make it
+-- again elsewhere (a camera's Camera Scripts page shows a step's settings
+-- under it, ns.SettingControl). And the settings a camera's section leaves
+-- out, its script page having them (movedFrom: a section's content -> set of
+-- keys; a moved control is made on a hidden frame, out of the layout and of
+-- search, so what's done with it after still works).
+local settingMakers, movedFrom, movedSink = {}, {}, nil
+local function Remember(control, key, make)
+	if type(key) ~= "string" then return end
+	control.settingKey = key
+	if not settingMakers[key] then settingMakers[key] = { make = make, control = control } end
+end
+
 local function Stack(anchor, kind, inline)
 	local stack = { last = anchor, kind = kind or "header", indent = 0, inline = inline, rows = {} }
+	stack.moved = anchor and anchor.GetParent and movedFrom[anchor:GetParent()] or nil
+	local parent = anchor and anchor.GetParent and anchor:GetParent()
+	if stack.moved and not stack.moved.noted then
+		stack.moved.noted = true
+		local note = Label(parent, "GameFontHighlightSmall", L["The rest of its settings are on the Scripts page, under the steps they make: pick this camera there."])
+		note:SetWidth(520)
+		note:SetJustifyH("LEFT")
+		note:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", 0, -8)
+		stack.last, stack.kind = note, "label"
+	end
+	-- (A header waits for the first control under it that isn't moved: none,
+	-- and it's left out too.)
+	local function Moved(control)
+		if not (stack.moved and control.settingKey and stack.moved[control.settingKey]) then return false end
+		if not movedSink then
+			movedSink = CreateFrame("Frame", nil, UIParent)
+			movedSink:Hide()
+		end
+		control:SetParent(movedSink)
+		control:ClearAllPoints()
+		control.searchLabel = nil
+		return true
+	end
 	-- Puts control below the last one. indent: how far right of the usual
 	-- place it sits (children of a checkbox); the next control is placed from it.
 	function stack:Add(control, controlKind, indent)
+		if Moved(control) then return control end
+		if self.waiting then
+			local header = self.waiting
+			self.waiting = nil
+			header:Show()
+			self:Add(header, "header")
+		end
 		indent = indent or 0
 		local placed = control
 		if self.inline and (controlKind == "slider" or control.inlineName) then
@@ -236,7 +281,14 @@ local function Stack(anchor, kind, inline)
 	end
 	function stack:Header(parent, text)
 		SetSection(parent, text)
-		return self:Add(Label(parent, "GameFontNormal", text), "header")
+		local header = Label(parent, "GameFontNormal", text)
+		if self.moved then
+			if self.waiting then self.waiting:Hide() end
+			self.waiting = header
+			header:Hide()
+			return header
+		end
+		return self:Add(header, "header")
 	end
 	-- A note in small text, wrapped to width.
 	function stack:Note(parent, text, width)
@@ -278,6 +330,12 @@ local function Check(parent, key, label, tip, onChange)
 	cb.Refresh = function(self) self:SetChecked(KeyGet(key)) end
 	controls[#controls + 1] = cb
 	RecordKey(parent, key)
+	Remember(cb, key, function(where, changed)
+		return Check(where, key, label, tip, function(value)
+			if onChange then onChange(value) else KeyPut(key, value) end
+			changed(value)
+		end)
+	end)
 	return cb
 end
 
@@ -350,6 +408,12 @@ local function Slider(parent, key, label, minV, maxV, step, fmt, scale, onChange
 		UpdateTitle(value)
 	end
 	controls[#controls + 1] = slider
+	Remember(slider, key, function(where, changed)
+		return Slider(where, key, label, minV, maxV, step, fmt, scale, function(value)
+			if onChange then onChange(value) end
+			changed(value)
+		end)
+	end)
 	return slider
 end
 
@@ -467,6 +531,7 @@ end
 
 -- Greys a control out unless test(db) holds (checkbox labels dim too).
 local function GreyUnless(control, test)
+	control.greyTest = test -- (for ns.SettingControl)
 	local refresh = control.Refresh
 	control.Refresh = function(self)
 		refresh(self)
@@ -718,7 +783,28 @@ local function Dropdown(parent, key, choices, width, onChange)
 	dropdown.Refresh = function(self) self:GenerateMenu() end
 	controls[#controls + 1] = dropdown
 	RecordKey(parent, key)
+	Remember(dropdown, key, function(where, changed)
+		return Dropdown(where, key, choices, width, function(value)
+			if onChange then onChange(value) end
+			changed(value)
+		end)
+	end)
 	return dropdown
+end
+
+-- A setting's control made again on parent, as its own page has it (its
+-- tip, its greying): changed(value) after each change. Nil for a setting
+-- with no control remembered.
+function ns.SettingControl(key, parent, changed)
+	local made = settingMakers[key]
+	if not made then return nil end
+	local control = made.make(parent, changed)
+	if not control then return nil end
+	if made.control.searchTip then Tooltip(control, made.control.searchTip) end
+	if made.control.greyTest then GreyUnless(control, made.control.greyTest) end
+	control.settingType = made.control.GetObjectType and made.control:GetObjectType() or nil
+	control.settingName = made.control.inlineName -- (a dropdown's name, drawn beside it on its own page)
+	return control
 end
 
 local SCROLLBAR_WIDTH = 26
@@ -1232,7 +1318,7 @@ local function CreatePanel()
 	local fadeUI = Check(panel, "fadeUI", L["Start in CineMode (fade UI, queue music, etc.)"],
 		L["Off: the UI stays as it is and the camera's left to you, with just the visual effects " ..
 		"over it (as the Visual Effects page says), as in the Subtle profile. Triggers with CineMode " ..
-		"ticked on the Cameras page still bring CineMode on while their camera " ..
+		"ticked on the Scenes page still bring CineMode on while their camera " ..
 		"runs: standing still or going AFK, say, for a screensaver."])
 	fadeUI:SetPoint("TOPLEFT", enabled, "BOTTOMLEFT", 0, -2)
 
@@ -1508,15 +1594,14 @@ do
 			{ "Chat", "Interface\\Icons\\INV_Scroll_03", section = "Chat" },
 			{ "Chat bubbles", "Interface\\Icons\\Ability_Warrior_BattleShout", label = "Chat Bubbles", section = "Chat" },
 		} },
-		-- (Camera Settings' icons, one per camera, name their sections themselves)
-		{ name = "Camera", colors = {
-			["At rest"] = { 0.3, 0.7, 0.5 }, Travel = { 0.35, 0.6, 0.9 }, Moments = { 0.65, 0.45, 0.9 },
-		}, pages = {
-			{ "Cameras", "Interface\\Icons\\INV_Misc_Spyglass_03", label = "General" },
-			{ "Camera Settings", "Interface\\Icons\\Trade_Engineering" }, -- (an icon per camera instead)
-			{ "My Shots", "Interface\\Icons\\INV_Misc_Spyglass_02" }, -- (ShotsPage.lua)
-			{ "Shoulder Cam", "Interface\\Icons\\INV_Shoulder_02", dev = true }, -- (ShoulderCam.lua)
-			{ "Camera Scripts", "Interface\\Icons\\INV_Scroll_05", dev = true }, -- (CameraScriptsPage.lua)
+		-- (Cameras: what everyone has; Dev: the dev copy's own, to the right)
+		{ name = "Camera", colors = { Cameras = { 0.35, 0.6, 0.9 }, Dev = { 0.85, 0.3, 0.25 } }, pages = {
+			{ "Cameras", "Interface\\Icons\\INV_Misc_Spyglass_03", label = "General", section = "Cameras" },
+			{ "Scenes", "Interface\\Icons\\Spell_Holy_MindVision", section = "Cameras" }, -- (built with Cameras: CreateCamerasPanel)
+			{ "Camera Scripts", "Interface\\Icons\\INV_Scroll_05", label = "Scripts", section = "Cameras" }, -- (CameraScriptsPage.lua)
+			{ "My Shots", "Interface\\Icons\\INV_Misc_Spyglass_02", section = "Cameras" }, -- (ShotsPage.lua)
+			{ "Camera Settings", "Interface\\Icons\\Trade_Engineering", dev = true, section = "Dev" }, -- (settings no script step uses)
+			{ "Shoulder Cam", "Interface\\Icons\\INV_Shoulder_02", dev = true, section = "Dev" }, -- (ShoulderCam.lua)
 		} },
 		-- (label: the name on its icon, when the page is registered under another)
 		-- (the look and the sound: the visual effects' pages, then Audio)
@@ -1868,6 +1953,12 @@ do
 			for order, page in ipairs(hub.pages) do
 				local english = page[1]
 				if name == english or name == L[english] then
+					-- (Where it is, for a Look box's title: UI Manager > Style > HUD > Unit Frames.)
+					local path = {}
+					for _, step in ipairs({ hub.under or false, hub.name, page.section or false, page.label or english }) do
+						if step then path[#path + 1] = L[step] end
+					end
+					canvas.hubPath = path
 					if not hub.frame then CreateHub(hub) end
 					canvas:SetParent(hub.host)
 					canvas:ClearAllPoints()
@@ -2405,7 +2496,7 @@ end
 local function CameraModesSwitch(content, anchor)
 	return PageSwitch(content, "cameraModes", L["Enable Cameras"],
 		L["On: the cameras start as the rows below say. Off: none of them ever starts, and the camera is " ..
-		"left to you; CineMode still fades the UI. The Camera Settings page greys out with it."], anchor)
+		"left to you; CineMode still fades the UI."], anchor)
 end
 
 -- Camera rotation settings, built once per profile (taxiOrbit* for flights,
@@ -2672,6 +2763,9 @@ local function CameraSection(name, key)
 	local anchor = body:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
 	anchor:SetPoint("TOPLEFT", body, "TOPLEFT", 0, -SECTION_HEADER + 2)
 	anchor:SetSize(1, 1)
+	-- (The settings its cameras' script pages have are left out
+	-- here, see Stack. Its cameras' script ids: CameraScripts.lua.)
+	movedFrom[body] = ns.CameraSectionMoved and ns.CameraSectionMoved(key) or nil
 	return body, anchor, title
 end
 
@@ -2894,7 +2988,7 @@ local function CreateStandingPanel()
 		name = L["AFK Cam"],
 		description = L["Once you've stood still for a while with the UI faded, or as soon as you " ..
 			"go AFK, the camera slowly sweeps around your character. Moving stops it. What starts it, " ..
-			"and how long you stand still first, is on the Cameras page."],
+			"and how long you stand still first, is on the Scenes page."],
 		inputPauseKey = "idleInputPause",
 		orbitPrefix = "idleOrbit", style = "sweep",
 		rotateLabel = L["Sweep round you"],
@@ -2928,7 +3022,7 @@ local function CreateCozyPanel()
 	CreateCameraModePanel({
 		name = L["Cozy Cam"],
 		description = L["Resting at a campfire, sitting, sleeping, dancing and the like (whichever " ..
-			"events pick it on the Cameras page): the camera swings slowly round to face you, then " ..
+			"events pick it on the Scenes page): the camera swings slowly round to face you, then " ..
 			"sways gently from side to side in front of you, and eases in close. Moving (or standing " ..
 			"up) ends it."],
 		inputPauseKey = "cozyInputPause",
@@ -2956,7 +3050,7 @@ end
 local function CreateVistaPanel()
 	CreateCameraModePanel({
 		name = L["Vista Cam"],
-		description = L["Stop and /stare out at the view (or any event set to it on the Cameras page): " ..
+		description = L["Stop and /stare out at the view (or any event set to it on the Scenes page): " ..
 			"the camera glides round behind you and sways very gently there, looking out the way " ..
 			"you're facing. Like the RP walk camera, only slower and softer. Moving, jumping or " ..
 			"another emote ends it."],
@@ -2979,7 +3073,7 @@ end
 local function CreateFishPanel()
 	CreateCameraModePanel({
 		name = L["Fish Cam"],
-		description = L["Cast Fishing (or any event set to it on the Cameras page): the vista camera, " ..
+		description = L["Cast Fishing (or any event set to it on the Scenes page): the vista camera, " ..
 			"made for fishing. The camera glides round behind you and sways only a little either " ..
 			"side, so your bobber stays in view. It carries on after the cast until you move or jump."],
 		inputPauseKey = "fishInputPause",
@@ -3167,7 +3261,7 @@ local function CreateDeathPanel()
 	Tooltip(songBox, L["Music file IDs, separated by commas; one is picked at random each time " ..
 		"you die (Wowhead lists the IDs on each sound's page). Try one with /cine songtest <ID>."])
 	stack:Note(content, L["Music file IDs, separated by commas. One is picked at random while the " ..
-		"Die row's Music is ticked on the Cameras page."], 280)
+		"Die row's Music is ticked on the Scenes page."], 280)
 end
 
 -- Chat Cam (ChatCam.lua), started by NPCs talking; laid
@@ -3244,7 +3338,7 @@ local function CreateQuestPanel()
 		"camera zooms in and swings round behind you, looking past you at them. It goes back " ..
 		"once you close the window or move off (your zoom stays if you zoomed yourself meanwhile). Works " ..
 		"whether or not CineMode is on. The \"Talk to a quest giver\" and \"Talk about a quest\" " ..
-		"events on the Cameras page can also turn it off or make it wait a moment."], top)
+		"events on the Scenes page can also turn it off or make it wait a moment."], top)
 	-- (On or off, and the wait before starting: its two rows', on the Cameras page.)
 	local function IfOn() return ns.TriggerAnyRow("Quest") or ns.TriggerAnyRow("QuestGossip") end
 
@@ -3331,7 +3425,7 @@ local function CreateTelePanel()
 		"teleport, the camera swings round in front of you, quickly enough to be there before you " ..
 		"go, then spins round you faster and faster as it zooms in. Cancel the cast and it goes " ..
 		"back to where it was; once you're there, it swings round behind you. Its music, haze and " ..
-		"tooltips follow the Cozy Cam's settings. The events on the Cameras page can also make it " ..
+		"tooltips follow the Cozy Cam's settings. The events on the Scenes page can also make it " ..
 		"wait a moment."], sectionTop)
 	-- (On or off: the Hearthstone and teleport rows' cameras, on the Cameras page.)
 	local function IfOn() return ns.TriggerAnyRow("Hearth") or ns.TriggerAnyRow("Teleport") end
@@ -3389,7 +3483,7 @@ local function CreateCameraSettingsPanel()
 	local title = Label(content, "GameFontNormalLarge", L["Camera Settings"])
 	title:SetPoint("TOPLEFT", 16, -16)
 	local subtitle = PageIntro(content, title, L["Each camera's own settings. Click a " ..
-		"camera's name to open its settings, and again to close them. The Cameras page has what " ..
+		"camera's name to open its settings, and again to close them. The Scenes page has what " ..
 		"starts each one."])
 	cameraSettingsTop = subtitle
 	subtitle.title = title
@@ -3440,8 +3534,11 @@ local function CreateCameraSettingsPanel()
 		["Quest Cam"] = "Moments", ["Chat Cam"] = "Moments",["Death Cam"] = "Moments",
 	}
 	local GROUP_ORDER = { ["At rest"] = 1, Travel = 2, Moments = 3 }
-	canvas.hubTabs = {}
-	for index, section in ipairs(cameraSections) do
+	-- (No icon per camera where there are scripts: each camera's settings
+	-- are on its Scripts page; what's left here, settings no step uses, is
+	-- on this page's one icon (dev copy only), a section for each camera.)
+	if not ns.CameraSectionMoved then canvas.hubTabs = {} end
+	for index, section in ipairs(canvas.hubTabs and cameraSections or {}) do
 		local english = section.name
 		for key in pairs(ICONS) do
 			if section.name == L[key] then english = key end
@@ -3457,15 +3554,15 @@ local function CreateCameraSettingsPanel()
 			setSelect = function(select) section.selectTab = select end,
 		}
 	end
-	table.sort(canvas.hubTabs, function(a, b)
+	table.sort(canvas.hubTabs or {}, function(a, b)
 		local groupA, groupB = GROUP_ORDER[a.section] or 4, GROUP_ORDER[b.section] or 4
 		if groupA ~= groupB then return groupA < groupB end
 		return a.index < b.index
 	end)
-	-- (each camera's place in that row, for the Cameras page's Sort by: Hub)
-	ns.CAMERA_HUB_ORDER = {}
-	for i, tab in ipairs(canvas.hubTabs) do ns.CAMERA_HUB_ORDER[tab.name] = i end
-	RegisterSubpage(canvas, "Camera Settings")
+	-- (Dev copy only: every camera's settings are on its Scripts page, which
+	-- makes its controls again from the ones here, so the page is still
+	-- built for players, just not shown or searched.)
+	if ns.isDev then RegisterSubpage(canvas, "Camera Settings") end
 end
 
 -- Blizzard's colour picker; the setup API changed in newer clients.
@@ -4386,7 +4483,7 @@ local function CreateAudioPanel()
 		L["Music fades out once you leave the camera modes and move on: walking off from the cozy " ..
 		"camera, say. Going from one camera straight to another (vista to cozy) keeps it playing, " ..
 		"as does standing still. A fresh track fades in when the next camera starts (standing " ..
-		"still counts once the AFK camera starts, with Go AFK's music on, Cameras page). " ..
+		"still counts once the AFK camera starts, with Go AFK's music on, Scenes page). " ..
 		"Fades at the music fade time."]), "check")
 
 	canvas:SetScript("OnShow", PageShown(Refresh, content))
@@ -4534,14 +4631,20 @@ local function CreateCamerasPanel()
 	title:SetPoint("TOPLEFT", 16, -16)
 	local subtitle = PageIntro(content, title,
 		L["While CineMode is on, the camera comes alive when something happens: an emote, a campfire, " ..
-		"going AFK, your Hearthstone, fishing, a flight, a quest giver, auto-walking or dying. Each row is a " ..
-		"trigger and the camera it starts; the Camera Settings page has each camera's own settings. Moving " ..
+		"going AFK, your Hearthstone, fishing, a flight, a quest giver, auto-walking or dying. The Scenes page " ..
+		"says what starts which camera; the Scripts page has each camera's steps and settings. Moving " ..
 		"by hand cancels them all, and everything goes back to normal when the UI returns."] .. "\n\n" ..
 		L["In the camera modes, the minimap and quest tracker hover holds and the buff and chat " ..
 		"peeks use their short default times, so they clear the view quickly."])
-	local switch = CameraModesSwitch(content, subtitle)
-	local header = Header(content, L["Scenes"], switch, -18)
-	header:SetPoint("TOPLEFT", switch, "BOTTOMLEFT", 2, -18)
+	CameraModesSwitch(content, subtitle)
+	canvas:SetScript("OnShow", PageShown(Refresh, content))
+	canvas:Hide()
+	RegisterSubpage(canvas, "Cameras")
+
+	-- The Scenes page: the rows, a page of their own (the Camera hub's second).
+	canvas, content = CreateScrollPage()
+	local header = Label(content, "GameFontNormalLarge", L["Scenes"])
+	header:SetPoint("TOPLEFT", 16, -16)
 	local help = PageIntro(content, header,
 		L["Each row is a scene: when one of its triggers happens, it plays its camera. When two scenes are on at " ..
 		"once, a Hearthstone or teleport cast comes first, then logging out, going AFK, the latest emote, a drawn " ..
@@ -4787,7 +4890,7 @@ local function CreateCamerasPanel()
 					end, function() Set(value) end)
 				end
 				-- (New shot...: made, picked, and My Shots opened on it.)
-				if takesShots and #(ns.ShotList()) < ns.SHOT_MAX then
+				if takesShots and not ns.SHOTS_RETIRED and #(ns.ShotList()) < ns.SHOT_MAX then
 					root:CreateButton(L["New shot..."], function() ns.NewShotFor(Set) end)
 				end
 			end)
@@ -4829,21 +4932,19 @@ local function CreateCamerasPanel()
 		return button
 	end
 
-	-- The rows as shown, grouped by their first row's camera (Sort by: Hub,
-	-- in the Camera hub's icon order; Camera, by its name) then by trigger
-	-- name, or by trigger name alone (Trigger); no camera last. Each
-	-- trigger's rows together in their order.
+	-- The rows as shown, grouped by their first row's camera's name (Sort
+	-- by: Camera, the default; an older saved "camera" too) then by scene
+	-- name, or by scene name alone (Scene); no camera last. Each scene's
+	-- rows together in their order.
 	local HUB_NAMES = { cozy = "Cozy Cam", vista = "Vista Cam", fish = "Fish Cam", afk = "AFK Cam",
 		tele = "Tele Cam", flight = "Flight Cam", quest = "Quest Cam", walk = "RP Walk Cam", run = "Auto-run Cam",
 		[true] = "Death Cam", chat = "Chat Cam", death = "Death Cam" }
-	local SORTS = { { nil, "Hub" }, { "camera", "Camera" }, { "trigger", "Scene" } }
+	local SORTS = { { nil, "Camera" }, { "trigger", "Scene" } }
 	local function SortOf()
-		local sort = ns.GetDB().cameraRows.sort
-		return (sort == "camera" or sort == "trigger") and sort or nil
+		return ns.GetDB().cameraRows.sort == "trigger" and "trigger" or nil
 	end
 	local function ShownRows()
 		local sort = SortOf()
-		local hubOrder = ns.CAMERA_HUB_ORDER or {}
 		local groups, byTrigger = {}, {}
 		for _, id in ipairs(ns.CameraRowOrder()) do
 			local trigger = ns.CameraRowTrigger(id)
@@ -4853,8 +4954,6 @@ local function CreateCamerasPanel()
 				local name = SceneName(trigger):gsub("^%p+", ""):lower()
 				local camera, cam = ns.ShotBase(ns.CameraRowValue(id, "camera")), ""
 				if sort == nil then
-					cam = hubOrder[HUB_NAMES[camera]] or 99
-				elseif sort == "camera" then
 					cam = HUB_NAMES[camera] and (ns.CAMERA_NAMES[camera] or ""):lower() or "\255"
 				end
 				group = { name = name, cam = cam }
@@ -4905,8 +5004,8 @@ local function CreateCamerasPanel()
 	end
 	sort:SetPoint("RIGHT", bar, "RIGHT", 0, 0)
 	sort.searchSkip = true
-	Tooltip(sort, L["How the rows are listed: Hub groups them by camera in the Camera hub's order, Camera by " ..
-		"camera name, Scene by scene name. Either way a scene's rows stay together, in the order they're tried."])
+	Tooltip(sort, L["How the rows are listed: Camera groups them by camera name, Scene by scene " ..
+		"name. Either way a scene's rows stay together, in the order they're tried."])
 	controls[#controls + 1] = sort
 	local sortLabel = content:CreateFontString(nil, "ARTWORK", "GameFontNormalSmall")
 	sortLabel:SetPoint("RIGHT", sort, "LEFT", -6, 0)
@@ -5436,7 +5535,7 @@ local function CreateCamerasPanel()
 
 	canvas:SetScript("OnShow", PageShown(Refresh, content))
 	canvas:Hide()
-	RegisterSubpage(canvas, "Cameras")
+	RegisterSubpage(canvas, "Scenes")
 end
 
 -- The Standard Frames table under anchor: a row per frame (COMBAT_SHOW
@@ -6318,7 +6417,7 @@ local function CreateFishingPanel()
 
 	local switch = PageSwitch(content, "handleFishing", L["Enable Page"],
 		L["On: right-click (or a gamepad button) casts again, and the Fishing cast bar hides, as this " ..
-		"page says. Off: fishing is left to the game. (The fish camera is on the Cameras " ..
+		"page says. Off: fishing is left to the game. (The fish camera is on the Scenes " ..
 		"page.)"], subtitle)
 	local stack = Stack(switch, "check")
 	stack:Header(content, L["Casting"])
@@ -7377,22 +7476,40 @@ local function CreateNameStylePanel()
 		return list
 	end, L["A whole look in one pick. Changing a setting after it shows Custom."], On)
 
-	stack:Header(content, L["Color"])
-	rows.Check("plateNameColour", L["Color by how the unit sees you"],
-		L["Red for hostile units, yellow for neutral ones and green for friendly ones, as over their heads. " ..
-		"Unticked: the plate's own color, white or gray."], On)
-	rows.Choices(L["Friendly players:"], "plateNameFriends", {
-		{ "blue", L["Blue"], L["Blue, as the game's names over their heads (green while they're PvP flagged, as there too)."] },
-		{ "class", L["Class colors"], L["Their class's color, as the plates draw them."] },
-		{ "white", L["White"], nil },
-	}, function(db) return db.plateNameStyle and db.plateNameColour end)
-
 	stack:Header(content, L["Text"])
-	rows.Choices(L["Outline:"], "plateNameOutline", {
-		{ 0, L["None"], L["No border around the letters, like the game's names over heads."] },
-		{ 1, L["Thin"], L["A thin black border around the letters."] },
-		{ 2, L["Thick"], L["A thick black border around the letters."] },
-	}, On)
+	rows.Look(L["Look:"], L["Names"], {
+		textColor = function(look)
+			look.Check("plateNameColour", L["Color by how the unit sees you"],
+				L["Red for hostile units, yellow for neutral ones and green for friendly ones, as over their heads. " ..
+				"Unticked: the plate's own color, white or gray."], On)
+			look.Choices(L["Friendly players:"], "plateNameFriends", {
+				{ "blue", L["Blue"], L["Blue, as the game's names over their heads (green while they're PvP flagged, " ..
+					"as there too)."] },
+				{ "class", L["Class colors"], L["Their class's color, as the plates draw them."] },
+				{ "white", L["White"], nil },
+			}, function(db) return db.plateNameStyle and db.plateNameColour end)
+		end,
+		outline = function(look)
+			look.Choices(L["Outline:"], "plateNameOutline", {
+				{ 0, L["None"], L["No border around the letters, like the game's names over heads."] },
+				{ 1, L["Thin"], L["A thin black border around the letters."] },
+				{ 2, L["Thick"], L["A thick black border around the letters."] },
+			}, On)
+		end,
+		shadow = function(look)
+			local shadow = look.Check("plateNameShadow", L["Shadow"], L["A dark copy of the letters just behind " ..
+				"them, to lift them off the world."], On)
+			local function Shadowed(db) return On(db) and db.plateNameShadow end
+			local boxes = look.Boxes(shadow)
+			boxes:Box(L["X"], "plateNameShadowX", -4, 4, 1, "%d", 1, L["How far right of the letters it falls " ..
+				"(left, below 0)."], Shadowed)
+			boxes:Box(L["Y"], "plateNameShadowY", -4, 4, 1, "%d", 1, L["How far above the letters it falls " ..
+				"(below, below 0)."], Shadowed)
+			boxes:Box(L["Opacity"], "plateNameShadowAlpha", 0, 100, 5, "%d", 100, L["How dark the shadow is."],
+				Shadowed, "%")
+		end,
+		outlineColor = false, -- (the game's outline is always black)
+	})
 
 	-- Size and height by distance. Retail's plates scale themselves: one of
 	-- each. WoW Forever's don't, so names are sized and placed by how far they
@@ -13955,7 +14072,7 @@ ns.OnLanguage(function()
 	CreateCamerasPanel()
 	-- Each camera's own settings, in a section apiece.
 	CreateCameraSettingsPanel()
-	if ns.CreateMyShotsPanel then -- (ShotsPage.lua)
+	if ns.CreateMyShotsPanel and not ns.SHOTS_RETIRED then -- (ShotsPage.lua; retired in the dev copy)
 		ns.CreateMyShotsPanel(ns.lowHealthKit)
 	end
 	if ns.CreateShoulderCamPanel then -- (ShoulderCam.lua)

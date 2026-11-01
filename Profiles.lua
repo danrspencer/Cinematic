@@ -781,11 +781,15 @@ function ns.ResetAddon(keepBackups)
 end
 
 -- Settings changed from the active profile's base, for the Profiles page's
--- "(changed)". (Not the lists: those are tables whatever's in them.)
+-- "(changed)". (Not the lists: those are tables whatever's in them. Nor what
+-- the Vitals theme put on: LowHealth.lua's SyncThemeLook, not the player.)
 function ns.ProfileChanged()
 	local base = ns.ProfileBase()
+	local fromTheme = type(ns.db.lowHealthFromTheme) == "table" and ns.db.lowHealthFromTheme.values or {}
 	for k in pairs(ns.DEFAULTS) do
-		if IsProfileKey(k) and ns.db[k] ~= base[k] then return true end
+		if IsProfileKey(k) and ns.db[k] ~= base[k] and not (fromTheme[k] ~= nil and fromTheme[k] == ns.db[k]) then
+			return true
+		end
 	end
 	return false
 end

@@ -411,24 +411,24 @@ ns.PROFILE_MODULES = {
 		end },
 
 	-- Cameras
-	{ key = "walk-run-music", name = "Music on walks and runs", scope = { "Cameras/Scenes" },
+	{ key = "walk-run-music", name = "Music on walks and runs", scope = { "Scenes" },
 		tip = "Auto-walking and auto-running can start music.",
 		apply = function(set)
 			set("musicCamWalk", true)
 			set("musicCamRun", true)
 		end },
-	{ key = "lite-cameras", name = "Just a few cameras", scope = { "Cameras/Scenes" },
+	{ key = "lite-cameras", name = "Just a few cameras", scope = { "Scenes" },
 		tip = "Just flights (and fly-bys), AFK, and your Hearthstone and teleports: no cozy, vista, fish, " ..
 		"RP walk, auto-run, death or quest cameras.",
 		apply = function(set)
 			CamsOff(set, { "cozy", "vista", "fish", "walk", "run", "death", "quest" })
 		end },
-	{ key = "no-cameras", name = "No cameras", scope = { "Cameras" },
+	{ key = "no-cameras", name = "No cameras", scope = { "Cameras", "Scenes" },
 		tip = "No camera moves on its own.",
 		apply = function(set)
 			CamsOff(set, { "flight", "idle", "cozy", "tele", "vista", "fish", "walk", "run", "death", "quest" })
 		end },
-	{ key = "cameras-bring-cinemode", name = "Cameras bring CineMode", scope = { "Cameras/Scenes",
+	{ key = "cameras-bring-cinemode", name = "Cameras bring CineMode", scope = { "Scenes",
 		"Camera Settings/Death Cam", "Story Vision" },
 		tip = "Every camera brings CineMode on, standing still starts the AFK camera, every camera can start " ..
 		"music, and no death screen.",
@@ -448,12 +448,13 @@ ns.PROFILE_MODULES = {
 			set("musicCamWalk", true)
 			set("musicCamRun", true)
 		end },
-	{ key = "pure-cameras", name = "Pure: cameras", scope = { "Cameras/Scenes", "Camera Settings/Chat Cam",
-		"General/top" },
+	{ key = "pure-cameras", name = "Pure: cameras", scope = { "Scenes", "Camera Settings/Chat Cam",
+		"General/top", "Story Vision" },
 		tip = "Standing still starts the AFK camera and every event's camera can start music; the cameras " ..
 		"don't wait for things to calm down after a fight, auto-run carries on in cities and instances (as RP " ..
 		"walk always does), and the death camera runs in instances too. NPCs talking bring the chat camera, " ..
-		"those chatting nearby straight away, and it doesn't look round for speakers off screen.",
+		"those chatting nearby straight away, and it doesn't look round for speakers off screen. YOU DIED " ..
+		"shows as the death camera starts.",
 		apply = function(set)
 			-- (Chat Cam: off to start with, on here.)
 			if ns.DEFAULTS.chatCamSearch ~= nil then
@@ -470,6 +471,7 @@ ns.PROFILE_MODULES = {
 			set("runOffInCities", false)
 			set("runOffInInstances", false)
 			set("deathOffInInstances", false)
+			set("deathBannerStyle", "youdied")
 		end },
 
 	-- The look

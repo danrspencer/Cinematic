@@ -116,7 +116,7 @@ ns.SLOT_CHOICES = {
 		{ part = "cameras", label = "During cameras", line = "The effects only while a camera mode runs",
 			modules = { "effects-in-cameras" } },
 		{ part = "pure", label = "Through fights", line = "Fights don't bring the letterbox down",
-			modules = { "letterbox-in-fights", "no-time-message", "vitals-vision", "rain-view-distance" } },
+			modules = { "letterbox-in-fights", "vitals-vision", "rain-view-distance" } },
 	} },
 	chat = { label = "Chat", page = "Chat", question = "How much chatter?", default = "standard", choices = {
 		{ part = "standard", label = "As the game has it", line = "NPC speech and every channel as usual",

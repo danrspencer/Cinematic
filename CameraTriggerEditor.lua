@@ -67,7 +67,7 @@ function ns.CameraChoiceValues(cameras)
 		if value == "none" or value == false then none = value else list[#list + 1] = value end
 	end
 	for _, value in ipairs(cameras) do
-		if value == "cozy" then
+		if value == "cozy" and not ns.SHOTS_RETIRED then
 			for _, shot in ipairs((ns.ShotList())) do list[#list + 1] = "shot:" .. shot end
 		end
 	end
@@ -415,7 +415,7 @@ function ns.BuildCustomTriggerLines(drawer, id, kit)
 		ns.ShowCameraShare(ns.ExportCameraTrigger(id), (L["Share %s"]):format(ns.CustomTriggerLabel(id)))
 	end)
 	kit.Tooltip(share, L["Text to send a friend: they add this scene (and the shot it plays) with Import on their " ..
-		"Cameras page. Where it may start (its When) stays with you."])
+		"Scenes page. Where it may start (its When) stays with you."])
 end
 
 -- The New scene panel, above the Cameras page's rows: a scene made in it
@@ -504,7 +504,9 @@ function ns.BuildTriggerDraft(parent, kit)
 		for _, value in ipairs(ns.CameraChoiceValues(ns.CUSTOM_TRIGGER_CAMERAS)) do
 			list[#list + 1] = { value = value, text = ns.CameraName(value) or tostring(value) }
 		end
-		if #(ns.ShotList()) < ns.SHOT_MAX then list[#list + 1] = { value = "newshot", text = L["New shot..."] } end
+		if not ns.SHOTS_RETIRED and #(ns.ShotList()) < ns.SHOT_MAX then
+			list[#list + 1] = { value = "newshot", text = L["New shot..."] }
+		end
 		return list
 	end, function() return data.camera end, function(value)
 		if value == "newshot" then

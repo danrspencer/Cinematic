@@ -51,10 +51,12 @@ DEFAULTS.rollDensity = "roomy"     -- player rows: "roomy" or "compact"
 DEFAULTS.rollFont = "general"      -- the text's font (ns.QUEST_ITEM_FONTS' names; general: General's)
 DEFAULTS.rollTextSize = 1          -- ...times its usual size
 DEFAULTS.rollOutline = -1          -- ...outline: 0 none, 1 thin, 2 thick (-1: General's)
+DEFAULTS.rollShadow = "general"    -- ...shadow: "game", "on" or "none" (ns.SetTextShadow; general: General's)
 DEFAULTS.rollBarTexture = "general" -- the time left's bar: "flat" or a texture (ns.StyleTexturePath; general: General's)
 DEFAULTS.rollBarColor = "quality"  -- ...its color: the item's "quality", "gold" or "custom" (rollBarR/G/B)
 DEFAULTS.rollBarR, DEFAULTS.rollBarG, DEFAULTS.rollBarB = 1, 0.82, 0
 DEFAULTS.rollBarHeight = 3
+DEFAULTS.rollBarGround = 0.6      -- how dark it is behind the time left's bar, 0 to 1
 DEFAULTS.rollPicks = "icons"       -- each pick as the game's "icons" (dice, coin) or "words" in their colors:
 DEFAULTS.rollNeedR, DEFAULTS.rollNeedG, DEFAULTS.rollNeedB = 1, 0.7, 0.28
 DEFAULTS.rollGreedR, DEFAULTS.rollGreedG, DEFAULTS.rollGreedB = 0.5, 0.83, 0.42
@@ -82,6 +84,7 @@ local function StyleText(text, look)
 		file = ns.StyleFontFile(look.rollFont) or file
 	end
 	text:SetFont(file, size * look.rollTextSize, ns.OutlinedFlags(flags, look.rollOutline))
+	ns.SetTextShadow(text, look.rollShadow)
 end
 
 -- Player rows per card: everyone in a party; in a raid, the top few
@@ -620,6 +623,7 @@ local function StyleCard(card, look)
 	for _, text in ipairs({ card.item, card.itemSmall, card.status, card.passed }) do StyleText(text, look) end
 	local height = look.rollBarHeight
 	card.track:SetHeight(height + 2)
+	card.track:SetColorTexture(0, 0, 0, tonumber(look.rollBarGround) or 0.6)
 	card.bar:SetHeight(height)
 	-- (Flat, or the game's: a color of its own, BarColor's; else the texture, tinted.)
 	if look.rollBarTexture == "flat" or not ns.SetStyleTexture(card.bar, look.rollBarTexture) then

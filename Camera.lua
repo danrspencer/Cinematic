@@ -4205,6 +4205,7 @@ local function FlightTimeLeft()
 	end
 	return duration - (GetTime() - ns.flight.start)
 end
+ns.FlightTimeLeft = FlightTimeLeft -- (camera scripts' Wait until landing: CameraScripts.lua)
 
 -- On flights the fly-by and the arrival are moves of the flight camera itself
 -- (ns.orbit.special), made the way its sways are: speed changes on top of the

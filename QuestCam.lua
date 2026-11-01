@@ -1087,6 +1087,7 @@ local function OnEvent(_, event)
 			cam.clickSide = cam.since - lastClick.at <= CLICK_WINDOW and lastClick.side or nil
 			cam.left = PickSide()
 			cam.startAt = now + delay
+			cam.scriptsAt = cam.startAt -- (camera scripts' own wait: see ns.QuestTalkNow)
 			-- Still zooming back out from the last one (or the Chat Cam's): it
 			-- eases to a stop, the rest held again till you walk off from here.
 			if zoomer.leaving and zoomer.moving then
@@ -1097,9 +1098,14 @@ local function OnEvent(_, event)
 				zoomer.leaving = false
 				Note("talking again: zoom out stopped, held")
 			end
-		elseif not cam.active and now > (cam.windowAt or 0) then
+		elseif now > (cam.windowAt or 0) then
 			local extra = math.min(WINDOW_EXTRA, delay)
-			cam.startAt = math.max((cam.startAt or now) + extra, now + extra)
+			if not cam.active then
+				cam.startAt = math.max((cam.startAt or now) + extra, now + extra)
+			end
+			if now < (cam.scriptsAt or 0) then
+				cam.scriptsAt = math.max(cam.scriptsAt + extra, now + extra)
+			end
 		end
 		cam.windowAt = now
 		cam.closingAt = nil
@@ -1337,6 +1343,21 @@ function ns.QuestCamWindowOpen()
 	return cam.active and not cam.closingAt
 end
 
+-- A quest giver's conversation open now, the quest cam running or not (for
+-- camera scripts): its trigger ("Quest" or "QuestGossip") and the side of
+-- the screen you clicked them on ("left", "right", or nil for a key). Only
+-- once its row's wait is over (questCamDelay or questCamGossipDelay, each
+-- window before then adding a little, as for the quest cam: a quest picked
+-- up and gone sooner starts no camera). A window closing for the next one
+-- (within CLOSE_GRACE) doesn't end it; leaving, or a fight, does.
+function ns.QuestTalkNow()
+	local now = GetTime()
+	if cam.since and cam.event and now >= (cam.scriptsAt or 0)
+		and (not cam.closingAt or now - cam.closingAt < CLOSE_GRACE) then
+		return cam.event, cam.clickSide
+	end
+end
+
 -- The trigger (Cameras page) it's running for ("Quest" or "QuestGossip"): its
 -- Music and CineMode columns.
 function ns.QuestCamEvent()
@@ -1358,7 +1379,7 @@ function ns.QuestCamTest(on)
 		local now = GetTime()
 		cam.since, cam.cancelled, cam.clickSide, cam.test = now, nil, nil, true
 		cam.left, cam.npcName, cam.leftNpc = PickSide(), nil, nil
-		cam.startAt, cam.windowAt, cam.closingAt = now, now, nil
+		cam.startAt, cam.windowAt, cam.closingAt, cam.scriptsAt = now, now, nil, now
 		return true
 	end
 	if cam.test and cam.since then

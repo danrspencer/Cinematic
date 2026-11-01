@@ -899,8 +899,9 @@ local MASTER_CHOICES = {
 	{ key = "menu", icon = "Interface\\Icons\\INV_Misc_Gear_01", trim = true, color = { 1, 0.82, 0.3 },
 		label = "Menu wheel", opens = CinematicMenuWheel },
 	{ key = "marker", icon = ICON .. 8, color = COLORS[8], label = "Marker wheel", opens = markerWheel },
+	-- (Off it until ticked, in every profile: the wheels list is the account's.)
 	{ key = "vision", icon = "Interface\\Icons\\Ability_EyeOfTheOwl", trim = true, color = { 0.35, 1, 0.45 },
-		label = "Vision wheel", opens = visionWheel },
+		label = "Vision wheel", opens = visionWheel, offByDefault = true },
 }
 if CinematicWorldMarkerWheel then
 	MASTER_CHOICES[#MASTER_CHOICES + 1] = { key = "world", icon = ICON .. 6, color = COLORS[6],
@@ -925,7 +926,7 @@ end
 -- profile: db.masterWheelOrder, the keys in their order, and
 -- db.masterWheelOff, the ones taken off it): each choice in order, with
 -- whether it's on. A wheel the saved order doesn't name (one new since) goes
--- at the end, on (a wheel of the player's own: off).
+-- at the end, on (the vision wheel or a wheel of the player's own: off).
 function ns.MasterWheelOrder()
 	local db = ns.db or {}
 	local off = type(db.masterWheelOff) == "table" and db.masterWheelOff or {}
@@ -1023,7 +1024,7 @@ function ns.SetMasterWheelOrder(list)
 		end
 		db.masterWheelOrder, db.masterWheelOff = order, next(off) and off or nil
 	else
-		-- (The player's own wheels stay off it.)
+		-- (The vision wheel and the player's own stay off it.)
 		db.masterWheelOrder, db.masterWheelOff = nil, nil
 	end
 	ns.RebuildMasterWheel()

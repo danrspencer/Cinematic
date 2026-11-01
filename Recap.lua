@@ -109,6 +109,30 @@ function ns.RecapPreview()
 	return RecapLine(session), session
 end
 
+-- The Test button and /cine recaptest: plays the login now, without logging
+-- out: the zone name fades in as it does when you enter the world, with the
+-- time of day (if ticked) and the Last time line under it. This session's
+-- line if there is one, else a made-up one in the zone you're in (returned
+-- second: true), so there's always something to look at.
+function ns.RecapDemo()
+	local line = ns.RecapPreview()
+	local sample = not line
+	if sample then
+		local zone = GetRealZoneText and GetRealZoneText() or ""
+		line = L["Last time: %s"]:format(table.concat({ zone ~= "" and zone or "Darkshore",
+			L["%d quests done"]:format(3), L["reached level %d"]:format(UnitLevel("player") or 24) }, SEPARATOR))
+	end
+	-- The game's own zone name, as at login (its frame is plain, not secure).
+	local onEvent = ZoneTextFrame and ZoneTextFrame:GetScript("OnEvent")
+	if onEvent then
+		pcall(onEvent, ZoneTextFrame, "ZONE_CHANGED_NEW_AREA")
+	end
+	if ns.ShowTimeOfDayTitle then
+		ns.ShowTimeOfDayTitle(ns.Setting("timeOfDayMessage"), line)
+	end
+	return line, sample
+end
+
 local frame = CreateFrame("Frame")
 for _, event in ipairs({ "ZONE_CHANGED_NEW_AREA", "QUEST_TURNED_IN", "PLAYER_LEVEL_UP", "ENCOUNTER_END",
 		"PLAYER_LOGOUT" }) do

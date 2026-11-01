@@ -22,15 +22,18 @@ local KEYS = {
 	rfBorderSize = 1, rfBorderR = 0, rfBorderG = 0, rfBorderB = 0,
 	rfBack = 0.5,                -- the dark behind the bar, with a border of ours
 	rfGround = 1,                -- the game's background behind each frame, its opacity
+	rfGroundColor = "game",      -- ...and its color: "game" or "custom" (a tint over it)
+	rfGroundR = 0.3, rfGroundG = 0.3, rfGroundB = 0.45,
 	rfHealthColor = "game",      -- the health bar: "game", "class" (class or reaction) or "custom"
 	rfHealthR = 0.2, rfHealthG = 0.8, rfHealthB = 0.4,
 	rfNameColor = "game",        -- the name: "game", "class" or "white"
 	rfFont = "general",          -- the name's font (ns.QUEST_ITEM_FONTS' names)
 	rfOutline = -1,              -- ...outline: 0 none, 1 thin, 2 thick (-1: General's)
 	rfNameSize = 1,              -- ...times its usual size
+	rfShadow = "general",        -- ...shadow: "game", "on" or "none" (ns.SetTextShadow; general: General's)
 }
 local SHARED = { rfTexture = { "texture", "game" }, rfFont = { "font", "game" }, rfOutline = { "outline", 0 },
-	rfBorder = { "border", "game" } }
+	rfShadow = { "shadow", "game" }, rfBorder = { "border", "game" } }
 
 local function Share(key, suffix)
 	local entry = SHARED[key]
@@ -122,6 +125,19 @@ local function SetAlphaOf(texture, alpha)
 	end
 end
 
+-- The game's background tinted as the page says (white: its own).
+local tinted = setmetatable({}, { __mode = "k" }) -- texture -> true, while we've tinted it
+local function TintOf(texture, view)
+	if not (texture and texture.SetVertexColor) then return end
+	if view and view.ufGroundColor == "custom" then
+		tinted[texture] = true
+		texture:SetVertexColor(view.ufGroundR or 1, view.ufGroundG or 1, view.ufGroundB or 1, 1)
+	elseif tinted[texture] then
+		tinted[texture] = nil
+		texture:SetVertexColor(1, 1, 1, 1)
+	end
+end
+
 local dressing = false
 local skinned = setmetatable({}, { __mode = "k" }) -- health bar -> true, once it has our border's pieces
 -- One compact frame as its group's look says.
@@ -151,6 +167,7 @@ local function Dress(frame)
 	-- the page says.)
 	local ours = view and view.ufBorder ~= "game"
 	for _, field in ipairs(BORDERS) do SetAlphaOf(frame[field], ours and 0 or 1) end
+	TintOf(frame.background, view)
 	SetAlphaOf(frame.background, view and tonumber(view.ufGround) or 1)
 	dressing = false
 end
@@ -248,6 +265,11 @@ function ns.MakeRaidStylePreview(parent, width, onPick)
 				ns.DressStyleEdges(tile.edge, 1, 0.3, 0.3, 0.3, 1, false)
 			end
 			tile.ground:SetAlpha(0.9 * (tonumber(view.ufGround) or 1))
+			if view.ufGroundColor == "custom" then
+				tile.ground:SetVertexColor(view.ufGroundR or 1, view.ufGroundG or 1, view.ufGroundB or 1, 1)
+			else
+				tile.ground:SetVertexColor(1, 1, 1, 1)
+			end
 			-- (The name.)
 			local object = _G.GameFontHighlightSmall
 			tile.name:SetFontObject(object)
@@ -258,6 +280,7 @@ function ns.MakeRaidStylePreview(parent, width, onPick)
 			end
 			if outline >= 0 and ns.OutlinedFlags then flags = ns.OutlinedFlags(flags, outline) end
 			if file and height then tile.name:SetFont(file, height * (tonumber(view.ufNameSize) or 1), flags or "") end
+			ns.SetTextShadow(tile.name, view.ufShadow)
 			tile.name:SetText(L[NAMES[tile.i]])
 			if view.ufNameColor == "class" then
 				tile.name:SetTextColor(ClassColor(class))
@@ -271,7 +294,7 @@ end
 
 -- The page itself.
 local PRESET_KEYS = { "rfTexture", "rfBorder", "rfBorderSize", "rfBorderR", "rfBorderG", "rfBorderB", "rfBack",
-	"rfGround", "rfHealthColor", "rfNameColor", "rfFont", "rfOutline", "rfNameSize" }
+	"rfGround", "rfGroundColor", "rfGroundR", "rfGroundG", "rfGroundB", "rfHealthColor", "rfNameColor", "rfFont", "rfOutline", "rfNameSize", "rfShadow" }
 local TAB_NAMES = {}
 for _, group in ipairs(GROUPS) do TAB_NAMES[group[1]] = group[2] end
 
@@ -417,37 +440,57 @@ function ns.CreateRaidStylePanel(kit)
 	partyNote:SetJustifyH("LEFT")
 	partyNote:SetTextColor(1, 0.82, 0)
 
-	stack:Header(content, L["Bars"])
-	rows.Texture(L["Texture:"], "rfTexture", L["The health bar's fill. Below the game's own few: any other " ..
-		"addon shares (through LibSharedMedia)."], Editable, { 0.25, 0.75, 0.3 })
-	rows.Border(L["Border:"], "rfBorder", { game = true }, L["Round each frame: the game's, or a border of ours " ..
-		"(Custom: its thickness and color under it)."], Editable)
-	local grounds = rows.Boxes()
-	grounds:Box(L["Background"], Field("rfGround"), 0, 100, 5, "%d", 100, L["How solid the game's dark " ..
-		"background behind each frame is."], Editable, "%")
-	grounds:Box(L["Behind the bar"], Field("rfBack"), 0, 100, 5, "%d", 100, L["How dark it is behind the " ..
-		"health bar, with a border of ours."], function(db) return Editable(db) and rows.Get("rfBorder") ~= "game" end,
-		"%")
-
-	stack:Header(content, L["Colors"])
-	local last = rows.Choices(L["Health:"], "rfHealthColor", {
-		{ "game", L["The game's"], L["As the game's options say (class colors, or green)."] },
-		{ "class", L["Class or reaction"] },
-		{ "custom", L["Custom"], L["A color of your own (the swatch)."] },
-	}, Editable)
-	rows.Swatch(last, "rfHealthColor", { "rfHealthR", "rfHealthG", "rfHealthB" }, L["The health bar's color, for Custom."],
-		Editable)
-	rows.Choices(L["Name:"], "rfNameColor", {
-		{ "game", L["The game's"] },
-		{ "class", L["Class or reaction"] },
-		{ "white", L["White"] },
-	}, Editable)
-
-	stack:Header(content, L["Name"])
-	rows.Font("rfFont", L["The name's font. Russian, Korean or Chinese names keep the game's, so their " ..
-		"letters show."], Editable)
-	rows.Outline("rfOutline", L["Outline"], 2, { [0] = L["None"], L["Thin"], L["Thick"] }, nil, Editable)
-	rows.Slider("rfNameSize", L["Size"], 50, 150, 5, "%d%%", 100, L["The name's size, next to the game's."], Editable)
+	stack:Header(content, L["Look"])
+	rows.Look(L["Bars:"], L["Bars"], {
+		texture = { "rfTexture", L["The health bar's fill. Below the game's own few: any other addon shares " ..
+			"(through LibSharedMedia)."], test = Editable, tint = { 0.25, 0.75, 0.3 } },
+		barColor = function(look)
+			local last = look.Choices(L["Health:"], "rfHealthColor", {
+				{ "game", L["The game's"], L["As the game's options say (class colors, or green)."] },
+				{ "class", L["Class or reaction"] },
+				{ "custom", L["Custom"], L["A color of your own (the swatch)."] },
+			}, Editable)
+			look.Swatch(last, "rfHealthColor", { "rfHealthR", "rfHealthG", "rfHealthB" },
+				L["The health bar's color, for Custom."], Editable)
+		end,
+		ground = function(look)
+			look.Boxes():Box(L["Behind the bar"], Field("rfBack"), 0, 100, 5, "%d", 100, L["How dark it is behind " ..
+				"the health bar, with a border of ours."], function(db)
+					return Editable(db) and look.Get("rfBorder") ~= "game"
+				end, "%")
+		end,
+		border = { "rfBorder", L["Round each frame: the game's, or a border of ours (Custom: its thickness and " ..
+			"color under it)."], opts = { game = true }, test = Editable },
+		backColor = function(look)
+			look.Swatch(look.Choices(L["Background:"], "rfGroundColor", {
+				{ "game", L["The game's"] },
+				{ "custom", L["Custom"], L["The game's background tinted a color of your own (the swatch)."] },
+			}, Editable), "rfGroundColor", { "rfGroundR", "rfGroundG", "rfGroundB" },
+				L["The background's color, for Custom."], Editable)
+		end,
+		backAlpha = function(look)
+			look.Boxes():Box(L["Background"], Field("rfGround"), 0, 100, 5, "%d", 100, L["How solid the game's " ..
+				"dark background behind each frame is."], Editable, "%")
+		end,
+	})
+	rows.Look(L["Name:"], L["Name"], {
+		font = { "rfFont", L["The name's font. Russian, Korean or Chinese names keep the game's, so their " ..
+			"letters show."], test = Editable },
+		textSize = function(look)
+			look.Slider("rfNameSize", L["Size"], 50, 150, 5, "%d%%", 100, L["The name's size, next to the game's."],
+				Editable)
+		end,
+		textColor = function(look)
+			look.Choices(L["Color:"], "rfNameColor", {
+				{ "game", L["The game's"] },
+				{ "class", L["Class or reaction"] },
+				{ "white", L["White"] },
+			}, Editable)
+		end,
+		outline = { "rfOutline", nil, names = { [0] = L["None"], L["Thin"], L["Thick"] }, test = Editable },
+		outlineColor = false, -- (the game's text: its outline is always black)
+		shadow = { "rfShadow", test = Editable },
+	})
 
 	canvas:SetScript("OnShow", kit.PageShown(kit.Refresh, content))
 	canvas:Hide()

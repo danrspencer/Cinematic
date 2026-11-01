@@ -87,6 +87,9 @@ DEFAULTS.questTalkAlpha = 1      -- the panels' opacity (their fill, edge and pa
 DEFAULTS.questTalkFont = "general" -- the words' font (ns.QUEST_ITEM_FONTS' names; game: each part's own; general: General's)
 DEFAULTS.questTalkTextSize = 1   -- ...times their usual size
 DEFAULTS.questTalkOutline = -1   -- ...outline: 0 none, 1 thin, 2 thick (-1: General's)
+DEFAULTS.questTalkTextColor = "game" -- ...the bubble's words' color: "game" (the look's) or "custom"
+DEFAULTS.questTalkTextR, DEFAULTS.questTalkTextG, DEFAULTS.questTalkTextB = 1, 1, 1
+DEFAULTS.questTalkShadow = "general" -- ...shadow: "game", "on" or "none" (ns.SetTextShadow; general: General's)
 local function Styled(key)
 	return ns.StyleLook("questTalkStyled")[key]
 end
@@ -96,9 +99,11 @@ end
 
 -- The words' font as the page says, after SetFontObject (and before
 -- SetText): its own file unless the client's language needs the game's
--- (Cyrillic, Korean, Chinese: boxes in the others), sized and outlined.
+-- (Cyrillic, Korean, Chinese: boxes in the others), sized, outlined and
+-- shadowed.
 local ROMAN = not ({ ruRU = true, koKR = true, zhCN = true, zhTW = true })[GetLocale and GetLocale() or ""]
 local function Font(fs)
+	ns.SetTextShadow(fs, Styled("questTalkShadow"))
 	local font, size, outline = Styled("questTalkFont"), Styled("questTalkTextSize"), Styled("questTalkOutline")
 	if font == "game" and size == 1 and outline == 0 then
 		return
@@ -119,9 +124,18 @@ local function Font(fs)
 			tostring(flags), tostring(outline), tostring(err)))
 	end
 end
+-- The bubble's words' color: the page's own, or the look's (given).
+local function WordsColor(color)
+	if Styled("questTalkTextColor") == "custom" then
+		return { Styled("questTalkTextR") or 1, Styled("questTalkTextG") or 1, Styled("questTalkTextB") or 1 }
+	end
+	return color
+end
 -- (What the words' look is now, to tell when it's changed.)
 local function FontKey()
-	return ("%s:%s:%s"):format(Styled("questTalkFont"), Styled("questTalkTextSize"), Styled("questTalkOutline"))
+	return ("%s:%s:%s:%s:%s:%s:%s:%s"):format(Styled("questTalkFont"), Styled("questTalkTextSize"),
+		Styled("questTalkOutline"), Styled("questTalkShadow"), Styled("questTalkTextColor"), Styled("questTalkTextR"),
+		Styled("questTalkTextG"), Styled("questTalkTextB"))
 end
 
 local function Setting(key)
@@ -799,7 +813,7 @@ local function ApplyLook()
 	bubble.count:SetFontObject("GameFontNormalSmall")
 	for _, fs in ipairs({ bubble.text, bubble.name, bubble.title, bubble.count }) do Font(fs) end
 	bubble.name:SetText(bubble.name:GetText() or "")
-	bubble.text:SetTextColor(unpack(look.text))
+	bubble.text:SetTextColor(unpack(WordsColor(look.text)))
 	bubble.name:SetTextColor(unpack(look.name))
 	bubble.title:SetTextColor(unpack(look.title))
 	bubble.count:SetTextColor(look.name[1], look.name[2], look.name[3], 0.8)
@@ -986,9 +1000,10 @@ local Draggable                    -- (below)
 
 -- On parchment, text as the game's quest and gossip windows have it: dark
 -- ink with no shadow (a shadow under black text smudges it). After
--- SetFontObject, which brings the font's own shadow back.
+-- SetFontObject, which brings the font's own shadow back. (Not with a
+-- Shadow of the page's own.)
 local function Shade(fs)
-	if ink == INK.parchment then
+	if ink == INK.parchment and Styled("questTalkShadow") == "game" then
 		fs:SetShadowOffset(0, 0)
 	end
 end
@@ -2512,7 +2527,7 @@ function ns.MakeQuestTalkPreview(parent, width)
 		Font(name)
 		Font(text)
 		name:SetTextColor(unpack(look.name))
-		text:SetTextColor(unpack(look.text))
+		text:SetTextColor(unpack(WordsColor(look.text)))
 		name:SetText(L["Farmer Brennick"])
 		text:SetText(L["Something has been taking the turnips at night, and nobody here is brave enough to " ..
 			"keep watch. Would you?"])

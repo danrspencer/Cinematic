@@ -10,8 +10,8 @@ local L = ns.L
 
 -- The look's settings a preset sets (the rest as the defaults; the custom
 -- colors are kept, for a pick of Custom later).
-local PRESET_KEYS = { "rollPanel", "rollAlpha", "rollDensity", "rollFont", "rollTextSize", "rollOutline",
-	"rollBarTexture", "rollBarColor", "rollBarHeight", "rollPicks", "rollNumbers", "rollWinner", "rollWinnerColor" }
+local PRESET_KEYS = { "rollPanel", "rollAlpha", "rollDensity", "rollFont", "rollTextSize", "rollOutline", "rollShadow",
+	"rollBarTexture", "rollBarColor", "rollBarHeight", "rollBarGround", "rollPicks", "rollNumbers", "rollWinner", "rollWinnerColor" }
 
 -- The two pages' tabs (picked: 1 Vision, 2 Style).
 function ns.RollTabs(content, title, picked)
@@ -67,33 +67,54 @@ function ns.CreateRollStylePanel(kit)
 	}, PRESET_KEYS)
 
 	stack:Header(content, L["Cards"])
-	rows.Choices(L["Cards on:"], "rollPanel", {
-		{ "rounded", L["The game's frame"], L["A dark panel in the rounded edge of the game's roll frames, in the item's quality color."] },
-		{ "flat", L["Flat"], L["A dark panel with a thin line round it, in the item's quality color."] },
-		{ "none", L["Nothing"], L["Just the text, over the world."] },
+	rows.Look(L["Look:"], L["Cards"], {
+		backColor = function(look)
+			look.Choices(L["Cards on:"], "rollPanel", {
+				{ "rounded", L["The game's frame"], L["A dark panel in the rounded edge of the game's roll frames, " ..
+					"in the item's quality color."] },
+				{ "flat", L["Flat"], L["A dark panel with a thin line round it, in the item's quality color."] },
+				{ "none", L["Nothing"], L["Just the text, over the world."] },
+			})
+		end,
+		backAlpha = function(look)
+			look.Slider("rollAlpha", L["Opacity"], 20, 100, 5, "%d%%", 100, L["How see-through the cards are."],
+				function(db) return rows.On(db) and db.rollPanel ~= "none" end)
+		end,
 	})
-	rows.Slider("rollAlpha", L["Opacity"], 20, 100, 5, "%d%%", 100, L["How see-through the cards are."],
-		function(db) return rows.On(db) and db.rollPanel ~= "none" end)
 	rows.Choices(L["Rows:"], "rollDensity", {
 		{ "roomy", L["Roomy"] },
 		{ "compact", L["Compact"] },
 	})
 
 	stack:Header(content, L["Text"])
-	rows.Font("rollFont", L["Names in Russian, Korean or Chinese keep the game's font, so their letters show."])
-	rows.Slider("rollTextSize", L["Size"], 70, 140, 5, "%d%%", 100, L["How big the text is, next to its usual size."])
-	local OUTLINES = { [0] = L["None"], L["Thin"], L["Thick"] }
-	rows.Outline("rollOutline", L["Outline"], 2, OUTLINES,
-		L["A black border round the letters: easier to read with no panel behind them."])
+	rows.Look(L["Look:"], L["Text"], {
+		font = { "rollFont", L["Names in Russian, Korean or Chinese keep the game's font, so their letters show."] },
+		textSize = function(look)
+			look.Slider("rollTextSize", L["Size"], 70, 140, 5, "%d%%", 100,
+				L["How big the text is, next to its usual size."])
+		end,
+		outline = { "rollOutline", L["A black border round the letters: easier to read with no panel behind them."],
+			names = { [0] = L["None"], L["Thin"], L["Thick"] } },
+		outlineColor = false, -- (a row each: too many copies)
+		shadow = { "rollShadow" },
+		textColor = false, -- (names in their class color, items in their quality's)
+	})
 
 	stack:Header(content, L["Time left"])
-	rows.Texture(L["Bar texture:"], "rollBarTexture", L["The bar's fill. Below the game's own few: any other " ..
-		"addon shares (through LibSharedMedia)."], nil, { 1, 0.82, 0 }, L["Flat"])
-	rows.Swatch(rows.Choices(L["Bar color:"], "rollBarColor", {
-		{ "quality", L["The item's quality"] },
-		{ "gold", L["Gold"] },
-		{ "custom", L["Custom"] },
-	}), "rollBarColor", { "rollBarR", "rollBarG", "rollBarB" }, L["Pick the bar's color."])
+	rows.Look(L["Look:"], L["Time left"], {
+		texture = { "rollBarTexture", L["The bar's fill. Below the game's own few: any other addon shares " ..
+			"(through LibSharedMedia)."], label = L["Bar texture:"], tint = { 1, 0.82, 0 }, game = L["Flat"] },
+		barColor = function(look)
+			look.Swatch(look.Choices(L["Bar color:"], "rollBarColor", {
+				{ "quality", L["The item's quality"] },
+				{ "gold", L["Gold"] },
+				{ "custom", L["Custom"] },
+			}), "rollBarColor", { "rollBarR", "rollBarG", "rollBarB" }, L["Pick the bar's color."])
+		end,
+		ground = function(look)
+			look.Slider("rollBarGround", L["Dark ground"], 0, 100, 5, "%d%%", 100, L["How dark it is behind the bar."])
+		end,
+	})
 	rows.Slider("rollBarHeight", L["Bar height"], 2, 10, 1, "%d", 1, L["How tall the bar for the time left is."])
 
 	stack:Header(content, L["Picks"])

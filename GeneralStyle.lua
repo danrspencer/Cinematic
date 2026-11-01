@@ -9,18 +9,19 @@ local L = ns.L
 -- The pages that share settings, as the list shows them: name, the page to
 -- open (ns.OpenOptions), its shared settings.
 local PAGES = {
-	{ "Unit frames", "Unit Style", { "ufTexture", "ufFont", "ufOutline", "ufBorder" } },
-	{ "Raid frames", "Raid Style", { "rfTexture", "rfFont", "rfOutline", "rfBorder" } },
+	{ "Unit frames", "Unit Style", { "ufTexture", "ufFont", "ufOutline", "ufShadow", "ufBorder" } },
+	{ "Raid frames", "Raid Style", { "rfTexture", "rfFont", "rfOutline", "rfShadow", "rfBorder" } },
 	{ "Personal Resource Display", "Personal Style", { "prdTexture", "prdBorder" } },
-	{ "Tooltips", "Tooltip Style", { "tooltipBarTexture", "tooltipFont", "tooltipOutline", "tooltipEdge" } },
-	{ "Cast bars", "Cast Bar Style", { "plateCastFill", "plateCastFont", "plateCastOutline", "plateCastBorder" } },
+	{ "Tooltips", "Tooltip Style", { "tooltipBarTexture", "tooltipFont", "tooltipOutline", "tooltipShadow", "tooltipEdge" } },
+	{ "Cast bars", "Cast Bar Style", { "plateCastFill", "plateCastFont", "plateCastOutline", "plateCastShadow", "plateCastBorder" } },
 	{ "Chat bubbles", "Bubble Style", { "bubblesFont", "bubblesOutline", "bubblesEdge" } },
-	{ "Dialogue", "Quest Talk Style", { "questTalkFont", "questTalkOutline" } },
-	{ "Quest item button", "Quest Item Style", { "questItemFont", "questItemOutline", "questItemFrame" } },
-	{ "Roll Vision", "Roll Style", { "rollBarTexture", "rollFont", "rollOutline" } },
-	{ "Combat Vision", "Combat Style", { "combatFont", "combatOutline" } },
+	{ "Dialogue", "Quest Talk Style", { "questTalkFont", "questTalkOutline", "questTalkShadow" } },
+	{ "Quest item button", "Quest Item Style", { "questItemFont", "questItemOutline", "questItemShadow", "questItemFrame" } },
+	{ "Roll Vision", "Roll Style", { "rollBarTexture", "rollFont", "rollOutline", "rollShadow" } },
+	{ "Battle Vision", "Combat Style", { "combatFont", "combatOutline", "combatShadow" } },
+	{ "Story Vision", "Story Vision", { "storyFont", "storyOutline", "storyShadow" } },
 }
-local KIND_NAMES = { texture = "Texture", font = "Font", outline = "Outline", border = "Border" }
+local KIND_NAMES = { texture = "Texture", font = "Font", outline = "Outline", shadow = "Shadow", border = "Border" }
 
 -- Every page's look again (General's settings changing).
 local function RefreshAll()
@@ -285,21 +286,27 @@ function ns.CreateGeneralStylePanel(kit)
 		{ L["Cinematic"], L["Soft bars and Friz Quadrata, thinly outlined."],
 			{ styleTexture = "soft", styleFont = "friz", styleOutline = 1 } },
 		{ L["Glass"], L["Glass bars, the game's fonts."], { styleTexture = "glass" } },
-	}, { "styleTexture", "styleFont", "styleOutline", "styleBorder", "styleBorderSize", "styleBorderR", "styleBorderG",
+	}, { "styleTexture", "styleFont", "styleOutline", "styleShadow", "styleBorder", "styleBorderSize", "styleBorderR", "styleBorderG",
 		"styleBorderB" })
 
 	stack:Header(content, L["Shared look"])
-	rows.Texture(L["Bar texture:"], "styleTexture", L["Every page's bars that follow General. The game's: " ..
-		"each page's own. Below the game's own few: any other addon shares (through LibSharedMedia)."], nil,
-		{ 0.25, 0.75, 0.3 })
-	rows.Font("styleFont", L["Every page's words that follow General. The game's: each page's own. Russian, " ..
-		"Korean or Chinese text keeps the game's, so its letters show."])
-	rows.Outline("styleOutline", L["Outline"], 2, { [0] = L["None"], L["Thin"], L["Thick"] },
-		L["A black border round the letters, on every page that follows General. The game's: as each " ..
-		"page's default has it."], nil, L["The game's"])
-	rows.Border(L["Border:"], "styleBorder", { game = true }, L["The border round every page's " ..
-		"bars, panels and buttons that follow General. The game's: as each page's default has it. Custom: " ..
-		"its thickness and color under it."])
+	rows.Look(L["Look:"], L["Shared look"], {
+		texture = { "styleTexture", L["Every page's bars that follow General. The game's: each page's own. Below " ..
+			"the game's own few: any other addon shares (through LibSharedMedia)."], label = L["Bar texture:"],
+			tint = { 0.25, 0.75, 0.3 } },
+		font = { "styleFont", L["Every page's words that follow General. The game's: each page's own. Russian, " ..
+			"Korean or Chinese text keeps the game's, so its letters show."] },
+		outline = { "styleOutline", L["A black border round the letters, on every page that follows General. " ..
+			"The game's: as each page's default has it."], names = { [0] = L["None"], L["Thin"], L["Thick"] },
+			own = L["The game's"] },
+		outlineColor = false, -- (most pages' text is the game's: its outline is always black)
+		shadow = { "styleShadow" },
+		-- (Each page's own: its colors and sizes mean its own parts.)
+		barColor = false, ground = false, textSize = false, textColor = false,
+		border = { "styleBorder", L["The border round every page's bars, panels and buttons that follow " ..
+			"General. The game's: as each page's default has it. Custom: its thickness and color under it."],
+			opts = { game = true } },
+	})
 
 	-- The game's own nameplate Style (retail's Options > Nameplates), shown
 	-- for what it is: greyed, as we leave it alone. Only where the client

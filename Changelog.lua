@@ -11,13 +11,17 @@
 local _, ns = ...
 
 ns.CHANGELOG_FEATURES = {
+	{ date = "2026-10-31", page = "Camera Scripts", title = "Camera scripts",
+		text = "Every camera is now a script of steps (turn, zoom, sway, wait, follow...) on the new Scripts " ..
+		"page in the Camera hub. Pick one to see how it moves, change its steps and settings there, or copy it " ..
+		"to make a camera of your own." },
 	{ date = "2026-10-31", page = "Story Vision", title = "Story Vision",
 		text = "A new Vision for the words that fade in on your screen between fights: what you did last time " ..
 		"as you log in (\"Last time: Darkshore · 3 quests done · reached level 24\"), the time of day, a place " ..
 		"under attack, and the death banner, each with its own tick and a Test button. Combat Vision is now " ..
 		"called Battle Vision." },
-	{ date = "2026-10-31", page = "Cameras", title = "Scenes and shots of your own",
-		text = "Make your own camera scenes on the Cameras page: an emote, a spell, a buff, a place, a moment or " ..
+	{ date = "2026-10-31", page = "Scenes", title = "Scenes and shots of your own",
+		text = "Make your own camera scenes on the Scenes page: an emote, a spell, a buff, a place, a moment or " ..
 		"a key can start one, and a scene can have several triggers. The built-in ones are grouped by camera and " ..
 		"take triggers of yours too. On My Shots, set how a camera sways and zooms, and share either with a " ..
 		"friend." },
@@ -60,7 +64,7 @@ ns.CHANGELOG_FEATURES = {
 		text = "A cue as you go into a fight and come out of it: a word on the screen or in a letterbox bar, a " ..
 		"pulse round the edges, an icon, and sounds you pick for each kind of fight, like horns for a raid boss. " ..
 		"Its look has a page in the Style hub, with presets and a preview." },
-	{ date = "2026-10-28", page = "Cameras", title = "Cameras page",
+	{ date = "2026-10-28", page = "Scenes", title = "Cameras page",
 		text = "Camera Modes and Camera Triggers are now one Cameras page: a row for each trigger (an emote, " ..
 		"a campfire, going AFK, a flight...) with the camera it starts, its music and CineMode, and where it " ..
 		"can start. Copy a row to give a trigger a different camera in other places." },

@@ -202,6 +202,7 @@ read_globals = {
 	"LootFrame_Show",
 	"GroupLootContainer",
 	"MenuUtil",
+	"Menu",
 	"MenuResponse",
 	"PixelUtil",
 	"Minimap",

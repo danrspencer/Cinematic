@@ -11,7 +11,7 @@ local _, ns = ...
 local L = ns.L
 
 -- The look's settings a preset sets (the rest as the defaults).
-local PRESET_KEYS = { "questTalkStyle", "questTalkAlpha", "questTalkFont", "questTalkTextSize", "questTalkOutline",
+local PRESET_KEYS = { "questTalkStyle", "questTalkAlpha", "questTalkFont", "questTalkTextSize", "questTalkOutline", "questTalkShadow", "questTalkTextColor",
 	"questTalkCardSame" }
 
 function ns.CreateQuestTalkStylePanel(kit)
@@ -50,14 +50,20 @@ function ns.CreateQuestTalkStylePanel(kit)
 	}, PRESET_KEYS)
 
 	stack:Header(content, L["Panels"])
-	rows.Choices(L["Panels:"], "questTalkStyle", {
-		{ "parchment", L["Parchment"], L["Like the quest window's page."] },
-		{ "bubble", L["Chat bubble"], L["The game's own chat bubble."] },
-		{ "dark", L["Dark"] },
-		{ "none", L["None"], L["Just the words, over the world: an outline helps them read."] },
+	rows.Look(L["Look:"], L["Panels"], {
+		backColor = function(look)
+			look.Choices(L["Panels:"], "questTalkStyle", {
+				{ "parchment", L["Parchment"], L["Like the quest window's page."] },
+				{ "bubble", L["Chat bubble"], L["The game's own chat bubble."] },
+				{ "dark", L["Dark"] },
+				{ "none", L["None"], L["Just the words, over the world: an outline helps them read."] },
+			})
+		end,
+		backAlpha = function(look)
+			look.Slider("questTalkAlpha", L["Opacity"], 20, 100, 5, "%d%%", 100, L["How see-through the panels are."],
+				function(db) return db.questTalk and db.questTalkStyle ~= "none" end)
+		end,
 	})
-	rows.Slider("questTalkAlpha", L["Opacity"], 20, 100, 5, "%d%%", 100, L["How see-through the panels are."],
-		function(db) return db.questTalk and db.questTalkStyle ~= "none" end)
 	rows.Check("questTalkCardSame", L["Quest card on the bubble's background"],
 		L["The quest card and the list of replies have the bubble's look instead of their own dark one, " ..
 		"their words in colors that suit it."])
@@ -111,13 +117,20 @@ function ns.CreateQuestTalkStylePanel(kit)
 	kit.GreyUnless(listY, rows.On)
 
 	stack:Header(content, L["Words"])
-	rows.Font("questTalkFont", L["The game's: each part in its own (the quest window's for the words). Russian, " ..
-		"Korean or Chinese text keeps the game's, so its letters show."])
-	rows.Slider("questTalkTextSize", L["Text size"], 70, 150, 5, "%d%%", 100,
-		L["How big the words are, next to their usual size."])
-	local OUTLINES = { [0] = L["None"], L["Thin"], L["Thick"] }
-	rows.Outline("questTalkOutline", L["Outline"], 2, OUTLINES,
-		L["A black border round the letters: for light words with no panel behind them."])
+	rows.Look(L["Look:"], L["Words"], {
+		font = { "questTalkFont", L["The game's: each part in its own (the quest window's for the words). Russian, " ..
+			"Korean or Chinese text keeps the game's, so its letters show."] },
+		textSize = function(look)
+			look.Slider("questTalkTextSize", L["Text size"], 70, 150, 5, "%d%%", 100,
+				L["How big the words are, next to their usual size."])
+		end,
+		outline = { "questTalkOutline", L["A black border round the letters: for light words with no panel behind " ..
+			"them."], names = { [0] = L["None"], L["Thin"], L["Thick"] } },
+		outlineColor = false, -- (a page of words: too many copies)
+		shadow = { "questTalkShadow" },
+		textColor = { "questTalkTextColor", L["The bubble's words in a color of your own (the quest card keeps " ..
+			"its ink)."], keys = { "questTalkTextR", "questTalkTextG", "questTalkTextB" } },
+	})
 
 	-- Using it.
 	stack:Header(content, L["Controls"])

@@ -595,7 +595,7 @@ DEFAULTS.deathScreen = true        -- dim, cold screen with a heavy vignette mea
 DEFAULTS.deathScreenStrength = 1
 DEFAULTS.deathVignetteTime = 10    -- seconds for its vignette to creep in
 DEFAULTS.deathVignetteSize = 0.35  -- ...and the fraction of the screen each edge covers then
-DEFAULTS.deathBannerStyle = "youdied" -- words across the screen as it starts: "none", "youdied", "wasted"
+DEFAULTS.deathBannerStyle = "none" -- words across the screen as it starts: "none", "youdied", "wasted" (YOU DIED in Cinema: pure-cameras)
 DEFAULTS.deathCorpseRun = true     -- released with no wave to wait for, the vignette lifts as you near your body
 DEFAULTS.deathZoom = 4             -- yards it pulls back meanwhile
 DEFAULTS.deathOrbitPause = 0       -- (always one continuous turn)
@@ -4693,6 +4693,17 @@ ticker:SetScript("OnEvent", ns.Profiled("Core events", function(self, event, arg
 				end
 			end
 			ns.db.storyVisionV1 = true
+		end
+		-- Story Vision's rows are all on in Balanced and Cinema now (Cinema's look
+		-- no longer turns the time of day off), the death banner only in Cinema
+		-- (YOU DIED): each row goes as your profile has it. Once.
+		if not ns.db.storyVisionRowsV1 then
+			local base = ns.ProfileBase and ns.ProfileBase() or DEFAULTS
+			for _, key in ipairs({ "storyRecap", "timeOfDayMessage", "timeOfDayChange", "chatAttackAlert",
+					"deathBannerStyle" }) do
+				if base[key] ~= nil then ns.db[key] = base[key] end
+			end
+			ns.db.storyVisionRowsV1 = true
 		end
 		-- The Style pages' shared settings (bar texture, font, outline) follow
 		-- the Style hub's General page now: everyone's start on General, saved
