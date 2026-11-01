@@ -3956,11 +3956,14 @@ end
 local function CheckTooltip(tooltip)
 	local hide, why = Hides(tooltip)
 	checked = { owner = tooltip:GetOwner(), name = TooltipName(), state = CheckState(), at = GetTime() }
-	-- (Inspect's Last tooltip, Why.lua: what was decided and why.)
-	local kinds = {}
-	for word in pairs(tooltipKinds) do kinds[word] = true end
-	ns.lastTooltipWhy = { name = checked.name, hide = hide, why = why, at = checked.at, kinds = kinds,
-		handled = Handling(), cinematic = ns.lastCinematic, keyDown = ShowKeyDown() }
+	-- (Inspect's Last tooltip, Why.lua: what was decided and why. One table,
+	-- filled afresh each time: tooltips show all the time, Inspect seldom.)
+	local last = ns.lastTooltipWhy or { kinds = {} }
+	ns.lastTooltipWhy = last
+	wipe(last.kinds)
+	for word in pairs(tooltipKinds) do last.kinds[word] = true end
+	last.name, last.hide, last.why, last.at = checked.name, hide, why, checked.at
+	last.handled, last.cinematic, last.keyDown = Handling(), ns.lastCinematic, ShowKeyDown()
 	return hide, why
 end
 

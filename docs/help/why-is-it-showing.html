@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Why Is It Showing</title>
+<meta name="description" content="Click any frame to see why it's showing or hidden, and which settings say so: Inspect and the Why Is It Showing? page.">
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="../assets/site.css">
+<script src="../assets/site.js" defer></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Marcellus+SC&family=Barlow:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a letterboxed opening frame, then one reading column, as on the Troubleshooting page. */
+:root {
+  --bg: #eef1f4; --surface: #ffffff; --fg: #1b2129; --muted: #58626e; --line: #d2d8df;
+  --accent: #8a6400; --accent-soft: #f2e6c2;
+  --bar: #0b0d10; --bar-fg: #e9e4d8; --gold: #e2b53f;
+  --forever: #2f6f4f; --retail: #2c5a92; --classic: #7a4a1c;
+  --font-display: "Marcellus SC", Georgia, serif;
+  --font-body: "Barlow", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #13171c; --surface: #1b2026; --fg: #e3e6ea; --muted: #9aa3ad; --line: #2e353d;
+  --accent: #e2b53f; --accent-soft: #3a3120; --bar: #050607;
+  --forever: #7fd0a4; --retail: #8fb8ee; --classic: #e0ad78; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #13171c; --surface: #1b2026; --fg: #e3e6ea; --muted: #9aa3ad; --line: #2e353d;
+  --accent: #e2b53f; --accent-soft: #3a3120; --bar: #050607;
+  --forever: #7fd0a4; --retail: #8fb8ee; --classic: #e0ad78; color-scheme: dark }
+* { box-sizing: border-box }
+html { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px) }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 17px/1.6 var(--font-body); padding-block: 0 }
+.gutter { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)) }
+.col { max-width: 760px; margin: 0 auto; display: grid; gap: 56px }
+.col > *, section > * { min-width: 0 }
+h1, h2 { font-family: var(--font-display); font-weight: 400; text-wrap: balance; margin: 0 }
+h1 { font-size: clamp(34px, 7vw, 58px); line-height: 1.05; letter-spacing: .01em }
+h2 { font-size: 28px; line-height: 1.2 }
+h3 { font: 600 18px/1.3 var(--font-body); margin: 0 }
+p { margin: 0 }
+a { color: var(--accent); text-underline-offset: 2px }
+a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px }
+.muted { color: var(--muted) }
+code { font-family: var(--font-mono); font-size: .86em; background: var(--accent-soft); padding: 1px 5px; border-radius: 3px; overflow-wrap: anywhere }
+kbd { font: 500 .82em var(--font-mono); border: 1px solid var(--line); border-bottom-width: 2px; background: var(--surface); border-radius: 4px; padding: 0 5px }
+section { display: grid; gap: 14px }
+.eyebrow { font: 600 13px/1 var(--font-body); letter-spacing: .14em; text-transform: uppercase; color: var(--accent) }
+ul.plain { margin: 0; padding-left: 1.2em; display: grid; gap: 6px }
+
+/* Opening: the letterbox itself */
+.hero { background: var(--bar); color: var(--bar-fg) }
+.hero .band { height: clamp(28px, 6vw, 56px); background: #000 }
+.hero .frame { padding-block: clamp(36px, 7vw, 72px); background:
+  radial-gradient(120% 90% at 50% 40%, #2b3240 0%, #151a22 55%, #0b0d10 100%) }
+.hero .inner { max-width: 760px; margin: 0 auto; display: grid; gap: 14px }
+.hero .eyebrow { color: var(--gold) }
+.hero p { font-size: 19px; max-width: 58ch; color: #cfcabe }
+.hero code { background: #2a2d33; color: var(--bar-fg) }
+
+/* Steps, commands and questions */
+.steps { display: grid; gap: 14px; list-style: none; margin: 0; padding: 0; counter-reset: s }
+.steps li { counter-increment: s; display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 10px }
+.steps li::before { content: counter(s); font: 400 24px/1.1 var(--font-display); color: var(--accent) }
+.steps li > div { display: grid; gap: 4px }
+.cmds { display: grid; gap: 8px }
+.cmd { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 14px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 10px 14px }
+.cmd > code { font-size: 15px; background: none; padding: 0; color: var(--fg); flex: 0 1 auto }
+.cmd .what { color: var(--muted); font-size: 15px; flex: 1 1 220px }
+.copy { font: 600 13px var(--font-body); color: var(--accent); background: none; border: 1px solid var(--line); border-radius: 4px; padding: 4px 10px; cursor: pointer }
+.copy:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px }
+dl.faq { display: grid; gap: 16px; margin: 0 }
+dl.faq dt { font-weight: 600 }
+dl.faq dd { margin: 2px 0 0; color: var(--muted) }
+
+/* Reference rows: a name, then what it does; stacked on a phone */
+.rows { display: grid; margin: 0; border-top: 1px solid var(--line) }
+.row { display: grid; grid-template-columns: minmax(0, 230px) minmax(0, 1fr); gap: 4px 20px; padding: 12px 0; border-bottom: 1px solid var(--line) }
+.row > dt, .row > .k { font-weight: 600 }
+.row > dd, .row > .v { margin: 0; color: var(--muted) }
+.row .v b, .row dd b { color: var(--fg); font-weight: 600 }
+@media (max-width: 560px) { .row { grid-template-columns: 1fr } }
+
+/* Cards and callouts */
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 16px 18px; display: grid; gap: 6px; align-content: start }
+.card .name { font: 400 22px/1.1 var(--font-display) }
+.note { background: var(--accent-soft); border-left: 3px solid var(--accent); border-radius: 0 6px 6px 0; padding: 12px 16px }
+.chip { display: inline-block; font: 600 12px/1 var(--font-body); letter-spacing: .05em; text-transform: uppercase;
+  border: 1px solid currentColor; border-radius: 4px; padding: 3px 6px; vertical-align: 2px; white-space: nowrap }
+.chip.forever { color: var(--forever) } .chip.retail { color: var(--retail) } .chip.classic { color: var(--classic) }
+.chip.soon { color: var(--muted) }
+a.card { text-decoration: none; color: inherit } a.card:hover { border-color: var(--accent) } a.card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px } .card .go { color: var(--accent); font-weight: 600 }
+</style>
+</head>
+<body>
+<header class="hero">
+  <div class="band"></div>
+  <div class="frame gutter">
+    <div class="inner">
+      <div class="eyebrow">Help · why is it showing?</div>
+      <h1>Why is that on my screen?</h1>
+      <p>Point at any frame and Cinematic tells you why it's showing or hidden right now, and which settings say so. No more guessing which tick or rule is keeping your minimap up.</p>
+    </div>
+  </div>
+  <div class="band"></div>
+</header>
+
+<main class="gutter" style="padding-block:48px 40px">
+<div class="col">
+
+  <section id="inspect">
+    <div class="eyebrow">Ask about one frame</div>
+    <h2>Inspect</h2>
+    <ol class="steps">
+      <li><div><h3>Start it</h3><p class="muted">Type <code>/cine why</code>, or right-click the minimap button and pick <b>Why is it showing?</b> A bar at the top of the screen says Inspect is on.</p></div></li>
+      <li><div><h3>Point at a frame</h3><p class="muted">A gold box shows its name and whether it's <b>showing</b> or <b>hidden</b>. Faded-out frames count too: point where they'd be. While Inspect is on, pointing at a frame doesn't bring it up, so you see things as they really are.</p></div></li>
+      <li><div><h3>Click it</h3><p class="muted">A card opens beside it with every reason, and keeps itself up to date: start a fight or target something and watch it change. Click a line to open its setting. Click another frame to look at that one instead.</p></div></li>
+      <li><div><h3>Stop</h3><p class="muted">Right-click, press Escape, or close the card.</p></div></li>
+    </ol>
+    <div class="cmds">
+<div class="cmd"><code id="cmd1">/cine why</code><span class="what">Starts Inspect (type it again to stop)</span><button type="button" class="copy" data-for="cmd1">Copy</button></div>
+    </div>
+  </section>
+
+  <section id="card">
+    <div class="eyebrow">Reading the card</div>
+    <h2>What the reasons mean</h2>
+    <dl class="rows">
+      <div class="row"><dt>Shown because</dt><dd>What's bringing it up right now: a column ticked on its Standard Frames row (<b>Always</b>, a place like <b>Open world</b>, <b>In combat</b>, the <b>Calm Timer</b>, a target column), a <b>Keep open</b> on the Minimap page, or a Mouseover group's event such as a minimap ping or quest progress.</dd></div>
+      <div class="row"><dt>Keeping it hidden</dt><dd>What's holding it back over everything else: the death camera, Chat Cam's Ultra immersive, your role, a fight's start, or the row it goes with being hidden.</dd></div>
+      <div class="row"><dt>Any of these would show it</dt><dd>Settings that are ticked but don't apply right now, like <b>In combat</b> when you're not fighting, or a place you're not in.</dd></div>
+      <div class="row"><dt>Rules</dt><dd>A row with a rule shows it word by word: green words are true now, grey ones aren't, so you can see which word is holding it back.</dd></div>
+    </dl>
+  </section>
+
+  <section id="more">
+    <div class="eyebrow">Not just the game's frames</div>
+    <h2>Other addons, Cinematic's own, and tooltips</h2>
+    <dl class="faq">
+      <div><dt>Another addon's frame</dt><dd>If Cinematic fades it, the card works as usual. If it doesn't, the box says <b>Not faded</b> and the card names the addon, with how to fade it too (<code>/cine add</code>, or the Advanced Frames page). See <a href="../guides/other-addons.html">Other addons</a>.</dd></div>
+      <div><dt>Cinematic's own frames</dt><dd>Quest talk, off-screen bubbles, Chat Cam's subtitles, the letterbox, the minimap, Campfire and quest item buttons, Battle Vision's cue and Story Vision's titles say what they are and which page they come from.</dd></div>
+      <div><dt>Tooltips</dt><dd>A hidden tooltip can't be pointed at, so the Inspect bar has a <b>Last tooltip</b> button: it explains why the last tooltip showed or hid, by its kind (enemy, quest objective, gatherable...) and the Tooltips row's rule.</dd></div>
+    </dl>
+  </section>
+
+  <section id="page">
+    <div class="eyebrow">Everything at once</div>
+    <h2>The Why Is It Showing? page</h2>
+    <p>In the settings, under <b>Community</b>, the <b>Why Is It Showing?</b> page lists every row of frames, what it's doing right now and the main reason why. It updates while it's open.</p>
+    <ul class="plain">
+      <li><b>Showing</b>, <b>Hidden</b> and <b>All</b> filter the list, each with a count.</li>
+      <li><b>Sort</b> puts it in order by name, or with the visible ones first.</li>
+      <li>Click a row for all its reasons and an <b>Open settings</b> button.</li>
+      <li>The <b>Now</b> line shows which situations are true right now (combat, world, city, group, mounted...): the same words rules use.</li>
+      <li><b>Pick a frame in game</b> closes the settings and starts Inspect.</li>
+    </ul>
+    <p class="note">Neither Inspect nor the page costs anything while it's closed: they only work while you're using them.</p>
+  </section>
+
+</div>
+</main>
+<script>
+// Copy buttons: each copies the text of the element its data-for names.
+document.querySelectorAll(".copy").forEach(function (b) {
+  b.addEventListener("click", function () {
+    var el = document.getElementById(b.dataset.for);
+    function selectIt() { var r = document.createRange(); r.selectNodeContents(el); var s = getSelection(); s.removeAllRanges(); s.addRange(r); }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(el.textContent).then(function () {
+        b.textContent = "Copied"; setTimeout(function () { b.textContent = "Copy"; }, 1500);
+      }, selectIt);
+    } else selectIt();
+  });
+});
+</script>
+</body>
+</html>

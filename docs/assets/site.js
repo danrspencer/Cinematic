@@ -62,6 +62,8 @@
       line: "Which features are on which game." },
     { section: "help", path: "help/troubleshooting.html", title: "Troubleshooting",
       line: "Common fixes, /cine panic and resume, and how to report a bug with /cine log." },
+    { section: "help", path: "help/why-is-it-showing.html", title: "Why is it showing?",
+      line: "Click any frame to see why it's showing or hidden, and which settings say so." },
     { section: "design", path: "design/profile-modules.html", title: "Profile modules",
       line: "How modules, choices and profiles fit together, with the welcome window, the coverage map and the checks." }
   ];
