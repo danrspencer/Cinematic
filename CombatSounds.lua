@@ -68,7 +68,7 @@ ns.COMBAT_SOUNDS = {
 	{ 136172, "Horde Brewfest Tapping Of The Keg Event...", "Horns", 1.5, 0.6 },
 	{ 137951, "NSA Alliance Naga Horn", "Horns", 8, 0.6 },
 	{ 185200, "MUS 91 Broker Myzas Oasis Horn Solo Success A", "Horns", 8.8, 0.6 },
-	{ 6140, "G Hornof Echeyakee.wav", "Horns", 3.4, 0.6 },
+	{ 6140, "Horn of Echeyakee", "Horns", 3.4, 0.6 },
 	{ 170346, "Bastion Centurion Colossus Horn 01", "Horns", 7.8, 0.6 },
 	{ 142160, "Alert Horn 01", "Horns", 5.1, 0.6 },
 	{ 222158, "Nazjatar Naga Horn Stereo Close 06", "Horns", 8.7, 0.6 },

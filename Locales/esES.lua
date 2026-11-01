@@ -3637,7 +3637,7 @@ L["Wipe"] = "Grupo caído"
 L["As the boss is pulled, as it dies or as your group wipes. Click to switch."] = "Al atacar al jefe, al morir o si tu grupo cae. Haz clic para cambiarlo."
 L["A new rule for boss fights, first on this tab."] = "Una regla nueva para combates contra jefes, la primera de esta pestaña."
 L["This tab's rules as they come: a war horn as a boss is pulled; a kill and a wipe, no sound yet."] = "Las reglas de serie de esta pestaña: un cuerno de guerra al atacar a un jefe; al derrotarlo y si el grupo cae, aún sin sonido."
-L["This tab's rules as they come: none, so other fights start and end quietly."] = "Las reglas de serie de esta pestaña: ninguna, así que los demás combates empiezan y terminan en silencio."
+L["This tab's rules as they come: a sound as any other fight starts and one as it ends."] = "Las reglas de serie de esta pestaña: un sonido al empezar cualquier otro combate y otro al terminarlo."
 L["Sound rule %d"] = "Regla de sonido %d"
 L["No sounds: silent"] = "Sin sonidos: silencio"
 L["Search"] = "Buscar"
@@ -4019,10 +4019,12 @@ L["Your health falls in hits in the preview, and on the screen as the Vitals Vis
 	"Cierra la configuración para verlo todo."
 L["Pop out"] = "Ampliar"
 L["Put back"] = "Devolver"
-L["Shows the preview larger, in a window of its own you can move anywhere and resize from its corner, so you " ..
-	"can watch it while you scroll down the page. Click again to put it back."] =
-	"Muestra la vista previa más grande, en una ventana propia que puedes mover a cualquier sitio y cambiar de " ..
-	"tamaño desde su esquina, para verla mientras bajas por la página. Vuelve a hacer clic para devolverla a su sitio."
+L["Shows the preview larger, in a window of its own beside the settings (its Pop out lets " ..
+	"you move it anywhere) that you can resize from its corner, so you can watch it while you scroll down the " ..
+	"page. Click again to put it back."] =
+	"Muestra la vista previa más grande, en una ventana propia junto a los ajustes (su botón Ampliar te deja " ..
+	"moverla a cualquier sitio) que puedes cambiar de tamaño desde su esquina, para verla mientras bajas por la " ..
+	"página. Vuelve a hacer clic para devolverla a su sitio."
 L["Showing in its own window. Click here to put it back."] =
 	"Se muestra en su propia ventana. Haz clic aquí para devolverla a su sitio."
 L["Plays the cue in the preview and on your screen, as it will look: going in, then coming out (on the Boss " ..

@@ -16,8 +16,8 @@ local L = ns.L
 
 -- The rules, saved as text so profiles and shared strings carry them: rules
 -- apart by ";", each "<in|out|kill|wipe>#<condition>#<id>@<volume %>,...".
-ns.DEFAULTS.combatSounds = "in#boss#233484@100;kill#boss#;wipe#boss#"
-ns.DEFAULTS.combatCueVolume = 0.8
+ns.DEFAULTS.combatSounds = "in#boss#6140@100;kill#boss#;wipe#boss#;in##700@100;out##698@100"
+ns.DEFAULTS.combatCueVolume = 0.5
 
 local SOUND = {} -- id -> its entry in ns.COMBAT_SOUNDS
 for _, entry in ipairs(ns.COMBAT_SOUNDS or {}) do SOUND[entry[1]] = entry end
@@ -112,6 +112,27 @@ local function Start(id, channel, seconds)
 		end)
 	end
 end
+-- Which of the list's sounds this client has: the classic clients lack the
+-- later expansions' sound kits, and the game won't play them. Tried once,
+-- each stopped the same frame so none is heard. With the game's sound off
+-- every one is turned away: nil then, everything listed.
+local playable
+function ns.CombatSoundsPlayable()
+	if playable then return playable end
+	if GetCVar("Sound_EnableAllSound") ~= "1" then return nil end
+	local found, any = {}, false
+	for _, entry in ipairs(ns.COMBAT_SOUNDS or {}) do
+		local ok, willPlay, handle = pcall(PlaySound, entry[1], "Master")
+		if ok and willPlay then
+			found[entry[1]], any = true, true
+			if handle then pcall(StopSound, handle, 0) end
+		end
+	end
+	if not any then return nil end
+	playable = found
+	return playable
+end
+
 function ns.PlayCombatSound(id, volume)
 	local entry = SOUND[id]
 	local seconds = entry and entry[4] or 3
@@ -362,7 +383,7 @@ function ns.CombatSoundRulesSection(kit, content, stack, boss)
 	kit.Tooltip(addRule, boss and L["A new rule for boss fights, first on this tab."]
 		or L["A new rule above the last one, for the fights you pick."])
 	kit.Tooltip(defaults, boss and L["This tab's rules as they come: a war horn as a boss is pulled; a kill and a wipe, no sound yet."]
-		or L["This tab's rules as they come: none, so other fights start and end quietly."])
+		or L["This tab's rules as they come: a sound as any other fight starts and one as it ends."])
 	addRule:SetScript("OnClick", function()
 		if boss then
 			table.insert(rules, 1, { edge = "in", rule = "boss", sounds = {} })
@@ -583,13 +604,22 @@ function picker.Open(rule, save)
 		picker.frame = frame
 	end
 
+	-- (Only the sounds this client can play, and the groups that have some.)
+	local playable = ns.CombatSoundsPlayable()
+	local sounds, filled = {}, {}
+	for _, entry in ipairs(ns.COMBAT_SOUNDS) do
+		if not playable or playable[entry[1]] then
+			sounds[#sounds + 1] = entry
+			filled[entry[3]] = true
+		end
+	end
 	local order = {}
 	local side = rule.edge == "in" and "in" or "out" -- (a boss's kill or wipe: the leaving groups)
 	for _, group in ipairs(ns.COMBAT_SOUND_GROUPS) do
-		if group[2] == side then order[#order + 1] = group[1] end
+		if group[2] == side and filled[group[1]] then order[#order + 1] = group[1] end
 	end
 	for _, group in ipairs(ns.COMBAT_SOUND_GROUPS) do
-		if group[2] ~= side then order[#order + 1] = group[1] end
+		if group[2] ~= side and filled[group[1]] then order[#order + 1] = group[1] end
 	end
 	frame.group, frame.offset = order[1], 0
 	frame.search:SetText("")
@@ -603,7 +633,7 @@ function picker.Open(rule, save)
 	function frame.Draw()
 		local query = (frame.search:GetText() or ""):lower()
 		local list = {}
-		for _, entry in ipairs(ns.COMBAT_SOUNDS) do
+		for _, entry in ipairs(sounds) do
 			if query ~= "" then
 				if L[entry[2]]:lower():find(query, 1, true) or tostring(entry[1]):find(query, 1, true) then
 					list[#list + 1] = entry
@@ -613,8 +643,9 @@ function picker.Open(rule, save)
 			end
 		end
 		frame.list = list
-		for g, button in ipairs(frame.groups) do
-			local name = order[g]
+		for g, button in ipairs(frame.groups) do button:SetShown(order[g] ~= nil) end
+		for g, name in ipairs(order) do
+			local button = frame.groups[g]
 			button.text:SetText(L[name])
 			local on = query == "" and name == frame.group
 			button.bg:SetColorTexture(1, 0.82, 0, on and 0.18 or 0)
@@ -633,13 +664,13 @@ function picker.Open(rule, save)
 				row.length:SetText(("%.1f s"):format(entry[4]))
 				local has = Has(entry[1])
 				row.pick:SetText(has and "|cffffd100v|r" or "+")
-				row.play:SetScript("OnClick", function() ns.PlayCombatSound(entry[1], entry[5]) end)
+				row.play:SetScript("OnClick", function() ns.PlayCombatSound(entry[1], 1) end)
 				row.pick:SetScript("OnClick", function()
 					local k = Has(entry[1])
 					if k then
 						table.remove(rule.sounds, k)
 					else
-						rule.sounds[#rule.sounds + 1] = { entry[1], entry[5] }
+						rule.sounds[#rule.sounds + 1] = { entry[1], 1 } -- (full volume to start)
 					end
 					save()
 					frame.Draw()

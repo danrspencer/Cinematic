@@ -346,10 +346,13 @@ end
 -- back. While it's out, a dark frame of its size holds its place (click it to
 -- put it back), and what was placed from it is placed from that instead. One
 -- preview out at a time; the size you give the window is kept for the next.
+-- The window sits docked beside the settings to start with; its own Pop out
+-- lets you drag it anywhere (kept for next time, stylePreviewPos), Dock puts
+-- it back beside them (as the camera script preview does).
 -- tooltip: the page's (kit.Tooltip, Options.lua's Tooltip).
 local POPOUT_SCALE = 1.5
 local POPOUT_MIN_SCALE = 0.75
-local popWindow, popped, popScale
+local popWindow, popped, popScale, popTooltip
 
 -- Everything on parent placed from from, placed from to instead.
 local function Repoint(parent, from, to)
@@ -380,6 +383,30 @@ local function PutBack()
 	preview.popButton:SetText(ns.L["Pop out"])
 	popWindow:Hide()
 	if preview.Refresh then preview:Refresh() end
+end
+
+-- The settings window a preview's page is in (to dock beside).
+local function SettingsWindow(frame)
+	while frame and frame:GetParent() and frame:GetParent() ~= UIParent do frame = frame:GetParent() end
+	return frame
+end
+
+-- Docked beside the settings, or where you dragged it (popped out).
+local function PlaceWindow()
+	local saved = ns.db and ns.db.stylePreviewPos
+	popWindow:ClearAllPoints()
+	if type(saved) == "table" and saved.x and saved.y then
+		popWindow:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", saved.x, saved.y)
+		popWindow.dock:SetText(ns.L["Dock"])
+		return
+	end
+	local settings = popped and popped.popSlot and SettingsWindow(popped.popSlot)
+	if settings and settings ~= UIParent and settings:IsShown() then
+		popWindow:SetPoint("TOPLEFT", settings, "TOPRIGHT", 4, 0)
+	else
+		popWindow:SetPoint("TOP", UIParent, "TOP", 0, -60)
+	end
+	popWindow.dock:SetText(ns.L["Pop out"])
 end
 
 -- The window's size: the preview's, scaled, with room for the title.
@@ -424,15 +451,22 @@ end
 local function Window()
 	if popWindow then return popWindow end
 	popWindow = CreateFrame("Frame", "CinematicPreviewWindow", UIParent, BackdropTemplateMixin and "BackdropTemplate")
-	popWindow:SetPoint("TOP", 0, -60)
 	popWindow:SetFrameStrata("DIALOG")
 	popWindow:SetToplevel(true)
 	popWindow:SetClampedToScreen(true)
 	popWindow:EnableMouse(true)
 	popWindow:SetMovable(true)
 	popWindow:RegisterForDrag("LeftButton")
-	popWindow:SetScript("OnDragStart", popWindow.StartMoving)
-	popWindow:SetScript("OnDragStop", popWindow.StopMovingOrSizing)
+	-- (Docked, it stays beside the settings: Pop out first to drag it.)
+	popWindow:SetScript("OnDragStart", function(self)
+		local saved = ns.db and ns.db.stylePreviewPos
+		if type(saved) == "table" and saved.x then self:StartMoving() end
+	end)
+	popWindow:SetScript("OnDragStop", function(self)
+		self:StopMovingOrSizing()
+		if ns.db then ns.db.stylePreviewPos = { x = self:GetLeft(), y = self:GetTop() } end
+		PlaceWindow()
+	end)
 	popWindow:SetBackdrop({
 		bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background-Dark",
 		edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
@@ -445,6 +479,23 @@ local function Window()
 	popWindow.title:SetPoint("TOPLEFT", 14, -10)
 	local close = CreateFrame("Button", nil, popWindow, "UIPanelCloseButton")
 	close:SetPoint("TOPRIGHT", 0, 0)
+	popWindow.dock = ns.PanelButton(popWindow)
+	popWindow.dock:SetSize(70, 20)
+	popWindow.dock:SetPoint("TOPRIGHT", -28, -6)
+	popWindow.dock:SetText(ns.L["Pop out"])
+	popWindow.dock:SetScript("OnClick", function()
+		if not ns.db then return end
+		local saved = ns.db.stylePreviewPos
+		if type(saved) == "table" and saved.x then
+			ns.db.stylePreviewPos = nil
+		else
+			ns.db.stylePreviewPos = { x = popWindow:GetLeft() + 30, y = popWindow:GetTop() - 30 }
+		end
+		PlaceWindow()
+	end)
+	if popTooltip then
+		popTooltip(popWindow.dock, ns.L["Pop out: drag the window anywhere (by its edge). Dock: back beside the settings."])
+	end
 	-- The corner grip (the chat frames' own) resizes it.
 	popWindow:SetResizable(true) -- (its bounds: ScalePopped)
 	local grip = CreateFrame("Button", nil, popWindow)
@@ -462,6 +513,7 @@ local function Window()
 		popWindow:StopMovingOrSizing()
 		popWindow.sizing = nil
 		FitWindow()
+		PlaceWindow() -- (sizing moved its anchor: back where it goes, docked or not)
 	end)
 	popWindow:SetScript("OnSizeChanged", Resizing)
 	popWindow:SetScript("OnHide", function()
@@ -511,6 +563,7 @@ local function PopOut(preview)
 	preview.popButton:SetText(ns.L["Put back"])
 	window:Show()
 	FitWindow()
+	PlaceWindow()
 	if preview.Refresh then preview:Refresh() end
 end
 
@@ -568,6 +621,7 @@ local function WidePreview(preview)
 end
 
 function ns.StylePopout(preview, tooltip, title)
+	popTooltip = popTooltip or tooltip
 	WidePreview(preview)
 	local button = ns.PanelButton(preview)
 	button:SetSize(80, 20)
@@ -578,8 +632,9 @@ function ns.StylePopout(preview, tooltip, title)
 	else
 		button:SetPoint("TOPRIGHT", -6, -6)
 	end
-	tooltip(button, ns.L["Shows the preview larger, in a window of its own you can move anywhere and resize " ..
-		"from its corner, so you can watch it while you scroll down the page. Click again to put it back."])
+	tooltip(button, ns.L["Shows the preview larger, in a window of its own beside the settings (its Pop out lets " ..
+		"you move it anywhere) that you can resize from its corner, so you can watch it while you scroll down the " ..
+		"page. Click again to put it back."])
 	button:SetScript("OnClick", function()
 		if popped == preview then PutBack() else PopOut(preview) end
 	end)
