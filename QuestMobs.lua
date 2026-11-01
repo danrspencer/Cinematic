@@ -189,8 +189,13 @@ end
 
 -- Classic gives units no quest lines (and UnitIsRelatedToActiveQuest says no):
 -- there, the kill objectives in the log not yet done ("Young Nightsaber slain:
--- 3/7"), by the mob's name. Items that drop from mobs can't be told this way.
-local killNames -- [name] = true, or nil until needed
+-- 3/7"), by the mob's name. Items that drop from mobs ("Fel Moss: 3/8") don't
+-- name the mob: an enemy counts for one when the quest's text names it ("...the
+-- grell and grellkin"), or once you've looted that item from its kind (learned
+-- by NPC ID, kept in CinematicDB.questDrops: the next ones count too).
+local killNames -- [name] = true, or nil until needed (itemNames, itemTexts with it)
+local itemNames -- [item name] = true: item objectives not yet done
+local itemTexts -- { lowercase quest text, ... } of quests with one of those
 
 local function KillName(text)
 	if type(text) ~= "string" or not Known(text) then
@@ -208,11 +213,40 @@ local function KillName(text)
 	return name ~= "" and name or nil
 end
 
+-- One objective of the quest at log index i: a kill or item name noted.
+-- Returns whether it's an item not yet done.
+local function NoteObjective(kind, finished, text)
+	local name = not finished and KillName(text)
+	if name and kind == "monster" then
+		killNames[name] = true
+	elseif name and kind == "item" then
+		itemNames[name] = true
+		return true
+	end
+	return false
+end
+
+local function NoteQuestText(i)
+	if not GetQuestLogQuestText then
+		return
+	end
+	local ok, description, objectives = pcall(GetQuestLogQuestText, i)
+	local text = ""
+	for _, part in ipairs(ok and { description, objectives } or {}) do
+		if type(part) == "string" and Known(part) then
+			text = text .. " " .. part:lower()
+		end
+	end
+	if text ~= "" then
+		itemTexts[#itemTexts + 1] = text
+	end
+end
+
 local function KillNames()
 	if killNames then
 		return killNames
 	end
-	killNames = {}
+	killNames, itemNames, itemTexts = {}, {}, {}
 	pcall(function()
 		local log = C_QuestLog
 		if log and log.GetInfo and log.GetQuestObjectives then
@@ -220,22 +254,24 @@ local function KillNames()
 				local info = log.GetInfo(i)
 				local questID = info and not info.isHeader and info.questID
 				local open = type(questID) == "number" and not ns.QuestDone(questID)
+				local items = false
 				for _, objective in ipairs(open and log.GetQuestObjectives(questID) or {}) do
-					local name = objective.type == "monster" and not objective.finished and KillName(objective.text)
-					if name then
-						killNames[name] = true
-					end
+					items = NoteObjective(objective.type, objective.finished, objective.text) or items
+				end
+				if items then
+					NoteQuestText(i)
 				end
 			end
 		elseif GetQuestLogTitle and GetNumQuestLeaderBoards and GetQuestLogLeaderBoard then
 			for i = 1, GetNumQuestLogEntries() do
 				local _, _, _, isHeader = GetQuestLogTitle(i)
+				local items = false
 				for j = 1, not isHeader and GetNumQuestLeaderBoards(i) or 0 do
 					local text, kind, finished = GetQuestLogLeaderBoard(j, i)
-					local name = kind == "monster" and not finished and KillName(text)
-					if name then
-						killNames[name] = true
-					end
+					items = NoteObjective(kind, finished, text) or items
+				end
+				if items then
+					NoteQuestText(i)
 				end
 			end
 		end
@@ -243,14 +279,94 @@ local function KillNames()
 	return killNames
 end
 
--- Whether the unit is an enemy named by a kill objective not yet done (see above).
+local function NpcID(guid)
+	if type(guid) ~= "string" or not Known(guid) then
+		return nil
+	end
+	local kind, _, _, _, _, id = strsplit("-", guid)
+	return (kind == "Creature" or kind == "Vehicle") and tonumber(id) or nil
+end
+
+local function UnitNpcID(unit)
+	local ok, guid = pcall(UnitGUID, unit)
+	return ok and NpcID(guid) or nil
+end
+
+-- Whether the enemy drops an item objective not yet done (see above): "learned",
+-- "text" (named by the quest's text), or nil.
+local function FromItemLog(unit)
+	if ns.isRetail or IsFriendly(unit) then
+		return nil
+	end
+	KillNames()
+	if not next(itemNames) then
+		return nil
+	end
+	local drops = CinematicDB and CinematicDB.questDrops
+	local learned = drops and drops[UnitNpcID(unit) or 0]
+	for item in pairs(learned or {}) do
+		if itemNames[item] then
+			return "learned"
+		end
+	end
+	local name = NameOf(unit)
+	if not name then
+		return nil
+	end
+	local pattern = "%f[%w]" .. name:lower():gsub("%p", "%%%0") .. "s?%f[%W]"
+	for _, text in ipairs(itemTexts) do
+		if text:find(pattern) then
+			return "text"
+		end
+	end
+	return nil
+end
+
+-- Whether the unit is an enemy named by a kill objective not yet done, or
+-- one that drops an item for one (see above).
 local function FromKillLog(unit)
 	if ns.isRetail or IsFriendly(unit) then
 		return false
 	end
 	local name = NameOf(unit)
-	return name and KillNames()[name] == true or false
+	return (name and KillNames()[name] == true) or FromItemLog(unit) ~= nil
 end
+
+-- Learning drops (Classic, see above): an item objective not yet done in the
+-- loot window, kept for the NPC IDs it came from.
+local looter = CreateFrame("Frame")
+if not ns.isRetail and GetLootSourceInfo then
+	looter:RegisterEvent("LOOT_OPENED")
+end
+looter:SetScript("OnEvent", function()
+	KillNames()
+	if not (CinematicDB and next(itemNames)) then
+		return
+	end
+	local learnedAny = false
+	pcall(function()
+		for slot = 1, GetNumLootItems() do
+			local _, item = GetLootSlotInfo(slot)
+			if type(item) == "string" and Known(item) and itemNames[item] then
+				local sources = { GetLootSourceInfo(slot) }
+				for k = 1, #sources, 2 do
+					local id = NpcID(sources[k])
+					if id then
+						CinematicDB.questDrops = CinematicDB.questDrops or {}
+						CinematicDB.questDrops[id] = CinematicDB.questDrops[id] or {}
+						if not CinematicDB.questDrops[id][item] then
+							CinematicDB.questDrops[id][item] = true
+							learnedAny = true
+						end
+					end
+				end
+			end
+		end
+	end)
+	if learnedAny then
+		wipe(answers)
+	end
+end)
 
 local function Read(unit)
 	local ok, isPlayer = pcall(UnitIsPlayer, unit)
@@ -855,8 +971,22 @@ function ns.DescribeQuestKills(unit)
 		done[#done + 1] = text
 	end
 	table.sort(done)
-	return ("tooltip says=%s, kill log match=%s, kill objectives: %s; ignored (quest ready to hand in): %s"):format(
-		tostring(FromTooltip(unit)), tostring(FromKillLog(unit)), #names > 0 and table.concat(names, ", ") or "none",
+	local items = {}
+	for name in pairs(itemNames) do
+		items[#items + 1] = name
+	end
+	table.sort(items)
+	local drops = CinematicDB and CinematicDB.questDrops
+	local learned = {}
+	for item in pairs(drops and drops[UnitNpcID(unit) or 0] or {}) do
+		learned[#learned + 1] = item
+	end
+	table.sort(learned)
+	return ("tooltip says=%s, kill log match=%s, drop match=%s (npc %s drops: %s), kill objectives: %s; item objectives:"
+		.. " %s (%d quest texts); ignored (quest ready to hand in): %s"):format(
+		tostring(FromTooltip(unit)), tostring(FromKillLog(unit)), tostring(FromItemLog(unit)), tostring(UnitNpcID(unit)),
+		#learned > 0 and table.concat(learned, ", ") or "none known", #names > 0 and table.concat(names, ", ") or "none",
+		#items > 0 and table.concat(items, ", ") or "none", #itemTexts,
 		#done > 0 and table.concat(done, ", ") or "none")
 end
 
