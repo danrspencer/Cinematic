@@ -682,6 +682,21 @@ function ns.IsScriptCamera(value)
 end
 local IsScript = ns.IsScriptCamera
 
+-- Dev copy, for bringing the scripts up to our cameras: with db.scriptBuiltIns
+-- on (/cine script builtins), a row set to one of our cameras runs that
+-- camera's script instead (CameraRows.lua's ns.TriggerSetting asks), so each
+-- can be compared in game with the camera's own code. The Scenes page still
+-- shows the camera.
+local BUILT_IN_OF = { cozy = "cozy", vista = "vista", fish = "fish", afk = "afk", tele = "tele", flight = "flight",
+	walk = "walk", run = "run", quest = "quest", chat = "chat", [true] = "death", death = "death" }
+function ns.ScriptBuiltInsOn()
+	return ns.isDev and ns.db ~= nil and ns.db.scriptBuiltIns == true
+end
+function ns.BuiltInAsScript(value)
+	local id = BUILT_IN_OF[value]
+	return id and "script:" .. id or value
+end
+
 -- The triggers whose rows may pick a script: those with a standing-still
 -- camera (theirs or your own triggers'), a Hearthstone or teleport's, a
 -- flight's, walking, running, death, a quest giver's or chat's.
@@ -1915,6 +1930,16 @@ function ns.CameraScriptCommand(arg)
 		ns.Print(L["no camera script called %s"]:format(rest))
 	elseif cmd == "stop" then
 		ns.Print(ns.StopCameraScript() and L["camera script stopped"] or L["no camera script is running"])
+	elseif cmd == "builtins" and ns.isDev and ns.db then
+		ns.db.scriptBuiltIns = not ns.db.scriptBuiltIns or nil
+		ns.CameraRowsChanged()
+		if ns.db.scriptBuiltIns then
+			ns.Print("our cameras run as their scripts: ON (Cozy, AFK, Flight... rows play the built-in script; " ..
+				"the cameras' own code stays off). /cine script builtins again for the old cameras.")
+		else
+			if run and run.trigger then ns.StopCameraScript() end -- (the old camera takes over)
+			ns.Print("our cameras run as their scripts: OFF (the cameras' own code again)")
+		end
 	elseif cmd == "list" then
 		for _, script in ipairs(ns.CameraScripts()) do
 			local keys = ns.CameraScriptTriggers(script.id)
@@ -1928,6 +1953,10 @@ function ns.CameraScriptCommand(arg)
 		ns.Print(("camera scripts: trigger now %s (%s); event %s (%s); flight %s; combat %s; view held by %s"):format(
 			tostring(key), tostring(camera), tostring(active), tostring(activeCam), tostring(ns.OnTaxi()),
 			tostring(InFight()), tostring(ns.CameraHolder and ns.CameraHolder(WHO) or "?")))
+		if ns.isDev then
+			ns.Print(("our cameras as scripts (/cine script builtins): %s"):format(
+				ns.ScriptBuiltInsOn() and "ON" or "off"))
+		end
 		if run then
 			local step = run.step
 			ns.Print(("running %s for %s: %s, step %s, %.1f s in%s; counted turn %.1f, tilt %.1f; zoom %.1f (started %.1f)%s"):format(
@@ -1944,6 +1973,6 @@ function ns.CameraScriptCommand(arg)
 		else
 			ns.Print(("not running%s"):format(stoppedFor and (" (stopped for %s until it's over)"):format(stoppedFor) or ""))
 		end
-		ns.Print("/cine script list | play <name> | stop")
+		ns.Print("/cine script list | play <name> | stop" .. (ns.isDev and " | builtins" or ""))
 	end
 end

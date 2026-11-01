@@ -389,6 +389,10 @@ function ns.TriggerSetting(key, field)
 	if not id then
 		return field == "camera" and TRIGGER[key] and TRIGGER[key].off or false
 	end
+	-- (Dev copy: our cameras run as their scripts, CameraScripts.lua.)
+	if field == "camera" and ns.ScriptBuiltInsOn and ns.ScriptBuiltInsOn() then
+		return ns.BuiltInAsScript(ns.CameraRowValue(id, field))
+	end
 	return ns.CameraRowValue(id, field)
 end
 -- Whether a trigger's camera now is one (and not none).

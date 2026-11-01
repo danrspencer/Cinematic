@@ -356,4 +356,9 @@ function ns.CameraManager(kit, canvas, content, title, intro, switch)
 		Fit()
 	end
 	kit.AddControl(grid) -- (the page's Refresh runs as it's shown too)
+	-- Off to another page (a camera tab's link to Scenes or Scripts, say):
+	-- back here, it's the General tab again, the camera's tab closed.
+	canvas:HookScript("OnHide", function()
+		if openId then Pick(1) end
+	end)
 end
