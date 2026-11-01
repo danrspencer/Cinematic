@@ -741,7 +741,13 @@ local function Dropdown(parent, key, choices, width, onChange)
 	dropdown:SetWidth(width or 200)
 	dropdown.searchSkip = true -- (it shows the current choice, not a label)
 	dropdown:SetupMenu(function(_, rootDescription)
-		for _, choice in ipairs(type(choices) == "function" and choices() or choices) do
+		local list = type(choices) == "function" and choices() or choices
+		-- (A long list, like the fonts with other addons' added, scrolls: else it
+		-- runs off the screen and its last entries can't be reached.)
+		if #list > 20 and rootDescription.SetScrollMode then
+			rootDescription:SetScrollMode(20 * 20)
+		end
+		for _, choice in ipairs(list) do
 			local radio = rootDescription:CreateRadio(choice.text,
 				-- SetupMenu builds the menu right away, before saved settings load.
 				function()
