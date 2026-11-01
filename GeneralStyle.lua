@@ -310,10 +310,12 @@ function ns.CreateGeneralStylePanel(kit)
 
 	-- The game's own nameplate Style (retail's Options > Nameplates), shown
 	-- for what it is: greyed, as we leave it alone. Only where the client
-	-- has it.
+	-- has it: the classic clients keep the CVar (6 there) with no Style
+	-- option in their menu, so a value that isn't one of retail's styles
+	-- hides the row.
+	local STYLES = { [0] = "Modern", "Thin Bars", "Blocky Bars", "Clean Health", "Blocky Cast", "Legacy Red" }
 	local okStyle, gameStyle = pcall(GetCVar, "nameplateStyle")
-	if okStyle and gameStyle ~= nil then
-		local STYLES = { [0] = "Modern", "Thin Bars", "Blocky Bars", "Clean Health", "Blocky Cast", "Legacy Red" }
+	if okStyle and STYLES[tonumber(gameStyle) or -1] then
 		local styleName = stack:Add(kit.Label(content, "GameFontHighlight", L["Game's nameplate style:"]), "label")
 		styleName:SetSize(150, 30)
 		styleName:SetJustifyV("MIDDLE")

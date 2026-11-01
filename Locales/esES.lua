@@ -2138,10 +2138,10 @@ L["Type part of an icon's name to see the ones it matches, such as " ..
 	"bang, turnin o speak. Intro elige el primero."
 L["The quest mark's icon on friendly NPCs you still need for a quest (an NPC to talk to): on their " ..
 	"nameplates or names, on your target frame, and over the quest object that glows. One you can't do " ..
-	"anything with yourself shows it grayed (with the default !, the game's \"in progress\" mark). Click to pick another."] =
+	"anything with yourself shows it grayed (with the !, the game's \"in progress\" mark). Click to pick another."] =
 	"El icono de la marca de misión en los PNJ amistosos que aún necesitas para una misión (un PNJ con quien hablar): " ..
 	"en sus placas de nombre o nombres, en tu marco de objetivo y sobre el objeto de misión que brilla. Uno con el " ..
-	"que no puedes hacer nada tú mismo lo muestra en gris (con el ! predeterminado, la marca \"en curso\" del juego). Haz clic para elegir otro."
+	"que no puedes hacer nada tú mismo lo muestra en gris (con el !, la marca \"en curso\" del juego). Haz clic para elegir otro."
 L["The quest mark's icon on enemies you still need for a quest (a mob to kill): on their nameplates " ..
 	"or names, and on your target frame. Click to pick another."] =
 	"El icono de la marca de misión en los enemigos que aún necesitas para una misión (un enemigo que matar): " ..
@@ -4835,4 +4835,22 @@ L["Quest talk is on: talking to an NPC, what they say and what you can say back 
 L["Show the game's window brings the game's own window back for the rest of the conversation"] = "Mostrar la ventana del juego trae de vuelta la ventana del juego durante el resto de la conversación"
 L["A minimap blip's tooltip, which always shows"] = "La descripción de un punto del minimapa, que siempre se muestra"
 -- What's new: Inspect (its title is above, with Why.lua's)
-L["Type /cine why, or pick it from the minimap button's menu, then click any frame to see why it's showing or hidden right now and which settings say so. It works on other addons' frames, Cinematic's own (like quest talk), and the last tooltip too."] = "Escribe /cine why, o elígelo en el menú del botón del minimapa, y haz clic en cualquier marco para ver por qué se muestra u oculta ahora y qué opciones lo deciden. También funciona con marcos de otros addons, los de Cinematic (como el diálogo de misiones) y la última descripción."
+L["Type /cine why, or pick it from the minimap button's menu, then click any frame to see why it's showing or hidden right now and which settings say so. It works on other addons' frames, Cinematic's own (like quest talk), and the last tooltip too. The Why Is It Showing? page in Community lists every row of frames at once."] = "Escribe /cine why, o elígelo en el menú del botón del minimapa, y haz clic en cualquier marco para ver por qué se muestra u oculta ahora y qué opciones lo deciden. También funciona con marcos de otros addons, los de Cinematic (como el diálogo de misiones) y la última descripción. La página ¿Por Qué Se Muestra? de Comunidad muestra todas las filas de marcos a la vez."
+L["Minimap button"] = "Botón del minimapa"
+L["The letterbox: black bars at the top and bottom of the screen while CineMode is on"] = "Las franjas: barras negras arriba y abajo de la pantalla mientras CineMode está activado"
+L["Cinematic's minimap button: click it for its menu. Show minimap button turns it off"] = "El botón del minimapa de Cinematic: haz clic para abrir su menú. Mostrar el botón del minimapa lo desactiva"
+L["The Campfire button: you're pointing at a campfire and standing still. Click it to sit down"] = "El botón de hoguera: señalas una hoguera y estás quieto. Haz clic para sentarte"
+L["The quest item button: the item your nearest tracked quest gives you to use"] = "El botón del objeto de misión: el objeto que te da para usar tu misión seguida más cercana"
+L["Battle Vision's cue as a fight starts or ends"] = "El aviso de la Visión de batalla al empezar o acabar un combate"
+L["Story Vision's Last time card: what you did last session, as you log in"] = "La tarjeta La última vez de la Visión de historia: lo que hiciste la última sesión, al entrar"
+L["Story Vision's death banner, as you die"] = "El rótulo de muerte de la Visión de historia, al morir"
+L["Story Vision's time of day, under the zone's name"] = "La hora del día de la Visión de historia, bajo el nombre de la zona"
+L["Story Vision's Last time line: what you did last session, as you log in"] = "La línea La última vez de la Visión de historia: lo que hiciste la última sesión, al entrar"
+L["Story Vision's title: the time of day changing, or a place under attack"] = "El título de la Visión de historia: la hora del día que cambia, o un lugar bajo ataque"
+L["Why Is It Showing?"] = "¿Por Qué Se Muestra?"
+L["What each row of frames is doing right now, and the settings behind it. Click a row for all its reasons. To ask about one frame on the screen, pick it in game (or type /cine why)."] = "Qué hace ahora cada fila de marcos y qué opciones lo deciden. Haz clic en una fila para ver todos sus motivos. Para preguntar por un marco de la pantalla, elígelo en el juego (o escribe /cine why)."
+L["Pick a frame in game"] = "Elegir un marco en el juego"
+L["Now: %s"] = "Ahora: %s"
+L["Showing"] = "Visibles"
+L["Sort:"] = "Ordenar:"
+L["Visible first"] = "Visibles primero"

@@ -253,13 +253,48 @@ local function OwnArea(frame)
 	local alpha = frame.GetEffectiveAlpha and frame:GetEffectiveAlpha()
 		or frame:GetAlpha() * (parent and parent:GetEffectiveAlpha() or 1)
 	local width, height = frame:GetSize()
-	if Plain(alpha) and alpha > 0.05 and Plain(width) and Plain(height) and width * height > 0 then
+	if Plain(alpha) and alpha > 0.05 and Plain(width) and Plain(height) and width * height > 0
+		and width * height < UIParent:GetWidth() * UIParent:GetHeight() / 2 then
 		return width * height
+	end
+end
+
+-- Ours made in files loaded before this one, or kept in a field of a frame:
+-- found by name when Inspect looks (path: a global, then fields), with the
+-- card's title, page and reasons (looked up then, for the language).
+local NAMED = {
+	{ { "CinematicLetterbox", "top" }, "Letterbox", "Letterbox Style",
+		"The letterbox: black bars at the top and bottom of the screen while CineMode is on" },
+	{ { "CinematicLetterbox", "bottom" }, "Letterbox", "Letterbox Style",
+		"The letterbox: black bars at the top and bottom of the screen while CineMode is on" },
+	{ { "CinematicMinimapButton" }, "Minimap button", "Cinematic",
+		"Cinematic's minimap button: click it for its menu. Show minimap button turns it off" },
+	{ { "CinematicSitButton" }, "Campfire button", "General",
+		"The Campfire button: you're pointing at a campfire and standing still. Click it to sit down" },
+	{ { "CinematicQuestItemButton" }, "Quest item button", "Quest Vision",
+		"The quest item button: the item your nearest tracked quest gives you to use" },
+}
+for _, part in ipairs({ "text", "sub", "meta", "icon" }) do
+	NAMED[#NAMED + 1] = { { "CinematicCombatVision", "cue", part }, "Battle Vision", "Combat Vision",
+		"Battle Vision's cue as a fight starts or ends" }
+	NAMED[#NAMED + 1] = { { "CinematicLastTime", "cue", part }, "Last time", "Story Vision",
+		"Story Vision's Last time card: what you did last session, as you log in" }
+end
+local function RegisterNamed()
+	for _, named in ipairs(NAMED) do
+		local object = _G[named[1][1]]
+		for i = 2, #named[1] do
+			object = type(object) == "table" and object[named[1][i]] or nil
+		end
+		if type(object) == "table" and object.IsMouseOver and not own[object] then
+			ns.WhyRegister(object, L[named[2]], named[3], { L[named[4]] })
+		end
 	end
 end
 
 -- The smallest of them under the cursor and on screen, or nil.
 local function OwnFrameUnderCursor()
+	RegisterNamed()
 	local best, bestArea
 	for frame, info in pairs(own) do
 		local ok, area = pcall(OwnArea, frame)
@@ -300,7 +335,7 @@ local function Explain(entry)
 		return name, "unmanaged", out, "extra:" .. name
 	end
 	local item = RowItem(entry)
-	local key = item and item.key or entry.group
+	local key = item and item.key or (ns.HoverRowFor and ns.HoverRowFor(entry)) or entry.group
 	local title = item and item.label or RowLabel(key) or entry.name or "?"
 	local out = {}
 	local n = notes[entry]
@@ -824,6 +859,31 @@ function ns.DebugInspect()
 		end
 	end
 	if found == 0 then print("  no managed frame under the cursor") end
+	-- (Anything on screen under the cursor, named or not, a level or two in.)
+	local seenAny = 0
+	local function Look(frame, depth, parentName)
+		if seenAny >= 12 or (frame.IsForbidden and frame:IsForbidden()) then return end
+		if not (ns.Flag(frame:IsVisible()) and ns.Flag(frame:IsMouseOver())) then return end
+		local name = frame:GetName()
+		local alpha = frame:GetEffectiveAlpha()
+		local width, height = frame:GetSize()
+		local shown = Plain(alpha) and alpha > 0.05
+		if shown and depth > 0 and Plain(width) and Plain(height) and width * height
+			< UIParent:GetWidth() * UIParent:GetHeight() / 2 then
+			seenAny = seenAny + 1
+			print(("  visible: %s, %.0fx%.0f, alpha %.2f, %s"):format(name or ("unnamed in " .. parentName),
+				width, height, alpha, frame:GetFrameStrata()))
+		end
+		if depth < 2 then
+			for _, child in ipairs({ frame:GetChildren() }) do
+				Look(child, depth + 1, name or parentName)
+			end
+		end
+	end
+	for _, top in ipairs({ UIParent, WorldFrame }) do
+		pcall(Look, top, 0, top:GetName())
+	end
+	if seenAny == 0 then print("  visible: nothing under the cursor") end
 	local okOwn, mine = pcall(OwnFrameUnderCursor)
 	print(("  Cinematic's own frame: %s (%d known)"):format(okOwn and mine and mine.name or (okOwn and "none" or "error"),
 		(function() local n = 0 for _ in pairs(own) do n = n + 1 end return n end)()))
@@ -846,4 +906,260 @@ function ns.ToggleInspect()
 	if not overlay then MakeOverlay() end
 	ns.whyPicking, ns.whyLook = true, {}
 	overlay:Show()
+end
+
+-- The UI Manager's "Why Is It Showing?" page: every row of frames Cinematic
+-- fades, what it's doing now and why, kept up to date while the page is open
+-- (UpdateFrames notes the first frame of each row, as Inspect's are).
+local NOW_WORDS = { "cinemode", "combat", "calm", "nocombat", "camera", "target", "enemy", "friendly", "boss",
+	"world", "city", "inn", "dungeon", "raid", "bg", "arena", "group", "mounted", "flagged" }
+local FILTERS = { { "shown", "Showing" }, { "hidden", "Hidden" }, { "all", "All" } }
+local SORTS = { { "name", "Name" }, { "visible", "Visible first" } }
+-- (Visible first: showing, then partly, hidden, and the ones it can't tell.)
+local STATUS_ORDER = { shown = 1, partly = 2, hidden = 3, unmanaged = 4, unknown = 5 }
+local ROW_HEIGHT = 22
+
+function ns.CreateWhyPanel(kit)
+	local canvas, content = kit.CreateScrollPage(true)
+	local title = kit.Label(content, "GameFontNormalLarge", L["Why Is It Showing?"])
+	title:SetPoint("TOPLEFT", 16, -16)
+	local intro = kit.Label(content, "GameFontHighlight", L["What each row of frames is doing right now, and the " ..
+		"settings behind it. Click a row for all its reasons. To ask about one frame on the screen, pick it in " ..
+		"game (or type /cine why)."])
+	intro:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -8)
+	intro:SetPoint("RIGHT", content, "RIGHT", -16, 0)
+	intro:SetJustifyH("LEFT")
+	local pick = ns.PanelButton(content)
+	pick:SetSize(170, 24)
+	pick:SetText(L["Pick a frame in game"])
+	pick:SetPoint("TOPLEFT", intro, "BOTTOMLEFT", 0, -10)
+	pick:SetScript("OnClick", function()
+		-- (The settings window would be in the way.)
+		local panel = _G.SettingsPanel or _G.InterfaceOptionsFrame
+		if panel and not InCombatLockdown() then pcall(HideUIPanel, panel) end
+		if not ns.whyPicking then ns.ToggleInspect() end
+	end)
+	local now = kit.Label(content, "GameFontHighlightSmall", "")
+	now:SetPoint("TOPLEFT", pick, "BOTTOMLEFT", 0, -12)
+	now:SetPoint("RIGHT", content, "RIGHT", -16, 0)
+	now:SetJustifyH("LEFT")
+
+	local filter = "shown"
+	local filterButtons = {}
+	local Fill -- (below)
+	for i, info in ipairs(FILTERS) do
+		local button = ns.PanelButton(content)
+		button:SetSize(90, 22)
+		button.key, button.label = info[1], info[2]
+		if i == 1 then
+			button:SetPoint("TOPLEFT", now, "BOTTOMLEFT", 0, -10)
+		else
+			button:SetPoint("LEFT", filterButtons[i - 1], "RIGHT", 6, 0)
+		end
+		button:SetScript("OnClick", function(self)
+			filter = self.key
+			Fill()
+		end)
+		filterButtons[i] = button
+	end
+
+	-- Sort: by name (to start with) or visible first. Kept while the page is
+	-- open this session, not in the profile.
+	local sort = "name"
+	local sortLabel = kit.Label(content, "GameFontNormal", L["Sort:"])
+	sortLabel:SetPoint("LEFT", filterButtons[#filterButtons], "RIGHT", 24, 0)
+	local okMenu, sortMenu = ns.MenuDropdown(content)
+	if okMenu and sortMenu and sortMenu.SetupMenu then
+		sortMenu:SetWidth(140)
+		sortMenu:SetPoint("LEFT", sortLabel, "RIGHT", 8, 0)
+		sortMenu:SetupMenu(function(_, root)
+			for _, info in ipairs(SORTS) do
+				root:CreateRadio(L[info[2]], function() return sort == info[1] end, function()
+					sort = info[1]
+					Fill()
+				end)
+			end
+		end)
+	else
+		-- (No menus on this client: a button that goes to the next one.)
+		sortMenu = ns.PanelButton(content)
+		sortMenu:SetSize(140, 22)
+		sortMenu:SetPoint("LEFT", sortLabel, "RIGHT", 8, 0)
+		sortMenu:SetText(L["Name"])
+		sortMenu:SetScript("OnClick", function(self)
+			sort = sort == "name" and "visible" or "name"
+			self:SetText(L[sort == "name" and "Name" or "Visible first"])
+			Fill()
+		end)
+	end
+
+	local list = CreateFrame("Frame", nil, content)
+	list:SetPoint("TOPLEFT", filterButtons[1], "BOTTOMLEFT", 0, -10)
+	list:SetPoint("RIGHT", content, "RIGHT", -16, 0)
+	list:SetHeight(1)
+	local rows, open, look = {}, {}, {}
+
+	local function Row(i)
+		if rows[i] then return rows[i] end
+		local row = CreateFrame("Button", nil, list)
+		row:SetPoint("LEFT")
+		row:SetPoint("RIGHT")
+		local glow = row:CreateTexture(nil, "HIGHLIGHT")
+		glow:SetPoint("TOPLEFT")
+		glow:SetPoint("TOPRIGHT")
+		glow:SetHeight(ROW_HEIGHT)
+		glow:SetColorTexture(1, 0.82, 0, 0.08)
+		row.name = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+		row.name:SetPoint("TOPLEFT", 4, -4)
+		row.name:SetWidth(170)
+		row.name:SetJustifyH("LEFT")
+		row.name:SetWordWrap(false)
+		row.status = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+		row.status:SetPoint("TOPLEFT", 180, -5)
+		row.status:SetWidth(100)
+		row.status:SetJustifyH("LEFT")
+		row.reason = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+		row.reason:SetPoint("TOPLEFT", 284, -5)
+		row.reason:SetPoint("RIGHT", row, "RIGHT", -4, 0)
+		row.reason:SetJustifyH("LEFT")
+		row.reason:SetWordWrap(false)
+		row.more = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+		row.more:SetPoint("TOPLEFT", 284, -ROW_HEIGHT)
+		row.more:SetPoint("RIGHT", row, "RIGHT", -4, 0)
+		row.more:SetJustifyH("LEFT")
+		row.go = ns.PanelButton(row)
+		row.go:SetSize(110, 20)
+		row.go:SetText(L["Open settings"])
+		row.go:SetPoint("TOPRIGHT", row.more, "BOTTOMRIGHT", 0, -4)
+		row.go:SetScript("OnClick", function(self)
+			if self.page then ns.OpenOptions(self.page) end
+		end)
+		row:SetScript("OnClick", function(self)
+			open[self.key] = not open[self.key] or nil
+			Fill()
+		end)
+		rows[i] = row
+		return row
+	end
+
+	-- One entry for each row: the first that's on screen, else the first.
+	local function RowEntries()
+		local order, first = {}, {}
+		for _, entry in ipairs(ns.managed or NONE) do
+			local item = RowItem(entry)
+			local key = item and item.key or (ns.HoverRowFor and ns.HoverRowFor(entry)) or entry.group
+			local ok, left = pcall(EntryRect, entry)
+			if key and (not first[key] or (not first[key].onScreen and ok and left)) then
+				if not first[key] then order[#order + 1] = key end
+				first[key] = { entry = entry, onScreen = ok and left ~= nil }
+			end
+		end
+		return order, first
+	end
+
+	function Fill()
+		for _, button in ipairs(filterButtons) do
+			-- (The one picked in gold: the skin's highlight alone hardly shows.)
+			local chosen = button.key == filter
+			if chosen then button:LockHighlight() else button:UnlockHighlight() end
+			local text = button:GetFontString()
+			if text then
+				if chosen then text:SetTextColor(1, 0.82, 0) else text:SetTextColor(1, 1, 1) end
+			end
+		end
+		-- The situations true now, as the rules have them.
+		local facts = ns.RuleFactsNow()
+		local words = {}
+		for _, word in ipairs(NOW_WORDS) do
+			words[#words + 1] = (facts[word] and GREEN or GREY) .. word .. "|r"
+		end
+		now:SetText(L["Now: %s"]:format(table.concat(words, "  ")))
+		local order, first = RowEntries()
+		-- (Noted for this page, unless Inspect is looking at its own.)
+		if not ns.whyPicking then
+			wipe(look)
+			for _, key in ipairs(order) do look[first[key].entry] = true end
+			ns.whyLook = look
+		end
+		local counts, shownRows = { shown = 0, hidden = 0, all = 0 }, 0
+		local items = {}
+		for _, key in ipairs(order) do
+			local title, status, reasons = Explain(first[key].entry)
+			local kind = (status == "shown" or status == "partly") and "shown" or status == "hidden" and "hidden"
+			counts.all = counts.all + 1
+			if kind then counts[kind] = counts[kind] + 1 end
+			if filter == "all" or filter == kind then
+				items[#items + 1] = { key = key, title = tostring(title), status = status, reasons = reasons }
+			end
+		end
+		table.sort(items, function(a, b)
+			if sort == "visible" and a.status ~= b.status then
+				return (STATUS_ORDER[a.status] or 9) < (STATUS_ORDER[b.status] or 9)
+			end
+			if a.title:lower() ~= b.title:lower() then return a.title:lower() < b.title:lower() end
+			return a.key < b.key
+		end)
+		local y = 0
+		for _, item in ipairs(items) do
+			local key, title, status, reasons = item.key, item.title, item.status, item.reasons
+			do
+				shownRows = shownRows + 1
+				local row = Row(shownRows)
+				row.key = key
+				row.name:SetText(title)
+				row.status:SetText(StatusText(status))
+				-- (The first reason doing it now, else the first one.)
+				local main = reasons[1]
+				for _, reason in ipairs(reasons) do
+					if reason.state ~= "off" then main = reason break end
+				end
+				row.reason:SetText(main and main.text or "")
+				local height = ROW_HEIGHT
+				if open[key] then
+					local lines = {}
+					for _, reason in ipairs(reasons) do
+						local mark = reason.state == "on" and GREEN .. "+" or reason.state == "block" and "|cfff2a3a3x"
+							or GREY .. "-"
+						lines[#lines + 1] = ("%s|r %s%s"):format(mark, reason.text,
+							reason.page and (GREY .. "  (" .. L[reason.page] .. ")|r") or "")
+					end
+					row.more:SetText(table.concat(lines, "\n"))
+					row.more:Show()
+					row.go.page = main and main.page or FramePage(key)
+					row.go:Show()
+					height = ROW_HEIGHT + row.more:GetStringHeight() + 34
+				else
+					row.more:Hide()
+					row.go:Hide()
+				end
+				row:ClearAllPoints()
+				row:SetPoint("TOPLEFT", list, "TOPLEFT", 0, -y)
+				row:SetPoint("RIGHT", list, "RIGHT")
+				row:SetHeight(height)
+				row:Show()
+				y = y + height
+			end
+		end
+		for i = shownRows + 1, #rows do rows[i]:Hide() end
+		for _, button in ipairs(filterButtons) do
+			button:SetText(("%s (%d)"):format(L[button.label], counts[button.key]))
+		end
+		list:SetHeight(math.max(1, y))
+		content:SetHeight(math.max(1, y) + 220 + intro:GetStringHeight())
+	end
+
+	local elapsedSince = 0
+	canvas:SetScript("OnUpdate", function(_, elapsed)
+		elapsedSince = elapsedSince + elapsed
+		if elapsedSince > 0.5 then
+			elapsedSince = 0
+			Fill()
+		end
+	end)
+	canvas:SetScript("OnShow", function() Fill() end)
+	canvas:SetScript("OnHide", function()
+		if not ns.whyPicking and ns.whyLook == look then ns.whyLook = nil end
+	end)
+	canvas:Hide()
+	kit.RegisterSubpage(canvas, "Why showing", L["Why Is It Showing?"])
 end

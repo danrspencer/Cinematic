@@ -5,7 +5,7 @@
 local _, ns = ...
 
 ns.QUEST_MARK_ICONS = {
-	"questnormal", -- (Golden !, the default: QuestMobs' PaintMark)
+	"questnormal", -- (Golden !: QuestMobs' PaintMark; the fallback for one a client lacks)
 	-- Quest marks: available (!)
 	"campaignavailabledailyquesticon",
 	"campaignavailablequesticon",

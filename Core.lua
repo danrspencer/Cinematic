@@ -954,9 +954,12 @@ DEFAULTS.questVision = true -- the Quest Vision page's switch: off, none of the 
 DEFAULTS.questMobsPlate = false
 DEFAULTS.questMobsName = false
 DEFAULTS.questMobsMark = true
--- The quest mark's icon on friendly NPCs, and on enemies: one of QUEST_MARK_ICONS (see QuestMobs' PaintMark)
-DEFAULTS.questMarkStyle = "questnormal"
-DEFAULTS.questMarkStyleEnemy = "questnormal"
+-- The quest mark's icon on friendly NPCs, and on enemies: one of QUEST_MARK_ICONS (see QuestMobs' PaintMark) (the ! where a client lacks it).
+-- The track cursor where the client has it (retail, Forever), else the small gold ! (Classic Era).
+local questMarkDefault = (C_Texture and C_Texture.GetAtlasInfo and C_Texture.GetAtlasInfo("crosshair_track_48"))
+	and "crosshair_track_48" or "smallquestbang"
+DEFAULTS.questMarkStyle = questMarkDefault
+DEFAULTS.questMarkStyleEnemy = questMarkDefault
 DEFAULTS.targetQuestIcon = true -- a quest icon on the target frame while your target is one of them (see QuestMobs)
 -- The nearest tracked quest's item to use on a big button at the extra ability button's spot (see QuestItemButton)
 DEFAULTS.questItemButton = true

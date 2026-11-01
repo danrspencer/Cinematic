@@ -323,14 +323,17 @@ local function FullHeight()
 end
 
 -- A paragraph's sentences, and a sentence's words: for one too tall for a page.
+-- An ellipsis before a lowercase letter ("certain...reagents") doesn't end
+-- one: its dots stand in as \1 until the split is done.
 local SENTENCE = "[^%.!%?]*[%.!%?]+[\"'%)]*%s*"
 local function Sentences(piece)
 	local parts = {}
+	piece = piece:gsub("%.%.%.(%s*%l)", "\1\1\1%1")
 	for part in piece:gmatch(SENTENCE) do
-		part = part:match("^%s*(.-)%s*$")
+		part = part:gsub("\1", "."):match("^%s*(.-)%s*$")
 		if part ~= "" then parts[#parts + 1] = part end
 	end
-	local rest = (piece:gsub(SENTENCE, "")):match("^%s*(.-)%s*$")
+	local rest = (piece:gsub(SENTENCE, "")):gsub("\1", "."):match("^%s*(.-)%s*$")
 	if rest ~= "" then parts[#parts + 1] = rest end
 	return parts
 end
@@ -376,6 +379,11 @@ local function Pages(text)
 		return pages
 	end
 	text = text:gsub("\r\n", "\n")
+	-- Old quests space their ellipses (". . ."): close them up so a line
+	-- can't wrap between the dots.
+	text = text:gsub("%.[ \t]*%.[ \t%.]*", function(dots)
+		return "..." .. dots:match("[ \t]*$")
+	end)
 	local full = FullHeight()
 	for paragraph in (text .. "\n\n"):gmatch("(.-)\n%s*\n") do
 		paragraph = paragraph:match("^%s*(.-)%s*$")
@@ -1175,6 +1183,28 @@ local ICON, BUTTON_HIGH, ROW_STEP = 39, 41, 44
 local NAME_FRAME = "Interface\\QuestFrame\\UI-QuestItemNameFrame"
 local ICON_FRAME = "Interface\\Common\\WhiteIconFrame"
 local CHOSEN = "Interface\\QuestFrame\\UI-QuestItemHighlight"
+-- (Our buttons are wider than the game's 147, so the name frame and the
+-- glow come in three: their ends as drawn, only the middle stretched; a
+-- whole stretched frame thickens its edges and pulls the glow off them.
+-- Cut at the name frame's x 24 and 104 of 128, the glow's 61 and 141 of 256
+-- at -8 on the button: the same places on the game's button.)
+local NAME_CUTS = { 0, 24, 104, 128 }
+local CHOSEN_CUTS = { 0, 61, 141, 256 }
+-- Three textures of file side by side from the first's anchor, cut at
+-- cuts (of the file's width); the middle one is sized later.
+local function ThreeParts(b, layer, sub, file, cuts, blend)
+	local parts = {}
+	for i = 1, 3 do
+		local part = b:CreateTexture(nil, layer, nil, sub)
+		part:SetTexture(file)
+		if blend then part:SetBlendMode(blend) end
+		part:SetTexCoord(cuts[i] / cuts[4], cuts[i + 1] / cuts[4], 0, 1)
+		part:SetSize(cuts[i + 1] - cuts[i], 64)
+		if i > 1 then part:SetPoint("LEFT", parts[i - 1], "RIGHT") end
+		parts[i] = part
+	end
+	return parts
+end
 local iconColumn = 0
 local function AddIcon(entry)
 	iconCount = iconCount + 1
@@ -1185,12 +1215,11 @@ local function AddIcon(entry)
 		-- the icon, the name 15 into it, and the warband mark at the name's
 		-- top right.
 		b = CreateFrame("Button", nil, panel)
-		b.nameFrame = b:CreateTexture(nil, "BACKGROUND", nil, -1)
-		b.nameFrame:SetTexture(NAME_FRAME)
+		b.nameFrame = ThreeParts(b, "BACKGROUND", -1, NAME_FRAME, NAME_CUTS)
 		b.icon = b:CreateTexture(nil, "BACKGROUND")
 		b.icon:SetSize(ICON, ICON)
 		b.icon:SetPoint("TOPLEFT")
-		b.nameFrame:SetPoint("LEFT", b.icon, "RIGHT", -10, 0)
+		b.nameFrame[1]:SetPoint("LEFT", b.icon, "RIGHT", -10, 0)
 		b.border = b:CreateTexture(nil, "OVERLAY", nil, 1)
 		b.border:SetAllPoints(b.icon)
 		b.border:SetTexture(ICON_FRAME)
@@ -1202,10 +1231,11 @@ local function AddIcon(entry)
 		b.mark = b:CreateTexture(nil, "OVERLAY", nil, 2)
 		b.mark:SetSize(16, 21)
 		b.mark:SetPoint("TOPLEFT", b.name, "TOPRIGHT", 0, 3)
-		b.chosen = b:CreateTexture(nil, "BACKGROUND", nil, -2)
-		b.chosen:SetTexture(CHOSEN)
-		b.chosen:SetBlendMode("ADD")
-		b.chosen:SetPoint("TOPLEFT", b, "TOPLEFT", -8, 12)
+		-- (Over the name frame and icon, as the game's: under them only its
+		-- edges showed, a yellow bar above the button.)
+		b.chosen = ThreeParts(b, "ARTWORK", 0, CHOSEN, CHOSEN_CUTS, "ADD")
+		-- (6 down, not the game's 7: at 7 it sat high on ours, tested.)
+		b.chosen[1]:SetPoint("TOPLEFT", b, "TOPLEFT", -8, 6)
 		b:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight", "ADD")
 		b:SetScript("OnEnter", function(self)
 			if self.tip then
@@ -1229,17 +1259,16 @@ local function AddIcon(entry)
 		Draggable(b)
 		icons[iconCount] = b
 	end
-	-- (Wider than the game's 147, the name frame and highlight stretch to suit.)
+	-- (Wider than the game's 147: the name frame's and glow's middles take
+	-- the extra.)
 	local wide = IconWidth()
 	b:SetSize(wide, BUTTON_HIGH)
-	-- (The art's edge stretches with it, so the name's 15 in does too, or
-	-- it sits on the frame's border.)
-	local stretch = (wide - ICON + 10) / (147 - ICON + 10)
-	b.nameFrame:SetSize(128 * stretch, 64)
+	local middle = 80 + wide - 147
+	b.nameFrame[2]:SetWidth(middle)
+	b.chosen[2]:SetWidth(middle)
 	b.name:ClearAllPoints()
-	b.name:SetPoint("LEFT", b.nameFrame, "LEFT", 15 * stretch, 0)
-	b.name:SetWidth(wide - ICON + 10 - 15 * stretch - 16)
-	b.chosen:SetSize(256 * wide / 147, 64)
+	b.name:SetPoint("LEFT", b.nameFrame[1], "LEFT", 15, 0)
+	b.name:SetWidth(wide - ICON + 10 - 15 - 16)
 	b:ClearAllPoints()
 	b:SetPoint("TOPLEFT", 14 + iconColumn * (wide + 8), -cursor - 4)
 	if iconColumn == 1 then
@@ -1273,7 +1302,9 @@ local function AddIcon(entry)
 		b.name:SetTextColor(1, 1, 1)
 	end
 	b.tip, b.pick, b.link = entry.tip, entry.pick, entry.link
-	b.chosen:SetShown(entry.chosen and true or false)
+	for _, part in ipairs(b.chosen) do
+		part:SetShown(entry.chosen and true or false)
+	end
 	b:Show()
 	return b
 end

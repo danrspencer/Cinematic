@@ -1102,6 +1102,9 @@ local function CreateDeathBanner()
 		banner.bleed[i] = Text("ARTWORK", offset[1], offset[2], BANNER_BLEED_ALPHA)
 	end
 	banner.text = Text("OVERLAY", 0, 0, BANNER_TEXT_ALPHA)
+	if ns.WhyRegister then
+		ns.WhyRegister(banner.text, L["Death banner"], "Story Vision", { L["Story Vision's death banner, as you die"] })
+	end
 	banner.flat = frame:CreateTexture(nil, "BACKGROUND")
 	banner.flat:SetColorTexture(0, 0, 0, WASTED_ALPHA)
 	banner.flat:SetPoint("LEFT")
@@ -1654,6 +1657,12 @@ function ns.ShowTimeOfDayTitle(showTime, recap)
 		timeTitle.recap = timeTitle:CreateFontString(nil, "OVERLAY")
 		timeTitle.recap:SetFontObject(_G.SubZoneTextFont or GameFontNormalLarge)
 		timeTitle.recap:SetShadowOffset(1, -1)
+		if ns.WhyRegister then
+			ns.WhyRegister(timeTitle.text, L["Time of day"], "Story Vision", { L["Story Vision's time of day, under the zone's name"] })
+		end
+		if ns.WhyRegister then
+			ns.WhyRegister(timeTitle.recap, L["Last time"], "Story Vision", { L["Story Vision's Last time line: what you did last session, as you log in"] })
+		end
 		timeTitle.recap:SetTextColor(RECAP_COLOR[1], RECAP_COLOR[2], RECAP_COLOR[3])
 		local function Clear()
 			timeTitle.text:SetText("")
@@ -1815,6 +1824,9 @@ local function ShowTitle(text, r, g, b, hold)
 		changeTitle.text = changeTitle:CreateFontString(nil, "OVERLAY")
 		changeTitle.text:SetFontObject(_G.ZoneTextFont or GameFontNormalHuge or GameFontNormalLarge)
 		changeTitle.text:SetShadowOffset(1, -1)
+		if ns.WhyRegister then
+			ns.WhyRegister(changeTitle.text, L["Story Vision"], "Story Vision", { L["Story Vision's title: the time of day changing, or a place under attack"] })
+		end
 		changeTitle.text:SetPoint("CENTER")
 		ns.AddOverlay(changeTitle)
 		changeTitle:SetScript("OnUpdate", function(self, elapsed)

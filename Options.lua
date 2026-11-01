@@ -1698,6 +1698,7 @@ do
 			{ "Thanks", "Interface\\Icons\\INV_ValentinesCard02", section = "People" },
 			{ "Help", "Interface\\Icons\\INV_Misc_QuestionMark", section = "Help" }, -- (WhatsNew.lua)
 			{ "Profiler", "Interface\\Icons\\INV_Misc_PocketWatch_02", section = "Help" }, -- (ProfilerPage.lua)
+			{ "Why showing", "Interface\\Icons\\Ability_Hunter_EagleEye", label = "Why Is It Showing?", section = "Help" }, -- (Why.lua)
 			{ "Module Editor", "Interface\\Icons\\INV_Misc_Wrench_01", section = "Dev", dev = true }, -- (ModuleEditor.lua)
 		} },
 	}
@@ -11158,7 +11159,7 @@ local function CreateVisionPanel()
 	MarkButton("questMarkStyle", L["Friendly"],
 		L["The quest mark's icon on friendly NPCs you still need for a quest (an NPC to talk to): on their " ..
 		"nameplates or names, on your target frame, and over the quest object that glows. One you can't do " ..
-		"anything with yourself shows it grayed (with the default !, the game's \"in progress\" mark). Click to pick another."], 0)
+		"anything with yourself shows it grayed (with the !, the game's \"in progress\" mark). Click to pick another."], 0)
 	MarkButton("questMarkStyleEnemy", L["Enemy"],
 		L["The quest mark's icon on enemies you still need for a quest (a mob to kill): on their nameplates " ..
 		"or names, and on your target frame. Click to pick another."], 140)
@@ -14321,6 +14322,9 @@ ns.OnLanguage(function()
 	end
 	if ns.CreateProfilerPanel then -- (ProfilerPage.lua: Community's last page)
 		ns.CreateProfilerPanel(ns.lowHealthKit)
+	end
+	if ns.CreateWhyPanel then -- (Why.lua: after the Profiler, in Community's Help)
+		ns.CreateWhyPanel(ns.lowHealthKit)
 	end
 	-- The dev build's Module Editor, Community's last page (ModuleEditor.lua).
 	if ns.isDev and ns.CreateModuleEditor then
