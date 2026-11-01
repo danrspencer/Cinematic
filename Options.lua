@@ -6622,6 +6622,14 @@ local function CreateQualityPanel()
 			L["On: everything below works as ticked. Off: none of it does, and each keeps its tick for " ..
 			"when you turn this back on."], title)
 		stack = Stack(switch, "check")
+		-- (Hunter.lua: Classic Era only. WoW Forever has the game's own setting.)
+		if ns.isClassicEra then
+			stack:Add(Check(content, "hunterRightClickShot", L["Right click attack also uses Auto-shot"],
+				L["Right-clicking an enemy targets it and attacks: Auto Shot when it's far enough away to shoot, " ..
+				"a melee swing when it's too close, in a fight or out of one. In a fight the game only checks " ..
+				"what's under the mouse a few times a second, so a very quick right-click on a new enemy can " ..
+				"still be a melee one."]), "check")
+		end
 		-- (HunterAmmo.lua.)
 		stack:Add(Check(content, "hunterAmmoSort", L["Smallest ammo stack first after Clean Up Bags"],
 			L["Clean Up Bags leaves the part stack of arrows or bullets last, but you shoot from the first stack, " ..

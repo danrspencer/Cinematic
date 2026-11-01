@@ -51,6 +51,7 @@ SpeakerWatch.lua
 ChatCam.lua
 ChatCamSubtitles.lua
 Campfire.lua
+Hunter.lua
 HunterAmmo.lua
 DragEquip.lua
 TalentLink.lua

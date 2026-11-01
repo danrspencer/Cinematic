@@ -300,6 +300,7 @@ local DEFAULTS = {
 	campfireKneel = true,
 	campfireLie = true,
 	campfireStandUp = true,   -- ...and stand up again once Camp Benefits arrives
+	hunterRightClickShot = true, -- hunters on Classic Era: right-click on an enemy starts Auto Shot, in combat too (Hunter.lua)
 	hunterAmmoSort = true,    -- hunters: after Clean Up Bags, the smallest ammo stack goes first, to be shot first (HunterAmmo.lua)
 	hunterQuiverFill = true,  -- hunters: a Fill button on arrows and bullets at vendors fills the quiver (HunterAmmo.lua)
 	-- Dragging something you can wear out of the bags opens the character window (DragEquip.lua). Off by
@@ -1268,7 +1269,7 @@ for page, keys in pairs({
 	handleQuality = { "campfireSitButton", "dragEquipCharacter", "talentLink", "talentCalc",
 		"centerPanels", "dragPanels", "chatCopyButton", "loginZoom",
 		"reloadButton", "reloadKeepWindows" },
-	handleHunter = { "hunterAmmoSort", "hunterQuiverFill" },
+	handleHunter = { "hunterRightClickShot", "hunterAmmoSort", "hunterQuiverFill" },
 	duelPlates = { "duelCC" }, -- Duel Vision's page
 	storyVision = { "storyRecap", "timeOfDayMessage", "timeOfDayChange", "chatAttackAlert", "deathBannerStyle" }, -- Story Vision's rows
 	cameraModes = { "shoulderCam" }, -- Cameras > General's Enable Cameras: Shoulder Cam
