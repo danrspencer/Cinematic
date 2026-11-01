@@ -162,8 +162,15 @@ local function FlatButton(parent, text, style, onClick)
 	if style == "main" then
 		b:SetSize(120, 30)
 		Flat(b, BUTTON, BUTTON)
-		b:SetScript("OnEnter", function() b:SetBackdropColor(unpack(BUTTON_LIT)) end)
-		b:SetScript("OnLeave", function() b:SetBackdropColor(unpack(BUTTON)) end)
+		b:SetScript("OnEnter", function() if b:IsEnabled() then b:SetBackdropColor(unpack(BUTTON_LIT)) end end)
+		b:SetScript("OnLeave", function() if b:IsEnabled() then b:SetBackdropColor(unpack(BUTTON)) end end)
+		-- (a plain box, as Settings beside it, while it can't be used: Next
+		-- before a level's picked; gold once it can)
+		function b:SetUsable(on)
+			b:SetEnabled(on)
+			Flat(b, on and BUTTON or RAISED, on and BUTTON or EDGE)
+			Color(s, on and WHITE or SOFT)
+		end
 	elseif style == "box" then
 		b:SetSize(120, 30)
 		Flat(b, RAISED, EDGE)
@@ -257,6 +264,8 @@ local function UpdatePicked()
 		status:SetText(L["Nothing runs until you pick one."])
 	end
 	finish:SetLabel(ns.ProfileChosen() and L["Done"] or L["Decide later"])
+	-- (Next only once a level's picked: Customize changes a level)
+	if pages[1]:IsShown() then primary:SetUsable(active and true or false) end
 	Describe(levelOf[active])
 end
 
@@ -655,6 +664,7 @@ local function CreateWindow()
 	pages[2].OnShow = function()
 		local out = ns.ProfileChosen() and L["Done"] or L["Decide later"]
 		local last = pages[2].IsLast()
+		primary:SetUsable(true)
 		primary:SetLabel(last and out or L["Next"])
 		-- (the quiet way out too, but not twice on the last)
 		finish:SetLabel(out)
