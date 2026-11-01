@@ -190,6 +190,7 @@ ns.BUILTIN_PROFILES = {
 			"camera can start music."],
 		picks = { layout = { forever = "preset", retail = "pure" }, frames = "pure", bars = "pure", camera = "pure",
 			vfx = "pure", chat = "pure" },
+		modules = { "zone-card" },
 	},
 }
 

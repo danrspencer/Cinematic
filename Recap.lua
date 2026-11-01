@@ -300,7 +300,8 @@ function ns.RecapDemo()
 	end
 	local carded = ns.RecapCard(parts)
 	if ns.ShowTimeOfDayTitle then
-		ns.ShowTimeOfDayTitle(ns.Setting("timeOfDayMessage"), not carded and line or nil)
+		local showTime = ns.Setting("timeOfDayMessage") and not (ns.ZoneCardTime and ns.ZoneCardTime())
+		ns.ShowTimeOfDayTitle(showTime, not carded and line or nil)
 	end
 	return line, sample
 end

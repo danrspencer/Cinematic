@@ -1274,7 +1274,7 @@ for page, keys in pairs({
 		"reloadButton", "reloadKeepWindows" },
 	handleHunter = { "hunterRightClickShot", "hunterAmmoSort", "hunterQuiverFill" },
 	duelPlates = { "duelCC" }, -- Duel Vision's page
-	storyVision = { "storyRecap", "timeOfDayMessage", "timeOfDayChange", "chatAttackAlert", "deathBannerStyle" }, -- Story Vision's rows
+	storyVision = { "storyRecap", "storyZoneCard", "timeOfDayMessage", "timeOfDayChange", "chatAttackAlert", "deathBannerStyle" }, -- Story Vision's rows
 	cameraModes = { "shoulderCam" }, -- Cameras > General's Enable Cameras: Shoulder Cam
 	visualEffects = { "letterboxPage", "tintPage", "graphicsPlus", "musicInCinematic" }, -- (the Atmosphere hub's pages' switches)
 	-- Style > General's Enable Style: the Style hub's pages' switches.
@@ -6053,6 +6053,8 @@ ticker:SetScript("OnEvent", ns.Profiled("Core events", function(self, event, arg
 				recap = nil
 			end
 			local timeOfDay = ns.Setting("timeOfDayMessage")
+			-- (With Story Vision's zone card, the time of day goes on it.)
+			if timeOfDay and ns.ProfileChosen() and ns.ZoneCardTime and ns.ZoneCardTime() then timeOfDay = false end
 			if (timeOfDay or recap) and ns.ProfileChosen() then
 				-- (Last time on a card of its own, if Story Vision's Style tab says.)
 				if recap and ns.RecapCard and ns.RecapCard() then recap = nil end

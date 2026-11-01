@@ -64,9 +64,10 @@ local NOTE_W = 440 -- (each moment's words under it, wrapped)
 local TABS = { now = "recap" }
 local function TabList()
 	TABS[1] = { "recap", L["Last time"], L["What you did last time you played, as you log in."] }
-	TABS[2] = { "time", L["Time of day"], L["The time of day's name, at login and as it changes."] }
-	TABS[3] = { "attack", L["Under attack"], L["A place under attack, from the LocalDefense channel."] }
-	TABS[4] = { "death", L["Death banner"], L["Words across the screen as you die."] }
+	TABS[2] = { "zone", L["Zone name"], L["The zone's name as you come into it, as a card of your own."] }
+	TABS[3] = { "time", L["Time of day"], L["The time of day's name, at login and as it changes."] }
+	TABS[4] = { "attack", L["Under attack"], L["A place under attack, from the LocalDefense channel."] }
+	TABS[5] = { "death", L["Death banner"], L["Words across the screen as you die."] }
 	return TABS
 end
 
@@ -77,6 +78,7 @@ local TESTS = {
 		ns.Print(sample and L["Last time: nothing to say yet this session (no quests, level or bosses), " ..
 			"so this is a sample."] or line)
 	end,
+	zone = function() ns.TestZoneCard() end,
 	time = function() ns.TestTimeChangeTitle() end,
 	attack = function()
 		local place = GetMinimapZoneText and GetMinimapZoneText() or ""
@@ -245,6 +247,16 @@ local function MakePreview(parent, width)
 					ns.PlayVisionCard(cardHost, ns.RecapCardLook(), self:GetWidth(), height, scale, card)
 				end)
 			end
+		elseif kind == "zone" then
+			-- (The card alone: the game's zone name doesn't show with it.)
+			Clear()
+			steps = nil
+			stage:SetAlpha(0)
+			local card = ns.ZoneCardText(look, zone, GetSubZoneText and GetSubZoneText() or "", nil, true)
+			if card then
+				cardHost:Show()
+				ns.PlayVisionCard(cardHost, ns.ZoneCardLook(), self:GetWidth(), height, scale, card)
+			end
 		elseif kind == "time" then
 			-- (At login under the zone name, then as it changes on its own.)
 			Play({
@@ -336,6 +348,18 @@ function ns.CreateStoryVisionPanel(kit)
 		local recapTest = TestButton(kit, content, recap, TESTS.recap)
 		kit.Tooltip(recapTest, L["Plays your login now: the zone name fades in with the Last time line under " ..
 			"it, from this session so far (a sample if nothing counted yet). Close the settings to see it."])
+	end)
+
+	parts.Part("zone", function()
+		local card = Moment("storyZoneCard", L["Zone name card"],
+			L["As you come into a new zone, its name shows as a card styled on the Style tab (where, how it " ..
+			"comes in, its color) in place of the game's own zone name. The time of day at login goes on it, " ..
+			"over the name."])
+		TestButton(kit, content, card, TESTS.zone)
+		local subzones = stack:Add(kit.Check(content, "storyZoneSubzones", L["Subzones too"],
+			L["A card as you come into a subzone (a town, a camp, a landing) too, the zone's name small over it."]),
+			"check")
+		kit.GreyUnless(subzones, function(db) return db.storyZoneCard end)
 	end)
 
 	parts.Part("time", function()
@@ -557,6 +581,49 @@ function ns.CreateStoryStylePanel(kit)
 		Pair({ "storyRecapSound", L["Page-turn sound"], L["A page turning as it shows, as a journal opens."] })
 		stack:Note(content, L["It shows only if something happened that's ticked here: quests, a level, bosses, " ..
 			"deaths or gold. The zone and time played come with it."], NOTE_W)
+	end, "rows")
+	-- Zone name: a card of its own, in place of the game's (ZoneCard.lua plays it).
+	parts.Part("zone", function()
+		local function InBar(db)
+			local place = rows.Get("storyZonePlace")
+			return On(db) and (place == "top" or place == "bottom")
+		end
+		Look({ "storyZone", L["The zone name's color, the lines with it in a lighter shade."] }, function(look)
+			look.Boxes():Box(L["Size"], "storyZoneSize", 14, 64, 1, "%d", 1,
+				L["How tall the zone's name is on the screen (its other lines go by it). In a letterbox bar: " ..
+				"the bar's height."])
+		end)
+		stack:Header(content, L["Where"])
+		rows.Dropdown(L["Place:"], "storyZonePlace", List({
+			{ "screen", L["On the screen"], L["In the middle of the screen."] },
+			{ "top", L["Top letterbox bar"] },
+			{ "bottom", L["Bottom letterbox bar"] },
+			{ "third", L["Lower third"], L["Low on the left of the screen, as a film names a place, its line " ..
+				"fading out to the right."] },
+		}), L["Where the zone's name shows."])
+		rows.Dropdown(L["In the bar:"], "storyZoneAlign", List({
+			{ "left", L["Left"] },
+			{ "center", L["Center"] },
+			{ "right", L["Right"] },
+		}), L["Where in the letterbox bar the card sits. (With no letterbox up, the lower third.)"], InBar)
+
+		stack:Header(content, L["Card"])
+		rows.Dropdown(L["Style:"], "storyZoneStyle", List({
+			{ "title", L["Title card"], L["The zone's name big, the rest under it."] },
+			{ "subtitle", L["Subtitle"], L["A small line low on the screen, where a film's subtitles go."] },
+			{ "chapter", L["Chapter line"], L["The zone's name over a line that draws out, as a new chapter starts."] },
+		}), L["How the card is set: a title card, a subtitle or a chapter line."])
+		rows.Dropdown(L["Animation:"], "storyZoneAnim", List({
+			{ "fade", L["Fade"], L["The card fades in and out, as the game's zone name does."] },
+			{ "reveal", L["Reveal"], L["The zone's name opens out from its middle (or side), the rest rising in after."] },
+			{ "track", L["Tracking in"], L["The zone's name's letters close up, as a film's title comes in."] },
+			{ "type", L["Typewriter"], L["The zone's name comes in a letter at a time, as if typed into a journal, " ..
+				"the rest rising in after."] },
+		}), L["How the card comes in."])
+		Stays("storyZoneHold", L["How long the card stays between fading in and out (Typewriter: once typed)."])
+		Pair({ "storyZoneIcon", L["Map icon"], L["A map before the zone's name."] },
+			{ "storyZoneTerritory", L["Territory"], L["Under the name, what the game says of the place: " ..
+				"Contested Territory, Sanctuary, Alliance or Horde Territory..."] })
 	end, "rows")
 	parts.Part("time", function()
 		Look({ "storyTime", L["Pick the color of the time of day's name as it changes. (At login it sits under " ..

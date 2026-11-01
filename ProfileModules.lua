@@ -475,6 +475,9 @@ ns.PROFILE_MODULES = {
 			set("deathOffInInstances", false)
 			set("deathBannerStyle", "youdied")
 		end },
+	{ key = "zone-card", name = "Zone name card", scope = { "Story Vision" },
+		tip = "The zone's name as you come into it shows as Story Vision's card, in place of the game's.",
+		apply = function(set) set("storyZoneCard", true) end },
 
 	-- The look
 	{ key = "no-letterbox", name = "No letterbox", scope = { "Letterbox/Show in" },

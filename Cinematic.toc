@@ -105,6 +105,7 @@ CombatSoundRules.lua
 CombatVision.lua
 StoryVision.lua
 Recap.lua
+ZoneCard.lua
 QuestTalkStyle.lua
 BubbleStyle.lua
 TooltipStyle.lua
