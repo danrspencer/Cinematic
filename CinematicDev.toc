@@ -33,6 +33,7 @@ Support\ForeverEnhancedCooldownManager.lua
 Support\EllesmereUI.lua
 Support\Bartender4.lua
 Support\ElvUI.lua
+Support\DaylightUI.lua
 Support\Plater.lua
 Support\HorizonSuite.lua
 Support\FlareUI.lua

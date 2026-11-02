@@ -1813,6 +1813,16 @@ L["Its other bars, pet, stance, totem, micro, bag and data bars are rows on the 
 L["its panels along the top and bottom of the screen"] = "sus paneles a lo largo de la parte superior e inferior de la pantalla"
 L["its threat bar"] = "su barra de amenaza"
 
+-- Support/DaylightUI.lua
+L["its damage meter windows"] = "sus ventanas de medidor de daño"
+L["Its info panel (XP bar and minimap) follows the Minimap row on the Standard Frames page; its unit frames, bars, buffs, chat and quest tracker follow the rows of the frames they replace."] = "Su panel de información (barra de experiencia y minimapa) sigue la fila Minimapa de la página Marcos estándar; sus marcos de unidad, barras, beneficios, chat y seguimiento de misiones siguen las filas de los marcos que sustituyen."
+L["its threat meter window"] = "su ventana de medidor de amenaza"
+L["its flight timer and loot feed"] = "su temporizador de vuelo y su lista de botín"
+L["its missing-buff reminder"] = "su recordatorio de beneficios que faltan"
+L["its pull timer"] = "su temporizador de pull"
+L["Its cast bar isn't faded, like the game's."] = "Su barra de lanzamiento no se desvanece, igual que la del juego."
+L["its quest arrow and marker"] = "su flecha y marcador de misión"
+
 -- Support/FlareUI.lua
 L["its boss frames"] = "sus marcos de jefe"
 L["Its unit frames, cast bar, resource bars, buffs, quest tracker, party and raid frames, XP bar and totems are rows on the Standard Frames page."] = "Sus marcos de unidad, barra de lanzamiento, barras de recursos, beneficios, seguimiento de misiones, marcos de grupo y banda, barra de experiencia y tótems son filas de la página Marcos estándar."

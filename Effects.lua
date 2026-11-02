@@ -1225,11 +1225,21 @@ end)
 -- A nameplate addon drawing plates of its own sets this (see Support/Plater.lua):
 -- fn(plate, alpha), alpha nil to let go of the plate.
 ns.addonPlateAlpha = nil
+-- And this, if it keeps the game's unit frame at alpha 0 under its own
+-- (Support/DaylightUI.lua): fn(plate), true to leave that frame's alpha be.
+ns.addonPlateHidden = nil
 
 -- bodyAlpha: for a plate up for its name alone, how far the rest of it shows.
 function ns.SetPlateAlpha(plate, alpha, bodyAlpha)
 	if ns.addonPlateAlpha and plate and not (plate.IsForbidden and plate:IsForbidden()) then
 		ns.addonPlateAlpha(plate, alpha)
+	end
+	if ns.addonPlateHidden and plate and not (plate.IsForbidden and plate:IsForbidden())
+		and ns.addonPlateHidden(plate) then
+		if plate.UnitFrame then
+			plate.UnitFrame.cinematicAlpha = nil -- (the keeper lets go of it)
+		end
+		return
 	end
 	if plate and plate.UnitFrame and not (plate.IsForbidden and plate:IsForbidden()) then
 		local frame = plate.UnitFrame
