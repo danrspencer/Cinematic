@@ -1256,15 +1256,23 @@ local function Apply(d, look, k, fade, heart, secret)
 		end
 	end
 	-- The portal: further away (its rim further in) the weaker you are, and stronger.
-	-- Not with secret health: the rest fades by the frame's alpha from the game,
-	-- and the model doesn't (seen: it stayed at full health, all else faded out).
+	-- With secret health: the rest fades by the frame's alpha from the game, and
+	-- the model didn't follow it (seen: it stayed at full health, all else faded
+	-- out), so it takes the game's number itself, as fully in (its opacity
+	-- setting can't scale a secret number); hidden if that fails.
 	local portal, info = d.portal, shown.portal
 	if portal then
-		local a = info and not secret and (look.lowHealthPortalAlpha or 0) * (info.alpha or 1)
-			* math.min(1, c * 2) * fade or 0
+		local a = info and (look.lowHealthPortalAlpha or 0) * (info.alpha or 1) * math.min(1, c * 2) * fade or 0
+		local curve = secret and a > 0 and SecretCurve()
+		if secret then
+			local ok = curve and pcall(function() portal:SetAlpha(UnitHealthPercent("player", true, curve)) end)
+			a = ok and 1 or 0
+		end
 		if a > 0 then
-			portal:SetPosition(PORTAL_OUT + ((info.distance or PORTAL_FULL) - PORTAL_OUT) * c, 0, 0)
-			portal:SetAlpha(math.min(1, a))
+			local out = info.out or PORTAL_OUT
+			portal:SetPosition(out + ((info.distance or PORTAL_FULL) - out) * c, 0, 0)
+			portal:SetModelScale(info.scale or 1)
+			if not secret then portal:SetAlpha(math.min(1, a)) end
 			portal:Show()
 		else
 			portal:Hide()
@@ -2865,9 +2873,36 @@ function ns.CreateVitalsStylePanel(kit)
 	if ns.isDev then
 		local portalName = stack:Add(kit.Label(content, "GameFontHighlight", "Theme's portal (dev copy)"), "label")
 		portalName.searchLabel = "Theme's portal"
+		-- (Where it sits, to try out: the theme's own portal changed in place, until /reload;
+		-- the numbers to write into LowHealthThemes.lua.)
+		local function PortalField(name, default)
+			return {
+				get = function()
+					local theme = ns.GetDB() and ns.VitalsEditedTheme()
+					local portal = theme and theme.portal
+					return portal and portal[name] or default
+				end,
+				set = function(value)
+					local theme = ns.VitalsEditedTheme()
+					if theme and theme.portal then
+						theme.portal[name] = value
+					end
+				end,
+			}
+		end
+		local function HasPortal(d) return Themed(d) and ns.VitalsEditedTheme().portal ~= nil end
+		for _, row in ipairs({
+			{ "out", PORTAL_OUT, "Start distance", -20, 10, 0.5, "%.1f", "Where it is as the edges start in (bigger: nearer, so bigger on screen)." },
+			{ "distance", PORTAL_FULL, "Full distance", -20, 10, 0.5, "%.1f", "Where it is at full: its rim should frame the screen." },
+			{ "scale", 1, "Size", 0.2, 4, 0.1, "%.1f", "The model's size." },
+		}) do
+			local slider = stack:Add(kit.Slider(content, PortalField(row[1], row[2]), row[3], row[4], row[5], row[6],
+				row[7], 1, Changed), "slider")
+			kit.Tooltip(slider, row[8] .. " Dev copy: changes the theme until /reload; run the page's Test to see it.")
+			kit.GreyUnless(slider, HasPortal)
+		end
 		Opacity("lowHealthPortalAlpha", "The theme's portal (one of the game's portal models), its swirling rim " ..
-			"closing in round the screen as you weaken. Only themes with one: Dungeon portal (a pink ring closing in " ..
-			"round you) and Vortex (the old dungeon portal's blue rim).", On)
+			"closing in round the screen as you weaken. Parked: no theme has one now.", On)
 	end
 	tabbed.Finish(swirlTab)
 

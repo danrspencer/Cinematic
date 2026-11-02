@@ -15,7 +15,7 @@ local MODELS = {
 	{ 240933, "Dungeon portal, blue" }, -- (the same)
 	{ 240935, "Dungeon portal, green (Wrath's)" }, -- (at -10: the whole screen green, too near)
 	{ 240939, "Dungeon portal, red (Wrath's)" }, -- (looks like 197007)
-	{ 165829, "Spell portal, purple" }, -- (at -10: a bright pink ring round you, in the middle)
+	{ 165829, "Spell portal, purple" }, -- (at -10: a pink ring round you; at 1 its rim frames the screen)
 	{ 165834, "Large spell portal, purple" }, -- (at -10: streaks off to the bottom left)
 	{ 166523, "Mage portal" }, -- (at -10: like 165829, blue)
 	{ 1713776, "Fel portal" },
