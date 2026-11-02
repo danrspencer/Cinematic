@@ -96,6 +96,9 @@ local MAX_SPARKS = 24
 local FADE_IN, FADE_END = 0.3, 1.2 -- seconds those that fade fade in and out over
 local GAS_REACH = 0.2              -- gas starts this share of the shadow's reach in (by the edge)...
 local GAS_DRIFT = 0.03             -- ...and billows this share of the way to the middle
+local SPIRAL_TURN = 0.45           -- a spiraling spark's turn round the middle over its life (turns)...
+local SPIRAL_IN = 0.65             -- ...and the share of the way to the middle it comes
+local ORBIT_SPEED = 0.35           -- an orbiting spark's speed round the middle (radians a second)
 -- Swirls (a theme's swirl, LowHealthThemes.lua): up to two layers, each a
 -- texture over the whole screen, turning, clear in its middle; the bigger it
 -- is, the further out its clear middle reaches, so it closes in as it shrinks.
@@ -230,7 +233,7 @@ local THEME_FIELDS = { "edge", "body", "glow", "glowAlpha", "shadow", "flash", "
 -- (The edges offered: the soft ones, no drawn shapes.)
 local EDGES = { "Smoke", "Glow", "Soak", "Rime", "Fur" }
 local SPARK_TEXTURES = { Mote = true, Star = true, Bolt = true, Gas = true }
-local SPARK_KINDS = { rise = true, twinkle = true, flicker = true, drift = true }
+local SPARK_KINDS = { rise = true, twinkle = true, flicker = true, drift = true, spiral = true, orbit = true }
 local SPARK_AT = { top = true, bottom = true, sides = true }
 local SWIRL_BLEND = { Swirl = "ADD", Vortex = "BLEND" } -- (the swirls' textures: the arms as light, the clouds as paint)
 local ORIGINAL = {} -- (LowHealthThemes.lua's, by key)
@@ -873,6 +876,10 @@ local function Spark(d, info)
 			local share = gas and GAS_REACH or 1
 			spark.x, spark.y = Place(info.at, d.reach * share, d.reachSides * share, gas)
 			spark.phase = math.random() * 2 * math.pi
+			-- (Spiraling and orbiting: the way the theme's swirl turns, or its arms' way.)
+			local swirl = d.shown and d.shown.swirl and d.shown.swirl[1]
+			spark.dir = swirl and swirl.spin < 0 and -1 or 1
+			spark.tex:SetRotation(0)
 			spark.tex:SetTexture(ART .. info.tex)
 			spark.tex:SetBlendMode(info.flat and "BLEND" or "ADD")
 			-- (mirrored now and then)
@@ -897,7 +904,9 @@ end
 
 -- The sparks now. flicker: on and off, fading out; twinkle: fading in and
 -- out; rise: floating up, swaying, fading in and out; drift: billowing in
--- a little toward the middle, growing, fading in slowly and out.
+-- a little toward the middle, growing, fading in slowly and out; spiral:
+-- winding in toward the middle the way the swirl turns, spinning, fading in
+-- and out; orbit: circling the middle the same way, twinkling.
 local function AnimateSparks(d, now, width, height, alpha)
 	for _, spark in ipairs(d.sparks) do
 		if spark.born then
@@ -917,6 +926,23 @@ local function AnimateSparks(d, now, width, height, alpha)
 					x, y = x + (0.5 - x) * GAS_DRIFT * share, y + (0.5 - y) * GAS_DRIFT * share
 					size = size * (1 + 0.5 * share)
 					a = math.min(1, t / (FADE_IN * 2), (spark.life - t) / FADE_END)
+				elseif info.kind == "spiral" or info.kind == "orbit" then
+					-- (Round the middle in pixels, so the path is round on a wide
+					-- screen; screen angles: down is positive, so the swirl's way
+					-- (counterclockwise to the eye) is down the angles.)
+					local share = t / spark.life
+					local dx, dy = (x - 0.5) * width, (y - 0.5) * height
+					local r, turn = math.sqrt(dx * dx + dy * dy), math.atan2(dy, dx)
+					if info.kind == "spiral" then
+						r = r * (1 - SPIRAL_IN * share * share)
+						turn = turn - spark.dir * SPIRAL_TURN * 2 * math.pi * share
+						a = math.min(1, t / FADE_IN, (spark.life - t) / FADE_END)
+					else
+						turn = turn - spark.dir * ORBIT_SPEED * t
+						a = math.sin(math.pi * share)
+					end
+					x, y = 0.5 + r * math.cos(turn) / width, 0.5 + r * math.sin(turn) / height
+					spark.tex:SetRotation(-turn)
 				else
 					y = y - (info.speed or 0.1) * t
 					x = x + math.sin(spark.phase + t * 2) * 0.008
@@ -2546,8 +2572,14 @@ function ns.CreateVitalsStylePanel(kit)
 			rate = 4, hit = { 1, 1 } },
 		gas = { tex = "Gas", kind = "drift", flat = true, size = { 0.35, 0.6 }, life = { 3, 5 }, rate = 45,
 			hit = { 3, 4 } },
+		spiral = { tex = "Mote", kind = "spiral", size = { 0.015, 0.03 }, life = { 3, 5 }, rate = 30, hit = { 3, 5 } },
+		orbit = { tex = "Star", kind = "orbit", size = { 0.02, 0.04 }, life = { 2, 4 }, rate = 20, hit = { 2, 3 } },
 	}
 	local KIND_OF = { Mote = "motes", Star = "stars", Bolt = "lightning", Gas = "gas" }
+	-- (The menu's choice a spark is: spiraling and orbiting by their motion, the rest by their texture.)
+	local function KindOf(info)
+		return (info.kind == "spiral" or info.kind == "orbit") and info.kind or KIND_OF[info.tex]
+	end
 	local function Sparks() return ThemeValue("sparks") or {} end
 	local function SetSpark(i, change)
 		local sparks = {}
@@ -2593,7 +2625,7 @@ function ns.CreateVitalsStylePanel(kit)
 		local kind = Choose({
 			get = function()
 				local info = Spark(i)
-				return info and KIND_OF[info.tex] or "none"
+				return info and KindOf(info) or "none"
 			end,
 			set = function(value)
 				SetSpark(i, function(sparks, info)
@@ -2611,9 +2643,11 @@ function ns.CreateVitalsStylePanel(kit)
 		}, function()
 			return { { value = "none", text = L["None"] }, { value = "motes", text = L["Rising motes"] },
 				{ value = "stars", text = L["Twinkling stars"] }, { value = "lightning", text = L["Lightning"] },
-				{ value = "gas", text = L["Drifting gas"] } }
-		end, 140, L["What it is: motes of light floating up, stars twinkling, lightning flickering, or gas " ..
-			"drifting in over the edges. None: not there."], function(d) return Themed(d) and i <= SparkCount() + 1 end)
+				{ value = "gas", text = L["Drifting gas"] }, { value = "spiral", text = L["Spiraling motes"] },
+				{ value = "orbit", text = L["Orbiting stars"] } }
+		end, 140, L["What it is: motes of light floating up, stars twinkling, lightning flickering, gas " ..
+			"drifting in over the edges, motes spiraling in the way the swirl turns, or stars circling the " ..
+			"middle. None: not there."], function(d) return Themed(d) and i <= SparkCount() + 1 end)
 		kind:SetPoint("LEFT", row, "LEFT", 0, 0)
 		-- (The swatch from just past the dropdown: from it, it'd sit on its text.)
 		local past = CreateFrame("Frame", nil, row)
@@ -2629,10 +2663,10 @@ function ns.CreateVitalsStylePanel(kit)
 			function(info, v) info.rate = v end), 0, 120, 5, "%d", 1,
 			L["How many come a minute at full (a big hit brings a few more)."], Used(i))
 		boxes:Box(L["Size"], SparkField(i, function(info)
-			local base = SPARK_KINDS[KIND_OF[info.tex]]
+			local base = SPARK_KINDS[KindOf(info)]
 			return info.size[2] / base.size[2]
 		end, function(info, v)
-			local base = SPARK_KINDS[KIND_OF[info.tex]]
+			local base = SPARK_KINDS[KindOf(info)]
 			info.size = { base.size[1] * v, base.size[2] * v }
 		end), 20, 300, 10, "%d", 100, L["How big they are, next to the usual."], Used(i), "%")
 		local from = Choose(SparkField(i, function(info) return info.at or "any" end, function(info, v)

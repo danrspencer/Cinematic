@@ -17,8 +17,9 @@
 --   sparks   the few sprites left (LowHealth.lua draws them), each:
 --     tex    its texture: "Bolt" (lightning), "Star", "Mote" or "Gas"
 --     kind   "flicker" (on and off, fading: lightning), "twinkle" (fading in
---            and out), "rise" (floating up, swaying) or "drift" (billowing in,
---            growing)
+--            and out), "rise" (floating up, swaying), "drift" (billowing in,
+--            growing), "spiral" (winding in toward the middle the way the
+--            swirl turns, spinning) or "orbit" (circling the middle, twinkling)
 --     flat   drawn as it is, not as light (gas over art: it shouldn't glow)
 --   (Every theme also gets a haze of gas: Haze, below.)
 --     at     where it starts: "top", "bottom", "sides", or nil for any edge
@@ -218,22 +219,27 @@ ns.LOW_HEALTH_THEMES = {
 		flash = { 0.6, 0.8, 1 }, pulse = 0.8, swirl = {
 			{ tex = "Vortex", color = { 0.5, 0.65, 0.95 }, alpha = 0.75, spin = 6, reach = 0.6 },
 			{ tex = "Swirl", color = { 0.55, 0.75, 1 }, alpha = 0.3, spin = 9, reach = 0.5 },
+		}, sparks = {
+			{ tex = "Mote", kind = "spiral", color = { 0.65, 0.8, 1 }, size = { 0.015, 0.03 }, life = { 3, 5 },
+				rate = 30, hit = { 3, 5 } },
 		} },
 	{ key = "abyss", name = "Abyss", edge = "Glow", glow = { 0.7, 0.3, 1 }, glowAlpha = 0.5,
 		shadow = { 0.1, 0, 0.16 }, flash = { 0.9, 0.4, 1 }, bpm = 0.85, swirl = {
 			{ tex = "Swirl", color = { 0.75, 0.35, 1 }, alpha = 0.8, spin = 7, reach = 0.75 },
 			{ tex = "Vortex", color = { 0.35, 0.1, 0.5 }, alpha = 0.65, spin = 4, reach = 0.85 },
 		}, sparks = {
-			{ tex = "Star", kind = "twinkle", color = { 0.9, 0.6, 1 }, size = { 0.02, 0.04 }, life = { 1, 2 },
+			{ tex = "Star", kind = "orbit", color = { 0.9, 0.6, 1 }, size = { 0.02, 0.04 }, life = { 2, 4 },
 				rate = 20, hit = { 2, 3 } },
+			{ tex = "Mote", kind = "spiral", color = { 0.8, 0.5, 1 }, size = { 0.015, 0.03 }, life = { 3, 5 },
+				rate = 25, hit = { 3, 5 } },
 		} },
 	{ key = "portal", name = "Dungeon portal", edge = "Glow", glow = { 0.55, 0.3, 1 }, glowAlpha = 0.45,
 		shadow = { 0.06, 0.02, 0.14 }, flash = { 0.7, 0.5, 1 }, pulse = 0.7, swirl = {
 			{ tex = "Vortex", color = { 0.45, 0.25, 0.85 }, alpha = 0.8, spin = -10, reach = 0.45 },
 			{ tex = "Swirl", color = { 0.8, 0.6, 1 }, alpha = 0.45, spin = -14, reach = 0.4 },
 		}, sparks = {
-			{ tex = "Mote", kind = "rise", color = { 0.8, 0.6, 1 }, size = { 0.015, 0.03 }, life = { 2, 3.5 },
-				speed = 0.05, rate = 25, hit = { 2, 4 } },
+			{ tex = "Mote", kind = "spiral", color = { 0.8, 0.6, 1 }, size = { 0.015, 0.03 }, life = { 3, 5 },
+				rate = 35, hit = { 3, 5 } },
 		} },
 }
 -- The page's More themes: those no class has.
