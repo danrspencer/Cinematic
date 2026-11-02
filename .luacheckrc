@@ -327,6 +327,7 @@ read_globals = {
 	"UnitIsPVPFreeForAll",
 	"UnitIsCharmed",
 	"StartDuel",
+	"AcceptDuel",
 	"GetZonePVPInfo",
 	"C_PvP",
 	"DUEL_WINNER",

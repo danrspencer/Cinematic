@@ -346,7 +346,7 @@ local CARDS = {
 	{ "combatOut", "Leaving combat", "4. Questing & combat" }, { "boss", "Boss", "4. Questing & combat" },
 	{ "death", "Death", "4. Questing & combat" }, { "zone", "Zone name", "2. Town & inn" },
 	{ "login", "Last time", "2. Town & inn" }, { "time", "Time of day", "5. Scenery & mood" },
-	{ "attack", "Under attack", "2. Town & inn" },
+	{ "attack", "Under attack", "2. Town & inn" }, { "duel", "Duel", "4. Questing & combat" },
 }
 for _, card in ipairs(CARDS) do
 	Add(card[3], { key = "card-" .. card[1], name = "Card: " .. card[2],
@@ -355,12 +355,12 @@ for _, card in ipairs(CARDS) do
 end
 Add("4. Questing & combat", { key = "cards", name = "Cards carousel: every card",
 	tip = "Every card in turn, 7 seconds each, UI hidden: entering and leaving combat, boss, zone, last time, time of day, " ..
-		"under attack, death. Change the looks on Card Style first to show yours.",
+		"under attack, duel, death. Change the looks on Card Style first to show yours.",
 	script = function(d)
 		d.Cine(true)
 		d.HideUI(true)
 		d.Wait(1)
-		for _, id in ipairs({ "combatIn", "combatOut", "boss", "zone", "login", "time", "attack", "death" }) do
+		for _, id in ipairs({ "combatIn", "combatOut", "boss", "zone", "login", "time", "attack", "duel", "death" }) do
 			d.Cue("card " .. id)
 			ns.CardTest(id)
 			d.Wait(7)

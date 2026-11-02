@@ -11644,6 +11644,10 @@ local function CreateVisionPanel()
 		L["A feared, stunned, polymorphed, rooted or silenced duelist gets an icon of the spell beside their " ..
 		"nameplate, with the time left."]), "check")
 	GreyUnless(duelCC, function(db) return db.handlePlates and db.duelPlates end)
+	local duelHide = stack:Add(Check(content, "duelHideOthers", L["Hide other duels while you duel"],
+		L["While you're in a duel (or have asked for one, or been asked), other players' duels nearby don't " ..
+		"show. Off: they show all through yours."]), "check")
+	GreyUnless(duelHide, function(db) return db.handlePlates and db.duelPlates end)
 	-- Test: pretend duels for 30 seconds (see Effects); Stop with the seconds
 	-- left meanwhile (as the camera tests').
 	local duelTest = ns.PanelButton(content)

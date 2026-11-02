@@ -1604,6 +1604,13 @@ do
 		pair.winner, pair.loser, pair.fled, pair.endedAt = winner, loser, fled, now
 		duels.ended[winner], duels.ended[loser] = now, now
 		duels.scanAt = 0
+		-- (Your own: the Duel card's result.)
+		local me = ShortName(UnitName("player"))
+		if winner == me then
+			duels.MyCard("won", loser, fled)
+		elseif loser == me then
+			duels.MyCard("lost", winner, fled)
+		end
 	end
 
 	-- A line that may be a duel's end (source, for /cine debug duels). True
@@ -1626,15 +1633,56 @@ do
 		return true
 	end
 
+	-- Your own duel (the Cards page's Duel card): the other's name and whether
+	-- it started, from a challenge until it ends.
+	local mine
+	function duels.MyCard(moment, other, fled)
+		if ns.Cards and ns.Setting(ns.DUEL_MOMENT[moment]) then
+			ns.Cards.Fire("duel", ns.DuelCard(moment, other, fled))
+		end
+	end
+	local function Challenge(moment, name)
+		duels.selfUntil = GetTime() + 60
+		name = Known(name) and type(name) == "string" and ShortName(name) or nil
+		mine = { other = name, at = GetTime() }
+		duels.MyCard(moment, name)
+	end
+	local function Start(source)
+		if mine and not mine.started and GetTime() - mine.at < 120 then
+			mine.started, mine.source = true, source
+			duels.MyCard("start", mine.other)
+		end
+	end
+
+	-- For /cine debug duels: the last duel events and system lines (around a
+	-- duel of your own), to find what fires as one starts on each client.
+	duels.log = {}
+	local function Log(event, ...)
+		local args = {}
+		for i = 1, select("#", ...) do
+			local value = select(i, ...)
+			args[i] = Known(value) and tostring(value) or "?"
+		end
+		table.insert(duels.log, ("%.1f %s %s"):format(GetTime(), event, table.concat(args, ", ")))
+		if #duels.log > 20 then table.remove(duels.log, 1) end
+	end
+
 	local watcher = CreateFrame("Frame")
-	for _, event in ipairs({ "CHAT_MSG_SYSTEM", "DUEL_REQUESTED", "DUEL_FINISHED" }) do
+	for _, event in ipairs({ "CHAT_MSG_SYSTEM", "DUEL_REQUESTED", "DUEL_FINISHED", "DUEL_TO_THE_DEATH_REQUESTED",
+		"DUEL_INBOUNDS", "DUEL_OUTOFBOUNDS", "START_TIMER" }) do
 		pcall(watcher.RegisterEvent, watcher, event)
 	end
-	watcher:SetScript("OnEvent", function(_, event, text)
-		if event == "DUEL_REQUESTED" then
-			duels.selfUntil = GetTime() + 60
+	watcher:SetScript("OnEvent", function(_, event, text, ...)
+		if event ~= "CHAT_MSG_SYSTEM" or GetTime() < duels.selfUntil then Log(event, text, ...) end
+		if event == "DUEL_REQUESTED" or event == "DUEL_TO_THE_DEATH_REQUESTED" then
+			Challenge("asked", text)
 		elseif event == "DUEL_FINISHED" then
 			duels.selfUntil = 0
+			mine = nil
+		elseif event == "START_TIMER" then
+			Start(event)
+		elseif event ~= "CHAT_MSG_SYSTEM" then
+			return
 		elseif Known(text) and type(text) == "string" then
 			duels.lastSystem = text
 			DuelLine(text, "event")
@@ -1643,11 +1691,25 @@ do
 		end
 	end)
 
-	-- Asking someone to a duel yourself.
+	-- Asking someone to a duel yourself (unit: a unit or a name), and saying
+	-- yes to one.
 	if StartDuel then
-		hooksecurefunc("StartDuel", function()
-			duels.selfUntil = GetTime() + 60
+		hooksecurefunc("StartDuel", function(unit)
+			Log("StartDuel", unit)
+			local name = unit
+			if type(unit) == "string" and Ask(UnitExists, unit) then name = UnitName(unit) end
+			Challenge("ask", name)
 		end)
+	end
+	if AcceptDuel then
+		hooksecurefunc("AcceptDuel", function()
+			Log("AcceptDuel")
+			Start("AcceptDuel")
+		end)
+	end
+	-- (What started yours, for /cine debug duels.)
+	function duels.Mine()
+		return mine
 	end
 
 	-- Why duels aren't watched now (nil: they are).
@@ -1660,7 +1722,7 @@ do
 			return "in combat"
 		elseif duels.test then
 			return nil -- (pretend duels: anywhere, cities too)
-		elseif GetTime() < duels.selfUntil then
+		elseif GetTime() < duels.selfUntil and ns.Setting("duelHideOthers") then
 			return "dueling yourself"
 		elseif Ask(ns.OnTaxi) then
 			return "on a flight"
@@ -3114,6 +3176,15 @@ function ns.PrintDuelsDebug()
 				tostring(pair.loser), GetTime() - pair.endedAt))
 		end
 	end
+	-- Your own duel, for the Cards page's Duel card.
+	local mine = duels.Mine()
+	ns.Print(("your duel: %s; Duel card row %s, Card Vision %s, hide others %s"):format(
+		mine and ("with %s, %s %.0fs ago"):format(tostring(mine.other),
+			mine.started and ("started by " .. mine.source) or "not started, asked", GetTime() - mine.at) or "none",
+		tostring(ns.Setting("cardDuelOn")), tostring(ns.Setting("cards")), tostring(ns.Setting("duelHideOthers"))))
+	ns.Print(("duel events (now %.1f), system lines only while dueling:"):format(GetTime()))
+	for _, line in ipairs(duels.log) do ns.Print("  " .. line) end
+	if #duels.log == 0 then ns.Print("  none yet") end
 end
 
 function ns.ShowPlatesNow()

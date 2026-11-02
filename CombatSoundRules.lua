@@ -27,11 +27,13 @@ ns.DEFAULTS.cardTimeSounds = "dawn##8352@100;morning##730@100;midday##1@100;afte
 -- (The other cards': one rule each, "show#<condition>#<sounds>". A page
 -- turning for Last time, your faction's bell for Under attack, the rest
 -- silent.)
-ns.CARD_SOUND_LISTS = { "zone", "subzone", "login", "attack", "death" }
+ns.CARD_SOUND_LISTS = { "zone", "subzone", "login", "attack", "duel", "death" }
 ns.DEFAULTS.cardSounds_zone = "show##"
 ns.DEFAULTS.cardSounds_subzone = "show##"
 ns.DEFAULTS.cardSounds_login = "show##836@100"
 ns.DEFAULTS.cardSounds_attack = "show##1@100"
+-- (The Duel card's: a rule for each of its moments, all silent to start with.)
+ns.DEFAULTS.cardSounds_duel = "ask##;asked##;start##;won##;lost##"
 ns.DEFAULTS.cardSounds_death = "show##"
 
 local SOUND = {} -- id -> its entry in ns.COMBAT_SOUNDS
@@ -43,6 +45,14 @@ local TIMES = { "dawn", "morning", "midday", "afternoon", "evening", "dusk", "ni
 local EDGES = { ["in"] = true, out = true, kill = true, wipe = true, show = true }
 local IS_TIME = {}
 for _, time in ipairs(TIMES) do EDGES[time], IS_TIME[time] = true, true end
+-- The cards with moments of their own (the Duel card's), each a rule's edge
+-- in place of "show": in order, with their names.
+local CARD_EDGES = { duel = { "ask", "asked", "start", "won", "lost" } }
+local CARD_EDGE_NAME = { ask = "You challenge", asked = "You're challenged", start = "Duel starts", won = "Won",
+	lost = "Lost" }
+for _, list in pairs(CARD_EDGES) do
+	for _, edge in ipairs(list) do EDGES[edge] = true end
+end
 
 -- Text -> { { edge = "in"|"out"|"kill"|"wipe"|a time of day|"show", rule = text, sounds = { { id, volume 0-1 }... } }... }
 function ns.ParseCombatSounds(text)
@@ -273,9 +283,10 @@ function ns.PlayTimeCueSound(title)
 	local edge = (title or ""):lower()
 	if IS_TIME[edge] then PlayList("cardTimeSounds", edge) end
 end
--- Another card's, as it shows (id: its event's).
-function ns.PlayCardCueSound(id)
-	PlayList("cardSounds_" .. tostring(id), "show")
+-- Another card's, as it shows (id: its event's; edge: its moment, for a
+-- card with moments).
+function ns.PlayCardCueSound(id, edge)
+	PlayList("cardSounds_" .. tostring(id), edge or "show")
 end
 
 -- A cue's Ambience volume left held by a crash or reload mid-cue: back now;
@@ -344,8 +355,12 @@ function ns.CombatSoundRulesSection(kit, content, stack, boss)
 	local card = type(boss) == "string" and not time and boss
 	if time or card then boss = false end
 	local key = card and ("cardSounds_" .. card) or time and "cardTimeSounds" or "combatSounds"
+	local moments = card and CARD_EDGES[card] -- (its moments, else one edge: "show")
+	local momentNext = {}
+	for i, edge in ipairs(moments or {}) do momentNext[edge] = moments[i % #moments + 1] end
 	local function EdgeText(edge)
 		if IS_TIME[edge] then return "|cffffdb99" .. L[TIME_NAME[edge]] .. "|r" end
+		if CARD_EDGE_NAME[edge] then return "|cffffdb99" .. L[CARD_EDGE_NAME[edge]] .. "|r" end
 		if edge == "show" then return "|cffffdb99" .. L["As it shows"] .. "|r" end
 		if edge == "kill" then return "|cff5dcaa5" .. L["Boss killed"] .. "|r" end
 		if edge == "wipe" then return "|cff9a9a9a" .. L["Wipe"] .. "|r" end
@@ -416,7 +431,8 @@ function ns.CombatSoundRulesSection(kit, content, stack, boss)
 		head.up:SetPoint("LEFT", head.rule, "RIGHT", 6, 0)
 		head.remove = SmallButton(head, "x")
 		head.remove:SetPoint("LEFT", head.up, "RIGHT", 4, 0)
-		kit.Tooltip(head.edge, card and L["As the card shows."]
+		kit.Tooltip(head.edge, moments and L["The moment this rule is for. Click to switch."]
+			or card and L["As the card shows."]
 			or time and L["The time of day this rule is for. Click to switch."]
 			or boss and L["As the boss is pulled, as it dies or as your group wipes. Click to switch."]
 			or L["As a fight starts or as it ends. Click to switch."])
@@ -478,7 +494,7 @@ function ns.CombatSoundRulesSection(kit, content, stack, boss)
 		or L["This tab's rules as they come: a sound as any other fight starts and one as it ends."])
 	addRule:SetScript("OnClick", function()
 		if time or card then
-			rules[#rules + 1] = { edge = card and "show" or "dawn", rule = "", sounds = {} }
+			rules[#rules + 1] = { edge = moments and moments[1] or card and "show" or "dawn", rule = "", sounds = {} }
 		elseif boss then
 			table.insert(rules, 1, { edge = "in", rule = "boss", sounds = {} })
 		else
@@ -518,6 +534,11 @@ function ns.CombatSoundRulesSection(kit, content, stack, boss)
 				head.rule:SetText(rule.rule:find("%S") and ns.ColoredRule(rule.rule) or ((time or card) and L["Any time"] or L["Any fight"]))
 				head.up:SetEnabled(above ~= nil)
 				head.edge:SetScript("OnClick", function()
+					if moments then
+						rule.edge = momentNext[rule.edge] or moments[1]
+						Save()
+						return
+					end
 					if card then return end -- (one edge: as it shows)
 					rule.edge = (time and TIME_NEXT or boss and BOSS_NEXT or NEXT)[rule.edge] or (time and "dawn" or "in")
 					Save()
@@ -707,7 +728,8 @@ function picker.Open(rule, save)
 	end
 	local order = {}
 	-- (A boss's kill or wipe: the leaving groups; a time of day: its own.)
-	local side = IS_TIME[rule.edge] and "time" or rule.edge == "show" and "card" or rule.edge == "in" and "in" or "out"
+	local side = IS_TIME[rule.edge] and "time" or (rule.edge == "show" or CARD_EDGE_NAME[rule.edge]) and "card"
+		or rule.edge == "in" and "in" or "out"
 	for _, group in ipairs(ns.COMBAT_SOUND_GROUPS) do
 		if group[2] == side and filled[group[1]] then order[#order + 1] = group[1] end
 	end

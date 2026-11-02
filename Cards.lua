@@ -21,6 +21,16 @@ local DEFAULTS = ns.DEFAULTS
 DEFAULTS.cards = true      -- the page's switch (off in Subtle: the no-visions module)
 DEFAULTS.cardDeathOn = false -- the Death row (on in Cinema: YOU DIED as the death camera starts)
 DEFAULTS.timeOfDayChange = true -- the Time of day row: its name and sound as it changes (off in Subtle, with the page)
+DEFAULTS.cardDuelOn = false -- the Duel row: your own duels (on in Cinema)
+-- Its moments, each a tick on its Settings tab (Effects.lua hears them), and
+-- its words.
+DEFAULTS.cardDuelAsk = true    -- you challenge someone
+DEFAULTS.cardDuelAsked = true  -- someone challenges you
+DEFAULTS.cardDuelStart = true  -- it starts
+DEFAULTS.cardDuelResult = true -- you win or lose
+DEFAULTS.duelTextStart = "Duel"
+DEFAULTS.duelTextWon = "Victory"
+DEFAULTS.duelTextLost = "Defeat"
 
 local BOOK = "Interface\\Icons\\INV_Misc_Book_09"
 local MAP = "Interface\\Icons\\INV_Misc_Map_01"
@@ -45,6 +55,10 @@ local EVENTS = {
 		icon = "Interface\\Icons\\INV_Misc_PocketWatch_01" },
 	{ id = "attack", name = "Under attack", on = "chatAttackAlert", priority = 60,
 		icon = "Interface\\Icons\\Ability_Warrior_BattleShout" },
+	-- (Combat's priority: a duel's cards and its fight's replace each other,
+	-- the newest showing.)
+	{ id = "duel", name = "Duel", on = "cardDuelOn", priority = 50,
+		icon = "Interface\\Icons\\Ability_Warrior_Challange" },
 	{ id = "death", name = "Death", on = "cardDeathOn", priority = 100,
 		icon = "Interface\\Icons\\Ability_Rogue_FeignDeath" },
 }
@@ -125,7 +139,7 @@ ns.CARD_STYLE_BY_ID = STYLE_BY_ID
 -- The style each event starts from ("default": the Default style; "follow":
 -- the one its parent starts from).
 local BASES = { combatIn = "combat", combatOut = "respite", boss = "boss", zone = "default", subzone = "follow",
-	login = "journal", time = "title", attack = "alert", death = "death" }
+	login = "journal", time = "title", attack = "alert", duel = "default", death = "death" }
 for _, field in ipairs(FIELDS) do
 	DEFAULTS["card" .. field[1]] = field[3]
 	for _, event in ipairs(EVENTS) do DEFAULTS["card" .. field[1] .. "_" .. event.id] = "default" end
@@ -336,14 +350,89 @@ samples.boss = function()
 	card.sound = function() ns.PlayCombatCueSound("enter", ns.lastCinematic and true or false) end
 	return card
 end
+-- The Duel card at a moment: "ask" (you challenge), "asked" (you're
+-- challenged), "start", "won" or "lost". other: the other duelist's name
+-- (nil: not known); fled: the loser ran.
+local DUEL_MOMENT = { ask = "cardDuelAsk", asked = "cardDuelAsked", start = "cardDuelStart", won = "cardDuelResult",
+	lost = "cardDuelResult" }
+ns.DUEL_MOMENT = DUEL_MOMENT
+-- (Each with its moment's sound: its rule on the Sounds tab.)
+function ns.DuelCard(moment, other, fled)
+	local name = other or L["Duel"]
+	local card
+	if moment == "ask" then
+		card = { name = name, sub = L["You challenge them to a duel"] }
+	elseif moment == "asked" then
+		card = { name = name, sub = L["Challenges you to a duel"] }
+	elseif moment == "start" then
+		local me = UnitName("player") or ""
+		card = { name = other and L["%s vs %s"]:format(me, other) or me, sub = ns.CardWords("duelTextStart") }
+	elseif moment == "won" then
+		card = { name = ns.CardWords("duelTextWon"),
+			sub = fled and L["%s fled"]:format(name) or L["Over %s"]:format(name) }
+	else
+		card = { name = ns.CardWords("duelTextLost"),
+			sub = fled and L["You fled from %s"]:format(name) or L["By %s"]:format(name) }
+	end
+	card.sound = function() ns.PlayCardCueSound("duel", moment) end
+	return card
+end
+-- (Made up: your target's name if it's a player.)
+local function SampleRival()
+	local other = UnitExists("target") and UnitIsPlayer("target") and UnitName("target") or "Unholy"
+	if issecretvalue and issecretvalue(other) then other = "Unholy" end
+	return other
+end
+samples.duel = function() return ns.DuelCard("won", SampleRival()) end
+
+-- A card with moments plays each in turn on its Test (the Duel card's).
+ns.CardSequences = {}
+ns.CardSequences.duel = function()
+	local other = SampleRival()
+	local list = {}
+	for _, moment in ipairs({ "ask", "asked", "start", "won", "lost" }) do
+		list[#list + 1] = ns.DuelCard(moment, other)
+	end
+	return list
+end
+
 function ns.CardSample(id)
 	local make = samples[id]
 	return make and make() or { name = L[BY_ID[id] and BY_ID[id].name or "Cards"] }
 end
 
 -- Test: an event's made-up card on your screen now, whatever the page says.
+-- A card with moments plays each in turn, its hold and 2 seconds apart; its
+-- Test again meanwhile stops it (ns.CardTestRunning: its button says Stop).
+local testRun
+function ns.CardTestRunning(id)
+	return testRun ~= nil and testRun.id == id
+end
 function ns.CardTest(id)
-	ns.Cards.Fire(id, ns.CardSample(id), true)
+	local sequence = ns.CardSequences[id]
+	if testRun then
+		local was = testRun.id
+		testRun.stopped, testRun = true, nil
+		ns.Cards.Cut(was)
+		if was == id then return end
+	end
+	if not sequence then
+		ns.Cards.Fire(id, ns.CardSample(id), true)
+		return
+	end
+	local run, list, i = { id = id }, sequence(), 0
+	testRun = run
+	local function Step()
+		if run.stopped then return end
+		i = i + 1
+		if not list[i] then
+			testRun = nil
+			return
+		end
+		ns.Cards.Fire(id, list[i], true)
+		C_Timer.After((tonumber(ns.CardLook(id).combatHoldIn) or 3) + 2, Step)
+	end
+	Step()
 end
 
 -- Battle Vision's and Story Vision's settings, onto the Cards page's: their

@@ -984,6 +984,7 @@ DEFAULTS.questTalkPortrait = true -- the NPC's portrait on the bubble's corner
 DEFAULTS.questTalkListY = 0.46 -- the list's top edge up the screen, till it's dragged
 DEFAULTS.duelPlates = true -- in CineMode, the nameplates of two players dueling near you show (see Effects)
 DEFAULTS.duelCC = true -- and crowd control on a duelist shows as an icon by their plate
+DEFAULTS.duelHideOthers = true -- and none of that while you duel yourself
 DEFAULTS.minimapHelper = true -- Minimap Glow Helper: the minimap button glows and lists the visions and camera in use (see MinimapButton)
 DEFAULTS.handleCooldowns = true -- the Cooldown Manager page's master switch (off: left alone)
 DEFAULTS.cooldownKeybinds = false -- its Show keybinds: each spell's key on its icon (Frames.lua)
@@ -1276,10 +1277,10 @@ for page, keys in pairs({
 		"centerPanels", "dragPanels", "chatCopyButton", "loginZoom",
 		"reloadButton", "reloadKeepWindows" },
 	handleHunter = { "hunterRightClickShot", "hunterAmmoSort", "hunterQuiverFill", "petUnhappyShow" },
-	duelPlates = { "duelCC" }, -- Duel Vision's page
+	duelPlates = { "duelCC", "duelHideOthers" }, -- Duel Vision's page
 	-- The Cards page's rows (Cards.lua) and the time of day at login.
 	cards = { "combatOnEnter", "combatOnLeave", "cardBossOn", "storyZoneCard", "storyZoneSubzones", "storyRecap",
-		"timeOfDayMessage", "timeOfDayChange", "chatAttackAlert", "cardDeathOn" },
+		"timeOfDayMessage", "timeOfDayChange", "chatAttackAlert", "cardDuelOn", "cardDeathOn" },
 	cameraModes = { "shoulderCam" }, -- Cameras > General's Enable Cameras: Shoulder Cam
 	visualEffects = { "letterboxPage", "tintPage", "graphicsPlus", "musicInCinematic" }, -- (the Atmosphere hub's pages' switches)
 	-- Style > General's Enable Style: the Style hub's pages' switches.

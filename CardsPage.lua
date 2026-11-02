@@ -270,6 +270,8 @@ local TIPS = {
 		"a wolf at night.",
 	attack = "When the LocalDefense channel says a place is under attack (\"Dun Algaz is under attack!\"), with " ..
 		"your faction's city bell. The same place at most once every 90 seconds.",
+	duel = "Your own duels: as you challenge someone or they challenge you, as it starts, and who won. Which of " ..
+		"those and their words: the Settings tab.",
 	death = "Shortly after the death camera starts: YOU DIED across the middle of the screen, \"wasted\" or " ..
 		"words of your own. Only with the death camera on (the Die row on the Scenes page).",
 }
@@ -279,6 +281,18 @@ local STORY_OPTS = { anyFight = true, quiet = true, omit = { enemyShow = true, f
 -- The lists a Show in row's ticks are kept in (its Always: cardAlways_<id>).
 local ROW_LISTS = { "combatShow", "calmShow", "quietShow", "camShow", "enemyShow", "friendlyShow", "bgShow",
 	"worldShow", "cityShow", "groupShow", "instanceShow", "frameRules", "tankHide", "healerHide", "damageHide" }
+
+-- A Test button says Stop while its card's moments play in turn (Now: its
+-- event's id).
+local function TestStops(button, Now)
+	local wait = 0
+	button:HookScript("OnUpdate", function(self, elapsed)
+		wait = wait - elapsed
+		if wait > 0 then return end
+		wait = 0.2
+		self:SetText(ns.CardTestRunning(Now()) and L["Stop"] or L["Test"])
+	end)
+end
 
 -- Events: a row for each event, as the Scenes page's: its tick, name and
 -- chips (the style it uses, and where it shows when not everywhere), its
@@ -290,7 +304,8 @@ function ns.CreateCardsPanel(kit)
 	CardTabs(content, title, 1)
 	local intro = kit.PageIntro(content, title,
 		L["Every moment that puts words on your screen, as a card: going into a fight and coming out of it, a " ..
-		"boss, a new zone, what you did last time, the time of day, a place under attack, your death. A row for " ..
+		"boss, a new zone, what you did last time, the time of day, a place under attack, a duel, your death. A " ..
+		"row for " ..
 		"each: its tick, the style it uses and where it shows; click it for its settings. How they look: the " ..
 		"Style tab. One card at a time: a more important one cuts in, a less important one waits for it."])
 	local switch = kit.PageSwitch(content, "cards", L["Enable Page"],
@@ -387,8 +402,12 @@ function ns.CreateCardsPanel(kit)
 					test:SetSize(60, 22)
 					test:SetText(L["Test"])
 					At(test, ns.ROW_LIST_LABEL_W + 408)
-					kit.Tooltip(test, L["Shows its card now, to see how it looks (close the settings to see it)."])
+					kit.Tooltip(test, ns.CardSequences[id]
+						and L["Shows each of its cards in turn, to see how they look (close the settings to see them). " ..
+						"Clicking Stop ends it."]
+						or L["Shows its card now, to see how it looks (close the settings to see it)."])
 					test:SetScript("OnClick", function() ns.CardTest(id) end)
+					TestStops(test, function() return id end)
 				end },
 			},
 		}
@@ -736,6 +755,7 @@ function ns.CreateCardSettingsPanel(kit)
 	test:SetText(L["Test"])
 	kit.Tooltip(test, L["Shows its card now, to see how it looks (close the settings to see it)."])
 	test:SetScript("OnClick", function() ns.CardTest(Now()) end)
+	TestStops(test, Now)
 	test.pageSwitch = false
 	local picker = kit.Dropdown(content, { get = Now, set = function(id) CARD.now = id end },
 		function()
@@ -849,6 +869,22 @@ function ns.CreateCardSettingsPanel(kit)
 	parts.Part("attack", function()
 		stack:Note(content, L["The same place shows at most once every 90 seconds."], NOTE_W)
 	end)
+	parts.Part("duel", function()
+		Header(L["When"])
+		Check("cardDuelAsk", L["You challenge"], L["The other player's name as you challenge them to a duel."])
+		Check("cardDuelAsked", L["You're challenged"], L["The other player's name as they challenge you to a duel."])
+		Check("cardDuelStart", L["Duel starts"], L["Both names as the duel is accepted and its countdown starts."])
+		Check("cardDuelResult", L["Result"], L["Whether you won or lost (or someone fled) as the duel ends."])
+		Header(L["Words"])
+		local start = WordsRow(kit, content, stack, "duelTextStart", L["Starts:"],
+			L["The words under both names as the duel starts. Empty: none."])
+		kit.GreyUnless(start, function(db) return db.cardDuelStart end)
+		for _, row in ipairs({ { "duelTextWon", L["Won:"], L["The big words as you win a duel."] },
+			{ "duelTextLost", L["Lost:"], L["The big words as you lose a duel."] } }) do
+			local box = WordsRow(kit, content, stack, row[1], row[2], row[3])
+			kit.GreyUnless(box, function(db) return db.cardDuelResult end)
+		end
+	end)
 	parts.Part("death", function()
 		Header(L["Words"])
 		local banner = kit.Dropdown(content, "deathBannerStyle", List({
@@ -911,6 +947,7 @@ function ns.CreateCardSoundsPanel(kit)
 	test:SetText(L["Test"])
 	kit.Tooltip(test, L["Shows its card now, with its sound (close the settings to see it)."])
 	test:SetScript("OnClick", function() if not IsDefault() then ns.CardTest(CARD.now) end end)
+	TestStops(test, function() return CARD.now end)
 	test.pageSwitch = false
 	test.Refresh = function(self) self:SetShown(not IsDefault()) end
 	kit.AddControl(test)
