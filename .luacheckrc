@@ -370,7 +370,7 @@ read_globals = {
 	"GetNumQuestChoices", "GetNumQuestItems", "GetNumQuestRewards", "GetQuestItemInfo", "GetQuestMoneyToGet",
 	"GetRewardMoney", "GetRewardXP", "IsQuestCompletable", "GetNumActiveQuests", "GetNumAvailableQuests",
 	"GetActiveTitle", "GetAvailableTitle", "GetAvailableQuestInfo", "SelectActiveQuest", "SelectAvailableQuest",
-	"C_CampaignInfo", "C_MajorFactions", "C_QuestInfoSystem", "C_QuestOffer", "BreakUpLargeNumbers",
+	"C_CampaignInfo", "C_MajorFactions", "C_QuestInfoSystem", "C_QuestOffer", "BreakUpLargeNumbers", "AbbreviateLargeNumbers", "AbbreviateNumbers", "C_RestrictedActions",
 	"GameFontHighlight", "IsModifierKeyDown", "IsModifiedClick", "GetQuestItemLink",
 	-- Reload.lua
 	"ToggleWorldMap", "ToggleQuestLog", "ToggleSpellBook", "PVEFrame_ToggleFrame", "InterfaceOptionsFrame", "OpenAllBags", "C_UI",

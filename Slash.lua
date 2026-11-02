@@ -142,7 +142,9 @@ local function PrintDebugHelp()
 	print("  /cine debug healwatch [seconds] - log each raid frame's alpha as it changes and who set it (5 seconds; /reload after)")
 	print("  /cine debug health - whether your group's health can be read and sorted (run in and out of combat)")
 	print("  /cine debug healthfade [percent] - test window: blocks that show only while someone's below the percent (again to close)")
-	print("  /cine debug damage [seconds] - whether damage taken reaches addons: hit event, damage meter (15 seconds)")
+	print("  /cine debug damage [seconds] - whether damage reaches addons: hit event, and the game's damage meter (yours and the group's damage, DPS, healing) now and after 15 seconds")
+	print("  /cine debug damage bar - a test window: your rank and bars drawn from the meter's totals, even when they're secret in a fight (again to close)")
+	print("  /cine debug damagevision - Damage Vision: showing or why not, the session and meter it reads, your place and whether the totals are secret")
 	print("  /cine debug modules - profile modules: any writing outside their pages and sections, or two of a profile's setting the same thing (in the log)")
 	print("  /cine debug speech - show a sample line of speech from behind you, and print what happens to each say and yell (again to stop)")
 	print("  /cine debug target - print where your target's plate is on screen (x, y, angle off the middle), even faded (again to stop, /reload to save)")
@@ -1088,6 +1090,10 @@ local function HandleSlash(msg)
 		ns.CombatLogDebug()
 	elseif cmd == "debug" and arg:find("^healthfade") then
 		ns.HealthFadeDebug(arg:match("^healthfade%s+(%S+)"))
+	elseif cmd == "debug" and arg == "damagevision" then
+		if ns.DamageVisionDebug then ns.DamageVisionDebug() else ns.Print("damagevision: the dev copy only") end
+	elseif cmd == "debug" and arg == "damage bar" then
+		ns.DamageBarDebug()
 	elseif cmd == "debug" and arg:find("^damage") then
 		ns.DamageDebug(arg:match("^damage%s+(%S+)"))
 	elseif cmd == "debug" and arg == "minimapicons" then

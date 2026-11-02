@@ -114,6 +114,7 @@ RaidStyle.lua
 GeneralStyle.lua
 WindGuideStyles.lua
 WindGuide.lua
+DamageVision.lua
 Focus.lua
 Tracking.lua
 NodeSweep.lua

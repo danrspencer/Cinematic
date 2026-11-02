@@ -1730,6 +1730,10 @@ do
 		{ name = "Visions", colors = { Combat = { 0.85, 0.3, 0.25 }, World = { 0.35, 0.6, 0.9 } }, pages = {
 			{ "Heal Vision", "Interface\\Icons\\Spell_Holy_FlashHeal", section = "Combat" },
 			-- (tabOf: no icon of its own, a folder tab on that page's (ns.PageTabs))
+			{ "Damage Vision", "Interface\\Icons\\Ability_Warrior_Rampage", section = "Combat" }, -- (DamageVision.lua)
+			{ "Damage Vision Style", "Interface\\Icons\\Ability_Warrior_Rampage", label = "Damage Vision Settings",
+				tabOf = "Damage Vision" },
+			{ "Damage Vision Look", "Interface\\Icons\\Ability_Warrior_Rampage", tabOf = "Damage Vision" },
 			{ "Vitals Vision", "Interface\\Icons\\Spell_Shadow_LifeDrain02", section = "Combat" },
 			{ "Vitals Style", "Interface\\Icons\\Spell_Shadow_LifeDrain02", tabOf = "Vitals Vision" },
 			{ "Quest Vision", "Interface\\Icons\\INV_Misc_Head_Dragon_01", section = "World" },
@@ -14655,6 +14659,11 @@ ns.OnLanguage(function()
 	end
 	if ns.CreateWindGuidePanel then -- (WindGuide.lua: the dev copy only, CinematicDev.toc)
 		ns.CreateWindGuidePanel(ns.lowHealthKit)
+	end
+	if ns.CreateDamageVisionPanel then -- (DamageVision.lua)
+		ns.CreateDamageVisionPanel(ns.lowHealthKit)
+		ns.CreateDamageVisionStylePanel(ns.lowHealthKit)
+		ns.CreateDamageVisionLookPanel(ns.lowHealthKit)
 	end
 	CreateBuffsPanel()
 	CreatePlatesPanel()

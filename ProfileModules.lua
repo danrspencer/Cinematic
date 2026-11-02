@@ -385,8 +385,8 @@ ns.PROFILE_MODULES = {
 			set("bubblesOffTop", false)
 		end },
 	{ key = "no-visions", name = "No visions", scope = { "Heal Vision", "Quest Vision", "Duel Vision", "Roll Vision",
-		"Vitals Vision", "Card Vision" },
-		tip = "Every vision off: Heal, Quest, Duel, Roll and Vitals Vision, and the Cards page.",
+		"Vitals Vision", "Card Vision", "Damage Vision" },
+		tip = "Every vision off: Heal, Quest, Duel, Roll, Vitals and Damage Vision, and the Cards page.",
 		apply = function(set)
 			set("handleHealVision", false)
 			set("questVision", false)
@@ -394,6 +394,7 @@ ns.PROFILE_MODULES = {
 			set("rollWindow", false)
 			set("lowHealth", false)
 			set("cards", false)
+			set("damageVision", false)
 		end },
 	{ key = "pure-tooltips", name = "Pure: tooltips", scope = { "Tooltips" },
 		tip = "The Tooltips page on: shown all through CineMode, fights too; no Mouse still.",
@@ -481,6 +482,9 @@ ns.PROFILE_MODULES = {
 	{ key = "zone-card", name = "Zone name card", scope = { "Card Vision" },
 		tip = "The zone's name as you come into it shows as the Cards page's card, in place of the game's.",
 		apply = function(set) set("storyZoneCard", true) end },
+	{ key = "damage-vision", name = "Damage Vision", scope = { "Damage Vision" },
+		tip = "Damage Vision on: your race with #1 (or your lead over #2) in fights in dungeons, delves and raids.",
+		apply = function(set) set("damageVision", true) end },
 
 	-- The look
 	{ key = "no-letterbox", name = "No letterbox", scope = { "Letterbox/Show in" },

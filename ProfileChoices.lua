@@ -176,6 +176,7 @@ ns.BUILTIN_PROFILES = {
 		tip = L["The UI fades and the look stays, with just a few cameras: flights, AFK, " ..
 			"and your Hearthstone and teleports. No cozy, vista, fish, RP walk, auto-run, death or quest cameras."],
 		picks = { layout = { forever = "preset" }, camera = "lite", chat = "lite" },
+		modules = { "damage-vision" },
 		preview = "bars",
 	},
 	{
@@ -190,7 +191,7 @@ ns.BUILTIN_PROFILES = {
 			"camera can start music."],
 		picks = { layout = { forever = "preset", retail = "pure" }, frames = "pure", bars = "pure", camera = "pure",
 			vfx = "pure", chat = "pure" },
-		modules = { "zone-card" },
+		modules = { "zone-card", "damage-vision" },
 	},
 }
 

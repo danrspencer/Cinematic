@@ -961,28 +961,83 @@ do
 		ns.Log("damage", text)
 	end
 
+	-- A table's keys, sorted, for learning what a client's meter API has.
+	local function Keys(t)
+		if type(t) ~= "table" or (issecrettable and issecrettable(t)) then return "none" end
+		local list = {}
+		for key in pairs(t) do list[#list + 1] = tostring(key) end
+		table.sort(list)
+		return table.concat(list, ", ")
+	end
+
+	-- One list of the meter (session type x meter type): plain or secret, its
+	-- top 5 and which row is you. Damage Vision needs the group's damage done
+	-- plain in fights, Current (this fight) and Overall (the run).
+	local function ReportList(sessionName, meterName, combat, fields)
+		local sessionType = Enum.DamageMeterSessionType[sessionName]
+		local meterType = Enum.DamageMeterType[meterName]
+		local label = sessionName .. " " .. meterName
+		if sessionType == nil or meterType == nil then
+			Line("  meter " .. label .. ": no such type here")
+			return
+		end
+		local ok, session = pcall(C_DamageMeter.GetCombatSessionFromType, sessionType, meterType)
+		local sources = ok and type(session) == "table" and session.combatSources
+		if not ok then
+			Line("  meter " .. label .. ": error " .. tostring(session))
+		elseif type(sources) ~= "table" or (issecrettable and issecrettable(sources)) then
+			Line("  meter " .. label .. ": list " .. (sources and "secret" or "missing"))
+		else
+			local count = 0
+			pcall(function() count = #sources end)
+			Line(("  meter %s (%s): %d in the list, duration %s"):format(label, combat, count,
+				Show(session.durationSeconds)))
+			if fields and count > 0 then
+				Line("    row fields: " .. Keys(sources[1]))
+			end
+			for i = 1, math.min(count, 5) do
+				local rowOk, text = pcall(function()
+					local source = sources[i]
+					return ("    %d. %s: %s total, %s per second, you %s, class %s"):format(i, Show(source.name),
+						Show(source.totalAmount), Show(source.amountPerSecond), Show(source.isLocalPlayer),
+						Show(source.classFilename))
+				end)
+				Line(rowOk and text or ("    %d. error %s"):format(i, tostring(text)))
+			end
+		end
+	end
+
 	local function ReportMeter(combat)
 		if not (C_DamageMeter and Enum.DamageMeterSessionType and Enum.DamageMeterType) then
 			Line("  damage meter: no C_DamageMeter on this client")
 			return
 		end
-		local ok, session = pcall(C_DamageMeter.GetCombatSessionFromType,
-			Enum.DamageMeterSessionType.Current, Enum.DamageMeterType.DamageTaken)
-		local sources = ok and type(session) == "table" and session.combatSources
-		if not ok then
-			Line("  damage meter: error " .. tostring(session))
-		elseif type(sources) ~= "table" or (issecrettable and issecrettable(sources)) then
-			Line("  damage meter: damage taken list " .. (sources and "secret" or "missing"))
+		Line("  meter functions: " .. Keys(C_DamageMeter))
+		Line("  session types: " .. Keys(Enum.DamageMeterSessionType))
+		Line("  meter types: " .. Keys(Enum.DamageMeterType))
+		-- The meter's own segments: is there one per fight, or per boss?
+		local ok, sessions = pcall(C_DamageMeter.GetAvailableCombatSessions)
+		if not ok or type(sessions) ~= "table" or (issecrettable and issecrettable(sessions)) then
+			Line("  sessions: " .. (ok and (sessions == nil and "none" or "secret") or ("error " .. tostring(sessions))))
 		else
 			local count = 0
-			pcall(function() count = #sources end)
-			Line(("  damage meter (%s): %d in the damage taken list"):format(combat, count))
-			for i = 1, math.min(count, 5) do
-				local source = sources[i]
-				Line(("    %d. %s: %s taken, class %s, spec icon %s"):format(i, Show(source.name),
-					Show(source.totalAmount), Show(source.classFilename), Show(source.specIconID)))
+			pcall(function() count = #sessions end)
+			Line(("  sessions: %d, fields %s"):format(count, count > 0 and Keys(sessions[1]) or "none"))
+			for i = math.max(1, count - 5), count do
+				local rowOk, text = pcall(function()
+					local session = sessions[i]
+					if type(session) ~= "table" then return Show(session) end
+					return ("id %s, name %s, duration %s"):format(Show(session.sessionID), Show(session.name),
+						Show(session.durationSeconds))
+				end)
+				Line(("    %d. %s"):format(i, rowOk and text or ("error " .. tostring(text))))
 			end
 		end
+		ReportList("Current", "DamageTaken", combat)
+		ReportList("Current", "DamageDone", combat, true)
+		ReportList("Overall", "DamageDone", combat)
+		ReportList("Current", "Dps", combat)
+		ReportList("Current", "HealingDone", combat)
 	end
 
 	function ns.DamageDebug(arg)
@@ -1001,8 +1056,11 @@ do
 			samples[kind] = ("%s (%s): amount %s"):format(Show(unit), Show(Read(UnitName, unit)), Show(amount))
 			order[#order + 1] = kind
 		end)
+		local startCombat = InCombatLockdown() and "in combat" or "out of combat"
 		ns.Print(("damage: listening %d seconds (%s): get hit, heal yourself, and in a group let others get hit"):format(seconds,
-			InCombatLockdown() and "in combat" or "out of combat"))
+			startCombat))
+		Line("damage: the meter now (" .. startCombat .. "):")
+		ReportMeter(startCombat)
 		C_Timer.After(seconds, function()
 			probe:UnregisterAllEvents()
 			probe:SetScript("OnEvent", nil)
@@ -1015,6 +1073,120 @@ do
 			ReportMeter(combat)
 			ns.Print("damage: done (" .. combat .. ")")
 		end)
+	end
+
+	-- /cine debug damage bar: can Damage Vision draw the gap in a fight? The
+	-- meter's totals are secret then, but bars take secret values: max = the
+	-- one ahead (#1, or you when you're #1), value = the one behind. The rank
+	-- comes from your row's place in the list (isLocalPlayer stays plain).
+	local barWindow
+	local barFailed = {}
+
+	local function BarTry(what, func, ...)
+		local ok, err = pcall(func, ...)
+		if not ok and not barFailed[what] then
+			barFailed[what] = true
+			Line(("damage bar: %s failed: %s"):format(what, tostring(err)))
+		end
+		return ok
+	end
+
+	-- Your rank, the list's length, your row and the row you race.
+	local function Standing(sessionName)
+		local ok, session = pcall(C_DamageMeter.GetCombatSessionFromType,
+			Enum.DamageMeterSessionType[sessionName], Enum.DamageMeterType.DamageDone)
+		local sources = ok and type(session) == "table" and session.combatSources
+		if type(sources) ~= "table" or (issecrettable and issecrettable(sources)) then return nil, 0 end
+		local count = #sources
+		for i = 1, count do
+			local mine = sources[i].isLocalPlayer
+			if not Secret(mine) and mine == true then
+				return i, count, sources[i], sources[i == 1 and 2 or 1]
+			end
+		end
+		return nil, count
+	end
+
+	local function UpdateBarRow(row)
+		local rank, count, me, other = Standing(row.session)
+		if not rank or not other then
+			row.label:SetText(("%s: %s"):format(row.session, rank and "no one to race" or ("not in the list (" .. count .. ")")))
+			row.bar:SetValue(0)
+			return
+		end
+		row.label:SetText(("%s: #%d of %d, %s"):format(row.session, rank, count,
+			rank == 1 and "your lead (empty part)" or "you vs #1"))
+		local ahead, behind = other, me
+		if rank == 1 then ahead, behind = me, other end
+		BarTry(row.session .. " bar", function()
+			row.bar:SetMinMaxValues(0, ahead.totalAmount)
+			row.bar:SetValue(behind.totalAmount)
+		end)
+		if rank == 1 then row.bar:SetStatusBarColor(0.11, 0.62, 0.46) else row.bar:SetStatusBarColor(0.94, 0.62, 0.15) end
+		BarTry(row.session .. " text", row.text.SetText, row.text, behind.totalAmount)
+	end
+
+	local function MakeBarWindow()
+		barWindow = CreateFrame("Frame", nil, UIParent)
+		barWindow:SetSize(260, 96)
+		barWindow:SetPoint("CENTER", 0, 260)
+		barWindow:SetFrameStrata("HIGH")
+		barWindow:SetMovable(true)
+		barWindow:EnableMouse(true)
+		barWindow:RegisterForDrag("LeftButton")
+		barWindow:SetScript("OnDragStart", barWindow.StartMoving)
+		barWindow:SetScript("OnDragStop", barWindow.StopMovingOrSizing)
+		local back = barWindow:CreateTexture(nil, "BACKGROUND")
+		back:SetAllPoints()
+		back:SetColorTexture(0, 0, 0, 0.75)
+		barWindow.title = barWindow:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+		barWindow.title:SetPoint("TOPLEFT", 8, -6)
+		barWindow.rows = {}
+		for i, session in ipairs({ "Current", "Overall" }) do
+			local row = { session = session }
+			row.label = barWindow:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+			row.label:SetPoint("TOPLEFT", 8, -6 - i * 32 + 8)
+			row.bar = CreateFrame("StatusBar", nil, barWindow)
+			row.bar:SetSize(244, 12)
+			row.bar:SetPoint("TOPLEFT", row.label, "BOTTOMLEFT", 0, -3)
+			row.bar:SetStatusBarTexture("Interface\\TargetingFrame\\UI-StatusBar")
+			row.bar:SetMinMaxValues(0, 1)
+			local track = row.bar:CreateTexture(nil, "BACKGROUND")
+			track:SetAllPoints()
+			track:SetColorTexture(1, 1, 1, 0.12)
+			row.text = row.bar:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+			row.text:SetPoint("RIGHT", -2, 0)
+			barWindow.rows[i] = row
+		end
+		local elapsed = 0
+		barWindow:SetScript("OnUpdate", function(_, delta)
+			elapsed = elapsed + delta
+			if elapsed < 0.25 then return end
+			elapsed = 0
+			-- Says on screenshots whether the totals were secret just then.
+			local _, _, me = Standing("Current")
+			local totals = not me and "none" or Secret(me.totalAmount) and "secret" or "plain"
+			barWindow.title:SetText(("Damage Vision test: %s, totals %s"):format(
+				InCombatLockdown() and "|cffff4040in combat|r" or "out of combat", totals))
+			for _, row in ipairs(barWindow.rows) do UpdateBarRow(row) end
+		end)
+	end
+
+	function ns.DamageBarDebug()
+		if barWindow and barWindow:IsShown() then
+			barWindow:Hide()
+			ns.Print("damage bar: closed")
+			return
+		end
+		if not (C_DamageMeter and Enum.DamageMeterSessionType and Enum.DamageMeterType) then
+			ns.Print("damage bar: no C_DamageMeter on this client")
+			return
+		end
+		wipe(barFailed)
+		if not barWindow then MakeBarWindow() end
+		barWindow:Show()
+		ns.Print("damage bar: fight in a group and watch the bars; a part that can't take secret values says so"
+			.. " in chat. Drag to move, run again to close")
 	end
 end
 

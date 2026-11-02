@@ -108,6 +108,7 @@ CombatVision.lua
 Cards.lua
 CardsPage.lua
 Recap.lua
+DamageVision.lua
 ZoneCard.lua
 QuestTalkStyle.lua
 BubbleStyle.lua

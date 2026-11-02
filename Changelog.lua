@@ -11,6 +11,9 @@
 local _, ns = ...
 
 ns.CHANGELOG_FEATURES = {
+	{ date = "2026-11-02", page = "Damage Vision", title = "Damage Vision",
+		text = "Instead of damage meter numbers, see your race with #1 (or your lead over #2) as a bar, a race " ..
+		"track or a ladder, plus a recap of how you did after each boss and dungeon." },
 	{ date = "2026-11-01", page = "Advanced Frames", title = "Smart Find",
 		text = "The Addon Frames page's Find frames tab can look for other addons' frames that nothing " ..
 		"fades, say which addon made each and guess which row it should follow. Add them with a click." },
