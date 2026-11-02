@@ -55,13 +55,14 @@ for i in range(1, len(ns.LOW_HEALTH_THEMES) + 1):
     d = {k: py(t[k]) for k in ("key", "name", "edge", "body", "glow", "glowAlpha", "shadow", "flash",
                                "pulse", "bpm", "sway", "sparks", "swirl", "look")}
     if t.theirs:
-        d["theirs"] = {"file": t.theirs[1], "own": None if t.theirs.own is None else bool(t.theirs.own)}
+        d["theirs"] = {"file": t.theirs[1], "own": None if t.theirs.own is None else bool(t.theirs.own),
+                       "second": t.theirs.second}
     themes.append(d)
 patterns = []
 for i in range(1, len(ns.LOW_HEALTH_BLIZZ_PATTERNS) + 1):
     p = ns.LOW_HEALTH_BLIZZ_PATTERNS[i]
     patterns.append({"id": p[1], "name": p[2], "mask": p.mask, "own": bool(p.own), "tiles": p.tiles or 1,
-                     "paint": bool(p.paint)})
+                     "paint": bool(p.paint), "drift": py(p.drift), "still": bool(p.still)})
 masks = [{"id": m[0], "name": m[1]} for m in py(ns.LOW_HEALTH_BLIZZ_MASKS)]
 menu = []
 for i in range(1, len(ns.LOW_HEALTH_MENU) + 1):
@@ -84,7 +85,7 @@ for key, value in re.findall(r"^DEFAULTS\.(lowHealth\w+) = (\S+)", lh, re.M):
 # The screenshots' order: the dev list in LowHealth.lua (EDGE_SCOUT), a pair each.
 block = lh[lh.index("local EDGE_SCOUT = {"):lh.index("\n}", lh.index("local EDGE_SCOUT = {"))]
 order = [int(x) for x in re.findall(r"\{ (\d+), \"", block)]
-shots = sorted(f for f in os.listdir(SHOTS) if f.lower().endswith(".jpg"))
+shots = sorted(f for f in os.listdir(SHOTS) if f.lower().endswith(".jpg"))  # (and any <file>.blp, below)
 assert len(shots) == 2 * len(order), "need one full texreel shots run: %d shots, %d textures" % (len(shots), len(order))
 # (The first few: the files Classic has, for the page's Classic switch.)
 classic = order[:8]
@@ -100,6 +101,14 @@ def shot(name):
 
 
 for file in sorted({p["id"] for p in patterns} | {m["id"] for m in masks}):
+    if file not in order:
+        # (Not in the reel: the game's file itself, if it's in the shots folder as <file>.blp.)
+        path = os.path.join(SHOTS, "%d.blp" % file)
+        if os.path.exists(path):
+            a = np.asarray(Image.open(path).convert("RGBA"), dtype=np.float32) / 255
+            img["p%dc" % file], img["p%da" % file] = pair(a[..., :3], a[..., 3])
+            print("blizzard art", file, "(from its file)", flush=True)
+        continue
     i = order.index(file)
     black, grey = shot(shots[2 * i]), shot(shots[2 * i + 1])
     alpha = np.clip(1 - (grey - black).mean(axis=2) / 0.5, 0, 1)

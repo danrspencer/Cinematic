@@ -30,6 +30,8 @@ DEFAULTS.lowHealthBloodReachSides = 0.7
 DEFAULTS.lowHealthGamePattern = "auto" -- or a pattern's file number
 DEFAULTS.lowHealthGameMask = "auto"    -- or "none", or a mask's file number
 DEFAULTS.lowHealthGameColors = "auto"  -- or "theme" (greyed, tinted) or "own"
+DEFAULTS.lowHealthGamePattern2 = "auto" -- a second pattern over the first: the theme's pick, "none" or a file number
+DEFAULTS.lowHealthGameDrift = true      -- the patterns drift slowly (not an edge, like the red one)
 DEFAULTS.lowHealthGameAlpha = 0.6
 DEFAULTS.lowHealthGameReach = 0.7  -- how far in Blizzard art comes at full (0-1), top and bottom
 DEFAULTS.lowHealthGameReachSides = 0.7
@@ -89,6 +91,8 @@ local RIPPLE_SPAN = 0.25           -- how far past the art each wave starts (scr
 local RIPPLE_ALPHA = 0.7
 local WHITE = { 1, 1, 1 }           -- (Blizzard art in its own colors: untinted)
 local SWAY = 0.012                 -- how far a sloshing theme's art rocks (share of the height, times its sway)
+local DRIFT = { 0.012, -0.008 }    -- Blizzard art's drift (tiles a second, across and down) unless its pattern says
+local SECOND_ALPHA = 0.6           -- the second pattern's opacity, next to the first's
 -- Sparks (a theme's sparks, LowHealthThemes.lua): the few sprites left, each
 -- its own texture: lightning flickering in by the top edge, stars twinkling,
 -- motes rising, gas billowing in.
@@ -657,6 +661,10 @@ local function NewDrawer(parent)
 	d.theirsWave = parent:CreateTexture(nil, "BORDER", nil, 1)
 	d.theirsWave:SetPoint("CENTER")
 	d.theirsWave:Hide()
+	d.theirs2 = parent:CreateTexture(nil, "BORDER", nil, 1) -- (the second pattern, over the first)
+	d.theirs2:SetPoint("CENTER")
+	d.theirs2:Hide()
+	d.drifted = { 0, 0, 0, 0 } -- (how far each pattern has drifted: the first's across and down, the second's)
 	d.edges = ns.CreateVignette(parent)
 	-- (The shadow under everything: over the art, it hid it.)
 	for _, piece in pairs(d.edges) do
@@ -760,7 +768,16 @@ local function TheirsPick(wanted, look)
 		mask = FileLoads(1305138) and 1305138 or nil -- (the wispy frame)
 		if not mask then return edge end
 	end
-	return { file, mask, pattern.tiles or 1, own and true or false, pattern.paint and true or false }
+	-- The second pattern (a theme's pick with Auto): over the first, cut by its mask,
+	-- in the theme's color unless it's one in its own; not over an edge (it has no mask).
+	local second = look.lowHealthGamePattern2
+	if second == "auto" then second = pick.second end
+	local other = type(second) == "number" and second ~= file and mask and FileLoads(second)
+		and (ns.LOW_HEALTH_BLIZZ_PATTERN[second] or { second }) or nil
+	return { file, mask, pattern.tiles or 1, own and true or false, pattern.paint and true or false,
+		drift = not pattern.still and (pattern.drift or DRIFT) or nil,
+		second = other and { file = second, tiles = other.tiles or 1, own = other.own and true or false,
+			drift = not other.still and (other.drift or DRIFT) or nil } }
 end
 
 -- Sets a drawer's textures up for a theme (its art and glow, and Blizzard
@@ -839,9 +856,19 @@ local function UseTheme(d, wanted, look)
 		end
 		theirs:SetBlendMode(paint and "BLEND" or "ADD")
 		theirsWave:SetBlendMode("ADD")
+		local second = d.pick.second
+		if second then
+			d.theirs2:SetTexture(second.file, "REPEAT", "REPEAT")
+			d.theirs2:SetDesaturated(not second.own)
+			d.theirs2:SetBlendMode("ADD")
+			Masked(d.theirs2, "edgeMask", mask)
+		else
+			d.theirs2:Hide()
+		end
 	else
 		theirs:Hide()
 		theirsWave:Hide()
+		d.theirs2:Hide()
 	end
 end
 
@@ -1069,9 +1096,40 @@ local function Apply(d, look, k, fade, heart, secret)
 			-- else the flash's; a smoke theme's art color is near black.)
 			local r, g, b = Lit(d.pick[4] and WHITE or shown.glow or shown.flash or shown.body or WHITE, bright)
 			local a = look.lowHealthGameAlpha * math.min(1, c * 3) * fade * (0.85 + 0.25 * heart + 0.3 * flash)
+			-- (Drifting: the pattern slides under its mask, which stays put.)
+			local now = GetTime()
+			local spent = now - (d.driftAt or now)
+			d.driftAt = now
+			local pick, drifted = d.pick, d.drifted
+			if look.lowHealthGameDrift and pick.drift then
+				local down = pick[3] * UIParent:GetHeight() / UIParent:GetWidth()
+				drifted[1] = (drifted[1] + pick.drift[1] * spent) % 1
+				drifted[2] = (drifted[2] + pick.drift[2] * spent) % 1
+				for _, tex in ipairs({ theirs, theirsWave }) do
+					tex:SetTexCoord(drifted[1], drifted[1] + pick[3], drifted[2], drifted[2] + down)
+				end
+			end
 			theirs:SetSize(width * (theirsSides + pad), height * (theirsScale + pad))
 			theirs:SetVertexColor(r, g, b, math.min(1, a))
 			theirs:Show()
+			local second = pick.second
+			if second then
+				local drift = look.lowHealthGameDrift and second.drift
+				if drift then
+					drifted[3] = (drifted[3] + drift[1] * spent) % 1
+					drifted[4] = (drifted[4] + drift[2] * spent) % 1
+				end
+				local across = second.tiles
+				d.theirs2:SetTexCoord(drifted[3], drifted[3] + across, drifted[4],
+					drifted[4] + across * UIParent:GetHeight() / UIParent:GetWidth())
+				local r2, g2, b2 = r, g, b
+				if second.own then r2, g2, b2 = Lit(WHITE, bright) end
+				d.theirs2:SetSize(width * (theirsSides + pad), height * (theirsScale + pad))
+				d.theirs2:SetVertexColor(r2, g2, b2, math.min(1, a * SECOND_ALPHA))
+				d.theirs2:Show()
+			else
+				d.theirs2:Hide()
+			end
 			if look.lowHealthRipple then
 				local wave = RIPPLE_SPAN * (1 - waveAt)
 				theirsWave:SetSize(width * (theirsSides + pad + wave), height * (theirsScale + pad + wave))
@@ -1083,10 +1141,12 @@ local function Apply(d, look, k, fade, heart, secret)
 		else
 			theirs:Hide()
 			theirsWave:Hide()
+			d.theirs2:Hide()
 		end
 	else
 		theirs:Hide()
 		theirsWave:Hide()
+		d.theirs2:Hide()
 	end
 	if look.lowHealthSparks and c > 0 then
 		AnimateSparks(d, GetTime(), width, height, look.lowHealthBloodAlpha * math.min(1, c * 2) * fade)
@@ -2794,6 +2854,22 @@ function ns.CreateVitalsStylePanel(kit)
 			{ value = "theme", text = L["The theme's color"] }, { value = "own", text = L["Its own colors"] } }
 	end, L["The theme's color: the effect turned grey and tinted to match your theme. Its own colors: as " ..
 		"the game draws it."], Theirs)
+	Pick("lowHealthGamePattern2", L["Second pattern:"], function()
+		local pick = db and WantedTheme().theirs
+		local second = pick and pick.second
+		local list = { { value = "auto", text = L["Theme's pick"] .. ": " .. (second and PatternName(second) or L["None"]) },
+			{ value = "none", text = L["None"] } }
+		for _, pattern in ipairs(ns.LOW_HEALTH_BLIZZ_PATTERNS) do
+			if FileLoads(pattern[1]) and pattern.mask then
+				list[#list + 1] = { value = pattern[1], text = L[pattern[2]], texture = pattern[1],
+					tint = pattern.own and WHITE or nil }
+			end
+		end
+		return list
+	end, L["Another of the game's effects over the first, added on as light and cut by the same edge (not " ..
+		"over an edge like the red one). Theme's pick: the one picked to go with your theme, if any."], Theirs)
+	rows.Check("lowHealthGameDrift", L["Drift"], L["The game's effects slide slowly under their edge, as " ..
+		"they do in the game (not an edge like the red one)."], Theirs)
 	tabbed.Finish(theirs)
 
 	-- The tabs, in their order (made in another: Blizzard's art uses ours' helpers).
@@ -2833,7 +2909,7 @@ function ns.CreateVitalsStylePanel(kit)
 		local LOOK_KEYS = { "lowHealthReach", "lowHealthDark", "lowHealthRed", "lowHealthBloodAlpha", "lowHealthBloodReach", "lowHealthGameReach",
 			"lowHealthReachSides", "lowHealthBloodReachSides", "lowHealthGameReachSides",
 			"lowHealthGamePattern", "lowHealthGameMask", "lowHealthGameColors", "lowHealthGameAlpha", "lowHealthSparks",
-			"lowHealthSwirlAlpha",
+			"lowHealthSwirlAlpha", "lowHealthGamePattern2", "lowHealthGameDrift",
 			"lowHealthRipple", "lowHealthPulse", "lowHealthPulseAmount", "lowHealthBpmSlow", "lowHealthBpmFast",
 			"lowHealthFlash" }
 		local function Picked() -- (one of LowHealthThemes.lua's: not one of the player's own)

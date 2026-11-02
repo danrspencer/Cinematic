@@ -341,16 +341,18 @@ end
 --   mask   the mask cutting it to an edge (nil: it's an edge already)
 --   own    in its own colors (else greyed and tinted in the theme's)
 --   tiles  times across the screen; paint  drawn over (else added on, as light)
+--   drift  { across, down }: how it drifts (tiles a second; LowHealth.lua has a default);
+--          still: it doesn't (an edge, or rays from the edges)
 -- Retail has them all; Classic only the first few (the rest are left out of
 -- the page there, and a theme's pick it hasn't falls back to the red edge).
 local SOFT, ROUND, RAGGED, FROSTY, WISPY, WAVY = 1802909, 2202396, 6225363, 2199927, 1305138, 5857689
 ns.LOW_HEALTH_BLIZZ_EDGE = 131140 -- (the game's own low-health edge: Classic has it)
 ns.LOW_HEALTH_BLIZZ_PATTERNS = {
-	{ 131140, "Red soft edge", own = true },
+	{ 131140, "Red soft edge", own = true, still = true },
 	{ 985799, "Grey fog", mask = WISPY },
 	{ 1273707, "White crackling veins", mask = WISPY },
 	{ 1305137, "Olive blotchy cells", mask = WISPY, own = true },
-	{ 4383351, "Rays in from the edges" },
+	{ 4383351, "Rays in from the edges", still = true },
 	{ 2395778, "Amber flame wisps", mask = SOFT, own = true },
 	{ 4876486, "Lava cracks", mask = SOFT, own = true },
 	{ 2140999, "Embers and ash flakes", own = true },
@@ -371,7 +373,8 @@ ns.LOW_HEALTH_BLIZZ_PATTERNS = {
 	{ 4541185, "Grey wavy wisps", mask = SOFT },
 	{ 6996935, "Grey flowing smoke", mask = SOFT },
 	{ 3509149, "Grey sideways streaks", mask = SOFT },
-	{ 5680179, "Green with yellow glows", mask = SOFT, own = true },
+	{ 5680179, "Green with yellow glows", mask = SOFT, own = true, drift = { -0.015, 0.02 } },
+	{ 5213729, "Pale water cells", mask = SOFT, tiles = 4, drift = { 0.01, 0.03 } },
 	{ 5198840, "Green speckles", mask = SOFT, own = true },
 	{ 6225364, "Dark green moss", mask = RAGGED, own = true },
 	{ 6225366, "Thorny green vines", mask = RAGGED, own = true, paint = true },
@@ -391,7 +394,8 @@ for _, pattern in ipairs(ns.LOW_HEALTH_BLIZZ_PATTERNS) do
 	ns.LOW_HEALTH_BLIZZ_PATTERN[pattern[1]] = pattern
 end
 -- Each theme's pick: a pattern, or { pattern, own = false } to tint one that
--- is in its own colors otherwise. (Game art themes: none, their art is it.)
+-- is in its own colors otherwise; second: a pattern over it (Poison's: the
+-- venom puddle's two). (Game art themes: none, their art is it.)
 local THEIRS = {
 	blood = 131140, wounds = 131140, claws = 131140, bloodrune = 131140,
 	bruise = { 131140, own = false },
@@ -399,7 +403,7 @@ local THEIRS = {
 	shield = 985799,
 	holylight = 4237662, holyshield = 4383351, judgement = 5201310,
 	lonewolf = 4541185, thorns = 6225366,
-	poison = 5680179, shadow = 6996935,
+	poison = { 5680179, second = 5213729 }, shadow = 6996935,
 	ward = 4237661, feathers = 6225095, void = 4741753,
 	storm = 3522953, gale = 6214876, water = 5332774,
 	arcane = 5857669, fire = 4876486, frost = 2202483,

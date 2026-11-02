@@ -86,10 +86,12 @@ input[type=checkbox] { accent-color: var(--gold); width: 16px; height: 16px; }
       <label class="tick"><input type="checkbox" id="theirs" checked> Blizzard art</label>
       <div class="row two"><label for="pattern">Pattern</label><select id="pattern"></select></div>
       <div class="row two"><label for="mask">Edge</label><select id="mask"></select></div>
+      <div class="row two"><label for="pattern2">Second</label><select id="pattern2"></select></div>
       <div class="row two"><label for="colors">Colors</label><select id="colors">
         <option value="auto">The pattern's own choice</option><option value="theme">The theme's color</option><option value="own">Its own colors</option></select></div>
       <div id="theirsRows"></div>
       <label class="tick"><input type="checkbox" data-key="lowHealthRipple"> Ripple wave</label>
+      <label class="tick"><input type="checkbox" data-key="lowHealthGameDrift"> Drift</label>
       <p class="note" id="pickNote"></p>
     </section>
 
@@ -124,6 +126,9 @@ const FADE_IN = 0.3, FADE_END = 1.2, GRADE_GREY = [0.6, 0.63, 0.68], GRADE_TINT 
 const SPIRAL_TURN = 0.45, SPIRAL_IN = 0.65, ORBIT_SPEED = 0.35;
 const SWIRL_FRONT = 0.36, SWIRL_OUT = 1.15, SWIRL_DEEPEST = 0.37, SWIRL_BLEND = { Swirl: "lighter", Vortex: "source-over" };
 const EDGE_FILE = D.edge, WISPY = 1305138, WHITE = [1, 1, 1];
+const DRIFT = [0.012, -0.008], SECOND_ALPHA = 0.6;
+const drifted = [0, 0, 0, 0];
+let driftAt = null;
 // Strength and Reach scale these ({ most, share it scales by }): LowHealth.lua's SCALED and REACHES.
 const SCALED = { lowHealthDark: [1, 1], lowHealthPulseAmount: [0.6, 1], lowHealthBloodAlpha: [1, 1],
   lowHealthGameAlpha: [1, 1], lowHealthReach: [0.5, 0.5], lowHealthReachSides: [0.5, 0.5], lowHealthSwirlAlpha: [1, 1] };
@@ -231,14 +236,23 @@ function theirsPick(theme) {
   const edge = { file: EDGE_FILE, mask: null, tiles: 1, own: false, paint: false };
   if (!has(file) || !imgs["p" + file + "c"]) return edge;
   if (mask && !has(mask)) { mask = has(WISPY) ? WISPY : null; if (!mask) return edge; }
-  return { file, mask, tiles: p.tiles || 1, own: !!own, paint: !!p.paint };
+  // The second pattern: over the first, cut by its mask (none over an edge).
+  let second = db.lowHealthGamePattern2;
+  if (second === "auto") second = pick.second;
+  const o = typeof second === "number" && second !== file && mask && has(second) && imgs["p" + second + "c"]
+    ? (PATTERN[second] || { id: second, tiles: 1 }) : null;
+  return { file, mask, tiles: p.tiles || 1, own: !!own, paint: !!p.paint,
+    drift: p.still ? null : p.drift || DRIFT,
+    second: o && { file: second, mask, tiles: o.tiles || 1, own: !!o.own, drift: o.still ? null : o.drift || DRIFT } };
 }
 
 // Its layer, the size of the screen: the pattern (an edge stretched, the rest
-// in squares across), tinted, cut by its mask. Drawn bigger as it closes in.
+// in squares across, slid by how far it has drifted), tinted, cut by its mask.
+// Drawn bigger as it closes in.
 const layers = new Map();
-function theirsLayer(pick, color) {
-  const id = [pick.file, pick.mask, pick.tiles, pick.own, color.map(v => v.toFixed(3)).join()].join("|");
+function theirsLayer(pick, color, du, dv) {
+  du = du || 0; dv = dv || 0;
+  const id = [pick.file, pick.mask, pick.tiles, pick.own, color.map(v => v.toFixed(3)).join(), du.toFixed(3), dv.toFixed(3)].join("|");
   if (layers.has(id)) return layers.get(id);
   const src = join("p" + pick.file);
   if (!src) return null;
@@ -247,7 +261,7 @@ function theirsLayer(pick, color) {
   if (pick.file === EDGE_FILE) x.drawImage(tex, 0, 0, W, H);
   else {
     const size = W / pick.tiles;
-    for (let ty = 0; ty < H; ty += size) for (let tx = 0; tx < W; tx += size) x.drawImage(tex, tx, ty, size, size);
+    for (let ty = -dv * size; ty < H; ty += size) for (let tx = -du * size; tx < W; tx += size) x.drawImage(tex, tx, ty, size, size);
   }
   const m = pick.mask && join("p" + pick.mask);
   if (m) { x.globalCompositeOperation = "destination-in"; x.drawImage(m, 0, 0, W, H); }
@@ -413,9 +427,24 @@ function apply(theme, k, heart, now) {
     }
     if (blizz) {
       const color = lit(pick.own ? WHITE : theme.glow || theme.flash || theme.body || WHITE, bright);
-      const layer = theirsLayer(pick, color);
+      // (Drifting: the pattern slides under its mask, which stays put.)
+      const spent = driftAt == null ? 0 : now - driftAt;
+      driftAt = now;
+      const drifting = db.lowHealthGameDrift && !reduce;
+      if (drifting && pick.drift) {
+        drifted[0] = (drifted[0] + pick.drift[0] * spent + 1) % 1; drifted[1] = (drifted[1] + pick.drift[1] * spent + 1) % 1;
+      }
+      const layer = theirsLayer(pick, color, pick.drift ? drifted[0] : 0, pick.drift ? drifted[1] : 0);
       const a = theirsAlpha * Math.min(1, c * 3) * (0.85 + 0.25 * heart + 0.3 * flash);
       drawScaled(layer, theirsX + pad, theirsY + pad, a, pick.paint ? "source-over" : "lighter", sx, sy);
+      if (pick.second) {
+        const sec = pick.second;
+        if (drifting && sec.drift) {
+          drifted[2] = (drifted[2] + sec.drift[0] * spent + 1) % 1; drifted[3] = (drifted[3] + sec.drift[1] * spent + 1) % 1;
+        }
+        const layer2 = theirsLayer(sec, sec.own ? lit(WHITE, bright) : color, drifted[2], drifted[3]);
+        drawScaled(layer2, theirsX + pad, theirsY + pad, Math.min(1, a) * SECOND_ALPHA, "lighter", sx, sy);
+      }
       if (db.lowHealthRipple) {
         const p = db.lowHealthPulse ? beat : now % 1, wave = RIPPLE_SPAN * (1 - p);
         drawScaled(layer, theirsX + pad + wave, theirsY + pad + wave, Math.min(1, a) * RIPPLE_ALPHA * Math.sin(Math.PI * p), "lighter");
@@ -501,6 +530,10 @@ function fillPatterns() {
   sel.innerHTML = ""; mk.innerHTML = "";
   sel.add(new Option("Theme's pick: " + (pick && PATTERN[pick.file] ? PATTERN[pick.file].name : "the red soft edge"), "auto"));
   for (const p of D.patterns) if (has(p.id)) sel.add(new Option(p.name, p.id));
+  const sec = $("pattern2"); sec.innerHTML = "";
+  sec.add(new Option("Theme's pick: " + (pick && pick.second && PATTERN[pick.second] ? PATTERN[pick.second].name : "none"), "auto"));
+  sec.add(new Option("None", "none"));
+  for (const p of D.patterns) if (has(p.id) && p.mask) sec.add(new Option(p.name, p.id));
   mk.add(new Option("The pattern's own", "auto")); mk.add(new Option("None", "none"));
   for (const m of D.masks) if (has(m.id)) mk.add(new Option(m.name, m.id));
 }
@@ -519,7 +552,7 @@ function sync() {
   }
   $("health").value = Math.round(S.health * 100); $("healthV").textContent = Math.round(S.health * 100) + "%";
   for (const box of document.querySelectorAll("[data-key]")) box.checked = !!db[box.dataset.key];
-  for (const [id, key] of [["pattern", "lowHealthGamePattern"], ["mask", "lowHealthGameMask"], ["colors", "lowHealthGameColors"]]) {
+  for (const [id, key] of [["pattern", "lowHealthGamePattern"], ["pattern2", "lowHealthGamePattern2"], ["mask", "lowHealthGameMask"], ["colors", "lowHealthGameColors"]]) {
     const sel = $(id), v = String(db[key]);
     sel.value = [...sel.options].some(o => o.value === v) ? v : "auto";
   }
@@ -527,7 +560,7 @@ function sync() {
   $("artTheirs").setAttribute("aria-pressed", !S.ours && S.theirs);
   $("artBoth").setAttribute("aria-pressed", S.ours && S.theirs);
   $("ours").checked = S.ours; $("theirs").checked = S.theirs;
-  for (const id of ["pattern", "mask", "colors"]) $(id).closest(".row").classList.toggle("dim", !S.theirs);
+  for (const id of ["pattern", "pattern2", "mask", "colors"]) $(id).closest(".row").classList.toggle("dim", !S.theirs);
   $("theirsRows").classList.toggle("dim", !S.theirs);
   $("oursRows").classList.toggle("dim", !S.ours);
   const layers = THEME[S.theme].swirl || [];
@@ -545,7 +578,7 @@ function bind() {
   $("theme").onchange = e => useTheme(e.target.value);
   for (const id of ["ours", "theirs", "shadow"]) $(id).onchange = e => { S[id] = e.target.checked; sync(); };
   for (const box of document.querySelectorAll("[data-key]")) box.onchange = e => { db[box.dataset.key] = e.target.checked; sync(); };
-  for (const [id, key] of [["pattern", "lowHealthGamePattern"], ["mask", "lowHealthGameMask"], ["colors", "lowHealthGameColors"]])
+  for (const [id, key] of [["pattern", "lowHealthGamePattern"], ["pattern2", "lowHealthGamePattern2"], ["mask", "lowHealthGameMask"], ["colors", "lowHealthGameColors"]])
     $(id).onchange = e => { db[key] = setting(e.target.value); sync(); };
   $("classic").onchange = e => { S.classic = e.target.checked; fillPatterns(); sync(); };
   $("artOurs").onclick = () => { S.ours = true; S.theirs = false; sync(); };
