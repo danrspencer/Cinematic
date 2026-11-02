@@ -275,12 +275,8 @@ local NAMED = {
 		"The quest item button: the item your nearest tracked quest gives you to use" },
 }
 for _, part in ipairs({ "text", "sub", "meta", "icon" }) do
-	NAMED[#NAMED + 1] = { { "CinematicCombatVision", "cue", part }, "Battle Vision", "Combat Vision",
-		"Battle Vision's cue as a fight starts or ends" }
-	NAMED[#NAMED + 1] = { { "CinematicLastTime", "cue", part }, "Last time", "Story Vision",
-		"Story Vision's Last time card: what you did last session, as you log in" }
-	NAMED[#NAMED + 1] = { { "CinematicZoneCard", "cue", part }, "Zone name", "Story Vision",
-		"Story Vision's zone name card, in place of the game's, as you come into a zone" }
+	NAMED[#NAMED + 1] = { { "CinematicCard", "cue", part }, "Card", "Card Vision",
+		"A card from the Card Vision page, as one of its events happens: a fight, a boss, a zone, your death..." }
 end
 local function RegisterNamed()
 	for _, named in ipairs(NAMED) do

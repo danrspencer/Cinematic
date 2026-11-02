@@ -1,9 +1,8 @@
--- Story Vision's Last time: as you log in, what you did in your last session,
--- such as "Last time: Darkshore · 3 quests done · reached level 24". Under
--- the zone name (Tint.lua draws it), or a card of its own drawn as Battle
--- Vision's boss card (ns.PlayVisionCard): its place, style, animation, heading
--- and which details, all on Story Vision's Style tab. This file keeps the
--- counts.
+-- The Cards page's Last time: as you log in, what you did in your last
+-- session, such as "Last time: Darkshore · 3 quests done · reached level 24".
+-- A card (Cards.lua fires and draws it: its look is the page's), or a line
+-- under the zone name (Tint.lua draws it); its heading and which details on
+-- the page's Last time event. This file keeps the counts.
 --
 -- A session's counts live in CinematicCharDB.session and are written as they
 -- change (no polling: a few events), so a crash that skips PLAYER_LOGOUT
@@ -14,18 +13,9 @@ local _, ns = ...
 local L = ns.L
 local DEFAULTS = ns.DEFAULTS
 
-DEFAULTS.storyRecap = true -- Story Vision's Last time row
--- Its look (the Style tab's Last time): "zone" under the zone name, else a
--- card as Battle Vision's ("screen", "top" or "bottom" bar, "third").
-DEFAULTS.storyRecapPlace = "third"
-DEFAULTS.storyRecapStyle = "chapter"   -- the card's: "title", "subtitle" or "chapter"
-DEFAULTS.storyRecapAnim = "type"       -- ...and how it comes in: "fade", "reveal", "track" or "type"
-DEFAULTS.storyRecapAlign = "center"    -- ...in a bar: "left", "center" or "right"
-DEFAULTS.storyRecapSize = 30           -- ...its zone name's height on the screen
-DEFAULTS.storyRecapHold = 10           -- ...seconds it stays, between its fades
-DEFAULTS.storyRecapDelay = 2           -- ...seconds after the zone name comes in
-DEFAULTS.storyRecapR, DEFAULTS.storyRecapG, DEFAULTS.storyRecapB = 0.85, 0.78, 0.6 -- ...parchment
-DEFAULTS.storyRecapBook = false        -- ...a book icon before it
+DEFAULTS.storyRecap = true -- the Last time row
+DEFAULTS.storyRecapUnder = false       -- a line under the zone name, not a card
+DEFAULTS.storyRecapDelay = 2           -- the card: seconds after the zone name comes in
 DEFAULTS.storyRecapHeading = "lasttime" -- "lasttime", "previously", "previouslyon", "sofar" or "none"
 -- Which details (in this order), and a little icon before each.
 DEFAULTS.storyRecapZone = true
@@ -40,7 +30,6 @@ DEFAULTS.storyRecapSound = true        -- a page turning as it shows
 
 local MAX_AGE = 14 * 24 * 3600 -- seconds: an older last session isn't worth recalling
 local SEPARATOR = " · "
-local BOOK = "Interface\\Icons\\INV_Misc_Book_09"
 local PAGE_TURN = 836 -- (SOUNDKIT.IG_ABILITY_PAGE_TURN)
 
 -- The zone shown is the one you spent the most time in, not the last one:
@@ -176,9 +165,9 @@ local function RecapText(parts, look)
 	return heading and heading .. ": " .. body or body
 end
 
--- (Story Vision's preview: the line under the zone name for parts.)
+-- (The line under the zone name for parts.)
 function ns.RecapLineFor(parts)
-	return RecapText(parts, ns.StyleLook("storyVision"))
+	return RecapText(parts, ns.db)
 end
 
 -- A card: the zone big, the heading over it, the rest under it (the heading
@@ -192,61 +181,41 @@ function ns.RecapCardText(parts, look)
 	return { name = name, sub = table.concat(list, SEPARATOR), meta = zone and heading or nil }
 end
 
--- The Last time look, read as Battle Vision's cue settings (ns.PlayVisionCard).
-local CARD_FIELDS = {
-	combatPlace = "storyRecapPlace", combatStyle = "storyRecapStyle", combatAnim = "storyRecapAnim",
-	combatAlign = "storyRecapAlign", combatSize = "storyRecapSize", combatHoldIn = "storyRecapHold",
-	combatInR = "storyRecapR", combatInG = "storyRecapG", combatInB = "storyRecapB",
-	combatFont = "storyFont", combatOutline = "storyOutline", combatShadow = "storyShadow",
-	combatOutlineR = "storyOutlineR", combatOutlineG = "storyOutlineG", combatOutlineB = "storyOutlineB",
-	combatIconShowIn = "storyRecapBook",
-}
-local CARD_FIXED = { combatBarScale = 0.5, combatBarFallback = true, combatPulseIn = 0, combatIconIn = BOOK }
-function ns.RecapCardLook(look)
-	look = look or ns.StyleLook("storyVision")
-	return setmetatable({}, { __index = function(_, key)
-		if CARD_FIXED[key] ~= nil then return CARD_FIXED[key] end
-		local value = look[CARD_FIELDS[key] or key]
-		if key == "combatOutline" then value = tonumber(value) or 0 end
-		return value
-	end })
-end
-
 local function PageTurn()
-	if ns.StyleLook("storyVision").storyRecapSound then
+	if ns.db.storyRecapSound then
 		pcall(PlaySound, SOUNDKIT and SOUNDKIT.IG_ABILITY_PAGE_TURN or PAGE_TURN, "SFX")
 	end
 end
 
--- The real card, over the whole screen (an overlay, kept with the UI hidden).
-local screen, played = nil, 0
--- Plays the Last time card for parts (default: the login's) if the Style tab
--- puts it on one, a moment after the zone name; true if it did (then it isn't
--- under the zone name). Under the zone name, the page turning just plays.
+-- Plays the Last time card for parts (default: the login's) a moment after
+-- the zone name, unless it's a line under the zone name; true if it did.
+-- Under the zone name, the page turning just plays.
+local played = 0
 function ns.RecapCard(parts)
 	parts = parts or lastParts
-	local look = ns.StyleLook("storyVision")
-	if look.storyRecapPlace == "zone" or not parts then
+	local db = ns.db
+	if db.storyRecapUnder or not parts then
 		if parts then PageTurn() end
 		return false
 	end
-	local card = ns.RecapCardText(parts, look)
-	if not card or not ns.PlayVisionCard then return false end
-	if not screen then
-		screen = CreateFrame("Frame", "CinematicLastTime", UIParent)
-		screen:SetAllPoints(UIParent)
-		screen:SetFrameStrata("LOW")
-		screen:EnableMouse(false)
-		ns.AddOverlay(screen)
-	end
+	local card = ns.RecapCardText(parts, db)
+	if not card then return false end
+	card.sound = PageTurn
 	played = played + 1
 	local this = played
-	C_Timer.After(tonumber(look.storyRecapDelay) or 0, function()
+	C_Timer.After(tonumber(db.storyRecapDelay) or 0, function()
 		if this ~= played or InCombatLockdown() then return end
-		ns.PlayVisionCard(screen, ns.RecapCardLook(), UIParent:GetWidth(), UIParent:GetHeight(), 1, card)
-		PageTurn()
+		ns.Cards.Fire("login", card)
 	end)
 	return true
+end
+
+-- The Test and preview's card: this session's so far, else made up.
+ns.CardSamples = ns.CardSamples or {}
+ns.CardSamples.login = function()
+	local card = ns.RecapCardText(ns.RecapPartsNow(), ns.db) or { name = "Darkshore", sub = "" }
+	card.sound = PageTurn
+	return card
 end
 
 -- Core.lua, at PLAYER_ENTERING_WORLD after a login or /reload. A real login
@@ -258,7 +227,7 @@ function ns.RecapLogin(initial)
 	local line
 	if initial then
 		lastParts = RecapParts(chardb.session)
-		line = RecapText(lastParts, ns.StyleLook("storyVision"))
+		line = RecapText(lastParts, ns.db)
 		if not line then lastParts = nil end
 		chardb.session = nil
 	end
@@ -272,14 +241,14 @@ end
 function ns.RecapPreview()
 	CountZone()
 	local session = Session()
-	return RecapText(RecapParts(session), ns.StyleLook("storyVision")), session
+	return RecapText(RecapParts(session), ns.db), session
 end
 
 -- What the preview and the Test show: this session's so far, else made up
 -- (second: true).
 function ns.RecapPartsNow()
 	CountZone()
-	local look = ns.StyleLook("storyVision")
+	local look = ns.db
 	local parts = RecapParts(Session())
 	if parts and RecapText(parts, look) then return parts, false end
 	return SampleParts(), true
@@ -292,7 +261,7 @@ end
 -- (returned second: true), so there's always something to look at.
 function ns.RecapDemo()
 	local parts, sample = ns.RecapPartsNow()
-	local line = RecapText(parts, ns.StyleLook("storyVision")) or L["Last time: %s"]:format(parts.zone)
+	local line = RecapText(parts, ns.db) or L["Last time: %s"]:format(parts.zone)
 	-- The game's own zone name, as at login (its frame is plain, not secure).
 	local onEvent = ZoneTextFrame and ZoneTextFrame:GetScript("OnEvent")
 	if onEvent then

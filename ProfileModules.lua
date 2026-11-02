@@ -370,10 +370,13 @@ ns.PROFILE_MODULES = {
 		apply = function(set)
 			set("questTalk", true)
 		end },
-	{ key = "combat-vision", name = "Battle Vision", scope = { "Combat Vision" },
-		tip = "Battle Vision on: a cue on the screen and sounds as you go into a fight and come out of it.",
+	{ key = "combat-vision", name = "Battle cards", scope = { "Card Vision" },
+		tip = "The Cards page's fights on: a card and sounds as you go into a fight and come out of it, and a " ..
+		"boss's name as its fight starts.",
 		apply = function(set)
-			set("combatVision", true)
+			set("combatOnEnter", true)
+			set("combatOnLeave", true)
+			set("cardBossOn", true)
 		end },
 	{ key = "no-custom-bubbles", name = "No custom bubbles", scope = { "Chat bubbles/Custom bubbles" },
 		tip = "Only the game's own chat bubbles: no off-screen ones, and none brought down from the top of the screen.",
@@ -382,16 +385,15 @@ ns.PROFILE_MODULES = {
 			set("bubblesOffTop", false)
 		end },
 	{ key = "no-visions", name = "No visions", scope = { "Heal Vision", "Quest Vision", "Duel Vision", "Roll Vision",
-		"Vitals Vision", "Combat Vision", "Story Vision" },
-		tip = "Every vision off: Heal, Quest, Duel, Roll, Vitals, Battle and Story Vision.",
+		"Vitals Vision", "Card Vision" },
+		tip = "Every vision off: Heal, Quest, Duel, Roll and Vitals Vision, and the Cards page.",
 		apply = function(set)
 			set("handleHealVision", false)
 			set("questVision", false)
 			set("duelPlates", false)
 			set("rollWindow", false)
 			set("lowHealth", false)
-			set("combatVision", false)
-			set("storyVision", false)
+			set("cards", false)
 		end },
 	{ key = "pure-tooltips", name = "Pure: tooltips", scope = { "Tooltips" },
 		tip = "The Tooltips page on: shown all through CineMode, fights too; no Mouse still.",
@@ -429,7 +431,7 @@ ns.PROFILE_MODULES = {
 			CamsOff(set, { "flight", "idle", "cozy", "tele", "vista", "fish", "walk", "run", "death", "quest" })
 		end },
 	{ key = "cameras-bring-cinemode", name = "Cameras bring CineMode", scope = { "Scenes",
-		"Camera Settings/Death Cam", "Story Vision" },
+		"Camera Settings/Death Cam", "Card Vision" },
 		tip = "Every camera brings CineMode on, standing still starts the AFK camera, every camera can start " ..
 		"music, and no death screen.",
 		apply = function(set)
@@ -443,14 +445,14 @@ ns.PROFILE_MODULES = {
 			set("deathCine", true)
 			-- (Death Cam's page is dev-only.)
 			if ns.isDev then set("deathScreen", false) end
-			set("deathBannerStyle", "none")
+			set("cardDeathOn", false)
 			set("eventStillCamera", "afk")
 			for _, event in ipairs(MUSIC_EVENTS) do set("event" .. event .. "Music", true) end
 			set("musicCamWalk", true)
 			set("musicCamRun", true)
 		end },
 	{ key = "pure-cameras", name = "Pure: cameras", scope = { "Scenes", "Camera Settings/Chat Cam",
-		"General/top", "Story Vision" },
+		"General/top", "Card Vision" },
 		tip = "Standing still starts the AFK camera and every event's camera can start music; the cameras " ..
 		"don't wait for things to calm down after a fight, auto-run carries on in cities and instances (as RP " ..
 		"walk always does), and the death camera runs in instances too. NPCs talking bring the chat camera, " ..
@@ -473,10 +475,11 @@ ns.PROFILE_MODULES = {
 			set("runOffInCities", false)
 			set("runOffInInstances", false)
 			set("deathOffInInstances", false)
+			set("cardDeathOn", true)
 			set("deathBannerStyle", "youdied")
 		end },
-	{ key = "zone-card", name = "Zone name card", scope = { "Story Vision" },
-		tip = "The zone's name as you come into it shows as Story Vision's card, in place of the game's.",
+	{ key = "zone-card", name = "Zone name card", scope = { "Card Vision" },
+		tip = "The zone's name as you come into it shows as the Cards page's card, in place of the game's.",
 		apply = function(set) set("storyZoneCard", true) end },
 
 	-- The look

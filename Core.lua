@@ -256,17 +256,14 @@ local DEFAULTS = {
 	speechBehindTailTop = true, -- ...its bubble's tail on top, pointing up
 	speechBehindTailFlip = true, -- ...mirrored, curling the other way
 	speechBehindTailPos = 0.8, -- ...along the bubble: 0 its left end, 0.5 the middle, 1 its right end
-	-- (Where those lines show: speechBehindLeft/Bottom, the Move box's corner;
-	-- none: beside the chat window.)
+	-- (Where those lines show: speechBehindX/Y, the Move box's middle and
+	-- bottom as a share of the screen's width and height (0-1), so it keeps
+	-- its place at any resolution or UI scale; none: beside the chat window.)
 	chatPeekBackground = true, -- a message shows the chat window's background with it
 	chatPeekTabs = false, -- ...its tabs
 	chatPeekButtons = false, -- ...the buttons beside it
 	chatAttackAlert = true, -- LocalDefense "... is under attack!" also shows as a title
 	updateNotice = true, -- after an update, a line in chat at login with a What's new link (WhatsNew.lua)
-	chatInCities = false,     -- keep chat visible in capital cities
-	chatInDungeons = false,   -- ...in dungeons and scenarios
-	chatInRaids = false,
-	chatInPvP = false,        -- ...while PvP flagged (battlegrounds and arenas too)
 	dropTargetOnFlights = true, -- ignore your target from takeoff (its frames fade) until you pick another
 	taxiInstant = true,       -- go cinematic as soon as a flight starts (no fade delay)
 	taxiCenter = true,        -- swing the camera behind the character when a flight starts
@@ -594,7 +591,8 @@ DEFAULTS.deathScreen = true        -- dim, cold screen with a heavy vignette mea
 DEFAULTS.deathScreenStrength = 1
 DEFAULTS.deathVignetteTime = 10    -- seconds for its vignette to creep in
 DEFAULTS.deathVignetteSize = 0.35  -- ...and the fraction of the screen each edge covers then
-DEFAULTS.deathBannerStyle = "none" -- words across the screen as it starts: "none", "youdied", "wasted" (YOU DIED in Cinema: pure-cameras)
+DEFAULTS.deathBannerStyle = "youdied" -- the Cards page's Death card's words: "youdied", "wasted" (a picture) or "custom" (its row: cardDeathOn)
+DEFAULTS.deathBannerText = ""      -- Custom's words (blank: YOU DIED)
 DEFAULTS.deathCorpseRun = true     -- released with no wave to wait for, the vignette lifts as you near your body
 DEFAULTS.deathZoom = 4             -- yards it pulls back meanwhile
 DEFAULTS.deathOrbitPause = 0       -- (always one continuous turn)
@@ -999,9 +997,11 @@ DEFAULTS.handleBuffs = true -- Buffs/debuffs
 DEFAULTS.handleChat = true
 -- Chat bubbles page (off: the game's own settings, as you left them).
 DEFAULTS.handleBubbles = false
--- Its grid: bubbles<Say|Party>OffAlways, and OffIn<where> (ns.EFFECT_OFF_WHERE),
--- ticked = no bubbles there. Say covers yell and NPC speech too.
-for _, kind in ipairs({ "Say", "Party" }) do
+-- Its grid: bubbles<Say|Yell|Party|NPC>OffAlways, and OffIn<where> (ns.EFFECT_OFF_WHERE),
+-- ticked = no bubbles there. Say, Yell and Party are players'; NPC all NPCs'
+-- speech. (Yell and NPC were never old settings: they only get their defaults
+-- from here.)
+for _, kind in ipairs({ "Say", "Yell", "Party", "NPC" }) do
 	DEFAULTS["bubbles" .. kind .. "OffAlways"] = false
 	for _, where in ipairs(ns.EFFECT_OFF_WHERE) do
 		DEFAULTS["bubbles" .. kind .. "OffIn" .. where] = false
@@ -1274,7 +1274,9 @@ for page, keys in pairs({
 		"reloadButton", "reloadKeepWindows" },
 	handleHunter = { "hunterRightClickShot", "hunterAmmoSort", "hunterQuiverFill" },
 	duelPlates = { "duelCC" }, -- Duel Vision's page
-	storyVision = { "storyRecap", "storyZoneCard", "timeOfDayMessage", "timeOfDayChange", "chatAttackAlert", "deathBannerStyle" }, -- Story Vision's rows
+	-- The Cards page's rows (Cards.lua) and the time of day at login.
+	cards = { "combatOnEnter", "combatOnLeave", "cardBossOn", "storyZoneCard", "storyZoneSubzones", "storyRecap",
+		"timeOfDayMessage", "timeOfDayChange", "chatAttackAlert", "cardDeathOn" },
 	cameraModes = { "shoulderCam" }, -- Cameras > General's Enable Cameras: Shoulder Cam
 	visualEffects = { "letterboxPage", "tintPage", "graphicsPlus", "musicInCinematic" }, -- (the Atmosphere hub's pages' switches)
 	-- Style > General's Enable Style: the Style hub's pages' switches.
@@ -1515,7 +1517,7 @@ do
 				for _, where in ipairs(ns.CAMERA_OFF_WHERE) do places[where] = prefix .. where end
 				return places
 			end
-			for _, kind in ipairs({ "Say", "Party" }) do
+			for _, kind in ipairs({ "Say", "Yell", "Party", "NPC" }) do
 				OFF_GRID_ROWS[#OFF_GRID_ROWS + 1] = { key = "bubble:" .. kind, always = "bubbles" .. kind .. "Always",
 					offAlways = "bubbles" .. kind .. "OffAlways", places = Places("bubbles" .. kind .. "OffIn") }
 			end
@@ -1991,9 +1993,6 @@ end
 local OFF_IN = {
 	city = "offInCities", dungeon = "offInDungeons", raid = "offInRaids", pvp = "offInPvP",
 }
-ns.CHAT_IN = {
-	city = "chatInCities", dungeon = "chatInDungeons", raid = "chatInRaids", pvp = "chatInPvP",
-}
 
 local PLACE_SUFFIX = { city = "Cities", dungeon = "Dungeons", raid = "Raids", pvp = "PvP" }
 
@@ -2068,6 +2067,22 @@ function ns.IsCameraOffHere(cam)
 	return ns.CameraRowsOff(cam)
 end
 ns.IsCameraOffHere = ns.Profiled("IsCameraOffHere", ns.IsCameraOffHere)
+-- Why ns.IsCameraOffHere has a camera off, in words (nil: it isn't), for
+-- /cine debug mode.
+function ns.CameraOffWhy(cam)
+	local db = ns.db
+	if not db or not ns.IsCameraOffHere(cam) then return nil end
+	if db.cameraModes == false then return "Enable Cameras is off" end
+	local stopped = ns.stoppedCam
+	if stopped and (stopped == cam or (stopped == "still" and ns.STILL_CAMS[cam])) then
+		return "stopped with Stop camera, until what started it is over"
+	end
+	local delay = SWITCHED_CAMS[cam] and db[cam .. "CameraDelay"] or 0
+	if delay > 0 and GetTime() - (ns.travelSince[cam] or GetTime()) < delay then
+		return ("its Wait (%s sec) hasn't run out"):format(delay)
+	end
+	return ns.CameraRowsOffWhy(cam)
+end
 
 -- The Stop camera key binding and the death camera's Exit camera button: the
 -- camera running now (ns.activeCam) stops, and stays off until what started
@@ -3634,6 +3649,23 @@ ticker:SetScript("OnEvent", ns.Profiled("Core events", function(self, event, arg
 		-- And the buffs' window after a fight and each camera's own wait.
 		ns.db.buffPeekCombatWindow, ns.db.musicCombatResume = nil, nil
 		ns.db.fadeChat = nil -- (chat always fades in CineMode now; mouseover shows it)
+		-- The Chat page's "Always show in" (Cities, Dungeons, Raids, PvP) became
+		-- the Standard Frames page's Chat window row: its place columns.
+		-- (Saved profiles too.)
+		local function ChatPlaces(t)
+			for old, list in pairs({ chatInCities = "cityShow", chatInDungeons = "instanceShow",
+				chatInRaids = "instanceShow", chatInPvP = "bgShow" }) do
+				if t[old] then
+					t[list] = type(t[list]) == "table" and t[list] or {}
+					if t[list].chat == nil then t[list].chat = true end
+				end
+				t[old] = nil
+			end
+		end
+		ChatPlaces(ns.db)
+		for _, saved in pairs(ns.db.profiles or {}) do
+			if type(saved) == "table" then ChatPlaces(saved) end
+		end
 		for _, mode in ipairs({ "taxi", "idle", "walk", "run", "cozy", "vista", "fish", "tele" }) do
 			ns.db[mode .. "CombatWait"] = nil
 		end
@@ -5428,6 +5460,29 @@ ticker:SetScript("OnEvent", ns.Profiled("Core events", function(self, event, arg
 			end
 			ns.db.tooltipOneRowV1 = true
 		end
+		-- The Chat bubbles page's Say & yell row became three, Say, Yell and NPCs:
+		-- the new rows start as the Say row was (its Always, ticks, rule and
+		-- roles). Once, in every profile.
+		if not ns.db.bubbleRowsSplitV1 then
+			local function Split(t)
+				for _, kind in ipairs({ "Yell", "NPC" }) do
+					local always = "bubbles" .. kind .. "Always"
+					if t.bubblesSayAlways ~= nil and t[always] == nil then
+						t[always] = t.bubblesSayAlways
+					end
+					for _, value in pairs(t) do
+						if type(value) == "table" and value["bubble:Say"] ~= nil and value["bubble:" .. kind] == nil then
+							value["bubble:" .. kind] = value["bubble:Say"]
+						end
+					end
+				end
+			end
+			Split(ns.db)
+			for _, saved in pairs(ns.db.profiles or {}) do
+				if type(saved) == "table" then Split(saved) end
+			end
+			ns.db.bubbleRowsSplitV1 = true
+		end
 		-- Rules' "arena" is arenas only now (bg: battlegrounds and arenas both;
 		-- battleground: battlegrounds only), so a rule written before says bg,
 		-- meaning both as it did. Once, in every profile.
@@ -5894,6 +5949,17 @@ ticker:SetScript("OnEvent", ns.Profiled("Core events", function(self, event, arg
 			end
 			ns.db.visionsMasterV2 = true
 		end
+		-- Battle Vision and Story Vision are one Cards page now: their switches
+		-- into its rows' ticks, their Show in rows onto its rows', each look
+		-- setting you'd changed onto its event (Cards.lua), saved profiles
+		-- too (only what they have). Once.
+		if not ns.db.cardsV1 then
+			ns.MigrateCards(ns.db, true)
+			for _, saved in pairs(ns.db.profiles or {}) do
+				if type(saved) == "table" then ns.MigrateCards(saved, false) end
+			end
+			ns.db.cardsV1 = true
+		end
 		-- New settings start as the active profile has them (a built-in's
 		-- changes to the defaults included). A fresh install (or Reset addon)
 		-- starts with all of them so: the once-only updates above write theirs
@@ -5975,6 +6041,18 @@ ticker:SetScript("OnEvent", ns.Profiled("Core events", function(self, event, arg
 		-- carries on, or starts, while you're steering yourself).
 		ns.MovingManually = function()
 			return ns.playerMoving and AnyMovementKey()
+		end
+		-- (In words, for /cine debug mode: what counts as moving by hand now.)
+		function ns.HeldMovementWhat()
+			local held = {}
+			for key, down in pairs(movementKeys) do
+				if down and not (ns.autoRunning and STRAFE[key]) then held[#held + 1] = key end
+			end
+			if ns.PadMovementHeld and ns.PadMovementHeld() then held[#held + 1] = "gamepad stick" end
+			if IsMouseButtonDown("LeftButton") and IsMouseButtonDown("RightButton") then
+				held[#held + 1] = "both mouse buttons"
+			end
+			return #held > 0 and table.concat(held, ", ") or nil
 		end
 		ns.IsAutoRunning = function()
 			if ns.testTravel then

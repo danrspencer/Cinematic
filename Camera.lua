@@ -3022,6 +3022,86 @@ function ns.ReportCameraMode(cam)
 	end
 end
 
+-- /cine debug mode: every check the camera modes go by right now, the ones
+-- not met in red, so a report says which one holds a camera back. UpdateOrbit
+-- notes what it went by each frame (ns.NoteCameraGates).
+ns.camGates = {}
+function ns.NoteCameraGates(now, cinematic, adjusting, turnBlocks, sinceTurn, want, prefix, running)
+	local g = ns.camGates
+	g.at, g.cinematic, g.adjusting, g.turnBlocks, g.sinceTurn = now, cinematic, adjusting, turnBlocks, sinceTurn
+	g.want, g.prefix, g.running = want, prefix, running
+end
+function ns.ReportCameraGates()
+	local db, g, now = ns.db, ns.camGates, GetTime()
+	local function Check(label, ok, detail)
+		ns.Print(("  %s %s%s"):format(ok and "|cff60ff60ok|r" or "|cffff6060NO|r", label,
+			detail and (" - " .. detail) or ""))
+	end
+	local function Secs(value) return value and ("%.1f"):format(math.min(value, 999)) or "-" end
+	ns.Print(("camera now: %s; orbit %s; this frame wants %s; place %s; game %s; walk mode %s"):format(
+		tostring(ns.activeCam or "none"), tostring(g.running or "still"), g.want and tostring(g.prefix) or "nothing",
+		tostring(ns.GetPlaceType()), tostring(select(4, GetBuildInfo())), ns.walking and "on" or "off"))
+	ns.Print("every camera:")
+	Check("Cinematic on", db.enabled)
+	Check("Enable Cameras (Scenes page)", db.cameraModes ~= false)
+	Check("CineMode on", ns.lastCinematic, not ns.lastCinematic and tostring(ns.cineOffWhy) or nil)
+	Check("out of combat", not (InCombatLockdown() or ns.Flag(UnitAffectingCombat("player"))))
+	Check("not moving the camera yourself", not g.adjusting, ("last camera input %s sec ago (%s)"):format(
+		Secs(now - ns.GetLastCameraInput()), tostring(ns.lastCameraInputWhat)))
+	Check("no fly-by playing", not (g.flyByAt and now - g.flyByAt < 0.5))
+	Check("not stopped with Stop camera", not ns.stoppedCam, ns.stoppedCam)
+	if ns.manualCam then ns.Print("  started by hand: " .. tostring(ns.manualCam)) end
+	if g.at and now - g.at > 1 then ns.Print(("  (the camera's checks last ran %s sec ago)"):format(Secs(now - g.at))) end
+
+	-- Moving: the RP walk or auto-run camera's own checks.
+	local cam = ns.walking and "walk" or "run"
+	if ns.playerMoving or ns.autoRunning then
+		local T = TRAVEL[cam]
+		ns.Print(cam == "walk" and "RP walk camera:" or "auto-run camera:")
+		Check("not on a flight", not ns.OnTaxi())
+		local held = ns.HeldMovementWhat and ns.HeldMovementWhat()
+		Check("not moving by hand", not held, held and ("held: " .. held))
+		if cam == "run" then
+			Check("auto-run seen (its key, or moving a moment hands-free)", ns.autoRunning)
+			Check("auto-running", ns.IsAutoRunning())
+		else
+			Check("RP walking", ns.IsRPWalking())
+		end
+		local delay = db[cam .. "CameraDelay"] or 0
+		local since = ns.travelSince[cam]
+		Check("its Wait has run out", delay == 0 or (since and now - since >= delay),
+			("%s of %s sec"):format(Secs(since and now - since or 0), delay))
+		local why = ns.CameraOffWhy(cam)
+		Check("allowed here (Scenes page)", not why, why)
+		Check("its sway on (" .. T.orbit .. ")", db[T.orbit])
+		Check("no menu or NPC window open", not ns.travelHeld)
+		Check("not turning", not g.turnBlocks, ("last turn %s sec ago, needs %s"):format(Secs(g.sinceTurn),
+			TRAVEL_START_AFTER_TURN))
+		Check("Calm Timer", ns.CombatWaitOver(T.orbit, now), ns.CameraWaitsForCalm(cam) and "waits for it" or nil)
+	else
+		-- Standing: the standing-still (AFK) camera's, and an event's.
+		ns.Print("standing-still camera:")
+		local still = ns.GetStillSince()
+		Check("standing still long enough", still and now - still >= db.idleOrbitDelay,
+			("%s of %s sec"):format(Secs(still and now - still or 0), db.idleOrbitDelay))
+		Check("its sway on (idleOrbit)", db.idleOrbit)
+		local why = ns.CameraOffWhy("idle")
+		Check("allowed here (Scenes page)", not why, why)
+		Check("runs now (Go AFK rows)", ns.StillRunsAFK())
+		local event, camera = ns.ActiveEvent()
+		ns.Print(("  event now: %s (%s)"):format(tostring(event), tostring(camera)))
+	end
+	-- Each camera with a trigger of its own: off here, and why.
+	local off = {}
+	for _, each in ipairs(ns.CAMERA_OFF_CAMS) do
+		local why = ns.CameraOffWhy(each[1])
+		if why then off[#off + 1] = each[1] end
+	end
+	ns.Print("off here: " .. (#off > 0 and table.concat(off, ", ") or "none"))
+	-- The camera script running, if one is, and its step.
+	ns.CameraScriptCommand("")
+end
+
 -- Turning the option on prints the current mode straight away.
 function ns.ResetCameraModeReport()
 	report.mode = false
@@ -3210,6 +3290,7 @@ function ns.UpdateOrbit(cinematic, elapsed)
 	-- camera to itself while it lasts.
 	ns.UpdateAutoFlyBy(now, onTaxi, cinematic, adjusting)
 	if ns.UpdateFlyBy(now, elapsed) then
+		ns.camGates.flyByAt = now
 		return
 	end
 
@@ -3234,6 +3315,8 @@ function ns.UpdateOrbit(cinematic, elapsed)
 	-- Fresh out of a fight: this mode may wait a while before starting.
 	-- (The tele camera turns with the cozy camera's rotation, but has its own wait.)
 	want = want and ns.CombatWaitOver((tele and prefix == "cozyOrbit") and "tele" or prefix, now)
+	ns.NoteCameraGates(now, cinematic, adjusting, turnBlocksStart, now - lastAnyTurnAt, want, prefix,
+		ns.orbit.level > 0 and orbitPrefix or nil)
 	local footHandoff = ns.orbit.level > 0 and orbitPrefix ~= prefix
 		and FOOT_ORBIT[orbitPrefix] and FOOT_ORBIT[prefix]
 	-- Into the vista camera with another one still moving (the standing-still

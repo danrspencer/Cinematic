@@ -38,27 +38,19 @@ local shared = {
 	questTalkFont = { kind = "font", own = "game" },
 	rollFont = { kind = "font", own = "game" },
 	questItemFont = { kind = "font", own = "game" },
-	combatFont = { kind = "font", own = "game" },
-	combatBossFont = { kind = "font", own = "game" },
-	storyFont = { kind = "font", own = "game" },
-	storyOutline = { kind = "outline", own = -1 },
-	storyShadow = { kind = "shadow", own = "game" },
 	plateCastFont = { kind = "font", own = "game" },
 	bubblesOutline = { kind = "outline", own = 0 },
 	tooltipOutline = { kind = "outline", own = 0 },
 	questTalkOutline = { kind = "outline", own = 0 },
 	rollOutline = { kind = "outline", own = 0 },
 	questItemOutline = { kind = "outline", own = 1 },
-	combatOutline = { kind = "outline", own = 1 },
-	combatBossOutline = { kind = "outline", own = 1 },
 	plateCastOutline = { kind = "outline", own = "game", map = function(value) return CAST_OUTLINES[value] end },
 	tooltipShadow = { kind = "shadow", own = "game" },
 	questTalkShadow = { kind = "shadow", own = "game" },
 	rollShadow = { kind = "shadow", own = "game" },
 	questItemShadow = { kind = "shadow", own = "game" },
-	combatShadow = { kind = "shadow", own = "game" },
-	combatBossShadow = { kind = "shadow", own = "game" },
 	plateCastShadow = { kind = "shadow", own = "game" },
+	-- (The Cards page's, each event's too: Cards.lua puts them in.)
 }
 -- Borders: each page's border (its own default "own"), and its Custom's
 -- thickness and color (<key>Size, <key>R/G/B), which follow General's while
@@ -479,6 +471,7 @@ local function Window()
 	})
 	if ns.SkinWindow then ns.SkinWindow(popWindow) end
 	tinsert(UISpecialFrames, "CinematicPreviewWindow") -- Escape closes it
+	ns.CloseWithSettings(popWindow) -- (and closing the settings)
 	popWindow.title = popWindow:CreateFontString(nil, "OVERLAY", "GameFontNormal")
 	popWindow.title:SetPoint("TOPLEFT", 14, -10)
 	local close = CreateFrame("Button", nil, popWindow, "UIPanelCloseButton")

@@ -1004,46 +1004,27 @@ local function UpdateDeathScreen(elapsed)
 	end
 end
 
--- "YOU DIED" banner (a nod to Elden Ring): shortly after the death camera starts, a dark
--- band with soft edges fades in across the middle of the screen, the words in
--- dull red on it, then it all fades away. Above the letterbox,
--- under popups (the release button). The text is a game font scaled up with
--- its frame, so other alphabets keep their letters. It looks worn: faint
--- offset copies behind it bleed its edges. (A grain texture over it wore the
--- band round the letters too, and looked dirty: tested.)
-local BANNER_WAIT = 2 -- seconds after the death camera starts
-local BANNER_IN, BANNER_OUT = 3, 1.5 -- seconds (how long it stays: Story Vision's storyBannerHold)
-local BANNER_HEIGHT, BANNER_EDGE = 0.1, 0.07 -- solid band, and each soft edge (shares of the screen height)
-local BANNER_ALPHA = 0.7
-local BANNER_SCALE = 3.3 -- the text's size (its font's, times this)
-local BANNER_COLOR = { 0.72, 0.11, 0.14 } -- (at first: then Story Vision's storyBannerR, G, B)
-local BANNER_BLEED = { { -0.7, 0 }, { 0.7, 0 }, { 0, -0.7 }, { 0, 0.7 }, { -0.4, 0.4 }, { 0.4, -0.4 } }
-local BANNER_BLEED_ALPHA, BANNER_TEXT_ALPHA = 0.16, 0.9
--- Or "wasted" (a nod to crime-sandbox films and games): a flat black band with
--- hard edges, "wasted" on it in red with a dark outline (a picture: drawn in
--- Pricedown by Tools/wasted-banner/render.py; the font isn't shipped), in quicker
--- and kept up longer. (The death screen's grey wash does the rest.)
-local WASTED_WAIT, WASTED_IN, WASTED_OUT = 1.5, 0.4, 1 -- seconds (it stays a second past storyBannerHold)
-local WASTED_HEIGHT, WASTED_ALPHA = 0.16, 0.5 -- share of the screen height; band opacity
+-- The death banner (a nod to Elden Ring): shortly after the death camera
+-- starts, the Death event's card (Cards.lua), a Banner to start with: "YOU
+-- DIED" in dull red across the middle of the screen on a dark band with soft
+-- edges. Or "wasted" (a nod to crime-sandbox films and games): a picture on a
+-- flat black band (drawn in Pricedown by Tools/wasted-banner/render.py; the
+-- font isn't shipped), sooner and kept up a second longer.
+local BANNER_WAIT, WASTED_WAIT = 2, 1.5 -- seconds after the death camera starts
 local WASTED_TEXTURE = "Interface\\AddOns\\" .. ADDON_NAME .. "\\Textures\\Wasted"
 local WASTED_SIZE = 0.1 -- the picture's height, a share of the screen's (4:1 wide)
-local banner = { started = nil, was = nil, bleed = {} }
--- (Its shape for Story Vision's preview, drawn there to scale.)
-ns.DEATH_BANNER_LOOK = { height = BANNER_HEIGHT, edge = BANNER_EDGE, alpha = BANNER_ALPHA, scale = BANNER_SCALE,
-	textAlpha = BANNER_TEXT_ALPHA, wastedHeight = WASTED_HEIGHT, wastedAlpha = WASTED_ALPHA,
-	wastedTexture = WASTED_TEXTURE, wastedSize = WASTED_SIZE, gradient = SetGradient }
 
--- Story Vision's font (Style General's unless the page picks its own) for
--- text at size pixels (flags: its outline), every alphabet's letters drawn,
--- with the page's outline and shadow (-1, "game": the text's own); false if
--- it's all the game's, left for the caller to set.
+-- The Cards page's font (its Time of day's: the Default style's unless it
+-- has its own) for text at size pixels (flags: its outline), every
+-- alphabet's letters drawn, with its outline and shadow; false if it's all
+-- the game's, left for the caller to set.
 local function StoryFont(text, object, size, flags)
-	local look = ns.StyleLook and ns.StyleLook("storyVision")
-	local file = look and ns.StyleFontFile and ns.StyleFontFile(look.storyFont)
-	local outline = look and tonumber(look.storyOutline) or -1
-	local shadow = look and look.storyShadow
+	local look = ns.CardLook and ns.CardLook("time")
+	local file = look and ns.StyleFontFile and ns.StyleFontFile(look.combatFont)
+	local outline = look and tonumber(look.combatOutline) or -1
+	local shadow = look and look.combatShadow
 	-- (An outline in a color: copies behind the text, ns.SetTextRim.)
-	local or_, og, ob = look and look.storyOutlineR or 0, look and look.storyOutlineG or 0, look and look.storyOutlineB or 0
+	local or_, og, ob = look and look.combatOutlineR or 0, look and look.combatOutlineG or 0, look and look.combatOutlineB or 0
 	local rimmed = outline > 0 and or_ + og + ob > 0
 	if not file and (outline >= 0 or (shadow and shadow ~= "game")) and object then
 		file = object:GetFont() -- (the game's font, outlined or shadowed)
@@ -1064,127 +1045,42 @@ local function StoryFont(text, object, size, flags)
 	if ns.SetTextShadow then ns.SetTextShadow(text, shadow) end
 	return true
 end
-ns.StoryFont = StoryFont -- (Story Vision's preview)
 
-local function CreateDeathBanner()
-	local frame = CreateFrame("Frame", nil, UIParent)
-	frame:SetAllPoints(UIParent)
-	frame:SetFrameStrata("HIGH")
-	frame:EnableMouse(false)
-	ns.AddOverlay(frame)
-	-- A full-width strip, its colour from bottom to top.
-	local function Strip(bottom, top, ...)
-		local strip = frame:CreateTexture(nil, "BACKGROUND")
-		strip:SetColorTexture(1, 1, 1, 1)
-		strip:SetPoint("LEFT")
-		strip:SetPoint("RIGHT")
-		strip:SetPoint(...)
-		SetGradient(strip, "VERTICAL", bottom, top)
-		return strip
-	end
-	local clear, black = { 0, 0, 0, 0 }, { 0, 0, 0, BANNER_ALPHA }
-	banner.middle = Strip(black, black, "CENTER")
-	banner.top = Strip(black, clear, "BOTTOM", banner.middle, "TOP")
-	banner.bottom = Strip(clear, black, "TOP", banner.middle, "BOTTOM")
-	banner.holder = CreateFrame("Frame", nil, frame)
-	banner.holder:SetSize(1, 1)
-	banner.holder:SetPoint("CENTER")
-	local function Text(layer, x, y, alpha)
-		local text = banner.holder:CreateFontString(nil, layer)
-		text:SetFontObject(GameFontNormalHuge) -- (a font before any text)
-		text:SetShadowOffset(0, 0)
-		text:SetTextColor(BANNER_COLOR[1], BANNER_COLOR[2], BANNER_COLOR[3], alpha)
-		text.alpha = alpha
-		text:SetPoint("CENTER", x, y)
-		return text
-	end
-	for i, offset in ipairs(BANNER_BLEED) do
-		banner.bleed[i] = Text("ARTWORK", offset[1], offset[2], BANNER_BLEED_ALPHA)
-	end
-	banner.text = Text("OVERLAY", 0, 0, BANNER_TEXT_ALPHA)
-	if ns.WhyRegister then
-		ns.WhyRegister(banner.text, L["Death banner"], "Story Vision", { L["Story Vision's death banner, as you die"] })
-	end
-	banner.flat = frame:CreateTexture(nil, "BACKGROUND")
-	banner.flat:SetColorTexture(0, 0, 0, WASTED_ALPHA)
-	banner.flat:SetPoint("LEFT")
-	banner.flat:SetPoint("RIGHT")
-	banner.flat:SetPoint("CENTER")
-	banner.wasted = frame:CreateTexture(nil, "OVERLAY")
-	banner.wasted:SetTexture(WASTED_TEXTURE)
-	banner.wasted:SetPoint("CENTER")
-	-- One size throughout. Growing it (the frame's scale each frame, or a
-	-- Scale animation) redraws the letters at whole font sizes, so it grew in
-	-- jumps, from its top left corner: it wobbled (tested).
-	banner.holder:SetScale(BANNER_SCALE)
-	banner.frame = frame
-	frame:Hide()
+-- The banner's words: your own with Custom (YOU DIED while left blank).
+function ns.DeathBannerWords(style)
+	local words = (style or ns.GetDB().deathBannerStyle) == "custom" and ns.GetDB().deathBannerText
+	words = type(words) == "string" and words:match("^%s*(.-)%s*$") or ""
+	return words ~= "" and words or L["YOU DIED"]
 end
 
-local function ShowDeathBanner(style)
-	local height = UIParent:GetHeight()
-	local wasted = (style or db.deathBannerStyle) == "wasted"
-	banner.wastedStyle = wasted
-	banner.middle:SetShown(not wasted)
-	banner.top:SetShown(not wasted)
-	banner.bottom:SetShown(not wasted)
-	banner.holder:SetShown(not wasted)
-	banner.flat:SetShown(wasted)
-	banner.wasted:SetShown(wasted)
-	if wasted then
-		banner.flat:SetHeight(height * WASTED_HEIGHT)
-		banner.wasted:SetSize(height * WASTED_SIZE * 4, height * WASTED_SIZE)
-		banner.started = GetTime()
-		banner.frame:SetAlpha(0)
-		banner.frame:Show()
-		return
+-- The Death event's card, in the style picked (style: or this one).
+local function DeathCard(style)
+	if (style or ns.GetDB().deathBannerStyle) == "wasted" then
+		return { name = "", picture = WASTED_TEXTURE, pictureSize = WASTED_SIZE, pictureAspect = 4, holdExtra = 1 }
 	end
-	banner.middle:SetHeight(height * BANNER_HEIGHT)
-	banner.top:SetHeight(height * BANNER_EDGE)
-	banner.bottom:SetHeight(height * BANNER_EDGE)
-	-- (The font each time: Story Vision's may have changed.)
-	local _, size = GameFontNormalHuge:GetFont()
-	local look = ns.StyleLook("storyVision")
-	for _, text in ipairs({ banner.text, unpack(banner.bleed) }) do
-		if not StoryFont(text, GameFontNormalHuge, size) then
-			text:SetFontObject(GameFontNormalHuge)
-		end
-		text:SetTextColor(look.storyBannerR, look.storyBannerG, look.storyBannerB, text.alpha)
-		text:SetText(L["YOU DIED"])
-	end
-	banner.started = GetTime()
-	banner.frame:SetAlpha(0)
-	banner.frame:Show()
+	return { name = ns.DeathBannerWords(style) }
 end
+ns.CardSamples = ns.CardSamples or {}
+ns.CardSamples.death = function() return DeathCard() end
 
+-- As the death camera starts (not dead at login: nil until the first
+-- check), its card a moment later; cut short as soon as it stops.
+local deathWas, deathAt
 local function UpdateDeathBanner()
-	if not banner.frame then
-		return
+	local want = db.enabled and ns.IsDeathCinematic and ns.IsDeathCinematic() or false
+	if want and deathWas == false then
+		local at, style = GetTime(), db.deathBannerStyle
+		deathAt = at
+		C_Timer.After(style == "wasted" and WASTED_WAIT or BANNER_WAIT, function()
+			if deathAt == at and ns.IsDeathCinematic and ns.IsDeathCinematic() then
+				ns.Cards.Fire("death", DeathCard(style))
+			end
+		end)
+	elseif not want and deathWas then
+		deathAt = nil
+		ns.Cards.Cut("death")
 	end
-	local style = ns.Setting("deathBannerStyle") -- (false with Story Vision off)
-	local want = banner.testing or db.enabled and style and style ~= "none" and ns.IsDeathCinematic
-		and ns.IsDeathCinematic() or false
-	if want and banner.was == false and not banner.testing then
-		ShowDeathBanner()
-	end
-	banner.was = want -- (nil until the first check: dead at login, it doesn't show)
-	if not banner.started then
-		return
-	end
-	local hold = tonumber(ns.StyleLook("storyVision").storyBannerHold) or 4
-	local wait, fadeIn, fadeOut = BANNER_WAIT, BANNER_IN, BANNER_OUT
-	if banner.wastedStyle then
-		wait, fadeIn, hold, fadeOut = WASTED_WAIT, WASTED_IN, hold + 1, WASTED_OUT
-	end
-	local t = GetTime() - banner.started - wait -- (below 0: still waiting, unseen)
-	local total = fadeIn + hold + fadeOut
-	if t >= total or not want then
-		banner.started, banner.testing = nil, nil
-		banner.frame:Hide()
-		return
-	end
-	local alpha = math.max(0, math.min(1, t / fadeIn, (total - t) / fadeOut))
-	banner.frame:SetAlpha(alpha * alpha * (3 - 2 * alpha))
+	deathWas = want
 end
 
 -- Indoors in an inn: resting outside a capital, under a roof. (The rested area
@@ -1374,16 +1270,9 @@ local function UpdateTint(cinematic, elapsed, vignetteOn, weatherOn)
 	ApplyTint(tintLevel, layerLevel.vignette, layerLevel.weather)
 end
 
--- Story Vision's Test: the death banner now, alive or not, in the style picked
--- ("YOU DIED" if that's None).
+-- The Cards page's Death Test: its card now, alive or not.
 function ns.TestDeathBanner()
-	db = db or ns.GetDB()
-	if not banner.frame then
-		return
-	end
-	local style = db.deathBannerStyle ~= "none" and db.deathBannerStyle or "youdied"
-	banner.testing = true
-	ShowDeathBanner(style)
+	ns.CardTest("death")
 end
 
 -- Entry points for Core.lua and the options page
@@ -1391,7 +1280,6 @@ function ns.CreateTint()
 	db = ns.GetDB()
 	CreateTint()
 	CreateDeathScreen()
-	CreateDeathBanner()
 end
 
 ns.UpdateTint = UpdateTint
@@ -1513,7 +1401,7 @@ end)
 -- Time-of-day title: a line such as "Dusk" under the game's own zone name
 -- when you log in or reload. It's a child of the zone text frame, so it fades
 -- in and out with it, and is cleared once the zone text hides. Under it on a
--- real login, smaller and dimmer, Story Vision's Last time line (Recap.lua),
+-- real login, smaller and dimmer, the Cards page's Last time line (Recap.lua),
 -- in the title's place if the title is off.
 local TIME_TITLES = {
 	{ 5, "Dawn" }, { 8, "Morning" }, { 12, "Midday" }, { 14, "Afternoon" },
@@ -1561,7 +1449,7 @@ local function PlaceTimeTitle()
 		local object = _G.SubZoneTextFont or GameFontNormalLarge
 		if size and StoryFont(timeTitle.text, object, math.floor(size * 0.75 + 0.5), flags) then
 			StoryFont(timeTitle.recap, object, math.floor(size * RECAP_SCALE + 0.5), flags)
-			timeTitle.sized = "Story Vision's font"
+			timeTitle.sized = "the Cards page's font"
 		elseif font and size and ns.SetPlateNameFont then
 			-- The game's font at a real size, its outline full width (scaled
 			-- text thins it). A family, so Russian letters aren't boxes. An
@@ -1576,7 +1464,7 @@ local function PlaceTimeTitle()
 			end
 			timeTitle.sized = "game font, own size"
 		elseif timeTitle.text.SetTextScale then
-			-- (Back to the game's font, if Story Vision's was on it.)
+			-- (Back to the game's font, if the Cards page's was on it.)
 			timeTitle.text:SetFontObject(object)
 			timeTitle.recap:SetFontObject(object)
 			timeTitle.text:SetText(timeTitle.text:GetText())
@@ -1658,10 +1546,10 @@ function ns.ShowTimeOfDayTitle(showTime, recap)
 		timeTitle.recap:SetFontObject(_G.SubZoneTextFont or GameFontNormalLarge)
 		timeTitle.recap:SetShadowOffset(1, -1)
 		if ns.WhyRegister then
-			ns.WhyRegister(timeTitle.text, L["Time of day"], "Story Vision", { L["Story Vision's time of day, under the zone's name"] })
+			ns.WhyRegister(timeTitle.text, L["Time of day"], "Card Vision", { L["The Card Vision page's time of day at login, under the zone's name"] })
 		end
 		if ns.WhyRegister then
-			ns.WhyRegister(timeTitle.recap, L["Last time"], "Story Vision", { L["Story Vision's Last time line: what you did last session, as you log in"] })
+			ns.WhyRegister(timeTitle.recap, L["Last time"], "Card Vision", { L["The Card Vision page's Last time line: what you did last session, as you log in"] })
 		end
 		timeTitle.recap:SetTextColor(RECAP_COLOR[1], RECAP_COLOR[2], RECAP_COLOR[3])
 		local function Clear()
@@ -1684,7 +1572,7 @@ function ns.ShowTimeOfDayTitle(showTime, recap)
 	local _, _, hour = TimeOfDayColor()
 	timeTitle.text:SetText(showTime and L[TimeTitleAt(hour)] or "")
 	timeTitle.recap:SetText(recap or "")
-	timeTitle.sized = nil -- (sized again: Story Vision's font may have changed)
+	timeTitle.sized = nil -- (sized again: the Cards page's font may have changed)
 	PlaceTimeTitle()
 	-- If the zone name never showed, don't leave the title waiting for the
 	-- next zone change.
@@ -1769,11 +1657,10 @@ ns.GetTimeOfDayInfo = function()
 	return phase, hour, minute
 end
 
--- When the time of day changes during play (Evening to Dusk, say), its name
--- fades in on its own where the zone title appears, then fades out.
-local CHANGE_FADE_IN, CHANGE_FADE_OUT = 1.5, 2 -- (how long it stays: Story Vision's storyTimeHold, storyAttackHold)
+-- When the time of day changes during play (Evening to Dusk, say): the Time
+-- of day event's card (Cards.lua), with a fitting sound.
 local CHANGE_CHECK = 15 -- seconds between checks
--- A sound for each time of day (Wowhead sound IDs), played with its title.
+-- A sound for each time of day (Wowhead sound IDs), played with its card.
 -- Bells are your faction's city bell.
 local TIME_SOUNDS = {
 	Dawn = 8352,          -- Chicken
@@ -1812,78 +1699,36 @@ local function PlayTimeSound(title) -- (a time of day, or "bell")
 		end
 	end
 end
-local changeTitle, lastTitle
+local lastTitle
 
--- The title itself: text fades in where the zone title appears, in this
--- colour, staying hold seconds.
-local function ShowTitle(text, r, g, b, hold)
-	if not changeTitle then
-		changeTitle = CreateFrame("Frame", nil, UIParent)
-		changeTitle:SetSize(1, 1)
-		changeTitle:SetFrameStrata("MEDIUM")
-		changeTitle.text = changeTitle:CreateFontString(nil, "OVERLAY")
-		changeTitle.text:SetFontObject(_G.ZoneTextFont or GameFontNormalHuge or GameFontNormalLarge)
-		changeTitle.text:SetShadowOffset(1, -1)
-		if ns.WhyRegister then
-			ns.WhyRegister(changeTitle.text, L["Story Vision"], "Story Vision", { L["Story Vision's title: the time of day changing, or a place under attack"] })
-		end
-		changeTitle.text:SetPoint("CENTER")
-		ns.AddOverlay(changeTitle)
-		changeTitle:SetScript("OnUpdate", function(self, elapsed)
-			self.t = self.t + elapsed
-			local t, alpha = self.t, 0
-			if t < CHANGE_FADE_IN then
-				alpha = t / CHANGE_FADE_IN
-			elseif t < CHANGE_FADE_IN + self.hold then
-				alpha = 1
-			elseif t < CHANGE_FADE_IN + self.hold + CHANGE_FADE_OUT then
-				alpha = 1 - (t - CHANGE_FADE_IN - self.hold) / CHANGE_FADE_OUT
-			else
-				self:Hide()
-			end
-			self:SetAlpha(alpha)
-		end)
-	end
-	-- Where the zone title sits (it keeps its place even while hidden).
-	changeTitle:ClearAllPoints()
-	if ZoneTextString and ZoneTextString:GetCenter() then
-		changeTitle:SetPoint("CENTER", ZoneTextString, "CENTER")
-	else
-		changeTitle:SetPoint("CENTER", UIParent, "TOP", 0, -200)
-	end
-	local object = _G.ZoneTextFont or GameFontNormalHuge or GameFontNormalLarge
-	local _, size, flags = object:GetFont()
-	if not StoryFont(changeTitle.text, object, size, flags) then
-		changeTitle.text:SetFontObject(object)
-	end
-	changeTitle.text:SetTextColor(r, g, b)
-	changeTitle.text:SetText(text)
-	changeTitle.t, changeTitle.hold = 0, tonumber(hold) or 4
-	changeTitle:SetAlpha(0)
-	changeTitle:Show()
+-- The time of day's card (title: its English name), its sound with it.
+local function TimeCard(title)
+	return { name = L[title], sound = function() PlayTimeSound(title) end }
 end
 
-local function ShowChangeTitle(text)
-	local look = ns.StyleLook("storyVision")
-	ShowTitle(L[text], look.storyTimeR, look.storyTimeG, look.storyTimeB, look.storyTimeHold)
-	PlayTimeSound(text)
+-- A warning from the game ("Dun Algaz is under attack!", Chat.lua): the Under
+-- attack event's card, with your faction's city bell. force: a test's.
+function ns.ShowAlertTitle(text, force)
+	ns.Cards.Fire("attack", { name = text, sound = function() PlayTimeSound("bell") end }, force)
 end
 
--- Warnings from the game ("Dun Algaz is under attack!") in the same place,
--- in red, with your faction's city bell.
-function ns.ShowAlertTitle(text)
-	local look = ns.StyleLook("storyVision")
-	ShowTitle(text, look.storyAttackR, look.storyAttackG, look.storyAttackB, look.storyAttackHold)
-	PlayTimeSound("bell")
+ns.CardSamples.time = function()
+	db = db or ns.GetDB()
+	return TimeCard(TimeTitleAt((GetClockTime())))
+end
+ns.CardSamples.attack = function()
+	local place = GetMinimapZoneText and GetMinimapZoneText() or ""
+	return { name = L["%s is under attack!"]:format(place ~= "" and place or (GetRealZoneText() or "")),
+		sound = function() PlayTimeSound("bell") end }
 end
 
 -- /cine timetest: show it now (the current time of day, or a given name).
 function ns.TestTimeChangeTitle(text)
 	db = db or ns.GetDB()
-	ShowChangeTitle(text or TimeTitleAt((GetClockTime())))
+	ns.Cards.Fire("time", TimeCard(text or TimeTitleAt((GetClockTime()))), true)
 end
 
--- The time of day's title now, in your language (Story Vision's preview).
+-- The time of day's title now, in your language.
 function ns.TimeTitleNow()
 	db = db or ns.GetDB()
 	return L[TimeTitleAt((GetClockTime()))]
@@ -1898,7 +1743,7 @@ C_Timer.NewTicker(CHANGE_CHECK, ns.Profiled("Time of day check", function()
 	local title = TimeTitleAt(hour)
 	if lastTitle and title ~= lastTitle and ns.Setting("timeOfDayChange")
 		and not InCombatLockdown() and not (ZoneTextFrame and ns.Flag(ZoneTextFrame:IsShown())) then
-		ShowChangeTitle(title)
+		ns.Cards.Fire("time", TimeCard(title))
 	end
 	lastTitle = title
 end))

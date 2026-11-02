@@ -301,10 +301,6 @@ local function CreateWindow()
 	window:SetFrameStrata("DIALOG")
 	window:SetToplevel(true)
 	window:EnableMouse(true)
-	window:SetMovable(true)
-	window:RegisterForDrag("LeftButton")
-	window:SetScript("OnDragStart", window.StartMoving)
-	window:SetScript("OnDragStop", window.StopMovingOrSizing)
 	window:SetBackdrop({
 		bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background-Dark",
 		edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
@@ -320,6 +316,7 @@ local function CreateWindow()
 
 	local close = ns.SkinClose(CreateFrame("Button", nil, window, "UIPanelCloseButton"))
 	close:SetPoint("TOPRIGHT", -2, -2)
+	ns.DockBeside(window, "profileShare")
 
 	local hint = window:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
 	hint:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -8)

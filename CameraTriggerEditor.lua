@@ -709,10 +709,6 @@ local function Window()
 	window:SetFrameStrata("DIALOG")
 	window:SetToplevel(true)
 	window:EnableMouse(true)
-	window:SetMovable(true)
-	window:RegisterForDrag("LeftButton")
-	window:SetScript("OnDragStart", window.StartMoving)
-	window:SetScript("OnDragStop", window.StopMovingOrSizing)
 	if window.SetBackdrop then
 		window:SetBackdrop({ bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background-Dark",
 			edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border", tile = true, tileSize = 32, edgeSize = 24,
@@ -720,11 +716,12 @@ local function Window()
 	end
 	if ns.SkinWindow then ns.SkinWindow(window) end
 	tinsert(UISpecialFrames, "CinematicCameraShareWindow")
+	ns.DockBeside(window, "cameraShare"):SetPoint("TOPRIGHT", -14, -14)
 	window:Hide()
 
 	window.title = window:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
 	window.title:SetPoint("TOPLEFT", 18, -16)
-	window.title:SetPoint("RIGHT", -18, 0)
+	window.title:SetPoint("RIGHT", -90, 0) -- (clear of Pop out)
 	window.title:SetJustifyH("LEFT")
 	window.hint = window:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
 	window.hint:SetPoint("TOPLEFT", window.title, "BOTTOMLEFT", 0, -6)

@@ -1,95 +1,28 @@
--- Combat Vision: a cue for a few seconds as you go into a fight and come out
--- of it: a word on the screen or in a letterbox bar (a title card, a
--- subtitle or a chapter line), a pulse round the screen's edges, an icon and
--- sounds (CombatSoundRules.lua). Its pages: the Visions hub's Combat Vision
--- (when it shows) and the Style hub's (how it looks, with a preview drawn by
--- the same code).
+-- Battle Vision's moments, as cards (Cards.lua): going into a fight and
+-- coming out of it, and a boss's name as its fight starts or before it. This
+-- file hears them (ns.Cards.Fire does the rest) and draws every card, of every
+-- page's moment: a word on the screen, in a letterbox bar or across it on a
+-- band (a title card, a subtitle, a chapter line or a banner), a pulse round
+-- the screen's edges, an icon. (Sounds: CombatSoundRules.lua.)
 
 local _, ns = ...
 local L = ns.L
 local DEFAULTS = ns.DEFAULTS
 
-DEFAULTS.combatVision = false
-DEFAULTS.combatOnEnter = true          -- as a fight starts (its Show in row's Combat dropdown)
-DEFAULTS.combatOnLeave = true          -- ...and as it ends
-DEFAULTS.combatMinFight = 3            -- no leaving cue after a fight shorter than this (seconds)
-DEFAULTS.combatAlways = true           -- its Show in row's Always (the rest: ROW_KEY's ticks and rule)
-DEFAULTS.combatPlace = "top"           -- "screen", "top" or "bottom" (a letterbox bar)
-DEFAULTS.combatBarScale = 0.62         -- in a bar: the text's height, a share of the bar's
-DEFAULTS.combatAlign = "center"        -- in a bar: "left", "center" or "right"
-DEFAULTS.combatStyle = "title"         -- "title", "subtitle" or "chapter" (no words: "none" in Setup)
+-- (Each a row on the Cards page: their look is its, Cards.lua's.)
+DEFAULTS.combatOnEnter = false         -- the Entering combat row (on in the Cinema profile)
+DEFAULTS.combatOnLeave = false         -- ...and Leaving combat
+DEFAULTS.combatMinFight = 3            -- no leaving card after a fight shorter than this (seconds)
 DEFAULTS.combatTextIn = "Combat"       -- the words ("": none, just the icon, pulse, bar; these
-DEFAULTS.combatTextOut = "Respite"     -- two shown in the game's language: ShownWords)
-DEFAULTS.combatFont = "general"        -- QUEST_ITEM_FONTS (QuestItemButton.lua; general: General's)
-DEFAULTS.combatSize = 34               -- the text's height on the screen
-DEFAULTS.combatOutlineR, DEFAULTS.combatOutlineG, DEFAULTS.combatOutlineB = 0, 0, 0 -- (black: the game's own)
-DEFAULTS.combatOutline = -1            -- 0 none, 1 thin, 2 thick (-1: General's, thin at the game's)
-DEFAULTS.combatShadow = "general"      -- "game" (its own soft one), "on" or "none" (general: General's)
-DEFAULTS.combatInR, DEFAULTS.combatInG, DEFAULTS.combatInB = 0.89, 0.13, 0.22 -- #E32038
-DEFAULTS.combatOutR, DEFAULTS.combatOutG, DEFAULTS.combatOutB = 0.49, 0.67, 0.73
--- The pulse's colors, going in and coming out.
-DEFAULTS.combatPulseInR, DEFAULTS.combatPulseInG, DEFAULTS.combatPulseInB = 0.89, 0.79, 0.34
-DEFAULTS.combatPulseOutR, DEFAULTS.combatPulseOutG, DEFAULTS.combatPulseOutB = 0.49, 0.67, 0.73
-DEFAULTS.combatHoldIn = 1              -- seconds the text stays, between its fades
-DEFAULTS.combatHoldOut = 1
-DEFAULTS.combatPulseIn = 0.03          -- the screen's edges flash, this strong (0: no)
-DEFAULTS.combatPulseOut = 0.01
-DEFAULTS.combatIconShowIn = false      -- an icon before the word going in
-DEFAULTS.combatIconShowOut = false     -- ...and coming out
-DEFAULTS.combatIconIn = "Interface\\Icons\\Ability_DualWield" -- (a file or file ID: IconBrowser.lua)
-DEFAULTS.combatIconOut = 132320
-DEFAULTS.combatAnim = "fade"           -- "fade"; "reveal": the words open from their middle (or side);
-                                       -- "track": their letters close up (tracking in)
-DEFAULTS.combatBarFallback = false     -- in a bar with no letterbox up: the lower third (else a bar of our own)
--- Boss fights: the going in cue as a title card, the boss's name for its
--- words, once a run for each boss: as it's pulled, or before that as you
--- first target it or come near it (its Show in row: BOSS_KEY).
+DEFAULTS.combatTextOut = "Respite"     -- two shown in the game's language: ns.CardWords)
+-- Boss fights: the boss's name for its words, once a run for each boss: as
+-- it's pulled, or before that as you first target it or come near it.
+DEFAULTS.cardBossOn = false            -- the Boss row
 DEFAULTS.combatBossPull = true         -- as a boss fight starts (ENCOUNTER_START)
 DEFAULTS.combatBossTarget = false      -- as you first target a boss, before the pull
 DEFAULTS.combatBossNear = false        -- as you first come within about 28 yards of one
-DEFAULTS.combatBossAlways = true       -- its Show in row's Always
-DEFAULTS.combatBossHold = 2.5          -- seconds it stays, between its fades
 DEFAULTS.combatBossSub = true          -- the dungeon and difficulty under the name
 DEFAULTS.combatBossCount = true        -- "Boss 2 of 3" over it, where the Journal knows (on the pull)
--- Its look, apart from the cue's (the Style page's Boss tab: BOSS_FIELDS):
--- a gold name over a line in the lower third, the dungeon under it.
-DEFAULTS.combatBossPlace = "third"
-DEFAULTS.combatBossBarScale = 0.62
-DEFAULTS.combatBossAlign = "center"
-DEFAULTS.combatBossStyle = "chapter"
-DEFAULTS.combatBossFont = "general"
-DEFAULTS.combatBossSize = 44
-DEFAULTS.combatBossOutline = -1
-DEFAULTS.combatBossShadow = "general"
-DEFAULTS.combatBossOutlineR, DEFAULTS.combatBossOutlineG, DEFAULTS.combatBossOutlineB = 0, 0, 0
-DEFAULTS.combatBossR, DEFAULTS.combatBossG, DEFAULTS.combatBossB = 0.85, 0.71, 0.35 -- #D9B45A
-DEFAULTS.combatBossPulse = 0
-DEFAULTS.combatBossPulseR, DEFAULTS.combatBossPulseG, DEFAULTS.combatBossPulseB = 0.85, 0.71, 0.35
-DEFAULTS.combatBossIconShow = false
-DEFAULTS.combatBossIcon = "Interface\\TargetingFrame\\UI-TargetingFrame-Skull"
-DEFAULTS.combatBossAnim = "track"
-DEFAULTS.combatBossBarFallback = true
-
--- Its Show in row (GridRows.lua: the places, roles and a rule, which can
--- name cinemode), read as a fight begins.
-local ROW_KEY = "vision:combat"
-local BOSS_KEY = "vision:boss"
-
--- The cue's look settings -> a boss card's own (going in's, for the side settings).
-local BOSS_FIELDS = {
-	combatPlace = "combatBossPlace", combatBarScale = "combatBossBarScale", combatAlign = "combatBossAlign",
-	combatStyle = "combatBossStyle", combatFont = "combatBossFont", combatSize = "combatBossSize",
-	combatOutline = "combatBossOutline", combatShadow = "combatBossShadow", combatOutlineR = "combatBossOutlineR",
-	combatOutlineG = "combatBossOutlineG", combatOutlineB = "combatBossOutlineB",
-	combatInR = "combatBossR", combatInG = "combatBossG", combatInB = "combatBossB",
-	combatPulseIn = "combatBossPulse", combatPulseInR = "combatBossPulseR", combatPulseInG = "combatBossPulseG",
-	combatPulseInB = "combatBossPulseB", combatIconShowIn = "combatBossIconShow", combatIconIn = "combatBossIcon",
-	combatHoldIn = "combatBossHold", combatAnim = "combatBossAnim", combatBarFallback = "combatBossBarFallback",
-}
--- A look (ns.StyleLook's) read as a boss card's: its own settings for the cue's.
-local function BossLook(look)
-	return setmetatable({}, { __index = function(_, key) return look[BOSS_FIELDS[key] or key] end })
-end
 
 local FADE_IN, FADE_OUT = 0.35, 0.5
 local REVEAL = 1.1                 -- Reveal: seconds the words take to open
@@ -101,11 +34,26 @@ local TYPE_EACH = 0.07             -- Typewriter: seconds for each letter
 local PULSE_PEAK, PULSE_GONE = 0.12, 0.9
 local CUT_OUT = 0.25               -- a cue cut short (the fight's other edge came first) fades this fast
 local OUTLINES = { [0] = "", "OUTLINE", "THICKOUTLINE" }
+-- Banner: the words across the middle of the screen on a dark band with soft
+-- edges (the death banner's), coming in and going slowly, or a picture on a
+-- flat one (card.picture), in quicker. The words look worn: faint copies
+-- behind them, nudged each way, bleed their edges. (A grain texture over them
+-- wore the band round the letters too, and looked dirty: tested.)
+local BANNER_IN, BANNER_OUT = 3, 1.5
+local PICTURE_IN, PICTURE_OUT = 0.4, 1
+local BANNER_BAND, BANNER_EDGE = 1.7, 1.2 -- the band's height and each soft edge's, of the words' height
+local BANNER_ALPHA = 0.7
+local BANNER_BLEED = { { -1, 0 }, { 1, 0 }, { 0, -1 }, { 0, 1 }, { -0.6, 0.6 }, { 0.6, -0.6 } }
+local BLEED_NUDGE = 0.035                 -- ...how far, of the words' size
+local BLEED_ALPHA, BANNER_TEXT_ALPHA = 0.16, 0.9
+local FLAT_BAND, FLAT_ALPHA = 1.6, 0.5    -- a picture's band, of its height
 
--- A gradient on texture, from alpha 0 at one end to 1 at the other ("VERTICAL":
--- opaque at the top if high; "HORIZONTAL": opaque at the left if high).
-local function Gradient(texture, orientation, high, r, g, b)
-	local from, to = high and 0 or 1, high and 1 or 0
+-- A gradient on texture, from alpha 0 at one end to peak (or 1) at the other
+-- ("VERTICAL": opaque at the top if high; "HORIZONTAL": opaque at the left if
+-- high). (The peak goes in its colors: SetAlpha on it after didn't dim it.)
+local function Gradient(texture, orientation, high, r, g, b, peak)
+	peak = peak or 1
+	local from, to = high and 0 or peak, high and peak or 0
 	if orientation == "HORIZONTAL" then from, to = to, from end
 	texture:SetColorTexture(1, 1, 1, 1)
 	if texture.SetGradient and CreateColor then
@@ -113,7 +61,7 @@ local function Gradient(texture, orientation, high, r, g, b)
 	elseif texture.SetGradientAlpha then
 		texture:SetGradientAlpha(orientation, r, g, b, from, r, g, b, to)
 	else
-		texture:SetColorTexture(r, g, b, 0.4)
+		texture:SetColorTexture(r, g, b, 0.4 * peak)
 	end
 end
 
@@ -170,6 +118,12 @@ local function MakeCue(frame)
 		text.rim[i] = clip:CreateFontString(nil, "OVERLAY", "GameFontNormalHuge")
 		text.rim[i]:SetDrawLayer("OVERLAY", -1)
 	end
+	-- (A banner's worn edges: its faint copies, behind the outline.)
+	text.bleed = {}
+	for i = 1, #BANNER_BLEED do
+		text.bleed[i] = clip:CreateFontString(nil, "OVERLAY", "GameFontNormalHuge")
+		text.bleed[i]:SetDrawLayer("OVERLAY", -2)
+	end
 	local line = over:CreateTexture(nil, "OVERLAY")
 	local icon = over:CreateTexture(nil, "OVERLAY")
 	icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
@@ -180,8 +134,26 @@ local function MakeCue(frame)
 		each:SetShadowOffset(1, -1)
 		each:SetShadowColor(0, 0, 0, 0.8)
 	end
+	-- A banner's band, under the words (the words' frame is over it): its
+	-- middle and soft edges, or flat for a picture.
+	local band = {}
+	for _, part in ipairs({ "middle", "top", "bottom", "flat" }) do
+		band[part] = over:CreateTexture(nil, "BACKGROUND")
+		band[part]:Hide()
+	end
+	for _, part in ipairs({ "middle", "flat" }) do
+		band[part]:SetPoint("LEFT", over, "LEFT")
+		band[part]:SetPoint("RIGHT", over, "RIGHT")
+	end
+	band.top:SetPoint("BOTTOMLEFT", band.middle, "TOPLEFT")
+	band.top:SetPoint("BOTTOMRIGHT", band.middle, "TOPRIGHT")
+	band.bottom:SetPoint("TOPLEFT", band.middle, "BOTTOMLEFT")
+	band.bottom:SetPoint("TOPRIGHT", band.middle, "BOTTOMRIGHT")
+	local picture = over:CreateTexture(nil, "ARTWORK")
+	picture:SetPoint("CENTER")
+	picture:Hide()
 	frame.cue = { bars = bars, pulse = pulse, over = over, clip = clip, text = text, line = line, icon = icon,
-		sub = sub, meta = meta }
+		sub = sub, meta = meta, band = band, picture = picture }
 	bars:Hide()
 	pulse:Hide()
 	over:Hide()
@@ -194,8 +166,8 @@ end
 
 -- The words at key (combatTextIn, combatTextOut) as shown: the defaults in
 -- the game's language.
-local function ShownWords(look, key)
-	local word = look[key] or DEFAULTS[key]
+function ns.CardWords(key)
+	local word = ns.db and ns.db[key] or DEFAULTS[key]
 	return word == DEFAULTS[key] and L[word] or word
 end
 
@@ -225,10 +197,15 @@ local function Setup(cue, look, enter, width, height, scale, boss)
 		r, g, b = look.combatOutR, look.combatOutG, look.combatOutB
 		pr, pg, pb = look.combatPulseOutR, look.combatPulseOutG, look.combatPulseOutB
 	end
-	local word = boss and boss.name or ShownWords(look, enter and "combatTextIn" or "combatTextOut")
+	local word = boss and boss.name or ns.CardWords(enter and "combatTextIn" or "combatTextOut")
 	local secret = issecretvalue ~= nil and issecretvalue(word)
 	local style, place = look.combatStyle, look.combatPlace
-	if not secret and word == "" then style = "none" end
+	-- (A banner: across the middle; a picture always on one, in place of the
+	-- words.)
+	local picture = boss and boss.picture
+	local banner = style == "banner" or picture and true or false
+	if banner then place = "screen" end
+	if picture or (not secret and word == "") then style = "none" end
 	-- (In a bar with no letterbox up, if it says so: the lower third.)
 	if (place == "top" or place == "bottom") and look.combatBarFallback
 		and not (ns.db.letterbox and (scale ~= 1 or ns.lastCinematic)
@@ -287,9 +264,26 @@ local function Setup(cue, look, enter, width, height, scale, boss)
 	local fontSize = math.floor(size + 0.5)
 	ns.SetPlateNameFont(text, GameFontNormalHuge, FontFile(look), fontSize, 1, rimmed and "" or outline)
 	ns.SetTextShadow(text, look.combatShadow)
+	-- (A banner's words a touch see-through, its copies faint: as SetAlpha,
+	-- below. A color's alpha is the same thing on text, and SetAlpha after
+	-- undid it: tested.)
+	cue.textAlpha = style == "banner" and BANNER_TEXT_ALPHA or 1
 	text:SetTextColor(r, g, b, 1)
 	text:SetVertexColor(r, g, b, 1) -- (one and the same on Forever)
 	text:SetShown(style ~= "none")
+	for i, bleed in ipairs(text.bleed) do
+		bleed:SetShown(style == "banner")
+		if style == "banner" then
+			local nudge = BANNER_BLEED[i]
+			bleed:ClearAllPoints()
+			bleed:SetPoint("CENTER", text, "CENTER", nudge[1] * size * BLEED_NUDGE, nudge[2] * size * BLEED_NUDGE)
+			bleed:SetText(word)
+			ns.SetPlateNameFont(bleed, GameFontNormalHuge, FontFile(look), fontSize, 1, "")
+			bleed:SetTextColor(r, g, b, 1)
+			bleed:SetVertexColor(r, g, b, 1)
+			bleed:SetShadowOffset(0, 0)
+		end
+	end
 	local nudge = (outline == "THICKOUTLINE" and 2 or 1) * math.max(scale, 0.5)
 	for i, rim in ipairs(text.rim) do
 		rim:SetShown(rimmed and style ~= "none")
@@ -441,8 +435,9 @@ local function Setup(cue, look, enter, width, height, scale, boss)
 	end
 	for i = count + 1, #cue.letters do cue.letters[i]:Hide() end
 	cue.tracking = cue.track and count > 0
-	text:SetAlpha(cue.tracking and 0 or 1)
+	text:SetAlpha(cue.tracking and 0 or cue.textAlpha)
 	for _, rim in ipairs(text.rim) do rim:SetAlpha(cue.tracking and 0 or 1) end
+	for _, bleed in ipairs(text.bleed) do bleed:SetAlpha(cue.tracking and 0 or BLEED_ALPHA) end
 	sub:SetAlpha(1)
 	meta:SetAlpha(1)
 	local showIcon = look[enter and "combatIconShowIn" or "combatIconShowOut"] and true or false
@@ -462,6 +457,31 @@ local function Setup(cue, look, enter, width, height, scale, boss)
 		Gradient(edge, (side == "TOP" or side == "BOTTOM") and "VERTICAL" or "HORIZONTAL",
 			side == "TOP" or side == "LEFT", pr, pg, pb)
 	end
+	-- A banner's band: soft edged under the words, or flat under a picture
+	-- (picture: a card's file, pictureSize its height of the screen's,
+	-- pictureAspect its width of its height).
+	local band = cue.band
+	for _, part in pairs(band) do part:Hide() end
+	cue.banner, cue.holdExtra = banner, boss and tonumber(boss.holdExtra) or 0
+	cue.pictured = picture and true or false
+	if picture then
+		local tall = height * (boss.pictureSize or 0.1)
+		cue.picture:SetTexture(picture)
+		cue.picture:SetSize(tall * (boss.pictureAspect or 4), tall)
+		band.flat:SetColorTexture(0, 0, 0, FLAT_ALPHA)
+		band.flat:SetHeight(tall * FLAT_BAND)
+		band.flat:Show()
+	elseif banner then
+		band.middle:SetColorTexture(0, 0, 0, BANNER_ALPHA)
+		band.middle:SetHeight(size * BANNER_BAND)
+		band.middle:Show()
+		for side, high in pairs({ top = false, bottom = true }) do
+			Gradient(band[side], "VERTICAL", high, 0, 0, 0, BANNER_ALPHA)
+			band[side]:SetHeight(size * BANNER_EDGE)
+			band[side]:Show()
+		end
+	end
+	cue.picture:SetShown(picture and true or false)
 	cue.look, cue.enter, cue.width, cue.height, cue.scale = look, enter, width, height, scale
 	cue.barLook = cue.barSide and setmetatable({ letterboxSizeBy = "height", letterboxSize = cue.barShare,
 		letterboxMotion = "slide" }, { __index = ns.LetterboxLook() })
@@ -471,17 +491,19 @@ end
 -- length.
 local function Shown(cue, age)
 	local look = cue.look
-	local hold = (cue.enter and look.combatHoldIn or look.combatHoldOut) + (cue.typeTime or 0) -- (a boss card's: BossLook's)
-	local fadeOut = (cue.reveal or cue.track or cue.type) and REVEAL_OUT or FADE_OUT
+	local hold = (cue.enter and look.combatHoldIn or look.combatHoldOut) + (cue.typeTime or 0) + (cue.holdExtra or 0)
+	local fadeIn = cue.pictured and PICTURE_IN or cue.banner and BANNER_IN or FADE_IN
+	local fadeOut = cue.pictured and PICTURE_OUT or cue.banner and BANNER_OUT
+		or (cue.reveal or cue.track or cue.type) and REVEAL_OUT or FADE_OUT
 	local a
-	if age < FADE_IN then
-		a = age / FADE_IN
-	elseif age > FADE_IN + hold then
-		a = 1 - (age - FADE_IN - hold) / fadeOut
+	if age < fadeIn then
+		a = age / fadeIn
+	elseif age > fadeIn + hold then
+		a = 1 - (age - fadeIn - hold) / fadeOut
 	else
 		a = 1
 	end
-	return math.max(a, 0), FADE_IN + hold + fadeOut
+	return math.max(a, 0), fadeIn + hold + fadeOut
 end
 
 -- Draws cue age seconds in. Gives false once it's over (and hidden). Cut
@@ -525,8 +547,9 @@ local function Draw(cue, age)
 			else
 				cue.tracking = false
 				for i = 1, cue.letterCount do cue.letters[i]:Hide() end
-				cue.text:SetAlpha(1)
+				cue.text:SetAlpha(cue.textAlpha)
 				for _, rim in ipairs(cue.text.rim) do rim:SetAlpha(1) end
+				for _, bleed in ipairs(cue.text.bleed) do bleed:SetAlpha(BLEED_ALPHA) end
 			end
 		end
 	end
@@ -563,8 +586,9 @@ local function Draw(cue, age)
 	return true
 end
 
--- Plays cue on frame: its OnUpdate runs it to the end. look: ns.db. after:
--- called once it's done (not if another cue on frame cuts it short).
+-- Plays cue on frame: its OnUpdate runs it to the end. look: a card's
+-- (ns.CardLook). after: called once it's done (not if another card on
+-- frame cuts it short).
 local function Play(frame, look, enter, width, height, scale, boss, after)
 	local cue = frame.cue or MakeCue(frame)
 	Setup(cue, look, enter, width, height, scale, boss)
@@ -585,62 +609,29 @@ local function Play(frame, look, enter, width, height, scale, boss, after)
 	end)
 end
 
--- A card of another page's in the cue's look (Story Vision's Last time):
--- look read as the cue's settings going in, card { name, sub, meta } as a
--- boss card's. On frame (the screen's, or a preview's), width x height,
--- scale next to the real screen.
-function ns.PlayVisionCard(frame, look, width, height, scale, card, after)
+-- A card { name, sub, meta } (or a banner's picture: Setup's) in look (a
+-- card's, Cards.lua's ns.CardLook), on frame (the screen's, or a preview's),
+-- width x height, scale next to the real screen.
+function ns.PlayCard(frame, look, width, height, scale, card, after)
 	Play(frame, look, true, width, height, scale, card, after)
 end
 
--- The real cue, over the whole screen (kept when the UI is hidden: an overlay).
-local screen
--- cine: CineMode as the fight began, for the sound rules (nil: as it is now).
--- boss: a boss card (Setup's), going in. after: Play's.
-function ns.PlayCombatVision(enter, cine, boss, after)
-	if not screen then
-		screen = CreateFrame("Frame", "CinematicCombatVision", UIParent)
-		screen:SetAllPoints(UIParent)
-		screen:SetFrameStrata("LOW")
-		screen:EnableMouse(false)
-		ns.AddOverlay(screen)
-	end
-	local look = ns.StyleLook("combatVision")
-	Play(screen, boss and BossLook(look) or look, enter, UIParent:GetWidth(), UIParent:GetHeight(), 1, boss, after)
-	if boss and boss.quiet then return end -- (a card before the pull: no fight's sound yet)
-	if cine == nil then cine = ns.lastCinematic and true or false end
-	ns.PlayCombatCueSound(enter and "enter" or "leave", cine) -- (CombatSoundRules.lua)
+-- The card playing on frame cut short: a quick fade out from as shown now.
+function ns.CutCard(frame)
+	local cue = frame and frame.cue
+	if cue and cue.cut and frame:GetScript("OnUpdate") then cue.cut() end
 end
 
--- The real cue cut short if it's a going in (enter) or coming out one still
--- playing: the fight ended (or began again) before it was done.
-local function CutCombatVision(enter)
-	local cue = screen and screen.cue
-	if cue and cue.cut and cue.enter == enter and screen:GetScript("OnUpdate") then
-		cue.cut()
-	end
-end
-
--- Whether the cue plays as a fight starts (edge "enter") or ends ("leave"):
--- its Show in row, read with the rules' entering or leaving true and
--- cinemode as the fight began. With no rule, its Combat dropdown's ticks
--- (combatOnEnter, combatOnLeave) say which; a rule says it all itself.
+-- Going into a fight and coming out of it: Entering and Leaving combat's
+-- cards (their Show in rows read with the rules' entering or leaving true,
+-- and CineMode as the fight began: cine), and the fight's sound with it.
 local fightStart, cineAtStart = 0, false
-local function Allowed(db, edge)
-	if not ns.Setting("combatVision") then
-		return false
-	end
-	ns.combatEdge, ns.combatEdgeCine = edge, cineAtStart
-	local ok, shows = pcall(ns.RowOnNow, ROW_KEY, db.combatAlways, true)
-	ns.combatEdge = nil
-	if not (ok and shows) then
-		return false
-	end
-	local rule = type(db.frameRules) == "table" and db.frameRules[ROW_KEY]
-	if type(rule) == "string" and rule:find("%S") and ns.CompileRule(rule) then
-		return true
-	end
-	return db[edge == "enter" and "combatOnEnter" or "combatOnLeave"] and true or false
+local function FightCard(enter, cine)
+	local edge = enter and "enter" or "leave"
+	ns.Cards.Fire(enter and "combatIn" or "combatOut", {
+		name = ns.CardWords(enter and "combatTextIn" or "combatTextOut"), edge = edge, cine = cine,
+		sound = function() ns.PlayCombatCueSound(edge, cine) end, -- (CombatSoundRules.lua)
+	})
 end
 
 -- Boss cards. A boss is told by the pull (ENCOUNTER_START: its name, plain)
@@ -649,7 +640,7 @@ end
 -- names and GUIDs there are secret even out of a fight, so no Journal match).
 -- Each encounter's card shows once a run (a wipe doesn't bring it back). One
 -- shown before a pull (target, near) holds the next until a boss dies, as
--- which boss it was can't be told; that boss's pull then has the usual cue.
+-- which boss it was can't be told; that boss's pull then has the usual card.
 local PULL_GAP = 2      -- seconds the pull and the fight's start can be apart
 local PRE_HOLD = 300    -- a card before a pull holds the next this long at most (no kill: not a boss)
 local NEAR_EVERY = 0.5  -- seconds between looks at the plates for one near
@@ -672,8 +663,8 @@ local function BossLog(text)
 end
 
 -- The line under the name: the dungeon and its difficulty ("" for none).
-local function InstanceLine(look)
-	if not look.combatBossSub then return "" end
+local function InstanceLine()
+	if not ns.db.combatBossSub then return "" end
 	local name, kind, _, difficulty = GetInstanceInfo()
 	if kind == "none" or type(name) ~= "string" or (issecretvalue and issecretvalue(name)) or name == "" then
 		return ""
@@ -685,8 +676,8 @@ local function InstanceLine(look)
 end
 
 -- "Boss 2 of 3" for an encounter, from the Journal where it knows ("" else).
-local function BossNumber(encounterID, look)
-	if not (look.combatBossCount and EJ_GetInstanceForMap and EJ_GetEncounterInfoByIndex) then return "" end
+local function BossNumber(encounterID)
+	if not (ns.db.combatBossCount and EJ_GetInstanceForMap and EJ_GetEncounterInfoByIndex) then return "" end
 	local mapID = C_Map and C_Map.GetBestMapForUnit and C_Map.GetBestMapForUnit("player")
 	local ok, journal = pcall(EJ_GetInstanceForMap, mapID or 0)
 	if not ok or not journal or journal == 0 then return "" end
@@ -707,10 +698,11 @@ end
 
 -- A made-up boss card for the preview and the Test button (in an instance:
 -- its own line under the name).
-local function SampleBoss(look)
-	local sub = InstanceLine(look)
-	if sub == "" and look.combatBossSub then sub = L["The Deadmines"] .. " · " .. L["Normal"] end
-	return { name = L["Edwin VanCleef"], sub = sub, meta = look.combatBossCount and L["Boss %d of %d"]:format(5, 5) or "" }
+function ns.BossSampleCard()
+	local sub = InstanceLine()
+	if sub == "" and ns.db.combatBossSub then sub = L["The Deadmines"] .. " · " .. L["Normal"] end
+	return { name = L["Edwin VanCleef"], sub = sub,
+		meta = ns.db.combatBossCount and L["Boss %d of %d"]:format(5, 5) or "" }
 end
 
 -- Whether unit looks like a boss before its pull (plain answers only), and why.
@@ -728,16 +720,21 @@ local function LooksLikeBoss(unit)
 		ns.isRetail and " or 2 over" or "")
 end
 
--- Whether a boss card may show now, by tick (combatBossPull...) and its Show in row, and why not.
+-- Whether a boss card may show now, by tick (combatBossPull...), the Boss
+-- row and its Show in row (Cards.lua), and why not.
 local function BossAllowed(db, tick)
-	if not ns.Setting("combatVision") then return false, "Battle Vision off" end
 	if not db[tick] then return false, tick .. " off" end
-	ns.combatEdge, ns.combatEdgeCine = "enter", ns.lastCinematic and true or false
-	local ok, shows = pcall(ns.RowOnNow, BOSS_KEY, db.combatBossAlways, true)
-	ns.combatEdge = nil
-	if not ok then return false, "Show in row errored" end
-	if not shows then return false, "its Show in row says not now" end
-	return true
+	return ns.CardAllowed("boss", "enter", ns.lastCinematic and true or false)
+end
+
+-- A boss's card on the screen (already allowed: BossAllowed), the pull's
+-- sound with it unless quiet (a card before the pull: no fight yet).
+local function BossCard(card, cine, quiet)
+	card.edge, card.cine = "enter", cine
+	if not quiet then
+		card.sound = function() ns.PlayCombatCueSound("enter", cine) end
+	end
+	ns.Cards.Fire("boss", card, true)
 end
 
 -- A card before the pull, for unit (target, a plate): once until a boss dies.
@@ -769,8 +766,7 @@ local function CardBeforePull(unit, tick)
 	end
 	BossLog(("card before the pull for %s: %s"):format(who, how))
 	bossRun.preAt = GetTime()
-	local look = ns.StyleLook("combatVision")
-	ns.PlayCombatVision(true, nil, { name = (UnitName(unit)), sub = InstanceLine(look), meta = "", quiet = true })
+	BossCard({ name = (UnitName(unit)), sub = InstanceLine(), meta = "" }, ns.lastCinematic and true or false, true)
 end
 
 -- Near: the plates looked at twice a second, only out of a fight in an instance.
@@ -782,7 +778,7 @@ nearLook:SetScript("OnUpdate", function(_, elapsed)
 	if nearWait > 0 then return end
 	nearWait = NEAR_EVERY
 	local db = ns.db
-	if not (db and ns.Setting("combatVision") and db.combatBossNear) or InCombatLockdown() or bossRun.encounterOn
+	if not (db and db.combatBossNear and ns.CardOn("boss")) or InCombatLockdown() or bossRun.encounterOn
 		or GetTime() - bossRun.preAt < PRE_HOLD then
 		return
 	end
@@ -811,7 +807,7 @@ local function EnteredWorld()
 	bossRun.instance, bossRun.leftAt = instanceID, nil
 end
 
--- The pull: its card in place of the going in cue, the first time this run.
+-- The pull: its card in place of Entering combat's, the first time this run.
 local function EncounterStart(db, encounterID, name)
 	bossRun.encounterOn = true
 	local key = (issecretvalue and issecretvalue(encounterID)) and "?" or encounterID
@@ -821,9 +817,9 @@ local function EncounterStart(db, encounterID, name)
 		return
 	end
 	bossRun.shown[key] = true
-	-- (Its card already showed before the pull: the usual cue.)
+	-- (Its card already showed before the pull: the usual card.)
 	if GetTime() - bossRun.preAt < PRE_HOLD then
-		BossLog(("no card at the pull of %s: a card showed before it (%.0fs ago), so the usual cue"):format(who,
+		BossLog(("no card at the pull of %s: a card showed before it (%.0fs ago), so the usual card"):format(who,
 			GetTime() - bossRun.preAt))
 		return
 	end
@@ -832,14 +828,13 @@ local function EncounterStart(db, encounterID, name)
 		BossLog(("no card at the pull of %s: %s"):format(who, no))
 		return
 	end
-	local look = ns.StyleLook("combatVision")
-	local card = { name = name ~= nil and name or "", sub = InstanceLine(look), meta = key ~= "?" and BossNumber(encounterID, look) or "",
-		at = GetTime() }
+	local card = { name = name ~= nil and name or "", sub = InstanceLine(),
+		meta = key ~= "?" and BossNumber(encounterID) or "", at = GetTime() }
 	if InCombatLockdown() or ns.Flag(UnitAffectingCombat("player")) then
-		-- (Already fighting, a pull from range: over the cue playing.)
+		-- (Already fighting, a pull from range: over the card playing.)
 		BossLog(("card at the pull of %s, already in combat: plays now (%s)"):format(who, card.meta))
 		bossRun.cardAt = GetTime()
-		ns.PlayCombatVision(true, ns.lastCinematic and true or false, card)
+		BossCard(card, ns.lastCinematic and true or false)
 	else
 		BossLog(("card at the pull of %s: waits for combat to start (%s)"):format(who, card.meta))
 		bossRun.pending = card
@@ -860,26 +855,28 @@ watcher:SetScript("OnEvent", function(_, event, ...)
 		return
 	end
 	if event == "PLAYER_REGEN_DISABLED" then
-		CutCombatVision(false) -- (a respite still showing; a going in cue below plays over it anyway)
+		ns.Cards.Cut("combatOut") -- (a respite still showing)
 		fightStart, cineAtStart = GetTime(), ns.lastCinematic and true or false
 		local card = bossRun.pending
 		bossRun.pending = nil
 		if card then
 			BossLog(("combat started %.2fs after the pull: %s"):format(GetTime() - card.at,
-				GetTime() - card.at < PULL_GAP and "its card plays" or "too late for its card, the usual cue"))
+				GetTime() - card.at < PULL_GAP and "its card plays" or "too late for its card, the usual card"))
 		end
 		if card and GetTime() - card.at < PULL_GAP then
 			bossRun.cardAt = GetTime()
-			ns.PlayCombatVision(true, cineAtStart, card)
-		elseif GetTime() - bossRun.cardAt >= PULL_GAP and Allowed(db, "enter") then
-			ns.PlayCombatVision(true, cineAtStart)
-		elseif GetTime() - bossRun.cardAt < PULL_GAP then
-			BossLog("combat started: no going in cue, a boss card just played")
+			BossCard(card, cineAtStart)
+		elseif GetTime() - bossRun.cardAt >= PULL_GAP then
+			FightCard(true, cineAtStart)
+		else
+			BossLog("combat started: no Entering combat card, a boss card just played")
 		end
 	elseif event == "PLAYER_REGEN_ENABLED" then
-		CutCombatVision(true) -- (the going in cue or a boss card still showing)
-		if GetTime() - fightStart >= db.combatMinFight and Allowed(db, "leave") then
-			ns.PlayCombatVision(false, cineAtStart)
+		-- (Entering combat's card or a boss's still showing: cut short.)
+		ns.Cards.Cut("combatIn")
+		ns.Cards.Cut("boss")
+		if GetTime() - fightStart >= db.combatMinFight then
+			FightCard(false, cineAtStart)
 		end
 	elseif event == "ENCOUNTER_START" then
 		EncounterStart(db, ...)
@@ -889,653 +886,16 @@ watcher:SetScript("OnEvent", function(_, event, ...)
 		if Plain(tostring, success) == "1" then bossRun.preAt = -math.huge end -- (a boss down: the next may show before its pull)
 		BossLog(("encounter ended, success %s: %s"):format(Plain(tostring, success) or "secret",
 			Plain(tostring, success) == "1" and "the next boss's card may show before its pull" or "a card before a pull stays held"))
-		-- (The Boss tab's sounds for a kill or a wipe.)
+		-- (The Boss event's sounds for a kill or a wipe.)
 		local result = Plain(tostring, success)
-		if ns.Setting("combatVision") and result then
+		if ns.CardOn("boss") and result then
 			ns.PlayCombatCueSound(result == "1" and "kill" or "wipe", ns.lastCinematic and true or false)
 		end
 	elseif event == "PLAYER_TARGET_CHANGED" then
-		if db.combatBossTarget and UnitExists("target") then CardBeforePull("target", "combatBossTarget") end
+		if db.combatBossTarget and ns.CardOn("boss") and UnitExists("target") then
+			CardBeforePull("target", "combatBossTarget")
+		end
 	else
 		EnteredWorld()
 	end
 end)
-
--- Folder tabs over the rest of a page (Battle Vision's two, Story Vision's).
--- list: { now = the picked tab's id, { id, name, tip }, ... }, list.now kept
--- as tabs are picked (shared by pages given the same list). onPick(tab) after a pick. Gives Part(tab, build, group): what
--- build puts on content shows only on that tab (each tab's part of a group
--- starts at the same place, so neither leaves a gap), and Finish() once the
--- page is built. Folder tabs as Heal Vision's (Options.lua): the picked one
--- taller, lit, a gold top, in the panel's colour with no line between, so
--- they look one piece; the rest dark behind. The panel holds the rest of the
--- page, its top edge either side of the picked tab.
-local TAB_W, TAB_H, TAB_GAP, PANEL_PAD = 100, 24, 4, 10
-local PANEL_BG, TAB_BG = { 0.12, 0.12, 0.13, 0.9 }, { 0.04, 0.04, 0.05, 0.9 }
-local EDGE, DIM_EDGE = { 0.42, 0.42, 0.42, 1 }, { 0.22, 0.22, 0.22, 1 }
-function ns.VisionFolderTabs(kit, content, stack, list, onPick)
-	local row = CreateFrame("Frame", nil, content)
-	row:SetSize(480, TAB_H + 4)
-	stack:Add(row, "label")
-	local panel = CreateFrame("Frame", nil, content)
-	panel:SetFrameLevel(content:GetFrameLevel()) -- (under the settings on it)
-	panel:SetPoint("TOPLEFT", row, "BOTTOMLEFT", -PANEL_PAD, 0)
-	panel:SetSize(480, 100) -- (as the page lays out: Layout)
-	local function Line(parent, color)
-		local line = parent:CreateTexture(nil, "BORDER")
-		line:SetColorTexture(unpack(color))
-		return line
-	end
-	local panelBg = panel:CreateTexture(nil, "BACKGROUND")
-	panelBg:SetAllPoints()
-	panelBg:SetColorTexture(unpack(PANEL_BG))
-	local leftEdge, rightEdge, bottomEdge = Line(panel, EDGE), Line(panel, EDGE), Line(panel, EDGE)
-	leftEdge:SetPoint("TOPLEFT")
-	leftEdge:SetPoint("BOTTOMLEFT")
-	leftEdge:SetWidth(1)
-	rightEdge:SetPoint("TOPRIGHT")
-	rightEdge:SetPoint("BOTTOMRIGHT")
-	rightEdge:SetWidth(1)
-	bottomEdge:SetPoint("BOTTOMLEFT")
-	bottomEdge:SetPoint("BOTTOMRIGHT")
-	bottomEdge:SetHeight(1)
-	local topLeft, topRight = Line(panel, EDGE), Line(panel, EDGE)
-	topLeft:SetHeight(1)
-	topRight:SetHeight(1)
-	local function PaintTab(tab, on)
-		tab:SetHeight(on and TAB_H + 4 or TAB_H)
-		tab.bg:SetColorTexture(unpack(on and PANEL_BG or TAB_BG))
-		for _, side in ipairs({ tab.left, tab.right, tab.top }) do
-			side:SetColorTexture(unpack(on and EDGE or DIM_EDGE))
-		end
-		if on then tab.top:SetColorTexture(1, 0.82, 0, 1) end
-		tab.top:SetHeight(on and 2 or 1)
-		local r, g, b = 1, 0.82, 0
-		if on then r, g, b = 1, 1, 1 end
-		tab.label:SetTextColor(r, g, b)
-		tab.label:SetVertexColor(r, g, b) -- (one on Forever)
-		if on then
-			topLeft:ClearAllPoints()
-			topLeft:SetPoint("TOPLEFT", panel, "TOPLEFT")
-			topLeft:SetPoint("TOPRIGHT", tab, "BOTTOMLEFT", 1, 0)
-			topRight:ClearAllPoints()
-			topRight:SetPoint("TOPLEFT", tab, "BOTTOMRIGHT", -1, 0)
-			topRight:SetPoint("TOPRIGHT", panel, "TOPRIGHT")
-		end
-	end
-	local x = 8
-	for _, info in ipairs(list) do
-		local tab = CreateFrame("Button", nil, content)
-		tab.label = tab:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-		tab.label:SetPoint("CENTER", 0, 1)
-		tab:SetFontString(tab.label)
-		tab:SetText(info[2])
-		tab:SetSize(math.max(TAB_W, math.ceil(tab.label:GetStringWidth()) + 16), TAB_H) -- (wider for a long name)
-		tab.bg = tab:CreateTexture(nil, "BACKGROUND")
-		tab.bg:SetAllPoints()
-		tab.left, tab.right, tab.top = Line(tab, EDGE), Line(tab, EDGE), Line(tab, EDGE)
-		tab.left:SetPoint("TOPLEFT")
-		tab.left:SetPoint("BOTTOMLEFT")
-		tab.left:SetWidth(1)
-		tab.right:SetPoint("TOPRIGHT")
-		tab.right:SetPoint("BOTTOMRIGHT")
-		tab.right:SetWidth(1)
-		tab.top:SetPoint("TOPLEFT")
-		tab.top:SetPoint("TOPRIGHT")
-		local hover = tab:CreateTexture(nil, "HIGHLIGHT")
-		hover:SetAllPoints()
-		hover:SetColorTexture(1, 1, 1, 0.06)
-		-- (Bottoms on the panel's top, whatever their height.)
-		tab:SetPoint("BOTTOMLEFT", panel, "TOPLEFT", x, 0)
-		x = x + tab:GetWidth() + TAB_GAP
-		kit.Tooltip(tab, info[3])
-		tab:SetScript("OnClick", function()
-			list.now = info[1]
-			if onPick then onPick(list.now) end
-			kit.PageShown(kit.Refresh, content)()
-		end)
-		tab.Refresh = function(self) PaintTab(self, list.now == info[1]) end
-		tab.pageSwitch = false
-		kit.AddControl(tab)
-	end
-	-- (A little room inside the panel's top.)
-	local inside = CreateFrame("Frame", nil, content)
-	inside:SetSize(1, 2)
-	stack:Add(inside, "label")
-	-- The panel down past the lowest thing shown under it and across the page.
-	local function Layout()
-		local top, left, right = panel:GetTop(), panel:GetLeft(), content:GetRight()
-		if not (top and left and right) then return end
-		local lowest = top
-		local function Consider(object)
-			if object ~= panel and object:IsShown() then
-				local bottom = object:GetBottom()
-				if bottom and bottom < lowest then lowest = bottom end
-			end
-		end
-		for _, object in ipairs({ content:GetChildren() }) do Consider(object) end
-		for _, object in ipairs({ content:GetRegions() }) do Consider(object) end
-		panel:SetSize(math.max(right - left - 2, 100), top - lowest + PANEL_PAD + 2)
-	end
-	local owner, hiddenByTab = {}, {}
-	local function Each(fn)
-		for _, object in ipairs({ content:GetChildren() }) do fn(object) end
-		for _, object in ipairs({ content:GetRegions() }) do fn(object) end
-	end
-	local parts = {}
-	local starts = {}
-	function parts.Part(tab, build, group)
-		-- (Each tab's part of a group from where the group's first began.)
-		group = group or 1
-		local start = starts[group]
-		if start then stack:Continue(start[1], start[2]) else starts[group] = { stack.last, stack.kind } end
-		local before = {}
-		Each(function(object) before[object] = true end)
-		build()
-		Each(function(object) if not before[object] then owner[object] = tab end end)
-	end
-	-- Shows the tab picked's parts and hides the rest: run last as the page
-	-- refreshes, after any control's own showing and hiding.
-	function parts.Finish()
-		local apply = CreateFrame("Frame", nil, content)
-		apply:SetSize(1, 1)
-		apply:Hide()
-		apply.pageSwitch = false
-		apply.Refresh = function()
-			Each(function(object)
-				local tab = owner[object]
-				if tab == list.now then
-					if hiddenByTab[object] then
-						hiddenByTab[object] = nil
-						object:Show()
-					end
-				elseif tab and object:IsShown() then
-					hiddenByTab[object] = true
-					object:Hide()
-				end
-			end)
-			-- (Again next frame, once anchors have settled.)
-			Layout()
-			C_Timer.After(0, Layout)
-		end
-		kit.AddControl(apply)
-	end
-	return parts
-end
-
--- Both pages' folder tabs: the cue (Combat) and the Boss card, the one
--- picked kept for both. (Its names as the pages are made: the language is
--- applied after this file loads.)
-local TABS = { now = "combat" }
-local function TabList()
-	TABS[1] = { "combat", L["Combat"], L["The cue going into a fight and coming out of it."] }
-	TABS[2] = { "boss", L["Boss"], L["A boss's name as a title card, as its fight starts or before it."] }
-	return TABS
-end
-
--- The pages' tabs: Vision (turning it on, when it shows) and Style (how it
--- looks), both in the Visions hub under one icon.
-local function CombatTabs(content, title, picked)
-	ns.VisionTabs(content, title, "Combat Vision", "Combat Style", picked,
-		L["Turning it on, and when it shows."], L["How the cue looks."])
-end
-
--- The Vision tab: turning it on, and when it shows.
-function ns.CreateCombatVisionPanel(kit)
-	local canvas, content = kit.CreateScrollPage()
-	local title = kit.Label(content, "GameFontNormalLarge", L["Battle Vision"])
-	CombatTabs(content, title, 1)
-	local intro = kit.PageIntro(content, title,
-		L["A cue for a few seconds as you go into a fight and come out of it: a word on the screen or in a " ..
-		"letterbox bar, a pulse round the screen's edges, an icon and a sound. How it looks: the Style tab."])
-	local function Changed() end
-	local switch = kit.PageSwitch(content, "combatVision", L["Enable Page"],
-		L["On: the cue shows as this page says. Off: never. Each setting keeps its value for when you turn " ..
-		"this back on."], intro, Changed)
-	local stack = kit.Stack(switch, "check")
-	local rows = ns.StyleRows(kit, content, stack, Changed, "combatVision")
-	local parts = ns.VisionFolderTabs(kit, content, stack, TabList())
-	local function Edge(key, name, tip)
-		return { name, function() return ns.GetDB()[key] and true or false end,
-			function() local db = ns.GetDB() db[key] = not db[key] end, nil, tip }
-	end
-
-	parts.Part("combat", function()
-		stack:Header(content, L["When"])
-		rows.Slider("combatMinFight", L["Not after fights under"], 0, 10, 1, "%d s", 1,
-			L["No cue coming out of a fight shorter than this, so a stray hit doesn't bring it up. 0: after " ..
-			"every fight."])
-
-		-- Where and which: a Show in row as the Visual Effects page's, read as a
-		-- fight starts and ends; its Combat dropdown is just those two (the
-		-- usual fights and targets left out).
-		local header = stack:Header(content, L["Show in"])
-		local lastRow = ns.ShowTable(content, header, {
-			underHeader = true,
-			opts = { anyFight = true, omit = { combatShow = true, enemyShow = true, friendlyShow = true },
-				combatItems = {
-					Edge("combatOnEnter", L["Entering combat"], L["The cue as a fight starts."]),
-					Edge("combatOnLeave", L["Leaving combat"], L["The cue as a fight ends."]),
-				} },
-			{ key = ROW_KEY, label = L["Battle Vision"], alwaysKey = "combatAlways",
-				alwaysOn = function() return ns.GetDB().combatAlways end,
-				setAlways = function(value) ns.GetDB().combatAlways = value end,
-				alwaysTip = L["Shows wherever you are. (The other columns then have nothing to add.)"],
-				recordKeys = { "combatOnEnter", "combatOnLeave" } },
-		}, L["Battle Vision"])
-		stack:Continue(lastRow, "label")
-
-		ns.CombatSoundRulesSection(kit, content, stack) -- (CombatSoundRules.lua)
-	end)
-
-	-- Boss cards: a Show in row of its own, its Combat dropdown when the
-	-- card shows (the places and roles where).
-	parts.Part("boss", function()
-		local bossHeader = stack:Header(content, L["Show in"])
-		local bossRow = ns.ShowTable(content, bossHeader, {
-			underHeader = true,
-			opts = { anyFight = true, omit = { combatShow = true, enemyShow = true, friendlyShow = true },
-				combatItems = {
-					Edge("combatBossPull", L["Boss pulled"], L["The boss's name as its fight starts, in place of the " ..
-						"cue's words. Once a run for each boss."]),
-					Edge("combatBossTarget", L["Boss targeted"], L["The boss's name as you first target it, before " ..
-						"the fight. A dungeon or raid boss is told by its level: a skull, or on retail two over yours."]),
-					Edge("combatBossNear", L["Boss nearby"], L["The boss's name as you first come within about 28 " ..
-						"yards of it, before the fight. A dungeon or raid boss is told by its level: a skull, or on " ..
-						"retail two over yours."]),
-				} },
-			{ key = BOSS_KEY, label = L["Boss card"], alwaysKey = "combatBossAlways",
-				alwaysOn = function() return ns.GetDB().combatBossAlways end,
-				setAlways = function(value) ns.GetDB().combatBossAlways = value end,
-				alwaysTip = L["Shows wherever you are. (The other columns then have nothing to add.)"],
-				recordKeys = { "combatBossPull", "combatBossTarget", "combatBossNear" } },
-		}, L["Boss card"])
-		stack:Continue(bossRow, "label")
-
-		ns.CombatSoundRulesSection(kit, content, stack, true) -- (its boss fights' sounds)
-	end)
-	parts.Finish()
-
-	canvas:SetScript("OnShow", kit.PageShown(kit.Refresh, content))
-	canvas:Hide()
-	kit.RegisterSubpage(canvas, "Combat Vision", L["Battle Vision"]) -- (shown as Battle Vision; its ID kept)
-end
-
--- The look's settings a preset sets (the rest as the defaults; the colors
--- and words too).
-local PRESET_KEYS = { "combatPlace", "combatBarScale", "combatAlign", "combatStyle", "combatFont", "combatSize",
-	"combatAnim", "combatBarFallback",
-	"combatOutline", "combatShadow", "combatOutlineR", "combatOutlineG", "combatOutlineB",
-	"combatHoldIn", "combatHoldOut", "combatPulseIn", "combatPulseOut", "combatIconShowIn", "combatIconShowOut",
-	"combatTextIn", "combatTextOut", "combatInR", "combatInG", "combatInB", "combatOutR", "combatOutG", "combatOutB",
-	"combatPulseInR", "combatPulseInG", "combatPulseInB", "combatPulseOutR", "combatPulseOutG", "combatPulseOutB" }
-
--- A row with an edit box for words (key: "" for none; the defaults shown
--- and kept as such in any language).
-local function WordsRow(kit, content, stack, key, label, tip, test)
-	local name = stack:Add(kit.Label(content, "GameFontHighlight", label), "label")
-	name:SetSize(150, 22)
-	local box = CreateFrame("EditBox", nil, content, "InputBoxTemplate")
-	if ns.SkinEditBox then ns.SkinEditBox(box) end
-	box:SetSize(100, 22) -- (narrow: the row also takes the color, icon, pulse and how long it stays)
-	box:SetAutoFocus(false)
-	box:SetMaxLetters(40)
-	box:SetPoint("LEFT", name, "LEFT", 160, 0) -- (in line with the rows' choices)
-	kit.Tooltip(box, tip)
-	local function Save(self)
-		local words = (self:GetText() or ""):match("^%s*(.-)%s*$")
-		ns.GetDB()[key] = words == L[DEFAULTS[key]] and DEFAULTS[key] or words
-		self:ClearFocus()
-		if content.combatChanged then content.combatChanged() end
-	end
-	box:SetScript("OnEnterPressed", Save)
-	box:SetScript("OnEditFocusLost", Save)
-	box:SetScript("OnEscapePressed", function(self)
-		self:SetText(ShownWords(ns.GetDB(), key))
-		self:ClearFocus()
-	end)
-	box.Refresh = function(self)
-		if not self:HasFocus() then self:SetText(ShownWords(ns.GetDB(), key)) end
-	end
-	kit.GreyUnless(box, test)
-	kit.AddControl(box)
-	return box
-end
-
--- The preview: the screen's shape (or a height given), the scene behind,
--- the cue played on it: going in then coming out, or kind() "boss": the
--- Boss card (this page's, and the General page's screen).
-function ns.MakeCombatPreview(parent, width, fixedH, kind)
-	local preview = CreateFrame("Frame", nil, parent)
-	preview:SetSize(width, fixedH or 270)
-	if preview.SetClipsChildren then preview:SetClipsChildren(true) end
-	local stage = CreateFrame("Frame", nil, preview)
-	stage:SetAllPoints()
-	stage:SetFrameLevel(preview:GetFrameLevel() + 2)
-	local caption = preview:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-	caption:SetText(L["Preview"])
-	caption:SetPoint("TOPLEFT", 6, -5)
-	caption.searchSkip = true
-	function preview:Refresh()
-		if not self:IsVisible() then
-			return -- (the kit refreshes every page's controls)
-		end
-		if ns.FitStylePreview(self) then return end -- (resized: it played from there)
-		local screenW, screenH = UIParent:GetWidth(), UIParent:GetHeight()
-		local previewH = fixedH or math.floor(width * screenH / math.max(screenW, 1) + 0.5)
-		self:SetHeight(previewH)
-		ns.StyleScene(self)
-		local look = ns.StyleLook("combatVision")
-		local scale = previewH / math.max(screenH, 1)
-		local wide = self:GetWidth() -- (the page's width: StylePopout)
-		if kind and kind() == "boss" then
-			Play(stage, BossLook(look), true, wide, previewH, scale, SampleBoss(look))
-		else
-			-- (Going in, then coming out.)
-			Play(stage, look, true, wide, previewH, scale, nil, function()
-				Play(stage, ns.StyleLook("combatVision"), false, wide, previewH, scale)
-			end)
-		end
-	end
-	return preview
-end
-
--- The Style tab: how the cue looks, a preview at the top.
-function ns.CreateCombatStylePanel(kit)
-	local canvas, content = kit.CreateScrollPage()
-	local title = kit.Label(content, "GameFontNormalLarge", L["Battle Vision"])
-	CombatTabs(content, title, 2)
-	local intro = kit.PageIntro(content, title,
-		L["How the cue going into a fight and coming out of it looks. When it shows: the Vision tab. Changes " ..
-		"play at once in the preview."])
-
-	-- What the preview plays: the tab picked (on either page: they share it).
-	local preview
-	local function Kind() return TABS.now == "boss" and "boss" or "in" end
-	local function Replay()
-		if preview then preview:Refresh() end
-	end
-	local function Changed() Replay() end
-	content.combatChanged = Changed
-
-	local switch = kit.PageSwitch(content, "combatVision", L["Enable Page"],
-		L["On: the cue shows as the Vision tab says, looking as this page says. Off: " ..
-		"never. Each setting keeps its value for when you turn this back on."], intro, Changed)
-	local stack = kit.Stack(switch, "check")
-	-- The look's rows edit the cue's settings, or on the Boss card tab the
-	-- card's own (BOSS_FIELDS).
-	local fields = {}
-	local function Field(key)
-		if not BOSS_FIELDS[key] then return key end
-		fields[key] = fields[key] or {
-			get = function()
-				local db = ns.GetDB()
-				return db and db[TABS.now == "boss" and BOSS_FIELDS[key] or key]
-			end,
-			set = function(value) ns.GetDB()[TABS.now == "boss" and BOSS_FIELDS[key] or key] = value end,
-		}
-		return fields[key]
-	end
-	for key, bossKey in pairs(BOSS_FIELDS) do
-		kit.RecordKey(content, key)
-		kit.RecordKey(content, bossKey)
-	end
-	local rows = ns.StyleRows(kit, content, stack, Changed, "combatVision", Field)
-	local Get = rows.Get
-
-	-- The preview: the screen's shape, the scene behind, the cue played on it.
-	preview = ns.MakeCombatPreview(content, 480, nil, Kind)
-	preview.pageSwitch = false
-	stack:Add(preview, "label")
-	ns.StylePopout(preview, kit.Tooltip) -- (StylePages.lua)
-	kit.AddControl(preview)
-
-	-- The tabs under the preview: what follows is the cue's or the Boss card's.
-	local parts = ns.VisionFolderTabs(kit, content, stack, TabList(), Replay)
-
-	-- Test: the preview's cue again, and on your screen (going in, then coming
-	-- out; or the Boss card).
-	ns.StylePreviewTest(preview, kit, L["Plays the cue in the preview and on your screen, as it will look: " ..
-		"going in, then coming out (on the Boss tab, the card)."], function()
-			preview:Refresh()
-			if Kind() == "boss" then
-				ns.PlayCombatVision(true, nil, SampleBoss(ns.StyleLook("combatVision")))
-			else
-				ns.PlayCombatVision(true, nil, nil, function() ns.PlayCombatVision(false) end)
-			end
-		end)
-
-	parts.Part("combat", function()
-		rows.PresetMenu({
-			{ L["Film"], L["A serif title in the middle of the screen, the edges pulsing."],
-				{ combatPlace = "screen", combatFont = "morpheus" } },
-			{ L["Reel"], L["The word in the bottom letterbox bar, no pulse."],
-				{ combatPlace = "bottom", combatPulseIn = 0, combatPulseOut = 0 } },
-			{ L["Minimal"], L["A small subtitle low on the screen, nothing else."],
-				{ combatPlace = "screen", combatStyle = "subtitle", combatFont = "friz", combatPulseIn = 0,
-				combatPulseOut = 0, combatInR = 0.94, combatInG = 0.58, combatInB = 0.58, combatOutR = 0.83, combatOutG = 0.82,
-				combatOutB = 0.78 } },
-			{ L["Arcade"], L["Big, bold, an icon and a strong pulse."],
-				{ combatPlace = "screen", combatFont = "skurri", combatSize = 46, combatOutline = 2,
-				combatPulseIn = 0.9, combatPulseOut = 0.9, combatIconShowIn = true,
-				combatIconShowOut = true, combatInR = 0.94, combatInG = 0.62, combatInB = 0.15,
-				combatOutR = 0.59, combatOutG = 0.77, combatOutB = 0.35, combatPulseInR = 0.94, combatPulseInG = 0.62,
-				combatPulseInB = 0.15, combatPulseOutR = 0.59, combatPulseOutG = 0.77, combatPulseOutB = 0.35 } },
-			{ L["Quiet"], L["A chapter line in the top bar, on the right, a faint pulse."],
-				{ combatPlace = "top", combatAlign = "right", combatStyle = "chapter", combatBarScale = 0.45,
-				combatHoldIn = 2, combatHoldOut = 2 } },
-		}, PRESET_KEYS)
-	end, "presets")
-	-- (The Boss card's own, its settings named as they're kept.)
-	local bossKeys = {}
-	for _, key in ipairs(PRESET_KEYS) do
-		if BOSS_FIELDS[key] then bossKeys[#bossKeys + 1] = BOSS_FIELDS[key] end
-	end
-	parts.Part("boss", function()
-		rows.PresetMenu({
-			{ L["Lower third"], L["The name over a gold line low on the left, the dungeon under it, its letters " ..
-				"closing up."], {} },
-			{ L["Film"], L["The name over a gold line in the middle of the screen, the dungeon under it."],
-				{ combatBossPlace = "screen", combatBossFont = "morpheus" } },
-			{ L["Reel"], L["The name in the bottom letterbox bar, the dungeon beside it."],
-				{ combatBossPlace = "bottom", combatBossStyle = "title" } },
-			{ L["Epic"], L["A big bold name in the middle, a red pulse round the edges."],
-				{ combatBossStyle = "title", combatBossFont = "skurri", combatBossSize = 58, combatBossOutline = 2,
-				combatBossR = 0.94, combatBossG = 0.3, combatBossB = 0.2, combatBossPulse = 0.5,
-				combatBossPulseR = 0.89, combatBossPulseG = 0.13, combatBossPulseB = 0.22, combatBossHold = 3 } },
-			{ L["Quiet"], L["A chapter line in the top bar, on the right."],
-				{ combatBossPlace = "top", combatBossAlign = "right", combatBossBarScale = 0.45 } },
-		}, bossKeys)
-	end, "presets")
-
-	stack:Header(content, L["Where"])
-	local function InBar(db)
-		local place = Get("combatPlace")
-		return db.combatVision and (place == "top" or place == "bottom")
-	end
-	-- (Dropdowns: one choice to read at a glance.)
-	local function List(choices)
-		return function()
-			local list = {}
-			for i, choice in ipairs(choices) do list[i] = { value = choice[1], text = choice[2], tip = choice[3] } end
-			return list
-		end
-	end
-	rows.Dropdown(L["Place:"], "combatPlace", List({
-		{ "screen", L["On the screen"] },
-		{ "top", L["Top letterbox bar"] },
-		{ "bottom", L["Bottom letterbox bar"] },
-		{ "third", L["Lower third"], L["Low on the left of the screen, as a film names someone, its line fading " ..
-			"out to the right."] },
-	}), L["Where the text shows: in the middle of the screen, in a letterbox bar or in the lower third."])
-	rows.Dropdown(L["In the bar:"], "combatAlign", List({
-		{ "left", L["Left"] },
-		{ "center", L["Center"] },
-		{ "right", L["Right"] },
-	}), L["Where in the letterbox bar the text sits."], InBar)
-	rows.Slider("combatBarScale", L["Letterbox scale"], 20, 100, 1, "%d%%", 100,
-		L["The text's height next to the bar's: it grows and shrinks with your letterbox. (With no letterbox " ..
-		"up, a bar as tall as your letterbox's comes in for the cue.)"], InBar)
-	rows.Check("combatBarFallback", L["Lower third with no letterbox"],
-		L["Ticked: while no letterbox is up, the text shows in the lower third. Unticked: a bar of its own " ..
-		"comes in for it."], InBar)
-
-	local On = rows.On
-
-	stack:Header(content, L["Text"])
-	local Words = On
-	rows.Dropdown(L["Style:"], "combatStyle", List({
-		{ "title", L["Title card"], L["A big word in the middle of the screen."] },
-		{ "subtitle", L["Subtitle"], L["A small line low on the screen, where a film's subtitles go."] },
-		{ "chapter", L["Chapter line"], L["The word over a line that draws out, as a new scene starts."] },
-	}), L["How the text is set: a title card, a subtitle or a chapter line."])
-	rows.Dropdown(L["Animation:"], "combatAnim", List({
-		{ "fade", L["Fade"], L["The text fades in and out."] },
-		{ "reveal", L["Reveal"], L["The text opens out from its middle (or from its side, in the lower third or " ..
-			"at a bar's side), its line drawing out with it; a boss card's other lines rise in after the name."] },
-		{ "track", L["Tracking in"], L["The letters start spread apart and close up, as a film's title comes in; " ..
-			"a boss card's other lines rise in after the name. A boss's name that the game keeps secret (a card " ..
-			"before the fight, on retail) opens as Reveal instead."] },
-		{ "type", L["Typewriter"], L["The words come in a letter at a time from the left, as if typed; a boss " ..
-			"card's other lines rise in after them. A secret boss's name opens as Reveal instead."] },
-	}), L["How the text comes in."])
-	rows.Look(L["Look:"], L["Words"], {
-		font = { "combatFont", L["Words in Russian, Korean or Chinese keep the game's font, so their letters show."],
-			test = Words },
-		textSize = function(look)
-			look.Boxes():Box(L["Size"], Field("combatSize"), 14, 64, 1, "%d", 1,
-				L["How tall the text is on the screen. (In a letterbox bar: Letterbox scale.)"],
-				function(db) return Words(db) and not InBar(db) end)
-		end,
-		outline = { "combatOutline", L["A border round the letters."], names = { [0] = L["None"], L["Thin"], L["Thick"] },
-			test = Words },
-		outlineColor = function(look)
-			look.Color(L["Outline color"], { "combatOutlineR", "combatOutlineG", "combatOutlineB" },
-				L["Pick the outline's color."], function(db)
-					local value = Get("combatOutline")
-					if value == -1 then value = ns.GeneralStyleValue("combatOutline") end
-					return Words(db) and (value or 0) > 0
-				end)
-		end,
-		textColor = false, -- (each cue's own: its row below)
-		shadow = { "combatShadow", test = Words },
-	})
-
-	-- Going in and coming out: a row each, its words, color, icon (a tick
-	-- for it at all, then a button opening every icon the game has:
-	-- IconBrowser.lua) and pulse.
-	local browser = ns.IconBrowser(canvas, function(key, icon)
-		ns.GetDB()[key] = icon
-		Changed()
-		kit.Refresh()
-	end)
-	-- (A row's number boxes closer to what's before them, so a whole row fits.)
-	local function Tight(line, after)
-		line:SetPoint("LEFT", after.Text or after.text or after, "RIGHT", 12, 0)
-		return line
-	end
-	-- A tick for the icon at all (showKey), then the icon's button.
-	local function IconButton(after, showKey, iconKey, tip)
-		local check = kit.Check(content, showKey, "", tip, function(value)
-			ns.GetDB()[showKey] = value
-			Changed()
-			kit.Refresh()
-		end)
-		check:SetPoint("LEFT", after, "RIGHT", 10, 0)
-		kit.GreyUnless(check, function(db) return db.combatVision end)
-		local button = CreateFrame("Button", nil, content)
-		button:SetSize(22, 22)
-		button:SetPoint("LEFT", check, "RIGHT", 2, 0)
-		local border = button:CreateTexture(nil, "BACKGROUND")
-		border:SetAllPoints()
-		border:SetColorTexture(0.45, 0.38, 0.2, 1)
-		local icon = button:CreateTexture(nil, "ARTWORK")
-		icon:SetPoint("TOPLEFT", 2, -2)
-		icon:SetPoint("BOTTOMRIGHT", -2, 2)
-		icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
-		local hl = button:CreateTexture(nil, "HIGHLIGHT")
-		hl:SetAllPoints(icon)
-		hl:SetColorTexture(1, 1, 1, 0.2)
-		kit.Tooltip(button, L["The icon. Click to pick it from all the game's. Right-click: back to the usual one."])
-		button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
-		button:SetScript("OnClick", function(self, mouse)
-			local db = ns.GetDB()
-			if mouse == "RightButton" then
-				db[iconKey] = DEFAULTS[iconKey]
-				Changed()
-				kit.Refresh()
-				return
-			end
-			browser:Open(self, iconKey, db[iconKey])
-		end)
-		button:SetScript("OnEnable", function(self) self:SetAlpha(1) end)
-		button:SetScript("OnDisable", function(self) self:SetAlpha(0.4) end)
-		button.Refresh = function() icon:SetTexture(ns.GetDB()[iconKey] or DEFAULTS[iconKey]) end
-		kit.GreyUnless(button, function(db) return db.combatVision and db[showKey] end)
-		kit.AddControl(button)
-		return button
-	end
-	local SIDES = {
-		{ L["Going in:"], "In",
-			L["The words going into a fight. Empty: none, just the rest of the cue."], L["Pick the text's color going in."],
-			L["An icon before the word going in: crossed swords, unless you pick another."],
-			L["The edges of the screen flash for a moment as a fight starts, this strongly. 0: no pulse."],
-			L["Pick the pulse's color going in."],
-			L["How long the cue going in stays between fading in and out."] },
-		{ L["Coming out:"], "Out",
-			L["The words coming out of it. Empty: none, just the rest of the cue."], L["Pick the text's color coming out."],
-			L["An icon before the word coming out, unless you pick another."],
-			L["The edges of the screen flash for a moment as a fight ends, this strongly. 0: no pulse."],
-			L["Pick the pulse's color coming out."],
-			L["How long the cue coming out stays between fading in and out."] },
-	}
-	parts.Part("combat", function()
-		stack:Header(content, L["Going in and coming out"])
-		for _, side in ipairs(SIDES) do
-			local which = side[2]
-			local box = WordsRow(kit, content, stack, "combatText" .. which, side[1], side[3], Words)
-			local swatch = rows.Swatch(box, nil, { "combat" .. which .. "R", "combat" .. which .. "G",
-				"combat" .. which .. "B" }, side[4])
-			local icon = IconButton(swatch, "combatIconShow" .. which, "combatIcon" .. which, side[5])
-			local pulse = Tight(rows.Boxes(icon), icon)
-			pulse:Box(L["Pulse"], "combatPulse" .. which, 0, 100, 1, "%d", 100, side[6], On, "%")
-			local pulseColor = rows.Swatch(pulse, nil, { "combatPulse" .. which .. "R", "combatPulse" .. which .. "G",
-				"combatPulse" .. which .. "B" }, side[7], function(db) return On(db) and db["combatPulse" .. which] > 0 end)
-			Tight(rows.Boxes(pulseColor), pulseColor):Box(L["Stays"], "combatHold" .. which, 0, 4, 0.1, "%.1f", 1, side[8], On, "s")
-		end
-	end, "sides")
-
-	-- The Boss card's: the name's color, icon, pulse and how long it stays
-	-- (no words: the boss's name), then its lines (when: the Visions hub's page).
-	parts.Part("boss", function()
-		stack:Header(content, L["Card"])
-		local name = stack:Add(kit.Label(content, "GameFontHighlight", L["Name:"]), "label")
-		name:SetSize(150, 22)
-		local gap = CreateFrame("Frame", nil, content) -- (its swatch just after its name)
-		gap:SetSize(1, 22)
-		gap:SetPoint("LEFT", name, "LEFT", 150, 0)
-		local swatch = rows.Swatch(gap, nil, { "combatBossR", "combatBossG", "combatBossB" },
-			L["Pick the boss's name's color."])
-		local icon = IconButton(swatch, "combatBossIconShow", "combatBossIcon",
-			L["An icon before the boss's name: a skull, unless you pick another."])
-		local pulse = Tight(rows.Boxes(icon), icon)
-		pulse:Box(L["Pulse"], "combatBossPulse", 0, 100, 1, "%d", 100,
-			L["The edges of the screen flash for a moment as the card shows, this strongly. 0: no pulse."], On, "%")
-		local pulseColor = rows.Swatch(pulse, nil, { "combatBossPulseR", "combatBossPulseG", "combatBossPulseB" },
-			L["Pick the pulse's color."], function(db) return On(db) and db.combatBossPulse > 0 end)
-		Tight(rows.Boxes(pulseColor), pulseColor):Box(L["Stays"], "combatBossHold", 0.5, 8, 0.1, "%.1f", 1,
-			L["How long a boss's card stays between fading in and out: longer than the usual cue, to read its lines."],
-			On, "s")
-		rows.Check("combatBossSub", L["Dungeon line"],
-			L["The dungeon or raid and its difficulty under the boss's name (beside it in a letterbox bar)."])
-		if EJ_GetInstanceForMap and EJ_GetEncounterInfoByIndex then
-			rows.Check("combatBossCount", L["Boss number"],
-				L["\"Boss 2 of 3\" over the name, from the Adventure Guide, as the fight starts (not in a letterbox bar)."])
-		end
-	end, "sides")
-	parts.Finish()
-
-	canvas:SetScript("OnShow", kit.PageShown(kit.Refresh, content)) -- (its refresh plays the preview)
-	canvas:Hide()
-	kit.RegisterSubpage(canvas, "Combat Style", L["Battle Vision"])
-end

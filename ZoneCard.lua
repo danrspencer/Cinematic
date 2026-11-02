@@ -1,8 +1,7 @@
--- Story Vision's Zone name: the game's zone name, as you come into a new
--- zone (or subzone), drawn as a card of its own in its place: Battle Vision's
--- boss card (ns.PlayVisionCard), as Last time's is (Recap.lua). Its place,
--- style, animation and color are on Story Vision's Style tab; off, the game's
--- own shows as it always does.
+-- The Cards page's Zone and Subzone: the game's zone name, as you come into
+-- a new zone (or subzone), drawn as a card in its place (Cards.lua fires and
+-- draws it: its look is the page's); off, the game's own shows as it always
+-- does.
 --
 -- The game's lines stay where they are, only see-through (the time of day's
 -- and Last time's lines go by them: Tint.lua): its zone text frames are plain,
@@ -11,24 +10,15 @@
 local _, ns = ...
 local DEFAULTS = ns.DEFAULTS
 
-DEFAULTS.storyZoneCard = false        -- Story Vision's Zone name row (off: the game's own)
-DEFAULTS.storyZoneSubzones = true     -- ...a card as you come into a subzone, too
-DEFAULTS.storyZonePlace = "third"     -- "screen", "top" or "bottom" bar, "third" (Battle Vision's)
-DEFAULTS.storyZoneStyle = "chapter"   -- "title", "subtitle" or "chapter"
-DEFAULTS.storyZoneAnim = "track"      -- "fade", "reveal", "track" or "type"
-DEFAULTS.storyZoneAlign = "center"    -- in a bar: "left", "center" or "right"
-DEFAULTS.storyZoneSize = 36           -- the name's height on the screen
-DEFAULTS.storyZoneHold = 3            -- seconds it stays, between its fades
-DEFAULTS.storyZoneR, DEFAULTS.storyZoneG, DEFAULTS.storyZoneB = 1, 0.82, 0 -- the game's zone gold
-DEFAULTS.storyZoneIcon = false        -- a map before the name
+DEFAULTS.storyZoneCard = false        -- the Zone row (off: the game's own)
+DEFAULTS.storyZoneSubzones = true     -- the Subzone row: a card as you come into a subzone, too
 DEFAULTS.storyZoneTerritory = false   -- "Contested Territory" and such under it, as the game says
 
-local MAP = "Interface\\Icons\\INV_Misc_Map_01"
 local SEPARATOR = " · "
 -- The game's lines: zone, PvP status, arena/sanctuary note, subzone.
 local LINES = { "ZoneTextString", "PVPInfoTextString", "PVPArenaTextString", "SubZoneTextString" }
 
-local function On() return ns.Setting("storyZoneCard") and true or false end
+local function On() return ns.CardOn("zone") end
 
 -- A line's text, or "" (none, or one the game keeps secret).
 local function Text(line)
@@ -66,31 +56,10 @@ local function HideGame()
 	end
 end
 
--- The Zone name look, read as Battle Vision's cue settings (ns.PlayVisionCard).
-local CARD_FIELDS = {
-	combatPlace = "storyZonePlace", combatStyle = "storyZoneStyle", combatAnim = "storyZoneAnim",
-	combatAlign = "storyZoneAlign", combatSize = "storyZoneSize", combatHoldIn = "storyZoneHold",
-	combatInR = "storyZoneR", combatInG = "storyZoneG", combatInB = "storyZoneB",
-	combatFont = "storyFont", combatOutline = "storyOutline", combatShadow = "storyShadow",
-	combatOutlineR = "storyOutlineR", combatOutlineG = "storyOutlineG", combatOutlineB = "storyOutlineB",
-	combatIconShowIn = "storyZoneIcon",
-}
-local CARD_FIXED = { combatBarScale = 0.5, combatBarFallback = true, combatPulseIn = 0, combatIconIn = MAP }
-function ns.ZoneCardLook(look)
-	look = look or ns.StyleLook("storyVision")
-	return setmetatable({}, { __index = function(_, key)
-		if CARD_FIXED[key] ~= nil then return CARD_FIXED[key] end
-		local value = look[CARD_FIELDS[key] or key]
-		if key == "combatOutline" then value = tonumber(value) or 0 end
-		return value
-	end })
-end
-
 -- A card { name, sub, meta }: a new zone's name, its subzone and territory
 -- under it; or a subzone's name, the zone and territory under it. meta: over
 -- the name (the time of day, at login). territory: nil, the game's.
-function ns.ZoneCardText(look, zone, subzone, territory, newArea, meta)
-	look = look or ns.StyleLook("storyVision")
+function ns.ZoneCardText(zone, subzone, territory, newArea, meta)
 	territory = territory or Text(PVPInfoTextString)
 	local under = {}
 	local name = zone
@@ -100,26 +69,18 @@ function ns.ZoneCardText(look, zone, subzone, territory, newArea, meta)
 		name = subzone ~= "" and subzone or zone
 		if zone ~= "" and zone ~= name then under[#under + 1] = zone end
 	end
-	if look.storyZoneTerritory and territory ~= "" then under[#under + 1] = territory end
+	if ns.db.storyZoneTerritory and territory ~= "" then under[#under + 1] = territory end
 	if name == "" then return nil end
 	return { name = name, sub = table.concat(under, SEPARATOR), meta = meta }
 end
 
--- The real card, over the whole screen (an overlay, kept with the UI hidden).
-local screen, last
+-- The card, as Cards.lua plays it (Zone's, or Subzone's).
+local last
 local timeUntil = 0 -- (until then, the next new zone's card carries the time of day: a login's)
 local function Play(card)
-	if not ns.PlayVisionCard then return end
-	if not screen then
-		screen = CreateFrame("Frame", "CinematicZoneCard", UIParent)
-		screen:SetAllPoints(UIParent)
-		screen:SetFrameStrata("LOW")
-		screen:EnableMouse(false)
-		ns.AddOverlay(screen)
-	end
-	card.at = GetTime()
 	last = card
-	ns.PlayVisionCard(screen, ns.ZoneCardLook(), UIParent:GetWidth(), UIParent:GetHeight(), 1, card)
+	card.played = GetTime()
+	ns.Cards.Fire(card.newArea and "zone" or "subzone", card)
 end
 
 -- What the game just showed (a frame later, so both its frames are set).
@@ -130,13 +91,12 @@ local function Shows()
 	zoneShown, subShown = false, false
 	HideGame()
 	if not On() then return end
-	local look = ns.StyleLook("storyVision")
-	if not newArea and not (sub and look.storyZoneSubzones) then return end
+	if not newArea and not (sub and ns.CardOn("subzone")) then return end
 	local meta
 	if newArea and GetTime() < timeUntil and ns.TimeTitleNow then
 		meta, timeUntil = ns.TimeTitleNow(), 0
 	end
-	local card = ns.ZoneCardText(look, Text(ZoneTextString), Shown(SubZoneTextFrame) and Text(SubZoneTextString) or "",
+	local card = ns.ZoneCardText(Text(ZoneTextString), Shown(SubZoneTextFrame) and Text(SubZoneTextString) or "",
 		nil, newArea, meta)
 	if card then
 		card.newArea = newArea
@@ -170,7 +130,7 @@ end
 -- it does (the card's on): the one just played gets it, or the next.
 function ns.ZoneCardTime()
 	if not On() then return false end
-	if last and last.newArea and not last.timed and GetTime() - last.at < 2 and ns.TimeTitleNow then
+	if last and last.newArea and not last.timed and GetTime() - last.played < 2 and ns.TimeTitleNow then
 		last.meta, last.timed = ns.TimeTitleNow(), true
 		Play(last)
 	else
@@ -179,10 +139,17 @@ function ns.ZoneCardTime()
 	return true
 end
 
--- The Test button: the zone you're in, as you'd come into it.
-function ns.TestZoneCard()
+-- The Tests and previews: the zone you're in, as you'd come into it (sub:
+-- the subzone you're in, as you'd come into that).
+local function Sample(sub)
 	local zone = GetRealZoneText and GetRealZoneText() or ""
-	local card = ns.ZoneCardText(nil, zone ~= "" and zone or "Darkshore", GetSubZoneText and GetSubZoneText() or "",
-		nil, true)
-	if card then Play(card) end
+	local subzone = GetSubZoneText and GetSubZoneText() or ""
+	if zone == "" then zone = "Darkshore" end
+	if sub and subzone == "" then subzone = "Auberdine" end
+	local card = ns.ZoneCardText(zone, subzone, nil, not sub)
+	if card then card.newArea = not sub end
+	return card
 end
+ns.CardSamples = ns.CardSamples or {}
+ns.CardSamples.zone = function() return Sample(false) end
+ns.CardSamples.subzone = function() return Sample(true) end

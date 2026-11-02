@@ -18,8 +18,7 @@ local PAGES = {
 	{ "Dialogue", "Quest Talk Style", { "questTalkFont", "questTalkOutline", "questTalkShadow" } },
 	{ "Quest item button", "Quest Item Style", { "questItemFont", "questItemOutline", "questItemShadow", "questItemFrame" } },
 	{ "Roll Vision", "Roll Style", { "rollBarTexture", "rollFont", "rollOutline", "rollShadow" } },
-	{ "Battle Vision", "Combat Style", { "combatFont", "combatOutline", "combatShadow" } },
-	{ "Story Vision", "Story Style", { "storyFont", "storyOutline", "storyShadow" } },
+	{ "Card Vision", "Card Style", { "cardFont", "cardOutline", "cardShadow" } },
 }
 local KIND_NAMES = { texture = "Texture", font = "Font", outline = "Outline", shadow = "Shadow", border = "Border" }
 
@@ -129,7 +128,7 @@ local CELLS = {
 	{ "Dialogue", "MakeQuestTalkPreview" },
 	{ "Roll Vision", "MakeRollPreview" },
 	{ "Quest item button", "MakeQuestItemPreview" },
-	{ "Combat Vision", "MakeCombatPreview", sized = true }, -- (sized: given the screen's height)
+	{ "Card Vision", "MakeCardPreview", sized = true }, -- (sized: given the screen's height)
 }
 local ROTATE_SECONDS, FADE_SECONDS = 6, 0.6
 local NAME_H = 24 -- (the page's name over the screen; the screen as high as every Style preview's)

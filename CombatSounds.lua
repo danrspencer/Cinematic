@@ -1,4 +1,4 @@
--- Combat Vision's sounds: the game's own, by their sound kit IDs (as
+-- The Cards page's fight sounds: the game's own, by their sound kit IDs (as
 -- Wowhead lists them), each with a name (Wowhead's, tidied; the shortlist's
 -- are ours), its group, how long it runs and its starting volume (louder
 -- kinds start lower). Made by a script from Wowhead's sound search: none of

@@ -85,11 +85,12 @@ local function PrintDebugHelp()
 	print("  /cine debug alpha -print frames setting their own alpha (again to stop)")
 	print("  /cine debug hover [group] - print what the mouse is on and whether the group (quests) counts as hovered (again to stop)")
 	print("  /cine debug swing - what the swing timer bars read, and print each one showing or fading (again to stop)")
-	print("  /cine debug mode - which camera mode it thinks you're in")
+	print("  /cine debug mode - the camera running now and every check the camera modes go by, the ones not met in red (run it while the camera should be going), and the camera script's step")
 	print("  /cine debug cooldowns - what the Cooldown Manager's \"stay up while recharging\" check sees")
 	print("  /cine debug newplayer - back to no profile picked, as on a fresh install (the welcome window)")
 	print("  /cine debug whatsnew - the chat line shown at login after an update, with its What's new link")
 	print("  /cine debug modes - print each camera mode change to chat (again to stop)")
+	print("  /cine debug cards - each Card Vision event: ticked, whether it shows here now and why not, its own look settings, and the card playing")
 	print("  /cine debug tab - every log line, as it's logged, in a chat tab named Cinematic (make the tab yourself)")
 	print("  /cine debug emote - the last emote the game passed, and whether cozy or vista took it")
 	print("  /cine debug cameras - each trigger's rows on the Scenes page, the one it goes by here and its camera")
@@ -783,7 +784,7 @@ local function HandleSlash(msg)
 		local text = arg ~= "" and (arg:gsub("^%l", string.upper)) or nil
 		ns.TestTimeChangeTitle(text)
 	elseif cmd == "recaptest" then
-		-- Story Vision's Last time: this session so far, as the next login would
+		-- The Cards page's Last time: this session so far, as the next login would
 		-- show it, with the counts and whether it would show at all.
 		local line, session = ns.RecapPreview()
 		ns.Print("next login would show: " .. (line or "nothing (no quests, level or bosses yet)"))
@@ -807,15 +808,15 @@ local function HandleSlash(msg)
 				end
 			end
 		end)
-		print(("  Last time row %s, Story Vision %s, in combat %s"):format(tostring(ns.Setting("storyRecap")),
-			tostring(ns.Setting("storyVision")), tostring(InCombatLockdown())))
+		print(("  Last time row %s, Card Vision %s, in combat %s"):format(tostring(ns.Setting("storyRecap")),
+			tostring(ns.Setting("cards")), tostring(InCombatLockdown())))
 	elseif cmd == "attacktest" then
 		-- Shows an attack warning now, as LocalDefense would (here, or the text given,
 		-- taken before lowercasing).
 		local text = msg:match("^%s*%S+%s+(.-)%s*$") or ""
 		local place = GetMinimapZoneText and GetMinimapZoneText() or ""
 		ns.ShowAlertTitle(text ~= "" and text or L["%s is under attack!"]:format(place ~= "" and place
-			or GetRealZoneText()))
+			or GetRealZoneText()), true)
 	elseif cmd == "debug" and arg == "tooltip" then
 		-- Traces tooltip hiding for 10 seconds (hover a herb meanwhile).
 		ns.tooltipTrace = { started = GetTime() }
@@ -1187,8 +1188,25 @@ local function HandleSlash(msg)
 		ns.Print(L["auto-run: %s"]:format(ns.autoRunning and L["on"] or L["off"]) ..
 			((ns.IsAutoRunning and ns.IsAutoRunning()) and L[" (auto-run camera)"] or
 				(ns.autoRunning and ns.walking and L[" (walking, so RP walk camera)"] or "")))
+	elseif cmd == "debug" and arg == "cards" then
+		-- The Cards page: each event ticked or not, whether it may show here now
+		-- and why not, its look's own settings, and the card playing.
+		local current = ns.Cards and ns.Cards.Current()
+		ns.Print(("Card Vision %s, Style %s, in combat %s, CineMode %s, playing: %s"):format(tostring(ns.Setting("cards")),
+			tostring(ns.StyleOn("cards")), tostring(InCombatLockdown()), tostring(ns.lastCinematic and true or false),
+			current and (current.id .. " (" .. tostring(current.name) .. ")") or "none"))
+		for _, event in ipairs(ns.CARD_EVENTS or {}) do
+			local ok, why = ns.CardAllowed(event.id)
+			local own = {}
+			for _, field in ipairs(ns.CARD_FIELDS) do
+				if ns.CardIsOwn(event.id, field[1]) then own[#own + 1] = field[1] end
+			end
+			print(("  %s: %s%s; own look: %s"):format(event.id, ok and "|cff60ff60shows here|r" or "|cffff6060not here|r",
+				ok and "" or " (" .. tostring(why) .. ")", #own > 0 and table.concat(own, ", ") or "none"))
+		end
 	elseif cmd == "debug" and arg == "mode" then
-		-- Which camera situation the addon thinks you're in.
+		-- Which camera situation the addon thinks you're in, then every check
+		-- the camera modes go by (Camera.lua).
 		local still = ns.GetStillSince()
 		local mode
 		if UnitOnTaxi("player") then
@@ -1217,6 +1235,7 @@ local function HandleSlash(msg)
 		ns.Print(("CineMode %s; place %s, auto-run flag %s, auto-run cam off here %s, trigger %s"):format(
 			ns.lastCinematic and "on" or ("off: " .. tostring(ns.cineOffWhy)), tostring(ns.GetPlaceType()),
 			tostring(ns.autoRunning), tostring(ns.IsCameraOffHere("run")), tostring(ns.TriggerStartsCine())))
+		ns.ReportCameraGates()
 	elseif cmd == "zoomtest" then
 		-- Zooms out by N yards (default 6) over 10 seconds with the same tiny
 		-- per-frame steps the slow zoom uses, then reports how far it really went.

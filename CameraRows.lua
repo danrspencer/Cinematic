@@ -443,6 +443,34 @@ function ns.CameraRowsOff(cam)
 	return true
 end
 
+-- The same in words, for /cine debug mode: each of its trigger's rows, and
+-- why it isn't the one (ticked off, its When, or another camera).
+local PLACE_LISTS = { "worldShow", "cityShow", "instanceShow", "bgShow", "groupShow" }
+function ns.CameraRowsOffWhy(cam)
+	local keys = OWN_TRIGGER[cam]
+	if cam == "quest" then keys = { ns.QuestCamEvent and ns.QuestCamEvent() or "Quest" } end
+	if not keys then return "its event's row decides (see the event line)" end
+	local why = {}
+	for _, key in ipairs(keys) do
+		local lead = TRIGGER[key] and ns.SceneLead(key)
+		for _, id in ipairs(lead and ns.TriggerRowIds(lead) or {}) do
+			local leader = ns.CameraRowFollow(id)
+			local when = (leader and not OwnWhen(id)) and ("cam:" .. leader) or ROW_KEY[id]
+			local places = {}
+			for _, list in ipairs(PLACE_LISTS) do
+				if ns.IsPlaceShowOn(list, when) then places[#places + 1] = list:gsub("Show$", "") end
+			end
+			local state = not ns.CameraRowOn(id) and "ticked off"
+				or not RowFits(id) and ("When doesn't fit (always %s, in combat %s, rule %s, places %s)"):format(
+					tostring(ns.CameraRowAlways(id)), tostring(ns.IsCombatShowOn(when) and true or false),
+					tostring(ns.RuleTest(when) ~= nil), #places > 0 and table.concat(places, "/") or "none")
+				or ("fits, plays %s"):format(tostring(ns.CameraRowValue(id, "camera")))
+			why[#why + 1] = ("%s row %s %s"):format(key, id, state)
+		end
+	end
+	return #why > 0 and table.concat(why, "; ") or "no row"
+end
+
 -- A camera's Calm Timer wait now: the row its trigger goes by.
 function ns.CameraWaitsForCalm(mode)
 	local key = ns.CameraModeTrigger(mode)

@@ -24,6 +24,7 @@ local GLOBAL_KEYS = {
 	masterWheelOrder = true, masterWheelOff = true, customWheels = true, wheelExtras = true, -- (Wheels pages)
 	cameraScripts = true, -- (CameraScripts.lua: your scripts, the same in every profile)
 	stylePreviewPos = true, -- (StylePages.lua: where you dragged the Style preview window)
+	dockSpots = true, -- (Skin.lua's DockBeside: where you dragged popped-out windows)
 }
 -- Lists kept as tables that belong to a profile (their defaults are in code;
 -- see EnsureTables in Core.lua). Missing from a profile: emptied, which means defaults.

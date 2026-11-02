@@ -259,17 +259,14 @@ local function BuildEditor()
 	editor:SetToplevel(true)
 	editor:SetClampedToScreen(true)
 	editor:EnableMouse(true)
-	editor:SetMovable(true)
-	editor:RegisterForDrag("LeftButton")
-	editor:SetScript("OnDragStart", editor.StartMoving)
-	editor:SetScript("OnDragStop", editor.StopMovingOrSizing)
+	ns.DockBeside(editor, "ruleEditor")
 	tinsert(UISpecialFrames, "CinematicRuleEditor") -- (Escape closes it)
 	local close = ns.SkinClose(CreateFrame("Button", nil, editor, "UIPanelCloseButton"))
 	close:SetPoint("TOPRIGHT", -2, -2)
 	close:SetScript("OnClick", function() editor:Hide() end)
 	local heading = editor:CreateFontString(nil, "OVERLAY", "GameFontNormal")
 	heading:SetPoint("TOP", 0, -10)
-	heading:SetWidth(EDIT_W - 80)
+	heading:SetWidth(EDIT_W - 220) -- (clear of Pop out)
 
 	-- The rule, a few lines' room; a click anywhere on it types there.
 	local well = CreateFrame("Frame", nil, editor, BACKDROP)
@@ -1220,4 +1217,181 @@ function ns.GridTable(content, columnTop, rows, kit)
 	end
 	ns.GridDots(content, made)
 	return lastLabel
+end
+
+-- A list of rows that open into drawers, as the Scenes page's: each row its
+-- tick, its name and chips (what's set apart from the usual, as many as fit;
+-- the row's tooltip lists them all), and a + to open its drawer under it, a
+-- line each (its name at the left, its controls after, At places them). kit:
+-- the page's (ns.lowHealthKit), parent: its content. items, in order: { id,
+-- label, tip, on = the tick's setting, onTip, chips = function() giving
+-- { { text, color }... }, dim = function() true: the row greyed (its name and
+-- chips), lines = { { name, build = function(drawer, At) } ... } }; At(control,
+-- x, dy) puts control on that line, x past the line's name (LABEL_W in).
+-- Gives the list, as tall as its rows and open drawers (anchor what's below to
+-- its bottom), and list:Open(id).
+ns.ROW_CHIP = {
+	plain = { 0.18, 0.18, 0.18, 0.8, 0.8, 0.8 },     -- (back r, g, b, then text r, g, b)
+	when = { 0.08, 0.2, 0.35, 0.55, 0.8, 1 },
+	never = { 0.35, 0.25, 0.05, 1, 0.8, 0.35 },
+	gold = { 0.29, 0.24, 0.03, 1, 0.88, 0.4 },
+	mine = { 0.18, 0.29, 0.11, 0.73, 0.89, 0.54 },
+}
+local LIST_ROW_W, LIST_ROW_H, LIST_ON_X, LIST_NAME_X, LIST_NAME_W, LIST_CHIPS_X, LIST_CHIPS_W =
+	590, 28, 16, 46, 206, 256, 300
+local LIST_DRAWER_X, LIST_LINE_H, LIST_LABEL_W = 20, 34, 62
+ns.ROW_LIST_LABEL_W = LIST_LABEL_W
+function ns.RowList(kit, parent, items)
+	local list = CreateFrame("Frame", nil, parent)
+	list:SetSize(LIST_ROW_W, LIST_ROW_H)
+	local rows, drawers, opened = {}, {}, {}
+	local function Layout()
+		local y = 0
+		for i, item in ipairs(items) do
+			local row, drawer = rows[i], drawers[i]
+			row:ClearAllPoints()
+			row:SetPoint("TOPLEFT", list, "TOPLEFT", 0, -y)
+			row.band:SetColorTexture(1, 1, 1, i % 2 == 1 and 0.04 or 0)
+			y = y + LIST_ROW_H
+			row.toggle:SetNormalTexture(opened[item.id] and "Interface\\Buttons\\UI-MinusButton-Up"
+				or "Interface\\Buttons\\UI-PlusButton-Up")
+			-- (A closed drawer's settings still count for page search, which opens it.)
+			drawer.searchAlways = true
+			if opened[item.id] then
+				drawer:ClearAllPoints()
+				drawer:SetPoint("TOPLEFT", list, "TOPLEFT", LIST_DRAWER_X, -y)
+				drawer:Show()
+				y = y + drawer:GetHeight() + 4
+			else
+				drawer:Hide()
+			end
+		end
+		list:SetHeight(math.max(y, 1))
+	end
+	local function Toggle(id)
+		opened[id] = not opened[id]
+		Layout()
+	end
+	for i, item in ipairs(items) do
+		local row = CreateFrame("Button", nil, list)
+		row:SetSize(LIST_ROW_W, LIST_ROW_H)
+		rows[i] = row
+		row.band = row:CreateTexture(nil, "BACKGROUND", nil, -8)
+		row.band:SetAllPoints()
+		local hover = row:CreateTexture(nil, "HIGHLIGHT")
+		hover:SetAllPoints()
+		hover:SetColorTexture(1, 1, 1, 0.05)
+		local edge = row:CreateTexture(nil, "BACKGROUND")
+		edge:SetPoint("BOTTOMLEFT")
+		edge:SetPoint("BOTTOMRIGHT")
+		edge:SetHeight(1)
+		edge:SetColorTexture(1, 1, 1, 0.08)
+		row:SetScript("OnClick", function() Toggle(item.id) end)
+		local function Place(control, x)
+			control:SetPoint("LEFT", row, "LEFT", x, 0)
+			return control
+		end
+
+		-- Its tick.
+		local on = Place(kit.Check(row, item.on, "", item.onTip, function(value)
+			ns.GetDB()[item.on] = value
+			kit.Refresh()
+		end), LIST_ON_X)
+		on.searchLabel = item.label
+		kit.RecordKey(parent, item.on)
+
+		-- Its name, and its chips (dimmed while it's greyed).
+		local name = Place(kit.Label(row, "GameFontHighlight", item.label), LIST_NAME_X)
+		name:SetWidth(LIST_NAME_W)
+		name:SetJustifyH("LEFT")
+		name:SetWordWrap(false)
+		name.searchSkip = true
+		local chips = Place(CreateFrame("Frame", nil, row), LIST_CHIPS_X)
+		chips:SetSize(LIST_CHIPS_W, 16)
+		chips.searchSkip = true
+		chips.pageSwitch = false
+		chips.pool = {}
+		chips.Refresh = function()
+			local made = item.chips and item.chips() or {}
+			row.chipList = made
+			local x, shown = 0, 0
+			for c, each in ipairs(made) do
+				local chip = chips.pool[c]
+				if not chip then
+					chip = CreateFrame("Frame", nil, chips)
+					chip:SetHeight(16)
+					chip.back = chip:CreateTexture(nil, "BACKGROUND")
+					chip.back:SetAllPoints()
+					chip.text = chip:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+					chip.text:SetPoint("CENTER")
+					chips.pool[c] = chip
+				end
+				chip.text:SetText(each[1])
+				local width = math.ceil(chip.text:GetStringWidth()) + 10
+				if x + width > LIST_CHIPS_W then break end
+				local color = each[2] or ns.ROW_CHIP.plain
+				chip.back:SetColorTexture(color[1], color[2], color[3], 0.9)
+				chip.text:SetTextColor(color[4], color[5], color[6])
+				chip:SetWidth(width)
+				chip:ClearAllPoints()
+				chip:SetPoint("LEFT", chips, "LEFT", x, 0)
+				chip:Show()
+				x, shown = x + width + 4, c
+			end
+			for c = shown + 1, #chips.pool do chips.pool[c]:Hide() end
+			local dim = item.dim and item.dim() and 0.5 or 1
+			name:SetAlpha(dim)
+			chips:SetAlpha(dim)
+		end
+		kit.AddControl(chips)
+		row:SetScript("OnEnter", function(self)
+			GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+			GameTooltip:SetText(item.label, 1, 1, 1)
+			if item.tip then GameTooltip:AddLine(item.tip, 0.8, 0.8, 0.8, true) end
+			for _, chip in ipairs(self.chipList or {}) do
+				GameTooltip:AddLine("- " .. chip[1], 1, 0.82, 0)
+			end
+			GameTooltip:AddLine(ns.L["Click to show or hide its settings."], 0.6, 0.6, 0.6)
+			GameTooltip:Show()
+		end)
+		row:SetScript("OnLeave", GameTooltip_Hide)
+		row.toggle = Place(CreateFrame("Button", nil, row), LIST_ROW_W - 22)
+		row.toggle:SetSize(14, 14)
+		row.toggle:SetHighlightTexture("Interface\\Buttons\\UI-Common-MouseHilight", "ADD")
+		row.toggle:SetScript("OnClick", function() Toggle(item.id) end)
+		kit.Tooltip(row.toggle, ns.L["Show or hide this row's settings."])
+
+		-- Its drawer: a line each, its name at the left.
+		local lines = item.lines or {}
+		local drawer = CreateFrame("Frame", nil, list)
+		drawer:SetSize(LIST_ROW_W - LIST_DRAWER_X, #lines * LIST_LINE_H + 8)
+		drawer:Hide()
+		drawer.openSection = function()
+			opened[item.id] = true
+			Layout()
+		end
+		drawers[i] = drawer
+		local back = drawer:CreateTexture(nil, "BACKGROUND")
+		back:SetAllPoints()
+		back:SetColorTexture(0, 0, 0, 0.3)
+		for l, line in ipairs(lines) do
+			local middle = -4 - (l - 0.5) * LIST_LINE_H
+			local label = kit.Label(drawer, "GameFontNormalSmall", line.name)
+			label:SetPoint("LEFT", drawer, "TOPLEFT", 6, middle)
+			label.searchSkip = true
+			line.build(drawer, function(control, x, dy)
+				control:SetPoint("LEFT", drawer, "TOPLEFT", x or LIST_LABEL_W, middle + (dy or 0))
+				return control
+			end)
+		end
+	end
+	list.pageSwitch = false
+	list.Refresh = function() Layout() end
+	kit.AddControl(list)
+	function list:Open(id)
+		opened[id] = true
+		Layout()
+	end
+	Layout()
+	return list
 end

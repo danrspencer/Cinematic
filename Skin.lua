@@ -181,6 +181,77 @@ function ns.PanelButton(parent)
 	return ns.SkinButton(CreateFrame("Button", nil, parent, "UIPanelButtonTemplate"))
 end
 
+-- Every window opened from the settings (DockBeside's, and the others that
+-- ask with this) closes as the settings do. (A frame of ours inside the
+-- settings window hears it, by its own OnHide: nothing of the game's hooked.)
+local closeWithSettings, settingsWatch = {}, nil
+function ns.CloseWithSettings(frame)
+	closeWithSettings[frame] = true
+	local settings = _G.SettingsPanel or _G.InterfaceOptionsFrame
+	if settingsWatch or not settings then return end
+	settingsWatch = CreateFrame("Frame", nil, settings)
+	settingsWatch:SetScript("OnHide", function()
+		for each in pairs(closeWithSettings) do each:Hide() end
+	end)
+end
+
+-- A window opened from the settings sits docked beside them (to their right)
+-- as it opens, like the Look panels; its Pop out button lets you drag it
+-- anywhere (kept for next time: dockSpots[key]), Dock puts it back. With the
+-- settings closed, it opens where it was put to start with. Returns the
+-- button (at the top right, left of the X: move it if that's taken).
+local function DockSpot(key)
+	local spots = ns.db and ns.db.dockSpots
+	local spot = type(spots) == "table" and spots[key]
+	return type(spot) == "table" and spot.x and spot.y and spot or nil
+end
+function ns.DockBeside(frame, key)
+	local home = { frame:GetPoint(1) }
+	local dock = ns.PanelButton(frame)
+	dock:SetSize(70, 20)
+	dock:SetPoint("TOPRIGHT", -30, -6)
+	local function Place()
+		local spot = DockSpot(key)
+		local settings = _G.SettingsPanel or _G.InterfaceOptionsFrame
+		frame:ClearAllPoints()
+		if spot then
+			frame:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", spot.x, spot.y)
+		elseif settings and settings:IsShown() then
+			frame:SetPoint("TOPLEFT", settings, "TOPRIGHT", 4, 0)
+		elseif home[1] then
+			frame:SetPoint(unpack(home))
+		end
+		dock:SetText(ns.L[spot and "Dock" or "Pop out"])
+	end
+	local function Save(spot)
+		if not ns.db then return end
+		if type(ns.db.dockSpots) ~= "table" then ns.db.dockSpots = {} end
+		ns.db.dockSpots[key] = spot
+	end
+	dock:SetScript("OnClick", function()
+		Save(not DockSpot(key) and { x = frame:GetLeft() + 30, y = frame:GetTop() - 30 } or nil)
+		Place()
+	end)
+	if ns.lowHealthKit then
+		ns.lowHealthKit.Tooltip(dock, ns.L["Pop out: drag the window anywhere (by its edge). Dock: back beside the settings."])
+	end
+	-- (Docked, it stays beside the settings: Pop out first to drag it.)
+	frame:SetMovable(true)
+	frame:SetClampedToScreen(true)
+	frame:RegisterForDrag("LeftButton")
+	frame:SetScript("OnDragStart", function(self)
+		if DockSpot(key) then self:StartMoving() end
+	end)
+	frame:SetScript("OnDragStop", function(self)
+		self:StopMovingOrSizing()
+		if DockSpot(key) then Save({ x = self:GetLeft(), y = self:GetTop() }) end
+		Place()
+	end)
+	frame:HookScript("OnShow", Place)
+	ns.CloseWithSettings(frame)
+	return dock
+end
+
 -- A UIPanelCloseButton in both looks. HD: a small flat square with an X,
 -- in the middle of the game's room for it.
 function ns.SkinClose(button)

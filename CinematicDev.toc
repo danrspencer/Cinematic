@@ -96,7 +96,8 @@ RollStyle.lua
 CombatSounds.lua
 CombatSoundRules.lua
 CombatVision.lua
-StoryVision.lua
+Cards.lua
+CardsPage.lua
 Recap.lua
 ZoneCard.lua
 QuestTalkStyle.lua

@@ -5,22 +5,34 @@ local _, ns = ...
 
 -- Where the bubbles show is the game's own two settings, written as you
 -- enter each place: chatBubbles (say, yell, NPC speech) and chatBubblesParty.
--- Your own values are put back when the page's switch goes off.
-local CVARS = { Say = "chatBubbles", Party = "chatBubblesParty" }
+-- Your own values are put back when the page's switch goes off. Kinds share
+-- them (players' say and yell and NPCs' speech chatBubbles, players' and NPCs'
+-- party chatBubblesParty): each on while any of its kinds is, and the off
+-- kinds' bubbles hidden by us (HideKindBubbles).
+local CVARS = { chatBubbles = { "Say", "Yell", "NPC" }, chatBubblesParty = { "Party", "NPC" } }
 
 -- Whether that kind of bubble is off here and now: its Show in row
 -- (bubble:<kind>, the page's grid) off.
-local BUBBLE_ROWS = { Say = "bubble:Say", Party = "bubble:Party" }
+local BUBBLE_ROWS = { Say = "bubble:Say", Yell = "bubble:Yell", Party = "bubble:Party", NPC = "bubble:NPC" }
 local function OffHere(db, kind)
 	return not ns.RowOnNow(BUBBLE_ROWS[kind], db["bubbles" .. kind .. "Always"], true)
 end
 
+-- Whether the page has that kind (Say, Yell, Party, NPC) off now. (Chat.lua: such a line
+-- has no bubble to wait for.)
+function ns.BubbleKindOff(kind)
+	local db = ns.db
+	return db and db.handleBubbles and BUBBLE_ROWS[kind] and OffHere(db, kind) or false
+end
+
 local function ApplyCVars(db)
 	local where = ns.EffectPlace()
-	for kind, cvar in pairs(CVARS) do
+	for cvar, kinds in pairs(CVARS) do
 		if GetCVar(cvar) ~= nil then
 			ns.SaveCVar(cvar)
-			local want = OffHere(db, kind) and "0" or "1"
+			local on = false
+			for _, kind in ipairs(kinds) do on = on or not OffHere(db, kind) end
+			local want = on and "1" or "0"
 			if GetCVar(cvar) ~= want then
 				ns.LogDetail("cvar", ("%s -> %s (chat bubbles, %s)"):format(cvar, want, where))
 				SetCVar(cvar, want)
@@ -30,7 +42,7 @@ local function ApplyCVars(db)
 end
 
 local function RestoreCVars()
-	for _, cvar in pairs(CVARS) do
+	for cvar in pairs(CVARS) do
 		ns.RestoreCVar(cvar)
 	end
 end
@@ -815,8 +827,29 @@ local BUBBLE_EVENTS = {
 local WATCH_FOR = 0.5
 local watchLeft = 0
 
+-- A kind off while another sharing its game setting is on: a line of the off
+-- kind has its bubble hidden as it shows, found by its text. Bubbles the game
+-- keeps from addons (in instances, on retail) can't be read, so stay.
+local KIND_OF = { CHAT_MSG_SAY = "Say", CHAT_MSG_YELL = "Yell", CHAT_MSG_PARTY = "Party",
+	CHAT_MSG_PARTY_LEADER = "Party", CHAT_MSG_MONSTER_SAY = "NPC", CHAT_MSG_MONSTER_YELL = "NPC",
+	CHAT_MSG_MONSTER_PARTY = "NPC" }
+ns.BUBBLE_KIND_OF = KIND_OF -- (Chat.lua)
+local hideLines = {} -- text -> until when its bubble is looked for
+
+local function HideKindBubbles()
+	local now = GetTime()
+	for text, untilTime in pairs(hideLines) do
+		if now > untilTime then
+			hideLines[text] = nil
+		else
+			ns.HideOffScreenBubble(text) -- (its OnHide gives it back)
+		end
+	end
+end
+
 local watcher = CreateFrame("Frame")
 local function OnUpdate(self, elapsed)
+	if next(hideLines) then HideKindBubbles() end
 	StyleBubbles()
 	if ns.db and ns.db.handleBubbles then HookBubbles() end
 	watchLeft = watchLeft - elapsed
@@ -860,9 +893,15 @@ for event in pairs(SITUATION_EVENTS) do watcher:RegisterEvent(event) end
 for _, event in ipairs(BUBBLE_EVENTS) do
 	pcall(watcher.RegisterEvent, watcher, event) -- (not every client has every event)
 end
-watcher:SetScript("OnEvent", ns.Profiled("chat bubbles event", function(self, event)
+watcher:SetScript("OnEvent", ns.Profiled("chat bubbles event", function(self, event, text)
 	if event == "PLAYER_ENTERING_WORLD" or event == "ZONE_CHANGED_NEW_AREA" or SITUATION_EVENTS[event] then
 		ns.ApplyBubbles()
+	elseif KIND_OF[event] and ns.BubbleKindOff(KIND_OF[event]) then
+		if type(text) == "string" and not (issecretvalue and issecretvalue(text)) then
+			hideLines[text] = GetTime() + WATCH_FOR
+		end
+		watchLeft = WATCH_FOR
+		self:SetScript("OnUpdate", OnUpdate)
 	-- (Also while the Style page is on, or any bubble is still styled from
 	-- before.) (And while the page is on at all, to keep new bubbles off the top.)
 	elseif ns.db and (ns.db.handleBubbles or ns.StyleOn("bubblesStyle") or Styled()) then

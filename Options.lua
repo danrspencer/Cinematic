@@ -1661,10 +1661,7 @@ do
 		-- (General and the dev copy's Wind Guide in no section: plain icons)
 		{ name = "Visions", colors = { Combat = { 0.85, 0.3, 0.25 }, World = { 0.35, 0.6, 0.9 } }, pages = {
 			{ "Heal Vision", "Interface\\Icons\\Spell_Holy_FlashHeal", section = "Combat" },
-			{ "Combat Vision", "Interface\\Icons\\Ability_Warrior_OffensiveStance", section = "Combat",
-				label = "Battle Vision" }, -- (its old name kept as its ID: links, scopes)
 			-- (tabOf: no icon of its own, a folder tab on that page's (ns.PageTabs))
-			{ "Combat Style", "Interface\\Icons\\Ability_DualWield", tabOf = "Combat Vision" },
 			{ "Vitals Vision", "Interface\\Icons\\Spell_Shadow_LifeDrain02", section = "Combat" },
 			{ "Vitals Style", "Interface\\Icons\\Spell_Shadow_LifeDrain02", tabOf = "Vitals Vision" },
 			{ "Quest Vision", "Interface\\Icons\\INV_Misc_Head_Dragon_01", section = "World" },
@@ -1673,8 +1670,9 @@ do
 			{ "Roll Vision", "Interface\\Icons\\INV_Misc_Dice_01", section = "World" },
 			{ "Roll Style", "Interface\\Icons\\INV_Misc_Dice_02", tabOf = "Roll Vision" },
 			{ "Duel Vision", "Interface\\Icons\\Ability_DualWield", section = "World" },
-			{ "Story Vision", "Interface\\Icons\\INV_Misc_Book_09", section = "World" },
-			{ "Story Style", "Interface\\Icons\\INV_Misc_Book_09", tabOf = "Story Vision" },
+			-- (CardsPage.lua's: Battle Vision's and Story Vision's moments, one page)
+			{ "Card Vision", "Interface\\Icons\\INV_Misc_Book_09", section = "World" },
+			{ "Card Style", "Interface\\Icons\\INV_Misc_Book_09", tabOf = "Card Vision" },
 			{ "Wind Guide", "Interface\\Icons\\Spell_Nature_Cyclone", dev = true },
 		} },
 		{ name = "Quality of life", colors = { Helpers = { 0.3, 0.7, 0.5 } }, pages = {
@@ -3297,8 +3295,8 @@ local function CreateDeathPanel()
 	local function IfOn() return ns.TriggerAnyRow("Death") end
 
 	local stack = Stack(subtitle, "label", true)
-	-- (The death banner, "YOU DIED" across the screen: Story Vision's now.)
-	stack:Add(ns.StoryVisionLink(content, L["The death banner:"]), "label")
+	-- (The death banner, "YOU DIED" across the screen: the Cards page's Death now.)
+	stack:Add(ns.CardsLink(content, L["The death banner:"], "death"), "label")
 
 	stack:Header(content, L["Starting"])
 	local delay = stack:Add(Slider(content, "deathOrbitDelay", L["Start after"], 0, 10, 0.5, L["%.1f sec"]), "slider")
@@ -4088,8 +4086,8 @@ local function CreateTintPanel()
 		L["For the Time of day and Zone + time of day presets, and the time of day message."])
 	timeHelp:SetPoint("TOPLEFT", timeHeader, "BOTTOMLEFT", 0, -6)
 
-	-- (Its title on the screen, at login and as it changes: Story Vision's now.)
-	local timeMessage = ns.StoryVisionLink(content, L["The time of day's title and sound:"])
+	-- (Its title on the screen, at login and as it changes: the Cards page's now.)
+	local timeMessage = ns.CardsLink(content, L["The time of day's title and sound:"], "time")
 	timeMessage:SetPoint("TOPLEFT", timeHelp, "BOTTOMLEFT", 0, -8)
 
 	local clockLabel = Label(content, "GameFontHighlight", L["Follows"])
@@ -4697,6 +4695,8 @@ for _, place in ipairs(ns.PLACE_SHOW) do
 		place.label, function(key) return ns.IsPlaceShowOn(place.list, key) end, place.list, false, place.tip,
 	}
 end
+
+ns.FRAME_COLUMNS = FRAME_COLUMNS -- (a Show in row's columns, for the pages outside this file)
 
 local function FrameHeading(parent, text)
 	local heading = Label(parent, "GameFontNormalSmall", (text:gsub("^(.*) ", "%1\n")))
@@ -6452,7 +6452,7 @@ local function CreateBubblesPanel()
 	local bubbleHeader = stack:Header(content, L["Show in"])
 	stack:Help(content, L["Where and when each kind of bubble shows. Always: everywhere. Nothing ticked: never."])
 	local bubbleRows = { opts = { quiet = true, cam = true, anyFight = true }, underHeader = true }
-	for _, bubble in ipairs({ { "Say", L["Say & yell"] }, { "Party", L["Party"] } }) do
+	for _, bubble in ipairs({ { "Say", L["Say"] }, { "Yell", L["Yell"] }, { "Party", L["Party"] }, { "NPC", L["NPCs"] } }) do
 		local alwaysKey = "bubbles" .. bubble[1] .. "Always"
 		bubbleRows[#bubbleRows + 1] = { key = "bubble:" .. bubble[1], label = bubble[2], alwaysKey = alwaysKey,
 			alwaysOn = function() return ns.GetDB()[alwaysKey] end,
@@ -6476,6 +6476,13 @@ local function CreateBubblesPanel()
 		"a bubble low on the screen, with the speaker's name, instead of bringing up chat. It needs the Chat " ..
 		"page's Show chat when a message arrives and Hide speech you can see as a bubble."]), "check")
 	GreyUnless(offScreen, function(db) return db.chatPeek and db.chatHideBubbled end)
+	-- (How they look: a button right of it, to the Style hub's Chat bubbles page.)
+	local offScreenStyle = ns.PanelButton(content)
+	offScreenStyle:SetSize(70, 20)
+	offScreenStyle:SetText(L["Style"])
+	offScreenStyle:SetPoint("LEFT", offScreen.Text or offScreen.text, "RIGHT", 16, 0)
+	Tooltip(offScreenStyle, L["Opens the Style hub's Chat bubbles page: how off-screen bubbles look and where they show."])
+	offScreenStyle:SetScript("OnClick", function() ns.OpenOptions("Bubble Style") end)
 	stack:Add(Check(content, "bubblesOffTop", L["Keep bubbles on screen"],
 		L["A bubble the game would put at the very top of the screen (someone above you, up some stairs say) " ..
 		"shows a little lower instead, below the letterbox bar (or a bit down from the top with the bars off), " ..
@@ -9814,30 +9821,18 @@ do
 			return anchor
 		end
 
-		-- Chat window: plain ticks, the places it stays up in a line.
+		-- Chat window: plain ticks. (Where it stays up is its row on the
+		-- Standard Frames page.)
 		local windowBody = Section(L["Chat window"], "Chat window")
 		local untilRead = Check(windowBody, "chatUntilWhisperRead", L["Keep chat up until whispers are read"],
 			L["When a whisper arrives in its own tab, the whole chat window stays up in CineMode " ..
 			"while that tab flashes, until you click it. Whispers that land in the tab you're " ..
 			"looking at don't flash, so they just show as above."])
 		untilRead:SetPoint("TOPLEFT", windowBody, "TOPLEFT", -2, -6)
-		local keepLabel = Label(windowBody, "GameFontHighlight", L["Always show in"])
-		keepLabel:SetPoint("TOPLEFT", untilRead, "BOTTOMLEFT", 2, -10)
-		local CHAT_TIP = L["The chat window stays up here while the rest of the UI fades. " ..
-			"Only matters where CineMode isn't turned off."]
-		for i, place in ipairs({
-			{ "chatInCities", L["Cities"], L["Capital cities. "] },
-			{ "chatInDungeons", L["Dungeons"], "" },
-			{ "chatInRaids", L["Raids"], "" },
-			{ "chatInPvP", L["PvP"], PVP_TIP .. " " },
-		}) do
-			local check = Check(windowBody, place[1], place[2], place[3] .. CHAT_TIP)
-			check:SetPoint("TOPLEFT", keepLabel, "BOTTOMLEFT", -2 + (i - 1) * 110, -4)
-		end
 		-- What of the window a new message brings up with it (hovering,
 		-- typing and unread whispers still bring it all).
 		local partsLabel = Label(windowBody, "GameFontHighlight", L["A message shows"])
-		partsLabel:SetPoint("TOPLEFT", keepLabel, "BOTTOMLEFT", 0, -34)
+		partsLabel:SetPoint("TOPLEFT", untilRead, "BOTTOMLEFT", 2, -10)
 		local PARTS_TIP = L["Hovering the chat, typing or a whisper to read still brings it all up."]
 		for i, part in ipairs({
 			{ "chatPeekBackground", L["Background"], L["The chat window's dark background comes up with a new " ..
@@ -9909,8 +9904,8 @@ do
 
 		-- Other: chat lines of Cinematic's own.
 		local otherBody = Section(L["Other"], "Other")
-		-- (Attacks shown on the screen: Story Vision's now.)
-		local attackAlert = ns.StoryVisionLink(otherBody, L["Attacks shown on the screen:"])
+		-- (Attacks shown on the screen: the Cards page's now.)
+		local attackAlert = ns.CardsLink(otherBody, L["Attacks shown on the screen:"], "attack")
 		attackAlert:SetPoint("TOPLEFT", otherBody, "TOPLEFT", 0, -6)
 		local updateNotice = Check(otherBody, "updateNotice", L["Get notified of updates"],
 			L["The first time you log in after Cinematic updates, a line in chat says so, with a " ..
@@ -12805,7 +12800,11 @@ end)
 -- failed because of an AddOn": its ShowUIPanel is). Where the window itself
 -- isn't protected it's shown and the page picked directly; where it is
 -- (retail, in a fight), it opens when the fight ends.
+-- (Pages that went into others: their old names, for links and saved ones.)
+local MOVED_PAGES = { ["Combat Vision"] = "Card Vision", ["Story Vision"] = "Card Vision", ["Cards"] = "Card Vision", ["Combat Style"] = "Card Style",
+	["Story Style"] = "Card Style" }
 function ns.OpenOptions(page)
+	page = MOVED_PAGES[page] or page
 	-- (a UI Manager page: that page, then UI Manager open at it)
 	page = page and HubTab(page) or page
 	-- (some pages are registered by their name as shown)
@@ -14239,11 +14238,9 @@ ns.OnLanguage(function()
 	if ns.CreateVitalsVisionPanel then -- (LowHealth.lua)
 		ns.CreateVitalsVisionPanel(ns.lowHealthKit)
 	end
-	if ns.CreateCombatVisionPanel then -- (CombatVision.lua)
-		ns.CreateCombatVisionPanel(ns.lowHealthKit)
-	end
-	if ns.CreateStoryVisionPanel then -- (StoryVision.lua)
-		ns.CreateStoryVisionPanel(ns.lowHealthKit)
+	if ns.CreateCardsPanel then -- (CardsPage.lua)
+		ns.CreateCardsPanel(ns.lowHealthKit)
+		ns.CreateCardStylePanel(ns.lowHealthKit)
 	end
 	if ns.CreateWindGuidePanel then -- (WindGuide.lua: the dev copy only, CinematicDev.toc)
 		ns.CreateWindGuidePanel(ns.lowHealthKit)
@@ -14264,12 +14261,6 @@ ns.OnLanguage(function()
 	end
 	if ns.CreateRollStylePanel then -- (RollStyle.lua)
 		ns.CreateRollStylePanel(ns.lowHealthKit)
-	end
-	if ns.CreateCombatStylePanel then -- (CombatVision.lua)
-		ns.CreateCombatStylePanel(ns.lowHealthKit)
-	end
-	if ns.CreateStoryStylePanel then -- (StoryVision.lua)
-		ns.CreateStoryStylePanel(ns.lowHealthKit)
 	end
 	if ns.CreateVitalsStylePanel then -- (LowHealth.lua)
 		ns.CreateVitalsStylePanel(ns.lowHealthKit)

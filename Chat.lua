@@ -460,8 +460,10 @@ end
 local OnBubbleWatch = ns.Profiled("Bubble watch", WatchBubbles)
 
 local function PeekUnlessBubble(chatFrame, event, text, author, guid)
+	-- (Its kind off on the Chat bubbles page: no bubble to wait for.)
+	local kind = ns.BUBBLE_KIND_OF and ns.BUBBLE_KIND_OF[event]
 	if not (ns.db.chatHideBubbled and BUBBLE_SPEECH[event] and type(text) == "string" and not (issecretvalue and issecretvalue(text))
-			and GetCVarBool and GetCVarBool("chatBubbles")) then
+			and GetCVarBool and GetCVarBool("chatBubbles") and not (kind and ns.BubbleKindOff(kind))) then
 		if BUBBLE_SPEECH[event] then
 			SpeechTrace(("not waiting for a bubble (hide bubbled %s, bubbles CVar %s)"):format(
 				tostring(ns.db.chatHideBubbled), tostring(GetCVar("chatBubbles"))))
@@ -603,7 +605,7 @@ function ns.HasUnreadWhisper()
 end
 
 -- LocalDefense warnings ("Dun Algaz is under attack!") also show as a title
--- where the zone name appears (Story Vision's chatAttackAlert). The channel is told by its
+-- where the zone name appears (the Cards page's Under attack: chatAttackAlert). The channel is told by its
 -- zone channel number, which every language shares, or else its English name;
 -- the game sends these with no sender, so players' lines there are skipped.
 -- The same place repeats at most once every ATTACK_REPEAT seconds.

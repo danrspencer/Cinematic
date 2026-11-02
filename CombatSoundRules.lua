@@ -1,5 +1,5 @@
--- Combat Vision's sounds: rules, each for entering or leaving combat (or, on
--- the Boss tab, a boss pulled, killed or a wipe: ENCOUNTER_END), with a
+-- The Cards page's fight sounds: rules, each for entering or leaving combat
+-- (or, on the Boss event, a boss pulled, killed or a wipe: ENCOUNTER_END), with a
 -- condition in the rules' words (boss, raid, cinemode...; none: any fight)
 -- and a list of sounds. As a fight starts or ends, the first rule that fits
 -- plays one of its sounds at random (not the one it played last), at its own
@@ -153,7 +153,7 @@ function ns.PlayCombatSound(id, volume)
 	C_Timer.After(done + 0.05, RestoreWhenDone)
 end
 
--- A boss fight's rule: its condition has the word boss (the Boss tab's).
+-- A boss fight's rule: its condition has the word boss (the Boss event's).
 local function IsBossRule(rule)
 	return ((" " .. (rule.rule or "") .. " "):lower():find("[^%w_]boss[^%w_]")) ~= nil
 end
@@ -227,8 +227,8 @@ end)
 
 -- The page's part: the cue volume, the rules (each its condition, its
 -- sounds with their volume, a play and remove button) and a window to pick
--- sounds from. kit, content, stack: the Visions page's. boss: the Boss tab's
--- part, its boss fights' rules; else the Combat tab's, the rest. (One list
+-- sounds from. kit, content, stack: the Cards page's. boss: the Boss event's
+-- part, its boss fights' rules; else Entering combat's, the rest. (One list
 -- saved, each tab showing its own.)
 local RULE_W, ROW_H = 520, 24
 local picker -- (below)
@@ -266,7 +266,7 @@ local function VolumeSlider(parent, onChange, onRelease)
 end
 
 -- A rule's edge on its button, and the next one a click switches to (the
--- Boss tab's go pulled, killed, wipe).
+-- Boss event's go pulled, killed, wipe).
 local NEXT = { ["in"] = "out", out = "in", kill = "in", wipe = "in" }
 local BOSS_NEXT = { ["in"] = "kill", kill = "wipe", wipe = "in", out = "in" }
 
@@ -280,9 +280,9 @@ function ns.CombatSoundRulesSection(kit, content, stack, boss)
 	local function Mine(rule) return IsBossRule(rule) == (boss and true or false) end
 	stack:Header(content, L["Sounds"])
 	stack:Help(content, boss
-		and L["Sounds for boss fights, read before the Combat tab's: as a boss is pulled, killed or your group " ..
+		and L["Sounds for boss fights, read before Entering combat's: as a boss is pulled, killed or your group " ..
 		"wipes, the first rule that fits plays one of its sounds at random. A rule here has Boss fight in its " ..
-		"condition (taken out, it moves to the Combat tab). Each sound's slider sets it next to the others, the " ..
+		"condition (taken out, it moves to Entering combat's). Each sound's slider sets it next to the others, the " ..
 		"cue volume sets them all."]
 		or L["Rules for the sounds, read top to bottom as a fight starts or ends: the first that fits plays one " ..
 		"of its sounds at random. A rule's condition uses the rules' words (Boss fight, Raids, In CineMode...); " ..
@@ -534,10 +534,7 @@ function picker.Open(rule, save)
 		frame:SetToplevel(true)
 		frame:SetClampedToScreen(true)
 		frame:EnableMouse(true)
-		frame:SetMovable(true)
-		frame:RegisterForDrag("LeftButton")
-		frame:SetScript("OnDragStart", frame.StartMoving)
-		frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
+		ns.DockBeside(frame, "soundPicker")
 		tinsert(UISpecialFrames, "CinematicCombatSoundPicker")
 		frame.title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
 		frame.title:SetPoint("TOPLEFT", 14, -12)
@@ -547,7 +544,7 @@ function picker.Open(rule, save)
 		if ns.SkinEditBox then ns.SkinEditBox(search) end
 		search:SetSize(200, 20)
 		search:SetAutoFocus(false)
-		search:SetPoint("TOPRIGHT", -36, -8)
+		search:SetPoint("TOPRIGHT", -110, -8) -- (Pop out after it)
 		frame.search = search
 		local hint = frame:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
 		hint:SetPoint("RIGHT", search, "LEFT", -10, 0)

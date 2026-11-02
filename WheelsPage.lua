@@ -672,10 +672,6 @@ local function ShareWindow()
 	share:SetFrameStrata("FULLSCREEN_DIALOG")
 	share:SetToplevel(true)
 	share:EnableMouse(true)
-	share:SetMovable(true)
-	share:RegisterForDrag("LeftButton")
-	share:SetScript("OnDragStart", share.StartMoving)
-	share:SetScript("OnDragStop", share.StopMovingOrSizing)
 	if share.SetBackdrop then
 		share:SetBackdrop({
 			bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
@@ -693,6 +689,7 @@ local function ShareWindow()
 	local close = CreateFrame("Button", nil, share, "UIPanelCloseButton")
 	if ns.SkinClose then ns.SkinClose(close) end
 	close:SetPoint("TOPRIGHT", -2, -2)
+	ns.DockBeside(share, "wheelShare")
 	share.hint = share:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
 	share.hint:SetPoint("TOPLEFT", share.title, "BOTTOMLEFT", 0, -8)
 	share.hint:SetWidth(468)

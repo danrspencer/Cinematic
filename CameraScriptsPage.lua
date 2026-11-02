@@ -322,7 +322,7 @@ end
 local function DrawPreview()
 	local w = preview
 	if not w.plan then return end
-	local yaw, pitch, zoom, active = ns.SampleCameraPlan(w.plan, w.t, w.start)
+	local yaw, pitch, zoom = ns.SampleCameraPlan(w.plan, w.t, w.start)
 	local height = math.max(-10, math.min(85, START_HEIGHT - pitch))
 	local flat = math.min(13, zoom * math.cos(math.rad(height)))
 	-- From above: you in the middle facing up; the view turned left puts the
@@ -346,18 +346,15 @@ local function DrawPreview()
 		math.floor(pitch + 0.5), Num(zoom), Num(w.t), Num(w.plan.total)))
 	w.head:ClearAllPoints()
 	w.head:SetPoint("LEFT", w.bar, "LEFT", (w.bar:GetWidth() - 2) * math.min(1, w.t / w.plan.total), 0)
-	w.status:SetText(w.playing and "" or L["Paused: click the drawing to play."])
-	if page.active ~= active then
-		page.active = active
-		if page.Paint then page.Paint() end
-	end
+	-- (Following Run: once it's over, how to play it again.)
+	w.status:SetText(w.following and "" or L["Stopped. Run plays it again."])
 end
 
 -- Lays the script out again (after a change) and draws its steps' bar.
 function ns.RefreshCameraScriptPreview()
 	local w = preview
 	if not w or not w:IsShown() or not page.script then return end
-	w.title:SetText(L["Preview: %s"]:format(page.script.name))
+	w.title:SetText(page.script.name)
 	w.start = { yaw = 0, pitch = 0, zoom = math.max(2, GetCameraZoom and GetCameraZoom() or 8) }
 	w.plan = ns.PlanCameraScript(page.script, w.start)
 	w.t = math.min(w.t or 0, w.plan.total)
@@ -422,6 +419,7 @@ local function MakePreview()
 	end
 	ns.SkinWindow(w)
 	tinsert(UISpecialFrames, "CinematicScriptPreview")
+	ns.CloseWithSettings(w)
 	w:RegisterForDrag("LeftButton")
 	w:SetScript("OnDragStart", function(self)
 		local saved = Store().preview
@@ -452,16 +450,9 @@ local function MakePreview()
 	end)
 	ns.lowHealthKit.Tooltip(w.dock, L["Pop out: drag the window anywhere (by its edge). Dock: back beside the settings."])
 
-	-- The drawing: a click pauses or plays it.
+	-- The drawing: where the camera is, from above and from the side.
 	w.art = CreateFrame("Frame", nil, w)
 	w.art:SetSize(ART_W, VIEW)
-	w.art:EnableMouse(true)
-	w.art:SetScript("OnMouseDown", function()
-		if not w.plan then return end
-		w.playing = not w.playing
-		DrawPreview()
-	end)
-	ns.lowHealthKit.Tooltip(w.art, L["Click to pause or play."])
 	local view = CreateFrame("Frame", nil, w.art)
 	view:SetSize(VIEW, VIEW)
 	view:SetPoint("TOPLEFT")
@@ -506,13 +497,9 @@ local function MakePreview()
 	sideLabel:SetText(L["side"])
 
 	w.readout = w:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-	-- The bar: a click (or a drag along it) jumps there.
+	-- The bar: the script's steps, and how far in it is.
 	w.bar = CreateFrame("Frame", nil, w)
 	w.bar:SetHeight(12)
-	w.bar:EnableMouse(true)
-	w.bar:SetScript("OnMouseDown", function() w.scrubbing = true end)
-	w.bar:SetScript("OnMouseUp", function() w.scrubbing = false end)
-	ns.lowHealthKit.Tooltip(w.bar, L["Click or drag along it to jump there."])
 	local barBg = w.bar:CreateTexture(nil, "BACKGROUND")
 	barBg:SetAllPoints()
 	barBg:SetColorTexture(0, 0, 0, 0.5)
@@ -549,34 +536,24 @@ local function MakePreview()
 	end)
 	FitPreview()
 
-	local END_HOLD = 1.5 -- seconds it holds at the end before playing again
-	w:SetScript("OnUpdate", function(_, elapsed)
+	-- It follows Run: the real camera's time into this script, while it's
+	-- the one running. (Its plan's moves, so a random one may differ a little
+	-- from the camera's.)
+	w:SetScript("OnUpdate", function()
 		if not w.plan then return end
-		if w.scrubbing then
-			local x = GetCursorPosition() / w.bar:GetEffectiveScale()
-			local share = (x - w.bar:GetLeft()) / math.max(1, w.bar:GetWidth())
-			w.t, w.held = w.plan.total * math.max(0, math.min(1, share)), nil
+		local state = ns.CameraScriptState()
+		local following = state and page.script and state.script.id == page.script.id and true or nil
+		if following then w.t = math.min(w.plan.total, state.t) end
+		if following or following ~= w.following then
+			w.following = following
 			DrawPreview()
-			return
 		end
-		if not w.playing then return end
-		if w.t >= w.plan.total then
-			w.held = (w.held or 0) + elapsed
-			if w.held < END_HOLD then return end
-			w.t, w.held = 0, nil
-		else
-			w.t = math.min(w.plan.total, w.t + elapsed)
-		end
-		DrawPreview()
 	end)
 	w:SetScript("OnHide", function()
-		w.playing, w.scrubbing = false, false
 		if w.sizing then
 			w:StopMovingOrSizing()
 			w.sizing = nil
 		end
-		page.active = nil
-		if page.Paint then page.Paint() end
 	end)
 	w:Hide()
 end
@@ -585,7 +562,7 @@ function ns.ShowCameraScriptPreview()
 	if not preview then MakePreview() end
 	preview:Show()
 	PlacePreview()
-	preview.t, preview.playing, preview.held = 0, true, nil
+	preview.t, preview.following = 0, nil
 	ns.RefreshCameraScriptPreview()
 end
 
@@ -611,6 +588,7 @@ local function ShareWindow()
 	share.title:SetPoint("TOPLEFT", 14, -12)
 	local close = ns.SkinClose(CreateFrame("Button", nil, share, "UIPanelCloseButton"))
 	close:SetPoint("TOPRIGHT", 0, 0)
+	ns.DockBeside(share, "scriptShare"):SetPoint("TOPRIGHT", -28, -6)
 	share.hint = share:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
 	share.hint:SetPoint("TOPLEFT", 14, -32)
 	share.hint:SetWidth(430)
@@ -869,7 +847,7 @@ end
 -- an arrow; a click drops the list down.
 local function CameraButton(content)
 	local button = ns.PanelButton(content)
-	button:SetSize(240, 26) -- (room beside it for Copy, Delete, Share, Run and Previewer)
+	button:SetSize(240, 26) -- (room beside it for Copy, Delete, Share and Run)
 	button.dot = button:CreateTexture(nil, "OVERLAY")
 	button.dot:SetSize(8, 8)
 	button.dot:SetPoint("LEFT", 10, 0)
@@ -1011,8 +989,7 @@ function ns.CreateCameraScriptsPanel(kit)
 	page.share:SetScript("OnClick", function() ShowShare(true) end)
 	kit.Tooltip(page.share, L["A string of this script to give to friends."])
 
-	-- Run and Previewer, beside Share. (What it is and what starts it: the
-	-- camera button's tip.)
+	-- (What it is and what starts it: the camera button's tip.)
 	-- Run, beside Share: moves the real camera through it; Stop while it's
 	-- the one running.
 	page.runNow = Button(content, L["Run"], 54)
@@ -1025,8 +1002,11 @@ function ns.CreateCameraScriptsPanel(kit)
 		local state = ns.CameraScriptState()
 		return state and page.script and state.script.id == page.script.id
 	end
+	-- (Its drawing opens beside the settings, following it.)
 	page.runNow:SetScript("OnClick", function()
-		if Running() then ns.StopCameraScript() else page.RunNow() end
+		if Running() then ns.StopCameraScript() return end
+		page.RunNow()
+		if Running() then ns.ShowCameraScriptPreview() end
 	end)
 	local runningWas
 	page.runNow:SetScript("OnUpdate", function(self)
@@ -1035,14 +1015,17 @@ function ns.CreateCameraScriptsPanel(kit)
 			runningWas = running
 			self:SetText(running and L["Stop"] or L["Run"])
 		end
+		-- (The steps it's on lit up.)
+		local lit = running and ns.CameraScriptActivePaths() or nil
+		local changed = false
+		for i = 1, page.used do
+			local row = page.rows[i]
+			local on = lit and lit[row.path] or nil
+			if on ~= row.lit then row.lit, changed = on, true end
+		end
+		if changed then page.Paint() end
 	end)
-	kit.Tooltip(page.runNow, L["Moves the real camera through this script now (click again to stop it). Its stop rules count, as for a trigger."])
-	page.previewButton = Button(content, L["Previewer"], 76)
-	page.previewButton:SetPoint("LEFT", page.runNow, "RIGHT", 4, 0)
-	page.previewButton:SetScript("OnClick", function()
-		if preview and preview:IsShown() then preview:Hide() else ns.ShowCameraScriptPreview() end
-	end)
-	kit.Tooltip(page.previewButton, L["Plays the script on a drawing, in a window of its own: no camera moves."])
+	kit.Tooltip(page.runNow, L["Moves the real camera through this script now, with a drawing of it beside the settings and its steps lit up as it goes (click again to stop it). Its stop rules count, as for a trigger."])
 
 	-- The lists and rules, laid out by Layout.
 	page.rows, page.used = {}, 0
@@ -1133,7 +1116,15 @@ function ns.CreateCameraScriptsPanel(kit)
 
 	-- Picks a camera for the page: a script's id, or a list entry (a camera
 	-- that isn't a script yet).
+	-- Leaving a script Run's playing (another picked, or the page left): it
+	-- stops, and its drawing closes. (A trigger's run of it carries on.)
+	local function LeaveRun(id)
+		local state = ns.CameraScriptState()
+		if id and state and not state.trigger and state.script.id == id then ns.StopCameraScript() end
+		if preview then preview:Hide() end
+	end
 	function page.Pick(entry)
+		local was = page.script and page.script.id
 		page.selected, page.confirmDelete = nil, nil
 		page.delete:SetText(L["Delete"])
 		if type(entry) == "table" and entry.own then
@@ -1145,6 +1136,7 @@ function ns.CreateCameraScriptsPanel(kit)
 			page.locked = script.builtin and true or false
 			page.hasSettings = script.builtin and ns.CameraScriptSettingKeys(script.id) ~= nil
 		end
+		if (page.script and page.script.id) ~= was then LeaveRun(was) end
 		page.Layout()
 		if page.script then ns.RefreshCameraScriptPreview() elseif preview then preview:Hide() end
 	end
@@ -1333,11 +1325,11 @@ function ns.CreateCameraScriptsPanel(kit)
 		page.Changed()
 	end
 
-	-- Colours the rows: picked, and the step the preview's playing.
+	-- Colours the rows: the steps Run's on (row.lit), and the one picked.
 	function page.Paint()
 		for i = 1, page.used do
 			local row = page.rows[i]
-			if row.step == page.active then
+			if row.lit then
 				row.bg:SetColorTexture(1, 0.82, 0, 0.16)
 			elseif row.step == page.selected then
 				row.bg:SetColorTexture(1, 0.82, 0, 0.1)
@@ -1436,15 +1428,18 @@ function ns.CreateCameraScriptsPanel(kit)
 
 	-- A list of steps, placed down the script's column.
 	-- (off: inside a step switched off, greyed too.)
-	local function PlaceRows(list, depth, y, off)
+	-- (prefix: the list's place, for its rows' paths, "2.1": the steps a
+	-- running script is on light up by them.)
+	local function PlaceRows(list, depth, y, off, prefix)
 		for i, step in ipairs(list) do
+			local at = prefix == "" and tostring(i) or (prefix .. "." .. i)
 			page.used = page.used + 1
 			local row = page.rows[page.used]
 			if not row then
 				row = StepRow(content)
 				page.rows[page.used] = row
 			end
-			row.step = step
+			row.step, row.path = step, at
 			row:ClearAllPoints()
 			row:SetPoint("TOPLEFT", COL, y)
 			local c = COLORS[KIND_COLOR[step.k]] or COLORS.wait
@@ -1477,7 +1472,7 @@ function ns.CreateCameraScriptsPanel(kit)
 				page.editorShown = true
 				y = y - page.editor:GetHeight() - 2
 			end
-			if step.steps then y = PlaceRows(step.steps, depth + 1, y, greyed) end
+			if step.steps then y = PlaceRows(step.steps, depth + 1, y, greyed, at) end
 		end
 		return y
 	end
@@ -1504,7 +1499,7 @@ function ns.CreateCameraScriptsPanel(kit)
 	function page.Layout()
 		local script = page.script
 		local scriptShown = script ~= nil
-		for _, widget in ipairs({ page.copy, page.share, page.runNow, page.previewButton }) do
+		for _, widget in ipairs({ page.copy, page.share, page.runNow }) do
 			if widget then widget:SetShown(scriptShown) end
 		end
 		page.used, page.editorShown = 0, false
@@ -1563,8 +1558,8 @@ function ns.CreateCameraScriptsPanel(kit)
 					page.endFor, page.endStep = script.ending, { k = "ending", steps = script.ending }
 					if page.selected == was and was then page.selected = page.endStep end
 				end
-				y = PlaceRows(script.steps, 0, y)
-				y = PlaceRows({ page.endStep }, 0, y)
+				y = PlaceRows(script.steps, 0, y, nil, "")
+				y = PlaceRows({ page.endStep }, 0, y, nil, "e")
 				local bar = page.addBars.steps
 				bar:SetShown(not page.locked)
 				if not page.locked then
@@ -1633,7 +1628,11 @@ function ns.CreateCameraScriptsPanel(kit)
 		content:SetHeight(-y + 30)
 	end
 
-	canvas:HookScript("OnHide", function() page.OpenList(false) end)
+	-- (Leaving the page, its section or the settings: Run stops too.)
+	canvas:HookScript("OnHide", function()
+		page.OpenList(false)
+		LeaveRun(page.script and page.script.id)
+	end)
 	canvas:SetScript("OnShow", kit.PageShown(function()
 		if not page.script and not page.own then page.Pick("cozy") elseif page.own then page.Pick(page.own)
 		else page.Pick(page.id) end

@@ -635,7 +635,7 @@ for _, name in ipairs(FRAME_GROUPS.castbar) do
 end
 -- The chat buttons too (Classic clients put them inside the chat window):
 -- a window peeking for a message doesn't bring them up, their row
--- ("Chat tabs and buttons", Mouseover groups) does.
+-- ("Chat window", Mouseover groups) does.
 for _, name in ipairs(FRAME_GROUPS.chat) do
 	if name ~= "GeneralDockManager" then
 		NEVER_NESTED[name] = true
@@ -1765,6 +1765,11 @@ ns.COMBAT_SHOW = {
 	{ key = "micro", label = _G.BagsBar and L["Micro menu"] or L["Micro menu and bags"], default = true,
 		frames = { "MicroButtonAndBagsBar", "MicroMenuContainer" } },
 	{ key = "bags", label = L["Bags"], default = true, frames = { "BagsBar" } },
+	-- The chat windows with their tabs and buttons. A new message, typing or
+	-- a whisper to read brings them up too (Chat page).
+	{ key = "chat", label = L["Chat window"], default = false, groups = { "chat" }, frames = FRAME_GROUPS.chat,
+		tip = L["The chat windows, with their tabs and buttons. Tick where they stay up while the rest fades; " ..
+			"which messages bring them up for a moment is on the Chat page."] },
 	-- Always ticked to start with (CINE_SHOW_DEFAULT), as before it had a row.
 	{ key = "voice", label = L["Voice chat speakers"], default = false, frames = FRAME_GROUPS.voice,
 		tip = L["The names and portraits above the chat of who's talking in voice chat. Untick Always to hide them in CineMode."] },
@@ -1804,7 +1809,7 @@ local ROW_SECTIONS = {
 	minimap = "minimap", minimapheader = "minimap", minimaptracking = "minimap", minimapcalendar = "minimap",
 	minimapzone = "minimap", minimapclock = "minimap", minimapdial = "minimap",
 	quests = "interface", waypoint = "interface", belowminimap = "interface", topcenter = "interface", micro = "interface", bags = "interface", xp = "interface",
-	voice = "interface",
+	chat = "interface", voice = "interface",
 }
 for _, item in ipairs(ns.COMBAT_SHOW) do
 	item.page = item.page or ROW_SECTIONS[item.key]
@@ -1868,7 +1873,6 @@ end
 local HOVER_EXTRA_ROWS = {
 	{ key = "totemtimers", label = L["Totem timers (by the portrait)"], frames = { "TotemFrame" } },
 	{ key = "durability", label = L["Durability figure"], frames = { "DurabilityFrame" } },
-	{ key = "chat", label = L["Chat tabs and buttons"], frames = FRAME_GROUPS.chat },
 	{ key = "questtimer", label = L["Quest timer"], frames = { "QuestTimerFrame" } },
 	{ key = "waypoint", label = L["Quest waypoint"], frames = { "SuperTrackedFrame" } },
 }
@@ -2371,9 +2375,9 @@ ns.RULE_WORDS = {
 	world = "world", group = "group", grouped = "group", instance = "instance",
 	dungeon = "dungeon", raid = "raid", city = "city", inn = "inn",
 	flagged = "flagged", mounted = "mounted",
-	-- (CineMode on: always so for the rows read in it, the frames'; Combat Vision's is read any time.)
+	-- (CineMode on: always so for the rows read in it, the frames'; the Cards page's are read any time.)
 	cinemode = "cinemode", cine = "cinemode",
-	-- (A fight starting or ending: only Combat Vision's row is read then.)
+	-- (A fight starting or ending: only the Cards page's fight rows are read then.)
 	entering = "entering", enter = "entering", leaving = "leaving", leave = "leaving",
 	boss = "boss",
 	-- (The tooltip being decided on, by kind: only the Tooltips row's rule reads them.)
@@ -2826,8 +2830,8 @@ do
 	function ns.RuleFacts(inCombat)
 		local now = GetTime()
 		inCombat = inCombat and true or false
-		-- (A fight starting or ending: only while Combat Vision reads its row
-		-- then, ns.combatEdge "enter" or "leave"; CineMode as the fight began.)
+		-- (A fight starting or ending: only while the Cards page reads a fight
+		-- row then, ns.combatEdge "enter" or "leave"; CineMode as the fight began.)
 		local edge = ns.combatEdge
 		facts.entering, facts.leaving = edge == "enter", edge == "leave"
 		if edge then
@@ -6971,10 +6975,6 @@ function ns.UpdateFrames(cinematic, elapsed)
 			break
 		end
 	end
-	-- Chat stays put when it isn't faded at all, or in a place chosen under
-	-- "Always show in" (Chat page).
-	local place = ns.GetOptionPlace()
-	local fadeChat = not (place and ns.db[ns.CHAT_IN[place]])
 	local keepForGathering, keepForCreatures = ns.IsKeepingMinimapForTracking(now)
 	-- (Quest tracker page, its switch on.)
 	local questTimerUp = ns.PageOn("handleQuests") and ns.db.questTimerShow and HasQuestTimer()
@@ -7211,7 +7211,7 @@ function ns.UpdateFrames(cinematic, elapsed)
 			fightingShown = true -- shown like a combat frame, at the normal fade speeds
 		end
 		if cinematic and not hovered[row] and not chatShowing and not tracking
-			and not fightingShown and (fadeChat or entry.group ~= "chat") then
+			and not fightingShown then
 			target = 0
 		end
 		if deathFade and deathKept[row] then
@@ -7320,7 +7320,7 @@ function ns.UpdateFrames(cinematic, elapsed)
 		end
 		if entry.isChatWindow then
 			if target > 0 then
-				local peekOnly = cinematic and (ns.chatPeekUntil[entry.frame] or 0) > now and fadeChat
+				local peekOnly = cinematic and (ns.chatPeekUntil[entry.frame] or 0) > now
 					and not hovered[row] and not typingShown and not tracking and not fightingShown
 				entry.backgroundAlpha = ns.Approach(entry.backgroundAlpha or 1,
 					(peekOnly and not ns.db.chatPeekBackground) and 0 or 1, elapsed, GroupFadeTime(entry.group, false))

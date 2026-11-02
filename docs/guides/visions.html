@@ -155,10 +155,8 @@ dl.faq dd { margin: 2px 0 0; color: var(--muted) }
         <p class="muted">Two players dueling near you get their nameplates.</p><span class="tag">On to start with</span></article>
       <article class="card"><a href="#vitals"><div class="name"><i style="background:#ff4066"></i>Vitals Vision</div></a>
         <p class="muted">Your health at the screen's edges, with no portrait to read.</p><span class="tag">On in the Cinema level</span></article>
-      <article class="card"><a href="#battle"><div class="name"><i style="background:#d94d40"></i>Battle Vision</div></a>
-        <p class="muted">A cue on the screen as a fight starts and ends, and a boss&rsquo;s name as a title card.</p><span class="tag">On in the Cinema level</span></article>
-      <article class="card"><a href="#story"><div class="name"><i style="background:#e6c98a"></i>Story Vision</div></a>
-        <p class="muted">Words for the moments between fights: what you did last time, the time of day, a place under attack, your death.</p><span class="tag">On, except in the Subtle level</span></article>
+      <article class="card"><a href="#cards"><div class="name"><i style="background:#e6c98a"></i>Card Vision</div></a>
+        <p class="muted">Words on the screen as things happen: a fight, a boss, a new zone, last time, the time of day, an attack, your death. One look, each event free to change it.</p><span class="tag">On, except in the Subtle level</span></article>
     </div>
     <p class="muted">Turn Heal, Quest, Roll, Duel or Vitals Vision on or off without opening the settings: the <a href="wheels.html">vision wheel</a> does it with one key, in a fight too, and each vision has a <b>Toggle</b> keybind of its own on the Keybinds page.</p>
     <p class="muted"><b>Minimap Glow Helper</b> (on Cinematic's main page): while a vision is doing something, Cinematic's minimap button glows in that vision's color, and its menu and tooltip list it with a link to its page.</p>
@@ -270,26 +268,24 @@ dl.faq dd { margin: 2px 0 0; color: var(--muted) }
     <p class="note">Some game versions keep your health secret from addons in fights. There the edges only fade in and out with it rather than following every point.</p>
   </section>
 
-  <section id="battle">
-    <div class="eyebrow">For your fights</div>
-    <h2>Battle Vision</h2>
-    <p>A cue for a few seconds as you go into a fight and come out of it: a word on the screen or in a letterbox bar, a pulse round the screen&rsquo;s edges, an icon and sounds you pick for each kind of fight. Its look has a <b>Style</b> tab, with presets and a preview. (It was called Combat Vision.)</p>
+  <section id="cards">
+    <div class="eyebrow">Words on your screen</div>
+    <h2>Card Vision</h2>
+    <p>Every moment that puts words on your screen, as one kind of card on one page, with two tabs. (Battle Vision and Story Vision were this page's two halves; your settings came over.) One card shows at a time: a more important one cuts in (your death, a boss), a less important one waits a few seconds for it (the time of day).</p>
     <div class="opts">
-      <div class="opt"><span class="l">Combat</span><span class="d">The cue as a fight starts and ends, and where: <b>Always</b>, or only in certain places and fights. No cue after a fight shorter than <b>Not after fights under</b>.</span></div>
-      <div class="opt"><span class="l">Boss card</span><span class="d">A boss&rsquo;s name as a title card, with its dungeon and which boss it is: as its fight starts, as you first target it, or as you first come near.</span></div>
+      <div class="opt"><span class="l">Events</span><span class="d">A row for each event, as on the Scenes page: its tick, its name and chips for the style it uses (<i>Combat</i>, <i>Death</i>, or <i>Combat +2</i> with settings of its own) and where it shows when that isn&rsquo;t everywhere. Click a row for its settings: <b>When</b> (<b>Always</b>, or the Combat and Location dropdowns, roles, or a rule with <b>Edit</b>) and <b>Style</b> (the style it starts from, <b>Edit style</b> and <b>Test</b>).</span></div>
+      <div class="opt"><span class="l">Styles</span><span class="d">Each event starts from a style: the <b>Default style</b> (the Lower third, the zone name&rsquo;s look) or a ready-made one: <i>Combat</i>, <i>Respite</i>, <i>Boss</i>, <i>Journal</i> (Last time), <i>Title</i>, <i>Alert</i>, <i>Death</i> (a banner), <i>Film</i>, <i>Reel</i>, <i>Storybook</i>, <i>Minimal</i>, <i>Arcade</i> and <i>Quiet</i>. A ready-made style changes only some settings; the rest come from the Default style.</span></div>
+      <div class="opt"><span class="l">Style</span><span class="d">One bar at the top picks what you edit: <b>Default style</b> first, then each event. The Default style is the look every card starts from: where it goes (the middle of the screen, a letterbox bar, the lower third), the layout (title card, subtitle, chapter line or <b>Banner</b>, across the middle on a dark band), how it comes in, the font, size, color, how long it stays, a pulse round the screen&rsquo;s edges and an icon, with a preset menu of the ready-made styles. Pick an event to set the style it <b>Starts from</b> and change any setting of its own over it; the line under the preview lists them, and <b>Back to its style</b> puts one back. Under an event&rsquo;s look, what&rsquo;s its alone. A preview and a <b>Test</b> button either way.</span></div>
     </div>
-  </section>
-
-  <section id="story">
-    <div class="eyebrow">For the moments between</div>
-    <h2>Story Vision</h2>
-    <p>Words that fade in on the screen at moments in your session that aren&rsquo;t your own fights. Each has its own tick, and a <b>Test</b> button to see it now.</p>
+    <h3>The events</h3>
     <div class="opts">
-      <div class="opt"><span class="l">Last time</span><span class="d">On a real login (not a reload), a dim line under the zone name says what you did last time you played: where you spent the most time, quests done, a level reached and bosses killed, as in <i>Last time: Darkshore · 3 quests done · reached level 24</i>. Only what happened, nothing at all if nothing did, never in a fight, and not after more than two weeks away. Its <b>Test</b> says in chat what your next login would show.</span></div>
-      <div class="opt"><span class="l">Time of day at login</span><span class="d">Dawn, Morning, Midday, Afternoon, Evening, Dusk or Night under the zone name when you log in or reload. It follows the clock picked on the Tint page.</span></div>
-      <div class="opt"><span class="l">Time of day changes</span><span class="d">As the time of day changes during play (not in combat), its name fades in where the zone name shows, with a sound: a rooster at dawn, a horse in the morning, your faction&rsquo;s bell at midday, frogs in the evening, an owl at dusk and a wolf at night.</span></div>
-      <div class="opt"><span class="l">Under attack</span><span class="d">When the LocalDefense channel says a place is under attack, it shows in red where the zone name appears, with your faction&rsquo;s city bell; the same place at most once every 90 seconds.</span></div>
-      <div class="opt"><span class="l">Death banner</span><span class="d"><b>YOU DIED</b> or <b>wasted</b> across the screen shortly after the death camera starts, or <b>None</b>. Only with the death camera on (the Die row on the Cameras page).</span></div>
+      <div class="opt"><span class="l">Entering and Leaving combat</span><span class="d">A word as a fight starts and ends (<i>Combat</i>, <i>Respite</i>: yours to change), with sounds you pick for each kind of fight. No card after a fight shorter than <b>Not after fights under</b>.</span></div>
+      <div class="opt"><span class="l">Boss</span><span class="d">A boss&rsquo;s name, with its dungeon and which boss it is: as its fight starts, as you first target it, or as you first come near. Once a run for each boss, in place of Entering combat&rsquo;s.</span></div>
+      <div class="opt"><span class="l">Zone and Subzone</span><span class="d">The zone&rsquo;s name as you come into it, in place of the game&rsquo;s own; a subzone&rsquo;s too, with the zone small under it. The time of day at login goes on the zone&rsquo;s card.</span></div>
+      <div class="opt"><span class="l">Last time</span><span class="d">On a real login (not a reload), what you did last time you played: where you spent the most time, quests done, a level reached and bosses killed, as in <i>Last time: Darkshore · 3 quests done · reached level 24</i>. A card, or a dim line under the zone name. Only what happened, nothing at all if nothing did, never in a fight, and not after more than two weeks away.</span></div>
+      <div class="opt"><span class="l">Time of day</span><span class="d">As the time of day changes during play (not in combat), its name with a sound: a rooster at dawn, a horse in the morning, your faction&rsquo;s bell at midday, frogs in the evening, an owl at dusk and a wolf at night.</span></div>
+      <div class="opt"><span class="l">Under attack</span><span class="d">When the LocalDefense channel says a place is under attack, with your faction&rsquo;s city bell; the same place at most once every 90 seconds.</span></div>
+      <div class="opt"><span class="l">Death</span><span class="d"><b>YOU DIED</b>, <b>wasted</b> or your own words across the screen shortly after the death camera starts. Only with the death camera on (the Die row on the Scenes page).</span></div>
     </div>
   </section>
 

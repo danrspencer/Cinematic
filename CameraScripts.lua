@@ -188,10 +188,12 @@ ns.CleanCameraScriptField = CleanField
 -- keepSet: a built-in camera's, its steps' settings kept (step.set: the
 -- setting keys it's made from, for its page; a copy has none), and steps
 -- switched off by one (step.off: shown greyed, not run; a copy leaves them out).
-local function CleanSteps(list, depth, budget, keepSet)
+-- (paths: given, each step kept is noted in it with its place in the list as
+-- its page shows it, prefix first: "2.1".)
+local function CleanSteps(list, depth, budget, keepSet, paths, prefix)
 	local out = {}
 	if type(list) ~= "table" then return out end
-	for _, step in ipairs(list) do
+	for i, step in ipairs(list) do
 		local def = type(step) == "table" and KINDS[step.k]
 		if def and budget.left > 0 and not (def.group and depth >= MAX_DEPTH) and (keepSet or not step.off) then
 			budget.left = budget.left - 1
@@ -199,7 +201,9 @@ local function CleanSteps(list, depth, budget, keepSet)
 			for _, field in ipairs(def.fields) do
 				clean[field[1]] = CleanField(field, step[field[1]])
 			end
-			if def.group then clean.steps = CleanSteps(step.steps, depth + 1, budget, keepSet) end
+			local at = paths and (prefix == "" and tostring(i) or (prefix .. "." .. i))
+			if at then paths[clean] = at end
+			if def.group then clean.steps = CleanSteps(step.steps, depth + 1, budget, keepSet, paths, at) end
 			if keepSet and type(step.set) == "table" then clean.set = step.set end
 			if keepSet and step.off then clean.off = true end
 			out[#out + 1] = clean
@@ -228,7 +232,7 @@ local function CleanDesc(text)
 	return text ~= "" and text or nil
 end
 
-function ns.CleanCameraScript(script, id, keepSet)
+function ns.CleanCameraScript(script, id, keepSet, paths)
 	if type(script) ~= "table" then return nil end
 	local budget = { left = MAX_STEPS }
 	local rules = {}
@@ -242,8 +246,8 @@ function ns.CleanCameraScript(script, id, keepSet)
 	return {
 		id = id or script.id,
 		name = CleanName(script.name) or L["My camera"],
-		steps = CleanSteps(script.steps, 1, budget, keepSet),
-		ending = CleanSteps(script.ending, 1, budget, keepSet),
+		steps = CleanSteps(script.steps, 1, budget, keepSet, paths, ""),
+		ending = CleanSteps(script.ending, 1, budget, keepSet, paths, "e.1"), -- (its page's When it ends row)
 		rules = rules,
 		-- (Yours: the icon and words the General page shows for it.)
 		icon = CleanIcon(script.icon),
@@ -382,10 +386,11 @@ end
 -- yours (Follow, after <cam>GlideDelay; <cam>SwingBehind), swaying and
 -- zooming meanwhile. Stopping: the zoom goes back. (Not the same yet:
 -- auto-run steering lower and closer, and the walk camera handing over to
--- standing still.)
+-- standing still.) The line-up is part of the sway (Camera.lua lines up only
+-- as its orbit starts): with the sway off, it's off too.
 function MovingCamera(cam)
 	return {
-		steps = { S("turnTo", { to = "behind", secs = 5 }),
+		steps = { On(Set(S("turnTo", { to = "behind", secs = 5 }), cam .. "Orbit"), Switch(cam .. "Orbit")),
 			On(Set(S("follow", { after = Db(cam .. "GlideDelay", 1.5) }), cam .. "SwingBehind", cam .. "GlideDelay"),
 				Switch(cam .. "SwingBehind")),
 			S("together", { steps = { SwayLoop(cam .. "Orbit", 0), ZoomGroup(cam .. "Zoom") } }) },
@@ -1727,7 +1732,11 @@ function DoStep(step)
 	local action = not step.off and STEP[step.k]
 	if action then
 		run.step = step
+		-- (The steps under way, for its page to light up: Together runs several.)
+		local active = run.active
+		active[step] = (active[step] or 0) + 1
 		action(step)
+		active[step] = active[step] > 1 and active[step] - 1 or nil
 	end
 end
 
@@ -1737,9 +1746,10 @@ local function Start(script, trigger, camera)
 	if run then StopAll() end
 	-- (A copy: editing it on its page meanwhile can't trip it up. A built-in
 	-- one's switched-off steps kept, to be passed by.)
-	script = ns.CleanCameraScript(script, script.id, script.builtin)
+	local paths = {}
+	script = ns.CleanCameraScript(script, script.id, script.builtin, paths)
 	run = {
-		script = script, trigger = trigger, camera = camera, t = 0, phase = "steps",
+		script = script, trigger = trigger, camera = camera, t = 0, phase = "steps", paths = paths, active = {},
 		startZoom = Zoom(), startedAt = GetTime(), inputSeen = ns.GetLastCameraInput and ns.GetLastCameraInput() or 0,
 		triggerOn = trigger ~= nil, onceLeft = math.random() < 0.5,
 	}
@@ -2070,6 +2080,21 @@ function ns.StopCameraScript()
 	return false
 end
 
+-- The steps under way now (not the groups they're in), by their place in the
+-- script as its page lists them ("2.1"; When it ends' "e.1.1"), and the
+-- script's id: for its page to light them up.
+function ns.CameraScriptActivePaths()
+	if not run then return nil end
+	local lit = run.lit or {}
+	run.lit = lit
+	wipe(lit)
+	for step in pairs(run.active) do
+		local at = not step.steps and run.paths[step]
+		if at then lit[at] = true end
+	end
+	return lit, run.script.id
+end
+
 -- The one running: its script, phase ("steps" or "ending"), the step under
 -- way, seconds in, paused (seconds left), and the trigger.
 function ns.CameraScriptState()
@@ -2125,8 +2150,18 @@ function ns.CameraScriptCommand(arg)
 		end
 		if run then
 			local step = run.step
-			ns.Print(("running %s for %s: %s, step %s, %.1f s in%s; counted turn %.1f, tilt %.1f; zoom %.1f (started %.1f)%s"):format(
-				run.script.name, tostring(run.trigger or "a play"), run.phase, step and step.k or "-", run.t,
+			-- (Where the step is in the script: 3, or 2.1 inside a group or repeat.)
+			local function Find(steps, path)
+				for i, each in ipairs(steps or {}) do
+					local at = path and (path .. "." .. i) or tostring(i)
+					if each == step then return at end
+					local inner = Find(each.steps, at)
+					if inner then return inner end
+				end
+			end
+			local where = step and ((Find(run.script.steps) or "?") .. " " .. tostring(step.k)) or "-"
+			ns.Print(("running %s for %s: %s, step %s of %d, %.1f s in%s; counted turn %.1f, tilt %.1f; zoom %.1f (started %.1f)%s"):format(
+				run.script.name, tostring(run.trigger or "a play"), run.phase, where, #run.script.steps, run.t,
 				run.pausedUntil and (", paused %.1f s (%s)"):format(run.pausedUntil - GetTime(), run.pausedBy) or "",
 				movers.yaw.amount, movers.pitch.amount, Zoom(), run.startZoom,
 				run.trigger and (run.triggerOn and ", trigger on" or ", trigger over") or ""))

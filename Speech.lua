@@ -22,7 +22,7 @@ local SAME_LINE = 1 -- seconds: the same line again (another chat window's copy)
 local BOX_W, BOX_H = 360, 48 -- the Move box
 local BESIDE_CHAT_X, BESIDE_CHAT_Y = 12, -30 -- the box's corner from the chat window's top corner
 
--- spot: the Move box's place (db.speechBehindLeft/Bottom; nil: beside the
+-- spot: the Move box's place (db.speechBehindX/Y, shares of the screen; nil: beside the
 -- chat window); the lines line up with its left edge, middle or right edge
 -- (side) as it's on the left, middle or right of the screen.
 local holder, spot
@@ -301,9 +301,21 @@ end
 -- (on its right; on its left if chat is on the right of the screen), else
 -- low in the middle of the screen.
 local function PlaceSpot()
-	local width = holder:GetWidth()
-	local left, bottom = tonumber(ns.db.speechBehindLeft), tonumber(ns.db.speechBehindBottom)
-	if not (left and bottom) then
+	local db = ns.db
+	local width, height = holder:GetWidth(), holder:GetHeight()
+	-- (Spots saved before as the box's corner in UI units: turned into shares
+	-- of this screen once.)
+	local oldLeft, oldBottom = tonumber(db.speechBehindLeft), tonumber(db.speechBehindBottom)
+	if oldLeft and oldBottom and width > 0 and height > 0 then
+		db.speechBehindX = (oldLeft + BOX_W / 2) / width
+		db.speechBehindY = oldBottom / height
+	end
+	db.speechBehindLeft, db.speechBehindBottom = nil, nil
+	local left, bottom
+	local x, y = tonumber(db.speechBehindX), tonumber(db.speechBehindY)
+	if x and y then
+		left, bottom = x * width - BOX_W / 2, y * height
+	else
 		local chatLeft, chatRight, chatTop
 		if _G.ChatFrame1 then
 			chatLeft, chatRight, chatTop = Edges(_G.ChatFrame1)
@@ -372,10 +384,11 @@ function ns.MoveSpeechBehind()
 		mover:SetScript("OnDragStop", function(self)
 			self:StopMovingOrSizing()
 			local left, bottom = self:GetLeft(), self:GetBottom()
-			if type(left) == "number" and type(bottom) == "number" then
+			local width, height = holder:GetWidth(), holder:GetHeight()
+			if type(left) == "number" and type(bottom) == "number" and width > 0 and height > 0 then
 				local scale = self:GetEffectiveScale() / holder:GetEffectiveScale()
-				ns.db.speechBehindLeft = math.floor(left * scale + 0.5)
-				ns.db.speechBehindBottom = math.floor(bottom * scale + 0.5)
+				ns.db.speechBehindX = (left * scale + BOX_W / 2) / width
+				ns.db.speechBehindY = bottom * scale / height
 			end
 			PlaceSpot()
 			Snap()
@@ -385,7 +398,7 @@ function ns.MoveSpeechBehind()
 			if self.draggedAt and GetTime() - self.draggedAt < 0.2 then
 				return
 			elseif button == "RightButton" then
-				ns.db.speechBehindLeft, ns.db.speechBehindBottom = nil, nil -- (beside the chat window)
+				ns.db.speechBehindX, ns.db.speechBehindY = nil, nil -- (beside the chat window)
 				PlaceSpot()
 				Snap()
 			else

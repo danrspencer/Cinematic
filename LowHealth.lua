@@ -2749,7 +2749,7 @@ function ns.CreateVitalsVisionPanel(kit)
 	end
 
 	local function Edges(d) return d.lowHealthEdges end
-	-- Where and when the edges close in: a Show in row as Combat Vision's.
+	-- Where and when the edges close in: a Show in row as the Cards page's rows.
 	local header = stack:Header(content, L["Show in"])
 	local lastRow = ns.ShowTable(content, header, {
 		opts = { anyFight = true }, underHeader = true,
