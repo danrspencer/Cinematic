@@ -24,7 +24,7 @@ DEFAULTS.teleportVisionEdges = true    -- black edges closing in with the portal
 DEFAULTS.teleportVisionEdgeReach = 0.35 -- how far in (share of the screen) they come as the cast fills
 DEFAULTS.teleportVisionEdgeAlpha = 1    -- how dark they get
 DEFAULTS.teleportVisionEdgeClose = 0    -- seconds before the cast ends that they close over the whole screen (0: never)
-DEFAULTS.teleportVisionHideCast = true  -- your cast bar kept invisible while it shows (the portal is the cast's progress)
+DEFAULTS.teleportVisionHideCast = true  -- your cast bar faded out (over CAST_FADE seconds) while it shows: the portal is the cast's progress
 
 local ART = "Interface\\AddOns\\" .. ADDON_NAME .. "\\Textures\\LowHealth\\"
 local RIM = 0.43           -- where the ring texture's rim is (a share of its half-width)
@@ -307,10 +307,11 @@ local function HideWanted()
 	return db and db.teleportVisionHideCast and ns.Setting("teleportVision") and cast and cast.scene
 		and not cast.done and true or false
 end
+local CAST_FADE = 3 -- seconds the cast bar takes to fade out (so you see the cast start)
 local function UpdateCastBar(bar)
 	if HideWanted() then
 		bar.cinematicTeleHidden = true
-		bar:SetAlpha(0)
+		bar:SetAlpha(math.max(0, 1 - (GetTime() - ns.departCast.startAt) / CAST_FADE))
 	elseif bar.cinematicTeleHidden then
 		bar.cinematicTeleHidden = nil
 		if bar:IsShown() then bar:SetAlpha(1) end
@@ -318,6 +319,15 @@ local function UpdateCastBar(bar)
 	end
 end
 local hookedBars = {}
+-- (Faded a little more each frame while it's wanted: the bar's own events
+-- alone come too seldom for a smooth fade.)
+local barFader = CreateFrame("Frame")
+barFader:Hide()
+barFader:SetScript("OnUpdate", function(self)
+	local wanted = HideWanted()
+	for bar in pairs(hookedBars) do UpdateCastBar(bar) end
+	if not wanted then self:Hide() end
+end)
 local barWatcher = CreateFrame("Frame")
 barWatcher:RegisterEvent("PLAYER_LOGIN")
 for _, event in ipairs({ "UNIT_SPELLCAST_START", "UNIT_SPELLCAST_STOP", "UNIT_SPELLCAST_SUCCEEDED",
@@ -335,6 +345,7 @@ barWatcher:SetScript("OnEvent", function()
 		-- (After Camera.lua has noted the cast: next frame.)
 		if bar then C_Timer.After(0, function() UpdateCastBar(bar) end) end
 	end
+	C_Timer.After(0, function() if HideWanted() then barFader:Show() end end)
 end)
 
 -- The page's test: a pretend cast of TEST_TIME seconds (again: stop).
@@ -520,8 +531,9 @@ function ns.CreateTeleportVisionPanel(kit)
 		kit.Tooltip(slider, info[8])
 		kit.GreyUnless(slider, Edges)
 	end
-	rows.Check("teleportVisionHideCast", L["Hide your cast bar"], L["Your cast bar stays out of sight while " ..
-		"it shows: the portal closing in is the cast's progress. Other casts show it as usual."], On)
+	rows.Check("teleportVisionHideCast", L["Fade out your cast bar"], L["Your cast bar fades out over the " ..
+		"first 3 seconds of the cast, so you see it start, then the portal closing in is its progress. Other " ..
+		"casts show it as usual."], On)
 	rows.Check("teleportVisionMotes", L["Motes spiraling in"], L["Motes of its color winding in from the rim."],
 		On)
 

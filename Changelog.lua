@@ -11,6 +11,10 @@
 local _, ns = ...
 
 ns.CHANGELOG_FEATURES = {
+	{ date = "2026-11-02", page = "Teleport Vision", title = "Tele Vision",
+		text = "As you cast your Hearthstone, Astral Recall or a teleport, a portal opens round you in your class " ..
+		"and spec's color, closing in as the cast fills, then the screen goes black as you're whisked away. It " ..
+		"plays alongside the tele camera." },
 	{ date = "2026-11-02", page = "Card Vision", title = "Story cards",
 		text = "The Cards page has 13 new moments: level up, places discovered, flight arrivals, inns, " ..
 		"achievements, reputation, new mounts and pets, profession ranks, story quests, dungeons cleared, rares, " ..
