@@ -12,7 +12,7 @@ before = json.load(open(before_path))["themes"] if os.path.exists(before_path) e
 COLORS = {"WARRIOR": "#C69B6D", "PALADIN": "#F48CBA", "HUNTER": "#AAD372", "ROGUE": "#FFF468",
           "PRIEST": "#FFFFFF", "SHAMAN": "#0070DD", "MAGE": "#3FC7EB", "WARLOCK": "#8788EE",
           "DRUID": "#FF7C0A", "DEATHKNIGHT": "#C41E3A", "MONK": "#00FF98", "DEMONHUNTER": "#A330C9",
-          "EVOKER": "#33937F"}
+          "EVOKER": "#33937F", "MORE": "#9F8CFF"}
 e = html.escape
 edges = sorted({t["edge"] for t in data["themes"].values()})
 
@@ -26,7 +26,7 @@ for c in data["classes"]:
         shown.add(s["key"])
         fx = ", ".join(t["fx"] + ([t["drip"]] if t["drip"] else [])) or "none"
         tag = '<span class="tag">retail</span>' if s["retail"] or c["retail"] else ""
-        old = before[s["key"]]
+        old = before.get(s["key"], t)
         changed = old["img"] != t["img"]
         swap = (f'<button type="button" class="swap" aria-pressed="false" data-old="{old["img"]}">Show before ({e(old["edge"])})</button>'
                 if changed else "")
@@ -96,7 +96,7 @@ dialog p {{ color:#fff; text-align:center; margin:8px 0 0; font:600 18px var(--d
   <h1>Vitals Vision themes</h1>
   <p>Every low-health theme, drawn from the addon's own textures and colors at the page's default settings, at full low health, just after a hit. These are stills: in the game the glow throbs with the heartbeat, and a hit flashes the edges. Every theme has a soft haze of gas drifting over its edges, in its own color. The only other sprites are lightning (Storm, Windfury), twinkling stars and rising motes.</p>
   <p>Each theme is shown under every spec that uses it. Click a still to see it larger.</p>
-  <p><b>New:</b> Decay is now Unholy Death Knight's (in place of Plague), Affliction Warlock has Drained souls: fel green souls rising out of a near-black violet shadow; and Frost Death Knight has Hoarfrost: frost creeping over the glass on a new Rime edge, its cold front glowing.</p>
+  <p><b>New:</b> every theme now has spiral arms turning over the screen, in its glow or flash color, closing in from past the corners (Swirl opacity 25% by default). Three themes no class has are built around swirls, under More themes at the bottom: Vortex, Abyss and Dungeon portal. In the game the swirl turns, quicker the weaker you are.</p>
   <div class="filter" role="group" aria-label="Filter by edge material"><span>Edge material</span>{chips}</div>
 </header>
 {"".join(sections)}

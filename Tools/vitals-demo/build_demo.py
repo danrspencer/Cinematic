@@ -3,7 +3,7 @@ addon's own art and LowHealthThemes.lua, and Blizzard art taken from
 /cine debug texreel shots screenshots (each texture on black, then on grey:
 its colors and its alpha come from the pair). The page runs LowHealth.lua's
 drawing in JavaScript: the shadow, our art, Blizzard art's layer and wave, the
-heartbeat, flashes, the color grade and sparks.
+heartbeat, flashes, the color grade, sparks and swirls.
 Usage: python build_demo.py <addon folder> <screenshots folder> <out .html>
 (the screenshots: just the 186 of one full texreel shots run, in order)."""
 import base64, io, json, os, re, sys
@@ -53,7 +53,7 @@ themes = []
 for i in range(1, len(ns.LOW_HEALTH_THEMES) + 1):
     t = ns.LOW_HEALTH_THEMES[i]
     d = {k: py(t[k]) for k in ("key", "name", "edge", "body", "glow", "glowAlpha", "shadow", "flash",
-                               "pulse", "bpm", "sway", "sparks", "look")}
+                               "pulse", "bpm", "sway", "sparks", "swirl", "look")}
     if t.theirs:
         d["theirs"] = {"file": t.theirs[1], "own": None if t.theirs.own is None else bool(t.theirs.own)}
     themes.append(d)
@@ -67,6 +67,8 @@ menu = []
 for i in range(1, len(ns.LOW_HEALTH_MENU) + 1):
     e = ns.LOW_HEALTH_MENU[i]
     menu.append({"name": e[2], "specs": [{"spec": e[3][j][1], "key": e[3][j][2]} for j in range(1, len(e[3]) + 1)]})
+# (Those no class has: More themes, as the page's menu has them.)
+menu.append({"name": "More themes", "specs": [{"spec": None, "key": k} for k in py(ns.LOW_HEALTH_MORE)]})
 
 lh = open(os.path.join(ADDON, "LowHealth.lua"), encoding="utf-8").read()
 # The settings' defaults (LowHealth.lua's DEFAULTS.lowHealth... lines): numbers, ticks and words.
@@ -114,6 +116,10 @@ for name in sorted({t["edge"] for t in themes if t.get("edge")} | {t["edge"] + "
     img["o" + name + "c"], img["o" + name + "a"] = pair(a[..., :3], a[..., 3])
 for name in ("Mote", "Star", "Bolt", "Gas"):
     img["s" + name] = b64(Image.open(os.path.join(ART, name + ".tga")).convert("RGBA"), "PNG")
+# The swirls' textures (a color and alpha pair each, like the edges).
+for name in ("Swirl", "Vortex"):
+    a = np.asarray(Image.open(os.path.join(ART, name + ".tga")).convert("RGBA"), dtype=np.float32) / 255
+    img["w" + name + "c"], img["w" + name + "a"] = pair(a[..., :3], a[..., 3])
 
 # The world behind: the gallery's scene.
 W, H = 960, 540

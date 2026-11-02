@@ -35,6 +35,7 @@ DEFAULTS.lowHealthGameReach = 0.7  -- how far in Blizzard art comes at full (0-1
 DEFAULTS.lowHealthGameReachSides = 0.7
 -- Our effects (with the shadow, heartbeat, grade and flash below).
 DEFAULTS.lowHealthSparks = true    -- the theme's sparks and haze
+DEFAULTS.lowHealthSwirlAlpha = 0.25 -- the theme's swirl (its opacity, times each layer's; 0: none)
 DEFAULTS.lowHealthRipple = true    -- a wave of the game's art creeping in on each beat
 DEFAULTS.lowHealthStrength = 0.5   -- the look's strength: half as set, scaled down to none or up to double
 DEFAULTS.lowHealthReachAll = 0.5   -- every reach (shadow, both arts): half as set, down to none or up to double
@@ -95,6 +96,13 @@ local MAX_SPARKS = 24
 local FADE_IN, FADE_END = 0.3, 1.2 -- seconds those that fade fade in and out over
 local GAS_REACH = 0.2              -- gas starts this share of the shadow's reach in (by the edge)...
 local GAS_DRIFT = 0.03             -- ...and billows this share of the way to the middle
+-- Swirls (a theme's swirl, LowHealthThemes.lua): up to two layers, each a
+-- texture over the whole screen, turning, clear in its middle; the bigger it
+-- is, the further out its clear middle reaches, so it closes in as it shrinks.
+local MAX_SWIRLS = 2
+local SWIRL_FRONT = 0.36   -- where a swirl texture is half there (a share of its half-width)
+local SWIRL_OUT = 1.15     -- its front as it starts (shares of the way from the middle to a corner)...
+local SWIRL_DEEPEST = 0.37 -- ...and at full with reach 100% (no further: it must still cover the corners)
 
 -- The colour grade: a layer over the whole screen that multiplies what's
 -- under it (the world, not the UI above), so it can't grey colours out, only
@@ -148,6 +156,7 @@ end
 local SCALED = {
 	lowHealthDark = { 1, 1 }, lowHealthPulseAmount = { 0.6, 1 }, lowHealthBloodAlpha = { 1, 1 },
 	lowHealthGameAlpha = { 1, 1 }, lowHealthReach = { 0.5, 0.5 }, lowHealthReachSides = { 0.5, 0.5 },
+	lowHealthSwirlAlpha = { 1, 1 },
 }
 -- (Reach, the master one (lowHealthReachAll), scales every reach the same way.)
 local REACHES = { lowHealthReach = { 0.5, 0.5 }, lowHealthBloodReach = { 1, 1 }, lowHealthGameReach = { 1, 1 },
@@ -217,12 +226,13 @@ end
 -- ("my<n>" -> a theme of theirs: name, from (the theme it started as, for
 -- its look and Blizzard art) and its fields). Built over LowHealthThemes.lua's
 -- into ns.LOW_HEALTH_THEME(S) when they change, or a profile brings others.
-local THEME_FIELDS = { "edge", "body", "glow", "glowAlpha", "shadow", "flash", "pulse", "bpm", "sparks" }
+local THEME_FIELDS = { "edge", "body", "glow", "glowAlpha", "shadow", "flash", "pulse", "bpm", "sparks", "swirl" }
 -- (The edges offered: the soft ones, no drawn shapes.)
 local EDGES = { "Smoke", "Glow", "Soak", "Rime", "Fur" }
 local SPARK_TEXTURES = { Mote = true, Star = true, Bolt = true, Gas = true }
 local SPARK_KINDS = { rise = true, twinkle = true, flicker = true, drift = true }
 local SPARK_AT = { top = true, bottom = true, sides = true }
+local SWIRL_BLEND = { Swirl = "ADD", Vortex = "BLEND" } -- (the swirls' textures: the arms as light, the clouds as paint)
 local ORIGINAL = {} -- (LowHealthThemes.lua's, by key)
 for _, theme in ipairs(ns.LOW_HEALTH_THEMES) do ORIGINAL[theme.key] = theme end
 ns.LOW_HEALTH_MY_THEMES = {} -- (theirs, by name)
@@ -293,6 +303,15 @@ local function Cleaned(fields)
 		end
 	end
 	clean.sparks = sparks
+	local swirl = {}
+	for _, info in ipairs(type(fields.swirl) == "table" and fields.swirl or {}) do
+		if type(info) == "table" and SWIRL_BLEND[info.tex] and #swirl < MAX_SWIRLS then
+			swirl[#swirl + 1] = { tex = info.tex, color = Color(info.color) or { 1, 1, 1 },
+				alpha = Number(info.alpha, 0, 1) or 0.6, spin = Number(info.spin, -30, 30) or 6,
+				reach = Number(info.reach, 0, 1) or 0.5 }
+		end
+	end
+	clean.swirl = swirl
 	return clean
 end
 
@@ -645,6 +664,14 @@ local function NewDrawer(parent)
 	d.grade:SetTexture("Interface\\Buttons\\WHITE8X8")
 	d.grade:SetBlendMode("MOD")
 	d.grade:Hide()
+	-- (The swirl over the shadow and grade, under the art.)
+	d.swirls = {}
+	for i = 1, MAX_SWIRLS do
+		local tex = parent:CreateTexture(nil, "BACKGROUND", nil, -6 + i)
+		tex:SetPoint("CENTER")
+		tex:Hide()
+		d.swirls[i] = { tex = tex, angle = math.random() * 2 * math.pi }
+	end
 	for i = 1, MAX_SPARKS do
 		local tex = parent:CreateTexture(nil, "BORDER", nil, 2)
 		tex:Hide()
@@ -784,6 +811,16 @@ local function UseTheme(d, wanted, look)
 		-- (Light on black, as the game draws it: as paint, its black middle
 		-- covered the screen.)
 		body:SetBlendMode(layers and layers.paint and "BLEND" or "ADD")
+	end
+	for i, swirl in ipairs(d.swirls) do
+		local info = wanted.swirl and wanted.swirl[i]
+		swirl.info = info
+		if info then
+			swirl.tex:SetTexture(ART .. info.tex)
+			swirl.tex:SetBlendMode(SWIRL_BLEND[info.tex])
+		else
+			swirl.tex:Hide()
+		end
 	end
 	-- Blizzard art's layer (not while the dev page's tester shows its own).
 	d.pick = not tested and TheirsPick(wanted, look) or nil
@@ -1077,6 +1114,30 @@ local function Apply(d, look, k, fade, heart, secret)
 		glow:Hide()
 		ripple:Hide()
 	end
+	-- The swirl: each layer turning (quicker as you weaken), its clear middle
+	-- closing in from past the corners.
+	local now = GetTime()
+	local spun = now - (d.swirlAt or now)
+	d.swirlAt = now
+	local swirlAlpha = look.lowHealthSwirlAlpha or 0
+	local corner = 0.5 * math.sqrt(width * width + height * height)
+	for _, swirl in ipairs(d.swirls) do
+		local info = swirl.info
+		if info and swirlAlpha > 0 and c > 0 then
+			swirl.angle = (swirl.angle + spun * info.spin / 60 * 2 * math.pi * (0.5 + c)) % (2 * math.pi)
+			local reach = Scaled(info.reach, look.lowHealthReachAll or 0.5, REACHES.lowHealthBloodReach)
+			local front = SWIRL_OUT - (SWIRL_OUT - SWIRL_DEEPEST) * reach * c
+			local half = corner * math.max(front / SWIRL_FRONT, 1.02)
+			swirl.tex:SetSize(half * 2, half * 2)
+			swirl.tex:SetRotation(swirl.angle)
+			local r, g, b = Lit(info.color, bright)
+			local a = swirlAlpha * info.alpha * math.min(1, c * 2) * fade * (0.9 + 0.2 * heart + 0.3 * flash)
+			swirl.tex:SetVertexColor(r, g, b, math.min(1, a))
+			swirl.tex:Show()
+		else
+			swirl.tex:Hide()
+		end
+	end
 	d.reach, d.reachSides = size, sides
 	return size
 end
@@ -1355,6 +1416,9 @@ do
 							table.insert(queue, math.random(#queue + 1), info)
 						end
 					end
+				end
+				for _, key in ipairs(ns.LOW_HEALTH_MORE) do
+					table.insert(queue, math.random(#queue + 1), ns.LOW_HEALTH_THEME[key])
 				end
 			end
 			if not classes and queue[1] == demoTheme and #queue > 1 then -- (not the same twice in a row)
@@ -2155,6 +2219,11 @@ function ns.CreateVitalsStylePanel(kit)
 						function() return Picked(key) end, function() PickTheme(key) end)
 				end
 			end
+			-- Those no class has (swirls, portals...).
+			local more = root:CreateButton(L["More themes"])
+			for _, key in ipairs(ns.LOW_HEALTH_MORE) do
+				more:CreateRadio(ThemeName(key), function() return Picked(key) end, function() PickTheme(key) end)
+			end
 			-- Theirs, then a new one from the theme shown.
 			root:CreateDivider()
 			if #ns.LOW_HEALTH_MY_THEMES > 0 then
@@ -2577,6 +2646,83 @@ function ns.CreateVitalsStylePanel(kit)
 
 	tabbed.Finish(ours)
 
+	-- The swirl: up to two layers, each a kind (None: not there), its color,
+	-- how strong, how quickly it turns and how far in it comes.
+	local swirlTab = tabbed.Begin()
+	stack:Header(content, L["Swirl"])
+	Opacity("lowHealthSwirlAlpha", L["The theme's swirl turning over the screen, closing in from past the " ..
+		"corners as they close in, and turning quicker the weaker you are."], On)
+	local SWIRL_KINDS = {
+		Swirl = { tex = "Swirl", alpha = 0.6, spin = 8, reach = 0.5 },
+		Vortex = { tex = "Vortex", alpha = 0.7, spin = 5, reach = 0.6 },
+	}
+	local function Swirls() return ThemeValue("swirl") or {} end
+	local function SetSwirl(i, change)
+		local list = Copy(Swirls())
+		change(list, list[i])
+		ns.SetVitalsThemeField("swirl", list)
+	end
+	local function SwirlField(i, get, set)
+		return {
+			get = function()
+				local info = Swirls()[i]
+				return info and get(info)
+			end,
+			set = function(value) SetSwirl(i, function(_, info) if info then set(info, value) end end) end,
+		}
+	end
+	local function SwirlUsed(i) return function(d) return Themed(d) and Swirls()[i] ~= nil end end
+	local swirlName = stack:Add(kit.Label(content, "GameFontHighlight", L["Theme's swirl"]), "label")
+	swirlName.searchLabel = L["Theme's swirl"]
+	for i = 1, MAX_SWIRLS do
+		local row = CreateFrame("Frame", nil, content)
+		row:SetSize(PREVIEW_W, 26)
+		stack:Add(row, "label")
+		local kind = Choose({
+			get = function()
+				local info = Swirls()[i]
+				return info and info.tex or "none"
+			end,
+			set = function(value)
+				SetSwirl(i, function(list, info)
+					if value == "none" then
+						if info then table.remove(list, i) end
+						return
+					end
+					local new = Copy(SWIRL_KINDS[value])
+					local theme = ns.VitalsEditedTheme()
+					new.color = info and info.color or Copy(theme.glow or theme.flash or { 1, 1, 1 })
+					list[info and i or #list + 1] = new
+				end)
+			end,
+		}, function()
+			return { { value = "none", text = L["None"] }, { value = "Swirl", text = L["Spiral arms"] },
+				{ value = "Vortex", text = L["Whirlpool clouds"] } }
+		end, 140, L["What it is: wispy spiral arms (added on as light) or clouds wound into a whirlpool. " ..
+			"None: not there."], function(d) return Themed(d) and i <= #Swirls() + 1 end)
+		kind:SetPoint("LEFT", row, "LEFT", 0, 0)
+		-- (The swatch from just past the dropdown, as the sparks' rows have it.)
+		local past = CreateFrame("Frame", nil, row)
+		past:SetSize(1, 1)
+		past:SetPoint("LEFT", kind, "RIGHT", 0, 0)
+		local swatch = rows.Swatch(past, nil, {
+			SwirlField(i, function(info) return info.color[1] end, function(info, v) info.color[1] = v end),
+			SwirlField(i, function(info) return info.color[2] end, function(info, v) info.color[2] = v end),
+			SwirlField(i, function(info) return info.color[3] end, function(info, v) info.color[3] = v end),
+		}, L["Its color."], SwirlUsed(i))
+		local boxes = rows.Boxes(swatch)
+		boxes:Box(L["Opacity"], SwirlField(i, function(info) return info.alpha end,
+			function(info, v) info.alpha = v end), 0, 100, 5, "%d", 100, L["How strong it is at full."],
+			SwirlUsed(i), "%")
+		boxes:Box(L["Speed"], SwirlField(i, function(info) return info.spin end,
+			function(info, v) info.spin = v end), -30, 30, 1, "%d", 1,
+			L["Turns a minute at full (half that as it starts). Below 0: the other way."], SwirlUsed(i))
+		boxes:Box(L["Reach"], SwirlField(i, function(info) return info.reach end,
+			function(info, v) info.reach = v end), 0, 100, 5, "%d", 100,
+			L["How far in its clear middle closes at full."], SwirlUsed(i), "%")
+	end
+	tabbed.Finish(swirlTab)
+
 	local theirs = tabbed.Begin()
 	stack:Header(content, L["Blizzard art assets"])
 	TickBeside(Opacity("lowHealthGameAlpha", L["The game's own screen effects (fire, frost, lightning, " ..
@@ -2619,11 +2765,12 @@ function ns.CreateVitalsStylePanel(kit)
 	-- The tabs, in their order (made in another: Blizzard's art uses ours' helpers).
 	-- ("Blizzard" as it is: its L key is the frost spell's name.)
 	do
-		local order = { general, theirs, ours }
+		local order = { general, theirs, ours, swirlTab }
 		local list = {
 			{ L["General"], L["The strength, reach and brightness of it all, the shadow, the heartbeat and big hits."] },
 			{ "Blizzard", L["The game's own screen effects, cut to an edge, over ours."] },
 			{ L["Cinematic"], L["The theme's own art and its sparks."] },
+			{ L["Swirl"], L["The theme's swirl: up to two layers turning over the screen."] },
 		}
 		local function Pick(i)
 			tabbed.picked = i
@@ -2652,6 +2799,7 @@ function ns.CreateVitalsStylePanel(kit)
 		local LOOK_KEYS = { "lowHealthReach", "lowHealthDark", "lowHealthRed", "lowHealthBloodAlpha", "lowHealthBloodReach", "lowHealthGameReach",
 			"lowHealthReachSides", "lowHealthBloodReachSides", "lowHealthGameReachSides",
 			"lowHealthGamePattern", "lowHealthGameMask", "lowHealthGameColors", "lowHealthGameAlpha", "lowHealthSparks",
+			"lowHealthSwirlAlpha",
 			"lowHealthRipple", "lowHealthPulse", "lowHealthPulseAmount", "lowHealthBpmSlow", "lowHealthBpmFast",
 			"lowHealthFlash" }
 		local function Picked() -- (one of LowHealthThemes.lua's: not one of the player's own)

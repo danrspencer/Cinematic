@@ -3353,10 +3353,11 @@ function ns.CameraMode()
 end
 
 function ns.HoldTime(key)
+	local db = ns.db or DEFAULTS -- (before settings load: an error alert at load time peeks chat)
 	if FLIGHT_USES_DEFAULT[key] and InCameraMode() then
-		return math.min(FLIGHT_HOLD[key] or DEFAULTS[key], ns.db[key])
+		return math.min(FLIGHT_HOLD[key] or DEFAULTS[key], db[key])
 	end
-	return ns.db[key]
+	return db[key]
 end
 ns.GetDB = function() return ns.db end
 ns.Snooze = function(seconds)

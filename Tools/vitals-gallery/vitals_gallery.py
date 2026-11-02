@@ -31,6 +31,7 @@ themes = py(ns.LOW_HEALTH_THEMES)
 
 # Defaults (LowHealth.lua)
 DARK, RED, BLOOD_ALPHA, REACH, BLOOD_REACH = 0.85, 0.6, 0.9, 0.3, 0.7
+SWIRL_ALPHA = 0.25  # (lowHealthSwirlAlpha)
 ART_SCALE = 1.2 + (1 - 1.2) * BLOOD_REACH
 
 _cache = {}
@@ -196,10 +197,29 @@ def drips(img, theme, rng):
         paste(img, s, x, y, d["color"], BLOOD_ALPHA * rng.uniform(0.7, 1), False)
 
 
+def swirls(img, theme, rng):
+    """The theme's swirl (LowHealth.lua's Apply at full): each layer turned to
+    a random angle, its clear middle as far in as its reach says."""
+    corner = 0.5 * (W * W + H * H) ** 0.5
+    for info in theme.get("swirl") or []:
+        front = 1.15 - (1.15 - 0.37) * info["reach"]
+        half = int(corner * max(front / 0.36, 1.02))
+        im = tex(info["tex"]).rotate(rng.uniform(0, 360), resample=Image.BICUBIC).resize((half * 2, half * 2), Image.LANCZOS)
+        im = im.crop((half - W // 2, half - H // 2, half - W // 2 + W, half - H // 2 + H))
+        rgb, a = arr(im)
+        a = a * info["alpha"] * SWIRL_ALPHA
+        if info["tex"] == "Swirl":  # (as light)
+            img += rgb * np.array(info["color"]) * a
+        else:
+            img[:] = img * (1 - a) + rgb * np.array(info["color"]) * a
+    return img
+
+
 def render(theme):
     rng = random.Random(theme["key"])
     img = BG.copy()
     img = vignette(img, [c * RED for c in theme["shadow"]])
+    img = swirls(img, theme, rng)
     edge = theme.get("edge")
     if edge and theme.get("body"):
         rgb, a = full_art(edge)
@@ -228,6 +248,9 @@ for i in range(1, len(ns.LOW_HEALTH_MENU) + 1):
         s = e[3][j]
         specs.append({"spec": s[1], "key": s[2], "retail": bool(s.retail)})
     data["classes"].append({"token": e[1], "name": e[2], "retail": bool(e.retail), "specs": specs})
+# (Those no class has: the page's More themes.)
+data["classes"].append({"token": "MORE", "name": "More themes", "retail": False,
+                        "specs": [{"spec": "", "key": k, "retail": False} for k in py(ns.LOW_HEALTH_MORE)]})
 
 for t in themes:
     print("rendering", t["key"], flush=True)

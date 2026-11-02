@@ -25,6 +25,13 @@
 --     color, size { min, max } (shares of the screen's height), life { min,
 --     max } (seconds), speed (rise: screen heights a second), rate (a minute,
 --     at full), hit { min, max } (on a big hit)
+--   swirl    up to two layers turning over the whole screen, clear in the
+--            middle, closing in from past the corners (LowHealth.lua), each:
+--     tex    "Swirl" (wispy spiral arms, as light) or "Vortex" (clouds wound
+--            into a whirlpool, as paint)
+--     color, alpha (0-1), spin (turns a minute at full; below 0 the other
+--     way), reach (0-1: how far in its clear middle closes at full)
+--   (A theme with no swirl of its own gets spiral arms: Arms, below.)
 
 local _, ns = ...
 
@@ -206,7 +213,31 @@ ns.LOW_HEALTH_THEMES = {
 		flash = { 0.9, 0.3, 0.2 }, pulse = 1.3, bpm = 0.75 },
 	{ key = "outlaw", name = "Powder and sea", edge = "Smoke", body = { 0.35, 0.4, 0.45 },
 		shadow = { 0.05, 0.08, 0.12 }, flash = { 1, 0.75, 0.4 } },
+	-- No class's (More themes, LOW_HEALTH_MORE below): swirls.
+	{ key = "vortex", name = "Vortex", edge = "Smoke", body = { 0.22, 0.3, 0.45 }, shadow = { 0.02, 0.04, 0.1 },
+		flash = { 0.6, 0.8, 1 }, pulse = 0.8, swirl = {
+			{ tex = "Vortex", color = { 0.5, 0.65, 0.95 }, alpha = 0.75, spin = 6, reach = 0.6 },
+			{ tex = "Swirl", color = { 0.55, 0.75, 1 }, alpha = 0.3, spin = 9, reach = 0.5 },
+		} },
+	{ key = "abyss", name = "Abyss", edge = "Glow", glow = { 0.7, 0.3, 1 }, glowAlpha = 0.5,
+		shadow = { 0.1, 0, 0.16 }, flash = { 0.9, 0.4, 1 }, bpm = 0.85, swirl = {
+			{ tex = "Swirl", color = { 0.75, 0.35, 1 }, alpha = 0.8, spin = 7, reach = 0.75 },
+			{ tex = "Vortex", color = { 0.35, 0.1, 0.5 }, alpha = 0.65, spin = 4, reach = 0.85 },
+		}, sparks = {
+			{ tex = "Star", kind = "twinkle", color = { 0.9, 0.6, 1 }, size = { 0.02, 0.04 }, life = { 1, 2 },
+				rate = 20, hit = { 2, 3 } },
+		} },
+	{ key = "portal", name = "Dungeon portal", edge = "Glow", glow = { 0.55, 0.3, 1 }, glowAlpha = 0.45,
+		shadow = { 0.06, 0.02, 0.14 }, flash = { 0.7, 0.5, 1 }, pulse = 0.7, swirl = {
+			{ tex = "Vortex", color = { 0.45, 0.25, 0.85 }, alpha = 0.8, spin = -10, reach = 0.45 },
+			{ tex = "Swirl", color = { 0.8, 0.6, 1 }, alpha = 0.45, spin = -14, reach = 0.4 },
+		}, sparks = {
+			{ tex = "Mote", kind = "rise", color = { 0.8, 0.6, 1 }, size = { 0.015, 0.03 }, life = { 2, 3.5 },
+				speed = 0.05, rate = 25, hit = { 2, 4 } },
+		} },
 }
+-- The page's More themes: those no class has.
+ns.LOW_HEALTH_MORE = { "vortex", "abyss", "portal" }
 
 -- Every theme gets a haze: soft gas drifting over its edges, like its glow but
 -- uneven and moving, so the edges feel alive. In the art's colour, drawn
@@ -230,6 +261,16 @@ local function Haze(theme)
 		size = { 0.35, 0.6 }, life = { 3, 5 }, rate = 45, hit = { 3, 4 } })
 end
 ns.LowHealthHaze = Haze -- (players' own themes and versions of ours get it too: LowHealth.lua)
+
+-- Every theme gets spiral arms turning over the screen unless it has a swirl
+-- of its own: in its glow's color (as light), else its flash's. A player's
+-- version of one keeps them as its own layer, so they can change or drop it.
+local function Arms(theme)
+	if theme.swirl then return end
+	local color = theme.glow or theme.flash
+	if not color then return end
+	theme.swirl = { { tex = "Swirl", color = { color[1], color[2], color[3] }, alpha = 1, spin = 6, reach = 0.5 } }
+end
 
 -- Each theme's own defaults for the Style page (the look field above), as set
 -- with the dev copy's DEV SET DEFAULT.
@@ -283,6 +324,7 @@ for _, theme in ipairs(ns.LOW_HEALTH_THEMES) do
 		end
 	end
 	Haze(theme)
+	Arms(theme)
 	ns.LOW_HEALTH_THEME[theme.key] = theme
 end
 
@@ -362,6 +404,7 @@ local THEIRS = {
 	demon = 1273707, souls = 3509149, devour = 5857660,
 	dream = 2735672, sands = 5636771,
 	bear = 4630641, outlaw = 2199926,
+	vortex = 6907568, abyss = 5857669, portal = 5857660,
 }
 for key, pick in pairs(THEIRS) do
 	ns.LOW_HEALTH_THEME[key].theirs = type(pick) == "table" and pick or { pick }

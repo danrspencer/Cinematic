@@ -11,6 +11,10 @@
 local _, ns = ...
 
 ns.CHANGELOG_FEATURES = {
+	{ date = "2026-11-02", page = "Vitals Style", title = "Vitals swirls",
+		text = "Vitals Vision's themes now have spiral arms turning over the screen as your health drops, " ..
+		"quicker the weaker you are. Set them on the Style page's new Swirl tab, or try the swirl themes under " ..
+		"More themes: Vortex, Abyss and Dungeon portal." },
 	{ date = "2026-11-02", page = "Damage Vision", title = "Damage Vision",
 		text = "Instead of damage meter numbers, see your race with #1 (or your lead over #2) as a bar, a race " ..
 		"track or a ladder, plus a recap of how you did after each boss and dungeon." },

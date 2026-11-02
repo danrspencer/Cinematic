@@ -27,9 +27,16 @@ longer shows them; make_wind_guide.py copies them for the Wind Guide, and the
 release leaves the file out (.pkgmeta). Bolt.tga (256 square), Star.tga
 (128) and Mote.tga (64): the few it still shows, each on its own; Gas.tga
 (256): a soft wisp, for gas.
-Our own, made from scratch here; usage: make_lowhealth.py (from the addon folder)"""
+Swirls (512 square, drawn over the whole screen and turned): clear in the
+middle, the swirl past it, so the more of the screen it covers the further
+in it has come.
+  Swirl   wispy spiral arms
+  Vortex  clouds wound into a whirlpool
+Our own, made from scratch here; usage: make_lowhealth.py [name...] (from the
+addon folder; names: only those, by their function's name below)"""
 import math
 import os
+import sys
 import numpy as np
 from PIL import Image, ImageDraw, ImageFilter
 
@@ -752,19 +759,58 @@ def gas():
     save("Gas", np.ones_like(x), alpha)
 
 
-soak()
-crack_plate()
-frost()
-rime()
-smoke()
-flame()
-glow()
-vines()
-runes()
-fur()
-scales()
-leaves()
-wind()
-sun_moon()
-sprites()
-gas()
+def turned(x, y, angle):
+    """Points turned by angle (radians; an array: each its own)."""
+    c, s = np.cos(angle), np.sin(angle)
+    return x * c - y * s, x * s + y * c
+
+
+def square_noise(x, y, cells, octaves, seed):
+    """fbm on a square texture (x, y within -1..1)."""
+    total, amp, norm = 0, 1.0, 0
+    for o in range(octaves):
+        c = cells * 2 ** o
+        total = total + value_noise(x, y, c, c, seed + o) * amp
+        norm += amp
+        amp *= 0.5
+    return total / norm
+
+
+def swirl():
+    """Swirl.tga: three wispy arms winding in toward a clear middle."""
+    w = 512
+    x, y = grid(w, w)
+    r = np.hypot(x, y)
+    angle = np.arctan2(y, x)
+    arms = 0.5 + 0.5 * np.cos(3 * angle + 7 * np.log(r + 0.05))
+    arms = smoothstep(0.5, 1.0, arms) ** 1.5
+    # (Noise wound the same way, so the wisps follow the arms.)
+    wx, wy = turned(x, y, 3.5 * (1 - np.clip(r, 0, 1.4)))
+    wisps = square_noise(wx / 1.45, wy / 1.45, 10, 4, 311)
+    wisps = smoothstep(0.3, 0.8, wisps)
+    body = np.clip(arms * (0.35 + 0.8 * wisps) + 0.12 * wisps, 0, 1)
+    alpha = body * smoothstep(0.12, 0.6, r)
+    save("Swirl", np.ones_like(x), alpha, 32)
+
+
+def vortex():
+    """Vortex.tga: clouds wound into a whirlpool, tighter toward the middle,
+    shaded light and dark (tinted in the game)."""
+    w = 512
+    x, y = grid(w, w)
+    r = np.hypot(x, y)
+    wx, wy = turned(x, y, 2.2 / (r + 0.35))
+    clouds = square_noise(wx / 1.45, wy / 1.45, 4, 5, 523)
+    clouds = smoothstep(0.2, 0.85, clouds)
+    sx, sy = turned(x, y, 4 / (r + 0.25))
+    streaks = square_noise(sx / 1.45, sy / 1.45, 10, 3, 547)
+    shade = 0.45 + 0.55 * np.clip(clouds * 0.8 + streaks * 0.3, 0, 1)
+    alpha = (0.35 + 0.65 * clouds) * smoothstep(0.1, 0.65, r)
+    save("Vortex", shade, alpha, 32)
+
+
+MAKERS = [soak, crack_plate, frost, rime, smoke, flame, glow, vines, runes, fur, scales, leaves, wind, sun_moon, sprites, gas, swirl, vortex]
+wanted = sys.argv[1:]
+for maker in MAKERS:
+    if not wanted or maker.__name__ in wanted:
+        maker()
