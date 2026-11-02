@@ -18,7 +18,7 @@ local PAGES = {
 	{ "Dialogue", "Quest Talk Style", { "questTalkFont", "questTalkOutline", "questTalkShadow" } },
 	{ "Quest item button", "Quest Item Style", { "questItemFont", "questItemOutline", "questItemShadow", "questItemFrame" } },
 	{ "Roll Vision", "Roll Style", { "rollBarTexture", "rollFont", "rollOutline", "rollShadow" } },
-	{ "Card Vision", "Card Style", { "cardFont", "cardOutline", "cardShadow" } },
+	{ "Card Vision", "Card Styles", { "cardFont", "cardOutline", "cardShadow" } },
 }
 local KIND_NAMES = { texture = "Texture", font = "Font", outline = "Outline", shadow = "Shadow", border = "Border" }
 

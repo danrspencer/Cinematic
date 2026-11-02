@@ -11,6 +11,10 @@
 local _, ns = ...
 
 ns.CHANGELOG_FEATURES = {
+	{ date = "2026-11-02", page = "Card Vision", title = "Story cards",
+		text = "The Cards page has 13 new moments: level up, places discovered, flight arrivals, inns, " ..
+		"achievements, reputation, new mounts and pets, profession ranks, story quests, dungeons cleared, rares, " ..
+		"battlegrounds and kill streaks. Every card now belongs to one of four looks, so they match out of the box." },
 	{ date = "2026-11-02", page = "Vitals Style", title = "Vitals swirls",
 		text = "Vitals Vision's themes now have spiral arms turning over the screen as your health drops, " ..
 		"quicker the weaker you are. Set them on the Style page's new Swirl tab, or try the swirl themes under " ..

@@ -8,11 +8,13 @@
 -- screen (a more important one cuts in, a less important one waits), drawn
 -- by CombatVision.lua (ns.PlayCard).
 --
--- The look: the Default style's settings (card<Field>), and each event's own
--- where it has one (card<Field>_<id>; "default": its parent's, else the
--- Default style's). As Heal Vision's roles have theirs (<key>_<ROLE>), but
--- setting by setting: an event can have its own color and still follow the
--- Default style's font. (The CardsPage.lua pages edit them.)
+-- The look: each event's own settings where it has them (card<Field>_<id>;
+-- "default": its parent's, else the style it starts from's), over the style
+-- it starts from: your changes to it (cardLook<Field>_<style>; "default":
+-- as it comes), over its ready-made look (STYLES), over the base look
+-- (card<Field>: not on the page, kept at its defaults). Setting by setting:
+-- an event can have its own color and still follow its style's font. (The
+-- CardsPage.lua pages edit them.)
 
 local _, ns = ...
 local L = ns.L
@@ -40,38 +42,74 @@ local WAIT_MAX = 6  -- seconds a card waits behind a more important one before i
 -- The events, in the page's order: name, its row's tick (on: a setting of
 -- its own, kept from before the page), priority (a higher one cuts in, the
 -- same replaces, a lower one waits), its icon, the one it follows for its
--- look (parent) and the one it needs on to show at all (needs).
+-- look (parent) and the one it needs on to show at all (needs). has = false:
+-- the client can't tell (no row). (CardMoments.lua hears the ones from
+-- Level up on.)
 local EVENTS = {
 	{ id = "combatIn", name = "Entering combat", on = "combatOnEnter", priority = 50,
 		icon = "Interface\\Icons\\Ability_DualWield", fight = true },
 	{ id = "combatOut", name = "Leaving combat", on = "combatOnLeave", priority = 50, icon = 132320, fight = true },
 	{ id = "boss", name = "Boss", on = "cardBossOn", priority = 80,
 		icon = "Interface\\TargetingFrame\\UI-TargetingFrame-Skull", fight = true },
+	{ id = "cleared", name = "Dungeon cleared", on = "cardClearedOn", priority = 75,
+		icon = "Interface\\Icons\\Achievement_Dungeon_ClassicDungeonMaster",
+		has = EJ_GetInstanceForMap ~= nil },
 	{ id = "zone", name = "Zone", on = "storyZoneCard", priority = 40, icon = MAP },
 	{ id = "subzone", name = "Subzone", on = "storyZoneSubzones", priority = 40, icon = MAP, parent = "zone",
 		needs = "zone" },
+	-- (A notch over Zone's: it cuts in on the card it'd come with.)
+	{ id = "discover", name = "Discovered", on = "cardDiscoverOn", priority = 45,
+		icon = "Interface\\Icons\\INV_Misc_Spyglass_03", parent = "zone" },
+	{ id = "arrival", name = "Flight arrival", on = "cardArrivalOn", priority = 30,
+		icon = "Interface\\Icons\\Ability_Mount_Gryphon_01", parent = "zone" },
+	{ id = "rested", name = "Rested", on = "cardRestedOn", priority = 25,
+		icon = "Interface\\Icons\\Spell_Nature_Sleep" },
 	{ id = "login", name = "Last time", on = "storyRecap", priority = 35, icon = BOOK },
 	{ id = "time", name = "Time of day", on = "timeOfDayChange", priority = 20,
 		icon = "Interface\\Icons\\INV_Misc_PocketWatch_01" },
+	{ id = "levelUp", name = "Level up", on = "cardLevelUpOn", priority = 70,
+		icon = "Interface\\Icons\\Spell_Holy_SurgeOfLight" },
+	{ id = "achievement", name = "Achievement", on = "cardAchievementOn", priority = 65,
+		icon = "Interface\\Icons\\Achievement_General", has = GetAchievementInfo ~= nil },
+	{ id = "reputation", name = "Reputation", on = "cardReputationOn", priority = 45,
+		icon = "Interface\\Icons\\INV_Misc_Note_02" },
+	{ id = "collect", name = "New mount or pet", on = "cardCollectOn", priority = 45,
+		icon = "Interface\\Icons\\Ability_Mount_RidingHorse",
+		has = C_MountJournal ~= nil or C_PetJournal ~= nil },
+	{ id = "profession", name = "Profession rank", on = "cardProfessionOn", priority = 45,
+		icon = "Interface\\Icons\\Trade_BlackSmithing" },
+	{ id = "quest", name = "Story quest", on = "cardQuestOn", priority = 55,
+		icon = "Interface\\Icons\\INV_Misc_Book_07" },
+	{ id = "rare", name = "Rare spotted", on = "cardRareOn", priority = 60,
+		icon = "Interface\\Icons\\Ability_Hunter_MarkedForDeath" },
 	{ id = "attack", name = "Under attack", on = "chatAttackAlert", priority = 60,
 		icon = "Interface\\Icons\\Ability_Warrior_BattleShout" },
 	-- (Combat's priority: a duel's cards and its fight's replace each other,
 	-- the newest showing.)
 	{ id = "duel", name = "Duel", on = "cardDuelOn", priority = 50,
 		icon = "Interface\\Icons\\Ability_Warrior_Challange" },
+	{ id = "battleground", name = "Battleground", on = "cardBattlegroundOn", priority = 60,
+		icon = "Interface\\Icons\\Ability_Warrior_OffensiveStance" },
+	{ id = "streak", name = "Kill streak", on = "cardStreakOn", priority = 55,
+		icon = "Interface\\Icons\\Ability_Warrior_Rampage", fight = true },
 	{ id = "death", name = "Death", on = "cardDeathOn", priority = 100,
 		icon = "Interface\\Icons\\Ability_Rogue_FeignDeath" },
 }
+for i = #EVENTS, 1, -1 do
+	if EVENTS[i].has == false then table.remove(EVENTS, i) end
+end
 ns.CARD_EVENTS = EVENTS
 local BY_ID = {}
 for _, event in ipairs(EVENTS) do BY_ID[event.id] = event end
 ns.CARD_BY_ID = BY_ID
 
 -- The look's settings: each field, the card drawing's settings it gives
--- (CombatVision.lua's: going in, coming out), and its Default style default.
+-- (CombatVision.lua's: going in, coming out), and the base look's value.
 local FIELDS = {
 	{ "Place", { "combatPlace" }, "third" },     -- "screen", "top" or "bottom" bar, "third"
 	{ "Align", { "combatAlign" }, "center" },    -- in a bar: "left", "center" or "right"
+	{ "OffsetX", { "combatOffsetX" }, 0 },       -- moved right (left below 0), a share of the screen's width
+	{ "OffsetY", { "combatOffsetY" }, 0 },       -- ...and up, a share of its height
 	{ "BarScale", { "combatBarScale" }, 0.5 },   -- in a bar: the words' height, a share of the bar's
 	{ "BarFallback", { "combatBarFallback" }, true }, -- in a bar with no letterbox up: the lower third
 	{ "Style", { "combatStyle" }, "chapter" },   -- "title", "subtitle", "chapter" or "banner"
@@ -91,6 +129,15 @@ local FIELDS = {
 	{ "PulseR", { "combatPulseInR", "combatPulseOutR" }, 0.89 },
 	{ "PulseG", { "combatPulseInG", "combatPulseOutG" }, 0.79 },
 	{ "PulseB", { "combatPulseInB", "combatPulseOutB" }, 0.34 },
+	-- The small lines over and under the words: their font ("same": the
+	-- words'), their size (times the one they'd have) and color ("auto": the
+	-- words' in a lighter shade under, a pale gray over; "custom": SmallR...).
+	{ "SmallFont", { "combatSmallFont" }, "same" },
+	{ "SmallSize", { "combatSmallSize" }, 1 },
+	{ "SmallColor", { "combatSmallColor" }, "auto" },
+	{ "SmallR", { "combatSmallR" }, 0.8 },
+	{ "SmallG", { "combatSmallG" }, 0.78 },
+	{ "SmallB", { "combatSmallB" }, 0.72 },
 	{ "IconShow", { "combatIconShowIn", "combatIconShowOut" }, false }, -- an icon before the words
 	{ "Icon", { "combatIconIn", "combatIconOut" }, "event" }, -- ...a file or ID ("event": the event's own)
 }
@@ -101,19 +148,44 @@ for _, field in ipairs(FIELDS) do
 end
 
 -- The styles an event can start from, ready made: its settings that differ
--- from the Default style's (the rest follow it). The first ones are the
--- looks the events had on Battle Vision's and Story Vision's Style tabs, each
--- event starting from its own (the Default style is the Zone name's look,
--- the Lower third); the rest the presets those tabs had.
+-- from the base look's (the rest follow it). The Lower third is the base
+-- look itself (the Zone name's); then the looks the events had on Battle
+-- Vision's and Story Vision's Style tabs, each event starting from its own;
+-- the rest the presets those tabs had.
 local STYLES = {
+	-- The four families every card starts in, one font (General's) and one
+	-- thin outline among them, their place and color telling what kind of
+	-- moment it is: Milestone (rare and big: the middle of the screen, gold),
+	-- Place (where you are: the lower third, pale gold), Ticker (small news:
+	-- the top bar's left end, pale gold, gold small lines) and Danger (the
+	-- top bar's middle, red). Respite is Danger's calm other side.
+	{ id = "milestone", name = "Milestone", look = { Place = "screen", Style = "title", Anim = "fade", Size = 44,
+		Outline = 1, Hold = 3.5, SmallSize = 1.4, R = 1, G = 0.82, B = 0.35, PulseR = 1, PulseG = 0.82,
+		PulseB = 0.35 } },
+	-- (A rare: seldom, so its own and the biggest of them, the letters
+	-- closing in, in the blue of a rare item's name (lighter, to read on
+	-- a bright sky), the edges flashing.)
+	{ id = "rare", name = "Rare", look = { Place = "screen", Style = "title", Anim = "track", Size = 60,
+		Outline = 1, Hold = 4.5, SmallSize = 1.3, Pulse = 0.35, IconShow = true, R = 0.35, G = 0.65, B = 1,
+		PulseR = 0, PulseG = 0.44, PulseB = 0.87 } },
+	-- (Its words drawn at the chapter line's 65%: 52 for them to read.)
+	{ id = "place", name = "Place", look = { Size = 52, Outline = 1, SmallSize = 1.3, R = 0.95, G = 0.88, B = 0.65,
+		PulseR = 0.95, PulseG = 0.88, PulseB = 0.65 } },
+	{ id = "ticker", name = "Ticker", look = { Place = "top", Align = "left", BarScale = 0.55, BarFallback = false,
+		Style = "title", Anim = "fade", Outline = 1, Hold = 2.5, SmallColor = "custom", SmallR = 1, SmallG = 0.82,
+		SmallB = 0.35, R = 0.95, G = 0.88, B = 0.65 } },
+	{ id = "danger", name = "Danger", look = { Place = "top", BarScale = 0.62, BarFallback = false, Style = "title",
+		Anim = "fade", Size = 34, Outline = 1, R = 0.89, G = 0.13, B = 0.22, Hold = 1.5, Pulse = 0.03 } },
+	{ id = "third", name = "Lower third", look = { Outline = 0 } },
 	{ id = "combat", name = "Combat", look = { Place = "top", BarScale = 0.62, BarFallback = false, Style = "title",
 		Anim = "fade", Size = 34, R = 0.89, G = 0.13, B = 0.22, Hold = 1, Pulse = 0.03 } },
 	{ id = "respite", name = "Respite", look = { Place = "top", BarScale = 0.62, BarFallback = false, Style = "title",
-		Anim = "fade", Size = 34, R = 0.49, G = 0.67, B = 0.73, Hold = 1, Pulse = 0.01, PulseR = 0.49, PulseG = 0.67,
-		PulseB = 0.73 } },
-	{ id = "boss", name = "Boss", look = { BarScale = 0.62, Size = 44, R = 0.85, G = 0.71, B = 0.35, Hold = 2.5,
-		PulseR = 0.85, PulseG = 0.71, PulseB = 0.35 } },
-	{ id = "journal", name = "Journal", look = { Anim = "type", Size = 30, Hold = 10, R = 0.85, G = 0.78, B = 0.6 } },
+		Anim = "fade", Size = 34, Outline = 1, R = 0.71, G = 0.73, B = 0.51, Hold = 1, Pulse = 0.01, PulseR = 0.71, PulseG = 0.73,
+		PulseB = 0.51 } }, -- (#B5BA81)
+	{ id = "boss", name = "Boss", look = { BarScale = 0.62, Size = 44, Outline = 0, R = 0.85, G = 0.71, B = 0.35,
+		Hold = 2.5, PulseR = 0.85, PulseG = 0.71, PulseB = 0.35 } },
+	{ id = "journal", name = "Journal", look = { Anim = "type", Size = 30, Outline = 0, Hold = 10, R = 0.85, G = 0.78,
+		B = 0.6 } },
 	{ id = "title", name = "Title", look = { Place = "screen", Style = "title", Anim = "fade", Size = 32, Hold = 4,
 		R = 1, G = 0.86, B = 0.6 } },
 	{ id = "alert", name = "Alert", look = { Place = "screen", Style = "title", Anim = "fade", Size = 32, Hold = 4,
@@ -123,8 +195,10 @@ local STYLES = {
 	{ id = "film", name = "Film", look = { Place = "screen", Style = "title", Anim = "fade", Font = "morpheus",
 		Size = 40 } },
 	{ id = "reel", name = "Reel", look = { Place = "bottom", Style = "title", Anim = "reveal" } },
-	{ id = "storybook", name = "Storybook", look = { Place = "screen", Font = "morpheus", Outline = 0, Shadow = "on",
-		Anim = "type", R = 0.96, G = 0.88, B = 0.7 } },
+	-- (A thin dark outline and bigger small lines: Morpheus is thin, and
+	-- hard to read on a bright sky without them.)
+	{ id = "storybook", name = "Storybook", look = { Place = "screen", Font = "morpheus", Outline = 1, Shadow = "on",
+		Anim = "type", Size = 40, SmallSize = 1.4, R = 0.96, G = 0.88, B = 0.7 } },
 	{ id = "minimal", name = "Minimal", look = { Place = "screen", Style = "subtitle", Font = "friz", Anim = "fade" } },
 	{ id = "arcade", name = "Arcade", look = { Place = "screen", Style = "title", Font = "skurri", Size = 46,
 		Outline = 2, Pulse = 0.9, IconShow = true, R = 0.94, G = 0.62, B = 0.15, PulseR = 0.94, PulseG = 0.62,
@@ -136,15 +210,33 @@ ns.CARD_STYLES = STYLES
 local STYLE_BY_ID = {}
 for _, style in ipairs(STYLES) do STYLE_BY_ID[style.id] = style end
 ns.CARD_STYLE_BY_ID = STYLE_BY_ID
--- The style each event starts from ("default": the Default style; "follow":
--- the one its parent starts from).
-local BASES = { combatIn = "combat", combatOut = "respite", boss = "boss", zone = "default", subzone = "follow",
-	login = "journal", time = "title", attack = "alert", duel = "default", death = "death" }
+-- The style each event starts from ("follow": the one its parent starts
+-- from).
+local BASES = { combatIn = "danger", combatOut = "respite", attack = "danger", death = "death",
+	levelUp = "milestone", achievement = "milestone", cleared = "milestone", discover = "milestone",
+	quest = "milestone", battleground = "place",
+	zone = "place", subzone = "follow", arrival = "follow", login = "place", boss = "place", duel = "place",
+	time = "milestone",
+	reputation = "ticker", collect = "ticker", profession = "ticker", rested = "ticker",
+	streak = "ticker", rare = "rare" }
+-- (What each started from before the families, for the update moving
+-- yours onto them: Core.lua's cardsV7.)
+ns.CARD_OLD_BASES = { combatIn = "combat", boss = "boss", zone = "third", login = "journal", time = "title",
+	attack = "alert", duel = "third", cleared = "boss", discover = "storybook", rested = "quiet", levelUp = "title",
+	achievement = "title", reputation = "quiet", collect = "quiet", profession = "quiet", quest = "journal",
+	rare = "alert", battleground = "title", streak = "combat" }
 for _, field in ipairs(FIELDS) do
 	DEFAULTS["card" .. field[1]] = field[3]
 	for _, event in ipairs(EVENTS) do DEFAULTS["card" .. field[1] .. "_" .. event.id] = "default" end
+	for _, style in ipairs(STYLES) do DEFAULTS["cardLook" .. field[1] .. "_" .. style.id] = "default" end
 end
 for _, event in ipairs(EVENTS) do DEFAULTS["cardBase_" .. event.id] = BASES[event.id] end
+DEFAULTS.cardAlign_rested = "center" -- (the Ticker's top bar, in its middle)
+DEFAULTS.cardAlign_streak = "center"
+
+-- All the cards bigger or smaller (their words' size, not a bar's): for a
+-- big or wide screen.
+DEFAULTS.cardScale = 1
 -- Each row's Always (its Show in row's: ns.CINE_SHOW_SETTING), on to start with.
 for _, event in ipairs(EVENTS) do
 	DEFAULTS["cardAlways_" .. event.id] = true
@@ -153,42 +245,81 @@ end
 -- The font, outline and shadow start on the Style hub's General page's.
 do
 	local shared = ns.SHARED_STYLE
-	for _, suffix in ipairs({ "", "_combatIn", "_combatOut", "_boss", "_zone", "_subzone", "_login", "_time",
-			"_attack", "_death" }) do
+	local suffixes = { "" }
+	for _, event in ipairs(EVENTS) do suffixes[#suffixes + 1] = "_" .. event.id end
+	for _, suffix in ipairs(suffixes) do
 		shared["cardFont" .. suffix] = { kind = "font", own = "game" }
 		shared["cardOutline" .. suffix] = { kind = "outline", own = 1 }
 		shared["cardShadow" .. suffix] = { kind = "shadow", own = "game" }
 	end
+	for _, style in ipairs(STYLES) do
+		shared["cardLookFont_" .. style.id] = { kind = "font", own = "game" }
+		shared["cardLookOutline_" .. style.id] = { kind = "outline", own = 1 }
+		shared["cardLookShadow_" .. style.id] = { kind = "shadow", own = "game" }
+	end
 end
 
--- A look setting's key for an event (nil: the Default style's).
+-- A look setting's key for an event (nil: the base look's).
 local function Key(field, id)
 	return id and "card" .. field .. "_" .. id or "card" .. field
 end
 ns.CardKey = Key
 
--- Whether an event has a setting of its own (else it follows).
-function ns.CardIsOwn(id, field, db)
-	local value = (db or ns.db or DEFAULTS)[Key(field, id)]
+-- A style's setting's key (your change to it).
+local function StyleKey(field, style)
+	return "cardLook" .. field .. "_" .. style
+end
+ns.CardStyleKey = StyleKey
+
+-- Whether a style has a setting changed from how it comes.
+function ns.CardStyleIsOwn(style, field, db)
+	local value = (db or ns.db or DEFAULTS)[StyleKey(field, style)]
 	return value ~= nil and value ~= "default"
 end
 
--- The style an event starts from ("default", or a STYLES id): its own,
--- else its parent's. source: the settings to read (else the saved ones).
+-- Whether an event has a setting of its own (else it follows).
+-- (One it comes with isn't yours: Rested's place in the middle of the bar.)
+function ns.CardIsOwn(id, field, db)
+	local key = Key(field, id)
+	local value = (db or ns.db or DEFAULTS)[key]
+	return value ~= nil and value ~= "default" and value ~= DEFAULTS[key]
+end
+
+-- The style an event starts from (a STYLES id): its own, else its
+-- parent's. ("default", the Default style's, was the Lower third's look.)
+-- source: the settings to read (else the saved ones).
 function ns.CardBase(id, source)
 	source = source or ns.GetDB() or DEFAULTS
 	local event = BY_ID[id]
 	while event do
 		local base = source["cardBase_" .. event.id]
-		if base ~= nil and base ~= "follow" then return STYLE_BY_ID[base] and base or "default" end
+		if base ~= nil and base ~= "follow" then return STYLE_BY_ID[base] and base or "third" end
 		event = BY_ID[event.parent]
 	end
-	return "default"
+	return "third"
 end
 
--- A look setting from source for an event (nil: the Default style's): its
--- own, else its parent's, else the style it starts from, else the Default
--- style's.
+-- The events that start from a style (a subzone following the zone's too).
+function ns.CardStyleUsers(style)
+	local list = {}
+	for _, event in ipairs(EVENTS) do
+		if ns.CardBase(event.id) == style then list[#list + 1] = event end
+	end
+	return list
+end
+
+-- A style's setting from source: your change, else as it comes, else the
+-- base look's.
+local function ResolveStyle(source, style, field)
+	local value = source[StyleKey(field, style)]
+	if value ~= nil and value ~= "default" then return value end
+	local look = STYLE_BY_ID[style] and STYLE_BY_ID[style].look
+	if look and look[field] ~= nil then return look[field] end
+	return source[Key(field)]
+end
+
+-- A look setting from source for an event (nil: the base look's): its own,
+-- else its parent's, else the style it starts from's.
 local function Resolve(source, id, field)
 	local event = BY_ID[id]
 	while event do
@@ -196,9 +327,8 @@ local function Resolve(source, id, field)
 		if value ~= nil and value ~= "default" then return value end
 		event = BY_ID[event.parent]
 	end
-	local style = id and STYLE_BY_ID[ns.CardBase(id, source)]
-	if style and style.look[field] ~= nil then return style.look[field] end
-	return source[Key(field)]
+	if not id then return source[Key(field)] end
+	return ResolveStyle(source, ns.CardBase(id, source), field)
 end
 
 -- A look setting's value for an event, as it shows (General's where it's on
@@ -213,6 +343,36 @@ function ns.CardRaw(id, field)
 	return Resolve(ns.GetDB() or DEFAULTS, id, field)
 end
 
+-- A style's setting as saved, for the Card Types tab's controls (shipped: as it
+-- comes, your changes left out).
+function ns.CardStyleRaw(style, field, shipped)
+	if shipped then
+		local look = STYLE_BY_ID[style] and STYLE_BY_ID[style].look
+		if look and look[field] ~= nil then return look[field] end
+		return DEFAULTS[Key(field)]
+	end
+	return ResolveStyle(ns.GetDB() or DEFAULTS, style, field)
+end
+
+-- A style's look as the card drawing reads it, for the Card Types tab's preview
+-- (each made once). id: the event whose card it plays (for its icon).
+local styleLooks = {}
+function ns.CardStyleLook(style, id)
+	local look = styleLooks[style .. ":" .. (id or "")]
+	if not look then
+		look = setmetatable({}, { __index = function(_, key)
+			local field = FIELD_OF[key]
+			if not field then return nil end
+			local value = ResolveStyle(ns.StyleLook("cards"), style, field)
+			if field == "Icon" and value == "event" then value = BY_ID[id] and BY_ID[id].icon or MAP end
+			if field == "Outline" then value = tonumber(value) or 0 end
+			return value
+		end })
+		styleLooks[style .. ":" .. (id or "")] = look
+	end
+	return look
+end
+
 -- An event's look as the card drawing reads it (its settings' names:
 -- FIELDS), made once for each.
 local looks = {}
@@ -225,11 +385,26 @@ function ns.CardLook(id)
 			local value = ns.CardValue(id, field)
 			if field == "Icon" and value == "event" then value = BY_ID[id] and BY_ID[id].icon or MAP end
 			if field == "Outline" then value = tonumber(value) or 0 end
+			if field == "Size" then value = (tonumber(value) or 36) * (tonumber(ns.db and ns.db.cardScale) or 1) end
 			return value
 		end })
 		looks[id or ""] = look
 	end
 	return look
+end
+
+-- An event's look with some of its settings swapped for one card ({ field =
+-- value }, by FIELDS' names): a moment that can't show where its event's
+-- others do (a battleground's result, with the game's scoreboard in the
+-- middle of the screen).
+function ns.CardLookWith(id, swap)
+	local own = {}
+	for _, field in ipairs(FIELDS) do
+		if swap[field[1]] ~= nil then
+			for _, key in ipairs(field[2]) do own[key] = swap[field[1]] end
+		end
+	end
+	return setmetatable(own, { __index = ns.CardLook(id) })
 end
 
 -- Whether an event's row is ticked (the page on, and what it needs).
@@ -287,7 +462,7 @@ local function Next()
 end
 function Show(card)
 	current = card
-	local look = ns.CardLook(not card.defaultLook and card.id or nil) -- (defaultLook: the Default style's Test)
+	local look = card.look or ns.CardLook(card.id) -- (look: the Card Types tab's Test, a style's)
 	ns.PlayCard(Screen(), look, UIParent:GetWidth(), UIParent:GetHeight(), 1, card, Next)
 	-- (Its own sound, or its event's rules on the Sounds tab: CombatSoundRules.lua.)
 	if card.sound then pcall(card.sound) elseif ns.PlayCardCueSound then pcall(ns.PlayCardCueSound, card.id) end
@@ -350,6 +525,7 @@ samples.boss = function()
 	card.sound = function() ns.PlayCombatCueSound("enter", ns.lastCinematic and true or false) end
 	return card
 end
+
 -- The Duel card at a moment: "ask" (you challenge), "asked" (you're
 -- challenged), "start", "won" or "lost". other: the other duelist's name
 -- (nil: not known); fled: the loser ran.
@@ -438,7 +614,8 @@ end
 -- Battle Vision's and Story Vision's settings, onto the Cards page's: their
 -- switches into the rows' ticks, their Show in rows to the rows', and each
 -- look setting you'd changed onto its event (the font, outline and shadow
--- Story Vision's moments shared, onto the Default style). t: the saved
+-- Story Vision's moments shared, onto the base look: ns.SpreadCardBase
+-- moves them onto the events after). t: the saved
 -- settings, or a saved profile (only what it has); main: the saved ones.
 local OLD_LOOKS = {
 	combatIn = { Place = { "combatPlace", "top" }, BarScale = { "combatBarScale", 0.62 },
@@ -487,7 +664,7 @@ local STORY_ROWS = { "storyRecap", "storyZoneCard", "timeOfDayMessage", "timeOfD
 
 function ns.MigrateCards(t, main)
 	-- Each look setting changed from its old default: onto the event (or the
-	-- Default style).
+	-- base look).
 	for id, olds in pairs(OLD_LOOKS) do
 		local suffix = id ~= "" and "_" .. id or ""
 		for name, old in pairs(olds) do
@@ -588,4 +765,50 @@ function ns.SplitCombatCard(t)
 		t.combatOnEnter, t.combatOnLeave = nil, nil
 	end
 	t.cardCombatOn = nil
+end
+
+-- The Default style (the base look, on the Style tab until 1.9.13) is gone
+-- from the page, and the Lower third is a style of its own: each card's
+-- setting that would look different now (one it took from the Default
+-- style, changed or not) becomes its own, so nothing does; the base look
+-- back at its defaults, and a starting style of "default" the Lower third.
+-- t: the saved settings, a saved profile or an imported one (only what it
+-- has; raw).
+local OLD_OWN = { cardOutline_zone = 0 } -- (own settings' old defaults: a profile without one had that)
+function ns.SpreadCardBase(t)
+	local function Get(key)
+		local value = rawget(t, key)
+		if value == nil then return DEFAULTS[key] end
+		return value
+	end
+	for _, event in ipairs(EVENTS) do
+		local baseKey = "cardBase_" .. event.id
+		local base = Get(baseKey)
+		-- (A subzone following the zone: it gets it from there.)
+		if not (event.parent and base == "follow") then
+			-- (Before: the Default style's ("default", "third" for a while) had no
+			-- look of its own: the base look's.)
+			local was = (base ~= "default" and base ~= "third" and STYLE_BY_ID[base]) and STYLE_BY_ID[base].look or {}
+			local now = STYLE_BY_ID[base == "default" and "third" or base]
+			now = now and now.look or {}
+			for _, field in ipairs(FIELDS) do
+				local name = field[1]
+				local own = rawget(t, Key(name, event.id))
+				if own == nil then own = OLD_OWN[Key(name, event.id)] or DEFAULTS[Key(name, event.id)] end
+				if own == nil or own == "default" then
+					local before = was[name]
+					if before == nil then before = Get(Key(name)) end
+					local after = now[name]
+					if after == nil then after = DEFAULTS[Key(name)] end
+					if before ~= after then t[Key(name, event.id)] = before end
+				end
+			end
+		end
+		if base == "default" then t[baseKey] = "third" end
+	end
+	-- (The zone's no outline, its own for a while: the Lower third's now.)
+	local zoneOutline = rawget(t, "cardOutline_zone")
+	if zoneOutline == nil then zoneOutline = OLD_OWN.cardOutline_zone end
+	if zoneOutline == 0 and Get("cardBase_zone") == "third" then t.cardOutline_zone = nil end
+	for _, field in ipairs(FIELDS) do t[Key(field[1])] = nil end
 end

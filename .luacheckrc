@@ -365,13 +365,20 @@ read_globals = {
 	"issecurevariable",
 	"seterrorhandler",
 	"tinsert",
+	-- CardMoments.lua
+	"MAX_PLAYER_LEVEL", "ERR_ZONE_EXPLORED", "ERR_ZONE_EXPLORED_XP", "C_MapExplorationInfo", "GetAchievementInfo",
+	"FACTION_STANDING_CHANGED", "C_PetJournal", "GetProfessions", "GetProfessionInfo", "GetNumSkillLines",
+	"GetSkillLineInfo", "TRADE_SKILLS", "SECONDARY_SKILLS", "GetQuestTagInfo", "GetBattlefieldWinner",
+	"GetBattlefieldArenaFaction", "CombatLogGetCurrentEventInfo", "FACTION_STANDING_LABEL5", "FACTION_STANDING_LABEL1",
+	"FACTION_STANDING_INCREASED",
+	"FACTION_STANDING_LABEL8", "FACTION_STANDING_LABEL8_FEMALE",
 	-- QuestTalk.lua
 	"AcceptQuest", "DeclineQuest", "CloseQuest", "CompleteQuest", "GetQuestReward", "GetQuestID", "GetActiveQuestID", "QuestIsDaily", "QuestIsWeekly",
 	"GetTitleText", "GetQuestText", "GetObjectiveText", "GetProgressText", "GetRewardText", "GetGreetingText",
 	"GetNumQuestChoices", "GetNumQuestItems", "GetNumQuestRewards", "GetQuestItemInfo", "GetQuestMoneyToGet",
 	"GetRewardMoney", "GetRewardXP", "IsQuestCompletable", "GetNumActiveQuests", "GetNumAvailableQuests",
 	"GetActiveTitle", "GetAvailableTitle", "GetAvailableQuestInfo", "SelectActiveQuest", "SelectAvailableQuest",
-	"C_CampaignInfo", "C_MajorFactions", "C_QuestInfoSystem", "C_QuestOffer", "BreakUpLargeNumbers", "AbbreviateLargeNumbers", "AbbreviateNumbers", "C_RestrictedActions",
+	"C_CampaignInfo", "C_MajorFactions", "C_QuestInfoSystem", "C_QuestOffer", "BreakUpLargeNumbers", "AbbreviateLargeNumbers", "AbbreviateNumbers", "Ambiguate", "C_RestrictedActions",
 	"GameFontHighlight", "IsModifierKeyDown", "IsModifiedClick", "GetQuestItemLink",
 	-- Reload.lua
 	"ToggleWorldMap", "ToggleQuestLog", "ToggleSpellBook", "PVEFrame_ToggleFrame", "InterfaceOptionsFrame", "OpenAllBags", "C_UI",

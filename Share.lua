@@ -214,6 +214,8 @@ function ns.ReadSharedProfile(text)
 			skipped = skipped + 1
 		end
 	end
+	-- (One from before the Cards page lost its Default style: that onto its cards.)
+	if ns.SpreadCardBase then ns.SpreadCardBase(settings) end
 	return {
 		name = Clean(data.name, MAX_NAME) or L["Shared profile"],
 		note = Clean(data.note, MAX_NOTE),

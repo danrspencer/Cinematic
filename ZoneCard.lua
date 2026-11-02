@@ -13,6 +13,7 @@ local DEFAULTS = ns.DEFAULTS
 DEFAULTS.storyZoneCard = false        -- the Zone row (off: the game's own)
 DEFAULTS.storyZoneSubzones = true     -- the Subzone row: a card as you come into a subzone, too
 DEFAULTS.storyZoneTerritory = false   -- "Contested Territory" and such under it, as the game says
+DEFAULTS.storyZoneGap = 5             -- seconds after a Zone or Subzone card before the next can come
 
 local SEPARATOR = " · "
 -- The game's lines: zone, PvP status, arena/sanctuary note, subzone.
@@ -84,20 +85,34 @@ local function Play(card)
 end
 
 -- What the game just showed (a frame later, so both its frames are set).
+-- Stepping out of a subzone back into the zone, the game shows the zone's
+-- name again (as the subzone line, or as the zone line once more): no card
+-- for a zone you're already in.
 local zoneShown, subShown, waiting = false, false, false
+local lastZone -- (the zone the last Zone card was for)
 local function Shows()
 	waiting = false
 	local newArea, sub = zoneShown, subShown
 	zoneShown, subShown = false, false
 	HideGame()
 	if not On() then return end
-	if not newArea and not (sub and ns.CardOn("subzone")) then return end
+	local zone = Text(ZoneTextString)
+	local subzone = Shown(SubZoneTextFrame) and Text(SubZoneTextString) or ""
+	if subzone == zone then subzone = "" end
+	if newArea and zone ~= "" and zone == lastZone then
+		-- (The same zone's line again: a subzone's card if it's a new one.)
+		newArea = false
+		sub = subzone ~= ""
+	end
+	if not newArea and not (sub and subzone ~= "" and ns.CardOn("subzone")) then return end
 	local meta
 	if newArea and GetTime() < timeUntil and ns.TimeTitleNow then
 		meta, timeUntil = ns.TimeTitleNow(), 0
 	end
-	local card = ns.ZoneCardText(Text(ZoneTextString), Shown(SubZoneTextFrame) and Text(SubZoneTextString) or "",
-		nil, newArea, meta)
+	if newArea then lastZone = zone end
+	-- (Passing through places quickly: none until the gap since the last's up.)
+	if last and GetTime() - last.played < (tonumber(ns.db.storyZoneGap) or 0) then return end
+	local card = ns.ZoneCardText(zone, subzone, nil, newArea, meta)
 	if card then
 		card.newArea = newArea
 		Play(card)

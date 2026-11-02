@@ -267,7 +267,8 @@ function ns.PageTabs(content, list, picked)
 	local tabs = {}
 	for i, each in ipairs(list) do tabs[i] = { each[1], each[3] } end
 	local panel, tabFrames, Show, base = ns.FolderTabs(content, tabs, function(i)
-		if i ~= picked then ns.ShowHubPage(list[i][2]) end
+		-- (list[i][4]: opens its page even while picked, from a page under it)
+		if i ~= picked or list[i][4] then ns.ShowHubPage(list[i][2]) end
 	end, nil, nil, function(i) ns.FlipPageSwitch(list[i][2]) end)
 	-- (A right-click flips that tab's page switch: on or off on its tip.)
 	for i, tab in ipairs(tabFrames) do
@@ -1083,7 +1084,7 @@ function ns.StyleRows(kit, content, stack, changed, switchKey, fieldOf)
 	end
 	local function Get(key) return ns.StyleKeyGet(K(key)) end
 	local function Put(key, value) ns.StyleKeyPut(K(key), value) end
-	rows.Get, rows.Put = Get, Put
+	rows.Get, rows.Put, rows.K = Get, Put, K -- (K: a key as its page's fieldOf gives it, for a line's :Box)
 
 	-- A row of choices for key, after its name: { value, text, tip } each.
 	-- Gives the last, to put a color swatch after.
@@ -1149,21 +1150,25 @@ function ns.StyleRows(kit, content, stack, changed, switchKey, fieldOf)
 	-- shared ones) lined up with the other rows' dropdowns; the row as tall as
 	-- the dropdown, so the next row clears it.
 	-- (A shared one: General first, named for the font it gives the page.)
-	function rows.Font(key, tip, test)
+	-- first: a choice ahead of the fonts ({ value, text }); label: the row's
+	-- name, if not Font:.
+	function rows.Font(key, tip, test, first, label)
 		local font = kit.Dropdown(content, K(key), function()
 			local list, choices = {}, ns.StyleFontChoices()
+			if first then list[1] = { value = first[1], text = first[2] } end
 			local general = ns.GeneralStyleValue(key)
 			if general ~= nil then
-				list[1] = { value = "general", text = ns.L["General"] .. " (" .. ns.StyleFontName(general) .. ")" }
+				local entry = { value = "general", text = ns.L["General"] .. " (" .. ns.StyleFontName(general) .. ")" }
+				list[#list + 1] = entry
 				for _, choice in ipairs(choices) do
-					if choice.value == general then list[1].font = choice.font end -- (drawn in General's font)
+					if choice.value == general then entry.font = choice.font end -- (drawn in General's font)
 				end
 			end
 			for _, choice in ipairs(choices) do list[#list + 1] = choice end
 			return list
 		end, 200, changed)
 		if not font then return end
-		local name = stack:Add(kit.Label(content, "GameFontHighlight", ns.L["Font:"]), "label")
+		local name = stack:Add(kit.Label(content, "GameFontHighlight", label or ns.L["Font:"]), "label")
 		name:SetSize(150, 30)
 		name:SetJustifyV("MIDDLE")
 		font:SetPoint("LEFT", name, "RIGHT", 4, 0)

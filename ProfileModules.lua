@@ -485,6 +485,17 @@ ns.PROFILE_MODULES = {
 	{ key = "duel-card", name = "Duel card", scope = { "Card Vision" },
 		tip = "Your own duels show as the Cards page's card: a challenge, the start and who won.",
 		apply = function(set) set("cardDuelOn", true) end },
+	{ key = "story-cards", name = "Story cards", scope = { "Card Vision" },
+		tip = "Your character's story as the Cards page's cards: a level, a place discovered, a flight's end, an " ..
+			"inn, an achievement, a new standing, mount, pet or profession rank, a story quest done, a dungeon " ..
+			"cleared, a rare spotted, a battleground and a kill streak.",
+		apply = function(set)
+			for _, key in ipairs({ "cardLevelUpOn", "cardDiscoverOn", "cardArrivalOn", "cardRestedOn",
+				"cardAchievementOn", "cardReputationOn", "cardCollectOn", "cardProfessionOn", "cardQuestOn",
+				"cardClearedOn", "cardRareOn", "cardBattlegroundOn", "cardStreakOn" }) do
+				set(key, true)
+			end
+		end },
 	{ key = "damage-vision", name = "Damage Vision", scope = { "Damage Vision" },
 		tip = "Damage Vision on: your race with #1 (or your lead over #2) in fights in dungeons, delves and raids.",
 		apply = function(set) set("damageVision", true) end },

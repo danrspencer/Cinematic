@@ -1280,7 +1280,9 @@ for page, keys in pairs({
 	duelPlates = { "duelCC", "duelHideOthers" }, -- Duel Vision's page
 	-- The Cards page's rows (Cards.lua) and the time of day at login.
 	cards = { "combatOnEnter", "combatOnLeave", "cardBossOn", "storyZoneCard", "storyZoneSubzones", "storyRecap",
-		"timeOfDayMessage", "timeOfDayChange", "chatAttackAlert", "cardDuelOn", "cardDeathOn" },
+		"timeOfDayMessage", "timeOfDayChange", "chatAttackAlert", "cardDuelOn", "cardDeathOn", "cardLevelUpOn",
+		"cardDiscoverOn", "cardArrivalOn", "cardRestedOn", "cardAchievementOn", "cardReputationOn", "cardCollectOn",
+		"cardProfessionOn", "cardQuestOn", "cardClearedOn", "cardRareOn", "cardBattlegroundOn", "cardStreakOn" },
 	cameraModes = { "shoulderCam" }, -- Cameras > General's Enable Cameras: Shoulder Cam
 	visualEffects = { "letterboxPage", "tintPage", "graphicsPlus", "musicInCinematic" }, -- (the Atmosphere hub's pages' switches)
 	-- Style > General's Enable Style: the Style hub's pages' switches.
@@ -4692,6 +4694,18 @@ ticker:SetScript("OnEvent", ns.Profiled("Core events", function(self, event, arg
 			end
 			ns.db.speechBehindLookV2 = true
 		end
+		-- The Zone card (the lower third) without an outline now: its outline
+		-- still following the Default style takes the new default, here and
+		-- in saved profiles. Ones you'd set stay. Once.
+		if not ns.db.cardZoneOutlineV1 then
+			if ns.db.cardOutline_zone == "default" then ns.db.cardOutline_zone = DEFAULTS.cardOutline_zone end
+			for _, saved in pairs(ns.db.profiles or {}) do
+				if type(saved) == "table" and saved.cardOutline_zone == "default" then
+					saved.cardOutline_zone = DEFAULTS.cardOutline_zone
+				end
+			end
+			ns.db.cardZoneOutlineV1 = true
+		end
 		if not ns.db.healVisionDefaultsV1 then
 			for key, value in pairs(DEFAULTS) do
 				if key:find("^healVision") then
@@ -6026,6 +6040,94 @@ ticker:SetScript("OnEvent", ns.Profiled("Core events", function(self, event, arg
 			end
 		end
 		ns.db.cardsV2, ns.db.cardsV3 = nil, true
+		-- The Default style went from the Cards page: what you'd changed on it
+		-- onto each card that showed it (Cards.lua), saved profiles too. Once.
+		if not ns.db.cardsV5 then
+			ns.SpreadCardBase(ns.db)
+			for _, saved in pairs(ns.db.profiles or {}) do
+				if type(saved) == "table" then ns.SpreadCardBase(saved) end
+			end
+			ns.db.cardsV5 = true
+		end
+		-- The story cards' (CardMoments.lua) starting places and style changed
+		-- after they first saved: theirs still as they first came, onto the
+		-- new ones. Once.
+		if not ns.db.cardsV6 then
+			for key, old in pairs({ cardAlign_profession = "default", cardAlign_reputation = "default",
+				cardAlign_collect = "default", cardAlign_rested = "default", cardBase_discover = "follow" }) do
+				if ns.db[key] == old then ns.db[key] = DEFAULTS[key] end
+			end
+			ns.db.cardsV6 = true
+		end
+		-- The cards went into four families (Cards.lua's Milestone, Place,
+		-- Ticker and Danger): each card still starting from the style it
+		-- came with, onto its family's; the story cards' own alignments as
+		-- they came, back to following it. Saved profiles too. Once.
+		if not ns.db.cardsV7 then
+			local function Families(t)
+				for id, old in pairs(ns.CARD_OLD_BASES) do
+					if t["cardBase_" .. id] == old then t["cardBase_" .. id] = DEFAULTS["cardBase_" .. id] end
+				end
+				for _, id in ipairs({ "profession", "reputation", "collect" }) do
+					if t["cardAlign_" .. id] == "left" then t["cardAlign_" .. id] = "default" end
+				end
+			end
+			Families(ns.db)
+			for _, saved in pairs(ns.db.profiles or {}) do
+				if type(saved) == "table" then Families(saved) end
+			end
+			ns.db.cardsV7 = true
+		end
+		-- Rare spotted got a card of its own (Cards.lua's Rare style): onto
+		-- it from the ones it had. Saved profiles too. Once.
+		if not ns.db.cardsV8 then
+			local OLD = { ticker = true, alert = true, film = true }
+			local function Rare(t)
+				if OLD[t.cardBase_rare] then t.cardBase_rare = "rare" end
+			end
+			Rare(ns.db)
+			for _, saved in pairs(ns.db.profiles or {}) do
+				if type(saved) == "table" then Rare(saved) end
+			end
+			ns.db.cardsV8 = true
+		end
+		-- Kill streak went to the top bar's middle (Cards.lua): yours still
+		-- following its style, onto it. Saved profiles too. Once.
+		if not ns.db.cardsV9 then
+			local function Middle(t)
+				if t.cardAlign_streak == "default" then t.cardAlign_streak = "center" end
+			end
+			Middle(ns.db)
+			for _, saved in pairs(ns.db.profiles or {}) do
+				if type(saved) == "table" then Middle(saved) end
+			end
+			ns.db.cardsV9 = true
+		end
+		-- Time of day went back to the middle of the screen (Cards.lua's
+		-- Milestone): yours still in the Ticker, onto it. Saved profiles too.
+		-- Once.
+		if not ns.db.cardsV10 then
+			local function Middle(t)
+				if t.cardBase_time == "ticker" then t.cardBase_time = "milestone" end
+			end
+			Middle(ns.db)
+			for _, saved in pairs(ns.db.profiles or {}) do
+				if type(saved) == "table" then Middle(saved) end
+			end
+			ns.db.cardsV10 = true
+		end
+		-- Battleground went to the lower third (Cards.lua's Place): yours
+		-- still a Milestone, onto it. Saved profiles too. Once.
+		if not ns.db.cardsV11 then
+			local function Third(t)
+				if t.cardBase_battleground == "milestone" then t.cardBase_battleground = "place" end
+			end
+			Third(ns.db)
+			for _, saved in pairs(ns.db.profiles or {}) do
+				if type(saved) == "table" then Third(saved) end
+			end
+			ns.db.cardsV11 = true
+		end
 		-- New settings start as the active profile has them (a built-in's
 		-- changes to the defaults included). A fresh install (or Reset addon)
 		-- starts with all of them so: the once-only updates above write theirs

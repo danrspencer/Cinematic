@@ -1231,6 +1231,14 @@ local function HandleSlash(msg)
 			print(("  %s: %s%s; own look: %s"):format(event.id, ok and "|cff60ff60shows here|r" or "|cffff6060not here|r",
 				ok and "" or " (" .. tostring(why) .. ")", #own > 0 and table.concat(own, ", ") or "none"))
 		end
+		-- (Each style changed from how it comes: which settings.)
+		for _, style in ipairs(ns.CARD_STYLES or {}) do
+			local changed = {}
+			for _, field in ipairs(ns.CARD_FIELDS) do
+				if ns.CardStyleIsOwn(style.id, field[1]) then changed[#changed + 1] = field[1] end
+			end
+			if #changed > 0 then print(("  style %s changed: %s"):format(style.id, table.concat(changed, ", "))) end
+		end
 	elseif cmd == "debug" and arg == "mode" then
 		-- Which camera situation the addon thinks you're in, then every check
 		-- the camera modes go by (Camera.lua).

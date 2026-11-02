@@ -27,7 +27,8 @@ ns.DEFAULTS.cardTimeSounds = "dawn##8352@100;morning##730@100;midday##1@100;afte
 -- (The other cards': one rule each, "show#<condition>#<sounds>". A page
 -- turning for Last time, your faction's bell for Under attack, the rest
 -- silent.)
-ns.CARD_SOUND_LISTS = { "zone", "subzone", "login", "attack", "duel", "death" }
+ns.CARD_SOUND_LISTS = { "zone", "subzone", "login", "attack", "duel", "death", "cleared", "discover", "arrival",
+	"rested", "levelUp", "achievement", "reputation", "collect", "profession", "quest", "rare", "battleground", "streak" }
 ns.DEFAULTS.cardSounds_zone = "show##"
 ns.DEFAULTS.cardSounds_subzone = "show##"
 ns.DEFAULTS.cardSounds_login = "show##836@100"
@@ -35,6 +36,10 @@ ns.DEFAULTS.cardSounds_attack = "show##1@100"
 -- (The Duel card's: a rule for each of its moments, all silent to start with.)
 ns.DEFAULTS.cardSounds_duel = "ask##;asked##;start##;won##;lost##"
 ns.DEFAULTS.cardSounds_death = "show##"
+-- (CardMoments.lua's cards: silent to start with.)
+for _, id in ipairs(ns.CARD_SOUND_LISTS) do
+	if ns.DEFAULTS["cardSounds_" .. id] == nil then ns.DEFAULTS["cardSounds_" .. id] = "show##" end
+end
 
 local SOUND = {} -- id -> its entry in ns.COMBAT_SOUNDS
 for _, entry in ipairs(ns.COMBAT_SOUNDS or {}) do SOUND[entry[1]] = entry end

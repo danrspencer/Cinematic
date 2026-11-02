@@ -129,7 +129,7 @@ local TOURS = {
 		"Audio" } },
 	{ "tour-visions", "Visions", { "Heal Vision", "Vitals Vision", "Vitals Style", "Quest Vision",
 		"Quest Talk Style", "Quest Item Style", "Roll Vision", "Roll Style", "Duel Vision", "Card Vision",
-		"Card Style", "Card Sounds" } },
+		"Card Styles", "Card Style", "Card Sounds" } },
 	{ "tour-wheels", "Wheels", { "Master wheel", "Your wheels", "Camera wheel", "Menu wheel", "Marker wheel",
 		"Ground marker wheel", "Vision wheel" } },
 	{ "tour-more", "Quality of life, Keybinds, Community", { "General", "Fishing", "Hunter", "Keybinds",
@@ -347,25 +347,84 @@ local CARDS = {
 	{ "death", "Death", "4. Questing & combat" }, { "zone", "Zone name", "2. Town & inn" },
 	{ "login", "Last time", "2. Town & inn" }, { "time", "Time of day", "5. Scenery & mood" },
 	{ "attack", "Under attack", "2. Town & inn" }, { "duel", "Duel", "4. Questing & combat" },
+	{ "cleared", "Dungeon cleared", "4. Questing & combat" }, { "subzone", "Subzone", "2. Town & inn" },
+	{ "discover", "Discovered", "5. Scenery & mood" }, { "arrival", "Flight arrival", "5. Scenery & mood" },
+	{ "rested", "Rested", "2. Town & inn" }, { "levelUp", "Level up", "4. Questing & combat" },
+	{ "achievement", "Achievement", "4. Questing & combat" }, { "reputation", "Reputation", "2. Town & inn" },
+	{ "collect", "New mount or pet", "2. Town & inn" }, { "profession", "Profession rank", "2. Town & inn" },
+	{ "quest", "Story quest", "4. Questing & combat" }, { "rare", "Rare spotted", "4. Questing & combat" },
+	{ "battleground", "Battleground", "4. Questing & combat" }, { "streak", "Kill streak", "4. Questing & combat" },
 }
 for _, card in ipairs(CARDS) do
-	Add(card[3], { key = "card-" .. card[1], name = "Card: " .. card[2],
-		tip = "The " .. card[2] .. " card, made up, in its look on the Card Vision page.",
-		run = function() ns.CardTest(card[1]) end })
+	if ns.CARD_BY_ID[card[1]] then -- (each this client has)
+		Add(card[3], { key = "card-" .. card[1], name = "Card: " .. card[2],
+			tip = "The " .. card[2] .. " card, made up, in its look on the Card Vision page.",
+			run = function() ns.CardTest(card[1]) end })
+	end
 end
 Add("4. Questing & combat", { key = "cards", name = "Cards carousel: every card",
-	tip = "Every card in turn, 7 seconds each, UI hidden: entering and leaving combat, boss, zone, last time, time of day, " ..
-		"under attack, duel, death. Change the looks on Card Style first to show yours.",
+	tip = "Every card this client has, in the page's order, 7 seconds each (a card with moments, all of them), UI " ..
+		"hidden. Change the looks on Card Styles first to show yours.",
 	script = function(d)
 		d.Cine(true)
 		d.HideUI(true)
 		d.Wait(1)
-		for _, id in ipairs({ "combatIn", "combatOut", "boss", "zone", "login", "time", "attack", "duel", "death" }) do
+		for _, event in ipairs(ns.CARD_EVENTS) do
+			local id = event.id
 			d.Cue("card " .. id)
 			ns.CardTest(id)
-			d.Wait(7)
+			-- (A card with moments plays each in turn, its hold and 2 seconds apart.)
+			local sequence = ns.CardSequences[id]
+			local moments = sequence and #sequence() or 1
+			d.Wait(moments > 1 and moments * ((tonumber(ns.CardLook(id).combatHoldIn) or 3) + 2) + 1 or 7)
 		end
 	end })
+-- Card shots: each card (each moment of one with moments) on its own, a
+-- screenshot of it once it's all in, the list of them saved
+-- (CinematicDB.debugCardShots: the card and the shot's time, as the
+-- screenshot's file name has it) to look over after a /reload.
+local IN_TIME = { fade = 0.35, reveal = 1.1, track = 1.4 }
+Add("4. Questing & combat", { key = "card-shots", name = "Card shots: a screenshot of every card",
+	tip = "Every card this client has (each moment of a card with moments), one at a time with the UI hidden, a " ..
+		"screenshot of each once it's all in. /reload after, so the list of which shot is which is saved.",
+	needs = function() return Screenshot ~= nil, "no Screenshot on this client" end,
+	script = function(d)
+		d.Cine(true)
+		d.HideUI(true)
+		d.Wait(1)
+		local list = {}
+		ns.db.debugCardShots = list
+		for _, event in ipairs(ns.CARD_EVENTS) do
+			local id = event.id
+			local sequence = ns.CardSequences[id]
+			local cards = sequence and sequence() or { ns.CardSample(id) }
+			for n, card in ipairs(cards) do
+				local look = ns.CardLook(id)
+				local name = type(card.name) == "string" and card.name or ""
+				local into = look.combatAnim == "type" and #name * 0.07 or IN_TIME[look.combatAnim] or 0.35
+				local hold = tonumber(look.combatHoldIn) or 3
+				d.Cue(("card %s %d"):format(id, n))
+				ns.Cards.Fire(id, card, true)
+				d.Wait(into + 0.4 + math.min(0.6, hold * 0.5)) -- (the other lines risen in too)
+				list[#list + 1] = { id = id, moment = n, name = name, at = date("%m%d%y_%H%M%S") }
+				Screenshot()
+				d.Wait(0.3)
+				if ActionStatus then ActionStatus:Hide() end -- (its "Screen captured" off the next)
+				d.Wait(hold + 1.5)
+				ns.Cards.Cut(id)
+				d.Wait(0.8)
+			end
+		end
+		ns.Print(("Card shots: %d taken. /reload to save their list."):format(#list))
+	end })
+Add("4. Questing & combat", { key = "damage", name = "Damage Vision: made-up fight",
+	tip = "Damage Vision's Test: a made-up 25-second race with four others, in the style picked on its page.",
+	needs = function() return ns.TestDamageVision ~= nil, "Damage Vision isn't loaded" end,
+	run = function() ns.TestDamageVision() end })
+Add("4. Questing & combat", { key = "damage-recap", name = "Damage Vision: recap",
+	tip = "The recap shown after a boss or dungeon (made up if the meter has nothing).",
+	needs = function() return ns.TestDamageRecap ~= nil, "Damage Vision isn't loaded" end,
+	run = function() ns.TestDamageRecap() end })
 Add("2. Town & inn", { key = "recap", name = "Login with Last time",
 	tip = "/cine recaptest: the zone name fades in as at login, with the Last time line (or its card).",
 	run = function() ns.RecapDemo() end })

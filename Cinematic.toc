@@ -110,6 +110,7 @@ CardsPage.lua
 Recap.lua
 DamageVision.lua
 ZoneCard.lua
+CardMoments.lua
 QuestTalkStyle.lua
 BubbleStyle.lua
 TooltipStyle.lua

@@ -25,6 +25,7 @@ DEFAULTS.combatBossSub = true          -- the dungeon and difficulty under the n
 DEFAULTS.combatBossCount = true        -- "Boss 2 of 3" over it, where the Journal knows (on the pull)
 
 local FADE_IN, FADE_OUT = 0.35, 0.5
+local SMALL_OUTLINE_MIN = 16          -- a card's small lines this big or more get a thin outline
 local REVEAL = 1.1                 -- Reveal: seconds the words take to open
 local REVEAL_OUT = 0.9             -- ...and to fade out, slower
 local LATE_FROM, LATE_FOR = 0.6, 0.6 -- ...a boss card's other lines coming in after the name
@@ -225,6 +226,8 @@ local function Setup(cue, look, enter, width, height, scale, boss)
 	icon:ClearAllPoints()
 	cue.barSide, cue.lineWidth, cue.third = nil, nil, place == "third"
 	local x, y, point, relative = 0, 0, "CENTER", "CENTER"
+	-- (Moved by its own offsets: shares of the screen, so any size reads the same.)
+	local dx, dy = (tonumber(look.combatOffsetX) or 0) * width, (tonumber(look.combatOffsetY) or 0) * height
 	if place == "top" or place == "bottom" then
 		-- With the letterbox up (in CineMode; the preview as if it were): in
 		-- its bar. Else in a bar of our own, as tall as the letterbox's. The
@@ -242,7 +245,7 @@ local function Setup(cue, look, enter, width, height, scale, boss)
 		y = (side == "TOP" and -1 or 1) * want / 2
 		cue.barSide, cue.barShare = side, want / height
 		if style == "chapter" then
-			line:SetPoint("CENTER", cue.over, side, 0, (side == "TOP" and -1 or 1) * (want - 1))
+			line:SetPoint("CENTER", cue.over, side, dx, (side == "TOP" and -1 or 1) * (want - 1) + dy)
 		end
 	elseif place == "third" then
 		-- The lower third: low on the left, the line under it fading out.
@@ -256,6 +259,7 @@ local function Setup(cue, look, enter, width, height, scale, boss)
 		y = height * 0.14
 		line:SetPoint("TOP", text, "BOTTOM", 0, -6 * scale)
 	end
+	x, y = x + dx, y + dy
 	text:SetPoint(point, cue.over, relative, x, y)
 	text:SetText(word)
 	local outline = OUTLINES[look.combatOutline] or ""
@@ -317,12 +321,28 @@ local function Setup(cue, look, enter, width, height, scale, boss)
 	local subText = boss and style ~= "none" and boss.sub or ""
 	local metaText = boss and style ~= "none" and not cue.barSide and boss.meta or ""
 	local subR, subG, subB = (r + 1) / 2, (g + 1) / 2, (b + 1) / 2
-	local plain = outline ~= "" and "OUTLINE" or ""
+	local metaR, metaG, metaB = 0.8, 0.78, 0.72
+	-- (The small lines' own font, size and color, where the look gives them.)
+	local smallFont = look.combatSmallFont ~= "same" and ns.StyleFontFile(look.combatSmallFont) or FontFile(look)
+	local smallSize = tonumber(look.combatSmallSize) or 1
+	if look.combatSmallColor == "custom" then
+		subR, subG, subB = tonumber(look.combatSmallR) or 1, tonumber(look.combatSmallG) or 1,
+			tonumber(look.combatSmallB) or 1
+		metaR, metaG, metaB = subR, subG, subB
+	end
+	-- (The small lines: a thin outline where the words have one and they're
+	-- big enough for it (smaller, it swamps the letters); a drop shadow too.)
+	local function SmallOutline(lineSize)
+		return outline ~= "" and lineSize >= SMALL_OUTLINE_MIN * scale and "OUTLINE" or ""
+	end
+	local smallShadow = outline ~= "" and "on" or look.combatShadow
 	local before = cue.barSide and look.combatAlign == "right"
 	if subText ~= "" then
-		local subSize = cue.barSide and size * 0.7 or math.max(size * 0.42, 10 * scale)
-		ns.SetPlateNameFont(sub, GameFontNormalHuge, FontFile(look), math.floor(subSize + 0.5), 1, plain)
-		ns.SetTextShadow(sub, look.combatShadow)
+		-- (Beside the words in a bar: never grown, or it's as big as they are.)
+		local subSize = cue.barSide and size * 0.85 * math.min(smallSize, 1)
+			or math.max(size * 0.42, 10 * scale) * smallSize
+		ns.SetPlateNameFont(sub, GameFontNormalHuge, smallFont, math.floor(subSize + 0.5), 1, SmallOutline(subSize))
+		ns.SetTextShadow(sub, smallShadow)
 		sub:SetText(subText)
 		sub:SetTextColor(subR, subG, subB, 1)
 		sub:SetVertexColor(subR, subG, subB, 1)
@@ -339,13 +359,22 @@ local function Setup(cue, look, enter, width, height, scale, boss)
 		sub:SetPoint(unpack(cue.subAt))
 	end
 	sub:SetShown(subText ~= "")
+	-- (Centered in a bar with a line beside it: the two together centered,
+	-- not the words with the line hanging off their right.)
+	if cue.barSide and subText ~= "" and look.combatAlign ~= "left" and look.combatAlign ~= "right" then
+		local subWidth = sub:GetStringWidth()
+		if not (issecretvalue and issecretvalue(subWidth)) then
+			text:ClearAllPoints()
+			text:SetPoint(point, cue.over, relative, x - (size * 0.8 + subWidth) / 2, y)
+		end
+	end
 	if metaText ~= "" then
-		local metaSize = math.max(size * 0.3, 8 * scale)
-		ns.SetPlateNameFont(meta, GameFontNormalHuge, FontFile(look), math.floor(metaSize + 0.5), 1, plain)
-		ns.SetTextShadow(meta, look.combatShadow)
+		local metaSize = math.max(size * 0.36, 8 * scale) * smallSize
+		ns.SetPlateNameFont(meta, GameFontNormalHuge, smallFont, math.floor(metaSize + 0.5), 1, SmallOutline(metaSize))
+		ns.SetTextShadow(meta, smallShadow)
 		meta:SetText(metaText)
-		meta:SetTextColor(0.8, 0.78, 0.72, 1)
-		meta:SetVertexColor(0.8, 0.78, 0.72, 1)
+		meta:SetTextColor(metaR, metaG, metaB, 1)
+		meta:SetVertexColor(metaR, metaG, metaB, 1)
 		cue.metaAt = cue.third and { "BOTTOMLEFT", text, "TOPLEFT", 0, size * 0.2 }
 			or { "BOTTOM", text, "TOP", 0, size * 0.2 }
 		meta:SetPoint(unpack(cue.metaAt))
@@ -443,7 +472,14 @@ local function Setup(cue, look, enter, width, height, scale, boss)
 	local showIcon = look[enter and "combatIconShowIn" or "combatIconShowOut"] and true or false
 	icon:SetShown(showIcon)
 	if showIcon then
-		icon:SetTexture(enter and look.combatIconIn or look.combatIconOut)
+		-- (A card can draw its own: a rare's portrait, while it can still be
+		-- had. Else the look's icon, its edges trimmed.)
+		if boss and boss.portrait and boss.portrait(icon) then
+			icon:SetTexCoord(0, 1, 0, 1)
+		else
+			icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+			icon:SetTexture(enter and look.combatIconIn or look.combatIconOut)
+		end
 		icon:SetSize(size * 1.1, size * 1.1)
 		if style == "none" then
 			icon:SetPoint(point, cue.over, relative, x, y)
@@ -464,6 +500,14 @@ local function Setup(cue, look, enter, width, height, scale, boss)
 	for _, part in pairs(band) do part:Hide() end
 	cue.banner, cue.holdExtra = banner, boss and tonumber(boss.holdExtra) or 0
 	cue.pictured = picture and true or false
+	-- (Across the screen at the words' height: moved up or down with them.)
+	for _, part in ipairs({ band.middle, band.flat }) do
+		part:ClearAllPoints()
+		part:SetPoint("LEFT", cue.over, "LEFT", 0, dy)
+		part:SetPoint("RIGHT", cue.over, "RIGHT", 0, dy)
+	end
+	cue.picture:ClearAllPoints()
+	cue.picture:SetPoint("CENTER", cue.over, "CENTER", dx, dy)
 	if picture then
 		local tall = height * (boss.pictureSize or 0.1)
 		cue.picture:SetTexture(picture)
@@ -675,12 +719,14 @@ local function InstanceLine()
 	return name
 end
 
--- "Boss 2 of 3" for an encounter, from the Journal where it knows ("" else).
-local function BossNumber(encounterID)
-	if not (ns.db.combatBossCount and EJ_GetInstanceForMap and EJ_GetEncounterInfoByIndex) then return "" end
+-- An encounter's place in the instance you're in, from the Journal where it
+-- knows: its number and the count (nil: not known). (Also the Dungeon
+-- cleared card's: CardMoments.lua.)
+function ns.EncounterIndex(encounterID)
+	if not (EJ_GetInstanceForMap and EJ_GetEncounterInfoByIndex) then return nil end
 	local mapID = C_Map and C_Map.GetBestMapForUnit and C_Map.GetBestMapForUnit("player")
 	local ok, journal = pcall(EJ_GetInstanceForMap, mapID or 0)
-	if not ok or not journal or journal == 0 then return "" end
+	if not ok or not journal or journal == 0 then return nil end
 	-- (The Journal's own choice put back after, in case its window is open.)
 	local before = EJ_GetCurrentInstance and EJ_GetCurrentInstance()
 	if EJ_SelectInstance then pcall(EJ_SelectInstance, journal) end
@@ -692,6 +738,13 @@ local function BossNumber(encounterID)
 		if dungeonEncounter == encounterID then index = count end
 	end
 	if before and before ~= 0 and before ~= journal and EJ_SelectInstance then pcall(EJ_SelectInstance, before) end
+	return index, count
+end
+
+-- "Boss 2 of 3" for an encounter, from the Journal where it knows ("" else).
+local function BossNumber(encounterID)
+	if not ns.db.combatBossCount then return "" end
+	local index, count = ns.EncounterIndex(encounterID)
 	if index and index == count and count > 1 then return L["Final boss"] end
 	return index and L["Boss %d of %d"]:format(index, count) or ""
 end

@@ -1,32 +1,77 @@
--- The Cards page (Cards.lua's), in the Visions hub under one icon with four
+-- The Cards page (Cards.lua's), in the Visions hub under one icon with two
 -- folder tabs. Events: a row for each event, its tick and its Show in row
 -- (GridRows.lua), as the frames pages' grids, and under each the style it
--- uses, with links to it, its settings and its sounds. Settings: what's an
--- event's alone (when it fires, its lines, its words), picked from a
--- dropdown. Style: the Default style, the look every card starts from, or an
--- event's own (each setting following the Default style until it's given its
--- own), picked from the same dropdown. Sounds: the picked event's sounds.
+-- uses, with buttons to its own pages. Card Types: the styles the cards start
+-- from, each changed for every card using it. An event's own pages, opened
+-- from its row (no tabs on the page's: their own three, and a way back):
+-- Settings, what's its alone (when it fires, its lines, its words); Style,
+-- its look (the style it starts from, each setting following it until it's
+-- given its own); Sounds.
 
 local _, ns = ...
 local L = ns.L
 
 local NOTE_W = 440
--- What the Style and Sounds tabs show: "default" (the Default style) or an
--- event's id (the links on other pages and under the Events tab's rows pick
--- one).
-local CARD = { now = "default" }
+-- The event an event's own pages show (the buttons under the Events tab's
+-- rows and the links on other pages pick one), and the style the Card Types
+-- tab shows.
+local CARD = { now = "combatIn", style = "third" }
 
--- The pages' tabs, picked 1 to 4. title: the page's, put under them.
+-- The page's tabs, picked 1 or 2. title: the page's, put under them.
 local function CardTabs(content, title, picked)
 	local panel = ns.PageTabs(content, {
 		{ L["Events"], "Card Vision", L["Each event's card on or off, and where it shows."] },
-		{ L["Settings"], "Card Settings", L["What's each card's alone: when it shows, its lines, its words."] },
-		{ L["Style"], "Card Style", L["How the cards look: the Default style every card starts from, and each " ..
-			"event's own, with a preview."] },
-		{ L["Sounds"], "Card Sounds", L["What each card plays as it shows."] },
+		{ L["Card Types"], "Card Styles", L["The styles the cards start from: change one for every card using it."] },
 	}, picked)
 	title:ClearAllPoints()
 	title:SetPoint("TOPLEFT", panel, "BOTTOMLEFT", 8, -14)
+end
+
+-- An event's own pages' top: the page's two tabs, Events lit (it's under
+-- it; a click goes back to it), the event's icon and name as the title, and
+-- under them a row of smaller folder tabs, one for each of its three pages
+-- (picked 1 to 3). Gives a frame to put the page under (kit.PageIntro's
+-- under).
+local PAGES = {
+	{ "Settings", "Card Settings", "What's this card's alone: when it shows, its lines, its words." },
+	{ "Style", "Card Style", "How this card looks, with a preview." },
+	{ "Sounds", "Card Sounds", "What this card plays as it shows." },
+}
+local function CardTop(kit, content, title, picked)
+	local panel = ns.PageTabs(content, {
+		{ L["Events"], "Card Vision", L["Back to every card's row."], true },
+		{ L["Card Types"], "Card Styles", L["The styles the cards start from: change one for every card using it."] },
+	}, 1)
+	local icon = content:CreateTexture(nil, "ARTWORK")
+	icon:SetSize(24, 24)
+	icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
+	icon:SetPoint("TOPLEFT", panel, "BOTTOMLEFT", 8, -10)
+	title:ClearAllPoints()
+	title:SetPoint("LEFT", icon, "RIGHT", 8, 0)
+	local list = {}
+	for i, page in ipairs(PAGES) do list[i] = { L[page[1]], L[page[3]] } end
+	local sub, _, ShowSub, subBase, subH = ns.FolderTabs(content, list, function(i)
+		if i ~= picked then ns.ShowHubPage(PAGES[i][2]) end
+	end)
+	subBase:SetPoint("TOPLEFT", panel, "BOTTOMLEFT", 0, -(44 + subH))
+	sub:SetPoint("TOPLEFT", subBase, "TOPLEFT")
+	sub:SetPoint("RIGHT", content, "RIGHT", -8, 0)
+	sub:SetHeight(1) -- (just its top edge, a line under the tabs)
+	ShowSub(picked)
+	local under = CreateFrame("Frame", nil, content)
+	under:SetSize(1, 1)
+	under:SetPoint("TOPLEFT", subBase, "TOPLEFT", 8, -6)
+	local holder = CreateFrame("Frame", nil, content)
+	holder:SetSize(1, 1)
+	holder:Hide()
+	holder.pageSwitch = false
+	holder.Refresh = function()
+		local event = ns.CARD_BY_ID[CARD.now] or ns.CARD_EVENTS[1]
+		icon:SetTexture(event.icon)
+		title:SetText(L[event.name])
+	end
+	kit.AddControl(holder)
+	return under
 end
 
 -- For the pages its moments used to be on: a line saying where they are
@@ -50,18 +95,11 @@ function ns.CardsLink(content, text, event)
 	return holder
 end
 
--- A made-up card for the Default style's preview and Test: the zone you're
--- in, as the Zone event would show it.
-local function DefaultSample()
-	local card = ns.CardSample("zone") or {}
-	if not card.name then card.name = GetRealZoneText and GetRealZoneText() or "Darkshore" end
-	return card
-end
-
 -- The preview: the screen's shape (or a height given), the scene behind, a
--- card played on it, the event which() gives (nil: the Default style's, a
--- zone's card). The General page's screen too.
-function ns.MakeCardPreview(parent, width, fixedH, which)
+-- card played on it, the event which() gives (nil: the Zone's, the zone
+-- you're in), in the look lookOf() gives (nil: the event's). The General
+-- page's screen too.
+function ns.MakeCardPreview(parent, width, fixedH, which, lookOf)
 	local preview = CreateFrame("Frame", nil, parent)
 	preview:SetSize(width, fixedH or 270)
 	if preview.SetClipsChildren then preview:SetClipsChildren(true) end
@@ -81,11 +119,12 @@ function ns.MakeCardPreview(parent, width, fixedH, which)
 		local previewH = fixedH or math.floor(width * screenH / math.max(screenW, 1) + 0.5)
 		self:SetHeight(previewH)
 		ns.StyleScene(self)
-		local id = which and which()
-		if id == "default" then id = nil end
-		local card = id and ns.CardSample(id) or DefaultSample()
+		local id = which and which() or "zone"
+		local card = ns.CardSample(id)
+		if id == "zone" and not card.name then card.name = GetRealZoneText and GetRealZoneText() or "Darkshore" end
 		card.sound = nil
-		ns.PlayCard(stage, ns.CardLook(id), self:GetWidth(), previewH, previewH / math.max(screenH, 1), card)
+		local look = lookOf and lookOf() or ns.CardLook(id)
+		ns.PlayCard(stage, look, self:GetWidth(), previewH, previewH / math.max(screenH, 1), card)
 	end
 	return preview
 end
@@ -99,8 +138,8 @@ local function List(choices)
 	end
 end
 
--- The Style tab's look rows (rows: ns.StyleRows', their keys the Default
--- style's: the tab's fieldOf turns them into the picked event's). icon: a
+-- The Style tab's look rows (rows: ns.StyleRows', their keys the base
+-- look's: the tab's fieldOf turns them into the picked event's). icon: a
 -- button for an event's own icon, after the Icon tick.
 local function LookRows(content, stack, rows, icon)
 	local On, Get = rows.On, rows.Get
@@ -118,6 +157,11 @@ local function LookRows(content, stack, rows, icon)
 			"out to the right."] },
 	}), L["Where the card shows: in the middle of the screen, in a letterbox bar or in the lower third. (A " ..
 		"banner goes across the middle.)"], function(db) return On(db) and not Banner() end)
+	local move = rows.Slider("cardOffsetX", L["Move across"], -50, 50, 0.5, "%.1f%%", 100,
+		L["Moves the card from where its place puts it: right, or left below 0, as a share of the screen's width."])
+	move:Box(L["Move up"], rows.K("cardOffsetY"), -50, 50, 0.5, "%.1f", 100,
+		L["Moves the card from where its place puts it: up, or down below 0, as a share of the screen's height."],
+		nil, "%")
 	rows.Dropdown(L["In the bar:"], "cardAlign", List({
 		{ "left", L["Left"] },
 		{ "center", L["Center"] },
@@ -167,6 +211,18 @@ local function LookRows(content, stack, rows, icon)
 		textColor = function(look)
 			look.Color(L["Color"], { "cardR", "cardG", "cardB" },
 				L["The words' color; the lines with them in a lighter shade."])
+			-- (The small lines over and under the words: Cards.lua's Small...)
+			look.Font("cardSmallFont", L["The small lines' font, over and under the words."], nil,
+				{ "same", L["Same as the words"] }, L["Small lines' font:"])
+			look.Slider("cardSmallSize", L["Small lines' size"], 50, 250, 5, "%d%%", 100,
+				L["The small lines over and under the words, bigger or smaller than they come (100%: as they come, " ..
+				"by the words' size)."])
+			local last = look.Choices(L["Small lines' color:"], "cardSmallColor", {
+				{ "auto", L["Automatic"], L["Under the words: their color, lighter. Over them: a pale gray."] },
+				{ "custom", L["Custom"], L["A color of your own (the swatch), for both lines."] },
+			})
+			look.Swatch(last, "cardSmallColor", { "cardSmallR", "cardSmallG", "cardSmallB" },
+				L["Pick the small lines' color."])
 		end,
 		shadow = { "cardShadow" },
 	})
@@ -185,11 +241,13 @@ end
 
 -- The settings an event can have of its own, as the Style tab lists them.
 local GROUPS = {
-	{ "Place", { "Place" } }, { "In the bar", { "Align" } }, { "Letterbox scale", { "BarScale" } },
+	{ "Place", { "Place" } }, { "Position", { "OffsetX", "OffsetY" } }, { "In the bar", { "Align" } }, { "Letterbox scale", { "BarScale" } },
 	{ "Lower third with no letterbox", { "BarFallback" } }, { "Style", { "Style" } }, { "Animation", { "Anim" } },
 	{ "Font", { "Font" } }, { "Size", { "Size" } }, { "Outline", { "Outline" } },
 	{ "Outline color", { "OutlineR", "OutlineG", "OutlineB" } }, { "Shadow", { "Shadow" } },
-	{ "Color", { "R", "G", "B" } }, { "Stays", { "Hold" } }, { "Edge pulse", { "Pulse" } },
+	{ "Color", { "R", "G", "B" } }, { "Small lines' font", { "SmallFont" } }, { "Small lines' size", { "SmallSize" } },
+	{ "Small lines' color", { "SmallColor", "SmallR", "SmallG", "SmallB" } },
+	{ "Stays", { "Hold" } }, { "Edge pulse", { "Pulse" } },
 	{ "Pulse color", { "PulseR", "PulseG", "PulseB" } }, { "Icon", { "IconShow" } }, { "Icon picture", { "Icon" } },
 }
 local function OwnGroup(id, group)
@@ -211,9 +269,8 @@ local function OwnNames(id)
 	return names
 end
 
--- The style an event starts from, by name: the Default style, a ready-made
--- one (Cards.lua's CARD_STYLES), or for a subzone following the zone, the
--- zone's.
+-- The style an event starts from, by name: a ready-made one (Cards.lua's
+-- CARD_STYLES), or for a subzone following the zone, the zone's.
 local function BaseName(id)
 	local event = ns.CARD_BY_ID[id]
 	local db = ns.GetDB()
@@ -222,7 +279,7 @@ local function BaseName(id)
 	end
 	local base = ns.CardBase(id)
 	local style = ns.CARD_STYLE_BY_ID[base]
-	return style and L[style.name] or L["Default style"]
+	return style and L[style.name] or L["Lower third"]
 end
 
 -- The style an event uses, in a few words: the one it starts from, and how
@@ -232,8 +289,8 @@ local function StyleSummary(id)
 	return BaseName(id) .. (#names > 0 and (" +" .. #names) or "")
 end
 
--- The styles an event can start from, for a dropdown: the Default style, the
--- ready-made ones, and for a subzone its zone's first.
+-- The styles an event can start from, for a dropdown: the ready-made ones,
+-- and for a subzone its zone's first.
 local function StyleChoices(id)
 	local list = {}
 	local event = ns.CARD_BY_ID[id]
@@ -241,7 +298,6 @@ local function StyleChoices(id)
 		list[#list + 1] = { value = "follow", text = L["Follows %s"]:format(L[ns.CARD_BY_ID[event.parent].name]),
 			tip = L["Whatever style that event starts from."] }
 	end
-	list[#list + 1] = { value = "default", text = L["Default style"], tip = L["The look every card starts from."] }
 	for _, style in ipairs(ns.CARD_STYLES) do list[#list + 1] = { value = style.id, text = L[style.name] } end
 	return list
 end
@@ -272,6 +328,27 @@ local TIPS = {
 		"your faction's city bell. The same place at most once every 90 seconds.",
 	duel = "Your own duels: as you challenge someone or they challenge you, as it starts, and who won. Which of " ..
 		"those and their words: the Settings tab.",
+	cleared = "As a dungeon's or raid's last boss goes down: its name, the time since you came in and how many " ..
+		"times you died.",
+	discover = "A place new to you: a zone the first time you're there, a subzone as the game says you " ..
+		"discovered it, a dungeon or raid the first time you go in. In place of the Zone or Subzone card.",
+	arrival = "As a flight lands: where it took you.",
+	rested = "As you come into an inn or a city (not at login, not in a fight): the place's name. The same " ..
+		"place at most once every 10 minutes.",
+	levelUp = "As you reach a new level (after the fight, if you're in one): the level, the zone and how long " ..
+		"it took this session. Max level at the cap.",
+	achievement = "An achievement you earn: its name and points.",
+	reputation = "As your standing with a faction changes (\"Honored\", with whom under it), a Renown level " ..
+		"or a friendship's rank: small in the top bar, but Exalted, Hated, the last Renown level and a " ..
+		"friendship's top rank big, as Level up looks.",
+	collect = "A new mount in your collection, big as Level up looks; a new pet, small in the top bar.",
+	profession = "A profession learned, or its cap raised (Journeyman, Expert...).",
+	quest = "As you turn in a story quest (campaign, important or legendary) or a dungeon, raid or elite one: " ..
+		"its title.",
+	rare = "A rare's name as you first target it, point at it or (out of fights) its nameplate shows. Once " ..
+		"each a session.",
+	battleground = "A battleground's or arena's name as the gates open, then Victory or Defeat.",
+	streak = "Other players you kill without dying, at 2, 3, 5 and every 5 after.",
 	death = "Shortly after the death camera starts: YOU DIED across the middle of the screen, \"wasted\" or " ..
 		"words of your own. Only with the death camera on (the Die row on the Scenes page).",
 }
@@ -280,7 +357,7 @@ local STORY_OPTS = { anyFight = true, quiet = true, omit = { enemyShow = true, f
 
 -- The lists a Show in row's ticks are kept in (its Always: cardAlways_<id>).
 local ROW_LISTS = { "combatShow", "calmShow", "quietShow", "camShow", "enemyShow", "friendlyShow", "bgShow",
-	"worldShow", "cityShow", "groupShow", "instanceShow", "frameRules", "tankHide", "healerHide", "damageHide" }
+	"worldShow", "cityShow", "groupShow", "instanceShow", "frameRules" }
 
 -- A Test button says Stop while its card's moments play in turn (Now: its
 -- event's id).
@@ -312,6 +389,10 @@ function ns.CreateCardsPanel(kit)
 		L["On: each card shows as its row says. Off: none of them do, and each row keeps its tick for when you " ..
 		"turn this back on."], intro)
 	local stack = kit.Stack(switch, "check")
+	local cardScale = stack:Add(kit.Slider(content, "cardScale", L["Card size"], 50, 200, 5, "%d%%", 100),
+		"slider")
+	kit.Tooltip(cardScale, L["Every card's words bigger or smaller, for a big or wide screen (a card in a " ..
+		"letterbox bar goes by the bar's height instead)."])
 	stack:Header(content, L["Events"])
 	local grid = ns.GRID_KIT
 	local columns = ns.FRAME_COLUMNS
@@ -352,18 +433,12 @@ function ns.CreateCardsPanel(kit)
 					list[#list + 1] = #names == 0 and { L["Never"], ns.ROW_CHIP.never }
 						or { table.concat(names, ", "), ns.ROW_CHIP.when }
 				end
-				for _, roleList in ipairs({ "tankHide", "healerHide", "damageHide" }) do
-					if ns.RoleHidden(db, roleList, key) then
-						list[#list + 1] = { L["Some roles"], ns.ROW_CHIP.when }
-						break
-					end
-				end
 				return list
 			end,
 			lines = {
 				{ name = L["When"], build = function(drawer, At)
 					local layout = { groups = event.fight and { ns.GRID_LOCATION } or { ns.GRID_COMBAT, ns.GRID_LOCATION },
-						roles = grid.rolesMenu, edit = true }
+						edit = true }
 					At(ns.GridRow(grid, drawer, 0, layout, {
 						band = 1,
 						always = { isOn = function() return ns.GetDB()[alwaysKey] and true or false end, set = SetAlways,
@@ -371,17 +446,14 @@ function ns.CreateCardsPanel(kit)
 						menus = parts.menus,
 						rule = { key = Key, label = function() return L[event.name] end, grid = parts.grid,
 							words = parts.words, apply = parts.apply },
-						roles = { key = Key, tip = L["Tick roles to show it only while you're one of them (your " ..
-							"specialization's, or the one picked in the group finder), whatever the row says. None " ..
-							"ticked (-): every role."] },
 					}))
 				end },
 				{ name = L["Style"], build = function(drawer, At)
 					local base = kit.Dropdown(drawer, BaseField(id), function() return StyleChoices(id) end, 170)
 					if base then
 						At(base)
-						kit.Tooltip(base, L["The style this card starts from: the Default style or a ready-made one. " ..
-							"Settings you give it on the Style tab go over it."])
+						kit.Tooltip(base, L["The style this card starts from. Settings you give it on the Style tab go " ..
+							"over it."])
 					end
 					-- (Buttons to it on the Settings, Style and Sounds tabs.)
 					for n, link in ipairs({ { L["Settings"], "Card Settings",
@@ -497,30 +569,26 @@ local function WordsRow(kit, content, stack, key, label, tip)
 	return box
 end
 
--- Style: the Default style or an event picked from one dropdown (the Default
--- style first) and its look.
+-- Style: an event's look (opened from its row).
 function ns.CreateCardStylePanel(kit)
 	local canvas, content = kit.CreateScrollPage()
 	local title = kit.Label(content, "GameFontNormalLarge", L["Card Vision"])
-	CardTabs(content, title, 3)
+	local under = CardTop(kit, content, title, 2)
 	local intro = kit.PageIntro(content, title,
-		L["How the cards look. Default style: the look every card starts from. An event: its own look, each " ..
-		"setting following the Default style (a subzone's, the zone's) until you change it here, then the " ..
-		"event's own until you put it back. Changes play at once in the preview. When each shows and its words: " ..
-		"the Settings tab."])
+		L["How this card looks. It starts from a style (a subzone's, the zone's), each setting following it until " ..
+		"you change it here, then the card's own until you put it back. Change the style itself on the Card Types " ..
+		"tab, for every card using it. Changes play at once in the preview."], under)
 	local preview
 	local function Changed()
 		if preview then preview:Refresh() end
 	end
 	local switch = kit.PageSwitch(content, "cards", L["Enable Page"],
-		L["On: each card shows as the Events tab says, looking as this tab says. Off: none of them do. Each " ..
-		"setting keeps its value for when you turn this back on."], intro, Changed)
+		L["On: each card shows as the Events tab says, looking as its Style page says. Off: none of them do. " ..
+		"Each setting keeps its value for when you turn this back on."], intro, Changed)
 	local stack = kit.Stack(switch, "check")
-	local function IsDefault() return CARD.now == "default" end
 
-	-- The look's rows edit the Default style's settings, or the picked event's
-	-- own (showing what shows: its own, else what it follows; a change makes
-	-- it its own).
+	-- The look's rows edit the picked event's own settings (showing what
+	-- shows: its own, else what it follows; a change makes it its own).
 	local isField = {}
 	for _, field in ipairs(ns.CARD_FIELDS) do isField[field[1]] = true end
 	local fields = {}
@@ -528,11 +596,8 @@ function ns.CreateCardStylePanel(kit)
 		local name = type(key) == "string" and key:match("^card(%u%w*)$")
 		if not (name and isField[name]) then return key end
 		fields[name] = fields[name] or {
-			get = function()
-				if IsDefault() then return ns.GetDB()[key] end
-				return ns.CardRaw(CARD.now, name)
-			end,
-			set = function(value) ns.GetDB()[ns.CardKey(name, not IsDefault() and CARD.now or nil)] = value end,
+			get = function() return ns.CardRaw(CARD.now, name) end,
+			set = function(value) ns.GetDB()[ns.CardKey(name, CARD.now)] = value end,
 		}
 		return fields[name]
 	end
@@ -543,77 +608,37 @@ function ns.CreateCardStylePanel(kit)
 	for _, event in ipairs(ns.CARD_EVENTS) do kit.RecordKey(content, "cardBase_" .. event.id) end
 	local rows = ns.StyleRows(kit, content, stack, Changed, "cards", FieldOf)
 
-	-- What it shows: one row, so it reads as what the rest of the tab is
-	-- about: the event's icon, "Editing", the dropdown (the Default style,
-	-- then each event) and a line saying what that is.
-	local bar = CreateFrame("Frame", nil, content)
-	bar:SetSize(480, 30)
-	stack:Add(bar, "label")
-	local barIcon = bar:CreateTexture(nil, "ARTWORK")
-	barIcon:SetSize(26, 26)
-	barIcon:SetPoint("LEFT", 2, 0)
-	barIcon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
-	local editing = kit.Label(bar, "GameFontNormalLarge", L["Editing"])
-	editing:SetPoint("LEFT", barIcon, "RIGHT", 8, 0)
-	local barLine = kit.Label(bar, "GameFontHighlightSmall", "")
-	barLine:SetWidth(320)
-	barLine:SetJustifyH("LEFT")
-	barLine:SetWordWrap(false)
-	local picker = kit.Dropdown(content, { get = function() return CARD.now end, set = function(id) CARD.now = id end },
-		function()
-			local list = { { value = "default", text = L["Default style"],
-				tip = L["The look every card starts from."] } }
-			for _, event in ipairs(ns.CARD_EVENTS) do list[#list + 1] = { value = event.id, text = L[event.name] } end
-			return list
-		end, 230, Changed)
-	if picker then
-		picker:SetPoint("LEFT", editing, "RIGHT", 12, 0)
-		picker:SetFrameLevel(bar:GetFrameLevel() + 3)
-		picker.pageSwitch = false
-		kit.Tooltip(picker, L["The Default style, or the event whose card this tab shows and sets."])
-		barLine:SetPoint("LEFT", picker, "RIGHT", 12, 0)
-	else
-		barLine:SetPoint("LEFT", editing, "RIGHT", 12, 0)
-	end
-	bar.pageSwitch = false
-	bar.Refresh = function()
-		local event = ns.CARD_BY_ID[CARD.now]
-		barIcon:SetTexture(event and event.icon or "Interface\\Icons\\INV_Misc_Book_09")
-		if not event then
-			barLine:SetText(L["The look every card starts from."])
-		else
-			local names = OwnNames(CARD.now)
-			barLine:SetText(L["Starts from: %s"]:format("|cffffd100" .. BaseName(CARD.now) .. "|r")
-				.. (#names > 0 and ("  " .. L["Its own: %s"]:format(table.concat(names, ", "))) or ""))
-		end
-	end
-	kit.AddControl(bar)
-
 	preview = ns.MakeCardPreview(content, 480, nil, function() return CARD.now end)
 	preview.pageSwitch = false
 	stack:Add(preview, "label")
 	ns.StylePopout(preview, kit.Tooltip) -- (StylePages.lua)
 	kit.AddControl(preview)
-	ns.StylePreviewTest(preview, kit, L["Plays the card in the preview and on your screen, as it will look, with " ..
-		"its sound (close the settings to see it there). The Default style: the zone you're in, as the Zone " ..
-		"event would show it."], function()
+	local styleTest = ns.StylePreviewTest(preview, kit, L["Plays the card in the preview and on your screen, as it " ..
+		"will look, with its sound (close the settings to see it there). A card with moments (Duel) plays each in " ..
+		"turn; clicking Stop ends it."], function()
 			preview:Refresh()
-			if IsDefault() then
-				local card = DefaultSample()
-				card.defaultLook = true
-				ns.Cards.Fire("zone", card, true)
-			else
-				ns.CardTest(CARD.now)
-			end
+			ns.CardTest(CARD.now)
 		end)
+	TestStops(styleTest, function() return CARD.now end)
 
-	-- The style the event starts from (the Default style's: none, it's what
-	-- they all start from).
-	rows.Dropdown(L["Starts from:"], { get = function() return not IsDefault() and ns.GetDB()["cardBase_" .. CARD.now] or nil end,
-		set = function(value) if not IsDefault() then ns.GetDB()["cardBase_" .. CARD.now] = value end end },
-		function() return IsDefault() and {} or StyleChoices(CARD.now) end,
-		L["The style this card starts from: the Default style or a ready-made one. The settings below that you " ..
-		"change go over it, as its own."], function(db) return rows.On(db) and not IsDefault() end)
+	-- The style the event starts from, and a button to change that style
+	-- itself (the Card Types tab, it picked).
+	local base = rows.Dropdown(L["Starts from:"], { get = function() return ns.GetDB()["cardBase_" .. CARD.now] end,
+		set = function(value) ns.GetDB()["cardBase_" .. CARD.now] = value end },
+		function() return StyleChoices(CARD.now) end,
+		L["The style this card starts from. The settings below that you change go over it, as its own."])
+	if base then
+		local edit = ns.PanelButton(content)
+		edit:SetSize(110, 22)
+		edit:SetText(L["Edit style"])
+		edit:SetPoint("LEFT", base, "RIGHT", 10, 0)
+		edit.pageSwitch = false
+		kit.Tooltip(edit, L["Opens this style on the Card Types tab: a change there is for every card using it."])
+		edit:SetScript("OnClick", function()
+			CARD.style = ns.CardBase(CARD.now)
+			ns.ShowHubPage("Card Styles")
+		end)
+	end
 
 	-- Which settings it has of its own, and a dropdown to put one back.
 	local own = kit.Label(content, "GameFontHighlightSmall", "")
@@ -621,11 +646,6 @@ function ns.CreateCardStylePanel(kit)
 	own:SetJustifyH("LEFT")
 	stack:Add(own, "label")
 	own.Refresh = function(self)
-		if IsDefault() then
-			self:SetText(L["The look every card starts from: each event follows it setting by setting, until it's " ..
-				"given its own (pick the event above)."])
-			return
-		end
 		local names = OwnNames(CARD.now)
 		if #names == 0 then
 			self:SetText(L["None of its own: it's all %s."]:format(BaseName(CARD.now)))
@@ -635,7 +655,6 @@ function ns.CreateCardStylePanel(kit)
 	end
 	kit.AddControl(own)
 	local back = rows.Dropdown(L["Back to its style:"], { get = function() return nil end, set = function(index)
-		if IsDefault() then return end
 		if index == "all" then
 			for _, group in ipairs(GROUPS) do Follow(CARD.now, group) end
 		elseif GROUPS[index] then
@@ -643,36 +662,18 @@ function ns.CreateCardStylePanel(kit)
 		end
 	end }, function()
 		local list = {}
-		if IsDefault() then return list end
 		for i, group in ipairs(GROUPS) do
 			if OwnGroup(CARD.now, group) then list[#list + 1] = { value = i, text = L[group[1]] } end
 		end
 		if #list > 1 then list[#list + 1] = { value = "all", text = L["All of them"] } end
 		return list
 	end, L["Puts one of the event's own settings back, to come from the style it starts from again."], function(db)
-		return not IsDefault() and #OwnNames(CARD.now) > 0 and rows.On(db)
+		return #OwnNames(CARD.now) > 0 and rows.On(db)
 	end)
 	if back and back.SetDefaultText then back:SetDefaultText(L["Pick a setting"]) end
 
-	-- A whole look in one pick, for the Default style: one of the ready-made
-	-- styles (the events' own settings, and the styles they start from, left
-	-- as they are).
-	local presetKeys = {}
-	for _, field in ipairs(ns.CARD_FIELDS) do presetKeys[#presetKeys + 1] = ns.CardKey(field[1]) end
-	-- (The ready-made styles, the Lower third first: the Default style's own.)
-	local presetList = { { L["Lower third"], L["The words over a line low on the left, the rest under it, its " ..
-		"letters closing up."], {} } }
-	for _, style in ipairs(ns.CARD_STYLES) do
-		local values = {}
-		for field, value in pairs(style.look) do values[ns.CardKey(field)] = value end
-		presetList[#presetList + 1] = { L[style.name], nil, values }
-	end
-	local presets = rows.PresetMenu(presetList, presetKeys)
-	if presets then kit.GreyUnless(presets, function(db) return rows.On(db) and IsDefault() end) end
-
 	-- The icon's own picture: a button after the Icon tick opening every icon
 	-- the game has (IconBrowser.lua). Right-click: back to the event's own.
-	-- (The Default style's: each event's own icon.)
 	local browser = ns.IconBrowser(canvas, function(key, icon)
 		ns.GetDB()[key] = icon
 		Changed()
@@ -695,7 +696,6 @@ function ns.CreateCardStylePanel(kit)
 		kit.Tooltip(button, L["The icon. Click to pick it from all the game's. Right-click: back to the event's own."])
 		button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
 		button:SetScript("OnClick", function(self, mouse)
-			if IsDefault() then return end
 			local key = ns.CardKey("Icon", CARD.now)
 			if mouse == "RightButton" then
 				ns.GetDB()[key] = "default"
@@ -707,9 +707,8 @@ function ns.CreateCardStylePanel(kit)
 		end)
 		button:SetScript("OnEnable", function(self) self:SetAlpha(1) end)
 		button:SetScript("OnDisable", function(self) self:SetAlpha(0.4) end)
-		button.Refresh = function(self)
-			self:SetShown(not IsDefault())
-			icon:SetTexture(not IsDefault() and ns.CardLook(CARD.now).combatIconIn or nil)
+		button.Refresh = function()
+			icon:SetTexture(ns.CardLook(CARD.now).combatIconIn)
 		end
 		kit.GreyUnless(button, function(db) return rows.On(db) and ns.CardRaw(CARD.now, "IconShow") end)
 		kit.AddControl(button)
@@ -722,62 +721,169 @@ function ns.CreateCardStylePanel(kit)
 	kit.RegisterSubpage(canvas, "Card Style", L["Card Vision"])
 end
 
--- Settings: an event picked from a dropdown (the Style tab's, without the
--- Default style: it has none) and what's its alone: when it fires, its
--- lines, its words.
-function ns.CreateCardSettingsPanel(kit)
+-- Card Types: a style picked from a dropdown and its look, for every card that
+-- starts from it (each card's own settings over it).
+function ns.CreateCardStylesPanel(kit)
 	local canvas, content = kit.CreateScrollPage()
 	local title = kit.Label(content, "GameFontNormalLarge", L["Card Vision"])
 	CardTabs(content, title, 2)
 	local intro = kit.PageIntro(content, title,
-		L["What's each card's alone: when it shows, the lines with its name, its words. Pick the event in the " ..
-		"dropdown. How the cards look: the Style tab."])
+		L["The styles the cards start from. Change one here and every card that starts from it changes too, " ..
+		"except where a card has a setting of its own (its Style page, from its row on the Events tab). Changes " ..
+		"play at once in the preview."])
+	local preview
+	local function Changed()
+		if preview then preview:Refresh() end
+	end
 	local switch = kit.PageSwitch(content, "cards", L["Enable Page"],
-		L["On: each card shows as the Events tab says, as this tab sets it. Off: none of them do. Each setting " ..
-		"keeps its value for when you turn this back on."], intro)
+		L["On: each card shows as the Events tab says, in its style. Off: none of them do. Each setting keeps " ..
+		"its value for when you turn this back on."], intro, Changed)
 	local stack = kit.Stack(switch, "check")
-	-- (With the Default style picked on another tab: the first event.)
-	local function Now() return CARD.now == "default" and ns.CARD_EVENTS[1].id or CARD.now end
 
-	-- What it shows, as on the Style tab: the event's icon, "Editing", the
-	-- dropdown and Test.
+	-- The look's rows edit the picked style (showing what shows: your change,
+	-- else how it comes; a change is yours).
+	local isField = {}
+	for _, field in ipairs(ns.CARD_FIELDS) do isField[field[1]] = true end
+	local fields = {}
+	local function FieldOf(key)
+		local name = type(key) == "string" and key:match("^card(%u%w*)$")
+		if not (name and isField[name]) then return key end
+		fields[name] = fields[name] or {
+			get = function() return ns.CardStyleRaw(CARD.style, name) end,
+			set = function(value) ns.GetDB()[ns.CardStyleKey(name, CARD.style)] = value end,
+		}
+		return fields[name]
+	end
+	for _, field in ipairs(ns.CARD_FIELDS) do
+		for _, style in ipairs(ns.CARD_STYLES) do kit.RecordKey(content, ns.CardStyleKey(field[1], style.id)) end
+	end
+	local rows = ns.StyleRows(kit, content, stack, Changed, "cards", FieldOf)
+
+	-- The settings changed from how the style comes, by the list's names.
+	local function Changes(style)
+		local names = {}
+		for _, group in ipairs(GROUPS) do
+			for _, field in ipairs(group[2]) do
+				if ns.CardStyleIsOwn(style, field) then
+					names[#names + 1] = L[group[1]]
+					break
+				end
+			end
+		end
+		return names
+	end
+	-- The card it plays: the first one using it, else the zone's.
+	local function Sample()
+		local users = ns.CardStyleUsers(CARD.style)
+		return users[1] and users[1].id or "zone"
+	end
+
+	-- What it shows: "Editing", the dropdown and a line saying which cards
+	-- use it.
 	local bar = CreateFrame("Frame", nil, content)
 	bar:SetSize(480, 30)
 	stack:Add(bar, "label")
-	local barIcon = bar:CreateTexture(nil, "ARTWORK")
-	barIcon:SetSize(26, 26)
-	barIcon:SetPoint("LEFT", 2, 0)
-	barIcon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
 	local editing = kit.Label(bar, "GameFontNormalLarge", L["Editing"])
-	editing:SetPoint("LEFT", barIcon, "RIGHT", 8, 0)
-	local test = ns.PanelButton(content)
-	test:SetSize(60, 22)
-	test:SetText(L["Test"])
-	kit.Tooltip(test, L["Shows its card now, to see how it looks (close the settings to see it)."])
-	test:SetScript("OnClick", function() ns.CardTest(Now()) end)
-	TestStops(test, Now)
-	test.pageSwitch = false
-	local picker = kit.Dropdown(content, { get = Now, set = function(id) CARD.now = id end },
-		function()
+	editing:SetPoint("LEFT", 2, 0)
+	local barLine = kit.Label(bar, "GameFontHighlightSmall", "")
+	barLine:SetWidth(320)
+	barLine:SetJustifyH("LEFT")
+	barLine:SetWordWrap(false)
+	local picker = kit.Dropdown(content, { get = function() return CARD.style end,
+		set = function(id) CARD.style = id end }, function()
 			local list = {}
-			for _, event in ipairs(ns.CARD_EVENTS) do list[#list + 1] = { value = event.id, text = L[event.name] } end
+			for _, style in ipairs(ns.CARD_STYLES) do list[#list + 1] = { value = style.id, text = L[style.name] } end
 			return list
-		end, 230, function() kit.Refresh() end)
+		end, 200, function() kit.Refresh() end)
 	if picker then
 		picker:SetPoint("LEFT", editing, "RIGHT", 12, 0)
 		picker:SetFrameLevel(bar:GetFrameLevel() + 3)
 		picker.pageSwitch = false
-		kit.Tooltip(picker, L["The event whose settings this tab shows and sets."])
-		test:SetPoint("LEFT", picker, "RIGHT", 12, 0)
+		kit.Tooltip(picker, L["The style this tab shows and sets."])
+		barLine:SetPoint("LEFT", picker, "RIGHT", 12, 0)
 	else
-		test:SetPoint("LEFT", editing, "RIGHT", 12, 0)
+		barLine:SetPoint("LEFT", editing, "RIGHT", 12, 0)
 	end
 	bar.pageSwitch = false
 	bar.Refresh = function()
-		local event = ns.CARD_BY_ID[Now()]
-		barIcon:SetTexture(event and event.icon or "Interface\\Icons\\INV_Misc_Book_09")
+		local names = {}
+		for _, event in ipairs(ns.CardStyleUsers(CARD.style)) do names[#names + 1] = L[event.name] end
+		barLine:SetText(#names > 0 and L["Used by: %s"]:format("|cffffd100" .. table.concat(names, ", ") .. "|r")
+			or L["No card uses it yet."])
 	end
 	kit.AddControl(bar)
+
+	preview = ns.MakeCardPreview(content, 480, nil, Sample, function() return ns.CardStyleLook(CARD.style, Sample()) end)
+	preview.pageSwitch = false
+	stack:Add(preview, "label")
+	ns.StylePopout(preview, kit.Tooltip) -- (StylePages.lua)
+	kit.AddControl(preview)
+	ns.StylePreviewTest(preview, kit, L["Plays a card in this style in the preview and on your screen (close the " ..
+		"settings to see it there): the first card using it, else the zone you're in."], function()
+			preview:Refresh()
+			local id = Sample()
+			local card = ns.CardSample(id)
+			if id == "zone" and not card.name then card.name = GetRealZoneText and GetRealZoneText() or "Darkshore" end
+			card.look = ns.CardStyleLook(CARD.style, id)
+			ns.Cards.Fire(id, card, true)
+		end)
+
+	-- What's changed from how it comes, and a dropdown to put one back.
+	local own = kit.Label(content, "GameFontHighlightSmall", "")
+	own:SetWidth(NOTE_W)
+	own:SetJustifyH("LEFT")
+	stack:Add(own, "label")
+	own.Refresh = function(self)
+		local names = Changes(CARD.style)
+		self:SetText(#names == 0 and L["As it comes: nothing changed."]
+			or L["Changed: %s."]:format(table.concat(names, ", ")))
+	end
+	kit.AddControl(own)
+	local back = rows.Dropdown(L["Back as it comes:"], { get = function() return nil end, set = function(index)
+		local db = ns.GetDB()
+		for i, group in ipairs(GROUPS) do
+			if index == "all" or index == i then
+				for _, field in ipairs(group[2]) do db[ns.CardStyleKey(field, CARD.style)] = "default" end
+			end
+		end
+	end }, function()
+		local list = {}
+		for i, group in ipairs(GROUPS) do
+			for _, field in ipairs(group[2]) do
+				if ns.CardStyleIsOwn(CARD.style, field) then
+					list[#list + 1] = { value = i, text = L[group[1]] }
+					break
+				end
+			end
+		end
+		if #list > 1 then list[#list + 1] = { value = "all", text = L["All of them"] } end
+		return list
+	end, L["Puts one of your changes to the style back, as it comes."], function(db)
+		return #Changes(CARD.style) > 0 and rows.On(db)
+	end)
+	if back and back.SetDefaultText then back:SetDefaultText(L["Pick a setting"]) end
+
+	LookRows(content, stack, rows)
+
+	canvas:SetScript("OnShow", kit.PageShown(kit.Refresh, content)) -- (its refresh plays the preview)
+	canvas:Hide()
+	kit.RegisterSubpage(canvas, "Card Styles", L["Card Vision"])
+end
+
+-- Settings: what's an event's alone (opened from its row): when it fires,
+-- its lines, its words.
+function ns.CreateCardSettingsPanel(kit)
+	local canvas, content = kit.CreateScrollPage()
+	local title = kit.Label(content, "GameFontNormalLarge", L["Card Vision"])
+	local under = CardTop(kit, content, title, 1)
+	local intro = kit.PageIntro(content, title,
+		L["What's this card's alone: when it shows, the lines with its name, its words. How it looks: the Style " ..
+		"tab."], under)
+	local switch = kit.PageSwitch(content, "cards", L["Enable Page"],
+		L["On: each card shows as the Events tab says, as this tab sets it. Off: none of them do. Each setting " ..
+		"keeps its value for when you turn this back on."], intro)
+	local stack = kit.Stack(switch, "check")
+	local function Now() return CARD.now end
 
 	-- What's each event's alone.
 	local parts = Parts(kit, content, stack, Now)
@@ -825,6 +931,10 @@ function ns.CreateCardSettingsPanel(kit)
 		Check("timeOfDayMessage", L["Time of day at login"], L["Dawn, Morning, Midday, Afternoon, Evening, Dusk or " ..
 			"Night as you log in or reload: over the name on this card, or under the game's zone name with Zone " ..
 			"unticked. Follows the clock picked on the Tint page."])
+		Header(L["When"])
+		local gap = stack:Add(kit.Slider(content, "storyZoneGap", L["Not again within"], 0, 30, 1, "%d s"), "slider")
+		kit.Tooltip(gap, L["After a Zone or Subzone card, no other comes for this long, so passing through " ..
+			"places quickly doesn't bring one after another. 0: every time."])
 	end)
 	parts.Part("subzone", function()
 		stack:Note(content, L["Only with Zone ticked: it takes the game's zone text away. Its look follows Zone's " ..
@@ -908,6 +1018,13 @@ function ns.CreateCardSettingsPanel(kit)
 		stack:Note(content, L["Nothing of its own here: its look is on the Style tab, a sound for each time of day " ..
 			"on the Sounds tab."], NOTE_W)
 	end)
+	for _, id in ipairs({ "cleared", "discover", "arrival", "rested", "levelUp", "achievement", "reputation", "collect",
+		"profession", "quest", "rare", "battleground", "streak" }) do
+		parts.Part(id, function()
+			stack:Note(content, L["Nothing of its own here: its look is on the Style tab, its sound on the Sounds tab."],
+				NOTE_W)
+		end)
+	end
 	parts.Finish()
 
 	canvas:SetScript("OnShow", kit.PageShown(kit.Refresh, content))
@@ -915,73 +1032,21 @@ function ns.CreateCardSettingsPanel(kit)
 	kit.RegisterSubpage(canvas, "Card Settings", L["Card Vision"])
 end
 
--- Sounds: the same dropdown as the Style tab's (the Default style first),
--- and the picked event's sounds. The Default style has none: each event's
--- sound is its own.
+-- Sounds: an event's sounds (opened from its row).
 function ns.CreateCardSoundsPanel(kit)
 	local canvas, content = kit.CreateScrollPage()
 	local title = kit.Label(content, "GameFontNormalLarge", L["Card Vision"])
-	CardTabs(content, title, 4)
-	local intro = kit.PageIntro(content, title,
-		L["What each card plays as it shows. Pick the event in the dropdown: its sounds are its own, the Default " ..
-		"style has none."])
+	local under = CardTop(kit, content, title, 3)
+	local intro = kit.PageIntro(content, title, L["What this card plays as it shows."], under)
 	local switch = kit.PageSwitch(content, "cards", L["Enable Page"],
 		L["On: each card shows as the Events tab says, with its sounds. Off: none of them do. Each setting keeps " ..
 		"its value for when you turn this back on."], intro)
 	local stack = kit.Stack(switch, "check")
-	local function IsDefault() return CARD.now == "default" end
-
-	-- What it shows, as on the Style tab: the event's icon, "Editing", the
-	-- dropdown and Test.
-	local bar = CreateFrame("Frame", nil, content)
-	bar:SetSize(480, 30)
-	stack:Add(bar, "label")
-	local barIcon = bar:CreateTexture(nil, "ARTWORK")
-	barIcon:SetSize(26, 26)
-	barIcon:SetPoint("LEFT", 2, 0)
-	barIcon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
-	local editing = kit.Label(bar, "GameFontNormalLarge", L["Editing"])
-	editing:SetPoint("LEFT", barIcon, "RIGHT", 8, 0)
-	local test = ns.PanelButton(content)
-	test:SetSize(60, 22)
-	test:SetText(L["Test"])
-	kit.Tooltip(test, L["Shows its card now, with its sound (close the settings to see it)."])
-	test:SetScript("OnClick", function() if not IsDefault() then ns.CardTest(CARD.now) end end)
-	TestStops(test, function() return CARD.now end)
-	test.pageSwitch = false
-	test.Refresh = function(self) self:SetShown(not IsDefault()) end
-	kit.AddControl(test)
-	local picker = kit.Dropdown(content, { get = function() return CARD.now end, set = function(id) CARD.now = id end },
-		function()
-			local list = { { value = "default", text = L["Default style"],
-				tip = L["No sounds: each event's are its own."] } }
-			for _, event in ipairs(ns.CARD_EVENTS) do list[#list + 1] = { value = event.id, text = L[event.name] } end
-			return list
-		end, 230, function() kit.Refresh() end)
-	if picker then
-		picker:SetPoint("LEFT", editing, "RIGHT", 12, 0)
-		picker:SetFrameLevel(bar:GetFrameLevel() + 3)
-		picker.pageSwitch = false
-		kit.Tooltip(picker, L["The event whose sounds this tab shows and sets."])
-		test:SetPoint("LEFT", picker, "RIGHT", 12, 0)
-	else
-		test:SetPoint("LEFT", editing, "RIGHT", 12, 0)
-	end
-	bar.pageSwitch = false
-	bar.Refresh = function()
-		local event = ns.CARD_BY_ID[CARD.now]
-		barIcon:SetTexture(event and event.icon or "Interface\\Icons\\INV_Misc_Book_09")
-	end
-	kit.AddControl(bar)
 
 	-- (Each event's sound rules: CombatSoundRules.lua. Entering and Leaving
 	-- combat's one list, shown on both; Boss's its own; Time of day's a rule for each time; the rest's
 	-- own, read as the card shows.)
 	local parts = Parts(kit, content, stack, function() return CARD.now end)
-	parts.Part("default", function()
-		stack:Note(content, L["The Default style has no sounds: each card's are its own. Pick an event above."],
-			NOTE_W)
-	end)
 	parts.Part("combatIn", function() ns.CombatSoundRulesSection(kit, content, stack) end)
 	parts.Part("combatOut", function() ns.CombatSoundRulesSection(kit, content, stack) end)
 	parts.Part("boss", function() ns.CombatSoundRulesSection(kit, content, stack, true) end)

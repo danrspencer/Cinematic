@@ -1744,6 +1744,8 @@ do
 			{ "Duel Vision", "Interface\\Icons\\Ability_DualWield", section = "World" },
 			-- (CardsPage.lua's: Battle Vision's and Story Vision's moments, one page)
 			{ "Card Vision", "Interface\\Icons\\INV_Misc_Book_09", section = "World" },
+			{ "Card Styles", "Interface\\Icons\\INV_Misc_Book_09", label = "Card Types", tabOf = "Card Vision" },
+			-- (an event's own pages: not tabs on the page's, opened from its row)
 			{ "Card Settings", "Interface\\Icons\\INV_Misc_Book_09", tabOf = "Card Vision" },
 			{ "Card Style", "Interface\\Icons\\INV_Misc_Book_09", tabOf = "Card Vision" },
 			{ "Card Sounds", "Interface\\Icons\\INV_Misc_Book_09", tabOf = "Card Vision" },
@@ -14669,6 +14671,7 @@ ns.OnLanguage(function()
 	end
 	if ns.CreateCardsPanel then -- (CardsPage.lua)
 		ns.CreateCardsPanel(ns.lowHealthKit)
+		ns.CreateCardStylesPanel(ns.lowHealthKit)
 		ns.CreateCardSettingsPanel(ns.lowHealthKit)
 		ns.CreateCardStylePanel(ns.lowHealthKit)
 		ns.CreateCardSoundsPanel(ns.lowHealthKit)
