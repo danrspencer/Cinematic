@@ -25,6 +25,7 @@ DEFAULTS.teleportVisionEdgeReach = 0.35 -- how far in (share of the screen) they
 DEFAULTS.teleportVisionEdgeAlpha = 1    -- how dark they get
 DEFAULTS.teleportVisionEdgeClose = 0    -- seconds before the cast ends that they close over the whole screen (0: never)
 DEFAULTS.teleportVisionHideCast = true  -- your cast bar faded out (over CAST_FADE seconds) while it shows: the portal is the cast's progress
+DEFAULTS.teleportVisionFadeTooltip = true -- ...and the tooltip, the same way
 
 local ART = "Interface\\AddOns\\" .. ADDON_NAME .. "\\Textures\\LowHealth\\"
 local RIM = 0.43           -- where the ring texture's rim is (a share of its half-width)
@@ -295,38 +296,59 @@ driver:SetScript("OnUpdate", function()
 	Update()
 end)
 
--- Your cast bar kept invisible while it shows a teleport Teleport Vision is
--- showing (teleportVisionHideCast), as Camera.lua does for Fishing: the bar
--- sets itself back to full as a cast starts, so its own events are followed
--- and the alpha set again after them; put back (and CineMode's fade on it)
--- once the cast is over.
+-- Your cast bar and the tooltip faded out over the cast's first CAST_FADE
+-- seconds while it shows a teleport Tele Vision is showing (teleportVisionHideCast,
+-- teleportVisionFadeTooltip), so you see it start, then the portal is the
+-- progress. The bar sets itself back to full as a cast starts, so its own
+-- events are followed too, and both are set again each frame while it lasts.
+-- Over (gone) or cancelled: both put back at once (and CineMode's fade on the
+-- bar, Tooltips' own on the tooltip as it next shows).
 local CAST_BARS = { "PlayerCastingBarFrame", "CastingBarFrame", "GamepadPlayerCastingBarFrame" }
-local function HideWanted()
+local CAST_FADE = 3 -- seconds they take to fade out
+-- The alpha wanted for the bar or the tooltip (key: its setting) now, or nil: not faded.
+local function FadeWanted(key)
 	local db = ns.GetDB()
 	local cast = ns.departCast
-	return db and db.teleportVisionHideCast and ns.Setting("teleportVision") and cast and cast.scene
-		and not cast.done and true or false
+	if not (db and db[key] and ns.Setting("teleportVision") and cast and cast.scene and not cast.done) then
+		return nil
+	end
+	return math.max(0, 1 - (GetTime() - cast.startAt) / CAST_FADE)
 end
-local CAST_FADE = 3 -- seconds the cast bar takes to fade out (so you see the cast start)
 local function UpdateCastBar(bar)
-	if HideWanted() then
+	local alpha = FadeWanted("teleportVisionHideCast")
+	if alpha then
 		bar.cinematicTeleHidden = true
-		bar:SetAlpha(math.max(0, 1 - (GetTime() - ns.departCast.startAt) / CAST_FADE))
+		bar:SetAlpha(alpha)
 	elseif bar.cinematicTeleHidden then
 		bar.cinematicTeleHidden = nil
 		if bar:IsShown() then bar:SetAlpha(1) end
 		if ns.ReapplyCastBar then ns.ReapplyCastBar(bar) end -- (unless CineMode has it faded: Cast bar row)
 	end
 end
+local tooltipFaded = false
+local function UpdateTooltip()
+	local alpha = FadeWanted("teleportVisionFadeTooltip")
+	if alpha then
+		tooltipFaded = true
+		GameTooltip:SetAlpha(alpha)
+	elseif tooltipFaded then
+		tooltipFaded = false
+		GameTooltip:SetAlpha(1)
+	end
+end
+-- (A tooltip that comes up meanwhile shows at full: faded straight away.)
+GameTooltip:HookScript("OnShow", function() if tooltipFaded then UpdateTooltip() end end)
 local hookedBars = {}
--- (Faded a little more each frame while it's wanted: the bar's own events
--- alone come too seldom for a smooth fade.)
-local barFader = CreateFrame("Frame")
-barFader:Hide()
-barFader:SetScript("OnUpdate", function(self)
-	local wanted = HideWanted()
+-- (Set each frame while it lasts: the bar's own events alone come too seldom
+-- for a smooth fade. It runs on till both are back.)
+local castFader = CreateFrame("Frame")
+castFader:Hide()
+castFader:SetScript("OnUpdate", function(self)
 	for bar in pairs(hookedBars) do UpdateCastBar(bar) end
-	if not wanted then self:Hide() end
+	UpdateTooltip()
+	if not FadeWanted("teleportVisionHideCast") and not FadeWanted("teleportVisionFadeTooltip") then
+		self:Hide()
+	end
 end)
 local barWatcher = CreateFrame("Frame")
 barWatcher:RegisterEvent("PLAYER_LOGIN")
@@ -342,10 +364,10 @@ barWatcher:SetScript("OnEvent", function()
 			bar:HookScript("OnEvent", UpdateCastBar)
 			bar:HookScript("OnShow", UpdateCastBar)
 		end
-		-- (After Camera.lua has noted the cast: next frame.)
-		if bar then C_Timer.After(0, function() UpdateCastBar(bar) end) end
 	end
-	C_Timer.After(0, function() if HideWanted() then barFader:Show() end end)
+	-- (After Camera.lua has noted the cast, or its end: next frame. One more
+	-- run puts back what was faded, on a cancel too.)
+	C_Timer.After(0, function() castFader:Show() end)
 end)
 
 -- The page's test: a pretend cast of TEST_TIME seconds (again: stop).
@@ -534,6 +556,8 @@ function ns.CreateTeleportVisionPanel(kit)
 	rows.Check("teleportVisionHideCast", L["Fade out your cast bar"], L["Your cast bar fades out over the " ..
 		"first 3 seconds of the cast, so you see it start, then the portal closing in is its progress. Other " ..
 		"casts show it as usual."], On)
+	rows.Check("teleportVisionFadeTooltip", L["Fade out the tooltip"], L["The tooltip fades out over the " ..
+		"first 3 seconds of the cast too, and comes back as the cast ends or is cancelled."], On)
 	rows.Check("teleportVisionMotes", L["Motes spiraling in"], L["Motes of its color winding in from the rim."],
 		On)
 
