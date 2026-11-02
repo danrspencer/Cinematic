@@ -182,7 +182,8 @@ local ZOOM_YOURS = 1.5  -- yards from where it zoomed to: you've zoomed yourself
 local CVAR = "cameraYawMoveSpeed"
 local WHO = "chatcam" -- (its hold on your turn speed: ns.HoldSpeed, Core.lua)
 
-local FOLLOW_CVARS = { values = { cameraSmoothStyle = "0" } } -- (camera follow would pull the view back)
+local FOLLOW_CVARS = ns.CVarSet("Follow off: Chat Cam", "camera follow off while Chat Cam turns",
+	{ values = { cameraSmoothStyle = "0" } }) -- (camera follow would pull the view back)
 
 -- amount: degrees turned, counted (positive: toward the right of the screen).
 -- kind: "swing", "snap", "drift", "track" or "back". stopping: easing to a stop early.

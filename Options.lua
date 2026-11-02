@@ -1744,6 +1744,10 @@ do
 			{ "Why showing", "Interface\\Icons\\Ability_Hunter_EagleEye", label = "Why Is It Showing?", section = "Help" }, -- (Why.lua)
 			{ "Module Editor", "Interface\\Icons\\INV_Misc_Wrench_01", section = "Dev", dev = true }, -- (ModuleEditor.lua)
 		} },
+		-- (The dev copy's own hub: none of its pages are in the release, so neither is it.)
+		{ name = "Dev", pages = {
+			{ "Held Game Settings", "Interface\\Icons\\INV_Gizmo_02", dev = true }, -- (HeldSettingsPage.lua)
+		} },
 	}
 	-- Pages still being worked on: "(WIP)" after the name on their icon's mouseover.
 	-- (dev = true on a page above: it's only in the dev copy (CinematicDev.toc), and
@@ -14645,6 +14649,9 @@ ns.OnLanguage(function()
 	if ns.isDev and ns.CreateModuleEditor then
 		ns.CreateModuleEditor({ CreateScrollPage = CreateScrollPage, Label = Label, PageShown = PageShown,
 			RegisterSubpage = RegisterSubpage, Tooltip = Tooltip, PageIntro = PageIntro, Header = Header })
+	end
+	if ns.isDev and ns.CreateHeldSettingsPage then -- (HeldSettingsPage.lua: the Dev hub)
+		ns.CreateHeldSettingsPage(ns.lowHealthKit)
 	end
 	GuardGamepadClose()
 end)

@@ -101,7 +101,8 @@ local INPUT_GRACE = 1 -- seconds: camera input this soon is the click that opene
 local CLICK_WINDOW = 2 -- seconds: a click on the world this soon before the window opened is what opened it
 local LOG_MAX = 4000  -- frames kept by /cine debug questlog
 
-local FOLLOW_CVARS = { values = { cameraSmoothStyle = "0" } }
+local FOLLOW_CVARS = ns.CVarSet("Follow off: quest cam", "camera follow off while the quest cam runs",
+	{ values = { cameraSmoothStyle = "0" } })
 
 local cam = { active = false, steps = {} }
 

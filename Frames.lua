@@ -8072,7 +8072,8 @@ do
 		end
 		for group, cvar in pairs(AURA_CVAR_ROWS) do
 			if not auraStandIns[group] and GetCVar(cvar) ~= nil then
-				local set = { values = { [cvar] = "0" }, playerWins = true }
+				local set = ns.CVarSet("Raid " .. group .. " off", "Forever: raid frame auras faded by their row",
+					{ values = { [cvar] = "0" }, playerWins = true })
 				local standIn = CreateFrame("Frame", nil, UIParent)
 				standIn:SetSize(1, 1)
 				standIn:SetPoint("TOPLEFT")

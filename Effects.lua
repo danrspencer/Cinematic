@@ -74,11 +74,13 @@ for _, group in ipairs(ns.NAME_GROUPS) do
 	for _, cvar in ipairs(group.cvars) do values[cvar] = "0" end
 	-- Secure: the game blocks changing name settings in combat. A fight's
 	-- names are set just before it starts (ns.UpdateCVarsForFight).
-	CVAR_SETS[#CVAR_SETS + 1] = { key = group.key, values = values, secure = true, playerWins = true }
+	CVAR_SETS[#CVAR_SETS + 1] = ns.CVarSet("Names: " .. group.key, "CineMode hides this kind's names over heads",
+		{ key = group.key, values = values, secure = true, playerWins = true })
 end
 -- The game's All NPCs names: off unless all three NPC rows are kept up here.
 local NPC_ALL = "UnitNameNPC"
-CVAR_SETS[#CVAR_SETS + 1] = { key = "AllNPCs", values = { [NPC_ALL] = "0" }, secure = true, playerWins = true }
+CVAR_SETS[#CVAR_SETS + 1] = ns.CVarSet("Names: All NPCs", "off unless all three NPC name rows stay up",
+	{ key = "AllNPCs", values = { [NPC_ALL] = "0" }, secure = true, playerWins = true })
 
 -- Whether CineMode keeps every nameplate switched on (see FORCED_PLATE_CVARS),
 -- leaving what shows to the plates' fades: everywhere but dungeons and raids,
@@ -204,19 +206,19 @@ end
 
 -- Switched off once plates have faded out (so invisible plates can't be
 -- clicked). Can't be changed during combat lockdown.
-local PLATE_CVARS = {
+local PLATE_CVARS = ns.CVarSet("Plates off", "every plate faded out: switched off so they can't be clicked", {
 	secure = true,
 	playerWins = true,
 	values = {
 		nameplateShowEnemies = "0", nameplateShowFriends = "0", nameplateShowFriendlyPlayers = "0",
 		nameplateShowFriendlyNPCs = "0",
 	},
-}
+})
 
 -- Floating combat text (damage and healing numbers, like "+10" from a heal or
 -- regen): off in cinematic mode while you're out of combat; back for fights.
 -- CVars this client doesn't have are skipped (retail's end in _v2).
-local COMBAT_TEXT_CVARS = {
+local COMBAT_TEXT_CVARS = ns.CVarSet("Combat text off", "CineMode out of fights (hideCombatText)", {
 	playerWins = true,
 	values = {
 		enableFloatingCombatText = "0",
@@ -233,15 +235,15 @@ local COMBAT_TEXT_CVARS = {
 		floatingCombatTextPetMeleeDamage_v2 = "0",
 		floatingCombatTextPetSpellDamage_v2 = "0",
 	},
-}
+})
 
 -- The selection circle the game draws on the ground under your target (a box
 -- on WoW Forever): off in CineMode unless its Standard Frames row
 -- (targetcircle) says to show it now.
-local TARGET_CIRCLE_CVARS = {
+local TARGET_CIRCLE_CVARS = ns.CVarSet("Target circle off", "CineMode, unless its Standard Frames row shows it", {
 	playerWins = true,
 	values = { ObjectSelectionCircle = "0" },
-}
+})
 
 -- Whether you were PvP flagged as the fight now under way started: names
 -- can't change mid-fight, so In PvP combat names go by that.
@@ -1499,9 +1501,9 @@ local duels = {
 	scanAt = 0,
 	selfUntil = 0, -- dueling yourself (asked or asking) until then, or until it ends
 	-- (Name-only friendly players have no health bar to watch: off meanwhile.)
-	cvars = { secure = true, playerWins = true,
-		values = { nameplateShowFriends = "1", nameplateShowFriendlyPlayers = "1",
-			nameplateShowOnlyNameForFriendlyPlayerUnits = "0" } },
+	cvars = ns.CVarSet("Duel plates", "Duel Vision: friendly player plates with health bars", { secure = true,
+		playerWins = true, values = { nameplateShowFriends = "1", nameplateShowFriendlyPlayers = "1",
+			nameplateShowOnlyNameForFriendlyPlayerUnits = "0" } }),
 }
 do
 	local SCAN_EVERY = 0.5
@@ -3268,7 +3270,9 @@ for _, kind in ipairs(LOCKED_PLATE_KINDS) do
 	for _, cvar in ipairs(PLATE_KIND_CVARS[kind]) do
 		values[cvar] = "0"
 	end
-	LOCKED_PLATE_SETS[kind] = { secure = true, playerWins = true, values = values }
+	LOCKED_PLATE_SETS[kind] = ns.CVarSet("Instance plates off: " .. kind,
+		"CineMode in dungeons and raids, as Friendly plates in dungeons and raids says",
+		{ secure = true, playerWins = true, values = values })
 end
 ns.LOCKED_PLATE_SETS = LOCKED_PLATE_SETS -- (ns.ShowPlatesNow, above)
 
@@ -3307,9 +3311,10 @@ end
 -- unit whose plate is switched off shows the game's own name over its head
 -- (or none). Plate names on: retail's plates otherwise follow the game's name
 -- settings, off for rows whose names are hidden. The player's own settings come back after.
-FORCED_PLATE_CVARS = { secure = true, playerWins = true, values = {
-	nameplateShowAll = "1", nameplateForceShowUnitName = "1", nameplateShowOnlyNameForFriendlyPlayerUnits = "0",
-} }
+FORCED_PLATE_CVARS = ns.CVarSet("All plates on", "CineMode away from instances: every plate on, fades decide",
+	{ secure = true, playerWins = true, values = {
+		nameplateShowAll = "1", nameplateForceShowUnitName = "1", nameplateShowOnlyNameForFriendlyPlayerUnits = "0",
+	} })
 for _, cvars in pairs(PLATE_KIND_CVARS) do
 	for _, cvar in ipairs(cvars) do
 		FORCED_PLATE_CVARS.values[cvar] = "1"
@@ -3321,8 +3326,10 @@ end
 -- pinned to the screen's edge, so rows and rules that look for plates (the
 -- elite words) still find an elite behind you; off, they go. Yours back
 -- after. Clients without it are left alone.
-ns.OFFSCREEN_PLATE_CVARS = { secure = true, playerWins = true, values = { nameplateShowOffscreen = "1" } }
-ns.NO_OFFSCREEN_PLATE_CVARS = { secure = true, playerWins = true, values = { nameplateShowOffscreen = "0" } }
+ns.OFFSCREEN_PLATE_CVARS = ns.CVarSet("Offscreen plates on", "CineMode, plateShowOffscreen ticked (elite rules)",
+	{ secure = true, playerWins = true, values = { nameplateShowOffscreen = "1" } })
+ns.NO_OFFSCREEN_PLATE_CVARS = ns.CVarSet("Offscreen plates off", "CineMode, plateShowOffscreen unticked",
+	{ secure = true, playerWins = true, values = { nameplateShowOffscreen = "0" } })
 
 -- Invisible plates still take clicks, so while every plate of a side
 -- (friendly or enemy) is faded out, that side's plates are made unclickable

@@ -41,7 +41,8 @@ local MAX_DEPTH = 4         -- Together and Repeat inside each other
 local MAX_SCRIPTS = 30
 local MAX_PLAYS = 3         -- Play steps inside each other (a camera playing itself, say)
 local EASES = { smooth = 0.5, gentle = 0.35, steady = 0.15 } -- share of a move spent speeding up (and slowing down)
-local FOLLOW_CVARS = { values = { cameraSmoothStyle = "0" } } -- camera follow off meanwhile
+local FOLLOW_CVARS = ns.CVarSet("Follow off: camera script", "camera follow off while a script plays",
+	{ values = { cameraSmoothStyle = "0" } }) -- camera follow off meanwhile
 ns.CAMERA_SCRIPT_EASES = { "smooth", "gentle", "steady" }
 
 -- ---------------------------------------------------------------------------

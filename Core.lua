@@ -2402,6 +2402,20 @@ function ns.RunOthersCVarPass(fn, ...)
 	return unpack(results, 2)
 end
 
+-- Every set of game settings the addon holds, for the dev copy's Held Game
+-- Settings page (HeldSettingsPage.lua): named where it's made, or listed the
+-- first time it's applied. label and why: what it is and what it's for (nil
+-- keeps what it has). Returns the set.
+ns.cvarSets = {}
+function ns.CVarSet(label, why, set)
+	set.label, set.why = label or set.label, why or set.why
+	if not set.listed then
+		set.listed = true
+		ns.cvarSets[#ns.cvarSets + 1] = set
+	end
+	return set
+end
+
 function ns.ApplyCVarSet(set, want)
 	if (set.active or false) == want then
 		return
@@ -2410,6 +2424,13 @@ function ns.ApplyCVarSet(set, want)
 		return -- try again once combat ends
 	end
 	set.active = want
+	-- (For the page: when it last took hold or let go, and how often.)
+	ns.CVarSet(nil, nil, set)
+	if want then
+		set.heldAt, set.holds = GetTime(), (set.holds or 0) + 1
+	else
+		set.letGoAt = GetTime()
+	end
 	for cvar, value in pairs(set.values) do
 		activeCVars[cvar] = want or nil
 		if want then

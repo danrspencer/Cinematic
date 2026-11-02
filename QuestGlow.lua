@@ -23,11 +23,12 @@ local CHECK_EVERY = 0.15
 -- soft targeting with gamepad mode), which would have let go of them and
 -- lost your own values. Held instead: written again (KeepHeld) and put back
 -- as they were when you untick it.
-local CVARS = { secure = true, values = {
-	SoftTargetInteract = "3", SoftTargetInteractRange = "20", SoftTargetInteractArc = "1",
-	SoftTargetInteractOnlyInRange = "0", SoftTargetNameplateInteract = "1",
-	SoftTargetIconGameObject = "1", nameplateGameObjectMaxDistance = "60",
-} }
+local CVARS = ns.CVarSet("Quest soft targeting", "Quest Vision: interact soft targeting and object icons",
+	{ secure = true, values = {
+		SoftTargetInteract = "3", SoftTargetInteractRange = "20", SoftTargetInteractArc = "1",
+		SoftTargetInteractOnlyInRange = "0", SoftTargetNameplateInteract = "1",
+		SoftTargetIconGameObject = "1", nameplateGameObjectMaxDistance = "60",
+	} })
 
 local function Known(value)
 	return not (issecretvalue and issecretvalue(value))

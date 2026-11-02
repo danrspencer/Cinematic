@@ -1526,7 +1526,8 @@ local TURN_FOLLOW_ACCEL = 30  -- degrees per second per second: eases the glide 
 local TURN_FOLLOW_DONE = 0.5  -- degrees: close enough to behind
 local GLIDE_BRAKE_MARGIN = 0.8 -- share of the full stopping speed allowed (some slack)
 -- While gliding, the game's own camera follow is off so the two don't fight.
-local TURN_FOLLOW_CVARS = { values = { cameraSmoothStyle = "0" } }
+local TURN_FOLLOW_CVARS = ns.CVarSet("Follow off: turn glide", "camera follow off while gliding behind you",
+	{ values = { cameraSmoothStyle = "0" } })
 local turnOffset, turnGlide = 0, 0
 local turnRate = 0          -- your turn speed (degrees per second, left positive), smoothed
 local TURN_SMOOTH = 0.08    -- seconds of smoothing on its jitter
@@ -2058,8 +2059,9 @@ end
 -- Optionally the max zoom distance is raised meanwhile; on the way back it's
 -- only restored once the camera is inside the old limit again, or the game
 -- would clamp the zoom with a visible snap.
-local ZOOM_MAX_CVARS = { values = { cameraDistanceMaxZoomFactor = "2.6" },
-	slack = 0.5 } -- (yards past where a zoom started that still counts as inside it)
+local ZOOM_MAX_CVARS = ns.CVarSet("Max zoom raised", "a camera zooming out past your max",
+	{ values = { cameraDistanceMaxZoomFactor = "2.6" },
+	slack = 0.5 }) -- (yards past where a zoom started that still counts as inside it)
 -- Raised only: a max already past it (Graphics+) is left as it is.
 local function RaiseZoomMax()
 	if not ZOOM_MAX_CVARS.active and (tonumber(GetCVar("cameraDistanceMaxZoomFactor")) or 0)
@@ -3666,7 +3668,8 @@ local FLYBY = {
 	MAX_ACCEL = 9,      -- degrees/sec per second: fly-by and arrival turns speed up no harder (the sways' most)
 	AGAINST_DRIFT = 0.3, -- degrees/sec: a fly-by or arrival turn against a drift faster than this waits for it to fade
 	FIRST = { 30, 60 }, -- seconds after takeoff for a random one on a route not timed yet
-	CVARS = { values = { cameraSmoothStyle = "0" } }, -- camera follow off (already off on flights)
+	CVARS = ns.CVarSet("Follow off: fly-by", "camera follow off for the fly-by",
+		{ values = { cameraSmoothStyle = "0" } }), -- camera follow off (already off on flights)
 }
 local flyby = { active = false }
 
@@ -4221,10 +4224,11 @@ end
 -- following instead: for RECENTER_TIME seconds, follow is set to "Always" with
 -- slowed swing speeds, so the camera eases round behind the character on its
 -- own, then the player's follow settings are put back. Zoom is untouched.
-ns.DEATH_CVARS = { values = { cameraSmoothStyle = "0" } }
-ns.RECENTER_CVARS = {
+ns.DEATH_CVARS = ns.CVarSet("Follow off: death", "camera follow off for the death camera",
+	{ values = { cameraSmoothStyle = "0" } })
+ns.RECENTER_CVARS = ns.CVarSet("Recenter", "follow Always with slow swings, to swing the camera behind you", {
 	values = { cameraSmoothStyle = "2", cameraYawSmoothSpeed = "45", cameraPitchSmoothSpeed = "30" },
-}
+})
 ns.wasOnTaxi = false
 
 -- duration and swing speeds (degrees per second) default to the flight-start
@@ -4264,7 +4268,8 @@ end
 -- moving character, which fights the orbit and makes it jitter. Turn it off
 -- for the whole flight; orbit offsets then stay put relative to the character
 -- (so the camera still banks with the flight) and add up sweep by sweep.
-ns.FLIGHT_CVARS = { values = { cameraSmoothStyle = "0" } }
+ns.FLIGHT_CVARS = ns.CVarSet("Follow off: flight", "camera follow off for the whole flight",
+	{ values = { cameraSmoothStyle = "0" } })
 
 -- Runs on the throttled tick: flight start, the end of a recenter, and camera
 -- follow for flights. Both CVar sets touch cameraSmoothStyle, so a recenter is
