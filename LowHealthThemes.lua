@@ -218,7 +218,7 @@ ns.LOW_HEALTH_THEMES = {
 	{ key = "outlaw", name = "Powder and sea", edge = "Smoke", body = { 0.35, 0.4, 0.45 },
 		shadow = { 0.05, 0.08, 0.12 }, flash = { 1, 0.75, 0.4 } },
 	-- No class's (More themes, LOW_HEALTH_MORE below): swirls.
-	{ key = "vortex", name = "Vortex", edge = "Smoke", body = { 0.22, 0.3, 0.45 }, shadow = { 0.02, 0.04, 0.1 },
+	{ key = "vortex", name = "Vortex", portal = { file = 197007 }, edge = "Smoke", body = { 0.22, 0.3, 0.45 }, shadow = { 0.02, 0.04, 0.1 },
 		flash = { 0.6, 0.8, 1 }, pulse = 0.8, swirl = {
 			{ tex = "Vortex", color = { 0.5, 0.65, 0.95 }, alpha = 0.75, spin = 6, reach = 0.6 },
 			{ tex = "Swirl", color = { 0.55, 0.75, 1 }, alpha = 0.3, spin = 9, reach = 0.5 },
@@ -236,7 +236,7 @@ ns.LOW_HEALTH_THEMES = {
 			{ tex = "Mote", kind = "spiral", color = { 0.8, 0.5, 1 }, size = { 0.015, 0.03 }, life = { 3, 5 },
 				rate = 25, hit = { 3, 5 } },
 		} },
-	{ key = "portal", name = "Dungeon portal", portal = { file = 197007 }, edge = "Glow", glow = { 0.55, 0.3, 1 },
+	{ key = "portal", name = "Dungeon portal", portal = { file = 165829 }, edge = "Glow", glow = { 0.55, 0.3, 1 },
 		glowAlpha = 0.45,
 		shadow = { 0.06, 0.02, 0.14 }, flash = { 0.7, 0.5, 1 }, pulse = 0.7, swirl = {
 			{ tex = "Vortex", color = { 0.45, 0.25, 0.85 }, alpha = 0.8, spin = -10, reach = 0.45 },

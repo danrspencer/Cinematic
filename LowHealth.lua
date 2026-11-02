@@ -2866,7 +2866,8 @@ function ns.CreateVitalsStylePanel(kit)
 		local portalName = stack:Add(kit.Label(content, "GameFontHighlight", "Theme's portal (dev copy)"), "label")
 		portalName.searchLabel = "Theme's portal"
 		Opacity("lowHealthPortalAlpha", "The theme's portal (one of the game's portal models), its swirling rim " ..
-			"closing in round the screen as you weaken. Only themes with one: Dungeon portal.", On)
+			"closing in round the screen as you weaken. Only themes with one: Dungeon portal (a pink ring closing in " ..
+			"round you) and Vortex (the old dungeon portal's blue rim).", On)
 	end
 	tabbed.Finish(swirlTab)
 

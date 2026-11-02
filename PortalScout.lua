@@ -11,13 +11,13 @@ local MODELS = {
 	{ 197007, "Dungeon portal (the old one)" },
 	{ 197011, "Dungeon portal, red" },
 	{ 197008, "Dungeon portal, green" },
-	{ 240937, "Dungeon portal, purple (Wrath's)" },
-	{ 240933, "Dungeon portal, blue" },
-	{ 240935, "Dungeon portal, green (Wrath's)" },
-	{ 240939, "Dungeon portal, red (Wrath's)" },
-	{ 165829, "Spell portal, purple" },
-	{ 165834, "Large spell portal, purple" },
-	{ 166523, "Mage portal" },
+	{ 240937, "Dungeon portal, purple (Wrath's)" }, -- (at -10: looks like 197007, blue; retail)
+	{ 240933, "Dungeon portal, blue" }, -- (the same)
+	{ 240935, "Dungeon portal, green (Wrath's)" }, -- (at -10: the whole screen green, too near)
+	{ 240939, "Dungeon portal, red (Wrath's)" }, -- (looks like 197007)
+	{ 165829, "Spell portal, purple" }, -- (at -10: a bright pink ring round you, in the middle)
+	{ 165834, "Large spell portal, purple" }, -- (at -10: streaks off to the bottom left)
+	{ 166523, "Mage portal" }, -- (at -10: like 165829, blue)
 	{ 1713776, "Fel portal" },
 	{ 1624366, "Void portal (Argus)" },
 	{ 5855151, "Dark swirl" },
