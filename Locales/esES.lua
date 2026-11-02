@@ -2707,6 +2707,8 @@ L["How far in it all comes: at 50% as the settings below say (and the theme's ow
 L["How bright both arts' colors are: at 50% as the theme has them; less, darker, down to black at 0%; more, lighter, toward white."] = "Lo brillantes que son los colores de ambos artes: al 50% como los tiene el tema; menos, más oscuros, hasta negro al 0%; más, más claros, hacia el blanco."
 L["Our effects"] = "Nuestros efectos"
 L["Sparks"] = "Chispas"
+L["Rising heat"] = "Calor ascendente"
+L["Soft wisps of heat rising from the bottom of the screen, flickering, higher the weaker you are. Fire themes have it."] = "Suaves volutas de calor que suben desde la parte inferior de la pantalla, parpadeando, más alto cuanto más débil estás. Los temas de fuego lo tienen."
 L["The theme's sparks (motes, stars, lightning) and the haze drifting over the edges."] = "Las chispas del tema (motas, estrellas, rayos) y la bruma que flota sobre los bordes."
 L["Ripple wave"] = "Onda"
 L["Second pattern:"] = "Segundo patrón:"

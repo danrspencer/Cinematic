@@ -32,6 +32,9 @@ middle, the swirl past it, so the more of the screen it covers the further
 in it has come.
   Swirl   wispy spiral arms
   Vortex  clouds wound into a whirlpool
+Heat (256 square, tiles both ways): soft upright wisps of rising heat, scrolled
+upward in the game; HeatMask (256 x 128): where it shows, full at the bottom,
+fading out above, so the heat rises from the bottom edge.
 Our own, made from scratch here; usage: make_lowhealth.py [name...] (from the
 addon folder; names: only those, by their function's name below)"""
 import math
@@ -809,7 +812,39 @@ def vortex():
     save("Vortex", shade, alpha, 32)
 
 
-MAKERS = [soak, crack_plate, frost, rime, smoke, flame, glow, vines, runes, fur, scales, leaves, wind, sun_moon, sprites, gas, swirl, vortex]
+def tiling_waves(x, y, count, max_fx, max_fy, seed):
+    """Noise that tiles both ways (x, y in 0..1): waves of whole numbers of
+    cycles across and down, so the edges meet. Wide across, long down: upright wisps."""
+    rng = np.random.default_rng(seed)
+    total = np.zeros_like(x)
+    for _ in range(count):
+        fx, fy = rng.integers(1, max_fx + 1), rng.integers(0, max_fy + 1)
+        total += np.sin(2 * np.pi * (fx * x + fy * y) + rng.uniform(0, 2 * np.pi)) / (1 + 0.3 * fx)
+    total -= total.min()
+    return total / total.max()
+
+
+def heat():
+    """Heat.tga: soft upright wisps, tiling both ways; HeatMask.tga: full at the
+    bottom, fading out up the texture."""
+    w = 256
+    y, x = np.mgrid[0:w, 0:w] / w
+    # (Bent sideways a little as they rise, like heat shimmering.)
+    bend = 0.025 * np.sin(2 * np.pi * (2 * y + 0.3)) + 0.012 * np.sin(2 * np.pi * (5 * y + 0.7))
+    wisps = tiling_waves((x + bend) % 1, y, 14, 9, 2, 901)
+    wisps = smoothstep(0.3, 1.0, wisps)
+    glow = tiling_waves(x, y, 6, 3, 1, 907)
+    save("Heat", np.ones_like(x), np.clip(wisps * 0.6 + glow * 0.4, 0, 1), 32)
+    h = 128
+    my, mx = np.mgrid[0:h, 0:w] / np.array([h, w])[:, None, None]
+    up = 1 - my  # (0 at the bottom row)
+    # (A top edge that wavers, so it doesn't end in a straight line.)
+    edge = 0.75 + 0.12 * np.sin(2 * np.pi * 3 * mx + 1) + 0.06 * np.sin(2 * np.pi * 7 * mx)
+    mask = smoothstep(edge, 0.0, up) ** 1.3
+    save("HeatMask", np.ones_like(mask), mask)
+
+
+MAKERS = [soak, crack_plate, frost, rime, smoke, flame, glow, vines, runes, fur, scales, leaves, wind, sun_moon, sprites, gas, swirl, vortex, heat]
 wanted = sys.argv[1:]
 for maker in MAKERS:
     if not wanted or maker.__name__ in wanted:

@@ -215,6 +215,23 @@ def swirls(img, theme, rng):
     return img
 
 
+def heat(img, theme):
+    """The theme's rising heat (LowHealth.lua's Apply at full): two layers of
+    wisps tiled across, cut to the bottom by its mask, added on as light."""
+    info = theme.get("heat")
+    if not info:
+        return img
+    h = int(H * 0.55 * info.get("reach", 1))
+    mask = np.asarray(tex("HeatMask").split()[3].resize((W, h), Image.LANCZOS), dtype=np.float32)[..., None] / 255
+    for tiles, alpha in ((4, 1), (7, 0.6)):
+        size = W // tiles
+        tile = np.asarray(tex("Heat").split()[3].resize((size, size), Image.LANCZOS), dtype=np.float32) / 255
+        reps = (h // size + 2, W // size + 2)
+        layer = np.tile(tile, reps)[:h, :W, None]
+        img[H - h:] += np.array(info["color"]) * layer * mask * info["alpha"] * BLOOD_ALPHA * alpha * 0.9
+    return img
+
+
 def render(theme):
     rng = random.Random(theme["key"])
     img = BG.copy()
@@ -231,6 +248,7 @@ def render(theme):
             rgb, a = full_art(name)
             ga = min(1, BLOOD_ALPHA * (theme.get("glowAlpha") or 1) * 0.8)
             img = img + rgb * np.array(theme["glow"]) * a * ga
+    img = heat(img, theme)
     drips(img, theme, rng)
     effects(img, theme, rng)
     out = Image.fromarray((np.clip(img, 0, 1) * 255).astype(np.uint8))

@@ -33,6 +33,8 @@
 --     color, alpha (0-1), spin (turns a minute at full; below 0 the other
 --     way), reach (0-1: how far in its clear middle closes at full)
 --   (A theme with no swirl of its own gets spiral arms: Arms, below.)
+--   heat     soft wisps of heat rising from the bottom edge (LowHealth.lua):
+--            { color, alpha, reach (how high, 1 as usual) }
 --   portal   one of the game's portal models round the screen (the dev copy's
 --            only, and parked: none has one. Tried: the old dungeon portal's
 --            blue rim (197007, -4 to -10) and the pink spell portal (165829, 3
@@ -54,7 +56,8 @@ ns.LOW_HEALTH_THEMES = {
 	-- Warrior
 	{ key = "wounds", name = "Battle wounds", edge = "Soak", body = BLOOD, glow = { 0.5, 0.05, 0.05 },
 		glowAlpha = 0.5, shadow = DARK_RED, flash = { 1, 0, 0 } },
-	{ key = "rage", name = "Rage", edge = "Soak", body = { 1, 0.12, 0.05 }, glow = { 1, 0.35, 0.1 },
+	{ key = "rage", name = "Rage",
+		heat = { color = { 1, 0.3, 0.08 }, alpha = 0.45, reach = 0.8 }, edge = "Soak", body = { 1, 0.12, 0.05 }, glow = { 1, 0.35, 0.1 },
 		glowAlpha = 0.8, shadow = { 0.45, 0.05, 0 }, flash = { 1, 0.3, 0 }, pulse = 1.6, bpm = 1.25 },
 	{ key = "shield", name = "Battered shield", edge = "Smoke", body = { 0.3, 0.31, 0.34 },
 		shadow = { 0.1, 0.1, 0.12 }, flash = { 1, 0.8, 0.5 } },
@@ -133,7 +136,8 @@ ns.LOW_HEALTH_THEMES = {
 			{ tex = "Star", kind = "twinkle", color = { 0.85, 0.65, 1 }, size = { 0.03, 0.06 }, life = { 0.8, 1.5 },
 				rate = 40, hit = { 3, 5 } },
 		} },
-	{ key = "fire", name = "Fire", edge = "Glow", glow = { 1, 0.45, 0.08 },
+	{ key = "fire", name = "Fire",
+		heat = { color = { 1, 0.45, 0.1 }, alpha = 0.55 }, edge = "Glow", glow = { 1, 0.45, 0.08 },
 		glowAlpha = 0.6, shadow = { 0.3, 0.08, 0 }, flash = { 1, 0.5, 0.1 }, sparks = {
 			{ tex = "Mote", kind = "rise", at = "bottom", color = { 1, 0.55, 0.15 }, size = { 0.015, 0.035 },
 				life = { 1.5, 3 }, speed = 0.12, rate = 70, hit = { 5, 8 } },
@@ -162,7 +166,8 @@ ns.LOW_HEALTH_THEMES = {
 				life = { 1.5, 3 }, speed = 0.05, rate = 30, hit = { 2, 4 } },
 		} },
 	-- (Destruction: a shadow glow, fire motes rising through it.)
-	{ key = "felfire", name = "Shadowflame", edge = "Glow", glow = { 0.55, 0.2, 0.85 },
+	{ key = "felfire", name = "Shadowflame",
+		heat = { color = { 1, 0.45, 0.12 }, alpha = 0.45 }, edge = "Glow", glow = { 0.55, 0.2, 0.85 },
 		glowAlpha = 0.55, shadow = { 0.12, 0.02, 0.18 }, flash = { 1, 0.45, 0.15 }, sparks = {
 			{ tex = "Mote", kind = "rise", at = "bottom", color = { 1, 0.5, 0.12 }, size = { 0.015, 0.035 },
 				life = { 1.5, 3 }, speed = 0.12, rate = 40, hit = { 3, 5 } },
@@ -210,7 +215,8 @@ ns.LOW_HEALTH_THEMES = {
 			{ tex = "Star", kind = "twinkle", color = { 0.7, 0.5, 1 }, size = { 0.02, 0.04 }, life = { 1, 2 }, rate = 30 },
 		} },
 	-- Evoker
-	{ key = "dragonfire", name = "Dragonfire", edge = "Glow", glow = { 1, 0.32, 0.08 },
+	{ key = "dragonfire", name = "Dragonfire",
+		heat = { color = { 1, 0.35, 0.08 }, alpha = 0.55 }, edge = "Glow", glow = { 1, 0.32, 0.08 },
 		glowAlpha = 0.6, shadow = { 0.3, 0.04, 0 }, flash = { 1, 0.5, 0.1 } },
 	{ key = "dream", name = "Emerald dream", edge = "Glow", glow = { 0.45, 1, 0.5 }, glowAlpha = 0.6,
 		shadow = { 0.04, 0.14, 0.05 }, flash = { 0.7, 1, 0.6 }, pulse = 0.6, bpm = 0.75 },

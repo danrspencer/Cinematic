@@ -38,6 +38,7 @@ DEFAULTS.lowHealthGameReachSides = 0.7
 -- Our effects (with the shadow, heartbeat, grade and flash below).
 DEFAULTS.lowHealthSparks = true    -- the theme's sparks and haze
 DEFAULTS.lowHealthSwirlAlpha = 0.25 -- the theme's swirl (its opacity, times each layer's; 0: none)
+DEFAULTS.lowHealthHeat = true      -- the theme's rising heat (fire themes)
 DEFAULTS.lowHealthPortalAlpha = 0.8 -- the theme's portal (dev copy for now; 0: none)
 DEFAULTS.lowHealthRipple = true    -- a wave of the game's art creeping in on each beat
 DEFAULTS.lowHealthStrength = 0.5   -- the look's strength: half as set, scaled down to none or up to double
@@ -108,6 +109,11 @@ local ORBIT_SPEED = 0.35           -- an orbiting spark's speed round the middle
 -- texture over the whole screen, turning, clear in its middle; the bigger it
 -- is, the further out its clear middle reaches, so it closes in as it shrinks.
 local MAX_SWIRLS = 2
+-- Rising heat (a theme's heat, LowHealthThemes.lua): soft wisps scrolling up
+-- from the bottom edge, flickering, in two layers at their own speeds; they
+-- rise higher the weaker you are.
+local HEAT_LAYERS = { { tiles = 4, speed = 0.12, alpha = 1 }, { tiles = 7, speed = 0.2, alpha = 0.6 } }
+local HEAT_LOW, HEAT_HIGH = 0.12, 0.55 -- how far up the screen it shows as it starts, and at full (times its reach)
 local SWIRL_FRONT = 0.36   -- where a swirl texture is half there (a share of its half-width)
 local SWIRL_OUT = 1.15     -- its front as it starts (shares of the way from the middle to a corner)...
 local SWIRL_DEEPEST = 0.37 -- ...and at full with reach 100% (no further: it must still cover the corners)
@@ -692,6 +698,25 @@ local function NewDrawer(parent)
 		tex:Hide()
 		d.swirls[i] = { tex = tex, angle = math.random() * 2 * math.pi }
 	end
+	-- (Rising heat over the art, under the sparks; cut to the bottom by a mask
+	-- of its own, where the client has masks.)
+	d.heat = {}
+	if parent.CreateMaskTexture then
+		d.heatMask = parent:CreateMaskTexture()
+		d.heatMask:SetTexture(ART .. "HeatMask", "CLAMP", "CLAMP")
+		d.heatMask:SetPoint("BOTTOMLEFT", parent)
+		d.heatMask:SetPoint("BOTTOMRIGHT", parent)
+		d.heatMask:SetHeight(1)
+		for i = 1, #HEAT_LAYERS do
+			local tex = parent:CreateTexture(nil, "BORDER", nil, 1)
+			tex:SetAllPoints(parent)
+			tex:SetTexture(ART .. "Heat", "REPEAT", "REPEAT")
+			tex:SetBlendMode("ADD")
+			tex:AddMaskTexture(d.heatMask)
+			tex:Hide()
+			d.heat[i] = { tex = tex, rise = math.random() }
+		end
+	end
 	for i = 1, MAX_SPARKS do
 		local tex = parent:CreateTexture(nil, "BORDER", nil, 2)
 		tex:Hide()
@@ -1230,6 +1255,31 @@ local function Apply(d, look, k, fade, heart, secret)
 		body:Hide()
 		glow:Hide()
 		ripple:Hide()
+	end
+	-- The rising heat: up from the bottom, higher the weaker you are, flickering
+	-- and brighter on a beat.
+	local heatInfo = shown.heat
+	local heatAlpha = heatInfo and look.lowHealthHeat and c > 0 and heatInfo.alpha * look.lowHealthBloodAlpha
+		* math.min(1, c * 2) * fade or 0
+	if heatAlpha > 0 and d.heatMask then
+		local t = GetTime()
+		local spentHeat = t - (d.heatAt or t)
+		d.heatAt = t
+		local reach = Scaled(heatInfo.reach or 1, look.lowHealthReachAll or 0.5, REACHES.lowHealthBloodReach)
+		d.heatMask:SetHeight(math.max(1, height * (HEAT_LOW + (HEAT_HIGH - HEAT_LOW) * c) * reach))
+		local flicker = 0.8 + 0.12 * math.sin(t * 9) + 0.08 * math.sin(t * 14.3 + 1)
+		local r, g, b = Lit(heatInfo.color, bright)
+		for i, layer in ipairs(d.heat) do
+			local how = HEAT_LAYERS[i]
+			layer.rise = (layer.rise + how.speed * spentHeat) % 1
+			local down = how.tiles * height / math.max(1, width)
+			layer.tex:SetTexCoord(0, how.tiles, layer.rise, layer.rise + down)
+			layer.tex:SetVertexColor(r, g, b, math.min(1, heatAlpha * how.alpha * flicker * (1 + 0.3 * heart)))
+			layer.tex:Show()
+		end
+	else
+		d.heatAt = nil
+		for _, layer in ipairs(d.heat) do layer.tex:Hide() end
 	end
 	-- The swirl: each layer turning (quicker as you weaken), its clear middle
 	-- closing in from past the corners.
@@ -1790,6 +1840,16 @@ function ns.ReportVitals()
 	ns.Print(("  theme %s (edge %s), frame shown %s, alpha %s, driver %s"):format(Show(screen.shown and screen.shown.key),
 		Show(screen.shown and screen.shown.edge), Show(frame:IsShown()), Show(frame:GetAlpha()), Show(driver:IsShown())))
 	ns.Print("  game art: " .. Show(screen.gameArt) .. ", Blizzard art: " .. Show(screen.pick and screen.pick[1]))
+	-- (The rising heat: the theme's, the tick, the files loading, the mask's height, each layer.)
+	local heatInfo = screen.shown and screen.shown.heat
+	ns.Print(("  heat: theme's %s, tick %s, file %s, mask %s, mask height %s"):format(Show(heatInfo and heatInfo.alpha),
+		Show(Look().lowHealthHeat), Show(FileLoads(ART .. "Heat")), Show(screen.heatMask and FileLoads(ART .. "HeatMask")),
+		Show(screen.heatMask and screen.heatMask:GetHeight())))
+	for i, layer in ipairs(screen.heat or {}) do
+		local _, _, _, a = layer.tex:GetVertexColor()
+		ns.Print(("    layer %d: shown %s, alpha %s, size %s x %s"):format(i, Show(layer.tex:IsShown()), Show(a),
+			Show(layer.tex:GetWidth()), Show(layer.tex:GetHeight())))
+	end
 	for name, tex in pairs({ art = screen.body, glow = screen.glow, wave = screen.ripple, blizzard = screen.theirs }) do
 		local r, g, b, a = tex:GetVertexColor()
 		local width, height = tex:GetSize()
@@ -2792,6 +2852,8 @@ function ns.CreateVitalsStylePanel(kit)
 		from:SetPoint("LEFT", boxes, "RIGHT", 4, 0)
 	end
 
+	rows.Check("lowHealthHeat", L["Rising heat"], L["Soft wisps of heat rising from the bottom of the screen, " ..
+		"flickering, higher the weaker you are. Fire themes have it."], Ours)
 	tabbed.Finish(ours)
 
 	-- The swirl: up to two layers, each a kind (None: not there), its color,
@@ -2998,7 +3060,7 @@ function ns.CreateVitalsStylePanel(kit)
 		local LOOK_KEYS = { "lowHealthReach", "lowHealthDark", "lowHealthRed", "lowHealthBloodAlpha", "lowHealthBloodReach", "lowHealthGameReach",
 			"lowHealthReachSides", "lowHealthBloodReachSides", "lowHealthGameReachSides",
 			"lowHealthGamePattern", "lowHealthGameMask", "lowHealthGameColors", "lowHealthGameAlpha", "lowHealthSparks",
-			"lowHealthSwirlAlpha", "lowHealthGamePattern2", "lowHealthGameDrift", "lowHealthPortalAlpha",
+			"lowHealthSwirlAlpha", "lowHealthGamePattern2", "lowHealthGameDrift", "lowHealthPortalAlpha", "lowHealthHeat",
 			"lowHealthRipple", "lowHealthPulse", "lowHealthPulseAmount", "lowHealthBpmSlow", "lowHealthBpmFast",
 			"lowHealthFlash" }
 		local function Picked() -- (one of LowHealthThemes.lua's: not one of the player's own)

@@ -80,6 +80,7 @@ input[type=checkbox] { accent-color: var(--gold); width: 16px; height: 16px; }
       <label class="tick"><input type="checkbox" id="ours" checked> Cinematic art</label>
       <div id="oursRows"></div>
       <label class="tick"><input type="checkbox" data-key="lowHealthSparks"> Sparks</label>
+      <label class="tick"><input type="checkbox" data-key="lowHealthHeat"> Rising heat</label>
       <h3>Swirl</h3>
       <div id="swirlRows"></div>
       <p class="note" id="swirlNote"></p>
@@ -124,6 +125,18 @@ const EDGE_START = 0.05, ART_OUT = 1.35, ART_DEEPEST = 1, ART_SHALLOWEST = 1.2, 
 const LIFT_EASE = 0.8, RIPPLE_SPAN = 0.25, RIPPLE_ALPHA = 0.7, SWAY = 0.012, GAS_REACH = 0.2, GAS_DRIFT = 0.03;
 const FADE_IN = 0.3, FADE_END = 1.2, GRADE_GREY = [0.6, 0.63, 0.68], GRADE_TINT = 0.3, MAX_SPARKS = 24;
 const SPIRAL_TURN = 0.45, SPIRAL_IN = 0.65, ORBIT_SPEED = 0.35;
+const HEAT_LAYERS = [{ tiles: 4, speed: 0.12, alpha: 1 }, { tiles: 7, speed: 0.2, alpha: 0.6 }], HEAT_LOW = 0.12, HEAT_HIGH = 0.55;
+const heatRise = [Math.random(), Math.random()];
+let heatAt = null;
+// A heat layer: its wisps tiled across, slid up by how far they've risen, cut by its mask (bottom, h high).
+function heatLayer(color, tiles, rise, h) {
+  const out = canvas(W, H), x = out.getContext("2d");
+  const src = tint(imgs.sHeat, color, false, "sHeat"), size = W / tiles;
+  for (let ty = -rise * size; ty < H; ty += size) for (let tx = 0; tx < W; tx += size) x.drawImage(src, tx, ty, size, size);
+  x.globalCompositeOperation = "destination-in";
+  x.drawImage(imgs.sHeatMask, 0, H - h, W, h);
+  return out;
+}
 const SWIRL_FRONT = 0.36, SWIRL_OUT = 1.15, SWIRL_DEEPEST = 0.37, SWIRL_BLEND = { Swirl: "lighter", Vortex: "source-over" };
 const EDGE_FILE = D.edge, WISPY = 1305138, WHITE = [1, 1, 1];
 const DRIFT = [0.012, -0.008], SECOND_ALPHA = 0.6;
@@ -451,6 +464,23 @@ function apply(theme, k, heart, now) {
       }
     }
   }
+  // Rising heat: up from the bottom, higher the weaker you are, flickering, brighter on a beat.
+  const heat = theme.heat;
+  const heatA = heat && db.lowHealthHeat && S.ours && c > 0 ? heat.alpha * oursAlpha * Math.min(1, c * 2) : 0;
+  if (heatA > 0 && imgs.sHeat && imgs.sHeatMask) {
+    const spentHeat = heatAt == null ? 0 : now - heatAt;
+    heatAt = now;
+    const reach = scaled(heat.reach || 1, db.lowHealthReachAll, REACHES.lowHealthBloodReach);
+    const h = Math.max(1, H * (HEAT_LOW + (HEAT_HIGH - HEAT_LOW) * c) * reach);
+    const flicker = reduce ? 0.9 : 0.8 + 0.12 * Math.sin(now * 9) + 0.08 * Math.sin(now * 14.3 + 1);
+    const col = lit(heat.color, bright);
+    HEAT_LAYERS.forEach((how, i) => {
+      if (!reduce) heatRise[i] = (heatRise[i] + how.speed * spentHeat) % 1;
+      ctx.globalAlpha = Math.min(1, heatA * how.alpha * flicker * (1 + 0.3 * heart)); ctx.globalCompositeOperation = "lighter";
+      ctx.drawImage(heatLayer(col, how.tiles, heatRise[i], h), 0, 0);
+    });
+    ctx.globalAlpha = 1; ctx.globalCompositeOperation = "source-over";
+  } else heatAt = null;
   // Sparks.
   const sa = oursAlpha * Math.min(1, c * 2);
   for (let i = sparks.length - 1; i >= 0; i--) {

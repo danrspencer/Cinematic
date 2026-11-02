@@ -53,7 +53,7 @@ themes = []
 for i in range(1, len(ns.LOW_HEALTH_THEMES) + 1):
     t = ns.LOW_HEALTH_THEMES[i]
     d = {k: py(t[k]) for k in ("key", "name", "edge", "body", "glow", "glowAlpha", "shadow", "flash",
-                               "pulse", "bpm", "sway", "sparks", "swirl", "look")}
+                               "pulse", "bpm", "sway", "sparks", "swirl", "heat", "look")}
     if t.theirs:
         d["theirs"] = {"file": t.theirs[1], "own": None if t.theirs.own is None else bool(t.theirs.own),
                        "second": t.theirs.second}
@@ -123,7 +123,7 @@ for name in sorted({t["edge"] for t in themes if t.get("edge")} | {t["edge"] + "
         continue
     a = np.asarray(Image.open(path).convert("RGBA"), dtype=np.float32) / 255
     img["o" + name + "c"], img["o" + name + "a"] = pair(a[..., :3], a[..., 3])
-for name in ("Mote", "Star", "Bolt", "Gas"):
+for name in ("Mote", "Star", "Bolt", "Gas", "Heat", "HeatMask"):
     img["s" + name] = b64(Image.open(os.path.join(ART, name + ".tga")).convert("RGBA"), "PNG")
 # The swirls' textures (a color and alpha pair each, like the edges).
 for name in ("Swirl", "Vortex"):

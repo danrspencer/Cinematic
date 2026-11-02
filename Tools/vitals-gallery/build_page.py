@@ -96,7 +96,7 @@ dialog p {{ color:#fff; text-align:center; margin:8px 0 0; font:600 18px var(--d
   <h1>Vitals Vision themes</h1>
   <p>Every low-health theme, drawn from the addon's own textures and colors at the page's default settings, at full low health, just after a hit. These are stills: in the game the glow throbs with the heartbeat, and a hit flashes the edges. Every theme has a soft haze of gas drifting over its edges, in its own color. The only other sprites are lightning (Storm, Windfury), twinkling stars and rising motes.</p>
   <p>Each theme is shown under every spec that uses it. Click a still to see it larger.</p>
-  <p><b>New:</b> two new sparks for the swirls: motes spiraling in toward the middle the way the swirl turns, and stars circling the middle. Vortex, Abyss and Dungeon portal (More themes, at the bottom) use them; any theme can have them on the Style page. Stills show them where they start: in the game they wind inward.</p>
+  <p><b>New:</b> rising heat for the fire themes (Fire, Dragonfire, Rage, Shadowflame): soft wisps of heat rising from the bottom of the screen, flickering, higher the weaker you are. In the game they drift upward.</p>
   <div class="filter" role="group" aria-label="Filter by edge material"><span>Edge material</span>{chips}</div>
 </header>
 {"".join(sections)}
