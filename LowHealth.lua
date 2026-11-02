@@ -849,14 +849,19 @@ local function UseTheme(d, wanted, look)
 		-- covered the screen.)
 		body:SetBlendMode(layers and layers.paint and "BLEND" or "ADD")
 	end
+	-- (The model loaded again only for another file: every setting changed sets
+	-- the theme up again, each step of a slider dragged, and loading blinked it out.)
 	if d.portal then
-		d.portal:ClearModel()
-		if wanted.portal then
-			d.portal:SetModel(wanted.portal.file)
-			d.portal:SetFacing(0)
-		else
-			d.portal:Hide()
+		local file = wanted.portal and wanted.portal.file
+		if file ~= d.portalFile then
+			d.portal:ClearModel()
+			if file then
+				d.portal:SetModel(file)
+				d.portal:SetFacing(0)
+			end
+			d.portalFile = file
 		end
+		if not file then d.portal:Hide() end
 	end
 	for i, swirl in ipairs(d.swirls) do
 		local info = wanted.swirl and wanted.swirl[i]
