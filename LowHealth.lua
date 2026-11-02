@@ -38,6 +38,7 @@ DEFAULTS.lowHealthGameReachSides = 0.7
 -- Our effects (with the shadow, heartbeat, grade and flash below).
 DEFAULTS.lowHealthSparks = true    -- the theme's sparks and haze
 DEFAULTS.lowHealthSwirlAlpha = 0.25 -- the theme's swirl (its opacity, times each layer's; 0: none)
+DEFAULTS.lowHealthPortalAlpha = 0.8 -- the theme's portal (dev copy for now; 0: none)
 DEFAULTS.lowHealthRipple = true    -- a wave of the game's art creeping in on each beat
 DEFAULTS.lowHealthStrength = 0.5   -- the look's strength: half as set, scaled down to none or up to double
 DEFAULTS.lowHealthReachAll = 0.5   -- every reach (shadow, both arts): half as set, down to none or up to double
@@ -110,6 +111,14 @@ local MAX_SWIRLS = 2
 local SWIRL_FRONT = 0.36   -- where a swirl texture is half there (a share of its half-width)
 local SWIRL_OUT = 1.15     -- its front as it starts (shares of the way from the middle to a corner)...
 local SWIRL_DEEPEST = 0.37 -- ...and at full with reach 100% (no further: it must still cover the corners)
+-- The portal (a theme's portal; the dev copy's only for now): one of the
+-- game's portal models facing the camera, so near its rim is past the
+-- screen's edges, further away the weaker you are, so its swirling rim closes
+-- in. Distances in the model frame's own units (tested, retail: at -10 the
+-- old dungeon portal's rim frames the screen, the middle clear; at 0 it's all
+-- round the camera, unseen).
+local PORTAL_OUT = -4      -- as it starts
+local PORTAL_FULL = -10    -- at full, unless the theme's portal says
 
 -- The colour grade: a layer over the whole screen that multiplies what's
 -- under it (the world, not the UI above), so it can't grey colours out, only
@@ -163,7 +172,7 @@ end
 local SCALED = {
 	lowHealthDark = { 1, 1 }, lowHealthPulseAmount = { 0.6, 1 }, lowHealthBloodAlpha = { 1, 1 },
 	lowHealthGameAlpha = { 1, 1 }, lowHealthReach = { 0.5, 0.5 }, lowHealthReachSides = { 0.5, 0.5 },
-	lowHealthSwirlAlpha = { 1, 1 },
+	lowHealthSwirlAlpha = { 1, 1 }, lowHealthPortalAlpha = { 1, 1 },
 }
 -- (Reach, the master one (lowHealthReachAll), scales every reach the same way.)
 local REACHES = { lowHealthReach = { 0.5, 0.5 }, lowHealthBloodReach = { 1, 1 }, lowHealthGameReach = { 1, 1 },
@@ -702,6 +711,14 @@ local function Create()
 	ns.AddOverlay(frame)
 	screen = NewDrawer(frame)
 	screen.isScreen = true
+	-- (The portal: a model frame over the screen's art, the dev copy's only for now.
+	-- Not in the preview: a model frame isn't cut to the preview's edges.)
+	if ns.isDev then
+		screen.portal = CreateFrame("PlayerModel", nil, frame)
+		screen.portal:SetAllPoints(frame)
+		screen.portal:EnableMouse(false)
+		screen.portal:Hide()
+	end
 	frame:Hide()
 	-- (Its own frame, not under UIParent, so it runs with the UI hidden too.)
 	driver = CreateFrame("Frame")
@@ -831,6 +848,15 @@ local function UseTheme(d, wanted, look)
 		-- (Light on black, as the game draws it: as paint, its black middle
 		-- covered the screen.)
 		body:SetBlendMode(layers and layers.paint and "BLEND" or "ADD")
+	end
+	if d.portal then
+		d.portal:ClearModel()
+		if wanted.portal then
+			d.portal:SetModel(wanted.portal.file)
+			d.portal:SetFacing(0)
+		else
+			d.portal:Hide()
+		end
 	end
 	for i, swirl in ipairs(d.swirls) do
 		local info = wanted.swirl and wanted.swirl[i]
@@ -1222,6 +1248,18 @@ local function Apply(d, look, k, fade, heart, secret)
 			swirl.tex:Show()
 		else
 			swirl.tex:Hide()
+		end
+	end
+	-- The portal: further away (its rim further in) the weaker you are, and stronger.
+	local portal, info = d.portal, shown.portal
+	if portal then
+		local a = info and (look.lowHealthPortalAlpha or 0) * (info.alpha or 1) * math.min(1, c * 2) * fade or 0
+		if a > 0 then
+			portal:SetPosition(PORTAL_OUT + ((info.distance or PORTAL_FULL) - PORTAL_OUT) * c, 0, 0)
+			portal:SetAlpha(math.min(1, a))
+			portal:Show()
+		else
+			portal:Hide()
 		end
 	end
 	d.reach, d.reachSides = size, sides
@@ -2815,6 +2853,13 @@ function ns.CreateVitalsStylePanel(kit)
 			function(info, v) info.reach = v end), 0, 100, 5, "%d", 100,
 			L["How far in its clear middle closes at full."], SwirlUsed(i), "%")
 	end
+	-- (The portal: the dev copy's only for now.)
+	if ns.isDev then
+		local portalName = stack:Add(kit.Label(content, "GameFontHighlight", "Theme's portal (dev copy)"), "label")
+		portalName.searchLabel = "Theme's portal"
+		Opacity("lowHealthPortalAlpha", "The theme's portal (one of the game's portal models), its swirling rim " ..
+			"closing in round the screen as you weaken. Only themes with one: Dungeon portal.", On)
+	end
 	tabbed.Finish(swirlTab)
 
 	local theirs = tabbed.Begin()
@@ -2909,7 +2954,7 @@ function ns.CreateVitalsStylePanel(kit)
 		local LOOK_KEYS = { "lowHealthReach", "lowHealthDark", "lowHealthRed", "lowHealthBloodAlpha", "lowHealthBloodReach", "lowHealthGameReach",
 			"lowHealthReachSides", "lowHealthBloodReachSides", "lowHealthGameReachSides",
 			"lowHealthGamePattern", "lowHealthGameMask", "lowHealthGameColors", "lowHealthGameAlpha", "lowHealthSparks",
-			"lowHealthSwirlAlpha", "lowHealthGamePattern2", "lowHealthGameDrift",
+			"lowHealthSwirlAlpha", "lowHealthGamePattern2", "lowHealthGameDrift", "lowHealthPortalAlpha",
 			"lowHealthRipple", "lowHealthPulse", "lowHealthPulseAmount", "lowHealthBpmSlow", "lowHealthBpmFast",
 			"lowHealthFlash" }
 		local function Picked() -- (one of LowHealthThemes.lua's: not one of the player's own)

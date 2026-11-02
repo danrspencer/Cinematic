@@ -33,6 +33,9 @@
 --     color, alpha (0-1), spin (turns a minute at full; below 0 the other
 --     way), reach (0-1: how far in its clear middle closes at full)
 --   (A theme with no swirl of its own gets spiral arms: Arms, below.)
+--   portal   one of the game's portal models round the screen (the dev copy's
+--            only for now): { file = its file number, distance = how far at
+--            full (LowHealth.lua has a default), alpha }
 
 local _, ns = ...
 
@@ -233,7 +236,8 @@ ns.LOW_HEALTH_THEMES = {
 			{ tex = "Mote", kind = "spiral", color = { 0.8, 0.5, 1 }, size = { 0.015, 0.03 }, life = { 3, 5 },
 				rate = 25, hit = { 3, 5 } },
 		} },
-	{ key = "portal", name = "Dungeon portal", edge = "Glow", glow = { 0.55, 0.3, 1 }, glowAlpha = 0.45,
+	{ key = "portal", name = "Dungeon portal", portal = { file = 197007 }, edge = "Glow", glow = { 0.55, 0.3, 1 },
+		glowAlpha = 0.45,
 		shadow = { 0.06, 0.02, 0.14 }, flash = { 0.7, 0.5, 1 }, pulse = 0.7, swirl = {
 			{ tex = "Vortex", color = { 0.45, 0.25, 0.85 }, alpha = 0.8, spin = -10, reach = 0.45 },
 			{ tex = "Swirl", color = { 0.8, 0.6, 1 }, alpha = 0.45, spin = -14, reach = 0.4 },

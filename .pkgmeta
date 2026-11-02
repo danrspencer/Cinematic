@@ -13,6 +13,8 @@ ignore:
   - WindGuide.lua
   - WindGuideStyles.lua
   - Textures/WindGuide
+  # (Portal scout: /cine debug portal, trying the game's portal models, dev copy only)
+  - PortalScout.lua
   # (Demo Hub: demo tools and recording scripts, in the dev copy only)
   - DemoHub.lua
   # (Vitals Vision's old sprites: only make_wind_guide.py reads them now)
