@@ -116,7 +116,7 @@ local DEFAULTS = {
 	questTimerShow = true,     -- keep the quest timer visible in cinematic mode while one runs (retail: the tracker's timers)
 	durabilityShow = true,     -- keep the durability figure visible in cinematic mode while gear is damaged
 	durabilityHideInCam = true, -- ...except while a camera mode is running
-	petUnhappyShow = true,     -- keep the pet frame visible in cinematic mode while a hunter's pet isn't happy (not retail)
+	petUnhappyShow = false,    -- keep the pet frame visible in cinematic mode while a hunter's pet isn't happy (not retail; Hunter page)
 	petUnhappyHideInCam = true, -- ...except while a camera mode is running
 	-- Swing timer page (not retail), in CineMode and out:
 	swingSmartShow = true,     -- melee and ranged bars only while that weapon is in use
@@ -1273,10 +1273,10 @@ for page, keys in pairs({
 	handleQuality = { "campfireSitButton", "dragEquipCharacter", "talentLink", "talentCalc",
 		"centerPanels", "dragPanels", "chatCopyButton", "loginZoom",
 		"reloadButton", "reloadKeepWindows" },
-	handleHunter = { "hunterRightClickShot", "hunterAmmoSort", "hunterQuiverFill" },
+	handleHunter = { "hunterRightClickShot", "hunterAmmoSort", "hunterQuiverFill", "petUnhappyShow" },
 	duelPlates = { "duelCC" }, -- Duel Vision's page
 	-- The Cards page's rows (Cards.lua) and the time of day at login.
-	cards = { "cardCombatOn", "cardBossOn", "storyZoneCard", "storyZoneSubzones", "storyRecap",
+	cards = { "combatOnEnter", "combatOnLeave", "cardBossOn", "storyZoneCard", "storyZoneSubzones", "storyRecap",
 		"timeOfDayMessage", "timeOfDayChange", "chatAttackAlert", "cardDeathOn" },
 	cameraModes = { "shoulderCam" }, -- Cameras > General's Enable Cameras: Shoulder Cam
 	visualEffects = { "letterboxPage", "tintPage", "graphicsPlus", "musicInCinematic" }, -- (the Atmosphere hub's pages' switches)
@@ -6001,15 +6001,15 @@ ticker:SetScript("OnEvent", ns.Profiled("Core events", function(self, event, arg
 			end
 			ns.db.cardsV1 = true
 		end
-		-- Entering and Leaving combat are one Combat card now (Cards.lua),
-		-- saved profiles too. Once.
-		if not ns.db.cardsV2 then
-			ns.MigrateCombatCard(ns.db)
+		-- Entering and Leaving combat, one Combat card in 1.9.12 (cardsV2), are
+		-- two again (Cards.lua), saved profiles too. Once.
+		if ns.db.cardsV2 and not ns.db.cardsV3 then
+			ns.SplitCombatCard(ns.db)
 			for _, saved in pairs(ns.db.profiles or {}) do
-				if type(saved) == "table" then ns.MigrateCombatCard(saved) end
+				if type(saved) == "table" then ns.SplitCombatCard(saved) end
 			end
-			ns.db.cardsV2 = true
 		end
+		ns.db.cardsV2, ns.db.cardsV3 = nil, true
 		-- New settings start as the active profile has them (a built-in's
 		-- changes to the defaults included). A fresh install (or Reset addon)
 		-- starts with all of them so: the once-only updates above write theirs

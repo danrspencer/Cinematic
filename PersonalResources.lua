@@ -170,19 +170,20 @@ end
 -- The page.
 function ns.CreatePersonalResourcesPanel(kit)
 	local canvas, content = kit.CreateScrollPage()
-	local title = kit.Label(content, "GameFontNormalLarge", L["Personal Resources"])
+	local title = kit.Label(content, "GameFontNormalLarge", L["Resource Display"])
 	title:SetPoint("TOPLEFT", 16, -16)
 	local hasDisplay = _G.CinematicPersonalPower ~= nil
 	local intro = kit.PageIntro(content, title,
 		L["Your player frame, pet frame and personal resource display in CineMode: kept up while you recover " ..
 		"after a fight or run low on mana, and held back at the start of a fight until there's something to " ..
-		"see. When they come up at all (always, in fights, in places) is their rows' on the Standard Frames page."])
+		"see. When they come up at all (always, in fights, in places) is their rows' on the Game Frames page."])
 	-- Their look: the Style hub's Personal Resource Display page (PersonalStyle.lua).
-	ns.StyleLink(content, title, "Personal Style", L["Opens the Style hub's Personal Resource Display page: how the " ..
-		"bars look."], kit.Tooltip)
+	local styleLink = ns.StyleLink(content, title, "Personal Style", L["Opens the Style hub's Personal Resource " ..
+		"Display page: how the bars look."], kit.Tooltip)
+	ns.FramesLink(content, title, "units", styleLink)
 	local switch = kit.PageSwitch(content, "personalResources", L["Enable Page"],
 		L["On: your player frame, pet frame and personal resource display stay up or wait as this page says, " ..
-		"and its mana bar and mana cost show. Off: none of it; they come up only as their Standard Frames " ..
+		"and its mana bar and mana cost show. Off: none of it; they come up only as their Game Frames " ..
 		"rows say."], intro, function()
 		if ns.UpdatePersonalMana then ns.UpdatePersonalMana() end
 		if ns.RefreshPersonalStyle then ns.RefreshPersonalStyle() end
@@ -257,7 +258,7 @@ function ns.CreatePersonalResourcesPanel(kit)
 		stack:Add(kit.Check(content, "prdMana", L["Show your mana when it isn't your power"],
 			L["The game shows only your main power under your character: Maelstrom, Insanity, Astral Power, " ..
 			"rage or energy in a form. Ticked, your mana gets a bar of its own under it. When it comes up is the " ..
-			"Personal mana bar row on the Standard Frames page."], function(value)
+			"Personal mana bar row on the Game Frames page."], function(value)
 			ns.GetDB().prdMana = value
 			if ns.RefreshPersonalStyle then ns.RefreshPersonalStyle() end -- (shown and dressed)
 			kit.Refresh()
@@ -311,5 +312,5 @@ function ns.CreatePersonalResourcesPanel(kit)
 
 	canvas:SetScript("OnShow", kit.PageShown(kit.Refresh, content))
 	canvas:Hide()
-	kit.RegisterSubpage(canvas, "Personal Resources")
+	kit.RegisterSubpage(canvas, "Personal Resources", L["Resource Display"])
 end

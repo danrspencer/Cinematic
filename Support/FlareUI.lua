@@ -18,7 +18,7 @@ table.insert(ns.ADDON_FRAMES, {
 	label = "FlareUI Boss Frames", short = "FlareUI bosses",
 	about = L["its boss frames"],
 	note = L["Its unit frames, cast bar, resource bars, buffs, quest tracker, party and raid frames, " ..
-		"XP bar and totems are rows on the Standard Frames page."],
+		"XP bar and totems are rows on the Game Frames page."],
 	names = { "FlareUI_Boss" },
 	hookAlpha = true,
 })

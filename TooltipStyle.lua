@@ -464,7 +464,7 @@ function ns.CreateTooltipStylePanel(kit)
 	title:SetPoint("TOPLEFT", 16, -16)
 	local intro = kit.PageIntro(content, title,
 		L["How the game's tooltips look: their background, edge and words, names in their colors and the " ..
-		"health bar. Which lines show and when: the UI Manager's Tooltips page."])
+		"health bar. Which lines show and when: the Interface hub's Tooltips page."])
 
 	local preview -- (below: drawn again as each setting changes)
 	local function Changed()

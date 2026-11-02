@@ -90,7 +90,7 @@ function ns.CreateBubbleStylePanel(kit)
 	-- while it's off there.
 	local speechHeader = stack:Header(content, L["Speech from behind you"])
 	stack:Help(content, L["Says and yells whose bubble isn't on your screen, shown low on the screen instead. " ..
-		"Turn it on on the UI Manager's Chat bubbles page (with that page on)."])
+		"Turn it on on the Interface hub's Chat bubbles page (with that page on)."])
 	-- (Test and Move buttons beside its "?": a line from you, where they show;
 	-- the Move box, to drag where they show.)
 	local speechTest = ns.PanelButton(content)

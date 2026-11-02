@@ -1586,16 +1586,18 @@ ns.COMBAT_SHOW = {
 	{ key = "player", label = L["Player frame"], default = true, frames = { "PlayerFrame" } },
 	-- Follows the player frame's ticks until set (see ROW_FALLBACK).
 	{ key = "petframe", label = L["Pet frame"], default = true, frames = { "PetFrame" } },
-	{ key = "prd", label = L["Personal health bar"], default = true,
+	{ key = "prd", label = L["Personal health bar"], default = true, morePage = "Personal Resources",
 		frames = { "PersonalResourceDisplayFrame", "CinematicPersonalResource" } },
 	-- Follows the health bar's ticks until set (see ROW_FALLBACK).
 	{ key = "prdpower", label = L["Personal resource bar"], default = true, frames = { "CinematicPersonalPower" },
+		morePage = "Personal Resources",
 		tip = L["Mana, rage, energy, focus or runic power under your character, and class resources " ..
 			"such as combo points."] },
 	-- Follows the resource bar's ticks until set (see ROW_FALLBACK).
 	{ key = "prdmana", label = L["Personal mana bar"], default = true, frames = { "CinematicPersonalMana" },
+		morePage = "Personal Resources",
 		tip = L["Your mana under your character when it isn't your power (Elemental Shaman, Shadow Priest...): " ..
-			"once it's on, on the Personal Resources page."] },
+			"once it's on, on the Resource Display page."] },
 	{ key = "target", label = L["Target"], default = true, frames = { "TargetFrame" } },
 	{ key = "tot", label = L["Target of target"], default = true, frames = { "TargetFrameToT" } },
 	{ key = "focus", label = L["Focus"], default = true, frames = { "FocusFrame" } },
@@ -1662,18 +1664,19 @@ ns.COMBAT_SHOW = {
 		page = "raid", groups = { "raiddebuffs" }, part = true },
 	{ key = "raidmanager", label = L["Raid Frame Manager"], default = false, addon = "Blizzard_CompactRaidFrames",
 		page = "raid", frames = { "CompactRaidFrameManager" } },
-	-- The battlegrounds' flag carriers, in the Interface section.
+	-- The battlegrounds' flag carriers, in the Info and menus section.
 	-- Always shown to start with (CINE_SHOW_DEFAULT), as before it had a row.
 	{ key = "flags", label = L["Flag carriers"], default = false, addon = "Blizzard_Deprecated_ArenaUI",
 		page = "interface", frames = { "ArenaEnemyFramesContainer" } },
-	-- morePage: the options page with more settings for it, which can keep it up besides.
+	-- morePage: the options page with more settings for it, which can keep it up besides
+	-- (a » by its name on the Game Frames page opens it).
 	{ key = "minimap", label = L["Minimap"], default = true, groups = { "minimap" }, morePage = "Minimap" },
 	-- The bar behind the zone's name (not the name): follows the minimap's
 	-- ticks until set (see ROW_FALLBACK).
 	{ key = "minimapheader", label = L["Minimap header"], default = true, groups = { "minimapheader" },
 		tip = L["The bar behind the zone's name above the minimap (the name has a row of its own). " ..
 			"Untick it to leave the name floating on its own. Hovering the minimap brings it up with the map: " ..
-			"to keep it hidden then too, take Minimap header out of the Minimap group on the Mouseover groups page."] },
+			"to keep it hidden then too, take Minimap header out of the Minimap group on the Hover groups page."] },
 	-- The buttons on the header: follow the minimap's ticks until set, too.
 	{ key = "minimaptracking", label = L["Tracking button"], default = true, groups = { "minimaptracking" },
 		tip = L["The tracking button on the minimap header. Untick it to hide it in CineMode even while the minimap is up. " ..
@@ -1710,7 +1713,7 @@ ns.COMBAT_SHOW = {
 			"such as a timer to the next event. Until you change its ticks it does what the quest tracker's row does."] },
 	{ key = "buffs", label = L["Buffs and debuffs"], default = true, morePage = "Buffs/debuffs",
 		frames = { "BuffFrame", "DebuffFrame", "TemporaryEnchantFrame" } },
-	{ key = "swing", label = L["Swing timer"], default = true, retail = false,
+	{ key = "swing", label = L["Swing timer"], default = true, retail = false, morePage = "Swing timer",
 		tip = L["The Swing timer page can fade out the bars of weapons you aren't using, and the off-hand's."],
 		frames ={ "SwingTimerMainHandFrame", "SwingTimerOffHandFrame", "SwingTimerRangedFrame" } },
 	-- Always ticked to start with (CINE_SHOW_DEFAULT), as before it had a row,
@@ -1773,6 +1776,7 @@ ns.COMBAT_SHOW = {
 	-- The chat windows with their tabs and buttons. A new message, typing or
 	-- a whisper to read brings them up too (Chat page).
 	{ key = "chat", label = L["Chat window"], default = false, groups = { "chat" }, frames = FRAME_GROUPS.chat,
+		morePage = "Chat",
 		tip = L["The chat windows, with their tabs and buttons. Tick where they stay up while the rest fades; " ..
 			"which messages bring them up for a moment is on the Chat page."] },
 	-- Always ticked to start with (CINE_SHOW_DEFAULT), as before it had a row.
@@ -1929,7 +1933,7 @@ ns.HOVER_TRIGGERS = {
 	{ key = "tracking", label = L["Tracking"],
 		tip = L["While the minimap stays up for herb, mineral or other tracking (Minimap page)."] },
 	{ key = "quest", label = L["Quest progress"], tip = L["Accepting a quest or progress on one (Quest tracker page)."] },
-	{ key = "gamepad", label = L["Gamepad input"], gamepad = true, tip = L["Pressing a gamepad button (Gamepad page)."] },
+	{ key = "gamepad", label = L["Gamepad input"], gamepad = true, tip = L["Pressing a gamepad button (Gamepad Frames page)."] },
 	{ key = "roster", label = L["Group joins or leaves"],
 		tip = L["Someone joining or leaving your party or raid, or you joining or leaving one."] },
 	{ key = "cooldown", label = L["Cooldown recharging"], tip = L["While a spell in the Cooldown Manager (or " ..
@@ -2090,10 +2094,10 @@ do
 		return preset and preset.preset or group.name
 	end
 
-	-- A group's icon: a default group's own, or the one picked for it.
+	-- A group's icon: the one picked for it, else a default group's own.
 	function ns.HoverGroupIcon(group)
 		local preset = ns.HoverGroupPreset(group)
-		return preset and preset.icon or group.icon or ns.HOVER_GROUP_ICONS[1]
+		return group.icon or preset and preset.icon or ns.HOVER_GROUP_ICONS[1]
 	end
 
 	-- An icon no group has yet (for a new one), else the first.
@@ -2122,7 +2126,7 @@ function ns.CopyHoverGroups()
 		for key, on in pairs(group.triggers or {}) do triggers[key] = on end
 		local preset = ns.HoverGroupPreset(group)
 		copy[#copy + 1] = { name = group.name, members = members, triggers = triggers, when = group.when,
-			off = group.off, preset = preset and preset.preset or nil, icon = not preset and group.icon or nil }
+			off = group.off, preset = preset and preset.preset or nil, icon = group.icon }
 	end
 	return copy
 end
@@ -4335,7 +4339,7 @@ do
 			end
 		end
 		if not any then
-			ns.Print("no Mouseover group has Minimap ping ticked: pings bring nothing up")
+			ns.Print("no Hover group has Minimap ping ticked: pings bring nothing up")
 		end
 	end
 end
@@ -4477,7 +4481,7 @@ local function OnPadButton(button, via)
 	end
 	if not RevealsBars(button) then
 		DebugPress(button, ("not revealing (%s)"):format(not ns.IsPadButtonOn(button)
-			and "unticked on the Gamepad page" or "what it's bound to"))
+			and "unticked on the Gamepad Frames page" or "what it's bound to"))
 		return
 	end
 	if ns.db and ns.db.gamepadPressReveal and ns.PageOn("handleGamepad") and not pendingPress then
@@ -6254,7 +6258,7 @@ function ns.ReportMinimap()
 		return ("%s to %s %s %s, %s"):format(tostring(p[1]), ok and tostring(name) or "?", tostring(p[3]),
 			Value(p[4]), Value(p[5]))
 	end
-	ns.Print(("minimap settings: profile %s, Standard Frames switch %s, Minimap page switch %s, Always %s, " ..
+	ns.Print(("minimap settings: profile %s, Game Frames switch %s, Minimap page switch %s, Always %s, " ..
 		"In combat %s"):format(tostring(ns.ActiveProfile()), tostring(db.handleFrames), tostring(db.handleMinimap),
 		tostring(ns.IsCineShowOn("minimap")), tostring(ns.IsCombatShowOn("minimap"))))
 	ns.Print(("addon on %s, keep up indoors %s, always show (old setting) %s"):format(
@@ -6988,7 +6992,7 @@ function ns.UpdateFrames(cinematic, elapsed)
 	-- (Hide in camera modes: not while one is running, it goes with the rest.)
 	local durabilityUp = ns.PageOn("handleQuests") and ns.db.durabilityShow and not (ns.db.durabilityHideInCam and ns.activeCam)
 		and ns.HasDurabilityAlert()
-	local petUnhappyUp = ns.db.petUnhappyShow and not (ns.db.petUnhappyHideInCam and ns.activeCam)
+	local petUnhappyUp = ns.Setting("petUnhappyShow") and not (ns.db.petUnhappyHideInCam and ns.activeCam)
 		and ns.IsPetUnhappy()
 	local questReveal = questRevealUntil > now
 	local padReveal = padRevealUntil > now
@@ -7544,7 +7548,7 @@ function ns.AddUnderMouse(name)
 	end
 	if not name then
 		ns.Print(L["hover over a named UI element, then type /cine add and press Enter " ..
-			"(or /cine add <FrameName>). Frames without a name can't be added: the Advanced Frames " ..
+			"(or /cine add <FrameName>). Frames without a name can't be added: the Addon Frames " ..
 			"settings page lists the addons faded out of the box."])
 		return
 	end
@@ -7574,7 +7578,7 @@ function ns.RemoveUnderMouse()
 		return
 	end
 	ns.StopFading(name)
-	ns.Print(L["%s will always be shown (untick its CineMode box under Custom frames on the Advanced Frames " ..
+	ns.Print(L["%s will always be shown (untick its CineMode box under Custom frames on the Addon Frames " ..
 		"options page to undo)."]:format(name))
 end
 
@@ -7659,7 +7663,7 @@ do
 		if ns.db.ignoredFrames[name] then
 			skipped[name] = true
 			ns.Print(L["%s skipped: you set it to always show (untick its CineMode box under Custom frames " ..
-				"on the Advanced Frames page)."]:format(name))
+				"on the Addon Frames page)."]:format(name))
 			return
 		end
 		pending[#pending + 1] = name

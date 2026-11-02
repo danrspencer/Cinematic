@@ -19,7 +19,6 @@ local L = ns.L
 local DEFAULTS = ns.DEFAULTS
 
 DEFAULTS.cards = true      -- the page's switch (off in Subtle: the no-visions module)
-DEFAULTS.cardCombatOn = false -- the Combat row (on in Cinema: going in and coming out, its ticks combatOnEnter/Leave)
 DEFAULTS.cardDeathOn = false -- the Death row (on in Cinema: YOU DIED as the death camera starts)
 DEFAULTS.timeOfDayChange = true -- the Time of day row: its name and sound as it changes (off in Subtle, with the page)
 
@@ -33,8 +32,9 @@ local WAIT_MAX = 6  -- seconds a card waits behind a more important one before i
 -- same replaces, a lower one waits), its icon, the one it follows for its
 -- look (parent) and the one it needs on to show at all (needs).
 local EVENTS = {
-	{ id = "combat", name = "Combat", on = "cardCombatOn", priority = 50,
+	{ id = "combatIn", name = "Entering combat", on = "combatOnEnter", priority = 50,
 		icon = "Interface\\Icons\\Ability_DualWield", fight = true },
+	{ id = "combatOut", name = "Leaving combat", on = "combatOnLeave", priority = 50, icon = 132320, fight = true },
 	{ id = "boss", name = "Boss", on = "cardBossOn", priority = 80,
 		icon = "Interface\\TargetingFrame\\UI-TargetingFrame-Skull", fight = true },
 	{ id = "zone", name = "Zone", on = "storyZoneCard", priority = 40, icon = MAP },
@@ -124,7 +124,7 @@ for _, style in ipairs(STYLES) do STYLE_BY_ID[style.id] = style end
 ns.CARD_STYLE_BY_ID = STYLE_BY_ID
 -- The style each event starts from ("default": the Default style; "follow":
 -- the one its parent starts from).
-local BASES = { combat = "combat", boss = "boss", zone = "default", subzone = "follow",
+local BASES = { combatIn = "combat", combatOut = "respite", boss = "boss", zone = "default", subzone = "follow",
 	login = "journal", time = "title", attack = "alert", death = "death" }
 for _, field in ipairs(FIELDS) do
 	DEFAULTS["card" .. field[1]] = field[3]
@@ -139,7 +139,7 @@ end
 -- The font, outline and shadow start on the Style hub's General page's.
 do
 	local shared = ns.SHARED_STYLE
-	for _, suffix in ipairs({ "", "_combat", "_boss", "_zone", "_subzone", "_login", "_time",
+	for _, suffix in ipairs({ "", "_combatIn", "_combatOut", "_boss", "_zone", "_subzone", "_login", "_time",
 			"_attack", "_death" }) do
 		shared["cardFont" .. suffix] = { kind = "font", own = "game" }
 		shared["cardOutline" .. suffix] = { kind = "outline", own = 1 }
@@ -323,9 +323,13 @@ end
 -- file hearing an event puts its own in (ns.CardSamples[id] = function()).
 ns.CardSamples = ns.CardSamples or {}
 local samples = ns.CardSamples
-samples.combat = function() -- (going in: the Entering combat tick's)
+samples.combatIn = function()
 	return { name = ns.CardWords("combatTextIn"),
 		sound = function() ns.PlayCombatCueSound("enter", ns.lastCinematic and true or false) end }
+end
+samples.combatOut = function()
+	return { name = ns.CardWords("combatTextOut"),
+		sound = function() ns.PlayCombatCueSound("leave", ns.lastCinematic and true or false) end }
 end
 samples.boss = function()
 	local card = ns.BossSampleCard()
@@ -457,38 +461,42 @@ function ns.MigrateCards(t, main)
 	t.cards = battle or story
 end
 
--- Entering and Leaving combat were two events; now one, Combat, going in
--- and coming out its ticks (combatOnEnter, combatOnLeave). Their looks,
--- starting styles, Always and Show in rows onto Combat's (Entering combat's,
--- else Leaving's); its row ticked if either was, and its ticks as they were.
--- t: the saved settings or a saved profile (only what it has; raw).
-function ns.MigrateCombatCard(t)
-	local function Move(new, inKey, outKey)
-		local value = rawget(t, inKey)
-		if value == nil then value = rawget(t, outKey) end
-		if value ~= nil and rawget(t, new) == nil then t[new] = value end
-		t[inKey], t[outKey] = nil, nil
+-- Entering and Leaving combat were one Combat card for a while (1.9.12),
+-- going in and coming out its ticks (combatOnEnter, combatOnLeave); two
+-- again. Its look, starting style, Always and Show in rows onto both
+-- (Leaving's starting style stays Respite unless Combat's was changed); its
+-- row and ticks onto their rows' ticks. t: the saved settings or a saved
+-- profile (only what it has; raw).
+function ns.SplitCombatCard(t)
+	local function Copy(old, inKey, outKey)
+		local value = rawget(t, old)
+		if value == nil then return end
+		if rawget(t, inKey) == nil then t[inKey] = value end
+		if outKey and rawget(t, outKey) == nil then t[outKey] = value end
+		t[old] = nil
 	end
 	for _, field in ipairs(FIELDS) do
-		Move(Key(field[1], "combat"), Key(field[1], "combatIn"), Key(field[1], "combatOut"))
+		Copy(Key(field[1], "combat"), Key(field[1], "combatIn"), Key(field[1], "combatOut"))
 	end
-	Move("cardBase_combat", "cardBase_combatIn", "cardBase_combatOut")
-	Move("cardAlways_combat", "cardAlways_combatIn", "cardAlways_combatOut")
+	local base = rawget(t, "cardBase_combat")
+	Copy("cardBase_combat", "cardBase_combatIn", base ~= "combat" and "cardBase_combatOut" or nil)
+	Copy("cardAlways_combat", "cardAlways_combatIn", "cardAlways_combatOut")
 	for _, list in pairs(t) do
-		if type(list) == "table" then
-			local value = list[ROW .. "combatIn"]
-			if value == nil then value = list[ROW .. "combatOut"] end
-			if value ~= nil and list[ROW .. "combat"] == nil then list[ROW .. "combat"] = value end
-			list[ROW .. "combatIn"], list[ROW .. "combatOut"] = nil, nil
+		if type(list) == "table" and list[ROW .. "combat"] ~= nil then
+			local value = list[ROW .. "combat"]
+			if list[ROW .. "combatIn"] == nil then list[ROW .. "combatIn"] = value end
+			if list[ROW .. "combatOut"] == nil then list[ROW .. "combatOut"] = value end
+			list[ROW .. "combat"] = nil
 		end
 	end
-	local enter, leave = rawget(t, "combatOnEnter"), rawget(t, "combatOnLeave")
-	if enter == nil and leave == nil then return end
-	local on = enter == true or leave == true
-	if rawget(t, "cardCombatOn") == nil then t.cardCombatOn = on end
-	if on then
-		t.combatOnEnter, t.combatOnLeave = enter == true, leave == true
-	else
-		t.combatOnEnter, t.combatOnLeave = nil, nil -- (both ticked, as they come, for when it's turned on)
+	-- (Its ticks were on to start with; the rows start off.)
+	local on, enter, leave = rawget(t, "cardCombatOn"), rawget(t, "combatOnEnter"), rawget(t, "combatOnLeave")
+	if on == true then
+		t.combatOnEnter, t.combatOnLeave = enter ~= false, leave ~= false
+	elseif on == false then
+		t.combatOnEnter, t.combatOnLeave = false, false
+	elseif enter ~= nil or leave ~= nil then
+		t.combatOnEnter, t.combatOnLeave = nil, nil
 	end
+	t.cardCombatOn = nil
 end

@@ -188,6 +188,9 @@ local function PrintDebugHelp()
 	print("  /cine tinttest [seconds] - each time of day's tint with its title, AFK camera on (8 each; again to stop)")
 	print("  /cine soundtest <id> - play a game sound by its ID (stops after 10 seconds)")
 	print("  /cine songtest [file ID] - play a random death song, or any music file (again to stop)")
+	if ns.DemoCommand then
+		print("  /cine demo [name|list|stop] - the Demo Hub: every demo tool and recording script (dev copy)")
+	end
 	logPrints = true
 end
 
@@ -389,6 +392,8 @@ local function HandleSlash(msg)
 		if ns.speechWatch and ns.ShowSpeechBehind then
 			ns.ShowSpeechBehind("CHAT_MSG_SAY", "Cinematic", "This is how speech from behind you looks.")
 		end
+	elseif cmd == "demo" and ns.DemoCommand then -- (DemoHub.lua: the dev copy only)
+		ns.DemoCommand(arg)
 	elseif cmd == "chatcam" and ns.ChatCamCommand then -- (ChatCam.lua)
 		ns.ChatCamCommand(arg)
 	elseif cmd == "script" and ns.CameraScriptCommand then -- (CameraScripts.lua, dev copy)

@@ -305,7 +305,7 @@ function ns.CreateRaidStylePanel(kit)
 	local intro = kit.PageIntro(content, title,
 		L["How the raid frames look, the party's when the game draws them raid-style, and the arena's. The " ..
 		"Default tab's settings are each group's until its own tab has Use default settings unticked. Which " ..
-		"parts show: the Standard Frames page's party and raid rows."])
+		"parts show: the Game Frames page's party and raid rows."])
 
 	local editing
 	local function UsesDefault(db) return editing and not db["rfOwn_" .. editing] end

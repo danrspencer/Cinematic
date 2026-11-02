@@ -363,9 +363,10 @@ function ns.CombatSoundRulesSection(kit, content, stack, boss)
 		"that fits plays one of its sounds at random. A rule's condition uses the rules' words (Cities, In " ..
 		"CineMode...); none: any time. A rule with no sounds: silent. Each sound's slider sets it next to the " ..
 		"others, the cue volume sets them all (the fights' sounds share it)."]
-		or boss and L["Sounds for boss fights, read before Combat's: as a boss is pulled, killed or your group " ..
-		"wipes, the first rule that fits plays one of its sounds at random. A rule here has Boss fight in its " ..
-		"condition (taken out, it moves to Combat's). Each sound's slider sets it next to the others, the " ..
+		or boss and L["Sounds for boss fights, read before the fights' (Entering and Leaving combat's): as a boss is " ..
+		"pulled, killed or your group " ..
+		"wipes, the first rule that fits plays one of its sounds at random. A rule here has Boss fight in " ..
+		"its condition (taken out, it moves to the fights'). Each sound's slider sets it next to the others, the " ..
 		"cue volume sets them all."]
 		or L["Rules for the sounds, read top to bottom as a fight starts or ends: the first that fits plays one " ..
 		"of its sounds at random. A rule's condition uses the rules' words (Boss fight, Raids, In CineMode...); " ..

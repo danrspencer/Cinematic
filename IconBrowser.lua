@@ -2,13 +2,13 @@
 -- icon list: a scrolling grid of every icon the game has (as the macro
 -- window lists them), the one picked now framed in gold, and a box to find
 -- one by name (a spell or item, or an icon's file name: ns.FindIcon in
--- CustomWheels.lua). Used for the Wheels pages' icons and your profiles'.
+-- CustomWheels.lua). Used for every icon you pick: wheels, profiles, cameras,
+-- cards, quest marks and Mouseover groups.
 --
 -- browser = ns.IconBrowser(canvas, onPick); browser:Open(owner, key,
 -- current) shows it under owner (above when that runs off the page), and a
--- click on an icon calls onPick(key, icon). Like the Mouseover groups page's
--- grid (Options.lua's IconPicker): on the page's canvas, so the scroll frame
--- doesn't clip it, and a click anywhere else puts it away.
+-- click on an icon calls onPick(key, icon). On the page's canvas, so the
+-- scroll frame doesn't clip it, and a click anywhere else puts it away.
 local _, ns = ...
 local L = ns.L
 

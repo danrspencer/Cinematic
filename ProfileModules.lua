@@ -100,7 +100,7 @@ end
 -- 1 to 3 (and 4 to 8) with the art.
 local MAIN_BARS = { "mainbar", "art", "bottomleft", "bottomright" }
 local EXTRA_BARS = { "right1", "right2", "bar6", "bar7", "bar8" }
--- The micro menu, bags and XP bars (the Interface section's).
+-- The micro menu, bags and XP bars (the Info and menus section's).
 local MICRO_ROWS = { "micro", "bags", "xp" }
 
 -- The mouseover groups as retail has them: the action bars group split into
@@ -206,14 +206,14 @@ ns.PROFILE_MODULES = {
 		"bars each come up on their own when you point at one.",
 		apply = SplitBarGroups },
 	{ key = "micro-off-in-fights", name = "No micro menu or XP bar in fights",
-		scope = { "Standard Frames/Interface" },
+		scope = { "Standard Frames/Info and menus" },
 		tip = "No micro menu, bags or XP bars in fights or with an enemy targeted.",
 		apply = function(set)
 			set("combatShow", All(MICRO_ROWS, false))
 			set("enemyShow", All(MICRO_ROWS, false))
 		end },
 	{ key = "cdm", name = "Cooldown Manager in fights",
-		scope = { "Cooldown Manager", "Standard Frames/Combat", "Standard Frames/Action bars" },
+		scope = { "Cooldown Manager", "Standard Frames/Trackers", "Standard Frames/Action bars" },
 		tip = "The Cooldown Manager in place of action bars 1 to 8 in fights and with an enemy targeted (the " ..
 		"pet, stance and totem bars still come up). After a fight it stays up until its cooldowns are ready, " ..
 		"within the Calm Timer. Turns the game's Cooldown Manager on if it's off.",
@@ -264,8 +264,8 @@ ns.PROFILE_MODULES = {
 			set("instanceShow", EveryRow(false, false))
 		end },
 	{ key = "pure-cdm", name = "Pure: Cooldown Manager only",
-		scope = { "Cooldown Manager", "Standard Frames/Combat", "Standard Frames/Action bars",
-			"Standard Frames/Interface", "Advanced Frames/Supported addons",
+		scope = { "Cooldown Manager", "Standard Frames/Trackers", "Standard Frames/Action bars",
+			"Standard Frames/Info and menus", "Advanced Frames/Supported addons",
 			"Gamepad/top" },
 		tip = "No action bars, micro menu, bags or XP bar in fights, with an enemy targeted or in instances; " ..
 		"the Cooldown Manager in fights, and up after one until its cooldowns are ready, within the Calm Timer.",
@@ -374,7 +374,6 @@ ns.PROFILE_MODULES = {
 		tip = "The Cards page's fights on: a card and sounds as you go into a fight and come out of it, and a " ..
 		"boss's name as its fight starts.",
 		apply = function(set)
-			set("cardCombatOn", true)
 			set("combatOnEnter", true)
 			set("combatOnLeave", true)
 			set("cardBossOn", true)

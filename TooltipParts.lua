@@ -348,9 +348,22 @@ local refilling = false
 local function TooltipUnit(tooltip)
 	local ok, unit = pcall(function()
 		local _, unit = tooltip:GetUnit()
+		if issecretvalue and issecretvalue(unit) then
+			return nil
+		end
 		return unit
 	end)
 	return ok and unit or nil
+end
+
+-- Whether the tooltip's unit token is secret (retail instances, even out of
+-- a fight): the game's refill of it then errors, blamed on us.
+local function UnitSecret(tooltip)
+	local ok, secret = pcall(function()
+		local _, unit = tooltip:GetUnit()
+		return issecretvalue and issecretvalue(unit) or false
+	end)
+	return not ok or secret
 end
 
 -- An object in the world (a quest's rune, chest or herb): no unit, and
@@ -436,10 +449,10 @@ local function ShowLater(tooltip)
 		HideBar(bar)
 	end
 	local unit = TooltipUnit(tooltip)
-	-- (Not in a fight: the game's refill then reads secret line colors and
-	-- errors, blamed on us; securecallfunction reports it past our pcall.
-	-- The lines stay as they are.)
-	if linesCut and InCombatLockdown() then
+	-- (Not in a fight, nor for a secret unit: the game's refill then reads
+	-- secret line colors or unit and errors, blamed on us; securecallfunction
+	-- reports it past our pcall. The lines stay as they are.)
+	if linesCut and (InCombatLockdown() or UnitSecret(tooltip)) then
 		return
 	end
 	if linesCut then

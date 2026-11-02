@@ -482,7 +482,7 @@ function ns.CreatePersonalStylePanel(kit)
 	title:SetPoint("TOPLEFT", 16, -16)
 	local intro = kit.PageIntro(content, title,
 		L["How the personal resource display under your character looks: its health and power bars, and " ..
-		"your class resource. When the bars come up: the UI Manager's Personal Resources page."])
+		"your class resource. When the bars come up: the Interface hub's Resource Display page."])
 
 	local preview -- (below: drawn again as each setting changes)
 	local function Changed()

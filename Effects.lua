@@ -240,7 +240,7 @@ local COMBAT_TEXT_CVARS = ns.CVarSet("Combat text off", "CineMode out of fights 
 -- The selection circle the game draws on the ground under your target (a box
 -- on WoW Forever): off in CineMode unless its Standard Frames row
 -- (targetcircle) says to show it now.
-local TARGET_CIRCLE_CVARS = ns.CVarSet("Target circle off", "CineMode, unless its Standard Frames row shows it", {
+local TARGET_CIRCLE_CVARS = ns.CVarSet("Target circle off", "CineMode, unless its Game Frames row shows it", {
 	playerWins = true,
 	values = { ObjectSelectionCircle = "0" },
 })

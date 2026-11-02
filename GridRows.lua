@@ -1146,11 +1146,9 @@ function ns.GridTable(content, columnTop, rows, kit)
 		rowLabel:SetJustifyH("LEFT")
 		rowLabel:SetWordWrap(false)
 		kit.ShowBox(content, item, rowLabel) -- (its frame on at all: item.showKey)
-		-- An asterisk, with a tip, on rows that have a page of their own.
-		if item.morePage then rowLabel:SetText(item.label .. " |cffffd100*|r") end
-		ns.LabelHover(content, rowLabel, item.morePage and (L["More settings on the %s page. They can keep it up " ..
-			"beyond what's ticked here (hovering, tracking, new auras, cooldowns recharging and the like)."]):format(L[item.morePage])
-			or item.tip)
+		-- A » to its page on rows that have a page of their own.
+		if item.morePage then ns.MoreLink(content, rowLabel, item.morePage) end
+		ns.LabelHover(content, rowLabel, item.tip)
 		if ns.CINE_SHOW_SETTING[item.key] then
 			kit.RecordKey(content, ns.CINE_SHOW_SETTING[item.key]) -- (for the page's Reset)
 		end
@@ -1191,7 +1189,7 @@ function ns.GridTable(content, columnTop, rows, kit)
 			band = r, dot = not item.alwaysOnly,
 			always = { isOn = function() return alwaysOn(item.key) end, set = SetAlways,
 				tip = item.alwaysTip or item.part
-				and L["Show it whenever its frame shows. This overrides its Mouseover groups: untick it to " ..
+				and L["Show it whenever its frame shows. This overrides its Hover groups: untick it to " ..
 				"hide it in CineMode except when hovered or brought up by the other columns."]
 				or L["Show it all through CineMode, instead of hiding it. (The other columns then have nothing to add.)"] },
 			changed = item.apply,

@@ -129,8 +129,8 @@ dl.faq dd { margin: 2px 0 0; color: var(--muted) }
 
   <section>
     <div class="eyebrow">The main page</div>
-    <h2>Standard Frames: a row per frame</h2>
-    <p>The <b>Standard Frames</b> page, in the UI Manager, lists the game's own frames, one row each. In CineMode everything on it is hidden unless its row says otherwise. Each row reads left to right:</p>
+    <h2>Game Frames: a row per frame</h2>
+    <p>The <b>Game Frames</b> page, in the Interface hub, lists the game's own frames, one row each. In CineMode everything on it is hidden unless its row says otherwise. Each row reads left to right:</p>
     <ul class="cols">
       <li><b>Always</b><span>Shows the frame all through CineMode. The other columns then have nothing to add.</span></li>
       <li><b>Combat</b><span>A dropdown: <b>In combat</b>, <b>Calm Timer</b> (after a fight, until it runs out), <b>Out of combat</b>, or <b>In a camera mode</b> (flights, AFK, cozy and the rest).</span></li>
@@ -148,7 +148,7 @@ dl.faq dd { margin: 2px 0 0; color: var(--muted) }
     <p>Pick a moment. Each row lights up when one of its ticks matches. The ticks here are an example setup, not any profile's.</p>
     <div class="win">
       <div class="win-top">
-        <span class="win-title">Standard Frames</span>
+        <span class="win-title">Game Frames</span>
         <span class="win-note">Example ticks</span>
       </div>
       <div class="sits" id="sits" role="group" aria-label="The moment"></div>
@@ -166,22 +166,22 @@ dl.faq dd { margin: 2px 0 0; color: var(--muted) }
 
   <section>
     <div class="eyebrow">What's on it</div>
-    <h2>The Standard Frames sections</h2>
+    <h2>The Game Frames sections</h2>
     <div class="tablewrap"><table class="t">
       <thead><tr><th>Section</th><th>Rows</th></tr></thead>
       <tbody>
         <tr><td>Unit frames</td><td>Player frame, pet frame, personal health bar, personal resource bar, personal mana bar, target, target of target, focus, focus target of target, and the target circle on the ground</td></tr>
-        <tr><td>Combat</td><td>Buffs and debuffs, swing timer (Classic clients), cast bar, the game's damage meter, Essential and Utility Cooldowns, Tracked Buffs, Tracked Bars, encounter bar</td></tr>
+        <tr><td>Trackers</td><td>Buffs and debuffs, swing timer (Classic clients), cast bar, the game's damage meter, Essential and Utility Cooldowns, Tracked Buffs, Tracked Bars, encounter bar</td></tr>
         <tr><td>Action bars</td><td>Action bars 1 to 3 and the art round bar 1, pet bar, stance bar, totem bar, and on retail the extra action button and zone ability</td></tr>
         <tr><td>Extra action bars</td><td>Action bars 4 and 5, and on retail 6 to 8</td></tr>
-        <tr><td>Interface</td><td>Quest tracker, micro menu, bags, experience and reputation bars, the chat window, voice chat speakers, and on retail the quest waypoint</td></tr>
+        <tr><td>Info and menus</td><td>Quest tracker, micro menu, bags, experience and reputation bars, the chat window, voice chat speakers, and on retail the quest waypoint</td></tr>
         <tr><td>Minimap</td><td>The minimap, and apart from it its header, tracking button, calendar, zone name, clock and (not on retail) the day/night dial</td></tr>
         <tr><td>Party frames</td><td>Party frames, role icons, names and status icons. Raid-style party frames follow the raid rows until you untick <b>Same as raid frames</b>, which gives them rows of their own.</td></tr>
         <tr><td>Raid frames</td><td>Players and pets, and their parts one by one: role icons, threat highlight, target highlight, ready check, player names, pet names, group titles, buffs, debuffs, and the Raid Frame Manager</td></tr>
         <tr><td>Battlegrounds</td><td>Flag carriers</td></tr>
       </tbody>
     </table></div>
-    <p class="muted">A row whose frame doesn't exist in your game isn't shown. WoW Forever's gamepad mode has rows of its own on the Gamepad page.</p>
+    <p class="muted">A row whose frame doesn't exist in your game isn't shown. WoW Forever's gamepad mode has rows of its own on the Gamepad Frames page. A <b>»</b> by a row's name opens the page with the rest of its settings (the Unit frames tab has a <b>Parts »</b> button by its name, to the Unit Frames page), and those pages have a <b>Game Frames »</b> button back to their rows.</p>
     <h3>Switches at the top</h3>
     <ul style="margin:0;padding-left:20px;display:grid;gap:6px" class="muted">
       <li><b>In combat rows stay for the Calm Timer</b>: frames ticked In combat stay up after a fight until the Calm Timer (CineMode page) runs out. Off, they fade as soon as the fight ends.</li>
@@ -192,12 +192,12 @@ dl.faq dd { margin: 2px 0 0; color: var(--muted) }
   <section>
     <div class="eyebrow">The other pages</div>
     <h2>Pages that keep a frame up for a reason</h2>
-    <p>Standard Frames says <i>when</i> a frame may show. These pages add <i>why</i>: they bring a frame up because something happened. All but Personal Resources have their own <b>Enable Page</b> switch; off, the frame just follows its Standard Frames row (on Unit Frames, every part shows as the game has it).</p>
+    <p>Game Frames says <i>when</i> a frame may show. These pages add <i>why</i>: they bring a frame up because something happened. All but Resource Display have their own <b>Enable Page</b> switch; off, the frame just follows its Game Frames row (on Unit Frames, every part shows as the game has it).</p>
     <div class="pages">
 
       <article class="pg">
         <div class="name">Unit Frames</div>
-        <p class="muted">Which parts of the unit frames show, CineMode or not. Click a frame's name to open its section: your own frame, your pet's, the target, the focus and the targets of target. Each part is a row like the Standard Frames page's: Always, then Combat, Target and Location for when it shows if Always is off, Roles, and Edit for a rule (a rule can name who your target is, like <code>hostilenpc</code>).</p>
+        <p class="muted">Which parts of the unit frames show, CineMode or not. Click a frame's name to open its section: your own frame, your pet's, the target, the focus and the targets of target. Each part is a row like the Game Frames page's: Always, then Combat, Target and Location for when it shows if Always is off, Roles, and Edit for a rule (a rule can name who your target is, like <code>hostilenpc</code>).</p>
         <ul>
           <li><b>Parts</b>: portrait, name, level, health bar, power bar, frame art (the portrait ring, name box and bar borders, which the game draws as one picture), PvP icon, icons (rest Zzz, leader's crown, role, quest and raid marker), auras, hit text, threat and cast bar.</li>
           <li><b>Same as target</b>: the focus and target of target follow the target's rows until you untick it.</li>
@@ -205,12 +205,12 @@ dl.faq dd { margin: 2px 0 0; color: var(--muted) }
       </article>
 
       <article class="pg">
-        <div class="name">Personal Resources</div>
+        <div class="name">Resource Display</div>
         <p class="muted">Your player frame, pet frame and personal resource display.</p>
         <ul>
           <li><b>After a fight</b>: keep your player frame, and separately your resource display, up until your health and power are full. Rage and runic power can count too, until they've drained to 0. Your pet frame can stay until its health is full.</li>
           <li><b>Low mana</b>: below the share you pick, your resource bar shows in a fight or not, while drinking or saving mana for the pull. It can bring your player frame too.</li>
-          <li><b>Mana bar</b>: when mana isn't your main power (Elemental Shaman, Shadow Priest, Balance Druid, druids in forms), the game shows only that power under your character. Turn on <i>Show your mana when it isn't your power</i> on the UI Manager's Personal Resources page and your mana gets a bar of its own under it (or only for a few seconds after you use mana; its color and height are on the Style hub's Personal Resource Display page), with its own Standard Frames row. Low mana and "until full" then go by that bar's row. Retail only.</li>
+          <li><b>Mana bar</b>: when mana isn't your main power (Elemental Shaman, Shadow Priest, Balance Druid, druids in forms), the game shows only that power under your character. Turn on <i>Show your mana when it isn't your power</i> on the Interface hub's Resource Display page and your mana gets a bar of its own under it (or only for a few seconds after you use mana; its color and height are on the Style hub's Personal Resource Display page), with its own Game Frames row. Low mana and "until full" then go by that bar's row. Retail only.</li>
           <li><b>Mana cost</b>: for your resource bar and your player frame, each with its own switch, <i>Show mana cost indicator</i> shows the mana a cast will take as a pale stretch at the end of your mana while you cast. What's left after the cast is the fill to its left.</li>
           <li><b>Remaining mana text</b>: under each indicator, your mana's numbers on that bar can show what you'll have once the cast is done, paler: the amount, the percent or both, whichever the game shows there.</li>
           <li><b>At the start of a fight</b>: the resource bar, health bar and player frame can each wait until something changes. Go in with full mana and the bar comes up with your first cast; the health bar with the first hit or heal you take.</li>
@@ -225,7 +225,7 @@ dl.faq dd { margin: 2px 0 0; color: var(--muted) }
           <li><b>Show keybinds</b>: each spell's key in the corner of its icon in the Essential and Utility bars, as on an action button.</li>
           <li><b>Spell icons</b>: for each spell, when its icon shows. <b>Always</b> as the game has it; <b>When ready</b> fades it while it recharges and brings it back once ready, or a few seconds early (<b>Show early</b>), and can wait for the <b>Resources</b> to cast it; <b>While recharging</b>; or <b>When it procs</b>, only while the game makes it glow.</li>
           <li><b>Close the gaps (centered)</b>: the shown icons sit together, centered, instead of faded ones leaving holes. On for Utility to start with.</li>
-          <li><b>Tracked Buffs and Tracked Bars</b>: sections of their own, as in the game's Cooldown Settings, each buff <b>Always</b>, <b>In combat</b>, <b>Out of combat</b> or <b>Hidden</b>. Click a section's name to fold it away. Each is also a row of its own on Standard Frames.</li>
+          <li><b>Tracked Buffs and Tracked Bars</b>: sections of their own, as in the game's Cooldown Settings, each buff <b>Always</b>, <b>In combat</b>, <b>Out of combat</b> or <b>Hidden</b>. Click a section's name to fold it away. Each is also a row of its own on Game Frames.</li>
         </ul>
       </article>
 
@@ -268,8 +268,8 @@ dl.faq dd { margin: 2px 0 0; color: var(--muted) }
       </article>
 
       <article class="pg">
-        <div class="name">Advanced Frames</div>
-        <p class="muted">Other addons' frames, with the same columns as Standard Frames.</p>
+        <div class="name">Addon Frames</div>
+        <p class="muted">Other addons' frames, with the same columns as Game Frames.</p>
         <ul>
           <li><b>Supported addons</b>, handled out of the box when installed: Bartender4, Cooldown Manager Centered, Deadly Boss Mods, Details!, EllesmereUI, ElvUI, FlareUI, Forever Enhanced Cooldown Manager, Horizon Suite, Naowh Forever, Plater, Questie, RestedXP Guides and WeakAuras. Some follow the rows of the frames they replace. Click an addon to show or hide its parts.</li>
           <li><b>Custom frames</b>: hover over any frame and type <code>/cine add</code>, press <b>Hover Find</b> to collect several, or type in <b>Find frames by name or addon</b> and click a match. Added frames start with nothing ticked, so they stay faded until you set their row.</li>
@@ -294,9 +294,9 @@ dl.faq dd { margin: 2px 0 0; color: var(--muted) }
     <div class="eyebrow">Questions</div>
     <h2>Good to know</h2>
     <dl class="faq">
-      <div><dt>A frame keeps coming back when I don't expect it.</dt><dd>Something other than its row may be bringing it up: hovering it (and the mouseover group it's in), or one of its page's reveals. Check its page, and the Mouseover groups page.</dd></div>
-      <div><dt>I turned off a page and the frame still fades.</dt><dd>That's expected. A page's <b>Enable Page</b> switch only turns off its extras; the frame still follows its Standard Frames row. Turn off Standard Frames' own switch to leave every frame alone.</dd></div>
-      <div><dt>Where are the nameplates?</dt><dd>On the Nameplate &amp; Names page, with <a href="nameplates.html">a guide of their own</a>.</dd></div>
+      <div><dt>A frame keeps coming back when I don't expect it.</dt><dd>Something other than its row may be bringing it up: hovering it (and the mouseover group it's in), or one of its page's reveals. Check its page, and the Hover groups page.</dd></div>
+      <div><dt>I turned off a page and the frame still fades.</dt><dd>That's expected. A page's <b>Enable Page</b> switch only turns off its extras; the frame still follows its Game Frames row. Turn off Game Frames' own switch to leave every frame alone.</dd></div>
+      <div><dt>Where are the nameplates?</dt><dd>On the Nameplates page, with <a href="nameplates.html">a guide of their own</a>.</dd></div>
     </dl>
   </section>
 

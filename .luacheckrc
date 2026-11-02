@@ -225,6 +225,7 @@ read_globals = {
 	"PlaySound",
 	"SOUNDKIT", "GameMenuFrame", "ShowUIPanel", "CloseMenus", "CloseAllWindows", "ToggleFriendsFrame", "FriendsFrame", "FRIENDS",
 	"AreAllPanelsDisallowed", "SettingsPanel",
+	"CHAT_SAY_GET", -- (DemoHub.lua)
 	"RELOADUI",
 	"ReloadUI",
 	"EXIT_GAME",

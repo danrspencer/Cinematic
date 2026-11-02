@@ -129,6 +129,7 @@ Welcome.lua
 Layouts.lua
 ModuleEditor.lua
 HeldSettingsPage.lua
+DemoHub.lua
 CameraScriptsPage.lua
 CameraManager.lua
 Options.lua

@@ -48,7 +48,7 @@ for _, known in ipairs({
 		key = "euiBars", addon = "EllesmereUIActionBars",
 		label = "EllesmereUI Action Bars 6-10", short = "EllesmereUI bars 6-10",
 		about = L["its action bars 6 to 10"],
-		note = L["Its bars 1-5, pet, stance and XP bars are rows on the Standard Frames page, " ..
+		note = L["Its bars 1-5, pet, stance and XP bars are rows on the Game Frames page, " ..
 			"with its unit frames and quest tracker."],
 		names = { "EABBar_Bar6", "EABBar_Bar7", "EABBar_Bar8", "EABBar_Bar9", "EABBar_Bar10" },
 	},
@@ -63,7 +63,7 @@ for _, known in ipairs({
 		label = "EllesmereUI Resource Bars", short = "EllesmereUI resource bars",
 		about = L["its health, power and totem bars"],
 		note = L["Its cast bar isn't faded, like the game's. Its swing timer is the Swing timer row on " ..
-			"the Standard Frames page."],
+			"the Game Frames page."],
 		names = { "EllesmereUIResourceBarsFrame", "ERB_TotemBarFrame", "ERB_CallTotemBarFrame" },
 	},
 	{

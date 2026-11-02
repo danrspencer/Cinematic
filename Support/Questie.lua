@@ -13,7 +13,7 @@ table.insert(ns.ADDON_NOTES, {
 	addon = "Questie", label = "Questie",
 	works = L["Follows the Quest tracker row"],
 	about = L["Questie's quest tracker and its quest item buttons fade with the Quest tracker row on the " ..
-		"Standard Frames page."],
+		"Game Frames page."],
 })
 
 -- Its item buttons, one per quest you can hold (made up front).

@@ -175,7 +175,7 @@ local function Columns(key, out)
 		found = true
 	end
 	if fighting and ns.FightHold(key) and not ns.IsCineShowOn(key) then
-		Add(out, "block", L["Held back at the fight's start while you're at rest (Personal Resources page)"],
+		Add(out, "block", L["Held back at the fight's start while you're at rest (Resource Display page)"],
 			"Personal Resources")
 	end
 	if not found then
@@ -323,11 +323,11 @@ local function Explain(entry)
 	if entry.unmanaged then
 		local out, name = {}, entry.name
 		if ns.db.ignoredFrames[name] then
-			Add(out, "on", L["You set it to always show (Custom frames, Advanced Frames page)"], "Advanced Frames")
+			Add(out, "on", L["You set it to always show (Custom frames, Addon Frames page)"], "Advanced Frames")
 		else
 			Add(out, "on", L["%s isn't a supported addon, so Cinematic leaves its frames as they are"]
 				:format(entry.unmanaged), "Advanced Frames")
-			Add(out, "off", L["/cine add %s fades it in CineMode, or add it on the Advanced Frames page"]:format(name),
+			Add(out, "off", L["/cine add %s fades it in CineMode, or add it on the Addon Frames page"]:format(name),
 				"Advanced Frames")
 		end
 		return name, "unmanaged", out, "extra:" .. name
@@ -369,7 +369,7 @@ local function Explain(entry)
 	end
 	-- What's bringing it up.
 	if n.hovered then
-		Add(out, "on", L["The mouse is on it, or on a frame in its Mouseover group"], "Mouseover groups")
+		Add(out, "on", L["The mouse is on it, or on a frame in its Hover group"], "Mouseover groups")
 	end
 	if n.typingShown then
 		Add(out, "on", L["You're typing in chat"], "Chat")
@@ -402,7 +402,7 @@ local function Explain(entry)
 			Add(out, "on", L["Your pet is unhappy"], "Hunter")
 		end
 		for _, trigger in ipairs(n.triggers) do
-			Add(out, "on", L["Mouseover group \"%s\": %s"]:format(trigger.group.name or "?", TriggerLabel(trigger.key)),
+			Add(out, "on", L["Hover group \"%s\": %s"]:format(trigger.group.name or "?", TriggerLabel(trigger.key)),
 				"Mouseover groups")
 		end
 	end
@@ -686,7 +686,7 @@ function Refresh()
 	elseif picked.unmanaged then
 		card.row:SetText(L["Made by %s"]:format(picked.unmanaged))
 	elseif picked.own then
-		card.row:SetText(L["Cinematic's own, %s page"]:format(L[picked.page]))
+		card.row:SetText(L["Cinematic's own, %s page"]:format(ns.PageLabel(picked.page)))
 	else
 		card.row:SetText(L["%s row, %s page"]:format(RowLabel(key) or title, L[FramePage(key)]))
 	end
@@ -720,7 +720,7 @@ function Refresh()
 		line.text:SetTextColor(reason.state == "off" and 0.62 or 1, reason.state == "off" and 0.58 or 1,
 			reason.state == "off" and 0.52 or 1)
 		line.page = reason.page
-		line.where:SetText(reason.page and L["Settings: %s"]:format(L[reason.page]) or "")
+		line.where:SetText(reason.page and L["Settings: %s"]:format(ns.PageLabel(reason.page)) or "")
 		local lineHeight = line.text:GetStringHeight() + (reason.page and line.where:GetStringHeight() + 2 or 0) + 2
 		line:ClearAllPoints()
 		line:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", 0, -6)
@@ -1119,7 +1119,7 @@ function ns.CreateWhyPanel(kit)
 						local mark = reason.state == "on" and GREEN .. "+" or reason.state == "block" and "|cfff2a3a3x"
 							or GREY .. "-"
 						lines[#lines + 1] = ("%s|r %s%s"):format(mark, reason.text,
-							reason.page and (GREY .. "  (" .. L[reason.page] .. ")|r") or "")
+							reason.page and (GREY .. "  (" .. ns.PageLabel(reason.page) .. ")|r") or "")
 					end
 					row.more:SetText(table.concat(lines, "\n"))
 					row.more:Show()

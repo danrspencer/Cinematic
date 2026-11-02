@@ -12,7 +12,7 @@ local _, ns = ...
 
 ns.CHANGELOG_FEATURES = {
 	{ date = "2026-11-01", page = "Advanced Frames", title = "Smart Find",
-		text = "The Advanced Frames page's Find frames tab can look for other addons' frames that nothing " ..
+		text = "The Addon Frames page's Find frames tab can look for other addons' frames that nothing " ..
 		"fades, say which addon made each and guess which row it should follow. Add them with a click." },
 	{ date = "2026-11-01", page = "Why showing", title = "Why is it showing?",
 		text = "Type /cine why, or pick it from the minimap button's menu, then click any frame to see why it's " ..
@@ -92,7 +92,7 @@ ns.CHANGELOG_FEATURES = {
 	{ date = "2026-10-27", page = "Profiles", title = "A new welcome window",
 		text = "Pick how much Cinematic does, Subtle, Balanced or Cinema, then Customize changes one part " ..
 		"at a time: your layout, camera, look, Visions, chat and sound." },
-	{ date = "2026-10-26", page = "Personal Resources", title = "Personal Resources page",
+	{ date = "2026-10-26", page = "Personal Resources", title = "Resource Display page",
 		text = "Your player frame, pet frame and resource display have a page of their own: kept up while you " ..
 		"recover or run low on mana, and held back at the start of a fight until your power changes." },
 	{ date = "2026-10-26", page = "Nameplate Style", title = "Target Arrow",
@@ -127,14 +127,14 @@ ns.CHANGELOG_FEATURES = {
 		text = "Tick Copy chat button on the Quality of life page and a small icon in a chat window's corner " ..
 		"opens its lines, ready to select and copy with Ctrl+C." },
 	{ date = "2026-10-23", page = "Advanced Frames", client = "forever", title = "Naowh Forever support",
-		text = "Naowh Forever's top bar now fades in CineMode (a row on the Advanced Frames page), and its " ..
+		text = "Naowh Forever's top bar now fades in CineMode (a row on the Addon Frames page), and its " ..
 		"RestedXP guide window fades with the Quest tracker row." },
 	{ date = "2026-10-23", page = "Heal Vision", title = "Vision Helper",
 		text = "The minimap button glows while a vision is doing something, and its menu lists the visions in " ..
 		"use with a link to each one's page." },
 	{ date = "2026-10-23", page = "Advanced Frames", title = "ElvUI, DBM and RestedXP support",
 		text = "ElvUI's frames, Deadly Boss Mods' timer bars and RestedXP's guide window now fade in CineMode: " ..
-		"ElvUI's following the Standard Frames rows of the frames they replace, RestedXP's with the Quest " ..
+		"ElvUI's following the Game Frames rows of the frames they replace, RestedXP's with the Quest " ..
 		"tracker row." },
 	{ date = "2026-10-23", page = "Nameplates", title = "Names on faded nameplates",
 		text = "Names kept up over faded nameplates in CineMode now look like the game's own names over " ..
@@ -168,7 +168,7 @@ ns.CHANGELOG_FEATURES = {
 		"\"In combat AND (Open World OR BGs & Arenas)\". Click Edit on its row to build it with buttons." },
 	{ date = "2026-10-19", page = "Advanced Frames", title = "FlareUI support",
 		text = "FlareUI's unit frames, resource bars, buffs, quest tracker, party and raid frames fade in " ..
-		"CineMode, following the Standard Frames rows of the frames they replace." },
+		"CineMode, following the Game Frames rows of the frames they replace." },
 	{ date = "2026-10-19", page = "Minimap", title = "Minimap Reveal",
 		text = "The faded minimap comes up when ore, herbs or treasure show on it, a quest of yours is " ..
 		"done, or another icon appears - with a ping on the node if you like." },
@@ -187,7 +187,7 @@ ns.CHANGELOG_FEATURES = {
 	{ date = "2026-10-17", page = "New features", title = "What's new",
 		text = "The last settings page lists new features, newest first, and every change made to Cinematic." },
 	{ date = "2026-10-17", page = "UI Manager", title = "Settings in hubs",
-		text = "UI Manager, Camera and Quality of life hold their pages behind a row of icons, " ..
+		text = "Interface, Camera and Quality of life hold their pages behind a row of icons, " ..
 		"with one search box for all of them." },
 	{ date = "2026-10-16", page = "General", client = "forever", title = "Talents button when inspecting",
 		text = "A button on the inspect window opens the player's talents, and one on the talents " ..
