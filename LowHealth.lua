@@ -1256,9 +1256,12 @@ local function Apply(d, look, k, fade, heart, secret)
 		end
 	end
 	-- The portal: further away (its rim further in) the weaker you are, and stronger.
+	-- Not with secret health: the rest fades by the frame's alpha from the game,
+	-- and the model doesn't (seen: it stayed at full health, all else faded out).
 	local portal, info = d.portal, shown.portal
 	if portal then
-		local a = info and (look.lowHealthPortalAlpha or 0) * (info.alpha or 1) * math.min(1, c * 2) * fade or 0
+		local a = info and not secret and (look.lowHealthPortalAlpha or 0) * (info.alpha or 1)
+			* math.min(1, c * 2) * fade or 0
 		if a > 0 then
 			portal:SetPosition(PORTAL_OUT + ((info.distance or PORTAL_FULL) - PORTAL_OUT) * c, 0, 0)
 			portal:SetAlpha(math.min(1, a))
