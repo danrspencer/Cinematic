@@ -313,6 +313,7 @@ do
 			-- You're off: the spin and zoom stop where they are (the zoom jumps
 			-- back to your distance), and the camera goes behind you on arrival.
 			castEndsAt = nil
+			if ns.departCast and not ns.departCast.done then ns.departCast.done, ns.departCast.doneAt = "gone", GetTime() end
 			if emoteEvent == depart then
 				emoteEvent = nil
 			end
@@ -359,8 +360,13 @@ do
 			else
 				castEndsAt = GetTime() + 10 -- (the usual cast)
 			end
+			-- (For Teleport Vision: this cast, its timing, and whether its scene plays now.)
+			ns.departCast = { kind = depart, startAt = GetTime(), endsAt = castEndsAt, scene = castCamera }
 		else
 			castEndsAt = nil
+			if ns.departCast and not ns.departCast.done then
+				ns.departCast.done, ns.departCast.doneAt = "cancelled", GetTime()
+			end
 			if emoteEvent == depart then
 				emoteEvent = nil
 			end

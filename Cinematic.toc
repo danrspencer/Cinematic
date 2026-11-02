@@ -97,6 +97,7 @@ CameraTests.lua
 Tint.lua
 LowHealthThemes.lua
 LowHealth.lua
+TeleportVision.lua
 PersonalResources.lua
 StylePages.lua
 LetterboxStyle.lua

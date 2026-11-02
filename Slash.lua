@@ -164,6 +164,7 @@ local function PrintDebugHelp()
 	print("  /cine debug questtimer - say whether a quest timer is running and how its box fades")
 	print("  /cine vital demo [seconds] [classes] - a random spec's Vitals Vision theme every few seconds (5 if not given), its name on the screen; with classes (paladin warlock), each of their specs' in turn; again or off to stop")
 	print("  /cine vital demo all [seconds] - every Vitals Vision theme once, in the menu's order, numbered with its key on the screen (to record), then stops")
+	print("  /cine teleport colors [seconds] - Tele Vision in every class and spec's color, a pretend cast each (4 seconds if not given), numbered with its spec and theme on the screen (to record); again to stop")
 	print("  /cine debug vitals - Vitals Vision now: your health as read, how far in, the theme's art (run it in a fight)")
 	print("  /cine debug gameedge [number|back|blend|off] - step through the game's full-screen effect textures over the whole screen, one each time, to pick edges for Vitals Vision's Game art")
 	print("  /cine debug portal [number|file|back|near|far|up|down|turn|tilt|scale N|alpha N|reset|reel [seconds]|off] - (dev copy) show the game's portal and swirl models over the screen, one each time, to see which load and how they sit, for Vitals Vision")
@@ -525,6 +526,8 @@ local function HandleSlash(msg)
 		for word in arg:gmatch("%S+") do words[#words + 1] = word end
 		table.remove(words, 1) -- ("demo")
 		ns.VitalsDemo(words)
+	elseif cmd == "teleport" and (arg == "colors" or arg:match("^colors ")) and ns.TeleportColorReel then
+		ns.TeleportColorReel(arg:match("^colors%s*(.-)$"))
 	elseif cmd == "debug" and (arg == "gameedge" or arg:match("^gameedge ")) then
 		ns.ScoutGameEdges(arg:match("^gameedge%s*(.-)$"))
 	elseif cmd == "debug" and (arg == "portal" or arg:match("^portal ")) then

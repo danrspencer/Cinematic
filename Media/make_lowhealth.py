@@ -33,7 +33,7 @@ in it has come.
   Swirl   wispy spiral arms
   Vortex  clouds wound into a whirlpool
   Ring    a portal's rim: a bright swirling ring, wisps trailing out from it,
-          clear inside
+          clear inside; RingShade: dark outside the rim (Teleport Vision)
 Heat (256 square, tiles both ways): soft upright wisps of rising heat, scrolled
 upward in the game; HeatMask (256 x 128): where it shows, full at the bottom,
 fading out above, so the heat rises from the bottom edge.
@@ -831,6 +831,10 @@ def ring():
     band = smoothstep(0.38, 0.43, edge) * (1 - smoothstep(0.43, 0.54, edge))
     body = rim * (0.35 + 0.5 * smoothstep(0.3, 0.8, wisps) + 0.12 * streaks) + band * 0.55
     save("Ring", np.ones_like(x), np.clip(body, 0, 1), 32)
+    # RingShade.tga: dark outside the rim, clear inside (a wavering edge), to
+    # darken the world round a portal; full out to the texture's corners.
+    shade = smoothstep(0.36, 0.62, r + 0.04 * (wisps - 0.5)) * (0.75 + 0.25 * smoothstep(0.62, 1.2, r))
+    save("RingShade", np.ones_like(x), np.clip(shade, 0, 1), 32)
 
 
 def tiling_waves(x, y, count, max_fx, max_fy, seed):

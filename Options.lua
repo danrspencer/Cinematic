@@ -1741,6 +1741,8 @@ do
 			{ "Quest Item Style", "Interface\\Icons\\INV_Misc_Key_03", tabOf = "Quest Vision" },
 			{ "Roll Vision", "Interface\\Icons\\INV_Misc_Dice_01", section = "World" },
 			{ "Roll Style", "Interface\\Icons\\INV_Misc_Dice_02", tabOf = "Roll Vision" },
+			{ "Teleport Vision", "Interface\\Icons\\Spell_Arcane_TeleportStormWind", label = "Tele Vision",
+				section = "World" }, -- (TeleportVision.lua; its tooltip: ns.TILE_TOOLTIPS)
 			{ "Duel Vision", "Interface\\Icons\\Ability_DualWield", section = "World" },
 			-- (CardsPage.lua's: Battle Vision's and Story Vision's moments, one page)
 			{ "Card Vision", "Interface\\Icons\\INV_Misc_Book_09", section = "World" },
@@ -2194,7 +2196,8 @@ do
 		-- Its page's name on mouseover.
 		tile:SetScript("OnEnter", function(self)
 			GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
-			local shown = L[label or english]
+			local own = ns.TILE_TOOLTIPS and ns.TILE_TOOLTIPS[english] -- (a page's own: Tele Vision's)
+			local shown = L[own or label or english]
 			GameTooltip:SetText(WIP_PAGES[english] and shown .. " " .. L["(WIP)"] or shown, 1, 0.82, 0)
 			if self.dev then
 				GameTooltip:AddLine("(dev only)", 1, 0.25, 0.25)
@@ -14683,6 +14686,9 @@ ns.OnLanguage(function()
 		ns.CreateDamageVisionPanel(ns.lowHealthKit)
 		ns.CreateDamageVisionStylePanel(ns.lowHealthKit)
 		ns.CreateDamageVisionLookPanel(ns.lowHealthKit)
+	end
+	if ns.CreateTeleportVisionPanel then -- (TeleportVision.lua)
+		ns.CreateTeleportVisionPanel(ns.lowHealthKit)
 	end
 	CreateBuffsPanel()
 	CreatePlatesPanel()
