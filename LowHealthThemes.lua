@@ -28,8 +28,9 @@
 --     at full), hit { min, max } (on a big hit)
 --   swirl    up to two layers turning over the whole screen, clear in the
 --            middle, closing in from past the corners (LowHealth.lua), each:
---     tex    "Swirl" (wispy spiral arms, as light) or "Vortex" (clouds wound
---            into a whirlpool, as paint)
+--     tex    "Swirl" (wispy spiral arms, as light), "Vortex" (clouds wound
+--            into a whirlpool, as paint) or "Ring" (a portal's glowing rim,
+--            clear inside, as light)
 --     color, alpha (0-1), spin (turns a minute at full; below 0 the other
 --     way), reach (0-1: how far in its clear middle closes at full)
 --   (A theme with no swirl of its own gets spiral arms: Arms, below.)
@@ -249,7 +250,7 @@ ns.LOW_HEALTH_THEMES = {
 	{ key = "portal", name = "Dungeon portal", edge = "Glow", glow = { 0.55, 0.3, 1 },
 		glowAlpha = 0.45,
 		shadow = { 0.06, 0.02, 0.14 }, flash = { 0.7, 0.5, 1 }, pulse = 0.7, swirl = {
-			{ tex = "Vortex", color = { 0.45, 0.25, 0.85 }, alpha = 0.8, spin = -10, reach = 0.45 },
+			{ tex = "Ring", color = { 0.85, 0.35, 1 }, alpha = 1, spin = -6, reach = 0.5 },
 			{ tex = "Swirl", color = { 0.8, 0.6, 1 }, alpha = 0.45, spin = -14, reach = 0.4 },
 		}, sparks = {
 			{ tex = "Mote", kind = "spiral", color = { 0.8, 0.6, 1 }, size = { 0.015, 0.03 }, life = { 3, 5 },
@@ -295,6 +296,7 @@ end
 -- Each theme's own defaults for the Style page (the look field above), as set
 -- with the dev copy's DEV SET DEFAULT.
 local LOOKS = {
+	portal = { lowHealthSwirlAlpha = 0.8 }, -- (its ring is the theme: stronger than the arms every theme gets)
 	wounds = { lowHealthBloodReach = 0, lowHealthGameAlpha = 0.75 },
 	rage = { lowHealthBloodAlpha = 0.1, lowHealthBloodReach = 0.2, lowHealthGameAlpha = 0.7 },
 	holylight = { lowHealthGameReach = 0.4, lowHealthGameAlpha = 0.15 },

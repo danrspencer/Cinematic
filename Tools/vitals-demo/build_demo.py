@@ -126,7 +126,7 @@ for name in sorted({t["edge"] for t in themes if t.get("edge")} | {t["edge"] + "
 for name in ("Mote", "Star", "Bolt", "Gas", "Heat", "HeatMask"):
     img["s" + name] = b64(Image.open(os.path.join(ART, name + ".tga")).convert("RGBA"), "PNG")
 # The swirls' textures (a color and alpha pair each, like the edges).
-for name in ("Swirl", "Vortex"):
+for name in ("Swirl", "Vortex", "Ring"):
     a = np.asarray(Image.open(os.path.join(ART, name + ".tga")).convert("RGBA"), dtype=np.float32) / 255
     img["w" + name + "c"], img["w" + name + "a"] = pair(a[..., :3], a[..., 3])
 

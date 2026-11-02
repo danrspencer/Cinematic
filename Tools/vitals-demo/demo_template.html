@@ -137,7 +137,7 @@ function heatLayer(color, tiles, rise, h) {
   x.drawImage(imgs.sHeatMask, 0, H - h, W, h);
   return out;
 }
-const SWIRL_FRONT = 0.36, SWIRL_OUT = 1.15, SWIRL_DEEPEST = 0.37, SWIRL_BLEND = { Swirl: "lighter", Vortex: "source-over" };
+const SWIRL_FRONT = 0.36, SWIRL_OUT = 1.15, SWIRL_DEEPEST = 0.37, SWIRL_BLEND = { Swirl: "lighter", Vortex: "source-over", Ring: "lighter" };
 const EDGE_FILE = D.edge, WISPY = 1305138, WHITE = [1, 1, 1];
 const DRIFT = [0.012, -0.008], SECOND_ALPHA = 0.6;
 const drifted = [0, 0, 0, 0];
@@ -594,7 +594,7 @@ function sync() {
   $("theirsRows").classList.toggle("dim", !S.theirs);
   $("oursRows").classList.toggle("dim", !S.ours);
   const layers = THEME[S.theme].swirl || [];
-  $("swirlNote").textContent = layers.length ? layers.map(l => `${l.tex === "Swirl" ? "Spiral arms" : "Whirlpool clouds"}, ` +
+  $("swirlNote").textContent = layers.length ? layers.map(l => `${l.tex === "Swirl" ? "Spiral arms" : l.tex === "Ring" ? "Portal ring" : "Whirlpool clouds"}, ` +
     `${Math.abs(l.spin)} turns a minute${l.spin < 0 ? " the other way" : ""}`).join("; ") + "." :
     "This theme has no swirl (More themes: Vortex, Abyss, Dungeon portal).";
   note();

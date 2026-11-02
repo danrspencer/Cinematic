@@ -254,7 +254,7 @@ local EDGES = { "Smoke", "Glow", "Soak", "Rime", "Fur" }
 local SPARK_TEXTURES = { Mote = true, Star = true, Bolt = true, Gas = true }
 local SPARK_KINDS = { rise = true, twinkle = true, flicker = true, drift = true, spiral = true, orbit = true }
 local SPARK_AT = { top = true, bottom = true, sides = true }
-local SWIRL_BLEND = { Swirl = "ADD", Vortex = "BLEND" } -- (the swirls' textures: the arms as light, the clouds as paint)
+local SWIRL_BLEND = { Swirl = "ADD", Vortex = "BLEND", Ring = "ADD" } -- (the swirls' textures: arms and ring as light, clouds as paint)
 local ORIGINAL = {} -- (LowHealthThemes.lua's, by key)
 for _, theme in ipairs(ns.LOW_HEALTH_THEMES) do ORIGINAL[theme.key] = theme end
 ns.LOW_HEALTH_MY_THEMES = {} -- (theirs, by name)
@@ -1523,6 +1523,7 @@ end
 do
 	local DEMO_FROM, DEMO_TO = 0.6, 0.1
 	local ticker, label, queue, classes
+	local ordered, shownCount, total -- ("all": every theme once, in the menu's order, numbered, then stops)
 	local whoText -- (by theme key: its classes and specs, coloured, a line each)
 	local classThemes -- (by class token: its specs' themes in order)
 	local function Build()
@@ -1590,10 +1591,27 @@ do
 		return label
 	end
 	local function Next(seconds)
+		if ordered and queue and not queue[1] then -- (all shown: done)
+			ns.VitalsDemo({ "off" })
+			ns.Print(L["Vitals Vision demo: all %d shown."]:format(total))
+			return
+		end
 		if not (queue and queue[1]) then
 			Build()
 			queue = {}
-			if classes then
+			if ordered then
+				local seen = {}
+				for _, class in ipairs(ns.LOW_HEALTH_MENU) do
+					for _, info in ipairs(classThemes[class[1]]) do
+						if not seen[info] then
+							seen[info] = true
+							queue[#queue + 1] = info
+						end
+					end
+				end
+				for _, key in ipairs(ns.LOW_HEALTH_MORE) do queue[#queue + 1] = ns.LOW_HEALTH_THEME[key] end
+				shownCount, total = 0, #queue
+			elseif classes then
 				for _, token in ipairs(classes) do
 					for _, info in ipairs(classThemes[token]) do queue[#queue + 1] = info end
 				end
@@ -1611,7 +1629,7 @@ do
 					table.insert(queue, math.random(#queue + 1), ns.LOW_HEALTH_THEME[key])
 				end
 			end
-			if not classes and queue[1] == demoTheme and #queue > 1 then -- (not the same twice in a row)
+			if not classes and not ordered and queue[1] == demoTheme and #queue > 1 then -- (not the same twice in a row)
 				queue[1], queue[#queue] = queue[#queue], queue[1]
 			end
 		end
@@ -1619,6 +1637,10 @@ do
 		local text = Label()
 		text:SetText(L[demoTheme.name])
 		text.who:SetText(Who(demoTheme))
+		if ordered then -- (numbered, with its key, to match a recording to the themes)
+			shownCount = shownCount + 1
+			text.who:SetText(("%d / %d  ·  %s\n%s"):format(shownCount, total, demoTheme.key, Who(demoTheme)))
+		end
 		text.holder:Show()
 		text.fade:Stop()
 		text.fade:Play()
@@ -1642,6 +1664,8 @@ do
 			end
 			if tonumber(word) then
 				seconds = tonumber(word)
+			elseif word == "all" then
+				wanted.all = true
 			elseif token then
 				wanted[#wanted + 1] = token
 			elseif word ~= "off" then
@@ -1662,7 +1686,7 @@ do
 		for _, word in ipairs(words) do
 			if word == "off" then return end
 		end
-		classes, queue = wanted[1] and wanted, nil
+		classes, queue, ordered = wanted[1] and wanted, nil, wanted.all
 		seconds = math.max(1, seconds or 5)
 		Next(seconds)
 		ticker = C_Timer.NewTicker(seconds, function() Next(seconds) end)
@@ -2865,6 +2889,7 @@ function ns.CreateVitalsStylePanel(kit)
 	local SWIRL_KINDS = {
 		Swirl = { tex = "Swirl", alpha = 0.6, spin = 8, reach = 0.5 },
 		Vortex = { tex = "Vortex", alpha = 0.7, spin = 5, reach = 0.6 },
+		Ring = { tex = "Ring", alpha = 0.8, spin = 5, reach = 0.5 },
 	}
 	local function Swirls() return ThemeValue("swirl") or {} end
 	local function SetSwirl(i, change)
@@ -2907,9 +2932,9 @@ function ns.CreateVitalsStylePanel(kit)
 			end,
 		}, function()
 			return { { value = "none", text = L["None"] }, { value = "Swirl", text = L["Spiral arms"] },
-				{ value = "Vortex", text = L["Whirlpool clouds"] } }
-		end, 140, L["What it is: wispy spiral arms (added on as light) or clouds wound into a whirlpool. " ..
-			"None: not there."], function(d) return Themed(d) and i <= #Swirls() + 1 end)
+				{ value = "Vortex", text = L["Whirlpool clouds"] }, { value = "Ring", text = L["Portal ring"] } }
+		end, 140, L["What it is: wispy spiral arms (added on as light), clouds wound into a whirlpool, or a " ..
+			"portal's glowing rim closing in round you. None: not there."], function(d) return Themed(d) and i <= #Swirls() + 1 end)
 		kind:SetPoint("LEFT", row, "LEFT", 0, 0)
 		-- (The swatch from just past the dropdown, as the sparks' rows have it.)
 		local past = CreateFrame("Frame", nil, row)

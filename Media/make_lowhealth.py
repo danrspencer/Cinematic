@@ -32,6 +32,8 @@ middle, the swirl past it, so the more of the screen it covers the further
 in it has come.
   Swirl   wispy spiral arms
   Vortex  clouds wound into a whirlpool
+  Ring    a portal's rim: a bright swirling ring, wisps trailing out from it,
+          clear inside
 Heat (256 square, tiles both ways): soft upright wisps of rising heat, scrolled
 upward in the game; HeatMask (256 x 128): where it shows, full at the bottom,
 fading out above, so the heat rises from the bottom edge.
@@ -812,6 +814,25 @@ def vortex():
     save("Vortex", shade, alpha, 32)
 
 
+def ring():
+    """Ring.tga: a portal's rim, a bright band of wisps wound round (so it reads
+    as turning), brightest at its inner edge, trailing out and fading; clear
+    inside, so the swirl layer's sizing puts its rim where the clear middle ends."""
+    w = 512
+    x, y = grid(w, w)
+    r = np.hypot(x, y)
+    angle = np.arctan2(y, x)
+    wx, wy = turned(x, y, 2.5 * (1 - np.clip(r, 0, 1.4)))
+    wisps = square_noise(wx / 1.45, wy / 1.45, 12, 4, 1301)
+    streaks = 0.5 + 0.5 * np.cos(9 * angle + 14 * np.log(r + 0.05))
+    # (The rim: sharp inside, a long soft tail out.)
+    rim = np.where(r < 0.42, smoothstep(0.3, 0.42, r), 1 - smoothstep(0.42, 1.3, r)) ** 1.6
+    edge = r + 0.025 * (wisps - 0.5)  # (a rim that wavers, not a drawn circle)
+    band = smoothstep(0.38, 0.43, edge) * (1 - smoothstep(0.43, 0.54, edge))
+    body = rim * (0.35 + 0.5 * smoothstep(0.3, 0.8, wisps) + 0.12 * streaks) + band * 0.55
+    save("Ring", np.ones_like(x), np.clip(body, 0, 1), 32)
+
+
 def tiling_waves(x, y, count, max_fx, max_fy, seed):
     """Noise that tiles both ways (x, y in 0..1): waves of whole numbers of
     cycles across and down, so the edges meet. Wide across, long down: upright wisps."""
@@ -844,7 +865,7 @@ def heat():
     save("HeatMask", np.ones_like(mask), mask)
 
 
-MAKERS = [soak, crack_plate, frost, rime, smoke, flame, glow, vines, runes, fur, scales, leaves, wind, sun_moon, sprites, gas, swirl, vortex, heat]
+MAKERS = [soak, crack_plate, frost, rime, smoke, flame, glow, vines, runes, fur, scales, leaves, wind, sun_moon, sprites, gas, swirl, vortex, heat, ring]
 wanted = sys.argv[1:]
 for maker in MAKERS:
     if not wanted or maker.__name__ in wanted:

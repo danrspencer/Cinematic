@@ -207,8 +207,8 @@ def swirls(img, theme, rng):
         im = tex(info["tex"]).rotate(rng.uniform(0, 360), resample=Image.BICUBIC).resize((half * 2, half * 2), Image.LANCZOS)
         im = im.crop((half - W // 2, half - H // 2, half - W // 2 + W, half - H // 2 + H))
         rgb, a = arr(im)
-        a = a * info["alpha"] * SWIRL_ALPHA
-        if info["tex"] == "Swirl":  # (as light)
+        a = a * info["alpha"] * (theme.get("look") or {}).get("lowHealthSwirlAlpha", SWIRL_ALPHA)
+        if info["tex"] in ("Swirl", "Ring"):  # (as light)
             img += rgb * np.array(info["color"]) * a
         else:
             img[:] = img * (1 - a) + rgb * np.array(info["color"]) * a
