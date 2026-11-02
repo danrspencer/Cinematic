@@ -1131,7 +1131,6 @@ end
 -- label, to place what comes below.
 function ns.GridTable(content, columnTop, rows, kit)
 	local LABEL_WIDTH, ROW_HEIGHT, COLUMNS = kit.labelWidth, kit.rowHeight, kit.columns
-	local Tooltip = kit.Tooltip
 	local LAYOUT = { roles = kit.rolesMenu, edit = true }
 	if not rows.noHeadings then
 		ns.GridHeadings(kit, content, columnTop, LABEL_WIDTH, LAYOUT)
@@ -1148,15 +1147,10 @@ function ns.GridTable(content, columnTop, rows, kit)
 		rowLabel:SetWordWrap(false)
 		kit.ShowBox(content, item, rowLabel) -- (its frame on at all: item.showKey)
 		-- An asterisk, with a tip, on rows that have a page of their own.
-		if item.morePage or item.tip then
-			if item.morePage then rowLabel:SetText(item.label .. " |cffffd100*|r") end
-			local hover = CreateFrame("Frame", nil, content)
-			hover:SetAllPoints(rowLabel)
-			hover:EnableMouse(true)
-			Tooltip(hover, item.morePage and (L["More settings on the %s page. They can keep it up beyond what's " ..
-				"ticked here (hovering, tracking, new auras, cooldowns recharging and the like)."]):format(L[item.morePage])
-				or item.tip)
-		end
+		if item.morePage then rowLabel:SetText(item.label .. " |cffffd100*|r") end
+		ns.LabelHover(content, rowLabel, item.morePage and (L["More settings on the %s page. They can keep it up " ..
+			"beyond what's ticked here (hovering, tracking, new auras, cooldowns recharging and the like)."]):format(L[item.morePage])
+			or item.tip)
 		if ns.CINE_SHOW_SETTING[item.key] then
 			kit.RecordKey(content, ns.CINE_SHOW_SETTING[item.key]) -- (for the page's Reset)
 		end

@@ -118,14 +118,6 @@ for _, known in ipairs({
 	table.insert(ns.ADDON_FRAMES, known)
 end
 
--- Its frames standing in for the game's, by Standard Frames row: the row,
--- the fade group, and the frames.
-local function FadeWithRows(rows)
-	for _, row in ipairs(rows) do
-		ns.FadeWithRow(row[1], row[2], { unpack(row, 3) }, true, true)
-	end
-end
-
 -- The core: its visibility pass sets its frames' alpha (and some of the
 -- game's) a frame after target changes and the like. Fade them again
 -- straight after, from its own list of visibility updates (kept last in it:
@@ -155,7 +147,7 @@ ns.WhenAddonLoads("EllesmereUI", function()
 end)
 
 ns.WhenAddonLoads("EllesmereUIUnitFrames", function()
-	FadeWithRows({
+	ns.FadeWithRows({
 		{ "player", "player", "EllesmereUIUnitFrames_Player", "EllesmereUIUnitFrames_Pet" },
 		{ "target", "target", "EllesmereUIUnitFrames_Target" },
 		{ "tot", "target", "EllesmereUIUnitFrames_TargetTarget" },
@@ -166,7 +158,7 @@ ns.WhenAddonLoads("EllesmereUIUnitFrames", function()
 end)
 
 ns.WhenAddonLoads("EllesmereUIActionBars", function()
-	FadeWithRows({
+	ns.FadeWithRows({
 		{ "mainbar", "bars", "EABBar_MainBar" },
 		{ "bottomleft", "bars", "EABBar_Bar2" },
 		{ "bottomright", "bars", "EABBar_Bar3" },
@@ -184,15 +176,10 @@ end)
 -- the raid ones (with its healer mana, boss and extra frames) as Players, the
 -- party ones (unnamed) as Party frames.
 ns.WhenAddonLoads("EllesmereUIRaidFrames", function()
+	ns.FadeFoundByName("raidplayers", {
+		"EllesmereUIRaidFrameContainer", "ERF_HealerMana", "ERFExtraFramesContainer", "ERFFriendlyBossContainer",
+	})
 	ns.AddScanner(function()
-		for _, name in ipairs({
-			"EllesmereUIRaidFrameContainer", "ERF_HealerMana", "ERFExtraFramesContainer", "ERFFriendlyBossContainer",
-		}) do
-			local frame = _G[name]
-			if type(frame) == "table" and not ns.IsFaded(frame) then
-				ns.AddFoundFrame(frame, "raidplayers", true, true)
-			end
-		end
 		local party = UnlockFrame("RF_PartyFrames")
 		if party and not ns.IsFaded(party) then
 			ns.AddFoundFrame(party, "party", true, true)
@@ -205,46 +192,23 @@ end)
 -- alpha 0. The fade only reached that unit frame, so its plates popped up and
 -- went at full as plates were switched on and off. Its frames on a plate fade
 -- with it, as Plater's do: its alpha (target and range fading) times ours,
--- hooked. They're pooled and move from plate to plate: one moved takes the
+-- hooked (ns.SetPlateFrameAlpha). They're pooled and move from plate to plate: one moved takes the
 -- alpha of the plate it lands on.
 do
 	local pieces = setmetatable({}, { __mode = "k" }) -- [game plate] = its frames on it (and how many children it had)
-	local applying = false
-
-	local function Apply(frame)
-		applying = true
-		frame:SetAlpha((frame.cinematicOwnAlpha or 1) * (frame.cinematicPlateAlpha or 1))
-		applying = false
-	end
-
-	local function SetPieceAlpha(frame, alpha)
-		alpha = alpha and alpha < 1 and alpha or nil
-		if frame.cinematicPlateAlpha ~= alpha then
-			frame.cinematicPlateAlpha = alpha
-			Apply(frame) -- (back to its own alpha at full)
-		end
-	end
+	local hooked = setmetatable({}, { __mode = "k" })
+	local LABEL = "EllesmereUI plate SetAlpha hook"
 
 	local function HookPiece(frame)
-		if frame.cinematicHooked then
+		if hooked[frame] then
 			return
 		end
-		frame.cinematicHooked = true
-		local alpha = frame:GetAlpha()
-		frame.cinematicOwnAlpha = not (issecretvalue and issecretvalue(alpha)) and alpha or nil
-		hooksecurefunc(frame, "SetAlpha", ns.Profiled("EllesmereUI plate SetAlpha hook", function(self, own)
-			if applying then
-				return
-			end
-			self.cinematicOwnAlpha = type(own) == "number" and not (issecretvalue and issecretvalue(own)) and own or nil
-			if self.cinematicPlateAlpha then
-				Apply(self)
-			end
-		end))
+		hooked[frame] = true
+		ns.HookPlateFrame(frame, LABEL)
 		hooksecurefunc(frame, "SetParent", function(self, parent)
 			local unitFrame = type(parent) == "table" and not (parent.IsForbidden and parent:IsForbidden())
 				and parent.UnitFrame
-			SetPieceAlpha(self, type(unitFrame) == "table" and unitFrame.cinematicAlpha or nil)
+			ns.SetPlateFrameAlpha(self, type(unitFrame) == "table" and unitFrame.cinematicAlpha or nil, LABEL)
 		end)
 	end
 
@@ -274,19 +238,13 @@ do
 	local function SetPlateAlpha(plate, alpha)
 		for _, frame in ipairs(Pieces(plate)) do
 			if frame:GetParent() == plate then
-				SetPieceAlpha(frame, alpha)
+				ns.SetPlateFrameAlpha(frame, alpha, LABEL)
 			end
 		end
 	end
 
 	ns.WhenAddonLoads("EllesmereUINameplates", function()
-		local other = ns.addonPlateAlpha
-		ns.addonPlateAlpha = function(plate, alpha)
-			if other then
-				other(plate, alpha)
-			end
-			SetPlateAlpha(plate, alpha)
-		end
+		ns.AddPlateAlpha(SetPlateAlpha)
 		-- A new plate's frames are put on it in its own handler, which runs
 		-- after ours (Core: NAME_PLATE_UNIT_ADDED): give them the plate's
 		-- alpha straight after, before they're drawn. That handler also sets
@@ -294,11 +252,8 @@ do
 		-- (ours, faded): put ours back too, or the name flashed up for a
 		-- frame on every plate coming into view (turning the camera round in
 		-- a city).
-		local watcher = CreateFrame("Frame")
-		watcher:RegisterEvent("NAME_PLATE_UNIT_ADDED")
-		watcher:SetScript("OnEvent", function(_, _, unit)
-			local plate = C_NamePlate and C_NamePlate.GetNamePlateForUnit(unit)
-			local unitFrame = plate and not (plate.IsForbidden and plate:IsForbidden()) and plate.UnitFrame
+		ns.AfterPlateAdded(function(plate)
+			local unitFrame = plate.UnitFrame
 			if unitFrame then
 				SetPlateAlpha(plate, unitFrame.cinematicAlpha)
 				if unitFrame.cinematicAlpha then
@@ -310,11 +265,11 @@ do
 end
 
 ns.WhenAddonLoads("EllesmereUIQuestTracker", function()
-	FadeWithRows({ { "quests", "quests", "EllesmereUIQTBackground" } })
+	ns.FadeWithRows({ { "quests", "quests", "EllesmereUIQTBackground" } })
 end)
 
 ns.WhenAddonLoads("EllesmereUIResourceBars", function()
-	FadeWithRows({ { "swing", "swing", "ERB_SwingTimerFrame" } })
+	ns.FadeWithRows({ { "swing", "swing", "ERB_SwingTimerFrame" } })
 end)
 
 -- It moves the map out of the cluster and keeps the cluster at alpha 0, and

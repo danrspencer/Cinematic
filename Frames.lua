@@ -847,6 +847,7 @@ local function IsWindow(frame, name)
 	end
 	return WINDOW_STRATA[frame:GetFrameStrata()] or false
 end
+ns.IsWindow = IsWindow -- (the frame guesser: FrameGuess.lua)
 
 local function ScanTopLevelFrames()
 	for _, frame in ipairs({ UIParent:GetChildren() }) do
@@ -1200,7 +1201,11 @@ function ns.SetAddonFramesOn(key, on)
 		ns.BuildManagedList()
 		return
 	end
-	local group = "addon:" .. key
+	ns.RemoveGroupFrames("addon:" .. key)
+end
+
+-- Every frame faded in the group put back.
+function ns.RemoveGroupFrames(group)
 	for i = #ns.managed, 1, -1 do
 		local entry = ns.managed[i]
 		if entry.group == group then
@@ -7392,6 +7397,7 @@ end
 function ns.StopFading(name)
 	ns.db.ignoredFrames[name] = true
 	if _G[name] then RemoveFrame(_G[name]) end
+	ns.RemoveGroupFrames("extra:" .. name) -- (an addon's unnamed frames: FrameGuess.lua)
 end
 
 -- Built-in, auto-matched and added frames come back on the next scan.
@@ -7403,6 +7409,7 @@ end
 -- (without being remembered as stopped), a stopped one is no longer ignored.
 function ns.ForgetExtraFrame(name)
 	if ns.db.extraFrames[name] and _G[name] then RemoveFrame(_G[name]) end
+	ns.RemoveGroupFrames("extra:" .. name)
 	ns.db.extraFrames[name] = nil
 	ns.db.ignoredFrames[name] = nil
 end
@@ -7743,11 +7750,30 @@ do
 		return addMode ~= nil
 	end
 
-	function ns.ToggleAddMode()
+	-- toList: from the page's Hover Find, the frames go on its Find frames
+	-- list to add (ns.NoteFoundFrame); from /cine add mode, they're faded.
+	function ns.ToggleAddMode(toList)
 		if not addMode then
 			addMode = C_Timer.NewTicker(ADD_MODE_CHECK, CheckUnderMouse)
-			ns.Print(L["add mode: hover over the frames to fade. Type /cine add mode again to fade them " ..
-				"(or /cine add cancel to drop them). The game's own frames and ones already faded are left out."])
+			ns.addModeToList = toList and true or nil
+			if toList then
+				ns.Print(L["Hover Find: hover over the frames you want, then click Stop: they go on the Find frames " ..
+					"list, to add. The game's own frames and ones already faded are left out."])
+			else
+				ns.Print(L["add mode: hover over the frames to fade. Type /cine add mode again to fade them " ..
+					"(or /cine add cancel to drop them). The game's own frames and ones already faded are left out."])
+			end
+			AddModeChanged()
+			return
+		end
+		if ns.addModeToList then
+			ns.addModeToList = nil
+			local listed = 0
+			for _, name in ipairs(EndAddMode()) do
+				if ns.NoteFoundFrame(name) then listed = listed + 1 end
+			end
+			ns.Print((listed == 1 and L["Hover Find: %d frame put on the Find frames list."]
+				or L["Hover Find: %d frames put on the Find frames list."]):format(listed))
 			AddModeChanged()
 			return
 		end
@@ -7773,6 +7799,7 @@ do
 			ns.Print(L["add mode isn't on (/cine add mode starts it)."])
 			return
 		end
+		ns.addModeToList = nil
 		local count = #EndAddMode()
 		ns.Print((count == 1 and L["add mode canceled: %d frame left as it was."]
 			or L["add mode canceled: %d frames left as they were."]):format(count))

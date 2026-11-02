@@ -45,7 +45,5 @@ local ROWS = {
 }
 
 ns.WhenAddonLoads("Bartender4", function()
-	for _, row in ipairs(ROWS) do
-		ns.FadeWithRow(row[1], row[2], { unpack(row, 3) }, true, true)
-	end
+	ns.FadeWithRows(ROWS)
 end)

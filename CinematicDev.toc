@@ -9,6 +9,7 @@
 # Remove the "# " below to force Spanish over the settings choice (then /reload):
 # ## X-Cinematic-Locale: esES
 
+FrameGuess.lua
 Locales\Locales.lua
 Locales\deDE.lua
 Locales\esES.lua
@@ -118,6 +119,7 @@ Tracking.lua
 NodeSweep.lua
 Slash.lua
 Why.lua
+SelfTest.lua
 ProfileModules.lua
 ProfileChoices.lua
 Profiles.lua

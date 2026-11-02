@@ -41,10 +41,6 @@ local ROW_CVARS = {
 -- Its own passes over the game's settings.
 local PASSES = { "RestoreProfileCVars", "SetCVarsOnFirstRun", "RefreshAutoToggle" }
 
-local function Known(value)
-	return not (issecretvalue and issecretvalue(value))
-end
-
 local function RowValues()
 	local values = {}
 	for _, cvar in ipairs(ROW_CVARS) do
@@ -128,57 +124,10 @@ end
 
 -- Fade -----------------------------------------------------------------------
 
--- On its unit frames: cinematicPlateAlpha, our alpha while faded (nil at
--- full); cinematicOwnAlpha, the alpha it last set itself (nil when it can't
--- be known: set from a secret value).
-local applying = false
-
-local function Apply(frame)
-	applying = true
-	frame:SetAlpha((frame.cinematicOwnAlpha or 1) * (frame.cinematicPlateAlpha or 1))
-	applying = false
-end
-
-local function HookFrame(frame)
-	if frame.cinematicHooked then
-		return
-	end
-	frame.cinematicHooked = true
-	local alpha = frame:GetAlpha()
-	frame.cinematicOwnAlpha = Known(alpha) and alpha or nil
-	hooksecurefunc(frame, "SetAlpha", ns.Profiled("Plater SetAlpha hook", function(self, own)
-		if applying then
-			return
-		end
-		self.cinematicOwnAlpha = type(own) == "number" and Known(own) and own or nil
-		if self.cinematicPlateAlpha then
-			Apply(self)
-		end
-	end))
-	if frame.SetAlphaFromBoolean then
-		hooksecurefunc(frame, "SetAlphaFromBoolean", function(self)
-			self.cinematicOwnAlpha = nil
-			if self.cinematicPlateAlpha then
-				Apply(self)
-			end
-		end)
-	end
-end
-
 local function SetPlaterPlateAlpha(plate, alpha)
 	local frame = plate.unitFrame
-	if type(frame) ~= "table" or not frame.Plater or not frame.SetAlpha then
-		return
-	end
-	if alpha and alpha < 1 then
-		HookFrame(frame)
-		if frame.cinematicPlateAlpha ~= alpha then
-			frame.cinematicPlateAlpha = alpha
-			Apply(frame)
-		end
-	elseif frame.cinematicPlateAlpha then
-		frame.cinematicPlateAlpha = nil
-		Apply(frame) -- (back to its own alpha; one it can't tell is put right at its next update)
+	if type(frame) == "table" and frame.Plater and frame.SetAlpha then
+		ns.SetPlateFrameAlpha(frame, alpha, "Plater SetAlpha hook")
 	end
 end
 
@@ -188,5 +137,5 @@ ns.WhenAddonLoads("Plater", function()
 		return
 	end
 	FollowPasses(plater)
-	ns.addonPlateAlpha = SetPlaterPlateAlpha
+	ns.AddPlateAlpha(SetPlaterPlateAlpha)
 end)

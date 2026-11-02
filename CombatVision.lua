@@ -10,8 +10,8 @@ local L = ns.L
 local DEFAULTS = ns.DEFAULTS
 
 -- (Each a row on the Cards page: their look is its, Cards.lua's.)
-DEFAULTS.combatOnEnter = false         -- the Entering combat row (on in the Cinema profile)
-DEFAULTS.combatOnLeave = false         -- ...and Leaving combat
+DEFAULTS.combatOnEnter = true          -- the Combat card going into a fight (its row: cardCombatOn)
+DEFAULTS.combatOnLeave = true          -- ...and coming out of it
 DEFAULTS.combatMinFight = 3            -- no leaving card after a fight shorter than this (seconds)
 DEFAULTS.combatTextIn = "Combat"       -- the words ("": none, just the icon, pulse, bar; these
 DEFAULTS.combatTextOut = "Respite"     -- two shown in the game's language: ns.CardWords)
@@ -622,13 +622,14 @@ function ns.CutCard(frame)
 	if cue and cue.cut and frame:GetScript("OnUpdate") then cue.cut() end
 end
 
--- Going into a fight and coming out of it: Entering and Leaving combat's
--- cards (their Show in rows read with the rules' entering or leaving true,
--- and CineMode as the fight began: cine), and the fight's sound with it.
+-- Going into a fight and coming out of it: the Combat card (its Show in row
+-- read with the rules' entering or leaving true, and CineMode as the fight
+-- began: cine), each as its tick says, and the fight's sound with it.
 local fightStart, cineAtStart = 0, false
 local function FightCard(enter, cine)
+	if not ns.Setting(enter and "combatOnEnter" or "combatOnLeave") then return end
 	local edge = enter and "enter" or "leave"
-	ns.Cards.Fire(enter and "combatIn" or "combatOut", {
+	ns.Cards.Fire("combat", {
 		name = ns.CardWords(enter and "combatTextIn" or "combatTextOut"), edge = edge, cine = cine,
 		sound = function() ns.PlayCombatCueSound(edge, cine) end, -- (CombatSoundRules.lua)
 	})
@@ -855,7 +856,7 @@ watcher:SetScript("OnEvent", function(_, event, ...)
 		return
 	end
 	if event == "PLAYER_REGEN_DISABLED" then
-		ns.Cards.Cut("combatOut") -- (a respite still showing)
+		ns.Cards.Cut("combat") -- (a respite still showing)
 		fightStart, cineAtStart = GetTime(), ns.lastCinematic and true or false
 		local card = bossRun.pending
 		bossRun.pending = nil
@@ -872,8 +873,8 @@ watcher:SetScript("OnEvent", function(_, event, ...)
 			BossLog("combat started: no Entering combat card, a boss card just played")
 		end
 	elseif event == "PLAYER_REGEN_ENABLED" then
-		-- (Entering combat's card or a boss's still showing: cut short.)
-		ns.Cards.Cut("combatIn")
+		-- (The Combat card going in or a boss's still showing: cut short.)
+		ns.Cards.Cut("combat")
 		ns.Cards.Cut("boss")
 		if GetTime() - fightStart >= db.combatMinFight then
 			FightCard(false, cineAtStart)

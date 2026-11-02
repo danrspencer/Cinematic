@@ -28,11 +28,28 @@ ns.OnLanguage(function()
 end)
 
 local setups = {} -- addon name -> setup functions still to run
+local supported = {} -- addon name -> true: has a setup (loaded or not)
 local started = false -- (Cinematic itself loaded: the setups can run)
 
 function ns.WhenAddonLoads(addon, setup)
+	supported[addon] = true
 	setups[addon] = setups[addon] or {}
 	table.insert(setups[addon], setup)
+end
+
+-- Whether Support/ has anything for the addon: rows, a note or a setup.
+function ns.IsSupportedAddon(addon)
+	if supported[addon] then
+		return true
+	end
+	for _, list in ipairs({ ns.ADDON_FRAMES, ns.ADDON_NOTES }) do
+		for _, known in ipairs(list) do
+			if known.addon == addon then
+				return true
+			end
+		end
+	end
+	return false
 end
 
 local function IsLoaded(addon)
@@ -78,3 +95,122 @@ watcher:SetScript("OnEvent", function(_, _, addon)
 		OnLoaded(addon)
 	end
 end)
+
+-- Helpers for the setups ------------------------------------------------------
+
+-- Its frames standing in for the game's, by Standard Frames row: each row is
+-- { row, fade group, frame names... }. They set their own alpha and are its
+-- own frames, so they're hooked.
+function ns.FadeWithRows(rows)
+	for _, row in ipairs(rows) do
+		ns.FadeWithRow(row[1], row[2], { unpack(row, 3) }, true, true)
+	end
+end
+
+-- Its named frames that fade in a group found by scans, not names (the raid
+-- frames' Players and Pets): picked up by each scan once they exist. Its own
+-- frames, so hooked.
+function ns.FadeFoundByName(group, names)
+	ns.AddScanner(function()
+		for _, name in ipairs(names) do
+			local frame = _G[name]
+			if type(frame) == "table" and not ns.IsFaded(frame) then
+				ns.AddFoundFrame(frame, group, true, true)
+			end
+		end
+	end)
+end
+
+-- Nameplate addons drawing plates of their own (see ns.SetPlateAlpha in
+-- Effects.lua). Each joins the ones already there, as more than one can be
+-- loaded (a whole-UI suite with its nameplates part, and Plater).
+-- fn(plate, alpha): alpha nil to let go of the plate.
+function ns.AddPlateAlpha(fn)
+	local other = ns.addonPlateAlpha
+	ns.addonPlateAlpha = other and function(plate, alpha)
+		other(plate, alpha)
+		fn(plate, alpha)
+	end or fn
+end
+
+-- fn(plate): true if it keeps the game's unit frame at alpha 0 under its own.
+function ns.AddPlateHidden(fn)
+	local other = ns.addonPlateHidden
+	ns.addonPlateHidden = other and function(plate)
+		return other(plate) or fn(plate)
+	end or fn
+end
+
+-- An addon's own frame on a plate, which sets its own alpha (range and target
+-- fading): hooked, so while the plate is faded its alpha is ours times its
+-- own, and at full it's left to it again. On the frame: cinematicPlateAlpha,
+-- ours while faded (nil at full); cinematicOwnAlpha, the alpha it last set
+-- itself (nil when it can't be known: set from a secret value).
+do
+	local applying = false
+
+	local function Known(value)
+		return not (issecretvalue and issecretvalue(value))
+	end
+
+	local function Apply(frame)
+		applying = true
+		frame:SetAlpha((frame.cinematicOwnAlpha or 1) * (frame.cinematicPlateAlpha or 1))
+		applying = false
+	end
+
+	-- label: what the hook is called on the Profiler page.
+	function ns.HookPlateFrame(frame, label)
+		if frame.cinematicHooked then
+			return
+		end
+		frame.cinematicHooked = true
+		local alpha = frame:GetAlpha()
+		frame.cinematicOwnAlpha = Known(alpha) and alpha or nil
+		hooksecurefunc(frame, "SetAlpha", ns.Profiled(label, function(self, own)
+			if applying then
+				return
+			end
+			self.cinematicOwnAlpha = type(own) == "number" and Known(own) and own or nil
+			if self.cinematicPlateAlpha then
+				Apply(self)
+			end
+		end))
+		if frame.SetAlphaFromBoolean then
+			hooksecurefunc(frame, "SetAlphaFromBoolean", function(self)
+				self.cinematicOwnAlpha = nil
+				if self.cinematicPlateAlpha then
+					Apply(self)
+				end
+			end)
+		end
+	end
+
+	-- alpha: the plate's fade, nil or 1 at full (back to its own alpha; one it
+	-- can't tell is put right at its next update).
+	function ns.SetPlateFrameAlpha(frame, alpha, label)
+		alpha = alpha and alpha < 1 and alpha or nil
+		if alpha then
+			ns.HookPlateFrame(frame, label)
+		end
+		if frame.cinematicPlateAlpha ~= alpha then
+			frame.cinematicPlateAlpha = alpha
+			Apply(frame)
+		end
+	end
+end
+
+-- fn(plate) runs on each new plate after the addon's own handler for it (it
+-- puts its frames on the plate in that, which runs after ours: Effects), so
+-- they get the plate's alpha before they're drawn. Called from the addon's
+-- setup: a watcher made then is called after the addon's own.
+function ns.AfterPlateAdded(fn)
+	local watcher = CreateFrame("Frame")
+	watcher:RegisterEvent("NAME_PLATE_UNIT_ADDED")
+	watcher:SetScript("OnEvent", function(_, _, unit)
+		local plate = C_NamePlate and C_NamePlate.GetNamePlateForUnit(unit)
+		if type(plate) == "table" and not (plate.IsForbidden and plate:IsForbidden()) then
+			fn(plate)
+		end
+	end)
+end

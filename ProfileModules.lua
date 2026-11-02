@@ -374,6 +374,7 @@ ns.PROFILE_MODULES = {
 		tip = "The Cards page's fights on: a card and sounds as you go into a fight and come out of it, and a " ..
 		"boss's name as its fight starts.",
 		apply = function(set)
+			set("cardCombatOn", true)
 			set("combatOnEnter", true)
 			set("combatOnLeave", true)
 			set("cardBossOn", true)

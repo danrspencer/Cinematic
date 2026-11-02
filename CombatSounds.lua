@@ -6,7 +6,8 @@
 
 local _, ns = ...
 
--- The groups in order: { name, side ("in": entering combat, "out": leaving) }.
+-- The groups in order: { name, side ("in": entering combat, "out": leaving,
+-- "time": the Time of day card's, "card": the other cards') }.
 ns.COMBAT_SOUND_GROUPS = {
 	{ "Weapons drawn", "in" },
 	{ "Drums", "in" },
@@ -24,10 +25,26 @@ ns.COMBAT_SOUND_GROUPS = {
 	{ "Victory", "out" },
 	{ "Calm and magic", "out" },
 	{ "Nature", "out" },
+	{ "Time of day", "time" },
+	{ "Cards", "card" },
 }
+
+-- (Not a sound kit: your faction's city bell, Alliance's or Horde's as it
+-- plays. CombatSoundRules.lua.)
+ns.FACTION_BELL = 1
 
 -- { id, name, group, seconds, volume, shortlist }
 ns.COMBAT_SOUNDS = {
+	-- (The cards' own, as they came before their rules: the Time of day's
+	-- each faded out after 3 seconds, some loop.)
+	{ 836, "Page turn", "Cards", 1, 1, true },
+	{ 1, "Your faction's city bell", "Cards", 3, 1, true },
+	{ 8352, "Chicken", "Time of day", 3, 1, true },
+	{ 730, "Horse", "Time of day", 3, 1, true },
+	{ 4420, "Afternoon", "Time of day", 3, 1, true },
+	{ 8353, "Frog", "Time of day", 3, 1, true },
+	{ 3605, "Owl", "Time of day", 3, 1, true },
+	{ 1018, "Wolf", "Time of day", 3, 1, true },
 	{ 700, "Sword drawn", "Weapons drawn", 0.7, 1, true },
 	{ 699, "Wooden weapon drawn", "Weapons drawn", 0.6, 1, true },
 	{ 701, "Shield raised", "Weapons drawn", 0.6, 1, true },

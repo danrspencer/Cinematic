@@ -164,13 +164,15 @@ ns.WhenAddonLoads("DaylightUI", function()
 end)
 
 ns.WhenAddonLoads("DaylightUI_ActionBars", function()
-	for num, row in ipairs(BARS) do
-		local names = {}
+	local rows = {}
+	for num, bar in ipairs(BARS) do
+		local row = { bar[1], bar[2] }
 		for i = 1, 12 do
-			names[i] = "DaylightUIBar" .. num .. "Button" .. i
+			row[i + 2] = "DaylightUIBar" .. num .. "Button" .. i
 		end
-		ns.FadeWithRow(row[1], row[2], names, true, true)
+		rows[num] = row
 	end
+	ns.FadeWithRows(rows)
 end)
 
 ns.WhenAddonLoads("DaylightUI_UnitFrames", function()
@@ -228,26 +230,15 @@ do
 	end
 
 	ns.WhenAddonLoads("DaylightUI_Nameplates", function()
-		local other, otherHidden = ns.addonPlateAlpha, ns.addonPlateHidden
-		ns.addonPlateAlpha = function(plate, alpha)
-			if other then
-				other(plate, alpha)
-			end
-			SetPlateAlpha(plate, alpha)
-		end
-		ns.addonPlateHidden = function(plate)
-			return (otherHidden and otherHidden(plate)) or Ours(plate) ~= nil
-		end
+		ns.AddPlateAlpha(SetPlateAlpha)
+		ns.AddPlateHidden(function(plate)
+			return Ours(plate) ~= nil
+		end)
 		-- A new plate gets its plate in its own handler, which runs after
 		-- ours (Effects: NAME_PLATE_UNIT_ADDED): give it the plate's alpha
 		-- straight after, before it's drawn.
-		local watcher = CreateFrame("Frame")
-		watcher:RegisterEvent("NAME_PLATE_UNIT_ADDED")
-		watcher:SetScript("OnEvent", function(_, _, unit)
-			local plate = C_NamePlate and C_NamePlate.GetNamePlateForUnit(unit)
-			if Usable(plate) then
-				SetPlateAlpha(plate, plateAlpha[plate])
-			end
+		ns.AfterPlateAdded(function(plate)
+			SetPlateAlpha(plate, plateAlpha[plate])
 		end)
 	end)
 end

@@ -53,21 +53,14 @@ local FOLLOWED = {
 }
 
 ns.WhenAddonLoads("FlareUI", function()
-	for _, row in ipairs(ROWS) do
-		ns.FadeWithRow(row[1], row[2], { unpack(row, 3) }, true, true)
-	end
+	ns.FadeWithRows(ROWS)
 	-- (A bar set to a Show choice other than Always is stepped towards its
 	-- alpha every frame, so it's faded again every frame, not just each tick.)
 	ns.FollowOwnAlpha(FOLLOWED)
 	ns.syncEveryFrame = true
+	-- Its raid frames (the main tanks' apart) fade with the game's, as Players.
+	ns.FadeFoundByName("raidplayers", { "FlareUI_Raid", "FlareUI_RaidTanks" })
 	ns.AddScanner(function()
-		-- Its raid frames (the main tanks' apart) fade with the game's, as Players.
-		for _, name in ipairs({ "FlareUI_Raid", "FlareUI_RaidTanks" }) do
-			local frame = _G[name]
-			if type(frame) == "table" and not ns.IsFaded(frame) then
-				ns.AddFoundFrame(frame, "raidplayers", true, true)
-			end
-		end
 		-- Its quest item buttons, numbered as they're made (on UIParent: they're
 		-- secure, so not in the tracker).
 		local i = 1

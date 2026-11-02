@@ -990,6 +990,7 @@ DEFAULTS.cooldownKeybinds = false -- its Show keybinds: each spell's key on its 
 DEFAULTS.handleFrames = true -- Standard Frames
 DEFAULTS.handleAddonFrames = true -- Advanced Frames
 DEFAULTS.addonDefaultAlways = true -- its Default row's Always: addons installed later start left alone (ns.DefaultNewAddons)
+DEFAULTS.smartFindBackground = true -- its Find frames tab: Smart Find now and then, while an addon is new to it (FrameGuess.lua)
 DEFAULTS.handleGamepad = true
 DEFAULTS.handleMinimap = true
 DEFAULTS.handleQuests = true -- Quest tracker
@@ -1275,7 +1276,7 @@ for page, keys in pairs({
 	handleHunter = { "hunterRightClickShot", "hunterAmmoSort", "hunterQuiverFill" },
 	duelPlates = { "duelCC" }, -- Duel Vision's page
 	-- The Cards page's rows (Cards.lua) and the time of day at login.
-	cards = { "combatOnEnter", "combatOnLeave", "cardBossOn", "storyZoneCard", "storyZoneSubzones", "storyRecap",
+	cards = { "cardCombatOn", "cardBossOn", "storyZoneCard", "storyZoneSubzones", "storyRecap",
 		"timeOfDayMessage", "timeOfDayChange", "chatAttackAlert", "cardDeathOn" },
 	cameraModes = { "shoulderCam" }, -- Cameras > General's Enable Cameras: Shoulder Cam
 	visualEffects = { "letterboxPage", "tintPage", "graphicsPlus", "musicInCinematic" }, -- (the Atmosphere hub's pages' switches)
@@ -3164,9 +3165,16 @@ function ns.EnsureTables()
 	ns.db.extraFrames = ns.db.extraFrames or {}
 	ns.db.ignoredFrames = ns.db.ignoredFrames or {}
 	ns.db.addonFrames = ns.db.addonFrames or {} -- Advanced Frames page: key -> false when switched off
-	-- Advanced Frames page: suite -> true when opened (they start collapsed).
-	ns.db.addonSuitesOpen = ns.db.addonSuitesOpen or {}
-	ns.db.addonSuitesClosed = nil -- (a test build's: they started open then)
+	-- Advanced Frames page: an addon's group (its name, or its suite's) ->
+	-- true when closed (they start open).
+	ns.db.addonGroupsClosed = ns.db.addonGroupsClosed or {}
+	ns.db.addonSuitesOpen, ns.db.addonSuitesClosed = nil, nil -- (before they were all grouped)
+	-- Frames the page found (FrameGuess.lua), and the addon each added frame
+	-- belongs to, remembered for when it isn't loaded: name -> addon.
+	ns.db.foundFrames = ns.db.foundFrames or {}
+	ns.db.frameAddons = ns.db.frameAddons or {}
+	-- Smart Find in the background: addon -> how many looks it has had (FrameGuess.lua).
+	ns.db.smartFindLooks = ns.db.smartFindLooks or {}
 	-- Options pages' sections opened or closed with a click: "page/section" -> true or false.
 	ns.db.sectionsOpen = ns.db.sectionsOpen or {}
 	ns.db.savedCVars = ns.db.savedCVars or {}
@@ -5857,10 +5865,22 @@ ticker:SetScript("OnEvent", ns.Profiled("Core events", function(self, event, arg
 		for _, saved in pairs(ns.db.profiles or {}) do
 			if type(saved) == "table" then LayoutRenamed(saved) end
 		end
+		-- Last time's Page-turn sound tick is its sound rules now (the Cards
+		-- page's Sounds tab): unticked, a rule with no sounds.
+		local function PageTurnOff(saved)
+			if rawget(saved, "storyRecapSound") == false and rawget(saved, "cardSounds_login") == nil then
+				saved.cardSounds_login = "show##"
+			end
+		end
+		PageTurnOff(ns.db)
+		for _, saved in pairs(ns.db.profiles or {}) do
+			if type(saved) == "table" then PageTurnOff(saved) end
+		end
 		-- Settings from removed or renamed features, now that the migrations
 		-- above have read what they need.
 		for _, key in ipairs({
 			"keepRaidMarkers", -- (now the Raid Markers grid)
+			"storyRecapSound", -- (now Last time's sound rules)
 			"cozyInstant", "cozyBuffsOn", "cozySit", "cozySleep", "cozyDance", "cozyKneel", "cozyChair",
 			"cozyWeapon", "vistaInstant", "vistaStare", "eventsV2", "eventDelay",
 			"taxiShotHold", "taxiShotBlendTime",
@@ -5959,6 +5979,15 @@ ticker:SetScript("OnEvent", ns.Profiled("Core events", function(self, event, arg
 				if type(saved) == "table" then ns.MigrateCards(saved, false) end
 			end
 			ns.db.cardsV1 = true
+		end
+		-- Entering and Leaving combat are one Combat card now (Cards.lua),
+		-- saved profiles too. Once.
+		if not ns.db.cardsV2 then
+			ns.MigrateCombatCard(ns.db)
+			for _, saved in pairs(ns.db.profiles or {}) do
+				if type(saved) == "table" then ns.MigrateCombatCard(saved) end
+			end
+			ns.db.cardsV2 = true
 		end
 		-- New settings start as the active profile has them (a built-in's
 		-- changes to the defaults included). A fresh install (or Reset addon)

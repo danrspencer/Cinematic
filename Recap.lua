@@ -26,11 +26,9 @@ DEFAULTS.storyRecapBosses = true
 DEFAULTS.storyRecapDeaths = false
 DEFAULTS.storyRecapGold = false
 DEFAULTS.storyRecapIcons = false
-DEFAULTS.storyRecapSound = true        -- a page turning as it shows
 
 local MAX_AGE = 14 * 24 * 3600 -- seconds: an older last session isn't worth recalling
 local SEPARATOR = " · "
-local PAGE_TURN = 836 -- (SOUNDKIT.IG_ABILITY_PAGE_TURN)
 
 -- The zone shown is the one you spent the most time in, not the last one:
 -- you often log out in a city or an inn, which says little about what you
@@ -181,11 +179,6 @@ function ns.RecapCardText(parts, look)
 	return { name = name, sub = table.concat(list, SEPARATOR), meta = zone and heading or nil }
 end
 
-local function PageTurn()
-	if ns.db.storyRecapSound then
-		pcall(PlaySound, SOUNDKIT and SOUNDKIT.IG_ABILITY_PAGE_TURN or PAGE_TURN, "SFX")
-	end
-end
 
 -- Plays the Last time card for parts (default: the login's) a moment after
 -- the zone name, unless it's a line under the zone name; true if it did.
@@ -195,12 +188,11 @@ function ns.RecapCard(parts)
 	parts = parts or lastParts
 	local db = ns.db
 	if db.storyRecapUnder or not parts then
-		if parts then PageTurn() end
+		if parts and ns.PlayCardCueSound then ns.PlayCardCueSound("login") end -- (its sound: a page turning, to start with)
 		return false
 	end
 	local card = ns.RecapCardText(parts, db)
 	if not card then return false end
-	card.sound = PageTurn
 	played = played + 1
 	local this = played
 	C_Timer.After(tonumber(db.storyRecapDelay) or 0, function()
@@ -213,9 +205,7 @@ end
 -- The Test and preview's card: this session's so far, else made up.
 ns.CardSamples = ns.CardSamples or {}
 ns.CardSamples.login = function()
-	local card = ns.RecapCardText(ns.RecapPartsNow(), ns.db) or { name = "Darkshore", sub = "" }
-	card.sound = PageTurn
-	return card
+	return ns.RecapCardText(ns.RecapPartsNow(), ns.db) or { name = "Darkshore", sub = "" }
 end
 
 -- Core.lua, at PLAYER_ENTERING_WORLD after a login or /reload. A real login

@@ -121,10 +121,48 @@ local function Tooltip(widget, tip)
 		else
 			GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
 		end
-		GameTooltip:SetText(tip, 1, 1, 1, 1, true)
+		-- A row label cut short (ns.LabelHover): its full name over the tip.
+		local full = self.fullLabel
+		if full and full:IsTruncated() then
+			GameTooltip:SetText(full:GetText(), 1, 0.82, 0)
+			GameTooltip:AddLine(tip, 1, 1, 1, true)
+		else
+			GameTooltip:SetText(tip, 1, 1, 1, 1, true)
+		end
 		GameTooltip:Show()
 	end)
 	widget:SetScript("OnLeave", function() GameTooltip:Hide() end)
+end
+
+-- Hovering a grid row's label (one line, cut short when too long) shows its
+-- tip, if any, and its full name while cut short. A name alone goes after a
+-- few seconds.
+function ns.LabelHover(parent, label, tip)
+	local hover = CreateFrame("Frame", nil, parent)
+	hover:SetAllPoints(label)
+	hover:EnableMouse(true)
+	hover.fullLabel = label
+	if tip then
+		Tooltip(hover, tip)
+		return hover
+	end
+	local shown = 0
+	hover:SetScript("OnEnter", function(self)
+		if not label:IsTruncated() then return end
+		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+		GameTooltip:SetText(label:GetText(), 1, 1, 1)
+		GameTooltip:Show()
+		shown = shown + 1
+		local this = shown
+		C_Timer.After(3, function()
+			if this == shown and GameTooltip:GetOwner() == self then GameTooltip:Hide() end
+		end)
+	end)
+	hover:SetScript("OnLeave", function(self)
+		shown = shown + 1
+		if GameTooltip:GetOwner() == self then GameTooltip:Hide() end
+	end)
+	return hover
 end
 
 -- What the PvP column or box covers, wherever it appears.
@@ -1673,6 +1711,7 @@ do
 			-- (CardsPage.lua's: Battle Vision's and Story Vision's moments, one page)
 			{ "Card Vision", "Interface\\Icons\\INV_Misc_Book_09", section = "World" },
 			{ "Card Style", "Interface\\Icons\\INV_Misc_Book_09", tabOf = "Card Vision" },
+			{ "Card Sounds", "Interface\\Icons\\INV_Misc_Book_09", tabOf = "Card Vision" },
 			{ "Wind Guide", "Interface\\Icons\\Spell_Nature_Cyclone", dev = true },
 		} },
 		{ name = "Quality of life", colors = { Helpers = { 0.3, 0.7, 0.5 } }, pages = {
@@ -5811,16 +5850,10 @@ local function ShowTable(content, anchor, rows, ...)
 		-- An asterisk, with a tip, on rows that have a page of their own.
 		if item.morePage then
 			rowLabel:SetText(item.label .. " |cffffd100*|r")
-			local hover = CreateFrame("Frame", nil, content)
-			hover:SetAllPoints(rowLabel)
-			hover:EnableMouse(true)
-			Tooltip(hover, (L["More settings on the %s page. They can keep it up beyond what's " ..
+			ns.LabelHover(content, rowLabel, (L["More settings on the %s page. They can keep it up beyond what's " ..
 				"ticked here (hovering, tracking, new auras, cooldowns recharging and the like)."]):format(L[item.morePage]))
-		elseif item.tip then
-			local hover = CreateFrame("Frame", nil, content)
-			hover:SetAllPoints(rowLabel)
-			hover:EnableMouse(true)
-			Tooltip(hover, item.tip)
+		else
+			ns.LabelHover(content, rowLabel, item.tip)
 		end
 		if ns.CINE_SHOW_SETTING[item.key] then
 			RecordKey(content, ns.CINE_SHOW_SETTING[item.key]) -- (for the page's Reset)
@@ -6378,6 +6411,7 @@ local function CreatePortraitsPanel()
 					label:SetJustifyH("LEFT")
 					label:SetWordWrap(false)
 					section.widgets[#section.widgets + 1] = label
+					section.widgets[#section.widgets + 1] = ns.LabelHover(content, label) -- (full name while cut short)
 					local function Key() return key end
 					local function SetAlways(value) ns.GetDB()[key] = value end
 					local parts = ns.ListRowParts(Key, FRAME_COLUMNS, nil, SetAlways, OPTS)
@@ -7076,6 +7110,7 @@ local function CreatePlatesPanel()
 		rowLabel:SetWidth(GRID_LABEL - 4 - ns.GRID_DOT_ROOM - rowLabel.indentX)
 		rowLabel:SetJustifyH("LEFT")
 		rowLabel:SetWordWrap(false)
+		ns.LabelHover(content, rowLabel)
 		spec.band = r
 		local row = ns.GridRow(ns.GRID_KIT, content, GRID_LABEL, top.layout, spec)
 		row.debugName = label -- (for the dev copy's page timing)
@@ -9946,8 +9981,9 @@ end
 local THIRD_PARTY_LAYOUT = { roles = true, edit = true }
 
 -- One row of the custom frames list, made as needed: a small X (takes it off
--- the list), the name, and the columns. row.item: { name, picked, kept, added }.
--- Placed by the page's Layout, in its Custom frames band.
+-- the list), the name, and the columns. row.item: { name, picked, kept, added,
+-- found, addon }. Placed by the page's Layout, under its addon's header (so
+-- the X and name sit a step in, past the header's +).
 local function GetExtraRow(index)
 	local row = extraRows[index]
 	if row then
@@ -9958,22 +9994,28 @@ local function GetExtraRow(index)
 
 	row.delete = ns.SkinClose(CreateFrame("Button", nil, row, "UIPanelCloseButton"))
 	row.delete:SetSize(22, 22)
-	row.delete:SetPoint("LEFT", -4, 0)
+	row.delete:SetPoint("LEFT", 14, 0)
 	Tooltip(row.delete, L["Takes this frame off the list. A frame you added stops fading; " ..
 		"one you kept up fades again if it's one the addon fades by itself."])
 	row.delete:SetScript("OnClick", function()
-		if row.item.picked then
-			ns.DropPickedFrame(row.item.name)
+		local item = row.item
+		if item.picked then
+			ns.DropPickedFrame(item.name)
 		else
-			ns.ForgetExtraFrame(row.item.name)
+			ns.ForgetExtraFrame(item.name)
 		end
 		RefreshExtras()
 	end)
 
 	row.text = Label(row, "GameFontHighlight")
-	row.text:SetPoint("LEFT", 20, 0)
-	row.text:SetWidth(THIRD_PARTY_LABEL_WIDTH - 24 - ns.GRID_DOT_ROOM)
+	row.text:SetPoint("LEFT", 38, 0)
+	row.text:SetWidth(THIRD_PARTY_LABEL_WIDTH - 42 - ns.GRID_DOT_ROOM)
 	row.text:SetWordWrap(false)
+	-- (Hovering the name: what it is, and for a found one, why it's there.)
+	row.hover = CreateFrame("Frame", nil, row)
+	row.hover:SetAllPoints(row.text)
+	row.hover:EnableMouse(true)
+	row.hover.fullLabel = row.text -- (its full name over the tip while cut short)
 
 	-- Its settings: Always (left alone), the Standard Frames page's lists,
 	-- its roles and rule, all by its key (the row's reused for other frames).
@@ -10006,17 +10048,27 @@ RefreshExtras = function()
 	local faded, ignored = ns.GetExtraFrames()
 	local db = ns.GetDB()
 	local items = {}
-	-- Frames add mode has picked so far, at the top while it's on.
-	for _, name in ipairs(ns.GetPickedFrames()) do items[#items + 1] = { name = name, picked = true } end
-	for _, name in ipairs(faded) do items[#items + 1] = { name = name, added = true } end
-	-- Kept up (/cine keep, or Always ticked): added ones and built-in ones.
-	for _, name in ipairs(ignored) do
-		items[#items + 1] = { name = name, kept = true, added = db.extraFrames[name] or false }
+	-- Frames add mode has picked so far, at the top while it's on (/cine add
+	-- mode's: Hover Find's are on the Find frames list).
+	if not ns.addModeToList then
+		for _, name in ipairs(ns.GetPickedFrames()) do items[#items + 1] = { name = name, picked = true } end
 	end
+	-- Faded ones and ones kept up (/cine keep, or Always ticked: added ones and
+	-- built-in ones), in one order by name: ticking Always doesn't move a row.
+	local listed = {}
+	for _, name in ipairs(faded) do listed[#listed + 1] = { name = name, added = true } end
+	for _, name in ipairs(ignored) do
+		listed[#listed + 1] = { name = name, kept = true, added = db.extraFrames[name] or false }
+	end
+	table.sort(listed, function(a, b) return a.name:lower() < b.name:lower() end)
+	for _, item in ipairs(listed) do items[#items + 1] = item end
 
 	for i, item in ipairs(items) do
 		local row = GetExtraRow(i)
 		row.item = item
+		local known = db.foundFrames[item.name]
+		item.found = known ~= nil and not known.dismissed
+		item.addon = ns.FrameAddon(item.name)
 		-- (A built-in frame kept up has its rows on the Standard Frames page.)
 		if not item.picked and item.added then
 			local key = "extra:" .. item.name
@@ -10031,11 +10083,24 @@ RefreshExtras = function()
 			end
 		end
 		row.grid:Refresh()
+		-- (An addon's unnamed frames: one row, "@<addon>".)
+		local unnamed = item.name:sub(1, #ns.UNNAMED_PREFIX) == ns.UNNAMED_PREFIX
+		local label = unnamed and L["Its unnamed frames"] or item.name
 		if item.picked then
-			row.text:SetText("|cffffd100" .. item.name .. "|r |cff808080(" .. L["picked"] .. ")|r")
+			row.text:SetText("|cffffd100" .. label .. "|r |cff808080(" .. L["picked"] .. ")|r")
+		elseif item.added then
+			row.text:SetText(label .. " |cffd9b35a(" .. L["added"] .. ")|r")
 		else
-			row.text:SetText(item.name)
+			row.text:SetText(label)
 		end
+		local tip = unnamed and L["Frames with no name that %s made."]:format(item.addon) or item.name
+		-- (Added from the Find frames tab with a guess: the row it follows.)
+		local follow = item.found and ns.RowLabel(known.follow)
+		if follow then
+			tip = tip .. "\n\n" .. L["It sits where the game's %s was, or is named like it: it takes that " ..
+				"row's ticks on the Standard Frames page until you give it its own."]:format(follow)
+		end
+		Tooltip(row.hover, tip)
 	end
 	extrasPanel.extraCount = #items
 	extrasPanel.Layout()
@@ -12013,22 +12078,53 @@ local function CreateExtrasPanel()
 		"frames on the Standard Frames page. Tick Always to leave an addon's frames alone (shown the " ..
 		"whole time); the next three show them only while you fight or have something targeted, and " ..
 		"the places while you're there."] .. "\n\n" ..
-		L["To fade something else, hover over it and type |cffffd100/cine add|r, " ..
-			"or type |cffffd100/cine add|r and its frame name. To pick up several, use the button below " ..
-			"(or |cffffd100/cine add mode|r) and hover over each one. " ..
-		"The columns work as for the supported addons above; the X takes a frame off the list."] .. "\n\n" ..
+		L["To fade something else, use the Find frames tab: search by name, pick frames by hovering, or let " ..
+		"Smart Find look for them. Or hover over a frame and type |cffffd100/cine add|r. Frames you add are " ..
+		"listed under their addon, with the same columns; the X takes one off the list."] .. "\n\n" ..
+		L["The Unloaded tab has the addons installed but not loaded, to set them up before you turn them " ..
+		"on, and the ones supported but not installed."] .. "\n\n" ..
 		L["The Default row is what frames you add, and addons you install later, start with; its Copy to all " ..
 		"gives it to every row here."])
 
-	-- The addons, laid out afresh each time the page opens (most load after
-	-- this one, so whether they're loaded isn't known when it's built): those
-	-- loaded, those installed but not loaded, the custom frames, then the rest
-	-- supported. A suite's parts (suite = its name) sit under a header that
-	-- opens and closes (closed to start with).
+	-- In folder tabs: Loaded (the grid, for the addons loaded), Find frames
+	-- (finding frames to add) and Unloaded (the addons installed but not
+	-- loaded, then the rest supported). The grid's laid out afresh each time
+	-- the page opens (most addons load after this one, so whether they're
+	-- loaded isn't known when it's built). Each addon's rows (a suite's: suite
+	-- = its name) sit under a header that opens and closes: its supported rows,
+	-- then the frames you added (from no addon known: Other frames).
+	local PANEL_W = THIRD_PARTY_LABEL_WIDTH + ns.GridWidth(THIRD_PARTY_LAYOUT) + 16
+	local holder = CreateFrame("Frame", nil, content)
+	holder:SetSize(PANEL_W, 1)
+	stack:Add(holder, "label")
 	local box = CreateFrame("Frame", nil, content)
-	box:SetSize(640, 1)
-	stack:Add(box, "label")
+	box:SetSize(PANEL_W - 16, 1)
 	content.box = box
+	local Layout, RefreshFound
+	local tab = 1 -- (the tab picked: 1 Loaded, 2 Find frames, 3 Unloaded)
+	-- (The Find frames tab's parts, made further down.)
+	local smart, foundHead, noneFound
+	local foundRows, foundCount = {}, 0
+	local tabsPanel, ShowTab, tabsBase, tabsHeight, _
+	tabsPanel, _, ShowTab, tabsBase, tabsHeight = ns.FolderTabs(content, {
+		{ L["Loaded"], L["The addons loaded now: their frames, and the ones you added."] },
+		{ L["Find frames"], L["Find other addons' frames to fade: search, hover, or Smart Find."] },
+		{ L["Unloaded"], L["Addons installed but not loaded, and the ones supported but not installed."] },
+	}, function(i)
+		tab = i
+		ShowTab(i)
+		if i == 2 then
+			ns.FindFoundFrames()
+			RefreshFound()
+		else
+			Layout()
+			FitContentHeight(content)
+		end
+	end)
+	tabsBase:SetPoint("TOPLEFT", holder, "TOPLEFT", 0, -tabsHeight)
+	tabsPanel:SetPoint("TOPLEFT", tabsBase, "TOPLEFT")
+	tabsPanel:SetSize(PANEL_W, 1)
+	box:SetPoint("TOPLEFT", tabsPanel, "TOPLEFT", 8, -10)
 
 	local LABEL_WIDTH, ROW_HEIGHT, INDENT = THIRD_PARTY_LABEL_WIDTH, 24, 18
 	local COLUMNS = THIRD_PARTY_COLUMNS
@@ -12047,10 +12143,7 @@ local function CreateExtrasPanel()
 		row.label:SetWidth(LABEL_WIDTH - INDENT)
 		row.label:SetJustifyH("LEFT")
 		row.label:SetWordWrap(false)
-		-- In its suite's list: its name without the suite's ("Data Bars").
-		if known.suite and known.label:sub(1, #known.suite + 1) == known.suite .. " " then
-			row.suiteLabel = known.label:sub(#known.suite + 2)
-		end
+		row.hover = ns.LabelHover(box, row.label) -- (its full name while cut short)
 		local item = "addon:" .. known.key
 		-- (For the page's Reset: just its rows of the shared lists.)
 		for c = 2, #COLUMNS do
@@ -12097,6 +12190,7 @@ local function CreateExtrasPanel()
 			row.label:SetWidth(LABEL_WIDTH - INDENT)
 			row.label:SetJustifyH("LEFT")
 			row.label:SetWordWrap(false)
+			row.frame.fullLabel = row.label -- (its full name over the tip while cut short)
 			row.works = Label(row.frame, "GameFontDisable", "")
 			row.works:SetPoint("TOPLEFT", LABEL_WIDTH, -5)
 			Tooltip(row.frame, "")
@@ -12110,14 +12204,12 @@ local function CreateExtrasPanel()
 	local bandSections = {
 		loaded = { id = "Advanced Frames/loaded", open = true },
 		installed = { id = "Advanced Frames/installed", open = true },
-		custom = { id = "Advanced Frames/custom", open = true },
 		missing = { id = "Advanced Frames/missing", open = false },
 	}
 	local missingNote = Label(box, "GameFontHighlightSmall", "")
 	missingNote:SetWidth(560)
 	missingNote:SetJustifyH("LEFT")
 	missingNote:SetJustifyV("TOP")
-	local Layout
 
 	-- The Default row, first under the headings: what a frame you add, or an
 	-- addon you install later, starts with (ns.ApplyExtraDefault,
@@ -12168,11 +12260,10 @@ local function CreateExtrasPanel()
 	})
 	defaultGrid:SetPoint("LEFT", defaultRow, "LEFT", LABEL_WIDTH, 0)
 
-	-- The Custom frames band's tools (add mode's button, the search box; made
-	-- below) and its "None yet.".
+	-- The tools for adding frames (the search box, then add mode's button;
+	-- made below), at the top.
 	local tools = CreateFrame("Frame", nil, box)
-	tools:SetSize(LABEL_WIDTH + ns.GridWidth(THIRD_PARTY_LAYOUT), 58)
-	local empty = Label(box, "GameFontDisableSmall", L["None yet."])
+	tools:SetSize(LABEL_WIDTH + ns.GridWidth(THIRD_PARTY_LAYOUT), 30)
 
 	local function SectionBandFor(key, title)
 		local holder = sectionBands[key]
@@ -12191,7 +12282,7 @@ local function CreateExtrasPanel()
 		return holder
 	end
 
-	-- A suite's header: + or - and its name, with how many parts it has.
+	-- An addon's header: + or - and its name, with how many rows it has.
 	local function SuiteHeader(suite)
 		local header = suiteHeaders[suite]
 		if not header then
@@ -12205,8 +12296,8 @@ local function CreateExtrasPanel()
 			header:SetHighlightTexture("Interface\\Buttons\\UI-PlusButton-Hilight", "ADD")
 			header:GetHighlightTexture():SetAllPoints(header.icon)
 			header:SetScript("OnClick", function()
-				local open = ns.GetDB().addonSuitesOpen
-				open[suite] = not open[suite] or nil
+				local closed = ns.GetDB().addonGroupsClosed
+				closed[suite] = not closed[suite] or nil
 				Layout()
 				FitContentHeight(content)
 			end)
@@ -12229,22 +12320,49 @@ local function CreateExtrasPanel()
 		for _, header in pairs(suiteHeaders) do header:Hide() end
 		for _, row in ipairs(rows) do
 			row.label:Hide()
+			row.hover:Hide()
 			row.grid:Hide()
 		end
 		for _, row in ipairs(extraRows) do row:Hide() end
-		tools:Hide()
-		empty:Hide()
+		for _, region in ipairs({ tools, headings, defaultRow, smart, foundHead, noneFound, missingNote }) do
+			region:Hide()
+		end
+		for _, row in ipairs(foundRows) do row:Hide() end
 		for _, row in ipairs(notes) do row.frame:Hide() end
-		-- The headings and the Default row, always at the top.
+		local function Fit()
+			box:SetHeight(math.max(1, y))
+			tabsPanel:SetHeight(y + 20)
+			holder:SetHeight(tabsHeight + y + 20)
+		end
+
+		-- Find frames: the search and Hover Find, Smart Find, and what it found.
+		if tab == 2 then
+			Place(tools, 0, 30)
+			smart:SetHeight(smart.Height()) -- (a frame with no height draws nothing in it)
+			Place(smart, 0, smart:GetHeight())
+			if foundCount > 0 then
+				Place(foundHead, 0, 18)
+				for i = 1, foundCount do Place(foundRows[i], 0, ROW_HEIGHT) end
+			else
+				Place(noneFound, 0, noneFound:GetStringHeight() + 6)
+			end
+			Fit()
+			return
+		end
+
+		-- Loaded and Unloaded: the headings (and on Loaded, the Default row).
 		Place(headings, 0, FRAME_HEADING_HEIGHT + 4)
-		Place(defaultRow, 0, ROW_HEIGHT)
+		if tab == 1 then
+			Place(defaultRow, 0, ROW_HEIGHT)
+		end
 		local band = 1
 
-		local function PlaceRow(row, indent)
-			row.label:SetText(indent > 0 and row.suiteLabel or row.known.short or row.known.label)
+		local function PlaceRow(row, label)
+			row.label:SetText(label)
 			row.label:ClearAllPoints()
-			row.label:SetPoint("TOPLEFT", box, "TOPLEFT", indent, -y - 5)
+			row.label:SetPoint("TOPLEFT", box, "TOPLEFT", INDENT, -y - 5)
 			row.label:Show()
+			row.hover:Show()
 			band = band + 1
 			row.grid:SetBand(band)
 			row.grid:ClearAllPoints()
@@ -12253,8 +12371,6 @@ local function CreateExtrasPanel()
 			y = y + ROW_HEIGHT
 		end
 
-		-- One section: its addons in the page's order, a suite's together under
-		-- its header.
 		local lastOpen = true
 		local function Band(key, title)
 			y = y + (y > 0 and (lastOpen and 12 or 6) or 0)
@@ -12265,70 +12381,130 @@ local function CreateExtrasPanel()
 			end
 			return lastOpen
 		end
-		local function Section(key, title, wanted)
-			local list, noteList = {}, {}
-			for _, row in ipairs(rows) do
-				if wanted(row.known) then
-					list[#list + 1] = row
-				end
+
+		-- The groups: by suite, else by addon; the frames you added and the
+		-- found ones under their addon's (that addon's suite's, for a suite's
+		-- part; the main addon's, for a module named after it:
+		-- SilverDragon_History), the rest under Other frames (key "").
+		local suiteOf = {}
+		for _, known in ipairs(ns.ADDON_FRAMES) do
+			if known.suite then suiteOf[known.addon] = known.suite end
+		end
+		local function GroupOf(addon)
+			if not addon then return "" end
+			if suiteOf[addon] then return suiteOf[addon] end
+			for _, suite in pairs(suiteOf) do
+				if addon:sub(1, #suite) == suite then return suite end
 			end
-			for _, row in ipairs(notes) do
-				if wanted(row.note) then
-					noteList[#noteList + 1] = row
-				end
+			local main = addon:match("^(.-)_")
+			if main and main ~= "" and ns.AddOnInstalled(main) then
+				return GroupOf(main)
 			end
-			if #list + #noteList == 0 or not Band(key, title) then
+			return addon
+		end
+		local groups, order = {}, {}
+		local function Group(key)
+			local group = groups[key]
+			if not group then
+				group = { key = key, rows = {}, notes = {}, extras = {}, loaded = false }
+				groups[key] = group
+				order[#order + 1] = group
+			end
+			return group
+		end
+		for _, row in ipairs(rows) do
+			local group = Group(row.known.suite or row.known.addon)
+			group.rows[#group.rows + 1] = row
+			group.loaded = group.loaded or ns.AddOnLoaded(row.known.addon)
+			group.title = group.title or row.known.suite
+		end
+		for _, row in ipairs(notes) do
+			local group = Group(row.note.addon)
+			group.notes[#group.notes + 1] = row
+			group.loaded = group.loaded or ns.AddOnLoaded(row.note.addon)
+			group.title = group.title or row.note.label
+		end
+		for i = 1, content.extraCount or 0 do
+			local row = extraRows[i]
+			local addon = row.item.addon
+			local group = Group(GroupOf(addon))
+			group.extras[#group.extras + 1] = row
+			group.loaded = group.loaded or not addon or ns.AddOnLoaded(addon)
+		end
+		-- Its name: the suite's, its one supported row's ("Deadly Boss Mods"),
+		-- the addon's own title, or its folder's.
+		local getInfo = C_AddOns and C_AddOns.GetAddOnInfo or GetAddOnInfo
+		for _, group in ipairs(order) do
+			if group.key == "" then
+				group.title = L["Other frames"]
+			elseif not group.title and #group.rows == 1 then
+				group.title = group.rows[1].known.label
+			elseif not group.title then
+				local title = getInfo and select(2, getInfo(group.key))
+				-- (Without colors, bracketed bits and a version at the end:
+				-- "Titan Panel [_Core_] 9.3.5" is Titan Panel.)
+				title = type(title) == "string" and title:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
+					:gsub("%b[]", ""):gsub("%b<>", ""):gsub("%s+v?%d[%d%.]*%s*$", ""):gsub("%s+", " ")
+					:match("^%s*(.-)%s*$") or ""
+				group.title = title ~= "" and title or group.key
+			end
+		end
+		table.sort(order, function(a, b)
+			if (a.key == "") ~= (b.key == "") then return b.key == "" end
+			return a.title:lower() < b.title:lower()
+		end)
+
+		-- A supported row's name under its addon's: without the addon's name
+		-- ("Data Bars"), else what it fades ("Its meter windows").
+		local function RowName(known, title)
+			local label = known.label
+			if label:sub(1, #title + 1) == title .. " " then
+				label = label:sub(#title + 2)
+			elseif label == title then
+				label = known.about or label
+			end
+			return label:sub(1, 1):upper() .. label:sub(2)
+		end
+
+		local function PlaceGroup(group)
+			local header = SuiteHeader(group.key)
+			local closed = db.addonGroupsClosed[group.key]
+			header.icon:SetTexture(closed and "Interface\\Buttons\\UI-PlusButton-Up"
+				or "Interface\\Buttons\\UI-MinusButton-Up")
+			header.text:SetText(("%s |cff808080(%d)|r"):format(group.title, #group.rows + #group.notes + #group.extras))
+			Place(header, 0, ROW_HEIGHT)
+			if closed then
 				return
 			end
 			-- (Texts read now: they're translated once the language is known.)
-			for _, row in ipairs(noteList) do
+			for _, row in ipairs(group.notes) do
 				row.label:SetText(row.note.label)
 				row.works:SetText(row.note.works)
 				Tooltip(row.frame, row.note.about)
-				Place(row.frame, 0, ROW_HEIGHT)
+				Place(row.frame, INDENT, ROW_HEIGHT)
 			end
-			local done = {}
-			for _, row in ipairs(list) do
-				local suite = row.known.suite
-				if not suite then
-					PlaceRow(row, 0)
-				elseif not done[suite] then
-					done[suite] = true
-					local parts = {}
-					for _, other in ipairs(list) do
-						if other.known.suite == suite then
-							parts[#parts + 1] = other
-						end
-					end
-					local header = SuiteHeader(suite)
-					local closed = not db.addonSuitesOpen[suite]
-					header.icon:SetTexture(closed and "Interface\\Buttons\\UI-PlusButton-Up"
-						or "Interface\\Buttons\\UI-MinusButton-Up")
-					header.text:SetText(("%s |cff808080(%d)|r"):format(suite, #parts))
-					Place(header, 0, ROW_HEIGHT)
-					if not closed then
-						for _, part in ipairs(parts) do
-							PlaceRow(part, part.suiteLabel and INDENT or 0)
-						end
-					end
-				end
+			for _, row in ipairs(group.rows) do
+				PlaceRow(row, RowName(row.known, group.title))
+			end
+			for _, row in ipairs(group.extras) do
+				band = band + 1
+				row.grid:SetBand(band)
+				Place(row, 0, ROW_HEIGHT)
 			end
 		end
 
-		Section("loaded", L["Loaded"], function(known) return ns.AddOnLoaded(known.addon) end)
-		Section("installed", L["Installed, not loaded"], function(known) return not ns.AddOnLoaded(known.addon) end)
-
-		-- The frames you added (RefreshExtras fills the rows), under their tools.
-		if Band("custom", L["Custom frames"]) then
-			Place(tools, 0, 58)
-			local count = content.extraCount or 0
-			for i = 1, count do
-				band = band + 1
-				extraRows[i].grid:SetBand(band)
-				Place(extraRows[i], 0, ROW_HEIGHT)
+		if tab == 1 then
+			y = y + 6
+			for _, group in ipairs(order) do
+				if group.loaded then PlaceGroup(group) end
 			end
-			if count == 0 then
-				Place(empty, 0, 16)
+		else
+			local wanted = {}
+			for _, group in ipairs(order) do
+				if not group.loaded then wanted[#wanted + 1] = group end
+			end
+			if #wanted > 0 and Band("installed", L["Installed, not loaded"]) then
+				for _, group in ipairs(wanted) do PlaceGroup(group) end
 			end
 		end
 
@@ -12346,25 +12522,162 @@ local function CreateExtrasPanel()
 				missing[#missing + 1] = note.label
 			end
 		end
-		if #missing > 0 and Band("missing", L["Not installed"]) then
+		if tab == 3 and #missing > 0 and Band("missing", L["Not installed"]) then
 			missingNote:SetText("|cff808080" .. L["Also supported, when installed: %s"]:format(table.concat(missing, ", ")) .. "|r")
 			Place(missingNote, 0, missingNote:GetStringHeight() + 4)
-		else
-			missingNote:Hide()
 		end
-		box:SetHeight(math.max(1, y))
+		Fit()
 	end
 	content.Layout = Layout
+
+	-- The Find frames tab's Smart Find: what it is, its background tick, and
+	-- a button to run it for a while (a countdown beside it).
+	smart = CreateFrame("Frame", nil, box)
+	smart:SetWidth(PANEL_W - 16)
+	local smartTitle = Label(smart, "GameFontNormal", L["Smart Find"])
+	smartTitle:SetPoint("TOPLEFT", 0, -6)
+	local smartHelp = Label(smart, "GameFontHighlightSmall", L["Looks over what's on screen for other addons' " ..
+		"frames that nothing fades, and guesses which Standard Frames row each stands in for. Add one to fade " ..
+		"it: it goes on the Loaded tab, under its addon."])
+	smartHelp:SetPoint("TOPLEFT", smartTitle, "BOTTOMLEFT", 0, -6)
+	smartHelp:SetWidth(PANEL_W - 40)
+	smartHelp:SetJustifyH("LEFT")
+	local background = Check(content, "smartFindBackground", L["Look in the background"],
+		L["Smart Find every 20 seconds while an addon is new to it (its first 15 minutes of play, for each " ..
+		"addon you install that isn't supported), not in fights, so frames that come and go (another addon's " ..
+		"popups) are caught while they're up. After that, look with the button below."])
+	background:SetParent(smart) -- (its setting recorded on the page, for its Reset)
+	background:SetPoint("TOPLEFT", smartHelp, "BOTTOMLEFT", -4, -6)
+	local runButton = ns.PanelButton(smart)
+	runButton:SetSize(220, 22)
+	runButton:SetPoint("TOPLEFT", background, "BOTTOMLEFT", 4, -6)
+	Tooltip(runButton, L["Looks once a second for a while, so a frame that only shows now and then is caught: " ..
+		"bring it up while it runs. Click again to stop."])
+	local countdown = Label(smart, "GameFontHighlightSmall", "")
+	countdown:SetPoint("LEFT", runButton, "RIGHT", 10, 0)
+	local function ShowRun()
+		local left = ns.SmartFindLeft()
+		runButton:SetText(left and L["Stop"] or L["Smart Find for %d seconds"]:format(ns.SMART_FIND_SECONDS))
+		countdown:SetText(left and ("|cff4ce64c" .. L["Looking... %ds"]:format(left) .. "|r") or "")
+	end
+	runButton:SetScript("OnClick", function()
+		if ns.SmartFindLeft() then
+			ns.StopSmartFind()
+			return
+		end
+		ns.StartSmartFind(function()
+			ShowRun()
+			if canvas:IsVisible() and tab == 2 then RefreshFound() end
+		end)
+	end)
+	ShowRun()
+	smart.Height = function()
+		return 6 + smartTitle:GetStringHeight() + 6 + smartHelp:GetStringHeight() + 6 + 26 + 6 + 22 + 12
+	end
+
+	-- What it found: the frame, its addon, the row it'd follow, and Add
+	-- (ns.AdoptFoundFrame: onto the Loaded tab, faded).
+	-- (The texts stop short of Add: their hover areas took its clicks.)
+	local FIND_ADD_W = 80
+	local FIND_NAME_W, FIND_ADDON_X, FIND_ADDON_W, FIND_GUESS_X = 220, 230, 150, 390
+	local FIND_GUESS_W = math.max(60, PANEL_W - 16 - FIND_ADD_W - 16 - FIND_GUESS_X)
+	foundHead = CreateFrame("Frame", nil, box)
+	foundHead:SetSize(PANEL_W - 16, 18)
+	for _, column in ipairs({ { L["Frame"], 0 }, { L["Addon"], FIND_ADDON_X }, { L["Guess"], FIND_GUESS_X } }) do
+		local heading = Label(foundHead, "GameFontNormalSmall", column[1])
+		heading:SetPoint("LEFT", column[2], 0)
+	end
+	noneFound = Label(box, "GameFontDisableSmall", L["Nothing found yet. Smart Find looks at what's on screen: " ..
+		"run it while the frames you want are showing."])
+	noneFound:SetWidth(PANEL_W - 40)
+	noneFound:SetJustifyH("LEFT")
+	local function FoundRow(i)
+		local row = foundRows[i]
+		if row then return row end
+		row = CreateFrame("Frame", nil, box)
+		row:SetSize(PANEL_W - 16, ROW_HEIGHT)
+		local function Text(x, width, font)
+			local text = Label(row, font, "")
+			text:SetPoint("LEFT", x, 0)
+			text:SetWidth(width)
+			text:SetJustifyH("LEFT")
+			text:SetWordWrap(false)
+			ns.LabelHover(row, text) -- (its full text while cut short)
+			return text
+		end
+		row.name = Text(0, FIND_NAME_W, "GameFontHighlight")
+		row.addon = Text(FIND_ADDON_X, FIND_ADDON_W, "GameFontHighlightSmall")
+		row.guess = Text(FIND_GUESS_X, FIND_GUESS_W, "GameFontHighlightSmall")
+		row.add = ns.PanelButton(row)
+		row.add:SetSize(FIND_ADD_W, 22)
+		row.add:SetPoint("RIGHT", -4, 0)
+		row.add:SetFrameLevel(row:GetFrameLevel() + 5) -- (over the texts' hover areas)
+		row.add:SetText(L["Add"])
+		Tooltip(row.add, L["Fades it: it goes on the Loaded tab, under its addon, with the Default row's " ..
+			"ticks, or the ticks of the row it follows."])
+		row.add:SetScript("OnClick", function()
+			ns.AdoptFoundFrame(row.name.frameName)
+			RefreshExtras()
+			RefreshFound()
+		end)
+		row.added = Label(row, "GameFontDisableSmall", L["Added"])
+		row.added:SetPoint("RIGHT", -14, 0)
+		foundRows[i] = row
+		return row
+	end
+	RefreshFound = function()
+		local db = ns.GetDB()
+		local names = {}
+		for name, known in pairs(db.foundFrames) do
+			if not known.dismissed then names[#names + 1] = name end
+		end
+		-- (Hover Find's picks so far, at the top: on the list once it stops.)
+		local picking = {}
+		if ns.addModeToList then
+			for _, name in ipairs(ns.GetPickedFrames()) do
+				if not db.foundFrames[name] then picking[#picking + 1] = name end
+			end
+		end
+		table.sort(names, function(a, b)
+			local addonA, addonB = db.foundFrames[a].addon or "", db.foundFrames[b].addon or ""
+			if addonA ~= addonB then return addonA:lower() < addonB:lower() end
+			return a:lower() < b:lower()
+		end)
+		for i, name in ipairs(picking) do
+			local row = FoundRow(i)
+			row.name.frameName = name
+			row.name:SetText("|cffffd100" .. name .. "|r")
+			row.addon:SetText(ns.FrameAddon(name) or "?")
+			row.guess:SetText("|cff808080(" .. L["picked"] .. ")|r")
+			row.add:Hide()
+			row.added:Hide()
+		end
+		for n, name in ipairs(names) do
+			local i = #picking + n
+			local known, row = db.foundFrames[name], FoundRow(i)
+			local unnamed = name:sub(1, #ns.UNNAMED_PREFIX) == ns.UNNAMED_PREFIX
+			row.name.frameName = name
+			row.name:SetText(unnamed and ("%s (%d)"):format(L["Its unnamed frames"], known.count or 0) or name)
+			row.addon:SetText(known.addon or "?")
+			row.guess:SetText(ns.RowLabel(known.follow) or L["Own row"])
+			local added = db.extraFrames[name] and true or false
+			row.add:SetShown(not added)
+			row.added:SetShown(added)
+		end
+		foundCount = #picking + #names
+		Layout()
+		FitContentHeight(content)
+	end
 	SetSection(content, L["Custom frames"]) -- (what's below: the custom frames' tools)
 
 	-- Add mode (/cine add mode): pick up frames by hovering, then fade them all.
 	local addMode = ns.PanelButton(tools)
-	addMode:SetSize(220, 22)
-	addMode:SetPoint("TOPLEFT", tools, "TOPLEFT", 0, -2)
-	Tooltip(addMode, L["Hover over the frames you want to fade (move this window out of the way, " ..
-		"or close it), then click Stop or type /cine add mode again to fade them all. " ..
-		"The game's own frames and ones already faded are left out. /cine add cancel drops them."])
-	addMode:SetScript("OnClick", ns.ToggleAddMode)
+	addMode:SetSize(120, 22)
+	addMode:SetPoint("TOPLEFT", tools, "TOPLEFT", 232, -3) -- (right of the search box)
+	Tooltip(addMode, L["Hover over the frames you want (move this window out of the way, or close it), " ..
+		"then click Stop: they go on the list below, to add. The game's own frames and ones already faded " ..
+		"are left out. /cine add cancel drops them."])
+	addMode:SetScript("OnClick", function() ns.ToggleAddMode(true) end)
 	-- A spinner beside it while it's on, to show it's still watching the mouse.
 	local spinner = addMode:CreateTexture(nil, "OVERLAY")
 	spinner:SetTexture("Interface\\COMMON\\StreamCircle")
@@ -12382,7 +12695,7 @@ local function CreateExtrasPanel()
 		local on = ns.IsAddModeOn()
 		spinner:SetShown(on)
 		if on then spin:Play() else spin:Stop() end
-		addMode:SetText(on and L["Stop"] or L["Pick frames by hovering"])
+		addMode:SetText(on and L["Stop"] or L["Hover Find"])
 		if on then addMode:SetSkinTint(0.3, 1, 0.3) else addMode:SetSkinTint(nil) end
 	end
 	content.addMode = addMode
@@ -12392,6 +12705,7 @@ local function CreateExtrasPanel()
 		ShowAddMode()
 		if canvas:IsVisible() then
 			RefreshExtras()
+			RefreshFound()
 		end
 	end
 
@@ -12406,13 +12720,14 @@ local function CreateExtrasPanel()
 	find:SetSize(215, 20)
 	find:SetAutoFocus(false)
 	find.searchSkip = true
-	-- (Under the button, its edge in line: the search box's art stands out past its left.)
-	find:SetPoint("TOPLEFT", addMode, "BOTTOMLEFT", 5, -8)
+	-- (In a step: the search box's art stands out past its left.)
+	find:SetPoint("TOPLEFT", tools, "TOPLEFT", 5, -4)
 	if find.Instructions then
 		find.Instructions:SetText(L["Find frames by name or addon"])
 	end
 	Tooltip(find, L["Type part of a frame's name or of the addon that made it. Hover over a match to see " ..
-		"it marked on screen, click it to fade it. Only other addons' frames that aren't faded yet are listed."])
+		"it marked on screen, click it to put it on the list below, to add. Only other addons' frames that " ..
+		"aren't faded yet are listed."])
 
 	local found = CreateFrame("Frame", nil, content)
 	found.searchSkip = true
@@ -12457,7 +12772,7 @@ local function CreateExtrasPanel()
 		row:SetScript("OnClick", function(self)
 			if not self.entry then return end
 			ns.MarkFrame(nil)
-			ns.AddUnderMouse(self.entry.name)
+			ns.NoteFoundFrame(self.entry.name) -- (on the list below, to add)
 			frames = nil -- (it's faded now: not a match any more)
 			find:SetText("")
 			find:ClearFocus()
@@ -12540,9 +12855,11 @@ local function CreateExtrasPanel()
 
 	canvas:SetScript("OnShow", PageShown(function()
 		if ns.GetDB() then
+			if tab == 2 then ns.FindFoundFrames() end
 			Layout()
 			Refresh()
 			RefreshExtras()
+			RefreshFound()
 		end
 	end, content))
 	canvas:Hide()
@@ -14241,6 +14558,7 @@ ns.OnLanguage(function()
 	if ns.CreateCardsPanel then -- (CardsPage.lua)
 		ns.CreateCardsPanel(ns.lowHealthKit)
 		ns.CreateCardStylePanel(ns.lowHealthKit)
+		ns.CreateCardSoundsPanel(ns.lowHealthKit)
 	end
 	if ns.CreateWindGuidePanel then -- (WindGuide.lua: the dev copy only, CinematicDev.toc)
 		ns.CreateWindGuidePanel(ns.lowHealthKit)

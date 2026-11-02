@@ -72,52 +72,11 @@ local ROWS = {
 
 -- Its nameplates are its own frames on the game's plates (plate.unitFrame),
 -- standing in for the game's (hidden), and it sets their alpha for its
--- target and range fading. They're hooked, as Plater's are: while a plate is
--- faded its alpha is ours times its own, and at full it's left to it again.
-local applying = false
-
-local function Apply(frame)
-	applying = true
-	frame:SetAlpha((frame.cinematicOwnAlpha or 1) * (frame.cinematicPlateAlpha or 1))
-	applying = false
-end
-
-local function Known(value)
-	return not (issecretvalue and issecretvalue(value))
-end
-
-local function HookPlate(frame)
-	if frame.cinematicHooked then
-		return
-	end
-	frame.cinematicHooked = true
-	local alpha = frame:GetAlpha()
-	frame.cinematicOwnAlpha = Known(alpha) and alpha or nil
-	hooksecurefunc(frame, "SetAlpha", ns.Profiled("ElvUI plate SetAlpha hook", function(self, own)
-		if applying then
-			return
-		end
-		self.cinematicOwnAlpha = type(own) == "number" and Known(own) and own or nil
-		if self.cinematicPlateAlpha then
-			Apply(self)
-		end
-	end))
-end
-
+-- target and range fading: hooked, as Plater's are (ns.SetPlateFrameAlpha).
 local function SetPlateAlpha(plate, alpha)
 	local frame = plate.unitFrame
-	if type(frame) ~= "table" or not frame.isNameplate or not frame.SetAlpha then
-		return
-	end
-	if alpha and alpha < 1 then
-		HookPlate(frame)
-		if frame.cinematicPlateAlpha ~= alpha then
-			frame.cinematicPlateAlpha = alpha
-			Apply(frame)
-		end
-	elseif frame.cinematicPlateAlpha then
-		frame.cinematicPlateAlpha = nil
-		Apply(frame) -- (back to its own alpha)
+	if type(frame) == "table" and frame.isNameplate and frame.SetAlpha then
+		ns.SetPlateFrameAlpha(frame, alpha, "ElvUI plate SetAlpha hook")
 	end
 end
 
@@ -129,28 +88,13 @@ local RAID = {
 }
 
 ns.WhenAddonLoads("ElvUI", function()
-	for _, row in ipairs(ROWS) do
-		ns.FadeWithRow(row[1], row[2], { unpack(row, 3) }, true, true)
-	end
+	ns.FadeWithRows(ROWS)
 	-- The game's addon compartment button (retail and Forever), which it
 	-- takes off the minimap and puts on UIParent by the map: it fades with the
 	-- minimap again. (The game's frame, so not hooked.)
 	ns.FadeWithRow("minimap", "minimap", { "AddonCompartmentFrame" })
-	ns.AddScanner(function()
-		for group, names in pairs(RAID) do
-			for _, name in ipairs(names) do
-				local frame = _G[name]
-				if type(frame) == "table" and not ns.IsFaded(frame) then
-					ns.AddFoundFrame(frame, group, true, true)
-				end
-			end
-		end
-	end)
-	local other = ns.addonPlateAlpha
-	ns.addonPlateAlpha = function(plate, alpha)
-		if other then
-			other(plate, alpha)
-		end
-		SetPlateAlpha(plate, alpha)
+	for group, names in pairs(RAID) do
+		ns.FadeFoundByName(group, names)
 	end
+	ns.AddPlateAlpha(SetPlateAlpha)
 end)

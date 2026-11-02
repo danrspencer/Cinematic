@@ -70,6 +70,7 @@ local function PrintDebugHelp()
 	ns.Print("troubleshooting commands")
 	logPrints = false
 	print("  /cine log - copy the log for a bug report: what's printed below goes in it too")
+	print("  /cine selftest - check the game is still as the addon expects on this client (read only); results in the log and the copy window")
 	print("  /cine debug record - also log game setting changes and music in detail (again to stop)")
 	print("  /cine debug cpu [seconds|stop] - time what the addon spends its time on (30 seconds), report in the log")
 	print("  /cine debug frame <name> - how faded frames with <name> in their name or group stand")
@@ -82,6 +83,8 @@ local function PrintDebugHelp()
 	print("  /cine debug peeks - print each change to your auras and when the buffs peek starts or stops (again to stop)")
 	print("  /cine debug cast - print each cast at an enemy that fades in the In combat rows, and how long it takes (again to stop)")
 	print("  /cine debug frames - log the shown frames that aren't faded, and gamepad frames")
+	print("  /cine debug guess - log other addons' shown frames that nothing fades, whose each is, and the row it might follow")
+	print("  /cine debug guess <frame> - why the frame guesser lists that frame or passes it by")
 	print("  /cine debug alpha -print frames setting their own alpha (again to stop)")
 	print("  /cine debug hover [group] - print what the mouse is on and whether the group (quests) counts as hovered (again to stop)")
 	print("  /cine debug swing - what the swing timer bars read, and print each one showing or fading (again to stop)")
@@ -232,6 +235,8 @@ local function HandleSlash(msg)
 			ns.Print("verbose logging (everything logged, errors and blocked actions shown in chat): "
 				.. OnOff(ns.db.verboseLog) .. (ns.db.verboseLog and ". Reproduce the problem, then /cine log." or ""))
 		end
+	elseif cmd == "selftest" or (cmd == "debug" and arg == "selftest") then
+		ns.SelfTest() -- (SelfTest.lua)
 	elseif cmd == "debug" and arg == "record" then
 		ns.db.logDetail = not ns.db.logDetail
 		ns.Print("detailed logging (game settings, music): " .. OnOff(ns.db.logDetail) ..
@@ -481,6 +486,10 @@ local function HandleSlash(msg)
 			tostring(ns.IsGamePadOn())))
 	elseif cmd == "debug" and arg == "frames" then
 		ns.ReportUnfadedFrames()
+	elseif cmd == "debug" and arg == "guess" then
+		ns.GuessFrames()
+	elseif cmd == "debug" and arg:find("^guess%s+%S") then
+		ns.ExplainGuess(msg:match("[Gg][Uu][Ee][Ss][Ss]%s+(%S+)")) -- (as typed: names have capitals)
 	elseif cmd == "debug" and (arg == "group" or arg:find("^group ")) then
 		-- (No choice given: a party, or off again if already faking one.)
 		local kind = arg:match("^group%s+(%S+)") or (ns.fakeGroup and "off" or "party")
@@ -1414,7 +1423,7 @@ end
 
 function ns.HandleSlash(msg)
 	local cmd, arg = msg:lower():match("^%s*(%S*)%s*(.-)%s*$")
-	if (cmd == "debug" and arg ~= "help") or cmd == "list" then
+	if (cmd == "debug" and arg ~= "help") or cmd == "list" or cmd == "selftest" then
 		ns.CaptureDebug("/cine " .. msg:match("^%s*(.-)%s*$"), function() HandleSlash(msg) end)
 	else
 		HandleSlash(msg)

@@ -1,25 +1,28 @@
--- The Cards page (Cards.lua's), in the Visions hub under one icon with two
+-- The Cards page (Cards.lua's), in the Visions hub under one icon with three
 -- folder tabs. Events: a row for each event, its tick and its Show in row
 -- (GridRows.lua), as the frames pages' grids, and under each the style it
--- uses, with a link to it. Style: the Default style, the look every card
--- starts from, or an event's own (each setting following the Default style
--- until it's given its own) and what's its alone (when it fires, its lines,
--- its words, its sounds), picked from one dropdown.
+-- uses, with links to it and its sounds. Style: the Default style, the look
+-- every card starts from, or an event's own (each setting following the
+-- Default style until it's given its own) and what's its alone (when it
+-- fires, its lines, its words), picked from one dropdown. Sounds: the same
+-- dropdown, the picked event's sounds.
 
 local _, ns = ...
 local L = ns.L
 
 local NOTE_W = 440
--- What the Style tab shows: "default" (the Default style) or an event's id
--- (the links on other pages and under the Events tab's rows pick one).
+-- What the Style and Sounds tabs show: "default" (the Default style) or an
+-- event's id (the links on other pages and under the Events tab's rows pick
+-- one).
 local CARD = { now = "default" }
 
--- The pages' tabs, picked 1 or 2. title: the page's, put under them.
+-- The pages' tabs, picked 1, 2 or 3. title: the page's, put under them.
 local function CardTabs(content, title, picked)
 	local panel = ns.PageTabs(content, {
 		{ L["Events"], "Card Vision", L["Each event's card on or off, and where it shows."] },
 		{ L["Style"], "Card Style", L["How the cards look: the Default style every card starts from, and each " ..
 			"event's own, with a preview."] },
+		{ L["Sounds"], "Card Sounds", L["What each card plays as it shows."] },
 	}, picked)
 	title:ClearAllPoints()
 	title:SetPoint("TOPLEFT", panel, "BOTTOMLEFT", 8, -14)
@@ -249,11 +252,10 @@ end
 
 -- Events: each event's tick and Show in row.
 local TIPS = {
-	combatIn = "As a fight starts: a word (Combat), a pulse round the screen's edges and a sound.",
-	combatOut = "As a fight ends: a word (Respite) and a sound. Not after a fight shorter than its setting on " ..
-		"the Style tab.",
+	combat = "As a fight starts and as it ends (each its tick on the Style tab): a word (Combat, Respite), a " ..
+		"pulse round the screen's edges and a sound. Not after a fight shorter than its setting on the Style tab.",
 	boss = "A boss's name as its fight starts (or before it, as you first target it or come near it), the " ..
-		"dungeon under it and \"Boss 2 of 3\" over it. Once a run for each boss, in place of Entering combat's.",
+		"dungeon under it and \"Boss 2 of 3\" over it. Once a run for each boss, in place of Combat's.",
 	zone = "As you come into a new zone, its name as a card in place of the game's own. The time of day at " ..
 		"login goes on it.",
 	subzone = "As you come into a subzone (a town, a camp, a landing) too, the zone's name small under it. Only " ..
@@ -279,7 +281,7 @@ local ROW_LISTS = { "combatShow", "calmShow", "quietShow", "camShow", "enemyShow
 -- Events: a row for each event, as the Scenes page's: its tick, name and
 -- chips (the style it uses, and where it shows when not everywhere), its
 -- settings in a drawer under it (When: its Show in row; Style: the one it
--- starts from, Edit style and Test).
+-- starts from, Style, Sounds and Test).
 function ns.CreateCardsPanel(kit)
 	local canvas, content = kit.CreateScrollPage()
 	local title = kit.Label(content, "GameFontNormalLarge", L["Card Vision"])
@@ -364,19 +366,23 @@ function ns.CreateCardsPanel(kit)
 						kit.Tooltip(base, L["The style this card starts from: the Default style or a ready-made one. " ..
 							"Settings you give it on the Style tab go over it."])
 					end
-					local edit = ns.PanelButton(drawer)
-					edit:SetSize(90, 22)
-					edit:SetText(L["Edit style"])
-					At(edit, ns.ROW_LIST_LABEL_W + 180)
-					kit.Tooltip(edit, L["Opens the Style tab with this event picked."])
-					edit:SetScript("OnClick", function()
-						CARD.now = id
-						ns.ShowHubPage("Card Style")
-					end)
+					-- (Buttons to its tab on the Style and Sounds tabs.)
+					for n, link in ipairs({ { L["Style"], "Card Style", L["Opens the Style tab with this event picked."] },
+						{ L["Sounds"], "Card Sounds", L["Opens the Sounds tab with this event picked."] } }) do
+						local button = ns.PanelButton(drawer)
+						button:SetSize(70, 22)
+						button:SetText(link[1])
+						At(button, ns.ROW_LIST_LABEL_W + 180 + (n - 1) * 76)
+						kit.Tooltip(button, link[3])
+						button:SetScript("OnClick", function()
+							CARD.now = id
+							ns.ShowHubPage(link[2])
+						end)
+					end
 					local test = ns.PanelButton(drawer)
 					test:SetSize(60, 22)
 					test:SetText(L["Test"])
-					At(test, ns.ROW_LIST_LABEL_W + 276)
+					At(test, ns.ROW_LIST_LABEL_W + 332)
 					kit.Tooltip(test, L["Shows its card now, to see how it looks (close the settings to see it)."])
 					test:SetScript("OnClick", function() ns.CardTest(id) end)
 				end },
@@ -695,25 +701,25 @@ function ns.CreateCardStylePanel(kit)
 		return check
 	end
 	local function Header(text) stack:Header(content, text) end
-	parts.Part("combatIn", function()
-		Header(L["Words"])
-		WordsRow(kit, content, stack, "combatTextIn", L["Words:"],
-			L["The words going into a fight. Empty: none, just the rest of the card."])
-		ns.CombatSoundRulesSection(kit, content, stack) -- (CombatSoundRules.lua)
-	end)
-	parts.Part("combatOut", function()
-		Header(L["Words"])
-		WordsRow(kit, content, stack, "combatTextOut", L["Words:"],
-			L["The words coming out of a fight. Empty: none, just the rest of the card."])
+	parts.Part("combat", function()
 		Header(L["When"])
-		stack:Add(kit.Slider(content, "combatMinFight", L["Not after fights under"], 0, 10, 1, "%d s"), "slider")
-		stack:Note(content, L["No card coming out of a fight shorter than this, so a stray hit doesn't bring it " ..
-			"up. 0: after every fight. Its sounds: Entering combat's rules (one list for both)."], NOTE_W)
+		Check("combatOnEnter", L["Entering combat"], L["The card as a fight starts."])
+		Check("combatOnLeave", L["Leaving combat"], L["The card as a fight ends."])
+		local minFight = stack:Add(kit.Slider(content, "combatMinFight", L["Not after fights under"], 0, 10, 1,
+			"%d s"), "slider")
+		kit.Tooltip(minFight, L["No card coming out of a fight shorter than this, so a stray hit doesn't bring it " ..
+			"up. 0: after every fight."])
+		kit.GreyUnless(minFight, function(db) return db.combatOnLeave end)
+		Header(L["Words"])
+		WordsRow(kit, content, stack, "combatTextIn", L["Going in:"],
+			L["The words going into a fight. Empty: none, just the rest of the card."])
+		WordsRow(kit, content, stack, "combatTextOut", L["Coming out:"],
+			L["The words coming out of a fight. Empty: none, just the rest of the card."])
 	end)
 	parts.Part("boss", function()
 		Header(L["When"])
-		Check("combatBossPull", L["Boss pulled"], L["The boss's name as its fight starts, in place of Entering " ..
-			"combat's card. Once a run for each boss."])
+		Check("combatBossPull", L["Boss pulled"], L["The boss's name as its fight starts, in place of the Combat " ..
+			"card. Once a run for each boss."])
 		Check("combatBossTarget", L["Boss targeted"], L["The boss's name as you first target it, before the " ..
 			"fight. A dungeon or raid boss is told by its level: a skull, or on retail two over yours."])
 		Check("combatBossNear", L["Boss nearby"], L["The boss's name as you first come within about 28 yards of " ..
@@ -725,7 +731,6 @@ function ns.CreateCardStylePanel(kit)
 			Check("combatBossCount", L["Boss number"],
 				L["\"Boss 2 of 3\" over the name, from the Adventure Guide, as the fight starts (not in a letterbox bar)."])
 		end
-		ns.CombatSoundRulesSection(kit, content, stack, true) -- (its boss fights' sounds)
 	end)
 	parts.Part("zone", function()
 		Header(L["Lines"])
@@ -769,20 +774,14 @@ function ns.CreateCardStylePanel(kit)
 			{ "storyRecapGold", L["Gold earned"], L["How much richer you came out, if you did."] },
 			{ "storyRecapIcons", L["Icons"], L["A little icon before each detail: a map, a watch, a quest mark, a " ..
 				"skull, coins..."] },
-			{ "storyRecapSound", L["Page-turn sound"], L["A page turning as it shows, as a journal opens."] },
 		}) do
 			Check(pair[1], pair[2], pair[3])
 		end
 		stack:Note(content, L["It shows only if something happened that's ticked here: quests, a level, bosses, " ..
 			"deaths or gold. The zone and time played come with it."], NOTE_W)
 	end)
-	parts.Part("time", function()
-		stack:Note(content, L["Its sound goes with the time of day: a rooster at dawn, a horse in the morning, " ..
-			"your faction's bell at midday, frogs in the evening, an owl at dusk and a wolf at night."], NOTE_W)
-	end)
 	parts.Part("attack", function()
-		stack:Note(content, L["With your faction's city bell. The same place shows at most once every 90 seconds."],
-			NOTE_W)
+		stack:Note(content, L["The same place shows at most once every 90 seconds."], NOTE_W)
 	end)
 	parts.Part("death", function()
 		Header(L["Words"])
@@ -808,4 +807,83 @@ function ns.CreateCardStylePanel(kit)
 	canvas:SetScript("OnShow", kit.PageShown(kit.Refresh, content)) -- (its refresh plays the preview)
 	canvas:Hide()
 	kit.RegisterSubpage(canvas, "Card Style", L["Card Vision"])
+end
+
+-- Sounds: the same dropdown as the Style tab's (the Default style first),
+-- and the picked event's sounds. The Default style has none: each event's
+-- sound is its own.
+function ns.CreateCardSoundsPanel(kit)
+	local canvas, content = kit.CreateScrollPage()
+	local title = kit.Label(content, "GameFontNormalLarge", L["Card Vision"])
+	CardTabs(content, title, 3)
+	local intro = kit.PageIntro(content, title,
+		L["What each card plays as it shows. Pick the event in the dropdown: its sounds are its own, the Default " ..
+		"style has none."])
+	local switch = kit.PageSwitch(content, "cards", L["Enable Page"],
+		L["On: each card shows as the Events tab says, with its sounds. Off: none of them do. Each setting keeps " ..
+		"its value for when you turn this back on."], intro)
+	local stack = kit.Stack(switch, "check")
+	local function IsDefault() return CARD.now == "default" end
+
+	-- What it shows, as on the Style tab: the event's icon, "Editing", the
+	-- dropdown and Test.
+	local bar = CreateFrame("Frame", nil, content)
+	bar:SetSize(480, 30)
+	stack:Add(bar, "label")
+	local barIcon = bar:CreateTexture(nil, "ARTWORK")
+	barIcon:SetSize(26, 26)
+	barIcon:SetPoint("LEFT", 2, 0)
+	barIcon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
+	local editing = kit.Label(bar, "GameFontNormalLarge", L["Editing"])
+	editing:SetPoint("LEFT", barIcon, "RIGHT", 8, 0)
+	local test = ns.PanelButton(content)
+	test:SetSize(60, 22)
+	test:SetText(L["Test"])
+	kit.Tooltip(test, L["Shows its card now, with its sound (close the settings to see it)."])
+	test:SetScript("OnClick", function() if not IsDefault() then ns.CardTest(CARD.now) end end)
+	test.pageSwitch = false
+	test.Refresh = function(self) self:SetShown(not IsDefault()) end
+	kit.AddControl(test)
+	local picker = kit.Dropdown(content, { get = function() return CARD.now end, set = function(id) CARD.now = id end },
+		function()
+			local list = { { value = "default", text = L["Default style"],
+				tip = L["No sounds: each event's are its own."] } }
+			for _, event in ipairs(ns.CARD_EVENTS) do list[#list + 1] = { value = event.id, text = L[event.name] } end
+			return list
+		end, 230, function() kit.Refresh() end)
+	if picker then
+		picker:SetPoint("LEFT", editing, "RIGHT", 12, 0)
+		picker:SetFrameLevel(bar:GetFrameLevel() + 3)
+		picker.pageSwitch = false
+		kit.Tooltip(picker, L["The event whose sounds this tab shows and sets."])
+		test:SetPoint("LEFT", picker, "RIGHT", 12, 0)
+	else
+		test:SetPoint("LEFT", editing, "RIGHT", 12, 0)
+	end
+	bar.pageSwitch = false
+	bar.Refresh = function()
+		local event = ns.CARD_BY_ID[CARD.now]
+		barIcon:SetTexture(event and event.icon or "Interface\\Icons\\INV_Misc_Book_09")
+	end
+	kit.AddControl(bar)
+
+	-- (Each event's sound rules: CombatSoundRules.lua. Combat's and Boss's
+	-- one list, each its own; Time of day's a rule for each time; the rest's
+	-- own, read as the card shows.)
+	local parts = Parts(kit, content, stack, function() return CARD.now end)
+	parts.Part("default", function()
+		stack:Note(content, L["The Default style has no sounds: each card's are its own. Pick an event above."],
+			NOTE_W)
+	end)
+	parts.Part("combat", function() ns.CombatSoundRulesSection(kit, content, stack) end)
+	parts.Part("boss", function() ns.CombatSoundRulesSection(kit, content, stack, true) end)
+	parts.Part("time", function() ns.CombatSoundRulesSection(kit, content, stack, "time") end)
+	for _, id in ipairs(ns.CARD_SOUND_LISTS) do
+		parts.Part(id, function() ns.CombatSoundRulesSection(kit, content, stack, id) end)
+	end
+	parts.Finish()
+
+	canvas:SetScript("OnShow", kit.PageShown(kit.Refresh, content))
+	canvas:Hide()
+	kit.RegisterSubpage(canvas, "Card Sounds", L["Card Vision"])
 end

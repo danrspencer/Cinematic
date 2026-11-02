@@ -3,7 +3,10 @@
 -- condition in the rules' words (boss, raid, cinemode...; none: any fight)
 -- and a list of sounds. As a fight starts or ends, the first rule that fits
 -- plays one of its sounds at random (not the one it played last), at its own
--- volume times the cue volume. The sounds: CombatSounds.lua.
+-- volume times the cue volume. The sounds: CombatSounds.lua. The other
+-- cards' sounds are rules too, each card a list of its own: the Time of day
+-- card's (cardTimeSounds) one for each time of day, read as it changes; the
+-- rest's (cardSounds_<id>) read as the card shows ("show").
 --
 -- Volume: the game can't play one sound quieter than another, so a cue plays
 -- on the Ambience channel with that channel's volume set for it, then put
@@ -18,14 +21,30 @@ local L = ns.L
 -- apart by ";", each "<in|out|kill|wipe>#<condition>#<id>@<volume %>,...".
 ns.DEFAULTS.combatSounds = "in#boss#6140@100;kill#boss#;wipe#boss#;in##700@100;out##698@100"
 ns.DEFAULTS.combatCueVolume = 0.5
+-- (The Time of day card's: "<dawn|morning|...>#<condition>#<sounds>", the same.)
+ns.DEFAULTS.cardTimeSounds = "dawn##8352@100;morning##730@100;midday##1@100;afternoon##4420@100;" ..
+	"evening##8353@100;dusk##3605@100;night##1018@100"
+-- (The other cards': one rule each, "show#<condition>#<sounds>". A page
+-- turning for Last time, your faction's bell for Under attack, the rest
+-- silent.)
+ns.CARD_SOUND_LISTS = { "zone", "subzone", "login", "attack", "death" }
+ns.DEFAULTS.cardSounds_zone = "show##"
+ns.DEFAULTS.cardSounds_subzone = "show##"
+ns.DEFAULTS.cardSounds_login = "show##836@100"
+ns.DEFAULTS.cardSounds_attack = "show##1@100"
+ns.DEFAULTS.cardSounds_death = "show##"
 
 local SOUND = {} -- id -> its entry in ns.COMBAT_SOUNDS
 for _, entry in ipairs(ns.COMBAT_SOUNDS or {}) do SOUND[entry[1]] = entry end
 ns.COMBAT_SOUND = SOUND
 
-local EDGES = { ["in"] = true, out = true, kill = true, wipe = true }
+-- The times of day, in order (the Time of day card's edges).
+local TIMES = { "dawn", "morning", "midday", "afternoon", "evening", "dusk", "night" }
+local EDGES = { ["in"] = true, out = true, kill = true, wipe = true, show = true }
+local IS_TIME = {}
+for _, time in ipairs(TIMES) do EDGES[time], IS_TIME[time] = true, true end
 
--- Text -> { { edge = "in"|"out"|"kill"|"wipe", rule = text, sounds = { { id, volume 0-1 }... } }... }
+-- Text -> { { edge = "in"|"out"|"kill"|"wipe"|a time of day|"show", rule = text, sounds = { { id, volume 0-1 }... } }... }
 function ns.ParseCombatSounds(text)
 	local rules = {}
 	for chunk in (text or ""):gmatch("[^;]+") do
@@ -102,8 +121,10 @@ local function Stop(fadeMs)
 		playing = nil
 	end
 end
+local BELLS = { Alliance = 6594, Horde = 6595 } -- BellTollAlliance, BellTollHorde
 local function Start(id, channel, seconds)
 	Stop(CUT_MS)
+	if id == ns.FACTION_BELL then id = BELLS[UnitFactionGroup("player") or ""] or BELLS.Alliance end
 	local ok, willPlay, handle = pcall(PlaySound, id, channel)
 	if ok and willPlay and handle then
 		playing = handle
@@ -122,10 +143,14 @@ function ns.CombatSoundsPlayable()
 	if GetCVar("Sound_EnableAllSound") ~= "1" then return nil end
 	local found, any = {}, false
 	for _, entry in ipairs(ns.COMBAT_SOUNDS or {}) do
-		local ok, willPlay, handle = pcall(PlaySound, entry[1], "Master")
-		if ok and willPlay then
-			found[entry[1]], any = true, true
-			if handle then pcall(StopSound, handle, 0) end
+		if entry[1] == ns.FACTION_BELL then
+			found[entry[1]] = true -- (not a sound kit: a bell every client has)
+		else
+			local ok, willPlay, handle = pcall(PlaySound, entry[1], "Master")
+			if ok and willPlay then
+				found[entry[1]], any = true, true
+				if handle then pcall(StopSound, handle, 0) end
+			end
 		end
 	end
 	if not any then return nil end
@@ -215,6 +240,44 @@ function ns.PlayCombatCueSound(edge, cine)
 	end)
 end
 
+-- A card's sound: the first of its list's rules (key: its setting) for edge
+-- that fits now plays one of its sounds at random.
+local cardLastPlayed = {} -- key -> rule's place -> the id it played last
+local function PlayList(key, edge)
+	local text = ns.db and ns.db[key]
+	if not text then return end
+	local lastTimePlayed = cardLastPlayed[key] or {}
+	cardLastPlayed[key] = lastTimePlayed
+	local ok, facts = pcall(ns.RuleFactsNow)
+	for place, rule in ipairs(ns.ParseCombatSounds(text)) do
+		if rule.edge == edge then
+			local fits = not rule.rule:find("%S")
+			if not fits and ok then
+				local test = ns.CompileRule(rule.rule)
+				fits = test and test(facts) and true or false
+			end
+			if fits then
+				local sounds = rule.sounds
+				if #sounds == 0 then return end -- (a rule with none: silence)
+				local i = math.random(#sounds)
+				if #sounds > 1 and sounds[i][1] == lastTimePlayed[place] then i = i % #sounds + 1 end
+				lastTimePlayed[place] = sounds[i][1]
+				ns.PlayCombatSound(sounds[i][1], sounds[i][2])
+				return
+			end
+		end
+	end
+end
+-- The Time of day card's (title: the time of day's English name, "Dusk").
+function ns.PlayTimeCueSound(title)
+	local edge = (title or ""):lower()
+	if IS_TIME[edge] then PlayList("cardTimeSounds", edge) end
+end
+-- Another card's, as it shows (id: its event's).
+function ns.PlayCardCueSound(id)
+	PlayList("cardSounds_" .. tostring(id), "show")
+end
+
 -- A cue's Ambience volume left held by a crash or reload mid-cue: back now;
 -- and given back as you log out.
 local guard = CreateFrame("Frame")
@@ -227,9 +290,11 @@ end)
 
 -- The page's part: the cue volume, the rules (each its condition, its
 -- sounds with their volume, a play and remove button) and a window to pick
--- sounds from. kit, content, stack: the Cards page's. boss: the Boss event's
--- part, its boss fights' rules; else Entering combat's, the rest. (One list
--- saved, each tab showing its own.)
+-- sounds from. kit, content, stack: the Cards page's. boss: true for the Boss
+-- event's part, its boss fights' rules; "time" for the Time of day event's
+-- (a list of its own); another event's id for its own list (Zone, Last
+-- time...); else the Combat event's, the rest of the fights'. (One list
+-- saved for the fights, each tab showing its own.)
 local RULE_W, ROW_H = 520, 24
 local picker -- (below)
 
@@ -269,20 +334,38 @@ end
 -- Boss event's go pulled, killed, wipe).
 local NEXT = { ["in"] = "out", out = "in", kill = "in", wipe = "in" }
 local BOSS_NEXT = { ["in"] = "kill", kill = "wipe", wipe = "in", out = "in" }
+local TIME_NEXT = {}
+for i, time in ipairs(TIMES) do TIME_NEXT[time] = TIMES[i % #TIMES + 1] end
+local TIME_NAME = { dawn = "Dawn", morning = "Morning", midday = "Midday", afternoon = "Afternoon",
+	evening = "Evening", dusk = "Dusk", night = "Night" }
 
 function ns.CombatSoundRulesSection(kit, content, stack, boss)
+	local time = boss == "time"
+	local card = type(boss) == "string" and not time and boss
+	if time or card then boss = false end
+	local key = card and ("cardSounds_" .. card) or time and "cardTimeSounds" or "combatSounds"
 	local function EdgeText(edge)
+		if IS_TIME[edge] then return "|cffffdb99" .. L[TIME_NAME[edge]] .. "|r" end
+		if edge == "show" then return "|cffffdb99" .. L["As it shows"] .. "|r" end
 		if edge == "kill" then return "|cff5dcaa5" .. L["Boss killed"] .. "|r" end
 		if edge == "wipe" then return "|cff9a9a9a" .. L["Wipe"] .. "|r" end
 		if edge == "in" then return "|cffe24b4a" .. (boss and L["Boss pulled"] or L["Entering combat"]) .. "|r" end
 		return "|cff5dcaa5" .. L["Leaving combat"] .. "|r"
 	end
-	local function Mine(rule) return IsBossRule(rule) == (boss and true or false) end
+	local function Mine(rule) return time or card or IsBossRule(rule) == (boss and true or false) end
 	stack:Header(content, L["Sounds"])
-	stack:Help(content, boss
-		and L["Sounds for boss fights, read before Entering combat's: as a boss is pulled, killed or your group " ..
+	stack:Help(content, card
+		and L["Rules for the card's sound, read top to bottom as it shows: the first that fits plays one of its " ..
+		"sounds at random. A rule's condition uses the rules' words (Cities, Raids, In CineMode...); none: any " ..
+		"time. A rule with no sounds: silent. Each sound's slider sets it next to the others, the cue volume sets " ..
+		"them all (every card's sounds share it)."]
+		or time and L["Rules for the sounds, read top to bottom as the time of day changes: the first for the new time " ..
+		"that fits plays one of its sounds at random. A rule's condition uses the rules' words (Cities, In " ..
+		"CineMode...); none: any time. A rule with no sounds: silent. Each sound's slider sets it next to the " ..
+		"others, the cue volume sets them all (the fights' sounds share it)."]
+		or boss and L["Sounds for boss fights, read before Combat's: as a boss is pulled, killed or your group " ..
 		"wipes, the first rule that fits plays one of its sounds at random. A rule here has Boss fight in its " ..
-		"condition (taken out, it moves to Entering combat's). Each sound's slider sets it next to the others, the " ..
+		"condition (taken out, it moves to Combat's). Each sound's slider sets it next to the others, the " ..
 		"cue volume sets them all."]
 		or L["Rules for the sounds, read top to bottom as a fight starts or ends: the first that fits plays one " ..
 		"of its sounds at random. A rule's condition uses the rules' words (Boss fight, Raids, In CineMode...); " ..
@@ -300,7 +383,7 @@ function ns.CombatSoundRulesSection(kit, content, stack, boss)
 	-- reset: the editor and picker hold on to the rules they're changing.)
 	local rules, loaded
 	local function Load()
-		local text = (ns.GetDB() or ns.DEFAULTS).combatSounds -- (the page is first made before the settings load)
+		local text = (ns.GetDB() or ns.DEFAULTS)[key] -- (the page is first made before the settings load)
 		if text ~= loaded then
 			rules, loaded = ns.ParseCombatSounds(text), text
 		end
@@ -308,7 +391,7 @@ function ns.CombatSoundRulesSection(kit, content, stack, boss)
 	local Rebuild
 	local function Save()
 		loaded = ns.FormatCombatSounds(rules)
-		ns.GetDB().combatSounds = loaded
+		ns.GetDB()[key] = loaded
 		Rebuild()
 	end
 
@@ -332,9 +415,12 @@ function ns.CombatSoundRulesSection(kit, content, stack, boss)
 		head.up:SetPoint("LEFT", head.rule, "RIGHT", 6, 0)
 		head.remove = SmallButton(head, "x")
 		head.remove:SetPoint("LEFT", head.up, "RIGHT", 4, 0)
-		kit.Tooltip(head.edge, boss and L["As the boss is pulled, as it dies or as your group wipes. Click to switch."]
+		kit.Tooltip(head.edge, card and L["As the card shows."]
+			or time and L["The time of day this rule is for. Click to switch."]
+			or boss and L["As the boss is pulled, as it dies or as your group wipes. Click to switch."]
 			or L["As a fight starts or as it ends. Click to switch."])
-		kit.Tooltip(head.rule, L["When this rule fits. Click to write it in the rule editor; empty: any fight."])
+		kit.Tooltip(head.rule, (time or card) and L["When this rule fits. Click to write it in the rule editor; empty: any time."]
+			or L["When this rule fits. Click to write it in the rule editor; empty: any fight."])
 		kit.Tooltip(head.up, L["Move this rule up: it's read before the ones below it."])
 		kit.Tooltip(head.remove, L["Remove this rule and its sounds."])
 		head.add = SmallButton(box, L["Add a sound"], 110)
@@ -380,12 +466,19 @@ function ns.CombatSoundRulesSection(kit, content, stack, boss)
 	local addRule = SmallButton(box, L["Add a rule"], 120)
 	local defaults = SmallButton(box, L["Back to the defaults"], 160)
 	defaults:SetPoint("LEFT", addRule, "RIGHT", 8, 0)
-	kit.Tooltip(addRule, boss and L["A new rule for boss fights, first on this tab."]
+	kit.Tooltip(addRule, card and L["A new rule at the end, for the places you pick (move it up to read it first)."]
+		or time and L["A new rule at the end, for the time of day and places you pick."]
+		or boss and L["A new rule for boss fights, first on this tab."]
 		or L["A new rule above the last one, for the fights you pick."])
-	kit.Tooltip(defaults, boss and L["This tab's rules as they come: a war horn as a boss is pulled; a kill and a wipe, no sound yet."]
+	kit.Tooltip(defaults, card and L["This card's rules as they come."]
+		or time and L["This tab's rules as they come: one for each time of day, a rooster at dawn, " ..
+		"a horse in the morning, your faction's bell at midday, frogs in the evening, an owl at dusk and a wolf at night."]
+		or boss and L["This tab's rules as they come: a war horn as a boss is pulled; a kill and a wipe, no sound yet."]
 		or L["This tab's rules as they come: a sound as any other fight starts and one as it ends."])
 	addRule:SetScript("OnClick", function()
-		if boss then
+		if time or card then
+			rules[#rules + 1] = { edge = card and "show" or "dawn", rule = "", sounds = {} }
+		elseif boss then
 			table.insert(rules, 1, { edge = "in", rule = "boss", sounds = {} })
 		else
 			table.insert(rules, math.max(1, #rules), { edge = "in", rule = "", sounds = {} })
@@ -395,7 +488,7 @@ function ns.CombatSoundRulesSection(kit, content, stack, boss)
 	defaults:SetScript("OnClick", function()
 		-- (Only this tab's put back: the other tab's kept.)
 		local list = {}
-		for _, rule in ipairs(ns.ParseCombatSounds(ns.DEFAULTS.combatSounds)) do
+		for _, rule in ipairs(ns.ParseCombatSounds(ns.DEFAULTS[key])) do
 			if Mine(rule) then list[#list + 1] = rule end
 		end
 		for _, rule in ipairs(rules) do
@@ -421,10 +514,11 @@ function ns.CombatSoundRulesSection(kit, content, stack, boss)
 				y = y + ROW_H + 2
 				head.number:SetText(shown .. ".")
 				head.edge:SetText(EdgeText(rule.edge))
-				head.rule:SetText(rule.rule:find("%S") and ns.ColoredRule(rule.rule) or L["Any fight"])
+				head.rule:SetText(rule.rule:find("%S") and ns.ColoredRule(rule.rule) or ((time or card) and L["Any time"] or L["Any fight"]))
 				head.up:SetEnabled(above ~= nil)
 				head.edge:SetScript("OnClick", function()
-					rule.edge = (boss and BOSS_NEXT or NEXT)[rule.edge] or "in"
+					if card then return end -- (one edge: as it shows)
+					rule.edge = (time and TIME_NEXT or boss and BOSS_NEXT or NEXT)[rule.edge] or (time and "dawn" or "in")
 					Save()
 				end)
 				head.up:SetScript("OnClick", function()
@@ -611,7 +705,8 @@ function picker.Open(rule, save)
 		end
 	end
 	local order = {}
-	local side = rule.edge == "in" and "in" or "out" -- (a boss's kill or wipe: the leaving groups)
+	-- (A boss's kill or wipe: the leaving groups; a time of day: its own.)
+	local side = IS_TIME[rule.edge] and "time" or rule.edge == "show" and "card" or rule.edge == "in" and "in" or "out"
 	for _, group in ipairs(ns.COMBAT_SOUND_GROUPS) do
 		if group[2] == side and filled[group[1]] then order[#order + 1] = group[1] end
 	end

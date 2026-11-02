@@ -11,6 +11,9 @@
 local _, ns = ...
 
 ns.CHANGELOG_FEATURES = {
+	{ date = "2026-11-01", page = "Advanced Frames", title = "Smart Find",
+		text = "The Advanced Frames page's Find frames tab can look for other addons' frames that nothing " ..
+		"fades, say which addon made each and guess which row it should follow. Add them with a click." },
 	{ date = "2026-11-01", page = "Why showing", title = "Why is it showing?",
 		text = "Type /cine why, or pick it from the minimap button's menu, then click any frame to see why it's " ..
 		"showing or hidden right now and which settings say so. It works on other addons' frames, Cinematic's " ..

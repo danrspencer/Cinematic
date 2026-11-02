@@ -1658,58 +1658,21 @@ ns.GetTimeOfDayInfo = function()
 end
 
 -- When the time of day changes during play (Evening to Dusk, say): the Time
--- of day event's card (Cards.lua), with a fitting sound.
+-- of day event's card (Cards.lua), with its sound (its rules on the Sounds
+-- tab: CombatSoundRules.lua).
 local CHANGE_CHECK = 15 -- seconds between checks
--- A sound for each time of day (Wowhead sound IDs), played with its card.
--- Bells are your faction's city bell.
-local TIME_SOUNDS = {
-	Dawn = 8352,          -- Chicken
-	Morning = 730,        -- HorseStand3
-	Midday = "bell",
-	Afternoon = 4420,
-	Evening = 8353,       -- Frog
-	Dusk = 3605,          -- OwlAggro
-	Night = 1018,         -- WolfFidget2
-}
-local BELLS = { Alliance = 6594, Horde = 6595 } -- BellTollAlliance, BellTollHorde
-local TIME_SOUND_LENGTH = 3      -- seconds before a time-of-day sound is faded out
-local TIME_SOUND_FADE_MS = 1000  -- ...over this long (4 seconds in all)
-local timeSoundHandle
-
-local function PlayTimeSound(title) -- (a time of day, or "bell")
-	local sound = TIME_SOUNDS[title] or title
-	if sound == "bell" then
-		sound = BELLS[UnitFactionGroup("player") or ""] or BELLS.Alliance
-	end
-	if sound then
-		-- Some sounds loop (they'd play forever): every one is faded out as the
-		-- title finishes, which short sounds have long since done anyway.
-		if timeSoundHandle then
-			StopSound(timeSoundHandle)
-		end
-		local ok, willPlay, handle = pcall(PlaySound, sound, "SFX")
-		if ok and willPlay and handle then
-			timeSoundHandle = handle
-			C_Timer.After(TIME_SOUND_LENGTH, function()
-				if timeSoundHandle == handle then
-					StopSound(handle, TIME_SOUND_FADE_MS)
-					timeSoundHandle = nil
-				end
-			end)
-		end
-	end
-end
 local lastTitle
 
 -- The time of day's card (title: its English name), its sound with it.
 local function TimeCard(title)
-	return { name = L[title], sound = function() PlayTimeSound(title) end }
+	return { name = L[title], sound = function() ns.PlayTimeCueSound(title) end }
 end
 
 -- A warning from the game ("Dun Algaz is under attack!", Chat.lua): the Under
--- attack event's card, with your faction's city bell. force: a test's.
+-- attack event's card (its sound: your faction's city bell, to start with).
+-- force: a test's.
 function ns.ShowAlertTitle(text, force)
-	ns.Cards.Fire("attack", { name = text, sound = function() PlayTimeSound("bell") end }, force)
+	ns.Cards.Fire("attack", { name = text }, force)
 end
 
 ns.CardSamples.time = function()
@@ -1718,8 +1681,7 @@ ns.CardSamples.time = function()
 end
 ns.CardSamples.attack = function()
 	local place = GetMinimapZoneText and GetMinimapZoneText() or ""
-	return { name = L["%s is under attack!"]:format(place ~= "" and place or (GetRealZoneText() or "")),
-		sound = function() PlayTimeSound("bell") end }
+	return { name = L["%s is under attack!"]:format(place ~= "" and place or (GetRealZoneText() or "")) }
 end
 
 -- /cine timetest: show it now (the current time of day, or a given name).
