@@ -171,11 +171,13 @@ local DEFAULTS = {
 	prdWhenNotFull = true,      -- ...and the personal resource display (its own tick)
 	buffPeek = true,          -- briefly show buffs/debuffs when a buff is gained or refreshed
 	buffPeekAfterCombat = false, -- ...or only within the Calm Timer of a fight
-	buffPeekIgnoreSelf = true,   -- ...and not for buffs you cast on yourself (or your pet does)
+	buffPeekIgnoreSelf = false,  -- ...or not for buffs you cast on yourself (or your pet does)
+	buffPeekOnlyNew = true,      -- ...showing just the new buff, the others staying faded
+	buffPeekCollapse = true,     -- ...at the start of the row, not among the faded ones' gaps
 	debuffPeek = true,        -- ...and when a debuff is
 	debuffPeekAfterCombat = false, -- (any time: Hunter's Mark and the like matter out of fights too)
 	debuffPeekUntilGone = true,    -- ...and keep them up until your debuffs are gone
-	buffPeekIgnoreLong = true,     -- ...not for buffs or debuffs lasting longer than
+	buffPeekIgnoreLong = true,     -- ...not for debuffs lasting longer than
 	buffPeekLongMinutes = 30,      -- ...this many minutes (their full time, not what's left)
 	buffPeekTime = 3,           -- seconds they stay up for a buff
 	debuffPeekTime = 3,         -- ...and for a debuff
@@ -4636,6 +4638,18 @@ ticker:SetScript("OnEvent", ns.Profiled("Core events", function(self, event, arg
 				end
 			end
 			ns.db.buffPeekDefaultsV1 = true
+		end
+		-- Buffs you cast on yourself peek now, showing just the new one
+		-- (Buffs/debuffs page): those two as their defaults in every profile.
+		-- Once.
+		if not ns.db.buffPeekDefaultsV2 then
+			for _, key in ipairs({ "buffPeekIgnoreSelf", "buffPeekOnlyNew" }) do
+				ns.db[key] = DEFAULTS[key]
+				for _, saved in pairs(ns.db.profiles or {}) do
+					if type(saved) == "table" then saved[key] = nil end
+				end
+			end
+			ns.db.buffPeekDefaultsV2 = true
 		end
 		-- The debuffs Heroism, Bloodlust and the like leave (Sated, Exhaustion,
 		-- Temporal Displacement, Insanity, Fatigued, the Evoker's Exhaustion)

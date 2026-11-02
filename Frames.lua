@@ -3351,7 +3351,7 @@ end
 
 -- One aura's data: lasting longer than buffPeekLongMinutes, with
 -- buffPeekIgnoreLong? (Its full time, not what's left. False when unsure, or
--- for ones with no time at all.)
+-- for ones with no time at all. Only debuffs are passed over for it.)
 function ns.IsLongAura(aura)
 	if type(aura) ~= "table" or not ns.db.buffPeekIgnoreLong then
 		return false
@@ -3423,12 +3423,16 @@ end
 -- buffPeekIgnoreSelf; otherwise as its kind allows. When unsure (no data,
 -- secret values), either kind will do.
 local function AuraHold(aura)
-	if IsIgnoredAura(aura) or ns.IsLongAura(aura) then
+	if IsIgnoredAura(aura) then
 		return nil
 	end
 	local harmful = type(aura) == "table" and aura.isHarmful
 	if harmful == nil or (issecretvalue and issecretvalue(harmful)) then
 		return EitherHold()
+	end
+	-- (A long buff still does: the setting is the debuffs'.)
+	if harmful and ns.IsLongAura(aura) then
+		return nil
 	end
 	if not harmful and ns.db.buffPeekIgnoreSelf and IsSelfCast(aura) then
 		return nil
@@ -3549,15 +3553,43 @@ function ns.CheckDebuffIcons(peek)
 	end)
 end
 
+-- Just the new ones (buffPeekOnlyNew): the icons (texture file IDs) of the
+-- buffs this peek is for, each with when its own time is up, and whether one of them couldn't be told (then
+-- all show).
+ns.newBuffIcons, ns.newBuffUnknown = {}, false
+ns.foundBuffIcons = {} -- (one aura change's, filled by AnyAuraHold)
+
 -- The longest hold of any aura gained or refreshed, or nil. Updates (a stack
 -- ticking up, say) only give instance IDs, so each is looked up. Either kind
--- when unsure.
-local function AnyAuraHold(updateInfo)
+-- when unsure. Each one that holds them up has its icon noted in found.
+local function AnyAuraHold(updateInfo, found)
 	local ok, hold = pcall(function()
 		local longest
-		local function Consider(seconds)
+		local function Consider(aura)
+			local seconds = AuraHold(aura)
 			if seconds and (not longest or seconds > longest) then
 				longest = seconds
+			end
+			local icon = seconds and type(aura) == "table" and aura.icon
+			if icon and not (issecretvalue and issecretvalue(icon)) then
+				found[#found + 1] = icon
+			end
+			-- (/cine debug peeks: each aura, and why it didn't count.)
+			if ns.auraDebug and type(aura) == "table" then
+				local okDebug, problem = pcall(function()
+					local function Say(value)
+						if issecretvalue and issecretvalue(value) then return "secret" end
+						return tostring(value)
+					end
+					local harmful = aura.isHarmful
+					harmful = not (issecretvalue and issecretvalue(harmful)) and harmful
+					ns.Print(("aura %s (icon %s, %s): %s"):format(Say(aura.name), Say(aura.icon),
+						harmful and "debuff" or "buff?", seconds and ("peeks %.1fs"):format(seconds)
+						or IsIgnoredAura(aura) and "on the ignore list" or harmful and ns.IsLongAura(aura) and "lasts too long"
+						or aura.isHarmful and "debuff peek" or ns.db.buffPeekIgnoreSelf and IsSelfCast(aura)
+						and "cast by you" or "buff peeks off now"))
+				end)
+				if not okDebug then ns.Print("aura (unreadable): " .. tostring(problem)) end
 			end
 		end
 		local added, updated = updateInfo.addedAuras, updateInfo.updatedAuraInstanceIDs
@@ -3566,7 +3598,7 @@ local function AnyAuraHold(updateInfo)
 				return AuraHold(nil)
 			end
 			for _, aura in pairs(added) do
-				Consider(AuraHold(aura))
+				Consider(aura)
 			end
 		end
 		if HasEntries(updated) then
@@ -3575,7 +3607,7 @@ local function AnyAuraHold(updateInfo)
 				return AuraHold(nil)
 			end
 			for _, instanceID in pairs(updated) do
-				Consider(AuraHold(C_UnitAuras.GetAuraDataByAuraInstanceID("player", instanceID)))
+				Consider(C_UnitAuras.GetAuraDataByAuraInstanceID("player", instanceID))
 			end
 		end
 		return longest
@@ -3615,10 +3647,26 @@ do
 		local count = PeekAllowed(true) and ns.DebuffCount() or nil
 		local gainedDebuff = count and ns.debuffCount and count > ns.debuffCount
 		if ns.auraDebug then
-			ns.Print(("aura change: in combat %s, debuffs %s -> %s, details %s"):format(
-				tostring(InCombatLockdown() or ns.Flag(UnitAffectingCombat("player"))), tostring(ns.debuffCount),
-				tostring(count), type(updateInfo) ~= "table" and "none"
-					or (issecretvalue and issecretvalue(updateInfo.addedAuras)) and "secret" or "readable"))
+			-- (Each value on its own: one secret one makes the whole line secret.)
+			local function Say(value)
+				if issecretvalue and issecretvalue(value) then return "secret" end
+				return tostring(value)
+			end
+			local function Size(list)
+				if issecretvalue and issecretvalue(list) then return "secret" end
+				local ok, n = pcall(function()
+					local size = 0
+					for _ in pairs(list or {}) do size = size + 1 end
+					return size
+				end)
+				return ok and Say(n) or "?"
+			end
+			local info = type(updateInfo) == "table" and updateInfo or {}
+			ns.Print(("aura change: in combat %s/%s, debuffs %s -> %s, added %s updated %s removed %s, " ..
+				"full %s, taxi %s/%s, landing quiet %s"):format(
+				Say(InCombatLockdown()), Say(UnitAffectingCombat("player")), Say(ns.debuffCount), Say(count),
+				Size(info.addedAuras), Size(info.updatedAuraInstanceIDs), Size(info.removedAuraInstanceIDs),
+				Say(info.isFullUpdate), Say(ns.OnTaxi()), Say(ns.wasOnTaxi), Say(GetTime() < landedQuietUntil)))
 		end
 		ns.debuffCount = count
 		-- In a fight buffs don't peek: they'd hold the buffs up past its end
@@ -3636,6 +3684,13 @@ do
 		if PeekAllowed(true) then
 			ns.CheckDebuffIcons(count == nil and fightPeeks)
 		end
+		-- (A new buff in a fight peeks too, but only as just the new one: the
+		-- whole bar would cover the fight for every proc. Not with "Only after
+		-- combat", nor in the moment after the fight.)
+		local fightBuffPeeks = inFight and PeekAllowed(false) and ns.db.buffPeekOnlyNew
+			and not ns.db.buffPeekAfterCombat and not ns.OnTaxi()
+			and (InCombatLockdown() or ns.Flag(UnitAffectingCombat("player")))
+		ns.CheckNewBuffIcons(fightBuffPeeks)
 		if inFight then
 			if gainedDebuff and fightPeeks then
 				ns.StartDebuffPeek()
@@ -3647,16 +3702,490 @@ do
 			return
 		end
 		local hold
+		local found = wipe(ns.foundBuffIcons)
 		if type(updateInfo) == "table" then
-			hold = not IsFullUpdate(updateInfo.isFullUpdate) and AnyAuraHold(updateInfo)
+			hold = not IsFullUpdate(updateInfo.isFullUpdate) and AnyAuraHold(updateInfo, found)
 		else
 			hold = EitherHold()
 		end
+		if ns.auraDebug then
+			ns.Print(("  peek for %s, icons noted %d"):format(tostring(hold), #found))
+		end
 		if hold then
-			-- (a short buff peek doesn't cut a longer debuff one short)
-			buffPeekUntil = math.max(buffPeekUntil, GetTime() + hold)
+			ns.StartBuffPeek(hold, found)
 		end
 	end))
+end
+
+-- A buff peek for hold seconds, for the buffs with these icons (none: can't
+-- be told, all show), for a weapon enchant (enchant), or for a fight's new
+-- ones told by their place (byPlace: ns.CheckNewBuffIcons notes them).
+function ns.StartBuffPeek(hold, found, enchant, byPlace)
+	-- (A new peek starts its own list; one while it's up adds to it.)
+	if buffPeekUntil <= GetTime() then
+		wipe(ns.newBuffIcons)
+		wipe(ns.fightNewBuffs)
+		ns.newBuffUnknown, ns.newBuffEnchant = false, false
+	end
+	if #found == 0 and not enchant and not byPlace then
+		ns.newBuffUnknown = true
+	end
+	-- (Each its own time: the first ones fade as later ones come up.)
+	for _, icon in ipairs(found) do
+		ns.newBuffIcons[icon] = math.max(ns.newBuffIcons[icon] or 0, GetTime() + hold)
+	end
+	ns.newBuffEnchant = ns.newBuffEnchant or enchant or false
+	-- (a short buff peek doesn't cut a longer debuff one short)
+	buffPeekUntil = math.max(buffPeekUntil, GetTime() + hold)
+end
+
+-- Weapon enchants (Flametongue Weapon, a poison, an oil...) aren't auras: a
+-- new or refreshed one is spotted by its time left going up, and peeks like a
+-- buff you cast on yourself. Its icon is the weapon's (as the game's buff
+-- frame draws it).
+do
+	local lastLeft = {} -- slot -> ms left at the last look (nil: none)
+	local enchantWatcher = CreateFrame("Frame")
+	enchantWatcher:RegisterUnitEvent("UNIT_INVENTORY_CHANGED", "player")
+	pcall(enchantWatcher.RegisterEvent, enchantWatcher, "WEAPON_ENCHANT_CHANGED")
+	enchantWatcher:RegisterEvent("PLAYER_ENTERING_WORLD")
+	enchantWatcher:SetScript("OnEvent", ns.Profiled("Weapon enchant peeks", function(_, event)
+		if not GetWeaponEnchantInfo then return end
+		local ok, hasMain, mainLeft, _, _, hasOff, offLeft = pcall(GetWeaponEnchantInfo)
+		if not ok then return end
+		local now = {}
+		now[16] = ns.Flag(hasMain) and type(mainLeft) == "number" and not (issecretvalue and issecretvalue(mainLeft))
+			and mainLeft or nil
+		now[17] = ns.Flag(hasOff) and type(offLeft) == "number" and not (issecretvalue and issecretvalue(offLeft))
+			and offLeft or nil
+		local found, gained = wipe(ns.foundBuffIcons), false
+		for slot = 16, 17 do
+			-- (Gained, or its time gone up by more than a second: refreshed.)
+			if event ~= "PLAYER_ENTERING_WORLD" and now[slot] and (not lastLeft[slot] or now[slot] > lastLeft[slot] + 1000) then
+				gained = true
+				local icon = GetInventoryItemTexture("player", slot)
+				if icon then found[#found + 1] = icon end
+			end
+			lastLeft[slot] = now[slot]
+		end
+		if ns.auraDebug and gained then
+			ns.Print("weapon enchant gained or refreshed, icons: " .. table.concat(found, " "))
+		end
+		if not (gained and ns.db and PeekAllowed(false)) or ns.db.buffPeekIgnoreSelf
+			or InCombatLockdown() or ns.Flag(UnitAffectingCombat("player"))
+			or ns.OnTaxi() or ns.wasOnTaxi or GetTime() < landedQuietUntil then
+			return
+		end
+		ns.StartBuffPeek(ns.HoldTime("buffPeekTime"), found, true)
+	end))
+end
+
+-- Just the new ones: with only, the game's buff icons other than the peek's
+-- fade; without, the ones faded come back. Not the icon's own alpha: retail
+-- sets that back to 1 every frame on timed buffs (as it counts them down), so
+-- its parts fade instead (picture, timer, border...), each put back as it was.
+-- Retail-style buttons (BuffFrame.auraFrames) say their icon in buttonInfo,
+-- older clients' BuffButtonN in their Icon texture. A new one whose own time
+-- is up fades out on its own (over the fade out time) while later ones stay.
+ns.newBuffFaded = {} -- button -> { part -> its alpha before }
+
+-- A buff icon's picture (texture file ID): retail-style buttons' buttonInfo,
+-- else its Icon texture. (Can error or be secret: callers pcall and check.)
+function ns.BuffIconOf(button)
+	local info = button.buttonInfo
+	if type(info) == "table" and info.texture then
+		return info.texture
+	end
+	local name = button.GetName and button:GetName()
+	local icon = button.Icon or (name and _G[name .. "Icon"])
+	return icon and icon.GetTexture and icon:GetTexture()
+end
+
+-- fn(button) for each of the game's buff icons: retail's list of them
+-- (auraFrames, plain Frames with an Icon, hidden spares too), else
+-- BuffFrame's children with an icon a few levels down, as for hovering:
+-- BuffButtonN on Classic.
+function ns.ForEachBuffIcon(fn)
+	local function Walk(depth, ...)
+		for i = 1, select("#", ...) do
+			local child = select(i, ...)
+			local ok, isButton = pcall(function()
+				return child.buttonInfo ~= nil or ns.BuffIconOf(child) ~= nil
+			end)
+			if ok and isButton then
+				fn(child)
+			elseif depth > 1 and child.GetChildren then
+				Walk(depth - 1, child:GetChildren())
+			end
+		end
+	end
+	local frame = _G.BuffFrame
+	if frame and type(frame.auraFrames) == "table" then
+		Walk(1, unpack(frame.auraFrames))
+	elseif frame and frame.GetChildren then
+		Walk(BUFF_HOVER_DEPTH, frame:GetChildren())
+	end
+end
+
+-- In a fight what an aura change added is secret, so a new buff is spotted
+-- on the game's buff icons instead, a frame after each change (once the game
+-- has drawn it). Pictures that can be read: any shown more times than at the
+-- last look is new (bar the ignore list's, by its spells' pictures). Retail
+-- keeps most pictures secret in a fight, even of buffs from before it, but
+-- each icon's aura index is plain, and buffs are numbered in the order you
+-- got them (tested: a new one is the highest, the rest move down as one
+-- ends). So more buffs than at the last look: the top ones are new, each
+-- noted by its place from the top (ns.fightNewBuffs). Buffs from before the
+-- fight often stay readable, end time included (tested: Skyfury): one whose
+-- end time moved on by more than a second was refreshed. Other refreshes and
+-- stacks can't be told.
+ns.shownBuffIcons = nil -- picture -> how many shown at the last look (nil: unknown)
+ns.shownBuffEnds = {} -- readable picture -> its latest end time then
+ns.shownBuffTotal = nil -- how many buffs then (the highest aura index)
+ns.fightNewBuffs = {} -- place from the top -> when its time is up (0: not one of these)
+function ns.CheckNewBuffIcons(peek)
+	C_Timer.After(0, function()
+		local shown, total, secretAt, ends = {}, 0, {}, {}
+		ns.ForEachBuffIcon(function(button)
+			local okShown, isShown = pcall(button.IsShown, button)
+			if okShown and ns.Flag(isShown) then
+				local ok, icon = pcall(ns.BuffIconOf, button)
+				local secret = not ok or (issecretvalue and issecretvalue(icon))
+				local info = button.buttonInfo
+				if not secret and icon then
+					shown[icon] = (shown[icon] or 0) + 1
+					local ending = type(info) == "table" and info.expirationTime
+					if type(ending) == "number" and not (issecretvalue and issecretvalue(ending)) and ending > 0 then
+						ends[icon] = math.max(ends[icon] or 0, ending)
+					end
+				end
+				local index = type(info) == "table" and info.auraType == "Buff" and info.index
+				if type(index) == "number" and not (issecretvalue and issecretvalue(index)) then
+					total = math.max(total, index)
+					secretAt[index] = secret
+				end
+			end
+		end)
+		local before, totalBefore, endsBefore = ns.shownBuffIcons, ns.shownBuffTotal, ns.shownBuffEnds
+		ns.shownBuffIcons, ns.shownBuffTotal, ns.shownBuffEnds = shown, total, ends
+		if ns.auraDebug and peek and total ~= totalBefore then
+			local places = {}
+			for index = total, 1, -1 do
+				places[#places + 1] = index .. (secretAt[index] and ":S" or "")
+			end
+			ns.Print(("buffs %s -> %d, highest first: %s"):format(tostring(totalBefore), total, table.concat(places, " ")))
+		end
+		if not (peek and before) then
+			return
+		end
+		local ignored = {}
+		local ids, names = IgnoreLists()
+		local function IgnoreSpell(spell)
+			local ok, texture = pcall(C_Spell and C_Spell.GetSpellTexture or GetSpellTexture, spell)
+			if ok and texture then ignored[texture] = true end
+		end
+		for id in pairs(ids) do IgnoreSpell(id) end
+		for name in pairs(names) do IgnoreSpell(name) end
+		local found = wipe(ns.foundBuffIcons)
+		for icon, times in pairs(shown) do
+			local refreshed = ends[icon] and endsBefore[icon] and ends[icon] > endsBefore[icon] + 1
+			if (times > (before[icon] or 0) or refreshed) and not ignored[icon] then
+				found[#found + 1] = icon
+			end
+		end
+		local added = totalBefore and math.max(0, total - totalBefore) or 0
+		if ns.auraDebug and (#found > 0 or added > 0) then
+			ns.Print(("fight buff new: pictures %s, from the top %d"):format(
+				#found > 0 and table.concat(found, " ") or "none", added))
+		end
+		if #found > 0 or added > 0 then
+			local hold = ns.HoldTime("buffPeekTime")
+			ns.StartBuffPeek(hold, found, nil, added > 0)
+			-- (The new ones go on top, older ones' places moving down. A
+			-- readable one is by its picture already.)
+			for place = added, 1, -1 do
+				table.insert(ns.fightNewBuffs, 1, secretAt[total - place + 1] and GetTime() + hold or 0)
+			end
+		end
+	end)
+end
+ns.newBuffFadeLevel = {} -- button -> how far up its parts were last set (0-1)
+
+-- Close the gaps (buffPeekCollapse): copies of the new buffs' icons in the
+-- first places of the row (slots: the shown icons in the game's order, the
+-- row's start first), so they don't sit among empty spaces. Copies, not the
+-- game's icons moved: those are laid out by the game (moving them could
+-- taint it). Each copies its icon's picture, timer and stacks every tick
+-- (secret ones too, which the game lets us show), their look and place on
+-- the icon, at its own fade level. Their holder follows the buff frame's
+-- alpha and scale. With no slots, the copies go.
+ns.buffMirrors = {}
+ns.buffIconLayout = {} -- part -> where it sat on a buff icon when last measured
+function ns.MirrorBuffs(slots, shownNew)
+	local holder = ns.buffMirrorHolder
+	if not slots then
+		if holder then holder:Hide() end
+		ns.buffMirrorDebugDone = nil
+		return
+	end
+	local frame = _G.BuffFrame
+	if not holder then
+		holder = CreateFrame("Frame", nil, UIParent)
+		holder:SetAllPoints(UIParent)
+		-- (Every frame, as the buff frame fades out after the peek too; and
+		-- each copy's inside as its icon's own alpha, which the game pulses
+		-- as a buff runs out.)
+		holder:SetScript("OnUpdate", function(self)
+			pcall(function()
+				self:SetAlpha(_G.BuffFrame:GetEffectiveAlpha() / UIParent:GetEffectiveAlpha())
+			end)
+			for _, mirror in ipairs(ns.buffMirrors) do
+				if mirror.source and mirror:IsShown() then
+					pcall(function() mirror.Inner:SetAlpha(mirror.source:GetAlpha()) end)
+				end
+			end
+		end)
+		ns.buffMirrorHolder = holder
+	end
+	holder:Show()
+	pcall(function()
+		holder:SetFrameStrata(frame:GetFrameStrata())
+		holder:SetFrameLevel(frame:GetFrameLevel() + 20)
+		holder:SetScale(frame:GetEffectiveScale() / UIParent:GetEffectiveScale())
+	end)
+	-- (A part of the game's icon: by key, else by its name plus the key on
+	-- older clients.)
+	local function Part(button, key)
+		local name = button.GetName and button:GetName()
+		return button[key] or (name and _G[name .. key])
+	end
+	-- (Where it sits on the icon, measured in the icon's own scale (the
+	-- icons can be scaled apart from the buff frame; textures and text have
+	-- no scale of their own to ask), its look and what it shows. In a fight
+	-- the sizes are secret: the last measured layout then (layout), else
+	-- the usual one: a square picture at the top, the timer under it, the
+	-- stacks in its corner.)
+	local layout = ns.buffIconLayout
+	local function Copy(key, source, copy, button, mirror, isText)
+		copy:ClearAllPoints()
+		local scale = 1
+		pcall(function() scale = button:GetEffectiveScale() / mirror:GetEffectiveScale() end)
+		pcall(function()
+			local left, bottom, width, height = source:GetRect()
+			local bLeft, bBottom = button:GetRect()
+			layout[key] = { x = left - bLeft, y = bottom - bBottom, width = width, height = height }
+		end)
+		local spot = layout[key]
+		if spot and isText then
+			-- (Text by its middle, no size: a size measured on a shorter
+			-- time would cut a longer one short.)
+			copy:SetPoint("CENTER", mirror, "BOTTOMLEFT", (spot.x + spot.width / 2) * scale,
+				(spot.y + spot.height / 2) * scale)
+		elseif spot then
+			copy:SetPoint("BOTTOMLEFT", mirror, "BOTTOMLEFT", spot.x * scale, spot.y * scale)
+			copy:SetSize(spot.width * scale, spot.height * scale)
+		elseif key == "Icon" then
+			copy:SetPoint("TOP", mirror, "TOP")
+			copy:SetSize(mirror:GetWidth(), mirror:GetWidth())
+		elseif key == "Duration" then
+			copy:SetPoint("TOP", mirror.Icon, "BOTTOM", 0, -1)
+		else
+			copy:SetPoint("BOTTOMRIGHT", mirror.Icon, "BOTTOMRIGHT", -1, 1)
+		end
+		-- (Each on its own: one failing doesn't stop the rest.)
+		if isText then
+			pcall(function()
+				local font, size, flags = source:GetFont()
+				copy:SetFont(font, size * scale, flags)
+			end)
+			-- (Not its alpha: on text that's one with SetAlpha, and the game's
+			-- own is faded under the copy.)
+			pcall(function()
+				local r, g, b = source:GetTextColor()
+				copy:SetTextColor(r, g, b, 1)
+			end)
+			local okText, problem = pcall(function() copy:SetText(source:GetText()) end)
+			if ns.auraDebug and not okText and not ns.buffMirrorTextDebugDone then
+				ns.buffMirrorTextDebugDone = true
+				ns.Print("close the gaps: copying " .. key .. " text fails: " .. tostring(problem))
+			end
+		else
+			pcall(function() copy:SetTexture(source:GetTexture()) end)
+			pcall(function() copy:SetTexCoord(source:GetTexCoord()) end)
+		end
+		local okShown, shown = pcall(source.IsShown, source)
+		copy:SetShown(not okShown or shown == nil or (issecretvalue and issecretvalue(shown)) or shown == true)
+	end
+	for i, entry in ipairs(shownNew) do
+		local mirror = ns.buffMirrors[i]
+		if not mirror then
+			mirror = CreateFrame("Frame", nil, holder)
+			mirror.Inner = CreateFrame("Frame", nil, mirror)
+			mirror.Inner:SetAllPoints(mirror)
+			mirror.Icon = mirror.Inner:CreateTexture(nil, "ARTWORK")
+			mirror.Duration = mirror.Inner:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+			mirror.Count = mirror.Inner:CreateFontString(nil, "OVERLAY", "NumberFontNormal")
+			ns.buffMirrors[i] = mirror
+		end
+		local button = entry.button
+		mirror.source = button
+		mirror:ClearAllPoints()
+		mirror:SetPoint("CENTER", slots[i], "CENTER")
+		-- (Its size, or the last measured one in a fight, where it's secret.)
+		pcall(function()
+			local width, height = button:GetSize()
+			layout.button = { width = width + 0, height = height + 0 }
+		end)
+		pcall(function()
+			local scale = button:GetEffectiveScale() / mirror:GetEffectiveScale()
+			local size = layout.button or { width = 30, height = 40 }
+			mirror:SetSize(size.width * scale, size.height * scale)
+		end)
+		mirror:SetAlpha(entry.level)
+		for _, key in ipairs({ "Icon", "Duration", "Count" }) do
+			local source = Part(button, key)
+			if source then
+				Copy(key, source, mirror[key], button, mirror, key ~= "Icon")
+			else
+				mirror[key]:Hide()
+			end
+		end
+		mirror:Show()
+	end
+	for i = #shownNew + 1, #ns.buffMirrors do
+		ns.buffMirrors[i]:Hide()
+	end
+	-- (/cine debug peeks, once per peek: what the copies had to go on.)
+	if ns.auraDebug and not ns.buffMirrorDebugDone then
+		ns.buffMirrorDebugDone = true
+		local function Say(value)
+			if issecretvalue and issecretvalue(value) then return "secret" end
+			return tostring(value)
+		end
+		ns.Print(("close the gaps: %d places, %d new"):format(#slots, #shownNew))
+		for i, entry in ipairs(shownNew) do
+			local button, parts = entry.button, {}
+			for key, value in pairs(button) do
+				local ok, kind = pcall(function()
+					return type(value) == "table" and value.GetObjectType and value:GetObjectType()
+				end)
+				if ok and (kind == "FontString" or kind == "Texture") then
+					local okInfo, info = pcall(function()
+						local _, _, width, height = value:GetRect()
+						return ("%s %s %sx%s shown %s%s"):format(key, kind, Say(width), Say(height),
+							Say(value:IsShown()), kind == "FontString" and (" text " .. Say(value:GetText())) or "")
+					end)
+					parts[#parts + 1] = okInfo and info or (key .. " " .. kind .. " (errors)")
+				end
+			end
+			table.sort(parts)
+			ns.Print(("  new %d (level %.2f): %s"):format(i, entry.level, table.concat(parts, "; ")))
+			local copy = ns.buffMirrors[i] and ns.buffMirrors[i].Duration
+			if copy then
+				local okCopy, state = pcall(function()
+					return ("shown %s, text %s, font %s"):format(Say(copy:IsShown()), Say(copy:GetText()),
+						Say(select(2, copy:GetFont())))
+				end)
+				ns.Print("  its timer copy: " .. (okCopy and state or "errors"))
+			end
+		end
+	end
+end
+
+function ns.UnfadeBuffIcon(button)
+	for part, alpha in pairs(ns.newBuffFaded[button]) do
+		pcall(part.SetAlpha, part, alpha)
+	end
+	ns.newBuffFaded[button], ns.newBuffFadeLevel[button] = nil, nil
+end
+function ns.ShowOnlyNewBuffs(only)
+	local faded = ns.newBuffFaded
+	if not only then
+		ns.newBuffDebugDone = nil
+		for button in pairs(faded) do
+			ns.UnfadeBuffIcon(button)
+		end
+		ns.MirrorBuffs(nil)
+		return
+	end
+	-- (Close the gaps: every icon fades, and copies of the new ones show in
+	-- the row's first places, ns.MirrorBuffs.)
+	local collapse = ns.db.buffPeekCollapse
+	local slots, shownNew = {}, {}
+	local now = GetTime()
+	-- (level: how far up its parts are, 0 gone to 1 as they were.)
+	local function FadeParts(button, level)
+		local parts = faded[button]
+		if not parts then
+			parts = {}
+			local function Note(...)
+				for i = 1, select("#", ...) do
+					local part = select(i, ...)
+					local ok, alpha = pcall(part.GetAlpha, part)
+					parts[part] = ok and type(alpha) == "number" and not (issecretvalue and issecretvalue(alpha))
+						and alpha or 1
+				end
+			end
+			Note(button:GetRegions())
+			Note(button:GetChildren())
+			faded[button] = parts
+		end
+		if ns.newBuffFadeLevel[button] ~= level then
+			ns.newBuffFadeLevel[button] = level
+			for part, alpha in pairs(parts) do
+				pcall(part.SetAlpha, part, alpha * level)
+			end
+		end
+	end
+	local function Apply(button)
+		local ok, icon = pcall(ns.BuffIconOf, button)
+		-- (Unsure, as when it errors: it shows. A secret picture: new only by
+		-- its place from the top, a fight's, else faded.)
+		local isSecret = ok and issecretvalue and issecretvalue(icon)
+		local unsure = not ok or icon == nil
+		local untilAt = not unsure and not isSecret and ns.newBuffIcons[icon] or nil
+		local info = button.buttonInfo
+		local index = type(info) == "table" and info.auraType == "Buff" and info.index
+		if ns.shownBuffTotal and type(index) == "number" and not (issecretvalue and issecretvalue(index)) then
+			local byPlace = ns.fightNewBuffs[ns.shownBuffTotal - index + 1]
+			if byPlace and byPlace > 0 and (not untilAt or byPlace > untilAt) then
+				untilAt = byPlace
+			end
+		end
+		-- (A new one whose time is up fades out; the rest are gone at once.)
+		local level = 1
+		if not (unsure or (untilAt and untilAt > now)) then
+			local fadeTime = ns.db.fadeOutTime or 0
+			level = untilAt and fadeTime > 0 and math.max(0, 1 - (now - untilAt) / fadeTime) or 0
+		end
+		local okShown, isShown = pcall(button.IsShown, button)
+		if collapse and okShown and ns.Flag(isShown) then
+			slots[#slots + 1] = button
+			if level > 0 then shownNew[#shownNew + 1] = { button = button, level = level } end
+			FadeParts(button, 0)
+		elseif level == 1 then
+			if faded[button] then
+				ns.UnfadeBuffIcon(button)
+			end
+		else
+			FadeParts(button, level)
+		end
+	end
+	local count = 0
+	ns.ForEachBuffIcon(function(button)
+		count = count + 1
+		Apply(button)
+	end)
+	ns.MirrorBuffs(collapse and slots, shownNew)
+	-- (/cine debug peeks: what it found, once per peek.)
+	if ns.auraDebug and not ns.newBuffDebugDone then
+		ns.newBuffDebugDone = true
+		local icons, fadedCount = {}, 0
+		for icon in pairs(ns.newBuffIcons) do icons[#icons + 1] = tostring(icon) end
+		for _ in pairs(faded) do fadedCount = fadedCount + 1 end
+		ns.Print(("just the new one: %d icons found, %d faded, new: %s"):format(count, fadedCount,
+			#icons > 0 and table.concat(icons, " ") or "none"))
+	end
 end
 
 do
@@ -6950,7 +7479,14 @@ function ns.UpdateFrames(cinematic, elapsed)
 	local castLeft = cinematic and not fighting and ns.db.stayInCombat and ns.HostileCastLeft(now)
 	if fighting then
 		lastCombatAt = now
-		buffPeekUntil = 0 -- (a buff peek from just before the fight doesn't outlast it)
+		-- (A buff peek from just before the fight doesn't outlast it; ones
+		-- in it, just the new one, do.)
+		if not ns.buffPeekFightSeen then
+			buffPeekUntil = 0
+			ns.buffPeekFightSeen = true
+		end
+	else
+		ns.buffPeekFightSeen = nil
 	end
 	if ns.Flag(IsFalling()) then
 		lastFallingAt = now
@@ -7115,6 +7651,16 @@ function ns.UpdateFrames(cinematic, elapsed)
 		ns.Print(("buffs peek %s (CineMode %s, page on %s, peek %.1fs, fight peek %.1fs)"):format(
 			events.aura and "on" or "off", tostring(cinematic), tostring(ns.PageOn("handleBuffs")),
 			math.max(0, buffPeekUntil - now), math.max(0, ns.debuffPeekUntil - now)))
+		-- (Which rows a peek brings up: the groups with New buff or debuff ticked.)
+		if events.aura then
+			local rows = {}
+			for _, group in ipairs(hoverGroups) do
+				if not group.off and group.when ~= offWhen and group.triggers and group.triggers.aura then
+					rows[#rows + 1] = table.concat(group.members or {}, "/")
+				end
+			end
+			ns.Print("  rows it brings up: " .. (#rows > 0 and table.concat(rows, ", ") or "none (no group has New buff or debuff ticked)"))
+		end
 	end
 	-- (Not on flight paths, Minimap page: no pings, reveals or tracking bring it up then.)
 	local taxiHidesMinimap = minimapPage and ns.db.minimapHideOnTaxi and ns.Flag(ns.OnTaxi())
@@ -7264,6 +7810,31 @@ function ns.UpdateFrames(cinematic, elapsed)
 					tracking and not padReveal and "kept up " or ""))
 			end
 			entry.debugUp = up
+		end
+		-- (Just the new ones, Buffs/debuffs page: up for a buff peek and nothing
+		-- else, the other buff icons fade, and weapon enchants with them (unless one is the new one). Up for
+		-- anything else they're all back; fading out, they stay as they are.)
+		if entry.name == "BuffFrame" or entry.name == "TemporaryEnchantFrame" then
+			local justNew = cinematic and ns.db.buffPeekOnlyNew and buffPeekUntil > now and auraOnly[row]
+				and not hovered[row] and not fightingShown and not ns.previewRows and not ns.newBuffUnknown
+			-- (/cine debug peeks: why a buff peek shows them all.)
+			if ns.auraDebug and entry.name == "BuffFrame" then
+				local why = not justNew and buffPeekUntil > now and ("option %s, row %s, peek only %s, hovered %s, " ..
+					"fight frame %s, preview %s, buff unknown %s"):format(tostring(ns.db.buffPeekOnlyNew), tostring(row),
+					tostring(auraOnly[row]), tostring(hovered[row]), tostring(fightingShown),
+					tostring(ns.previewRows ~= nil), tostring(ns.newBuffUnknown)) or nil
+				if why ~= ns.newBuffWhy then
+					ns.newBuffWhy = why
+					if why then ns.Print("buff peek shows all: " .. why) end
+				end
+			end
+			if entry.name == "TemporaryEnchantFrame" then
+				if justNew and not ns.newBuffEnchant then target = 0 end
+			elseif justNew then
+				ns.ShowOnlyNewBuffs(true)
+			elseif target > 0 or entry.alpha == 0 then
+				ns.ShowOnlyNewBuffs(false)
+			end
 		end
 		-- (Fading out for a profile's layout change, Layouts.lua; then a
 		-- profile's preview: just its group up, ns.PreviewProfile.)

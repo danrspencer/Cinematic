@@ -2591,9 +2591,21 @@ local function CreateBuffsPanel()
 	buffIgnoreSelf:SetPoint("TOPLEFT", buffAfterCombat, "BOTTOMLEFT", 0, -2)
 	GreyUnless(buffIgnoreSelf, IfBuffPeek)
 
+	local buffOnlyNew = Check(content, "buffPeekOnlyNew", L["Just the new one"],
+		L["Only the buff you gained or refreshed shows; your other buffs stay faded. Hovering shows them all. " ..
+		"In fights too, for new buffs (procs and the like)."])
+	buffOnlyNew:SetPoint("TOPLEFT", buffIgnoreSelf, "BOTTOMLEFT", 0, -2)
+	GreyUnless(buffOnlyNew, IfBuffPeek)
+	buffOnlyNew:HookScript("OnClick", Refresh)
+
+	local buffCollapse = Check(content, "buffPeekCollapse", L["Close the gaps"],
+		L["The new buff shows at the start of the row, not in its own place among empty spaces."])
+	buffCollapse:SetPoint("TOPLEFT", buffOnlyNew, "BOTTOMLEFT", BUFF_INDENT, -2)
+	GreyUnless(buffCollapse, function(db) return db.buffPeek and db.buffPeekOnlyNew end)
+
 	local debuffPeek = Check(content, "debuffPeek", L["Show debuffs when you gain or refresh one"],
 		L["Gaining or refreshing a debuff briefly shows your debuffs (not your buffs), in fights too. Not on flights."])
-	debuffPeek:SetPoint("TOPLEFT", buffIgnoreSelf, "BOTTOMLEFT", -BUFF_INDENT, -2)
+	debuffPeek:SetPoint("TOPLEFT", buffCollapse, "BOTTOMLEFT", -2 * BUFF_INDENT, -2)
 	debuffPeek:HookScript("OnClick", Refresh)
 
 	local debuffAfterCombat = Check(content, "debuffPeekAfterCombat", L["Only after combat"],
@@ -2607,19 +2619,19 @@ local function CreateBuffsPanel()
 	debuffUntilGone:SetPoint("TOPLEFT", debuffAfterCombat, "BOTTOMLEFT", 0, -2)
 	GreyUnless(debuffUntilGone, IfDebuffPeek)
 
-	-- (Buffs and debuffs alike: a long debuff doesn't keep them up either.)
+	-- (Debuffs only: a long debuff doesn't keep them up either.)
 	local ignoreLong = Check(content, "buffPeekIgnoreLong", L["Not ones lasting longer than"],
-		L["Buffs and debuffs that last longer than this (their full time, not what's left: Power Word: " ..
-		"Fortitude, Deserter...) don't bring them up, nor keep them up until gone. Not in fights, when " ..
-		"what they are can't be seen."], function(value)
+		L["Debuffs that last longer than this (their full time, not what's left: Deserter, Resurrection " ..
+		"Sickness...) don't bring them up, nor keep them up until gone. Not in fights, when what they are " ..
+		"can't be seen. Buffs always do."], function(value)
 			ns.GetDB().buffPeekIgnoreLong = value
 			Refresh()
 		end)
 	ignoreLong:SetPoint("TOPLEFT", debuffUntilGone, "BOTTOMLEFT", 0, -2)
-	GreyUnless(ignoreLong, IfAnyPeek)
+	GreyUnless(ignoreLong, IfDebuffPeek)
 	local longMinutes = Slider(content, "buffPeekLongMinutes", "", 1, 60, 1, L["%d min"])
 	longMinutes:SetPoint("TOPLEFT", ignoreLong, "BOTTOMLEFT", 24, -10)
-	GreyUnless(longMinutes, function(db) return IfAnyPeek(db) and db.buffPeekIgnoreLong end)
+	GreyUnless(longMinutes, function(db) return IfDebuffPeek(db) and db.buffPeekIgnoreLong end)
 
 	local buffPeekTime = Slider(content, "buffPeekTime", L["Show buffs for"], 0.5, 30, 0.5, L["%.1f sec"])
 	buffPeekTime:SetPoint("TOPLEFT", longMinutes, "BOTTOMLEFT", 4 - BUFF_INDENT - 24, -30)

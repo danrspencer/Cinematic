@@ -490,13 +490,20 @@ L["Gaining or refreshing a buff briefly shows your buffs and debuffs. Not on fli
 L["On: this page's peeks bring your buffs and debuffs up in CineMode. Off: no peeks; they still fade as their Game Frames row says."] = "Activado: los avisos de esta página muestran tus beneficios y perjuicios en CineMode. Desactivado: sin avisos; siguen desvaneciéndose según su fila de la página Marcos del juego."
 L["Only within the Calm Timer after a fight, so buffing up in town doesn't count."] = "Solo dentro del Temporizador de calma tras un combate, para que ponerte beneficios en la ciudad no cuente."
 L["Not ones you cast on yourself"] = "No los que te lanzas a ti mismo"
+L["Just the new one"] = "Solo el nuevo"
+L["Close the gaps"] = "Cerrar los huecos"
+L["The new buff shows at the start of the row, not in its own place among empty spaces."] = "El beneficio nuevo se muestra al principio de la fila, no en su propio sitio entre huecos vacíos."
+L["Only the buff you gained or refreshed shows; your other buffs stay faded. Hovering shows them all. " ..
+	"In fights too, for new buffs (procs and the like)."] = "Solo se muestra el beneficio que obtuviste o renovaste; " ..
+	"tus otros beneficios siguen desvanecidos. Al pasar el ratón se muestran todos. También en combate, para " ..
+	"beneficios nuevos (activaciones y similares)."
 L["Not ones lasting longer than"] = "No los que duran más de"
-L["Buffs and debuffs that last longer than this (their full time, not what's left: Power Word: " ..
-	"Fortitude, Deserter...) don't bring them up, nor keep them up until gone. Not in fights, when " ..
-	"what they are can't be seen."] =
-	"Los beneficios y perjuicios que duran más que esto (su duración total, no lo que les queda: " ..
-	"Palabra de poder: entereza, Desertor...) no los muestran, ni los mantienen hasta que se van. " ..
-	"No en combate, cuando no se puede ver cuáles son."
+L["Debuffs that last longer than this (their full time, not what's left: Deserter, Resurrection " ..
+	"Sickness...) don't bring them up, nor keep them up until gone. Not in fights, when what they are " ..
+	"can't be seen. Buffs always do."] =
+	"Los perjuicios que duran más que esto (su duración total, no lo que les queda: Desertor, " ..
+	"Enfermedad de resurrección...) no los muestran, ni los mantienen hasta que se van. No en combate, " ..
+	"cuando no se puede ver cuáles son. Los beneficios siempre lo hacen."
 L["Your own buffs on yourself (Power Word: Fortitude, Arcane Intellect, a self-cast shield...) and your pet's don't bring them up; ones from other players and the world still do."] = "Tus propios beneficios sobre ti (Palabra de poder: entereza, Intelecto Arcano, un escudo propio...) y los de tu mascota no los muestran; los de otros jugadores y del mundo sí."
 L["Show debuffs when you gain or refresh one"] = "Mostrar los perjuicios al obtener o renovar uno"
 L["Gaining or refreshing a debuff briefly shows your debuffs (not your buffs), in fights too. Not on flights."] = "Obtener o renovar un perjuicio muestra brevemente tus perjuicios (no tus beneficios), también en combate. No en vuelos."

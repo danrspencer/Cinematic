@@ -136,7 +136,7 @@ read_globals = {
 	"ContainerFrameCombinedBags", "UpdateContainerFrameAnchors",
 	"C_Container", "PickupContainerItem", "GetContainerNumSlots", "GetContainerItemInfo", "NUM_BAG_SLOTS",
 	"C_SpellBook", "GetNumSpellTabs", "BOOKTYPE_SPELL", "GetSpellTabInfo", "GetSpellBookItemName", "GetSpellBookItemTexture",
-	"NUM_TOTAL_EQUIPPED_BAG_SLOTS", "GetInventoryItemTexture", "C_MountJournal",
+	"NUM_TOTAL_EQUIPPED_BAG_SLOTS", "GetInventoryItemTexture", "GetWeaponEnchantInfo", "C_MountJournal",
 	"ClearCursor", "SortBags",
 	"GetItemFamily", "GetContainerNumFreeSlots", "GetBagName", "C_MerchantFrame", "GetMerchantItemInfo",
 	"GetMerchantItemID", "GetMerchantItemLink", "GetItemInfo", "GetMoney", "GetCoinTextureString",
