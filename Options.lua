@@ -7439,6 +7439,7 @@ local function CreatePlatesPanel()
 		local ruleKey = "plate:" .. kind[1]
 		local layout = top.layout
 		local function RuleKey() return ruleKey end
+		if layout.edit then RecordRow(content, "frameRules", ruleKey) end -- (for the page's Reset and the modules)
 		lastLabel = PlaceRow(top, r, kind[2], kind[3], {
 			dot = true,
 			always = { isOn = function() return ns.GetDB()[alwaysKey] end,
@@ -7622,6 +7623,7 @@ local function CreatePlatesPanel()
 		-- Its rule (name:<row>), on the row.
 		local ruleKey = ns.NameRuleKey(key)
 		local function RuleKey() return ruleKey end
+		RecordRow(content, "frameRules", ruleKey) -- (for the page's Reset and the modules)
 		lastLabel = PlaceRow(top, r, label, indent, {
 			dot = true,
 			always = { isOn = function() return ns.GetDB()[alwaysKey] end,

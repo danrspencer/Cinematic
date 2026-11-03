@@ -519,9 +519,6 @@ ns.PROFILE_MODULES = {
 	{ key = "letterbox-in-fights", name = "Letterbox stays in fights", scope = { "Letterbox/Show in" },
 		tip = "Fights don't bring the letterbox down.",
 		apply = function(set) set("letterboxOffInCombat", false) end },
-	{ key = "rain-view-distance", name = "Reduce view distance in rain", scope = { "Effects/Show in" },
-		tip = "In CineMode, rain pulls the view distance in from yours, all the way in a downpour.",
-		apply = function(set) set("rainViewScale", 1) end },
 	{ key = "vitals-vision", name = "Vitals Vision on", scope = { "Vitals Vision" },
 		tip = "Your health at the screen's edges, the picture drained toward grey and the personal resource " ..
 		"display (or, in a game without one, your player frame) fading in as it drops.",
