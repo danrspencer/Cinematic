@@ -3254,6 +3254,29 @@ do
 		end
 		return shown
 	end
+	-- (Every row's rule and ticks were worked out every frame. Now at most
+	-- every SHOWN_HOLD seconds, and at once when the fight, the Calm Timer,
+	-- the target or a cast at an enemy changes: the rest of a rule's facts
+	-- (moving, mounted...) count a moment later, well inside a fade.)
+	local SHOWN_HOLD = 0.1
+	local Compute = GetCombatShownFrames
+	local keptAt, keptShown = -1, nil
+	local wasFighting, wasCalm, wasTarget, wasEnemy, wasCast
+	function GetCombatShownFrames()
+		local now = GetTime()
+		local fighting = InCombatLockdown() or ns.Flag(UnitAffectingCombat("player"))
+		local calm = not fighting and now - lastCombatAt < (ns.db.calmTime or 0)
+		local target = HasAnyTarget() and true or false
+		local enemy = target and ns.IsEnemyUnit("target") and not ns.Flag(UnitIsDeadOrGhost("target")) or false
+		local cast = ns.HostileCastLeft(now) ~= nil
+		if keptShown and now >= keptAt and now - keptAt < SHOWN_HOLD and fighting == wasFighting
+			and calm == wasCalm and target == wasTarget and enemy == wasEnemy and cast == wasCast then
+			return keptShown
+		end
+		wasFighting, wasCalm, wasTarget, wasEnemy, wasCast = fighting, calm, target, enemy, cast
+		keptAt, keptShown = now, Compute()
+		return keptShown
+	end
 
 	-- Whether a grid row that isn't a frame (the Chat page's: a message type,
 	-- a channel; Chat bubbles', tooltips', Visual Effects', music's, Camera
