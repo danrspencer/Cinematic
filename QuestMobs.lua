@@ -10,8 +10,13 @@ local _, ns = ...
 -- Answers by GUID: true/false and when they were read. A yes holds until the
 -- quest log changes; a no is read again after a while (a unit's tooltip lines
 -- can be missing for a moment after its plate appears).
-local answers = {} -- [guid] = { quest = bool, at = time }
+local answers = {} -- [guid] = { quest = bool, at = time, noes = nos in a row }
 local RECHECK_NO = 2
+-- A no read twice in a row is read again after RECHECK_SETTLED instead: in
+-- cities new plates kept every NPC's tooltip being read every 2 seconds (a
+-- table of lines each time). Only the quest log makes one a quest mob, and
+-- its changes forget every answer.
+local RECHECK_SETTLED = 30
 -- Where the GUID is secret (retail's instances): by unit token for
 -- TOKEN_HOLD seconds, forgotten as soon as a token may point at someone else.
 local tokenAnswers = {} -- [unit token] = { quest = bool, at = time }
@@ -436,11 +441,14 @@ function ns.IsQuestMob(unit)
 	end
 	local now = GetTime()
 	local answer = answers[guid]
-	if answer and (answer.at >= settleAt or now < settleAt) and (answer.quest or now - answer.at < RECHECK_NO) then
+	-- (A no read twice holds longer: its tooltip was there by then.)
+	local recheck = answer and (answer.noes or 0) >= 2 and RECHECK_SETTLED or RECHECK_NO
+	if answer and (answer.at >= settleAt or now < settleAt) and (answer.quest or now - answer.at < recheck) then
 		return answer.quest
 	end
 	answer = answer or {}
 	answer.quest, answer.at = Read(unit), now
+	answer.noes = not answer.quest and (answer.noes or 0) + 1 or 0
 	answers[guid] = answer
 	return answer.quest
 end
