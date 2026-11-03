@@ -298,6 +298,7 @@ read_globals = {
 	"UnitGroupRolesAssigned",
 	"GetSpecialization",
 	"GetSpecializationRole",
+	"C_SpecializationInfo",
 	"GetNumTalentTabs",
 	"LOCALIZED_CLASS_NAMES_MALE",
 	"GetTalentTabInfo",

@@ -492,8 +492,11 @@ end
 -- spec, on clients with specs). No points yet: the class's own.
 local function TreeWithMostPoints()
 	if not (GetNumTalentTabs and GetTalentTabInfo) then return nil end
+	-- (MoP Classic has it but errors "API unsupported".)
+	local okTabs, tabs = pcall(GetNumTalentTabs)
+	if not okTabs or type(tabs) ~= "number" then return nil end
 	local best, bestPoints = nil, 0
-	for i = 1, GetNumTalentTabs() or 0 do
+	for i = 1, tabs do
 		-- (Classic: name, icon, points...; later clients: id, name, description, icon, points...)
 		local ok, a, _, c, _, e = pcall(GetTalentTabInfo, i)
 		local points = ok and (type(a) == "number" and e or c)
@@ -510,13 +513,17 @@ local function AutoTheme(byClass, bySpec, fallback)
 	local list = byClass[class]
 	if not list then return fallback end
 	local tree
-	if GetSpecialization then
-		local ok, spec = pcall(GetSpecialization)
+	-- (MoP Classic: only C_SpecializationInfo's.)
+	local getSpec = GetSpecialization
+		or C_SpecializationInfo and C_SpecializationInfo.GetSpecialization
+	if getSpec then
+		local ok, spec = pcall(getSpec)
 		if ok and type(spec) == "number" and spec > 0 then
 			list = bySpec[class] or list
 			tree = spec
 		end
-	else
+	end
+	if not tree and not GetSpecialization then
 		tree = TreeWithMostPoints()
 	end
 	return tree and list[tree] or list.none or list[1]
