@@ -107,7 +107,7 @@ local DEFAULTS = {
 	innGlowAmount = 0.02,  -- light the inn glow adds at its brightest (0.1 = 10%)
 	weatherTint = true,    -- rain, snow and sandstorms grey or colour the scene (clients with C_Weather)
 	weatherTintStrength = 1,
-	rainViewScale = 0,     -- in rain, the view distance comes in from yours (Graphics.lua); Cinema: 1
+	rainViewScale = 0,     -- in rain, the view distance comes in from yours (Graphics.lua); off in every profile
 	tintClock = "game",    -- time-of-day tint follows "game" (realm) time or "local" (computer) time
 	timeTintStrength = 1,  -- how strongly the time-of-day colour applies (both time presets)
 	tintPreviewHour = -2,  -- options-page preview of the time-of-day tint at this hour (-1 = now, -2 = not picked)
@@ -988,6 +988,14 @@ DEFAULTS.duelHideOthers = true -- and none of that while you duel yourself
 DEFAULTS.minimapHelper = true -- Minimap Glow Helper: the minimap button glows and lists the visions and camera in use (see MinimapButton)
 DEFAULTS.handleCooldowns = true -- the Cooldown Manager page's master switch (off: left alone)
 DEFAULTS.cooldownKeybinds = false -- its Show keybinds: each spell's key on its icon (Frames.lua)
+DEFAULTS.cooldownFollowNumbers = true -- its icons' countdown numbers follow the game's Show Numbers for Cooldowns
+-- Its Flash style, for every spell with Flash ticked: how long, and whether
+-- the icon glows, grows and gets a colored border while it flashes.
+DEFAULTS.cooldownFlashTime = 3
+DEFAULTS.cooldownFlashGlow = true
+DEFAULTS.cooldownFlashGrow = true
+DEFAULTS.cooldownFlashBorder = false
+DEFAULTS.cooldownFlashR, DEFAULTS.cooldownFlashG, DEFAULTS.cooldownFlashB = 1, 0.82, 0
 -- The other pages' master switches likewise (see ns.HANDLE_SWITCHES): off,
 -- CineMode leaves that part of the UI to the game.
 DEFAULTS.handleFrames = true -- Standard Frames
@@ -1124,28 +1132,11 @@ do
 		end
 	end
 
-	-- A grid row's roles button (tankHide, healerHide, damageHide: row key ->
-	-- true, hidden or off while you're that role; false, ticked back on). Rows
-	-- not set go by these: Heal Vision is for healers to start with.
-	ns.ROLE_HIDE_DEFAULTS = { tankHide = { healVision = true }, damageHide = { healVision = true } }
-	function ns.RoleHidden(db, list, key)
-		local value = db[list] and db[list][key]
-		if value == nil then
-			value = ns.ROLE_HIDE_DEFAULTS[list] and ns.ROLE_HIDE_DEFAULTS[list][key]
-		end
-		return value and true or false
-	end
-
 	-- Whether Heal Vision is on where you are now (in a party or raid or not,
 	-- a healer or not).
 	function ns.HealVisionHere(db)
 		db = db or ns.db
 		if not db then return false end
-		-- (Off while you're a role its roles button has unticked: healers only to start with.)
-		local role = ns.PlayerRole()
-		local list = role == "TANK" and "tankHide" or role == "HEALER" and "healerHide"
-			or role == "DAMAGER" and "damageHide"
-		if list and ns.RoleHidden(db, list, "healVision") then return false end
 		if not ns.Setting("handleHealVision") then return false end -- (its page's switch, and the Visions')
 		-- (Its rule, edited on its row, decides instead of its ticks.)
 		local facts = ns.RuleFactsNow and ns.RuleFactsNow()
@@ -3081,6 +3072,8 @@ function ns.SetEnabled(enabled)
 		startSnapUntil = GetTime() + START_SNAP_WINDOW
 		snapRound = snapRound + 1
 	end
+	-- (The Unit Frames grid's parts hide CineMode or not, but not switched off.)
+	if ns.ApplyUnitFrameParts then ns.ApplyUnitFrameParts() end
 end
 
 -- Switching profiles starts afresh: CineMode comes in now rather than after
@@ -3234,21 +3227,19 @@ function ns.EnsureTables()
 	ns.db.cooldownAlwaysShow = ns.db.cooldownAlwaysShow or {} -- ...spell ID -> true: Always, whatever its group's
 	ns.db.cooldownGroupDefaults = ns.db.cooldownGroupDefaults or {} -- ...group -> { mode, power, early }
 	ns.db.cooldownBuffMode = ns.db.cooldownBuffMode or {} -- ...tracked buff's spell ID -> its own mode
+	ns.db.cooldownFlashReady = ns.db.cooldownFlashReady or {} -- ...spell ID -> true/false: Flash, its own
 	ns.db.cooldownEarlyOff = nil -- (a test build's, when Show early started ticked)
 	ns.db.gamepadPressButtons = ns.db.gamepadPressButtons or {} -- Gamepad page: button -> reveals the bars
 	ns.db.cineFade = nil -- (a test build's CineMode column, before it became cineShow)
 	ns.db.tooltipCineMode = nil -- (a test build's: the Tooltips page's master switch decides now)
 	ns.db.cineShow = ns.db.cineShow or {} -- Standard Frames row -> true: shown all through CineMode
 	ns.db.frameRules = ns.db.frameRules or {} -- row key -> rule text (Custom Visibility Rules, Advanced Frames page)
+	ns.db.rowFollow = ns.db.rowFollow or {} -- row key -> the row it follows (a grid's Follow column)
 	ns.db.markNames = ns.db.markNames or {} -- Nameplates page row id -> a name of your own for it
 	ns.db.cameraRows = ns.db.cameraRows or {} -- the Cameras page's rows (CameraRows.lua)
 	-- Vitals Vision: players' versions of its themes, and their own (LowHealth.lua)
 	ns.db.lowHealthThemeEdits = ns.db.lowHealthThemeEdits or {}
 	ns.db.lowHealthMyThemes = ns.db.lowHealthMyThemes or {}
-	-- Row key -> true: kept hidden in CineMode while you're that role (a frames grid row's roles button).
-	ns.db.tankHide = ns.db.tankHide or {}
-	ns.db.healerHide = ns.db.healerHide or {}
-	ns.db.damageHide = ns.db.damageHide or {}
 	ns.db.playerRule = nil -- (a test build's one rule, the player frame's)
 	-- The minimap button's old spot, 225 (never dragged: dragging never lands
 	-- exactly on it), covered the dungeon finder's eye: the new default.
@@ -4547,25 +4538,6 @@ ticker:SetScript("OnEvent", ns.Profiled("Core events", function(self, event, arg
 			end
 			ns.db.metersCombatV1 = true
 		end
-		-- Heal Vision's "Only while you're a healer" is its roles button now
-		-- (healers only by default): unticked, it's ticked back on for tanks
-		-- and damage, in every profile too. Once.
-		if not ns.db.healVisionRolesV1 then
-			local function Roles(t)
-				if t.healVisionHealerOnly == false then
-					for _, list in ipairs({ "tankHide", "damageHide" }) do
-						if type(t[list]) ~= "table" then t[list] = {} end
-						t[list].healVision = false
-					end
-				end
-				t.healVisionHealerOnly = nil
-			end
-			Roles(ns.db)
-			for _, saved in pairs(ns.db.profiles or {}) do
-				if type(saved) == "table" then Roles(saved) end
-			end
-			ns.db.healVisionRolesV1 = true
-		end
 		-- The party frames and raid frames' players show while you're grouped
 		-- by default: their Grouped boxes ticked in every profile too. Once.
 		if not ns.db.groupFramesV1 then
@@ -5705,6 +5677,27 @@ ticker:SetScript("OnEvent", ns.Profiled("Core events", function(self, event, arg
 			end
 			ns.db.extraAloneV1 = true
 		end
+		-- Retail's collapse buffs button has a row now, hidden but for hovering
+		-- the buffs: put it in the saved Buffs Mouseover groups. Once.
+		if not ns.db.buffCollapseV1 then
+			local function CollapseToo(groups)
+				for _, group in ipairs(groups or {}) do
+					local preset = ns.HoverGroupPreset(group)
+					if preset and preset.preset == "buffs" and group.members then
+						local has = false
+						for _, member in ipairs(group.members) do
+							if member == "buffcollapse" then has = true end
+						end
+						if not has then group.members[#group.members + 1] = "buffcollapse" end
+					end
+				end
+			end
+			CollapseToo(ns.db.hoverGroups)
+			for _, saved in pairs(ns.db.profiles or {}) do
+				if type(saved) == "table" then CollapseToo(saved.hoverGroups) end
+			end
+			ns.db.buffCollapseV1 = true
+		end
 		-- The Cooldown Manager's row is now its Essential bar's, with a row of its
 		-- own for the Utility bar: put that in every saved group the old row was in. Once.
 		if not ns.db.cooldownsUtilityV1 then
@@ -6139,6 +6132,7 @@ ticker:SetScript("OnEvent", ns.Profiled("Core events", function(self, event, arg
 			end
 		end
 		ns.EnsureTables()
+		ns.MigrateRoleHides() -- (the grids' old Roles column, as rules: Frames.lua)
 		ns.InitProfiles()
 		ns.InitLog()
 		SLASH_CINEMATIC1 = "/cine"

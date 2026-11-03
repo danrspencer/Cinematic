@@ -15,10 +15,9 @@ local PAGES = {
 	{ "Tooltips", "Tooltip Style", { "tooltipBarTexture", "tooltipFont", "tooltipOutline", "tooltipShadow", "tooltipEdge" } },
 	{ "Cast bars", "Cast Bar Style", { "plateCastFill", "plateCastFont", "plateCastOutline", "plateCastShadow", "plateCastBorder" } },
 	{ "Chat bubbles", "Bubble Style", { "bubblesFont", "bubblesOutline", "bubblesEdge" } },
-	{ "Dialogue", "Quest Talk Style", { "questTalkFont", "questTalkOutline", "questTalkShadow" } },
-	{ "Quest item button", "Quest Item Style", { "questItemFont", "questItemOutline", "questItemShadow", "questItemFrame" } },
-	{ "Roll Vision", "Roll Style", { "rollBarTexture", "rollFont", "rollOutline", "rollShadow" } },
-	{ "Card Vision", "Card Styles", { "cardFont", "cardOutline", "cardShadow" } },
+	-- (The Visions follow the Visions hub's Style page, and it follows General.)
+	{ "Visions", "Visions Style", { "visionStyleTexture", "visionStyleFont", "visionStyleOutline", "visionStyleShadow",
+		"visionStyleBorder" } },
 }
 local KIND_NAMES = { texture = "Texture", font = "Font", outline = "Outline", shadow = "Shadow", border = "Border" }
 

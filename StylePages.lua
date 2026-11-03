@@ -65,6 +65,52 @@ for key, own in pairs({ prdBorder = "game", tooltipEdge = "game", bubblesEdge = 
 		shared[key .. channel] = { kind = "border" .. channel, follows = key }
 	end
 end
+-- The Visions hub's Style page (VisionsStyle.lua): a step between the
+-- Visions' shared settings and General. A Vision's setting on "general"
+-- follows it; its own start on General ("general", -1) and follow that, and
+-- its "game" leaves each Vision at its own default.
+ns.DEFAULTS.visionStyleTexture = "general"
+ns.DEFAULTS.visionStyleFont = "general"
+ns.DEFAULTS.visionStyleOutline = -1
+ns.DEFAULTS.visionStyleShadow = "general"
+ns.DEFAULTS.visionStyleBorder = "general"
+ns.DEFAULTS.visionStyleBorderSize = 1
+ns.DEFAULTS.visionStyleBorderR, ns.DEFAULTS.visionStyleBorderG, ns.DEFAULTS.visionStyleBorderB = 0, 0, 0
+ns.DEFAULTS.visionStyleTextSize = 1 -- times each Vision's own text size
+local VISION_KEYS = { texture = "visionStyleTexture", font = "visionStyleFont", outline = "visionStyleOutline",
+	shadow = "visionStyleShadow", border = "visionStyleBorder", borderSize = "visionStyleBorderSize",
+	borderR = "visionStyleBorderR", borderG = "visionStyleBorderG", borderB = "visionStyleBorderB" }
+-- Its own follow General as a page's do (shown "Interface Style (X)").
+shared.visionStyleTexture = { kind = "texture", own = "game", visionsHub = true }
+shared.visionStyleFont = { kind = "font", own = "game", visionsHub = true }
+shared.visionStyleOutline = { kind = "outline", own = "game", visionsHub = true }
+shared.visionStyleShadow = { kind = "shadow", own = "game", visionsHub = true }
+shared.visionStyleBorder = { kind = "border", own = "game", visionsHub = true }
+shared.visionStyleBorderSize = { kind = "borderSize", follows = "visionStyleBorder" }
+for _, channel in ipairs({ "R", "G", "B" }) do
+	shared["visionStyleBorder" .. channel] = { kind = "border" .. channel, follows = "visionStyleBorder" }
+end
+-- The Visions' shared settings, by how their keys start: Damage Vision's,
+-- Roll Vision's, Quest Vision's two Style tabs' and Card Vision's (theirs
+-- put in later, by their own files, marked as they come).
+local VISION_PREFIXES = { "damageVision", "roll", "questTalk", "questItem", "card" }
+local function MarkVision(key, entry)
+	if type(entry) ~= "table" or type(key) ~= "string" then return end
+	for _, prefix in ipairs(VISION_PREFIXES) do
+		if key:sub(1, #prefix) == prefix then entry.visions = true return end
+	end
+end
+for key, entry in pairs(shared) do MarkVision(key, entry) end
+setmetatable(shared, { __newindex = function(list, key, entry)
+	MarkVision(key, entry)
+	rawset(list, key, entry)
+end })
+-- Each Vision's text size, times Visions Style's (Cards.lua's cardScale too).
+local VISION_SIZES = { damageVisionTextSize = true, questTalkTextSize = true, rollTextSize = true }
+function ns.VisionTextScale()
+	local db = ns.db
+	return db and db.styleGeneral and tonumber(db.visionStyleTextSize) or 1
+end
 ns.SHARED_STYLE = shared -- (the General page's list of who follows it)
 
 local function IsGeneral(value)
@@ -72,11 +118,22 @@ local function IsGeneral(value)
 end
 ns.IsGeneralStyle = IsGeneral
 
--- What General gives a shared setting now (gameOnly: General off, or the
--- page: its own default).
+-- Where a shared setting's "general" takes it, for its first choice's name:
+-- a Vision's to Visions Style, Visions Style's own to the Style hub's General.
+function ns.SharedStyleSource(key)
+	local entry = shared[key]
+	if entry and entry.visions then return ns.L["Visions Style"] end
+	if entry and entry.visionsHub then return ns.L["Interface Style"] end
+	return ns.L["General"]
+end
+
+-- What General (and for a Vision, Visions Style first) gives a shared setting
+-- now (gameOnly: General off, or the page: its own default).
 local function FromGeneral(entry, gameOnly)
 	local db = ns.db
-	local value = not gameOnly and db and db.styleGeneral and db[GENERAL_KEYS[entry.kind]] or nil
+	if gameOnly or not (db and db.styleGeneral) then return entry.own end
+	local value = entry.visions and db[VISION_KEYS[entry.kind]] or nil
+	if value == nil or IsGeneral(value) then value = db[GENERAL_KEYS[entry.kind]] end
 	if value == nil or value == "game" or value == -1 then
 		return entry.own
 	end
@@ -103,16 +160,20 @@ function ns.StyleLook(switchKey, off)
 				local value = source and source[key]
 				local entry = shared[key]
 				if entry and entry.follows then
-					-- (A border's thickness or color: General's while that border's on General.)
+					-- (A border's thickness or color: General's while that border's on
+					-- General, or Visions Style's while a Vision's is on one of its own.)
 					local db = ns.db
-					if on and db and db.styleGeneral and IsGeneral(source[entry.follows])
-						and db.styleBorder == "custom" then
-						return db[GENERAL_KEYS[entry.kind]]
+					if on and db and db.styleGeneral and IsGeneral(source[entry.follows]) then
+						local from = (entry.visions and not IsGeneral(db.visionStyleBorder)) and VISION_KEYS or GENERAL_KEYS
+						if db[from.border] == "custom" then return db[from[entry.kind]] end
 					end
 					return value
 				end
 				if entry and IsGeneral(value) then
 					return FromGeneral(entry, not on)
+				end
+				if on and VISION_SIZES[key] then
+					return (tonumber(value) or 1) * ns.VisionTextScale()
 				end
 				return value
 			end })
@@ -738,7 +799,7 @@ function ns.StyleTextureChoices(game, key)
 	if key and ns.GeneralStyleValue(key) ~= nil then
 		local value = ns.GeneralStyleValue(key)
 		local path, atlas = ns.StyleTexturePath(value)
-		list[1] = { value = "general", text = ns.L["General"] .. " (" .. (value == "game" and (game or
+		list[1] = { value = "general", text = ns.SharedStyleSource(key) .. " (" .. (value == "game" and (game or
 			ns.L["The game's"]) or TextureName(value)) .. ")", texture = path, atlas = atlas }
 	end
 	list[#list + 1] = { value = "game", text = game or ns.L["The game's"] }
@@ -1059,7 +1120,8 @@ local LOOK_BUILD = {
 	shadow = function(look, made)
 		local list = {}
 		if shared[made[1]] then
-			list[1] = { "general", ns.L["General"], ns.L["As the Style hub's General page says."] }
+			list[1] = { "general", ns.SharedStyleSource(made[1]), shared[made[1]].visions
+				and ns.L["As the Visions hub's Style page says."] or ns.L["As the Style hub's General page says."] }
 		end
 		list[#list + 1] = { "game", ns.L["The game's"] }
 		list[#list + 1] = { "on", ns.L["Shadow"], ns.L["A dark copy of the letters just behind them, down and to " ..
@@ -1158,7 +1220,7 @@ function ns.StyleRows(kit, content, stack, changed, switchKey, fieldOf)
 			if first then list[1] = { value = first[1], text = first[2] } end
 			local general = ns.GeneralStyleValue(key)
 			if general ~= nil then
-				local entry = { value = "general", text = ns.L["General"] .. " (" .. ns.StyleFontName(general) .. ")" }
+				local entry = { value = "general", text = ns.SharedStyleSource(key) .. " (" .. ns.StyleFontName(general) .. ")" }
 				list[#list + 1] = entry
 				for _, choice in ipairs(choices) do
 					if choice.value == general then entry.font = choice.font end -- (drawn in General's font)
@@ -1237,7 +1299,7 @@ function ns.StyleRows(kit, content, stack, changed, switchKey, fieldOf)
 			local list = {}
 			local general = ns.GeneralStyleValue(key)
 			if general ~= nil then
-				list[1] = { value = -1, text = ns.L["General"] .. " (" .. (names[general] or "") .. ")" }
+				list[1] = { value = -1, text = ns.SharedStyleSource(key) .. " (" .. (names[general] or "") .. ")" }
 			elseif own then
 				list[1] = { value = -1, text = own }
 			end
@@ -1261,7 +1323,7 @@ function ns.StyleRows(kit, content, stack, changed, switchKey, fieldOf)
 			local list = {}
 			local general = ns.GeneralStyleValue(key)
 			if general ~= nil then
-				list[1] = { value = "general", text = ns.L["General"] .. " (" .. Name(general) .. ")" }
+				list[1] = { value = "general", text = ns.SharedStyleSource(key) .. " (" .. Name(general) .. ")" }
 			end
 			if opts.game then list[#list + 1] = { value = "game", text = Name("game") } end
 			for _, value in ipairs({ "none", "thin", "thick" }) do list[#list + 1] = { value = value, text = Name(value) } end
@@ -1504,8 +1566,14 @@ function ns.StyleRows(kit, content, stack, changed, switchKey, fieldOf)
 			local back = ns.PanelButton(pop)
 			back:SetSize(110, 20)
 			popStack:Add(back, "label")
-			back:SetText(ns.L["Use General"])
-			kit.Tooltip(back, ns.L["These settings back on General."])
+			if shared[sharedKeys[1]].visions then
+				back:SetWidth(140)
+				back:SetText(ns.L["Use Visions Style"])
+				kit.Tooltip(back, ns.L["These settings back on the Visions hub's Style page."])
+			else
+				back:SetText(ns.L["Use General"])
+				kit.Tooltip(back, ns.L["These settings back on General."])
+			end
 			back:SetScript("OnClick", function()
 				for _, key in ipairs(sharedKeys) do Put(key, shared[key].kind == "outline" and -1 or "general") end
 				changed()

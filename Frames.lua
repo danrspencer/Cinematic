@@ -55,6 +55,9 @@ local FRAME_GROUPS = {
 		"LFGMinimapFrame", "MiniMapLFGFrame", "QueueStatusMinimapButton", "MiniMapBattlefieldFrame",
 	},
 	buffs = { "BuffFrame", "DebuffFrame", "TemporaryEnchantFrame" },
+	-- Retail's arrow by the buffs that folds them away (BuffFrame.CollapseAndExpandButton,
+	-- no name: found in BuildManagedList).
+	buffcollapse = {},
 	quests = { "QuestWatchFrame", "WatchFrame", "ObjectiveTrackerFrame" },
 	-- Classic's quest timer box: its own group, so it can stay up without the tracker.
 	questtimer = { "QuestTimerFrame" },
@@ -583,7 +586,8 @@ local function AddFrame(frame, group)
 	-- (Cast bars too, so their row alone decides: see castBars. And what's on
 	-- the minimap's header (minimapzone, minimapclock...), so it can go while
 	-- the map stays.)
-	if (group == "questtimer" or group == "castbar" or group:find("^minimap.")) and frame.SetIgnoreParentAlpha then
+	if (group == "questtimer" or group == "castbar" or group == "buffcollapse" or group:find("^minimap."))
+		and frame.SetIgnoreParentAlpha then
 		frame:SetIgnoreParentAlpha(true)
 	end
 	if group == "castbar" then
@@ -1190,6 +1194,7 @@ function ns.BuildManagedList()
 	FindIssueReporter()
 	FindBarArt()
 	ns.FindMinimapHeader()
+	AddFrame(type(_G.BuffFrame) == "table" and _G.BuffFrame.CollapseAndExpandButton or nil, "buffcollapse")
 	RecomputeNesting()
 end
 
@@ -1713,6 +1718,12 @@ ns.COMBAT_SHOW = {
 			"such as a timer to the next event. Until you change its ticks it does what the quest tracker's row does."] },
 	{ key = "buffs", label = L["Buffs and debuffs"], default = true, morePage = "Buffs/debuffs",
 		frames = { "BuffFrame", "DebuffFrame", "TemporaryEnchantFrame" } },
+	-- Hidden even while the buffs are up: hovering the buffs brings it (it's in
+	-- their Mouseover group), a buff peek doesn't (see the aura trigger).
+	{ key = "buffcollapse", label = L["Collapse buffs button"], default = false, retail = true,
+		groups = { "buffcollapse" },
+		tip = L["The arrow by your buffs that folds them away. Hidden in CineMode even while your buffs show; " ..
+			"hovering your buffs brings it up."] },
 	{ key = "swing", label = L["Swing timer"], default = true, retail = false, morePage = "Swing timer",
 		tip = L["The Swing timer page can fade out the bars of weapons you aren't using, and the off-hand's."],
 		frames ={ "SwingTimerMainHandFrame", "SwingTimerOffHandFrame", "SwingTimerRangedFrame" } },
@@ -1810,7 +1821,7 @@ ns.COMBAT_SHOW = {
 local ROW_SECTIONS = {
 	player = "units", petframe = "units", prd = "units", prdpower = "units", prdmana = "units", target = "units", tot = "units", focus = "units", focustot = "units",
 	targetcircle = "units",
-	buffs = "combat", swing = "combat", castbar = "combat", meters = "combat", cooldowns = "combat",
+	buffs = "combat", buffcollapse = "combat", swing = "combat", castbar = "combat", meters = "combat", cooldowns = "combat",
 	cooldownsutility = "combat", cooldownsbuffs = "combat", cooldownsbars = "combat", encounter = "combat",
 	mainbar = "bars", art = "bars", bottomleft = "bars", bottomright = "bars",
 	pet = "bars", stance = "bars", totems = "bars", extra = "bars",
@@ -1910,7 +1921,7 @@ local HOVER_ROW_BY_GROUP = {
 	partyroles = "partyroles", partynames = "partynames", partystatus = "partystatus",
 	raidbuffs = "raidbuffs", raiddebuffs = "raiddebuffs", raidthreat = "raidthreat", raidtarget = "raidtarget",
 	raidready = "raidready",
-	minimap = "minimap", buffs = "buffs", quests = "quests", questtimer = "questtimer", misc = "durability",
+	minimap = "minimap", buffs = "buffs", buffcollapse = "buffcollapse", quests = "quests", questtimer = "questtimer", misc = "durability",
 	swing = "swing", castbar = "castbar", meters = "meters", cooldowns = "cooldowns", waypoint = "waypoint",
 	gamepadbars = "gamepadbars", gamepadlegend = "gamepadlegend", gamepadreticle = "gamepadreticle",
 	chat = "chat", barart = "mainbar", voice = "voice", encounter = "encounter",
@@ -1977,7 +1988,7 @@ ns.HOVER_GROUPS_DEFAULT = {
 			"minimapdial" },
 		triggers = { ping = true, tracking = true } },
 	{ preset = "buffs", icon = "Interface\\Icons\\Spell_Holy_WordFortitude", name = L["Buffs"],
-		members = { "buffs" }, triggers = { aura = true } },
+		members = { "buffs", "buffcollapse" }, triggers = { aura = true } },
 	{ preset = "quests", icon = "Interface\\Icons\\INV_Misc_Note_01", name = L["Quest tracker"],
 		members = { "quests" }, triggers = { quest = true } },
 	{ preset = "gamepad", icon = "Interface\\Icons\\INV_Gizmo_01", name = L["Gamepad action bars"],
@@ -2206,7 +2217,24 @@ end
 -- (For the settings: ticking a row gives those that follow it ticks of their own first, GridRows.lua.)
 ns.ROW_FALLBACK = ROW_FALLBACK
 
+-- A row set to follow another (a grid's Follow column: db.rowFollow, key ->
+-- the row it follows) shows when that one does: its ticks and rule are
+-- that row's, through a chain of them; its own are kept for when it stops.
+-- Gives the row whose settings decide (key itself when it follows none).
+function ns.FollowKey(key)
+	local follow = ns.db.rowFollow
+	local leader = follow and follow[key]
+	if not leader then return key end
+	for _ = 1, 10 do -- (a loop, which the menu doesn't offer, ends here)
+		local after = follow[leader]
+		if not after or after == key then return leader end
+		leader = after
+	end
+	return leader
+end
+
 function ns.IsCombatShowOn(key)
+	key = ns.FollowKey(key)
 	local on = ns.db.combatShow[key]
 	if on == nil then
 		if ROW_FALLBACK[key] then
@@ -2226,6 +2254,7 @@ function ns.IsCombatShowOn(key)
 end
 
 local function IsListOn(list, key, defaults)
+	key = ns.FollowKey(key)
 	local on = ns.db[list][key]
 	if on == nil then
 		-- (A default of its own wins over the row it follows: NPCs chatting nearby's Cities.)
@@ -2252,6 +2281,7 @@ local CINE_SHOW_DEFAULT = {
 	encounter = true, targetcircle = true, focustot = true, belowminimap = true,
 }
 function ns.IsCineShowOn(key)
+	key = ns.FollowKey(key)
 	local setting = ns.CINE_SHOW_SETTING[key]
 	if setting then
 		return ns.db[setting] or false
@@ -2276,6 +2306,7 @@ function ns.IsEnemyShowOn(key) return IsListOn("enemyShow", key, ENEMY_SHOW_DEFA
 -- row ticked In combat, combatShowCalm (the page's one switch, before: those
 -- rows stayed for it).
 function ns.IsCalmShowOn(key)
+	key = ns.FollowKey(key)
 	local on = ns.db.calmShow and ns.db.calmShow[key]
 	if on == nil and ROW_FALLBACK[key] then
 		return ns.IsCalmShowOn(ROW_FALLBACK[key])
@@ -2494,12 +2525,71 @@ do
 		return test, not test and err or nil
 	end
 
-	-- The rows kept hidden in CineMode while you're the role you are (a grid
-	-- row's roles button: tankHide, healerHide, damageHide), key -> true.
-	local NO_ROWS = {}
-	function ns.RoleHides(facts)
-		return facts.tank and ns.db.tankHide or facts.healer and ns.db.healerHide
-			or facts.damage and ns.db.damageHide or NO_ROWS
+	-- A row's ticks as a rule, for a row whose ticks are the shared lists
+	-- (Always, the Combat dropdown's, the targets, the places): "always",
+	-- "never" or the words joined by OR. Rows whose ticks are settings of their
+	-- own (names, plates, marks) give theirs by ns.TICKS_RULE (key pattern ->
+	-- function(key)).
+	ns.TICKS_RULE = {}
+	local PLACE_WORD = { bgShow = "bg", worldShow = "world", cityShow = "city", groupShow = "group",
+		instanceShow = "instance" }
+	function ns.RowTicksRule(key)
+		for pattern, Rule in pairs(ns.TICKS_RULE) do
+			if key:find(pattern) then return Rule(key) end
+		end
+		if ns.IsCineShowOn(key) then return "always" end
+		local words = {}
+		local function Add(on, word) if on then words[#words + 1] = word end end
+		Add(ns.IsCombatShowOn(key), "combat")
+		Add(ns.IsCalmShowOn(key), "calm")
+		Add(ns.IsQuietShowOn(key), "nocombat")
+		Add(ns.IsCamShowOn(key), "camera")
+		Add(ns.IsEnemyShowOn(key), "enemy")
+		Add(ns.IsFriendlyShowOn(key), "friendly")
+		for _, place in ipairs(ns.PLACE_SHOW) do
+			Add(PLACE_WORD[place.list] and ns.IsPlaceShowOn(place.list, key), PLACE_WORD[place.list])
+		end
+		return #words > 0 and table.concat(words, " or ") or "never"
+	end
+
+	-- The grids' Roles column is gone (2026-11-02): a row it kept hidden while
+	-- you're a role (tankHide, healerHide, damageHide: key -> true) gets "and
+	-- not <role>" on its rule, its ticks as one when it had none. (Heal Vision's,
+	-- healers only to start with, is gone: it's for every role now.) The lists
+	-- are emptied after: run on load and on each profile loaded.
+	local OLD_ROLES = { { "tankHide", "tank" }, { "healerHide", "healer" }, { "damageHide", "damage" } }
+	function ns.MigrateRoleHides()
+		local db = ns.db
+		local function Hidden(list, key)
+			if type(db[list]) == "table" then return db[list][key] end
+		end
+		local keys = {}
+		for _, role in ipairs(OLD_ROLES) do
+			if type(db[role[1]]) == "table" then
+				for key, hidden in pairs(db[role[1]]) do
+					if hidden == true and key ~= "healVision" then keys[key] = true end
+				end
+			end
+		end
+		for key in pairs(keys) do
+			local nots = {}
+			for _, role in ipairs(OLD_ROLES) do
+				if Hidden(role[1], key) then nots[#nots + 1] = "not " .. role[2] end
+			end
+			local rule = db.frameRules and db.frameRules[key]
+			local text
+			if type(rule) == "string" and rule:find("%S") then
+				text = "(" .. rule .. ")"
+			else
+				text = ns.RowTicksRule(key)
+				text = text ~= "always" and text ~= "never" and "(" .. text .. ")" or text
+			end
+			if text ~= "never" then
+				db.frameRules = db.frameRules or {}
+				db.frameRules[key] = (text == "always" and "" or text .. " and ") .. table.concat(nots, " and ")
+			end
+		end
+		for _, role in ipairs(OLD_ROLES) do db[role[1]] = nil end
 	end
 
 	function ns.RuleShows(key, facts)
@@ -2512,6 +2602,7 @@ do
 	-- its text changes: asked for each row on every tick.)
 	local ruleText, ruleTest = {}, {}
 	function ns.RuleTest(key)
+		key = ns.FollowKey(key)
 		local text = ns.db.frameRules and ns.db.frameRules[key]
 		if text == ruleText[key] then
 			return ruleTest[key]
@@ -3123,8 +3214,6 @@ do
 		-- Rows for gamepad mode only, and the ones they stand in for then.
 		local gamepad = ns.IsGamePadOn()
 		local facts = ns.RuleFacts(inCombat)
-		-- The rows kept hidden while you're the role you are (their roles buttons), ticks or rule.
-		local roleHide = ns.RoleHides(facts)
 		for _, item in ipairs(ns.COMBAT_SHOW) do
 			local applies = not (gamepad and item.notGamepad) and not (item.gamepadOnly and not gamepad)
 			local calmRow = calm and ns.db.stayInCombat and (ns.IsCalmShowOn(item.key)
@@ -3135,7 +3224,6 @@ do
 				ticked = ns.IsCineShowOn(item.key) or KeptHere(placeLists, item.key) or (isOn and isOn(item.key))
 					or calmRow
 			end
-			if roleHide[item.key] then ticked = false end
 			-- (Your bars held back at a fight's start, Personal Resources page:
 			-- up only where Always or a place keeps them.)
 			if ticked and (fighting or isOn == CastIsOn) and ns.FightHold(item.key)
@@ -3159,7 +3247,6 @@ do
 				ticked = KeptHere(placeLists, key) or (isOn and isOn(key))
 					or (calm and ns.db.stayInCombat and ns.IsCalmShowOn(key))
 			end
-			ticked = ticked and not roleHide[key]
 			if ticked then
 				shown[GROUP_KEY[key]] = true
 			end
@@ -3172,17 +3259,13 @@ do
 	-- Modes') is on now, as a Standard Frames row would show: its rule if it
 	-- has one, else Always (always: its own setting, when it has one), a place
 	-- that applies here, In a camera mode, In combat / Out of combat, or Tar
-	-- Enemy / Tar friendly; never while you're a role its roles button has
-	-- unticked. anyFight: In combat counts in any fight (else only while
+	-- Enemy / Tar friendly. anyFight: In combat counts in any fight (else only while
 	-- CineMode stays on in them).
 	function ns.RowOnNow(key, always, anyFight)
 		local fighting = InCombatLockdown() or ns.Flag(UnitAffectingCombat("player"))
 		local calm = not fighting and GetTime() - lastCombatAt < (ns.db.calmTime or 0)
 		local inCombat = fighting or (calm and ns.db.combatShowCalm)
 		local facts = ns.RuleFacts(inCombat)
-		if ns.RoleHides(facts)[key] then
-			return false
-		end
 		local ticked = ns.RuleShows(key, facts)
 		if ticked ~= nil then
 			return ticked
@@ -3737,6 +3820,7 @@ function ns.StartBuffPeek(hold, found, enchant, byPlace)
 	ns.newBuffEnchant = ns.newBuffEnchant or enchant or false
 	-- (a short buff peek doesn't cut a longer debuff one short)
 	buffPeekUntil = math.max(buffPeekUntil, GetTime() + hold)
+	ns.buffPeekStartedAt = GetTime()
 end
 
 -- Weapon enchants (Flametongue Weapon, a poison, an oil...) aren't auras: a
@@ -3975,8 +4059,14 @@ function ns.MirrorBuffs(slots, shownNew)
 			local bLeft, bBottom = button:GetRect()
 			layout[key] = { x = left - bLeft, y = bottom - bBottom, width = width, height = height }
 		end)
-		local spot = layout[key]
-		if spot and isText then
+		local spot, iconSpot = layout[key], layout.Icon
+		if spot and key == "Duration" and iconSpot and mirror.Icon:IsShown() then
+			-- (The timer by its top under the picture, as the game anchors it:
+			-- by its middle it came out a few pixels up, over the picture.)
+			copy:SetPoint("TOP", mirror.Icon, "BOTTOM",
+				(spot.x + spot.width / 2 - iconSpot.x - iconSpot.width / 2) * scale,
+				(spot.y + spot.height - iconSpot.y) * scale)
+		elseif spot and isText then
 			-- (Text by its middle, no size: a size measured on a shorter
 			-- time would cut a longer one short.)
 			copy:SetPoint("CENTER", mirror, "BOTTOMLEFT", (spot.x + spot.width / 2) * scale,
@@ -4003,6 +4093,12 @@ function ns.MirrorBuffs(slots, shownNew)
 			pcall(function()
 				local r, g, b = source:GetTextColor()
 				copy:SetTextColor(r, g, b, 1)
+			end)
+			-- (And its vertex color: retail's timers are gold by that, their text
+			-- color white. On Forever the two are one, so it's the same color.)
+			pcall(function()
+				local r, g, b = source:GetVertexColor()
+				copy:SetVertexColor(r, g, b, 1)
 			end)
 			local okText, problem = pcall(function() copy:SetText(source:GetText()) end)
 			if ns.auraDebug and not okText and not ns.buffMirrorTextDebugDone then
@@ -5526,6 +5622,26 @@ function ns.CooldownBuffMode(id, group)
 	return (ns.CooldownGroupSettings(group or "buffs")), false
 end
 
+-- The bars whose Flash is on with Smart set ticked, until their group's Flash is set.
+ns.COOLDOWN_SMART_FLASH = { utility = true }
+
+-- Whether a group's Flash is on: set (true or false), else Smart set's pick.
+function ns.CooldownGroupFlash(group)
+	local set = ns.db.cooldownGroupDefaults[group or "other"]
+	if set and set.flash ~= nil then return set.flash end
+	return (ns.db.cooldownSmartDefaults and ns.COOLDOWN_SMART_FLASH[group]) or false
+end
+
+-- Whether a spell's icon flashes as its cooldown ends (the page's Flash):
+-- set on its own (db.cooldownFlashReady, true or false), else its group's.
+function ns.CooldownSpellFlash(id, group)
+	local own = ns.db.cooldownFlashReady
+	local value = own[id]
+	if value == nil then value = own[ns.BaseSpell(id)] end
+	if value ~= nil then return value end
+	return ns.CooldownGroupFlash(group)
+end
+
 -- Whether a tracked buff's or bar's icon shows in a mode.
 function ns.CooldownBuffShows(mode, inCombat)
 	if mode == "hidden" then return false end
@@ -5950,6 +6066,81 @@ do
 		Update()
 		watcher:SetShown(ns.db.cooldownKeybinds and true or false)
 	end
+end
+
+-- The Cooldown Manager page's Follow Show Numbers for Cooldowns
+-- (db.cooldownFollowNumbers): the countdown on each of its icons shows only
+-- with the game's option (Action Bars: CVar countdownForCooldowns) on; the
+-- Cooldown Manager draws it either way. Its icons' Cooldown frames are put
+-- that way twice a second and kept there (a hook on their
+-- SetHideCountdownNumbers: the game sets it again as it refreshes them);
+-- off, each gets back what the game last set.
+do
+	local gameHides = setmetatable({}, { __mode = "k" }) -- cooldown -> what the game last set (true: hidden)
+	local applying = false
+	local want -- true: hide them; nil: left to the game
+
+	local function Hook(cooldown)
+		if gameHides[cooldown] ~= nil then return end
+		gameHides[cooldown] = false
+		hooksecurefunc(cooldown, "SetHideCountdownNumbers", function(self, hide)
+			if applying then return end
+			gameHides[self] = hide and true or false
+			if want ~= nil and (hide and true or false) ~= want then
+				applying = true
+				pcall(self.SetHideCountdownNumbers, self, want)
+				applying = false
+			end
+		end)
+	end
+
+	local function Apply(icon)
+		local cooldown = not IsForbidden(icon) and icon.Cooldown
+		if type(cooldown) ~= "table" or type(cooldown.SetHideCountdownNumbers) ~= "function" then return end
+		Hook(cooldown)
+		applying = true
+		pcall(cooldown.SetHideCountdownNumbers, cooldown, want)
+		applying = false
+	end
+
+	local function Release()
+		applying = true
+		for cooldown, hide in pairs(gameHides) do
+			pcall(cooldown.SetHideCountdownNumbers, cooldown, hide)
+		end
+		applying = false
+	end
+
+	local function Update()
+		if not ns.db then return end
+		local on = ns.db.cooldownFollowNumbers and ns.PageOn("handleCooldowns")
+		local hide = nil
+		if on then
+			local ok, shown = pcall(GetCVarBool, "countdownForCooldowns")
+			hide = not (ok and shown)
+		end
+		if hide == nil then
+			if want ~= nil then
+				want = nil
+				Release()
+			end
+			return
+		end
+		want = hide
+		EachCooldownIcon(Apply, true)
+	end
+
+	local since = 0
+	local watcher = CreateFrame("Frame")
+	watcher:SetScript("OnUpdate", function(_, elapsed)
+		since = since + elapsed
+		if since < 0.5 then return end
+		since = 0
+		Update()
+	end)
+	watcher:RegisterEvent("CVAR_UPDATE")
+	watcher:SetScript("OnEvent", function() since = 1 end) -- (on the next frame)
+	ns.ApplyCooldownNumbers = Update
 end
 
 -- /cine debug cdm: what the game says about each Cooldown Manager spell -
@@ -6597,6 +6788,10 @@ local function ReadyTarget(icon, id, bar)
 	elseif mode == "proc" then
 		readyTargets[icon] = ns.SpellGlowing(id, icon) and 1 or 0
 	end
+	-- (Flashing as its cooldown ends: shown for it, whatever its mode.)
+	if readyTargets[icon] == 0 and ns.CooldownIconFlashing(icon) then
+		readyTargets[icon] = 1
+	end
 end
 function UpdateReadyOnly(elapsed, now)
 	SyncSwitches()
@@ -6640,6 +6835,174 @@ function UpdateReadyOnly(elapsed, now)
 end
 end
 UpdateReadyOnly = ns.Profiled("UpdateReadyOnly", UpdateReadyOnly)
+
+-- The Cooldown Manager page's Flash (ns.CooldownSpellFlash, any mode): as a
+-- spell's cooldown ends, its icon in the Essential or Utility bar pulses
+-- bright for a few seconds, shown while it does even if its mode fades it
+-- (UpdateReadyOnly asks ns.CooldownIconFlashing). The icons are looked at ten
+-- times a second while any is set; an icon flashes only if it was seen
+-- recharging (the GCD doesn't count) with the same spell. Its style is the
+-- page's, for all of them (db.cooldownFlashTime, Glow, Grow, Border and its
+-- color): Grow draws the spell's picture over the icon, swelling and
+-- shrinking with each beat (the game's icon itself isn't scaled: that would
+-- move it in its bar).
+do
+	local FLASH_PULSE, FLASH_GROW, FLASH_OUT, BORDER = 0.6, 0.2, 0.3, 2 -- (sec a beat, grown by, fading out; px)
+	local wasRecharging = setmetatable({}, { __mode = "k" }) -- icon -> its spell, while seen recharging
+	local flashUntil = {} -- icon -> when its flash ends
+	local flashSpell = {} -- icon -> the spell it's flashing for
+	local flashes = setmetatable({}, { __mode = "k" }) -- icon -> its flash frame
+	local checkedAt, passNow = 0, 0
+	local GetIcon = (C_Spell and C_Spell.GetSpellTexture) or GetSpellTexture
+
+	local function Flash(icon)
+		local flash = flashes[icon]
+		if not flash then
+			local ok, holder = pcall(CreateFrame, "Frame", nil, icon)
+			if not ok then return nil end
+			flash = holder
+			-- (Centered and sized, not on its corners: scaled, it grows about its middle.)
+			flash:SetPoint("CENTER")
+			flash:SetFrameLevel(icon:GetFrameLevel() + 5)
+			flash.art = flash:CreateTexture(nil, "ARTWORK")
+			flash.art:SetAllPoints()
+			flash.art:SetTexCoord(0.07, 0.93, 0.07, 0.93)
+			flash.glow = flash:CreateTexture(nil, "OVERLAY")
+			flash.glow:SetTexture("Interface\\Buttons\\ButtonHilight-Square")
+			flash.glow:SetBlendMode("ADD")
+			flash.glow:SetAllPoints()
+			flash.edges = {}
+			for i, sides in ipairs({ { "TOPLEFT", "TOPRIGHT" }, { "BOTTOMLEFT", "BOTTOMRIGHT" },
+				{ "TOPLEFT", "BOTTOMLEFT" }, { "TOPRIGHT", "BOTTOMRIGHT" } }) do
+				local edge = flash:CreateTexture(nil, "OVERLAY", nil, 1)
+				edge:SetPoint(sides[1])
+				edge:SetPoint(sides[2])
+				if i <= 2 then edge:SetHeight(BORDER) else edge:SetWidth(BORDER) end
+				flash.edges[i] = edge
+			end
+			flashes[icon] = flash
+		end
+		return flash
+	end
+
+	-- Puts an icon's flash in its look for this frame (left: sec till it ends).
+	local function Draw(icon, flash, left)
+		local db = ns.db
+		local okW, w, h = pcall(icon.GetSize, icon)
+		if okW and not Secret(w, h) and type(w) == "number" and w > 0 then
+			flash:SetSize(w, h)
+		end
+		-- (A smooth beat, 0 to 1 and back, starting at 0.)
+		local into = (db.cooldownFlashTime or 3) - left
+		local beat = 0.5 - 0.5 * math.cos(into / FLASH_PULSE * 2 * math.pi)
+		local grow = db.cooldownFlashGrow and flashSpell[icon] and GetIcon
+		if grow then
+			local ok, texture = pcall(GetIcon, flashSpell[icon])
+			grow = ok and texture ~= nil
+			if grow then flash.art:SetTexture(texture) end
+		end
+		flash.art:SetShown(grow and true or false)
+		flash:SetScale(grow and 1 + FLASH_GROW * beat or 1)
+		flash.glow:SetShown(db.cooldownFlashGlow and true or false)
+		flash.glow:SetAlpha(0.15 + 0.85 * beat)
+		local r, g, b = db.cooldownFlashR or 1, db.cooldownFlashG or 0.82, db.cooldownFlashB or 0
+		for _, edge in ipairs(flash.edges) do
+			edge:SetColorTexture(r, g, b, 1)
+			edge:SetShown(db.cooldownFlashBorder and true or false)
+		end
+		flash:SetAlpha(math.min(1, left / FLASH_OUT))
+		flash:Show()
+	end
+
+	local function Look(icon, id, bar)
+		local group = ns.COOLDOWN_BAR_GROUPS[bar]
+		if not group then return end
+		if not ns.CooldownSpellFlash(id, group) then
+			wasRecharging[icon] = nil
+			return
+		end
+		local left = IconTimeLeft(icon, id, passNow)
+		if left == nil then return end -- (can't tell: as it was)
+		if left > 0 then
+			wasRecharging[icon] = id
+		elseif wasRecharging[icon] then
+			if wasRecharging[icon] == id then
+				flashUntil[icon], flashSpell[icon] = passNow + (ns.db.cooldownFlashTime or 3), id
+			end
+			wasRecharging[icon] = nil
+		end
+	end
+
+	-- (Any spell or group with Flash on.)
+	local function AnyFlash()
+		for _, on in pairs(ns.db.cooldownFlashReady) do
+			if on then return true end
+		end
+		for _, set in pairs(ns.db.cooldownGroupDefaults) do
+			if type(set) == "table" and set.flash then return true end
+		end
+		for group in pairs(ns.COOLDOWN_SMART_FLASH) do
+			if ns.CooldownGroupFlash(group) then return true end
+		end
+		return false
+	end
+
+	local function Update()
+		local now = GetTime()
+		if now - checkedAt >= 0.1 and ns.db then
+			checkedAt = now
+			if AnyFlash() and GroupHandled("cooldowns") and ns.PageOn("handleCooldowns") then
+				passNow = now
+				EachCooldownIcon(Look)
+			else
+				wipe(wasRecharging) -- (a flash under way plays out: the page's Test needs none ticked)
+			end
+		end
+		for icon, flash in pairs(flashes) do
+			local untilAt = flashUntil[icon]
+			if untilAt and now < untilAt and not IsForbidden(icon) then
+				Draw(icon, flash, untilAt - now)
+			else
+				flash:Hide()
+				flashUntil[icon], flashSpell[icon] = nil, nil
+			end
+		end
+		for icon in pairs(flashUntil) do
+			if not flashes[icon] and (IsForbidden(icon) or not Flash(icon)) then
+				flashUntil[icon], flashSpell[icon] = nil, nil
+			end
+		end
+	end
+
+	-- The page's Test: flashes every icon in the Essential and Utility bars
+	-- once, the bars brought up for it (ns.CooldownFlashTesting, asked by the
+	-- fade each frame) a moment before and kept till it's done.
+	local TEST_LEAD = 0.4 -- (sec the bars have to come up before it flashes)
+	local testUntil = 0
+	function ns.CooldownFlashTesting(now)
+		return now < testUntil
+	end
+	local function StartTest()
+		local now = GetTime()
+		EachCooldownIcon(function(icon, id, bar)
+			if ns.COOLDOWN_BAR_GROUPS[bar] then
+				flashUntil[icon], flashSpell[icon] = now + (ns.db.cooldownFlashTime or 3), id
+			end
+		end)
+	end
+	function ns.TestCooldownFlash()
+		testUntil = GetTime() + TEST_LEAD + (ns.db.cooldownFlashTime or 3) + 0.5
+		C_Timer.After(TEST_LEAD, StartTest)
+	end
+
+	function ns.CooldownIconFlashing(icon)
+		local untilAt = flashUntil[icon]
+		return untilAt ~= nil and GetTime() < untilAt
+	end
+
+	local watcher = CreateFrame("Frame")
+	watcher:SetScript("OnUpdate", ns.Profiled("CooldownFlash", Update))
+end
 
 -- /cine debug cooldowns: what the Cooldown Manager check sees.
 function ns.ReportCooldowns()
@@ -6739,6 +7102,9 @@ end
 -- commands come lowercased).
 function ns.ReportFrames(text)
 	local found = false
+	ns.Print(("addon on %s, CineMode %s, Game Frames switch %s, unit parts switch %s, in combat %s"):format(
+		tostring(ns.db.enabled), ns.lastCinematic and "on" or ("off: " .. tostring(ns.cineOffWhy)),
+		tostring(ns.db.handleFrames), tostring(ns.db.handleUnitFrames), tostring(InCombatLockdown())))
 	for _, entry in ipairs(ns.managed) do
 		local name = entry.name or entry.frame:GetDebugName()
 		if name:lower():find(text, 1, true) or entry.group:lower():find(text, 1, true) then
@@ -6761,6 +7127,19 @@ function ns.ReportFrames(text)
 				parent and (parent:GetName() or parent:GetDebugName()) or "none",
 				tostring(parent and parent:IsShown()), Number(parent and parent:GetAlpha()),
 				Number(frame.GetEffectiveAlpha and frame:GetEffectiveAlpha())))
+			-- (Where it sits, and how many of its parts the Unit Frames grid holds hidden.)
+			local ok, point, relativeTo, relativePoint, x, y = pcall(frame.GetPoint, frame, 1)
+			local held = 0
+			for region in pairs(ns.unitPartsHidden or {}) do
+				local up = region
+				while up and up ~= frame do up = up:GetParent() end
+				if up then held = held + 1 end
+			end
+			ns.Print(("  at %s to %s %s %s, %s; size %s x %s; parts held hidden %d"):format(tostring(ok and point),
+				ok and relativeTo and select(2, pcall(function() return relativeTo:GetName() or relativeTo:GetDebugName() end))
+					or "screen",
+				tostring(ok and relativePoint), Number(ok and x or nil), Number(ok and y or nil),
+				Number(frame:GetWidth()), Number(frame:GetHeight()), held))
 		end
 	end
 	if not found then
@@ -7480,9 +7859,16 @@ function ns.UpdateFrames(cinematic, elapsed)
 	if fighting then
 		lastCombatAt = now
 		-- (A buff peek from just before the fight doesn't outlast it; ones
-		-- in it, just the new one, do.)
+		-- in it, just the new one, do. So does one from the last moment
+		-- before it, as a proc from the cast that starts the fight: it comes
+		-- a moment before the game says you're in combat, and the fight's
+		-- own look has counted it as there already.)
 		if not ns.buffPeekFightSeen then
-			buffPeekUntil = 0
+			local justBefore = now - (ns.buffPeekStartedAt or -math.huge) < 1 -- (seconds)
+				and ns.db.buffPeekOnlyNew and not ns.db.buffPeekAfterCombat and not ns.newBuffUnknown
+			if not justBefore then
+				buffPeekUntil = 0
+			end
 			ns.buffPeekFightSeen = true
 		end
 	else
@@ -7681,6 +8067,8 @@ function ns.UpdateFrames(cinematic, elapsed)
 	barUp.utility = cooldownsOn and ns.db.cooldownUtilityWhileRecharging
 		and (calm or not ns.db.cooldownUtilityAfterCombat) and AnyCooldownRecharging(now, "utility") or false
 	events.cooldown = barUp.essential or barUp.utility
+	-- (The page's Flash Test: the Essential and Utility bars up while it plays.)
+	local flashTestUp = ns.CooldownFlashTesting(now)
 	-- (auraOnly: rows brought up by a buff or debuff peek and nothing else.)
 	local auraOnly = wipe(tickTables.auraOnly)
 	for _, group in ipairs(hoverGroups) do
@@ -7689,7 +8077,8 @@ function ns.UpdateFrames(cinematic, elapsed)
 				for _, member in ipairs(group.members) do
 					-- (A cooldown bar: only for its own bar's cooldowns.)
 					local bar = key == "cooldown" and ns.COOLDOWN_MEMBER_BAR[member]
-					if not bar or barUp[bar] then
+					-- (The collapse buffs button: only by hovering, not for a peek.)
+					if (not bar or barUp[bar]) and not (key == "aura" and member == "buffcollapse") then
 						if not triggered[member] then auraOnly[member] = key == "aura" or nil end
 						if key ~= "aura" then auraOnly[member] = nil end
 						triggered[member] = true
@@ -7755,6 +8144,7 @@ function ns.UpdateFrames(cinematic, elapsed)
 			or (trackerTimerUp and entry.group == "quests" and entry.frame == _G.ObjectiveTrackerFrame)
 			or (durabilityUp and entry.group == "misc")
 			or (petUnhappyUp and entry.name == "PetFrame")
+			or (flashTestUp and ns.COOLDOWN_BAR_GROUPS[entry.name])
 			or (triggered[row] and not (debuffsOnly and auraOnly[row]
 				and (entry.name == "BuffFrame" or entry.name == "TemporaryEnchantFrame")))
 		local listShown = combatShown
@@ -8003,16 +8393,13 @@ do -- (In a do block: the file is near Lua's 200 locals.)
 	end
 	local function Get(list, key) return ns.db[list] and ns.db[list][key] end
 	local function CopyDefaultRow(to)
-		local db, from = ns.db, ns.EXTRA_DEFAULT_KEY
+		local from = ns.EXTRA_DEFAULT_KEY
 		Set("combatShow", to, ns.IsCombatShowOn(from) and true or false)
 		Set("calmShow", to, ns.IsCalmShowOn(from) and true or false)
 		Set("enemyShow", to, ns.IsEnemyShowOn(from) and true or false)
 		Set("friendlyShow", to, ns.IsFriendlyShowOn(from) and true or false)
 		for _, place in ipairs(ns.PLACE_SHOW) do
 			Set(place.list, to, ns.IsPlaceShowOn(place.list, from) and true or false)
-		end
-		for _, list in ipairs({ "tankHide", "healerHide", "damageHide" }) do
-			Set(list, to, ns.RoleHidden(db, list, from))
 		end
 		Set("frameRules", to, Get("frameRules", from))
 	end
@@ -9026,13 +9413,13 @@ do
 	-- isn't simply always shown has the frames applied again as things change
 	-- (FRAMES.dynamic: the watcher below).
 	function FRAMES.Hidden(key)
-		if not key then
+		-- (The addon switched off: every part back, as the game has it.)
+		if not key or not ns.db.enabled then
 			return false
 		end
 		local db = ns.db
-		if not (db[key] == false or ns.RuleTest(key) or (db.tankHide and db.tankHide[key])
-			or (db.healerHide and db.healerHide[key]) or (db.damageHide and db.damageHide[key])) then
-			return false -- (Always, no rule or roles: shown, without working out the rest)
+		if not (db[key] == false or ns.RuleTest(key)) then
+			return false -- (Always, no rule: shown, without working out the rest)
 		end
 		FRAMES.dynamic = true
 		return not ns.RowOnNow(key, db[key] ~= false, true)

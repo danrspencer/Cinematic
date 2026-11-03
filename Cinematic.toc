@@ -110,6 +110,7 @@ Cards.lua
 CardsPage.lua
 Recap.lua
 DamageVision.lua
+DamageReport.lua
 ZoneCard.lua
 CardMoments.lua
 QuestTalkStyle.lua
@@ -123,6 +124,7 @@ PlateCastStyle.lua
 UnitStyle.lua
 RaidStyle.lua
 GeneralStyle.lua
+VisionsStyle.lua
 Focus.lua
 Tracking.lua
 NodeSweep.lua

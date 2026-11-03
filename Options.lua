@@ -315,10 +315,13 @@ local function Stack(anchor, kind, inline)
 			placed = self:InlineRow(control, controlKind)
 			controlKind = "inline"
 		end
+		-- (Under a page's hidden Enable switch, already 14 below the title: no
+		-- more gap than a tick's, bar a slider's room for its name.)
+		local gap = STACK_GAP[controlKind][self.kind]
+		if self.last.hiddenSwitch and controlKind ~= "slider" then gap = math.min(gap, 2) end
 		-- (A centered preview's spot: where it'd have been, the column's edge.)
 		placed:SetPoint("TOPLEFT", self.last.stackSpot or self.last, "BOTTOMLEFT",
-			STACK_X[controlKind] + indent - STACK_X[self.kind] - self.indent,
-			-STACK_GAP[controlKind][self.kind])
+			STACK_X[controlKind] + indent - STACK_X[self.kind] - self.indent, -gap)
 		self.last, self.kind, self.indent = placed, controlKind, indent
 		return control
 	end
@@ -724,6 +727,7 @@ local function RegisterPageSwitch(content, key, check)
 		check:Hide()
 		check:SetHeight(1)
 		check.searchLabel = nil
+		check.hiddenSwitch = true -- (the stack under it starts close: Stack's Add)
 	end
 end
 local function PageSwitch(content, key, label, tip, anchor, onChange)
@@ -1728,6 +1732,8 @@ do
 		} },
 		-- (General and the dev copy's Wind Guide in no section: plain icons)
 		{ name = "Visions", colors = { Combat = { 0.85, 0.3, 0.25 }, World = { 0.35, 0.6, 0.9 } }, pages = {
+			-- (VisionsStyle.lua: the look they share; in no section, a band of its own)
+			{ "Visions Style", "Interface\\Icons\\INV_Misc_Gear_08", label = "Style" },
 			{ "Heal Vision", "Interface\\Icons\\Spell_Holy_FlashHeal", section = "Combat" },
 			-- (tabOf: no icon of its own, a folder tab on that page's (ns.PageTabs))
 			{ "Damage Vision", "Interface\\Icons\\Ability_Warrior_Rampage", section = "Combat" }, -- (DamageVision.lua)
@@ -2574,7 +2580,7 @@ local function CreateBuffsPanel()
 
 	local buffPeek = Check(content, "buffPeek", L["Show buffs when you gain or refresh one"],
 		L["Gaining or refreshing a buff briefly shows your buffs and debuffs. Not on flights."])
-	buffPeek:SetPoint("TOPLEFT", note, "BOTTOMLEFT", -2, -48)
+	buffPeek:SetPoint("TOPLEFT", note, "BOTTOMLEFT", -2, -17) -- (as under the other pages' hidden switch)
 	PageSwitch(content, "handleBuffs", L["Enable Page"],
 		L["On: this page's peeks bring your buffs and debuffs up in CineMode. Off: no peeks; they still " ..
 		"fade as their Game Frames row says."], note)
@@ -4883,7 +4889,9 @@ end
 -- cinematic in combat", tip }): Always, the fights and targets, then the
 -- places (ns.PLACE_SHOW). Narrow columns, so all eight fit beside the
 -- scrollbar: a heading of two words or more takes two lines, the last lines level.
-local FRAME_LABEL_WIDTH, FRAME_COLUMN_WIDTH, FRAME_HEADING_HEIGHT = 160, 52, 24
+-- With the dropdowns (ns.GRID_MENUS) the name has the old Roles column's room
+-- too: longer names in full, and the section tabs in one row.
+local FRAME_LABEL_WIDTH, FRAME_COLUMN_WIDTH, FRAME_HEADING_HEIGHT = ns.GRID_MENUS and 212 or 160, 52, 24
 local FRAME_COLUMNS = {
 	{ L["Always"], ns.IsCineShowOn, "cineShow", false },
 	{ L["In combat"], ns.IsCombatShowOn, "combatShow", true },
@@ -4904,78 +4912,6 @@ local function FrameHeading(parent, text)
 	heading:SetJustifyH("CENTER")
 	heading:SetJustifyV("BOTTOM")
 	return heading
-end
-
--- A grid row's roles button: the icons of the roles it shows for (All with
--- all three, None with none), a menu of them on click. Unticked, the row is
--- kept hidden in CineMode while you're that role (tankHide, healerHide,
--- damageHide: row key -> true). key: the row's key, or a function giving it
--- (rows reused for other frames). page: the page whose Reset ticks them all
--- again (string keys only). tip, onChange: its own tooltip, and what else a
--- change needs. nil on clients without menus: ROLES_MENU.
-local ROLES_MENU = MenuUtil and MenuUtil.CreateContextMenu and true or false
-local RolesButton
-do
-	local ICON = "|TInterface\\LFGFrame\\UI-LFG-ICON-PORTRAITROLES:16:16:0:0:64:64:%s|t"
-	local ROLES = { { "tankHide", L["Tank"], ICON:format("0:19:22:41") },
-		{ "healerHide", L["Healer"], ICON:format("20:39:1:20") }, { "damageHide", L["Damage"], ICON:format("20:39:22:41") } }
-	function RolesButton(parent, page, key, tip, onChange)
-		if not ROLES_MENU then return nil end
-		local function Key() if type(key) == "function" then return key() end return key end
-		local button = CreateFrame("Button", nil, parent)
-		button:SetSize(52, 22)
-		button:SetNormalFontObject("GameFontNormalSmall")
-		button:SetHighlightTexture("Interface\\Buttons\\UI-Common-MouseHilight", "ADD")
-		button:SetText(" ") -- (makes its font string)
-		local function ShowRoles()
-			local db, rowKey, on = ns.GetDB(), Key(), {}
-			if not (db and rowKey) then return end
-			for _, role in ipairs(ROLES) do
-				if not ns.RoleHidden(db, role[1], rowKey) then on[#on + 1] = role[3] end
-			end
-			button:SetText(#on == #ROLES and L["All"] or #on == 0 and L["None"] or table.concat(on))
-		end
-		button:SetScript("OnClick", function(self)
-			MenuUtil.CreateContextMenu(self, function(_, root)
-				for _, role in ipairs(ROLES) do
-					local setting = role[1]
-					root:CreateCheckbox(role[3] .. " " .. role[2],
-						function()
-							local db, rowKey = ns.GetDB(), Key()
-							return db ~= nil and rowKey ~= nil and not ns.RoleHidden(db, setting, rowKey)
-						end,
-						function()
-							local db, rowKey = ns.GetDB(), Key()
-							if not rowKey then return end
-							db[setting] = db[setting] or {}
-							-- (Back to nil when it's the row's default again.)
-							local hide = not ns.RoleHidden(db, setting, rowKey)
-							if hide == ns.RoleHidden({}, setting, rowKey) then
-								db[setting][rowKey] = nil
-							else
-								db[setting][rowKey] = hide
-							end
-							ShowRoles()
-							if onChange then onChange() end
-							-- (Kept open, for ticking another.)
-							return MenuResponse and MenuResponse.Refresh
-						end)
-				end
-			end)
-		end)
-		button.Refresh = ShowRoles
-		controls[#controls + 1] = button
-		Tooltip(button, tip or L["The roles it shows for: untick one to keep it hidden in CineMode while you're " ..
-			"that role (your specialization's, or the one picked in the group finder), whatever " ..
-			"its ticks or rule say."])
-		if type(key) == "string" then
-			for _, role in ipairs(ROLES) do
-				RecordKey(page, role[1])
-				RecordRow(page, role[1], key)
-			end
-		end
-		return button
-	end
 end
 
 -- A row whose frame can be turned off altogether (item.showKey, a setting
@@ -5001,7 +4937,7 @@ local function ShowBox(content, item, rowLabel)
 end
 
 -- The page helpers the dropdown grids share (GridRows.lua's ns.GridRow).
-ns.GRID_KIT = { controls = controls, rolesMenu = ROLES_MENU, Label = Label, Tooltip = Tooltip,
+ns.GRID_KIT = { controls = controls, Label = Label, Tooltip = Tooltip,
 	FrameHeading = FrameHeading, RecordKey = RecordKey, RecordRow = RecordRow,
 	Refresh = Refresh, headingHeight = FRAME_HEADING_HEIGHT, ShowBox = ShowBox, RowShown = RowShown }
 
@@ -5123,7 +5059,7 @@ local function CreateCamerasPanel()
 	local PLACE_NAMES = { world = L["Open world"], city = L["Cities"], instance = L["Instances"],
 		bg = L["BGs & arenas"], group = L["Grouped"] }
 	local PLACE_WORDS = { "world", "city", "instance", "bg" }
-	local WHEN_LAYOUT = { groups = { ns.GRID_COMBAT, ns.GRID_LOCATION }, roles = ROLES_MENU, edit = true }
+	local WHEN_LAYOUT = { groups = { ns.GRID_COMBAT, ns.GRID_LOCATION }, edit = true }
 	local WHEN_HELP = { [ns.GRID_COMBAT] = L["Whether this row's camera may start in a fight (unticked, one " ..
 		"running stops when a fight starts), and whether it waits for things to calm down after one."],
 		[ns.GRID_LOCATION] = L["Where this row's camera may start (Grouped: in a party or raid). Anywhere else the " ..
@@ -5191,6 +5127,20 @@ local function CreateCamerasPanel()
 		local trigger = ns.CameraRowTrigger(id)
 		return ns.CameraRowValue(id, "camera") ~= trigger.off
 	end
+	-- (The rows a row's When may follow, by their keys: every row shown, your
+	-- name for it first.)
+	local function FollowChoices()
+		local list = {}
+		for _, id in ipairs(ns.CameraRowOrder()) do
+			list[#list + 1] = { ns.CameraRowKey(id), OwnName(id) ~= "" and OwnName(id) or RowLabel(id) }
+		end
+		return list
+	end
+	local function FollowLabel(key)
+		local id = tostring(key):match("^trig:(.+)$")
+		if id and ns.CameraRowTrigger(id) then return OwnName(id) ~= "" and OwnName(id) or RowLabel(id) end
+		return tostring(key)
+	end
 
 	-- What's set apart from the usual on a row, for its chips: { text, color }.
 	local function RowChips(id, parts)
@@ -5220,6 +5170,12 @@ local function CreateCamerasPanel()
 				list[#list + 1] = { (L["%d sec"]):format(db.idleOrbitDelay or 0), PLAIN_CHIP }
 			end
 		end
+		-- (Following a row: just that, its When being that row's.)
+		local leader = db.rowFollow and db.rowFollow[key]
+		if leader then
+			list[#list + 1] = { (L["Follows %s"]):format(FollowLabel(leader)), WHEN_CHIP }
+			return list
+		end
 		if trigger.key ~= "Death" and not ns.CameraRowAlways(id) and ns.IsCombatShowOn(key) then
 			list[#list + 1] = { L["In combat"], WHEN_CHIP }
 		end
@@ -5246,12 +5202,6 @@ local function CreateCamerasPanel()
 					if ticked[word] then names[#names + 1] = PLACE_NAMES[word] end
 				end
 				list[#list + 1] = #names == 0 and { L["Never"], NEVER_CHIP } or { table.concat(names, ", "), WHEN_CHIP }
-			end
-		end
-		for _, roleList in ipairs({ "tankHide", "healerHide", "damageHide" }) do
-			if ns.RoleHidden(db, roleList, key) then
-				list[#list + 1] = { L["Some roles"], WHEN_CHIP }
-				break
 			end
 		end
 		return list
@@ -5886,11 +5836,9 @@ local function CreateCamerasPanel()
 				"untick this."] },
 			menus = parts.menus,
 			help = WHEN_HELP,
+			follow = { key = Key, choices = FollowChoices },
 			rule = { key = Key, label = function() return RowLabel(id) end, grid = parts.grid, words = parts.words,
 				apply = parts.apply, changed = WhenChanged },
-			roles = { key = Key, changed = WhenChanged,
-				tip = L["Tick roles to have this row fit only while you're one of them (your specialization's, or " ..
-				"the one picked in the group finder), whatever the row says. None ticked (-): every role."] },
 			changed = WhenChanged,
 		})
 		At("When", when, LABEL_W)
@@ -5993,11 +5941,6 @@ local function ShowTable(content, anchor, rows, ...)
 		FrameHeading(content, column[1]):SetPoint("TOPLEFT", columnTop, "TOPLEFT",
 			LABEL_WIDTH + (c - 1) * COLUMN_WIDTH, 0)
 	end
-	-- (Over the rows' roles buttons.)
-	if ROLES_MENU and not rows.noHeadings then
-		FrameHeading(content, L["Role"]):SetPoint("TOPLEFT", columnTop, "TOPLEFT",
-			LABEL_WIDTH + #COLUMNS * COLUMN_WIDTH - 6, 0)
-	end
 
 	local lastLabel = columnTop
 	for r, item in ipairs(rows) do
@@ -6013,11 +5956,6 @@ local function ShowTable(content, anchor, rows, ...)
 		ns.LabelHover(content, rowLabel, item.tip)
 		if ns.CINE_SHOW_SETTING[item.key] then
 			RecordKey(content, ns.CINE_SHOW_SETTING[item.key]) -- (for the page's Reset)
-		end
-		-- The roles it shows for, after its last column.
-		local roles = not item.alwaysOnly and RolesButton(content, content, item.key, rows.rolesTip)
-		if roles then
-			roles:SetPoint("LEFT", rowLabel, "LEFT", LABEL_WIDTH + #COLUMNS * COLUMN_WIDTH - 6, 0)
 		end
 		local alwaysOn = item.alwaysOn or ns.IsCineShowOn
 		for c, column in ipairs(item.alwaysOnly and { COLUMNS[1] } or COLUMNS) do
@@ -6206,9 +6144,8 @@ local function CreateCombatPanel()
 		ns.OpenOptions("Standard Frames")
 	end
 	resetHooks[content] = Layout
-	-- Set apart: its rows start as the raid frames' (ticks, roles and rules),
+	-- Set apart: its rows start as the raid frames' (ticks and rules),
 	-- unless they have choices of their own from before.
-	local ROLE_SETTINGS = { "tankHide", "healerHide", "damageHide" }
 	local function CopyRaidRows()
 		local db = ns.GetDB()
 		for _, key in pairs(ns.RAID_STYLE_PARTY) do
@@ -6221,11 +6158,6 @@ local function CreateCombatPanel()
 		for raidKey, key in pairs(ns.RAID_STYLE_PARTY) do
 			for _, column in ipairs(FRAME_COLUMNS) do
 				db[column[3]][key] = column[2](raidKey)
-			end
-			for _, setting in ipairs(ROLE_SETTINGS) do
-				if type(db[setting]) == "table" then
-					db[setting][key] = db[setting][raidKey]
-				end
 			end
 			if type(db.frameRules) == "table" then
 				db.frameRules[key] = db.frameRules[raidKey]
@@ -6240,8 +6172,8 @@ local function CreateCombatPanel()
 		return set
 	end
 
-	local SECTION_WIDTH = ns.GRID_MENUS and FRAME_LABEL_WIDTH + ns.GridWidth({ roles = ROLES_MENU, edit = true })
-		or FRAME_LABEL_WIDTH + #FRAME_COLUMNS * FRAME_COLUMN_WIDTH + (ROLES_MENU and 46 or 0)
+	local SECTION_WIDTH = ns.GRID_MENUS and FRAME_LABEL_WIDTH + ns.GridWidth({ edit = true })
+		or FRAME_LABEL_WIDTH + #FRAME_COLUMNS * FRAME_COLUMN_WIDTH
 	-- (tab: its tab's name, nil: heading. link: { page, tip, label }, a button
 	-- to the page with the rest of its settings, right of its heading, named
 	-- label or the page.)
@@ -6431,10 +6363,10 @@ local function CreatePortraitsPanel()
 			return section.parts[part] ~= nil and (not only or only[section.unit] == true)
 		end
 
-		local LAYOUT = { roles = ROLES_MENU, edit = true }
+		local LAYOUT = { edit = true }
 		local OPTS = { quiet = true, cam = true, anyFight = true }
-		-- The lists a row keeps its dropdowns' and roles' ticks in.
-		local LISTS = { "calmShow", "quietShow", "camShow", "tankHide", "healerHide", "damageHide" }
+		-- The lists a row keeps its dropdowns' ticks in.
+		local LISTS = { "calmShow", "quietShow", "camShow" }
 		for c = 2, #FRAME_COLUMNS do
 			LISTS[#LISTS + 1] = FRAME_COLUMNS[c][3]
 		end
@@ -6576,7 +6508,6 @@ local function CreatePortraitsPanel()
 						band = r, dot = true,
 						always = { isOn = function() return ns.GetDB()[key] ~= false end, set = SetAlways, tip = ALWAYS_TIP },
 						menus = parts.menus,
-						roles = { key = Key, changed = ns.ApplyUnitFrameParts },
 						rule = { key = Key, label = function() return section.title .. ": " .. part[2] end,
 							grid = parts.grid, words = parts.words, apply = parts.apply, changed = ns.ApplyUnitFrameParts },
 						changed = ns.ApplyUnitFrameParts,
@@ -7257,8 +7188,8 @@ local function CreatePlatesPanel()
 	-- Standard Frames page's (GridRows.lua): Always, the Combat, Target and
 	-- Location dropdowns, the roles and Edit.
 	local ROW_HEIGHT = 24
-	local GRID_LABEL = 150
-	local PLATE_LAYOUT = { roles = true, edit = true }
+	local GRID_LABEL = 170 -- (wide enough for every tab on one row over the grid)
+	local PLATE_LAYOUT = { edit = true }
 	local NAME_LAYOUT = PLATE_LAYOUT
 	local function TableTop(anchor, layout)
 		local top = CreateFrame("Frame", nil, content)
@@ -7506,12 +7437,6 @@ local function CreatePlatesPanel()
 		local ruleKey = "plate:" .. kind[1]
 		local layout = top.layout
 		local function RuleKey() return ruleKey end
-		if layout.roles then
-			for _, list in ipairs({ "tankHide", "healerHide", "damageHide" }) do
-				RecordKey(content, list)
-				RecordRow(content, list, ruleKey)
-			end
-		end
 		lastLabel = PlaceRow(top, r, kind[2], kind[3], {
 			dot = true,
 			always = { isOn = function() return ns.GetDB()[alwaysKey] end,
@@ -7519,7 +7444,6 @@ local function CreatePlatesPanel()
 			menus = { [ns.GRID_COMBAT] = combat, [ns.GRID_TARGET] = targets, [ns.GRID_LOCATION] = places },
 			help = { [ns.GRID_COMBAT] = L["Shown in fights: any of them, or only while you're PvP flagged."] },
 			enabled = Available,
-			roles = layout.roles and { key = RuleKey } or nil,
 			rule = layout.edit and { key = RuleKey, label = function() return kind[2] end,
 				changed = function()
 					local text = ns.GetDB().frameRules[ruleKey]
@@ -7693,19 +7617,14 @@ local function CreatePlatesPanel()
 				ticks[#ticks + 1] = { placeKey, PLACE_WORDS[place[1]] }
 			end
 		end
-		-- Its roles and rule (name:<row>), on the row.
+		-- Its rule (name:<row>), on the row.
 		local ruleKey = ns.NameRuleKey(key)
-		for _, list in ipairs({ "tankHide", "healerHide", "damageHide" }) do
-			RecordKey(content, list)
-			RecordRow(content, list, ruleKey)
-		end
 		local function RuleKey() return ruleKey end
 		lastLabel = PlaceRow(top, r, label, indent, {
 			dot = true,
 			always = { isOn = function() return ns.GetDB()[alwaysKey] end,
 				set = function(value) Set(alwaysKey, value) end, tip = ALWAYS_TIP .. tip },
 			menus = { [ns.GRID_COMBAT] = combat, [ns.GRID_TARGET] = targets, [ns.GRID_LOCATION] = places },
-			roles = { key = RuleKey, changed = function() ns.SyncNameRow(group) end },
 			rule = { key = RuleKey, label = function() return label end, changed = function() ns.SyncNameRow(group) end },
 			help = { [ns.GRID_COMBAT] = L["Shown in fights: any of them, or only while you're PvP flagged."] },
 			-- Greyed out where this client has no such setting.
@@ -8526,7 +8445,7 @@ do
 
 		-- When each row fits, in its drawer (as the Standard Frames page's rows:
 		-- Always, the dropdowns, roles, a rule: Core's MARK_WHEN_WORDS).
-		local WHEN_LAYOUT = { roles = true, edit = true }
+		local WHEN_LAYOUT = { edit = true }
 		local WHEN_GROUP = { combat = 1, calm = 1, nocombat = 1, camera = 1, enemy = 2, friendly = 2, near = 2,
 			near28 = 2 }
 		local WHEN_NAMES = { combat = L["In combat"], calm = L["Calm Timer"], nocombat = L["Out of combat"],
@@ -8555,12 +8474,6 @@ do
 				end
 				list[#list + 1] = { #ticked == 0 and L["Never"] or #ticked == 1 and ticked[1]
 					or ticked[1] .. " +" .. (#ticked - 1), "when" }
-			end
-			for _, roleList in ipairs({ "tankHide", "healerHide", "damageHide" }) do
-				if ns.RoleHidden(db, roleList, key) then
-					list[#list + 1] = { L["Some roles"], "when" }
-					break
-				end
 			end
 			if ns.MarkRowBase(kind) == "aggro" and ns.TargetMarkOwn("AlsoSame", kind) then
 				list[#list + 1] = { L["Your target's"] }
@@ -8768,9 +8681,6 @@ do
 			end
 			db.frameRules = db.frameRules or {}
 			db.frameRules[id .. "When"] = rule
-			for _, list in ipairs({ "tankHide", "healerHide", "damageHide" }) do
-				if type(db[list]) == "table" then db[list][id .. "When"] = nil end
-			end
 			local order = Order()
 			local at = #order + 1
 			for i, each in ipairs(order) do
@@ -9080,10 +8990,8 @@ do
 			end
 			local profile = ns.ProfileBase()
 			for _, key in ipairs(keys) do db[key] = profile[key] end
-			for _, list in ipairs({ "frameRules", "tankHide", "healerHide", "damageHide" }) do
-				if type(db[list]) == "table" then
-					db[list][new .. "When"], db[list][id .. "When"] = db[list][id .. "When"], nil
-				end
+			if type(db.frameRules) == "table" then
+				db.frameRules[new .. "When"], db.frameRules[id .. "When"] = db.frameRules[id .. "When"], nil
 			end
 			db.markNames = db.markNames or {}
 			db.markNames[new], db.markNames[id] = db.markNames[id], nil
@@ -9113,9 +9021,7 @@ do
 			for _, word in ipairs(ns.MARK_WHEN_WORDS) do
 				db[new .. "When" .. word[2]] = db[id .. "When" .. word[2]]
 			end
-			for _, list in ipairs({ "frameRules", "tankHide", "healerHide", "damageHide" }) do
-				if type(db[list]) == "table" then db[list][new .. "When"] = db[list][id .. "When"] end
-			end
+			if type(db.frameRules) == "table" then db.frameRules[new .. "When"] = db.frameRules[id .. "When"] end
 			db.markNames = db.markNames or {}
 			local own = db.markNames[id]
 			db.markNames[new] = own and (L["%s (copy)"]):format(own):sub(1, 40) or nil
@@ -9702,10 +9608,6 @@ do
 				group[#group + 1] = { WHEN_NAMES[word[1]], function() return ns.GetDB()[key] and true or false end,
 					function() ns.GetDB()[key] = not ns.GetDB()[key] end }
 			end
-			for _, list in ipairs({ "tankHide", "healerHide", "damageHide" }) do
-				RecordKey(content, list)
-				RecordRow(content, list, whenKey)
-			end
 			local function WhenChanged()
 				Changed()
 				chips.Refresh()
@@ -9732,9 +9634,6 @@ do
 						end
 					end,
 					changed = WhenChanged },
-				roles = { key = function() return whenKey end, changed = WhenChanged,
-					tip = L["Tick roles to have this row fit only while you're one of them (your specialization's, " ..
-					"or the one picked in the group finder), whatever the row says. None ticked (-): every role."] },
 				changed = WhenChanged,
 			})
 			At("When", when, LABEL_W)
@@ -9848,9 +9747,7 @@ do
 	end
 	-- A message table's rows: these, its settings.
 	local function MessageRows()
-		return { labelWidth = CHAT_LABEL_WIDTH, columnTips = MESSAGE_COLUMN_TIPS,
-			rolesTip = L["Tick roles to have its messages show chat only while you're one of them (your " ..
-			"specialization's, or the one picked in the group finder), whatever its ticks or rule say. None ticked (-): every role."] }
+		return { labelWidth = CHAT_LABEL_WIDTH, columnTips = MESSAGE_COLUMN_TIPS }
 	end
 
 	-- The settings a table recorded on its own frame are the page's (its Reset),
@@ -10076,9 +9973,6 @@ do
 		local typingRows = MessageRows()
 		typingRows.noHeadings = true
 		typingRows.columnTips = nil
-		typingRows.rolesTip = L["Tick roles to have typing bring up the chat window only while you're one of them " ..
-			"(your specialization's, or the one picked in the group finder), and just the input box otherwise, whatever " ..
-			"its ticks or rule say. None ticked (-): every role."]
 		typingRows[1] = { key = "chat:typing", label = L["Typing"],
 			tip = L["Pressing Enter to type brings up the chat window with the input box where it's ticked. " ..
 			"Elsewhere just the input box comes up, so you can type without the chat window (or Mouseover " ..
@@ -10147,7 +10041,7 @@ for c = 2, #FRAME_COLUMNS do
 	THIRD_PARTY_COLUMNS[c] = FRAME_COLUMNS[c]
 end
 -- Their rows as the Standard Frames page's: Always, the dropdowns, the roles and Edit (GridRows.lua).
-local THIRD_PARTY_LAYOUT = { roles = true, edit = true }
+local THIRD_PARTY_LAYOUT = { edit = true }
 
 -- One row of the custom frames list, made as needed: a small X (takes it off
 -- the list), the name, and the columns. row.item: { name, picked, kept, added,
@@ -10194,11 +10088,11 @@ local function GetExtraRow(index)
 	local parts = ns.ListRowParts(Key, THIRD_PARTY_COLUMNS, nil, SetKept)
 	row.grid = ns.GridRow(ns.GRID_KIT, row, THIRD_PARTY_LABEL_WIDTH, THIRD_PARTY_LAYOUT, {
 		band = index, dot = true,
+		enabled = function() return not row.unloaded end, -- (greyed on the Unloaded tab)
 		always = { isOn = function() return row.item and row.item.kept end, set = SetKept,
 			tip = L["Show this frame the whole time in CineMode (Cinematic leaves it " ..
 			"alone). Unticked, it's hidden, except as the other columns say."] },
 		menus = parts.menus,
-		roles = { key = Key },
 		rule = { key = Key, label = function() return row.item and row.item.name or "" end, grid = parts.grid,
 			words = parts.words, apply = parts.apply },
 		cells = function()
@@ -10246,7 +10140,7 @@ RefreshExtras = function()
 				RecordKey(extrasPanel, THIRD_PARTY_COLUMNS[c][3])
 				RecordRow(extrasPanel, THIRD_PARTY_COLUMNS[c][3], key, L["Custom frames"])
 			end
-			for _, list in ipairs({ "calmShow", "tankHide", "healerHide", "damageHide", "frameRules" }) do
+			for _, list in ipairs({ "calmShow", "frameRules" }) do
 				RecordKey(extrasPanel, list)
 				RecordRow(extrasPanel, list, key, L["Custom frames"])
 			end
@@ -10525,7 +10419,7 @@ local function CreateQuestTrackerPanel()
 		L["Accepting a quest shows the quest tracker as if you'd hovered it (with the rest of the " ..
 		"Hover groups that have Quest progress ticked): it goes after \"Stays after " ..
 		"mouseover\" (Hover groups page)."])
-	reveal:SetPoint("TOPLEFT", subtitle, "BOTTOMLEFT", -2, -48)
+	reveal:SetPoint("TOPLEFT", subtitle, "BOTTOMLEFT", -2, -17) -- (as under the other pages' hidden switch)
 	PageSwitch(content, "handleQuests", L["Enable Page"],
 		L["On: this page's settings can bring the quest tracker, quest timer and durability figure up in " ..
 		"CineMode. Off: they don't; they still fade as their Game Frames rows say."], subtitle)
@@ -10717,7 +10611,14 @@ local function CreateCooldownPanel()
 	keybinds:SetPoint("TOPLEFT", afterCombat, "BOTTOMLEFT", -16, -8)
 	keybinds:HookScript("OnClick", function() ns.ApplyCooldownKeybinds() end)
 	GreyUnless(keybinds, function(db) return db.handleCooldowns end)
-	afterCombat = keybinds
+	-- Its icons' countdown numbers as the game's option says (Frames.lua: ns.ApplyCooldownNumbers).
+	local numbers = Check(content, "cooldownFollowNumbers", L["Numbers follow the game's Show Numbers for Cooldowns"],
+		L["The seconds left on the Cooldown Manager's icons show only when the game's Show Numbers for " ..
+		"Cooldowns (Options > Action Bars) is on. Unticked, the Cooldown Manager shows them as it likes."])
+	numbers:SetPoint("TOPLEFT", keybinds, "BOTTOMLEFT", 0, -2)
+	numbers:HookScript("OnClick", function() ns.ApplyCooldownNumbers() end)
+	GreyUnless(numbers, function(db) return db.handleCooldowns end)
+	afterCombat = numbers
 
 	-- Each spell's icon: always shown (the game's own), only when ready in
 	-- fights, or only while recharging. A row per spell in the Cooldown
@@ -10733,6 +10634,7 @@ local function CreateCooldownPanel()
 		"glow (a proc, like an instant Lightning Bolt). A faded icon keeps its place in the bar. In " ..
 		"fights the game may not say how long is left, so then it goes by when you last cast it. The " ..
 		"settings beside each group's name set every spell in it at once."]:format(ns.READY_EARLY * 100) .. " " ..
+		L["Flash: the icon flashes for a few seconds as its cooldown ends, shown then even if its setting has it faded."] .. " " ..
 		L["Tracked buffs and bars: Always, In combat, Out of combat or Hidden (the game keeps your buffs " ..
 		"secret in fights, so they go by that alone). Each group has a tab of its own."] .. " " ..
 		L["With Smart set ticked, until you set a bar's mode, its spells with no cooldown go by what they " ..
@@ -10747,9 +10649,11 @@ local function CreateCooldownPanel()
 	RecordKey(content, "cooldownAlwaysShow")
 	RecordKey(content, "cooldownBuffMode")
 	RecordKey(content, "cooldownSmartDefaults")
-	-- Columns: the spell, when it shows, and (When ready only) how early it's back.
-	local MODE_X, POWER_X, EARLY_X, ROW_HEIGHT = 200, 360, 440, 26
-	local GROUP_HEIGHT, GROUP_WIDTH = 36, 560
+	RecordKey(content, "cooldownFlashReady")
+	-- Columns: the spell, when it shows, (When ready only) its Resources and
+	-- how early it's back, and Flash.
+	local MODE_X, POWER_X, EARLY_X, FLASH_X, ROW_HEIGHT = 200, 360, 440, 556, 26
+	local GROUP_HEIGHT, GROUP_WIDTH = 36, 610
 	-- Each group a tab of its own, in Heal Vision's folder look (ns.FolderTabs,
 	-- made below), only those with spells now: the picked one's spells on the
 	-- panel under them, the column headings at its top. The tab last picked
@@ -10767,8 +10671,10 @@ local function CreateCooldownPanel()
 	modeHeading:SetPoint("TOPLEFT", panelTop, "TOPLEFT", 12 + MODE_X, -10)
 	local powerHeading = Label(content, "GameFontNormalSmall", L["Resources"])
 	powerHeading:SetPoint("TOPLEFT", panelTop, "TOPLEFT", 12 + POWER_X - 4, -10)
-	local earlyHeading = Label(content, "GameFontNormalSmall", L["Show early"])
+	local earlyHeading = Label(content, "GameFontNormalSmall", L["Show early"] .. " (" .. L["sec"] .. ")")
 	earlyHeading:SetPoint("TOPLEFT", panelTop, "TOPLEFT", 12 + EARLY_X, -10)
+	local flashHeading = Label(content, "GameFontNormalSmall", L["Flash"])
+	flashHeading:SetPoint("TOPLEFT", panelTop, "TOPLEFT", 12 + FLASH_X - 4, -10)
 	local noSpells = Label(content, "GameFontDisable", L["Nothing in the Cooldown Manager right now."])
 	noSpells:SetPoint("TOPLEFT", readyNote, "BOTTOMLEFT", 0, -42)
 
@@ -10863,6 +10769,8 @@ local function CreateCooldownPanel()
 			db.cooldownEarlyOn[spell], db.cooldownReadyEarly[spell] = true, seconds
 		end,
 		Length = function(spell) return ns.CooldownLength(spell) end,
+		Flash = function(spell) return ns.CooldownSpellFlash(spell, groupOf[spell]) end,
+		SetFlash = function(spell, value) ns.GetDB().cooldownFlashReady[spell] = value end,
 		modes = MODES,
 		tip = L["When this spell's icon shows in the Cooldown Manager."],
 	}
@@ -10889,12 +10797,20 @@ local function CreateCooldownPanel()
 			end
 		end,
 		Length = function() return nil end,
+		Flash = function(group) return ns.CooldownGroupFlash(group) end,
+		SetFlash = function(group, value)
+			-- (Kept even when off: Smart set turns some groups' on until they're set.)
+			GroupDefaults(group).flash = value and true or false
+			for _, spell in ipairs(groupSpells[group] or {}) do
+				ns.GetDB().cooldownFlashReady[spell] = nil
+			end
+		end,
 		modes = MODES,
 		tip = L["Sets every spell in this group to this. Spells you haven't set on their own follow it, " ..
 			"and a spell here made When ready on its own starts with its Resources and Show early."],
 	}
 	-- A tracked buff or bar (db.cooldownBuffMode), and their groups' settings.
-	-- (No Resources or Show early: those are When ready's.)
+	-- (No Resources, Show early or Flash: those are for spells.)
 	local function NoValue() return nil end
 	local BUFF = {
 		Mode = function(spell) return (ns.CooldownBuffMode(spell, buffGroupOf[spell])) end,
@@ -11010,8 +10926,27 @@ local function CreateCooldownPanel()
 			self:ClearFocus()
 		end)
 		row.early = early
-		row.earlyText = Label(content, "GameFontHighlightSmall", "")
-		row.earlyText:SetPoint("LEFT", early, "RIGHT", 6, 0)
+		-- (Empty: the default's seconds, greyed, in the box.)
+		row.earlyText = early:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+		row.earlyText:SetPoint("LEFT", early, "LEFT", 1, 0)
+		early:HookScript("OnTextChanged", function(self)
+			row.earlyText:SetShown(self:GetText() == "")
+		end)
+
+		-- Flash (any mode): its icon flashes for a few seconds as its cooldown
+		-- ends, shown for it even if its mode has it faded.
+		if access.SetFlash then
+			local flash = Check(content, nil, "", L["Flashes the icon for a few seconds when the spell's " ..
+				"cooldown ends."], function(value)
+				if row.key ~= nil then
+					access.SetFlash(row.key, value)
+					Refresh()
+				end
+			end)
+			flash.Refresh = function() end -- (set by its row's)
+			flash:SetPoint("LEFT", row.mode, "LEFT", FLASH_X - MODE_X, 0)
+			row.flash = flash
+		end
 
 		-- (The page's Refresh greys the mode with the page switch, after this.)
 		row.mode.Refresh = function(self)
@@ -11029,8 +10964,12 @@ local function CreateCooldownPanel()
 			local handled = Handled()
 			SetLabelFont(row.name, handled and row.font or "GameFontDisable")
 			local ready = mode == "ready" and row.shown
+			if row.flash then
+				row.flash:SetShown(row.shown)
+				row.flash:SetChecked(access.Flash(key) and true or false)
+				row.flash:SetEnabled(handled)
+			end
 			row.early:SetShown(ready)
-			row.earlyText:SetShown(ready)
 			row.power:SetShown(ready)
 			if not ready then return end
 			row.power:SetChecked(access.Power(key) and true or false)
@@ -11040,12 +10979,11 @@ local function CreateCooldownPanel()
 				row.early:SetText(text)
 			end
 			local length = access.Length(key)
-			row.earlyText:SetText(text ~= "" and L["sec"] or (length
-				and (L["sec (empty: %d)"]):format(math.floor(length * ns.READY_EARLY + 0.5))
-				or (L["sec (empty: %d%%)"]):format(ns.READY_EARLY * 100)))
+			row.earlyText:SetText(length and tostring(math.floor(length * ns.READY_EARLY + 0.5))
+				or ("%d%%"):format(ns.READY_EARLY * 100))
+			row.earlyText:SetShown(row.early:GetText() == "")
 			row.early:SetEnabled(handled)
 			row.early:SetAlpha(handled and 1 or 0.5)
-			row.earlyText:SetAlpha(handled and 1 or 0.5)
 		end
 		controls[#controls + 1] = row.mode
 		return row
@@ -11070,6 +11008,7 @@ local function CreateCooldownPanel()
 		row.early:Hide()
 		row.earlyText:Hide()
 		row.power:Hide()
+		if row.flash then row.flash:Hide() end
 		if row.line then row.line:Hide() end
 		if row.center then row.center:Hide() end
 	end
@@ -11185,6 +11124,7 @@ local function CreateCooldownPanel()
 		modeHeading:SetShown(group ~= nil)
 		earlyHeading:SetShown(group ~= nil)
 		powerHeading:SetShown(group ~= nil)
+		flashHeading:SetShown(group ~= nil and not BUFF_GROUP[group])
 	end
 	-- The tabs (their full names their tips).
 	local tabList = {}
@@ -11196,10 +11136,9 @@ local function CreateCooldownPanel()
 		Refresh()
 		FitContentHeight(content)
 	end, nil, GROUP_WIDTH + 8)
-	-- (Under Smart set.)
-	panelTop:SetPoint("TOPLEFT", readyNote, "BOTTOMLEFT", 0, -38 - height)
+	-- (Under Smart set and the Flash style: placed below, once they're made.)
 	panel:SetPoint("TOPLEFT", panelTop, "TOPLEFT")
-	panel:SetWidth(EARLY_X + 200) -- (room for Show early's "sec (empty: 15%)" beside its box)
+	panel:SetWidth(FLASH_X + 64) -- (room for Flash's tick)
 	base:SetPoint("TOPLEFT", panelTop, "TOPLEFT")
 
 	-- Smart set (db.cooldownSmartDefaults): until you set a bar's mode, its
@@ -11211,7 +11150,8 @@ local function CreateCooldownPanel()
 		L["Ticked: the spells with no cooldown you haven't set yourself go by what they cost, until you set " ..
 		"their group's mode: When ready with Resources if they spend a resource you build up (like Maelstrom), " ..
 		"else When it procs (like Lightning Bolt). Spells with a cooldown or charges go by their group's " ..
-		"setting. Unticked: every spell you haven't set yourself goes by its group's setting."],
+		"setting. It also turns on Flash for Utility Cooldowns, until you set that group's Flash. Unticked: " ..
+		"every spell you haven't set yourself goes by its group's setting."],
 		function(value)
 			KeyPut("cooldownSmartDefaults", value)
 			ListSpells()
@@ -11221,7 +11161,8 @@ local function CreateCooldownPanel()
 	-- Reset: just the spell icons' settings (the page's Reset does the rest too).
 	local SPELL_ICON_KEYS = { cooldownReadyOnly = true, cooldownReadyEarly = true, cooldownEarlyOn = true,
 		cooldownRechargeOnly = true, cooldownNeedsPower = true, cooldownGroupDefaults = true,
-		cooldownProcOnly = true, cooldownAlwaysShow = true, cooldownBuffMode = true, cooldownSmartDefaults = true }
+		cooldownProcOnly = true, cooldownAlwaysShow = true, cooldownBuffMode = true, cooldownSmartDefaults = true,
+		cooldownFlashReady = true }
 	local iconsReset = ns.PanelButton(content)
 	iconsReset:SetSize(60, 20)
 	iconsReset:SetPoint("LEFT", smartSet.Text or smartSet.text or smartSet, "RIGHT", 16, 0)
@@ -11236,6 +11177,60 @@ local function CreateCooldownPanel()
 				Refresh()
 			end })
 	end)
+
+	-- The Flash style, for every spell with Flash ticked (Frames.lua): a
+	-- glow, the icon growing with each beat, a colored border, and how long.
+	local flashLabel = Label(content, "GameFontHighlight", L["Flash style:"])
+	flashLabel:SetPoint("TOPLEFT", smartSet, "BOTTOMLEFT", 2, -12)
+	local flashGlow = Check(content, "cooldownFlashGlow", L["Glow"],
+		L["The icon glows bright and dim while it flashes."])
+	flashGlow:SetPoint("LEFT", flashLabel, "RIGHT", 8, 0)
+	local flashGrow = Check(content, "cooldownFlashGrow", L["Grow"],
+		L["The icon grows a little and back with each beat while it flashes."])
+	flashGrow:SetPoint("LEFT", flashGlow.Text or flashGlow.text or flashGlow, "RIGHT", 12, 0)
+	local flashBorder = Check(content, "cooldownFlashBorder", L["Border"],
+		L["A border in the color beside it round the icon while it flashes."])
+	flashBorder:SetPoint("LEFT", flashGrow.Text or flashGrow.text or flashGrow, "RIGHT", 12, 0)
+	local flashSwatch = CreateFrame("Button", nil, content)
+	flashSwatch:SetSize(20, 20)
+	flashSwatch:SetPoint("LEFT", flashBorder.Text or flashBorder.text or flashBorder, "RIGHT", 6, 0)
+	local swatchEdge = flashSwatch:CreateTexture(nil, "BACKGROUND")
+	swatchEdge:SetAllPoints()
+	swatchEdge:SetColorTexture(0.6, 0.6, 0.6, 1)
+	local swatchColor = flashSwatch:CreateTexture(nil, "ARTWORK")
+	swatchColor:SetPoint("TOPLEFT", 2, -2)
+	swatchColor:SetPoint("BOTTOMRIGHT", -2, 2)
+	Tooltip(flashSwatch, L["Click to choose the flash's border color."])
+	RecordKey(content, "cooldownFlashR")
+	RecordKey(content, "cooldownFlashG")
+	RecordKey(content, "cooldownFlashB")
+	flashSwatch.Refresh = function()
+		local db = ns.GetDB()
+		swatchColor:SetColorTexture(db.cooldownFlashR, db.cooldownFlashG, db.cooldownFlashB, 1)
+	end
+	flashSwatch:SetScript("OnClick", function()
+		local db = ns.GetDB()
+		OpenColorPicker(db.cooldownFlashR, db.cooldownFlashG, db.cooldownFlashB, function(r, g, b)
+			db.cooldownFlashR, db.cooldownFlashG, db.cooldownFlashB = r, g, b
+			flashSwatch.Refresh()
+		end)
+	end)
+	controls[#controls + 1] = flashSwatch
+	local flashTest = ns.PanelButton(content)
+	flashTest:SetSize(60, 20)
+	flashTest:SetPoint("LEFT", flashSwatch, "RIGHT", 16, 0)
+	flashTest:SetText(L["Test"])
+	flashTest.searchSkip = true
+	Tooltip(flashTest, L["Flashes every icon in the Essential and Utility bars once, in this style."])
+	flashTest:SetScript("OnClick", function() ns.TestCooldownFlash() end)
+	local flashTime = Slider(content, "cooldownFlashTime", L["Flash for"], 1, 6, 0.5,
+		function(value) return L["%.1f sec"]:format(value) end)
+	flashTime:SetPoint("TOPLEFT", flashLabel, "BOTTOMLEFT", 0, -28)
+	Tooltip(flashTime, L["How long the icon flashes once its cooldown ends."])
+	for _, control in ipairs({ flashGlow, flashGrow, flashBorder, flashTime }) do
+		GreyUnless(control, function(db) return db.handleCooldowns end)
+	end
+	panelTop:SetPoint("TOPLEFT", flashTime, "BOTTOMLEFT", 0, -16 - height)
 
 	local shown = PageShown(Refresh, content)
 	canvas:SetScript("OnShow", function()
@@ -11732,9 +11727,9 @@ local function CreateVisionPanel()
 			"when you turn this back on."], healIntro, ApplyFrames)
 
 		-- The row as the Standard Frames page's (GridRows.lua): Always, a
-		-- Location dropdown of the places and groups, and the roles.
+		-- Location dropdown of the places and groups.
 		local NAME_WIDTH = 90
-		local LAYOUT = { roles = true, edit = true }
+		local LAYOUT = { edit = true }
 		local gridTop = CreateFrame("Frame", nil, content)
 		gridTop:SetSize(NAME_WIDTH + ns.GridWidth(LAYOUT), FRAME_HEADING_HEIGHT)
 		-- (Up into the headings' empty top, as ShowTable's underHeader.)
@@ -11774,10 +11769,6 @@ local function CreateVisionPanel()
 				L["Heal Vision out of fights while you have a living enemy targeted."]),
 			Item(L["Friend targeted"], "healVisionTargetFriendly",
 				L["Heal Vision out of fights while you have anything else targeted: friends, NPCs, dead enemies."]) }
-		for _, list in ipairs({ "tankHide", "healerHide", "damageHide" }) do
-			RecordKey(content, list)
-			RecordRow(content, list, "healVision")
-		end
 		ns.GridRow(ns.GRID_KIT, row, NAME_WIDTH, LAYOUT, {
 			band = 1,
 			always = { isOn = function() return ns.GetDB().healVision end,
@@ -11789,9 +11780,6 @@ local function CreateVisionPanel()
 				[ns.GRID_LOCATION] = L["On while you're in any of these (Party and Raid: in one, wherever you are)."] },
 			rule = { key = function() return "healVision" end, label = function() return L["Heal Vision"] end,
 				changed = Apply },
-			roles = { key = function() return "healVision" end, changed = Apply,
-				tip = L["Tick roles to have Heal Vision on only while you're one of them (your specialization's, " ..
-				"or the one picked in the group finder), whatever the row says. None ticked (-): every role."] },
 		}):SetPoint("LEFT", row, "LEFT", NAME_WIDTH, 0)
 
 		-- Default, Tank, Healer and Damage tabs: the settings below are the
@@ -12241,17 +12229,12 @@ local function CreateExtrasPanel()
 	local title = Label(content, "GameFontNormalLarge", L["Addon Frames"])
 	title:SetPoint("TOPLEFT", 16, -16)
 
-	local switch = PageSwitch(content, "handleAddonFrames", L["Enable Page"],
-		L["On: CineMode fades the supported addons' frames, and frames you added, as this page says. " ..
-		"Off: it leaves them all alone."], title)
-	local stack = Stack(switch, "check")
 	-- One grid for every addon's frames: the supported addons' and the custom
 	-- frames', under one set of headings and the Default row. (Their settings
 	-- stay in sections of those names, for the profile modules' scopes: the
 	-- custom frames' and the Default row's recorded as Custom frames.)
-	stack:Add(Label(content, "GameFontNormal", L["Addon frames"]), "header")
 	SetSection(content, L["Supported addons"])
-	stack:Help(content, L["These addons' frames are hidden in CineMode unless ticked, like the game's " ..
+	local note = PageIntro(content, title, L["These addons' frames are hidden in CineMode unless ticked, like the game's " ..
 		"frames on the Game Frames page. Tick Always to leave an addon's frames alone (shown the " ..
 		"whole time); the next three show them only while you fight or have something targeted, and " ..
 		"the places while you're there."] .. "\n\n" ..
@@ -12262,6 +12245,10 @@ local function CreateExtrasPanel()
 		"on, and the ones supported but not installed."] .. "\n\n" ..
 		L["The Default row is what frames you add, and addons you install later, start with; its Copy to all " ..
 		"gives it to every row here."])
+	local switch = PageSwitch(content, "handleAddonFrames", L["Enable Page"],
+		L["On: CineMode fades the supported addons' frames, and frames you added, as this page says. " ..
+		"Off: it leaves them all alone."], note)
+	local stack = Stack(switch, "check")
 
 	-- In folder tabs: Loaded (the grid, for the addons loaded), Find frames
 	-- (finding frames to add) and Unloaded (the addons installed but not
@@ -12327,7 +12314,7 @@ local function CreateExtrasPanel()
 			RecordKey(content, COLUMNS[c][3])
 			RecordRow(content, COLUMNS[c][3], item)
 		end
-		for _, list in ipairs({ "calmShow", "tankHide", "healerHide", "damageHide" }) do
+		for _, list in ipairs({ "calmShow" }) do
 			RecordKey(content, list)
 			RecordRow(content, list, item)
 		end
@@ -12337,12 +12324,12 @@ local function CreateExtrasPanel()
 		local parts = ns.ListRowParts(Key, COLUMNS, nil, SetAlways)
 		row.grid = ns.GridRow(ns.GRID_KIT, box, LABEL_WIDTH, THIRD_PARTY_LAYOUT, {
 			band = 1, dot = true,
+			enabled = function() return not row.unloaded end, -- (greyed on the Unloaded tab)
 			always = { isOn = function() return not ns.IsAddonFramesOn(known.key) end, set = SetAlways,
 				tip = (L["Show %s the whole time in CineMode (Cinematic leaves them " ..
 				"alone). Unticked, they're hidden, except as the other columns say.%s"]):format(known.about,
 				known.note and " " .. known.note or "") },
 			menus = parts.menus,
-			roles = { key = Key },
 			rule = { key = Key, label = function() return known.label end, grid = parts.grid,
 				words = parts.words, apply = parts.apply },
 		})
@@ -12419,7 +12406,7 @@ local function CreateExtrasPanel()
 		RecordKey(content, COLUMNS[c][3])
 		RecordRow(content, COLUMNS[c][3], ns.EXTRA_DEFAULT_KEY, L["Custom frames"])
 	end
-	for _, list in ipairs({ "calmShow", "tankHide", "healerHide", "damageHide", "frameRules" }) do
+	for _, list in ipairs({ "calmShow", "frameRules" }) do
 		RecordKey(content, list)
 		RecordRow(content, list, ns.EXTRA_DEFAULT_KEY, L["Custom frames"])
 	end
@@ -12431,7 +12418,6 @@ local function CreateExtrasPanel()
 			"time in CineMode. Unticked, they start hidden, except as the other columns say. (Frames you add " ..
 			"yourself start faded either way.)"] },
 		menus = defaultParts.menus,
-		roles = { key = DefaultKey },
 		rule = { key = DefaultKey, label = function() return L["Default"] end, grid = defaultParts.grid,
 			words = defaultParts.words, apply = defaultParts.apply },
 	})
@@ -12661,13 +12647,21 @@ local function CreateExtrasPanel()
 				Tooltip(row.frame, row.note.about)
 				Place(row.frame, INDENT, ROW_HEIGHT)
 			end
+			-- (An addon that isn't loaded: its rows greyed, nothing to fade yet.)
+			local unloaded = not group.loaded
 			for _, row in ipairs(group.rows) do
 				PlaceRow(row, RowName(row.known, group.title))
+				row.unloaded = unloaded
+				row.label:SetAlpha(unloaded and 0.5 or 1)
+				row.grid:Refresh()
 			end
 			for _, row in ipairs(group.extras) do
 				band = band + 1
 				row.grid:SetBand(band)
 				Place(row, 0, ROW_HEIGHT)
+				row.unloaded = unloaded
+				row.text:SetAlpha(unloaded and 0.5 or 1)
+				row.grid:Refresh()
 			end
 		end
 
@@ -14730,6 +14724,9 @@ ns.OnLanguage(function()
 	end
 	if ns.CreateGeneralStylePanel then -- (GeneralStyle.lua)
 		ns.CreateGeneralStylePanel(ns.lowHealthKit)
+	end
+	if ns.CreateVisionsStylePanel then -- (VisionsStyle.lua)
+		ns.CreateVisionsStylePanel(ns.lowHealthKit)
 	end
 	if ns.CreatePlateCastStylePanel then -- (PlateCastStyle.lua)
 		ns.CreatePlateCastStylePanel(ns.lowHealthKit)

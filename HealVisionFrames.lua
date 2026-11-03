@@ -574,11 +574,7 @@ function ns.HealVisionDebug(unit)
 	-- (Off: why, as ns.HealVisionHere goes.)
 	local on = Wanted("healVision") and "true"
 	if not on then
-		local role = ns.PlayerRole()
-		local list = role == "TANK" and "tankHide" or role == "HEALER" and "healerHide"
-			or role == "DAMAGER" and "damageHide"
 		on = ns.IsSuspended() and "false (stopped for this session)"
-			or (list and ns.RoleHidden(db, list, "healVision") and ("false (role button: off as " .. role .. ")"))
 			or (db.handleHealVision == false and "false (Heal Vision page switched off)")
 			or "false (Show in grid: not ticked here)"
 	end

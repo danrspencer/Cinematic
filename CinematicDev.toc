@@ -115,9 +115,11 @@ PlateCastStyle.lua
 UnitStyle.lua
 RaidStyle.lua
 GeneralStyle.lua
+VisionsStyle.lua
 WindGuideStyles.lua
 WindGuide.lua
 DamageVision.lua
+DamageReport.lua
 Focus.lua
 Tracking.lua
 NodeSweep.lua

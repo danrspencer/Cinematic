@@ -241,6 +241,52 @@ if arg[1] then
 		end
 		if #leftover > 0 then ShotProblem("left behind: " .. table.concat(leftover, ", ")) end
 	end
+	-- Visions Style: a Vision's shared setting on "general" follows the Visions
+	-- hub's Style page, which follows the Style hub's General; one of its own
+	-- wins, and the other pages still follow General alone.
+	do
+		local db = ns.GetDB()
+		local keys = { "styleGeneral", "styleFont", "styleBorder", "styleBorderSize", "visionStyleFont",
+			"visionStyleBorder", "visionStyleBorderSize", "visionStyleTextSize", "damageVisionFont",
+			"damageVisionTextSize", "tooltipFont", "questItemFrame" }
+		local saved = {}
+		for _, key in ipairs(keys) do saved[key] = db[key] end
+		local look = ns.StyleLook("styleGeneral")
+		local function Expect(what, key, want)
+			if look[key] ~= want then
+				print(("problem\tVisions Style: %s: %s is %s, not %s"):format(what, key, tostring(look[key]), tostring(want)))
+			end
+		end
+		db.styleGeneral, db.styleFont = true, "arial"
+		db.visionStyleFont, db.damageVisionFont, db.tooltipFont = "general", "general", "general"
+		Expect("both on General", "damageVisionFont", "arial")
+		Expect("both on General", "tooltipFont", "arial")
+		db.visionStyleFont = "friz"
+		Expect("a Visions font", "damageVisionFont", "friz")
+		Expect("a Visions font", "tooltipFont", "arial")
+		db.visionStyleFont = "game"
+		Expect("each Vision's own", "damageVisionFont", ns.SHARED_STYLE.damageVisionFont.own)
+		db.damageVisionFont = "morpheus"
+		Expect("the Vision's own", "damageVisionFont", "morpheus")
+		db.damageVisionTextSize, db.visionStyleTextSize = 1.2, 1.5
+		if math.abs((look.damageVisionTextSize or 0) - 1.8) > 1e-6 then
+			print("problem\tVisions Style: text size 1.2 x 1.5 is " .. tostring(look.damageVisionTextSize))
+		end
+		if ns.DEFAULTS.questItemFrame ~= nil then
+			db.questItemFrame, db.styleBorder, db.styleBorderSize = "general", "custom", 5
+			db.visionStyleBorder = "general"
+			Expect("General's custom border", "questItemFrameSize", 5)
+			db.visionStyleBorder, db.visionStyleBorderSize = "custom", 3
+			Expect("a Visions custom border", "questItemFrame", "custom")
+			Expect("a Visions custom border", "questItemFrameSize", 3)
+		end
+		for _, key in ipairs({ "cardFont", "rollFont", "questTalkFont", "damageVisionTexture" }) do
+			local entry = ns.SHARED_STYLE[key]
+			if entry and not entry.visions then print("problem\tVisions Style: " .. key .. " isn't marked a Vision's") end
+		end
+		if ns.SHARED_STYLE.tooltipFont.visions then print("problem\tVisions Style: tooltipFont marked a Vision's") end
+		for _, key in ipairs(keys) do db[key] = saved[key] end
+	end
 	-- Vitals Vision: a page's Reset (its settings back to the profile's) leaves
 	-- each theme's own look on them, not the plain defaults.
 	local db, base = ns.GetDB(), ns.ProfileBase()

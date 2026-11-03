@@ -400,6 +400,12 @@ local BUBBLE_SPEECH = {
 }
 local BUBBLE_WAIT = 0.3
 local waiting = {} -- { chatFrame, text, until }
+-- A speaker saying more while their bubble is still up gets the same bubble
+-- back (the Headless Horseman's summoning lines): kept from addons, no new
+-- one turns up to count. A speaker whose line was taken as bubbled that way
+-- keeps their bubble for SPEAKER_BUBBLE seconds, while no bubble has gone.
+local SPEAKER_BUBBLE = 8
+local bubbledSpeakers = {} -- [GUID or name] = { when, unreadable bubbles then }
 local bubbleWatch = CreateFrame("Frame")
 
 -- A chat window you can't read now: faded or fading (in CineMode), or hidden
@@ -437,16 +443,55 @@ local function SpeakOrPeek(line)
 	-- chat up: in a busy place the speech never stops, and chat never faded.)
 end
 
+-- Who said a line: their GUID, else their name (nil if neither can be read).
+local function Speaker(line)
+	local guid, author = line[6], line[5]
+	if type(guid) == "string" and guid ~= "" and not (issecretvalue and issecretvalue(guid)) then
+		return guid
+	end
+	if type(author) == "string" and not (issecretvalue and issecretvalue(author)) then
+		return author
+	end
+end
+
+-- Whether the line's speaker still has a bubble kept from addons up (one
+-- taken as theirs a moment ago, with none gone since).
+local function SpeakerBubbleUp(line, now, unreadable)
+	local speaker = Speaker(line)
+	local seen = speaker and bubbledSpeakers[speaker]
+	if not seen then
+		return false
+	end
+	if now - seen[1] >= SPEAKER_BUBBLE or unreadable < seen[2] then
+		bubbledSpeakers[speaker] = nil
+		return false
+	end
+	return true
+end
+
+local function NoteSpeakerBubble(line, now, unreadable)
+	local speaker = Speaker(line)
+	if speaker then
+		bubbledSpeakers[speaker] = { now, unreadable }
+	end
+end
+
 local function WatchBubbles()
 	local now = GetTime()
 	for i = #waiting, 1, -1 do
 		local line = waiting[i]
+		local unreadable = ns.UnreadableBubbles and ns.UnreadableBubbles() or 0
 		if ns.IsBubbleOnScreen and ns.IsBubbleOnScreen(line[2]) then
 			SpeechTrace("its bubble is on screen")
 			table.remove(waiting, i)
-		elseif ns.UnreadableBubbles and ns.UnreadableBubbles() > line[7] then
+		elseif unreadable > line[7] then
 			-- (A bubble kept from addons turned up after it: taken as its own.)
 			SpeechTrace("a bubble kept from addons showed up")
+			NoteSpeakerBubble(line, now, unreadable)
+			table.remove(waiting, i)
+		elseif now >= line[3] and unreadable > 0 and SpeakerBubbleUp(line, now, unreadable) then
+			SpeechTrace("its speaker's bubble kept from addons is still up")
+			NoteSpeakerBubble(line, now, unreadable)
 			table.remove(waiting, i)
 		elseif now >= line[3] then
 			table.remove(waiting, i)

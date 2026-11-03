@@ -1,0 +1,689 @@
+{
+  "captures": "C:\\Users\\casal\\Videos\\Cinematic Showcase\\raw",
+  "library": "C:\\Users\\casal\\Videos\\Cinematic Showcase",
+  "sessions": [
+    {
+      "id": "S0",
+      "name": "Setup",
+      "where": "OBS test: a few seconds of WoW to check the picture, sound and that the take gets filed."
+    },
+    {
+      "id": "S1",
+      "name": "Settings & menus",
+      "where": "Anywhere quiet. Raise WoW's UI Scale so the text reads on video."
+    },
+    {
+      "id": "R",
+      "name": "Sections",
+      "where": "One recording per section: follow its route in order without stopping; I mark each feature in the take afterwards. A section can be split over takes if something goes wrong (t1, t2…)."
+    }
+  ],
+  "clips": [
+    {
+      "id": "C00",
+      "session": "S0",
+      "slug": "obs-test",
+      "title": "OBS test recording",
+      "client": "any",
+      "hub": "tints",
+      "do": "Record ~15 seconds: run the Tint presets carousel, move the camera a little.",
+      "status": "done",
+      "takes": [
+        {
+          "file": "C00 obs-test t1.mp4",
+          "from": "2026-11-02 15-56-19.mp4",
+          "note": "picture ok, no sound",
+          "marks": []
+        },
+        {
+          "file": "C00 obs-test t2.mp4",
+          "from": "2026-11-02 16-00-20.mp4",
+          "note": "sound ok: Game Capture audio",
+          "marks": [
+            "0:00 on the mount, hilltop",
+            "0:04 spell flash",
+            "0:08 flying mount takes off",
+            "0:10 lands"
+          ]
+        }
+      ],
+      "zoom": "wide"
+    },
+    {
+      "id": "C01",
+      "session": "S1",
+      "slug": "welcome",
+      "title": "Welcome window and the three profiles",
+      "client": "any",
+      "hub": "welcome",
+      "do": "Click through the levels, pick Cinema, Next turns gold.",
+      "short": true,
+      "status": "done",
+      "takes": [
+        {
+          "file": "C01 welcome t1.mp4",
+          "from": "2026-11-02 16-42-27.mp4",
+          "note": "17s: opens, Cinema picked, no clicking through",
+          "marks": [
+            "0:00 world, no UI",
+            "0:03 window opens, Cinema already picked",
+            "0:17 end"
+          ]
+        },
+        {
+          "file": "C01 welcome t2.mp4",
+          "from": "2026-11-02 16-44-43.mp4",
+          "note": "65s full take: Subtle, Balanced, Cinema, Customize pages",
+          "marks": [
+            "0:00 window, full UI",
+            "0:06 Subtle",
+            "0:09 Balanced",
+            "0:15-0:18 Cinema: UI fades",
+            "0:21-0:24 Vitals Vision preview (Cinema picked)",
+            "0:27 Customize: UI fade",
+            "0:33 Action bars",
+            "0:39 Layout",
+            "0:42 Camera",
+            "0:48 Look",
+            "0:51 Visions",
+            "0:57 Chat",
+            "1:00 Music",
+            "1:03 closed, world"
+          ]
+        },
+        {
+          "file": "C01 welcome t3.mp4",
+          "from": "2026-11-02 16-49-40.mp4",
+          "note": "UI Scale 1.15: window ~1000px wide, sharp. Best take: Subtle/Balanced/Cinema + 4 Customize pages",
+          "marks": [
+            "0:00 window, full UI, nothing picked",
+            "0:06 Subtle",
+            "0:09 Balanced",
+            "0:12 Cinema: UI fades",
+            "0:12.6-0:15 Vitals Vision preview (Cinema picked)",
+            "0:16 Next gold",
+            "0:16.5 Customize: UI fade",
+            "0:27 Action bars",
+            "0:30 Layout",
+            "0:33 Camera",
+            "0:36 Look",
+            "0:39 Visions",
+            "0:42 Chat",
+            "0:45 Music",
+            "0:45.5 closed, world"
+          ]
+        }
+      ],
+      "zoom": "close",
+      "zoomOn": "the window"
+    },
+    {
+      "id": "C02",
+      "session": "S1",
+      "slug": "settings-tour",
+      "title": "Settings tour: every page",
+      "client": "any",
+      "hub": "tour-all",
+      "do": "Let it run; pages change on their own.",
+      "status": "done",
+      "takes": [
+        {
+          "file": "C02 settings-tour t1.mp4",
+          "from": "2026-11-02 18-40-54.mp4",
+          "note": "",
+          "marks": [
+            "0:08 Main page",
+            "0:12 Profiles",
+            "0:16 Interface (Game Frames…Chat Bubbles, 4s each)",
+            "0:59 Nameplates",
+            "1:07 Style (General, Unit, Raid, PRD, Tooltip, Nameplate, Names, Cast Bars, Bubbles)",
+            "1:43 Camera (General, Scenes, Scripts)",
+            "1:55 Atmosphere (Effects, Tint, Letterbox, Graphics+, Audio)",
+            "2:23 Visions (Heal, Vitals, Quest, Roll, Duel)",
+            "2:59 Cards (Events, Styles, a card, Sounds)",
+            "3:15 Wheels (master, yours, camera, menu, marker, ground, vision)",
+            "3:43 QoL General, Fishing",
+            "3:52 Keybinds",
+            "3:55 New features, All changes, Socials, Help",
+            "4:11 Why Is It Showing (tour over; idle to 4:39)",
+            "4:39 Esc: game menu (cut before)"
+          ]
+        }
+      ],
+      "zoom": "close",
+      "zoomOn": "the window"
+    },
+    {
+      "id": "C03",
+      "session": "S1",
+      "slug": "page-names",
+      "title": "Interface hub: new page names, Visibility/HUD/Overhead groups, the » on Game Frames rows",
+      "client": "any",
+      "do": "Open Interface, hover the icons, click a row's » to jump to its page.",
+      "new": true,
+      "status": "skip",
+      "takes": [],
+      "zoom": "close",
+      "zoomOn": "the window",
+      "skipNote": "covered by C02 0:16-1:07 (Interface pages, bands); » click moved to C04"
+    },
+    {
+      "id": "C04",
+      "session": "S1",
+      "slug": "search",
+      "title": "Settings search box, and a Game Frames row's » to its own page",
+      "client": "any",
+      "do": "Type \"tint\", then \"music\", click a result. Then Interface > Game Frames: click a row's » (e.g. Minimap).",
+      "status": "done",
+      "takes": [
+        {
+          "file": "C04 search t1.mp4",
+          "from": "2026-11-02 18-55-26.mp4",
+          "note": "",
+          "marks": [
+            "0:05 /cine options",
+            "0:06 settings: main page",
+            "0:09 search: tint results",
+            "0:14 search cleared",
+            "0:15 search: music results",
+            "0:18 result clicked: lands on its setting, highlighted",
+            "0:20 Interface > Game Frames",
+            "0:24 row tooltips (Location, Edit as a rule)",
+            "0:29 minimap shows (row hovered)",
+            "0:31 Esc: game menu (cut before)",
+            "no » jump in this take"
+          ]
+        }
+      ],
+      "zoom": "close",
+      "zoomOn": "the window"
+    },
+    {
+      "id": "C05",
+      "session": "S1",
+      "slug": "menu-look",
+      "title": "Menu look: HD vs SD",
+      "client": "any",
+      "hub": "menu-look",
+      "status": "done",
+      "takes": [
+        {
+          "file": "C05 menu-look t1.mp4",
+          "from": "2026-11-02 20-00-20.mp4",
+          "note": "",
+          "marks": [
+            "0:06 3-2-1",
+            "0:09 lead-in (clear)",
+            "0:11 settings: main page",
+            "0:12 HD (flat gold boxes)",
+            "0:15 SD (game checkmarks)",
+            "0:18 HD",
+            "0:21 SD",
+            "0:24 Stop recording (cut before)",
+            "difference is only the checkboxes on this page: subtle"
+          ]
+        },
+        {
+          "file": "C05 menu-look t2.mp4",
+          "from": "2026-11-02 20-03-42.mp4",
+          "note": "",
+          "marks": [
+            "0:08 lead-in",
+            "0:09 settings: main page (not Tint: old code, no /reload?)",
+            "0:12 HD",
+            "0:15 SD",
+            "0:18 HD",
+            "0:21 SD",
+            "0:22 Stop recording",
+            "same as t1"
+          ]
+        },
+        {
+          "file": "C05 menu-look t3.mp4",
+          "from": "2026-11-02 20-04-49.mp4",
+          "note": "",
+          "marks": [
+            "0:08 lead-in",
+            "0:11 Tint page opens",
+            "0:13 HD: flat gold sliders and boxes",
+            "0:16 SD: game sliders, checkmarks",
+            "0:19 HD",
+            "0:22 SD",
+            "0:25 Stop recording (cut before)",
+            "best take"
+          ]
+        }
+      ],
+      "zoom": "close",
+      "zoomOn": "the window"
+    },
+    {
+      "id": "C06",
+      "session": "S1",
+      "slug": "style-preview",
+      "title": "Style preview: larger preview, Pop out, drag, Dock",
+      "client": "any",
+      "do": "Style > Unit Frames: open the larger preview, Pop out, drag it, Dock.",
+      "new": true,
+      "status": "skip",
+      "takes": [],
+      "zoom": "close",
+      "zoomOn": "the window",
+      "skipNote": "menu detail: shown in the settings tour (C02)"
+    },
+    {
+      "id": "C07",
+      "session": "S1",
+      "slug": "profiles",
+      "title": "Profiles: switch Subtle / Balanced / Cinema and watch the world change, make your own, share it",
+      "client": "any",
+      "hub": "export, then import",
+      "status": "skip",
+      "takes": [],
+      "zoom": "close",
+      "zoomOn": "the window",
+      "short": true,
+      "do": "Profiles page beside the world: click each built-in profile (pause on each), New profile, then Export and Import.",
+      "skipNote": "covered by C01 t3 (levels switched with the world changing behind)"
+    },
+    {
+      "id": "C08",
+      "session": "S1",
+      "slug": "language",
+      "title": "Language dropdown",
+      "client": "any",
+      "do": "Main page: switch to Deutsch, then back.",
+      "status": "skip",
+      "takes": [],
+      "zoom": "close",
+      "zoomOn": "the window",
+      "skipNote": "menu detail"
+    },
+    {
+      "id": "C09",
+      "session": "S1",
+      "slug": "inspect",
+      "title": "Inspect (/cine why): click a frame, see why it shows",
+      "client": "any",
+      "hub": "why",
+      "do": "Click a faded action bar, then the minimap.",
+      "status": "skip",
+      "takes": [],
+      "zoom": "close",
+      "zoomOn": "the Inspect popup and the frame clicked",
+      "skipNote": "troubleshooting tool, not a showcase feature"
+    },
+    {
+      "id": "C10",
+      "session": "S1",
+      "slug": "why-page",
+      "title": "Why Is It Showing? page: every row, filters, pick a frame",
+      "client": "any",
+      "do": "Community > Why Is It Showing?: sort, Showing/Hidden filters, Pick a frame.",
+      "status": "skip",
+      "takes": [],
+      "zoom": "close",
+      "zoomOn": "the window",
+      "skipNote": "menu detail: in the settings tour (C02)"
+    },
+    {
+      "id": "C11",
+      "session": "S1",
+      "slug": "addon-frames",
+      "title": "Addon Frames: Loaded/Unloaded tabs, Hover Find, Smart Find",
+      "client": "any",
+      "do": "With an extra addon loaded: Find frames tab, Hover Find a frame, run Smart Find.",
+      "status": "skip",
+      "takes": [],
+      "zoom": "close",
+      "zoomOn": "the window",
+      "skipNote": "menu detail: in the settings tour (C02)"
+    },
+    {
+      "id": "C12",
+      "session": "S1",
+      "slug": "minimap-button",
+      "title": "Minimap button menu and tooltip",
+      "client": "any",
+      "do": "Hover, then right-click the minimap button.",
+      "status": "skip",
+      "takes": [],
+      "zoom": "close",
+      "zoomOn": "the minimap button and its menu",
+      "skipNote": "menu detail"
+    },
+    {
+      "id": "C13",
+      "session": "S1",
+      "slug": "cameras-page",
+      "title": "Cameras page: copy a camera, rename, pick its icon",
+      "client": "any",
+      "do": "Right-click a camera > Copy, rename it, choose an icon from the browser.",
+      "status": "skip",
+      "takes": [],
+      "zoom": "close",
+      "zoomOn": "the window",
+      "skipNote": "menu detail: Cameras page in the settings tour (C02)"
+    },
+    {
+      "id": "C14",
+      "session": "S1",
+      "slug": "camera-scripts",
+      "title": "Camera Scripts: steps, Play step, run and Stop",
+      "client": "any",
+      "do": "Open a built-in script, add a step, press Play, then Stop.",
+      "status": "skip",
+      "takes": [],
+      "zoom": "close",
+      "zoomOn": "the window",
+      "skipNote": "menu detail: Scripts page in the settings tour (C02)"
+    },
+    {
+      "id": "C15",
+      "session": "S1",
+      "slug": "camera-wheel",
+      "title": "Wheels: camera wheel, then the menu, marker and vision wheels",
+      "client": "any",
+      "hub": "wheel",
+      "do": "Cursor mid-screen. Hold each wheel's key in turn; start a camera from the camera wheel.",
+      "short": true,
+      "status": "skip",
+      "takes": [],
+      "zoom": "medium",
+      "zoomOn": "the wheel round the cursor",
+      "skipNote": "in a section"
+    },
+    {
+      "id": "C16",
+      "session": "S1",
+      "slug": "other-wheels",
+      "title": "Menu, marker, ground marker and vision wheels",
+      "client": "any",
+      "do": "Hold each wheel's key in turn, open a window from the menu wheel.",
+      "status": "skip",
+      "takes": [],
+      "zoom": "medium",
+      "zoomOn": "the wheel round the cursor",
+      "skipNote": "merged into C15"
+    },
+    {
+      "id": "C17",
+      "session": "S1",
+      "slug": "whats-new",
+      "title": "What's new page and the update notice",
+      "client": "any",
+      "hub": "whatsnew, update-notice",
+      "status": "skip",
+      "takes": [],
+      "zoom": "close",
+      "zoomOn": "the window",
+      "skipNote": "menu detail: in the settings tour (C02)"
+    },
+    {
+      "id": "R1",
+      "slug": "city-and-inn",
+      "title": "City and inn",
+      "short": true,
+      "zoom": "wide",
+      "steps": [
+        "Stand at a nice street spot, UI showing: `/cine demo hook` (UI fades, letterbox in), then `/cine demo hook-back`",
+        "Hover the action bars, then the minimap (hover reveal, its group comes up)",
+        "`/cine demo chat-peek`, then `/cine demo speech` (chat pops up, speech from behind)",
+        "Walk through the crowd past chatty NPCs (nameplates by kind, text-only bubbles)",
+        "Target a player and hover them (styled target frame, tooltip)",
+        "Cast a self-buff or a weapon enchant (buff peek)",
+        "Talk to a quest giver, read, accept (Quest Cam, Quest Vision)",
+        "Walk mode + auto-run down the main street (RP Walk Cam)",
+        "Walk into the inn (Rested card, inn glow)",
+        "`/cine demo cozy-tour`, then sit in a chair, then stand and draw your weapon (Cozy Cam)"
+      ],
+      "covers": [
+        "C20",
+        "C21",
+        "C22",
+        "C23",
+        "C24",
+        "C25",
+        "C26",
+        "C27",
+        "C36",
+        "C31",
+        "C32",
+        "C33",
+        "C40",
+        "C44",
+        "C41",
+        "C42",
+        "C43"
+      ],
+      "session": "R",
+      "status": "todo",
+      "takes": [],
+      "client": "any",
+      "do": "A busy capital, ending in its inn. CineMode off at the start. About 6–8 min."
+    },
+    {
+      "id": "R2",
+      "slug": "travel",
+      "title": "Travel: flight, mount, Hearthstone",
+      "short": true,
+      "zoom": "wide",
+      "steps": [
+        "`/cine demo flight-director`, then take the flight (Flight Cam, fly-bys)",
+        "Land (settling camera, Flight arrival card, zone card)",
+        "Mount up and auto-run down a road (Auto-run Cam; skyriding on retail)",
+        "Stop, Hearthstone (Tele Cam, Tele Vision)"
+      ],
+      "covers": [
+        "C50",
+        "C52",
+        "C51",
+        "C53"
+      ],
+      "session": "R",
+      "status": "todo",
+      "takes": [],
+      "client": "any",
+      "do": "A flight master, on a route you've flown before. About 3–5 min."
+    },
+    {
+      "id": "R3",
+      "slug": "questing-and-combat",
+      "title": "Questing and combat",
+      "short": true,
+      "zoom": "wide",
+      "steps": [
+        "Tracking on, ride toward the quest area past a node (minimap stays up)",
+        "Look over the quest mobs and objects (quest marks)",
+        "Pull one mob (combat frames, combat cards and sound, Cooldown Manager on retail, then it all fades)",
+        "Pull several and let your health drop (Vitals Vision)",
+        "Die (Death Cam, its song, Death card)"
+      ],
+      "covers": [
+        "C69",
+        "C68",
+        "C60",
+        "C61",
+        "C63",
+        "C65",
+        "C67"
+      ],
+      "session": "R",
+      "status": "todo",
+      "takes": [],
+      "client": "any",
+      "do": "A low-level zone with an unfinished kill/collect quest. About 4–6 min."
+    },
+    {
+      "id": "R4",
+      "slug": "reel-look",
+      "title": "Reel: the look",
+      "short": true,
+      "zoom": "wide",
+      "hub": "reel-look",
+      "steps": [
+        "`/cine demo reel-look`: tints, zone moods, vignette, depth of field, letterbox, time of day, golden hour, moonlight, Vista Cam"
+      ],
+      "covers": [
+        "C80",
+        "C81",
+        "C82",
+        "C83",
+        "C84",
+        "C85",
+        "C86",
+        "C87",
+        "C88",
+        "C89",
+        "C90",
+        "C94"
+      ],
+      "session": "R",
+      "status": "done",
+      "takes": [
+        {
+          "file": "R4 reel-look t1.mp4",
+          "from": "2026-11-02 20-45-52.mp4",
+          "note": "",
+          "marks": [
+            "0:00 UI, run typed",
+            "0:08 3-2-1, lead-in",
+            "0:12 Tints: none, warm, cool, night, dusk, sepia, dreamy (4s each)",
+            "0:39.6 UI flashes for a frame (cut)",
+            "0:42 Zone moods (subtle here: the zone is already gold)",
+            "~1:37 Vignette sweep",
+            "~1:49 Depth of field",
+            "~2:00 Letterbox sweep: no bars visible (fixed in code)",
+            "2:06 Time of day sweep, camera circling (titles Dawn 2:40, Morning 2:48, Evening 3:04, Dusk 3:12)",
+            "3:24 Golden hour B-roll",
+            "4:00 Moonlight B-roll",
+            "4:32 Vista Cam",
+            "4:48 Stop recording: CUT HERE",
+            "4:56-7:28 idle, game AFK camera (unused)"
+          ]
+        }
+      ],
+      "client": "any",
+      "do": "Somewhere pretty with a view, ideally near dusk. One button, ~6 min, stand still."
+    },
+    {
+      "id": "R5",
+      "slug": "reel-visions",
+      "title": "Reel: visions and cards",
+      "zoom": "wide",
+      "hub": "reel-visions",
+      "steps": [
+        "`/cine demo reel-visions`: Tele Vision, Vitals Vision fall + themes, every card, Damage Vision (if loaded)"
+      ],
+      "covers": [
+        "C66",
+        "C73",
+        "C28",
+        "C29",
+        "C30",
+        "C62",
+        "C70"
+      ],
+      "session": "R",
+      "status": "todo",
+      "takes": [],
+      "client": "any",
+      "do": "Anywhere. One button, ~5 min, stand still."
+    },
+    {
+      "id": "R6",
+      "slug": "outdoors",
+      "title": "Outdoors: wheels, fishing, campfire",
+      "zoom": "wide",
+      "steps": [
+        "Cursor mid-screen: hold the camera wheel key, start a camera; then the menu, marker and vision wheels",
+        "Fish, recast with right-click (Fish Cam)",
+        "Hover the campfire, click the icon at the cursor (Campfire button, Cozy Cam)",
+        "Any time it rains or snows: record a bit (weather tint)"
+      ],
+      "covers": [
+        "C15",
+        "C16",
+        "C91",
+        "C92",
+        "C93"
+      ],
+      "session": "R",
+      "status": "todo",
+      "takes": [],
+      "client": "any",
+      "do": "By water with a campfire nearby. About 3–4 min."
+    },
+    {
+      "id": "R7",
+      "slug": "group",
+      "title": "Group",
+      "zoom": "medium",
+      "steps": [
+        "A few pulls in a party (Heal Vision on the party frames)",
+        "Ready check",
+        "A loot roll (Roll Vision)",
+        "Mark mobs from the marker wheel",
+        "Duel your friend near other duels (Duel card, Duel Vision)"
+      ],
+      "covers": [
+        "C100",
+        "C101",
+        "C102",
+        "C103",
+        "C104",
+        "C34",
+        "C105"
+      ],
+      "session": "R",
+      "status": "todo",
+      "takes": [],
+      "client": "any",
+      "do": "With a friend or two. Whenever you can."
+    },
+    {
+      "id": "R8",
+      "slug": "other-addons",
+      "title": "Other addons fade too",
+      "zoom": "wide",
+      "hub": "hook",
+      "steps": [
+        "`/cine demo hook` once each with Details!, Bartender4, Plater, EllesmereUI, FlareUI, DaylightUI, Questie, RestedXP"
+      ],
+      "covers": [
+        "C110"
+      ],
+      "session": "R",
+      "status": "todo",
+      "takes": [],
+      "client": "any",
+      "do": "Anywhere, one addon loaded per take."
+    },
+    {
+      "id": "R9",
+      "slug": "classic-extras",
+      "title": "Classic extras",
+      "zoom": "medium",
+      "client": "classic",
+      "steps": [
+        "Melee a mob (swing timer)",
+        "Right-click mobs in and out of a fight (target + Auto Shot)",
+        "Ammo vendor: Fill quiver"
+      ],
+      "covers": [
+        "C64",
+        "C71",
+        "C72"
+      ],
+      "session": "R",
+      "status": "todo",
+      "takes": [],
+      "do": "Classic Era, on a hunter."
+    }
+  ],
+  "zoomGuide": {
+    "wide": "Full frame (only cut to the video's shape). Cameras, tints, cards, the world. Normal UI Scale.",
+    "medium": "Crop to about half the frame, on the area named. Normal UI Scale is fine.",
+    "close": "The window fills most of the frame. Record with UI Scale turned on at max (1.15) so the text is sharp, then crop to it."
+  }
+}

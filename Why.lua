@@ -119,10 +119,6 @@ local function Columns(key, out)
 	local fighting = Fighting()
 	local calm = ns.InCalm()
 	local facts = ns.RuleFacts(fighting or (calm and ns.db.combatShowCalm))
-	if ns.RoleHides(facts)[key] then
-		Add(out, "block", L["Hidden while you play your current role (the row's roles button)"], page)
-		return
-	end
 	local text = ns.db.frameRules and ns.db.frameRules[key]
 	if ns.RuleTest(key) then
 		local on = ns.RuleShows(key, facts)

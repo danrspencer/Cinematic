@@ -1,5 +1,5 @@
 -- Cinematic: the dev build's Demo Hub (/cine demo). Every demo tool in one
--- place, for recording the showcase videos (Tools/video/shot-list.md): the
+-- place, for recording the showcase videos (Tools/video/playbook.md): the
 -- test commands and pages scattered round the addon, and demo scripts that
 -- run a shot on their own (a camera, a tint carousel, a settings tour...), so
 -- a clip is: start recording, press Run, stop recording.
@@ -13,7 +13,7 @@
 -- and settings it changed are also put back after a /reload mid-demo
 -- (db.debugDemoRestore). A tool is a plain function, run and done.
 --
--- Settings: db.debugDemoHub (countdown, hide the hub while running, captions,
+-- Settings: db.debugDemoHub (countdown, lead-in, hide the hub while running, captions,
 -- seconds per settings page). Keys starting "debug" stay out of profiles.
 -- The same list is the Dev hub's Demo Commands page. Dev copy only
 -- (CinematicDev.toc; ignored in .pkgmeta).
@@ -27,7 +27,7 @@ local GOLD, SOFT, DIM = { 1, 0.82, 0 }, { 0.9, 0.9, 0.9 }, { 0.6, 0.6, 0.6 }
 local HUB_W, HUB_H = 470, 600
 local ROW_H, HEAD_H = 26, 30
 
-local DEFAULT_SETTINGS = { countdown = 3, hideHub = true, captions = false, pageSeconds = 4 }
+local DEFAULT_SETTINGS = { countdown = 3, leadIn = 2, hideHub = true, captions = false, pageSeconds = 4 }
 local function Settings()
 	local db = ns.db
 	if not db then return DEFAULT_SETTINGS end
@@ -45,7 +45,7 @@ end
 
 -- Groups in order: the shot list's recording sessions, then the rest.
 local GROUPS = {
-	"Recording helpers", "1. Settings & menus", "2. Town & inn", "3. Flight & hearth", "4. Questing & combat",
+	"Sections", "Recording helpers", "1. Settings & menus", "2. Town & inn", "3. Flight & hearth", "4. Questing & combat",
 	"5. Scenery & mood", "6. Group", "Dev pages & test commands",
 }
 local demos, byKey = {}, {}
@@ -78,6 +78,29 @@ local function CloseSettings()
 	end
 end
 
+-- Sections: one recording each, the demos that run where you stand in a row
+-- (Tools/video/playbook.md's sections). Captions (above) name each one.
+
+local REELS = {
+	{ "reel-look", "Reel: the look", "Tints, zone moods, vignette, depth of field, letterbox, the time of day, " ..
+		"golden hour and moonlight B-roll, the Vista Cam (about 6 minutes). Somewhere pretty; stand still.",
+		{ { "tints" }, { "moods" }, { "vignette" }, { "dof" }, { "letterbox" }, { "day" }, { "golden" }, { "night" },
+			{ "stare" } } },
+	{ "reel-visions", "Reel: visions and cards", "Tele Vision, Vitals Vision (a fall, then a minute of themes), " ..
+		"every card, Damage Vision where it's loaded (about 5 minutes). Anywhere; stand still.",
+		{ { "tele-vision", 10 }, { "vitals", 14 }, { "vitals-themes" }, { "cards" }, { "damage", 27 } } },
+}
+for _, reel in ipairs(REELS) do
+	Add("Sections", { key = reel[1], name = reel[2], tip = reel[3], still = true,
+		script = function(d)
+			-- (CineMode and the UI hidden for the whole reel: each part putting
+			-- its own back would flash the UI between them)
+			d.Cine(true)
+			d.HideUI(true)
+			for _, part in ipairs(reel[4]) do d.Play(part[1], part[2]) end
+		end })
+end
+
 -- Recording helpers -----------------------------------------------------------
 
 Add("Recording helpers", { key = "clean", name = "Clean slate",
@@ -101,6 +124,10 @@ Add("Recording helpers", { key = "letterbox", name = "Letterbox sweep",
 	tip = "The bars close in to 12% of the screen, hold, and ease back to your size.",
 	script = function(d)
 		d.Cine(true)
+		-- (bars on, sized by height: by a film's aspect, a screen that wide already has none)
+		d.Set("letterbox", true)
+		d.Set("letterboxPage", true)
+		d.Set("letterboxSizeBy", "height")
 		local start = ns.db.letterboxSize or 0.03
 		d.Set("letterboxSize", start)
 		local function Size(value) ns.db.letterboxSize = value ns.RefreshLetterbox() end
@@ -163,15 +190,16 @@ for _, tour in ipairs(TOURS) do
 		script = function(d) Tour(d, tour[3]) end })
 end
 Add("1. Settings & menus", { key = "menu-look", name = "Menu look: HD, then SD",
-	tip = "Opens the settings and flips Cinematic's windows between the flat HD look and the game's own SD " ..
-		"look, twice. Your Menu look is put back.",
+	tip = "Opens the Tint page (sliders, dropdowns, buttons and boxes: the most to see change) and flips " ..
+		"Cinematic's windows between the flat HD look and the game's own SD look, twice. Your Menu look is " ..
+		"put back.",
 	script = function(d)
 		local was = CinematicDB.menuSkin -- (the account's, not ns.db: Remember can't keep it over a reload)
 		d.Restore(function()
 			CinematicDB.menuSkin = was
 			ns.ApplyMenuSkin()
 		end)
-		ns.OpenOptions()
+		ns.OpenOptions("Tint")
 		d.Wait(1.5)
 		for _ = 1, 2 do
 			for _, skin in ipairs({ "HD", "SD" }) do
@@ -294,6 +322,16 @@ end
 
 -- 3. Flight & hearth ------------------------------------------------------------
 
+Add("3. Flight & hearth", { key = "tele-vision", name = "Tele Vision: a pretend Hearthstone",
+	tip = "Tele Vision's Test: the portal opens round you as if casting your Hearthstone, then the screen " ..
+		"goes black. Again stops it.",
+	needs = function() return ns.TestTeleportVision ~= nil, "Tele Vision isn't loaded" end,
+	run = function() ns.TestTeleportVision() end })
+Add("3. Flight & hearth", { key = "tele-colors", name = "Tele Vision: every class color",
+	tip = "/cine teleport colors: a pretend cast in each class and spec's color, 4 seconds each, numbered. " ..
+		"Again stops it.",
+	needs = function() return ns.TeleportColorReel ~= nil, "Tele Vision isn't loaded" end,
+	run = function() ns.HandleSlash("teleport colors") end })
 Add("3. Flight & hearth", { key = "flight-director", name = "Flight director",
 	tip = "Start it, then take a flight: a fly-by 12 seconds after takeoff and every 25 seconds after, " ..
 		"until you land. Waits up to 10 minutes for the flight.",
@@ -332,6 +370,9 @@ Add("4. Questing & combat", { key = "vitals-glimpse", name = "Vitals Vision: qui
 	tip = "The welcome window's short look: health drops in hits, holds 3 seconds, comes back.",
 	run = function() ns.FlashVitals(3) end })
 
+Add("4. Questing & combat", { key = "vitals-all", name = "Vitals Vision: every theme once",
+	tip = "/cine vital demo all: every theme in the menu's order, numbered with its key, then stops.",
+	run = function() ns.VitalsDemo({ "all" }) end })
 Add("4. Questing & combat", { key = "vitals-themes", name = "Vitals Vision: theme reel",
 	tip = "/cine vital demo 4: a random spec's theme every 4 seconds, its name on the screen, for a minute.",
 	script = function(d)
@@ -667,6 +708,20 @@ local function Overlay()
 	captionText:SetPoint("CENTER")
 	captionText:SetShadowOffset(2, -2)
 	overlay.caption = caption
+	local stop = CreateFrame("Frame", nil, overlay)
+	stop:SetSize(400, 60)
+	stop:SetPoint("CENTER")
+	stop:SetScale(2)
+	stop:Hide()
+	stop.text = stop:CreateFontString(nil, "OVERLAY", "GameFontNormalHuge")
+	stop.text:SetPoint("CENTER", 0, 8)
+	stop.text:SetTextColor(1, 0.25, 0.2)
+	stop.text:SetShadowOffset(2, -2)
+	stop.text:SetText("Stop recording")
+	stop.sub = stop:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+	stop.sub:SetPoint("TOP", stop.text, "BOTTOM", 0, -4)
+	stop.sub:SetShadowOffset(1, -1)
+	overlay.stop = stop
 	overlay:SetScale(UIParent:GetEffectiveScale() / WorldFrame:GetEffectiveScale())
 	return overlay
 end
@@ -674,6 +729,28 @@ end
 local current -- the run going now
 local driver = CreateFrame("Frame")
 local hub, RefreshHub -- (the window, below)
+
+-- As a script ends: every window closed (out of combat: closing some in a
+-- fight is blocked) and "Stop recording" in the middle of the screen for a
+-- few seconds, so the take ends on a clean frame; the hub comes back after.
+local STOP_SECONDS = 4
+local stopTimer
+local function StopCue(run, why)
+	if not InCombatLockdown() then
+		CloseSettings()
+		if CloseAllWindows then pcall(CloseAllWindows) end
+	end
+	local stop = Overlay().stop
+	stop.sub:SetText(run.demo.name .. " " .. (why or "done"))
+	stop:Show()
+	if stopTimer then stopTimer:Cancel() end
+	stopTimer = C_Timer.NewTimer(STOP_SECONDS, function()
+		stopTimer = nil
+		stop:Hide()
+		if run.hidHub and hub and not current then hub:Show() end
+	end)
+	stopTimer.hub = run.hidHub
+end
 
 local function Finish(why)
 	local run = current
@@ -690,7 +767,7 @@ local function Finish(why)
 	local took = GetTime() - run.started
 	ns.Log("demo", ("%s: %s after %.1f s"):format(run.demo.key, why or "done", took))
 	ns.Print(("Demo %s %s (%.0f s)."):format(run.demo.name, why or "done", took))
-	if run.hidHub and hub then hub:Show() end
+	StopCue(run, why)
 	if RefreshHub then RefreshHub() end
 end
 
@@ -716,7 +793,8 @@ local function OnUpdate()
 		return
 	end
 	if run.countdownUntil then
-		local left = math.ceil(run.countdownUntil - now)
+		-- (the numbers, then leadIn seconds of a clear screen before it starts)
+		local left = math.ceil(run.countdownUntil - run.leadIn - now)
 		countdownText:SetText(left > 0 and tostring(left) or "")
 		if now >= run.countdownUntil then
 			run.countdownUntil = nil
@@ -847,6 +925,38 @@ local function Director(run)
 		ns.CameraTestStop()
 		return true
 	end
+	-- Another demo inside this one (a section's reel): its script with a
+	-- director of its own, what it changed put back as it ends, before the
+	-- next (or by this one's end, if stopped meanwhile); or a tool, run, then
+	-- seconds waited. Skipped where it can't run.
+	function d.Play(key, seconds)
+		local demo = byKey[key]
+		if not demo then return end
+		if demo.needs and not demo.needs() then
+			d.Cue("skipped " .. key)
+			return
+		end
+		d.Cue("play " .. key)
+		d.Caption(demo.name, 3)
+		if not demo.script then
+			local ok, err = pcall(demo.run)
+			if not ok then d.Cue("error: " .. tostring(err)) end
+			d.Wait(seconds or 5)
+			return
+		end
+		-- (its waits and captions go on this run: only its own things apart)
+		local sub = setmetatable({ demo = demo, restore = {} }, { __index = run, __newindex = run })
+		local function PutBack()
+			local list = rawget(sub, "restore")
+			rawset(sub, "restore", {})
+			for i = #list, 1, -1 do pcall(list[i]) end
+			RefreshAll()
+		end
+		d.Restore(PutBack)
+		demo.script(Director(sub))
+		PutBack()
+		d.Wait(1)
+	end
 	return d
 end
 
@@ -872,8 +982,16 @@ local function Run(key, fromSettings)
 	end
 	if not ns.db then return end
 	Stop()
+	local hubWaiting -- (the last one hid the hub and hadn't brought it back yet)
+	if stopTimer then -- (the last one's Stop recording: gone as this one starts)
+		hubWaiting = stopTimer.hub
+		stopTimer:Cancel()
+		stopTimer = nil
+		overlay.stop:Hide()
+	end
 	if fromSettings and not key:find("^tour") and key ~= "menu-look" then CloseSettings() end
 	if not demo.script then
+		if hubWaiting and hub then hub:Show() end
 		local ok, err = pcall(demo.run)
 		if not ok then ns.Print("Demo error: " .. tostring(err)) end
 		if RefreshHub then RefreshHub() end
@@ -884,14 +1002,17 @@ local function Run(key, fromSettings)
 	run.co = coroutine.create(function() demo.script(run.d) end)
 	run.d = Director(run)
 	current = run
-	if hub and hub:IsShown() and settings.hideHub then
+	if hubWaiting then
+		run.hidHub = true
+	elseif hub and hub:IsShown() and settings.hideHub then
 		hub:Hide()
 		run.hidHub = true
 	end
 	Overlay()
 	ns.Log("demo", "start " .. key)
-	if settings.countdown > 0 then
-		run.countdownUntil = GetTime() + settings.countdown
+	if settings.countdown + settings.leadIn > 0 then
+		run.leadIn = settings.leadIn
+		run.countdownUntil = GetTime() + settings.countdown + settings.leadIn
 	else
 		run.wakeAt = GetTime() -- (first resume next frame)
 	end
@@ -983,6 +1104,7 @@ function RefreshHub()
 		local s = Settings()
 		hub.countdown:SetText(("Countdown: %d s"):format(s.countdown))
 		hub.pages:SetText(("Pages: %d s"):format(s.pageSeconds))
+		hub.leadIn:SetText(("Lead-in: %d s"):format(s.leadIn))
 		hub.hideHub:SetChecked(s.hideHub)
 		hub.captions:SetChecked(s.captions)
 	end
@@ -1071,6 +1193,10 @@ local function CreateHub()
 	hub.countdown:SetPoint("LEFT", stop, "RIGHT", 6, 0)
 	hub.pages = Cycle(hub, 90, "pageSeconds", { 3, 4, 6, 8 }, "How long the settings tours stay on each page.")
 	hub.pages:SetPoint("LEFT", hub.countdown, "RIGHT", 6, 0)
+	hub.leadIn = Cycle(hub, 90, "leadIn", { 0, 2, 3, 5 },
+		"Seconds of a clear screen after the countdown before the script starts, so the take has room to " ..
+		"cut in.")
+	hub.leadIn:SetPoint("LEFT", hub.pages, "RIGHT", 6, 0)
 	hub.hideHub = Check(hub, "Hide while running", "hideHub",
 		"Hide this window while a script runs (it comes back when the script ends).")
 	hub.hideHub:SetPoint("TOPLEFT", stop, "BOTTOMLEFT", -2, -4)

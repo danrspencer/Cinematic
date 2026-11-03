@@ -261,12 +261,9 @@ local function NameKeptHere(key, inCombat)
 	if key == "Target" then
 		return NameKeptHere("YourTarget", inCombat) -- (the Target section's Names row)
 	end
-	-- (Its roles, and its rule, edited on its row: name:<row>.)
+	-- (Its rule, edited on its row: name:<row>.)
 	local facts = ns.RuleFactsNow()
 	local ruleKey = ns.NameRuleKey(key)
-	if ns.RoleHides(facts)[ruleKey] then
-		return false
-	end
 	local rule = ns.RuleShows(ruleKey, facts)
 	if rule ~= nil then
 		return rule
@@ -299,6 +296,26 @@ do
 		end
 		return ruleKey
 	end
+end
+
+-- A names or plates row's ticks as a rule (name:<row>, plate:<row>), for
+-- the old Roles column's going over (Frames.lua's ns.RowTicksRule).
+do
+	local function TicksRule(prefix, world, row)
+		local db = ns.db
+		if db[prefix .. "Always" .. row] then return "always" end
+		local words = {}
+		for _, tick in ipairs({ { "Combat", "(combat or calm)" }, { "CombatPvP", "((combat or calm) and flagged)" },
+			{ "Group", "group" }, { world, "(not combat and world)" }, { "InCities", "(not combat and city)" },
+			{ "InPvP", "(not combat and flagged and not bg)" }, { "InBGs", "(not combat and bg)" },
+			{ "InInstances", "(not combat and instance)" }, { "TargetEnemy", "(not combat and enemy)" },
+			{ "TargetFriendly", "(not combat and friendly)" } }) do
+			if db[prefix .. tick[1] .. row] then words[#words + 1] = tick[2] end
+		end
+		return #words > 0 and table.concat(words, " or ") or "never"
+	end
+	ns.TICKS_RULE["^name:"] = function(key) return TicksRule("name", "Keep", key:sub(6)) end
+	ns.TICKS_RULE["^plate:"] = function(key) return TicksRule("plate", "Cinematic", key:sub(7)) end
 end
 
 -- fightStarting: called as a fight starts, just before combat lockdown.
@@ -1341,15 +1358,11 @@ ns.InPvPFight = InPvPFight
 -- whatever its other boxes say).
 -- A row with a rule (its row's Edit, key plate:<row>) goes by it instead,
 -- in fights and out: nil without one. (Keys made once each, not each frame.)
--- Hidden by its roles button while you're that role: no, whatever the rest says.
 local PLATE_RULE_KEY = setmetatable({}, { __index = function(keys, kind)
 	keys[kind] = "plate:" .. kind
 	return keys[kind]
 end })
 local function RuleSays(kind)
-	if ns.RoleHides(ns.RuleFactsNow())[PLATE_RULE_KEY[kind]] then
-		return false
-	end
 	local test = ns.RuleTest(PLATE_RULE_KEY[kind])
 	if test then
 		return test(ns.RuleFactsNow()) and true or false

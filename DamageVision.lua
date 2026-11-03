@@ -22,18 +22,16 @@ DEFAULTS.damageVisionDuring = "all"        -- "all" fights or "boss" fights only
 DEFAULTS.damageVisionFrom = "boss"         -- "run" (the meter's Overall), "boss" (a boss's own, else the run), "fight"
 DEFAULTS.damageVisionOnlyCine = false      -- only while CineMode is on
 DEFAULTS.damageVisionPlace = true          -- your place over it...
-DEFAULTS.damageVisionPlaceOf = true        -- ...as "#2 of 5" (else just "#2")
-DEFAULTS.damageVisionLadderRows = 5        -- the rank ladder: at most this many rows (#1 down, you last if further down)
+DEFAULTS.damageVisionPlaceOf = false       -- ...as "#2 of 5" (else just "#2")
+DEFAULTS.damageVisionLadderRows = 3        -- the rank ladder: at most this many rows (#1 down, you last if further down)
 DEFAULTS.damageVisionAlways = false        -- its Show in row's Always: in every fight, wherever you are
 DEFAULTS.damageVisionHold = 5              -- seconds it stays after a fight
 DEFAULTS.damageVisionSize = 1              -- its size, times its own
--- Where they sit: X right and Y up from the middle of the screen, in the UI's
--- units (the display by its top edge, the recap by its middle). Typed on the
--- Style tab or dragged with its mover.
+-- Where it sits: X right and Y up from the middle of the screen, in the UI's
+-- units, by its top edge. The recap takes the same spot (the display fading
+-- out while it's up). Typed on the Style tab or dragged with its mover.
 DEFAULTS.damageVisionX = -861     -- (top left, beside the game's damage meter window)
 DEFAULTS.damageVisionY = 545
-DEFAULTS.damageVisionRecapX = 0
-DEFAULTS.damageVisionRecapY = 450 -- (top middle)
 DEFAULTS.damageVisionRecapBoss = true      -- a recap as a boss dies
 DEFAULTS.damageVisionRecapRun = true       -- ...and as a dungeon's done
 -- The look (the Style tab's; its switch damageVisionLook, off: these defaults).
@@ -52,7 +50,7 @@ DEFAULTS.damageVisionBorderR, DEFAULTS.damageVisionBorderG, DEFAULTS.damageVisio
 DEFAULTS.damageVisionSmooth = true         -- the bars glide to their new value
 DEFAULTS.damageVisionSpark = true          -- a spark at the filled part's edge
 DEFAULTS.damageVisionCrown = true          -- the crown as you take #1
-DEFAULTS.damageVisionDots = "circle"       -- the race track's dots: "circle", "portrait" (you; them: their class icon) or "class"
+DEFAULTS.damageVisionDots = "portrait"     -- the race track's dots: "circle", "portrait" (you; them: their class icon) or "class"
 DEFAULTS.damageVisionTotal = false         -- your total in the gap bar
 DEFAULTS.damageVisionRivalName = true      -- the name of the one you race
 DEFAULTS.damageVisionFont = "general"      -- the words' font (general: General's)
@@ -213,9 +211,13 @@ local function Restricted()
 	return false
 end
 
+-- For the full report (DamageReport.lua).
+ns.DamageVisionMeter = { HasMeter = HasMeter, MeterType = MeterType, Rows = Rows, Restricted = Restricted }
+
 -- Whether it shows now, and why not (for the debug command).
 local function Allowed()
 	if test then return true end
+	if recap and recap:IsShown() then return false, "its recap is up (in the same spot)" end
 	if not db.damageVision then return false, "the page is off" end
 	if not HasMeter() then return false, "no damage meter on this client" end
 	if not MeterOn() then return false, "the game's damage meter is off (Gameplay Enhancements: Enable Damage Meter)" end
@@ -610,9 +612,31 @@ local function Crown(rank)
 	lastRank = rank
 end
 
+-- Where your place sits: above the bar, or on the race track on your dot's
+-- line (your dot slides over it, drawn on top: its frame is above the text).
+local function PlacePlace(look)
+	local key = "top"
+	if db.damageVisionStyle == "race" then
+		local bare = look.damageVisionDots == "portrait" or look.damageVisionDots == "class"
+		local half = frame.race:GetHeight() / 2
+		local size = (Heights(look)) + 4
+		-- (The dot's bottom over the line's middle, as dot:Pin() puts it.)
+		key = (bare and half + 2 or half + 7) + size / 2
+	end
+	if frame.place.at == key then return end
+	frame.place.at = key
+	frame.place:ClearAllPoints()
+	if key == "top" then
+		frame.place:SetPoint("BOTTOM", frame, "TOP", 0, 2)
+	else
+		frame.place:SetPoint("CENTER", frame.race, "CENTER", 0, key)
+	end
+end
+
 local function Draw(rows, top)
 	local look = Look()
 	local style = db.damageVisionStyle
+	PlacePlace(look)
 	frame.gap:SetShown(style == "gap")
 	frame.race:SetShown(style == "race")
 	frame.ladder:SetShown(style == "ladder")
@@ -634,7 +658,7 @@ local function Draw(rows, top)
 	local barHeight, _, step = Heights(look)
 	if style == "ladder" then
 		-- (At most Rows: #1 down, and you in the last one if you're further down.)
-		local count = math.max(1, math.min(tonumber(db.damageVisionLadderRows) or 5, LADDER_ROWS))
+		local count = math.max(1, math.min(tonumber(db.damageVisionLadderRows) or 3, LADDER_ROWS))
 		FillRows(frame.ladder.rows, rows, rank, top, count)
 		frame.ladder.target = math.min(rank, count)
 		frame:SetHeight(math.min(#rows, count) * step)
@@ -771,6 +795,23 @@ local function CreateRecap()
 	local back = recap:CreateTexture(nil, "BACKGROUND")
 	back:SetAllPoints()
 	back:SetColorTexture(0, 0, 0, 0.55)
+	-- (Dungeon done: a Full report button at its top, the one bit you can
+	-- click. Over it, the recap waits.)
+	local report = CreateFrame("Button", nil, recap, "UIPanelButtonTemplate")
+	report:SetSize(120, 22)
+	report:SetPoint("TOP", 0, -8)
+	report:SetText(L["Full report"])
+	if ns.SkinButton then ns.SkinButton(report) end
+	report:SetScript("OnClick", function()
+		ns.StopDamageRecap()
+		if ns.ShowDamageReport then ns.ShowDamageReport(recap.test) end
+	end)
+	report:SetScript("OnEnter", function() recap.anim:Pause() end)
+	report:SetScript("OnLeave", function()
+		if recap:IsShown() and recap.anim:IsPaused() then recap.anim:Play() end
+	end)
+	report:Hide()
+	recap.report = report
 	recap.title = recap:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
 	recap.title:SetPoint("TOP", 0, -8)
 	recap.place = recap:CreateFontString(nil, "OVERLAY", "GameFontHighlightLarge")
@@ -797,14 +838,24 @@ local function CreateRecap()
 	fadeOut:SetToAlpha(0)
 	fadeOut:SetDuration(0.8)
 	fadeOut:SetOrder(3)
-	anim:SetScript("OnFinished", function() recap:Hide() end)
+	anim:SetScript("OnFinished", function()
+		recap:Hide()
+		Wake() -- (the display back in its spot, if it's still wanted)
+	end)
 	recap.anim = anim
 end
 
--- A recap of rows (a session's, read out of combat: plain).
-local function ShowRecap(title, rows, top)
+-- A recap of rows (a session's, read out of combat: plain). report: with the
+-- Full report button (test: it opens the test report, made-up bosses
+-- unless the meter has some).
+local function ShowRecap(title, rows, top, report, test)
 	if not rows or #rows == 0 then return end
 	if not recap then CreateRecap() end
+	local button = report and ns.ShowDamageReport ~= nil
+	recap.report:SetShown(button)
+	recap.test = test and "test" or nil
+	recap.title:ClearAllPoints()
+	recap.title:SetPoint("TOP", 0, button and -36 or -8)
 	local look = Look()
 	local _, row, step = Heights(look)
 	for i, each in ipairs(recap.rows) do
@@ -819,9 +870,9 @@ local function ShowRecap(title, rows, top)
 	recap.title:SetText(title)
 	recap.place:SetText(rank and L["#%d of %d"]:format(rank, #rows) or L["You're not on the meter"])
 	FillRows(recap.rows, rows, rank, top)
-	recap:SetHeight(64 + math.min(#rows, RECAP_ROWS) * step)
+	recap:SetHeight(64 + (button and 28 or 0) + math.min(#rows, RECAP_ROWS) * step)
 	recap:SetScale(db.damageVisionSize)
-	SpotPoint(recap, db.damageVisionRecapX, db.damageVisionRecapY, db.damageVisionSize, "CENTER")
+	SpotPoint(recap, db.damageVisionX, db.damageVisionY, db.damageVisionSize, "TOP")
 	recap:SetAlpha(0)
 	recap:Show()
 	recap.anim:Stop()
@@ -863,7 +914,8 @@ local function RunPending(late)
 		local rows = id and Rows(nil, MeterType(), id) or Rows(Enum.DamageMeterSessionType.Current, MeterType())
 		ShowRecap(L["%s down"]:format(name or L["Boss"]), rows)
 	else
-		ShowRecap(L["Dungeon done"], Rows(Enum.DamageMeterSessionType.Overall, MeterType()))
+		local rows, top = Rows(Enum.DamageMeterSessionType.Overall, MeterType())
+		ShowRecap(L["Dungeon done"], rows, top, true)
 	end
 end
 
@@ -881,9 +933,9 @@ end
 function ns.RefreshDamageVision()
 	db = ns.GetDB()
 	Wake()
-	-- (A recap up, or a mover out: to their X and Y as typed.)
+	-- (A recap up, or the mover out: to the X and Y as typed.)
 	if recap and recap:IsShown() then
-		SpotPoint(recap, db.damageVisionRecapX, db.damageVisionRecapY, db.damageVisionSize, "CENTER")
+		SpotPoint(recap, db.damageVisionX, db.damageVisionY, db.damageVisionSize, "TOP")
 	end
 	if ns.SnapDamageMovers then ns.SnapDamageMovers() end
 end
@@ -914,7 +966,7 @@ function ns.TestDamageRecap()
 			{ name = "Rogue", classFilename = "ROGUE", totalAmount = 4100000 },
 			{ name = "Priest", classFilename = "PRIEST", totalAmount = 1200000 } }
 	end
-	ShowRecap(L["Dungeon done"], rows)
+	ShowRecap(L["Dungeon done"], rows, nil, true, true)
 end
 
 -- The tests running (for their buttons, Stop while they are), and stopping them.
@@ -932,16 +984,15 @@ function ns.StopDamageRecap()
 	if not recap then return end
 	recap.anim:Stop()
 	recap:Hide()
+	Wake()
 end
 
--- Movers (as speech from behind's, Speech.lua): a box where the display or
--- the recap sits, its size. Drag it, left-click to set (and see a test),
+-- Movers (as speech from behind's, Speech.lua): a box where the display (and
+-- its recap) sits, its size. Drag it, left-click to set (and see a test),
 -- right-click to put it back where it started.
 local MOVERS = {
 	display = { x = "damageVisionX", y = "damageVisionY", point = "TOP", height = 60,
-		text = "Damage Vision shows here.\nDrag it where you want it, left-click to set, right-click to reset." },
-	recap = { x = "damageVisionRecapX", y = "damageVisionRecapY", point = "CENTER", height = 160,
-		text = "Damage Vision's recap shows here.\nDrag it where you want it, left-click to set, right-click to reset." },
+		text = "Damage Vision and its recap show here.\nDrag it where you want it, left-click to set, right-click to reset." },
 }
 local movers = {}
 
@@ -968,8 +1019,7 @@ function ns.MoveDamageVision(which)
 		close:SetPoint("TOPRIGHT", 4, 4)
 		function mover.Snap()
 			local size = db.damageVisionSize
-			local width = which == "recap" and WIDTH + 20 or (Look().damageVisionWidth or WIDTH)
-			mover:SetSize(width * size, info.height * size)
+			mover:SetSize((Look().damageVisionWidth or WIDTH) * size, info.height * size)
 			SpotPoint(mover, db[info.x], db[info.y], 1, info.point)
 		end
 		-- (Moved: the page's X and Y boxes show it, if the settings are open.)
@@ -1001,7 +1051,7 @@ function ns.MoveDamageVision(which)
 				Moved()
 			else
 				self:Hide()
-				if which == "recap" then ns.TestDamageRecap() else ns.TestDamageVision() end
+				ns.TestDamageVision()
 			end
 		end)
 		movers[which] = mover
@@ -1406,6 +1456,10 @@ function ns.CreateDamageVisionStylePanel(kit)
 		L["The recap card, with the meter's whole run if you've one, else made up (Stop hides it)."],
 		ns.DamageRecapShowing, ns.TestDamageRecap, ns.StopDamageRecap)
 	recapButton:SetPoint("LEFT", testButton, "RIGHT", 8, 0)
+	local reportButton = b.Button(tests, L["Full report"], 110,
+		L["The full report: how you did on the run, boss by boss and the rest, with the whole party " ..
+		"(/cine report). Made-up bosses while the meter has none."], function() ns.ToggleDamageReport("test") end)
+	reportButton:SetPoint("LEFT", recapButton, "RIGHT", 8, 0)
 
 	stack:Header(content, L["Over it"])
 	b.Toggles(L["Show:"], {
@@ -1539,7 +1593,7 @@ function ns.CreateDamageVisionLookPanel(kit)
 
 	stack:Header(content, L["Position"])
 	b.Number(L["Scale:"], "damageVisionSize", 50, 200, 10, 100, "%", L["Everything at once, bars and words."])
-	-- Each one's X and Y from the middle of the screen, and its mover.
+	-- Its X and Y from the middle of the screen (the recap's too), and its mover.
 	local XY_TIP = L["How far right (X) and up (Y) from the middle of the screen it sits; below 0, left or down. " ..
 		"Dragging it with Move fills these in."]
 	local function Spot(label, xKey, yKey, buttonText, buttonTip, which)
@@ -1552,10 +1606,8 @@ function ns.CreateDamageVisionLookPanel(kit)
 		button:SetPoint("LEFT", yBox, "RIGHT", 16, 0)
 	end
 	Spot(L["Damage Vision:"], "damageVisionX", "damageVisionY", L["Move"],
-		L["A box where it shows: drag it where you want it, left-click to set, right-click to put it back. " ..
-		"Close the settings to see it."], "display")
-	Spot(L["Recap:"], "damageVisionRecapX", "damageVisionRecapY", L["Move recap"],
-		L["The same for the recap after a boss or a dungeon."], "recap")
+		L["A box where it and its recap show: drag it where you want it, left-click to set, right-click to put " ..
+		"it back. Close the settings to see it."], "display")
 
 	canvas:SetScript("OnShow", kit.PageShown(kit.Refresh, content))
 	canvas:Hide()

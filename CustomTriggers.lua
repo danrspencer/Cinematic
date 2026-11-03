@@ -639,6 +639,7 @@ function ns.RemoveCustomTrigger(id)
 	for _, list in ipairs(ns.CAMERA_ROW_LISTS) do
 		if type(db[list]) == "table" then db[list][ns.CameraRowKey(id)] = nil end
 	end
+	ns.DropCameraRowFollowers(id)
 	local list = {}
 	for each in tostring(rows.custom or ""):gmatch("[^,]+") do
 		if each ~= id then list[#list + 1] = each end

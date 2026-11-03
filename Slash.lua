@@ -59,6 +59,7 @@ local function PrintHelp()
 	Command("/cine walk", L["does the addon think you're walking or auto-running?"])
 	Command("/cine walk flip", L["fix it if it has walk and run backwards"])
 	Heading(L["More"])
+	Command("/cine report", L["your damage report for this run: boss by boss, the rest, the whole party (test: made up)"])
 	Command("/cine debug help", L["troubleshooting commands"])
 	Command("/cine log", L["copy the log and your setup for a bug report (/cine log clear empties it)"])
 	Command("/cine panic", L["stop for this session and put your UI and settings back (/cine resume to restart)"])
@@ -278,6 +279,8 @@ local function HandleSlash(msg)
 		ns.RemoveUnderMouse()
 	elseif cmd == "why" then
 		ns.ToggleInspect()
+	elseif cmd == "report" then
+		ns.ToggleDamageReport(arg == "test")
 	elseif cmd == "debug" and arg == "why" then
 		ns.DebugInspect()
 	elseif cmd == "button" then
@@ -1226,14 +1229,23 @@ local function HandleSlash(msg)
 		ns.Print(("Card Vision %s, Style %s, in combat %s, CineMode %s, playing: %s"):format(tostring(ns.Setting("cards")),
 			tostring(ns.StyleOn("cards")), tostring(InCombatLockdown()), tostring(ns.lastCinematic and true or false),
 			current and (current.id .. " (" .. tostring(current.name) .. ")") or "none"))
+		-- (Held through a fight: which, and when they show.)
+		local held, showIn = ns.Cards.Held()
+		local ids = {}
+		for id in pairs(held) do ids[#ids + 1] = id end
+		if #ids > 0 then
+			print(("  held till after the fight: %s; %s"):format(table.concat(ids, ", "),
+				showIn and ("show in %.1f s"):format(showIn) or "still in it"))
+		end
 		for _, event in ipairs(ns.CARD_EVENTS or {}) do
 			local ok, why = ns.CardAllowed(event.id)
 			local own = {}
 			for _, field in ipairs(ns.CARD_FIELDS) do
 				if ns.CardIsOwn(event.id, field[1]) then own[#own + 1] = field[1] end
 			end
-			print(("  %s: %s%s; own look: %s"):format(event.id, ok and "|cff60ff60shows here|r" or "|cffff6060not here|r",
-				ok and "" or " (" .. tostring(why) .. ")", #own > 0 and table.concat(own, ", ") or "none"))
+			print(("  %s: %s%s; in a fight: %s; own look: %s"):format(event.id,
+				ok and "|cff60ff60shows here|r" or "|cffff6060not here|r", ok and "" or " (" .. tostring(why) .. ")",
+				event.inFight and tostring(ns.db["cardFight_" .. event.id]) or "always", #own > 0 and table.concat(own, ", ") or "none"))
 		end
 		-- (Each style changed from how it comes: which settings.)
 		for _, style in ipairs(ns.CARD_STYLES or {}) do

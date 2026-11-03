@@ -12,8 +12,7 @@
 -- camera, music, cine (a copy's; nil: its trigger's own row's), name (one of
 -- your own), off (true: unticked, passed over), always and calm (the When's Always and the Calm Timer wait; nil
 -- on a trigger's own row: its camera's, below). A row's place ticks and rule
--- are under "trig:<id>" in the shared lists (cityShow..., frameRules,
--- tankHide...).
+-- are under "trig:<id>" in the shared lists (cityShow..., frameRules).
 --
 -- Triggers of your own (CustomTriggers.lua: custom = true) keep all of theirs
 -- in it too, their own row's included: "custom" their ids, and
@@ -275,15 +274,33 @@ local function Leader(id)
 	return CamOf(ns.CameraRowValue(id, "camera"))
 end
 
--- The lists a row's When is in, and its key in them.
+-- The lists a row's When is in, and its key in them. (rowFollow: the row it
+-- follows, picked in the rule editor's Follow a row.)
 ns.CAMERA_ROW_LISTS = { "combatShow", "calmShow", "quietShow", "camShow", "enemyShow", "friendlyShow", "bgShow",
-	"worldShow", "cityShow", "groupShow", "instanceShow", "frameRules", "tankHide", "healerHide", "damageHide" }
+	"worldShow", "cityShow", "groupShow", "instanceShow", "frameRules", "rowFollow" }
 local ROW_KEY = setmetatable({}, { __index = function(keys, id)
 	local key = "trig:" .. id
 	keys[id] = key
 	return key
 end })
 function ns.CameraRowKey(id) return ROW_KEY[id] end
+
+-- The row whose When a row goes by: the one it follows (db.rowFollow, through
+-- a chain of them: its ticks, rule, Always and Calm Timer wait all that
+-- row's; its own kept for when it stops), else itself.
+local function WhenRow(id)
+	local db = ns.db or ns.GetDB()
+	if not (db and db.rowFollow and db.rowFollow[ROW_KEY[id]]) then return id end
+	return ns.FollowKey(ROW_KEY[id]):match("^trig:(.+)$") or id
+end
+ns.CameraWhenRow = WhenRow
+-- A row gone: the rows that followed it go by their own When again.
+function ns.DropCameraRowFollowers(id)
+	local follow = ns.GetDB().rowFollow
+	for key, leader in pairs(follow or {}) do
+		if leader == ROW_KEY[id] then follow[key] = nil end
+	end
+end
 
 -- Whether a trigger's own row has a When of its own yet (else its camera's
 -- counts, rule, roles and all, as before the page was one). A tick it starts
@@ -307,14 +324,19 @@ function ns.CameraRowFollow(id)
 end
 
 -- A row's Always and Calm Timer wait: its own, else (a trigger's own row)
--- its camera's.
+-- its camera's. (Following a row: that row's.)
 function ns.CameraRowAlways(id)
+	id = WhenRow(id)
 	local own = Rows()[id .. ".always"]
 	if own ~= nil then return own end
 	local leader = Leader(id)
 	return leader and ns.GetDB()["camAlways" .. leader] and true or false
 end
 function ns.CameraRowCalm(id)
+	-- (The death camera never waits, following a row that does or not.)
+	local trigger = ns.CameraRowTrigger(id)
+	if trigger and trigger.key == "Death" then return false end
+	id = WhenRow(id)
 	local own = Rows()[id .. ".calm"]
 	if own ~= nil then return own end
 	local leader = Leader(id)
@@ -338,6 +360,7 @@ local function FightFits(key, always)
 end
 local function RowFits(id)
 	local trigger = ns.CameraRowTrigger(id)
+	id = WhenRow(id) -- (following another row: its When)
 	local leader = ns.CameraRowFollow(id)
 	if trigger.key ~= "Death" then
 		local key, always = ROW_KEY[id], ns.CameraRowAlways(id)
@@ -454,8 +477,9 @@ function ns.CameraRowsOffWhy(cam)
 	for _, key in ipairs(keys) do
 		local lead = TRIGGER[key] and ns.SceneLead(key)
 		for _, id in ipairs(lead and ns.TriggerRowIds(lead) or {}) do
-			local leader = ns.CameraRowFollow(id)
-			local when = (leader and not OwnWhen(id)) and ("cam:" .. leader) or ROW_KEY[id]
+			local whenId = WhenRow(id)
+			local leader = ns.CameraRowFollow(whenId)
+			local when = (leader and not OwnWhen(whenId)) and ("cam:" .. leader) or ROW_KEY[whenId]
 			local places = {}
 			for _, list in ipairs(PLACE_LISTS) do
 				if ns.IsPlaceShowOn(list, when) then places[#places + 1] = list:gsub("Show$", "") end
@@ -549,6 +573,7 @@ function ns.RemoveCameraRow(id)
 	for _, list in ipairs(ns.CAMERA_ROW_LISTS) do
 		if type(db[list]) == "table" then db[list][ROW_KEY[id]] = nil end
 	end
+	ns.DropCameraRowFollowers(id)
 	local list = {}
 	for _, each in ipairs(ns.CameraRowOrder()) do
 		if each ~= id then list[#list + 1] = each end

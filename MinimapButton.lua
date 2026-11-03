@@ -96,16 +96,47 @@ local function UpdateInUse()
 	end
 end
 
+-- Whether one quarter of the minimap (vert "TOP"/"BOTTOM", horiz "LEFT"/"RIGHT")
+-- is round, from GetMinimapShape: the global that minimap addons (ElvUI and
+-- the like) set for a square map. "CORNER-X" rounds only corner X, "SIDE-X"
+-- the two corners on side X, "TRICORNER-X" all but the one opposite X.
+local function QuarterIsRound(vert, horiz)
+	local shape = GetMinimapShape and GetMinimapShape() or "ROUND"
+	if shape == "SQUARE" then
+		return false
+	end
+	local kind, which = tostring(shape):match("^(%u+)%-(%u+)$")
+	if kind == "CORNER" then
+		return which == vert .. horiz
+	elseif kind == "SIDE" then
+		return which == vert or which == horiz
+	elseif kind == "TRICORNER" then
+		return (which:find(vert, 1, true) or which:find(horiz, 1, true)) ~= nil
+	end
+	return true
+end
+
+-- The button's offset from the minimap's center at the saved angle: on the
+-- circle in a round quarter, on the square's edge in a square one.
+local function RimOffset(angle, halfWidth, halfHeight)
+	local x, y = math.cos(angle), math.sin(angle)
+	if QuarterIsRound(y > 0 and "TOP" or "BOTTOM", x < 0 and "LEFT" or "RIGHT") then
+		return x * halfWidth, y * halfHeight
+	end
+	local stretch = 1 / math.max(math.abs(x), math.abs(y)) -- out from the circle to the square
+	return x * stretch * halfWidth, y * stretch * halfHeight
+end
+
 local function UpdatePosition()
 	local db = ns.GetDB()
 	if not button or not db then
 		return
 	end
 	if onMinimap then
-		local radius = Minimap:GetWidth() / 2 + EDGE_OFFSET
-		local angle = math.rad(db.minimapAngle)
+		local x, y = RimOffset(math.rad(db.minimapAngle),
+			Minimap:GetWidth() / 2 + EDGE_OFFSET, Minimap:GetHeight() / 2 + EDGE_OFFSET)
 		button:ClearAllPoints()
-		button:SetPoint("CENTER", Minimap, "CENTER", math.cos(angle) * radius, math.sin(angle) * radius)
+		button:SetPoint("CENTER", Minimap, "CENTER", x, y)
 		return
 	end
 	if Minimap:GetScale() < 0.5 then
@@ -123,12 +154,12 @@ local function UpdatePosition()
 	if mx * minimapScale / uiScale > UIParent:GetWidth() then
 		return
 	end
-	local radius = (Minimap:GetWidth() / 2) * minimapScale / buttonScale + EDGE_OFFSET
 	local cx, cy = mx * minimapScale / buttonScale, my * minimapScale / buttonScale
-	local angle = math.rad(db.minimapAngle)
+	local x, y = RimOffset(math.rad(db.minimapAngle),
+		(Minimap:GetWidth() / 2) * minimapScale / buttonScale + EDGE_OFFSET,
+		(Minimap:GetHeight() / 2) * minimapScale / buttonScale + EDGE_OFFSET)
 	button:ClearAllPoints()
-	button:SetPoint("CENTER", UIParent, "BOTTOMLEFT",
-		cx + math.cos(angle) * radius, cy + math.sin(angle) * radius)
+	button:SetPoint("CENTER", UIParent, "BOTTOMLEFT", cx + x, cy + y)
 end
 
 local function UpdateIcon()

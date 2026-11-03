@@ -1,7 +1,7 @@
 -- The frames tables' rows as dropdowns (Options.lua's ShowTable: Standard
 -- Frames, Gamepad, Chat): an Always box, a dropdown of the fights and one
 -- of the places (each ticked item shows the row: all joined by OR, as the
--- columns were), the roles and an Edit button. The ticks are the lists the
+-- columns were) and an Edit button. The ticks are the lists the
 -- columns always were (combatShow, worldShow...), so saved settings and
 -- profiles are as they were. Edit shows the row as a rule (db.frameRules,
 -- ns.CompileRule) in the rule editor here: one still just the dropdowns'
@@ -236,7 +236,9 @@ end
 -- SetText(text), as it's typed; Close(text), as it closes (back into the
 -- dropdowns if it reads, else kept as the row's rule); ResetToGrid(), drop
 -- the rule for the ticks it had; grid, the words its dropdowns hold: nil for
--- a row without (a nameplate row, a unit frame part), whose rule just stays }.
+-- a row without (a nameplate row, a unit frame part), whose rule just stays;
+-- follow (nil: none): { key, the row's; choices() the rows it may follow, as
+-- { key, label }; leader(), the one it follows; set(key), nil for none } }.
 -- Built the first time.
 local editor, target
 local EDIT_W = 560
@@ -445,6 +447,39 @@ local function BuildEditor()
 		editor:Hide()
 	end)
 	Tip(resetGrid, L["Drops the rule: the row's dropdowns decide again, ticked as they were before."])
+	-- Follow a row: a menu of the row's table's others (those that follow it
+	-- greyed: no loops). Picking one closes the editor, the rule as it was.
+	local followButton = ns.PanelButton(editor)
+	followButton:SetSize(120, 22)
+	followButton:SetPoint("RIGHT", done, "LEFT", -8, 0)
+	followButton:SetText(L["Follow a row"])
+	followButton:SetScript("OnClick", function(self)
+		local follow = target and target.follow
+		if not follow then return end
+		MenuUtil.CreateContextMenu(self, function(_, root)
+			root:CreateTitle(L["Follow another row"])
+			root:CreateRadio(L["None: its own settings"], function() return not follow.leader() end, function()
+				follow.set(nil)
+			end)
+			root:CreateDivider()
+			for _, choice in ipairs(follow.choices()) do
+				local key = choice[1]
+				if key ~= follow.key then
+					local loops = ns.FollowKey(key) == follow.key
+					local radio = root:CreateRadio(choice[2] .. (loops and " " .. L["(follows this one)"] or ""),
+						function() return follow.leader() == key end, function()
+							follow.set(key)
+							target = nil -- (its rule left as it was)
+							editor:Hide()
+						end)
+					if loops and radio and radio.SetEnabled then radio:SetEnabled(false) end
+				end
+			end
+		end)
+	end)
+	Tip(followButton, L["Instead of a rule, this row shows whenever another row of its table does, however that " ..
+		"one is set now or later. All or nothing: none of this row's own settings count while it follows, and " ..
+		"they're kept for when it stops (Grid on the row)."])
 	editor:SetHeight(34 + 64 + 6 + 32 + 12 + palette:GetHeight() + 50)
 
 	function Refresh()
@@ -454,6 +489,7 @@ local function BuildEditor()
 		local isAlways, why
 		if grid then isAlways, why = ns.ReadGridRule(text, grid) end
 		resetGrid:SetShown(grid ~= nil and isAlways == nil)
+		followButton:SetShown(target.follow ~= nil)
 		-- (Only a rule that reads, or none, can be kept.)
 		done:SetEnabled(not text:find("%S") or ns.CompileRule(text) ~= nil)
 		reads:SetShown(grid ~= nil)
@@ -545,22 +581,14 @@ local MENU_GROUPS = {
 ns.GRID_COMBAT, ns.GRID_TARGET, ns.GRID_LOCATION = 1, 2, 3
 -- Which dropdown each list's in (the rest: Location).
 local LIST_GROUP = { combatShow = 1, enemyShow = 2, friendlyShow = 2 }
-local ROLE_COLOR = { 0.4, 0.85, 0.5 }
+local FOLLOW_COLOR = { 0.79, 0.73, 1 }
 -- The targets' names in a menu (the rest are their columns').
 local MENU_NAMES = { combatShow = "In combat", enemyShow = "Enemy targeted", friendlyShow = "Friend targeted" }
 
--- Across a row, from the label's end: Always, the dropdowns, the roles, Edit.
-local ALWAYS_W, MENU_W, ROLES_W, RULE_W, GAP = 46, 96, 50, 40, 2
+-- Across a row, from the label's end: Always, the dropdowns, Edit.
+local ALWAYS_W, MENU_W, RULE_W, GAP = 46, 96, 40, 2
 -- The dot at the end of a row's name (room kept for it in the label).
 ns.GRID_DOT_ROOM = 18
-
--- The roles (a row's roles dropdown: unticked, kept hidden while you're
--- that role), their settings and icons (the nameplates' role texture).
-local ROLES = { { "tankHide", "Tank", "0:19:22:41" }, { "healerHide", "Healer", "20:39:1:20" },
-	{ "damageHide", "Damage", "20:39:22:41" } }
-local function RoleIcon(role, size)
-	return ("|TInterface\\LFGFrame\\UI-LFG-ICON-PORTRAITROLES:%d:%d:0:0:64:64:%s|t"):format(size, size, role[3])
-end
 
 -- What a dropdown says: -, the one ticked, All or how many.
 local function Summary(names, total, color)
@@ -572,7 +600,7 @@ end
 
 -- Where a grid's columns go across a row, labelWidth in. layout: { groups,
 -- the dropdowns it has ({ 1, 2, 3 } when nil); always = false: no Always
--- column; roles, edit: those columns }.
+-- column; edit: that column }.
 local function Columns(layout)
 	local x, cols = 0, { menus = {} }
 	if layout.always ~= false then
@@ -584,10 +612,6 @@ local function Columns(layout)
 		x = x + MENU_W + GAP
 	end
 	cols.menusEnd = x
-	if layout.roles and ns.GRID_MENUS then
-		cols.roles = x
-		x = x + ROLES_W + GAP
-	end
 	if layout.edit then
 		cols.edit = x
 		x = x + RULE_W
@@ -613,7 +637,6 @@ function ns.GridHeadings(kit, parent, top, labelWidth, layout)
 	for g, group in ipairs(MENU_GROUPS) do
 		if cols.menus[g] then Heading(L[group.heading], cols.menus[g], MENU_W, group.color) end
 	end
-	if cols.roles then Heading(L["Roles"], cols.roles, ROLES_W, ROLE_COLOR) end
 	if cols.edit then Heading(L["Edit"], cols.edit, RULE_W) end
 	return made
 end
@@ -637,7 +660,9 @@ end
 -- (Options.lua's Tooltip, Refresh, controls, RecordKey...). spec:
 --   always = { isOn(), set(value), tip } (nil: an empty cell);
 --   menus = { [dropdown] = { { name, isOn(), toggle(), usable() or nil, tip }... } };
---   roles = { key(), tip, changed() } (nil: none);
+--   follow = { key(), choices() giving { { key, label }... }: the rows it
+--     may follow, picked in the rule editor } (nil: none): following one, it
+--     shows "Follows <row>" where its rule would be, and shows as that row does;
 --   rule = { key(), label(), grid (the dropdowns' words, for ns.ReadGridRule;
 --     nil: a rule just stays), words(), apply(always, ticked), changed(key) } (nil: no Edit);
 --   enabled() (nil: usable): whether its client has it and the like;
@@ -659,12 +684,12 @@ function ns.GridRow(kit, parent, labelWidth, layout, spec)
 	end
 	local rule = spec.rule
 	local function RuleKey() return rule and rule.key() end
-	local function Rule()
-		local key = RuleKey()
+	local function RuleOf(key)
 		local rules = key and ns.GetDB().frameRules
 		local text = rules and rules[key]
 		return type(text) == "string" and text:find("%S") and text or nil
 	end
+	local function Rule() return RuleOf(RuleKey()) end
 	local function SetRule(text)
 		local db = ns.GetDB()
 		db.frameRules = db.frameRules or {}
@@ -735,75 +760,18 @@ function ns.GridRow(kit, parent, labelWidth, layout, spec)
 		end
 	end
 
-	-- The roles it shows for (kept apart from the rule: they count either way).
-	local roles
-	if spec.roles and cols.roles then
-		local Key = spec.roles.key
-		roles = ns.GridMenuButton(row, ROLES_W)
-		roles:SetPoint("LEFT", cols.roles, 0)
-		roles:SetSkinEdge(ROLE_COLOR[1], ROLE_COLOR[2], ROLE_COLOR[3], 0.45)
-		-- Ticked: it shows only while you're one of them; none ticked (-), for
-		-- every role. Kept as the roles it's hidden for (tankHide...), so all
-		-- ticked is none hidden too, and back to -. (All hidden, from before:
-		-- None, in red, ticks as none.)
-		local function Hidden(list) return ns.RoleHidden(ns.GetDB(), list, Key()) end
-		local function HiddenCount()
-			local count = 0
-			for _, role in ipairs(ROLES) do
-				if Hidden(role[1]) then count = count + 1 end
-			end
-			return count
+	-- The row it follows (db.rowFollow), picked in the rule editor: all of
+	-- that row's settings, none of its own (kept for when it stops).
+	local function Leader() return spec.follow and ns.GetDB().rowFollow[spec.follow.key()] end
+	local function LeaderLabel(key)
+		for _, choice in ipairs(spec.follow.choices()) do
+			if choice[1] == key then return choice[2] end
 		end
-		local function Ticked(list)
-			local hidden = HiddenCount()
-			return hidden > 0 and hidden < #ROLES and not Hidden(list)
-		end
-		local entries = {}
-		for _, role in ipairs(ROLES) do
-			local list = role[1]
-			entries[#entries + 1] = { RoleIcon(role, 14) .. " " .. L[role[2]], function() return Ticked(list) end, function()
-				local db, key = ns.GetDB(), Key()
-				local ticked, count = {}, 0
-				for _, each in ipairs(ROLES) do
-					local on = Ticked(each[1])
-					if each[1] == list then on = not on end
-					ticked[each[1]] = on
-					if on then count = count + 1 end
-				end
-				for _, each in ipairs(ROLES) do
-					local hide = count > 0 and count < #ROLES and not ticked[each[1]]
-					db[each[1]] = db[each[1]] or {}
-					-- (Back to nil when it's the row's default again.)
-					if hide == ns.RoleHidden({}, each[1], key) then
-						db[each[1]][key] = nil
-					else
-						db[each[1]][key] = hide
-					end
-				end
-			end }
-		end
-		roles:SetScript("OnClick", function(self)
-			ns.TickMenu(self, entries, function()
-				if spec.roles.changed then spec.roles.changed() end
-				Changed()
-			end, true)
-		end)
-		roles.Refresh = function(self)
-			local hidden = HiddenCount()
-			if hidden == 0 then
-				self:SetText("|cff808080-|r")
-			elseif hidden == #ROLES then
-				self:SetText("|cffff6060" .. L["None"] .. "|r")
-			else
-				local on = {}
-				for _, role in ipairs(ROLES) do
-					if not Hidden(role[1]) then on[#on + 1] = RoleIcon(role, 13) end
-				end
-				self:SetText(table.concat(on))
-			end
-		end
-		Tooltip(roles, spec.roles.tip or L["Tick roles to show it only while you're one of them (your specialization's, " ..
-			"or the one picked in the group finder), whatever its ticks or rule say. None ticked (-): every role."])
+		return key
+	end
+	local function SetLeader(key)
+		ns.GetDB().rowFollow[spec.follow.key()] = key
+		Changed()
 	end
 
 	-- The rule: in text mode, shown where Always and the dropdowns were (a
@@ -844,10 +812,21 @@ function ns.GridRow(kit, parent, labelWidth, layout, spec)
 					Changed()
 				end,
 				ResetToGrid = function() SetRule(nil) Changed() end,
+				follow = spec.follow and ns.GRID_MENUS and { key = spec.follow.key(), choices = spec.follow.choices,
+					leader = Leader, set = SetLeader } or nil,
 			}
 		end
 		ruleText:SetScript("OnClick", function() ns.OpenRuleEditor(Target()) end)
 		ruleText:SetScript("OnEnter", function(self)
+			if Leader() then
+				GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+				GameTooltip:SetText(L["Follow"], FOLLOW_COLOR[1], FOLLOW_COLOR[2], FOLLOW_COLOR[3])
+				GameTooltip:AddLine((L["Follows %s: shows when it does. Its own settings are kept for when it stops."])
+					:format(LeaderLabel(Leader())), 1, 1, 1, true)
+				GameTooltip:AddLine(L["Click to open the editor."], 0.8, 0.8, 0.8, true)
+				GameTooltip:Show()
+				return
+			end
 			local text = Rule() or ""
 			GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
 			GameTooltip:SetText(L["Rule"], 1, 1, 1)
@@ -870,7 +849,9 @@ function ns.GridRow(kit, parent, labelWidth, layout, spec)
 		if edit.SetMotionScriptsWhileDisabled then edit:SetMotionScriptsWhileDisabled(true) end -- (its tip says why)
 		edit:SetScript("OnClick", function()
 			local text = Rule()
-			if not text then
+			if Leader() then
+				SetLeader(nil) -- (its own settings again)
+			elseif not text then
 				ns.OpenRuleEditor(Target())
 			elseif rule.grid then
 				Target().Close(text) -- (back into the dropdowns, as the editor would)
@@ -882,7 +863,11 @@ function ns.GridRow(kit, parent, labelWidth, layout, spec)
 		edit:SetScript("OnEnter", function(self)
 			local text = Rule()
 			GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-			if not text then
+			if Leader() then
+				GameTooltip:SetText(L["Back to its own settings"], 1, 1, 1)
+				GameTooltip:AddLine(L["Stops following: its own ticks or rule, as they were, decide again."],
+					0.8, 0.8, 0.8, true)
+			elseif not text then
 				GameTooltip:SetText(L["Edit as a rule"], 1, 1, 1)
 				if rule.grid then
 					GameTooltip:AddLine(ns.ColoredRule(ns.GridRule(AlwaysOn(), rule.words())), 1, 1, 1, true)
@@ -905,21 +890,19 @@ function ns.GridRow(kit, parent, labelWidth, layout, spec)
 		edit:SetScript("OnLeave", GameTooltip_Hide)
 	end
 
-	-- The dot: what its rule (or its ticks, as one) gives where you are
-	-- now, and whether its roles keep it hidden.
+	-- The dot: what its rule (or its ticks, as one) gives where you are now.
 	local function Live()
 		if not live then return end
 		local facts = ns.db and ns.RuleFactsNow and ns.RuleFactsNow()
-		local text = Rule() or (spec.liveRule and spec.liveRule())
+		local key = RuleKey()
+		local text = RuleOf(key and ns.FollowKey(key)) or (spec.liveRule and spec.liveRule())
 			or (rule and rule.grid and ns.GridRule(AlwaysOn(), rule.words()))
 		local test = facts and text and ns.CompileRule(text)
 		if not test then
 			live:Hide()
 			return
 		end
-		local key = spec.roles and spec.roles.key()
-		local roleList = facts.tank and "tankHide" or facts.healer and "healerHide" or facts.damage and "damageHide"
-		local shows = test(facts) and not (key and roleList and ns.RoleHidden(ns.GetDB(), roleList, key))
+		local shows = test(facts)
 		live:SetTexture(shows and "Interface\\COMMON\\Indicator-Green" or "Interface\\COMMON\\Indicator-Gray")
 		live:Show()
 	end
@@ -934,34 +917,35 @@ function ns.GridRow(kit, parent, labelWidth, layout, spec)
 		local full = cells == "full"
 		local enabled = row.enabled ~= false and (not spec.enabled or spec.enabled())
 		local text = full and Rule()
+		-- (Following a row: "Follows <row>" in the rule's place.)
+		local leader = full and Leader()
 		local on = AlwaysOn()
 		if always then
-			always:SetShown(cells ~= "none" and not text)
+			always:SetShown(cells ~= "none" and not text and not leader)
 			always:SetChecked(on)
 			always:SetEnabled(enabled)
 		end
 		for _, menu in ipairs(menus) do
-			menu:SetShown(full and not text)
+			menu:SetShown(full and not text and not leader)
 			menu:Refresh()
 			menu:SetEnabled(enabled and not on)
 			-- (Greyed, faded whole, edge and all: plainly out of play while Always is ticked.)
 			menu:SetAlpha((enabled and not on) and 1 or 0.35)
 		end
-		if roles then
-			roles:SetShown(full)
-			roles:Refresh()
-			roles:SetEnabled(enabled)
-		end
 		if ruleText then
-			ruleText:SetShown(text and true or false)
+			ruleText:SetShown((text or leader) and true or false)
 			ruleText:SetEnabled(enabled)
-			if text then
+			if leader then
+				ruleText:SetText(Colored(FOLLOW_COLOR, (L["Follows %s"]):format(LeaderLabel(leader))))
+				ruleText:SetSkinTint(nil)
+			elseif text then
 				ruleText:SetText(ns.ColoredRule(text))
 				ruleText:SetSkinTint(not ns.CompileRule(text) and 1 or nil, 0.45, 0.45)
 			end
 			edit:SetShown(full)
-			edit:SetText(text and L["Grid"] or L["Edit"])
-			edit:SetEnabled(enabled and (not text or not rule.grid or ns.ReadGridRule(text, rule.grid) ~= nil))
+			edit:SetText((text or leader) and L["Grid"] or L["Edit"])
+			edit:SetEnabled(enabled and (leader or not text or not rule.grid or ns.ReadGridRule(text, rule.grid) ~= nil)
+				and true or false)
 		end
 		if live then
 			if full then Live() else live:Hide() end
@@ -1131,7 +1115,13 @@ end
 -- label, to place what comes below.
 function ns.GridTable(content, columnTop, rows, kit)
 	local LABEL_WIDTH, ROW_HEIGHT, COLUMNS = kit.labelWidth, kit.rowHeight, kit.columns
-	local LAYOUT = { roles = kit.rolesMenu, edit = true }
+	local LAYOUT = { edit = true }
+	-- (The rows a row may follow: the table's others.)
+	local choices = {}
+	for _, item in ipairs(rows) do
+		if not item.alwaysOnly then choices[#choices + 1] = { item.key, item.label } end
+	end
+	local function Choices() return choices end
 	if not rows.noHeadings then
 		ns.GridHeadings(kit, content, columnTop, LABEL_WIDTH, LAYOUT)
 	end
@@ -1164,7 +1154,7 @@ function ns.GridTable(content, columnTop, rows, kit)
 		for k, v in pairs(rows.opts or {}) do opts[k] = v end
 		for k, v in pairs(item.opts or {}) do opts[k] = v end
 		if not item.alwaysOnly then
-			for _, list in ipairs({ "calmShow", "quietShow", "camShow", "tankHide", "healerHide", "damageHide" }) do
+			for _, list in ipairs({ "calmShow", "quietShow", "camShow", "rowFollow" }) do
 				kit.RecordKey(content, list)
 				kit.RecordRow(content, list, item.key)
 			end
@@ -1197,7 +1187,7 @@ function ns.GridTable(content, columnTop, rows, kit)
 		}
 		if not item.alwaysOnly then
 			spec.menus = parts.menus
-			spec.roles = { key = Key, tip = rows.rolesTip }
+			spec.follow = { key = Key, choices = Choices }
 			spec.rule = { key = Key, label = function() return item.label end, grid = parts.grid,
 				words = parts.words, apply = parts.apply }
 		end

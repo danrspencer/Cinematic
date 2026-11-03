@@ -2219,11 +2219,25 @@ local function PlanRandomZoom()
 	PlanZoom(target)
 end
 
--- Nudge the real camera distance toward `desired`.
-local function CorrectZoomToward(desired)
-	local err = desired - GetCameraZoom()
-	if math.abs(err) > ZOOM_DEADBAND then
-		CallCameraFunction(err > 0 and "CameraZoomOut" or "CameraZoomIn", math.abs(err) * ZOOM_GAIN)
+-- Nudge the real camera distance toward `desired`. The commands add up in the
+-- game's own zoom target, which the camera chases at your zoom speed: on a
+-- path quicker than that (the tele camera's 0.5 s zoom back on a cancel) the
+-- gap never closed, each frame asked for more, and the target ran out to the
+-- max distance. So track.aim keeps where the commands sent have it heading,
+-- and nothing past `desired` is asked for; once the camera is still, nothing
+-- is on its way any more and the aim is where it is (the game's steps aren't
+-- exactly the size asked).
+local function CorrectZoomToward(desired, track)
+	local zoom = GetCameraZoom()
+	if not track.aim or math.abs(zoom - (track.lastZoom or zoom)) < 0.002 then
+		track.aim = zoom
+	end
+	track.lastZoom = zoom
+	local err, ahead = desired - zoom, desired - track.aim
+	if math.abs(err) > ZOOM_DEADBAND and (ahead > 0) == (err > 0) then
+		local ask = math.min(math.abs(err) * ZOOM_GAIN, math.abs(ahead))
+		CallCameraFunction(err > 0 and "CameraZoomOut" or "CameraZoomIn", ask)
+		track.aim = track.aim + (err > 0 and ask or -ask)
 	end
 	return err
 end
@@ -2394,7 +2408,7 @@ function ns.UpdateDeathTilt(on, elapsed)
 	end
 	if tilt.zoomTo then
 		local desired = tilt.zoomFrom + (tilt.zoomTo - tilt.zoomFrom) * EaseProgress(tilt.t, tilt.T, 0.5)
-		local err = CorrectZoomToward(desired)
+		local err = CorrectZoomToward(desired, tilt)
 		if tilt.t >= tilt.T and (math.abs(err) < ZOOM_RESTORE_DONE or tilt.t >= tilt.T + DEATH_ZOOM_GIVE_UP) then
 			tilt.zoomTo = nil
 			if not tilt.on then
@@ -2614,7 +2628,7 @@ local function StepIdleZoom(elapsed)
 	else
 		desired = idleZoom.from + idleZoom.delta * EaseProgress(idleZoom.t, T, idleZoom.ease)
 	end
-	local err = CorrectZoomToward(desired)
+	local err = CorrectZoomToward(desired, idleZoom)
 
 	if idleZoom.phase == "restore" then
 		if (idleZoom.t >= T and math.abs(err) < ZOOM_RESTORE_DONE) or idleZoom.t >= T + ZOOM_RESTORE_GIVE_UP then

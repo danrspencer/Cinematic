@@ -211,6 +211,7 @@ read_globals = {
 	"MenuResponse",
 	"PixelUtil",
 	"Minimap",
+	"GetMinimapShape",
 	"MoveViewDownStart",
 	"MoveViewDownStop",
 	"MoveViewLeftStart",

@@ -61,16 +61,6 @@ local function Span(seconds)
 	return L["%d h %d min"]:format(math.floor(minutes / 60), minutes % 60)
 end
 
--- A card that waits for the fight to end (the newest of each kind kept).
-local afterFight = {}
-local function FireCalm(id, card)
-	if Fight() then
-		afterFight[id] = card
-	else
-		ns.Cards.Fire(id, card)
-	end
-end
-
 -- The character's places already seen (Discovered), kept between sessions.
 local function Seen()
 	local char = ns.chardb
@@ -580,7 +570,7 @@ samples.streak = function() return StreakCard(3, "Unholy") end
 
 ---------------------------------------------------------------------------
 local watcher = CreateFrame("Frame")
-for _, event in ipairs({ "PLAYER_ENTERING_WORLD", "PLAYER_REGEN_ENABLED", "PLAYER_LEVEL_UP", "ZONE_CHANGED_NEW_AREA",
+for _, event in ipairs({ "PLAYER_ENTERING_WORLD", "PLAYER_LEVEL_UP", "ZONE_CHANGED_NEW_AREA",
 	"UI_INFO_MESSAGE", "CHAT_MSG_SYSTEM", "PLAYER_CONTROL_LOST", "PLAYER_CONTROL_GAINED", "PLAYER_UPDATE_RESTING",
 	"ACHIEVEMENT_EARNED", "NEW_MOUNT_ADDED", "NEW_PET_ADDED", "SKILL_LINES_CHANGED", "QUEST_COMPLETE",
 	"QUEST_TURNED_IN", "ENCOUNTER_END", "PLAYER_DEAD", "PLAYER_TARGET_CHANGED", "UPDATE_MOUSEOVER_UNIT",
@@ -609,17 +599,12 @@ watcher:SetScript("OnEvent", function(_, event, ...)
 		if key ~= run.key then run = { key = key, at = GetTime(), deaths = 0 } end
 		match = { started = false, ended = false }
 		C_Timer.After(1, ZoneEntered)
-	elseif event == "PLAYER_REGEN_ENABLED" then
-		for id, card in pairs(afterFight) do
-			afterFight[id] = nil
-			ns.Cards.Fire(id, card)
-		end
 	elseif event == "PLAYER_LEVEL_UP" then
 		local level = Plain(...)
 		if level then
 			local took = levelAt and GetTime() - levelAt
 			levelAt = GetTime()
-			if ns.CardOn("levelUp") then FireCalm("levelUp", LevelCard(level, took)) end
+			if ns.CardOn("levelUp") then ns.Cards.Fire("levelUp", LevelCard(level, took)) end
 		end
 	elseif event == "ZONE_CHANGED_NEW_AREA" then
 		C_Timer.After(0.5, ZoneEntered)
@@ -646,7 +631,7 @@ watcher:SetScript("OnEvent", function(_, event, ...)
 		local id, already = ...
 		if ns.CardOn("achievement") and Plain(id) and not already then
 			local card = AchievementCard(id)
-			if card then FireCalm("achievement", card) end
+			if card then ns.Cards.Fire("achievement", card) end
 		end
 	elseif event == "NEW_MOUNT_ADDED" or event == "NEW_PET_ADDED" then
 		if GetTime() - loginAt < 30 or not ns.CardOn("collect") then return end

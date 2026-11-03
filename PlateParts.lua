@@ -1682,7 +1682,6 @@ ns.TargetMarkOrder = MarkOrder
 -- MARK_WHEN_WORDS): kind -> false while it doesn't, worked out by UpdateWhen
 -- (twice a second, and as settings change), facts asked only for a row set
 -- to more than Always.
-local WHEN_ROLES = { "tankHide", "healerHide", "damageHide" }
 local whenNow = {}
 -- (A row's When setting: as its other settings, its kind's while it hasn't one.)
 local function WhenStyle(kind, suffix)
@@ -1695,21 +1694,10 @@ local function WhenStyle(kind, suffix)
 end
 local function WhenSet(kind)
 	local key, db = kind .. "When", ns.db
-	if not WhenStyle(kind, "") or (db.frameRules and db.frameRules[key]) then
-		return true
-	end
-	for _, list in ipairs(WHEN_ROLES) do
-		if ns.RoleHidden(db, list, key) then return true end
-	end
-	return false
+	return not WhenStyle(kind, "") or (db.frameRules and db.frameRules[key]) and true or false
 end
 local function WhenFits(kind, facts)
-	local key = kind .. "When"
-	local list = facts.tank and "tankHide" or facts.healer and "healerHide" or facts.damage and "damageHide"
-	if list and ns.RoleHidden(ns.db, list, key) then
-		return false
-	end
-	local rule = ns.RuleShows(key, facts)
+	local rule = ns.RuleShows(kind .. "When", facts)
 	if rule ~= nil then
 		return rule
 	end
@@ -1720,6 +1708,16 @@ local function WhenFits(kind, facts)
 		if WhenStyle(kind, word[2]) and facts[ns.RULE_WORDS[word[1]]] then return true end
 	end
 	return false
+end
+-- (A row's When ticks as a rule, for the old Roles column's going over: Frames.lua.)
+ns.TICKS_RULE["When$"] = function(key)
+	local kind = key:sub(1, -5)
+	if WhenStyle(kind, "") then return "always" end
+	local words = {}
+	for _, word in ipairs(ns.MARK_WHEN_WORDS) do
+		if WhenStyle(kind, word[2]) then words[#words + 1] = word[1] end
+	end
+	return #words > 0 and table.concat(words, " or ") or "never"
 end
 -- (Gives whether any row's changed.)
 local function UpdateWhen()

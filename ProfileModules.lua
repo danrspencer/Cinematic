@@ -39,9 +39,9 @@ local KEY_ADDRESSES = {
 	-- (the effects' switches, set from their row of the Visual Effects grid, or the Letterbox page's)
 	letterbox = "Letterbox/Show in", vignette = "Effects/Show in", weatherTint = "Effects/Show in",
 }
--- Lists whose rows go with the same rows of the grids: a row's rule or the
--- roles it shows for is where that row is.
-local ROW_RULE_LISTS = { frameRules = true, tankHide = true, healerHide = true, damageHide = true }
+-- Lists whose rows go with the same rows of the grids: a row's rule, or the
+-- row it follows, is where that row is.
+local ROW_RULE_LISTS = { frameRules = true, rowFollow = true }
 
 -- Switches cameras off: an event's camera to none, or (for the ones no
 -- event starts) its row of the Cameras page's "Turn off in" grid.
@@ -246,7 +246,8 @@ ns.PROFILE_MODULES = {
 		tip = "Fights bring up only your resource bar: no portrait, target, buffs, minimap or swing timer, " ..
 		"nothing for an enemy or friend targeted, nothing in dungeons and raids, and the cast bar shows all " ..
 		"through CineMode. The player frame and resource display don't stay up until full; no focus's target of target; " ..
-		"raid frames without names, buffs, threat, target markers, ready checks or titles in CineMode.",
+		"raid frames without names, buffs, threat, target markers, ready checks or titles in CineMode. " ..
+		"The mana bar follows the resource bar.",
 		apply = function(set)
 			set("portraitWhenNotFull", false)
 			set("prdWhenNotFull", false)
@@ -259,6 +260,8 @@ ns.PROFILE_MODULES = {
 			set("enemyShow", { target = false, tot = false, player = false, prd = false, prdpower = false,
 				party = false, raidplayers = false, raidpets = false, focus = false, buffs = false })
 			set("friendlyShow", { target = false, tot = false })
+			-- (The mana bar shows whenever the resource bar does.)
+			set("rowFollow", { prdmana = "prdpower" })
 			-- (Nor in dungeons, scenarios and raids, where the Instances column
 			-- starts with the party and raid frames ticked. The bars: pure-cdm's.)
 			set("instanceShow", EveryRow(false, false))
@@ -268,7 +271,8 @@ ns.PROFILE_MODULES = {
 			"Standard Frames/Info and menus", "Advanced Frames/Supported addons",
 			"Gamepad/top" },
 		tip = "No action bars, micro menu, bags or XP bar in fights, with an enemy targeted or in instances; " ..
-		"the Cooldown Manager in fights, and up after one until its cooldowns are ready, within the Calm Timer.",
+		"the Cooldown Manager in fights, and up after one until its cooldowns are ready, within the Calm Timer. " ..
+		"Its utility, buff and bar rows follow Essential Cooldowns.",
 		apply = function(set)
 			set("cooldownManagerOn", true)
 			set("cooldownWhileRecharging", true)
@@ -281,6 +285,8 @@ ns.PROFILE_MODULES = {
 			for row, value in pairs(fights) do combat[row] = value end
 			combat.cooldowns = true
 			set("combatShow", combat)
+			-- (The other Cooldown Manager rows show whenever Essential Cooldowns does.)
+			set("rowFollow", { cooldownsutility = "cooldowns", cooldownsbuffs = "cooldowns", cooldownsbars = "cooldowns" })
 			set("enemyShow", fights)
 			set("instanceShow", EveryRow(true, false))
 		end },
@@ -405,12 +411,10 @@ ns.PROFILE_MODULES = {
 			set("tooltipShowStill", 1)
 		end },
 	{ key = "heal-vision-everywhere", name = "Heal Vision everywhere", scope = { "Heal Vision" },
-		tip = "Heal Vision in dungeons and raids too, and as a tank or damage dealer.",
+		tip = "Heal Vision in dungeons and raids too.",
 		apply = function(set)
 			set("healVisionInDungeons", true)
 			set("healVisionInRaids", true)
-			set("tankHide", { healVision = false })
-			set("damageHide", { healVision = false })
 		end },
 
 	-- Cameras

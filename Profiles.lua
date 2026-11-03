@@ -32,9 +32,10 @@ local PROFILE_TABLES = {
 	"chatPeekTypes", "chatPeekChannelList", "combatShow", "calmShow", "quietShow", "camShow", "cineShow", "targetShow", "enemyShow",
 	"friendlyShow", "bgShow", "worldShow", "cityShow", "groupShow", "instanceShow", "addonFrames", "gamepadPressButtons",
 	"hoverGroups", "cooldownReadyOnly", "cooldownReadyEarly", "cooldownEarlyOn", "cooldownRechargeOnly", "cooldownNeedsPower",
-	"cooldownGroupDefaults", "cooldownProcOnly", "cooldownAlwaysShow", "cooldownBuffMode",
+	"cooldownGroupDefaults", "cooldownProcOnly", "cooldownAlwaysShow", "cooldownBuffMode", "cooldownFlashReady",
 	"frameRules", -- (none in any built-in profile: each starts with no Custom Visibility Rules)
-	"tankHide", "healerHide", "damageHide",
+	"rowFollow", -- (the grids' Follow: which row each follows; Cinema's mana bar its resource bar)
+	"tankHide", "healerHide", "damageHide", -- (the old Roles column's: loaded to become rules, ns.MigrateRoleHides)
 	"markNames", -- (the Nameplates page's rows' own names)
 	"cameraRows", -- (the Cameras page's rows: CameraRows.lua)
 	"lowHealthThemeEdits", "lowHealthMyThemes", -- (Vitals Vision's themes: players' versions of ours, and their own)
@@ -292,6 +293,7 @@ local function Load(name)
 		db[k] = CopyTable(saved[k] or base[k])
 	end
 	ns.EnsureTables()
+	ns.MigrateRoleHides()
 	if ns.ResyncVitalsLook then ns.ResyncVitalsLook() end -- (its theme's own look onto settings at their defaults)
 end
 

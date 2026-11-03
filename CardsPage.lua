@@ -893,6 +893,26 @@ function ns.CreateCardSettingsPanel(kit)
 		return check
 	end
 	local function Header(text) stack:Header(content, text) end
+	-- In a fight (or just out of one): shown now, held till after, or not at
+	-- all. (Not for the fight's own cards.)
+	local function FightRow(id)
+		if not (ns.CARD_BY_ID[id] and ns.CARD_BY_ID[id].inFight) then return end
+		Header(L["In a fight"])
+		local choice = kit.Dropdown(content, "cardFight_" .. id, List({
+			{ "show", L["Show it now"] },
+			{ "wait", L["Wait till after"], L["Held till you've been out of the fight 5 seconds (back in it, longer: a " ..
+				"feign death or vanish doesn't let it through), then shown. Dropped after 5 minutes."] },
+			{ "skip", L["Skip it"], L["Not shown at all in a fight, or in the 5 seconds after one."] },
+		}), 200)
+		if choice then
+			local name = stack:Add(kit.Label(content, "GameFontHighlight", L["In a fight:"]), "label")
+			name:SetSize(150, 30)
+			name:SetJustifyV("MIDDLE")
+			choice:SetPoint("LEFT", name, "RIGHT", 4, 0)
+			kit.Tooltip(choice, L["What this card does if it comes while you're in a fight, or in the 5 seconds " ..
+				"after one."])
+		end
+	end
 	parts.Part("combatIn", function()
 		Header(L["Words"])
 		WordsRow(kit, content, stack, "combatTextIn", L["Words:"],
@@ -935,10 +955,12 @@ function ns.CreateCardSettingsPanel(kit)
 		local gap = stack:Add(kit.Slider(content, "storyZoneGap", L["Not again within"], 0, 30, 1, "%d s"), "slider")
 		kit.Tooltip(gap, L["After a Zone or Subzone card, no other comes for this long, so passing through " ..
 			"places quickly doesn't bring one after another. 0: every time."])
+		FightRow("zone")
 	end)
 	parts.Part("subzone", function()
 		stack:Note(content, L["Only with Zone ticked: it takes the game's zone text away. Its look follows Zone's " ..
 			"until it's given its own here; its lines are Zone's."], NOTE_W)
+		FightRow("subzone")
 	end)
 	parts.Part("login", function()
 		Header(L["Where"])
@@ -975,6 +997,7 @@ function ns.CreateCardSettingsPanel(kit)
 		end
 		stack:Note(content, L["It shows only if something happened that's ticked here: quests, a level, bosses, " ..
 			"deaths or gold. The zone and time played come with it."], NOTE_W)
+		FightRow("login")
 	end)
 	parts.Part("attack", function()
 		stack:Note(content, L["The same place shows at most once every 90 seconds."], NOTE_W)
@@ -1015,14 +1038,19 @@ function ns.CreateCardSettingsPanel(kit)
 		stack:Note(content, L["Only with the death camera on (the Die row on the Scenes page)."], NOTE_W)
 	end)
 	parts.Part("time", function()
-		stack:Note(content, L["Nothing of its own here: its look is on the Style tab, a sound for each time of day " ..
-			"on the Sounds tab."], NOTE_W)
+		FightRow("time")
+		stack:Note(content, L["Its look is on the Style tab, a sound for each time of day on the Sounds tab."], NOTE_W)
 	end)
 	for _, id in ipairs({ "cleared", "discover", "arrival", "rested", "levelUp", "achievement", "reputation", "collect",
 		"profession", "quest", "rare", "battleground", "streak" }) do
 		parts.Part(id, function()
-			stack:Note(content, L["Nothing of its own here: its look is on the Style tab, its sound on the Sounds tab."],
-				NOTE_W)
+			if ns.CARD_BY_ID[id] and ns.CARD_BY_ID[id].inFight then
+				FightRow(id)
+				stack:Note(content, L["Its look is on the Style tab, its sound on the Sounds tab."], NOTE_W)
+			else
+				stack:Note(content, L["Nothing of its own here: its look is on the Style tab, its sound on the Sounds " ..
+					"tab."], NOTE_W)
+			end
 		end)
 	end
 	parts.Finish()

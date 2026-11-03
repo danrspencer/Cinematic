@@ -38,13 +38,17 @@ local BOOK = "Interface\\Icons\\INV_Misc_Book_09"
 local MAP = "Interface\\Icons\\INV_Misc_Map_01"
 local ROW = "card:" -- (each event's Show in row: ROW .. id)
 local WAIT_MAX = 6  -- seconds a card waits behind a more important one before it's dropped
+local CALM_AFTER = 5 -- seconds out of a fight before the cards held through it show (back in it: longer)
+local HELD_MAX = 300 -- a card held through a fight longer than this is dropped
 
 -- The events, in the page's order: name, its row's tick (on: a setting of
 -- its own, kept from before the page), priority (a higher one cuts in, the
 -- same replaces, a lower one waits), its icon, the one it follows for its
 -- look (parent) and the one it needs on to show at all (needs). has = false:
--- the client can't tell (no row). (CardMoments.lua hears the ones from
--- Level up on.)
+-- the client can't tell (no row). inFight: what it does in a fight to start
+-- with ("show", "wait" till after it, "skip"; cardFight_<id>), none: always
+-- shows (it's about the fight). (CardMoments.lua hears the ones from Level up
+-- on.)
 local EVENTS = {
 	{ id = "combatIn", name = "Entering combat", on = "combatOnEnter", priority = 50,
 		icon = "Interface\\Icons\\Ability_DualWield", fight = true },
@@ -53,35 +57,35 @@ local EVENTS = {
 		icon = "Interface\\TargetingFrame\\UI-TargetingFrame-Skull", fight = true },
 	{ id = "cleared", name = "Dungeon cleared", on = "cardClearedOn", priority = 75,
 		icon = "Interface\\Icons\\Achievement_Dungeon_ClassicDungeonMaster",
-		has = EJ_GetInstanceForMap ~= nil },
-	{ id = "zone", name = "Zone", on = "storyZoneCard", priority = 40, icon = MAP },
+		has = EJ_GetInstanceForMap ~= nil, inFight = "wait" },
+	{ id = "zone", name = "Zone", on = "storyZoneCard", priority = 40, icon = MAP, inFight = "show" },
 	{ id = "subzone", name = "Subzone", on = "storyZoneSubzones", priority = 40, icon = MAP, parent = "zone",
-		needs = "zone" },
+		needs = "zone", inFight = "show" },
 	-- (A notch over Zone's: it cuts in on the card it'd come with.)
 	{ id = "discover", name = "Discovered", on = "cardDiscoverOn", priority = 45,
-		icon = "Interface\\Icons\\INV_Misc_Spyglass_03", parent = "zone" },
+		icon = "Interface\\Icons\\INV_Misc_Spyglass_03", parent = "zone", inFight = "show" },
 	{ id = "arrival", name = "Flight arrival", on = "cardArrivalOn", priority = 30,
-		icon = "Interface\\Icons\\Ability_Mount_Gryphon_01", parent = "zone" },
+		icon = "Interface\\Icons\\Ability_Mount_Gryphon_01", parent = "zone", inFight = "show" },
 	{ id = "rested", name = "Rested", on = "cardRestedOn", priority = 25,
-		icon = "Interface\\Icons\\Spell_Nature_Sleep" },
-	{ id = "login", name = "Last time", on = "storyRecap", priority = 35, icon = BOOK },
+		icon = "Interface\\Icons\\Spell_Nature_Sleep", inFight = "show" },
+	{ id = "login", name = "Last time", on = "storyRecap", priority = 35, icon = BOOK, inFight = "show" },
 	{ id = "time", name = "Time of day", on = "timeOfDayChange", priority = 20,
-		icon = "Interface\\Icons\\INV_Misc_PocketWatch_01" },
+		icon = "Interface\\Icons\\INV_Misc_PocketWatch_01", inFight = "wait" },
 	{ id = "levelUp", name = "Level up", on = "cardLevelUpOn", priority = 70,
-		icon = "Interface\\Icons\\Spell_Holy_SurgeOfLight" },
+		icon = "Interface\\Icons\\Spell_Holy_SurgeOfLight", inFight = "wait" },
 	{ id = "achievement", name = "Achievement", on = "cardAchievementOn", priority = 65,
-		icon = "Interface\\Icons\\Achievement_General", has = GetAchievementInfo ~= nil },
+		icon = "Interface\\Icons\\Achievement_General", has = GetAchievementInfo ~= nil, inFight = "wait" },
 	{ id = "reputation", name = "Reputation", on = "cardReputationOn", priority = 45,
-		icon = "Interface\\Icons\\INV_Misc_Note_02" },
+		icon = "Interface\\Icons\\INV_Misc_Note_02", inFight = "wait" },
 	{ id = "collect", name = "New mount or pet", on = "cardCollectOn", priority = 45,
 		icon = "Interface\\Icons\\Ability_Mount_RidingHorse",
-		has = C_MountJournal ~= nil or C_PetJournal ~= nil },
+		has = C_MountJournal ~= nil or C_PetJournal ~= nil, inFight = "wait" },
 	{ id = "profession", name = "Profession rank", on = "cardProfessionOn", priority = 45,
-		icon = "Interface\\Icons\\Trade_BlackSmithing" },
+		icon = "Interface\\Icons\\Trade_BlackSmithing", inFight = "wait" },
 	{ id = "quest", name = "Story quest", on = "cardQuestOn", priority = 55,
-		icon = "Interface\\Icons\\INV_Misc_Book_07" },
+		icon = "Interface\\Icons\\INV_Misc_Book_07", inFight = "wait" },
 	{ id = "rare", name = "Rare spotted", on = "cardRareOn", priority = 60,
-		icon = "Interface\\Icons\\Ability_Hunter_MarkedForDeath" },
+		icon = "Interface\\Icons\\Ability_Hunter_MarkedForDeath", inFight = "show" },
 	{ id = "attack", name = "Under attack", on = "chatAttackAlert", priority = 60,
 		icon = "Interface\\Icons\\Ability_Warrior_BattleShout" },
 	-- (Combat's priority: a duel's cards and its fight's replace each other,
@@ -89,7 +93,7 @@ local EVENTS = {
 	{ id = "duel", name = "Duel", on = "cardDuelOn", priority = 50,
 		icon = "Interface\\Icons\\Ability_Warrior_Challange" },
 	{ id = "battleground", name = "Battleground", on = "cardBattlegroundOn", priority = 60,
-		icon = "Interface\\Icons\\Ability_Warrior_OffensiveStance" },
+		icon = "Interface\\Icons\\Ability_Warrior_OffensiveStance", inFight = "show" },
 	{ id = "streak", name = "Kill streak", on = "cardStreakOn", priority = 55,
 		icon = "Interface\\Icons\\Ability_Warrior_Rampage", fight = true },
 	{ id = "death", name = "Death", on = "cardDeathOn", priority = 100,
@@ -231,6 +235,9 @@ for _, field in ipairs(FIELDS) do
 	for _, style in ipairs(STYLES) do DEFAULTS["cardLook" .. field[1] .. "_" .. style.id] = "default" end
 end
 for _, event in ipairs(EVENTS) do DEFAULTS["cardBase_" .. event.id] = BASES[event.id] end
+for _, event in ipairs(EVENTS) do
+	if event.inFight then DEFAULTS["cardFight_" .. event.id] = event.inFight end
+end
 DEFAULTS.cardAlign_rested = "center" -- (the Ticker's top bar, in its middle)
 DEFAULTS.cardAlign_streak = "center"
 
@@ -385,7 +392,8 @@ function ns.CardLook(id)
 			local value = ns.CardValue(id, field)
 			if field == "Icon" and value == "event" then value = BY_ID[id] and BY_ID[id].icon or MAP end
 			if field == "Outline" then value = tonumber(value) or 0 end
-			if field == "Size" then value = (tonumber(value) or 36) * (tonumber(ns.db and ns.db.cardScale) or 1) end
+			if field == "Size" then value = (tonumber(value) or 36) * (tonumber(ns.db and ns.db.cardScale) or 1)
+				* ns.VisionTextScale() end
 			return value
 		end })
 		looks[id or ""] = look
@@ -449,12 +457,13 @@ local function Screen()
 end
 
 local Show
--- The card done (or cut short): the next one waiting, if not waiting too long.
+-- The card done (or cut short): the next one waiting, if not waiting too long
+-- (one held through a fight waits its turn however long).
 local function Next()
 	current = nil
 	while #waiting > 0 do
 		local card = table.remove(waiting, 1)
-		if GetTime() - card.at <= WAIT_MAX then
+		if card.afterFight or GetTime() - card.at <= WAIT_MAX then
 			Show(card)
 			return
 		end
@@ -467,6 +476,50 @@ function Show(card)
 	-- (Its own sound, or its event's rules on the Sounds tab: CombatSoundRules.lua.)
 	if card.sound then pcall(card.sound) elseif ns.PlayCardCueSound then pcall(ns.PlayCardCueSound, card.id) end
 end
+
+-- Cards held through a fight (its In a fight: Wait till after), the newest
+-- of each event's: they show CALM_AFTER seconds out of it, so a feign death
+-- or vanish straight back into the fight holds them on. fightAt: the last
+-- moment seen in one.
+local held, fightAt, checking = {}, -math.huge, false
+local function Fighting()
+	if (InCombatLockdown and InCombatLockdown()) or ns.Flag(UnitAffectingCombat("player")) then
+		fightAt = GetTime()
+		return true
+	end
+	return false
+end
+-- In a fight, or not yet CALM_AFTER seconds out of one.
+local function Unsettled()
+	return Fighting() or GetTime() - fightAt < CALM_AFTER
+end
+local function Release()
+	local list = {}
+	for id, card in pairs(held) do
+		held[id] = nil
+		if GetTime() - card.heldAt <= HELD_MAX then list[#list + 1] = card end
+	end
+	-- (The most important first, the rest waiting behind it in turn.)
+	table.sort(list, function(a, b) return BY_ID[a.id].priority > BY_ID[b.id].priority end)
+	for _, card in ipairs(list) do
+		card.afterFight = true
+		ns.Cards.Fire(card.id, card)
+	end
+end
+local function Check()
+	checking = false
+	if not next(held) then return end
+	local wait = Fighting() and 1 or CALM_AFTER - (GetTime() - fightAt)
+	if wait > 0 then
+		checking = true
+		C_Timer.After(math.max(wait, 0.1), Check)
+	else
+		Release()
+	end
+end
+local fights = CreateFrame("Frame")
+fights:RegisterEvent("PLAYER_REGEN_ENABLED")
+fights:SetScript("OnEvent", function() fightAt = GetTime() end)
 
 -- An event's card: card { name, sub, meta, picture..., sound = function()
 -- played with it, delay = seconds before it fires, edge and cine for a
@@ -482,17 +535,43 @@ function ns.Cards.Fire(id, card, force)
 		return true
 	end
 	if not force and not ns.CardAllowed(id, card.edge, card.cine) then return false end
+	-- (In a fight or just out of one: shown now, held till after, or not at all.)
+	local inFight = not force and not card.afterFight and event.inFight and ns.db["cardFight_" .. id]
+	if inFight and inFight ~= "show" and Unsettled() then
+		if inFight ~= "wait" then return false end
+		card.id, card.heldAt = id, GetTime()
+		held[id] = card
+		if not checking then Check() end
+		return true
+	end
 	card.id, card.priority, card.at = id, event.priority, GetTime()
-	-- (A more important one playing: this one waits, in place of one of its own.)
-	if current and current.priority > card.priority then
+	-- (A more important one playing, or this one held through a fight: it
+	-- waits, in place of one of its own.)
+	if current and (current.priority > card.priority or card.afterFight) then
 		for i = #waiting, 1, -1 do
 			if waiting[i].id == id then table.remove(waiting, i) end
 		end
 		waiting[#waiting + 1] = card
 		return true
 	end
+	-- (One playing: it fades out quickly first, then this one shows.)
+	if current and screen and screen:GetScript("OnUpdate") then
+		for i = #waiting, 1, -1 do
+			if waiting[i].id == id then table.remove(waiting, i) end
+		end
+		table.insert(waiting, 1, card)
+		ns.CutCard(screen)
+		return true
+	end
 	Show(card)
 	return true
+end
+
+-- The cards held through a fight now ({ id = card }), and seconds till they
+-- show (nil: none held, or still in the fight), for /cine debug cards.
+function ns.Cards.Held()
+	if not next(held) then return held, nil end
+	return held, not Fighting() and math.max(0, CALM_AFTER - (GetTime() - fightAt)) or nil
 end
 
 -- An event's card cut short if it's playing, dropped if it's waiting.
