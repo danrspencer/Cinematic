@@ -984,6 +984,20 @@ function ns.CreateCameraScriptsPanel(kit)
 		end
 	end)
 	kit.Tooltip(page.delete, L["Deletes this script (click twice). Rows set to it go back to no camera."])
+	-- One of ours you changed: back to ours (in Delete's place).
+	page.reset = Button(content, L["Reset"], 60)
+	page.reset:SetPoint("LEFT", page.copy, "RIGHT", 4, 0)
+	page.reset:SetScript("OnClick", function()
+		if page.confirmDelete == page.id then
+			ns.ResetBuiltinCameraScript(page.id)
+			page.confirmDelete = nil
+			page.Pick(page.id)
+		else
+			page.confirmDelete = page.id
+			page.reset:SetText(L["Sure?"])
+		end
+	end)
+	kit.Tooltip(page.reset, L["Puts our script back, made from its camera's settings again, in place of your changes (click twice)."])
 	-- (After Delete; after Copy for a built-in one, which has no Delete: see Layout.)
 	page.share = Button(content, L["Share"], 56)
 	page.share:SetScript("OnClick", function() ShowShare(true) end)
@@ -1043,19 +1057,27 @@ function ns.CreateCameraScriptsPanel(kit)
 		page.addBars[list] = bar
 	end
 	page.ruleRows = {}
+	local RULE_X = 30 -- (the rows' names, after the rules' ticks)
 	for i, rule in ipairs(ns.CAMERA_SCRIPT_RULES) do
 		local row = CreateFrame("Frame", nil, content)
 		row:SetSize(WIDTH, 26)
+		-- Its tick first: off, the event leaves the camera running.
+		row.on = ns.SkinCheck(CreateFrame("CheckButton", nil, row, "UICheckButtonTemplate"))
+		row.on:SetSize(24, 24)
+		row.on:SetPoint("LEFT", 2, 0)
+		row.on:SetScript("OnClick", function(self)
+			if page.script then page.SetRule(rule.key .. "On", self:GetChecked() and true or false) end
+		end)
+		kit.Tooltip(row.on, L["Untick to leave the camera running when this happens. Moving the camera yourself still takes over: it carries on a second after you let go."])
 		row.label = kit.Label(row, "GameFontHighlightSmall", RULE_NAMES[rule.key])
-		row.label:SetPoint("LEFT", 8, 0)
+		row.label:SetPoint("LEFT", RULE_X, 0)
 		row.label:SetWidth(126)
 		row.pick = Choice(row, 150, function() return rule.actions end,
 			function() return page.script and page.script.rules[rule.key] end,
 			function(action)
-				page.script.rules[rule.key] = action
-				page.Changed()
+				page.SetRule(rule.key, action)
 			end, function(action) return ACTION_NAMES[action] end)
-		row.pick:SetPoint("LEFT", 136, 0)
+		row.pick:SetPoint("LEFT", RULE_X + 128, 0)
 		row.secsLabel = kit.Label(row, "GameFontHighlightSmall", L["for"])
 		row.secsLabel:SetPoint("LEFT", row.pick, "RIGHT", 8, 0)
 		row.secs = Box(row, 34)
@@ -1064,10 +1086,7 @@ function ns.CreateCameraScriptsPanel(kit)
 		row.secsUnit:SetPoint("LEFT", row.secs, "RIGHT", 4, 0)
 		local function Commit(box)
 			local secs = tonumber(box:GetText())
-			if secs and page.script then
-				page.script.rules[rule.key .. "Secs"] = math.max(1, math.min(60, secs))
-				page.Changed()
-			end
+			if secs and page.script then page.SetRule(rule.key .. "Secs", math.max(1, math.min(60, secs))) end
 			box:SetText(page.script and Num(page.script.rules[rule.key .. "Secs"]) or "")
 		end
 		row.secs:SetScript("OnEditFocusLost", Commit)
@@ -1083,11 +1102,11 @@ function ns.CreateCameraScriptsPanel(kit)
 		row:SetSize(WIDTH, 26)
 		row.key = key
 		row.label = kit.Label(row, "GameFontHighlightSmall", key == "haze" and L["Edge haze"] or L["Stop button"])
-		row.label:SetPoint("LEFT", 8, 0)
+		row.label:SetPoint("LEFT", RULE_X, 0)
 		row.label:SetWidth(126)
 		if key == "haze" then
 			row.box = Box(row, 40)
-			row.box:SetPoint("LEFT", 136, 0)
+			row.box:SetPoint("LEFT", RULE_X + 128, 0)
 			row.unit = kit.Label(row, "GameFontHighlightSmall", "%")
 			row.unit:SetPoint("LEFT", row.box, "RIGHT", 4, 0)
 			local function Commit(box)
@@ -1108,7 +1127,7 @@ function ns.CreateCameraScriptsPanel(kit)
 					page.script.button = choice == "yes" or nil
 					page.Changed()
 				end, function(choice) return choice == "yes" and L["Show it"] or L["No button"] end)
-			row.pick:SetPoint("LEFT", 136, 0)
+			row.pick:SetPoint("LEFT", RULE_X + 128, 0)
 			kit.Tooltip(row.pick, L["A Stop camera button on screen while its steps run (under the release popup when you're dead): click it for your own view back, until what started it is over."])
 		end
 		page.optRows[i] = row
@@ -1127,22 +1146,56 @@ function ns.CreateCameraScriptsPanel(kit)
 		local was = page.script and page.script.id
 		page.selected, page.confirmDelete = nil, nil
 		page.delete:SetText(L["Delete"])
+		page.reset:SetText(L["Reset"])
 		if type(entry) == "table" and entry.own then
 			page.own, page.id, page.script = entry, nil, nil
 		else
 			local id = type(entry) == "table" and entry.id or entry
 			local script = ns.MyCameraScript(id) or ns.FindCameraScript(id) or ns.FindCameraScript("cozy")
 			page.own, page.id, page.script = nil, script.id, script
-			page.locked = script.builtin and true or false
-			page.hasSettings = script.builtin and ns.CameraScriptSettingKeys(script.id) ~= nil
+			-- (Ours change too: the first change keeps yours of it, page.Changed.
+			-- Unchanged, its steps show the settings they're made from.)
+			page.builtin = script.builtin and true or false
+			page.locked = false
+			page.hasSettings = script.builtin and not script.edited and ns.CameraScriptSettingKeys(script.id) ~= nil
 		end
 		if (page.script and page.script.id) ~= was then LeaveRun(was) end
 		page.Layout()
 		if page.script then ns.RefreshCameraScriptPreview() elseif preview then preview:Hide() end
 	end
 
-	-- After a change: the page and the preview follow.
-	function page.Changed()
+	-- A stop rule (or its seconds), saved in the script (one of ours: kept as
+	-- yours of it, page.Changed).
+	function page.SetRule(key, value)
+		page.script.rules[key] = value
+		page.Changed()
+	end
+
+	-- After a change: the page and the preview follow. One of our scripts
+	-- changed for the first time: yours of it kept from now on (plain numbers,
+	-- not its settings), the step picked still picked in it.
+	local function PathTo(list, step, path)
+		for i, each in ipairs(list or {}) do
+			path[#path + 1] = i
+			if each == step or (each.steps and PathTo(each.steps, step, path)) then return path end
+			path[#path] = nil
+		end
+	end
+	-- (fromSettings: remade from its settings, not changed: not kept.)
+	function page.Changed(fromSettings)
+		local script = page.script
+		if script and script.builtin and not script.edited and not fromSettings then
+			local key = page.selected and (PathTo(script.steps, page.selected, {}) and "steps"
+				or PathTo(script.ending, page.selected, {}) and "ending")
+			local path = key and PathTo(script[key], page.selected, {})
+			page.script = ns.EditBuiltinCameraScript(script)
+			page.hasSettings = false
+			if path then
+				local step = { steps = page.script[key] }
+				for _, i in ipairs(path) do step = step and step.steps and step.steps[i] end
+				page.selected = step
+			end
+		end
 		page.Layout()
 		ns.RefreshCameraScriptPreview()
 	end
@@ -1186,12 +1239,12 @@ function ns.CreateCameraScriptsPanel(kit)
 		remake = true
 		C_Timer.After(0, function()
 			remake = false
-			if not (page.id and page.locked and content:IsVisible()) then return end
+			if not (page.id and page.builtin and not page.script.edited and content:IsVisible()) then return end
 			local path = page.selected and StepPath(page.script, page.selected)
 			page.script = ns.FindCameraScript(page.id)
 			page.selected = path and StepAt(page.script, path, page.selected) or nil
 			kit.Refresh() -- (greyed settings, and the camera's own page)
-			page.Changed()
+			page.Changed(true)
 		end)
 	end
 	-- A setting's control on parent, as its own page has it (Options.lua's
@@ -1509,6 +1562,7 @@ function ns.CreateCameraScriptsPanel(kit)
 			page.name:Hide()
 			page.nameLabel:Hide()
 			page.delete:Hide()
+			page.reset:Hide()
 			page.SetCameraButton(page.own.name and L[page.own.name] or ns.CAMERA_NAMES[page.own.own] or "", "own")
 			page.tipStatus = L["Not a script yet: it runs on its own code. Laying it out as steps needs %s, steps the runner doesn't have yet."]:format(
 				L[page.own.needs])
@@ -1521,17 +1575,20 @@ function ns.CreateCameraScriptsPanel(kit)
 			HideTabs()
 			y = -84
 		else
-			page.name:SetShown(not page.locked)
-			page.nameLabel:SetShown(not page.locked)
+			-- (Ours: its name stays ours, Reset in Delete's place once changed.)
+			page.name:SetShown(not page.builtin)
+			page.nameLabel:SetShown(not page.builtin)
 			if not page.name:HasFocus() then page.name:SetText(script.name) end
-			page.SetCameraButton(script.name, not page.locked and "mine" or "script")
-			local top = page.locked and -84 or -112
-			page.delete:SetShown(not page.locked)
+			page.SetCameraButton(script.name, not page.builtin and "mine" or "script")
+			local top = page.builtin and -84 or -112
+			page.delete:SetShown(not page.builtin)
+			page.reset:SetShown(page.builtin and script.edited or false)
 			page.share:ClearAllPoints()
-			page.share:SetPoint("LEFT", page.locked and page.copy or page.delete, "RIGHT", 4, 0)
-			page.tipStatus = not page.locked and L["Yours: change anything."]
-				or page.hasSettings and L["Built in: click a step to change the settings it's made from. The camera itself still runs on its own code: set a row to this script to use it instead."]
-				or L["Built in, from your settings. The camera itself still runs on its own code: set a row to this script to use it instead."]
+			page.share:SetPoint("LEFT", not page.builtin and page.delete or script.edited and page.reset or page.copy,
+				"RIGHT", 4, 0)
+			page.tipStatus = not page.builtin and L["Yours: change anything."]
+				or script.edited and L["Built in, changed by you: change anything. Reset puts ours back. The camera itself still runs on its own code: set a row to this script to use it instead."]
+				or L["Built in, from your settings: change anything, and it's kept as yours of it (Reset puts ours back). The camera itself still runs on its own code: set a row to this script to use it instead."]
 			y = top + 4
 			local keys = ns.CameraScriptTriggers(script.id)
 			local names = {}
@@ -1571,23 +1628,26 @@ function ns.CreateCameraScriptsPanel(kit)
 				page.optHeader:Hide()
 			else
 				page.addBars.steps:Hide()
-				-- A dropdown each; a built-in camera's greyed (Copy it to change
-				-- them). A rule made from a setting: its slider under the row.
+				-- A dropdown each (a built-in camera's too: kept beside it, for
+				-- when its script runs). A rule made from a setting: its slider
+				-- under the row while it pauses.
 				for _, row in ipairs(page.ruleRows) do
 					local key = row.rule.key
 					row:Show()
 					row:SetPoint("TOPLEFT", COL, y)
+					local on = script.rules[key .. "On"] ~= false
+					row.on:SetChecked(on)
 					row.pick:Refresh()
-					if row.pick.SetEnabled then row.pick:SetEnabled(not page.locked) end
-					row.pick:SetAlpha(page.locked and 0.6 or 1) -- (greyed whatever the dropdown's look)
-					local pause = script.rules[key] == "pause"
-					local set = page.locked and script.ruleSet and script.ruleSet[key]
+					if row.pick.SetEnabled then row.pick:SetEnabled(on) end
+					row.pick:SetAlpha(on and 1 or 0.6) -- (greyed whatever the dropdown's look)
+					local pause = on and script.rules[key] == "pause"
+					local set = pause and page.hasSettings and script.ruleSet and script.ruleSet[key]
 					local showSecs = pause and not set
 					row.secsLabel:SetShown(showSecs)
 					row.secs:SetShown(showSecs)
 					row.secsUnit:SetShown(showSecs)
 					if showSecs then
-						row.secs:SetEnabled(not page.locked)
+						row.secs:SetEnabled(true)
 						if not row.secs:HasFocus() then row.secs:SetText(Num(script.rules[key .. "Secs"])) end
 					end
 					y = y - 26
@@ -1599,7 +1659,7 @@ function ns.CreateCameraScriptsPanel(kit)
 				page.optHeader:SetPoint("TOPLEFT", COL + 8, y - 12)
 				y = y - 34
 				for _, row in ipairs(page.optRows) do
-					local set = page.locked and script.ruleSet and script.ruleSet[row.key]
+					local set = page.hasSettings and script.ruleSet and script.ruleSet[row.key]
 					row:Show()
 					row:SetPoint("TOPLEFT", COL, y)
 					local control = row.box or row.pick

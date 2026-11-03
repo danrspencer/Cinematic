@@ -421,12 +421,46 @@ function ns.SkinDropdown(dropdown)
 	return dropdown
 end
 
+-- A menu's list (and each submenu's) longer than MENU_ROWS entries scrolls,
+-- that many tall: else a long one runs off the screen and its last entries
+-- can't be reached. (After the menu's made: its entries counted.)
+local MENU_ROWS, MENU_ROW_H = 15, 20
+function ns.ScrollMenu(description)
+	if not description then return end
+	local list = description.elementDescriptions
+	if type(list) ~= "table" and description.EnumerateElementDescriptions then
+		list = {}
+		for _, child in description:EnumerateElementDescriptions() do list[#list + 1] = child end
+	end
+	if type(list) ~= "table" then return end
+	if #list > MENU_ROWS and description.SetScrollMode then description:SetScrollMode(MENU_ROWS * MENU_ROW_H) end
+	for _, child in ipairs(list) do ns.ScrollMenu(child) end
+end
+
+-- A right-click menu (MenuUtil.CreateContextMenu's), its long lists
+-- scrolling.
+function ns.ContextMenu(owner, generator)
+	return MenuUtil.CreateContextMenu(owner, function(menuOwner, root, ...)
+		generator(menuOwner, root, ...)
+		ns.ScrollMenu(root)
+	end)
+end
+
 -- A new dropdown on parent in both looks, given as pcall(CreateFrame, ...)
 -- gives it: ok and the dropdown (ok false where the client has no
--- DropdownButton or the template).
+-- DropdownButton or the template). Its long lists scroll (ns.ScrollMenu).
 function ns.MenuDropdown(parent)
 	local ok, dropdown = pcall(CreateFrame, "DropdownButton", nil, parent, "WowStyle1DropdownTemplate")
-	if ok and dropdown and dropdown.SetupMenu then ns.SkinDropdown(dropdown) end
+	if ok and dropdown and dropdown.SetupMenu then
+		ns.SkinDropdown(dropdown)
+		local setup = dropdown.SetupMenu
+		dropdown.SetupMenu = function(self, generator)
+			return setup(self, function(owner, root, ...)
+				generator(owner, root, ...)
+				ns.ScrollMenu(root)
+			end)
+		end
+	end
 	return ok, dropdown
 end
 

@@ -70,6 +70,12 @@
 	<Binding name="CINEMATIC_CAM_TELE" category="ADDONS">
 		Cinematic_StartCam("tele")
 	</Binding>
+	<Binding name="CINEMATIC_CAM_WALK" category="ADDONS">
+		Cinematic_StartCam("walk")
+	</Binding>
+	<Binding name="CINEMATIC_CAM_RUN" category="ADDONS">
+		Cinematic_StartCam("run")
+	</Binding>
 	<Binding name="CINEMATIC_CAM_DEATH" category="ADDONS">
 		Cinematic_StartCam("death")
 	</Binding>

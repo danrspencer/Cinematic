@@ -267,6 +267,9 @@ local function Start(unit)
 	unit.on, unit.since, unit.done = true, GetTime(), false
 	local camera = ns.TriggerSetting(unit.scene, "camera")
 	unit.death, unit.tele = camera == "death", camera == "tele"
+	-- (A script: moving doesn't end it here, its stop rules do; auto-walk
+	-- and auto-run carry it on, as they do our cameras.)
+	unit.walks = ns.IsScriptCamera and ns.IsScriptCamera(camera) or false
 	if camera == "tele" and ns.PretendDepartCast then
 		ns.PretendDepartCast(unit.untilKind == "time" and unit.secs or 10)
 	elseif unit.death then
@@ -286,6 +289,21 @@ local function SceneOn(key)
 		if unit.on and not unit.death then return key end
 	end
 	return nil
+end
+-- A scene you started with its key (Custom camera trigger N) that's on now,
+-- or nil: a camera script asks first (CameraScripts.lua's TriggerNow), so it
+-- plays with a window open or you walking, as the key says to.
+function ns.CustomKeyScene()
+	for _, unit in ipairs(units) do
+		if unit.on and unit.kind == "key" and not unit.death then return unit.scene end
+	end
+end
+-- Its script over by its own stop rules: the key's scene ends too, so one
+-- press starts it again.
+function ns.EndCustomKeyScene(scene)
+	for _, unit in ipairs(units) do
+		if unit.on and unit.kind == "key" and unit.scene == scene then Stop(unit) end
+	end
 end
 -- Whether one of these plays the tele camera now (its pretend cast holds
 -- while it does, Camera.lua's DepartTimeLeft).
@@ -417,7 +435,7 @@ local function Tick()
 				Stop(unit)
 			end
 		end
-		if unit.on and (moving or TimedOut(unit, now)) then Stop(unit) end
+		if unit.on and ((moving and not unit.walks) or TimedOut(unit, now)) then Stop(unit) end
 	end
 	if needSync then
 		needSync = false

@@ -124,10 +124,6 @@ Add("Recording helpers", { key = "letterbox", name = "Letterbox sweep",
 	tip = "The bars close in to 12% of the screen, hold, and ease back to your size.",
 	script = function(d)
 		d.Cine(true)
-		-- (bars on, sized by height: by a film's aspect, a screen that wide already has none)
-		d.Set("letterbox", true)
-		d.Set("letterboxPage", true)
-		d.Set("letterboxSizeBy", "height")
 		local start = ns.db.letterboxSize or 0.03
 		d.Set("letterboxSize", start)
 		local function Size(value) ns.db.letterboxSize = value ns.RefreshLetterbox() end
@@ -215,6 +211,26 @@ Add("1. Settings & menus", { key = "why", name = "Inspect: why is it showing?",
 	run = function() ns.HandleSlash("why") end })
 Add("1. Settings & menus", { key = "welcome", name = "Welcome window", tip = "/cine welcome",
 	run = function() ns.ShowWelcome() end })
+Add("1. Settings & menus", { key = "welcome-tour", name = "Welcome window: Subtle, Balanced, Cinema",
+	tip = "Opens the welcome window and picks each level in turn (the mouse over it, then a click), 3 seconds " ..
+		"each and 5 on Cinema, the UI changing with it. Your profile is put back after.",
+	needs = function() return ns.WelcomeCards ~= nil, "The welcome window isn't loaded" end,
+	script = function(d)
+		local was = ns.ActiveProfile()
+		d.Cine(ns.db.enabled and true or false)
+		d.Restore(function() if ns.ActiveProfile() ~= was then ns.SetProfile(was) end end)
+		ns.ShowWelcome()
+		d.Wait(2)
+		local cards = ns.WelcomeCards()
+		for i, card in ipairs(cards) do
+			if cards[i - 1] then cards[i - 1]:GetScript("OnLeave")(cards[i - 1]) end
+			card:GetScript("OnEnter")(card)
+			d.Wait(0.8)
+			d.Cue("picked " .. i)
+			card:Click()
+			d.Wait(i == #cards and 5 or 3)
+		end
+	end })
 Add("1. Settings & menus", { key = "export", name = "Share: export the profile",
 	tip = "/cine export (a built-in profile says to make your own first)", run = function() ns.HandleSlash("export") end })
 Add("1. Settings & menus", { key = "import", name = "Share: import a profile", tip = "/cine import",
@@ -722,18 +738,19 @@ local function Overlay()
 	captionText:SetShadowOffset(2, -2)
 	overlay.caption = caption
 	local stop = CreateFrame("Frame", nil, overlay)
-	stop:SetSize(400, 60)
+	stop:SetSize(260, 64)
 	stop:SetPoint("CENTER")
-	stop:SetScale(2)
+	stop:SetScale(3)
 	stop:Hide()
+	local back = stop:CreateTexture(nil, "BACKGROUND")
+	back:SetAllPoints()
+	back:SetColorTexture(0, 0, 0, 0.8) -- (any scene: the words on a dark box)
 	stop.text = stop:CreateFontString(nil, "OVERLAY", "GameFontNormalHuge")
-	stop.text:SetPoint("CENTER", 0, 8)
-	stop.text:SetTextColor(1, 0.25, 0.2)
-	stop.text:SetShadowOffset(2, -2)
+	stop.text:SetPoint("CENTER", 0, 9)
+	stop.text:SetTextColor(1, 0.3, 0.25)
 	stop.text:SetText("Stop recording")
-	stop.sub = stop:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+	stop.sub = stop:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
 	stop.sub:SetPoint("TOP", stop.text, "BOTTOM", 0, -4)
-	stop.sub:SetShadowOffset(1, -1)
 	overlay.stop = stop
 	overlay:SetScale(UIParent:GetEffectiveScale() / WorldFrame:GetEffectiveScale())
 	return overlay
@@ -744,10 +761,20 @@ local driver = CreateFrame("Frame")
 local hub, RefreshHub -- (the window, below)
 
 -- As a script ends: every window closed (out of combat: closing some in a
--- fight is blocked) and "Stop recording" in the middle of the screen for a
--- few seconds, so the take ends on a clean frame; the hub comes back after.
-local STOP_SECONDS = 4
-local stopTimer
+-- fight is blocked) and "Stop recording" in the middle of the screen, so the
+-- take ends on a clean frame. It stays till you move (after standing still:
+-- moving may be what stopped it), the next demo starts, or STOP_MAX seconds;
+-- then the hub comes back if it hid.
+local STOP_MAX = 60
+local stopping -- (while Stop recording is up: whether the hub waits to come back)
+local function HideStopCue(showHub)
+	local was = stopping
+	if not was then return end
+	stopping = nil
+	overlay.stop:Hide()
+	if showHub and was.hub and hub and not current then hub:Show() end
+	return was.hub
+end
 local function StopCue(run, why)
 	if not InCombatLockdown() then
 		CloseSettings()
@@ -755,14 +782,14 @@ local function StopCue(run, why)
 	end
 	local stop = Overlay().stop
 	stop.sub:SetText(run.demo.name .. " " .. (why or "done"))
-	stop:Show()
-	if stopTimer then stopTimer:Cancel() end
-	stopTimer = C_Timer.NewTimer(STOP_SECONDS, function()
-		stopTimer = nil
-		stop:Hide()
-		if run.hidHub and hub and not current then hub:Show() end
+	stopping = { hub = run.hidHub, at = GetTime() }
+	stop:SetScript("OnUpdate", function()
+		local now = stopping
+		if not now then return end
+		if not ns.playerMoving then now.still = true end
+		if (now.still and ns.playerMoving) or GetTime() - now.at > STOP_MAX then HideStopCue(true) end
 	end)
-	stopTimer.hub = run.hidHub
+	stop:Show()
 end
 
 local function Finish(why)
@@ -995,13 +1022,9 @@ local function Run(key, fromSettings)
 	end
 	if not ns.db then return end
 	Stop()
-	local hubWaiting -- (the last one hid the hub and hadn't brought it back yet)
-	if stopTimer then -- (the last one's Stop recording: gone as this one starts)
-		hubWaiting = stopTimer.hub
-		stopTimer:Cancel()
-		stopTimer = nil
-		overlay.stop:Hide()
-	end
+	-- (the last one's Stop recording: gone as this one starts; true if it
+	-- hid the hub and hadn't brought it back yet)
+	local hubWaiting = HideStopCue(false)
 	if fromSettings and not key:find("^tour") and key ~= "menu-look" then CloseSettings() end
 	if not demo.script then
 		if hubWaiting and hub then hub:Show() end

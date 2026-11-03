@@ -22,6 +22,9 @@ DEFAULTS.cardClearedOn = false
 DEFAULTS.cardRareOn = false
 DEFAULTS.cardBattlegroundOn = false
 DEFAULTS.cardStreakOn = false
+DEFAULTS.cardBossDownOn = false
+DEFAULTS.cardFelledOn = false
+DEFAULTS.cardRevivedOn = false
 
 local SEPARATOR = " · "
 local samples = ns.CardSamples
@@ -163,6 +166,14 @@ local function InfoLine(text)
 			return
 		end
 	end
+end
+-- Zone's and Subzone's cards (ZoneCard.lua) ask first: true if Discovered's
+-- card has the place (one just shown, or one this check shows), so theirs
+-- isn't shown as well.
+function ns.DiscoverHasIt()
+	if not ns.CardOn("discover") then return false end
+	ZoneEntered()
+	return lastFound ~= nil and GetTime() - lastFoundAt < 5
 end
 samples.discover = function()
 	local sub, zone = Subzone(), Zone()
@@ -453,17 +464,37 @@ local run = { at = GetTime(), deaths = 0 }
 local function ClearedCard(name, seconds, deaths)
 	local under = { Span(seconds) }
 	under[2] = deaths == 0 and L["no deaths"] or deaths == 1 and L["1 death"] or L["%d deaths"]:format(deaths)
-	return { meta = L["Cleared"], name = name, sub = table.concat(under, SEPARATOR) }
+	local card = { meta = L["Cleared"], name = name, sub = table.concat(under, SEPARATOR) }
+	return ns.SoulsCard("cleared", card, L["%s CONQUERED"]:format(name:upper()))
 end
-local function EncounterEnd(encounterID, success)
+
+-- Boss defeated: a dungeon or raid boss (its encounter won), or a world boss
+-- you fought (Rare felled's watch), as a souls banner: VICTORY ACHIEVED,
+-- its name under it.
+local function BossDownCard(name, great)
+	local words, named = ns.SoulsWords("bossDown", name, great)
+	return { name = words, sub = not named and name or "" }
+end
+local function BossDown(name, great)
+	if ns.CardOn("bossDown") then ns.Cards.Fire("bossDown", BossDownCard(name, great)) end
+end
+samples.bossDown = function() return BossDownCard(L["Edwin VanCleef"]) end
+
+local function EncounterEnd(encounterID, encounterName, success)
 	encounterID, success = Plain(encounterID), Plain(success)
-	if not (encounterID and success == 1 and ns.EncounterIndex and ns.CardOn("cleared")) then return end
+	if not (encounterID and success == 1) then return end
+	-- (Its name from the Journal where the event's is secret.)
+	local name = Plain(encounterName)
+	if not name and EJ_GetEncounterInfo then name = Plain((EJ_GetEncounterInfo(encounterID))) end
+	BossDown(name, select(2, IsInInstance()) == "raid")
+	if not (ns.EncounterIndex and ns.CardOn("cleared")) then return end
 	local index, count = ns.EncounterIndex(encounterID)
 	if not (index and index == count) then return end
-	local name = Plain((GetInstanceInfo())) or ""
-	if name == "" then return end
-	local card = ClearedCard(name, GetTime() - run.at, run.deaths)
-	card.delay = 3 -- (the kill's own moment first)
+	local place = Plain((GetInstanceInfo())) or ""
+	if place == "" then return end
+	local card = ClearedCard(place, GetTime() - run.at, run.deaths)
+	-- (The kill's own moment first: its banner, if it has one, done.)
+	card.delay = ns.CardOn("bossDown") and 6 or 3
 	ns.Cards.Fire("cleared", card)
 end
 samples.cleared = function() return ClearedCard(L["The Deadmines"], 34 * 60, 1) end
@@ -513,6 +544,59 @@ samples.rare = function()
 end
 
 ---------------------------------------------------------------------------
+-- Rare felled: a rare you targeted alive dying while still your target, not
+-- tapped by others: ENEMY FELLED, its name under it. A world boss the same
+-- way: Boss defeated's. (Your target only: other units' are secret in fights
+-- on retail.)
+local watched -- { name, class, key } of your live rare target
+local felledDone = {}
+local function FelledCard(name)
+	local words, named = ns.SoulsWords("felled", name)
+	return { name = words, sub = not named and name or "" }
+end
+local function Watch()
+	watched = nil
+	if not ns.Flag(UnitExists("target")) or ns.Flag(UnitIsPlayer("target")) or ns.Flag(UnitIsDead("target")) then
+		return
+	end
+	local class = Plain(UnitClassification("target"))
+	if class ~= "rare" and class ~= "rareelite" and class ~= "worldboss" then return end
+	watched = { name = Plain(UnitName("target")), class = class, key = Plain(UnitGUID("target")) }
+end
+local function TargetDied()
+	if not (watched and ns.Flag(UnitIsDead("target"))) then return end
+	local was = watched
+	watched = nil
+	if UnitIsTapDenied and ns.Flag(UnitIsTapDenied("target")) then return end
+	if was.key then
+		if felledDone[was.key] then return end
+		felledDone[was.key] = true
+	end
+	if was.class == "worldboss" then
+		BossDown(was.name, true)
+	elseif ns.CardOn("felled") then
+		ns.Cards.Fire("felled", FelledCard(was.name))
+	end
+end
+samples.felled = function() return FelledCard(L["Mor'Ladim"]) end
+
+---------------------------------------------------------------------------
+-- Revived: back from death (resurrected, or your spirit back in your body):
+-- VITALITY RESTORED, as YOU DIED's other side.
+local dead = false
+local function ReviveCard() return { name = (ns.SoulsWords("revived")) } end
+local function AliveCheck()
+	local now = ns.Flag(UnitIsDeadOrGhost("player")) and true or false
+	if dead and not now and ns.CardOn("revived") then
+		local card = ReviveCard()
+		card.delay = 1
+		ns.Cards.Fire("revived", card)
+	end
+	dead = now
+end
+samples.revived = function() return ReviveCard() end
+
+---------------------------------------------------------------------------
 -- Battleground: its name as the gates open (in the lower third, its
 -- style's), then Victory or Defeat (arenas too).
 local match = { started = false, ended = false }
@@ -521,8 +605,10 @@ local match = { started = false, ended = false }
 local RESULT_LOOK = { Place = "top", Align = "center", BarScale = 0.62, BarFallback = false }
 local function BattleCard(moment, name)
 	if moment == "start" then return { meta = L["Battleground"], name = name, sub = L["The battle begins"] } end
-	return { meta = name, name = moment == "won" and L["Victory"] or L["Defeat"], sub = name,
+	local card = { meta = name, name = moment == "won" and L["Victory"] or L["Defeat"], sub = name,
 		look = ns.CardLookWith("battleground", RESULT_LOOK) }
+	if moment == "won" then return ns.SoulsCard("battleground", card, "VICTORY ACHIEVED") end
+	return ns.SoulsCard("battleground", card, "DEFEATED", true)
 end
 local function PvPName()
 	local inInstance, kind = IsInInstance()
@@ -558,7 +644,11 @@ end
 -- game's honorable kills it doesn't tell of.
 local streak, logKillAt = 0, -math.huge
 local function StreakCard(count, victim)
-	return { meta = L["Kill streak"], name = L["%d in a row"]:format(count), sub = victim or "" }
+	local card = { meta = L["Kill streak"], name = L["%d in a row"]:format(count), sub = victim or "" }
+	if (ns.GetDB() or DEFAULTS).cardSouls_streak == "souls" then
+		card.sub = victim and card.name .. SEPARATOR .. victim or card.name
+	end
+	return ns.SoulsCard("streak", card, "PREY SLAUGHTERED")
 end
 local function Killed(victim)
 	streak = streak + 1
@@ -575,7 +665,8 @@ for _, event in ipairs({ "PLAYER_ENTERING_WORLD", "PLAYER_LEVEL_UP", "ZONE_CHANG
 	"ACHIEVEMENT_EARNED", "NEW_MOUNT_ADDED", "NEW_PET_ADDED", "SKILL_LINES_CHANGED", "QUEST_COMPLETE",
 	"QUEST_TURNED_IN", "ENCOUNTER_END", "PLAYER_DEAD", "PLAYER_TARGET_CHANGED", "UPDATE_MOUSEOVER_UNIT",
 	"NAME_PLATE_UNIT_ADDED", "START_TIMER", "PVP_MATCH_ACTIVE", "UPDATE_BATTLEFIELD_STATUS", "PVP_MATCH_COMPLETE",
-	"PLAYER_PVP_KILLS_CHANGED", "CHAT_MSG_COMBAT_FACTION_CHANGE", "MAJOR_FACTION_RENOWN_LEVEL_CHANGED" }) do
+	"PLAYER_PVP_KILLS_CHANGED", "CHAT_MSG_COMBAT_FACTION_CHANGE", "MAJOR_FACTION_RENOWN_LEVEL_CHANGED",
+	"PLAYER_ALIVE", "PLAYER_UNGHOST" }) do
 	pcall(watcher.RegisterEvent, watcher, event) -- (each client that has it)
 end
 -- (Not on clients with secret values: there addons may not register the
@@ -583,6 +674,10 @@ end
 -- PLAYER_PVP_KILLS_CHANGED there.)
 if not issecretvalue then
 	pcall(watcher.RegisterEvent, watcher, "COMBAT_LOG_EVENT_UNFILTERED")
+end
+-- (Your rare target dying: Rare felled.)
+for _, event in ipairs({ "UNIT_HEALTH", "UNIT_FLAGS" }) do
+	pcall(watcher.RegisterUnitEvent, watcher, event, "target")
 end
 local loginAt = 0
 watcher:SetScript("OnEvent", function(_, event, ...)
@@ -593,6 +688,7 @@ watcher:SetScript("OnEvent", function(_, event, ...)
 			loginAt, calmAfter = GetTime(), GetTime() + 15
 			resting = ns.Flag(IsResting())
 			professions = ReadProfessions()
+			dead = ns.Flag(UnitIsDeadOrGhost("player")) and true or false
 		end
 		local inInstance = ns.Flag(IsInInstance())
 		local key = inInstance and (Plain(select(8, GetInstanceInfo())) or Plain((GetInstanceInfo()))) or nil
@@ -643,13 +739,19 @@ watcher:SetScript("OnEvent", function(_, event, ...)
 	elseif event == "QUEST_TURNED_IN" then
 		if ns.CardOn("quest") then TurnedIn(...) else reward = nil end
 	elseif event == "ENCOUNTER_END" then
-		local encounterID, _, _, _, success = ...
-		EncounterEnd(encounterID, success)
+		local encounterID, encounterName, _, _, success = ...
+		EncounterEnd(encounterID, encounterName, success)
 	elseif event == "PLAYER_DEAD" then
 		run.deaths = run.deaths + 1
 		streak = 0
+		dead = true
+	elseif event == "PLAYER_ALIVE" or event == "PLAYER_UNGHOST" then
+		C_Timer.After(0, AliveCheck)
+	elseif event == "UNIT_HEALTH" or event == "UNIT_FLAGS" then
+		TargetDied()
 	elseif event == "PLAYER_TARGET_CHANGED" then
 		Spot("target")
+		Watch()
 	elseif event == "UPDATE_MOUSEOVER_UNIT" then
 		Spot("mouseover")
 	elseif event == "NAME_PLATE_UNIT_ADDED" then

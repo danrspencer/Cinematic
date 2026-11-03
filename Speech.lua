@@ -7,6 +7,9 @@
 -- do: in a bubble of its own, or just the text (outlined, if ticked) with the
 -- Chat bubbles page's Text only, and at its text size. Newer lines push older
 -- ones up; each fades out after a while, longer for longer lines.
+-- Emotes (db.chatSpeechEmotes: a /point, an NPC's "laughs.") never have a
+-- bubble: they show here too, as the sentence chat shows, in a bubble with
+-- no tail, so they don't read as speech.
 local _, ns = ...
 local L = ns.L
 
@@ -154,6 +157,7 @@ local function SetLook(line, words)
 	end
 	local back = boxed and (own and line.skin or not own and line.bubble) or nil
 	line.boxed = back and true or false
+	line.tailed = line.boxed and not line.emote -- (room for its tail)
 	local tailTop = select(4, Behind())
 	-- (The tail's room is under the bubble, or over it with the tail on top.)
 	-- (Lined up with the Move box's side; a bubble's edge, not its words', on it.)
@@ -163,7 +167,7 @@ local function SetLook(line, words)
 	text:SetJustifyH(align)
 	text:ClearAllPoints()
 	text:SetPoint(point, line.frame, point, line.boxed and inset or 0,
-		line.boxed and PAD_Y + (tailTop and 0 or TAIL_SPACE) or 0)
+		line.boxed and PAD_Y + ((tailTop or not line.tailed) and 0 or TAIL_SPACE) or 0)
 	line.point = point
 	for _, frame in ipairs({ line.bubble or false, line.skin or false }) do
 		if frame then
@@ -173,10 +177,13 @@ local function SetLook(line, words)
 			frame:SetPoint("BOTTOMRIGHT", text, "BOTTOMRIGHT", PAD_X, -PAD_Y)
 		end
 	end
-	if line.skin then ns.DressBubbleSkin(line.skin, look) end
+	if line.skin then
+		ns.DressBubbleSkin(line.skin, look)
+		line.skin.tail:SetShown(look.bubblesTail and not line.emote and true or false)
+	end
 	if line.bubble then
 		line.bubble:SetAlpha(tonumber(look.bubblesAlpha) or 1)
-		line.bubble.tail:SetShown(look.bubblesTail and true or false)
+		line.bubble.tail:SetShown(look.bubblesTail and not line.emote and true or false)
 	end
 	if line.skin then line.skin:SetShown(back == line.skin) end
 	if line.bubble then line.bubble:SetShown(back == line.bubble) end
@@ -277,7 +284,8 @@ local function OnUpdate(_, elapsed)
 		line.y = math.abs(y - line.y) < 0.5 and y or line.y + (y - line.y) * math.min(1, elapsed * SLIDE_RATE)
 		line.frame:ClearAllPoints()
 		line.frame:SetPoint(line.point, spot, line.point, 0, line.y)
-		y = y + line.text:GetStringHeight() + (line.boxed and PAD_Y * 2 + TAIL_SPACE or 0) + GAP
+		y = y + line.text:GetStringHeight() + (line.boxed and PAD_Y * 2 or 0)
+			+ (line.tailed and TAIL_SPACE or 0) + GAP
 	end
 	if #lines == 0 then
 		holder:SetScript("OnUpdate", nil)
@@ -428,7 +436,22 @@ local function ClassColoured(name, guid)
 	return name
 end
 
--- event: CHAT_MSG_SAY, _YELL, _MONSTER_SAY or _MONSTER_YELL; guid: the
+-- Emotes: the sentence as chat shows it. A text emote (/point) has the name
+-- in already; an NPC's has %s for it; a custom one (/e) has it put first.
+local EMOTES = { CHAT_MSG_EMOTE = true, CHAT_MSG_TEXT_EMOTE = true, CHAT_MSG_MONSTER_EMOTE = true }
+ns.SPEECH_EMOTES = EMOTES -- (Chat.lua)
+local function EmoteWords(event, author, text, guid)
+	local name = type(author) == "string" and not (issecretvalue and issecretvalue(author)) and author ~= ""
+		and ClassColoured(_G.Ambiguate and _G.Ambiguate(author, "none") or author, guid) or nil
+	if text:find("%s", 1, true) then
+		return (text:gsub("%%s", ((name or ""):gsub("%%", "%%%%"))))
+	elseif event == "CHAT_MSG_EMOTE" and name then
+		return name .. " " .. text
+	end
+	return text
+end
+
+-- event: CHAT_MSG_SAY, _YELL, _MONSTER_SAY, _MONSTER_YELL or an emote; guid: the
 -- speaker's, if the chat message gave it.
 -- The Style hub's Chat bubbles page's Test button: a line from you, as one
 -- from behind you would show.
@@ -453,7 +476,10 @@ function ns.ShowSpeechBehind(event, author, text, guid)
 
 	local chatType = event:gsub("^CHAT_MSG_", "")
 	local words = text
-	if Styled().speechBehindName and type(author) == "string" and author ~= ""
+	local emote = EMOTES[event] or false
+	if emote then
+		words = EmoteWords(event, author, text, guid)
+	elseif Styled().speechBehindName and type(author) == "string" and author ~= ""
 			and not (issecretvalue and issecretvalue(author)) then
 		-- (A player's in brackets, as the chat window shows it, the brackets in
 		-- the chat's colour; an NPC's without, as there too.)
@@ -473,7 +499,7 @@ function ns.ShowSpeechBehind(event, author, text, guid)
 	local line = NewLine()
 	local rise, _, most = Behind()
 	line.born, line.life, line.fading = now, ns.SpeechLife(text), nil
-	line.most, line.said, line.bubbled = most, text, nil
+	line.most, line.said, line.bubbled, line.emote = most, text, nil, emote
 	-- (Rising: it starts below the screen's bottom edge and slides up into place.)
 	line.y = rise and -(spotBottom + RISE_FROM) or 0
 	local info = _G.ChatTypeInfo and _G.ChatTypeInfo[chatType]

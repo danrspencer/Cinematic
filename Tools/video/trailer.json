@@ -1,0 +1,256 @@
+{
+  "output": "Trailer v25.mp4",
+  "fps": 30,
+  "crossfade": 0.6,
+  "segments": [
+    {
+      "card": {
+        "title": "Cinematic",
+        "sub": "Update 2.0",
+        "seconds": 3.5,
+        "sound": {
+          "take": "V01 hook t3",
+          "in": "0:02.1",
+          "fadein": 0.01
+        },
+        "rise": 1.5,
+        "subat": 1.8
+      },
+      "note": "title card, as the v1.7 video",
+      "game": 5.5
+    },
+    {
+      "take": "V01 hook t3",
+      "in": "0:05",
+      "out": "0:10",
+      "fadein": 1.0,
+      "note": "end of the tunnel walk, full UI",
+      "fadesound": false,
+      "game": 5.5
+    },
+    {
+      "take": "V01 hook t3",
+      "in": "0:10",
+      "out": "0:25",
+      "cut": true,
+      "text": "Bring Azeroth to life",
+      "sub": "See the world the way it was meant to be seen",
+      "note": "CineMode on: the UI melts, out into the valley, its name card",
+      "pos": "tl",
+      "textat": 1.5,
+      "game": 5.5
+    },
+    {
+      "take": "V02 ui-returns t2",
+      "in": "0:02",
+      "out": "0:10",
+      "text": "Bring back anything hidden, automatically",
+      "sub": "It's back in combat, in dungeons, whenever you need it",
+      "note": "no UI, a fight, the full UI back",
+      "pos": "tl"
+    },
+    {
+      "take": "V19 show-rules t2",
+      "in": "0:09",
+      "out": "0:18.5",
+      "text": "You choose what shows, and when",
+      "sub": "Every frame its own rule: always, in combat, on mouseover",
+      "note": "Game Frames page; mouseover brings frames back",
+      "pos": "ml",
+      "size": 0.75,
+      "game": 5
+    },
+    {
+      "take": "V03 profiles t1",
+      "in": "0:14",
+      "out": "0:25",
+      "text": "Easy one-click setup",
+      "sub": "Three unique profiles ready out of the box",
+      "note": "Subtle, Balanced, Cinema",
+      "pos": "ml",
+      "size": 0.8
+    },
+    {
+      "take": "V16 customize t2",
+      "in": "0:02",
+      "out": "0:16.5",
+      "text": "Fine-tune\nevery piece",
+      "sub": "Show or hide anything and everything",
+      "note": "Customize: fade, action bars, layout to Retail Inspired",
+      "pos": "ml",
+      "size": 0.75
+    },
+    {
+      "take": "V09 boss-fight t1",
+      "in": "1:13",
+      "out": "1:28",
+      "text": "Introducing Visions",
+      "sub": "{Heal Vision}: see who needs healing, at a glance",
+      "note": "boss card, party frames in and out",
+      "pos": "tl"
+    },
+    {
+      "take": "V10 vitals-death t1",
+      "in": "0:24",
+      "out": "0:39",
+      "text": "{Vitals Vision}",
+      "sub": "Feel every hit with a class-themed alert",
+      "note": "storm closing in, death, YOU DIED",
+      "size": 0.85
+    },
+    {
+      "take": "V17 level-up-card t1",
+      "in": "0:22.5",
+      "out": "0:27.5",
+      "note": "Card Vision: level up",
+      "text": "{Card Vision}",
+      "sub": "Capture the small moments and the big milestones",
+      "pos": "tl"
+    },
+    {
+      "take": "V18 boss-card t1",
+      "in": "0:03.5",
+      "out": "0:09",
+      "note": "Card Vision: boss card",
+      "text": "{Card Vision}",
+      "sub": "Capture the small moments and the big milestones",
+      "pos": "tl"
+    },
+    {
+      "take": "V08 tele-cam t2",
+      "in": "0:05",
+      "out": "0:16.4",
+      "text": "{Tele Vision}",
+      "sub": "A portal rips open as you teleport",
+      "note": "Hearthstone into the portal"
+    },
+    {
+      "take": "V07 chat-cam t1",
+      "in": "0:54",
+      "out": "1:05",
+      "text": "Chat Cam",
+      "sub": "Follow the story as it unfolds",
+      "note": "camera swings between speakers",
+      "game": 0.75,
+      "soundearly": 1
+    },
+    {
+      "take": "V13 retail-half t2",
+      "in": "0:51",
+      "out": "0:57",
+      "split": {
+        "take": "V14 classic-half t2",
+        "in": "0:53",
+        "labels": [
+          "Retail",
+          "Classic"
+        ]
+      },
+      "text": "Works on every version",
+      "sub": "Retail, Classic, Forever + Gamepad",
+      "note": "split screen, both cameras turning",
+      "size": 0.8
+    },
+    {
+      "take": "V12 settings-tour t1",
+      "in": "1:12.3",
+      "out": "73.8",
+      "text": "Make it entirely yours",
+      "sub": "Advanced yet intuitive, with built-in support tools",
+      "note": "Unit frames"
+    },
+    {
+      "take": "V12 settings-tour t1",
+      "in": "1:19",
+      "out": "80.5",
+      "cut": true,
+      "text": "Make it entirely yours",
+      "sub": "Advanced yet intuitive, with built-in support tools",
+      "note": "Raid frames"
+    },
+    {
+      "take": "V12 settings-tour t1",
+      "in": "1:31",
+      "out": "92.5",
+      "cut": true,
+      "text": "Make it entirely yours",
+      "sub": "Advanced yet intuitive, with built-in support tools",
+      "note": "Nameplates"
+    },
+    {
+      "take": "V12 settings-tour t1",
+      "in": "2:37",
+      "out": "158.5",
+      "cut": true,
+      "text": "Make it entirely yours",
+      "sub": "Advanced yet intuitive, with built-in support tools",
+      "note": "Vitals Vision"
+    },
+    {
+      "take": "V12 settings-tour t1",
+      "in": "2:46.3",
+      "out": "167.8",
+      "cut": true,
+      "text": "Make it entirely yours",
+      "sub": "Advanced yet intuitive, with built-in support tools",
+      "note": "Dialogue"
+    },
+    {
+      "take": "V12 settings-tour t1",
+      "in": "2:58.3",
+      "out": "180.1",
+      "cut": true,
+      "text": "Make it entirely yours",
+      "sub": "Advanced yet intuitive, with built-in support tools",
+      "note": "Roll Vision"
+    },
+    {
+      "take": "V15 outro-cozy t1",
+      "in": "0:34",
+      "out": "0:42",
+      "text": "Hundreds of other features",
+      "sub": "Join our Discord community and tell us what you think",
+      "note": "Cozy Cam settles at the table",
+      "pos": "tl"
+    },
+    {
+      "take": "V15 outro-cozy t1",
+      "in": "0:42",
+      "out": "0:45",
+      "fadeout": 1.5,
+      "note": "fade out"
+    },
+    {
+      "card": {
+        "title": "Cinematic",
+        "sub": "See you on Azeroth",
+        "seconds": 4
+      },
+      "note": "end card, as the v1.7 video"
+    }
+  ],
+  "music": {
+    "game": 0.5,
+    "gamefadein": 6,
+    "songs": [
+      {
+        "file": "music/A_Call_To_Arms.mp3",
+        "from": 10,
+        "volume": 1,
+        "fadein": 4
+      },
+      {
+        "file": "music/Faerie_Dragon.ogg",
+        "from": 0,
+        "volume": 1,
+        "at": 15,
+        "fadein": 6,
+        "fadeout": 10
+      }
+    ],
+    "sync": {
+      "take": "V09 boss-fight t1",
+      "song": 69.4
+    }
+  }
+}

@@ -217,7 +217,7 @@ local function ShowMenu(owner)
 		UpdateIcon()
 		return
 	end
-	local menu = MenuUtil.CreateContextMenu(owner, function(_, root)
+	local menu = ns.ContextMenu(owner, function(_, root)
 		local db = ns.GetDB()
 		-- (The camera in use first, a link to its tab on the Cameras page.)
 		local camera = CameraInUse()
@@ -253,7 +253,7 @@ local function ShowMenu(owner)
 		root:CreateDivider()
 		-- (A frame later: the menu's own click is done with by then.)
 		root:CreateButton(L["Why is it showing?"], function() C_Timer.After(0, ns.ToggleInspect) end)
-		root:CreateButton(L["Open settings"], ns.OpenOptions)
+		root:CreateButton(L["Settings"], ns.OpenOptions)
 	end)
 	-- The menu opens at the cursor and is only kept on screen; keep it a little
 	-- way off the edges too. (Once it has its size, a frame later.)

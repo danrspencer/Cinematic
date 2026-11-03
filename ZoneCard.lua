@@ -84,6 +84,21 @@ local function Play(card)
 	ns.Cards.Fire(card.newArea and "zone" or "subzone", card)
 end
 
+-- The card for what the game showed, unless one came too soon before it.
+local function Card(zone, subzone, newArea)
+	local meta
+	if newArea and GetTime() < timeUntil and ns.TimeTitleNow then
+		meta, timeUntil = ns.TimeTitleNow(), 0
+	end
+	-- (Passing through places quickly: none until the gap since the last's up.)
+	if last and GetTime() - last.played < (tonumber(ns.db.storyZoneGap) or 0) then return end
+	local card = ns.ZoneCardText(zone, subzone, nil, newArea, meta)
+	if card then
+		card.newArea = newArea
+		Play(card)
+	end
+end
+
 -- What the game just showed (a frame later, so both its frames are set).
 -- Stepping out of a subzone back into the zone, the game shows the zone's
 -- name again (as the subzone line, or as the zone line once more): no card
@@ -105,18 +120,16 @@ local function Shows()
 		sub = subzone ~= ""
 	end
 	if not newArea and not (sub and subzone ~= "" and ns.CardOn("subzone")) then return end
-	local meta
-	if newArea and GetTime() < timeUntil and ns.TimeTitleNow then
-		meta, timeUntil = ns.TimeTitleNow(), 0
-	end
 	if newArea then lastZone = zone end
-	-- (Passing through places quickly: none until the gap since the last's up.)
-	if last and GetTime() - last.played < (tonumber(ns.db.storyZoneGap) or 0) then return end
-	local card = ns.ZoneCardText(zone, subzone, nil, newArea, meta)
-	if card then
-		card.newArea = newArea
-		Play(card)
+	-- (A place new to you: Discovered's card in place of this one. A moment
+	-- later, as the game's "Discovered:" line can come just after its name.)
+	if ns.DiscoverHasIt and ns.CardOn("discover") then
+		C_Timer.After(0.5, function()
+			if not ns.DiscoverHasIt() then Card(zone, subzone, newArea) end
+		end)
+		return
 	end
+	Card(zone, subzone, newArea)
 end
 local function Showing(frame)
 	if frame == ZoneTextFrame then

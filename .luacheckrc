@@ -20,6 +20,7 @@ globals = {
 	"BINDING_NAME_CINEMATIC_TOGGLE", "BINDING_NAME_CINEMATIC_HIDEUI", "BINDING_NAME_CINEMATIC_SCREENSHOT",
 	"BINDING_NAME_CINEMATIC_CAM_VISTA", "BINDING_NAME_CINEMATIC_CAM_IDLE", "BINDING_NAME_CINEMATIC_CAM_TELE",
 	"BINDING_NAME_CINEMATIC_CAM_FISH", "BINDING_NAME_CINEMATIC_CAM_DEATH", "BINDING_NAME_CINEMATIC_STOPCAM", "BINDING_NAME_CINEMATIC_CAM_COZY",
+	"BINDING_NAME_CINEMATIC_CAM_WALK", "BINDING_NAME_CINEMATIC_CAM_RUN",
 }
 
 -- The WoW API the addon uses (add new ones here as they come up)
@@ -192,7 +193,7 @@ read_globals = {
 	"ITEM_REQ_SKILL",
 	"IsInGroup",
 	"IsInInstance", "GetInstanceInfo", "strsplit", "C_RaidLocks", "EJ_GetCreatureInfo", "EJ_GetCurrentInstance",
-	"EJ_GetEncounterInfoByIndex", "EJ_GetInstanceForMap", "EJ_SelectInstance", "UnitEffectiveLevel",
+	"EJ_GetEncounterInfoByIndex", "EJ_GetEncounterInfo", "UnitIsTapDenied", "EJ_GetInstanceForMap", "EJ_SelectInstance", "UnitEffectiveLevel",
 	"IsInRaid",
 	"IsIndoors",
 	"IsMounted",

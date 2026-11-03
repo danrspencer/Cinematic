@@ -498,11 +498,20 @@ function ns.BuildTriggerDraft(parent, kit)
 	kit.Tooltip(name, L["A name of your own for it, shown on the rows. Empty: what starts it."])
 	own[#own + 1] = name
 
-	-- (Its camera: the ones that run where you stand, scripts, shots.)
+	-- (Its camera: the ones that run where you stand, the moving ones (their
+	-- scripts) and yours, by name, as the General page has them; not our
+	-- cameras' scripts or their parts, Fly-by say: those aren't cameras.)
+	local MOVING = { walk = true, run = true }
 	local camera = At("Camera", Menu(panel, 150, function()
 		local list = {}
 		for _, value in ipairs(ns.CameraChoiceValues(ns.CUSTOM_TRIGGER_CAMERAS)) do
-			list[#list + 1] = { value = value, text = ns.CameraName(value) or tostring(value) }
+			local id = ns.IsScriptCamera(value) and value:sub(8)
+			local script = id and (MOVING[id] and ns.FindCameraScript(id) or ns.MyCameraScript(id))
+			if not id then
+				list[#list + 1] = { value = value, text = ns.CameraName(value) or tostring(value) }
+			elseif script then
+				list[#list + 1] = { value = value, text = script.name }
+			end
 		end
 		if not ns.SHOTS_RETIRED and #(ns.ShotList()) < ns.SHOT_MAX then
 			list[#list + 1] = { value = "newshot", text = L["New shot..."] }

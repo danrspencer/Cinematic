@@ -148,6 +148,7 @@ local function PrintDebugHelp()
 	print("  /cine debug damagevision - Damage Vision: showing or why not, the session and meter it reads, your place and whether the totals are secret")
 	print("  /cine debug modules - profile modules: any writing outside their pages and sections, or two of a profile's setting the same thing (in the log)")
 	print("  /cine debug speech - show a sample line of speech from behind you, and print what happens to each say and yell (again to stop)")
+	print("  /cine debug emote - show a sample NPC emote as an off-screen bubble, and the settings real ones need")
 	print("  /cine debug target - print where your target's plate is on screen (x, y, angle off the middle), even faded (again to stop, /reload to save)")
 	print("  /cine debug speakers -log where each speaking NPC's bubble and plate are on screen, and the angle off the middle (again to stop, /reload to save)")
 	print("  /cine debug bubbles - log each chat bubble's place, frame by frame as it changes, and how far it's moved off the top (again to stop, /reload to save)")
@@ -399,6 +400,15 @@ local function HandleSlash(msg)
 		ns.Print("print what happens to each say and yell: " .. OnOff(ns.speechWatch) .. " (until you /reload)")
 		if ns.speechWatch and ns.ShowSpeechBehind then
 			ns.ShowSpeechBehind("CHAT_MSG_SAY", "Cinematic", "This is how speech from behind you looks.")
+		end
+	elseif cmd == "debug" and arg == "emote" then
+		-- (An NPC's emote as an off-screen bubble shows it, and what lets real ones show.)
+		local db = ns.db
+		ns.Print(("emote test; Chat bubbles page %s, off-screen bubbles %s, emotes too %s, hide bubbled %s, "
+			.. "show chat on message %s, hide own %s"):format(OnOff(db.handleBubbles), OnOff(db.chatSpeechBehind),
+			OnOff(db.chatSpeechEmotes), OnOff(db.chatHideBubbled), OnOff(db.chatPeek), OnOff(db.chatHideOwn)))
+		if ns.ShowSpeechBehind then
+			ns.ShowSpeechBehind("CHAT_MSG_MONSTER_EMOTE", "Dariness the Learned", "%s looks around thoughtfully.")
 		end
 	elseif cmd == "demo" and ns.DemoCommand then -- (DemoHub.lua: the dev copy only)
 		ns.DemoCommand(arg)

@@ -243,6 +243,8 @@ function ns.CleanCameraScript(script, id, keepSet, paths)
 		rules[rule.key] = RULE_ACTIONS[rule.key][action] and action or rule.actions[1]
 		local secs = tonumber(given[rule.key .. "Secs"])
 		rules[rule.key .. "Secs"] = secs and math.max(1, math.min(60, secs)) or 5
+		-- (Its tick: off, the event leaves it running; see Act.)
+		rules[rule.key .. "On"] = given[rule.key .. "On"] ~= false
 	end
 	return {
 		id = id or script.id,
@@ -642,11 +644,72 @@ local function Store()
 	return store
 end
 
--- Every script: the built-in ones (builtin = true) then yours, in order.
+-- A built-in camera's stop rules you changed on its page ({ [id] = { [rule
+-- or rule.."Secs"] = value } }): they count when its script runs (Run, or a
+-- row set to it), not for the camera's own code.
+local function RuleEdits(id)
+	local store = Store()
+	if not store then return nil end
+	if type(store.ruleEdits) ~= "table" then store.ruleEdits = {} end
+	if id and type(store.ruleEdits[id]) ~= "table" then store.ruleEdits[id] = {} end
+	return id and store.ruleEdits[id] or store.ruleEdits
+end
+local function WithRuleEdits(made, id)
+	local edits = RuleEdits(id)
+	if edits and next(edits) then
+		for key, value in pairs(edits) do made.rules[key] = value end
+	end
+	return made
+end
+-- Sets one (key: a rule, or rule.."Secs"); back to the built-in's own drops it.
+function ns.SetBuiltinCameraRule(id, key, value)
+	for _, each in ipairs(BUILT_IN) do
+		if each.id == id then
+			local edits = RuleEdits(id)
+			if not edits then return end
+			local own = ns.CleanCameraScript(each.make(), id, true).rules[key]
+			if value == own then edits[key] = nil else edits[key] = value end
+			return
+		end
+	end
+end
+
+-- A built-in camera's script you changed ({ [id] = script }): plain numbers
+-- from then on, not its settings, until Reset (ns.ResetBuiltinCameraScript).
+local function BuiltinEdits()
+	local store = Store()
+	if not store then return nil end
+	if type(store.builtinEdits) ~= "table" then store.builtinEdits = {} end
+	return store.builtinEdits
+end
+-- Keeps script (a built-in one, just changed) as yours of it; gives the one kept.
+function ns.EditBuiltinCameraScript(script)
+	local edits = BuiltinEdits()
+	if not edits then return script end
+	local kept = ns.CleanCameraScript(script, script.id)
+	kept.icon, kept.desc = nil, nil
+	edits[script.id] = kept
+	return ns.FindCameraScript(script.id) or kept
+end
+function ns.ResetBuiltinCameraScript(id)
+	local edits = BuiltinEdits()
+	if edits then edits[id] = nil end
+	local rules = RuleEdits()
+	if rules then rules[id] = nil end
+end
+
+-- Every script: the built-in ones (builtin = true; edited: yours of it) then
+-- yours, in order.
 function ns.CameraScripts()
 	local list = {}
+	local edits = BuiltinEdits() or {}
 	for _, each in ipairs(BUILT_IN) do
-		local script = ns.CleanCameraScript(each.make(), each.id, true)
+		local script = edits[each.id]
+		if type(script) == "table" then
+			script.edited = true -- (the table kept: the page changes it as it does yours)
+		else
+			script = ns.CleanCameraScript(WithRuleEdits(each.make(), each.id), each.id, true)
+		end
 		script.name, script.builtin = each.name, true
 		list[#list + 1] = script
 	end
@@ -808,9 +871,11 @@ function ns.SyncScriptCameras()
 		values[#values + 1] = value
 		ns.CAMERA_NAMES[value] = L["Script: %s"]:format(script.name)
 	end
+	-- (Your own scenes' Camera menu too, before any scene of yours uses it.)
+	local lists = { ns.CUSTOM_TRIGGER_CAMERAS }
+	for _, trigger in ipairs(ns.CAMERA_TRIGGERS) do lists[#lists + 1] = trigger.cameras end
 	local done = {}
-	for _, trigger in ipairs(ns.CAMERA_TRIGGERS) do
-		local list = trigger.cameras
+	for _, list in pairs(lists) do
 		if type(list) == "table" and not done[list] and TakesScripts(list) then
 			done[list] = true
 			for i = #list, 1, -1 do
@@ -1777,7 +1842,10 @@ local function Finish(why)
 	ns.ApplyCVarSet(FOLLOW_CVARS, false)
 	ns.Log("state", ("camera script %s ended (%s)"):format(run.script.name, why or "done"))
 	if run.trigger and run.triggerOn then stoppedFor = run.trigger .. run.camera end
+	-- (A scene its key started: over too, so the next press starts it again.)
+	local trigger = run.trigger
 	run = nil
+	if trigger and ns.EndCustomKeyScene then ns.EndCustomKeyScene(trigger) end
 end
 
 local function BeginEnding(why)
@@ -1790,10 +1858,20 @@ local function BeginEnding(why)
 	run.co = coroutine.create(function() DoSteps(run.script.ending) end)
 end
 
--- What a stop rule says to do.
+-- How long a pause for event lasts (its rule off: a moment after you let go).
+local function PauseSecs(rules, event)
+	return rules[event .. "On"] == false and 1 or rules[event .. "Secs"]
+end
+
+-- What a stop rule says to do. Off, its event carries on, except your
+-- camera input: that's still yours, carrying on a moment after you let go.
 local function Act(event)
 	local rules = run.script.rules
 	local action = rules[event]
+	if rules[event .. "On"] == false then
+		if event ~= "camera" then return false end
+		action = "pause"
+	end
 	if action == "ignore" then return false end
 	-- (Its When it ends under way: only your camera input or a fight stops
 	-- that; walking on, say, it carries on turning back.)
@@ -1804,7 +1882,7 @@ local function Act(event)
 		BeginEnding(event)
 	elseif action == "pause" then
 		if not run.pausedUntil then Suspend() end
-		run.pausedUntil = GetTime() + rules[event .. "Secs"]
+		run.pausedUntil = GetTime() + PauseSecs(rules, event)
 		run.pausedBy = event
 	elseif action == "restart" then
 		StopAll()
@@ -1875,6 +1953,12 @@ end
 -- running's, a quest giver's or chat's.
 local function TriggerNow()
 	if not ns.db or not ns.db.enabled or not ns.ActiveEvent then return nil end
+	-- (A scene of yours its key started: first, a window open or walking.)
+	local scene = ns.CustomKeyScene and ns.CustomKeyScene()
+	if scene then
+		local camera = ns.TriggerSetting(scene, "camera")
+		if IsScript(camera) then return scene, camera end
+	end
 	local key, camera = ns.ActiveEvent()
 	if IsScript(camera) then return key, camera end
 	local triggers = ns.CAMERA_TRIGGER
@@ -1960,10 +2044,10 @@ local function Update(elapsed)
 		-- Paused: more input keeps it paused; then it carries on.
 		if (run.pausedBy == "camera" and (moved or zoomed)) or (run.pausedBy == "zoom" and zoomed)
 			or (run.pausedBy == "walk" and ns.playerMoving) then
-			run.pausedUntil = now + run.script.rules[run.pausedBy .. "Secs"]
+			run.pausedUntil = now + PauseSecs(run.script.rules, run.pausedBy)
 		end
-		if InFight() then Act("fight") return end
-		if run.trigger and not run.triggerOn then Act("ends") return end
+		if InFight() and Act("fight") then return end
+		if run.trigger and not run.triggerOn and Act("ends") then return end
 		if now < run.pausedUntil then return end
 		run.pausedUntil = nil
 		Resume()
@@ -2057,7 +2141,8 @@ if ns.RegisterCamera then
 			run.tookAt = GetTime()
 			if run.pausedUntil then return end
 			Suspend()
-			if run.script.rules.camera ~= "pause" then StopAll() end
+			local rules = run.script.rules
+			if rules.camera ~= "pause" and rules.cameraOn ~= false then StopAll() end
 		end
 	end)
 end
@@ -2142,9 +2227,13 @@ function ns.CameraScriptCommand(arg)
 		local key, camera = TriggerNow()
 		local active, activeCam
 		if ns.ActiveEvent then active, activeCam = ns.ActiveEvent() end
-		ns.Print(("camera scripts: trigger now %s (%s); event %s (%s); flight %s; combat %s; view held by %s"):format(
+		ns.Print(("camera scripts: Cinematic %s; trigger now %s (%s); event %s (%s); flight %s; combat %s; view held by %s"):format(
+			ns.db.enabled and "on" or "OFF (/cine: no script plays)",
 			tostring(key), tostring(camera), tostring(active), tostring(activeCam), tostring(ns.OnTaxi()),
 			tostring(InFight()), tostring(ns.CameraHolder and ns.CameraHolder(WHO) or "?")))
+		local scene = ns.CustomKeyScene and ns.CustomKeyScene()
+		ns.Print(("scene started by its key: %s%s"):format(tostring(scene), scene and (" (row now %s, camera %s)"):format(
+			tostring(ns.TriggerRowNow(scene)), tostring(ns.TriggerSetting(scene, "camera"))) or ""))
 		if ns.isDev then
 			ns.Print(("our cameras as scripts (/cine script builtins): %s"):format(
 				ns.ScriptBuiltInsOn() and "ON" or "off"))

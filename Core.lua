@@ -27,6 +27,8 @@ local function SetBindingNames()
 	BINDING_NAME_CINEMATIC_CAM_VISTA = "Cinematic: " .. L["Start the vista camera"]
 	BINDING_NAME_CINEMATIC_CAM_FISH = "Cinematic: " .. L["Start the fish camera"]
 	BINDING_NAME_CINEMATIC_CAM_TELE = "Cinematic: " .. L["Start the tele camera"]
+	BINDING_NAME_CINEMATIC_CAM_WALK = "Cinematic: " .. L["Start the RP walk camera"]
+	BINDING_NAME_CINEMATIC_CAM_RUN = "Cinematic: " .. L["Start the auto-run camera"]
 	BINDING_NAME_CINEMATIC_CAM_DEATH = "Cinematic: " .. L["Test the death camera"]
 	BINDING_NAME_CINEMATIC_STOPCAM = "Cinematic: " .. L["Stop the camera"]
 	for n = 1, 5 do
@@ -248,6 +250,7 @@ local DEFAULTS = {
 	chatHideOwn = true, -- your own messages (emotes, say, party...) don't show chat
 	chatHideBubbled = true, -- say/yell you can see as a bubble on screen doesn't show chat
 	chatSpeechBehind = false, -- ...and one with no bubble on screen shows low on the screen instead
+	chatSpeechEmotes = true, -- ...emotes (no bubble ever) show there too, in a bubble with no tail
 	speechBehindName = true, -- ...with who said it ("Name says: ")
 	speechBehindClassColor = true, -- ...players' names in their class colour
 	speechBehindWidth = 480, -- ...wrapping past this wide
@@ -1273,7 +1276,8 @@ for page, keys in pairs({
 	cards = { "combatOnEnter", "combatOnLeave", "cardBossOn", "storyZoneCard", "storyZoneSubzones", "storyRecap",
 		"timeOfDayMessage", "timeOfDayChange", "chatAttackAlert", "cardDuelOn", "cardDeathOn", "cardLevelUpOn",
 		"cardDiscoverOn", "cardArrivalOn", "cardRestedOn", "cardAchievementOn", "cardReputationOn", "cardCollectOn",
-		"cardProfessionOn", "cardQuestOn", "cardClearedOn", "cardRareOn", "cardBattlegroundOn", "cardStreakOn" },
+		"cardProfessionOn", "cardQuestOn", "cardClearedOn", "cardRareOn", "cardBattlegroundOn", "cardStreakOn",
+		"cardBossDownOn", "cardFelledOn", "cardRevivedOn" },
 	cameraModes = { "shoulderCam" }, -- Cameras > General's Enable Cameras: Shoulder Cam
 	visualEffects = { "letterboxPage", "tintPage", "graphicsPlus", "musicInCinematic" }, -- (the Atmosphere hub's pages' switches)
 	-- Style > General's Enable Style: the Style hub's pages' switches.
@@ -3115,7 +3119,7 @@ end
 -- quiet: no messages in chat (the camera wheel). via: what started it, for
 -- the camera mode log (a key binding if not given).
 local CAM_NAMES = { idle = "AFK camera", cozy = "cozy camera", vista = "vista camera", fish = "fish camera",
-	tele = "tele camera" }
+	tele = "tele camera", walk = "RP walk camera", run = "auto-run camera" }
 function Cinematic_StartCam(camera, quiet, via)
 	if not ns.db then
 		return
@@ -3142,6 +3146,30 @@ function Cinematic_StartCam(camera, quiet, via)
 	end
 	if not ns.db.enabled then
 		Print(L["Cinematic is off: turn it on first"])
+		return
+	end
+	-- Its script's You walk rule unticked (its Stop rules tab), or a moving
+	-- camera (RP walk, auto-run): the key plays the script instead, walking or
+	-- not, its stop rules deciding when it ends.
+	local scriptId = camera == "idle" and "afk" or camera
+	local script = ns.FindCameraScript and ns.FindCameraScript(scriptId)
+	local moving = camera == "walk" or camera == "run"
+	if script and (moving or script.rules.walkOn == false) then
+		local playing = ns.PlayingCameraScript()
+		if playing and playing.id == scriptId then
+			ns.StopCameraScript()
+			Print(L["%s stopped"]:format(L[CAM_NAMES[camera]]))
+			return
+		end
+		if camera == "tele" then
+			ns.PretendDepartCast(10) -- (the usual Hearthstone cast: its Until the cast ends needs one)
+		end
+		local ok, why = ns.PlayCameraScript(script)
+		if ok then
+			Print(L["%s on: press the key again to stop it"]:format(L[CAM_NAMES[camera]]))
+		else
+			Print(why)
+		end
 		return
 	end
 	if ns.playerMoving or ns.OnTaxi() then
@@ -4409,6 +4437,18 @@ ticker:SetScript("OnEvent", ns.Profiled("Core events", function(self, event, arg
 				if type(saved) == "table" then AddManaRow(saved.hoverGroups) end
 			end
 			ns.db.prdManaHoverV1 = true
+		end
+		-- The mana bar's row followed the resource bar (the Cinema profile's):
+		-- its own Always now, the bar's few seconds after you use mana. Once.
+		if not ns.db.prdManaFollowV1 then
+			local function Unfollow(follow)
+				if type(follow) == "table" and follow.prdmana == "prdpower" then follow.prdmana = nil end
+			end
+			Unfollow(ns.db.rowFollow)
+			for _, saved in pairs(ns.db.profiles or {}) do
+				if type(saved) == "table" then Unfollow(saved.rowFollow) end
+			end
+			ns.db.prdManaFollowV1 = true
 		end
 		-- The minimap header got a row apart from the minimap: into saved
 		-- Mouseover groups with the minimap, as the default groups have it. Once.

@@ -34,6 +34,10 @@ local TRACK_FROM = 0.32            -- ...from this much apart (of the text's hei
 local TYPE_EACH = 0.07             -- Typewriter: seconds for each letter
 local PULSE_PEAK, PULSE_GONE = 0.12, 0.9
 local CUT_OUT = 0.25               -- a cue cut short (the fight's other edge came first) fades this fast
+local TOAST_GAP = 12               -- a card pushed under Blizzard's toast: this far under its bottom
+local TOAST_SLIDE = 6              -- ...sliding there this fast (share of the way each second, about)
+local TOAST_GUESS = 0.32           -- ...its bottom this far down the screen when it can't be read
+local TOAST_MOST = 0.45            -- ...but pushed no more than this share of the screen
 local OUTLINES = { [0] = "", "OUTLINE", "THICKOUTLINE" }
 -- Banner: the words across the middle of the screen on a dark band with soft
 -- edges (the death banner's), coming in and going slowly, or a picture on a
@@ -225,6 +229,12 @@ local function Setup(cue, look, enter, width, height, scale, boss)
 	line:ClearAllPoints()
 	icon:ClearAllPoints()
 	cue.barSide, cue.lineWidth, cue.third = nil, nil, place == "third"
+	-- (On the real screen, up in the middle: pushed under Blizzard's toast
+	-- while it's up. In a bar or low down it's clear of it.)
+	cue.toastable = scale == 1 and place ~= "top" and place ~= "bottom" and place ~= "third" and style ~= "subtitle"
+	cue.toastPush, cue.pushNow, cue.pushAge = 0, 0, 0
+	cue.over:ClearAllPoints()
+	cue.over:SetAllPoints()
 	local x, y, point, relative = 0, 0, "CENTER", "CENTER"
 	-- (Moved by its own offsets: shares of the screen, so any size reads the same.)
 	local dx, dy = (tonumber(look.combatOffsetX) or 0) * width, (tonumber(look.combatOffsetY) or 0) * height
@@ -550,6 +560,57 @@ local function Shown(cue, age)
 	return math.max(a, 0), fadeIn + hold + fadeOut
 end
 
+-- Retail's big toast in the top middle (EventToastManagerFrame: a Renown
+-- level, a campaign's title...): how far its bottom is under frame's top,
+-- in frame's units; nil when it isn't up.
+local function ToastDepth(frame)
+	local toast = _G.EventToastManagerFrame
+	if not (toast and ns.Flag(toast:IsVisible())) then return end
+	local alpha = toast:GetEffectiveAlpha()
+	local secret = issecretvalue and issecretvalue(alpha)
+	if not secret and alpha <= 0 then return end
+	local bottom, top = toast:GetBottom(), frame:GetTop()
+	if bottom == nil or top == nil or issecretvalue and (issecretvalue(bottom) or issecretvalue(top)) then
+		return frame:GetHeight() * TOAST_GUESS
+	end
+	return top - bottom * toast:GetEffectiveScale() / frame:GetEffectiveScale()
+end
+
+-- How far under the top of cue's words frame its highest shown part is
+-- (nil if none can be read: a secret name's size is secret).
+local function CardDepth(cue)
+	local overTop, best = cue.over:GetTop(), nil
+	if overTop == nil or issecretvalue and issecretvalue(overTop) then return end
+	for _, part in ipairs({ cue.text, cue.meta, cue.sub, cue.icon, cue.picture, cue.band.top }) do
+		if part:IsShown() then
+			local top = part:GetTop()
+			if top ~= nil and not (issecretvalue and issecretvalue(top)) and (best == nil or top > best) then
+				best = top
+			end
+		end
+	end
+	return best and overTop - best
+end
+
+-- Pushes cue down under Blizzard's toast while it's up, sliding there; it
+-- stays down once the toast goes (back up would be restless).
+local function DodgeToast(cue, age)
+	local frame = cue.over:GetParent()
+	local toast = ToastDepth(frame)
+	if toast then
+		local want = toast + TOAST_GAP - (CardDepth(cue) or cue.height * TOAST_GUESS)
+		cue.toastPush = math.max(cue.toastPush, math.min(want, cue.height * TOAST_MOST))
+	end
+	-- (Already up as the card starts: straight there.)
+	local step = age == 0 and 1 or math.min(1, (age - cue.pushAge) * TOAST_SLIDE)
+	cue.pushAge = age
+	if cue.toastPush - cue.pushNow < 0.5 then return end
+	cue.pushNow = cue.pushNow + (cue.toastPush - cue.pushNow) * step
+	cue.over:ClearAllPoints()
+	cue.over:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, -cue.pushNow)
+	cue.over:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", 0, -cue.pushNow)
+end
+
 -- Draws cue age seconds in. Gives false once it's over (and hidden). Cut
 -- short (cue.cutAt, cue.cutFrom: when, and how shown then), it fades out
 -- from there in CUT_OUT.
@@ -570,6 +631,7 @@ local function Draw(cue, age)
 	a = a * a * (3 - 2 * a)
 	cue.over:Show()
 	cue.over:SetAlpha(a)
+	if cue.toastable then DodgeToast(cue, age) end
 	-- (Reveal: the window opening, eased out; the line drawing out with it.)
 	local open = a
 	if cue.reveal then

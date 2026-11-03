@@ -505,6 +505,13 @@ end
 local OnBubbleWatch = ns.Profiled("Bubble watch", WatchBubbles)
 
 local function PeekUnlessBubble(chatFrame, event, text, author, guid)
+	-- (An emote never has a bubble: with "Show emotes" too, it shows with the
+	-- off-screen bubbles while its chat window is faded, as speech does.)
+	if ns.SPEECH_EMOTES and ns.SPEECH_EMOTES[event] and ns.db.chatSpeechEmotes and ns.db.chatHideBubbled
+			and type(text) == "string" and not (issecretvalue and issecretvalue(text)) then
+		SpeakOrPeek({ chatFrame, text, 0, event, author, guid })
+		return
+	end
 	-- (Its kind off on the Chat bubbles page: no bubble to wait for.)
 	local kind = ns.BUBBLE_KIND_OF and ns.BUBBLE_KIND_OF[event]
 	if not (ns.db.chatHideBubbled and BUBBLE_SPEECH[event] and type(text) == "string" and not (issecretvalue and issecretvalue(text))

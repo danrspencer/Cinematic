@@ -377,7 +377,10 @@ do
 	-- nil otherwise.
 	function ns.DepartTimeLeft()
 		-- (Its key's run, or a trigger of your own playing it: CustomTriggers.lua.)
+		-- (Or its key playing its script: Core.lua's Cinematic_StartCam.)
+		local playing = ns.PlayingCameraScript and ns.PlayingCameraScript()
 		local held = ns.manualCam == "tele" or (ns.CustomTeleOn and ns.CustomTeleOn())
+			or (playing and playing.id == "tele")
 		if pretending and (not held or GetTime() >= castEndsAt) then
 			-- The pretend cast over (or stopped): like a cancelled one, the spin
 			-- turns back and the zoom goes back out, and the camera ends.

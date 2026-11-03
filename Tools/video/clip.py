@@ -3,20 +3,20 @@
 clips.json holds every clip to record and how far each is; playbook.md is
 made from it (don't edit that by hand). A take is the newest recording in
 the captures folder, moved to the library and named after its clip:
-"C31 quest-cam t1.mp4".
+"V06 quest-cam t1.mp4".
 
     python Tools/video/clip.py               where we are, and the next clips
-    python Tools/video/clip.py done C31      newest recording = C31's take
-    python Tools/video/clip.py done C31 --note "good light"
-    python Tools/video/clip.py done C31 --file "<path>"   that recording instead
-    python Tools/video/clip.py skip C31      won't record it (--note why)
-    python Tools/video/clip.py redo C31      back to do (its takes are kept)
+    python Tools/video/clip.py done V06      newest recording = V06's take
+    python Tools/video/clip.py done V06 --note "good light"
+    python Tools/video/clip.py done V06 --file "<path>"   that recording instead
+    python Tools/video/clip.py skip V06      won't record it (--note why)
+    python Tools/video/clip.py redo V06      back to do (its takes are kept)
     python Tools/video/clip.py pending       recordings not given to a clip yet
     python Tools/video/clip.py render        remake playbook.md
-    python Tools/video/clip.py scan C31 [take]   contact sheets of a take (newest if
+    python Tools/video/clip.py scan V06 [take]   contact sheets of a take (newest if
                                              no take): a frame at each picture change
                                              and every few seconds, its time on it
-    python Tools/video/clip.py mark C31 2 "0:04 the camera swings in" "0:12 ..."
+    python Tools/video/clip.py mark V06 2 "0:04 the camera swings in" "0:12 ..."
                                              the take's marks (replaces any it had)
 """
 import json
@@ -197,7 +197,7 @@ def render(data):
         "Made from `clips.json` by `clip.py`: don't edit by hand.",
         "",
         f"**Done {n['done']} / {total}**, skipped {n['skip']}, to record {n['todo']}.  ",
-        f"OBS records to `{data["captures"]}` → takes go to `{data['library']}` as `C31 quest-cam t1.mp4`.",
+        f"OBS records to `{data["captures"]}` → takes go to `{data['library']}` as `V06 quest-cam t1.mp4`.",
         "",
         "One clip at a time: set up, record in OBS, stop, then say which clip it was.",
         "**Hub** = a Demo Hub button (`/cine demo <key>`, or Dev > Demo Commands). "
@@ -208,6 +208,10 @@ def render(data):
         "**Zoom** (how the clip is framed in the edit):",
         "",
     ] + [f"- **{k}**: {v}" for k, v in data.get("zoomGuide", {}).items()] + [""]
+    if data.get("script"):
+        out += ["## Script", "", "| Time | Section | Shot | On screen |", "|---|---|---|---|"]
+        out += ["| " + " | ".join(cell(p.strip()) for p in line.split("|")) + " |" for line in data["script"]]
+        out.append("")
     for session in data["sessions"]:
         clips = [c for c in data["clips"] if c["session"] == session["id"]]
         done_here = sum(1 for c in clips if c["status"] == "done")
@@ -226,14 +230,6 @@ def render(data):
             out.append(f"| {MARK[c['status']]} | {c['id']} | {cell(c['title'])}{tags} | {zoom(c)} | {c['client']} | "
                        f"{cell(c.get('hub', ''))} | {how} | {takes} |")
         out.append("")
-    out += [
-        "## Edits to make from these",
-        "",
-        "1. **All features** (first): each section in order, cut down to its marked moments.",
-        "2. **Short videos (1-2)**: the best moments from the ★ sections: open on the hook (R1), end on the B-roll (R4).",
-        "3. **In-depth video**: all clips plus settings close-ups (S1) per feature.",
-        "",
-    ]
     with open(PLAYBOOK, "w", encoding="utf-8") as f:
         f.write("\n".join(out))
 

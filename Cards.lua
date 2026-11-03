@@ -33,6 +33,17 @@ DEFAULTS.cardDuelResult = true -- you win or lose
 DEFAULTS.duelTextStart = "Duel"
 DEFAULTS.duelTextWon = "Victory"
 DEFAULTS.duelTextLost = "Defeat"
+-- Souls banners (a souls-like's VICTORY ACHIEVED, as Death's YOU DIED): the
+-- words Boss defeated, Rare felled and Revived show (SOULS_WORDS' or
+-- "custom": <id>Text), and whether Duel, Battleground, Dungeon cleared and
+-- Kill streak's wins and losses show as one ("souls") or as they were.
+DEFAULTS.bossDownWords = "victory"
+DEFAULTS.bossDownText = ""
+DEFAULTS.felledWords = "felled"
+DEFAULTS.felledText = ""
+DEFAULTS.revivedWords = "restored"
+DEFAULTS.revivedText = ""
+for _, id in ipairs({ "duel", "battleground", "cleared", "streak" }) do DEFAULTS["cardSouls_" .. id] = "usual" end
 
 local BOOK = "Interface\\Icons\\INV_Misc_Book_09"
 local MAP = "Interface\\Icons\\INV_Misc_Map_01"
@@ -55,6 +66,9 @@ local EVENTS = {
 	{ id = "combatOut", name = "Leaving combat", on = "combatOnLeave", priority = 50, icon = 132320, fight = true },
 	{ id = "boss", name = "Boss", on = "cardBossOn", priority = 80,
 		icon = "Interface\\TargetingFrame\\UI-TargetingFrame-Skull", fight = true },
+	-- (Over Dungeon cleared's: the kill's own banner first, the run's after.)
+	{ id = "bossDown", name = "Boss defeated", on = "cardBossDownOn", priority = 85,
+		icon = "Interface\\Icons\\INV_Misc_Bone_HumanSkull_01", inFight = "show" },
 	{ id = "cleared", name = "Dungeon cleared", on = "cardClearedOn", priority = 75,
 		icon = "Interface\\Icons\\Achievement_Dungeon_ClassicDungeonMaster",
 		has = EJ_GetInstanceForMap ~= nil, inFight = "wait" },
@@ -86,6 +100,8 @@ local EVENTS = {
 		icon = "Interface\\Icons\\INV_Misc_Book_07", inFight = "wait" },
 	{ id = "rare", name = "Rare spotted", on = "cardRareOn", priority = 60,
 		icon = "Interface\\Icons\\Ability_Hunter_MarkedForDeath", inFight = "show" },
+	{ id = "felled", name = "Rare felled", on = "cardFelledOn", priority = 62,
+		icon = "Interface\\Icons\\Ability_BackStab", inFight = "show" },
 	{ id = "attack", name = "Under attack", on = "chatAttackAlert", priority = 60,
 		icon = "Interface\\Icons\\Ability_Warrior_BattleShout" },
 	-- (Combat's priority: a duel's cards and its fight's replace each other,
@@ -98,6 +114,8 @@ local EVENTS = {
 		icon = "Interface\\Icons\\Ability_Warrior_Rampage", fight = true },
 	{ id = "death", name = "Death", on = "cardDeathOn", priority = 100,
 		icon = "Interface\\Icons\\Ability_Rogue_FeignDeath" },
+	{ id = "revived", name = "Revived", on = "cardRevivedOn", priority = 100,
+		icon = "Interface\\Icons\\Spell_Holy_Resurrection" },
 }
 for i = #EVENTS, 1, -1 do
 	if EVENTS[i].has == false then table.remove(EVENTS, i) end
@@ -196,6 +214,9 @@ local STYLES = {
 		R = 1, G = 0.3, B = 0.2 } },
 	{ id = "death", name = "Death", look = { Style = "banner", Anim = "fade", Size = 60, Hold = 4,
 		R = 0.72, G = 0.11, B = 0.14 } },
+	-- (Death's gold other side: a win, or coming back.)
+	{ id = "victory", name = "Victory", look = { Style = "banner", Anim = "fade", Size = 60, Hold = 4,
+		R = 0.93, G = 0.76, B = 0.3 } },
 	{ id = "film", name = "Film", look = { Place = "screen", Style = "title", Anim = "fade", Font = "morpheus",
 		Size = 40 } },
 	{ id = "reel", name = "Reel", look = { Place = "bottom", Style = "title", Anim = "reveal" } },
@@ -222,7 +243,7 @@ local BASES = { combatIn = "danger", combatOut = "respite", attack = "danger", d
 	zone = "place", subzone = "follow", arrival = "follow", login = "place", boss = "place", duel = "place",
 	time = "milestone",
 	reputation = "ticker", collect = "ticker", profession = "ticker", rested = "ticker",
-	streak = "ticker", rare = "rare" }
+	streak = "ticker", rare = "rare", bossDown = "victory", felled = "victory", revived = "victory" }
 -- (What each started from before the families, for the update moving
 -- yours onto them: Core.lua's cardsV7.)
 ns.CARD_OLD_BASES = { combatIn = "combat", boss = "boss", zone = "third", login = "journal", time = "title",
@@ -363,6 +384,17 @@ end
 
 -- A style's look as the card drawing reads it, for the Card Types tab's preview
 -- (each made once). id: the event whose card it plays (for its icon).
+-- (A field's value as the drawing reads it: the event's icon for "event";
+-- sized: times the cards' scale, for a card on the screen.)
+local function Drawn(field, value, id, sized)
+	if field == "Icon" and value == "event" then value = BY_ID[id] and BY_ID[id].icon or MAP end
+	if field == "Outline" then value = tonumber(value) or 0 end
+	if sized and field == "Size" then
+		value = (tonumber(value) or 36) * (tonumber(ns.db and ns.db.cardScale) or 1) * ns.VisionTextScale()
+	end
+	return value
+end
+
 local styleLooks = {}
 function ns.CardStyleLook(style, id)
 	local look = styleLooks[style .. ":" .. (id or "")]
@@ -370,12 +402,25 @@ function ns.CardStyleLook(style, id)
 		look = setmetatable({}, { __index = function(_, key)
 			local field = FIELD_OF[key]
 			if not field then return nil end
-			local value = ResolveStyle(ns.StyleLook("cards"), style, field)
-			if field == "Icon" and value == "event" then value = BY_ID[id] and BY_ID[id].icon or MAP end
-			if field == "Outline" then value = tonumber(value) or 0 end
-			return value
+			return Drawn(field, ResolveStyle(ns.StyleLook("cards"), style, field), id)
 		end })
 		styleLooks[style .. ":" .. (id or "")] = look
+	end
+	return look
+end
+
+-- ...and as a real card of id's draws it, sized as the cards are: a card
+-- playing in another style than its event's (a souls banner on a Duel card).
+local cardLooks = {}
+function ns.CardStyleCardLook(style, id)
+	local look = cardLooks[style .. ":" .. (id or "")]
+	if not look then
+		look = setmetatable({}, { __index = function(_, key)
+			local field = FIELD_OF[key]
+			if not field then return nil end
+			return Drawn(field, ResolveStyle(ns.StyleLook("cards"), style, field), id, true)
+		end })
+		cardLooks[style .. ":" .. (id or "")] = look
 	end
 	return look
 end
@@ -389,12 +434,7 @@ function ns.CardLook(id)
 		look = setmetatable({}, { __index = function(_, key)
 			local field = FIELD_OF[key]
 			if not field then return nil end
-			local value = ns.CardValue(id, field)
-			if field == "Icon" and value == "event" then value = BY_ID[id] and BY_ID[id].icon or MAP end
-			if field == "Outline" then value = tonumber(value) or 0 end
-			if field == "Size" then value = (tonumber(value) or 36) * (tonumber(ns.db and ns.db.cardScale) or 1)
-				* ns.VisionTextScale() end
-			return value
+			return Drawn(field, ns.CardValue(id, field), id, true)
 		end })
 		looks[id or ""] = look
 	end
@@ -605,6 +645,46 @@ samples.boss = function()
 	return card
 end
 
+-- Each souls event's words to pick from, in its Settings tab's order (%s:
+-- its name in capitals; the first one's while it isn't known).
+ns.SOULS_WORDS = {
+	bossDown = { { "victory", "VICTORY ACHIEVED" }, { "vanquished", "FOE VANQUISHED" },
+		{ "felled", "ENEMY FELLED" }, { "named", "%s FELLED" } },
+	felled = { { "felled", "ENEMY FELLED" }, { "vanquished", "FOE VANQUISHED" }, { "named", "%s FELLED" } },
+	revived = { { "restored", "VITALITY RESTORED" }, { "returned", "RETURNED FROM DEATH" } },
+}
+-- A souls event's words (great: a raid's or world boss's, ENEMY FELLED
+-- growing to GREAT ENEMY FELLED), and whether the name's in them.
+function ns.SoulsWords(id, name, great)
+	local db = ns.GetDB() or DEFAULTS
+	local pick = db[id .. "Words"]
+	if pick == "custom" then
+		local own = type(db[id .. "Text"]) == "string" and db[id .. "Text"]:match("^%s*(.-)%s*$") or ""
+		if own ~= "" then return own, false end
+	end
+	local list = ns.SOULS_WORDS[id]
+	local words = list[1][2]
+	for _, entry in ipairs(list) do
+		if entry[1] == pick then words = entry[2] end
+	end
+	if words:find("%s", 1, true) then
+		if name and name ~= "" then return L[words]:format(name:upper()), true end
+		words = list[1][2]
+	end
+	if great and words == "ENEMY FELLED" then words = "GREAT ENEMY FELLED" end
+	return L[words], false
+end
+
+-- A win's (or lost: a loss's) card as a souls banner if its event says so
+-- (its Settings tab's Banner): words big, its own small line under them, in
+-- the Victory style's look (Death's for a loss).
+function ns.SoulsCard(id, card, words, lost)
+	if (ns.GetDB() or DEFAULTS)["cardSouls_" .. id] ~= "souls" then return card end
+	card.name, card.meta = L[words], nil
+	card.look = ns.CardStyleCardLook(lost and "death" or "victory", id)
+	return card
+end
+
 -- The Duel card at a moment: "ask" (you challenge), "asked" (you're
 -- challenged), "start", "won" or "lost". other: the other duelist's name
 -- (nil: not known); fled: the loser ran.
@@ -628,6 +708,11 @@ function ns.DuelCard(moment, other, fled)
 	else
 		card = { name = ns.CardWords("duelTextLost"),
 			sub = fled and L["You fled from %s"]:format(name) or L["By %s"]:format(name) }
+	end
+	if moment == "won" then
+		ns.SoulsCard("duel", card, "VICTORY ACHIEVED")
+	elseif moment == "lost" then
+		ns.SoulsCard("duel", card, "DEFEATED", true)
 	end
 	card.sound = function() ns.PlayCardCueSound("duel", moment) end
 	return card

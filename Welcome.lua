@@ -718,6 +718,16 @@ function ns.ShowWelcome()
 	ShowPage(1)
 end
 
+-- The level cards in their order (the Demo Hub's welcome tour clicks them).
+function ns.WelcomeCards()
+	local list = {}
+	for _, level in ipairs(LEVELS) do
+		local card = cards[level.profile or ns.DEFAULT_PROFILE]
+		if card then list[#list + 1] = card end
+	end
+	return list
+end
+
 -- At login (and /reload), until a profile's been picked.
 local watcher = CreateFrame("Frame")
 watcher:RegisterEvent("PLAYER_ENTERING_WORLD")

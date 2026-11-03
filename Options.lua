@@ -813,12 +813,8 @@ local function Dropdown(parent, key, choices, width, onChange)
 	dropdown:SetWidth(width or 200)
 	dropdown.searchSkip = true -- (it shows the current choice, not a label)
 	dropdown:SetupMenu(function(_, rootDescription)
+		-- (A long list scrolls: ns.MenuDropdown's.)
 		local list = type(choices) == "function" and choices() or choices
-		-- (A long list, like the fonts with other addons' added, scrolls: else it
-		-- runs off the screen and its last entries can't be reached.)
-		if #list > 20 and rootDescription.SetScrollMode then
-			rootDescription:SetScrollMode(20 * 20)
-		end
 		for _, choice in ipairs(list) do
 			local radio = rootDescription:CreateRadio(choice.text,
 				-- SetupMenu builds the menu right away, before saved settings load.
@@ -6598,6 +6594,7 @@ local function CreateBubblesPanel()
 		"a bubble low on the screen, with the speaker's name, instead of bringing up chat. It needs the Chat " ..
 		"page's Show chat when a message arrives and Hide speech you can see as a bubble."]), "check")
 	GreyUnless(offScreen, function(db) return db.chatPeek and db.chatHideBubbled end)
+	offScreen:HookScript("OnClick", Refresh) -- (greys out / enables Show emotes too)
 	-- (How they look: a button right of it, to the Style hub's Chat bubbles page.)
 	local offScreenStyle = ns.PanelButton(content)
 	offScreenStyle:SetSize(70, 20)
@@ -6605,6 +6602,11 @@ local function CreateBubblesPanel()
 	offScreenStyle:SetPoint("LEFT", offScreen.Text or offScreen.text, "RIGHT", 16, 0)
 	Tooltip(offScreenStyle, L["Opens the Style hub's Chat bubbles page: how off-screen bubbles look and where they show."])
 	offScreenStyle:SetScript("OnClick", function() ns.OpenOptions("Bubble Style") end)
+	local emotes = stack:Add(Check(content, "chatSpeechEmotes", L["Show emotes too"],
+		L["Emotes (someone's /point, an NPC that laughs or looks around) never have a bubble: they show with " ..
+		"the off-screen bubbles too, in a bubble with no tail so they don't read as speech, instead of bringing " ..
+		"up chat."]), "check")
+	GreyUnless(emotes, function(db) return db.chatPeek and db.chatHideBubbled and db.chatSpeechBehind end)
 	stack:Add(Check(content, "bubblesOffTop", L["Keep bubbles on screen"],
 		L["A bubble the game would put at the very top of the screen (someone above you, up some stairs say) " ..
 		"shows a little lower instead, below the letterbox bar (or a bit down from the top with the bars off), " ..
@@ -9828,7 +9830,8 @@ do
 
 		-- On top: the master switch and the peek's own options.
 		local switch = PageSwitch(chatPanel, "handleChat", L["Enable Page"],
-			L["On: CineMode fades the chat windows and tabs as this page says. Off: it leaves them alone."],
+			L["On: new messages, typing, unread whispers and scrolling back bring up the chat windows as this " ..
+			"page says. Off: none of them do, and the chat windows fade as their Game Frames row says."],
 			subtitle)
 
 		local chatPeek = Check(chatPanel, "chatPeek", L["Show chat when a message arrives"],
@@ -13106,16 +13109,31 @@ local KEYBINDS = {
 	{ action = "CINEMATIC_CAM_TELE", label = L["Tele camera"],
 		tip = L["Starts the tele camera now, as if you were casting your Hearthstone. Press again, move or " ..
 			"jump to stop it."] },
+	{ action = "CINEMATIC_CAM_WALK", label = L["RP walk camera"],
+		tip = L["Starts the RP walk camera now, walking or not. Press again to stop it; its stop rules (its Scripts " ..
+			"page) say what else does."] },
+	{ action = "CINEMATIC_CAM_RUN", label = L["Auto-run camera"],
+		tip = L["Starts the auto-run camera now, running or not. Press again to stop it; its stop rules (its Scripts " ..
+			"page) say what else does."] },
 	{ action = "CINEMATIC_CAM_DEATH", label = L["Death camera test"],
 		tip = L["Pretends you're dead for 30 seconds so the death camera runs. Press again to stop. " ..
 			"Like /cine deathtest."] },
+}
+-- Your own scenes' keys (a scene whose trigger is Custom camera trigger N).
+for n = 1, 5 do
+	KEYBINDS[#KEYBINDS + 1] = { action = "CINEMATIC_CUSTOMTRIGGER" .. n, label = L["Custom camera trigger %d"]:format(n),
+		section = n == 1 and L["Your scenes"] or nil,
+		tip = L["Plays the scenes of yours whose trigger is this key: set a scene's trigger to it on the Scenes page. " ..
+			"Press again to stop it."] }
+end
+for _, each in ipairs({
 	{ action = "CINEMATIC_SHOWTOOLTIPS", label = L["Show hidden tooltips"], section = L["Tooltips"],
 		tip = L["Hold to see the tooltips the Tooltips page hides, in combat and in CineMode. Pressing it " ..
 			"while you're on a unit or something in the world brings its tooltip up; anything else, " ..
 			"hover it again with the key held."] },
 	{ action = "CINEMATIC_TOGGLETOOLTIPS", label = L["Toggle tooltip hiding"],
 		tip = L["Turns the Tooltips page on or off (its Enable Page switch)."] },
-}
+}) do KEYBINDS[#KEYBINDS + 1] = each end
 if ns.ChatCamCommand then -- (ChatCam.lua, so here rather than in Bindings.xml)
 	KEYBINDS[#KEYBINDS + 1] = { action = "CLICK CinematicChatTargetButton:LeftButton",
 		label = L["Target the last speaker"], section = L["Chat Cam"],
@@ -13756,7 +13774,7 @@ local function CreateProfilesPanel()
 		if not PROFILE_MENUS then return end
 		local name = cell.name
 		local own = not ns.IsBuiltinProfile(name)
-		MenuUtil.CreateContextMenu(cell, function(_, root)
+		ns.ContextMenu(cell, function(_, root)
 			root:CreateTitle(ns.ProfileLabel(name))
 			if name ~= active then
 				root:CreateButton(L["Switch to it"], function() cell:Click("LeftButton") end)

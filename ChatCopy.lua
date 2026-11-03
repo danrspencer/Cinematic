@@ -353,6 +353,7 @@ local function CreateWindow()
 						Refresh()
 					end)
 			end
+			if ns.ScrollMenu then ns.ScrollMenu(rootDescription) end
 		end)
 		window.dropdown = dropdown
 	end

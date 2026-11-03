@@ -21,7 +21,7 @@ DEFAULTS.drainWhenNotEmpty = true   -- "until full" also waits for rage, runic p
 DEFAULTS.petWhenNotFull = false     -- the pet frame stays up after a fight until its health is full
 DEFAULTS.lowManaShare = 0           -- the resource bar shows whenever mana is under this share (0: off)
 DEFAULTS.lowManaPortrait = false    -- ...and the player frame too
-DEFAULTS.prdMana = false            -- a mana bar of ours under them, when mana isn't your power (PersonalMana.lua)
+DEFAULTS.prdMana = true             -- a mana bar of ours under them, when mana isn't your power (PersonalMana.lua)
 DEFAULTS.prdManaRecent = 3          -- ...only for this many seconds after you use mana (0: always)
 
 -- The resource bar's stand-in (Frames.lua; none: no personal resource display).

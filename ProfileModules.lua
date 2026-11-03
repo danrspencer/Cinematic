@@ -246,8 +246,7 @@ ns.PROFILE_MODULES = {
 		tip = "Fights bring up only your resource bar: no portrait, target, buffs, minimap or swing timer, " ..
 		"nothing for an enemy or friend targeted, nothing in dungeons and raids, and the cast bar shows all " ..
 		"through CineMode. The player frame and resource display don't stay up until full; no focus's target of target; " ..
-		"raid frames without names, buffs, threat, target markers, ready checks or titles in CineMode. " ..
-		"The mana bar follows the resource bar.",
+		"raid frames without names, buffs, threat, target markers, ready checks or titles in CineMode.",
 		apply = function(set)
 			set("portraitWhenNotFull", false)
 			set("prdWhenNotFull", false)
@@ -260,8 +259,6 @@ ns.PROFILE_MODULES = {
 			set("enemyShow", { target = false, tot = false, player = false, prd = false, prdpower = false,
 				party = false, raidplayers = false, raidpets = false, focus = false, buffs = false })
 			set("friendlyShow", { target = false, tot = false })
-			-- (The mana bar shows whenever the resource bar does.)
-			set("rowFollow", { prdmana = "prdpower" })
 			-- (Nor in dungeons, scenarios and raids, where the Instances column
 			-- starts with the party and raid frames ticked. The bars: pure-cdm's.)
 			set("instanceShow", EveryRow(false, false))

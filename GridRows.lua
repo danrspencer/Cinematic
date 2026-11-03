@@ -198,7 +198,7 @@ function ns.TickMenu(owner, entries, changed, plain)
 		end
 		return true
 	end
-	MenuUtil.CreateContextMenu(owner, function(_, root)
+	ns.ContextMenu(owner, function(_, root)
 		if not plain then
 			local top = root:CreateButton(AllOn() and L["Clear"] or L["All"], function()
 				local on = not AllOn()
@@ -456,7 +456,7 @@ local function BuildEditor()
 	followButton:SetScript("OnClick", function(self)
 		local follow = target and target.follow
 		if not follow then return end
-		MenuUtil.CreateContextMenu(self, function(_, root)
+		ns.ContextMenu(self, function(_, root)
 			root:CreateTitle(L["Follow another row"])
 			root:CreateRadio(L["None: its own settings"], function() return not follow.leader() end, function()
 				follow.set(nil)

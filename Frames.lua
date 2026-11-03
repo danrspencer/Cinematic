@@ -526,10 +526,11 @@ end
 -- The options pages' master switches (handle<...>, all on to start with).
 -- The Standard Frames page's: off, the frames in its groups aren't faded
 -- (let go, their own alpha back). It covers every built-in group but the
--- chat and gamepad ones, whose own pages' switches do the same for them. The
--- Advanced Frames page's covers other addons' and added frames. The other
--- pages' (Minimap, Quest tracker...) only turn that page's extras on or off
--- (see ns.PageOn): their frames still fade as their Standard Frames rows say.
+-- gamepad ones, whose rows are on the Gamepad page, its switch doing the same
+-- for them. The Advanced Frames page's covers other addons' and added frames.
+-- The other pages' (Minimap, Quest tracker, Chat...) only turn that page's
+-- extras on or off (see ns.PageOn): their frames still fade as their Standard
+-- Frames rows say.
 local GROUP_SWITCH = {
 	minimap = "handleMinimap", minimapheader = "handleMinimap", minimaptracking = "handleMinimap",
 	minimapcalendar = "handleMinimap", minimapzone = "handleMinimap", minimapclock = "handleMinimap",
@@ -537,7 +538,7 @@ local GROUP_SWITCH = {
 	buffs = "handleBuffs", cooldowns = "handleCooldowns", chat = "handleChat", swing = "handleSwing",
 	gamepadbars = "handleGamepad", gamepadlegend = "handleGamepad", gamepadreticle = "handleGamepad",
 }
-local OWN_PAGE_GROUPS = { chat = true, gamepadbars = true, gamepadlegend = true, gamepadreticle = true }
+local OWN_PAGE_GROUPS = { gamepadbars = true, gamepadlegend = true, gamepadreticle = true }
 ns.HANDLE_SWITCHES = {
 	"handleFrames", "handleAddonFrames", "handleGamepad", "handleMinimap", "handleQuests", "handleBuffs",
 	"handleCooldowns", "handleChat", "handleSwing",
@@ -1598,8 +1599,8 @@ ns.COMBAT_SHOW = {
 		morePage = "Personal Resources",
 		tip = L["Mana, rage, energy, focus or runic power under your character, and class resources " ..
 			"such as combo points."] },
-	-- Follows the resource bar's ticks until set (see ROW_FALLBACK).
-	{ key = "prdmana", label = L["Personal mana bar"], default = true, frames = { "CinematicPersonalMana" },
+	-- Nothing ticked to start with: its own setting (a few seconds after you use mana) shows it.
+	{ key = "prdmana", label = L["Personal mana bar"], default = false, frames = { "CinematicPersonalMana" },
 		morePage = "Personal Resources",
 		tip = L["Your mana under your character when it isn't your power (Elemental Shaman, Shadow Priest...): " ..
 			"once it's on, on the Resource Display page."] },
@@ -2171,7 +2172,7 @@ end
 local TARGET_SHOW_DEFAULT = { target = true, tot = true }
 -- Enemy targeted: also the action bars, buffs and the like.
 local ENEMY_SHOW_DEFAULT = {
-	player = true, prd = true, prdpower = true, prdmana = true, target = true, tot = true, focus = true, buffs = true,
+	player = true, prd = true, prdpower = true, target = true, tot = true, focus = true, buffs = true,
 	mainbar = true,
 	bottomleft = true, bottomright = true, pet = true, stance = true, totems = true, micro = true, bags = true, xp = true,
 	gamepadbars = true, gamepadreticle = true,
@@ -2204,7 +2205,7 @@ end
 -- and the minimap header and its buttons the minimap, so profiles and lists
 -- from before it was a row (the Cooldown Manager profile's: no action bars) still hold.
 local ROW_FALLBACK = {
-	art = "mainbar", petframe = "player", prdpower = "prd", prdmana = "prdpower", focustot = "focus", minimapheader = "minimap", minimaptracking = "minimap", minimapcalendar = "minimap",
+	art = "mainbar", petframe = "player", prdpower = "prd", focustot = "focus", minimapheader = "minimap", minimaptracking = "minimap", minimapcalendar = "minimap",
 	minimapzone = "minimap", minimapclock = "minimap", minimapdial = "minimap", bags = "micro",
 	belowminimap = "quests", topcenter = "quests",
 	cooldownsutility = "cooldowns", cooldownsbuffs = "cooldowns", cooldownsbars = "cooldowns",
@@ -7888,14 +7889,19 @@ function ns.UpdateFrames(cinematic, elapsed)
 		ns.chatTypingUntil = now + ns.HoldTime("chatPeekTime")
 	end
 	local typing = ns.chatTypingUntil > now
+	-- (The Chat page's extras: none while its switch is off. The chat window
+	-- then fades as its Standard Frames row says, the input box still up to type.)
+	local chatPage = ns.PageOn("handleChat")
 	-- (The Chat page's Typing row: where it's off, just the input box comes up.)
-	local typingWindows = typing and ns.RowOnNow("chat:typing", ns.db.chatShowWhileTyping)
+	local typingWindows = typing and chatPage and ns.RowOnNow("chat:typing", ns.db.chatShowWhileTyping)
 	-- (Then the input box only while it's open: held after, it was an empty bar.)
 	local activeEditBox = not typingWindows and ChatEdit_GetActiveWindow and ChatEdit_GetActiveWindow()
 	-- A whisper tab waiting to be read keeps the whole chat window up, tabs
 	-- and all, so it can be clicked (Chat page).
-	local whisperUnread = cinematic and ns.db.chatUntilWhisperRead and ns.HasUnreadWhisper()
-	ns.HoldScrolledChat(now)
+	local whisperUnread = cinematic and chatPage and ns.db.chatUntilWhisperRead and ns.HasUnreadWhisper()
+	if chatPage then
+		ns.HoldScrolledChat(now)
+	end
 	-- A docked chat window peeking: the window comes up, with its background,
 	-- tabs and buttons as the Chat page ticks them (and for Mouseover groups
 	-- with "Chat message" ticked).
@@ -9675,5 +9681,49 @@ do
 		if changed then
 			ns.ApplyUnitFrameParts()
 		end
+	end)
+end
+
+-- The game's red flash on an action button (Auto Shot, Shoot or Auto Attack
+-- while on) is drawn at a fixed size from the button's top-left on the
+-- retail-style bars, so on a smaller or scaled button it hangs off its
+-- bottom-right. Pinned to the button's edges instead, out of combat (the
+-- buttons are secure), on entering the world and after each fight.
+do
+	local BARS = { "ActionButton", "MultiBarBottomLeftButton", "MultiBarBottomRightButton",
+		"MultiBarRightButton", "MultiBarLeftButton", "MultiBar5Button", "MultiBar6Button",
+		"MultiBar7Button", "PetActionButton", "StanceButton" }
+
+	local function Pin(button)
+		if not button or IsForbidden(button) then return end
+		local flash = button.Flash or (button.GetName and button:GetName() and _G[button:GetName() .. "Flash"])
+		if not flash or type(flash.SetAllPoints) ~= "function" then return end
+		pcall(function()
+			flash:ClearAllPoints()
+			flash:SetAllPoints(button)
+		end)
+	end
+
+	local function PinAll()
+		if InCombatLockdown() then return end
+		for _, prefix in ipairs(BARS) do
+			for i = 1, 12 do
+				Pin(_G[prefix .. i])
+			end
+		end
+		local pad = _G.GamepadMainActionBarFrame
+		if pad and type(pad.actionButtons) == "table" then
+			for _, button in ipairs(pad.actionButtons) do
+				Pin(button)
+			end
+		end
+	end
+
+	local watcher = CreateFrame("Frame")
+	watcher:RegisterEvent("PLAYER_ENTERING_WORLD")
+	watcher:RegisterEvent("PLAYER_REGEN_ENABLED")
+	watcher:SetScript("OnEvent", function()
+		PinAll()
+		C_Timer.After(1, PinAll) -- (bars some addons and Edit Mode build a moment later)
 	end)
 end

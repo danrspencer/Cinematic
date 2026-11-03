@@ -62,7 +62,7 @@ end
 -- submenu's entries in turn).
 local function Menu(owner, entries)
 	if MenuUtil and MenuUtil.CreateContextMenu then
-		MenuUtil.CreateContextMenu(owner, function(_, root)
+		ns.ContextMenu(owner, function(_, root)
 			local function Add(parent, list)
 				for _, entry in ipairs(list) do
 					if type(entry[2]) == "table" then

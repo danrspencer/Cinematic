@@ -407,7 +407,7 @@ function ns.CameraManager(kit, canvas, content, title, intro, switch, helper)
 	function Menu(owner, script)
 		if not (MenuUtil and MenuUtil.CreateContextMenu) then return end
 		local mine = ns.MyCameraScript(script.id) and true or false
-		MenuUtil.CreateContextMenu(owner, function(_, root)
+		ns.ContextMenu(owner, function(_, root)
 			root:CreateTitle(script.name)
 			root:CreateButton(L["Open"], function() Pick(2, script.id) end)
 			root:CreateButton(L["Copy"], function() CopyCamera(script) end)

@@ -749,3 +749,26 @@ function ns.DescribeCameraRows()
 	end
 	return lines
 end
+
+-- Dev copy, once (2026-11-03): the built-in rows a profile's Cameras off part
+-- left on No camera (ProfileModules.lua's CamsOff) back on their cameras, the
+-- chat rows on Chat Cam.
+if ns.isDev then
+	local once = CreateFrame("Frame")
+	once:RegisterEvent("PLAYER_LOGIN")
+	once:SetScript("OnEvent", function(self)
+		self:UnregisterAllEvents()
+		local db = ns.db
+		if not db or db.devRowCamerasBack then return end
+		db.devRowCamerasBack = true
+		if ns.newInstall then return end -- (nothing left on No camera by a profile yet)
+		for _, trigger in ipairs(TRIGGERS) do
+			local key = not trigger.custom and type(trigger.camera) == "string" and trigger.camera
+			if key and db[key] == "none" then
+				local own = (trigger.key == "Chat" or trigger.key == "ChatNearby") and "chat" or ns.DEFAULTS[key]
+				if own ~= nil and own ~= "none" then db[key] = own end
+			end
+		end
+		if ns.CameraRowsChanged then ns.CameraRowsChanged() end
+	end)
+end

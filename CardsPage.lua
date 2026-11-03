@@ -351,6 +351,12 @@ local TIPS = {
 	streak = "Other players you kill without dying, at 2, 3, 5 and every 5 after.",
 	death = "Shortly after the death camera starts: YOU DIED across the middle of the screen, \"wasted\" or " ..
 		"words of your own. Only with the death camera on (the Die row on the Scenes page).",
+	bossDown = "As a dungeon or raid boss goes down, or a world boss you fought: VICTORY ACHIEVED across the " ..
+		"middle of the screen in gold, its name under it. Its words: the Settings tab.",
+	felled = "As a rare you have targeted dies (yours, not someone else's): ENEMY FELLED across the middle of " ..
+		"the screen in gold, its name under it. Its words: the Settings tab.",
+	revived = "As you come back to life, resurrected or back in your body: VITALITY RESTORED across the middle " ..
+		"of the screen in gold, YOU DIED's other side.",
 }
 local FIGHT_OPTS = { anyFight = true, omit = { combatShow = true, enemyShow = true, friendlyShow = true } }
 local STORY_OPTS = { anyFight = true, quiet = true, omit = { enemyShow = true, friendlyShow = true } }
@@ -1002,6 +1008,50 @@ function ns.CreateCardSettingsPanel(kit)
 	parts.Part("attack", function()
 		stack:Note(content, L["The same place shows at most once every 90 seconds."], NOTE_W)
 	end)
+	-- A dropdown on a row of its own, its label before it.
+	local function PickRow(key, label, items, tip)
+		local box = kit.Dropdown(content, key, List(items), 200)
+		if not box then return end
+		local name = stack:Add(kit.Label(content, "GameFontHighlight", label), "label")
+		name:SetSize(150, 30)
+		name:SetJustifyV("MIDDLE")
+		box:SetPoint("LEFT", name, "RIGHT", 4, 0)
+		kit.Tooltip(box, tip)
+	end
+	-- A win's (and loss's) card as it was or as a souls banner (Cards.lua's
+	-- ns.SoulsCard).
+	local function SoulsRow(id, tip)
+		Header(L["Banner"])
+		PickRow("cardSouls_" .. id, L["Shows as:"], {
+			{ "usual", L["Its card"], L["As it always has, in its own look (the Style tab)."] },
+			{ "souls", L["Souls banner"], L["Big words across the middle of the screen on a dark band, as YOU DIED " ..
+				"shows: a win in gold, a loss in red (the Victory and Death styles' looks)."] },
+		}, tip)
+	end
+	-- Boss defeated's, Rare felled's and Revived's words (SOULS_WORDS, or your
+	-- own).
+	local function SoulsWordsRows(id)
+		Header(L["Words"])
+		local items = {}
+		for _, entry in ipairs(ns.SOULS_WORDS[id]) do
+			items[#items + 1] = { entry[1], L[entry[2]]:format(L["<NAME>"]) }
+		end
+		items[#items + 1] = { "custom", L["Custom"], L["Your own words."] }
+		PickRow(id .. "Words", L["Banner words:"], items,
+			L["The big words across the screen. <NAME>: the name of the one that fell."])
+		local box = WordsRow(kit, content, stack, id .. "Text", L["Your words:"],
+			L["The words the banner shows with Custom picked. Left blank: the first ones in the list."])
+		kit.GreyUnless(box, function(db) return db[id .. "Words"] == "custom" end)
+	end
+	-- (The wins that can show as a souls banner, and their Banner's tooltip.)
+	local SOULS_TIPS = {
+		cleared = "How the dungeon's end shows: its card, or a souls banner: its name and CONQUERED across the " ..
+			"middle of the screen, the time and deaths under it.",
+		battleground = "How the result shows: its card in the top bar, or a souls banner: VICTORY ACHIEVED or " ..
+			"DEFEATED across the middle of the screen (where the game's scoreboard may cover it).",
+		streak = "How it shows: its card, or a souls banner: PREY SLAUGHTERED across the middle of the screen, " ..
+			"the count and who under it.",
+	}
 	parts.Part("duel", function()
 		Header(L["When"])
 		Check("cardDuelAsk", L["You challenge"], L["The other player's name as you challenge them to a duel."])
@@ -1017,7 +1067,17 @@ function ns.CreateCardSettingsPanel(kit)
 			local box = WordsRow(kit, content, stack, row[1], row[2], row[3])
 			kit.GreyUnless(box, function(db) return db.cardDuelResult end)
 		end
+		SoulsRow("duel", L["How the result shows: its card (with the words above), or a souls banner: VICTORY " ..
+			"ACHIEVED or DEFEATED across the middle of the screen, who it was against under it."])
 	end)
+	for _, id in ipairs({ "bossDown", "felled", "revived" }) do
+		parts.Part(id, function()
+			SoulsWordsRows(id)
+			if ns.CARD_BY_ID[id].inFight then FightRow(id) end
+			stack:Note(content, L["Its look is the Victory style's (the Style tab), its sound on the Sounds tab."],
+				NOTE_W)
+		end)
+	end
 	parts.Part("death", function()
 		Header(L["Words"])
 		local banner = kit.Dropdown(content, "deathBannerStyle", List({
@@ -1044,6 +1104,7 @@ function ns.CreateCardSettingsPanel(kit)
 	for _, id in ipairs({ "cleared", "discover", "arrival", "rested", "levelUp", "achievement", "reputation", "collect",
 		"profession", "quest", "rare", "battleground", "streak" }) do
 		parts.Part(id, function()
+			if SOULS_TIPS[id] then SoulsRow(id, L[SOULS_TIPS[id]]) end
 			if ns.CARD_BY_ID[id] and ns.CARD_BY_ID[id].inFight then
 				FightRow(id)
 				stack:Note(content, L["Its look is on the Style tab, its sound on the Sounds tab."], NOTE_W)

@@ -327,7 +327,12 @@ local function UpdateCastBar(bar)
 		bar:SetAlpha(alpha)
 	elseif bar.cinematicTeleHidden then
 		bar.cinematicTeleHidden = nil
-		if bar:IsShown() then bar:SetAlpha(1) end
+		if ns.Flag(bar:IsShown()) then
+			bar:SetAlpha(1)
+			-- (The game skips its finish fade for a bar at alpha 0, as it was as you
+			-- went: idle, it would show full, stuck. Hidden, as that fade would have.)
+			if not (bar.casting or bar.channeling or bar.reverseChanneling or bar.isInEditMode) then bar:Hide() end
+		end
 		if ns.ReapplyCastBar then ns.ReapplyCastBar(bar) end -- (unless CineMode has it faded: Cast bar row)
 	end
 end
