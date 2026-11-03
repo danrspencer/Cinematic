@@ -3889,26 +3889,37 @@ end
 -- fn(button) for each of the game's buff icons: retail's list of them
 -- (auraFrames, plain Frames with an Icon, hidden spares too), else
 -- BuffFrame's children with an icon a few levels down, as for hovering:
--- BuffButtonN on Classic.
-function ns.ForEachBuffIcon(fn)
-	local function Walk(depth, ...)
+-- BuffButtonN on Classic. (arg goes to fn too. Called every frame of a buff
+-- peek, so nothing here makes a table or function.)
+do
+	local function IsBuffButton(child)
+		return child.buttonInfo ~= nil or ns.BuffIconOf(child) ~= nil
+	end
+	local function Walk(fn, arg, depth, ...)
 		for i = 1, select("#", ...) do
 			local child = select(i, ...)
-			local ok, isButton = pcall(function()
-				return child.buttonInfo ~= nil or ns.BuffIconOf(child) ~= nil
-			end)
+			local ok, isButton = pcall(IsBuffButton, child)
 			if ok and isButton then
-				fn(child)
+				fn(child, arg)
 			elseif depth > 1 and child.GetChildren then
-				Walk(depth - 1, child:GetChildren())
+				Walk(fn, arg, depth - 1, child:GetChildren())
 			end
 		end
 	end
-	local frame = _G.BuffFrame
-	if frame and type(frame.auraFrames) == "table" then
-		Walk(1, unpack(frame.auraFrames))
-	elseif frame and frame.GetChildren then
-		Walk(BUFF_HOVER_DEPTH, frame:GetChildren())
+	function ns.ForEachBuffIcon(fn, arg)
+		local frame = _G.BuffFrame
+		if frame and type(frame.auraFrames) == "table" then
+			local list = frame.auraFrames
+			for i = 1, #list do
+				local child = list[i]
+				local ok, isButton = pcall(IsBuffButton, child)
+				if ok and isButton then
+					fn(child, arg)
+				end
+			end
+		elseif frame and frame.GetChildren then
+			Walk(fn, arg, BUFF_HOVER_DEPTH, frame:GetChildren())
+		end
 	end
 end
 
@@ -4006,38 +4017,74 @@ ns.newBuffFadeLevel = {} -- button -> how far up its parts were last set (0-1)
 -- alpha and scale. With no slots, the copies go.
 ns.buffMirrors = {}
 ns.buffIconLayout = {} -- part -> where it sat on a buff icon when last measured
-function ns.MirrorBuffs(slots, shownNew)
-	local holder = ns.buffMirrorHolder
-	if not slots then
-		if holder then holder:Hide() end
-		ns.buffMirrorDebugDone = nil
-		return
+-- (Every frame of a peek, so no tables or functions made here: the pcalls
+-- call these named ones.)
+do
+	local layout = ns.buffIconLayout
+	local MIRROR_PARTS = { "Icon", "Duration", "Count" }
+	local function FollowBuffFrame(holder)
+		holder:SetAlpha(_G.BuffFrame:GetEffectiveAlpha() / UIParent:GetEffectiveAlpha())
 	end
-	local frame = _G.BuffFrame
-	if not holder then
-		holder = CreateFrame("Frame", nil, UIParent)
-		holder:SetAllPoints(UIParent)
-		-- (Every frame, as the buff frame fades out after the peek too; and
-		-- each copy's inside as its icon's own alpha, which the game pulses
-		-- as a buff runs out.)
-		holder:SetScript("OnUpdate", function(self)
-			pcall(function()
-				self:SetAlpha(_G.BuffFrame:GetEffectiveAlpha() / UIParent:GetEffectiveAlpha())
-			end)
-			for _, mirror in ipairs(ns.buffMirrors) do
-				if mirror.source and mirror:IsShown() then
-					pcall(function() mirror.Inner:SetAlpha(mirror.source:GetAlpha()) end)
-				end
-			end
-		end)
-		ns.buffMirrorHolder = holder
+	local function FollowSourceAlpha(mirror)
+		mirror.Inner:SetAlpha(mirror.source:GetAlpha())
 	end
-	holder:Show()
-	pcall(function()
+	local function PlaceHolder(holder, frame)
 		holder:SetFrameStrata(frame:GetFrameStrata())
 		holder:SetFrameLevel(frame:GetFrameLevel() + 20)
 		holder:SetScale(frame:GetEffectiveScale() / UIParent:GetEffectiveScale())
-	end)
+	end
+	local function ScaleBetween(button, mirror)
+		return button:GetEffectiveScale() / mirror:GetEffectiveScale()
+	end
+	-- (Into the layout's own table, kept: all worked out first, so a secret
+	-- one errors before any of it changes.)
+	local function MeasurePart(key, source, button)
+		local left, bottom, width, height = source:GetRect()
+		local bLeft, bBottom = button:GetRect()
+		local x, y = left - bLeft, bottom - bBottom
+		local spot = layout[key]
+		if not spot then
+			spot = {}
+			layout[key] = spot
+		end
+		spot.x, spot.y, spot.width, spot.height = x, y, width, height
+	end
+	local function MeasureButton(button)
+		local width, height = button:GetSize()
+		width, height = width + 0, height + 0
+		local size = layout.button
+		if not size then
+			size = {}
+			layout.button = size
+		end
+		size.width, size.height = width, height
+	end
+	local function SizeMirror(mirror, button)
+		local scale = button:GetEffectiveScale() / mirror:GetEffectiveScale()
+		local size = layout.button
+		mirror:SetSize((size and size.width or 30) * scale, (size and size.height or 40) * scale)
+	end
+	local function CopyFont(source, copy, scale)
+		local font, size, flags = source:GetFont()
+		copy:SetFont(font, size * scale, flags)
+	end
+	local function CopyTextColor(source, copy)
+		local r, g, b = source:GetTextColor()
+		copy:SetTextColor(r, g, b, 1)
+	end
+	local function CopyVertexColor(source, copy)
+		local r, g, b = source:GetVertexColor()
+		copy:SetVertexColor(r, g, b, 1)
+	end
+	local function CopyText(source, copy)
+		copy:SetText(source:GetText())
+	end
+	local function CopyTexture(source, copy)
+		copy:SetTexture(source:GetTexture())
+	end
+	local function CopyTexCoord(source, copy)
+		copy:SetTexCoord(source:GetTexCoord())
+	end
 	-- (A part of the game's icon: by key, else by its name plus the key on
 	-- older clients.)
 	local function Part(button, key)
@@ -4050,16 +4097,12 @@ function ns.MirrorBuffs(slots, shownNew)
 	-- the sizes are secret: the last measured layout then (layout), else
 	-- the usual one: a square picture at the top, the timer under it, the
 	-- stacks in its corner.)
-	local layout = ns.buffIconLayout
 	local function Copy(key, source, copy, button, mirror, isText)
 		copy:ClearAllPoints()
 		local scale = 1
-		pcall(function() scale = button:GetEffectiveScale() / mirror:GetEffectiveScale() end)
-		pcall(function()
-			local left, bottom, width, height = source:GetRect()
-			local bLeft, bBottom = button:GetRect()
-			layout[key] = { x = left - bLeft, y = bottom - bBottom, width = width, height = height }
-		end)
+		local okScale, measured = pcall(ScaleBetween, button, mirror)
+		if okScale then scale = measured end
+		pcall(MeasurePart, key, source, button)
 		local spot, iconSpot = layout[key], layout.Icon
 		if spot and key == "Duration" and iconSpot and mirror.Icon:IsShown() then
 			-- (The timer by its top under the picture, as the game anchors it:
@@ -4085,105 +4128,117 @@ function ns.MirrorBuffs(slots, shownNew)
 		end
 		-- (Each on its own: one failing doesn't stop the rest.)
 		if isText then
-			pcall(function()
-				local font, size, flags = source:GetFont()
-				copy:SetFont(font, size * scale, flags)
-			end)
+			pcall(CopyFont, source, copy, scale)
 			-- (Not its alpha: on text that's one with SetAlpha, and the game's
 			-- own is faded under the copy.)
-			pcall(function()
-				local r, g, b = source:GetTextColor()
-				copy:SetTextColor(r, g, b, 1)
-			end)
+			pcall(CopyTextColor, source, copy)
 			-- (And its vertex color: retail's timers are gold by that, their text
 			-- color white. On Forever the two are one, so it's the same color.)
-			pcall(function()
-				local r, g, b = source:GetVertexColor()
-				copy:SetVertexColor(r, g, b, 1)
-			end)
-			local okText, problem = pcall(function() copy:SetText(source:GetText()) end)
+			pcall(CopyVertexColor, source, copy)
+			local okText, problem = pcall(CopyText, source, copy)
 			if ns.auraDebug and not okText and not ns.buffMirrorTextDebugDone then
 				ns.buffMirrorTextDebugDone = true
 				ns.Print("close the gaps: copying " .. key .. " text fails: " .. tostring(problem))
 			end
 		else
-			pcall(function() copy:SetTexture(source:GetTexture()) end)
-			pcall(function() copy:SetTexCoord(source:GetTexCoord()) end)
+			pcall(CopyTexture, source, copy)
+			pcall(CopyTexCoord, source, copy)
 		end
 		local okShown, shown = pcall(source.IsShown, source)
 		copy:SetShown(not okShown or shown == nil or (issecretvalue and issecretvalue(shown)) or shown == true)
 	end
-	for i, entry in ipairs(shownNew) do
-		local mirror = ns.buffMirrors[i]
-		if not mirror then
-			mirror = CreateFrame("Frame", nil, holder)
-			mirror.Inner = CreateFrame("Frame", nil, mirror)
-			mirror.Inner:SetAllPoints(mirror)
-			mirror.Icon = mirror.Inner:CreateTexture(nil, "ARTWORK")
-			mirror.Duration = mirror.Inner:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-			mirror.Count = mirror.Inner:CreateFontString(nil, "OVERLAY", "NumberFontNormal")
-			ns.buffMirrors[i] = mirror
-		end
-		local button = entry.button
-		mirror.source = button
-		mirror:ClearAllPoints()
-		mirror:SetPoint("CENTER", slots[i], "CENTER")
-		-- (Its size, or the last measured one in a fight, where it's secret.)
-		pcall(function()
-			local width, height = button:GetSize()
-			layout.button = { width = width + 0, height = height + 0 }
-		end)
-		pcall(function()
-			local scale = button:GetEffectiveScale() / mirror:GetEffectiveScale()
-			local size = layout.button or { width = 30, height = 40 }
-			mirror:SetSize(size.width * scale, size.height * scale)
-		end)
-		mirror:SetAlpha(entry.level)
-		for _, key in ipairs({ "Icon", "Duration", "Count" }) do
-			local source = Part(button, key)
-			if source then
-				Copy(key, source, mirror[key], button, mirror, key ~= "Icon")
-			else
-				mirror[key]:Hide()
+	-- (Every frame, as the buff frame fades out after the peek too; and
+	-- each copy's inside as its icon's own alpha, which the game pulses
+	-- as a buff runs out.)
+	local function HolderOnUpdate(self)
+		pcall(FollowBuffFrame, self)
+		for _, mirror in ipairs(ns.buffMirrors) do
+			if mirror.source and mirror:IsShown() then
+				pcall(FollowSourceAlpha, mirror)
 			end
 		end
-		mirror:Show()
 	end
-	for i = #shownNew + 1, #ns.buffMirrors do
-		ns.buffMirrors[i]:Hide()
-	end
-	-- (/cine debug peeks, once per peek: what the copies had to go on.)
-	if ns.auraDebug and not ns.buffMirrorDebugDone then
-		ns.buffMirrorDebugDone = true
-		local function Say(value)
-			if issecretvalue and issecretvalue(value) then return "secret" end
-			return tostring(value)
+	function ns.MirrorBuffs(slots, shownNew)
+		local holder = ns.buffMirrorHolder
+		if not slots then
+			if holder then holder:Hide() end
+			ns.buffMirrorDebugDone = nil
+			return
 		end
-		ns.Print(("close the gaps: %d places, %d new"):format(#slots, #shownNew))
+		local frame = _G.BuffFrame
+		if not holder then
+			holder = CreateFrame("Frame", nil, UIParent)
+			holder:SetAllPoints(UIParent)
+			holder:SetScript("OnUpdate", HolderOnUpdate)
+			ns.buffMirrorHolder = holder
+		end
+		holder:Show()
+		pcall(PlaceHolder, holder, frame)
 		for i, entry in ipairs(shownNew) do
-			local button, parts = entry.button, {}
-			for key, value in pairs(button) do
-				local ok, kind = pcall(function()
-					return type(value) == "table" and value.GetObjectType and value:GetObjectType()
-				end)
-				if ok and (kind == "FontString" or kind == "Texture") then
-					local okInfo, info = pcall(function()
-						local _, _, width, height = value:GetRect()
-						return ("%s %s %sx%s shown %s%s"):format(key, kind, Say(width), Say(height),
-							Say(value:IsShown()), kind == "FontString" and (" text " .. Say(value:GetText())) or "")
-					end)
-					parts[#parts + 1] = okInfo and info or (key .. " " .. kind .. " (errors)")
+			local mirror = ns.buffMirrors[i]
+			if not mirror then
+				mirror = CreateFrame("Frame", nil, holder)
+				mirror.Inner = CreateFrame("Frame", nil, mirror)
+				mirror.Inner:SetAllPoints(mirror)
+				mirror.Icon = mirror.Inner:CreateTexture(nil, "ARTWORK")
+				mirror.Duration = mirror.Inner:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+				mirror.Count = mirror.Inner:CreateFontString(nil, "OVERLAY", "NumberFontNormal")
+				ns.buffMirrors[i] = mirror
+			end
+			local button = entry.button
+			mirror.source = button
+			mirror:ClearAllPoints()
+			mirror:SetPoint("CENTER", slots[i], "CENTER")
+			-- (Its size, or the last measured one in a fight, where it's secret.)
+			pcall(MeasureButton, button)
+			pcall(SizeMirror, mirror, button)
+			mirror:SetAlpha(entry.level)
+			for _, key in ipairs(MIRROR_PARTS) do
+				local source = Part(button, key)
+				if source then
+					Copy(key, source, mirror[key], button, mirror, key ~= "Icon")
+				else
+					mirror[key]:Hide()
 				end
 			end
-			table.sort(parts)
-			ns.Print(("  new %d (level %.2f): %s"):format(i, entry.level, table.concat(parts, "; ")))
-			local copy = ns.buffMirrors[i] and ns.buffMirrors[i].Duration
-			if copy then
-				local okCopy, state = pcall(function()
-					return ("shown %s, text %s, font %s"):format(Say(copy:IsShown()), Say(copy:GetText()),
-						Say(select(2, copy:GetFont())))
-				end)
-				ns.Print("  its timer copy: " .. (okCopy and state or "errors"))
+			mirror:Show()
+		end
+		for i = #shownNew + 1, #ns.buffMirrors do
+			ns.buffMirrors[i]:Hide()
+		end
+		-- (/cine debug peeks, once per peek: what the copies had to go on.)
+		if ns.auraDebug and not ns.buffMirrorDebugDone then
+			ns.buffMirrorDebugDone = true
+			local function Say(value)
+				if issecretvalue and issecretvalue(value) then return "secret" end
+				return tostring(value)
+			end
+			ns.Print(("close the gaps: %d places, %d new"):format(#slots, #shownNew))
+			for i, entry in ipairs(shownNew) do
+				local button, parts = entry.button, {}
+				for key, value in pairs(button) do
+					local ok, kind = pcall(function()
+						return type(value) == "table" and value.GetObjectType and value:GetObjectType()
+					end)
+					if ok and (kind == "FontString" or kind == "Texture") then
+						local okInfo, info = pcall(function()
+							local _, _, width, height = value:GetRect()
+							return ("%s %s %sx%s shown %s%s"):format(key, kind, Say(width), Say(height),
+								Say(value:IsShown()), kind == "FontString" and (" text " .. Say(value:GetText())) or "")
+						end)
+						parts[#parts + 1] = okInfo and info or (key .. " " .. kind .. " (errors)")
+					end
+				end
+				table.sort(parts)
+				ns.Print(("  new %d (level %.2f): %s"):format(i, entry.level, table.concat(parts, "; ")))
+				local copy = ns.buffMirrors[i] and ns.buffMirrors[i].Duration
+				if copy then
+					local okCopy, state = pcall(function()
+						return ("shown %s, text %s, font %s"):format(Say(copy:IsShown()), Say(copy:GetText()),
+							Say(select(2, copy:GetFont())))
+					end)
+					ns.Print("  its timer copy: " .. (okCopy and state or "errors"))
+				end
 			end
 		end
 	end
@@ -4195,36 +4250,27 @@ function ns.UnfadeBuffIcon(button)
 	end
 	ns.newBuffFaded[button], ns.newBuffFadeLevel[button] = nil, nil
 end
-function ns.ShowOnlyNewBuffs(only)
+-- (Every frame of a peek: its lists and their entries are kept and reused,
+-- and its helpers made once, so it makes no garbage as it goes.)
+do
 	local faded = ns.newBuffFaded
-	if not only then
-		ns.newBuffDebugDone = nil
-		for button in pairs(faded) do
-			ns.UnfadeBuffIcon(button)
+	local slots, shownNew, entries = {}, {}, {}
+	local collapse, now = false, 0
+	local function Note(parts, ...)
+		for i = 1, select("#", ...) do
+			local part = select(i, ...)
+			local ok, alpha = pcall(part.GetAlpha, part)
+			parts[part] = ok and type(alpha) == "number" and not (issecretvalue and issecretvalue(alpha))
+				and alpha or 1
 		end
-		ns.MirrorBuffs(nil)
-		return
 	end
-	-- (Close the gaps: every icon fades, and copies of the new ones show in
-	-- the row's first places, ns.MirrorBuffs.)
-	local collapse = ns.db.buffPeekCollapse
-	local slots, shownNew = {}, {}
-	local now = GetTime()
 	-- (level: how far up its parts are, 0 gone to 1 as they were.)
 	local function FadeParts(button, level)
 		local parts = faded[button]
 		if not parts then
 			parts = {}
-			local function Note(...)
-				for i = 1, select("#", ...) do
-					local part = select(i, ...)
-					local ok, alpha = pcall(part.GetAlpha, part)
-					parts[part] = ok and type(alpha) == "number" and not (issecretvalue and issecretvalue(alpha))
-						and alpha or 1
-				end
-			end
-			Note(button:GetRegions())
-			Note(button:GetChildren())
+			Note(parts, button:GetRegions())
+			Note(parts, button:GetChildren())
 			faded[button] = parts
 		end
 		if ns.newBuffFadeLevel[button] ~= level then
@@ -4234,7 +4280,8 @@ function ns.ShowOnlyNewBuffs(only)
 			end
 		end
 	end
-	local function Apply(button)
+	local function Apply(button, counter)
+		counter.count = counter.count + 1
 		local ok, icon = pcall(ns.BuffIconOf, button)
 		-- (Unsure, as when it errors: it shows. A secret picture: new only by
 		-- its place from the top, a fight's, else faded.)
@@ -4258,7 +4305,16 @@ function ns.ShowOnlyNewBuffs(only)
 		local okShown, isShown = pcall(button.IsShown, button)
 		if collapse and okShown and ns.Flag(isShown) then
 			slots[#slots + 1] = button
-			if level > 0 then shownNew[#shownNew + 1] = { button = button, level = level } end
+			if level > 0 then
+				local n = #shownNew + 1
+				local entry = entries[n]
+				if not entry then
+					entry = {}
+					entries[n] = entry
+				end
+				entry.button, entry.level = button, level
+				shownNew[n] = entry
+			end
 			FadeParts(button, 0)
 		elseif level == 1 then
 			if faded[button] then
@@ -4268,20 +4324,34 @@ function ns.ShowOnlyNewBuffs(only)
 			FadeParts(button, level)
 		end
 	end
-	local count = 0
-	ns.ForEachBuffIcon(function(button)
-		count = count + 1
-		Apply(button)
-	end)
-	ns.MirrorBuffs(collapse and slots, shownNew)
-	-- (/cine debug peeks: what it found, once per peek.)
-	if ns.auraDebug and not ns.newBuffDebugDone then
-		ns.newBuffDebugDone = true
-		local icons, fadedCount = {}, 0
-		for icon in pairs(ns.newBuffIcons) do icons[#icons + 1] = tostring(icon) end
-		for _ in pairs(faded) do fadedCount = fadedCount + 1 end
-		ns.Print(("just the new one: %d icons found, %d faded, new: %s"):format(count, fadedCount,
-			#icons > 0 and table.concat(icons, " ") or "none"))
+	local counter = { count = 0 }
+	function ns.ShowOnlyNewBuffs(only)
+		if not only then
+			ns.newBuffDebugDone = nil
+			for button in pairs(faded) do
+				ns.UnfadeBuffIcon(button)
+			end
+			ns.MirrorBuffs(nil)
+			return
+		end
+		-- (Close the gaps: every icon fades, and copies of the new ones show in
+		-- the row's first places, ns.MirrorBuffs.)
+		collapse, now = ns.db.buffPeekCollapse, GetTime()
+		wipe(slots)
+		wipe(shownNew)
+		counter.count = 0
+		ns.ForEachBuffIcon(Apply, counter)
+		local count = counter.count
+		ns.MirrorBuffs(collapse and slots, shownNew)
+		-- (/cine debug peeks: what it found, once per peek.)
+		if ns.auraDebug and not ns.newBuffDebugDone then
+			ns.newBuffDebugDone = true
+			local icons, fadedCount = {}, 0
+			for icon in pairs(ns.newBuffIcons) do icons[#icons + 1] = tostring(icon) end
+			for _ in pairs(faded) do fadedCount = fadedCount + 1 end
+			ns.Print(("just the new one: %d icons found, %d faded, new: %s"):format(count, fadedCount,
+				#icons > 0 and table.concat(icons, " ") or "none"))
+		end
 	end
 end
 
@@ -5241,6 +5311,41 @@ end
 local ItemSpell
 do
 local INFO_SPELL_FIELDS = { "overrideSpellID", "spellID" }
+-- (The Cooldown Manager's info gives a new table each time, and in a fight
+-- GetSpellID is secret, so it was asked for every icon on every pass: its
+-- spell is kept by cooldown ID for INFO_HOLD seconds, or till spells or
+-- their overrides change.)
+local INFO_HOLD = 0.5
+local infoSpell, infoAt = {}, {} -- [cooldownID] = spell ID (false: none), when read
+local infoForgetter = CreateFrame("Frame")
+for _, event in ipairs({ "SPELLS_CHANGED", "PLAYER_TALENT_UPDATE", "PLAYER_ENTERING_WORLD",
+	"COOLDOWN_VIEWER_SPELL_OVERRIDE_UPDATED", "COOLDOWN_VIEWER_DATA_LOADED" }) do
+	pcall(infoForgetter.RegisterEvent, infoForgetter, event)
+end
+infoForgetter:SetScript("OnEvent", function()
+	wipe(infoSpell)
+	wipe(infoAt)
+end)
+local function InfoSpell(cooldownID)
+	local now = GetTime()
+	local at = infoAt[cooldownID]
+	if at and now - at < INFO_HOLD then
+		return infoSpell[cooldownID] or nil
+	end
+	local found = false
+	local ok, info = pcall(C_CooldownViewer.GetCooldownViewerCooldownInfo, cooldownID)
+	if ok and type(info) == "table" then
+		for _, field in ipairs(INFO_SPELL_FIELDS) do
+			local id = info[field]
+			if type(id) == "number" and not Secret(id) and id > 0 then
+				found = id
+				break
+			end
+		end
+	end
+	infoSpell[cooldownID], infoAt[cooldownID] = found, now
+	return found or nil
+end
 function ItemSpell(item)
 	if item.GetSpellID then
 		local ok, id = pcall(item.GetSpellID, item)
@@ -5254,13 +5359,7 @@ function ItemSpell(item)
 	end
 	if type(cooldownID) == "number" and not Secret(cooldownID)
 		and C_CooldownViewer and C_CooldownViewer.GetCooldownViewerCooldownInfo then
-		local ok, info = pcall(C_CooldownViewer.GetCooldownViewerCooldownInfo, cooldownID)
-		if ok and type(info) == "table" then
-			for _, field in ipairs(INFO_SPELL_FIELDS) do
-				local id = info[field]
-				if type(id) == "number" and not Secret(id) and id > 0 then return id end
-			end
-		end
+		return InfoSpell(cooldownID)
 	end
 end
 end

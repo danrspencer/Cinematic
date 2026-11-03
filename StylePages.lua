@@ -93,7 +93,7 @@ end
 -- The Visions' shared settings, by how their keys start: Damage Vision's,
 -- Roll Vision's, Quest Vision's two Style tabs' and Card Vision's (theirs
 -- put in later, by their own files, marked as they come).
-local VISION_PREFIXES = { "damageVision", "roll", "questTalk", "questItem", "card" }
+local VISION_PREFIXES = { "damageVision", "roll", "questTalk", "questItem", "card", "emote" }
 local function MarkVision(key, entry)
 	if type(entry) ~= "table" or type(key) ~= "string" then return end
 	for _, prefix in ipairs(VISION_PREFIXES) do

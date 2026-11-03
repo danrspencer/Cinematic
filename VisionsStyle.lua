@@ -15,6 +15,7 @@ local VISIONS = {
 	{ "Quest item button", "Quest Item Style", "questItem" },
 	{ "Roll Vision", "Roll Style", "roll" },
 	{ "Card Vision", "Card Styles", "card" },
+	{ "Emote Vision", "Emote Vision", "emote" },
 }
 local KIND_NAMES = { texture = "Texture", font = "Font", outline = "Outline", shadow = "Shadow", border = "Border" }
 -- (Its own settings, for Reset.)
@@ -50,7 +51,7 @@ end
 
 local function RefreshVisions()
 	if ns.RefreshAllStyles then ns.RefreshAllStyles() end
-	for _, refresh in ipairs({ ns.RefreshDamageVision, ns.RefreshQuestTalk }) do
+	for _, refresh in ipairs({ ns.RefreshDamageVision, ns.RefreshQuestTalk, ns.RefreshEmoteVision }) do
 		pcall(refresh)
 	end
 end

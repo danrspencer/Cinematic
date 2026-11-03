@@ -428,7 +428,8 @@ end
 -- Rows filled from the meter's: names and bars, each against the top total.
 -- (Yours in the look's colors, the rest in their class's.)
 -- count: how many rows to fill (the rest hidden), else all of list's.
-local function FillRows(list, rows, mine, top, count)
+-- classes: yours in your class's color too (brighter than the rest).
+local function FillRows(list, rows, mine, top, count, classes)
 	local first = rows[1]
 	local behind, ahead = BarColors(Look())
 	count = math.min(count or #list, #list)
@@ -445,7 +446,10 @@ local function FillRows(list, rows, mine, top, count)
 			end
 			SetTotal(row.total, source.totalAmount)
 			SetBar(row.bar, top or first.totalAmount, source.totalAmount)
-			if index == mine then
+			if index == mine and classes then
+				local r, g, b = ClassColor(source)
+				row.bar:SetStatusBarColor(r, g, b, 1)
+			elseif index == mine then
 				local color = mine == 1 and ahead or behind
 				row.bar:SetStatusBarColor(color[1], color[2], color[3], 1)
 			else
@@ -869,7 +873,7 @@ local function ShowRecap(title, rows, top, report, test)
 	local rank = Rank(rows)
 	recap.title:SetText(title)
 	recap.place:SetText(rank and L["#%d of %d"]:format(rank, #rows) or L["You're not on the meter"])
-	FillRows(recap.rows, rows, rank, top)
+	FillRows(recap.rows, rows, rank, top, nil, true)
 	recap:SetHeight(64 + (button and 28 or 0) + math.min(#rows, RECAP_ROWS) * step)
 	recap:SetScale(db.damageVisionSize)
 	SpotPoint(recap, db.damageVisionX, db.damageVisionY, db.damageVisionSize, "TOP")

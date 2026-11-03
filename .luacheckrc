@@ -193,6 +193,7 @@ read_globals = {
 	"ITEM_REQ_SKILL",
 	"IsInGroup",
 	"IsInInstance", "GetInstanceInfo", "strsplit", "C_RaidLocks", "EJ_GetCreatureInfo", "EJ_GetCurrentInstance",
+	"IsGUIDInGroup", "UnitInParty", "UnitInRaid", "IsGuildMember", "C_BattleNet", "GetPlayerInfoByGUID", "UnitAura",
 	"EJ_GetEncounterInfoByIndex", "EJ_GetEncounterInfo", "UnitIsTapDenied", "EJ_GetInstanceForMap", "EJ_SelectInstance", "UnitEffectiveLevel",
 	"IsInRaid",
 	"IsIndoors",

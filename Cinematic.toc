@@ -125,6 +125,7 @@ UnitStyle.lua
 RaidStyle.lua
 GeneralStyle.lua
 VisionsStyle.lua
+EmoteVision.lua
 Focus.lua
 Tracking.lua
 NodeSweep.lua

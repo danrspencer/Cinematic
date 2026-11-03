@@ -116,6 +116,7 @@ UnitStyle.lua
 RaidStyle.lua
 GeneralStyle.lua
 VisionsStyle.lua
+EmoteVision.lua
 WindGuideStyles.lua
 WindGuide.lua
 DamageVision.lua

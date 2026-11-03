@@ -1746,6 +1746,7 @@ do
 			{ "Teleport Vision", "Interface\\Icons\\Spell_Arcane_TeleportStormWind", label = "Tele Vision",
 				section = "World" }, -- (TeleportVision.lua; its tooltip: ns.TILE_TOOLTIPS)
 			{ "Duel Vision", "Interface\\Icons\\Ability_DualWield", section = "World" },
+			{ "Emote Vision", "Interface\\Icons\\Spell_Holy_PrayerOfFortitude", section = "World" }, -- (EmoteVision.lua)
 			-- (CardsPage.lua's: Battle Vision's and Story Vision's moments, one page)
 			{ "Card Vision", "Interface\\Icons\\INV_Misc_Book_09", section = "World" },
 			{ "Card Styles", "Interface\\Icons\\INV_Misc_Book_09", label = "Card Types", tabOf = "Card Vision" },
@@ -14703,6 +14704,9 @@ ns.OnLanguage(function()
 	end
 	if ns.CreateTeleportVisionPanel then -- (TeleportVision.lua)
 		ns.CreateTeleportVisionPanel(ns.lowHealthKit)
+	end
+	if ns.CreateEmoteVisionPanel then -- (EmoteVision.lua)
+		ns.CreateEmoteVisionPanel(ns.lowHealthKit)
 	end
 	CreateBuffsPanel()
 	CreatePlatesPanel()

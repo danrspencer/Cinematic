@@ -12,11 +12,11 @@ Hey everyone! A couple of weeks ago I posted Cinematic v1.7, and since then this
 
 **What it does**
 
-Cinematic is about bringing Azeroth to life. Your screen changes with the moment you're in: hiding what you don't need, showing what you do, taking away the clutter and adding touches that pull you into the world.
+Cinematic is about bringing Azeroth to life. Your screen changes with the moment you're in: hiding what you don't need, showing what you do, adjusting the game's own pieces and adding touches that pull you into the world.
 
 - **Hide:** your frames, names, nameplates, tooltips and chat fade away while you explore, so it's just you and the world.
 - **Show:** they come back the moment they matter: on mouseover, in combat, for quests and for buffs, with just what that moment needs.
-- **Remove:** some of the game's own pieces are swapped out for something that fits the world better: NPCs speak in a bubble over their heads instead of the quest window, and zone names arrive as a title card.
+- **Adjust:** some of the game's own pieces are swapped out for something that fits the world better: NPCs speak in a bubble over their heads instead of the quest window, and zone names arrive as a title card.
 - **Add:** Visions that show what's happening in the world itself, title cards for the big moments, a camera that directs itself through quests, conversations, walks and hearths, and color, light and music that follow the time of day and what you're doing.
 
 **What's in the trailer**

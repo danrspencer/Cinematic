@@ -464,18 +464,25 @@ local function PlaceType()
 end
 
 -- A map as a zone: up through the small maps inside it (caves, city
--- districts) to the zone or dungeon map they're in.
+-- districts) to the zone or dungeon map they're in. (Kept by map: maps don't
+-- move, and GetMapInfo makes a table each time, every frame for each member.)
+local zoneMaps = {} -- [map] = its zone map
 local function ZoneMap(map)
+	local kept = zoneMaps[map]
+	if kept then return kept end
+	local start = map
 	for _ = 1, 5 do
 		local ok, info = pcall(C_Map.GetMapInfo, map)
+		-- (Unreadable: not kept, asked again next time.)
 		if not ok or type(Plain(info)) ~= "table" then return map end
 		local mapType, parent = Plain(info.mapType), Plain(info.parentMapID)
 		if type(mapType) ~= "number" or mapType <= Enum.UIMapType.Dungeon
 			or type(parent) ~= "number" or parent == 0 then
-			return map
+			break
 		end
 		map = parent
 	end
+	zoneMaps[start] = map
 	return map
 end
 

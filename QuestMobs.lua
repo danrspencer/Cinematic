@@ -12,6 +12,10 @@ local _, ns = ...
 -- can be missing for a moment after its plate appears).
 local answers = {} -- [guid] = { quest = bool, at = time }
 local RECHECK_NO = 2
+-- Where the GUID is secret (retail's instances): by unit token for
+-- TOKEN_HOLD seconds, forgotten as soon as a token may point at someone else.
+local tokenAnswers = {} -- [unit token] = { quest = bool, at = time }
+local TOKEN_HOLD = 1
 -- The game drops a unit's quest line a moment after the quest log changes
 -- (an NPC you've just questioned): answers read within SETTLE seconds of a
 -- change are read once more after it.
@@ -400,7 +404,17 @@ function ns.IsQuestMob(unit)
 	end
 	local ok, guid = pcall(UnitGUID, unit)
 	if not (ok and type(guid) == "string" and Known(guid)) then
-		return Read(unit)
+		-- (No GUID to keep it by, as in retail's instances: by the unit token,
+		-- briefly. Read every time, its tooltip made heaps of garbage a frame.)
+		local now = GetTime()
+		local held = tokenAnswers[unit]
+		if held and now - held.at < TOKEN_HOLD then
+			return held.quest
+		end
+		held = held or {}
+		held.quest, held.at = Read(unit), now
+		tokenAnswers[unit] = held
+		return held.quest
 	end
 	if spent[guid] then
 		local okOn, on = pcall(C_QuestLog.IsOnQuest, spent[guid])
@@ -641,11 +655,37 @@ watcher:SetScript("OnEvent", function()
 	end
 	itemQuests = nil
 	wipe(answers)
+	wipe(tokenAnswers)
 	wipe(passiveAnswers)
 	settleAt = GetTime() + SETTLE
 	barTexts = nil
 	doneTexts = nil
 	killNames = nil
+end)
+
+-- A unit token now on someone else: its kept answer goes (see tokenAnswers).
+local tokenWatcher = CreateFrame("Frame")
+local TOKEN_EVENTS = {
+	NAME_PLATE_UNIT_ADDED = true, NAME_PLATE_UNIT_REMOVED = true,
+	PLAYER_TARGET_CHANGED = "target", UPDATE_MOUSEOVER_UNIT = "mouseover", PLAYER_FOCUS_CHANGED = "focus",
+	PLAYER_SOFT_ENEMY_CHANGED = "softenemy", PLAYER_SOFT_FRIEND_CHANGED = "softfriend",
+	PLAYER_SOFT_INTERACT_CHANGED = "softinteract",
+}
+for event in pairs(TOKEN_EVENTS) do
+	pcall(tokenWatcher.RegisterEvent, tokenWatcher, event)
+end
+tokenWatcher:SetScript("OnEvent", function(_, event, unit)
+	local token = TOKEN_EVENTS[event]
+	if token == true then token = unit end
+	if type(token) == "string" then
+		tokenAnswers[token] = nil
+	end
+	-- (targettarget and the like follow the target: those go too.)
+	if event == "PLAYER_TARGET_CHANGED" then
+		for kept in pairs(tokenAnswers) do
+			if kept:find("target", 1, true) then tokenAnswers[kept] = nil end
+		end
+	end
 end)
 
 -- The golden exclamation mark shown for them (plates' Quest Icon row, the
