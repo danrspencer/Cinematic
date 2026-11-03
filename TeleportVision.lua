@@ -301,15 +301,21 @@ end)
 -- teleportVisionFadeTooltip), so you see it start, then the portal is the
 -- progress. The bar sets itself back to full as a cast starts, so its own
 -- events are followed too, and both are set again each frame while it lasts.
--- Over (gone) or cancelled: both put back at once (and CineMode's fade on the
--- bar, Tooltips' own on the tooltip as it next shows).
+-- Cancelled: both put back at once (and CineMode's fade on the bar, Tooltips'
+-- own on the tooltip as it next shows). Gone: kept hidden while the black and
+-- its clearing last (GONE_TIME), or the bar's finish flash showed on the black.
 local CAST_BARS = { "PlayerCastingBarFrame", "CastingBarFrame", "GamepadPlayerCastingBarFrame" }
 local CAST_FADE = 3 -- seconds they take to fade out
 -- The alpha wanted for the bar or the tooltip (key: its setting) now, or nil: not faded.
 local function FadeWanted(key)
 	local db = ns.GetDB()
 	local cast = ns.departCast
-	if not (db and db[key] and ns.Setting("teleportVision") and cast and cast.scene and not cast.done) then
+	if not (db and db[key] and ns.Setting("teleportVision") and cast and cast.scene) then
+		return nil
+	end
+	if cast.done == "gone" and GetTime() - cast.doneAt < GONE_TIME then
+		return 0
+	elseif cast.done then
 		return nil
 	end
 	return math.max(0, 1 - (GetTime() - cast.startAt) / CAST_FADE)

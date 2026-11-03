@@ -246,6 +246,19 @@ Add("2. Town & inn", { key = "hook-back", name = "UI back and away again",
 		ns.SetEnabled(true)
 		d.Wait(6)
 	end })
+Add("2. Town & inn", { key = "hook-walk", name = "The hook: walk in, then CineMode",
+	tip = "CineMode off (your full UI). Start auto-walking (walk mode + auto-run) toward the city: 6 seconds " ..
+		"after you set off, CineMode comes on and the RP walk camera takes over as the UI fades.",
+	script = function(d)
+		d.Cine(false)
+		d.Set("walkCameraDelay", 0)
+		d.Caption("Walk mode, then auto-run", 4)
+		if not d.WaitUntil(function() return ns.IsRPWalking and ns.IsRPWalking() end, 60) then return end
+		d.Wait(6)
+		d.Cue("CineMode on")
+		ns.SetEnabled(true)
+		d.Wait(25)
+	end })
 local CHAT_LINES = {
 	{ "Aldric", "Anyone heading to Goldshire? Could use a hand with the kobolds." },
 	{ "Mirelle", "Just watch out for the gnolls past the river." },
