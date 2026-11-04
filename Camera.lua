@@ -129,8 +129,9 @@ ns.DEFAULTS.eventQuestMusic = false
 ns.DEFAULTS.eventQuestGossipMusic = false
 ns.DEFAULTS.eventStillMusic = false
 
--- Each event's CineMode column (event<key>Cine, and walkCine/runCine/deathCine
--- for auto-walking, auto-running and dying): with "Start in CineMode" off, its camera
+-- Each event's CineMode column (event<key>Cine, walkCine/runCine/deathCine
+-- for auto-walking, auto-running and dying, and chatCine/chatNearbyCine for
+-- the chat camera's two rows, ChatCam.lua): with "Start in CineMode" off, its camera
 -- starting brings CineMode on (the UI fades, music, the camera) until it ends.
 -- The quest camera runs either way; its switch brings CineMode in around it
 -- (quest windows never fade).
@@ -166,6 +167,11 @@ function ns.TriggerStartsCine()
 		ns.travelCine = false
 	end
 	if ns.travelCine then
+		return true
+	end
+	-- A conversation: by the row that started it.
+	local chat = ns.ChatCamScene and ns.ChatCamScene()
+	if chat and ns.TriggerSetting(chat, "cine") then
 		return true
 	end
 	-- (A camera started from its key binding always does: you asked for it.)

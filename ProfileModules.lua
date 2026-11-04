@@ -503,6 +503,10 @@ ns.PROFILE_MODULES = {
 	{ key = "tele-vision", name = "Tele Vision", scope = { "Teleport Vision" },
 		tip = "Tele Vision on: a portal opens round you as you cast your Hearthstone, Astral Recall or a teleport.",
 		apply = function(set) set("teleportVision", true) end },
+	{ key = "emote-vision", name = "Emote Vision", scope = { "Emote Vision" },
+		tip = "Emote Vision on: a card shows who buffed you, brought you back or emoted at you, with emotes to " ..
+			"answer in one click.",
+		apply = function(set) set("emoteVision", true) end },
 
 	-- The look
 	{ key = "no-letterbox", name = "No letterbox", scope = { "Letterbox/Show in" },

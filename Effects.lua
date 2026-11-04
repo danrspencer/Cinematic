@@ -1621,8 +1621,10 @@ do
 		local me = ShortName(UnitName("player"))
 		if winner == me then
 			duels.MyCard("won", loser, fled)
+			if ns.EmoteVisionDuel then ns.EmoteVisionDuel("won", loser) end -- (EmoteVision.lua)
 		elseif loser == me then
 			duels.MyCard("lost", winner, fled)
+			if ns.EmoteVisionDuel then ns.EmoteVisionDuel("lost", winner) end
 		end
 	end
 

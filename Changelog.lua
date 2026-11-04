@@ -11,6 +11,10 @@
 local _, ns = ...
 
 ns.CHANGELOG_FEATURES = {
+	{ date = "2026-11-03", page = "Emote Vision", title = "Emote Vision",
+		text = "When someone buffs you, raises you, emotes at you, summons you or trades with you, or your group " ..
+		"kills a boss or levels up, a small card shows who it was, with emotes to answer in one click. Pick each " ..
+		"moment's emotes (voice ones too) and one of six card styles." },
 	{ date = "2026-11-02", page = "Teleport Vision", title = "Tele Vision",
 		text = "As you cast your Hearthstone, Astral Recall or a teleport, a portal opens round you in your class " ..
 		"and spec's color, closing in as the cast fills, then the screen goes black as you're whisked away. It " ..

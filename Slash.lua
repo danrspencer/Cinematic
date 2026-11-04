@@ -145,7 +145,9 @@ local function PrintDebugHelp()
 	print("  /cine debug healthfade [percent] - test window: blocks that show only while someone's below the percent (again to close)")
 	print("  /cine debug damage [seconds] - whether damage reaches addons: hit event, and the game's damage meter (yours and the group's damage, DPS, healing) now and after 15 seconds")
 	print("  /cine debug damage bar - a test window: your rank and bars drawn from the meter's totals, even when they're secret in a fight (again to close)")
-	print("  /cine debug emotevision - Emote Vision: whether it shows here now, what's queued, a resurrection offer, and who your target is to you (party, guild, friend)")
+	print("  /cine debug emotestop [emote] - plays a looping emote (dance if none given), then tries each way to stop it 4 seconds apart, naming each in chat (again to stop)")
+	print("  /cine debug emotescan [first [last] | more] - every emote of the game's in turn at no one (or from first to last; more: the few still to check, 10 seconds each), 5 seconds each, its number and command big at the top, for a recording (logged in CinematicDB.emoteScan; again to stop)")
+	print("  /cine debug emotevision -Emote Vision: whether it shows here now, what's queued, a resurrection offer, and the unit your target's card would emote at")
 	print("  /cine debug damagevision - Damage Vision: showing or why not, the session and meter it reads, your place and whether the totals are secret")
 	print("  /cine debug modules - profile modules: any writing outside their pages and sections, or two of a profile's setting the same thing (in the log)")
 	print("  /cine debug speech - show a sample line of speech from behind you, and print what happens to each say and yell (again to stop)")
@@ -1117,6 +1119,10 @@ local function HandleSlash(msg)
 		ns.HealthFadeDebug(arg:match("^healthfade%s+(%S+)"))
 	elseif cmd == "debug" and arg == "emotevision" then
 		ns.EmoteVisionDebug()
+	elseif cmd == "debug" and (arg == "emotestop" or arg:find("^emotestop%s")) then
+		ns.EmoteStopTest(arg:match("^emotestop%s+(%S+)"))
+	elseif cmd == "debug" and (arg == "emotescan" or arg:find("^emotescan%s")) then
+		ns.EmoteScan(arg:match("^emotescan%s+(.+)$"))
 	elseif cmd == "debug" and arg == "damagevision" then
 		if ns.DamageVisionDebug then ns.DamageVisionDebug() else ns.Print("damagevision: the dev copy only") end
 	elseif cmd == "debug" and arg == "damage bar" then

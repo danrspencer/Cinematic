@@ -1,11 +1,13 @@
--- Emote Vision: when someone buffs you, brings you back to life or emotes
--- at you, a small card shows who it was and what they did, with a few
--- emotes to answer in one click (/thank, /bow, the same emote back...). It
--- never shows in a fight: a moment from one waits for the fight to end and
--- is dropped if it's grown old by then. One card at a time, the rest
--- queued; once per person a minute, so a raid's buffer doesn't flood you.
--- Its look follows Visions Style (font, outline, shadow, border). Its page
--- is at the bottom.
+-- Emote Vision: when someone buffs you, brings you back to life, emotes at
+-- you, summons you, trades with you, levels up in your group, or you clear a
+-- dungeon or finish a duel, a small card shows who it was and what they did,
+-- with up to three emotes to answer in one click (each moment's picked on
+-- its page: /thank, /bow, the same emote back...). It never shows in a
+-- fight: a moment from one waits for the fight to end and is dropped if it's
+-- grown old by then. One card at a time, the rest queued; repeats from the
+-- same person (the same moment) ignored for a while, so a raid's buffer
+-- doesn't flood you. Its look follows Visions Style (font, outline, shadow,
+-- border). Its pages are at the bottom.
 
 local _, ns = ...
 local L = ns.L
@@ -13,17 +15,14 @@ local L = ns.L
 local DEFAULTS = ns.DEFAULTS
 DEFAULTS.emoteVision = false           -- at all (its page's switch)
 DEFAULTS.emoteVisionAlways = false     -- its Show in row's Always: everywhere
-DEFAULTS.emoteVisionBuffs = true       -- someone buffs you (a buff of a minute or more)
-DEFAULTS.emoteVisionRes = true         -- someone brings you back to life
-DEFAULTS.emoteVisionEmotes = true      -- someone emotes at you (/wave, /bow, /hug...)
-DEFAULTS.emoteVisionGroup = true       -- who: your party or raid...
-DEFAULTS.emoteVisionGuild = true       -- ...your guild
-DEFAULTS.emoteVisionFriends = true     -- ...your friends (and Battle.net friends)
-DEFAULTS.emoteVisionStrangers = false  -- ...anyone else
+DEFAULTS.emoteVisionStill = false      -- only while you stand still (moving: it waits)
+DEFAULTS.emoteVisionRepeats = true     -- the same person's same moment again ignored...
+DEFAULTS.emoteVisionRepeatMins = 10    -- ...for this many minutes
 DEFAULTS.emoteVisionHold = 8           -- seconds a card stays (paused while the mouse is over it)
 DEFAULTS.emoteVisionScale = 1
 DEFAULTS.emoteVisionPortrait = true    -- their face (or class icon) on the card
-DEFAULTS.emoteVisionX = 0              -- from the bottom middle of the screen
+DEFAULTS.emoteVisionSpot = "speech"   -- "speech": just above the lines from behind you (Speech.lua's spot); "own": X, Y
+DEFAULTS.emoteVisionX = 0              -- ...own: from the bottom middle of the screen (dragging it with Move)
 DEFAULTS.emoteVisionY = 260
 -- (Its look: on Visions Style to start with, StylePages.lua's "emote" prefix.)
 DEFAULTS.emoteFont = "general"
@@ -42,42 +41,243 @@ for _, channel in ipairs({ "R", "G", "B" }) do
 	ns.SHARED_STYLE["emoteBorder" .. channel] = { kind = "border" .. channel, follows = "emoteBorder" }
 end
 
--- Where: its Show in row, the open world, cities and instances ticked to
--- start with (not battlegrounds: strangers' buffs and emotes there are noise).
+-- The common emotes, the add menu's first list: their tokens (DoEmote) and
+-- names. The game says each one's own words in chat. (All the game's, and
+-- its voice emotes, come from its own lists: GameEmotes.)
+local EMOTES = {
+	{ "THANK", "Thank" }, { "BOW", "Bow" }, { "SALUTE", "Salute" }, { "KNEEL", "Kneel" }, { "CURTSEY", "Curtsey" },
+	{ "CHEER", "Cheer" }, { "APPLAUD", "Applaud" }, { "CONGRATULATE", "Congratulate" }, { "WAVE", "Wave" },
+	{ "HELLO", "Hello" }, { "WELCOME", "Welcome" }, { "BYE", "Bye" }, { "SMILE", "Smile" }, { "GRIN", "Grin" },
+	{ "WINK", "Wink" }, { "LAUGH", "Laugh" }, { "GIGGLE", "Giggle" }, { "HUG", "Hug" }, { "KISS", "Kiss" },
+	{ "LOVE", "Love" }, { "DANCE", "Dance" }, { "FLEX", "Flex" }, { "ROAR", "Roar" }, { "APOLOGIZE", "Sorry" },
+	{ "HIGHFIVE", "High five" },
+}
+local EMOTE_NAMES = {}
+for _, each in ipairs(EMOTES) do EMOTE_NAMES[each[1]] = each[2] end
+local SAME = "SAME" -- (in a list: "Same back", the emote they did at you)
+local MAX_EMOTES = 6   -- buttons a card can have (three to a row)
+
+-- The game's emotes: every one it has a slash command for (EMOTE<n>_TOKEN
+-- and _CMD1, its own numbering: several hundred; the chat menu's Emote list,
+-- EmoteList, is only a short pick of them), and its voice ones (the Voice
+-- Emote list, TextEmoteSpeechList), each token's command ("/thank", in your
+-- language). Made once, when first asked.
+local EMOTE_INDEX_MOST = 1000 -- (the numbering has gaps: looked through this far)
+local gameEmotes
+local function GameEmotes()
+	if gameEmotes then return gameEmotes end
+	gameEmotes = { text = {}, voice = {}, command = {}, isVoice = {} }
+	local last = math.max(tonumber(_G.MAXEMOTEINDEX) or 0, EMOTE_INDEX_MOST)
+	for i = 1, last do
+		local token = _G["EMOTE" .. i .. "_TOKEN"]
+		local command = _G["EMOTE" .. i .. "_CMD1"]
+		if type(token) == "string" and type(command) == "string" and not gameEmotes.command[token] then
+			gameEmotes.command[token] = command
+			gameEmotes.text[#gameEmotes.text + 1] = token
+		end
+	end
+	local voice = _G.TextEmoteSpeechList
+	if type(voice) == "table" then
+		for _, token in ipairs(voice) do
+			if type(token) == "string" then
+				gameEmotes.voice[#gameEmotes.voice + 1] = token
+				gameEmotes.isVoice[token] = true
+			end
+		end
+	end
+	return gameEmotes
+end
+
+-- An emote's command ("/thank") and its name on a card's button ("Thank").
+local function Command(token)
+	return GameEmotes().command[token] or ("/" .. token:lower())
+end
+local function EmoteName(token)
+	if token == SAME then return L["Same back"] end
+	if EMOTE_NAMES[token] then return L[EMOTE_NAMES[token]] end
+	local word = Command(token):gsub("^/", "")
+	return word:sub(1, 1):upper() .. word:sub(2)
+end
+
+-- What each emote does, from recording every one of them played at no one
+-- (retail, 2026-11-03, /cine debug emotescan): moves your character, makes a
+-- sound (voice ones: the game's own list), loops till you move (or
+-- CancelEmote), or holds a pose till you /stand or move. Not listed: chat
+-- words only. (Another race, or with a target, may differ a little.)
+local EMOTE_MOVES, EMOTE_SOUND, EMOTE_LOOPS = {}, {}, {}
+for token in ("ANGRY APPLAUD ATTACKMYTARGET BASHFUL BEG BLAME BLUSH BOGGLE BOOP BOW BYE CACKLE CHARGE CHEER " ..
+	"CHICKEN CHUCKLE CLAP COMMEND CONFUSED CONGRATULATE COWER CRY CURIOUS CURTSEY DANCE DRINK EAT FLEE FLEX FLIRT " ..
+	"FOLLOW FORTHEALLIANCE FORTHEHORDE GASP GIGGLE GLOAT GOLFCLAP GREET GROVEL GROWL GUFFAW HAIL HEALME HELLO " ..
+	"HELPME HUZZAH IMPRESSED INCOMING INSULT JOKE KISS KNEEL LAUGH LAYDOWN LEAN LOST MAGNIFICENT MASSAGE MERCY " ..
+	"MOURN OBJECT OOM OOPS OPENFIRE PANIC PEER PLEAD POINT PONDER PRAY PROUD PUZZLE QUACK RASP READ ROAR ROFL " ..
+	"RUDE SALUTE SCARED SHOUT SHRUG SHY SING SIT SLEEP SNARL SURRENDER TALK TALKEX TALKQ TAUNT THANK TRAIN " ..
+	"VICTORY VIOLIN WAIT WAVE WELCOME WHOA YW"):gmatch("%S+") do EMOTE_MOVES[token] = true end
+for token in ("APOLOGIZE APPLAUD BORED CACKLE CHICKEN CHUCKLE CLAP COMMEND CRY GIGGLE GLOAT GOLFCLAP GUFFAW " ..
+	"IMPRESSED KISS LAUGH MOURN OOPS ROAR ROFL SIGH TAUNT THREATEN VIOLIN WHISTLE WHOA YAWN YW"):gmatch("%S+") do
+	EMOTE_SOUND[token] = true
+end
+for token, how in pairs({ DANCE = "loops", COWER = "loops", KNEEL = "holds", LAYDOWN = "holds", SIT = "holds",
+	SLEEP = "holds", LEAN = "holds", READ = "holds" }) do EMOTE_LOOPS[token] = how end
+-- ...of the ones that move you, the full-body ones (the whole character changes
+-- pose: kneels, sits, lies, bows, dances, cowers, flexes...), picked by eye from
+-- the recordings; the rest are gestures (hands, arms, head).
+local EMOTE_BODY = {}
+for token in ("ANGRY BASHFUL BEG BLUSH BOW CHEER CHICKEN COWER CURTSEY DANCE FLEX GROVEL HUZZAH INSULT KNEEL " ..
+	"LAYDOWN LEAN MERCY MOURN PLEAD PRAY ROAR RUDE SCARED SHY SIT SLEEP SURRENDER VICTORY"):gmatch("%S+") do
+	EMOTE_BODY[token] = true
+end
+
+-- An emote's tags as colored words after its name: full body or gesture,
+-- voice or sound, loops or holds (none: chat words only).
+local function EmoteTags(token)
+	local tags = {}
+	if EMOTE_BODY[token] then tags[#tags + 1] = "|cff7fd88f" .. L["full body"] .. "|r"
+	elseif EMOTE_MOVES[token] then tags[#tags + 1] = "|cff7fd88f" .. L["gesture"] .. "|r" end
+	if GameEmotes().isVoice[token] then tags[#tags + 1] = "|cff8fb8ff" .. L["voice"] .. "|r"
+	elseif EMOTE_SOUND[token] then tags[#tags + 1] = "|cff8fb8ff" .. L["sound"] .. "|r" end
+	if EMOTE_LOOPS[token] then tags[#tags + 1] = "|cffffb060" .. L[EMOTE_LOOPS[token]] .. "|r" end
+	return table.concat(tags, " ")
+end
+
+-- Plays an emote to try it (the page's > buttons, a right-click in the
+-- picker): at no one, so your target isn't bothered. (Same back: nothing to play.)
+local function TryEmote(token)
+	if not token or token == SAME then return end
+	pcall(DoEmote, token, "none")
+end
+
+-- A moment's emotes, saved as "THANK,BOW,SALUTE" (emoteVision<Id>Emotes).
+local function ParseEmotes(text)
+	local list = {}
+	for token in tostring(text or ""):gmatch("[%w_]+") do
+		if #list < MAX_EMOTES then list[#list + 1] = token:upper() end
+	end
+	return list
+end
+
+-- The moments, in the page's order: id, its switch, name, tip, the emotes
+-- it starts with (its list: emoteVision<Id>Emotes), whether it can play the
+-- same back, and a pretend one for Test.
+local MOMENTS = {
+	{ id = "Buff", on = "emoteVisionBuffs", name = "Someone buffs you", emotes = { "THANK", "BOW", "SALUTE" },
+		tip = "A buff of a minute or more someone else puts on you (Fortitude, Arcane Intellect, a blessing...). " ..
+			"Not heals over time.",
+		sample = { name = "Aelwyn", class = "PRIEST", line = "gave you %s", spell = "Power Word: Fortitude",
+			icon = "Interface\\Icons\\Spell_Holy_WordFortitude" } },
+	{ id = "Res", on = "emoteVisionRes", name = "You're brought back to life", emotes = { "THANK", "KNEEL", "CHEER" },
+		tip = "Someone resurrects you and you accept.",
+		sample = { name = "Thornbrook", class = "DRUID", line = "brought you back to life" } },
+	{ id = "Emote", on = "emoteVisionEmotes", name = "Someone emotes at you", emotes = { SAME, "WAVE", "SMILE" },
+		same = true, tip = "Someone waves, bows, hugs or the like at you. Same back: the one they did.",
+		sample = { name = "Pip", class = "MAGE", line = "waves at you.", same = "WAVE" } },
+	{ id = "Summon", on = "emoteVisionSummon", name = "You're summoned", emotes = { "THANK", "WAVE" },
+		tip = "A warlock's summon, or a meeting stone's, that you accept: once you're there.",
+		sample = { name = "Velmora", class = "WARLOCK", line = "summoned you" } },
+	{ id = "Trade", on = "emoteVisionTrade", name = "A trade goes through", emotes = { "THANK", "BOW" },
+		tip = "A trade with someone finishes (both of you clicked Trade).",
+		sample = { name = "Brakka", class = "WARRIOR", line = "traded with you" } },
+	{ id = "Level", on = "emoteVisionLevel", name = "Someone in your group levels up",
+		emotes = { "CONGRATULATE", "CHEER", "APPLAUD" }, tip = "Your party or raid's members, not you.",
+		sample = { name = "Brakka", class = "WARRIOR", line = "reached level %d", level = 42 } },
+	{ id = "Dungeon", on = "emoteVisionDungeon", name = "You clear a dungeon", emotes = { "THANK", "BOW", "CHEER" },
+		journal = true, tip = "Its last boss down, in a group: the emotes go to everyone, not one person.",
+		sample = { name = "The Deadmines", line = "cleared with your group", group = true,
+			icon = "Interface\\Icons\\INV_Misc_Key_03" } },
+	{ id = "Duel", on = "emoteVisionDuel", name = "A duel ends", emotes = { "BOW", "SALUTE", "CONGRATULATE" },
+		tip = "Won or lost, against whoever it was.",
+		sample = { name = "Kargash", class = "ROGUE", line = "lost a duel to you" } },
+	{ id = "Join", on = "emoteVisionJoin", name = "Someone joins your group", emotes = { "WELCOME", "WAVE", "HELLO" },
+		tip = "Someone new in your party or raid (not a whole raid filling at once).",
+		sample = { name = "Thornbrook", class = "DRUID", line = "joined your group" } },
+	{ id = "Leave", on = "emoteVisionLeave", name = "Someone leaves your group", emotes = { "BYE", "WAVE", "THANK" },
+		tip = "Someone leaves your party or raid.",
+		sample = { name = "Velmora", class = "WARLOCK", line = "left your group" } },
+	{ id = "Joined", on = "emoteVisionJoined", name = "You join a group", emotes = { "HELLO", "WAVE" },
+		tip = "You join someone's party or raid: the emotes go to everyone, not one person.",
+		sample = { name = "Your group", line = "you joined a group", group = true,
+			icon = "Interface\\Icons\\INV_Misc_GroupNeedMore" } },
+	{ id = "Achievement", on = "emoteVisionAchievement", name = "Someone earns an achievement",
+		emotes = { "CONGRATULATE", "CHEER", "APPLAUD" },
+		tip = "Someone near you, in your group or in your guild earns an achievement.",
+		sample = { name = "Aelwyn", class = "PRIEST", line = "earned %s", spell = "Explore Elwynn Forest" } },
+	{ id = "Boss", on = "emoteVisionBoss", name = "Your group kills a boss", emotes = { "CHEER", "ROAR", "VICTORY" },
+		tip = "A boss down in a dungeon or raid with your group (each one, not just the last): the emotes go to " ..
+			"everyone.",
+		sample = { name = "Edwin VanCleef", line = "defeated with your group", group = true,
+			icon = "Interface\\Icons\\INV_Misc_Bone_HumanSkull_01" } },
+	{ id = "Wipe", on = "emoteVisionWipe", name = "Your group wipes", emotes = { "SIGH", "CRY", "FACEPALM" },
+		tip = "A boss fight lost with your group: the emotes go to everyone.",
+		sample = { name = "Edwin VanCleef", line = "your group wiped", group = true,
+			icon = "Interface\\Icons\\Ability_Rogue_FeignDeath" } },
+	{ id = "YouLevel", on = "emoteVisionYouLevel", name = "You level up", emotes = { "CHEER", "DANCE", "FLEX" },
+		tip = "You reach a new level: the emotes go to everyone, to celebrate.",
+		sample = { name = "You", line = "reached level %d", level = 42, group = true,
+			icon = "Interface\\Icons\\Spell_Holy_SurgeOfLight" } },
+}
+-- (No Encounter Journal, as on Classic Era: no telling a dungeon's last boss,
+-- so no Dungeon moment there.)
+if not (EJ_GetInstanceForMap and EJ_GetEncounterInfoByIndex) then
+	for i = #MOMENTS, 1, -1 do
+		if MOMENTS[i].journal then table.remove(MOMENTS, i) end
+	end
+end
+local MOMENT = {}
+for _, moment in ipairs(MOMENTS) do
+	MOMENT[moment.id] = moment
+	DEFAULTS[moment.on] = not moment.off
+	moment.key = "emoteVision" .. moment.id .. "Emotes"
+	DEFAULTS[moment.key] = table.concat(moment.emotes, ",")
+end
+
+-- Where: its Show in row, Out of combat ticked to start with (anywhere, so
+-- long as you're not fighting or just out of a fight).
 local ROW_KEY = "emote:vision"
 ns.CINE_SHOW_SETTING[ROW_KEY] = "emoteVisionAlways"
-ns.LIST_DEFAULTS.worldShow[ROW_KEY] = true
-ns.LIST_DEFAULTS.cityShow[ROW_KEY] = true
-ns.LIST_DEFAULTS.instanceShow[ROW_KEY] = true
+ns.LIST_DEFAULTS.quietShow[ROW_KEY] = true
+-- ...and its rule, given once (yours kept if you've written one): out of a
+-- fight, in the open world (not cities, instances or battlegrounds).
+local DEFAULT_RULE = "not combat and world"
+local function GiveRule()
+	local db = ns.db
+	if not db then return end
+	-- (Your group wipes started off in the dev copy, then on: on, once.)
+	if not db.emoteVisionWipeOnV1 then
+		db.emoteVisionWipeOnV1 = true
+		db.emoteVisionWipe = true
+	end
+	if db.emoteVisionRuleV1 then return end
+	db.emoteVisionRuleV1 = true
+	db.frameRules = db.frameRules or {}
+	if db.frameRules[ROW_KEY] == nil then db.frameRules[ROW_KEY] = DEFAULT_RULE end
+end
 
 local WIDTH = 300
 local FADE_IN, FADE_OUT = 0.25, 0.4
-local PER_PERSON = 60      -- seconds before the same person can bring up another card
+local AGAIN_SOON = 5       -- with repeats not ignored: the same moment this soon is still one (a doubled event)
 local MAX_AGE = 20         -- a queued moment older than this (a long fight) is dropped
 local MAX_QUEUE = 4
+local SPEECH_GAP = 24      -- the card this far above the box where speech from behind you shows
 local MIN_BUFF = 60        -- a buff shorter than this (a heal over time, a shield) isn't a card
 local GOLD = { 1, 0.82, 0 }
 local BORDER_GOLD = { 0.55, 0.42, 0.16 }
 
--- The emotes the buttons play: their tokens (DoEmote) and names.
-local EMOTE_NAMES = {
-	THANK = "Thank", BOW = "Bow", SALUTE = "Salute", KNEEL = "Kneel", CHEER = "Cheer", WAVE = "Wave",
-	HELLO = "Hello", SMILE = "Smile", HUG = "Hug", APPLAUD = "Applaud", KISS = "Kiss", DANCE = "Dance",
-}
-local BUFF_EMOTES = { "THANK", "BOW", "SALUTE" }
-local RES_EMOTES = { "THANK", "KNEEL", "CHEER" }
-local BACK_EMOTES = { "WAVE", "SMILE", "BOW" }
--- An emote at you, by the words in it (English), for the same one back first.
+-- An emote at you, by the words in it (English), for Same back.
 local EMOTE_WORDS = {
-	{ "wave", "WAVE" }, { "bow", "BOW" }, { "hug", "HUG" }, { "thank", "THANK" }, { "cheer", "CHEER" },
-	{ "greet", "HELLO" }, { "hello", "HELLO" }, { "salute", "SALUTE" }, { "smile", "SMILE" },
+	{ "thank", "THANK" }, { "high", "HIGHFIVE" }, { "wave", "WAVE" }, { "bow", "BOW" }, { "hug", "HUG" },
+	{ "cheer", "CHEER" }, { "greet", "HELLO" }, { "hello", "HELLO" }, { "salute", "SALUTE" }, { "smile", "SMILE" },
 	{ "kiss", "KISS" }, { "dance", "DANCE" }, { "applaud", "APPLAUD" }, { "clap", "APPLAUD" },
+	{ "curtsey", "CURTSEY" }, { "congratulat", "CONGRATULATE" }, { "welcome", "WELCOME" }, { "farewell", "BYE" },
+	{ "goodbye", "BYE" }, { "grin", "GRIN" }, { "wink", "WINK" }, { "laugh", "LAUGH" }, { "giggle", "GIGGLE" },
+	{ "love", "LOVE" }, { "flex", "FLEX" }, { "roar", "ROAR" }, { "apolog", "APOLOGIZE" }, { "kneel", "KNEEL" },
 }
 
 local card, queue, lastFrom = nil, {}, {}
-local showing -- (the moment on the card: { name, unit, guid, class, line, emotes, test })
+local showing -- (the moment on the card: { kind, name, unit, guid, class, line, same, group, test })
 local moving   -- (Move: the card held up to drag)
 local resFrom  -- (who offered to bring you back: { name, at })
+local summonFrom -- (who's summoning you: { name, at })
+local tradeWith  -- (who the trade window's with: { name, guid, class })
+local levels = {} -- (your group's levels, by GUID: who went up)
 local dead = false
 
 local function Plain(value)
@@ -96,12 +296,17 @@ local function Fighting()
 end
 
 -- The unit someone is now, if any (their face, and the emote aimed at them).
+-- (By name: "Name" or, from another realm, "Name-Realm".)
 local function UnitFor(guid, name)
 	if not guid and not name then return nil end
 	local function Is(unit)
 		local each = Plain(UnitGUID(unit))
 		if guid then return each == guid end
-		return each and Plain(UnitName(unit)) == name
+		if not each then return false end
+		local own, realm = UnitName(unit)
+		own, realm = Plain(own), Plain(realm)
+		return own == name or (type(own) == "string" and type(realm) == "string" and realm ~= ""
+			and own .. "-" .. realm == name)
 	end
 	for _, unit in ipairs({ "target", "mouseover", "focus" }) do
 		if Is(unit) then return unit end
@@ -119,87 +324,226 @@ local function UnitFor(guid, name)
 	end
 end
 
--- Who they are to you: "group", "guild", "friend" or "stranger".
-local function Relation(guid, name)
-	if guid and IsGUIDInGroup and ns.Flag(IsGUIDInGroup(guid)) then return "group" end
-	if name and (ns.Flag(UnitInParty(name)) or ns.Flag(UnitInRaid(name))) then return "group" end
-	if guid and IsGuildMember then
-		local ok, yes = pcall(IsGuildMember, guid)
-		if ok and ns.Flag(yes) then return "guild" end
+-- The emotes a moment's buttons play, as its list says (same: the one done
+-- at you, for Same back; none of them twice). own: a list to use instead.
+local function EmotesFor(kind, same, own)
+	local moment = MOMENT[kind]
+	local list, seen = {}, {}
+	for _, token in ipairs(own or ParseEmotes(moment and DB()[moment.key])) do
+		if token == SAME then token = same end
+		if token and not seen[token] then
+			seen[token] = true
+			list[#list + 1] = token
+		end
 	end
-	if guid and C_FriendList and C_FriendList.IsFriend then
-		local ok, yes = pcall(C_FriendList.IsFriend, guid)
-		if ok and ns.Flag(yes) then return "friend" end
-	end
-	if guid and C_BattleNet and C_BattleNet.GetAccountInfoByGUID then
-		local ok, info = pcall(C_BattleNet.GetAccountInfoByGUID, guid)
-		if ok and info then return "friend" end
-	end
-	return "stranger"
+	return list
 end
-local RELATION_KEY = { group = "emoteVisionGroup", guild = "emoteVisionGuild", friend = "emoteVisionFriends",
-	stranger = "emoteVisionStrangers" }
 
 ---------------------------------------------------------------------------
--- The card.
+-- The card, in one of six styles (emoteVisionLook, its Style tab):
+--   classic    a dark panel, its border Visions Style's, buttons in a row
+--   parchment  a letter: cream paper, a brown double edge, the name in
+--              Morpheus, a red seal round the face, the emotes underlined words
+--   bubble     the game's own chat bubble (as speech from behind you), its
+--              tail at their face beside it, the emotes small tabs
+--   subtitle   no panel: outlined words, the emotes gold words in a row
+--   banner     a dark band between two gold lines, the moment's heading
+--              over the name (A KINDNESS...), the emotes in gold boxes
+--   wheel      their face in a dark disc, the emotes round it, as our wheels
+-- layout: "left" (face on the left, words beside it), "center" (no face,
+-- everything centered) or "wheel"; buttons: "panel" (the game's buttons),
+-- "link" (words), "tab" (words on a dark tab) or "box" (words in a frame).
+local LOOKS = {
+	classic = { layout = "left", width = 300, panel = "visions", buttons = "panel", bar = GOLD, close = true },
+	-- (Its words nearly black-brown: lighter browns were hard to read on the paper.)
+	parchment = { layout = "left", width = 290, buttons = "tab", tab = { 0.42, 0.27, 0.1, 0.3 }, close = true,
+		tabEdge = { 0.3, 0.18, 0.06 },
+		panel = { paper = true, edge = { 0.36, 0.22, 0.09 } },
+		name = { 0.14, 0.08, 0.02 }, line = { 0.2, 0.12, 0.04 }, link = { 0.16, 0.08, 0.02 },
+		ring = { 0.6, 0.16, 0.13 }, bar = { 0.42, 0.29, 0.14 }, rule = { 0.62, 0.5, 0.31 },
+		nameFont = "Fonts\\MORPHEUS.TTF", noShadow = true },
+	bubble = { layout = "left", width = 316, panel = "bubble", buttons = "tab", faceOut = 58, barInset = 14,
+		line = { 1, 1, 1 }, link = GOLD, bar = { 0.75, 0.75, 0.75 } },
+	subtitle = { layout = "center", width = 320, panel = "shade", buttons = "tab", tab = { 0, 0, 0, 0.55 },
+		outline = true, name = { 1, 1, 1 }, link = GOLD, bar = { 1, 0.82, 0, 0.5 }, barShare = 0.3 },
+	banner = { layout = "center", width = 280, buttons = "box", heading = true, close = true,
+		panel = { bg = { 0.04, 0.04, 0.05, 0.92 } }, lines = { 0.79, 0.64, 0.29 },
+		name = { 1, 1, 1 }, line = { 0.75, 0.71, 0.6 }, link = { 0.79, 0.64, 0.29 }, bar = { 0.79, 0.64, 0.29 } },
+	wheel = { layout = "wheel", width = 200, buttons = "panel", fit = true, face = 56, outline = true },
+}
+local LOOK_ORDER = { "classic", "parchment", "bubble", "subtitle", "banner", "wheel" }
+local LOOK_NAMES = { classic = "Classic", parchment = "Parchment letter", bubble = "Speech bubble",
+	subtitle = "Subtitle", banner = "Banner", wheel = "Wheel" }
+local LOOK_TIPS = {
+	classic = "A dark panel, its border Visions Style's, the emotes as buttons.",
+	parchment = "A letter on the game's own mail paper, a brown edge, a red seal round their face, the emotes on " ..
+		"brown tabs.",
+	bubble = "The game's own chat bubble, as speech from behind you, pointing at their face.",
+	subtitle = "Outlined words on a dark band that fades out at both ends, as a film's subtitles, the emotes on " ..
+		"dark tabs. Their face isn't shown.",
+	banner = "A dark band between two gold lines, a heading for the moment over the name (A KINDNESS, SAVED...). " ..
+		"Their face isn't shown.",
+	wheel = "Their face in a dark disc, the emotes round it, as Cinematic's wheels.",
+}
+DEFAULTS.emoteVisionLook = "classic"
+-- The banner's heading over the name, by moment.
+local HEADINGS = { Buff = "A KINDNESS", Res = "SAVED", Emote = "A GREETING", Summon = "SUMMONED",
+	Trade = "A FAIR TRADE", Level = "LEVEL UP", Dungeon = "VICTORY", Duel = "THE DUEL", Join = "WELCOME",
+	Leave = "FAREWELL", Joined = "WELL MET", Achievement = "WELL DONE", Boss = "VICTORY", Wipe = "NEXT TIME",
+	YouLevel = "LEVEL UP" }
+local BUTTON_W, BUTTON_H, BUTTON_GAP, ROW_GAP = 84, 24, 8, 6
+local WHEEL_DISC, WHEEL_REACH = 170, 74 -- the wheel's disc, and how far out its emotes sit (on its edge)
 
 local ROMAN = not ({ ruRU = true, koKR = true, zhCN = true, zhTW = true })[GetLocale and GetLocale() or ""]
-local function StyleText(text, look)
+local function StyleText(text, look, outline)
 	text.base = text.base or { text:GetFont() }
 	local file, size, flags = text.base[1], text.base[2], text.base[3]
 	if not (file and size) then return end
 	if ROMAN then file = ns.StyleFontFile(look.emoteFont) or file end
-	text:SetFont(file, size * (tonumber(look.emoteTextSize) or 1) * ns.VisionTextScale(),
-		ns.OutlinedFlags(flags, look.emoteOutline))
+	flags = ns.OutlinedFlags(flags, look.emoteOutline)
+	-- (No panel behind it: an outline always, to read over the world.)
+	if outline and not tostring(flags or ""):find("OUTLINE") then flags = "OUTLINE" end
+	text:SetFont(file, size * (tonumber(look.emoteTextSize) or 1) * ns.VisionTextScale(), flags)
 	ns.SetTextShadow(text, look.emoteShadow)
+end
+local function Color(text, color)
+	if color then text:SetTextColor(color[1], color[2], color[3], 1) end
 end
 
 local Hide, Next
+
+local function LookNow()
+	return LOOKS[DB().emoteVisionLook] or LOOKS.classic
+end
 
 local function Place()
 	local db = DB()
 	local scale = tonumber(db.emoteVisionScale) or 1
 	card:SetScale(scale)
 	card:ClearAllPoints()
-	card:SetPoint("BOTTOM", UIParent, "BOTTOM", (tonumber(db.emoteVisionX) or 0) / scale,
-		(tonumber(db.emoteVisionY) or 260) / scale)
-end
-
-local function Restyle()
-	local look = Look()
-	for _, text in ipairs({ card.name, card.line }) do StyleText(text, look) end
-	for _, button in ipairs(card.buttons) do StyleText(button:GetFontString(), look) end
-	local kind, size, r, g, b = ns.StyleBorder(look, "emoteBorder", BORDER_GOLD)
-	if kind == "line" then
-		card:SetBackdrop({ bgFile = "Interface\\Buttons\\WHITE8X8", edgeFile = "Interface\\Buttons\\WHITE8X8",
-			edgeSize = size })
-		card:SetBackdropBorderColor(r, g, b, 1)
-	elseif kind == "game" then
-		card:SetBackdrop({ bgFile = "Interface\\Buttons\\WHITE8X8",
-			edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border", edgeSize = 14,
-			insets = { left = 3, right = 3, top = 3, bottom = 3 } })
-		card:SetBackdropBorderColor(BORDER_GOLD[1], BORDER_GOLD[2], BORDER_GOLD[3], 1)
-	else
-		card:SetBackdrop({ bgFile = "Interface\\Buttons\\WHITE8X8" })
+	-- (To start with: its left edge on theirs, a little above their box.)
+	if db.emoteVisionSpot ~= "own" and ns.SpeechBehindSpot then
+		local left, bottom, _, height = ns.SpeechBehindSpot()
+		if type(left) == "number" and type(bottom) == "number" then
+			-- (Whole units: a card between pixels draws its thin edges broken.)
+			card:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", math.floor(left / scale + 0.5),
+				math.floor((bottom + height + SPEECH_GAP) / scale + 0.5))
+			return
+		end
 	end
-	card:SetBackdropColor(0.04, 0.04, 0.05, 0.9)
+	card:SetPoint("BOTTOM", UIParent, "BOTTOM", math.floor((tonumber(db.emoteVisionX) or 0) / scale + 0.5),
+		math.floor((tonumber(db.emoteVisionY) or 260) / scale + 0.5))
 end
 
--- Plays emote at the one on the card (a test: says so in chat instead).
+-- The panel behind the words, as the style says (classic: Visions Style's
+-- border).
+local function Panel(style)
+	local panel = card.panel
+	panel:SetShown(style.panel ~= nil and style.panel ~= "bubble" and style.panel ~= "shade")
+	card.bubble:SetShown(style.panel == "bubble")
+	if panel.wash then panel.wash:SetShown(type(style.panel) == "table" and style.panel.paper == true) end
+	for _, half in ipairs(card.shade) do half:SetShown(style.panel == "shade") end
+	if style.panel == "visions" then
+		local kind, size, r, g, b = ns.StyleBorder(Look(), "emoteBorder", BORDER_GOLD)
+		if kind == "line" then
+			panel:SetBackdrop({ bgFile = "Interface\\Buttons\\WHITE8X8", edgeFile = "Interface\\Buttons\\WHITE8X8",
+				edgeSize = size })
+			panel:SetBackdropBorderColor(r, g, b, 1)
+		elseif kind == "game" then
+			panel:SetBackdrop({ bgFile = "Interface\\Buttons\\WHITE8X8",
+				edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border", edgeSize = 14,
+				insets = { left = 3, right = 3, top = 3, bottom = 3 } })
+			panel:SetBackdropBorderColor(BORDER_GOLD[1], BORDER_GOLD[2], BORDER_GOLD[3], 1)
+		else
+			panel:SetBackdrop({ bgFile = "Interface\\Buttons\\WHITE8X8" })
+		end
+		panel:SetBackdropColor(0.04, 0.04, 0.05, 0.9)
+	elseif type(style.panel) == "table" and style.panel.paper then
+		-- (The letter's: the game's own mail paper, the rounded tooltip edge in brown.)
+		panel:SetBackdrop({ bgFile = "Interface\\Stationery\\StationeryTest1",
+			edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border", edgeSize = 16,
+			insets = { left = 4, right = 4, top = 4, bottom = 4 } })
+		panel:SetBackdropColor(1, 1, 1, 1)
+		local edge = style.panel.edge
+		panel:SetBackdropBorderColor(edge[1], edge[2], edge[3], 1)
+		-- (A cream wash over the paper, evening out its darker patches so the
+		-- words read.)
+		if not panel.wash then
+			panel.wash = panel:CreateTexture(nil, "BORDER")
+			panel.wash:SetPoint("TOPLEFT", 4, -4)
+			panel.wash:SetPoint("BOTTOMRIGHT", -4, 4)
+		end
+		panel.wash:SetColorTexture(0.96, 0.91, 0.79, 0.55)
+	elseif type(style.panel) == "table" then
+		local own = style.panel
+		if own.edge then
+			panel:SetBackdrop({ bgFile = "Interface\\Buttons\\WHITE8X8", edgeFile = "Interface\\Buttons\\WHITE8X8",
+				edgeSize = own.edgeSize or 1 })
+			panel:SetBackdropBorderColor(own.edge[1], own.edge[2], own.edge[3], 1)
+		else
+			panel:SetBackdrop({ bgFile = "Interface\\Buttons\\WHITE8X8" })
+		end
+		panel:SetBackdropColor(own.bg[1], own.bg[2], own.bg[3], own.bg[4] or 1)
+	end
+	for _, line in ipairs({ card.lineTop, card.lineBottom }) do
+		line:SetShown(style.lines ~= nil)
+		if style.lines then line:SetColorTexture(style.lines[1], style.lines[2], style.lines[3], 1) end
+	end
+	card.rule:SetShown(style.rule ~= nil)
+	if style.rule then card.rule:SetColorTexture(style.rule[1], style.rule[2], style.rule[3], 0.45) end
+	card.disc:SetShown(style.layout == "wheel")
+	card.discEdge:SetShown(style.layout == "wheel")
+end
+
+-- Plays emote at the one on the card ("none": at no one, for the group's
+-- cards; a test: says so in chat instead).
 local function Answer(token)
 	local moment = showing
 	if not moment then return end
 	if moment.test then
-		ns.Print(L["Emote Vision test: you'd /%s %s."]:format(L[EMOTE_NAMES[token]]:lower(), moment.name))
+		ns.Print(L["Emote Vision test: you'd %s %s."]:format(Command(token), moment.name))
+	elseif moment.group then
+		pcall(DoEmote, token, "none")
 	else
-		local unit = UnitFor(moment.guid, moment.name) or moment.name
+		local name = moment.fullName or moment.name
+		local unit = UnitFor(moment.guid, name) or name
 		pcall(DoEmote, token, unit)
 	end
 	Hide()
 end
 
+-- A word button (the styles but Classic's): its words, a tab or frame behind
+-- them if the style has one, a line under them for the letter's.
+local function WordButton()
+	local button = CreateFrame("Button", nil, card.front)
+	button.text = button:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+	button.text:SetPoint("CENTER")
+	button.back = button:CreateTexture(nil, "BACKGROUND")
+	button.back:SetAllPoints()
+	button.edges = {}
+	for i, side in ipairs({ { "TOPLEFT", "TOPRIGHT" }, { "BOTTOMLEFT", "BOTTOMRIGHT" }, { "TOPLEFT", "BOTTOMLEFT" },
+		{ "TOPRIGHT", "BOTTOMRIGHT" } }) do
+		local edge = button:CreateTexture(nil, "BORDER")
+		edge:SetPoint(side[1])
+		edge:SetPoint(side[2])
+		-- (At least one real pixel at any UI scale: a 1-unit line can round to
+		-- nothing, leaving the frame broken.)
+		local set = PixelUtil and (i <= 2 and PixelUtil.SetHeight or PixelUtil.SetWidth)
+		if set then set(edge, 1, 1) elseif i <= 2 then edge:SetHeight(1) else edge:SetWidth(1) end
+		button.edges[i] = edge
+	end
+	button.under = button:CreateTexture(nil, "ARTWORK")
+	button.under:SetHeight(1)
+	button.under:SetPoint("TOPLEFT", button.text, "BOTTOMLEFT", 0, -1)
+	button.under:SetPoint("TOPRIGHT", button.text, "BOTTOMRIGHT", 0, -1)
+	button:SetScript("OnEnter", function(self) self.text:SetAlpha(0.7) end)
+	button:SetScript("OnLeave", function(self) self.text:SetAlpha(1) end)
+	button:SetScript("OnClick", function(self) Answer(self.token) end)
+	return button
+end
+
 local function Create()
-	card = CreateFrame("Frame", "CinematicEmoteVision", UIParent, "BackdropTemplate")
+	card = CreateFrame("Frame", "CinematicEmoteVision", UIParent)
 	card:SetSize(WIDTH, 96)
 	card:SetFrameStrata("DIALOG")
 	card:SetClampedToScreen(true)
@@ -208,18 +552,70 @@ local function Create()
 	card:RegisterForDrag("LeftButton")
 	card:Hide()
 
-	card.portrait = card:CreateTexture(nil, "ARTWORK")
+	-- (What's behind the words: a panel, the game's chat bubble, a banner's
+	-- lines, a letter's rule, a wheel's disc. Each style shows its own.)
+	card.panel = CreateFrame("Frame", nil, card, "BackdropTemplate")
+	card.panel:SetFrameLevel(card:GetFrameLevel() + 1)
+	card.bubble = ns.MakeGameBubble and ns.MakeGameBubble(card) or CreateFrame("Frame", nil, card)
+	card.bubble:SetFrameLevel(card:GetFrameLevel() + 1)
+	-- (Its tail turned to point left, at the face: its texture's corners moved
+	-- round a quarter turn and its width and height swapped, as Speech.lua turns
+	-- its tails. SetRotation turns it inside its own box, squashing it.)
+	local tail = card.bubble.tail
+	if tail then
+		local c = { tail:GetTexCoord() } -- upper left, lower left, upper right, lower right: x, y each
+		if #c >= 8 then
+			-- (A quarter turn clockwise: its bottom, the tip, becomes its left side.)
+			tail:SetTexCoord(c[3], c[4], c[7], c[8], c[1], c[2], c[5], c[6])
+			local w, h = tail:GetSize()
+			if w and h and w > 0 and h > 0 then tail:SetSize(h, w) end
+		end
+	end
+	-- (Everything else on a frame above them: a backdrop or the bubble's art,
+	-- frames of their own, would cover what's drawn on the card itself.)
+	card.front = CreateFrame("Frame", nil, card)
+	card.front:SetAllPoints()
+	card.front:SetFrameLevel(card:GetFrameLevel() + 5)
+	local front = card.front
+	card.lineTop = front:CreateTexture(nil, "ARTWORK")
+	card.lineBottom = front:CreateTexture(nil, "ARTWORK")
+	card.rule = front:CreateTexture(nil, "ARTWORK")
+	card.rule:SetHeight(1)
+	-- (The subtitle's: a dark band behind the words, fading out to both ends,
+	-- as a film's subtitles have. Flat where the client can't fade a texture.)
+	card.shade = {}
+	for i, side in ipairs({ "LEFT", "RIGHT" }) do
+		local half = card:CreateTexture(nil, "BACKGROUND")
+		half:SetColorTexture(1, 1, 1, 1)
+		half:SetPoint("TOP")
+		half:SetPoint("BOTTOM")
+		half:SetPoint(side)
+		half:SetPoint(i == 1 and "RIGHT" or "LEFT", card, "CENTER")
+		local clear, dark = 0, 0.6
+		local fromA, toA = i == 1 and clear or dark, i == 1 and dark or clear
+		if not (CreateColor and pcall(half.SetGradient, half, "HORIZONTAL", CreateColor(0, 0, 0, fromA),
+			CreateColor(0, 0, 0, toA))) then
+			half:SetColorTexture(0, 0, 0, 0.35)
+		end
+		half:Hide()
+		card.shade[i] = half
+	end
+	card.discEdge = card:CreateTexture(nil, "BACKGROUND", nil, -1)
+	card.discEdge:SetColorTexture(0.79, 0.64, 0.29, 0.7) -- (a whole circle under the disc: only its rim shows)
+	card.disc = card:CreateTexture(nil, "BACKGROUND")
+	card.disc:SetColorTexture(0.05, 0.05, 0.06, 0.9) -- (dark enough that the gold under it doesn't tint it)
+
+	card.portrait = front:CreateTexture(nil, "ARTWORK")
 	card.portrait:SetSize(40, 40)
-	card.portrait:SetPoint("TOPLEFT", 12, -10)
 	-- (A ring round it in their class's color: a circle a little bigger, under it.)
-	card.ring = card:CreateTexture(nil, "BORDER")
+	card.ring = front:CreateTexture(nil, "BORDER")
 	card.ring:SetSize(44, 44)
 	card.ring:SetPoint("CENTER", card.portrait, "CENTER")
 	card.ring:SetColorTexture(1, 1, 1, 1)
-	-- (Both round: mask textures, not SetMask, which forbids the icons' tex coords.)
+	-- (All round: mask textures, not SetMask, which forbids the icons' tex coords.)
 	if card.CreateMaskTexture then
-		for _, texture in ipairs({ card.portrait, card.ring }) do
-			local mask = card:CreateMaskTexture()
+		for _, texture in ipairs({ card.portrait, card.ring, card.disc, card.discEdge }) do
+			local mask = texture:GetParent():CreateMaskTexture()
 			mask:SetAllPoints(texture)
 			mask:SetTexture("Interface\\CharacterFrame\\TempPortraitAlphaMask", "CLAMPTOBLACKADDITIONAL",
 				"CLAMPTOBLACKADDITIONAL")
@@ -227,30 +623,26 @@ local function Create()
 		end
 	end
 
-	card.name = card:CreateFontString(nil, "OVERLAY", "GameFontHighlightLarge")
-	card.name:SetJustifyH("LEFT")
+	card.heading = front:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+	card.name = front:CreateFontString(nil, "OVERLAY", "GameFontHighlightLarge")
 	card.name:SetWordWrap(false)
-	card.line = card:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-	card.line:SetJustifyH("LEFT")
-	card.line:SetTextColor(GOLD[1], GOLD[2], GOLD[3])
+	card.line = front:CreateFontString(nil, "OVERLAY", "GameFontNormal")
 
-	card.close = CreateFrame("Button", nil, card, "UIPanelCloseButton")
+	card.close = CreateFrame("Button", nil, front, "UIPanelCloseButton")
 	card.close:SetScale(0.7)
-	card.close:SetPoint("TOPRIGHT", 2, 2)
 	card.close:SetScript("OnClick", function() Hide() end)
 
-	card.buttons = {}
-	for i = 1, 3 do
-		local button = ns.PanelButton(card)
-		button:SetSize(84, 24)
+	card.buttons, card.words = {}, {}
+	for i = 1, MAX_EMOTES do
+		local button = ns.PanelButton(front)
+		button:SetSize(BUTTON_W, BUTTON_H)
 		button:SetScript("OnClick", function(self) Answer(self.token) end)
 		card.buttons[i] = button
+		card.words[i] = WordButton()
 	end
 
-	card.bar = card:CreateTexture(nil, "ARTWORK")
-	card.bar:SetColorTexture(GOLD[1], GOLD[2], GOLD[3], 0.8)
+	card.bar = front:CreateTexture(nil, "ARTWORK")
 	card.bar:SetHeight(2)
-	card.bar:SetPoint("BOTTOMLEFT", 8, 5)
 
 	-- (Moving it: dragged where you want it, kept from the bottom middle.)
 	card:SetScript("OnDragStart", function(self) if moving then self:StartMoving() end end)
@@ -263,6 +655,7 @@ local function Create()
 			local db = ns.GetDB()
 			db.emoteVisionX = math.floor((left + right) / 2 * scale - UIParent:GetWidth() / 2 + 0.5)
 			db.emoteVisionY = math.floor(bottom * scale + 0.5)
+			db.emoteVisionSpot = "own"
 		end
 		Place()
 		if ns.RefreshOptions then pcall(ns.RefreshOptions) end
@@ -287,7 +680,7 @@ local function Create()
 			return
 		end
 		self:SetAlpha(math.min(1, age / FADE_IN))
-		self.bar:SetWidth(math.max(1, (WIDTH - 16) * (1 - math.min(1, age / hold))))
+		self.bar:SetWidth(math.max(1, (self.barWidth or 100) * (1 - math.min(1, age / hold))))
 		if age >= hold then self.leaving = 0 end
 	end)
 	card:SetScript("OnHide", function()
@@ -297,72 +690,262 @@ local function Create()
 
 	if ns.WhyRegister then
 		ns.WhyRegister(card, L["Emote Vision"], "Emote Vision", function()
-			return { showing and showing.test and L["its test"] or L["someone did something for you (or at you)"] }
+			return { showing and (showing.test or showing.tried) and L["its test"]
+				or L["someone did something for you (or at you)"] }
 		end)
 	end
 end
 
--- The card for moment: its face, name, line and buttons, laid out to fit.
+-- The face: their portrait when in sight, else their class's icon, else the
+-- moment's own icon.
+local function Face(moment)
+	local unit = moment.unit and Plain(UnitExists(moment.unit)) and moment.unit
+	if unit then
+		SetPortraitTexture(card.portrait, unit)
+		card.portrait:SetTexCoord(0, 1, 0, 1)
+	elseif moment.class and CLASS_ICON_TCOORDS and CLASS_ICON_TCOORDS[moment.class] then
+		card.portrait:SetTexture("Interface\\GLUES\\CHARACTERCREATE\\UI-CHARACTERCREATE-CLASSES")
+		card.portrait:SetTexCoord(unpack(CLASS_ICON_TCOORDS[moment.class]))
+	else
+		card.portrait:SetTexture(moment.icon or "Interface\\Icons\\INV_Misc_QuestionMark")
+		card.portrait:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+	end
+end
+
+-- The emotes' buttons as the style has them, each with its token and width.
+local function EmoteButtons(style, emotes, look)
+	local list = {}
+	for i = 1, MAX_EMOTES do
+		local panelButton, word = card.buttons[i], card.words[i]
+		panelButton:Hide()
+		word:Hide()
+		local token = emotes[i]
+		if token then
+			local button
+			if style.buttons == "panel" then
+				button = panelButton
+				StyleText(button:GetFontString(), look)
+				button:SetText(EmoteName(token))
+				-- (fit: as wide as its name, the wheel's, not all the same width)
+				button.width = style.fit and math.max(56, math.ceil(button:GetFontString():GetStringWidth()) + 22)
+					or BUTTON_W
+				button:SetWidth(button.width)
+			else
+				button = word
+				StyleText(button.text, look, style.outline)
+				button.text:SetText(EmoteName(token))
+				Color(button.text, style.link)
+				local tab, box = style.buttons == "tab", style.buttons == "box"
+				button.back:SetShown(tab)
+				local back = style.tab or { 0, 0, 0, 0.45 }
+				if tab then button.back:SetColorTexture(back[1], back[2], back[3], back[4]) end
+				-- (A frame: the banner's boxes, or a tab's own edge, the letter's.)
+				local color = style.tabEdge or style.link or GOLD
+				for _, edge in ipairs(button.edges) do
+					edge:SetShown(box or style.tabEdge ~= nil)
+					edge:SetColorTexture(color[1], color[2], color[3], 0.9)
+				end
+				button.under:SetShown(style.underline == true)
+				button.under:SetColorTexture(color[1], color[2], color[3], 0.8)
+				button.width = math.ceil(button.text:GetStringWidth()) + ((tab or box) and 22 or 8)
+				button:SetSize(button.width, BUTTON_H - 2)
+			end
+			button.token = token
+			list[#list + 1] = button
+		end
+	end
+	return list
+end
+
+-- buttons in rows of three, each row centered on middle; gives the height.
+local function Rows(buttons, middle, top, room)
+	-- (Rows of up to three, fewer where long names wouldn't fit in room.)
+	local lines, line, used = {}, {}, 0
+	for _, button in ipairs(buttons) do
+		local need = button.width + (#line > 0 and BUTTON_GAP or 0)
+		if #line > 0 and (#line == 3 or used + need > room) then
+			lines[#lines + 1], line, used = line, {}, 0
+			need = button.width
+		end
+		line[#line + 1] = button
+		used = used + need
+	end
+	if #line > 0 then lines[#lines + 1] = line end
+	for row, each in ipairs(lines) do
+		local total = 0
+		for _, button in ipairs(each) do total = total + button.width + BUTTON_GAP end
+		local x = math.floor(middle - (total - BUTTON_GAP) / 2 + 0.5) -- (whole pixels: crisp edges)
+		for _, button in ipairs(each) do
+			button:ClearAllPoints()
+			button:SetPoint("TOPLEFT", card, "TOPLEFT", x, -top - (row - 1) * (BUTTON_H + ROW_GAP))
+			button:Show()
+			x = x + button.width + BUTTON_GAP
+		end
+	end
+	return #lines * BUTTON_H + (#lines - 1) * ROW_GAP
+end
+
+-- The card for moment: its face, name, line and buttons (its emotes as its
+-- list says now), in the style picked, laid out to fit. False if it has no
+-- buttons to show.
 local function Show(moment)
+	local emotes = EmotesFor(moment.kind, moment.same, moment.emotes)
+	if #emotes == 0 then return false end
 	if not card then Create() end
 	showing = moment
-	Restyle()
+	local style, look, db = LookNow(), Look(), DB()
+	Panel(style)
 	Place()
-	local db = DB()
-	local face = db.emoteVisionPortrait
+
+	-- Words: Visions Style's look, then the style's own colors (and font).
+	for _, text in ipairs({ card.name, card.line, card.heading }) do StyleText(text, look, style.outline) end
+	if style.nameFont and ROMAN then
+		local _, size, flags = card.name:GetFont()
+		card.name:SetFont(style.nameFont, (size or 16) + 2, flags)
+	end
+	if style.noShadow then
+		for _, text in ipairs({ card.name, card.line }) do text:SetShadowOffset(0, 0) end
+	end
+	card.name:SetText(moment.name)
+	card.line:SetText(moment.line)
+	local class = moment.class and RAID_CLASS_COLORS and RAID_CLASS_COLORS[moment.class]
+	if style.name then Color(card.name, style.name)
+	elseif class then card.name:SetTextColor(class.r, class.g, class.b, 1)
+	else Color(card.name, { 1, 1, 1 }) end
+	Color(card.line, style.line or GOLD)
+	local ring = style.ring or (class and { class.r, class.g, class.b }) or GOLD
+	card.ring:SetVertexColor(ring[1], ring[2], ring[3], 1)
+	card.heading:SetShown(style.heading == true)
+	if style.heading then
+		card.heading:SetText(L[HEADINGS[moment.kind] or "A KINDNESS"])
+		Color(card.heading, style.lines or GOLD)
+	end
+	local face = db.emoteVisionPortrait and style.layout ~= "center"
+	-- (Its size: the style's, the wheel's bigger in its middle.)
+	local faceSize = style.face or 40
+	card.portrait:SetSize(faceSize, faceSize)
+	card.ring:SetSize(faceSize + 4, faceSize + 4)
 	card.portrait:SetShown(face)
 	card.ring:SetShown(face)
-	if face then
-		local unit = moment.unit and Plain(UnitExists(moment.unit)) and moment.unit
-		if unit then
-			SetPortraitTexture(card.portrait, unit)
-			card.portrait:SetTexCoord(0, 1, 0, 1)
-		elseif moment.class and CLASS_ICON_TCOORDS and CLASS_ICON_TCOORDS[moment.class] then
-			card.portrait:SetTexture("Interface\\GLUES\\CHARACTERCREATE\\UI-CHARACTERCREATE-CLASSES")
-			card.portrait:SetTexCoord(unpack(CLASS_ICON_TCOORDS[moment.class]))
-		else
-			card.portrait:SetTexture(moment.icon or "Interface\\Icons\\INV_Misc_QuestionMark")
-			card.portrait:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-		end
-	end
-	local left = face and 62 or 12
-	card.name:ClearAllPoints()
-	card.name:SetPoint("TOPLEFT", left, -12)
-	card.name:SetPoint("RIGHT", -24, 0)
-	card.line:ClearAllPoints()
-	card.line:SetPoint("TOPLEFT", card.name, "BOTTOMLEFT", 0, -3)
-	card.line:SetPoint("RIGHT", -12, 0)
-	card.name:SetText(moment.name)
-	local color = moment.class and RAID_CLASS_COLORS and RAID_CLASS_COLORS[moment.class]
-	if color then
-		card.name:SetTextColor(color.r, color.g, color.b)
-		card.ring:SetVertexColor(color.r, color.g, color.b, 1)
-	else
-		card.name:SetTextColor(1, 1, 1)
-		card.ring:SetVertexColor(GOLD[1], GOLD[2], GOLD[3], 1)
-	end
-	card.line:SetText(moment.line)
+	if face then Face(moment) end
+	card.close:SetShown(style.close == true)
+	local buttons = EmoteButtons(style, emotes, look)
+	local width = style.width
+	local height
+	for _, text in ipairs({ card.name, card.line, card.heading }) do text:ClearAllPoints() end
+	card.portrait:ClearAllPoints()
+	card.bar:ClearAllPoints()
+	card.bar:SetShown(style.bar ~= nil)
+	if style.bar then card.bar:SetColorTexture(style.bar[1], style.bar[2], style.bar[3], 0.8) end
 
-	-- Its buttons in a row under the words, centered.
-	local count = #moment.emotes
-	local gap = 8
-	local width = 84
-	local total = count * width + (count - 1) * gap
-	local top = math.max(face and 56 or 0, 14 + card.name:GetStringHeight() + 3 + card.line:GetStringHeight()) + 8
-	for i, button in ipairs(card.buttons) do
-		local token = moment.emotes[i]
-		button:SetShown(token ~= nil)
-		if token then
-			button.token = token
-			button:SetText(L[EMOTE_NAMES[token]])
-			button:ClearAllPoints()
-			button:SetPoint("TOPLEFT", (WIDTH - total) / 2 + (i - 1) * (width + gap), -top)
+	if style.layout == "left" then
+		-- Face on the left (outside the panel for the bubble), the words beside it.
+		local out = style.faceOut or 0
+		local inside = out > 0 and out or 0 -- (where the panel starts)
+		if face then card.portrait:SetPoint("TOPLEFT", card, "TOPLEFT", out > 0 and 4 or 12, -10) end
+		local left = inside + ((face and out == 0) and 62 or 14)
+		card.name:SetJustifyH("LEFT")
+		card.line:SetJustifyH("LEFT")
+		card.name:SetPoint("TOPLEFT", card, "TOPLEFT", left, -12)
+		card.name:SetPoint("RIGHT", card, "RIGHT", -24, 0)
+		card.line:SetPoint("TOPLEFT", card.name, "BOTTOMLEFT", 0, -3)
+		card.line:SetPoint("RIGHT", card, "RIGHT", -12, 0)
+		local top = 14 + card.name:GetStringHeight() + 3 + card.line:GetStringHeight()
+		if face and out == 0 then top = math.max(top, 56) end
+		top = top + 8
+		if style.rule then
+			card.rule:ClearAllPoints()
+			card.rule:SetPoint("TOPLEFT", card, "TOPLEFT", inside + 14, -top + 2)
+			card.rule:SetPoint("TOPRIGHT", card, "TOPRIGHT", -14, -top + 2)
+			top = top + 6
 		end
+		top = top + Rows(buttons, inside + (width - inside) / 2, top, width - inside - 24 - (style.barInset or 0) * 2)
+		local barIn = style.barInset or 0 -- (the bubble's: clear of its rounded edge)
+		height = top + 14 + barIn / 2
+		card.panel:ClearAllPoints()
+		card.panel:SetPoint("TOPLEFT", card, "TOPLEFT", inside, 0)
+		card.panel:SetPoint("BOTTOMRIGHT")
+		card.bubble:ClearAllPoints()
+		card.bubble:SetPoint("TOPLEFT", card, "TOPLEFT", inside, 0)
+		card.bubble:SetPoint("BOTTOMRIGHT")
+		if card.bubble.tail then
+			card.bubble.tail:ClearAllPoints()
+			card.bubble.tail:SetPoint("RIGHT", card.bubble, "LEFT", card.bubble.tailInto or 3, 0)
+			card.bubble.tail:SetPoint("TOP", card, "TOP", 0, -24)
+		end
+		card.barWidth = width - inside - 16 - barIn * 2
+		card.bar:SetPoint("BOTTOMLEFT", card, "BOTTOMLEFT", inside + 8 + barIn, 5 + barIn / 2)
+		card.close:ClearAllPoints()
+		card.close:SetPoint("TOPRIGHT", card, "TOPRIGHT", 2, 2)
+	elseif style.layout == "center" then
+		-- No face: a heading (the banner's), the name and line, the buttons,
+		-- all centered.
+		local top = 10
+		card.heading:SetJustifyH("CENTER")
+		if style.heading then
+			card.heading:SetPoint("TOP", card, "TOP", 0, -top)
+			top = top + card.heading:GetStringHeight() + 3
+		end
+		card.name:SetJustifyH("CENTER")
+		card.line:SetJustifyH("CENTER")
+		card.name:SetPoint("TOP", card, "TOP", 0, -top)
+		card.name:SetWidth(width - 40)
+		top = top + card.name:GetStringHeight() + 3
+		card.line:SetPoint("TOP", card, "TOP", 0, -top)
+		card.line:SetWidth(width - 24)
+		top = top + card.line:GetStringHeight() + 10
+		top = top + Rows(buttons, width / 2, top, width - 24)
+		height = top + 14
+		card.panel:ClearAllPoints()
+		card.panel:SetAllPoints()
+		card.lineTop:ClearAllPoints()
+		card.lineTop:SetPoint("TOPLEFT")
+		card.lineTop:SetPoint("TOPRIGHT")
+		card.lineTop:SetHeight(2)
+		card.lineBottom:ClearAllPoints()
+		card.lineBottom:SetPoint("BOTTOMLEFT")
+		card.lineBottom:SetPoint("BOTTOMRIGHT")
+		card.lineBottom:SetHeight(2)
+		card.barWidth = width * (style.barShare or 1) - (style.barShare and 0 or 16)
+		card.bar:SetPoint("BOTTOMLEFT", card, "BOTTOMLEFT", (width - card.barWidth) / 2, 6)
+		card.close:ClearAllPoints()
+		card.close:SetPoint("TOPRIGHT", card, "TOPRIGHT", 2, 2)
+	else
+		-- The wheel: a disc, the face in its middle and the name under it, the
+		-- emotes round it (the first at the top), the line under the disc.
+		local middle = width / 2
+		card.discEdge:ClearAllPoints()
+		card.discEdge:SetSize(WHEEL_DISC + 4, WHEEL_DISC + 4)
+		card.discEdge:SetPoint("CENTER", card, "TOPLEFT", middle, -middle)
+		card.disc:ClearAllPoints()
+		card.disc:SetSize(WHEEL_DISC, WHEEL_DISC)
+		card.disc:SetPoint("CENTER", card, "TOPLEFT", middle, -middle)
+		if face then
+			card.portrait:SetPoint("CENTER", card, "TOPLEFT", middle, -middle)
+		end
+		-- (The name under the disc, whole: inside it a long one was cut short.)
+		card.name:SetJustifyH("CENTER")
+		card.name:SetWidth(width + 60)
+		card.name:SetPoint("TOP", card, "TOPLEFT", middle, -width - 2)
+		for i, button in ipairs(buttons) do
+			local angle = math.pi / 2 - (i - 1) * 2 * math.pi / #buttons
+			button:ClearAllPoints()
+			button:SetPoint("CENTER", card, "TOPLEFT", middle + math.cos(angle) * WHEEL_REACH,
+				-middle + math.sin(angle) * WHEEL_REACH)
+			button:Show()
+		end
+		card.line:SetJustifyH("CENTER")
+		card.line:SetWidth(width + 60)
+		card.line:SetPoint("TOP", card.name, "BOTTOM", 0, -2)
+		height = width + 8 + card.name:GetStringHeight() + card.line:GetStringHeight()
 	end
-	card:SetHeight(top + 24 + 14)
+	-- (Whole pixels: the bubble's and the letter's tiled edges went crooked, seams
+	-- showing, on a size from the words' heights.)
+	card:SetSize(math.floor(width + 0.5), math.floor(height + 0.5))
 	card.age, card.leaving = 0, nil
 	card:SetAlpha(0)
 	card:Show()
+	return true
 end
 
 function Hide()
@@ -370,43 +953,61 @@ function Hide()
 	if card and card:IsShown() and not card.leaving then card.leaving = 0 end
 end
 
--- Whether it shows here now (its page, its Show in row).
+-- Whether it shows here now (its page, its Show in row, standing still if
+-- it says so).
 local function Allowed()
 	if not ns.Setting("emoteVision") then return false end
+	if Fighting() then return false end
+	if DB().emoteVisionStill and ns.playerMoving then return false end
 	local ok, here = pcall(ns.RowOnNow, ROW_KEY, nil, true)
 	return ok and here and true or false
 end
 
--- The next queued moment, once out of a fight (the old ones dropped).
+-- The next queued moment once it can show (out of a fight and the calm
+-- after it, standing still...); the old ones dropped. Asks again each
+-- second while any wait.
+local retry
 function Next()
 	if card and card:IsShown() then return end
-	if Fighting() then return end
 	local now = GetTime()
-	while queue[1] do
+	while queue[1] and now - queue[1].at > MAX_AGE do table.remove(queue, 1) end
+	while queue[1] and Allowed() do
 		local moment = table.remove(queue, 1)
-		if now - moment.at <= MAX_AGE and Allowed() then
-			Show(moment)
+		if Show(moment) then
+			-- (Repeats count from a card shown: one dropped unseen doesn't hold the next back.)
+			if moment.key then lastFrom[moment.key] = GetTime() end
 			return
 		end
 	end
+	if queue[1] and not retry then
+		retry = C_Timer.NewTimer(1, function()
+			retry = nil
+			Next()
+		end)
+	end
 end
 
--- A moment worth a card: who, what (its line) and the emotes to answer with.
-local function Fire(moment, anyone)
+-- A moment worth a card: its kind (MOMENTS' id), who, what (its line).
+-- The same person's same moment again within the page's minutes of its card
+-- showing is ignored (with that off, only a doubled event's), and so is one
+-- already waiting in the queue.
+local function Fire(moment)
 	if not ns.Setting("emoteVision") then return end
 	local db = DB()
+	local kind = MOMENT[moment.kind]
+	if not (kind and db[kind.on]) then return end
 	local who = moment.guid or moment.name
 	if not who then return end
-	if not anyone and not db[RELATION_KEY[Relation(moment.guid, moment.name)]] then return end
+	local key = moment.kind .. ":" .. who
 	local now = GetTime()
-	if lastFrom[who] and now - lastFrom[who] < PER_PERSON then return end
-	lastFrom[who] = now
-	moment.at = now
-	if not Fighting() and not (card and card:IsShown()) then
-		if Allowed() then Show(moment) end
-		return
+	local wait = db.emoteVisionRepeats and (tonumber(db.emoteVisionRepeatMins) or 10) * 60 or AGAIN_SOON
+	if lastFrom[key] and now - lastFrom[key] < wait then return end
+	for _, each in ipairs(queue) do
+		if each.key == key then return end
 	end
+	moment.key, moment.at = key, now
 	if #queue < MAX_QUEUE then queue[#queue + 1] = moment end
+	Next()
 end
 
 -- Their class (for the name's color and the icon), from their GUID.
@@ -426,12 +1027,24 @@ local function Short(name)
 	return name and (name:match("^([^%-]+)") or name)
 end
 
+-- Someone by name (and GUID, if known) as a moment of kind: their unit,
+-- class and line.
+local function FireFor(kind, name, guid, line, extra)
+	local unit = UnitFor(guid, name)
+	guid = guid or (unit and Plain(UnitGUID(unit)))
+	local moment = extra or {}
+	moment.kind, moment.name, moment.unit, moment.guid = kind, Short(name), unit, guid
+	moment.fullName = name -- (with its realm, if from another: who the emote goes to)
+	moment.class = moment.class or ClassOf(guid, unit)
+	moment.line = line
+	Fire(moment)
+end
+
 ---------------------------------------------------------------------------
 -- The moments.
 
 -- A buff someone else put on you (a minute or more: not a heal over time).
 local function Buffed(aura)
-	if not DB().emoteVisionBuffs then return end
 	local unit = Plain(aura.sourceUnit)
 	local name = Plain(aura.name)
 	local duration = Plain(aura.duration)
@@ -441,8 +1054,8 @@ local function Buffed(aura)
 	local guid = Plain(UnitGUID(unit))
 	-- (By GUID: UnitIsPlayer can say false for players after a buff on Forever.)
 	if not (guid and guid:find("^Player%-")) then return end
-	Fire({ name = Short(Plain(UnitName(unit))) or "?", unit = unit, guid = guid, class = ClassOf(guid, unit),
-		icon = Plain(aura.icon), line = L["gave you %s"]:format(name), emotes = BUFF_EMOTES })
+	Fire({ kind = "Buff", name = Short(Plain(UnitName(unit))) or "?", unit = unit, guid = guid,
+		class = ClassOf(guid, unit), icon = Plain(aura.icon), line = L["gave you %s"]:format(name) })
 end
 
 -- Old clients' auras with no list of the new ones: what's new since last time.
@@ -482,13 +1095,9 @@ end
 -- own soulstone: no one to thank, or the soulstone's buff did already).
 local function AliveCheck()
 	local now = ns.Flag(UnitIsDeadOrGhost("player")) and true or false
-	if dead and not now and resFrom and GetTime() - resFrom.at < 120 and DB().emoteVisionRes then
-		local name = resFrom.name
-		local unit = UnitFor(nil, name)
-		local guid = unit and Plain(UnitGUID(unit))
-		Fire({ name = Short(name), unit = unit, guid = guid, class = ClassOf(guid, unit),
-			icon = "Interface\\Icons\\Spell_Holy_Resurrection", line = L["brought you back to life"],
-			emotes = RES_EMOTES }, true)
+	if dead and not now and resFrom and GetTime() - resFrom.at < 120 then
+		FireFor("Res", resFrom.name, nil, L["brought you back to life"],
+			{ icon = "Interface\\Icons\\Spell_Holy_Resurrection" })
 	end
 	if not now then resFrom = nil end
 	dead = now
@@ -503,33 +1112,195 @@ local function AtYou(text)
 	return YOU ~= "you" and lower:find("%f[%a]" .. YOU:lower() .. "%f[%A]") ~= nil
 end
 local function Emoted(text, author, guid)
-	if not DB().emoteVisionEmotes then return end
 	text, author, guid = Plain(text), Plain(author), Plain(guid)
 	if type(text) ~= "string" or type(author) ~= "string" then return end
 	if guid == Plain(UnitGUID("player")) then return end
 	if guid and not guid:find("^Player%-") then return end
 	if not AtYou(text) then return end
-	-- (The same one back first, then the usual few.)
-	local emotes, lower = {}, text:lower()
+	-- (Which one it was, for Same back.)
+	local same, lower = nil, text:lower()
 	for _, pair in ipairs(EMOTE_WORDS) do
 		if lower:find(pair[1], 1, true) then
-			emotes[1] = pair[2]
+			same = pair[2]
 			break
 		end
-	end
-	for _, token in ipairs(BACK_EMOTES) do
-		if #emotes < 3 and token ~= emotes[1] then emotes[#emotes + 1] = token end
 	end
 	local name = Short(author)
 	local line = text
 	if line:sub(1, #name) == name then line = line:sub(#name + 1):gsub("^%s+", "") end
-	local unit = UnitFor(guid, name)
-	Fire({ name = name, unit = unit, guid = guid, class = ClassOf(guid, unit), line = line, emotes = emotes })
+	FireFor("Emote", name, guid, line, { same = same })
+end
+
+-- A summon you accepted: its card a moment later, once you're there (after
+-- the loading screen, if there is one).
+local loading -- (a loading screen up)
+local arriving -- (a summon accepted: { name, at }, its card once you're there)
+local function SummonerName()
+	local get = C_SummonInfo and C_SummonInfo.GetSummonConfirmSummoner or GetSummonConfirmSummoner
+	if not get then return nil end
+	local ok, name = pcall(get)
+	return ok and Plain(name) or nil
+end
+local function Arrived()
+	if loading or not arriving then return end
+	local from = arriving
+	arriving = nil
+	if GetTime() - from.at < 180 then FireFor("Summon", from.name, nil, L["summoned you"]) end
+end
+local function Summoned()
+	local from = summonFrom
+	summonFrom = nil
+	if not (from and GetTime() - from.at < 180) then return end
+	arriving = { name = from.name, at = GetTime() }
+	C_Timer.After(3, Arrived)
+end
+if C_SummonInfo and C_SummonInfo.ConfirmSummon then
+	hooksecurefunc(C_SummonInfo, "ConfirmSummon", Summoned)
+elseif ConfirmSummon then
+	hooksecurefunc("ConfirmSummon", Summoned)
+end
+
+-- Your group's levels, learnt again (who's in it now); one gone up: a card.
+local function GroupUnits()
+	local units = {}
+	if IsInRaid() then
+		for i = 1, 40 do units[#units + 1] = "raid" .. i end
+	else
+		for i = 1, 4 do units[#units + 1] = "party" .. i end
+	end
+	return units
+end
+local function LearnLevels()
+	wipe(levels)
+	for _, unit in ipairs(GroupUnits()) do
+		local guid = Plain(UnitGUID(unit))
+		local level = Plain(UnitLevel(unit))
+		if guid and type(level) == "number" and level > 0 then levels[guid] = level end
+	end
+end
+local function LevelChanged(unit)
+	if not (type(unit) == "string" and (unit:find("^party%d") or unit:find("^raid%d"))) then return end
+	if ns.Flag(UnitIsUnit(unit, "player")) then return end
+	local guid = Plain(UnitGUID(unit))
+	local level = Plain(UnitLevel(unit))
+	if not (guid and type(level) == "number" and level > 0) then return end
+	local was = levels[guid]
+	levels[guid] = level
+	if was and level > was then
+		FireFor("Level", Plain(UnitName(unit)), guid, L["reached level %d"]:format(level))
+	end
+end
+
+-- Who's in your group (GUID -> name and class), to tell who joined and who
+-- left. Learnt quietly at login and on loading screens.
+local roster, grouped
+local function Roster()
+	local now = {}
+	for _, unit in ipairs(GroupUnits()) do
+		local guid = Plain(UnitGUID(unit))
+		if guid and not ns.Flag(UnitIsUnit(unit, "player")) then
+			now[guid] = { name = Plain(UnitName(unit)), class = ClassOf(guid, unit) }
+		end
+	end
+	return now
+end
+local function RosterChanged(quiet)
+	local now, inGroup = Roster(), IsInGroup() and true or false
+	local was, wasGrouped = roster, grouped
+	roster, grouped = now, inGroup
+	if quiet or not was then return end
+	if inGroup and not wasGrouped then
+		Fire({ kind = "Joined", name = L["Your group"], line = L["you joined a group"], group = true,
+			icon = "Interface\\Icons\\INV_Misc_GroupNeedMore" })
+		return
+	end
+	if not (inGroup and wasGrouped) then return end -- (you left: everyone did, for you)
+	-- (A few at a time: a raid filling or emptying at once isn't a moment each.)
+	local joined, left = {}, {}
+	for guid, who in pairs(now) do if not was[guid] then joined[#joined + 1] = { guid, who } end end
+	for guid, who in pairs(was) do if not now[guid] then left[#left + 1] = { guid, who } end end
+	if #joined <= 2 then
+		for _, each in ipairs(joined) do
+			if each[2].name then
+				FireFor("Join", each[2].name, each[1], L["joined your group"], { class = each[2].class })
+			end
+		end
+	end
+	if #left <= 2 then
+		for _, each in ipairs(left) do
+			if each[2].name then
+				FireFor("Leave", each[2].name, each[1], L["left your group"], { class = each[2].class })
+			end
+		end
+	end
+end
+
+-- A boss fight's end in a group, in a dungeon or raid: a kill (the card for
+-- all of you; a dungeon's last boss: the Dungeon moment's, a moment later)
+-- or a wipe.
+local function EncounterEnded(encounterID, encounterName, success)
+	encounterID, success = Plain(encounterID), Plain(success)
+	if not (encounterID and IsInGroup()) then return end
+	local _, kind = IsInInstance()
+	if kind ~= "party" and kind ~= "raid" then return end
+	local name = Plain(encounterName)
+	if not name and EJ_GetEncounterInfo then name = Plain((EJ_GetEncounterInfo(encounterID))) end
+	name = name or L["A boss"]
+	if success ~= 1 then
+		Fire({ kind = "Wipe", name = name, line = L["your group wiped"], group = true,
+			icon = "Interface\\Icons\\Ability_Rogue_FeignDeath" })
+		return
+	end
+	local last
+	if kind == "party" and ns.EncounterIndex then
+		local index, count = ns.EncounterIndex(encounterID)
+		last = index and index == count
+	end
+	local place = Plain((GetInstanceInfo()))
+	if last and place and place ~= "" and MOMENT.Dungeon and DB()[MOMENT.Dungeon.on] then
+		-- (After the kill's own banner and the Dungeon cleared card.)
+		C_Timer.After(6, function()
+			Fire({ kind = "Dungeon", name = place, line = L["cleared with your group"], group = true,
+				icon = "Interface\\Icons\\INV_Misc_Key_03" })
+		end)
+		return
+	end
+	Fire({ kind = "Boss", name = name, line = L["defeated with your group"], group = true,
+		icon = "Interface\\Icons\\INV_Misc_Bone_HumanSkull_01" })
+end
+
+-- An achievement someone else earned (near you, your group, your guild):
+-- "Aelwyn has earned the achievement [Explore Elwynn Forest]!".
+local function Achieved(text, author, guid)
+	text, author, guid = Plain(text), Plain(author), Plain(guid)
+	if type(text) ~= "string" or type(author) ~= "string" then return end
+	if guid and guid == Plain(UnitGUID("player")) then return end
+	if Short(author) == Short(Plain(UnitName("player"))) then return end
+	local what = text:match("%[(.-)%]") or L["an achievement"]
+	FireFor("Achievement", author, guid, L["earned %s"]:format(what))
+end
+
+-- Your own level up: a card for everyone around, to celebrate.
+local function LeveledUp(level)
+	level = Plain(level)
+	if type(level) ~= "number" then return end
+	local _, class = UnitClass("player")
+	Fire({ kind = "YouLevel", name = Short(Plain(UnitName("player"))) or L["You"], class = Plain(class),
+		unit = "player", line = L["reached level %d"]:format(level), group = true })
+end
+
+-- Your duel's end (Effects.lua's duel line): moment "won" or "lost", other
+-- the one you fought.
+function ns.EmoteVisionDuel(moment, other)
+	if type(other) ~= "string" then return end
+	FireFor("Duel", other, nil, moment == "won" and L["lost a duel to you"] or L["beat you in a duel"])
 end
 
 local watcher = CreateFrame("Frame")
 for _, event in ipairs({ "PLAYER_ENTERING_WORLD", "PLAYER_REGEN_ENABLED", "RESURRECT_REQUEST", "PLAYER_DEAD",
-	"PLAYER_ALIVE", "PLAYER_UNGHOST", "CHAT_MSG_TEXT_EMOTE" }) do
+	"PLAYER_ALIVE", "PLAYER_UNGHOST", "CHAT_MSG_TEXT_EMOTE", "PLAYER_STOPPED_MOVING", "CONFIRM_SUMMON",
+	"TRADE_SHOW", "UI_INFO_MESSAGE", "GROUP_ROSTER_UPDATE", "UNIT_LEVEL", "ENCOUNTER_END", "LOADING_SCREEN_ENABLED",
+	"LOADING_SCREEN_DISABLED", "CHAT_MSG_ACHIEVEMENT", "CHAT_MSG_GUILD_ACHIEVEMENT", "PLAYER_LEVEL_UP" }) do
 	pcall(watcher.RegisterEvent, watcher, event)
 end
 pcall(watcher.RegisterUnitEvent, watcher, "UNIT_AURA", "player")
@@ -542,36 +1313,97 @@ watcher:SetScript("OnEvent", function(_, event, ...)
 	elseif event == "RESURRECT_REQUEST" then
 		local name = Plain((...))
 		if type(name) == "string" then resFrom = { name = name, at = GetTime() } end
+	elseif event == "CONFIRM_SUMMON" then
+		local name = SummonerName()
+		if name then summonFrom = { name = name, at = GetTime() } end
+	elseif event == "TRADE_SHOW" then
+		local name, guid = Plain(UnitName("NPC")), Plain(UnitGUID("NPC"))
+		tradeWith = name and { name = name, guid = guid, class = ClassOf(guid, "NPC") } or nil
+	elseif event == "UI_INFO_MESSAGE" then
+		-- ((type, message) on newer clients, (message) on older ones.)
+		local first, second = ...
+		local done = ERR_TRADE_COMPLETE
+		if tradeWith and done and (Plain(first) == done or Plain(second) == done) then
+			local with = tradeWith
+			tradeWith = nil
+			FireFor("Trade", with.name, with.guid, L["traded with you"], { class = with.class })
+		end
+	elseif event == "UNIT_LEVEL" then
+		LevelChanged(...)
+	elseif event == "GROUP_ROSTER_UPDATE" then
+		LearnLevels()
+		RosterChanged(loading)
+	elseif event == "ENCOUNTER_END" then
+		local encounterID, encounterName, _, _, success = ...
+		EncounterEnded(encounterID, encounterName, success)
+	elseif event == "CHAT_MSG_ACHIEVEMENT" or event == "CHAT_MSG_GUILD_ACHIEVEMENT" then
+		local text, author = ...
+		Achieved(text, author, (select(12, ...)))
+	elseif event == "PLAYER_LEVEL_UP" then
+		LeveledUp((...))
+	elseif event == "LOADING_SCREEN_ENABLED" then
+		loading = true
+	elseif event == "LOADING_SCREEN_DISABLED" then
+		loading = nil
+		if arriving then C_Timer.After(2, Arrived) end
 	elseif event == "PLAYER_DEAD" then
 		dead = true
 	elseif event == "PLAYER_ALIVE" or event == "PLAYER_UNGHOST" then
 		C_Timer.After(0, AliveCheck)
+	elseif event == "PLAYER_STOPPED_MOVING" then
+		C_Timer.After(0.2, Next) -- (once ns.playerMoving has caught up)
 	elseif event == "PLAYER_REGEN_ENABLED" then
 		ScanOld(true)
 		C_Timer.After(1, Next)
 	elseif event == "PLAYER_ENTERING_WORLD" then
+		GiveRule()
 		dead = ns.Flag(UnitIsDeadOrGhost("player")) and true or false
 		ScanOld(true)
+		LearnLevels()
+		RosterChanged(true)
 	end
 end)
 
 ---------------------------------------------------------------------------
 -- The page's test and mover.
 
-local SAMPLES = {
-	{ name = "Aelwyn", class = "PRIEST", line = "gave you %s", spell = "Power Word: Fortitude", emotes = BUFF_EMOTES,
-		icon = "Interface\\Icons\\Spell_Holy_WordFortitude" },
-	{ name = "Thornbrook", class = "DRUID", line = "brought you back to life", emotes = RES_EMOTES },
-	{ name = "Pip", class = "MAGE", line = "waves at you.", emotes = { "WAVE", "SMILE", "BOW" } },
-}
+-- Test: each moment's pretend card in turn (the next moment ticked on).
 local nextSample = 1
 function ns.TestEmoteVision()
-	local sample = SAMPLES[nextSample]
-	nextSample = nextSample % #SAMPLES + 1
+	local db = DB()
+	local kind
+	for _ = 1, #MOMENTS do
+		local each = MOMENTS[nextSample]
+		nextSample = nextSample % #MOMENTS + 1
+		if db[each.on] and #EmotesFor(each.id, each.sample.same) > 0 then
+			kind = each
+			break
+		end
+	end
+	kind = kind or MOMENTS[1]
+	local sample = kind.sample
 	moving = nil
 	if card then card:Hide() end
-	Show({ name = sample.name, class = sample.class, icon = sample.icon, emotes = sample.emotes, test = true,
-		line = sample.spell and L[sample.line]:format(L[sample.spell]) or L[sample.line] })
+	local line = L[sample.line]
+	if sample.spell then line = line:format(L[sample.spell]) elseif sample.level then line = line:format(sample.level) end
+	local moment = { kind = kind.id, name = L[sample.name], class = sample.class, icon = sample.icon, test = true,
+		line = line, same = sample.same, group = sample.group }
+	-- (Someone targeted: the card's theirs, its face and name, and its buttons
+	-- really emote at them; a group's card stays the group's.)
+	local name = not sample.group and ns.Flag(UnitExists("target")) and not ns.Flag(UnitIsUnit("target", "player"))
+		and Plain(UnitName("target"))
+	if name then
+		local guid = Plain(UnitGUID("target"))
+		moment.name, moment.unit, moment.guid, moment.test, moment.tried = name, "target", guid, nil, true
+		moment.class = guid and guid:find("^Player%-") and ClassOf(guid, "target") or nil
+	end
+	if not Show(moment) then
+		-- (No moment with emotes on: the first one's as they come, so Test
+		-- still shows one.)
+		local first = MOMENTS[1]
+		moment.kind, moment.emotes = first.id, ParseEmotes(DEFAULTS[first.key])
+		Show(moment)
+	end
 end
 
 -- Move: the card held up to drag where you want it; again to let go.
@@ -583,7 +1415,7 @@ function ns.MoveEmoteVision()
 	end
 	ns.TestEmoteVision()
 	moving = true
-	card:SetAlpha(1)
+	if card then card:SetAlpha(1) end
 end
 function ns.EmoteVisionMoving() return moving and true or false end
 
@@ -595,43 +1427,732 @@ function ns.RefreshEmoteVision()
 		card:Hide()
 		return
 	end
-	if card:IsShown() then
-		Restyle()
-		Place()
+	-- (Up: drawn again in the look now, its time and fade kept.)
+	if card:IsShown() and showing and not card.leaving then
+		local age, wasMoving = card.age, moving
+		Show(showing)
+		card.age, moving = age, wasMoving
+		card:SetAlpha(1)
 	end
 end
 
--- /cine debug emotevision: what it would do now, and why.
+-- /cine debug emotescan [first]: every emote of the game's in turn, at no
+-- one, for a recording to tell which animate and which make a sound. Each
+-- one's number, command and token big at the top of the screen (shown with
+-- the UI hidden too), a square in the top left switching color with each,
+-- and a log in CinematicDB.emoteScan (each one's GetTime, and the clock's at
+-- the start). Between them, /stand, so a dance or a sit doesn't carry on.
+-- Again to stop.
+-- /cine debug emotestop [emote]: which way stops a looping emote (/dance,
+-- /map, /read...). It plays the emote, then tries each way 4 seconds apart,
+-- saying in chat which it's trying: watch which one ends it. Again to stop.
+local STOP_STEP = 4
+local stopTest
+function ns.EmoteStopTest(arg)
+	if stopTest then
+		stopTest:Cancel()
+		stopTest = nil
+		ns.Print("emotestop: stopped.")
+		return
+	end
+	local token = (arg and arg ~= "" and arg or "DANCE"):upper():gsub("^/", "")
+	local function Try(name, run)
+		return { name = name, run = run }
+	end
+	local steps = {
+		Try("/" .. token:lower() .. " (start it)", function() DoEmote(token, "none") end),
+		Try("CancelEmote()", function()
+			if not CancelEmote then error("no CancelEmote on this client") end
+			CancelEmote()
+		end),
+		Try("/" .. token:lower() .. " (start it again)", function() DoEmote(token, "none") end),
+		Try("/stand", function() DoEmote("STAND", "none") end),
+		Try("/" .. token:lower() .. " (start it again)", function() DoEmote(token, "none") end),
+		Try("/" .. token:lower() .. " again (does a second one toggle it off?)", function() DoEmote(token, "none") end),
+		Try("/" .. token:lower() .. " (start it again)", function() DoEmote(token, "none") end),
+		Try("another emote, /wave", function() DoEmote("WAVE", "none") end),
+		Try("/" .. token:lower() .. " (start it again)", function() DoEmote(token, "none") end),
+		Try("/sit then /stand", function()
+			DoEmote("SIT", "none")
+			C_Timer.After(1, function() DoEmote("STAND", "none") end)
+		end),
+	}
+	ns.Print(("emotestop: %s, then each way to stop it, %d seconds apart. CancelEmote %s. Again to stop."):format(
+		"/" .. token:lower(), STOP_STEP, CancelEmote and "is here" or "is NOT on this client"))
+	local n = 0
+	stopTest = C_Timer.NewTicker(STOP_STEP, function()
+		n = n + 1
+		local step = steps[n]
+		if not step then
+			stopTest:Cancel()
+			stopTest = nil
+			ns.Print("emotestop: done. Which ones stopped it?")
+			return
+		end
+		local ok, why = pcall(step.run)
+		local verb = step.name:find("start it") and "" or "trying "
+		ns.Print(("emotestop %d/%d: %s%s%s"):format(n, #steps, verb, step.name, ok and "" or (" - failed: " .. tostring(why))))
+	end)
+end
+
+local SCAN_STEP = 5    -- seconds each emote gets
+local SCAN_STAND = 4   -- ...the /stand this far into it
+local SCAN_CANCEL = 0.5 -- ...CancelEmote() this long before it
+local SCAN_READY = 5   -- seconds before the first, to start recording
+-- "/cine debug emotescan more": what the full scan left to check, 10 seconds
+-- each (a loop shows as still going near the end): the ones a stuck /kneel
+-- spoilt (#60-68), and the ones still moving at 4 seconds, maybe looping.
+local SCAN_MORE = { "KNEEL", "LAUGH", "LAYDOWN", "MASSAGE", "MOON", "MOURN", "NO", "NOD", "NOSEPICK",
+	"DANCE", "SHY", "BASHFUL", "BLUSH", "COWER", "FLIRT", "READ", "LEAN", "MAP", "SIT", "SLEEP", "GOING", "STARE",
+	"ROLLEYES" }
+local SCAN_MORE_STEP = 10
+local scan
+function ns.EmoteScan(arg)
+	if scan then
+		scan.timer:Cancel()
+		scan.frame:Hide()
+		if scan.wasOn and ns.SetEnabled then ns.SetEnabled(true) end
+		ns.Print(("emotescan: stopped at %d of %d."):format(scan.at, #scan.list))
+		scan = nil
+		return
+	end
+	if Fighting() then
+		ns.Print("emotescan: not in a fight.")
+		return
+	end
+	-- (The game's text emotes, then the voice ones not among them.)
+	local game, list, seen = GameEmotes(), {}, {}
+	for _, group in ipairs({ game.text, game.voice }) do
+		for _, token in ipairs(group) do
+			if not seen[token] then
+				seen[token] = true
+				list[#list + 1] = token
+			end
+		end
+	end
+	if #list == 0 then
+		ns.Print("emotescan: this client has no emote lists (EmoteList, TextEmoteSpeechList).")
+		return
+	end
+	-- (arg: "first" or "first last", to play again only a stretch of them;
+	-- "more", SCAN_MORE's, longer each.)
+	local step, stand = SCAN_STEP, SCAN_STAND
+	local first = 1
+	if arg == "more" then
+		list, step, stand = {}, SCAN_MORE_STEP, SCAN_MORE_STEP - 1
+		for _, token in ipairs(SCAN_MORE) do list[#list + 1] = token end
+	else
+		local from, to = tostring(arg or ""):match("^(%d*)%s*(%d*)$")
+		first = math.max(1, math.min(#list, tonumber(from) or 1))
+		local last = math.max(first, math.min(#list, tonumber(to) or #list))
+		for k = #list, last + 1, -1 do list[k] = nil end
+	end
+	local frame = CreateFrame("Frame", nil, UIParent)
+	frame:SetAllPoints(UIParent)
+	frame:SetFrameStrata("FULLSCREEN_DIALOG")
+	if ns.AddOverlay then ns.AddOverlay(frame) end
+	local back = frame:CreateTexture(nil, "BACKGROUND")
+	back:SetColorTexture(0, 0, 0, 0.75)
+	back:SetPoint("TOP", 0, -40)
+	back:SetSize(900, 70)
+	local text = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalHuge")
+	text:SetFont((text:GetFont()), 32, "OUTLINE")
+	text:SetPoint("CENTER", back, "CENTER")
+	local square = frame:CreateTexture(nil, "OVERLAY")
+	square:SetSize(60, 60)
+	square:SetPoint("TOPLEFT", 20, -20)
+	local db = ns.GetDB()
+	db.emoteScan = { started = date("%Y-%m-%d %H:%M:%S"), startedAt = GetTime(), step = step,
+		stand = stand, ready = SCAN_READY, client = select(4, GetBuildInfo()), emotes = {} }
+	-- (Cinematic off while it runs, back on after: its AFK and cozy cameras
+	-- would swing round you as you stand there and /sit, /dance...)
+	local wasOn = ns.db and ns.db.enabled and true or false
+	if wasOn and ns.SetEnabled then ns.SetEnabled(false) end
+	scan = { list = list, at = first - 1, frame = frame, wasOn = wasOn }
+	text:SetText(("Emote scan: %d emotes from #%d, %d sec each. Starting in %d..."):format(#list - first + 1, first,
+		step, SCAN_READY))
+	square:SetColorTexture(1, 1, 1, 1)
+	ns.Print(("emotescan: %d emotes (%d of them voice ones), from #%d, %d sec each; about %d min. /cine debug " ..
+		"emotescan again to stop."):format(#list, #game.voice, first, step,
+		math.ceil((#list - first + 1) * step / 60)))
+	ns.Print(("emotescan: between emotes, %s then /stand (looping ones like /dance stop only if it works)."):format(
+		CancelEmote and "CancelEmote()" or "no CancelEmote() on this client, only"))
+	local function Step()
+		if not scan then return end
+		scan.at = scan.at + 1
+		local i = scan.at
+		local token = list[i]
+		if not token then
+			text:SetText(("Emote scan: done, %d emotes."):format(#list))
+			square:SetColorTexture(1, 1, 1, 1)
+			ns.Print("emotescan: done. The log is in CinematicDB.emoteScan (saved on /reload or logout).")
+			scan.timer:Cancel()
+			if scan.wasOn and ns.SetEnabled then ns.SetEnabled(true) end
+			C_Timer.After(5, function() frame:Hide() end)
+			scan = nil
+			return
+		end
+		local voice = game.isVoice[token] and "  voice" or ""
+		text:SetText(("#%d / %d    %s    %s%s"):format(i, #list, Command(token), token, voice))
+		if i % 2 == 0 then square:SetColorTexture(1, 0, 1, 1) else square:SetColorTexture(0, 1, 0, 1) end
+		local fighting = Fighting()
+		db.emoteScan.emotes[#db.emoteScan.emotes + 1] = { i = i, token = token, command = Command(token),
+			voice = game.isVoice[token] or nil, at = GetTime(), skipped = fighting or nil }
+		if not fighting then pcall(DoEmote, token, "none") end
+		-- (Then stopped: a looping one, /dance or /map, carries on through the
+		-- next emotes and even /stand, till you move; the game's CancelEmote
+		-- ends it. /stand after, for /sit, /kneel and /laydown.)
+		-- (Half a second apart: in the same moment, /stand didn't take after
+		-- /kneel, and the next eight emotes played from one knee.)
+		C_Timer.After(stand - SCAN_CANCEL, function()
+			if not (scan and scan.at == i) or Fighting() then return end
+			if CancelEmote then pcall(CancelEmote) end
+		end)
+		C_Timer.After(stand, function()
+			if not (scan and scan.at == i) or Fighting() then return end
+			pcall(DoEmote, "STAND", "none")
+		end)
+	end
+	scan.timer = C_Timer.NewTimer(SCAN_READY, function()
+		Step()
+		if scan then scan.timer = C_Timer.NewTicker(step, Step) end
+	end)
+end
+
+-- /cine debug emote: what it would do now, and why.
 function ns.EmoteVisionDebug()
 	local ok, here = pcall(ns.RowOnNow, ROW_KEY, nil, true)
-	ns.Print(("emotevision: page %s; here %s; fighting %s; queued %d; card %s; dead %s; res offer %s"):format(
+	local db = DB()
+	ns.Print(("emotevision: page %s; Show in %s; fighting %s; moving %s (still only %s); queued %d; card %s"):format(
 		tostring(ns.Setting("emoteVision")), ok and tostring(here) or ("error: " .. tostring(here)),
-		tostring(Fighting()), #queue, card and card:IsShown() and tostring(showing and showing.name) or "hidden",
-		tostring(dead), resFrom and resFrom.name or "none"))
+		tostring(Fighting()), tostring(ns.playerMoving), tostring(db.emoteVisionStill), #queue,
+		card and card:IsShown() and tostring(showing and showing.name) or "hidden"))
+	ns.Print(("  repeats ignored %s (%s min); dead %s; res offer %s; summon offer %s; trade with %s; group levels %d"):format(
+		tostring(db.emoteVisionRepeats), tostring(db.emoteVisionRepeatMins), tostring(dead),
+		resFrom and resFrom.name or "none", summonFrom and summonFrom.name or "none",
+		tradeWith and tradeWith.name or "none", (function() local n = 0 for _ in pairs(levels) do n = n + 1 end return n end)()))
+	local moments = {}
+	for _, each in ipairs(MOMENTS) do
+		local list = EmotesFor(each.id, each.same and "WAVE" or nil)
+		moments[#moments + 1] = each.id .. (db[each.on] and "" or " (off)") .. ": " .. table.concat(list, ",")
+	end
+	ns.Print("  " .. table.concat(moments, "; "))
 	local target = Plain(UnitGUID("target"))
 	if target then
-		ns.Print(("  target %s: %s, unit %s"):format(tostring(Plain(UnitName("target"))),
-			Relation(target, Plain(UnitName("target"))), tostring(UnitFor(target))))
+		ns.Print(("  target %s: unit %s"):format(tostring(Plain(UnitName("target"))), tostring(UnitFor(target))))
 	end
 end
 
 ---------------------------------------------------------------------------
--- The page (Visions, World).
+-- The pages (Visions, World): Vision (when it shows) and Style (how it
+-- looks), two folder tabs.
 
+local function Tabs(content, title, picked)
+	local panel = ns.PageTabs(content, {
+		{ L["Vision"], "Emote Vision", L["Turning it on, the moments a card shows for and each one's emotes."] },
+		{ L["Settings"], "Emote Vision Settings", L["When the cards show, and for how long."] },
+		{ L["Look"], "Emote Vision Style", L["Its style, words, frame and face, and where it sits."] },
+	}, picked)
+	title:ClearAllPoints()
+	title:SetPoint("TOPLEFT", panel, "BOTTOMLEFT", 8, -14)
+end
+
+-- Its Test button (not a page control: it works with the page off too).
+local function TestButton(parent)
+	local test = ns.PanelButton(parent)
+	test:SetSize(100, 22)
+	test:SetText(L["Test"])
+	test:SetScript("OnClick", function() ns.TestEmoteVision() end)
+	return test
+end
+local TEST_TIP = "Shows a pretend card for each moment in turn (close the settings to see it). With someone " ..
+	"targeted it's theirs, and its buttons really emote at them; with no one, they only say in chat what they'd do."
+
+local function On() return ns.GetDB() and ns.GetDB().emoteVision end
+local function Changed() ns.RefreshEmoteVision() end
+
+-- The moments and their emotes, as the Sounds tabs' rules and sounds: a band
+-- for each moment (its tick and name), its emotes under it (^ to move one up,
+-- x to take it off), Add an emote under them (the picker below: search,
+-- filters, every emote of the game's, and Same back for an emote at you).
+local GRID_W, HEAD_H, ROW_H = 520, 24, 22
+local function SmallButton(parent, text, width)
+	local button = ns.PanelButton(parent)
+	button:SetSize(width or 22, 20)
+	button:SetText(text)
+	return button
+end
+
+-- The emote picker (Add an emote): a window beside the button, a search box
+-- (name or command), filter buttons (by what the emote does, the tags'
+-- groups), and every emote of the game's in a scrolling list, its tags on
+-- the right. A click adds it to the card, and the window stays open for more
+-- (up to MAX_EMOTES); ones already on it are greyed.
+local PICK_W, PICK_ROWS, PICK_ROW_H, PICK_TOP = 420, 14, 22, 112
+local FILTERS = {
+	{ "all", "All" }, { "common", "Common" }, { "body", "Full body" }, { "gesture", "Gesture" },
+	{ "voice", "Voice" }, { "sound", "Sound" }, { "loops", "Loops or holds" }, { "chat", "Chat only" },
+}
+local FILTER_TIPS = {
+	all = "Every emote.", common = "The ones most used to answer someone: thank, bow, wave, cheer...",
+	body = "Your whole character changes pose: kneels, sits, lies down, bows, dances, cowers, flexes...",
+	gesture = "Hands, arms and head while you stand: a wave, a point, a salute, a laugh...",
+	voice = "Says something out loud (the game's voice emotes).", sound = "Makes a sound, not a voice line: a laugh, a roar, a whistle...",
+	loops = "Keeps going (a dance) or holds a pose (kneeling, sitting) till you move.",
+	chat = "Only a line in chat: nothing on your character.",
+}
+local function FilterPasses(filter, token)
+	if token == SAME then return filter == "all" or filter == "common" end
+	if filter == "common" then return EMOTE_NAMES[token] ~= nil end
+	if filter == "body" then return EMOTE_BODY[token] == true end
+	if filter == "gesture" then return EMOTE_MOVES[token] == true and not EMOTE_BODY[token] end
+	if filter == "voice" then return GameEmotes().isVoice[token] == true end
+	if filter == "sound" then return EMOTE_SOUND[token] == true and not GameEmotes().isVoice[token] end
+	if filter == "loops" then return EMOTE_LOOPS[token] ~= nil end
+	if filter == "chat" then
+		return not (EMOTE_MOVES[token] or EMOTE_SOUND[token] or GameEmotes().isVoice[token])
+	end
+	return true
+end
+
+local picker
+local function Picker()
+	if picker then return picker end
+	local f = CreateFrame("Frame", "CinematicEmotePicker", UIParent, "BackdropTemplate")
+	picker = f
+	f:SetSize(PICK_W, PICK_TOP + PICK_ROWS * PICK_ROW_H + 30)
+	f:SetFrameStrata("FULLSCREEN_DIALOG")
+	f:SetClampedToScreen(true)
+	f:EnableMouse(true)
+	f:SetMovable(true)
+	f:RegisterForDrag("LeftButton")
+	f:SetScript("OnDragStart", f.StartMoving)
+	f:SetScript("OnDragStop", f.StopMovingOrSizing)
+	f:SetBackdrop({ bgFile = "Interface\\Buttons\\WHITE8X8", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+		edgeSize = 14, insets = { left = 3, right = 3, top = 3, bottom = 3 } })
+	f:SetBackdropColor(0.05, 0.05, 0.06, 0.97)
+	f:SetBackdropBorderColor(BORDER_GOLD[1], BORDER_GOLD[2], BORDER_GOLD[3], 1)
+	f:Hide()
+	f.filter, f.offset, f.items = "all", 0, {}
+
+	f.title = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+	f.title:SetPoint("TOPLEFT", 14, -12)
+	f.title:SetPoint("RIGHT", -30, 0)
+	f.title:SetJustifyH("LEFT")
+	local close = CreateFrame("Button", nil, f, "UIPanelCloseButton")
+	close:SetPoint("TOPRIGHT", 2, 2)
+
+	-- Search: what's typed, in an emote's name or command.
+	f.search = CreateFrame("EditBox", nil, f, "InputBoxTemplate")
+	f.search:SetSize(220, 20)
+	f.search:SetPoint("TOPLEFT", 20, -36)
+	f.search:SetAutoFocus(false)
+	f.hint = f.search:CreateFontString(nil, "OVERLAY", "GameFontDisable")
+	f.hint:SetPoint("LEFT", 2, 0)
+	f.hint:SetText(L["Search"])
+	f.search:SetScript("OnTextChanged", function(self)
+		f.hint:SetShown(self:GetText() == "")
+		f.offset = 0
+		f.Refresh()
+	end)
+	f.search:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
+	f.count = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+	f.count:SetPoint("LEFT", f.search, "RIGHT", 12, 0)
+
+	-- The filters, four to a row.
+	f.chips = {}
+	for i, each in ipairs(FILTERS) do
+		local chip = SmallButton(f, L[each[2]], (PICK_W - 40) / 4 - 4)
+		chip:SetPoint("TOPLEFT", 16 + ((i - 1) % 4) * ((PICK_W - 40) / 4), -62 - math.floor((i - 1) / 4) * 23)
+		chip.key = each[1]
+		chip:SetScript("OnClick", function(self)
+			f.filter, f.offset = self.key, 0
+			f.Refresh()
+		end)
+		chip:SetScript("OnEnter", function(self)
+			GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+			GameTooltip:SetText(L[each[2]], 1, 1, 1)
+			GameTooltip:AddLine(L[FILTER_TIPS[each[1]]], nil, nil, nil, true)
+			GameTooltip:Show()
+		end)
+		chip:SetScript("OnLeave", GameTooltip_Hide)
+		f.chips[i] = chip
+	end
+
+	-- The list: PICK_ROWS rows, the mouse wheel or the bar beside them scrolls.
+	f.rows = {}
+	for i = 1, PICK_ROWS do
+		local row = CreateFrame("Button", nil, f)
+		row:SetSize(PICK_W - 44, PICK_ROW_H)
+		row:SetPoint("TOPLEFT", 16, -PICK_TOP - (i - 1) * PICK_ROW_H)
+		local light = row:CreateTexture(nil, "HIGHLIGHT")
+		light:SetAllPoints()
+		light:SetColorTexture(1, 0.82, 0, 0.12)
+		row.name = row:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+		row.name:SetPoint("LEFT", 6, 0)
+		row.name:SetJustifyH("LEFT")
+		row.tags = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+		-- (> at its right end plays it, as a right-click on the row does.)
+		row.play = SmallButton(row, ">")
+		row.play:SetSize(20, 18)
+		row.play:SetPoint("RIGHT", -2, 0)
+		row.play:SetScript("OnClick", function() TryEmote(row.token) end)
+		row.play:SetScript("OnEnter", function(self)
+			GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+			GameTooltip:SetText(L["Play it, to see it (at no one)."], 1, 1, 1, 1, true)
+			GameTooltip:Show()
+		end)
+		row.play:SetScript("OnLeave", GameTooltip_Hide)
+		row.tags:SetPoint("RIGHT", row.play, "LEFT", -6, 0)
+		row.tags:SetJustifyH("RIGHT")
+		row:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+		row:SetScript("OnClick", function(self, button)
+			if button == "RightButton" then
+				TryEmote(self.token)
+			elseif self.token and not self.taken and f.add then
+				f.add(self.token)
+				f.Refresh()
+			end
+		end)
+		row:SetScript("OnEnter", function(self)
+			GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+			GameTooltip:SetText(EmoteName(self.token), 1, 1, 1)
+			GameTooltip:AddLine(self.taken and L["Already on this card (or the card is full). Right-click: play it."]
+				or L["Click: add it to the card. Right-click: play it."], nil, nil, nil, true)
+			GameTooltip:Show()
+		end)
+		row:SetScript("OnLeave", GameTooltip_Hide)
+		f.rows[i] = row
+	end
+	f.bar = CreateFrame("Slider", nil, f)
+	f.bar:SetOrientation("VERTICAL")
+	f.bar:SetPoint("TOPRIGHT", -12, -PICK_TOP)
+	f.bar:SetSize(14, PICK_ROWS * PICK_ROW_H)
+	local track = f.bar:CreateTexture(nil, "BACKGROUND")
+	track:SetAllPoints()
+	track:SetColorTexture(1, 1, 1, 0.06)
+	f.bar:SetThumbTexture("Interface\\Buttons\\UI-ScrollBar-Knob")
+	f.bar:SetValueStep(1)
+	if f.bar.SetObeyStepOnDrag then f.bar:SetObeyStepOnDrag(true) end
+	f.bar:SetScript("OnValueChanged", function(_, value)
+		value = math.floor(value + 0.5)
+		if value ~= f.offset then
+			f.offset = value
+			f.Draw()
+		end
+	end)
+	f:EnableMouseWheel(true)
+	f:SetScript("OnMouseWheel", function(_, delta)
+		local most = math.max(0, #f.items - PICK_ROWS)
+		f.offset = math.max(0, math.min(most, f.offset - delta * 3))
+		f.bar:SetValue(f.offset)
+		f.Draw()
+	end)
+	f.empty = f:CreateFontString(nil, "OVERLAY", "GameFontDisable")
+	f.empty:SetPoint("TOP", 0, -PICK_TOP - 20)
+	f.empty:SetText(L["No emotes match."])
+
+	-- The rows from offset on, each its name, command and tags; one on the card greyed.
+	function f.Draw()
+		local list = f.getList and f.getList() or {}
+		local have = {}
+		for _, token in ipairs(list) do have[token] = true end
+		local full = #list >= MAX_EMOTES
+		for i, row in ipairs(f.rows) do
+			local token = f.items[f.offset + i]
+			row:SetShown(token ~= nil)
+			if token then
+				row.token = token
+				row.taken = have[token] or full
+				local name = EmoteName(token)
+				if token == SAME then
+					name = name .. "  |cff808080" .. L["(the emote they did at you)"] .. "|r"
+				else
+					name = name .. "  |cff808080" .. Command(token) .. "|r"
+				end
+				row.name:SetText(name)
+				row.tags:SetText(token ~= SAME and EmoteTags(token) or "")
+				row.play:SetShown(token ~= SAME)
+				row.name:SetAlpha(row.taken and 0.4 or 1)
+				row.tags:SetAlpha(row.taken and 0.4 or 1)
+			end
+		end
+		f.empty:SetShown(#f.items == 0)
+		f.count:SetText(full and ("|cffff6060" .. L["%d of %d: the card is full"]:format(#list, MAX_EMOTES) .. "|r")
+			or L["%d of %d on this card"]:format(#list, MAX_EMOTES))
+	end
+
+	-- The emotes the search and filter leave, sorted by command (Same back first).
+	function f.Refresh()
+		local find = f.search:GetText():lower():gsub("^%s+", ""):gsub("%s+$", ""):gsub("^/", "")
+		local game, all, seen = GameEmotes(), {}, {}
+		for _, group in ipairs({ game.text, game.voice }) do
+			for _, token in ipairs(group) do
+				if not seen[token] then
+					seen[token] = true
+					all[#all + 1] = token
+				end
+			end
+		end
+		for _, each in ipairs(EMOTES) do
+			if not seen[each[1]] then
+				seen[each[1]] = true
+				all[#all + 1] = each[1]
+			end
+		end
+		table.sort(all, function(a, b) return Command(a) < Command(b) end)
+		if f.moment and f.moment.same then table.insert(all, 1, SAME) end
+		wipe(f.items)
+		for _, token in ipairs(all) do
+			local text = (EmoteName(token) .. " " .. (token ~= SAME and Command(token) or "")):lower()
+			if FilterPasses(f.filter, token) and (find == "" or text:find(find, 1, true)) then
+				f.items[#f.items + 1] = token
+			end
+		end
+		local most = math.max(0, #f.items - PICK_ROWS)
+		f.offset = math.min(f.offset, most)
+		f.bar:SetMinMaxValues(0, most)
+		f.bar:SetShown(most > 0)
+		f.bar:SetValue(f.offset)
+		for _, chip in ipairs(f.chips) do
+			local on = chip.key == f.filter
+			if on then chip:LockHighlight() else chip:UnlockHighlight() end
+			local text = chip:GetFontString()
+			if text then
+				if on then text:SetTextColor(1, 0.82, 0) else text:SetTextColor(1, 1, 1) end
+			end
+		end
+		f.Draw()
+	end
+
+	if ns.CloseWithSettings then ns.CloseWithSettings(f) end
+	return f
+end
+
+-- Opens the picker beside owner for moment: getList() gives its emotes now,
+-- add(token) adds one.
+function ns.OpenEmotePicker(owner, moment, getList, add)
+	local f = Picker()
+	f.moment, f.getList, f.add, f.offset = moment, getList, add, 0
+	f.title:SetText(L["Add an emote: %s"]:format(L[moment.name]))
+	f:ClearAllPoints()
+	f:SetPoint("TOPLEFT", owner, "TOPRIGHT", 12, 80)
+	f:Show()
+	f.Refresh()
+end
+local function MomentsGrid(kit, content, stack)
+	local box = CreateFrame("Frame", nil, content)
+	box:SetSize(GRID_W, 40)
+	stack:Add(box, "label")
+
+	local Rebuild
+	local function List(moment) return ParseEmotes(DB()[moment.key]) end
+	local function Save(moment, list)
+		ns.GetDB()[moment.key] = table.concat(list, ",")
+		Changed()
+		Rebuild()
+	end
+
+	-- Add an emote: the picker window, for moment (token added at the end,
+	-- none twice).
+	local function AddMenu(owner, moment)
+		ns.OpenEmotePicker(owner, moment, function() return List(moment) end, function(token)
+			local list = List(moment)
+			for _, each in ipairs(list) do if each == token then return end end
+			if #list >= MAX_EMOTES then return end
+			list[#list + 1] = token
+			Save(moment, list)
+		end)
+	end
+
+	local heads, rows = {}, {}
+	-- (Each moment closed to start, its emotes summed up on its band; open:
+	-- its rows and Add an emote under it. Kept while the settings stay open.)
+	local opened = {}
+	local function Head(i)
+		if heads[i] then return heads[i] end
+		local head = CreateFrame("Frame", nil, box)
+		head:SetSize(GRID_W, HEAD_H)
+		local band = head:CreateTexture(nil, "BACKGROUND")
+		band:SetAllPoints()
+		band:SetColorTexture(1, 1, 1, 0.05)
+		head.toggle = SmallButton(head, "+")
+		head.toggle:SetPoint("LEFT", 2, 0)
+		kit.Tooltip(head.toggle, L["Open or close this moment's emotes."])
+		head.check = CreateFrame("CheckButton", nil, head, "UICheckButtonTemplate")
+		if ns.SkinCheck then ns.SkinCheck(head.check) end
+		head.check:SetSize(24, 24)
+		head.check:SetPoint("LEFT", head.toggle, "RIGHT", 2, 0)
+		head.name = kit.Label(head, "GameFontNormal", "")
+		head.name:SetPoint("LEFT", head.check, "RIGHT", 2, 0)
+		head.count = kit.Label(head, "GameFontDisableSmall", "")
+		head.count:SetPoint("RIGHT", -8, 0)
+		head.summary = kit.Label(head, "GameFontDisableSmall", "")
+		head.summary:SetPoint("LEFT", head.name, "RIGHT", 10, 0)
+		head.summary:SetPoint("RIGHT", head.count, "LEFT", -8, 0)
+		head.summary:SetJustifyH("LEFT")
+		head.summary:SetWordWrap(false)
+		-- (A click on the band itself opens or closes it too.)
+		head:EnableMouse(true)
+		head:SetScript("OnMouseUp", function(self) if self.toggle:IsEnabled() then self.toggle:Click() end end)
+		head.add = SmallButton(box, L["Add an emote"], 120)
+		kit.Tooltip(head.add, L["Pick an emote to add as a button on this card: a common one, any of the " ..
+			"game's, or a voice emote (said out loud). Up to six."])
+		heads[i] = head
+		return head
+	end
+	local function Row(n)
+		if rows[n] then return rows[n] end
+		local row = CreateFrame("Frame", nil, box)
+		row:SetSize(GRID_W - 26, ROW_H)
+		row.name = kit.Label(row, "GameFontHighlightSmall", "")
+		row.name:SetPoint("LEFT", 0, 0)
+		row.name:SetWidth(300)
+		row.name:SetJustifyH("LEFT")
+		row.name:SetWordWrap(false)
+		row.play = SmallButton(row, ">")
+		row.play:SetPoint("LEFT", row.name, "RIGHT", 8, 0)
+		row.up = SmallButton(row, "^")
+		row.up:SetPoint("LEFT", row.play, "RIGHT", 4, 0)
+		row.remove = SmallButton(row, "x")
+		row.remove:SetPoint("LEFT", row.up, "RIGHT", 4, 0)
+		kit.Tooltip(row.play, L["Play it, to see it (at no one)."])
+		kit.Tooltip(row.up, L["Move this emote up: its button comes first."])
+		kit.Tooltip(row.remove, L["Take it off this card."])
+		rows[n] = row
+		return row
+	end
+
+	local defaults = SmallButton(box, L["Back to the defaults"], 160)
+	kit.Tooltip(defaults, L["Every moment's emotes as they come."])
+	defaults:SetScript("OnClick", function()
+		local db = ns.GetDB()
+		for _, moment in ipairs(MOMENTS) do db[moment.key] = DEFAULTS[moment.key] end
+		Changed()
+		Rebuild()
+	end)
+
+	function Rebuild()
+		local db = DB()
+		local pageOn = On() and true or false
+		for _, head in ipairs(heads) do head:Hide() head.add:Hide() end
+		for _, row in ipairs(rows) do row:Hide() end
+		local y, n = 0, 0
+		for i, moment in ipairs(MOMENTS) do
+			local head = Head(i)
+			head:ClearAllPoints()
+			head:SetPoint("TOPLEFT", box, "TOPLEFT", 0, -y)
+			head:Show()
+			y = y + HEAD_H + 2
+			local momentOn = db[moment.on] and true or false
+			-- (Its font before its text: the other way, Russian letters show as boxes.)
+			head.name:SetFontObject(pageOn and momentOn and "GameFontNormal" or "GameFontDisable")
+			head.name:SetText(L[moment.name])
+			head.check:SetChecked(momentOn)
+			head.check:SetEnabled(pageOn)
+			head.check:SetScript("OnClick", function(self)
+				ns.GetDB()[moment.on] = self:GetChecked() and true or false
+				Changed()
+				Rebuild()
+			end)
+			kit.Tooltip(head.check, L[moment.tip])
+			local list = List(moment)
+			head.count:SetText(("%d/%d"):format(#list, MAX_EMOTES))
+			local open = pageOn and momentOn
+			local expanded = opened[moment.id] and true or false
+			head.toggle:SetText(expanded and "-" or "+")
+			head.toggle:SetScript("OnClick", function()
+				opened[moment.id] = not opened[moment.id]
+				Rebuild()
+			end)
+			local names = {}
+			for _, token in ipairs(list) do names[#names + 1] = EmoteName(token) end
+			head.summary:SetText(not expanded and table.concat(names, ", ") or "")
+			for k, token in ipairs(expanded and list or {}) do
+				n = n + 1
+				local row = Row(n)
+				row:ClearAllPoints()
+				row:SetPoint("TOPLEFT", box, "TOPLEFT", 26, -y)
+				row:Show()
+				y = y + ROW_H
+				local text = EmoteName(token)
+				if token ~= SAME then text = text .. "  |cff808080" .. Command(token) .. "|r  " .. EmoteTags(token) end
+				if token == SAME then
+					text = text .. "  |cff808080" .. L["(the emote they did at you)"] .. "|r"
+				end
+				row.name:SetText(text)
+				row.name:SetAlpha(open and 1 or 0.5)
+				row.play:SetShown(token ~= SAME)
+				row.play:SetScript("OnClick", function() TryEmote(token) end)
+				row.up:SetEnabled(open and k > 1)
+				row.remove:SetEnabled(open)
+				row.up:SetScript("OnClick", function()
+					local now = List(moment)
+					now[k], now[k - 1] = now[k - 1], now[k]
+					Save(moment, now)
+				end)
+				row.remove:SetScript("OnClick", function()
+					local now = List(moment)
+					table.remove(now, k)
+					Save(moment, now)
+				end)
+			end
+			if not expanded then
+				y = y + 2
+			elseif #list == 0 then
+				n = n + 1
+				local row = Row(n)
+				row:ClearAllPoints()
+				row:SetPoint("TOPLEFT", box, "TOPLEFT", 26, -y)
+				row:Show()
+				row.name:SetText("|cff808080" .. L["No emotes: no card"] .. "|r")
+				row.play:Hide()
+				row.up:Hide()
+				row.remove:Hide()
+				y = y + ROW_H
+			else
+				for k = n - #list + 1, n do rows[k].up:Show() rows[k].remove:Show() end
+			end
+			if expanded then
+				head.add:ClearAllPoints()
+				head.add:SetPoint("TOPLEFT", box, "TOPLEFT", 26, -y)
+				head.add:Show()
+				head.add:SetEnabled(open and #list < MAX_EMOTES)
+				head.add:SetScript("OnClick", function(self) AddMenu(self, moment) end)
+				y = y + 28
+			end
+		end
+		defaults:ClearAllPoints()
+		defaults:SetPoint("TOPLEFT", box, "TOPLEFT", 0, -y - 4)
+		defaults:SetEnabled(pageOn)
+		box:SetHeight(y + 30)
+		if kit.FitContentHeight then kit.FitContentHeight(content) end
+	end
+
+	-- (Rebuilt as the page shows and as settings change: a profile, Reset.)
+	box.Refresh = function()
+		if content:IsVisible() then Rebuild() end
+	end
+	box.pageSwitch = false
+	kit.AddControl(box)
+	Rebuild()
+end
+
+local LookTiles -- (below, with its pictures)
+
+-- Vision: turning it on, where (Show in), and the moments and their emotes.
 function ns.CreateEmoteVisionPanel(kit)
 	local canvas, content = kit.CreateScrollPage()
 	local title = kit.Label(content, "GameFontNormalLarge", L["Emote Vision"])
-	title:SetPoint("TOPLEFT", 16, -16)
+	Tabs(content, title, 1)
 	local intro = kit.PageIntro(content, title,
-		L["When someone buffs you, brings you back to life or emotes at you, a small card shows who it was, " ..
-		"with a few emotes to answer in one click. It waits out fights and fades away by itself."])
-	local function Changed() ns.RefreshEmoteVision() end
+		L["When someone does something for you or at you, a small card shows who it was, with a few " ..
+		"emotes to answer in one click. It waits out fights and fades away by itself. Pick the moments and " ..
+		"their emotes below. When it shows: the Settings tab. Its style and look: the Look tab."])
 	local switch = kit.PageSwitch(content, "emoteVision", L["Enable Page"],
-		L["On: the cards show as ticked below. Off: none do, and it keeps its settings for when you turn " ..
-		"this back on."], intro, Changed)
+		L["On: the cards show as ticked below. Off: none do, and it keeps its settings for when " ..
+		"you turn this back on."], intro, Changed)
 	local stack = kit.Stack(switch, "check")
-	local rows = ns.StyleRows(kit, content, stack, Changed, "emoteVision")
-	local function On() return ns.GetDB() and ns.GetDB().emoteVision end
 
 	local header = stack:Header(content, L["Show in"])
 	local lastRow = ns.ShowTable(content, header, {
@@ -644,86 +2165,232 @@ function ns.CreateEmoteVisionPanel(kit)
 	}, L["Emote Vision"])
 	stack:Continue(lastRow, "label")
 
-	stack:Header(content, L["Moments"])
-	rows.Check("emoteVisionBuffs", L["Someone buffs you"], L["A buff of a minute or more someone else puts on " ..
-		"you (Fortitude, Arcane Intellect, a blessing...): Thank, Bow or Salute. Not heals over time."], On)
-	rows.Check("emoteVisionRes", L["You're brought back to life"], L["Someone resurrects you and you accept: " ..
-		"Thank, Kneel or Cheer. Whoever it is, Who below or not."], On)
-	rows.Check("emoteVisionEmotes", L["Someone emotes at you"], L["Someone waves, bows, hugs or the like at " ..
-		"you: the same back, Wave, Smile or Bow."], On)
-
-	stack:Header(content, L["Who"])
-	rows.Check("emoteVisionGroup", L["Your party or raid"], nil, On)
-	rows.Check("emoteVisionGuild", L["Your guild"], nil, On)
-	rows.Check("emoteVisionFriends", L["Your friends"], L["Friends and Battle.net friends."], On)
-	rows.Check("emoteVisionStrangers", L["Anyone else"], L["Everyone not above: strangers in a city buffing " ..
-		"everyone near them too."], On)
-
-	stack:Header(content, L["Card"])
-	local hold = stack:Add(kit.Slider(content, "emoteVisionHold", L["Stays for"], 3, 20, 1, "%d sec", 1, Changed),
-		"slider")
-	kit.Tooltip(hold, L["How long a card stays before it fades. The mouse over it holds it."])
-	kit.GreyUnless(hold, On)
-	local size = stack:Add(kit.Slider(content, "emoteVisionScale", L["Size"], 50, 150, 5, "%d%%", 100, Changed),
-		"slider")
-	kit.GreyUnless(size, On)
-	rows.Check("emoteVisionPortrait", L["Their face"], L["Their portrait on the card (their class's icon when " ..
-		"they're out of sight)."], On)
-
-	-- Test and Move, on a row of their own.
-	local row = CreateFrame("Frame", nil, content)
-	row:SetSize(300, 26)
-	stack:Add(row, "label")
-	local test = ns.PanelButton(content)
-	test:SetSize(100, 22)
-	test:SetPoint("LEFT", row, "LEFT")
-	test:SetText(L["Test"])
-	test:SetScript("OnClick", function() ns.TestEmoteVision() end)
-	test.Refresh = function() end -- (before GreyUnless, which wraps it)
-	kit.Tooltip(test, L["Shows a pretend card (close the settings to see it). Its buttons only say in chat " ..
-		"what they'd do."])
-	kit.GreyUnless(test, On)
-	kit.AddControl(test)
-	local move = ns.PanelButton(content)
-	move:SetSize(100, 22)
-	move:SetPoint("LEFT", test, "RIGHT", 8, 0)
-	local function Label() move:SetText(ns.EmoteVisionMoving() and L["Done"] or L["Move"]) end
-	move:SetScript("OnClick", function()
-		ns.MoveEmoteVision()
-		Label()
-	end)
-	move:SetScript("OnUpdate", Label)
-	move.Refresh = Label
-	kit.Tooltip(move, L["Holds the card up so you can drag it where you want it; Done lets it go."])
-	kit.GreyUnless(move, On)
-	kit.AddControl(move)
-	local reset = ns.PanelButton(content)
-	reset:SetSize(100, 22)
-	reset:SetPoint("LEFT", move, "RIGHT", 8, 0)
-	reset:SetText(L["Reset"])
-	reset:SetScript("OnClick", function()
-		local db = ns.GetDB()
-		db.emoteVisionX, db.emoteVisionY = DEFAULTS.emoteVisionX, DEFAULTS.emoteVisionY
-		Changed()
-	end)
-	reset.Refresh = function() end -- (before GreyUnless, which wraps it)
-	kit.Tooltip(reset, L["Puts the card back where it starts, low in the middle of the screen."])
-	kit.GreyUnless(reset, On)
-	kit.AddControl(reset)
-
-	stack:Header(content, L["Look"])
-	rows.Font("emoteFont")
-	local textSize = stack:Add(kit.Slider(content, "emoteTextSize", L["Text size"], 70, 150, 5, "%d%%", 100,
-		Changed), "slider")
-	kit.GreyUnless(textSize, On)
-	rows.Outline("emoteOutline", L["Outline"], 2, { [0] = L["None"], L["Thin"], L["Thick"] })
-	rows.Choices(L["Shadow:"], "emoteShadow", {
-		{ "general", ns.SharedStyleSource("emoteShadow") }, { "game", L["The game's"] }, { "on", L["Shadow"] },
-		{ "none", L["None"] },
-	})
-	rows.Border(L["Border:"], "emoteBorder", { game = L["The game's"] })
+	local moments = stack:Header(content, L["Moments"])
+	local test = TestButton(content)
+	-- (After the "?" its help puts beside it, 6 + 18 wide: PageIntro's.)
+	test:SetPoint("LEFT", moments, "RIGHT", 36, 0)
+	kit.Tooltip(test, L[TEST_TIP])
+	stack:Help(content, L["Each moment's card has a button for each emote under it, in that order. Untick a " ..
+		"moment for no card at all. + opens a moment."])
+	MomentsGrid(kit, content, stack)
 
 	canvas:SetScript("OnShow", kit.PageShown(kit.Refresh, content))
 	canvas:Hide()
 	kit.RegisterSubpage(canvas, "Emote Vision")
+end
+
+-- Settings: when the cards show, and for how long.
+function ns.CreateEmoteVisionSettingsPanel(kit)
+	local canvas, content = kit.CreateScrollPage()
+	local title = kit.Label(content, "GameFontNormalLarge", L["Emote Vision"])
+	Tabs(content, title, 2)
+	local intro = kit.PageIntro(content, title,
+		L["When the cards show and for how long. The moments and their emotes: the Vision tab. Its look: " ..
+		"the Look tab."])
+	local stack = kit.Stack(intro, "label")
+	local b = ns.VisionRows(kit, content, stack, Changed)
+
+	stack:Header(content, L["When"])
+	b.Toggles(L["Only:"], {
+		{ "emoteVisionStill", L["Only while you stand still"], L["While you're moving the card waits, and " ..
+			"shows once you stop (if that's within 20 seconds)."] },
+	}, On)
+	b.Toggles(L["Repeats:"], {
+		{ "emoteVisionRepeats", L["Ignore repeats from the same person"], L["The same person doing the same " ..
+			"again (buffing you again, another wave) brings up no card for the minutes below. Their other " ..
+			"moments still do."] },
+	}, On)
+	b.Number(L["Ignored for:"], "emoteVisionRepeatMins", 1, 60, 1, 1, L["min"], L["How long a repeat is ignored for."],
+		function(db) return db.emoteVision and db.emoteVisionRepeats end)
+	b.Number(L["Stays for:"], "emoteVisionHold", 3, 20, 1, 1, L["sec"],
+		L["How long a card stays before it fades. The mouse over it holds it."], On)
+
+	canvas:SetScript("OnShow", kit.PageShown(kit.Refresh, content))
+	canvas:Hide()
+	kit.RegisterSubpage(canvas, "Emote Vision Settings")
+end
+
+-- The six styles as picture tiles (as Damage Vision's types): a little card
+-- in each one's look, a click picks it. Draw: its textures on the tile's
+-- picture area, 100 x 40.
+local function Rect(area, layer, r, g, b, a, w, h, point, x, y)
+	local tex = area:CreateTexture(nil, layer)
+	tex:SetColorTexture(r, g, b, a)
+	tex:SetSize(w, h)
+	tex:SetPoint(point or "CENTER", area, point or "CENTER", x or 0, y or 0)
+	return tex
+end
+local function Dot(area, layer, r, g, b, size, point, x, y)
+	local tex = area:CreateTexture(nil, layer)
+	tex:SetTexture("Interface\\CHARACTERFRAME\\TempPortraitAlphaMask")
+	tex:SetVertexColor(r, g, b)
+	tex:SetSize(size, size)
+	tex:SetPoint(point or "CENTER", area, point or "CENTER", x or 0, y or 0)
+	return tex
+end
+local LOOK_DRAW = {
+	classic = function(area)
+		Rect(area, "BACKGROUND", 0.55, 0.42, 0.16, 1, 92, 40)
+		Rect(area, "BORDER", 0.04, 0.04, 0.05, 1, 90, 38)
+		Dot(area, "ARTWORK", 0.85, 0.85, 0.85, 12, "TOPLEFT", 8, -5)
+		Rect(area, "ARTWORK", 1, 1, 1, 0.9, 40, 3, "TOPLEFT", 24, -7)
+		Rect(area, "ARTWORK", 1, 0.82, 0, 0.9, 54, 3, "TOPLEFT", 24, -13)
+		for i = 0, 2 do Rect(area, "ARTWORK", 0.4, 0.08, 0.08, 1, 22, 8, "TOPLEFT", 12 + i * 25, -24) end
+	end,
+	parchment = function(area)
+		Rect(area, "BACKGROUND", 0.42, 0.29, 0.13, 1, 92, 40)
+		Rect(area, "BORDER", 0.9, 0.83, 0.64, 1, 88, 36)
+		Dot(area, "ARTWORK", 0.6, 0.16, 0.13, 13, "TOPLEFT", 8, -5)
+		Rect(area, "ARTWORK", 0.23, 0.15, 0.06, 1, 40, 3, "TOPLEFT", 25, -7)
+		Rect(area, "ARTWORK", 0.42, 0.29, 0.14, 1, 52, 2, "TOPLEFT", 25, -13)
+		Rect(area, "ARTWORK", 0.62, 0.5, 0.31, 1, 74, 1, "TOPLEFT", 9, -21)
+		for i = 0, 2 do Rect(area, "ARTWORK", 0.42, 0.27, 0.1, 0.4, 20, 7, "TOPLEFT", 13 + i * 24, -26) end
+	end,
+	bubble = function(area)
+		Dot(area, "ARTWORK", 0.85, 0.85, 0.85, 14, "LEFT", 0, 0)
+		Rect(area, "BACKGROUND", 0.85, 0.85, 0.85, 0.9, 78, 38, "RIGHT", 0, 0)
+		Rect(area, "BORDER", 0.12, 0.12, 0.13, 0.95, 76, 36, "RIGHT", -1, 0)
+		Rect(area, "BORDER", 0.85, 0.85, 0.85, 0.9, 6, 6, "LEFT", 16, 0) -- (its tail, at the face)
+		Rect(area, "ARTWORK", 1, 1, 1, 0.9, 50, 3, "TOPLEFT", 30, -8)
+		for i = 0, 2 do Rect(area, "ARTWORK", 0, 0, 0, 0.6, 18, 7, "TOPLEFT", 30 + i * 21, -24) end
+	end,
+	subtitle = function(area)
+		Rect(area, "BACKGROUND", 0, 0, 0, 0.45, 84, 36)
+		Rect(area, "ARTWORK", 1, 1, 1, 0.95, 60, 3, "CENTER", 0, 8)
+		Rect(area, "ARTWORK", 1, 0.82, 0, 0.9, 44, 2, "CENTER", 0, 2)
+		for i = -1, 1 do Rect(area, "ARTWORK", 1, 0.82, 0, 1, 14, 2, "CENTER", i * 22, -8) end
+		Rect(area, "ARTWORK", 1, 0.82, 0, 0.6, 36, 1, "CENTER", 0, -15)
+	end,
+	banner = function(area)
+		Rect(area, "BACKGROUND", 0.04, 0.04, 0.05, 1, 100, 38)
+		Rect(area, "BORDER", 0.79, 0.64, 0.29, 1, 100, 2, "TOP")
+		Rect(area, "BORDER", 0.79, 0.64, 0.29, 1, 100, 2, "BOTTOM", 0, 1)
+		Rect(area, "ARTWORK", 0.79, 0.64, 0.29, 1, 26, 2, "TOP", 0, -6)
+		Rect(area, "ARTWORK", 1, 1, 1, 1, 40, 4, "TOP", 0, -12)
+		for i = -1, 1 do
+			Rect(area, "ARTWORK", 0.79, 0.64, 0.29, 1, 18, 8, "TOP", i * 22, -24)
+			Rect(area, "OVERLAY", 0.04, 0.04, 0.05, 1, 16, 6, "TOP", i * 22, -25)
+		end
+	end,
+	wheel = function(area)
+		Dot(area, "BACKGROUND", 0.79, 0.64, 0.29, 38)
+		Dot(area, "BORDER", 0.1, 0.1, 0.11, 36)
+		Dot(area, "ARTWORK", 0.85, 0.85, 0.85, 15)
+		for i = 0, 5 do
+			local angle = math.pi / 2 - i * math.pi / 3
+			Rect(area, "OVERLAY", 0.45, 0.08, 0.06, 1, 10, 5, "CENTER", math.cos(angle) * 16, math.sin(angle) * 16)
+			Rect(area, "OVERLAY", 1, 0.82, 0, 1, 6, 1, "CENTER", math.cos(angle) * 16, math.sin(angle) * 16)
+		end
+	end,
+}
+function LookTiles(kit, content, stack)
+	local grid = CreateFrame("Frame", nil, content)
+	grid:SetSize(400, 2 * 80 + 10)
+	stack:Add(grid, "label", 2)
+	for i, key in ipairs(LOOK_ORDER) do
+		local tile = CreateFrame("Button", nil, grid)
+		tile:SetSize(124, 80)
+		tile:SetPoint("TOPLEFT", ((i - 1) % 3) * 134, -math.floor((i - 1) / 3) * 90)
+		local back = tile:CreateTexture(nil, "BACKGROUND")
+		back:SetAllPoints()
+		back:SetColorTexture(0, 0, 0, 0.45)
+		local lit = tile:CreateTexture(nil, "BORDER")
+		lit:SetAllPoints()
+		lit:SetColorTexture(1, 0.82, 0, 0.08)
+		local area = CreateFrame("Frame", nil, tile)
+		area:SetSize(100, 40)
+		area:SetPoint("TOP", 0, -10)
+		LOOK_DRAW[key](area)
+		local name = tile:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+		name:SetPoint("BOTTOM", 0, 8)
+		name:SetText(L[LOOK_NAMES[key]])
+		local edges = ns.MakeStyleEdges(tile)
+		kit.Tooltip(tile, L[LOOK_TIPS[key]])
+		tile:SetScript("OnClick", function()
+			ns.GetDB().emoteVisionLook = key
+			Changed()
+			kit.Refresh()
+		end)
+		tile.Refresh = function()
+			local picked = (ns.GetDB() or DEFAULTS).emoteVisionLook == key
+			ns.DressStyleEdges(edges, picked and 2 or 1, picked and 1 or 0.4, picked and 0.82 or 0.4,
+				picked and 0 or 0.4, 1)
+			lit:SetShown(picked)
+			name:SetTextColor(picked and 1 or 0.8, picked and 0.82 or 0.8, picked and 0 or 0.8)
+		end
+		tile.pageSwitch = false
+		kit.AddControl(tile)
+	end
+end
+
+-- Look: its style as picture tiles (as Damage Vision's types) and the Test,
+-- its words, frame and face, and where it sits.
+function ns.CreateEmoteVisionStylePanel(kit)
+	local canvas, content = kit.CreateScrollPage()
+	local title = kit.Label(content, "GameFontNormalLarge", L["Emote Vision"])
+	Tabs(content, title, 3)
+	local intro = kit.PageIntro(content, title,
+		L["Pick its style, then how its words and frame look and where it sits. The font, outline, shadow " ..
+		"and border start on Visions Style's. Press Test and close the settings to see it."])
+	local stack = kit.Stack(intro, "label")
+	local rows = ns.StyleRows(kit, content, stack, Changed, "emoteVision")
+	local b = ns.VisionRows(kit, content, stack, Changed)
+
+	stack:Header(content, L["Style"])
+	LookTiles(kit, content, stack)
+	local tests = b.Row("")
+	local test = TestButton(tests)
+	test:SetPoint("LEFT")
+	kit.Tooltip(test, L[TEST_TIP])
+
+	stack:Header(content, L["Words"])
+	rows.Font("emoteFont")
+	b.Number(L["Size:"], "emoteTextSize", 70, 150, 5, 100, "%", L["The words' size, next to their own."], On)
+	rows.Outline("emoteOutline", L["Outline"], 2, { [0] = L["None"], L["Thin"], L["Thick"] })
+	b.Choices(L["Shadow:"], "emoteShadow", {
+		{ "general", ns.SharedStyleSource("emoteShadow") }, { "game", L["The game's"] }, { "on", L["Shadow"] },
+		{ "none", L["None"] },
+	}, On)
+
+	stack:Header(content, L["Frame"])
+	rows.Border(L["Border:"], "emoteBorder", { game = L["The game's"] })
+	b.Toggles(L["Show:"], {
+		{ "emoteVisionPortrait", L["Their face"], L["Their portrait on the card (their class's icon when " ..
+			"they're out of sight)."] },
+	}, On)
+
+	stack:Header(content, L["Position"])
+	b.Number(L["Scale:"], "emoteVisionScale", 50, 150, 5, 100, "%", L["The whole card at once."], On)
+	-- Its X and Y (yours, once typed or dragged), Move to drag it, Reset to put
+	-- it back above speech from behind you.
+	local XY_TIP = L["How far right (X) of the middle of the screen, and up (Y) from its bottom, the card sits. " ..
+		"Typing here or dragging it with Move puts it there; Reset puts it back above speech from behind you."]
+	local row, name = b.Row(L["Emote Vision:"])
+	local line = kit.BoxLine(content) -- (the page's: its Reset puts them back)
+	line:SetPoint("LEFT", name, "RIGHT", 4, 0)
+	local function Own()
+		ns.GetDB().emoteVisionSpot = "own"
+		Changed()
+	end
+	line:Box("X", "emoteVisionX", -2000, 2000, 1, "%d", 1, XY_TIP, Own, 52)
+	local yBox = line:Box("Y", "emoteVisionY", 0, 1600, 1, "%d", 1, XY_TIP, Own, 52)
+	local move = b.Button(row, L["Move"], 90, L["Holds the card up so you can drag it where you want it; Done " ..
+		"lets it go. Close the settings to see it."], function()
+		ns.MoveEmoteVision()
+	end)
+	move:SetPoint("LEFT", yBox, "RIGHT", 16, 0)
+	move:SetScript("OnUpdate", function(self) self:SetText(ns.EmoteVisionMoving() and L["Done"] or L["Move"]) end)
+	local reset = b.Button(row, L["Reset"], 90, L["Puts the card back where it starts: just above where speech " ..
+		"from behind you shows (the Chat Bubbles page's Move), beside the chat window."], function()
+		local db = ns.GetDB()
+		db.emoteVisionX, db.emoteVisionY = DEFAULTS.emoteVisionX, DEFAULTS.emoteVisionY
+		db.emoteVisionSpot = DEFAULTS.emoteVisionSpot
+		Changed()
+		kit.Refresh()
+	end)
+	reset:SetPoint("LEFT", move, "RIGHT", 8, 0)
+
+	canvas:SetScript("OnShow", kit.PageShown(kit.Refresh, content))
+	canvas:Hide()
+	kit.RegisterSubpage(canvas, "Emote Vision Style")
 end

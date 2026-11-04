@@ -15,7 +15,7 @@ local VISIONS = {
 	{ "Quest item button", "Quest Item Style", "questItem" },
 	{ "Roll Vision", "Roll Style", "roll" },
 	{ "Card Vision", "Card Styles", "card" },
-	{ "Emote Vision", "Emote Vision", "emote" },
+	{ "Emote Vision", "Emote Vision Style", "emote" },
 }
 local KIND_NAMES = { texture = "Texture", font = "Font", outline = "Outline", shadow = "Shadow", border = "Border" }
 -- (Its own settings, for Reset.)

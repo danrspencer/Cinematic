@@ -98,11 +98,12 @@ for _, trigger in ipairs({
 	if trigger.key == "Flight" then trigger.music = "musicCamFlight" end
 	if not (FOREVER_ONLY[trigger.key] and ns.isRetail) then ns.RegisterCameraTrigger(trigger) end
 end
--- (The chat camera: ChatCam.lua; no music or CineMode switch yet.)
+-- (The chat camera: ChatCam.lua; no music switch yet.)
 if ns.ChatCamCommand then
-	ns.RegisterCameraTrigger({ key = "Chat", camera = "chatCamera", cameras = { "chat", "none" }, off = "none" })
-	ns.RegisterCameraTrigger({ key = "ChatNearby", camera = "chatNearbyCamera", cameras = { "chat", "none" },
+	ns.RegisterCameraTrigger({ key = "Chat", camera = "chatCamera", cine = "chatCine", cameras = { "chat", "none" },
 		off = "none" })
+	ns.RegisterCameraTrigger({ key = "ChatNearby", camera = "chatNearbyCamera", cine = "chatNearbyCine",
+		cameras = { "chat", "none" }, off = "none" })
 	-- Capital cities' citizens never stop chatting: that row's Cities unticked
 	-- to start with (its other ticks follow the chat camera's).
 	ns.LIST_DEFAULTS.cityShow["trig:ChatNearby"] = false

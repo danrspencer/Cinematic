@@ -199,6 +199,7 @@ local turn = { amount = 0, moving = false, stoppedAt = 0, primedUntil = 0 }
 local convo
 local leaving -- once it's over: { zoom, zoomedTo, startedAt } until the turn back starts
 local zoomingOut -- the distance the zoom back out is heading for
+local takenBy -- the row that took the last line ("Chat" or "ChatNearby": see Ambient)
 
 local watcher = CreateFrame("Frame")
 
@@ -208,6 +209,9 @@ local watcher = CreateFrame("Frame")
 ns.DEFAULTS.chatCamera = "none"        -- (the Cinema profile's cameras: "chat", ProfileModules.lua)
 ns.DEFAULTS.chatNearbyCamera = "none"
 ns.DEFAULTS.chatNearbyDelay = 10
+-- (Their CineMode ticks: with "Start in CineMode" off, a conversation brings it on. Camera.lua.)
+ns.DEFAULTS.chatCine = false
+ns.DEFAULTS.chatNearbyCine = false
 -- Its section on the Camera Settings page.
 ns.DEFAULTS.chatCamDistance = 4      -- yards it zooms in to (if you're further out)
 ns.DEFAULTS.chatCamZoomSpeed = 0.5   -- yards a second the zoom in goes
@@ -582,7 +586,7 @@ end
 -- back and zooms back out (unless you zoomed yourself).
 local function End(why)
 	Say("conversation over (" .. why .. ")" .. (Turned() and (", turning back from %+.1f deg"):format(turn.amount) or ""))
-	leaving = { zoom = convo.zoom, zoomedTo = convo.zoomedTo, startedAt = convo.startedAt }
+	leaving = { zoom = convo.zoom, zoomedTo = convo.zoomedTo, startedAt = convo.startedAt, scene = convo.scene }
 	convo = nil
 	EaseToStop()
 end
@@ -1506,7 +1510,7 @@ end
 local function Heard(text, name, event)
 	local now = GetTime()
 	if not convo then
-		convo = { nextAimAt = 0, startedAt = now, gain = GAIN_START, base = 0 }
+		convo = { nextAimAt = 0, startedAt = now, gain = GAIN_START, base = 0, scene = not fake and takenBy or nil }
 		if frameLog.on or fake then -- (a Test button run is always logged)
 			ns.db.chatCamLog = {}
 			frameLog.lines, frameLog.startedAt = ns.db.chatCamLog, now
@@ -1559,16 +1563,21 @@ local function Plain(value)
 	return type(value) == "string" and not Secret(value) and value or nil
 end
 
--- Why a line isn't taken by its row, or nil.
+-- Why a line isn't taken by its row, or nil. (Taken: takenBy, the row's key,
+-- for the conversation it starts: its CineMode tick, Camera.lua.)
 local function Ambient(event, name, now)
+	takenBy = nil
 	if convo or leaving or (zoomingOut and ns.QuestCamZooming()) then
+		takenBy = leaving and leaving.scene or nil
 		return nil
 	elseif event == "CHAT_MSG_MONSTER_PARTY" or talking or now - talkedAt < TALKED_WINDOW
 		or (name ~= "?" and Plain(UnitName("target")) == name) then
+		takenBy = "Chat"
 		return ns.db.chatCamera ~= "chat" and "NPCs you talk to: no camera" or nil
 	elseif ns.db.chatNearbyCamera ~= "chat" then
 		return "NPCs chatting nearby: no camera"
 	end
+	takenBy = "ChatNearby"
 	stillSince = stillSince or now
 	local wait = ns.db.chatNearbyDelay or 0
 	if now - stillSince < wait then
@@ -1702,6 +1711,12 @@ end)
 -- minimap by it: ns.activeCam, Camera.lua).
 function ns.ChatCamActive()
 	return convo ~= nil
+end
+
+-- The scene whose row started the conversation going now ("Chat" or
+-- "ChatNearby"; nil for none, or a Test run).
+function ns.ChatCamScene()
+	return convo and convo.scene
 end
 
 -- Whether Ultra immersive has the screen now: a conversation going, with it

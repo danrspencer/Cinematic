@@ -1154,9 +1154,9 @@ end)
 
 local function DamageTabs(content, title, picked)
 	local panel = ns.PageTabs(content, {
-		{ L["Vision"], "Damage Vision", L["Turning it on, when it shows and what it counts."] },
-		{ L["Settings"], "Damage Vision Style", L["Its type, and that type's settings."] },
-		{ L["Look"], "Damage Vision Look", L["Its colors, bars and words, and where it sits."] },
+		{ L["Vision"], "Damage Vision", L["Turning it on, when it shows, what it counts, its tests and the " ..
+			"picked type's settings."] },
+		{ L["Look"], "Damage Vision Look", L["Its type, colors, bars and words, and where it sits."] },
 	}, picked)
 	title:ClearAllPoints()
 	title:SetPoint("TOPLEFT", panel, "BOTTOMLEFT", 8, -14)
@@ -1249,7 +1249,9 @@ local function Builder(kit, content, stack, Changed)
 	end
 	return b
 end
+ns.VisionRows = Builder -- (the other Visions' pages, laid out the same: EmoteVision.lua)
 
+local TypeSettings -- (below: the tests and the picked type's settings)
 function ns.CreateDamageVisionPanel(kit)
 	local canvas, content = kit.CreateScrollPage()
 	local title = kit.Label(content, "GameFontNormalLarge", L["Damage Vision"])
@@ -1257,7 +1259,7 @@ function ns.CreateDamageVisionPanel(kit)
 	local intro = kit.PageIntro(content, title,
 		L["Not the damage meter's numbers: your race with the player ahead of you, or your lead over #2 once " ..
 		"you're #1. It reads the game's own damage meter, so that needs to be on (Options, Gameplay " ..
-		"Enhancements: Enable Damage Meter). Its type: the Settings tab. How it looks: the Look tab."])
+		"Enhancements: Enable Damage Meter). Its type and how it looks: the Look tab."])
 	local function Changed()
 		ns.RefreshDamageVision()
 	end
@@ -1312,12 +1314,14 @@ function ns.CreateDamageVisionPanel(kit)
 		{ "damageVisionRecapRun", L["A dungeon"], L["Ticked, how you did on the whole run as it's done."] },
 	})
 
+	TypeSettings(kit, content, stack, b)
+
 	canvas:SetScript("OnShow", kit.PageShown(kit.Refresh, content))
 	canvas:Hide()
 	kit.RegisterSubpage(canvas, "Damage Vision")
 end
 
--- The types, as the Settings tab's tiles show them: a little picture of
+-- The types, as the Look tab's tiles show them: a little picture of
 -- each (Draw: its textures on the tile's picture area, 100 x 40).
 local TYPES = {
 	{ value = "gap", name = "Gap bar", tip = "One bar: full is the player ahead, filled is the one behind.",
@@ -1370,31 +1374,9 @@ local PRESET_KEYS = { "damageVisionTexture", "damageVisionBarHeight", "damageVis
 	"damageVisionBorderR", "damageVisionBorderG", "damageVisionBorderB", "damageVisionSmooth", "damageVisionSpark",
 	"damageVisionTextSize", "damageVisionOutline", "damageVisionTextColor" }
 
--- Settings: the type as picture tiles (a click picks it), the tests, what
--- shows over it, then the picked type's own settings (the others' hidden:
--- each type's start at the same place, last on the page, so nothing's left
--- with a gap).
-function ns.CreateDamageVisionStylePanel(kit)
-	local canvas, content = kit.CreateScrollPage()
-	local title = kit.Label(content, "GameFontNormalLarge", L["Damage Vision"])
-	DamageTabs(content, title, 2)
-	local intro = kit.PageIntro(content, title,
-		L["Pick its type, then that type's settings below. Press Test and close the settings to see it. Its " ..
-		"colors and words: the Look tab."])
-	local function Changed()
-		ns.RefreshDamageVision()
-	end
-	local stack = kit.Stack(intro, "label")
-	local b = Builder(kit, content, stack, Changed)
-	local sections = {} -- the type's value -> what its settings made
-
-	local function ShowType()
-		local picked = ns.GetDB().damageVisionStyle
-		for value, made in pairs(sections) do
-			for _, each in ipairs(made) do each:SetShown(value == picked) end
-		end
-	end
-
+-- The type as picture tiles (a click picks it), under a Type header: the
+-- Look tab's first row. (Not page controls: the Look switch leaves them be.)
+local function TypeTiles(kit, content, stack, Changed)
 	stack:Header(content, L["Type"])
 	local tileRow = CreateFrame("Frame", nil, content)
 	tileRow:SetSize(560, 84)
@@ -1435,8 +1417,25 @@ function ns.CreateDamageVisionStylePanel(kit)
 		kit.AddControl(tile)
 		last = tile
 	end
+end
+
+-- The Vision tab's last rows: the tests, what shows over it, then the picked
+-- type's own settings (the type itself: the Look tab's tiles; the others'
+-- hidden: each type's start at the same place, last on the page, so
+-- nothing's left with a gap).
+TypeSettings = function(kit, content, stack, b)
+	local sections = {} -- the type's value -> what its settings made
+
+	local function ShowType()
+		local picked = ns.GetDB().damageVisionStyle
+		for value, made in pairs(sections) do
+			for _, each in ipairs(made) do each:SetShown(value == picked) end
+		end
+	end
+
 	-- The tests: each Stop while it runs (a click stops it), its own name
 	-- again as it ends. (Not page controls: they work with the page off.)
+	stack:Header(content, L["Test"])
 	local tests = b.Row("")
 	local function RunButton(width, text, tip, Running, Start, Stop)
 		local button = b.Button(tests, text, width, tip, function()
@@ -1506,10 +1505,6 @@ function ns.CreateDamageVisionStylePanel(kit)
 	holder.pageSwitch = false
 	holder.Refresh = ShowType
 	kit.AddControl(holder)
-
-	canvas:SetScript("OnShow", kit.PageShown(kit.Refresh, content))
-	canvas:Hide()
-	kit.RegisterSubpage(canvas, "Damage Vision Style")
 end
 
 -- Look: a switch of its own (off: the plain look), presets, then the bar,
@@ -1517,9 +1512,9 @@ end
 function ns.CreateDamageVisionLookPanel(kit)
 	local canvas, content = kit.CreateScrollPage()
 	local title = kit.Label(content, "GameFontNormalLarge", L["Damage Vision"])
-	DamageTabs(content, title, 3)
+	DamageTabs(content, title, 2)
 	local intro = kit.PageIntro(content, title,
-		L["How Damage Vision looks and where it sits. Press Test on the Settings tab and close the settings " ..
+		L["Its type, how it looks and where it sits. Press Test on the Vision tab and close the settings " ..
 		"to see it."])
 	local function Changed()
 		ns.RefreshDamageVision()
@@ -1532,6 +1527,8 @@ function ns.CreateDamageVisionLookPanel(kit)
 	local b = Builder(kit, content, stack, Changed)
 	local On = rows.On
 
+	TypeTiles(kit, content, stack, Changed)
+	stack:Header(content, L["Look"])
 	rows.PresetMenu({
 		{ L["Cinematic's"], L["As it comes: amber when you're behind, teal when you lead, a thin border."], {} },
 		{ L["Minimal"], L["A thin line, no border or spark."],

@@ -29,7 +29,7 @@ local BESIDE_CHAT_X, BESIDE_CHAT_Y = 12, -30 -- the box's corner from the chat w
 -- chat window); the lines line up with its left edge, middle or right edge
 -- (side) as it's on the left, middle or right of the screen.
 local holder, spot
-local side, spotBottom = "LEFT", 0
+local side, spotBottom, spotLeft = "LEFT", 0, 0
 local ANCHOR = { LEFT = "BOTTOMLEFT", CENTER = "BOTTOM", RIGHT = "BOTTOMRIGHT" }
 local lines = {} -- newest first: { frame, text, born, life, y }
 local spare = {}
@@ -341,7 +341,7 @@ local function PlaceSpot()
 	end
 	local middle = left + BOX_W / 2
 	side = middle < width / 3 and "LEFT" or middle > width * 2 / 3 and "RIGHT" or "CENTER"
-	spotBottom = bottom
+	spotBottom, spotLeft = bottom, left
 	spot:ClearAllPoints()
 	spot:SetSize(BOX_W, 1)
 	spot:SetPoint("BOTTOMLEFT", holder, "BOTTOMLEFT", left, bottom)
@@ -360,6 +360,13 @@ local function Holder()
 	end
 	PlaceSpot()
 	return holder
+end
+
+-- Where the lines from behind you show (Emote Vision's card sits just above):
+-- the Move box's left and bottom in UIParent's units, its width and height.
+function ns.SpeechBehindSpot()
+	Holder()
+	return spotLeft, spotBottom, BOX_W, BOX_H
 end
 
 -- The Style hub's Chat bubbles page's Move button: a box standing in for the lines, dragged to

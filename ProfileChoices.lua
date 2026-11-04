@@ -165,7 +165,7 @@ ns.BUILTIN_PROFILES = {
 			"letterbox, and the camera's left to you."],
 		picks = { layout = { forever = "preset" }, frames = "nofade", camera = "off", vfx = "noletterbox",
 			sound = "nomusic" },
-		modules = { "no-visions", "no-custom-bubbles" },
+		modules = { "no-visions", "no-custom-bubbles", "emote-vision" },
 	},
 	{
 		name = "Balanced",
@@ -176,7 +176,7 @@ ns.BUILTIN_PROFILES = {
 		tip = L["The UI fades and the look stays, with just a few cameras: flights, AFK, " ..
 			"and your Hearthstone and teleports. No cozy, vista, fish, RP walk, auto-run, death or quest cameras."],
 		picks = { layout = { forever = "preset" }, camera = "lite", chat = "lite" },
-		modules = { "damage-vision" },
+		modules = { "damage-vision", "emote-vision" },
 		preview = "bars",
 	},
 	{
@@ -191,7 +191,7 @@ ns.BUILTIN_PROFILES = {
 			"camera can start music."],
 		picks = { layout = { forever = "preset", retail = "pure" }, frames = "pure", bars = "pure", camera = "pure",
 			vfx = "pure", chat = "pure" },
-		modules = { "zone-card", "duel-card", "story-cards", "damage-vision", "tele-vision" },
+		modules = { "zone-card", "duel-card", "story-cards", "damage-vision", "tele-vision", "emote-vision" },
 	},
 }
 
