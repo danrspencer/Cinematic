@@ -97,6 +97,8 @@ QuestTalk.lua
 TalkingHeads.lua
 CameraTests.lua
 Tint.lua
+ScreenEffectsData.lua
+ScreenEffects.lua
 LowHealthThemes.lua
 LowHealth.lua
 TeleportVision.lua

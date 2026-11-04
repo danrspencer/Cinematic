@@ -11,6 +11,10 @@
 local _, ns = ...
 
 ns.CHANGELOG_FEATURES = {
+	{ date = "2026-11-04", page = "Vitals Style", title = "Game effect themes", client = "retail",
+		text = "Six new Vitals Vision themes are built from the game's own full-screen effects, moving and closing " ..
+		"in as your health drops: Cosmic void, Hellfire, Radiance, Frostbite, Fel flames and Spellfire. Find them " ..
+		"under More themes." },
 	{ date = "2026-11-03", page = "Emote Vision", title = "Emote Vision",
 		text = "When someone buffs you, raises you, emotes at you, summons you or trades with you, or your group " ..
 		"kills a boss or levels up, a small card shows who it was, with emotes to answer in one click. Pick each " ..

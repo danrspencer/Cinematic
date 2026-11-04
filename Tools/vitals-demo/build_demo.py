@@ -3,9 +3,10 @@ addon's own art and LowHealthThemes.lua, and Blizzard art taken from
 /cine debug texreel shots screenshots (each texture on black, then on grey:
 its colors and its alpha come from the pair). The page runs LowHealth.lua's
 drawing in JavaScript: the shadow, our art, Blizzard art's layer and wave, the
-heartbeat, flashes, the color grade, sparks and swirls.
+heartbeat, flashes, the color grade, sparks, swirls and game effects (a
+theme's effect: ScreenEffectsData.lua, drawn as ScreenEffects.lua does).
 Usage: python build_demo.py <addon folder> <screenshots folder> <out .html>
-(the screenshots: just the 186 of one full texreel shots run, in order)."""
+(the screenshots: just those of one full texreel shots run, in order)."""
 import base64, io, json, os, re, sys
 import numpy as np
 from PIL import Image
@@ -19,15 +20,19 @@ CROP = 118         # rows of a 1440-high shot under the reel's label box
 
 lua = lupa.LuaRuntime(unpack_returned_tuples=True)
 ns = lua.table()
-src = open(os.path.join(ADDON, "LowHealthThemes.lua"), encoding="utf-8").read()
-lua.eval("function(src, ns) local f = assert(load(src)) f('Cinematic', ns) end")(src, ns)
+ns.isRetail = True  # (the page shows retail's menu: the game effects are retail's)
+for name in ("ScreenEffectsData.lua", "LowHealthThemes.lua"):
+    src = open(os.path.join(ADDON, name), encoding="utf-8").read()
+    lua.eval("function(src, ns) local f = assert(load(src)) f('Cinematic', ns) end")(src, ns)
 
 
 def py(t):
     if lupa.lua_type(t) != "table":
         return t
     keys = list(t.keys())
-    if keys and all(isinstance(k, int) for k in keys):
+    if not keys:
+        return []  # (an empty table: a list, as the effect themes' empty swirl is)
+    if all(isinstance(k, int) for k in keys):
         return [py(t[k]) for k in sorted(keys)]
     return {k: py(v) for k, v in t.items()}
 
@@ -53,7 +58,7 @@ themes = []
 for i in range(1, len(ns.LOW_HEALTH_THEMES) + 1):
     t = ns.LOW_HEALTH_THEMES[i]
     d = {k: py(t[k]) for k in ("key", "name", "edge", "body", "glow", "glowAlpha", "shadow", "flash",
-                               "pulse", "bpm", "sway", "sparks", "swirl", "heat", "look")}
+                               "pulse", "bpm", "sway", "sparks", "swirl", "heat", "look", "effect")}
     if t.theirs:
         d["theirs"] = {"file": t.theirs[1], "own": None if t.theirs.own is None else bool(t.theirs.own),
                        "second": t.theirs.second}
@@ -64,6 +69,37 @@ for i in range(1, len(ns.LOW_HEALTH_BLIZZ_PATTERNS) + 1):
     patterns.append({"id": p[1], "name": p[2], "mask": p.mask, "own": bool(p.own), "tiles": p.tiles or 1,
                      "paint": bool(p.paint), "drift": py(p.drift), "still": bool(p.still)})
 masks = [{"id": m[0], "name": m[1]} for m in py(ns.LOW_HEALTH_BLIZZ_MASKS)]
+# The game effects the themes use: their files and colors, as ScreenEffects.lua
+# draws them (ns.ScreenEffectLook's rules, the same numbers).
+SOLID = {1273161, 188526, 3308414}
+fx_by_id = {}
+for i in range(1, len(ns.SCREEN_EFFECTS) + 1):
+    fx_by_id[ns.SCREEN_EFFECTS[i].id] = py(ns.SCREEN_EFFECTS[i])
+
+
+def effect_look(fx):
+    def scaled(c):
+        s = c[3] if len(c) > 3 else 1
+        return [min(v * s, 1) for v in c[:3]]
+    chroma = lambda c: max(c) - min(c)
+    light = lambda c: 0.3 * c[0] + 0.59 * c[1] + 0.11 * c[2]
+    m, a = scaled(fx["multiply"]), scaled(fx["add"])
+    white = chroma(m) < 0.12 and chroma(a) < 0.12 and light(m) > 0.85 and light(a) > 0.85
+    color = m if chroma(m) > chroma(a) else a
+    glow = 0.35 if min(color) > 0.6 else 1
+    darkness = (1 - light(m)) * 0.25 if max(m) < 0.5 else 0
+    return {"color": color, "glow": glow, "darkness": darkness, "white": white}
+
+
+effects = {}
+for t in themes:
+    e = t.get("effect")
+    if not e or e["id"] in effects:
+        continue
+    fx = fx_by_id[e["id"]]
+    layers = fx["layers"]
+    effects[e["id"]] = dict(effect_look(fx), shape=layers[0][0] if layers else None,
+                            moving=[l for l in layers[1:3] if l[0] not in SOLID], overlay=fx["overlay"] or None)
 menu = []
 for i in range(1, len(ns.LOW_HEALTH_MENU) + 1):
     e = ns.LOW_HEALTH_MENU[i]
@@ -100,7 +136,10 @@ def shot(name):
                       dtype=np.float32) / 255
 
 
-for file in sorted({p["id"] for p in patterns} | {m["id"] for m in masks}):
+effect_files = set()
+for e in effects.values():
+    effect_files |= {f for f in [e["shape"], e["overlay"]] + [l[0] for l in e["moving"]] if f}
+for file in sorted({p["id"] for p in patterns} | {m["id"] for m in masks} | effect_files):
     if file not in order:
         # (Not in the reel: the game's file itself, if it's in the shots folder as <file>.blp.)
         path = os.path.join(SHOTS, "%d.blp" % file)
@@ -147,7 +186,7 @@ world[(((X - cx) / 26) ** 2 + ((Y - cy) / 70) ** 2 < 1) | (((X - cx) ** 2 + (Y -
 img["world"] = b64(Image.fromarray((np.clip(world, 0, 1) * 255).astype(np.uint8)), "JPEG", quality=85)
 
 data = {"themes": themes, "patterns": patterns, "masks": masks, "menu": menu, "classic": classic, "img": img,
-        "defaults": defaults, "edge": ns.LOW_HEALTH_BLIZZ_EDGE}
+        "defaults": defaults, "edge": ns.LOW_HEALTH_BLIZZ_EDGE, "effects": effects}
 page = open(os.path.join(HERE, "demo_template.html"), encoding="utf-8").read()
 page = page.replace("/*DATA*/null", json.dumps(data, separators=(",", ":")))
 with open(OUT, "w", encoding="utf-8") as f:

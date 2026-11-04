@@ -256,9 +256,31 @@ ns.LOW_HEALTH_THEMES = {
 			{ tex = "Mote", kind = "spiral", color = { 0.8, 0.6, 1 }, size = { 0.015, 0.03 }, life = { 3, 5 },
 				rate = 35, hit = { 3, 5 } },
 		} },
+	-- Game effects (More themes, retail): one of the game's own full-screen
+	-- effects each (ScreenEffects.lua), picked from all 127 by their shots
+	-- (2026-11-04), one for each colour; no edge art of their own and no
+	-- spiral arms (an empty swirl), only the effect, the shadow and the flash.
+	{ key = "cosmic", name = "Cosmic void", effect = { id = 248, alpha = 1 }, swirl = {},
+		shadow = { 0.08, 0, 0.16 }, flash = { 0.7, 0.4, 1 }, pulse = 0.8 },
+	{ key = "hellfire", name = "Hellfire", effect = { id = 134, alpha = 1 }, swirl = {},
+		shadow = { 0.25, 0.05, 0 }, flash = { 1, 0.45, 0.1 } },
+	{ key = "radiance", name = "Radiance", effect = { id = 188, alpha = 1 }, swirl = {},
+		shadow = { 0.2, 0.14, 0.03 }, flash = { 1, 0.85, 0.45 }, pulse = 0.7 },
+	{ key = "frostbite", name = "Frostbite", effect = { id = 174, alpha = 1 }, swirl = {},
+		shadow = { 0.03, 0.08, 0.16 }, flash = { 0.65, 0.88, 1 }, bpm = 0.75 },
+	{ key = "felflames", name = "Fel flames", effect = { id = 115, alpha = 1 }, swirl = {},
+		shadow = { 0.03, 0.12, 0.02 }, flash = { 0.45, 1, 0.3 } },
+	{ key = "spellfire", name = "Spellfire", effect = { id = 257, alpha = 1 }, swirl = {},
+		shadow = { 0.14, 0.02, 0.1 }, flash = { 1, 0.45, 0.8 } },
 }
--- The page's More themes: those no class has.
+-- The page's More themes: those no class has (the game effects on retail
+-- only: Classic hasn't their files).
 ns.LOW_HEALTH_MORE = { "vortex", "abyss", "portal" }
+if ns.isRetail then
+	for _, key in ipairs({ "cosmic", "hellfire", "radiance", "frostbite", "felflames", "spellfire" }) do
+		table.insert(ns.LOW_HEALTH_MORE, key)
+	end
+end
 
 -- Every theme gets a haze: soft gas drifting over its edges, like its glow but
 -- uneven and moving, so the edges feel alive. In the art's colour, drawn

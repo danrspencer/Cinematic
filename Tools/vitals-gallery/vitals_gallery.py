@@ -1,28 +1,35 @@
 """Render a still of every Vitals Vision theme from the addon's own textures
 and LowHealthThemes.lua, at the page's default strengths, full low health.
-Usage: python vitals_gallery.py <addon folder> <out folder>
-(from here: python vitals_gallery.py ../.. out), then build_page.py."""
-import base64, io, json, os, random, sys
+Usage: python vitals_gallery.py <addon folder> <out folder> [<screenshots folder>]
+(from here: python vitals_gallery.py ../.. out), then build_page.py. The
+screenshots: one full /cine debug texreel shots run, as the web demo takes,
+for the game effects' textures (a theme's effect: drawn as ScreenEffects.lua
+does); without them those themes show their shadow only."""
+import base64, io, json, os, random, re, sys
 import numpy as np
 from PIL import Image
 import lupa
 
 ADDON, OUT = sys.argv[1], sys.argv[2]
+SHOTS = sys.argv[3] if len(sys.argv) > 3 else None
 ART = os.path.join(ADDON, "Textures", "LowHealth")
 W, H = 960, 540
 
 lua = lupa.LuaRuntime(unpack_returned_tuples=True)
 ns = lua.table()
-src = open(os.path.join(ADDON, "LowHealthThemes.lua"), encoding="utf-8").read()
+ns.isRetail = True  # (retail's menu: the game effects are retail's)
 loader = lua.eval("function(src, ns) local f = assert(load(src)) f('Cinematic', ns) end")
-loader(src, ns)
+for name in ("ScreenEffectsData.lua", "LowHealthThemes.lua"):
+    loader(open(os.path.join(ADDON, name), encoding="utf-8").read(), ns)
 
 
 def py(t):
     if lupa.lua_type(t) != "table":
         return t
     keys = list(t.keys())
-    if keys and all(isinstance(k, int) for k in keys):
+    if not keys:
+        return []  # (an empty table: a list, as the effect themes' empty swirl is)
+    if all(isinstance(k, int) for k in keys):
         return [py(t[k]) for k in sorted(keys)]
     return {k: py(v) for k, v in t.items()}
 
@@ -232,6 +239,92 @@ def heat(img, theme):
     return img
 
 
+# The game effects (a theme's effect): their textures from the screenshots
+# (each on black, then on grey: colors and alpha from the pair, as the web
+# demo takes them), drawn as ScreenEffects.lua does at full.
+FX = {fx["id"]: fx for fx in py(ns.SCREEN_EFFECTS)}
+SOLID, REF_HEIGHT = {1273161, 188526, 3308414}, 768
+shot_files, order = [], []
+if SHOTS:
+    lh = open(os.path.join(ADDON, "LowHealth.lua"), encoding="utf-8").read()
+    block = lh[lh.index("local EDGE_SCOUT = {"):lh.index("\n}", lh.index("local EDGE_SCOUT = {"))]
+    order = [int(x) for x in re.findall(r"\{ (\d+), \"", block)]
+    shot_files = sorted(f for f in os.listdir(SHOTS) if f.lower().endswith(".jpg"))
+    assert len(shot_files) == 2 * len(order), "need one full texreel shots run"
+_game = {}
+
+
+def game_tex(file, size):
+    """A game texture as (rgb, alpha) at size, or None if it isn't in the shots."""
+    if file not in order:
+        return None
+    if file not in _game:
+        i = order.index(file)
+        def shot(name):
+            a = np.asarray(Image.open(os.path.join(SHOTS, name)).convert("RGB"), dtype=np.float32) / 255
+            crop = int(118 * a.shape[0] / 1440)
+            a = a.copy()
+            a[:crop] = a[crop:2 * crop][::-1]  # (under the reel's label box: the rows below, mirrored)
+            return a
+        black, grey = shot(shot_files[2 * i]), shot(shot_files[2 * i + 1])
+        alpha = np.clip(1 - (grey - black).mean(axis=2) / 0.5, 0, 1)
+        rgb = np.clip(black / np.maximum(alpha, 1 / 255)[..., None], 0, 1)
+        _game[file] = Image.fromarray((np.dstack([rgb, alpha]) * 255).astype(np.uint8), "RGBA")
+    return arr(_game[file].resize(size, Image.LANCZOS))
+
+
+def effect_look(fx):
+    def scaled(c):
+        s = c[3] if len(c) > 3 else 1
+        return [min(v * s, 1) for v in c[:3]]
+    chroma = lambda c: max(c) - min(c)
+    light = lambda c: 0.3 * c[0] + 0.59 * c[1] + 0.11 * c[2]
+    m, a = scaled(fx["multiply"]), scaled(fx["add"])
+    white = chroma(m) < 0.12 and chroma(a) < 0.12 and light(m) > 0.85 and light(a) > 0.85
+    color = np.array(m if chroma(m) > chroma(a) else a)
+    glow = 0.35 if color.min() > 0.6 else 1
+    darkness = (1 - light(m)) * 0.25 if max(m) < 0.5 else 0
+    return color, glow, darkness, white
+
+
+def game_effect(img, theme, rng):
+    info = theme.get("effect")
+    fx = info and FX.get(info["id"])
+    if not fx or not SHOTS:
+        return img
+    color, glow, darkness, white = effect_look(fx)
+    layers = fx["layers"]
+    shape = game_tex(layers[0][0], (W, H)) if layers else None
+    m = shape[1] if shape else np.ones((H, W, 1))
+    a = BLOOD_ALPHA * info.get("alpha", 1)
+    # (paint: the colour wash and the darkening; light: the moving layers and overlay)
+    img = img * (1 - 0.15 * glow * m * a) + color * 0.15 * glow * m * a
+    img = img * (1 - darkness * m * a)
+    for file, su, sv, ru, rv, *_ in layers[1:3]:
+        if file in SOLID:
+            continue
+        def reps(s, across):
+            s = abs(s) or 1
+            if s < 0.05:
+                s *= REF_HEIGHT * (W / H if across else 1)
+            return s
+        tw, th = max(2, int(W / reps(su, True))), max(2, int(H / reps(sv, False)))
+        tex_ = game_tex(file, (tw, th))
+        if tex_ is None:
+            continue
+        rgb, al = tex_
+        ny, nx = H // th + 2, W // tw + 2
+        oy, ox = rng.randrange(th), rng.randrange(tw)
+        trgb = np.tile(rgb, (ny, nx, 1))[oy:oy + H, ox:ox + W]
+        tal = np.tile(al, (ny, nx, 1))[oy:oy + H, ox:ox + W]
+        img = img + trgb * color * tal * 0.6 * glow * m * a
+    if fx["overlay"]:
+        over = game_tex(fx["overlay"], (W, H))
+        if over:
+            img = img + over[0] * color * over[1] * (0.6 if white else glow) * m * a
+    return img
+
+
 def render(theme):
     rng = random.Random(theme["key"])
     img = BG.copy()
@@ -251,6 +344,7 @@ def render(theme):
     img = heat(img, theme)
     drips(img, theme, rng)
     effects(img, theme, rng)
+    img = game_effect(img, theme, rng)
     out = Image.fromarray((np.clip(img, 0, 1) * 255).astype(np.uint8))
     buf = io.BytesIO()
     out.save(buf, "JPEG", quality=84)

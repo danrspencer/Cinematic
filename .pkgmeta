@@ -15,10 +15,12 @@ ignore:
   - Textures/WindGuide
   # (Portal scout: /cine debug portal, trying the game's portal models, dev copy only)
   - PortalScout.lua
-  # (Screen effects: /cine debug screenfx, the game's full-screen effects animated, dev copy only)
-  - ScreenEffectsData.lua
+  # (Screen effects: /cine debug screenfx, the game's full-screen effects animated, dev copy only;
+  # ScreenEffectsData.lua and ScreenEffects.lua ship: Vitals Vision's game effects)
   - ScreenEffectScout.lua
   # (Demo Hub: demo tools and recording scripts, in the dev copy only)
   - DemoHub.lua
+  # (Cursor Hide: the Dev hub's test of hiding a still cursor, dev copy only)
+  - CursorHideTest.lua
   # (Vitals Vision's old sprites: only make_wind_guide.py reads them now)
   - Textures/LowHealth/Effects.tga

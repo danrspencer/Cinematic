@@ -89,11 +89,12 @@ QuestTalk.lua
 TalkingHeads.lua
 CameraTests.lua
 Tint.lua
+ScreenEffectsData.lua
+ScreenEffects.lua
 LowHealthThemes.lua
 LowHealth.lua
 TeleportVision.lua
 PortalScout.lua
-ScreenEffectsData.lua
 ScreenEffectScout.lua
 PersonalResources.lua
 StylePages.lua

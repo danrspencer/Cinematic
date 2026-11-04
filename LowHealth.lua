@@ -123,6 +123,10 @@ local SWIRL_DEEPEST = 0.37 -- ...and at full with reach 100% (no further: it mus
 -- in. Distances in the model frame's own units (tested, retail: at -10 the
 -- old dungeon portal's rim frames the screen, the middle clear; at 0 it's all
 -- round the camera, unseen).
+-- A game effect (a theme's effect: one of the game's own full-screen effects,
+-- ScreenEffects.lua): its area this much bigger than the screen as it starts
+-- (its edges past the screen's), the screen's size at full, so it closes in.
+local EFFECT_OUT = 0.35
 local PORTAL_OUT = -4      -- as it starts
 local PORTAL_FULL = -10    -- at full, unless the theme's portal says
 
@@ -248,7 +252,8 @@ end
 -- ("my<n>" -> a theme of theirs: name, from (the theme it started as, for
 -- its look and Blizzard art) and its fields). Built over LowHealthThemes.lua's
 -- into ns.LOW_HEALTH_THEME(S) when they change, or a profile brings others.
-local THEME_FIELDS = { "edge", "body", "glow", "glowAlpha", "shadow", "flash", "pulse", "bpm", "sparks", "swirl" }
+local THEME_FIELDS = { "edge", "body", "glow", "glowAlpha", "shadow", "flash", "pulse", "bpm", "sparks", "swirl",
+	"effect" }
 -- (The edges offered: the soft ones, no drawn shapes.)
 local EDGES = { "Smoke", "Glow", "Soak", "Rime", "Fur" }
 local SPARK_TEXTURES = { Mote = true, Star = true, Bolt = true, Gas = true }
@@ -334,6 +339,10 @@ local function Cleaned(fields)
 		end
 	end
 	clean.swirl = swirl
+	local effect = type(fields.effect) == "table" and fields.effect
+	if effect and ns.ScreenEffectById and ns.ScreenEffectById(effect.id) then
+		clean.effect = { id = effect.id, alpha = Number(effect.alpha, 0, 1) or 1 }
+	end
 	return clean
 end
 
@@ -697,6 +706,11 @@ local function NewDrawer(parent)
 	d.grade:SetTexture("Interface\\Buttons\\WHITE8X8")
 	d.grade:SetBlendMode("MOD")
 	d.grade:Hide()
+	-- (A game effect: its own frame, over the art.)
+	if ns.NewScreenEffect then
+		d.effect = ns.NewScreenEffect(parent)
+		d.effect:Hide()
+	end
 	-- (The swirl over the shadow and grade, under the art.)
 	d.swirls = {}
 	for i = 1, MAX_SWIRLS do
@@ -894,6 +908,12 @@ local function UseTheme(d, wanted, look)
 			d.portalFile = file
 		end
 		if not file then d.portal:Hide() end
+	end
+	-- (The game effect: set up for the theme's, or off; none where the client hasn't its files.)
+	if d.effect then
+		local fx = wanted.effect and ns.ScreenEffectById(wanted.effect.id)
+		d.effectOn = fx and d.effect:Set(fx) or false
+		if not d.effectOn then d.effect:Hide() end
 	end
 	for i, swirl in ipairs(d.swirls) do
 		local info = wanted.swirl and wanted.swirl[i]
@@ -1310,6 +1330,22 @@ local function Apply(d, look, k, fade, heart, secret)
 			swirl.tex:Show()
 		else
 			swirl.tex:Hide()
+		end
+	end
+	-- The game effect: closing in from past the edges and stronger the weaker
+	-- you are, brighter on a beat and in a flash, its layers moving.
+	if d.effect then
+		local info = shown.effect
+		local a = d.effectOn and info and c > 0
+			and look.lowHealthBloodAlpha * info.alpha * math.min(1, c * 2) * fade or 0
+		if a > 0 then
+			local grow = 1 + EFFECT_OUT * (1 - c)
+			d.effect:Place(width * grow, height * grow)
+			d.effect:Step(spun)
+			d.effect:SetAlpha(math.min(1, a * (0.9 + 0.2 * heart + 0.3 * flash)))
+			d.effect:Show()
+		else
+			d.effect:Hide()
 		end
 	end
 	-- The portal: further away (its rim further in) the weaker you are, and stronger.
@@ -2006,6 +2042,17 @@ local EDGE_SCOUT = {
 	{ 7550812, "Round darkening, blue and purple (Midnight menu)", "Edges", "ui_mainmenu_midnight_vignette" },
 	{ 7713391, "Small upright rectangle (a UI mask)", "Other", "fullscreeneffect_blend_7713391" },
 	{ 7713861, "Big centered rectangle (a UI mask)", "Other", "fullscreeneffect_blend_7713861" },
+	-- (Added at the end, numbers kept: the layers of the game effects the
+	-- More themes use (ScreenEffects.lua) that weren't in it, for the web
+	-- demo's art. Named by file, not yet by eye.)
+	{ 2159813, "Fire energy chunks, scrolling (Hellfire's overlay)", "Fire", "fireenergychuncksscroll" },
+	{ 2189528, "Fire spike pillar (Hellfire's layer)", "Fire", "8fx_wrathion_firespike_pillar_2189528" },
+	{ 4529965, "Golden spell light (Radiance's overlay)", "Holy and gold", "drakks_spell_4529965" },
+	{ 1862453, "Wispy sand energy (Radiance's layer)", "Smoke and clouds", "smoke_wispyenergy_sand_a" },
+	{ 4421664, "Painted clouds, scrolling (Frostbite's overlay)", "Water and ice", "10fx_painted_cloudscroll_03" },
+	{ 4272488, "Green flames (Fel flames' overlay)", "Nature and fel", "4272469_4272488" },
+	{ 4295956, "Spell wisps (Fel flames' layer)", "Nature and fel", "10fx_spell30_4295956" },
+	{ 5689340, "Light feather impact (Spellfire's layer)", "Holy and gold", "12fx_marchonqueldanas_belorenchildofalar_lightfeather_impact_5689340" },
 }
 local scout, scoutAt, scoutBlend = nil, 0, false
 function ns.ScoutGameEdges(arg)
