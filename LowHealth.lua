@@ -2107,8 +2107,7 @@ function ns.TextureReel(arg)
 		reel.bar:SetHeight(4)
 		reel.barBack = barBack
 		reel:SetScript("OnUpdate", function(self, elapsed)
-			if self.paused then return end
-			self.left = self.left - elapsed
+			if not self.paused then self.left = self.left - elapsed end
 			local each = self.each
 			while self.left <= 0 do
 				self.at = self.at + 1
@@ -2147,6 +2146,24 @@ function ns.TextureReel(arg)
 		end)
 		reel:SetScript("OnHide", function()
 			if ActionStatus then ActionStatus:SetAlpha(1) end
+		end)
+		-- Space skips to the next texture, Backspace goes back one (also
+		-- while paused). Other keys go on to the game as usual; in a fight
+		-- the keyboard can't be held, so the keys do nothing extra there.
+		reel:EnableKeyboard(true)
+		reel:SetPropagateKeyboardInput(true)
+		reel:SetScript("OnKeyDown", function(self, key)
+			if InCombatLockdown() then return end
+			local step = (key == "SPACE" and 1) or (key == "BACKSPACE" and -1) or nil
+			self:SetPropagateKeyboardInput(not step)
+			if not step then return end
+			self.at = math.max(self.at + step, 1)
+			if self.at > #self.list then
+				self:Hide()
+				ns.Print("texture reel: done")
+				return
+			end
+			self.left, self.shown = self.each, nil
 		end)
 	end
 	local words = {}
@@ -2188,7 +2205,7 @@ function ns.TextureReel(arg)
 	ns.Print(("texture reel: %d textures, %ds each (half on black, half on grey), %d:%02d in all%s")
 		:format(#list, each, math.floor(total / 60), total % 60,
 			shots and (", a screenshot of each half (%d)"):format(#list * 2) or ""))
-	ns.Print("  /cine debug texreel pause, or off")
+	ns.Print("  Space: next, Backspace: back. /cine debug texreel pause, or off")
 end
 
 -- (which: as ns.VitalsFrameAlpha's.)

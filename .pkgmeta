@@ -15,6 +15,9 @@ ignore:
   - Textures/WindGuide
   # (Portal scout: /cine debug portal, trying the game's portal models, dev copy only)
   - PortalScout.lua
+  # (Screen effects: /cine debug screenfx, the game's full-screen effects animated, dev copy only)
+  - ScreenEffectsData.lua
+  - ScreenEffectScout.lua
   # (Demo Hub: demo tools and recording scripts, in the dev copy only)
   - DemoHub.lua
   # (Vitals Vision's old sprites: only make_wind_guide.py reads them now)
