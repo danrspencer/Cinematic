@@ -555,14 +555,12 @@ ns.PROFILE_MODULES = {
 			if client == ns.CLIENT and not ns.HasPersonalDisplay() then set("lowHealthPortrait", true) end
 		end },
 
-	{ key = "cursor-hide", name = "Cursor out of the way on flights", scope = { "Cursor Hide" },
-		tip = "On flights, the cursor turns tiny, and is gone once the mouse has been still for 5 seconds.",
+	{ key = "cursor-hide", name = "Cursor out of the way in cameras", scope = { "Cursor Hide" },
+		tip = "On flights, at vistas and while you're AFK, the cursor is gone once the mouse has been still for " ..
+			"3 seconds (the page's own Hide completely and 3 seconds).",
 		apply = function(set)
+			-- (Its Show in row's rule is everyone's default: CursorHide.lua's RULE_DEFAULTS.)
 			set("cursorHide", true)
-			set("cursorHideAlways", false)
-			set("frameRules", { ["cursor:hide"] = "cam_flight" })
-			set("cursorHideMethod", "both")
-			set("cursorHideDelay", 5)
 		end },
 
 	-- Sound and chat

@@ -168,6 +168,22 @@ local function ModulesFor(name)
 	end
 end
 
+-- The rows' default rules (ns.RULE_DEFAULTS) put into values.frameRules where
+-- it has none for the row (a copy: the table may be a built-in's or a reset
+-- point's). A row's rule cleared on purpose ("") stays cleared.
+local function WithRuleDefaults(values)
+	local rules = type(values.frameRules) == "table" and values.frameRules or nil
+	local copy
+	for key, rule in pairs(ns.RULE_DEFAULTS or {}) do
+		if not (rules and rules[key] ~= nil) then
+			copy = copy or CopyTable(rules or {})
+			copy[key] = rule
+		end
+	end
+	if copy then values.frameRules = copy end
+	return values
+end
+
 -- The values a profile starts from: the defaults, with a built-in's modules.
 local baseCache = {}
 function ns.ProfileBase(name)
@@ -177,6 +193,7 @@ function ns.ProfileBase(name)
 	for k, v in pairs(ns.DEFAULTS) do base[k] = v end
 	local modules = ModulesFor(name)
 	if modules then ns.ApplyModules(modules, base, ns.CLIENT) end
+	WithRuleDefaults(base)
 	baseCache[name] = base
 	return base
 end
@@ -188,7 +205,7 @@ function ns.RawProfileBase(name)
 	for k, v in pairs(ns.DEFAULTS) do base[k] = v end
 	local modules = ModulesFor(name)
 	if modules then ns.ApplyModules(modules, base, ns.CLIENT, nil, true) end
-	return base
+	return WithRuleDefaults(base)
 end
 
 -- After a built-in's modules change (Module Editor): worked out again when
@@ -786,7 +803,7 @@ function ns.ResetBase(name)
 	local values = {}
 	for k, v in pairs(base) do values[k] = v end
 	for k, v in pairs(point) do values[k] = v end
-	return values
+	return WithRuleDefaults(values) -- (a point saved before a row had its rule)
 end
 
 -- Back to the profile's reset point if it has one, else its base: a

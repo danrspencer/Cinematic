@@ -242,6 +242,18 @@ dl.faq dd { margin: 2px 0 0; color: var(--muted) }
     <p class="muted">The game's own frames and ones that already fade are left out. To keep a frame up all the time instead, hover over it and type <code>/cine keep</code>.</p>
   </section>
 
+  <section id="cursor-hide">
+    <div class="eyebrow">Experimental</div>
+    <h2>Cursor Hide: the cursor out of the way</h2>
+    <p>The <b>Cursor Hide</b> page (Interface, Overhead) gets your cursor out of the way in CineMode, where its <b>Show in</b> row says. It starts with flights, vistas and going AFK (the rule <code>cam_flight or cam_vista or cam_idle</code>), and a reset always puts that rule back. Pick how:</p>
+    <ul>
+      <li><b>Tiny</b>: The cursor stays a tiny corner, as you move and click too.</li>
+      <li><b>Hide completely</b>: To start with. Once the mouse has been still a while (3 seconds to start with, up to 10), the cursor's gone; moving the mouse brings it back. Meanwhile the game draws the cursor itself, which can feel a little behind at a low frame rate.</li>
+      <li><b>Tiny, then gone</b>: The tiny cursor all the time, and gone once the mouse has been still a while. Moving the mouse brings the tiny one back.</li>
+    </ul>
+    <p class="muted">It's experimental: the page shows a warning first, and nothing happens until you keep the mouse on its button for a few seconds and accept it. While the cursor's hidden and the game isn't the window you're using, a black square can show where the cursor is. If your cursor ever gets stuck, <code>/cine reset cursor</code> puts just your cursor back to normal (and turns Cursor Hide off until you accept the warning again). The Cinema profile has it on.</p>
+  </section>
+
   <section>
     <div class="eyebrow">Screenshots</div>
     <h2>Hide the UI, keep the look</h2>

@@ -1014,8 +1014,7 @@ function ns.UpdateMouseSteer()
 	local walking = ns.IsRPWalking and ns.IsRPWalking()
 	local travel = (walking and not ns.IsCozy() and not ns.IsCameraOffHere("walk"))
 		or (not walking and ns.IsAutoRunning and ns.IsAutoRunning() and not ns.IsCameraOffHere("run"))
-	ns.mouseSteering = (travel and IsMouselooking and IsMouselooking() and not ns.cursorSteering
-		and not IsMouseButtonDown("LeftButton")
+	ns.mouseSteering = (travel and IsMouselooking and IsMouselooking() and not IsMouseButtonDown("LeftButton")
 		and not ns.OnTaxi()) or false
 	if ns.mouseSteering then
 		ns.orbit.angle = 0 -- mouselook keeps the camera behind you: sway on from there
@@ -1034,8 +1033,7 @@ local function IsMouseOnCamera()
 		or (ns.QuestCamWindowOpen and ns.QuestCamWindowOpen())) then
 		return GetTime() - mouseCameraHeld >= 0.4
 	end
-	-- (The dev Cursor Hide test's steering isn't you: CursorHideTest.lua.)
-	return mouseCameraHeld and true or (IsMouselooking and IsMouselooking() and not ns.cursorSteering) or false
+	return mouseCameraHeld and true or (IsMouselooking and IsMouselooking()) or false
 end
 ns.IsMouseOnCamera = IsMouseOnCamera -- (QuestTalk: the bubble while the camera moves)
 -- A button down on the camera at all, even before IsMouseOnCamera counts it

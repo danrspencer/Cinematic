@@ -3995,7 +3995,7 @@ local stillX, stillY, stillSince = nil, nil, 0
 
 local function NoteCursor()
 	local x, y = GetCursorPosition()
-	if x ~= stillX or y ~= stillY or (IsMouselooking() and not ns.cursorSteering) then -- (CursorHideTest.lua's isn't you)
+	if x ~= stillX or y ~= stillY or IsMouselooking() then
 		stillX, stillY, stillSince = x, y, GetTime()
 	end
 end
@@ -4146,7 +4146,7 @@ end
 
 local function ViewMoved(note)
 	local ok, speed = pcall(GetUnitSpeed, "player")
-	if (ok and Readable(speed) and speed > 0) or ns.OnTaxi() or (IsMouselooking() and not ns.cursorSteering)
+	if (ok and Readable(speed) and speed > 0) or ns.OnTaxi() or IsMouselooking()
 		or (ns.yawAxis and ns.yawAxis.moving) or (ns.pitchAxis and ns.pitchAxis.moving) then
 		return true
 	end

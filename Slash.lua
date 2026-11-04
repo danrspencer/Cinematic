@@ -36,7 +36,9 @@ local function PrintHelp()
 	Command("/cine hideui", L["hide the UI but keep the look (again to bring it back)"])
 	Command("/cine size <percent>", L["letterbox bar height (now %s%%)"]:format(ns.db.letterboxSize * 100))
 	Command("/cine button", L["show or hide the minimap button"])
-	Command("/cine reset", L["put the active profile back to how it started"])
+	Command("/cine reset", L["put the active profile back to how it started, and your cursor back to normal"])
+	Command("/cine reset cursor", L["just your cursor back to normal, if Cursor Hide left it hidden or odd"])
+	Command("/cine orbit [angle] [seconds]", L["the camera turns once around you: 360 degrees over 10 seconds unless given (negative: the other way); again stops it"])
 	Command("/cine profile", L["list the profiles (/cine profile <name> switches to one)"])
 	Command("/cine export", L["share the active profile as text to copy"])
 	Command("/cine import", L["add a profile someone shared with you"])
@@ -178,6 +180,7 @@ local function PrintDebugHelp()
 	print("  /cine debug gameedge [number|back|blend|off] - step through the game's full-screen effect textures over the whole screen, one each time, to pick edges for Vitals Vision's Game art")
 	print("  /cine debug portal [number|file|back|near|far|up|down|turn|tilt|scale N|alpha N|reset|reel [seconds]|off] - (dev copy) show the game's portal and swirl models over the screen, one each time, to see which load and how they sit, for Vitals Vision")
 	print("  /cine debug screenfx [number | id N | find words | speed N | tile N | shots [from] | back | off] - dev copy: the game's full-screen effects (all of them, from its data) animated over the screen, one at a time; Space: next, Backspace: back; shots: a screenshot of each")
+	if ns.isDev then print("  /cine debug cursorsize [value | cycle | back | cvars [word] | hardware 0/1/back | pic blank/small/red/tiny/off] - the game's Cursor Size setting (cursorSizePreferred): what it is, set it, step through -1 to 4 three seconds each, put yours back, list every game setting with cursor (or the word) in its name, switch the hardware cursor, or show a test picture as the cursor") end
 	print("  /cine debug cursor [log [seconds]] - Cursor Hide: on or off, its method, whether its Show in row is on here, what's holding it back, the turn speeds and camera; log: a record of it all for 30 seconds (or the seconds given), saved by a /reload")
 	print("  /cine debug vitalspage - the lowest shown widgets on the Vitals Style page, to find what stretches its scroll")
 	print("  /cine debug texreel [masks] [shots] [seconds] [from] | pause | off - play the game's full-screen effect textures as a slideshow to record, each with its number, file and name, and the time left; shots takes a screenshot of each; Space skips one, Backspace goes back")
@@ -568,6 +571,8 @@ local function HandleSlash(msg)
 		else
 			ns.Print("/cine debug screenfx is in the dev copy only.")
 		end
+	elseif cmd == "debug" and ns.isDev and (arg == "cursorsize" or arg:match("^cursorsize ")) then
+		ns.CursorSizeTest(arg:match("^cursorsize%s*(.-)$"))
 	elseif cmd == "debug" and (arg == "cursor" or arg:match("^cursor ")) then
 		local seconds = arg:match("^cursor log%s*(%d*)")
 		if seconds then ns.CursorHideRecord(seconds) else ns.CursorHideDebug() end
@@ -1490,7 +1495,14 @@ local function HandleSlash(msg)
 		end
 	elseif cmd == "list" then
 		ns.ListExtras()
+	elseif cmd == "reset" and arg == "cursor" then
+		-- (Just the cursor, the profile left as it is.)
+		if ns.CursorHideReset then ns.CursorHideReset() end
+		ns.Print(L["your cursor is back to normal (Cursor Hide off till you accept its warning again)"])
 	elseif cmd == "reset" then
+		-- (The cursor too: Cursor Hide off till its warning's accepted again, the
+		-- hardware cursor back on. For anyone stuck with a hidden or odd cursor.)
+		if ns.CursorHideReset then ns.CursorHideReset() end
 		ns.ResetSettings()
 		ns.Print(L["profile %s reset"]:format(ns.ProfileLabel(ns.ActiveProfile())))
 	elseif cmd == "export" then

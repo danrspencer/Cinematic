@@ -1444,6 +1444,10 @@ for _, list in ipairs({ "combatShow", "calmShow", "quietShow", "camShow", "world
 	"instanceShow", "groupShow", "enemyShow", "friendlyShow" }) do
 	ns.LIST_DEFAULTS[list] = {}
 end
+-- Rows' own rules to start from (row key -> rule text): in every profile's
+-- base unless its modules give the row one (Profiles.lua's WithRuleDefaults),
+-- so Reset page, a profile's reset and Reset Settings put them back.
+ns.RULE_DEFAULTS = {}
 do
 	local OFF_GRID_ROWS, OLD_GRID_DEFAULTS = {}, {}
 
@@ -3299,6 +3303,11 @@ function ns.EnsureTables()
 	ns.db.tooltipCineMode = nil -- (a test build's: the Tooltips page's master switch decides now)
 	ns.db.cineShow = ns.db.cineShow or {} -- Standard Frames row -> true: shown all through CineMode
 	ns.db.frameRules = ns.db.frameRules or {} -- row key -> rule text (Custom Visibility Rules, Advanced Frames page)
+	-- (A row's own default rule wherever it has none: after any reset, a
+	-- profile loaded, a fresh install. Cleared, it's "", not nil: stays so.)
+	for key, rule in pairs(ns.RULE_DEFAULTS) do
+		if ns.db.frameRules[key] == nil then ns.db.frameRules[key] = rule end
+	end
 	ns.db.rowFollow = ns.db.rowFollow or {} -- row key -> the row it follows (a grid's Follow column)
 	ns.db.markNames = ns.db.markNames or {} -- Nameplates page row id -> a name of your own for it
 	ns.db.cameraRows = ns.db.cameraRows or {} -- the Cameras page's rows (CameraRows.lua)
