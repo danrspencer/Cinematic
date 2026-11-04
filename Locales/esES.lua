@@ -5904,6 +5904,13 @@ L["You run into a recent ally"] = "Te encuentras con un aliado reciente"
 L["Someone you grouped with lately (the game's Recent Allies, not in your group now) comes into view: with friendly nameplates on, as soon as you see them; otherwise when you mouse over or target them. Once an hour per person."] = "Alguien con quien te agrupaste hace poco (los Aliados recientes del juego, que no está ahora en tu grupo) aparece a la vista: con las placas de nombre amistosas activadas, en cuanto lo ves; si no, al pasar el ratón por encima o seleccionarlo. Una vez por hora por persona."
 L["is in your guild"] = "es de tu hermandad"
 L["grouped with you before"] = "se agrupó contigo antes"
+L["Eyes meet"] = "Cruce de miradas"
+L["You and a stranger (not in your group or guild) target each other for 10 seconds straight. Once you've looked away, it can happen again."] = "Tú y un desconocido (que no está en tu grupo ni en tu hermandad) os seleccionáis mutuamente durante 10 segundos seguidos. Cuando apartas la mirada, puede volver a pasar."
+L["is looking back at you"] = "también te está mirando"
+L["EYES MEET"] = "CRUCE DE MIRADAS"
+L["Help from others"] = "Ayuda de otros"
+L["Meeting people"] = "Encuentros"
+L["Yourself"] = "Tú"
 L["%.2f yards"] = "%.2f m"
 
 -- Options.lua: the CineMode page's Overview tab

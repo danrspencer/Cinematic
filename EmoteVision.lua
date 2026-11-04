@@ -140,10 +140,50 @@ local function EmoteTags(token)
 	return table.concat(tags, " ")
 end
 
+-- Words-only emotes (no gesture, sound or voice: nothing to see or hear) a
+-- card's button or the page's > button plays show with the speech from
+-- behind you too, when that's on with its emotes (the Chat page's): your
+-- own line as the game words it, caught from chat for a moment after the click.
+local ECHO_WAIT = 2
+local echoUntil
+local lastEcho -- (for /cine debug emotevision: the last button's emote and what came of it)
+local function WordsOnly(token)
+	return not (EMOTE_MOVES[token] or EMOTE_SOUND[token] or GameEmotes().isVoice[token])
+end
+local function SpeechBehindOn()
+	local db = ns.db
+	return db and db.handleBubbles and db.chatSpeechBehind and db.chatSpeechEmotes and ns.ShowSpeechBehind and true
+end
+-- (A button about to play token: wait for its line if it's words only.)
+local function ArmEcho(token, test)
+	local db = ns.db or {}
+	lastEcho = { token = token, at = GetTime(), test = test, words = WordsOnly(token),
+		speech = ("bubbles page %s, behind you %s, emotes too %s"):format(tostring(db.handleBubbles),
+			tostring(db.chatSpeechBehind), tostring(db.chatSpeechEmotes)) }
+	if not test and lastEcho.words and SpeechBehindOn() then echoUntil = GetTime() + ECHO_WAIT end
+end
+-- (CHAT_MSG_TEXT_EMOTE: your own, while one's awaited.)
+local function EchoOwn(text, author, guid)
+	if not echoUntil or GetTime() > echoUntil then return end
+	local function Clean(value)
+		if issecretvalue and issecretvalue(value) then return nil end
+		return value
+	end
+	text, author, guid = Clean(text), Clean(author), Clean(guid)
+	if type(text) ~= "string" or guid ~= Clean(UnitGUID("player")) then
+		if lastEcho then lastEcho.other = ("%s (guid %s)"):format(tostring(text), tostring(guid)) end
+		return
+	end
+	echoUntil = nil
+	if lastEcho then lastEcho.caught = text end
+	ns.ShowSpeechBehind("CHAT_MSG_TEXT_EMOTE", author, text, guid)
+end
+
 -- Plays an emote to try it (the page's > buttons, a right-click in the
 -- picker): at no one, so your target isn't bothered. (Same back: nothing to play.)
 local function TryEmote(token)
 	if not token or token == SAME then return end
+	ArmEcho(token)
 	pcall(DoEmote, token, "none")
 end
 
@@ -224,6 +264,10 @@ local MOMENTS = {
 			"view: with friendly nameplates on, as soon as you see them; otherwise when you mouse over or " ..
 			"target them. Once an hour per person.",
 		sample = { name = "Thornbrook", class = "DRUID", line = "grouped with you before" } },
+	{ id = "Eyes", on = "emoteVisionEyes", name = "Eyes meet", emotes = { "WAVE", "WINK", "SMILE" },
+		tip = "You and a stranger (not in your group or guild) target each other for 10 seconds straight. " ..
+			"Once you've looked away, it can happen again.",
+		sample = { name = "Velmora", class = "WARLOCK", line = "is looking back at you" } },
 	{ id = "YouLevel", on = "emoteVisionYouLevel", name = "You level up", emotes = { "CHEER", "DANCE", "FLEX" },
 		tip = "You reach a new level: the emotes go to everyone, to celebrate.",
 		sample = { name = "You", line = "reached level %d", level = 42, group = true,
@@ -241,6 +285,35 @@ if not (C_RecentAllies and C_RecentAllies.IsRecentAllyByGUID) then
 	for i = #MOMENTS, 1, -1 do
 		if MOMENTS[i].ally then table.remove(MOMENTS, i) end
 	end
+end
+-- The moments in groups, the page's order: a header over each group's.
+-- (One not listed goes at the end, in the last group.)
+local MOMENT_GROUPS = {
+	{ name = "Help from others", "Buff", "Res", "Summon", "Trade" },
+	{ name = "Meeting people", "Emote", "Eyes", "Guild", "Ally", "Achievement", "Duel" },
+	{ name = "Your group", "Join", "Leave", "Joined", "Level", "Boss", "Dungeon", "Wipe" },
+	{ name = "Yourself", "YouLevel" },
+}
+do
+	local byId, ordered = {}, {}
+	for _, moment in ipairs(MOMENTS) do byId[moment.id] = moment end
+	for _, group in ipairs(MOMENT_GROUPS) do
+		for _, id in ipairs(group) do
+			local moment = byId[id]
+			if moment then
+				moment.group = group.name
+				ordered[#ordered + 1] = moment
+				byId[id] = nil
+			end
+		end
+	end
+	for _, moment in ipairs(MOMENTS) do
+		if byId[moment.id] then
+			moment.group = MOMENT_GROUPS[#MOMENT_GROUPS].name
+			ordered[#ordered + 1] = moment
+		end
+	end
+	MOMENTS = ordered
 end
 local MOMENT = {}
 for _, moment in ipairs(MOMENTS) do
@@ -432,7 +505,7 @@ DEFAULTS.emoteVisionLook = "classic"
 local HEADINGS = { Buff = "A KINDNESS", Res = "SAVED", Emote = "A GREETING", Summon = "SUMMONED",
 	Trade = "A FAIR TRADE", Level = "LEVEL UP", Dungeon = "VICTORY", Duel = "THE DUEL", Join = "WELCOME",
 	Leave = "FAREWELL", Joined = "WELL MET", Achievement = "WELL DONE", Boss = "VICTORY", Wipe = "NEXT TIME",
-	YouLevel = "LEVEL UP", Guild = "WELL MET", Ally = "WELL MET" }
+	YouLevel = "LEVEL UP", Guild = "WELL MET", Ally = "WELL MET", Eyes = "EYES MEET" }
 local BUTTON_W, BUTTON_H, BUTTON_GAP, ROW_GAP = 84, 24, 8, 6
 local WHEEL_DISC, WHEEL_REACH = 170, 74 -- the wheel's disc, and how far out its emotes sit (on its edge)
 
@@ -542,6 +615,7 @@ end
 local function Answer(token)
 	local moment = showing
 	if not moment then return end
+	ArmEcho(token, moment.test)
 	if moment.test then
 		ns.Print(L["Emote Vision test: you'd %s %s."]:format(Command(token), moment.name))
 	elseif moment.group then
@@ -1465,6 +1539,51 @@ local function Spotted(unit)
 		kind == "Guild" and L["is in your guild"] or L["grouped with you before"])
 end
 
+-- Eyes meet: you and a stranger (a player not in your group or guild)
+-- targeting each other for EYES_MEET seconds straight, out of a fight.
+-- Either of you looking away starts it over; one card per look.
+local EYES_MEET = 10
+local gaze      -- (who you're looking at who's looking back: { guid, since, done })
+local gazeTicker
+local function LookingBack()
+	local guid = Plain(UnitGUID("target"))
+	if not (guid and guid:find("^Player%-")) or guid == Plain(UnitGUID("player")) then return end
+	if ns.Flag(UnitInParty("target")) or ns.Flag(UnitInRaid("target")) then return end
+	if UnitIsInMyGuild and ns.Flag(UnitIsInMyGuild("target")) then return end
+	if not ns.Flag(UnitIsUnit("targettarget", "player")) then return end
+	return guid
+end
+local function WatchGaze()
+	local on = ns.Setting("emoteVision") and DB()[MOMENT.Eyes.on]
+	local target = Plain(UnitGUID("target"))
+	if not (on and target and target:find("^Player%-")) then
+		-- (No one to look at: stop asking until you target someone.)
+		gaze = nil
+		if gazeTicker then gazeTicker:Cancel() gazeTicker = nil end
+		return
+	end
+	local guid = not loading and not Fighting() and LookingBack()
+	if not guid then gaze = nil return end
+	if not gaze or gaze.guid ~= guid then
+		gaze = { guid = guid, since = GetTime() }
+		return
+	end
+	if gaze.done or GetTime() - gaze.since < EYES_MEET then return end
+	gaze.done = true
+	FireFor("Eyes", Plain(UnitName("target")), guid, L["is looking back at you"])
+end
+-- (Your target changed: watch them, twice a second, while it's a player.)
+local function GazeTargetChanged()
+	gaze = nil
+	WatchGaze()
+	-- (By GUID, not UnitIsPlayer: that can say false for players on Forever.)
+	local target = Plain(UnitGUID("target"))
+	if target and target:find("^Player%-") and not gazeTicker and ns.Setting("emoteVision")
+		and DB()[MOMENT.Eyes.on] then
+		gazeTicker = C_Timer.NewTicker(0.5, WatchGaze)
+	end
+end
+
 -- Your own level up: a card for everyone around, to celebrate.
 local function LeveledUp(level)
 	level = Plain(level)
@@ -1495,6 +1614,7 @@ watcher:SetScript("OnEvent", function(_, event, ...)
 		AurasChanged(select(2, ...))
 	elseif event == "CHAT_MSG_TEXT_EMOTE" then
 		local text, author = ...
+		EchoOwn(text, author, (select(12, ...)))
 		Emoted(text, author, (select(12, ...)))
 	elseif event == "RESURRECT_REQUEST" then
 		local name = Plain((...))
@@ -1533,6 +1653,7 @@ watcher:SetScript("OnEvent", function(_, event, ...)
 				or (event == "UPDATE_MOUSEOVER_UNIT" and "mouseover" or "target")
 			if unit then Spotted(unit) end
 		end
+		if event == "PLAYER_TARGET_CHANGED" then GazeTargetChanged() end
 	elseif event == "LOADING_SCREEN_ENABLED" then
 		loading = true
 	elseif event == "LOADING_SCREEN_DISABLED" then
@@ -1837,6 +1958,14 @@ function ns.EmoteVisionDebug()
 		auraSeen.last or "none", known))
 	ns.Print("  last buff: " .. (lastBuff or "none yet") ..
 		(" (refreshes tracked: %s)"):format(C_UnitAuras and C_UnitAuras.GetAuraDataByAuraInstanceID and "yes" or "no, old client"))
+	if lastEcho then
+		ns.Print(("  last button: %s %d s ago; test %s; words only %s; %s; own line caught: %s%s"):format(
+			lastEcho.token, GetTime() - lastEcho.at, tostring(lastEcho.test), tostring(lastEcho.words),
+			lastEcho.speech, tostring(lastEcho.caught or "no"),
+			lastEcho.other and ("; other emote line: " .. lastEcho.other) or ""))
+	else
+		ns.Print("  last button: none clicked since /reload")
+	end
 	local target = Plain(UnitGUID("target"))
 	if target then
 		local ally = "no API"
@@ -1847,7 +1976,7 @@ function ns.EmoteVisionDebug()
 		ns.Print(("  target %s: unit %s; guild %s; recent ally %s; known as %s; met %s"):format(
 			tostring(Plain(UnitName("target"))), tostring(UnitFor(target)),
 			UnitIsInMyGuild and tostring(Plain(UnitIsInMyGuild("target"))) or "no API", ally,
-			tostring(select(2, Known("target"))), met[target] and ("%d s ago"):format(GetTime() - met[target]) or "never"))
+			tostring((select(2, Known("target")))), met[target] and ("%d s ago"):format(GetTime() - met[target]) or "never"))
 	end
 end
 
@@ -2173,7 +2302,7 @@ local function MomentsGrid(kit, content, stack)
 		end)
 	end
 
-	local heads, rows = {}, {}
+	local heads, rows, groupTitles = {}, {}, {}
 	-- (Each moment closed to start, its emotes summed up on its band; open:
 	-- its rows and Add an emote under it. Kept while the settings stay open.)
 	local opened = {}
@@ -2245,8 +2374,22 @@ local function MomentsGrid(kit, content, stack)
 		local pageOn = On() and true or false
 		for _, head in ipairs(heads) do head:Hide() head.add:Hide() end
 		for _, row in ipairs(rows) do row:Hide() end
-		local y, n = 0, 0
+		for _, title in ipairs(groupTitles) do title:Hide() end
+		local y, n, lastGroup, g = 0, 0, nil, 0
 		for i, moment in ipairs(MOMENTS) do
+			-- (A header over each group's moments.)
+			if moment.group ~= lastGroup then
+				lastGroup, g = moment.group, g + 1
+				if g > 1 then y = y + 10 end
+				local title = groupTitles[g] or kit.Label(box, "GameFontNormal", "")
+				groupTitles[g] = title
+				title:SetFontObject(pageOn and "GameFontNormal" or "GameFontDisable")
+				title:SetText(L[moment.group])
+				title:ClearAllPoints()
+				title:SetPoint("TOPLEFT", box, "TOPLEFT", 2, -y)
+				title:Show()
+				y = y + 20
+			end
 			local head = Head(i)
 			head:ClearAllPoints()
 			head:SetPoint("TOPLEFT", box, "TOPLEFT", 0, -y)
