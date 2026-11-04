@@ -1129,7 +1129,6 @@ L["open the settings"] = "打开设置"
 L["hide the UI but keep the look (again to bring it back)"] = "隐藏界面但保留画面效果（再次输入可恢复）"
 L["letterbox bar height (now %s%%)"] = "宽银幕黑边高度（当前为%s%%）"
 L["show or hide the minimap button"] = "显示或隐藏小地图按钮"
-L["put the active profile back to how it started"] = "将当前配置文件恢复为初始状态"
 L["list the profiles (/cine profile <name> switches to one)"] = "列出配置文件（/cine profile <名称> 可切换）"
 L["the welcome window, to pick a profile"] = "欢迎窗口，用于选择配置文件"
 L["Frames (hover over one first)"] = "框体（先将鼠标悬停在一个框体上）"
@@ -2738,7 +2737,6 @@ L["Need, greed and who won."] = "需求、贪婪以及谁获得了。"
 L["Neutral"] = "中立"
 L["Neutral players"] = "中立玩家"
 L["Never"] = "从不"
-L["Never counts in fights: the game won't say how far anyone is then. Spell range does."] = "战斗中从不计算：那时游戏不会告知任何人的距离。法术距离可以。"
 L["New features"] = "新功能"
 L["New mount"] = "新坐骑"
 L["New pet"] = "新宠物"
@@ -4377,3 +4375,80 @@ L["As your health drops, the screen's edges close in, so you feel a fight withou
 L["As you cast your Hearthstone or a teleport, a portal opens around you and the world fades out as you leave."] = "施放炉石或传送时，你周围会打开一道传送门，离开时世界逐渐消失。"
 -- Skyriding Cam (dev copy): its built-in camera script (CameraScripts.lua)
 L["Skyriding zoom"] = "驭空术镜头拉远"
+
+-- CameraScripts.lua
+L["Skyriding Cam"] = "驭空术镜头"
+
+-- CameraScripts.lua: /cine orbit
+L["orbit stopped"] = "环绕已停止"
+L["Orbit"] = "环绕"
+L["orbit: %d degrees over %s seconds (/cine orbit again stops it)"] = "环绕：%d度，用时%s秒（再次输入 /cine orbit 停止）"
+L["orbit can't start: %s"] = "环绕无法开始：%s"
+
+-- CursorHide.lua
+L["Cursor Hide"] = "隐藏鼠标指针"
+L["In CineMode, the cursor gets out of the way: tiny, gone once the mouse has been still a while, or tiny and then gone. Moving the mouse brings it back from gone."] = "在CineMode中，鼠标指针会让开：变得极小，鼠标静止一会儿后消失，或先极小再消失。移动鼠标会让消失的指针回来。"
+L["On: the cursor gets out of the way where its Show in row says."] = "开启：在“显示于”这一行指定的地方，鼠标指针会让开。"
+L["All through CineMode. (The other columns then have nothing to add.)"] = "整个CineMode期间。（其他列就没有什么可加的了。）"
+L["Cursor"] = "指针"
+L["Tiny"] = "极小"
+L["The cursor stays a tiny corner, as you move and click too."] = "指针一直是一个极小的角，移动和点击时也是。"
+L["Hide completely"] = "完全隐藏"
+L["Once the mouse has been still a while, the cursor's gone, and moving the mouse brings it back. Meanwhile the game draws its cursor itself (its Hardware cursor off), which can feel a little behind at a low frame rate; yours is back with the cursor."] = "鼠标静止一会儿后指针消失，移动鼠标即可恢复。期间由游戏自己绘制指针（关闭其硬件指针），帧数低时可能会感觉稍有延迟；指针回来时你的设置也会恢复。"
+L["Tiny, then gone"] = "极小，然后消失"
+L["The tiny cursor all the time, as you move and click too, and gone once the mouse has been still a while (as Hide completely). Moving the mouse brings the tiny one back, not yours."] = "指针一直是极小的，移动和点击时也是，鼠标静止一会儿后消失（同完全隐藏）。移动鼠标恢复的是极小指针，而不是你的指针。"
+L["Gone after the mouse is still for"] = "鼠标静止多久后消失"
+L["Experimental"] = "实验性"
+L["Cursor Hide changes how the game draws your cursor: it swaps in one of the game's own cursor pictures, and to hide it completely it turns the game's hardware cursor off for a while. It's experimental: the cursor may vanish where you need it, look wrong in places, or feel a little behind. While the cursor's hidden and the game isn't the window you're using, a black square can show over the game where the cursor is."] = "隐藏鼠标指针会改变游戏绘制指针的方式：换成游戏自带的一个指针图片，若要完全隐藏，则会暂时关闭游戏的硬件指针。这是实验性的：指针可能在你需要时消失，在某些地方显示不正确，或感觉稍有延迟。指针隐藏期间，如果游戏不是当前窗口，指针位置上可能会出现一个黑色方块。"
+L["If your cursor ever gets stuck, type |cffffd100/cine reset cursor|r to put just your cursor back to normal, or |cffffd100/cine reset|r to put your profile back too. Either turns Cursor Hide off until you accept this again."] = "如果你的指针卡住了，输入 |cffffd100/cine reset cursor|r 只让指针恢复正常，或输入 |cffffd100/cine reset|r 同时重置你的配置。两者都会关闭隐藏鼠标指针，直到你再次接受此提示。"
+L["I understand, let me use it"] = "我明白了，让我使用"
+L["Keep the mouse here: %d"] = "请把鼠标停在这里：%d"
+
+-- GridRows.lua: the rule editor
+L["A camera script"] = "镜头脚本"
+L["Specific camera..."] = "指定镜头..."
+L["Within %s*"] = "%s以内*"
+L["Picks one camera: true while that one's running."] = "选择一个镜头：该镜头运行时为真。"
+L["True while your target is in reach of this spell, however close."] = "你的目标在此法术范围内时为真，无论多近。"
+L["In fights the game won't say how far anyone is: it stays as it was for the same target, and is false for a new one. Spell range is measured in fights too."] = "战斗中游戏不会告诉任何人的距离：同一目标时保持原值，新目标时为假。法术距离在战斗中同样会测量。"
+L["In fights the game won't say how far anyone is: it stays as it was as the fight began, while an elite enemy still has a nameplate."] = "战斗中游戏不会告诉任何人的距离：只要精英敌人还有姓名板，就保持战斗开始时的值。"
+L["Out of fights only, as the dropdowns' target ticks: in a fight, In combat decides. For your target in a fight, use the kinds (Hostile NPCs, Enemy players...)."] = "仅在战斗外，同下拉菜单的目标勾选：战斗中由“战斗中”决定。战斗中的目标请使用类型（敌对NPC、敌方玩家……）。"
+
+-- LowHealth.lua: Vitals Style
+L["New theme"] = "新主题"
+L["The look: Auto picks your class and spec's (by the talent tree you've put most into, on clients without specs), or pick any. Each class has a theme for each spec. Create theme makes a blank one of your own, Copy theme one from the one shown, under Your themes; the theme's own settings below change the one shown (ours become your version, which Reset theme puts back)."] = "外观：自动会选择你的职业和专精的主题（在没有专精的客户端上，按你投入最多的天赋树），或任选一个。每个职业的每个专精都有主题。“创建主题”新建一个空白的自定义主题，“复制主题”从当前显示的主题复制一个，放在“你的主题”下；下面的主题设置会修改当前显示的主题（我们的主题会变成你的版本，可用“重置主题”恢复）。"
+L["Copy theme"] = "复制主题"
+L["A blank theme of your own: only the shadow and the heartbeat, to build up on the tabs below."] = "一个空白的自定义主题：只有阴影和心跳，在下面的标签页中逐步搭建。"
+L["Pattern"] = "图案"
+L["Second pattern"] = "第二图案"
+L["Game effect"] = "游戏特效"
+L["One of the game's own full-screen effects as it plays them: an edge shape with moving layers inside it, in its own colors, over all the rest. Unlike the Blizzard tab's still patterns, it's the whole effect. It closes in from past the edges as you weaken, with the art's opacity."] = "游戏自带的全屏特效之一，按游戏的播放方式：边缘形状内有移动的图层，使用其自身颜色，覆盖在其他一切之上。与暴雪标签页中的静态图案不同，这是完整的特效。随着你变弱，它会从屏幕边缘之外收拢，使用美术的不透明度。"
+L["Theme's game effect"] = "主题的游戏特效"
+L["One of the game's own full-screen effects, its layers moving, over all the rest, closing in from past the edges as you weaken. Its own colors. None: not there."] = "游戏自带的全屏特效之一，图层移动，覆盖在其他一切之上，随着你变弱从边缘之外收拢。使用其自身颜色。无：不显示。"
+L["How strong it is at full (times the art's opacity)."] = "满强度时的强度（乘以美术的不透明度）。"
+L["Where its edge sits: 50 as the game has it. Higher comes in further at full (100: a third of the way to the middle; far in, the outer part fills in solid), lower pushes it out past the screen so less of it shows."] = "边缘的位置：50为游戏原样。越高，满强度时越往里（100：到中心的三分之一；很靠里时外侧会填满），越低则推出屏幕外，显示得越少。"
+L["One of the game's own full-screen effects, moving, over all the rest."] = "游戏自带的全屏特效之一，动态，覆盖在其他一切之上。"
+
+-- Options.lua
+L["Hunting your prey"] = "狩猎猎物"
+L["While you're on a prey hunt, the minimap stays up during CineMode, so you can see the activities, world quests, rares and treasures that lure your prey out."] = "在猎物狩猎期间，CineMode中小地图保持显示，让你看到能引出猎物的活动、世界任务、稀有怪和宝藏。"
+L["The quest shows at the top of the quest tracker, not in its own place under empty space. Hovering the tracker puts it back."] = "该任务显示在任务追踪器顶部，而不是在空白处下方的原位置。鼠标悬停在追踪器上会让它回到原位。"
+
+-- Options.lua: Quest Vision
+L["Shop window goes there too"] = "商店窗口也去那里"
+L["Picking a vendor's \"let me browse your goods\", the shop window opens where the talk was, on the other half of the screen from the NPC, instead of where the game puts it. A vendor with nothing else to say opens it on the other half from where you clicked them. Drag it and it stays where you drop it until it closes."] = "与商人选择“让我看看你的货物”时，商店窗口会在对话所在的位置打开，即与NPC相对的另一半屏幕，而不是游戏放置的位置。没有别的话要说的商人会在你点击他们的另一半屏幕打开它。拖动它后，它会停留在你放下的位置，直到关闭。"
+
+-- ProfileChoices.lua
+L["A light touch that leaves your UI exactly as it is. A color tint, vignette and weather set the mood, and only the quiet extras join in: the camera sweeps along on flights and teleports, a portal opens as you hearth, and small cards mark your big moments, your duels and the players who buff or emote at you."] = "轻轻一点，完全保留你的界面。色调、暗角和天气营造氛围，只加入安静的额外效果：飞行和传送时镜头相随，使用炉石时传送门开启，小卡片记录你的高光时刻、你的决斗以及为你施加增益或做表情的玩家。"
+L["The best of both. Your UI fades away and comes right back for a fight, a quest or a look with the mouse, with your bars and frames where you know them. The letterbox, tint and weather bring the world to life, most of the Visions and cards join in, and the camera takes over on flights, when you go AFK and for your Hearthstone and teleports."] = "两全其美。你的界面会淡出，并在战斗、任务或用鼠标查看时立即回来，动作条和框体仍在你熟悉的位置。宽银幕、色调和天气让世界鲜活起来，大多数Visions和卡片加入其中，飞行、暂离以及使用炉石和传送时由镜头接管。"
+L["The full experience, with as little UI as possible, even in fights. Nameplates tell you what you need to know, the Cooldown Manager takes the place of your action bars, and your health shows at the screen's edges. Every camera, every Vision and all the atmosphere: the letterbox stays up through fights, and the camera comes alive on flights, by campfires, at vistas and more."] = "完整体验，界面尽可能少，即使在战斗中。姓名板告诉你需要知道的一切，冷却管理器取代你的动作条，生命值显示在屏幕边缘。每个镜头、每个Vision和全部氛围：宽银幕在战斗中保持，镜头在飞行、篝火旁、观景点等处活起来。"
+
+-- Slash.lua
+L["put the active profile back to how it started, and your cursor back to normal"] = "将当前配置恢复为最初状态，并让你的指针恢复正常"
+L["just your cursor back to normal, if Cursor Hide left it hidden or odd"] = "只让你的指针恢复正常，如果隐藏鼠标指针让它隐藏或异常"
+L["the camera turns once around you: 360 degrees over 10 seconds unless given (negative: the other way); again stops it"] = "镜头绕你转一圈：未指定时10秒转360度（负数：反方向）；再次输入停止"
+L["your cursor is back to normal (Cursor Hide off till you accept its warning again)"] = "你的指针已恢复正常（隐藏鼠标指针已关闭，直到你再次接受其提示）"
+
+-- Changelog.lua: What's new
+L["Cursor Hide (experimental)"] = "隐藏鼠标指针（实验性）"
+L["In CineMode, your cursor gets out of the way: it shrinks to a tiny corner, vanishes once the mouse has been still a while, or both. Moving the mouse brings it back. It's experimental: accept the warning on its page to turn it on, and /cine reset cursor puts your cursor back if it ever gets stuck. The Cinema profile uses it during flights, at vistas and while you're AFK."] = "在CineMode中，你的鼠标指针会让开：缩成一个极小的角，鼠标静止一会儿后消失，或两者兼有。移动鼠标即可恢复。这是实验性的：在其页面接受提示后才能开启，指针卡住时 /cine reset cursor 可让它恢复。Cinema配置在飞行中、观景点和暂离时使用它。"

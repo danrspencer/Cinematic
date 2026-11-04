@@ -1130,7 +1130,6 @@ L["open the settings"] = "apri le impostazioni"
 L["hide the UI but keep the look (again to bring it back)"] = "nascondi l'interfaccia ma mantieni l'aspetto (di nuovo per farla tornare)"
 L["letterbox bar height (now %s%%)"] = "altezza delle bande nere (ora %s%%)"
 L["show or hide the minimap button"] = "mostra o nascondi il pulsante della minimappa"
-L["put the active profile back to how it started"] = "riporta il profilo attivo a com'era all'inizio"
 L["list the profiles (/cine profile <name> switches to one)"] = "elenca i profili (/cine profile <nome> passa a uno)"
 L["the welcome window, to pick a profile"] = "la finestra di benvenuto, per scegliere un profilo"
 L["Frames (hover over one first)"] = "Riquadri (prima passa il mouse su uno)"
@@ -2739,7 +2738,6 @@ L["Need, greed and who won."] = "Necessità, avidità e chi ha vinto."
 L["Neutral"] = "Neutrale"
 L["Neutral players"] = "Giocatori neutrali"
 L["Never"] = "Mai"
-L["Never counts in fights: the game won't say how far anyone is then. Spell range does."] = "Non conta mai in combattimento: il gioco allora non dice quanto è lontano qualcuno. La portata degli incantesimi sì."
 L["New features"] = "Novità"
 L["New mount"] = "Nuova cavalcatura"
 L["New pet"] = "Nuova mascotte"
@@ -4378,3 +4376,80 @@ L["As your health drops, the screen's edges close in, so you feel a fight withou
 L["As you cast your Hearthstone or a teleport, a portal opens around you and the world fades out as you leave."] = "Mentre lanci la pietra del ritorno o un teletrasporto, un portale si apre attorno a te e il mondo svanisce mentre parti."
 -- Skyriding Cam (dev copy): its built-in camera script (CameraScripts.lua)
 L["Skyriding zoom"] = "Zoom del volo dinamico"
+
+-- CameraScripts.lua
+L["Skyriding Cam"] = "Telecamera del volo dinamico"
+
+-- CameraScripts.lua: /cine orbit
+L["orbit stopped"] = "orbita fermata"
+L["Orbit"] = "Orbita"
+L["orbit: %d degrees over %s seconds (/cine orbit again stops it)"] = "orbita: %d gradi in %s secondi (/cine orbit di nuovo la ferma)"
+L["orbit can't start: %s"] = "l'orbita non può partire: %s"
+
+-- CursorHide.lua
+L["Cursor Hide"] = "Nascondi cursore"
+L["In CineMode, the cursor gets out of the way: tiny, gone once the mouse has been still a while, or tiny and then gone. Moving the mouse brings it back from gone."] = "In CineMode il cursore si toglie di mezzo: minuscolo, sparito quando il mouse resta fermo per un po', oppure minuscolo e poi sparito. Muovere il mouse lo riporta quando è sparito."
+L["On: the cursor gets out of the way where its Show in row says."] = "Attivo: il cursore si toglie di mezzo dove dice la sua riga Mostra in."
+L["All through CineMode. (The other columns then have nothing to add.)"] = "Per tutto il CineMode. (Le altre colonne non hanno allora nulla da aggiungere.)"
+L["Cursor"] = "Cursore"
+L["Tiny"] = "Minuscolo"
+L["The cursor stays a tiny corner, as you move and click too."] = "Il cursore resta un angolino minuscolo, anche mentre ti muovi e clicchi."
+L["Hide completely"] = "Nascondi del tutto"
+L["Once the mouse has been still a while, the cursor's gone, and moving the mouse brings it back. Meanwhile the game draws its cursor itself (its Hardware cursor off), which can feel a little behind at a low frame rate; yours is back with the cursor."] = "Quando il mouse resta fermo per un po', il cursore sparisce, e muovere il mouse lo riporta. Nel frattempo il gioco disegna il cursore da sé (il suo cursore hardware disattivato), il che può sembrare un po' in ritardo con pochi fotogrammi; il tuo torna con il cursore."
+L["Tiny, then gone"] = "Minuscolo, poi sparito"
+L["The tiny cursor all the time, as you move and click too, and gone once the mouse has been still a while (as Hide completely). Moving the mouse brings the tiny one back, not yours."] = "Il cursore minuscolo sempre, anche mentre ti muovi e clicchi, e sparito quando il mouse resta fermo per un po' (come Nascondi del tutto). Muovere il mouse riporta quello minuscolo, non il tuo."
+L["Gone after the mouse is still for"] = "Sparisce dopo che il mouse è fermo per"
+L["Experimental"] = "Sperimentale"
+L["Cursor Hide changes how the game draws your cursor: it swaps in one of the game's own cursor pictures, and to hide it completely it turns the game's hardware cursor off for a while. It's experimental: the cursor may vanish where you need it, look wrong in places, or feel a little behind. While the cursor's hidden and the game isn't the window you're using, a black square can show over the game where the cursor is."] = "Nascondi cursore cambia il modo in cui il gioco disegna il tuo cursore: mette una delle immagini di cursore del gioco, e per nasconderlo del tutto disattiva per un po' il cursore hardware del gioco. È sperimentale: il cursore può sparire dove ti serve, apparire sbagliato in certi punti o sembrare un po' in ritardo. Mentre il cursore è nascosto e il gioco non è la finestra in uso, sopra il gioco può comparire un quadrato nero dove si trova il cursore."
+L["If your cursor ever gets stuck, type |cffffd100/cine reset cursor|r to put just your cursor back to normal, or |cffffd100/cine reset|r to put your profile back too. Either turns Cursor Hide off until you accept this again."] = "Se il tuo cursore dovesse mai bloccarsi, scrivi |cffffd100/cine reset cursor|r per riportare alla normalità solo il cursore, oppure |cffffd100/cine reset|r per ripristinare anche il profilo. Entrambi disattivano Nascondi cursore finché non accetti di nuovo questo avviso."
+L["I understand, let me use it"] = "Ho capito, fammelo usare"
+L["Keep the mouse here: %d"] = "Tieni il mouse qui: %d"
+
+-- GridRows.lua: the rule editor
+L["A camera script"] = "Uno script della telecamera"
+L["Specific camera..."] = "Telecamera specifica..."
+L["Within %s*"] = "Entro %s*"
+L["Picks one camera: true while that one's running."] = "Sceglie una telecamera: vero mentre è in funzione proprio quella."
+L["True while your target is in reach of this spell, however close."] = "Vero mentre il tuo bersaglio è alla portata di questo incantesimo, per quanto vicino."
+L["In fights the game won't say how far anyone is: it stays as it was for the same target, and is false for a new one. Spell range is measured in fights too."] = "In combattimento il gioco non dice quanto è lontano nessuno: resta com'era per lo stesso bersaglio, ed è falso per uno nuovo. La portata degli incantesimi si misura anche in combattimento."
+L["In fights the game won't say how far anyone is: it stays as it was as the fight began, while an elite enemy still has a nameplate."] = "In combattimento il gioco non dice quanto è lontano nessuno: resta com'era all'inizio del combattimento, finché un nemico élite ha ancora una barra del nome."
+L["Out of fights only, as the dropdowns' target ticks: in a fight, In combat decides. For your target in a fight, use the kinds (Hostile NPCs, Enemy players...)."] = "Solo fuori dal combattimento, come le spunte del bersaglio nei menu a tendina: in combattimento decide In combattimento. Per il tuo bersaglio in combattimento usa i tipi (PNG ostili, Giocatori nemici...)."
+
+-- LowHealth.lua: Vitals Style
+L["New theme"] = "Nuovo tema"
+L["The look: Auto picks your class and spec's (by the talent tree you've put most into, on clients without specs), or pick any. Each class has a theme for each spec. Create theme makes a blank one of your own, Copy theme one from the one shown, under Your themes; the theme's own settings below change the one shown (ours become your version, which Reset theme puts back)."] = "L'aspetto: Auto sceglie quello della tua classe e specializzazione (secondo l'albero dei talenti in cui hai investito di più, sui client senza specializzazioni), oppure scegline uno. Ogni classe ha un tema per ogni specializzazione. Crea tema ne crea uno vuoto tuo, Copia tema uno da quello mostrato, sotto I tuoi temi; le impostazioni del tema qui sotto cambiano quello mostrato (i nostri diventano la tua versione, che Ripristina tema rimette com'era)."
+L["Copy theme"] = "Copia tema"
+L["A blank theme of your own: only the shadow and the heartbeat, to build up on the tabs below."] = "Un tema vuoto tuo: solo l'ombra e il battito, da costruire nelle schede qui sotto."
+L["Pattern"] = "Motivo"
+L["Second pattern"] = "Secondo motivo"
+L["Game effect"] = "Effetto di gioco"
+L["One of the game's own full-screen effects as it plays them: an edge shape with moving layers inside it, in its own colors, over all the rest. Unlike the Blizzard tab's still patterns, it's the whole effect. It closes in from past the edges as you weaken, with the art's opacity."] = "Uno degli effetti a schermo intero del gioco, come lo riproduce: una forma di bordo con livelli in movimento dentro, nei suoi colori, sopra tutto il resto. A differenza dei motivi fissi della scheda Blizzard, è l'effetto intero. Si stringe da oltre i bordi mentre ti indebolisci, con l'opacità della grafica."
+L["Theme's game effect"] = "Effetto di gioco del tema"
+L["One of the game's own full-screen effects, its layers moving, over all the rest, closing in from past the edges as you weaken. Its own colors. None: not there."] = "Uno degli effetti a schermo intero del gioco, con i livelli in movimento, sopra tutto il resto, che si stringe da oltre i bordi mentre ti indebolisci. Nei suoi colori. Nessuno: assente."
+L["How strong it is at full (times the art's opacity)."] = "Quanto è forte al massimo (per l'opacità della grafica)."
+L["Where its edge sits: 50 as the game has it. Higher comes in further at full (100: a third of the way to the middle; far in, the outer part fills in solid), lower pushes it out past the screen so less of it shows."] = "Dove sta il suo bordo: 50 come nel gioco. Più alto entra di più al massimo (100: un terzo della strada verso il centro; molto dentro, la parte esterna si riempie del tutto), più basso lo spinge oltre lo schermo, così se ne vede meno."
+L["One of the game's own full-screen effects, moving, over all the rest."] = "Uno degli effetti a schermo intero del gioco, in movimento, sopra tutto il resto."
+
+-- Options.lua
+L["Hunting your prey"] = "A caccia della preda"
+L["While you're on a prey hunt, the minimap stays up during CineMode, so you can see the activities, world quests, rares and treasures that lure your prey out."] = "Mentre sei a caccia di una preda, la minimappa resta visibile in CineMode, così vedi le attività, le missioni mondiali, i rari e i tesori che fanno uscire la tua preda."
+L["The quest shows at the top of the quest tracker, not in its own place under empty space. Hovering the tracker puts it back."] = "La missione compare in cima al tracciatore delle missioni, non al suo posto sotto uno spazio vuoto. Passare sopra il tracciatore la rimette a posto."
+
+-- Options.lua: Quest Vision
+L["Shop window goes there too"] = "Anche la finestra del mercante va lì"
+L["Picking a vendor's \"let me browse your goods\", the shop window opens where the talk was, on the other half of the screen from the NPC, instead of where the game puts it. A vendor with nothing else to say opens it on the other half from where you clicked them. Drag it and it stays where you drop it until it closes."] = "Scegliendo «Fammi vedere la tua merce» da un mercante, la finestra del mercante si apre dove era la conversazione, nell'altra metà dello schermo rispetto al PNG, invece di dove la mette il gioco. Un mercante che non ha altro da dire la apre nell'altra metà rispetto a dove l'hai cliccato. Trascinala e resta dove la lasci finché non si chiude."
+
+-- ProfileChoices.lua
+L["A light touch that leaves your UI exactly as it is. A color tint, vignette and weather set the mood, and only the quiet extras join in: the camera sweeps along on flights and teleports, a portal opens as you hearth, and small cards mark your big moments, your duels and the players who buff or emote at you."] = "Un tocco leggero che lascia la tua interfaccia esattamente com'è. Una tinta di colore, la vignettatura e il meteo creano l'atmosfera, e si aggiungono solo gli extra discreti: la telecamera ti segue in volo e nei teletrasporti, un portale si apre quando usi la pietra del ritorno, e piccole schede segnano i tuoi grandi momenti, i tuoi duelli e i giocatori che ti potenziano o ti salutano."
+L["The best of both. Your UI fades away and comes right back for a fight, a quest or a look with the mouse, with your bars and frames where you know them. The letterbox, tint and weather bring the world to life, most of the Visions and cards join in, and the camera takes over on flights, when you go AFK and for your Hearthstone and teleports."] = "Il meglio di entrambi. La tua interfaccia svanisce e torna subito per un combattimento, una missione o un'occhiata con il mouse, con barre e riquadri dove li conosci. Letterbox, tinta e meteo danno vita al mondo, la maggior parte delle Visions e delle schede si aggiunge, e la telecamera prende il comando in volo, quando vai AFK e per la pietra del ritorno e i teletrasporti."
+L["The full experience, with as little UI as possible, even in fights. Nameplates tell you what you need to know, the Cooldown Manager takes the place of your action bars, and your health shows at the screen's edges. Every camera, every Vision and all the atmosphere: the letterbox stays up through fights, and the camera comes alive on flights, by campfires, at vistas and more."] = "L'esperienza completa, con meno interfaccia possibile, anche in combattimento. Le barre del nome ti dicono ciò che serve, il gestore dei tempi di recupero prende il posto delle barre delle azioni, e la tua salute si vede ai bordi dello schermo. Ogni telecamera, ogni Vision e tutta l'atmosfera: il letterbox resta anche nei combattimenti, e la telecamera si anima in volo, accanto ai fuochi da campo, ai panorami e altro ancora."
+
+-- Slash.lua
+L["put the active profile back to how it started, and your cursor back to normal"] = "riporta il profilo attivo com'era all'inizio, e il tuo cursore alla normalità"
+L["just your cursor back to normal, if Cursor Hide left it hidden or odd"] = "solo il tuo cursore alla normalità, se Nascondi cursore l'ha lasciato nascosto o strano"
+L["the camera turns once around you: 360 degrees over 10 seconds unless given (negative: the other way); again stops it"] = "la telecamera fa un giro intorno a te: 360 gradi in 10 secondi se non indicato (negativo: nell'altro senso); di nuovo la ferma"
+L["your cursor is back to normal (Cursor Hide off till you accept its warning again)"] = "il tuo cursore è tornato normale (Nascondi cursore disattivato finché non accetti di nuovo il suo avviso)"
+
+-- Changelog.lua: What's new
+L["Cursor Hide (experimental)"] = "Nascondi cursore (sperimentale)"
+L["In CineMode, your cursor gets out of the way: it shrinks to a tiny corner, vanishes once the mouse has been still a while, or both. Moving the mouse brings it back. It's experimental: accept the warning on its page to turn it on, and /cine reset cursor puts your cursor back if it ever gets stuck. The Cinema profile uses it during flights, at vistas and while you're AFK."] = "In CineMode il tuo cursore si toglie di mezzo: si riduce a un angolino minuscolo, sparisce quando il mouse resta fermo per un po', o entrambe le cose. Muovere il mouse lo riporta. È sperimentale: accetta l'avviso nella sua pagina per attivarlo, e /cine reset cursor riporta il cursore se dovesse mai bloccarsi. Il profilo Cinema lo usa in volo, ai panorami e mentre sei AFK."

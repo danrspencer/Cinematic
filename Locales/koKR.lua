@@ -1129,7 +1129,6 @@ L["open the settings"] = "설정 열기"
 L["hide the UI but keep the look (again to bring it back)"] = "분위기는 유지하고 UI 숨기기 (다시 입력하면 돌아옴)"
 L["letterbox bar height (now %s%%)"] = "레터박스 바 높이 (현재 %s%%)"
 L["show or hide the minimap button"] = "미니맵 버튼 표시/숨기기"
-L["put the active profile back to how it started"] = "현재 프로필을 처음 상태로 되돌리기"
 L["list the profiles (/cine profile <name> switches to one)"] = "프로필 목록 (/cine profile <이름>으로 바꿈)"
 L["the welcome window, to pick a profile"] = "프로필을 고르는 환영 창"
 L["Frames (hover over one first)"] = "창 (먼저 마우스를 올리세요)"
@@ -2738,7 +2737,6 @@ L["Need, greed and who won."] = "입찰, 차비, 승자."
 L["Neutral"] = "중립"
 L["Neutral players"] = "중립 플레이어"
 L["Never"] = "안 함"
-L["Never counts in fights: the game won't say how far anyone is then. Spell range does."] = "전투 중에는 세지 않습니다: 그때 게임은 거리를 알려 주지 않습니다. 주문 사거리는 셉니다."
 L["New features"] = "새 기능"
 L["New mount"] = "새 탈것"
 L["New pet"] = "새 애완동물"
@@ -4377,3 +4375,80 @@ L["As your health drops, the screen's edges close in, so you feel a fight withou
 L["As you cast your Hearthstone or a teleport, a portal opens around you and the world fades out as you leave."] = "귀환석이나 순간이동을 시전하면 주위에 차원문이 열리고, 떠나면서 세상이 서서히 사라집니다."
 -- Skyriding Cam (dev copy): its built-in camera script (CameraScripts.lua)
 L["Skyriding zoom"] = "하늘비행 줌"
+
+-- CameraScripts.lua
+L["Skyriding Cam"] = "용 조련술 카메라"
+
+-- CameraScripts.lua: /cine orbit
+L["orbit stopped"] = "궤도 회전 중지됨"
+L["Orbit"] = "궤도 회전"
+L["orbit: %d degrees over %s seconds (/cine orbit again stops it)"] = "궤도 회전: %d도를 %s초 동안 (/cine orbit 다시 입력하면 중지)"
+L["orbit can't start: %s"] = "궤도 회전을 시작할 수 없음: %s"
+
+-- CursorHide.lua
+L["Cursor Hide"] = "커서 숨기기"
+L["In CineMode, the cursor gets out of the way: tiny, gone once the mouse has been still a while, or tiny and then gone. Moving the mouse brings it back from gone."] = "CineMode에서 커서가 방해되지 않게 비켜 줍니다: 아주 작게, 마우스가 한동안 멈추면 사라지게, 또는 작게 있다가 사라지게. 사라진 커서는 마우스를 움직이면 돌아옵니다."
+L["On: the cursor gets out of the way where its Show in row says."] = "켜짐: 표시 장소 줄이 정한 곳에서 커서가 비켜 줍니다."
+L["All through CineMode. (The other columns then have nothing to add.)"] = "CineMode 내내. (그러면 다른 열은 더할 것이 없습니다.)"
+L["Cursor"] = "커서"
+L["Tiny"] = "아주 작게"
+L["The cursor stays a tiny corner, as you move and click too."] = "움직이거나 클릭할 때도 커서가 아주 작은 모서리로 남습니다."
+L["Hide completely"] = "완전히 숨기기"
+L["Once the mouse has been still a while, the cursor's gone, and moving the mouse brings it back. Meanwhile the game draws its cursor itself (its Hardware cursor off), which can feel a little behind at a low frame rate; yours is back with the cursor."] = "마우스가 한동안 멈추면 커서가 사라지고, 마우스를 움직이면 돌아옵니다. 그동안 게임이 커서를 직접 그리므로(하드웨어 커서 꺼짐) 프레임이 낮으면 조금 늦게 느껴질 수 있습니다. 커서가 돌아오면 원래대로 돌아옵니다."
+L["Tiny, then gone"] = "작게, 그다음 사라짐"
+L["The tiny cursor all the time, as you move and click too, and gone once the mouse has been still a while (as Hide completely). Moving the mouse brings the tiny one back, not yours."] = "움직이거나 클릭할 때도 늘 작은 커서이고, 마우스가 한동안 멈추면 사라집니다(완전히 숨기기처럼). 마우스를 움직이면 원래 커서가 아니라 작은 커서가 돌아옵니다."
+L["Gone after the mouse is still for"] = "마우스가 멈춘 뒤 사라지기까지"
+L["Experimental"] = "실험적"
+L["Cursor Hide changes how the game draws your cursor: it swaps in one of the game's own cursor pictures, and to hide it completely it turns the game's hardware cursor off for a while. It's experimental: the cursor may vanish where you need it, look wrong in places, or feel a little behind. While the cursor's hidden and the game isn't the window you're using, a black square can show over the game where the cursor is."] = "커서 숨기기는 게임이 커서를 그리는 방식을 바꿉니다: 게임 자체의 커서 그림 중 하나로 바꾸고, 완전히 숨길 때는 게임의 하드웨어 커서를 잠시 끕니다. 실험적인 기능입니다: 필요한 곳에서 커서가 사라지거나, 어떤 곳에서는 이상하게 보이거나, 조금 늦게 느껴질 수 있습니다. 커서가 숨겨져 있고 게임이 사용 중인 창이 아닐 때는 커서 자리에 검은 사각형이 보일 수 있습니다."
+L["If your cursor ever gets stuck, type |cffffd100/cine reset cursor|r to put just your cursor back to normal, or |cffffd100/cine reset|r to put your profile back too. Either turns Cursor Hide off until you accept this again."] = "커서가 멈춰 버리면 |cffffd100/cine reset cursor|r를 입력해 커서만 원래대로 돌리거나, |cffffd100/cine reset|r로 프로필까지 되돌리세요. 둘 다 이 경고를 다시 수락할 때까지 커서 숨기기를 끕니다."
+L["I understand, let me use it"] = "이해했습니다, 사용할게요"
+L["Keep the mouse here: %d"] = "마우스를 여기에 두세요: %d"
+
+-- GridRows.lua: the rule editor
+L["A camera script"] = "카메라 스크립트"
+L["Specific camera..."] = "특정 카메라..."
+L["Within %s*"] = "%s 이내*"
+L["Picks one camera: true while that one's running."] = "카메라 하나를 고릅니다: 그 카메라가 작동하는 동안 참."
+L["True while your target is in reach of this spell, however close."] = "대상이 이 주문의 사거리 안에 있는 동안 참, 아무리 가까워도."
+L["In fights the game won't say how far anyone is: it stays as it was for the same target, and is false for a new one. Spell range is measured in fights too."] = "전투 중에는 게임이 거리를 알려 주지 않습니다: 같은 대상이면 이전 값을 유지하고, 새 대상이면 거짓입니다. 주문 사거리는 전투 중에도 측정됩니다."
+L["In fights the game won't say how far anyone is: it stays as it was as the fight began, while an elite enemy still has a nameplate."] = "전투 중에는 게임이 거리를 알려 주지 않습니다: 정예 적에게 아직 이름표가 있는 동안 전투가 시작될 때의 값을 유지합니다."
+L["Out of fights only, as the dropdowns' target ticks: in a fight, In combat decides. For your target in a fight, use the kinds (Hostile NPCs, Enemy players...)."] = "전투 밖에서만, 드롭다운의 대상 체크처럼: 전투 중에는 전투 중이 결정합니다. 전투 중 대상에는 종류(적대적 NPC, 적 플레이어...)를 쓰세요."
+
+-- LowHealth.lua: Vitals Style
+L["New theme"] = "새 테마"
+L["The look: Auto picks your class and spec's (by the talent tree you've put most into, on clients without specs), or pick any. Each class has a theme for each spec. Create theme makes a blank one of your own, Copy theme one from the one shown, under Your themes; the theme's own settings below change the one shown (ours become your version, which Reset theme puts back)."] = "모습: 자동은 직업과 전문화의 테마를 고릅니다(전문화가 없는 클라이언트에서는 가장 많이 투자한 특성 트리로), 또는 원하는 것을 고르세요. 직업마다 전문화별 테마가 있습니다. 테마 만들기는 빈 내 테마를, 테마 복사는 보이는 테마로 하나를 내 테마 아래에 만듭니다. 아래 테마 설정은 보이는 테마를 바꿉니다(우리 테마는 내 버전이 되며, 테마 초기화로 되돌립니다)."
+L["Copy theme"] = "테마 복사"
+L["A blank theme of your own: only the shadow and the heartbeat, to build up on the tabs below."] = "빈 내 테마: 그림자와 심장 박동만 있으며, 아래 탭에서 채워 나갑니다."
+L["Pattern"] = "무늬"
+L["Second pattern"] = "두 번째 무늬"
+L["Game effect"] = "게임 효과"
+L["One of the game's own full-screen effects as it plays them: an edge shape with moving layers inside it, in its own colors, over all the rest. Unlike the Blizzard tab's still patterns, it's the whole effect. It closes in from past the edges as you weaken, with the art's opacity."] = "게임 자체의 전체 화면 효과 중 하나를 게임이 재생하는 그대로: 안에서 레이어가 움직이는 테두리 모양이 자체 색으로 다른 모든 것 위에 나옵니다. Blizzard 탭의 정지된 무늬와 달리 효과 전체입니다. 약해질수록 화면 가장자리 너머에서 좁혀 오며, 그림의 불투명도를 따릅니다."
+L["Theme's game effect"] = "테마의 게임 효과"
+L["One of the game's own full-screen effects, its layers moving, over all the rest, closing in from past the edges as you weaken. Its own colors. None: not there."] = "게임 자체의 전체 화면 효과 중 하나로, 레이어가 움직이며 다른 모든 것 위에 나오고, 약해질수록 가장자리 너머에서 좁혀 옵니다. 자체 색. 없음: 표시 안 함."
+L["How strong it is at full (times the art's opacity)."] = "최대일 때의 세기(그림의 불투명도를 곱함)."
+L["Where its edge sits: 50 as the game has it. Higher comes in further at full (100: a third of the way to the middle; far in, the outer part fills in solid), lower pushes it out past the screen so less of it shows."] = "테두리 위치: 50은 게임과 같습니다. 높을수록 최대일 때 더 안쪽까지 들어오고(100: 중앙까지 3분의 1; 깊이 들어오면 바깥쪽이 꽉 찹니다), 낮을수록 화면 밖으로 밀려나 덜 보입니다."
+L["One of the game's own full-screen effects, moving, over all the rest."] = "게임 자체의 전체 화면 효과 중 하나, 움직이며 다른 모든 것 위에."
+
+-- Options.lua
+L["Hunting your prey"] = "사냥감 추적"
+L["While you're on a prey hunt, the minimap stays up during CineMode, so you can see the activities, world quests, rares and treasures that lure your prey out."] = "사냥감 추적 중에는 CineMode에서도 미니맵이 보여서, 사냥감을 끌어내는 활동, 전역 퀘스트, 희귀 몬스터와 보물을 볼 수 있습니다."
+L["The quest shows at the top of the quest tracker, not in its own place under empty space. Hovering the tracker puts it back."] = "퀘스트가 빈 공간 아래 원래 자리 대신 퀘스트 추적기 맨 위에 나옵니다. 추적기에 마우스를 올리면 원래대로 돌아옵니다."
+
+-- Options.lua: Quest Vision
+L["Shop window goes there too"] = "상점 창도 그곳으로"
+L["Picking a vendor's \"let me browse your goods\", the shop window opens where the talk was, on the other half of the screen from the NPC, instead of where the game puts it. A vendor with nothing else to say opens it on the other half from where you clicked them. Drag it and it stays where you drop it until it closes."] = "상인에게서 「물건을 보여 주세요」를 고르면, 게임이 놓는 자리 대신 대화가 있던 곳, 곧 NPC와 반대쪽 화면 절반에 상점 창이 열립니다. 다른 할 말이 없는 상인은 클릭한 위치와 반대쪽 절반에 엽니다. 끌어 옮기면 창이 닫힐 때까지 놓은 자리에 머뭅니다."
+
+-- ProfileChoices.lua
+L["A light touch that leaves your UI exactly as it is. A color tint, vignette and weather set the mood, and only the quiet extras join in: the camera sweeps along on flights and teleports, a portal opens as you hearth, and small cards mark your big moments, your duels and the players who buff or emote at you."] = "UI를 그대로 두는 가벼운 손길. 색조, 비네트와 날씨가 분위기를 만들고, 조용한 추가 기능만 함께합니다: 비행과 순간이동 때 카메라가 따라가고, 귀환석을 쓰면 차원문이 열리며, 작은 카드가 중요한 순간, 결투, 그리고 버프나 감정 표현을 해 준 플레이어를 기록합니다."
+L["The best of both. Your UI fades away and comes right back for a fight, a quest or a look with the mouse, with your bars and frames where you know them. The letterbox, tint and weather bring the world to life, most of the Visions and cards join in, and the camera takes over on flights, when you go AFK and for your Hearthstone and teleports."] = "둘의 장점만. UI가 사라졌다가 전투, 퀘스트, 마우스로 둘러볼 때 바로 돌아오며, 바와 프레임은 익숙한 자리에 있습니다. 레터박스, 색조와 날씨가 세상에 생기를 주고, 대부분의 Visions와 카드가 함께하며, 비행 중, 자리 비움일 때, 귀환석과 순간이동 때 카메라가 나섭니다."
+L["The full experience, with as little UI as possible, even in fights. Nameplates tell you what you need to know, the Cooldown Manager takes the place of your action bars, and your health shows at the screen's edges. Every camera, every Vision and all the atmosphere: the letterbox stays up through fights, and the camera comes alive on flights, by campfires, at vistas and more."] = "전투 중에도 UI를 최소로 한 완전한 경험. 이름표가 꼭 필요한 것을 알려 주고, 재사용 대기시간 관리자가 행동 단축바를 대신하며, 체력은 화면 가장자리에 나타납니다. 모든 카메라, 모든 Vision과 모든 분위기: 레터박스는 전투 중에도 유지되고, 카메라는 비행, 모닥불, 경치 좋은 곳 등에서 살아납니다."
+
+-- Slash.lua
+L["put the active profile back to how it started, and your cursor back to normal"] = "활성 프로필을 처음 상태로 되돌리고, 커서도 원래대로"
+L["just your cursor back to normal, if Cursor Hide left it hidden or odd"] = "커서 숨기기 때문에 커서가 숨겨졌거나 이상할 때, 커서만 원래대로"
+L["the camera turns once around you: 360 degrees over 10 seconds unless given (negative: the other way); again stops it"] = "카메라가 당신 주위를 한 바퀴 돕니다: 따로 정하지 않으면 10초 동안 360도(음수: 반대 방향); 다시 입력하면 중지"
+L["your cursor is back to normal (Cursor Hide off till you accept its warning again)"] = "커서가 원래대로 돌아왔습니다(경고를 다시 수락할 때까지 커서 숨기기 꺼짐)"
+
+-- Changelog.lua: What's new
+L["Cursor Hide (experimental)"] = "커서 숨기기 (실험적)"
+L["In CineMode, your cursor gets out of the way: it shrinks to a tiny corner, vanishes once the mouse has been still a while, or both. Moving the mouse brings it back. It's experimental: accept the warning on its page to turn it on, and /cine reset cursor puts your cursor back if it ever gets stuck. The Cinema profile uses it during flights, at vistas and while you're AFK."] = "CineMode에서 커서가 비켜 줍니다: 아주 작은 모서리로 줄거나, 마우스가 한동안 멈추면 사라지거나, 둘 다. 마우스를 움직이면 돌아옵니다. 실험적인 기능입니다: 켜려면 페이지에서 경고를 수락하세요. 커서가 멈추면 /cine reset cursor로 되돌릴 수 있습니다. Cinema 프로필은 비행 중, 경치 좋은 곳, 자리 비움일 때 사용합니다."
