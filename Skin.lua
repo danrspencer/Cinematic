@@ -460,6 +460,27 @@ function ns.MenuDropdown(parent)
 				ns.ScrollMenu(root)
 			end)
 		end
+		-- Rebuilding a scrolling menu while it's open (a pick that refreshes
+		-- the page) re-lays its list at the old scroll offset: entries jump
+		-- and overlap. So while it's open the rebuild waits until it closes.
+		local generate = dropdown.GenerateMenu
+		if generate and dropdown.IsMenuOpen then
+			local waiting
+			local function Later(self)
+				if self:IsMenuOpen() then
+					C_Timer.After(0.05, function() Later(self) end)
+				else
+					waiting = nil
+					generate(self)
+				end
+			end
+			dropdown.GenerateMenu = function(self, ...)
+				if not self:IsMenuOpen() then return generate(self, ...) end
+				if waiting then return end
+				waiting = true
+				C_Timer.After(0, function() Later(self) end)
+			end
+		end
 	end
 	return ok, dropdown
 end
