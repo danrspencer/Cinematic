@@ -2970,7 +2970,8 @@ do
 		local enemy = hasTarget and ns.IsEnemyUnit("target") and not ns.Flag(UnitIsDeadOrGhost("target"))
 		facts.always, facts.never = true, false
 		facts.combat = inCombat and true or false
-		facts.camera = ns.activeCam ~= nil -- (a camera mode running: flights, AFK, cozy and the rest)
+		-- (A camera mode running: flights, AFK, cozy and the rest; or a camera script.)
+		facts.camera = ns.activeCam ~= nil or (ns.PlayingCameraScript ~= nil and ns.PlayingCameraScript() ~= nil)
 		facts.calm = ns.InCalm and ns.InCalm() or false -- (just after a fight, till the Calm Timer runs out)
 		-- (Out of combat: no fight, and the Calm Timer after one run out.)
 		facts.nocombat = not facts.combat and not facts.calm

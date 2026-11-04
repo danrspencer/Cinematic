@@ -66,7 +66,7 @@ end
 -- False if it didn't go.
 function ns.CameraCall(who, name, ...)
 	if (name:find("Start$") or name:find("^CameraZoom") or name:find("View$"))
-		and ns.ClaimCamera and not ns.ClaimCamera(who) then
+		and ns.ClaimCamera and not ns.ClaimCamera(who, name:find("^CameraZoom") and ns.zoomWhileSteering[who]) then
 		return false
 	end
 	ns.CallCameraFunction(name, ...)
@@ -142,6 +142,16 @@ ns.DEFAULTS.walkCine = false
 ns.DEFAULTS.runCine = false
 ns.DEFAULTS.deathCine = false
 
+-- Skyriding in the air, or a scene of yours on while you travel (mounted,
+-- flying, swimming), its camera a script and its CineMode ticked: CineMode
+-- stays on as you move.
+function ns.TravelSceneCine()
+	local scene = ns.SkyridingNow and not ns.OnTaxi() and ns.SkyridingNow() and "Skyride"
+		or (ns.CustomTravelScene and ns.CustomTravelScene())
+	return scene ~= nil and ns.IsScriptCamera ~= nil and ns.IsScriptCamera(ns.TriggerSetting(scene, "camera"))
+		and ns.TriggerSetting(scene, "cine") == true
+end
+
 -- Whether a camera ticked in the CineMode column is running (or, for the
 -- standing-still events, due to start).
 function ns.TriggerStartsCine()
@@ -172,6 +182,11 @@ function ns.TriggerStartsCine()
 	-- A conversation: by the row that started it.
 	local chat = ns.ChatCamScene and ns.ChatCamScene()
 	if chat and ns.TriggerSetting(chat, "cine") then
+		return true
+	end
+	-- Skyriding, or a scene of yours playing its script while you're mounted,
+	-- flying or swimming (CustomTriggers.lua): on the move too.
+	if ns.TravelSceneCine() then
 		return true
 	end
 	-- (A camera started from its key binding always does: you asked for it.)

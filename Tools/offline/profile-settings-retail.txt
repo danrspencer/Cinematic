@@ -394,6 +394,7 @@ Cinema|rowFollow.cooldownsbars=cooldowns
 Cinema|rowFollow.cooldownsbuffs=cooldowns
 Cinema|rowFollow.cooldownsutility=cooldowns
 Cinema|runCalmWait=false
+Cinema|skyrideCamera=script:skyride
 Cinema|storyZoneCard=true
 Cinema|targetArrowY=-10
 Cinema|targetQuestIcon=false

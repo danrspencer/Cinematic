@@ -290,6 +290,20 @@ local function SceneOn(key)
 	end
 	return nil
 end
+-- The states you travel in: a scene of yours on through one of them, its
+-- camera a script, carries on while you move (a skyriding zoom-out), and
+-- ends as the state does (until "move" can't end it: moving is the point).
+local TRAVEL_STATES = { mounted = true, flying = true, swimming = true }
+local function Travels(unit)
+	return unit.kind == "state" and TRAVEL_STATES[unit.what] and unit.walks or false
+end
+-- That scene on now (not on a flight path: the flight camera has those), or nil.
+function ns.CustomTravelScene()
+	if ns.OnTaxi and ns.Flag(ns.OnTaxi()) then return nil end
+	for _, unit in ipairs(units) do
+		if unit.on and Travels(unit) then return unit.scene end
+	end
+end
 -- A scene you started with its key (Custom camera trigger N) that's on now,
 -- or nil: a camera script asks first (CameraScripts.lua's TriggerNow), so it
 -- plays with a window open or you walking, as the key says to.
@@ -422,7 +436,9 @@ local function Tick()
 		if cond ~= nil then
 			if cond and not unit.cond and not unit.done then Start(unit) end
 			if not cond then
-				if unit.on and unit.untilKind == "ends" then unit.on = false end
+				if unit.on and (unit.untilKind == "ends" or (unit.untilKind == "move" and Travels(unit))) then
+					unit.on = false
+				end
 				unit.done = false
 			end
 			unit.cond = cond

@@ -116,6 +116,8 @@ if arg[1] and not update then
 	-- camera's only where it's loaded).
 	local expected = { "Hearth", "Teleport", "Logout", "AFK", "Sit", "SitButton", "Sleep", "Dance", "Kneel", "Stare",
 		"Chair", "Weapon", "Campfire", "Fishing", "Still", "Flight", "Quest", "QuestGossip", "Walk", "Run", "Death" }
+	-- (Skyriding: retail's dev copy only.)
+	if ns.isDev and ns.isRetail and C_PlayerInfo and C_PlayerInfo.GetGlidingInfo then expected[#expected + 1] = "Skyride" end
 	if ns.ChatCamCommand then
 		expected[#expected + 1] = "Chat"
 		expected[#expected + 1] = "ChatNearby"

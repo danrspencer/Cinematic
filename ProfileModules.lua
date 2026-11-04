@@ -464,7 +464,7 @@ ns.PROFILE_MODULES = {
 		tip = "The cameras don't wait for things to calm down after a fight, auto-run carries on in cities and " ..
 		"instances (as RP walk always does), and the death camera runs in instances too. NPCs talking bring the chat camera, " ..
 		"those chatting nearby straight away, and it doesn't look round for speakers off screen. YOU DIED " ..
-		"shows as the death camera starts.",
+		"shows as the death camera starts. Skyriding (retail) zooms the camera all the way out in the air.",
 		apply = function(set)
 			-- (Chat Cam: off to start with, on here. Its look-round setting's
 			-- page is dev-only.)
@@ -474,6 +474,8 @@ ns.PROFILE_MODULES = {
 				set("chatNearbyDelay", 0)
 				if ns.isDev then set("chatCamSearch", false) end
 			end
+			-- (Skyriding: off to start with, on here. Retail only.)
+			if ns.CAMERA_TRIGGER and ns.CAMERA_TRIGGER.Skyride then set("skyrideCamera", "script:skyride") end
 			-- (Standing still and music: still-afk and camera-music, in its choice.)
 			for _, cam in ipairs({ "walk", "run", "tele", "quest" }) do
 				set(cam .. "CalmWait", false)

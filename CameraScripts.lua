@@ -545,6 +545,17 @@ local BUILT_IN = {
 			rules = { camera = "stop", fight = "stop", walk = "stop", zoom = "ignore", ends = "stop" },
 		}
 	end },
+	-- Skyriding (retail: the Skyriding row): all the way out as you take to
+	-- the air, back to your distance once you've landed. (Steering doesn't
+	-- stop it, nor walking: see Start's travel.)
+	{ id = "skyride", name = "Skyriding zoom", retail = true, make = function()
+		return {
+			steps = { S("zoom", { to = 39, secs = 3, past = "yes" }) },
+			ending = { S("putback", { secs = 2.5 }) },
+			rules = { camera = "pause", cameraSecs = 3, fight = "putback", walk = "ignore", zoom = "ignore",
+				ends = "putback" },
+		}
+	end },
 	-- The quest cam (once its row's wait is over: QuestCam.lua's
 	-- ns.QuestTalkNow): in to questCamDistance while
 	-- camera follow swings it behind you over questCamTime, then questCamAngle
@@ -623,6 +634,12 @@ local function Example()
 		rules = { camera = "pause", cameraSecs = 5, fight = "putback", walk = "putback", zoom = "ignore",
 			ends = "putback" },
 	}
+end
+-- (Skyriding's only where there's skyriding: retail; and in the dev copy only for now.)
+if not (ns.isDev and ns.isRetail and C_PlayerInfo and C_PlayerInfo.GetGlidingInfo) then
+	for i = #BUILT_IN, 1, -1 do
+		if BUILT_IN[i].retail then table.remove(BUILT_IN, i) end
+	end
 end
 ns.OnLanguage(function()
 	for _, each in ipairs(BUILT_IN) do each.name = L[each.name] end
@@ -848,6 +865,7 @@ end
 local TAKES = { afk = true, tele = true, flight = true, walk = true, run = true, quest = true, chat = true,
 	[true] = true }
 local function TakesScripts(list)
+	if list.scripts then return true end -- (one made for scripts: Skyriding's)
 	for _, value in ipairs(list) do
 		if TAKES[value] then return true end
 	end
@@ -899,6 +917,7 @@ function ns.CameraTriggerName(key)
 	local trigger = ns.CAMERA_TRIGGER and ns.CAMERA_TRIGGER[key]
 	if not trigger then return tostring(key) end
 	if trigger.custom and ns.CustomTriggerLabel then return ns.CustomTriggerLabel(key) end
+	if key == "Skyride" then return L["Skyriding"] end
 	for _, event in ipairs(ns.EVENTS or {}) do
 		if event.key == key then return event.label end
 	end
@@ -1392,9 +1411,9 @@ local function ZoomTo(distance, T, ease)
 end
 
 local function BeginZoom()
-	if not ns.ClaimCamera(WHO) then return end
+	if not ns.ClaimCamera(WHO, ns.zoomWhileSteering[WHO]) then return end
 	local now = Zoom()
-	zoomer.release = nil
+	zoomer.release, zoomer.yours = nil, nil
 	ns.HoldSpeed(ZOOM_WHO, ZOOM_CVAR)
 	zoomer.from, zoomer.t = now, 0
 	zoomer.cruise = math.abs(zoomer.goal - now) / (zoomer.T * (1 - zoomer.ease))
@@ -1461,6 +1480,43 @@ end
 
 local function ZoomDone()
 	return not (zoomer.pending or zoomer.moving or zoomer.suspended)
+end
+
+-- You zoomed while ours zooms (or its speed eases back after). The game
+-- takes your scroll at the speed set right then and keeps it going that
+-- long: the speed raised back meanwhile ran a scroll taken at the crawl many
+-- times too far (out to your max). So the speed stays where it is till the
+-- camera's settled from your scrolling, then yours comes back (as the quest
+-- cam does, QuestCam.lua's StopZoomForYou).
+local YOUR_ZOOM_HOLD_MAX = 6 -- seconds at most the speed's held for your zoom
+local function HoldForYourZoom()
+	local held = ns.SpeedHeld(ZOOM_CVAR, ZOOM_WHO) and tonumber(GetCVar(ZOOM_CVAR))
+	local yours = held and ns.YourSpeed(ZOOM_CVAR)
+	zoomer.moving, zoomer.pending, zoomer.release = false, false, nil
+	if not (held and yours and held < yours) then
+		zoomer.sent = nil
+		ns.ReleaseSpeed(ZOOM_WHO, ZOOM_CVAR)
+		return
+	end
+	local zoom = Zoom()
+	zoomer.yours = { last = zoom, at = GetTime(), still = 0 }
+	ns.Log("state", ("camera script: you zoomed, its zoom speed held at %.2f till your zoom's done"):format(held))
+end
+local function StepYourZoom(elapsed)
+	local yz = zoomer.yours
+	if not yz then return end
+	if not ns.SpeedHeld(ZOOM_CVAR, ZOOM_WHO) then -- (put back by something else)
+		zoomer.yours = nil
+		return
+	end
+	local now, zoom = GetTime(), Zoom()
+	yz.still = math.abs(zoom - yz.last) < ZOOM_STILL and yz.still + elapsed or 0
+	yz.last = zoom
+	local lastScroll = ns.lastPlayerZoomAt or yz.at
+	if (yz.still >= ZOOM_SETTLED and now - lastScroll >= ZOOM_SETTLED) or now - yz.at >= YOUR_ZOOM_HOLD_MAX then
+		zoomer.yours, zoomer.sent = nil, nil
+		ns.ReleaseSpeed(ZOOM_WHO, ZOOM_CVAR)
+	end
 end
 
 -- Every move stopped where it is (nothing kept to carry on with).
@@ -1818,7 +1874,13 @@ local function Start(script, trigger, camera)
 		script = script, trigger = trigger, camera = camera, t = 0, phase = "steps", paths = paths, active = {},
 		startZoom = Zoom(), startedAt = GetTime(), inputSeen = ns.GetLastCameraInput and ns.GetLastCameraInput() or 0,
 		triggerOn = trigger ~= nil, onceLeft = math.random() < 0.5,
+		-- (Played for Skyriding, or a scene of yours on the move, mounted or flying: walking
+		-- and steering are what you do then. Walk doesn't stop it, and your
+		-- turning the camera stops only its turns and tilts: its zoom goes on.)
+		travel = trigger == "Skyride"
+			or (trigger ~= nil and ns.CustomTravelScene ~= nil and ns.CustomTravelScene() == trigger),
 	}
+	ns.zoomWhileSteering[WHO] = run.travel or nil
 	movers.yaw.amount, movers.pitch.amount = 0, 0
 	run.co = coroutine.create(function() DoSteps(script.steps) end)
 	ns.ApplyCVarSet(FOLLOW_CVARS, true)
@@ -1845,6 +1907,7 @@ local function Finish(why)
 	-- (A scene its key started: over too, so the next press starts it again.)
 	local trigger = run.trigger
 	run = nil
+	ns.zoomWhileSteering[WHO] = nil
 	if trigger and ns.EndCustomKeyScene then ns.EndCustomKeyScene(trigger) end
 end
 
@@ -1948,6 +2011,26 @@ local function ChatNow()
 	return convo and ScriptRow(convo.key) and convo.key or nil
 end
 
+-- Skyriding in the air now (retail's gliding info), for the Skyriding row:
+-- on once you've been up SKY_START seconds (not for a hop), off once you've
+-- been down SKY_LAND (not for a touch on the ground between flaps).
+local SKY_START, SKY_LAND = 0.5, 2
+local sky = { on = false }
+function ns.SkyridingNow()
+	if not (ns.CAMERA_TRIGGER and ns.CAMERA_TRIGGER.Skyride) then return false end
+	local now, up = GetTime(), ns.GlidingSpeed and ns.GlidingSpeed() ~= nil
+	if up then
+		sky.downSince = nil
+		sky.upSince = sky.upSince or now
+		if now - sky.upSince >= SKY_START then sky.on = true end
+	else
+		sky.upSince = nil
+		sky.downSince = sky.downSince or now
+		if now - sky.downSince >= SKY_LAND then sky.on = false end
+	end
+	return sky.on
+end
+
 -- The trigger running a script camera now, and that camera: a standing-still
 -- trigger's (or your own's, or a cast's), else a flight's, death's, walking's,
 -- running's, a quest giver's or chat's.
@@ -1955,6 +2038,12 @@ local function TriggerNow()
 	if not ns.db or not ns.db.enabled or not ns.ActiveEvent then return nil end
 	-- (A scene of yours its key started: first, a window open or walking.)
 	local scene = ns.CustomKeyScene and ns.CustomKeyScene()
+	if scene then
+		local camera = ns.TriggerSetting(scene, "camera")
+		if IsScript(camera) then return scene, camera end
+	end
+	-- (One of yours on while you're mounted, flying or swimming: on the move too.)
+	scene = ns.CustomTravelScene and ns.CustomTravelScene()
 	if scene then
 		local camera = ns.TriggerSetting(scene, "camera")
 		if IsScript(camera) then return scene, camera end
@@ -1967,8 +2056,9 @@ local function TriggerNow()
 	-- camera is off then, CameraRows.lua's ns.CameraRowsOff.)
 	local own = { ns.OnTaxi() and "Flight", ns.IsDead and ns.IsDead() and "Death",
 		ns.IsRPWalking and ns.IsRPWalking() and "Walk", ns.IsAutoRunning and ns.IsAutoRunning() and "Run",
-		ns.QuestTalkNow and ns.QuestTalkNow() or false, ChatNow() or false }
-	for i = 1, 6 do
+		ns.QuestTalkNow and ns.QuestTalkNow() or false, ChatNow() or false,
+		not ns.OnTaxi() and ns.SkyridingNow() and "Skyride" or false }
+	for i = 1, 7 do
 		local each = own[i]
 		if each and triggers[each] then
 			camera = ns.TriggerSetting(each, "camera")
@@ -2052,9 +2142,17 @@ local function Update(elapsed)
 		run.pausedUntil = nil
 		Resume()
 	end
+	if moved and run.travel then
+		StopMove(movers.yaw) -- (yours: its turns and tilts give way, its zoom carries on)
+		StopMove(movers.pitch)
+		movers.yaw.suspended, movers.pitch.suspended = nil, nil
+		moved = false
+	end
 	if moved and Act("camera") then return end
 	if InFight() and Act("fight") then return end
-	if ns.playerMoving and (not ns.MovingManually or ns.MovingManually()) and Act("walk") then return end
+	if ns.playerMoving and not run.travel and (not ns.MovingManually or ns.MovingManually()) and Act("walk") then
+		return
+	end
 	if zoomed then
 		if not Act("zoom") then StopZoom() end -- (yours wins: its zoom gives up)
 		if not run or run.pausedUntil then return end
@@ -2100,6 +2198,13 @@ ns.SetOnUpdate(watcher, function(_, elapsed)
 		local script = ns.FindCameraScript(camera:sub(8))
 		if script then Start(script, key, camera) end
 	end
+	-- (You zoomed while ours zooms or its speed eases back: held for yours.)
+	local yourZoom = ns.lastPlayerZoomAt
+	if yourZoom and yourZoom ~= zoomer.seenYourZoom then
+		zoomer.seenYourZoom = yourZoom
+		if zoomer.moving or zoomer.release then HoldForYourZoom() end
+	end
+	StepYourZoom(elapsed)
 	if run then
 		Update(elapsed)
 	elseif zoomer.release then
@@ -2134,11 +2239,16 @@ end)
 
 if ns.RegisterCamera then
 	ns.RegisterCamera(WHO, function()
-		return run ~= nil or restoring > 0 or zoomer.moving or zoomer.release ~= nil
+		return run ~= nil or restoring > 0 or zoomer.moving or zoomer.release ~= nil or zoomer.yours ~= nil
 	end, function()
 		-- You took the camera: every move stops now (the rules decide next frame).
 		if run then
 			run.tookAt = GetTime()
+			if run.travel then
+				StopMove(movers.yaw) -- (the zoom goes on: see Start)
+				StopMove(movers.pitch)
+				return
+			end
 			if run.pausedUntil then return end
 			Suspend()
 			local rules = run.script.rules

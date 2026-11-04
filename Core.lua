@@ -585,6 +585,11 @@ end
 -- off everywhere (Cameras page), as the events' "No camera" does.
 DEFAULTS.walkCamera = "walk"
 DEFAULTS.runCamera = "run"
+-- Skyriding (retail): in the air, the Skyriding zoom script zooms all the way
+-- out, and back to your distance as you land (CameraScripts.lua). Off to
+-- start with; Cinema's cameras (ProfileModules.lua's pure-cameras) turn it on.
+DEFAULTS.skyrideCamera = "none"
+DEFAULTS.skyrideCine = false
 -- Seconds of auto-walking or auto-running before its camera starts (and its
 -- CineMode column with it); 0 is straight away.
 DEFAULTS.walkCameraDelay = 0
@@ -2287,13 +2292,15 @@ local function ShouldBeCinematic(now)
 		or LongMove()
 	-- Moving: back once you've moved on, or stood still, for its own time
 	-- (not the "Back into CineMode after" one).
-	if MovingOff() then
+	-- (A scene of yours on the move, its CineMode ticked: Off while moving waits.)
+	local travelCine = ns.TravelSceneCine and ns.TravelSceneCine()
+	if MovingOff() and not travelCine then
 		lastMovingOff = now
 		offForMoving = true
 		ns.cineOffWhy = "moving (Off while moving)"
 		return false
 	end
-	if instant or not ns.db.offWhileMoving then
+	if instant or travelCine or not ns.db.offWhileMoving then
 		lastMovingOff = -math.huge
 	elseif now - lastMovingOff < MovingWait() then
 		offForMoving = true
@@ -2302,7 +2309,7 @@ local function ShouldBeCinematic(now)
 	end
 	-- Otherwise things must stay calm (no cast, window or the like) for the
 	-- "Back into CineMode after" time first. After fights and at login, at once.
-	local delay = (instant or quickStart or switchedOn) and 0 or ns.db.returnDelay
+	local delay = (instant or travelCine or quickStart or switchedOn) and 0 or ns.db.returnDelay
 	if now - lastBusy >= delay then
 		switchedOn = false
 		return true
@@ -2489,6 +2496,7 @@ do
 	local PLAYER_HOLD = 0.5 -- seconds after your camera input that none of ours starts a move
 	local playerAt = -math.huge
 	local waitedFor = {} -- [who] = the holder it was last logged waiting for
+	ns.zoomWhileSteering = {} -- [who] = true: its zooms go on while you steer (CameraHolder's zoomOnly)
 
 	-- who: its name ("modes", "quest", "chatcam"). busy(): whether it's moving
 	-- the view, or has a speed setting still to put back. letGo(what): you
@@ -2498,9 +2506,14 @@ do
 	end
 
 	-- Who holds the view, other than `except`: one of ours, "you", or nil.
-	function ns.CameraHolder(except)
+	-- zoomOnly: for a zoom that may go on while you steer with the mouse (a
+	-- camera script on the move, ns.zoomWhileSteering): only your own zooming
+	-- holds it then.
+	function ns.CameraHolder(except, zoomOnly)
 		local now = GetTime()
-		if now - playerAt < PLAYER_HOLD or (ns.IsMouseOnCamera and ns.IsMouseOnCamera()) then
+		if zoomOnly then
+			if now - (ns.lastPlayerZoomAt or -math.huge) < PLAYER_HOLD then return "you" end
+		elseif now - playerAt < PLAYER_HOLD or (ns.IsMouseOnCamera and ns.IsMouseOnCamera()) then
 			return "you"
 		end
 		for who, camera in pairs(cameras) do
@@ -2511,8 +2524,8 @@ do
 	end
 
 	-- Whether `who` may move the view now; if so it's held for it.
-	function ns.ClaimCamera(who)
-		local holder = ns.CameraHolder(who)
+	function ns.ClaimCamera(who, zoomOnly)
+		local holder = ns.CameraHolder(who, zoomOnly)
 		if holder then
 			if holder ~= "you" and waitedFor[who] ~= holder then
 				ns.Log("state", ("%s camera waits: the %s camera has the view"):format(who, holder))
