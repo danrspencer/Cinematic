@@ -62,10 +62,11 @@ function ns.RulePieces()
 	for _, piece in ipairs({ { "instance", L["Instances"] }, { "dungeon", L["Dungeons"] }, { "raid", L["Raids"] } }) do
 		location[#location + 1] = piece
 	end
-	-- (Spell range's bands, Frames.lua: * as the yards go by your class.)
+	-- (Spell range's bands, Frames.lua: * as the yards go by your class.
+	-- Within: each is your target in reach, closer too, not a ring.)
 	local ranges = {}
 	for _, band in ipairs(ns.RANGE_BANDS) do
-		ranges[#ranges + 1] = { band.field, band.label .. "*" }
+		ranges[#ranges + 1] = { band.field, (L["Within %s*"]):format(band.label) }
 	end
 	-- (The classes this client has, by the game's names for them.)
 	local classes = {}
@@ -318,6 +319,18 @@ local function BuildEditor()
 	box:SetWidth(EDIT_W - 40)
 	box:SetPoint("TOPLEFT", 6, -6)
 	box:SetMaxLetters(255)
+	-- (The words in their colours: the box's own text drawn clear, its cursor
+	-- and selection kept, the coloured copy over it in the same font and width.)
+	local colored = well:CreateFontString(nil, "OVERLAY")
+	colored:SetFontObject(ChatFontNormal)
+	colored:SetPoint("TOPLEFT", box, "TOPLEFT")
+	colored:SetWidth(EDIT_W - 40)
+	colored:SetJustifyH("LEFT")
+	colored:SetJustifyV("TOP")
+	colored:SetWordWrap(true)
+	box:SetTextColor(1, 1, 1, 0)
+	box:SetShadowColor(0, 0, 0, 0)
+	local function Recolor() colored:SetText(ns.ColoredRule(box:GetText())) end
 	-- (It has the keys from the start: Escape here closes the editor, as Done does.)
 	box:SetScript("OnEscapePressed", function() editor:Hide() end)
 	well:SetScript("OnMouseDown", function() box:SetFocus() end)
@@ -337,6 +350,7 @@ local function BuildEditor()
 		Refresh()
 	end
 	box:SetScript("OnTextChanged", function(_, userInput)
+		Recolor()
 		if userInput then Changed() end
 	end)
 	-- A piece in at the cursor, spaced from what's either side.
@@ -433,9 +447,19 @@ local function BuildEditor()
 				local tip = (L["Adds \"%s\". A green dot: true where you are now."]):format(word)
 				if field:find("^range") then
 					-- (What it measures with here, as you look.)
-					Tip(button, function() return ns.RangeBandInfo(field) end)
+					Tip(button, function()
+						return L["True while your target is in reach of this spell, however close."] .. "\n\n"
+							.. ns.RangeBandInfo(field)
+					end)
 				elseif field == "near" or field == "near28" then
-					Tip(button, tip .. "\n\n" .. L["Never counts in fights: the game won't say how far anyone is then. Spell range does."])
+					Tip(button, tip .. "\n\n" .. L["In fights the game won't say how far anyone is: it stays as it " ..
+						"was for the same target, and is false for a new one. Spell range is measured in fights too."])
+				elseif field == "elite11" or field == "elite28" then
+					Tip(button, tip .. "\n\n" .. L["In fights the game won't say how far anyone is: it stays as it was " ..
+						"as the fight began, while an elite enemy still has a nameplate."])
+				elseif field == "enemy" or field == "friendly" or field == "target" then
+					Tip(button, tip .. "\n\n" .. L["Out of fights only, as the dropdowns' target ticks: in a fight, In " ..
+						"combat decides. For your target in a fight, use the kinds (Hostile NPCs, Enemy players...)."])
 				else
 					Tip(button, tip)
 				end
@@ -535,7 +559,7 @@ local function BuildEditor()
 		reads:SetShown(grid ~= nil)
 		reads:SetText(not grid and "" or isAlways ~= nil and "|cff60ff60" .. L["Goes back into the dropdowns as you close it."] .. "|r"
 			or "|cffffd100" .. (L["Stays the row's rule (it can't go in the dropdowns: %s)."]):format(why) .. "|r")
-		local facts = ns.db and ns.RuleFactsNow and ns.RuleFactsNow()
+		local facts = ns.db and ns.RuleFactsFor and ns.RuleFactsFor(target.key)
 		for word, button in pairs(wordButtons) do
 			button.dot:SetShown(facts and facts[ns.RULE_WORDS[word]] and true or false)
 		end
@@ -733,6 +757,9 @@ function ns.GridRow(kit, parent, labelWidth, layout, spec)
 	local function SetRule(text)
 		local db = ns.GetDB()
 		db.frameRules = db.frameRules or {}
+		-- (A row with a default rule: cleared is "", else the default comes
+		-- back as the settings are next set up: Core's EnsureTables.)
+		if text == nil and ns.RULE_DEFAULTS[RuleKey()] then text = "" end
 		db.frameRules[RuleKey()] = text
 		if rule.changed then rule.changed(RuleKey()) end
 	end
@@ -933,8 +960,8 @@ function ns.GridRow(kit, parent, labelWidth, layout, spec)
 	-- The dot: what its rule (or its ticks, as one) gives where you are now.
 	local function Live()
 		if not live then return end
-		local facts = ns.db and ns.RuleFactsNow and ns.RuleFactsNow()
 		local key = RuleKey()
+		local facts = ns.db and ns.RuleFactsFor and ns.RuleFactsFor(key)
 		local text = RuleOf(key and ns.FollowKey(key)) or (spec.liveRule and spec.liveRule())
 			or (rule and rule.grid and ns.GridRule(AlwaysOn(), rule.words()))
 		local test = facts and text and ns.CompileRule(text)
@@ -1194,7 +1221,8 @@ function ns.GridTable(content, columnTop, rows, kit)
 		for k, v in pairs(rows.opts or {}) do opts[k] = v end
 		for k, v in pairs(item.opts or {}) do opts[k] = v end
 		if not item.alwaysOnly then
-			for _, list in ipairs({ "calmShow", "quietShow", "camShow", "rowFollow" }) do
+			-- (frameRules too: its rule. Left out, Reset page kept a row's rule.)
+			for _, list in ipairs({ "calmShow", "quietShow", "camShow", "rowFollow", "frameRules" }) do
 				kit.RecordKey(content, list)
 				kit.RecordRow(content, list, item.key)
 			end

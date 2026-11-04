@@ -835,7 +835,8 @@ local RESET_KEEPS = {
 -- you made in it (its settings go back to the built-in's).
 local RESET_PROFILE_KEEPS = {
 	"cameraRows", -- (your cameras and triggers)
-	"frameRules", -- (Custom Visibility Rules)
+	-- (Not frameRules: every Show in row's rule is a setting now, reset with
+	-- the rest, at the user's ask.)
 	"lowHealthMyThemes", "lowHealthThemeEdits", -- (your Vitals themes, and your versions of ours)
 	"markNames", -- (the Nameplates page's rows' own names)
 }

@@ -2416,6 +2416,7 @@ end
 ns.RULE_WORDS = {
 	always = "always", ["true"] = "always", never = "never", ["false"] = "never",
 	combat = "combat", fighting = "combat", calm = "calm", nocombat = "nocombat", camera = "camera", cam = "camera",
+	-- (Out of fights only, as the ticks have them: see SetTargetWords.)
 	enemy = "enemy", friendly = "friendly", target = "target",
 	-- (Your target by what it is, as Effects' TargetRow has it.)
 	targetself = "targetself", enemyplayer = "enemyplayer", hostilenpc = "hostilenpc", neutralplayer = "neutralplayer",
@@ -2515,6 +2516,10 @@ do
 				return inner
 			elseif token == nil then
 				err = err or "it ends too soon"
+			elseif token == "and" or token == "or" then
+				err = err or ("%s needs a word before it"):format(token:upper())
+			elseif token == ")" then
+				err = err or (tokens[pos - 1] == "(" and "a ( ) has nothing in it" or "a word is missing before a )")
 			elseif ns.RULE_WORDS[token] then
 				local field = ns.RULE_WORDS[token]
 				pos = pos + 1
@@ -2660,8 +2665,21 @@ do
 	local function UnitWithin(unit, index)
 		return InteractDistance(unit, index) or false
 	end
+	-- The rules' near and near28: in a fight, where nothing can say, as it
+	-- was last measured for the same target (so not near doesn't turn true
+	-- the moment a fight starts); a new target in one: false.
+	local targetSerial = 0
+	local targetWatch = CreateFrame("Frame")
+	targetWatch:RegisterEvent("PLAYER_TARGET_CHANGED")
+	targetWatch:SetScript("OnEvent", function() targetSerial = targetSerial + 1 end)
+	local nearKept, nearKeptFor = {}, {}
 	local function TargetWithin(index)
-		return UnitWithin("target", index)
+		local near = InteractDistance("target", index)
+		if near ~= nil then
+			nearKept[index], nearKeptFor[index] = near, targetSerial
+			return near
+		end
+		return nearKeptFor[index] == targetSerial and nearKept[index] or false
 	end
 
 	-- The 40-yard bands (elite40, In40, Past40): no interact distance goes
@@ -2680,7 +2698,7 @@ do
 		{ field = "range5to10", from = 0, label = "5-10" },
 		{ field = "range20to25", from = 20, label = "20-25" },
 		{ field = "range30to35", from = 30, label = "30-35" },
-		{ field = "range40plus", from = 40, label = "40+" },
+		{ field = "range40plus", from = 40, label = "40" },
 	}
 	ns.RANGE_BANDS = RANGE_BANDS
 	local rangeSpells, rangeLookAt = {}, -math.huge
@@ -2922,7 +2940,10 @@ do
 	-- target. Only units with a plate count (the game makes them for units in
 	-- view, up to its plate distance). Looked at four times a second.
 	local ELITE_EVERY = 0.25
-	local eliteAt, elitesNear = -math.huge, {}
+	-- In a fight, where 11 and 28 can't be measured: as they were as it
+	-- began, while an elite enemy still has a plate (40 still measured, and
+	-- true with 28).
+	local eliteAt, elitesNear, elitesKept = -math.huge, {}, {}
 	local function ElitesNear()
 		local now = GetTime()
 		if now - eliteAt < ELITE_EVERY then
@@ -2931,6 +2952,23 @@ do
 		eliteAt = now
 		elitesNear[11], elitesNear[28], elitesNear[40] = false, false, false
 		local plates = C_NamePlate and C_NamePlate.GetNamePlates and C_NamePlate.GetNamePlates() or {}
+		if InCombatLockdown() then
+			local anyElite = false
+			for _, plate in ipairs(plates) do
+				local unit = plate.namePlateUnitToken or (plate.UnitFrame and plate.UnitFrame.unit)
+				if ns.EnemyNPCRank(unit) == "elite" then
+					anyElite = true
+					if UnitWithin40(unit, true) then
+						elitesNear[40] = true
+						break
+					end
+				end
+			end
+			elitesNear[11] = anyElite and elitesKept[11] or false
+			elitesNear[28] = anyElite and elitesKept[28] or false
+			elitesNear[40] = elitesNear[40] or elitesNear[28]
+			return elitesNear
+		end
 		for _, plate in ipairs(plates) do
 			local unit = plate.namePlateUnitToken or (plate.UnitFrame and plate.UnitFrame.unit)
 			if ns.EnemyNPCRank(unit) == "elite" then
@@ -2945,6 +2983,7 @@ do
 				if elitesNear[11] then break end
 			end
 		end
+		elitesKept[11], elitesKept[28] = elitesNear[11], elitesNear[28]
 		return elitesNear
 	end
 
@@ -2954,6 +2993,22 @@ do
 	-- asking both ways in one frame had it all worked out again each time).
 	local facts = {}
 	local factsAt
+	-- (target, enemy and friendly as worked out, before SetTargetWords.)
+	local anyTarget, enemyTarget = false, false -- (enemyTarget nil: the game won't say)
+	-- target, enemy and friendly mean what the grids' Enemy targeted and
+	-- Friend targeted ticks do: only out of a real fight (the Calm Timer
+	-- after one counts as out), as the In combat tick takes over in one. So a
+	-- row's ticks read the same once it's a rule (the Edit box, the old Roles
+	-- column's rules). At a fight's edge (the Cards page's and the combat
+	-- sounds' rows) they count either way. Your target in a fight: the kind
+	-- words (hostilenpc, enemyplayer...).
+	local function SetTargetWords()
+		local counts = ns.combatEdge ~= nil
+			or not (InCombatLockdown() or ns.Flag(UnitAffectingCombat("player")))
+		facts.target = counts and anyTarget
+		facts.enemy = counts and enemyTarget == true
+		facts.friendly = counts and anyTarget and enemyTarget == false
+	end
 	function ns.RuleFacts(inCombat)
 		local now = GetTime()
 		inCombat = inCombat and true or false
@@ -2974,28 +3029,34 @@ do
 		if factsAt == now then
 			facts.combat = inCombat
 			facts.nocombat = not inCombat and not facts.calm
+			SetTargetWords()
 			return facts
 		end
 		factsAt = now
 		local place = ns.GetPlaceType()
 		local hasTarget = ns.HasTarget()
-		local enemy = hasTarget and ns.IsEnemyUnit("target") and not ns.Flag(UnitIsDeadOrGhost("target"))
+		-- (Dead: as a friend, as the ticks have it. nil: the game won't say, so
+		-- neither enemy nor friendly.)
+		local dead = hasTarget and ns.Flag(UnitIsDeadOrGhost("target"))
+		local enemy = hasTarget and not dead and ns.IsEnemyUnit("target")
 		facts.always, facts.never = true, false
 		facts.combat = inCombat and true or false
 		-- (A camera mode running: flights, AFK, cozy and the rest; or a camera script.)
 		local script = ns.PlayingCameraScript ~= nil and ns.PlayingCameraScript() ~= nil
 		facts.camera = ns.activeCam ~= nil or script
-		-- (Which one: cam_<its key>, cam_script.)
+		-- (Which one: cam_<its key>, by its own code or as its built-in
+		-- script; cam_script, any script.)
+		local scripted = ns.PlayingCameraKey and ns.PlayingCameraKey()
 		for _, cam in ipairs(ns.RULE_CAMERAS) do
-			if cam[2] then facts[cam[1]] = ns.activeCam == cam[2] end
+			if cam[2] then facts[cam[1]] = ns.activeCam == cam[2] or scripted == cam[2] end
 		end
 		facts.cam_script = script
 		facts.calm = ns.InCalm and ns.InCalm() or false -- (just after a fight, till the Calm Timer runs out)
 		-- (Out of combat: no fight, and the Calm Timer after one run out.)
 		facts.nocombat = not facts.combat and not facts.calm
-		facts.target = hasTarget and true or false
-		facts.enemy = enemy and true or false
-		facts.friendly = (hasTarget and not enemy) and true or false
+		anyTarget = hasTarget and true or false
+		if not hasTarget or dead then enemyTarget = false else enemyTarget = enemy end
+		SetTargetWords()
 		-- Your target by what it is: yourself, else as Effects' TargetRow has it (Effects.lua: players and NPCs, enemy, neutral or friendly; the dead friendly).
 		local targetSelf = hasTarget and ns.Flag(UnitIsUnit("target", "player")) and true or false
 		local row = hasTarget and not targetSelf and ns.TargetNameRow and ns.TargetNameRow("target")
@@ -3030,15 +3091,20 @@ do
 		facts.group = ns.InGroup() and true or false
 		facts.flagged = ns.IsPvPFlagged() and true or false
 		facts.mounted = ns.Flag(IsMounted()) and true or false
-		-- (A boss fight: an encounter on, the game's boss frames up, or a boss targeted.)
+		-- (A boss fight: an encounter on, the game's boss frames up, or a boss
+		-- targeted: a world boss, or in a dungeon or raid an elite at ?? or 2+
+		-- levels above you (retail's dungeon bosses are +2, trash +0: tested).
+		-- Not ?? alone: out in the world that's any mob far above you.)
 		local rank, level
 		if hasTarget and enemy then
 			rank, level = UnitClassification("target"), UnitLevel("target")
 			if issecretvalue and (issecretvalue(rank) or issecretvalue(level)) then rank, level = nil, nil end
 		end
+		local mine = UnitLevel("player")
 		local encounter = _G.IsEncounterInProgress
 		facts.boss = (encounter and ns.Flag(encounter())) or ns.Flag(UnitExists("boss1"))
-			or rank == "worldboss" or level == -1 or false
+			or rank == "worldboss" or (facts.instance and ELITE_RANKS[rank] and type(level) == "number"
+				and (level == -1 or (type(mine) == "number" and level >= mine + 2))) or false
 		local role = ns.PlayerRole()
 		facts.tank, facts.healer, facts.damage = role == "TANK", role == "HEALER", role == "DAMAGER"
 		-- (Your class: true for its word; the others never set, so nil.)
@@ -3067,6 +3133,18 @@ ns.OnCalmEnd(function(cut) lastCombatAt = math.min(lastCombatAt, cut) end)
 function ns.InCalm()
 	local fighting = InCombatLockdown() or ns.Flag(UnitAffectingCombat("player"))
 	return not fighting and GetTime() - lastCombatAt < (ns.db.calmTime or 0)
+end
+-- The facts a row's rule is read with where it's used, for the rule
+-- editor's "Right now" and dots: the nameplates', names', plate parts' (<kind>When)
+-- and Heal Vision's in a fight only while really in one (ns.RuleFactsNow); the
+-- rest (frames, ns.RowOnNow) with the Calm Timer as combat while combatShowCalm is on.
+function ns.RuleFactsFor(key)
+	if type(key) == "string" and (key:find("^plate:") or key:find("^name:") or key == "healVision"
+		or key:find("When$")) then
+		return ns.RuleFactsNow()
+	end
+	return ns.RuleFacts(InCombatLockdown() or ns.Flag(UnitAffectingCombat("player"))
+		or (ns.InCalm() and ns.db.combatShowCalm))
 end
 
 -- Casting at an enemy out of combat (Standard Frames page, "Cast fade into
@@ -3231,9 +3309,11 @@ do
 				isOn = ns.IsCombatShowOn
 			end
 		elseif HasAnyTarget() then
-			if ns.IsEnemyUnit("target") and not ns.Flag(UnitIsDeadOrGhost("target")) then
+			-- (Dead: as a friend. nil, the game won't say: neither.)
+			local isEnemy = not ns.Flag(UnitIsDeadOrGhost("target")) and ns.IsEnemyUnit("target")
+			if isEnemy then
 				isOn = ns.IsEnemyShowOn
-			else
+			elseif isEnemy == false then
 				isOn = ns.IsFriendlyShowOn
 			end
 		end
@@ -3350,10 +3430,13 @@ do
 			return true
 		end
 		if HasAnyTarget() then
-			if ns.IsEnemyUnit("target") and not ns.Flag(UnitIsDeadOrGhost("target")) then
+			-- (Dead: as a friend. nil, the game won't say: neither.)
+			local isEnemy = not ns.Flag(UnitIsDeadOrGhost("target")) and ns.IsEnemyUnit("target")
+			if isEnemy then
 				return ns.IsEnemyShowOn(key) and true or false
+			elseif isEnemy == false then
+				return ns.IsFriendlyShowOn(key) and true or false
 			end
-			return ns.IsFriendlyShowOn(key) and true or false
 		end
 		return false
 	end

@@ -1870,9 +1870,11 @@ local function Start(script, trigger, camera)
 	-- (A copy: editing it on its page meanwhile can't trip it up. A built-in
 	-- one's switched-off steps kept, to be passed by.)
 	local paths = {}
+	local builtinId = script.builtin and script.id or nil -- (the copy below doesn't keep builtin: PlayingCameraKey)
 	script = ns.CleanCameraScript(script, script.id, script.builtin, paths)
 	run = {
 		script = script, trigger = trigger, camera = camera, t = 0, phase = "steps", paths = paths, active = {},
+		builtinId = builtinId,
 		startZoom = Zoom(), startedAt = GetTime(), inputSeen = ns.GetLastCameraInput and ns.GetLastCameraInput() or 0,
 		triggerOn = trigger ~= nil, onceLeft = math.random() < 0.5,
 		-- (Played for Skyriding, or a scene of yours on the move, mounted or flying: walking
