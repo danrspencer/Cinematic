@@ -4270,6 +4270,11 @@ L["Delete everything in Cinematic? Your own profiles, cameras, scripts, themes, 
 L["Reset Settings"] = "重置设置"
 L["Reset EVERYTHING"] = "全部重置"
 
+-- TalkingHeads.lua (its option on the Quest Vision page)
+L["Talking heads"] = "对话头像"
+L["Hide repeated talking heads"] = "隐藏重复的对话头像"
+L["The game's talking head (the NPC portrait at the top of the screen, with their line and voice) closes at once when it's a line you've already seen. Daily and world quest lines come back every day, so you see them once; the story's lines play only once anyway. Each character remembers its own, ticked or not, so an alt still sees the story's."] = "游戏的对话头像（屏幕顶部的 NPC 头像，带台词和语音）若是你已看过的台词，会立即关闭。日常和世界任务的台词每天都会重来，所以你只看一次；剧情台词本来就只播放一次。无论是否勾选，每个角色各自记录，所以小号仍能看到剧情台词。"
+
 -- ProfileChoices.lua and Welcome.lua: profile choices
 L["Fights and opening windows bring your UI back"] = "战斗和打开窗口会让界面回来"
 L["Most of the time"] = "大部分时间"

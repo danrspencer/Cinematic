@@ -211,7 +211,7 @@ local PURE_CINEMA_SYSTEMS = {
 	"6 0 1 2 2 UIParent -255.0 -10.0 -1 ##$#%#&.(()(",
 	"6 1 1 2 2 UIParent -270.0 -155.0 -1 ##$#%#'+(()(-$",
 	"6 2 1 1 1 UIParent 0.0 -25.0 -1 ##$#%$&.(()(+#,-,$",
-	"7 -1 0 6 6 UIParent 531.7 92.8 -1 #",
+	"7 -1 0 4 4 UIParent 0.0 60.0 -1 #",                -- talking head: in the middle, a little above centre
 	"8 -1 1 6 6 UIParent 35.0 50.0 -1 #'$A%$&i",
 	"9 -1 1 7 7 UIParent 0.0 45.0 -1 #",
 	"10 -1 1 0 0 UIParent 16.0 -116.0 -1 #",

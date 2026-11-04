@@ -972,6 +972,9 @@ DEFAULTS.questObjectGlow = true -- the quest object soft targeting picks glows (
 -- Talking to an NPC: their words in a bubble over them, the replies in a list,
 -- instead of the game's gossip and quest windows (see QuestTalk).
 DEFAULTS.questTalk = false
+-- The game's talking head closes at once on a line you've seen before (dailies,
+-- world quests), seen by this character (see TalkingHeads)
+DEFAULTS.talkingHeadRepeats = true
 DEFAULTS.questTalkStyle = "parchment" -- or "bubble" (the game's chat bubble)
 -- Where the bubble goes: "head" (over their nameplate), "fixed" (where you
 -- drag it) or "opposite" (across the screen from where you clicked them).
@@ -2894,8 +2897,12 @@ local function OnUpdate(_, elapsed)
 		-- the letterbox and tint while their own page's Enable Page is on too.)
 		-- (Show me's effects demo, ShowMe.lua: just its effects, for its few seconds.)
 		for _, key in ipairs(GRID_EFFECTS) do
-			effectWanted[key] = effectsOn and ns.db.visualEffects and ns.db[key .. "Page"] ~= false
-				and ns.RowOnNow(EFFECT_ROWS[key], ns.db[key .. "Always"], true) or false
+			if ns.effectsDemo then
+				effectWanted[key] = ns.effectsDemo[key] or false
+			else
+				effectWanted[key] = effectsOn and ns.db.visualEffects and ns.db[key .. "Page"] ~= false
+					and ns.RowOnNow(EFFECT_ROWS[key], ns.db[key .. "Always"], true) or false
+			end
 		end
 		Step(ns.UpdateLetterbox, effectWanted.letterbox, restElapsed)
 		-- (The vignette and weather share the tint's overlay, each fading on its own.)

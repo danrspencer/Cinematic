@@ -4270,6 +4270,11 @@ L["Delete everything in Cinematic? Your own profiles, cameras, scripts, themes, 
 L["Reset Settings"] = "설정 초기화"
 L["Reset EVERYTHING"] = "전부 초기화"
 
+-- TalkingHeads.lua (its option on the Quest Vision page)
+L["Talking heads"] = "말하는 얼굴"
+L["Hide repeated talking heads"] = "반복되는 말하는 얼굴 숨기기"
+L["The game's talking head (the NPC portrait at the top of the screen, with their line and voice) closes at once when it's a line you've already seen. Daily and world quest lines come back every day, so you see them once; the story's lines play only once anyway. Each character remembers its own, ticked or not, so an alt still sees the story's."] = "게임의 말하는 얼굴(화면 위쪽의 NPC 초상화와 대사, 음성)이 이미 본 대사라면 바로 닫힙니다. 일일 퀘스트와 전역 퀘스트 대사는 매일 다시 나오므로 한 번만 보게 되고, 이야기 대사는 어차피 한 번만 나옵니다. 체크 여부와 상관없이 캐릭터마다 따로 기억하므로 부캐는 이야기 대사를 그대로 봅니다."
+
 -- ProfileChoices.lua and Welcome.lua: profile choices
 L["Fights and opening windows bring your UI back"] = "전투와 창 열기가 UI를 되돌림"
 L["Most of the time"] = "대부분"

@@ -86,6 +86,7 @@ CameraTriggerEditor.lua
 ShotsPage.lua
 CameraScripts.lua
 QuestTalk.lua
+TalkingHeads.lua
 CameraTests.lua
 Tint.lua
 LowHealthThemes.lua
@@ -137,6 +138,7 @@ Profiles.lua
 Share.lua
 Backups.lua
 Welcome.lua
+ShowMe.lua
 Layouts.lua
 ModuleEditor.lua
 HeldSettingsPage.lua

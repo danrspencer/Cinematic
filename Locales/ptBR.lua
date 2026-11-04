@@ -4270,6 +4270,11 @@ L["Delete everything in Cinematic? Your own profiles, cameras, scripts, themes, 
 L["Reset Settings"] = "Redefinir configurações"
 L["Reset EVERYTHING"] = "Redefinir TUDO"
 
+-- TalkingHeads.lua (its option on the Quest Vision page)
+L["Talking heads"] = "Cabeças falantes"
+L["Hide repeated talking heads"] = "Ocultar cabeças falantes repetidas"
+L["The game's talking head (the NPC portrait at the top of the screen, with their line and voice) closes at once when it's a line you've already seen. Daily and world quest lines come back every day, so you see them once; the story's lines play only once anyway. Each character remembers its own, ticked or not, so an alt still sees the story's."] = "A cabeça falante do jogo (o retrato do PNJ no topo da tela, com a fala e a voz) fecha na hora quando é uma fala que você já viu. Falas de missões diárias e mundiais voltam todo dia, então você as vê uma vez; as da história só tocam uma vez de qualquer jeito. Cada personagem lembra das suas, marcado ou não, então um alt ainda vê as da história."
+
 -- ProfileChoices.lua and Welcome.lua: profile choices
 L["Fights and opening windows bring your UI back"] = "Lutas e janelas abertas trazem sua interface de volta"
 L["Most of the time"] = "Na maior parte do tempo"
