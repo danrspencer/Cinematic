@@ -96,7 +96,7 @@ dialog p {{ color:#fff; text-align:center; margin:8px 0 0; font:600 18px var(--d
   <h1>Vitals Vision themes</h1>
   <p>Every low-health theme, drawn from the addon's own textures and colors at the page's default settings, at full low health, just after a hit. These are stills: in the game the glow throbs with the heartbeat, and a hit flashes the edges. Every theme has a soft haze of gas drifting over its edges, in its own color. The only other sprites are lightning (Storm, Windfury), twinkling stars and rising motes.</p>
   <p>Each theme is shown under every spec that uses it. Click a still to see it larger.</p>
-  <p><b>New:</b> game effects. Six themes (More themes, at the bottom: Cosmic void, Hellfire, Radiance, Frostbite, Fel flames, Spellfire) are each one of the game's own full-screen effects, its layers moving, closing in from past the edges as you weaken. Retail only: Classic hasn't their files. Drawn here from screenshots of the game's textures.</p>
+  <p><b>New:</b> game effects. Six themes (More themes, at the bottom: Cosmic void, Hellfire, Radiance, Frostbite, Fel flames, Spellfire) are each one of the game's own full-screen effects, its layers moving, closing in from past the edges as you weaken. Five class themes have one too: Frost mage (Frost), Fire mage (Ember glow), Demonology (Fel flames), Retribution (Yellow rays, faint) and Frost Death Knight (Cyan glow). Retail only: Classic hasn't their files. Drawn here from screenshots of the game's textures.</p>
   <div class="filter" role="group" aria-label="Filter by edge material"><span>Edge material</span>{chips}</div>
 </header>
 {"".join(sections)}

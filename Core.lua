@@ -587,8 +587,8 @@ DEFAULTS.walkCamera = "walk"
 DEFAULTS.runCamera = "run"
 -- Skyriding Cam (SkyrideCam.lua: dev copy, retail): in the air, the Skyriding
 -- zoom script zooms out to skyrideCamDistance over skyrideCamZoomTime, and
--- back over skyrideCamBackTime as you land. Off to start with; Cinema's
--- cameras (ProfileModules.lua's pure-cameras) turn it on.
+-- back over skyrideCamBackTime as you land. Off to start with, in every
+-- profile.
 DEFAULTS.skyrideCam = false
 DEFAULTS.skyrideCamAlways = true -- ...everywhere: its Show in row's Always
 DEFAULTS.skyrideCamDistance = 39 -- ...yards out

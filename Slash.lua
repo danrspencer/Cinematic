@@ -108,7 +108,7 @@ local function PrintDebugHelp()
 	if ns.GetShoulderCamDebug then -- (dev copy: ShoulderCam.lua)
 		print("  /cine debug shoulder - the Shoulder Cam: on or off, the game's shoulder offset and Keep Character Centered")
 	end
-	if ns.isDev then print("  /cine debug skyride - what the game says about skyriding (gliding, speed, the skyriding bar's charges, height) and the Skyriding camera; logs while you fly (again to stop)") end
+	if ns.isDev then print("  /cine debug skyride [frames|probe zoom|turn|tilt|fov|follow] - skyriding: what the game says and the flight log (again to stop); the frames up; or one of our camera moves tried mid-flight") end
 	print("  /cine debug questlog - save every frame of the next quest cams (for tracking down snaps)")
 	print("  /cine debug zoom - the slow zoom's state")
 	print("  /cine debug turn - turn handling while walking (8 seconds)")
@@ -969,8 +969,8 @@ local function HandleSlash(msg)
 			tostring(d.shoulder), tostring(d.centered), tostring(IsMounted and IsMounted()), tostring(InCombatLockdown())))
 		ns.Print(("  Frames follow you %s: slide %.0f of %.0f (UI units, - left), zoom %.1f, cameraFov %s; moving %s"):format(
 			tostring(d.follow), d.followShift, d.followTarget, GetCameraZoom and GetCameraZoom() or 0, tostring(GetCVar("cameraFov")), d.followed))
-	elseif cmd == "debug" and arg == "skyride" and ns.isDev and ns.SkyrideDebug then
-		ns.SkyrideDebug()
+	elseif cmd == "debug" and (arg == "skyride" or arg:find("^skyride%s")) and ns.isDev and ns.SkyrideDebug then
+		ns.SkyrideDebug(arg:match("^skyride%s+(.-)%s*$"))
 	elseif cmd == "debug" and arg == "help" then
 		PrintDebugHelp()
 	elseif cmd == "debug" and arg == "zoom" then
