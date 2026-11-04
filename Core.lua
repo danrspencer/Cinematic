@@ -99,7 +99,7 @@ local DEFAULTS = {
 	calmFullAfter = 6,        -- ...this many seconds after they're full
 	tintPreset = "zonetime",   -- screen tint over the game world (see TINT_PRESETS)
 	tintStrength = 1,
-	tintClassicBoost = true, -- classic clients: the tint a little stronger, as their brighter world hides it (Tint.lua)
+	tintClassicBoost = false, -- classic clients, on: the tint a little stronger, as their brighter world hides it (Tint.lua)
 	tintCustomR = 1, tintCustomG = 0.8, tintCustomB = 0.6,
 	tintDrift = true,      -- tint strength slowly wanders up and down over a few minutes
 	tintDriftAmount = 0.08, -- how far it wanders, as a fraction of the strength (0.08 = +/-8%)
