@@ -79,6 +79,7 @@ Triggers.lua
 Camera.lua
 QuestCam.lua
 ShoulderCam.lua
+SkyrideCam.lua
 CameraRows.lua
 CustomTriggers.lua
 Shots.lua

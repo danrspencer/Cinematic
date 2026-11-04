@@ -4375,7 +4375,5 @@ L["A color wash over the world that follows the time of day and the zone, with s
 L["The camera moves on its own at quiet moments: on flights, when you go AFK, by a campfire. This shows a half turn around you; move the camera yourself to stop it."] = "鏡頭會在安靜時刻自行移動：飛行時、暫離時、營火旁。這裡展示繞你半圈；自己移動鏡頭即可停止。"
 L["As your health drops, the screen's edges close in, so you feel a fight without watching your health bar."] = "生命值下降時，畫面邊緣會向內收攏，讓你無需盯著生命條也能感受戰鬥。"
 L["As you cast your Hearthstone or a teleport, a portal opens around you and the world fades out as you leave."] = "施放爐石或傳送時，你周圍會打開一道傳送門，離開時世界逐漸消失。"
--- Scenes page: Skyriding (CameraRows.lua, CameraScripts.lua, Options.lua)
-L["Skyriding"] = "御空術"
+-- Skyriding Cam (dev copy): its built-in camera script (CameraScripts.lua)
 L["Skyriding zoom"] = "御空術鏡頭拉遠"
-L["Skyriding through the air (not on the ground). Off to start with (the Cinema profile turns it on). Skyriding zoom takes the camera all the way out so you can see where you're going, and back to your own distance a moment after you land. Steering with the mouse doesn't stop it; scrolling the zoom yourself does. Any camera script can play here instead (Scripts page)."] = "在空中御空飛行時（不在地面）。預設關閉（Cinema設定檔會開啟）。御空術鏡頭拉遠會把鏡頭拉到最遠，讓你看清前方，並在落地片刻後回到你自己的距離。用滑鼠轉向不會停止它；自己滾動縮放則會。這裡也可以改為播放任何鏡頭腳本（腳本頁面）。"

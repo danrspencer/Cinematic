@@ -585,11 +585,18 @@ end
 -- off everywhere (Cameras page), as the events' "No camera" does.
 DEFAULTS.walkCamera = "walk"
 DEFAULTS.runCamera = "run"
--- Skyriding (retail): in the air, the Skyriding zoom script zooms all the way
--- out, and back to your distance as you land (CameraScripts.lua). Off to
--- start with; Cinema's cameras (ProfileModules.lua's pure-cameras) turn it on.
-DEFAULTS.skyrideCamera = "none"
-DEFAULTS.skyrideCine = false
+-- Skyriding Cam (SkyrideCam.lua: dev copy, retail): in the air, the Skyriding
+-- zoom script zooms out to skyrideCamDistance over skyrideCamZoomTime, and
+-- back over skyrideCamBackTime as you land. Off to start with; Cinema's
+-- cameras (ProfileModules.lua's pure-cameras) turn it on.
+DEFAULTS.skyrideCam = false
+DEFAULTS.skyrideCamAlways = true -- ...everywhere: its Show in row's Always
+DEFAULTS.skyrideCamDistance = 39 -- ...yards out
+DEFAULTS.skyrideCamZoomTime = 3 -- ...seconds zooming out
+DEFAULTS.skyrideCamBackTime = 2.5 -- ...seconds back in after landing
+DEFAULTS.skyrideCamStart = 0.5 -- ...seconds in the air before it starts (not for a hop)
+DEFAULTS.skyrideCamLand = 2 -- ...seconds on the ground before it ends (not for a touch between flaps)
+DEFAULTS.skyrideCine = false -- ...CineMode while skyriding
 -- Seconds of auto-walking or auto-running before its camera starts (and its
 -- CineMode column with it); 0 is straight away.
 DEFAULTS.walkCameraDelay = 0
@@ -1295,7 +1302,7 @@ for page, keys in pairs({
 		"cardDiscoverOn", "cardDepartureOn", "cardArrivalOn", "cardRestedOn", "cardAchievementOn", "cardReputationOn", "cardCollectOn",
 		"cardProfessionOn", "cardQuestOn", "cardClearedOn", "cardRareOn", "cardBattlegroundOn", "cardStreakOn",
 		"cardBossDownOn", "cardFelledOn", "cardRevivedOn" },
-	cameraModes = { "shoulderCam" }, -- Cameras > General's Enable Cameras: Shoulder Cam
+	cameraModes = { "shoulderCam", "skyrideCam" }, -- Cameras > General's Enable Cameras: Shoulder Cam, Skyriding Cam
 	visualEffects = { "letterboxPage", "tintPage", "graphicsPlus", "musicInCinematic" }, -- (the Atmosphere hub's pages' switches)
 	-- Style > General's Enable Style: the Style hub's pages' switches.
 	styleGeneral = { "ufStyle", "rfStyle", "prdStyle", "tooltipStyle", "handlePlateStyle", "plateNameStyle",

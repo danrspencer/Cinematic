@@ -459,7 +459,7 @@ ns.PROFILE_MODULES = {
 			if ns.isDev then set("deathScreen", false) end
 			set("cardDeathOn", false)
 		end },
-	{ key = "pure-cameras", name = "Cinema: cameras", scope = { "Scenes", "Camera Settings/Chat Cam",
+	{ key = "pure-cameras", name = "Cinema: cameras", scope = { "Scenes", "Camera Settings/Chat Cam", "Skyriding Cam",
 		"General/top", "Card Vision" },
 		tip = "The cameras don't wait for things to calm down after a fight, auto-run carries on in cities and " ..
 		"instances (as RP walk always does), and the death camera runs in instances too. NPCs talking bring the chat camera, " ..
@@ -474,8 +474,8 @@ ns.PROFILE_MODULES = {
 				set("chatNearbyDelay", 0)
 				if ns.isDev then set("chatCamSearch", false) end
 			end
-			-- (Skyriding: off to start with, on here. Retail only.)
-			if ns.CAMERA_TRIGGER and ns.CAMERA_TRIGGER.Skyride then set("skyrideCamera", "script:skyride") end
+			-- (Skyriding Cam: off to start with, on here. Retail's dev copy only.)
+			if ns.SKYRIDE_CAM then set("skyrideCam", true) end
 			-- (Standing still and music: still-afk and camera-music, in its choice.)
 			for _, cam in ipairs({ "walk", "run", "tele", "quest" }) do
 				set(cam .. "CalmWait", false)

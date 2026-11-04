@@ -4375,7 +4375,5 @@ L["A color wash over the world that follows the time of day and the zone, with s
 L["The camera moves on its own at quiet moments: on flights, when you go AFK, by a campfire. This shows a half turn around you; move the camera yourself to stop it."] = "조용한 순간에 카메라가 스스로 움직입니다: 비행 중, 자리 비움일 때, 모닥불 곁에서. 여기서는 내 주위를 반 바퀴 돕니다. 직접 카메라를 움직이면 멈춥니다."
 L["As your health drops, the screen's edges close in, so you feel a fight without watching your health bar."] = "체력이 떨어지면 화면 가장자리가 좁혀 들어와, 체력 바를 보지 않아도 전투를 느낄 수 있습니다."
 L["As you cast your Hearthstone or a teleport, a portal opens around you and the world fades out as you leave."] = "귀환석이나 순간이동을 시전하면 주위에 차원문이 열리고, 떠나면서 세상이 서서히 사라집니다."
--- Scenes page: Skyriding (CameraRows.lua, CameraScripts.lua, Options.lua)
-L["Skyriding"] = "하늘비행"
+-- Skyriding Cam (dev copy): its built-in camera script (CameraScripts.lua)
 L["Skyriding zoom"] = "하늘비행 줌"
-L["Skyriding through the air (not on the ground). Off to start with (the Cinema profile turns it on). Skyriding zoom takes the camera all the way out so you can see where you're going, and back to your own distance a moment after you land. Steering with the mouse doesn't stop it; scrolling the zoom yourself does. Any camera script can play here instead (Scripts page)."] = "공중에서 하늘비행할 때 (지상 제외). 처음에는 꺼져 있습니다 (Cinema 프로필이 켭니다). 하늘비행 줌은 어디로 가는지 보이도록 카메라를 끝까지 멀리 빼고, 착지하고 잠시 뒤 원래 거리로 되돌립니다. 마우스로 방향을 잡아도 멈추지 않지만, 직접 휠로 줌하면 멈춥니다. 여기에서 다른 카메라 스크립트를 대신 재생할 수도 있습니다 (스크립트 페이지)."

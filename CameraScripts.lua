@@ -545,13 +545,15 @@ local BUILT_IN = {
 			rules = { camera = "stop", fight = "stop", walk = "stop", zoom = "ignore", ends = "stop" },
 		}
 	end },
-	-- Skyriding (retail: the Skyriding row): all the way out as you take to
-	-- the air, back to your distance once you've landed. (Steering doesn't
+	-- Skyriding (retail, the dev copy's Skyriding Cam page, SkyrideCam.lua):
+	-- out to skyrideCamDistance over skyrideCamZoomTime as you take to the
+	-- air, back over skyrideCamBackTime once you've landed. (Steering doesn't
 	-- stop it, nor walking: see Start's travel.)
 	{ id = "skyride", name = "Skyriding zoom", retail = true, make = function()
 		return {
-			steps = { S("zoom", { to = 39, secs = 3, past = "yes" }) },
-			ending = { S("putback", { secs = 2.5 }) },
+			steps = { Set(S("zoom", { to = Db("skyrideCamDistance", 39), secs = Db("skyrideCamZoomTime", 3),
+				past = "yes" }), "skyrideCamDistance", "skyrideCamZoomTime") },
+			ending = { Set(S("putback", { secs = Db("skyrideCamBackTime", 2.5) }), "skyrideCamBackTime") },
 			rules = { camera = "pause", cameraSecs = 3, fight = "putback", walk = "ignore", zoom = "ignore",
 				ends = "putback" },
 		}
@@ -865,7 +867,6 @@ end
 local TAKES = { afk = true, tele = true, flight = true, walk = true, run = true, quest = true, chat = true,
 	[true] = true }
 local function TakesScripts(list)
-	if list.scripts then return true end -- (one made for scripts: Skyriding's)
 	for _, value in ipairs(list) do
 		if TAKES[value] then return true end
 	end
@@ -917,7 +918,7 @@ function ns.CameraTriggerName(key)
 	local trigger = ns.CAMERA_TRIGGER and ns.CAMERA_TRIGGER[key]
 	if not trigger then return tostring(key) end
 	if trigger.custom and ns.CustomTriggerLabel then return ns.CustomTriggerLabel(key) end
-	if key == "Skyride" then return L["Skyriding"] end
+	if key == "Skyride" then return L["Skyriding Cam"] end
 	for _, event in ipairs(ns.EVENTS or {}) do
 		if event.key == key then return event.label end
 	end
@@ -2011,22 +2012,25 @@ local function ChatNow()
 	return convo and ScriptRow(convo.key) and convo.key or nil
 end
 
--- Skyriding in the air now (retail's gliding info), for the Skyriding row:
--- on once you've been up SKY_START seconds (not for a hop), off once you've
--- been down SKY_LAND (not for a touch on the ground between flaps).
-local SKY_START, SKY_LAND = 0.5, 2
+-- Skyriding in the air now (retail's gliding info), for the Skyriding Cam
+-- page (SkyrideCam.lua: on, and its Show in row here): on once you've been
+-- up skyrideCamStart seconds (not for a hop), off once you've been down
+-- skyrideCamLand (not for a touch on the ground between flaps).
 local sky = { on = false }
 function ns.SkyridingNow()
-	if not (ns.CAMERA_TRIGGER and ns.CAMERA_TRIGGER.Skyride) then return false end
+	if not (ns.SkyrideCamOn and ns.SkyrideCamOn()) then
+		sky.on, sky.upSince, sky.downSince = false, nil, nil
+		return false
+	end
 	local now, up = GetTime(), ns.GlidingSpeed and ns.GlidingSpeed() ~= nil
 	if up then
 		sky.downSince = nil
 		sky.upSince = sky.upSince or now
-		if now - sky.upSince >= SKY_START then sky.on = true end
+		if now - sky.upSince >= Db("skyrideCamStart", 0.5) then sky.on = true end
 	else
 		sky.upSince = nil
 		sky.downSince = sky.downSince or now
-		if now - sky.downSince >= SKY_LAND then sky.on = false end
+		if now - sky.downSince >= Db("skyrideCamLand", 2) then sky.on = false end
 	end
 	return sky.on
 end
@@ -2048,6 +2052,8 @@ local function TriggerNow()
 		local camera = ns.TriggerSetting(scene, "camera")
 		if IsScript(camera) then return scene, camera end
 	end
+	-- (Skyriding Cam's page: its own script, made from its settings.)
+	if not ns.OnTaxi() and ns.SkyridingNow() then return "Skyride", "script:skyride" end
 	local key, camera = ns.ActiveEvent()
 	if IsScript(camera) then return key, camera end
 	local triggers = ns.CAMERA_TRIGGER
@@ -2056,9 +2062,8 @@ local function TriggerNow()
 	-- camera is off then, CameraRows.lua's ns.CameraRowsOff.)
 	local own = { ns.OnTaxi() and "Flight", ns.IsDead and ns.IsDead() and "Death",
 		ns.IsRPWalking and ns.IsRPWalking() and "Walk", ns.IsAutoRunning and ns.IsAutoRunning() and "Run",
-		ns.QuestTalkNow and ns.QuestTalkNow() or false, ChatNow() or false,
-		not ns.OnTaxi() and ns.SkyridingNow() and "Skyride" or false }
-	for i = 1, 7 do
+		ns.QuestTalkNow and ns.QuestTalkNow() or false, ChatNow() or false }
+	for i = 1, 6 do
 		local each = own[i]
 		if each and triggers[each] then
 			camera = ns.TriggerSetting(each, "camera")
@@ -2375,5 +2380,136 @@ function ns.CameraScriptCommand(arg)
 			ns.Print(("not running%s"):format(stoppedFor and (" (stopped for %s until it's over)"):format(stoppedFor) or ""))
 		end
 		ns.Print("/cine script list | play <name> | stop" .. (ns.isDev and " | builtins" or ""))
+	end
+end
+-- /cine debug skyride: what the game says about skyriding now (gliding, can
+-- glide, its speed, flying, the skyriding bar's spells and charges, where you
+-- are), and ours (the Skyriding Cam page, its script, the zoom); again to log a
+-- line every SKY_LOG_EVERY seconds to the saved log while you're in the air
+-- (and each change of gliding at once), for SKY_LOG_FOR seconds at most.
+-- Speed worked out from your position too, and the climb, where the game
+-- gives a position (UnitPosition: not in instances).
+do
+	local SKY_LOG_EVERY, SKY_LOG_FOR = 0.25, 300
+	local function V(value, fmt)
+		if value == nil then return "nil" end
+		if issecretvalue and issecretvalue(value) then return "secret" end
+		if fmt and type(value) == "number" then return fmt:format(value) end
+		return tostring(value)
+	end
+	local function Plain(value) return type(value) == "number" and not (issecretvalue and issecretvalue(value)) end
+	local function Glide()
+		if not (C_PlayerInfo and C_PlayerInfo.GetGlidingInfo) then return "no API" end
+		local ok, gliding, can, speed = pcall(C_PlayerInfo.GetGlidingInfo)
+		if not ok then return "error", nil, nil, nil end
+		return ("gliding %s, can %s, speed %s"):format(V(gliding), V(can), V(speed, "%.1f")), gliding, can, speed
+	end
+	local function Call(name, ...)
+		local fn = _G[name]
+		if not fn then return "nil" end
+		local ok, a = pcall(fn, ...)
+		return ok and V(a) or "error"
+	end
+	-- The skyriding bar (the bonus bar while you skyride): each spell, and its
+	-- charges. compact: only the spells with charges (vigor: Surge Forward's), by ID.
+	local function Bar(compact)
+		local index = _G.GetBonusBarIndex and _G.GetBonusBarIndex()
+		if not Plain(index) or index == 0 then return ("bonus bar %s"):format(V(index)) end
+		local first = ((_G.NUM_ACTIONBAR_PAGES or 6) + index - 1) * 12
+		local parts = {}
+		for slot = first + 1, first + 12 do
+			local ok, kind, id = pcall(GetActionInfo, slot)
+			if ok and kind == "spell" and Plain(id) then
+				local name = C_Spell and C_Spell.GetSpellName and C_Spell.GetSpellName(id) or tostring(id)
+				local charges = C_Spell and C_Spell.GetSpellCharges and C_Spell.GetSpellCharges(id)
+				local have = type(charges) == "table" and ("%s/%s"):format(V(charges.currentCharges), V(charges.maxCharges))
+					or "-"
+				if not compact then
+					parts[#parts + 1] = ("%s %s %s"):format(V(name), V(id), have)
+				elseif have ~= "-" then
+					parts[#parts + 1] = ("%s %s"):format(V(id), have)
+				end
+			end
+		end
+		if compact then return ("charges %s"):format(#parts > 0 and table.concat(parts, ", ") or "none") end
+		return ("bonus bar %d: %s"):format(index, #parts > 0 and table.concat(parts, ", ") or "no spells")
+	end
+	local function Where()
+		local ok, y, x, z, instance = pcall(UnitPosition, "player")
+		if not ok then return nil end
+		return y, x, z, instance
+	end
+	local function Ours()
+		local state = ns.CameraScriptState and ns.CameraScriptState()
+		return ("Skyriding Cam page %s, may play here %s, cine %s; skyriding now %s; script %s; zoom %s, speed %s, max factor %s"):format(
+			ns.SKYRIDE_CAM and (ns.Setting("skyrideCam") and "on" or "off") or "NOT HERE (not retail?)",
+			tostring(ns.SkyrideCamOn and ns.SkyrideCamOn()), tostring(ns.db.skyrideCine), tostring(ns.SkyridingNow()),
+			state and ("%s (%s)"):format(state.script and state.script.name or "?", tostring(state.phase)) or "none",
+			V(Zoom(), "%.1f"), tostring(GetCVar("cameraZoomSpeed")), tostring(GetCVar("cameraDistanceMaxZoomFactor")))
+	end
+
+	local logger = CreateFrame("Frame")
+	local log = { on = false }
+	logger:Hide()
+	ns.SetOnUpdate(logger, function(_, elapsed)
+		local now = GetTime()
+		if now - log.started >= SKY_LOG_FOR then
+			log.on = false
+			logger:Hide()
+			ns.Log("skyride", "log over (time up)")
+			ns.Print("skyride log over (5 minutes): /reload to save it")
+			return
+		end
+		local text, gliding, can, speed = Glide()
+		local changed = gliding ~= log.gliding or can ~= log.can
+		log.gliding, log.can = gliding, can
+		log.since = log.since + elapsed
+		local flying = IsFlying and IsFlying()
+		if not changed and (log.since < SKY_LOG_EVERY or not (gliding or flying)) then return end
+		-- (Your height and pitch can't be read, and the unit speed is 0 while
+		-- gliding: tested. The flat speed from your position against the
+		-- glide's speed gives how steep you go, not which way; the glide speed
+		-- falling says climbing, rising without a surge diving.)
+		local y, x = Where()
+		local shape = ""
+		if Plain(y) and Plain(x) and log.y and log.since > 0 then
+			local flat = math.sqrt((x - log.x) ^ 2 + (y - log.y) ^ 2) / log.since
+			local steep = Plain(speed) and speed > 5 and math.deg(math.acos(math.min(1, flat / speed)))
+			local trend = Plain(speed) and Plain(log.speed) and (speed - log.speed) / log.since
+			shape = (" | flat %.1f, steep %s, speed %s/s"):format(flat, steep and ("%.0f deg"):format(steep) or "-",
+				trend and ("%+.1f"):format(trend) or "-")
+		end
+		if Plain(y) and Plain(x) then log.y, log.x = y, x else log.y = nil end
+		log.speed = Plain(speed) and speed or nil
+		ns.Log("skyride", ("%s%s%s | %s | flying %s, combat %s | ours: sky %s, zoom %s"):format(
+			changed and "CHANGED " or "", text, shape, Bar(true), V(flying), V(InCombatLockdown()),
+			tostring(ns.SkyridingNow()), V(Zoom(), "%.1f")))
+		-- (The bar in full as you take off: its spells by name.)
+		if changed and gliding == true then ns.Log("skyride", Bar()) end
+		log.since = 0
+	end)
+
+	function ns.SkyrideDebug()
+		local build, _, _, toc = GetBuildInfo()
+		ns.Print(("skyride: %s | flying %s, mounted %s, taxi %s, skyriding zone %s, flyable %s, indoors %s, combat %s (client %s, %s)"):format(
+			(Glide()), Call("IsFlying"), Call("IsMounted"), Call("UnitOnTaxi", "player"), Call("IsAdvancedFlyableArea"),
+			Call("IsFlyableArea"), Call("IsIndoors"), V(InCombatLockdown()), tostring(build), tostring(toc)))
+		local _, speed, run, flight, swim = pcall(GetUnitSpeed, "player")
+		local y, x, z, instance = Where()
+		ns.Print(("  unit speed %s (run %s, flight %s, swim %s); position %s, %s, height %s (instance %s); pitch %s"):format(
+			V(speed, "%.1f"), V(run, "%.1f"), V(flight, "%.1f"), V(swim, "%.1f"), V(x, "%.1f"), V(y, "%.1f"),
+			V(z, "%.1f"), V(instance), Call("GetUnitPitch", "player")))
+		ns.Print("  " .. Bar())
+		ns.Print("  " .. Ours())
+		log.on = not log.on
+		if log.on then
+			log.started, log.since, log.gliding, log.can, log.y, log.speed = GetTime(), 0, nil, nil, nil, nil
+			ns.Log("skyride", "log started: " .. Ours())
+			ns.Print("  logging while you're in the air (5 minutes, or /cine debug skyride again): /reload after to save it")
+		else
+			ns.Log("skyride", "log stopped")
+			ns.Print("  log stopped: /reload to save it")
+		end
+		logger:SetShown(log.on)
 	end
 end

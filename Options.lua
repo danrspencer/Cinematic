@@ -1714,6 +1714,7 @@ do
 			{ "My Shots", "Interface\\Icons\\INV_Misc_Spyglass_02", section = "Cameras" }, -- (ShotsPage.lua)
 			{ "Camera Settings", "Interface\\Icons\\Trade_Engineering", dev = true, section = "Dev" }, -- (settings no script step uses)
 			{ "Shoulder Cam", "Interface\\Icons\\INV_Shoulder_02", dev = true, section = "Dev" }, -- (ShoulderCam.lua)
+			{ "Skyriding Cam", "Interface\\Icons\\INV_Misc_Spyglass_03", dev = true, section = "Dev" }, -- (SkyrideCam.lua: retail)
 		} },
 		-- (label: the name on its icon, when the page is registered under another)
 		-- (the look and the sound: the visual effects' pages, then Audio)
@@ -5239,7 +5240,7 @@ local function CreateCamerasPanel()
 
 	-- Each trigger's name and tip (the events' from ns.EVENTS and EVENT_TIPS).
 	local LABELS = { Walk = L["Auto-walk (RP walk)"], Run = L["Auto-run"], Death = L["Die"],
-		Chat = L["NPCs you talk to"], ChatNearby = L["NPCs chatting nearby"], Skyride = L["Skyriding"] }
+		Chat = L["NPCs you talk to"], ChatNearby = L["NPCs chatting nearby"] }
 	for _, event in ipairs(ns.EVENTS) do LABELS[event.key] = event.label end
 	local TIPS = {
 		Walk = L["Auto-walking (auto-run in walk mode). The camera's settings are under RP Walk Cam on the " ..
@@ -5254,11 +5255,6 @@ local function CreateCamerasPanel()
 		ChatNearby = L["Other NPCs talking near you, such as a city's citizens chatting among themselves. The " ..
 			"same chat camera, once you've stood still for the time below, so passers-by don't swing it about while " ..
 			"you're busy."],
-		Skyride = L["Skyriding through the air (not on the ground). Off to start with (the Cinema profile turns it " ..
-			"on). Skyriding zoom takes the camera all the way " ..
-			"out so you can see where you're going, and back to your own distance a moment after you land. " ..
-			"Steering with the mouse doesn't stop it; scrolling the zoom yourself does. Any camera script can " ..
-			"play here instead (Scripts page)."],
 	}
 	local MUSIC_TIP = L["Music starts as this event's camera starts, unless the addon started music " ..
 		"within the fatigue time (Audio page). Music already playing just carries on. Off: this " ..
@@ -15135,6 +15131,9 @@ ns.OnLanguage(function()
 	end
 	if ns.CreateShoulderCamPanel then -- (ShoulderCam.lua)
 		ns.CreateShoulderCamPanel(ns.lowHealthKit)
+	end
+	if ns.CreateSkyrideCamPanel then -- (SkyrideCam.lua: dev copy, retail)
+		ns.CreateSkyrideCamPanel(ns.lowHealthKit)
 	end
 	if ns.CreateCameraScriptsPanel then -- (CameraScriptsPage.lua, dev copy)
 		ns.CreateCameraScriptsPanel(ns.lowHealthKit)

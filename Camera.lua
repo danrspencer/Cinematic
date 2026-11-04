@@ -146,8 +146,10 @@ ns.DEFAULTS.deathCine = false
 -- flying, swimming), its camera a script and its CineMode ticked: CineMode
 -- stays on as you move.
 function ns.TravelSceneCine()
-	local scene = ns.SkyridingNow and not ns.OnTaxi() and ns.SkyridingNow() and "Skyride"
-		or (ns.CustomTravelScene and ns.CustomTravelScene())
+	if ns.SkyridingNow and not ns.OnTaxi() and ns.SkyridingNow() then
+		return ns.db.skyrideCine == true -- (Skyriding Cam's own tick: SkyrideCam.lua)
+	end
+	local scene = ns.CustomTravelScene and ns.CustomTravelScene()
 	return scene ~= nil and ns.IsScriptCamera ~= nil and ns.IsScriptCamera(ns.TriggerSetting(scene, "camera"))
 		and ns.TriggerSetting(scene, "cine") == true
 end

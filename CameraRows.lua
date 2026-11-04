@@ -98,18 +98,6 @@ for _, trigger in ipairs({
 	if trigger.key == "Flight" then trigger.music = "musicCamFlight" end
 	if not (FOREVER_ONLY[trigger.key] and ns.isRetail) then ns.RegisterCameraTrigger(trigger) end
 end
--- (Skyriding, retail only: plays a camera script, its own the Skyriding zoom.
--- Its list is only No camera here: CameraScripts.lua puts the scripts in.
--- Dev copy only for now: not ready for players.)
-if ns.isDev and ns.isRetail and C_PlayerInfo and C_PlayerInfo.GetGlidingInfo then
-	ns.RegisterCameraTrigger({ key = "Skyride", camera = "skyrideCamera", cine = "skyrideCine",
-		cameras = { "none", scripts = true }, off = "none" })
-	-- (Its When to start with: anywhere you can skyride, not battlegrounds and
-	-- arenas, nor in a fight.)
-	for _, list in ipairs({ "worldShow", "cityShow", "instanceShow", "groupShow" }) do
-		if ns.LIST_DEFAULTS[list] then ns.LIST_DEFAULTS[list]["trig:Skyride"] = true end
-	end
-end
 -- (The chat camera: ChatCam.lua; no music switch yet.)
 if ns.ChatCamCommand then
 	ns.RegisterCameraTrigger({ key = "Chat", camera = "chatCamera", cine = "chatCine", cameras = { "chat", "none" },
