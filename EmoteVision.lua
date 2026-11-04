@@ -712,7 +712,7 @@ local function Create()
 		if button == "RightButton" then Hide() end
 	end)
 
-	card:SetScript("OnUpdate", function(self, elapsed)
+	ns.SetOnUpdate(card, function(self, elapsed)
 		if moving or self.dragging then self:SetAlpha(1) return end
 		-- (The mouse over it: its time stands still.)
 		if not ns.Flag(self:IsMouseOver()) then self.age = self.age + elapsed end
@@ -2584,7 +2584,7 @@ function ns.CreateEmoteVisionStylePanel(kit)
 		ns.MoveEmoteVision()
 	end)
 	move:SetPoint("LEFT", yBox, "RIGHT", 16, 0)
-	move:SetScript("OnUpdate", function(self) self:SetText(ns.EmoteVisionMoving() and L["Done"] or L["Move"]) end)
+	ns.SetOnUpdate(move, function(self) self:SetText(ns.EmoteVisionMoving() and L["Done"] or L["Move"]) end)
 	local reset = b.Button(row, L["Reset"], 90, L["Puts the card back where it starts: just above where speech " ..
 		"from behind you shows (the Chat Bubbles page's Move), beside the chat window."], function()
 		local db = ns.GetDB()

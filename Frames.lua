@@ -477,7 +477,7 @@ function castBars.Hook(entry)
 	if castBars.entries[frame] == nil and frame.HookScript then
 		frame:HookScript("OnEvent", castBars.onScript)
 		frame:HookScript("OnShow", castBars.onScript)
-		frame:HookScript("OnUpdate", castBars.onUpdate)
+		ns.HookOnUpdate(frame, castBars.onUpdate)
 		if frame.GetAnimationGroups then
 			for _, group in ipairs({ frame:GetAnimationGroups() }) do
 				local ok, fades = pcall(castBars.FadesFrame, group, frame)
@@ -4206,7 +4206,7 @@ do
 		if not holder then
 			holder = CreateFrame("Frame", nil, UIParent)
 			holder:SetAllPoints(UIParent)
-			holder:SetScript("OnUpdate", HolderOnUpdate)
+			ns.SetOnUpdate(holder, HolderOnUpdate)
 			ns.buffMirrorHolder = holder
 		end
 		holder:Show()
@@ -5583,7 +5583,7 @@ local padMoveHeld = false
 function ns.PadMovementHeld()
 	return padMoveHeld
 end
-padWatcher:SetScript("OnUpdate", ns.Profiled("Gamepad watch", function()
+ns.SetOnUpdate(padWatcher, ns.Profiled("Gamepad watch", function()
 	CheckPendingPress()
 	if not (ns.db and C_GamePad and C_GamePad.GetDeviceMappedState and ns.IsGamePadOn()) then
 		padMoveHeld = false
@@ -6490,7 +6490,7 @@ do
 	end
 
 	local since = 0
-	watcher:SetScript("OnUpdate", function(_, elapsed)
+	ns.SetOnUpdate(watcher, function(_, elapsed)
 		since = since + elapsed
 		if since < 0.5 then return end
 		since = 0
@@ -6579,7 +6579,7 @@ do
 
 	local since = 0
 	local watcher = CreateFrame("Frame")
-	watcher:SetScript("OnUpdate", function(_, elapsed)
+	ns.SetOnUpdate(watcher, function(_, elapsed)
 		since = since + elapsed
 		if since < 0.5 then return end
 		since = 0
@@ -7448,7 +7448,7 @@ do
 	end
 
 	local watcher = CreateFrame("Frame")
-	watcher:SetScript("OnUpdate", ns.Profiled("CooldownFlash", Update))
+	ns.SetOnUpdate(watcher, ns.Profiled("CooldownFlash", Update))
 end
 
 -- /cine debug cooldowns: what the Cooldown Manager check sees.
@@ -9493,7 +9493,7 @@ do
 				local standIn = CreateFrame("Frame", nil, UIParent)
 				standIn:SetSize(1, 1)
 				standIn:SetPoint("TOPLEFT")
-				standIn:SetScript("OnUpdate", function(self)
+				ns.SetOnUpdate(standIn, function(self)
 					ns.ApplyCVarSet(set, self:GetAlpha() < 0.5)
 				end)
 				auraStandIns[group] = standIn
@@ -9523,7 +9523,7 @@ do
 		if partyEntries[frame] == nil and frame.HookScript then
 			frame:HookScript("OnEvent", onPartyScript)
 			frame:HookScript("OnShow", onPartyScript)
-			frame:HookScript("OnUpdate", onPartyScript)
+			ns.HookOnUpdate(frame, onPartyScript)
 		end
 		partyEntries[frame] = ns.managed[#ns.managed]
 	end
@@ -10087,7 +10087,7 @@ do
 			fades[bar] = {}
 			bar:HookScript("OnEvent", BarEvent)
 			bar:HookScript("OnShow", BarEvent)
-			bar:HookScript("OnUpdate", ns.Profiled("Unit cast bar update hook", function(self)
+			ns.HookOnUpdate(bar, ns.Profiled("Unit cast bar update hook", function(self)
 				if hidden[self] then
 					KeepHidden(self)
 				end
@@ -10126,7 +10126,7 @@ do
 	-- applied again when what their rows know changes (a fight, a place, a
 	-- group...), checked 4 times a second.
 	local lastFacts, since = {}, 0
-	watcher:SetScript("OnUpdate", function(_, elapsed)
+	ns.SetOnUpdate(watcher, function(_, elapsed)
 		since = since + elapsed
 		if since < 0.25 or not ns.db then
 			return

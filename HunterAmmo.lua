@@ -86,7 +86,7 @@ local watcher = CreateFrame("Frame")
 local giveUpAt, settleAt, moves = 0, 0, 0
 
 local function Stop()
-	watcher:SetScript("OnUpdate", nil)
+	ns.SetOnUpdate(watcher, nil)
 	watcher:UnregisterEvent("BAG_UPDATE_DELAYED")
 	watcher:UnregisterEvent("ITEM_LOCK_CHANGED")
 end
@@ -124,7 +124,7 @@ local function Sorted()
 	giveUpAt, settleAt, moves = now + GIVE_UP, now + SETTLE, 0
 	watcher:RegisterEvent("BAG_UPDATE_DELAYED")
 	watcher:RegisterEvent("ITEM_LOCK_CHANGED")
-	watcher:SetScript("OnUpdate", Wait)
+	ns.SetOnUpdate(watcher, Wait)
 end
 
 -- (The bag's Clean Up Bags button, and any addon or macro that calls it.)

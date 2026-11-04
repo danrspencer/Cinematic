@@ -969,7 +969,7 @@ passWatcher:SetScript("OnEvent", function(self)
 	end
 	self:Show()
 end)
-passWatcher:SetScript("OnUpdate", function(self)
+ns.SetOnUpdate(passWatcher, function(self)
 	if not ns.Flag(UnitExists("mouseover")) then
 		pass.guid = nil
 		self:Hide()
@@ -1390,7 +1390,7 @@ for _, name in ipairs({ "MoveViewLeftStart", "MoveViewLeftStop", "MoveViewRightS
 		end)
 	end
 end
-frame:SetScript("OnUpdate", ns.Profiled("Quest cam", OnUpdate))
+ns.SetOnUpdate(frame, ns.Profiled("Quest cam", OnUpdate))
 
 -- Whether the quest cam is zooming back out to your distance (the RP walk
 -- and auto-run cameras' own zoom waits for it, rather than starting from close in).
@@ -1587,7 +1587,7 @@ do
 		elseif test.kind ~= "nomove" then
 			ns.CallCameraFunction("MoveViewLeftStop")
 		end
-		runner:SetScript("OnUpdate", nil)
+		ns.SetOnUpdate(runner, nil)
 		C_Timer.After(SPEED_RESTORE_DELAY, function()
 			ns.ReleaseSpeed(TEST, YAW)
 			ns.ReleaseSpeed(TEST, PITCH)
@@ -1671,7 +1671,7 @@ do
 			ns.HoldSpeed(TEST, PITCH)
 		end
 		test = { kind = kind, t = 0 }
-		runner:SetScript("OnUpdate", OnTestUpdate)
+		ns.SetOnUpdate(runner, OnTestUpdate)
 		return true
 	end
 end

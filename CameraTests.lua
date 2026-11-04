@@ -145,7 +145,7 @@ local function Tick(_, elapsed)
 	end
 	ns.cameraTesting = current ~= nil
 	if not current then
-		ticker:SetScript("OnUpdate", nil)
+		ns.SetOnUpdate(ticker, nil)
 	end
 end
 
@@ -173,7 +173,7 @@ function ns.CameraTestStart(key)
 	end
 	current = { key = key, test = test, untilAt = GetTime() + TEST_TIME }
 	wait = CHECK_EVERY
-	ticker:SetScript("OnUpdate", Tick)
+	ns.SetOnUpdate(ticker, Tick)
 	return true
 end
 

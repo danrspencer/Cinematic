@@ -888,7 +888,7 @@ end
 local nearLook = CreateFrame("Frame")
 nearLook:Hide()
 local nearWait = 0
-nearLook:SetScript("OnUpdate", function(_, elapsed)
+ns.SetOnUpdate(nearLook, function(_, elapsed)
 	nearWait = nearWait - elapsed
 	if nearWait > 0 then return end
 	nearWait = NEAR_EVERY

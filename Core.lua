@@ -2659,7 +2659,7 @@ do
 	local WATCH_EVERY = 0.25
 	local freeSince, watched, mouseWas = nil, 0, false
 	local watch = CreateFrame("Frame")
-	watch:SetScript("OnUpdate", function(_, elapsed)
+	ns.SetOnUpdate(watch, function(_, elapsed)
 		if not ns.db then
 			return
 		end
@@ -6181,19 +6181,26 @@ ticker:SetScript("OnEvent", ns.Profiled("Core events", function(self, event, arg
 		SLASH_CINEMATIC2 = "/cinematic"
 		SlashCmdList.CINEMATIC = ns.HandleSlash
 	elseif event == "PLAYER_LOGIN" then
-		ns.MusicTrace(("LOGIN volume %s music %s"):format(GetCVar("Sound_MusicVolume"), GetCVar("Sound_EnableMusic")))
-		RestoreSavedCVars()
-		ns.ReleaseAllSpeeds("left held when the game last closed")
-		if ns.musicBackOn and GetCVar("Sound_EnableMusic") == "0" then
-			SetCVar("Sound_EnableMusic", 1)
-		end
+		-- Each setup step protected (ns.Guard): one failing (a client
+		-- difference, say) is reported and the rest, and the update loop, still start.
+		local Guard = ns.Guard
+		Guard(function()
+			ns.MusicTrace(("LOGIN volume %s music %s"):format(GetCVar("Sound_MusicVolume"), GetCVar("Sound_EnableMusic")))
+		end)
+		Guard(RestoreSavedCVars)
+		Guard(ns.ReleaseAllSpeeds, "left held when the game last closed")
+		Guard(function()
+			if ns.musicBackOn and GetCVar("Sound_EnableMusic") == "0" then
+				SetCVar("Sound_EnableMusic", 1)
+			end
+		end)
 		ns.musicBackOn = nil
-		ns.RestoreMusicVolume()
-		ns.PruneBuiltInExtras()
-		ns.DefaultNewAddons() -- (Advanced Frames: supported addons installed since, the Default row's settings)
-		ns.wasOnTaxi = ns.OnTaxi() -- don't re-center after a /reload mid-flight
-		ns.RegisterChatPeek()
-		ns.HookCameraInput()
+		Guard(ns.RestoreMusicVolume)
+		Guard(ns.PruneBuiltInExtras)
+		Guard(ns.DefaultNewAddons) -- (Advanced Frames: supported addons installed since, the Default row's settings)
+		Guard(function() ns.wasOnTaxi = ns.OnTaxi() end) -- don't re-center after a /reload mid-flight
+		Guard(ns.RegisterChatPeek)
+		Guard(ns.HookCameraInput)
 		-- Walk mode: there's no "am I walking" API, so the walk/run toggle is
 		-- followed (you log in running), and corrected from your actual speed
 		-- whenever you move and the speed can be read (it's secret at times).
@@ -6217,7 +6224,7 @@ ticker:SetScript("OnEvent", ns.Profiled("Core events", function(self, event, arg
 			return ns.walking and not ns.MovingManually()
 		end
 		if ToggleRun then
-			hooksecurefunc("ToggleRun", function() ns.walking = not ns.walking end)
+			Guard(hooksecurefunc, "ToggleRun", function() ns.walking = not ns.walking end)
 		end
 		-- Auto-run: no "am I auto-running" API either, so follow the auto-run key
 		-- and the things that end it (forward/back, stopping, a flight).
@@ -6274,7 +6281,7 @@ ticker:SetScript("OnEvent", ns.Profiled("Core events", function(self, event, arg
 			return ns.autoRunning and not ns.IsRPWalking()
 		end
 		local function Hook(name, fn)
-			if _G[name] then hooksecurefunc(name, fn) end
+			if _G[name] then Guard(hooksecurefunc, name, fn) end
 		end
 		for _, key in ipairs({ "MoveForward", "MoveBackward", "StrafeLeft", "StrafeRight", "MoveAndSteer" }) do
 			Hook(key .. "Start", function() movementKeys[key] = true end)
@@ -6297,18 +6304,20 @@ ticker:SetScript("OnEvent", ns.Profiled("Core events", function(self, event, arg
 		Hook("StopAutoRun", function() ns.autoRunning = false end)
 		Hook("MoveForwardStart", function() ns.autoRunning = false end)
 		Hook("MoveBackwardStart", function() ns.autoRunning = false end)
-		ns.HookTaxiRoutes()
-		GameTooltip:HookScript("OnShow", ns.Profiled("Tooltip shown", ns.OnTooltipShow))
-		GameTooltip:HookScript("OnHide", ns.OnTooltipHide)
-		hooksecurefunc(GameTooltip, "SetUnit", ns.OnTooltipSetUnit)
-		hooksecurefunc("GameTooltip_SetDefaultAnchor", ns.OnTooltipDefaultAnchor)
-		ns.HookTooltipParts()
+		Guard(ns.HookTaxiRoutes)
+		Guard(function()
+			GameTooltip:HookScript("OnShow", ns.Profiled("Tooltip shown", ns.OnTooltipShow))
+			GameTooltip:HookScript("OnHide", ns.OnTooltipHide)
+		end)
+		Guard(hooksecurefunc, GameTooltip, "SetUnit", ns.OnTooltipSetUnit)
+		Guard(hooksecurefunc, "GameTooltip_SetDefaultAnchor", ns.OnTooltipDefaultAnchor)
+		Guard(ns.HookTooltipParts)
 		-- The minimap button first, so the fade list picks it up straight away
 		-- (otherwise it stays visible until the next scan).
-		if ns.UpdateMinimapButton then ns.UpdateMinimapButton() end
-		ns.BuildManagedList()
-		ns.CreateLetterbox()
-		ns.CreateTint()
+		Guard(ns.UpdateMinimapButton)
+		Guard(ns.BuildManagedList)
+		Guard(ns.CreateLetterbox)
+		Guard(ns.CreateTint)
 		lastBusy = GetTime()
 		started = true
 		if not suspended then
@@ -6360,20 +6369,26 @@ ticker:SetScript("OnEvent", ns.Profiled("Core events", function(self, event, arg
 			ns.LoginZoom()
 		end
 	elseif event == "PLAYER_LOGOUT" then
-		ns.SaveProfile()
-		ns.MusicTrace(("LOGOUT volume %s music %s"):format(GetCVar("Sound_MusicVolume"), GetCVar("Sound_EnableMusic")))
+		-- (Each step protected, so one failing doesn't leave the rest undone.)
+		local Guard = ns.Guard
+		Guard(ns.SaveProfile)
+		Guard(function()
+			ns.MusicTrace(("LOGOUT volume %s music %s"):format(GetCVar("Sound_MusicVolume"), GetCVar("Sound_EnableMusic")))
+		end)
 		-- Put the player's music/name/nameplate settings back before they're saved.
-		ns.UpdateCVars(false)
-		ns.StopIdleZoomNow()
-		ns.StopDeathSongNow()
-		ns.StopMusicNow()
-		ns.StopCombatMusicNow()
-		ns.ShowPlatesNow()
-		ns.StopOrbitNow()
-		ns.ApplyCVarSet(ns.FLIGHT_CVARS, false)
-		ns.ApplyCVarSet(ns.RECENTER_CVARS, false)
-		ns.ReleaseAllSpeeds("logging out")
-		ns.MusicTrace(("LOGOUT done volume %s music %s"):format(GetCVar("Sound_MusicVolume"), GetCVar("Sound_EnableMusic")))
+		Guard(ns.UpdateCVars, false)
+		Guard(ns.StopIdleZoomNow)
+		Guard(ns.StopDeathSongNow)
+		Guard(ns.StopMusicNow)
+		Guard(ns.StopCombatMusicNow)
+		Guard(ns.ShowPlatesNow)
+		Guard(ns.StopOrbitNow)
+		Guard(ns.ApplyCVarSet, ns.FLIGHT_CVARS, false)
+		Guard(ns.ApplyCVarSet, ns.RECENTER_CVARS, false)
+		Guard(ns.ReleaseAllSpeeds, "logging out")
+		Guard(function()
+			ns.MusicTrace(("LOGOUT done volume %s music %s"):format(GetCVar("Sound_MusicVolume"), GetCVar("Sound_EnableMusic")))
+		end)
 	elseif event == "PLAYER_LEVEL_UP" then
 		ns.levelUpUntil = GetTime() + ns.LEVEL_UP_WINDOW
 	elseif event == "PLAYER_STARTED_MOVING" then

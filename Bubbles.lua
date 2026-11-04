@@ -667,7 +667,7 @@ local function HookBubbles()
 			local inside = bubble:GetChildren()
 			if inside and not (inside.IsForbidden and inside:IsForbidden()) then
 				hooked[bubble] = true
-				bubble:HookScript("OnUpdate", function() Lift(inside) end)
+				ns.HookOnUpdate(bubble, function() Lift(inside) end)
 				-- (Gone or reused: our copy goes too, and the game's comes back.)
 				bubble:HookScript("OnHide", function()
 					local state = lifted[inside]
@@ -691,7 +691,7 @@ function ns.ToggleBubbleTrace()
 	tracing = not tracing
 	ns.bubbleTraceFrame = 0
 	local zoom, count
-	traceHooker:SetScript("OnUpdate", tracing and function()
+	ns.SetOnUpdate(traceHooker, tracing and function()
 		ns.bubbleTraceFrame = ns.bubbleTraceFrame + 1
 		HookBubbles()
 		-- (The camera bumping on stairs moves every bubble at once.)
@@ -854,7 +854,7 @@ local function OnUpdate(self, elapsed)
 	if ns.db and ns.db.handleBubbles then HookBubbles() end
 	watchLeft = watchLeft - elapsed
 	if watchLeft <= 0 then
-		self:SetScript("OnUpdate", nil)
+		ns.SetOnUpdate(self, nil)
 	end
 end
 
@@ -862,7 +862,7 @@ end
 -- camera mode starting, a rule's other words.
 local ticker = CreateFrame("Frame")
 local sinceCheck = 0
-ticker:SetScript("OnUpdate", function(_, elapsed)
+ns.SetOnUpdate(ticker, function(_, elapsed)
 	sinceCheck = sinceCheck + elapsed
 	if sinceCheck < 1 then return end
 	sinceCheck = 0
@@ -901,12 +901,12 @@ watcher:SetScript("OnEvent", ns.Profiled("chat bubbles event", function(self, ev
 			hideLines[text] = GetTime() + WATCH_FOR
 		end
 		watchLeft = WATCH_FOR
-		self:SetScript("OnUpdate", OnUpdate)
+		ns.SetOnUpdate(self, OnUpdate)
 	-- (Also while the Style page is on, or any bubble is still styled from
 	-- before.) (And while the page is on at all, to keep new bubbles off the top.)
 	elseif ns.db and (ns.db.handleBubbles or ns.StyleOn("bubblesStyle") or Styled()) then
 		watchLeft = WATCH_FOR
-		self:SetScript("OnUpdate", OnUpdate)
+		ns.SetOnUpdate(self, OnUpdate)
 	end
 end))
 

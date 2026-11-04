@@ -86,7 +86,7 @@ end
 local held = {}
 local keeper = CreateFrame("Frame")
 keeper:Hide()
-keeper:SetScript("OnUpdate", ns.Profiled("Plate parts keeper", function(self)
+ns.SetOnUpdate(keeper, ns.Profiled("Plate parts keeper", function(self)
 	for frame, wanted in pairs(held) do
 		-- (A secret alpha can't be compared: set ours again.)
 		local alpha = frame:GetAlpha()
@@ -1362,7 +1362,7 @@ local function StyleArrow(arrow, unit, kind)
 	end
 	PlaceArrow(arrow, 0)
 	arrow.bob = ArrowSetting("Bob", kind)
-	arrow:SetScript("OnUpdate", (arrow.bob or arrow.plate) and ArrowMoves or nil)
+	ns.SetOnUpdate(arrow, (arrow.bob or arrow.plate) and ArrowMoves or nil)
 	arrow.styled = kind or "target"
 end
 
@@ -1517,7 +1517,7 @@ do
 
 	local painter = CreateFrame("Frame")
 	painter:Hide()
-	painter:SetScript("OnUpdate", ns.Profiled("Target colors", function()
+	ns.SetOnUpdate(painter, ns.Profiled("Target colors", function()
 		for unitFrame, tint in pairs(tints) do
 			if Usable(unitFrame) then
 				if tint.name then
@@ -2052,7 +2052,7 @@ local goals = { opacity = {}, width = {}, height = {} }
 local settled = {}
 local easer = CreateFrame("Frame")
 easer:Hide()
-easer:SetScript("OnUpdate", function(self, elapsed)
+ns.SetOnUpdate(easer, function(self, elapsed)
 	local time = Style("plateStyleFadeTime") or 1.5
 	local step = time > 0 and elapsed / time or 1
 	for plate, goal in pairs(goals.opacity) do
@@ -2274,7 +2274,7 @@ end
 -- starts or stops fitting (a fight starting, a zone changing...).
 local WHEN_CHECK = 0.5
 local whenAt = 0
-CreateFrame("Frame"):SetScript("OnUpdate", function()
+ns.SetOnUpdate(CreateFrame("Frame"), function()
 	local now = GetTime()
 	if now < whenAt then
 		return
@@ -2288,7 +2288,7 @@ CreateFrame("Frame"):SetScript("OnUpdate", function()
 end)
 
 local mouseoverAt = 0
-mouseoverWatch:SetScript("OnUpdate", function(self)
+ns.SetOnUpdate(mouseoverWatch, function(self)
 	local now = GetTime()
 	if now < mouseoverAt then
 		return
@@ -2470,7 +2470,7 @@ end
 local farWatch = CreateFrame("Frame")
 farWatch:Hide()
 local farCheckAt = 0
-farWatch:SetScript("OnUpdate", ns.Profiled("Plate names", function(self, elapsed)
+ns.SetOnUpdate(farWatch, ns.Profiled("Plate names", function(self, elapsed)
 	local now = GetTime()
 	local personal
 	-- (The camera moved in or out: see Look.)
@@ -2545,7 +2545,7 @@ local namesLast = {}
 -- flash of the wrong color lasts a frame or so, under the ticker's 0.1 s.)
 local namesColours = CreateFrame("Frame")
 namesColours:Hide()
-namesColours:SetScript("OnUpdate", function()
+ns.SetOnUpdate(namesColours, function()
 	local function Colour(region)
 		if not region then return "none" end
 		local ok, r, g, b, a = pcall(region.GetTextColor, region)

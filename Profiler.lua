@@ -410,7 +410,7 @@ function ns.ProfileTimeLeft()
 	return math.max(0, run.endsAt - GetTime()), run.deep
 end
 
-watcher:SetScript("OnUpdate", function(_, elapsed)
+ns.SetOnUpdate(watcher, function(_, elapsed)
 	current = nil -- (a wrapped call that errored never finished)
 	if run.first then
 		-- (The first update only starts the count: the frame before was partly unmeasured.)

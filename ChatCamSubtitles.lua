@@ -87,7 +87,7 @@ local function OnUpdate()
 		end
 	end
 	if not on and not showing then
-		holder:SetScript("OnUpdate", nil)
+		ns.SetOnUpdate(holder, nil)
 	end
 end
 local OnHolderUpdate = ns.Profiled("Chat Cam subtitles", OnUpdate)
@@ -122,7 +122,7 @@ function ns.ShowSubtitle(event, author, words)
 	slot.frame:SetAlpha(0)
 	slot.frame:Show()
 	Place(slot)
-	holder:SetScript("OnUpdate", OnHolderUpdate)
+	ns.SetOnUpdate(holder, OnHolderUpdate)
 end
 
 -- Players' say and yell in the conversation too (NPCs' come from ChatCam.lua,

@@ -310,7 +310,7 @@ wheel:SetScript("OnHide", function()
 	wheel:EnableMouse(false)
 	Pick(nil)
 end)
-wheel:SetScript("OnUpdate", ns.Profiled("Camera wheel", OnUpdate))
+ns.SetOnUpdate(wheel, ns.Profiled("Camera wheel", OnUpdate))
 -- (The other wheels put it away as they open.)
 function ns.CloseCameraWheel()
 	if wheel:IsShown() then

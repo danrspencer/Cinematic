@@ -316,7 +316,7 @@ end
 -- (Runs while it's in use and fading, or kept to a while: off otherwise.)
 local recentDriver = CreateFrame("Frame")
 recentDriver:Hide()
-recentDriver:SetScript("OnUpdate", function(self, elapsed)
+ns.SetOnUpdate(recentDriver, function(self, elapsed)
 	local target = RecentNow() and 1 or 0
 	if recent ~= target then
 		local step = elapsed / RECENT_FADE

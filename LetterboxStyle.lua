@@ -195,7 +195,7 @@ function ns.CreateLetterboxStylePanel(kit)
 	function preview:Refresh()
 		Draw()
 	end
-	preview:SetScript("OnUpdate", function(_, elapsed)
+	ns.SetOnUpdate(preview, function(_, elapsed)
 		if progress ~= target then
 			progress = ns.Approach(progress, target, elapsed, ns.LetterboxTime(ns.LetterboxLook(), target > progress))
 			Draw()

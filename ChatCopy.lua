@@ -435,7 +435,7 @@ end
 
 local watcher = CreateFrame("Frame")
 local sinceCheck = 0
-watcher:SetScript("OnUpdate", ns.Profiled("Chat copy button", function(_, elapsed)
+ns.SetOnUpdate(watcher, ns.Profiled("Chat copy button", function(_, elapsed)
 	sinceCheck = sinceCheck + elapsed
 	if sinceCheck < CHECK_INTERVAL then
 		return

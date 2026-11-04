@@ -1749,7 +1749,7 @@ local function EndShake()
 	shaker:Hide()
 end
 
-shaker:SetScript("OnUpdate", function(_, elapsed)
+ns.SetOnUpdate(shaker, function(_, elapsed)
 	-- (What the last frame's speeds turned.)
 	for axis, speed in pairs(shake.going) do
 		shake.at[axis] = shake.at[axis] + speed * elapsed
@@ -1812,7 +1812,7 @@ events:SetScript("OnEvent", function(_, event, _, action, _, amount)
 			for key in pairs(CinematicDB.vitalsThemeEdits) do ThemeEdited(key) end
 		end
 		Create()
-		driver:SetScript("OnUpdate", Update)
+		ns.SetOnUpdate(driver, Update)
 		events:RegisterUnitEvent("UNIT_HEALTH", "player")
 		events:RegisterUnitEvent("UNIT_MAXHEALTH", "player")
 		events:RegisterUnitEvent("UNIT_COMBAT", "player")
@@ -2106,7 +2106,7 @@ function ns.TextureReel(arg)
 		reel.bar:SetPoint("TOPLEFT", barBack, "TOPLEFT")
 		reel.bar:SetHeight(4)
 		reel.barBack = barBack
-		reel:SetScript("OnUpdate", function(self, elapsed)
+		ns.SetOnUpdate(reel, function(self, elapsed)
 			if not self.paused then self.left = self.left - elapsed end
 			local each = self.each
 			while self.left <= 0 do
@@ -2270,7 +2270,7 @@ function ns.CreateVitalsStylePanel(kit)
 		self.drawer.shown = nil
 	end
 	-- As Update does for the screen, at the preview's health.
-	preview:SetScript("OnUpdate", function(self, elapsed)
+	ns.SetOnUpdate(preview, function(self, elapsed)
 		if not db then return end
 		local d, look = self.drawer, Look()
 		local wanted = WantedTheme(look)
@@ -2331,7 +2331,7 @@ function ns.CreateVitalsStylePanel(kit)
 			end
 		end)
 	local wait = 0
-	testButton:SetScript("OnUpdate", function(self, elapsed)
+	ns.SetOnUpdate(testButton, function(self, elapsed)
 		wait = wait - elapsed
 		if wait > 0 then return end
 		wait = 0.2

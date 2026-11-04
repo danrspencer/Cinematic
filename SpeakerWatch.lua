@@ -160,7 +160,7 @@ local function OnUpdate()
 		end
 	end
 	if #followed == 0 then
-		watcher:SetScript("OnUpdate", nil)
+		ns.SetOnUpdate(watcher, nil)
 	end
 end
 
@@ -185,7 +185,7 @@ watcher:SetScript("OnEvent", function(_, event, text, name, ...)
 	followed[#followed + 1] = { label = label, text = text, guid = guid, name = name,
 		born = now, nextAt = now }
 	ns.Log("speakers", label .. ": " .. text)
-	watcher:SetScript("OnUpdate", OnUpdate)
+	ns.SetOnUpdate(watcher, OnUpdate)
 end)
 
 -- /cine debug target: where your target's plate is on screen, read as above,
@@ -247,7 +247,7 @@ local function TargetLine()
 end
 
 targetWatch:Hide()
-targetWatch:SetScript("OnUpdate", function()
+ns.SetOnUpdate(targetWatch, function()
 	local now = GetTime()
 	if now < targetLast.logAt then
 		return
@@ -304,7 +304,7 @@ function ns.ToggleSpeakerWatch()
 			WorldFrame:GetWidth(), WorldFrame:GetHeight()))
 	else
 		followed = {}
-		watcher:SetScript("OnUpdate", nil)
+		ns.SetOnUpdate(watcher, nil)
 	end
 	return on
 end

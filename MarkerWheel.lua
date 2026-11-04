@@ -597,7 +597,7 @@ local function MakeWheel(spec)
 	end)
 	-- (The face goes on its next update: a pick's action, just after this,
 	-- may linger it first.)
-	face:SetScript("OnUpdate", ns.Profiled(spec.title, OnUpdate))
+	ns.SetOnUpdate(face, ns.Profiled(spec.title, OnUpdate))
 
 	-- Called by a slot's action as it's picked: that slot stays up showing it.
 	function wheel.Linger(index)

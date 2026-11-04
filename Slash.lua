@@ -1334,7 +1334,7 @@ local function HandleSlash(msg)
 		local elapsedTotal, sent = 0, 0
 		ns.Print(("zoom test: out %d yards over 10 sec, starting at %.2f"):format(yards, start))
 		local tester = CreateFrame("Frame")
-		tester:SetScript("OnUpdate", function(self, elapsed)
+		ns.SetOnUpdate(tester, function(self, elapsed)
 			elapsedTotal = elapsedTotal + elapsed
 			local step = math.min(yards - sent, yards / 10 * elapsed)
 			if step > 0 then
@@ -1342,7 +1342,7 @@ local function HandleSlash(msg)
 				sent = sent + step
 			end
 			if elapsedTotal >= 11 then
-				self:SetScript("OnUpdate", nil)
+				ns.SetOnUpdate(self, nil)
 				ns.Print(("zoom test done: asked for %.2f yards, camera moved %.2f (now %.2f)"):format(
 					sent, GetCameraZoom() - start, GetCameraZoom()))
 			end

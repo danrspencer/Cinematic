@@ -400,7 +400,7 @@ local function StopFade(restore)
 	fader:Hide()
 end
 
-fader:SetScript("OnUpdate", function()
+ns.SetOnUpdate(fader, function()
 	local alpha = Alpha(GameTooltip)
 	local against = alpha and fade and (fade.to > fade.from and alpha < fade.set - 0.02
 		or fade.to < fade.from and alpha > fade.set + 0.02)

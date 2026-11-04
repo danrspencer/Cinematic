@@ -1481,7 +1481,7 @@ local function OnUpdate(_, elapsed)
 		frameLog.lines = nil
 		turn.amount = 0
 		ns.ApplyCVarSet(FOLLOW_CVARS, false)
-		watcher:SetScript("OnUpdate", nil)
+		ns.SetOnUpdate(watcher, nil)
 	end
 end
 
@@ -1539,7 +1539,7 @@ local function Heard(text, name, event)
 	end
 	convo.lastLineAt = now
 	convo.speaker = { name = name, text = text, at = now }
-	watcher:SetScript("OnUpdate", OnUpdate)
+	ns.SetOnUpdate(watcher, OnUpdate)
 	if Immersive() and ns.ShowSubtitle then
 		ns.ShowSubtitle(event or "CHAT_MSG_MONSTER_SAY", name, text)
 	end

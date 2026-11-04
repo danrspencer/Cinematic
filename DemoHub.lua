@@ -783,7 +783,7 @@ local function StopCue(run, why)
 	local stop = Overlay().stop
 	stop.sub:SetText(run.demo.name .. " " .. (why or "done"))
 	stopping = { hub = run.hidHub, at = GetTime() }
-	stop:SetScript("OnUpdate", function()
+	ns.SetOnUpdate(stop, function()
 		local now = stopping
 		if not now then return end
 		if not ns.playerMoving then now.still = true end
@@ -796,7 +796,7 @@ local function Finish(why)
 	local run = current
 	if not run then return end
 	current = nil
-	driver:SetScript("OnUpdate", nil)
+	ns.SetOnUpdate(driver, nil)
 	for i = #run.restore, 1, -1 do
 		local ok, err = pcall(run.restore[i])
 		if not ok then ns.Log("demo", "put back failed: " .. tostring(err)) end
@@ -1052,7 +1052,7 @@ local function Run(key, fromSettings)
 	else
 		run.wakeAt = GetTime() -- (first resume next frame)
 	end
-	driver:SetScript("OnUpdate", OnUpdate)
+	ns.SetOnUpdate(driver, OnUpdate)
 	if RefreshHub then RefreshHub() end
 end
 ns.RunDemo = Run

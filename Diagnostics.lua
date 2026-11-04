@@ -58,7 +58,7 @@ end
 local clockBase -- time() - GetTime(); nil until lined up
 do
 	local syncer, lastSecond = CreateFrame("Frame"), nil
-	syncer:SetScript("OnUpdate", function()
+	syncer:SetScript("OnUpdate", function() -- (loads before ns.SetOnUpdate)
 		local second = time()
 		if lastSecond and second ~= lastSecond then
 			clockBase = second - GetTime()
@@ -227,9 +227,24 @@ local function Alert(text)
 	end
 end
 
+-- (WoW Forever, as and once DragEquip.lua has opened or closed the character
+-- window: it works, but Blizzard's player and pet bars, updated in our call and
+-- so counted as ours, can't compare their secret values. Only those are
+-- dropped: any during the call, and the bars' own later updates (text, health,
+-- heal prediction) after it. Also when our own protected loops catch them.)
+local function Harmless(message)
+	return type(message) == "string" and message:find("secret", 1, true)
+		and message:find("tainted by '" .. ADDON_NAME .. "'", 1, true)
+		and (ns.togglingCharacter or message:find("TextStatusBar", 1, true)
+			or message:find("HealthBar", 1, true) or message:find("UnitFrame", 1, true)) and true or false
+end
+
 -- Records an error from this addon. `caught` errors were stopped by the
 -- addon's own loop (so the game's error handler hasn't seen them yet).
 function ns.ReportError(message, stack, caught)
+	if caught and Harmless(message) then
+		return
+	end
 	message = tostring(message)
 	local now = GetTime()
 	local entry = errors[message]
@@ -262,6 +277,69 @@ function ns.ReportError(message, stack, caught)
 	end
 end
 
+-- Update loops in the feature files (each frame's OnUpdate) run protected
+-- through these: an error is logged once and passed on as above, and a loop
+-- that keeps failing (REPEAT_LIMIT times in REPEAT_WINDOW sec) is turned off,
+-- so it can't flood the error window every frame. Setting it again (the
+-- feature starting over) turns it back on.
+local loopStack
+local function LoopHandler(err)
+	loopStack = debugstack and debugstack(2) or "" -- (none offline)
+	return err
+end
+local function Breaker(frame, wrapped, why)
+	ns.Log("safety", ("an update loop kept failing and was turned off (%s)"):format(why))
+	if frame and frame.GetScript and frame:GetScript("OnUpdate") == wrapped then
+		pcall(frame.SetScript, frame, "OnUpdate", nil)
+	end
+end
+local function Protect(fn, hooked)
+	local self_, elapsed_
+	local function Run() return fn(self_, elapsed_) end
+	local state = { dead = false, windowStart = 0, inWindow = 0 }
+	local wrapped
+	wrapped = function(frame, elapsed)
+		if state.dead then return end
+		self_, elapsed_ = frame, elapsed
+		local ok, err = xpcall(Run, LoopHandler)
+		self_, elapsed_ = nil, nil
+		if ok or Harmless(err) then return end
+		pcall(ns.ReportError, err, loopStack, true)
+		local now = GetTime()
+		if now - state.windowStart > REPEAT_WINDOW then
+			state.windowStart, state.inWindow = now, 0
+		end
+		state.inWindow = state.inWindow + 1
+		if state.inWindow >= REPEAT_LIMIT then
+			state.dead = true
+			Breaker(not hooked and frame, wrapped, tostring(err):match("^[^\n]*"))
+		end
+	end
+	return wrapped
+end
+
+-- frame:SetScript("OnUpdate", fn), protected (nil clears it as usual).
+function ns.SetOnUpdate(frame, fn)
+	frame:SetScript("OnUpdate", fn and Protect(fn, false) or nil)
+end
+
+-- frame:HookScript("OnUpdate", fn), protected. (A hook can't be removed: a
+-- failing one just stops doing anything.)
+function ns.HookOnUpdate(frame, fn)
+	frame:HookScript("OnUpdate", Protect(fn, true))
+end
+
+-- fn(...) protected, for one-off setup steps (login): an error is logged and
+-- reported, and the steps after it still run.
+function ns.Guard(fn, ...)
+	if not fn then return end
+	local args, n = { ... }, select("#", ...)
+	local ok, err = xpcall(function() return fn(unpack(args, 1, n)) end, LoopHandler)
+	if not ok then
+		pcall(ns.ReportError, err, loopStack, true)
+	end
+end
+
 -- After /cine resume: give the repeat counts a fresh start.
 function ns.ResetErrorWindows()
 	for _, entry in pairs(errors) do
@@ -286,15 +364,7 @@ end
 local usingBugGrabber = false
 local original = geterrorhandler()
 seterrorhandler(function(message, ...)
-	-- (WoW Forever, as and once DragEquip.lua has opened or closed the
-	-- character window: it works, but Blizzard's player and pet bars, updated
-	-- in our call and so counted as ours, can't compare their secret values.
-	-- Only those are dropped: any during the call, and the bars' own later
-	-- updates (text, health, heal prediction) after it.)
-	if type(message) == "string" and message:find("secret", 1, true)
-		and message:find("tainted by '" .. ADDON_NAME .. "'", 1, true)
-		and (ns.togglingCharacter or message:find("TextStatusBar", 1, true)
-			or message:find("HealthBar", 1, true) or message:find("UnitFrame", 1, true)) then
+	if Harmless(message) then -- (see Harmless)
 		return
 	end
 	if not forwarding and not usingBugGrabber then
@@ -921,7 +991,7 @@ do
 		Head("alpha", 208)
 		Head("color", 252)
 		local elapsed = 0
-		window:SetScript("OnUpdate", function(_, delta)
+		ns.SetOnUpdate(window, function(_, delta)
 			elapsed = elapsed + delta
 			if elapsed < 0.2 then return end
 			elapsed = 0
@@ -1159,7 +1229,7 @@ do
 			barWindow.rows[i] = row
 		end
 		local elapsed = 0
-		barWindow:SetScript("OnUpdate", function(_, delta)
+		ns.SetOnUpdate(barWindow, function(_, delta)
 			elapsed = elapsed + delta
 			if elapsed < 0.25 then return end
 			elapsed = 0
@@ -1562,7 +1632,7 @@ do
 		watcher = watcher or CreateFrame("Frame")
 		untilTime = GetTime() + math.min(seconds, 600)
 		local wait = 1
-		watcher:SetScript("OnUpdate", function(_, elapsed)
+		ns.SetOnUpdate(watcher, function(_, elapsed)
 			wait = wait - elapsed
 			if wait > 0 then return end
 			wait = 1

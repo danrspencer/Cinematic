@@ -290,7 +290,7 @@ local function Follow(frame, drag)
 	following = false
 end
 
-dragger:SetScript("OnUpdate", function(self)
+ns.SetOnUpdate(dragger, function(self)
 	local any = false
 	for frame, drag in pairs(moving) do
 		any = true

@@ -330,7 +330,7 @@ end)
 hooksecurefunc("SetItemRef", function(link) -- (the chat line's link, Profiler.lua)
 	if link == "garrmission:cinematic:profiler" then ns.OpenOptions("Profiler") end
 end)
-timer:SetScript("OnUpdate", function(self)
+ns.SetOnUpdate(timer, function(self)
 	local left, deep = ns.ProfileTimeLeft()
 	if left then
 		if doneAt then self:EnableMouse(false) end
@@ -374,7 +374,7 @@ local function StartRecording(seconds, deep)
 			or L["CPU recording for %d seconds: play as usual."]):format(seconds))
 	end
 end
-armer:SetScript("OnUpdate", function(self)
+ns.SetOnUpdate(armer, function(self)
 	if SettingsOpen() then
 		return
 	end
@@ -769,10 +769,10 @@ function ns.CreateProfilerPanel(kit)
 	graph:EnableMouse(true)
 	graph:SetScript("OnEnter", function(self)
 		hovered = nil
-		self:SetScript("OnUpdate", ShowHovered)
+		ns.SetOnUpdate(self, ShowHovered)
 	end)
 	graph:SetScript("OnLeave", function(self)
-		self:SetScript("OnUpdate", nil)
+		ns.SetOnUpdate(self, nil)
 		GameTooltip:Hide()
 	end)
 
@@ -1131,7 +1131,7 @@ function ns.CreateProfilerPanel(kit)
 	-- every second while the page shows and is on: reading them costs
 	-- nothing while it's closed or off.)
 	local shownAt, wasBusy = 0, false
-	canvas:SetScript("OnUpdate", function()
+	ns.SetOnUpdate(canvas, function()
 		local now = GetTime()
 		if now - shownAt >= 1 then
 			shownAt = now

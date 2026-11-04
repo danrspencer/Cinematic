@@ -2265,7 +2265,7 @@ local LOCKOUT_WAIT = 1.5
 local LOCKOUT_MOVING = 10
 local watcher = CreateFrame("Frame")
 local watched, unseen, hiddenFor, stray = 0, 0, 0, 0
-watcher:SetScript("OnUpdate", function(_, elapsed)
+ns.SetOnUpdate(watcher, function(_, elapsed)
 	watched = watched + elapsed
 	if watched < WATCH_EVERY then
 		return
@@ -2310,7 +2310,7 @@ end)
 local MOVE_DIM = 0.35
 local FADE_OUT, FADE_IN = 0.15, 0.3 -- seconds, all the way
 local follower = CreateFrame("Frame")
-follower:SetScript("OnUpdate", function(_, elapsed)
+ns.SetOnUpdate(follower, function(_, elapsed)
 	local now = GetTime()
 	if (ns.QuestCamMoving and ns.QuestCamMoving()) or (ns.IsMouseOnCamera and ns.IsMouseOnCamera()) then
 		camMove.at = now

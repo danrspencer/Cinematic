@@ -118,7 +118,7 @@ watcher:SetScript("OnEvent", function(_, event, mouseButton)
 		end
 		pullButton:SetAttribute("macrotext", "/target mouseover\n/startattack\n/cast !" .. AutoShotName())
 		ApplyDriver()
-		watcher:SetScript("OnUpdate", ns.Profiled("Hunter right-click watch", function()
+		ns.SetOnUpdate(watcher, ns.Profiled("Hunter right-click watch", function()
 			-- Right button held: the binding stays as it was pressed (swapping it
 			-- mid-press would leave a right-drag turning stuck).
 			if not IsMouseButtonDown("RightButton") then

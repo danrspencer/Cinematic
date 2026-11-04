@@ -539,7 +539,7 @@ local function MakePreview()
 	-- It follows Run: the real camera's time into this script, while it's
 	-- the one running. (Its plan's moves, so a random one may differ a little
 	-- from the camera's.)
-	w:SetScript("OnUpdate", function()
+	ns.SetOnUpdate(w, function()
 		if not w.plan then return end
 		local state = ns.CameraScriptState()
 		local following = state and page.script and state.script.id == page.script.id and true or nil
@@ -1023,7 +1023,7 @@ function ns.CreateCameraScriptsPanel(kit)
 		if Running() then ns.ShowCameraScriptPreview() end
 	end)
 	local runningWas
-	page.runNow:SetScript("OnUpdate", function(self)
+	ns.SetOnUpdate(page.runNow, function(self)
 		local running = Running() and true or false
 		if running ~= runningWas then
 			runningWas = running

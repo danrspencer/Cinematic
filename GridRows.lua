@@ -515,7 +515,7 @@ local function BuildEditor()
 		end
 	end
 	local since = 0
-	editor:SetScript("OnUpdate", function(_, elapsed)
+	ns.SetOnUpdate(editor, function(_, elapsed)
 		since = since + elapsed
 		if since > 0.5 then
 			since = 0
@@ -964,7 +964,7 @@ end
 function ns.GridDots(parent, rows)
 	local ticker = CreateFrame("Frame", nil, parent)
 	local since = 0
-	ticker:SetScript("OnUpdate", function(_, elapsed)
+	ns.SetOnUpdate(ticker, function(_, elapsed)
 		since = since + elapsed
 		if since < 0.5 then return end
 		since = 0

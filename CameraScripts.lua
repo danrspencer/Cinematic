@@ -2088,7 +2088,7 @@ local function Update(elapsed)
 end
 
 local watcher = CreateFrame("Frame")
-watcher:SetScript("OnUpdate", function(_, elapsed)
+ns.SetOnUpdate(watcher, function(_, elapsed)
 	if not ns.db then return end
 	local key, camera = TriggerNow()
 	if run and run.trigger then

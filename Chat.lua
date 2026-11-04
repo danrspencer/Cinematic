@@ -499,7 +499,7 @@ local function WatchBubbles()
 		end
 	end
 	if #waiting == 0 then
-		bubbleWatch:SetScript("OnUpdate", nil)
+		ns.SetOnUpdate(bubbleWatch, nil)
 	end
 end
 local OnBubbleWatch = ns.Profiled("Bubble watch", WatchBubbles)
@@ -525,7 +525,7 @@ local function PeekUnlessBubble(chatFrame, event, text, author, guid)
 	end
 	waiting[#waiting + 1] = { chatFrame, text, GetTime() + BUBBLE_WAIT, event, author, guid,
 		ns.UnreadableBubbles and ns.UnreadableBubbles() or 0 }
-	bubbleWatch:SetScript("OnUpdate", OnBubbleWatch)
+	ns.SetOnUpdate(bubbleWatch, OnBubbleWatch)
 end
 
 -- Message filters run once per chat window that will show the message, which
@@ -608,7 +608,7 @@ local function WatchServerMessages()
 	end
 	local watcher = CreateFrame("Frame")
 	local sinceCheck = 0
-	watcher:SetScript("OnUpdate", ns.Profiled("Server message watch", function(_, elapsed)
+	ns.SetOnUpdate(watcher, ns.Profiled("Server message watch", function(_, elapsed)
 		sinceCheck = sinceCheck + elapsed
 		if sinceCheck < SERVER_CHECK_INTERVAL then
 			return

@@ -284,7 +284,7 @@ local function Update()
 end
 
 local driver = CreateFrame("Frame")
-driver:SetScript("OnUpdate", function()
+ns.SetOnUpdate(driver, function()
 	if not ns.GetDB() then return end
 	-- (Nothing to do with no cast, or one over a while: not every frame's work.)
 	local cast = Cast()
@@ -354,7 +354,7 @@ local hookedBars = {}
 -- for a smooth fade. It runs on till both are back.)
 local castFader = CreateFrame("Frame")
 castFader:Hide()
-castFader:SetScript("OnUpdate", function(self)
+ns.SetOnUpdate(castFader, function(self)
 	for bar in pairs(hookedBars) do UpdateCastBar(bar) end
 	UpdateTooltip()
 	if not FadeWanted("teleportVisionHideCast") and not FadeWanted("teleportVisionFadeTooltip") then
@@ -589,7 +589,7 @@ function ns.CreateTeleportVisionPanel(kit)
 		ns.TestTeleportVision()
 		Label()
 	end)
-	button:SetScript("OnUpdate", Label)
+	ns.SetOnUpdate(button, Label)
 	button.Refresh = Label -- (before GreyUnless, which wraps it)
 	kit.Tooltip(button,L["A pretend 8-second cast, on the screen (close the settings to see it)."])
 	kit.GreyUnless(button, On)

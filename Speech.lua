@@ -288,7 +288,7 @@ local function OnUpdate(_, elapsed)
 			+ (line.tailed and TAIL_SPACE or 0) + GAP
 	end
 	if #lines == 0 then
-		holder:SetScript("OnUpdate", nil)
+		ns.SetOnUpdate(holder, nil)
 	end
 end
 local OnHolderUpdate = ns.Profiled("Speech behind", OnUpdate)
@@ -519,5 +519,5 @@ function ns.ShowSpeechBehind(event, author, text, guid)
 	line.frame:SetPoint(line.point, spot, line.point, 0, line.y)
 	line.frame:Show()
 	table.insert(lines, 1, line)
-	holder:SetScript("OnUpdate", OnHolderUpdate)
+	ns.SetOnUpdate(holder, OnHolderUpdate)
 end

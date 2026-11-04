@@ -326,7 +326,7 @@ do
 	fade:SetSmoothing("IN_OUT")
 	glow.pulse = pulse
 end
-glow:SetScript("OnUpdate", function(self)
+ns.SetOnUpdate(glow, function(self)
 	local left = LIGHT_TIME + LIGHT_FADE - (GetTime() - (self.litAt or 0))
 	local alpha = math.max(0, math.min(1, left / LIGHT_FADE))
 	if self.light:GetAlpha() ~= alpha then
@@ -527,7 +527,7 @@ end
 -- icon flashed when hidden only each check): the hidden ones every frame.
 local iconKeeper = CreateFrame("Frame")
 iconKeeper:Hide()
-iconKeeper:SetScript("OnUpdate", function(self)
+ns.SetOnUpdate(iconKeeper, function(self)
 	if not next(hiddenIcons) then
 		self:Hide()
 		return
@@ -668,7 +668,7 @@ ns.UpdateQuestGlow = Update
 
 local ticker = CreateFrame("Frame")
 ticker.at = 0
-ticker:SetScript("OnUpdate", function(self)
+ns.SetOnUpdate(ticker, function(self)
 	local now = GetTime()
 	if now < self.at then
 		return
@@ -743,7 +743,7 @@ function ns.StartIconWatch()
 			GetPlayerFacing and Text(GetPlayerFacing) or "?",
 			x and ("%.1f,%.1f"):format(x, y) or "?"))
 	end)
-	watch:SetScript("OnUpdate", function(self)
+	ns.SetOnUpdate(watch, function(self)
 		if GetTime() > self.untilAt then
 			self:Hide()
 			self:UnregisterAllEvents()

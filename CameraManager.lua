@@ -226,7 +226,7 @@ function ns.CameraManager(kit, canvas, content, title, intro, switch, helper)
 		end
 	end)
 	local runningWas
-	run:SetScript("OnUpdate", function(self)
+	ns.SetOnUpdate(run, function(self)
 		local running = Running() and true or false
 		if running ~= runningWas then
 			runningWas = running

@@ -45,7 +45,7 @@ local sinceLook = 0
 local waiter = CreateFrame("Frame")
 
 local function StopWaiting()
-	waiter:SetScript("OnUpdate", nil)
+	ns.SetOnUpdate(waiter, nil)
 end
 
 -- Opening and closing the window update your player and pet frames' bars
@@ -86,7 +86,7 @@ local function CursorChanged()
 	if kind == "item" then
 		if CanOpen() and Wearable(itemID) then
 			sinceLook = 0
-			waiter:SetScript("OnUpdate", Wait)
+			ns.SetOnUpdate(waiter, Wait)
 		end
 	elseif not kind then
 		StopWaiting()

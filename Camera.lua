@@ -666,7 +666,7 @@ do
 		return (x - objectX) ^ 2 + (y - objectY) ^ 2 < OBJECT_REACH ^ 2
 	end
 
-	recastWatcher:SetScript("OnUpdate", ns.Profiled("Right-click cast watch", function()
+	ns.SetOnUpdate(recastWatcher, ns.Profiled("Right-click cast watch", function()
 		if not castButton then
 			return
 		end
@@ -843,7 +843,7 @@ function ns.HookCameraInput()
 		end
 	end)
 	-- The snap may not send a movement event: watch your position instead.
-	seatWatcher:SetScript("OnUpdate", ns.Profiled("Seat watch", function()
+	ns.SetOnUpdate(seatWatcher, ns.Profiled("Seat watch", function()
 		if GetTime() - seatClickAt > SEAT_SNAP_WINDOW or not seatX then
 			return
 		end

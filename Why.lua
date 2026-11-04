@@ -664,7 +664,7 @@ local function MakeCard()
 	card.hint:SetWidth(LINE_WIDTH + 20)
 	card.hint:SetJustifyH("LEFT")
 	card.elapsed = 0
-	card:SetScript("OnUpdate", function(self, elapsed)
+	ns.SetOnUpdate(card, function(self, elapsed)
 		self.elapsed = self.elapsed + elapsed
 		if self.elapsed > 0.25 then
 			self.elapsed = 0
@@ -788,7 +788,7 @@ local function MakeOverlay()
 	bar:SetPoint("BOTTOMRIGHT", tip, 12, -8)
 	box = MakeBox()
 	box.elapsed = 0
-	overlay:SetScript("OnUpdate", function(_, elapsed)
+	ns.SetOnUpdate(overlay, function(_, elapsed)
 		box.elapsed = box.elapsed + elapsed
 		if box.elapsed < 0.05 then return end
 		box.elapsed = 0
@@ -1146,7 +1146,7 @@ function ns.CreateWhyPanel(kit)
 	end
 
 	local elapsedSince = 0
-	canvas:SetScript("OnUpdate", function(_, elapsed)
+	ns.SetOnUpdate(canvas, function(_, elapsed)
 		elapsedSince = elapsedSince + elapsed
 		if elapsedSince > 0.5 then
 			elapsedSince = 0

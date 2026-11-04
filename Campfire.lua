@@ -495,7 +495,7 @@ button:Hide()
 ns.AddOverlay(button) -- (stays with the UI hidden, like the bars)
 
 local driver = CreateFrame("Frame")
-driver:SetScript("OnUpdate", ns.Profiled("Campfire sit button", OnUpdate))
+ns.SetOnUpdate(driver, ns.Profiled("Campfire sit button", OnUpdate))
 
 GameTooltip:HookScript("OnShow", OnTooltipShow)
 

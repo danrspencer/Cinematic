@@ -771,7 +771,7 @@ local function Hook(bar, id)
 	barIds[bar] = id
 	bar:HookScript("OnEvent", onEvent)
 	bar:HookScript("OnShow", onEvent)
-	bar:HookScript("OnUpdate", onUpdate)
+	ns.HookOnUpdate(bar, onUpdate)
 	-- (The game's own fill and color kept, for turning ours off again.)
 	pcall(hooksecurefunc, bar, "SetStatusBarTexture", function(self, texture)
 		if busy then
@@ -1190,7 +1190,7 @@ function ns.CreatePlateCastStylePanel(kit)
 		end
 	end
 	local started = GetTime()
-	preview:SetScript("OnUpdate", function()
+	ns.SetOnUpdate(preview, function()
 		local look = Look(editing)
 		for _, bar in ipairs(samples) do
 			local done = ((GetTime() - started) / SAMPLE_TIME + bar.offset) % 1
@@ -1418,7 +1418,7 @@ function ns.MakePlateCastSample(parent)
 		Apply(self, look, true, true)
 	end
 	local started = GetTime()
-	bar:HookScript("OnUpdate", function(self)
+	ns.HookOnUpdate(bar, function(self)
 		local value = ((GetTime() - started) / SAMPLE_TIME) % 1
 		self:SetValue(value)
 		self.value, self.maxValue = value * SAMPLE_TIME, SAMPLE_TIME

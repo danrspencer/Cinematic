@@ -231,7 +231,7 @@ local function Hook(frame)
 	hooked[frame] = true
 	frame:HookScript("OnEvent", Reassert)
 	frame:HookScript("OnShow", Reassert)
-	frame:HookScript("OnUpdate", Reassert)
+	ns.HookOnUpdate(frame, Reassert)
 end
 
 -- The mouse onto a member: it fades in (Mouseover, at least), and out from
@@ -726,7 +726,7 @@ watcher:SetScript("OnEvent", function(_, event, unit)
 		end
 	end
 end)
-watcher:SetScript("OnUpdate", function(_, elapsed)
+ns.SetOnUpdate(watcher, function(_, elapsed)
 	if not next(members) and not next(touched) and not ns.HealVisionAny() then
 		return
 	end
@@ -845,9 +845,9 @@ function ns.HealWatchDebug(seconds)
 		for _ in pairs(members) do n = n + 1 end
 		return n
 	end)(), revealStep))
-	watching:SetScript("OnUpdate", function(self)
+	ns.SetOnUpdate(watching, function(self)
 		if GetTime() - start > seconds then
-			self:SetScript("OnUpdate", nil)
+			ns.SetOnUpdate(self, nil)
 			watching = nil
 			Log("stop")
 			ns.Print("healwatch: done, /reload to write the log")

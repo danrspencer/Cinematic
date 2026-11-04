@@ -245,7 +245,7 @@ function ns.CreateHeldSettingsPage(kit)
 	end
 
 	local since = 0
-	canvas:SetScript("OnUpdate", function(_, elapsed)
+	ns.SetOnUpdate(canvas, function(_, elapsed)
 		since = since + elapsed
 		if since < REFRESH then return end
 		since = 0

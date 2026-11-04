@@ -536,7 +536,7 @@ events:SetScript("OnEvent", function(_, event)
 	if event == "PLAYER_LOGIN" then
 		db = ns.GetDB()
 		Create()
-		driver:SetScript("OnUpdate", Update)
+		ns.SetOnUpdate(driver, Update)
 		for _, other in ipairs({ "PLAYER_REGEN_ENABLED", "PLAYER_ENTERING_WORLD", "ZONE_CHANGED_NEW_AREA",
 			"SUPER_TRACKING_CHANGED", "USER_WAYPOINT_UPDATED", "PLAYER_ALIVE", "PLAYER_UNGHOST" }) do
 			pcall(events.RegisterEvent, events, other)

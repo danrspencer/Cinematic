@@ -1563,7 +1563,7 @@ function ns.ShowTimeOfDayTitle(showTime, recap)
 		timeTitle:SetScript("OnEvent", function() timeTitle.recap:SetText("") end)
 		timeTitle.Clear = Clear
 		-- Only runs while the zone title shows (this frame is its child).
-		timeTitle:SetScript("OnUpdate", function()
+		ns.SetOnUpdate(timeTitle, function()
 			if (timeTitle.text:GetText() or "") ~= "" or (timeTitle.recap:GetText() or "") ~= "" then
 				PlaceTimeTitle()
 			end

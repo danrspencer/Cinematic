@@ -543,7 +543,7 @@ end)
 wheel:HookScript("OnHide", function()
 	Pick(nil)
 end)
-wheel:SetScript("OnUpdate", ns.Profiled("Menu wheel", OnUpdate))
+ns.SetOnUpdate(wheel, ns.Profiled("Menu wheel", OnUpdate))
 
 -- Laid out at login and again as a fight starts (just before the lockdown),
 -- so the ring in a fight matches the bar.

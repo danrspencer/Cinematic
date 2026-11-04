@@ -369,7 +369,7 @@ local ROW_LISTS = { "combatShow", "calmShow", "quietShow", "camShow", "enemyShow
 -- event's id).
 local function TestStops(button, Now)
 	local wait = 0
-	button:HookScript("OnUpdate", function(self, elapsed)
+	ns.HookOnUpdate(button, function(self, elapsed)
 		wait = wait - elapsed
 		if wait > 0 then return end
 		wait = 0.2

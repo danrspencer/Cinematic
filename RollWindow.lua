@@ -1312,7 +1312,7 @@ local function CreateWindow()
 	window:SetFrameStrata("MEDIUM")
 	window:SetClampedToScreen(true)
 	window:SetMovable(true)
-	window:SetScript("OnUpdate", OnUpdate)
+	ns.SetOnUpdate(window, OnUpdate)
 
 	local empty = CreateFrame("Button", nil, window)
 	empty:SetPoint("TOPLEFT")
@@ -1668,7 +1668,7 @@ function ns.MakeRollPreview(parent, width)
 		end
 	end
 	local since = 0
-	holder:SetScript("OnUpdate", function(self, delta)
+	ns.SetOnUpdate(holder, function(self, delta)
 		since = since + delta
 		if since >= 0.1 then -- (the dots and the time bar, as the window's)
 			since = 0

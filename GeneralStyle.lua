@@ -215,7 +215,7 @@ local function MakePreview(parent, width)
 		if side[3] < 0 then holder.prevArrow = arrow end
 	end
 	holder:SetScript("OnShow", function(self) EndFade(); waited = 0; self:Refresh() end)
-	holder:SetScript("OnUpdate", function(_, elapsed)
+	ns.SetOnUpdate(holder, function(_, elapsed)
 		if fading then
 			fading.time = fading.time + elapsed
 			local cell = cells[current]

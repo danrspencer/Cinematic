@@ -178,14 +178,14 @@ local function StartSpellScan()
 			end
 		until debugprofilestop() > stop
 	end
-	scanner:SetScript("OnUpdate", function(self)
+	ns.SetOnUpdate(scanner, function(self)
 		if InCombatLockdown() then
 			return
 		end
 		local ok, finished = pcall(Step)
 		if finished or not ok then
 			scanDone = true
-			self:SetScript("OnUpdate", nil)
+			ns.SetOnUpdate(self, nil)
 		end
 	end)
 end
@@ -451,7 +451,7 @@ function ns.IconBrowser(canvas, onPick, source)
 	end)
 
 	-- Closes on a click anywhere else.
-	browser:SetScript("OnUpdate", function(self)
+	ns.SetOnUpdate(browser, function(self)
 		if self.partial and scanDone then
 			self.partial = nil
 			local row = top

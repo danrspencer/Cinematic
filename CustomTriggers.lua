@@ -447,7 +447,7 @@ if ns.Profiled then Tick = ns.Profiled("CustomTriggers", Tick) end
 local ticker = CreateFrame("Frame")
 local sinceTick = 0
 ticker:Hide()
-ticker:SetScript("OnUpdate", function(_, elapsed)
+ns.SetOnUpdate(ticker, function(_, elapsed)
 	sinceTick = sinceTick + elapsed
 	if sinceTick >= TICK then
 		sinceTick = 0

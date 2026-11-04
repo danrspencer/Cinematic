@@ -157,6 +157,8 @@ function M.Install(client)
 		CreateFrame = M.CreateFrame,
 		UIParent = M.CreateFrame("Frame", "UIParent"),
 		WorldFrame = M.CreateFrame("Frame", "WorldFrame"),
+		-- (A real frame: the minimap button reads its scale and size as numbers.)
+		Minimap = M.CreateFrame("Frame", "Minimap"),
 		GameTooltip = M.CreateFrame("GameTooltip", "GameTooltip"),
 		WOW_PROJECT_MAINLINE = 1,
 		WOW_PROJECT_ID = client == "retail" and 1 or 2,

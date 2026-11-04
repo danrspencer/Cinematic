@@ -1117,7 +1117,7 @@ events:SetScript("OnEvent", function(_, event, ...)
 	if event == "PLAYER_LOGIN" then
 		db = ns.GetDB()
 		Create()
-		frame:SetScript("OnUpdate", Update)
+		ns.SetOnUpdate(frame, Update)
 		for _, other in ipairs({ "PLAYER_REGEN_DISABLED", "PLAYER_REGEN_ENABLED", "ENCOUNTER_START", "ENCOUNTER_END",
 			"PLAYER_ENTERING_WORLD", "LFG_COMPLETION_REWARD", "CHALLENGE_MODE_COMPLETED",
 			"DAMAGE_METER_COMBAT_SESSION_UPDATED", "DAMAGE_METER_RESET", "ADDON_RESTRICTION_STATE_CHANGED" }) do
@@ -1430,7 +1430,7 @@ local function TestButtons(stack, content, b)
 			if Running() then Stop() else Start() end
 		end)
 		local shown
-		button:SetScript("OnUpdate", function(self)
+		ns.SetOnUpdate(button, function(self)
 			local running = Running()
 			if running ~= shown then
 				shown = running

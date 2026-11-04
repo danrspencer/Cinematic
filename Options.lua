@@ -791,7 +791,7 @@ local function FontSample(dropdown, file, name, line)
 		sample.line = sample:CreateFontString(nil, "OVERLAY")
 		sample.line:SetPoint("TOPLEFT", sample.name, "BOTTOMLEFT", 0, -6)
 		sample.line:SetWordWrap(false)
-		sample:SetScript("OnUpdate", function(self)
+		ns.SetOnUpdate(sample, function(self)
 			if not (self.dropdown and self.dropdown.IsMenuOpen and self.dropdown:IsMenuOpen()) then self:Hide() end
 		end)
 	end
@@ -1205,7 +1205,7 @@ local function Highlight(canvas, edges)
 		local texture = glow:CreateTexture(nil, "OVERLAY")
 		texture:SetAllPoints()
 		texture:SetColorTexture(1, 0.82, 0, 0.25)
-		glow:SetScript("OnUpdate", function(self, elapsed)
+		ns.SetOnUpdate(glow, function(self, elapsed)
 			self.time = self.time + elapsed
 			if self.time >= 2.5 then
 				self:Hide()
@@ -3125,7 +3125,7 @@ local function CameraSection(name, key)
 			end
 		end)
 		local wait = 0
-		test:SetScript("OnUpdate", function(self, elapsed)
+		ns.SetOnUpdate(test, function(self, elapsed)
 			wait = wait - elapsed
 			if wait > 0 then return end
 			wait = 0.2
@@ -7978,7 +7978,7 @@ local function CreateNameStylePanel()
 		local cameraNote = stack:Note(content, "", 460)
 		cameraNote.searchSkip = true
 		local noteAt = 0
-		canvas:HookScript("OnUpdate", function()
+		ns.HookOnUpdate(canvas, function()
 			if GetTime() < noteAt then
 				return
 			end
@@ -8284,7 +8284,7 @@ do
 		-- (Hooked: StylePopout's own OnShow fits it to the page's width.)
 		preview:HookScript("OnShow", function(self) self.snap = true end)
 		preview.snap = true
-		preview:SetScript("OnUpdate", function(self, elapsed)
+		ns.SetOnUpdate(preview, function(self, elapsed)
 			local time = ns.GetDB().plateStyleFadeTime or 1.5
 			for what, goal in pairs(self.goal) do
 				now[what] = self.snap and goal or ns.Approach(now[what], goal, elapsed, time)
@@ -11707,7 +11707,7 @@ local function CreateVisionPanel()
 		end
 	end)
 	local duelWait = 0
-	duelTest:SetScript("OnUpdate", function(self, elapsed)
+	ns.SetOnUpdate(duelTest, function(self, elapsed)
 		duelWait = duelWait - elapsed
 		if duelWait > 0 then return end
 		duelWait = 0.2
@@ -14173,7 +14173,7 @@ local function CreateMouseoverPanel()
 	end)
 	-- Clicking the scroll bar takes the focus from the search box, so the list
 	-- stays open while the mouse is on it and closes on a click anywhere else.
-	results:SetScript("OnUpdate", function(self)
+	ns.SetOnUpdate(results, function(self)
 		if not (list.box and list.box:HasFocus()) and not self:IsMouseOver()
 			and (IsMouseButtonDown("LeftButton") or IsMouseButtonDown("RightButton")) then
 			self:Hide()
@@ -14628,14 +14628,14 @@ local function GuardGamepadClose()
 	end
 	-- Runs only while Settings is open (a child of it).
 	local watcher = CreateFrame("Frame", nil, panel)
-	watcher:SetScript("OnUpdate", function(self)
+	ns.SetOnUpdate(watcher, function(self)
 		if not Wanted() then
 			return
 		end
 		for _, page in ipairs(searchPages) do
 			if page.canvas:IsVisible() then
 				Install()
-				self:SetScript("OnUpdate", nil)
+				ns.SetOnUpdate(self, nil)
 				return
 			end
 		end

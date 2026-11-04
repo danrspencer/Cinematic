@@ -76,7 +76,7 @@ function ns.MakeQuestItemPreview(parent, width)
 	end
 	-- (The cooling one starts again a moment after it's done.)
 	local readyAt
-	preview:SetScript("OnUpdate", function()
+	ns.SetOnUpdate(preview, function()
 		if cooling.parts.start then
 			readyAt = nil
 		elseif not readyAt then
