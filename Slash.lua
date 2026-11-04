@@ -1517,8 +1517,15 @@ local function HandleSlash(msg)
 		-- (The cursor too: Cursor Hide off till its warning's accepted again, the
 		-- hardware cursor back on. For anyone stuck with a hidden or odd cursor.)
 		if ns.CursorHideReset then ns.CursorHideReset() end
-		ns.ResetSettings()
-		ns.Print(L["profile %s reset"]:format(ns.ProfileLabel(ns.ActiveProfile())))
+		local active = ns.ActiveProfile()
+		if not ns.IsBuiltinProfile(active) and not ns.HasResetPoint(active) then
+			-- (As the Profiles page: one of yours saves as you go, so it has nothing
+			-- to go back to until you Save it there.)
+			ns.Print(L["%s is your own profile: it has nothing to reset to until you Save it on the Profiles page"]
+				:format(ns.ProfileLabel(active)))
+		elseif ns.ResetSettings() then
+			ns.Print(L["profile %s reset"]:format(ns.ProfileLabel(active)))
+		end
 	elseif cmd == "export" then
 		ns.ShowExport()
 	elseif cmd == "import" then

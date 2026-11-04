@@ -821,7 +821,7 @@ function ns.ResetBase(name)
 end
 
 -- Back to the profile's reset point if it has one, else its base: a
--- built-in's own values, or the defaults.
+-- built-in's own values, or the defaults. True once done (false: in a fight).
 function ns.ResetProfile()
 	if ns.ProfileSwitchBlocked() then return false end
 	local name = ns.ActiveProfile()
@@ -833,6 +833,7 @@ function ns.ResetProfile()
 	for _, switch in ipairs(PROFILE_SWITCHES) do ns.db[switch.leftAlone] = nil end
 	Load(name)
 	SettingsChanged()
+	return true
 end
 
 -- Kept by Reset Settings: what you made, and what the addon learned as you
@@ -1080,7 +1081,17 @@ function ns.InitProfiles()
 	for _, profile in ipairs(retiredHere) do
 		local old = profile.name
 		local inUse = db.profile == old or db.liveProfile == old or chardb.profile == old
-		if (db.profiles[old] or inUse) and not db.retiredProfiles[old] then
+		if profile.client == "forever" then
+			-- (Forever's old built-ins date from before it was out: nobody's to
+			-- keep, so only the three built-ins show. Ones kept before go too;
+			-- whoever was on one gets the default profile, below.)
+			local kept = db.retiredProfiles[old]
+			if kept and db.profileNotes[kept]
+				and db.profileNotes[kept]:find(profile.label or old, 1, true) then
+				db.profiles[kept], db.profileIcons[kept], db.profileNotes[kept] = nil, nil, nil
+			end
+			db.profiles[old], db.retiredProfiles[old] = nil, nil
+		elseif (db.profiles[old] or inUse) and not db.retiredProfiles[old] then
 			-- (The live one's settings as they are now; others' as saved.)
 			local saved = db.liveProfile == old and Snapshot(old) or db.profiles[old] or {}
 			local own = AgainstDefaults(saved, ns.ProfileBase(old))

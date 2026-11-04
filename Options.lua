@@ -919,6 +919,26 @@ local SCROLLBAR_WIDTH = 26
 -- Lists whose defaults are in code and that are nil until changed (emptied,
 -- they'd be an empty list rather than the defaults).
 local RESET_TO_NIL = { hoverGroups = true }
+-- Lists holding what you made beside settings: a page's Reset leaves those
+-- entries as they are, as Reset Settings does (Profiles.lua's
+-- RESET_PROFILE_KEEPS). [key] = fn(entry): true for one of yours.
+local CAMERA_ROWS_MINE = { order = true, custom = true, extras = true, sort = true }
+local CAMERA_ROW_FIELDS_MINE = { name = true, triggers = true } -- (your names and added triggers, on any row)
+local RESET_KEEPS_MINE = {
+	-- (The Nameplates rows' names you gave them.)
+	markNames = function() return true end,
+	-- (Your own triggers and the copies of rows you added: all of theirs. The
+	-- rows' order, as it says which copies there are. A built-in trigger's own
+	-- row goes back: its ticks, When, and Add back for one you deleted.)
+	cameraRows = function(entry)
+		if CAMERA_ROWS_MINE[entry] then return true end
+		local id, field = tostring(entry):match("^([^.]+)%.(.+)$")
+		if not id then return false end
+		if CAMERA_ROW_FIELDS_MINE[field] then return true end
+		local trigger, copy = ns.CameraRowTrigger(id)
+		return copy ~= nil or (trigger ~= nil and trigger.custom == true)
+	end,
+}
 -- More for a page's reset to do: [page content] = fn, after its settings are back.
 local resetHooks = {}
 local function DeepCopy(source)
@@ -937,7 +957,17 @@ local function ResetPage(content, only)
 	for key in pairs(pageKeys[content] or {}) do
 		local default = base[key]
 		local rows = pageRows[content] and pageRows[content][key]
+		local mine = RESET_KEEPS_MINE[key]
 		if only and not only[key] then -- luacheck: ignore 542 (not this part's)
+		elseif mine and type(db[key]) == "table" then
+			-- Back to the profile's own entries, but for yours.
+			local from = type(default) == "table" and default or {}
+			for k in pairs(db[key]) do
+				if not mine(k) and from[k] == nil then db[key][k] = nil end
+			end
+			for k, v in pairs(from) do
+				if not mine(k) then db[key][k] = DeepCopy(v) end
+			end
 		elseif RESET_TO_NIL[key] and not (point and point[key]) then
 			db[key] = nil
 		elseif type(default) == "table" then
@@ -961,6 +991,7 @@ local function ResetPage(content, only)
 	ns.letterboxDirty = true
 	if ns.ResyncVitalsLook then ns.ResyncVitalsLook() end -- (the theme's own look back on its settings)
 	if resetHooks[content] then resetHooks[content]() end
+	if ns.InvalidateSceneGroups then ns.InvalidateSceneGroups() end -- (the Scenes page's rows, changed in place)
 	if ns.RefreshTint then ns.RefreshTint() end
 	if ns.ApplyBubbles then ns.ApplyBubbles() end
 	if ns.ApplyUnitFrameParts then ns.ApplyUnitFrameParts() end
@@ -8612,6 +8643,8 @@ do
 				"doesn't count."] },
 			{ "aggrohealer", L["Aggro on a healer"], L["Any enemy attacking a healer (you too, if you're " ..
 				"one): for a healer, who's after you or the other healers; for a tank, the ones to pull off them."] },
+			{ "tapped", L["Not your kill"], L["An NPC someone outside your group hit first: killing it gives you " ..
+				"no loot, experience or quest credit. Its name and health bar gray to start with."] },
 			{ "npc", L["Normal NPC"], L["Living NPCs that aren't elite, rare elite or a boss (minor critters " ..
 				"too). Normal NPC - Enemy starts faded to 40% while an elite enemy is within about 28 yards (its " ..
 				"When rule: elite28), so in a pull the elites stand out."] },
@@ -8982,6 +9015,7 @@ do
 			{ "target", L["Target"] }, { "focus", L["Focus"] }, { "mouseover", L["Mouseover"] },
 			{ "aggro", L["Aggro"], { { "aggro", L["On you"] }, { "aggroother", L["Not on you"] },
 				{ "aggrononank", L["On a non-tank"] }, { "aggrohealer", L["On a healer"] } } },
+			{ "tapped", L["Not your kill"] },
 			-- (Aggro's and Units' Type is ticks; these their steps on a client
 			-- without menus, and their names for those mixes.)
 			{ "units", L["Units"], { { "all", L["Any unit"] }, { "npcs", L["NPC"] }, { "npc", L["Normal NPC"] },
@@ -15011,8 +15045,14 @@ ns.OnLanguage(function()
 	ns.TranslateFields(KEYBINDS, "label", "tip")
 	for _, popup in ipairs({ "CINEMATIC_RESET_PAGE", "CINEMATIC_RESET_PART", "CINEMATIC_PROFILE_RENAME",
 		"CINEMATIC_PROFILE_NOTE", "CINEMATIC_PROFILE_DELETE", "CINEMATIC_PROFILE_RESET", "CINEMATIC_PROFILE_RESET_POINT",
-		"CINEMATIC_ADDON_RESET" }) do
-		StaticPopupDialogs[popup].text = L[StaticPopupDialogs[popup].text]
+		"CINEMATIC_ADDON_RESET", "CINEMATIC_ADDON_RESET_ALL", "CINEMATIC_RESET_SECTION" }) do
+		local dialog = StaticPopupDialogs[popup]
+		dialog.text = L[dialog.text]
+		-- (Its own buttons' words too, made before the language was known. The
+		-- game's own, like YES, are in the player's language already.)
+		for _, button in ipairs({ "button1", "button2", "button3" }) do
+			if type(dialog[button]) == "string" then dialog[button] = L[dialog[button]] end
+		end
 	end
 	StaticPopupDialogs.CINEMATIC_LANGUAGE_RELOAD = {
 		text = L["Cinematic's language changes after a reload. Reload now?"],

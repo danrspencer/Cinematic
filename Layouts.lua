@@ -239,6 +239,12 @@ local PURE_CINEMA_SYSTEMS = {
 	"26 -1 1 4 4 UIParent 0.0 0.0 -1 #(",
 }
 
+-- Forever's Personal Resource Centered: the Modern preset with the personal
+-- resource display moved to the middle, where retail's has it (no export of
+-- Forever's yet; its system number by name, none on a client without it).
+local PRD_SYSTEM = Enum.EditModeSystem and Enum.EditModeSystem.PersonalResourceDisplay
+local FOREVER_PURE = PRD_SYSTEM and { { PRD_SYSTEM, nil, "CENTER", "UIParent", "CENTER", 0, -205 } } or {}
+
 -- Cinematic's own layouts, by the name Edit Mode lists them under. export:
 -- an Edit Mode export string (Share > Copy to Clipboard); without one, design:
 -- changes to the Modern preset (as DESIGN). bars: the action bars it lays
@@ -252,9 +258,9 @@ ns.EDIT_MODE_LAYOUTS = {
 	CINE_RETAIL_FOREVER_LAYOUT = { export = nil,
 		design = { { UNIT_FRAME, PARTY, nil, nil, nil, nil, nil, { [RAID_STYLE_PARTY] = 1 } } },
 		client = "retail" },
-	-- (the Pure Cinema profile's on retail)
-	["Personal Resource Centered"] = { systems = PURE_CINEMA_SYSTEMS,
-		client = "retail" },
+	-- (the Cinema profile's: retail's from the dev's own, Forever's designed)
+	["Personal Resource Centered"] = ns.isRetail and { systems = PURE_CINEMA_SYSTEMS, client = "retail" }
+		or { design = FOREVER_PURE, client = "forever" },
 }
 
 -- A layout from systems lines (as PURE_CINEMA_SYSTEMS): the export string is

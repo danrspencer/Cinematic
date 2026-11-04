@@ -162,7 +162,7 @@ ns.PROFILE_MODULES = {
 		"as on retail."),
 	Layout("layout-forever", "Forever-style layout", "CINE_RETAIL_FOREVER_LAYOUT", "retail",
 		"Retail laid out like WoW Forever's default."),
-	Layout("layout-pure", "Personal Resource Centered layout", "Personal Resource Centered", "retail",
+	Layout("layout-pure", "Personal Resource Centered layout", "Personal Resource Centered", nil,
 		"The personal resource display in the middle, the Cooldown Manager above it. Turns the game's personal " ..
 		"resource display on if it's off.",
 		function(set) set("prdOn", true) end),
@@ -314,12 +314,13 @@ ns.PROFILE_MODULES = {
 	{ key = "ultra-plates", name = "Ultra responsive nameplates", scope = { "Nameplate Style" },
 		tip = "In fights the plates say what matters at a glance: the further a unit, the fainter its plate " ..
 		"(past 40, 28 and within 11 yards), normal NPCs faint and narrower while an elite's within 40 yards, an enemy after " ..
-		"someone else tinted orange, and marks on your target and the unit under the mouse. No aggro mark, and " ..
+		"someone else tinted orange, mobs that aren't your kill gray, and marks on your target and the unit under the mouse. No aggro mark, and " ..
 		"plates change quicker.",
 		apply = function(set)
-			set("markOrder", "target,mouseover,focus,allPast40,allPast28,allIn11,npc,aggroother,aggro")
+			set("markOrder", "tapped,target,mouseover,focus,allPast40,allPast28,allIn11,npc,aggroother,aggro")
 			set("markNames", { allPast40 = "Fade 40", allPast28 = "Fade 28", allIn11 = "Fade 11",
 				npc = "Fade non elite", aggroother = "Aggro not on you" })
+			-- (Not your kill first: grey before anything else, the target's arrow still on it.)
 			set("plateStyleFadeTime", 0.6)
 			-- Your target's arrow and the mouseover's mark in fights too, a little lower.
 			set("targetWhenCombat", true)

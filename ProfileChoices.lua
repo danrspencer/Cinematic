@@ -54,7 +54,7 @@ ns.SLOT_CHOICES = {
 			line = "Action bars centered along the bottom, menus in the corner", modules = { "layout-retail" } },
 		{ part = "forever", client = "retail", hidden = true, label = "Like WoW Forever",
 			line = "Laid out like WoW Forever's default", modules = { "layout-forever" } },
-		{ part = "pure", client = "retail", label = "Personal Resource Centered", made = true,
+		{ part = "pure", label = "Personal Resource Centered", made = true,
 			line = "Your resources in the middle, the Cooldown Manager above", modules = { "layout-pure" } },
 		{ part = "own", label = "Your own", line = "Cinematic leaves your Edit Mode layout as it is",
 			modules = {} },
@@ -211,7 +211,7 @@ ns.BUILTIN_PROFILES = {
 			"shows at the screen's edges. Every camera, every Vision and all the atmosphere: the letterbox " ..
 			"stays up through fights, and the camera comes alive on flights, by campfires, at vistas and " ..
 			"more."],
-		picks = { layout = { forever = "preset", retail = "pure" }, frames = "pure", bars = "pure", camera = "pure",
+		picks = { layout = "pure", frames = "pure", bars = "pure", camera = "pure",
 			vfx = "pure", chat = "pure" },
 		-- (Its own Visions and cards, apart from the slots' choices: picking a
 		-- choice for a slot then leaves them as they are.)

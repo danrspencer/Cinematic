@@ -1786,6 +1786,9 @@ local function FittingRow(plate, unit, start)
 			local fits
 			if AGGRO_ROWS[base] then
 				fits = AggroFits(AGGRO_ROWS[base], unit)
+			elseif base == "tapped" then
+				-- (Tagged by someone outside your group: no loot or credit for you.)
+				fits = unit ~= nil and UnitIsTapDenied ~= nil and Ask(UnitIsTapDenied, unit)
 			elseif base == "others" then
 				fits = OthersOn(kind)
 			elseif base == "all" then
@@ -1854,6 +1857,12 @@ local function PlateLook(plate, unit)
 		return nil, partKinds, false, nil, MasterSizeOn() and { width = masterWidth, height = masterHeight } or nil
 	end
 	local mark = ArrowSetting("Style", kind) ~= "none" and kind or nil
+	-- (Not your kill with no mark of its own: the next fitting row's mark,
+	-- so a tagged target keeps its arrow under the grey.)
+	if not mark and at and ns.MarkRowBase(kind) == "tapped" then
+		local below = FittingRow(plate, unit, at + 1)
+		mark = below and below ~= "others" and ArrowSetting("Style", below) ~= "none" and below or nil
+	end
 	local alpha = ArrowSetting("Alpha", kind) or 1
 	local width = (ArrowSetting("PlateWidth", kind) or 1) * masterWidth
 	local height = (ArrowSetting("PlateHeight", kind) or 1) * masterHeight
@@ -1874,7 +1883,7 @@ local function PlateLook(plate, unit)
 		if not at then break end
 		colorRow, at = FittingRow(plate, unit, at + 1)
 	end
-	return mark, partKinds, ns.MarkRowBase(kind) == "mouseover", alpha < 1 and alpha or nil,
+	return mark, partKinds, ns.MarkRowBase(mark or kind) == "mouseover", alpha < 1 and alpha or nil,
 		(math.abs(width - 1) > 0.001 or math.abs(height - 1) > 0.001) and { width = width, height = height } or nil
 end
 
@@ -1899,10 +1908,12 @@ local function TypeRowsOn()
 	return false
 end
 -- (Whether an aggro row is on the grid and shown: plates looked at as
--- enemies change who they're after.)
+-- enemies change who they're after. Not your kill too: a mob tagged after
+-- its plate came up.)
 local function AggroRowsOn()
 	for _, kind in ipairs(MarkOrder()) do
-		if AGGRO_ROWS[ns.MarkRowBase(kind)] and ArrowSetting("Show", kind) and whenNow[kind] ~= false then
+		local base = ns.MarkRowBase(kind)
+		if (AGGRO_ROWS[base] or base == "tapped") and ArrowSetting("Show", kind) and whenNow[kind] ~= false then
 			return true
 		end
 	end

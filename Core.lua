@@ -687,9 +687,9 @@ DEFAULTS.targetArrowStyle = "arrow"
 -- mark's color, while the row shows (<kind>ColorName, ColorBar, ColorBorder).
 -- Your target's bar and your focus's name and bar to start with.
 for _, kind in ipairs({ "target", "aggro", "focus", "mouseover", "others", "aggroother", "aggrononank",
-	"aggrohealer", "npc", "elite", "npcs", "players", "minions", "all" }) do
-	local colored = kind == "target" or kind == "focus"
-	DEFAULTS[kind .. "ColorName"] = kind == "focus"
+	"aggrohealer", "tapped", "npc", "elite", "npcs", "players", "minions", "all" }) do
+	local colored = kind == "target" or kind == "focus" or kind == "tapped"
+	DEFAULTS[kind .. "ColorName"] = kind == "focus" or kind == "tapped"
 	DEFAULTS[kind .. "ColorBar"] = colored
 	DEFAULTS[kind .. "ColorBorder"] = false
 end
@@ -723,14 +723,15 @@ ns.MARK_COPIES = 5 -- (rows of one kind and Who at most)
 -- you (aggroother), Aggro on non-tank (aggrononank) and Aggro on a healer
 -- (aggrohealer): any enemy in a fight that's after someone friendly other
 -- than you, after a player who isn't a tank (you too), or after a healer
--- (you too); other mixes below (MARK_AGGRO_FLAGS). Normal NPC (npc) and Elite NPC (elite): living NPCs by
+-- (you too); other mixes below (MARK_AGGRO_FLAGS). Not your kill (tapped):
+-- an NPC someone outside your group tagged first (UnitIsTapDenied). Normal NPC (npc) and Elite NPC (elite): living NPCs by
 -- rank (elite, rare elite and world boss; ns.NPCRank), NPC (npcs) any of
 -- them. Players and Minions (pets, totems, guardians): as the Nameplates page
 -- sorts them, friendly or enemy (no neutral players). Any unit (all): every
 -- plate.
 ns.MARK_ROW_KINDS = {
 	target = ns.MARK_REACTIONS, focus = ns.MARK_REACTIONS, mouseover = ns.MARK_REACTIONS,
-	aggro = {}, aggroother = {}, aggrononank = {}, aggrohealer = {},
+	aggro = {}, aggroother = {}, aggrononank = {}, aggrohealer = {}, tapped = {},
 	npc = ns.MARK_REACTIONS, elite = ns.MARK_REACTIONS, npcs = ns.MARK_REACTIONS,
 	players = { "Enemy", "Friendly" }, minions = { "Enemy", "Friendly" },
 	all = ns.MARK_REACTIONS,
@@ -879,6 +880,17 @@ for kind, rgb in pairs({ aggroother = { 1, 0.55, 0 }, aggrononank = { 1, 0.15, 0
 	DEFAULTS[kind .. "MarkBob"] = true
 	DEFAULTS[kind .. "MarkAlpha"] = 1
 end
+-- (Not your kill: an NPC another player or group tagged first, so killing
+-- it gives you nothing. No mark; its name and health bar grey.)
+DEFAULTS.tappedMarkShow = true
+DEFAULTS.tappedMarkStyle = "none"
+DEFAULTS.tappedMarkColor = "custom"
+DEFAULTS.tappedMarkR, DEFAULTS.tappedMarkG, DEFAULTS.tappedMarkB = 0.55, 0.55, 0.55
+DEFAULTS.tappedMarkSize = 1
+DEFAULTS.tappedMarkBob = false
+DEFAULTS.tappedMarkAlpha = 1
+DEFAULTS.tappedMarkPlateColor = "custom"
+DEFAULTS.tappedMarkPlateR, DEFAULTS.tappedMarkPlateG, DEFAULTS.tappedMarkPlateB = 0.55, 0.55, 0.55
 DEFAULTS.focusMarkShow = true
 DEFAULTS.focusMarkStyle = "diamond"
 DEFAULTS.focusMarkColor = "custom"
@@ -3339,8 +3351,9 @@ end
 -- Puts the active profile back to how it started (Profiles.lua): its
 -- settings only, so the player's added/ignored frames are kept.
 -- (Straight back into CineMode after, as on switching: ResetProfile restarts the timers.)
+-- True once done (false: in a fight, and it says so).
 function ns.ResetSettings()
-	ns.ResetProfile()
+	return ns.ResetProfile()
 end
 
 -- Shared with Options.lua
