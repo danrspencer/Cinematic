@@ -387,16 +387,16 @@ ns.PROFILE_MODULES = {
 			set("chatSpeechBehind", false)
 			set("bubblesOffTop", false)
 		end },
-	{ key = "no-visions", name = "No visions", scope = { "Heal Vision", "Quest Vision", "Duel Vision", "Roll Vision",
-		"Vitals Vision", "Card Vision", "Damage Vision" },
-		tip = "Every vision off: Heal, Quest, Duel, Roll, Vitals and Damage Vision, and the Cards page.",
+	-- (Not Duel, Tele or Emote Vision, or the Cards page: they only show for
+	-- a moment, and every profile has them.)
+	{ key = "no-visions", name = "No visions", scope = { "Heal Vision", "Quest Vision", "Roll Vision",
+		"Vitals Vision", "Damage Vision" },
+		tip = "The visions that change your UI off: Heal, Quest, Roll, Vitals and Damage Vision.",
 		apply = function(set)
 			set("handleHealVision", false)
 			set("questVision", false)
-			set("duelPlates", false)
 			set("rollWindow", false)
 			set("lowHealth", false)
-			set("cards", false)
 			set("damageVision", false)
 		end },
 	{ key = "pure-tooltips", name = "Pure: tooltips", scope = { "Tooltips" },
@@ -431,6 +431,11 @@ ns.PROFILE_MODULES = {
 		tip = "No camera moves on its own.",
 		apply = function(set)
 			CamsOff(set, { "flight", "idle", "cozy", "tele", "vista", "fish", "walk", "run", "death", "quest" })
+		end },
+	{ key = "travel-cameras", name = "Just flights and teleports", scope = { "Cameras", "Scenes" },
+		tip = "Only flights (and fly-bys), your Hearthstone and teleports move the camera on their own.",
+		apply = function(set)
+			CamsOff(set, { "idle", "cozy", "vista", "fish", "walk", "run", "death", "quest" })
 		end },
 	{ key = "cameras-bring-cinemode", name = "Cameras bring CineMode", scope = { "Scenes",
 		"Camera Settings/Death Cam", "Card Vision" },
@@ -486,14 +491,23 @@ ns.PROFILE_MODULES = {
 	{ key = "duel-card", name = "Duel card", scope = { "Card Vision" },
 		tip = "Your own duels show as the Cards page's card: a challenge, the start and who won.",
 		apply = function(set) set("cardDuelOn", true) end },
-	{ key = "story-cards", name = "Story cards", scope = { "Card Vision" },
-		tip = "Your character's story as the Cards page's cards: a level, a place discovered, a flight's end, an " ..
-			"inn, an achievement, a new standing, mount, pet or profession rank, a story quest done, a dungeon " ..
-			"cleared, a rare spotted, a battleground and a kill streak.",
+	-- (The big, rare moments: every profile has them. The rest: story-cards.)
+	{ key = "milestone-cards", name = "Milestone cards", scope = { "Card Vision" },
+		tip = "Your character's big moments as the Cards page's cards: a level, an achievement, a new mount or " ..
+			"pet, a dungeon cleared and a boss down.",
 		apply = function(set)
-			for _, key in ipairs({ "cardLevelUpOn", "cardDiscoverOn", "cardArrivalOn", "cardRestedOn",
-				"cardAchievementOn", "cardReputationOn", "cardCollectOn", "cardProfessionOn", "cardQuestOn",
-				"cardClearedOn", "cardRareOn", "cardBattlegroundOn", "cardStreakOn" }) do
+			for _, key in ipairs({ "cardLevelUpOn", "cardAchievementOn", "cardCollectOn", "cardClearedOn",
+				"cardBossDownOn" }) do
+				set(key, true)
+			end
+		end },
+	{ key = "story-cards", name = "Story cards", scope = { "Card Vision" },
+		tip = "The rest of your character's story as the Cards page's cards: a place discovered, a flight's end, " ..
+			"an inn, a new standing or profession rank, a story quest done, a rare spotted, a battleground and a " ..
+			"kill streak.",
+		apply = function(set)
+			for _, key in ipairs({ "cardDiscoverOn", "cardArrivalOn", "cardRestedOn", "cardReputationOn",
+				"cardProfessionOn", "cardQuestOn", "cardRareOn", "cardBattlegroundOn", "cardStreakOn" }) do
 				set(key, true)
 			end
 		end },

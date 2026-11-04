@@ -104,6 +104,9 @@ ns.SLOT_CHOICES = {
 		{ part = "lite", label = "Sometimes", line = "Flights, going AFK, and your Hearthstone and teleports",
 			modules = { "lite-cameras" } },
 		{ part = "off", label = "Never", line = "The camera is all yours", modules = { "no-cameras" } },
+		-- (Only Subtle's: not offered.)
+		{ part = "travel", hidden = true, label = "Flights and teleports",
+			line = "Just flights, and your Hearthstone and teleports", modules = { "travel-cameras" } },
 		-- (Only the retired Camera Only profile's, and the plain defaults: not offered.)
 		{ part = "cinemode", hidden = true, label = "Cameras bring CineMode",
 			line = "Every camera brings CineMode on, and can start music", modules = { "cameras-bring-cinemode" } },
@@ -161,11 +164,14 @@ ns.BUILTIN_PROFILES = {
 		label = "Subtle", -- (shown in your language)
 		oldNames = { "VFX Only" },
 		icon = "Interface\\Icons\\Spell_Nature_Lightning",
-		tip = L["Just the visual effects (tint, vignette, weather) over your normal UI: nothing fades, no " ..
-			"letterbox, and the camera's left to you."],
-		picks = { layout = { forever = "preset" }, frames = "nofade", camera = "off", vfx = "noletterbox",
+		tip = L["A light touch that leaves your UI exactly as it is. A color tint, vignette and weather set " ..
+			"the mood, and only the quiet extras join in: the camera sweeps along on flights and teleports, " ..
+			"a portal opens as you hearth, and small cards mark your big moments, your duels and the " ..
+			"players who buff or emote at you."],
+		picks = { layout = { forever = "preset" }, frames = "nofade", camera = "travel", vfx = "noletterbox",
 			sound = "nomusic" },
-		modules = { "no-visions", "no-custom-bubbles", "emote-vision" },
+		modules = { "no-visions", "no-custom-bubbles", "milestone-cards", "duel-card", "tele-vision",
+			"emote-vision" },
 	},
 	{
 		name = "Balanced",
@@ -173,10 +179,12 @@ ns.BUILTIN_PROFILES = {
 		oldNames = { "Lite" },
 		default = true,
 		icon = "Interface\\Icons\\Spell_Holy_HolyBolt",
-		tip = L["The UI fades and the look stays, with just a few cameras: flights, AFK, " ..
-			"and your Hearthstone and teleports. No cozy, vista, fish, RP walk, auto-run, death or quest cameras."],
+		tip = L["The best of both. Your UI fades away and comes right back for a fight, a quest or a look " ..
+			"with the mouse, with your bars and frames where you know them. The letterbox, tint and weather " ..
+			"bring the world to life, most of the Visions and cards join in, and the camera takes over on " ..
+			"flights, when you go AFK and for your Hearthstone and teleports."],
 		picks = { layout = { forever = "preset" }, camera = "lite", chat = "lite" },
-		modules = { "damage-vision", "emote-vision" },
+		modules = { "zone-card", "milestone-cards", "duel-card", "damage-vision", "tele-vision", "emote-vision" },
 		preview = "bars",
 	},
 	{
@@ -184,14 +192,15 @@ ns.BUILTIN_PROFILES = {
 		label = "Cinema", -- (shown in your language)
 		oldNames = { "Pure Cinema", "Full" }, -- (Full: on main for a day, not released)
 		icon = "Interface\\Icons\\Ability_Stealth",
-		tip = L["As little UI as possible: nameplates show only for enemies in fights, and fights don't bring " ..
-			"the letterbox down. Fights bring up only your resource bar and the Cooldown Manager, the cast bar " ..
-			"shows all through CineMode, your health shows at the screen's edges and " ..
-			"your personal resource display fades in as it drops (Vitals Vision), and every " ..
-			"camera can start music."],
+		tip = L["The full experience, with as little UI as possible, even in fights. Nameplates tell you what " ..
+			"you need to know, the Cooldown Manager takes the place of your action bars, and your health " ..
+			"shows at the screen's edges. Every camera, every Vision and all the atmosphere: the letterbox " ..
+			"stays up through fights, and the camera comes alive on flights, by campfires, at vistas and " ..
+			"more."],
 		picks = { layout = { forever = "preset", retail = "pure" }, frames = "pure", bars = "pure", camera = "pure",
 			vfx = "pure", chat = "pure" },
-		modules = { "zone-card", "duel-card", "story-cards", "damage-vision", "tele-vision", "emote-vision" },
+		modules = { "zone-card", "duel-card", "milestone-cards", "story-cards", "damage-vision", "tele-vision",
+			"emote-vision" },
 	},
 }
 
@@ -225,21 +234,23 @@ ns.RETIRED_PROFILES = {
 -- with their own descriptions (simpler than the profiles', true on both
 -- clients).
 ns.WELCOME_LEVELS = {
-	{ label = "Subtle", profile = "Subtle", line = "A softer look. Your UI and camera stay yours.",
-		tip = "A color tint, a vignette and weather over your normal UI. No camera moves on its own and " ..
-			"nothing hides, but every camera, fade and the rest of Cinematic are there in Customize and " ..
-			"Settings whenever you want them." },
-	{ label = "Balanced", profile = "Balanced", line = "Clears your screen between fights.",
-		tip = "The clutter clears between fights: your UI fades away for the letterbox and tint, and comes " ..
-			"straight back for a fight, a window or a look with the mouse. The camera takes over now and then: " ..
-			"on flights, when you go AFK, and for your Hearthstone and teleports." },
+	{ label = "Subtle", profile = "Subtle", line = "A light touch. Your UI stays just as it is.",
+		tip = "A light touch that leaves your UI exactly as it is. A color tint, vignette and weather set the " ..
+			"mood, and only the quiet extras join in: the camera sweeps along on flights and teleports, a " ..
+			"portal opens as you hearth, and small cards mark your big moments, your duels and the players " ..
+			"who buff or emote at you." },
+	{ label = "Balanced", profile = "Balanced", line = "Your UI fades away, and comes back when you need it.",
+		tip = "The best of both. Your UI fades away and comes right back for a fight, a quest or a look with the " ..
+			"mouse, with your bars and frames where you know them. The letterbox, tint and weather bring " ..
+			"the world to life, most of the Visions and cards join in, and the camera takes over on " ..
+			"flights, when you go AFK and for your Hearthstone and teleports." },
 	-- (flash: something shown for a moment when it's picked, besides the
 	-- profile's preview: "vitals", Vitals Vision's screen edges.)
 	{ label = "Cinema", profile = "Cinema", flash = "vitals", line = "Full immersion: just you and the world.",
-		tip = "Lose yourself in the world. The game's UI stays away even in fights, and Cinematic shows " ..
-			"what you need its own way: your health at the screen's edges, an arrow over your target, your " ..
-			"resources and the Cooldown Manager in fights. The letterbox stays up, and the camera comes alive " ..
-			"on flights, by campfires, at vistas and more." },
+		tip = "The full experience, with as little UI as possible, even in fights. Nameplates tell you what you " ..
+			"need to know, the Cooldown Manager takes the place of your action bars, and your health shows " ..
+			"at the screen's edges. Every camera, every Vision and all the atmosphere: the letterbox stays " ..
+			"up through fights, and the camera comes alive on flights, by campfires, at vistas and more." },
 }
 
 -- In your language once it's set (Locales.lua): the levels' text, and each

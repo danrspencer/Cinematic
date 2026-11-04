@@ -3,7 +3,8 @@
 -- spotted, Battleground and Kill streak): each heard here and fired as a
 -- card (ns.Cards.Fire), with its made-up one for the Test buttons
 -- (ns.CardSamples). The page's tick for each is its row's; all off to start
--- with (on in Cinema: ProfileModules.lua's "story-cards").
+-- with (ProfileModules.lua: "milestone-cards" in every built-in profile,
+-- "story-cards" the rest in Cinema).
 
 local _, ns = ...
 local L = ns.L

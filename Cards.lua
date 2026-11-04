@@ -20,10 +20,10 @@ local _, ns = ...
 local L = ns.L
 local DEFAULTS = ns.DEFAULTS
 
-DEFAULTS.cards = true      -- the page's switch (off in Subtle: the no-visions module)
+DEFAULTS.cards = true      -- the page's switch
 DEFAULTS.cardDeathOn = false -- the Death row (on in Cinema: YOU DIED as the death camera starts)
-DEFAULTS.timeOfDayChange = true -- the Time of day row: its name and sound as it changes (off in Subtle, with the page)
-DEFAULTS.cardDuelOn = false -- the Duel row: your own duels (on in Cinema)
+DEFAULTS.timeOfDayChange = true -- the Time of day row: its name and sound as it changes
+DEFAULTS.cardDuelOn = false -- the Duel row: your own duels (on in every built-in profile)
 -- Its moments, each a tick on its Settings tab (Effects.lua hears them), and
 -- its words.
 DEFAULTS.cardDuelAsk = true    -- you challenge someone
