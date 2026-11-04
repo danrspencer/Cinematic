@@ -17,7 +17,7 @@ DEFAULTS.emoteVision = false           -- at all (its page's switch)
 DEFAULTS.emoteVisionAlways = false     -- its Show in row's Always: everywhere
 DEFAULTS.emoteVisionStill = false      -- only while you stand still (moving: it waits)
 DEFAULTS.emoteVisionRepeats = true     -- the same person's same moment again ignored...
-DEFAULTS.emoteVisionRepeatMins = 10    -- ...for this many minutes
+DEFAULTS.emoteVisionRepeatMins = 1     -- ...for this many minutes
 DEFAULTS.emoteVisionGroupBuffs = false -- buffs from your own party or raid ignored (no card)
 DEFAULTS.emoteVisionHold = 8           -- seconds a card stays (paused while the mouse is over it)
 DEFAULTS.emoteVisionScale = 1
@@ -266,6 +266,12 @@ local function GiveRule()
 	if not db.emoteVisionWipeOnV1 then
 		db.emoteVisionWipeOnV1 = true
 		db.emoteVisionWipe = true
+	end
+	-- (Repeats were ignored for 10 minutes to start with, then 1: moved once
+	-- if still 10.)
+	if not db.emoteVisionRepeatV2 then
+		db.emoteVisionRepeatV2 = true
+		if db.emoteVisionRepeatMins == 10 then db.emoteVisionRepeatMins = 1 end
 	end
 	if db.emoteVisionRuleV1 and not db.emoteVisionRuleV2 and db.frameRules
 		and db.frameRules[ROW_KEY] == OLD_RULE then
@@ -1119,17 +1125,26 @@ local function InGroup(guid)
 end
 
 -- A buff someone else put on you (a minute or more: not a heal over time).
-local function Buffed(aura)
+local lastBuff -- (for /cine debug emote: the last buff seen, and what came of it)
+local function Buffed(aura, refresh)
 	local unit = Plain(aura.sourceUnit)
 	local name = Plain(aura.name)
 	local duration = Plain(aura.duration)
-	if not (unit and name and type(duration) == "number" and duration >= MIN_BUFF) then return end
-	if Plain(aura.isHelpful) == false then return end
-	if unit == "player" or unit == "pet" or unit == "vehicle" or ns.Flag(UnitIsUnit(unit, "player")) then return end
+	local function Skip(why)
+		lastBuff = ("%s%s from %s: %s"):format(tostring(name), refresh and " (refreshed)" or "", tostring(unit), why)
+	end
+	if not (unit and name and type(duration) == "number" and duration >= MIN_BUFF) then
+		return Skip(not unit and "no caster unit" or "under a minute or unreadable")
+	end
+	if Plain(aura.isHelpful) == false then return Skip("not a buff") end
+	if unit == "player" or unit == "pet" or unit == "vehicle" or ns.Flag(UnitIsUnit(unit, "player")) then
+		return Skip("yours")
+	end
 	local guid = Plain(UnitGUID(unit))
 	-- (By GUID: UnitIsPlayer can say false for players after a buff on Forever.)
-	if not (guid and guid:find("^Player%-")) then return end
-	if DB().emoteVisionGroupBuffs and InGroup(guid) then return end
+	if not (guid and guid:find("^Player%-")) then return Skip("not a player") end
+	if DB().emoteVisionGroupBuffs and InGroup(guid) then return Skip("your group's, ignored") end
+	Skip("card")
 	Fire({ kind = "Buff", name = Short(Plain(UnitName(unit))) or "?", unit = unit, guid = guid,
 		class = ClassOf(guid, unit), icon = Plain(aura.icon), line = L["gave you %s"]:format(name) })
 end
@@ -1151,19 +1166,75 @@ local function ScanOld(silent)
 	seenAuras = now
 end
 
+-- New clients: each of your buffs' end time, by its instance id, to tell a
+-- refresh (someone casting it again while it's on you: an update, not a new
+-- buff) by its end time jumping on. Learnt again, quietly, after a fight or
+-- a full update.
+local ends = {}
+local function EndOf(aura)
+	local at = type(aura) == "table" and Plain(aura.expirationTime)
+	return type(at) == "number" and at or nil
+end
+local function LearnEnds()
+	wipe(ends)
+	if not (C_UnitAuras and C_UnitAuras.GetAuraDataByIndex) then return end
+	for i = 1, 80 do
+		local ok, aura = pcall(C_UnitAuras.GetAuraDataByIndex, "player", i, "HELPFUL")
+		if not (ok and type(aura) == "table") then break end
+		local id = Plain(aura.auraInstanceID)
+		if id then ends[id] = EndOf(aura) end
+	end
+end
+
+local auraSeen = { events = 0 } -- (for /cine debug emotevision: what the game's aura events looked like)
+local function Count(list) return type(list) == "table" and #list or 0 end
 local function AurasChanged(info)
+	auraSeen.events = auraSeen.events + 1
+	auraSeen.last = type(info) ~= "table" and "no info (old client: scanned)"
+		or (issecretvalue and (issecretvalue(info.addedAuras) or issecretvalue(info.updatedAuraInstanceIDs)))
+		and "secret" or ("full %s, added %d, updated %d, removed %d"):format(tostring(info.isFullUpdate),
+			Count(info.addedAuras), Count(info.updatedAuraInstanceIDs), Count(info.removedAuraInstanceIDs))
 	-- (In a fight they're secret on retail: learnt again, quietly, after it.)
-	if Fighting() then return end
+	if Fighting() then
+		auraSeen.last = auraSeen.last .. "; skipped, fighting"
+		return
+	end
 	if type(info) ~= "table" then
 		ScanOld(false)
 		return
 	end
 	-- (Can be secret out of a fight too, in instances: skipped then.)
-	local full, added = info.isFullUpdate, info.addedAuras
-	if issecretvalue and (issecretvalue(full) or issecretvalue(added)) then return end
-	if full or type(added) ~= "table" then return end
-	for _, aura in ipairs(added) do
-		if type(aura) == "table" then Buffed(aura) end
+	local full, added, updated, removed = info.isFullUpdate, info.addedAuras, info.updatedAuraInstanceIDs,
+		info.removedAuraInstanceIDs
+	if issecretvalue and (issecretvalue(full) or issecretvalue(added) or issecretvalue(updated)
+		or issecretvalue(removed)) then return end
+	if full then
+		LearnEnds()
+		return
+	end
+	if type(removed) == "table" then
+		for _, id in ipairs(removed) do ends[id] = nil end
+	end
+	if type(added) == "table" then
+		for _, aura in ipairs(added) do
+			if type(aura) == "table" then
+				local id = Plain(aura.auraInstanceID)
+				if id then ends[id] = EndOf(aura) end
+				Buffed(aura)
+			end
+		end
+	end
+	if type(updated) == "table" and C_UnitAuras and C_UnitAuras.GetAuraDataByAuraInstanceID then
+		for _, id in ipairs(updated) do
+			local ok, aura = pcall(C_UnitAuras.GetAuraDataByAuraInstanceID, "player", id)
+			if ok and type(aura) == "table" and Plain(aura.isHelpful) ~= false then
+				local was, now = ends[id], EndOf(aura)
+				ends[id] = now
+				-- (Its end a second or more on: cast again, a refresh. Not a
+				-- stack's change or a tick, which leave the end as it was.)
+				if was and now and now > was + 1 then Buffed(aura, true) end
+			end
+		end
 	end
 end
 
@@ -1465,11 +1536,13 @@ watcher:SetScript("OnEvent", function(_, event, ...)
 		C_Timer.After(0.2, Next) -- (once ns.playerMoving has caught up)
 	elseif event == "PLAYER_REGEN_ENABLED" then
 		ScanOld(true)
+		LearnEnds()
 		C_Timer.After(1, Next)
 	elseif event == "PLAYER_ENTERING_WORLD" then
 		GiveRule()
 		dead = ns.Flag(UnitIsDeadOrGhost("player")) and true or false
 		ScanOld(true)
+		LearnEnds()
 		LearnLevels()
 		RosterChanged(true)
 	end
@@ -1730,7 +1803,7 @@ function ns.EmoteScan(arg)
 	end)
 end
 
--- /cine debug emote: what it would do now, and why.
+-- /cine debug emotevision: what it would do now, and why.
 function ns.EmoteVisionDebug()
 	local ok, here = pcall(ns.RowOnNow, ROW_KEY, nil, true)
 	local db = DB()
@@ -1748,6 +1821,12 @@ function ns.EmoteVisionDebug()
 		moments[#moments + 1] = each.id .. (db[each.on] and "" or " (off)") .. ": " .. table.concat(list, ",")
 	end
 	ns.Print("  " .. table.concat(moments, "; "))
+	local known = 0
+	for _ in pairs(ends) do known = known + 1 end
+	ns.Print(("  aura events %d, last: %s; buffs' end times known %d"):format(auraSeen.events,
+		auraSeen.last or "none", known))
+	ns.Print("  last buff: " .. (lastBuff or "none yet") ..
+		(" (refreshes tracked: %s)"):format(C_UnitAuras and C_UnitAuras.GetAuraDataByAuraInstanceID and "yes" or "no, old client"))
 	local target = Plain(UnitGUID("target"))
 	if target then
 		local ally = "no API"
