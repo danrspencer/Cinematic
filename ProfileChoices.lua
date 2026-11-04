@@ -198,7 +198,7 @@ ns.BUILTIN_PROFILES = {
 			"bring the world to life, most of the Visions and cards join in, and the camera takes over on " ..
 			"flights, when you go AFK and for your Hearthstone and teleports."],
 		picks = { layout = { forever = "preset" }, camera = "lite", chat = "lite" },
-		modules = With("zone-card", "damage-vision", "tint-balanced"),
+		modules = With("zone-card", "damage-vision", "tint-balanced", "quest-talk"),
 		preview = "bars",
 	},
 	{

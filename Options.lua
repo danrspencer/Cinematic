@@ -11772,7 +11772,7 @@ local function CreateVisionPanel()
 		local column = CreateFrame("Frame", nil, content)
 		column:SetSize(1, 1)
 		column:SetPoint("TOPLEFT", placeLabel, "TOPLEFT", 260, 0)
-		local byPlace = { head = {} }
+		local byPlace = { head = {}, opposite = {} }
 		local function Own(mode, control)
 			byPlace[mode][#byPlace[mode] + 1] = control
 			return control
@@ -11814,6 +11814,13 @@ local function CreateVisionPanel()
 				GreyUnless(check, TalkOn)
 			end
 		end
+		-- Opposite clicked (with or without Custom dialogue frames).
+		local oppositeStack = Stack(column, "label")
+		Own("opposite", oppositeStack:Add(Check(content, "questTalkShopFollow", L["Shop window goes there too"],
+			L["Picking a vendor's \"let me browse your goods\", the shop window opens where the talk was, on the " ..
+			"other half of the screen from the NPC, instead of where the game puts it. A vendor with nothing else " ..
+			"to say opens it on the other half from where you clicked them. Drag it and it stays where you drop it " ..
+			"until it closes."]), "check"))
 		-- (Shown as the position is: refreshed with the page, so picking
 		-- another in the dropdown swaps them.)
 		controls[#controls + 1] = {

@@ -39,6 +39,9 @@ local TALK_LEFT = 0.12
 -- to the quest window and back, two windows to the game, one to the player.
 local SPOT_NAME = { QuestFrame = "GossipFrame" }
 
+-- Shop windows: with Quest Vision's Opposite clicked they can follow the talk (PlaceShop).
+local SHOP = { MerchantFrame = true }
+
 -- Rows narrower than this (UIParent's units) sit there too. Retail's
 -- character window with its stats open is 540 wide; the group finder, 563,
 -- stays in the middle.
@@ -134,6 +137,9 @@ end
 local hooked = {}  -- frame -> true once it can be dragged
 local moving = {}  -- frame -> where the mouse and the window started, while it's being dragged
 local dropped = {} -- frame -> { point, relativePoint, x, y } for windows without a name, while they stay open
+-- The shop window, following the talk (see PlaceShop): { x, y } or { side }
+-- while one that follows is open; false: one that doesn't (or was dragged).
+local shop
 
 -- Where the window with this name was last dropped, or nil: { point,
 -- relativePoint, x, y } in the window's own units, on this screen.
@@ -328,6 +334,9 @@ local function DragStop(frame)
 	end
 	Log(frame, "drag stop")
 	moving[frame] = nil
+	if shop and SHOP[frame:GetName() or ""] then
+		shop = false -- (dropped somewhere: stays there)
+	end
 	frame:SetUserPlaced(false)
 	local point, _, relativePoint, x, y = frame:GetPoint(1)
 	x, y = Number(x), Number(y)
@@ -521,6 +530,35 @@ end
 -- one opens with none: its click is read then).
 local talking = false
 
+-- Quest Vision's Opposite clicked, "Shop window goes where the talk was"
+-- (ns.ShopSpot): the merchant window, opened from the talk, is centered where
+-- the talk was; opened with no talk first, it's mirrored off the half you
+-- clicked the vendor on. Decided as it opens (shop), kept while it's open.
+
+local function PlaceShop(frame)
+	if Held(frame) or not shop then
+		return
+	end
+	local screenWidth, screenHeight = ScreenSize()
+	local left, top, width, height = Number(frame:GetLeft()), Number(frame:GetTop()),
+		Number(frame:GetWidth()), Number(frame:GetHeight())
+	if not screenWidth or not left or not top or not width or not height then
+		return
+	end
+	local toUI = ToUI(frame)
+	left, top, width, height = left * toUI, top * toUI, width * toUI, height * toUI
+	if shop.x then
+		left, top = shop.x - width / 2, shop.y + height / 2
+	elseif (left + width / 2 > screenWidth / 2) == (shop.side == "right") then
+		left = screenWidth - left - width
+	end
+	-- (kept on the screen)
+	left = math.max(EDGE, math.min(left, screenWidth - width - EDGE))
+	top = math.min(screenHeight - EDGE, math.max(top, height + EDGE))
+	frame:ClearAllPoints()
+	frame:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", left / toUI, top / toUI)
+end
+
 local function Arrange()
 	if not ns.db then
 		return
@@ -538,6 +576,21 @@ local function Arrange()
 	end
 	local keepClear = talkOpen and ns.TalkWindowSide and ns.TalkWindowSide(not talking) or nil
 	talking = talkOpen
+	local shopFrame
+	for _, frame in ipairs(open) do
+		if SHOP[frame:GetName() or ""] then
+			shopFrame = frame
+		end
+	end
+	if not shopFrame then
+		shop = nil
+	elseif shop == nil then
+		local x, y, side
+		if ns.ShopSpot then
+			x, y, side = ns.ShopSpot()
+		end
+		shop = x and { x = x, y = y } or side and { side = side } or false
+	end
 	for _, frame in ipairs(open) do
 		if not sized[frame] then
 			sized[frame] = true
@@ -554,8 +607,30 @@ local function Arrange()
 			frame:SetPoint(spot[1], UIParent, spot[2], spot[3], spot[4])
 		end
 	end
+	if shop and shopFrame then
+		for i = #row, 1, -1 do
+			if row[i] == shopFrame then
+				table.remove(row, i)
+			end
+		end
+	end
 	if ns.Setting("centerPanels") or keepClear then
 		CenterRow(keepClear, ns.Setting("centerPanels"))
+	end
+	-- (after the row: it's placed on its own)
+	if shop and shopFrame then
+		PlaceShop(shopFrame)
+	end
+	-- Where the game's talk window is (a shop window opening from it goes there).
+	for _, frame in ipairs(open) do
+		if TALK[frame:GetName() or ""] and ns.NoteTalkSpot and not Held(frame) then
+			local left, right, top, bottom = Number(frame:GetLeft()), Number(frame:GetRight()),
+				Number(frame:GetTop()), Number(frame:GetBottom())
+			if left and right and top and bottom then
+				local toUI = ToUI(frame)
+				ns.NoteTalkSpot((left + right) / 2 * toUI, (top + bottom) / 2 * toUI)
+			end
+		end
 	end
 end
 
@@ -677,7 +752,7 @@ end
 
 function Placed()
 	if not (ns.db and (ns.Setting("centerPanels") or ns.Setting("dragPanels") or next(handles)
-		or ns.TalkWindowPlace and ns.TalkWindowPlace())) then
+		or ns.TalkWindowPlace and ns.TalkWindowPlace() or ns.ShopFollowsTalk and ns.ShopFollowsTalk())) then
 		return
 	end
 	Arrange()

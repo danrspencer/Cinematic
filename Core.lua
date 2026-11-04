@@ -998,7 +998,8 @@ DEFAULTS.questTalkStyle = "parchment" -- or "bubble" (the game's chat bubble)
 -- Where the bubble goes: "head" (over their nameplate), "fixed" (where you
 -- drag it) or "opposite" (across the screen from where you clicked them).
 DEFAULTS.questTalkPlace = "opposite"
-DEFAULTS.questTalkGameButton = false -- "Show the game's window" on the card
+DEFAULTS.questTalkShopFollow = true -- Opposite clicked: a shop window opened from the talk goes where the talk was
+DEFAULTS.questTalkGameButton = true -- "Show the game's window" on the card
 DEFAULTS.questTalkStill = true -- Over the head: the quest camera holds still (no drift) while it's up
 DEFAULTS.questTalkCamMove = "follow" -- Over the head, while the camera moves: "follow", "fade", "dim" or "wait" (see QuestTalk)
 DEFAULTS.questTalkKeys = true         -- 1-0 pick, Space turns the page / first button

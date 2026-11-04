@@ -524,6 +524,72 @@ function ns.TalkClickX()
 	return x
 end
 
+-- Opposite clicked, questTalkShopFollow: a shop window opening from the talk
+-- (its vendor reply) goes where the talk was, on the clear half. Where it was:
+-- the middle of the bubble and card (or, Custom dialogue frames off, the
+-- game's talk window: CenterPanels.lua notes it), UIParent's units, noted
+-- while it shows; still good for SHOP_WAIT after it goes, for the same NPC.
+local SHOP_WAIT = 1.5 -- seconds
+local talkSpot = { at = -math.huge }
+
+function ns.NoteTalkSpot(x, y)
+	talkSpot.x, talkSpot.y, talkSpot.at = x, y, GetTime()
+	talkSpot.guid = Plain(UnitGUID("npc"))
+end
+
+-- The middle of the bubble and the card beside it, if they show and can be measured.
+local function NoteBubble()
+	if not (bubble and bubble:IsShown()) or bubble.onPlate then
+		return
+	end
+	local uiScale = Plain(UIParent:GetEffectiveScale())
+	local left, right, top, bottom
+	for _, frame in ipairs({ bubble, panel }) do
+		if frame and frame:IsShown() then
+			local ok, l, r, t, b = pcall(function() return frame:GetLeft(), frame:GetRight(), frame:GetTop(), frame:GetBottom() end)
+			local scale = Plain(frame:GetEffectiveScale())
+			l, r, t, b = ok and Plain(l), ok and Plain(r), ok and Plain(t), ok and Plain(b)
+			if type(l) ~= "number" or type(r) ~= "number" or type(t) ~= "number" or type(b) ~= "number"
+				or type(scale) ~= "number" or type(uiScale) ~= "number" or uiScale <= 0 then
+				return
+			end
+			local toUI = scale / uiScale
+			l, r, t, b = l * toUI, r * toUI, t * toUI, b * toUI
+			left, right = left and math.min(left, l) or l, right and math.max(right, r) or r
+			top, bottom = top and math.max(top, t) or t, bottom and math.min(bottom, b) or b
+		end
+	end
+	if left then
+		ns.NoteTalkSpot((left + right) / 2, (top + bottom) / 2)
+	end
+end
+
+-- Whether a shop window should follow the talk at all.
+function ns.ShopFollowsTalk()
+	return ns.db and PlaceMode() == "opposite" and Setting("questTalkShopFollow") and true or false
+end
+
+-- For a shop window opening now: the middle of where the talk was (x, y,
+-- UIParent's units); else, with no talk shown first (a vendor with nothing
+-- else to say), nil, nil and the half you clicked them on ("left" or
+-- "right"), to keep clear. All nil: leave it be.
+function ns.ShopSpot()
+	if not ns.ShopFollowsTalk() then
+		return nil
+	end
+	NoteBubble()
+	local guid = Plain(UnitGUID("npc"))
+	if talkSpot.x and GetTime() - talkSpot.at <= SHOP_WAIT
+		and (not guid or not talkSpot.guid or guid == talkSpot.guid) then
+		return talkSpot.x, talkSpot.y
+	end
+	local x = ns.TalkClickX()
+	if x then
+		return nil, nil, x > 0.5 and "right" or "left"
+	end
+	return nil
+end
+
 -- With quest talk off, Where they go places the game's own
 -- gossip and quest windows (CenterPanels.lua): "fixed" or "opposite", or nil
 -- to leave them be (Over the head: a whole window over an NPC would hide
@@ -2015,6 +2081,7 @@ end
 
 local function Hide(why)
 	ns.LogDetail("questtalk", ("ours gone, the game's windows back (%s)"):format(why or "?"))
+	NoteBubble() -- (a shop window opening from it goes there: ns.ShopSpot)
 	if bubble then
 		bubble:Hide()
 		panel:Hide()
