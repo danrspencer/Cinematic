@@ -542,18 +542,26 @@ local function BoxLine(parent)
 			local value = type(key) == "table" and key.get() or ns.GetDB()[key]
 			return (value or 0) * scale
 		end
+		local percent = scale == 100 or (unit and unit:match("^%%"))
+		-- (A % box shows a typed 3.25 as 3.25%, whole numbers as before.)
 		local function Shown(value)
-			return type(fmt) == "function" and fmt(value) or fmt:format(value)
+			if type(fmt) == "function" then return fmt(value) end
+			if percent and math.abs(value - math.floor(value + 0.5)) > 1e-6 then
+				local text = ("%.2f"):format(value):gsub("0+$", ""):gsub("%.$", "")
+				return (fmt:gsub("%%[%d%.]*[df]", "%%s", 1)):format(text)
+			end
+			return fmt:format(value)
 		end
 		-- (A typed number is kept as typed, to the decimals the box shows,
-		-- not snapped to step; a % box's wheel moves 1% a time.)
+		-- not snapped to step; a % box keeps two decimals (3.2%), whichever
+		-- it shows; a % box's wheel moves 1% a time.)
 		local exact = step
 		if type(fmt) == "string" then
 			local decimals = fmt:match("%%[%d]*%.(%d)f")
 			exact = fmt:match("%%[%d]*d") and 1 or decimals and 10 ^ -tonumber(decimals) or step
 			exact = math.min(exact, step)
 		end
-		local percent = scale == 100 or (unit and unit:match("^%%"))
+		if percent then exact = math.min(exact, 0.01) end
 		local wheelStep = percent and math.min(1, step) or step
 		local function Set(value)
 			value = math.max(minV, math.min(maxV, math.floor(value / exact + 0.5) * exact))
@@ -567,7 +575,15 @@ local function BoxLine(parent)
 			if onChange then onChange(value) end
 		end
 		box:SetScript("OnMouseWheel", function(self, delta)
-			if self:IsEnabled() then Set(Now() + delta * wheelStep) end
+			if not self:IsEnabled() then return end
+			-- (From a typed 3.2%, the wheel goes to 4% or 3%, back on the steps.)
+			local steps = Now() / wheelStep
+			local near = math.floor(steps + 0.5)
+			if math.abs(steps - near) > 1e-6 then
+				Set((delta > 0 and math.ceil(steps) or math.floor(steps)) * wheelStep)
+			else
+				Set(Now() + delta * wheelStep)
+			end
 		end)
 		box:SetScript("OnEditFocusGained", function(self)
 			self:SetText(tostring(math.floor(Now() / exact + 0.5) * exact))
