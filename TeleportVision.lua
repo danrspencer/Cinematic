@@ -35,13 +35,14 @@ local GONE_TIME = 1.6      -- seconds it takes to clear as you go...
 local BLACK_HOLD = 0.6     -- ...the first of them all black (with Black edges): the ring shrinking into you under it
 local CANCEL_TIME = 0.8    -- seconds it takes to open back out and fade
 local TEST_TIME = 8        -- seconds the page's test cast takes
+local SKIP_FADE = 0.4      -- seconds a test started part way through fades in over
 local MAX_MOTES = 16
 
 local frame, ring, arms, flash, shade, clouds, edges, blackout
 local motes = {}
 local spin = { ring = 0, arms = 0 }
 local lastAt
-local test -- (the page's pretend cast: { startAt, endsAt })
+local test -- (the page's pretend cast: { startAt, endsAt, shownAt, quiet })
 
 local function Create()
 	frame = CreateFrame("Frame", nil, UIParent)
@@ -157,6 +158,7 @@ local function Update()
 		p = math.min(1, math.max(0, ((cast.doneAt or now) - cast.startAt) / span))
 		rim = RIM_OUT + (RIM_IN - RIM_OUT) * p * p * (3 - 2 * p)
 		alpha = 0.25 + 0.75 * p ^ 1.5
+		if cast.shownAt then alpha = alpha * math.min(1, (now - cast.shownAt) / SKIP_FADE) end
 		if cast.done == "gone" then
 			local since = now - cast.doneAt
 			rim = rim * math.max(0, 1 - since / BLACK_HOLD) -- (shrinking into you as you go)
@@ -266,7 +268,7 @@ local function Update()
 		end
 	end
 	-- (The test's timer: seconds left, the blackout marked as it starts.)
-	if cast == test then
+	if cast == test and not cast.quiet then
 		local left = cast.endsAt - now
 		if cast.done == "gone" then
 			Timer("|cffaaaaaa" .. L["gone"] .. "|r")
@@ -382,13 +384,18 @@ barWatcher:SetScript("OnEvent", function()
 end)
 
 -- The page's test: a pretend cast of TEST_TIME seconds (again: stop).
-function ns.TestTeleportVision()
+-- skip: seconds of it already gone as it starts (the welcome window's
+-- demo: straight to the portal), faded in over SKIP_FADE. quiet: without
+-- the timer in the middle (the page's, for timing its settings).
+function ns.TestTeleportVision(skip, quiet)
 	if test and not test.done then
 		test.done, test.doneAt = "cancelled", GetTime()
 		return
 	end
 	local now = GetTime()
-	test = { startAt = now, endsAt = now + TEST_TIME }
+	skip = math.max(0, math.min(TEST_TIME - 1, skip or 0))
+	test = { startAt = now - skip, endsAt = now + TEST_TIME - skip, shownAt = skip > 0 and now or nil,
+		quiet = quiet or nil }
 end
 function ns.TeleportVisionTesting() return test ~= nil and not test.done end
 

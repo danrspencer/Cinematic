@@ -4270,6 +4270,22 @@ L["Delete everything in Cinematic? Your own profiles, cameras, scripts, themes, 
 L["Reset Settings"] = "Redefinir configurações"
 L["Reset EVERYTHING"] = "Redefinir TUDO"
 
+-- ProfileChoices.lua and Welcome.lua: profile choices
+L["Fights and opening windows bring your UI back"] = "Lutas e janelas abertas trazem sua interface de volta"
+L["Most of the time"] = "Na maior parte do tempo"
+L["Between fights, and fights bring back less: no minimap, fewer group nameplates"] = "Entre lutas, e as lutas trazem menos: sem minimapa, menos placas de nome do grupo"
+L["Always show"] = "Sempre mostrar"
+L["Action bars (Classic group)"] = "Barras de ação (grupo Classic)"
+L["Action bars (Retail group)"] = "Barras de ação (grupo Retail)"
+L["General and Trade too"] = "Geral e Comércio também"
+L["Neither NPC speech nor public channels bring chat up"] = "Nem falas de PNJ nem canais públicos trazem o chat"
+L["No NPC chatter; speech from behind you shows low on the screen"] = "Sem conversa de PNJ; falas atrás de você aparecem embaixo na tela"
+L["A portal opens around you as you hearth or teleport"] = "Um portal se abre ao seu redor quando você usa a pedra de regresso ou se teleporta"
+L["A card shows who buffed you or emoted at you"] = "Um cartão mostra quem te bufou ou fez um emote para você"
+L["Your race with the top of the meter, in dungeons and raids"] = "Sua corrida com o topo do medidor, em masmorras e raides"
+L["NPC speech brings chat up; public channels don't"] = "Falas de PNJ trazem o chat; canais públicos não"
+L["NPC speech, and the General and Trade channels"] = "Falas de PNJ e os canais Geral e Comércio"
+
 -- CardMoments.lua, CardsPage.lua, FlightLine.lua: Flight departure
 L["Click to target %s"] = "Clique para selecionar %s"
 L["As a flight lands: where it took you, and how long the flight took."] = "Quando um voo pousa: para onde ele te levou e quanto tempo durou."
@@ -4314,3 +4330,17 @@ L["Off. Click to turn this page on."] = "Desligada. Clique para ligar esta pági
 L["Everything CineMode can do, page by page. Click On or Off to turn a page on or off; Open takes you there."] = "Tudo o que o CineMode faz, página por página. Clique em Ligado ou Desligado para ligar ou desligar uma página; Abrir leva você até lá."
 L["Go to this page."] = "Ir para esta página."
 L["%d of %d pages on."] = "%d de %d páginas ligadas."
+
+-- ShowMe.lua and Welcome.lua: See it first, Show me
+L["Nothing to show here."] = "Nada para mostrar aqui."
+L["Not in a fight: try it once the fight ends."] = "Não em luta: tente quando a luta acabar."
+L["Click the row to turn it on first."] = "Clique primeiro na linha para ligar."
+L["See it first"] = "Veja antes"
+L["Click one to see it for a few seconds."] = "Clique em um para vê-lo por alguns segundos."
+L["Vitals"] = "Vitais"
+L["Teleport"] = "Teleporte"
+L["Black bars at the top and bottom of the screen, as in a film."] = "Faixas pretas no topo e na base da tela, como num filme."
+L["A color wash over the world that follows the time of day and the zone, with soft dark edges and weather to match."] = "Um véu de cor sobre o mundo que segue a hora do dia e a zona, com bordas escuras suaves e clima combinando."
+L["The camera moves on its own at quiet moments: on flights, when you go AFK, by a campfire. This shows a half turn around you; move the camera yourself to stop it."] = "A câmera se move sozinha em momentos tranquilos: em voos, quando você fica AFK, perto de uma fogueira. Isto mostra meia volta ao seu redor; mova a câmera você mesmo para parar."
+L["As your health drops, the screen's edges close in, so you feel a fight without watching your health bar."] = "Conforme sua vida cai, as bordas da tela se fecham, então você sente a luta sem olhar a barra de vida."
+L["As you cast your Hearthstone or a teleport, a portal opens around you and the world fades out as you leave."] = "Enquanto você conjura a pedra de regresso ou um teleporte, um portal se abre ao seu redor e o mundo some quando você parte."

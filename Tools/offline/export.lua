@@ -2,6 +2,7 @@
 -- mock-ups of the profile pages are made from it). From the repo root:
 --
 --   lua5.1 Tools/offline/export.lua > profiles.json
+--   python -I Tools/offline/run.py Tools/offline/export.lua > profiles.json    (no lua5.1)
 --
 -- For each client (the dev build's files, so the hidden and dev-only
 -- profiles are there too): its options pages and their sections (how many
@@ -100,8 +101,7 @@ local function Client(client)
 			local picks, pickedBy = ns.ProfilePicks(profile, client, ns.ALL_BUILTIN_BY_NAME)
 			local slots = {}
 			for _, slot in ipairs(ns.PROFILE_SLOTS) do
-				local info = ns.SLOT_CHOICES[slot.key]
-				slots[slot.key] = { part = picks[slot.key] or info.default, by = pickedBy[slot.key] or "default" }
+				slots[slot.key] = { part = picks[slot.key] or ns.SlotDefault(slot.key, client), by = pickedBy[slot.key] or "default" }
 			end
 			out.profiles[#out.profiles + 1] = { name = profile.name, label = profile.label or profile.name,
 				tip = profile.tip, from = profile.from, hidden = profile.hidden, dev = profile.dev,
@@ -124,7 +124,7 @@ local function Client(client)
 			end
 		end
 		out.slots[#out.slots + 1] = { key = slot.key, label = info.label, question = info.question, page = info.page,
-			default = info.default, choices = choices }
+			default = ns.SlotDefault(slot.key, client), choices = choices }
 	end
 	out.levels = {}
 	for _, level in ipairs(ns.WELCOME_LEVELS) do
@@ -142,7 +142,8 @@ if arg[1] then
 end
 local parts = {}
 for _, client in ipairs({ "forever", "retail" }) do
-	local pipe = io.popen("lua5.1 Tools/offline/export.lua " .. client)
+	-- (run.py sets CINE_LUA to itself: no lua5.1 there.)
+	local pipe = io.popen((os.getenv("CINE_LUA") or "lua5.1") .. " Tools/offline/export.lua " .. client)
 	parts[#parts + 1] = '  "' .. client .. '": ' .. pipe:read("*a"):gsub("%s+$", ""):gsub("\n", "\n  ")
 	pipe:close()
 end

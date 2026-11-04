@@ -4271,6 +4271,22 @@ L["Delete everything in Cinematic? Your own profiles, cameras, scripts, themes, 
 L["Reset Settings"] = "Ripristina impostazioni"
 L["Reset EVERYTHING"] = "Ripristina TUTTO"
 
+-- ProfileChoices.lua and Welcome.lua: profile choices
+L["Fights and opening windows bring your UI back"] = "I combattimenti e le finestre aperte riportano l'interfaccia"
+L["Most of the time"] = "Quasi sempre"
+L["Between fights, and fights bring back less: no minimap, fewer group nameplates"] = "Tra i combattimenti, e i combattimenti riportano meno: niente minimappa, meno barre dei nomi del gruppo"
+L["Always show"] = "Mostra sempre"
+L["Action bars (Classic group)"] = "Barre delle azioni (gruppo Classic)"
+L["Action bars (Retail group)"] = "Barre delle azioni (gruppo Retail)"
+L["General and Trade too"] = "Anche Generale e Commercio"
+L["Neither NPC speech nor public channels bring chat up"] = "Né le battute dei PNG né i canali pubblici fanno comparire la chat"
+L["No NPC chatter; speech from behind you shows low on the screen"] = "Niente chiacchiere dei PNG; le battute alle tue spalle compaiono in basso sullo schermo"
+L["A portal opens around you as you hearth or teleport"] = "Un portale si apre attorno a te quando usi la pietra del ritorno o ti teletrasporti"
+L["A card shows who buffed you or emoted at you"] = "Una scheda mostra chi ti ha potenziato o ti ha rivolto un'emote"
+L["Your race with the top of the meter, in dungeons and raids"] = "La tua gara con la cima del contatore, in spedizioni e incursioni"
+L["NPC speech brings chat up; public channels don't"] = "Le battute dei PNG fanno comparire la chat; i canali pubblici no"
+L["NPC speech, and the General and Trade channels"] = "Le battute dei PNG e i canali Generale e Commercio"
+
 -- CardMoments.lua, CardsPage.lua, FlightLine.lua: Flight departure
 L["Click to target %s"] = "Clic per bersagliare %s"
 L["As a flight lands: where it took you, and how long the flight took."] = "All'atterraggio di un volo: dove ti ha portato e quanto è durato."
@@ -4315,3 +4331,17 @@ L["Off. Click to turn this page on."] = "Disattiva. Clic per attivare questa pag
 L["Everything CineMode can do, page by page. Click On or Off to turn a page on or off; Open takes you there."] = "Tutto ciò che CineMode sa fare, pagina per pagina. Clicca su Acceso o Spento per attivare o disattivare una pagina; Apri ti porta lì."
 L["Go to this page."] = "Vai a questa pagina."
 L["%d of %d pages on."] = "%d pagine attive su %d."
+
+-- ShowMe.lua and Welcome.lua: See it first, Show me
+L["Nothing to show here."] = "Niente da mostrare qui."
+L["Not in a fight: try it once the fight ends."] = "Non in combattimento: provalo quando finisce."
+L["Click the row to turn it on first."] = "Prima clicca sulla riga per attivarlo."
+L["See it first"] = "Guarda prima"
+L["Click one to see it for a few seconds."] = "Clicca su uno per vederlo per qualche secondo."
+L["Vitals"] = "Vitalità"
+L["Teleport"] = "Teletrasporto"
+L["Black bars at the top and bottom of the screen, as in a film."] = "Bande nere in alto e in basso sullo schermo, come in un film."
+L["A color wash over the world that follows the time of day and the zone, with soft dark edges and weather to match."] = "Una velatura di colore sul mondo che segue l'ora del giorno e la zona, con bordi scuri morbidi e meteo in tono."
+L["The camera moves on its own at quiet moments: on flights, when you go AFK, by a campfire. This shows a half turn around you; move the camera yourself to stop it."] = "La telecamera si muove da sola nei momenti tranquilli: in volo, quando vai AFK, accanto a un falò. Qui fa mezzo giro attorno a te; muovi tu la telecamera per fermarla."
+L["As your health drops, the screen's edges close in, so you feel a fight without watching your health bar."] = "Quando la salute cala, i bordi dello schermo si stringono, così senti il combattimento senza guardare la barra della salute."
+L["As you cast your Hearthstone or a teleport, a portal opens around you and the world fades out as you leave."] = "Mentre lanci la pietra del ritorno o un teletrasporto, un portale si apre attorno a te e il mondo svanisce mentre parti."

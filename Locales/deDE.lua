@@ -4270,6 +4270,22 @@ L["Delete everything in Cinematic? Your own profiles, cameras, scripts, themes, 
 L["Reset Settings"] = "Einstellungen zurücksetzen"
 L["Reset EVERYTHING"] = "ALLES zurücksetzen"
 
+-- ProfileChoices.lua and Welcome.lua: profile choices
+L["Fights and opening windows bring your UI back"] = "Kämpfe und geöffnete Fenster holen dein UI zurück"
+L["Most of the time"] = "Meistens"
+L["Between fights, and fights bring back less: no minimap, fewer group nameplates"] = "Zwischen Kämpfen, und Kämpfe holen weniger zurück: keine Minikarte, weniger Gruppen-Namensplaketten"
+L["Always show"] = "Immer zeigen"
+L["Action bars (Classic group)"] = "Aktionsleisten (Classic-Gruppe)"
+L["Action bars (Retail group)"] = "Aktionsleisten (Retail-Gruppe)"
+L["General and Trade too"] = "Auch Allgemein und Handel"
+L["Neither NPC speech nor public channels bring chat up"] = "Weder NSC-Sprache noch öffentliche Kanäle holen den Chat hervor"
+L["No NPC chatter; speech from behind you shows low on the screen"] = "Kein NSC-Geplauder; Sprache hinter dir erscheint unten am Bildschirm"
+L["A portal opens around you as you hearth or teleport"] = "Ein Portal öffnet sich um dich, wenn du den Ruhestein nutzt oder teleportierst"
+L["A card shows who buffed you or emoted at you"] = "Eine Karte zeigt, wer dich gebufft oder dir ein Emote geschickt hat"
+L["Your race with the top of the meter, in dungeons and raids"] = "Dein Rennen mit der Spitze der Anzeige, in Dungeons und Schlachtzügen"
+L["NPC speech brings chat up; public channels don't"] = "NSC-Sprache holt den Chat hervor, öffentliche Kanäle nicht"
+L["NPC speech, and the General and Trade channels"] = "NSC-Sprache und die Kanäle Allgemein und Handel"
+
 -- CardMoments.lua, CardsPage.lua, FlightLine.lua: Flight departure
 L["Click to target %s"] = "Klicken, um %s ins Ziel zu nehmen"
 L["As a flight lands: where it took you, and how long the flight took."] = "Wenn ein Flug landet: wohin er dich gebracht hat und wie lange er gedauert hat."
@@ -4314,3 +4330,17 @@ L["Off. Click to turn this page on."] = "Aus. Klicken, um diese Seite einzuschal
 L["Everything CineMode can do, page by page. Click On or Off to turn a page on or off; Open takes you there."] = "Alles, was CineMode kann, Seite für Seite. Klicke auf An oder Aus, um eine Seite ein- oder auszuschalten; Öffnen bringt dich hin."
 L["Go to this page."] = "Zu dieser Seite gehen."
 L["%d of %d pages on."] = "%d von %d Seiten an."
+
+-- ShowMe.lua and Welcome.lua: See it first, Show me
+L["Nothing to show here."] = "Hier gibt es nichts zu zeigen."
+L["Not in a fight: try it once the fight ends."] = "Nicht im Kampf: Probier es, wenn der Kampf vorbei ist."
+L["Click the row to turn it on first."] = "Klicke zuerst auf die Zeile, um es einzuschalten."
+L["See it first"] = "Erst ansehen"
+L["Click one to see it for a few seconds."] = "Klicke auf eins, um es ein paar Sekunden zu sehen."
+L["Vitals"] = "Vitalwerte"
+L["Teleport"] = "Teleport"
+L["Black bars at the top and bottom of the screen, as in a film."] = "Schwarze Balken oben und unten am Bildschirm, wie im Film."
+L["A color wash over the world that follows the time of day and the zone, with soft dark edges and weather to match."] = "Ein Farbschleier über der Welt, der Tageszeit und Zone folgt, mit weichen dunklen Rändern und passendem Wetter."
+L["The camera moves on its own at quiet moments: on flights, when you go AFK, by a campfire. This shows a half turn around you; move the camera yourself to stop it."] = "Die Kamera bewegt sich in ruhigen Momenten von selbst: auf Flügen, wenn du AFK gehst, am Lagerfeuer. Das zeigt eine halbe Drehung um dich; beweg die Kamera selbst, um es zu stoppen."
+L["As your health drops, the screen's edges close in, so you feel a fight without watching your health bar."] = "Wenn deine Gesundheit sinkt, rücken die Bildschirmränder näher, so spürst du einen Kampf, ohne auf deine Gesundheitsleiste zu schauen."
+L["As you cast your Hearthstone or a teleport, a portal opens around you and the world fades out as you leave."] = "Während du den Ruhestein oder einen Teleport wirkst, öffnet sich ein Portal um dich, und die Welt verblasst, wenn du gehst."

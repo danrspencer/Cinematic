@@ -4514,7 +4514,8 @@ local immersiveProgress = 0
 
 function ns.UpdateLetterbox(cinematic, elapsed)
 	local immersive = ns.ChatCamImmersive and ns.ChatCamImmersive() or false
-	local target = ((cinematic and ns.db.letterbox) or immersive) and 1 or 0
+	-- (Show me's demo, ShowMe.lua: the bars with the setting off, too)
+	local target = ((cinematic and (ns.db.letterbox or ns.effectsDemo)) or immersive) and 1 or 0
 	local grow = immersive and 1 or 0
 	if letterboxProgress == target and immersiveProgress == grow and not ns.letterboxDirty then
 		return

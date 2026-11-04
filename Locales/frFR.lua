@@ -4269,6 +4269,22 @@ L["Delete everything in Cinematic? Your own profiles, cameras, scripts, themes, 
 L["Reset Settings"] = "Réinitialiser les réglages"
 L["Reset EVERYTHING"] = "Tout réinitialiser"
 
+-- ProfileChoices.lua and Welcome.lua: profile choices
+L["Fights and opening windows bring your UI back"] = "Les combats et les fenêtres ouvertes ramènent votre interface"
+L["Most of the time"] = "La plupart du temps"
+L["Between fights, and fights bring back less: no minimap, fewer group nameplates"] = "Entre les combats, et les combats en ramènent moins : pas de minicarte, moins de barres de nom du groupe"
+L["Always show"] = "Toujours afficher"
+L["Action bars (Classic group)"] = "Barres d'action (groupe Classic)"
+L["Action bars (Retail group)"] = "Barres d'action (groupe Retail)"
+L["General and Trade too"] = "Général et Commerce aussi"
+L["Neither NPC speech nor public channels bring chat up"] = "Ni les paroles des PNJ ni les canaux publics n'affichent le chat"
+L["No NPC chatter; speech from behind you shows low on the screen"] = "Pas de bavardage de PNJ ; les paroles derrière vous s'affichent en bas de l'écran"
+L["A portal opens around you as you hearth or teleport"] = "Un portail s'ouvre autour de vous quand vous utilisez la pierre de foyer ou vous téléportez"
+L["A card shows who buffed you or emoted at you"] = "Une carte montre qui vous a amélioré ou vous a adressé une émote"
+L["Your race with the top of the meter, in dungeons and raids"] = "Votre course avec le haut du classement, en donjon et en raid"
+L["NPC speech brings chat up; public channels don't"] = "Les paroles des PNJ affichent le chat ; pas les canaux publics"
+L["NPC speech, and the General and Trade channels"] = "Les paroles des PNJ, et les canaux Général et Commerce"
+
 -- CardMoments.lua, CardsPage.lua, FlightLine.lua: Flight departure
 L["Click to target %s"] = "Cliquez pour cibler %s"
 L["As a flight lands: where it took you, and how long the flight took."] = "À l'atterrissage d'un vol : où il vous a emmené, et combien de temps il a duré."
@@ -4313,3 +4329,17 @@ L["Off. Click to turn this page on."] = "Désactivée. Cliquez pour activer cett
 L["Everything CineMode can do, page by page. Click On or Off to turn a page on or off; Open takes you there."] = "Tout ce que CineMode sait faire, page par page. Cliquez sur Activée ou Désactivée pour basculer une page ; Ouvrir vous y emmène."
 L["Go to this page."] = "Aller à cette page."
 L["%d of %d pages on."] = "%d pages activées sur %d."
+
+-- ShowMe.lua and Welcome.lua: See it first, Show me
+L["Nothing to show here."] = "Rien à montrer ici."
+L["Not in a fight: try it once the fight ends."] = "Pas en combat : essayez une fois le combat terminé."
+L["Click the row to turn it on first."] = "Cliquez d'abord sur la ligne pour l'activer."
+L["See it first"] = "Voir d'abord"
+L["Click one to see it for a few seconds."] = "Cliquez-en un pour le voir quelques secondes."
+L["Vitals"] = "Vitalité"
+L["Teleport"] = "Téléportation"
+L["Black bars at the top and bottom of the screen, as in a film."] = "Des bandes noires en haut et en bas de l'écran, comme au cinéma."
+L["A color wash over the world that follows the time of day and the zone, with soft dark edges and weather to match."] = "Un voile de couleur sur le monde qui suit l'heure du jour et la zone, avec des bords sombres adoucis et une météo assortie."
+L["The camera moves on its own at quiet moments: on flights, when you go AFK, by a campfire. This shows a half turn around you; move the camera yourself to stop it."] = "La caméra bouge toute seule aux moments calmes : en vol, quand vous êtes absent, près d'un feu de camp. Ceci montre un demi-tour autour de vous ; bougez la caméra vous-même pour l'arrêter."
+L["As your health drops, the screen's edges close in, so you feel a fight without watching your health bar."] = "Quand votre santé baisse, les bords de l'écran se resserrent : vous sentez le combat sans regarder votre barre de vie."
+L["As you cast your Hearthstone or a teleport, a portal opens around you and the world fades out as you leave."] = "Pendant que vous lancez votre pierre de foyer ou une téléportation, un portail s'ouvre autour de vous et le monde s'efface à votre départ."

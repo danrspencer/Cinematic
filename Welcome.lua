@@ -43,6 +43,22 @@ local VISION_LINES = {
 	duel = "Watch duels near you: the duelists' health shows",
 	roll = "Group loot rolls in a window: who picked what",
 	vitals = "The screen's edges close in as your health drops",
+	tele = "A portal opens around you as you hearth or teleport",
+	emote = "A card shows who buffed you or emoted at you",
+	damage = "Your race with the top of the meter, in dungeons and raids",
+}
+-- (Visions the vision wheel doesn't have, ticked here as the wheel's are:
+-- their setting on or off. The profiles turn them on: ProfileChoices.lua.)
+local MORE_VISIONS = {
+	{ key = "tele", setting = "teleportVision", label = "Tele Vision",
+		icon = "Interface\\Icons\\Spell_Arcane_TeleportStormWind" },
+	{ key = "emote", setting = "emoteVision", label = "Emote Vision",
+		icon = "Interface\\Icons\\Spell_Holy_PrayerOfFortitude" },
+	{ key = "damage", setting = "damageVision", label = "Damage Vision",
+		icon = "Interface\\Icons\\Ability_Warrior_Rampage",
+		Apply = function() if ns.RefreshDamageVision then ns.RefreshDamageVision() end end,
+		-- (Only in a game with the damage meter it reads.)
+		available = function() return C_DamageMeter ~= nil end },
 }
 -- (A slot with no choices on this client isn't listed: Layout on retail.)
 for _, slot in ipairs({ "frames", "bars", "layout", "camera", "vfx", "visions", "chat", "sound" }) do
@@ -58,7 +74,7 @@ ns.OnLanguage(function()
 	for key, line in pairs(VISION_LINES) do VISION_LINES[key] = L[line] end
 end)
 
-local window, pages, status, about
+local window, pages, status, about, demoRow
 local cards = {} -- profile name -> its card
 local levelOf = {} -- profile name -> its level
 
@@ -233,6 +249,7 @@ end
 
 -- What the description box says: the hovered level's, else the picked one's.
 local function Describe(level)
+	if demoRow then demoRow:Update(level) end
 	if level then
 		about:SetText("|cffffd100" .. level.label .. "|r   " .. level.tip)
 	else
@@ -309,6 +326,116 @@ local function Card(parent, profile, level)
 	return card
 end
 
+-- See it first: a row of demos under the level cards, each a few seconds
+-- of one look (ShowMe.lua), Stop while it runs. Under each, whether the
+-- level hovered (else the one picked) has it. A Vision's test plays with
+-- its switch off too: trying it is the point.
+local DEMO_ROW = {
+	-- (each its settings page's icon, or its Vision's; tip: the description
+	-- box's words while it's hovered)
+	{ key = "bars", label = "Letterbox", icon = "Interface\\Icons\\Spell_Shadow_ShadesOfDarkness",
+		tip = "Black bars at the top and bottom of the screen, as in a film." },
+	{ key = "tint", label = "Tint", icon = "Interface\\Icons\\INV_Misc_Gem_Variety_02",
+		tip = "A color wash over the world that follows the time of day and the zone, with soft dark edges " ..
+			"and weather to match." },
+	{ key = "camera", label = "Camera", icon = "Interface\\Icons\\INV_Misc_Spyglass_03",
+		tip = "The camera moves on its own at quiet moments: on flights, when you go AFK, by a campfire. " ..
+			"This shows a half turn around you; move the camera yourself to stop it." },
+	{ key = "vitals", label = "Vitals", icon = "Interface\\Icons\\Spell_Shadow_LifeDrain02",
+		tip = "As your health drops, the screen's edges close in, so you feel a fight without watching " ..
+			"your health bar." },
+	{ key = "tele", label = "Teleport", icon = "Interface\\Icons\\Spell_Arcane_TeleportStormWind",
+		tip = "As you cast your Hearthstone or a teleport, a portal opens around you and the world fades " ..
+			"out as you leave." },
+}
+local DEMO_ROW_H = 74
+local function BuildDemoRow(page, width)
+	local row = CreateFrame("Frame", nil, page, BackdropTemplateMixin and "BackdropTemplate")
+	row:SetSize(width, DEMO_ROW_H)
+	Flat(row, BG)
+	local head = Text(row, "GameFontNormalSmall", L["See it first"], GOLD)
+	head:SetPoint("TOPLEFT", 12, -9)
+	local hint = Text(row, "GameFontHighlightSmall", L["Click one to see it for a few seconds."], DIM)
+	hint:SetJustifyH("RIGHT")
+	hint:SetPoint("TOPRIGHT", -12, -9)
+	local list = {}
+	for _, demo in ipairs(DEMO_ROW) do
+		if ns.ShowMeAvailable and ns.ShowMeAvailable(demo.key) then list[#list + 1] = demo end
+	end
+	local gap = 6
+	local buttonW = (width - 24 - gap * math.max(0, #list - 1)) / math.max(1, #list)
+	local buttons = {}
+	for i, demo in ipairs(list) do
+		local b = CreateFrame("Button", nil, row, BackdropTemplateMixin and "BackdropTemplate")
+		b:SetSize(buttonW, 38)
+		b:SetPoint("BOTTOMLEFT", 12 + (i - 1) * (buttonW + gap), 10)
+		Flat(b, RAISED, EDGE)
+		-- (its icon on the left, rounded as the level cards' are; the name
+		-- and its In or Not in beside it)
+		b.icon = b:CreateTexture(nil, "ARTWORK")
+		b.icon:SetSize(26, 26)
+		b.icon:SetPoint("LEFT", 6, 0)
+		b.icon:SetTexture(demo.icon)
+		b.icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
+		Rounded(b, b.icon)
+		b.name = Text(b, "GameFontHighlightSmall", L[demo.label], SOFT, buttonW - 40)
+		b.name:SetPoint("TOPLEFT", b.icon, "TOPRIGHT", 6, 0)
+		b.name:SetWordWrap(false)
+		b.tag = Text(b, "GameFontDisableSmall", "", DIM, buttonW - 40)
+		b.tag:SetPoint("TOPLEFT", b.name, "BOTTOMLEFT", 0, -3)
+		b.tag:SetWordWrap(false)
+		b:SetScript("OnClick", function() ns.ShowMe(demo.key, window, true) end)
+		b:SetScript("OnEnter", function(self)
+			if self:IsEnabled() then self:SetBackdropBorderColor(unpack(LIT)) end
+			about:SetText("|cffffd100" .. L[demo.label] .. "|r   " .. L[demo.tip])
+			local why = ns.ShowMeBlocked(demo.key, true)
+			if why then
+				GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+				GameTooltip:SetText(why, 1, 1, 1, 1, true)
+				GameTooltip:Show()
+			end
+		end)
+		b:SetScript("OnLeave", function(self)
+			self:SetBackdropBorderColor(unpack(ns.ShowMeRunning(demo.key) and GOLD or EDGE))
+			GameTooltip:Hide()
+			Describe(levelOf[Active()])
+		end)
+		b.demo = demo
+		buttons[i] = b
+	end
+	local show -- (the level the tags are for: Describe's, nil for none)
+	-- keep: the same level as last time (a demo started or ended, a fight).
+	function row:Update(level, keep)
+		if not keep then show = level end
+		for _, b in ipairs(buttons) do
+			local key = b.demo.key
+			local running = ns.ShowMeRunning(key)
+			local blocked = not running and ns.ShowMeBlocked(key, true)
+			b:SetEnabled(not blocked)
+			b.name:SetText(running and L["Stop"] or L[b.demo.label])
+			Color(b.name, blocked and DIM or running and GOLD or SOFT)
+			b.icon:SetDesaturated(blocked and true or false)
+			b.icon:SetAlpha(blocked and 0.5 or 1)
+			b:SetBackdropBorderColor(unpack(running and GOLD or EDGE))
+			local has = show and ns.ShowMeInProfile(key, show.profile)
+			if has == nil then
+				b.tag:SetText("")
+			else
+				b.tag:SetText((has and L["In %s"] or L["Not in %s"]):format(show.label))
+				Color(b.tag, has and GOLD or DIM)
+			end
+		end
+	end
+	local function Recheck() if row:IsVisible() then row:Update(nil, true) end end
+	if ns.ShowMeListen then ns.ShowMeListen(Recheck) end
+	row:RegisterEvent("PLAYER_REGEN_DISABLED")
+	row:RegisterEvent("PLAYER_REGEN_ENABLED")
+	row:SetScript("OnEvent", Recheck)
+	row:SetScript("OnShow", Recheck)
+	row:SetScript("OnHide", function() if ns.StopShowMe then ns.StopShowMe() end end)
+	return row
+end
+
 -- Page 1: the three levels.
 local function BuildLevels(page)
 	local title = Text(page, "GameFontNormalHuge", L["Welcome to Cinematic"], GOLD)
@@ -327,9 +454,15 @@ local function BuildLevels(page)
 		end
 	end
 
-	-- The description box under the cards.
+	-- See it first, then the description box, under the cards.
+	local rowH = 0
+	if ns.ShowMe then
+		demoRow = BuildDemoRow(page, WIDTH - 2 * PAD)
+		demoRow:SetPoint("TOPLEFT", sub, "BOTTOMLEFT", 0, -18 - 124 - 12)
+		rowH = DEMO_ROW_H + 12
+	end
 	local box = CreateFrame("Frame", nil, page, BackdropTemplateMixin and "BackdropTemplate")
-	box:SetPoint("TOPLEFT", sub, "BOTTOMLEFT", 0, -18 - 124 - 12)
+	box:SetPoint("TOPLEFT", sub, "BOTTOMLEFT", 0, -18 - 124 - 12 - rowH)
 	box:SetSize(WIDTH - 2 * PAD, 56)
 	Flat(box, BG)
 	about = Text(box, "GameFontHighlightSmall", "", SOFT, WIDTH - 2 * PAD - 24)
@@ -349,7 +482,7 @@ local function BuildLevels(page)
 
 	status = Text(page, "GameFontHighlightSmall", "", SOFT)
 	status:SetPoint("TOPLEFT", box, "BOTTOMLEFT", 0, -10)
-	page.height = 380 + boxH - 56
+	page.height = 380 + boxH - 56 + rowH
 end
 
 -- The Customize panel: a list of parts on the left and the one shown on the
@@ -360,7 +493,8 @@ end
 -- one, false on the last), :IsLast() and :SettingsPage(). skinned: in the
 -- menu look, SD too (the Profiles page; Skinnable above).
 function ns.CustomizePanel(parent, width, onChange, skinned)
-	local NAV_W, PANEL_H = 140, 300
+	-- (Tall enough for the Visions page's eight rows with their lines.)
+	local NAV_W, PANEL_H = 140, 360
 	local holder = CreateFrame("Frame", nil, parent)
 	holder:SetSize(width, PANEL_H)
 	local rows, question, soon, saved, panel
@@ -402,6 +536,16 @@ function ns.CustomizePanel(parent, width, onChange, skinned)
 			saved:SetText((any and L["Changes go in your profile %s."]
 				or L["Changes go in your profile %s. This part is a mix of its own."])
 				:format("|cffffd100" .. active .. "|r"))
+		end
+		-- (Show me: Stop while its demo runs, greyed while it can't run)
+		for _, option in ipairs(options) do
+			if option.demo and option:IsShown() then
+				local running = ns.ShowMeRunning(option.demo)
+				local blocked = not running and ns.ShowMeBlocked(option.demo)
+				option.show:SetLabel(running and L["Stop"] or L["Show me"])
+				option.show:SetEnabled(not blocked)
+				Color(option.show.text, blocked and DIM or running and GOLD or SOFT)
+			end
 		end
 	end
 
@@ -456,6 +600,29 @@ function ns.CustomizePanel(parent, width, onChange, skinned)
 			GameTooltip:Show()
 		end)
 		option.regenerate:HookScript("OnLeave", function() GameTooltip:Hide() end)
+		-- (Show me: the choice tried for a few seconds, Stop while it runs;
+		-- greyed, with why, while it can't run: ShowMe.lua)
+		option.show = FlatButton(option, L["Show me"], "box", function()
+			-- (The welcome window steps aside for a camera; the Settings
+			-- window stays, as on the Cameras page's Test buttons.)
+			local top
+			if not skinned then
+				top = holder
+				while top:GetParent() and top:GetParent() ~= UIParent do top = top:GetParent() end
+			end
+			ns.ShowMe(option.demo, top)
+		end)
+		option.show:SetSize(84, 24)
+		option.show:SetPoint("RIGHT", -8, 0)
+		if skinned then Skinnable(option.show) end
+		option.show:HookScript("OnEnter", function(self)
+			local why = option.demo and ns.ShowMeBlocked(option.demo)
+			if not why then return end
+			GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+			GameTooltip:SetText(why, 1, 1, 1, 1, true)
+			GameTooltip:Show()
+		end)
+		option.show:HookScript("OnLeave", function() GameTooltip:Hide() end)
 		option:SetScript("OnEnter", function(self)
 			if not self.active then self:SetBackdropBorderColor(unpack(LIT)) end
 		end)
@@ -495,9 +662,13 @@ function ns.CustomizePanel(parent, width, onChange, skinned)
 		if shown.visions then
 			-- (each a row that's ticked on or off, its icon as the vision wheel has it)
 			choices = {}
-			for _, vision in ipairs(ns.VISION_LIST or {}) do
-				choices[#choices + 1] = { vision = vision, label = L[vision.label], icon = vision.icon,
-					line = VISION_LINES[vision.key] }
+			for _, list in ipairs({ ns.VISION_LIST or {}, MORE_VISIONS }) do
+				for _, vision in ipairs(list) do
+					if not vision.available or vision.available() then
+						choices[#choices + 1] = { vision = vision, label = L[vision.label], icon = vision.icon,
+							line = VISION_LINES[vision.key] }
+					end
+				end
 			end
 		elseif #choices > 0 then
 			-- (and Custom, for settings none of them has)
@@ -532,7 +703,12 @@ function ns.CustomizePanel(parent, width, onChange, skinned)
 			local room = panelW - 28 - nameX - (regenerate and regenW + 16 or 8)
 				- (choice.made and math.ceil(option.tag:GetStringWidth()) + 8 or 0)
 			if option.name:GetStringWidth() > room then option.name:SetWidth(room) end
-			option.line:SetWidth(panelW - 28 - (choice.icon and 56 or 20) - (regenerate and regenW + 8 or 0))
+			option.demo = not regenerate and ns.ShowMeFor and ns.ShowMeFor(shown.slot, choice) or nil
+			option.show:SetShown(option.demo ~= nil)
+			if option.demo then room = room - 92 end
+			if option.name:GetStringWidth() > room then option.name:SetWidth(room) end
+			option.line:SetWidth(panelW - 28 - (choice.icon and 56 or 20) - (regenerate and regenW + 8 or 0)
+				- (option.demo and 92 or 0))
 			option.line:SetText(choice.line)
 			option:Show()
 		end
@@ -577,6 +753,14 @@ function ns.CustomizePanel(parent, width, onChange, skinned)
 	saved:SetPoint("BOTTOMLEFT", 14, 12)
 	Show(1, true)
 	building = false
+	-- (Show me's buttons kept up to date: a demo starting or ending, a
+	-- fight; and a demo stops as the panel goes)
+	local function Recheck() if holder:IsVisible() then UpdateChoices() end end
+	if ns.ShowMeListen then ns.ShowMeListen(Recheck) end
+	holder:RegisterEvent("PLAYER_REGEN_DISABLED")
+	holder:RegisterEvent("PLAYER_REGEN_ENABLED")
+	holder:SetScript("OnEvent", Recheck)
+	holder:HookScript("OnHide", function() if ns.StopShowMe then ns.StopShowMe() end end)
 	return holder
 end
 
@@ -598,7 +782,7 @@ local function BuildCustomize(page)
 	page.Next = function() return panel:Next() end
 	page.IsLast = function() return panel:IsLast() end
 	page.settingsPage = function() return panel:SettingsPage() end
-	page.height = 476
+	page.height = 536 -- (the Customize panel's 360, and the title above it)
 end
 
 local function ShowPage(n)

@@ -410,7 +410,7 @@ function ns.CreateModuleEditor(kit)
 					end
 				end
 				entries[#entries + 1] = { profile.from and ("As " .. ns.ProfileLabel(profile.from) .. " has it")
-					or ("The default (" .. tostring(info and info.default) .. ")"), function() Pick(nil) end }
+					or ("The default (" .. tostring(ns.SlotDefault(slot.key, client)) .. ")"), function() Pick(nil) end }
 				Menu(self, entries)
 			end)
 			cell:SetScript("OnEnter", function(self)
@@ -725,8 +725,7 @@ function ns.CreateModuleEditor(kit)
 			local picks, by = ns.ProfilePicks(profile, client, ns.ALL_BUILTIN_BY_NAME, EditOf)
 			local edited = EditOf(profile.name)
 			for i, slot in ipairs(ns.PROFILE_SLOTS) do
-				local info = ns.SLOT_CHOICES[slot.key]
-				local part = picks[slot.key] or (info and info.default)
+				local part = picks[slot.key] or ns.SlotDefault(slot.key, client)
 				local choice = part and ns.GetChoice(slot.key, part)
 				local text = choice and choice.label or ("|cffff4040" .. tostring(part) .. "?|r")
 				if not picks[slot.key] then

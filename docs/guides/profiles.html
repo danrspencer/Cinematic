@@ -209,19 +209,19 @@ dl.faq dd { margin: 2px 0 0; color: var(--muted) }
 <script>
 (function () {
   // The areas and choices as players see them in Customize. levels: the levels that use the choice, per game version.
-  // (In Customize's order. A level with no pick of its own has the area's starting choice; on WoW Forever that's Action Bars (Classic Group) for the bars.)
+  // (In Customize's order. A level with no pick of its own has the area's starting choice; on WoW Forever that's Action bars (Classic group) for the bars.)
   var ALL = ["Subtle", "Balanced", "Cinema"];
   var AREAS = [
     { name: "Interface", q: "When does your UI fade?", choices: [
-      { l: "Between fights", d: "Fights and opening windows bring it back" },
-      { l: "Only when solo", d: "Out in the world on your own; normal in groups" },
       { l: "Almost always", d: "As little UI as possible, even in fights", levels: { both: ["Cinema"] } },
-      { l: "Never", d: "Your UI stays as the game has it", levels: { both: ["Subtle"] } },
-      { l: "Softly", d: "Between fights, with the minimap and group plates as usual", levels: { both: ["Balanced"] } } ] },
+      { l: "Most of the time", d: "Between fights, and fights bring back less: no minimap, fewer group nameplates" },
+      { l: "Between fights", d: "Fights and opening windows bring your UI back", levels: { both: ["Balanced"] } },
+      { l: "Only when solo", d: "Out in the world on your own; normal in groups" },
+      { l: "Never", d: "Your UI stays as the game has it", levels: { both: ["Subtle"] } } ] },
     { name: "Action bars", q: "When do your action bars show?", choices: [
-      { l: "Always Show", d: "Your action bars stay up all through CineMode" },
-      { l: "Action Bars (Classic Group)", d: "Point at one and the bars, menus and XP bar come up", levels: { forever: ["Subtle", "Balanced"] } },
-      { l: "Action Bars (Retail Group)", d: "Point at the bars, the menus or the XP bar", levels: { retail: ["Subtle", "Balanced"] } },
+      { l: "Always show", d: "Your action bars stay up all through CineMode" },
+      { l: "Action bars (Classic group)", d: "Point at one and the bars, menus and XP bar come up", levels: { forever: ["Subtle", "Balanced"] } },
+      { l: "Action bars (Retail group)", d: "Point at the bars, the menus or the XP bar", levels: { retail: ["Subtle", "Balanced"] } },
       { l: "Cooldown Manager", d: "In fights just the Cooldown Manager: no bars or menus", levels: { both: ["Cinema"] } } ] },
     { name: "Layout", q: "Where should your bars and menus sit?", choices: [
       { l: "Retail Inspired", d: "Action bars centered along the bottom, menus in the corner. Cinematic makes it for you", only: "forever" },
@@ -240,16 +240,19 @@ dl.faq dd { margin: 2px 0 0; color: var(--muted) }
       { l: "During cameras", d: "The effects only while a camera mode runs" },
       { l: "Through fights", d: "Fights don't bring the letterbox down", levels: { both: ["Cinema"] } } ] },
     { name: "Visions", q: "Which Visions do you want?", ticks: true, choices: [
-      { l: "Heal Vision", d: "Party and raid frames show only who needs healing", levels: { both: ALL } },
-      { l: "Quest Vision", d: "Quest mobs keep their nameplates, with a quest mark", levels: { both: ALL } },
+      { l: "Heal Vision", d: "Party and raid frames show only who needs healing", levels: { both: ["Balanced", "Cinema"] } },
+      { l: "Quest Vision", d: "Quest mobs keep their nameplates, with a quest mark", levels: { both: ["Balanced", "Cinema"] } },
       { l: "Duel Vision", d: "Watch duels near you: the duelists' health shows", levels: { both: ALL } },
-      { l: "Roll Vision", d: "Group loot rolls in a window: who picked what", levels: { both: ALL } },
-      { l: "Vitals Vision", d: "The screen's edges close in as your health drops", levels: { both: ["Cinema"] } } ] },
+      { l: "Roll Vision", d: "Group loot rolls in a window: who picked what", levels: { both: ["Balanced", "Cinema"] } },
+      { l: "Vitals Vision", d: "The screen's edges close in as your health drops", levels: { both: ["Cinema"] } },
+      { l: "Tele Vision", d: "A portal opens around you as you hearth or teleport", levels: { both: ALL } },
+      { l: "Emote Vision", d: "A card shows who buffed you or emoted at you", levels: { both: ALL } },
+      { l: "Damage Vision", d: "Your race with the top of the meter, in dungeons and raids (in a game with a damage meter)", levels: { both: ["Balanced", "Cinema"] } } ] },
     { name: "Chat", q: "How much chatter?", choices: [
-      { l: "As the game has it", d: "NPC speech and every channel as usual", levels: { both: ["Subtle"] } },
-      { l: "No NPC chatter", d: "Chat doesn't peek for NPC speech" },
-      { l: "Quieter chat", d: "Only General and Trade", levels: { both: ["Balanced"] } },
-      { l: "Quietest", d: "Minimal chat reveal. Keeps speech bubbles", levels: { both: ["Cinema"] } } ] },
+      { l: "General and Trade too", d: "NPC speech, and the General and Trade channels", levels: { both: ["Balanced"] } },
+      { l: "NPC speech", d: "NPC speech brings chat up; public channels don't", levels: { both: ["Subtle"] } },
+      { l: "No NPC chatter", d: "Neither NPC speech nor public channels bring chat up" },
+      { l: "Quietest", d: "No NPC chatter; speech from behind you shows low on the screen", levels: { both: ["Cinema"] } } ] },
     { name: "Sound", q: "How much music?", choices: [
       { l: "Music on cameras", d: "A camera can bring music in, as the defaults have it", levels: { both: ["Balanced", "Cinema"] } },
       { l: "Spaced out", d: "Music on cameras, with half a minute between starts" },

@@ -96,7 +96,7 @@ local function EveryRow(bars, value)
 	return list
 end
 
--- The action bars as Pure Cinema and the CDM module hide them: action bars
+-- The action bars as Cinema and the CDM module hide them: action bars
 -- 1 to 3 (and 4 to 8) with the art.
 local MAIN_BARS = { "mainbar", "art", "bottomleft", "bottomright" }
 local EXTRA_BARS = { "right1", "right2", "bar6", "bar7", "bar8" }
@@ -240,8 +240,8 @@ ns.PROFILE_MODULES = {
 			set("cineShow", rows)
 		end },
 
-	-- Pure Cinema's, page by page
-	{ key = "pure-frames", name = "Pure: frames",
+	-- Cinema's, page by page (keys pure-: what it was called before)
+	{ key = "pure-frames", name = "Cinema: frames",
 		scope = { "Standard Frames", "Personal Resources", "Advanced Frames/Supported addons", "Gamepad/top" },
 		tip = "Fights bring up only your resource bar: no portrait, target, buffs, minimap or swing timer, " ..
 		"nothing for an enemy or friend targeted, nothing in dungeons and raids, and the cast bar shows all " ..
@@ -263,7 +263,7 @@ ns.PROFILE_MODULES = {
 			-- starts with the party and raid frames ticked. The bars: pure-cdm's.)
 			set("instanceShow", EveryRow(false, false))
 		end },
-	{ key = "pure-cdm", name = "Pure: Cooldown Manager only",
+	{ key = "pure-cdm", name = "Cinema: Cooldown Manager only",
 		scope = { "Cooldown Manager", "Standard Frames/Trackers", "Standard Frames/Action bars",
 			"Standard Frames/Info and menus", "Advanced Frames/Supported addons",
 			"Gamepad/top" },
@@ -287,7 +287,7 @@ ns.PROFILE_MODULES = {
 			set("enemyShow", fights)
 			set("instanceShow", EveryRow(true, false))
 		end },
-	{ key = "pure-plates", name = "Pure: nameplates", scope = { "Nameplates", "Nameplate Style" },
+	{ key = "pure-plates", name = "Cinema: nameplates", scope = { "Nameplates", "Nameplate Style" },
 		tip = "Enemies' nameplates (and their minions') in fights, not kept up otherwise; in PvP and " ..
 		"battlegrounds, none; in instances, friendly players' and NPCs' hidden; no group members' or friendly " ..
 		"targets'; an arrow over your target's plate all through CineMode " ..
@@ -389,17 +389,15 @@ ns.PROFILE_MODULES = {
 		end },
 	-- (Not Duel, Tele or Emote Vision, or the Cards page: they only show for
 	-- a moment, and every profile has them.)
-	{ key = "no-visions", name = "No visions", scope = { "Heal Vision", "Quest Vision", "Roll Vision",
-		"Vitals Vision", "Damage Vision" },
-		tip = "The visions that change your UI off: Heal, Quest, Roll, Vitals and Damage Vision.",
+	-- (Vitals and Damage Vision are off to start with: their modules turn them on.)
+	{ key = "no-visions", name = "No visions", scope = { "Heal Vision", "Quest Vision", "Roll Vision" },
+		tip = "The visions that change your UI and are on to start with, off: Heal, Quest and Roll Vision.",
 		apply = function(set)
 			set("handleHealVision", false)
 			set("questVision", false)
 			set("rollWindow", false)
-			set("lowHealth", false)
-			set("damageVision", false)
 		end },
-	{ key = "pure-tooltips", name = "Pure: tooltips", scope = { "Tooltips" },
+	{ key = "pure-tooltips", name = "Cinema: tooltips", scope = { "Tooltips" },
 		tip = "The Tooltips page on: shown all through CineMode, fights too; no Mouse still.",
 		apply = function(set)
 			set("handleTooltips", true)
@@ -415,6 +413,14 @@ ns.PROFILE_MODULES = {
 		end },
 
 	-- Cameras
+	{ key = "still-afk", name = "Standing still: AFK camera", scope = { "Scenes" },
+		tip = "Standing still starts the AFK camera.",
+		apply = function(set) set("eventStillCamera", "afk") end },
+	{ key = "camera-music", name = "Music on every event", scope = { "Scenes" },
+		tip = "Every event's camera can start music (auto-walking and auto-running: walk-run-music).",
+		apply = function(set)
+			for _, event in ipairs(MUSIC_EVENTS) do set("event" .. event .. "Music", true) end
+		end },
 	{ key = "walk-run-music", name = "Music on walks and runs", scope = { "Scenes" },
 		tip = "Auto-walking and auto-running can start music.",
 		apply = function(set)
@@ -439,8 +445,7 @@ ns.PROFILE_MODULES = {
 		end },
 	{ key = "cameras-bring-cinemode", name = "Cameras bring CineMode", scope = { "Scenes",
 		"Camera Settings/Death Cam", "Card Vision" },
-		tip = "Every camera brings CineMode on, standing still starts the AFK camera, every camera can start " ..
-		"music, and no death screen.",
+		tip = "Every camera brings CineMode on, and no death screen.",
 		apply = function(set)
 			for _, event in ipairs(ns.EVENTS or {}) do
 				if ns.DEFAULTS["event" .. event.key .. "Cine"] ~= nil then
@@ -453,16 +458,11 @@ ns.PROFILE_MODULES = {
 			-- (Death Cam's page is dev-only.)
 			if ns.isDev then set("deathScreen", false) end
 			set("cardDeathOn", false)
-			set("eventStillCamera", "afk")
-			for _, event in ipairs(MUSIC_EVENTS) do set("event" .. event .. "Music", true) end
-			set("musicCamWalk", true)
-			set("musicCamRun", true)
 		end },
-	{ key = "pure-cameras", name = "Pure: cameras", scope = { "Scenes", "Camera Settings/Chat Cam",
+	{ key = "pure-cameras", name = "Cinema: cameras", scope = { "Scenes", "Camera Settings/Chat Cam",
 		"General/top", "Card Vision" },
-		tip = "Standing still starts the AFK camera and every event's camera can start music; the cameras " ..
-		"don't wait for things to calm down after a fight, auto-run carries on in cities and instances (as RP " ..
-		"walk always does), and the death camera runs in instances too. NPCs talking bring the chat camera, " ..
+		tip = "The cameras don't wait for things to calm down after a fight, auto-run carries on in cities and " ..
+		"instances (as RP walk always does), and the death camera runs in instances too. NPCs talking bring the chat camera, " ..
 		"those chatting nearby straight away, and it doesn't look round for speakers off screen. YOU DIED " ..
 		"shows as the death camera starts.",
 		apply = function(set)
@@ -474,8 +474,7 @@ ns.PROFILE_MODULES = {
 				set("chatNearbyDelay", 0)
 				if ns.isDev then set("chatCamSearch", false) end
 			end
-			set("eventStillCamera", "afk")
-			for _, event in ipairs(MUSIC_EVENTS) do set("event" .. event .. "Music", true) end
+			-- (Standing still and music: still-afk and camera-music, in its choice.)
 			for _, cam in ipairs({ "walk", "run", "tele", "quest" }) do
 				set(cam .. "CalmWait", false)
 			end
@@ -523,6 +522,13 @@ ns.PROFILE_MODULES = {
 		apply = function(set) set("emoteVision", true) end },
 
 	-- The look
+	-- (The tint's strength per level: Cinema keeps the default, 100%.)
+	{ key = "tint-subtle", name = "Subtle tint", scope = { "Tint/How strong" },
+		tip = "The tint at a third of its strength (33%).",
+		apply = function(set) set("tintStrength", 0.33) end },
+	{ key = "tint-balanced", name = "Balanced tint", scope = { "Tint/How strong" },
+		tip = "The tint at two thirds of its strength (66%).",
+		apply = function(set) set("tintStrength", 0.66) end },
 	{ key = "no-letterbox", name = "No letterbox", scope = { "Letterbox/Show in" },
 		tip = "No letterbox: the other effects show over the normal UI.",
 		apply = function(set) set("letterbox", false) end },
@@ -564,11 +570,10 @@ ns.PROFILE_MODULES = {
 			set("chatPeekChannelList", { General = true, Trade = true, LocalDefense = false, Services = false,
 				TradeLocal = false })
 		end },
-	{ key = "pure-chat", name = "Pure: chat", scope = { "Chat/Other", "Chat bubbles/top", "Chat bubbles/Custom bubbles" },
-		tip = "Chat doesn't peek for General or LocalDefense, and speech from behind you shows low on the screen " ..
-		"(the Chat bubbles page on, which it needs).",
+	-- (Public channels are off to start with: nothing to turn off.)
+	{ key = "pure-chat", name = "Cinema: chat", scope = { "Chat bubbles/top", "Chat bubbles/Custom bubbles" },
+		tip = "Speech from behind you shows low on the screen (the Chat bubbles page on, which it needs).",
 		apply = function(set)
-			set("chatPeekChannelList", { General = false, LocalDefense = false })
 			set("handleBubbles", true)
 			set("chatSpeechBehind", true)
 		end },
@@ -657,6 +662,15 @@ function ns.GetChoice(slot, part)
 			return choice
 		end
 	end
+end
+
+-- A slot's default choice on a client (default: a part, or { forever =
+-- part, retail = part }), or nil.
+function ns.SlotDefault(slot, client)
+	local info = ns.SLOT_CHOICES and ns.SLOT_CHOICES[slot]
+	local default = info and info.default
+	if type(default) == "table" then default = default[client or ns.CLIENT] end
+	return default
 end
 
 -- Whether a choice is hidden on a client (hidden: true, or that client's name).
@@ -766,8 +780,7 @@ function ns.ResolveModules(profile, client, byName, editOf)
 	local list = {}
 	local picks, by = Picks(profile, client, byName or {}, editOf)
 	for _, slot in ipairs(ns.PROFILE_SLOTS or {}) do
-		local info = ns.SLOT_CHOICES[slot.key]
-		local part = picks[slot.key] or (info and info.default)
+		local part = picks[slot.key] or ns.SlotDefault(slot.key, client)
 		if part then
 			local choice = ns.GetChoice(slot.key, part)
 			if choice then
@@ -1090,7 +1103,7 @@ local function AnyInScope(scope, addresses)
 end
 
 -- The checks: each module writing only inside its scope, no two of a
--- profile's modules setting the same thing, each choice's and built-in's
+-- profile's modules setting (or just writing) the same thing, each choice's and built-in's
 -- modules (and each built-in's picks) there, and no setting changed by the
 -- choices of two slots. Problems as lines; also how many settings each
 -- module changes (counts[key]), the scope entries not on this client's
@@ -1162,6 +1175,21 @@ function ns.CheckModules(client, profiles)
 			end
 			local resolved = ns.ResolveModules(profile, client, byName, EditOf)
 			local who = {}
+			-- (Each setting a module writes, even to the value it starts with:
+			-- a later module's write, the same as the default or not, would
+			-- quietly undo an earlier one's, which the changes alone don't show.)
+			local wrote = {}
+			for _, entry in ipairs(resolved) do
+				if entry.module then
+					ns.ApplyModules({ entry }, {}, client, function(key, row)
+						local where = key .. (row ~= nil and "." .. tostring(row) or "")
+						if wrote[where] and wrote[where] ~= entry.key then
+							Problem(("%s: %s and %s both write %s"):format(profile.name, wrote[where], entry.key, where))
+						end
+						wrote[where] = entry.key
+					end, true)
+				end
+			end
 			for _, entry in ipairs(resolved) do
 				if entry.missing then
 					Problem(entry.part and not entry.module and entry.key == entry.slot .. ":" .. entry.part
@@ -1191,8 +1219,12 @@ function ns.CheckModules(client, profiles)
 		if not info then
 			Problem(("slot %s has no choices (ns.SLOT_CHOICES)"):format(slot.key))
 		else
-			if info.default and not ns.GetChoice(slot.key, info.default) then
-				Problem(("slot %s: its default, %s, isn't one of its choices"):format(slot.key, info.default))
+			local default = ns.SlotDefault(slot.key, client)
+			local defaultChoice = default and ns.GetChoice(slot.key, default)
+			if default and not defaultChoice then
+				Problem(("slot %s: its default, %s, isn't one of its choices"):format(slot.key, default))
+			elseif defaultChoice and defaultChoice.client and defaultChoice.client ~= client then
+				Problem(("slot %s: its default, %s, is the other client's only"):format(slot.key, default))
 			end
 			local seen = {}
 			for _, choice in ipairs(info.choices) do

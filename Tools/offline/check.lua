@@ -2,6 +2,10 @@
 -- the game. From the repo root:
 --
 --   lua5.1 Tools/offline/check.lua
+--   python -I Tools/offline/run.py Tools/offline/check.lua    (no lua5.1: Windows)
+--
+-- Add --update after it when a built-in profile's settings changed on
+-- purpose: it writes them to profile-settings-<client>.txt (see below).
 --
 -- Loads the addon on each client and build (load.lua: each in a Lua of its
 -- own, so one's settings don't carry into the next) and runs
@@ -11,6 +15,17 @@
 -- client's options, and every module used by a built-in or a slot's choice.
 -- Notes (two choices of a slot that come out the same) are listed but pass. Exits 1 on any
 -- problem.
+--
+-- And each built-in profile's settings, retired ones too, as they come out
+-- (what each changes from the defaults), against the ones saved in
+-- Tools/offline/profile-settings-<client>.txt: a change to a module or a
+-- choice changes the profiles using it, and a retired one is made again
+-- from them for a player coming back. Any difference is a problem until
+-- it's saved with --update.
+
+-- (The Lua that runs each run: run.py sets CINE_LUA to itself.)
+local LUA = os.getenv("CINE_LUA") or "lua5.1"
+local update = arg[1] == "--update"
 
 local RUNS = {
 	{ "forever", "Cinematic.toc" }, { "retail", "Cinematic.toc" },
@@ -18,7 +33,7 @@ local RUNS = {
 }
 
 -- One run (lua5.1 check.lua <client> <toc>): its lines, tab-separated.
-if arg[1] then
+if arg[1] and not update then
 	local client, toc = arg[1], arg[2]
 	local ns, wow = dofile("Tools/offline/load.lua")(client, toc)
 	for _, warning in ipairs(wow.warnings) do
@@ -48,6 +63,28 @@ if arg[1] then
 		if db.offUntilPicked then print("problem\tpicked a profile: still off") end
 	end
 	local problems, _, absent, nowhere, notes = ns.CheckModules(client, ns.ALL_BUILTIN_PROFILES)
+	-- Each built-in's settings, retired ones too (the dev build's run: it
+	-- has every profile).
+	if toc == "CinematicDev.toc" then
+		local byName, list = {}, {}
+		for _, group in ipairs({ ns.ALL_BUILTIN_PROFILES, ns.RETIRED_PROFILES or {} }) do
+			for _, profile in ipairs(group) do
+				byName[profile.name] = profile
+				list[#list + 1] = profile
+			end
+		end
+		local base = ns.ModuleBase(client)
+		for _, profile in ipairs(list) do
+			if not profile.client or profile.client == client then
+				for _, change in ipairs(ns.ModuleEffect(ns.ResolveModules(profile, client, byName), client, base)) do
+					local value = change[3]
+					value = type(value) == "table" and ns.SerialValue(value) or tostring(value)
+					print(("settings\t%s|%s%s=%s"):format(profile.name, change[1],
+						change[2] ~= nil and "." .. tostring(change[2]) or "", value))
+				end
+			end
+		end
+	end
 	for _, line in ipairs(problems) do print("problem\t" .. line) end
 	for _, line in ipairs(notes) do print("note\t" .. line) end
 	for key, entries in pairs(absent) do
@@ -348,10 +385,10 @@ local function Problem(text)
 		problems[#problems + 1] = text
 	end
 end
-local looked, absent, nowhere, used = {}, {}, {}, {}
+local looked, absent, nowhere, used, settings = {}, {}, {}, {}, { forever = {}, retail = {} }
 for _, run in ipairs(RUNS) do
 	local where = run[1] .. " (" .. run[2] .. ")"
-	local pipe = io.popen(("lua5.1 Tools/offline/check.lua %s %s 2>&1"):format(run[1], run[2]))
+	local pipe = io.popen(("%s Tools/offline/check.lua %s %s 2>&1"):format(LUA, run[1], run[2]))
 	for line in pipe:lines() do
 		local kind, a, b = line:match("^(%a+)\t([^\t]*)\t?(.*)$")
 		if kind == "problem" then
@@ -369,6 +406,8 @@ for _, run in ipairs(RUNS) do
 			looked[a] = (looked[a] or 0) + 1
 		elseif kind == "used" then
 			used[a] = true
+		elseif kind == "settings" then
+			table.insert(settings[run[1]], a)
 		else
 			Problem(where .. ": " .. line)
 		end
@@ -391,6 +430,43 @@ for pair, count in pairs(nowhere) do
 end
 for key in pairs(looked) do
 	if not used[key] then Problem(("module %s: no built-in profile or part uses it"):format(key)) end
+end
+
+-- The built-ins' settings against the saved ones (or saved, with --update).
+for client, lines in pairs(settings) do
+	table.sort(lines)
+	local path = "Tools/offline/profile-settings-" .. client .. ".txt"
+	if update then
+		local file = assert(io.open(path, "wb"))
+		file:write(table.concat(lines, "\n"), "\n")
+		file:close()
+		print(("saved %d settings to %s"):format(#lines, path))
+	else
+		local saved, now = {}, {}
+		local file = io.open(path, "rb")
+		if not file then
+			Problem(path .. " isn't there: run with --update to make it")
+		else
+			for line in file:lines() do
+				line = line:gsub("\r$", "")
+				if line ~= "" then saved[line] = true end
+			end
+			file:close()
+			for _, line in ipairs(lines) do now[line] = true end
+			local changed = {}
+			for line in pairs(saved) do
+				if not now[line] then changed[#changed + 1] = "  was " .. line end
+			end
+			for _, line in ipairs(lines) do
+				if not saved[line] then changed[#changed + 1] = "  now " .. line end
+			end
+			if #changed > 0 then
+				table.sort(changed, function(x, y) return x:sub(7) < y:sub(7) end)
+				Problem(("%s: built-in profiles' settings changed (if that's meant, run with --update):\n%s")
+					:format(client, table.concat(changed, "\n")))
+			end
+		end
+	end
 end
 
 table.sort(problems)

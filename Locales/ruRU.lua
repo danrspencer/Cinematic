@@ -4270,6 +4270,22 @@ L["Delete everything in Cinematic? Your own profiles, cameras, scripts, themes, 
 L["Reset Settings"] = "Сбросить настройки"
 L["Reset EVERYTHING"] = "Сбросить ВСЁ"
 
+-- ProfileChoices.lua and Welcome.lua: profile choices
+L["Fights and opening windows bring your UI back"] = "Бои и открытые окна возвращают интерфейс"
+L["Most of the time"] = "Почти всегда"
+L["Between fights, and fights bring back less: no minimap, fewer group nameplates"] = "Между боями, а в бою возвращается меньше: без миникарты, меньше индикаторов группы"
+L["Always show"] = "Показывать всегда"
+L["Action bars (Classic group)"] = "Панели команд (группа Classic)"
+L["Action bars (Retail group)"] = "Панели команд (группа Retail)"
+L["General and Trade too"] = "Также Общий и Торговля"
+L["Neither NPC speech nor public channels bring chat up"] = "Ни речь НИП, ни общие каналы не показывают чат"
+L["No NPC chatter; speech from behind you shows low on the screen"] = "Без болтовни НИП; речь позади вас внизу экрана"
+L["A portal opens around you as you hearth or teleport"] = "Вокруг вас открывается портал, когда вы используете камень возвращения или телепорт"
+L["A card shows who buffed you or emoted at you"] = "Карточка показывает, кто вас усилил или обратился эмоцией"
+L["Your race with the top of the meter, in dungeons and raids"] = "Ваша гонка с лидером счётчика в подземельях и рейдах"
+L["NPC speech brings chat up; public channels don't"] = "Речь НИП показывает чат, общие каналы — нет"
+L["NPC speech, and the General and Trade channels"] = "Речь НИП и каналы Общий и Торговля"
+
 -- CardMoments.lua, CardsPage.lua, FlightLine.lua: Flight departure
 L["Click to target %s"] = "Щёлкните, чтобы выбрать целью: %s"
 L["As a flight lands: where it took you, and how long the flight took."] = "При посадке: куда вас доставил полёт и сколько он длился."
@@ -4314,3 +4330,17 @@ L["Off. Click to turn this page on."] = "Выкл. Щёлкните, чтобы 
 L["Everything CineMode can do, page by page. Click On or Off to turn a page on or off; Open takes you there."] = "Всё, что умеет CineMode, страница за страницей. Нажмите «Вкл.» или «Выкл.», чтобы включить или выключить страницу; «Открыть» переходит к ней."
 L["Go to this page."] = "Перейти на эту страницу."
 L["%d of %d pages on."] = "Включено страниц: %d из %d."
+
+-- ShowMe.lua and Welcome.lua: See it first, Show me
+L["Nothing to show here."] = "Здесь нечего показать."
+L["Not in a fight: try it once the fight ends."] = "Не в бою: попробуйте, когда бой закончится."
+L["Click the row to turn it on first."] = "Сначала щёлкните строку, чтобы включить."
+L["See it first"] = "Сначала посмотрите"
+L["Click one to see it for a few seconds."] = "Щёлкните, чтобы посмотреть несколько секунд."
+L["Vitals"] = "Здоровье"
+L["Teleport"] = "Телепорт"
+L["Black bars at the top and bottom of the screen, as in a film."] = "Чёрные полосы вверху и внизу экрана, как в кино."
+L["A color wash over the world that follows the time of day and the zone, with soft dark edges and weather to match."] = "Цветовой оттенок над миром, следующий за временем суток и зоной, с мягкими тёмными краями и подходящей погодой."
+L["The camera moves on its own at quiet moments: on flights, when you go AFK, by a campfire. This shows a half turn around you; move the camera yourself to stop it."] = "В тихие моменты камера движется сама: в полёте, когда вы отходите, у костра. Здесь она делает пол-оборота вокруг вас; сдвиньте камеру сами, чтобы остановить."
+L["As your health drops, the screen's edges close in, so you feel a fight without watching your health bar."] = "Когда здоровье падает, края экрана сужаются, и вы чувствуете бой, не глядя на полосу здоровья."
+L["As you cast your Hearthstone or a teleport, a portal opens around you and the world fades out as you leave."] = "Пока вы используете камень возвращения или телепорт, вокруг открывается портал, и мир меркнет, когда вы исчезаете."

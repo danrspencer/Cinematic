@@ -4270,6 +4270,22 @@ L["Delete everything in Cinematic? Your own profiles, cameras, scripts, themes, 
 L["Reset Settings"] = "설정 초기화"
 L["Reset EVERYTHING"] = "전부 초기화"
 
+-- ProfileChoices.lua and Welcome.lua: profile choices
+L["Fights and opening windows bring your UI back"] = "전투와 창 열기가 UI를 되돌림"
+L["Most of the time"] = "대부분"
+L["Between fights, and fights bring back less: no minimap, fewer group nameplates"] = "전투 사이에, 전투 중엔 덜 돌아옴: 미니맵 없음, 파티 이름표 적게"
+L["Always show"] = "항상 표시"
+L["Action bars (Classic group)"] = "행동 단축바 (클래식 그룹)"
+L["Action bars (Retail group)"] = "행동 단축바 (정식 그룹)"
+L["General and Trade too"] = "일반과 거래도"
+L["Neither NPC speech nor public channels bring chat up"] = "NPC 대사도 공개 채널도 대화창을 띄우지 않음"
+L["No NPC chatter; speech from behind you shows low on the screen"] = "NPC 잡담 없음; 뒤쪽 대사는 화면 아래에 표시"
+L["A portal opens around you as you hearth or teleport"] = "귀환하거나 순간이동할 때 주위에 차원문이 열림"
+L["A card shows who buffed you or emoted at you"] = "나에게 강화 효과나 감정 표현을 한 사람을 카드로 표시"
+L["Your race with the top of the meter, in dungeons and raids"] = "던전과 공격대에서 미터기 선두와의 경쟁"
+L["NPC speech brings chat up; public channels don't"] = "NPC 대사는 대화창을 띄우고, 공개 채널은 띄우지 않음"
+L["NPC speech, and the General and Trade channels"] = "NPC 대사와 일반, 거래 채널"
+
 -- CardMoments.lua, CardsPage.lua, FlightLine.lua: Flight departure
 L["Click to target %s"] = "클릭하여 %s 대상 지정"
 L["As a flight lands: where it took you, and how long the flight took."] = "비행이 착륙할 때: 어디로 데려왔는지와 비행 시간."
@@ -4314,3 +4330,17 @@ L["Off. Click to turn this page on."] = "꺼짐. 클릭하면 이 페이지를 �
 L["Everything CineMode can do, page by page. Click On or Off to turn a page on or off; Open takes you there."] = "CineMode가 할 수 있는 모든 것을 페이지별로. 켜짐 또는 꺼짐을 클릭하면 페이지를 켜고 끄며, 열기를 누르면 그 페이지로 갑니다."
 L["Go to this page."] = "이 페이지로 이동."
 L["%d of %d pages on."] = "%d/%d 페이지 켜짐."
+
+-- ShowMe.lua and Welcome.lua: See it first, Show me
+L["Nothing to show here."] = "보여 줄 것이 없습니다."
+L["Not in a fight: try it once the fight ends."] = "전투 중에는 안 됩니다: 전투가 끝나면 해 보세요."
+L["Click the row to turn it on first."] = "먼저 줄을 클릭해 켜세요."
+L["See it first"] = "먼저 보기"
+L["Click one to see it for a few seconds."] = "하나를 클릭하면 몇 초간 보여 줍니다."
+L["Vitals"] = "생명력"
+L["Teleport"] = "순간이동"
+L["Black bars at the top and bottom of the screen, as in a film."] = "영화처럼 화면 위아래의 검은 띠."
+L["A color wash over the world that follows the time of day and the zone, with soft dark edges and weather to match."] = "시간대와 지역을 따라가는 세상 위의 색감, 부드럽고 어두운 가장자리와 어울리는 날씨."
+L["The camera moves on its own at quiet moments: on flights, when you go AFK, by a campfire. This shows a half turn around you; move the camera yourself to stop it."] = "조용한 순간에 카메라가 스스로 움직입니다: 비행 중, 자리 비움일 때, 모닥불 곁에서. 여기서는 내 주위를 반 바퀴 돕니다. 직접 카메라를 움직이면 멈춥니다."
+L["As your health drops, the screen's edges close in, so you feel a fight without watching your health bar."] = "체력이 떨어지면 화면 가장자리가 좁혀 들어와, 체력 바를 보지 않아도 전투를 느낄 수 있습니다."
+L["As you cast your Hearthstone or a teleport, a portal opens around you and the world fades out as you leave."] = "귀환석이나 순간이동을 시전하면 주위에 차원문이 열리고, 떠나면서 세상이 서서히 사라집니다."
