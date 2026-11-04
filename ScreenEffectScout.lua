@@ -4,9 +4,13 @@
 -- pick looks for Vitals Vision and the like. A rebuild by eye, not the game's
 -- shader: layer 1 is the shape (a mask, stretched once over the screen, never
 -- tiled: tiled it drew a grid), layers 2 and 3 scroll inside it in the
--- effect's multiply colour, the overlay over them. The game's scroll and
--- scale units aren't known, so speed and tile are knobs to match it by eye
--- (2026-11-04: effect 248, Dimensius's Cosmic Void, was the first one seen).
+-- effect's multiply colour, the overlay over them. Units, measured on a
+-- recording of the real effect 248 (Dimensius's Cosmic Void, a quest's
+-- buff, 2026-11-04): a small scale (under 0.05) counts pixels of a 768-tall
+-- screen (repeats down the screen = 768 x scale) and the scroll rate is
+-- texture lengths a second (its layers rose 0.17 and 0.06 screens a second,
+-- predicted 0.18 and 0.05). Bigger scales are a guess (screens), slowed by
+-- the speed knob. speed and tile still multiply both, to adjust by eye.
 -- Space: next, Backspace: back, while it shows (not in a fight).
 -- /cine debug screenfx shots: a screenshot of each, to review them all.
 
@@ -28,7 +32,13 @@ ns.SCREEN_EFFECT_FIXES = FIXES
 
 local scout, shooter
 local at = 0
-local speed, tile = 0.1, 1
+local speed, tile = 1, 1
+local REF_HEIGHT = 768 -- (the game's units for small scales: pixels of a 768-tall screen)
+local BIG_SCALE_SPEED = 0.1 -- (the guess for layers with big scales, unmeasured)
+-- Flat-colour textures some effects use as a layer: a constant in the game's
+-- shader, not a picture. Drawn as light they were a flat wash over the
+-- screen (effect 248's white8x8 next to the real one, 2026-11-04): left out.
+local SOLID = { [1273161] = "white8x8", [188526] = "grey", [3308414] = "gray8x8" }
 local SHOT_WAIT = 2.5 -- (seconds on each before its screenshot: past the fade-in, moving)
 
 -- (ns.SetOnUpdate where the protected one is loaded, else a plain OnUpdate.)
@@ -41,13 +51,21 @@ local function Probe(file)
 	return scout.probe:SetTexture(file) ~= false
 end
 
--- How many times a layer repeats across the screen: scales from 0.1 up are
--- screens; the tiny ones (0.008, 0.01) look like per-pixel, about 100 px a tile.
-local function Repeats(scale, fix)
+-- How many times a layer repeats over the screen (across: wide, with the
+-- screen's shape) and how fast it moves: small scales are the game's pixel
+-- units (measured), the rest screens (a guess), slowed.
+local function Small(scale) return scale ~= 0 and math.abs(scale) < 0.05 end
+local function Repeats(scale, fix, across)
 	scale = math.abs(scale or 1)
 	if scale == 0 then scale = 1 end
-	if scale < 0.1 then scale = scale * 100 end
+	if Small(scale) then
+		scale = scale * REF_HEIGHT
+		if across then scale = scale * UIParent:GetWidth() / UIParent:GetHeight() end
+	end
 	return scale * tile * (fix.tile or 1)
+end
+local function LayerSpeed(layer)
+	return (Small(layer[2]) or Small(layer[3])) and 1 or BIG_SCALE_SPEED
 end
 
 local function Create()
@@ -105,8 +123,9 @@ local function Create()
 		for i, tex in ipairs(self.layers) do
 			local layer = self.moving[i]
 			if layer then
-				local u, v = t * layer[4], t * layer[5]
-				tex:SetTexCoord(u, u + Repeats(layer[2], fix), v, v + Repeats(layer[3], fix))
+				local lt = t * LayerSpeed(layer)
+				local u, v = lt * layer[4], lt * layer[5]
+				tex:SetTexCoord(u, u + Repeats(layer[2], fix, true), v, v + Repeats(layer[3], fix))
 			end
 		end
 		-- (Fades in over the effect's own fade-in time.)
@@ -188,15 +207,19 @@ local function Show(index)
 	if shape and not masked and not fix.noMask then missing[#missing + 1] = shape[1] end
 	if masked then
 		scout.mask:SetTexture(shape[1], "CLAMP", "CLAMP")
-		local height = UIParent:GetHeight()
 		scout.mask:ClearAllPoints()
-		scout.mask:SetPoint("TOPLEFT", 0, (fx.mask[1] or 0) * height)
-		scout.mask:SetPoint("BOTTOMRIGHT", 0, (fx.mask[1] or 0) * height)
+		-- (The data's mask offset isn't used: effect 248's -0.25 moved either
+		-- way was wrong next to the real one. Lowered, its heavy bottom went
+		-- off screen; raised, the clamped edge filled the bottom 40% with a
+		-- flat block, 2026-11-04. Fitted to the screen it's closest.)
+		scout.mask:SetAllPoints(scout)
 	end
 	SetMasked(masked)
 	for i, tex in ipairs(scout.layers) do
 		local layer = moving[i]
-		if layer and Probe(layer[1]) then
+		if layer and SOLID[layer[1]] then
+			tex:Hide()
+		elseif layer and Probe(layer[1]) then
 			tex:SetTexture(layer[1], "REPEAT", "REPEAT")
 			tex:SetVertexColor(r, g, b, fix.alpha or 0.6 * glow)
 			tex:Show()
