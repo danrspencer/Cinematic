@@ -1293,7 +1293,9 @@ local function AddIcon(entry)
 	end
 	b.mark:SetShown(entry.mark ~= nil)
 	local count = tonumber(entry.count)
-	b.count:SetText(count and count > 1 and tostring(count) or "")
+	-- (Big ones short, as the game's buttons: 1000 reputation is "1K".)
+	b.count:SetText(count and count > 1 and (count >= 1000 and AbbreviateNumbers and AbbreviateNumbers(count)
+		or tostring(count)) or "")
 	b.name:SetText(entry.name or "")
 	-- (Red: one you can't use, as on the game's window.)
 	if entry.red then
@@ -1574,12 +1576,12 @@ local function CurrencyInfo(kind, i)
 	return Call(_G.GetQuestCurrencyInfo, kind, i)
 end
 
-local function Currency(kind, i)
+local function Currency(kind, i, pick, chosen)
 	local name, texture, count, quality = CurrencyInfo(kind, i)
 	if not Plain(name) then
 		return
 	end
-	AddIcon({ name = name, icon = texture, count = count, quality = quality,
+	AddIcon({ name = name, icon = texture, count = count, quality = quality, chosen = chosen, pick = pick,
 		tip = function(tip) tip:SetQuestCurrency(kind, i) end })
 end
 
@@ -1699,7 +1701,16 @@ local function Rewards(pick)
 				"QuestFont", ink.text)
 		end
 		for i = 1, choices do
-			QuestItem("choice", i, pick and choices > 1 and function() pick(i) end, pick and talk.choice == i)
+			-- (A choice can be a currency, as Midnight's pick-a-faction
+			-- reputation: loot type 1, as the game's window checks. Its item
+			-- info is then a stand-in: an old item, 100000 of it, and a
+			-- tooltip with a broken sell price.)
+			local onPick = pick and choices > 1 and function() pick(i) end
+			if Plain(Call(_G.GetQuestItemInfoLootType, "choice", i)) == 1 then
+				Currency("choice", i, onPick, pick and talk.choice == i)
+			else
+				QuestItem("choice", i, onPick, pick and talk.choice == i)
+			end
 		end
 		EndIcons()
 	end
@@ -2631,4 +2642,59 @@ function ns.MakeQuestTalkPreview(parent, width)
 		end
 	end
 	return holder
+end
+
+-- /cine debug questrewards: each reward the open quest window has, as the
+-- game hands it over (GetQuestItemInfo's returns, the link, the item's own
+-- sell price and the quest tooltip's money line) and what the game's own
+-- reward buttons show for it, so ours can be held up against them.
+function ns.LogQuestRewards()
+	local function S(v)
+		if issecretvalue and issecretvalue(v) then return "secret" end
+		return tostring(v)
+	end
+	local counts = {
+		choice = Call(GetNumQuestChoices) or 0,
+		reward = Call(GetNumQuestRewards) or 0,
+		required = Call(GetNumQuestItems) or 0,
+	}
+	local logged = 0
+	for _, kind in ipairs({ "choice", "reward", "required" }) do
+		for i = 1, tonumber(Plain(counts[kind])) or 0 do
+			local info = { Call(GetQuestItemInfo, kind, i) }
+			local parts = {}
+			for n = 1, math.max(#info, 7) do parts[n] = S(info[n]) end
+			local link = Call(GetQuestItemLink, kind, i)
+			local sell = "?"
+			if type(link) == "string" and C_Item and C_Item.GetItemInfo then
+				sell = S(select(11, Call(C_Item.GetItemInfo, link)))
+			end
+			local tipMoney = "no tooltip data"
+			local data = C_TooltipInfo and C_TooltipInfo.GetQuestItem and Call(C_TooltipInfo.GetQuestItem, kind, i)
+			if type(data) == "table" then
+				tipMoney = "no money line"
+				for _, line in ipairs(data.lines or {}) do
+					if line.price ~= nil then tipMoney = "price " .. S(line.price) end
+				end
+				tipMoney = tipMoney .. ", item id " .. S(data.id) .. ", " .. #(data.lines or {}) .. " lines"
+			end
+			ns.Log("questtalk", ("reward %s %d: loot type %s; info {%s}; link %s; item sell price %s; quest tooltip %s")
+				:format(kind, i, S(Call(_G.GetQuestItemInfoLootType, kind, i)), table.concat(parts, ", "),
+					S(link and link:gsub("|", "||")), sell, tipMoney))
+			logged = logged + 1
+		end
+	end
+	-- The game's own buttons (parked behind ours, still filled in).
+	local frame = _G.QuestInfoRewardsFrame
+	for i, button in ipairs(frame and frame.RewardButtons or {}) do
+		if ns.Flag(button:IsShown()) then
+			local name = button.Name and S(button.Name:GetText())
+			local count = button.Count and S(button.Count:GetText())
+			ns.Log("questtalk", ("game's reward button %d: type %s, id %s, name %s, count %s (count shown %s)")
+				:format(i, S(button.type), S(button.GetID and button:GetID()), name, count,
+					S(button.Count and button.Count:IsShown())))
+			logged = logged + 1
+		end
+	end
+	return logged
 end

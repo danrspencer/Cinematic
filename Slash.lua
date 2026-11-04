@@ -133,6 +133,7 @@ local function PrintDebugHelp()
 	print("  /cine debug iconwatch - log nameplate interact icons every frame for 30 seconds")
 	print("  /cine debug sounds - print each sound the game plays, by number and name, e.g. the talents window's (again to stop)")
 	print("  /cine debug talentart - log every part of the open talents window (sizes, textures, atlases) and its trees")
+	print("  /cine debug questrewards - log each reward of the open quest window as the game gives it (info, link, sell price) and what the game's own reward buttons show")
 	print("  /cine debug questart - log every part of the game's quest and gossip windows (talking to an NPC: they're open behind Quest talk's bubble)")
 	print("  /cine debug talentcalc - the talent calculator: your trees as read, their grids, the row rule, its button")
 	print("  /cine debug talents - the character window's Talents button and the talents window's Character button: made, shown, where")
@@ -1076,6 +1077,13 @@ local function HandleSlash(msg)
 			ns.Print("questart: talk to an NPC first (a quest's text or its rewards), then run it again")
 		else
 			ns.Print(("questart: logged %d parts of the quest and gossip windows. /reload to write the log"):format(logged))
+		end
+	elseif cmd == "debug" and arg == "questrewards" then
+		local logged = ns.LogQuestRewards and ns.LogQuestRewards() or 0
+		if logged == 0 then
+			ns.Print("questrewards: open a quest that has rewards first, then run it again")
+		else
+			ns.Print(("questrewards: logged %d lines about the quest's rewards. /reload to write the log"):format(logged))
 		end
 	elseif cmd == "debug" and arg == "talentcalc" then
 		if ns.PrintTalentCalcDebug then ns.PrintTalentCalcDebug() else ns.Print("talent calculator not loaded (retail, or TalentCalc.lua missing)") end
