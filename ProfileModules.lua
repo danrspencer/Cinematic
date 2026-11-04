@@ -243,7 +243,7 @@ ns.PROFILE_MODULES = {
 	-- Cinema's, page by page (keys pure-: what it was called before)
 	{ key = "pure-frames", name = "Cinema: frames",
 		scope = { "Standard Frames", "Personal Resources", "Advanced Frames/Supported addons", "Gamepad/top" },
-		tip = "Fights bring up only your resource bar: no portrait, target, buffs, minimap or swing timer, " ..
+		tip = "Fights bring up only your health and resource bars: no portrait, target, buffs, minimap or swing timer, " ..
 		"nothing for an enemy or friend targeted, nothing in dungeons and raids, and the cast bar shows all " ..
 		"through CineMode. The player frame and resource display don't stay up until full; no focus's target of target; " ..
 		"raid frames without names, buffs, threat, target markers, ready checks or titles in CineMode.",
@@ -253,8 +253,8 @@ ns.PROFILE_MODULES = {
 			set("unitPartsFocusToT", false)
 			set("cineShow", { castbar = true, raidnames = false, raidbuffs = false, raidthreat = false,
 				raidtarget = false, raidready = false, raidtitles = false })
-			set("combatShow", { prdpower = true, player = false, petframe = false, target = false, tot = false,
-				focus = false, castbar = false, prd = false, party = false, raidplayers = false, raidpets = false, minimap = false,
+			set("combatShow", { prd = true, prdpower = true, player = false, petframe = false, target = false, tot = false,
+				focus = false, castbar = false, party = false, raidplayers = false, raidpets = false, minimap = false,
 				buffs = false, swing = false })
 			set("enemyShow", { target = false, tot = false, player = false, prd = false, prdpower = false,
 				party = false, raidplayers = false, raidpets = false, focus = false, buffs = false })
@@ -355,16 +355,12 @@ ns.PROFILE_MODULES = {
 			set("aggrootherMarkPlateG", 0.54)
 			set("aggrootherMarkPlateB", 0)
 		end },
-	{ key = "minimal-target", name = "Minimal target frame",
-		scope = { "Unit Frames/Target", "Standard Frames/Unit frames", "Quest Vision/top" },
-		tip = "The target frame stays through CineMode with nothing in it until a fight, then just its health, " ..
-		"buffs and debuffs and cast bar: the nameplates show the rest. No quest icon on it.",
+	-- (Key kept from when it hid the frame's parts until a fight: profiles
+	-- pick it by it.)
+	{ key = "minimal-target", name = "Target frame up",
+		scope = { "Standard Frames/Unit frames", "Quest Vision/top" },
+		tip = "The target frame stays through CineMode, every part of it showing. No quest icon on it.",
 		apply = function(set)
-			for _, part in ipairs({ "Art", "Auras", "CastBar", "Health", "Icons", "Level", "Name", "Numbers",
-				"Portrait", "Power", "PvP", "Threat" }) do
-				set("unitPartTarget" .. part, false)
-			end
-			set("combatShow", { unitPartTargetHealth = true, unitPartTargetAuras = true, unitPartTargetCastBar = true })
 			set("cineShow", { target = true })
 			set("targetQuestIcon", false)
 		end },
