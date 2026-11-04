@@ -729,7 +729,8 @@ end
 
 -- cinematic: already false outside the situations ticked for the tint (see Core).
 local function TintWanted(cinematic)
-	return (cinematic or Previewing()) and db.visualEffects ~= false
+	-- (Show me's effects demo: with the effects switched off too, as before a profile's picked.)
+	return (cinematic or Previewing()) and (db.visualEffects ~= false or ns.effectsDemo ~= nil)
 end
 
 -- Death screen: while the death camera runs, the world goes dim and cold and a

@@ -25,6 +25,28 @@ if arg[1] then
 		-- (The minimap button compares the stand-in's numbers: not the addon's.)
 		if not warning:find("^PLAYER_LOGIN: MinimapButton") then print("problem\t" .. warning) end
 	end
+	-- A new player (load.lua: a fresh install): every page off until a profile's
+	-- picked (Profiles.lua), then the profile's own. (The rest: as after a pick.)
+	do
+		local db = ns.GetDB()
+		if db.profileChosen ~= false then print("problem\ta fresh install has a profile picked") end
+		for _, key in ipairs(ns.OFF_UNTIL_PICKED) do
+			if ns.DEFAULTS[key] ~= nil and db[key] ~= false then -- (nil: the dev copy's only)
+				print("problem\tno profile picked: " .. key .. " is on")
+			end
+		end
+		-- (Its settings are in before the stand-in's frames fall short of what
+		-- the settings' refresh after needs: Bubbles' GetChildren.)
+		pcall(ns.SetProfile, ns.ActiveProfile())
+		local base = ns.ProfileBase()
+		for _, key in ipairs(ns.OFF_UNTIL_PICKED) do
+			if ns.IsProfileKey(key) and db[key] ~= base[key] then
+				print(("problem\tpicked a profile: %s is %s, not its %s"):format(key, tostring(db[key]),
+					tostring(base[key])))
+			end
+		end
+		if db.offUntilPicked then print("problem\tpicked a profile: still off") end
+	end
 	local problems, _, absent, nowhere, notes = ns.CheckModules(client, ns.ALL_BUILTIN_PROFILES)
 	for _, line in ipairs(problems) do print("problem\t" .. line) end
 	for _, line in ipairs(notes) do print("note\t" .. line) end

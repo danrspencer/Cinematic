@@ -1448,6 +1448,8 @@ local function HandleSlash(msg)
 		-- (Your profiles and their settings stay; picking one carries on from them.)
 		ns.SaveProfile()
 		ns.db.profileChosen = false
+		ns.SwitchOffUntilPicked()
+		if ns.RefreshOptions then ns.RefreshOptions() end
 		ns.Print("no profile picked: Cinematic is off until you pick one")
 		ns.ShowWelcome()
 	elseif cmd == "debug" then

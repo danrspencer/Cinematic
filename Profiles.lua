@@ -234,6 +234,54 @@ function ns.ProfileChosen()
 	return not ns.db or ns.db.profileChosen ~= false
 end
 
+-- Until then every page's switch is off too, so nothing of Cinematic's runs
+-- or shows as on in the settings (db.offUntilPicked: each one's value from
+-- before, put back as a profile's picked, then the profile loaded over it).
+-- Kept: the switches that only change a look of Cinematic's own (the
+-- letterbox's, Vitals', a Vision's), which do nothing with their feature off
+-- and give the welcome window's demos (ShowMe.lua) their proper look.
+local OFF_UNTIL_PICKED = {
+	"handleFrames", "handleAddonFrames", "mouseover", "handleGamepad", "handleUnitFrames", "personalResources",
+	"handleBuffs", "handleCooldowns", "handleSwing", "handleMinimap", "handleQuests", "handleTooltips",
+	"handleChat", "handlePlates", "handleBubbles",
+	"cameraModes", "shoulderCam",
+	"visualEffects", "letterboxPage", "tintPage", "graphicsPlus", "musicInCinematic",
+	"styleGeneral", "ufStyle", "rfStyle", "prdStyle", "tooltipStyle", "handlePlateStyle", "plateNameStyle",
+	"plateCastStyle", "bubblesStyle",
+	"handleHealVision", "damageVision", "lowHealth", "questVision", "questTalk", "rollWindow", "teleportVision",
+	"duelPlates", "emoteVision", "cards", "windGuide",
+	"handleQuality", "handleFishing", "handleHunter",
+	"cooldownManagerOn", "prdOn", -- (the game switches a profile turns on: ApplyProfileSwitches)
+}
+ns.OFF_UNTIL_PICKED = OFF_UNTIL_PICKED
+
+function ns.SwitchOffUntilPicked()
+	local db = ns.db
+	if not db or db.offUntilPicked then return end
+	local before = {}
+	for _, key in ipairs(OFF_UNTIL_PICKED) do
+		if ns.DEFAULTS[key] ~= nil then
+			before[key] = db[key]
+			db[key] = false
+		end
+	end
+	db.offUntilPicked = before
+end
+
+-- Picking a profile (or making one of your own) while they're off: back as
+-- they were first, so the live settings are the profile's again.
+local function LeaveOffState()
+	local db = ns.db
+	local before = db and db.offUntilPicked
+	if type(before) ~= "table" then
+		if db then db.offUntilPicked = nil end
+		return false
+	end
+	db.offUntilPicked = nil
+	for key, value in pairs(before) do db[key] = value end
+	return true
+end
+
 function ns.ActiveProfile()
 	return ns.db and ns.db.liveProfile or DEFAULT_PROFILE
 end
@@ -388,7 +436,9 @@ end
 
 -- Keeps the live settings in the active profile (on switching and logout).
 function ns.SaveProfile()
-	if ns.db and ns.db.profiles then
+	-- (Not while the pages' switches are off for no profile picked: they're
+	-- not the profile's.)
+	if ns.db and ns.db.profiles and not ns.db.offUntilPicked then
 		ns.db.profiles[ns.ActiveProfile()] = Snapshot(ns.ActiveProfile())
 	end
 end
@@ -424,9 +474,13 @@ end
 function ns.SetProfile(name)
 	if not ns.ProfileExists(name) then return end
 	local first = not ns.ProfileChosen()
+	-- (the pages' switches off till now: the active profile's again, loaded
+	-- below if it's the one picked)
+	local wasOff = LeaveOffState()
 	ns.db.profileChosen = true
 	if name == ns.ActiveProfile() then
-		if first then SettingsChanged() end -- (the first pick: Cinematic starts)
+		if wasOff then Load(name) end
+		if first or wasOff then SettingsChanged() end -- (the first pick: Cinematic starts)
 		return
 	end
 	-- (How long it took, in the log: the settings pages' refresh is most of it.)
@@ -641,6 +695,7 @@ end
 -- A new profile of your own from the current settings.
 function ns.NewProfile(name)
 	if ns.ProfileExists(name) then return false end
+	LeaveOffState() -- (from the profile's settings, not the switches off for none picked)
 	local saved = Snapshot(ns.ActiveProfile())
 	-- Stored against the defaults (a player's profile has no built-in under it).
 	local base, own = ns.ProfileBase(ns.ActiveProfile()), ns.ProfileBase(name)
@@ -955,15 +1010,19 @@ function ns.InitProfiles()
 	db.liveProfile = db.liveProfile or db.profile
 	local wanted = chardb.profile or db.profile
 	if wanted ~= db.liveProfile then
+		LeaveOffState() -- (loaded over below: switched off again after)
 		if ns.ProfileExists(db.liveProfile) then ns.SaveProfile() end
 		db.liveProfile = wanted
 		Load(wanted)
 	elseif liveRenamed or ns.newInstall then
+		LeaveOffState()
 		-- (The one in use renamed: loaded again from its saved changes, so what
 		-- its new built-in adds, like retail's own action bar groups, comes in.
 		-- A fresh install or Reset addon too: the default profile's own lists,
 		-- like those groups, aren't in the defaults the live settings start from.)
 		Load(wanted)
 	end
+	-- (No profile picked yet: every page off till one is.)
+	if not db.profileChosen then ns.SwitchOffUntilPicked() end
 	ns.WarmPartValues()
 end
