@@ -1466,6 +1466,13 @@ local function Update(_, elapsed)
 	if on and not testing and not secret and not ns.Flag(UnitAffectingCombat("player")) then
 		target = target * db.lowHealthCalm
 	end
+	-- (Secret, the level went all the way in and the game's alpha hid it. Out
+	-- of it (a fight over, Vitals turned off by a profile): from where it
+	-- should be, else the edges showed at full and eased out.)
+	if screen.wasSecret and not secret and level > target then
+		level, liftSpeed = target, 0
+	end
+	screen.wasSecret = secret
 	if dead or target >= level then
 		-- Closing in (or dying): straight there, quickly.
 		level = Approach(level, target, elapsed, dead and DEATH_FADE or db.lowHealthFollow)
@@ -1495,6 +1502,16 @@ local function Update(_, elapsed)
 	end
 	local shown = (k > 0 or flash > 0) and fade > 0
 	frame:SetShown(shown)
+	-- (Each time the edges come up, in the log, and why: tracking down a
+	-- profile switch that showed them.)
+	if shown ~= screen.wasShown then
+		screen.wasShown = shown
+		if shown then
+			ns.Log("vitals", ("edges up: %s, on %s, health %s, level %.2f, flash %.2f, profile %s"):format(
+				test and (test.quiet and "quick look" or "test") or glimpse and "quick look easing out" or "health",
+				tostring(on), secret and "secret" or tostring(share), level, flash, tostring(ns.ActiveProfile())))
+		end
+	end
 	if shown then
 		Apply(screen, look, k, fade, heart, secret)
 	else
@@ -1523,6 +1540,7 @@ end
 -- edges off too.
 function ns.TestLowHealth()
 	db = db or ns.GetDB()
+	ns.Log("vitals", "test from " .. tostring((debugstack(2, 1, 0) or "?"):gsub("\n", " ")))
 	test = { from = db.lowHealthTestFrom, to = db.lowHealthTestTo, time = db.lowHealthTestTime,
 		start = GetTime(), hits = db.lowHealthTestHits }
 	glimpse = nil
@@ -1536,6 +1554,7 @@ end
 local GLIMPSE_FROM, GLIMPSE_TO, GLIMPSE_TIME = 0.7, 0.1, 1.4
 function ns.FlashVitals(seconds)
 	db = db or ns.GetDB()
+	ns.Log("vitals", "quick look from " .. tostring((debugstack(2, 1, 0) or "?"):gsub("\n", " ")))
 	test ={ from = GLIMPSE_FROM, to = GLIMPSE_TO, time = GLIMPSE_TIME, start = GetTime(), hits = true,
 		hold = seconds or 2, quiet = true }
 	glimpse = true
