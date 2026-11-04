@@ -374,7 +374,9 @@ local function ApplyProfileSwitches()
 			local on = GetCVar(cvar) == "1"
 			local want
 			if db[switch.key] and db.enabled then
-				if not on and not db[switch.turnedOn] and not db[switch.leftAlone] then want = "1" end
+				-- (Our turnedOn with it off: switched off where its CVAR_UPDATE wasn't
+				-- seen, e.g. logged out. Stale: on again.)
+				if not on and not db[switch.leftAlone] then want = "1" end
 			else
 				db[switch.leftAlone] = nil
 				if db[switch.turnedOn] then
@@ -794,16 +796,41 @@ function ns.ResetProfile()
 	if ns.BackupProfile then ns.BackupProfile(name, "reset") end -- (Backups.lua)
 	local point = ns.db.profileResetPoints and ns.db.profileResetPoints[name]
 	ns.db.profiles[name] = point and CopyTable(point) or nil
+	-- (The game switches back to the profile's too: the Cooldown Manager or
+	-- personal resource display turned on again if the player had switched it off.)
+	for _, switch in ipairs(PROFILE_SWITCHES) do ns.db[switch.leftAlone] = nil end
 	Load(name)
 	SettingsChanged()
 end
 
--- Everything back to a fresh install: every profile and setting goes, and the
--- UI reloads so it starts over (the welcome window too). Other characters'
--- own profile picks fall back to the account's next login. keepBackups: the
--- backups stay (Backups.lua), your own profiles among the deleted ones to
--- bring back.
-function ns.ResetAddon(keepBackups)
+-- Kept by Reset Settings: what you made, and what the addon learned as you
+-- played (not settings: losing them only makes it learn again).
+local RESET_KEEPS = {
+	"profileBackups", "deletedProfiles", "profileBackupsKeep", "profileBackupsDaily", -- (Backups.lua)
+	"profileResetPoints", -- (your profiles' reset points)
+	"cameraScripts", "customWheels", -- (your scripts, your own wheels)
+	"zoneTints", "zonePresets", "zoneTintStrength", "timePhaseColors", "timePhaseStrength", -- (tints you picked)
+	"extraFrames", -- (frames you added)
+	"devEdits", -- (the dev copy's Module Editor)
+	"flightTimes", "questDrops", "frameAddons", "smartFindLooks", "goodSpeeds", "selfTest",
+}
+-- What a built-in profile keeps of your changes on Reset Settings: the lists
+-- you made in it (its settings go back to the built-in's).
+local RESET_PROFILE_KEEPS = {
+	"cameraRows", -- (your cameras and triggers)
+	"frameRules", -- (Custom Visibility Rules)
+	"lowHealthMyThemes", "lowHealthThemeEdits", -- (your Vitals themes, and your versions of ours)
+	"markNames", -- (the Nameplates page's rows' own names)
+}
+
+-- Back to a fresh install, and the UI reloads so it starts over (the welcome
+-- window too). Every character back on the default profile, the account's
+-- next login. settingsOnly (Reset Settings): every setting goes back, but
+-- nothing you made: your own profiles stay as they are, the built-ins keep
+-- the cameras, rules, themes and nameplate rows you made in them (their
+-- changes backed up first), and your scripts, wheels, tints, backups and what
+-- the addon learned stay. Without it (Reset Everything): all of it goes.
+function ns.ResetAddon(settingsOnly)
 	-- (Not in a fight: Edit Mode's layouts can't change then.)
 	if ns.ResetLayouts and not ns.ResetLayouts() then
 		ns.Print(L["can't reset Cinematic in a fight: try again once it's over"])
@@ -819,22 +846,38 @@ function ns.ResetAddon(keepBackups)
 	-- fresh install to Core.lua.)
 	local kept = {}
 	kept.vitalsThemeEdits = ns.isDev and CinematicDB and CinematicDB.vitalsThemeEdits or nil
-	if keepBackups and ns.BackupDeleted then
+	if settingsOnly then
 		ns.SaveProfile()
-		for _, name in ipairs(ns.ProfileNames()) do
-			if not builtinByName[name] then
-				ns.BackupDeleted(name)
-			elseif next(ns.db.profiles[name] or {}) then
-				ns.BackupProfile(name, "reset") -- (a changed built-in's changes)
+		local profiles = {}
+		for name, saved in pairs(ns.db.profiles) do
+			if type(saved) ~= "table" then
+				-- (nothing to keep)
+			elseif not builtinByName[name] and not allBuiltinNames[name] and not otherClientRetired[name] then
+				profiles[name] = saved -- (your own: as it is)
+			else
+				-- A built-in: its changes backed up, then only what you made in it.
+				if next(saved) and ns.BackupProfile and builtinByName[name] then ns.BackupProfile(name, "reset") end
+				local mine = {}
+				for _, k in ipairs(RESET_PROFILE_KEEPS) do
+					if type(saved[k]) == "table" and next(saved[k]) ~= nil then mine[k] = saved[k] end
+				end
+				EachRowSetting(saved, function(k, v) mine[k] = v end) -- (Nameplates rows you added)
+				if next(mine) then profiles[name] = mine end
 			end
 		end
-		for _, k in ipairs({ "profileBackups", "deletedProfiles", "profileBackupsKeep", "profileBackupsDaily" }) do
-			kept[k] = ns.db[k]
+		kept.profiles = profiles
+		for _, k in ipairs(RESET_KEEPS) do
+			local v = ns.db[k]
+			if type(v) == "table" and next(v) ~= nil then kept[k] = v end
 		end
 	end
 	if next(kept) then kept.resetKept = true end
 	CinematicDB = next(kept) and kept or nil
-	CinematicCharDB = nil
+	-- (The character's memory of play stays: places Discovered's card has
+	-- shown, talking heads heard. Not settings, and losing them replays them.)
+	local char = CinematicCharDB
+	CinematicCharDB = char and (char.cardSeen or char.talkingHeadSeen)
+		and { cardSeen = char.cardSeen, talkingHeadSeen = char.talkingHeadSeen } or nil
 	ns.db.profiles = {} -- (so logout's ns.SaveProfile writes into nothing kept)
 	ReloadUI()
 end
