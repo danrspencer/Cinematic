@@ -529,7 +529,7 @@ function ns.CreateTooltipStylePanel(kit)
 					"to you (red, yellow or green)."] },
 			})
 		end,
-		outline = { "tooltipOutline", L["A black border round the letters, for see-through backgrounds."],
+		outline = { "tooltipOutline", L["A black border around the letters, for see-through backgrounds."],
 			names = OUTLINES },
 		outlineColor = false, -- (the game's text: its outline is always black)
 		shadow = { "tooltipShadow" },

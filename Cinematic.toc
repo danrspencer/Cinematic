@@ -1,18 +1,19 @@
 ## Interface: 120100, 50504, 40402, 38000, 20506, 16001, 11509, 11508
 ## Title: Cinematic
-## Notes: Fades the UI and adds letterbox bars between fights for a more cinematic feel.
-## Notes-deDE: Blendet zwischen Kämpfen das UI aus und fügt Kinobalken für ein filmischeres Gefühl hinzu.
-## Notes-esES: Desvanece la interfaz y añade franjas de cine entre combates para un aire más cinematográfico.
-## Notes-esMX: Desvanece la interfaz y añade franjas de cine entre combates para un aire más cinematográfico.
-## Notes-frFR: Estompe l'interface et ajoute des bandes noires entre les combats pour une ambiance plus cinématographique.
-## Notes-itIT: Dissolve l'interfaccia e aggiunge bande nere tra un combattimento e l'altro per un'atmosfera più cinematografica.
-## Notes-koKR: 전투 사이에 UI를 흐리게 하고 레터박스 바를 추가해 더욱 영화 같은 분위기를 만듭니다.
-## Notes-ptBR: Esmaece a interface e adiciona faixas de cinema entre os combates para um clima mais cinematográfico.
-## Notes-ruRU: Скрывает интерфейс и добавляет черные полосы кадра между боями для более кинематографичной атмосферы.
-## Notes-zhCN: 在战斗间隙淡出界面并加上宽银幕黑边，营造更具电影感的氛围。
-## Notes-zhTW: 在戰鬥之間淡出介面並加上電影黑邊，營造更有電影感的氛圍。
+## Notes: Brings Azeroth to life: fades your UI between fights and adds cinematic cameras, letterbox bars, weather, Visions and more.
+## Notes-deDE: Erweckt Azeroth zum Leben: blendet dein UI zwischen Kämpfen aus und bringt filmische Kameras, Kinobalken, Wetter, Visions und mehr.
+## Notes-esES: Da vida a Azeroth: desvanece tu interfaz entre combates y añade cámaras cinematográficas, franjas de cine, clima, Visiones y más.
+## Notes-esMX: Da vida a Azeroth: desvanece tu interfaz entre combates y añade cámaras cinematográficas, franjas de cine, clima, Visiones y más.
+## Notes-frFR: Donne vie à Azeroth : estompe l'interface entre les combats et ajoute des caméras cinématiques, des bandes noires, la météo, les Visions et plus encore.
+## Notes-itIT: Dà vita ad Azeroth: dissolve l'interfaccia tra un combattimento e l'altro e aggiunge telecamere cinematografiche, bande nere, meteo, Vision e altro.
+## Notes-koKR: 아제로스에 생명을 불어넣습니다: 전투 사이에 UI를 흐리게 하고 영화 같은 카메라, 레터박스 바, 날씨, Visions 등을 더합니다.
+## Notes-ptBR: Dá vida a Azeroth: esmaece a interface entre os combates e adiciona câmeras cinematográficas, faixas de cinema, clima, Visions e mais.
+## Notes-ruRU: Оживляет Азерот: скрывает интерфейс между боями и добавляет кинематографичные камеры, черные полосы кадра, погоду, Visions и многое другое.
+## Notes-zhCN: 让艾泽拉斯活起来：在战斗间隙淡出界面，并加入电影镜头、宽银幕黑边、天气、Visions 等。
+## Notes-zhTW: 讓艾澤拉斯活起來：在戰鬥之間淡出介面，並加入電影鏡頭、電影黑邊、天氣、Visions 等。
 ## Author: sapo
 ## Category: UI
+## IconTexture: Interface\Icons\INV_Misc_Spyglass_03
 ## Version: @project-version@
 ## X-Curse-Project-ID: 1730730
 ## SavedVariables: CinematicDB

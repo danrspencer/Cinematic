@@ -16,7 +16,7 @@ ns.CHANGELOG_FEATURES = {
 		"kills a boss or levels up, a small card shows who it was, with emotes to answer in one click. Pick each " ..
 		"moment's emotes (voice ones too) and one of six card styles." },
 	{ date = "2026-11-02", page = "Teleport Vision", title = "Tele Vision",
-		text = "As you cast your Hearthstone, Astral Recall or a teleport, a portal opens round you in your class " ..
+		text = "As you cast your Hearthstone, Astral Recall or a teleport, a portal opens around you in your class " ..
 		"and spec's color, closing in as the cast fills, then the screen goes black as you're whisked away. It " ..
 		"plays alongside the tele camera." },
 	{ date = "2026-11-02", page = "Card Vision", title = "Story cards",
@@ -92,7 +92,7 @@ ns.CHANGELOG_FEATURES = {
 		"border they all follow." },
 	{ date = "2026-10-29", page = "Combat Vision", title = "Battle Vision",
 		text = "A cue as you go into a fight and come out of it: a word on the screen or in a letterbox bar, a " ..
-		"pulse round the edges, an icon, and sounds you pick for each kind of fight, like horns for a raid boss. " ..
+		"pulse around the edges, an icon, and sounds you pick for each kind of fight, like horns for a raid boss. " ..
 		"Its look has a page in the Style hub, with presets and a preview." },
 	{ date = "2026-10-28", page = "Scenes", title = "Cameras page",
 		text = "Camera Modes and Camera Triggers are now one Cameras page: a row for each trigger (an emote, " ..
@@ -136,7 +136,7 @@ ns.CHANGELOG_FEATURES = {
 		text = "A new Wheels page shows every wheel and its icons, with its keybind right there, and lets you " ..
 		"pick which wheels sit on the master wheel and in what order." },
 	{ date = "2026-10-24", page = "Vitals Vision", title = "Vitals Vision",
-		text = "As your health drops, dark edges creep in round the screen with art themed to your class " ..
+		text = "As your health drops, dark edges creep in around the screen with art themed to your class " ..
 		"and talents (blood, frost, fire...), a heartbeat that quickens and a flash on big hits, so you can " ..
 		"tell how you're doing at a glance." },
 	{ date = "2026-10-23", page = "Chat", title = "Speech from behind you",
@@ -190,14 +190,14 @@ ns.CHANGELOG_FEATURES = {
 		"CineMode, following the Game Frames rows of the frames they replace." },
 	{ date = "2026-10-19", page = "Minimap", title = "Minimap Reveal",
 		text = "The faded minimap comes up when ore, herbs or treasure show on it, a quest of yours is " ..
-		"done, or another icon appears - with a ping on the node if you like." },
+		"done, or another icon appears, with a ping on the node if you like." },
 	{ date = "2026-10-17", page = "Advanced Frames", title = "WeakAuras support",
 		text = "WeakAuras' auras fade in CineMode; auras anchored to another frame fade with that frame." },
 	{ date = "2026-10-17", page = "Advanced Frames", title = "Questie support",
 		text = "Questie's quest tracker and its quest item buttons fade with the Quest tracker row." },
 	{ date = "2026-10-17", page = "Unit Frames", title = "Unit frame parts",
-		text = "Pick which parts of your frame and the target and focus frames show - portrait, name, " ..
-		"level, frame art - for you and each kind of unit, to keep just the bars." },
+		text = "Pick which parts of your frame and the target and focus frames show (portrait, name, " ..
+		"level, frame art) for you and each kind of unit, to keep just the bars." },
 	{ date = "2026-10-17", page = "Chat", title = "Update notices",
 		text = "After an update with new features, a line in chat at login says so, with a link to " ..
 		"What's new. Turn it off on the Chat page." },

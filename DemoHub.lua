@@ -331,7 +331,7 @@ local CAMERAS = {
 	{ "Flight Cam", "3. Flight & hearth", 30, "as if on a flight path: no route known, so it doesn't land" },
 	{ "Tele Cam", "3. Flight & hearth", 15, "the Hearthstone's cast pretended" },
 	{ "Death Cam", "4. Questing & combat", 30, "you lie down as if dead" },
-	{ "AFK Cam", "5. Scenery & mood", 30, "the slow sweep round you" },
+	{ "AFK Cam", "5. Scenery & mood", 30, "the slow sweep around you" },
 	{ "Cozy Cam", "5. Scenery & mood", 20, "as if sitting" },
 	{ "Vista Cam", "5. Scenery & mood", 20, "as if /stare-ing at the view" },
 	{ "Fish Cam", "5. Scenery & mood", 15, "as if fishing" },
@@ -352,7 +352,7 @@ end
 -- 3. Flight & hearth ------------------------------------------------------------
 
 Add("3. Flight & hearth", { key = "tele-vision", name = "Tele Vision: a pretend Hearthstone",
-	tip = "Tele Vision's Test: the portal opens round you as if casting your Hearthstone, then the screen " ..
+	tip = "Tele Vision's Test: the portal opens around you as if casting your Hearthstone, then the screen " ..
 		"goes black. Again stops it.",
 	needs = function() return ns.TestTeleportVision ~= nil, "Tele Vision isn't loaded" end,
 	run = function() ns.TestTeleportVision() end })
@@ -640,7 +640,7 @@ Add("6. Group", { key = "party", name = "Act as if in a party",
 Add("6. Group", { key = "solo", name = "Act solo again", tip = "/cine debug group off",
 	run = function() ns.HandleSlash("debug group off") end })
 Add("6. Group", { key = "duels", name = "Duel Vision: pretend duels",
-	tip = "/cine debug duels test: friendly players round you as if dueling each other (5 minutes, again " ..
+	tip = "/cine debug duels test: friendly players around you as if dueling each other (5 minutes, again " ..
 		"stops). Somewhere busy, e.g. outside a city bank.",
 	run = function() ns.HandleSlash("debug duels test") end })
 

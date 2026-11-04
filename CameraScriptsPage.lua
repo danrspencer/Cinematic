@@ -65,7 +65,7 @@ local HINTS = {
 	["repeat"] = "Runs the steps inside it again. 0 times: until the camera ends (the preview shows three).",
 	emote = "Your character does this emote (a word, like wave or cheer).",
 	putback = "Undoes every turn, tilt and zoom this script made. Zoom too off: the zoom stays, for a Zoom beside it in a Together to bring back at its own speed.",
-	turnTo = "Behind: the game's camera follow brings it round behind you, as the vista camera lines up. In front: turns to face you, counted from where it started.",
+	turnTo = "Behind: the game's camera follow brings it around behind you, as the vista camera lines up. In front: turns to face you, counted from where it started.",
 	sway = "A random spot within Arc of behind (or in front), At least that far on; then it creeps on at Drift degrees a second through Pause, easing off before the edge. Middle: favor spots near the middle.",
 	tiltRand = "A random height: Middle degrees down (negative: up), give or take Down and Up. It waits for a turn to finish.",
 	spin = "Round and round, speeding up by Speed-up degrees a second each second to Top speed. 0 seconds: until the camera ends.",
@@ -122,7 +122,7 @@ local function StepText(step)
 	elseif k == "turnTo" and step.to == "front" and step.fit == "cast" then
 		return L["Turn to face you before the cast ends"]
 	elseif k == "turnTo" then
-		return (step.to == "front" and L["Turn to face you over %s s"] or L["Turn round behind you over %s s"]):format(
+		return (step.to == "front" and L["Turn to face you over %s s"] or L["Turn around behind you over %s s"]):format(
 			Num(step.secs))
 	elseif k == "until" then
 		local text = step.what == "cast" and (step.secs > 0 and L["Until the cast is %s s from done"]:format(Num(step.secs))
@@ -1119,7 +1119,7 @@ function ns.CreateCameraScriptsPanel(kit)
 			end
 			row.box:SetScript("OnEnterPressed", function(self) Commit(self) self:ClearFocus() end)
 			row.box:SetScript("OnEditFocusLost", Commit)
-			kit.Tooltip(row.box, L["A soft haze round the edges of the screen while this camera runs, as if it had focused on you. 0 leaves it off. Needs Camera haze on the Visual Effects page, which also turns it up or down."])
+			kit.Tooltip(row.box, L["A soft haze around the edges of the screen while this camera runs, as if it had focused on you. 0 leaves it off. Needs Camera haze on the Visual Effects page, which also turns it up or down."])
 		else
 			row.pick = Choice(row, 150, function() return { "no", "yes" } end,
 				function() return page.script and (page.script.button and "yes" or "no") end,

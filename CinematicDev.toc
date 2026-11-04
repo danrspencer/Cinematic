@@ -3,6 +3,7 @@
 ## Notes: Development copy of Cinematic. Don't enable it together with the released Cinematic.
 ## Author: sapo
 ## Category: UI
+## IconTexture: Interface\Icons\INV_Misc_Spyglass_03
 ## Version: dev
 ## SavedVariables: CinematicDB
 ## SavedVariablesPerCharacter: CinematicCharDB

@@ -555,7 +555,7 @@ local BUILT_IN = {
 	-- questCamZoomMaxTime at most. Leaving, it all goes back. (Not the same
 	-- yet: the zoom back out waits till you walk off, and only if no other
 	-- quest giver's near.)
-	{ id = "quest", name = "Quest cam", make = function()
+	{ id = "quest", name = "Quest camera", make = function()
 		local side, angle = ns.db and ns.db.questCamSide or "click", Db("questCamAngle", 30)
 		local turn
 		if side == "click" then
@@ -588,7 +588,7 @@ local BUILT_IN = {
 	-- round for one off screen). Over (chatCamQuiet with no one talking): it
 	-- all goes back. (Not the same yet: no keeping up with one walking off, no
 	-- learning how far a swing moves them.)
-	{ id = "chat", name = "Chat Cam", make = function()
+	{ id = "chat", name = "Chat camera", make = function()
 		local function Aim()
 			return Set(S("aim", { at = "speaker", deg = Db("chatCamFrame", 6), secs = 3, speed = Db("chatCamSwingSpeed", 15),
 				miss = ns.db and ns.db.chatCamSearch == false and "stay" or "look" }), "chatCamFrame", "chatCamSwingSpeed",

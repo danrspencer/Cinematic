@@ -8239,6 +8239,8 @@ function ns.UpdateFrames(cinematic, elapsed)
 		or ns.db.minimapKeepQuest and ns.HasTrackedQuest()
 			-- (Only after progress: 0 is off.)
 			and ((ns.db.minimapKeepQuestFor or 0) <= 0 or now - ns.questActivityAt < ns.db.minimapKeepQuestFor * 60)
+		-- (Retail: hunting your prey.)
+		or ns.db.minimapKeepPrey and ns.IsHuntingPrey(now)
 		-- (Zones you picked: not on flight paths, where Not on flight paths is ticked.)
 		or not taxiHidesMinimap and ns.IsMinimapKeptInZone())
 

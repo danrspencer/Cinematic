@@ -3219,13 +3219,13 @@ local function TurningExtras(swingKey, delayKey)
 		stack:Header(content, L["Turning"])
 		local swing = stack:Add(Check(content, swingKey, L["Glide round gently when you turn"],
 			L["When you turn left or right, the camera doesn't snap round with you: it carries on " ..
-			"as it was (sway and all) until you stop turning, then glides gently round to your " ..
+			"as it was (sway and all) until you stop turning, then glides gently around to your " ..
 			"new facing, easing in and out. Dragging with either mouse button hands the camera " ..
 			"straight back to you."]), "check")
 		swing:HookScript("OnClick", Refresh) -- grey out / enable the wait below
 		local glideDelay = stack:Add(Slider(content, delayKey, L["Wait before gliding"], 0, 5, 0.5, L["%.1f sec"]),
 			"slider")
-		Tooltip(glideDelay, L["After you stop turning, the view holds this long before gliding round " ..
+		Tooltip(glideDelay, L["After you stop turning, the view holds this long before gliding around " ..
 			"to your new facing, in case you turn again. Turning again starts the wait over."])
 		GreyUnless(glideDelay, function(db) return db[swingKey] end)
 	end
@@ -3297,14 +3297,14 @@ local EVENT_TIPS = {
 local function CreateFlightPanel()
 	CreateCameraModePanel({
 		name = L["Flight Cam"],
-		description = L["On flight paths. The camera swings round behind you as you take off, sways " ..
+		description = L["On flight paths. The camera swings around behind you as you take off, sways " ..
 			"behind you on the way and settles behind you before landing."],
 		start = function(content, stack)
 			stack:Add(Check(content, "dropTargetOnFlights", L["Drop your target at takeoff"],
 				L["Your target's frames fade as if nothing were targeted, until you pick a new target " ..
 				"or land. (Addons can't clear the target itself; the game doesn't allow it.)"]), "check")
-			stack:Add(Check(content, "taxiCenter", L["Swing round behind you at takeoff"],
-				L["Slowly swings the camera round behind your character as you take off, ready for " ..
+			stack:Add(Check(content, "taxiCenter", L["Swing around behind you at takeoff"],
+				L["Slowly swings the camera around behind your character as you take off, ready for " ..
 				"the sway behind you. Also once the pause after you move the camera mid-flight is up."]),
 				"check")
 		end,
@@ -3365,7 +3365,7 @@ local function CreateStandingPanel()
 			"and how long you stand still first, is on the Scenes page."],
 		inputPauseKey = "idleInputPause",
 		orbitPrefix = "idleOrbit", style = "sweep",
-		rotateLabel = L["Sweep round you"],
+		rotateLabel = L["Sweep around you"],
 		rotateTip = L["The camera sweeps around your character, pausing between sweeps. Moving or " ..
 			"dragging the camera stops it."],
 		zoomPrefix = "idleZoom",
@@ -3425,7 +3425,7 @@ local function CreateVistaPanel()
 	CreateCameraModePanel({
 		name = L["Vista Cam"],
 		description = L["Stop and /stare out at the view (or any event set to it on the Scenes page): " ..
-			"the camera glides round behind you and sways very gently there, looking out the way " ..
+			"the camera glides around behind you and sways very gently there, looking out the way " ..
 			"you're facing. Like the RP walk camera, only slower and softer. Moving, jumping or " ..
 			"another emote ends it."],
 		inputPauseKey = "vistaInputPause",
@@ -3448,7 +3448,7 @@ local function CreateFishPanel()
 	CreateCameraModePanel({
 		name = L["Fish Cam"],
 		description = L["Cast Fishing (or any event set to it on the Scenes page): the vista camera, " ..
-			"made for fishing. The camera glides round behind you and sways only a little either " ..
+			"made for fishing. The camera glides around behind you and sways only a little either " ..
 			"side, so your bobber stays in view. It carries on after the cast until you move or jump."],
 		inputPauseKey = "fishInputPause",
 		inputPauseTip = L["It glides back behind you first."],
@@ -3709,7 +3709,7 @@ local QUEST_SIDES = {
 local function CreateQuestPanel()
 	local content, top, title = CameraSection(L["Quest Cam"], "Quest Cam")
 	local subtitle = PageIntro(content, title, L["Talking to a quest giver, the " ..
-		"camera zooms in and swings round behind you, looking past you at them. It goes back " ..
+		"camera zooms in and swings around behind you, looking past you at them. It goes back " ..
 		"once you close the window or move off (your zoom stays if you zoomed yourself meanwhile). Works " ..
 		"whether or not CineMode is on. The \"Talk to a quest giver\" and \"Talk about a quest\" " ..
 		"events on the Scenes page can also turn it off or make it wait a moment."], top)
@@ -3797,8 +3797,8 @@ local function CreateTelePanel()
 	local content, sectionTop, title = CameraSection(L["Tele Cam"], "Tele Cam")
 	local subtitle = PageIntro(content, title, L["Casting your Hearthstone or a " ..
 		"teleport, the camera swings round in front of you, quickly enough to be there before you " ..
-		"go, then spins round you faster and faster as it zooms in. Cancel the cast and it goes " ..
-		"back to where it was; once you're there, it swings round behind you. Its music, haze and " ..
+		"go, then spins around you faster and faster as it zooms in. Cancel the cast and it goes " ..
+		"back to where it was; once you're there, it swings around behind you. Its music, haze and " ..
 		"tooltips follow the Cozy Cam's settings. The events on the Scenes page can also make it " ..
 		"wait a moment."], sectionTop)
 	-- (On or off: the Hearthstone and teleport rows' cameras, on the Cameras page.)
@@ -3845,7 +3845,7 @@ local function CreateTelePanel()
 		"the camera was before you started. Off: it stops where it is."]), "check")
 	GreyUnless(back, IfOn)
 	local behind = stack:Add(Check(content, "teleBehind", L["Swing behind you where you arrive"],
-		L["Once you're there (after the loading screen, if there is one), the camera swings round " ..
+		L["Once you're there (after the loading screen, if there is one), the camera swings around " ..
 		"behind you."]), "check")
 	GreyUnless(behind, IfOn)
 end
@@ -10374,10 +10374,19 @@ local function CreateMinimapPanel()
 	Tooltip(questFor, L["The minimap stays up only this long after you pick up a quest or make progress " ..
 		"on a tracked one, then fades until you do again. Off: it stays up the whole time a quest is tracked."])
 	GreyUnless(questFor, function(db) return db.minimapKeepQuest end)
+	-- (Retail: hunting your prey. Left off where the client has no prey hunts.)
+	local aboveCreatures, creaturesGap = questFor, { -24, -10 }
+	if ns.HasPreyHunts() then
+		local prey = Check(content, "minimapKeepPrey", L["Hunting your prey"],
+			L["While you're on a prey hunt, the minimap stays up during CineMode, so you can see " ..
+			"the activities, world quests, rares and treasures that lure your prey out."])
+		prey:SetPoint("TOPLEFT", questFor, "BOTTOMLEFT", -24, -10)
+		aboveCreatures, creaturesGap = prey, { 0, -2 }
+	end
 	local creatures = Check(content, "minimapKeepCreatures", L["Tracking creatures or fish"],
 		L["While hunter, druid or warlock creature tracking, or Find Fish, is on, the minimap stays " ..
 		"up during CineMode."])
-	creatures:SetPoint("TOPLEFT", questFor, "BOTTOMLEFT", -24, -10)
+	creatures:SetPoint("TOPLEFT", aboveCreatures, "BOTTOMLEFT", creaturesGap[1], creaturesGap[2])
 	local gathering = Check(content, "minimapKeepGathering", L["Tracking herbs, minerals or treasure"],
 		L["While Find Herbs, Find Minerals or Find Treasure is on, the minimap stays up during CineMode, " ..
 		"except in the places below."], function(value)
@@ -11195,7 +11204,7 @@ local function CreateCooldownPanel()
 		L["The icon grows a little and back with each beat while it flashes."])
 	flashGrow:SetPoint("LEFT", flashGlow.Text or flashGlow.text or flashGlow, "RIGHT", 12, 0)
 	local flashBorder = Check(content, "cooldownFlashBorder", L["Border"],
-		L["A border in the color beside it round the icon while it flashes."])
+		L["A border in the color beside it around the icon while it flashes."])
 	flashBorder:SetPoint("LEFT", flashGrow.Text or flashGrow.text or flashGrow, "RIGHT", 12, 0)
 	local flashSwatch = CreateFrame("Button", nil, content)
 	flashSwatch:SetSize(20, 20)

@@ -199,7 +199,7 @@ local function LookRows(content, stack, rows, icon)
 				L["How tall the words are on the screen; the other lines go by them. (In a letterbox bar: " ..
 				"Letterbox scale.)"], function(db) return On(db) and not InBar(db) end)
 		end,
-		outline = { "cardOutline", L["A border round the letters."], names = { [0] = L["None"], L["Thin"], L["Thick"] } },
+		outline = { "cardOutline", L["A border around the letters."], names = { [0] = L["None"], L["Thin"], L["Thick"] } },
 		outlineColor = function(look)
 			look.Color(L["Outline color"], { "cardOutlineR", "cardOutlineG", "cardOutlineB" },
 				L["Pick the outline's color."], function(db)
@@ -309,7 +309,7 @@ end
 
 -- Events: each event's tick and Show in row.
 local TIPS = {
-	combatIn = "As a fight starts: a word (Combat), a pulse round the screen's edges and a sound.",
+	combatIn = "As a fight starts: a word (Combat), a pulse around the screen's edges and a sound.",
 	combatOut = "As a fight ends: a word (Respite) and a sound. Not after a fight shorter than its setting on " ..
 		"the Settings tab.",
 	boss = "A boss's name as its fight starts (or before it, as you first target it or come near it), the " ..

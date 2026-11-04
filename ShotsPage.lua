@@ -143,7 +143,7 @@ function ns.CreateMyShotsPanel(kit)
 	end)
 	base:SetPoint("LEFT", baseLabel, "LEFT", 66, 0)
 	kit.Tooltip(base, L["The camera it moves like: cozy swings round to face you, vista and fish settle behind you " ..
-		"(fish sways less), AFK turns right round you. Its other settings (Camera Settings page) go on as they are."])
+		"(fish sways less), AFK turns right around you. Its other settings (Camera Settings page) go on as they are."])
 	kit.AddControl(base)
 
 	local sliders = {}

@@ -467,7 +467,7 @@ function ns.CreateTeleportVisionPanel(kit)
 	local title = kit.Label(content, "GameFontNormalLarge", L["Tele Vision"])
 	title:SetPoint("TOPLEFT", 16, -16)
 	local intro = kit.PageIntro(content, title,
-		L["As you cast your Hearthstone, Astral Recall or a teleport, a portal's glowing rim closes in round " ..
+		L["As you cast your Hearthstone, Astral Recall or a teleport, a portal's glowing rim closes in around " ..
 		"you, brighter and turning quicker as the cast fills, and flashes as you're whisked away. It shows " ..
 		"whenever the tele camera would play for that cast (Cameras), with or alongside it."])
 	local function Changed() end

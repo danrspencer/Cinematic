@@ -1187,12 +1187,15 @@ local function LearnEnds()
 end
 
 local auraSeen = { events = 0 } -- (for /cine debug emotevision: what the game's aura events looked like)
-local function Count(list) return type(list) == "table" and #list or 0 end
+local function Count(list)
+	if issecretvalue and issecretvalue(list) then return "?" end
+	return type(list) == "table" and #list or 0
+end
 local function AurasChanged(info)
 	auraSeen.events = auraSeen.events + 1
 	auraSeen.last = type(info) ~= "table" and "no info (old client: scanned)"
 		or (issecretvalue and (issecretvalue(info.addedAuras) or issecretvalue(info.updatedAuraInstanceIDs)))
-		and "secret" or ("full %s, added %d, updated %d, removed %d"):format(tostring(info.isFullUpdate),
+		and "secret" or ("full %s, added %s, updated %s, removed %s"):format(tostring(info.isFullUpdate),
 			Count(info.addedAuras), Count(info.updatedAuraInstanceIDs), Count(info.removedAuraInstanceIDs))
 	-- (In a fight they're secret on retail: learnt again, quietly, after it.)
 	if Fighting() then

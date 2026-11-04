@@ -515,7 +515,7 @@ ns.PROFILE_MODULES = {
 		tip = "Damage Vision on: your race with #1 (or your lead over #2) in fights in dungeons, delves and raids.",
 		apply = function(set) set("damageVision", true) end },
 	{ key = "tele-vision", name = "Tele Vision", scope = { "Teleport Vision" },
-		tip = "Tele Vision on: a portal opens round you as you cast your Hearthstone, Astral Recall or a teleport.",
+		tip = "Tele Vision on: a portal opens around you as you cast your Hearthstone, Astral Recall or a teleport.",
 		apply = function(set) set("teleportVision", true) end },
 	{ key = "emote-vision", name = "Emote Vision", scope = { "Emote Vision" },
 		tip = "Emote Vision on: a card shows who buffed you, brought you back or emoted at you, with emotes to " ..

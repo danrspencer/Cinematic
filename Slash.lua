@@ -76,6 +76,7 @@ local function PrintDebugHelp()
 	print("  /cine debug cpu [seconds|stop] - time what the addon spends its time on (30 seconds), report in the log")
 	print("  /cine debug frame <name> - how faded frames with <name> in their name or group stand")
 	print("  /cine debug minimap - the minimap's settings, where it's anchored, and whether it's shrunk and moved off the screen")
+	print("  /cine debug prey - how the addon tells you're hunting your prey (retail), widget sets and all")
 	print("  /cine debug ping - print each minimap ping and whether it brings the minimap up (again to stop)")
 	print("  /cine debug chatcopy - Copy chat shows each line's codes as text, to see how its colors come (again to stop)")
 	print("  /cine debug minimapicons - the minimap's methods for its player arrow and icons on this client")
@@ -1386,6 +1387,9 @@ local function HandleSlash(msg)
 			tostring(gathering), gathering and ns.IsTrackingOffHere() and " (but not here: Except in, Minimap page)" or "",
 			tostring(creatures)))
 		ns.Print(ns.NodeSweepReport())
+	elseif cmd == "debug" and arg == "prey" then
+		-- How a prey hunt is told (Keep open while hunting, Minimap page).
+		ns.ReportPrey()
 	elseif cmd == "debug" and arg == "place" then
 		-- Shows how the addon classifies where you are (cities vs inns etc.).
 		local inInstance, instanceType = IsInInstance()

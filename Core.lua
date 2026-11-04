@@ -145,6 +145,7 @@ local DEFAULTS = {
 	minimapKeepQuest = true,   -- keep the minimap up while a quest is tracked
 	minimapKeepQuestFor = 1,   -- ...only this many minutes after picking one up or progress on one (0 = off)
 	minimapKeepZones = "",     -- ...and in these zones: map IDs, comma-separated (ns.IsMinimapKeptInZone)
+	minimapKeepPrey = true,    -- ...and while hunting your prey (retail; ns.IsHuntingPrey)
 	-- Reveal (Minimap page): the faded minimap comes up while one of these is on
 	-- it (NodeSweep.lua looks; with any ticked it's kept full size, icons hidden).
 	minimapRevealNodes = true,   -- ore, herbs and treasure (the tracking has to be on)

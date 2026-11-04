@@ -2941,7 +2941,7 @@ function ns.CreateVitalsStylePanel(kit)
 			return { { value = "none", text = L["None"] }, { value = "Swirl", text = L["Spiral arms"] },
 				{ value = "Vortex", text = L["Whirlpool clouds"] }, { value = "Ring", text = L["Portal ring"] } }
 		end, 140, L["What it is: wispy spiral arms (added on as light), clouds wound into a whirlpool, or a " ..
-			"portal's glowing rim closing in round you. None: not there."], function(d) return Themed(d) and i <= #Swirls() + 1 end)
+			"portal's glowing rim closing in around you. None: not there."], function(d) return Themed(d) and i <= #Swirls() + 1 end)
 		kind:SetPoint("LEFT", row, "LEFT", 0, 0)
 		-- (The swatch from just past the dropdown, as the sparks' rows have it.)
 		local past = CreateFrame("Frame", nil, row)
@@ -2996,7 +2996,7 @@ function ns.CreateVitalsStylePanel(kit)
 			kit.GreyUnless(slider, HasPortal)
 		end
 		Opacity("lowHealthPortalAlpha", "The theme's portal (one of the game's portal models), its swirling rim " ..
-			"closing in round the screen as you weaken. Parked: no theme has one now.", On)
+			"closing in around the screen as you weaken. Parked: no theme has one now.", On)
 	end
 	tabbed.Finish(swirlTab)
 
@@ -3030,7 +3030,7 @@ function ns.CreateVitalsStylePanel(kit)
 			if FileLoads(mask[1]) then list[#list + 1] = { value = mask[1], text = L[mask[2]] } end
 		end
 		return list
-	end, L["What cuts the pattern to an edge, so it stays round the screen's sides. None: the pattern over " ..
+	end, L["What cuts the pattern to an edge, so it stays around the screen's sides. None: the pattern over " ..
 		"all of the screen (an edge already, like the red one, needs none)."], Theirs)
 	Pick("lowHealthGameColors", L["Colors:"], function()
 		return { { value = "auto", text = L["The pattern's own choice"] },

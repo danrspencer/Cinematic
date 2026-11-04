@@ -384,6 +384,9 @@ local function Explain(entry)
 				if ns.db.minimapKeepQuest and ns.HasTrackedQuest() then
 					Add(out, "on", L["Keep open: a tracked quest"], "Minimap")
 				end
+				if ns.db.minimapKeepPrey and ns.IsHuntingPrey(GetTime()) then
+					Add(out, "on", L["Keep open: hunting your prey"], "Minimap")
+				end
 				if ns.IsMinimapKeptInZone() then
 					Add(out, "on", L["Keep open: in this zone"], "Minimap")
 				end

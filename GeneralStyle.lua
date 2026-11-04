@@ -294,7 +294,7 @@ function ns.CreateGeneralStylePanel(kit)
 			tint = { 0.25, 0.75, 0.3 } },
 		font = { "styleFont", L["Every page's words that follow General. The game's: each page's own. Russian, " ..
 			"Korean or Chinese text keeps the game's, so its letters show."] },
-		outline = { "styleOutline", L["A black border round the letters, on every page that follows General. " ..
+		outline = { "styleOutline", L["A black border around the letters, on every page that follows General. " ..
 			"The game's: as each page's default has it."], names = { [0] = L["None"], L["Thin"], L["Thick"] },
 			own = L["The game's"] },
 		outlineColor = false, -- (most pages' text is the game's: its outline is always black)

@@ -126,7 +126,7 @@ function ns.CreateQuestTalkStylePanel(kit)
 			look.Slider("questTalkNumberAlpha", L["Numbers opacity"], 10, 100, 5, "%d%%", 100,
 				L["How faded the page count (2 / 3) and the numbers by the replies and buttons are."])
 		end,
-		outline = { "questTalkOutline", L["A black border round the letters: for light words with no panel behind " ..
+		outline = { "questTalkOutline", L["A black border around the letters: for light words with no panel behind " ..
 			"them."], names = { [0] = L["None"], L["Thin"], L["Thick"] } },
 		outlineColor = false, -- (a page of words: too many copies)
 		shadow = { "questTalkShadow" },

@@ -78,7 +78,7 @@ function ns.CreateVisionsStylePanel(kit)
 	rows.Font("visionStyleFont", L["Every Vision's words that follow this page. Each Vision's own: the game's " ..
 		"font, or the one its page starts with."])
 	rows.Outline("visionStyleOutline", L["Outline"], 2, { [0] = L["None"], L["Thin"], L["Thick"], game = OWN },
-		L["A black border round the letters, on every Vision that follows this page."])
+		L["A black border around the letters, on every Vision that follows this page."])
 	rows.Choices(L["Shadow:"], "visionStyleShadow", {
 		{ "general", L["Interface Style"], L["As the Style hub's General page says."] },
 		{ "game", L["The game's"] },
@@ -90,7 +90,7 @@ function ns.CreateVisionsStylePanel(kit)
 	rows.Texture(L["Bar texture:"], "visionStyleTexture", L["The bars of every Vision that follows this page " ..
 		"(Damage Vision's, Roll Vision's time left). Below the game's own few: any other addon shares (through " ..
 		"LibSharedMedia)."], nil, { 0.25, 0.75, 0.3 }, OWN)
-	rows.Border(L["Border:"], "visionStyleBorder", { game = OWN }, L["The border round the Vision parts that " ..
+	rows.Border(L["Border:"], "visionStyleBorder", { game = OWN }, L["The border around the Vision parts that " ..
 		"follow this page (the quest item button's frame). Custom: its thickness and color under it."])
 
 	stack:Header(content, L["Visions"])

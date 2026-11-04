@@ -93,7 +93,7 @@ function ns.CreateRollStylePanel(kit)
 			look.Slider("rollTextSize", L["Size"], 70, 140, 5, "%d%%", 100,
 				L["How big the text is, next to its usual size."])
 		end,
-		outline = { "rollOutline", L["A black border round the letters: easier to read with no panel behind them."],
+		outline = { "rollOutline", L["A black border around the letters: easier to read with no panel behind them."],
 			names = { [0] = L["None"], L["Thin"], L["Thick"] } },
 		outlineColor = false, -- (a row each: too many copies)
 		shadow = { "rollShadow" },

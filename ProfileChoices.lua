@@ -75,7 +75,7 @@ ns.SLOT_CHOICES = {
 		{ part = "standard", label = "Softly", line = "Between fights, with the minimap and group plates as usual",
 			modules = { "recovering" } },
 	} },
-	bars = { label = "Action bars", page = "Mouseover groups", question = "Hide/Show Action Bars in Combat",
+	bars = { label = "Action bars", page = "Mouseover groups", question = "When do your action bars show?",
 		default = "standard", choices = {
 		{ part = "always", label = "Always Show", line = "Your action bars stay up all through CineMode",
 			modules = { "bars-always" } },

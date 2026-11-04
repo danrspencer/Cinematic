@@ -7,7 +7,8 @@
 local _, ns = ...
 local L = ns.L
 
--- "2026-10-16" -> "16 October 2026" (the game's month names where it has them).
+-- "2026-10-16" -> "October 16, 2026" in English, "16 October 2026" in the other
+-- languages (the game's month names where it has them).
 local MONTHS = { "January", "February", "March", "April", "May", "June", "July", "August",
 	"September", "October", "November", "December" }
 local function FormatDate(date)
@@ -15,6 +16,7 @@ local function FormatDate(date)
 	if not year then return date end
 	month = tonumber(month)
 	local name = (CALENDAR_FULLDATE_MONTH_NAMES and CALENDAR_FULLDATE_MONTH_NAMES[month]) or L[MONTHS[month]]
+	if (ns.locale or "enUS"):find("^en") then return ("%s %d, %s"):format(name, tonumber(day), year) end
 	return ("%d %s %s"):format(tonumber(day), name, year)
 end
 

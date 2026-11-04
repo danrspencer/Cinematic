@@ -25,7 +25,7 @@ ns.SHOT_SETTINGS = {
 	{ key = "OrbitBackArc", label = L["Sway either side"], min = 0, max = 90, step = 1, fmt = "%d°", skip = "afk",
 		tip = L["How far the camera may sway either side of where it settles."] },
 	{ key = "OrbitStep", label = L["Turn each move"], min = 5, max = 180, step = 5, fmt = "%d°", only = "afk",
-		tip = L["How far round you the camera turns with each move."] },
+		tip = L["How far around you the camera turns with each move."] },
 	{ key = "OrbitPitchUp", label = L["Tilt up to"], min = 0, max = 30, step = 1, fmt = "%d°",
 		tip = L["How far the camera may tilt up as it moves."] },
 	{ key = "OrbitPitchDown", label = L["Tilt down to"], min = 0, max = 30, step = 1, fmt = "%d°",

@@ -76,7 +76,7 @@ function ns.CreateBubbleStylePanel(kit)
 			look.Slider("bubblesTextScale", L["Text size"], 50, 200, 5, "%d%%", 100,
 				L["How big the words are, next to their usual size."])
 		end,
-		outline = { "bubblesOutline", L["A black border round the letters, so they stand out against the world. " ..
+		outline = { "bubblesOutline", L["A black border around the letters, so they stand out against the world. " ..
 			"Thick + shadow also drops a shadow below and to the right of them."], names = OUTLINES, max = 3 },
 		outlineColor = false, -- (the game's text: its outline is always black)
 		shadow = false, -- (Outline's Thick + shadow)
