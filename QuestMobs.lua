@@ -490,13 +490,15 @@ local function ReadQuestLogItems(say)
 	local okCount, entries = pcall(log.GetNumQuestLogEntries)
 	for index = 1, okCount and type(entries) == "number" and entries or 0 do
 		local ok, problem = pcall(function()
+			-- (Its item first: most quests have none, and GetInfo makes a
+			-- big new table each time.)
+			local link, icon, _, showComplete = SpecialItem(index)
+			if link == nil then
+				return
+			end
 			local info = log.GetInfo(index)
 			local questID = info and not info.isHeader and info.questID
 			if type(questID) ~= "number" then
-				return
-			end
-			local link, icon, _, showComplete = SpecialItem(index)
-			if link == nil then
 				return
 			end
 			local readable = type(link) == "string" and Known(link)
@@ -992,7 +994,7 @@ local targetWatcher = CreateFrame("Frame")
 targetWatcher.at = 0
 targetWatcher:RegisterEvent("PLAYER_TARGET_CHANGED")
 targetWatcher:SetScript("OnEvent", ns.RefreshTargetQuestIcon)
-targetWatcher:SetScript("OnUpdate", function(self)
+ns.SetOnUpdate(targetWatcher, function(self)
 	local now = GetTime()
 	if now >= self.at then
 		self.at = now + TARGET_EVERY

@@ -353,7 +353,7 @@ local function Tick(top)
 	local parts = top.parts
 	local left = parts.start and parts.start + parts.duration - GetTime() or 0
 	if left <= 0 then
-		top:SetScript("OnUpdate", nil)
+		ns.SetOnUpdate(top, nil)
 		ns.QuestItemCooldown(parts, nil, nil)
 		return
 	end
@@ -383,10 +383,10 @@ function ns.QuestItemCooldown(parts, start, duration)
 	parts.glow:SetShown(look.questItemGlow ~= "none" and start ~= false and not cooling)
 	parts.top.parts = parts
 	if cooling then
-		parts.top:SetScript("OnUpdate", Tick)
+		ns.SetOnUpdate(parts.top, Tick)
 		Tick(parts.top)
 	else
-		parts.top:SetScript("OnUpdate", nil)
+		ns.SetOnUpdate(parts.top, nil)
 	end
 end
 
@@ -665,7 +665,7 @@ for _, event in ipairs({ "PLAYER_LOGIN", "PLAYER_ENTERING_WORLD", "QUEST_LOG_UPD
 	pcall(watcher.RegisterEvent, watcher, event)
 end
 pcall(watcher.RegisterUnitEvent, watcher, "UNIT_SPELLCAST_SENT", "player")
-watcher:SetScript("OnEvent", function(_, event, _, _, _, spellID)
+watcher:SetScript("OnEvent", function(self, event, _, _, _, spellID)
 	if event == "UNIT_SPELLCAST_SENT" then
 		-- (unit, target name, castGUID, spellID): sent, before the count moves
 		ItemCast(spellID)
@@ -683,16 +683,20 @@ watcher:SetScript("OnEvent", function(_, event, _, _, _, spellID)
 	elseif event == "QUEST_REMOVED" or event == "QUEST_TURNED_IN" or event == "PLAYER_ENTERING_WORLD" then
 		ForgetGone()
 	end
-	ns.RefreshQuestItemButton()
+	-- (On the next frame, once for a burst: the quest log and bags send
+	-- several at a time, and each refresh reads the log again.)
+	self.at = 0
+	self.anyway = true
 end)
 watcher.at = 0
-watcher:SetScript("OnUpdate", function(self)
+ns.SetOnUpdate(watcher, function(self)
 	local now = GetTime()
 	if now >= self.at then
 		self.at = now + CHECK_EVERY
-		if ns.db and (ns.db.questItemButton or button:IsShown()) then
+		if self.anyway or ns.db and (ns.db.questItemButton or button:IsShown()) then
 			ns.RefreshQuestItemButton()
 		end
+		self.anyway = false
 	end
 end)
 -- The zone ability can come and go with no event of its own we hear.

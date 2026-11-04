@@ -347,6 +347,20 @@ local function ReapplyIfChanged(entry)
 end
 ReapplyIfChanged = ns.Profiled("ReapplyIfChanged", ReapplyIfChanged)
 
+-- Puts the values (a frame's children, say) into list, clearing what's past
+-- them, and gives their count: one kept table, not a new one each time.
+function ns.FillChildren(list, ...)
+	local count = select("#", ...)
+	for i = 1, count do
+		list[i] = (select(i, ...))
+	end
+	for i = count + 1, list.count or 0 do
+		list[i] = nil
+	end
+	list.count = count
+	return count
+end
+
 -- A part of a frame (a chat window's background, its button column) faded
 -- relative to its own alpha, which Blizzard may fade too, and put back to it
 -- once alpha is 1 again.
@@ -4483,11 +4497,15 @@ do
 		return section == _G.ScenarioObjectiveTracker or type(section.StageBlock) == "table"
 	end
 	local FOCUS_FIND_TIME = 0.5 -- none of its quests found in the tracker by then: show the lot
+	-- (Kept lists of children, refilled each tick, not made anew: the
+	-- sections, and a section's or holder's children looked through inside.)
+	local sectionList, childList = {}, {}
 	local function TrackerSections(tracker)
 		if type(tracker.modules) == "table" then
 			return tracker.modules
 		end
-		return { tracker:GetChildren() }
+		ns.FillChildren(sectionList, tracker:GetChildren())
+		return sectionList
 	end
 	-- Close the gaps (questRevealCollapse): the shown quests drawn at the
 	-- top of the tracker instead of in their own places under the faded
@@ -4821,7 +4839,8 @@ do
 		if type(holder) ~= "table" or not holder.GetChildren or IsForbidden(holder) then
 			return
 		end
-		for _, child in ipairs({ holder:GetChildren() }) do
+		for i = 1, ns.FillChildren(childList, holder:GetChildren()) do
+			local child = childList[i]
 			if not blockAlphas[child] and child.SetAlpha and not IsForbidden(child) then
 				local block = AnchorBlock(child)
 				if block then
@@ -4846,7 +4865,8 @@ do
 					-- (Its stage and other blocks aren't all in usedBlocks.)
 					sectionHas = (focus.quests[SCENARIO] or timers and timers[SCENARIO]) and true or false
 					sectionAlpha = sectionHas and 1 or alpha
-					for _, child in ipairs({ section:GetChildren() }) do
+					for i = 1, ns.FillChildren(childList, section:GetChildren()) do
+						local child = childList[i]
 						if child.SetAlpha and not IsForbidden(child) then
 							ns.FadeRelative(child, sectionAlpha)
 						end
@@ -4903,7 +4923,8 @@ do
 			end
 		end
 		FadeEdgeButtons(tracker) -- (in case the game parents them to the tracker)
-		for _, part in ipairs({ tracker.Header, tracker.NineSlice }) do
+		for i = 1, 2 do
+			local part = i == 1 and tracker.Header or tracker.NineSlice
 			if type(part) == "table" and part.SetAlpha and not IsForbidden(part) then
 				ns.FadeRelative(part, alpha)
 			end
@@ -5815,17 +5836,7 @@ end
 local EachCooldownPart
 do
 local childLists, walking = {}, 0
-local function FillChildren(list, ...)
-	local count = select("#", ...)
-	for i = 1, count do
-		list[i] = (select(i, ...))
-	end
-	for i = count + 1, list.count or 0 do
-		list[i] = nil
-	end
-	list.count = count
-	return count
-end
+local FillChildren = ns.FillChildren
 function EachCooldownPart(frame, depth, visit, all)
 	walking = walking + 1
 	local list = childLists[walking]
@@ -9761,20 +9772,36 @@ do
 
 	-- A field on a frame (_G. for a global of its own, @ for the global named
 	-- after the frame: @Portrait on TargetFrame is TargetFramePortrait).
+	-- (Each path split into its names once and kept: splitting it on every
+	-- pass made garbage, some 200 paths a time.)
+	FRAMES.split = {}
 	local function Field(frame, path)
-		if path:sub(1, 1) == "@" then
-			local name = frame.GetName and frame:GetName()
-			path = name and "_G." .. name .. path:sub(2) or ""
-		end
-		local value = frame
-		for name in path:gmatch("[^.]+") do
-			if name == "_G" and value == frame then
-				value = _G
-			elseif type(value) ~= "table" then
-				return nil
-			else
-				value = value[name]
+		local names = FRAMES.split[path]
+		if not names then
+			names = {}
+			for name in path:gmatch("[^.]+") do
+				names[#names + 1] = name
 			end
+			if path:sub(1, 1) == "@" then
+				names.global = names[1]:sub(2)
+			end
+			FRAMES.split[path] = names
+		end
+		local value, first = frame, 1
+		if names.global then
+			local name = frame.GetName and frame:GetName()
+			if not name then
+				return nil
+			end
+			value, first = _G[name .. names.global], 2
+		elseif names[1] == "_G" then
+			value, first = _G, 2
+		end
+		for i = first, #names do
+			if type(value) ~= "table" then
+				return nil
+			end
+			value = value[names[i]]
 		end
 		if type(value) == "table" and value.SetAlpha then
 			return value
@@ -9915,7 +9942,7 @@ do
 							FRAMES.owner[region] = FRAMES.owner[region] or entry[1]
 						end
 					else
-						for _, path in ipairs(paths or {}) do
+						for _, path in ipairs(paths or NO_DEFAULTS) do
 							local region = Field(frame, path)
 							if region then
 								want[region] = want[region] or hide

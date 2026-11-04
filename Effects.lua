@@ -954,7 +954,7 @@ ns.plates = { level = 1, off = false }
 local fadedPlates = {} -- [plate unit frame] = true while it has a cinematicAlpha
 local plateKeeper = CreateFrame("Frame")
 plateKeeper:Hide()
-plateKeeper:SetScript("OnUpdate", ns.Profiled("Plate keeper", function(self)
+ns.SetOnUpdate(plateKeeper, ns.Profiled("Plate keeper", function(self)
 	for frame in pairs(fadedPlates) do
 		local wanted = frame.cinematicAlpha
 		if wanted then
@@ -1036,7 +1036,7 @@ do
 	end
 	function ns.TogglePlateWatch()
 		if ns.plateWatch then
-			ns.plateWatch.frame:SetScript("OnUpdate", nil)
+			ns.SetOnUpdate(ns.plateWatch.frame, nil)
 			ns.plateWatch = nil
 			return false
 		end
@@ -1047,7 +1047,7 @@ do
 			Line(("keeper: %s (%s) was at %s, put back to %.2f"):format(
 				(name and not (issecretvalue and issecretvalue(name))) and name or "?", tostring(unit), Num(alpha), wanted))
 		end
-		watch.frame:SetScript("OnUpdate", function()
+		ns.SetOnUpdate(watch.frame, function()
 			Scan("start")
 			C_Timer.After(0, function()
 				if ns.plateWatch == watch then
@@ -2126,7 +2126,7 @@ do
 		front:SetFrameLevel(cc.cooldown:GetFrameLevel() + 2)
 		cc.time = front:CreateFontString(nil, "OVERLAY", "NumberFontNormal")
 		cc.time:SetPoint("CENTER", 0, 0)
-		cc:SetScript("OnUpdate", CCTick)
+		ns.SetOnUpdate(cc, CCTick)
 		cc:Hide()
 		overlay.cc = cc
 		overlays[plate] = overlay
@@ -3826,8 +3826,23 @@ local function SameName(a, b)
 	return not ok or same
 end
 
--- The titles of the quests in your log.
-local function QuestTitles()
+-- The titles of the quests in your log. (Kept until the log changes: read
+-- for every tooltip, and each quest's GetInfo is a big new table.)
+local QuestTitles
+do
+local kept
+local forgetter = CreateFrame("Frame")
+for _, event in ipairs({ "QUEST_LOG_UPDATE", "QUEST_ACCEPTED", "QUEST_REMOVED", "QUEST_TURNED_IN",
+	"PLAYER_ENTERING_WORLD" }) do
+	pcall(forgetter.RegisterEvent, forgetter, event)
+end
+forgetter:SetScript("OnEvent", function()
+	kept = nil
+end)
+function QuestTitles()
+	if kept then
+		return kept
+	end
 	local titles = {}
 	if C_QuestLog and C_QuestLog.GetInfo then
 		for i = 1, C_QuestLog.GetNumQuestLogEntries() do
@@ -3844,7 +3859,9 @@ local function QuestTitles()
 			end
 		end
 	end
+	kept = titles
 	return titles
+end
 end
 
 -- Whether the tooltip lists a quest objective: from the lines' own kinds where
