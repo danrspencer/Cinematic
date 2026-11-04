@@ -680,9 +680,15 @@ local function Create()
 	card.bar = front:CreateTexture(nil, "ARTWORK")
 	card.bar:SetHeight(2)
 
-	-- (Moving it: dragged where you want it, kept from the bottom middle.)
-	card:SetScript("OnDragStart", function(self) if moving then self:StartMoving() end end)
+	-- (Moving it: any card dragged where you want it, Move's or a real one, kept
+	-- from the bottom middle; one fading away is brought back first.)
+	card:SetScript("OnDragStart", function(self)
+		self.leaving, self.dragging = nil, true
+		self:SetAlpha(1)
+		self:StartMoving()
+	end)
 	card:SetScript("OnDragStop", function(self)
+		self.dragging = nil
 		self:StopMovingOrSizing()
 		if self.SetUserPlaced then self:SetUserPlaced(false) end
 		local left, right, bottom = self:GetLeft(), self:GetRight(), self:GetBottom()
@@ -701,7 +707,7 @@ local function Create()
 	end)
 
 	card:SetScript("OnUpdate", function(self, elapsed)
-		if moving then self:SetAlpha(1) return end
+		if moving or self.dragging then self:SetAlpha(1) return end
 		-- (The mouse over it: its time stands still.)
 		if not ns.Flag(self:IsMouseOver()) then self.age = self.age + elapsed end
 		local hold = tonumber(DB().emoteVisionHold) or 8
