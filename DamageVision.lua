@@ -24,6 +24,7 @@ DEFAULTS.damageVisionOnlyCine = false      -- only while CineMode is on
 DEFAULTS.damageVisionPlace = true          -- your place over it...
 DEFAULTS.damageVisionPlaceOf = false       -- ...as "#2 of 5" (else just "#2")
 DEFAULTS.damageVisionLadderRows = 3        -- the rank ladder: at most this many rows (#1 down, you last if further down)
+DEFAULTS.damageVisionLadderNames = false   -- the rank ladder: the players' names on their rows
 DEFAULTS.damageVisionAlways = false        -- its Show in row's Always: in every fight, wherever you are
 DEFAULTS.damageVisionHold = 5              -- seconds it stays after a fight
 DEFAULTS.damageVisionSize = 1              -- its size, times its own
@@ -52,7 +53,7 @@ DEFAULTS.damageVisionSpark = true          -- a spark at the filled part's edge
 DEFAULTS.damageVisionCrown = true          -- the crown as you take #1
 DEFAULTS.damageVisionDots = "portrait"     -- the race track's dots: "circle", "portrait" (you; them: their class icon) or "class"
 DEFAULTS.damageVisionTotal = false         -- your total in the gap bar
-DEFAULTS.damageVisionRivalName = true      -- the name of the one you race
+DEFAULTS.damageVisionRivalName = false     -- the name of the one you race (off by default)
 DEFAULTS.damageVisionFont = "general"      -- the words' font (general: General's)
 DEFAULTS.damageVisionTextSize = 1          -- ...times their usual size
 DEFAULTS.damageVisionOutline = -1          -- ...outline: 0 none, 1 thin, 2 thick (-1: General's)
@@ -429,7 +430,8 @@ end
 -- (Yours in the look's colors, the rest in their class's.)
 -- count: how many rows to fill (the rest hidden), else all of list's.
 -- classes: yours in your class's color too (brighter than the rest).
-local function FillRows(list, rows, mine, top, count, classes)
+-- noNames: no names on the rows (just your place, when you're below the rows).
+local function FillRows(list, rows, mine, top, count, classes, noNames)
 	local first = rows[1]
 	local behind, ahead = BarColors(Look())
 	count = math.min(count or #list, #list)
@@ -440,9 +442,13 @@ local function FillRows(list, rows, mine, top, count, classes)
 		local source = i <= count and rows[index]
 		if source and first then
 			row:Show()
-			pcall(row.name.SetText, row.name, source.name)
-			if index ~= i then
-				pcall(row.name.SetFormattedText, row.name, "%d. %s", index, source.name)
+			if noNames then
+				row.name:SetText(index ~= i and (index .. ".") or "")
+			else
+				pcall(row.name.SetText, row.name, source.name)
+				if index ~= i then
+					pcall(row.name.SetFormattedText, row.name, "%d. %s", index, source.name)
+				end
 			end
 			SetTotal(row.total, source.totalAmount)
 			SetBar(row.bar, top or first.totalAmount, source.totalAmount)
@@ -663,7 +669,7 @@ local function Draw(rows, top)
 	if style == "ladder" then
 		-- (At most Rows: #1 down, and you in the last one if you're further down.)
 		local count = math.max(1, math.min(tonumber(db.damageVisionLadderRows) or 3, LADDER_ROWS))
-		FillRows(frame.ladder.rows, rows, rank, top, count)
+		FillRows(frame.ladder.rows, rows, rank, top, count, nil, not db.damageVisionLadderNames)
 		frame.ladder.target = math.min(rank, count)
 		frame:SetHeight(math.min(#rows, count) * step)
 		return
@@ -1501,7 +1507,10 @@ TypeSettings = function(kit, content, stack, b)
 	end)
 	Section("ladder", L["Rank ladder"], function()
 		return b.Number(L["Rows:"], "damageVisionLadderRows", 2, LADDER_ROWS, 1, 1, nil,
-			L["At most this many rows: #1 on down, and you in the last row if you're further down than that."])
+			L["At most this many rows: #1 on down, and you in the last row if you're further down than that."]),
+			b.Toggles(L["On the rows:"], {
+				{ "damageVisionLadderNames", L["Names"], L["Ticked, each player's name on their row."] },
+			})
 	end)
 	local holder = CreateFrame("Frame", nil, content)
 	holder:Hide()
