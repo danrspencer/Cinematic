@@ -272,6 +272,12 @@ ns.LOW_HEALTH_THEMES = {
 		shadow = { 0.03, 0.12, 0.02 }, flash = { 0.45, 1, 0.3 } },
 	{ key = "spellfire", name = "Spellfire", effect = { id = 257, alpha = 1 }, swirl = {},
 		shadow = { 0.14, 0.02, 0.1 }, flash = { 1, 0.45, 0.8 } },
+	-- Blank: what Create theme starts a player's own from (in no menu):
+	-- nothing but the shadow and the heartbeat, no edge art, colors, sparks or
+	-- swirl, and no Blizzard art (its look: their opacity 0), to build up on
+	-- the Style page's tabs.
+	{ key = "blank", name = "Blank", swirl = {}, shadow = { 0, 0, 0 }, flash = { 1, 1, 1 },
+		look = { lowHealthGameAlpha = 0 } },
 }
 -- The page's More themes: those no class has (the game effects on retail
 -- only: Classic hasn't their files).

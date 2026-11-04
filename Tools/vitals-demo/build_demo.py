@@ -71,7 +71,9 @@ for i in range(1, len(ns.LOW_HEALTH_BLIZZ_PATTERNS) + 1):
 masks = [{"id": m[0], "name": m[1]} for m in py(ns.LOW_HEALTH_BLIZZ_MASKS)]
 # The game effects the themes use: their files and colors, as ScreenEffects.lua
 # draws them (ns.ScreenEffectLook's rules, the same numbers).
-SOLID = {1273161, 188526, 3308414}
+SOLID = {1273161, 188526, 3308414, 166282}
+OWN_COLORS = {6996936, 2159813, 2395778, 4529965, 5636772, 3522953, 2735672}  # (ScreenEffects.lua's)
+EDGES = {164: 1803988, 258: 1803988, 129: 1803988, 137: 1803988}  # (ScreenEffects.lua's SCREEN_EFFECT_EDGES)
 fx_by_id = {}
 for i in range(1, len(ns.SCREEN_EFFECTS) + 1):
     fx_by_id[ns.SCREEN_EFFECTS[i].id] = py(ns.SCREEN_EFFECTS[i])
@@ -86,6 +88,8 @@ def effect_look(fx):
     m, a = scaled(fx["multiply"]), scaled(fx["add"])
     white = chroma(m) < 0.12 and chroma(a) < 0.12 and light(m) > 0.85 and light(a) > 0.85
     color = m if chroma(m) > chroma(a) else a
+    if chroma(m) >= 0.12 and chroma(a) < 0.12 and light(a) > 0.85:  # (white added: halfway to white)
+        color = [(v + 1) / 2 for v in color]
     glow = 0.35 if min(color) > 0.6 else 1
     darkness = (1 - light(m)) * 0.25 if max(m) < 0.5 else 0
     return {"color": color, "glow": glow, "darkness": darkness, "white": white}
@@ -99,7 +103,8 @@ for t in themes:
     fx = fx_by_id[e["id"]]
     layers = fx["layers"]
     effects[e["id"]] = dict(effect_look(fx), shape=layers[0][0] if layers else None,
-                            moving=[l for l in layers[1:3] if l[0] not in SOLID], overlay=fx["overlay"] or None)
+                            moving=[l for l in layers[1:3] if l[0] not in SOLID], overlay=fx["overlay"] or None,
+                            ownOverlay=fx["overlay"] in OWN_COLORS, edge=EDGES.get(e["id"]))
 menu = []
 for i in range(1, len(ns.LOW_HEALTH_MENU) + 1):
     e = ns.LOW_HEALTH_MENU[i]
@@ -138,7 +143,7 @@ def shot(name):
 
 effect_files = set()
 for e in effects.values():
-    effect_files |= {f for f in [e["shape"], e["overlay"]] + [l[0] for l in e["moving"]] if f}
+    effect_files |= {f for f in [e["shape"], e["overlay"], e.get("edge")] + [l[0] for l in e["moving"]] if f}
 for file in sorted({p["id"] for p in patterns} | {m["id"] for m in masks} | effect_files):
     if file not in order:
         # (Not in the reel: the game's file itself, if it's in the shots folder as <file>.blp.)

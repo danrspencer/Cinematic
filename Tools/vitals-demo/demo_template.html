@@ -170,8 +170,8 @@ function effectLayers(e, time, color) {
     for (let ty = -v * th; ty < H; ty += th) for (let tx = -u * tw; tx < W; tx += tw) l.drawImage(tex, tx, ty, tw, th);
   }
   const over = e.overlay && join("p" + e.overlay);
-  if (over) { l.globalAlpha = e.white ? 0.6 : e.glow; l.drawImage(tint(over, color, false, "p" + e.overlay), 0, 0, W, H); }
-  const shape = e.shape && join("p" + e.shape);
+  if (over) { l.globalAlpha = e.white ? 0.6 : e.glow; l.drawImage(e.ownOverlay ? over : tint(over, color, false, "p" + e.overlay), 0, 0, W, H); }
+  const shape = (e.edge || e.shape) && join("p" + (e.edge || e.shape));
   if (shape) for (const x of [p, l]) { x.globalAlpha = 1; x.globalCompositeOperation = "destination-in"; x.drawImage(shape, 0, 0, W, H); }
   return { paint, light };
 }

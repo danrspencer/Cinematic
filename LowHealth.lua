@@ -127,6 +127,12 @@ local SWIRL_DEEPEST = 0.37 -- ...and at full with reach 100% (no further: it mus
 -- ScreenEffects.lua): its area this much bigger than the screen as it starts
 -- (its edges past the screen's), the screen's size at full, so it closes in.
 local EFFECT_OUT = 0.35
+-- (Its reach (the theme's effect.reach, 0-1, half: as the game has it):
+-- above half, its shape drawn up to this share of the way to the middle
+-- at full (pulled further, past the shape's edge the effect fills in as a
+-- flat band); below, pushed out past the screen by up to as much, all
+-- along, so less of it shows.)
+local EFFECT_REACH_MOST = 0.33
 local PORTAL_OUT = -4      -- as it starts
 local PORTAL_FULL = -10    -- at full, unless the theme's portal says
 
@@ -341,7 +347,8 @@ local function Cleaned(fields)
 	clean.swirl = swirl
 	local effect = type(fields.effect) == "table" and fields.effect
 	if effect and ns.ScreenEffectById and ns.ScreenEffectById(effect.id) then
-		clean.effect = { id = effect.id, alpha = Number(effect.alpha, 0, 1) or 1 }
+		clean.effect = { id = effect.id, alpha = Number(effect.alpha, 0, 1) or 1,
+			reach = Number(effect.reach, 0, 1) or 0.5 }
 	end
 	return clean
 end
@@ -403,8 +410,9 @@ ns.VitalsThemesCurrent = CheckThemes
 
 -- The dev copy's DEV SET DEFAULT: a theme's own defaults
 -- (CinematicDB.vitalsThemeEdits[key].look), over its look as written, to be
--- written into LowHealthThemes.lua. (The old theme editor's other edits stay
--- saved but do nothing: nothing on the page shows them.)
+-- written into LowHealthThemes.lua. (Its button was taken off the Style page,
+-- 2026-11-04; defaults it saved before still apply. The old theme editor's
+-- other edits stay saved but do nothing: nothing on the page shows them.)
 local themeLookAsWritten = {} -- (by key: the look as LowHealthThemes.lua has it, or false)
 local function ThemeEdited(key)
 	local theme = ORIGINAL[key]
@@ -586,13 +594,14 @@ function ns.SetVitalsThemeField(name, value)
 	RebuildThemes()
 end
 
--- A theme of their own, as the one shown is now, picked: its key.
-function ns.CreateVitalsTheme()
-	local from = ns.VitalsEditedTheme() or ns.LOW_HEALTH_THEMES[1]
+-- A theme of their own, picked: its key. Blank (Create theme: from the blank
+-- theme, LowHealthThemes.lua) or, with copy, as the one shown is now (Copy theme).
+function ns.CreateVitalsTheme(copy)
+	local from = copy and ns.VitalsEditedTheme() or ns.LOW_HEALTH_THEME.blank or ns.LOW_HEALTH_THEMES[1]
 	local n = 1
 	while db.lowHealthMyThemes["my" .. n] do n = n + 1 end
 	local fields = FieldsOf(from)
-	fields.name = L["%s copy"]:format(L[from.name])
+	fields.name = copy and L["%s copy"]:format(from.mine and from.name or L[from.name]) or L["New theme"]
 	fields.from = from.mine and from.from or from.key
 	local key = "my" .. n
 	db.lowHealthMyThemes[key] = fields
@@ -912,7 +921,7 @@ local function UseTheme(d, wanted, look)
 	-- (The game effect: set up for the theme's, or off; none where the client hasn't its files.)
 	if d.effect then
 		local fx = wanted.effect and ns.ScreenEffectById(wanted.effect.id)
-		d.effectOn = fx and d.effect:Set(fx) or false
+		d.effectOn = fx and d.effect:Set(fx, { edge = ns.SCREEN_EFFECT_EDGES[fx.id] }) or false
 		if not d.effectOn then d.effect:Hide() end
 	end
 	for i, swirl in ipairs(d.swirls) do
@@ -1340,7 +1349,8 @@ local function Apply(d, look, k, fade, heart, secret)
 			and look.lowHealthBloodAlpha * info.alpha * math.min(1, c * 2) * fade or 0
 		if a > 0 then
 			local grow = 1 + EFFECT_OUT * (1 - c)
-			d.effect:Place(width * grow, height * grow)
+			local pull = ((info.reach or 0.5) - 0.5) * 2 * EFFECT_REACH_MOST
+			d.effect:Place(width * grow, height * grow, pull > 0 and pull * c or pull)
 			d.effect:Step(spun)
 			d.effect:SetAlpha(math.min(1, a * (0.9 + 0.2 * heart + 0.3 * flash)))
 			d.effect:Show()
@@ -2455,9 +2465,9 @@ function ns.CreateVitalsStylePanel(kit)
 	end
 	local themePicker, themeName = Pick("lowHealthTheme", L["Theme:"], Choices,
 		L["The look: Auto picks your class and spec's (by the talent tree you've put most into, on clients " ..
-		"without specs), or pick any. Each class has a theme for each spec. Create theme makes one of your " ..
-		"own from the one shown, under Your themes; the theme's own settings below change the one shown " ..
-		"(ours become your version, which Reset theme puts back)."])
+		"without specs), or pick any. Each class has a theme for each spec. Create theme makes a blank one of " ..
+		"your own, Copy theme one from the one shown, under Your themes; the theme's own settings below change " ..
+		"the one shown (ours become your version, which Reset theme puts back)."])
 	-- (Just after its name, not in line with the rows' choices below.)
 	themePicker:ClearAllPoints()
 	themePicker:SetPoint("LEFT", themeName, "LEFT", themeName:GetStringWidth() + 10, 0)
@@ -2531,6 +2541,12 @@ function ns.CreateVitalsStylePanel(kit)
 			root:CreateButton("|cff9fd0ff+ " .. L["Create theme"] .. "|r", function()
 				PickTheme(ns.CreateVitalsTheme())
 			end)
+			-- (Copy: of the theme shown; none to copy with a Game art one.)
+			if ns.VitalsEditedTheme() then
+				root:CreateButton("|cff9fd0ff+ " .. L["Copy theme"] .. "|r", function()
+					PickTheme(ns.CreateVitalsTheme(true))
+				end)
+			end
 			root:CreateButton("|cff9fd0ff" .. L["Import theme"] .. "|r", ImportTheme)
 		end)
 	end
@@ -2594,13 +2610,13 @@ function ns.CreateVitalsStylePanel(kit)
 	local delete = ThemeButton(L["Delete"], L["Deletes this theme of yours."], rename,
 		function(theme) return theme.mine end,
 		function(theme) StaticPopup_Show("CINEMATIC_VITALS_DELETE", theme.name, nil, theme.key) end)
-	local reset = ThemeButton(L["Reset theme"], L["Puts this theme back as it comes, undoing your changes to its " ..
+	local reset = ThemeButton(L["Reset"], L["Puts this theme back as it comes, undoing your changes to its " ..
 		"own settings (edge, colors, sparks, heartbeat)."], themePicker, function(theme) return theme.edited end,
 		function(theme) StaticPopup_Show("CINEMATIC_VITALS_RESET", L[theme.name], nil, theme.key) end)
 	-- Share: the theme shown as a line of text for a friend, after whichever
 	-- of those show. (Import is in the theme menu, or beside it without one.)
 	local create -- (Create theme, below, without a menu)
-	local share = ThemeButton(L["Share theme"], L["This theme as a line of text to send a friend, who adds it with " ..
+	local share = ThemeButton(L["Share"], L["This theme as a line of text to send a friend, who adds it with " ..
 		"Import theme in their theme menu. Only the theme (edge, colors, sparks, heartbeat), not this page's " ..
 		"other settings."], themePicker, function() return true end, function(theme)
 			ns.ShowCameraShare(ns.ExportVitalsTheme(theme),
@@ -2622,13 +2638,17 @@ function ns.CreateVitalsStylePanel(kit)
 			self:SetShown(ns.GetDB() ~= nil)
 			self:SetEnabled(On(ns.GetDB()))
 		end
-		create = ThemeButton(L["Create theme"], L["A theme of your own, made from the one shown."], themePicker,
-			function(theme) return not theme.mine and not theme.edited end, function()
-				ns.CreateVitalsTheme()
-				SyncThemeLook(WantedTheme())
-				Changed()
-				kit.Refresh()
-			end)
+		local function Made(key)
+			SyncThemeLook(WantedTheme())
+			Changed()
+			kit.Refresh()
+			return key
+		end
+		local made = ThemeButton(L["Create theme"], L["A blank theme of your own: only the shadow and the " ..
+			"heartbeat, to build up on the tabs below."], themePicker,
+			function(theme) return not theme.mine and not theme.edited end, function() Made(ns.CreateVitalsTheme()) end)
+		create = ThemeButton(L["Copy theme"], L["A theme of your own, made from the one shown."], made,
+			function(theme) return not theme.mine and not theme.edited end, function() Made(ns.CreateVitalsTheme(true)) end)
 	end
 
 	-- The theme's own settings (the theme shown, Auto's pick with Auto): fields
@@ -3076,6 +3096,8 @@ function ns.CreateVitalsStylePanel(kit)
 		local pattern = ns.LOW_HEALTH_BLIZZ_PATTERN[file]
 		return pattern and L[pattern[2]] or tostring(file)
 	end
+	local patternHead = stack:Add(kit.Label(content, "GameFontHighlight", L["Pattern"]), "label")
+	patternHead.searchLabel = L["Pattern"]
 	Pick("lowHealthGamePattern", L["Pattern:"], function()
 		local pick = db and WantedTheme().theirs -- (the menu's first made before settings load)
 		local list = { { value = "auto", text = L["Theme's pick"] .. ": " .. PatternName(pick and pick[1] or ns.LOW_HEALTH_BLIZZ_EDGE) } }
@@ -3101,6 +3123,8 @@ function ns.CreateVitalsStylePanel(kit)
 			{ value = "theme", text = L["The theme's color"] }, { value = "own", text = L["Its own colors"] } }
 	end, L["The theme's color: the effect turned grey and tinted to match your theme. Its own colors: as " ..
 		"the game draws it."], Theirs)
+	local secondHead = stack:Add(kit.Label(content, "GameFontHighlight", L["Second pattern"]), "label")
+	secondHead.searchLabel = L["Second pattern"]
 	Pick("lowHealthGamePattern2", L["Second pattern:"], function()
 		local pick = db and WantedTheme().theirs
 		local second = pick and pick.second
@@ -3119,6 +3143,79 @@ function ns.CreateVitalsStylePanel(kit)
 		"they do in the game (not an edge like the red one)."], Theirs)
 	tabbed.Finish(theirs)
 
+	-- Game effect, a tab of its own (was under Blizzard's art, 2026-11-04: in
+	-- one long list with the still patterns, hard to tell apart): the theme's
+	-- effect field, one of the game's own full-screen effects, its layers
+	-- moving, over everything, closing in as you weaken (ScreenEffects.lua),
+	-- from the best of them. Retail only: Classic hasn't their files, so no
+	-- tab there.
+	local effectTab
+	if ns.isRetail and ns.SCREEN_EFFECT_PICKS then
+		effectTab = tabbed.Begin()
+		stack:Header(content, L["Game effect"])
+		local about = stack:Add(kit.Label(content, "GameFontHighlightSmall", L["One of the game's own full-screen " ..
+			"effects as it plays them: an edge shape with moving layers inside it, in its own colors, over all the " ..
+			"rest. Unlike the Blizzard tab's still patterns, it's the whole effect. It closes in from past the edges " ..
+			"as you weaken, with the art's opacity."]), "label")
+		about:SetWidth(PREVIEW_W)
+		about:SetJustifyH("LEFT")
+		local effectName = stack:Add(kit.Label(content, "GameFontHighlight", L["Theme's game effect"]), "label")
+		effectName.searchLabel = L["Theme's game effect"]
+		local row = CreateFrame("Frame", nil, content)
+		row:SetSize(PREVIEW_W, 26)
+		stack:Add(row, "label")
+		local function Effect() return ThemeValue("effect") end
+		local kind = Choose({
+			get = function()
+				local effect = Effect()
+				return effect and effect.id or "none"
+			end,
+			set = function(value)
+				if value == "none" then
+					ns.SetVitalsThemeField("effect", nil)
+				else
+					local effect = Effect()
+					ns.SetVitalsThemeField("effect", { id = value, alpha = effect and effect.alpha or 1,
+						reach = effect and effect.reach or 0.5 })
+				end
+			end,
+		}, function()
+			local list = { { value = "none", text = L["None"] } }
+			for _, pick in ipairs(ns.SCREEN_EFFECT_PICKS) do list[#list + 1] = { value = pick[1], text = L[pick[2]] } end
+			return list
+		end, 180, L["One of the game's own full-screen effects, its layers moving, over all the rest, closing in " ..
+			"from past the edges as you weaken. Its own colors. None: not there."], Themed)
+		kind:SetPoint("LEFT", row, "LEFT", 0, 0)
+		local past = CreateFrame("Frame", nil, row)
+		past:SetSize(1, 1)
+		past:SetPoint("LEFT", kind, "RIGHT", 0, 0)
+		-- (Each box changes its part of the theme's effect, the rest kept.)
+		local function EffectPart(name, default)
+			return {
+				get = function()
+					local effect = Effect()
+					return effect and effect[name] or default
+				end,
+				set = function(value)
+					local effect = Effect()
+					if not effect then return end
+					local changed = { id = effect.id, alpha = effect.alpha or 1, reach = effect.reach or 0.5 }
+					changed[name] = value
+					ns.SetVitalsThemeField("effect", changed)
+				end,
+			}
+		end
+		local function HasEffect(d) return Themed(d) and Effect() ~= nil end
+		local effectBoxes = rows.Boxes(past)
+		effectBoxes:Box(L["Opacity"], EffectPart("alpha", 1), 0, 100, 5, "%d", 100,
+			L["How strong it is at full (times the art's opacity)."], HasEffect, "%")
+		effectBoxes:Box(L["Reach"], EffectPart("reach", 0.5), 0, 100, 5, "%d", 100,
+			L["Where its edge sits: 50 as the game has it. Higher comes in further at full (100: a third of " ..
+			"the way to the middle; far in, the outer part fills in solid), lower pushes it out past the " ..
+			"screen so less of it shows."], HasEffect, "%")
+		tabbed.Finish(effectTab)
+	end
+
 	-- The tabs, in their order (made in another: Blizzard's art uses ours' helpers).
 	-- ("Blizzard" as it is: its L key is the frost spell's name.)
 	do
@@ -3129,6 +3226,10 @@ function ns.CreateVitalsStylePanel(kit)
 			{ L["Cinematic"], L["The theme's own art and its sparks."] },
 			{ L["Swirl"], L["The theme's swirl: up to two layers turning over the screen."] },
 		}
+		if effectTab then
+			order[#order + 1] = effectTab
+			list[#list + 1] = { L["Game effect"], L["One of the game's own full-screen effects, moving, over all the rest."] }
+		end
 		local function Pick(i)
 			tabbed.picked = i
 			tabbed.Layout()
@@ -3148,62 +3249,44 @@ function ns.CreateVitalsStylePanel(kit)
 	stack:Continue(afterTabs, "label")
 	tabbed.Layout()
 
-	-- (Dev copy: DEV SET DEFAULT. This page's settings, as they show now, become
-	-- the shown theme's own defaults (CinematicDB.vitalsThemeEdits, to be
-	-- written into LowHealthThemes.lua), and the page goes back to its
-	-- defaults, so it follows the theme. With Auto, the one Auto's on.)
-	if ns.isDev then
-		local LOOK_KEYS = { "lowHealthReach", "lowHealthDark", "lowHealthRed", "lowHealthBloodAlpha", "lowHealthBloodReach", "lowHealthGameReach",
-			"lowHealthReachSides", "lowHealthBloodReachSides", "lowHealthGameReachSides",
-			"lowHealthGamePattern", "lowHealthGameMask", "lowHealthGameColors", "lowHealthGameAlpha", "lowHealthSparks",
-			"lowHealthSwirlAlpha", "lowHealthGamePattern2", "lowHealthGameDrift", "lowHealthPortalAlpha", "lowHealthHeat",
-			"lowHealthRipple", "lowHealthPulse", "lowHealthPulseAmount", "lowHealthBpmSlow", "lowHealthBpmFast",
-			"lowHealthFlash" }
-		local function Picked() -- (one of LowHealthThemes.lua's: not one of the player's own)
-			if not ns.GetDB() then return nil end
-			local key = WantedTheme().key
-			return ORIGINAL[key] and key or nil
-		end
-		local devRow = CreateFrame("Frame", nil, content)
-		devRow:SetSize(PREVIEW_W, 30)
-		stack:Add(devRow, "label")
-		local devSet = ns.PanelButton(devRow)
-		devSet:SetSize(140, 22)
-		devSet:SetText("DEV SET DEFAULT")
-		devSet:SetPoint("LEFT")
-		kit.Tooltip(devSet, "Dev copy: this page's settings, as they show now, become the shown theme's own " ..
-			"defaults (with Auto, the one Auto's on), and the page goes back to its defaults so it follows the " ..
-			"theme. Then ask Claude to write them into LowHealthThemes.lua.")
-		devSet:SetScript("OnClick", function()
-			local key = Picked()
-			if not key then return end
-			local d, theme, look, count = ns.GetDB(), ns.LOW_HEALTH_THEME[key], {}, 0
-			for _, setting in ipairs(LOOK_KEYS) do
-				local value = d[setting]
-				if value == DEFAULTS[setting] and theme.look and theme.look[setting] ~= nil then
-					value = theme.look[setting]
-				end
-				if value ~= DEFAULTS[setting] then
-					look[setting] = value
-					count = count + 1
-				end
-				d[setting] = DEFAULTS[setting]
+	-- (/cine debug vitalspage: the lowest shown widgets on this page and how
+	-- far down, to find what stretches its scroll: it scrolled far past the
+	-- last row, 2026-11-04.)
+	function ns.VitalsPageDepth()
+		local top = content:GetTop()
+		if not top then ns.Print("Vitals Style page: not laid out yet (open it first)") return end
+		local found = {}
+		local function Consider(object, path)
+			if object.IsShown and object:IsShown() and object.GetBottom and object:GetBottom() then
+				found[#found + 1] = { top - object:GetBottom(), path, object }
 			end
-			CinematicDB.vitalsThemeEdits = CinematicDB.vitalsThemeEdits or {}
-			local edits = CinematicDB.vitalsThemeEdits[key] or {}
-			edits.look = count > 0 and look or false
-			CinematicDB.vitalsThemeEdits[key] = edits
-			ThemeEdited(key)
-			db.lowHealthFromTheme = nil -- (the page's at its defaults: the theme's onto it)
-			SyncThemeLook(theme, true)
-			Changed()
-			kit.Refresh()
-			ns.Print(("Vitals Vision: %s's defaults set, %d settings away from the usual."):format(theme.name, count))
-		end)
-		devSet.Refresh = function(self) self:SetEnabled(Picked() ~= nil) end
-		devSet.pageSwitch = false
-		kit.AddControl(devSet)
+		end
+		for _, child in ipairs({ content:GetChildren() }) do
+			local name = child:GetName() or child:GetObjectType()
+			Consider(child, name)
+			if child:IsShown() then
+				for _, grand in ipairs({ child:GetChildren() }) do
+					Consider(grand, name .. " > " .. (grand:GetName() or grand:GetObjectType()))
+				end
+				for _, region in ipairs({ child:GetRegions() }) do
+					local text = region.GetText and region:GetText()
+					Consider(region, name .. " > " .. region:GetObjectType() .. (text and (" '" .. tostring(text):sub(1, 30) .. "'") or ""))
+				end
+			end
+		end
+		for _, region in ipairs({ content:GetRegions() }) do
+			local text = region.GetText and region:GetText()
+			Consider(region, region:GetObjectType() .. (text and (" '" .. tostring(text):sub(1, 30) .. "'") or ""))
+		end
+		table.sort(found, function(a, b) return a[1] > b[1] end)
+		ns.Print(("Vitals Style page: %d shown, content height %.0f; the lowest:"):format(#found, content:GetHeight()))
+		for i = 1, math.min(8, #found) do
+			local f = found[i]
+			local w, h = f[3]:GetSize()
+			ns.Print(("  %.0f down: %s (%.0f x %.0f)"):format(f[1], f[2], w or 0, h or 0))
+		end
 	end
+
 
 	canvas:SetScript("OnShow", kit.PageShown(function()
 		kit.Refresh()

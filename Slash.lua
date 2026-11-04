@@ -177,6 +177,7 @@ local function PrintDebugHelp()
 	print("  /cine debug gameedge [number|back|blend|off] - step through the game's full-screen effect textures over the whole screen, one each time, to pick edges for Vitals Vision's Game art")
 	print("  /cine debug portal [number|file|back|near|far|up|down|turn|tilt|scale N|alpha N|reset|reel [seconds]|off] - (dev copy) show the game's portal and swirl models over the screen, one each time, to see which load and how they sit, for Vitals Vision")
 	print("  /cine debug screenfx [number | id N | find words | speed N | tile N | shots [from] | back | off] - dev copy: the game's full-screen effects (all of them, from its data) animated over the screen, one at a time; Space: next, Backspace: back; shots: a screenshot of each")
+	print("  /cine debug vitalspage - the lowest shown widgets on the Vitals Style page, to find what stretches its scroll")
 	print("  /cine debug texreel [masks] [shots] [seconds] [from] | pause | off - play the game's full-screen effect textures as a slideshow to record, each with its number, file and name, and the time left; shots takes a screenshot of each; Space skips one, Backspace goes back")
 	print("  /cine debug gameart [off] - test Vitals Vision with the game's own low-health edge in place of the theme's art, in its colors; off for the theme's again")
 	print("  /cine debug death - print what the death camera does on real deaths (again to stop)")
@@ -565,6 +566,8 @@ local function HandleSlash(msg)
 		else
 			ns.Print("/cine debug screenfx is in the dev copy only.")
 		end
+	elseif cmd == "debug" and arg == "vitalspage" then
+		if ns.VitalsPageDepth then ns.VitalsPageDepth() else ns.Print("Open the Vitals Style page first.") end
 	elseif cmd == "debug" and (arg == "texreel" or arg:match("^texreel ")) then
 		ns.TextureReel(arg:match("^texreel%s*(.-)$"))
 	elseif cmd == "debug" and (arg == "gameart" or arg:match("^gameart ")) then

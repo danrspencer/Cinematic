@@ -19,7 +19,36 @@ local BIG_SCALE_SPEED = 0.1 -- (the guess for layers with big scales, unmeasured
 -- Flat-colour textures some effects use as a layer: a constant in the game's
 -- shader, not a picture. Drawn as light they were a flat wash over the
 -- screen (effect 248's white8x8 next to the real one, 2026-11-04): left out.
-local SOLID = { [1273161] = "white8x8", [188526] = "grey", [3308414] = "gray8x8" }
+local SOLID = { [1273161] = "white8x8", [188526] = "grey", [3308414] = "gray8x8",
+	[166282] = "grey50percentsquare16x16" }
+-- Overlays that are coloured pictures (measured on the texreel shots,
+-- 2026-11-04), drawn in their own colours; the rest are grey, tinted. (Grey:
+-- Frostbite's 4421664, Fel flames' 4272488, 4741748, 2199089.)
+local OWN_COLORS = { [6996936] = true, [2159813] = true, [2395778] = true, [4529965] = true, [5636772] = true,
+	[3522953] = true, [2735672] = true }
+
+-- Those players can pick for a theme (the Vitals Style page's Blizzard tab),
+-- the best of all 127 by their shots (2026-11-04: clean edges, their own
+-- colour; the blur-only and faint ones left out), named by how they look.
+ns.SCREEN_EFFECT_PICKS = {
+	{ 10, "Red fire edge" }, { 134, "Rolling fire" }, { 149, "Ember glow" },
+	{ 127, "Golden glow" }, { 188, "Golden rays" }, { 198, "Yellow rays" }, { 164, "Golden ripples" },
+	{ 210, "Yellow flames" },
+	{ 13, "Electric blue" }, { 126, "Blue mist" }, { 146, "Blue flames" }, { 174, "Frost" }, { 132, "Cyan glow" },
+	{ 115, "Fel flames" }, { 137, "Green mist" }, { 249, "Fel green" },
+	{ 248, "Cosmic void" }, { 189, "Lilac glow" }, { 226, "Purple flames" }, { 259, "Blue-violet shadow" },
+	{ 136, "Magenta glow" }, { 257, "Pink flames" }, { 258, "Pink mist" },
+	{ 129, "Cracked web" }, { 156, "Glittering white" }, { 205, "Teal sparkles" },
+}
+-- Picks whose first layer isn't an edge (a pattern over the whole screen:
+-- Golden ripples' is tiled five times), so they covered all of it (seen in
+-- game, 2026-11-04): an edge of the game's to cut them to instead.
+ns.SCREEN_EFFECT_EDGES = {
+	[164] = 1803988, -- (the soft frame, thick at the bottom)
+	[258] = 1803988,
+	[129] = 1803988,
+	[137] = 1803988, -- (its shape is the fake depth of field's texture, not an edge)
+}
 
 local byId
 function ns.ScreenEffectById(id)
@@ -69,6 +98,13 @@ function ns.ScreenEffectLook(fx)
 	local blurOnly = white and (fx.overlay == 0 or name:find("blur", 1, true) or name:find("dof", 1, true)) and true
 	local r, g, b = ar, ag, ab
 	if mc > ac then r, g, b = mr, mg, mb end
+	-- (A colour multiplied with white light added on top: the game's lightens
+	-- toward white, so halfway there. Cosmic void, 248: blue-violet with
+	-- white added is lavender in the game; blue-violet alone was too dark,
+	-- next to the quest's real one, 2026-11-04.)
+	if mc >= 0.12 and ac < 0.12 and Light(ar, ag, ab) > 0.85 then
+		r, g, b = (r + 1) / 2, (g + 1) / 2, (b + 1) / 2
+	end
 	local glow = math.min(r, g, b) > 0.6 and 0.35 or 1
 	local darkness = math.max(mr, mg, mb) < 0.5 and (1 - Light(mr, mg, mb)) * 0.25 or 0
 	return r, g, b, glow, darkness, blurOnly, white
@@ -95,7 +131,7 @@ end
 -- caller fades it with SetAlpha and grows it past the screen's edges.
 -- :Set(fx, opts) sets it up for an effect (opts: tile, speed, alpha (the
 -- moving layers), tint (the colour wash), noMask, swap (layer 2 as the shape),
--- skip), and says whether there's anything to draw, why not, and the files
+-- edge (a file to use as the shape), skip), and says whether there's anything to draw, why not, and the files
 -- this client hasn't; :Step(elapsed) moves its layers.
 function ns.NewScreenEffect(parent)
 	local e = {}
@@ -127,8 +163,17 @@ function ns.NewScreenEffect(parent)
 	local masked = false
 	local moving, time, opts = {}, 0, {}
 
-	function e:Place(w, h)
+	-- Its size, and how far in its shape is drawn (inset: a share of the way
+	-- to the middle, 0 as the effect has it): the layers still fill the
+	-- area, so past the shape's edge (clamped) the effect fills in.
+	function e:Place(w, h, inset)
 		holder:SetSize(math.max(1, w), math.max(1, h))
+		if mask then
+			local dx, dy = (inset or 0) * w / 2, (inset or 0) * h / 2
+			mask:ClearAllPoints()
+			mask:SetPoint("TOPLEFT", holder, "TOPLEFT", dx, -dy)
+			mask:SetPoint("BOTTOMRIGHT", holder, "BOTTOMRIGHT", -dx, dy)
+		end
 	end
 	function e:Show() holder:Show() end
 	function e:Hide() holder:Hide() end
@@ -144,6 +189,8 @@ function ns.NewScreenEffect(parent)
 		local shape = fx.layers[1]
 		moving = { fx.layers[2], fx.layers[3] }
 		if opts.swap then shape, moving = fx.layers[2], { fx.layers[1], fx.layers[3] } end
+		-- (An edge of the game's in place of a shape that isn't one: opts.edge.)
+		if opts.edge then shape = { opts.edge } end
 		-- (The data's mask offset isn't used: effect 248's -0.25 moved either
 		-- way was wrong next to the real one. Lowered, its heavy bottom went off
 		-- screen; raised, the clamped edge filled the bottom 40% with a flat
@@ -174,9 +221,14 @@ function ns.NewScreenEffect(parent)
 		end
 		if fx.overlay ~= 0 and Has(fx.overlay) then
 			overlay:SetTexture(fx.overlay)
-			-- (White effects: the overlay in its own colours; at full strength the
-			-- white ones still glared.)
-			overlay:SetVertexColor(r, g, b, white and 0.6 or glow)
+			-- (A coloured one in its own colours: tinted, Cosmic void's stars came
+			-- out dark blue and all but gone, next to the real one. Grey ones
+			-- tinted. At full strength the white effects' still glared: 0.6.)
+			if OWN_COLORS[fx.overlay] then
+				overlay:SetVertexColor(1, 1, 1, white and 0.6 or glow)
+			else
+				overlay:SetVertexColor(r, g, b, white and 0.6 or glow)
+			end
 			overlay:Show()
 			drawn = true
 		else

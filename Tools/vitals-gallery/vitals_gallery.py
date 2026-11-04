@@ -243,7 +243,9 @@ def heat(img, theme):
 # (each on black, then on grey: colors and alpha from the pair, as the web
 # demo takes them), drawn as ScreenEffects.lua does at full.
 FX = {fx["id"]: fx for fx in py(ns.SCREEN_EFFECTS)}
-SOLID, REF_HEIGHT = {1273161, 188526, 3308414}, 768
+SOLID, REF_HEIGHT = {1273161, 188526, 3308414, 166282}, 768
+OWN_COLORS = {6996936, 2159813, 2395778, 4529965, 5636772, 3522953, 2735672}  # (ScreenEffects.lua's)
+EDGES = {164: 1803988, 258: 1803988, 129: 1803988, 137: 1803988}  # (ScreenEffects.lua's SCREEN_EFFECT_EDGES)
 shot_files, order = [], []
 if SHOTS:
     lh = open(os.path.join(ADDON, "LowHealth.lua"), encoding="utf-8").read()
@@ -282,6 +284,8 @@ def effect_look(fx):
     m, a = scaled(fx["multiply"]), scaled(fx["add"])
     white = chroma(m) < 0.12 and chroma(a) < 0.12 and light(m) > 0.85 and light(a) > 0.85
     color = np.array(m if chroma(m) > chroma(a) else a)
+    if chroma(m) >= 0.12 and chroma(a) < 0.12 and light(a) > 0.85:  # (white added: halfway to white)
+        color = (color + 1) / 2
     glow = 0.35 if color.min() > 0.6 else 1
     darkness = (1 - light(m)) * 0.25 if max(m) < 0.5 else 0
     return color, glow, darkness, white
@@ -294,7 +298,8 @@ def game_effect(img, theme, rng):
         return img
     color, glow, darkness, white = effect_look(fx)
     layers = fx["layers"]
-    shape = game_tex(layers[0][0], (W, H)) if layers else None
+    edge = EDGES.get(info["id"]) or (layers[0][0] if layers else None)
+    shape = game_tex(edge, (W, H)) if edge else None
     m = shape[1] if shape else np.ones((H, W, 1))
     a = BLOOD_ALPHA * info.get("alpha", 1)
     # (paint: the colour wash and the darkening; light: the moving layers and overlay)
@@ -321,7 +326,8 @@ def game_effect(img, theme, rng):
     if fx["overlay"]:
         over = game_tex(fx["overlay"], (W, H))
         if over:
-            img = img + over[0] * color * over[1] * (0.6 if white else glow) * m * a
+            tint = 1 if fx["overlay"] in OWN_COLORS else color
+            img = img + over[0] * tint * over[1] * (0.6 if white else glow) * m * a
     return img
 
 
