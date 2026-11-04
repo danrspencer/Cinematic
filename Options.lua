@@ -2824,6 +2824,11 @@ local function CreateRevealPanel()
 	end, content))
 	canvas:Hide()
 	RegisterSubpage(canvas, "CineMode")
+	-- (The welcome window's See Profile: the CineMode page on its Overview.)
+	function ns.OpenCineModeOverview()
+		PickTab(1)
+		ns.OpenOptions("CineMode")
+	end
 end
 
 -- Sub-page: your buffs and debuffs, shown when you gain one and on hover.
@@ -8194,7 +8199,7 @@ local function CreateNameStylePanel()
 		local sizes = rows.Boxes()
 		sizes:Box(L["Size"], "plateNameSize", 50, 200, 5, "%d", 100,
 			L["How big the names are, next to the plates' own."], On, "%")
-		sizes:Box(L["Height"], "plateNameY", -30, 30, 1, "%d", 1,
+		sizes:Box(L["Raise"], "plateNameY", -30, 30, 1, "%d", 1,
 			L["Moves the names up (or down, below 0) from where the plates put them."], On)
 		sizes:Box(L["Opacity"], "plateNameAlpha", 20, 100, 5, "%d", 100,
 			L["How see-through the names are, on top of their fades."], On, "%")
@@ -8209,7 +8214,7 @@ local function CreateNameStylePanel()
 		close:Box(L["Size"], "plateNameCloseSize", 50, 300, 5, "%d", 100,
 			L["How big a name is with its unit about 10 yards from the camera, next to the plates' own. " ..
 			"Nearer, bigger still; further, smaller, as the game's names over heads."], On, "%")
-		close:Box(L["Height"], "plateNameCloseY", -40, 60, 1, "%d", 1,
+		close:Box(L["Raise"], "plateNameCloseY", -40, 60, 1, "%d", 1,
 			L["Moves a name up (or down, below 0) from where the plates put it, with its unit about 10 yards " ..
 			"from the camera."], On)
 		stack:Header(content, L["Far (about 50 yards from the camera)"])
@@ -8217,7 +8222,7 @@ local function CreateNameStylePanel()
 		far:Box(L["Size"], "plateNameFarSize", 20, 100, 5, "%d", 100,
 			L["How big a name is with its unit about 50 yards from the camera: about the size of the game's " ..
 			"names where those take over, at the edge of nameplate range."], On, "%")
-		far:Box(L["Height"], "plateNameFarY", -60, 10, 1, "%d", 1,
+		far:Box(L["Raise"], "plateNameFarY", -60, 10, 1, "%d", 1,
 			L["Moves a name up (or down, below 0) with its unit about 50 yards from the camera, as the " ..
 			"game's names over heads sit closer to the head further off."], On)
 		-- (A unit's own distance from you comes in bands: under 11, 28 and 41 yards.)
@@ -9950,9 +9955,9 @@ do
 		if ns.isRetail then
 			local MASTER_TIP = L["Every plate's, those no row fits too, times its row's own. When they show is the " ..
 				"Target Indicator row's, as the rows'."]
-			allRows:Box(L["W"], "plateStyleWidth", 50, 300, 5, "%d", 100,
+			allRows:Box(L["Width"], "plateStyleWidth", 50, 300, 5, "%d", 100,
 				L["The health bar's width."] .. " " .. MASTER_TIP, Changed, nil, "%")
-			allRows:Box(L["H"], "plateStyleHeight", 50, 300, 5, "%d", 100,
+			allRows:Box(L["Height"], "plateStyleHeight", 50, 300, 5, "%d", 100,
 				L["The health bar's height."] .. " " .. MASTER_TIP, Changed, nil, "%")
 		end
 		-- (The game's Show Offscreen Nameplates in CineMode; none on a client
@@ -9967,10 +9972,10 @@ do
 		end
 
 		stack:Header(content, L["All marks"])
-		-- (Two heights: on a showing plate, and with none; the marks move
+		-- (Two raises: on a showing plate, and with none; the marks move
 		-- between them as the plate fades, as the quest mark does.)
 		local marks = stack:Add(BoxLine(content), "label")
-		marks:Box(L["Height with a plate"], "targetArrowY", -40, 40, 1, "%d", 1,
+		marks:Box(L["Raise with a plate"], "targetArrowY", -40, 40, 1, "%d", 1,
 			L["Moves the marks drawn over the plate (arrow, chevron, diamond) up, or down below 0, " ..
 			"from just over the name, while the plate shows."], Changed)
 		marks:Box(L["without a plate"], "targetArrowBareY", -40, 40, 1, "%d", 1,
@@ -11309,9 +11314,11 @@ local function CreateCooldownPanel()
 			row.line = content:CreateTexture(nil, "ARTWORK")
 			row.line:SetColorTexture(1, 0.82, 0, 0.4)
 			row.line:SetSize(GROUP_WIDTH, 1)
-			if group ~= "other" and not BUFF_GROUP[group] then
-				row.center = Check(content, nil, L["Close the gaps (centered)"],
-					L["The icons this bar shows sit together in their order, centered on the bar, instead of " ..
+			if group ~= "other" and (not BUFF_GROUP[group] or group == "buffs") then
+				row.center = Check(content, nil, L["Close the gaps (centered)"], group == "buffs"
+					and L["The buffs this bar shows sit together in their order, centered on the bar, instead of " ..
+					"inactive or faded ones leaving gaps. Edit Mode shows the game's own layout."]
+					or L["The icons this bar shows sit together in their order, centered on the bar, instead of " ..
 					"faded ones leaving gaps. Edit Mode shows the game's own layout."], function(value)
 					GroupDefaults(group).center = value -- (false kept: Utility's is on until set)
 				end)
@@ -11818,8 +11825,8 @@ local function CreateVisionPanel()
 		local oppositeStack = Stack(column, "label")
 		Own("opposite", oppositeStack:Add(Check(content, "questTalkShopFollow", L["Shop window goes there too"],
 			L["Picking a vendor's \"let me browse your goods\", the shop window opens where the talk was, on the " ..
-			"other half of the screen from the NPC, instead of where the game puts it. A vendor with nothing else " ..
-			"to say opens it on the other half from where you clicked them. Drag it and it stays where you drop it " ..
+			"other half of the screen from the NPC, instead of where the game puts it. A shop opened straight from " ..
+			"a right click on the vendor opens where the game puts it. Drag it and it stays where you drop it " ..
 			"until it closes."]), "check"))
 		-- (Shown as the position is: refreshed with the page, so picking
 		-- another in the dropdown swaps them.)
@@ -12087,7 +12094,7 @@ local function CreateVisionPanel()
 
 		-- Default, Tank, Healer and Damage tabs: the settings below are the
 		-- Default tab's, or a role's (ns.HEAL_VISION_ROLE_KEYS, <key>_<ROLE>),
-		-- used while you're that role once its "Use default settings" is unticked.
+		-- used while you're that role once its "Same as the Default tab" is unticked.
 		local editing -- (nil: the Default tab; else "TANK", "HEALER" or "DAMAGER")
 		local function UsesDefault(db) return editing and not db["healVisionOwn_" .. editing] end
 		local function Editable(db) return IfAny(db) and not UsesDefault(db) end
@@ -12138,7 +12145,7 @@ local function CreateVisionPanel()
 		tabNote.searchSkip = true
 		for _, role in ipairs(ns.HEAL_VISION_ROLES) do RecordKey(content, "healVisionOwn_" .. role) end
 		-- Use default settings: unticked, the role goes by its own values (each kept while ticked).
-		ownCheck = Check(content, false, L["Use default settings"],
+		ownCheck = Check(content, false, L["Same as the Default tab"],
 			L["Ticked: while you're this role, Heal Vision goes by the Default tab. Unticked: by the " ..
 			"settings on this tab."], function(value)
 				ns.GetDB()["healVisionOwn_" .. editing] = not value
@@ -14047,7 +14054,7 @@ local function CreateProfilesPanel()
 				ProfileMenu(self)
 			elseif self.name ~= active then
 				picker:Hide()
-				ns.SetProfile(self.name)
+				if not ns.SetProfile(self.name) then return end -- (in a fight: it said so)
 				ns.PreviewProfile(self.name)
 				-- (Cinema: Vitals Vision's screen edges for a moment, as on the
 				-- welcome window. Another profile ends that look at once.)
@@ -14155,7 +14162,7 @@ local function CreateProfilesPanel()
 			-- (A copy of that one: switched to first, as New profile copies the active one.)
 			root:CreateButton(L["Copy profile"], function()
 				picker:Hide()
-				if name ~= ns.ActiveProfile() then ns.SetProfile(name) end
+				if name ~= ns.ActiveProfile() and not ns.SetProfile(name) then return end
 				NewFromActive()
 			end)
 			if own then

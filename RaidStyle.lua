@@ -2,7 +2,7 @@
 -- raid's, the party's when the game draws it raid-style, and retail's arena
 -- frames: their health bar's texture, border and color, their background,
 -- and their names' color, font, outline and size. A Default tab, and Raid,
--- Party and Arena tabs that follow it until "Use default settings" is
+-- Party and Arena tabs that follow it until "Same as the Default tab" is
 -- unticked (as the Unit frames page's do). Which parts show: the Standard
 -- Frames page's party and raid rows (Frames.lua). The bars and names are
 -- dressed by the Unit frames page's code (UnitStyle.lua), reading this
@@ -62,7 +62,7 @@ for _, group in ipairs(GROUPS) do
 end
 
 -- A group's look, read as the Unit frames page's keys (ufTexture -> rfTexture...):
--- its own settings while its "Use default settings" is unticked, else Default's.
+-- its own settings while its "Same as the Default tab" is unticked, else Default's.
 local views = {}
 local function View(id)
 	local view = views[id]
@@ -304,7 +304,7 @@ function ns.CreateRaidStylePanel(kit)
 	title:SetPoint("TOPLEFT", 16, -16)
 	local intro = kit.PageIntro(content, title,
 		L["How the raid frames look, the party's when the game draws them raid-style, and the arena's. The " ..
-		"Default tab's settings are each group's until its own tab has Use default settings unticked. Which " ..
+		"Default tab's settings are each group's until its own tab has Same as the Default tab unticked. Which " ..
 		"parts show: the Game Frames page's party and raid rows."])
 
 	local editing
@@ -338,7 +338,7 @@ function ns.CreateRaidStylePanel(kit)
 	end
 
 	local preview
-	local tabs, ownCheck, partyNote = {}, nil, nil
+	local tabs, ownCheck, partyNote
 	local function Changed()
 		ns.RefreshRaidStyle()
 		if preview then preview:Refresh(editing) end
@@ -374,32 +374,37 @@ function ns.CreateRaidStylePanel(kit)
 			{ rfTexture = "soft", rfBorder = "thin", rfOutline = 1 } },
 	}, PRESET_KEYS)
 
-	-- The tabs: Default, then each group; on a group's, Use default settings.
-	local tabsRow = CreateFrame("Frame", nil, content)
-	tabsRow:SetSize(480, 22)
-	stack:Add(tabsRow, "label")
+	-- The tabs, in the folder look (ns.FolderTabs): Default, then each group,
+	-- the settings on the panel under them. On a group's, Same as the Default
+	-- tab; on Default's, a note in its place.
+	local TAB_H = ns.FOLDER_TAB_HEIGHT
+	local ids, list = { false }, {}
+	for _, group in ipairs(GROUPS) do ids[#ids + 1] = group[1] end
+	for i, id in ipairs(ids) do
+		list[i] = { id and L[TAB_NAMES[id]] or L["Default"],
+			id and L["This group's settings: Default's until you untick Same as the Default tab."]
+			or L["The settings every group has while its tab uses the default settings."] }
+	end
+	local tabsRoom = CreateFrame("Frame", nil, content)
+	tabsRoom:SetSize(480, TAB_H + 4)
+	stack:Add(tabsRoom, "label")
+	local panel, ShowTab, base
+	panel, tabs, ShowTab, base = ns.FolderTabs(content, list, function(i) Pick(ids[i] or nil) end)
+	panel:SetPoint("TOPLEFT", tabsRoom, "BOTTOMLEFT", -10, 0)
+	base:SetPoint("TOPLEFT", tabsRoom, "BOTTOMLEFT", -10, 0)
+	local defaultNote
 	local function TabsLook()
 		local db = ns.GetDB()
-		for _, tab in ipairs(tabs) do
-			if tab.id == editing then tab:LockHighlight() else tab:UnlockHighlight() end
-			local own = tab.id and db and db["rfOwn_" .. tab.id]
-			tab:SetText((tab.id and L[TAB_NAMES[tab.id]] or L["Default"]) .. (own and " |cffffd100*|r" or ""))
+		for i, tab in ipairs(tabs) do
+			local id = ids[i] or nil
+			local own = id and db and db["rfOwn_" .. id]
+			tab:SetText((id and L[TAB_NAMES[id]] or L["Default"]) .. (own and " |cffffd100*|r" or ""))
+			tab:SetWidth(math.max(56, math.ceil(tab.label:GetStringWidth()) + 16))
+			if id == editing then ShowTab(i) end
 		end
 		ownCheck:SetShown(editing ~= nil)
+		defaultNote:SetShown(editing == nil)
 		partyNote:SetShown(editing == "PARTY" and not (ns.RaidStyleParty and ns.RaidStyleParty()))
-	end
-	local list = { false }
-	for _, group in ipairs(GROUPS) do list[#list + 1] = group[1] end
-	for i, id in ipairs(list) do
-		local tab = ns.PanelButton(tabsRow)
-		tab.id = id or nil
-		tab:SetText(id and L[TAB_NAMES[id]] or L["Default"])
-		tab:SetSize(math.max(64, tab:GetFontString():GetStringWidth() + 20), 22)
-		if i == 1 then tab:SetPoint("LEFT", tabsRow, "LEFT", 0, 0) else tab:SetPoint("LEFT", tabs[i - 1], "RIGHT", 4, 0) end
-		kit.Tooltip(tab, id and L["This group's settings: Default's until you untick Use default settings."]
-			or L["The settings every group has while its tab uses the default settings."])
-		tab:SetScript("OnClick", function() Pick(tab.id) end)
-		tabs[i] = tab
 	end
 	-- (Every setting the page has, Default's and each group's, for its Reset.)
 	for key in pairs(KEYS) do kit.RecordKey(content, key) end
@@ -408,7 +413,7 @@ function ns.CreateRaidStylePanel(kit)
 		for key in pairs(KEYS) do kit.RecordKey(content, key .. "_" .. group[1]) end
 		for _, part in ipairs({ "Size", "R", "G", "B" }) do kit.RecordKey(content, "rfBorder_" .. group[1] .. part) end
 	end
-	ownCheck = kit.Check(content, false, L["Use default settings"],
+	ownCheck = kit.Check(content, false, L["Same as the Default tab"],
 		L["Ticked: this group looks as the Default tab says. Unticked: as the settings below say (they start " ..
 		"as Default's, and are kept while it's ticked)."], function(value)
 			local db = ns.GetDB()
@@ -434,11 +439,15 @@ function ns.CreateRaidStylePanel(kit)
 	kit.AddControl(ownCheck)
 	-- (Party, while the game draws it as its own frames: the Unit frames page's.)
 	partyNote = kit.Label(content, "GameFontHighlightSmall", L["Your party uses its own frames, not raid-style " ..
-		"ones: they follow the Unit frames page's Party tab."])
+		"ones: they follow the Unit Frames page's Party tab."])
 	partyNote:SetPoint("LEFT", ownCheck.Text or ownCheck.text or ownCheck, "RIGHT", 16, 0)
 	partyNote:SetWidth(300)
 	partyNote:SetJustifyH("LEFT")
 	partyNote:SetTextColor(1, 0.82, 0)
+	defaultNote = kit.Label(content, "GameFontHighlightSmall",
+		L["Every group looks as this tab says while its own tab has Same as the Default tab ticked."])
+	defaultNote:SetPoint("LEFT", ownCheck, "LEFT", 4, 0)
+	defaultNote.searchSkip = true
 
 	stack:Header(content, L["Look"])
 	rows.Look(L["Bars:"], L["Bars"], {
@@ -473,7 +482,7 @@ function ns.CreateRaidStylePanel(kit)
 				"dark background behind each frame is."], Editable, "%")
 		end,
 	})
-	rows.Look(L["Name:"], L["Name"], {
+	local nameLook = rows.Look(L["Name:"], L["Name"], {
 		font = { "rfFont", L["The name's font. Russian, Korean or Chinese names keep the game's, so their " ..
 			"letters show."], test = Editable },
 		textSize = function(look)
@@ -491,6 +500,9 @@ function ns.CreateRaidStylePanel(kit)
 		outlineColor = false, -- (the game's text: its outline is always black)
 		shadow = { "rfShadow", test = Editable },
 	})
+	-- (The panel's bottom under the last row, its right at the page's.)
+	panel:SetPoint("BOTTOM", nameLook, "BOTTOM", 0, -12)
+	panel:SetPoint("RIGHT", content, "RIGHT", -16, 0)
 
 	canvas:SetScript("OnShow", kit.PageShown(kit.Refresh, content))
 	canvas:Hide()

@@ -1,7 +1,7 @@
 ---
 name: release
 description: The user typed /release. Gather everything uncommitted in C:\dev\Cinematic, run the checks, review it, find missing translations and guidebook updates, and stop for the user's review; on their go-ahead, commit it in player-readable commits, push, tag the next version and push the tag (the GitHub Action uploads to CurseForge).
-argument-hint: "[version, default next patch] [anything to leave out or note]"
+argument-hint: "[quick] [version, default next patch] [anything to leave out or note]"
 disable-model-invocation: true
 ---
 
@@ -11,6 +11,9 @@ A release takes **everything uncommitted** in C:\dev\Cinematic (on `main`):
 here, other sessions' work is the user's own work and is included, unless the
 user's words after /release leave something out. Two phases with a hard stop
 between them: nothing is committed, pushed or tagged until the user says go.
+
+**`/release quick`** (the first word is `quick`) skips all of that: see
+"Quick release" at the end. Anything else runs the full two phases below.
 
 ## Phase 1: gather, check, review (no commits)
 
@@ -135,3 +138,27 @@ between them: nothing is committed, pushed or tagged until the user says go.
 15. **Report**: the version, the commits (`git log --oneline <prev tag>..`),
     and what's left uncommitted, if anything. If a commit answers a GitHub
     issue, offer a short draft reply for it and leave the issue open.
+
+## Quick release (`/release quick`)
+
+For a fix that has to go out now. Typing `/release quick` is the go-ahead:
+no review, no stop, no questions unless something below blocks it. Skipped
+on purpose: diff review, offline checks, translations, guidebook, What's new.
+
+1. `main`, not behind `origin/main` (fetch first), identity `sapo` +
+   noreply: same as step 1. Next version = last tag's patch + 1 unless the
+   words after `quick` give one.
+2. **Only the checks that stop a broken load** (seconds): luacheck and
+   `luacompile.py` on every changed or new `.lua`. A failure here stops the
+   release: show it, ask whether to fix it now. Never ship a file that won't
+   load.
+3. Untracked files: include `.lua`/`.tga`/locale/docs files that belong to
+   the addon (a new `.lua` must be in a `.toc`); leave out anything that
+   looks like scratch (`*.md` notes in the root, logs) and name it in the
+   report.
+4. **One commit** with everything: `git add <files>` (never `-A`), subject in
+   the house style ("Area: what changed, for players", American English,
+   dev-only work only in the body, no "Fixes #N"), Co-Authored-By line.
+5. Push, tag, push the tag (step 14), then report the version, the commit,
+   the Actions link, and what was left out. Mention that translations and
+   the guidebook can catch up in the next full `/release`.

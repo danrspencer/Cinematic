@@ -9,12 +9,12 @@ local L = ns.L
 -- The pages that share settings, as the list shows them: name, the page to
 -- open (ns.OpenOptions), its shared settings.
 local PAGES = {
-	{ "Unit frames", "Unit Style", { "ufTexture", "ufFont", "ufOutline", "ufShadow", "ufBorder" } },
-	{ "Raid frames", "Raid Style", { "rfTexture", "rfFont", "rfOutline", "rfShadow", "rfBorder" } },
+	{ "Unit Frames", "Unit Style", { "ufTexture", "ufFont", "ufOutline", "ufShadow", "ufBorder" } },
+	{ "Raid Frames", "Raid Style", { "rfTexture", "rfFont", "rfOutline", "rfShadow", "rfBorder" } },
 	{ "Personal Resource Display", "Personal Style", { "prdTexture", "prdBorder" } },
 	{ "Tooltips", "Tooltip Style", { "tooltipBarTexture", "tooltipFont", "tooltipOutline", "tooltipShadow", "tooltipEdge" } },
-	{ "Cast bars", "Cast Bar Style", { "plateCastFill", "plateCastFont", "plateCastOutline", "plateCastShadow", "plateCastBorder" } },
-	{ "Chat bubbles", "Bubble Style", { "bubblesFont", "bubblesOutline", "bubblesEdge" } },
+	{ "Cast Bars", "Cast Bar Style", { "plateCastFill", "plateCastFont", "plateCastOutline", "plateCastShadow", "plateCastBorder" } },
+	{ "Chat Bubbles", "Bubble Style", { "bubblesFont", "bubblesOutline", "bubblesEdge" } },
 	-- (The Visions follow the Visions hub's Style page, and it follows General.)
 	{ "Visions", "Visions Style", { "visionStyleTexture", "visionStyleFont", "visionStyleOutline", "visionStyleShadow",
 		"visionStyleBorder" } },

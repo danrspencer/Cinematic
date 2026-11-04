@@ -950,7 +950,8 @@ function ns.RefreshDamageVision()
 	if ns.SnapDamageMovers then ns.SnapDamageMovers() end
 end
 
-function ns.TestDamageVision()
+-- quiet: no line in chat (Show me, with nothing to close).
+function ns.TestDamageVision(quiet)
 	if not frame then return end
 	local mine = UnitName("player")
 	local _, class = UnitClass("player")
@@ -963,6 +964,7 @@ function ns.TestDamageVision()
 	} }
 	lastRank = nil
 	Wake()
+	if quiet then return end
 	ns.Print(L["Damage Vision test: a made-up fight for 25 seconds. Close the settings to see it."])
 end
 

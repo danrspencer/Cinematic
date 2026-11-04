@@ -941,28 +941,65 @@ end
 -- The slot whose choices change a setting (or a list's row), on this
 -- client; nil: none of them do. (Picking a choice puts just these back as
 -- it has them: ns.ApplyPart.)
-local slotOf
-function ns.ForgetSlotSettings() slotOf = nil end
-function ns.SettingSlot(key, row)
-	if not slotOf then
-		slotOf = { keys = {}, rows = {} }
-		local before = ns.ModuleBase(ns.CLIENT)
-		for _, slot in ipairs(ns.PROFILE_SLOTS) do
-			for _, choice in ipairs(ns.SLOT_CHOICES[slot.key] and ns.SLOT_CHOICES[slot.key].choices or {}) do
-				local modules = ns.ChoiceModules(slot.key, choice.part, ns.CLIENT)
-				for _, change in ipairs(ns.ModuleEffect(modules, ns.CLIENT, before)) do
-					if change[2] == nil then
-						slotOf.keys[change[1]] = slotOf.keys[change[1]] or slot.key
-					else
-						slotOf.rows[change[1]] = slotOf.rows[change[1]] or {}
-						slotOf.rows[change[1]][change[2]] = slotOf.rows[change[1]][change[2]] or slot.key
-					end
-				end
-			end
+-- (Working it out takes ~80 ms, a hitch on first opening Customize: so it's
+-- built a choice a frame after login, out of fights, and whatever's left is
+-- done at once only if it's asked for before that's finished.)
+local slotOf, slotTodo, slotBefore
+local function StartSlotBuild()
+	slotOf, slotTodo, slotBefore = { keys = {}, rows = {} }, {}, nil
+	for _, slot in ipairs(ns.PROFILE_SLOTS) do
+		for _, choice in ipairs(ns.SLOT_CHOICES[slot.key] and ns.SLOT_CHOICES[slot.key].choices or {}) do
+			slotTodo[#slotTodo + 1] = { slot.key, choice.part }
 		end
 	end
+end
+-- One choice's settings into the table; false when there are none left.
+local function SlotBuildStep()
+	local item = slotTodo and table.remove(slotTodo, 1)
+	if not item then
+		slotTodo, slotBefore = nil, nil
+		return false
+	end
+	slotBefore = slotBefore or ns.ModuleBase(ns.CLIENT)
+	local slot = item[1]
+	local modules = ns.ChoiceModules(slot, item[2], ns.CLIENT)
+	for _, change in ipairs(ns.ModuleEffect(modules, ns.CLIENT, slotBefore)) do
+		if change[2] == nil then
+			slotOf.keys[change[1]] = slotOf.keys[change[1]] or slot
+		else
+			slotOf.rows[change[1]] = slotOf.rows[change[1]] or {}
+			slotOf.rows[change[1]][change[2]] = slotOf.rows[change[1]][change[2]] or slot
+		end
+	end
+	return true
+end
+function ns.ForgetSlotSettings() slotOf, slotTodo, slotBefore = nil, nil, nil end
+function ns.SettingSlot(key, row)
+	if not slotOf then
+		StartSlotBuild()
+	end
+	while slotTodo and SlotBuildStep() do end
 	if row ~= nil and slotOf.rows[key] and slotOf.rows[key][row] then return slotOf.rows[key][row] end
 	return slotOf.keys[key]
+end
+do
+	local builder = CreateFrame("Frame")
+	local wait = 0
+	builder:RegisterEvent("PLAYER_ENTERING_WORLD")
+	builder:SetScript("OnEvent", function(self)
+		self:UnregisterEvent("PLAYER_ENTERING_WORLD")
+		wait = 5 -- (seconds: after the login's own work)
+		ns.SetOnUpdate(self, function(_, elapsed)
+			wait = wait - elapsed
+			if wait > 0 or InCombatLockdown() then return end
+			if not slotOf then
+				StartSlotBuild()
+			end
+			if not (slotTodo and SlotBuildStep()) then
+				ns.SetOnUpdate(self, nil)
+			end
+		end)
+	end)
 end
 
 -- Where each setting is, made once the options pages are: keys[key] and

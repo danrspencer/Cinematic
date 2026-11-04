@@ -25,6 +25,7 @@ local GLOBAL_KEYS = {
 	cameraScripts = true, -- (CameraScripts.lua: your scripts, the same in every profile)
 	stylePreviewPos = true, -- (StylePages.lua: where you dragged the Style preview window)
 	dockSpots = true, -- (Skin.lua's DockBeside: where you dragged popped-out windows)
+	peeksLog = true, -- (/cine debug peeks log)
 }
 -- Lists kept as tables that belong to a profile (their defaults are in code;
 -- see EnsureTables in Core.lua). Missing from a profile: emptied, which means defaults.
@@ -490,8 +491,19 @@ function ns.FindProfile(text)
 	end
 end
 
+-- Not in fights: a switch reloads every setting and restyles the UI, which
+-- the game's protected frames refuse mid-fight (left half-switched). Says so.
+function ns.ProfileSwitchBlocked()
+	if not InCombatLockdown() then return false end
+	ns.Print(L["can't switch profiles in a fight: try again once it's over"])
+	if ns.PeekChat then ns.PeekChat(DEFAULT_CHAT_FRAME, 8) end -- (up through CineMode, to be seen)
+	return true
+end
+
+-- True once on that profile (false: no such profile, or in a fight).
 function ns.SetProfile(name)
-	if not ns.ProfileExists(name) then return end
+	if not ns.ProfileExists(name) then return false end
+	if ns.ProfileSwitchBlocked() then return false end
 	local first = not ns.ProfileChosen()
 	-- (the pages' switches off till now: the active profile's again, loaded
 	-- below if it's the one picked)
@@ -500,7 +512,7 @@ function ns.SetProfile(name)
 	if name == ns.ActiveProfile() then
 		if wasOff then Load(name) end
 		if first or wasOff then SettingsChanged() end -- (the first pick: Cinematic starts)
-		return
+		return true
 	end
 	-- (How long it took, in the log: the settings pages' refresh is most of it.)
 	local started = debugprofilestop()
@@ -512,6 +524,7 @@ function ns.SetProfile(name)
 	local applied = debugprofilestop() - loaded
 	ns.Log("state", ("profile: %s (%.0f ms: load %.0f, apply %.0f, settings pages %.0f)"):format(name,
 		debugprofilestop() - started, loaded - started, applied - optionsMs, optionsMs))
+	return true
 end
 
 -- One choice on its own over the live settings (the welcome window's
@@ -755,6 +768,7 @@ end
 -- Deleting the active one switches to the default profile first.
 function ns.DeleteProfile(name)
 	if builtinByName[name] then return false end
+	if name == ns.ActiveProfile() and ns.ProfileSwitchBlocked() then return false end
 	if ns.BackupDeleted then ns.BackupDeleted(name) end -- (its last copy kept a while: Backups.lua)
 	if name == ns.ActiveProfile() then ns.SetProfile(DEFAULT_PROFILE) end
 	if ns.db.profile == name then ns.db.profile = DEFAULT_PROFILE end
@@ -809,6 +823,7 @@ end
 -- Back to the profile's reset point if it has one, else its base: a
 -- built-in's own values, or the defaults.
 function ns.ResetProfile()
+	if ns.ProfileSwitchBlocked() then return false end
 	local name = ns.ActiveProfile()
 	if ns.BackupProfile then ns.BackupProfile(name, "reset") end -- (Backups.lua)
 	local point = ns.db.profileResetPoints and ns.db.profileResetPoints[name]
@@ -880,13 +895,28 @@ function ns.ResetAddon(settingsOnly)
 					if type(saved[k]) == "table" and next(saved[k]) ~= nil then mine[k] = saved[k] end
 				end
 				EachRowSetting(saved, function(k, v) mine[k] = v end) -- (Nameplates rows you added)
-				if next(mine) then profiles[name] = mine end
+				if next(mine) then
+					-- (With the once-only marks, as below: some updates mark each
+					-- profile, Core.lua's TargetUpgrades. Built-ins' saved changes
+					-- carry none, so the db's.)
+					for k, v in pairs(ns.db) do
+						if v == true and type(k) == "string" and k:find("V%d+$") and ns.DEFAULTS[k] == nil then mine[k] = v end
+					end
+					profiles[name] = mine
+				end
 			end
 		end
 		kept.profiles = profiles
 		for _, k in ipairs(RESET_KEEPS) do
 			local v = ns.db[k]
 			if type(v) == "table" and next(v) ~= nil then kept[k] = v end
+		end
+		-- The once-only updates done (Core.lua's ...V1, ...V2 marks): the kept
+		-- profiles have them already. Without the marks they ran again at the
+		-- reload, writing their old values into the built-ins (the profile came
+		-- up "(changed)" straight after a reset) and over your own profiles.
+		for k, v in pairs(ns.db) do
+			if v == true and type(k) == "string" and k:find("V%d+$") and ns.DEFAULTS[k] == nil then kept[k] = v end
 		end
 	end
 	if next(kept) then kept.resetKept = true end
@@ -912,6 +942,28 @@ function ns.ProfileChanged()
 		end
 	end
 	return false
+end
+
+-- /cine debug changed: what makes the Profiles page say "(changed)", each
+-- setting with its value, the profile's and the default.
+function ns.ProfileChangedDebug()
+	local base = ns.ProfileBase()
+	local fromTheme = type(ns.db.lowHealthFromTheme) == "table" and ns.db.lowHealthFromTheme.values or {}
+	local keys = {}
+	for k in pairs(ns.DEFAULTS) do
+		if IsProfileKey(k) and ns.db[k] ~= base[k] and not (fromTheme[k] ~= nil and fromTheme[k] == ns.db[k]) then
+			keys[#keys + 1] = k
+		end
+	end
+	table.sort(keys)
+	local head = ("profile %s, changed %s, picked %s, new install %s, Vitals theme %s: %d setting(s) differ")
+		:format(tostring(ns.ActiveProfile()), tostring(ns.ProfileChanged()), tostring(ns.db.profileChosen), tostring(ns.newInstall),
+			tostring(ns.db.lowHealthTheme), #keys)
+	ns.Print(head) -- (printed lines go in the log too: Diagnostics.lua)
+	for _, k in ipairs(keys) do
+		ns.Print(("%s = %s (profile's %s, default %s)"):format(k, tostring(ns.db[k]), tostring(base[k]),
+			tostring(ns.DEFAULTS[k])))
+	end
 end
 
 -- A profile's saved changes over its base, as changes from the defaults
@@ -960,6 +1012,7 @@ end
 -- defaults, as your own are), switched to.
 function ns.AddSharedProfile(name, settings, note, icon)
 	if ns.ProfileExists(name) then return false end
+	if ns.ProfileSwitchBlocked() then return false end -- (switched to below)
 	-- (One shared from before the old grids went over: theirs go over now.)
 	ns.ConvertOffGrids(settings, ns.OldGridDefault, { switches = true })
 	ns.db.profileIcons[name] = icon or ns.UnusedProfileIcon()
@@ -976,6 +1029,8 @@ function ns.SetCharacterProfile(own)
 	if own then
 		ns.chardb.profile = ns.ActiveProfile()
 	elseif ns.IsCharacterProfile() then
+		-- (Back to the account's: a switch, so not in a fight.)
+		if ns.db.profile ~= ns.ActiveProfile() and ns.ProfileSwitchBlocked() then return end
 		ns.chardb.profile = nil
 		if ns.db.profile ~= ns.ActiveProfile() then
 			ns.SaveProfile()

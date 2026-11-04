@@ -222,7 +222,7 @@ local MOMENTS = {
 		tip = "Your party or raid's members, not you. Only when they're near you.",
 		sample = { name = "Brakka", class = "WARRIOR", line = "reached level %d", level = 42 } },
 	{ id = "Dungeon", on = "emoteVisionDungeon", name = "You clear a dungeon", emotes = { "THANK", "BOW", "CHEER" },
-		journal = true, tip = "Its last boss down, in a group: the emotes go to everyone, not one person.",
+		journal = true, maxAge = 300, soon = true, tip = "Its last boss down, in a group: the emotes go to everyone, not one person.",
 		sample = { name = "The Deadmines", line = "cleared with your group", group = true,
 			icon = "Interface\\Icons\\INV_Misc_Key_03" } },
 	{ id = "Duel", on = "emoteVisionDuel", name = "A duel ends", emotes = { "BOW", "SALUTE", "CONGRATULATE" },
@@ -245,7 +245,7 @@ local MOMENTS = {
 			"your guild).",
 		sample = { name = "Aelwyn", class = "PRIEST", line = "earned %s", spell = "Explore Elwynn Forest" } },
 	{ id = "Boss", on = "emoteVisionBoss", name = "Your group kills a boss", emotes = { "CHEER", "ROAR", "VICTORY" },
-		tip = "A boss down in a dungeon or raid with your group (each one, not just the last): the emotes go to " ..
+		maxAge = 300, soon = true, tip = "A boss down in a dungeon or raid with your group (each one, not just the last): the emotes go to " ..
 			"everyone.",
 		sample = { name = "Edwin VanCleef", line = "defeated with your group", group = true,
 			icon = "Interface\\Icons\\INV_Misc_Bone_HumanSkull_01" } },
@@ -362,6 +362,7 @@ local FADE_IN, FADE_OUT = 0.25, 0.4
 local AGAIN_SOON = 5       -- with repeats not ignored: the same moment this soon is still one (a doubled event)
 local MAX_AGE = 20         -- a queued moment older than this (a long fight) is dropped
 local MAX_QUEUE = 4
+local KILL_WAIT = 2        -- a boss kill's card: this many seconds after the kill (and out of the fight)
 local SPEECH_GAP = 24      -- the card this far above the box where speech from behind you shows
 local MIN_BUFF = 60        -- a buff shorter than this (a heal over time, a shield) isn't a card
 local GOLD = { 1, 0.82, 0 }
@@ -1084,14 +1085,25 @@ end
 
 -- Whether it shows here now (its page, its Show in row, standing still if
 -- it says so).
-local function Allowed()
-	if not ns.Setting("emoteVision") then return false end
-	if Fighting() then return false end
+-- (Why not, for the log: nil when it can. A boss kill's own card (kind.soon):
+-- out of the fight and its "after" time come, no calm or Show in row to wait
+-- for.)
+local function WhyWaiting(moment)
+	if not ns.Setting("emoteVision") then return "page off" end
+	if Fighting() then return "in a fight" end
 	-- (No emoting while dead or a ghost: a wipe's card waits until you're back.)
-	if ns.Flag(UnitIsDeadOrGhost("player")) then return false end
-	if DB().emoteVisionStill and ns.playerMoving then return false end
+	if ns.Flag(UnitIsDeadOrGhost("player")) then return "dead" end
+	if DB().emoteVisionStill and ns.playerMoving then return "moving" end
+	local kind = moment and MOMENT[moment.kind]
+	if kind and kind.soon then
+		if moment.after and GetTime() < moment.after then return "just killed" end
+		return nil
+	end
 	local ok, here = pcall(ns.RowOnNow, ROW_KEY, nil, true)
-	return ok and here and true or false
+	if not (ok and here) then return "its Show in row says no (the calm after a fight, or its rule)" end
+end
+local function Allowed(moment)
+	return WhyWaiting(moment) == nil
 end
 
 -- The next queued moment once it can show (out of a fight and the calm
@@ -1103,9 +1115,13 @@ function Next()
 	local now = GetTime()
 	for i = #queue, 1, -1 do
 		local kind = MOMENT[queue[i].kind]
-		if now - queue[i].at > (kind and kind.maxAge or MAX_AGE) then table.remove(queue, i) end
+		if now - queue[i].at > (kind and kind.maxAge or MAX_AGE) then
+			ns.Log("emote", ("%s card dropped unseen: waited too long (%s)"):format(queue[i].kind,
+				WhyWaiting(queue[i]) or "nothing now"))
+			table.remove(queue, i)
+		end
 	end
-	while queue[1] and Allowed() do
+	while queue[1] and Allowed(queue[1]) do
 		local moment = table.remove(queue, 1)
 		if Show(moment) then
 			-- (Repeats count from a card shown: one dropped unseen doesn't hold the next back.)
@@ -1472,8 +1488,11 @@ end
 -- or a wipe.
 local function EncounterEnded(encounterID, encounterName, success)
 	encounterID, success = Plain(encounterID), Plain(success)
-	if not (encounterID and IsInGroup()) then return end
 	local _, kind = IsInInstance()
+	ns.Log("emote", ("boss fight ended: encounter %s, success %s, in group %s, instance %s"):format(
+		tostring(encounterID or "secret"), tostring(success or "secret"), tostring(IsInGroup() and true or false),
+		tostring(kind)))
+	if not (encounterID and IsInGroup()) then return end
 	if kind ~= "party" and kind ~= "raid" then return end
 	local name = Plain(encounterName)
 	if not name and EJ_GetEncounterInfo then name = Plain((EJ_GetEncounterInfo(encounterID))) end
@@ -1484,21 +1503,22 @@ local function EncounterEnded(encounterID, encounterName, success)
 		return
 	end
 	local last
+	local place = Plain((GetInstanceInfo()))
 	if kind == "party" and ns.EncounterIndex then
 		local index, count = ns.EncounterIndex(encounterID)
 		last = index and index == count
+		ns.Log("emote", ("boss %s of %s in %s (Journal): %s"):format(tostring(index), tostring(count),
+			tostring(place), last and "the last, Dungeon moment" or "not the last, Boss moment"))
 	end
-	local place = Plain((GetInstanceInfo()))
+	-- (Shown 2 seconds after the kill, once out of the fight: no calm to wait for.)
+	local after = GetTime() + KILL_WAIT
 	if last and place and place ~= "" and MOMENT.Dungeon and DB()[MOMENT.Dungeon.on] then
-		-- (After the kill's own banner and the Dungeon cleared card.)
-		C_Timer.After(6, function()
-			Fire({ kind = "Dungeon", name = place, line = L["cleared with your group"], group = true,
-				icon = "Interface\\Icons\\INV_Misc_Key_03" })
-		end)
+		Fire({ kind = "Dungeon", name = place, line = L["cleared with your group"], group = true,
+			icon = "Interface\\Icons\\INV_Misc_Key_03", after = after })
 		return
 	end
 	Fire({ kind = "Boss", name = name, line = L["defeated with your group"], group = true,
-		icon = "Interface\\Icons\\INV_Misc_Bone_HumanSkull_01" })
+		icon = "Interface\\Icons\\INV_Misc_Bone_HumanSkull_01", after = after })
 end
 
 -- An achievement someone else earned (near you, your group, your guild):
@@ -1733,6 +1753,14 @@ function ns.MoveEmoteVision()
 	if card then card:SetAlpha(1) end
 end
 function ns.EmoteVisionMoving() return moving and true or false end
+
+-- The card up now, and taken away (Show me's Stop).
+function ns.EmoteCardShown()
+	return card ~= nil and card:IsShown()
+end
+function ns.HideEmoteCard()
+	if card then card:Hide() end
+end
 
 function ns.RefreshEmoteVision()
 	if not card then return end

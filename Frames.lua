@@ -3371,24 +3371,39 @@ do
 	-- every SHOWN_HOLD seconds, and at once when the fight, the Calm Timer,
 	-- the target or a cast at an enemy changes: the rest of a rule's facts
 	-- (moving, mounted...) count a moment later, well inside a fade.)
-	local SHOWN_HOLD = 0.1
+	-- (The renewal every SHOWN_HOLD is done in the tick's second half,
+	-- ns.WarmCombatShown from Core.lua's tickRest, so it doesn't stack with
+	-- the frames' pass: that one takes the kept list up to SHOWN_GRACE more,
+	-- working it out itself only on a change or if the warming didn't run.)
+	local SHOWN_HOLD, SHOWN_GRACE = 0.1, 0.1
 	local Compute = GetCombatShownFrames
-	local keptAt, keptShown = -1, nil
+	local keptAt, keptShown, askedAt = -1, nil, -math.huge
 	local wasFighting, wasCalm, wasTarget, wasEnemy, wasCast
-	function GetCombatShownFrames()
-		local now = GetTime()
+	local function Kept(now, hold)
 		local fighting = InCombatLockdown() or ns.Flag(UnitAffectingCombat("player"))
 		local calm = not fighting and now - lastCombatAt < (ns.db.calmTime or 0)
 		local target = HasAnyTarget() and true or false
 		local enemy = target and ns.IsEnemyUnit("target") and not ns.Flag(UnitIsDeadOrGhost("target")) or false
 		local cast = ns.HostileCastLeft(now) ~= nil
-		if keptShown and now >= keptAt and now - keptAt < SHOWN_HOLD and fighting == wasFighting
+		if keptShown and now >= keptAt and now - keptAt < hold and fighting == wasFighting
 			and calm == wasCalm and target == wasTarget and enemy == wasEnemy and cast == wasCast then
 			return keptShown
 		end
 		wasFighting, wasCalm, wasTarget, wasEnemy, wasCast = fighting, calm, target, enemy, cast
 		keptAt, keptShown = now, Compute()
 		return keptShown
+	end
+	function GetCombatShownFrames()
+		local now = GetTime()
+		askedAt = now
+		return Kept(now, SHOWN_HOLD + SHOWN_GRACE)
+	end
+	-- (Only while the frames' pass is asking: in CineMode.)
+	function ns.WarmCombatShown()
+		local now = GetTime()
+		if now - askedAt < 0.5 then
+			Kept(now, SHOWN_HOLD)
+		end
 	end
 
 	-- Whether a grid row that isn't a frame (the Chat page's: a message type,
@@ -3769,10 +3784,41 @@ function ns.CheckDebuffIcons(peek)
 			debuffHeld = false
 		end
 		if ns.auraDebug then
-			ns.Print(("debuff icons %s -> %s%s"):format(tostring(ns.debuffIcons), tostring(icons),
+			ns.AuraSay(("debuff icons %s -> %s%s"):format(tostring(ns.debuffIcons), tostring(icons),
 				peek and "" or " (not peeking)"))
 		end
 		ns.debuffIcons = icons
+	end)
+end
+
+-- /cine debug peeks lines: to chat, or with /cine debug peeks log
+-- (ns.auraDebug "log", kept over /reloads in peeksLog) only to the log, for
+-- a miss that's hard to reproduce. That also logs your casts in fights, to
+-- line a proc's buff up with the spell that gave it.
+function ns.AuraSay(text)
+	if ns.auraDebug == "log" then
+		ns.Log("peeks", text)
+	else
+		ns.Print(text)
+	end
+end
+do
+	local castLogger = CreateFrame("Frame")
+	castLogger:RegisterUnitEvent("UNIT_SPELLCAST_SUCCEEDED", "player")
+	castLogger:RegisterEvent("PLAYER_ENTERING_WORLD")
+	castLogger:SetScript("OnEvent", function(_, event, _, _, spellID)
+		if event == "PLAYER_ENTERING_WORLD" then
+			if ns.db and ns.db.peeksLog and not ns.auraDebug then
+				ns.auraDebug = "log"
+			end
+			return
+		end
+		if ns.auraDebug ~= "log" or not (InCombatLockdown() or ns.Flag(UnitAffectingCombat("player"))) then
+			return
+		end
+		local secret = issecretvalue and issecretvalue(spellID)
+		local name = not secret and C_Spell and C_Spell.GetSpellName and C_Spell.GetSpellName(spellID)
+		ns.Log("peeks", ("cast %s %s"):format(secret and "secret" or tostring(spellID), tostring(name or "")))
 	end)
 end
 
@@ -3806,13 +3852,13 @@ local function AnyAuraHold(updateInfo, found)
 					end
 					local harmful = aura.isHarmful
 					harmful = not (issecretvalue and issecretvalue(harmful)) and harmful
-					ns.Print(("aura %s (icon %s, %s): %s"):format(Say(aura.name), Say(aura.icon),
+					ns.AuraSay(("aura %s (icon %s, %s): %s"):format(Say(aura.name), Say(aura.icon),
 						harmful and "debuff" or "buff?", seconds and ("peeks %.1fs"):format(seconds)
 						or IsIgnoredAura(aura) and "on the ignore list" or harmful and ns.IsLongAura(aura) and "lasts too long"
 						or aura.isHarmful and "debuff peek" or ns.db.buffPeekIgnoreSelf and IsSelfCast(aura)
 						and "cast by you" or "buff peeks off now"))
 				end)
-				if not okDebug then ns.Print("aura (unreadable): " .. tostring(problem)) end
+				if not okDebug then ns.AuraSay("aura (unreadable): " .. tostring(problem)) end
 			end
 		end
 		local added, updated = updateInfo.addedAuras, updateInfo.updatedAuraInstanceIDs
@@ -3885,7 +3931,7 @@ do
 				return ok and Say(n) or "?"
 			end
 			local info = type(updateInfo) == "table" and updateInfo or {}
-			ns.Print(("aura change: in combat %s/%s, debuffs %s -> %s, added %s updated %s removed %s, " ..
+			ns.AuraSay(("aura change: in combat %s/%s, debuffs %s -> %s, added %s updated %s removed %s, " ..
 				"full %s, taxi %s/%s, landing quiet %s"):format(
 				Say(InCombatLockdown()), Say(UnitAffectingCombat("player")), Say(ns.debuffCount), Say(count),
 				Size(info.addedAuras), Size(info.updatedAuraInstanceIDs), Size(info.removedAuraInstanceIDs),
@@ -3932,7 +3978,7 @@ do
 			hold = EitherHold()
 		end
 		if ns.auraDebug then
-			ns.Print(("  peek for %s, icons noted %d"):format(tostring(hold), #found))
+			ns.AuraSay(("  peek for %s, icons noted %d"):format(tostring(hold), #found))
 		end
 		if hold then
 			ns.StartBuffPeek(hold, found)
@@ -3993,7 +4039,7 @@ do
 			lastLeft[slot] = now[slot]
 		end
 		if ns.auraDebug and gained then
-			ns.Print("weapon enchant gained or refreshed, icons: " .. table.concat(found, " "))
+			ns.AuraSay("weapon enchant gained or refreshed, icons: " .. table.concat(found, " "))
 		end
 		if not (gained and ns.db and PeekAllowed(false)) or ns.db.buffPeekIgnoreSelf
 			or InCombatLockdown() or ns.Flag(UnitAffectingCombat("player"))
@@ -4103,12 +4149,14 @@ function ns.CheckNewBuffIcons(peek)
 		end)
 		local before, totalBefore, endsBefore = ns.shownBuffIcons, ns.shownBuffTotal, ns.shownBuffEnds
 		ns.shownBuffIcons, ns.shownBuffTotal, ns.shownBuffEnds = shown, total, ends
-		if ns.auraDebug and peek and total ~= totalBefore then
+		-- (Every fight change, the count the same too: one buff ending as
+		-- another comes leaves it unchanged.)
+		if ns.auraDebug and peek then
 			local places = {}
 			for index = total, 1, -1 do
 				places[#places + 1] = index .. (secretAt[index] and ":S" or "")
 			end
-			ns.Print(("buffs %s -> %d, highest first: %s"):format(tostring(totalBefore), total, table.concat(places, " ")))
+			ns.AuraSay(("buffs %s -> %d, highest first: %s"):format(tostring(totalBefore), total, table.concat(places, " ")))
 		end
 		if not (peek and before) then
 			return
@@ -4130,7 +4178,7 @@ function ns.CheckNewBuffIcons(peek)
 		end
 		local added = totalBefore and math.max(0, total - totalBefore) or 0
 		if ns.auraDebug and (#found > 0 or added > 0) then
-			ns.Print(("fight buff new: pictures %s, from the top %d"):format(
+			ns.AuraSay(("fight buff new: pictures %s, from the top %d"):format(
 				#found > 0 and table.concat(found, " ") or "none", added))
 		end
 		if #found > 0 or added > 0 then
@@ -4277,7 +4325,7 @@ do
 			local okText, problem = pcall(CopyText, source, copy)
 			if ns.auraDebug and not okText and not ns.buffMirrorTextDebugDone then
 				ns.buffMirrorTextDebugDone = true
-				ns.Print("close the gaps: copying " .. key .. " text fails: " .. tostring(problem))
+				ns.AuraSay("close the gaps: copying " .. key .. " text fails: " .. tostring(problem))
 			end
 		else
 			pcall(CopyTexture, source, copy)
@@ -4352,7 +4400,7 @@ do
 				if issecretvalue and issecretvalue(value) then return "secret" end
 				return tostring(value)
 			end
-			ns.Print(("close the gaps: %d places, %d new"):format(#slots, #shownNew))
+			ns.AuraSay(("close the gaps: %d places, %d new"):format(#slots, #shownNew))
 			for i, entry in ipairs(shownNew) do
 				local button, parts = entry.button, {}
 				for key, value in pairs(button) do
@@ -4369,14 +4417,14 @@ do
 					end
 				end
 				table.sort(parts)
-				ns.Print(("  new %d (level %.2f): %s"):format(i, entry.level, table.concat(parts, "; ")))
+				ns.AuraSay(("  new %d (level %.2f): %s"):format(i, entry.level, table.concat(parts, "; ")))
 				local copy = ns.buffMirrors[i] and ns.buffMirrors[i].Duration
 				if copy then
 					local okCopy, state = pcall(function()
 						return ("shown %s, text %s, font %s"):format(Say(copy:IsShown()), Say(copy:GetText()),
 							Say(select(2, copy:GetFont())))
 					end)
-					ns.Print("  its timer copy: " .. (okCopy and state or "errors"))
+					ns.AuraSay("  its timer copy: " .. (okCopy and state or "errors"))
 				end
 			end
 		end
@@ -4488,7 +4536,7 @@ do
 			local icons, fadedCount = {}, 0
 			for icon in pairs(ns.newBuffIcons) do icons[#icons + 1] = tostring(icon) end
 			for _ in pairs(faded) do fadedCount = fadedCount + 1 end
-			ns.Print(("just the new one: %d icons found, %d faded, new: %s"):format(count, fadedCount,
+			ns.AuraSay(("just the new one: %d icons found, %d faded, new: %s"):format(count, fadedCount,
 				#icons > 0 and table.concat(icons, " ") or "none"))
 		end
 	end
@@ -6113,7 +6161,11 @@ ns.COOLDOWN_BUFF_GROUPS = { BuffIconCooldownViewer = "buffs", BuffBarCooldownVie
 -- recharging brings each up.)
 ns.COOLDOWN_MEMBER_BAR = { cooldowns = "essential", ["addon:fecm"] = "essential", cooldownsutility = "utility" }
 -- The bars with Close the gaps on until it's set (below: CenterCooldownIcons).
-ns.COOLDOWN_GROUP_CENTER = { essential = true, utility = true }
+ns.COOLDOWN_GROUP_CENTER = { essential = true, utility = true, buffs = true }
+-- The bars Close the gaps can center: the two spell bars and the tracked
+-- buffs (whose inactive buffs the game hides, leaving their places empty).
+ns.COOLDOWN_CENTER_BARS = { EssentialCooldownViewer = "essential", UtilityCooldownViewer = "utility",
+	BuffIconCooldownViewer = "buffs" }
 
 -- Whether a bar's Close the gaps is on.
 function ns.CooldownGroupCentered(group)
@@ -6786,7 +6838,7 @@ local function ReleaseReadyIcons()
 end
 
 -- A bar's Close the gaps (ns.CooldownGroupCentered; the Essential and
--- Utility bars): the icons it shows sit together in their
+-- Utility bars and the tracked buffs): the icons it shows sit together in their
 -- order, centered on the bar's rows (or columns), instead of faded ones
 -- leaving gaps; the faded ones wait after the last shown. Each icon's place
 -- in the game's own layout is caught as the game sets it (a hook on the
@@ -6802,7 +6854,13 @@ do
 	local goal = setmetatable({}, { __mode = "k" }) -- icon -> { x, y }, where it's going
 	local placeOf = setmetatable({}, { __mode = "k" }) -- icon -> its place in its bar (layoutIndex)
 	local watched = setmetatable({}, { __mode = "k" }) -- icon -> true once its SetPoint is hooked
-	local barIcons, lineCross, wanted, shownIn = {}, {}, {}, {}
+	-- (hidden: tracked buffs the game hides while inactive, gaps like faded
+	-- ones; wasHidden: last pass, so those just shown again go straight to
+	-- their place rather than sliding there. In one table: the main chunk's
+	-- locals are at Lua's cap.)
+	local barIcons, lineCross, wanted, shownIn = {}, {}, {}, {
+		hidden = setmetatable({}, { __mode = "k" }), wasHidden = setmetatable({}, { __mode = "k" }),
+		hooked = setmetatable({}, { __mode = "k" }) }
 	local putting = false -- (our own SetPoint: not the game's place)
 
 	local function Movable(icon)
@@ -6887,6 +6945,7 @@ do
 		table.sort(icons, ByPlace)
 		local first, second = slotOf[icons[1]], slotOf[icons[2]]
 		local stepX, stepY = second[4] - first[4], second[5] - first[5]
+		if math.abs(stepX) < 0.5 and math.abs(stepY) < 0.5 then return end -- (two in one place: no grid to read)
 		local across = math.abs(stepY) < 0.5 -- (side by side: rows; else columns)
 		-- The game's lines (rows or columns), by where each sits across them.
 		wipe(lineCross)
@@ -6898,7 +6957,7 @@ do
 				lineCross[#lineCross + 1] = cross
 			end
 			if #lineCross == 1 then lineLength = lineLength + 1 end
-			shownIn[icon] = readyTargets[icon] ~= 0
+			shownIn[icon] = readyTargets[icon] ~= 0 and not shownIn.hidden[icon]
 			if shownIn[icon] then count = count + 1 end
 		end
 		local function Goal(icon, line, along)
@@ -6943,17 +7002,29 @@ do
 				local line = math.floor(shown / lineLength)
 				local inLine = math.min(lineLength, count - line * lineLength)
 				Goal(icon, line, shown % lineLength + (lineLength - inLine) / 2)
+				if shownIn.wasHidden[icon] then Put(icon, goal[icon][1], goal[icon][2]) end
 				shown = shown + 1
 			else
 				FadedGoal(icon, faded)
 				faded = faded + 1
 			end
 		end
-		wipe(shownIn)
+		for _, icon in ipairs(icons) do shownIn[icon] = nil end
 	end
 
+	-- (Walked with hidden icons too: the spell bars' are left out as before,
+	-- the tracked buffs' kept, so their places still give the bar's grid.)
 	local function Collect(icon, _, bar)
-		local group = ns.COOLDOWN_BAR_GROUPS[bar]
+		local group = ns.COOLDOWN_CENTER_BARS[bar]
+		local hidden = Hidden(icon)
+		if hidden and not ns.COOLDOWN_BUFF_GROUPS[bar] then return end
+		shownIn.wasHidden[icon], shownIn.hidden[icon] = shownIn.hidden[icon], hidden or nil
+		-- (A tracked buff the game shows again: placed the same frame, not up
+		-- to a pass later where its gap was.)
+		if ns.COOLDOWN_BUFF_GROUPS[bar] and not shownIn.hooked[icon] and type(icon.HookScript) == "function" then
+			shownIn.hooked[icon] = true
+			icon:HookScript("OnShow", function() ns.CenterCooldownIcons() end)
+		end
 		if group and ns.CooldownGroupCentered(group) and ReadSlot(icon) then
 			local place = icon.layoutIndex
 			if Secret(place) or type(place) ~= "number" then place = math.huge end
@@ -6975,7 +7046,7 @@ do
 	end
 
 	local function HookBars()
-		for name in pairs(ns.COOLDOWN_BAR_GROUPS) do
+		for name in pairs(ns.COOLDOWN_CENTER_BARS) do
 			local viewer = _G[name]
 			if not hooked[name] and type(viewer) == "table" and type(viewer.Layout) == "function" then
 				hooked[name] = true
@@ -6987,7 +7058,7 @@ do
 	-- Each pass of the When ready check: every centered bar's goals.
 	function ns.CenterCooldownIcons()
 		local on = false
-		for _, group in pairs(ns.COOLDOWN_BAR_GROUPS) do
+		for _, group in pairs(ns.COOLDOWN_CENTER_BARS) do
 			on = on or ns.CooldownGroupCentered(group)
 		end
 		if not on and not next(putAt) then return end
@@ -6996,7 +7067,7 @@ do
 		local editMode = _G.EditModeManagerFrame
 		if on and not (editMode and editMode.IsEditModeActive and ns.Flag(editMode:IsEditModeActive())) then
 			for _, icons in pairs(barIcons) do wipe(icons) end
-			EachCooldownIcon(Collect)
+			EachCooldownIcon(Collect, true)
 			for _, icons in pairs(barIcons) do
 				if #icons > 1 then PlaceBar(icons) end
 			end
@@ -7048,7 +7119,7 @@ do
 		ns.Print(("close the gaps: edit mode %s, in combat %s"):format(
 			tostring(editMode and editMode.IsEditModeActive and ns.Flag(editMode:IsEditModeActive()) or false),
 			tostring(InCombatLockdown())))
-		for bar, group in pairs(ns.COOLDOWN_BAR_GROUPS) do
+		for bar, group in pairs(ns.COOLDOWN_CENTER_BARS) do
 			local viewer = _G[bar]
 			local geometry = "?"
 			if type(viewer) == "table" and viewer.GetCenter then
@@ -7071,7 +7142,7 @@ do
 		end
 		local count = 0
 		EachCooldownIcon(function(icon, id, bar)
-			local group = ns.COOLDOWN_BAR_GROUPS[bar]
+			local group = ns.COOLDOWN_CENTER_BARS[bar]
 			if not group then return end
 			count = count + 1
 			if count > 30 then return end
@@ -7081,16 +7152,16 @@ do
 			local relName = ok and not Secret(relativeTo) and type(relativeTo) == "table" and relativeTo.GetName
 				and relativeTo:GetName() or "?"
 			local okC, cx = pcall(icon.GetCenter, icon)
-			print(("  %s spell=%s place=%s points=%s now %s %s,%s on %s screen x %s | slot %s | put %s | goal %s | target %s, movable %s")
-				:format(group, tostring(id), Num(icon.layoutIndex), okCount and Num(points) or "?",
+			print(("  %s spell=%s hidden=%s place=%s points=%s now %s %s,%s on %s screen x %s | slot %s | put %s | goal %s | target %s, movable %s")
+				:format(group, tostring(id), tostring(Hidden(icon)), Num(icon.layoutIndex), okCount and Num(points) or "?",
 				ok and tostring(point) or "?", ok and Num(x) or "?", ok and Num(y) or "?", tostring(relName),
 				okC and Num(cx) or "?",
 				slot and (Num(slot[4]) .. "," .. Num(slot[5])) or "none",
 				at and (Num(at[1]) .. "," .. Num(at[2])) or "none",
 				to and (Num(to[1]) .. "," .. Num(to[2])) or "none",
 				tostring(readyTargets[icon]), tostring(Movable(icon))))
-		end)
-		if count == 0 then print("  (no Essential or Utility icons found)") end
+		end, true)
+		if count == 0 then print("  (no Essential, Utility or tracked buff icons found)") end
 	end
 end
 
@@ -7342,8 +7413,10 @@ local function ReadyTarget(icon, id, bar)
 		readyTargets[icon] = 1
 	end
 end
+-- (In the tick's second half, Core.lua's tickRest: in the frames' half it
+-- stacked with GetCombatShownFrames' pass into 5 ms frames. SyncSwitches
+-- stays in ns.UpdateFrames.)
 function UpdateReadyOnly(elapsed, now)
-	SyncSwitches()
 	if not GroupHandled("cooldowns") or not ns.PageOn("handleCooldowns") then
 		return
 	end
@@ -7383,7 +7456,11 @@ function UpdateReadyOnly(elapsed, now)
 	end
 end
 end
-UpdateReadyOnly = ns.Profiled("UpdateReadyOnly", UpdateReadyOnly)
+-- (Not wrapped in ns.Profiled: Core.lua's Step already times it under this
+-- name, and both under one name read as two calls a tick.)
+function ns.UpdateReadyOnly(elapsed)
+	UpdateReadyOnly(elapsed, GetTime())
+end
 
 -- The Cooldown Manager page's Flash (ns.CooldownSpellFlash, any mode): as a
 -- spell's cooldown ends, its icon in the Essential or Utility bar pulses
@@ -8393,7 +8470,7 @@ tickTables.hoverMouse = { at = -math.huge }
 
 function ns.UpdateFrames(cinematic, elapsed)
 	local now = GetTime()
-	UpdateReadyOnly(elapsed, now)
+	SyncSwitches() -- (UpdateReadyOnly: the tick's second half, Core.lua)
 	if not ns.isRetail then
 		ns.UpdateSwingOrder()
 	end
@@ -8588,7 +8665,7 @@ function ns.UpdateFrames(cinematic, elapsed)
 	-- (/cine debug peeks: when a peek starts and stops, and why not.)
 	if ns.auraDebug and (events.aura or false) ~= (ns.auraDebugWas or false) then
 		ns.auraDebugWas = events.aura or false
-		ns.Print(("buffs peek %s (CineMode %s, page on %s, peek %.1fs, fight peek %.1fs)"):format(
+		ns.AuraSay(("buffs peek %s (CineMode %s, page on %s, peek %.1fs, fight peek %.1fs)"):format(
 			events.aura and "on" or "off", tostring(cinematic), tostring(ns.PageOn("handleBuffs")),
 			math.max(0, buffPeekUntil - now), math.max(0, ns.debuffPeekUntil - now)))
 		-- (Which rows a peek brings up: the groups with New buff or debuff ticked.)
@@ -8599,7 +8676,7 @@ function ns.UpdateFrames(cinematic, elapsed)
 					rows[#rows + 1] = table.concat(group.members or {}, "/")
 				end
 			end
-			ns.Print("  rows it brings up: " .. (#rows > 0 and table.concat(rows, ", ") or "none (no group has New buff or debuff ticked)"))
+			ns.AuraSay("  rows it brings up: " .. (#rows > 0 and table.concat(rows, ", ") or "none (no group has New buff or debuff ticked)"))
 		end
 	end
 	-- (Not on flight paths, Minimap page: no pings, reveals or tracking bring it up then.)
@@ -8771,7 +8848,7 @@ function ns.UpdateFrames(cinematic, elapsed)
 					tostring(ns.previewRows ~= nil), tostring(ns.newBuffUnknown)) or nil
 				if why ~= ns.newBuffWhy then
 					ns.newBuffWhy = why
-					if why then ns.Print("buff peek shows all: " .. why) end
+					if why then ns.AuraSay("buff peek shows all: " .. why) end
 				end
 			end
 			if entry.name == "TemporaryEnchantFrame" then

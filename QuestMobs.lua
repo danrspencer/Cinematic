@@ -21,6 +21,9 @@ local RECHECK_SETTLED = 30
 -- TOKEN_HOLD seconds, forgotten as soon as a token may point at someone else.
 local tokenAnswers = {} -- [unit token] = { quest = bool, at = time }
 local TOKEN_HOLD = 1
+-- Tokens whose change the token watcher below hears (nameplateN too).
+local TOKEN_EVENT_UNITS = { target = true, mouseover = true, focus = true, softenemy = true, softfriend = true,
+	softinteract = true }
 -- The game drops a unit's quest line a moment after the quest log changes
 -- (an NPC you've just questioned): answers read within SETTLE seconds of a
 -- change are read once more after it.
@@ -411,13 +414,20 @@ function ns.IsQuestMob(unit)
 	if not (ok and type(guid) == "string" and Known(guid)) then
 		-- (No GUID to keep it by, as in retail's instances: by the unit token,
 		-- briefly. Read every time, its tooltip made heaps of garbage a frame.)
+		-- Tokens the watcher below forgets as they change (plates, target...)
+		-- hold like GUIDs: a party's 8 plates were read every second, 35 KB/s.
 		local now = GetTime()
 		local held = tokenAnswers[unit]
-		if held and now - held.at < TOKEN_HOLD then
+		local hold = TOKEN_HOLD
+		if held and type(unit) == "string" and (TOKEN_EVENT_UNITS[unit] or unit:find("^nameplate%d+$")) then
+			hold = held.quest and math.huge or (held.noes or 0) >= 2 and RECHECK_SETTLED or RECHECK_NO
+		end
+		if held and (held.at >= settleAt or now < settleAt) and now - held.at < hold then
 			return held.quest
 		end
 		held = held or {}
 		held.quest, held.at = Read(unit), now
+		held.noes = not held.quest and (held.noes or 0) + 1 or 0
 		tokenAnswers[unit] = held
 		return held.quest
 	end

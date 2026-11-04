@@ -115,7 +115,7 @@ for _, frame in ipairs(FRAMES) do
 	end
 end
 
--- A frame's look: its own settings while its "Use default settings" is
+-- A frame's look: its own settings while its "Same as the Default tab" is
 -- unticked, else Default's; each through the Style pages' look (General's,
 -- and the game's with the page or General off).
 local views = {}
@@ -343,11 +343,17 @@ local hooked = setmetatable({}, { __mode = "k" })
 local Dress
 local HEALTH_GREEN = { 0, 0.8, 0 }
 
+-- Game frame -> its entry, as last dressed (the portrait hook's lookup, so
+-- it doesn't rebuild every list on each portrait update; refilled by
+-- ns.RefreshUnitStyle on the roster and Edit Mode events).
+local frameInfo = setmetatable({}, { __mode = "k" })
+
 -- One frame (id) as the page says, every game frame it covers.
 local function DressFrame(info)
 	local active = ns.StyleOn("ufStyle")
 	local view = active and View(info[1]) or nil
 	for _, frame in ipairs(GameFrames(info)) do
+		frameInfo[frame] = info
 		if not (frame.IsForbidden and frame:IsForbidden()) then
 			local unit = frame.unit
 			local health, power, text, portrait = Parts(frame)
@@ -381,6 +387,7 @@ end
 -- Every frame again (the page's settings changing, a new target...).
 function ns.RefreshUnitStyle()
 	if not ns.db then return end
+	wipe(frameInfo)
 	for _, info in ipairs(FRAMES) do DressFrame(info) end
 end
 
@@ -396,13 +403,10 @@ watcher:SetScript("OnEvent", function(_, event, name)
 end)
 if hooksecurefunc and type(_G.UnitFramePortrait_Update) == "function" then
 	hooksecurefunc("UnitFramePortrait_Update", function(frame)
-		for _, info in ipairs(FRAMES) do
-			for _, each in ipairs(GameFrames(info)) do
-				if each == frame then
-					local _, _, _, portrait = Parts(frame)
-					DressPortrait(portrait, ns.StyleOn("ufStyle") and View(info[1]) or nil, frame.unit)
-				end
-			end
+		local info = frame and frameInfo[frame]
+		if info then
+			local _, _, _, portrait = Parts(frame)
+			DressPortrait(portrait, ns.StyleOn("ufStyle") and View(info[1]) or nil, frame.unit)
 		end
 	end)
 end
@@ -601,7 +605,7 @@ function ns.CreateUnitStylePanel(kit)
 	title:SetPoint("TOPLEFT", 16, -16)
 	local intro = kit.PageIntro(content, title,
 		L["How your player, target, focus, pet, target of target and party frames look. The Default tab's " ..
-		"settings are every frame's until its own tab has Use default settings unticked. Which parts show: " ..
+		"settings are every frame's until its own tab has Same as the Default tab unticked. Which parts show: " ..
 		"the Interface hub's Unit Frames page."])
 
 	-- The tab being edited (nil: Default), and each setting as the field it edits:
@@ -636,7 +640,7 @@ function ns.CreateUnitStylePanel(kit)
 	end
 
 	local preview -- (below: drawn again as each setting changes)
-	local tabs, ownCheck, partyNote = {}, nil, nil
+	local tabs, ownCheck, partyNote
 	local function Changed()
 		ns.RefreshUnitStyle()
 		if preview then preview:Refresh(editing) end
@@ -675,32 +679,37 @@ function ns.CreateUnitStylePanel(kit)
 				ufOutline = 1 } },
 	}, PRESET_KEYS)
 
-	-- The tabs: Default, then each frame; on a frame's, Use default settings.
-	local tabsRow = CreateFrame("Frame", nil, content)
-	tabsRow:SetSize(480, 22)
-	stack:Add(tabsRow, "label")
+	-- The tabs, in the folder look (ns.FolderTabs): Default, then each frame,
+	-- the settings on the panel under them. On a frame's, Same as the Default
+	-- tab; on Default's, a note in its place.
+	local TAB_H = ns.FOLDER_TAB_HEIGHT
+	local ids, list = { false }, {}
+	for _, info in ipairs(FRAMES) do ids[#ids + 1] = info[1] end
+	for i, id in ipairs(ids) do
+		list[i] = { id and L[TAB_NAMES[id]] or L["Default"],
+			id and L["This frame's settings: Default's until you untick Same as the Default tab."]
+			or L["The settings every frame has while its tab uses the default settings."] }
+	end
+	local tabsRoom = CreateFrame("Frame", nil, content)
+	tabsRoom:SetSize(480, TAB_H + 4)
+	stack:Add(tabsRoom, "label")
+	local panel, ShowTab, base
+	panel, tabs, ShowTab, base = ns.FolderTabs(content, list, function(i) Pick(ids[i] or nil) end)
+	panel:SetPoint("TOPLEFT", tabsRoom, "BOTTOMLEFT", -10, 0)
+	base:SetPoint("TOPLEFT", tabsRoom, "BOTTOMLEFT", -10, 0)
+	local defaultNote
 	local function TabsLook()
 		local db = ns.GetDB()
-		for _, tab in ipairs(tabs) do
-			if tab.id == editing then tab:LockHighlight() else tab:UnlockHighlight() end
-			local own = tab.id and db and db["ufOwn_" .. tab.id]
-			tab:SetText((tab.id and L[TAB_NAMES[tab.id]] or L["Default"]) .. (own and " |cffffd100*|r" or ""))
+		for i, tab in ipairs(tabs) do
+			local id = ids[i] or nil
+			local own = id and db and db["ufOwn_" .. id]
+			tab:SetText((id and L[TAB_NAMES[id]] or L["Default"]) .. (own and " |cffffd100*|r" or ""))
+			tab:SetWidth(math.max(56, math.ceil(tab.label:GetStringWidth()) + 16))
+			if id == editing then ShowTab(i) end
 		end
 		ownCheck:SetShown(editing ~= nil)
+		defaultNote:SetShown(editing == nil)
 		partyNote:SetShown(editing == "PARTY" and ns.RaidStyleParty())
-	end
-	local list = { false }
-	for _, info in ipairs(FRAMES) do list[#list + 1] = info[1] end
-	for i, id in ipairs(list) do
-		local tab = ns.PanelButton(tabsRow)
-		tab.id = id or nil
-		tab:SetText(id and L[TAB_NAMES[id]] or L["Default"])
-		tab:SetSize(math.max(64, tab:GetFontString():GetStringWidth() + 20), 22)
-		if i == 1 then tab:SetPoint("LEFT", tabsRow, "LEFT", 0, 0) else tab:SetPoint("LEFT", tabs[i - 1], "RIGHT", 4, 0) end
-		kit.Tooltip(tab, id and L["This frame's settings: Default's until you untick Use default settings."]
-			or L["The settings every frame has while its tab uses the default settings."])
-		tab:SetScript("OnClick", function() Pick(tab.id) end)
-		tabs[i] = tab
 	end
 	-- (Every setting the page has, Default's and each frame's, for its Reset.)
 	for key in pairs(KEYS) do kit.RecordKey(content, key) end
@@ -709,7 +718,7 @@ function ns.CreateUnitStylePanel(kit)
 		for key in pairs(KEYS) do kit.RecordKey(content, key .. "_" .. info[1]) end
 		for _, part in ipairs({ "Size", "R", "G", "B" }) do kit.RecordKey(content, "ufBorder_" .. info[1] .. part) end
 	end
-	ownCheck = kit.Check(content, false, L["Use default settings"],
+	ownCheck = kit.Check(content, false, L["Same as the Default tab"],
 		L["Ticked: this frame looks as the Default tab says. Unticked: as the settings below say (they start " ..
 		"as Default's, and are kept while it's ticked)."], function(value)
 			local db = ns.GetDB()
@@ -734,13 +743,17 @@ function ns.CreateUnitStylePanel(kit)
 	stack:Add(ownCheck, "check")
 	-- (Party, while the game draws it as raid frames: nothing here to dress.)
 	partyNote = kit.Label(content, "GameFontHighlightSmall", L["Your party uses raid-style frames (Edit Mode's " ..
-		"party frames setting): they follow the Raid frames page, not this tab."])
+		"party frames setting): they follow the Raid Frames page, not this tab."])
 	partyNote:SetPoint("LEFT", ownCheck.Text or ownCheck.text or ownCheck, "RIGHT", 16, 0)
 	partyNote:SetWidth(300)
 	partyNote:SetJustifyH("LEFT")
 	partyNote:SetTextColor(1, 0.82, 0)
 	kit.GreyUnless(ownCheck, rows.On)
 	kit.AddControl(ownCheck)
+	defaultNote = kit.Label(content, "GameFontHighlightSmall",
+		L["Every frame looks as this tab says while its own tab has Same as the Default tab ticked."])
+	defaultNote:SetPoint("LEFT", ownCheck, "LEFT", 4, 0)
+	defaultNote.searchSkip = true
 
 	stack:Header(content, L["Look"])
 	rows.Look(L["Bars:"], L["Bars"], {
@@ -782,11 +795,13 @@ function ns.CreateUnitStylePanel(kit)
 		shadow = { "ufShadow", test = Editable },
 	})
 
-	stack:Header(content, L["Portrait"])
-	rows.Choices(L["Portrait:"], "ufPortrait", {
+	local portrait = rows.Choices(L["Portrait:"], "ufPortrait", {
 		{ "game", L["The game's"], L["Their face."] },
 		{ "class", L["Class icon"], L["A player's class icon in place of their face (NPCs keep theirs)."] },
 	}, Editable)
+	-- (The panel's bottom under the last row, its right at the page's.)
+	panel:SetPoint("BOTTOM", portrait, "BOTTOM", 0, -12)
+	panel:SetPoint("RIGHT", content, "RIGHT", -16, 0)
 
 	canvas:SetScript("OnShow", kit.PageShown(kit.Refresh, content))
 	canvas:Hide()

@@ -137,8 +137,8 @@ end
 local hooked = {}  -- frame -> true once it can be dragged
 local moving = {}  -- frame -> where the mouse and the window started, while it's being dragged
 local dropped = {} -- frame -> { point, relativePoint, x, y } for windows without a name, while they stay open
--- The shop window, following the talk (see PlaceShop): { x, y } or { side }
--- while one that follows is open; false: one that doesn't (or was dragged).
+-- The shop window, following the talk (see PlaceShop): { x, y } while one
+-- that follows is open; false: one that doesn't (or was dragged).
 local shop
 
 -- Where the window with this name was last dropped, or nil: { point,
@@ -532,26 +532,21 @@ local talking = false
 
 -- Quest Vision's Opposite clicked, "Shop window goes where the talk was"
 -- (ns.ShopSpot): the merchant window, opened from the talk, is centered where
--- the talk was; opened with no talk first, it's mirrored off the half you
--- clicked the vendor on. Decided as it opens (shop), kept while it's open.
+-- the talk was; opened with no talk first (a right click straight to the
+-- shop), it's left be. Decided as it opens (shop), kept while it's open.
 
 local function PlaceShop(frame)
 	if Held(frame) or not shop then
 		return
 	end
 	local screenWidth, screenHeight = ScreenSize()
-	local left, top, width, height = Number(frame:GetLeft()), Number(frame:GetTop()),
-		Number(frame:GetWidth()), Number(frame:GetHeight())
-	if not screenWidth or not left or not top or not width or not height then
+	local width, height = Number(frame:GetWidth()), Number(frame:GetHeight())
+	if not screenWidth or not width or not height then
 		return
 	end
 	local toUI = ToUI(frame)
-	left, top, width, height = left * toUI, top * toUI, width * toUI, height * toUI
-	if shop.x then
-		left, top = shop.x - width / 2, shop.y + height / 2
-	elseif (left + width / 2 > screenWidth / 2) == (shop.side == "right") then
-		left = screenWidth - left - width
-	end
+	width, height = width * toUI, height * toUI
+	local left, top = shop.x - width / 2, shop.y + height / 2
 	-- (kept on the screen)
 	left = math.max(EDGE, math.min(left, screenWidth - width - EDGE))
 	top = math.min(screenHeight - EDGE, math.max(top, height + EDGE))
@@ -585,11 +580,11 @@ local function Arrange()
 	if not shopFrame then
 		shop = nil
 	elseif shop == nil then
-		local x, y, side
+		local x, y
 		if ns.ShopSpot then
-			x, y, side = ns.ShopSpot()
+			x, y = ns.ShopSpot()
 		end
-		shop = x and { x = x, y = y } or side and { side = side } or false
+		shop = x and y and { x = x, y = y } or false
 	end
 	for _, frame in ipairs(open) do
 		if not sized[frame] then

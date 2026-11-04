@@ -42,12 +42,20 @@ local DEMOS = {
 		running = function() return ns.TeleportVisionTesting() end,
 		-- (its test again: it stops)
 		stop = function() if ns.TeleportVisionTesting() then ns.TestTeleportVision() end end },
-	emote = { once = true, setting = "emoteVision", start = function() ns.TestEmoteVision() end },
-	roll = { once = true, setting = "rollWindow", start = function() ns.TestRollWindow() end },
+	-- (Emote and Roll: up until they go as they would, or Stop)
+	emote = { seconds = 60, setting = "emoteVision", start = function() ns.TestEmoteVision() end,
+		running = function() return ns.EmoteCardShown() end,
+		stop = function() ns.HideEmoteCard() end },
+	roll = { seconds = 60, setting = "rollWindow", start = function() ns.TestRollWindow(true) end,
+		running = function() return ns.RollVisionActive() end,
+		stop = function() ns.CloseRollWindow() end },
+	damage = { seconds = 30, setting = "damageVision", start = function() ns.TestDamageVision(true) end,
+		running = function() return ns.DamageVisionTesting() end,
+		stop = function() ns.StopDamageVisionTest() end },
 }
 -- Each test's function, which a client without that Vision lacks.
 local NEEDS = { vitals = "FlashVitals", tele = "TestTeleportVision", emote = "TestEmoteVision",
-	roll = "TestRollWindow" }
+	roll = "TestRollWindow", damage = "TestDamageVision" }
 function ns.ShowMeAvailable(key)
 	return DEMOS[key] ~= nil and not (NEEDS[key] and not ns[NEEDS[key]])
 end

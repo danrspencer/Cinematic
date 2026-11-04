@@ -280,13 +280,14 @@ local function UpdatePicked()
 	else
 		status:SetText(L["Nothing runs until you pick one."])
 	end
-	finish:SetLabel(ns.ProfileChosen() and L["Done"] or L["Decide later"])
+	finish:SetLabel(ns.ProfileChosen() and L["See Profile"] or L["Decide later"])
 	-- (Next only once a level's picked: Customize changes a level)
 	if pages[1]:IsShown() then primary:SetUsable(active and true or false) end
 	Describe(levelOf[active])
 end
 
 local function Pick(name, level)
+	if InCombatLockdown() then ns.ProfileSwitchBlocked() return end -- (says so)
 	if not ns.db.enabled then ns.SetEnabled(true) end
 	ns.SetProfile(name)
 	if ns.RestartTimers then ns.RestartTimers() end
@@ -440,7 +441,7 @@ end
 local function BuildLevels(page)
 	local title = Text(page, "GameFontNormalHuge", L["Welcome to Cinematic"], GOLD)
 	title:SetPoint("TOPLEFT")
-	local sub = Text(page, "GameFontHighlight", L["Immerse yourself in the world. How much do you want?"], SOFT)
+	local sub = Text(page, "GameFontHighlight", L["Select a profile that suits you."], SOFT)
 	sub:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -6)
 
 	local byName = {}
@@ -493,11 +494,11 @@ end
 -- one, false on the last), :IsLast() and :SettingsPage(). skinned: in the
 -- menu look, SD too (the Profiles page; Skinnable above).
 function ns.CustomizePanel(parent, width, onChange, skinned)
-	-- (Tall enough for the Visions page's eight rows with their lines.)
-	local NAV_W, PANEL_H = 140, 360
+	-- (Rows past the panel's height scroll: the Visions page has more than fit.)
+	local NAV_W, PANEL_H, FOOT_H = 140, 360, 36
 	local holder = CreateFrame("Frame", nil, parent)
 	holder:SetSize(width, PANEL_H)
-	local rows, question, soon, saved, panel
+	local rows, question, soon, saved, panel, scroll, list
 	local options = {} -- the choices shown, as rows
 	local panelW = width - NAV_W - GAP
 	local shown -- (the section shown)
@@ -541,7 +542,7 @@ function ns.CustomizePanel(parent, width, onChange, skinned)
 		for _, option in ipairs(options) do
 			if option.demo and option:IsShown() then
 				local running = ns.ShowMeRunning(option.demo)
-				local blocked = not running and ns.ShowMeBlocked(option.demo)
+				local blocked = not running and ns.ShowMeBlocked(option.demo, true)
 				option.show:SetLabel(running and L["Stop"] or L["Show me"])
 				option.show:SetEnabled(not blocked)
 				Color(option.show.text, blocked and DIM or running and GOLD or SOFT)
@@ -561,7 +562,7 @@ function ns.CustomizePanel(parent, width, onChange, skinned)
 
 	-- A choice's row: an icon, its name and a line, gold when it's the live one.
 	local function Option(i)
-		local option = CreateFrame("Button", nil, panel, BackdropTemplateMixin and "BackdropTemplate")
+		local option = CreateFrame("Button", nil, list, BackdropTemplateMixin and "BackdropTemplate")
 		option:SetSize(panelW - 28, 40)
 		Flat(option, BG)
 		if skinned then Skinnable(option) end
@@ -578,7 +579,8 @@ function ns.CustomizePanel(parent, width, onChange, skinned)
 		option.tag:SetPoint("LEFT", option.name, "RIGHT", 8, 0)
 		option.line = Text(option, "GameFontHighlightSmall", "", SOFT, panelW - 28 - 60)
 		option.line:SetPoint("TOPLEFT", option.name, "BOTTOMLEFT", 0, -3)
-		option.line:SetWordWrap(false)
+		option.line:SetWordWrap(true) -- (wrapped: the row grows to fit it)
+		option.line:SetJustifyH("LEFT")
 		-- (and once it's in Edit Mode, Regenerate: made again from the code,
 		-- Edit Mode then back on the profile's layout if this isn't it)
 		option.regenerate = FlatButton(option, L["Regenerate"], "box", function()
@@ -610,13 +612,13 @@ function ns.CustomizePanel(parent, width, onChange, skinned)
 				top = holder
 				while top:GetParent() and top:GetParent() ~= UIParent do top = top:GetParent() end
 			end
-			ns.ShowMe(option.demo, top)
+			ns.ShowMe(option.demo, top, true)
 		end)
 		option.show:SetSize(84, 24)
 		option.show:SetPoint("RIGHT", -8, 0)
 		if skinned then Skinnable(option.show) end
 		option.show:HookScript("OnEnter", function(self)
-			local why = option.demo and ns.ShowMeBlocked(option.demo)
+			local why = option.demo and ns.ShowMeBlocked(option.demo, true)
 			if not why then return end
 			GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
 			GameTooltip:SetText(why, 1, 1, 1, 1, true)
@@ -650,6 +652,7 @@ function ns.CustomizePanel(parent, width, onChange, skinned)
 		return option
 	end
 
+	local Lay -- (below: the rows laid out)
 	local function Show(i, quiet)
 		for j, row in ipairs(rows) do
 			row.on = i == j
@@ -678,12 +681,30 @@ function ns.CustomizePanel(parent, width, onChange, skinned)
 			choices = own
 		end
 		soon:SetShown(#choices == 0)
-		-- (rows closer together when there are more than five, to fit the panel)
-		local step = math.min(44, math.floor((PANEL_H - 56) / math.max(1, #choices)))
+		-- (rows under the question, each as tall as its line wrapped needs;
+		-- when they don't all fit, the list scrolls and its bar takes room
+		-- off the rows' right: laid out again that much narrower)
+		local fits = PANEL_H - 14 - math.ceil(question:GetStringHeight()) - 12 - FOOT_H
+		local total = Lay(choices, panelW - 28)
+		local overflow = total > fits
+		if overflow then total = Lay(choices, panelW - 28 - 22) end
+		scroll:ClearAllPoints()
+		scroll:SetPoint("TOPLEFT", question, "BOTTOMLEFT", 0, -12)
+		scroll:SetPoint("BOTTOMRIGHT", panel, "BOTTOMRIGHT", -14 - (overflow and 22 or 0), FOOT_H)
+		if scroll.ScrollBar then scroll.ScrollBar:SetShown(overflow) end
+		list:SetSize(panelW - 28 - (overflow and 22 or 0), math.max(1, total))
+		scroll:SetVerticalScroll(0)
+		for j = #choices + 1, #options do options[j]:Hide() end
+		UpdateChoices()
+		if not quiet then Changed() end
+	end
+	-- The choices' rows, rowW wide, one under another; their height in all.
+	function Lay(choices, rowW)
+		local y = 0
 		for j, choice in ipairs(choices) do
 			local option = options[j] or Option(j)
-			option:SetHeight(step - 4)
-			option:SetPoint("TOPLEFT", question, "BOTTOMLEFT", 0, -12 - (j - 1) * step)
+			option:SetWidth(rowW)
+			option:SetPoint("TOPLEFT", list, "TOPLEFT", 0, -y)
 			option.choice = choice
 			-- (an icon when the choice has one, the text beside it)
 			option.icon:SetTexture(choice.icon)
@@ -700,21 +721,23 @@ function ns.CustomizePanel(parent, width, onChange, skinned)
 			-- tag would slip under it)
 			local regenW = math.max(64, math.ceil(option.regenerate.text:GetStringWidth()) + 20)
 			option.regenerate:SetWidth(regenW)
-			local room = panelW - 28 - nameX - (regenerate and regenW + 16 or 8)
+			local room = rowW - nameX - (regenerate and regenW + 16 or 8)
 				- (choice.made and math.ceil(option.tag:GetStringWidth()) + 8 or 0)
 			if option.name:GetStringWidth() > room then option.name:SetWidth(room) end
 			option.demo = not regenerate and ns.ShowMeFor and ns.ShowMeFor(shown.slot, choice) or nil
 			option.show:SetShown(option.demo ~= nil)
 			if option.demo then room = room - 92 end
 			if option.name:GetStringWidth() > room then option.name:SetWidth(room) end
-			option.line:SetWidth(panelW - 28 - (choice.icon and 56 or 20) - (regenerate and regenW + 8 or 0)
+			option.line:SetWidth(rowW - (choice.icon and 56 or 20) - (regenerate and regenW + 8 or 0)
 				- (option.demo and 92 or 0))
-			option.line:SetText(choice.line)
+			option.line:SetText(choice.line or "")
+			local height = math.max(40, math.ceil(6 + option.name:GetStringHeight() + 3
+				+ (choice.line and option.line:GetStringHeight() or 0) + 7))
+			option:SetHeight(height)
 			option:Show()
+			y = y + height + 4
 		end
-		for j = #choices + 1, #options do options[j]:Hide() end
-		UpdateChoices()
-		if not quiet then Changed() end
+		return math.max(0, y - 4)
 	end
 	function holder:Refresh() if shown then Show(shown.index, true) end end
 	function holder:Next()
@@ -747,6 +770,10 @@ function ns.CustomizePanel(parent, width, onChange, skinned)
 	if skinned then Skinnable(panel) end
 	question = Text(panel, "GameFontHighlightLarge", "", WHITE, panelW - 28)
 	question:SetPoint("TOPLEFT", 14, -14)
+	scroll = ns.SkinScroll(CreateFrame("ScrollFrame", nil, panel, "UIPanelScrollFrameTemplate"))
+	list = CreateFrame("Frame", nil, scroll)
+	list:SetSize(1, 1)
+	scroll:SetScrollChild(list)
 	soon = Text(panel, "GameFontHighlightSmall", L["Its choices come next."], DIM)
 	soon:SetPoint("TOPLEFT", question, "BOTTOMLEFT", 0, -8)
 	saved = Text(panel, "GameFontHighlightSmall", "", DIM, panelW - 28)
@@ -846,7 +873,7 @@ local function CreateWindow()
 	-- On Customize the main button steps through the parts: Next, then Done
 	-- (or Decide later) on the last.
 	pages[2].OnShow = function()
-		local out = ns.ProfileChosen() and L["Done"] or L["Decide later"]
+		local out = ns.ProfileChosen() and L["See Profile"] or L["Decide later"]
 		local last = pages[2].IsLast()
 		primary:SetUsable(true)
 		primary:SetLabel(last and out or L["Next"])
@@ -860,15 +887,27 @@ local function CreateWindow()
 	-- Done on the last. Beside it Settings (the options at the page for
 	-- what's shown: the Profiles page, or the part's) and, quietly, Done (or
 	-- Decide later): out at any point, keeping what's picked, as the X does.
+	-- See Profile (once one's picked) closes onto the CineMode page's
+	-- Overview: everything the profile turned on, page by page.
+	local function Finish()
+		if ns.ProfileChosen() then
+			-- (the chat line naming the profile still prints: the Overview
+			-- doesn't name it)
+			window:Hide()
+			if ns.OpenCineModeOverview then ns.OpenCineModeOverview() else ns.OpenOptions("CineMode") end
+		else
+			window:Hide()
+		end
+	end
 	primary = FlatButton(window, L["Next"], "main", function()
 		if window.page == 1 then
 			ShowPage(2)
 		elseif not pages[2].Next() then
-			window:Hide()
+			Finish()
 		end
 	end)
 	primary:SetPoint("BOTTOMRIGHT", -PAD, PAD)
-	finish = FlatButton(window, L["Done"], nil, function() window:Hide() end)
+	finish = FlatButton(window, L["See Profile"], nil, Finish)
 	settings = FlatButton(window, L["Settings"], "box", function()
 		local page = window.page == 2 and pages[2].settingsPage() or "Profiles"
 		toSettings = true

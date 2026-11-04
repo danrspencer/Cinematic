@@ -570,9 +570,8 @@ function ns.ShopFollowsTalk()
 end
 
 -- For a shop window opening now: the middle of where the talk was (x, y,
--- UIParent's units); else, with no talk shown first (a vendor with nothing
--- else to say), nil, nil and the half you clicked them on ("left" or
--- "right"), to keep clear. All nil: leave it be.
+-- UIParent's units); nil with no talk shown first (opened straight from a
+-- right click on the vendor): it's left where the game puts it.
 function ns.ShopSpot()
 	if not ns.ShopFollowsTalk() then
 		return nil
@@ -582,10 +581,6 @@ function ns.ShopSpot()
 	if talkSpot.x and GetTime() - talkSpot.at <= SHOP_WAIT
 		and (not guid or not talkSpot.guid or guid == talkSpot.guid) then
 		return talkSpot.x, talkSpot.y
-	end
-	local x = ns.TalkClickX()
-	if x then
-		return nil, nil, x > 0.5 and "right" or "left"
 	end
 	return nil
 end

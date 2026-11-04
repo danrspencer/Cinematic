@@ -1468,6 +1468,11 @@ function ns.RollVisionActive()
 	return window and window:IsShown() and true or false
 end
 
+-- The window closed (Show me's Stop).
+function ns.CloseRollWindow()
+	Close()
+end
+
 -- The Style hub's Roll Vision page changed: every card and row in its look again.
 function ns.RefreshRollStyle()
 	styleVersion = styleVersion + 1
@@ -1540,8 +1545,9 @@ local function FakePlayers()
 	return players
 end
 
-function ns.TestRollWindow()
-	if not Enabled() then
+-- force: with the window's switch off too (Customize's Show me).
+function ns.TestRollWindow(force)
+	if not force and not Enabled() then
 		ns.Print(L["Turn on the loot roll window first."])
 		return
 	end

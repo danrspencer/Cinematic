@@ -85,6 +85,7 @@ local function PrintDebugHelp()
 	print("  /cine debug nodes [raw] [grow [update]|park|stay] [seconds] - sweep a pretend mouse over the minimap and list the names its tooltip gives (herbs, veins), faded or not; grow gives the faded minimap its size back for each sweep only; park keeps it full size off the screen while it watches (60 seconds), stay full size in its place; update has the game place its dots first; raw shows each name's line as the game wrote it; with seconds, once a second, then all of it in the copy window (again to stop early)")
 	print("  /cine debug pad - print each gamepad button press and whether it shows the bars (again to stop)")
 	print("  /cine debug peeks - print each change to your auras and when the buffs peek starts or stops (again to stop)")
+	print("  /cine debug peeks log - the same, quietly into the log only (plus your casts in fights), kept over /reload")
 	print("  /cine debug cast - print each cast at an enemy that fades in the In combat rows, and how long it takes (again to stop)")
 	print("  /cine debug frames - log the shown frames that aren't faded, and gamepad frames")
 	print("  /cine debug guess - log other addons' shown frames that nothing fades, whose each is, and the row it might follow")
@@ -162,6 +163,7 @@ local function PrintDebugHelp()
 	print("  /cine debug speakers -log where each speaking NPC's bubble and plate are on screen, and the angle off the middle (again to stop, /reload to save)")
 	print("  /cine debug bubbles - log each chat bubble's place, frame by frame as it changes, and how far it's moved off the top (again to stop, /reload to save)")
 	print("  /cine debug layoutexport - save the Edit Mode layout you're on as an export string (in the saved settings: /reload after)")
+	print("  /cine debug changed - which settings make the Profiles page say (changed): each with the profile's value and the default")
 	print("  /cine debug cvars - graphics CVars: which exist here; run, move the Graphics sliders, run again to log what the menu changed")
 	print("  /cine debug cvars <words> - log every CVar whose name has any of the words in it, with its value and default")
 	print("  /cine debug settings <words> - list every option in the game's Settings panel named like the words, with the variable behind it and its value")
@@ -487,6 +489,14 @@ local function HandleSlash(msg)
 		ns.questItemDebug = not ns.questItemDebug
 		ns.Print("print quest item casts: " .. OnOff(ns.questItemDebug) .. " (until you /reload)")
 		if ns.DescribeQuestItemButton then ns.Print(ns.DescribeQuestItemButton()) end
+	elseif cmd == "debug" and arg == "peeks log" then
+		-- (Quiet: to the log only, kept over /reloads, for a miss that's hard
+		-- to reproduce. ns.AuraSay.)
+		ns.db.peeksLog = not ns.db.peeksLog or nil
+		ns.auraDebug = ns.db.peeksLog and "log" or nil
+		ns.auraDebugWas = nil
+		ns.Print("log buff/debuff peeks quietly: " .. OnOff(ns.db.peeksLog) ..
+			(ns.db.peeksLog and " (kept over /reload; type it again to stop)" or ""))
 	elseif cmd == "debug" and arg == "peeks" then
 		ns.auraDebug = not ns.auraDebug
 		ns.auraDebugWas = nil
@@ -1135,6 +1145,8 @@ local function HandleSlash(msg)
 		end
 		ns.Print(("edge creep %d%% (aiming for %s), edges reach %d%% of the screen, dim wash %d%%"):format(
 			c.creep * 100, c.level and ("%d%%"):format(c.level * 100) or "none", c.edgeSize * 100, c.wash * 100))
+	elseif cmd == "debug" and arg == "changed" then
+		ns.ProfileChangedDebug()
 	elseif cmd == "debug" and arg == "cvars" then
 		ns.CVarsDebug()
 	elseif cmd == "debug" and arg:find("^cvars%s") then
@@ -1527,8 +1539,7 @@ local function HandleSlash(msg)
 		-- (The name's matched ignoring case: msg was lowered.)
 		local name = arg ~= "" and ns.FindProfile(arg)
 		if name then
-			ns.SetProfile(name)
-			ns.Print(L["profile: %s"]:format(ns.ProfileLabel(name)))
+			if ns.SetProfile(name) then ns.Print(L["profile: %s"]:format(ns.ProfileLabel(name))) end
 		else
 			if arg ~= "" then ns.Print(L["no profile called %s"]:format(arg)) end
 			ns.Print(L["profiles (the active one in yellow):"])

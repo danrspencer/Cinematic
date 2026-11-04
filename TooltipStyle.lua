@@ -534,8 +534,14 @@ function ns.CreateTooltipStylePanel(kit)
 		outlineColor = false, -- (the game's text: its outline is always black)
 		shadow = { "tooltipShadow" },
 	})
+	stack:Header(content, L["Health bar"])
+	rows.Choices(L["Position:"], "tooltipBar", {
+		{ "under", L["Under it"], L["Under the tooltip, where the game puts it."] },
+		{ "top", L["Along the top"] },
+		{ "none", L["None"] },
+	})
 	local function BarOn(db) return rows.On(db) and db.tooltipBar ~= "none" end
-	rows.Look(L["Health bar:"], L["Health bar"], {
+	rows.Look(L["Look:"], L["Health bar"], {
 		texture = { "tooltipBarTexture", L["The health bar's fill. Below the game's own few: any other addon shares " ..
 			"(through LibSharedMedia)."], test = BarOn, tint = { 0, 0.83, 0 } },
 		barColor = function(look)
@@ -549,13 +555,6 @@ function ns.CreateTooltipStylePanel(kit)
 			look.Slider("tooltipBarGround", L["Dark ground"], 0, 100, 5, "%d%%", 100, L["How dark it is behind the bar."],
 				BarOn)
 		end,
-	})
-
-	stack:Header(content, L["Health bar"])
-	rows.Choices(L["Position:"], "tooltipBar", {
-		{ "under", L["Under it"], L["Under the tooltip, where the game puts it."] },
-		{ "top", L["Along the top"] },
-		{ "none", L["None"] },
 	})
 	rows.Slider("tooltipBarHeight", L["Height"], 2, 12, 1, "%d", nil, L["The health bar's height."], BarOn)
 
