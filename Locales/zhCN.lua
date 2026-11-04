@@ -4263,6 +4263,6 @@ L["you're in a fight, and the page is on"] = "你正在战斗中，且该页面�
 L["your damage report for this run: boss by boss, the rest, the whole party (test: made up)"] = "你本次副本的伤害报告：逐个首领、其余部分、整个队伍（测试：模拟数据）"
 L["your group wiped"] = "你的队伍团灭了"
 L["Its type, colors, bars and words, and where it sits."] = "其类型、颜色、条和文字，以及位置。"
-L["Its type, how it looks and where it sits. Press Test on the Vision tab and close the settings to see it."] = "其类型、外观和位置。在 Vision 标签页按测试，然后关闭设置即可看到。"
+L["Its type, how it looks and where it sits. Press Test and close the settings to see it."] = "其类型、外观和位置。按测试，然后关闭设置即可看到。"
 L["Not the damage meter's numbers: your race with the player ahead of you, or your lead over #2 once you're #1. It reads the game's own damage meter, so that needs to be on (Options, Gameplay Enhancements: Enable Damage Meter). Its type and how it looks: the Look tab."] = "不是伤害统计的数字：而是你与前一名玩家的竞争，或者你成为第1名后对第2名的领先。它读取游戏自带的伤害统计，所以需要开启它（选项，游戏增强：启用伤害统计）。其类型和外观：外观标签页。"
 L["Turning it on, when it shows, what it counts, its tests and the picked type's settings."] = "开启、何时显示、统计什么、它的测试，以及所选类型的设置。"

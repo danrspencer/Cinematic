@@ -4263,6 +4263,6 @@ L["you're in a fight, and the page is on"] = "전투 중이며 페이지가 켜�
 L["your damage report for this run: boss by boss, the rest, the whole party (test: made up)"] = "이번 진행의 피해 보고: 우두머리별, 나머지, 파티 전체(시험: 지어냄)"
 L["your group wiped"] = "파티 전멸"
 L["Its type, colors, bars and words, and where it sits."] = "종류, 색상, 바와 문구, 그리고 위치."
-L["Its type, how it looks and where it sits. Press Test on the Vision tab and close the settings to see it."] = "종류, 모양과 위치. Vision 탭에서 시험을 누르고 설정을 닫으면 볼 수 있습니다."
+L["Its type, how it looks and where it sits. Press Test and close the settings to see it."] = "종류, 모양과 위치. 시험을 누르고 설정을 닫으면 볼 수 있습니다."
 L["Not the damage meter's numbers: your race with the player ahead of you, or your lead over #2 once you're #1. It reads the game's own damage meter, so that needs to be on (Options, Gameplay Enhancements: Enable Damage Meter). Its type and how it looks: the Look tab."] = "피해량 측정기 숫자가 아닙니다: 바로 앞 플레이어와의 경쟁, 또는 1위가 되면 2위와의 격차. 게임 자체 피해량 측정기를 읽으므로 그것을 켜야 합니다(옵션, 게임플레이 향상: 피해량 측정기 사용). 종류와 모양: 모양 탭."
 L["Turning it on, when it shows, what it counts, its tests and the picked type's settings."] = "켜기, 표시 시점, 세는 대상, 시험, 그리고 고른 종류의 설정."

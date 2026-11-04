@@ -4263,6 +4263,6 @@ L["you're in a fight, and the page is on"] = "вы в бою, и страниц�
 L["your damage report for this run: boss by boss, the rest, the whole party (test: made up)"] = "ваш отчет об уроне за это прохождение: босс за боссом, остальное, вся группа (тест: вымышленный)"
 L["your group wiped"] = "ваша группа потерпела поражение"
 L["Its type, colors, bars and words, and where it sits."] = "Его тип, цвета, полосы и слова, и где он находится."
-L["Its type, how it looks and where it sits. Press Test on the Vision tab and close the settings to see it."] = "Его тип, вид и где он находится. Нажмите «Тест» на вкладке «Vision» и закройте настройки, чтобы увидеть его."
+L["Its type, how it looks and where it sits. Press Test and close the settings to see it."] = "Его тип, вид и где он находится. Нажмите «Тест» и закройте настройки, чтобы увидеть его."
 L["Not the damage meter's numbers: your race with the player ahead of you, or your lead over #2 once you're #1. It reads the game's own damage meter, so that needs to be on (Options, Gameplay Enhancements: Enable Damage Meter). Its type and how it looks: the Look tab."] = "Не числа измерителя урона: ваша гонка с игроком впереди или ваш отрыв от №2, когда вы №1. Он читает собственный измеритель урона игры, так что тот должен быть включен (Настройки, Улучшения игрового процесса: Включить измеритель урона). Его тип и вид: вкладка «Вид»."
 L["Turning it on, when it shows, what it counts, its tests and the picked type's settings."] = "Включение, когда он показывается, что он считает, его тесты и настройки выбранного типа."

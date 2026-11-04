@@ -1419,22 +1419,10 @@ local function TypeTiles(kit, content, stack, Changed)
 	end
 end
 
--- The Vision tab's last rows: the tests, what shows over it, then the picked
--- type's own settings (the type itself: the Look tab's tiles; the others'
--- hidden: each type's start at the same place, last on the page, so
--- nothing's left with a gap).
-TypeSettings = function(kit, content, stack, b)
-	local sections = {} -- the type's value -> what its settings made
-
-	local function ShowType()
-		local picked = ns.GetDB().damageVisionStyle
-		for value, made in pairs(sections) do
-			for _, each in ipairs(made) do each:SetShown(value == picked) end
-		end
-	end
-
-	-- The tests: each Stop while it runs (a click stops it), its own name
-	-- again as it ends. (Not page controls: they work with the page off.)
+-- The tests, under the Look tab's type tiles: each Stop while it runs (a click
+-- stops it), its own name again as it ends. (Not page controls: they work
+-- with the page off.)
+local function TestButtons(stack, content, b)
 	stack:Header(content, L["Test"])
 	local tests = b.Row("")
 	local function RunButton(width, text, tip, Running, Start, Stop)
@@ -1463,6 +1451,21 @@ TypeSettings = function(kit, content, stack, b)
 		L["The full report: how you did on the run, boss by boss and the rest, with the whole party " ..
 		"(/cine report). Made-up bosses while the meter has none."], function() ns.ToggleDamageReport("test") end)
 	reportButton:SetPoint("LEFT", recapButton, "RIGHT", 8, 0)
+end
+
+-- The Vision tab's last rows: what shows over it, then the picked
+-- type's own settings (the type itself: the Look tab's tiles; the others'
+-- hidden: each type's start at the same place, last on the page, so
+-- nothing's left with a gap).
+TypeSettings = function(kit, content, stack, b)
+	local sections = {} -- the type's value -> what its settings made
+
+	local function ShowType()
+		local picked = ns.GetDB().damageVisionStyle
+		for value, made in pairs(sections) do
+			for _, each in ipairs(made) do each:SetShown(value == picked) end
+		end
+	end
 
 	stack:Header(content, L["Over it"])
 	b.Toggles(L["Show:"], {
@@ -1514,7 +1517,7 @@ function ns.CreateDamageVisionLookPanel(kit)
 	local title = kit.Label(content, "GameFontNormalLarge", L["Damage Vision"])
 	DamageTabs(content, title, 2)
 	local intro = kit.PageIntro(content, title,
-		L["Its type, how it looks and where it sits. Press Test on the Vision tab and close the settings " ..
+		L["Its type, how it looks and where it sits. Press Test and close the settings " ..
 		"to see it."])
 	local function Changed()
 		ns.RefreshDamageVision()
@@ -1528,6 +1531,7 @@ function ns.CreateDamageVisionLookPanel(kit)
 	local On = rows.On
 
 	TypeTiles(kit, content, stack, Changed)
+	TestButtons(stack, content, b)
 	stack:Header(content, L["Look"])
 	rows.PresetMenu({
 		{ L["Cinematic's"], L["As it comes: amber when you're behind, teal when you lead, a thin border."], {} },

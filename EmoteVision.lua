@@ -18,6 +18,7 @@ DEFAULTS.emoteVisionAlways = false     -- its Show in row's Always: everywhere
 DEFAULTS.emoteVisionStill = false      -- only while you stand still (moving: it waits)
 DEFAULTS.emoteVisionRepeats = true     -- the same person's same moment again ignored...
 DEFAULTS.emoteVisionRepeatMins = 10    -- ...for this many minutes
+DEFAULTS.emoteVisionGroupBuffs = false -- buffs from your own party or raid ignored (no card)
 DEFAULTS.emoteVisionHold = 8           -- seconds a card stays (paused while the mouse is over it)
 DEFAULTS.emoteVisionScale = 1
 DEFAULTS.emoteVisionPortrait = true    -- their face (or class icon) on the card
@@ -177,7 +178,8 @@ local MOMENTS = {
 		tip = "A trade with someone finishes (both of you clicked Trade).",
 		sample = { name = "Brakka", class = "WARRIOR", line = "traded with you" } },
 	{ id = "Level", on = "emoteVisionLevel", name = "Someone in your group levels up",
-		emotes = { "CONGRATULATE", "CHEER", "APPLAUD" }, tip = "Your party or raid's members, not you.",
+		emotes = { "CONGRATULATE", "CHEER", "APPLAUD" }, near = true,
+		tip = "Your party or raid's members, not you. Only when they're near you.",
 		sample = { name = "Brakka", class = "WARRIOR", line = "reached level %d", level = 42 } },
 	{ id = "Dungeon", on = "emoteVisionDungeon", name = "You clear a dungeon", emotes = { "THANK", "BOW", "CHEER" },
 		journal = true, tip = "Its last boss down, in a group: the emotes go to everyone, not one person.",
@@ -187,18 +189,20 @@ local MOMENTS = {
 		tip = "Won or lost, against whoever it was.",
 		sample = { name = "Kargash", class = "ROGUE", line = "lost a duel to you" } },
 	{ id = "Join", on = "emoteVisionJoin", name = "Someone joins your group", emotes = { "WELCOME", "WAVE", "HELLO" },
-		tip = "Someone new in your party or raid (not a whole raid filling at once).",
+		near = true, tip = "Someone new in your party or raid (not a whole raid filling at once), near you.",
 		sample = { name = "Thornbrook", class = "DRUID", line = "joined your group" } },
 	{ id = "Leave", on = "emoteVisionLeave", name = "Someone leaves your group", emotes = { "BYE", "WAVE", "THANK" },
-		tip = "Someone leaves your party or raid.",
+		near = true, tip = "Someone near you leaves your party or raid.",
 		sample = { name = "Velmora", class = "WARLOCK", line = "left your group" } },
 	{ id = "Joined", on = "emoteVisionJoined", name = "You join a group", emotes = { "HELLO", "WAVE" },
-		tip = "You join someone's party or raid: the emotes go to everyone, not one person.",
+		tip = "You join someone's party or raid with one of them near you: the emotes go to everyone, not " ..
+			"one person.",
 		sample = { name = "Your group", line = "you joined a group", group = true,
 			icon = "Interface\\Icons\\INV_Misc_GroupNeedMore" } },
 	{ id = "Achievement", on = "emoteVisionAchievement", name = "Someone earns an achievement",
 		emotes = { "CONGRATULATE", "CHEER", "APPLAUD" },
-		tip = "Someone near you, in your group or in your guild earns an achievement.",
+		near = true, tip = "Someone near you earns an achievement (a stranger, someone in your group or in " ..
+			"your guild).",
 		sample = { name = "Aelwyn", class = "PRIEST", line = "earned %s", spell = "Explore Elwynn Forest" } },
 	{ id = "Boss", on = "emoteVisionBoss", name = "Your group kills a boss", emotes = { "CHEER", "ROAR", "VICTORY" },
 		tip = "A boss down in a dungeon or raid with your group (each one, not just the last): the emotes go to " ..
@@ -206,9 +210,20 @@ local MOMENTS = {
 		sample = { name = "Edwin VanCleef", line = "defeated with your group", group = true,
 			icon = "Interface\\Icons\\INV_Misc_Bone_HumanSkull_01" } },
 	{ id = "Wipe", on = "emoteVisionWipe", name = "Your group wipes", emotes = { "SIGH", "CRY", "FACEPALM" },
-		tip = "A boss fight lost with your group: the emotes go to everyone.",
+		maxAge = 300, tip = "A boss fight lost with your group: the emotes go to everyone. If you died, the " ..
+			"card waits until you're alive again (you can't emote while dead).",
 		sample = { name = "Edwin VanCleef", line = "your group wiped", group = true,
 			icon = "Interface\\Icons\\Ability_Rogue_FeignDeath" } },
+	{ id = "Guild", on = "emoteVisionGuild", name = "You run into a guild member", emotes = { "WAVE", "HELLO", "HUG" },
+		tip = "Someone from your guild (not in your group) comes into view: with friendly nameplates on, as " ..
+			"soon as you see them; otherwise when you mouse over or target them. Once an hour per person.",
+		sample = { name = "Brakka", class = "WARRIOR", line = "is in your guild" } },
+	{ id = "Ally", on = "emoteVisionAlly", name = "You run into a recent ally", emotes = { "WAVE", "HELLO", "SALUTE" },
+		ally = true,
+		tip = "Someone you grouped with lately (the game's Recent Allies, not in your group now) comes into " ..
+			"view: with friendly nameplates on, as soon as you see them; otherwise when you mouse over or " ..
+			"target them. Once an hour per person.",
+		sample = { name = "Thornbrook", class = "DRUID", line = "grouped with you before" } },
 	{ id = "YouLevel", on = "emoteVisionYouLevel", name = "You level up", emotes = { "CHEER", "DANCE", "FLEX" },
 		tip = "You reach a new level: the emotes go to everyone, to celebrate.",
 		sample = { name = "You", line = "reached level %d", level = 42, group = true,
@@ -219,6 +234,12 @@ local MOMENTS = {
 if not (EJ_GetInstanceForMap and EJ_GetEncounterInfoByIndex) then
 	for i = #MOMENTS, 1, -1 do
 		if MOMENTS[i].journal then table.remove(MOMENTS, i) end
+	end
+end
+-- (No Recent Allies on this client: no Ally moment.)
+if not (C_RecentAllies and C_RecentAllies.IsRecentAllyByGUID) then
+	for i = #MOMENTS, 1, -1 do
+		if MOMENTS[i].ally then table.remove(MOMENTS, i) end
 	end
 end
 local MOMENT = {}
@@ -235,8 +256,9 @@ local ROW_KEY = "emote:vision"
 ns.CINE_SHOW_SETTING[ROW_KEY] = "emoteVisionAlways"
 ns.LIST_DEFAULTS.quietShow[ROW_KEY] = true
 -- ...and its rule, given once (yours kept if you've written one): out of a
--- fight, in the open world (not cities, instances or battlegrounds).
-local DEFAULT_RULE = "not combat and world"
+-- fight, anywhere.
+local DEFAULT_RULE = "not combat"
+local OLD_RULE = "not combat and world" -- (the first one given: changed to the new one if still unedited)
 local function GiveRule()
 	local db = ns.db
 	if not db then return end
@@ -245,6 +267,11 @@ local function GiveRule()
 		db.emoteVisionWipeOnV1 = true
 		db.emoteVisionWipe = true
 	end
+	if db.emoteVisionRuleV1 and not db.emoteVisionRuleV2 and db.frameRules
+		and db.frameRules[ROW_KEY] == OLD_RULE then
+		db.frameRules[ROW_KEY] = DEFAULT_RULE
+	end
+	db.emoteVisionRuleV2 = true
 	if db.emoteVisionRuleV1 then return end
 	db.emoteVisionRuleV1 = true
 	db.frameRules = db.frameRules or {}
@@ -326,12 +353,21 @@ end
 
 -- The emotes a moment's buttons play, as its list says (same: the one done
 -- at you, for Same back; none of them twice). own: a list to use instead.
+-- Whether this client has the emote (one picked on another client, or a
+-- default newer than it, isn't a button: it would do nothing). With no list
+-- of the game's to ask (its globals gone), all are kept.
+local function HasEmote(token)
+	local game = GameEmotes()
+	if #game.text == 0 then return true end
+	return game.command[token] ~= nil or game.isVoice[token] == true
+end
+
 local function EmotesFor(kind, same, own)
 	local moment = MOMENT[kind]
 	local list, seen = {}, {}
 	for _, token in ipairs(own or ParseEmotes(moment and DB()[moment.key])) do
 		if token == SAME then token = same end
-		if token and not seen[token] then
+		if token and not seen[token] and HasEmote(token) then
 			seen[token] = true
 			list[#list + 1] = token
 		end
@@ -390,7 +426,7 @@ DEFAULTS.emoteVisionLook = "classic"
 local HEADINGS = { Buff = "A KINDNESS", Res = "SAVED", Emote = "A GREETING", Summon = "SUMMONED",
 	Trade = "A FAIR TRADE", Level = "LEVEL UP", Dungeon = "VICTORY", Duel = "THE DUEL", Join = "WELCOME",
 	Leave = "FAREWELL", Joined = "WELL MET", Achievement = "WELL DONE", Boss = "VICTORY", Wipe = "NEXT TIME",
-	YouLevel = "LEVEL UP" }
+	YouLevel = "LEVEL UP", Guild = "WELL MET", Ally = "WELL MET" }
 local BUTTON_W, BUTTON_H, BUTTON_GAP, ROW_GAP = 84, 24, 8, 6
 local WHEEL_DISC, WHEEL_REACH = 170, 74 -- the wheel's disc, and how far out its emotes sit (on its edge)
 
@@ -958,6 +994,8 @@ end
 local function Allowed()
 	if not ns.Setting("emoteVision") then return false end
 	if Fighting() then return false end
+	-- (No emoting while dead or a ghost: a wipe's card waits until you're back.)
+	if ns.Flag(UnitIsDeadOrGhost("player")) then return false end
 	if DB().emoteVisionStill and ns.playerMoving then return false end
 	local ok, here = pcall(ns.RowOnNow, ROW_KEY, nil, true)
 	return ok and here and true or false
@@ -970,7 +1008,10 @@ local retry
 function Next()
 	if card and card:IsShown() then return end
 	local now = GetTime()
-	while queue[1] and now - queue[1].at > MAX_AGE do table.remove(queue, 1) end
+	for i = #queue, 1, -1 do
+		local kind = MOMENT[queue[i].kind]
+		if now - queue[i].at > (kind and kind.maxAge or MAX_AGE) then table.remove(queue, i) end
+	end
 	while queue[1] and Allowed() do
 		local moment = table.remove(queue, 1)
 		if Show(moment) then
@@ -1010,6 +1051,22 @@ local function Fire(moment)
 	Next()
 end
 
+-- Whether unit is near enough to see your emote (in view of you, as the game
+-- draws them: about 100 yards).
+local function Near(unit)
+	return unit ~= nil and ns.Flag(UnitIsVisible(unit)) and true or false
+end
+
+-- Whether anyone in your group is near you.
+local function GroupNear()
+	local group = IsInRaid() and "raid" or "party"
+	for i = 1, IsInRaid() and 40 or 4 do
+		local unit = group .. i
+		if not ns.Flag(UnitIsUnit(unit, "player")) and Near(unit) then return true end
+	end
+	return false
+end
+
 -- Their class (for the name's color and the icon), from their GUID.
 local function ClassOf(guid, unit)
 	if unit then
@@ -1031,6 +1088,8 @@ end
 -- class and line.
 local function FireFor(kind, name, guid, line, extra)
 	local unit = UnitFor(guid, name)
+	-- (Emotes only reach those near you: someone far away is no moment.)
+	if MOMENT[kind] and MOMENT[kind].near and not Near(unit) then return end
 	guid = guid or (unit and Plain(UnitGUID(unit)))
 	local moment = extra or {}
 	moment.kind, moment.name, moment.unit, moment.guid = kind, Short(name), unit, guid
@@ -1043,6 +1102,16 @@ end
 ---------------------------------------------------------------------------
 -- The moments.
 
+-- Whether the one with this GUID is in your party or raid.
+local function InGroup(guid)
+	if not IsInGroup() then return false end
+	local group = IsInRaid() and "raid" or "party"
+	for i = 1, IsInRaid() and 40 or 4 do
+		if Plain(UnitGUID(group .. i)) == guid then return true end
+	end
+	return false
+end
+
 -- A buff someone else put on you (a minute or more: not a heal over time).
 local function Buffed(aura)
 	local unit = Plain(aura.sourceUnit)
@@ -1054,6 +1123,7 @@ local function Buffed(aura)
 	local guid = Plain(UnitGUID(unit))
 	-- (By GUID: UnitIsPlayer can say false for players after a buff on Forever.)
 	if not (guid and guid:find("^Player%-")) then return end
+	if DB().emoteVisionGroupBuffs and InGroup(guid) then return end
 	Fire({ kind = "Buff", name = Short(Plain(UnitName(unit))) or "?", unit = unit, guid = guid,
 		class = ClassOf(guid, unit), icon = Plain(aura.icon), line = L["gave you %s"]:format(name) })
 end
@@ -1210,6 +1280,7 @@ local function RosterChanged(quiet)
 	roster, grouped = now, inGroup
 	if quiet or not was then return end
 	if inGroup and not wasGrouped then
+		if not GroupNear() then return end -- (joined from across the world: no one to greet)
 		Fire({ kind = "Joined", name = L["Your group"], line = L["you joined a group"], group = true,
 			icon = "Interface\\Icons\\INV_Misc_GroupNeedMore" })
 		return
@@ -1280,6 +1351,33 @@ local function Achieved(text, author, guid)
 	FireFor("Achievement", author, guid, L["earned %s"]:format(what))
 end
 
+-- Someone you know (your guild's, or a recent ally) seen near you: on a
+-- nameplate showing, your mouseover or your target. Each one once an hour,
+-- whatever the repeats setting (a guild city would flood you otherwise).
+local MET_AGAIN = 3600
+local met = {}
+local function Known(unit)
+	local guid = Plain(UnitGUID(unit))
+	if not (guid and guid:find("^Player%-")) then return end
+	if guid == Plain(UnitGUID("player")) then return end
+	if ns.Flag(UnitInParty(unit)) or ns.Flag(UnitInRaid(unit)) then return end
+	if UnitIsInMyGuild and ns.Flag(UnitIsInMyGuild(unit)) then return guid, "Guild" end
+	if MOMENT.Ally then
+		local ok, ally = pcall(C_RecentAllies.IsRecentAllyByGUID, guid)
+		if ok and ns.Flag(ally) then return guid, "Ally" end
+	end
+end
+local function Spotted(unit)
+	if loading or Fighting() then return end
+	local guid, kind = Known(unit)
+	if not guid or not DB()[MOMENT[kind].on] then return end
+	local now = GetTime()
+	if met[guid] and now - met[guid] < MET_AGAIN then return end
+	met[guid] = now
+	FireFor(kind, Plain(UnitName(unit)), guid,
+		kind == "Guild" and L["is in your guild"] or L["grouped with you before"])
+end
+
 -- Your own level up: a card for everyone around, to celebrate.
 local function LeveledUp(level)
 	level = Plain(level)
@@ -1300,7 +1398,8 @@ local watcher = CreateFrame("Frame")
 for _, event in ipairs({ "PLAYER_ENTERING_WORLD", "PLAYER_REGEN_ENABLED", "RESURRECT_REQUEST", "PLAYER_DEAD",
 	"PLAYER_ALIVE", "PLAYER_UNGHOST", "CHAT_MSG_TEXT_EMOTE", "PLAYER_STOPPED_MOVING", "CONFIRM_SUMMON",
 	"TRADE_SHOW", "UI_INFO_MESSAGE", "GROUP_ROSTER_UPDATE", "UNIT_LEVEL", "ENCOUNTER_END", "LOADING_SCREEN_ENABLED",
-	"LOADING_SCREEN_DISABLED", "CHAT_MSG_ACHIEVEMENT", "CHAT_MSG_GUILD_ACHIEVEMENT", "PLAYER_LEVEL_UP" }) do
+	"LOADING_SCREEN_DISABLED", "CHAT_MSG_ACHIEVEMENT", "CHAT_MSG_GUILD_ACHIEVEMENT", "PLAYER_LEVEL_UP",
+	"NAME_PLATE_UNIT_ADDED", "UPDATE_MOUSEOVER_UNIT", "PLAYER_TARGET_CHANGED" }) do
 	pcall(watcher.RegisterEvent, watcher, event)
 end
 pcall(watcher.RegisterUnitEvent, watcher, "UNIT_AURA", "player")
@@ -1341,6 +1440,12 @@ watcher:SetScript("OnEvent", function(_, event, ...)
 		Achieved(text, author, (select(12, ...)))
 	elseif event == "PLAYER_LEVEL_UP" then
 		LeveledUp((...))
+	elseif event == "NAME_PLATE_UNIT_ADDED" or event == "UPDATE_MOUSEOVER_UNIT" or event == "PLAYER_TARGET_CHANGED" then
+		if ns.Setting("emoteVision") then
+			local unit = event == "NAME_PLATE_UNIT_ADDED" and Plain((...))
+				or (event == "UPDATE_MOUSEOVER_UNIT" and "mouseover" or "target")
+			if unit then Spotted(unit) end
+		end
 	elseif event == "LOADING_SCREEN_ENABLED" then
 		loading = true
 	elseif event == "LOADING_SCREEN_DISABLED" then
@@ -1639,7 +1744,15 @@ function ns.EmoteVisionDebug()
 	ns.Print("  " .. table.concat(moments, "; "))
 	local target = Plain(UnitGUID("target"))
 	if target then
-		ns.Print(("  target %s: unit %s"):format(tostring(Plain(UnitName("target"))), tostring(UnitFor(target))))
+		local ally = "no API"
+		if C_RecentAllies and C_RecentAllies.IsRecentAllyByGUID then
+			local okAlly, value = pcall(C_RecentAllies.IsRecentAllyByGUID, target)
+			ally = okAlly and tostring(Plain(value)) or ("error: " .. tostring(value))
+		end
+		ns.Print(("  target %s: unit %s; guild %s; recent ally %s; known as %s; met %s"):format(
+			tostring(Plain(UnitName("target"))), tostring(UnitFor(target)),
+			UnitIsInMyGuild and tostring(Plain(UnitIsInMyGuild("target"))) or "no API", ally,
+			tostring(select(2, Known("target"))), met[target] and ("%d s ago"):format(GetTime() - met[target]) or "never"))
 	end
 end
 
@@ -2199,6 +2312,10 @@ function ns.CreateEmoteVisionSettingsPanel(kit)
 		{ "emoteVisionRepeats", L["Ignore repeats from the same person"], L["The same person doing the same " ..
 			"again (buffing you again, another wave) brings up no card for the minutes below. Their other " ..
 			"moments still do."] },
+	}, On)
+	b.Toggles(L["Buffs:"], {
+		{ "emoteVisionGroupBuffs", L["Ignore buffs from your group"], L["Buffs from people in your party or " ..
+			"raid bring up no card: only strangers' do."] },
 	}, On)
 	b.Number(L["Ignored for:"], "emoteVisionRepeatMins", 1, 60, 1, 1, L["min"], L["How long a repeat is ignored for."],
 		function(db) return db.emoteVision and db.emoteVisionRepeats end)
