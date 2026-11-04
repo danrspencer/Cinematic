@@ -131,6 +131,7 @@ local DEFAULTS = {
 	questRevealOnScenario = true, -- scenario progress (stages, raid/dungeon objectives) shows it the same way
 	questScenarioCalm = false,  -- ...and stays up for the Calm Timer (if longer than the mouseover time)
 	questRevealOnlyThat = true, -- those two reveals show just that quest, the rest of the tracker faded
+	questRevealCollapse = true, -- ...drawn at the top of the tracker, not in its own place under the faded ones
 	questCombatCalm = false,  -- ticked In combat (Standard Frames), it stays up until the Calm Timer runs out
 	minimapRevealOnPing = true, -- a group member pinging the minimap shows it as a mouseover would
 	minimapPingTime = 30,       -- ...for this many seconds (once faded in), then it fades

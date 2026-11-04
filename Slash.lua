@@ -129,6 +129,7 @@ local function PrintDebugHelp()
 	print("  /cine debug duels test - pretend duels between friendly players around you, to see how they look")
 	print("  /cine debug questglow - quest object glow: what soft targeting picked and why it glows or not")
 	print("  /cine debug questmob - the unit under your mouse: the cursor the game gives it, its quest checks and quest items")
+	print("  /cine debug questgaps - print when the quest tracker's Close the gaps copies show and what they copied (again to stop)")
 	print("  /cine debug questitem - print each cast aimed at an NPC and whether it counts as a quest item used on it (again to stop)")
 	print("  /cine debug iconwatch - log nameplate interact icons every frame for 30 seconds")
 	print("  /cine debug sounds - print each sound the game plays, by number and name, e.g. the talents window's (again to stop)")
@@ -472,6 +473,9 @@ local function HandleSlash(msg)
 			ns.ReportSwing()
 		end
 		ns.Print("print swing bars showing or fading: " .. OnOff(ns.swingDebug) .. " (until you /reload)")
+	elseif cmd == "debug" and arg == "questgaps" then
+		ns.questGapsDebug = not ns.questGapsDebug
+		ns.Print("print quest tracker Close the gaps copies: " .. OnOff(ns.questGapsDebug) .. " (until you /reload)")
 	elseif cmd == "debug" and arg == "questitem" then
 		ns.questItemDebug = not ns.questItemDebug
 		ns.Print("print quest item casts: " .. OnOff(ns.questItemDebug) .. " (until you /reload)")

@@ -499,6 +499,9 @@ L["Not ones you cast on yourself"] = "No los que te lanzas a ti mismo"
 L["Just the new one"] = "Solo el nuevo"
 L["Close the gaps"] = "Cerrar los huecos"
 L["The new buff shows at the start of the row, not in its own place among empty spaces."] = "El beneficio nuevo se muestra al principio de la fila, no en su propio sitio entre huecos vacíos."
+L["The quest shows at the top of the quest tracker, not in its own place under empty space. " ..
+	"Hovering the tracker puts it back."] = "La misión se muestra arriba del todo en el seguimiento de misiones, no en su propio sitio bajo un hueco vacío. " ..
+	"Al pasar el ratón por el seguimiento vuelve a su sitio."
 L["Only the buff you gained or refreshed shows; your other buffs stay faded. Hovering shows them all. " ..
 	"In fights too, for new buffs (procs and the like)."] = "Solo se muestra el beneficio que obtuviste o renovaste; " ..
 	"tus otros beneficios siguen desvanecidos. Al pasar el ratón se muestran todos. También en combate, para " ..

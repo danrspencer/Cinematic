@@ -4489,6 +4489,307 @@ do
 		end
 		return { tracker:GetChildren() }
 	end
+	-- Close the gaps (questRevealCollapse): the shown quests drawn at the
+	-- top of the tracker instead of in their own places under the faded
+	-- ones. Copies, as the buffs' (ns.MirrorBuffs): the game lays out its
+	-- blocks, and moving one (its item button is secure) could taint it.
+	-- Each tick Plan works out how far up each shown quest's block goes
+	-- (shift, screen pixels); ApplyFocus fades those blocks, their bars and
+	-- buttons right out and hands them to Add; Draw copies their pictures
+	-- and text, moved up that far, and hides the copies left over. Not
+	-- with a scenario shown (it keeps its own place). In a function of its
+	-- own, so its locals don't count towards the file's (200 at most).
+	local function MakeQuestGaps()
+		local api = { shift = {}, up = false }
+		local shift, tops, planned = api.shift, {}, {}
+		local jobFrames, jobUps, jobCount, added = {}, {}, 0, {}
+		local holder, holderScale
+		local textures, texts, usedTextures, usedTexts = {}, {}, 0, 0
+		local QUEST_GAP = 10 -- between the quests stacked at the top (tracker units)
+		local MAX_DEPTH = 6
+		local lastProblem
+		local function ScreenTop(frame)
+			return frame:GetTop() * frame:GetEffectiveScale()
+		end
+		local function ScreenHeight(frame)
+			return frame:GetHeight() * frame:GetEffectiveScale()
+		end
+		-- (Its top on the screen, if it's up and that's plain; else nil.)
+		local function Top(frame)
+			if type(frame) ~= "table" or not frame.GetTop or IsForbidden(frame) then
+				return nil
+			end
+			local okShown, shown = pcall(frame.IsVisible, frame)
+			if not okShown or not ns.Flag(shown) then
+				return nil
+			end
+			local ok, top = pcall(ScreenTop, frame)
+			if ok and type(top) == "number" and not IsSecretValue(top) then
+				return top
+			end
+		end
+		local function Higher(a, b)
+			return tops[a] > tops[b]
+		end
+		function api.Plan(tracker, timers, active)
+			wipe(shift)
+			wipe(tops)
+			wipe(planned)
+			wipe(added)
+			jobCount = 0
+			if not (active and ns.db.questRevealOnlyThat and ns.db.questRevealCollapse)
+				or focus.quests[SCENARIO] or (timers and timers[SCENARIO]) then
+				return
+			end
+			-- (The top of the first thing in the tracker: its header, a
+			-- section's, the scenario, a quest.)
+			local startTop = Top(tracker.Header)
+			for _, section in ipairs(TrackerSections(tracker)) do
+				if type(section) == "table" and type(section.usedBlocks) == "table" and not IsForbidden(section) then
+					local scenarioSection = IsScenarioSection(section)
+					local top = scenarioSection and Top(section) or Top(section.Header)
+					if top and (not startTop or top > startTop) then
+						startTop = top
+					end
+					for _, blocks in pairs(section.usedBlocks) do
+						if type(blocks) == "table" then
+							for id, block in pairs(blocks) do
+								local blockTop = Top(block)
+								if blockTop then
+									if not startTop or blockTop > startTop then
+										startTop = blockTop
+									end
+									if not scenarioSection and not tops[block]
+										and (focus.quests[id] or (timers and timers[id])) then
+										tops[block] = blockTop
+										planned[#planned + 1] = block
+									end
+								end
+							end
+						end
+					end
+				end
+			end
+			if not startTop or #planned == 0 then
+				return
+			end
+			-- (Stacked from the top in the order they're in.)
+			table.sort(planned, Higher)
+			local y = startTop
+			for _, block in ipairs(planned) do
+				local okHeight, height = pcall(ScreenHeight, block)
+				if not okHeight or type(height) ~= "number" or IsSecretValue(height) then
+					wipe(shift) -- (unsure: all in their own places)
+					return
+				end
+				local up = y - tops[block]
+				if up > 1 then
+					shift[block] = up
+				end
+				y = y - height - QUEST_GAP * block:GetEffectiveScale()
+			end
+		end
+		-- A block, or one of its bars or buttons, to copy (up: how far). (Once:
+		-- a bar can turn up as a button anchored to the block too.)
+		function api.Add(frame, up)
+			if added[frame] then
+				return
+			end
+			added[frame] = true
+			jobCount = jobCount + 1
+			jobFrames[jobCount], jobUps[jobCount] = frame, up
+		end
+		local function FollowTracker(tracker)
+			holder:SetFrameStrata(tracker:GetFrameStrata())
+			holder:SetFrameLevel(math.min(9000, tracker:GetFrameLevel() + 50))
+			holderScale = tracker:GetEffectiveScale()
+			holder:SetScale(holderScale / UIParent:GetEffectiveScale())
+			local parentAlpha = UIParent:GetEffectiveAlpha()
+			holder:SetAlpha(parentAlpha > 0 and math.min(1, tracker:GetEffectiveAlpha() / parentAlpha) or 0)
+		end
+		-- (The holder fills the screen at the tracker's scale, so a part's
+		-- screen place over holderScale is its place on the holder.)
+		local function Place(copy, region, scale, up)
+			local left, bottom, width, height = region:GetRect()
+			copy:ClearAllPoints()
+			copy:SetPoint("BOTTOMLEFT", holder, "BOTTOMLEFT", left * scale / holderScale,
+				(bottom * scale + up) / holderScale)
+			copy:SetSize(width * scale / holderScale, height * scale / holderScale)
+		end
+		local function CopyTexture(copy, region, scale, up, alpha)
+			Place(copy, region, scale, up)
+			local atlas = region.GetAtlas and region:GetAtlas()
+			if atlas then
+				copy:SetAtlas(atlas)
+			else
+				local file = region:GetTexture()
+				if file then
+					copy:SetTexture(file)
+				else
+					copy:SetColorTexture(1, 1, 1, 1)
+				end
+			end
+			copy:SetTexCoord(region:GetTexCoord())
+			copy:SetVertexColor(region:GetVertexColor())
+			if region.IsDesaturated then
+				copy:SetDesaturated(region:IsDesaturated())
+			end
+			copy:SetBlendMode(region:GetBlendMode())
+			copy:SetDrawLayer(region:GetDrawLayer())
+			copy:SetAlpha(region:GetAlpha() * alpha)
+		end
+		local function SameFont(copy, font, size, flags)
+			local copyFont, copySize, copyFlags = copy:GetFont()
+			return copyFont == font and copySize and math.abs(copySize - size) < 0.05 and copyFlags == flags
+		end
+		-- (Its font only when it changes, the text cleared first: a font
+		-- set over text can draw boxes for Russian.)
+		local function CopyText(copy, region, scale, up, alpha)
+			Place(copy, region, scale, up)
+			local font, size, flags = region:GetFont()
+			size = size * scale / holderScale
+			if not SameFont(copy, font, size, flags) then
+				copy:SetText("")
+				local object = region:GetFontObject()
+				if object then
+					copy:SetFontObject(object)
+				end
+				if not SameFont(copy, font, size, flags) then
+					copy:SetFont(font, size, flags)
+				end
+			end
+			copy:SetJustifyH(region:GetJustifyH())
+			copy:SetJustifyV(region:GetJustifyV())
+			copy:SetWordWrap(region:CanWordWrap())
+			if region.GetSpacing then
+				copy:SetSpacing(region:GetSpacing())
+			end
+			copy:SetShadowColor(region:GetShadowColor())
+			copy:SetShadowOffset(region:GetShadowOffset())
+			copy:SetDrawLayer(region:GetDrawLayer())
+			copy:SetTextColor(region:GetTextColor())
+			if region.GetVertexColor then
+				copy:SetVertexColor(region:GetVertexColor())
+			end
+			copy:SetText(region:GetText())
+			copy:SetAlpha(region:GetAlpha() * alpha)
+		end
+		local function CopyRegion(region, scale, up, alpha)
+			if type(region) ~= "table" or IsForbidden(region) then
+				return
+			end
+			local okShown, shown = pcall(region.IsVisible, region)
+			if not okShown or not ns.Flag(shown) then
+				return
+			end
+			local kind = region:GetObjectType()
+			local copy, ok, problem
+			if kind == "Texture" then
+				usedTextures = usedTextures + 1
+				copy = textures[usedTextures]
+				if not copy then
+					copy = holder:CreateTexture(nil, "ARTWORK")
+					textures[usedTextures] = copy
+				end
+				ok, problem = pcall(CopyTexture, copy, region, scale, up, alpha)
+			elseif kind == "FontString" then
+				usedTexts = usedTexts + 1
+				copy = texts[usedTexts]
+				if not copy then
+					copy = holder:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+					texts[usedTexts] = copy
+				end
+				ok, problem = pcall(CopyText, copy, region, scale, up, alpha)
+			end
+			if copy then
+				copy:SetShown(ok)
+				if not ok then
+					lastProblem = kind .. ": " .. tostring(problem)
+				end
+			end
+		end
+		local function CopyRegions(scale, up, alpha, ...)
+			for i = 1, select("#", ...) do
+				CopyRegion((select(i, ...)), scale, up, alpha)
+			end
+		end
+		local CopyFrame
+		local function CopyChildren(depth, up, alpha, ...)
+			for i = 1, select("#", ...) do
+				CopyFrame((select(i, ...)), up, alpha, depth)
+			end
+		end
+		-- (The frame's own alpha only below the top: the top one is the
+		-- block or bar we faded out.)
+		CopyFrame = function(frame, up, alpha, depth)
+			if depth > MAX_DEPTH or type(frame) ~= "table" or not frame.GetRegions or IsForbidden(frame) then
+				return
+			end
+			local okShown, shown = pcall(frame.IsVisible, frame)
+			if not okShown or not ns.Flag(shown) then
+				return
+			end
+			local okScale, scale = pcall(frame.GetEffectiveScale, frame)
+			if not okScale or type(scale) ~= "number" or IsSecretValue(scale) then
+				return
+			end
+			if depth > 0 then
+				local okAlpha, own = pcall(frame.GetAlpha, frame)
+				if okAlpha and type(own) == "number" and not IsSecretValue(own) then
+					alpha = alpha * own
+				end
+			end
+			if alpha <= 0 then
+				return
+			end
+			CopyRegions(scale, up, alpha, frame:GetRegions())
+			CopyChildren(depth + 1, up, alpha, frame:GetChildren())
+		end
+		function api.Draw(tracker)
+			usedTextures, usedTexts = 0, 0
+			if jobCount > 0 then
+				if not holder then
+					holder = CreateFrame("Frame", nil, UIParent)
+					holder:SetAllPoints(UIParent)
+				end
+				if pcall(FollowTracker, tracker) then
+					holder:Show()
+					for i = 1, jobCount do
+						CopyFrame(jobFrames[i], jobUps[i], 1, 0)
+					end
+				else
+					holder:Hide()
+				end
+			elseif holder then
+				holder:Hide()
+			end
+			for i = usedTextures + 1, #textures do
+				textures[i]:Hide()
+			end
+			for i = usedTexts + 1, #texts do
+				texts[i]:Hide()
+			end
+			-- (/cine debug questgaps: what it did, once each time it starts.)
+			local up = usedTextures + usedTexts > 0
+			if ns.questGapsDebug and up and not api.up then
+				local moved = 0
+				for _ in pairs(shift) do
+					moved = moved + 1
+				end
+				ns.Print(("close the gaps: %d quests shown, %d moved up, %d parts copied (%d pictures, %d texts)%s")
+					:format(#planned, moved, jobCount, usedTextures, usedTexts,
+						lastProblem and (", last problem: " .. lastProblem) or ""))
+				lastProblem = nil
+			elseif ns.questGapsDebug and not up and api.up then
+				ns.Print("close the gaps: copies gone")
+			end
+			api.up = up
+			jobCount = 0
+			wipe(added)
+		end
+		return api
+	end
+	local questGaps = MakeQuestGaps()
 	-- Fades every quest not in focus.quests, the headers and the background
 	-- to alpha; true if any focused quest has a block in the tracker. (Relative
 	-- to their own alpha: the background's is Edit Mode's opacity.)
@@ -4525,13 +4826,17 @@ do
 				local block = AnchorBlock(child)
 				if block then
 					ns.FadeRelative(child, blockAlphas[block])
+					if questGaps.shift[block] then
+						questGaps.Add(child, questGaps.shift[block])
+					end
 				end
 			end
 		end
 	end
-	local function ApplyFocus(tracker, alpha, timers)
+	local function ApplyFocus(tracker, alpha, timers, active)
 		local found = false
 		wipe(blockAlphas)
+		questGaps.Plan(tracker, timers, active)
 		for _, section in ipairs(TrackerSections(tracker)) do
 			if type(section) == "table" and type(section.usedBlocks) == "table" and not IsForbidden(section) then
 				local sectionHas = false
@@ -4556,7 +4861,11 @@ do
 									blockAlpha = sectionAlpha
 								elseif focus.quests[id] or timers and timers[id] then
 									sectionHas = true
-									blockAlpha = 1
+									-- (Drawn up top instead: Close the gaps.)
+									blockAlpha = questGaps.shift[block] and 0 or 1
+									if blockAlpha == 0 then
+										questGaps.Add(block, questGaps.shift[block])
+									end
 								end
 								blockAlphas[block] = blockAlpha
 								ns.FadeRelative(block, blockAlpha)
@@ -4575,6 +4884,9 @@ do
 								local owner = type(line) == "table" and line.GetParent and not IsForbidden(line)
 									and line:GetParent()
 								ns.FadeRelative(bar, owner and blockAlphas[owner] or sectionAlpha)
+								if owner and questGaps.shift[owner] then
+									questGaps.Add(bar, questGaps.shift[owner])
+								end
 							end
 						end
 					end
@@ -4596,6 +4908,7 @@ do
 				ns.FadeRelative(part, alpha)
 			end
 		end
+		questGaps.Draw(tracker)
 		return found
 	end
 	local function Focus(questID)
@@ -4728,13 +5041,13 @@ do
 			focus.on = false
 		end
 		local want = (focus.on or timers) and 0 or 1
-		if want == 1 and focus.othersAlpha == 1 then
+		if want == 1 and focus.othersAlpha == 1 and not questGaps.up then
 			return
 		end
 		-- (Hidden with the tracker: no fade to see.)
 		focus.othersAlpha = entry.alpha == 0 and want
 			or ns.Approach(focus.othersAlpha, want, elapsed, want > 0 and ns.FadeInTime() or ns.FadeOutTime())
-		if not ApplyFocus(entry.frame, focus.othersAlpha, timers) and focus.on and now - focus.since > FOCUS_FIND_TIME then
+		if not ApplyFocus(entry.frame, focus.othersAlpha, timers, want == 0) and focus.on and now - focus.since > FOCUS_FIND_TIME then
 			focus.on = false
 		end
 	end

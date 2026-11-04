@@ -10479,11 +10479,20 @@ local function CreateQuestTrackerPanel()
 		"stays faded. Scenario progress shows just the scenario. Hovering it shows it all."])
 	onlyThat:SetPoint("TOPLEFT", lastReveal, "BOTTOMLEFT", -QUEST_INDENT, -2)
 	GreyUnless(onlyThat, function(db) return db.questRevealOnAccept or db.questRevealOnProgress or db.questRevealOnScenario end)
+	onlyThat:HookScript("OnClick", Refresh) -- grey out / enable the option below
+
+	local questCollapse = Check(content, "questRevealCollapse", L["Close the gaps"],
+		L["The quest shows at the top of the quest tracker, not in its own place under empty space. " ..
+		"Hovering the tracker puts it back."])
+	questCollapse:SetPoint("TOPLEFT", onlyThat, "BOTTOMLEFT", QUEST_INDENT, -2)
+	GreyUnless(questCollapse, function(db)
+		return db.questRevealOnlyThat and (db.questRevealOnAccept or db.questRevealOnProgress or db.questRevealOnScenario)
+	end)
 
 	local combatCalm = Check(content, "questCombatCalm", L["Stay up for the Calm Timer after a fight"],
 		L["With the quest tracker ticked In combat (Game Frames page), it stays up after a fight " ..
 		"until the Calm Timer (CineMode page) has run out, then fades. Off: it fades as soon as the fight ends."])
-	combatCalm:SetPoint("TOPLEFT", onlyThat, "BOTTOMLEFT", 0, -2)
+	combatCalm:SetPoint("TOPLEFT", questCollapse, "BOTTOMLEFT", -QUEST_INDENT, -2)
 	GreyUnless(combatCalm, function(db) return db.stayInCombat end)
 
 	-- Classic's quest timer box; retail shows timers in the tracker itself.
