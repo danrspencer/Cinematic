@@ -17,6 +17,14 @@ local VISIONS = {
 	{ "Card Vision", "Card Styles", "card" },
 	{ "Emote Vision", "Emote Vision Style", "emote" },
 }
+-- The preview's screens, in turn (GeneralStyle.lua's ns.MakeStyleJumbotron):
+-- the Visions that have a preview of their own.
+local CELLS = {
+	{ "Dialogue", "MakeQuestTalkPreview" },
+	{ "Quest item button", "MakeQuestItemPreview" },
+	{ "Roll Vision", "MakeRollPreview" },
+	{ "Card Vision", "MakeCardPreview", sized = true },
+}
 local KIND_NAMES = { texture = "Texture", font = "Font", outline = "Outline", shadow = "Shadow", border = "Border" }
 -- (Its own settings, for Reset.)
 local OWN_KEYS = { "visionStyleTexture", "visionStyleFont", "visionStyleOutline", "visionStyleShadow",
@@ -65,14 +73,17 @@ function ns.CreateVisionsStylePanel(kit)
 		"setting of its own on its page keeps it."])
 
 	local visionRows = {}
+	local preview -- (below: drawn again as each setting changes)
 	local function Changed()
 		RefreshVisions()
+		if preview then preview:Refresh() end
 		for _, row in ipairs(visionRows) do row:Refresh() end
 	end
 
 	local stack = kit.Stack(intro, "label")
 	local rows = ns.StyleRows(kit, content, stack, Changed) -- (greyed with the Style hub's Enable Style)
 	local OWN = L["Each Vision's own"]
+	preview = ns.MakeStyleJumbotron(kit, content, stack, 480, CELLS)
 
 	stack:Header(content, L["Shared look"])
 	rows.Font("visionStyleFont", L["Every Vision's words that follow this page. Each Vision's own: the game's " ..

@@ -116,7 +116,8 @@ end
 -- The preview: one big screen showing the pages' own previews in turn, in
 -- this order, a new one every few seconds fading in over the last; arrows
 -- step back and forth (and start the wait again). Each is held to one size
--- (what's past it clipped).
+-- (what's past it clipped). (The Visions hub's Style page shows its own
+-- list: ns.MakeStyleJumbotron.)
 local CELLS = {
 	{ "Unit frames", "MakeUnitStylePreview" },
 	{ "Raid frames", "MakeRaidStylePreview" },
@@ -124,15 +125,13 @@ local CELLS = {
 	{ "Personal Resource Display", "MakePersonalPreview" },
 	{ "Tooltips", "MakeTooltipPreview" },
 	{ "Chat bubbles", "MakeBubblePreview" },
-	{ "Dialogue", "MakeQuestTalkPreview" },
-	{ "Roll Vision", "MakeRollPreview" },
-	{ "Quest item button", "MakeQuestItemPreview" },
-	{ "Card Vision", "MakeCardPreview", sized = true }, -- (sized: given the screen's height)
+	-- (The Visions' own are on the Visions hub's Style page. sized: a cell
+	-- given the screen's height, as Card Vision's there.)
 }
 local ROTATE_SECONDS, FADE_SECONDS = 6, 0.6
 local NAME_H = 24 -- (the page's name over the screen; the screen as high as every Style preview's)
 
-local function MakePreview(parent, width)
+local function MakePreview(parent, width, list)
 	local holder = CreateFrame("Frame", nil, parent)
 	holder:SetSize(width, NAME_H + ns.StylePreviewHeight())
 	local name = holder:CreateFontString(nil, "OVERLAY", "GameFontNormal")
@@ -142,7 +141,7 @@ local function MakePreview(parent, width)
 	count:SetPoint("LEFT", name, "RIGHT", 6, 0)
 	count.searchSkip = true
 	local cells = {}
-	for _, info in ipairs(CELLS) do
+	for _, info in ipairs(list or CELLS) do
 		local make = ns[info[2]]
 		if make then
 			local cell = make(holder, width, info.sized and ns.StylePreviewHeight() or nil)
@@ -231,6 +230,20 @@ local function MakePreview(parent, width)
 	return holder
 end
 
+-- A page's rotating preview of the given cells ({ name, maker, sized = }),
+-- with Pop out left of its arrows, on the page's stack.
+function ns.MakeStyleJumbotron(kit, content, stack, width, list)
+	local preview = MakePreview(content, width, list)
+	preview.headHeight = NAME_H -- (its name over the screen: StylePages.lua)
+	stack:Add(preview, "label")
+	local pop = ns.StylePopout(preview, kit.Tooltip) -- (StylePages.lua)
+	-- (left of the arrows, not over them)
+	pop:ClearAllPoints()
+	pop:SetPoint("RIGHT", preview.prevArrow, "LEFT", -6, 0)
+	kit.AddControl(preview)
+	return preview
+end
+
 -- The pages list: each page, whether it follows General, and a button to
 -- put it back on General.
 local function PageStatus(keys)
@@ -268,14 +281,7 @@ function ns.CreateGeneralStylePanel(kit)
 	local stack = kit.Stack(switch, "check")
 	local rows = ns.StyleRows(kit, content, stack, Changed, "styleGeneral")
 
-	preview = MakePreview(content, 480)
-	preview.headHeight = NAME_H -- (its name over the screen: StylePages.lua)
-	stack:Add(preview, "label")
-	local pop = ns.StylePopout(preview, kit.Tooltip) -- (StylePages.lua)
-	-- (left of the arrows, not over them)
-	pop:ClearAllPoints()
-	pop:SetPoint("RIGHT", preview.prevArrow, "LEFT", -6, 0)
-	kit.AddControl(preview)
+	preview = ns.MakeStyleJumbotron(kit, content, stack, 480)
 
 	rows.PresetMenu({
 		{ L["Like the game's"], L["Each page as its own defaults have it (the game's look)."], {} },
