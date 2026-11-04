@@ -26,6 +26,29 @@ local function Colored(color, text)
 	return ("|cff%02x%02x%02x%s|r"):format(color[1] * 255, color[2] * 255, color[3] * 255, text)
 end
 
+-- Each camera a rule can name (Frames.lua's ns.RULE_CAMERAS), by its name:
+-- { word, name }.
+function ns.RuleCameraList()
+	local names = { chatcam = L["Chat Cam"] }
+	for _, cam in ipairs(ns.CAMERA_OFF_CAMS) do names[cam[1]] = cam[2] end
+	local list = {}
+	for _, cam in ipairs(ns.RULE_CAMERAS) do
+		list[#list + 1] = { cam[1], cam[2] and names[cam[2]] or L["A camera script"] }
+	end
+	return list
+end
+-- The Camera line: any camera, then a pick of one (a menu where the client
+-- has them; else a button each). A piece with pick: a menu of { word, label }.
+function ns.RuleCameraPieces()
+	local pieces = { { "camera", L["In a camera mode"] } }
+	if ns.GRID_MENUS then
+		pieces[2] = { "", L["Specific camera..."], pick = ns.RuleCameraList() }
+	else
+		for _, cam in ipairs(ns.RuleCameraList()) do pieces[#pieces + 1] = cam end
+	end
+	return pieces
+end
+
 -- The pieces of a rule, a line of buttons each in the rule editor:
 -- { name, colour, { { word, label }... } }. Made when asked,
 -- once the language is known.
@@ -55,8 +78,9 @@ function ns.RulePieces()
 	return {
 		{ L["Logic"], { 1, 1, 1 }, { { "and", "AND" }, { "or", "OR" }, { "not", "NOT" }, { "(", "(" }, { ")", ")" } } },
 		{ L["Combat"], { 1, 0.45, 0.4 }, { { "combat", L["In combat"] }, { "calm", L["Calm Timer"] },
-			{ "nocombat", L["Out of combat"] }, { "camera", L["In a camera mode"] },
+			{ "nocombat", L["Out of combat"] },
 			{ "entering", L["Entering combat"] }, { "leaving", L["Leaving combat"] }, { "boss", L["Boss fight"] } } },
+		{ L["Camera"], { 0.95, 0.75, 0.45 }, ns.RuleCameraPieces() },
 		{ L["Target"], { 1, 0.65, 0.25 }, { { "enemy", L["Enemy targeted"] }, { "friendly", L["Friend targeted"] },
 			{ "target", L["Anything targeted"] }, { "targetself", L["You"] }, { "enemyplayer", L["Enemy players"] },
 			{ "hostilenpc", L["Hostile NPCs"] }, { "neutralplayer", L["Neutral players"] },
@@ -86,6 +110,9 @@ local function FieldColor(field)
 			for _, piece in ipairs(group[3]) do
 				local field = ns.RULE_WORDS[piece[1]]
 				if field then fieldColor[field] = group[2] end
+				for _, picked in ipairs(piece.pick or {}) do -- (a menu's words: its line's colour too)
+					fieldColor[ns.RULE_WORDS[picked[1]] or picked[1]] = group[2]
+				end
 			end
 		end
 	end
@@ -382,7 +409,20 @@ local function BuildEditor()
 		for _, piece in ipairs(group[3]) do
 			local word = piece[1]
 			local field = ns.RULE_WORDS[word]
-			local button = Piece(piece[2], function() Insert(word) end, group[2], field ~= nil)
+			local button
+			if piece.pick then
+				-- (A menu of words: the one picked goes in.)
+				button = Piece(piece[2], function(self)
+					ns.ContextMenu(self, function(_, root)
+						for _, picked in ipairs(piece.pick) do
+							root:CreateButton(picked[2], function() Insert(picked[1]) end)
+						end
+					end)
+				end, group[2], false)
+				Tip(button, L["Picks one camera: true while that one's running."])
+			else
+				button = Piece(piece[2], function() Insert(word) end, group[2], field ~= nil)
+			end
 			if group.tooltipOnly then tipLine[#tipLine + 1] = button end
 			if field and group.tooltipOnly then
 				wordButtons[word] = button

@@ -216,7 +216,7 @@ ns.BUILTIN_PROFILES = {
 		-- (Its own Visions and cards, apart from the slots' choices: picking a
 		-- choice for a slot then leaves them as they are.)
 		modules = With("zone-card", "story-cards", "damage-vision", "vitals-vision", "quest-talk",
-			"combat-vision", "heal-vision-everywhere"),
+			"combat-vision", "heal-vision-everywhere", "cursor-hide"),
 	},
 }
 

@@ -1703,6 +1703,7 @@ do
 			{ "Chat", "Interface\\Icons\\INV_Scroll_03", section = "HUD" },
 			{ "Nameplates", "Interface\\Icons\\Ability_Hunter_SniperShot", section = "Overhead" },
 			{ "Chat bubbles", "Interface\\Icons\\Ability_Warrior_BattleShout", label = "Chat Bubbles", section = "Overhead" },
+			{ "Cursor Hide", "Interface\\Icons\\INV_Misc_Eye_01", section = "Overhead" }, -- (CursorHide.lua)
 		} },
 		-- (Cameras: what everyone has; Dev: the dev copy's own, to the right)
 		-- (master: Enable Cameras; its pages with no switch of their own show Off with it)
@@ -15025,6 +15026,9 @@ ns.OnLanguage(function()
 	end
 	if ns.CreatePersonalResourcesPanel then -- (PersonalResources.lua)
 		ns.CreatePersonalResourcesPanel(ns.lowHealthKit)
+	end
+	if ns.CreateCursorHidePage then -- (CursorHide.lua)
+		ns.CreateCursorHidePage(ns.lowHealthKit)
 	end
 	-- WoW Forever's gamepad mode (retail's has no frames of its own).
 	if C_GamePad and not ns.isRetail then

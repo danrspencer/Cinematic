@@ -555,6 +555,16 @@ ns.PROFILE_MODULES = {
 			if client == ns.CLIENT and not ns.HasPersonalDisplay() then set("lowHealthPortrait", true) end
 		end },
 
+	{ key = "cursor-hide", name = "Cursor out of the way on flights", scope = { "Cursor Hide" },
+		tip = "On flights, the cursor turns tiny, and is gone once the mouse has been still for 5 seconds.",
+		apply = function(set)
+			set("cursorHide", true)
+			set("cursorHideAlways", false)
+			set("frameRules", { ["cursor:hide"] = "cam_flight" })
+			set("cursorHideMethod", "both")
+			set("cursorHideDelay", 5)
+		end },
+
 	-- Sound and chat
 	{ key = "music-fatigue", name = "Music fatigue", scope = { "Audio/Music" },
 		tip = "No camera starts music again within half a minute of the last start.",

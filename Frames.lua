@@ -2444,6 +2444,18 @@ ns.RULE_WORDS = {
 	deathknight = "deathknight", dk = "deathknight", shaman = "shaman", mage = "mage", warlock = "warlock",
 	monk = "monk", druid = "druid", demonhunter = "demonhunter", dh = "demonhunter", evoker = "evoker",
 }
+-- (One camera running, by its key in ns.activeCam: cam_flight, cam_idle...,
+-- cam_chatcam; cam_script: a camera script playing. The rule editor's Camera
+-- line picks them by name: ns.RULE_CAMERAS.)
+ns.RULE_CAMERAS = {}
+for _, cam in ipairs(ns.CAMERA_OFF_CAMS) do
+	ns.RULE_CAMERAS[#ns.RULE_CAMERAS + 1] = { "cam_" .. cam[1], cam[1] }
+end
+ns.RULE_CAMERAS[#ns.RULE_CAMERAS + 1] = { "cam_chatcam", "chatcam" }
+ns.RULE_CAMERAS[#ns.RULE_CAMERAS + 1] = { "cam_script" }
+for _, cam in ipairs(ns.RULE_CAMERAS) do
+	ns.RULE_WORDS[cam[1]] = cam[1]
+end
 do
 	local OPERATORS = { ["and"] = "and", ["&"] = "and", ["&&"] = "and", ["or"] = "or", ["|"] = "or", ["||"] = "or",
 		["not"] = "not", ["!"] = "not" }
@@ -2971,7 +2983,13 @@ do
 		facts.always, facts.never = true, false
 		facts.combat = inCombat and true or false
 		-- (A camera mode running: flights, AFK, cozy and the rest; or a camera script.)
-		facts.camera = ns.activeCam ~= nil or (ns.PlayingCameraScript ~= nil and ns.PlayingCameraScript() ~= nil)
+		local script = ns.PlayingCameraScript ~= nil and ns.PlayingCameraScript() ~= nil
+		facts.camera = ns.activeCam ~= nil or script
+		-- (Which one: cam_<its key>, cam_script.)
+		for _, cam in ipairs(ns.RULE_CAMERAS) do
+			if cam[2] then facts[cam[1]] = ns.activeCam == cam[2] end
+		end
+		facts.cam_script = script
 		facts.calm = ns.InCalm and ns.InCalm() or false -- (just after a fight, till the Calm Timer runs out)
 		-- (Out of combat: no fight, and the Calm Timer after one run out.)
 		facts.nocombat = not facts.combat and not facts.calm

@@ -201,6 +201,8 @@ read_globals = {
 	"IsMounted",
 	"IsMouseButtonDown",
 	"IsMouselooking",
+	"SetCursor", "ResetCursor",
+	"MouselookStart", "MouselookStop", "GetCursorDelta",
 	"IsPlayerMoving",
 	"IsPlayerSpell",
 	"IsResting",

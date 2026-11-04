@@ -11,6 +11,10 @@
 local _, ns = ...
 
 ns.CHANGELOG_FEATURES = {
+	{ date = "2026-11-04", page = "Cursor Hide", title = "Cursor Hide",
+		text = "In CineMode, your cursor gets out of the way: it shrinks to a tiny corner, vanishes once the mouse " ..
+		"has been still a while, or both. Moving the mouse brings it back. Choose where it happens with its Show " ..
+		"in row; the Cinema profile has it on during flights." },
 	{ date = "2026-11-04", page = "Vitals Style", title = "Game effect themes", client = "retail",
 		text = "Six new Vitals Vision themes are built from the game's own full-screen effects, moving and closing " ..
 		"in as your health drops: Cosmic void, Hellfire, Radiance, Frostbite, Fel flames and Spellfire. Find them " ..

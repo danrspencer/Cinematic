@@ -133,6 +133,7 @@ Tracking.lua
 NodeSweep.lua
 Slash.lua
 Why.lua
+CursorHide.lua
 SelfTest.lua
 ProfileModules.lua
 ProfileChoices.lua
