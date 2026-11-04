@@ -3510,7 +3510,6 @@ L["The camera is %d yards from you: a unit next to you is about %d yards from it
 L["The camera it moves like: cozy swings round to face you, vista and fish settle behind you (fish sways less), AFK turns right around you. Its other settings (Camera Settings page) go on as they are."] = "它模仿的鏡頭動作：悠閒會轉過來面對你，遠景與釣魚會停在你身後（釣魚擺動較少），暫離會繞你整圈。它的其他設定（鏡頭設定頁面）照舊。"
 L["The camera lines up behind you, then turns this far round: 180 looks straight back at you."] = "鏡頭轉到你身後，然後再轉這麼多：180 表示直接回頭看著你。"
 L["The camera never tilts more than this far below where it was when auto-run started, even when it lowers while you steer."] = "鏡頭向下傾斜的角度，永遠不會比自動奔跑開始時再低超過此值，即使你操控方向時鏡頭降低也一樣。"
-L["The camera sits over your right shoulder, with you on the left of the screen."] = "鏡頭位於你的右肩上方，你在畫面左側。"
 L["The camera slowly pulls back, then (with random zoom) drifts in and out. Moving glides it back to your distance; zooming yourself keeps your new distance."] = "鏡頭緩緩拉遠，然後（開啟隨機縮放時）前後飄移。移動會讓它平滑回到你的距離；你自己縮放則保留新的距離。"
 L["The camera snaps straight to whoever's talking instead of swinging, the letterbox comes in twice as tall for the conversation with subtitles in its bottom bar, and the whole UI fades out: the minimap, frames, nameplates, names and the circle under your target."] = "鏡頭直接切到說話者而不是轉過去，對話期間黑邊高度加倍並在底部黑邊中顯示字幕，整個介面淡出：小地圖、框架、名條、名稱以及目標腳下的圓圈。"
 L["The camera sways this much lower than where it lines up behind you, so it looks out across the view rather than down at it. 0 keeps your angle."] = "鏡頭在你身後的對位位置下方這麼多處擺動，讓它眺望景色而非俯視。0 表示保持你的角度。"
@@ -4264,6 +4263,7 @@ L["Its type, colors, bars and words, and where it sits."] = "其類型、顏色�
 L["Its type, how it looks and where it sits. Press Test and close the settings to see it."] = "其類型、外觀和位置。按測試，然後關閉設定即可看到。"
 L["Not the damage meter's numbers: your race with the player ahead of you, or your lead over #2 once you're #1. It reads the game's own damage meter, so that needs to be on (Options, Gameplay Enhancements: Enable Damage Meter). Its type and how it looks: the Look tab."] = "不是傷害統計的數字：而是你與前一名玩家的競賽，或你成為第 1 名後對第 2 名的領先。它讀取遊戲本身的傷害統計，所以需要開啟（選項 > 遊戲玩法增強：啟用傷害統計）。其類型和外觀：外觀分頁。"
 L["Turning it on, when it shows, what it counts, its tests and the picked type's settings."] = "開啟、何時顯示、計算什麼、它的測試，以及所選類型的設定。"
+L["%.2f yards"] = "%.2f 碼"
 
 -- Options.lua: Reset addon (Reset Settings, Reset EVERYTHING)
 L["Reset Settings puts every setting back and keeps what you made: your own profiles, cameras, scripts, themes and backups. Reset EVERYTHING deletes all of it. Either reloads the UI."] = "「重置設定」會還原所有設定，並保留你建立的內容：你自己的設定檔、鏡頭、腳本、主題和備份。「全部重置」會刪除這一切。兩者都會重新載入介面。"
@@ -4271,6 +4271,27 @@ L["Reset Cinematic?\n\nReset Settings: every setting goes back to how it was on 
 L["Delete everything in Cinematic? Your own profiles, cameras, scripts, themes, rules, wheels and backups are deleted for good, along with every setting. This can't be undone."] = "刪除 Cinematic 中的一切？你自己的設定檔、鏡頭、腳本、主題、規則、輪盤和備份將連同所有設定被永久刪除。此操作無法復原。"
 L["Reset Settings"] = "重置設定"
 L["Reset EVERYTHING"] = "全部重置"
+
+-- ShoulderCam.lua
+L["Over your shoulder wherever you are. (The other columns then have nothing to add.)"] = "無論在哪裡都越過你的肩膀。（其他欄此時沒有可添加的。）"
+L["Frames follow you"] = "框架跟隨你"
+L["Your cast bar and Personal Resource Display slide over to where you are on the screen, and glide back as the camera goes behind you. Edit Mode still places them: this moves them from there."] = "你的施法條和個人資源顯示會滑到你在畫面上的位置，鏡頭回到你身後時滑回。它們仍由編輯模式擺放：這只是從那裡移動它們。"
+L["Follow strength"] = "跟隨強度"
+L["How far they slide. Where you are on the screen is worked out from the camera, not read: if they land short of you or past you, turn this up or down."] = "它們滑動的距離。你在畫面上的位置是根據鏡頭推算的，而非讀取：如果它們沒到你或超過你，就調高或調低此項。"
+L["The camera sits over your shoulder, with you to one side of the screen."] = "鏡頭位於你的肩膀上方，你在畫面的一側。"
+L["On: the camera moves over your shoulder. This uses one of Blizzard's experimental camera settings: the game shows its experimental camera warning (Accept keeps it working). The game's Keep Character Centered option (Accessibility) stops it, so that's turned off meanwhile. Off: your own settings come back."] = "開啟：鏡頭移到你的肩膀上方。這會用到暴雪的一項實驗性鏡頭設定：遊戲會顯示實驗性鏡頭警告（選擇接受可保持生效）。遊戲的「保持角色置中」選項（協助工具）會阻止它，因此期間會關閉該選項。關閉：恢復你自己的設定。"
+L["Shoulder"] = "肩膀"
+L["Offset"] = "偏移"
+L["How far to the side the camera moves. About 1 is subtle; 1.5 to 2 is a strong over-the-shoulder look."] = "鏡頭向側邊移動的距離。約 1 較為含蓄；1.5 到 2 則是明顯的過肩視角。"
+L["Right shoulder"] = "右肩"
+L["Left shoulder"] = "左肩"
+L["Which shoulder the camera looks over. The swap key below flips it."] = "鏡頭越過哪一側肩膀。下方的切換鍵可以翻轉。"
+L["Swap shoulders key"] = "切換肩膀按鍵"
+L["Not during Cinematic's cameras that frame you"] = "Cinematic 以你為中心的鏡頭期間不生效"
+L["On a mount the camera stays straight behind you: a big mount's head fills the shot from the side."] = "騎乘時鏡頭保持在你正後方：從側面看，大型坐騎的頭會佔滿畫面。"
+L["While the standing-still, AFK, flight, fly-by or death camera runs, the camera goes back behind you, as their shots are built around you in the middle. It comes back as they end. The quest and chat cameras keep it."] = "靜止不動、暫離、飛行、飛掠或死亡鏡頭運行時，鏡頭會回到你身後，因為它們的畫面以你為中心構圖。它們結束後恢復。任務和聊天鏡頭會保留。"
+L["Frames"] = "框架"
+L["Pause"] = "暫停"
 
 -- TalkingHeads.lua (its option on the Quest Vision page)
 L["Talking heads"] = "對話頭像"

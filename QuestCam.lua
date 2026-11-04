@@ -454,16 +454,20 @@ end
 -- once, any last bit of the game's own zoom left to go happened in a frame:
 -- a hop). restoreNow: at once (you're zooming yourself).
 local ZOOM_RELEASE_TIME = 1.5
+local function LogZoomStop(why, speedText)
+	local zoom = GetCameraZoom()
+	ZoomLog(("stopped (%s) at %.1f yards, on the way %.1f -> %.1f (%.1f of %.1f sec): %d commands asking %+.1f yards, camera moved %+.1f; speed %s"):format(
+		why or "?", zoom, zoomer.from, zoomer.goal, zoomer.t, zoomer.T, zoomer.sends or 0, zoomer.asked or 0,
+		zoom - zoomer.from, speedText))
+	return zoom
+end
 local function StopZoom(restoreNow, why)
 	if zoomer.moving then
-		local zoom = GetCameraZoom()
-		ZoomLog(("stopped (%s) at %.1f yards, on the way %.1f -> %.1f (%.1f of %.1f sec): %d commands asking %+.1f yards, camera moved %+.1f; speed %s"):format(
-			why or "?", zoom, zoomer.from, zoomer.goal, zoomer.t, zoomer.T, zoomer.sends or 0, zoomer.asked or 0,
-			zoom - zoomer.from, restoreNow and "back at once" or "easing back"))
+		local zoom = LogZoomStop(why, restoreNow and "back at once" or "easing back")
 		zoomer.watch = { from = zoom, at = GetTime(), last = zoom, far = zoom, still = 0 }
 	end
 	if restoreNow then
-		zoomer.moving, zoomer.sent, zoomer.release = false, nil, nil
+		zoomer.moving, zoomer.sent, zoomer.release, zoomer.yours = false, nil, nil, nil
 		RestoreSpeed(ZOOM_CVAR)
 		return
 	end
@@ -503,6 +507,50 @@ local function StepZoomRelease(elapsed)
 	end
 	-- (Geometric, so it creeps up from the crawl rather than leaping.)
 	ns.SetHeldSpeed(WHO, ZOOM_CVAR, release.from * (release.to / release.from) ^ (f * f))
+end
+
+-- You zoomed while ours zooms (or its speed eases back). The game takes your
+-- scroll at the speed set right then and keeps it going that long: your
+-- speed put back at once ran a tick taken at the crawl many times too far
+-- (13.5 -> 0 yards, 5.2 -> 19.1). So the speed stays where it was till the
+-- camera's settled from your scrolling, then yours comes back.
+local YOUR_ZOOM_HOLD_MAX = 6 -- seconds at most the speed's held for your zoom
+local function StopZoomForYou(why)
+	local held = ns.SpeedHeld(ZOOM_CVAR, WHO) and tonumber(GetCVar(ZOOM_CVAR))
+	local yours = held and ns.YourSpeed(ZOOM_CVAR)
+	if not (held and yours and held < yours) then
+		StopZoom(true, why)
+		return
+	end
+	local zoom = zoomer.moving and LogZoomStop(why, ("held at %.2f till your zoom's done"):format(held)) or GetCameraZoom()
+	if not zoomer.moving then
+		ZoomLog(("you zoomed as the speed eased back: held at %.2f till your zoom's done"):format(held))
+	end
+	zoomer.moving, zoomer.sent, zoomer.release, zoomer.watch = false, nil, nil, nil
+	zoomer.yours = { from = zoom, last = zoom, at = GetTime(), still = 0, speed = held }
+end
+
+local function StepYourZoom(elapsed)
+	local yz = zoomer.yours
+	if not yz then
+		return
+	end
+	if not ns.SpeedHeld(ZOOM_CVAR, WHO) then -- (put back by something else)
+		zoomer.yours = nil
+		return
+	end
+	local now, zoom = GetTime(), GetCameraZoom()
+	yz.still = math.abs(zoom - yz.last) < ZOOM_STILL and yz.still + elapsed or 0
+	yz.last = zoom
+	local lastScroll = ns.lastPlayerZoomAt or yz.at
+	local settled = yz.still >= ZOOM_SETTLED and now - lastScroll >= ZOOM_SETTLED
+	if settled or now - yz.at >= YOUR_ZOOM_HOLD_MAX then
+		zoomer.yours = nil
+		ZoomLog(("your zoom %s: %.1f -> %.1f yards in %.1f sec at %.2f; your speed back"):format(
+			settled and "done" or "still going, gave up holding", yz.from, zoom, now - yz.at, yz.speed))
+		zoomer.watch = { from = zoom, at = now, last = zoom, far = zoom, still = 0 }
+		RestoreSpeed(ZOOM_CVAR)
+	end
 end
 
 local function SetZoomSpeed(speed)
@@ -553,7 +601,7 @@ local function ZoomTo(distance, T, why, by)
 	if math.abs(distance - now) < ZOOM_DONE then
 		return
 	end
-	zoomer.release, cam.zoomBy = nil, by
+	zoomer.release, zoomer.yours, cam.zoomBy = nil, nil, by
 	ns.HoldSpeed(WHO, ZOOM_CVAR)
 	Note(("zoom to %.2f"):format(distance))
 	ZoomLog(("%s %.1f -> %.1f yards over %.1f sec (%s; max factor %s)"):format(by or "quest cam", now, distance,
@@ -591,6 +639,10 @@ local function EaseZoomStop(T)
 	local sign = zoomer.goal > zoomer.from and 1 or -1
 	ZoomLog(("easing to a stop over %.1f sec at %.1f yards (was heading %.1f -> %.1f)"):format(
 		T, zoom, zoomer.from, zoomer.goal))
+	-- (What's been asked counts from the new start: left counting from the
+	-- old one, the steering thought the commands already had it past the stop
+	-- and sent none, so it sat 1 yard short for 4.5 sec.)
+	zoomer.asked = zoomer.from + (zoomer.asked or 0) - zoom
 	zoomer.from, zoomer.goal, zoomer.t, zoomer.T = zoom, zoom + sign * speed * T / 2, 0, T
 	zoomer.cruise, zoomer.easeOut, zoomer.rate, zoomer.rateGoal = speed, true, 1, 1
 	return zoomer.goal
@@ -758,7 +810,11 @@ local function HandOver(what)
 		-- doesn't need it: the speed eases back, as the game's zoom still has
 		-- a bit to go past where it's stopped, and at your speed that went in
 		-- a lurch (1.3 yards in half a second).
-		StopZoom(ns.lastCameraInputWhat == "zoom", "you took the camera: " .. tostring(what))
+		if ns.lastCameraInputWhat == "zoom" then
+			StopZoomForYou("you took the camera: zoom")
+		else
+			StopZoom(false, "you took the camera: " .. tostring(what))
+		end
 		ns.RestoreZoomLimit()
 	end
 	cam.steps, cam.handedOver = {}, true
@@ -1225,6 +1281,7 @@ do
 			parts[#parts + 1] = (cam.zoomBy and cam.zoomBy .. "'s " or "") .. ("zoom to %.1f"):format(zoomer.goal)
 		end
 		if zoomer.release then parts[#parts + 1] = "zoom speed easing back" end
+		if zoomer.yours then parts[#parts + 1] = "zoom speed held for your zoom" end
 		if zoomer.pending then
 			parts[#parts + 1] = ("zoom out to %.1f held till you walk off"):format(zoomer.pending.to)
 		end
@@ -1271,16 +1328,18 @@ local function OnUpdate(_, elapsed)
 	StepMove(movers.pitch, elapsed)
 	StepZoom(elapsed)
 	StepZoomRelease(elapsed)
+	StepYourZoom(elapsed)
 	local busy = cam.active or #cam.steps > 0 or movers.yaw.moving or movers.pitch.moving or zoomer.moving
 	if not cam.handedOver and cam.startedAt and busy
 		and ns.GetLastCameraInput() > cam.startedAt + INPUT_GRACE then
 		HandOver(ns.lastCameraInputWhat)
 	end
 	-- Zoomed yourself while it zooms (in, or back out): it stops, and the
-	-- wheel goes at your speed (also while the speed's still easing back).
+	-- speed's held till your scroll's done, then it's yours (also while the
+	-- speed's still easing back; see StopZoomForYou).
 	if (zoomer.moving or zoomer.release) and ns.PlayerZoomedSince(zoomer.startedAt) then
 		Note("you zoomed: zoom stopped")
-		StopZoom(true, "you zoomed")
+		StopZoomForYou("you zoomed")
 		ns.RestoreZoomLimit()
 	end
 	-- The zoom back out, held: it goes once you've walked off from where you
@@ -1499,6 +1558,9 @@ end
 ns.RegisterCamera("quest", function()
 	return cam.active or #cam.steps > 0 or movers.yaw.moving or movers.pitch.moving
 		or ((zoomer.moving or zoomer.release ~= nil) and cam.zoomBy == nil) or (cam.restoring or 0) > 0
+		-- (Holding the speed for your scroll: not busy, Core's watch let it go
+		-- mid-scroll and the scroll ran on at your speed, all the way out.)
+		or zoomer.yours ~= nil
 		or GetTime() - (zoomer.wantsAt or -math.huge) < 0.5 or ns.QuestCamPending()
 end, function(what)
 	if not cam.handedOver and GetTime() > (cam.startedAt or 0) + INPUT_GRACE then

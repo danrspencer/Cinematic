@@ -368,6 +368,13 @@ local DEFAULTS = {
 	questCamNotDaily = true, --...nor when all the quest giver has is dailies or weeklies
 	-- Shoulder Cam (ShoulderCam.lua): the camera sits over your right shoulder (a Blizzard experimental setting)
 	shoulderCam = false,
+	shoulderCamOffset = 1,     -- ...yards to the side
+	shoulderCamSide = "right", -- ..."right" or "left" (the swap key flips it)
+	shoulderCamNotMounted = true, -- ...back behind you while mounted
+	shoulderCamPause = true,   -- ...and while one of our cameras that frame you runs
+	shoulderCamFrames = true,  -- ...the cast bar and PRD slide over with you
+	shoulderCamFramesStrength = 1, -- ...how far (1 = the worked-out place)
+	shoulderCamAlways = true,  -- ...everywhere: its Show in row's Always (the rest: the row's ticks and rule)
 	indoorLimits = true,      -- indoors, keep the camera modes from pushing into walls:
 	indoorZoomOut = 1,        -- ...zoom out at most this many yards past your own distance
 	indoorSwing = 10,         -- ...swing at most this far either side of behind

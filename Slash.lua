@@ -951,8 +951,11 @@ local function HandleSlash(msg)
 			q.active and "on" or (q.talking and "waiting") or "off", tostring(ns.db.eventQuestCamera), q.turned, q.lowered, q.handedOver and " (handed over to you)" or "", tostring(q.zoom), tostring(q.zoomedTo)))
 	elseif cmd == "debug" and arg == "shoulder" and ns.GetShoulderCamDebug then
 		local d = ns.GetShoulderCamDebug()
-		ns.Print(("Shoulder Cam: setting %s, applied %s; test_cameraOverShoulder %s, Keep Character Centered %s; in combat %s"):format(
-			tostring(d.setting), tostring(d.applied), tostring(d.shoulder), tostring(d.centered), tostring(InCombatLockdown())))
+		ns.Print(("Shoulder Cam: setting %s, applied %s, %s %s yd, paused %s, Show in Always %s, swap key %s; test_cameraOverShoulder %s, Keep Character Centered %s; mounted %s, in combat %s"):format(
+			tostring(d.setting), tostring(d.applied), tostring(d.side), tostring(d.offset), tostring(d.paused), tostring(d.always), tostring(d.key),
+			tostring(d.shoulder), tostring(d.centered), tostring(IsMounted and IsMounted()), tostring(InCombatLockdown())))
+		ns.Print(("  Frames follow you %s: slide %.0f of %.0f (UI units, - left), zoom %.1f, cameraFov %s; moving %s"):format(
+			tostring(d.follow), d.followShift, d.followTarget, GetCameraZoom and GetCameraZoom() or 0, tostring(GetCVar("cameraFov")), d.followed))
 	elseif cmd == "debug" and arg == "help" then
 		PrintDebugHelp()
 	elseif cmd == "debug" and arg == "zoom" then

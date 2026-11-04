@@ -3510,7 +3510,6 @@ L["The camera is %d yards from you: a unit next to you is about %d yards from it
 L["The camera it moves like: cozy swings round to face you, vista and fish settle behind you (fish sways less), AFK turns right around you. Its other settings (Camera Settings page) go on as they are."] = "움직임을 본뜰 카메라: 아늑함은 나를 마주 보도록 돌고, 풍경과 낚시는 뒤쪽에 자리 잡으며(낚시는 덜 흔들림), 자리 비움은 주위를 한 바퀴 돕니다. 다른 설정(카메라 설정 페이지)은 그대로 적용됩니다."
 L["The camera lines up behind you, then turns this far round: 180 looks straight back at you."] = "카메라가 뒤쪽에 정렬한 뒤 이만큼 돕니다: 180이면 나를 정면으로 돌아봅니다."
 L["The camera never tilts more than this far below where it was when auto-run started, even when it lowers while you steer."] = "자동 달리기가 시작될 때의 각도보다 더 아래로는 기울지 않습니다. 방향을 조종하며 내려갈 때도 마찬가지입니다."
-L["The camera sits over your right shoulder, with you on the left of the screen."] = "카메라가 오른쪽 어깨 너머에 있고, 나는 화면 왼쪽에 놓입니다."
 L["The camera slowly pulls back, then (with random zoom) drifts in and out. Moving glides it back to your distance; zooming yourself keeps your new distance."] = "카메라가 천천히 물러난 뒤 (무작위 확대/축소를 켜면) 앞뒤로 흘러갑니다. 움직이면 내 거리로 부드럽게 돌아오고, 직접 확대/축소하면 새 거리를 유지합니다."
 L["The camera snaps straight to whoever's talking instead of swinging, the letterbox comes in twice as tall for the conversation with subtitles in its bottom bar, and the whole UI fades out: the minimap, frames, nameplates, names and the circle under your target."] = "카메라가 돌지 않고 말하는 사람에게 곧바로 붙으며, 대화 동안 레터박스가 두 배 높이로 들어와 아래 바에 자막이 나오고, UI 전체가 사라집니다: 미니맵, 창, 이름표, 이름, 대상 아래 원."
 L["The camera sways this much lower than where it lines up behind you, so it looks out across the view rather than down at it. 0 keeps your angle."] = "카메라가 뒤쪽 정렬 위치보다 이만큼 낮게 흔들려서 경치를 내려다보지 않고 가로질러 바라봅니다. 0이면 각도를 유지합니다."
@@ -4264,6 +4263,7 @@ L["Its type, colors, bars and words, and where it sits."] = "종류, 색상, 바
 L["Its type, how it looks and where it sits. Press Test and close the settings to see it."] = "종류, 모양과 위치. 시험을 누르고 설정을 닫으면 볼 수 있습니다."
 L["Not the damage meter's numbers: your race with the player ahead of you, or your lead over #2 once you're #1. It reads the game's own damage meter, so that needs to be on (Options, Gameplay Enhancements: Enable Damage Meter). Its type and how it looks: the Look tab."] = "피해량 측정기 숫자가 아닙니다: 바로 앞 플레이어와의 경쟁, 또는 1위가 되면 2위와의 격차. 게임 자체 피해량 측정기를 읽으므로 그것을 켜야 합니다(옵션, 게임플레이 향상: 피해량 측정기 사용). 종류와 모양: 모양 탭."
 L["Turning it on, when it shows, what it counts, its tests and the picked type's settings."] = "켜기, 표시 시점, 세는 대상, 시험, 그리고 고른 종류의 설정."
+L["%.2f yards"] = "%.2fm"
 
 -- Options.lua: Reset addon (Reset Settings, Reset EVERYTHING)
 L["Reset Settings puts every setting back and keeps what you made: your own profiles, cameras, scripts, themes and backups. Reset EVERYTHING deletes all of it. Either reloads the UI."] = "설정 초기화는 모든 설정을 되돌리고 직접 만든 것은 남깁니다: 내 프로필, 카메라, 스크립트, 테마, 백업. 전부 초기화는 그것까지 모두 지웁니다. 어느 쪽이든 UI를 다시 불러옵니다."
@@ -4271,6 +4271,27 @@ L["Reset Cinematic?\n\nReset Settings: every setting goes back to how it was on 
 L["Delete everything in Cinematic? Your own profiles, cameras, scripts, themes, rules, wheels and backups are deleted for good, along with every setting. This can't be undone."] = "Cinematic의 모든 것을 지울까요? 내 프로필, 카메라, 스크립트, 테마, 규칙, 휠, 백업이 모든 설정과 함께 영구히 지워집니다. 되돌릴 수 없습니다."
 L["Reset Settings"] = "설정 초기화"
 L["Reset EVERYTHING"] = "전부 초기화"
+
+-- ShoulderCam.lua
+L["Over your shoulder wherever you are. (The other columns then have nothing to add.)"] = "어디에 있든 어깨 너머로. (그러면 다른 열은 더할 것이 없습니다.)"
+L["Frames follow you"] = "프레임이 따라옴"
+L["Your cast bar and Personal Resource Display slide over to where you are on the screen, and glide back as the camera goes behind you. Edit Mode still places them: this moves them from there."] = "시전 바와 개인 자원 표시가 화면에서 내 위치로 미끄러져 가고, 카메라가 뒤로 돌아가면 돌아옵니다. 위치는 여전히 편집 모드가 정하며, 이 기능은 거기서 옮깁니다."
+L["Follow strength"] = "따라가는 정도"
+L["How far they slide. Where you are on the screen is worked out from the camera, not read: if they land short of you or past you, turn this up or down."] = "얼마나 미끄러질지. 화면 속 내 위치는 읽는 것이 아니라 카메라로 계산합니다: 나보다 덜 가거나 지나치면 이 값을 올리거나 내리세요."
+L["The camera sits over your shoulder, with you to one side of the screen."] = "카메라가 어깨 너머에 자리하고, 나는 화면 한쪽에 있습니다."
+L["On: the camera moves over your shoulder. This uses one of Blizzard's experimental camera settings: the game shows its experimental camera warning (Accept keeps it working). The game's Keep Character Centered option (Accessibility) stops it, so that's turned off meanwhile. Off: your own settings come back."] = "켜짐: 카메라가 어깨 너머로 옮겨 갑니다. Blizzard의 실험적 카메라 설정 중 하나를 쓰므로, 게임이 실험적 카메라 경고를 띄웁니다(수락하면 계속 작동). 게임의 캐릭터 가운데 유지 옵션(접근성)이 이를 막으므로 그동안 꺼 둡니다. 꺼짐: 내 설정이 돌아옵니다."
+L["Shoulder"] = "어깨"
+L["Offset"] = "오프셋"
+L["How far to the side the camera moves. About 1 is subtle; 1.5 to 2 is a strong over-the-shoulder look."] = "카메라가 옆으로 얼마나 이동할지. 1 정도는 은은하고, 1.5~2는 확실한 어깨 너머 시점입니다."
+L["Right shoulder"] = "오른쪽 어깨"
+L["Left shoulder"] = "왼쪽 어깨"
+L["Which shoulder the camera looks over. The swap key below flips it."] = "카메라가 어느 어깨 너머로 볼지. 아래의 전환 키로 바꿉니다."
+L["Swap shoulders key"] = "어깨 전환 키"
+L["Not during Cinematic's cameras that frame you"] = "나를 담는 Cinematic 카메라 중에는 끔"
+L["On a mount the camera stays straight behind you: a big mount's head fills the shot from the side."] = "탈것에 타면 카메라가 바로 뒤에 머뭅니다: 옆에서 보면 큰 탈것의 머리가 화면을 채웁니다."
+L["While the standing-still, AFK, flight, fly-by or death camera runs, the camera goes back behind you, as their shots are built around you in the middle. It comes back as they end. The quest and chat cameras keep it."] = "정지, 자리 비움, 비행, 근접 비행, 죽음 카메라가 도는 동안에는 그 장면들이 나를 가운데 두고 짜여 있어 카메라가 다시 뒤로 갑니다. 끝나면 돌아옵니다. 퀘스트 카메라와 대화 카메라는 유지합니다."
+L["Frames"] = "프레임"
+L["Pause"] = "일시 정지"
 
 -- TalkingHeads.lua (its option on the Quest Vision page)
 L["Talking heads"] = "말하는 얼굴"

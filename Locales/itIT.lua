@@ -3511,7 +3511,6 @@ L["The camera is %d yards from you: a unit next to you is about %d yards from it
 L["The camera it moves like: cozy swings round to face you, vista and fish settle behind you (fish sways less), AFK turns right around you. Its other settings (Camera Settings page) go on as they are."] = "La telecamera a cui somiglia nei movimenti: l'accogliente ruota verso di te, la panoramica e quella di pesca si assestano alle tue spalle (quella di pesca ondeggia meno), quella AFK ti gira tutto attorno. Le sue altre impostazioni (pagina Impostazioni telecamere) restano come sono."
 L["The camera lines up behind you, then turns this far round: 180 looks straight back at you."] = "La telecamera si allinea alle tue spalle, poi ruota di tanto: 180 ti guarda dritto in faccia."
 L["The camera never tilts more than this far below where it was when auto-run started, even when it lowers while you steer."] = "La telecamera non si inclina mai più di così sotto la posizione che aveva all'avvio della corsa automatica, anche quando si abbassa mentre sterzi."
-L["The camera sits over your right shoulder, with you on the left of the screen."] = "La telecamera sta sopra la tua spalla destra, con te sulla sinistra dello schermo."
 L["The camera slowly pulls back, then (with random zoom) drifts in and out. Moving glides it back to your distance; zooming yourself keeps your new distance."] = "La telecamera si allontana lentamente, poi (con lo zoom casuale) oscilla avanti e indietro. Muoverti la riporta dolcemente alla tua distanza; zoomare tu mantiene la nuova distanza."
 L["The camera snaps straight to whoever's talking instead of swinging, the letterbox comes in twice as tall for the conversation with subtitles in its bottom bar, and the whole UI fades out: the minimap, frames, nameplates, names and the circle under your target."] = "La telecamera scatta direttamente su chi parla invece di ruotare, le bande nere diventano alte il doppio per la conversazione con i sottotitoli nella banda inferiore, e tutta l'interfaccia si dissolve: minimappa, riquadri, barre dei nomi, nomi e il cerchio sotto il bersaglio."
 L["The camera sways this much lower than where it lines up behind you, so it looks out across the view rather than down at it. 0 keeps your angle."] = "La telecamera ondeggia di tanto più in basso rispetto a dove si allinea alle tue spalle, così guarda il panorama invece che verso il basso. 0 mantiene la tua angolazione."
@@ -4265,6 +4264,7 @@ L["Its type, colors, bars and words, and where it sits."] = "Il suo tipo, colori
 L["Its type, how it looks and where it sits. Press Test and close the settings to see it."] = "Il suo tipo, il suo aspetto e dove si trova. Premi Prova e chiudi le impostazioni per vederlo."
 L["Not the damage meter's numbers: your race with the player ahead of you, or your lead over #2 once you're #1. It reads the game's own damage meter, so that needs to be on (Options, Gameplay Enhancements: Enable Damage Meter). Its type and how it looks: the Look tab."] = "Non i numeri del misuratore di danni: la tua gara con il giocatore davanti a te, o il tuo vantaggio sul n. 2 quando sei il n. 1. Legge il misuratore di danni del gioco, quindi deve essere attivo (Opzioni, Miglioramenti del gameplay: Attiva misuratore di danni). Il suo tipo e il suo aspetto: la scheda Aspetto."
 L["Turning it on, when it shows, what it counts, its tests and the picked type's settings."] = "Attivarlo, quando si mostra, cosa conta, le sue prove e le impostazioni del tipo scelto."
+L["%.2f yards"] = "%.2f m"
 
 -- Options.lua: Reset addon (Reset Settings, Reset EVERYTHING)
 L["Reset Settings puts every setting back and keeps what you made: your own profiles, cameras, scripts, themes and backups. Reset EVERYTHING deletes all of it. Either reloads the UI."] = "Ripristina impostazioni rimette ogni impostazione com'era e tiene ciò che hai creato: i tuoi profili, telecamere, script, temi e backup. Ripristina TUTTO cancella anche quelli. In entrambi i casi l'interfaccia si ricarica."
@@ -4272,6 +4272,27 @@ L["Reset Cinematic?\n\nReset Settings: every setting goes back to how it was on 
 L["Delete everything in Cinematic? Your own profiles, cameras, scripts, themes, rules, wheels and backups are deleted for good, along with every setting. This can't be undone."] = "Cancellare tutto in Cinematic? I tuoi profili, telecamere, script, temi, regole, ruote e backup vengono cancellati per sempre, insieme a ogni impostazione. Non si può annullare."
 L["Reset Settings"] = "Ripristina impostazioni"
 L["Reset EVERYTHING"] = "Ripristina TUTTO"
+
+-- ShoulderCam.lua
+L["Over your shoulder wherever you are. (The other columns then have nothing to add.)"] = "Sopra la tua spalla ovunque tu sia. (Le altre colonne allora non aggiungono nulla.)"
+L["Frames follow you"] = "I riquadri ti seguono"
+L["Your cast bar and Personal Resource Display slide over to where you are on the screen, and glide back as the camera goes behind you. Edit Mode still places them: this moves them from there."] = "La barra di lancio e la visualizzazione delle risorse personali scivolano dove sei sullo schermo e tornano indietro quando la telecamera ti torna alle spalle. La Modalità modifica le posiziona ancora: questo le sposta da lì."
+L["Follow strength"] = "Intensità"
+L["How far they slide. Where you are on the screen is worked out from the camera, not read: if they land short of you or past you, turn this up or down."] = "Quanto scivolano. La tua posizione sullo schermo è calcolata dalla telecamera, non letta: se si fermano prima o dopo di te, alza o abbassa questo valore."
+L["The camera sits over your shoulder, with you to one side of the screen."] = "La telecamera sta sopra la tua spalla, con te da un lato dello schermo."
+L["On: the camera moves over your shoulder. This uses one of Blizzard's experimental camera settings: the game shows its experimental camera warning (Accept keeps it working). The game's Keep Character Centered option (Accessibility) stops it, so that's turned off meanwhile. Off: your own settings come back."] = "Attivo: la telecamera passa sopra la tua spalla. Usa una delle impostazioni sperimentali della telecamera di Blizzard: il gioco mostra il suo avviso sulla telecamera sperimentale (Accetta la mantiene attiva). L'opzione del gioco Mantieni il personaggio centrato (Accessibilità) la blocca, quindi intanto viene disattivata. Disattivo: tornano le tue impostazioni."
+L["Shoulder"] = "Spalla"
+L["Offset"] = "Spostamento"
+L["How far to the side the camera moves. About 1 is subtle; 1.5 to 2 is a strong over-the-shoulder look."] = "Quanto si sposta di lato la telecamera. Circa 1 è discreto; da 1,5 a 2 è una vista decisa sopra la spalla."
+L["Right shoulder"] = "Spalla destra"
+L["Left shoulder"] = "Spalla sinistra"
+L["Which shoulder the camera looks over. The swap key below flips it."] = "Sopra quale spalla guarda la telecamera. Il tasto di scambio qui sotto la inverte."
+L["Swap shoulders key"] = "Tasto cambio spalla"
+L["Not during Cinematic's cameras that frame you"] = "Non durante le telecamere di Cinematic che ti inquadrano"
+L["On a mount the camera stays straight behind you: a big mount's head fills the shot from the side."] = "In sella la telecamera resta dritta dietro di te: di lato, la testa di una grossa cavalcatura riempie l'inquadratura."
+L["While the standing-still, AFK, flight, fly-by or death camera runs, the camera goes back behind you, as their shots are built around you in the middle. It comes back as they end. The quest and chat cameras keep it."] = "Mentre è attiva la telecamera da fermo, AFK, di volo, di sorvolo o di morte, la telecamera torna dietro di te, perché le loro inquadrature ti mettono al centro. Torna quando finiscono. Le telecamere delle missioni e della chat la mantengono."
+L["Frames"] = "Riquadri"
+L["Pause"] = "Pausa"
 
 -- TalkingHeads.lua (its option on the Quest Vision page)
 L["Talking heads"] = "Teste parlanti"

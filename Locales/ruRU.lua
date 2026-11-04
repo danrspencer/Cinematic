@@ -3510,7 +3510,6 @@ L["The camera is %d yards from you: a unit next to you is about %d yards from it
 L["The camera it moves like: cozy swings round to face you, vista and fish settle behind you (fish sways less), AFK turns right around you. Its other settings (Camera Settings page) go on as they are."] = "Камера, на которую он похож движением: уютная разворачивается к вам лицом, панорамная и рыбалки устанавливаются за спиной (рыбалки покачивается меньше), АФК облетает вас кругом. Ее остальные настройки (страница «Настройки камер») действуют как есть."
 L["The camera lines up behind you, then turns this far round: 180 looks straight back at you."] = "Камера выстраивается за спиной, затем поворачивается на столько: 180 — смотрит прямо на вас."
 L["The camera never tilts more than this far below where it was when auto-run started, even when it lowers while you steer."] = "Камера никогда не наклоняется ниже этого относительно положения в начале автобега, даже когда опускается, пока вы рулите."
-L["The camera sits over your right shoulder, with you on the left of the screen."] = "Камера находится над правым плечом, а вы — слева на экране."
 L["The camera slowly pulls back, then (with random zoom) drifts in and out. Moving glides it back to your distance; zooming yourself keeps your new distance."] = "Камера медленно отдаляется, затем (при случайном зуме) плавно приближается и отдаляется. Движение плавно возвращает ее к вашему расстоянию; ваш собственный зум сохраняет новое расстояние."
 L["The camera snaps straight to whoever's talking instead of swinging, the letterbox comes in twice as tall for the conversation with subtitles in its bottom bar, and the whole UI fades out: the minimap, frames, nameplates, names and the circle under your target."] = "Камера сразу переходит к говорящему, без поворота, полосы кадра становятся вдвое выше на время разговора с субтитрами в нижней полосе, и весь интерфейс скрывается: миникарта, рамки, индикаторы, имена и круг под вашей целью."
 L["The camera sways this much lower than where it lines up behind you, so it looks out across the view rather than down at it. 0 keeps your angle."] = "Камера покачивается на столько ниже положения за спиной, чтобы смотреть вдаль, а не вниз. 0 сохраняет ваш угол."
@@ -4264,6 +4263,7 @@ L["Its type, colors, bars and words, and where it sits."] = "Его тип, цв
 L["Its type, how it looks and where it sits. Press Test and close the settings to see it."] = "Его тип, вид и где он находится. Нажмите «Тест» и закройте настройки, чтобы увидеть его."
 L["Not the damage meter's numbers: your race with the player ahead of you, or your lead over #2 once you're #1. It reads the game's own damage meter, so that needs to be on (Options, Gameplay Enhancements: Enable Damage Meter). Its type and how it looks: the Look tab."] = "Не числа измерителя урона: ваша гонка с игроком впереди или ваш отрыв от №2, когда вы №1. Он читает собственный измеритель урона игры, так что тот должен быть включен (Настройки, Улучшения игрового процесса: Включить измеритель урона). Его тип и вид: вкладка «Вид»."
 L["Turning it on, when it shows, what it counts, its tests and the picked type's settings."] = "Включение, когда он показывается, что он считает, его тесты и настройки выбранного типа."
+L["%.2f yards"] = "%.2f м"
 
 -- Options.lua: Reset addon (Reset Settings, Reset EVERYTHING)
 L["Reset Settings puts every setting back and keeps what you made: your own profiles, cameras, scripts, themes and backups. Reset EVERYTHING deletes all of it. Either reloads the UI."] = "«Сбросить настройки» возвращает все настройки и сохраняет созданное вами: ваши профили, камеры, сценарии, темы и резервные копии. «Сбросить ВСЁ» удаляет и это. В обоих случаях интерфейс перезагружается."
@@ -4271,6 +4271,27 @@ L["Reset Cinematic?\n\nReset Settings: every setting goes back to how it was on 
 L["Delete everything in Cinematic? Your own profiles, cameras, scripts, themes, rules, wheels and backups are deleted for good, along with every setting. This can't be undone."] = "Удалить всё в Cinematic? Ваши профили, камеры, сценарии, темы, правила, колёса и резервные копии будут удалены навсегда вместе со всеми настройками. Это нельзя отменить."
 L["Reset Settings"] = "Сбросить настройки"
 L["Reset EVERYTHING"] = "Сбросить ВСЁ"
+
+-- ShoulderCam.lua
+L["Over your shoulder wherever you are. (The other columns then have nothing to add.)"] = "Из-за плеча, где бы вы ни были. (Другим столбцам тогда нечего добавить.)"
+L["Frames follow you"] = "Рамки следуют за вами"
+L["Your cast bar and Personal Resource Display slide over to where you are on the screen, and glide back as the camera goes behind you. Edit Mode still places them: this moves them from there."] = "Полоса заклинаний и личный индикатор ресурсов сдвигаются туда, где вы на экране, и возвращаются, когда камера уходит за спину. Их по-прежнему размещает режим редактирования: это сдвигает их оттуда."
+L["Follow strength"] = "Сила следования"
+L["How far they slide. Where you are on the screen is worked out from the camera, not read: if they land short of you or past you, turn this up or down."] = "Насколько далеко они сдвигаются. Ваше положение на экране вычисляется по камере, а не считывается: если они не доходят до вас или проскакивают, увеличьте или уменьшите это."
+L["The camera sits over your shoulder, with you to one side of the screen."] = "Камера смотрит из-за вашего плеча, а вы — сбоку экрана."
+L["On: the camera moves over your shoulder. This uses one of Blizzard's experimental camera settings: the game shows its experimental camera warning (Accept keeps it working). The game's Keep Character Centered option (Accessibility) stops it, so that's turned off meanwhile. Off: your own settings come back."] = "Вкл.: камера переходит за ваше плечо. Используется одна из экспериментальных настроек камеры Blizzard: игра покажет предупреждение об экспериментальной камере («Принять» оставляет её работать). Игровая настройка «Держать персонажа в центре» (Специальные возможности) мешает этому, поэтому на это время она отключается. Выкл.: возвращаются ваши настройки."
+L["Shoulder"] = "Плечо"
+L["Offset"] = "Смещение"
+L["How far to the side the camera moves. About 1 is subtle; 1.5 to 2 is a strong over-the-shoulder look."] = "Насколько камера сдвигается в сторону. Около 1 — едва заметно; от 1,5 до 2 — явный вид из-за плеча."
+L["Right shoulder"] = "Правое плечо"
+L["Left shoulder"] = "Левое плечо"
+L["Which shoulder the camera looks over. The swap key below flips it."] = "Из-за какого плеча смотрит камера. Клавиша смены ниже переключает его."
+L["Swap shoulders key"] = "Клавиша смены плеча"
+L["Not during Cinematic's cameras that frame you"] = "Не во время камер Cinematic, снимающих вас"
+L["On a mount the camera stays straight behind you: a big mount's head fills the shot from the side."] = "Верхом камера остаётся прямо позади: сбоку голова крупного ездового животного заполняет кадр."
+L["While the standing-still, AFK, flight, fly-by or death camera runs, the camera goes back behind you, as their shots are built around you in the middle. It comes back as they end. The quest and chat cameras keep it."] = "Пока работает камера бездействия, отсутствия, полёта, пролёта или смерти, камера возвращается за спину: их кадры построены с вами в центре. По их окончании она возвращается. Камеры заданий и чата её сохраняют."
+L["Frames"] = "Рамки"
+L["Pause"] = "Пауза"
 
 -- TalkingHeads.lua (its option on the Quest Vision page)
 L["Talking heads"] = "Говорящие головы"
