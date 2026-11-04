@@ -548,8 +548,15 @@ local function Answer(token)
 		pcall(DoEmote, token, "none")
 	else
 		local name = moment.fullName or moment.name
-		local unit = UnitFor(moment.guid, name) or name
-		pcall(DoEmote, token, unit)
+		local unit = UnitFor(moment.guid, name)
+		-- (Out of your sight, the game can't find them and plays it at everyone
+		-- around you instead: say so and play nothing. With no unit for them at
+		-- all, e.g. a stranger with no nameplate, there's no telling: by name.)
+		if unit and not ns.Flag(UnitIsVisible(unit)) then
+			ns.Print(L["Emote Vision: %s is too far away now."]:format(moment.name))
+		else
+			pcall(DoEmote, token, unit or name)
+		end
 	end
 	Hide()
 end

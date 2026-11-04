@@ -5692,6 +5692,7 @@ L["High five"] = "Chocar los cinco"
 
 -- Emote Vision: the moments' emote grid, voice emotes
 L["Emote Vision test: you'd %s %s."] = "Prueba de Visión de gestos: harías %s a %s."
+L["Emote Vision: %s is too far away now."] = "Visión de gestos: %s ya está demasiado lejos."
 L["All emotes"] = "Todos los gestos"
 L["Voice emotes"] = "Gestos de voz"
 L["Add an emote"] = "Añadir un gesto"

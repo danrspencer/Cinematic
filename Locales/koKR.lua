@@ -4345,6 +4345,9 @@ L["The time left at the line's end."] = "선 끝에 표시할 남은 시간."
 L["The Flight departure card's line is on: on a route you've flown before, it fills up as you fly"] = "비행 출발 카드의 선이 켜져 있습니다: 전에 날아 본 경로에서 비행하는 동안 채워집니다"
 L["Where:"] = "위치:"
 
+-- EmoteVision.lua
+L["Emote Vision: %s is too far away now."] = "Emote Vision: %s 님이 이제 너무 멀리 있습니다."
+
 -- Options.lua: the CineMode page's Overview
 L["Overview"] = "개요"
 L["Everything CineMode can do, page by page, and whether each page is on."] = "CineMode가 할 수 있는 모든 것을 페이지별로, 각 페이지가 켜져 있는지와 함께."

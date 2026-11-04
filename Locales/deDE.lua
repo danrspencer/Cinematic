@@ -4345,6 +4345,9 @@ L["The time left at the line's end."] = "Die verbleibende Zeit am Ende der Linie
 L["The Flight departure card's line is on: on a route you've flown before, it fills up as you fly"] = "Die Linie der Abflugkarte ist an: Auf einer schon geflogenen Route füllt sie sich beim Fliegen"
 L["Where:"] = "Wo:"
 
+-- EmoteVision.lua
+L["Emote Vision: %s is too far away now."] = "Emote Vision: %s ist jetzt zu weit weg."
+
 -- Options.lua: the CineMode page's Overview
 L["Overview"] = "Übersicht"
 L["Everything CineMode can do, page by page, and whether each page is on."] = "Alles, was CineMode kann, Seite für Seite, und ob jede Seite an ist."

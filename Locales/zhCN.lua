@@ -4345,6 +4345,9 @@ L["The time left at the line's end."] = "线末端的剩余时间。"
 L["The Flight departure card's line is on: on a route you've flown before, it fills up as you fly"] = "起飞卡片的线已开启：在飞过的航线上，它会随飞行填满"
 L["Where:"] = "位置："
 
+-- EmoteVision.lua
+L["Emote Vision: %s is too far away now."] = "Emote Vision：%s 现在太远了。"
+
 -- Options.lua: the CineMode page's Overview
 L["Overview"] = "概览"
 L["Everything CineMode can do, page by page, and whether each page is on."] = "CineMode 能做的一切，逐页列出，以及每页是否开启。"
