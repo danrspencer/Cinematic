@@ -2262,8 +2262,9 @@ local function CorrectZoomToward(desired, track)
 	local err, ahead = desired - zoom, desired - track.aim
 	if math.abs(err) > ZOOM_DEADBAND and (ahead > 0) == (err > 0) then
 		local ask = math.min(math.abs(err) * ZOOM_GAIN, math.abs(ahead))
-		CallCameraFunction(err > 0 and "CameraZoomOut" or "CameraZoomIn", ask)
-		track.aim = track.aim + (err > 0 and ask or -ask)
+		if CallCameraFunction(err > 0 and "CameraZoomOut" or "CameraZoomIn", ask) then -- (refused: another camera has the view)
+			track.aim = track.aim + (err > 0 and ask or -ask)
+		end
 	end
 	return err
 end

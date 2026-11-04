@@ -2273,9 +2273,46 @@ function ns.PlayCameraScript(script)
 	return true
 end
 
+-- /cine orbit [angle] [secs]: the camera turns once round you, 360 degrees
+-- over 10 seconds unless given (a negative angle goes the other way), as a
+-- one-step script: the rotate step's camera lock, speed hold and creep start.
+-- Again while it turns: stops it. Moving, a fight or your own camera stop it.
+local ORBIT_ID = "orbit"
+function ns.OrbitCommand(arg)
+	local playing = run and run.script
+	if playing and playing.id == ORBIT_ID then
+		ns.StopCameraScript()
+		ns.Print(L["orbit stopped"])
+		return
+	end
+	local angle, secs = (arg or ""):match("^%s*(%S*)%s*(%S*)")
+	angle, secs = tonumber(angle) or 360, tonumber(secs) or 10
+	local deg = math.max(1, math.min(3600, math.abs(angle)))
+	secs = math.max(0.5, math.min(600, secs))
+	local turn = ns.NewCameraScriptStep("rotate")
+	turn.deg, turn.secs, turn.way, turn.ease = deg, secs, angle < 0 and "right" or "left", "steady"
+	local ok, why = ns.PlayCameraScript({ id = ORBIT_ID, name = L["Orbit"], steps = { turn }, ending = {},
+		rules = { camera = "stop", fight = "stop", walk = "stop", zoom = "ignore", ends = "stop" } })
+	if ok then
+		ns.Print(L["orbit: %d degrees over %s seconds (/cine orbit again stops it)"]:format(deg, tostring(secs)))
+	else
+		ns.Print(L["orbit can't start: %s"]:format(tostring(why)))
+	end
+end
+
 -- The script playing now, or nil (the minimap button's menu lists it).
 function ns.PlayingCameraScript()
 	return run and run.script
+end
+
+-- The camera a playing built-in script stands in for, by its key in
+-- ns.activeCam ("idle", "vista", "flight"...), or nil: the rules' cam_*
+-- words (Frames.lua). Run as its script, a camera leaves ns.activeCam unset.
+local CAMERA_KEY_OF = { afk = "idle", chat = "chatcam" }
+function ns.PlayingCameraKey()
+	local id = run and run.builtinId
+	if type(id) ~= "string" then return nil end
+	return CAMERA_KEY_OF[id] or id
 end
 
 function ns.StopCameraScript()

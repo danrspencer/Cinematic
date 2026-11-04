@@ -1447,6 +1447,8 @@ local function HandleSlash(msg)
 		for name in pairs(ns.cityNames) do names[#names + 1] = name end
 		table.sort(names)
 		ns.Print("cities: " .. (#names > 0 and table.concat(names, ", ") or "none found"))
+	elseif cmd == "orbit" then
+		ns.OrbitCommand(arg)
 	elseif cmd == "debug" and arg == "orbit" then
 		-- Run mid-flight to see what the camera rotation thinks it's doing.
 		ns.Print(("onTaxi=%s cinematic=%s enabled=%s orbitOption=%s mode=%s"):format(
