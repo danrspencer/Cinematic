@@ -1277,7 +1277,7 @@ for page, keys in pairs({
 	-- The Cards page's rows (Cards.lua) and the time of day at login.
 	cards = { "combatOnEnter", "combatOnLeave", "cardBossOn", "storyZoneCard", "storyZoneSubzones", "storyRecap",
 		"timeOfDayMessage", "timeOfDayChange", "chatAttackAlert", "cardDuelOn", "cardDeathOn", "cardLevelUpOn",
-		"cardDiscoverOn", "cardArrivalOn", "cardRestedOn", "cardAchievementOn", "cardReputationOn", "cardCollectOn",
+		"cardDiscoverOn", "cardDepartureOn", "cardArrivalOn", "cardRestedOn", "cardAchievementOn", "cardReputationOn", "cardCollectOn",
 		"cardProfessionOn", "cardQuestOn", "cardClearedOn", "cardRareOn", "cardBattlegroundOn", "cardStreakOn",
 		"cardBossDownOn", "cardFelledOn", "cardRevivedOn" },
 	cameraModes = { "shoulderCam" }, -- Cameras > General's Enable Cameras: Shoulder Cam
@@ -2892,6 +2892,7 @@ local function OnUpdate(_, elapsed)
 			or (offForMoving and ns.db.movingKeepVFX) or false
 		-- (Each on while its Show in row, effect:<effect>, is: Visual Effects page;
 		-- the letterbox and tint while their own page's Enable Page is on too.)
+		-- (Show me's effects demo, ShowMe.lua: just its effects, for its few seconds.)
 		for _, key in ipairs(GRID_EFFECTS) do
 			effectWanted[key] = effectsOn and ns.db.visualEffects and ns.db[key .. "Page"] ~= false
 				and ns.RowOnNow(EFFECT_ROWS[key], ns.db[key .. "Always"], true) or false

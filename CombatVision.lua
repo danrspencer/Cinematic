@@ -692,12 +692,81 @@ local function Draw(cue, age)
 	return true
 end
 
+-- A card's icon you can click (a rare's portrait: card.clickMacro, e.g.
+-- /targetexact its name; card.clickTip its tooltip). Addons can't target,
+-- only a click may: a secure button over the icon, shown out of fights only
+-- (a secure button can't move, show or hide in one), off as one starts. No
+-- parent (the card's screen moves to a holder with the UI hidden), placed
+-- by the icon's place on the screen.
+local clickButton
+local function ClickButton()
+	if clickButton then return clickButton end
+	local button = CreateFrame("Button", "CinematicCardClickButton", nil, "SecureActionButtonTemplate")
+	button:SetFrameStrata("LOW")
+	button:SetFrameLevel(100)
+	button:SetAttribute("type", "macro")
+	button:SetAttribute("macrotext", "")
+	-- (On key down or up as the game's action buttons are, not both: it'd go twice.)
+	button:RegisterForClicks(GetCVarBool("ActionButtonUseKeyDown") and "AnyDown" or "AnyUp")
+	local glow = button:CreateTexture(nil, "HIGHLIGHT")
+	glow:SetAllPoints()
+	-- (Round, as the portrait is: the game's round portrait mask, white.)
+	glow:SetTexture("Interface\\CharacterFrame\\TempPortraitAlphaMask")
+	glow:SetVertexColor(1, 1, 1, 0.2)
+	button:SetScript("OnEnter", function(self)
+		if not self.tip then return end
+		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+		GameTooltip:SetText(self.tip, 1, 1, 1, 1, true)
+		GameTooltip:Show()
+	end)
+	button:SetScript("OnLeave", function() GameTooltip:Hide() end)
+	-- (PLAYER_REGEN_DISABLED comes just before the lockdown: still free to hide.)
+	button:RegisterEvent("PLAYER_REGEN_DISABLED")
+	button:RegisterEvent("PLAYER_REGEN_ENABLED")
+	button:SetScript("OnEvent", function(self, event)
+		if event == "PLAYER_REGEN_DISABLED" or not self.cue then self:Hide() end
+	end)
+	button:Hide()
+	clickButton = button
+	return button
+end
+local function PlaceClick(cue)
+	local button = clickButton
+	if not button or InCombatLockdown() then return end
+	if not cue.click and button.cue ~= cue then return end -- (another card's, e.g. a preview's)
+	local icon = cue.icon
+	local x, y = icon:GetCenter()
+	if not (cue.click and icon:IsVisible() and x) or UnitAffectingCombat("player") then
+		button.cue = nil
+		button:Hide()
+		return
+	end
+	-- (In the button's own units: its scale UIParent's, no parent.)
+	local ui = UIParent:GetEffectiveScale()
+	local k = icon:GetEffectiveScale() / ui
+	button:SetScale(ui)
+	button:ClearAllPoints()
+	button:SetPoint("CENTER", UIParent, "BOTTOMLEFT", x * k, y * k)
+	button:SetSize(icon:GetWidth() * k, icon:GetHeight() * k)
+	button.cue = cue
+	button:Show()
+end
+local function ArmClick(cue, card, scale)
+	cue.click = nil
+	if scale ~= 1 or not (card and card.clickMacro) or InCombatLockdown() then return end
+	local button = ClickButton()
+	button:SetAttribute("macrotext", card.clickMacro)
+	button.tip = card.clickTip
+	cue.click = true
+end
+
 -- Plays cue on frame: its OnUpdate runs it to the end. look: a card's
 -- (ns.CardLook). after: called once it's done (not if another card on
 -- frame cuts it short).
 local function Play(frame, look, enter, width, height, scale, boss, after)
 	local cue = frame.cue or MakeCue(frame)
 	Setup(cue, look, enter, width, height, scale, boss)
+	ArmClick(cue, boss, scale)
 	local age = 0
 	cue.cutAt = nil
 	-- Cut short: a quick fade out from as shown as it is now.
@@ -706,10 +775,16 @@ local function Play(frame, look, enter, width, height, scale, boss, after)
 		cue.cutAt, cue.cutFrom = age, (Shown(cue, age))
 	end
 	Draw(cue, 0)
-	frame:SetScript("OnUpdate", function(self, elapsed)
+	PlaceClick(cue)
+	ns.SetOnUpdate(frame, function(self, elapsed)
 		age = age + elapsed
-		if not Draw(cue, age) then
-			self:SetScript("OnUpdate", nil)
+		local going = Draw(cue, age)
+		if not going then cue.click = nil end
+		-- (Off once it's faded most of the way: not a click on nothing.)
+		if cue.click and cue.over:GetAlpha() < 0.3 and age > 1 then cue.click = nil end
+		PlaceClick(cue)
+		if not going then
+			ns.SetOnUpdate(self, nil)
 			if after then after() end
 		end
 	end)

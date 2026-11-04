@@ -14,6 +14,7 @@ DEFAULTS.storyZoneCard = false        -- the Zone row (off: the game's own)
 DEFAULTS.storyZoneSubzones = true     -- the Subzone row: a card as you come into a subzone, too
 DEFAULTS.storyZoneTerritory = false   -- "Contested Territory" and such under it, as the game says
 DEFAULTS.storyZoneGap = 5             -- seconds after a Zone or Subzone card before the next can come
+DEFAULTS.storyZoneNotFlying = true    -- none on a flight path (the Flight departure and arrival cards say where)
 
 local SEPARATOR = " · "
 -- The game's lines: zone, PvP status, arena/sanctuary note, subzone.
@@ -90,6 +91,8 @@ local function Card(zone, subzone, newArea)
 	if newArea and GetTime() < timeUntil and ns.TimeTitleNow then
 		meta, timeUntil = ns.TimeTitleNow(), 0
 	end
+	-- (On a flight path: none, the places flown over coming one after another.)
+	if ns.db.storyZoneNotFlying and ns.Flag(ns.OnTaxi()) then return end
 	-- (Passing through places quickly: none until the gap since the last's up.)
 	if last and GetTime() - last.played < (tonumber(ns.db.storyZoneGap) or 0) then return end
 	local card = ns.ZoneCardText(zone, subzone, nil, newArea, meta)

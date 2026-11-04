@@ -1,5 +1,5 @@
 -- The Cards page's moments of a character's story (Cards.lua's events from
--- Level up on, and Discovered, Flight arrival, Rested, Dungeon cleared, Rare
+-- Level up on, and Discovered, Flight departure and arrival, Rested, Dungeon cleared, Rare
 -- spotted, Battleground and Kill streak): each heard here and fired as a
 -- card (ns.Cards.Fire), with its made-up one for the Test buttons
 -- (ns.CardSamples). The page's tick for each is its row's; all off to start
@@ -12,6 +12,11 @@ local DEFAULTS = ns.DEFAULTS
 
 DEFAULTS.cardLevelUpOn = false
 DEFAULTS.cardDiscoverOn = false
+DEFAULTS.cardDepartureOn = false
+DEFAULTS.cardDepartureLine = true -- (its progress line as you fly: FlightLine.lua)
+DEFAULTS.cardDepartureLinePlace = "top" -- its bar: "top" or "bottom" (no letterbox up: that edge of the screen)
+DEFAULTS.cardDepartureLineEdges = 8 -- seconds at a flight's start and end it shows (between: the mouse over it); 0: always
+DEFAULTS.cardDepartureClock = "minutes" -- the time left at its end: "minutes" (2 min), "clock" (1:12), "none"
 DEFAULTS.cardArrivalOn = false
 DEFAULTS.cardRestedOn = false
 DEFAULTS.cardAchievementOn = false
@@ -149,7 +154,8 @@ local function ZoneEntered()
 	seen.zones[zone] = true
 	local count = ExploredCount()
 	local new
-	if count then new = count <= 1 else new = not first end
+	-- (0: a map with no explorable areas at all, as cities: no answer there.)
+	if count and count > 0 then new = count <= 1 else new = not first end
 	if new and ns.CardOn("discover") then
 		zoneFoundAt = GetTime()
 		Discovered(zone)
@@ -188,30 +194,93 @@ ns.CardSequences.discover = function()
 end
 
 ---------------------------------------------------------------------------
--- Flight arrival: where a flight took you, as you land (the flight
--- camera's arrival shot is over by then). The place: the flight master's
--- node you picked ("Booty Bay, Stranglethorn"), else where you are.
-local onTaxi, destination = false, nil
-local function ArrivalCard(place)
+-- Flight departure and arrival: where a flight is taking you, as you take
+-- off (once the flight camera's swing round behind you is done), and where
+-- it took you as you land (its arrival shot over by then). The place: the
+-- flight master's node you picked ("Booty Bay, Stranglethorn"), else (landing)
+-- where you are. How long: the route's time the flight camera saved
+-- (ns.FlightDuration, Camera.lua), unknown on its first flight; the flight's
+-- own, timed from takeoff (takeoffAt; nil after a /reload in the air).
+local onTaxi, destination, takeoffAt = false, nil, nil
+local DEPART_AFTER = 1 -- seconds after takeoff the departure card shows (as the swing behind you starts)
+local function PlaceParts(place)
 	local name, sub = (place or ""):match("^(.-),%s*(.+)$")
 	if not name then name, sub = place or "", "" end
-	return { meta = L["Arrived"], name = name, sub = sub }
+	return name, sub
 end
-local function Landed()
+-- ("1:52", for a flight's time.)
+function ns.FlightClock(seconds)
+	seconds = math.max(0, math.floor(seconds + 0.5))
+	return ("%d:%02d"):format(math.floor(seconds / 60), seconds % 60)
+end
+local function DepartureCard(place, duration)
+	local name, sub = PlaceParts(place)
+	local how
+	if not duration then
+		how = L["First time on this route"]
+	elseif duration < 60 then
+		how = L["under a minute"]
+	else
+		how = L["about %d min"]:format(math.floor(duration / 60 + 0.5))
+	end
+	return { meta = L["Flying to"], name = name, sub = sub ~= "" and (sub .. SEPARATOR .. how) or how }
+end
+local function ArrivalCard(place, took)
+	local name, sub = PlaceParts(place)
+	local meta = L["Arrived"]
+	if took then meta = meta .. SEPARATOR .. L["%s flight"]:format(ns.FlightClock(took)) end
+	return { meta = meta, name = name, sub = sub }
+end
+-- What the last takeoff did about its card, for /cine debug cards (Slash.lua).
+ns.departureTrace = { text = "no takeoff seen since login" }
+local function Trace(text)
+	ns.departureTrace = { text = text, at = GetTime() }
+end
+local function Departed()
+	if not ns.Flag(ns.OnTaxi()) then Trace("landed before its card was due") return end
+	-- (The node you picked, else the route's end as the flight camera has it.)
+	local place = destination or (ns.flight and ns.flight.route and ns.flight.route:match(" > (.+)$"))
+	if not place then Trace("no destination: not picked at a flight master") return end
+	local duration = ns.FlightDuration()
+	local _, why = ns.CardAllowed("departure")
+	local playing = ns.Cards.Current()
+	if ns.Cards.Fire("departure", DepartureCard(place, duration)) then
+		Trace("fired: " .. place .. (duration and (", route known, " .. ns.FlightClock(duration)) or
+			", route not flown before") .. (playing and (", behind " .. tostring(playing.id)) or ""))
+	else
+		Trace("not shown: " .. tostring(why))
+	end
+end
+-- Takeoff, as the flight camera sees it (Camera.lua's ns.UpdateTaxi, whatever
+-- the camera's settings): the card once its swing behind you is done.
+function ns.OnTakeoff()
+	takeoffAt = GetTime()
+	if ns.FlightLineStart then ns.FlightLineStart() end -- (its progress line: FlightLine.lua)
+	if ns.CardOn("departure") then
+		Trace("takeoff seen, card due")
+		C_Timer.After(DEPART_AFTER, Departed)
+	else
+		Trace("takeoff seen, the Flight departure row is off")
+	end
+end
+local function Landed(took)
 	local place = destination
 	destination = nil
 	if not place then
 		local sub, zone = Subzone(), Zone()
 		place = sub ~= "" and sub ~= zone and (sub .. ", " .. zone) or zone
 	end
-	if place ~= "" then ns.Cards.Fire("arrival", ArrivalCard(place)) end
+	if place ~= "" then ns.Cards.Fire("arrival", ArrivalCard(place, took)) end
 end
 if TakeTaxiNode then
 	hooksecurefunc("TakeTaxiNode", function(index)
 		destination = TaxiNodeName and Plain(TaxiNodeName(index)) or nil
 	end)
 end
-samples.arrival = function() return ArrivalCard("Booty Bay, Stranglethorn") end
+samples.departure = function()
+	return DepartureCard("Booty Bay, Stranglethorn", ns.FlightDuration and ns.FlightDuration() or 134)
+end
+samples.arrival = function() return ArrivalCard("Booty Bay, Stranglethorn", 112) end
 
 ---------------------------------------------------------------------------
 -- Rested: coming into an inn or a city (not at login, not in a fight), the
@@ -536,7 +605,11 @@ local function Spot(unit)
 	local key = Plain(UnitGUID(unit)) or name
 	if not (name and key) or raresSeen[key] then return end
 	raresSeen[key] = true
-	ns.Cards.Fire("rare", RareCard(name, class == "rareelite", key))
+	-- (Its icon a click to target it, out of fights: CombatVision.lua.)
+	local card = RareCard(name, class == "rareelite", key)
+	card.clickMacro = "/targetexact " .. name
+	card.clickTip = L["Click to target %s"]:format(name)
+	ns.Cards.Fire("rare", card)
 end
 -- (Made up: your target's portrait if you have one, so the Test shows it.)
 samples.rare = function()
@@ -716,11 +789,14 @@ watcher:SetScript("OnEvent", function(_, event, ...)
 	elseif event == "MAJOR_FACTION_RENOWN_LEVEL_CHANGED" then
 		if ns.CardOn("reputation") then Renown(...) end
 	elseif event == "PLAYER_CONTROL_LOST" then
+		-- (The departure card goes by the flight camera's takeoff: ns.OnTakeoff.)
 		C_Timer.After(1, function() onTaxi = ns.Flag(UnitOnTaxi("player")) and true or false end)
 	elseif event == "PLAYER_CONTROL_GAINED" then
 		if onTaxi then
 			onTaxi = false
-			if ns.CardOn("arrival") then C_Timer.After(0.5, Landed) else destination = nil end
+			local took = takeoffAt and GetTime() - takeoffAt
+			takeoffAt = nil
+			if ns.CardOn("arrival") then C_Timer.After(0.5, function() Landed(took) end) else destination = nil end
 		end
 	elseif event == "PLAYER_UPDATE_RESTING" then
 		if ns.CardOn("rested") then RestChanged() else resting = ns.Flag(IsResting()) end

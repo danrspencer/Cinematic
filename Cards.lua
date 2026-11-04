@@ -72,12 +72,16 @@ local EVENTS = {
 	{ id = "cleared", name = "Dungeon cleared", on = "cardClearedOn", priority = 75,
 		icon = "Interface\\Icons\\Achievement_Dungeon_ClassicDungeonMaster",
 		has = EJ_GetInstanceForMap ~= nil, inFight = "wait" },
-	{ id = "zone", name = "Zone", on = "storyZoneCard", priority = 40, icon = MAP, inFight = "show" },
+	{ id = "zone", name = "Zone", on = "storyZoneCard", priority = 40, icon = MAP, inFight = "skip" },
 	{ id = "subzone", name = "Subzone", on = "storyZoneSubzones", priority = 40, icon = MAP, parent = "zone",
-		needs = "zone", inFight = "show" },
+		needs = "zone", inFight = "skip" },
 	-- (A notch over Zone's: it cuts in on the card it'd come with.)
 	{ id = "discover", name = "Discovered", on = "cardDiscoverOn", priority = 45,
 		icon = "Interface\\Icons\\INV_Misc_Spyglass_03", parent = "zone", inFight = "show" },
+	-- (Over Zone's and Subzone's: a city hop crosses subzones as it takes off,
+	-- their cards would keep it waiting till it's dropped.)
+	{ id = "departure", name = "Flight departure", on = "cardDepartureOn", priority = 42,
+		icon = "Interface\\Icons\\Ability_Mount_Gryphon_01", parent = "zone", inFight = "show" },
 	{ id = "arrival", name = "Flight arrival", on = "cardArrivalOn", priority = 30,
 		icon = "Interface\\Icons\\Ability_Mount_Gryphon_01", parent = "zone", inFight = "show" },
 	{ id = "rested", name = "Rested", on = "cardRestedOn", priority = 25,
@@ -240,7 +244,7 @@ ns.CARD_STYLE_BY_ID = STYLE_BY_ID
 local BASES = { combatIn = "danger", combatOut = "respite", attack = "danger", death = "death",
 	levelUp = "milestone", achievement = "milestone", cleared = "milestone", discover = "milestone",
 	quest = "milestone", battleground = "place",
-	zone = "place", subzone = "follow", arrival = "follow", login = "place", boss = "place", duel = "place",
+	zone = "place", subzone = "follow", departure = "follow", arrival = "follow", login = "place", boss = "place", duel = "place",
 	time = "milestone",
 	reputation = "ticker", collect = "ticker", profession = "ticker", rested = "ticker",
 	streak = "ticker", rare = "rare", bossDown = "victory", felled = "victory", revived = "victory" }
@@ -756,6 +760,8 @@ function ns.CardTest(id)
 		ns.Cards.Cut(was)
 		if was == id then return end
 	end
+	-- (Flight departure's Test plays its progress line too, on a made-up flight: FlightLine.lua.)
+	if id == "departure" and ns.FlightLineTest then ns.FlightLineTest() end
 	if not sequence then
 		ns.Cards.Fire(id, ns.CardSample(id), true)
 		return

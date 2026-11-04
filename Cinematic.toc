@@ -114,6 +114,7 @@ DamageVision.lua
 DamageReport.lua
 ZoneCard.lua
 CardMoments.lua
+FlightLine.lua
 QuestTalkStyle.lua
 BubbleStyle.lua
 TooltipStyle.lua

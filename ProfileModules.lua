@@ -502,11 +502,11 @@ ns.PROFILE_MODULES = {
 			end
 		end },
 	{ key = "story-cards", name = "Story cards", scope = { "Card Vision" },
-		tip = "The rest of your character's story as the Cards page's cards: a place discovered, a flight's end, " ..
+		tip = "The rest of your character's story as the Cards page's cards: a place discovered, a flight's start and end, " ..
 			"an inn, a new standing or profession rank, a story quest done, a rare spotted, a battleground and a " ..
 			"kill streak.",
 		apply = function(set)
-			for _, key in ipairs({ "cardDiscoverOn", "cardArrivalOn", "cardRestedOn", "cardReputationOn",
+			for _, key in ipairs({ "cardDiscoverOn", "cardDepartureOn", "cardArrivalOn", "cardRestedOn", "cardReputationOn",
 				"cardProfessionOn", "cardQuestOn", "cardRareOn", "cardBattlegroundOn", "cardStreakOn" }) do
 				set(key, true)
 			end

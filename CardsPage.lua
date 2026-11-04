@@ -332,7 +332,9 @@ local TIPS = {
 		"times you died.",
 	discover = "A place new to you: a zone the first time you're there, a subzone as the game says you " ..
 		"discovered it, a dungeon or raid the first time you go in. In place of the Zone or Subzone card.",
-	arrival = "As a flight lands: where it took you.",
+	departure = "As a flight takes off: where it's taking you, and about how long it takes on a route you've " ..
+		"flown before. With a line along the top or bottom of the screen filling up on the way, if you like.",
+	arrival = "As a flight lands: where it took you, and how long the flight took.",
 	rested = "As you come into an inn or a city (not at login, not in a fight): the place's name. The same " ..
 		"place at most once every 10 minutes.",
 	levelUp = "As you reach a new level (after the fight, if you're in one): the level, the zone and how long " ..
@@ -961,6 +963,9 @@ function ns.CreateCardSettingsPanel(kit)
 		local gap = stack:Add(kit.Slider(content, "storyZoneGap", L["Not again within"], 0, 30, 1, "%d s"), "slider")
 		kit.Tooltip(gap, L["After a Zone or Subzone card, no other comes for this long, so passing through " ..
 			"places quickly doesn't bring one after another. 0: every time."])
+		Check("storyZoneNotFlying", L["Not on flights"], L["No Zone or Subzone card on a flight path: the " ..
+			"places you fly over don't bring one after another, and the Flight departure and arrival cards say " ..
+			"where you're going."])
 		FightRow("zone")
 	end)
 	parts.Part("subzone", function()
@@ -1100,6 +1105,46 @@ function ns.CreateCardSettingsPanel(kit)
 	parts.Part("time", function()
 		FightRow("time")
 		stack:Note(content, L["Its look is on the Style tab, a sound for each time of day on the Sounds tab."], NOTE_W)
+	end)
+	parts.Part("departure", function()
+		FightRow("departure")
+		Header(L["Progress line"])
+		Check("cardDepartureLine", L["Show a line as you fly"],
+			L["On a route you've flown before, a thin line along a letterbox bar (or that edge of the " ..
+			"screen) fills up as you fly, with the time left at its end. It shows while your UI is faded, and " ..
+			"goes a moment before you land. A route's first flight has none: it's timed as you fly it."])
+		local where = kit.Dropdown(content, "cardDepartureLinePlace", List({
+			{ "top", L["Top bar"] },
+			{ "bottom", L["Bottom bar"] },
+		}), 200)
+		if where then
+			local name = stack:Add(kit.Label(content, "GameFontHighlight", L["Where:"]), "label")
+			name:SetSize(150, 30)
+			name:SetJustifyV("MIDDLE")
+			where:SetPoint("LEFT", name, "RIGHT", 4, 0)
+			kit.Tooltip(where, L["The letterbox bar the line and its time go in (no letterbox up: that edge of " ..
+				"the screen)."])
+			kit.GreyUnless(where, function(db) return db.cardDepartureLine end)
+		end
+		local edges = stack:Add(kit.Slider(content, "cardDepartureLineEdges", L["Only at the start and end"], 0, 30, 1,
+			"%d s"), "slider")
+		kit.Tooltip(edges, L["The line shows for this long as the flight starts and before it lands, and is " ..
+			"hidden in between: point the mouse at its place to see it. 0: it shows the whole way."])
+		kit.GreyUnless(edges, function(db) return db.cardDepartureLine end)
+		local clock = kit.Dropdown(content, "cardDepartureClock", List({
+			{ "minutes", L["Minutes only"], L["\"2 min\", rounded up, then \"under a minute\"."] },
+			{ "clock", L["Minutes and seconds"], L["\"1:12\", counting down."] },
+			{ "none", L["Don't show"], L["Just the line."] },
+		}), 200)
+		if clock then
+			local name = stack:Add(kit.Label(content, "GameFontHighlight", L["Time left:"]), "label")
+			name:SetSize(150, 30)
+			name:SetJustifyV("MIDDLE")
+			clock:SetPoint("LEFT", name, "RIGHT", 4, 0)
+			kit.Tooltip(clock, L["The time left at the line's end."])
+			kit.GreyUnless(clock, function(db) return db.cardDepartureLine end)
+		end
+		stack:Note(content, L["Its look is on the Style tab, its sound on the Sounds tab."], NOTE_W)
 	end)
 	for _, id in ipairs({ "cleared", "discover", "arrival", "rested", "levelUp", "achievement", "reputation", "collect",
 		"profession", "quest", "rare", "battleground", "streak" }) do

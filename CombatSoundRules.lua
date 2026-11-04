@@ -27,7 +27,7 @@ ns.DEFAULTS.cardTimeSounds = "dawn##8352@100;morning##730@100;midday##1@100;afte
 -- (The other cards': one rule each, "show#<condition>#<sounds>". A page
 -- turning for Last time, your faction's bell for Under attack, the rest
 -- silent.)
-ns.CARD_SOUND_LISTS = { "zone", "subzone", "login", "attack", "duel", "death", "cleared", "discover", "arrival",
+ns.CARD_SOUND_LISTS = { "zone", "subzone", "login", "attack", "duel", "death", "cleared", "discover", "departure", "arrival",
 	"rested", "levelUp", "achievement", "reputation", "collect", "profession", "quest", "rare", "battleground", "streak",
 	"bossDown", "felled", "revived" }
 ns.DEFAULTS.cardSounds_zone = "show##"

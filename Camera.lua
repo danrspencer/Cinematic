@@ -4337,6 +4337,14 @@ local function FlightTimeLeft()
 	return duration - (GetTime() - ns.flight.start)
 end
 ns.FlightTimeLeft = FlightTimeLeft -- (camera scripts' Wait until landing: CameraScripts.lua)
+-- The flight in progress: how long it takes in all and how long it's been
+-- going (nil: not flying, or a route not flown before), for the Flight
+-- departure card and its line (CardMoments.lua, FlightLine.lua).
+function ns.FlightDuration()
+	local duration = ns.flight.start and KnownFlightTime(ns.flight.route)
+	if not duration then return nil end
+	return duration, GetTime() - ns.flight.start
+end
 
 -- On flights the fly-by and the arrival are moves of the flight camera itself
 -- (ns.orbit.special), made the way its sways are: speed changes on top of the
@@ -4529,6 +4537,7 @@ function ns.UpdateTaxi()
 		ns.db.takeoffZoom = ns.PlayerZoom()
 		ns.db.takeoffInCity = ns.IsInCity() and true or nil -- (for the Flight Cam's "Turn off in: Cities")
 		flightSince, flightCamStarted = ns.flight.start or now, false
+		if ns.OnTakeoff then pcall(ns.OnTakeoff) end -- (the Flight departure card: CardMoments.lua)
 	elseif ns.wasOnTaxi and not onTaxi then
 		ns.flight.takeoverLogged = nil
 		if ns.flight.route then

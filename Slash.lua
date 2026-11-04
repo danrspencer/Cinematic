@@ -1286,6 +1286,15 @@ local function HandleSlash(msg)
 				ok and "|cff60ff60shows here|r" or "|cffff6060not here|r", ok and "" or " (" .. tostring(why) .. ")",
 				event.inFight and tostring(ns.db["cardFight_" .. event.id]) or "always", #own > 0 and table.concat(own, ", ") or "none"))
 		end
+		-- (The last takeoff's Flight departure card, and the flight now: CardMoments.lua.)
+		local trace = ns.departureTrace
+		if trace then
+			local duration, gone = ns.FlightDuration()
+			print(("  last departure: %s%s; on a flight: %s, route: %s%s"):format(trace.text,
+				trace.at and (" (%.0f s ago)"):format(GetTime() - trace.at) or "", tostring(ns.Flag(ns.OnTaxi())),
+				tostring(ns.flight and ns.flight.route),
+				duration and (", %.0f of %.0f s"):format(gone or 0, duration) or ""))
+		end
 		-- (Each style changed from how it comes: which settings.)
 		for _, style in ipairs(ns.CARD_STYLES or {}) do
 			local changed = {}
