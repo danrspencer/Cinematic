@@ -2063,6 +2063,10 @@ local EDGE_SCOUT = {
 	{ 4272488, "Green flames (Fel flames' overlay)", "Nature and fel", "4272469_4272488" },
 	{ 4295956, "Spell wisps (Fel flames' layer)", "Nature and fel", "10fx_spell30_4295956" },
 	{ 5689340, "Light feather impact (Spellfire's layer)", "Holy and gold", "12fx_marchonqueldanas_belorenchildofalar_lightfeather_impact_5689340" },
+	-- (And those of the effects some class themes have, 2026-11-04.)
+	{ 2159762, "Ambient sparks (Ember glow's overlay)", "Fire", "8fx_generic_spark_ambient_grinder_nocollision_4_2159762" },
+	{ 2388126, "Wispy blurred magic (Cyan glow's overlay)", "Smoke and clouds", "wispymagic_necroblur_alift" },
+	{ 2499977, "Wispy blurred magic (2) (Cyan glow's layer)", "Smoke and clouds", "wispymagic_necroblurb_a" },
 }
 local scout, scoutAt, scoutBlend = nil, 0, false
 function ns.ScoutGameEdges(arg)

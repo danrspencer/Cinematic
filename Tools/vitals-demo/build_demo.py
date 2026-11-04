@@ -71,7 +71,7 @@ for i in range(1, len(ns.LOW_HEALTH_BLIZZ_PATTERNS) + 1):
 masks = [{"id": m[0], "name": m[1]} for m in py(ns.LOW_HEALTH_BLIZZ_MASKS)]
 # The game effects the themes use: their files and colors, as ScreenEffects.lua
 # draws them (ns.ScreenEffectLook's rules, the same numbers).
-SOLID = {1273161, 188526, 3308414, 166282}
+SOLID = {1273161, 188526, 3308414, 166282, 984062}
 OWN_COLORS = {6996936, 2159813, 2395778, 4529965, 5636772, 3522953, 2735672}  # (ScreenEffects.lua's)
 EDGES = {164: 1803988, 258: 1803988, 129: 1803988, 137: 1803988}  # (ScreenEffects.lua's SCREEN_EFFECT_EDGES)
 fx_by_id = {}

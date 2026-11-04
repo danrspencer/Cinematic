@@ -20,7 +20,7 @@ local BIG_SCALE_SPEED = 0.1 -- (the guess for layers with big scales, unmeasured
 -- shader, not a picture. Drawn as light they were a flat wash over the
 -- screen (effect 248's white8x8 next to the real one, 2026-11-04): left out.
 local SOLID = { [1273161] = "white8x8", [188526] = "grey", [3308414] = "gray8x8",
-	[166282] = "grey50percentsquare16x16" }
+	[166282] = "grey50percentsquare16x16", [984062] = "white_64" }
 -- Overlays that are coloured pictures (measured on the texreel shots,
 -- 2026-11-04), drawn in their own colours; the rest are grey, tinted. (Grey:
 -- Frostbite's 4421664, Fel flames' 4272488, 4741748, 2199089.)

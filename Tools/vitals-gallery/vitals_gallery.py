@@ -243,7 +243,7 @@ def heat(img, theme):
 # (each on black, then on grey: colors and alpha from the pair, as the web
 # demo takes them), drawn as ScreenEffects.lua does at full.
 FX = {fx["id"]: fx for fx in py(ns.SCREEN_EFFECTS)}
-SOLID, REF_HEIGHT = {1273161, 188526, 3308414, 166282}, 768
+SOLID, REF_HEIGHT = {1273161, 188526, 3308414, 166282, 984062}, 768
 OWN_COLORS = {6996936, 2159813, 2395778, 4529965, 5636772, 3522953, 2735672}  # (ScreenEffects.lua's)
 EDGES = {164: 1803988, 258: 1803988, 129: 1803988, 137: 1803988}  # (ScreenEffects.lua's SCREEN_EFFECT_EDGES)
 shot_files, order = [], []
@@ -299,8 +299,19 @@ def game_effect(img, theme, rng):
     color, glow, darkness, white = effect_look(fx)
     layers = fx["layers"]
     edge = EDGES.get(info["id"]) or (layers[0][0] if layers else None)
-    shape = game_tex(edge, (W, H)) if edge else None
-    m = shape[1] if shape else np.ones((H, W, 1))
+    # (Its reach: the shape drawn inset, at full; past it, as the game's clamped
+    # edge, solid. Below half, pushed out past the screen.)
+    inset = (info.get("reach", 0.5) - 0.5) * 2 * 0.33
+    dx, dy = int(inset * W / 2), int(inset * H / 2)
+    sw, sh = W - 2 * dx, H - 2 * dy
+    shape = game_tex(edge, (sw, sh)) if edge else None
+    if shape is None:
+        m = np.ones((H, W, 1))
+    elif dx >= 0:
+        m = np.ones((H, W, 1))
+        m[dy:dy + sh, dx:dx + sw] = shape[1]
+    else:
+        m = shape[1][-dy:-dy + H, -dx:-dx + W]
     a = BLOOD_ALPHA * info.get("alpha", 1)
     # (paint: the colour wash and the darkening; light: the moving layers and overlay)
     img = img * (1 - 0.15 * glow * m * a) + color * 0.15 * glow * m * a

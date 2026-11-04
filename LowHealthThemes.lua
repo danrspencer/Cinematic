@@ -34,6 +34,10 @@
 --     color, alpha (0-1), spin (turns a minute at full; below 0 the other
 --     way), reach (0-1: how far in its clear middle closes at full)
 --   (A theme with no swirl of its own gets spiral arms: Arms, below.)
+--   effect   one of the game's own full-screen effects over it all (ScreenEffects.lua;
+--            retail: Classic hasn't their files): { id = its number, alpha (0-1),
+--            reach (0-1, half: the game's edge) }. Some specs have one (picked by the
+--            user, 2026-11-04).
 --   heat     soft wisps of heat rising from the bottom edge (LowHealth.lua):
 --            { color, alpha, reach (how high, 1 as usual) }
 --   portal   one of the game's portal models round the screen (the dev copy's
@@ -74,7 +78,7 @@ ns.LOW_HEALTH_THEMES = {
 			{ tex = "Mote", kind = "rise", color = { 1, 0.9, 0.5 }, size = { 0.015, 0.03 },
 				life = { 1.5, 3 }, speed = 0.05, rate = 25, hit = { 3, 5 } },
 		} },
-	{ key = "judgement", name = "Judgement", edge = "Glow", glow = { 1, 0.72, 0.25 },
+	{ key = "judgement", effect = { id = 198, alpha = 0.25, reach = 0.02 }, name = "Judgement", edge = "Glow", glow = { 1, 0.72, 0.25 },
 		glowAlpha = 0.6, shadow = { 0.35, 0.15, 0 }, flash = { 1, 0.8, 0.3 }, sparks = {
 			{ tex = "Mote", kind = "rise", at = "bottom", color = { 1, 0.8, 0.3 }, size = { 0.015, 0.03 },
 				life = { 1.5, 3 }, speed = 0.1, rate = 35, hit = { 4, 6 } },
@@ -137,7 +141,7 @@ ns.LOW_HEALTH_THEMES = {
 			{ tex = "Star", kind = "twinkle", color = { 0.85, 0.65, 1 }, size = { 0.03, 0.06 }, life = { 0.8, 1.5 },
 				rate = 40, hit = { 3, 5 } },
 		} },
-	{ key = "fire", name = "Fire",
+	{ key = "fire", effect = { id = 149, alpha = 1, reach = 0.25 }, name = "Fire",
 		heat = { color = { 1, 0.45, 0.1 }, alpha = 0.55 }, edge = "Glow", glow = { 1, 0.45, 0.08 },
 		glowAlpha = 0.6, shadow = { 0.3, 0.08, 0 }, flash = { 1, 0.5, 0.1 }, sparks = {
 			{ tex = "Mote", kind = "rise", at = "bottom", color = { 1, 0.55, 0.15 }, size = { 0.015, 0.035 },
@@ -145,7 +149,7 @@ ns.LOW_HEALTH_THEMES = {
 			{ tex = "Mote", kind = "rise", color = { 1, 0.75, 0.3 }, size = { 0.01, 0.02 },
 				life = { 1.5, 2.5 }, speed = 0.06, rate = 30 },
 		} },
-	{ key = "frost", name = "Frost", edge = "Smoke", body = { 0.72, 0.82, 0.92 },
+	{ key = "frost", effect = { id = 174, alpha = 1, reach = 0.5 }, name = "Frost", edge = "Smoke", body = { 0.72, 0.82, 0.92 },
 		shadow = { 0.05, 0.1, 0.2 }, flash = { 0.7, 0.9, 1 }, bpm = 0.7, sparks = {
 			{ tex = "Mote", kind = "rise", color = { 0.8, 0.92, 1 }, size = { 0.012, 0.028 },
 				life = { 2, 3.5 }, speed = 0.03, rate = 30, hit = { 2, 4 } },
@@ -161,7 +165,7 @@ ns.LOW_HEALTH_THEMES = {
 			{ tex = "Mote", kind = "rise", color = { 0.4, 0.9, 0.2 }, size = { 0.012, 0.028 },
 				life = { 2.5, 4 }, speed = 0.03, rate = 30, hit = { 2, 3 } },
 		} },
-	{ key = "fel", name = "Fel runes", edge = "Glow", glow = { 0.45, 1, 0.2 },
+	{ key = "fel", effect = { id = 115, alpha = 1, reach = 0.15 }, name = "Fel runes", edge = "Glow", glow = { 0.45, 1, 0.2 },
 		glowAlpha = 0.5, shadow = { 0.03, 0.12, 0 }, flash = { 0.5, 1, 0.2 }, sparks = {
 			{ tex = "Mote", kind = "rise", color = { 0.45, 1, 0.2 }, size = { 0.015, 0.03 },
 				life = { 1.5, 3 }, speed = 0.05, rate = 30, hit = { 2, 4 } },
@@ -192,7 +196,7 @@ ns.LOW_HEALTH_THEMES = {
 	{ key = "bloodrune", name = "Blood drawn", edge = "Soak", body = { 0.55, 0.02, 0.05 }, glow = { 0.6, 0.05, 0.08 },
 		glowAlpha = 0.5, shadow = { 0.25, 0, 0.02 }, flash = { 0.9, 0.05, 0.1 }, pulse = 1.3, bpm = 0.8 },
 	-- (Frost: frost creeping over the glass, its cold front glowing, ice glinting in it.)
-	{ key = "runefrost", name = "Hoarfrost", edge = "Rime", body = { 0.62, 0.78, 1 }, glow = { 0.45, 0.75, 1 },
+	{ key = "runefrost", effect = { id = 132, alpha = 1, reach = 0.1 }, name = "Hoarfrost", edge = "Rime", body = { 0.62, 0.78, 1 }, glow = { 0.45, 0.75, 1 },
 		glowAlpha = 0.5, shadow = { 0.03, 0.07, 0.17 }, flash = { 0.6, 0.85, 1 }, bpm = 0.75, sparks = {
 			{ tex = "Star", kind = "twinkle", color = { 0.75, 0.9, 1 }, size = { 0.02, 0.04 }, life = { 1, 2 },
 				rate = 25, hit = { 2, 3 } },
