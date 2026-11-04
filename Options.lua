@@ -1,6 +1,9 @@
 -- Cinematic settings: a panel under Options > AddOns, also opened with /cine config
 local _, ns = ...
 local L = ns.L
+-- (The disc behind the pages' "?" help icons, soft-edged at its size: Media/make_help_disc.py.
+-- On ns, not a local: this file is near Lua's 200-local cap.)
+ns.HELP_DISC = "Interface\\AddOns\\" .. (...) .. "\\Textures\\HelpDisc"
 
 -- Each page is a canvas (registered with the Settings panel) holding a scroll
 -- frame; the panel/extrasPanel variables are the scrolling content
@@ -210,6 +213,8 @@ end
 -- hover (and search still finds its words). Returns a flat anchor under the
 -- title (or under, if given) for what goes below; hiding it hides the "?" too.
 local function PageIntro(parent, title, text, under)
+	-- (A page's first: its intro, its first sentence on the CineMode page's Overview.)
+	if parent.introText == nil then parent.introText = text end
 	local anchor = CreateFrame("Frame", nil, parent)
 	anchor:SetSize(1, 1)
 	anchor:SetPoint("TOPLEFT", under or title, "BOTTOMLEFT", 0, -2)
@@ -221,7 +226,7 @@ local function PageIntro(parent, title, text, under)
 	help:SetFrameLevel(math.max(anchor:GetFrameLevel(), title:GetParent():GetFrameLevel()) + 2)
 	local ring = help:CreateTexture(nil, "BACKGROUND")
 	ring:SetAllPoints()
-	ring:SetTexture("Interface\\CHARACTERFRAME\\TempPortraitAlphaMask")
+	ring:SetTexture(ns.HELP_DISC)
 	ring:SetVertexColor(0.3, 0.3, 0.3, 0.9)
 	local mark = help:CreateFontString(nil, "OVERLAY", "GameFontNormal")
 	mark:SetPoint("CENTER", 1, 0)
@@ -1629,10 +1634,10 @@ local function CreatePanel()
 	defaults:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -16, -12)
 	defaults:SetText(L["Reset addon"])
 	defaults.searchSkip = true
-	Tooltip(defaults, L["Put Cinematic back to a fresh install: every profile, built-in or your own, " ..
-		"and every setting goes, including frames you added or stopped fading. The UI reloads."])
+	Tooltip(defaults, L["Reset Settings puts every setting back and keeps what you made: your own profiles, " ..
+		"cameras, scripts, themes and backups. Reset EVERYTHING deletes all of it. Either reloads the UI."])
 	defaults:SetScript("OnClick", function()
-		StaticPopup_Show("CINEMATIC_ADDON_RESET")
+		ns.ShowResetPopup()
 	end)
 	-- The active profile, under the button (picked on the Profiles page).
 	local profileLabel = Label(panel, "GameFontHighlightSmall")
@@ -2361,6 +2366,32 @@ do
 			end
 		end
 	end
+
+	-- A hub's pages as the CineMode page's Overview lists them (a page's tabs
+	-- left out, and pages this client hasn't): each one's name, label, icon and
+	-- intro, and its switch (on; held: off with the hub's; fixed: can't be
+	-- flipped from there). Second, the hub's name as shown.
+	function ns.HubPageStates(hubName)
+		for _, hub in ipairs(HUBS) do
+			if hub.name == hubName then
+				local list = {}
+				for _, page in ipairs(hub.pages) do
+					local tile = not page.tabOf and byName[page[1]]
+					if tile then
+						local switch = TileSwitch(tile)
+						local on, held = false, false
+						if switch then on, held = SwitchState(switch) end
+						local content = tile.resetContent or (tile.canvas and tile.canvas.content)
+						list[#list + 1] = { name = page[1], label = L[page.label or page[1]],
+							icon = type(page[2]) == "function" and page[2]() or page[2],
+							intro = content and content.introText, hasSwitch = switch ~= nil, dev = page.dev,
+							on = on, held = held, fixed = (switch and switch.follows or held) and true or false }
+					end
+				end
+				return list, L[hub.label or hub.name]
+			end
+		end
+	end
 end
 
 -- (name in English, as ns.OpenOptions takes it; shown in the game's language,
@@ -2407,8 +2438,193 @@ end
 local function CreateRevealPanel()
 	local canvas, content = CreateScrollPage()
 
+	-- Two folder tabs at the top: Overview, every page CineMode uses (on or
+	-- off, a click away) built from the hubs as it first shows; Settings, this
+	-- page's own (everything made on it below the overview, moved onto host).
+	local overview, host, PickTab, FillOverview
+	local picked = 1 -- (the tab shown, kept while the game runs)
+	local tabsPanel, _, ShowTab, tabsBase = ns.FolderTabs(content, {
+		{ L["Overview"], L["Everything CineMode can do, page by page, and whether each page is on."] },
+		{ L["Settings"], L["How fast the UI fades, the Calm Timer, combat text and error messages."] },
+	}, function(i) PickTab(i) end)
+	tabsBase:SetPoint("TOPLEFT", content, "TOPLEFT", 8, -(ns.FOLDER_TAB_HEIGHT + 16))
+	tabsPanel:SetPoint("TOPLEFT", tabsBase)
+	tabsPanel:SetPoint("RIGHT", content, "RIGHT", -8, 0)
+	tabsPanel:SetHeight(1) -- (just its top edge, a line under the tabs)
+
 	local title = Label(content, "GameFontNormalLarge", "CineMode")
-	title:SetPoint("TOPLEFT", 16, -16)
+	title:SetPoint("TOPLEFT", tabsPanel, "BOTTOMLEFT", 8, -14)
+
+	-- The Overview: a group for each hub CineMode works through, a row for each
+	-- of its pages (icon, name, its intro behind a "?", On or Off, Open).
+	overview = CreateFrame("Frame", nil, content)
+	overview:SetSize(1, 1)
+	overview:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -10)
+	overview.searchSkip = true -- (the settings' own pages are what search finds)
+	local OVERVIEW_HUBS = {
+		{ "UI Manager", L["What fades in CineMode, and what brings it back."] },
+		{ "Atmosphere", L["How the world looks and sounds in CineMode."] },
+		{ "Camera", L["The camera coming alive while CineMode is on."] },
+	}
+	local ROW_W = 560
+	local rows, groups, summary
+	-- (Dev copy: its dev-only pages listed too (a red X over the icon, as on
+	-- their hub's), unless the dev box is unticked. Players have no such pages.)
+	local showDev = true
+	local function StateTip(self)
+		local page = self.page
+		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+		GameTooltip:SetText(self.title, 1, 0.82, 0)
+		if page.held then
+			GameTooltip:AddLine(L["Off with the General page's switch."], 1, 0.25, 0.25, true)
+		elseif page.fixed then
+			GameTooltip:AddLine(L["On and off with the General page's switch."], 1, 1, 1, true)
+		elseif page.on then
+			GameTooltip:AddLine(L["On. Click to turn this page off."], 0.25, 1, 0.25, true)
+		else
+			GameTooltip:AddLine(L["Off. Click to turn this page on."], 1, 0.25, 0.25, true)
+		end
+		GameTooltip:Show()
+	end
+	local function BuildOverview()
+		rows, groups = {}, {}
+		local intro = Label(overview, "GameFontHighlight",
+			L["Everything CineMode can do, page by page. Click On or Off to turn a page on or off; Open takes you there."])
+		intro:SetWidth(ROW_W)
+		intro:SetPoint("TOPLEFT", overview, "TOPLEFT", 0, 0)
+		summary = Label(overview, "GameFontHighlightSmall")
+		summary:SetPoint("TOPLEFT", intro, "BOTTOMLEFT", 0, -6)
+		if ns.isDev then
+			local devBox = Check(overview, false, "Show dev-only pages",
+				"Dev copy only: list its dev-only pages too (Shoulder Cam, Camera Settings...). Unticked, the " ..
+				"list is as players see it.", function(value)
+					showDev = value
+					FillOverview()
+				end)
+			devBox.Refresh = function(self) self:SetChecked(showDev) end
+			devBox:SetChecked(showDev)
+			devBox:SetPoint("LEFT", summary, "LEFT", 380, 0)
+		end
+		for _, group in ipairs(OVERVIEW_HUBS) do
+			local pages, hubLabel = ns.HubPageStates(group[1])
+			if pages and #pages > 0 then
+				local header = Label(overview, "GameFontNormal", hubLabel)
+				local note = Label(overview, "GameFontHighlightSmall", group[2])
+				note:SetPoint("TOPLEFT", header, "BOTTOMLEFT", 0, -4)
+				note:SetTextColor(0.7, 0.7, 0.7)
+				local entry = { header = header, note = note, rows = {} }
+				groups[#groups + 1] = entry
+				for _, page in ipairs(pages) do
+					local row = CreateFrame("Frame", nil, overview)
+					row:SetWidth(ROW_W)
+					row.icon = row:CreateTexture(nil, "ARTWORK")
+					row.icon:SetSize(22, 22)
+					row.icon:SetPoint("TOPLEFT", 0, -2)
+					row.icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
+					row.icon:SetTexture(page.icon)
+					if page.dev and row.CreateLine then
+						-- (A red X over the icon: dev copy only, as on its hub's icon.)
+						for _, corners in ipairs({ { "TOPLEFT", "BOTTOMRIGHT" }, { "TOPRIGHT", "BOTTOMLEFT" } }) do
+							local line = row:CreateLine(nil, "OVERLAY")
+							line:SetThickness(2)
+							line:SetColorTexture(1, 0.15, 0.15, 0.9)
+							line:SetStartPoint(corners[1], row.icon, 0, 0)
+							line:SetEndPoint(corners[2], row.icon, 0, 0)
+						end
+					end
+					-- (A hub's General page by its own name: Effects, Cameras)
+					row.label = Label(row, "GameFontHighlight",
+						page.label == L["General"] and L[page.name] or page.label)
+					row.label:SetPoint("LEFT", row.icon, "RIGHT", 8, 0)
+					-- (Its page's whole intro on a "?" beside the name, as on the page itself.)
+					if type(page.intro) == "string" then PageIntro(row, row.label, page.intro) end
+					local open = ns.PanelButton(row)
+					open:SetSize(70, 20)
+					open:SetPoint("TOPRIGHT", row, "TOPRIGHT", 0, -2)
+					open:SetText(L["Open"])
+					Tooltip(open, L["Go to this page."])
+					open:SetScript("OnClick", function() ns.OpenOptions(page.name) end)
+					-- (On or Off: a click flips the page's switch, as a right-click on its icon does)
+					local state = CreateFrame("Button", nil, row)
+					state:SetSize(80, 20)
+					state:SetPoint("RIGHT", open, "LEFT", -6, 0)
+					state.text = state:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+					state.text:SetPoint("RIGHT", -4, 0)
+					local hover = state:CreateTexture(nil, "HIGHLIGHT")
+					hover:SetAllPoints()
+					hover:SetColorTexture(1, 1, 1, 0.06)
+					state:SetScript("OnEnter", StateTip)
+					state:SetScript("OnLeave", function() GameTooltip:Hide() end)
+					state:SetScript("OnClick", function(self)
+						if self.page.fixed then return end
+						ns.FlipPageSwitch(self.page.name)
+						FillOverview()
+						if GameTooltip:IsOwned(self) then StateTip(self) end
+					end)
+					state.title = row.label:GetText()
+					row.state = state
+					row:SetHeight(26)
+					local each = { row = row, hub = group[1], name = page.name, dev = page.dev }
+					rows[#rows + 1] = each
+					entry.rows[#entry.rows + 1] = each
+				end
+			end
+		end
+	end
+	-- Each row as its page is now, and how many are on.
+	function FillOverview()
+		if not ns.GetDB() then return end
+		if not rows then BuildOverview() end
+		local states = {}
+		for _, group in ipairs(OVERVIEW_HUBS) do
+			for _, page in ipairs(ns.HubPageStates(group[1]) or {}) do states[page.name] = page end
+		end
+		-- (Each group under the last, its rows under its note; dev-only ones
+		-- left out with the dev box unticked.)
+		local last = summary
+		for _, group in ipairs(groups) do
+			group.header:ClearAllPoints()
+			group.header:SetPoint("TOPLEFT", last, "BOTTOMLEFT", 0, -18)
+			last = group.note
+			for _, each in ipairs(group.rows) do
+				each.shown = showDev or not each.dev
+				each.row:SetShown(each.shown)
+				if each.shown then
+					each.row:ClearAllPoints()
+					each.row:SetPoint("TOPLEFT", last, "BOTTOMLEFT", 0, last == group.note and -8 or -6)
+					last = each.row
+				end
+			end
+		end
+		local count, onCount = 0, 0
+		for _, each in ipairs(rows) do
+			local page, row = states[each.name], each.row
+			local state = row.state
+			if page and page.hasSwitch and each.shown then
+				count = count + 1
+				if page.on then onCount = onCount + 1 end
+				state.page = page
+				state.text:SetText(page.on and L["On"] or L["Off"])
+				local r, g, b = 0.25, 1, 0.25
+				if not page.on then r, g, b = 1, 0.25, 0.25 end
+				if page.fixed then r, g, b = r * 0.6, g * 0.6, b * 0.6 end
+				state.text:SetTextColor(r, g, b)
+				state.text:SetVertexColor(r, g, b) -- (one on Forever)
+				state:Show()
+			else
+				state:Hide()
+			end
+			row.icon:SetDesaturated(page and page.hasSwitch and not page.on or false)
+		end
+		summary:SetText(L["%d of %d pages on."]:format(onCount, count))
+		FitContentHeight(content)
+	end
+
+	-- (What's on the page so far: the tabs, title and overview stay where they
+	-- are; whatever's made after goes onto the Settings tab's host, below.)
+	local before = {}
+	for _, object in ipairs({ content:GetChildren() }) do before[object] = true end
+	for _, object in ipairs({ content:GetRegions() }) do before[object] = true end
 
 	local subtitle = PageIntro(content, title,
 		L["How fast the UI fades, what brings it (or parts of it) back while CineMode " ..
@@ -2575,7 +2791,35 @@ local function CreateRevealPanel()
 		"\"Can't do that while moving\") while you're out of combat."])
 	stack:Add(errorsOutOfCombat, "check")
 
-	canvas:SetScript("OnShow", PageShown(Refresh, content))
+	-- The Settings tab: everything made since the overview, on a frame of its
+	-- own to show and hide (1 by 1: one with no height draws none of it).
+	-- Search still finds its settings with the Overview shown, and a match
+	-- opens this tab (ShowMatch's openSection).
+	host = CreateFrame("Frame", nil, content)
+	host:SetSize(1, 1)
+	host:SetPoint("TOPLEFT")
+	host.searchAlways = true
+	host.openSection = function() PickTab(2) end
+	for _, list in ipairs({ { content:GetChildren() }, { content:GetRegions() } }) do
+		for _, object in ipairs(list) do
+			if not before[object] and object ~= host then object:SetParent(host) end
+		end
+	end
+	function PickTab(i)
+		picked = i
+		ShowTab(i)
+		overview:SetShown(i == 1)
+		host:SetShown(i == 2)
+		if i == 1 and ns.Flag(canvas:IsVisible()) then FillOverview() end
+		FitContentHeight(content)
+		C_Timer.After(0, function() FitContentHeight(content) end)
+	end
+	PickTab(picked)
+
+	canvas:SetScript("OnShow", PageShown(function()
+		Refresh()
+		if picked == 1 then FillOverview() end
+	end, content))
 	canvas:Hide()
 	RegisterSubpage(canvas, "CineMode")
 end
@@ -11465,6 +11709,16 @@ local function CreateVisionPanel()
 			if ns.RefreshQuestTalk then ns.RefreshQuestTalk() end
 		end
 		local function TalkOn(db) return db.questTalk end
+		-- Talking heads played before closed at once (TalkingHeads.lua); only
+		-- where the game has them.
+		if C_TalkingHead then
+			questStack:Header(content, L["Talking heads"])
+			questStack:Add(Check(content, "talkingHeadRepeats", L["Hide repeated talking heads"],
+				L["The game's talking head (the NPC portrait at the top of the screen, with their line and voice) " ..
+				"closes at once when it's a line you've already seen. Daily and world quest lines come back every " ..
+				"day, so you see them once; the story's lines play only once anyway. Each character remembers its own, " ..
+				"ticked or not, so an alt still sees the story's."]), "check")
+		end
 		questStack:Header(content, L["Talking to NPCs"])
 		-- Quest talk itself (questTalk; off to start with, on in the Cinema
 		-- profile). How it looks, the "Show the game's window" link and the
@@ -13530,15 +13784,88 @@ local function AskResetProfile()
 	local label = ns.ProfileLabel(ns.ActiveProfile())
 	StaticPopup_Show(ns.HasResetPoint() and "CINEMATIC_PROFILE_RESET_POINT" or "CINEMATIC_PROFILE_RESET", label)
 end
--- (Keep backups: your own profiles wait among the deleted ones, Backups.lua.)
+-- Reset Everything on the left, Reset Settings on the right; Reset Everything
+-- asks again, as nothing it deletes comes back (ns.ResetAddon).
+-- (Their paragraphs read left-aligned; centred again on hide, as the game
+-- reuses the popup frames for its own.)
+local function PopupFontString(popup)
+	return popup.text or popup.Text or (popup.GetTextFontString and popup:GetTextFontString())
+end
+-- (The game's own width back on hide: see WidenPopupText.)
+local function AlignPopupText(popup, side)
+	local text = PopupFontString(popup)
+	if not (text and text.SetJustifyH) then return end
+	text:SetJustifyH(side)
+	if side == "CENTER" and popup.cineTextWidth then
+		text:SetWidth(popup.cineTextWidth)
+		popup.cineTextWidth = nil
+	end
+end
+-- The text wider than the game's 290 (narrow in a three-button popup, 440
+-- wide), and the popup's height by what that saves. After the game has
+-- built and sized the popup (it sets the width back as it shows one), and
+-- once more a frame later in case it lays it out again.
+local function WidenPopupText(popup, which, width)
+	local text = PopupFontString(popup)
+	if not (popup and popup.which == which and popup:IsShown() and text and text.SetWidth) then return end
+	if math.abs(text:GetWidth() - width) < 1 then return end
+	local before = text:GetHeight()
+	popup.cineTextWidth = popup.cineTextWidth or text:GetWidth()
+	text:SetWidth(width)
+	popup:SetHeight(popup:GetHeight() + text:GetHeight() - before)
+end
+function ns.ShowResetPopup()
+	local popup = StaticPopup_Show("CINEMATIC_ADDON_RESET")
+	if not popup then return end
+	WidenPopupText(popup, "CINEMATIC_ADDON_RESET", 400)
+	C_Timer.After(0, function() WidenPopupText(popup, "CINEMATIC_ADDON_RESET", 400) end)
+end
+-- The question (the text's first line) centred over the left-aligned rest:
+-- a line of its own on the popup, its place in the text left blank.
+local function CenterPopupTitle(popup)
+	local text = PopupFontString(popup)
+	local full = text and text.GetText and text:GetText()
+	if type(full) ~= "string" then return end
+	local title, rest = full:match("^(.-)\n\n(.*)$")
+	if not title then return end
+	if not popup.cineTitle then
+		popup.cineTitle = popup:CreateFontString(nil, "ARTWORK")
+		popup.cineTitle:SetFontObject(text:GetFontObject() or "GameFontHighlight")
+		popup.cineTitle:SetJustifyH("CENTER")
+	end
+	popup.cineTitle:ClearAllPoints()
+	popup.cineTitle:SetPoint("TOP", text, "TOP")
+	popup.cineTitle:SetText(title)
+	popup.cineTitle:Show()
+	text:SetText("\n\n" .. rest)
+end
 StaticPopupDialogs.CINEMATIC_ADDON_RESET = {
-	text = L["Reset Cinematic? Every profile and setting goes, your own profiles too, and the UI reloads. " ..
-		"Cinematic's Edit Mode layouts are removed too, and your own layout comes back.\n\n" ..
-		"Keep backups keeps your profiles' backups, and your own profiles to bring back from Backups for 30 days."],
-	button1 = L["Keep backups"], button2 = CANCEL, button3 = L["Delete everything"],
-	OnAccept = function() ns.ResetAddon(true) end,
-	OnAlt = function() ns.ResetAddon() end,
+	OnShow = function(self)
+		AlignPopupText(self, "LEFT")
+		CenterPopupTitle(self)
+	end,
+	OnHide = function(self)
+		AlignPopupText(self, "CENTER")
+		if self.cineTitle then self.cineTitle:Hide() end
+	end,
+	text = L["Reset Cinematic?\n\nReset Settings: every setting goes back to how it was on install, and you start on " ..
+		"the default profile. Nothing you made is deleted: your own profiles, cameras, scripts, themes, rules, " ..
+		"wheels and backups stay, and so do flight times and what Cinematic has learned as you played.\n\n" ..
+		"Reset EVERYTHING: deletes all of it, as on a fresh install.\n\n" ..
+		"Either way the UI reloads, and Cinematic's Edit Mode layouts are removed so your own comes back."],
+	button1 = L["Reset EVERYTHING"], button2 = CANCEL, button3 = L["Reset Settings"],
+	OnAccept = function() StaticPopup_Show("CINEMATIC_ADDON_RESET_ALL") end,
+	OnAlt = function() ns.ResetAddon(true) end,
 	timeout = 0, whileDead = true, hideOnEscape = true,
+}
+StaticPopupDialogs.CINEMATIC_ADDON_RESET_ALL = {
+	text = L["Delete everything in Cinematic? Your own profiles, cameras, scripts, themes, rules, wheels and " ..
+		"backups are deleted for good, along with every setting. This can't be undone."],
+	button1 = L["Reset EVERYTHING"], button2 = CANCEL,
+	OnShow = function(self) AlignPopupText(self, "LEFT") end,
+	OnHide = function(self) AlignPopupText(self, "CENTER") end,
+	OnAccept = function() ns.ResetAddon() end,
+	timeout = 0, whileDead = true, hideOnEscape = true, showAlert = true,
 }
 
 -- The game's right-click menus (not on Classic Era): a profile card's.
