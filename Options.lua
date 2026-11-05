@@ -7308,9 +7308,9 @@ local function CreateGamepadPanel()
 		"showing it can be caught. Unticked, it fades with them."])
 	prompt:SetPoint("TOPLEFT", lastRow, "BOTTOMLEFT", -2, -16)
 	local press = Check(content, "gamepadPressReveal", L["Show the action bars when you press a button"],
-		L["Gamepad mode's mouseover: pressing any gamepad button brings the action bars up, and " ..
-		"they fade out again your \"stays after mouseover\" time later (Hover groups page). " ..
-		"Each press starts that time again. Choose the buttons in the list below. Presses that " ..
+		L["Gamepad mode's mouseover: pressing any gamepad button brings the action bars up. They " ..
+		"stay while you hold it (not stick directions), and fade out your \"Stay after a press\" " ..
+		"time after you let go. Each press starts that time again. Choose the buttons in the list below. Presses that " ..
 		"make you jump don't count (whichever button jumps), nor presses while you fish (the " ..
 		"fish camera on, a cast going, or looting)."])
 	press:SetPoint("TOPLEFT", prompt, "BOTTOMLEFT", 0, -2)
@@ -7373,7 +7373,7 @@ local function CreateGamepadPanel()
 	stack:Header(content, L["Action bar fading"])
 	local stay = stack:Add(Slider(content, "gamepadPressHold", L["Stay after a press"], 0, 10, 0.5, L["%.1f sec"]),
 		"slider")
-	Tooltip(stay, L["How long the action bars stay after your last button press, counting their fade out."])
+	Tooltip(stay, L["How long the action bars stay after your last button press, or after you let go of a held button, counting their fade out."])
 	GreyUnless(stay, function(db) return db.gamepadPressReveal end)
 	local fadeIn = stack:Add(Slider(content, "gamepadBarsFadeIn", L["Fade in time"], 0, 3, 0.1, L["%.1f sec"]),
 		"slider")
@@ -13022,11 +13022,7 @@ local function CreateExtrasPanel()
 	local smart, foundHead, noneFound
 	local foundRows, foundCount = {}, 0
 	local tabsPanel, ShowTab, tabsBase, tabsHeight, _
-	tabsPanel, _, ShowTab, tabsBase, tabsHeight = ns.FolderTabs(content, {
-		{ L["Loaded"], L["The addons loaded now: their frames, and the ones you added."] },
-		{ L["Find frames"], L["Find other addons' frames to fade: search, hover, or Smart Find."] },
-		{ L["Not running"], L["Addons installed but not loaded, and the ones supported but not installed."] },
-	}, function(i)
+	local function PickTab(i)
 		tab = i
 		ShowTab(i)
 		if i == 2 then
@@ -13036,7 +13032,12 @@ local function CreateExtrasPanel()
 			Layout()
 			FitContentHeight(content)
 		end
-	end)
+	end
+	tabsPanel, _, ShowTab, tabsBase, tabsHeight = ns.FolderTabs(content, {
+		{ L["Loaded"], L["The addons loaded now: their frames, and the ones you added."] },
+		{ L["Find frames"], L["Find other addons' frames to fade: search, hover, or Smart Find."] },
+		{ L["Not running"], L["Addons installed but not loaded, and the ones supported but not installed."] },
+	}, PickTab)
 	tabsBase:SetPoint("TOPLEFT", holder, "TOPLEFT", 0, -tabsHeight)
 	tabsPanel:SetPoint("TOPLEFT", tabsBase, "TOPLEFT")
 	tabsPanel:SetSize(PANEL_W, 1)
@@ -13178,6 +13179,10 @@ local function CreateExtrasPanel()
 	-- The tools for adding frames (the search box, then add mode's button;
 	-- made below), at the top.
 	local tools = CreateFrame("Frame", nil, box)
+	-- (The settings search and /cine find reach its tab's tools from any tab:
+	-- finding one picks the tab. Smart Find's the same, below.)
+	tools.searchAlways = true
+	tools.openSection = function() PickTab(2) end
 	tools:SetSize(LABEL_WIDTH + ns.GridWidth(THIRD_PARTY_LAYOUT), 30)
 
 	local function SectionBandFor(key, title)
@@ -13457,6 +13462,8 @@ local function CreateExtrasPanel()
 	-- The Find frames tab's Smart Find: what it is, its background tick, and
 	-- a button to run it for a while, up by Hover Find (counting down on it).
 	smart = CreateFrame("Frame", nil, box)
+	smart.searchAlways = true
+	smart.openSection = tools.openSection
 	smart:SetWidth(PANEL_W - 16)
 	local smartTitle = Label(smart, "GameFontNormal", L["Smart Find"])
 	smartTitle:SetPoint("TOPLEFT", 0, -6)

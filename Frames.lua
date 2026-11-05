@@ -5985,6 +5985,11 @@ local function OnPadButton(button, via)
 	end
 end
 -- A waiting press: dropped if it started fishing, else the bars come up.
+-- (The bars' own times, Gamepad page: see GroupFadeTime.)
+function ns.PadRevealEnd()
+	local hold = ns.db.gamepadPressHold - ns.db.gamepadBarsFadeOut
+	return GetTime() + ns.db.gamepadBarsFadeIn + math.max(0, hold)
+end
 local function CheckPendingPress()
 	local press = pendingPress
 	if not press then
@@ -5999,9 +6004,7 @@ local function CheckPendingPress()
 	elseif GetTime() - press.at >= CAST_WAIT then
 		pendingPress = nil
 		DebugPress(press.button, "reveals")
-		-- (The bars' own times, Gamepad page: see GroupFadeTime.)
-		local hold = ns.db.gamepadPressHold - ns.db.gamepadBarsFadeOut
-		padRevealUntil = GetTime() + ns.db.gamepadBarsFadeIn + math.max(0, hold)
+		padRevealUntil = ns.PadRevealEnd()
 	end
 end
 local padWatcher = CreateFrame("Frame")
@@ -6038,7 +6041,8 @@ ns.SetOnUpdate(padWatcher, ns.Profiled("Gamepad watch", function()
 		padMoveHeld = false
 		return
 	end
-	local moving = false
+	local moving, keepUp = false, false
+	local revealed = padRevealUntil > GetTime()
 	for index, down in ipairs(state.buttons) do
 		local name = (down or padHeld[index]) and ButtonName(index)
 		if down and PAD_MOVE[name] then
@@ -6052,7 +6056,16 @@ ns.SetOnUpdate(padWatcher, ns.Profiled("Gamepad watch", function()
 			end
 			OnPadButton(name, "read")
 		end
+		-- Bars up and a button that shows them still held: they stay until it's
+		-- let go, then "Stay after a press" runs. Not stick directions: you'd
+		-- walk or turn with the bars up the whole way.
+		if down and revealed and not name:find("^PAD[LR]STICK%u") and RevealsBars(name) then
+			keepUp = true
+		end
 		padHeld[index] = down or nil
+	end
+	if keepUp and not Fishing() then
+		padRevealUntil = ns.PadRevealEnd()
 	end
 	padMoveHeld = moving
 end))

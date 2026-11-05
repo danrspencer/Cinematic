@@ -1043,7 +1043,7 @@ DEFAULTS.questMarkStyleEnemy = questMarkDefault
 DEFAULTS.targetQuestIcon = true -- a quest icon on the target frame while your target is one of them (see QuestMobs)
 -- The nearest tracked quest's item to use on a big button at the extra ability button's spot (see QuestItemButton)
 DEFAULTS.questItemButton = true
-DEFAULTS.questObjectGlow = true -- the quest object soft targeting picks glows (see QuestGlow; changes interact settings)
+DEFAULTS.questObjectGlow = false -- the quest object soft targeting picks glows (see QuestGlow; changes interact settings)
 DEFAULTS.hideObjectIcons = false -- the game's icon over objects held off while the glow isn't (QuestGlow)
 -- Talking to an NPC: their words in a bubble over them, the replies in a list,
 -- instead of the game's gossip and quest windows (see QuestTalk).
@@ -5103,6 +5103,37 @@ ticker:SetScript("OnEvent", ns.Profiled("Core events", function(self, event, arg
 				end
 			end
 			ns.db.skyrideDefaultsV1 = true
+		end
+		-- Glow on quest objects off to start with now: it turned on the game's
+		-- interact key, with an icon and plate over NPCs you face, and players
+		-- couldn't find what did it. Off in every profile. Once: tick it again
+		-- and it stays.
+		if not ns.db.questGlowOffV1 then
+			ns.db.questObjectGlow = false
+			for _, saved in pairs(ns.db.profiles or {}) do
+				if type(saved) == "table" then
+					saved.questObjectGlow = nil
+					if type(saved.settings) == "table" then saved.settings.questObjectGlow = nil end
+				end
+			end
+			ns.db.questGlowOffV1 = true
+		end
+		-- Bubble position's Opposite clicked was the default until v2.0.27, and
+		-- it stayed saved: the game's quest window jumped across the screen, over
+		-- the quest tracker, and players couldn't find what did it. Back to
+		-- Default in every profile (Over the head is left alone). Once: pick it
+		-- again and it stays.
+		if not ns.db.questTalkPlaceFixedV1 then
+			if ns.db.questTalkPlace == "opposite" then ns.db.questTalkPlace = "fixed" end
+			for _, saved in pairs(ns.db.profiles or {}) do
+				if type(saved) == "table" then
+					if saved.questTalkPlace == "opposite" then saved.questTalkPlace = nil end
+					if type(saved.settings) == "table" and saved.settings.questTalkPlace == "opposite" then
+						saved.settings.questTalkPlace = nil
+					end
+				end
+			end
+			ns.db.questTalkPlaceFixedV1 = true
 		end
 		-- The pet frame kept up until its health is full (Personal Resources)
 		-- off to start with now: off in every profile. Once.

@@ -657,43 +657,8 @@ local function HealSaved()
 	end
 end
 
--- Letting go with a key bound to Interact: your saved soft targeting (often
--- the game's defaults: 1 = gamepad only, 10 yards, straight ahead) left that
--- key unable to pick objects, though it did while we held ours (tested on a
--- player's retail). The keyboard part, our range and our arc stay instead
--- (anything wider of yours is kept).
-local KEEP_FOR_KEY = { SoftTargetInteractRange = 20, SoftTargetInteractArc = 1 }
-
-local function KeepInteractKey()
-	if not GetBindingKey then
-		return
-	end
-	local ok, key = pcall(GetBindingKey, "INTERACTTARGET")
-	if not (ok and key) then
-		return
-	end
-	local saved = ns.db.savedCVars
-	local mode = tonumber(saved.SoftTargetInteract)
-	if mode == 0 or mode == 1 then
-		saved.SoftTargetInteract = tostring(mode + 2)
-		ns.Log("cvar", ("SoftTargetInteract: yours was %d but %s is your Interact key, %d goes back"):format(mode,
-			tostring(key), mode + 2))
-	end
-	for cvar, least in pairs(KEEP_FOR_KEY) do
-		local yours = tonumber(saved[cvar])
-		if yours and yours < least then
-			saved[cvar] = tostring(least)
-			ns.Log("cvar", ("%s: yours was %s, %s goes back for your Interact key"):format(cvar, tostring(yours),
-				least))
-		end
-	end
-end
-
 local function Update()
 	local on = Wanted()
-	if not on and CVARS.active then
-		KeepInteractKey()
-	end
 	-- Retail draws the icon over a creature-like interact pick (a hand over the
 	-- shears on a table) in the world, with no plate to hide it on: held as
 	-- your own settings would show it (followed as gamepad mode changes).
