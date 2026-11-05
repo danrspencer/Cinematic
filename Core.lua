@@ -11,8 +11,9 @@ local L = ns.L
 -- this is for the few that differ by design (data files, retail-only options).
 ns.isRetail = WOW_PROJECT_ID ~= nil and WOW_PROJECT_ID == WOW_PROJECT_MAINLINE
 -- Classic Era (game 11509) rather than WoW Forever (16001): isRetail lumps
--- them, this tells them apart where the names differ.
-ns.isClassicEra = not ns.isRetail and GetBuildInfo ~= nil and (select(4, GetBuildInfo()) or 0) < 20000
+-- them, this tells them apart where the names differ. (The line sits between
+-- those two numbers: Forever's is below 20000, so that's no test.)
+ns.isClassicEra = not ns.isRetail and GetBuildInfo ~= nil and (select(4, GetBuildInfo()) or 0) < 16000
 
 BINDING_HEADER_CINEMATIC = "Cinematic"
 -- (Set again once the language is known: see Locales.lua.)
