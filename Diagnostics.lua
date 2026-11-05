@@ -2545,7 +2545,7 @@ do
 	end
 end
 
--- /cine debug viewdist: can the view distance change (for rain) here, in or
+-- /cine debug viewdist: can the view distance change (for bad weather) here, in or
 -- out of a fight? Once to pull it in, again to put it back. Yours is kept in
 -- savedCVars, so a /reload mid-test puts it back too.
 do
@@ -2580,9 +2580,18 @@ do
 		ns.Print("viewdist: now " .. State())
 		if ns.RainViewDebug then
 			local level, want = ns.RainViewDebug()
-			ns.Print(("viewdist: rain view distance %d%% (in %d%%, going to %d%%), %s"):format(
+			ns.Print(("viewdist: bad weather view distance %d%% (in %d%%, going to %d%%), %s"):format(
 				(ns.db.rainViewScale or 0) * 100 + 0.5, level * 100 + 0.5, want * 100 + 0.5,
 				ns.lastCinematic and "in CineMode" or "not in CineMode"))
+		end
+		-- (While bad weather has it in, the test would write over that, and the
+		-- weather would then keep the test's values as yours: report only.)
+		local weatherLevel, weatherWant = 0, 0
+		if ns.RainViewDebug then weatherLevel, weatherWant = ns.RainViewDebug() end
+		if not testing and (weatherLevel > 0 or weatherWant > 0) then
+			ns.Print("viewdist: bad weather has the view distance in, so no test writes now " ..
+				"(turn its slider to 0% or go indoors to test)")
+			return
 		end
 		if not testing then
 			testing = true

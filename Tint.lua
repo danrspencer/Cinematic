@@ -1131,15 +1131,21 @@ local function CurrentWeather()
 	return kind, math.max(0, math.min(1, intensity))
 end
 
--- Rain's intensity here (0-1): 0 in other weather, under a roof or when the
--- client doesn't say. (For the view distance in rain: Graphics.lua.)
-function ns.RainIntensity()
+-- Bad weather's intensity here (0-1): rain, snow or a sandstorm; 0 in clear
+-- or other weather, under a roof or when the client doesn't say. (For the
+-- view distance in bad weather: Graphics.lua.)
+local BAD_WEATHER = {
+	[WEATHER_TYPE.Rain or 1] = true,
+	[WEATHER_TYPE.Snow or 2] = true,
+	[WEATHER_TYPE.Sandstorm or 3] = true,
+}
+function ns.BadWeatherIntensity()
 	local ok, indoors = pcall(IsIndoors)
 	if ok and indoors then
 		return 0
 	end
 	local kind, intensity = CurrentWeather()
-	return kind == (WEATHER_TYPE.Rain or 1) and intensity or 0
+	return kind and BAD_WEATHER[kind] and intensity or 0
 end
 
 -- The weather colour to show here: no change with the option off, indoors,

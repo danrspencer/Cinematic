@@ -4404,15 +4404,15 @@ local function CreateEffectsPanel()
 		"reports the weather."])
 	GreyRow(weatherTintStrength, function(db) return db.weatherTint end)
 
-	-- View distance in rain (Graphics.lua): only where the game says the
+	-- View distance in bad weather (Graphics.lua): only where the game says the
 	-- weather and has the view distance setting.
 	local lastRow = weatherTintStrength
 	if C_Weather and C_Weather.GetCurrentWeather and GetCVar("horizonStart") ~= nil then
-		lastRow = InlineSlider(weatherTintStrength.rowName, 18, "rainViewScale", L["Reduce view distance in rain"], 100, 5)
-		Tooltip(lastRow, L["In CineMode, as it rains, the view distance comes in from yours: the harder the rain, " ..
-			"the closer. At 100% a downpour brings it all the way in, as far as the Graphics menu's lowest View " ..
-			"distance; it never goes further out than yours. Yours is put back once the rain stops or you go " ..
-			"indoors."])
+		lastRow = InlineSlider(weatherTintStrength.rowName, 18, "rainViewScale", L["Reduce view distance in bad weather"], 100, 5)
+		Tooltip(lastRow, L["In CineMode, in rain, snow or a sandstorm, the view distance comes in from yours: the " ..
+			"heavier the weather, the closer. At 100% a downpour or blizzard brings it all the way in, as far as " ..
+			"the Graphics menu's lowest View distance; it never goes further out than yours. Yours is put back " ..
+			"once the weather clears or you go indoors."])
 	end
 
 	-- Camera haze (depth of field): each camera mode's page sets its own
