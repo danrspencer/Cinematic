@@ -183,7 +183,7 @@ function M.Install(client)
 		UnitFactionGroup = function() return "Alliance", "Alliance" end,
 		UnitGUID = function() return nil end,
 		UnitExists = function() return false end,
-		GetBuildInfo = function() return client == "retail" and "11.2.0" or "1.15.7", "0", "", client == "retail" and 110200 or 11507 end,
+		GetBuildInfo = function() return client == "retail" and "11.2.0" or "1.60.1", "0", "", client == "retail" and 110200 or 16001 end,
 		GetRealmName = function() return "Realm" end,
 		GetNumClasses = function() return 2 end,
 		GetClassInfo = function(id)
