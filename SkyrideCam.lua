@@ -583,7 +583,7 @@ function ns.CreateSkyrideCamPanel(kit)
 		"cruise distance."], "skyrideWhirl")
 
 	Section("halt", L["Aerial Halt"])
-	Tick("skyrideHalt", L["Swing round and zoom in"], L["Aerial Halt swings the camera round you and in close for " ..
+	Tick("skyrideHalt", L["Swing around and zoom in"], L["Aerial Halt swings the camera around you and in close for " ..
 		"a shot of you hovering, holds it, then swings back. A Surge to fly off ends the shot."])
 	Slider("skyrideHaltDeg", L["By"], 30, 180, 10, DEGREES, nil, "skyrideHalt")
 	Slider("skyrideHaltYards", L["Zoom in to"], 0, 25, 1, YARDS, L["How close the camera comes in meanwhile. " ..
@@ -614,14 +614,14 @@ function ns.CreateSkyrideCamPanel(kit)
 	Slider("skyrideDiveTime", L["Over"], 1, 5, 0.5, SECS, nil, "skyrideDive")
 
 	Section("turn", L["Turning"])
-	Tick("skyrideTurn", L["Swing into the turn"], L["While you turn hard, the camera swings round toward where " ..
+	Tick("skyrideTurn", L["Swing into the turn"], L["While you turn hard, the camera swings around toward where " ..
 		"you're turning, and back behind you as you straighten out. Steering with the mouse moves the camera " ..
 		"yourself, so this only shows when you turn with the keys."], "skyrideFollow")
 	Slider("skyrideTurnDeg", L["By"], 5, 60, 5, DEGREES, nil, "skyrideTurn", "skyrideFollow")
 	Slider("skyrideTurnTime", L["Over"], 1, 5, 0.5, SECS, nil, "skyrideTurn", "skyrideFollow")
 	kit.GreyUnless(Put(kit.Check(content, "skyrideFollow", L["Follow your turns"],
 		L["As the auto-run camera does: while you turn, the camera holds its direction, so you bank across the " ..
-		"screen, then glides round behind you once you straighten out. In place of Swing into the turn. Steering " ..
+		"screen, then glides around behind you once you straighten out. In place of Swing into the turn. Steering " ..
 		"with the mouse keeps the camera behind you, as ever."]), "check"), IfOn)
 	Slider("skyrideFollowAfter", L["Glide back after"], 0, 3, 0.25, L["%.2f sec"],
 		L["How long after you stop turning the camera starts gliding back behind you."], "skyrideFollow")
@@ -638,7 +638,7 @@ function ns.CreateSkyrideCamPanel(kit)
 		"doesn't bounce it. Off again before it's back: it goes back out with you."])
 
 	local FASTEST_TIP = L["The fastest the camera goes at the height of a move. A moment that would go faster takes " ..
-		"longer instead, so moments firing close together never whip the camera round."]
+		"longer instead, so moments firing close together never whip the camera around."]
 	Section("blend", L["Blend"])
 	Slider("skyrideMaxTurn", L["Fastest turn"], 30, 360, 10, L["%d degrees a second"], FASTEST_TIP)
 	Slider("skyrideMaxTilt", L["Fastest tilt"], 10, 90, 5, L["%d degrees a second"], FASTEST_TIP)

@@ -132,12 +132,12 @@ local function NamedAfter(name)
 end
 
 -- Whose a named frame is: who made it, else the addon it's named after,
--- else who wrote its global. GAME for the game's; nil if none tells.
+-- else who wrote its global. GAME for the game's; nil if none tells. (Made
+-- by the game only counts if its global says so too: a long file path can
+-- be cut short on the call stack, leaving no addon to read there.)
 local function NamedOwner(frame, name)
 	local maker = madeBy[frame]
-	if maker == GAME then
-		return GAME, "made by the game"
-	elseif maker then
+	if maker and maker ~= GAME then
 		return maker, "made by it"
 	end
 	local game, source = GlobalSource(name)
@@ -381,6 +381,15 @@ local function NamedLikeWindow(name)
 	return false
 end
 
+-- Whether a frame in the dialog or fullscreen strata is an addon's part of
+-- the screen, not a window: named by an addon we've no support for (those
+-- have their rows), and not named like a window. (RoC UI draws its player
+-- panel and portrait there.)
+function ns.IsAddonDialogFrame(name)
+	local game, source = GlobalSource(name)
+	return not game and source ~= nil and not ns.IsSupportedAddon(source) and not NamedLikeWindow(name)
+end
+
 -- Other addons' shown frames that nothing fades, by addon: byAddon[addon] =
 -- { frames = { { name (nil: unnamed), row, why, text }... } }, order (the
 -- addons as found), and what was passed over, for the report.
@@ -563,17 +572,11 @@ function ns.RowLabel(key)
 end
 
 -- Add on the Find frames tab: an added frame from then on, faded,
--- with the Default row's ticks, or the ticks of the row it follows.
+-- with the Default row's settings as they are now, Always too. (Changing that
+-- row later leaves it be: Copy to all is for that.)
 function ns.AdoptFoundFrame(name)
-	local db = ns.db
-	db.extraFrames[name] = true
-	local found = db.foundFrames[name]
-	if found and IsRowKey(found.follow) then
-		Follow(name, found.follow)
-		db.ignoredFrames[name] = nil
-	else
-		ns.ApplyExtraDefault(name)
-	end
+	ns.db.extraFrames[name] = true
+	ns.ApplyExtraDefault(name, true)
 	ns.BuildManagedList()
 end
 
@@ -608,9 +611,10 @@ function ns.FindFoundFrames()
 	-- row's Always was ticked: let go, unless you faded them already.)
 	for name in pairs(db.foundFrames) do
 		local frame = _G[name]
-		if not db.extraFrames[name] and not db.foundFrames[name].picked and type(frame) == "table"
-			and frame.GetObjectType and not IsForbidden(frame) and (Covered(frame, name) or NamedLikeWindow(name) or not Draws(frame, 2)
-			or IsBigHolder(frame)) then
+		local known = db.foundFrames[name]
+		if not db.extraFrames[name] and not known.picked and type(frame) == "table"
+			and frame.GetObjectType and not IsForbidden(frame) and (Covered(frame, name) or NamedLikeWindow(name)
+			or (not known.byName and (not Draws(frame, 2) or IsBigHolder(frame)))) then
 			db.foundFrames[name] = nil
 			ns.ROW_FALLBACK["extra:" .. name] = nil
 		end
@@ -642,6 +646,97 @@ function ns.FindFoundFrames()
 			local known = db.foundFrames[key] or { addon = addon }
 			known.count = unnamed
 			db.foundFrames[key] = known
+		end
+	end
+end
+
+-- Whether a frame comes along with one above it: that one's faded, the
+-- game's, or an addon's named frame that could be added itself. Only an
+-- addon's root (straight on UIParent, screen-sized or unsized) doesn't count:
+-- a whole-UI addon keeps everything in one (Reforged UI), and each part is
+-- wanted on its own. Not under UIParent at all: not part of the UI.
+local function ComesWithParent(frame)
+	local parent = frame:GetParent()
+	while parent and parent ~= UIParent do
+		if IsForbidden(parent) or ns.IsFaded(parent) then
+			return true
+		end
+		if parent:GetName() then
+			local _, _, width, height = Rect(parent)
+			local root = parent:GetParent() == UIParent and (not width or width * height <= 0 or IsBigHolder(parent))
+			if not root then
+				return true
+			end
+		end
+		parent = parent:GetParent()
+	end
+	return parent == nil
+end
+
+-- The addon to list a named frame under, or nil: not the game's or ours, not
+-- a supported addon's (its rows have it), and something that could be faded.
+local function NamedFrameAddon(frame, name)
+	local db = ns.db
+	if frame:GetName() ~= name or IsForbidden(frame) or db.foundFrames[name] or db.extraFrames[name]
+		or db.ignoredFrames[name] or not frame:IsObjectType("Frame") or frame:IsObjectType("GameTooltip") then
+		return nil
+	end
+	local addon = NamedOwner(frame, name)
+	if not addon or addon == GAME or addon == ADDON_NAME or not ns.AddOnLoaded(addon)
+		or ns.IsSupportedAddon(addon) then
+		return nil
+	end
+	if ns.IsFaded(frame) or ns.IsWindow(frame, name) or NamedLikeWindow(name) or Covered(frame, name)
+		or ComesWithParent(frame) or not Draws(frame, 2) then
+		return nil
+	end
+	return addon
+end
+
+-- A look through every named frame, by elimination: what isn't the game's or
+-- ours is another addon's, shown or not (a target frame with no target), and
+-- however deep. Goes through all the globals, so once per Smart Find, not each
+-- look. Screen-sized frames are told by their names: their spot says nothing.
+function ns.FindNamedFrames()
+	if InCombatLockdown() then
+		return
+	end
+	local db = ns.db
+	local byAddon = {}
+	for name, frame in pairs(_G) do
+		-- (pcall: a mixin table can look like a frame and error on its methods.)
+		if type(name) == "string" and type(frame) == "table" and type(frame.GetObjectType) == "function"
+			and type(frame.SetAlpha) == "function" then
+			local ok, addon = pcall(NamedFrameAddon, frame, name)
+			if ok and addon then
+				byAddon[addon] = byAddon[addon] or {}
+				table.insert(byAddon[addon], name)
+			end
+		end
+	end
+	local listed = {}
+	for _, known in pairs(db.foundFrames) do
+		if known.addon then listed[known.addon] = (listed[known.addon] or 0) + 1 end
+	end
+	local hiddenGame = HiddenGameFrames()
+	for addon, names in pairs(byAddon) do
+		-- (The shortest first: an addon's main frames before its parts.)
+		table.sort(names, function(a, b)
+			if #a ~= #b then return #a < #b end
+			return a < b
+		end)
+		for _, name in ipairs(names) do
+			if (listed[addon] or 0) >= MAX_PER_ADDON then
+				break
+			end
+			listed[addon] = (listed[addon] or 0) + 1
+			local frame = _G[name]
+			local left, bottom, width, height = Rect(frame)
+			local rect = left and not IsBigHolder(frame) and { left, bottom, width, height } or nil
+			local row = RowGuess(name, rect, hiddenGame)
+			local follow = IsRowKey(row) and row or nil
+			db.foundFrames[name] = { addon = addon, follow = follow, byName = true }
+			Follow(name, follow)
 		end
 	end
 end
@@ -821,11 +916,16 @@ login:SetScript("OnEvent", function()
 	-- now and then, so frames that come and go (another addon's popups) are
 	-- caught while they're up. Only while an addon is new to it (NewAddons),
 	-- and not in fights.
+	local lookedByName = false
 	C_Timer.NewTicker(FIND_EVERY, ns.Profiled("Find found frames", function()
 		if ns.db.smartFindBackground and ns.db.handleAddonFrames and not InCombatLockdown() then
 			local new = ns.NewAddons()
 			if #new > 0 then
 				ns.FindFoundFrames()
+				if not lookedByName then
+					lookedByName = true
+					ns.FindNamedFrames()
+				end
 				local looks = ns.db.smartFindLooks
 				for _, addon in ipairs(new) do
 					looks[addon] = (looks[addon] or 0) + 1
@@ -902,7 +1002,7 @@ function ns.ExplainGuess(name)
 		tostring(ns.IsWindow(frame, name)), tostring(NamedLikeWindow(name)), tostring(Draws(frame, 2)),
 		tostring(Covered(frame, name)),
 		tostring(ns.db.ignoredFrames[name] or false),
-		found and (found.dismissed and "no (taken off)" or "yes") or "no"))
+		found and (found.dismissed and "no (taken off)" or found.byName and "yes (by name)" or "yes") or "no"))
 end
 
 -- Smart Find for a while (the Find frames tab's button): a look once a
@@ -929,6 +1029,7 @@ function ns.StartSmartFind(onTick)
 	ns.StopSmartFind()
 	run = { left = ns.SMART_FIND_SECONDS, onTick = onTick }
 	ns.FindFoundFrames()
+	ns.FindNamedFrames()
 	run.ticker = C_Timer.NewTicker(1, function()
 		if not run then return end
 		run.left = run.left - 1

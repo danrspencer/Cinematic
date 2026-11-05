@@ -793,7 +793,7 @@ local function Example()
 			ends = "putback" },
 	}
 end
--- (Skyriding's only where there's skyriding: retail; and in the dev copy only for now.)
+-- (Skyriding's only where there's skyriding: retail.)
 if not (ns.isRetail and C_PlayerInfo and C_PlayerInfo.GetGlidingInfo) then
 	for i = #BUILT_IN, 1, -1 do
 		if BUILT_IN[i].retail then table.remove(BUILT_IN, i) end
@@ -2939,7 +2939,7 @@ function ns.OrbitCommand(arg)
 end
 
 -- Steps played now in place of the running script's own, while it's in its
--- steps for trigger: the dev Skyriding Cam's moments (SkyrideCam.lua: a
+-- steps for trigger: the Skyriding Cam's moments (SkyrideCam.lua: a
 -- surge zooms out, a halt swings round...). What it was doing stops where it
 -- is; once these are done it holds there, as it does after its own steps,
 -- until its trigger's over and When it ends puts everything back. False if

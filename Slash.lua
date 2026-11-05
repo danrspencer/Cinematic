@@ -1005,7 +1005,7 @@ local function HandleSlash(msg)
 			tostring(d.shoulder), tostring(d.centered), tostring(IsMounted and IsMounted()), tostring(InCombatLockdown())))
 		ns.Print(("  Frames follow you %s: slide %.0f of %.0f (UI units, - left), zoom %.1f, cameraFov %s; moving %s"):format(
 			tostring(d.follow), d.followShift, d.followTarget, GetCameraZoom and GetCameraZoom() or 0, tostring(GetCVar("cameraFov")), d.followed))
-	elseif cmd == "debug" and (arg == "skyride" or arg:find("^skyride%s")) and ns.isDev and ns.SkyrideDebug then
+	elseif cmd == "debug" and (arg == "skyride" or arg:find("^skyride%s")) and ns.SkyrideDebug then
 		ns.SkyrideDebug(arg:match("^skyride%s+(.-)%s*$"))
 	elseif cmd == "debug" and arg == "help" then
 		PrintDebugHelp()

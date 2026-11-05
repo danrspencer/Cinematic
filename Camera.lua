@@ -1149,11 +1149,17 @@ function ns.HookCameraInput()
 	-- The world tooltip still up and naming the seat: the mouse is on it now.
 	-- (The tooltip options fade it with its alpha, so it stays shown.)
 	local function TooltipOnSeat(name)
-		if not GameTooltip:IsShown() then return false end
-		local owner = GameTooltip:GetOwner()
-		if not (owner == nil or owner == UIParent or owner == WorldFrame) then return false end
-		local ok, text = pcall(function() return GameTooltipTextLeft1 and GameTooltipTextLeft1:GetText() end)
-		return ok and text == name
+		-- (All inside the pcall, the text checked as it's read: the mouse may be
+		-- on something secret by now, and comparing a secret value is an error.)
+		local ok, same = pcall(function()
+			if not ns.Flag(GameTooltip:IsShown()) then return false end
+			local owner = GameTooltip:GetOwner()
+			if not (owner == nil or owner == UIParent or owner == WorldFrame) then return false end
+			local text = GameTooltipTextLeft1 and GameTooltipTextLeft1:GetText()
+			if type(text) ~= "string" or (issecretvalue and issecretvalue(text)) then return false end
+			return text == name
+		end)
+		return ok and same == true
 	end
 	-- The cursor in the middle of the screen (SEAT.MIDDLE of it from the center each way).
 	local function CursorInMiddle(d)

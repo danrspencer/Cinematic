@@ -262,7 +262,7 @@ local OFF_UNTIL_PICKED = {
 	"handleFrames", "handleAddonFrames", "mouseover", "handleGamepad", "handleUnitFrames", "personalResources",
 	"handleBuffs", "handleCooldowns", "handleSwing", "handleMinimap", "handleQuests", "handleTooltips",
 	"handleChat", "handlePlates", "handleBubbles",
-	"cameraModes", "shoulderCam",
+	"cameraModes", "shoulderCam", "skyrideCam",
 	"visualEffects", "letterboxPage", "tintPage", "graphicsPlus", "musicInCinematic",
 	"styleGeneral", "ufStyle", "rfStyle", "prdStyle", "tooltipStyle", "handlePlateStyle", "plateNameStyle",
 	"plateCastStyle", "bubblesStyle",

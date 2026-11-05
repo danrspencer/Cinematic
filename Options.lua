@@ -10543,7 +10543,7 @@ local function GetExtraRow(index)
 	local parts = ns.ListRowParts(Key, THIRD_PARTY_COLUMNS, nil, SetKept)
 	row.grid = ns.GridRow(ns.GRID_KIT, row, THIRD_PARTY_LABEL_WIDTH, THIRD_PARTY_LAYOUT, {
 		band = index, dot = true,
-		enabled = function() return not row.unloaded end, -- (greyed on the Unloaded tab)
+		enabled = function() return not row.unloaded end, -- (greyed on the Not running tab)
 		always = { isOn = function() return row.item and row.item.kept end, set = SetKept,
 			tip = L["Show this frame the whole time in CineMode (Cinematic leaves it " ..
 			"alone). Unticked, it's hidden, except as the other columns say."] },
@@ -12993,7 +12993,7 @@ local function CreateExtrasPanel()
 		L["To fade something else, use the Find frames tab: search by name, pick frames by hovering, or let " ..
 		"Smart Find look for them. Or hover over a frame and type |cffffd100/cine add|r. Frames you add are " ..
 		"listed under their addon, with the same columns; the X takes one off the list."] .. "\n\n" ..
-		L["The Unloaded tab has the addons installed but not loaded, to set them up before you turn them " ..
+		L["The Not running tab has the addons installed but not loaded, to set them up before you turn them " ..
 		"on, and the ones supported but not installed."] .. "\n\n" ..
 		L["The Default row is what frames you add, and addons you install later, start with; its Copy to all " ..
 		"gives it to every row here."])
@@ -13003,7 +13003,7 @@ local function CreateExtrasPanel()
 	local stack = Stack(switch, "check")
 
 	-- In folder tabs: Loaded (the grid, for the addons loaded), Find frames
-	-- (finding frames to add) and Unloaded (the addons installed but not
+	-- (finding frames to add) and Not running (the addons installed but not
 	-- loaded, then the rest supported). The grid's laid out afresh each time
 	-- the page opens (most addons load after this one, so whether they're
 	-- loaded isn't known when it's built). Each addon's rows (a suite's: suite
@@ -13017,7 +13017,7 @@ local function CreateExtrasPanel()
 	box:SetSize(PANEL_W - 16, 1)
 	content.box = box
 	local Layout, RefreshFound
-	local tab = 1 -- (the tab picked: 1 Loaded, 2 Find frames, 3 Unloaded)
+	local tab = 1 -- (the tab picked: 1 Loaded, 2 Find frames, 3 Not running)
 	-- (The Find frames tab's parts, made further down.)
 	local smart, foundHead, noneFound
 	local foundRows, foundCount = {}, 0
@@ -13025,7 +13025,7 @@ local function CreateExtrasPanel()
 	tabsPanel, _, ShowTab, tabsBase, tabsHeight = ns.FolderTabs(content, {
 		{ L["Loaded"], L["The addons loaded now: their frames, and the ones you added."] },
 		{ L["Find frames"], L["Find other addons' frames to fade: search, hover, or Smart Find."] },
-		{ L["Unloaded"], L["Addons installed but not loaded, and the ones supported but not installed."] },
+		{ L["Not running"], L["Addons installed but not loaded, and the ones supported but not installed."] },
 	}, function(i)
 		tab = i
 		ShowTab(i)
@@ -13076,7 +13076,7 @@ local function CreateExtrasPanel()
 		local parts = ns.ListRowParts(Key, COLUMNS, nil, SetAlways)
 		row.grid = ns.GridRow(ns.GRID_KIT, box, LABEL_WIDTH, THIRD_PARTY_LAYOUT, {
 			band = 1, dot = true,
-			enabled = function() return not row.unloaded end, -- (greyed on the Unloaded tab)
+			enabled = function() return not row.unloaded end, -- (greyed on the Not running tab)
 			always = { isOn = function() return not ns.IsAddonFramesOn(known.key) end, set = SetAlways,
 				tip = (L["Show %s the whole time in CineMode (Cinematic leaves them " ..
 				"alone). Unticked, they're hidden, except as the other columns say.%s"]):format(known.about,
@@ -13266,7 +13266,7 @@ local function CreateExtrasPanel()
 			return
 		end
 
-		-- Loaded and Unloaded: the headings (and on Loaded, the Default row).
+		-- Loaded and Not running: the headings (and on Loaded, the Default row).
 		Place(headings, 0, FRAME_HEADING_HEIGHT + 4)
 		if tab == 1 then
 			Place(defaultRow, 0, ROW_HEIGHT)
@@ -13455,34 +13455,28 @@ local function CreateExtrasPanel()
 	content.Layout = Layout
 
 	-- The Find frames tab's Smart Find: what it is, its background tick, and
-	-- a button to run it for a while (a countdown beside it).
+	-- a button to run it for a while, up by Hover Find (counting down on it).
 	smart = CreateFrame("Frame", nil, box)
 	smart:SetWidth(PANEL_W - 16)
 	local smartTitle = Label(smart, "GameFontNormal", L["Smart Find"])
 	smartTitle:SetPoint("TOPLEFT", 0, -6)
-	local smartHelp = Label(smart, "GameFontHighlightSmall", L["Looks over what's on screen for other addons' " ..
-		"frames that nothing fades, and guesses which Game Frames row each stands in for. Add one to fade " ..
-		"it: it goes on the Loaded tab, under its addon."])
-	smartHelp:SetPoint("TOPLEFT", smartTitle, "BOTTOMLEFT", 0, -6)
-	smartHelp:SetWidth(PANEL_W - 40)
-	smartHelp:SetJustifyH("LEFT")
 	local background = Check(content, "smartFindBackground", L["Look in the background"],
 		L["Smart Find every 20 seconds while an addon is new to it (its first 15 minutes of play, for each " ..
 		"addon you install that isn't supported), not in fights, so frames that come and go (another addon's " ..
-		"popups) are caught while they're up. After that, look with the button below."])
+		"popups) are caught while they're up. After that, look with the Smart Find button."])
 	background:SetParent(smart) -- (its setting recorded on the page, for its Reset)
-	background:SetPoint("TOPLEFT", smartHelp, "BOTTOMLEFT", -4, -6)
-	local runButton = ns.PanelButton(smart)
-	runButton:SetSize(220, 22)
-	runButton:SetPoint("TOPLEFT", background, "BOTTOMLEFT", 4, -6)
-	Tooltip(runButton, L["Looks once a second for a while, so a frame that only shows now and then is caught: " ..
+	background:SetPoint("TOPLEFT", smartTitle, "BOTTOMLEFT", -4, -6)
+	local runButton = ns.PanelButton(tools)
+	runButton:SetSize(120, 22)
+	runButton:SetPoint("TOPLEFT", tools, "TOPLEFT", 384, -3) -- (right of Hover Find and its spinner)
+	Tooltip(runButton, L["Looks for other addons' frames that nothing " ..
+		"fades, on screen or hidden, and guesses which Game Frames row each stands in for. Load one to put " ..
+		"it on the Loaded tab, under its addon, with the Default row's settings."] .. "\n\n" ..
+		L["Looks once a second for a while, so a frame that only shows now and then is caught: " ..
 		"bring it up while it runs. Click again to stop."])
-	local countdown = Label(smart, "GameFontHighlightSmall", "")
-	countdown:SetPoint("LEFT", runButton, "RIGHT", 10, 0)
 	local function ShowRun()
 		local left = ns.SmartFindLeft()
-		runButton:SetText(left and L["Stop"] or L["Smart Find for %d seconds"]:format(ns.SMART_FIND_SECONDS))
-		countdown:SetText(left and ("|cff4ce64c" .. L["Looking... %ds"]:format(left) .. "|r") or "")
+		runButton:SetText(left and ("%s (%ds)"):format(L["Stop"], left) or L["Smart Find"])
 	end
 	runButton:SetScript("OnClick", function()
 		if ns.SmartFindLeft() then
@@ -13496,13 +13490,18 @@ local function CreateExtrasPanel()
 	end)
 	ShowRun()
 	smart.Height = function()
-		return 6 + smartTitle:GetStringHeight() + 6 + smartHelp:GetStringHeight() + 6 + 26 + 6 + 22 + 12
+		return 6 + smartTitle:GetStringHeight() + 6 + 26 + 12
 	end
 
 	-- What it found: the frame, its addon, the row it'd follow, and Add
 	-- (ns.AdoptFoundFrame: onto the Loaded tab, faded).
 	-- (The texts stop short of Add: their hover areas took its clicks.)
 	local FIND_ADD_W = 80
+	-- (A found frame whose addon isn't loaded now stays off this list: its row,
+	-- if it has one, is on the Not running tab, and it's back with the addon.)
+	local function FoundListed(known)
+		return not known.dismissed and (not known.addon or ns.AddOnLoaded(known.addon))
+	end
 	local FIND_NAME_W, FIND_ADDON_X, FIND_ADDON_W, FIND_GUESS_X = 220, 230, 150, 390
 	local FIND_GUESS_W = math.max(60, PANEL_W - 16 - FIND_ADD_W - 16 - FIND_GUESS_X)
 	foundHead = CreateFrame("Frame", nil, box)
@@ -13517,15 +13516,15 @@ local function CreateExtrasPanel()
 	local addAll = ns.PanelButton(smart)
 	addAll:SetSize(FIND_ADD_W, 22)
 	addAll:SetPoint("RIGHT", smart, "RIGHT", -4, 0)
-	addAll:SetPoint("TOP", runButton, "TOP")
-	addAll:SetText(L["Add all"])
-	Tooltip(addAll, L["Fades every frame on this list that isn't added yet, as Add does for one."])
+	addAll:SetPoint("TOP", background, "TOP", 0, -2)
+	addAll:SetText(L["Load all"])
+	Tooltip(addAll, L["Loads every frame on this list that isn't loaded yet, as Load does for one."])
 	foundHead.addAll = addAll
 	addAll:SetScript("OnClick", function()
 		local db = ns.GetDB()
 		local names = {}
 		for name, known in pairs(db.foundFrames) do
-			if not known.dismissed and not db.extraFrames[name] then names[#names + 1] = name end
+			if FoundListed(known) and not db.extraFrames[name] then names[#names + 1] = name end
 		end
 		for _, name in ipairs(names) do ns.AdoptFoundFrame(name) end
 		RefreshExtras()
@@ -13556,15 +13555,14 @@ local function CreateExtrasPanel()
 		row.add:SetSize(FIND_ADD_W, 22)
 		row.add:SetPoint("RIGHT", -4, 0)
 		row.add:SetFrameLevel(row:GetFrameLevel() + 5) -- (over the texts' hover areas)
-		row.add:SetText(L["Add"])
-		Tooltip(row.add, L["Fades it: it goes on the Loaded tab, under its addon, with the Default row's " ..
-			"ticks, or the ticks of the row it follows."])
+		row.add:SetText(L["Load"])
+		Tooltip(row.add, L["Puts it on the Loaded tab, under its addon, with the Default row's settings."])
 		row.add:SetScript("OnClick", function()
 			ns.AdoptFoundFrame(row.name.frameName)
 			RefreshExtras()
 			RefreshFound()
 		end)
-		row.added = Label(row, "GameFontDisableSmall", L["Added"])
+		row.added = Label(row, "GameFontDisableSmall", L["Loaded"])
 		row.added:SetPoint("RIGHT", -14, 0)
 		foundRows[i] = row
 		return row
@@ -13573,7 +13571,7 @@ local function CreateExtrasPanel()
 		local db = ns.GetDB()
 		local names = {}
 		for name, known in pairs(db.foundFrames) do
-			if not known.dismissed then names[#names + 1] = name end
+			if FoundListed(known) then names[#names + 1] = name end
 		end
 		-- (Hover Find's picks so far, at the top: on the list once it stops.)
 		local picking = {}
@@ -13582,9 +13580,10 @@ local function CreateExtrasPanel()
 				if not db.foundFrames[name] then picking[#picking + 1] = name end
 			end
 		end
+		-- (Ones still to load first, then by name.)
 		table.sort(names, function(a, b)
-			local addonA, addonB = db.foundFrames[a].addon or "", db.foundFrames[b].addon or ""
-			if addonA ~= addonB then return addonA:lower() < addonB:lower() end
+			local loadedA, loadedB = db.extraFrames[a] and true or false, db.extraFrames[b] and true or false
+			if loadedA ~= loadedB then return loadedB end
 			return a:lower() < b:lower()
 		end)
 		for i, name in ipairs(picking) do
@@ -13622,7 +13621,7 @@ local function CreateExtrasPanel()
 	addMode:SetSize(120, 22)
 	addMode:SetPoint("TOPLEFT", tools, "TOPLEFT", 232, -3) -- (right of the search box)
 	Tooltip(addMode, L["Hover over the frames you want (move this window out of the way, or close it), " ..
-		"then click Stop: they go on the list below, to add. The game's own frames and ones already faded " ..
+		"then click Stop: they go on the list below, to load. The game's own frames and ones already faded " ..
 		"are left out. /cine add cancel drops them."])
 	addMode:SetScript("OnClick", function() ns.ToggleAddMode(true) end)
 	-- A spinner beside it while it's on, to show it's still watching the mouse.
@@ -13673,7 +13672,7 @@ local function CreateExtrasPanel()
 		find.Instructions:SetText(L["Find frames by name or addon"])
 	end
 	Tooltip(find, L["Type part of a frame's name or of the addon that made it. Hover over a match to see " ..
-		"it marked on screen, click it to put it on the list below, to add. Only other addons' frames that " ..
+		"it marked on screen, click it to put it on the list below, to load. Only other addons' frames that " ..
 		"aren't faded yet are listed."])
 
 	local found = CreateFrame("Frame", nil, content)
@@ -13692,6 +13691,7 @@ local function CreateExtrasPanel()
 	back:SetColorTexture(0.05, 0.05, 0.05, 0.97)
 
 	local frames, matches, findRows, findOffset = nil, {}, {}, 0
+	local DrawFound, UpdateFound
 	local function FindRow(i)
 		if findRows[i] then return findRows[i] end
 		local row = CreateFrame("Button", nil, found)
@@ -13720,17 +13720,22 @@ local function CreateExtrasPanel()
 			if not self.entry then return end
 			ns.MarkFrame(nil)
 			ns.NoteFoundFrame(self.entry.name) -- (on the list below, to add)
-			frames = nil -- (it's faded now: not a match any more)
-			find:SetText("")
-			find:ClearFocus()
 			RefreshExtras()
+			RefreshFound()
+			-- (It's off the matches now; the rest stay up, where they were, to
+			-- pick the next.)
+			local offset = findOffset
+			UpdateFound()
+			findOffset = math.max(0, math.min(offset, #matches - FIND_ROWS))
+			DrawFound()
+			if self:IsShown() and self.entry then ns.MarkFrame(self.entry.name) end
 		end)
 		findRows[i] = row
 		return row
 	end
 
 	-- The matches from findOffset on; the mouse wheel scrolls through the rest.
-	local function DrawFound()
+	DrawFound = function()
 		local shown = math.min(#matches - findOffset, FIND_ROWS)
 		for i = 1, shown do
 			local entry, row = matches[findOffset + i], FindRow(i)
@@ -13760,7 +13765,7 @@ local function CreateExtrasPanel()
 
 	-- Names starting with what's typed first, then the shortest (an addon's
 	-- main window before its parts).
-	local function UpdateFound()
+	UpdateFound = function()
 		local query = (find:GetText() or ""):match("^%s*(.-)%s*$"):lower()
 		if query == "" then
 			found:Hide()
@@ -13768,8 +13773,10 @@ local function CreateExtrasPanel()
 		end
 		frames = frames or ns.FindAddableFrames()
 		matches = {}
+		local listed = ns.GetDB().foundFrames
 		for _, entry in ipairs(frames) do
-			if entry.lower:find(query, 1, true) then
+			local known = listed[entry.name]
+			if entry.lower:find(query, 1, true) and not (known and not known.dismissed) then
 				matches[#matches + 1] = entry
 			end
 		end
@@ -15669,7 +15676,7 @@ ns.OnLanguage(function()
 	if ns.CreateSkyrideCamPanel then -- (SkyrideCam.lua: retail)
 		ns.CreateSkyrideCamPanel(ns.lowHealthKit)
 	end
-	if ns.CreateCameraScriptsPanel then -- (CameraScriptsPage.lua, dev copy)
+	if ns.CreateCameraScriptsPanel then -- (CameraScriptsPage.lua)
 		ns.CreateCameraScriptsPanel(ns.lowHealthKit)
 	end
 	if ns.CreateWheelsPanels then -- (WheelsPage.lua; its hub listed after Camera)

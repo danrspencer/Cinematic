@@ -889,7 +889,8 @@ end
 -- Windows (settings, spellbook, popups) are never faded as extras: fading
 -- one you're using leaves it invisible but still taking your clicks and keys.
 -- Escape-closable and panel windows, ones the reveal lists know, and anything
--- drawn in the dialog strata or above.
+-- drawn in the dialog strata or above (but an addon's frame in the dialog or
+-- fullscreen strata needs more than that: FrameGuess.lua).
 local WINDOW_STRATA = { DIALOG = true, FULLSCREEN = true, FULLSCREEN_DIALOG = true, TOOLTIP = true }
 
 local function IsWindow(frame, name)
@@ -901,7 +902,11 @@ local function IsWindow(frame, name)
 			return true
 		end
 	end
-	return WINDOW_STRATA[frame:GetFrameStrata()] or false
+	local strata = frame:GetFrameStrata()
+	if (strata == "DIALOG" or strata == "FULLSCREEN") and name and ns.IsAddonDialogFrame(name) then
+		return false
+	end
+	return WINDOW_STRATA[strata] or false
 end
 ns.IsWindow = IsWindow -- (the frame guesser: FrameGuess.lua)
 
@@ -9482,8 +9487,9 @@ end
 -- The Advanced Frames page's Default row: its key in the shared lists, its
 -- Always a setting of its own (addonDefaultAlways, on to start with: an
 -- addon you install isn't hidden till you say so). A supported addon newly
--- installed starts with its settings, a frame you add with all but Always
--- (added to be faded); Copy to all gives them to every row on the page. Written out tick by tick (not left
+-- installed or a frame loaded on the Find frames tab starts with its settings,
+-- a frame added by command with all but Always (added to be faded); Copy to
+-- all gives them to every row on the page. Written out tick by tick (not left
 -- nil), so a supported addon's own defaults don't come back through.
 ns.EXTRA_DEFAULT_KEY = "extradefault"
 do -- (In a do block: the file is near Lua's 200 locals.)

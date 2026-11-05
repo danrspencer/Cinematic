@@ -1,4 +1,4 @@
--- Cinematic: the Camera Scripts page (dev copy), where camera scripts are
+-- Cinematic: the Camera Scripts page, where camera scripts are
 -- written (CameraScripts.lua runs them), and the preview window beside it.
 --
 -- The page: the camera picked, by its name at the top: a click drops the
