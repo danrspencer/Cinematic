@@ -8459,11 +8459,24 @@ do
 	-- Ranged bar on top (swingRangedOnTop<CLASS>, for your class): the ranged bar
 	-- takes the main hand's place, and the main hand and off-hand bars each move
 	-- down one (main hand, off hand, ranged becomes ranged, main hand, off hand).
-	-- Each bar takes the anchors of the place it moves to, and one anchored to
-	-- another bar is anchored to whichever bar is in that place now. The game's
-	-- own anchors are kept (and taken afresh whenever it moves a bar), so it
-	-- can be undone. Without an off-hand bar: main hand and ranged trade places.
+	-- Each bar is pinned to the screen spot of the place it moves to. The
+	-- game's own anchors are kept (and taken afresh whenever it moves a bar),
+	-- so it can be undone and redone. Without an off-hand bar: main hand and ranged trade places.
 	local order = { swapped = false, game = {}, moving = false }
+	order.barNames = { "SwingTimerMainHandFrame", "SwingTimerOffHandFrame", "SwingTimerRangedFrame" }
+
+	-- (/cine debug swing: a bar's anchors and where it is, as text.)
+	function order.Describe(frame)
+		local parts = {}
+		for i = 1, frame:GetNumPoints() do
+			local point, to, toPoint, x, y = frame:GetPoint(i)
+			to = type(to) == "table" and to.GetName and to:GetName() or tostring(to)
+			parts[#parts + 1] = ("%s %s %s %s %s"):format(tostring(point), tostring(to), tostring(toPoint), tostring(x), tostring(y))
+		end
+		local cx, cy = frame:GetCenter()
+		return ("[%s] at %s,%s shown %s"):format(#parts > 0 and table.concat(parts, "; ") or "NO ANCHORS",
+			tostring(cx), tostring(cy), tostring(frame:IsShown()))
+	end
 
 	local function ReadPoints(frame)
 		local points = {}
@@ -8477,12 +8490,10 @@ do
 		return points
 	end
 
-	-- moved: bar -> the bar now in its place.
-	local function SetPoints(frame, points, moved)
+	local function SetPoints(frame, points)
 		order.moving = true
-		frame:ClearAllPoints()
 		for _, p in ipairs(points) do
-			frame:SetPoint(p[1], moved and moved[p[2]] or p[2], p[3], p[4], p[5])
+			frame:SetPoint(p[1], p[2], p[3], p[4], p[5])
 		end
 		order.moving = false
 	end
@@ -8507,51 +8518,173 @@ do
 			order.hooked = true
 			-- The game moving a bar: its new anchors are the game's, and the order is done again.
 			local function OnMoved(frame)
+				if ns.swingDebug then
+					ns.Log("swing", ("%s SetPoint%s -> %s | %s"):format(frame:GetName() or "?", order.moving and " (ours)" or "",
+						order.Describe(frame), (debugstack(3, 2, 0) or ""):gsub("\n", " < ")))
+				end
 				if order.moving then return end
 				order.game[frame] = nil
-				order.swapped = nil -- (looked at next tick)
+				order.Redo()
 			end
-			for _, bar in ipairs(bars) do hooksecurefunc(bar, "SetPoint", OnMoved) end
-			-- The player dragging a bar in Edit Mode: they place the bars
-			-- themselves now, so the swap goes off for this class (swapping
-			-- would move the bar they dropped into another bar's place).
-			local function OnDragStop()
-				if order.key and ns.db[order.key] then
-					ns.db[order.key] = false
-					ns.Print(L["You moved a swing timer bar, so \"Ranged bar on top\" is now off for %s and the bars stay where you put them."]
-						:format((UnitClass("player"))))
+			-- (Done again at once, not next tick: the game lays the bars out in
+			-- its bottom stack whenever one comes or goes, and a tick in its
+			-- places showed as a bar jumping.)
+			function order.Redo()
+				order.swapped = nil
+				if order.want and not order.applying then
+					order.applying = true
+					if not pcall(Apply, true) then
+						order.moving = false
+						order.swapped = true -- (an error: not tried again every tick)
+					end
+					order.applying = false
 				end
 			end
+			for _, bar in ipairs(bars) do hooksecurefunc(bar, "SetPoint", OnMoved) end
+			-- (/cine debug swing: the game clearing a bar's anchors, logged.)
 			for _, bar in ipairs(bars) do
-				if type(bar.OnDragStop) == "function" then hooksecurefunc(bar, "OnDragStop", OnDragStop) end
+				hooksecurefunc(bar, "ClearAllPoints", function(frame)
+					if ns.swingDebug and not order.moving then
+						ns.Log("swing", ("%s ClearAllPoints by the game | %s"):format(frame:GetName() or "?",
+							(debugstack(3, 2, 0) or ""):gsub("\n", " < ")))
+					end
+				end)
+			end
+			-- (A bar coming or going: the order is done again.)
+			for _, bar in ipairs(bars) do
+				bar:HookScript("OnShow", function() order.Redo() end)
+				bar:HookScript("OnHide", function() order.Redo() end)
 			end
 		end
-		if swap then
-			-- (where each bar goes: the place of the bar named)
-			local place = off and { [ranged] = main, [main] = off, [off] = ranged } or { [ranged] = main, [main] = ranged }
-			local moved = {}
-			for bar, to in pairs(place) do moved[to] = bar end
-			for bar, to in pairs(place) do SetPoints(bar, order.game[to], moved) end
-		else
-			for _, bar in ipairs(bars) do SetPoints(bar, order.game[bar]) end
+		-- First the game's own places (all cleared before any is set: they anchor to each other).
+		order.moving = true
+		for _, bar in ipairs(bars) do bar:ClearAllPoints() end
+		order.moving = false
+		for _, bar in ipairs(bars) do SetPoints(bar, order.game[bar]) end
+		order.swapped = false
+		if not swap then
+			return
 		end
-		order.swapped = swap
+		-- Swapped: only the bars showing count (the game parks a hidden one in
+		-- the screen's corner and closes the gap). Top to bottom, the ranged
+		-- bar goes first and the others each move down one. Each bar is pinned
+		-- to the screen spot of the place it takes, from the middle of the
+		-- screen, not to another bar or the game's stack (the game laying its
+		-- anchors out later can't then make a loop of them).
+		local ux, uy = UIParent:GetCenter()
+		local uScale = UIParent:GetEffectiveScale()
+		if not (Number(ux) and Number(uy)) then
+			order.waitUntil = GetTime() + 1
+			return
+		end
+		local shown, at = {}, {}
+		for _, bar in ipairs(bars) do
+			if ns.Flag(bar:IsShown()) then
+				local x, y = bar:GetCenter()
+				if not (Number(x) and Number(y)) then
+					order.waitUntil = GetTime() + 1 -- (not laid out yet, or secret: the game's places for now)
+					return
+				end
+				local scale = bar:GetEffectiveScale()
+				at[bar] = { x * scale, y * scale } -- (in screen units)
+				shown[#shown + 1] = bar
+			end
+		end
+		if not at[ranged] or #shown < 2 then
+			order.swapped = true -- (nothing to swap: the game's places, done again when a bar comes or goes)
+			return
+		end
+		table.sort(shown, function(a, b) return at[a][2] > at[b][2] end)
+		local wanted = { ranged }
+		for _, bar in ipairs(shown) do
+			if bar ~= ranged then wanted[#wanted + 1] = bar end
+		end
+		local spots = {}
+		for i, bar in ipairs(wanted) do
+			local spot, scale = at[shown[i]], bar:GetEffectiveScale()
+			spots[bar] = { (spot[1] - ux * uScale) / scale, (spot[2] - uy * uScale) / scale }
+		end
+		order.moving = true
+		for bar in pairs(spots) do bar:ClearAllPoints() end
+		for bar, spot in pairs(spots) do bar:SetPoint("CENTER", UIParent, "CENTER", spot[1], spot[2]) end
+		order.moving = false
+		if ns.swingDebug then
+			ns.Log("swing", ("swapped %d bars: main %s; ranged %s; off %s"):format(#shown,
+				order.Describe(main), order.Describe(ranged), off and order.Describe(off) or "none"))
+		end
+		order.swapped = true
+	end
+
+	-- The game's places for the bars, as one string (nil: no bars, or secret).
+	-- A bar with no game anchors kept was just moved by the game (or never
+	-- swapped), so where it is now is the game's place.
+	function order.Places()
+		local parts = {}
+		for _, name in ipairs(order.barNames) do
+			local bar = _G[name]
+			local points = bar and (order.game[bar] or ReadPoints(bar))
+			if not points then
+				if bar then return nil end
+			else
+				for _, p in ipairs(points) do
+					local to = p[2]
+					to = type(to) == "table" and to.GetName and to:GetName() or tostring(to)
+					parts[#parts + 1] = ("%s %s %s %s %.1f %.1f"):format(name, tostring(p[1]), to, tostring(p[3]), p[4], p[5])
+				end
+			end
+		end
+		return table.concat(parts, ";")
+	end
+
+	-- /cine debug swing: each bar's anchors now, and the game's kept ones, in the log.
+	function ns.ReportSwingOrder()
+		ns.Log("swing", ("order: swapped %s, editing %s, setting %s"):format(tostring(order.swapped),
+			tostring(order.editing), tostring(order.key and ns.db[order.key])))
+		for _, name in ipairs(order.barNames) do
+			local bar = _G[name]
+			if bar then
+				local kept = {}
+				for _, p in ipairs(order.game[bar] or {}) do
+					local to = type(p[2]) == "table" and p[2].GetName and p[2]:GetName() or tostring(p[2])
+					kept[#kept + 1] = ("%s %s %s %s %s"):format(tostring(p[1]), to, tostring(p[3]), tostring(p[4]), tostring(p[5]))
+				end
+				ns.Log("swing", ("%s now %s; game's %s"):format(name, order.Describe(bar),
+					#kept > 0 and table.concat(kept, "; ") or "none kept"))
+			end
+		end
 	end
 
 	-- Each tick: the bars as the setting (and the page's master switch) say.
 	function ns.UpdateSwingOrder()
 		-- (The class's setting name made once: a new string each tick was garbage.)
 		order.key = order.key or "swingRangedOnTop" .. select(2, UnitClass("player"))
-		local swap = ns.db.handleSwing and ns.db[order.key] and true or false
-		-- (In Edit Mode the bars sit in their own places, so the one you drag is the one that moves.)
+		-- In Edit Mode the bars sit in their own places, so the one you drag is
+		-- the one that moves. Leaving it with a bar moved: you place the bars
+		-- yourself now, so the swap goes off for this class (swapping would put
+		-- the bar you dropped in another bar's place).
 		local editMode = _G.EditModeManagerFrame
-		if swap and editMode and editMode.IsEditModeActive and ns.Flag(editMode:IsEditModeActive()) then
-			swap = false
+		local editing = editMode and editMode.IsEditModeActive and ns.Flag(editMode:IsEditModeActive()) or false
+		if editing ~= order.editing then
+			order.editing = editing
+			if editing then
+				order.before = order.Places()
+			else
+				local after = order.Places()
+				if order.before and after and after ~= order.before and ns.db[order.key] then
+					ns.db[order.key] = false
+					ns.Print(L["You moved a swing timer bar, so \"Ranged bar on top\" is now off for %s and the bars stay where you put them."]
+						:format((UnitClass("player"))))
+				end
+				order.before = nil
+			end
 		end
-		if order.swapped ~= swap then
+		local swap = not editing and ns.db.handleSwing and ns.db[order.key] and true or false
+		order.want = swap -- (the game moving a bar: the swap done again at once)
+		if order.swapped ~= swap and GetTime() >= (order.waitUntil or 0) then
 			-- (Not swapped and the game's anchors not taken yet: nothing to put back.)
 			if swap or next(order.game) then
 				if not pcall(Apply, swap) then
+					order.moving = false
 					order.swapped = swap -- (an error: not tried again every tick)
 				end
 			else
@@ -8627,11 +8760,21 @@ function ns.UpdateFrames(cinematic, elapsed)
 	-- tabs and buttons as the Chat page ticks them (and for Mouseover groups
 	-- with "Chat message" ticked).
 	local dockPeek = false
+	-- (A peeking window, or the open input box, inside a faded frame of the
+	-- chat group, ElvUI's chat panels: that frame comes up with it, or it
+	-- can't be seen.)
+	local peekHolders = ns.chatPeekHolders
+	wipe(peekHolders)
 	for chatFrame, untilTime in pairs(ns.chatPeekUntil) do
-		if untilTime > now and (chatFrame.isDocked or chatFrame == DEFAULT_CHAT_FRAME) then
-			dockPeek = true
-			break
+		if untilTime > now then
+			if chatFrame.isDocked or chatFrame == DEFAULT_CHAT_FRAME then
+				dockPeek = true
+			end
+			ns.MarkChatHolders(chatFrame)
 		end
+	end
+	if activeEditBox then
+		ns.MarkChatHolders(activeEditBox)
 	end
 	local keepForGathering, keepForCreatures = ns.IsKeepingMinimapForTracking(now)
 	-- (Quest tracker page, its switch on.)
@@ -8855,6 +8998,7 @@ function ns.UpdateFrames(cinematic, elapsed)
 		-- chat windows too where the Chat page's Typing row is on.)
 		local typingShown = entry.group == "chat" and (typingWindows or (activeEditBox and entry.frame == activeEditBox))
 		local chatShowing = (ns.chatPeekUntil[entry.frame] or 0) > now
+			or (entry.group == "chat" and peekHolders[entry.frame])
 			-- (An unread whisper brings up the Mouseover groups with it ticked,
 			-- chat by default.)
 			or typingShown

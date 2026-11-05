@@ -893,6 +893,13 @@ function ns.ResetAddon(settingsOnly)
 	-- fresh install to Core.lua.)
 	local kept = {}
 	kept.vitalsThemeEdits = ns.isDev and CinematicDB and CinematicDB.vitalsThemeEdits or nil
+	-- (The dev copy keeps the flight times learned, Reset Everything too: each
+	-- route takes a flight to learn again. The speed scale goes with them, as
+	-- the times are saved at it: Camera.lua's RecordFlightTime.)
+	if ns.isDev and type(ns.db.flightTimes) == "table" and next(ns.db.flightTimes) ~= nil then
+		kept.flightTimes = ns.db.flightTimes
+		kept.flightSpeedScale = ns.db.flightSpeedScale
+	end
 	if settingsOnly then
 		ns.SaveProfile()
 		local profiles = {}

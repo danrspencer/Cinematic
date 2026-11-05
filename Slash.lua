@@ -485,6 +485,9 @@ local function HandleSlash(msg)
 		if ns.ReportSwing then
 			ns.ReportSwing()
 		end
+		if ns.ReportSwingOrder then
+			ns.ReportSwingOrder()
+		end
 		ns.Print("print swing bars showing or fading: " .. OnOff(ns.swingDebug) .. " (until you /reload)")
 	elseif cmd == "debug" and arg == "questgaps" then
 		ns.questGapsDebug = not ns.questGapsDebug

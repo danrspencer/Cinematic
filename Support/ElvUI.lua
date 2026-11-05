@@ -40,7 +40,8 @@ end
 -- Its frames standing in for the game's, by Standard Frames row: the row,
 -- the fade group, and the frames. (Its bars 1 and 3-6 show the game's action
 -- pages 1 and 3-6, so the bars that page sits on; 13-15 are retail's bars 6-8.
--- Its cast bars are on its unit frames and fade with them.)
+-- Its target and focus cast bars are on its unit frames and fade with them,
+-- as the game's do.)
 local ROWS = {
 	{ "player", "player", "ElvUF_Player" },
 	{ "petframe", "player", "ElvUF_Pet", "ElvUF_PetTarget" },
@@ -65,6 +66,10 @@ local ROWS = {
 	-- (Classic clients have no Bags row: their bags go with the micro menu.)
 	{ _G.BagsBar and "bags" or "micro", "bars", "ElvUIBagBar" },
 	{ "xp", "bars", "ElvUI_ExperienceBarHolder", "ElvUI_ReputationBarHolder", "ElvUI_PetExperienceBarHolder" },
+	-- Your cast bars sit inside its player and pet frames: they follow the
+	-- Cast bar row, as the game's do (the castbar group ignores the parent's
+	-- fade), not the frame they're on.
+	{ "castbar", "castbar", "ElvUF_Player_CastBar", "ElvUF_Pet_CastBar" },
 	-- Its chat panels hold the game's chat frames, with its data texts and
 	-- toggle buttons (no row: the Chat page's).
 	{ "chat", "chat", "LeftChatPanel", "RightChatPanel", "LeftChatToggleButton", "RightChatToggleButton" },

@@ -334,6 +334,14 @@ local function ChannelPeekName(number, baseName, channelString)
 	return name
 end
 ns.chatPeekUntil = {} -- [chat frame] = GetTime() when it may fade again
+ns.chatPeekHolders = {} -- [frame] = true: holds a peeking chat window (Frames.lua)
+function ns.MarkChatHolders(frame)
+	local parent = frame:GetParent()
+	while parent and parent ~= UIParent do
+		ns.chatPeekHolders[parent] = true
+		parent = parent:GetParent()
+	end
+end
 ns.chatTypingUntil = 0 -- typing shows the whole chat group without leaving cinematic
 
 -- Only a window you'd see peeks: a docked tab that isn't the selected one is
