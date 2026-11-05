@@ -3794,6 +3794,21 @@ function ns.IsLongAura(aura)
 	return duration > (ns.db.buffPeekLongMinutes or 30) * 60
 end
 
+-- One aura's data: no timer and no stacks, so an update to it refreshed
+-- nothing. (Retail updates your mount's aura now and then as you ride: seen
+-- going into Tranquil Repose, Eversong Woods. False when unsure: no data, or
+-- secret values.)
+function ns.IsBareAura(aura)
+	if type(aura) ~= "table" then
+		return false
+	end
+	local duration, ending, stacks = aura.duration, aura.expirationTime, aura.applications
+	if issecretvalue and (issecretvalue(duration) or issecretvalue(ending) or issecretvalue(stacks)) then
+		return false
+	end
+	return duration == 0 and ending == 0 and (stacks or 0) <= 1
+end
+
 -- A buff you cast on yourself (buffPeekIgnoreSelf passes these over): its
 -- caster is you or your pet. (False when unsure: no data, or a secret caster.)
 local function IsSelfCast(aura)
@@ -3866,6 +3881,9 @@ local function AuraHold(aura)
 		return nil
 	end
 	if not harmful and ns.db.buffPeekIgnoreSelf and IsSelfCast(aura) then
+		return nil
+	end
+	if not harmful and ns.db.buffPeekNotSkyriding and ns.OnSkyridingMount() then
 		return nil
 	end
 	local hold = PeekHold(harmful and true or false)
@@ -4049,7 +4067,8 @@ local function AnyAuraHold(updateInfo, found)
 						harmful and "debuff" or "buff?", seconds and ("peeks %.1fs"):format(seconds)
 						or IsIgnoredAura(aura) and "on the ignore list" or harmful and ns.IsLongAura(aura) and "lasts too long"
 						or aura.isHarmful and "debuff peek" or ns.db.buffPeekIgnoreSelf and IsSelfCast(aura)
-						and "cast by you" or "buff peeks off now"))
+						and "cast by you" or ns.db.buffPeekNotSkyriding and ns.OnSkyridingMount()
+						and "skyriding" or "buff peeks off now"))
 				end)
 				if not okDebug then ns.AuraSay("aura (unreadable): " .. tostring(problem)) end
 			end
@@ -4069,7 +4088,15 @@ local function AnyAuraHold(updateInfo, found)
 				return AuraHold(nil)
 			end
 			for _, instanceID in pairs(updated) do
-				Consider(C_UnitAuras.GetAuraDataByAuraInstanceID("player", instanceID))
+				local aura = C_UnitAuras.GetAuraDataByAuraInstanceID("player", instanceID)
+				if ns.IsBareAura(aura) then
+					if ns.auraDebug then
+						ns.AuraSay(("aura %s: updated, but no time or stacks to refresh"):format(
+							issecretvalue and issecretvalue(aura.name) and "secret" or tostring(aura.name)))
+					end
+				else
+					Consider(aura)
+				end
 			end
 		end
 		return longest
@@ -4151,6 +4178,7 @@ do
 		-- combat", nor in the moment after the fight.)
 		local fightBuffPeeks = inFight and PeekAllowed(false) and ns.db.buffPeekOnlyNew
 			and not ns.db.buffPeekAfterCombat and not ns.OnTaxi()
+			and not (ns.db.buffPeekNotSkyriding and ns.OnSkyridingMount())
 			and (InCombatLockdown() or ns.Flag(UnitAffectingCombat("player")))
 		ns.CheckNewBuffIcons(fightBuffPeeks)
 		if inFight then
@@ -4235,7 +4263,7 @@ do
 			ns.AuraSay("weapon enchant gained or refreshed, icons: " .. table.concat(found, " "))
 		end
 		if not (gained and ns.db and PeekAllowed(false)) or ns.db.buffPeekIgnoreSelf
-			or InCombatLockdown() or ns.Flag(UnitAffectingCombat("player"))
+			or (ns.db.buffPeekNotSkyriding and ns.OnSkyridingMount()) or InCombatLockdown() or ns.Flag(UnitAffectingCombat("player"))
 			or ns.OnTaxi() or ns.wasOnTaxi or GetTime() < landedQuietUntil then
 			return
 		end

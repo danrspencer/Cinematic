@@ -187,6 +187,7 @@ local DEFAULTS = {
 	buffPeek = true,          -- briefly show buffs/debuffs when a buff is gained or refreshed
 	buffPeekAfterCombat = false, -- ...or only within the Calm Timer of a fight
 	buffPeekIgnoreSelf = false,  -- ...or not for buffs you cast on yourself (or your pet does)
+	buffPeekNotSkyriding = true, -- ...or not on a mount that can skyride, air or ground (retail)
 	buffPeekOnlyNew = true,      -- ...showing just the new buff, the others staying faded
 	buffPeekCollapse = true,     -- ...at the start of the row, not among the faded ones' gaps
 	debuffPeek = true,        -- ...and when a debuff is
@@ -3516,6 +3517,19 @@ function ns.GlidingSpeed()
 		return nil
 	end
 	return type(speed) == "number" and speed or 0
+end
+
+-- Skyriding (retail): gliding, or able to (on the ground on a mount that can).
+-- False when the game won't say.
+function ns.OnSkyridingMount()
+	if not (C_PlayerInfo and C_PlayerInfo.GetGlidingInfo) then
+		return false
+	end
+	local ok, gliding, canGlide = pcall(C_PlayerInfo.GetGlidingInfo)
+	if not ok or (issecretvalue and (issecretvalue(gliding) or issecretvalue(canGlide))) then
+		return false
+	end
+	return gliding == true or (canGlide == true and ns.Flag(IsMounted()) and true or false)
 end
 
 function ns.GetPlayerSpeed()

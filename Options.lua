@@ -2914,10 +2914,21 @@ local function CreateBuffsPanel()
 	buffIgnoreSelf:SetPoint("TOPLEFT", buffAfterCombat, "BOTTOMLEFT", 0, -2)
 	GreyUnless(buffIgnoreSelf, IfBuffPeek)
 
+	-- (Only where there's skyriding: as SkyrideCam.lua decides that.)
+	local aboveOnlyNew = buffIgnoreSelf
+	if ns.isRetail and C_PlayerInfo and C_PlayerInfo.GetGlidingInfo then
+		local buffNotSkyriding = Check(content, "buffPeekNotSkyriding", L["Not while skyriding"],
+			L["No buff brings them up while you're on a mount that can skyride, in the air or on the ground, " ..
+			"so skyriding's own buffs stay out of the way. Debuffs still do."])
+		buffNotSkyriding:SetPoint("TOPLEFT", buffIgnoreSelf, "BOTTOMLEFT", 0, -2)
+		GreyUnless(buffNotSkyriding, IfBuffPeek)
+		aboveOnlyNew = buffNotSkyriding
+	end
+
 	local buffOnlyNew = Check(content, "buffPeekOnlyNew", L["Just the new one"],
 		L["Only the buff you gained or refreshed shows; your other buffs stay faded. Hovering shows them all. " ..
 		"In fights too, for new buffs (procs and the like)."])
-	buffOnlyNew:SetPoint("TOPLEFT", buffIgnoreSelf, "BOTTOMLEFT", 0, -2)
+	buffOnlyNew:SetPoint("TOPLEFT", aboveOnlyNew, "BOTTOMLEFT", 0, -2)
 	GreyUnless(buffOnlyNew, IfBuffPeek)
 	buffOnlyNew:HookScript("OnClick", Refresh)
 
