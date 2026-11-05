@@ -372,8 +372,10 @@ end
 -- The Style hub's Chat bubbles page's Move button: a box standing in for the lines, dragged to
 -- where they should show (saved as it's let go). A left click sets it there
 -- and closes it, a line showing there to see; right-click puts it back.
+-- inEditMode: shown by the game's Edit Mode instead (blue like its frames, no
+-- close button, a click doesn't close it; it goes when Edit Mode closes).
 local mover
-function ns.MoveSpeechBehind()
+function ns.MoveSpeechBehind(inEditMode)
 	Holder()
 	if not mover then
 		mover = CreateFrame("Button", nil, UIParent, "BackdropTemplate")
@@ -388,9 +390,10 @@ function ns.MoveSpeechBehind()
 		mover:SetBackdropBorderColor(1, 0.82, 0, 1)
 		local label = mover:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
 		label:SetPoint("CENTER")
-		label:SetText(ns.L["Speech from behind you shows here.\nDrag it where you want it, left-click to set, right-click to reset."])
+		mover.label = label
 		local close = CreateFrame("Button", nil, mover, "UIPanelCloseButton")
 		close:SetPoint("TOPRIGHT", 4, 4)
+		mover.close = close
 		local function Snap()
 			mover:ClearAllPoints()
 			mover:SetPoint("BOTTOMLEFT", spot, "BOTTOMLEFT", 0, 0)
@@ -416,16 +419,41 @@ function ns.MoveSpeechBehind()
 				ns.db.speechBehindX, ns.db.speechBehindY = nil, nil -- (beside the chat window)
 				PlaceSpot()
 				Snap()
-			else
+			elseif not self.inEditMode then
 				self:Hide()
 				ns.ShowSpeechBehind("CHAT_MSG_SAY", nil, ns.L["Speech from behind you shows here."])
 			end
 		end)
 		mover.Snap = Snap
 	end
+	if not inEditMode and mover.inEditMode and mover:IsShown() then
+		inEditMode = true -- (the Move button while Edit Mode has it up: keep it Edit Mode's)
+	end
+	mover.inEditMode = inEditMode or nil
+	mover.label:SetText(inEditMode and ns.L["Speech from behind you\nDrag to move, right-click to reset"]
+		or ns.L["Speech from behind you shows here.\nDrag it where you want it, left-click to set, right-click to reset."])
+	mover.close:SetShown(not inEditMode)
+	ns.EditModeLook(mover, inEditMode)
 	mover.Snap()
 	mover:Show()
 end
+
+-- The game's Edit Mode (retail, Forever): the box shows with the game's own
+-- frames while it's open, if speech from behind you is on, and goes when it
+-- closes. (Only its events are listened to: nothing of Edit Mode's is touched,
+-- the spot stays in our settings.)
+ns.OnEditMode(function()
+	-- (Only with speech from behind you on: as the Chat bubbles page has it.)
+	if ns.Setting("handleBubbles") and ns.Setting("chatPeek") and ns.Setting("chatHideBubbled")
+			and ns.Setting("chatSpeechBehind") then
+		ns.MoveSpeechBehind(true)
+	end
+end, function()
+	if mover and mover.inEditMode then
+		mover:Hide()
+		mover.inEditMode = nil
+	end
+end)
 
 -- A player's name in their class colour (db.speechBehindClassColor), as the
 -- chat window shows it; NPCs' and unknown ones as they are.

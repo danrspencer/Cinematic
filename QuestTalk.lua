@@ -1502,6 +1502,84 @@ function Draggable(frame)
 	frame:SetScript("OnDragStop", Dropped)
 end
 
+-- The game's Edit Mode (Core.lua's ns.OnEditMode): with Quest Talk on, a box
+-- standing in for the list where it goes off an NPC's head (as wide as it,
+-- at its size), dragged to move it (saved as db.questTalkSpot, as dragging
+-- the list does), right-click back to the default; gone as Edit Mode closes.
+do
+	local BOX_H = 160
+	local box
+	local function BoxToUI()
+		local scale, uiScale = Plain(box:GetEffectiveScale()), Plain(UIParent:GetEffectiveScale())
+		return scale and uiScale and uiScale > 0 and scale / uiScale or 1
+	end
+	local function PlaceBox()
+		box:SetScale(tonumber(Styled("questTalkScale")) or 1)
+		box:SetSize(PANEL_WIDTH, BOX_H)
+		box:ClearAllPoints()
+		local width, height = UIParent:GetWidth(), UIParent:GetHeight()
+		local toUI = BoxToUI()
+		local spot = ns.db.questTalkSpot
+		if type(spot) == "table" and type(spot.x) == "number" and type(spot.top) == "number" then
+			box:SetPoint("TOP", UIParent, "BOTTOMLEFT", spot.x * width / toUI, spot.top * height / toUI)
+		else
+			box:SetPoint("TOP", UIParent, "BOTTOM", 0, height * (tonumber(ns.db.questTalkListY) or 0.46) / toUI)
+		end
+	end
+	-- (The list up now, off a head: put where the box says too.)
+	local function Moved()
+		PlaceBox()
+		if panel and ns.Flag(panel:IsShown()) and not panel.following then
+			PlacePanel()
+		end
+	end
+	local function Box()
+		if box then return box end
+		box = CreateFrame("Button", nil, UIParent, "BackdropTemplate")
+		box:SetClampedToScreen(true)
+		box:SetMovable(true)
+		box:RegisterForDrag("LeftButton")
+		box:RegisterForClicks("RightButtonUp")
+		box:SetBackdrop({ bgFile = "Interface\\Buttons\\WHITE8X8", edgeFile = "Interface\\Buttons\\WHITE8X8",
+			edgeSize = 1 })
+		local label = box:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+		label:SetPoint("CENTER")
+		label:SetText(L["Quest Talk's replies\nDrag to move, right-click to reset"])
+		box:SetScript("OnDragStart", box.StartMoving)
+		box:SetScript("OnDragStop", function(self)
+			self:StopMovingOrSizing()
+			if self.SetUserPlaced then self:SetUserPlaced(false) end
+			local x, top = Plain(self:GetCenter()), Plain(self:GetTop())
+			local width, height = UIParent:GetWidth(), UIParent:GetHeight()
+			if x and top and width > 0 and height > 0 then
+				local toUI = BoxToUI()
+				ns.db.questTalkSpot = { x = x * toUI / width, top = top * toUI / height }
+			end
+			Moved()
+			self.draggedAt = GetTime() -- (the button-up ending a drag isn't a click)
+		end)
+		box:SetScript("OnClick", function(self)
+			if self.draggedAt and GetTime() - self.draggedAt < 0.2 then
+				return
+			end
+			ns.db.questTalkSpot = nil -- (the List height on the screen box decides again)
+			Moved()
+			if ns.RefreshOptions then pcall(ns.RefreshOptions) end
+		end)
+		ns.EditModeLook(box, true)
+		return box
+	end
+	ns.OnEditMode(function()
+		if ns.QuestVisionSetting("questTalk") then
+			Box()
+			PlaceBox()
+			box:Show()
+		end
+	end, function()
+		if box then box:Hide() end
+	end)
+end
+
 local function FinishPanel()
 	cursor = cursor + 6
 	panel.full:ClearAllPoints()

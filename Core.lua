@@ -2400,6 +2400,15 @@ end
 -- keep their own copy of settings (see Support/Plater.lua).
 ns.cvarWrittenHooks = {}
 
+-- A camera speed setting the addon wrote (a crawl for a slow move, a swing
+-- speed): noted, so the watch below can tell one of ours left behind from a
+-- low speed you set yourself (/console cameraYawMoveSpeed 30), which stays.
+function ns.NoteOwnSpeed(cvar, value)
+	if ns.db and ns.db.ownSpeeds and cvar:find("Speed$") then
+		ns.db.ownSpeeds[cvar] = tonumber(value)
+	end
+end
+
 local function WriteCVar(cvar, value)
 	writingCVar = true
 	SetCVar(cvar, value)
@@ -2420,6 +2429,7 @@ local function WriteBackOverridden()
 			overridden[key] = nil
 			if not SameValue(GetCVar(held.name), held.value) then
 				ns.Log("cvar", ("%s changed by another addon: put back to %s"):format(held.name, tostring(held.value)))
+				ns.NoteOwnSpeed(held.name, held.value)
 				WriteCVar(held.name, held.value)
 			end
 		end
@@ -2488,6 +2498,7 @@ function ns.ApplyCVarSet(set, want)
 					ns.db.savedCVars[cvar] = original
 				end
 				ns.LogDetail("cvar", ("%s %s -> %s"):format(cvar, tostring(original), tostring(value)))
+				ns.NoteOwnSpeed(cvar, value)
 				WriteCVar(cvar, value)
 				if set.playerWins then
 					heldCVars[cvar:lower()] = { name = cvar, value = value }
@@ -2593,8 +2604,11 @@ do
 	-- kept its own copy before, and every slip (two at once, the watch below
 	-- putting yours back mid-tilt) left a crawl behind as yours, which the
 	-- game then saved: 15.14 for tilting, after the death tilt.
-	-- Stuck: lower than you'd ever set it (the death tilt peaks near 15 deg/s;
-	-- the quest camera's zoom crawls at 0.3-0.5 yards a second).
+	-- Stuck: low (the death tilt peaks near 15 deg/s; the quest camera's
+	-- zoom crawls at 0.3-0.5 yards a second) AND the very value one of ours
+	-- last wrote (ns.db.ownSpeeds). A low speed you set yourself is yours:
+	-- players slow the turn speed to 30 by console, and the watch used to
+	-- put that back to 180 within a second.
 	local SPEEDS = { cameraYawMoveSpeed = 180, cameraPitchMoveSpeed = 90, cameraZoomSpeed = 20,
 		cameraYawSmoothSpeed = 180, cameraPitchSmoothSpeed = 45 }
 	local STUCK_SPEED = { cameraYawMoveSpeed = 60, cameraPitchMoveSpeed = 30, cameraZoomSpeed = 1,
@@ -2606,9 +2620,16 @@ do
 		return getDefault and tonumber(getDefault(cvar)) or SPEEDS[cvar]
 	end
 
+	-- A low value one of ours wrote and left behind (a crawl). A low one
+	-- you set yourself doesn't count: it's yours.
+	local function LeftByUs(cvar, value)
+		local own = ns.db.ownSpeeds[cvar]
+		return value < (STUCK_SPEED[cvar] or 0) and own ~= nil and math.abs(own - value) < 0.01
+	end
+
 	local function Sane(cvar, value)
 		value = tonumber(value)
-		return value and value >= (STUCK_SPEED[cvar] or 0) and value or nil
+		return value and value > 0 and not LeftByUs(cvar, value) and value or nil
 	end
 
 	local function Held(cvar)
@@ -2641,7 +2662,9 @@ do
 	-- Sets it (degrees, or yards, a second), held for who.
 	function ns.SetHeldSpeed(who, cvar, value)
 		ns.HoldSpeed(who, cvar)
-		SetCVar(cvar, ("%.2f"):format(value))
+		value = ("%.2f"):format(value)
+		ns.NoteOwnSpeed(cvar, value)
+		SetCVar(cvar, value)
 	end
 
 	-- who's done with it; the last one done puts yours back.
@@ -2655,6 +2678,7 @@ do
 		local yours = ns.db.heldSpeeds[cvar]
 		if yours then
 			ns.db.heldSpeeds[cvar] = nil
+			ns.db.ownSpeeds[cvar] = nil
 			ns.LogDetail("cvar", ("%s back to %s"):format(cvar, yours))
 			SetCVar(cvar, yours)
 		end
@@ -2678,6 +2702,7 @@ do
 			ns.Log("cvar", ("%s back to %s (%s)"):format(cvar, yours, why))
 			SetCVar(cvar, yours)
 			ns.db.heldSpeeds[cvar] = nil
+			ns.db.ownSpeeds[cvar] = nil
 		end
 	end
 
@@ -2747,10 +2772,11 @@ do
 				ns.RestoreCVar(cvar)
 			end
 			local value = tonumber(GetCVar(cvar))
-			if value and value < STUCK_SPEED[cvar] and not activeCVars[cvar] and not Held(cvar) then
+			if value and LeftByUs(cvar, value) and not activeCVars[cvar] and not Held(cvar) then
 				local default = DefaultSpeed(cvar)
 				ns.Log("cvar", ("%s was %s (left over from a camera move): back to %s"):format(cvar,
 					tostring(value), tostring(default)))
+				ns.db.ownSpeeds[cvar] = nil
 				SetCVar(cvar, default)
 			end
 		end
@@ -3295,6 +3321,7 @@ function ns.EnsureTables()
 	-- good ones (the speed keeper, ns.HoldSpeed): cvar -> value.
 	ns.db.heldSpeeds = ns.db.heldSpeeds or {}
 	ns.db.goodSpeeds = ns.db.goodSpeeds or {}
+	ns.db.ownSpeeds = ns.db.ownSpeeds or {}
 	ns.db.chatPeekTypes = ns.db.chatPeekTypes or {}
 	ns.db.chatPeekChannelList = ns.db.chatPeekChannelList or { General = false, LocalDefense = false }
 	ns.db.flightTimes = ns.db.flightTimes or {}
@@ -6547,4 +6574,52 @@ if ADDON_NAME == "CinematicDev" then
 		}
 		StaticPopup_Show("CINEMATIC_DEV_WINS")
 	end)
+end
+
+-- The game's Edit Mode (retail, Forever; Classic Era has none): our own
+-- movable frames show there too, with the game's (only its open and close are
+-- listened to: nothing of Edit Mode's is touched, each spot stays in our
+-- settings). ns.OnEditMode(enter, exit): called as it opens and closes.
+-- ns.EditModeLook(mover, on): a Move box in Edit Mode's blue (below its
+-- window, as its frames are), or back in our gold.
+do
+	local hooked = {}
+	local registered = false
+	function ns.EditModeActive()
+		local manager = _G.EditModeManagerFrame
+		return manager and manager.IsEditModeActive and Flag(manager:IsEditModeActive()) or false
+	end
+	function ns.OnEditMode(enter, exit)
+		local events = _G.EventRegistry
+		if not (events and events.RegisterCallback and _G.EditModeManagerFrame) then
+			return
+		end
+		hooked[#hooked + 1] = { enter = enter, exit = exit }
+		if registered then
+			return
+		end
+		registered = true
+		-- (One callback each, calling them all: the same owner again would
+		-- replace the last one.)
+		events:RegisterCallback("EditMode.Enter", function()
+			for _, each in ipairs(hooked) do
+				if each.enter then each.enter() end
+			end
+		end, "CinematicEditMode")
+		events:RegisterCallback("EditMode.Exit", function()
+			for _, each in ipairs(hooked) do
+				if each.exit then each.exit() end
+			end
+		end, "CinematicEditMode")
+	end
+	function ns.EditModeLook(mover, on)
+		mover:SetFrameStrata(on and "HIGH" or "FULLSCREEN_DIALOG")
+		if on then
+			mover:SetBackdropColor(0.1, 0.35, 0.7, 0.45)
+			mover:SetBackdropBorderColor(0.35, 0.7, 1, 1)
+		else
+			mover:SetBackdropColor(0, 0, 0, 0.6)
+			mover:SetBackdropBorderColor(1, 0.82, 0, 1)
+		end
+	end
 end

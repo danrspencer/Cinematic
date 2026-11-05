@@ -144,8 +144,9 @@ end
 
 -- Each kind's first what and until.
 local KIND_START = { emote = { "cheer", "move" }, spell = { "", "ends" }, aura = { "", "ends" },
-	place = { "", "ends" }, moment = { "levelup", "time:5" }, state = { "mounted", "ends" }, key = { "1", "key" } }
-local ENDS_KINDS = { spell = true, aura = true, place = true, moment = true, state = true }
+	place = { "", "ends" }, moment = { "levelup", "time:5" }, state = { "mounted", "ends" },
+	interact = { "mail", "ends" }, key = { "1", "key" } }
+local ENDS_KINDS = { spell = true, aura = true, place = true, moment = true, state = true, interact = true }
 local SECONDS = { 3, 5, 8, 10, 15, 20, 30, 60 }
 -- The priority list's places (Triggers.lua's built-in sources).
 local AFTER = { { "", "First, before everything" }, { "depart", "After Hearthstones and teleports" },
@@ -166,7 +167,8 @@ local function UntilChoices(store)
 		key = key or kind == "key"
 		only = (only == nil or only == kind) and kind or false
 	end
-	local ENDS = { spell = L["The cast ends"], aura = L["The buff fades"], place = L["You leave"], state = L["It stops"] }
+	local ENDS = { spell = L["The cast ends"], aura = L["The buff fades"], place = L["You leave"], state = L["It stops"],
+		interact = L["Its window closes"] }
 	local list = { { value = "move", text = L["You move"] } }
 	if ends then list[#list + 1] = { value = "ends", text = only and ENDS[only] or L["It ends"] } end
 	list[#list + 1] = { value = "time", text = L["A set time"] }
@@ -249,7 +251,8 @@ local function BuildLines(parent, store, kit)
 	-- list; Here for a place), and remove. Made for the most a scene can have,
 	-- shown for those it has.
 	local KIND_TIP = L["One thing that starts this scene: an emote you do, a spell you cast, a buff on you, a place " ..
-		"you're in, a moment (leveling up...), something you are (mounted...), or a key you press. Any one of a " ..
+		"you're in, a moment (leveling up...), something you are (mounted...), a window you open (the mailbox, " ..
+		"bank, auction house, map or an NPC's), or a key you press. Any one of a " ..
 		"scene's triggers starts it."]
 	for i = 1, ns.SCENE_TRIGGER_MAX do
 		local line = i + offset
@@ -321,7 +324,7 @@ local function BuildLines(parent, store, kit)
 		local function Fixed()
 			local k = Source(store, i)
 			return k == "moment" and ns.CUSTOM_TRIGGER_MOMENTS or k == "state" and ns.CUSTOM_TRIGGER_STATES
-				or k == "key" and ns.CUSTOM_TRIGGER_KEYS or nil
+				or k == "interact" and ns.CUSTOM_TRIGGER_INTERACTIONS or k == "key" and ns.CUSTOM_TRIGGER_KEYS or nil
 		end
 		local pick = kit.BlockAt(line, Menu(parent, 200, function() return Fixed() or {} end,
 			function() return (select(2, Source(store, i))) end,

@@ -2079,6 +2079,12 @@ local function TriggerNow()
 		local camera = ns.TriggerSetting(scene, "camera")
 		if IsScript(camera) then return scene, camera end
 	end
+	-- (One an interaction started, the mailbox say: with its window open too.)
+	scene = ns.CustomInteractScene and ns.CustomInteractScene()
+	if scene then
+		local camera = ns.TriggerSetting(scene, "camera")
+		if IsScript(camera) then return scene, camera end
+	end
 	-- (One of yours on while you're mounted, flying or swimming: on the move too.)
 	scene = ns.CustomTravelScene and ns.CustomTravelScene()
 	if scene then
@@ -2419,6 +2425,10 @@ function ns.CameraScriptCommand(arg)
 		local scene = ns.CustomKeyScene and ns.CustomKeyScene()
 		ns.Print(("scene started by its key: %s%s"):format(tostring(scene), scene and (" (row now %s, camera %s)"):format(
 			tostring(ns.TriggerRowNow(scene)), tostring(ns.TriggerSetting(scene, "camera"))) or ""))
+		scene = ns.CustomInteractScene and ns.CustomInteractScene()
+		ns.Print(("scene started by a window (Interaction): %s%s; NPC window open %s, menu window open %s"):format(
+			tostring(scene), scene and (" (camera %s)"):format(tostring(ns.TriggerSetting(scene, "camera"))) or "",
+			tostring(ns.NPCWindowOpen and ns.NPCWindowOpen()), tostring(ns.MenuWindowOpen and ns.MenuWindowOpen())))
 		if ns.isDev then
 			ns.Print(("our cameras as scripts (/cine script builtins): %s"):format(
 				ns.ScriptBuiltInsOn() and "ON" or "off"))

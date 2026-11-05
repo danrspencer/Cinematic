@@ -13107,6 +13107,26 @@ local function CreateExtrasPanel()
 		local heading = Label(foundHead, "GameFontNormalSmall", column[1])
 		heading:SetPoint("LEFT", column[2], 0)
 	end
+	-- Add all: on Smart Find's button line, over the Add column, every found
+	-- frame not added yet (Hover Find's picks still going aren't on the list
+	-- yet: left out).
+	local addAll = ns.PanelButton(smart)
+	addAll:SetSize(FIND_ADD_W, 22)
+	addAll:SetPoint("RIGHT", smart, "RIGHT", -4, 0)
+	addAll:SetPoint("TOP", runButton, "TOP")
+	addAll:SetText(L["Add all"])
+	Tooltip(addAll, L["Fades every frame on this list that isn't added yet, as Add does for one."])
+	foundHead.addAll = addAll
+	addAll:SetScript("OnClick", function()
+		local db = ns.GetDB()
+		local names = {}
+		for name, known in pairs(db.foundFrames) do
+			if not known.dismissed and not db.extraFrames[name] then names[#names + 1] = name end
+		end
+		for _, name in ipairs(names) do ns.AdoptFoundFrame(name) end
+		RefreshExtras()
+		RefreshFound()
+	end)
 	noneFound = Label(box, "GameFontDisableSmall", L["Nothing found yet. Smart Find looks at what's on screen: " ..
 		"run it while the frames you want are showing."])
 	noneFound:SetWidth(PANEL_W - 40)
@@ -13172,6 +13192,7 @@ local function CreateExtrasPanel()
 			row.add:Hide()
 			row.added:Hide()
 		end
+		local toAdd = 0
 		for n, name in ipairs(names) do
 			local i = #picking + n
 			local known, row = db.foundFrames[name], FoundRow(i)
@@ -13183,7 +13204,9 @@ local function CreateExtrasPanel()
 			local added = db.extraFrames[name] and true or false
 			row.add:SetShown(not added)
 			row.added:SetShown(added)
+			if not added then toAdd = toAdd + 1 end
 		end
+		foundHead.addAll:SetShown(toAdd > 0)
 		foundCount = #picking + #names
 		Layout()
 		FitContentHeight(content)

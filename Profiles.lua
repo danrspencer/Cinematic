@@ -849,7 +849,7 @@ local RESET_KEEPS = {
 	"zoneTints", "zonePresets", "zoneTintStrength", "timePhaseColors", "timePhaseStrength", -- (tints you picked)
 	"extraFrames", -- (frames you added)
 	"devEdits", -- (the dev copy's Module Editor)
-	"flightTimes", "questDrops", "frameAddons", "smartFindLooks", "goodSpeeds", "selfTest",
+	"flightTimes", "questDrops", "frameAddons", "smartFindLooks", "goodSpeeds", "ownSpeeds", "selfTest",
 }
 -- What a built-in profile keeps of your changes on Reset Settings: the lists
 -- you made in it (its settings go back to the built-in's).

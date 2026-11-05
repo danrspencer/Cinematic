@@ -1004,11 +1004,14 @@ end
 -- right-click to put it back where it started.
 local MOVERS = {
 	display = { x = "damageVisionX", y = "damageVisionY", point = "TOP", height = 60,
-		text = "Damage Vision and its recap show here.\nDrag it where you want it, left-click to set, right-click to reset." },
+		text = "Damage Vision and its recap show here.\nDrag it where you want it, left-click to set, right-click to reset.",
+		editText = "Damage Vision\nDrag to move, right-click to reset" },
 }
 local movers = {}
 
-function ns.MoveDamageVision(which)
+-- inEditMode: shown by the game's Edit Mode (Core.lua's ns.OnEditMode): in its
+-- blue, no close button, a click doesn't close it; it goes as Edit Mode closes.
+function ns.MoveDamageVision(which, inEditMode)
 	db = ns.GetDB()
 	local info = MOVERS[which]
 	if not info then return end
@@ -1026,9 +1029,10 @@ function ns.MoveDamageVision(which)
 		mover:SetBackdropBorderColor(1, 0.82, 0, 1)
 		local label = mover:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
 		label:SetPoint("CENTER")
-		label:SetText(L[info.text])
+		mover.label = label
 		local close = CreateFrame("Button", nil, mover, "UIPanelCloseButton")
 		close:SetPoint("TOPRIGHT", 4, 4)
+		mover.close = close
 		function mover.Snap()
 			local size = db.damageVisionSize
 			mover:SetSize((Look().damageVisionWidth or WIDTH) * size, info.height * size)
@@ -1061,16 +1065,37 @@ function ns.MoveDamageVision(which)
 			elseif button == "RightButton" then
 				db[info.x], db[info.y] = ns.DEFAULTS[info.x], ns.DEFAULTS[info.y]
 				Moved()
-			else
+			elseif not self.inEditMode then
 				self:Hide()
 				ns.TestDamageVision()
 			end
 		end)
 		movers[which] = mover
 	end
+	if not inEditMode and mover.inEditMode and mover:IsShown() then
+		inEditMode = true -- (the Move button while Edit Mode has it up: keep it Edit Mode's)
+	end
+	mover.inEditMode = inEditMode or nil
+	mover.label:SetText(inEditMode and L[info.editText] or L[info.text])
+	mover.close:SetShown(not inEditMode)
+	ns.EditModeLook(mover, inEditMode)
 	mover.Snap()
 	mover:Show()
 end
+
+ns.OnEditMode(function()
+	db = ns.GetDB()
+	if ns.Setting("damageVision") and HasMeter() then
+		for which in pairs(MOVERS) do ns.MoveDamageVision(which, true) end
+	end
+end, function()
+	for _, mover in pairs(movers) do
+		if mover.inEditMode then
+			mover:Hide()
+			mover.inEditMode = nil
+		end
+	end
+end)
 
 function ns.SnapDamageMovers()
 	for _, mover in pairs(movers) do

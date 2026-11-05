@@ -16,6 +16,8 @@
 --             place:<zone or subzone name>,
 --             moment:levelup|achievement|quest|boss|alive,
 --             state:mounted|swimming|flying|indoors|outdoors|resting|stealthed|night,
+--             interact:mail|bank|auction|map|npc (its window open: these
+--             play with it open, where other cameras wait for it to close),
 --             key:1-5 (a scene of yours from before: one in "source")
 --   until     (yours) move (nil), ends (as the trigger that started it ends),
 --             time:<sec>, key (pressed again); a built-in scene's extra
@@ -37,7 +39,7 @@ ns.CUSTOM_TRIGGER_KINDS = {
 	{ value = "emote", text = L["Emote"] }, { value = "spell", text = L["Spell cast"] },
 	{ value = "aura", text = L["Buff on you"] }, { value = "place", text = L["Place"] },
 	{ value = "moment", text = L["Moment"] }, { value = "state", text = L["State"] },
-	{ value = "key", text = L["Key binding"] },
+	{ value = "interact", text = L["Interaction"] }, { value = "key", text = L["Key binding"] },
 }
 ns.CUSTOM_TRIGGER_MOMENTS = {
 	{ value = "levelup", text = L["You level up"] }, { value = "achievement", text = L["You earn an achievement"] },
@@ -50,12 +52,18 @@ ns.CUSTOM_TRIGGER_STATES = {
 	{ value = "outdoors", text = L["Outdoors"] }, { value = "resting", text = L["Resting (an inn or a city)"] },
 	{ value = "stealthed", text = L["Stealthed"] }, { value = "night", text = L["Night (game time)"] },
 }
+ns.CUSTOM_TRIGGER_INTERACTIONS = {
+	{ value = "mail", text = L["At a mailbox"] }, { value = "bank", text = L["At the bank"] },
+	{ value = "auction", text = L["At the auction house"] }, { value = "map", text = L["World map open"] },
+	{ value = "npc", text = L["Talking to an NPC (chat, vendor, trainer)"] },
+}
 ns.CUSTOM_TRIGGER_KEYS = {}
 for n = 1, 5 do
 	ns.CUSTOM_TRIGGER_KEYS[n] = { value = tostring(n), text = (L["Custom camera trigger %d"]):format(n) }
 end
 ns.OnLanguage(function()
-	for _, list in ipairs({ ns.CUSTOM_TRIGGER_KINDS, ns.CUSTOM_TRIGGER_MOMENTS, ns.CUSTOM_TRIGGER_STATES }) do
+	for _, list in ipairs({ ns.CUSTOM_TRIGGER_KINDS, ns.CUSTOM_TRIGGER_MOMENTS, ns.CUSTOM_TRIGGER_STATES,
+		ns.CUSTOM_TRIGGER_INTERACTIONS }) do
 		ns.TranslateFields(list, "text")
 	end
 	for n, each in ipairs(ns.CUSTOM_TRIGGER_KEYS) do each.text = (L["Custom camera trigger %d"]):format(n) end
@@ -99,6 +107,21 @@ local function StateNow(what)
 	if not fn then return false end
 	local ok, value = pcall(fn)
 	return ok and ns.Flag(value) or false
+end
+-- Interactions: their windows (each client names some differently; some
+-- load only when first opened), read on the tick as the states are.
+local INTERACT_FRAMES = { mail = { "MailFrame" }, bank = { "BankFrame" },
+	auction = { "AuctionHouseFrame", "AuctionFrame" }, map = { "WorldMapFrame" },
+	npc = { "GossipFrame", "MerchantFrame", "ClassTrainerFrame" } }
+local function InteractNow(what)
+	for _, name in ipairs(INTERACT_FRAMES[what] or {}) do
+		local frame = _G[name]
+		if type(frame) == "table" and frame.IsShown then
+			local ok, shown = pcall(frame.IsShown, frame)
+			if ok and ns.Flag(shown) then return true end
+		end
+	end
+	return false
 end
 
 -- A buff on you by spell ID or name (lower case). On retail your own buffs
@@ -234,7 +257,7 @@ local needSync = false
 
 -- A built-in scene's extra trigger ends as its kind would on its own.
 local KIND_UNTIL = { emote = "move", spell = "ends", aura = "ends", place = "ends", moment = "time:5", state = "ends",
-	key = "key" }
+	interact = "ends", key = "key" }
 
 -- Reads a unit's source and until (again only when their text changes).
 local function Parse(unit)
@@ -310,6 +333,14 @@ end
 function ns.CustomKeyScene()
 	for _, unit in ipairs(units) do
 		if unit.on and unit.kind == "key" and not unit.death then return unit.scene end
+	end
+end
+-- A scene an interaction started that's on now, or nil: it plays with its
+-- window open (Camera.lua's CurrentEvent and CameraScripts.lua's TriggerNow
+-- ask before waiting for windows to close), as that window is the point.
+function ns.CustomInteractScene()
+	for _, unit in ipairs(units) do
+		if unit.on and unit.kind == "interact" and not unit.death then return unit.scene end
 	end
 end
 -- Its script over by its own stop rules: the key's scene ends too, so one
@@ -402,6 +433,8 @@ local function Condition(unit, now)
 	local kind = unit.kind
 	if kind == "state" then
 		return StateNow(unit.what)
+	elseif kind == "interact" then
+		return InteractNow(unit.what)
 	elseif kind == "aura" or kind == "place" then
 		if unit.dirty or not unit.lookedAt or now - unit.lookedAt >= SLOW_LOOK then
 			unit.dirty, unit.lookedAt = false, now
@@ -576,6 +609,8 @@ function ns.DescribeTriggerSource(source)
 		return ChoiceText(ns.CUSTOM_TRIGGER_MOMENTS, what) or what
 	elseif kind == "state" then
 		return ChoiceText(ns.CUSTOM_TRIGGER_STATES, what) or what
+	elseif kind == "interact" then
+		return ChoiceText(ns.CUSTOM_TRIGGER_INTERACTIONS, what) or what
 	elseif kind == "key" then
 		return (L["Custom camera trigger %d"]):format(tonumber(what) or 1)
 	end

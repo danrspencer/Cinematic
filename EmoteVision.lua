@@ -1754,6 +1754,21 @@ function ns.MoveEmoteVision()
 end
 function ns.EmoteVisionMoving() return moving and true or false end
 
+-- The game's Edit Mode (Core.lua's ns.OnEditMode): a card held up to drag
+-- while it's open, if the page is on; let go as it closes.
+local editModeCard = false
+ns.OnEditMode(function()
+	if ns.Setting("emoteVision") and not moving then
+		ns.MoveEmoteVision()
+		editModeCard = moving and true or false
+	end
+end, function()
+	if editModeCard and moving then
+		ns.MoveEmoteVision()
+	end
+	editModeCard = false
+end)
+
 -- The card up now, and taken away (Show me's Stop).
 function ns.EmoteCardShown()
 	return card ~= nil and card:IsShown()

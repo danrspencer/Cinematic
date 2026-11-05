@@ -1376,6 +1376,13 @@ do
 			end
 			return nil
 		end
+		-- (A scene of yours an interaction started, the mailbox say: its
+		-- window's the point, so it plays with it open.)
+		local interact = ns.CustomInteractScene and ns.CustomInteractScene()
+		local interactCamera = interact and EventCamera(interact)
+		if interactCamera then
+			return interact, interactCamera
+		end
 		if ns.NPCWindowOpen and ns.NPCWindowOpen() then
 			return nil -- talking to an NPC: waits until the window closes
 		end
@@ -4335,8 +4342,14 @@ function CenterCamera(duration, yawSpeed, pitchSpeed, ramp)
 	local yaw, pitch = RampedSpeeds(now)
 	if ns.RECENTER_CVARS.active then
 		-- Already swinging (your own settings are saved): just change the speeds.
-		if values.cameraYawSmoothSpeed ~= yaw then SetCVar("cameraYawSmoothSpeed", yaw) end
-		if values.cameraPitchSmoothSpeed ~= pitch then SetCVar("cameraPitchSmoothSpeed", pitch) end
+		if values.cameraYawSmoothSpeed ~= yaw then
+			ns.NoteOwnSpeed("cameraYawSmoothSpeed", yaw)
+			SetCVar("cameraYawSmoothSpeed", yaw)
+		end
+		if values.cameraPitchSmoothSpeed ~= pitch then
+			ns.NoteOwnSpeed("cameraPitchSmoothSpeed", pitch)
+			SetCVar("cameraPitchSmoothSpeed", pitch)
+		end
 	end
 	values.cameraYawSmoothSpeed, values.cameraPitchSmoothSpeed = yaw, pitch
 	ns.ApplyCVarSet(ns.RECENTER_CVARS, true)
@@ -4709,10 +4722,12 @@ function ns.UpdateTaxi()
 		local values = ns.RECENTER_CVARS.values
 		if values.cameraYawSmoothSpeed ~= yaw then
 			values.cameraYawSmoothSpeed = yaw
+			ns.NoteOwnSpeed("cameraYawSmoothSpeed", yaw)
 			SetCVar("cameraYawSmoothSpeed", yaw)
 		end
 		if values.cameraPitchSmoothSpeed ~= pitch then
 			values.cameraPitchSmoothSpeed = pitch
+			ns.NoteOwnSpeed("cameraPitchSmoothSpeed", pitch)
 			SetCVar("cameraPitchSmoothSpeed", pitch)
 		end
 	end

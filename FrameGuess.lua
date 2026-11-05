@@ -164,6 +164,14 @@ local function Rect(frame)
 	return left * scale, bottom * scale, width * scale, height * scale
 end
 
+-- A holder: an addon's frame covering most of the screen that its other
+-- frames sit in (ElvUI's ElvUIParent). Never offered on its own: fading it
+-- would fade all that addon's frames as one, and what's inside is looked at.
+local function IsBigHolder(frame)
+	local _, _, width, height = Rect(frame)
+	return width ~= nil and width * height > UIParent:GetWidth() * UIParent:GetHeight() * HOLDER_SHARE
+end
+
 -- How much of the smaller of two rects the other covers (0 to 1).
 local function Overlap(a, b)
 	local across = math.min(a[1] + a[3], b[1] + b[3]) - math.max(a[1], b[1])
@@ -447,7 +455,7 @@ local function Collect()
 		local row, why = RowGuess(name or "", rect, hiddenGame)
 		local alpha = frame:GetAlpha()
 		entry.frames[#entry.frames + 1] = {
-			name = name, row = row, why = why, kept = status == "you keep it shown", top = depth == 0,
+			name = name, row = row, why = why, kept = status == "you keep it shown", top = depth == 0, holder = big,
 			text = ("  %s %s %dx%d at %d,%d strata=%s alpha=%s mouse=%s%s -> %s (%s)%s")
 				:format(name or ("(unnamed: %s) %s"):format(how, frame:GetDebugName()), frame:GetObjectType(),
 				width, height, left, bottom, frame:GetFrameStrata(),
@@ -601,7 +609,8 @@ function ns.FindFoundFrames()
 	for name in pairs(db.foundFrames) do
 		local frame = _G[name]
 		if not db.extraFrames[name] and not db.foundFrames[name].picked and type(frame) == "table"
-			and frame.GetObjectType and not IsForbidden(frame) and (Covered(frame, name) or NamedLikeWindow(name) or not Draws(frame, 2)) then
+			and frame.GetObjectType and not IsForbidden(frame) and (Covered(frame, name) or NamedLikeWindow(name) or not Draws(frame, 2)
+			or IsBigHolder(frame)) then
 			db.foundFrames[name] = nil
 			ns.ROW_FALLBACK["extra:" .. name] = nil
 		end
@@ -617,14 +626,14 @@ function ns.FindFoundFrames()
 		local unnamed = 0
 		for _, item in ipairs(entry.frames) do
 			if item.name then
-				if not item.kept and not db.extraFrames[item.name] and not db.foundFrames[item.name]
+				if not item.kept and not item.holder and not db.extraFrames[item.name] and not db.foundFrames[item.name]
 					and (listed[addon] or 0) < MAX_PER_ADDON then
 					listed[addon] = (listed[addon] or 0) + 1
 					local follow = IsRowKey(item.row) and item.row or nil
 					db.foundFrames[item.name] = { addon = addon, follow = follow }
 					Follow(item.name, follow)
 				end
-			elseif item.top then
+			elseif item.top and not item.holder then
 				unnamed = unnamed + 1
 			end
 		end
