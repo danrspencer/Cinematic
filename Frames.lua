@@ -851,6 +851,7 @@ local function RemoveFrame(frame)
 			end
 			ns.SetFrameAlpha(frame, frame.cinematicFishingHidden and 0 or entry.baseAlpha or 1)
 			if entry.looseParts then FadeLooseParts(entry, 1) end
+			ns.EntryClicksBack(entry)
 			if entry.shrunk and ns.ScaleBlocked(frame) then
 				local scale = entry.savedScale or 1
 				local waiter = CreateFrame("Frame")
@@ -1415,8 +1416,56 @@ function ns.UnshrinkForLayout()
 	end
 end
 
+-- A fully faded action bar still takes clicks, so the camera can't be turned
+-- over it, and nothing shows why. Its buttons stop taking clicks while it's at
+-- 0, and only clicks: they still notice the mouse, so hovering brings the bar
+-- up as before (and a bar that's up takes its clicks again). Not in fights:
+-- the buttons are protected, so they get their clicks back as one starts, or
+-- they couldn't be clicked in it. Not in Edit Mode either, where bars are
+-- dragged. (entry.clicksOff: the frames turned off, to put back.)
+do -- (a block: this file is at Lua's 200-local cap)
+local CLICK_GROUPS = { bars = true, sidebars = true }
+
+local function ClicksOff(frame, list)
+	if frame.IsForbidden and frame:IsForbidden() then return end
+	if ns.Flag(frame:IsMouseClickEnabled()) then
+		frame:SetMouseClickEnabled(false)
+		list[#list + 1] = frame
+	end
+	for _, child in ipairs({ frame:GetChildren() }) do ClicksOff(child, list) end
+end
+
+function ns.EntryClicksBack(entry)
+	local list = entry.clicksOff
+	if not list or InCombatLockdown() then return end
+	entry.clicksOff = nil
+	for _, frame in ipairs(list) do
+		if not (frame.IsForbidden and frame:IsForbidden()) then frame:SetMouseClickEnabled(true) end
+	end
+end
+
+function ns.UpdateEntryClicks(entry, alpha)
+	if not CLICK_GROUPS[entry.group] or InCombatLockdown() or not entry.frame.SetMouseClickEnabled then return end
+	local editMode = _G.EditModeManagerFrame
+	if alpha > 0 or (editMode and editMode.IsEditModeActive and ns.Flag(editMode:IsEditModeActive())) then
+		ns.EntryClicksBack(entry)
+	elseif not entry.clicksOff then
+		entry.clicksOff = {}
+		ClicksOff(entry.frame, entry.clicksOff)
+	end
+end
+
+-- (PLAYER_REGEN_DISABLED comes just before the lockdown: still free to change.)
+local fightWatch = CreateFrame("Frame")
+fightWatch:RegisterEvent("PLAYER_REGEN_DISABLED")
+fightWatch:SetScript("OnEvent", function()
+	for _, entry in ipairs(ns.managed) do ns.EntryClicksBack(entry) end
+end)
+end
+
 function ns.SetEntryAlpha(entry, alpha)
 	entry.alpha = alpha
+	ns.UpdateEntryClicks(entry, alpha)
 	if entry.shrinkWhenFaded then
 		if alpha > 0 then
 			-- (Blocked in combat: it stays shrunk, and grows back once the fight ends.)
@@ -9238,6 +9287,8 @@ function ns.UpdateFrames(cinematic, elapsed)
 			if not entry.ownAlpha then
 				ReapplyIfChanged(entry)
 			end
+			-- (Each tick: after a fight, and in and out of Edit Mode, nothing else calls it.)
+			ns.UpdateEntryClicks(entry, 0)
 		-- Keep re-applying 0 while hidden in case Blizzard code resets the alpha;
 		-- once fully revealed, leave the frame alone.
 		elseif entry.alpha ~= target or target == 0 or entry.shrunk then
