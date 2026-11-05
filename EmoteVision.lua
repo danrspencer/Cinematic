@@ -272,6 +272,12 @@ local MOMENTS = {
 		tip = "You reach a new level: the emotes go to everyone, to celebrate.",
 		sample = { name = "You", line = "reached level %d", level = 42, group = true,
 			icon = "Interface\\Icons\\Spell_Holy_SurgeOfLight" } },
+	{ id = "Campfire", on = "emoteVisionCampfire", name = "You hover a campfire", emotes = { "SIT", "KNEEL", "LAYDOWN" },
+		tip = "The cursor rests on a campfire near the middle of the screen, you standing still and not sitting " ..
+			"yet: sit, kneel or lie down by it in one click (the Campfire button's names for a fire, its " ..
+			"camera too).",
+		sample = { name = "Campfire", line = "rest a while by the fire", group = true,
+			icon = "Interface\\Icons\\Spell_Fire_Fire" } },
 }
 -- (No Encounter Journal, as on Classic Era: no telling a dungeon's last boss,
 -- so no Dungeon moment there.)
@@ -292,7 +298,7 @@ local MOMENT_GROUPS = {
 	{ name = "Help from others", "Buff", "Res", "Summon", "Trade" },
 	{ name = "Meeting people", "Emote", "Eyes", "Guild", "Ally", "Achievement", "Duel" },
 	{ name = "Your group", "Join", "Leave", "Joined", "Level", "Boss", "Dungeon", "Wipe" },
-	{ name = "Yourself", "YouLevel" },
+	{ name = "Yourself", "YouLevel", "Campfire" },
 }
 do
 	local byId, ordered = {}, {}
@@ -381,6 +387,7 @@ local EMOTE_WORDS = {
 local card, queue, lastFrom = nil, {}, {}
 local showing -- (the moment on the card: { kind, name, unit, guid, class, line, same, group, test })
 local moving   -- (Move: the card held up to drag)
+local editModeCard = false -- (the game's Edit Mode held it up: its blue look)
 local resFrom  -- (who offered to bring you back: { name, at })
 local summonFrom -- (who's summoning you: { name, at })
 local tradeWith  -- (who the trade window's with: { name, guid, class })
@@ -506,7 +513,7 @@ DEFAULTS.emoteVisionLook = "classic"
 local HEADINGS = { Buff = "A KINDNESS", Res = "SAVED", Emote = "A GREETING", Summon = "SUMMONED",
 	Trade = "A FAIR TRADE", Level = "LEVEL UP", Dungeon = "VICTORY", Duel = "THE DUEL", Join = "WELCOME",
 	Leave = "FAREWELL", Joined = "WELL MET", Achievement = "WELL DONE", Boss = "VICTORY", Wipe = "NEXT TIME",
-	YouLevel = "LEVEL UP", Guild = "WELL MET", Ally = "WELL MET", Eyes = "EYES MEET" }
+	YouLevel = "LEVEL UP", Guild = "WELL MET", Ally = "WELL MET", Eyes = "EYES MEET", Campfire = "A WARM FIRE" }
 local BUTTON_W, BUTTON_H, BUTTON_GAP, ROW_GAP = 84, 24, 8, 6
 local WHEEL_DISC, WHEEL_REACH = 170, 74 -- the wheel's disc, and how far out its emotes sit (on its edge)
 
@@ -621,6 +628,8 @@ local function Answer(token)
 		ns.Print(L["Emote Vision test: you'd %s %s."]:format(Command(token), moment.name))
 	elseif moment.group then
 		pcall(DoEmote, token, "none")
+		-- (By a fire: the Campfire button's own camera, not the emote's.)
+		if moment.kind == "Campfire" and ns.SatByButton then ns.SatByButton() end
 	else
 		local name = moment.fullName or moment.name
 		local unit = UnitFor(moment.guid, name)
@@ -767,6 +776,46 @@ local function Create()
 
 	card.bar = front:CreateTexture(nil, "ARTWORK")
 	card.bar:SetHeight(2)
+
+	-- (Edit Mode's look, as the other boxes it shows (Damage Vision's): the
+	-- card's art faded out under a blue box with its name; the box takes the
+	-- mouse, so the card's buttons can't be pressed unseen.)
+	local cover = CreateFrame("Frame", nil, card, "BackdropTemplate")
+	cover:SetAllPoints()
+	cover:SetFrameLevel(card:GetFrameLevel() + 20)
+	cover:SetBackdrop({ bgFile = "Interface\\Buttons\\WHITE8X8", edgeFile = "Interface\\Buttons\\WHITE8X8",
+		edgeSize = 1 })
+	if ns.EditModeLook then ns.EditModeLook(cover, true) end
+	cover:SetFrameStrata(card:GetFrameStrata())
+	cover:EnableMouse(true)
+	cover:RegisterForDrag("LeftButton")
+	cover:SetScript("OnDragStart", function() card:GetScript("OnDragStart")(card) end)
+	cover:SetScript("OnDragStop", function() card:GetScript("OnDragStop")(card) end)
+	cover:SetScript("OnMouseUp", function(_, button)
+		if button ~= "RightButton" then return end
+		local db = ns.GetDB()
+		db.emoteVisionX, db.emoteVisionY, db.emoteVisionSpot =
+			ns.DEFAULTS.emoteVisionX, ns.DEFAULTS.emoteVisionY, ns.DEFAULTS.emoteVisionSpot
+		Place()
+		if ns.RefreshOptions then pcall(ns.RefreshOptions) end
+	end)
+	cover.label = cover:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+	cover.label:SetPoint("CENTER")
+	cover:Hide()
+	card.cover = cover
+	-- (On while Edit Mode holds the card up; off for every other card.)
+	function card.UpdateCover()
+		local on = (editModeCard and moving) and true or false
+		cover.label:SetText(L["Emote Vision\nDrag to move, right-click to reset"])
+		cover:SetShown(on)
+		local alpha = on and 0 or 1
+		card.panel:SetAlpha(alpha)
+		card.bubble:SetAlpha(alpha)
+		card.front:SetAlpha(alpha)
+		card.disc:SetAlpha(alpha)
+		card.discEdge:SetAlpha(alpha)
+		for _, half in ipairs(card.shade) do half:SetAlpha(alpha) end
+	end
 
 	-- (Moving it: any card dragged where you want it, Move's or a real one, kept
 	-- from the bottom middle; one fading away is brought back first.)
@@ -1073,6 +1122,7 @@ local function Show(moment)
 	-- showing, on a size from the words' heights.)
 	card:SetSize(math.floor(width + 0.5), math.floor(height + 0.5))
 	card.age, card.leaving = 0, nil
+	card.UpdateCover()
 	card:SetAlpha(0)
 	card:Show()
 	return true
@@ -1124,10 +1174,18 @@ function Next()
 	while queue[1] and Allowed(queue[1]) do
 		local moment = table.remove(queue, 1)
 		if Show(moment) then
+			ns.Log("emote", moment.kind .. " card shown")
 			-- (Repeats count from a card shown: one dropped unseen doesn't hold the next back.)
 			if moment.key then lastFrom[moment.key] = GetTime() end
 			return
 		end
+		ns.Log("emote", moment.kind .. " card not shown: none of its emotes on this client")
+	end
+	-- (Why the first one waits, logged once per reason.)
+	local why = queue[1] and WhyWaiting(queue[1])
+	if why and queue[1].waitLogged ~= why then
+		queue[1].waitLogged = why
+		ns.Log("emote", ("%s card waiting: %s"):format(queue[1].kind, why))
 	end
 	if queue[1] and not retry then
 		retry = C_Timer.NewTimer(1, function()
@@ -1613,6 +1671,32 @@ local function LeveledUp(level)
 		unit = "player", line = L["reached level %d"]:format(level), group = true })
 end
 
+-- A campfire the cursor rests on (Campfire.lua's watch, name its tooltip's
+-- first line): a card to sit, kneel or lie down by it. Once a minute at most,
+-- whatever the repeat setting says (the watch asks ten times a second).
+local CAMPFIRE_AGAIN = 60
+local campfireAt = -math.huge
+function ns.EmoteVisionCampfireOn()
+	return ns.Setting("emoteVision") and DB()[MOMENT.Campfire.on] and true or false
+end
+local campfireSkip -- (the last reason one wasn't fired, logged once)
+function ns.EmoteVisionCampfire(name)
+	local now = GetTime()
+	local skip = (loading and "loading screen") or (Fighting() and "in a fight")
+		or (not ns.EmoteVisionCampfireOn() and "page or moment off")
+		or (now - campfireAt < CAMPFIRE_AGAIN and ("one %d s ago"):format(now - campfireAt)) or nil
+	if skip then
+		if campfireSkip ~= skip and not skip:find("^one ") then ns.Log("emote", "campfire card skipped: " .. skip) end
+		campfireSkip = skip
+		return
+	end
+	campfireSkip = nil
+	campfireAt = now
+	ns.Log("emote", "campfire card fired: " .. tostring(name))
+	Fire({ kind = "Campfire", name = type(name) == "string" and name or L["Campfire"],
+		line = L["rest a while by the fire"], group = true, icon = "Interface\\Icons\\Spell_Fire_Fire" })
+end
+
 -- Your duel's end (Effects.lua's duel line): moment "won" or "lost", other
 -- the one you fought.
 function ns.EmoteVisionDuel(moment, other)
@@ -1756,11 +1840,11 @@ function ns.EmoteVisionMoving() return moving and true or false end
 
 -- The game's Edit Mode (Core.lua's ns.OnEditMode): a card held up to drag
 -- while it's open, if the page is on; let go as it closes.
-local editModeCard = false
 ns.OnEditMode(function()
 	if ns.Setting("emoteVision") and not moving then
 		ns.MoveEmoteVision()
 		editModeCard = moving and true or false
+		if card then card.UpdateCover() end
 	end
 end, function()
 	if editModeCard and moving then

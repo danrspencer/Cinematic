@@ -123,9 +123,11 @@ local function TooltipIsCampfire()
 	return LookAtTooltip() and lastWasCampfire
 end
 
--- Times you can't (or wouldn't) sit down by a fire.
-local function CanSit()
-	if not ns.Setting("campfireSitButton") then
+-- Times you can't (or wouldn't) sit down by a fire: the button's off (and
+-- Emote Vision's campfire card too, with any = true), or you're sitting,
+-- fighting, mounted...
+local function CanSit(any)
+	if not (ns.Setting("campfireSitButton") or (any and ns.EmoteVisionCampfireOn and ns.EmoteVisionCampfireOn())) then
 		return false
 	end
 	if (ns.IsSitting and ns.IsSitting()) or InCombatLockdown() or ns.Flag(UnitAffectingCombat("player")) or ns.Flag(UnitIsDeadOrGhost("player"))
@@ -355,8 +357,9 @@ local function OnUpdate(_, elapsed)
 			SawTent("tooltip")
 		end
 		ForgetTentIfAway()
-		local onFire = CanSit() and OnCampfire()
-		if not CanSit() then
+		-- (The fire's watched for Emote Vision's campfire card too, the button off.)
+		local onFire = CanSit(true) and OnCampfire()
+		if not CanSit(true) then
 			if alpha == 0 and not blockedLogged and ns.Setting("campfireSitButton") and TooltipIsCampfire() then
 				blockedLogged = true
 				ns.Log("campfire", ("on a campfire, but no button: sitting %s, combat %s, mounted %s, dead %s, " ..
@@ -379,6 +382,11 @@ local function OnUpdate(_, elapsed)
 			end
 			if now >= restUntil and (alpha > 0 or now - hoverSince >= HOVER) then
 				lastSeen = now
+			end
+			-- (Emote Vision: a card to sit, kneel or lie down, once you've stayed
+			-- on the fire as long; it ignores the same fire again for a while.)
+			if now - hoverSince >= HOVER and ns.EmoteVisionCampfire then
+				ns.EmoteVisionCampfire(lastText)
 			end
 		else
 			hoverSince = nil

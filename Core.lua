@@ -156,6 +156,10 @@ local DEFAULTS = {
 	minimapRevealAreas = true,   -- the areas of quests of yours that aren't
 	minimapRevealIcons = true,   -- anything else (quest givers, flight masters...)
 	minimapHideOnTaxi = true,    -- none of these, pings or Keep open's tracking bring it up on a flight path
+	-- The header parts (row keys, comma-separated) that come up with the map when one of those or a
+	-- ping brings it up; "" = just the map (hovering shows all). Default: all of them.
+	minimapRevealParts = "minimapzone,minimapheader,minimaptracking,minimapcalendar,minimapclock,minimapdial,"
+		.. "minimapaddons,minimapcoords",
 	-- Keep open (Minimap page): the minimap stays up the whole time this tracking is on.
 	minimapKeepCreatures = false, -- creatures (hunter, druid, warlock) or fish
 	minimapKeepGathering = false, -- herbs, minerals or treasure...
@@ -468,7 +472,9 @@ DEFAULTS.fishZoom = true
 DEFAULTS.fishInputPause = DEFAULTS.vistaInputPause
 DEFAULTS.fishLevel = DEFAULTS.vistaLevel
 DEFAULTS.fishRightClickCast = true  -- right-click casts Fishing again while the fish camera is on
-DEFAULTS.fishRecastDelay = 0.3     --...seconds after a cast ends before it does
+DEFAULTS.fishRightClickReel = true -- right-click (or the gamepad cast button) reels in while the bobber is out
+DEFAULTS.fishKeyReel = true        -- ...and so does the key you cast Fishing with from an action bar
+DEFAULTS.fishRecastDelay = 0.3    --...seconds after a cast ends before it does
 DEFAULTS.fishPoleRightClickCast = true -- ...and for the first cast, with a fishing pole equipped
 DEFAULTS.fishMissPause = 30        -- ...seconds it stands aside after a cast misses the water
 DEFAULTS.hideFishingCastBar = true -- no cast bar while it shows Fishing (other spells still show it)
@@ -2499,7 +2505,13 @@ function ns.ApplyCVarSet(set, want)
 		set.letGoAt = GetTime()
 	end
 	for cvar, value in pairs(set.values) do
-		activeCVars[cvar] = want or nil
+		-- (Two sets can hold one setting, sharing one saved value of yours:
+		-- the last to let go puts yours back. One letting go before then
+		-- writes the other's value, and leaves yours saved.)
+		local holders = activeCVars[cvar] or {}
+		holders[set] = want or nil
+		activeCVars[cvar] = next(holders) and holders or nil
+		local other = next(holders)
 		if want then
 			local original = GetCVar(cvar)
 			if original ~= nil then
@@ -2511,6 +2523,17 @@ function ns.ApplyCVarSet(set, want)
 				WriteCVar(cvar, value)
 				if set.playerWins then
 					heldCVars[cvar:lower()] = { name = cvar, value = value }
+				end
+			end
+		elseif other then
+			heldCVars[cvar:lower()] = nil
+			local theirs = other.values[cvar]
+			if theirs ~= nil then
+				ns.LogDetail("cvar", ("%s -> %s (still held: %s)"):format(cvar, tostring(theirs),
+					tostring(other.label)))
+				WriteCVar(cvar, theirs)
+				if other.playerWins then
+					heldCVars[cvar:lower()] = { name = cvar, value = theirs }
 				end
 			end
 		else
@@ -4612,6 +4635,25 @@ ticker:SetScript("OnEvent", ns.Profiled("Core events", function(self, event, arg
 				if type(saved) == "table" then AddDialRow(saved.hoverGroups) end
 			end
 			ns.db.minimapDialHoverV1 = true
+		end
+		-- And the addon buttons (ours was in the minimap's own row) and the coordinates.
+		if not ns.db.minimapAddonsHoverV1 then
+			local function AddEdgeRows(groups)
+				for _, group in ipairs(groups or {}) do
+					local has = {}
+					for _, key in ipairs(group.members or {}) do has[key] = true end
+					for _, key in ipairs({ "minimapaddons", "minimapcoords" }) do
+						if has.minimap and not has[key] then
+							table.insert(group.members, key)
+						end
+					end
+				end
+			end
+			AddEdgeRows(ns.db.hoverGroups)
+			for _, saved in pairs(ns.db.profiles or {}) do
+				if type(saved) == "table" then AddEdgeRows(saved.hoverGroups) end
+			end
+			ns.db.minimapAddonsHoverV1 = true
 		end
 		-- The objective boxes under the minimap went with the quest tracker
 		-- (always up); now with the minimap: into saved groups with it. Once.

@@ -277,6 +277,12 @@ ns.PROFILE_MODULES = {
 			-- column starts with the party and raid frames ticked. The bars: pure-cdm's.)
 			set("instanceShow", instance)
 		end },
+	{ key = "pure-minimap", name = "Cinema: minimap", scope = { "Minimap" },
+		tip = "A reveal, ping or Keep open brings up just the map, none of its header, buttons or coordinates " ..
+		"(hovering shows them).",
+		apply = function(set)
+			set("minimapRevealParts", "")
+		end },
 	{ key = "pure-cdm", name = "Cinema: Cooldown Manager only",
 		scope = { "Cooldown Manager", "Standard Frames/Trackers", "Standard Frames/Action bars",
 			"Standard Frames/Info and menus", "Advanced Frames/Supported addons",

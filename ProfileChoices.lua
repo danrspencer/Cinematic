@@ -65,7 +65,7 @@ ns.SLOT_CHOICES = {
 		default = "standard", choices = {
 		-- (From the most fading to the least.)
 		{ part = "pure", label = "Almost always", line = "As little UI as possible, even in fights",
-			modules = { "pure-frames", "minimal-target", "pure-plates", "ultra-plates", "pure-tooltips" } },
+			modules = { "pure-frames", "pure-minimap", "minimal-target", "pure-plates", "ultra-plates", "pure-tooltips" } },
 		{ part = "immersive", label = "Most of the time",
 			line = "Between fights, and fights bring back less: no minimap, fewer group nameplates",
 			modules = { "recovering", "minimap-off-in-fights", "fewer-group-plates" } },

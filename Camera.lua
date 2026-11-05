@@ -531,18 +531,126 @@ do
 
 	-- In gamepad mode a gamepad button does the same (fishGamepadCast, the
 	-- button: fishGamepadKey, X by default).
-	local bound = {} -- key -> true while it casts
+	local bound = {} -- key -> "cast" or "reel" while it does that
 	local channelEndedAt = -math.huge
-	local function SetRecast(key, on)
-		if (bound[key] or false) == on or InCombatLockdown() then
+	-- mode: "cast" (our button), "reel" (the game's interact key: see below), or false.
+	local function SetRecast(key, mode)
+		mode = mode or false
+		if (bound[key] or false) == mode or InCombatLockdown() then
 			return -- (bindings can't change in combat)
 		end
-		bound[key] = on or nil
-		if on then
+		bound[key] = mode or nil
+		if mode == "cast" then
 			SetOverrideBindingClick(castButton, true, key, castButton:GetName())
+		elseif mode == "reel" then
+			SetOverrideBinding(castButton, true, key, "INTERACTTARGET")
 		else
 			SetOverrideBinding(castButton, true, key, nil)
 		end
+	end
+
+	-- Right-click to reel in (fishRightClickReel): while a Fishing cast is going,
+	-- right-click (and the gamepad cast button) is the game's "Interact with
+	-- target" key, which uses the soft interact pick: the bobber, wherever the
+	-- mouse is. The game's settings for that pick are held while you fish (and
+	-- REEL_HOLD sec after, so they aren't switched each cast), yours put back
+	-- after: soft targeting of things to interact with, keyboard and mouse too,
+	-- far enough in front of you for a long cast.
+	local REEL_HOLD = 15
+	local REEL_CVARS = ns.CVarSet("Fishing reel", "Fishing: right-click or the casting key reels in (interact soft targeting)",
+		{ values = { SoftTargetInteract = "3", SoftTargetInteractRange = "30", SoftTargetInteractArc = "1" } })
+	local reelHeldUntil = -math.huge
+	local wasFishing = false
+	local fishCastWhy, loggedWhy -- why right-click isn't casting now (nil: it is), and as last logged
+	local function FishingChannel()
+		local channel = select(8, UnitChannelInfo("player"))
+		return type(channel) == "number" and not (issecretvalue and issecretvalue(channel))
+			and IsFishingSpell(channel) or false
+	end
+	-- The same key reels in (fishKeyReel): the keys bound to an action button
+	-- with Fishing on it (the spell, or a macro that casts it) reel in too while
+	-- the bobber is out, rather than casting again. The game's bars only (each
+	-- button's binding: ACTIONBUTTON1, MULTIACTIONBAR1BUTTON1...); looked up as
+	-- a cast starts, as bars and bindings can change between casts.
+	local BARS = { { "ActionButton", "ACTIONBUTTON" }, { "MultiBarBottomLeftButton", "MULTIACTIONBAR1BUTTON" },
+		{ "MultiBarBottomRightButton", "MULTIACTIONBAR2BUTTON" }, { "MultiBarRightButton", "MULTIACTIONBAR3BUTTON" },
+		{ "MultiBarLeftButton", "MULTIACTIONBAR4BUTTON" }, { "MultiBar5Button", "MULTIACTIONBAR5BUTTON" },
+		{ "MultiBar6Button", "MULTIACTIONBAR6BUTTON" }, { "MultiBar7Button", "MULTIACTIONBAR7BUTTON" } }
+	local fishKeys = {} -- [key] = the button it came from (for the debug line)
+	local function SlotCastsFishing(slot)
+		local kind, id = GetActionInfo(slot)
+		if kind == "spell" then
+			return IsFishingSpell(id)
+		elseif kind == "macro" and GetMacroSpell then
+			local spell = GetMacroSpell(id)
+			return spell ~= nil and IsFishingSpell(spell)
+		end
+		return false
+	end
+	local function FindFishKeys()
+		wipe(fishKeys)
+		for _, bar in ipairs(BARS) do
+			for i = 1, 12 do
+				local button = _G[bar[1] .. i]
+				local slot = button and (button.action or (button.CalculateAction and button:CalculateAction()))
+				if type(slot) == "number" and SlotCastsFishing(slot) then
+					local command = button.commandName or (bar[2] .. i)
+					for _, key in ipairs({ GetBindingKey(command) }) do
+						if key ~= "BUTTON2" then fishKeys[key] = bar[1] .. i end
+					end
+				end
+			end
+		end
+	end
+	local function SafeFindFishKeys()
+		local ok = pcall(FindFishKeys)
+		if not ok then wipe(fishKeys) end
+	end
+
+	-- For /cine debug fishing.
+	-- (Objects aren't units to UnitExists: their name and GUID are asked
+	-- straight, and the game's own event for the pick changing is noted.)
+	local softChanges, lastSoftGUID = 0, nil
+	local softWatcher = CreateFrame("Frame")
+	if pcall(softWatcher.RegisterEvent, softWatcher, "PLAYER_SOFT_INTERACT_CHANGED") then
+		softWatcher:SetScript("OnEvent", function(_, _, _, newGUID)
+			softChanges = softChanges + 1
+			lastSoftGUID = newGUID
+		end)
+	end
+	local function PlainOf(fn, ...)
+		local ok, value = pcall(fn, ...)
+		if not ok then return "error" end
+		if issecretvalue and issecretvalue(value) then return "(secret)" end
+		return tostring(value)
+	end
+	function ns.FishingReelDebug()
+		local pick = PlainOf(UnitName, "softinteract") .. " / " .. PlainOf(UnitGUID, "softinteract")
+		local last = lastSoftGUID
+		if issecretvalue and issecretvalue(last) then last = "(secret)" end
+		pick = pick .. (" | pick changes seen: %d, last: %s"):format(softChanges, tostring(last))
+		local keys = {}
+		for key, mode in pairs(bound) do keys[#keys + 1] = key .. "=" .. mode end
+		table.sort(keys)
+		ns.Print(("fishing: casting=%s reel switch=%s held=%s | soft interact pick: %s"):format(
+			tostring(FishingChannel()), tostring(ns.db.fishRightClickReel), tostring(REEL_CVARS.active or false),
+			pick))
+		-- (What the game has on right-click now, overrides and all: another
+		-- addon's override would show here instead of ours.)
+		local okAction, action = pcall(GetBindingAction, "BUTTON2", true)
+		ns.Print(("  right-click cast: %s | right-click does now: %s | last red error: %s"):format(
+			fishCastWhy and ("off: " .. fishCastWhy) or "on", okAction and tostring(action) or "?",
+			tostring(ns.fishErrorDebug and ns.fishErrorDebug.message)))
+		SafeFindFishKeys()
+		local found = {}
+		for key, from in pairs(fishKeys) do found[#found + 1] = key .. " (" .. from .. ")" end
+		table.sort(found)
+		ns.Print(("  same-key switch=%s | keys with Fishing on the bars: %s"):format(tostring(ns.db.fishKeyReel),
+			#found > 0 and table.concat(found, ", ") or "none"))
+		ns.Print(("  SoftTargetInteract=%s Range=%s Arc=%s | bound: %s | combat=%s gamepad=%s mouseover=%s"):format(
+			tostring(GetCVar("SoftTargetInteract")), tostring(GetCVar("SoftTargetInteractRange")),
+			tostring(GetCVar("SoftTargetInteractArc")), #keys > 0 and table.concat(keys, " ") or "none",
+			tostring(InCombatLockdown()), tostring(ns.IsGamePadOn()), tostring(ns.Flag(UnitExists("mouseover")))))
 	end
 	local function ClearRecast()
 		if InCombatLockdown() then
@@ -608,9 +716,12 @@ do
 	-- World objects under the mouse: their tooltip appearing (it may be hidden
 	-- straight away by the tooltip options), and the mouse staying near there.
 	local objectAt, objectX, objectY = -math.huge, 0, 0
+	-- (Not the bobber: its tooltip while you fish, or just after as you loot
+	-- it. That spot kept right-click from casting there again for 30 sec.)
 	GameTooltip:HookScript("OnShow", function(self)
 		local owner = self:GetOwner()
-		if owner == nil or owner == UIParent or owner == WorldFrame then
+		if (owner == nil or owner == UIParent or owner == WorldFrame) and not FishingChannel()
+			and GetTime() - channelEndedAt > 3 then
 			objectAt = GetTime()
 			objectX, objectY = GetCursorPosition()
 		end
@@ -722,19 +833,80 @@ do
 		-- (Left button held: right-click is the game's, so both together run you forward.)
 		local want = ready and ns.db.fishRightClickCast and not IsMouseButtonDown("LeftButton")
 			and ((fishCam and not ns.Flag(UnitExists("mouseover"))) or (poleReady and not MouseOnSomething()))
+		-- Why right-click isn't casting now (for /cine debug fishing, and the
+		-- log as it changes while you're fishing: fish camera, or a pole and a
+		-- cast in the last 2 minutes).
+		local why
+		if not want and ns.db then
+			local now = GetTime()
+			if not ns.db.handleFishing then why = "Fishing page off"
+			elseif not ns.db.fishRightClickCast then why = "right-click cast switch off"
+			elseif not fishCam and not poleEquipped then why = "no fish camera, no pole equipped"
+			elseif not fishCam and not ns.db.fishPoleRightClickCast then why = "pole switch off (no fish camera)"
+			elseif ns.Flag(UnitChannelInfo("player")) or ns.Flag(UnitCastingInfo("player")) then why = "casting"
+			elseif inCombat then why = "combat"
+			elseif now - combatSeenAt < AFTER_COMBAT then why = ("after combat (%.0fs left)"):format(AFTER_COMBAT - (now - combatSeenAt))
+			elseif LootFrame and ns.Flag(LootFrame:IsShown()) then why = "loot window open"
+			elseif now - channelEndedAt < (tonumber(ns.db.fishRecastDelay) or 0.5) then why = "wait after a cast"
+			elseif now - missedAt < (tonumber(ns.db.fishMissPause) or 30) then
+				why = ("missed-cast pause (%.0fs left; move and stand still to end it)"):format(
+					(tonumber(ns.db.fishMissPause) or 30) - (now - missedAt))
+			elseif now < skillBlockedUntil then why = ("skill pause (%.0fs left)"):format(skillBlockedUntil - now)
+			elseif IsMouseButtonDown("LeftButton") then why = "left button held"
+			elseif ns.Flag(UnitExists("mouseover")) then why = "mouse on a player or NPC"
+			elseif not fishCam and ns.playerMoving then why = "moving (pole, no fish camera)"
+			elseif not fishCam and ns.Flag(IsMounted()) then why = "mounted"
+			elseif not fishCam and ns.OnTaxi() then why = "on a flight"
+			elseif not fishCam and ns.Flag(UnitIsDeadOrGhost("player")) then why = "dead"
+			elseif not fishCam and MouseOnSomething() then
+				why = ("mouse near an object you hovered %.0fs ago"):format(now - objectAt)
+			else why = "?" end
+		end
+		fishCastWhy = why
+		local context = fishCam or (poleEquipped and GetTime() - channelEndedAt < 120)
+		if context and why ~= loggedWhy and not rightHeld then
+			loggedWhy = why
+			ns.Log("fishing", "right-click cast: " .. (why and ("off: " .. why) or "on"))
+		elseif not context then
+			loggedWhy = nil
+		end
+		-- The bobber out: reel in (not on a player or NPC: right-click is theirs).
+		local fishing = FishingChannel()
+		local reelSwitch = ns.db and ns.db.handleFishing and (ns.db.fishRightClickReel or ns.db.fishKeyReel)
+		local reelAny = reelSwitch and fishing and not inCombat
+		if reelAny and not wasFishing then
+			SafeFindFishKeys() -- (a cast just started: the bars as they are now)
+		end
+		wasFishing = fishing
+		if reelAny then
+			reelHeldUntil = GetTime() + REEL_HOLD
+		end
+		if not InCombatLockdown() then
+			ns.ApplyCVarSet(REEL_CVARS, GetTime() < reelHeldUntil and reelSwitch and true or false)
+		end
+		local reel = reelAny and ns.db.fishRightClickReel
+		local reelMouse = reel and not IsMouseButtonDown("LeftButton") and not ns.Flag(UnitExists("mouseover"))
 		if not rightHeld then
-			SetRecast("BUTTON2", want and true or false)
+			SetRecast("BUTTON2", (want and "cast") or (reelMouse and "reel"))
+		end
+		-- The keys that cast Fishing from the bars (held ones stay as pressed).
+		local reelKeys = reelAny and ns.db.fishKeyReel
+		for key in pairs(fishKeys) do
+			if not IsKeyHeld(key) then
+				SetRecast(key, reelKeys and "reel")
+			end
 		end
 		-- The gamepad button: no mouse to be on things, so just the camera or the pole.
 		local padKey = ns.db and ns.db.fishGamepadKey
 		for key in pairs(bound) do
-			if key ~= "BUTTON2" and key ~= padKey and not IsKeyHeld(key) then
-				SetRecast(key, false) -- (another button chosen)
+			if key ~= "BUTTON2" and key ~= padKey and not fishKeys[key] and not IsKeyHeld(key) then
+				SetRecast(key, false) -- (another button chosen, or off the bars now)
 			end
 		end
-		if padKey and not IsKeyHeld(padKey) then
-			local padWant = ready and ns.db.fishGamepadCast and ns.IsGamePadOn() and (fishCam or poleReady)
-			SetRecast(padKey, padWant and true or false)
+		if padKey and not IsKeyHeld(padKey) and not (reelKeys and fishKeys[padKey]) then
+			local padOn = ns.db.fishGamepadCast and ns.IsGamePadOn()
+			local padWant = ready and padOn and (fishCam or poleReady)
+			SetRecast(padKey, (padWant and "cast") or (reel and padOn and "reel"))
 		end
 	end))
 end

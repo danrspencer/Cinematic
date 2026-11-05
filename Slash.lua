@@ -175,7 +175,8 @@ local function PrintDebugHelp()
 	print("  /cine debug flight - the flight route, its known time and when the camera settles")
 	print("  /cine debug orbit - the camera rotation's state")
 	print("  /cine debug flyby - the fly-by's state and the random ones planned")
-	print("  /cine debug flybys - print each fly-by's start and end, random ones too (again to stop)")
+	print("  /cine debug fishing - right-click reeling: whether you're fishing, what soft targeting picked (the bobber?), its settings and the keys bound now")
+	print("  /cine debug flybys -print each fly-by's start and end, random ones too (again to stop)")
 	print("  /cine debug questtimer - say whether a quest timer is running and how its box fades")
 	print("  /cine vital demo [seconds] [classes] - a random spec's Vitals Vision theme every few seconds (5 if not given), its name on the screen; with classes (paladin warlock), each of their specs' in turn; again or off to stop")
 	print("  /cine vital demo all [seconds] - every Vitals Vision theme once, in the menu's order, numbered with its key on the screen (to record), then stops")
@@ -341,6 +342,8 @@ local function HandleSlash(msg)
 		Cinematic_FlyBy()
 	elseif cmd == "hideui" then
 		Cinematic_ToggleUI()
+	elseif cmd == "debug" and arg == "fishing" and ns.FishingReelDebug then
+		ns.FishingReelDebug()
 	elseif cmd == "debug" and arg == "flybys" then
 		ns.db.debugFlyBy = not ns.db.debugFlyBy
 		ns.Print("fly-by messages " .. (ns.db.debugFlyBy and

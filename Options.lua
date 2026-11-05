@@ -7115,7 +7115,7 @@ local function CreateFishingPanel()
 	local recast = stack:Add(Check(content, "fishRightClickCast", L["Right-click to cast again"],
 		L["While the fish camera is on and no bobber is out, right-clicking in the world casts " ..
 		"Fishing again. Each cast still comes from your own click. While the bobber is out, " ..
-		"right-click clicks it as usual; in combat, with the loot window open or with your " ..
+		"right-click clicks it as usual (or reels in from anywhere: see below); in combat, with the loot window open or with your " ..
 		"mouse on a player or NPC, right-click is left alone. (Meanwhile right-drag doesn't " ..
 		"turn the camera: left-drag still does.)"]), "check")
 	recast:HookScript("OnClick", Refresh) -- grey out / enable the options below
@@ -7139,6 +7139,18 @@ local function CreateFishingPanel()
 		"Moving and then standing still for 1 sec ends it early: you're likely at a new spot to fish from. " ..
 		"Off doesn't pause. (\"Skill not high enough\" always pauses it for 30 sec, moving or not.)"])
 	GreyUnless(missPause, IfRecast)
+	stack:Add(Check(content, "fishRightClickReel", L["Right-click to reel in"],
+		L["While the bobber is out, right-clicking anywhere in the world reels it in, with no need " ..
+		"to find the bobber with the mouse (in gamepad mode, the cast button below does too). " ..
+		"It uses the game's \"Interact with target\" key, so the game's soft targeting of objects " ..
+		"is on while you fish, and your own setting comes back after. Reeling in before a bite " ..
+		"ends the cast. Not in combat or with your mouse on a player or NPC. (While the bobber " ..
+		"is out, right-drag doesn't turn the camera: left-drag still does.)"]), "check")
+	stack:Add(Check(content, "fishKeyReel", L["The key you cast with reels in too"],
+		L["With Fishing on an action bar (the spell, or a macro that casts it), its key reels the " ..
+		"bobber in while it's out, rather than casting again: press 1 to cast, then 1 again to reel " ..
+		"in. Works on the game's own action bars. Uses the game's soft targeting of objects, as " ..
+		"right-click does. Not in combat."]), "check")
 
 	-- Gamepad mode: a gamepad button does what right-click does.
 	if C_GamePad then
@@ -10549,6 +10561,83 @@ local function CreateMinimapPanel()
 	-- something is on it (NodeSweep.lua looks).
 	local revealLabel = Label(content, "GameFontHighlight", L["Reveal"])
 	revealLabel:SetPoint("TOPLEFT", aboveTracking or switch, "BOTTOMLEFT", 4, -14)
+	local aboveReveal
+	-- Reveal shows: which of the header's parts come up with the map
+	-- (minimapRevealParts, row keys comma-separated; "" = just the map).
+	-- Only the parts this client has (a managed frame in their row).
+	local REVEAL_PARTS = {
+		{ "minimapzone", L["Zone name"] }, { "minimapheader", L["Minimap header"] },
+		{ "minimaptracking", L["Tracking button"] }, { "minimapcalendar", L["Calendar"] },
+		{ "minimapclock", L["Clock"] }, { "minimapdial", L["Day/night dial"] },
+		{ "minimapaddons", L["Addon buttons"] }, { "minimapcoords", L["Coordinates"] },
+	}
+	local function PartsHere()
+		local here, has = {}, {}
+		for _, entry in ipairs(ns.managed or {}) do
+			if entry.group then has[entry.group] = true end
+		end
+		for _, part in ipairs(REVEAL_PARTS) do
+			if has[part[1]] then here[#here + 1] = part end
+		end
+		return here
+	end
+	local function PartShown(key)
+		return ((ns.GetDB().minimapRevealParts or "") .. ","):find(key .. ",", 1, true) ~= nil
+	end
+	local function SetParts(keys)
+		ns.GetDB().minimapRevealParts = table.concat(keys, ",")
+	end
+	local function TogglePart(key)
+		local keys = {}
+		for _, part in ipairs(REVEAL_PARTS) do
+			if (part[1] == key) ~= PartShown(part[1]) then keys[#keys + 1] = part[1] end
+		end
+		SetParts(keys)
+	end
+	RecordKey(content, "minimapRevealParts")
+	local okParts, parts = ns.MenuDropdown(content)
+	if okParts and parts and parts.SetupMenu then
+		local partsLabel = Label(content, "GameFontHighlight", L["Reveal shows"])
+		partsLabel:SetPoint("TOPLEFT", revealLabel, "BOTTOMLEFT", 12, -6)
+		parts:SetPoint("TOPLEFT", partsLabel, "BOTTOMLEFT", -4, -4)
+		parts:SetWidth(260)
+		parts.searchSkip = true -- (it shows the current ticks, not a label)
+		parts:SetupMenu(function(_, root)
+			root:CreateButton(L["Everything"], function()
+				local keys = {}
+				for _, part in ipairs(PartsHere()) do keys[#keys + 1] = part[1] end
+				SetParts(keys)
+				return MenuResponse and MenuResponse.Refresh
+			end)
+			root:CreateButton(L["Just the map"], function()
+				SetParts({})
+				return MenuResponse and MenuResponse.Refresh
+			end)
+			if root.CreateDivider then root:CreateDivider() end
+			for _, part in ipairs(PartsHere()) do
+				root:CreateCheckbox(part[2], function() return PartShown(part[1]) end, function()
+					TogglePart(part[1])
+					return MenuResponse and MenuResponse.Refresh
+				end)
+			end
+		end)
+		if parts.SetSelectionText then
+			parts:SetSelectionText(function()
+				local here, ticked = PartsHere(), {}
+				for _, part in ipairs(here) do
+					if PartShown(part[1]) then ticked[#ticked + 1] = part[2] end
+				end
+				if #ticked == 0 then return L["Just the map"] end
+				return #ticked == #here and L["Everything"] or L["Map"] .. ", " .. table.concat(ticked, ", ")
+			end)
+		end
+		parts.Refresh = function(self) self:GenerateMenu() end
+		controls[#controls + 1] = parts
+		Tooltip(parts, L["When a ping, a reveal below or Keep open's tracking brings the faded minimap up, " ..
+			"only the map comes up with what's ticked here; the rest of the header stays faded. " ..
+			"Hovering the minimap shows it all."])
+		aboveReveal = parts
+	end
 	local ping = Check(content, "minimapRevealOnPing", L["Pings"],
 		L["You or someone in your party or raid pinging the minimap shows it as if you'd hovered it, so " ..
 		"you can see where, with the rest of the Hover groups that have Minimap ping ticked, for " ..
@@ -10556,7 +10645,11 @@ local function CreateMinimapPanel()
 			ns.GetDB().minimapRevealOnPing = value
 			Refresh() -- grey out / enable the time below
 		end)
-	ping:SetPoint("TOPLEFT", revealLabel, "BOTTOMLEFT", 12, -4)
+	if aboveReveal then
+		ping:SetPoint("TOPLEFT", aboveReveal, "BOTTOMLEFT", 4, -6)
+	else
+		ping:SetPoint("TOPLEFT", revealLabel, "BOTTOMLEFT", 12, -4)
+	end
 	local pingTime = Slider(content, "minimapPingTime", L["Show for"], 2, 60, 1, L["%d sec"])
 	pingTime:SetPoint("TOPLEFT", ping, "BOTTOMLEFT", 4, -26)
 	Tooltip(pingTime, L["How long the minimap stays up after someone pings it, before it fades."])
@@ -10609,6 +10702,7 @@ local function CreateMinimapPanel()
 		"still shows it."])
 	onTaxi:SetPoint("TOPLEFT", previousReveal, "BOTTOMLEFT", 0, -2)
 	previousReveal = onTaxi
+
 
 	-- Keep open: the minimap stays up the whole time.
 	local keepLabel = Label(content, "GameFontHighlight", L["Keep open"])

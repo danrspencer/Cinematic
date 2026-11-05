@@ -51,7 +51,7 @@ local FRAME_GROUPS = {
 	-- (With the queue eyes for the dungeon finder and battlegrounds, which can
 	-- sit outside the minimap: named differently by client.)
 	minimap = {
-		"MinimapCluster", "Minimap", "CinematicMinimapButton",
+		"MinimapCluster", "Minimap",
 		"LFGMinimapFrame", "MiniMapLFGFrame", "QueueStatusMinimapButton", "MiniMapBattlefieldFrame",
 	},
 	buffs = { "BuffFrame", "DebuffFrame", "TemporaryEnchantFrame" },
@@ -111,6 +111,10 @@ local FRAME_GROUPS = {
 	-- WoW Forever's day and night dial by the minimap (MinimapCluster.DielFrame:
 	-- found by FindMinimapHeader).
 	minimapdial = {},
+	-- Addons' buttons on the minimap's edge (ours, LibDBIcon's: found by
+	-- FindMinimapHeader) and the coordinates under it (found by their text).
+	minimapaddons = { "CinematicMinimapButton" },
+	minimapcoords = {},
 	chat = {
 		"GeneralDockManager", "ChatFrameMenuButton", "ChatFrameChannelButton",
 		"QuickJoinToastButton", "ChatFrameToggleVoiceDeafenButton", "ChatFrameToggleVoiceMuteButton",
@@ -578,7 +582,7 @@ end
 local GROUP_SWITCH = {
 	minimap = "handleMinimap", minimapheader = "handleMinimap", minimaptracking = "handleMinimap",
 	minimapcalendar = "handleMinimap", minimapzone = "handleMinimap", minimapclock = "handleMinimap",
-	minimapdial = "handleMinimap", belowminimap = "handleMinimap", quests = "handleQuests", questtimer = "handleQuests", waypoint = "handleQuests",
+	minimapdial = "handleMinimap", minimapaddons = "handleMinimap", minimapcoords = "handleMinimap", belowminimap = "handleMinimap", quests = "handleQuests", questtimer = "handleQuests", waypoint = "handleQuests",
 	buffs = "handleBuffs", cooldowns = "handleCooldowns", chat = "handleChat", swing = "handleSwing",
 	gamepadbars = "handleGamepad", gamepadlegend = "handleGamepad", gamepadreticle = "handleGamepad",
 }
@@ -1165,6 +1169,39 @@ do
 		-- The zone's name: its button, whose bar art ignores its fade (above).
 		AddFrame(bar, "minimapzone")
 		AddFrame(cluster and cluster.DielFrame, "minimapdial")
+		-- Addons' buttons on the minimap (LibDBIcon's: LibDBIcon10_<addon>).
+		if type(Minimap) == "table" and Minimap.GetChildren and not leftAlone.Minimap then
+			for _, child in ipairs({ Minimap:GetChildren() }) do
+				local ok, name = pcall(child.GetName, child)
+				if ok and type(name) == "string" and name:find("^LibDBIcon10_") then
+					AddFrame(child, "minimapaddons")
+				end
+			end
+		end
+		-- The coordinates: a text reading like "41.5, 39.3" in the cluster or
+		-- on the map (its frame, unless it sits on one of those directly).
+		local function FindCoords(frame, depth)
+			if type(frame) ~= "table" or not frame.GetRegions or IsForbidden(frame) then return end
+			for _, region in ipairs({ frame:GetRegions() }) do
+				local okText, text = pcall(function() return region:GetObjectType() == "FontString" and region:GetText() end)
+				if okText and type(text) == "string" and not (issecretvalue and issecretvalue(text))
+					and text:find("^%s*%d+%.?%d*%s*,%s*%d+%.?%d*%s*$") then
+					AddFrame((frame ~= cluster and frame ~= Minimap) and frame or region, "minimapcoords")
+					return
+				end
+			end
+			if depth > 0 then
+				for _, child in ipairs({ frame:GetChildren() }) do
+					local okName, name = pcall(child.GetName, child)
+					-- (Not the map's pins and addon buttons.)
+					if not (okName and type(name) == "string" and name:find("^LibDBIcon10_")) then
+						FindCoords(child, depth - 1)
+					end
+				end
+			end
+		end
+		if cluster then FindCoords(cluster, 2) end
+		if type(Minimap) == "table" and not leftAlone.Minimap then FindCoords(Minimap, 1) end
 		local calendar = _G.GameTimeFrame
 		if type(calendar) == "table" and calendar.GetRegions and not IsForbidden(calendar)
 			and not leftAlone.GameTimeFrame then
@@ -1744,6 +1781,12 @@ ns.COMBAT_SHOW = {
 	{ key = "minimapdial", label = L["Day/night dial"], default = true, groups = { "minimapdial" }, retail = false,
 		tip = L["The day and night dial by the minimap. Untick it to hide it in CineMode even while the minimap is up. " ..
 			"Hovering the minimap brings it up with the map."] },
+	{ key = "minimapaddons", label = L["Addon buttons"], default = true, groups = { "minimapaddons" },
+		tip = L["Addons' buttons around the minimap's edge, Cinematic's own too. Untick it to hide them in CineMode " ..
+			"even while the minimap is up. Hovering the minimap brings them up with the map."] },
+	{ key = "minimapcoords", label = L["Coordinates"], default = true, groups = { "minimapcoords" },
+		tip = L["The map coordinates by the minimap. Untick it to hide them in CineMode even while the minimap is up. " ..
+			"Hovering the minimap brings them up with the map."] },
 	-- The boxes under the minimap (a capture bar, a scenario's step): go with
 	-- the minimap, following its ticks until set (see ROW_FALLBACK), and in its
 	-- Mouseover group.
@@ -1875,7 +1918,8 @@ local ROW_SECTIONS = {
 	pet = "bars", stance = "bars", totems = "bars", extra = "bars",
 	right1 = "bars", right2 = "bars", bar6 = "bars", bar7 = "bars", bar8 = "bars",
 	minimap = "minimap", minimapheader = "minimap", minimaptracking = "minimap", minimapcalendar = "minimap",
-	minimapzone = "minimap", minimapclock = "minimap", minimapdial = "minimap", belowminimap = "minimap",
+	minimapzone = "minimap", minimapclock = "minimap", minimapdial = "minimap", minimapaddons = "minimap",
+	minimapcoords = "minimap", belowminimap = "minimap",
 	quests = "interface", waypoint = "interface", topcenter = "interface", micro = "interface", bags = "interface", xp = "interface",
 	chat = "interface", voice = "interface",
 }
@@ -2033,7 +2077,7 @@ ns.HOVER_GROUPS_DEFAULT = {
 		members = { "raidmanager" }, triggers = { roster = true }, when = "calm" },
 	{ preset = "minimap", icon = "Interface\\Icons\\INV_Misc_Map_01", name = L["Minimap"],
 		members = { "minimap", "minimapheader", "minimapzone", "minimaptracking", "minimapcalendar", "minimapclock",
-			"minimapdial", "belowminimap" },
+			"minimapdial", "minimapaddons", "minimapcoords", "belowminimap" },
 		triggers = { ping = true, tracking = true } },
 	{ preset = "buffs", icon = "Interface\\Icons\\Spell_Holy_WordFortitude", name = L["Buffs"],
 		members = { "buffs", "buffcollapse" }, triggers = { aura = true } },
@@ -2253,7 +2297,8 @@ end
 -- from before it was a row (the Cooldown Manager profile's: no action bars) still hold.
 local ROW_FALLBACK = {
 	art = "mainbar", petframe = "player", prdpower = "prd", focustot = "focus", minimapheader = "minimap", minimaptracking = "minimap", minimapcalendar = "minimap",
-	minimapzone = "minimap", minimapclock = "minimap", minimapdial = "minimap", bags = "micro",
+	minimapzone = "minimap", minimapclock = "minimap", minimapdial = "minimap", minimapaddons = "minimap",
+	minimapcoords = "minimap", bags = "micro",
 	belowminimap = "minimap", topcenter = "quests",
 	cooldownsutility = "cooldowns", cooldownsbuffs = "cooldowns", cooldownsbars = "cooldowns",
 	["addon:fecmAuras"] = "addon:fecm",
@@ -5573,6 +5618,34 @@ end
 -- that hides it. Your own pings too, but not the ones NodeSweep.lua makes on
 -- ore and herbs (its own reveal shows those; theirs come back a moment later).
 local pingRevealUntil = 0
+
+-- What comes up with the map when a reveal, Keep open's tracking or a ping
+-- brings it up (Minimap page's "Reveal shows", minimapRevealParts: the
+-- header rows' keys listed there). Unlisted ones stay faded; hovering
+-- shows them all.
+do
+	local PARTS = { minimapheader = true, minimapzone = true, minimaptracking = true, minimapcalendar = true,
+		minimapclock = true, minimapdial = true, minimapaddons = true, minimapcoords = true }
+	local parsed, shown = nil, {}
+	function ns.MinimapRevealHides(member)
+		if not PARTS[member] then
+			return false
+		end
+		local list = ns.db and ns.db.minimapRevealParts or ""
+		if list ~= parsed then
+			parsed = list
+			wipe(shown)
+			for key in list:gmatch("[%w_]+") do
+				shown[key] = true
+			end
+		end
+		return not shown[member]
+	end
+	-- (Picked for it: Keep open's Indoors and zones and Always show bring it up too.)
+	function ns.MinimapRevealShows(group)
+		return PARTS[group] and not ns.MinimapRevealHides(group) or false
+	end
+end
 do
 	local NODE_PING_ECHO = 3 -- seconds after a node ping that a ping of yours is taken as its echo
 	local function Reveal(how, mine)
@@ -8948,7 +9021,9 @@ function ns.UpdateFrames(cinematic, elapsed)
 					-- (A cooldown bar: only for its own bar's cooldowns.)
 					local bar = key == "cooldown" and ns.COOLDOWN_MEMBER_BAR[member]
 					-- (The collapse buffs button: only by hovering, not for a peek.)
-					if (not bar or barUp[bar]) and not (key == "aura" and member == "buffcollapse") then
+					-- (A minimap reveal or ping: only the header parts picked for it.)
+					if (not bar or barUp[bar]) and not (key == "aura" and member == "buffcollapse")
+						and not ((key == "tracking" or key == "ping") and ns.MinimapRevealHides(member)) then
 						if not triggered[member] then auraOnly[member] = key == "aura" or nil end
 						if key ~= "aura" then auraOnly[member] = nil end
 						triggered[member] = true
@@ -9011,7 +9086,8 @@ function ns.UpdateFrames(cinematic, elapsed)
 		local ownRow = ownPartyRows and entry.rspGroup
 		local row = ownRow or entry.row
 		-- (Kept up by a setting, or brought up by an event ticked for one of its Mouseover groups.)
-		local tracking = ((ns.db.alwaysShowMinimap or keepIndoors) and entry.group == "minimap")
+		local tracking = ((ns.db.alwaysShowMinimap or keepIndoors)
+			and (entry.group == "minimap" or ns.MinimapRevealShows(entry.group)))
 			or (ns.db.alwaysShowWaypoint and entry.group == "waypoint")
 			or (questTimerUp and entry.group == "questtimer")
 			or (trackerTimerUp and entry.group == "quests" and entry.frame == _G.ObjectiveTrackerFrame)
