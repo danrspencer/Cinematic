@@ -182,7 +182,6 @@ L["Quest tracker"] = "Seguimiento de misiones"
 L["Quest Tracker"] = "Seguimiento de misiones"
 L["Quest waypoint"] = "Punto de ruta de misión"
 L["Objective boxes (below the minimap)"] = "Recuadros de objetivo (bajo el minimapa)"
-L["The boxes the game puts under the minimap for a scenario's or quest's current step, such as a capture bar. Always shown to start with."] = "Los recuadros que el juego pone bajo el minimapa para el paso actual de un escenario o misión, como una barra de captura. Siempre visibles al principio."
 L["Event boxes (top of the screen)"] = "Recuadros de evento (arriba de la pantalla)"
 L["The bars and boxes the game puts at the top of the screen for a zone event or scenario, such as a timer to the next event. Until you change its ticks it does what the quest tracker's row does."] = "Las barras y recuadros que el juego pone arriba de la pantalla para un evento de zona o escenario, como un temporizador hasta el próximo evento. Hasta que cambies sus marcas, hace lo mismo que la fila del seguimiento de misiones."
 L["Buffs and debuffs"] = "Beneficios y perjuicios"
@@ -782,7 +781,6 @@ L["Casting"] = "Lanzamiento"
 L["Hide the Fishing cast bar"] = "Ocultar la barra de lanzamiento de Pesca"
 L["Your cast bar stays hidden while it shows Fishing. Every other spell shows it as usual."] = "Tu barra de lanzamiento se queda oculta mientras muestra Pesca. Con cualquier otro hechizo se muestra como siempre."
 L["Right-click to cast again"] = "Clic derecho para volver a lanzar"
-L["While the fish camera is on and no bobber is out, right-clicking in the world casts Fishing again. Each cast still comes from your own click. While the bobber is out, right-click clicks it as usual; in combat, with the loot window open or with your mouse on a player or NPC, right-click is left alone. (Meanwhile right-drag doesn't turn the camera: left-drag still does.)"] = "Mientras la cámara de pesca está activa y no hay ningún corcho fuera, hacer clic derecho en el mundo vuelve a lanzar Pesca. Cada lanzamiento sigue saliendo de tu propio clic. Mientras el corcho está fuera, el clic derecho lo pulsa como siempre; en combate, con la ventana de botín abierta o con el ratón sobre un jugador o PNJ, el clic derecho no se toca. (Mientras tanto, arrastrar con el botón derecho no gira la cámara: con el izquierdo sí.)"
 L["Also the first cast, with a pole equipped"] = "También el primer lanzamiento, con una caña equipada"
 L["With a fishing pole in your main hand, standing still, right-clicking in the world casts Fishing, so you don't have to start the first cast yourself. Not while your mouse is on a player, NPC or object (mailbox, corpse...): right-click works on them as usual. Swap the pole out to have right-click back everywhere."] = "Con una caña de pescar en la mano principal y estando quieto, hacer clic derecho en el mundo lanza Pesca, así que no tienes que empezar tú el primer lanzamiento. No mientras el ratón está sobre un jugador, PNJ u objeto (buzón, cadáver...): el clic derecho funciona con ellos como siempre. Quítate la caña para recuperar el clic derecho en todas partes."
 L["Wait after a cast ends"] = "Espera tras acabar un lanzamiento"
@@ -953,8 +951,6 @@ L["in 40 yd"] = "a 40 m"
 L["past 28 yd"] = "+28 m"
 L["past 40 yd"] = "+40 m"
 L["Any distance"] = "Cualquier distancia"
-L["This row: just those about that far from you. 11 and 28 yards are the game's interact distances; 40 asks a 40-yard spell on your action bars (harmful for enemies, helpful for friends), and with none there the row fits no unit past 28 yards."] = "Esta fila: solo los que están a esa distancia de ti, más o menos. 11 y 28 metros son las distancias de interacción del juego; 40 pregunta a un hechizo de 40 metros de tus barras de acción (dañino para enemigos, de ayuda para amigos), y sin ninguno ahí la fila no encaja con ninguna unidad a más de 28 metros."
-L["Any distance: all of them, near or far. Within or past 11, 28 or 40 yards: just those that far from you, say Any unit past 40 yards to fade the plates far off. 40 yards asks a 40-yard spell on your action bars; with none there, the row fits no unit past 28 yards."] = "Cualquier distancia: todos, cerca o lejos. A menos o a más de 11, 28 o 40 metros: solo los que están así de lejos de ti, por ejemplo Cualquier unidad a más de 40 metros para atenuar las placas lejanas. 40 metros pregunta a un hechizo de 40 metros de tus barras de acción; sin ninguno ahí, la fila no encaja con ninguna unidad a más de 28 metros."
 L["Players, friendly or enemy as the Nameplates page has them (the other faction's are enemies)."] = "Jugadores, amistosos o enemigos según la página Placas de nombre (los de la otra facción son enemigos)."
 L["Anything a player controls: pets, totems and guardians."] = "Todo lo que controla un jugador: mascotas, tótems y guardianes."
 L["Remove this row. Add it again under the grid."] = "Quita esta fila. Vuelve a añadirla bajo la cuadrícula."
@@ -3257,7 +3253,6 @@ L["With custom dialogue frames off, it forgets where you dragged the game's goss
 L["Bubble position"] = "Posición del bocadillo"
 L["Hold the camera still"] = "Mantener la cámara quieta"
 L["Shop window goes there too"] = "La ventana de la tienda también va ahí"
-L["Picking a vendor's \"let me browse your goods\", the shop window opens where the talk was, on the other half of the screen from the NPC, instead of where the game puts it. A vendor with nothing else to say opens it on the other half from where you clicked them. Drag it and it stays where you drop it until it closes."] = "Al elegir \"déjame ver tus mercancías\" de un vendedor, la ventana de la tienda se abre donde estaba la conversación, en la otra mitad de la pantalla respecto al PNJ, en lugar de donde la pone el juego. Un vendedor sin nada más que decir la abre en la otra mitad respecto a donde lo clicaste. Arrástrala y se queda donde la sueltes hasta que se cierre."
 L["With the bubble over the head, the quest camera turns in as usual but doesn't drift to and fro while you talk: following the NPC on the screen, the bubble and card would jiggle as it moved."] = "Con el bocadillo sobre la cabeza, la cámara de misión gira como siempre pero no oscila mientras hablas: al seguir al PNJ por la pantalla, el bocadillo y la tarjeta temblarían con el movimiento."
 L["While the camera moves"] = "Mientras se mueve la cámara"
 L["Follow"] = "Seguir"
@@ -3573,14 +3568,12 @@ L["Bars"] = "Franjas"
 -- PlateCastStyle.lua: the Style hub's Cast bars page
 L["Cast bars"] = "Barras de lanzamiento"
 L["Cast Bars"] = "Barras de lanzamiento"
-L["How the cast bars look: on nameplates, yours, your target's and focus's, and the bosses' and arena enemies'. The Default tab's settings are every bar's until its own tab has Use default settings unticked. All but the nameplates' keep the game's look until their tab's Restyle these bars is ticked. Whether the nameplates' show in CineMode: the Nameplates page's Plate parts grid. Changes show at once, here and on bars casting now."] = "El aspecto de las barras de lanzamiento: las de las placas de nombre, la tuya, las de tu objetivo y tu foco, y las de los jefes y los enemigos de arena. Los ajustes de la pestaña Predeterminado son los de todas las barras hasta que su propia pestaña tenga Usar ajustes predeterminados desmarcado. Todas menos las de las placas conservan el aspecto del juego hasta que se marque Reestilizar estas barras en su pestaña. Si las de las placas se ven en el CineMode: la cuadrícula Partes de la placa de la página Placas de nombre. Los cambios se ven al momento, aquí y en las barras que estén lanzando."
 L["Target & focus"] = "Objetivo y foco"
 L["Boss & arena"] = "Jefes y arena"
 L["These cast bars' settings: Default's until you untick Use default settings."] = "Los ajustes de estas barras de lanzamiento: los de Predeterminado hasta que desmarques Usar ajustes predeterminados."
 L["The settings every kind of cast bar has while its tab uses the default settings."] = "Los ajustes que tiene cada tipo de barra de lanzamiento mientras su pestaña usa los ajustes predeterminados."
 L["Ticked: these cast bars look as the Default tab says. Unticked: as the settings below say (they start as Default's, and are kept while it's ticked)."] = "Marcado: estas barras de lanzamiento se ven como dice la pestaña Predeterminado. Desmarcado: como dicen los ajustes de abajo (empiezan como los de Predeterminado y se guardan mientras está marcado)."
 L["Restyle these bars"] = "Reestilizar estas barras"
-L["Every kind of cast bar looks as this tab says until its own tab has Use default settings unticked."] = "Cada tipo de barra de lanzamiento se ve como dice esta pestaña hasta que su propia pestaña tenga Usar ajustes predeterminados desmarcado."
 L["Ticked: these cast bars take this page's look (the Default tab's, or this tab's own). Unticked: they keep the game's own. Their size stays the game's (yours is sized in Edit Mode)."] = "Marcado: estas barras de lanzamiento toman el aspecto de esta página (el de la pestaña Predeterminado, o el propio de esta pestaña). Desmarcado: conservan el del juego. Su tamaño sigue siendo el del juego (el de la tuya se ajusta en el Modo Edición)."
 L["On: the cast bars look as this page says. Off: the game's own (the preview shows that too). Each setting keeps its value for when you turn this back on."] = "Activado: las barras de lanzamiento se ven como dice esta página. Desactivado: las del juego (la vista previa también lo muestra). Cada ajuste conserva su valor para cuando lo vuelvas a activar."
 L["Channeling"] = "Canalización"
@@ -4089,7 +4082,6 @@ L["The game's frames, as it draws them (the defaults)."] = "Los marcos del juego
 L["Flat bars with a thin black edge, health and names in class and reaction colors, Arial Narrow."] = "Barras lisas con un borde negro fino, salud y nombres en colores de clase y reacción, Arial Narrow."
 L["Borderless flat bars in class colors, small white names."] = "Barras lisas sin borde en colores de clase, nombres blancos pequeños."
 L["Soft bars with a fine edge, class icons for players."] = "Barras suaves con un borde delicado, iconos de clase para los jugadores."
-L["This frame's settings: Default's until you untick Use default settings."] = "Los ajustes de este marco: los de Predeterminado hasta que desmarques Usar ajustes predeterminados."
 L["The settings every frame has while its tab uses the default settings."] = "Los ajustes que tiene cada marco mientras su pestaña usa los ajustes predeterminados."
 L["Ticked: this frame looks as the Default tab says. Unticked: as the settings below say (they start as Default's, and are kept while it's ticked)."] = "Marcado: este marco se ve como dice la pestaña Predeterminado. Desmarcado: como dicen los ajustes de abajo (empiezan como los de Predeterminado y se guardan mientras está marcado)."
 L["Round each bar: the game's frame alone, or a border of ours (Custom: its thickness and color under it)."] = "Alrededor de cada barra: solo el marco del juego o un borde nuestro (Personalizado: su grosor y su color, debajo)."
@@ -4113,22 +4105,17 @@ L["Wolf"] = "Lobo"
 L["Opens the Style hub's Unit frames page: how the frames look."] = "Abre la página Marcos de unidad del centro Estilo: cómo se ven los marcos."
 L["Unit frames style"] = "Estilo de los marcos de unidad"
 L["Your player, target, focus, pet and target of target frames have a page of their own in the Style hub: their bars' texture and border, health and name colors, the name's font, and class icons for players, with a Default tab and a tab for each frame that can have its own look."] = "Tus marcos de jugador, objetivo, foco, mascota y objetivo del objetivo tienen su propia página en el centro Estilo: la textura y el borde de sus barras, los colores de la salud y el nombre, la fuente del nombre e iconos de clase para los jugadores, con una pestaña Predeterminado y una pestaña para cada marco que puede tener su propio aspecto."
-L["How your player, target, focus, pet, target of target and party frames look. The Default tab's settings are every frame's until its own tab has Use default settings unticked. Which parts show: the Interface hub's Unit Frames page."] = "Cómo se ven tus marcos de jugador, objetivo, foco, mascota, objetivo del objetivo y grupo. Los ajustes de la pestaña Predeterminado son los de cada marco hasta que su propia pestaña tenga Usar ajustes predeterminados desmarcado. Qué partes se muestran: la página Marcos de unidad del centro Interfaz."
-L["Your party uses raid-style frames (Edit Mode's party frames setting): they follow the Raid frames page, not this tab."] = "Tu grupo usa marcos estilo banda (el ajuste de marcos de grupo del Modo edición): siguen la página Marcos de banda, no esta pestaña."
 L["Lumen"] = "Lumen"
 
 -- RaidStyle.lua: the Style hub's Raid frames page
 L["Raid frames"] = "Marcos de banda"
-L["How the raid frames look, the party's when the game draws them raid-style, and the arena's. The Default tab's settings are each group's until its own tab has Use default settings unticked. Which parts show: the Game Frames page's party and raid rows."] = "Cómo se ven los marcos de banda, los del grupo cuando el juego los dibuja estilo banda y los de arena. Los ajustes de la pestaña Predeterminado son los de cada grupo hasta que su propia pestaña tenga Usar ajustes predeterminados desmarcado. Qué partes se muestran: las filas de grupo y banda de la página Marcos del juego."
 L["On: the raid frames look as this page says. Off: the game's own (the preview shows that too). Each setting keeps its value for when you turn this back on."] = "Activada: los marcos de banda se ven como dice esta página. Desactivada: los del juego (la vista previa también lo muestra). Cada ajuste guarda su valor para cuando la vuelvas a activar."
 L["The game's raid frames, as it draws them (the defaults)."] = "Los marcos de banda del juego, tal como los dibuja (los valores predeterminados)."
 L["Flat bars with a thin black edge, class-colored names, Arial Narrow."] = "Barras lisas con un borde negro fino, nombres en color de clase, Arial Narrow."
 L["Borderless flat bars on a faint ground, small names."] = "Barras lisas sin borde sobre un fondo tenue, nombres pequeños."
 L["Soft bars with a fine edge, names outlined."] = "Barras suaves con un borde delicado, nombres contorneados."
-L["This group's settings: Default's until you untick Use default settings."] = "Los ajustes de este grupo: los de Predeterminado hasta que desmarques Usar ajustes predeterminados."
 L["The settings every group has while its tab uses the default settings."] = "Los ajustes que tiene cada grupo mientras su pestaña usa los ajustes predeterminados."
 L["Ticked: this group looks as the Default tab says. Unticked: as the settings below say (they start as Default's, and are kept while it's ticked)."] = "Marcado: este grupo se ve como dice la pestaña Predeterminado. Desmarcado: como dicen los ajustes de abajo (empiezan como los de Predeterminado y se guardan mientras está marcado)."
-L["Your party uses its own frames, not raid-style ones: they follow the Unit frames page's Party tab."] = "Tu grupo usa sus propios marcos, no estilo banda: siguen la pestaña Grupo de la página Marcos de unidad."
 L["Round each frame: the game's, or a border of ours (Custom: its thickness and color under it)."] = "Alrededor de cada marco: el del juego o un borde nuestro (Personalizado: su grosor y su color, debajo)."
 L["How solid the game's dark background behind each frame is."] = "Lo sólido que es el fondo oscuro del juego detrás de cada marco."
 L["Behind the bar"] = "Detrás de la barra"
@@ -4664,7 +4651,6 @@ L["Delete this scene of your own, with its copies."] = "Borra esta escena propia
 L["Delete this scene: its rows go and it starts no camera. Add back, above the rows, brings it back with its settings."] = "Borra esta escena: sus filas desaparecen y no pone ninguna cámara. Recuperar, encima de las filas, la devuelve con sus ajustes."
 L["Delete the scene %s and its settings?"] = "¿Borrar la escena %s y sus ajustes?"
 L["Delete the scene %s? It starts no camera until you bring it back with Add back, above the rows (its settings are kept)."] = "¿Borrar la escena %s? No pondrá ninguna cámara hasta que la recuperes con Recuperar, encima de las filas (sus ajustes se guardan)."
-L["One thing that starts this scene: an emote you do, a spell you cast, a buff on you, a place you're in, a moment (leveling up...), something you are (mounted...), or a key you press. Any one of a scene's triggers starts it."] = "Algo que inicia esta escena: un emote que haces, un hechizo que lanzas, un beneficio que tienes, un lugar en el que estás, un momento (subir de nivel...), algo que eres (montado...) o una tecla que pulsas. Cualquiera de los disparadores de una escena la inicia."
 L["Another thing that starts this scene: any one of its triggers starts it."] = "Otra cosa que inicia esta escena: cualquiera de sus disparadores la inicia."
 L["When its camera stops. Moving always stops it too, as it does every camera that runs while you stand still. It ends: when the trigger that started it ends (the cast, the buff, leaving the place)."] = "Cuándo se detiene su cámara. Moverte también la detiene siempre, como a toda cámara que funciona mientras estás quieto. Termina: cuando termina el disparador que la inició (el lanzamiento, el beneficio, salir del lugar)."
 L["Where it comes when other scenes are on at the same time: the first one on in this order plays. Going AFK while doing an emote is the AFK scene, say."] = "Qué lugar ocupa cuando hay otras escenas activas a la vez: se pone la primera activa en este orden. Por ejemplo, ausentarte mientras haces un emote pone la escena AFK."
@@ -6039,3 +6025,153 @@ L["orbit stopped"] = "órbita detenida"
 L["orbit: %d degrees over %s seconds (/cine orbit again stops it)"] = "órbita: %d grados en %s segundos (/cine orbit otra vez la detiene)"
 L["orbit can't start: %s"] = "la órbita no puede empezar: %s"
 L["the camera turns once around you: 360 degrees over 10 seconds unless given (negative: the other way); again stops it"] = "la cámara da una vuelta a tu alrededor: 360 grados en 10 segundos si no se indica otra cosa (negativo: al revés); otra vez la detiene"
+
+-- Core.lua, Options.lua
+L["Toggle letterbox bars"] = "Alternar las franjas"
+
+-- Frames.lua, Options.lua
+L["Addon buttons"] = "Botones de addons"
+L["Coordinates"] = "Coordenadas"
+
+-- Frames.lua
+L["Addons' buttons around the minimap's edge, Cinematic's own too. Untick it to hide them in CineMode even while the minimap is up. Hovering the minimap brings them up with the map."] = "Los botones de los addons alrededor del borde del minimapa, también el de Cinematic. Desmárcalo para ocultarlos en CineMode incluso mientras se ve el minimapa. Pasar el ratón por el minimapa los muestra con el mapa."
+L["The map coordinates by the minimap. Untick it to hide them in CineMode even while the minimap is up. Hovering the minimap brings them up with the map."] = "Las coordenadas del mapa junto al minimapa. Desmárcalo para ocultarlas en CineMode incluso mientras se ve el minimapa. Pasar el ratón por el minimapa las muestra con el mapa."
+L["The boxes the game puts under the minimap for a scenario's or quest's current step, such as a capture bar. They come and go with the minimap until you change their ticks, and hovering the minimap brings them up with the map."] = "Los recuadros que el juego pone bajo el minimapa para el paso actual de un escenario o misión, como una barra de captura. Aparecen y desaparecen con el minimapa hasta que cambies sus marcas, y pasar el ratón por el minimapa los muestra con el mapa."
+L["You moved a swing timer bar, so \"Ranged bar on top\" is now off for %s and the bars stay where you put them."] = "Has movido una barra del temporizador de golpes, así que \"Barra de distancia arriba\" queda desactivada para %s y las barras se quedan donde las pusiste."
+
+-- Speech.lua
+L["Speech from behind you\nDrag to move, right-click to reset"] = "Voces detrás de ti\nArrastra para mover, clic derecho para restablecer"
+
+-- Effects.lua, Options.lua
+L["Service NPCs"] = "PNJ de servicio"
+
+-- Effects.lua
+L[" Friendly and neutral NPCs with a title under their name (<Repair Vendor>, <Innkeeper>...), whatever their own row says: Kinds picks which, Show whether their names show or just their titles. Beyond nameplate range, and in dungeons and raids, the game shows the names of NPCs with something for you (vendors, quest givers...), titles included."] = " PNJ amistosos y neutrales con un título bajo su nombre (<Armero>, <Tabernero>...), diga lo que diga su propia fila: Tipos elige cuáles, Mostrar si se ven sus nombres o solo sus títulos. Más allá del alcance de las placas de nombre, y en mazmorras y bandas, el juego muestra los nombres de los PNJ que tienen algo para ti (vendedores, dadores de misiones...), con el título incluido."
+L["letterbox bars on"] = "franjas activadas"
+L["letterbox bars off"] = "franjas desactivadas"
+
+-- PlateGuild.lua
+L["Vendors"] = "Vendedores"
+L["vendor,merchant,goods,supplies,supplier,provisions,provisioner,quartermaster,reagents,trader,armorer,weaponsmith,bowyer,gunsmith,butcher,baker,food,drink,wine"] = "vendedor,mercader,mercancías,suministros,proveedor,provisiones,intendente,componentes,comerciante,armero,armas,arcos,armas de fuego,carnicer,panader,comida,bebida,vino"
+L["Repair"] = "Reparación"
+L["repair"] = "reparac"
+L["Trainers"] = "Instructores"
+L["trainer"] = "instructor"
+L["Professions"] = "Profesiones"
+L["fish,cook,first aid,alchem,herbal,mining,miner,skinn,blacksmith,leatherwork,tailor,enchant,engineer,jewelcraft,inscription,scribe,archaeolog"] = "pesca,cocin,primeros auxilios,alquimi,herbor,minería,minero,desuell,herrer,peleter,sastrer,encantamiento,ingenier,joyer,inscripción,escriba,arqueolog"
+L["Flight masters"] = "Maestros de vuelo"
+L["flight,gryphon master,wind rider master,hippogryph master,bat handler,dragonhawk master"] = "vuelo,grifo,jinete del viento,hipogrifo,murciélago,dracohalcón"
+L["Innkeepers"] = "Taberneros"
+L["innkeeper"] = "taberner"
+L["Bankers and auctioneers"] = "Banqueros y subastadores"
+L["banker,auctioneer,bank,auction"] = "banquer,subastador,banco,subasta"
+L["Stable masters"] = "Maestros de establos"
+L["stable"] = "establo"
+L["Other titles"] = "Otros títulos"
+
+-- CustomTriggers.lua
+L["Interaction"] = "Interacción"
+L["At a mailbox"] = "En un buzón"
+L["At the bank"] = "En el banco"
+L["At the auction house"] = "En la casa de subastas"
+L["World map open"] = "Mapa del mundo abierto"
+L["Talking to an NPC (chat, vendor, trainer)"] = "Hablando con un PNJ (charla, vendedor, instructor)"
+
+-- CameraTriggerEditor.lua
+L["Its window closes"] = "Su ventana se cierra"
+L["One thing that starts this scene: an emote you do, a spell you cast, a buff on you, a place you're in, a moment (leveling up...), something you are (mounted...), a window you open (the mailbox, bank, auction house, map or an NPC's), or a key you press. Any one of a scene's triggers starts it."] = "Algo que inicia esta escena: un emote que haces, un hechizo que lanzas, un beneficio que tienes, un lugar en el que estás, un momento (subir de nivel...), algo que eres (montado...), una ventana que abres (el buzón, el banco, la casa de subastas, el mapa o la de un PNJ) o una tecla que pulsas. Cualquiera de los activadores de una escena la inicia."
+
+-- QuestTalk.lua
+L["Quest Talk's replies\nDrag to move, right-click to reset"] = "Respuestas de Quest Talk\nArrastra para mover, clic derecho para restablecer"
+
+-- LetterboxStyle.lua
+L["New places"] = "Lugares nuevos"
+L["Show bars on discovering a new place"] = "Mostrar las franjas al descubrir un lugar nuevo"
+L["The bars come in for a few seconds when you find a place new to you: a zone you're in for the first time, a subzone the game says you discovered, a dungeon or raid. In or out of CineMode, with everything else off too. Not in fights, if the bars are off in combat."] = "Las franjas entran unos segundos cuando encuentras un lugar nuevo para ti: una zona en la que estás por primera vez, una subzona que el juego dice que descubriste, una mazmorra o una banda. Dentro o fuera de CineMode, aunque todo lo demás esté desactivado. No en combate, si las franjas están desactivadas en combate."
+L["How long the bars stay for a new place, not counting their coming in and going. Another new place meanwhile starts the count again."] = "Cuánto tiempo se quedan las franjas por un lugar nuevo, sin contar su entrada y salida. Otro lugar nuevo mientras tanto vuelve a empezar la cuenta."
+
+-- PlateCastStyle.lua
+L["How the cast bars look: on nameplates, yours, your target's and focus's, and the bosses' and arena enemies'. Each tab's These bars picks its look: the game's (all but the nameplates' start so), the Default tab's, or its own. Whether the nameplates' show in CineMode: the Nameplates page's Plate parts grid. Changes show at once, here and on bars casting now."] = "El aspecto de las barras de lanzamiento: las de las placas de nombre, la tuya, las de tu objetivo y tu foco, y las de los jefes y los enemigos de arena. Estas barras, en cada pestaña, elige su aspecto: el del juego (todas menos las de las placas empiezan así), el de la pestaña Predeterminado o el suyo propio. Si las de las placas se ven en CineMode: la cuadrícula Partes de la placa de la página Placas de nombre. Los cambios se ven al momento, aquí y en las barras que se están lanzando."
+L["These cast bars: the game's look, the Default tab's, or their own, as These bars says."] = "Estas barras de lanzamiento: el aspecto del juego, el de la pestaña Predeterminado o el suyo propio, según diga Estas barras."
+L["These bars:"] = "Estas barras:"
+L["The game's look"] = "El aspecto del juego"
+L["Cinematic leaves them alone. Their size stays the game's either way (yours is sized in Edit Mode)."] = "Cinematic no las toca. Su tamaño sigue siendo el del juego en cualquier caso (el de la tuya se ajusta en el Modo edición)."
+L["They look as the Default tab says."] = "Se ven como dice la pestaña Predeterminado."
+L["Their own look"] = "Su propio aspecto"
+L["They look as the settings below say. These start as the Default tab's, and are kept while you pick another choice."] = "Se ven como dicen los ajustes de abajo. Empiezan como los de la pestaña Predeterminado y se conservan mientras eliges otra opción."
+L["How these cast bars look: the game's own, the Default tab's, or this tab's own settings."] = "Cómo se ven estas barras de lanzamiento: el aspecto propio del juego, el de la pestaña Predeterminado o los ajustes propios de esta pestaña."
+L["Every kind of cast bar looks as this tab says while its own tab picks Same as the Default tab."] = "Cada tipo de barra de lanzamiento se ve como dice esta pestaña mientras su propia pestaña elija Igual que la pestaña Predeterminado."
+
+-- PlateCastStyle.lua, UnitStyle.lua, RaidStyle.lua, Options.lua
+L["Same as the Default tab"] = "Igual que la pestaña Predeterminado"
+
+-- UnitStyle.lua
+L["How your player, target, focus, pet, target of target and party frames look. The Default tab's settings are every frame's until its own tab has Same as the Default tab unticked. Which parts show: the Interface hub's Unit Frames page."] = "Cómo se ven tus marcos de jugador, objetivo, foco, mascota, objetivo del objetivo y grupo. Los ajustes de la pestaña Predeterminado son los de cada marco hasta que su propia pestaña tenga Igual que la pestaña Predeterminado desmarcado. Qué partes se ven: la página Marcos de unidad del apartado Interfaz."
+L["This frame's settings: Default's until you untick Same as the Default tab."] = "Los ajustes de este marco: los de Predeterminado hasta que desmarques Igual que la pestaña Predeterminado."
+L["Your party uses raid-style frames (Edit Mode's party frames setting): they follow the Raid Frames page, not this tab."] = "Tu grupo usa marcos estilo banda (el ajuste de marcos de grupo del Modo edición): siguen la página Marcos de banda, no esta pestaña."
+L["Every frame looks as this tab says while its own tab has Same as the Default tab ticked."] = "Cada marco se ve como dice esta pestaña mientras su propia pestaña tenga marcado Igual que la pestaña Predeterminado."
+
+-- RaidStyle.lua
+L["How the raid frames look, the party's when the game draws them raid-style, and the arena's. The Default tab's settings are each group's until its own tab has Same as the Default tab unticked. Which parts show: the Game Frames page's party and raid rows."] = "Cómo se ven los marcos de banda, los del grupo cuando el juego los dibuja estilo banda y los de arena. Los ajustes de la pestaña Predeterminado son los de cada grupo hasta que su propia pestaña tenga Igual que la pestaña Predeterminado desmarcado. Qué partes se ven: las filas de grupo y banda de la página Marcos del juego."
+L["This group's settings: Default's until you untick Same as the Default tab."] = "Los ajustes de este grupo: los de Predeterminado hasta que desmarques Igual que la pestaña Predeterminado."
+L["Your party uses its own frames, not raid-style ones: they follow the Unit Frames page's Party tab."] = "Tu grupo usa sus propios marcos, no estilo banda: siguen la pestaña Grupo de la página Marcos de unidad."
+L["Every group looks as this tab says while its own tab has Same as the Default tab ticked."] = "Cada grupo se ve como dice esta pestaña mientras su propia pestaña tenga marcado Igual que la pestaña Predeterminado."
+
+-- EmoteVision.lua
+L["Emote Vision\nDrag to move, right-click to reset"] = "Visión de gestos\nArrastra para mover, clic derecho para restablecer"
+L["Campfire"] = "Hoguera"
+L["rest a while by the fire"] = "descansa un rato junto al fuego"
+
+-- Slash.lua
+L["%s is your own profile: it has nothing to reset to until you Save it on the Profiles page"] = "%s es tu propio perfil: no tiene a qué restablecerse hasta que lo guardes en la página Perfiles"
+
+-- Why.lua
+L["Keep open: herb, mineral or treasure tracking is on"] = "Mantener abierto: el rastreo de hierbas, minerales o tesoros está activado"
+L["Keep open: creature or fish tracking is on"] = "Mantener abierto: el rastreo de criaturas o peces está activado"
+L["Reveal: the minimap shows %s"] = "Mostrar: el minimapa muestra %s"
+L["Reveal: something you ticked is on the minimap"] = "Mostrar: algo que marcaste está en el minimapa"
+L["It was up as this fight started, so it stays up through it"] = "Estaba visible al empezar este combate, así que sigue visible durante todo él"
+L["Keep open: a tracked quest, for a while after progress on it"] = "Mantener abierto: una misión rastreada, durante un rato tras avanzar en ella"
+L["Kept up by a setting Inspect can't name yet"] = "Lo mantiene visible un ajuste que Inspeccionar aún no sabe nombrar"
+
+-- Profiles.lua
+L["can't switch profiles in a fight: try again once it's over"] = "no se puede cambiar de perfil en combate: inténtalo de nuevo cuando acabe"
+
+-- Welcome.lua
+L["See Profile"] = "Ver perfil"
+L["Select a profile that suits you."] = "Elige un perfil que te guste."
+
+-- CameraScriptsPage.lua
+L["End the music over %s s"] = "Terminar la música en %s s"
+
+-- Options.lua
+L["(game: %s)"] = "(juego: %s)"
+L["While the fish camera is on and no bobber is out, right-clicking in the world casts Fishing again. Each cast still comes from your own click. While the bobber is out, right-click clicks it as usual (or reels in from anywhere: see below); in combat, with the loot window open or with your mouse on a player or NPC, right-click is left alone. (Meanwhile right-drag doesn't turn the camera: left-drag still does.)"] = "Mientras la cámara de pesca está activa y no hay ningún corcho fuera, hacer clic derecho en el mundo vuelve a lanzar Pesca. Cada lanzamiento sigue saliendo de tu propio clic. Mientras el corcho está fuera, el clic derecho lo pulsa como siempre (o lo recoge desde cualquier sitio: ver abajo); en combate, con la ventana de botín abierta o con el ratón sobre un jugador o PNJ, el clic derecho no se toca. (Mientras tanto, arrastrar con el botón derecho no gira la cámara: con el izquierdo sí.)"
+L["Right-click to reel in"] = "Clic derecho para recoger"
+L["While the bobber is out, right-clicking anywhere in the world reels it in, with no need to find the bobber with the mouse (in gamepad mode, the cast button below does too). It uses the game's \"Interact with target\" key, so the game's soft targeting of objects is on while you fish, and your own setting comes back after. Reeling in before a bite ends the cast. Not in combat or with your mouse on a player or NPC. (While the bobber is out, right-drag doesn't turn the camera: left-drag still does.)"] = "Mientras el corcho está fuera, hacer clic derecho en cualquier parte del mundo lo recoge, sin tener que buscar el corcho con el ratón (en modo mando, el botón de lanzar de abajo también). Usa la tecla del juego \"Interactuar con el objetivo\", así que la selección suave de objetos del juego está activada mientras pescas, y tu propio ajuste vuelve después. Recoger antes de que piquen termina el lanzamiento. No en combate ni con el ratón sobre un jugador o PNJ. (Mientras el corcho está fuera, arrastrar con el botón derecho no gira la cámara: con el izquierdo sí.)"
+L["The key you cast with reels in too"] = "La tecla con la que lanzas también recoge"
+L["With Fishing on an action bar (the spell, or a macro that casts it), its key reels the bobber in while it's out, rather than casting again: press 1 to cast, then 1 again to reel in. Works on the game's own action bars. Uses the game's soft targeting of objects, as right-click does. Not in combat."] = "Con Pesca en una barra de acción (el hechizo o una macro que lo lance), su tecla recoge el corcho mientras está fuera, en vez de lanzar otra vez: pulsa 1 para lanzar y luego 1 otra vez para recoger. Funciona en las barras de acción propias del juego. Usa la selección suave de objetos del juego, como el clic derecho. No en combate."
+L["Names and titles: a service NPC's name shows on its nameplate with its title under it. Titles only: just its title (<Repair Vendor>) where its name would be, unless its own row (or your target's) shows its name too. Beyond nameplate range, and in dungeons and raids, the game shows names and titles together."] = "Nombres y títulos: el nombre de un PNJ de servicio se ve en su placa con su título debajo. Solo títulos: solo su título (<Armero>) donde estaría su nombre, salvo que su propia fila (o la de tu objetivo) muestre también su nombre. Más allá del alcance de las placas de nombre, y en mazmorras y bandas, el juego muestra nombres y títulos juntos."
+L["Names and titles"] = "Nombres y títulos"
+L["Titles only"] = "Solo títulos"
+L["Kinds"] = "Tipos"
+L["Any other title, lore titles too (<Ranger-General of Silvermoon>)."] = "Cualquier otro título, también los de historia (<General forestal de Lunargenta>)."
+L["NPCs whose title has one of these words in it: %s."] = "PNJ cuyo título tiene alguna de estas palabras: %s."
+L["Raise"] = "Subir"
+L["Not your kill"] = "No es tu presa"
+L["An NPC someone outside your group hit first: killing it gives you no loot, experience or quest credit. Its name and health bar gray to start with."] = "Un PNJ al que alguien de fuera de tu grupo golpeó primero: matarlo no te da botín, experiencia ni progreso de misión. Su nombre y su barra de salud se ven grises al principio."
+L["Out of range"] = "Fuera de alcance"
+L["out of range"] = "fuera de alcance"
+L["This row: just those about that far from you. 11 and 28 yards are the game's interact distances; 40 asks a 40-yard spell on your action bars (harmful for enemies, helpful for friends), and with none there the row fits no unit past 28 yards. Out of range: none of the spells on your action bars reaches it (attacks for enemies, helpful spells for friends), as their buttons turn red."] = "Esta fila: solo los que están a esa distancia de ti, más o menos. 11 y 28 metros son las distancias de interacción del juego; 40 pregunta a un hechizo de 40 metros de tus barras de acción (dañino para enemigos, de ayuda para amigos), y sin ninguno ahí la fila no encaja con ninguna unidad a más de 28 metros. Fuera de alcance: ninguno de los hechizos de tus barras de acción lo alcanza (ataques para enemigos, hechizos de ayuda para amigos), como cuando sus botones se ponen rojos."
+L["Any distance: all of them, near or far. Within or past 11, 28 or 40 yards: just those that far from you, say Any unit past 40 yards to fade the plates far off. 40 yards asks a 40-yard spell on your action bars; with none there, the row fits no unit past 28 yards. Out of range: none of the spells on your action bars reaches them, as their buttons turn red."] = "Cualquier distancia: todos, cerca o lejos. A menos o a más de 11, 28 o 40 metros: solo los que están así de lejos de ti, por ejemplo Cualquier unidad a más de 40 metros para atenuar las placas lejanas. 40 metros pregunta a un hechizo de 40 metros de tus barras de acción; sin ninguno ahí, la fila no encaja con ninguna unidad a más de 28 metros. Fuera de alcance: ninguno de los hechizos de tus barras de acción los alcanza, como cuando sus botones se ponen rojos."
+L["Raise with a plate"] = "Subir con placa"
+L["Reveal shows"] = "Mostrar enseña"
+L["Everything"] = "Todo"
+L["Just the map"] = "Solo el mapa"
+L["Map"] = "Mapa"
+L["When a ping, a reveal below or Keep open's tracking brings the faded minimap up, only the map comes up with what's ticked here; the rest of the header stays faded. Hovering the minimap shows it all."] = "Cuando un aviso, un Mostrar de abajo o el rastreo de Mantener abierto hace aparecer el minimapa atenuado, solo aparece el mapa con lo que esté marcado aquí; el resto de la cabecera sigue atenuado. Pasar el ratón por el minimapa lo muestra todo."
+L["The buffs this bar shows sit together in their order, centered on the bar, instead of inactive or faded ones leaving gaps. Edit Mode shows the game's own layout."] = "Los beneficios que muestra esta barra se juntan en su orden, centrados en la barra, en vez de dejar huecos los inactivos o atenuados. El Modo edición muestra la disposición propia del juego."
+L["Picking a vendor's \"let me browse your goods\", the shop window opens where the talk was, on the other half of the screen from the NPC, instead of where the game puts it. A shop opened straight from a right click on the vendor opens where the game puts it. Drag it and it stays where you drop it until it closes."] = "Al elegir \"déjame ver tus mercancías\" de un vendedor, la ventana de la tienda se abre donde estaba la conversación, en la otra mitad de la pantalla respecto al PNJ, en vez de donde la pone el juego. Una tienda abierta directamente con un clic derecho sobre el vendedor se abre donde la pone el juego. Si la arrastras, se queda donde la sueltes hasta que se cierre."
+L["Add all"] = "Añadir todos"
+L["Fades every frame on this list that isn't added yet, as Add does for one."] = "Atenúa cada marco de esta lista que aún no esté añadido, como hace Añadir con uno."
+L["Brings the letterbox bars in, or takes them out, in or out of CineMode. Turning CineMode on or off puts them back as the Letterbox page says."] = "Hace entrar o salir las franjas, dentro o fuera de CineMode. Activar o desactivar CineMode las deja como dice la página Franjas."

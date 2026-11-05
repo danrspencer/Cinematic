@@ -581,7 +581,6 @@ L["Casting"] = "Заброс"
 L["Hide the Fishing cast bar"] = "Скрывать полосу рыбной ловли"
 L["Your cast bar stays hidden while it shows Fishing. Every other spell shows it as usual."] = "Полоса заклинаний скрыта, пока на ней рыбная ловля. Для всех остальных заклинаний она показывается как обычно."
 L["Right-click to cast again"] = "ПКМ — снова забросить"
-L["While the fish camera is on and no bobber is out, right-clicking in the world casts Fishing again. Each cast still comes from your own click. While the bobber is out, right-click clicks it as usual; in combat, with the loot window open or with your mouse on a player or NPC, right-click is left alone. (Meanwhile right-drag doesn't turn the camera: left-drag still does.)"] = "Пока работает камера рыбалки и поплавка нет, ПКМ в мире снова забрасывает удочку. Каждый заброс по-прежнему происходит от вашего щелчка. Пока поплавок в воде, ПКМ нажимает на него как обычно; в бою, с открытым окном добычи или с курсором на игроке или НИП ПКМ не трогается. (В это время перетаскивание ПКМ не поворачивает камеру: ЛКМ — поворачивает.)"
 L["Also the first cast, with a pole equipped"] = "И первый заброс, с удочкой в руках"
 L["With a fishing pole in your main hand, standing still, right-clicking in the world casts Fishing, so you don't have to start the first cast yourself. Not while your mouse is on a player, NPC or object (mailbox, corpse...): right-click works on them as usual. Swap the pole out to have right-click back everywhere."] = "С удочкой в правой руке, стоя на месте, ПКМ в мире забрасывает удочку, чтобы не начинать первый заброс самому. Не когда курсор на игроке, НИП или объекте (почтовый ящик, труп...): на них ПКМ работает как обычно. Уберите удочку, чтобы вернуть обычный ПКМ везде."
 L["Wait after a cast ends"] = "Ожидание после заброса"
@@ -1708,7 +1707,6 @@ L["Another of the game's effects over the first, added on as light and cut by th
 L["Another thing that starts this scene: any one of its triggers starts it."] = "Еще одно, что запускает эту сцену: ее запускает любой из ее триггеров."
 L["Any"] = "Любой"
 L["Any distance"] = "Любое расстояние"
-L["Any distance: all of them, near or far. Within or past 11, 28 or 40 yards: just those that far from you, say Any unit past 40 yards to fade the plates far off. 40 yards asks a 40-yard spell on your action bars; with none there, the row fits no unit past 28 yards."] = "Любое расстояние: все, близко или далеко. Ближе или дальше 11, 28 или 40 м: только на таком расстоянии от вас, например «Любой юнит дальше 40 м», чтобы скрыть дальние индикаторы. Для 40 м нужно заклинание с дальностью 40 м на ваших панелях команд; если его нет, строка не подходит ни одному юниту дальше 28 м."
 L["Any edge"] = "Любой край"
 L["Any enemy attacking a healer (you too, if you're one): for a healer, who's after you or the other healers; for a tank, the ones to pull off them."] = "Любой противник, атакующий лекаря (и вас, если вы лекарь): для лекаря — кто охотится за вами или другими лекарями; для танка — кого с них снять."
 L["Any enemy attacking a player who isn't a tank (you too, unless you're one): for a healer, who's in trouble; for a tank, the ones to taunt. A pet tanking doesn't count."] = "Любой противник, атакующий игрока, который не танк (и вас, если вы не танк): для лекаря — кто в беде; для танка — кого провоцировать. Питомец-танк не считается."
@@ -2139,7 +2137,6 @@ L["Every camera, made of small steps: rotate, tilt, zoom, sway, wait, and Togeth
 L["Every card's words bigger or smaller, for a big or wide screen (a card in a letterbox bar goes by the bar's height instead)."] = "Слова всех карточек крупнее или мельче, для большого или широкого экрана (карточка в полосе кадра зависит от высоты полосы)."
 L["Every change made to Cinematic, newest first, as written when it was made (in English)."] = "Все изменения в Cinematic, сначала новые, в том виде, как были записаны (на английском)."
 L["Every fight"] = "Каждый бой"
-L["Every kind of cast bar looks as this tab says until its own tab has Use default settings unticked."] = "Все виды полос заклинаний выглядят, как задано на этой вкладке, пока на их собственной вкладке не снята отметка «Использовать настройки по умолчанию»."
 L["Every moment that puts words on your screen, as a card: going into a fight and coming out of it, a boss, a new zone, what you did last time, the time of day, a place under attack, a duel, your death. A row for each: its tick, the style it uses and where it shows; click it for its settings. How they look: the Style tab. One card at a time: a more important one cuts in, a less important one waits for it."] = "Каждый момент, который выводит слова на экран, в виде карточки: вступление в бой и выход из него, босс, новая зона, что вы делали в прошлый раз, время суток, место под атакой, дуэль, ваша смерть. По строке на каждый: отметка, используемый стиль и где показывается; нажмите на нее для настроек. Как они выглядят: вкладка «Стиль». По одной карточке за раз: более важная перебивает, менее важная ждет."
 L["Every moment's emotes as they come."] = "Эмоции каждого момента по мере появления."
 L["Every other plate, when no row above fits it: the game's own look to start with (no mark, its own colors). Give it a mark or an Also color to change them all."] = "Все остальные индикаторы, когда ни одна строка выше не подходит: для начала собственный вид игры (без метки, свои цвета). Дайте метку или цвет «Также», чтобы изменить их все."
@@ -2449,14 +2446,12 @@ L["How the bars at the top and bottom of the screen look and come in. When they 
 L["How the big button for the nearest quest's item looks. Turning it on: the Vision tab. Where it sits: the extra ability button's place in Edit Mode. Changes show at once (its size after a fight, if you're in one)."] = "Как выглядит большая кнопка предмета ближайшего задания. Включение: вкладка Vision. Где она: место кнопки дополнительной способности в редакторе режимов. Изменения видны сразу (размер — после боя, если вы в бою)."
 L["How the card comes in."] = "Как появляется карточка."
 L["How the card is set: a title card, a subtitle, a chapter line or a banner."] = "Как оформлена карточка: титр, субтитр, строка главы или баннер."
-L["How the cast bars look: on nameplates, yours, your target's and focus's, and the bosses' and arena enemies'. The Default tab's settings are every bar's until its own tab has Use default settings unticked. All but the nameplates' keep the game's look until their tab's Restyle these bars is ticked. Whether the nameplates' show in CineMode: the Nameplates page's Plate parts grid. Changes show at once, here and on bars casting now."] = "Как выглядят полосы заклинаний: на индикаторах, ваша, вашей цели и фокуса, боссов и противников на арене. Настройки вкладки «По умолчанию» действуют на все полосы, пока на их вкладке не снята отметка «Использовать настройки по умолчанию». Все, кроме индикаторов, сохраняют вид игры, пока на их вкладке не отмечено «Переоформить эти полосы». Видны ли полосы индикаторов в CineMode: сетка «Части индикатора» на странице «Индикаторы». Изменения видны сразу, здесь и на полосах, которые сейчас заполняются."
 L["How the dialogue looks, the \"Show the game's window\" link and the number keys."] = "Как выглядят диалог, ссылка «Показать окно игры» и цифровые клавиши."
 L["How the game world looks in CineMode (or over the normal UI, with Start in CineMode off on the main page): vignette, inn glow, weather and depth of field. The letterbox bars and the color grading have pages of their own (Letterbox, Tint). The UI isn't tinted. Names and nameplates are on the Nameplates page."] = "Как выглядит игровой мир в CineMode (или поверх обычного интерфейса, если на главной странице выключено «Запуск в CineMode»): виньетка, свет в тавернах, погода и глубина резкости. У полос кадра и цветокоррекции свои страницы («Полосы», «Оттенок»). Интерфейс не окрашивается. Имена и индикаторы — на странице «Индикаторы»."
 L["How the game's tooltips look: their background, edge and words, names in their colors and the health bar. Which lines show and when: the Interface hub's Tooltips page."] = "Как выглядят игровые подсказки: фон, край и слова, имена их цветами и полоса здоровья. Какие строки видны и когда: страница «Подсказки» в разделе «Интерфейс»."
 L["How the low-health edges look: the theme, our art and Blizzard's, the shadow and the effects. When they show: the Vision tab. Changes show at once in the preview."] = "Как выглядят края при низком здоровье: тема, наше оформление и оформление Blizzard, тень и эффекты. Когда они видны: вкладка Vision. Изменения сразу видны в предпросмотре."
 L["How the personal resource display under your character looks: its health and power bars, and your class resource. When the bars come up: the Interface hub's Resource Display page."] = "Как выглядит личный дисплей ресурсов под вашим персонажем: полосы здоровья и энергии и ресурс класса. Когда появляются полосы: страница «Отображение ресурсов» в разделе «Интерфейс»."
 L["How the quest item button looks."] = "Как выглядит кнопка предмета задания."
-L["How the raid frames look, the party's when the game draws them raid-style, and the arena's. The Default tab's settings are each group's until its own tab has Use default settings unticked. Which parts show: the Game Frames page's party and raid rows."] = "Как выглядят рамки рейда, рамки группы, когда игра рисует их в стиле рейда, и рамки арены. Настройки вкладки «По умолчанию» действуют на каждую группу, пока на ее вкладке не снята отметка «Использовать настройки по умолчанию». Какие части видны: строки группы и рейда на странице «Рамки игры»."
 L["How the result shows: its card (with the words above), or a souls banner: VICTORY ACHIEVED or DEFEATED across the middle of the screen, who it was against under it."] = "Как показывается результат: его карточка (со словами выше) или баннер в стиле souls: ПОБЕДА ДОСТИГНУТА или ПОВЕРЖЕН поперек середины экрана, а под ним — против кого."
 L["How the roll window looks."] = "Как выглядит окно розыгрыша."
 L["How the rows are listed: Camera groups them by camera name, Scene by scene name. Either way a scene's rows stay together, in the order they're tried."] = "Как перечисляются строки: «Камера» группирует их по названию камеры, «Сцена» — по названию сцены. В любом случае строки сцены идут вместе, в порядке проверки."
@@ -2466,7 +2461,6 @@ L["How thickly grass, flowers and stones grow on the ground."] = "Насколь
 L["How this card looks. It starts from a style (a subzone's, the zone's), each setting following it until you change it here, then the card's own until you put it back. Change the style itself on the Card Types tab, for every card using it. Changes play at once in the preview."] = "Как выглядит эта карточка. Она начинается со стиля (подзоны, зоны), и каждая настройка следует ему, пока вы не измените ее здесь; тогда она становится собственной для карточки, пока вы ее не вернете. Сам стиль меняется на вкладке «Типы карточек», для всех карточек с ним. Изменения сразу проигрываются в предпросмотре."
 L["How wide a line of speech from behind you can get before it wraps onto the next row, as a bubble overhead does."] = "Насколько широкой может быть строка речи из-за вашей спины, прежде чем перенестись на следующую строку, как в облачке над головой."
 L["How wide it is."] = "Ширина."
-L["How your player, target, focus, pet, target of target and party frames look. The Default tab's settings are every frame's until its own tab has Use default settings unticked. Which parts show: the Interface hub's Unit Frames page."] = "Как выглядят ваши рамки игрока, цели, фокуса, питомца, цели цели и группы. Настройки вкладки «По умолчанию» действуют на все рамки, пока на их вкладке не снята отметка «Использовать настройки по умолчанию». Какие части видны: страница «Рамки юнитов» в разделе «Интерфейс»."
 L["How your target, focus and the unit under the mouse stand out on the nameplates, for when no target frame shows them: a mark on each one's plate, a row for each in the grid, and its name, health bar or border in its mark's color (the row's Also color). When they show is the Target Indicator row's, on the Nameplates page's Cinematic plate parts grid. Changes show at once, here and on the plates."] = "Как ваша цель, фокус и юнит под курсором выделяются на индикаторах, когда их не показывает рамка цели: метка на индикаторе каждого, строка для каждого в сетке и его имя, полоса здоровья или рамка цвета его метки (цвет «Также» строки). Когда они видны — по строке «Указатель цели» в сетке «Части индикатора Cinematic» на странице «Индикаторы». Изменения видны сразу, здесь и на индикаторах."
 L["How:"] = "Как:"
 L["Icon"] = "Значок"
@@ -2889,7 +2883,6 @@ L["Once you're there (after the loading screen, if there is one), the camera swi
 L["Once you've stood still for a while with the UI faded, or as soon as you go AFK, the camera slowly sweeps around your character. Moving stops it. What starts it, and how long you stand still first, is on the Scenes page."] = "Когда вы какое-то время простоите на месте со скрытым интерфейсом или сразу как уйдете в АФК, камера медленно облетает вашего персонажа. Движение ее останавливает. Что ее запускает и сколько нужно сначала стоять — на странице «Сцены»."
 L["One line under the game's zone name, as it comes in at login, in place of a card. (The look above is the card's.)"] = "Одна строка под названием зоны в игре, когда оно появляется при входе, вместо карточки. (Вид выше — вид карточки.)"
 L["One size at any distance. Unticked, a name grows and shrinks with its plate as its unit comes nearer or goes."] = "Один размер на любом расстоянии. Без отметки имя растет и уменьшается вместе с индикатором, когда его юнит приближается или удаляется."
-L["One thing that starts this scene: an emote you do, a spell you cast, a buff on you, a place you're in, a moment (leveling up...), something you are (mounted...), or a key you press. Any one of a scene's triggers starts it."] = "Одно, что запускает эту сцену: ваша эмоция, ваше заклинание, бафф на вас, место, где вы находитесь, момент (новый уровень...), ваше состояние (верхом...) или нажатая клавиша. Любой из триггеров сцены ее запускает."
 L["Only after progress"] = "Только после продвижения"
 L["Only after you use mana, for"] = "Только после траты маны, на"
 L["Only in CineMode"] = "Только в CineMode"
@@ -3492,7 +3485,6 @@ L["The border's color. Picking one turns it to Custom."] = "Цвет рамки.
 L["The boss's name as its fight starts, in place of Entering combat's card. Once a run for each boss."] = "Имя босса в начале боя с ним вместо карточки «Вступление в бой». Один раз за прохождение для каждого босса."
 L["The boss's name as you first come within about 28 yards of it, before the fight. A dungeon or raid boss is told by its level: a skull, or on retail two over yours."] = "Имя босса, когда вы впервые оказываетесь примерно в 28 м от него, до боя. Босс подземелья или рейда определяется по уровню: череп или, в retail, на два выше вашего."
 L["The boss's name as you first target it, before the fight. A dungeon or raid boss is told by its level: a skull, or on retail two over yours."] = "Имя босса, когда вы впервые берете его в цель, до боя. Босс подземелья или рейда определяется по уровню: череп или, в retail, на два выше вашего."
-L["The boxes the game puts under the minimap for a scenario's or quest's current step, such as a capture bar. Always shown to start with."] = "Окна, которые игра выводит под миникартой для текущего этапа сценария или задания, например полоса захвата. Изначально видны всегда."
 L["The bubble's color, for Custom."] = "Цвет облачка для «Свой»."
 L["The bubble's tail sits on top, pointing up, instead of under it pointing down. (In a bubble only: not with no bubble behind the words.)"] = "Хвостик облачка находится сверху и указывает вверх, а не снизу вниз. (Только в облачке: не без облачка за словами.)"
 L["The bubble's words in a color of your own (the quest card keeps its ink)."] = "Слова облачка своим цветом (карточка задания сохраняет свои чернила)."
@@ -3757,9 +3749,7 @@ L["This boss only: everyone starts at 0 as a boss is pulled, and when it dies it
 L["This camera can't be tested now: Cinematic or the camera is off (Camera Triggers page), or you're moving, flying or in a fight."] = "Эту камеру сейчас нельзя проверить: Cinematic или камера выключены (страница «Триггеры камеры»), или вы движетесь, летите или в бою."
 L["This card's rules as they come."] = "Исходные правила этой карточки."
 L["This client has no damage meter."] = "В этом клиенте нет измерителя урона."
-L["This frame's settings: Default's until you untick Use default settings."] = "Настройки этой рамки: как у «По умолчанию», пока вы не снимете отметку «Использовать настройки по умолчанию»."
 L["This game version has none of these settings."] = "В этой версии игры нет ни одной из этих настроек."
-L["This group's settings: Default's until you untick Use default settings."] = "Настройки этой группы: как у «По умолчанию», пока вы не снимете отметку «Использовать настройки по умолчанию»."
 L["This is from a newer Cinematic: update it to add this one."] = "Это из более новой версии Cinematic: обновите модификацию, чтобы добавить это."
 L["This page's shared settings back on General."] = "Вернуть общие настройки этой страницы к «Общим»."
 L["This row fits everywhere. The rest of the row keeps its ticks for when you untick this."] = "Эта строка подходит везде. Остальная строка сохраняет свои отметки на случай, если вы снимете эту."
@@ -3769,7 +3759,6 @@ L["This row: just the enemies among them."] = "Эта строка: только
 L["This row: just the friendly ones among them."] = "Эта строка: только дружественные среди них."
 L["This row: just the neutral ones among them."] = "Эта строка: только нейтральные среди них."
 L["This row: just these among them: %s."] = "Эта строка: только эти среди них: %s."
-L["This row: just those about that far from you. 11 and 28 yards are the game's interact distances; 40 asks a 40-yard spell on your action bars (harmful for enemies, helpful for friends), and with none there the row fits no unit past 28 yards."] = "Эта строка: только те, кто примерно на таком расстоянии от вас. 11 и 28 м — дистанции взаимодействия в игре; для 40 м нужно заклинание с дальностью 40 м на ваших панелях команд (вредящее для врагов, помогающее для друзей), а если его нет, строка не подходит ни одному юниту дальше 28 м."
 L["This sound's volume, next to the others."] = "Громкость этого звука относительно остальных."
 L["This swing bar isn't in use"] = "Эта полоса удара не используется"
 L["This tab's rules as they come: a sound as any other fight starts and one as it ends."] = "Исходные правила этой вкладки: звук в начале любого другого боя и звук в конце."
@@ -4113,8 +4102,6 @@ L["Your own profile"] = "Ваш профиль"
 L["Your own profile. Right-click it, then Description to say what it's for."] = "Ваш собственный профиль. Нажмите на него ПКМ, затем «Описание», чтобы указать, для чего он."
 L["Your own settings, as they were before you picked a preset."] = "Ваши собственные настройки, какими они были до выбора набора."
 L["Your own words."] = "Свои слова."
-L["Your party uses its own frames, not raid-style ones: they follow the Unit frames page's Party tab."] = "Ваша группа использует собственные рамки, а не в стиле рейда: они следуют вкладке «Группа» страницы «Рамки юнитов»."
-L["Your party uses raid-style frames (Edit Mode's party frames setting): they follow the Raid frames page, not this tab."] = "Ваша группа использует рамки в стиле рейда (настройка рамок группы в редакторе режимов): они следуют странице «Рамки рейда», а не этой вкладке."
 L["Your personal resource display (the health bar under your character) fades in as your health drops."] = "Ваш личный дисплей ресурсов (полоса здоровья под персонажем) проявляется по мере падения здоровья."
 L["Your pet is unhappy"] = "Ваш питомец недоволен"
 L["Your place"] = "Ваше место"
@@ -4436,7 +4423,6 @@ L["The quest shows at the top of the quest tracker, not in its own place under e
 
 -- Options.lua: Quest Vision
 L["Shop window goes there too"] = "Окно торговца тоже туда"
-L["Picking a vendor's \"let me browse your goods\", the shop window opens where the talk was, on the other half of the screen from the NPC, instead of where the game puts it. A vendor with nothing else to say opens it on the other half from where you clicked them. Drag it and it stays where you drop it until it closes."] = "Если выбрать у торговца «Я хочу посмотреть, что вы продаёте», окно торговца откроется там, где был разговор, на другой половине экрана от НИП, а не там, где его ставит игра. Торговец, которому больше нечего сказать, открывает его на другой половине от места, где вы по нему щёлкнули. Перетащите окно, и оно останется там, куда вы его отпустили, пока не закроется."
 
 -- ProfileChoices.lua
 L["A light touch that leaves your UI exactly as it is. A color tint, vignette and weather set the mood, and only the quiet extras join in: the camera sweeps along on flights and teleports, a portal opens as you hearth, and small cards mark your big moments, your duels and the players who buff or emote at you."] = "Лёгкое касание, которое оставляет ваш интерфейс в точности как есть. Цветовой тон, виньетка и погода задают настроение, и присоединяются только тихие дополнения: камера сопровождает полёты и телепорты, при использовании камня возвращения открывается портал, а маленькие карточки отмечают ваши важные моменты, дуэли и игроков, которые накладывают на вас бафы или показывают эмоции."
@@ -4452,3 +4438,161 @@ L["your cursor is back to normal (Cursor Hide off till you accept its warning ag
 -- Changelog.lua: What's new
 L["Cursor Hide (experimental)"] = "Скрытие курсора (экспериментально)"
 L["In CineMode, your cursor gets out of the way: it shrinks to a tiny corner, vanishes once the mouse has been still a while, or both. Moving the mouse brings it back. It's experimental: accept the warning on its page to turn it on, and /cine reset cursor puts your cursor back if it ever gets stuck. The Cinema profile uses it during flights, at vistas and while you're AFK."] = "В CineMode ваш курсор не мешает: сжимается в крошечный уголок, исчезает, когда мышь какое-то время неподвижна, или и то и другое. Движение мыши возвращает его. Это экспериментально: примите предупреждение на его странице, чтобы включить, а /cine reset cursor вернёт курсор, если он когда-нибудь застрянет. Профиль Cinema использует его в полётах, на видовых точках и когда вы отошли."
+
+-- Core.lua, Options.lua
+L["Toggle letterbox bars"] = "Вкл./выкл. полосы"
+
+-- Frames.lua, Options.lua
+L["Addon buttons"] = "Кнопки аддонов"
+L["Coordinates"] = "Координаты"
+
+-- Frames.lua
+L["Addons' buttons around the minimap's edge, Cinematic's own too. Untick it to hide them in CineMode even while the minimap is up. Hovering the minimap brings them up with the map."] = "Кнопки аддонов по краю миникарты, и кнопка Cinematic тоже. Снимите галочку, чтобы скрыть их в CineMode, даже когда миникарта видна. При наведении на миникарту они появляются вместе с картой."
+L["The map coordinates by the minimap. Untick it to hide them in CineMode even while the minimap is up. Hovering the minimap brings them up with the map."] = "Координаты карты у миникарты. Снимите галочку, чтобы скрыть их в CineMode, даже когда миникарта видна. При наведении на миникарту они появляются вместе с картой."
+L["The boxes the game puts under the minimap for a scenario's or quest's current step, such as a capture bar. They come and go with the minimap until you change their ticks, and hovering the minimap brings them up with the map."] = "Рамки, которые игра ставит под миникартой для текущего этапа сценария или задания, например полоса захвата. Они появляются и исчезают вместе с миникартой, пока вы не измените их галочки, а при наведении на миникарту появляются вместе с картой."
+L["You moved a swing timer bar, so \"Ranged bar on top\" is now off for %s and the bars stay where you put them."] = "Вы передвинули полосу таймера удара, поэтому \"Полоса дальнего боя сверху\" теперь выключена для %s, и полосы остаются там, где вы их поставили."
+
+-- Speech.lua
+L["Speech from behind you\nDrag to move, right-click to reset"] = "Речь позади вас\nПеретащите, чтобы переместить, ПКМ — сбросить"
+
+-- Effects.lua, Options.lua
+L["Service NPCs"] = "Служебные НИП"
+
+-- Effects.lua
+L[" Friendly and neutral NPCs with a title under their name (<Repair Vendor>, <Innkeeper>...), whatever their own row says: Kinds picks which, Show whether their names show or just their titles. Beyond nameplate range, and in dungeons and raids, the game shows the names of NPCs with something for you (vendors, quest givers...), titles included."] = " Дружественные и нейтральные НИП с титулом под именем (<Оружейник>, <Хозяин таверны>...), что бы ни говорила их собственная строка: Виды выбирает, какие, Показывать — видны ли их имена или только титулы. За пределами дальности индикаторов, а также в подземельях и рейдах, игра показывает имена НИП, у которых есть что-то для вас (торговцы, квестодатели...), вместе с титулом."
+L["letterbox bars on"] = "полосы включены"
+L["letterbox bars off"] = "полосы выключены"
+
+-- PlateGuild.lua
+L["Vendors"] = "Торговцы"
+L["vendor,merchant,goods,supplies,supplier,provisions,provisioner,quartermaster,reagents,trader,armorer,weaponsmith,bowyer,gunsmith,butcher,baker,food,drink,wine"] = "Торговец,торговец,Продавец,продавец,Поставщик,поставщик,Интендант,интендант,Снабженец,реагент,Оружейник,оружейник,Бронник,Мясник,Пекарь,еда,напитки,вино"
+L["Repair"] = "Ремонт"
+L["repair"] = "Ремонт,ремонт"
+L["Trainers"] = "Учителя"
+L["trainer"] = "Учитель,учитель,Наставник,наставник"
+L["Professions"] = "Профессии"
+L["fish,cook,first aid,alchem,herbal,mining,miner,skinn,blacksmith,leatherwork,tailor,enchant,engineer,jewelcraft,inscription,scribe,archaeolog"] = "рыб,кулинар,повар,первой помощи,алхим,травни,горн,шахт,снятия шкур,кузне,кожевни,портн,зачаров,инженер,ювелир,начертат,писар,археолог"
+L["Flight masters"] = "Распорядители полетов"
+L["flight,gryphon master,wind rider master,hippogryph master,bat handler,dragonhawk master"] = "полет,полёт,грифон,ветрокрыл,гиппогриф,летучих мыш,драконьих ястреб"
+L["Innkeepers"] = "Хозяева таверн"
+L["innkeeper"] = "таверн"
+L["Bankers and auctioneers"] = "Банкиры и аукционисты"
+L["banker,auctioneer,bank,auction"] = "Банкир,банкир,Аукционист,аукционист,банк,аукцион"
+L["Stable masters"] = "Смотрители стойл"
+L["stable"] = "стойл"
+L["Other titles"] = "Другие титулы"
+
+-- CustomTriggers.lua
+L["Interaction"] = "Взаимодействие"
+L["At a mailbox"] = "У почтового ящика"
+L["At the bank"] = "В банке"
+L["At the auction house"] = "На аукционе"
+L["World map open"] = "Карта мира открыта"
+L["Talking to an NPC (chat, vendor, trainer)"] = "Разговор с НИП (беседа, торговец, учитель)"
+
+-- CameraTriggerEditor.lua
+L["Its window closes"] = "Его окно закрывается"
+L["One thing that starts this scene: an emote you do, a spell you cast, a buff on you, a place you're in, a moment (leveling up...), something you are (mounted...), a window you open (the mailbox, bank, auction house, map or an NPC's), or a key you press. Any one of a scene's triggers starts it."] = "Одно событие, которое запускает эту сцену: ваша эмоция, ваше заклинание, эффект на вас, место, где вы находитесь, момент (новый уровень...), ваше состояние (верхом...), окно, которое вы открываете (почтовый ящик, банк, аукцион, карта или окно НИП), или нажатая клавиша. Сцену запускает любой из её триггеров."
+
+-- QuestTalk.lua
+L["Quest Talk's replies\nDrag to move, right-click to reset"] = "Ответы Quest Talk\nПеретащите, чтобы переместить, ПКМ — сбросить"
+
+-- LetterboxStyle.lua
+L["New places"] = "Новые места"
+L["Show bars on discovering a new place"] = "Полосы при открытии нового места"
+L["The bars come in for a few seconds when you find a place new to you: a zone you're in for the first time, a subzone the game says you discovered, a dungeon or raid. In or out of CineMode, with everything else off too. Not in fights, if the bars are off in combat."] = "Полосы появляются на несколько секунд, когда вы находите новое для себя место: зону, где вы впервые, подзону, которую игра считает открытой вами, подземелье или рейд. В CineMode и вне его, даже когда всё остальное выключено. Не в бою, если полосы в бою выключены."
+L["How long the bars stay for a new place, not counting their coming in and going. Another new place meanwhile starts the count again."] = "Сколько полосы остаются для нового места, не считая их появления и ухода. Ещё одно новое место за это время начинает отсчёт заново."
+
+-- PlateCastStyle.lua
+L["How the cast bars look: on nameplates, yours, your target's and focus's, and the bosses' and arena enemies'. Each tab's These bars picks its look: the game's (all but the nameplates' start so), the Default tab's, or its own. Whether the nameplates' show in CineMode: the Nameplates page's Plate parts grid. Changes show at once, here and on bars casting now."] = "Как выглядят полосы заклинаний: на индикаторах, ваша, вашей цели и фокуса, а также боссов и противников на арене. «Эти полосы» на каждой вкладке выбирает их вид: игры (все, кроме индикаторов, так начинают), вкладки «По умолчанию» или свой. Видны ли полосы индикаторов в CineMode: сетка «Части индикатора» на странице «Индикаторы». Изменения видны сразу, здесь и на полосах, которые сейчас идут."
+L["These cast bars: the game's look, the Default tab's, or their own, as These bars says."] = "Эти полосы заклинаний: вид игры, вкладки «По умолчанию» или свой, как указано в «Эти полосы»."
+L["These bars:"] = "Эти полосы:"
+L["The game's look"] = "Вид игры"
+L["Cinematic leaves them alone. Their size stays the game's either way (yours is sized in Edit Mode)."] = "Cinematic их не трогает. Их размер в любом случае остаётся игровым (размер вашей задаётся в режиме редактирования)."
+L["They look as the Default tab says."] = "Они выглядят так, как указано на вкладке «По умолчанию»."
+L["Their own look"] = "Свой вид"
+L["They look as the settings below say. These start as the Default tab's, and are kept while you pick another choice."] = "Они выглядят так, как указано в настройках ниже. Те начинаются с настроек вкладки «По умолчанию» и сохраняются, пока вы выбираете другой вариант."
+L["How these cast bars look: the game's own, the Default tab's, or this tab's own settings."] = "Как выглядят эти полосы заклинаний: собственный вид игры, вкладки «По умолчанию» или свои настройки этой вкладки."
+L["Every kind of cast bar looks as this tab says while its own tab picks Same as the Default tab."] = "Каждый вид полосы заклинаний выглядит так, как указано на этой вкладке, пока на его вкладке выбрано «Как на вкладке «По умолчанию»»."
+
+-- PlateCastStyle.lua, UnitStyle.lua, RaidStyle.lua, Options.lua
+L["Same as the Default tab"] = "Как на вкладке «По умолчанию»"
+
+-- UnitStyle.lua
+L["How your player, target, focus, pet, target of target and party frames look. The Default tab's settings are every frame's until its own tab has Same as the Default tab unticked. Which parts show: the Interface hub's Unit Frames page."] = "Как выглядят ваши рамки игрока, цели, фокуса, питомца, цели цели и группы. Настройки вкладки «По умолчанию» действуют для каждой рамки, пока на её вкладке не снята галочка «Как на вкладке «По умолчанию»». Какие части видны: страница «Рамки юнитов» раздела «Интерфейс»."
+L["This frame's settings: Default's until you untick Same as the Default tab."] = "Настройки этой рамки: как у «По умолчанию», пока вы не снимете галочку «Как на вкладке «По умолчанию»»."
+L["Your party uses raid-style frames (Edit Mode's party frames setting): they follow the Raid Frames page, not this tab."] = "Ваша группа использует рамки в стиле рейда (настройка рамок группы в режиме редактирования): они следуют странице «Рамки рейда», а не этой вкладке."
+L["Every frame looks as this tab says while its own tab has Same as the Default tab ticked."] = "Каждая рамка выглядит так, как указано на этой вкладке, пока на её вкладке стоит галочка «Как на вкладке «По умолчанию»»."
+
+-- RaidStyle.lua
+L["How the raid frames look, the party's when the game draws them raid-style, and the arena's. The Default tab's settings are each group's until its own tab has Same as the Default tab unticked. Which parts show: the Game Frames page's party and raid rows."] = "Как выглядят рамки рейда, рамки группы, когда игра рисует их в стиле рейда, и рамки арены. Настройки вкладки «По умолчанию» действуют для каждой группы, пока на её вкладке не снята галочка «Как на вкладке «По умолчанию»». Какие части видны: строки группы и рейда на странице «Рамки игры»."
+L["This group's settings: Default's until you untick Same as the Default tab."] = "Настройки этой группы: как у «По умолчанию», пока вы не снимете галочку «Как на вкладке «По умолчанию»»."
+L["Your party uses its own frames, not raid-style ones: they follow the Unit Frames page's Party tab."] = "Ваша группа использует собственные рамки, не в стиле рейда: они следуют вкладке «Группа» страницы «Рамки юнитов»."
+L["Every group looks as this tab says while its own tab has Same as the Default tab ticked."] = "Каждая группа выглядит так, как указано на этой вкладке, пока на её вкладке стоит галочка «Как на вкладке «По умолчанию»»."
+
+-- EmoteVision.lua
+L["Emote Vision\nDrag to move, right-click to reset"] = "Emote Vision\nПеретащите, чтобы переместить, ПКМ — сбросить"
+L["is in your guild"] = "в вашей гильдии"
+L["grouped with you before"] = "уже был с вами в группе"
+L["is looking back at you"] = "тоже смотрит на вас"
+L["Campfire"] = "Костёр"
+L["rest a while by the fire"] = "отдохните немного у огня"
+L["Buffs:"] = "Эффекты:"
+L["Ignore buffs from your group"] = "Не учитывать эффекты от группы"
+L["Buffs from people in your party or raid bring up no card: only strangers' do."] = "Эффекты от игроков вашей группы или рейда не показывают карточку: только от незнакомцев."
+
+-- Slash.lua
+L["%s is your own profile: it has nothing to reset to until you Save it on the Profiles page"] = "%s — ваш собственный профиль: ему не к чему сбрасываться, пока вы не сохраните его на странице «Профили»"
+
+-- Why.lua
+L["Keep open: herb, mineral or treasure tracking is on"] = "Держать открытой: включено отслеживание трав, руды или сокровищ"
+L["Keep open: creature or fish tracking is on"] = "Держать открытой: включено отслеживание существ или рыбы"
+L["Reveal: the minimap shows %s"] = "Показывать: на миникарте видно %s"
+L["Reveal: something you ticked is on the minimap"] = "Показывать: на миникарте есть что-то из отмеченного вами"
+L["It was up as this fight started, so it stays up through it"] = "Она была видна в начале этого боя, поэтому остаётся видна до его конца"
+L["Keep open: a tracked quest, for a while after progress on it"] = "Держать открытой: отслеживаемое задание, ещё какое-то время после продвижения в нём"
+L["Keep open: hunting your prey"] = "Держать открытой: охота на добычу"
+L["Kept up by a setting Inspect can't name yet"] = "Держится на экране из-за настройки, которую Осмотр пока не может назвать"
+
+-- Profiles.lua
+L["can't switch profiles in a fight: try again once it's over"] = "нельзя сменить профиль в бою: попробуйте снова, когда он закончится"
+
+-- Welcome.lua
+L["See Profile"] = "Открыть профиль"
+L["Select a profile that suits you."] = "Выберите подходящий вам профиль."
+
+-- CameraScriptsPage.lua
+L["End the music over %s s"] = "Остановить музыку за %s с"
+
+-- Options.lua
+L["(game: %s)"] = "(игра: %s)"
+L["While the fish camera is on and no bobber is out, right-clicking in the world casts Fishing again. Each cast still comes from your own click. While the bobber is out, right-click clicks it as usual (or reels in from anywhere: see below); in combat, with the loot window open or with your mouse on a player or NPC, right-click is left alone. (Meanwhile right-drag doesn't turn the camera: left-drag still does.)"] = "Пока камера рыбалки включена и поплавка нет, ПКМ по миру снова забрасывает удочку. Каждый заброс по-прежнему делается вашим собственным щелчком. Пока поплавок на воде, ПКМ нажимает на него как обычно (или вытягивает его откуда угодно: см. ниже); в бою, с открытым окном добычи или с курсором на игроке или НИП ПКМ не трогается. (В это время перетаскивание ПКМ не поворачивает камеру: ЛКМ — поворачивает.)"
+L["Right-click to reel in"] = "ПКМ, чтобы вытянуть"
+L["While the bobber is out, right-clicking anywhere in the world reels it in, with no need to find the bobber with the mouse (in gamepad mode, the cast button below does too). It uses the game's \"Interact with target\" key, so the game's soft targeting of objects is on while you fish, and your own setting comes back after. Reeling in before a bite ends the cast. Not in combat or with your mouse on a player or NPC. (While the bobber is out, right-drag doesn't turn the camera: left-drag still does.)"] = "Пока поплавок на воде, ПКМ в любом месте мира вытягивает его, не нужно искать поплавок курсором (в режиме геймпада — и кнопка заброса ниже). Используется клавиша игры \"Взаимодействие с целью\", поэтому мягкий выбор объектов в игре включён, пока вы рыбачите, а ваша настройка возвращается после. Если вытянуть до поклёвки, заброс закончится. Не в бою и не с курсором на игроке или НИП. (Пока поплавок на воде, перетаскивание ПКМ не поворачивает камеру: ЛКМ — поворачивает.)"
+L["The key you cast with reels in too"] = "Клавиша заброса тоже вытягивает"
+L["With Fishing on an action bar (the spell, or a macro that casts it), its key reels the bobber in while it's out, rather than casting again: press 1 to cast, then 1 again to reel in. Works on the game's own action bars. Uses the game's soft targeting of objects, as right-click does. Not in combat."] = "Если Рыбная ловля стоит на панели команд (само заклинание или макрос с ним), её клавиша вытягивает поплавок, пока он на воде, вместо нового заброса: 1 — забросить, ещё раз 1 — вытянуть. Работает на собственных панелях команд игры. Использует мягкий выбор объектов в игре, как и ПКМ. Не в бою."
+L["Show"] = "Показывать"
+L["Names and titles: a service NPC's name shows on its nameplate with its title under it. Titles only: just its title (<Repair Vendor>) where its name would be, unless its own row (or your target's) shows its name too. Beyond nameplate range, and in dungeons and raids, the game shows names and titles together."] = "Имена и титулы: имя служебного НИП видно на его индикаторе с титулом под ним. Только титулы: только его титул (<Оружейник>) на месте имени, если только его собственная строка (или строка вашей цели) не показывает и имя. За пределами дальности индикаторов, а также в подземельях и рейдах, игра показывает имена и титулы вместе."
+L["Names and titles"] = "Имена и титулы"
+L["Titles only"] = "Только титулы"
+L["Kinds"] = "Виды"
+L["Any other title, lore titles too (<Ranger-General of Silvermoon>)."] = "Любой другой титул, в том числе сюжетные (<Генерал следопытов Луносвета>)."
+L["NPCs whose title has one of these words in it: %s."] = "НИП, в титуле которых есть одно из этих слов: %s."
+L["Raise"] = "Поднять"
+L["Not your kill"] = "Не ваша добыча"
+L["An NPC someone outside your group hit first: killing it gives you no loot, experience or quest credit. Its name and health bar gray to start with."] = "НИП, которого первым ударил кто-то вне вашей группы: за его убийство вы не получите ни добычи, ни опыта, ни продвижения задания. Его имя и полоса здоровья изначально серые."
+L["Out of range"] = "Вне досягаемости"
+L["out of range"] = "вне досягаемости"
+L["This row: just those about that far from you. 11 and 28 yards are the game's interact distances; 40 asks a 40-yard spell on your action bars (harmful for enemies, helpful for friends), and with none there the row fits no unit past 28 yards. Out of range: none of the spells on your action bars reaches it (attacks for enemies, helpful spells for friends), as their buttons turn red."] = "Эта строка: только те, кто примерно на таком расстоянии от вас. 11 и 28 м — дистанции взаимодействия в игре; 40 — проверка заклинанием на 40 м с ваших панелей команд (вредоносным для врагов, полезным для союзников), а без такого строка не подходит ни к одному юниту дальше 28 м. Вне досягаемости: ни одно заклинание с ваших панелей команд до него не достаёт (атаки для врагов, полезные заклинания для союзников), как когда их кнопки краснеют."
+L["Any distance: all of them, near or far. Within or past 11, 28 or 40 yards: just those that far from you, say Any unit past 40 yards to fade the plates far off. 40 yards asks a 40-yard spell on your action bars; with none there, the row fits no unit past 28 yards. Out of range: none of the spells on your action bars reaches them, as their buttons turn red."] = "Любое расстояние: все, близко или далеко. Ближе или дальше 11, 28 или 40 м: только те, кто на таком расстоянии от вас, например «Любой юнит дальше 40 м», чтобы приглушить дальние индикаторы. 40 м — проверка заклинанием на 40 м с ваших панелей команд; без такого строка не подходит ни к одному юниту дальше 28 м. Вне досягаемости: ни одно заклинание с ваших панелей команд до них не достаёт, как когда их кнопки краснеют."
+L["Raise with a plate"] = "Поднять с индикатором"
+L["Reveal shows"] = "Показ включает"
+L["Everything"] = "Всё"
+L["Just the map"] = "Только карта"
+L["Map"] = "Карта"
+L["When a ping, a reveal below or Keep open's tracking brings the faded minimap up, only the map comes up with what's ticked here; the rest of the header stays faded. Hovering the minimap shows it all."] = "Когда сигнал, показ ниже или отслеживание «Держать открытой» выводит приглушённую миникарту, появляется только карта с тем, что отмечено здесь; остальная шапка остаётся приглушённой. При наведении на миникарту видно всё."
+L["The buffs this bar shows sit together in their order, centered on the bar, instead of inactive or faded ones leaving gaps. Edit Mode shows the game's own layout."] = "Эффекты на этой полосе стоят вместе по порядку, по центру полосы, а неактивные или приглушённые не оставляют пробелов. Режим редактирования показывает собственную раскладку игры."
+L["Picking a vendor's \"let me browse your goods\", the shop window opens where the talk was, on the other half of the screen from the NPC, instead of where the game puts it. A shop opened straight from a right click on the vendor opens where the game puts it. Drag it and it stays where you drop it until it closes."] = "Если выбрать у торговца \"Покажи мне свои товары\", окно магазина открывается там, где был разговор, на другой половине экрана от НИП, а не там, где его ставит игра. Магазин, открытый сразу щелчком ПКМ по торговцу, открывается там, где его ставит игра. Перетащите его, и оно останется там, где вы его отпустите, пока не закроется."
+L["Add all"] = "Добавить все"
+L["Fades every frame on this list that isn't added yet, as Add does for one."] = "Приглушает каждую ещё не добавленную рамку из этого списка, как «Добавить» делает для одной."
+L["Brings the letterbox bars in, or takes them out, in or out of CineMode. Turning CineMode on or off puts them back as the Letterbox page says."] = "Выводит полосы или убирает их, в CineMode и вне его. Включение или выключение CineMode возвращает их, как указано на странице «Полосы»."

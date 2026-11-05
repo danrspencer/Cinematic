@@ -584,7 +584,6 @@ L["Casting"] = "시전"
 L["Hide the Fishing cast bar"] = "낚시 시전 바 숨기기"
 L["Your cast bar stays hidden while it shows Fishing. Every other spell shows it as usual."] = "낚시를 시전하는 동안 시전 바를 숨깁니다. 다른 주문은 평소처럼 보입니다."
 L["Right-click to cast again"] = "오른쪽 클릭으로 다시 시전"
-L["While the fish camera is on and no bobber is out, right-clicking in the world casts Fishing again. Each cast still comes from your own click. While the bobber is out, right-click clicks it as usual; in combat, with the loot window open or with your mouse on a player or NPC, right-click is left alone. (Meanwhile right-drag doesn't turn the camera: left-drag still does.)"] = "낚시 카메라가 켜져 있고 찌가 없을 때, 세상을 오른쪽 클릭하면 낚시를 다시 시전합니다. 시전은 언제나 내 클릭으로만 일어납니다. 찌가 있을 때는 평소처럼 오른쪽 클릭으로 찌를 클릭합니다. 전투 중, 전리품 창이 열려 있을 때, 마우스가 플레이어나 NPC 위에 있을 때는 오른쪽 클릭을 건드리지 않습니다. (그동안 오른쪽 끌기로는 카메라가 돌지 않습니다. 왼쪽 끌기는 여전히 됩니다.)"
 L["Also the first cast, with a pole equipped"] = "낚싯대를 장착했다면 첫 시전도"
 L["With a fishing pole in your main hand, standing still, right-clicking in the world casts Fishing, so you don't have to start the first cast yourself. Not while your mouse is on a player, NPC or object (mailbox, corpse...): right-click works on them as usual. Swap the pole out to have right-click back everywhere."] = "주 장비에 낚싯대를 들고 가만히 서 있으면, 세상을 오른쪽 클릭해 낚시를 시전하므로 첫 시전을 직접 할 필요가 없습니다. 마우스가 플레이어, NPC, 물체(우편함, 시체...) 위에 있을 때는 제외하며, 평소처럼 오른쪽 클릭이 작동합니다. 낚싯대를 빼면 어디서나 오른쪽 클릭이 원래대로 돌아옵니다."
 L["Wait after a cast ends"] = "시전이 끝난 뒤 대기"
@@ -1708,7 +1707,6 @@ L["Another of the game's effects over the first, added on as light and cut by th
 L["Another thing that starts this scene: any one of its triggers starts it."] = "이 장면을 시작하는 또 다른 원인: 발동 조건 중 하나만 맞아도 시작합니다."
 L["Any"] = "아무거나"
 L["Any distance"] = "모든 거리"
-L["Any distance: all of them, near or far. Within or past 11, 28 or 40 yards: just those that far from you, say Any unit past 40 yards to fade the plates far off. 40 yards asks a 40-yard spell on your action bars; with none there, the row fits no unit past 28 yards."] = "모든 거리: 가깝든 멀든 전부. 11, 28, 40m 안 또는 밖: 그만큼 떨어진 것만. 예를 들어 '40m 밖의 모든 유닛'으로 먼 이름표를 흐리게 합니다. 40m는 행동 단축바에 있는 40m 주문으로 확인하며, 없으면 그 줄은 28m 밖의 유닛에는 맞지 않습니다."
 L["Any edge"] = "아무 가장자리"
 L["Any enemy attacking a healer (you too, if you're one): for a healer, who's after you or the other healers; for a tank, the ones to pull off them."] = "치유 전담을 공격하는 모든 적(내가 치유 전담이면 나도): 치유 전담에게는 나나 다른 치유 전담을 노리는 적, 방어 전담에게는 떼어 내야 할 적."
 L["Any enemy attacking a player who isn't a tank (you too, unless you're one): for a healer, who's in trouble; for a tank, the ones to taunt. A pet tanking doesn't count."] = "방어 전담이 아닌 플레이어를 공격하는 모든 적(내가 방어 전담이 아니면 나도): 치유 전담에게는 위험한 사람, 방어 전담에게는 도발할 적. 소환수가 방어하는 것은 치지 않습니다."
@@ -2139,7 +2137,6 @@ L["Every camera, made of small steps: rotate, tilt, zoom, sway, wait, and Togeth
 L["Every card's words bigger or smaller, for a big or wide screen (a card in a letterbox bar goes by the bar's height instead)."] = "모든 카드의 글자를 크거나 작게. 큰 화면이나 와이드 화면용(레터박스 바 안의 카드는 바 높이를 따름)."
 L["Every change made to Cinematic, newest first, as written when it was made (in English)."] = "Cinematic의 모든 변경 사항. 최신순이며 만들 당시 쓴 그대로(영어)입니다."
 L["Every fight"] = "모든 전투"
-L["Every kind of cast bar looks as this tab says until its own tab has Use default settings unticked."] = "모든 종류의 시전 바는 자체 탭에서 '기본 설정 사용'을 해제하기 전까지 이 탭대로 보입니다."
 L["Every moment that puts words on your screen, as a card: going into a fight and coming out of it, a boss, a new zone, what you did last time, the time of day, a place under attack, a duel, your death. A row for each: its tick, the style it uses and where it shows; click it for its settings. How they look: the Style tab. One card at a time: a more important one cuts in, a less important one waits for it."] = "화면에 글자를 띄우는 모든 순간을 카드로: 전투 시작과 끝, 우두머리, 새 지역, 지난번에 한 일, 시간대, 공격받는 장소, 결투, 죽음. 줄마다 체크, 사용할 스타일, 표시 위치가 있고, 클릭하면 설정이 열립니다. 모양: 스타일 탭. 카드는 한 번에 하나: 더 중요한 카드가 끼어들고, 덜 중요한 카드는 기다립니다."
 L["Every moment's emotes as they come."] = "모든 순간의 감정 표현 그대로."
 L["Every other plate, when no row above fits it: the game's own look to start with (no mark, its own colors). Give it a mark or an Also color to change them all."] = "위의 어떤 줄에도 맞지 않는 나머지 모든 이름표: 처음에는 게임의 모양(표시 없음, 고유 색). 표시나 '추가 색'을 주면 모두 바뀝니다."
@@ -2449,14 +2446,12 @@ L["How the bars at the top and bottom of the screen look and come in. When they 
 L["How the big button for the nearest quest's item looks. Turning it on: the Vision tab. Where it sits: the extra ability button's place in Edit Mode. Changes show at once (its size after a fight, if you're in one)."] = "가장 가까운 퀘스트 아이템의 큰 버튼 모양. 켜기: Vision 탭. 위치: 편집 모드의 추가 행동 버튼 자리. 바꾸면 곧바로 보입니다(크기는 전투 중이면 전투 후에)."
 L["How the card comes in."] = "카드가 나타나는 방식."
 L["How the card is set: a title card, a subtitle, a chapter line or a banner."] = "카드 형식: 타이틀 카드, 자막, 장 제목 줄 또는 배너."
-L["How the cast bars look: on nameplates, yours, your target's and focus's, and the bosses' and arena enemies'. The Default tab's settings are every bar's until its own tab has Use default settings unticked. All but the nameplates' keep the game's look until their tab's Restyle these bars is ticked. Whether the nameplates' show in CineMode: the Nameplates page's Plate parts grid. Changes show at once, here and on bars casting now."] = "시전 바의 모양: 이름표, 나, 대상과 주시 대상, 우두머리와 투기장 적. 기본 탭의 설정은 자체 탭에서 '기본 설정 사용'을 해제하기 전까지 모든 바에 적용됩니다. 이름표 것을 빼고는 그 탭의 '이 바 다시 꾸미기'에 체크하기 전까지 게임의 모양을 유지합니다. 이름표 시전 바가 CineMode에서 보일지는 이름표 페이지의 이름표 구성 요소 격자에서 정합니다. 바꾸면 여기와 지금 시전 중인 바에 곧바로 보입니다."
 L["How the dialogue looks, the \"Show the game's window\" link and the number keys."] = "대화의 모양, \"게임 창 보기\" 링크와 숫자 키."
 L["How the game world looks in CineMode (or over the normal UI, with Start in CineMode off on the main page): vignette, inn glow, weather and depth of field. The letterbox bars and the color grading have pages of their own (Letterbox, Tint). The UI isn't tinted. Names and nameplates are on the Nameplates page."] = "CineMode에서(또는 메인 페이지의 'CineMode로 시작'이 꺼져 있으면 일반 UI 위에) 게임 세상이 어떻게 보일지: 비네트, 여관 불빛, 날씨, 피사계 심도. 레터박스 바와 색 보정은 자체 페이지(레터박스, 색조)가 있습니다. UI에는 색조가 입혀지지 않습니다. 이름과 이름표는 이름표 페이지에 있습니다."
 L["How the game's tooltips look: their background, edge and words, names in their colors and the health bar. Which lines show and when: the Interface hub's Tooltips page."] = "게임 툴팁의 모양: 배경, 가장자리, 글자, 색 입힌 이름, 생명력 바. 어떤 줄을 언제 보일지: 인터페이스 허브의 툴팁 페이지."
 L["How the low-health edges look: the theme, our art and Blizzard's, the shadow and the effects. When they show: the Vision tab. Changes show at once in the preview."] = "낮은 생명력 가장자리의 모양: 테마, 우리 그림과 블리자드 그림, 그림자, 효과. 언제 보일지: Vision 탭. 바꾸면 미리 보기에 곧바로 보입니다."
 L["How the personal resource display under your character looks: its health and power bars, and your class resource. When the bars come up: the Interface hub's Resource Display page."] = "캐릭터 아래 개인 자원 표시의 모양: 생명력과 자원 바, 직업 자원. 바가 언제 나타날지: 인터페이스 허브의 자원 표시 페이지."
 L["How the quest item button looks."] = "퀘스트 아이템 버튼의 모양."
-L["How the raid frames look, the party's when the game draws them raid-style, and the arena's. The Default tab's settings are each group's until its own tab has Use default settings unticked. Which parts show: the Game Frames page's party and raid rows."] = "공격대 창, 게임이 공격대 방식으로 그리는 파티 창, 투기장 창의 모양. 기본 탭의 설정은 자체 탭에서 '기본 설정 사용'을 해제하기 전까지 각 그룹에 적용됩니다. 어떤 부분이 보일지: 게임 창 페이지의 파티와 공격대 줄."
 L["How the result shows: its card (with the words above), or a souls banner: VICTORY ACHIEVED or DEFEATED across the middle of the screen, who it was against under it."] = "결과 표시 방식: 카드(위 문구 포함), 또는 소울 배너: 화면 가운데를 가로지르는 VICTORY ACHIEVED 또는 DEFEATED, 그 아래 상대 이름."
 L["How the roll window looks."] = "주사위 창의 모양."
 L["How the rows are listed: Camera groups them by camera name, Scene by scene name. Either way a scene's rows stay together, in the order they're tried."] = "줄 나열 방식: 카메라는 카메라 이름별로, 장면은 장면 이름별로 묶습니다. 어느 쪽이든 한 장면의 줄은 시도되는 순서대로 함께 있습니다."
@@ -2466,7 +2461,6 @@ L["How thickly grass, flowers and stones grow on the ground."] = "땅에 풀, �
 L["How this card looks. It starts from a style (a subzone's, the zone's), each setting following it until you change it here, then the card's own until you put it back. Change the style itself on the Card Types tab, for every card using it. Changes play at once in the preview."] = "이 카드의 모양. 스타일(하위 지역 것, 지역 것)에서 시작하며, 각 설정은 여기서 바꾸기 전까지 스타일을 따르다가 바꾸면 되돌릴 때까지 카드 고유 값이 됩니다. 스타일 자체는 카드 종류 탭에서 바꾸며, 그 스타일을 쓰는 모든 카드에 적용됩니다. 바꾸면 미리 보기에서 곧바로 재생됩니다."
 L["How wide a line of speech from behind you can get before it wraps onto the next row, as a bubble overhead does."] = "머리 위 말풍선처럼, 뒤에서 들리는 대사 한 줄이 다음 줄로 넘어가기 전까지 얼마나 넓어질 수 있을지."
 L["How wide it is."] = "너비."
-L["How your player, target, focus, pet, target of target and party frames look. The Default tab's settings are every frame's until its own tab has Use default settings unticked. Which parts show: the Interface hub's Unit Frames page."] = "플레이어, 대상, 주시 대상, 소환수, 대상의 대상, 파티 프레임의 모양. 기본 탭의 설정은 자체 탭에서 '기본 설정 사용'을 해제하기 전까지 모든 프레임에 적용됩니다. 어떤 부분이 보일지: 인터페이스 허브의 Unit Frames 페이지."
 L["How your target, focus and the unit under the mouse stand out on the nameplates, for when no target frame shows them: a mark on each one's plate, a row for each in the grid, and its name, health bar or border in its mark's color (the row's Also color). When they show is the Target Indicator row's, on the Nameplates page's Cinematic plate parts grid. Changes show at once, here and on the plates."] = "대상 프레임이 보이지 않을 때 대상, 주시 대상, 마우스 아래 유닛이 이름표에서 어떻게 돋보일지: 각 이름표의 표시, 격자의 각 줄, 그리고 표시 색(줄의 '추가 색')으로 칠한 이름, 생명력 바 또는 테두리. 언제 보일지는 이름표 페이지 Cinematic 이름표 구성 요소 격자의 대상 표시기 줄이 정합니다. 바꾸면 여기와 이름표에 곧바로 보입니다."
 L["How:"] = "방식:"
 L["Icon"] = "아이콘"
@@ -2889,7 +2883,6 @@ L["Once you're there (after the loading screen, if there is one), the camera swi
 L["Once you've stood still for a while with the UI faded, or as soon as you go AFK, the camera slowly sweeps around your character. Moving stops it. What starts it, and how long you stand still first, is on the Scenes page."] = "UI가 흐려진 채 한동안 가만히 서 있거나 자리 비움이 되자마자 카메라가 캐릭터 주위를 천천히 돕니다. 움직이면 멈춥니다. 무엇으로 시작하는지, 얼마나 서 있어야 하는지는 장면 페이지에 있습니다."
 L["One line under the game's zone name, as it comes in at login, in place of a card. (The look above is the card's.)"] = "접속할 때 카드 대신 게임의 지역 이름 아래 한 줄로. (위 모양은 카드의 것입니다.)"
 L["One size at any distance. Unticked, a name grows and shrinks with its plate as its unit comes nearer or goes."] = "거리와 관계없이 같은 크기. 해제하면 유닛이 다가오거나 멀어질 때 이름이 이름표와 함께 커지고 작아집니다."
-L["One thing that starts this scene: an emote you do, a spell you cast, a buff on you, a place you're in, a moment (leveling up...), something you are (mounted...), or a key you press. Any one of a scene's triggers starts it."] = "이 장면을 시작하는 원인 하나: 내가 하는 감정 표현, 시전하는 주문, 나에게 걸린 강화 효과, 있는 장소, 순간(레벨 업...), 나의 상태(탈것 탑승...), 또는 누르는 키. 장면의 발동 조건 중 하나만 맞아도 시작합니다."
 L["Only after progress"] = "진행이 있은 뒤에만"
 L["Only after you use mana, for"] = "마나를 쓴 뒤에만, 지속 시간"
 L["Only in CineMode"] = "CineMode에서만"
@@ -3492,7 +3485,6 @@ L["The border's color. Picking one turns it to Custom."] = "테두리 색. 고�
 L["The boss's name as its fight starts, in place of Entering combat's card. Once a run for each boss."] = "전투가 시작될 때 전투 시작 카드 대신 우두머리 이름. 우두머리마다 한 번 진행에 한 번."
 L["The boss's name as you first come within about 28 yards of it, before the fight. A dungeon or raid boss is told by its level: a skull, or on retail two over yours."] = "전투 전, 우두머리에게 처음 약 28m 안으로 다가갈 때 그 이름. 던전이나 공격대 우두머리는 레벨로 알아봅니다: 해골, 또는 리테일에서는 내 레벨보다 2 높음."
 L["The boss's name as you first target it, before the fight. A dungeon or raid boss is told by its level: a skull, or on retail two over yours."] = "전투 전, 우두머리를 처음 대상으로 지정할 때 그 이름. 던전이나 공격대 우두머리는 레벨로 알아봅니다: 해골, 또는 리테일에서는 내 레벨보다 2 높음."
-L["The boxes the game puts under the minimap for a scenario's or quest's current step, such as a capture bar. Always shown to start with."] = "시나리오나 퀘스트의 현재 단계를 위해 게임이 미니맵 아래에 띄우는 상자(예: 점령 바). 처음에는 항상 표시됩니다."
 L["The bubble's color, for Custom."] = "사용자 지정일 때 말풍선 색."
 L["The bubble's tail sits on top, pointing up, instead of under it pointing down. (In a bubble only: not with no bubble behind the words.)"] = "말풍선 꼬리를 아래로 향하게 밑에 두는 대신 위로 향하게 위에 둡니다. (말풍선이 있을 때만: 글자 뒤에 말풍선이 없으면 아님.)"
 L["The bubble's words in a color of your own (the quest card keeps its ink)."] = "말풍선 글자를 직접 고른 색으로(퀘스트 카드는 원래 잉크 유지)."
@@ -3757,9 +3749,7 @@ L["This boss only: everyone starts at 0 as a boss is pulled, and when it dies it
 L["This camera can't be tested now: Cinematic or the camera is off (Camera Triggers page), or you're moving, flying or in a fight."] = "지금은 이 카메라를 시험할 수 없습니다: Cinematic이나 카메라가 꺼져 있거나(카메라 발동 조건 페이지), 움직이거나 비행 중이거나 전투 중입니다."
 L["This card's rules as they come."] = "이 카드의 원래 규칙."
 L["This client has no damage meter."] = "이 클라이언트에는 피해량 측정기가 없습니다."
-L["This frame's settings: Default's until you untick Use default settings."] = "이 창의 설정: '기본 설정 사용'을 해제하기 전까지 기본 값."
 L["This game version has none of these settings."] = "이 게임 버전에는 이 설정이 하나도 없습니다."
-L["This group's settings: Default's until you untick Use default settings."] = "이 그룹의 설정: '기본 설정 사용'을 해제하기 전까지 기본 값."
 L["This is from a newer Cinematic: update it to add this one."] = "더 새로운 Cinematic에서 온 것입니다: 이것을 추가하려면 업데이트하세요."
 L["This page's shared settings back on General."] = "이 페이지의 공유 설정을 일반 값으로 되돌리기."
 L["This row fits everywhere. The rest of the row keeps its ticks for when you untick this."] = "이 줄은 어디서나 맞습니다. 이 항목을 해제할 때를 위해 줄의 나머지 체크는 그대로 유지됩니다."
@@ -3769,7 +3759,6 @@ L["This row: just the enemies among them."] = "이 줄: 그중 적만."
 L["This row: just the friendly ones among them."] = "이 줄: 그중 아군만."
 L["This row: just the neutral ones among them."] = "이 줄: 그중 중립만."
 L["This row: just these among them: %s."] = "이 줄: 그중 다음만: %s."
-L["This row: just those about that far from you. 11 and 28 yards are the game's interact distances; 40 asks a 40-yard spell on your action bars (harmful for enemies, helpful for friends), and with none there the row fits no unit past 28 yards."] = "이 줄: 나에게서 대략 그만큼 떨어진 것만. 11m와 28m는 게임의 상호작용 거리이고, 40m는 행동 단축바의 40m 주문으로 확인합니다(적에게는 해로운 주문, 아군에게는 이로운 주문). 없으면 그 줄은 28m 밖의 유닛에는 맞지 않습니다."
 L["This sound's volume, next to the others."] = "다른 소리 대비 이 소리의 음량."
 L["This swing bar isn't in use"] = "이 평타 바는 쓰이지 않음"
 L["This tab's rules as they come: a sound as any other fight starts and one as it ends."] = "이 탭의 원래 규칙: 다른 전투가 시작될 때 소리 하나, 끝날 때 하나."
@@ -4113,8 +4102,6 @@ L["Your own profile"] = "나만의 프로필"
 L["Your own profile. Right-click it, then Description to say what it's for."] = "나만의 프로필. 오른쪽 클릭한 뒤 '설명'으로 용도를 적으세요."
 L["Your own settings, as they were before you picked a preset."] = "프리셋을 고르기 전의 내 설정."
 L["Your own words."] = "직접 쓴 글자."
-L["Your party uses its own frames, not raid-style ones: they follow the Unit frames page's Party tab."] = "파티가 공격대 방식이 아닌 자체 창을 씁니다: 유닛 프레임 페이지의 파티 탭을 따릅니다."
-L["Your party uses raid-style frames (Edit Mode's party frames setting): they follow the Raid frames page, not this tab."] = "파티가 공격대 방식 창(편집 모드의 파티 창 설정)을 씁니다: 이 탭이 아니라 공격대 창 페이지를 따릅니다."
 L["Your personal resource display (the health bar under your character) fades in as your health drops."] = "생명력이 줄면 개인 자원 표시(캐릭터 아래 생명력 바)가 나타납니다."
 L["Your pet is unhappy"] = "소환수가 불만스러움"
 L["Your place"] = "내 순위"
@@ -4436,7 +4423,6 @@ L["The quest shows at the top of the quest tracker, not in its own place under e
 
 -- Options.lua: Quest Vision
 L["Shop window goes there too"] = "상점 창도 그곳으로"
-L["Picking a vendor's \"let me browse your goods\", the shop window opens where the talk was, on the other half of the screen from the NPC, instead of where the game puts it. A vendor with nothing else to say opens it on the other half from where you clicked them. Drag it and it stays where you drop it until it closes."] = "상인에게서 「물건을 보여 주세요」를 고르면, 게임이 놓는 자리 대신 대화가 있던 곳, 곧 NPC와 반대쪽 화면 절반에 상점 창이 열립니다. 다른 할 말이 없는 상인은 클릭한 위치와 반대쪽 절반에 엽니다. 끌어 옮기면 창이 닫힐 때까지 놓은 자리에 머뭅니다."
 
 -- ProfileChoices.lua
 L["A light touch that leaves your UI exactly as it is. A color tint, vignette and weather set the mood, and only the quiet extras join in: the camera sweeps along on flights and teleports, a portal opens as you hearth, and small cards mark your big moments, your duels and the players who buff or emote at you."] = "UI를 그대로 두는 가벼운 손길. 색조, 비네트와 날씨가 분위기를 만들고, 조용한 추가 기능만 함께합니다: 비행과 순간이동 때 카메라가 따라가고, 귀환석을 쓰면 차원문이 열리며, 작은 카드가 중요한 순간, 결투, 그리고 버프나 감정 표현을 해 준 플레이어를 기록합니다."
@@ -4452,3 +4438,161 @@ L["your cursor is back to normal (Cursor Hide off till you accept its warning ag
 -- Changelog.lua: What's new
 L["Cursor Hide (experimental)"] = "커서 숨기기 (실험적)"
 L["In CineMode, your cursor gets out of the way: it shrinks to a tiny corner, vanishes once the mouse has been still a while, or both. Moving the mouse brings it back. It's experimental: accept the warning on its page to turn it on, and /cine reset cursor puts your cursor back if it ever gets stuck. The Cinema profile uses it during flights, at vistas and while you're AFK."] = "CineMode에서 커서가 비켜 줍니다: 아주 작은 모서리로 줄거나, 마우스가 한동안 멈추면 사라지거나, 둘 다. 마우스를 움직이면 돌아옵니다. 실험적인 기능입니다: 켜려면 페이지에서 경고를 수락하세요. 커서가 멈추면 /cine reset cursor로 되돌릴 수 있습니다. Cinema 프로필은 비행 중, 경치 좋은 곳, 자리 비움일 때 사용합니다."
+
+-- Core.lua, Options.lua
+L["Toggle letterbox bars"] = "레터박스 켜기/끄기"
+
+-- Frames.lua, Options.lua
+L["Addon buttons"] = "애드온 버튼"
+L["Coordinates"] = "좌표"
+
+-- Frames.lua
+L["Addons' buttons around the minimap's edge, Cinematic's own too. Untick it to hide them in CineMode even while the minimap is up. Hovering the minimap brings them up with the map."] = "미니맵 가장자리에 있는 애드온 버튼들, Cinematic 버튼도 포함됩니다. 체크를 해제하면 미니맵이 보이는 동안에도 CineMode에서 숨깁니다. 미니맵에 마우스를 올리면 지도와 함께 나타납니다."
+L["The map coordinates by the minimap. Untick it to hide them in CineMode even while the minimap is up. Hovering the minimap brings them up with the map."] = "미니맵 옆의 지도 좌표입니다. 체크를 해제하면 미니맵이 보이는 동안에도 CineMode에서 숨깁니다. 미니맵에 마우스를 올리면 지도와 함께 나타납니다."
+L["The boxes the game puts under the minimap for a scenario's or quest's current step, such as a capture bar. They come and go with the minimap until you change their ticks, and hovering the minimap brings them up with the map."] = "시나리오나 퀘스트의 현재 단계를 위해 게임이 미니맵 아래에 두는 상자들입니다(예: 점령 바). 체크를 바꾸기 전까지는 미니맵과 함께 나타나고 사라지며, 미니맵에 마우스를 올리면 지도와 함께 나타납니다."
+L["You moved a swing timer bar, so \"Ranged bar on top\" is now off for %s and the bars stay where you put them."] = "평타 타이머 바를 옮겨서 %s의 \"원거리 바를 위로\"가 이제 꺼졌고, 바는 놓은 자리에 그대로 있습니다."
+
+-- Speech.lua
+L["Speech from behind you\nDrag to move, right-click to reset"] = "뒤에서 들리는 말\n드래그로 이동, 오른쪽 클릭으로 초기화"
+
+-- Effects.lua, Options.lua
+L["Service NPCs"] = "서비스 NPC"
+
+-- Effects.lua
+L[" Friendly and neutral NPCs with a title under their name (<Repair Vendor>, <Innkeeper>...), whatever their own row says: Kinds picks which, Show whether their names show or just their titles. Beyond nameplate range, and in dungeons and raids, the game shows the names of NPCs with something for you (vendors, quest givers...), titles included."] = " 이름 아래에 직함이 있는 우호적·중립 NPC(<방어구 제작자>, <여관주인>...)로, 그들 자신의 줄이 뭐라고 하든 적용됩니다. 종류에서 어떤 것인지 고르고, 표시에서 이름을 보일지 직함만 보일지 고릅니다. 이름표 범위 밖과 던전·공격대에서는 게임이 당신에게 볼일이 있는 NPC(상인, 퀘스트 제공자...)의 이름을 직함과 함께 보여줍니다."
+L["letterbox bars on"] = "레터박스 켜짐"
+L["letterbox bars off"] = "레터박스 꺼짐"
+
+-- PlateGuild.lua
+L["Vendors"] = "상인"
+L["vendor,merchant,goods,supplies,supplier,provisions,provisioner,quartermaster,reagents,trader,armorer,weaponsmith,bowyer,gunsmith,butcher,baker,food,drink,wine"] = "상인,잡화,물품,보급,공급,병참장교,재료,무기,방어구,활,총기,정육,제빵,음식,음료,포도주"
+L["Repair"] = "수리"
+L["repair"] = "수리"
+L["Trainers"] = "기술 전문가"
+L["trainer"] = "전문가,훈련사,교관"
+L["Professions"] = "전문 기술"
+L["fish,cook,first aid,alchem,herbal,mining,miner,skinn,blacksmith,leatherwork,tailor,enchant,engineer,jewelcraft,inscription,scribe,archaeolog"] = "낚시,요리,응급치료,연금술,약초,채광,광부,무두질,대장,가죽세공,재봉,마법부여,기계공학,보석세공,주문각인,고고학"
+L["Flight masters"] = "비행 조련사"
+L["flight,gryphon master,wind rider master,hippogryph master,bat handler,dragonhawk master"] = "비행,그리폰,와이번,히포그리프,박쥐,용매"
+L["Innkeepers"] = "여관주인"
+L["innkeeper"] = "여관"
+L["Bankers and auctioneers"] = "은행원과 경매인"
+L["banker,auctioneer,bank,auction"] = "은행,경매"
+L["Stable masters"] = "야수 관리인"
+L["stable"] = "야수 관리인,마구간"
+L["Other titles"] = "다른 직함"
+
+-- CustomTriggers.lua
+L["Interaction"] = "상호작용"
+L["At a mailbox"] = "우체통 앞"
+L["At the bank"] = "은행"
+L["At the auction house"] = "경매장"
+L["World map open"] = "세계 지도 열림"
+L["Talking to an NPC (chat, vendor, trainer)"] = "NPC와 대화 중 (대화, 상인, 기술 전문가)"
+
+-- CameraTriggerEditor.lua
+L["Its window closes"] = "그 창이 닫힘"
+L["One thing that starts this scene: an emote you do, a spell you cast, a buff on you, a place you're in, a moment (leveling up...), something you are (mounted...), a window you open (the mailbox, bank, auction house, map or an NPC's), or a key you press. Any one of a scene's triggers starts it."] = "이 장면을 시작하는 것 하나: 당신이 하는 감정 표현, 시전하는 주문, 당신에게 걸린 강화 효과, 당신이 있는 장소, 순간(레벨 업...), 당신의 상태(탈것 탑승...), 여는 창(우체통, 은행, 경매장, 지도 또는 NPC 창), 또는 누르는 키. 장면의 발동 조건 중 아무거나 하나로 시작됩니다."
+
+-- QuestTalk.lua
+L["Quest Talk's replies\nDrag to move, right-click to reset"] = "Quest Talk 답변\n드래그로 이동, 오른쪽 클릭으로 초기화"
+
+-- LetterboxStyle.lua
+L["New places"] = "새로운 장소"
+L["Show bars on discovering a new place"] = "새로운 장소 발견 시 레터박스"
+L["The bars come in for a few seconds when you find a place new to you: a zone you're in for the first time, a subzone the game says you discovered, a dungeon or raid. In or out of CineMode, with everything else off too. Not in fights, if the bars are off in combat."] = "처음 가 보는 장소를 찾으면 레터박스가 몇 초 동안 들어옵니다: 처음 와 본 지역, 게임이 발견했다고 알려 주는 하위 지역, 던전 또는 공격대. CineMode 안팎 모두, 다른 모든 것이 꺼져 있어도 됩니다. 전투 중 레터박스가 꺼져 있다면 전투 중에는 아닙니다."
+L["How long the bars stay for a new place, not counting their coming in and going. Another new place meanwhile starts the count again."] = "새로운 장소에서 레터박스가 머무는 시간으로, 들어오고 나가는 시간은 빼고 셉니다. 그동안 또 다른 새 장소를 찾으면 다시 셉니다."
+
+-- PlateCastStyle.lua
+L["How the cast bars look: on nameplates, yours, your target's and focus's, and the bosses' and arena enemies'. Each tab's These bars picks its look: the game's (all but the nameplates' start so), the Default tab's, or its own. Whether the nameplates' show in CineMode: the Nameplates page's Plate parts grid. Changes show at once, here and on bars casting now."] = "시전 바의 모습: 이름표 위, 당신, 대상과 주시 대상, 그리고 우두머리와 투기장 적의 시전 바. 각 탭의 '이 바'에서 모습을 고릅니다: 게임의 모습(이름표 것을 뺀 모두가 이렇게 시작), 기본 탭의 모습, 또는 자체 모습. 이름표 시전 바가 CineMode에서 보일지는 이름표 페이지의 이름표 구성 요소 표에서 정합니다. 바뀐 내용은 여기와 지금 시전 중인 바에 바로 보입니다."
+L["These cast bars: the game's look, the Default tab's, or their own, as These bars says."] = "이 시전 바: '이 바'에 따라 게임의 모습, 기본 탭의 모습, 또는 자체 모습."
+L["These bars:"] = "이 바:"
+L["The game's look"] = "게임의 모습"
+L["Cinematic leaves them alone. Their size stays the game's either way (yours is sized in Edit Mode)."] = "Cinematic이 손대지 않습니다. 크기는 어느 쪽이든 게임 그대로입니다(당신의 것은 편집 모드에서 크기를 정합니다)."
+L["They look as the Default tab says."] = "기본 탭에 따른 모습입니다."
+L["Their own look"] = "자체 모습"
+L["They look as the settings below say. These start as the Default tab's, and are kept while you pick another choice."] = "아래 설정에 따른 모습입니다. 이 설정은 기본 탭의 것으로 시작하며, 다른 선택을 고르는 동안에도 유지됩니다."
+L["How these cast bars look: the game's own, the Default tab's, or this tab's own settings."] = "이 시전 바의 모습: 게임 자체의 모습, 기본 탭의 모습, 또는 이 탭의 자체 설정."
+L["Every kind of cast bar looks as this tab says while its own tab picks Same as the Default tab."] = "각 시전 바 종류는 자기 탭이 '기본 탭과 같게'를 고르는 동안 이 탭에 따른 모습입니다."
+
+-- PlateCastStyle.lua, UnitStyle.lua, RaidStyle.lua, Options.lua
+L["Same as the Default tab"] = "기본 탭과 같게"
+
+-- UnitStyle.lua
+L["How your player, target, focus, pet, target of target and party frames look. The Default tab's settings are every frame's until its own tab has Same as the Default tab unticked. Which parts show: the Interface hub's Unit Frames page."] = "플레이어, 대상, 주시 대상, 소환수, 대상의 대상, 파티 프레임의 모습입니다. 기본 탭의 설정은 각 프레임의 탭에서 '기본 탭과 같게'를 해제하기 전까지 모든 프레임에 적용됩니다. 어떤 부분이 보일지는 인터페이스 메뉴의 유닛 프레임 페이지에서 정합니다."
+L["This frame's settings: Default's until you untick Same as the Default tab."] = "이 프레임의 설정: '기본 탭과 같게'를 해제할 때까지 기본 탭의 설정입니다."
+L["Your party uses raid-style frames (Edit Mode's party frames setting): they follow the Raid Frames page, not this tab."] = "파티가 공격대 스타일 프레임을 씁니다(편집 모드의 파티 프레임 설정): 이 탭이 아니라 공격대 창 페이지를 따릅니다."
+L["Every frame looks as this tab says while its own tab has Same as the Default tab ticked."] = "각 프레임은 자기 탭에 '기본 탭과 같게'가 체크된 동안 이 탭에 따른 모습입니다."
+
+-- RaidStyle.lua
+L["How the raid frames look, the party's when the game draws them raid-style, and the arena's. The Default tab's settings are each group's until its own tab has Same as the Default tab unticked. Which parts show: the Game Frames page's party and raid rows."] = "공격대 창, 게임이 공격대 스타일로 그릴 때의 파티 프레임, 투기장 프레임의 모습입니다. 기본 탭의 설정은 각 그룹의 탭에서 '기본 탭과 같게'를 해제하기 전까지 모든 그룹에 적용됩니다. 어떤 부분이 보일지는 게임 프레임 페이지의 파티와 공격대 줄에서 정합니다."
+L["This group's settings: Default's until you untick Same as the Default tab."] = "이 그룹의 설정: '기본 탭과 같게'를 해제할 때까지 기본 탭의 설정입니다."
+L["Your party uses its own frames, not raid-style ones: they follow the Unit Frames page's Party tab."] = "파티가 공격대 스타일이 아닌 자체 프레임을 씁니다: 유닛 프레임 페이지의 파티 탭을 따릅니다."
+L["Every group looks as this tab says while its own tab has Same as the Default tab ticked."] = "각 그룹은 자기 탭에 '기본 탭과 같게'가 체크된 동안 이 탭에 따른 모습입니다."
+
+-- EmoteVision.lua
+L["Emote Vision\nDrag to move, right-click to reset"] = "Emote Vision\n드래그로 이동, 오른쪽 클릭으로 초기화"
+L["is in your guild"] = "당신 길드원입니다"
+L["grouped with you before"] = "전에 당신과 파티를 했습니다"
+L["is looking back at you"] = "당신을 마주 보고 있습니다"
+L["Campfire"] = "모닥불"
+L["rest a while by the fire"] = "불가에서 잠시 쉬어 가세요"
+L["Buffs:"] = "강화 효과:"
+L["Ignore buffs from your group"] = "파티의 강화 효과 무시"
+L["Buffs from people in your party or raid bring up no card: only strangers' do."] = "파티나 공격대원의 강화 효과는 카드를 띄우지 않습니다: 모르는 사람의 것만 띄웁니다."
+
+-- Slash.lua
+L["%s is your own profile: it has nothing to reset to until you Save it on the Profiles page"] = "%s은(는) 당신의 프로필입니다: 프로필 페이지에서 저장하기 전까지는 초기화할 상태가 없습니다"
+
+-- Why.lua
+L["Keep open: herb, mineral or treasure tracking is on"] = "계속 열기: 약초, 광물 또는 보물 추적이 켜져 있음"
+L["Keep open: creature or fish tracking is on"] = "계속 열기: 생물 또는 물고기 추적이 켜져 있음"
+L["Reveal: the minimap shows %s"] = "표시: 미니맵에 %s이(가) 보임"
+L["Reveal: something you ticked is on the minimap"] = "표시: 체크한 것이 미니맵에 있음"
+L["It was up as this fight started, so it stays up through it"] = "이 전투가 시작될 때 보이고 있었으므로 전투 내내 보입니다"
+L["Keep open: a tracked quest, for a while after progress on it"] = "계속 열기: 추적 중인 퀘스트, 진행 후 한동안"
+L["Keep open: hunting your prey"] = "계속 열기: 사냥감 추적 중"
+L["Kept up by a setting Inspect can't name yet"] = "살펴보기가 아직 이름을 알 수 없는 설정 때문에 보입니다"
+
+-- Profiles.lua
+L["can't switch profiles in a fight: try again once it's over"] = "전투 중에는 프로필을 바꿀 수 없습니다: 끝난 뒤 다시 시도하세요"
+
+-- Welcome.lua
+L["See Profile"] = "프로필 보기"
+L["Select a profile that suits you."] = "마음에 드는 프로필을 고르세요."
+
+-- CameraScriptsPage.lua
+L["End the music over %s s"] = "%s초에 걸쳐 음악 끝내기"
+
+-- Options.lua
+L["(game: %s)"] = "(게임: %s)"
+L["While the fish camera is on and no bobber is out, right-clicking in the world casts Fishing again. Each cast still comes from your own click. While the bobber is out, right-click clicks it as usual (or reels in from anywhere: see below); in combat, with the loot window open or with your mouse on a player or NPC, right-click is left alone. (Meanwhile right-drag doesn't turn the camera: left-drag still does.)"] = "낚시 카메라가 켜져 있고 찌가 없는 동안, 세계를 오른쪽 클릭하면 낚시를 다시 던집니다. 던지기는 여전히 매번 당신의 클릭으로 이루어집니다. 찌가 떠 있는 동안 오른쪽 클릭은 평소처럼 찌를 클릭합니다(또는 어디서든 건져 올립니다: 아래 참고). 전투 중, 전리품 창이 열려 있을 때, 마우스가 플레이어나 NPC 위에 있을 때는 오른쪽 클릭을 건드리지 않습니다. (그동안 오른쪽 드래그로는 카메라가 돌지 않습니다: 왼쪽 드래그는 됩니다.)"
+L["Right-click to reel in"] = "오른쪽 클릭으로 건지기"
+L["While the bobber is out, right-clicking anywhere in the world reels it in, with no need to find the bobber with the mouse (in gamepad mode, the cast button below does too). It uses the game's \"Interact with target\" key, so the game's soft targeting of objects is on while you fish, and your own setting comes back after. Reeling in before a bite ends the cast. Not in combat or with your mouse on a player or NPC. (While the bobber is out, right-drag doesn't turn the camera: left-drag still does.)"] = "찌가 떠 있는 동안 세계 어디든 오른쪽 클릭하면 찌를 건져 올립니다. 마우스로 찌를 찾을 필요가 없습니다(게임패드 모드에서는 아래의 던지기 버튼도 마찬가지). 게임의 \"대상과 상호작용\" 키를 쓰므로 낚시하는 동안 게임의 사물 소프트 타겟팅이 켜지고, 끝나면 당신의 설정이 돌아옵니다. 입질 전에 건지면 던지기가 끝납니다. 전투 중이거나 마우스가 플레이어나 NPC 위에 있을 때는 아닙니다. (찌가 떠 있는 동안 오른쪽 드래그로는 카메라가 돌지 않습니다: 왼쪽 드래그는 됩니다.)"
+L["The key you cast with reels in too"] = "던진 키로도 건지기"
+L["With Fishing on an action bar (the spell, or a macro that casts it), its key reels the bobber in while it's out, rather than casting again: press 1 to cast, then 1 again to reel in. Works on the game's own action bars. Uses the game's soft targeting of objects, as right-click does. Not in combat."] = "행동 단축바에 낚시(주문 자체나 그것을 시전하는 매크로)가 있으면, 찌가 떠 있는 동안 그 키가 다시 던지는 대신 찌를 건져 올립니다: 1로 던지고 다시 1로 건집니다. 게임 자체의 행동 단축바에서 작동합니다. 오른쪽 클릭처럼 게임의 사물 소프트 타겟팅을 씁니다. 전투 중에는 아닙니다."
+L["Show"] = "표시"
+L["Names and titles: a service NPC's name shows on its nameplate with its title under it. Titles only: just its title (<Repair Vendor>) where its name would be, unless its own row (or your target's) shows its name too. Beyond nameplate range, and in dungeons and raids, the game shows names and titles together."] = "이름과 직함: 서비스 NPC의 이름이 이름표에 보이고 그 아래에 직함이 보입니다. 직함만: 자기 줄(또는 대상의 줄)이 이름도 보여주지 않는 한, 이름 자리에 직함(<방어구 제작자>)만 보입니다. 이름표 범위 밖과 던전·공격대에서는 게임이 이름과 직함을 함께 보여줍니다."
+L["Names and titles"] = "이름과 직함"
+L["Titles only"] = "직함만"
+L["Kinds"] = "종류"
+L["Any other title, lore titles too (<Ranger-General of Silvermoon>)."] = "그 밖의 모든 직함, 설정상 직함도 포함(<실버문의 순찰대장>)."
+L["NPCs whose title has one of these words in it: %s."] = "직함에 다음 단어 중 하나가 든 NPC: %s."
+L["Raise"] = "올리기"
+L["Not your kill"] = "내 몫 아님"
+L["An NPC someone outside your group hit first: killing it gives you no loot, experience or quest credit. Its name and health bar gray to start with."] = "당신 파티 밖의 누군가가 먼저 공격한 NPC: 죽여도 전리품, 경험치, 퀘스트 진행을 얻지 못합니다. 이름과 생명력 바는 처음부터 회색입니다."
+L["Out of range"] = "사거리 밖"
+L["out of range"] = "사거리 밖"
+L["This row: just those about that far from you. 11 and 28 yards are the game's interact distances; 40 asks a 40-yard spell on your action bars (harmful for enemies, helpful for friends), and with none there the row fits no unit past 28 yards. Out of range: none of the spells on your action bars reaches it (attacks for enemies, helpful spells for friends), as their buttons turn red."] = "이 줄: 당신에게서 대략 그만큼 떨어진 것만. 11m와 28m는 게임의 상호작용 거리이고, 40은 행동 단축바의 40m 주문(적에게는 해로운 주문, 아군에게는 이로운 주문)에 물어보며, 그런 주문이 없으면 이 줄은 28m 밖의 어떤 유닛에도 맞지 않습니다. 사거리 밖: 행동 단축바의 어떤 주문도 닿지 않는 경우(적에게는 공격, 아군에게는 이로운 주문)로, 버튼이 빨갛게 될 때와 같습니다."
+L["Any distance: all of them, near or far. Within or past 11, 28 or 40 yards: just those that far from you, say Any unit past 40 yards to fade the plates far off. 40 yards asks a 40-yard spell on your action bars; with none there, the row fits no unit past 28 yards. Out of range: none of the spells on your action bars reaches them, as their buttons turn red."] = "모든 거리: 가깝든 멀든 전부. 11, 28, 40m 이내 또는 밖: 그만큼 떨어진 것만. 예를 들어 '40m 밖의 모든 유닛'으로 먼 이름표를 흐리게 합니다. 40m는 행동 단축바의 40m 주문에 물어보며, 그런 주문이 없으면 이 줄은 28m 밖의 어떤 유닛에도 맞지 않습니다. 사거리 밖: 행동 단축바의 어떤 주문도 닿지 않는 경우로, 버튼이 빨갛게 될 때와 같습니다."
+L["Raise with a plate"] = "이름표와 함께 올리기"
+L["Reveal shows"] = "표시 시 보이는 것"
+L["Everything"] = "전부"
+L["Just the map"] = "지도만"
+L["Map"] = "지도"
+L["When a ping, a reveal below or Keep open's tracking brings the faded minimap up, only the map comes up with what's ticked here; the rest of the header stays faded. Hovering the minimap shows it all."] = "알림, 아래의 표시 또는 계속 열기의 추적이 흐려진 미니맵을 띄울 때, 여기서 체크한 것과 함께 지도만 나타납니다. 나머지 머리 부분은 흐린 채로 남습니다. 미니맵에 마우스를 올리면 전부 보입니다."
+L["The buffs this bar shows sit together in their order, centered on the bar, instead of inactive or faded ones leaving gaps. Edit Mode shows the game's own layout."] = "이 바가 보여주는 강화 효과는 순서대로 모여 바 가운데에 놓이고, 비활성이거나 흐려진 것이 빈자리를 남기지 않습니다. 편집 모드에서는 게임 자체의 배치가 보입니다."
+L["Picking a vendor's \"let me browse your goods\", the shop window opens where the talk was, on the other half of the screen from the NPC, instead of where the game puts it. A shop opened straight from a right click on the vendor opens where the game puts it. Drag it and it stays where you drop it until it closes."] = "상인에게서 \"물건을 보여 주세요\"를 고르면, 게임이 두는 자리 대신 대화하던 자리, NPC 반대쪽 화면 절반에 상점 창이 열립니다. 상인을 오른쪽 클릭해 바로 연 상점은 게임이 두는 자리에 열립니다. 창을 드래그하면 닫힐 때까지 놓은 자리에 있습니다."
+L["Add all"] = "모두 추가"
+L["Fades every frame on this list that isn't added yet, as Add does for one."] = "이 목록에서 아직 추가하지 않은 모든 창을 흐리게 합니다. 하나에 대해 추가가 하는 것과 같습니다."
+L["Brings the letterbox bars in, or takes them out, in or out of CineMode. Turning CineMode on or off puts them back as the Letterbox page says."] = "CineMode 안팎에서 레터박스를 들여오거나 내보냅니다. CineMode를 켜거나 끄면 레터박스 페이지 설정대로 돌아갑니다."

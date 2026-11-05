@@ -584,7 +584,6 @@ L["Casting"] = "抛竿"
 L["Hide the Fishing cast bar"] = "隐藏钓鱼施法条"
 L["Your cast bar stays hidden while it shows Fishing. Every other spell shows it as usual."] = "施法条显示钓鱼时保持隐藏。其他所有法术照常显示。"
 L["Right-click to cast again"] = "右键点击再次抛竿"
-L["While the fish camera is on and no bobber is out, right-clicking in the world casts Fishing again. Each cast still comes from your own click. While the bobber is out, right-click clicks it as usual; in combat, with the loot window open or with your mouse on a player or NPC, right-click is left alone. (Meanwhile right-drag doesn't turn the camera: left-drag still does.)"] = "钓鱼镜头开启且没有鱼漂时，在世界中右键点击会再次施放钓鱼。每次抛竿仍然来自你自己的点击。有鱼漂时，右键点击照常点击鱼漂；在战斗中、拾取窗口打开时或鼠标指向玩家或NPC时，右键点击不做处理。（在此期间，按住右键拖动不会转动镜头：按住左键拖动仍然可以。）"
 L["Also the first cast, with a pole equipped"] = "装备鱼竿时也包括第一次抛竿"
 L["With a fishing pole in your main hand, standing still, right-clicking in the world casts Fishing, so you don't have to start the first cast yourself. Not while your mouse is on a player, NPC or object (mailbox, corpse...): right-click works on them as usual. Swap the pole out to have right-click back everywhere."] = "主手装备鱼竿并站着不动时，在世界中右键点击会施放钓鱼，这样你就不必自己开始第一次抛竿。鼠标指向玩家、NPC或物体（邮箱、尸体……）时除外：右键点击对它们照常有效。换下鱼竿即可让右键点击在所有地方恢复正常。"
 L["Wait after a cast ends"] = "抛竿结束后的等待"
@@ -1708,7 +1707,6 @@ L["Another of the game's effects over the first, added on as light and cut by th
 L["Another thing that starts this scene: any one of its triggers starts it."] = "启动此场景的另一个条件：任一触发条件都能启动它。"
 L["Any"] = "任何"
 L["Any distance"] = "任何距离"
-L["Any distance: all of them, near or far. Within or past 11, 28 or 40 yards: just those that far from you, say Any unit past 40 yards to fade the plates far off. 40 yards asks a 40-yard spell on your action bars; with none there, the row fits no unit past 28 yards."] = "任何距离：所有单位，无论远近。11、28或40码以内或以外：只针对离你那么远的单位，例如“40码外的任何单位”可淡出远处的姓名板。40码需要你的动作条上有一个40码的法术；如果没有，该行不适用于28码外的任何单位。"
 L["Any edge"] = "任何边缘"
 L["Any enemy attacking a healer (you too, if you're one): for a healer, who's after you or the other healers; for a tank, the ones to pull off them."] = "攻击治疗者（如果你是治疗者，也包括你）的任何敌人：对治疗者来说，是追着你或其他治疗者的敌人；对坦克来说，是要从他们身上拉走的敌人。"
 L["Any enemy attacking a player who isn't a tank (you too, unless you're one): for a healer, who's in trouble; for a tank, the ones to taunt. A pet tanking doesn't count."] = "攻击非坦克玩家（除非你是坦克，否则也包括你）的任何敌人：对治疗者来说，是陷入危险的人；对坦克来说，是要嘲讽的敌人。宠物坦怪不算。"
@@ -2139,7 +2137,6 @@ L["Every camera, made of small steps: rotate, tilt, zoom, sway, wait, and Togeth
 L["Every card's words bigger or smaller, for a big or wide screen (a card in a letterbox bar goes by the bar's height instead)."] = "所有卡片的文字放大或缩小，适用于大屏或宽屏（位于宽银幕黑边中的卡片则按黑边的高度）。"
 L["Every change made to Cinematic, newest first, as written when it was made (in English)."] = "Cinematic的每一次更改，最新的在前，保持当时的原文（英文）。"
 L["Every fight"] = "每场战斗"
-L["Every kind of cast bar looks as this tab says until its own tab has Use default settings unticked."] = "每种施法条的外观都按此标签页设置，除非其自己的标签页取消勾选了“使用默认设置”。"
 L["Every moment that puts words on your screen, as a card: going into a fight and coming out of it, a boss, a new zone, what you did last time, the time of day, a place under attack, a duel, your death. A row for each: its tick, the style it uses and where it shows; click it for its settings. How they look: the Style tab. One card at a time: a more important one cuts in, a less important one waits for it."] = "每个在你屏幕上显示文字的时刻，都以卡片形式出现：进入战斗和脱离战斗、首领、新区域、你上次做了什么、时段、某地遭到攻击、决斗、你的死亡。每个时刻一行：其勾选框、使用的风格和显示位置；点击可打开其设置。外观：风格标签页。一次只显示一张卡片：更重要的会插队，次要的会等待。"
 L["Every moment's emotes as they come."] = "每个时刻的表情按原样。"
 L["Every other plate, when no row above fits it: the game's own look to start with (no mark, its own colors). Give it a mark or an Also color to change them all."] = "上方没有任何行符合的其他所有姓名板：起初为游戏自身的外观（没有标记，使用其自身的颜色）。给它一个标记或“附加”颜色即可全部更改。"
@@ -2449,14 +2446,12 @@ L["How the bars at the top and bottom of the screen look and come in. When they 
 L["How the big button for the nearest quest's item looks. Turning it on: the Vision tab. Where it sits: the extra ability button's place in Edit Mode. Changes show at once (its size after a fight, if you're in one)."] = "最近任务物品的大按钮的外观。开启它：Vision 标签页。位置：编辑模式中额外技能按钮的位置。更改会立即显示（如果你在战斗中，其大小在战斗后改变）。"
 L["How the card comes in."] = "卡片如何出现。"
 L["How the card is set: a title card, a subtitle, a chapter line or a banner."] = "卡片的排版：标题卡、字幕、章节行或横幅。"
-L["How the cast bars look: on nameplates, yours, your target's and focus's, and the bosses' and arena enemies'. The Default tab's settings are every bar's until its own tab has Use default settings unticked. All but the nameplates' keep the game's look until their tab's Restyle these bars is ticked. Whether the nameplates' show in CineMode: the Nameplates page's Plate parts grid. Changes show at once, here and on bars casting now."] = "施法条的外观：姓名板上的、你的、你目标和焦点的，以及首领和竞技场敌人的。默认标签页的设置适用于每种施法条，除非其自己的标签页取消勾选了“使用默认设置”。除姓名板外，其他施法条保持游戏外观，直到其标签页勾选了“重新设置这些条的风格”。姓名板施法条是否在CineMode中显示：姓名板页面的姓名板部件表格。更改会立即显示，包括此处和正在施法的条上。"
 L["How the dialogue looks, the \"Show the game's window\" link and the number keys."] = "对话的外观、“显示游戏窗口”链接和数字键。"
 L["How the game world looks in CineMode (or over the normal UI, with Start in CineMode off on the main page): vignette, inn glow, weather and depth of field. The letterbox bars and the color grading have pages of their own (Letterbox, Tint). The UI isn't tinted. Names and nameplates are on the Nameplates page."] = "CineMode中游戏世界的外观（或在主页面关闭“以CineMode启动”时，叠加在正常界面上）：暗角、旅店光晕、天气和景深。宽银幕黑边和色彩分级有各自的页面（宽银幕黑边、色调）。界面不会被着色。名字和姓名板在姓名板页面。"
 L["How the game's tooltips look: their background, edge and words, names in their colors and the health bar. Which lines show and when: the Interface hub's Tooltips page."] = "游戏鼠标提示的外观：背景、边缘和文字、带颜色的名字以及生命条。显示哪些行以及何时显示：界面中心的鼠标提示页面。"
 L["How the low-health edges look: the theme, our art and Blizzard's, the shadow and the effects. When they show: the Vision tab. Changes show at once in the preview."] = "低生命值边缘的外观：主题、我们的美术和暴雪的美术、阴影和效果。何时显示：Vision 标签页。更改会立即在预览中显示。"
 L["How the personal resource display under your character looks: its health and power bars, and your class resource. When the bars come up: the Interface hub's Resource Display page."] = "角色下方个人资源显示的外观：生命条和能量条，以及你的职业资源。资源条何时出现：界面中心的资源显示页面。"
 L["How the quest item button looks."] = "任务物品按钮的外观。"
-L["How the raid frames look, the party's when the game draws them raid-style, and the arena's. The Default tab's settings are each group's until its own tab has Use default settings unticked. Which parts show: the Game Frames page's party and raid rows."] = "团队框架的外观，以及游戏以团队样式绘制时的小队框架和竞技场框架。默认标签页的设置适用于每个分组，除非其自己的标签页取消勾选了“使用默认设置”。显示哪些部分：游戏框体页面的小队和团队行。"
 L["How the result shows: its card (with the words above), or a souls banner: VICTORY ACHIEVED or DEFEATED across the middle of the screen, who it was against under it."] = "结果的显示方式：其卡片（带上方的文字），或魂系横幅：屏幕中间显示“胜利达成”或“战败”，下方显示对手是谁。"
 L["How the roll window looks."] = "掷骰窗口的外观。"
 L["How the rows are listed: Camera groups them by camera name, Scene by scene name. Either way a scene's rows stay together, in the order they're tried."] = "行的排列方式：“镜头”按镜头名称分组，“场景”按场景名称分组。无论哪种，一个场景的行都会排在一起，按尝试顺序排列。"
@@ -2466,7 +2461,6 @@ L["How thickly grass, flowers and stones grow on the ground."] = "地面上草�
 L["How this card looks. It starts from a style (a subzone's, the zone's), each setting following it until you change it here, then the card's own until you put it back. Change the style itself on the Card Types tab, for every card using it. Changes play at once in the preview."] = "此卡片的外观。它以一种风格（子区域的、区域的）为起点，每项设置都跟随该风格，直到你在这里更改，此后就是卡片自己的设置，直到你恢复。要更改风格本身（对使用它的每张卡片生效），请到卡片类型标签页。更改会立即在预览中播放。"
 L["How wide a line of speech from behind you can get before it wraps onto the next row, as a bubble overhead does."] = "来自你身后的一行话语在换行前最多可以有多宽，就像头顶上的气泡一样。"
 L["How wide it is."] = "它的宽度。"
-L["How your player, target, focus, pet, target of target and party frames look. The Default tab's settings are every frame's until its own tab has Use default settings unticked. Which parts show: the Interface hub's Unit Frames page."] = "你的玩家、目标、焦点、宠物、目标的目标以及小队框体的外观。默认标签页的设置适用于每个框体，除非其自己的标签页取消勾选了“使用默认设置”。显示哪些部分：界面中心的单位框体页面。"
 L["How your target, focus and the unit under the mouse stand out on the nameplates, for when no target frame shows them: a mark on each one's plate, a row for each in the grid, and its name, health bar or border in its mark's color (the row's Also color). When they show is the Target Indicator row's, on the Nameplates page's Cinematic plate parts grid. Changes show at once, here and on the plates."] = "当没有目标框体显示时，你的目标、焦点和鼠标下的单位如何在姓名板上突出显示：在各自的姓名板上显示一个标记，表格中各占一行，其名字、生命条或边框使用其标记的颜色（该行的“附加”颜色）。显示时机取决于姓名板页面Cinematic姓名板部件表格中的目标指示器行。更改会立即显示，包括此处和姓名板上。"
 L["How:"] = "方式："
 L["Icon"] = "图标"
@@ -2889,7 +2883,6 @@ L["Once you're there (after the loading screen, if there is one), the camera swi
 L["Once you've stood still for a while with the UI faded, or as soon as you go AFK, the camera slowly sweeps around your character. Moving stops it. What starts it, and how long you stand still first, is on the Scenes page."] = "在界面淡出的状态下站着不动一段时间后，或一进入暂离状态，镜头就会缓慢地围绕你的角色环绕。移动会停止它。什么会启动它以及需要先站多久，在场景页面中设置。"
 L["One line under the game's zone name, as it comes in at login, in place of a card. (The look above is the card's.)"] = "登录时在游戏区域名称下方显示一行，代替卡片。（上方的外观是卡片的。）"
 L["One size at any distance. Unticked, a name grows and shrinks with its plate as its unit comes nearer or goes."] = "在任何距离都是同一大小。未勾选时，名字会随单位靠近或远离而与其姓名板一起放大缩小。"
-L["One thing that starts this scene: an emote you do, a spell you cast, a buff on you, a place you're in, a moment (leveling up...), something you are (mounted...), or a key you press. Any one of a scene's triggers starts it."] = "启动此场景的一个条件：你做的表情、你施放的法术、你身上的增益效果、你所在的地点、某个时刻（升级……）、你的某种状态（骑乘……）或你按下的按键。场景的任一触发条件都能启动它。"
 L["Only after progress"] = "仅在有进展后"
 L["Only after you use mana, for"] = "仅在你消耗法力后，持续"
 L["Only in CineMode"] = "仅在CineMode中"
@@ -3492,7 +3485,6 @@ L["The border's color. Picking one turns it to Custom."] = "边框的颜色。�
 L["The boss's name as its fight starts, in place of Entering combat's card. Once a run for each boss."] = "首领战开始时显示首领的名字，代替进入战斗的卡片。每次副本中每个首领只显示一次。"
 L["The boss's name as you first come within about 28 yards of it, before the fight. A dungeon or raid boss is told by its level: a skull, or on retail two over yours."] = "战斗前你第一次进入首领约28码范围内时显示其名字。地下城或团队副本首领通过其等级判断：骷髅，或在正式服上比你高两级。"
 L["The boss's name as you first target it, before the fight. A dungeon or raid boss is told by its level: a skull, or on retail two over yours."] = "战斗前你第一次选中首领时显示其名字。地下城或团队副本首领通过其等级判断：骷髅，或在正式服上比你高两级。"
-L["The boxes the game puts under the minimap for a scenario's or quest's current step, such as a capture bar. Always shown to start with."] = "游戏为场景战役或任务的当前步骤在小地图下方放置的框，例如占领进度条。初始为始终显示。"
 L["The bubble's color, for Custom."] = "气泡的颜色，用于自定义。"
 L["The bubble's tail sits on top, pointing up, instead of under it pointing down. (In a bubble only: not with no bubble behind the words.)"] = "气泡的尾巴位于顶部向上指，而不是在底部向下指。（仅限气泡：文字后面没有气泡时不适用。）"
 L["The bubble's words in a color of your own (the quest card keeps its ink)."] = "气泡文字使用你自己的颜色（任务卡片保持其墨色）。"
@@ -3757,9 +3749,7 @@ L["This boss only: everyone starts at 0 as a boss is pulled, and when it dies it
 L["This camera can't be tested now: Cinematic or the camera is off (Camera Triggers page), or you're moving, flying or in a fight."] = "现在无法测试此镜头：Cinematic或该镜头已关闭（镜头触发页面），或你正在移动、飞行或战斗。"
 L["This card's rules as they come."] = "此卡片规则的原样。"
 L["This client has no damage meter."] = "此客户端没有伤害统计。"
-L["This frame's settings: Default's until you untick Use default settings."] = "此框体的设置：使用默认的，直到你取消勾选“使用默认设置”。"
 L["This game version has none of these settings."] = "此游戏版本没有这些设置。"
-L["This group's settings: Default's until you untick Use default settings."] = "此分组的设置：使用默认的，直到你取消勾选“使用默认设置”。"
 L["This is from a newer Cinematic: update it to add this one."] = "这来自更新版本的Cinematic：请更新后再添加。"
 L["This page's shared settings back on General."] = "本页面的共享设置恢复为跟随“常规”。"
 L["This row fits everywhere. The rest of the row keeps its ticks for when you untick this."] = "此行在所有地方都符合。取消勾选此项时，该行的其余部分会保留其勾选项。"
@@ -3769,7 +3759,6 @@ L["This row: just the enemies among them."] = "此行：只针对其中的敌人
 L["This row: just the friendly ones among them."] = "此行：只针对其中的友方。"
 L["This row: just the neutral ones among them."] = "此行：只针对其中的中立单位。"
 L["This row: just these among them: %s."] = "此行：只针对其中的这些：%s。"
-L["This row: just those about that far from you. 11 and 28 yards are the game's interact distances; 40 asks a 40-yard spell on your action bars (harmful for enemies, helpful for friends), and with none there the row fits no unit past 28 yards."] = "此行：只针对离你大约那么远的单位。11码和28码是游戏的互动距离；40码需要你的动作条上有一个40码的法术（对敌人为有害法术，对友方为有益法术），如果没有，该行不适用于28码外的任何单位。"
 L["This sound's volume, next to the others."] = "此音效的音量，相对于其他音效。"
 L["This swing bar isn't in use"] = "此攻击计时条未在使用"
 L["This tab's rules as they come: a sound as any other fight starts and one as it ends."] = "此标签页规则的原样：其他战斗开始时一个音效，结束时一个音效。"
@@ -4113,8 +4102,6 @@ L["Your own profile"] = "你自己的配置文件"
 L["Your own profile. Right-click it, then Description to say what it's for."] = "你自己的配置文件。右键点击它，然后选择“描述”来说明它的用途。"
 L["Your own settings, as they were before you picked a preset."] = "你自己的设置，即你选择预设之前的设置。"
 L["Your own words."] = "你自己的文字。"
-L["Your party uses its own frames, not raid-style ones: they follow the Unit frames page's Party tab."] = "你的小队使用自己的框体，而不是团队样式框体：它们按单位框体页面的小队标签页设置。"
-L["Your party uses raid-style frames (Edit Mode's party frames setting): they follow the Raid frames page, not this tab."] = "你的小队使用团队样式框体（编辑模式的小队框体设置）：它们按团队框体页面设置，而不是此标签页。"
 L["Your personal resource display (the health bar under your character) fades in as your health drops."] = "你的个人资源显示（角色下方的生命条）会随你的生命值下降而淡入。"
 L["Your pet is unhappy"] = "你的宠物不快乐"
 L["Your place"] = "你的名次"
@@ -4436,7 +4423,6 @@ L["The quest shows at the top of the quest tracker, not in its own place under e
 
 -- Options.lua: Quest Vision
 L["Shop window goes there too"] = "商店窗口也去那里"
-L["Picking a vendor's \"let me browse your goods\", the shop window opens where the talk was, on the other half of the screen from the NPC, instead of where the game puts it. A vendor with nothing else to say opens it on the other half from where you clicked them. Drag it and it stays where you drop it until it closes."] = "与商人选择“让我看看你的货物”时，商店窗口会在对话所在的位置打开，即与NPC相对的另一半屏幕，而不是游戏放置的位置。没有别的话要说的商人会在你点击他们的另一半屏幕打开它。拖动它后，它会停留在你放下的位置，直到关闭。"
 
 -- ProfileChoices.lua
 L["A light touch that leaves your UI exactly as it is. A color tint, vignette and weather set the mood, and only the quiet extras join in: the camera sweeps along on flights and teleports, a portal opens as you hearth, and small cards mark your big moments, your duels and the players who buff or emote at you."] = "轻轻一点，完全保留你的界面。色调、暗角和天气营造氛围，只加入安静的额外效果：飞行和传送时镜头相随，使用炉石时传送门开启，小卡片记录你的高光时刻、你的决斗以及为你施加增益或做表情的玩家。"
@@ -4452,3 +4438,161 @@ L["your cursor is back to normal (Cursor Hide off till you accept its warning ag
 -- Changelog.lua: What's new
 L["Cursor Hide (experimental)"] = "隐藏鼠标指针（实验性）"
 L["In CineMode, your cursor gets out of the way: it shrinks to a tiny corner, vanishes once the mouse has been still a while, or both. Moving the mouse brings it back. It's experimental: accept the warning on its page to turn it on, and /cine reset cursor puts your cursor back if it ever gets stuck. The Cinema profile uses it during flights, at vistas and while you're AFK."] = "在CineMode中，你的鼠标指针会让开：缩成一个极小的角，鼠标静止一会儿后消失，或两者兼有。移动鼠标即可恢复。这是实验性的：在其页面接受提示后才能开启，指针卡住时 /cine reset cursor 可让它恢复。Cinema配置在飞行中、观景点和暂离时使用它。"
+
+-- Core.lua, Options.lua
+L["Toggle letterbox bars"] = "开关宽银幕黑边"
+
+-- Frames.lua, Options.lua
+L["Addon buttons"] = "插件按钮"
+L["Coordinates"] = "坐标"
+
+-- Frames.lua
+L["Addons' buttons around the minimap's edge, Cinematic's own too. Untick it to hide them in CineMode even while the minimap is up. Hovering the minimap brings them up with the map."] = "小地图边缘的插件按钮，包括Cinematic自己的。取消勾选可在CineMode中隐藏它们，即使小地图正在显示。鼠标悬停小地图时，它们会随地图一起出现。"
+L["The map coordinates by the minimap. Untick it to hide them in CineMode even while the minimap is up. Hovering the minimap brings them up with the map."] = "小地图旁的地图坐标。取消勾选可在CineMode中隐藏它们，即使小地图正在显示。鼠标悬停小地图时，它们会随地图一起出现。"
+L["The boxes the game puts under the minimap for a scenario's or quest's current step, such as a capture bar. They come and go with the minimap until you change their ticks, and hovering the minimap brings them up with the map."] = "游戏在小地图下方为场景战役或任务的当前步骤显示的框，例如占领进度条。在你更改它们的勾选之前，它们随小地图一起出现和消失；鼠标悬停小地图时，它们会随地图一起出现。"
+L["You moved a swing timer bar, so \"Ranged bar on top\" is now off for %s and the bars stay where you put them."] = "你移动了一条攻击计时条，所以%s的\"远程计时条置顶\"现已关闭，计时条会留在你放下的位置。"
+
+-- Speech.lua
+L["Speech from behind you\nDrag to move, right-click to reset"] = "身后的话语\n拖动以移动，右键点击以重置"
+
+-- Effects.lua, Options.lua
+L["Service NPCs"] = "服务NPC"
+
+-- Effects.lua
+L[" Friendly and neutral NPCs with a title under their name (<Repair Vendor>, <Innkeeper>...), whatever their own row says: Kinds picks which, Show whether their names show or just their titles. Beyond nameplate range, and in dungeons and raids, the game shows the names of NPCs with something for you (vendors, quest givers...), titles included."] = " 名字下方有头衔的友方和中立NPC（<护甲商>、<旅店老板>……），无论它们自己那一行怎么设置：种类决定哪些算，显示决定显示名字还是只显示头衔。在姓名板范围之外，以及在地下城和团队副本中，游戏会显示对你有用的NPC（商人、任务发布者……）的名字，连同头衔。"
+L["letterbox bars on"] = "宽银幕黑边已开启"
+L["letterbox bars off"] = "宽银幕黑边已关闭"
+
+-- PlateGuild.lua
+L["Vendors"] = "商人"
+L["vendor,merchant,goods,supplies,supplier,provisions,provisioner,quartermaster,reagents,trader,armorer,weaponsmith,bowyer,gunsmith,butcher,baker,food,drink,wine"] = "商人,杂货,商品,补给,供应商,军需官,施法材料,材料,武器,护甲,弓,枪械,屠夫,面包,食物,饮料,酒"
+L["Repair"] = "修理"
+L["repair"] = "修理"
+L["Trainers"] = "训练师"
+L["trainer"] = "训练师"
+L["Professions"] = "专业"
+L["fish,cook,first aid,alchem,herbal,mining,miner,skinn,blacksmith,leatherwork,tailor,enchant,engineer,jewelcraft,inscription,scribe,archaeolog"] = "钓鱼,烹饪,急救,炼金,草药,采矿,矿工,剥皮,锻造,铁匠,制皮,裁缝,附魔,工程,珠宝,铭文,考古"
+L["Flight masters"] = "飞行管理员"
+L["flight,gryphon master,wind rider master,hippogryph master,bat handler,dragonhawk master"] = "飞行,狮鹫,双足飞龙,角鹰兽,蝙蝠,龙鹰"
+L["Innkeepers"] = "旅店老板"
+L["innkeeper"] = "旅店"
+L["Bankers and auctioneers"] = "银行职员和拍卖师"
+L["banker,auctioneer,bank,auction"] = "银行,拍卖"
+L["Stable masters"] = "兽栏管理员"
+L["stable"] = "兽栏"
+L["Other titles"] = "其他头衔"
+
+-- CustomTriggers.lua
+L["Interaction"] = "互动"
+L["At a mailbox"] = "在邮箱旁"
+L["At the bank"] = "在银行"
+L["At the auction house"] = "在拍卖行"
+L["World map open"] = "世界地图已打开"
+L["Talking to an NPC (chat, vendor, trainer)"] = "与NPC交谈（对话、商人、训练师）"
+
+-- CameraTriggerEditor.lua
+L["Its window closes"] = "其窗口关闭"
+L["One thing that starts this scene: an emote you do, a spell you cast, a buff on you, a place you're in, a moment (leveling up...), something you are (mounted...), a window you open (the mailbox, bank, auction house, map or an NPC's), or a key you press. Any one of a scene's triggers starts it."] = "启动此场景的一件事：你做的表情、你施放的法术、你身上的增益、你所在的地点、某个时刻（升级……）、你的某种状态（骑乘……）、你打开的窗口（邮箱、银行、拍卖行、地图或NPC的窗口），或你按下的按键。场景的任意一个触发条件都能启动它。"
+
+-- QuestTalk.lua
+L["Quest Talk's replies\nDrag to move, right-click to reset"] = "Quest Talk的回复\n拖动以移动，右键点击以重置"
+
+-- LetterboxStyle.lua
+L["New places"] = "新地点"
+L["Show bars on discovering a new place"] = "发现新地点时显示黑边"
+L["The bars come in for a few seconds when you find a place new to you: a zone you're in for the first time, a subzone the game says you discovered, a dungeon or raid. In or out of CineMode, with everything else off too. Not in fights, if the bars are off in combat."] = "当你发现对你来说的新地点时，黑边会出现几秒钟：你第一次进入的区域、游戏提示你发现的子区域、地下城或团队副本。在CineMode内外都会，即使其他一切都已关闭。如果战斗中黑边关闭，战斗中则不会。"
+L["How long the bars stay for a new place, not counting their coming in and going. Another new place meanwhile starts the count again."] = "黑边因新地点而停留多久，不计其进入和退出。在此期间发现另一个新地点会重新开始计时。"
+
+-- PlateCastStyle.lua
+L["How the cast bars look: on nameplates, yours, your target's and focus's, and the bosses' and arena enemies'. Each tab's These bars picks its look: the game's (all but the nameplates' start so), the Default tab's, or its own. Whether the nameplates' show in CineMode: the Nameplates page's Plate parts grid. Changes show at once, here and on bars casting now."] = "施法条的外观：姓名板上的、你的、你的目标和焦点的，以及首领和竞技场敌人的。每个标签页的“这些施法条”选择其外观：游戏的（除姓名板外都以此开始）、默认标签页的，或其自己的。姓名板的施法条是否在CineMode中显示：见姓名板页面的姓名板部件表格。更改会立即生效，在这里和正在施法的施法条上。"
+L["These cast bars: the game's look, the Default tab's, or their own, as These bars says."] = "这些施法条：游戏的外观、默认标签页的，或其自己的，按“这些施法条”的设置。"
+L["These bars:"] = "这些施法条："
+L["The game's look"] = "游戏的外观"
+L["Cinematic leaves them alone. Their size stays the game's either way (yours is sized in Edit Mode)."] = "Cinematic不改动它们。无论如何它们的大小都保持游戏的（你的大小在编辑模式中设置）。"
+L["They look as the Default tab says."] = "它们按默认标签页的设置显示。"
+L["Their own look"] = "自己的外观"
+L["They look as the settings below say. These start as the Default tab's, and are kept while you pick another choice."] = "它们按下方的设置显示。这些设置从默认标签页的开始，在你选择其他选项时也会保留。"
+L["How these cast bars look: the game's own, the Default tab's, or this tab's own settings."] = "这些施法条的外观：游戏自己的、默认标签页的，或此标签页自己的设置。"
+L["Every kind of cast bar looks as this tab says while its own tab picks Same as the Default tab."] = "只要某类施法条自己的标签页选择“与默认标签页相同”，它就按此标签页的设置显示。"
+
+-- PlateCastStyle.lua, UnitStyle.lua, RaidStyle.lua, Options.lua
+L["Same as the Default tab"] = "与默认标签页相同"
+
+-- UnitStyle.lua
+L["How your player, target, focus, pet, target of target and party frames look. The Default tab's settings are every frame's until its own tab has Same as the Default tab unticked. Which parts show: the Interface hub's Unit Frames page."] = "你的玩家、目标、焦点、宠物、目标的目标和小队框体的外观。在各框体自己的标签页取消勾选“与默认标签页相同”之前，默认标签页的设置适用于每个框体。显示哪些部件：界面中的单位框体页面。"
+L["This frame's settings: Default's until you untick Same as the Default tab."] = "此框体的设置：在你取消勾选“与默认标签页相同”之前，使用默认的设置。"
+L["Your party uses raid-style frames (Edit Mode's party frames setting): they follow the Raid Frames page, not this tab."] = "你的小队使用团队风格框体（编辑模式中的小队框体设置）：它们遵循团队框架页面，而不是此标签页。"
+L["Every frame looks as this tab says while its own tab has Same as the Default tab ticked."] = "只要框体自己的标签页勾选了“与默认标签页相同”，它就按此标签页的设置显示。"
+
+-- RaidStyle.lua
+L["How the raid frames look, the party's when the game draws them raid-style, and the arena's. The Default tab's settings are each group's until its own tab has Same as the Default tab unticked. Which parts show: the Game Frames page's party and raid rows."] = "团队框架的外观，游戏以团队风格绘制时的小队框体，以及竞技场框体。在各组自己的标签页取消勾选“与默认标签页相同”之前，默认标签页的设置适用于每个组。显示哪些部件：游戏框体页面的小队和团队行。"
+L["This group's settings: Default's until you untick Same as the Default tab."] = "此组的设置：在你取消勾选“与默认标签页相同”之前，使用默认的设置。"
+L["Your party uses its own frames, not raid-style ones: they follow the Unit Frames page's Party tab."] = "你的小队使用自己的框体，而非团队风格：它们遵循单位框体页面的小队标签页。"
+L["Every group looks as this tab says while its own tab has Same as the Default tab ticked."] = "只要组自己的标签页勾选了“与默认标签页相同”，它就按此标签页的设置显示。"
+
+-- EmoteVision.lua
+L["Emote Vision\nDrag to move, right-click to reset"] = "Emote Vision\n拖动以移动，右键点击以重置"
+L["is in your guild"] = "在你的公会中"
+L["grouped with you before"] = "以前和你组过队"
+L["is looking back at you"] = "也在看着你"
+L["Campfire"] = "篝火"
+L["rest a while by the fire"] = "在火边休息一会儿"
+L["Buffs:"] = "增益："
+L["Ignore buffs from your group"] = "忽略来自你队伍的增益"
+L["Buffs from people in your party or raid bring up no card: only strangers' do."] = "来自你小队或团队成员的增益不会弹出卡片：只有陌生人的会。"
+
+-- Slash.lua
+L["%s is your own profile: it has nothing to reset to until you Save it on the Profiles page"] = "%s是你自己的配置文件：在你于配置文件页面保存它之前，没有可重置到的状态"
+
+-- Why.lua
+L["Keep open: herb, mineral or treasure tracking is on"] = "保持打开：草药、矿物或宝藏追踪已开启"
+L["Keep open: creature or fish tracking is on"] = "保持打开：生物或鱼类追踪已开启"
+L["Reveal: the minimap shows %s"] = "显示：小地图显示了%s"
+L["Reveal: something you ticked is on the minimap"] = "显示：你勾选的某样东西在小地图上"
+L["It was up as this fight started, so it stays up through it"] = "这场战斗开始时它就在显示，所以整场战斗都保持显示"
+L["Keep open: a tracked quest, for a while after progress on it"] = "保持打开：一个追踪中的任务，在取得进展后的一段时间内"
+L["Keep open: hunting your prey"] = "保持打开：正在狩猎你的猎物"
+L["Kept up by a setting Inspect can't name yet"] = "被一个检查功能尚无法命名的设置保持显示"
+
+-- Profiles.lua
+L["can't switch profiles in a fight: try again once it's over"] = "战斗中无法切换配置文件：战斗结束后再试"
+
+-- Welcome.lua
+L["See Profile"] = "查看配置文件"
+L["Select a profile that suits you."] = "选择一个适合你的配置文件。"
+
+-- CameraScriptsPage.lua
+L["End the music over %s s"] = "在%s秒内结束音乐"
+
+-- Options.lua
+L["(game: %s)"] = "（游戏：%s）"
+L["While the fish camera is on and no bobber is out, right-clicking in the world casts Fishing again. Each cast still comes from your own click. While the bobber is out, right-click clicks it as usual (or reels in from anywhere: see below); in combat, with the loot window open or with your mouse on a player or NPC, right-click is left alone. (Meanwhile right-drag doesn't turn the camera: left-drag still does.)"] = "钓鱼镜头开启且没有鱼漂时，在世界中右键点击会再次施放钓鱼。每次施放仍来自你自己的点击。鱼漂在外时，右键点击照常点击它（或从任何地方收竿：见下文）；在战斗中、拾取窗口打开时或鼠标指向玩家或NPC时，右键点击不受影响。（此期间右键拖动不会转动镜头：左键拖动仍会。）"
+L["Right-click to reel in"] = "右键点击收竿"
+L["While the bobber is out, right-clicking anywhere in the world reels it in, with no need to find the bobber with the mouse (in gamepad mode, the cast button below does too). It uses the game's \"Interact with target\" key, so the game's soft targeting of objects is on while you fish, and your own setting comes back after. Reeling in before a bite ends the cast. Not in combat or with your mouse on a player or NPC. (While the bobber is out, right-drag doesn't turn the camera: left-drag still does.)"] = "鱼漂在外时，在世界任何地方右键点击都会收竿，无需用鼠标寻找鱼漂（手柄模式下，下方的施放按钮也可以）。它使用游戏的\"与目标互动\"按键，所以你钓鱼时游戏的物体软目标会开启，之后恢复你自己的设置。在鱼咬钩前收竿会结束这次施放。战斗中或鼠标指向玩家或NPC时不会。（鱼漂在外时，右键拖动不会转动镜头：左键拖动仍会。）"
+L["The key you cast with reels in too"] = "施放所用的按键也能收竿"
+L["With Fishing on an action bar (the spell, or a macro that casts it), its key reels the bobber in while it's out, rather than casting again: press 1 to cast, then 1 again to reel in. Works on the game's own action bars. Uses the game's soft targeting of objects, as right-click does. Not in combat."] = "动作条上有钓鱼时（法术本身或施放它的宏），鱼漂在外时它的按键会收竿，而不是再次施放：按1施放，再按1收竿。适用于游戏自己的动作条。和右键点击一样使用游戏的物体软目标。战斗中不会。"
+L["Show"] = "显示"
+L["Names and titles: a service NPC's name shows on its nameplate with its title under it. Titles only: just its title (<Repair Vendor>) where its name would be, unless its own row (or your target's) shows its name too. Beyond nameplate range, and in dungeons and raids, the game shows names and titles together."] = "名字和头衔：服务NPC的名字显示在其姓名板上，头衔在下方。仅头衔：在名字的位置只显示其头衔（<护甲商>），除非其自己那一行（或你目标的那一行）也显示名字。在姓名板范围之外，以及在地下城和团队副本中，游戏会把名字和头衔一起显示。"
+L["Names and titles"] = "名字和头衔"
+L["Titles only"] = "仅头衔"
+L["Kinds"] = "种类"
+L["Any other title, lore titles too (<Ranger-General of Silvermoon>)."] = "任何其他头衔，包括背景故事头衔（<银月城游侠将军>）。"
+L["NPCs whose title has one of these words in it: %s."] = "头衔中含有以下任一词语的NPC：%s。"
+L["Raise"] = "抬高"
+L["Not your kill"] = "不是你的猎物"
+L["An NPC someone outside your group hit first: killing it gives you no loot, experience or quest credit. Its name and health bar gray to start with."] = "被你队伍之外的人先攻击的NPC：杀死它不会给你拾取、经验或任务进度。它的名字和生命条一开始就是灰色的。"
+L["Out of range"] = "超出范围"
+L["out of range"] = "超出范围"
+L["This row: just those about that far from you. 11 and 28 yards are the game's interact distances; 40 asks a 40-yard spell on your action bars (harmful for enemies, helpful for friends), and with none there the row fits no unit past 28 yards. Out of range: none of the spells on your action bars reaches it (attacks for enemies, helpful spells for friends), as their buttons turn red."] = "此行：只限离你大约那么远的。11码和28码是游戏的互动距离；40会询问你动作条上的一个40码法术（对敌人用伤害法术，对友方用辅助法术），没有这样的法术时，此行不适用于28码以外的任何单位。超出范围：你动作条上的法术都够不到它（对敌人是攻击，对友方是辅助法术），就像它们的按钮变红时一样。"
+L["Any distance: all of them, near or far. Within or past 11, 28 or 40 yards: just those that far from you, say Any unit past 40 yards to fade the plates far off. 40 yards asks a 40-yard spell on your action bars; with none there, the row fits no unit past 28 yards. Out of range: none of the spells on your action bars reaches them, as their buttons turn red."] = "任何距离：全部，无论远近。11、28或40码以内或以外：只限离你那么远的，例如用“40码外的任何单位”来淡化远处的姓名板。40码会询问你动作条上的一个40码法术；没有这样的法术时，此行不适用于28码以外的任何单位。超出范围：你动作条上的法术都够不到它们，就像它们的按钮变红时一样。"
+L["Raise with a plate"] = "有姓名板时抬高"
+L["Reveal shows"] = "显示时出现"
+L["Everything"] = "全部"
+L["Just the map"] = "仅地图"
+L["Map"] = "地图"
+L["When a ping, a reveal below or Keep open's tracking brings the faded minimap up, only the map comes up with what's ticked here; the rest of the header stays faded. Hovering the minimap shows it all."] = "当信号、下方的显示或保持打开的追踪让淡出的小地图出现时，只有地图和这里勾选的内容会出现；标题区的其余部分保持淡出。鼠标悬停小地图会显示全部。"
+L["The buffs this bar shows sit together in their order, centered on the bar, instead of inactive or faded ones leaving gaps. Edit Mode shows the game's own layout."] = "此条显示的增益按顺序聚在一起，在条上居中，而不是让未激活或淡出的增益留下空隙。编辑模式显示游戏自己的布局。"
+L["Picking a vendor's \"let me browse your goods\", the shop window opens where the talk was, on the other half of the screen from the NPC, instead of where the game puts it. A shop opened straight from a right click on the vendor opens where the game puts it. Drag it and it stays where you drop it until it closes."] = "选择商人的\"让我看看你出售的货物\"时，商店窗口会在对话所在的位置打开，即屏幕上与NPC相对的另一半，而不是游戏放置它的位置。直接右键点击商人打开的商店会在游戏放置它的位置打开。拖动它，它会留在你放下的位置，直到关闭。"
+L["Add all"] = "全部添加"
+L["Fades every frame on this list that isn't added yet, as Add does for one."] = "淡化此列表中尚未添加的每个框体，就像添加对单个框体所做的那样。"
+L["Brings the letterbox bars in, or takes them out, in or out of CineMode. Turning CineMode on or off puts them back as the Letterbox page says."] = "在CineMode内外引入或移出宽银幕黑边。开启或关闭CineMode会让它们恢复为宽银幕黑边页面的设置。"
