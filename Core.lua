@@ -286,7 +286,6 @@ local DEFAULTS = {
 	updateNotice = true, -- after an update, a line in chat at login with a What's new link (WhatsNew.lua)
 	dropTargetOnFlights = true, -- ignore your target from takeoff (its frames fade) until you pick another
 	taxiInstant = true,       -- go cinematic as soon as a flight starts (no fade delay)
-	taxiCenter = true,        -- swing the camera behind the character when a flight starts
 	taxiFlyBy = true,         -- random fly-bys in the middle of flights
 	taxiFlyByEvery = 60,      -- ...about one per this many seconds of...
 	taxiFlyByFrom = 25,       -- ...the stretch between these % of the way
@@ -509,14 +508,13 @@ DEFAULTS.fishZoomDistance = 2      -- (vista: 4)
 -- swing round to face you, only quicker, then a spin round you that speeds up
 -- until you go, zooming in over the cast. (Its sway settings are the cozy camera's.)
 DEFAULTS.teleArriveEarly = 3       -- seconds before the cast ends that the swing gets round in front
-DEFAULTS.teleSpinAccel = 8         -- degrees per second it speeds up by, each second, once round
+DEFAULTS.teleSpinAccel = 14        -- degrees per second it speeds up by, each second, once round
 DEFAULTS.teleSpinMax = 120         -- degrees per second, at most
 DEFAULTS.teleLevel = 15            -- degrees it brings the camera down as it swings round
 DEFAULTS.teleZoom = true           -- zoom in over the cast
 DEFAULTS.teleZoomClose = 4         -- yards it zooms in to (if you're further out)
 DEFAULTS.teleReturn = true         -- cancelled: turn back to where the camera was
 DEFAULTS.teleZoomBackTime = 0.5    -- seconds to zoom back out to your distance on a cancel
-DEFAULTS.teleBehind = true         -- arrived: swing the camera round behind you
 -- (Its zoom is one move in over the cast, then a hold: no random zooms.)
 for key, value in pairs({
 	Distance = 0, In = 0, Time = 1, Pause = 1, PauseVary = 0, Random = false, Ease = 0.5, PastMax = false,

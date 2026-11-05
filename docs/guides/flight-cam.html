@@ -122,7 +122,7 @@ dl.faq dd { margin: 2px 0 0; color: var(--muted) }
     <div class="inner">
       <div class="eyebrow">Cinematic · Flight Cam</div>
       <h1>Every flight a film</h1>
-      <p>Take a flight path and the camera swings behind you, sways through the journey, now and then turns round to take in the view behind you, and settles behind you just before you land.</p>
+      <p>Take a flight path and the camera sways through the journey, now and then turns round to take in the view behind you, and turns back to where it started just before you land.</p>
     </div>
   </div>
   <div class="band"></div>
@@ -135,10 +135,10 @@ dl.faq dd { margin: 2px 0 0; color: var(--muted) }
     <div class="eyebrow">The journey</div>
     <h2>From takeoff to landing</h2>
     <ol class="steps">
-      <li><div><h3>Takeoff</h3><p class="muted">With <b>Fade at once</b> ticked on the <b>Take a flight</b> row of the Cameras page, the UI fades and the camera starts straight away, with no wait. <b>Swing round behind you at takeoff</b> slowly brings the camera round behind your character, ready for the sway. <b>Drop your target at takeoff</b> fades your target's frames as if nothing were targeted, until you pick a new target or land. (Addons can't clear the target itself.)</p></div></li>
-      <li><div><h3>The sway</h3><p class="muted"><b>Sway behind you</b> swings the camera from side to side behind you, pausing between moves, and drifting slowly through the pauses. It can tilt and zoom slowly as it goes. All of this is under <b>Flight Cam</b> on the Camera Settings page.</p></div></li>
-      <li><div><h3>Fly-bys</h3><p class="muted">Now and then in the middle of the flight, the camera slowly turns round to look back past you, holds there, then turns back behind you. More below.</p></div></li>
-      <li><div><h3>Landing</h3><p class="muted"><b>Lock the camera behind you before landing</b>: shortly before you land, the sway stops and the camera turns back behind you and stays there until you touch down. <b>Put the zoom back when you land</b> glides the camera back to the zoom you had at takeoff.</p></div></li>
+      <li><div><h3>Takeoff</h3><p class="muted">With <b>Fade at once</b> ticked on the <b>Take a flight</b> row of the Cameras page, the UI fades and the camera starts straight away, with no wait. <b>Drop your target at takeoff</b> fades your target's frames as if nothing were targeted, until you pick a new target or land. (Addons can't clear the target itself.)</p></div></li>
+      <li><div><h3>The sway</h3><p class="muted"><b>Sway from side to side</b> sways the camera either side of where it was at takeoff, pausing between moves, and drifting slowly through the pauses. It can tilt and zoom slowly as it goes. All of this is under <b>Flight Cam</b> on the Camera Settings page.</p></div></li>
+      <li><div><h3>Fly-bys</h3><p class="muted">Now and then in the middle of the flight, the camera slowly turns round to look back past you, holds there, then turns back. More below.</p></div></li>
+      <li><div><h3>Landing</h3><p class="muted"><b>Turn back before landing</b>: shortly before you land, the sway stops and the camera turns back to where it was at takeoff and stays there until you touch down. <b>Put the zoom back when you land</b> glides the camera back to the zoom you had at takeoff.</p></div></li>
     </ol>
     <p class="muted">Drag the camera, zoom or use a camera key on a flight and it's yours for the rest of that flight: the camera waits a while (15 seconds to start with), then just sways from where you left it. No more fly-bys, no swing back behind you, no slow zoom, no lock behind you before landing and no zoom back when you land: it stays how you set it. <code>/cine flyby</code> still works when you ask.</p>
   </section>
@@ -159,10 +159,9 @@ dl.faq dd { margin: 2px 0 0; color: var(--muted) }
         <div class="track" id="track" aria-hidden="true"></div>
         <div class="scale" id="scale"></div>
         <ul class="legend">
-          <li><i style="background:rgba(160,200,255,.6)"></i>Swing behind you</li>
           <li><i style="background:rgba(226,181,63,.3)"></i>Where fly-bys can come</li>
           <li><i style="background:rgba(226,181,63,.85)"></i>A fly-by (its moment is random)</li>
-          <li><i style="background:rgba(140,220,170,.6)"></i>Zoom back and turn behind you</li>
+          <li><i style="background:rgba(140,220,170,.6)"></i>Zoom back and turn back</li>
         </ul>
         <ul class="choices" id="flightLines"></ul>
       </div>
@@ -172,7 +171,7 @@ dl.faq dd { margin: 2px 0 0; color: var(--muted) }
   <section>
     <div class="eyebrow">Fly-bys</div>
     <h2>Looking back at the view</h2>
-    <p>With <b>Random fly-bys</b> on, the camera lines up behind you, then turns round (160° to start with, 180 looks straight back at you), holds the view for a few seconds, and turns back behind you, easing in and out.</p>
+    <p>With <b>Random fly-bys</b> on, the camera undoes the flight's sway, then turns round (160° to start with; 180 is half a turn), holds the view for a few seconds, and turns back, easing in and out.</p>
     <div class="cards">
       <div class="card"><h3>About one every</h3><p>Fly-bys are spread over the middle of the flight: one per minute of it to start with, and at least one, each at a random moment in its share.</p></div>
       <div class="card"><h3>Not before, not after</h3><p>They keep away from takeoff and landing: between 25% and 75% of the way, to start with.</p></div>
@@ -219,7 +218,7 @@ dl.faq dd { margin: 2px 0 0; color: var(--muted) }
   // The flight camera's planning with the settings as they start: fly-bys between 25% and 75%
   // of the way, one per 60 seconds of that stretch (at least one), each about 19 seconds long
   // (8 to turn, 5 looking back, 6 to turn back) and over before the arrival, which starts about
-  // 22 seconds out (zoom back, the turn behind you, settled 5 seconds before landing).
+  // 22 seconds out (zoom back, the turn back, settled 5 seconds before landing).
   var FLYBY = 19, ARRIVE = 22, SETTLED = 5;
   var len = document.getElementById("len"), first = document.getElementById("first");
   var track = document.getElementById("track"), lines = document.getElementById("flightLines");
@@ -243,8 +242,7 @@ dl.faq dd { margin: 2px 0 0; color: var(--muted) }
     var T = +len.value;
     document.getElementById("lenOut").textContent = fmt(T);
     track.textContent = ""; lines.textContent = "";
-    bar("take", 0, Math.min(10, T), T);
-    bar("sway", 10, T, T);
+    bar("sway", 0, T, T);
     var shown = 0;
     if (first.checked) {
       if (reroll || picks.length !== 1) picks = [30 + Math.random() * 30];
@@ -265,7 +263,7 @@ dl.faq dd { margin: 2px 0 0; color: var(--muted) }
       }
       bar("arrive", T - ARRIVE, T - SETTLED, T);
       line(shown === 1 ? "1 fly-by" : shown + " fly-bys", shown ? "Between " + fmt(from) + " and " + fmt(to) + (shown === 1 ? ", at a random moment" : ", each at a random moment in its share") : "Too short: a fly-by wouldn't be over before the landing starts");
-      line("Landing", "About " + ARRIVE + " seconds out the zoom glides back and the camera turns behind you, settled " + SETTLED + " seconds before you land");
+      line("Landing", "About " + ARRIVE + " seconds out the zoom glides back and the camera turns back, settled " + SETTLED + " seconds before you land");
     }
     var sc = document.getElementById("scale"); sc.textContent = "";
     ["0", fmt(T / 2), fmt(T)].forEach(function (t) { var s = document.createElement("span"); s.textContent = t; sc.appendChild(s); });

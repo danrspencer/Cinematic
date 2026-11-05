@@ -260,7 +260,6 @@ do
 	local HEARTH_IDS = { [8690] = true, [556] = true }
 	local TELEPORT_IDS = { [3561] = true, [3562] = true, [3563] = true, [3565] = true, [3566] = true, [3567] = true }
 	local MIN_SWING = 1.5  -- seconds, at least, for the swing round
-	local BEHIND_TIME = 1.5 -- seconds the swing behind you takes where you arrive
 	local castEndsAt -- when the cast ends (GetTime), while casting one
 	local castCamera = false -- that cast's event has the tele camera
 	local pretending = false -- castEndsAt is a pretend cast's (the tele camera's key: PretendDepartCast)
@@ -300,28 +299,6 @@ do
 	departWatcher:RegisterUnitEvent("UNIT_SPELLCAST_FAILED", "player")
 	departWatcher:RegisterUnitEvent("UNIT_SPELLCAST_SUCCEEDED", "player")
 
-	-- Gone: once you're there (after the loading screen, if there is one),
-	-- swing the camera round behind you.
-	local behindPending, loading = false, false
-	local function SwingBehind()
-		if behindPending then
-			behindPending = false
-			ns.CenterCamera(BEHIND_TIME, 360, 120)
-		end
-	end
-	local arrivalWatcher = CreateFrame("Frame")
-	for _, event in ipairs({ "LOADING_SCREEN_ENABLED", "LOADING_SCREEN_DISABLED", "PLAYER_ENTERING_WORLD" }) do
-		pcall(arrivalWatcher.RegisterEvent, arrivalWatcher, event)
-	end
-	arrivalWatcher:SetScript("OnEvent", function(_, event)
-		if event == "LOADING_SCREEN_ENABLED" then
-			loading = true
-		elseif behindPending then
-			loading = false
-			C_Timer.After(0.2, SwingBehind) -- (a moment for the world to settle)
-		end
-	end)
-
 	departWatcher:SetScript("OnEvent", function(_, event, _, _, spellID)
 		local depart = DepartEvent(spellID)
 		if not depart then
@@ -334,7 +311,8 @@ do
 		local camera = castCamera
 		if event == "UNIT_SPELLCAST_SUCCEEDED" and castEndsAt then
 			-- You're off: the spin and zoom stop where they are (the zoom jumps
-			-- back to your distance), and the camera goes behind you on arrival.
+			-- back to your distance). (No swing behind you where you arrive: it
+			-- leaned on camera follow, which doesn't turn the camera.)
 			castEndsAt = nil
 			if ns.departCast and not ns.departCast.done then ns.departCast.done, ns.departCast.doneAt = "gone", GetTime() end
 			if emoteEvent == depart then
@@ -346,12 +324,6 @@ do
 				ns.StopIdleZoomNow()
 				if ns.stillSince then
 					ns.stillSince = GetTime() -- (no AFK camera in the moment before you go)
-				end
-				if ns.db.teleBehind and ns.db.enabled then
-					behindPending, loading = true, false
-					C_Timer.After(1, function()
-						if not loading then SwingBehind() end -- (no loading screen)
-					end)
 				end
 			end
 			return
@@ -370,7 +342,7 @@ do
 			pretending = false
 			emoteEvent = depart
 			if ns.EndLogoutEvent then ns.EndLogoutEvent() end -- (casting calls a logout off)
-			castCamera, behindPending = ns.IsDepartEvent(), false
+			castCamera = ns.IsDepartEvent()
 			local okName, spellName = pcall(function()
 				return C_Spell and C_Spell.GetSpellName and C_Spell.GetSpellName(spellID) or (GetSpellInfo(spellID))
 			end)
@@ -1360,6 +1332,11 @@ ns.IsMouseOnCamera = IsMouseOnCamera -- (QuestTalk: the bubble while the camera 
 function ns.MouseCameraPressed()
 	return mouseCameraHeld and true or false
 end
+-- A turn key held (camera scripts' Follow your turns: turns where the facing
+-- direction is hidden).
+function ns.TurnKeyHeld()
+	return turnKeys.left or turnKeys.right
+end
 
 -- Turning left or right, by keys or mouse: the facing direction changing
 -- faster than TURN_RATE, or a turn key held (where facing is hidden).
@@ -1851,16 +1828,6 @@ function ns.StillRunsAFK()
 end
 local RECENTER_TIME = 5 -- seconds a swing back behind you lasts
 local recenterUntil = 0
--- Travel modes (RP walk, auto-run) line up behind you before swaying: a
--- slower version of the takeoff swing that carries on while you move.
-local TRAVEL_CENTER_TIME = 5
-local TRAVEL_CENTER_RAMP = 2 -- seconds for that glide to build up speed (no lurch)
--- Auto-running with no fight for a while: a quicker line-up.
-local CALM_AFTER_COMBAT = 60
-local CALM_CENTER_TIME = 2.5
-local CALM_CENTER_RAMP = 0.8
-local CALM_CENTER_YAW = 70
-local CALM_CENTER_PITCH = 40
 local lastCombatAt = -math.huge
 ns.OnCalmEnd(function(cut) lastCombatAt = math.min(lastCombatAt, cut) end)
 -- Cameras whose row (Cameras page) has Wait for the Calm Timer ticked hold
@@ -1890,8 +1857,6 @@ local TURN_SIZE_BOOST_MAX = 1.5
 local TURN_SIZE_GENTLE = 0.5 -- small turns glide at down to half the normal speed
 local turnStarts, wasTurningAny = {}, false
 local TRAVEL_START_AFTER_TURN = 0.6 -- seconds of not turning before a travel camera starts
-local TRAVEL_CENTER_YAW = 40
-local TRAVEL_CENTER_PITCH = 25
 local travelRecenter = false
 -- RP walk turn follow: when you turn, the camera keeps its direction instead
 -- of snapping round with you, then glides round behind your new facing.
@@ -1969,8 +1934,6 @@ local TRAVEL = {
 local FOOT_ORBIT = { idleOrbit = true, walkOrbit = true, runOrbit = true, cozyOrbit = true }
 -- (The vista and fish cameras always start afresh, so they can line up behind you first.)
 local FOOT_ZOOM = { idle = true, walk = true, run = true, cozy = true, vista = true, fish = true }
--- Modes that line up behind you before they start (cozy then swings round).
-local LINEUP_ORBIT = { walkOrbit = true, runOrbit = true, vistaOrbit = true, fishOrbit = true }
 -- Modes whose sway favours angles near directly behind (the way you face).
 local TRAVEL_ORBIT = { walkOrbit = true, runOrbit = true, vistaOrbit = true, fishOrbit = true }
 -- Indoors (with the indoor limits on): smaller swings and zoom, so the
@@ -3812,34 +3775,10 @@ function ns.UpdateOrbit(cinematic, elapsed)
 				ns.orbit.continuous = false -- its own slow turn, eased in from a standstill
 				ns.DeathTestLog("turn started")
 			end
-			-- Start moving straight away, except while the takeoff swing is
-			-- still bringing the camera round behind the character.
-			local wait = onTaxi and math.max(0, (ns.orbit.centerUntil or 0) - now) or 0
-			if onTaxi and ns.orbit.newReference then
-				-- Picking up mid-flight after you moved the camera: swing back
-				-- behind you first, and sway from there.
-				wait = math.max(wait, ns.RecenterFlight())
-			end
-			if LINEUP_ORBIT[prefix] then
-				-- RP walk / auto-run / vista starting (or picking up after you moved
-				-- the camera): glide round behind you first, then sway from there.
-				-- Auto-running well clear of any fight: a quicker line-up, so the
-				-- travel camera gets going sooner.
-				if prefix == "runOrbit" and now - lastCombatAt > CALM_AFTER_COMBAT then
-					CenterCamera(CALM_CENTER_TIME, CALM_CENTER_YAW, CALM_CENTER_PITCH, CALM_CENTER_RAMP)
-					wait = CALM_CENTER_TIME
-				elseif prefix == "vistaOrbit" or prefix == "fishOrbit" then
-					-- Vista: an unhurried glide (8 sec at up to 30 deg/sec yaw and 20
-					-- tilt, building up over 3 sec), long enough to come round from in
-					-- front without being cut off mid-swing.
-					CenterCamera(8, 30, 20, 3)
-					wait = 8
-				else
-					CenterCamera(TRAVEL_CENTER_TIME, TRAVEL_CENTER_YAW, TRAVEL_CENTER_PITCH, TRAVEL_CENTER_RAMP)
-					wait = TRAVEL_CENTER_TIME
-				end
-				travelRecenter = true
-			end
+			-- Start moving straight away. (No swing round behind you first, at
+			-- takeoff, mid-flight or setting off walking: those leaned on camera
+			-- follow, which doesn't turn the camera.)
+			local wait = 0
 			local mode = OrbitSetting("Mode")
 			local opening = ns.db.idleOpeningDrift
 			if wait == 0 and not onTaxi and opening > 0 and (mode == "random" or mode == "back") then
@@ -4925,16 +4864,6 @@ function ns.FlightTakenOver()
 	return flightSince ~= nil and lastCameraInput > flightSince
 end
 
-function ns.RecenterFlight()
-	if not (ns.db.enabled and ns.db.taxiCenter) or ns.FlightTakenOver() then
-		return 0
-	end
-	ns.ApplyCVarSet(ns.FLIGHT_CVARS, false)
-	CenterCamera(nil, nil, 0, 1.5) -- (turn only: the height you left it at stays; easing in)
-	ns.orbit.centerUntil = GetTime() + RECENTER_TIME
-	return RECENTER_TIME
-end
-
 function ns.UpdateTaxi()
 	local onTaxi = ns.OnTaxi()
 	local now = GetTime()
@@ -4996,14 +4925,6 @@ function ns.UpdateTaxi()
 	if onTaxi and not flightCamStarted and ns.FlightCameraOn() then
 		flightCamStarted = true
 		ns.orbit.angle, ns.orbit.pitch = 0, 0
-		if ns.db.enabled and ns.db.taxiCenter then
-			-- Round behind you, turning only: the height stays as you had it at
-			-- takeoff, which the flight camera then tracks from (so the settle
-			-- before landing puts it back there). Camera follow would otherwise
-			-- shift the height too, out of sight of that tracking.
-			CenterCamera(nil, nil, 0, 1.5) -- (easing in over 1.5 sec rather than starting at full speed)
-			ns.orbit.centerUntil = now + RECENTER_TIME
-		end
 	end
 
 	-- Settle: before a known landing, turn the camera back behind you so it's

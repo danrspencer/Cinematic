@@ -24,14 +24,14 @@ Between fights it fades your UI away, adds letterbox bars and a color tint that 
 
 Each situation has its own camera, and they hand over seamlessly:
 
-* **Flight Cam:** swings behind you at takeoff, sways through the journey, and settles behind you before landing. Each route is timed as you fly it, so the next time it knows when you'll land. It allows for the Frequent Flier legacy talent, and if every flight speeds up for some other reason, one flight on a route it knows is enough to correct them all. Random fly-bys turn the camera slowly round to look back at the view, then return.
+* **Flight Cam:** sways through the journey and turns back to where it started before landing. Each route is timed as you fly it, so the next time it knows when you'll land. It allows for the Frequent Flier legacy talent, and if every flight speeds up for some other reason, one flight on a route it knows is enough to correct them all. Random fly-bys turn the camera slowly round to look back at the view, then return.
 * **AFK Cam:** stand still for a while, or go AFK, and the camera slowly sweeps around your character and drifts in and out.
-* **RP Walk Cam:** auto-walk (auto-run in walk mode) and the camera sways gently behind you. It holds steady through turns, then glides round to your new heading.
+* **RP Walk Cam:** auto-walk (auto-run in walk mode) and the camera sways gently from side to side.
 * **Auto-run Cam:** a travel camera that looks ahead down the road and drifts in and out as you go. On retail it keeps going when you auto-run on a skyriding mount.
-* **Cozy Cam:** rest by a campfire, `/sit`, `/sleep`, `/dance`, `/kneel`, sit in a chair, draw your weapon for a hero shot, or log out away from an inn or city (during the 20-second countdown). The camera swings round to face you, comes in close, and sways softly.
-* **Tele Cam:** cast your Hearthstone or a teleport and the camera swings round in front of you, spinning faster and faster as it zooms in until you're gone, then swings round behind you where you arrive. Cancel the cast and it turns back and zooms back out.
-* **Vista Cam:** `/stare` out at the view and the camera lines up behind you, lowers, and takes it in.
-* **Fish Cam:** cast Fishing and the camera settles behind you with the bobber in view. Right-click (or a gamepad button) to cast again.
+* **Cozy Cam:** rest by a campfire, `/sit`, `/sleep`, `/dance`, `/kneel`, sit in a chair, draw your weapon for a hero shot, or log out away from an inn or city (during the 20-second countdown). The camera turns half round (facing you, if it started behind you), comes in close, and sways softly.
+* **Tele Cam:** cast your Hearthstone or a teleport and the camera turns half round, spinning faster and faster as it zooms in until you're gone. Cancel the cast and it turns back and zooms back out.
+* **Vista Cam:** `/stare` out at the view and the camera lowers and takes it in.
+* **Fish Cam:** cast Fishing and the camera sways gently with the bobber in view. Right-click (or a gamepad button) to cast again.
 * **Quest Cam:** talk to a quest giver and the camera eases in close and comes round to a dialogue shot past your shoulder. It goes back when you close the window.
 * **Death Cam:** when you die, the camera rises and circles slowly round your body over a cold, dimmed screen, with a song of its own. You can also start it from a key or the camera wheel to see it without dying.
 * **Camera wheel:** hold its key and a ring of camera icons comes up round your cursor. Point at one and let go to start that camera, or tap the key and click one.

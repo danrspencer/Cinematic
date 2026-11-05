@@ -41,10 +41,23 @@ local MAX_STEPS = 80        -- steps in a script, all lists and depths together
 local MAX_DEPTH = 8         -- Together, Repeat and Wait until inside each other (the flight cruise goes 7 deep)
 local MAX_SCRIPTS = 30
 local MAX_PLAYS = 3         -- Play steps inside each other (a camera playing itself, say)
-local EASES = { smooth = 0.5, gentle = 0.35, steady = 0.15 } -- share of a move spent speeding up (and slowing down)
+-- Each: the share of a move spent speeding up and slowing down (both ends
+-- alike), or { speeding up, slowing down } for one end only: in eases in and
+-- ends at full speed (to hand over to the next turn the same way), out sets
+-- off at full speed and eases to a stop.
+local EASES = { smooth = 0.5, gentle = 0.35, steady = 0.15, none = 0, ["in"] = { 0.5, 0 }, out = { 0, 0.5 } }
 local FOLLOW_CVARS = ns.CVarSet("Follow off: camera script", "camera follow off while a script plays",
 	{ values = { cameraSmoothStyle = "0" } }) -- camera follow off meanwhile
-ns.CAMERA_SCRIPT_EASES = { "smooth", "gentle", "steady" }
+-- Speed up and Slow down (speedUp, slowDown): each end's ramp on its own,
+-- as a share of the move (none: full speed at that end).
+local RAMP = { none = 0, short = 0.15, medium = 0.35, long = 0.5 }
+ns.CAMERA_SCRIPT_RAMPS = { "none", "short", "medium", "long" }
+-- An Ease from before (and a sway's, which keeps one: its drift follows on
+-- from its own end) as Speed up and Slow down.
+local EASE_RAMPS = { smooth = { "long", "long" }, gentle = { "medium", "medium" }, steady = { "short", "short" },
+	["in"] = { "long", "none" }, out = { "none", "long" }, none = { "none", "none" } }
+ns.CAMERA_SCRIPT_EASES = { "smooth", "gentle", "steady", "none" }
+local SWAY_EASES = ns.CAMERA_SCRIPT_EASES
 
 -- ---------------------------------------------------------------------------
 -- The steps
@@ -57,60 +70,65 @@ ns.CAMERA_SCRIPT_KINDS = {
 	-- (way "once": either way, picked as the script starts and the same for
 	-- every such turn in it. of "yours": yards from your own distance as it
 	-- started, out positive, rather than from you.)
+	-- (blend: seconds its speed slides from what the turn before it was going
+	-- at, when that one handed straight over to it, the same way: Handover.
+	-- 0: its own speed straight away.)
+	-- (speedUp, slowDown: see RAMP. Their places on the page: two to a row.)
 	rotate = { fields = { { "deg", "num", 1, 3600, 45 }, { "secs", "num", 0.5, 600, 4 },
-		{ "way", "pick", { "left", "right", "random", "once" }, "left" },
-		{ "ease", "pick", ns.CAMERA_SCRIPT_EASES, "smooth" } } },
-	tilt = { fields = { { "deg", "num", -80, 80, 10 }, { "secs", "num", 0.5, 600, 3 } } },
+		{ "way", "pick", { "left", "right", "random", "once" }, "left" }, { "blend", "num", 0, 10, 0 },
+		{ "speedUp", "pick", ns.CAMERA_SCRIPT_RAMPS, "long" }, { "slowDown", "pick", ns.CAMERA_SCRIPT_RAMPS, "long" } } },
+	-- (rand "give": to deg from where the scene started, give or take up
+	-- (higher) and down (lower), picked each time: was Tilt at random. Else
+	-- deg more from where it is.)
+	tilt = { fields = { { "deg", "num", -80, 80, 10 }, { "secs", "num", 0.5, 600, 3 },
+		{ "rand", "pick", { "no", "give" }, "no" }, { "blend", "num", 0, 10, 0 },
+		{ "up", "num", 0, 80, 5 }, { "down", "num", 0, 80, 3 },
+		{ "speedUp", "pick", ns.CAMERA_SCRIPT_RAMPS, "long" }, { "slowDown", "pick", ns.CAMERA_SCRIPT_RAMPS, "long" } } },
 	-- (fit "cast": over the time a Hearthstone or teleport cast has left
 	-- instead of secs, as the tele camera's zoom in goes. speed: yards a
 	-- second at its fastest, secs then the longest it takes; 0 goes by secs.
 	-- past "yes": the game's max zoom distance raised meanwhile, as far as 2.6
 	-- times, so a zoom out isn't cut short at yours.)
-	zoom = { fields = { { "to", "num", -50, 50, 5 }, { "secs", "num", 0.5, 600, 3 },
-		{ "of", "pick", { "yards", "yours" }, "yards" }, { "fit", "pick", { "secs", "cast" }, "secs" },
-		{ "speed", "num", 0, 20, 0 }, { "ease", "pick", ns.CAMERA_SCRIPT_EASES, "gentle" },
-		{ "past", "pick", { "no", "yes" }, "no" } } },
-	zoomRand = { fields = { { "min", "num", -50, 50, 3 }, { "max", "num", -50, 50, 8 }, { "secs", "num", 0.5, 600, 6 },
-		{ "of", "pick", { "yards", "yours" }, "yards" }, { "speed", "num", 0, 20, 0 },
-		{ "ease", "pick", ns.CAMERA_SCRIPT_EASES, "gentle" }, { "past", "pick", { "no", "yes" }, "no" } } },
-	lineup = { fields = { { "secs", "num", 0.5, 600, 3 } } },
-	wait = { fields = { { "secs", "num", 0, 3600, 2 } } },
+	-- (rand "between": somewhere from to to max, picked each time: was Zoom
+	-- at random.)
+	zoom = { fields = { { "rand", "pick", { "no", "between" }, "no" }, { "of", "pick", { "yards", "yours" }, "yards" },
+		{ "to", "num", -50, 50, 5 }, { "max", "num", -50, 50, 8 },
+		{ "secs", "num", 0.5, 600, 3 }, { "fit", "pick", { "secs", "cast" }, "secs" },
+		{ "speed", "num", 0, 20, 0 }, { "past", "pick", { "no", "yes" }, "no" },
+		{ "speedUp", "pick", ns.CAMERA_SCRIPT_RAMPS, "medium" }, { "slowDown", "pick", ns.CAMERA_SCRIPT_RAMPS, "medium" } } },
+	-- Waits for something: secs going by (time; rand "between": somewhere
+	-- from secs to max, picked each time), a cast secs from done (cast),
+	-- landing in secs (landing: a route flown before; else touchdown), coming
+	-- back to life (alive), or someone other than the one last aimed at
+	-- saying something (talk). With steps of its own, it runs them meanwhile
+	-- and, once it's time, eases them to a stop and goes on. (No cast, flight
+	-- or death under way: nothing to end, it waits on, running them.) Was
+	-- Wait, Wait at random and Wait until.
+	wait = { group = true, fields = { { "what", "pick", { "time", "cast", "landing", "alive", "talk" }, "time" },
+		{ "rand", "pick", { "no", "between" }, "no" }, { "secs", "num", 0, 3600, 2 }, { "max", "num", 0, 3600, 6 } } },
 	emote = { fields = { { "token", "text", "wave" } } },
+	-- Undo its turns: every turn and tilt the scene made taken back, by the
+	-- running total of them (the game never says where the camera points:
+	-- each turn is sent as a speed for a time, and added up). Your own camera
+	-- input starts the total again from where you leave it (ForgetTurns).
 	-- (zoom "no": the zoom left where it is, a zoom step beside it say.)
 	putback = { fields = { { "secs", "num", 0.5, 600, 3 }, { "zoom", "pick", { "yes", "no" }, "yes" } } },
-	-- (Turn to face you: counted from where the script started. There's no
-	-- turning behind you: that leaned on the game's camera follow, which
-	-- doesn't turn the camera; older ones are dropped, CleanSteps.)
-	-- (fit "cast": there by the time a cast is teleArriveEarly from done, as
-	-- the tele camera swings round.)
-	turnTo = { fields = { { "to", "pick", { "front" }, "front" },
-		{ "secs", "num", 0.5, 600, 6 }, { "fit", "pick", { "secs", "cast" }, "secs" } } },
-	-- A random spot within arc degrees of behind (or in front), at least min
-	-- from where it is (favor: nearer the middle, as the vista and fish cameras
+	-- (No Turn to or Line up: the game never says which way the camera
+	-- points, let alone where you are on screen, so "face you" was only 180
+	-- degrees from the start and "behind you" only back to it. Older ones
+	-- become a Rotate 180 and an Undo its turns, CleanSteps.)
+	-- A random spot within arc degrees of where it was as this sway first ran
+	-- in the scene (SwayCenter), at least min from where it is (favor: nearer the middle, as the vista and fish cameras
 	-- like), over secs; then creeping on the same way at drift degrees a second
 	-- through pause seconds, flowing straight out of the turn and easing off
 	-- before the arc's edge.
-	sway = { fields = { { "around", "pick", { "behind", "front" }, "behind" }, { "arc", "num", 1, 180, 30 },
-		{ "min", "num", 0, 180, 10 }, { "secs", "num", 0.5, 600, 10 }, { "ease", "pick", ns.CAMERA_SCRIPT_EASES, "smooth" },
+	sway = { fields = { { "arc", "num", 1, 180, 30 },
+		{ "min", "num", 0, 180, 10 }, { "secs", "num", 0.5, 600, 10 }, { "ease", "pick", SWAY_EASES, "smooth" },
 		{ "drift", "num", 0, 30, 0.5 }, { "pause", "num", 0, 600, 15 }, { "favor", "pick", { "no", "yes" }, "no" } } },
-	-- A random height: deg down from where it started (negative: up), give or
-	-- take down and up.
-	tiltRand = { fields = { { "deg", "num", -80, 80, 5 }, { "down", "num", 0, 80, 3 }, { "up", "num", 0, 80, 5 },
-		{ "secs", "num", 0.5, 600, 3 } } },
-	-- Round and round, speeding up accel degrees a second each second to max;
-	-- secs 0: until the camera ends.
-	spin = { fields = { { "accel", "num", 0.5, 100, 8 }, { "max", "num", 1, 360, 120 }, { "secs", "num", 0, 3600, 0 },
-		{ "way", "pick", { "left", "right", "random", "once" }, "left" } } },
-	-- Waits for something: a cast secs from done (cast), landing in secs
-	-- (landing: a route flown before; else touchdown), coming back to life
-	-- (alive), or secs going by (time). With steps of its own, it runs them
-	-- meanwhile and, once it's time, eases them to a stop and goes on. (No cast,
-	-- flight or death under way: nothing to end, it waits on, running them.)
-	-- (talk: someone other than the one last aimed at says something.)
-	["until"] = { group = true, fields = { { "what", "pick", { "cast", "landing", "alive", "talk", "time" }, "time" },
-		{ "secs", "num", 0, 3600, 5 } } },
-	-- Waits somewhere between min and max seconds, picked each time.
-	waitRand = { fields = { { "min", "num", 0, 3600, 20 }, { "max", "num", 0, 3600, 60 } } },
+	-- Round and round, from start degrees a second (0: from still), speeding
+	-- up accel degrees a second each second to max; secs 0: until the camera ends.
+	spin = { fields = { { "start", "num", 0, 360, 0 }, { "accel", "num", 0.5, 100, 8 }, { "max", "num", 1, 360, 120 }, { "secs", "num", 0, 3600, 0 },
+		{ "way", "pick", { "left", "right", "random", "once" }, "left" }, { "blend", "num", 0, 10, 0 } } },
 	-- Toward who you're talking to. at "click": deg degrees round to the side
 	-- of the screen you clicked them on, as the quest cam turns (opened with
 	-- a key, no click: miss). at "speaker": toward the one talking now, by
@@ -122,7 +140,8 @@ ns.CAMERA_SCRIPT_KINDS = {
 	-- 0 goes by secs.
 	aim = { fields = { { "at", "pick", { "click", "speaker" }, "click" }, { "deg", "num", 0, 90, 30 },
 		{ "secs", "num", 0.5, 600, 4 }, { "miss", "pick", { "random", "stay", "look" }, "random" },
-		{ "ease", "pick", ns.CAMERA_SCRIPT_EASES, "smooth" }, { "speed", "num", 0, 90, 0 } } },
+		{ "speed", "num", 0, 90, 0 },
+		{ "speedUp", "pick", ns.CAMERA_SCRIPT_RAMPS, "long" }, { "slowDown", "pick", ns.CAMERA_SCRIPT_RAMPS, "long" } } },
 	-- Another camera's steps, here (not its stop rules or When it ends), as
 	-- they are now: a built-in one follows your settings. Cameras playing
 	-- cameras go MAX_PLAYS deep at most.
@@ -130,11 +149,37 @@ ns.CAMERA_SCRIPT_KINDS = {
 	-- Music a camera started fades out over secs and ends (your own game music
 	-- is left alone). It doesn't wait: the steps after it go on meanwhile.
 	endMusic = { fields = { { "secs", "num", 0, 60, 3 } } },
+	-- Follow your turns, until the camera ends (beside the rest in a
+	-- Together): while you turn, the view is turned back as far, so it holds
+	-- its direction instead of swinging round with you; after seconds
+	-- of not turning, it glides round behind your new facing, lazy seconds
+	-- of laziness (the further off, the quicker), top degrees a second at
+	-- most, speeding up and slowing down by accel. corners "yes": bigger turns
+	-- glide back quicker, small ones gentler. steer "yes": several turns in
+	-- a row (steering) glide sooner and quicker. most (degrees, 0: none):
+	-- the furthest it lets the view fall behind a turn; past it, the view
+	-- turns with you (a long skyriding turn would put it in front of you).
+	-- Its own turns go out
+	-- meanwhile: the script's other turns wait for it (a sway carries on
+	-- after). (The RP walk and auto-run cameras' turn follow, Camera.lua's
+	-- UpdateTurnFollow.)
+	follow = { fields = { { "after", "num", 0, 10, 1.5 }, { "lazy", "num", 0.2, 10, 1.6 }, { "top", "num", 5, 180, 40 },
+		{ "accel", "num", 5, 360, 30 }, { "corners", "pick", { "no", "yes" }, "no" },
+		{ "steer", "pick", { "yes", "no" }, "yes" }, { "most", "num", 0, 180, 0 } } },
 	together = { group = true, fields = {} },
 	["repeat"] = { group = true, fields = { { "times", "num", 0, 100, 2 } } },
 }
-ns.CAMERA_SCRIPT_ADDABLE = { "rotate", "tilt", "zoom", "zoomRand", "lineup", "wait", "together", "repeat", "emote",
-	"putback", "turnTo", "sway", "tiltRand", "spin", "until", "waitRand", "aim", "play", "endMusic" }
+-- The page's add buttons, in their groups (headers: CameraScriptsPage.lua).
+ns.CAMERA_SCRIPT_ADD_GROUPS = {
+	{ key = "move", kinds = { "rotate", "tilt", "zoom", "spin", "sway", "aim", "follow", "putback" } },
+	{ key = "wait", kinds = { "wait" } },
+	{ key = "group", kinds = { "together", "repeat" } },
+	{ key = "other", kinds = { "emote", "play", "endMusic" } },
+}
+ns.CAMERA_SCRIPT_ADDABLE = {}
+for _, group in ipairs(ns.CAMERA_SCRIPT_ADD_GROUPS) do
+	for _, kind in ipairs(group.kinds) do ns.CAMERA_SCRIPT_ADDABLE[#ns.CAMERA_SCRIPT_ADDABLE + 1] = kind end
+end
 local KINDS = ns.CAMERA_SCRIPT_KINDS
 
 -- The stop rules: each event's actions (the first is its default).
@@ -152,6 +197,39 @@ local RULE_ACTIONS = {}
 for _, rule in ipairs(ns.CAMERA_SCRIPT_RULES) do
 	RULE_ACTIONS[rule.key] = {}
 	for _, action in ipairs(rule.actions) do RULE_ACTIONS[rule.key][action] = true end
+end
+
+-- A step's Ease from before (or a built-in's, written that way) as its
+-- Speed up and Slow down, in place, for kinds that have them now.
+local function HasRamps(kind)
+	local def = KINDS[kind]
+	if not def then return false end
+	for _, field in ipairs(def.fields) do
+		if field[1] == "speedUp" then return true end
+	end
+	return false
+end
+local function TakeOldEase(step)
+	if type(step) ~= "table" or step.ease == nil or not HasRamps(step.k) then return step end
+	local ramps = EASE_RAMPS[step.ease]
+	if ramps then
+		if step.speedUp == nil then step.speedUp = ramps[1] end
+		if step.slowDown == nil then step.slowDown = ramps[2] end
+	end
+	step.ease = nil
+	return step
+end
+ns.UpgradeCameraScriptStep = TakeOldEase
+
+-- How a step's move speeds up and slows down: { speeding up, slowing down }
+-- shares (Speed up and Slow down), or a sway's one Ease.
+local function StepEase(step)
+	if step.speedUp ~= nil or step.slowDown ~= nil then
+		return { RAMP[step.speedUp] or RAMP.long, RAMP[step.slowDown] or RAMP.long }
+	end
+	local ramps = EASE_RAMPS[step.ease]
+	if ramps then return { RAMP[ramps[1]], RAMP[ramps[2]] } end
+	return EASES.smooth
 end
 
 -- A step with its kind's defaults.
@@ -195,14 +273,59 @@ ns.CleanCameraScriptField = CleanField
 -- switched off by one (step.off: shown greyed, not run; a copy leaves them out).
 -- (paths: given, each step kept is noted in it with its place in the list as
 -- its page shows it, prefix first: "2.1".)
+-- An old step that's gone, as what it really did: Turn to (face you) a
+-- Rotate 180 either way, Line up (behind you) an Undo its turns leaving the
+-- zoom be. A turn behind you, from before that: dropped (it leaned on camera
+-- follow, which does nothing), as Follow is by having no kind now.
+-- Steps folded into others (2026-11-05): Zoom at random a Zoom with
+-- Random, Tilt at random a Tilt with Random, Wait at random and Wait until
+-- a Wait. A copy, the old one's settings carried over.
+local FOLDED = {
+	zoomRand = function(old, new)
+		new.k, new.rand, new.to, new.max, new.min = "zoom", "between", old.min, old.max, nil
+	end,
+	tiltRand = function(old, new)
+		new.k, new.rand = "tilt", "give"
+		if old.ease == nil and old.speedUp == nil then new.speedUp, new.slowDown = "long", "long" end
+	end,
+	waitRand = function(old, new)
+		new.k, new.rand, new.secs, new.max, new.min = "wait", "between", old.min, old.max, nil
+	end,
+	["until"] = function(_, new) new.k = "wait" end,
+}
+local function Unfold(step)
+	local fold = type(step) == "table" and FOLDED[step.k]
+	if not fold then return step end
+	local copy = {}
+	for k, v in pairs(step) do copy[k] = v end
+	fold(step, copy)
+	return copy
+end
+
+local function OldStep(step)
+	if type(step) ~= "table" then return step end
+	step = Unfold(step)
+	if step.ease ~= nil and HasRamps(step.k) then
+		local copy = {}
+		for k, v in pairs(step) do copy[k] = v end
+		step = TakeOldEase(copy)
+	end
+	if step.k == "turnTo" then
+		if step.to == "behind" then return nil end
+		return { k = "rotate", deg = 180, secs = step.fit ~= "cast" and step.secs or 6, way = "random",
+			speedUp = "long", slowDown = "long", set = step.set, off = step.off }
+	elseif step.k == "lineup" then
+		return { k = "putback", secs = step.secs, zoom = "no", set = step.set, off = step.off }
+	end
+	return step
+end
+
 local function CleanSteps(list, depth, budget, keepSet, paths, prefix)
 	local out = {}
 	if type(list) ~= "table" then return out end
 	for i, step in ipairs(list) do
+		step = OldStep(step)
 		local def = type(step) == "table" and KINDS[step.k]
-		-- (A turn behind you, from before it went: dropped, as Follow is by
-		-- having no kind now. Both leaned on camera follow, which does nothing.)
-		if def and step.k == "turnTo" and step.to == "behind" then def = nil end
 		if def and budget.left > 0 and not (def.group and depth >= MAX_DEPTH) and (keepSet or not step.off) then
 			budget.left = budget.left - 1
 			local clean = { k = step.k }
@@ -277,9 +400,13 @@ end
 -- ---------------------------------------------------------------------------
 
 local function S(kind, fields)
-	local step = ns.NewCameraScriptStep(kind)
-	for k, v in pairs(fields or {}) do step[k] = v end
-	return step
+	local raw = { k = kind }
+	for k, v in pairs(fields or {}) do raw[k] = v end
+	raw = Unfold(raw)
+	local step = ns.NewCameraScriptStep(raw.k)
+	if raw.ease ~= nil and HasRamps(raw.k) then step.speedUp, step.slowDown = nil, nil end
+	for k, v in pairs(raw) do step[k] = v end
+	return TakeOldEase(step)
 end
 
 local RestCamera, MovingCamera -- (below)
@@ -312,8 +439,8 @@ end
 
 -- Over and over (o: the camera's orbit setting prefix, a switch itself): a
 -- random height (level degrees down, levelKey's, give or take PitchDown and
--- PitchUp) and a sway within BackArc of behind (front: of your front), at
--- least MinChange on, over MoveTime, drifting on at DriftSpeed (Drift)
+-- PitchUp) and a sway within BackArc of where it first was (front: the cozy
+-- camera's, after its half turn; no leaning to the middle), at least MinChange on, over MoveTime, drifting on at DriftSpeed (Drift)
 -- through Pause; the height and the sway together.
 local function SwayLoop(o, level, levelKey, front)
 	-- (The height over the sway's turn, beside it: as the cameras' own code
@@ -323,7 +450,7 @@ local function SwayLoop(o, level, levelKey, front)
 	if levelKey then Set(height, levelKey, o .. "PitchDown", o .. "PitchUp") else Set(height, o .. "PitchDown", o .. "PitchUp") end
 	-- (Auto-run's lowest tilt: the real camera's, while you steer; shown here.)
 	if o == "runOrbit" then table.insert(height.set, "runOrbitPitchFloor") end
-	local sway = Set(S("sway", { around = front and "front" or "behind", arc = Db(o .. "BackArc", 30),
+	local sway = Set(S("sway", { arc = Db(o .. "BackArc", 30),
 		min = Db(o .. "MinChange", 10), secs = Db(o .. "MoveTime", 10), ease = NearestEase(Db(o .. "Ease", 0.5)),
 		drift = Switch(o .. "Drift") and Db(o .. "DriftSpeed", 0.5) or 0, pause = Db(o .. "Pause", 15),
 		favor = front and "no" or "yes" }), o .. "BackArc", o .. "MinChange", o .. "MoveTime", o .. "Ease", o .. "Pause",
@@ -358,7 +485,7 @@ end
 -- A standing-still camera that sways (vista, fish, cozy), from its settings
 -- (<cam>Orbit..., <cam>Level, <cam>Zoom...). Vista and fish: the sways round
 -- Level beside the slow zoom, from where the camera is.
--- Cozy: swings round in front of you while zooming in to cozyZoomClose,
+-- Cozy: half a turn round (180 degrees from where it started) while zooming in to cozyZoomClose,
 -- then the same round your front, its zoom drifting about the close-up.
 -- Leaving, the zoom goes back to where it began; the turn stays (as theirs
 -- do). (Not the same yet: the cozy camera doesn't keep clear of Camp Tents.)
@@ -376,7 +503,7 @@ function RestCamera(cam)
 			Set(ZoomStepOf(z, "zoomRand", { min = close - near, max = close + far, secs = time }), "cozyZoomClose",
 				z .. "In", z .. "Distance", z .. "Time", z .. "Ease", z .. "PastMax") } }), z .. "Random"),
 			Switch(z) and Switch(z .. "Random"))
-		steps = { S("together", { steps = { S("turnTo", { to = "front", secs = 14 }),
+		steps = { S("together", { steps = { S("rotate", { deg = 180, secs = 14, way = "random" }),
 				On(Set(S("zoom", { to = close, secs = 9 }), z, "cozyZoomClose"), Switch(z)) } }),
 			S("together", { steps = { loop, drifts } }) }
 	else
@@ -396,14 +523,21 @@ function RestCamera(cam)
 end
 
 -- The RP walk and auto-run cameras (walkOrbit, runOrbit): swaying and
--- zooming. Stopping: the zoom goes back. (Not the same yet: auto-run
--- steering lower and closer, and the walk camera handing over to standing
--- still.) No line-up behind you, nor a glide back behind you after your
--- turns: those leaned on the game's camera follow, which doesn't turn the
--- camera (user, 2026-11-05).
+-- zooming, and following your turns (<cam>SwingBehind: held, then a glide
+-- back behind you <cam>GlideDelay after; auto-run's quicker, and quicker
+-- still round corners). Stopping: the zoom goes back. (Not the same yet:
+-- auto-run steering lower and closer, and the walk camera handing over to
+-- standing still.) No line-up behind you: that leaned on the game's camera
+-- follow, which doesn't turn the camera (user, 2026-11-05).
+local FOLLOW_OF = { walk = { lazy = 1.6, top = 40, accel = 30, corners = "no" },
+	run = { lazy = 1, top = 70, accel = 60, corners = "yes" } }
 function MovingCamera(cam)
+	local glide = FOLLOW_OF[cam]
+	local follow = On(Set(S("follow", { after = Db(cam .. "GlideDelay", cam == "run" and 0.5 or 1.5), lazy = glide.lazy,
+		top = glide.top, accel = glide.accel, corners = glide.corners }), cam .. "SwingBehind", cam .. "GlideDelay"),
+		Switch(cam .. "SwingBehind"))
 	return {
-		steps = { S("together", { steps = { SwayLoop(cam .. "Orbit", 0), ZoomGroup(cam .. "Zoom") } }) },
+		steps = { S("together", { steps = { SwayLoop(cam .. "Orbit", 0), ZoomGroup(cam .. "Zoom"), follow } }) },
 		ending = { On(Set(S("zoom", { to = 0, secs = 2, of = "yours" }), cam .. "Zoom"), Switch(cam .. "Zoom")) },
 		rules = { camera = "pause", cameraSecs = Db(cam .. "InputPause", 2), fight = "stop", walk = "ignore", zoom = "ignore",
 			ends = "putback" },
@@ -461,27 +595,31 @@ local BUILT_IN = {
 	{ id = "fish", name = "Fish camera", make = function() return RestCamera("fish") end },
 	{ id = "cozy", name = "Cozy camera", make = function() return RestCamera("cozy") end },
 	-- The tele camera (a Hearthstone or teleport cast, about 10 seconds): over
-	-- 10 seconds, comes down teleLevel, swings round in front of you, then
-	-- spins round you, speeding up by teleSpinAccel to teleSpinMax, while
-	-- zooming in to teleZoomClose (teleZoom). A plain 10 seconds, not timed
+	-- 5 seconds, comes down teleLevel as it turns half round (180 degrees) to
+	-- the left, building up and ending at full speed (48 degrees a second),
+	-- then spins on from that speed for 5 seconds, speeding up by
+	-- teleSpinAccel to teleSpinMax, while zooming in to teleZoomClose
+	-- (teleZoom). (As the user set it up on retail, 2026-11-05.) A plain 10 seconds, not timed
 	-- to the cast: the scene starts it, the script plays as listed, and the
 	-- Your cast ends rule ends it with the cast (a quicker one with haste too). Cancelled: it turns back (teleReturn) and zooms back over
-	-- teleZoomBackTime. (Arriving, the real camera swings round behind you,
-	-- teleBehind, shown with When it ends.)
+	-- teleZoomBackTime.
 	{ id = "tele", name = "Tele camera", make = function()
 		-- (The turns one after another, beside the zoom over the whole cast: a Repeat once.)
+		-- (The tilt down beside the half turn, both at once.)
 		local turns = S("repeat", { times = 1, steps = {
-			Set(S("tilt", { deg = Db("teleLevel", 15), secs = 1.5 }), "teleLevel"),
-			S("turnTo", { to = "front", secs = 5 }),
-			Set(S("spin", { accel = Db("teleSpinAccel", 8), max = Db("teleSpinMax", 120), secs = 3, way = "random" }),
-				"teleSpinAccel", "teleSpinMax") } })
+			S("together", { steps = { Set(S("tilt", { deg = Db("teleLevel", 15), secs = 5 }), "teleLevel"),
+				S("rotate", { deg = 180, secs = 5, way = "left", speedUp = "long", slowDown = "none" }) } }),
+			-- (Start: the half turn's speed as it ends, 180 degrees in 5 seconds with
+			-- the first half building up: one turn, no change of speed.)
+			Set(S("spin", { start = 48, accel = Db("teleSpinAccel", 14), max = Db("teleSpinMax", 120), secs = 5,
+				way = "left" }), "teleSpinAccel", "teleSpinMax") } })
 		local zoom = On(Set(S("zoom", { to = Db("teleZoomClose", 4), secs = 10 }), "teleZoom", "teleZoomClose"),
 			Switch("teleZoom"))
 		local back = math.max(0.5, Db("teleZoomBackTime", 0.5))
 		return {
 			steps = { S("together", { steps = { turns, zoom } }) },
-			ending = { Switch("teleReturn") and Set(S("putback", { secs = back }), "teleReturn", "teleZoomBackTime", "teleBehind")
-				or Set(S("zoom", { to = 0, secs = back, of = "yours" }), "teleReturn", "teleZoomBackTime", "teleBehind") },
+			ending = { Switch("teleReturn") and Set(S("putback", { secs = back }), "teleReturn", "teleZoomBackTime")
+				or Set(S("zoom", { to = 0, secs = back, of = "yours" }), "teleReturn", "teleZoomBackTime") },
 			rules = { camera = "stop", fight = "putback", walk = "putback", zoom = "ignore", ends = "putback",
 				cast = "putback" },
 		}
@@ -508,7 +646,7 @@ local BUILT_IN = {
 			steps = { Set(S("until", { what = "landing", secs = settle and Db("taxiSettleLead", 5) + 12 + 3 or 0, steps = {
 					cruise } }), "taxiSettle", "taxiSettleLead"),
 				On(Set(S("zoom", { to = 0, secs = 3, of = "yours" }), "taxiSettle"), settle),
-				On(Set(S("lineup", { secs = 12 }), "taxiSettle"), settle) },
+				On(Set(S("putback", { secs = 12, zoom = "no" }), "taxiSettle"), settle) },
 			ending = { On(Set(S("zoom", { to = 0, secs = 3, of = "yours" }), "taxiLandZoom"), Switch("taxiLandZoom")) },
 			rules = { camera = "pause", cameraSecs = Db("taxiInputPause", 15), fight = "stop", walk = "ignore", zoom = "ignore",
 				ends = "putback" },
@@ -543,17 +681,17 @@ local BUILT_IN = {
 			ruleSet = { button = { "deathExitButton" } },
 		}
 	end },
-	-- A fly-by (the flight camera's): a /look as it starts (flyByLook), round
-	-- flyByAngle from behind you over flyByTurnTime, looking back flyByHold,
-	-- then back behind you over flyByBackTime.
+	-- A fly-by (the flight camera's): a /look as it starts (flyByLook), the
+	-- flight's turns undone, round flyByAngle over flyByTurnTime, looking back
+	-- flyByHold, then its turns undone again over flyByBackTime.
 	{ id = "flyby", name = "Fly-by", make = function()
 		return {
 			steps = { On(Set(S("emote", { token = "look" }), "flyByLook"), Switch("flyByLook")),
-				S("wait", { secs = 1 }), S("lineup", { secs = 1.5 }),
+				S("wait", { secs = 1 }), S("putback", { secs = 1.5, zoom = "no" }),
 				Set(S("rotate", { deg = Db("flyByAngle", 160), secs = Db("flyByTurnTime", 8), way = "random" }), "flyByAngle",
 					"flyByTurnTime"),
 				Set(S("wait", { secs = Db("flyByHold", 5) }), "flyByHold"),
-				Set(S("lineup", { secs = Db("flyByBackTime", 6) }), "flyByBackTime") },
+				Set(S("putback", { secs = Db("flyByBackTime", 6), zoom = "no" }), "flyByBackTime") },
 			ending = {},
 			rules = { camera = "stop", fight = "stop", walk = "stop", zoom = "ignore", ends = "stop" },
 		}
@@ -992,23 +1130,41 @@ local function Wrap(angle)
 	return (angle + 180) % 360 - 180
 end
 
--- Share (0-1) of a move covered at t along T seconds, with ease*T ramps at
--- either end (as QuestCam.lua's EaseProgress).
+-- An ease's ramps, as shares of the move: speeding up, slowing down.
+local function Ramps(ease)
+	if type(ease) == "table" then return ease[1], ease[2] end
+	return ease, ease
+end
+-- The share of a move's time it would take at full speed throughout: its
+-- full speed is the distance over T times this.
+local function Flat(ease)
+	local up, down = Ramps(ease)
+	return 1 - (up + down) / 2
+end
+
+-- Share (0-1) of a move covered at t along T seconds, with half-cosine
+-- ramps at either end (as QuestCam.lua's EaseProgress; one end only for in
+-- and out).
 local function EaseProgress(t, T, ease)
 	if t <= 0 then return 0 end
 	if t >= T then return 1 end
-	local R = ease * T
-	if R <= 0 then return t / T end
-	local function ramp(u) return u / 2 - R / (2 * math.pi) * math.sin(math.pi * u / R) end
-	local covered
-	if t < R then
-		covered = ramp(t)
-	elseif t <= T - R then
-		covered = R / 2 + (t - R)
-	else
-		covered = (T - R) - ramp(T - t)
+	local up, down = Ramps(ease)
+	local A, B = up * T, down * T
+	local total = T - (A + B) / 2
+	if total <= 0 then return t / T end
+	local function ramp(u, R)
+		if R <= 0 then return u end
+		return u / 2 - R / (2 * math.pi) * math.sin(math.pi * u / R)
 	end
-	return covered / (T - R)
+	local covered
+	if t < A then
+		covered = ramp(t, A)
+	elseif t <= T - B then
+		covered = A / 2 + (t - A)
+	else
+		covered = total - ramp(T - t, B)
+	end
+	return covered / total
 end
 ns.CameraScriptEase = EaseProgress
 
@@ -1024,13 +1180,12 @@ end
 -- Speed (0-1) at t along a move of T seconds: half-cosine ramps of ease*T at
 -- either end (as Camera.lua's).
 local function EaseShape(t, T, ease)
-	local R = ease * T
-	if R <= 0 then
-		return 1
-	elseif t < R then
-		return (1 - math.cos(math.pi * t / R)) / 2
-	elseif t > T - R then
-		return (1 - math.cos(math.pi * (T - t) / R)) / 2
+	local up, down = Ramps(ease)
+	local A, B = up * T, down * T
+	if A > 0 and t < A then
+		return (1 - math.cos(math.pi * t / A)) / 2
+	elseif B > 0 and t > T - B then
+		return (1 - math.cos(math.pi * (T - t) / B)) / 2
 	end
 	return 1
 end
@@ -1042,12 +1197,11 @@ local function CurveDistance(curve, T)
 	return sum
 end
 
--- A sway's turn from amount: a random spot within its arc of the middle
--- (behind 0, in front 180), at least min from where it is, the shorter way
--- (as Camera.lua's PickBackTarget, and the vista and fish cameras' leaning
--- toward the middle with favor). random: math.random or the plan's own.
-local function SwayTurn(step, amount, random)
-	local center = step.around == "front" and 180 or 0
+-- A sway's turn from amount: a random spot within its arc of center (where
+-- it was as the sway first ran), at least min from where it is, the shorter
+-- way (as Camera.lua's PickBackTarget, and the vista and fish cameras'
+-- leaning toward the middle with favor). random: math.random or the plan's own.
+local function SwayTurn(step, amount, random, center)
 	local arc, min = step.arc, step.min
 	local here = Wrap(amount - center)
 	local lowEnd, highStart = math.min(here - min, arc), math.max(here + min, -arc)
@@ -1068,14 +1222,13 @@ end
 -- to a stop before the arc's edge). Gives the curve, its seconds, its top
 -- speed, and the still time left of the pause; nil without a drift.
 local DRIFT_STOP = 1.5 -- seconds a drift takes to ease to a stop
-local function SwayCurve(step, delta, from)
+local function SwayCurve(step, delta, from, center)
 	local v, P = step.drift, step.pause
 	if v <= 0 or P <= 0 or math.abs(delta) < 0.5 then return nil end
 	local T, e = step.secs, EASES[step.ease]
 	local c = math.abs(delta) / (T * (1 - e))
 	local R = e * T
 	local dir = delta >= 0 and 1 or -1
-	local center = step.around == "front" and 180 or 0
 	-- (Room to the edge of the arc, the way it's going, after the turn.)
 	local room = step.arc - dir * Wrap(from + delta - center)
 	room = math.max(0, room - v * R / 2)
@@ -1091,8 +1244,26 @@ local function SwayCurve(step, delta, from)
 end
 
 local function SpinCurve(step)
-	local accel, top = step.accel, step.max
-	return function(t) return math.min(top, accel * t) end
+	local accel, top, from = step.accel, step.max, step.start
+	return function(t) return math.min(top, from + accel * t) end
+end
+
+-- A Zoom's yards (Random: somewhere from to to max, picked now), a Random
+-- Tilt's height from where the scene started (deg, give or take up and
+-- down), a Wait's seconds (Random: secs to max). random: math.random or
+-- the plan's own.
+local function ZoomYards(step, random)
+	if step.rand ~= "between" then return step.to end
+	local low, high = math.min(step.to, step.max), math.max(step.to, step.max)
+	return low + random() * (high - low)
+end
+local function TiltTarget(step, random)
+	return step.deg - step.up + random() * (step.up + step.down)
+end
+local function WaitSecs(step, random)
+	if step.rand ~= "between" then return step.secs end
+	local low, high = math.min(step.secs, step.max), math.max(step.secs, step.max)
+	return low + random() * (high - low)
 end
 
 local function ZoomGoal(step, yards, startZoom)
@@ -1103,13 +1274,13 @@ end
 -- top speed gets there sooner.
 local function ZoomSecs(step, secs, distance)
 	if step.speed <= 0 then return secs end
-	return math.min(secs, math.abs(distance) / (step.speed * (1 - EASES[step.ease])))
+	return math.min(secs, math.abs(distance) / (step.speed * Flat(StepEase(step))))
 end
 -- An Aim at's seconds for a turn: its own, or (speed) longer if the turn
 -- would go faster than that.
 local function AimSecs(step, turn)
 	if step.speed <= 0 then return step.secs end
-	return math.max(step.secs, math.abs(turn) / (step.speed * (1 - EASES[step.ease])))
+	return math.max(step.secs, math.abs(turn) / (step.speed * Flat(StepEase(step))))
 end
 
 -- Aim at a speaker (as ChatCam.lua's swing): the camera turns round you, not
@@ -1136,6 +1307,8 @@ function ns.PlanCameraScript(script, start)
 	local state = { yaw = start.yaw, pitch = start.pitch, zoom = start.zoom }
 	local onceLeft = Random() < 0.5
 	local plays = 0 -- (Play steps inside each other)
+	local swayCenters = {} -- (each sway's middle: where it was as it first ran)
+	local stepNow -- (the step whose moves these are, for CameraStepSpeeds)
 	local One
 	local function Run(list, t, top)
 		for _, step in ipairs(list) do t = One(step, t, top or step) end
@@ -1143,7 +1316,8 @@ function ns.PlanCameraScript(script, start)
 	end
 	local function Move(axis, to, t, secs, ease, top)
 		secs = math.max(MOVE_MIN_TIME, secs or 0)
-		moves[#moves + 1] = { axis = axis, from = state[axis], to = to, t0 = t, t1 = t + secs, ease = ease, top = top }
+		moves[#moves + 1] = { axis = axis, from = state[axis], to = to, t0 = t, t1 = t + secs, ease = ease, top = top,
+			step = stepNow }
 		state[axis] = to
 		return t + secs
 	end
@@ -1155,32 +1329,29 @@ function ns.PlanCameraScript(script, start)
 	local function Curve(growing, curve, t, secs, top)
 		local dist = CurveDistance(curve, secs)
 		moves[#moves + 1] = { axis = "yaw", from = state.yaw, to = state.yaw + (growing and dist or -dist), t0 = t,
-			t1 = t + secs, curve = curve, sign = growing and 1 or -1, top = top }
+			t1 = t + secs, curve = curve, sign = growing and 1 or -1, top = top, step = stepNow }
 		state.yaw = state.yaw + (growing and dist or -dist)
 		return t + secs
 	end
 	function One(step, t, top)
+		stepNow = step
 		local from, ending = t, t
 		local k = not step.off and step.k
 		if k == "rotate" then
 			local way = Way(step, Random, onceLeft)
-			ending = Move("yaw", state.yaw + (way == "left" and step.deg or -step.deg), t, step.secs, EASES[step.ease], top)
+			ending = Move("yaw", state.yaw + (way == "left" and step.deg or -step.deg), t, step.secs, StepEase(step), top)
+		elseif k == "tilt" and step.rand == "give" then
+			ending = Move("pitch", start.pitch + TiltTarget(step, Random), t, step.secs, StepEase(step), top)
 		elseif k == "tilt" then
-			ending = step.deg ~= 0 and Move("pitch", state.pitch + step.deg, t, step.secs, 0.5, top) or t
-		elseif k == "zoom" or k == "zoomRand" then
-			local goal
-			if k == "zoom" then
-				goal = ZoomGoal(step, step.to, start.zoom)
-			else
-				local low, high = math.min(step.min, step.max), math.max(step.min, step.max)
-				goal = ZoomGoal(step, low + Random() * (high - low), start.zoom)
-			end
-			ending = Move("zoom", goal, t, ZoomSecs(step, step.secs, goal - state.zoom), EASES[step.ease], top)
-		elseif k == "turnTo" then
-			ending = Move("yaw", state.yaw - Wrap(state.yaw - 180), t, step.secs, 0.5, top)
+			ending = step.deg ~= 0 and Move("pitch", state.pitch + step.deg, t, step.secs, StepEase(step), top) or t
+		elseif k == "zoom" then
+			local goal = ZoomGoal(step, ZoomYards(step, Random), start.zoom)
+			ending = Move("zoom", goal, t, ZoomSecs(step, step.secs, goal - state.zoom), StepEase(step), top)
 		elseif k == "sway" then
-			local delta = SwayTurn(step, state.yaw, Random)
-			local curve, secs, _, still = SwayCurve(step, delta, state.yaw)
+			swayCenters[step] = swayCenters[step] or state.yaw
+			local center = swayCenters[step]
+			local delta = SwayTurn(step, state.yaw, Random, center)
+			local curve, secs, _, still = SwayCurve(step, delta, state.yaw, center)
 			if curve then
 				ending = Curve(delta >= 0, curve, t, secs, top)
 				if still > 0 then ending = Hold(ending, still, top) end
@@ -1188,15 +1359,12 @@ function ns.PlanCameraScript(script, start)
 				ending = Move("yaw", state.yaw + delta, t, step.secs, EASES[step.ease], top)
 				if step.pause > 0 then ending = Hold(ending, step.pause, top) end
 			end
-		elseif k == "tiltRand" then
-			local target = step.deg - step.up + Random() * (step.up + step.down)
-			ending = Move("pitch", target, t, step.secs, 0.5, top)
 		elseif k == "spin" then
 			local secs = step.secs > 0 and step.secs or 20
 			ending = Curve(Way(step, Random, onceLeft) == "left", SpinCurve(step), t, secs, top)
-		elseif k == "until" then
+		elseif k == "wait" then
 			-- (The preview can't know when a cast ends or you land: a stand-in time.)
-			local secs = step.what == "time" and step.secs or PREVIEW_UNTIL[step.what] or 10
+			local secs = step.what == "time" and WaitSecs(step, Random) or PREVIEW_UNTIL[step.what] or 10
 			if #step.steps > 0 then
 				-- (Its steps run till then, cut off there: the part of them that fits.)
 				local keep = #moves
@@ -1225,24 +1393,17 @@ function ns.PlanCameraScript(script, start)
 				end
 			end
 			ending = Hold(t, secs, top)
-		elseif k == "waitRand" then
-			local low, high = math.min(step.min, step.max), math.max(step.min, step.max)
-			ending = Hold(t, low + Random() * (high - low), top)
 		elseif k == "aim" then
 			-- (Either side at random: the preview can't know where they are.)
 			local turn = step.at == "click" and step.deg
 				or math.min(AIM_MOST, math.max(0, PREVIEW_SPEAKER - step.deg) / AIM_GAIN)
 			if Random() < 0.5 then turn = -turn end
-			ending = math.abs(turn) >= 0.5 and Move("yaw", state.yaw + turn, t, AimSecs(step, turn), EASES[step.ease], top)
+			ending = math.abs(turn) >= 0.5 and Move("yaw", state.yaw + turn, t, AimSecs(step, turn), StepEase(step), top)
 				or t
-		elseif k == "lineup" then
-			ending = Move("yaw", state.yaw - Wrap(state.yaw), t, step.secs, 0.5, top)
 		elseif k == "putback" then
 			local turned = Move("yaw", state.yaw - Wrap(state.yaw), t, step.secs, 0.5, top)
 			if step.zoom == "yes" then Move("zoom", start.zoom, t, step.secs, EASES.gentle, top) end
-			ending = math.max(turned, Move("pitch", start.pitch, turned, step.secs, 0.5, top))
-		elseif k == "wait" then
-			ending = Hold(t, step.secs, top)
+			ending = math.max(turned, Move("pitch", start.pitch, t, step.secs, 0.5, top))
 		elseif k == "emote" then
 			ending = Hold(t, 0.5, top)
 		elseif k == "together" then
@@ -1272,6 +1433,52 @@ end
 
 -- Where the plan has the camera at t: yaw, pitch, zoom, and the top-level
 -- step under way (nil between them).
+-- A planned move's speed t seconds in (degrees, or yards, a second), and
+-- its way (1 or -1).
+local function PlannedSpeed(move, t)
+	if move.curve then return math.max(0, move.curve(t)) end
+	local T, dist = move.t1 - move.t0, math.abs(move.to - move.from)
+	if T <= 0 or dist == 0 then return 0 end
+	local ease = move.ease or 0.5
+	return dist / (T * Flat(ease)) * EaseShape(t, T, ease)
+end
+local function PlannedWay(move)
+	if move.curve then return move.sign end
+	return move.to >= move.from and 1 or -1
+end
+
+-- For a step's speed graph (the Scripts page): its move in the plan, as
+-- { axis, T (seconds), Speed(t) its own speed, from: the speed of the turn
+-- before it that hands straight over to it (the same axis, the same way,
+-- ending at speed just as it starts; nil for none: Speed match does
+-- nothing then) }. Repeated, the first time it's handed over to (else its
+-- first). nil: no move of its own.
+local HANDOVER_AT = 0.02 -- seconds: a move ending this close to another's start hands over to it
+function ns.CameraStepSpeeds(plan, step)
+	if not plan then return nil end
+	local first, fed, from
+	for _, move in ipairs(plan.moves) do
+		if move.step == step and move.axis ~= "none" then
+			first = first or move
+			for _, before in ipairs(plan.moves) do
+				if before ~= move and before.axis == move.axis and math.abs(before.t1 - move.t0) < HANDOVER_AT
+					and PlannedWay(before) == PlannedWay(move) then
+					local speed = PlannedSpeed(before, before.t1 - before.t0 - 0.001)
+					if speed > MIN_SPEED then
+						fed, from = move, speed
+						break
+					end
+				end
+			end
+			if fed then break end
+		end
+	end
+	local move = fed or first
+	if not move then return nil end
+	return { axis = move.axis, T = move.t1 - move.t0, from = from,
+		Speed = function(t) return PlannedSpeed(move, t) end }
+end
+
 function ns.SampleCameraPlan(plan, t, start)
 	local yaw, pitch, zoom, active = start.yaw, start.pitch, start.zoom, nil
 	for _, move in ipairs(plan.moves) do
@@ -1314,11 +1521,26 @@ local function Command(m)
 	return m.growing and m.grow or m.shrink
 end
 
+-- Follow your turns (STEP.follow): its own turn of the view, outside the
+-- yaw mover. drive: what it has the game doing (moving, left, speed: the
+-- MoveView amount sent, at).
+local follower = { drive = { moving = false }, offset = 0, glide = 0, rate = 0, starts = {},
+	lastTurnAt = -math.huge, lastAnyTurnAt = -math.huge }
+
 -- A move's start stops the other axis's move in the game (a tilt held the
 -- turn), and its stop may too: sent again then, at the speed it's going, as Camera.lua's orbit
--- keeps both going in one sweep.
+-- keeps both going in one sweep. (Handed over, still turning: the same.)
 local function Resend(m)
 	local o = m.other
+	local drive = follower.drive
+	if o == movers.yaw and drive.moving then -- (Follow your turns has the turn)
+		Send((drive.left and o.grow or o.shrink) .. "Start", drive.speed)
+		return
+	end
+	if o.held then
+		Send((o.held.growing and o.grow or o.shrink) .. "Start", o.held.share)
+		return
+	end
 	if not o.moving then return end
 	if o.sent then
 		Send(Command(o) .. "Start", o.share)
@@ -1327,16 +1549,8 @@ local function Resend(m)
 	end
 end
 
--- (now: you took the camera, your speed back this moment, not after a wait.)
-local function StopMove(m, now)
-	m.pending = false
-	if not m.moving then return end
-	if m.sent or m.creeping then
-		Send(Command(m) .. "Stop")
-		Resend(m)
-	end
-	m.moving, m.sent, m.creeping = false, nil, nil
-	m.lastStop = GetTime()
+-- Your speed setting back, a moment after a move stopped (now: at once).
+local function Release(m, now)
 	if now then
 		ns.ReleaseSpeed(m.who, m.cvar)
 		return
@@ -1344,13 +1558,55 @@ local function StopMove(m, now)
 	restoring = restoring + 1
 	C_Timer.After(RESTORE_DELAY, function()
 		restoring = restoring - 1
-		if not m.moving then ns.ReleaseSpeed(m.who, m.cvar) end
+		if not (m.moving or m.held) then ns.ReleaseSpeed(m.who, m.cvar) end
 	end)
 end
 
--- Moves to target degrees over T seconds (it sets off once it can: see Begin).
-local function MoveTo(m, target, T, ease)
-	StopMove(m)
+-- Handover: a turn or tilt done, the game's move is left going a frame
+-- (m.held: its way, speed setting and share), in case the next step turns
+-- the same way at once; Begin then carries it on at a new speed, with no
+-- stop, no STEP_GAP and no creep start. Nothing taking it over: DropHeld.
+local function DropHeld(m, now)
+	local held = m.held
+	if not held then return end
+	m.held = nil
+	Send((held.growing and m.grow or m.shrink) .. "Stop")
+	Resend(m)
+	m.lastStop = GetTime()
+	Release(m, now)
+end
+
+-- (now: you took the camera, your speed back this moment, not after a wait.
+-- keepHeld: a new move for this axis, which may take over a handed-over one.)
+local function StopMove(m, now, keepHeld)
+	m.pending = false
+	if not keepHeld then DropHeld(m, now) end
+	if not m.moving then return end
+	if m.sent or m.creeping then
+		Send(Command(m) .. "Stop")
+		Resend(m)
+	end
+	m.moving, m.sent, m.creeping = false, nil, nil
+	m.lastStop = GetTime()
+	Release(m, now)
+end
+
+-- A move come to its end by itself: handed over (see DropHeld) if it's
+-- really going, else stopped.
+local function EndMove(m)
+	if not (m.moving and m.sent and m.share) then
+		StopMove(m)
+		return
+	end
+	m.held = { growing = m.growing, sent = m.sent, share = m.share }
+	m.moving, m.sent, m.creeping, m.pending = false, nil, nil, false
+end
+
+-- Moves to target degrees over T seconds (it sets off once it can: see
+-- Begin). blend: seconds sliding in from a handed-over move's speed.
+local function MoveTo(m, target, T, ease, blend)
+	StopMove(m, nil, true)
+	m.blend = blend or 0
 	m.suspended, m.curve = nil, nil
 	m.target, m.t, m.T, m.ease = target, 0, math.max(MOVE_MIN_TIME, T or 0), ease or EASES.smooth
 	m.pending = math.abs(target - m.amount) >= 0.5
@@ -1358,8 +1614,9 @@ end
 
 -- A move along a speed curve instead: curve(t) degrees a second (top: its
 -- fastest), growing or not, for T seconds; it goes as far as that takes it.
-local function MoveCurve(m, growing, curve, T, top)
-	StopMove(m)
+local function MoveCurve(m, growing, curve, T, top, blend)
+	StopMove(m, nil, true)
+	m.blend = blend or 0
 	m.suspended = nil
 	m.curve, m.top, m.curveGrowing, m.t, m.T = curve, math.max(0.05, top), growing, 0, T
 	m.target = m.amount + (growing and 1 or -1) * 1e6 -- (never reached: the time ends it)
@@ -1369,17 +1626,39 @@ end
 -- Sets a pending move off: not within STEP_GAP of this axis's last move
 -- stopping, nor without the view.
 local function Begin(m)
+	if m.blocked then return end -- (Follow your turns has the turn: this one waits)
 	local now = GetTime()
-	if now - m.lastStop < STEP_GAP or not ns.ClaimCamera(WHO) then return end
+	local held = m.held
+	if held then
+		-- (Handed over: the same way carries straight on, the other way stops first.)
+		local growing
+		if m.curve then growing = m.curveGrowing else growing = m.target > m.amount end
+		if growing ~= held.growing or not ns.ClaimCamera(WHO) then DropHeld(m) end
+	end
+	if not m.held and (now - m.lastStop < STEP_GAP or not ns.ClaimCamera(WHO)) then return end
 	local yours = ns.HoldSpeed(m.who, m.cvar)
 	if m.curve then
 		m.share = m.top / yours
 		m.growing = m.curveGrowing
 	else
-		m.cruise = math.abs(m.target - m.amount) / (m.T * (1 - m.ease))
+		m.cruise = math.abs(m.target - m.amount) / (m.T * Flat(m.ease))
 		m.share = m.cruise / yours
 		m.growing = m.target > m.amount
 	end
+	if m.held then
+		-- On at the speed it was going (Speed match, its blend field, slides from it; else this
+		-- move's own speed from the next frame), sent with this move's share.
+		local speed = held.sent * held.share
+		m.held = nil
+		m.blendFrom = speed
+		m.sent = math.max(MIN_SETTING, speed / m.share)
+		m.pending, m.creeping, m.moving, m.t, m.primedUntil = false, nil, true, 0, 0
+		ns.SetHeldSpeed(m.who, m.cvar, m.sent)
+		Send(Command(m) .. "Start", m.share)
+		Resend(m)
+		return
+	end
+	m.blendFrom = nil
 	ns.SetHeldSpeed(m.who, m.cvar, MIN_SETTING)
 	m.primedUntil = now + PRIME_TIME
 	m.pending = false
@@ -1392,9 +1671,34 @@ local function Begin(m)
 	end
 end
 
+-- A move come to its end in a frame of its own: handed over still going, the
+-- game turns it this frame too, so it's counted (the next frame's count goes
+-- to whatever takes it over, or comes off as it's stopped: StepMove).
+local function EndInFrame(m, elapsed)
+	if m.moving and m.sent and m.share then
+		m.amount = m.amount + (m.growing and 1 or -1) * m.sent * m.share * elapsed
+	end
+	EndMove(m)
+end
+
 local function StepMove(m, elapsed)
+	local held = m.held
+	if held then
+		-- (Still going in the game: counted on. Nothing took it over last frame: stopped.)
+		local speed = held.sent * held.share
+		local step = (held.growing and speed or -speed) * elapsed
+		m.amount = m.amount + step
+		if not m.pending then
+			DropHeld(m)
+			m.amount = m.amount - step -- (stopped this frame: the game doesn't move it)
+		end
+	end
 	if m.pending then
 		Begin(m)
+		-- (Not taken over, the other way: stopped this frame, not moved.)
+		if held and not m.held and m.lastStop == GetTime() then
+			m.amount = m.amount - (held.growing and 1 or -1) * held.sent * held.share * elapsed
+		end
 		return
 	end
 	if not m.moving or GetTime() < m.primedUntil then return end
@@ -1402,16 +1706,20 @@ local function StepMove(m, elapsed)
 	local speed
 	if m.curve then
 		if m.t >= m.T then
-			StopMove(m)
+			EndInFrame(m, elapsed)
 			return
 		end
 		speed = math.max(0, m.curve(m.t))
 	else
 		if (m.target > m.amount) ~= m.growing or math.abs(m.target - m.amount) < 0.05 or m.t > m.T + 3 then
-			StopMove(m)
+			EndInFrame(m, elapsed)
 			return
 		end
 		speed = math.max(MIN_SPEED, m.cruise * EaseShape(math.min(m.t, m.T), m.T, m.ease))
+	end
+	-- (Speed match, blend: from the handed-over move's speed to this one's, over blend seconds.)
+	if m.blendFrom and m.blend > 0 and m.t < m.blend then
+		speed = m.blendFrom + (speed - m.blendFrom) * EaseShape(m.t, 2 * m.blend, 0.5)
 	end
 	local setting = math.max(MIN_SETTING, speed / m.share)
 	if not m.sent then
@@ -1428,6 +1736,202 @@ end
 
 local function MoverDone(m)
 	return not (m.pending or m.moving or m.suspended)
+end
+
+-- One mover's move put off, what's left of it kept to carry on with (now:
+-- your speed back this moment); and carried on.
+local function SuspendMover(m, now)
+	if m.pending or m.moving then
+		m.suspended = { target = m.target, T = math.max(MOVE_MIN_TIME, (m.T or 0) - (m.t or 0)), curve = m.curve,
+			at = m.t or 0, total = m.T, top = m.top, growing = m.curveGrowing }
+		StopMove(m, now)
+	elseif m.held then
+		DropHeld(m, now)
+	end
+end
+local function ResumeMover(m)
+	local left = m.suspended
+	if left and left.curve then
+		-- (On along its curve from where it was: the rest of it, eased in again over a second.)
+		local at, curve = left.at, left.curve
+		MoveCurve(m, left.growing, function(t) return curve(at + t) * math.min(1, t) end, left.total - at, left.top)
+	elseif left then
+		MoveTo(m, left.target, left.T, m.ease)
+	end
+end
+
+-- ---------------------------------------------------------------------------
+-- Follow your turns (KINDS.follow), as Camera.lua's UpdateTurnFollow: offset
+-- is how far the view is from behind you (degrees, left positive), rate
+-- your turn speed (smoothed), glide the speed gliding it back.
+-- ---------------------------------------------------------------------------
+local FOLLOW_TURN_RATE = 20   -- degrees a second: turning faster than this is a turn
+local FOLLOW_ARM = 0.6        -- seconds of not turning before it takes a turn (not one already under way)
+local FOLLOW_SMOOTH = 0.08    -- seconds of smoothing on your turn speed's jitter
+local FOLLOW_JUMP = 15        -- degrees a second: bigger changes are followed at once
+local FOLLOW_DONE = 0.5       -- degrees: close enough to behind you
+local FOLLOW_BRAKE = 0.8      -- share of the full stopping speed allowed (some slack)
+local FOLLOW_BURST, FOLLOW_BURST_SECS = 3, 4 -- turns started within these seconds: steering
+local FOLLOW_STEER_AFTER, FOLLOW_STEER_BOOST = 0.3, 1.5 -- steering: glide after this at most, this much quicker
+local FOLLOW_SMALL, FOLLOW_PER, FOLLOW_BOOST_MAX, FOLLOW_GENTLE = 15, 50, 1.5, 0.5 -- corners (Camera.lua's TURN_SIZE_*)
+
+local function StopFollowDrive()
+	local drive = follower.drive
+	if not drive.moving then return end
+	local m = movers.yaw
+	Send((drive.left and m.grow or m.shrink) .. "Stop")
+	drive.moving = false
+	Resend(m) -- (the tilt, if one's going)
+end
+
+-- The view turned at cmd degrees a second (left positive), as Camera.lua's
+-- MoveAxis: restarted only for changes that show.
+local function DriveFollow(cmd)
+	local drive, m = follower.drive, movers.yaw
+	-- (By your turn speed setting, which TakeYaw puts back: worked out from
+	-- a held one, it would spin as yours came back.)
+	local base = ns.YourSpeed and ns.YourSpeed(m.cvar) or tonumber(GetCVar(m.cvar)) or 180
+	local speed = math.abs(cmd) / math.max(1, base)
+	if math.abs(cmd) < 0.1 then
+		StopFollowDrive()
+		return
+	end
+	local left = cmd > 0
+	if drive.moving and drive.left ~= left then StopFollowDrive() end
+	local now = GetTime()
+	if drive.moving then
+		local change = math.abs(speed - drive.speed)
+		if change <= drive.speed * 0.02 or (now - drive.at < 0.05 and change <= drive.speed * 0.3) then return end
+	end
+	if Send((left and m.grow or m.shrink) .. "Start", speed) then
+		drive.moving, drive.left, drive.speed, drive.at = true, left, speed, now
+		Resend(m)
+	else
+		drive.moving = false
+	end
+end
+
+-- The script's other turns wait while it glides (theirs put off, your speed
+-- setting back at once: its own turn goes by yours), and carry on after.
+local function TakeYaw()
+	if follower.took then return end
+	follower.took = true
+	local m = movers.yaw
+	SuspendMover(m, true)
+	m.blocked = true
+	ns.ReleaseSpeed(m.who, m.cvar) -- (a move just ended holds it a moment more: Release)
+end
+local function GiveYaw()
+	if not follower.took then return end
+	follower.took = false
+	movers.yaw.blocked = nil
+	ResumeMover(movers.yaw)
+end
+
+-- Let go: its turn stopped where it is, the others carry on (resume: from
+-- where they were; else they're stopped or put off by the caller).
+local function ReleaseFollow(resume)
+	StopFollowDrive()
+	follower.offset, follower.glide, follower.rate = 0, 0, 0
+	if resume then
+		GiveYaw()
+	else
+		follower.took, movers.yaw.blocked = false, nil
+	end
+end
+-- Stopped, paused or ended: let go, and start afresh next time (a stale
+-- facing would read as a big turn).
+local function StopFollow()
+	ReleaseFollow(false)
+	follower.lastFacing, follower.armed = nil, false
+end
+
+local function FollowFrame(step, dt)
+	local f = follower
+	local now = GetTime()
+	-- Your turn this frame (degrees, left positive; 0 with the facing hidden).
+	local turned = 0
+	local ok, facing = pcall(GetPlayerFacing)
+	if ok and type(facing) == "number" and not (issecretvalue and issecretvalue(facing)) then
+		if f.lastFacing and dt > 0 then
+			turned = math.deg((facing - f.lastFacing + math.pi) % (2 * math.pi) - math.pi)
+		end
+		f.lastFacing = facing
+	else
+		f.lastFacing = nil
+	end
+	local turning = (ns.TurnKeyHeld and ns.TurnKeyHeld()) or (dt > 0 and math.abs(turned) / dt > FOLLOW_TURN_RATE)
+	-- Steering: several turns started in quick succession.
+	if turning and not f.wasTurning then f.starts[#f.starts + 1] = now end
+	f.wasTurning = turning
+	while f.starts[1] and now - f.starts[1] > FOLLOW_BURST_SECS do table.remove(f.starts, 1) end
+	local steering = step.steer == "yes" and #f.starts >= FOLLOW_BURST
+	if turning then f.lastAnyTurnAt = now end
+	-- (The mouse on the camera, or steering with it: mouselook keeps the
+	-- camera behind you.) Only taking a turn once you've stopped turning a
+	-- moment: catching one under way would stop the camera dead mid-swing.
+	local allowed = not (ns.IsMouseOnCamera and ns.IsMouseOnCamera()) and not ns.mouseSteering
+	if not allowed then
+		f.armed = false
+	elseif not f.armed and now - f.lastAnyTurnAt >= FOLLOW_ARM then
+		f.armed = true
+	end
+	if not (allowed and f.armed) then
+		if f.took or f.offset ~= 0 then ReleaseFollow(true) end
+		return
+	end
+	-- Your turn speed, smoothed (the raw figure jitters with frame times);
+	-- starting, stopping or reversing followed at once.
+	local measured = dt > 0 and turned / dt or 0
+	local diff = measured - f.rate
+	if math.abs(diff) > math.max(FOLLOW_JUMP, math.abs(f.rate) * 0.15) then
+		f.rate = measured
+	else
+		f.rate = f.rate + diff * math.min(1, dt / FOLLOW_SMOOTH)
+	end
+	if measured == 0 and math.abs(f.rate) < 1 then f.rate = 0 end
+	local after = steering and math.min(step.after, FOLLOW_STEER_AFTER) or step.after
+	if turning then
+		f.glide, f.lastTurnAt = 0, now -- (held until the turn ends)
+	elseif f.glide == 0 and now - f.lastTurnAt < after then
+		-- (Just stopped turning: held a moment longer, in case of more.)
+	elseif math.abs(f.offset) > FOLLOW_DONE or f.glide ~= 0 then
+		-- The glide: the further off, the quicker, capped, its speed eased.
+		local lazy, top, accel = step.lazy, step.top, step.accel
+		if steering then
+			lazy, top, accel = lazy / FOLLOW_STEER_BOOST, top * FOLLOW_STEER_BOOST, accel * FOLLOW_STEER_BOOST
+		end
+		if step.corners == "yes" then
+			local size = math.abs(f.offset)
+			local boost = size < FOLLOW_SMALL and FOLLOW_GENTLE + (1 - FOLLOW_GENTLE) * size / FOLLOW_SMALL
+				or 1 + math.min(FOLLOW_BOOST_MAX, (size - FOLLOW_SMALL) / FOLLOW_PER)
+			lazy, top, accel = lazy / boost, top * boost, accel * boost
+		end
+		local target = math.max(-top, math.min(top, -f.offset / lazy))
+		-- (Always room to stop: no faster than it can brake in the distance left.)
+		local brake = math.sqrt(2 * accel * math.abs(f.offset)) * FOLLOW_BRAKE
+		target = math.max(-brake, math.min(brake, target))
+		local stepBy = accel * dt
+		f.glide = f.glide + math.max(-stepBy, math.min(stepBy, target - f.glide))
+	end
+	-- The view's offset from your facing: the counter-turn plus the glide,
+	-- the short way round (a full spin leaves it where it was).
+	local rate = -f.rate + f.glide
+	local offset = ((f.offset + rate * dt) + 180) % 360 - 180
+	local most = step.most or 0
+	if most > 0 and math.abs(offset) > most and dt > 0 then
+		offset = math.max(-most, math.min(most, offset))
+		rate = (offset - f.offset) / dt
+	end
+	f.offset = offset
+	if f.rate == 0 and math.abs(f.offset) <= FOLLOW_DONE and math.abs(f.glide) < 2 then
+		if f.took or f.offset ~= 0 then ReleaseFollow(true) end
+		return
+	end
+	TakeYaw()
+	-- (Flipped: the camera's "left" turns the view as turning you right does.)
+	DriveFollow(-rate)
+	if follower.drive.moving then movers.yaw.amount = movers.yaw.amount - rate * dt end
 end
 
 -- The zoom: steered along its eased path (as the quest cam's: the game
@@ -1478,7 +1982,7 @@ local function BeginZoom()
 	zoomer.release, zoomer.yours = nil, nil
 	ns.HoldSpeed(ZOOM_WHO, ZOOM_CVAR)
 	zoomer.from, zoomer.t = now, 0
-	zoomer.cruise = math.abs(zoomer.goal - now) / (zoomer.T * (1 - zoomer.ease))
+	zoomer.cruise = math.abs(zoomer.goal - now) / (zoomer.T * Flat(zoomer.ease))
 	zoomer.last, zoomer.sentAt, zoomer.stillSince, zoomer.sent, zoomer.asked = now, 0, nil, nil, 0
 	zoomer.pending, zoomer.moving = false, true
 end
@@ -1583,6 +2087,7 @@ end
 
 -- Every move stopped where it is (nothing kept to carry on with).
 local function StopAll()
+	StopFollow()
 	StopMove(movers.yaw)
 	StopMove(movers.pitch)
 	movers.yaw.suspended, movers.pitch.suspended = nil, nil
@@ -1593,30 +2098,31 @@ end
 -- Paused: each move stopped, what's left of it kept to carry on with (now:
 -- you took the camera, every speed yours this moment).
 local function Suspend(now)
-	for _, m in pairs(movers) do
-		if m.pending or m.moving then
-			m.suspended = { target = m.target, T = math.max(MOVE_MIN_TIME, (m.T or 0) - (m.t or 0)), curve = m.curve,
-				at = m.t or 0, total = m.T, top = m.top, growing = m.curveGrowing }
-			StopMove(m, now)
-		end
-	end
+	StopFollow() -- (a turn it put off stays put off, for Resume)
+	for _, m in pairs(movers) do SuspendMover(m, now) end
 	if zoomer.pending or zoomer.moving then
 		zoomer.suspended = { goal = zoomer.goal, T = math.max(MOVE_MIN_TIME, zoomer.T - (zoomer.t or 0)), ease = zoomer.ease }
 	end
 	StopZoom(now)
 end
 
-local function Resume()
+-- Your own camera input: the running totals of the turn and tilt start
+-- again from where you leave the camera (the game never says how far you
+-- turned it), so Undo its turns takes back only what the scene turns from
+-- here, and a sway's middle is picked again. A move put off meanwhile
+-- keeps the rest of its turn.
+local function ForgetTurns()
 	for _, m in pairs(movers) do
-		local left = m.suspended
-		if left and left.curve then
-			-- (On along its curve from where it was: the rest of it, eased in again over a second.)
-			local at, curve = left.at, left.curve
-			MoveCurve(m, left.growing, function(t) return curve(at + t) * math.min(1, t) end, left.total - at, left.top)
-		elseif left then
-			MoveTo(m, left.target, left.T, m.ease)
-		end
+		local off = m.amount
+		m.amount = 0
+		if m.target then m.target = m.target - off end
+		if m.suspended and m.suspended.target then m.suspended.target = m.suspended.target - off end
 	end
+	if run then run.swayCenters = {} end
+end
+
+local function Resume()
+	for _, m in pairs(movers) do ResumeMover(m) end
 	local left = zoomer.suspended
 	if left then ZoomTo(left.goal, left.T, left.ease) end
 end
@@ -1643,13 +2149,18 @@ local STEP = {}
 function STEP.rotate(step)
 	local way = Way(step, math.random, run.onceLeft)
 	local m = movers.yaw
-	MoveTo(m, m.amount + (way == "left" and step.deg or -step.deg), step.secs, EASES[step.ease])
+	MoveTo(m, m.amount + (way == "left" and step.deg or -step.deg), step.secs, StepEase(step), step.blend)
 	WaitMover(m)
 end
 function STEP.tilt(step)
-	if step.deg == 0 then return end
 	local m = movers.pitch
-	MoveTo(m, m.amount + step.deg, step.secs, EASES.smooth)
+	if step.rand == "give" then
+		MoveTo(m, TiltTarget(step, math.random), step.secs, StepEase(step), step.blend)
+		WaitMover(m)
+		return
+	end
+	if step.deg == 0 then return end
+	MoveTo(m, m.amount + step.deg, step.secs, StepEase(step), step.blend)
 	WaitMover(m)
 end
 -- A zoom to goal yards: over secs, or (speed) as quick as its top speed
@@ -1660,28 +2171,22 @@ local function ZoomStep(step, goal, secs)
 		ns.RaiseZoomMax()
 		run.raisedMax = true
 	end
-	ZoomTo(goal, ZoomSecs(step, secs, goal - Zoom()), EASES[step.ease])
+	ZoomTo(goal, ZoomSecs(step, secs, goal - Zoom()), StepEase(step))
 	WaitZoom()
 end
 function STEP.zoom(step)
 	local secs = step.fit == "cast" and ns.DepartCastLeft and ns.DepartCastLeft() or step.secs
-	ZoomStep(step, ZoomGoal(step, step.to, run.startZoom), secs)
+	ZoomStep(step, ZoomGoal(step, ZoomYards(step, math.random), run.startZoom), secs)
 end
-function STEP.zoomRand(step)
-	local low, high = math.min(step.min, step.max), math.max(step.min, step.max)
-	ZoomStep(step, ZoomGoal(step, low + math.random() * (high - low), run.startZoom), step.secs)
-end
--- To face you: counted from where the script started.
-function STEP.turnTo(step)
-	local m = movers.yaw
-	local secs = step.fit == "cast" and ns.DepartTimeLeft and ns.DepartTimeLeft() or step.secs
-	MoveTo(m, m.amount - Wrap(m.amount - 180), secs, EASES.smooth)
-	WaitMover(m)
-end
+-- (Its middle: where the camera was as this sway first ran in the scene,
+-- by the running total; again from where you leave it after you move the
+-- camera, ForgetTurns.)
 function STEP.sway(step)
 	local m = movers.yaw
-	local delta = SwayTurn(step, m.amount, math.random)
-	local curve, secs, top, still = SwayCurve(step, delta, m.amount)
+	run.swayCenters[step] = run.swayCenters[step] or m.amount
+	local center = run.swayCenters[step]
+	local delta = SwayTurn(step, m.amount, math.random, center)
+	local curve, secs, top, still = SwayCurve(step, delta, m.amount, center)
 	if curve then
 		MoveCurve(m, delta >= 0, curve, secs, top)
 		WaitMover(m)
@@ -1694,24 +2199,11 @@ function STEP.sway(step)
 		WaitSeconds(step.pause)
 	end
 end
-function STEP.tiltRand(step)
-	local m = movers.pitch
-	MoveTo(m, step.deg - step.up + math.random() * (step.up + step.down), step.secs, EASES.smooth)
-	WaitMover(m)
-end
 function STEP.spin(step)
 	local m = movers.yaw
 	MoveCurve(m, Way(step, math.random, run.onceLeft) == "left", SpinCurve(step), step.secs > 0 and step.secs or 1e7,
-		step.max)
+		step.max, step.blend)
 	WaitMover(m)
-end
-function STEP.lineup(step)
-	local m = movers.yaw
-	MoveTo(m, m.amount - Wrap(m.amount), step.secs, EASES.smooth)
-	WaitMover(m)
-end
-function STEP.wait(step)
-	WaitSeconds(step.secs)
 end
 function STEP.emote(step)
 	local token = step.token:upper()
@@ -1722,14 +2214,20 @@ function STEP.emote(step)
 	end
 	WaitSeconds(0.5)
 end
--- Everything this script turned, tilted and zoomed undone: the turn and the
--- zoom together, then the tilt (the game won't turn and tilt at once).
+-- Undo its turns: everything this script turned, tilted and zoomed undone,
+-- by the running totals, all at once (the turn and the tilt kept going
+-- together as a Together's are: Resend). A turn or tilt that only just
+-- stopped holds the others back till its STEP_GAP is up, so all three set
+-- off together.
 function STEP.putback(step)
 	local yaw, pitch = movers.yaw, movers.pitch
+	DropHeld(yaw)
+	DropHeld(pitch)
+	while GetTime() - math.max(yaw.lastStop, pitch.lastStop) < STEP_GAP do Yield() end
 	MoveTo(yaw, yaw.amount - Wrap(yaw.amount), step.secs, EASES.smooth)
+	MoveTo(pitch, 0, step.secs, EASES.smooth)
 	if step.zoom == "yes" then ZoomTo(run.startZoom, step.secs) end
 	WaitMover(yaw)
-	MoveTo(pitch, 0, step.secs, EASES.smooth)
 	WaitMover(pitch)
 	if step.zoom == "yes" then WaitZoom() end
 end
@@ -1753,6 +2251,7 @@ local UNTIL = {
 -- Wait until cutting its steps short: stopped dead, it jolted).
 local BRAKE_TIME = 1.2
 local function BrakeAll()
+	StopFollow()
 	for _, m in pairs(movers) do
 		m.suspended = nil
 		if m.moving and m.sent and m.share then
@@ -1777,7 +2276,12 @@ local UNDER_WAY = {
 	landing = function() return ns.OnTaxi() end,
 	alive = function() return ns.IsDead() end,
 }
-STEP["until"] = function(step)
+function STEP.wait(step)
+	local secs = step.what == "time" and WaitSecs(step, math.random) or step.secs
+	if step.what == "time" and #step.steps == 0 then
+		WaitSeconds(secs)
+		return
+	end
 	local check = step.what == "time" and function() return false end or UNTIL[step.what]
 	local underWay = UNDER_WAY[step.what]
 	local seen = not underWay
@@ -1788,7 +2292,7 @@ STEP["until"] = function(step)
 		end
 		return check(step)
 	end
-	local untilT = step.what == "time" and run.t + step.secs or math.huge
+	local untilT = step.what == "time" and run.t + secs or math.huge
 	local kid = #step.steps > 0 and coroutine.create(function() DoSteps(step.steps) end)
 	while not done() and run.t < untilT do
 		if kid and coroutine.status(kid) ~= "dead" then
@@ -1802,12 +2306,16 @@ STEP["until"] = function(step)
 		while not (MoverDone(movers.yaw) and MoverDone(movers.pitch)) do Yield() end
 	end
 end
-function STEP.waitRand(step)
-	local low, high = math.min(step.min, step.max), math.max(step.min, step.max)
-	WaitSeconds(low + math.random() * (high - low))
-end
 function STEP.endMusic(step)
 	if ns.EndSceneMusic then ns.EndSceneMusic(step.secs) end
+end
+-- Follow your turns: every frame until the camera ends (FollowFrame).
+function STEP.follow(step)
+	StopFollow()
+	while true do
+		FollowFrame(step, run.dt or 0)
+		Yield()
+	end
 end
 -- Aim at: see KINDS.aim. (Where a bubble is goes stale as the camera
 -- turns: read before each swing, with the camera still.)
@@ -1841,7 +2349,7 @@ local function LookRound(step)
 	local m = movers.yaw
 	local way = math.random() < 0.5 and 1 or -1
 	for _ = 1, 360 / LOOK_STEP do
-		MoveTo(m, m.amount + way * LOOK_STEP, AimSecs(step, LOOK_STEP), EASES[step.ease])
+		MoveTo(m, m.amount + way * LOOK_STEP, AimSecs(step, LOOK_STEP), StepEase(step))
 		WaitMover(m)
 		WaitSeconds(0.3)
 		run.aimCenter = m.amount
@@ -1868,14 +2376,14 @@ function STEP.aim(step)
 		turn = math.random() < 0.5 and deg or -deg
 	end
 	if not turn or math.abs(turn) < 0.5 then return end
-	MoveTo(m, m.amount + turn, AimSecs(step, turn), EASES[step.ease])
+	MoveTo(m, m.amount + turn, AimSecs(step, turn), StepEase(step))
 	WaitMover(m)
 	if step.at == "speaker" then
 		-- (Still well off, a swing cut short by how far it may go: one more.)
 		WaitSeconds(0.3)
 		local again, off = SpeakerTurn(step, 0)
 		if again and off > AIM_CORRECT and math.abs(again) >= 0.5 then
-			MoveTo(m, m.amount + again, AimSecs(step, again), EASES[step.ease])
+			MoveTo(m, m.amount + again, AimSecs(step, again), StepEase(step))
 			WaitMover(m)
 		end
 	end
@@ -1942,7 +2450,7 @@ local function Start(script, trigger, camera)
 		script = script, trigger = trigger, camera = camera, t = 0, phase = "steps", paths = paths, active = {},
 		builtinId = builtinId,
 		startZoom = Zoom(), startedAt = GetTime(), inputSeen = ns.GetLastCameraInput and ns.GetLastCameraInput() or 0,
-		triggerOn = trigger ~= nil, onceLeft = math.random() < 0.5,
+		triggerOn = trigger ~= nil, onceLeft = math.random() < 0.5, swayCenters = {},
 		-- (Played for Skyriding, or a scene of yours on the move, mounted or flying: walking
 		-- and steering are what you do then. Walk doesn't stop it, and your
 		-- turning the camera stops only its turns and tilts: its zoom goes on.)
@@ -2234,7 +2742,7 @@ local function Update(elapsed)
 	StepMove(movers.yaw, elapsed)
 	StepMove(movers.pitch, elapsed)
 	StepZoom(elapsed)
-	run.t = run.t + elapsed
+	run.t, run.dt = run.t + elapsed, elapsed
 	if coroutine.status(run.co) ~= "dead" then
 		local ok, err = coroutine.resume(run.co)
 		if not ok then
@@ -2324,6 +2832,7 @@ if ns.RegisterCamera then
 		-- You took the camera: every move stops now (the rules decide next frame).
 		if run then
 			run.tookAt = GetTime()
+			ForgetTurns()
 			if run.travel then
 				StopMove(movers.yaw, true) -- (the zoom goes on: see Start)
 				StopMove(movers.pitch, true)
@@ -2363,7 +2872,8 @@ function ns.OrbitCommand(arg)
 	local deg = math.max(1, math.min(3600, math.abs(angle)))
 	secs = math.max(0.5, math.min(600, secs))
 	local turn = ns.NewCameraScriptStep("rotate")
-	turn.deg, turn.secs, turn.way, turn.ease = deg, secs, angle < 0 and "right" or "left", "steady"
+	turn.deg, turn.secs, turn.way = deg, secs, angle < 0 and "right" or "left"
+	turn.speedUp, turn.slowDown = "short", "short"
 	local ok, why = ns.PlayCameraScript({ id = ORBIT_ID, name = L["Orbit"], steps = { turn }, ending = {},
 		rules = { camera = "stop", fight = "stop", walk = "stop", zoom = "ignore", ends = "stop" } })
 	if ok then

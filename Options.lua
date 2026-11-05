@@ -3138,7 +3138,7 @@ end
 -- Camera rotation settings, built once per profile (taxiOrbit* for flights,
 -- idleOrbit* for standing still), each on its own sub-page.
 -- Rotation controls for a camera's fixed style: "sweep" (steady sweeps: the
--- AFK camera) or "back" (swings behind you: flights, RP walk).
+-- AFK camera) or "back" (sways from side to side: flights, RP walk).
 local function BuildRotationControls(container, stack, prefix, style)
 	local function key(name) return prefix .. name end
 
@@ -3167,11 +3167,10 @@ local function BuildRotationControls(container, stack, prefix, style)
 		Tooltip(minChange, L["The new angle is never within this many degrees of the current " ..
 			"one, either way. Keep it below the swing for varied moves."])
 
-		local backArc = stack:Add(Slider(container, key("BackArc"),
-			prefix == "cozyOrbit" and L["Swing either side of the front"] or L["Swing either side of behind"],
-			0, 90, 5, "%d°"), "slider")
-		Tooltip(backArc, L["How far the camera may swing to either side of directly behind your " ..
-			"character. 90° reaches side-on; smaller keeps it closer behind."])
+		local backArc = stack:Add(Slider(container, key("BackArc"), L["Sway either side"], 0, 90, 5, "%d°"), "slider")
+		Tooltip(backArc, L["How far the camera may sway to either side of where it was as the sway began. " ..
+			"(The game doesn't tell addons which way the camera points, so that's wherever it was, " ..
+			"not always straight behind you.)"])
 
 		local pitchUp = stack:Add(Slider(container, key("PitchUp"), L["Tilt up as far as"], 0, 45, 5, "%d°"), "slider")
 		Tooltip(pitchUp, L["Each move also tilts the camera to a random angle between the down " ..
@@ -3529,23 +3528,6 @@ local function HeightExtras(key, minV, maxV, tip)
 end
 
 -- The "Turning" section of a travel mode's page (RP walk, auto-run).
-local function TurningExtras(swingKey, delayKey)
-	return function(content, stack)
-		stack:Header(content, L["Turning"])
-		local swing = stack:Add(Check(content, swingKey, L["Glide round gently when you turn"],
-			L["When you turn left or right, the camera doesn't snap round with you: it carries on " ..
-			"as it was (sway and all) until you stop turning, then glides gently around to your " ..
-			"new facing, easing in and out. Dragging with either mouse button hands the camera " ..
-			"straight back to you."]), "check")
-		swing:HookScript("OnClick", Refresh) -- grey out / enable the wait below
-		local glideDelay = stack:Add(Slider(content, delayKey, L["Wait before gliding"], 0, 5, 0.5, L["%.1f sec"]),
-			"slider")
-		Tooltip(glideDelay, L["After you stop turning, the view holds this long before gliding around " ..
-			"to your new facing, in case you turn again. Turning again starts the wait over."])
-		GreyUnless(glideDelay, function(db) return db[swingKey] end)
-	end
-end
-
 -- A comma-separated list setting in an edit box (saved as you leave it).
 local function ListBox(parent, key, width, tip, onSave)
 	RecordKey(parent, key)
@@ -3583,10 +3565,10 @@ local EVENT_TIPS = {
 		"using the words below."],
 	Weapon = L["Unsheathing your weapon with your Sheathe/Unsheathe key out of combat, for a \"hero shot\" " ..
 		"(not when it comes out from attacking or casting). Putting it away, running or " ..
-		"combat ends it. With the cozy camera it carries on while you auto-walk (the camera " ..
-		"swings round in front as you walk, even with Stop on move)."],
+		"combat ends it. With the cozy camera it carries on while you auto-walk (even with Stop " ..
+		"on move)."],
 	Hearth = L["Casting your Hearthstone (or Astral Recall, or any spell with \"Hearthstone\" in its " ..
-		"name). The tele camera swings round in front of you and spins faster and faster as it " ..
+		"name). The tele camera turns half round and spins faster and faster as it " ..
 		"zooms in, until you go. The cast doesn't bring the UI back " ..
 		"or pause the camera."],
 	Teleport = L["Casting a teleport (a mage's \"Teleport: Stormwind\" and the like, or a druid's " ..
@@ -3612,27 +3594,23 @@ local EVENT_TIPS = {
 local function CreateFlightPanel()
 	CreateCameraModePanel({
 		name = L["Flight Cam"],
-		description = L["On flight paths. The camera swings around behind you as you take off, sways " ..
-			"behind you on the way and settles behind you before landing."],
+		description = L["On flight paths. The camera sways from side to side on the way, with a fly-by " ..
+			"now and then, and turns back to where it started before landing."],
 		start = function(content, stack)
 			stack:Add(Check(content, "dropTargetOnFlights", L["Drop your target at takeoff"],
 				L["Your target's frames fade as if nothing were targeted, until you pick a new target " ..
 				"or land. (Addons can't clear the target itself; the game doesn't allow it.)"]), "check")
-			stack:Add(Check(content, "taxiCenter", L["Swing around behind you at takeoff"],
-				L["Slowly swings the camera around behind your character as you take off, ready for " ..
-				"the sway behind you. Also once the pause after you move the camera mid-flight is up."]),
-				"check")
 		end,
 		inputPauseKey = "taxiInputPause",
 		orbitPrefix = "taxiOrbit", style = "back",
-		rotateLabel = L["Sway behind you"],
-		rotateTip = L["The camera swings from side to side behind your character, pausing between " ..
+		rotateLabel = L["Sway from side to side"],
+		rotateTip = L["The camera sways from side to side around where it started, pausing between " ..
 			"moves. Dragging the camera pauses it."],
 		extras = function(content, stack)
 			stack:Header(content, L["Fly-bys"])
 			stack:Add(Check(content, "taxiFlyBy", L["Random fly-bys"],
 				L["Now and then in the middle of a flight, the camera slowly turns round to look back " ..
-				"past you, holds there, then turns back behind you. On a route's first flight (its " ..
+				"past you, holds there, then turns back. On a route's first flight (its " ..
 				"length not known yet), just one, early on. Dragging the camera stops it. /cine flyby " ..
 				"starts one whenever you like. Once you move the camera yourself on a flight, " ..
 				"there are no more for that flight."]), "check")
@@ -3646,27 +3624,27 @@ local function CreateFlightPanel()
 			Tooltip(from, L["Keeps random fly-bys away from takeoff."])
 			local to = stack:Add(Slider(content, "taxiFlyByTo", L["Not after"], 0, 100, 5, L["%d%% of the way"]), "slider")
 			Tooltip(to, L["Keeps random fly-bys away from landing (and the settle before it)."])
-			local angle = stack:Add(Slider(content, "flyByAngle", L["Turn round to"], 90, 180, 5, L["%d° from behind you"]), "slider")
-			Tooltip(angle, L["The camera lines up behind you, then turns this far round: 180 looks " ..
-				"straight back at you."])
+			local angle = stack:Add(Slider(content, "flyByAngle", L["Turn round"], 90, 180, 5, "%d°"), "slider")
+			Tooltip(angle, L["The camera undoes the flight's sway, then turns this far round: 180 is " ..
+				"half a turn, so if it started behind you it looks straight back at you."])
 			local turnTime = stack:Add(Slider(content, "flyByTurnTime", L["Turn round takes"], 3, 20, 1, L["%d sec"]), "slider")
 			Tooltip(turnTime, L["How long the turn round takes, easing in and out."])
 			stack:Add(Slider(content, "flyByHold", L["Look back for"], 0, 20, 1, L["%d sec"]), "slider")
 			stack:Add(Slider(content, "flyByBackTime", L["Turn back takes"], 3, 20, 1, L["%d sec"]), "slider")
 
 			stack:Header(content, L["Landing"])
-			stack:Add(Check(content, "taxiSettle", L["Lock the camera behind you before landing"],
-				L["Shortly before you land, the rotation stops and the camera turns back behind you " ..
-				"and stays there until you touch down. Needs one flight on a " ..
+			stack:Add(Check(content, "taxiSettle", L["Turn back before landing"],
+				L["Shortly before you land, the sway stops and the camera turns back to where it was at " ..
+				"takeoff, and stays there until you touch down. Needs one flight on a " ..
 				"route to learn how long it takes. Skipped if you've moved the camera yourself on that " ..
 				"flight: it stays how you set it."]), "check")
 			stack:Add(Check(content, "taxiLandZoom", L["Put the zoom back when you land"],
 				L["As you land, the camera glides back to the zoom distance you had when you took " ..
 				"off. If you zoomed yourself on the way, it stays where you put it."]), "check")
-			local settleLead = stack:Add(Slider(content, "taxiSettleLead", L["Behind you by"], 2, 20, 1,
+			local settleLead = stack:Add(Slider(content, "taxiSettleLead", L["Turned back by"], 2, 20, 1,
 				L["%d sec before landing"]), "slider")
-			Tooltip(settleLead, L["The camera turns back over the 6 seconds before this, so it's settled " ..
-				"behind you this long before you land."])
+			Tooltip(settleLead, L["The camera turns back over the 12 seconds before this, so it's settled " ..
+				"this long before you land."])
 		end,
 		zoomPrefix = "taxiZoom", dofKey = "dofFlight",
 	})
@@ -3696,10 +3674,9 @@ local function CreateAutoRunPanel()
 			"walking counts as RP walk instead."],
 		inputPauseKey = "runInputPause",
 		orbitPrefix = "runOrbit", style = "back",
-		rotateLabel = L["Sway behind you"],
-		rotateTip = L["The camera swings gently from side to side behind your character, pausing " ..
+		rotateLabel = L["Sway from side to side"],
+		rotateTip = L["The camera sways gently from side to side around where it started, pausing " ..
 			"between moves."],
-		extras = TurningExtras("runSwingBehind", "runGlideDelay"),
 		zoomPrefix = "runZoom",
 		zoomTip = L["The camera eases out a little, then drifts in and out around your own distance. " ..
 			"When you stop it glides back."],
@@ -3711,15 +3688,15 @@ local function CreateCozyPanel()
 	CreateCameraModePanel({
 		name = L["Cozy Cam"],
 		description = L["Resting at a campfire, sitting, sleeping, dancing and the like (whichever " ..
-			"events pick it on the Scenes page): the camera swings slowly round to face you, then " ..
-			"sways gently from side to side in front of you, and eases in close. Moving (or standing " ..
-			"up) ends it."],
+			"events pick it on the Scenes page): the camera turns slowly half round (180°, so if it " ..
+			"started behind you it faces you), then sways gently from side to side there, and eases " ..
+			"in close. Moving (or standing up) ends it."],
 		inputPauseKey = "cozyInputPause",
 		orbitPrefix = "cozyOrbit", style = "back",
-		rotateLabel = L["Sway in front of you"],
-		rotateTip = L["Once it has swung round to face you, the camera sways gently from side to side " ..
-			"in front of your character, pausing between moves."],
-		extras = HeightExtras("cozyLevel", -30, 80, L["As it swings round, the camera also comes down " ..
+		rotateLabel = L["Sway from side to side"],
+		rotateTip = L["Once it has turned half round, the camera sways gently from side to side " ..
+			"there, pausing between moves."],
+		extras = HeightExtras("cozyLevel", -30, 80, L["As it turns round, the camera also comes down " ..
 			"this much toward the ground, so it feels low and close rather than looking down from " ..
 			"above. It stops at the ground, so a big number just means \"as low as it goes\". 0 " ..
 			"keeps your angle."]),
@@ -3740,17 +3717,15 @@ local function CreateVistaPanel()
 	CreateCameraModePanel({
 		name = L["Vista Cam"],
 		description = L["Stop and /stare out at the view (or any event set to it on the Scenes page): " ..
-			"the camera glides around behind you and sways very gently there, looking out the way " ..
-			"you're facing. Like the RP walk camera, only slower and softer. Moving, jumping or " ..
-			"another emote ends it."],
+			"the camera sways very gently from side to side from where it is. Like the RP walk camera, " ..
+			"only slower and softer. Moving, jumping or another emote ends it."],
 		inputPauseKey = "vistaInputPause",
-		inputPauseTip = L["It glides back behind you first."],
 		orbitPrefix = "vistaOrbit", style = "back",
-		rotateLabel = L["Sway behind you"],
-		rotateTip = L["The camera swings very gently from side to side behind your character, " ..
+		rotateLabel = L["Sway from side to side"],
+		rotateTip = L["The camera sways very gently from side to side around where it started, " ..
 			"pausing between moves."],
 		extras = HeightExtras("vistaLevel", -30, 45, L["The camera sways this much lower than where " ..
-			"it lines up behind you, so it looks out across the view rather than down at it. 0 " ..
+			"it started, so it looks out across the view rather than down at it. 0 " ..
 			"keeps your angle."]),
 		zoomPrefix = "vistaZoom",
 		zoomTip = L["The camera eases out a little, then drifts slowly in and out around your own " ..
@@ -3763,16 +3738,15 @@ local function CreateFishPanel()
 	CreateCameraModePanel({
 		name = L["Fish Cam"],
 		description = L["Cast Fishing (or any event set to it on the Scenes page): the vista camera, " ..
-			"made for fishing. The camera glides around behind you and sways only a little either " ..
-			"side, so your bobber stays in view. It carries on after the cast until you move or jump."],
+			"made for fishing. The camera sways only a little either side of where it is, so your " ..
+			"bobber stays in view. It carries on after the cast until you move or jump."],
 		inputPauseKey = "fishInputPause",
-		inputPauseTip = L["It glides back behind you first."],
 		orbitPrefix = "fishOrbit", style = "back",
-		rotateLabel = L["Sway behind you"],
-		rotateTip = L["The camera swings a little from side to side behind your character, " ..
+		rotateLabel = L["Sway from side to side"],
+		rotateTip = L["The camera sways a little from side to side around where it started, " ..
 			"pausing between moves. Narrower than the vista camera's sway."],
 		extras = HeightExtras("fishLevel", -30, 45, L["The camera sways this much lower than where " ..
-			"it lines up behind you, so it looks out across the water rather than down at it. 0 " ..
+			"it started, so it looks out across the water rather than down at it. 0 " ..
 			"keeps your angle."]),
 		zoomPrefix = "fishZoom",
 		zoomTip = L["The camera eases out a little, then drifts slowly in and out around your own " ..
@@ -3790,10 +3764,9 @@ local function CreateWalkPanel()
 		inputPauseKey = "walkInputPause",
 		inputPauseTip = L["Keep it short, so it's back in time if you need to steer."],
 		orbitPrefix = "walkOrbit", style = "back",
-		rotateLabel = L["Sway behind you"],
-		rotateTip = L["The camera swings gently from side to side behind your character, pausing " ..
+		rotateLabel = L["Sway from side to side"],
+		rotateTip = L["The camera sways gently from side to side around where it started, pausing " ..
 			"between moves."],
-		extras = TurningExtras("walkSwingBehind", "walkGlideDelay"),
 		zoomPrefix = "walkZoom",
 		zoomTip = L["The camera eases out a little, then drifts in and out around your own distance. " ..
 			"When you stop walking it glides back."],
@@ -4024,7 +3997,7 @@ local QUEST_SIDES = {
 local function CreateQuestPanel()
 	local content, top, title = CameraSection(L["Quest Cam"], "Quest Cam")
 	local subtitle = PageIntro(content, title, L["Talking to a quest giver, the " ..
-		"camera zooms in and swings around behind you, looking past you at them. It goes back " ..
+		"camera zooms in and turns a little to one side, looking past you at them. It goes back " ..
 		"once you close the window or move off (your zoom stays if you zoomed yourself meanwhile). Works " ..
 		"whether or not CineMode is on. The \"Talk to a quest giver\" and \"Talk about a quest\" " ..
 		"events on the Scenes page can also turn it off or make it wait a moment."], top)
@@ -4047,17 +4020,12 @@ local function CreateQuestPanel()
 	GreyUnless(daily, IfOn)
 
 	stack:Header(content, L["Rotation"])
-	local duration = stack:Add(Slider(content, "questCamTime", L["Swing behind you takes"], 1, 6, 0.25, L["%.2f sec"]), "slider")
-	Tooltip(duration, L["The turn to the side starts once the swing is done."])
-	GreyUnless(duration, IfOn)
 	local angle = stack:Add(Slider(content, "questCamAngle", L["Come round to the side"], 0, 90, 5, "%d°"), "slider")
-	Tooltip(angle, L["After swinging behind you, the camera comes round this far to one side, so " ..
-		"you see the quest giver past you at an angle rather than straight over your head. " ..
-		"0 stays straight behind you. It turns back behind you as the window closes."])
+	Tooltip(angle, L["The camera turns this far to one side, so you see the quest giver past you " ..
+		"at an angle rather than straight over your head. 0: no turn. It turns back as the window closes."])
 	GreyUnless(angle, IfOn)
 	local turnTime = stack:Add(Slider(content, "questCamTurnTime", L["Turn to the side takes"], 1, 8, 0.5, L["%.1f sec"]), "slider")
-	Tooltip(turnTime, L["It starts once the swing behind you is done, while the zoom carries on. " ..
-		"The tilt down follows."])
+	Tooltip(turnTime, L["It turns while the zoom carries on. The tilt down follows."])
 	GreyUnless(turnTime, IfOn)
 	local SIDE_TIP = L["Which side the camera comes round to. On your right, the quest giver is on " ..
 		"the right of the screen. (The game doesn't tell addons where the quest giver stands, or " ..
@@ -4111,9 +4079,8 @@ end
 local function CreateTelePanel()
 	local content, sectionTop, title = CameraSection(L["Tele Cam"], "Tele Cam")
 	local subtitle = PageIntro(content, title, L["Casting your Hearthstone or a " ..
-		"teleport, the camera swings round in front of you, quickly enough to be there before you " ..
-		"go, then spins around you faster and faster as it zooms in. Cancel the cast and it goes " ..
-		"back to where it was; once you're there, it swings around behind you. Its music, haze and " ..
+		"teleport, the camera turns half round, then spins around you faster and faster as it " ..
+		"zooms in. Cancel the cast and it goes back to where it was. Its music, haze and " ..
 		"tooltips follow the Cozy Cam's settings. The events on the Scenes page can also make it " ..
 		"wait a moment."], sectionTop)
 	-- (On or off: the Hearthstone and teleport rows' cameras, on the Cameras page.)
@@ -4122,21 +4089,16 @@ local function CreateTelePanel()
 	local stack = Stack(subtitle, "label", true)
 
 	stack:Header(content, L["Rotation"])
-	local early = stack:Add(Slider(content, "teleArriveEarly", L["Round in front of you"], 0, 6, 0.5,
-		L["%.1f sec before you go"]), "slider")
-	Tooltip(early, L["The swing round to face you is timed to get there this long before the cast " ..
-		"ends. More is a quicker swing."])
-	GreyUnless(early, IfOn)
 	local accel = stack:Add(Slider(content, "teleSpinAccel", L["Then speeds up by"], 0, 30, 1,
 		L["%d° per sec, each sec"]), "slider")
-	Tooltip(accel, L["Once round in front, the spin keeps going and picks up speed until you go. " ..
+	Tooltip(accel, L["Once half round, the spin keeps going and picks up speed until you go. " ..
 		"0 keeps a steady speed."])
 	GreyUnless(accel, IfOn)
 	local top = stack:Add(Slider(content, "teleSpinMax", L["Top speed"], 30, 360, 10, L["%d° per sec"]), "slider")
 	Tooltip(top, L["The spin never goes faster than this."])
 	GreyUnless(top, IfOn)
 	local level = stack:Add(Slider(content, "teleLevel", L["Bring the camera down"], -30, 80, 5, "%d°"), "slider")
-	Tooltip(level, L["As it swings round, the camera also comes down toward the ground (negative: up)."])
+	Tooltip(level, L["As it turns round, the camera also comes down toward the ground (negative: up)."])
 	GreyUnless(level, IfOn)
 
 	stack:Header(content, L["Zoom"])
@@ -4154,15 +4116,11 @@ local function CreateTelePanel()
 	Tooltip(zoomBack, L["Canceling the cast, the camera zooms back out to your own distance this quickly."])
 	GreyUnless(zoomBack, IfZoom)
 
-	stack:Header(content, L["Canceling and arriving"])
+	stack:Header(content, L["Canceling"])
 	local back = stack:Add(Check(content, "teleReturn", L["Turn back if you cancel"],
 		L["Moving, jumping or Esc cancels the cast: the spin slows to a stop and turns back to where " ..
 		"the camera was before you started. Off: it stops where it is."]), "check")
 	GreyUnless(back, IfOn)
-	local behind = stack:Add(Check(content, "teleBehind", L["Swing behind you where you arrive"],
-		L["Once you're there (after the loading screen, if there is one), the camera swings around " ..
-		"behind you."]), "check")
-	GreyUnless(behind, IfOn)
 end
 
 -- The Camera Settings page, with a section for each camera.

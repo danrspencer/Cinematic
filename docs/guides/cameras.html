@@ -224,14 +224,14 @@ table.grid tr:last-child td { border-bottom: 0 }
     <table class="grid">
       <thead><tr><th>Camera</th><th>What it does</th></tr></thead>
       <tbody>
-        <tr><td><b>Flight</b></td><td>Swings behind you at takeoff, sways on the way, fly-bys, settles behind you before landing. <a href="flight-cam.html">More on the Flight Cam</a>.</td></tr>
+        <tr><td><b>Flight</b></td><td>Sways on the way, fly-bys, turns back to where it started before landing. <a href="flight-cam.html">More on the Flight Cam</a>.</td></tr>
         <tr><td><b>AFK</b></td><td>Slowly sweeps around your character and drifts in and out.</td></tr>
-        <tr><td><b>Cozy</b></td><td>Swings round to face you, comes in close and low, and sways softly.</td></tr>
-        <tr><td><b>Tele</b></td><td>Swings in front of you and spins faster and faster as it zooms in until you're gone, then swings behind you where you arrive.</td></tr>
-        <tr><td><b>Vista</b></td><td>Lines up behind you, lowers, and sways very gently, looking out the way you face.</td></tr>
+        <tr><td><b>Cozy</b></td><td>Turns half round (facing you, if it started behind you), comes in close and low, and sways softly.</td></tr>
+        <tr><td><b>Tele</b></td><td>Turns half round and spins faster and faster as it zooms in until you're gone.</td></tr>
+        <tr><td><b>Vista</b></td><td>Lowers and sways very gently from where it is, taking in the view.</td></tr>
         <tr><td><b>Fish</b></td><td>The vista camera made for fishing: a narrower sway so your bobber stays in view.</td></tr>
-        <tr><td><b>RP Walk</b></td><td>Sways gently behind you while you auto-walk, and glides round to your new heading after a turn.</td></tr>
-        <tr><td><b>Auto-run</b></td><td>A travel camera that sways behind you and drifts in and out as you go.</td></tr>
+        <tr><td><b>RP Walk</b></td><td>Sways gently from side to side while you auto-walk.</td></tr>
+        <tr><td><b>Auto-run</b></td><td>A travel camera that sways from side to side and drifts in and out as you go.</td></tr>
         <tr><td><b>Quest</b></td><td>Eases in close and comes round to a shot past your shoulder at the quest giver.</td></tr>
         <tr><td><b>Death</b></td><td>Rises and circles slowly round your body over a cold, dimmed screen, with a song of its own.</td></tr>
       </tbody>
@@ -270,35 +270,35 @@ table.grid tr:last-child td { border-bottom: 0 }
   // Each camera: what starts it (events, with "tag" for the events that pick it on the
   // Scenes page to start with), what ends it, and a line on what it does.
   var CAMS = [
-    { name: "Flight", lead: "Swings round behind you as you take off, sways behind you on the way, and settles behind you before landing. Now and then a fly-by turns it round to look back past you.",
+    { name: "Flight", lead: "Sways from side to side on the way and turns back to where it started before landing. Now and then a fly-by turns it round to look back past you.",
       starts: [{ l: "Take a flight", d: "Taking off on a flight path", tag: 1 }],
       ends: "Landing. Moving the camera yourself pauses it, and once you've moved it on a flight there are no more fly-bys on that flight." },
     { name: "AFK", lead: "Slowly pulls back, then sweeps around your character, pausing between sweeps and drifting in and out.",
       starts: [{ l: "Go AFK", d: "Being flagged AFK (/afk, or away long enough)", tag: 1 }, { l: "Stand still", d: "Standing still for a while with nothing else going on. No camera to start with; the Cinema profile picks the AFK camera" }, { l: "Any emote you set to it", d: "On the Scenes page" }, { l: "Keybind or camera wheel", d: "Start the AFK camera" }],
       ends: "Moving." },
-    { name: "Cozy", lead: "Swings slowly round to face you, comes down low and in close, then sways gently from side to side in front of you.",
+    { name: "Cozy", lead: "Turns slowly half round (facing you, if it started behind you), comes down low and in close, then sways gently from side to side there.",
       starts: [{ l: "Resting with a listed buff (campfire)", d: "Standing or sitting still with a buff like Welcoming Campfire", tag: 1 },
         { l: "Campfire button", d: "Clicking the Campfire button that shows at your cursor over a campfire", tag: 1, only: "forever" },
         { l: "/sleep, /dance, /kneel", d: "Doing the emote", tag: 1 }, { l: "Sitting in a chair or on a bench", d: "Right-clicking a seat to sit on it", tag: 1 },
         { l: "Unsheathe your weapon", d: "With your Sheathe/Unsheathe key out of combat, for a hero shot", tag: 1 },
         { l: "Log out", d: "The 20-second countdown away from an inn or city", tag: 1 }, { l: "Keybind or camera wheel", d: "Start the cozy camera" }],
       ends: "Moving, jumping, standing up or another emote. A drawn weapon ends it when you put it away, run or start a fight." },
-    { name: "Tele", lead: "Swings round in front of you, then spins round you faster and faster as it zooms in until you go. Once you're there, it swings round behind you.",
+    { name: "Tele", lead: "Turns half round, then spins round you faster and faster as it zooms in until you go.",
       starts: [{ l: "Cast your Hearthstone", d: "Also Astral Recall, and any spell with Hearthstone in its name", tag: 1 }, { l: "Cast a teleport", d: "A mage's Teleport: Stormwind and the like, or a druid's Teleport: Moonglade", tag: 1 }, { l: "Keybind or camera wheel", d: "Start the tele camera" }],
       ends: "Arriving. Cancel the cast (moving, jumping or Esc) and the spin slows and turns back to where the camera was." },
-    { name: "Vista", lead: "Glides round behind you, lowers, and sways very gently there, looking out the way you're facing. Like the RP walk camera, only slower and softer.",
+    { name: "Vista", lead: "Lowers and sways very gently from where it is, taking in the view. Like the RP walk camera, only slower and softer.",
       starts: [{ l: "/stare", d: "Doing the emote while standing still", tag: 1 }, { l: "/sit", d: "Or pressing the sit key", tag: 1 }, { l: "Keybind or camera wheel", d: "Start the vista camera" }],
       ends: "Moving, jumping or another emote." },
-    { name: "Fish", lead: "The vista camera made for fishing: it settles behind you and sways only a little either side, so your bobber stays in view.",
+    { name: "Fish", lead: "The vista camera made for fishing: it sways only a little either side, so your bobber stays in view.",
       starts: [{ l: "Cast Fishing", d: "It carries on after the cast: looting, casting again", tag: 1 }, { l: "Keybind or camera wheel", d: "Start the fish camera" }],
       ends: "Moving or jumping. Right-click (or a gamepad button) casts again." },
-    { name: "RP Walk", lead: "Sways gently behind you. It holds steady through turns, then glides round to your new heading.",
+    { name: "RP Walk", lead: "Sways gently from side to side as you walk.",
       starts: [{ l: "Auto-walk", d: "Auto-run in walk mode, after a short wait", tag: 1 }],
       ends: "Walking by hand, or stopping. Stop and stand, and the AFK camera can take over." },
-    { name: "Auto-run", lead: "A travel camera that sways behind you and drifts in and out as you go.",
+    { name: "Auto-run", lead: "A travel camera that sways from side to side and drifts in and out as you go.",
       starts: [{ l: "Auto-run", d: "The auto-run key, after a short wait", tag: 1 }, { l: "Skyriding", d: "Keeps going when you auto-run on a skyriding mount", only: "retail" }],
       ends: "Pressing forward or back, or stopping." },
-    { name: "Quest", lead: "Eases in close and swings round behind you, coming round to one side so you see the quest giver past you. It goes back when you close the window or move off.",
+    { name: "Quest", lead: "Eases in close and turns a little to one side so you see the quest giver past you. It goes back when you close the window or move off.",
       starts: [{ l: "Talk to a quest giver", d: "A quest to pick up or hand in. Works whether or not CineMode is on", tag: 1 }, { l: "Every NPC you talk to", d: "An option on its settings: innkeepers, guards and the rest too" }],
       ends: "Closing the window or moving off. The zoom comes back once you walk more than 10 yards away." },
     { name: "Death", lead: "Rises and turns slowly round your body. The world dims and goes cold, \"YOU DIED\" (or \"wasted\") fades in, and a song of its own plays.",

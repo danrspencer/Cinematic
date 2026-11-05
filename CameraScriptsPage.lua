@@ -29,51 +29,54 @@ local SHARE_PREFIX, SHARE_FORMAT = "CINES", 1
 local COLORS = {
 	move = { 0.4, 0.62, 1 }, wait = { 0.6, 0.62, 0.68 }, flow = { 0.68, 0.52, 0.95 }, misc = { 0.92, 0.62, 0.3 },
 }
-local KIND_COLOR = { rotate = "move", tilt = "move", zoom = "move", zoomRand = "move", lineup = "move",
-	wait = "wait", together = "flow", ["repeat"] = "flow", emote = "misc", putback = "misc", turnTo = "move",
-	sway = "move", tiltRand = "move", spin = "move", ["until"] = "flow", waitRand = "wait", aim = "move", ending = "flow",
-	play = "flow", endMusic = "misc" }
-local KIND_NAMES = { rotate = "Rotate", tilt = "Tilt", zoom = "Zoom", zoomRand = "Zoom at random",
-	lineup = "Line up", wait = "Wait", together = "Together", ["repeat"] = "Repeat", emote = "Emote",
-	putback = "Put back", turnTo = "Turn to", sway = "Sway", tiltRand = "Tilt at random", spin = "Spin",
-	["until"] = "Wait until", waitRand = "Wait at random", aim = "Aim at", play = "Play", endMusic = "End music" }
+local KIND_COLOR = { rotate = "move", tilt = "move", zoom = "move",
+	wait = "wait", together = "flow", ["repeat"] = "flow", emote = "misc", putback = "misc",
+	sway = "move", spin = "move", aim = "move", ending = "flow",
+	play = "flow", endMusic = "misc", follow = "move" }
+local KIND_NAMES = { rotate = "Rotate", tilt = "Tilt", zoom = "Zoom",
+	wait = "Wait", together = "Together", ["repeat"] = "Repeat", emote = "Emote",
+	putback = "Undo its turns", sway = "Sway", spin = "Spin",
+	aim = "Aim at", play = "Play script", endMusic = "End music",
+	follow = "Follow your turns" }
+-- The add buttons' groups (CameraScripts.lua's ns.CAMERA_SCRIPT_ADD_GROUPS).
+local ADD_GROUP_NAMES = { move = "Move the camera", wait = "Wait", group = "Group steps", other = "Other" }
 -- (A field's name: by its kind first, where the same key means something else there.)
 local FIELD_NAMES = { deg = "Degrees", secs = "Seconds", way = "Way", ease = "Ease", to = "Yards", min = "Nearest",
-	max = "Furthest", token = "Emote", times = "Times", of = "From", around = "Around", arc = "Arc", drift = "Drift",
-	pause = "Pause", favor = "Middle", down = "Down", up = "Up", accel = "Speed-up", ["turnTo.to"] = "To",
-	["sway.min"] = "At least", ["spin.max"] = "Top speed", ["tiltRand.deg"] = "Middle", what = "Until", after = "After",
-	fit = "Time", ["waitRand.min"] = "Shortest", ["waitRand.max"] = "Longest", at = "At", miss = "Not found",
-	speed = "Top speed", past = "Past max", ["putback.zoom"] = "Zoom too", script = "Camera" }
+	max = "Furthest", token = "Emote", times = "Times", of = "From", arc = "Arc", drift = "Drift",
+	pause = "Pause", favor = "Middle", down = "Down", up = "Up", accel = "Speed-up",
+	["sway.min"] = "At least", ["spin.max"] = "Top speed", ["spin.start"] = "Start speed", blend = "Speed match", speedUp = "Speed up", slowDown = "Slow down", what = "Until", after = "After", rand = "Random",
+	["tilt.up"] = "Higher by", ["tilt.down"] = "Lower by", ["zoom.max"] = "Up to", ["wait.max"] = "Up to",
+	fit = "Time", at = "At", miss = "Not found",
+	speed = "Top speed", past = "Past max", ["putback.zoom"] = "Zoom too", script = "Camera",
+	["follow.after"] = "Glide after", lazy = "Laziness", top = "Top speed", corners = "Corners", steer = "Steering",
+	["follow.most"] = "Fall behind at most" }
 local CHOICE_NAMES = { left = "Left", right = "Right", random = "Either way", once = "Picked once",
-	smooth = "Smooth", gentle = "Gentle", steady = "Steady", yards = "You", yours = "Your zoom", behind = "Behind",
-	front = "In front", yes = "Favor", no = "Anywhere", cast = "The cast", landing = "Landing", alive = "Back to life",
+	smooth = "Smooth", gentle = "Gentle", steady = "Steady", none = "None", short = "Short", medium = "Medium", long = "Long", yards = "You", yours = "Your zoom",
+	yes = "Favor", no = "Anywhere", cast = "The cast", landing = "Landing", alive = "Back to life",
 	time = "Seconds go by", secs = "Its seconds", talk = "Someone new talks", click = "Where you clicked",
 	speaker = "Who's talking", stay = "Stay", look = "Look round", ["past.no"] = "No", ["past.yes"] = "Yes",
-	["zoom.no"] = "No", ["zoom.yes"] = "Yes" }
+	["zoom.no"] = "No", ["zoom.yes"] = "Yes", ["corners.no"] = "No", ["corners.yes"] = "Quicker",
+	["steer.no"] = "No", ["steer.yes"] = "Quicker", ["rand.no"] = "No", ["rand.between"] = "Between two",
+	["rand.give"] = "Give or take" }
 local RULE_NAMES = { camera = "You move the camera", fight = "A fight starts", walk = "You walk", zoom = "You zoom",
 	ends = "Its trigger ends", cast = "Your cast ends" }
 local ACTION_NAMES = { stop = "Stop, leave it there", putback = "Run When it ends", pause = "Pause, then carry on",
 	restart = "Start again", ignore = "Carry on" }
 local HINTS = {
-	rotate = "Turns the view, as your Turn view left and right keys do. One turn at a time. Picked once: either way, the same for every such turn in the script.",
-	tilt = "Positive tilts the view down, negative up. Beside a turn (Together), both go at once.",
-	zoom = "Zooms to this many yards from you, or (From: your zoom) this many further out than you were as it started (negative: closer). Top speed (yards a second): quicker if it gets there sooner, Seconds the longest it takes; 0 goes by Seconds. Past max: further out than the game's own limit lets you.",
-	zoomRand = "Zooms somewhere between the two, picked each time it runs: yards from you, or from your distance as it started. Top speed and Past max as for Zoom.",
-	lineup = "Turns back to straight behind you, however far round it is.",
-	wait = "Holds still. A short wait also gives the game a moment between moves.",
+	rotate = "Turns the view. Picked once: one way for every such turn in the script. Slow down None ends at full speed, for a turn the same way next to carry straight on; Speed match: seconds to go from that speed to its own.",
+	tilt = "Positive tilts down, negative up; beside a turn (Together) both go at once. Random Give or take: to Height from where the scene started, give or take Higher by and Lower by, picked each time. Slow down None ends at full speed, for a tilt the same way next to carry straight on; Speed match: seconds to go from that speed to its own.",
+	zoom = "Zooms to this many yards from you, or (From: your zoom) this many further out than you were as it started. Random Between two: somewhere from Nearest to Up to, picked each time. Top speed (yards a second): quicker if it gets there sooner; 0 goes by Seconds. Past max: beyond the game's own limit.",
+	wait = "Until: seconds, or a Hearthstone or teleport cast that many seconds from done, that many seconds before landing, back to life, or someone new talks. Waiting on something, steps added while it's picked go inside it and run meanwhile, easing to a stop when it's time.",
 	together = "Runs the steps inside it at once; it's done when the longest is. Pick it and add steps to put them inside.",
 	["repeat"] = "Runs the steps inside it again. 0 times: until the camera ends (the preview shows three).",
 	emote = "Your character does this emote (a word, like wave or cheer).",
-	putback = "Undoes every turn, tilt and zoom this script made. Zoom too off: the zoom stays, for a Zoom beside it in a Together to bring back at its own speed.",
-	turnTo = "Turns to face you, counted from where it started.",
-	sway = "A random spot within Arc of behind (or in front), At least that far on; then it creeps on at Drift degrees a second through Pause, easing off before the edge. Middle: favor spots near the middle.",
-	tiltRand = "A random height: Middle degrees down (negative: up), give or take Down and Up. It waits for a turn to finish.",
-	spin = "Round and round, speeding up by Speed-up degrees a second each second to Top speed. 0 seconds: until the camera ends.",
-	["until"] = "Waits until a Hearthstone or teleport cast is that many seconds from done, you're that many seconds from landing (on a route you've flown before), you're back to life, or the seconds go by. Steps inside it run meanwhile and ease to a stop when it's time.",
-	waitRand = "Waits somewhere between the two, picked each time.",
+	putback = "Undoes every turn, tilt and zoom this scene made, all at once, by adding up its own turns (the game never says which way the camera points). If you move the camera yourself, it starts counting again from where you leave it. Zoom too off: the zoom stays, for a Zoom beside it in a Together to bring back at its own speed.",
+	sway = "A random spot within Arc of where the camera was as this sway first ran, At least that far on; then it creeps on at Drift degrees a second through Pause, easing off before the edge. Middle: favor spots near the middle.",
+	spin = "Round and round from Start speed, speeding up by Speed-up each second to Top speed (degrees a second); 0 seconds: until the camera ends. Speed match: seconds to go from the turn before's speed to its own.",
 	aim = "Where you clicked: turns Degrees toward the side of the screen you clicked who you're talking to, as the quest cam does. Who's talking: swings toward the NPC talking now by their chat bubble, leaving them Degrees off the middle, as Chat Cam does. Not found (opened with a key, no bubble on screen): a turn either way, stay, or look round (a full turn at most) for their bubble. Top speed (degrees a second): slower than Seconds if the turn would go faster; 0 goes by Seconds.",
 	play = "Plays another camera's steps here, as they are now (a built-in one with your settings), then goes on. Not its stop rules or When it ends.",
 	endMusic = "Fades out the music a camera started, over this many seconds, and ends it (your own game music is left alone). The next steps go on meanwhile. Put it in When it ends to stop the music as the scene ends.",
+	follow = "Runs until the camera ends: put it in a Together beside the rest. While you turn, the view holds its direction instead of swinging round with you. Glide after seconds of not turning, it glides round after you, to where it was before you turned: Laziness (seconds) says how lazily (the further off, the quicker), Top speed (degrees a second) the fastest, Speed-up how quickly it gets going and slows down. Corners: bigger turns glide back quicker, small ones gentler. Steering: several turns in a row glide sooner and quicker. Fall behind at most (degrees, 0: no limit): the furthest it lets you turn away from the view; past it, the view turns with you. The script's other turns wait while it glides, then carry on.",
 }
 local function Translate(map)
 	for key, text in pairs(map) do map[key] = L[text] end
@@ -97,7 +100,15 @@ local function StepText(step)
 		return #step.steps > 0 and L["When it ends"] or L["When it ends: nothing, it stays where it is"]
 	end
 	local k = step.k
-	if k == "zoom" and step.fit == "cast" then
+	if k == "zoom" and step.rand == "between" then
+		local low, high = math.min(step.to, step.max), math.max(step.to, step.max)
+		return (step.of == "yours" and L["Zoom somewhere from your distance %s to %s yd over %s s"]:format(Signed(low),
+			Signed(high), Num(step.secs)) or L["Zoom somewhere from %s to %s yd over %s s"]:format(Num(low), Num(high),
+			Num(step.secs)))
+	elseif k == "tilt" and step.rand == "give" then
+		return L["Tilt to %s° give or take %s/%s over %s s"]:format(Signed(step.deg), Num(step.up), Num(step.down),
+			Num(step.secs))
+	elseif k == "zoom" and step.fit == "cast" then
 		return (step.of == "yours" and L["Zoom to your distance %s yd over the cast"]:format(Signed(step.to))
 			or L["Zoom to %s yd over the cast"]:format(Num(step.to)))
 	elseif k == "rotate" then
@@ -110,48 +121,39 @@ local function StepText(step)
 			Num(step.secs))
 	elseif k == "zoom" and step.of == "yours" then
 		return L["Zoom to your distance %s yd over %s s"]:format(Signed(step.to), Num(step.secs))
-	elseif k == "zoomRand" and step.of == "yours" then
-		return L["Zoom somewhere from your distance %s to %s yd over %s s"]:format(Signed(step.min), Signed(step.max),
-			Num(step.secs))
 	elseif k == "zoom" then
 		return L["Zoom to %s yd over %s s"]:format(Num(step.to), Num(step.secs))
-	elseif k == "zoomRand" then
-		return L["Zoom somewhere from %s to %s yd over %s s"]:format(Num(step.min), Num(step.max), Num(step.secs))
-	elseif k == "lineup" then
-		return L["Line up behind you over %s s"]:format(Num(step.secs))
-	elseif k == "turnTo" and step.fit == "cast" then
-		return L["Turn to face you before the cast ends"]
-	elseif k == "turnTo" then
-		return L["Turn to face you over %s s"]:format(Num(step.secs))
-	elseif k == "until" then
+	elseif k == "wait" and step.what == "time" and #(step.steps or {}) == 0 then
+		if step.rand == "between" then
+			return L["Wait %s to %s s"]:format(Num(math.min(step.secs, step.max)), Num(math.max(step.secs, step.max)))
+		end
+		return L["Wait %s s"]:format(Num(step.secs))
+	elseif k == "wait" then
 		local text = step.what == "cast" and (step.secs > 0 and L["Until the cast is %s s from done"]:format(Num(step.secs))
 			or L["Until the cast ends"])
 			or step.what == "landing" and L["Until %s s before landing"]:format(Num(step.secs))
 			or step.what == "alive" and L["Until you're back to life"]
 			or step.what == "talk" and L["Until someone new talks"]
+			or step.rand == "between" and L["Until %s to %s s go by"]:format(Num(math.min(step.secs, step.max)),
+				Num(math.max(step.secs, step.max)))
 			or L["Until %s s go by"]:format(Num(step.secs))
 		return #step.steps > 0 and text .. L[", doing these"] or text
-	elseif k == "waitRand" then
-		return L["Wait %s to %s s"]:format(Num(math.min(step.min, step.max)), Num(math.max(step.min, step.max)))
 	elseif k == "aim" then
 		return (step.at == "click" and L["Turn %s° toward where you clicked them over %s s"]
 			or L["Swing to who's talking, %s° off the middle, over %s s"]):format(Num(step.deg), Num(step.secs))
 	elseif k == "sway" then
-		local text = (step.around == "front" and L["Sway within %s° of your front over %s s"]
-			or L["Sway within %s° of behind you over %s s"]):format(Num(step.arc), Num(step.secs))
+		local text = L["Sway within %s° of where the sway began over %s s"]:format(Num(step.arc), Num(step.secs))
 		if step.pause > 0 then
 			text = text .. ", " .. (step.drift > 0 and L["drift %s°/s for %s s"]:format(Num(step.drift), Num(step.pause))
 				or L["hold %s s"]:format(Num(step.pause)))
 		end
 		return text
-	elseif k == "tiltRand" then
-		return L["Tilt to %s° give or take %s/%s over %s s"]:format(Signed(step.deg), Num(step.down), Num(step.up),
-			Num(step.secs))
+	elseif k == "spin" and step.start > 0 then
+		return (step.secs > 0 and L["Spin from %s to %s°/s, for %s s"]:format(Num(step.start), Num(step.max), Num(step.secs))
+			or L["Spin from %s to %s°/s, until it ends"]:format(Num(step.start), Num(step.max)))
 	elseif k == "spin" then
 		return (step.secs > 0 and L["Spin, speeding up to %s°/s, for %s s"]:format(Num(step.max), Num(step.secs))
 			or L["Spin, speeding up to %s°/s, until it ends"]:format(Num(step.max)))
-	elseif k == "wait" then
-		return L["Wait %s s"]:format(Num(step.secs))
 	elseif k == "play" then
 		local played = ns.FindCameraScript(step.script)
 		return L["Play %s"]:format(played and played.name or step.script)
@@ -159,8 +161,10 @@ local function StepText(step)
 		return L["Do /%s"]:format(step.token)
 	elseif k == "endMusic" then
 		return L["End the music over %s s"]:format(Num(step.secs))
+	elseif k == "follow" then
+		return L["Follow your turns, catching up %s s after"]:format(Num(step.after))
 	elseif k == "putback" then
-		return (step.zoom == "no" and L["Put the turn and tilt back over %s s"] or L["Put everything back over %s s"]):format(
+		return (step.zoom == "no" and L["Undo its turns and tilts over %s s"] or L["Undo its turns, tilts and zoom over %s s"]):format(
 			Num(step.secs))
 	elseif k == "together" then
 		return #step.steps == 0 and L["Together (empty: pick it and add steps)"] or L["Together: these at once"]
@@ -238,6 +242,24 @@ local function Box(parent, width)
 	box:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
 	box:SetScript("OnEnterPressed", function(self) self:ClearFocus() end)
 	return box
+end
+
+-- A number box the mouse wheel turns up and down: by stepOf()'s step (nil:
+-- not a number now, the wheel does nothing), ten times that with Shift, a
+-- tenth with Ctrl; then saved as typing it would be (its OnEditFocusLost,
+-- which keeps it in range).
+local function WheelNumber(box, stepOf)
+	box:EnableMouseWheel(true)
+	box:SetScript("OnMouseWheel", function(self, delta)
+		local by = stepOf()
+		if not by or (self.IsEnabled and not self:IsEnabled()) then return end
+		by = by * (IsShiftKeyDown() and 10 or IsControlKeyDown() and 0.1 or 1)
+		local value = (tonumber(self:GetText()) or 0) + delta * by
+		value = math.floor(value / by + 0.5) * by
+		self:SetText((("%.2f"):format(value):gsub("%.?0+$", "")))
+		local save = self:GetScript("OnEditFocusLost")
+		if save then save(self) end
+	end)
 end
 
 local function IconButton(parent, art, tip)
@@ -720,9 +742,157 @@ local function StepRow(content)
 	return row
 end
 
+-- A step's speed over its time, under its settings (rotate, tilt, zoom,
+-- spin, aim): its own speed in blue; with Speed match and a turn before it
+-- handing straight over, the part it takes over shaded, starting from that
+-- turn's speed (the dot), its own speed without it dashed grey.
+local GRAPH_H, GRAPH_POINTS, GRAPH_LEFT, GRAPH_BOTTOM = 70, 48, 44, 14
+local function MakeGraph(parent)
+	local g = CreateFrame("Frame", nil, parent)
+	g:SetSize(WIDTH - 28, GRAPH_H)
+	local bg = g:CreateTexture(nil, "BACKGROUND")
+	bg:SetAllPoints()
+	bg:SetColorTexture(0, 0, 0, 0.25)
+	local plotW, plotH = WIDTH - 28 - GRAPH_LEFT - 8, GRAPH_H - GRAPH_BOTTOM - 8
+	g.plotW, g.plotH = plotW, plotH
+	g.band = g:CreateTexture(nil, "BORDER")
+	g.band:SetColorTexture(1, 0.82, 0, 0.13)
+	local function Line(r, gg, b, a, thick)
+		if not g.CreateLine then return nil end
+		local line = g:CreateLine(nil, "ARTWORK")
+		line:SetThickness(thick)
+		line:SetColorTexture(r, gg, b, a)
+		return line
+	end
+	g.Line = Line
+	g.axisX, g.axisY = Line(0.35, 0.35, 0.4, 1, 1), Line(0.35, 0.35, 0.4, 1, 1)
+	g.edge = Line(1, 0.82, 0, 0.6, 1)
+	g.own, g.real = {}, {}
+	for i = 1, GRAPH_POINTS do
+		g.own[i] = Line(0.55, 0.55, 0.6, 0.7, 1)
+		g.real[i] = Line(0.36, 0.55, 0.94, 1, 2)
+	end
+	g.dot = g:CreateTexture(nil, "OVERLAY")
+	g.dot:SetSize(6, 6)
+	g.dot:SetColorTexture(1, 0.82, 0, 1)
+	-- (The dot's speed beside it: what the turn before ends at, to match.)
+	g.dotText = g:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+	g.dotText:SetTextColor(1, 0.82, 0)
+	local function Text(justify)
+		local text = g:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+		text:SetJustifyH(justify)
+		return text
+	end
+	g.top, g.zero, g.secs, g.match = Text("RIGHT"), Text("LEFT"), Text("RIGHT"), Text("CENTER")
+	g.top:SetPoint("TOPRIGHT", g, "TOPLEFT", GRAPH_LEFT - 4, -4)
+	g.zero:SetPoint("BOTTOMLEFT", g, "BOTTOMLEFT", GRAPH_LEFT, 2)
+	g.zero:SetText(L["0 s"])
+	g.secs:SetPoint("BOTTOMRIGHT", g, "BOTTOMRIGHT", -8, 2)
+	g.match:SetTextColor(1, 0.82, 0)
+	g.match:SetText(L["Speed match"])
+	return g
+end
+local function PlaceLine(g, line, x1, y1, x2, y2)
+	if not line then return end
+	line:SetStartPoint("BOTTOMLEFT", g, GRAPH_LEFT + x1, GRAPH_BOTTOM + y1)
+	line:SetEndPoint("BOTTOMLEFT", g, GRAPH_LEFT + x2, GRAPH_BOTTOM + y2)
+	line:Show()
+end
+-- Draws speeds (ns.CameraStepSpeeds) with blend seconds of Speed match.
+local function DrawGraph(g, speeds, blend)
+	local T = speeds.T
+	local from = speeds.from
+	local match = from and blend > 0 and math.min(T, blend) or 0
+	local function Own(t) return speeds.Speed(t) end
+	local function Real(t)
+		if match > 0 and t < match then
+			local u = (1 - math.cos(math.pi * t / match)) / 2
+			return from + (Own(t) - from) * u
+		end
+		return Own(t)
+	end
+	local most = from or 0
+	for i = 0, GRAPH_POINTS do most = math.max(most, Own(T * i / GRAPH_POINTS)) end
+	most = math.max(most, 0.1)
+	local W, H = g.plotW, g.plotH
+	local function X(t) return W * t / T end
+	local function Y(v) return H * math.min(1, v / most) end
+	PlaceLine(g, g.axisX, 0, 0, W, 0)
+	PlaceLine(g, g.axisY, 0, 0, 0, H)
+	for i = 1, GRAPH_POINTS do
+		local t0, t1 = T * (i - 1) / GRAPH_POINTS, T * i / GRAPH_POINTS
+		PlaceLine(g, g.real[i], X(t0), Y(Real(t0)), X(t1), Y(Real(t1)))
+		-- (Its own speed, dashed: every other piece, only where Speed match changes it.)
+		if match > 0 and t0 < match and i % 2 == 0 then
+			PlaceLine(g, g.own[i], X(t0), Y(Own(t0)), X(t1), Y(Own(t1)))
+		elseif g.own[i] then
+			g.own[i]:Hide()
+		end
+	end
+	g.band:SetShown(match > 0)
+	g.match:SetShown(match > 0)
+	if g.edge then g.edge:SetShown(match > 0) end
+	if match > 0 then
+		g.band:ClearAllPoints()
+		g.band:SetPoint("BOTTOMLEFT", g, "BOTTOMLEFT", GRAPH_LEFT, GRAPH_BOTTOM)
+		g.band:SetSize(math.max(1, X(match)), H)
+		PlaceLine(g, g.edge, X(match), 0, X(match), H)
+		g.match:ClearAllPoints()
+		g.match:SetPoint("TOP", g, "BOTTOMLEFT", GRAPH_LEFT + X(match) / 2, GRAPH_BOTTOM + H - 2)
+	end
+	local unit = speeds.axis == "zoom" and L["%s yd/s"] or L["%s°/s"]
+	g.dot:SetShown(from ~= nil)
+	g.dotText:SetShown(from ~= nil)
+	if from then
+		g.dot:ClearAllPoints()
+		g.dot:SetPoint("CENTER", g, "BOTTOMLEFT", GRAPH_LEFT, GRAPH_BOTTOM + Y(from))
+		g.dotText:ClearAllPoints()
+		-- (Under it near the top, so it stays inside the graph.)
+		if Y(from) > H * 0.6 then
+			g.dotText:SetPoint("TOPLEFT", g.dot, "BOTTOMRIGHT", 3, -1)
+		else
+			g.dotText:SetPoint("BOTTOMLEFT", g.dot, "TOPRIGHT", 3, 1)
+		end
+		g.dotText:SetText(unit:format(Num(from)))
+	end
+	g.top:SetText(unit:format(Num(most)))
+	g.secs:SetText(L["%s s"]:format(Num(T)))
+	g:Show()
+end
+-- The plan the graph reads from: the page's script, from the preview's start.
+local function GraphPlan()
+	if not page.script then return nil end
+	return ns.PlanCameraScript(page.script,
+		{ yaw = 0, pitch = 0, zoom = math.max(2, GetCameraZoom and GetCameraZoom() or 8) })
+end
+local GRAPH_KINDS = { rotate = true, tilt = true, zoom = true, spin = true, aim = true }
+
+-- Settings that can't do anything as the step is set: hidden, their place
+-- left empty. (speeds: ns.CameraStepSpeeds's, for Speed match.)
+local function FieldHidden(step, key, speeds)
+	if key == "blend" then return not (speeds and speeds.from) end
+	local k = step.k
+	if k == "zoom" and key == "max" then return step.rand ~= "between" end
+	if k == "tilt" and (key == "up" or key == "down") then return step.rand ~= "give" end
+	if k == "wait" then
+		if key == "rand" then return step.what ~= "time" end
+		if key == "max" then return step.what ~= "time" or step.rand ~= "between" end
+		if key == "secs" then return step.what == "alive" or step.what == "talk" end
+	end
+	return false
+end
+-- A setting's name, where Random changes what it is.
+local function FieldLabel(step, key)
+	if step.k == "zoom" and key == "to" and step.rand == "between" then return L["Nearest"] end
+	if step.k == "tilt" and key == "deg" and step.rand == "give" then return L["Height"] end
+	if step.k == "wait" and key == "secs" and step.what == "time" and step.rand == "between" then return L["Shortest"] end
+	return nil
+end
+
 -- The settings of the step picked, under its row: up to eight fields, two
--- to a row, and a hint.
-local SLOTS, PER_ROW, SLOT_ROW, SLOT_W = 8, 2, 26, 186
+-- to a row, the speed graph, and a hint. (Speed match: hidden, its place
+-- left empty, where no turn hands over to the step: it would do nothing.)
+local SLOTS, PER_ROW, SLOT_ROW, SLOT_W = 10, 2, 26, 186
 local function MakeEditor(content)
 	local editor = CreateFrame("Frame", nil, content)
 	editor:SetSize(WIDTH, EDITOR_H)
@@ -747,6 +917,13 @@ local function MakeEditor(content)
 		end
 		slot.box:SetScript("OnEnterPressed", function(self) Commit(self) self:ClearFocus() end)
 		slot.box:SetScript("OnEditFocusLost", Commit)
+		-- (Seconds and Speed match by half a second, the rest by one.)
+		WheelNumber(slot.box, function()
+			local field = slot.field
+			if not field or field[2] ~= "num" then return nil end
+			return (field[1] == "secs" or field[1] == "blend" or field[1] == "max" and editor.step
+				and editor.step.k == "wait") and 0.5 or 1
+		end)
 		-- (A camera to play: every one but this, by name.)
 		local function Choices()
 			if not slot.field then return {} end
@@ -779,21 +956,29 @@ local function MakeEditor(content)
 	editor.hint:SetJustifyH("LEFT")
 	editor.hint:SetWordWrap(true)
 	if editor.hint.SetMaxLines then editor.hint:SetMaxLines(3) end
+	editor.graph = MakeGraph(editor)
 
 	function editor:Edit(step, locked)
 		self.step = step
+		if ns.UpgradeCameraScriptStep then ns.UpgradeCameraScriptStep(step) end
 		-- (When it ends: no settings of its own, just what it is.)
 		local kind = ns.CAMERA_SCRIPT_KINDS[step.k]
 		local fields = kind and kind.fields or {}
+		local speeds = GRAPH_KINDS[step.k] and not step.off and ns.CameraStepSpeeds
+			and ns.CameraStepSpeeds(GraphPlan(), step) or nil
 		for i, slot in ipairs(self.slots) do
 			local field = not locked and fields[i]
+			-- (Speed match with nothing handing over to it: an empty place.)
+			local shown = field and not FieldHidden(step, field[1], speeds)
 			slot.field = field or nil
-			slot.label:SetShown(field and true or false)
+			slot.label:SetShown(shown and true or false)
 			local picked = field and (field[2] == "pick" or field[2] == "script") or false
-			slot.box:SetShown(field and not picked or false)
-			slot.pick:SetShown(picked)
+			slot.box:SetShown(shown and not picked or false)
+			slot.pick:SetShown(shown and picked or false)
+			if field and step[field[1]] == nil then step[field[1]] = field[#field] end
 			if field then
-				slot.label:SetText(FIELD_NAMES[step.k .. "." .. field[1]] or FIELD_NAMES[field[1]] or field[1])
+				slot.label:SetText(FieldLabel(step, field[1]) or FIELD_NAMES[step.k .. "." .. field[1]]
+					or FIELD_NAMES[field[1]] or field[1])
 				if picked then
 					slot.pick:Refresh()
 				else
@@ -809,7 +994,16 @@ local function MakeEditor(content)
 			or step.k == "ending" and L["Runs when the camera ends, whatever ends it (its stop rules say which do). Every camera has it: it can't be removed. Pick it and add steps to put them inside."]
 			or locked and L["A built-in camera: Copy it to change it."] or HINTS[step.k] or "")
 		local rows = locked and 0 or math.ceil(#fields / PER_ROW)
-		self:SetHeight(rows * SLOT_ROW + settings + math.max(26, self.hint:GetStringHeight() + 14))
+		local graphH = 0
+		if speeds and speeds.T > 0 then
+			self.graph:ClearAllPoints()
+			self.graph:SetPoint("TOPLEFT", self, "TOPLEFT", 14, -(rows * SLOT_ROW + settings + 6))
+			DrawGraph(self.graph, speeds, tonumber(step.blend) or 0)
+			graphH = GRAPH_H + 8
+		else
+			self.graph:Hide()
+		end
+		self:SetHeight(rows * SLOT_ROW + settings + graphH + math.max(26, self.hint:GetStringHeight() + 14))
 	end
 	return editor
 end
@@ -1044,15 +1238,25 @@ function ns.CreateCameraScriptsPanel(kit)
 	page.rows, page.used = {}, 0
 	page.editor = MakeEditor(content)
 	page.addBars = {}
-	page.addHeight = math.ceil(#ns.CAMERA_SCRIPT_ADDABLE / 3) * 26
+	-- (A header over each group, then its buttons four to a row.)
+	local ADD_PER_ROW, ADD_W, ADD_ROW, ADD_HEADER = 4, 136, 26, 18
 	for _, list in ipairs({ "steps" }) do
 		local bar = CreateFrame("Frame", nil, content)
-		bar:SetSize(WIDTH, page.addHeight)
-		for i, kind in ipairs(ns.CAMERA_SCRIPT_ADDABLE) do
-			local add = Button(bar, "+ " .. KIND_NAMES[kind], 126)
-			add:SetPoint("TOPLEFT", ((i - 1) % 3) * 130, -math.floor((i - 1) / 3) * 26)
-			add:SetScript("OnClick", function() page.AddStep(kind) end)
+		local y = 0
+		for _, group in ipairs(ns.CAMERA_SCRIPT_ADD_GROUPS) do
+			local header = bar:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+			header:SetPoint("TOPLEFT", 2, y - 3)
+			header:SetText(L[ADD_GROUP_NAMES[group.key]])
+			y = y - ADD_HEADER
+			for i, kind in ipairs(group.kinds) do
+				local add = Button(bar, "+ " .. KIND_NAMES[kind], ADD_W - 4)
+				add:SetPoint("TOPLEFT", ((i - 1) % ADD_PER_ROW) * ADD_W, y - math.floor((i - 1) / ADD_PER_ROW) * ADD_ROW)
+				add:SetScript("OnClick", function() page.AddStep(kind) end)
+			end
+			y = y - math.ceil(#group.kinds / ADD_PER_ROW) * ADD_ROW - 4
 		end
+		page.addHeight = -y
+		bar:SetSize(WIDTH, page.addHeight)
 		page.addBars[list] = bar
 	end
 	page.ruleRows = {}
@@ -1089,6 +1293,7 @@ function ns.CreateCameraScriptsPanel(kit)
 			box:SetText(page.script and Num(page.script.rules[rule.key .. "Secs"]) or "")
 		end
 		row.secs:SetScript("OnEditFocusLost", Commit)
+		WheelNumber(row.secs, function() return 1 end)
 		row.rule = rule
 		page.ruleRows[i] = row
 	end
@@ -1118,6 +1323,7 @@ function ns.CreateCameraScriptsPanel(kit)
 			end
 			row.box:SetScript("OnEnterPressed", function(self) Commit(self) self:ClearFocus() end)
 			row.box:SetScript("OnEditFocusLost", Commit)
+			WheelNumber(row.box, function() return 5 end)
 			kit.Tooltip(row.box, L["A soft haze around the edges of the screen while this camera runs, as if it had focused on you. 0 leaves it off. Needs Camera haze on the Visual Effects page, which also turns it up or down."])
 		else
 			row.pick = Choice(row, 150, function() return { "no", "yes" } end,
@@ -1347,7 +1553,9 @@ function ns.CreateCameraScriptsPanel(kit)
 		local list, at
 		if sel then list, at = FindStep(script.steps, sel) end
 		if sel and not list then list, at = FindStep(script.ending, sel) end
-		if sel and sel.steps and (list or sel.k == "ending") then
+		local into = sel and sel.steps
+			and not (sel.k == "wait" and sel.what == "time" and #sel.steps == 0)
+		if into and (list or sel.k == "ending") then
 			table.insert(sel.steps, step)
 		elseif list then
 			table.insert(list, at + 1, step)
