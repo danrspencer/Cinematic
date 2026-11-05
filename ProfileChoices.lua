@@ -86,7 +86,8 @@ ns.SLOT_CHOICES = {
 		-- (Retail Group: on retail the client's own, standard, which is the
 		-- default there; on Forever, whose own is Classic Group, split.)
 		{ part = "split", hidden = "retail", label = "Action bars (Retail group)",
-			line = "Point at the bars, the menus or the XP bar", modules = { "retail-groups" } },
+			line = "Point at the bars, the menus or the XP bar; fights bring up just the bars",
+			modules = { "retail-groups", "micro-off-in-fights" } },
 		{ part = "standard", client = "retail", label = "Action bars (Retail group)",
 			line = "Point at the bars, the menus or the XP bar", modules = { { retail = "retail-groups" } } },
 		{ part = "pure", noCDM = "grouped", label = "Cooldown Manager",
@@ -211,8 +212,9 @@ ns.BUILTIN_PROFILES = {
 			"shows at the screen's edges. Every camera, every Vision and all the atmosphere: the letterbox " ..
 			"stays up through fights, and the camera comes alive on flights, by campfires, at vistas and " ..
 			"more."],
-		picks = { layout = "pure", frames = "pure", bars = "pure", camera = "pure",
-			vfx = "pure", chat = "pure" },
+		-- (On Forever, the Retail Inspired layout and its Retail group bars.)
+		picks = { layout = { forever = "retail", retail = "pure" }, frames = "pure",
+			bars = { forever = "split", retail = "pure" }, camera = "pure", vfx = "pure", chat = "pure" },
 		-- (Its own Visions and cards, apart from the slots' choices: picking a
 		-- choice for a slot then leaves them as they are.)
 		modules = With("zone-card", "story-cards", "damage-vision", "vitals-vision", "quest-talk",

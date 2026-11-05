@@ -35,6 +35,24 @@ local EFFECT_PAGES = {
 			"and its Style tab keeps its settings for when you turn this back on." },
 }
 
+-- Under the Letterbox tab's row: the bars for a few seconds on a place new
+-- to you (CineMode or not: Effects.lua, ns.LetterboxOnDiscover).
+EFFECT_PAGES.letterbox.More = function(kit, content, stack)
+	stack:Header(content, L["New places"])
+	stack:Add(kit.Check(content, "letterboxOnDiscover", L["Show bars on discovering a new place"],
+		L["The bars come in for a few seconds when you find a place new to you: a zone you're in for the first " ..
+		"time, a subzone the game says you discovered, a dungeon or raid. In or out of CineMode, with " ..
+		"everything else off too. Not in fights, if the bars are off in combat."], function(value)
+			ns.GetDB().letterboxOnDiscover = value
+			kit.Refresh()
+		end), "check")
+	local time = stack:Add(kit.Slider(content, "letterboxDiscoverTime", L["How long"], 2, 10, 1, L["%d sec"]),
+		"slider")
+	kit.Tooltip(time, L["How long the bars stay for a new place, not counting their coming in and going. " ..
+		"Another new place meanwhile starts the count again."])
+	kit.GreyUnless(time, function(db) return db.letterboxOnDiscover end)
+end
+
 -- Under the Tint tab's row: how strong it is, its drift, and the zone
 -- borders' timing, each slider on one line with its name (stack: inline).
 EFFECT_PAGES.tint.More = function(kit, content, stack)

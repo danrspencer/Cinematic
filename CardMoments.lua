@@ -114,9 +114,15 @@ local function DiscoverCard(name, sub)
 end
 -- (Its card playing, or to play: the game's own lines for the place go,
 -- ZoneCard.lua.)
+-- (Wanted: its card, or the Letterbox tab's bars on a new place, Effects.lua.)
+local function Wanted()
+	return ns.CardOn("discover") or (ns.db and ns.db.letterboxOnDiscover) or false
+end
 local function Discovered(name, sub)
 	if name == "" or (name == lastFound and GetTime() - lastFoundAt < 10) then return end
 	lastFound, lastFoundAt = name, GetTime()
+	if ns.LetterboxOnDiscover then ns.LetterboxOnDiscover() end
+	if not ns.CardOn("discover") then return end
 	ns.Cards.Cut("zone")
 	ns.Cards.Cut("subzone")
 	if ns.Cards.Fire("discover", DiscoverCard(name, sub)) then
@@ -145,7 +151,7 @@ local function ZoneEntered()
 		local key = instanceID or name
 		if key and not seen.instances[key] then
 			seen.instances[key] = true
-			if ns.CardOn("discover") and name then
+			if Wanted() and name then
 				zoneFoundAt = GetTime()
 				Discovered(name, kind == "raid" and L["Raid"] or L["Dungeon"])
 			end
@@ -161,14 +167,14 @@ local function ZoneEntered()
 	local new
 	-- (0: a map with no explorable areas at all, as cities: no answer there.)
 	if count and count > 0 then new = count <= 1 else new = not first end
-	if new and ns.CardOn("discover") then
+	if new and Wanted() then
 		zoneFoundAt = GetTime()
 		Discovered(zone)
 	end
 end
 local function InfoLine(text)
 	text = Plain(text)
-	if not (text and ns.CardOn("discover")) then return end
+	if not (text and Wanted()) then return end
 	for _, pattern in ipairs(DISCOVERED) do
 		local place = text:match(pattern)
 		if place then

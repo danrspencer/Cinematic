@@ -21,6 +21,7 @@ local function SetBindingNames()
 	BINDING_NAME_CINEMATIC_HIDEUI = "Cinematic: " .. L["Hide the UI (keep the look)"]
 	BINDING_NAME_CINEMATIC_SCREENSHOT = "Cinematic: " .. L["Take a CineShot"]
 	BINDING_NAME_CINEMATIC_TOGGLEEFFECTS = "Cinematic: " .. L["Toggle visual effects"]
+	BINDING_NAME_CINEMATIC_TOGGLELETTERBOX = "Cinematic: " .. L["Toggle letterbox bars"]
 	BINDING_NAME_CINEMATIC_CAMWHEEL = "Cinematic: " .. L["Camera wheel (hold)"]
 	BINDING_NAME_CINEMATIC_CAM_IDLE = "Cinematic: " .. L["Start the AFK camera"]
 	BINDING_NAME_CINEMATIC_CAM_COZY = "Cinematic: " .. L["Start the cozy camera"]
@@ -555,6 +556,8 @@ for _, effect in ipairs(ns.EFFECT_GRID) do
 	DEFAULTS[effect .. "OnlyInCameras"] = false
 end
 DEFAULTS.letterboxOffInCombat = true -- (the bars slide away for fights)
+DEFAULTS.letterboxOnDiscover = false -- the bars for a while on a place new to you (Effects.lua)
+DEFAULTS.letterboxDiscoverTime = 8   -- ...this many seconds
 DEFAULTS.tintOffInCombat = false
 DEFAULTS.vignetteOffInCombat = false
 -- The grid's Always column: the letterbox, vignette and weather have their own
@@ -2949,6 +2952,11 @@ local function OnUpdate(_, elapsed)
 				effectWanted[key] = effectsOn and ns.db.visualEffects and ns.db[key .. "Page"] ~= false
 					and ns.RowOnNow(EFFECT_ROWS[key], ns.db[key .. "Always"], true) or false
 			end
+		end
+		-- (The letterbox key and a new place's few seconds: Effects.lua.)
+		if not ns.effectsDemo and ns.LetterboxExtra then
+			effectWanted.letterbox = Step(ns.LetterboxExtra, effectWanted.letterbox, inCombat, cinematic)
+				or false
 		end
 		Step(ns.UpdateLetterbox, effectWanted.letterbox, restElapsed)
 		-- (The vignette and weather share the tint's overlay, each fading on its own.)

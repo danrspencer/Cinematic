@@ -4544,10 +4544,53 @@ end
 -- subtitles; back to as they were after.
 local immersiveProgress = 0
 
+-- The letterbox key (Cinematic_ToggleLetterbox) and a place new to you
+-- (CardMoments.lua, with the Letterbox tab's "Show bars on discovering a new
+-- place"): the bars in or out whatever CineMode and the Show in row say. The
+-- key's pick lasts till CineMode goes on or off; a fight takes the bars out
+-- meanwhile if they're off in combat, and they come back after.
+-- (until: GetTime the new place's bars go; key: the key's pick, true in,
+-- false out, nil none; keyCine: made in CineMode or not; wanted: last tick's
+-- answer, for the key to flip; forced: in, the letterbox's own switch or not;
+-- cine: last tick's CineMode. One table: Lua's cap on a file's locals.)
+local bars = { untilAt = 0, key = nil, keyCine = false, wanted = false, forced = false, cine = false }
+
+function ns.LetterboxOnDiscover()
+	local db = ns.db
+	if not (db and db.letterboxOnDiscover) then return end
+	bars.untilAt = GetTime() + (db.letterboxDiscoverTime or 8)
+end
+
+function ns.LetterboxExtra(wanted, inCombat, cinematic)
+	local db = ns.db
+	cinematic = cinematic and true or false
+	bars.cine = cinematic
+	if bars.key ~= nil and bars.keyCine ~= cinematic then bars.key = nil end
+	local outForFight = inCombat and db.letterboxOffInCombat
+	local discover = GetTime() < bars.untilAt and db.letterboxOnDiscover and db.letterboxPage ~= false
+		and db.visualEffects ~= false
+	bars.forced = false
+	if bars.key == false then
+		wanted = false
+	elseif (bars.key or discover) and not wanted and not outForFight then
+		wanted, bars.forced = true, true
+	end
+	bars.wanted = wanted and true or false
+	return bars.wanted
+end
+
+function Cinematic_ToggleLetterbox()
+	if not ns.db then return end
+	bars.key = not bars.wanted
+	bars.keyCine = bars.cine
+	ns.letterboxDirty = true
+	ns.Print(bars.key and L["letterbox bars on"] or L["letterbox bars off"])
+end
+
 function ns.UpdateLetterbox(cinematic, elapsed)
 	local immersive = ns.ChatCamImmersive and ns.ChatCamImmersive() or false
 	-- (Show me's demo, ShowMe.lua: the bars with the setting off, too)
-	local target = ((cinematic and (ns.db.letterbox or ns.effectsDemo)) or immersive) and 1 or 0
+	local target = ((cinematic and (ns.db.letterbox or ns.effectsDemo or bars.forced)) or immersive) and 1 or 0
 	local grow = immersive and 1 or 0
 	if letterboxProgress == target and immersiveProgress == grow and not ns.letterboxDirty then
 		return

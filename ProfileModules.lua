@@ -245,8 +245,8 @@ ns.PROFILE_MODULES = {
 	{ key = "pure-frames", name = "Cinema: frames",
 		scope = { "Standard Frames", "Personal Resources", "Advanced Frames/Supported addons", "Gamepad/top" },
 		tip = "Fights bring up your health and resource bars, target, target of target, focus and focus's target " ..
-		"of target (these also for an enemy or friend targeted and in dungeons and raids), but no portrait, buffs, " ..
-		"minimap or swing timer; the cast bar shows all " ..
+		"of target (these also for an enemy or friend targeted and in dungeons and raids) and the swing timer, but " ..
+		"no portrait, buffs or minimap; the cast bar shows all " ..
 		"through CineMode. The player frame and resource display don't stay up until full; " ..
 		"raid frames without names, buffs, threat, target markers, ready checks or titles in CineMode. Turns the " ..
 		"game's personal resource display on if it's off, whatever the layout.",
@@ -263,7 +263,7 @@ ns.PROFILE_MODULES = {
 			-- target: on in every column.)
 			local units = { "target", "tot", "focus", "focustot" }
 			local combat = { prd = true, prdpower = true, player = false, petframe = false, castbar = false,
-				party = false, raidplayers = false, raidpets = false, minimap = false, buffs = false, swing = false }
+				party = false, raidplayers = false, raidpets = false, minimap = false, buffs = false, swing = true }
 			local enemy = { player = false, prd = false, prdpower = false, party = false, raidplayers = false,
 				raidpets = false, buffs = false }
 			local instance = EveryRow(false, false)

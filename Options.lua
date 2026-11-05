@@ -13400,6 +13400,9 @@ local KEYBINDS = {
 	{ action = "CINEMATIC_TOGGLEEFFECTS", label = L["Toggle visual effects"],
 		tip = L["Turns the visual effects on or off (their Enable Visual Effects switch): the letterbox, tint, " ..
 			"vignette, weather and the rest."] },
+	{ action = "CINEMATIC_TOGGLELETTERBOX", label = L["Toggle letterbox bars"],
+		tip = L["Brings the letterbox bars in, or takes them out, in or out of CineMode. Turning CineMode on " ..
+			"or off puts them back as the Letterbox page says."] },
 	{ action = "CINEMATIC_RELOAD", label = L["Reload the UI"],
 		tip = L["Reloads the UI, like /reload. With Keep windows open across a reload ticked (Quality of " ..
 			"life > General), what you had open opens again after."] },
