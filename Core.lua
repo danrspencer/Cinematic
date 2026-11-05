@@ -1018,6 +1018,7 @@ DEFAULTS.targetQuestIcon = true -- a quest icon on the target frame while your t
 -- The nearest tracked quest's item to use on a big button at the extra ability button's spot (see QuestItemButton)
 DEFAULTS.questItemButton = true
 DEFAULTS.questObjectGlow = true -- the quest object soft targeting picks glows (see QuestGlow; changes interact settings)
+DEFAULTS.hideObjectIcons = false -- the game's icon over objects held off while the glow isn't (QuestGlow)
 -- Talking to an NPC: their words in a bubble over them, the replies in a list,
 -- instead of the game's gossip and quest windows (see QuestTalk).
 DEFAULTS.questTalk = false

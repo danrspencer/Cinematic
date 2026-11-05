@@ -568,7 +568,10 @@ local function ApplyPlate(plate, personal)
 	-- shown at nothing then, for the title line to sit where it is.)
 	local textAlpha = nameAlpha * (textShare[plate] or 1)
 	-- (Our own text in its place, with the Nameplates page's tick: see texts.)
+	-- (Not on an object's plate the game brought up itself: QuestGlow.lua.)
 	local ours = nameOnly and plate ~= personal and ns.StyleOn() and Style("plateNameStyle")
+		and not (ns.GameOwnsObjectPlate and ns.GameOwnsObjectPlate(plate.namePlateUnitToken
+			or unitFrame.unit))
 	CentreName(unitFrame, nameOnly and not ours)
 	OwnName(plate, ours and nameAlpha > 0 and textAlpha * Style("plateNameAlpha") or nil)
 	for _, part in ipairs(ns.PLATE_PARTS) do

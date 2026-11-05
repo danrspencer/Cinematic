@@ -30,6 +30,14 @@ local CVARS = ns.CVarSet("Quest soft targeting", "Quest Vision: interact soft ta
 		SoftTargetIconGameObject = "1", nameplateGameObjectMaxDistance = "60",
 	} })
 
+-- Quest Vision's Hide object icons (hideObjectIcons): the game's icon and name
+-- over the object soft targeting picks (a gear on a gate...) kept off while
+-- the glow isn't holding the settings above. The game turns them on again as
+-- you log in (a player's retail, gamepad mode), so it's held, not set once;
+-- yours comes back when you untick it.
+local ICON_CVARS = ns.CVarSet("Object icons hidden", "Quest Vision: Hide object icons",
+	{ values = { SoftTargetIconGameObject = "0" } })
+
 local function Known(value)
 	return not (issecretvalue and issecretvalue(value))
 end
@@ -294,6 +302,13 @@ local function IsObject(unit)
 	return not Ask(UnitExists, unit)
 end
 
+-- An object's plate while the glow isn't holding its settings: the game's
+-- own (retail turns object icons back on as you log in, tested in gamepad
+-- mode), so the Name Style page leaves its name to the game (PlateParts).
+function ns.GameOwnsObjectPlate(unit)
+	return not CVARS.active and unit ~= nil and IsObject(unit)
+end
+
 -- The glow: a soft gold light round the object (below its plate) and the
 -- quest mark over it, drawn whatever the plate's own fade (CineMode fades it).
 -- The light only for LIGHT_TIME seconds per object, then it fades out over
@@ -507,7 +522,21 @@ local function OwnIconShows(object)
 	local mode = tonumber(Own("SoftTargetInteract")) or 0
 	local pad = ns.IsGamePadOn and ns.IsGamePadOn() or false
 	local covered = mode == 3 or (mode == 1 and pad) or (mode == 2 and not pad)
+	if object and ns.QuestVisionSetting("hideObjectIcons") then
+		return false
+	end
 	return covered and Own(object and "SoftTargetIconGameObject" or "SoftTargetIconInteract") == "1"
+end
+
+-- Hide object icons held while the glow isn't, and written again where the
+-- game turned the icon back on.
+local function UpdateIconHold()
+	ns.ApplyCVarSet(ICON_CVARS, ns.db and ns.QuestVisionSetting("hideObjectIcons") and not CVARS.active or false)
+	local now = ICON_CVARS.active and GetCVar("SoftTargetIconGameObject")
+	if now and tonumber(now) ~= 0 then
+		ns.Log("cvar", "SoftTargetIconGameObject turned on by the game: Hide object icons puts it back to 0")
+		SetCVar("SoftTargetIconGameObject", "0")
+	end
 end
 -- (Also for the fishing reel, Camera.lua, which turns soft targeting on too.)
 ns.OwnSoftIconShows = OwnIconShows
@@ -628,21 +657,35 @@ local function HealSaved()
 	end
 end
 
--- Letting go with a key bound to Interact: your saved SoftTargetInteract
--- (often the game's default 1, gamepad only) would leave that key unable to
--- pick objects, though it did while we held 3. The keyboard part stays on
--- (0 -> 2, 1 -> 3).
+-- Letting go with a key bound to Interact: your saved soft targeting (often
+-- the game's defaults: 1 = gamepad only, 10 yards, straight ahead) left that
+-- key unable to pick objects, though it did while we held ours (tested on a
+-- player's retail). The keyboard part, our range and our arc stay instead
+-- (anything wider of yours is kept).
+local KEEP_FOR_KEY = { SoftTargetInteractRange = 20, SoftTargetInteractArc = 1 }
+
 local function KeepInteractKey()
-	local saved = ns.db.savedCVars
-	local mode = tonumber(saved.SoftTargetInteract)
-	if not (mode == 0 or mode == 1) or not GetBindingKey then
+	if not GetBindingKey then
 		return
 	end
 	local ok, key = pcall(GetBindingKey, "INTERACTTARGET")
-	if ok and key then
+	if not (ok and key) then
+		return
+	end
+	local saved = ns.db.savedCVars
+	local mode = tonumber(saved.SoftTargetInteract)
+	if mode == 0 or mode == 1 then
 		saved.SoftTargetInteract = tostring(mode + 2)
 		ns.Log("cvar", ("SoftTargetInteract: yours was %d but %s is your Interact key, %d goes back"):format(mode,
 			tostring(key), mode + 2))
+	end
+	for cvar, least in pairs(KEEP_FOR_KEY) do
+		local yours = tonumber(saved[cvar])
+		if yours and yours < least then
+			saved[cvar] = tostring(least)
+			ns.Log("cvar", ("%s: yours was %s, %s goes back for your Interact key"):format(cvar, tostring(yours),
+				least))
+		end
 	end
 end
 
@@ -658,6 +701,7 @@ local function Update()
 		CVARS.values.SoftTargetIconInteract = OwnIconShows(false) and "1" or "0"
 	end
 	ns.ApplyCVarSet(CVARS, on)
+	UpdateIconHold()
 	HealSaved()
 	KeepHeld()
 	UpdateHiddenSoftPlate()
@@ -699,6 +743,8 @@ ns.SetOnUpdate(ticker, function(self)
 	self.at = now + CHECK_EVERY
 	if Wanted() or CVARS.active or glow:IsShown() or next(hiddenIcons) then
 		Update()
+	else
+		UpdateIconHold()
 	end
 end)
 

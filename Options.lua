@@ -11980,6 +11980,21 @@ local function CreateVisionPanel()
 			if ns.UpdateQuestGlow then ns.UpdateQuestGlow() end
 		end)
 	questStack:Add(questGlow, "check")
+	local hideObjectIcons = Check(content, "hideObjectIcons", L["Hide object icons"],
+		L["Keeps the game's icon and name off the thing in front of you that your interact key would use (a " ..
+		"gear over a gate, a hand over a chest). The game turns them back on each time you log in, so this " ..
+		"keeps them off for you. While the glow on quest objects is lit, the glow decides instead. Your own " ..
+		"setting comes back when you untick it."],
+		function(value)
+			ns.GetDB().hideObjectIcons = value
+			if ns.UpdateQuestGlow then ns.UpdateQuestGlow() end
+		end)
+	-- (Only where the game has object icons.)
+	if GetCVar("SoftTargetIconGameObject") ~= nil then
+		questStack:Add(hideObjectIcons, "check")
+	else
+		hideObjectIcons:Hide()
+	end
 	-- Talking to NPCs in speech bubbles (QuestTalk.lua).
 	do
 		local function ApplyTalk()
