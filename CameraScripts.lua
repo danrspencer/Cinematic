@@ -16,8 +16,9 @@
 -- one held turn, tilt or zoom per move, its speed setting stepped along an
 -- eased curve, sent at the share of your speed setting that makes it the
 -- move's top speed; a creep start under the lowest setting (no jump on the
--- first frame); a turn and a tilt never at once, with a short gap between
--- moves; the zoom steered toward its eased path. Camera follow is off while
+-- first frame); a turn and a tilt can go together (a move's start stops the
+-- other axis's, so that one is sent again: as Camera.lua's orbit sways), with
+-- a short gap between one axis's moves; the zoom steered toward its eased path. Camera follow is off while
 -- one runs. One camera at a time (ns.ClaimCamera): it holds the view from
 -- start to end, and your camera input stops its moves at once.
 --
@@ -37,7 +38,7 @@ local PRIME_SHARE = 0.001   -- ...creeping meanwhile at this share of it (see FL
 local RESTORE_DELAY = 0.3   -- seconds after a move stops before your speed setting comes back
 local STEP_GAP = 0.6        -- seconds between a turn or tilt stopping and the next starting
 local MAX_STEPS = 80        -- steps in a script, all lists and depths together
-local MAX_DEPTH = 4         -- Together and Repeat inside each other
+local MAX_DEPTH = 8         -- Together, Repeat and Wait until inside each other (the flight cruise goes 7 deep)
 local MAX_SCRIPTS = 30
 local MAX_PLAYS = 3         -- Play steps inside each other (a camera playing itself, say)
 local EASES = { smooth = 0.5, gentle = 0.35, steady = 0.15 } -- share of a move spent speeding up (and slowing down)
@@ -77,12 +78,12 @@ ns.CAMERA_SCRIPT_KINDS = {
 	emote = { fields = { { "token", "text", "wave" } } },
 	-- (zoom "no": the zoom left where it is, a zoom step beside it say.)
 	putback = { fields = { { "secs", "num", 0.5, 600, 3 }, { "zoom", "pick", { "yes", "no" }, "yes" } } },
-	-- (Turn to behind: the game's camera follow brings it round, as the vista
-	-- camera lines up; the counts start again from there. In front: counted
-	-- from where the script started, or that line-up.)
+	-- (Turn to face you: counted from where the script started. There's no
+	-- turning behind you: that leaned on the game's camera follow, which
+	-- doesn't turn the camera; older ones are dropped, CleanSteps.)
 	-- (fit "cast": there by the time a cast is teleArriveEarly from done, as
 	-- the tele camera swings round.)
-	turnTo = { fields = { { "to", "pick", { "behind", "front" }, "behind" },
+	turnTo = { fields = { { "to", "pick", { "front" }, "front" },
 		{ "secs", "num", 0.5, 600, 6 }, { "fit", "pick", { "secs", "cast" }, "secs" } } },
 	-- A random spot within arc degrees of behind (or in front), at least min
 	-- from where it is (favor: nearer the middle, as the vista and fish cameras
@@ -103,16 +104,13 @@ ns.CAMERA_SCRIPT_KINDS = {
 	-- Waits for something: a cast secs from done (cast), landing in secs
 	-- (landing: a route flown before; else touchdown), coming back to life
 	-- (alive), or secs going by (time). With steps of its own, it runs them
-	-- meanwhile and, once it's time, eases them to a stop and goes on.
+	-- meanwhile and, once it's time, eases them to a stop and goes on. (No cast,
+	-- flight or death under way: nothing to end, it waits on, running them.)
 	-- (talk: someone other than the one last aimed at says something.)
 	["until"] = { group = true, fields = { { "what", "pick", { "cast", "landing", "alive", "talk", "time" }, "time" },
 		{ "secs", "num", 0, 3600, 5 } } },
 	-- Waits somewhere between min and max seconds, picked each time.
 	waitRand = { fields = { { "min", "num", 0, 3600, 20 }, { "max", "num", 0, 3600, 60 } } },
-	-- From here on: after you turn, once you've held still that long, camera
-	-- follow glides the camera back behind you (as the RP walk and auto-run
-	-- cameras do), and the script's counts start again from there.
-	follow = { fields = { { "after", "num", 0, 30, 1.5 } } },
 	-- Toward who you're talking to. at "click": deg degrees round to the side
 	-- of the screen you clicked them on, as the quest cam turns (opened with
 	-- a key, no click: miss). at "speaker": toward the one talking now, by
@@ -136,7 +134,7 @@ ns.CAMERA_SCRIPT_KINDS = {
 	["repeat"] = { group = true, fields = { { "times", "num", 0, 100, 2 } } },
 }
 ns.CAMERA_SCRIPT_ADDABLE = { "rotate", "tilt", "zoom", "zoomRand", "lineup", "wait", "together", "repeat", "emote",
-	"putback", "turnTo", "sway", "tiltRand", "spin", "until", "waitRand", "follow", "aim", "play", "endMusic" }
+	"putback", "turnTo", "sway", "tiltRand", "spin", "until", "waitRand", "aim", "play", "endMusic" }
 local KINDS = ns.CAMERA_SCRIPT_KINDS
 
 -- The stop rules: each event's actions (the first is its default).
@@ -146,6 +144,9 @@ ns.CAMERA_SCRIPT_RULES = {
 	{ key = "walk", actions = { "putback", "stop", "pause", "restart", "ignore" } },
 	{ key = "zoom", actions = { "ignore", "stop", "putback", "pause" } },
 	{ key = "ends", actions = { "putback", "stop" } },
+	-- (A cast or channel of yours ending or cancelled while it plays: a
+	-- Hearthstone's, however long haste makes it. Carry on unless set.)
+	{ key = "cast", actions = { "ignore", "putback", "stop" } },
 }
 local RULE_ACTIONS = {}
 for _, rule in ipairs(ns.CAMERA_SCRIPT_RULES) do
@@ -199,6 +200,9 @@ local function CleanSteps(list, depth, budget, keepSet, paths, prefix)
 	if type(list) ~= "table" then return out end
 	for i, step in ipairs(list) do
 		local def = type(step) == "table" and KINDS[step.k]
+		-- (A turn behind you, from before it went: dropped, as Follow is by
+		-- having no kind now. Both leaned on camera follow, which does nothing.)
+		if def and step.k == "turnTo" and step.to == "behind" then def = nil end
 		if def and budget.left > 0 and not (def.group and depth >= MAX_DEPTH) and (keepSet or not step.off) then
 			budget.left = budget.left - 1
 			local clean = { k = step.k }
@@ -310,9 +314,12 @@ end
 -- random height (level degrees down, levelKey's, give or take PitchDown and
 -- PitchUp) and a sway within BackArc of behind (front: of your front), at
 -- least MinChange on, over MoveTime, drifting on at DriftSpeed (Drift)
--- through Pause.
+-- through Pause; the height and the sway together.
 local function SwayLoop(o, level, levelKey, front)
-	local height = S("tiltRand", { deg = level, down = Db(o .. "PitchDown", 3), up = Db(o .. "PitchUp", 5), secs = 3 })
+	-- (The height over the sway's turn, beside it: as the cameras' own code
+	-- tilts and turns in one sweep.)
+	local height = S("tiltRand", { deg = level, down = Db(o .. "PitchDown", 3), up = Db(o .. "PitchUp", 5),
+		secs = Db(o .. "MoveTime", 10) })
 	if levelKey then Set(height, levelKey, o .. "PitchDown", o .. "PitchUp") else Set(height, o .. "PitchDown", o .. "PitchUp") end
 	-- (Auto-run's lowest tilt: the real camera's, while you steer; shown here.)
 	if o == "runOrbit" then table.insert(height.set, "runOrbitPitchFloor") end
@@ -321,7 +328,8 @@ local function SwayLoop(o, level, levelKey, front)
 		drift = Switch(o .. "Drift") and Db(o .. "DriftSpeed", 0.5) or 0, pause = Db(o .. "Pause", 15),
 		favor = front and "no" or "yes" }), o .. "BackArc", o .. "MinChange", o .. "MoveTime", o .. "Ease", o .. "Pause",
 		o .. "Drift", o .. "DriftSpeed")
-	return On(Set(S("repeat", { times = 0, steps = { height, sway } }), o), Switch(o))
+	table.insert(height.set, o .. "MoveTime")
+	return On(Set(S("repeat", { times = 0, steps = { S("together", { steps = { height, sway } }) } }), o), Switch(o))
 end
 
 -- The slow zoom beside it (z: the zoom setting prefix, a switch itself):
@@ -348,14 +356,12 @@ local function ZoomGroup(z)
 end
 
 -- A standing-still camera that sways (vista, fish, cozy), from its settings
--- (<cam>Orbit..., <cam>Level, <cam>Zoom...). Vista and fish: line up behind
--- you with camera follow, then the sways round Level beside the slow zoom.
+-- (<cam>Orbit..., <cam>Level, <cam>Zoom...). Vista and fish: the sways round
+-- Level beside the slow zoom, from where the camera is.
 -- Cozy: swings round in front of you while zooming in to cozyZoomClose,
 -- then the same round your front, its zoom drifting about the close-up.
 -- Leaving, the zoom goes back to where it began; the turn stays (as theirs
--- do). (Not the same yet: a height and a sway go one after the other, the
--- game won't do both at once with these moves; and the cozy camera doesn't
--- keep clear of Camp Tents.)
+-- do). (Not the same yet: the cozy camera doesn't keep clear of Camp Tents.)
 function RestCamera(cam)
 	local o, z = cam .. "Orbit", cam .. "Zoom"
 	local front = cam == "cozy"
@@ -374,7 +380,9 @@ function RestCamera(cam)
 				On(Set(S("zoom", { to = close, secs = 9 }), z, "cozyZoomClose"), Switch(z)) } }),
 			S("together", { steps = { loop, drifts } }) }
 	else
-		steps = { S("turnTo", { to = "behind", secs = 8 }), S("together", { steps = { loop, ZoomGroup(z) } }) }
+		-- (No line-up behind you first: camera follow never turns a camera
+		-- while you stand still, so it was only a wait.)
+		steps = { S("together", { steps = { loop, ZoomGroup(z) } }) }
 	end
 	local dof = "dof" .. cam:sub(1, 1):upper() .. cam:sub(2)
 	return {
@@ -387,19 +395,15 @@ function RestCamera(cam)
 	}
 end
 
--- The RP walk and auto-run cameras (walkOrbit, runOrbit): line up behind
--- you with camera follow, then glide back behind you after each turn of
--- yours (Follow, after <cam>GlideDelay; <cam>SwingBehind), swaying and
--- zooming meanwhile. Stopping: the zoom goes back. (Not the same yet:
--- auto-run steering lower and closer, and the walk camera handing over to
--- standing still.) The line-up is part of the sway (Camera.lua lines up only
--- as its orbit starts): with the sway off, it's off too.
+-- The RP walk and auto-run cameras (walkOrbit, runOrbit): swaying and
+-- zooming. Stopping: the zoom goes back. (Not the same yet: auto-run
+-- steering lower and closer, and the walk camera handing over to standing
+-- still.) No line-up behind you, nor a glide back behind you after your
+-- turns: those leaned on the game's camera follow, which doesn't turn the
+-- camera (user, 2026-11-05).
 function MovingCamera(cam)
 	return {
-		steps = { On(Set(S("turnTo", { to = "behind", secs = 5 }), cam .. "Orbit"), Switch(cam .. "Orbit")),
-			On(Set(S("follow", { after = Db(cam .. "GlideDelay", 1.5) }), cam .. "SwingBehind", cam .. "GlideDelay"),
-				Switch(cam .. "SwingBehind")),
-			S("together", { steps = { SwayLoop(cam .. "Orbit", 0), ZoomGroup(cam .. "Zoom") } }) },
+		steps = { S("together", { steps = { SwayLoop(cam .. "Orbit", 0), ZoomGroup(cam .. "Zoom") } }) },
 		ending = { On(Set(S("zoom", { to = 0, secs = 2, of = "yours" }), cam .. "Zoom"), Switch(cam .. "Zoom")) },
 		rules = { camera = "pause", cameraSecs = Db(cam .. "InputPause", 2), fight = "stop", walk = "ignore", zoom = "ignore",
 			ends = "putback" },
@@ -456,32 +460,33 @@ local BUILT_IN = {
 	{ id = "vista", name = "Vista camera", make = function() return RestCamera("vista") end },
 	{ id = "fish", name = "Fish camera", make = function() return RestCamera("fish") end },
 	{ id = "cozy", name = "Cozy camera", make = function() return RestCamera("cozy") end },
-	-- The tele camera (a Hearthstone or teleport cast): comes down teleLevel,
-	-- swings round in front of you by teleArriveEarly before the cast ends
-	-- while zooming in to teleZoomClose over the whole cast (teleZoom), then
-	-- spins round you, speeding up by teleSpinAccel to teleSpinMax, until
-	-- you're gone. Cancelled: it turns back (teleReturn) and zooms back over
+	-- The tele camera (a Hearthstone or teleport cast, about 10 seconds): over
+	-- 10 seconds, comes down teleLevel, swings round in front of you, then
+	-- spins round you, speeding up by teleSpinAccel to teleSpinMax, while
+	-- zooming in to teleZoomClose (teleZoom). A plain 10 seconds, not timed
+	-- to the cast: the scene starts it, the script plays as listed, and the
+	-- Your cast ends rule ends it with the cast (a quicker one with haste too). Cancelled: it turns back (teleReturn) and zooms back over
 	-- teleZoomBackTime. (Arriving, the real camera swings round behind you,
 	-- teleBehind, shown with When it ends.)
 	{ id = "tele", name = "Tele camera", make = function()
 		-- (The turns one after another, beside the zoom over the whole cast: a Repeat once.)
 		local turns = S("repeat", { times = 1, steps = {
 			Set(S("tilt", { deg = Db("teleLevel", 15), secs = 1.5 }), "teleLevel"),
-			Set(S("turnTo", { to = "front", secs = 6, fit = "cast" }), "teleArriveEarly"),
-			Set(S("spin", { accel = Db("teleSpinAccel", 8), max = Db("teleSpinMax", 120), secs = 0, way = "random" }),
+			S("turnTo", { to = "front", secs = 5 }),
+			Set(S("spin", { accel = Db("teleSpinAccel", 8), max = Db("teleSpinMax", 120), secs = 3, way = "random" }),
 				"teleSpinAccel", "teleSpinMax") } })
-		local zoom = On(Set(S("zoom", { to = Db("teleZoomClose", 4), secs = 8, fit = "cast" }), "teleZoom", "teleZoomClose"),
+		local zoom = On(Set(S("zoom", { to = Db("teleZoomClose", 4), secs = 10 }), "teleZoom", "teleZoomClose"),
 			Switch("teleZoom"))
 		local back = math.max(0.5, Db("teleZoomBackTime", 0.5))
 		return {
-			steps = { S("until", { what = "cast", secs = 0, steps = { S("together", { steps = { turns, zoom } }) } }) },
+			steps = { S("together", { steps = { turns, zoom } }) },
 			ending = { Switch("teleReturn") and Set(S("putback", { secs = back }), "teleReturn", "teleZoomBackTime", "teleBehind")
 				or Set(S("zoom", { to = 0, secs = back, of = "yours" }), "teleReturn", "teleZoomBackTime", "teleBehind") },
-			rules = { camera = "stop", fight = "putback", walk = "putback", zoom = "ignore", ends = "putback" },
+			rules = { camera = "stop", fight = "putback", walk = "putback", zoom = "ignore", ends = "putback",
+				cast = "putback" },
 		}
 	end },
-	-- The flight camera (taxiOrbit, "back" mode): round behind you at takeoff
-	-- (taxiCenter), swaying and zooming until it's time to settle (taxiSettle,
+	-- The flight camera (taxiOrbit, "back" mode): swaying and zooming until it's time to settle (taxiSettle,
 	-- on a route flown before: taxiSettleLead before landing, with time for
 	-- the zoom and the turn), then the zoom back and the turn back behind you.
 	-- Landing, the zoom goes back to your distance (taxiLandZoom). With
@@ -500,8 +505,7 @@ local BUILT_IN = {
 			Set(cruise, "taxiFlyBy")
 		end
 		return {
-			steps = { On(Set(S("turnTo", { to = "behind", secs = 5 }), "taxiCenter"), Switch("taxiCenter")),
-				Set(S("until", { what = "landing", secs = settle and Db("taxiSettleLead", 5) + 12 + 3 or 0, steps = {
+			steps = { Set(S("until", { what = "landing", secs = settle and Db("taxiSettleLead", 5) + 12 + 3 or 0, steps = {
 					cruise } }), "taxiSettle", "taxiSettleLead"),
 				On(Set(S("zoom", { to = 0, secs = 3, of = "yours" }), "taxiSettle"), settle),
 				On(Set(S("lineup", { secs = 12 }), "taxiSettle"), settle) },
@@ -521,12 +525,18 @@ local BUILT_IN = {
 	{ id = "death", name = "Death camera", make = function()
 		local way = "left"
 		if ns.db and ns.db.deathOrbitRandomDir then way = "random" elseif ns.db and ns.db.deathOrbitRight then way = "right" end
-		return {
-			steps = { Set(S("wait", { secs = Db("deathOrbitDelay", 0) }), "deathOrbitDelay"),
+		-- (Start after: a wait first, only when it's set: no Wait 0 s.)
+		local steps = {}
+		if Db("deathOrbitDelay", 0) > 0 then
+			steps[1] = Set(S("wait", { secs = Db("deathOrbitDelay", 0) }), "deathOrbitDelay")
+		end
+		for _, step in ipairs({
 				S("together", { steps = { Set(S("tilt", { deg = -Db("deathLevel", 30), secs = 6 }), "deathLevel"),
 					Set(S("zoom", { to = Db("deathZoom", 4), secs = 8, of = "yours" }), "deathZoom") } }),
 				Set(S("spin", { accel = 2, max = Db("deathOrbitSpeed", 5), secs = 0, way = way }), "deathOrbitSpeed",
-					"deathOrbitRandomDir", "deathOrbitRight") },
+					"deathOrbitRandomDir", "deathOrbitRight") }) do steps[#steps + 1] = step end
+		return {
+			steps = steps,
 			ending = { S("putback", { secs = 2 }) },
 			rules = { camera = "pause", cameraSecs = 5, fight = "ignore", walk = "ignore", zoom = "ignore", ends = "putback" },
 			button = Switch("deathExitButton"),
@@ -562,8 +572,7 @@ local BUILT_IN = {
 		}
 	end },
 	-- The quest cam (once its row's wait is over: QuestCam.lua's
-	-- ns.QuestTalkNow): in to questCamDistance while
-	-- camera follow swings it behind you over questCamTime, then questCamAngle
+	-- ns.QuestTalkNow): in to questCamDistance, then questCamAngle
 	-- round to the side over questCamTurnTime (questCamSide: where you clicked
 	-- them, at random, or always one way), down questCamLower, then a slow
 	-- drift to and fro of questCamDrift about there. The zooms go at
@@ -583,12 +592,12 @@ local BUILT_IN = {
 		end
 		local drift = Db("questCamDrift", 4)
 		return {
-			steps = { S("together", { steps = {
-					Set(S("zoom", { to = Db("questCamDistance", 4), secs = Db("questCamZoomMaxTime", 8),
-						speed = Db("questCamZoomSpeed", 0.5) }), "questCamDistance", "questCamZoomSpeed", "questCamZoomMaxTime"),
-					Set(S("turnTo", { to = "behind", secs = Db("questCamTime", 3) }), "questCamTime") } }),
+			-- (No swing behind you while it zooms in: camera follow never turns a
+			-- camera while you stand still.)
+			steps = { Set(S("zoom", { to = Db("questCamDistance", 4), secs = Db("questCamZoomMaxTime", 8),
+					speed = Db("questCamZoomSpeed", 0.5) }), "questCamDistance", "questCamZoomSpeed", "questCamZoomMaxTime"),
 				On(Set(turn, "questCamAngle", "questCamTurnTime", "questCamSide"), angle > 0),
-				Set(S("tilt", { deg = Db("questCamLower", 0), secs = 2 }), "questCamLower"),
+				On(Set(S("tilt", { deg = Db("questCamLower", 0), secs = 2 }), "questCamLower"), Db("questCamLower", 0) ~= 0),
 				On(Set(S("repeat", { times = 0, steps = {
 					S("rotate", { deg = math.max(1, drift), secs = 7, way = "left", ease = "gentle" }),
 					S("rotate", { deg = math.max(1, drift), secs = 7, way = "right", ease = "gentle" }) } }), "questCamDrift"),
@@ -870,19 +879,28 @@ function ns.IsScriptCamera(value)
 end
 local IsScript = ns.IsScriptCamera
 
--- Dev copy, for bringing the scripts up to our cameras: with db.scriptBuiltIns
--- on (/cine script builtins), a row set to one of our cameras runs that
--- camera's script instead (CameraRows.lua's ns.TriggerSetting asks), so each
--- can be compared in game with the camera's own code. The Scenes page still
--- shows the camera.
+-- Our cameras play their scripts: a row set to one of our cameras runs that
+-- camera's script (CameraRows.lua's ns.TriggerSetting asks), so your edits
+-- to a built-in script are what plays. The Scenes page still shows the
+-- camera. (Dev copy: /cine script builtins switches back to the cameras' own
+-- code, db.scriptBuiltIns false, to compare.)
 local BUILT_IN_OF = { cozy = "cozy", vista = "vista", fish = "fish", afk = "afk", tele = "tele", flight = "flight",
 	walk = "walk", run = "run", quest = "quest", chat = "chat", [true] = "death", death = "death" }
 function ns.ScriptBuiltInsOn()
-	return ns.isDev and ns.db ~= nil and ns.db.scriptBuiltIns == true
+	return ns.db ~= nil and not (ns.isDev and ns.db.scriptBuiltIns == false)
 end
 function ns.BuiltInAsScript(value)
 	local id = BUILT_IN_OF[value]
 	return id and "script:" .. id or value
+end
+-- The camera a built-in script stands in for, by its key in ns.activeCam
+-- ("idle", "fish", "chatcam"...): from a script id or a "script:<id>" value.
+-- nil for any other script (yours, the fly-by, Skyriding).
+local CAMERA_KEY_OF = { afk = "idle", cozy = "cozy", vista = "vista", fish = "fish", tele = "tele", flight = "flight",
+	walk = "walk", run = "run", quest = "quest", chat = "chatcam", death = "death" }
+function ns.ScriptStandIn(value)
+	if type(value) ~= "string" then return nil end
+	return CAMERA_KEY_OF[value:match("^script:(.+)$") or value]
 end
 
 -- The triggers whose rows may pick a script: those with a standing-still
@@ -950,11 +968,15 @@ function ns.CameraTriggerName(key)
 end
 
 -- The Cameras page rows set to a script: their trigger keys, each once.
+-- (One of ours: the rows set to its camera too, which play it.)
 function ns.CameraScriptTriggers(id)
 	local value, keys, seen = "script:" .. id, {}, {}
+	local builtins = ns.ScriptBuiltInsOn()
 	for _, row in ipairs(ns.CameraRowOrder()) do
 		local trigger = ns.CameraRowTrigger(row)
-		if trigger and not seen[trigger.key] and ns.CameraRowValue(row, "camera") == value then
+		local camera = trigger and ns.CameraRowValue(row, "camera")
+		if builtins then camera = ns.BuiltInAsScript(camera) end
+		if trigger and not seen[trigger.key] and camera == value then
 			seen[trigger.key] = true
 			keys[#keys + 1] = trigger.key
 		end
@@ -1113,7 +1135,6 @@ function ns.PlanCameraScript(script, start)
 	end
 	local state = { yaw = start.yaw, pitch = start.pitch, zoom = start.zoom }
 	local onceLeft = Random() < 0.5
-	local busyUntil = { yaw = 0, pitch = 0 } -- (a turn and a tilt one at a time)
 	local plays = 0 -- (Play steps inside each other)
 	local One
 	local function Run(list, t, top)
@@ -1121,14 +1142,9 @@ function ns.PlanCameraScript(script, start)
 		return t
 	end
 	local function Move(axis, to, t, secs, ease, top)
-		if axis == "yaw" or axis == "pitch" then
-			local other = axis == "yaw" and "pitch" or "yaw"
-			if busyUntil[other] > t then t = busyUntil[other] + STEP_GAP end
-		end
 		secs = math.max(MOVE_MIN_TIME, secs or 0)
 		moves[#moves + 1] = { axis = axis, from = state[axis], to = to, t0 = t, t1 = t + secs, ease = ease, top = top }
 		state[axis] = to
-		if busyUntil[axis] then busyUntil[axis] = t + secs end
 		return t + secs
 	end
 	local function Hold(t, secs, top)
@@ -1137,12 +1153,10 @@ function ns.PlanCameraScript(script, start)
 	end
 	-- (A turn along a speed curve: where it is at each moment is worked out as it's drawn.)
 	local function Curve(growing, curve, t, secs, top)
-		if busyUntil.pitch > t then t = busyUntil.pitch + STEP_GAP end
 		local dist = CurveDistance(curve, secs)
 		moves[#moves + 1] = { axis = "yaw", from = state.yaw, to = state.yaw + (growing and dist or -dist), t0 = t,
 			t1 = t + secs, curve = curve, sign = growing and 1 or -1, top = top }
 		state.yaw = state.yaw + (growing and dist or -dist)
-		busyUntil.yaw = t + secs
 		return t + secs
 	end
 	function One(step, t, top)
@@ -1163,8 +1177,7 @@ function ns.PlanCameraScript(script, start)
 			end
 			ending = Move("zoom", goal, t, ZoomSecs(step, step.secs, goal - state.zoom), EASES[step.ease], top)
 		elseif k == "turnTo" then
-			local center = step.to == "front" and 180 or 0
-			ending = Move("yaw", state.yaw - Wrap(state.yaw - center), t, step.secs, 0.5, top)
+			ending = Move("yaw", state.yaw - Wrap(state.yaw - 180), t, step.secs, 0.5, top)
 		elseif k == "sway" then
 			local delta = SwayTurn(step, state.yaw, Random)
 			local curve, secs, _, still = SwayCurve(step, delta, state.yaw)
@@ -1210,14 +1223,11 @@ function ns.PlanCameraScript(script, start)
 						if moves[i].axis == axis then state[axis] = moves[i].to break end
 					end
 				end
-				busyUntil.yaw, busyUntil.pitch = math.min(busyUntil.yaw, t + secs), math.min(busyUntil.pitch, t + secs)
 			end
 			ending = Hold(t, secs, top)
 		elseif k == "waitRand" then
 			local low, high = math.min(step.min, step.max), math.max(step.min, step.max)
 			ending = Hold(t, low + Random() * (high - low), top)
-		elseif k == "follow" then
-			ending = t
 		elseif k == "aim" then
 			-- (Either side at random: the preview can't know where they are.)
 			local turn = step.at == "click" and step.deg
@@ -1298,18 +1308,39 @@ local movers = {
 		grow = "MoveViewDown", shrink = "MoveViewUp" },
 }
 movers.yaw.other, movers.pitch.other = movers.pitch, movers.yaw
-local lastStop = -math.huge -- when a turn or tilt last stopped
+for _, m in pairs(movers) do m.lastStop = -math.huge end -- (when its last move stopped)
 
 local function Command(m)
 	return m.growing and m.grow or m.shrink
 end
 
-local function StopMove(m)
+-- A move's start stops the other axis's move in the game (a tilt held the
+-- turn), and its stop may too: sent again then, at the speed it's going, as Camera.lua's orbit
+-- keeps both going in one sweep.
+local function Resend(m)
+	local o = m.other
+	if not o.moving then return end
+	if o.sent then
+		Send(Command(o) .. "Start", o.share)
+	elseif o.creeping then
+		Send(Command(o) .. "Start", PRIME_SHARE)
+	end
+end
+
+-- (now: you took the camera, your speed back this moment, not after a wait.)
+local function StopMove(m, now)
 	m.pending = false
 	if not m.moving then return end
-	if m.sent or m.creeping then Send(Command(m) .. "Stop") end
+	if m.sent or m.creeping then
+		Send(Command(m) .. "Stop")
+		Resend(m)
+	end
 	m.moving, m.sent, m.creeping = false, nil, nil
-	lastStop = GetTime()
+	m.lastStop = GetTime()
+	if now then
+		ns.ReleaseSpeed(m.who, m.cvar)
+		return
+	end
 	restoring = restoring + 1
 	C_Timer.After(RESTORE_DELAY, function()
 		restoring = restoring - 1
@@ -1335,11 +1366,11 @@ local function MoveCurve(m, growing, curve, T, top)
 	m.pending = T > 0
 end
 
--- Sets a pending move off: not with the other axis moving, nor within
--- STEP_GAP of a move stopping, nor without the view.
+-- Sets a pending move off: not within STEP_GAP of this axis's last move
+-- stopping, nor without the view.
 local function Begin(m)
 	local now = GetTime()
-	if m.other.moving or now - lastStop < STEP_GAP or not ns.ClaimCamera(WHO) then return end
+	if now - m.lastStop < STEP_GAP or not ns.ClaimCamera(WHO) then return end
 	local yours = ns.HoldSpeed(m.who, m.cvar)
 	if m.curve then
 		m.share = m.top / yours
@@ -1354,6 +1385,7 @@ local function Begin(m)
 	m.pending = false
 	if Send(Command(m) .. "Start", PRIME_SHARE) then
 		m.creeping, m.moving, m.sent, m.t = true, true, nil, 0
+		Resend(m)
 	else
 		m.pending = true
 		ns.ReleaseSpeed(m.who, m.cvar)
@@ -1385,6 +1417,7 @@ local function StepMove(m, elapsed)
 	if not m.sent then
 		Send(Command(m) .. "Start", m.share)
 		m.sent = MIN_SETTING
+		Resend(m)
 	elseif math.abs(setting - m.sent) > m.sent * CHANGE then
 		ns.SetHeldSpeed(m.who, m.cvar, setting)
 		m.sent = setting
@@ -1412,12 +1445,16 @@ local function Zoom()
 	return GetCameraZoom and GetCameraZoom() or 0
 end
 
-local function StopZoom()
+local function StopZoom(now)
 	zoomer.pending = false
+	if now and zoomer.release then -- (easing back: yours now)
+		zoomer.release, zoomer.sent = nil, nil
+		ns.ReleaseSpeed(ZOOM_WHO, ZOOM_CVAR)
+	end
 	if not zoomer.moving then return end
 	zoomer.moving = false
 	local yours = ns.SpeedHeld(ZOOM_CVAR, ZOOM_WHO) and ns.YourSpeed(ZOOM_CVAR)
-	if yours and zoomer.sent and yours > zoomer.sent then
+	if not now and yours and zoomer.sent and yours > zoomer.sent then
 		zoomer.release = { from = zoomer.sent, to = yours, t = 0 }
 	else
 		zoomer.sent = nil
@@ -1553,19 +1590,20 @@ local function StopAll()
 	zoomer.suspended = nil
 end
 
--- Paused: each move stopped, what's left of it kept to carry on with.
-local function Suspend()
+-- Paused: each move stopped, what's left of it kept to carry on with (now:
+-- you took the camera, every speed yours this moment).
+local function Suspend(now)
 	for _, m in pairs(movers) do
 		if m.pending or m.moving then
 			m.suspended = { target = m.target, T = math.max(MOVE_MIN_TIME, (m.T or 0) - (m.t or 0)), curve = m.curve,
 				at = m.t or 0, total = m.T, top = m.top, growing = m.curveGrowing }
-			StopMove(m)
+			StopMove(m, now)
 		end
 	end
 	if zoomer.pending or zoomer.moving then
 		zoomer.suspended = { goal = zoomer.goal, T = math.max(MOVE_MIN_TIME, zoomer.T - (zoomer.t or 0)), ease = zoomer.ease }
-		StopZoom()
 	end
+	StopZoom(now)
 end
 
 local function Resume()
@@ -1633,24 +1671,12 @@ function STEP.zoomRand(step)
 	local low, high = math.min(step.min, step.max), math.max(step.min, step.max)
 	ZoomStep(step, ZoomGoal(step, low + math.random() * (high - low), run.startZoom), step.secs)
 end
--- Behind you: camera follow brings it round (as the vista camera lines up:
--- ns.CenterCamera, Camera.lua), our own follow-off set out of its way
--- meanwhile; then everything counts from there. In front: counted.
+-- To face you: counted from where the script started.
 function STEP.turnTo(step)
-	if step.to == "front" then
-		local m = movers.yaw
-		local secs = step.fit == "cast" and ns.DepartTimeLeft and ns.DepartTimeLeft() or step.secs
-		MoveTo(m, m.amount - Wrap(m.amount - 180), secs, EASES.smooth)
-		WaitMover(m)
-		return
-	end
-	ns.ApplyCVarSet(FOLLOW_CVARS, false)
-	ns.CenterCamera(step.secs, 30, 20, math.min(3, step.secs / 2))
-	WaitSeconds(step.secs)
-	local giveUp = run.t + 2
-	while ns.RECENTER_CVARS and ns.RECENTER_CVARS.active and run.t < giveUp do Yield() end
-	ns.ApplyCVarSet(FOLLOW_CVARS, true)
-	movers.yaw.amount, movers.pitch.amount = 0, 0
+	local m = movers.yaw
+	local secs = step.fit == "cast" and ns.DepartTimeLeft and ns.DepartTimeLeft() or step.secs
+	MoveTo(m, m.amount - Wrap(m.amount - 180), secs, EASES.smooth)
+	WaitMover(m)
 end
 function STEP.sway(step)
 	local m = movers.yaw
@@ -1743,11 +1769,28 @@ local function BrakeAll()
 	zoomer.suspended = nil
 end
 
+-- What a Wait until waits on is under way: a cast going, a flight, a death.
+-- Until it is, there's nothing to end: no landing without a flight, so it
+-- runs its steps on (played from its page, say), as long as the script does.
+local UNDER_WAY = {
+	cast = function() return ns.DepartCastLeft ~= nil and ns.DepartCastLeft() ~= nil end,
+	landing = function() return ns.OnTaxi() end,
+	alive = function() return ns.IsDead() end,
+}
 STEP["until"] = function(step)
-	local done = step.what == "time" and function() return false end or UNTIL[step.what]
+	local check = step.what == "time" and function() return false end or UNTIL[step.what]
+	local underWay = UNDER_WAY[step.what]
+	local seen = not underWay
+	local function done()
+		if not seen then
+			seen = underWay()
+			if not seen then return false end
+		end
+		return check(step)
+	end
 	local untilT = step.what == "time" and run.t + step.secs or math.huge
 	local kid = #step.steps > 0 and coroutine.create(function() DoSteps(step.steps) end)
-	while not done(step) and run.t < untilT do
+	while not done() and run.t < untilT do
 		if kid and coroutine.status(kid) ~= "dead" then
 			local ok, err = coroutine.resume(kid)
 			if not ok then error(err, 0) end
@@ -1762,10 +1805,6 @@ end
 function STEP.waitRand(step)
 	local low, high = math.min(step.min, step.max), math.max(step.min, step.max)
 	WaitSeconds(low + math.random() * (high - low))
-end
-function STEP.follow(step)
-	run.follow = step.after
-	run.facing = nil
 end
 function STEP.endMusic(step)
 	if ns.EndSceneMusic then ns.EndSceneMusic(step.secs) end
@@ -1930,7 +1969,6 @@ local function Finish(why)
 		if Zoom() > run.startZoom + 0.5 then maxHeldTo = run.startZoom else ns.LowerZoomMax() end
 	end
 	if exitBox then exitBox:Hide() end
-	run.follow, run.glideUntil = nil, nil
 	ns.ApplyCVarSet(FOLLOW_CVARS, false)
 	ns.Log("state", ("camera script %s ended (%s)"):format(run.script.name, why or "done"))
 	if run.trigger and run.triggerOn then stoppedFor = run.trigger .. run.camera end
@@ -1978,7 +2016,7 @@ local function Act(event)
 	elseif action == "putback" then
 		BeginEnding(event)
 	elseif action == "pause" then
-		if not run.pausedUntil then Suspend() end
+		if not run.pausedUntil then Suspend(event == "camera") end
 		run.pausedUntil = GetTime() + PauseSecs(rules, event)
 		run.pausedBy = event
 	elseif action == "restart" then
@@ -2005,6 +2043,14 @@ end
 local function ScriptRow(key)
 	return ns.CAMERA_TRIGGER and ns.CAMERA_TRIGGER[key] and IsScript(ns.TriggerSetting(key, "camera")) or false
 end
+-- Your casts ending (the Your cast ends rule): noted for the running script.
+local castFrame = CreateFrame("Frame")
+for _, event in ipairs({ "UNIT_SPELLCAST_STOP", "UNIT_SPELLCAST_INTERRUPTED", "UNIT_SPELLCAST_CHANNEL_STOP" }) do
+	castFrame:RegisterUnitEvent(event, "player")
+end
+castFrame:SetScript("OnEvent", function()
+	if run then run.castEnded = true end
+end)
 local heardFrame = CreateFrame("Frame")
 for _, event in ipairs({ "CHAT_MSG_MONSTER_SAY", "CHAT_MSG_MONSTER_YELL", "CHAT_MSG_MONSTER_PARTY",
 	"PLAYER_STARTED_MOVING", "PLAYER_STOPPED_MOVING", "PLAYER_ENTERING_WORLD", "GOSSIP_SHOW", "GOSSIP_CLOSED",
@@ -2071,6 +2117,7 @@ end
 -- The trigger running a script camera now, and that camera: a standing-still
 -- trigger's (or your own's, or a cast's), else a flight's, death's, walking's,
 -- running's, a quest giver's or chat's.
+local OWN_CAM = { "flight", "death", "walk", "run", "quest", "chatcam" } -- (TriggerNow's own list, in order)
 local function TriggerNow()
 	if not ns.db or not ns.db.enabled or not ns.ActiveEvent then return nil end
 	-- (A scene of yours its key started: first, a window open or walking.)
@@ -2093,18 +2140,29 @@ local function TriggerNow()
 	end
 	-- (Skyriding Cam's page: its own script, made from its settings.)
 	if not ns.OnTaxi() and ns.SkyridingNow() then return "Skyride", "script:skyride" end
+	local now = GetTime()
 	local key, camera = ns.ActiveEvent()
-	if IsScript(camera) then return key, camera end
+	-- (The Calm Timer after a fight, as the cameras' own code waits it out:
+	-- the event's row says.)
+	if IsScript(camera) then
+		if ns.CombatWaitOver and not ns.CombatWaitOver(ns.ScriptStandIn(camera) or "event", now) then return nil end
+		return key, camera
+	end
 	local triggers = ns.CAMERA_TRIGGER
 	if not triggers then return nil end
 	-- (A trigger with a camera of its own, its row set to a script: its own
-	-- camera is off then, CameraRows.lua's ns.CameraRowsOff.)
-	local own = { ns.OnTaxi() and "Flight", ns.IsDead and ns.IsDead() and "Death",
+	-- camera is off then, CameraRows.lua's ns.CameraRowsOff. Each goes by what
+	-- its own camera would: Enable Cameras, Stop camera, the auto-walk and
+	-- auto-run waits, the Calm Timer; dying, by the Death Cam's conditions.)
+	local own = { ns.OnTaxi() and "Flight",
+		(ns.DeathCinematicWanted and ns.DeathCinematicWanted() or false) and "Death",
 		ns.IsRPWalking and ns.IsRPWalking() and "Walk", ns.IsAutoRunning and ns.IsAutoRunning() and "Run",
 		ns.QuestTalkNow and ns.QuestTalkNow() or false, ChatNow() or false }
 	for i = 1, 6 do
 		local each = own[i]
-		if each and triggers[each] then
+		local cam = OWN_CAM[i]
+		if each and triggers[each] and not (ns.CameraOffBesidesRows and ns.CameraOffBesidesRows(cam))
+			and (cam == "death" or not ns.CombatWaitOver or ns.CombatWaitOver(cam, now)) then
 			camera = ns.TriggerSetting(each, "camera")
 			if IsScript(camera) then return each, camera end
 		end
@@ -2113,49 +2171,6 @@ end
 
 local function InFight()
 	return InCombatLockdown() or ns.Flag(UnitAffectingCombat("player"))
-end
-
--- Follow on (STEP.follow): your facing watched; after a turn of more than
--- FOLLOW_TURN, held still run.follow seconds, the script's moves stop and
--- camera follow glides the camera behind you over FOLLOW_GLIDE seconds (the
--- script holds meanwhile), then the counts start from there. True while
--- gliding. (Your facing can't be read in some places: no follow there.)
-local FOLLOW_TURN, FOLLOW_GLIDE = 15, 2.5
-local function StepFollow(now)
-	if run.glideUntil then
-		if now < run.glideUntil or (ns.RECENTER_CVARS and ns.RECENTER_CVARS.active and now < run.glideUntil + 2) then
-			return true
-		end
-		run.glideUntil = nil
-		ns.ApplyCVarSet(FOLLOW_CVARS, true)
-		movers.yaw.amount, movers.pitch.amount = 0, 0
-		return false
-	end
-	if not run.follow then return false end
-	local ok, facing = pcall(GetPlayerFacing)
-	if not ok or type(facing) ~= "number" or (issecretvalue and issecretvalue(facing)) then return false end
-	facing = math.deg(facing)
-	if not run.facing then
-		run.facing, run.facingAt, run.turnedFrom = facing, now, nil
-		return false
-	end
-	if math.abs(Wrap(facing - run.facing)) > 0.5 then
-		run.turnedFrom = run.turnedFrom or run.facing
-		run.facing, run.facingAt = facing, now
-		return false
-	end
-	if run.turnedFrom and now - run.facingAt >= run.follow then
-		local turned = math.abs(Wrap(facing - run.turnedFrom))
-		run.turnedFrom = nil
-		if turned >= FOLLOW_TURN then
-			StopAll()
-			ns.ApplyCVarSet(FOLLOW_CVARS, false)
-			ns.CenterCamera(FOLLOW_GLIDE, 40, 25, 1)
-			run.glideUntil = now + FOLLOW_GLIDE
-			return true
-		end
-	end
-	return false
 end
 
 local function Update(elapsed)
@@ -2182,13 +2197,16 @@ local function Update(elapsed)
 		end
 		if InFight() and Act("fight") then return end
 		if run.trigger and not run.triggerOn and Act("ends") then return end
+		-- (Its zoom speed still eases back to yours meanwhile: left at the crawl,
+		-- every pause of a steered auto-run kept your zoom creeping.)
+		if not zoomer.moving and zoomer.release then StepZoom(elapsed) end
 		if now < run.pausedUntil then return end
 		run.pausedUntil = nil
 		Resume()
 	end
 	if moved and run.travel then
-		StopMove(movers.yaw) -- (yours: its turns and tilts give way, its zoom carries on)
-		StopMove(movers.pitch)
+		StopMove(movers.yaw, true) -- (yours: its turns and tilts give way, its zoom carries on)
+		StopMove(movers.pitch, true)
 		movers.yaw.suspended, movers.pitch.suspended = nil, nil
 		moved = false
 	end
@@ -2198,15 +2216,21 @@ local function Update(elapsed)
 		return
 	end
 	if zoomed then
-		if not Act("zoom") then StopZoom() end -- (yours wins: its zoom gives up)
+		if not Act("zoom") then -- (yours wins: its zoom gives up, a paused one too)
+			StopZoom()
+			zoomer.suspended = nil
+		end
 		if not run or run.pausedUntil then return end
 	end
 	if run.phase == "steps" and run.trigger and not run.triggerOn then
 		Act("ends")
 		if not run then return end
 	end
+	if run.castEnded then
+		run.castEnded = nil
+		if Act("cast") and (not run or run.pausedUntil) then return end
+	end
 	if run.pausedUntil then return end
-	if StepFollow(now) then return end
 	StepMove(movers.yaw, elapsed)
 	StepMove(movers.pitch, elapsed)
 	StepZoom(elapsed)
@@ -2249,6 +2273,18 @@ ns.SetOnUpdate(watcher, function(_, elapsed)
 		if zoomer.moving or zoomer.release then HoldForYourZoom() end
 	end
 	StepYourZoom(elapsed)
+	-- (Your zoom is the script's new start: its drifts and its zoom back at the
+	-- end go from where you put the camera, never back to where it began.)
+	if run and yourZoom and yourZoom > run.startedAt and yourZoom ~= run.rebasedFor then
+		local zoom = Zoom()
+		run.rebaseStill = math.abs(zoom - (run.rebaseLast or zoom)) < ZOOM_STILL and (run.rebaseStill or 0) + elapsed or 0
+		run.rebaseLast = zoom
+		if run.rebaseStill >= ZOOM_SETTLED and GetTime() - yourZoom >= ZOOM_SETTLED then
+			run.rebasedFor, run.rebaseStill, run.rebaseLast = yourZoom, nil, nil
+			ns.LogDetail("state", ("camera script: you zoomed, its start now %.1f (was %.1f)"):format(zoom, run.startZoom))
+			run.startZoom = zoom
+		end
+	end
 	if run then
 		Update(elapsed)
 	elseif zoomer.release then
@@ -2289,12 +2325,12 @@ if ns.RegisterCamera then
 		if run then
 			run.tookAt = GetTime()
 			if run.travel then
-				StopMove(movers.yaw) -- (the zoom goes on: see Start)
-				StopMove(movers.pitch)
+				StopMove(movers.yaw, true) -- (the zoom goes on: see Start)
+				StopMove(movers.pitch, true)
 				return
 			end
 			if run.pausedUntil then return end
-			Suspend()
+			Suspend(true)
 			local rules = run.script.rules
 			if rules.camera ~= "pause" and rules.cameraOn ~= false then StopAll() end
 		end
@@ -2345,11 +2381,12 @@ end
 -- The camera a playing built-in script stands in for, by its key in
 -- ns.activeCam ("idle", "vista", "flight"...), or nil: the rules' cam_*
 -- words (Frames.lua). Run as its script, a camera leaves ns.activeCam unset.
-local CAMERA_KEY_OF = { afk = "idle", chat = "chatcam" }
-function ns.PlayingCameraKey()
+-- (triggered: only one a trigger started, not Run on its page. Our cameras'
+-- keys only: not the fly-by or Skyriding.)
+function ns.PlayingCameraKey(triggered)
 	local id = run and run.builtinId
-	if type(id) ~= "string" then return nil end
-	return CAMERA_KEY_OF[id] or id
+	if type(id) ~= "string" or (triggered and not run.trigger) then return nil end
+	return ns.ScriptStandIn(id)
 end
 
 function ns.StopCameraScript()
@@ -2399,9 +2436,9 @@ function ns.CameraScriptCommand(arg)
 	elseif cmd == "stop" then
 		ns.Print(ns.StopCameraScript() and L["camera script stopped"] or L["no camera script is running"])
 	elseif cmd == "builtins" and ns.isDev and ns.db then
-		ns.db.scriptBuiltIns = not ns.db.scriptBuiltIns or nil
+		if ns.db.scriptBuiltIns == false then ns.db.scriptBuiltIns = nil else ns.db.scriptBuiltIns = false end
 		ns.CameraRowsChanged()
-		if ns.db.scriptBuiltIns then
+		if ns.ScriptBuiltInsOn() then
 			ns.Print("our cameras run as their scripts: ON (Cozy, AFK, Flight... rows play the built-in script; " ..
 				"the cameras' own code stays off). /cine script builtins again for the old cameras.")
 		else

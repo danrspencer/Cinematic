@@ -257,11 +257,11 @@ ns.PROFILE_MODULES = {
 		tip = "Fights bring up your portrait, target, target of target, focus and focus's target " ..
 		"of target (these also for an enemy or friend targeted and in dungeons and raids) and the swing timer, but " ..
 		"no buffs or minimap (the personal resource display: as the layout has it); the cast bar shows all " ..
-		"through CineMode. The player frame and resource display don't stay up until full; " ..
+		"through CineMode. The player frame stays up until health and power are full (not the resource display); " ..
 		"raid frames without names, buffs, threat, target markers, ready checks or titles in CineMode.",
 		apply = function(set)
 			-- (The personal resource display in fights: the layout module's.)
-			set("portraitWhenNotFull", false)
+			set("portraitWhenNotFull", true)
 			set("prdWhenNotFull", false)
 			set("unitPartsFocusToT", true)
 			set("cineShow", { castbar = true, raidnames = false, raidbuffs = false, raidthreat = false,
@@ -289,6 +289,16 @@ ns.PROFILE_MODULES = {
 		"(hovering shows them).",
 		apply = function(set)
 			set("minimapRevealParts", "")
+		end },
+	{ key = "node-icons", name = "Ore and herb icons", scope = { "Minimap" },
+		tip = "The minimap comes up for nearby ore, herbs and treasure, pings each where it shows up, and " ..
+		"puts the ore's or herb's icon on it while it's on the minimap.",
+		apply = function(set)
+			set("minimapRevealNodes", true)
+			set("minimapNodeMark", "ping")
+			-- (Icons off for every profile while they're being fixed; the
+			-- Minimap page's Node icons row still turns them on.)
+			set("minimapNodeIcons", "")
 		end },
 	{ key = "pure-cdm", name = "Cinema: Cooldown Manager only",
 		scope = { "Cooldown Manager", "Standard Frames/Trackers", "Standard Frames/Action bars",
@@ -406,12 +416,14 @@ ns.PROFILE_MODULES = {
 			set("cineShow", { target = true })
 			set("targetQuestIcon", false)
 		end },
-	{ key = "quest-talk", name = "Quest talk", scope = { "Quest Vision/Talking to NPCs" },
-		tip = "Custom dialogue frames: speech bubbles and a reply list instead of the game's gossip and " ..
-		"quest windows.",
-		apply = function(set)
-			set("questTalk", true)
-		end },
+	-- (Off in every profile while Quest talk is being fixed: put this back, and
+	-- "quest-talk" into Balanced's and Cinema's modules in ProfileChoices.lua.)
+	-- { key = "quest-talk", name = "Quest talk", scope = { "Quest Vision/Talking to NPCs" },
+	-- 	tip = "Custom dialogue frames: speech bubbles and a reply list instead of the game's gossip and " ..
+	-- 	"quest windows.",
+	-- 	apply = function(set)
+	-- 		set("questTalk", true)
+	-- 	end },
 	{ key = "combat-vision", name = "Battle cards", scope = { "Card Vision" },
 		tip = "The Cards page's fights on: a card and sounds as you go into a fight and come out of it, and a " ..
 		"boss's name as its fight starts.",
@@ -582,6 +594,10 @@ ns.PROFILE_MODULES = {
 	{ key = "letterbox-in-fights", name = "Letterbox stays in fights", scope = { "Letterbox/Show in" },
 		tip = "Fights don't bring the letterbox down.",
 		apply = function(set) set("letterboxOffInCombat", false) end },
+	{ key = "weather-view-distance", name = "View distance in bad weather", scope = { "Effects/Show in" },
+		tip = "In rain, snow or a sandstorm the view distance comes all the way in (Reduce view distance in bad " ..
+			"weather at 100%).",
+		apply = function(set) set("rainViewScale", 1) end },
 	{ key = "vitals-vision", name = "Vitals Vision on", scope = { "Vitals Vision" },
 		tip = "Your health at the screen's edges, the picture drained toward grey and the personal resource " ..
 		"display (or, in a game without one, your player frame) fading in as it drops.",

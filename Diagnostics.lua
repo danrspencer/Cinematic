@@ -20,7 +20,7 @@ local REPEAT_WINDOW = 3      -- ...within this many seconds means it's stuck in 
 -- Addons that also fade frames, move the camera or handle nameplates, so they
 -- may overlap with this one. Only noted in the log's summary.
 local OVERLAPPING = {
-	"DynamicCam", "ElvUI", "DaylightUI", "Immersion", "ConsolePort", "SexyMap", "Bartender4", "Dominos",
+	"DynamicCam", "ElvUI", "DaylightUI", "Immersion", "DialogueUI", "ConsolePort", "SexyMap", "Bartender4", "Dominos",
 	"Plater", "Kui_Nameplates", "TidyPlates_ThreatPlates", "Platynator",
 }
 

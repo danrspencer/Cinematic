@@ -1076,7 +1076,7 @@ function ns.MoveDamageVision(which, inEditMode)
 		inEditMode = true -- (the Move button while Edit Mode has it up: keep it Edit Mode's)
 	end
 	mover.inEditMode = inEditMode or nil
-	mover.label:SetText(inEditMode and L[info.editText] or L[info.text])
+	mover.label:SetText(inEditMode and ns.EditModeName(L[info.editText]) or L[info.text])
 	mover.close:SetShown(not inEditMode)
 	ns.EditModeLook(mover, inEditMode)
 	mover.Snap()

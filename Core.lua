@@ -110,7 +110,7 @@ local DEFAULTS = {
 	innGlowAmount = 0.02,  -- light the inn glow adds at its brightest (0.1 = 10%)
 	weatherTint = true,    -- rain, snow and sandstorms grey or colour the scene (clients with C_Weather)
 	weatherTintStrength = 1,
-	rainViewScale = 0,     -- in rain, the view distance comes in from yours (Graphics.lua); off in every profile
+	rainViewScale = 0,     -- in rain, the view distance comes in from yours (Graphics.lua); Cinema: 100% (weather-view-distance)
 	tintClock = "game",    -- time-of-day tint follows "game" (realm) time or "local" (computer) time
 	timeTintStrength = 1,  -- how strongly the time-of-day colour applies (both time presets)
 	tintPreviewHour = -2,  -- options-page preview of the time-of-day tint at this hour (-1 = now, -2 = not picked)
@@ -151,7 +151,13 @@ local DEFAULTS = {
 	-- Reveal (Minimap page): the faded minimap comes up while one of these is on
 	-- it (NodeSweep.lua looks; with any ticked it's kept full size, icons hidden).
 	minimapRevealNodes = true,   -- ore, herbs and treasure (the tracking has to be on)
-	minimapNodePing = true,      -- ...with a minimap ping where one shows up (your group sees it too)
+	-- ...and how one is marked where it shows up (NodeSweep.lua): "mark" (a
+	-- silent ring of ours, just you), "ping" (the game's ping: sound, your
+	-- group sees it), "off".
+	minimapNodeMark = "mark",
+	-- ...and which kinds get their icon on the node, kept there while it's on
+	-- the minimap (NodeSweep.lua): kinds comma-separated (ore, herb), "" none.
+	minimapNodeIcons = "",
 	minimapRevealTurnIns = true, -- quests of yours that are done
 	minimapRevealAreas = true,   -- the areas of quests of yours that aren't
 	minimapRevealIcons = true,   -- anything else (quest givers, flight masters...)
@@ -159,7 +165,7 @@ local DEFAULTS = {
 	-- The header parts (row keys, comma-separated) that come up with the map when one of those or a
 	-- ping brings it up; "" = just the map (hovering shows all). Default: all of them.
 	minimapRevealParts = "minimapzone,minimapheader,minimaptracking,minimapcalendar,minimapclock,minimapdial,"
-		.. "minimapaddons,minimapcoords",
+		.. "minimapaddons,minimapcompartment,minimapcoords",
 	-- Keep open (Minimap page): the minimap stays up the whole time this tracking is on.
 	minimapKeepCreatures = false, -- creatures (hunter, druid, warlock) or fish
 	minimapKeepGathering = false, -- herbs, minerals or treasure...
@@ -238,6 +244,7 @@ local DEFAULTS = {
 	tooltipCursorMode = "corner", -- tooltips the game puts in the bottom-right corner: "corner", "cursor" or "combat" (cursor in fights; switch or not)
 	tooltipFadeTime = 0.2,    -- seconds tooltips take to fade in, and out when the mouse is still too long (0: no fading; switch or not)
 	tooltipFullAfter = 2,     -- seconds hovering before the parts grid's After column takes over (0: never)
+	tooltipNeverShow = "Fishing Bobber", -- comma-separated tooltip names (first line) CineMode always hides; each matches its translation too (Effects.lua)
 	musicFadeTime = 3,        -- seconds for music to fade in or out
 	musicFatigue = 0,         -- minutes: don't start music again within this long of the last start
 	-- Which cameras can start music as they start (when music fatigue allows).
@@ -471,11 +478,9 @@ DEFAULTS.fishOrbit = true
 DEFAULTS.fishZoom = true
 DEFAULTS.fishInputPause = DEFAULTS.vistaInputPause
 DEFAULTS.fishLevel = DEFAULTS.vistaLevel
-DEFAULTS.fishRightClickCast = true  -- right-click casts Fishing again while the fish camera is on
-DEFAULTS.fishRightClickReel = true -- right-click (or the gamepad cast button) reels in while the bobber is out
-DEFAULTS.fishKeyReel = true        -- ...and so does the key you cast Fishing with from an action bar
+DEFAULTS.fishRightClickCast = true  -- right-click casts Fishing (first cast and recasts), only with a pole equipped
+DEFAULTS.fishRightClickReel = true -- right-click, the Fishing action bar key and the gamepad cast button reel in while the bobber is out
 DEFAULTS.fishRecastDelay = 0.3    --...seconds after a cast ends before it does
-DEFAULTS.fishPoleRightClickCast = true -- ...and for the first cast, with a fishing pole equipped
 DEFAULTS.fishMissPause = 30        -- ...seconds it stands aside after a cast misses the water
 DEFAULTS.hideFishingCastBar = true -- no cast bar while it shows Fishing (other spells still show it)
 DEFAULTS.fishGamepadCast = true    -- in gamepad mode, a gamepad button casts as right-click does...
@@ -499,6 +504,7 @@ DEFAULTS.fishOrbitDriftSpeed = 0.3 -- (vista: 0.5)
 for _, key in ipairs({ "Distance", "In", "Time", "Pause", "Random", "Ease", "PastMax" }) do
 	DEFAULTS["fishZoom" .. key] = DEFAULTS["vistaZoom" .. key]
 end
+DEFAULTS.fishZoomDistance = 2      -- (vista: 4)
 -- Tele camera (casting your Hearthstone or a teleport): the cozy camera's
 -- swing round to face you, only quicker, then a spin round you that speeds up
 -- until you go, zooming in over the cast. (Its sway settings are the cozy camera's.)
@@ -1021,7 +1027,7 @@ DEFAULTS.talkingHeadRepeats = true
 DEFAULTS.questTalkStyle = "parchment" -- or "bubble" (the game's chat bubble)
 -- Where the bubble goes: "head" (over their nameplate), "fixed" (where you
 -- drag it) or "opposite" (across the screen from where you clicked them).
-DEFAULTS.questTalkPlace = "opposite"
+DEFAULTS.questTalkPlace = "fixed"
 DEFAULTS.questTalkShopFollow = true -- Opposite clicked: a shop window opened from the talk goes where the talk was
 DEFAULTS.questTalkGameButton = true -- "Show the game's window" on the card
 DEFAULTS.questTalkStill = true -- Over the head: the quest camera holds still (no drift) while it's up
@@ -2102,7 +2108,9 @@ function ns.NoteTravel(walking, autoRunning)
 	ns.travelSince.walk = walking and (ns.travelSince.walk or now) or nil
 	ns.travelSince.run = autoRunning and (ns.travelSince.run or now) or nil
 end
-function ns.IsCameraOffHere(cam)
+-- Off for everything but its rows: Enable Cameras, Stop camera, the waits.
+-- (A camera playing its script goes by this too: CameraScripts.lua.)
+function ns.CameraOffBesidesRows(cam)
 	local db = ns.db
 	if not db then return false end
 	if db.cameraModes == false then
@@ -2126,10 +2134,15 @@ function ns.IsCameraOffHere(cam)
 			return true
 		end
 	end
+	return false
+end
+function ns.IsCameraOffHere(cam)
+	if not ns.db then return false end
 	-- The row its trigger goes by now (Cameras page) not set to it: a
 	-- flight's, auto-walk's, dying's... (The cameras events start go by the
-	-- event's row as it picks one: CameraRows.lua.)
-	return ns.CameraRowsOff(cam)
+	-- event's row as it picks one: CameraRows.lua.) Set to its script, its
+	-- own code is off too: the script plays it.
+	return ns.CameraOffBesidesRows(cam) or ns.CameraRowsOff(cam)
 end
 ns.IsCameraOffHere = ns.Profiled("IsCameraOffHere", ns.IsCameraOffHere)
 -- Why ns.IsCameraOffHere has a camera off, in words (nil: it isn't), for
@@ -2700,6 +2713,9 @@ do
 		value = ("%.2f"):format(value)
 		ns.NoteOwnSpeed(cvar, value)
 		SetCVar(cvar, value)
+		if cvar == "cameraZoomSpeed" and ns.WantZoomKeys then
+			ns.WantZoomKeys(tonumber(value) < (tonumber(ns.db.heldSpeeds[cvar]) or 0))
+		end
 	end
 
 	-- who's done with it; the last one done puts yours back.
@@ -2710,6 +2726,7 @@ do
 		if Held(cvar) then
 			return
 		end
+		if cvar == "cameraZoomSpeed" and ns.WantZoomKeys then ns.WantZoomKeys(false) end
 		local yours = ns.db.heldSpeeds[cvar]
 		if yours then
 			ns.db.heldSpeeds[cvar] = nil
@@ -2727,6 +2744,58 @@ do
 		return Held(cvar)
 	end
 
+	-- Your zoom keys while one of ours holds the zoom speed down: the game
+	-- takes a scroll at the speed set right then and keeps it going that long,
+	-- so a scroll taken at a crawl crept, then shot out to your max once the
+	-- speed came back (the fish and auto-run cameras, 2026-11-05). So while
+	-- it's held low, your zoom keys go to a button that puts your speed back
+	-- first (every holder let go: their own code sees your zoom and stops
+	-- its zoom), then zooms. (Not in a fight: bindings are locked then.)
+	local ZOOM_CVAR = "cameraZoomSpeed"
+	local zoomKeys = { owner = nil, armed = false, wanted = false }
+	local function ZoomKeyClick(name, amount)
+		holders[ZOOM_CVAR] = nil
+		local yours = ns.db.heldSpeeds[ZOOM_CVAR]
+		if yours then
+			ns.db.heldSpeeds[ZOOM_CVAR], ns.db.ownSpeeds[ZOOM_CVAR] = nil, nil
+			ns.LogDetail("cvar", ("%s back to %s (your zoom key)"):format(ZOOM_CVAR, yours))
+			SetCVar(ZOOM_CVAR, yours)
+		end
+		ns.WantZoomKeys(false)
+		_G[name](amount)
+	end
+	local function SyncZoomKeys()
+		local want = zoomKeys.wanted
+		if want == zoomKeys.armed or InCombatLockdown() then return end
+		if not zoomKeys.owner then
+			local owner = CreateFrame("Frame")
+			owner:RegisterEvent("PLAYER_REGEN_ENABLED")
+			owner:SetScript("OnEvent", SyncZoomKeys)
+			zoomKeys.owner = owner
+			for _, each in ipairs({ { "CinematicZoomKeyIn", "CameraZoomIn", "CAMERAZOOMIN" },
+				{ "CinematicZoomKeyOut", "CameraZoomOut", "CAMERAZOOMOUT" } }) do
+				local button = CreateFrame("Button", each[1])
+				button:SetScript("OnClick", function() ZoomKeyClick(each[2], 1) end)
+				button.action = each[3]
+			end
+		end
+		ClearOverrideBindings(zoomKeys.owner)
+		if want then
+			for _, name in ipairs({ "CinematicZoomKeyIn", "CinematicZoomKeyOut" }) do
+				for _, key in ipairs({ GetBindingKey(_G[name].action) }) do
+					SetOverrideBindingClick(zoomKeys.owner, true, key, name)
+				end
+			end
+		end
+		zoomKeys.armed = want
+	end
+	-- (Held low by one of ours, or not: the keys follow.)
+	local function WantZoomKeys(want)
+		zoomKeys.wanted = want
+		if CameraZoomIn and CameraZoomOut and GetBindingKey and SetOverrideBindingClick then SyncZoomKeys() end
+	end
+	ns.WantZoomKeys = WantZoomKeys
+
 	-- Everything back at once (logging out; and at login, anything a reload
 	-- or crash left held).
 	function ns.ReleaseAllSpeeds(why)
@@ -2739,6 +2808,7 @@ do
 			ns.db.heldSpeeds[cvar] = nil
 			ns.db.ownSpeeds[cvar] = nil
 		end
+		WantZoomKeys(false)
 	end
 
 	-- One of ours moving the view or holding a speed setting, whether or not
@@ -3485,9 +3555,15 @@ ns.InCameraMode = function() return InCameraMode() end
 
 -- Which camera mode you're in: "flight", "walk", "run", "vista", "fish", "cozy", "idle", or nil.
 -- (Not one turned off where you are; see ns.IsCameraOffHere.)
+-- (One of ours playing as its script: its mode; the tele camera's is cozy's.)
+local SCRIPT_MODE = { idle = "idle", cozy = "cozy", vista = "vista", fish = "fish", tele = "cozy", flight = "flight",
+	walk = "walk", run = "run" }
 function ns.CameraMode()
+	local scripted = ns.PlayingCameraKey and ns.PlayingCameraKey(true)
 	if ns.OnTaxi() then
 		return "flight"
+	elseif scripted and SCRIPT_MODE[scripted] then
+		return SCRIPT_MODE[scripted]
 	elseif ns.IsRPWalking and ns.IsRPWalking() then
 		return not ns.IsCameraOffHere("walk") and "walk" or nil
 	elseif ns.IsAutoRunning and ns.IsAutoRunning() then
@@ -3580,6 +3656,17 @@ ticker:SetScript("OnEvent", ns.Profiled("Core events", function(self, event, arg
 		MigrateReaches(ns.db)
 		for _, saved in pairs(ns.db.profiles or {}) do
 			if type(saved) == "table" then MigrateReaches(saved) end
+		end
+		-- Minimap nodes' old Ping where it is box, untick: now Mark where it
+		-- is's Off (ticked takes the new default, our silent mark).
+		local function MigrateNodeMark(saved)
+			if saved.minimapNodePing == false and saved.minimapNodeMark == nil then saved.minimapNodeMark = "off" end
+			-- (Ping, no sound went: it didn't mute the ping, tested.)
+			if saved.minimapNodeMark == "quietping" then saved.minimapNodeMark = "mark" end
+		end
+		MigrateNodeMark(ns.db)
+		for _, saved in pairs(ns.db.profiles or {}) do
+			if type(saved) == "table" then MigrateNodeMark(saved) end
 		end
 		-- Older settings: one vertical range for up and down, and a separate
 		-- narrow behind mode (now behind mode with a 45 degree swing).
@@ -4658,6 +4745,35 @@ ticker:SetScript("OnEvent", ns.Profiled("Core events", function(self, event, arg
 			end
 			ns.db.minimapAddonsHoverV1 = true
 		end
+		-- And the game's addon compartment: into saved groups with the minimap,
+		-- and into Reveal shows lists that have the addon buttons. Once.
+		if not ns.db.minimapCompartmentV1 then
+			local function AddCompartmentRow(groups)
+				for _, group in ipairs(groups or {}) do
+					local has = {}
+					for _, key in ipairs(group.members or {}) do has[key] = true end
+					if has.minimap and not has.minimapcompartment then
+						table.insert(group.members, "minimapcompartment")
+					end
+				end
+			end
+			local function AddCompartmentPart(db)
+				local parts = db.minimapRevealParts
+				if type(parts) == "string" and (parts .. ","):find("minimapaddons,", 1, true)
+					and not (parts .. ","):find("minimapcompartment,", 1, true) then
+					db.minimapRevealParts = parts .. ",minimapcompartment"
+				end
+			end
+			AddCompartmentRow(ns.db.hoverGroups)
+			AddCompartmentPart(ns.db)
+			for _, saved in pairs(ns.db.profiles or {}) do
+				if type(saved) == "table" then
+					AddCompartmentRow(saved.hoverGroups)
+					AddCompartmentPart(saved)
+				end
+			end
+			ns.db.minimapCompartmentV1 = true
+		end
 		-- The objective boxes under the minimap went with the quest tracker
 		-- (always up); now with the minimap: into saved groups with it. Once.
 		if not ns.db.belowMinimapHoverV1 then
@@ -4942,6 +5058,15 @@ ticker:SetScript("OnEvent", ns.Profiled("Core events", function(self, event, arg
 				if type(saved) == "table" then saved.questTalk = nil end
 			end
 			ns.db.questTalkProfileV1 = true
+		end
+		-- Quest talk is off in every profile for now (being fixed): turn it
+		-- off once, saved profiles too.
+		if not ns.db.questTalkOffV1 then
+			ns.db.questTalk = false
+			for _, saved in pairs(ns.db.profiles or {}) do
+				if type(saved) == "table" then saved.questTalk = nil end
+			end
+			ns.db.questTalkOffV1 = true
 		end
 		-- Combat Vision is off to start with, on in the Cinema profile: it goes
 		-- as your profile has it, and saved profiles drop theirs. Once.
@@ -6135,6 +6260,7 @@ ticker:SetScript("OnEvent", ns.Profiled("Core events", function(self, event, arg
 		-- above have read what they need.
 		for _, key in ipairs({
 			"keepRaidMarkers", -- (now the Raid Markers grid)
+			"minimapNodePing", -- (now minimapNodeMark)
 			"storyRecapSound", -- (now Last time's sound rules)
 			"cozyInstant", "cozyBuffsOn", "cozySit", "cozySleep", "cozyDance", "cozyKneel", "cozyChair",
 			"cozyWeapon", "vistaInstant", "vistaStare", "eventsV2", "eventDelay",
@@ -6635,7 +6761,9 @@ end
 -- listened to: nothing of Edit Mode's is touched, each spot stays in our
 -- settings). ns.OnEditMode(enter, exit): called as it opens and closes.
 -- ns.EditModeLook(mover, on): a Move box in Edit Mode's blue (below its
--- window, as its frames are), or back in our gold.
+-- window, as its frames are), or back in our gold. ns.EditModeName(text): a
+-- box's words in Edit Mode with "Cinematic: " before them, so ours can be told
+-- from the game's (the addon's name: never translated).
 do
 	local hooked = {}
 	local registered = false
@@ -6665,6 +6793,9 @@ do
 				if each.exit then each.exit() end
 			end
 		end, "CinematicEditMode")
+	end
+	function ns.EditModeName(text)
+		return "Cinematic: " .. (text or "")
 	end
 	function ns.EditModeLook(mover, on)
 		mover:SetFrameStrata(on and "HIGH" or "FULLSCREEN_DIALOG")

@@ -96,8 +96,12 @@ function ns.ApplyShoulderCam()
 	if ns.Setting("shoulderCam") then
 		yours = yours or {}
 		ns.db.shoulderCamYours = yours
-		Write(yours, "CameraKeepCharacterCentered", "0")
-		Write(yours, "test_cameraOverShoulder", ShoulderValue())
+		-- (DialogueUI's camera sets the same offset for its talks, and puts
+		-- back what it found: hands off till it's done. Support/DialogueUI.lua.)
+		if not (ns.DialogueUICameraOn and ns.DialogueUICameraOn()) then
+			Write(yours, "CameraKeepCharacterCentered", "0")
+			Write(yours, "test_cameraOverShoulder", ShoulderValue())
+		end
 		poller:Show()
 	else
 		poller:Hide()

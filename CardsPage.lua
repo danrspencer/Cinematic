@@ -397,6 +397,8 @@ function ns.CreateCardsPanel(kit)
 		L["On: each card shows as its row says. Off: none of them do, and each row keeps its tick for when you " ..
 		"turn this back on."], intro)
 	local stack = kit.Stack(switch, "check")
+	kit.RecordKey(content, "cardThirdX") -- (the lower third's spot, moved in Edit Mode: Reset puts it back)
+	kit.RecordKey(content, "cardThirdY")
 	local cardScale = stack:Add(kit.Slider(content, "cardScale", L["Card size"], 50, 200, 5, "%d%%", 100),
 		"slider")
 	kit.Tooltip(cardScale, L["Every card's words bigger or smaller, for a big or wide screen (a card in a " ..

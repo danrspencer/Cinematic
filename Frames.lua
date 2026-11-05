@@ -114,6 +114,8 @@ local FRAME_GROUPS = {
 	-- Addons' buttons on the minimap's edge (ours, LibDBIcon's: found by
 	-- FindMinimapHeader) and the coordinates under it (found by their text).
 	minimapaddons = { "CinematicMinimapButton" },
+	-- The game's addon compartment button by the minimap (retail and Forever).
+	minimapcompartment = { "AddonCompartmentFrame" },
 	minimapcoords = {},
 	chat = {
 		"GeneralDockManager", "ChatFrameMenuButton", "ChatFrameChannelButton",
@@ -582,7 +584,7 @@ end
 local GROUP_SWITCH = {
 	minimap = "handleMinimap", minimapheader = "handleMinimap", minimaptracking = "handleMinimap",
 	minimapcalendar = "handleMinimap", minimapzone = "handleMinimap", minimapclock = "handleMinimap",
-	minimapdial = "handleMinimap", minimapaddons = "handleMinimap", minimapcoords = "handleMinimap", belowminimap = "handleMinimap", quests = "handleQuests", questtimer = "handleQuests", waypoint = "handleQuests",
+	minimapdial = "handleMinimap", minimapaddons = "handleMinimap", minimapcompartment = "handleMinimap", minimapcoords = "handleMinimap", belowminimap = "handleMinimap", quests = "handleQuests", questtimer = "handleQuests", waypoint = "handleQuests",
 	buffs = "handleBuffs", cooldowns = "handleCooldowns", chat = "handleChat", swing = "handleSwing",
 	gamepadbars = "handleGamepad", gamepadlegend = "handleGamepad", gamepadreticle = "handleGamepad",
 }
@@ -1788,6 +1790,9 @@ ns.COMBAT_SHOW = {
 	{ key = "minimapaddons", label = L["Addon buttons"], default = true, groups = { "minimapaddons" },
 		tip = L["Addons' buttons around the minimap's edge, Cinematic's own too. Untick it to hide them in CineMode " ..
 			"even while the minimap is up. Hovering the minimap brings them up with the map."] },
+	{ key = "minimapcompartment", label = L["Addon compartment"], default = true, groups = { "minimapcompartment" },
+		tip = L["The game's addon compartment button by the minimap, which lists your addons' entries. Untick it to hide it " ..
+			"in CineMode even while the minimap is up. Hovering the minimap brings it up with the map."] },
 	{ key = "minimapcoords", label = L["Coordinates"], default = true, groups = { "minimapcoords" },
 		tip = L["The map coordinates by the minimap. Untick it to hide them in CineMode even while the minimap is up. " ..
 			"Hovering the minimap brings them up with the map."] },
@@ -1923,7 +1928,7 @@ local ROW_SECTIONS = {
 	right1 = "bars", right2 = "bars", bar6 = "bars", bar7 = "bars", bar8 = "bars",
 	minimap = "minimap", minimapheader = "minimap", minimaptracking = "minimap", minimapcalendar = "minimap",
 	minimapzone = "minimap", minimapclock = "minimap", minimapdial = "minimap", minimapaddons = "minimap",
-	minimapcoords = "minimap", belowminimap = "minimap",
+	minimapcompartment = "minimap", minimapcoords = "minimap", belowminimap = "minimap",
 	quests = "interface", waypoint = "interface", topcenter = "interface", micro = "interface", bags = "interface", xp = "interface",
 	chat = "interface", voice = "interface",
 }
@@ -2084,7 +2089,7 @@ ns.HOVER_GROUPS_DEFAULT = {
 		members = { "raidmanager" }, triggers = { roster = true }, when = "calm" },
 	{ preset = "minimap", icon = "Interface\\Icons\\INV_Misc_Map_01", name = L["Minimap"],
 		members = { "minimap", "minimapheader", "minimapzone", "minimaptracking", "minimapcalendar", "minimapclock",
-			"minimapdial", "minimapaddons", "minimapcoords", "belowminimap" },
+			"minimapdial", "minimapaddons", "minimapcompartment", "minimapcoords", "belowminimap" },
 		triggers = { ping = true, tracking = true } },
 	{ preset = "buffs", icon = "Interface\\Icons\\Spell_Holy_WordFortitude", name = L["Buffs"],
 		members = { "buffs", "buffcollapse" }, triggers = { aura = true } },
@@ -2314,7 +2319,7 @@ end
 local ROW_FALLBACK = {
 	art = "mainbar", petframe = "player", prdpower = "prd", focustot = "focus", minimapheader = "minimap", minimaptracking = "minimap", minimapcalendar = "minimap",
 	minimapzone = "minimap", minimapclock = "minimap", minimapdial = "minimap", minimapaddons = "minimap",
-	minimapcoords = "minimap", bags = "micro",
+	minimapcompartment = "minimap", minimapcoords = "minimap", bags = "micro",
 	belowminimap = "minimap", topcenter = "quests",
 	cooldownsutility = "cooldowns", cooldownsbuffs = "cooldowns", cooldownsbars = "cooldowns",
 	["addon:fecmAuras"] = "addon:fecm",
@@ -5641,7 +5646,8 @@ local pingRevealUntil = 0
 -- shows them all.
 do
 	local PARTS = { minimapheader = true, minimapzone = true, minimaptracking = true, minimapcalendar = true,
-		minimapclock = true, minimapdial = true, minimapaddons = true, minimapcoords = true }
+		minimapclock = true, minimapdial = true, minimapaddons = true, minimapcompartment = true,
+		minimapcoords = true }
 	local parsed, shown = nil, {}
 	function ns.MinimapRevealHides(member)
 		if not PARTS[member] then

@@ -23,6 +23,8 @@ DEFAULTS.combatBossTarget = false      -- as you first target a boss, before the
 DEFAULTS.combatBossNear = false        -- as you first come within about 28 yards of one
 DEFAULTS.combatBossSub = true          -- the dungeon and difficulty under the name
 DEFAULTS.combatBossCount = true        -- "Boss 2 of 3" over it, where the Journal knows (on the pull)
+DEFAULTS.cardThirdX = 0.07             -- the lower third's spot: its words' left edge, a share of the screen's width
+DEFAULTS.cardThirdY = 0.22             -- ...and their bottom, a share of its height up (moved in Edit Mode)
 
 local FADE_IN, FADE_OUT = 0.35, 0.5
 local SMALL_OUTLINE_MIN = 16          -- a card's small lines this big or more get a thin outline
@@ -259,7 +261,9 @@ local function Setup(cue, look, enter, width, height, scale, boss)
 		end
 	elseif place == "third" then
 		-- The lower third: low on the left, the line under it fading out.
-		point, relative, x, y = "BOTTOMLEFT", "BOTTOMLEFT", width * 0.07, height * 0.22
+		point, relative = "BOTTOMLEFT", "BOTTOMLEFT"
+		x = (tonumber(ns.db.cardThirdX) or DEFAULTS.cardThirdX) * width
+		y = (tonumber(ns.db.cardThirdY) or DEFAULTS.cardThirdY) * height
 		if style == "chapter" then line:SetPoint("TOPLEFT", text, "BOTTOMLEFT", 0, -6 * scale) end
 	elseif style == "title" then
 		y = height * 0.12
@@ -1089,3 +1093,65 @@ watcher:SetScript("OnEvent", function(_, event, ...)
 		EnteredWorld()
 	end
 end)
+
+-- The lower third's spot in the game's Edit Mode (Core.lua's ns.OnEditMode),
+-- with Card Vision on: a box where its cards' words start, dragged where you
+-- want them (cardThirdX/Y, shares of the screen; each card's own Move across
+-- and Move up still go on top), right-click to put it back.
+do
+	local mover
+	local function Snap()
+		local width, height = UIParent:GetWidth(), UIParent:GetHeight()
+		local db = ns.GetDB()
+		mover:SetSize(width * 0.28, 70 * (tonumber(db.cardScale) or 1))
+		mover:ClearAllPoints()
+		mover:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", (tonumber(db.cardThirdX) or DEFAULTS.cardThirdX) * width,
+			(tonumber(db.cardThirdY) or DEFAULTS.cardThirdY) * height)
+	end
+	local function Mover()
+		if mover then return mover end
+		mover = CreateFrame("Button", nil, UIParent, "BackdropTemplate")
+		mover:SetClampedToScreen(true)
+		mover:SetMovable(true)
+		mover:RegisterForDrag("LeftButton")
+		mover:RegisterForClicks("RightButtonUp")
+		mover:SetBackdrop({ bgFile = "Interface\\Buttons\\WHITE8X8", edgeFile = "Interface\\Buttons\\WHITE8X8",
+			edgeSize = 1 })
+		local label = mover:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+		label:SetPoint("CENTER")
+		mover.label = label
+		mover:SetScript("OnDragStart", mover.StartMoving)
+		mover:SetScript("OnDragStop", function(self)
+			self:StopMovingOrSizing()
+			if self.SetUserPlaced then self:SetUserPlaced(false) end
+			local left, bottom = self:GetLeft(), self:GetBottom()
+			local width, height = UIParent:GetWidth(), UIParent:GetHeight()
+			if type(left) == "number" and type(bottom) == "number" and width > 0 and height > 0 then
+				local scale = self:GetEffectiveScale() / UIParent:GetEffectiveScale()
+				local db = ns.GetDB()
+				db.cardThirdX = math.floor(left * scale / width * 1000 + 0.5) / 1000
+				db.cardThirdY = math.floor(bottom * scale / height * 1000 + 0.5) / 1000
+			end
+			Snap()
+			self.draggedAt = GetTime() -- (the button-up ending a drag isn't a click)
+		end)
+		mover:SetScript("OnClick", function(self)
+			if self.draggedAt and GetTime() - self.draggedAt < 0.2 then return end
+			local db = ns.GetDB()
+			db.cardThirdX, db.cardThirdY = DEFAULTS.cardThirdX, DEFAULTS.cardThirdY
+			Snap()
+			if ns.RefreshOptions then pcall(ns.RefreshOptions) end
+		end)
+		ns.EditModeLook(mover, true)
+		return mover
+	end
+	ns.OnEditMode(function()
+		if not ns.Setting("cards") then return end
+		Mover()
+		mover.label:SetText(ns.EditModeName(L["Lower third cards\nDrag to move, right-click to reset"]))
+		Snap()
+		mover:Show()
+	end, function()
+		if mover then mover:Hide() end
+	end)
+end

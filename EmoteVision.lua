@@ -806,7 +806,7 @@ local function Create()
 	-- (On while Edit Mode holds the card up; off for every other card.)
 	function card.UpdateCover()
 		local on = (editModeCard and moving) and true or false
-		cover.label:SetText(L["Emote Vision\nDrag to move, right-click to reset"])
+		cover.label:SetText(ns.EditModeName(L["Emote Vision\nDrag to move, right-click to reset"]))
 		cover:SetShown(on)
 		local alpha = on and 0 or 1
 		card.panel:SetAlpha(alpha)

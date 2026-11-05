@@ -123,14 +123,28 @@ local function TooltipIsCampfire()
 	return LookAtTooltip() and lastWasCampfire
 end
 
+-- Whether you're casting or channeling (cooking at the fire, fishing...).
+-- Unreadable counts as no.
+local function Casting()
+	for _, Info in ipairs({ UnitCastingInfo or false, UnitChannelInfo or false }) do
+		if Info then
+			local ok, name = pcall(Info, "player")
+			if ok and type(name) == "string" then
+				return true
+			end
+		end
+	end
+	return false
+end
+
 -- Times you can't (or wouldn't) sit down by a fire: the button's off (and
 -- Emote Vision's campfire card too, with any = true), or you're sitting,
--- fighting, mounted...
+-- fighting, casting, mounted...
 local function CanSit(any)
 	if not (ns.Setting("campfireSitButton") or (any and ns.EmoteVisionCampfireOn and ns.EmoteVisionCampfireOn())) then
 		return false
 	end
-	if (ns.IsSitting and ns.IsSitting()) or InCombatLockdown() or ns.Flag(UnitAffectingCombat("player")) or ns.Flag(UnitIsDeadOrGhost("player"))
+	if (ns.IsSitting and ns.IsSitting()) or Casting() or InCombatLockdown() or ns.Flag(UnitAffectingCombat("player")) or ns.Flag(UnitIsDeadOrGhost("player"))
 		or ns.Flag(ns.OnTaxi()) or (IsMounted and ns.Flag(IsMounted()))
 		or (UnitInVehicle and ns.Flag(UnitInVehicle("player"))) then
 		return false
@@ -362,8 +376,9 @@ local function OnUpdate(_, elapsed)
 		if not CanSit(true) then
 			if alpha == 0 and not blockedLogged and ns.Setting("campfireSitButton") and TooltipIsCampfire() then
 				blockedLogged = true
-				ns.Log("campfire", ("on a campfire, but no button: sitting %s, combat %s, mounted %s, dead %s, " ..
-					"taxi %s, vehicle %s"):format(tostring(ns.IsSitting and ns.IsSitting()), tostring(InCombatLockdown()),
+				ns.Log("campfire", ("on a campfire, but no button: sitting %s, casting %s, combat %s, mounted %s, dead %s, " ..
+					"taxi %s, vehicle %s"):format(tostring(ns.IsSitting and ns.IsSitting()), tostring(Casting()),
+					tostring(InCombatLockdown()),
 					tostring(IsMounted and ns.Flag(IsMounted())), tostring(ns.Flag(UnitIsDeadOrGhost("player"))),
 					tostring(ns.Flag(ns.OnTaxi())), tostring(UnitInVehicle and ns.Flag(UnitInVehicle("player")))))
 			end

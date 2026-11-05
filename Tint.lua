@@ -938,7 +938,10 @@ local function CorpseRunLevel(elapsed)
 		corpse.walked, corpse.fakeX, corpse.fakeAt = nil, nil, nil
 	end
 	corpse.level = nil
-	if not (ghost and db.enabled and db.deathScreen and not ns.IsCameraOffHere("death")) then
+	-- (The death camera on here, by its own code or as its script.)
+	local deathCamOn = not ns.IsCameraOffHere("death")
+		or (ns.CameraRowsScripted ~= nil and ns.CameraRowsScripted("death") and not ns.CameraOffBesidesRows("death"))
+	if not (ghost and db.enabled and db.deathScreen and deathCamOn) then
 		return nil
 	end
 	local wave = WaveLevel(GetTime())

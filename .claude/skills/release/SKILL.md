@@ -39,9 +39,17 @@ between them: nothing is committed, pushed or tagged until the user says go.
      syntax). luacheck misses these.
    - Lines starting with `(`: check the line before isn't an expression
      statement (WoW's Lua 5.1 "ambiguous syntax").
-   - Offline checks, one run per client, stdin from /dev/null:
-     `python -I Tools/offline/run.py Tools/offline/check.lua forever Cinematic.toc < /dev/null`
-     and the same for `retail`, and for `CinematicDev.toc`.
+   - Offline checks: the **full run**, exactly what GitHub's Checks runs,
+     stdin from /dev/null (a few minutes; run it in the background):
+     `python -I Tools/offline/run.py Tools/offline/check.lua < /dev/null`
+     It must end `profile modules: 0 problems`. Never the per-client runs
+     (`check.lua forever Cinematic.toc`) instead: they skip the comparison
+     against `Tools/offline/profile-settings-<client>.txt`, which is how four
+     releases in a row (v2.0.23-v2.0.26) went out red on GitHub.
+   - "built-in profiles' settings changed": a default a profile gets changed.
+     Show the was/now lines in the review and say which change in the diff
+     caused each. If they're meant, phase 2 saves them (step 9a); if one
+     isn't, it's a finding.
    Fix nothing yet; failures go in the review.
 
 4. **Review the diff.** Read the whole `git diff` plus the new files, topic by
@@ -95,6 +103,14 @@ between them: nothing is committed, pushed or tagged until the user says go.
 
 9. Apply any fixes they agreed to and re-run step 3 on those files.
 
+9a. **Profile snapshots**: once all code edits are done, run
+    `python -I Tools/offline/run.py Tools/offline/check.lua --update < /dev/null`,
+    then the full run again: it must end `0 problems`. The two
+    `Tools/offline/profile-settings-*.txt` files go in the commit of the
+    topic that changed the defaults (several topics: the last of them).
+    If another session edits code after this, run 9a again before
+    committing. Never push a release while the full run fails.
+
 10. **What's new**: run the whats-new skill over the whole release; any New
     features entry only with the user's yes (it goes in the matching commit).
 
@@ -143,7 +159,8 @@ between them: nothing is committed, pushed or tagged until the user says go.
 
 For a fix that has to go out now. Typing `/release quick` is the go-ahead:
 no review, no stop, no questions unless something below blocks it. Skipped
-on purpose: diff review, offline checks, translations, guidebook, What's new.
+on purpose: diff review, translations, guidebook, What's new. The full
+offline check still runs (step 2a): GitHub runs it on every push.
 
 1. `main`, not behind `origin/main` (fetch first), identity `sapo` +
    noreply: same as step 1. Next version = last tag's patch + 1 unless the
@@ -152,6 +169,11 @@ on purpose: diff review, offline checks, translations, guidebook, What's new.
    `luacompile.py` on every changed or new `.lua`. A failure here stops the
    release: show it, ask whether to fix it now. Never ship a file that won't
    load.
+2a. **Full offline check** (step 3's command, in the background). Only
+   "built-in profiles' settings changed": run it with `--update`, include
+   the two snapshot files in the commit, name the changed settings in the
+   report. Any other problem: show it and ask whether to fix it or ship
+   anyway (GitHub's Checks will go red).
 3. Untracked files: include `.lua`/`.tga`/locale/docs files that belong to
    the addon (a new `.lua` must be in a `.toc`); leave out anything that
    looks like scratch (`*.md` notes in the root, logs) and name it in the

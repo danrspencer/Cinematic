@@ -214,6 +214,16 @@ local WINDOWS = { "GossipFrame", "QuestFrame" }
 local parked = {}   -- frame -> its own points before parking ({ point, relative, relativePoint, x, y }...)
 local parking = false
 
+-- An addon standing in for the game's windows that tucks them away under a
+-- hidden frame of its own (Immersion: the game still shows its gossip window
+-- there, CustomGossipFrameManager on retail-based clients): not up for us,
+-- so ours stay down and its window has the conversation. (UIParent itself
+-- hidden, Alt+Z, doesn't count.)
+local function TuckedAway(frame)
+	local parent = frame:GetParent()
+	return parent ~= nil and parent ~= UIParent and not ns.Flag(parent:IsShown())
+end
+
 local function SavePoints(frame)
 	local points = {}
 	for i = 1, Plain(frame:GetNumPoints()) or 0 do
@@ -1544,7 +1554,7 @@ do
 			edgeSize = 1 })
 		local label = box:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
 		label:SetPoint("CENTER")
-		label:SetText(L["Quest Talk's replies\nDrag to move, right-click to reset"])
+		label:SetText(ns.EditModeName(L["Quest Talk's replies\nDrag to move, right-click to reset"]))
 		box:SetScript("OnDragStart", box.StartMoving)
 		box:SetScript("OnDragStop", function(self)
 			self:StopMovingOrSizing()
@@ -2287,7 +2297,7 @@ local CLOSES = { GOSSIP_CLOSED = true, QUEST_FINISHED = true }
 local function TalkWindowOpen()
 	for _, name in ipairs(WINDOWS) do
 		local frame = _G[name]
-		if frame and ns.Flag(frame:IsShown()) then
+		if frame and ns.Flag(frame:IsShown()) and not TuckedAway(frame) then
 			return true
 		end
 	end
@@ -2317,7 +2327,8 @@ function TalkState()
 	for _, name in ipairs(WINDOWS) do
 		local frame = _G[name]
 		if frame and ns.Flag(frame:IsShown()) then
-			open[#open + 1] = name .. (parked[frame] and " parked" or " in view")
+			open[#open + 1] = name .. (TuckedAway(frame) and " tucked away by an addon"
+				or parked[frame] and " parked" or " in view")
 		end
 	end
 	local function Frame(frame, extra)
@@ -2629,7 +2640,7 @@ local function HookWindows()
 			hooksecurefunc(frame, "SetPoint", Moved)
 			-- (Parked as it shows, so it doesn't flash up for a frame first.)
 			frame:HookScript("OnShow", function(self)
-				if ns.db and Setting("questTalk") and not gameWindow then Park(self) end
+				if ns.db and Setting("questTalk") and not gameWindow and not TuckedAway(self) then Park(self) end
 				ns.LogDetail("questtalk", ("%s shown%s"):format(name, parked[self] and ", parked" or ""))
 			end)
 			frame:HookScript("OnHide", function()

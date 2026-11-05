@@ -1,6 +1,6 @@
 -- Cinematic minimap sweep: what's on the minimap, for its Reveal boxes
 -- (Minimap page: nearby ore, herbs and treasure, quests, other icons).
-local _, ns = ...
+local ADDON_NAME, ns = ...
 
 -- The game doesn't tell addons where the tracking dots are, but it answers a
 -- pretend mouse on the minimap (Minimap:UpdateMouseoverAtPoint, in screen
@@ -12,7 +12,8 @@ local _, ns = ...
 -- put back in the same call, before the screen is drawn again, but the game
 -- adds no new dots to it while it's shrunk: grow is for /cine debug nodes.)
 
-local STEP = 12          -- minimap units between two points of the grid (a dot answers 6-30 units around it)
+local STEP = 12          -- minimap units between two points of the grid (each sweep sets it: SweepStep)
+local RIM_BAND = 24      -- minimap units in from the rim: a quest name heard only there is its rim arrow
 local SWEEP_EVERY = 1.5  -- seconds between two sweeps
 local HOLD = 3           -- seconds the answer stays yes after the last sweep that found one
 
@@ -56,7 +57,7 @@ local function LoadHerbNames()
 		local name = C_Item and C_Item.GetItemNameByID and C_Item.GetItemNameByID(id)
 			or GetItemInfo and GetItemInfo(id)
 		if type(name) == "string" and not Secret(name) then
-			herbNames[name] = true
+			herbNames[name] = id -- (its item: the mark's icon, NodeIcon)
 		else
 			herbsMissing = true
 			if C_Item and C_Item.RequestLoadItemDataByID then pcall(C_Item.RequestLoadItemDataByID, id) end
@@ -131,6 +132,59 @@ local function HasWord(name, list)
 	return false
 end
 
+-- The icon on a node's mark (Mark where it is): a herb's own item; a vein's
+-- ore, the ore item whose name shares the most of its words' starts with the
+-- vein's (Copper Vein: Copper Ore; Dark Iron Deposit: Dark Iron Ore, not Iron
+-- Ore; Kupferader: Kupfererz), in any language; a chest's a chest. The trade's
+-- icon when nothing fits.
+local ORE_ITEMS = {
+	2770, 2771, 2772, 2775, 2776, 3858, 7911, 10620, 11370, -- copper, tin, iron, silver, gold, mithril, truesilver, thorium, dark iron
+	3340, 4278, 5833, -- incendicite, lesser bloodstone, indurium
+}
+local ICONS = {
+	herb = "Interface\\Icons\\Trade_Herbalism", ore = "Interface\\Icons\\Trade_Mining",
+	treasure = "Interface\\Icons\\INV_Box_01",
+}
+local function ItemIcon(id)
+	local get = C_Item and C_Item.GetItemIconByID or GetItemIcon
+	local ok, icon = pcall(get or error, id)
+	return ok and (type(icon) == "number" or type(icon) == "string") and not Secret(icon) and icon or nil
+end
+local function SharedStart(a, b)
+	local i = 0
+	while i < #a and i < #b and a:byte(i + 1) == b:byte(i + 1) do i = i + 1 end
+	return i
+end
+local function OreIcon(vein)
+	local best, bestScore = nil, 0
+	for _, id in ipairs(ORE_ITEMS) do
+		local ore = C_Item and C_Item.GetItemNameByID and C_Item.GetItemNameByID(id) or GetItemInfo and GetItemInfo(id)
+		if type(ore) == "string" and not Secret(ore) then
+			local score = 0
+			for veinWord in vein:lower():gmatch("%S+") do
+				local most, whole = 0, false
+				for oreWord in ore:lower():gmatch("%S+") do
+					local shared = SharedStart(veinWord, oreWord)
+					most = math.max(most, shared)
+					whole = whole or (shared == #veinWord and shared == #oreWord)
+				end
+				-- (Not "de", "of"...; a whole short word does: Tin Vein, Tin Ore.)
+				if most >= 4 or (whole and most >= 3) then score = score + most end
+			end
+			if score > bestScore then best, bestScore = id, score end
+		elseif C_Item and C_Item.RequestLoadItemDataByID then
+			pcall(C_Item.RequestLoadItemDataByID, id)
+		end
+	end
+	return best and ItemIcon(best)
+end
+local function NodeIcon(name, kind)
+	local icon
+	if kind == "herb" and type(herbNames[name]) == "number" then icon = ItemIcon(herbNames[name]) end
+	if kind == "ore" then icon = OreIcon(name) end
+	return icon or ICONS[kind] or ICONS.treasure
+end
+
 function ns.NodeKind(name)
 	if listsChanged then ReadLists() end
 	if herbsMissing then LoadHerbNames() end
@@ -175,65 +229,6 @@ local function Grow()
 	end
 end
 
--- Tries a grid of points over the minimap as it is now. Each name heard goes
--- to found[name] = { points, gray, list } (gray: a dot in a cave; list: the
--- points' offsets from the minimap's centre, x, y pairs); stop(name), when
--- given, ends the sweep at the first name it says yes to. radius, when given:
--- only that far from the middle (minimap units).
-local function Probe(step, found, stop, radius)
-	local left, bottom = Minimap:GetLeft(), Minimap:GetBottom()
-	local scale, width = Minimap:GetEffectiveScale(), Minimap:GetWidth()
-	if not (left and bottom and scale and width) or width <= 0 then return nil, "the minimap has no place" end
-	local probes = 0
-	local ok, err = pcall(function()
-		Minimap:SetUsingSoftCursor(true)
-		local half = width / 2
-		local reach = math.min(radius or half, half)
-		for dx = -reach, reach, step do
-			for dy = -reach, reach, step do
-				if dx * dx + dy * dy <= reach * reach then
-					probes = probes + 1
-					Minimap:UpdateMouseoverAtPoint((left + half + dx) * scale, (bottom + half + dy) * scale)
-					local data = C_TooltipInfo.GetMinimapMouseover()
-					local lines = not Secret(data) and type(data) == "table" and data.lines
-					for _, line in ipairs(type(lines) == "table" and not Secret(lines) and lines or {}) do
-						local text, color = line.leftText, line.leftColor
-						if type(text) == "string" and not Secret(text) then
-							local gray = type(color) == "table" and not Secret(color) and type(color.r) == "number"
-								and math.abs(color.r - color.g) < 0.05 and math.abs(color.g - color.b) < 0.05
-								and color.r < 0.8
-							-- (Colour codes and icons out, one name a line.)
-							local plain = text:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
-								:gsub("|T.-|t", ""):gsub("|A.-|a", "")
-							for name in plain:gmatch("[^\n]+") do
-								name = name:match("^%s*(.-)%s*$")
-								if name ~= "" then
-									local entry = found[name] or { points = 0 }
-									entry.points = entry.points + 1
-									-- (Each point, offset from the minimap's centre: where its dots are.)
-									entry.list = entry.list or {}
-									entry.list[#entry.list + 1], entry.list[#entry.list + 2] = dx, dy
-									entry.gray = entry.gray or gray or text:find("|cff7f7f7f") ~= nil
-									-- (The line as the game wrote it, and its colour: for /cine debug nodes raw.)
-									entry.raw = entry.raw or text
-									entry.color = entry.color or (type(color) == "table" and not Secret(color)
-										and type(color.r) == "number" and ("%02x%02x%02x"):format(color.r * 255,
-										color.g * 255, color.b * 255)) or nil
-									found[name] = entry
-									if stop and stop(name, entry) then return end
-								end
-							end
-						end
-					end
-				end
-			end
-		end
-	end)
-	pcall(Minimap.SetUsingSoftCursor, Minimap, false)
-	if not ok then return nil, "the game refused: " .. tostring(err) end
-	return found, probes
-end
-
 -- Whether this client lets the minimap be swept at all (retail doesn't,
 -- tested: its Reveal boxes that need a sweep are hidden, Options.lua).
 function ns.CanSweepMinimap()
@@ -241,33 +236,177 @@ function ns.CanSweepMinimap()
 		and C_TooltipInfo ~= nil and C_TooltipInfo.GetMinimapMouseover ~= nil
 end
 
+-- The pretend mouse's turn on the minimap (OnMinimap): the faded minimap
+-- grown or back on the screen for it (Grow) and the soft cursor on, then
+-- both put back. The Reveal sweep runs as a job over several frames
+-- (sweepJob, a coroutine: PER_FRAME points a frame, not ~400 at once, a
+-- stutter every sweep): between frames the minimap is put back and the
+-- cursor off, and the turn ends if a fight starts or your mouse comes onto
+-- the minimap meanwhile.
+local PER_FRAME = 60
+local session -- the turn going on: { grow, putBack, chunk (in the job) }
+local framePoints = 0 -- points the job has tried this frame (all its turns)
+local sweepJob -- the Reveal sweep's coroutine while it runs
+
+-- Why the pretend mouse can't have the minimap now, or nil.
+local function NotReady()
+	if not ns.CanSweepMinimap() then return "this client can't move a pretend mouse over the minimap" end
+	-- (Not in combat; nor with your own mouse there, whose tooltip it would change.)
+	if InCombatLockdown() then return "in combat" end
+	if ns.Flag(Minimap:IsMouseOver()) then return "your mouse is over the minimap" end
+	local entry = MinimapEntry()
+	if entry and entry.parkedFullSize and ns.IsEntryHovered(entry) then return "your mouse is over the minimap" end
+end
+
+local function Enter(turn)
+	local entry = MinimapEntry()
+	turn.parked = entry and entry.parkedFullSize
+	if turn.grow or turn.parked then
+		local ok, result = pcall(Grow)
+		if not ok then return "couldn't grow the minimap: " .. tostring(result) end
+		turn.putBack = result
+		turn.grown = turn.grown or (result ~= nil and not turn.parked)
+	end
+	pcall(Minimap.SetUsingSoftCursor, Minimap, true)
+end
+
+local function Leave(turn)
+	pcall(Minimap.SetUsingSoftCursor, Minimap, false)
+	if turn.putBack then
+		local ok, err = pcall(turn.putBack)
+		if not ok then ns.Log("nodes", "couldn't put the minimap back: " .. tostring(err)) end
+		turn.putBack = nil
+	end
+end
+
+-- After each point: in the job, once PER_FRAME are done, the rest waits for
+-- the next frame. (An error ends the job: it's not a pcall's, which can't
+-- wait across frames in Lua 5.1.)
+local function Pause()
+	local turn = session
+	if not (turn and turn.chunk and sweepJob and coroutine.running() == sweepJob) then return end
+	framePoints = framePoints + 1
+	if framePoints < PER_FRAME then return end
+	framePoints = 0
+	Leave(turn)
+	coroutine.yield()
+	local why = NotReady() or Enter(turn)
+	if why then error({ stopped = why }) end
+end
+
+-- The names the pretend mouse hears at px, py (minimap units from the middle),
+-- as the tooltip lines; nil and why if the game refused.
+local function Listen(px, py)
+	local left, bottom = Minimap:GetLeft(), Minimap:GetBottom()
+	local scale, width = Minimap:GetEffectiveScale(), Minimap:GetWidth()
+	if not (left and bottom and scale and width) or width <= 0 then return nil, "the minimap has no place" end
+	local half = width / 2
+	local ok, data = pcall(function()
+		Minimap:UpdateMouseoverAtPoint((left + half + px) * scale, (bottom + half + py) * scale)
+		return C_TooltipInfo.GetMinimapMouseover()
+	end)
+	Pause()
+	if not ok then return nil, "the game refused: " .. tostring(data) end
+	local lines = not Secret(data) and type(data) == "table" and data.lines
+	return type(lines) == "table" and not Secret(lines) and lines or {}
+end
+
+-- Whether the game wrote a tooltip line gray: a dot on the other side of
+-- indoors and outdoors from you (in a cave while you're out, or the other way
+-- round), drawn grayed on the minimap too.
+local function GrayLine(text, color)
+	if type(color) == "table" and not Secret(color) and type(color.r) == "number"
+		and math.abs(color.r - color.g) < 0.05 and math.abs(color.g - color.b) < 0.05 and color.r < 0.8 then
+		return true
+	end
+	return type(text) == "string" and text:find("|cff7f7f7f") ~= nil
+end
+
+-- Tries a grid of points over the minimap as it is now. Each name heard goes
+-- to found[name] = { points, gray, list } (gray: a dot in a cave; list: the
+-- points' offsets from the minimap's centre, x, y pairs); stop(name), when
+-- given, ends the sweep at the first name it says yes to. radius, when given:
+-- only that far from the middle (minimap units).
+-- (cx, cy, when given: the grid's middle instead of the minimap's, its
+-- points still only on the minimap.)
+local function Probe(step, found, stop, radius, cx, cy)
+	local width = Minimap:GetWidth()
+	if not width or width <= 0 then return nil, "the minimap has no place" end
+	local probes = 0
+	local half = width / 2
+	local reach = math.min(radius or half, half)
+	cx, cy = cx or 0, cy or 0
+	for gx = -reach, reach, step do
+		for gy = -reach, reach, step do
+			local dx, dy = cx + gx, cy + gy
+			if gx * gx + gy * gy <= reach * reach and dx * dx + dy * dy <= half * half then
+				probes = probes + 1
+				local lines, why = Listen(dx, dy)
+				if not lines then return nil, why end
+				for _, line in ipairs(lines) do
+					local text, color = line.leftText, line.leftColor
+					if type(text) == "string" and not Secret(text) then
+						local gray = GrayLine(text, color)
+						-- (Colour codes and icons out, one name a line.)
+						local plain = text:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
+							:gsub("|T.-|t", ""):gsub("|A.-|a", "")
+						for name in plain:gmatch("[^\n]+") do
+							name = name:match("^%s*(.-)%s*$")
+							if name ~= "" then
+								local entry = found[name] or { points = 0 }
+								entry.points = entry.points + 1
+								-- (Each point, offset from the minimap's centre: where its dots are.)
+								entry.list = entry.list or {}
+								entry.list[#entry.list + 1], entry.list[#entry.list + 2] = dx, dy
+								entry.gray = entry.gray or gray
+								-- (The line as the game wrote it, and its colour: for /cine debug nodes raw.)
+								entry.raw = entry.raw or text
+								entry.color = entry.color or (type(color) == "table" and not Secret(color)
+									and type(color.r) == "number" and ("%02x%02x%02x"):format(color.r * 255,
+									color.g * 255, color.b * 255)) or nil
+								found[name] = entry
+								if stop and stop(name, entry) then return found, probes end
+							end
+						end
+					end
+				end
+			end
+		end
+	end
+	return found, probes
+end
+
+-- The minimap made ready for the pretend mouse, fn() run on it, and the
+-- minimap put back. Returns fn's two results and whether it was grown, or
+-- nil and why not. (grow: a shrunk faded minimap is grown for it; refresh:
+-- the game places its dots first, Minimap:UpdateBlips.)
+local function OnMinimap(grow, refresh, fn)
+	local why = NotReady()
+	if why then return nil, why end
+	local turn = { grow = grow, chunk = sweepJob ~= nil and coroutine.running() == sweepJob }
+	why = Enter(turn)
+	if why then return nil, why end
+	local before = session
+	session = turn
+	if refresh and Minimap.UpdateBlips then pcall(Minimap.UpdateBlips, Minimap) end
+	local ok, first, second
+	if turn.chunk then
+		ok, first, second = true, fn() -- (an error here ends the job, which puts the minimap back)
+	else
+		ok, first, second = pcall(fn)
+	end
+	Leave(turn)
+	session = before
+	if not ok then return nil, "the game refused: " .. tostring(first) end
+	return first, second, turn.grown == true
+end
+
 -- One sweep: found (name -> { points, gray }), points tried, and whether the
 -- faded minimap was grown for it (grow); or nil and why not. (refresh: has
 -- the game place its dots first, Minimap:UpdateBlips, for /cine debug nodes
 -- update; radius: only that far from the middle, as Probe.)
-function ns.SweepMinimap(step, grow, stop, refresh, radius)
-	if not ns.CanSweepMinimap() then
-		return nil, "this client can't move a pretend mouse over the minimap"
-	end
-	-- (Not in combat; nor with your own mouse there, whose tooltip it would change.)
-	if InCombatLockdown() then return nil, "in combat" end
-	if ns.Flag(Minimap:IsMouseOver()) then return nil, "your mouse is over the minimap" end
-	local entry = MinimapEntry()
-	local parked = entry and entry.parkedFullSize
-	if parked and ns.IsEntryHovered(entry) then return nil, "your mouse is over the minimap" end
-	local putBack
-	if grow or parked then
-		local ok, result = pcall(Grow)
-		if not ok then return nil, "couldn't grow the minimap: " .. tostring(result) end
-		putBack = result
-	end
-	if refresh and Minimap.UpdateBlips then pcall(Minimap.UpdateBlips, Minimap) end
-	local found, probes = Probe(step or STEP, {}, stop, radius)
-	if putBack then
-		local ok, err = pcall(putBack)
-		if not ok then ns.Log("nodes", "couldn't put the minimap back: " .. tostring(err)) end
-	end
-	return found, probes, putBack ~= nil and not parked
+function ns.SweepMinimap(step, grow, stop, refresh, radius, cx, cy)
+	return OnMinimap(grow, refresh, function() return Probe(step or STEP, {}, stop, radius, cx, cy) end)
 end
 
 -- Reveal (Minimap page): which kinds of name bring the minimap up. (Group
@@ -287,7 +426,7 @@ local function OnlyAtRim(entry)
 	local half = (Minimap:GetWidth() or 0) / 2
 	local list = entry and entry.list
 	if not list or half <= 0 then return false end
-	local inner = (half - 2 * STEP) ^ 2
+	local inner = (half - RIM_BAND) ^ 2
 	for i = 1, #list, 2 do
 		if list[i] ^ 2 + list[i + 1] ^ 2 < inner then return false end
 	end
@@ -416,9 +555,9 @@ function ns.MinimapAreaShown()
 	return areaShown
 end
 
--- Nearby ore, herbs and treasure's Ping where it is (minimapNodePing): a
--- minimap ping where a node shows up, the same ping as clicking the minimap
--- (so your group sees it too). A node is the middle of the points that heard
+-- Nearby ore, herbs and treasure's Mark where it is (minimapNodeMark): our
+-- ring where a node shows up (MarkNode below), or a minimap ping, the same as
+-- clicking the minimap (so your group sees it too). A node is the middle of the points that heard
 -- its name next to each other: two dots of the same name are two nodes,
 -- unless they touch. One counts as new unless a node of its name was close by
 -- in the sweep before, in world yards where the client says where you are (so
@@ -460,12 +599,13 @@ local function Groups(points, step)
 	local reach = (step * 1.5) ^ 2
 	for i = 1, count do
 		if not group[i] then
-			local sx, sy, size, queue = 0, 0, 0, { i }
+			local sx, sy, size, queue, members = 0, 0, 0, { i }, {}
 			group[i] = true
 			while #queue > 0 do
 				local j = table.remove(queue)
 				local jx, jy = points[j * 2 - 1], points[j * 2]
 				sx, sy, size = sx + jx, sy + jy, size + 1
+				members[#members + 1] = j
 				for k = 1, count do
 					if not group[k] and (points[k * 2 - 1] - jx) ^ 2 + (points[k * 2] - jy) ^ 2 <= reach then
 						group[k] = true
@@ -473,10 +613,239 @@ local function Groups(points, step)
 					end
 				end
 			end
-			list[#list + 1] = { sx / size, sy / size }
+			-- (Its third: how far its furthest point is from the middle.)
+			local mx, my, far = sx / size, sy / size, 0
+			for _, j in ipairs(members) do
+				far = math.max(far, ((points[j * 2 - 1] - mx) ^ 2 + (points[j * 2] - my) ^ 2) ^ 0.5)
+			end
+			-- (Its fourth: the points' numbers.)
+			list[#list + 1] = { mx, my, far, members }
 		end
 	end
 	return list
+end
+
+-- Where the dots of one name really are, near x, y (minimap units from the
+-- middle). The pretend mouse hears a dot over a disc some 15 units around it
+-- (twice the real mouse's), so the middle of what heard it is only right
+-- for a dot on its own, whole; two veins side by side are one patch whose
+-- middle is the gap between them (marks sat there, tested). So, on a grid
+-- LOOK apart:
+-- - a patch one dot's size: its four edges are found (halving the step each
+--   time), and the dot is halfway between each pair, to about a unit;
+-- - a bigger patch: discs of the dot's size are fitted to its outline, each
+--   where the most of the outline lies one radius off, as few as explain
+--   it; two dots leave two arcs, however close.
+-- The disc's radius is learned from the dots found whole (hearRadius).
+-- Returns { { x, y }, ... }, or nil and why.
+local LOOK = 3 -- minimap units between points
+local hearRadius = 15 -- minimap units a dot is heard around it (11 to 24)
+local EDGE_STEPS = 5 -- halvings when finding an edge (to under a unit)
+local ARC = 2 -- minimap units an outline point may be off a fitted disc
+local MIN_ARC = 6 -- outline points a fitted disc has to explain
+local ENOUGH = 0.85 -- of the best fit's explained outline: the fewest discs that reach it win
+local MOST_DOTS = 6
+local lastLocate -- (for /cine debug tracking)
+
+local function Locate(name, x, y, reach)
+	return OnMinimap(true, true, function()
+		local width = Minimap:GetWidth()
+		if not width or width <= 0 then return nil, "the minimap has no place" end
+		local rim = (width / 2 - 1) ^ 2
+		local probes = 0
+		-- (Whether the pretend mouse hears the name at px, py; nil off the minimap.
+		-- Second: whether the game wrote it gray, GrayLine.)
+		local function Hears(px, py)
+			if px * px + py * py > rim then return nil end
+			probes = probes + 1
+			local lines = Listen(px, py)
+			if not lines then error("the game refused the pretend mouse") end
+			for _, line in ipairs(lines) do
+				local text = line.leftText
+				if type(text) == "string" and not Secret(text) then
+					local plain = text:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""):gsub("|T.-|t", ""):gsub("|A.-|a", "")
+					for each in plain:gmatch("[^\n]+") do
+						if each:match("^%s*(.-)%s*$") == name then return true, GrayLine(text, line.leftColor) end
+					end
+				end
+			end
+			return false
+		end
+		local spots = (function()
+			-- The grid: cells i, j (LOOK apart round x, y) heard (true), not (false),
+			-- or off the minimap (nil).
+			local cells, grays, n = {}, {}, math.ceil(reach / LOOK)
+			local function Key(i, j) return (i + 500) * 1000 + j + 500 end
+			for i = -n, n do
+				for j = -n, n do
+					if i * i + j * j <= n * n then
+						local key = Key(i, j)
+						cells[key], grays[key] = Hears(x + i * LOOK, y + j * LOOK)
+					end
+				end
+			end
+			-- Patches: heard cells touching (sides or corners).
+			local seen, patches = {}, {}
+			for key, heard in pairs(cells) do
+				if heard and not seen[key] then
+					seen[key] = true
+					local stack, patch = { key }, {}
+					while #stack > 0 do
+						local k = table.remove(stack)
+						patch[#patch + 1] = k
+						for _, d in ipairs({ -1001, -1000, -999, -1, 1, 999, 1000, 1001 }) do
+							if cells[k + d] and not seen[k + d] then
+								seen[k + d] = true
+								stack[#stack + 1] = k + d
+							end
+						end
+					end
+					patches[#patches + 1] = patch
+				end
+			end
+			local function Place(k) return x + (math.floor(k / 1000) - 500) * LOOK, y + (k % 1000 - 500) * LOOK end
+			local found = {}
+			for _, patch in ipairs(patches) do
+				local first = #found + 1
+				local area = #patch * LOOK * LOOK
+				local sx, sy = 0, 0
+				for _, k in ipairs(patch) do
+					local px, py = Place(k)
+					sx, sy = sx + px, sy + py
+				end
+				local mx, my = sx / #patch, sy / #patch
+				local several = area > 1.35 * math.pi * hearRadius ^ 2
+				local single
+				if not several then
+					-- One dot: its edges either way from the middle, halfway between.
+					local function Edge(dx, dy)
+						local inside, outside = 0, hearRadius * 1.7
+						local at = Hears(mx + dx * outside, my + dy * outside)
+						if at ~= false then return nil end -- (still heard, or off the minimap: no edge to trust)
+						if not Hears(mx, my) then return nil end
+						for _ = 1, EDGE_STEPS do
+							local mid = (inside + outside) / 2
+							if Hears(mx + dx * mid, my + dy * mid) then inside = mid else outside = mid end
+						end
+						return (inside + outside) / 2
+					end
+					local west, east = Edge(-1, 0), Edge(1, 0)
+					if west and east then mx = mx + (east - west) / 2 end
+					local south, north = Edge(0, -1), Edge(0, 1)
+					if south and north then my = my + (north - south) / 2 end
+					local whole = (west and east and south and north) ~= nil
+					single = { mx, my, whole = whole, area = area }
+					-- (Wider one way than the other, or than a dot: two close together,
+					-- heard as one patch, tested; else what it's heard over teaches the
+					-- radius, slowly.)
+					if whole then
+						local across, up = (west + east) / 2, (south + north) / 2
+						if math.abs(across - up) > 2.5 or math.max(across, up) > hearRadius + 3 then
+							several = true
+						else
+							hearRadius = math.max(11, math.min(24, hearRadius + ((across + up) / 2 - hearRadius) / 4))
+						end
+					end
+				end
+				if not several then
+					found[#found + 1] = single
+				else
+					-- Several: the outline (heard cells next to one not heard),
+					-- each point half a cell out; and each heard cell's room to
+					-- the nearest one not heard (a disc's middle has a radius of it).
+					local outline, misses = {}, {}
+					for _, k in ipairs(patch) do
+						local px, py = Place(k)
+						for _, d in ipairs({ { -1000, -1, 0 }, { 1000, 1, 0 }, { -1, 0, -1 }, { 1, 0, 1 } }) do
+							if cells[k + d[1]] == false then
+								outline[#outline + 1] = { px + d[2] * LOOK / 2, py + d[3] * LOOK / 2 }
+								misses[#misses + 1] = { px + d[2] * LOOK, py + d[3] * LOOK }
+							end
+						end
+					end
+					local centers = {}
+					for _, k in ipairs(patch) do
+						local px, py = Place(k)
+						local room = math.huge
+						for _, m in ipairs(misses) do room = math.min(room, (px - m[1]) ^ 2 + (py - m[2]) ^ 2) end
+						centers[#centers + 1] = { px, py, room ^ 0.5 }
+					end
+					local most = math.min(MOST_DOTS, math.max(2, math.floor(area / (math.pi * hearRadius ^ 2) + 1)))
+					local function Fit(r)
+						local open, discs, explained = outline, {}, 0
+						local function Votes(cx, cy)
+							local votes = 0
+							for _, o in ipairs(open) do
+								if math.abs(((cx - o[1]) ^ 2 + (cy - o[2]) ^ 2) ^ 0.5 - r) <= ARC then votes = votes + 1 end
+							end
+							return votes
+						end
+						for _ = 1, most do
+							local best, bx, by = 0, 0, 0
+							for _, c in ipairs(centers) do
+								if c[3] >= r - ARC - LOOK then
+									local votes = Votes(c[1], c[2])
+									if votes > best then best, bx, by = votes, c[1], c[2] end
+								end
+							end
+							if best < MIN_ARC then break end
+							-- (A unit either way, in case it fits better between cells.)
+							local cx, cy = bx, by
+							for ox = -1, 1 do
+								for oy = -1, 1 do
+									local votes = Votes(bx + ox, by + oy)
+									if votes > best then best, cx, cy = votes, bx + ox, by + oy end
+								end
+							end
+							discs[#discs + 1] = { cx, cy }
+							explained = explained + best
+							local rest = {}
+							for _, o in ipairs(open) do
+								if math.abs(((cx - o[1]) ^ 2 + (cy - o[2]) ^ 2) ^ 0.5 - r) > ARC then rest[#rest + 1] = o end
+							end
+							open = rest
+						end
+						return discs, explained
+					end
+					local fits, top = {}, 0
+					for _, r in ipairs({ hearRadius, hearRadius - 1.5, hearRadius + 1.5, hearRadius - 3, hearRadius + 3 }) do
+						local discs, explained = Fit(r)
+						fits[#fits + 1] = { discs = discs, explained = explained }
+						top = math.max(top, explained)
+					end
+					local pick
+					for _, fit in ipairs(fits) do
+						if #fit.discs > 0 and fit.explained >= ENOUGH * top and (not pick or #fit.discs < #pick.discs
+							or (#fit.discs == #pick.discs and fit.explained > pick.explained)) then
+							pick = fit
+						end
+					end
+					if pick and not (single and #pick.discs < 2) then
+						for _, disc in ipairs(pick.discs) do found[#found + 1] = { disc[1], disc[2], fitted = true, area = area } end
+					else
+						-- (Nothing fitted, or one disc where the edges had one: those.)
+						found[#found + 1] = single or { mx, my, area = area }
+					end
+				end
+				-- (Gray where most of its patch was heard gray: indoors from you or
+				-- outdoors, as the game's own dot.)
+				local grayCells = 0
+				for _, k in ipairs(patch) do
+					if grays[k] then grayCells = grayCells + 1 end
+				end
+				for i = first, #found do found[i].gray = grayCells * 2 > #patch end
+			end
+			return found
+		end)()
+		local parts = {}
+		for _, spot in ipairs(spots) do
+			parts[#parts + 1] = ("%.1f, %.1f (%s, %.0f units sq)"):format(spot[1], spot[2],
+				spot.fitted and "fitted" or spot.whole and "edges" or "middle", spot.area)
+		end
+		lastLocate = ("%s: from %.1f, %.1f (reach %.0f, %d probes): %s; heard %.1f around a dot"):format(name, x, y,
+			reach, probes, #parts > 0 and table.concat(parts, " / ") or "nothing", hearRadius)
+		return spots
+	end)
 end
 
 local function Near(node, before)
@@ -487,41 +856,316 @@ local function Near(node, before)
 	return (node.x - before.x) ^ 2 + (node.y - before.y) ^ 2 <= MATCH_UNITS ^ 2
 end
 
-local function SeenBefore(node, now)
+-- The node pinged or marked lately that this one is (pinged's: the nearest
+-- not claimed yet this sweep, so two veins side by side don't both take one
+-- mark), or true for one only in the sweep before, or nil for a new one.
+local function SeenBefore(node, now, claimed)
+	local best, bestD
 	for i = #pinged, 1, -1 do
-		if now - pinged[i].at > PING_MEMORY then
+		local record = pinged[i]
+		if now - (record.seenAt or record.at) > PING_MEMORY then
 			table.remove(pinged, i)
-		elseif Near(node, pinged[i]) then
-			return true
+		elseif not (claimed and claimed[record]) and Near(node, record) then
+			local d = (node.x - record.x) ^ 2 + (node.y - record.y) ^ 2
+			if not bestD or d < bestD then best, bestD = record, d end
 		end
+	end
+	if best then
+		if claimed then claimed[best] = true end
+		return best
 	end
 	for _, before in ipairs(nodes) do
 		if Near(node, before) then return true end
 	end
-	return false
+	return nil
 end
 
+-- Where a node is on the minimap now: from its place in the world, where you
+-- are and the minimap's turn (PingNodes' sums the other way round), else where
+-- it was seen.
+local function ToMinimap(node, yards, facing, n, w)
+	if node.n and yards and n then
+		local cos, sin = math.cos(facing), math.sin(facing)
+		local dn, dw = node.n - n, node.w - w
+		return (sin * dn - cos * dw) / yards, (cos * dn + sin * dw) / yards
+	end
+	local scale = (node.yards and yards) and node.yards / yards or 1
+	return node.x * scale, node.y * scale
+end
+
+-- Mark where it is's own mark ("mark"): a ring on the minimap, tinted by
+-- kind, pulsing for MARK_TIME and then fading. It's ours (no sound, nobody
+-- else sees it), and kept on the node each frame from its place in the world
+-- as you walk and turn (where that's known: else where it was seen).
+-- Node icons (minimapNodeIcons): the kinds ticked there get their icon on
+-- the node itself, kept there for as long as the sweep still finds it.
+local MarkNode, IconNode, IconWanted
+local lastIcon -- (the last icon put on a node, for /cine debug tracking)
+local lastSweepAt = -math.huge -- (the last sweep that heard anything: PingNodes)
+do
+	local RING = "Interface\\AddOns\\" .. ADDON_NAME .. "\\Textures\\NodeRing" -- (Media/make_node_ring.py)
+	local DISC = "Interface\\AddOns\\" .. ADDON_NAME .. "\\Textures\\HelpDisc" -- (a round, soft-edged disc)
+	local TINT = { herb = { 0.45, 0.95, 0.3 }, ore = { 1, 0.55, 0.25 }, treasure = { 1, 0.82, 0.1 } }
+	local MARK_TIME, FADE, PULSE = 5, 1.2, 0.9 -- seconds: shown, its fade at the end, one pulse
+	local SIZE, GROW = 13, 16 -- the ring's size and how much a pulse grows past it (minimap units)
+	local ICON = 15 -- a node icon's disc (minimap units; the picture is most of it)
+	local GONE = 4 -- seconds of sweeps not finding a node before its icon goes (gathered, or gone)
+	local marks, icons, pool, driver = {}, {}, {}, nil
+
+	function IconWanted(kind)
+		local list = ns.db and ns.db.minimapNodeIcons
+		return type(list) == "string" and kind ~= nil and (list .. ","):find(kind .. ",", 1, true) ~= nil
+	end
+
+	local function Place(pin, yards, facing, n, w)
+		local x, y = ToMinimap(pin.node, yards, facing, n, w)
+		local frame = pin.frame
+		local edge = (Minimap:GetWidth() or 0) / 2 - 4
+		if x * x + y * y > edge * edge then
+			frame:Hide()
+			return
+		end
+		frame:ClearAllPoints()
+		frame:SetPoint("CENTER", Minimap, "CENTER", x, y)
+		frame:Show()
+	end
+
+	-- (An icon grayed, as the game's own dot, while its node is on the other side
+	-- of indoors and outdoors from you: PingNodes' close looks tell, GrayLine.)
+	local GRAY = { 0.6, 0.6, 0.6 }
+	local function Shade(pin)
+		local gray = pin.node.gray == true
+		if pin.gray == gray then return end
+		pin.gray = gray
+		local frame, tint = pin.frame, gray and GRAY or pin.tint
+		frame.icon:SetDesaturated(gray)
+		frame.icon:SetVertexColor(gray and 0.75 or 1, gray and 0.75 or 1, gray and 0.75 or 1, 1)
+		frame.edge:SetVertexColor(tint[1], tint[2], tint[3], 1)
+	end
+
+	local function Free(list, i)
+		local frame = list[i].frame
+		frame:Hide()
+		pool[#pool + 1] = frame
+		table.remove(list, i)
+	end
+
+	local function Update()
+		local now = GetTime()
+		local yards, facing = View()
+		local n, w = Here()
+		for i = #marks, 1, -1 do
+			local mark = marks[i]
+			local age = now - mark.at
+			if age >= MARK_TIME or not (ns.db and ns.db.minimapNodeMark == "mark") then
+				Free(marks, i)
+			else
+				local fade = age > MARK_TIME - FADE and (MARK_TIME - age) / FADE or 1
+				local frame = mark.frame
+				frame.ring:SetAlpha(fade)
+				for k, pulse in ipairs(frame.pulses) do
+					local p = (age / PULSE + (k - 1) / #frame.pulses) % 1
+					pulse:SetSize(SIZE + p * GROW, SIZE + p * GROW)
+					pulse:SetAlpha(fade * (1 - p) * 0.9)
+				end
+				Place(mark, yards, facing, n, w)
+			end
+		end
+		for i = #icons, 1, -1 do
+			local pin = icons[i]
+			-- (Gone once sweeps have gone on without it: with none running, the
+			-- minimap shown, it stays.)
+			if not IconWanted(pin.kind) or not (ns.db and ns.db.minimapRevealNodes)
+				or lastSweepAt - (pin.node.seenAt or pin.at) > GONE then
+				pin.node.icon = nil
+				Free(icons, i)
+			else
+				Shade(pin)
+				Place(pin, yards, facing, n, w)
+			end
+		end
+		if #marks == 0 and #icons == 0 then driver:Hide() end
+	end
+
+	-- (One frame for either: a ring with its pulses, or an icon on a dark disc
+	-- edged with the kind's tint; the parts the other uses hidden.)
+	local function NewFrame(icon)
+		local frame = table.remove(pool)
+		if not frame then
+			frame = CreateFrame("Frame", nil, Minimap)
+			frame:SetSize(SIZE + GROW, SIZE + GROW)
+			frame:SetFrameLevel(Minimap:GetFrameLevel() + 6) -- (over the dots and blips)
+			frame.ring = frame:CreateTexture(nil, "OVERLAY")
+			frame.ring:SetTexture(RING)
+			frame.ring:SetSize(SIZE, SIZE)
+			frame.ring:SetPoint("CENTER")
+			frame.pulses = {}
+			for k = 1, 2 do
+				local pulse = frame:CreateTexture(nil, "OVERLAY")
+				pulse:SetTexture(RING)
+				pulse:SetPoint("CENTER")
+				frame.pulses[k] = pulse
+			end
+			frame.disc = frame:CreateTexture(nil, "OVERLAY", nil, 1)
+			frame.disc:SetTexture(DISC)
+			frame.disc:SetVertexColor(0, 0, 0, 0.85)
+			frame.disc:SetSize(ICON, ICON)
+			frame.disc:SetPoint("CENTER")
+			-- (Square, inside the round edge: masked round with the disc it came out
+			-- in orange and black bands, tested on Forever.)
+			frame.icon = frame:CreateTexture(nil, "OVERLAY", nil, 2)
+			frame.icon:SetSize(ICON * 0.72, ICON * 0.72)
+			frame.icon:SetPoint("CENTER")
+			frame.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+			frame.edge = frame:CreateTexture(nil, "OVERLAY", nil, 3)
+			frame.edge:SetTexture(RING)
+			frame.edge:SetSize(ICON + 2, ICON + 2)
+			frame.edge:SetPoint("CENTER")
+		end
+		frame.ring:SetShown(not icon)
+		for _, pulse in ipairs(frame.pulses) do pulse:SetShown(not icon) end
+		frame.disc:SetShown(icon)
+		frame.icon:SetShown(icon)
+		frame.edge:SetShown(icon)
+		-- (An icon over a ring, where both are on one node.)
+		frame:SetFrameLevel(Minimap:GetFrameLevel() + (icon and 7 or 6))
+		frame:SetAlpha(1)
+		return frame
+	end
+
+	local function Start()
+		if not driver then
+			driver = CreateFrame("Frame")
+			ns.SetOnUpdate(driver, Update)
+		end
+		driver:Show()
+		Update()
+	end
+
+	function MarkNode(node)
+		local frame = NewFrame(false)
+		local tint = TINT[ns.NodeKind(node.name)] or TINT.treasure
+		frame.ring:SetVertexColor(tint[1], tint[2], tint[3], 1)
+		for _, pulse in ipairs(frame.pulses) do pulse:SetVertexColor(tint[1], tint[2], tint[3], 1) end
+		marks[#marks + 1] = { frame = frame, node = node, at = GetTime() }
+		node.markedUntil = GetTime() + MARK_TIME -- (PingNodes keeps it on its dot till then)
+		Start()
+	end
+
+	-- (node.icon: it has one, so PingNodes keeps the node and its place.)
+	function IconNode(node)
+		if node.icon then return end
+		local kind = ns.NodeKind(node.name)
+		local frame = NewFrame(true)
+		local tint = TINT[kind] or TINT.treasure
+		local icon = NodeIcon(node.name, kind)
+		frame.icon:SetTexture(icon)
+		lastIcon = { name = node.name, kind = kind, icon = icon, gray = node.gray }
+		node.icon = true
+		local pin = { frame = frame, node = node, kind = kind, tint = tint, at = GetTime() }
+		Shade(pin)
+		icons[#icons + 1] = pin
+		Start()
+	end
+end
+
+-- Where the dots of a patch the sweep heard really are (Locate, over the
+-- whole of it): the sweep's points are STEP apart, so its middle can be most
+-- of a step off a dot, or the gap between two. nil when it hears nothing.
+local lastAnchor -- (for /cine debug tracking)
+local function CloseLook(name, x, y, far)
+	local spots = Locate(name, x, y, math.min(48, far + hearRadius + LOOK))
+	return type(spots) == "table" and #spots > 0 and spots or nil
+end
+
+local ICON_LOOK = 6 -- seconds between close looks at a node with an icon on it
 local function PingNodes(found)
-	local db, now = ns.db, {}
+	local db, now, claimed, at = ns.db, {}, {}, GetTime()
+	lastSweepAt = at
+	local style = db.minimapNodeMark
+	local marking = style == "mark" or (style == "ping" and Minimap.PingLocation)
 	local yards, facing = View()
 	local n, w = Here()
+	local function InWorld(record)
+		record.yards = yards
+		if yards and n then
+			-- (Turned back from the minimap's turn into yards east and north.)
+			local cos, sin = math.cos(facing), math.sin(facing)
+			local sx, sy = record.x * yards, record.y * yards
+			record.n, record.w = n + sx * sin + sy * cos, w - (sx * cos - sy * sin)
+		end
+	end
+	-- (x, y: where the pretend mouse heard it; the node: where it's drawn.)
+	local function Node(name, x, y)
+		local node = { name = name, x = x, y = y }
+		InWorld(node)
+		return node
+	end
+	-- (Its dot looked at again near there: a mark still showing, put back on it
+	-- each sweep, not left to drift (the yards per minimap unit aren't exact);
+	-- an icon now and then; a node to get an icon now.)
+	local function LookNear(node, far, iconWanted)
+		for _, record in ipairs(pinged) do
+			if record.name == node.name and (node.x - record.x) ^ 2 + (node.y - record.y) ^ 2 <= (far + MATCH_UNITS) ^ 2
+				and ((record.markedUntil or 0) > at or (record.icon and at - (record.lookedAt or 0) > ICON_LOOK)
+				or (iconWanted and not record.icon)) then
+				return true
+			end
+		end
+	end
 	for name, entry in pairs(found or {}) do
-		if NODE_KINDS[ns.NodeKind(name)] and db.minimapRevealNodes and entry.list then
-			for _, spot in ipairs(Groups(entry.list, STEP)) do
-				local node = { name = name, x = spot[1], y = spot[2] }
-				if yards and n then
-					-- (Turned back from the minimap's turn into yards east and north.)
-					local cos, sin = math.cos(facing), math.sin(facing)
-					local sx, sy = node.x * yards, node.y * yards
-					node.n, node.w = n + sx * sin + sy * cos, w - (sx * cos - sy * sin)
+		local kind = ns.NodeKind(name)
+		if NODE_KINDS[kind] and db.minimapRevealNodes and entry.list then
+			local iconWanted = IconWanted(kind)
+			local tracking = marking or iconWanted
+			for _, group in ipairs(Groups(entry.list, STEP)) do
+				local coarse = Node(name, group[1], group[2])
+				-- (A close look only where something's new, or a mark or icon's to
+				-- be kept on its dot; else the sweep's middle does, to know it again.)
+				local spots, looked = { group }, false
+				-- (Heard over more than one dot's worth: likely two veins, one maybe new.)
+				if tracking and (not SeenBefore(coarse, at) or LookNear(coarse, group[3], iconWanted) or group[3] > STEP) then
+					local close = CloseLook(name, group[1], group[2], group[3])
+					if close then spots, looked = close, true end
 				end
-				if db.minimapNodePing and Minimap.PingLocation and not SeenBefore(node, GetTime()) then
-					ns.nodePingAt = GetTime() -- (not a ping of yours for Pings, Minimap page)
-					pcall(Minimap.PingLocation, Minimap, node.x, node.y)
-					node.at = GetTime()
-					pinged[#pinged + 1] = node
+				for _, spot in ipairs(spots) do
+					local node = Node(name, spot[1], spot[2])
+					node.gray = looked and spot.gray or nil
+					local before = SeenBefore(node, at, claimed)
+					if type(before) == "table" then
+						-- (One pinged, marked or with an icon: still there, and its place
+						-- from now on; one with an icon only from a close look, the
+						-- sweep's middle being up to a step off.)
+						before.seenAt = at
+						if looked or not before.icon then
+							if looked and (before.markedUntil or 0) > at then
+								local px, py = ToMinimap(before, yards, facing, n, w)
+								lastAnchor = ("%s: mark was at %.1f, %.1f, dot at %.1f, %.1f (%.1f off)"):format(name,
+									px, py, node.x, node.y, ((px - node.x) ^ 2 + (py - node.y) ^ 2) ^ 0.5)
+							end
+							before.x, before.y = node.x, node.y
+							InWorld(before)
+							if looked then before.lookedAt, before.gray = at, node.gray end
+						end
+						if iconWanted and looked then IconNode(before) end
+					-- (A new one only from a close look: the sweep's middle of two
+					-- veins close together is the gap between them, where a mark or
+					-- icon sat, tested; no close look, it waits for the next sweep.)
+					elseif tracking and not before and looked then
+						if style == "mark" then
+							MarkNode(node)
+						elseif style == "ping" and Minimap.PingLocation then
+							ns.nodePingAt = at -- (not a ping of yours for Pings, Minimap page)
+							pcall(Minimap.PingLocation, Minimap, node.x, node.y)
+						end
+						node.at, node.seenAt = at, at
+						if looked then node.lookedAt = at end
+						if iconWanted then IconNode(node) end
+						pinged[#pinged + 1] = node
+						claimed[node] = true
+					end
+					now[#now + 1] = node
 				end
-				now[#now + 1] = node
 			end
 		end
 	end
@@ -549,6 +1193,78 @@ function ns.QuestGiverNear(yards, skip)
 	return false
 end
 
+-- The sweep's grid: points as far apart as can't miss a dot (each is
+-- heard hearRadius around it: no spot further than step / sqrt 2 from a
+-- point), 2 to spare; 12 to 20 units.
+local function SweepStep()
+	return math.max(12, math.min(20, math.floor((hearRadius - 2) * math.sqrt(2))))
+end
+
+-- The Reveal sweep, run as sweepJob (OnMinimap's turns wait across frames
+-- in it): the grid, what's on it, then PingNodes' marks and close looks.
+local function Sweep()
+	local now = GetTime()
+	STEP = SweepStep()
+	-- (The ping needs every point that hears a node: no stopping at the first.)
+	local marking = ns.db.minimapRevealNodes and ((ns.db.minimapNodeMark or "off") ~= "off"
+		or (ns.db.minimapNodeIcons or "") ~= "")
+	local found, probes, grown = ns.SweepMinimap(STEP, true, not marking and Wanted or nil)
+	last.at, last.why, last.grown, last.names = now, nil, grown, nil
+	if not found then
+		last.why = probes
+		return
+	end
+	local names, wantedNames = {}, {}
+	areaShown = false
+	for name, entry in pairs(found) do
+		local wanted = Wanted(name, entry)
+		local kind = ns.NodeKind(name)
+		if kind == "objective" and not OnlyAtRim(entry) then areaShown = true end
+		names[#names + 1] = ("%s (%s%s%s)"):format(name, kind,
+			QUEST_KINDS[kind] and OnlyAtRim(entry) and ", at the rim" or "", wanted and ", reveals" or "")
+		if wanted then
+			seenAt = GetTime()
+			wantedNames[#wantedNames + 1] = name
+		end
+	end
+	if #wantedNames > 0 then
+		table.sort(wantedNames)
+		revealedBy = table.concat(wantedNames, ", ")
+	end
+	last.names, last.probes, last.step = table.concat(names, ", "), probes, STEP
+	PingNodes(found)
+end
+
+-- One frame of the job; done or failed, it's dropped (a turn left half way
+-- is put back: the minimap where it was, the cursor off).
+local function RunSweep()
+	if not sweepJob then return end
+	framePoints = 0
+	local ok, err = coroutine.resume(sweepJob)
+	if coroutine.status(sweepJob) == "dead" then
+		sweepJob = nil
+		if session then
+			Leave(session)
+			session = nil
+		end
+		if not ok then
+			if type(err) == "table" and err.stopped then
+				last.why = err.stopped
+			else
+				last.why = "error: " .. tostring(err)
+				ns.Log("nodes", "the minimap sweep failed: " .. tostring(err))
+			end
+		end
+	end
+end
+RunSweep = ns.Profiled("Minimap sweep", RunSweep)
+local sweepDriver = CreateFrame("Frame")
+sweepDriver:Hide()
+ns.SetOnUpdate(sweepDriver, function(self)
+	RunSweep()
+	if not sweepJob then self:Hide() end
+end)
+
 -- (A fight stops the sweep, SweepMinimap: a minimap revealed as it started
 -- stays up through it, rather than fading once the hold runs out and coming
 -- back as it ends. nil out of fights; true or false, latched at its start.)
@@ -568,39 +1284,16 @@ function ns.IsMinimapRevealed(now)
 	else
 		heldIntoFight = nil
 	end
-	if now - sweptAt >= SWEEP_EVERY and (Minimap:GetEffectiveAlpha() < 0.99 or now - seenAt < HOLD) then
+	-- (A sweep due: started as a job, its first points now, the rest over the
+	-- next frames; what it finds counts once it's done.)
+	if not sweepJob and now - sweptAt >= SWEEP_EVERY and (Minimap:GetEffectiveAlpha() < 0.99 or now - seenAt < HOLD) then
 		sweptAt = now
-		-- (The ping needs every point that hears a node: no stopping at the first.)
-		local marking = ns.db.minimapRevealNodes and ns.db.minimapNodePing
-		local found, probes, grown = ns.SweepMinimap(STEP, true, not marking and Wanted or nil)
-		last.at, last.why, last.grown, last.names = now, nil, grown, nil
-		if found then
-			local names, wantedNames = {}, {}
-			areaShown = false
-			for name, entry in pairs(found) do
-				local wanted = Wanted(name, entry)
-				local kind = ns.NodeKind(name)
-				if kind == "objective" and not OnlyAtRim(entry) then areaShown = true end
-				names[#names + 1] = ("%s (%s%s%s)"):format(name, kind,
-					QUEST_KINDS[kind] and OnlyAtRim(entry) and ", at the rim" or "", wanted and ", reveals" or "")
-				if wanted then
-					seenAt = now
-					wantedNames[#wantedNames + 1] = name
-				end
-			end
-			if #wantedNames > 0 then
-				table.sort(wantedNames)
-				revealedBy = table.concat(wantedNames, ", ")
-			end
-			last.names, last.probes = table.concat(names, ", "), probes
-			PingNodes(found)
-		else
-			last.why = probes
-		end
+		sweepJob = coroutine.create(Sweep)
+		RunSweep()
+		if sweepJob then sweepDriver:Show() end
 	end
 	return now - seenAt < HOLD
 end
-ns.IsMinimapRevealed = ns.Profiled("Minimap sweep", ns.IsMinimapRevealed)
 
 -- For /cine why: whether a reveal holds the minimap up now, what the sweep
 -- last found that revealed it (names, or nil), and whether it's held up
@@ -608,6 +1301,105 @@ ns.IsMinimapRevealed = ns.Profiled("Minimap sweep", ns.IsMinimapRevealed)
 function ns.MinimapRevealWhy(now)
 	if not AnyReveal() or now - seenAt >= HOLD then return false end
 	return true, revealedBy, heldIntoFight == true
+end
+
+-- /cine debug nodeoffset: how far what the pretend mouse hears sits from
+-- what's drawn (marks sat up and left of the veins, tested). For 20 seconds,
+-- the real mouse resting on a dot: each name its tooltip gives, at the
+-- middle of where it gave it. Once the mouse is off the minimap, the pretend
+-- mouse's close look around each of those, and how far off what it hears is.
+do
+	local watcher, untilAt, heard
+	local function Report()
+		local any = false
+		for name, list in pairs(heard) do
+			any = true
+			local rx, ry = 0, 0
+			for i = 1, #list, 2 do rx, ry = rx + list[i], ry + list[i + 1] end
+			rx, ry = rx / (#list / 2), ry / (#list / 2)
+			local found, why = Locate(name, rx, ry, 40)
+			local spots = type(found) == "table" and found or {}
+			local best, bestD
+			for _, spot in ipairs(spots) do
+				local d = (spot[1] - rx) ^ 2 + (spot[2] - ry) ^ 2
+				if not bestD or d < bestD then best, bestD = spot, d end
+			end
+			-- (Kept, to fit what's heard against what's drawn: nodeOffsetSamples; the
+			-- first ones, nodeOffsets, came before Locate split pairs and aren't read.)
+			if best and ns.db then
+				ns.db.nodeOffsetSamples = ns.db.nodeOffsetSamples or {}
+				table.insert(ns.db.nodeOffsetSamples, { drawn = { rx, ry }, heard = { best[1], best[2] },
+					width = Minimap:GetWidth(), scale = Minimap:GetEffectiveScale(),
+					left = Minimap:GetLeft(), bottom = Minimap:GetBottom(), height = Minimap:GetHeight() })
+			end
+			ns.Print(("nodeoffset: %s: your mouse got it around %.1f, %.1f (%d spots); pretend mouse %s"):format(name,
+				rx, ry, #list / 2, best and ("around %.1f, %.1f: off by %.1f across, %.1f up"):format(best[1], best[2],
+				best[1] - rx, best[2] - ry) or ("hears nothing there (" .. tostring(why or "no answer") .. ")")))
+		end
+		if not any then ns.Print("nodeoffset: your mouse got no tooltip on the minimap") end
+		-- (Each axis on its own, drawn = a * heard + b, by least squares over all kept.)
+		local kept = ns.db and ns.db.nodeOffsetSamples or {}
+		local fits = {}
+		for axis = 1, 2 do
+			local n, sh, sd, shh, shd = #kept, 0, 0, 0, 0
+			for _, s in ipairs(kept) do
+				local h, d = s.heard[axis], s.drawn[axis]
+				sh, sd, shh, shd = sh + h, sd + d, shh + h * h, shd + h * d
+			end
+			local den = n * shh - sh * sh
+			if n >= 2 and math.abs(den) > 1e-6 then
+				local a = (n * shd - sh * sd) / den
+				fits[axis] = ("%.2f x heard %+.1f"):format(a, (sd - a * sh) / n)
+			else
+				fits[axis] = "needs samples further apart"
+			end
+		end
+		ns.Print(("nodeoffset: %d kept; drawn across = %s, drawn up = %s; Minimap %.0f x %.0f"):format(#kept, fits[1],
+			fits[2], Minimap:GetWidth() or 0, Minimap:GetHeight() or 0))
+		heard = {}
+	end
+	function ns.NodeOffsetWatch()
+		if not watcher then
+			watcher = CreateFrame("Frame")
+			ns.SetOnUpdate(watcher, function(self)
+				local over = ns.Flag(Minimap:IsMouseOver())
+				if not over and (next(heard) or GetTime() > untilAt) then
+					self:Hide()
+					Report()
+					return
+				end
+				if not over then return end
+				local cx, cy = GetCursorPosition()
+				local scale, left, bottom = Minimap:GetEffectiveScale(), Minimap:GetLeft(), Minimap:GetBottom()
+				if not (cx and scale and left and bottom) then return end
+				local half = (Minimap:GetWidth() or 0) / 2
+				local ux, uy = cx / scale - left - half, cy / scale - bottom - half
+				local data = C_TooltipInfo and C_TooltipInfo.GetMinimapMouseover and C_TooltipInfo.GetMinimapMouseover()
+				local lines = type(data) == "table" and not Secret(data) and data.lines
+				for _, line in ipairs(type(lines) == "table" and not Secret(lines) and lines or {}) do
+					local text = line.leftText
+					if type(text) == "string" and not Secret(text) then
+						local plain = text:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""):gsub("|T.-|t", ""):gsub("|A.-|a", "")
+						for name in plain:gmatch("[^\n]+") do
+							name = name:match("^%s*(.-)%s*$")
+							if NODE_KINDS[ns.NodeKind(name)] then
+								heard[name] = heard[name] or {}
+								local list = heard[name]
+								list[#list + 1], list[#list + 2] = ux, uy
+							end
+						end
+					end
+				end
+			end)
+		end
+		untilAt, heard = GetTime() + 20, {}
+		watcher:Show()
+		local entry = MinimapEntry()
+		ns.Print(("nodeoffset: 20 seconds: stand still, rest your mouse on a vein's dot, then move it off the minimap. " ..
+			"Minimap %.0f wide, scale %.2f; faded: shrunk %s, off the screen %s"):format(Minimap:GetWidth() or 0,
+			Minimap:GetEffectiveScale() or 0, tostring(entry and entry.shrunk or false),
+			tostring(entry and entry.parkedFullSize or false)))
+	end
 end
 
 function ns.NodeSweepReport()
@@ -621,10 +1413,21 @@ function ns.NodeSweepReport()
 			or ("%s at %.0f, %.0f on the minimap (no world place)"):format(node.name, node.x, node.y)
 	end
 	if #places > 0 then ns.Print("nodes: " .. table.concat(places, "; ")) end
+	if lastLocate then ns.Print("last close look, minimap units from the middle: " .. lastLocate) end
+	if lastIcon then
+		-- (The icon itself, big in the chat line, to see what the mark's badge shows.)
+		ns.Print(("last mark's icon: |T%s:40:40|t %s (%s%s): %s"):format(tostring(lastIcon.icon), lastIcon.name,
+			lastIcon.kind, lastIcon.gray and ", gray: other side of indoors/outdoors" or "", tostring(lastIcon.icon)))
+	end
+	if lastAnchor then ns.Print("last mark put back on its dot, minimap units: " .. lastAnchor) end
+	local ok, radius = pcall(C_Minimap and C_Minimap.GetViewRadius or error)
+	ns.Print(("minimap: view radius %s yards, width %.1f, so %s yards a unit; zoom %s"):format(tostring(ok and radius),
+		Minimap:GetWidth() or 0, tostring(View()), tostring(Minimap:GetZoom())))
 	return ("minimap sweep: %.1fs ago%s%s: %s; last reveal %s"):format(GetTime() - last.at,
 		last.grown and ", minimap grown for it" or "",
 		areaShown and ", a quest area on it (waits off the screen while faded)" or "",
 		last.why and ("couldn't sweep (" .. tostring(last.why) .. ")")
-			or (("%d points, heard %s"):format(last.probes or 0, last.names ~= "" and last.names or "nothing")),
+			or (("%d points %d apart (over a few frames), heard %s"):format(last.probes or 0, last.step or STEP,
+				last.names ~= "" and last.names or "nothing")),
 		seenAt > -math.huge and ("%.1fs ago"):format(GetTime() - seenAt) or "never")
 end

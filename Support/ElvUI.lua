@@ -94,10 +94,6 @@ local RAID = {
 
 ns.WhenAddonLoads("ElvUI", function()
 	ns.FadeWithRows(ROWS)
-	-- The game's addon compartment button (retail and Forever), which it
-	-- takes off the minimap and puts on UIParent by the map: it fades with the
-	-- minimap again. (The game's frame, so not hooked.)
-	ns.FadeWithRow("minimap", "minimap", { "AddonCompartmentFrame" })
 	for group, names in pairs(RAID) do
 		ns.FadeFoundByName(group, names)
 	end

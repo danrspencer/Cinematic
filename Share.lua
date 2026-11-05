@@ -120,7 +120,7 @@ end
 
 -- Reading one back from pos: the value and where the next one starts.
 -- Errors on anything else (Read catches it).
-local MAX_DEPTH = 8
+local MAX_DEPTH = 24 -- (tables inside tables: a camera script's groups take two each)
 local function ReadValue(text, pos, depth)
 	local tag = text:sub(pos, pos)
 	if tag == "T" then

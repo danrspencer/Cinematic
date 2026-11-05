@@ -927,8 +927,9 @@ function ns.UpdateMusic(cinematic, elapsed)
 	local cam = (ns.CameraMode and ns.CameraMode()) or (ns.QuestCamActive and ns.QuestCamActive() and "quest") or nil
 	if cam ~= musicCam then
 		-- A built-in camera ending with an End music step in your edit of its
-		-- When it ends (Scripts page): it runs its own code, not the script.
-		-- (With the dev copy's /cine script builtins the script runs the step.)
+		-- When it ends (Scripts page), with it running its own code (the dev
+		-- copy's /cine script builtins off): played as its script, the script
+		-- runs the step itself.
 		if musicCam and ns.BuiltinEndMusicSecs and not (ns.ScriptBuiltInsOn and ns.ScriptBuiltInsOn()) then
 			local secs = ns.BuiltinEndMusicSecs(MODE_SCRIPT[musicCam] or musicCam)
 			if secs then ns.EndSceneMusic(secs) end
@@ -4099,6 +4100,36 @@ local function StillWaiting()
 	return ns.db.tooltipStillMode == "show" and wait and wait > 0 and GetTime() - stillSince < wait
 end
 
+-- The Tooltips page's Filtered tooltips list (tooltipNeverShow, comma-
+-- separated names), read again only when it changes: lower-cased name -> true.
+-- Whether a tooltip with this name (its first line) is on that list, any
+-- case. A secret or missing name never is. (In a do block: the main chunk
+-- is at its 200-local cap: hence ns.TooltipNeverShown, not a local.)
+do
+local _ = L["Fishing Bobber"] -- (the default list's one name: translated as the game names the object)
+local neverText, neverNames = nil, {}
+function ns.TooltipNeverShown(name)
+	local text = ns.db.tooltipNeverShow or ""
+	if text == "" or type(name) ~= "string" or (issecretvalue and issecretvalue(name)) then
+		return false
+	end
+	if text ~= neverText then
+		neverText, neverNames = text, {}
+		for entry in text:gmatch("[^,]+") do
+			entry = entry:match("^%s*(.-)%s*$")
+			if entry ~= "" then
+				-- (Its translation too, so the English default "Fishing Bobber"
+				-- finds the game's own name for it in every language.)
+				neverNames[entry:lower()] = true
+				local translated = L[entry]
+				if type(translated) == "string" then neverNames[translated:lower()] = true end
+			end
+		end
+	end
+	return neverNames[name:match("^%s*(.-)%s*$"):lower()] or false
+end
+end
+
 -- Whether the tooltip should be hidden now, and why. Only in CineMode, with
 -- the key not held, and never a minimap blip's. While the Tooltips row is
 -- off, its rule reading the tooltip's kinds (HIDE_KINDS; a UI one is always
@@ -4111,6 +4142,10 @@ local function HidesByKind(tooltip)
 	local world = WorldOwned()
 	if world and OverMinimap() then
 		return false
+	end
+	if ns.TooltipNeverShown(TooltipName()) then
+		wipe(tooltipKinds)
+		return true, "listed"
 	end
 	local unitOrWorld = world or TooltipHasUnit(tooltip)
 	-- (Hidden: the Tooltips row, tooltip:All, off here and now for its kinds.)

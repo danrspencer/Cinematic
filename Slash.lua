@@ -33,6 +33,7 @@ local function PrintHelp()
 	Heading(L["General"])
 	Command("/cine", L["toggle CineMode (also /cine on, /cine off)"])
 	Command("/cine config", L["open the settings"])
+	Command("/cine find <words>", L["open the settings at the setting or page with those words, e.g. /cine find minimap"])
 	Command("/cine hideui", L["hide the UI but keep the look (again to bring it back)"])
 	Command("/cine size <percent>", L["letterbox bar height (now %s%%)"]:format(ns.db.letterboxSize * 100))
 	Command("/cine button", L["show or hide the minimap button"])
@@ -83,7 +84,8 @@ local function PrintDebugHelp()
 	print("  /cine debug chatcopy - Copy chat shows each line's codes as text, to see how its colors come (again to stop)")
 	print("  /cine debug minimapicons - the minimap's methods for its player arrow and icons on this client")
 	print("  /cine debug nodes [raw] [grow [update]|park|stay] [seconds] - sweep a pretend mouse over the minimap and list the names its tooltip gives (herbs, veins), faded or not; grow gives the faded minimap its size back for each sweep only; park keeps it full size off the screen while it watches (60 seconds), stay full size in its place; update has the game place its dots first; raw shows each name's line as the game wrote it; with seconds, once a second, then all of it in the copy window (again to stop early)")
-	print("  /cine debug pad - print each gamepad button press and whether it shows the bars (again to stop)")
+	print("  /cine debug nodeoffset - for 20 seconds: rest the mouse on a vein's or herb's dot on the minimap, then move it off; prints how far the pretend mouse hears it from where your mouse did")
+	print("  /cine debug pad -print each gamepad button press and whether it shows the bars (again to stop)")
 	print("  /cine debug peeks - print each change to your auras and when the buffs peek starts or stops (again to stop)")
 	print("  /cine debug peeks log - the same, quietly into the log only (plus your casts in fights), kept over /reload")
 	print("  /cine debug cast - print each cast at an enemy that fades in the In combat rows, and how long it takes (again to stop)")
@@ -273,6 +275,19 @@ local function HandleSlash(msg)
 		Cinematic_Toggle()
 	elseif cmd == "config" or cmd == "options" then
 		ns.OpenOptions()
+	elseif cmd == "find" then
+		-- (The words as typed: the search ignores case, but they're printed back.)
+		local words = msg:match("^%s*%S+%s*(.-)%s*$") or ""
+		if words == "" then
+			ns.Print(L["type what to find after it, e.g. /cine find minimap"])
+		else
+			local found, page = ns.FindSetting(words)
+			if found then
+				ns.Print(L["found \"%s\" (%s)"]:format(found, page))
+			else
+				ns.Print(L["nothing in the settings matches \"%s\""]:format(words))
+			end
+		end
 	elseif cmd == "on" or cmd == "off" then
 		ns.SetEnabled(cmd == "on")
 		ns.Print(ns.db.enabled and L["enabled"] or L["disabled"])
@@ -1207,6 +1222,8 @@ local function HandleSlash(msg)
 		end
 		table.sort(methods)
 		ns.Print(("minimap icon methods (%d): %s"):format(#methods, #methods > 0 and table.concat(methods, ", ") or "none"))
+	elseif cmd == "debug" and arg == "nodeoffset" then
+		ns.NodeOffsetWatch()
 	elseif cmd == "debug" and arg:find("^nodes") then
 		ns.NodesDebug(arg:match("^nodes%s*(.*)$"))
 	elseif cmd == "facing" then

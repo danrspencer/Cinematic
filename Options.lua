@@ -1291,6 +1291,18 @@ local function ShowMatch(entry, onPage)
 	end)
 end
 
+-- /cine find <words>: the settings search's best match for them, opened as
+-- clicking it would (its page, scrolled to it, glowing). Returns its text and
+-- its page's name, or nil with nothing found.
+function ns.FindSetting(query)
+	query = type(query) == "string" and query:match("^%s*(.-)%s*$") or ""
+	if query == "" then return nil end
+	local best = SearchMatches(BuildSearchIndex(), query)[1]
+	if not best then return nil end
+	ShowMatch(best)
+	return best.text, best.page.name or "Cinematic"
+end
+
 local SEARCH_ROWS = 12
 
 -- The search box, with its matches listed in a box below it (over the page).
@@ -7135,21 +7147,17 @@ local function CreateFishingPanel()
 	stack:Add(Check(content, "hideFishingCastBar", L["Hide the Fishing cast bar"],
 		L["Your cast bar stays hidden while it shows Fishing. Every other spell shows it as usual."]),
 		"check")
-	local recast = stack:Add(Check(content, "fishRightClickCast", L["Right-click to cast again"],
-		L["While the fish camera is on and no bobber is out, right-clicking in the world casts " ..
-		"Fishing again. Each cast still comes from your own click. While the bobber is out, " ..
-		"right-click clicks it as usual (or reels in from anywhere: see below); in combat, with the loot window open or with your " ..
-		"mouse on a player or NPC, right-click is left alone. (Meanwhile right-drag doesn't " ..
-		"turn the camera: left-drag still does.)"]), "check")
+	local recast = stack:Add(Check(content, "fishRightClickCast", L["Right-click to cast"],
+		L["Works only with a fishing pole equipped. Right-clicking in the world casts Fishing: " ..
+		"the first cast too, standing still, and again after each catch. Each cast still comes " ..
+		"from your own click. Swap the pole out to have right-click back everywhere. While the " ..
+		"bobber is out, right-click clicks it as usual (or reels in from anywhere: see below); in " ..
+		"combat, with the loot window open or with your mouse on a player, NPC or object (mailbox, " ..
+		"corpse, mining node...), right-click is left alone. (Meanwhile right-drag doesn't turn " ..
+		"the camera: left-drag still does.)"]), "check")
 	recast:HookScript("OnClick", Refresh) -- grey out / enable the options below
 	-- (They apply to the gamepad button too.)
 	local function IfRecast(db) return db.fishRightClickCast or (C_GamePad ~= nil and db.fishGamepadCast) end
-	local pole = stack:Add(Check(content, "fishPoleRightClickCast", L["Also the first cast, with a pole equipped"],
-		L["With a fishing pole in your main hand, standing still, right-clicking in the world " ..
-		"casts Fishing, so you don't have to start the first cast yourself. Not while your " ..
-		"mouse is on a player, NPC or object (mailbox, corpse...): right-click works on them " ..
-		"as usual. Swap the pole out to have right-click back everywhere."]), "check", 24)
-	GreyUnless(pole, IfRecast)
 	local delay = stack:Add(Slider(content, "fishRecastDelay", L["Wait after a cast ends"], 0, 3, 0.1,
 		L["%.1f sec"]), "slider")
 	Tooltip(delay, L["How long after a cast ends (a catch looted, or the bobber gone) before " ..
@@ -7157,30 +7165,29 @@ local function CreateFishingPanel()
 	GreyUnless(delay, IfRecast)
 	local missPause = stack:Add(Slider(content, "fishMissPause", L["Pause after a missed cast"], 0, 30, 1,
 		function(value) return value == 0 and L["Off"] or (L["%d sec"]):format(value) end), "slider")
-	Tooltip(missPause, L["When a cast doesn't land in fishable water (say, a pole left equipped " ..
+	Tooltip(missPause, L["When a cast fails or doesn't land in fishable water (say, a pole left equipped " ..
 		"away from water), right-click goes back to normal for this long before it casts again. " ..
-		"Moving and then standing still for 1 sec ends it early: you're likely at a new spot to fish from. " ..
+		"It ends early when you cast Fishing yourself (a key or an action bar), when you catch " ..
+		"something, when you stand still for 5 sec doing nothing else (no mining or picking herbs), " ..
+		"or when you move 20 yards or more and then stand still for 1 sec: you're likely " ..
+		"at a new spot to fish from (a few steps up to a mining node or herb don't). " ..
 		"Off doesn't pause. (\"Skill not high enough\" always pauses it for 30 sec, moving or not.)"])
 	GreyUnless(missPause, IfRecast)
-	stack:Add(Check(content, "fishRightClickReel", L["Right-click to reel in"],
-		L["While the bobber is out, right-clicking anywhere in the world reels it in, with no need " ..
-		"to find the bobber with the mouse (in gamepad mode, the cast button below does too). " ..
-		"It uses the game's \"Interact with target\" key, so the game's soft targeting of objects " ..
-		"is on while you fish, and your own setting comes back after. Reeling in before a bite " ..
-		"ends the cast. Not in combat or with your mouse on a player or NPC. (While the bobber " ..
-		"is out, right-drag doesn't turn the camera: left-drag still does.)"]), "check")
-	stack:Add(Check(content, "fishKeyReel", L["The key you cast with reels in too"],
-		L["With Fishing on an action bar (the spell, or a macro that casts it), its key reels the " ..
-		"bobber in while it's out, rather than casting again: press 1 to cast, then 1 again to reel " ..
-		"in. Works on the game's own action bars. Uses the game's soft targeting of objects, as " ..
-		"right-click does. Not in combat."]), "check")
+	stack:Add(Check(content, "fishRightClickReel", L["Reel in with same key/click"],
+		L["While the bobber is out, the way you cast reels it in, with no need to find the bobber " ..
+		"with the mouse: right-click anywhere in the world, the key of Fishing on one of the game's " ..
+		"action bars (the spell, or a macro that casts it: press 1 to cast, then 1 again to reel in), " ..
+		"or in gamepad mode the cast button below. It uses the game's \"Interact with target\" key, " ..
+		"so the game's soft targeting of objects is on while you fish, and your own setting comes " ..
+		"back after. Reeling in before a bite ends the cast. Not in combat; right-click not with your " ..
+		"mouse on a player or NPC. (While the bobber is out, right-drag doesn't turn the camera: " ..
+		"left-drag still does.)"]), "check")
 
 	-- Gamepad mode: a gamepad button does what right-click does.
 	if C_GamePad then
 		local padCast = stack:Add(Check(content, "fishGamepadCast", L["Gamepad: a button casts too"],
-			L["In gamepad mode, the button below casts Fishing whenever right-click would: in the " ..
-			"fish camera with no bobber out, and (if ticked above) with a pole equipped, standing " ..
-			"still. The rest of the time it does what it usually does. Each cast still comes from " ..
+			L["In gamepad mode, the button below casts Fishing whenever right-click would: with a " ..
+			"pole equipped, standing still or in the fish camera, no bobber out. The rest of the time it does what it usually does. Each cast still comes from " ..
 			"your own press."]), "check")
 		padCast:HookScript("OnClick", Refresh) -- grey out / enable the button choice (and the options above)
 		local function IfPadCast(db) return db.fishGamepadCast end
@@ -10592,7 +10599,8 @@ local function CreateMinimapPanel()
 		{ "minimapzone", L["Zone name"] }, { "minimapheader", L["Minimap header"] },
 		{ "minimaptracking", L["Tracking button"] }, { "minimapcalendar", L["Calendar"] },
 		{ "minimapclock", L["Clock"] }, { "minimapdial", L["Day/night dial"] },
-		{ "minimapaddons", L["Addon buttons"] }, { "minimapcoords", L["Coordinates"] },
+		{ "minimapaddons", L["Addon buttons"] }, { "minimapcompartment", L["Addon compartment"] },
+		{ "minimapcoords", L["Coordinates"] },
 	}
 	local function PartsHere()
 		local here, has = {}, {}
@@ -10664,7 +10672,7 @@ local function CreateMinimapPanel()
 	local ping = Check(content, "minimapRevealOnPing", L["Pings"],
 		L["You or someone in your party or raid pinging the minimap shows it as if you'd hovered it, so " ..
 		"you can see where, with the rest of the Hover groups that have Minimap ping ticked, for " ..
-		"as long as the slider under it says. Ore, herbs and treasure pinged by Ping where it is don't count."], function(value)
+		"as long as the slider under it says. Ore, herbs and treasure pinged by Mark where it is don't count."], function(value)
 			ns.GetDB().minimapRevealOnPing = value
 			Refresh() -- grey out / enable the time below
 		end)
@@ -10706,17 +10714,86 @@ local function CreateMinimapPanel()
 				ns.GetDB().minimapRevealNodes = value
 				Refresh()
 			end or nil)
-		check:SetPoint("TOPLEFT", previousReveal, "BOTTOMLEFT", previousReveal.nodeMark and -16 or 0, -2)
+		check:SetPoint("TOPLEFT", previousReveal, "BOTTOMLEFT", -(previousReveal.revealIndent or 0),
+			previousReveal.revealIndent and -6 or -2)
 		previousReveal = check
-		-- (Under it: a ping for each node.)
+		-- (Under it: how each node is marked, minimapNodeMark.)
 		if kind[1] == "minimapRevealNodes" then
-			local nodePing = Check(content, "minimapNodePing", L["Ping where it is"],
-				L["When a vein, herb or chest shows up on the minimap, it's pinged there, the same ping as " ..
-				"clicking the minimap: in a group, everyone sees it."])
-			nodePing:SetPoint("TOPLEFT", check, "BOTTOMLEFT", 16, -2)
-			GreyUnless(nodePing, function(db) return db.minimapRevealNodes end)
-			nodePing.nodeMark = true
-			previousReveal = nodePing
+			local function IfNodes(db) return db.minimapRevealNodes end
+			local MARK_TIP = L["How a vein, herb or chest is marked where it shows up on the minimap. " ..
+				"Our mark: a ring of Cinematic's that pulses on it a few seconds, no sound, only you see it. " ..
+				"Ping: the same ping as clicking the minimap, with its sound; in a group, everyone sees it."]
+			local MARKS = {
+				{ value = "mark", text = L["Our mark (no sound)"] },
+				{ value = "ping", text = L["Ping"] },
+				{ value = "off", text = L["Off"] },
+			}
+			local markLabel = Label(content, "GameFontHighlight", L["Mark where it is"])
+			markLabel:SetPoint("TOPLEFT", check, "BOTTOMLEFT", 20, -6)
+			local mark = Dropdown(content, "minimapNodeMark", MARKS, 240)
+			if mark then
+				mark:SetPoint("TOPLEFT", markLabel, "BOTTOMLEFT", -4, -4)
+				mark.rowName = markLabel
+				Tooltip(mark, MARK_TIP)
+				GreyUnless(mark, IfNodes)
+				mark.revealIndent = 16
+				previousReveal = mark
+				-- Node icons (minimapNodeIcons, kinds comma-separated): which kinds
+				-- get their icon on the node, kept there while it's on the minimap.
+				local ICON_KINDS = { { "ore", L["Ore"] }, { "herb", L["Herbs"] } }
+				-- (SetupMenu builds the menu right away, before saved settings load: no db yet, tested.)
+				local function IconOn(key)
+					local db = ns.GetDB()
+					return db ~= nil and ((db.minimapNodeIcons or "") .. ","):find(key .. ",", 1, true) ~= nil
+				end
+				RecordKey(content, "minimapNodeIcons")
+				local okIcons, icons = ns.MenuDropdown(content)
+				if okIcons and icons and icons.SetupMenu then
+					local iconsLabel = Label(content, "GameFontHighlight", L["Node icons"])
+					iconsLabel:SetPoint("TOPLEFT", mark, "BOTTOMLEFT", 4, -8)
+					icons:SetPoint("TOPLEFT", iconsLabel, "BOTTOMLEFT", -4, -4)
+					icons:SetWidth(240)
+					icons.searchSkip = true -- (it shows the current ticks, not a label)
+					icons:SetupMenu(function(_, root)
+						for _, iconKind in ipairs(ICON_KINDS) do
+							root:CreateCheckbox(iconKind[2], function() return IconOn(iconKind[1]) end, function()
+								local keys = {}
+								for _, each in ipairs(ICON_KINDS) do
+									if (each[1] == iconKind[1]) ~= IconOn(each[1]) then keys[#keys + 1] = each[1] end
+								end
+								ns.GetDB().minimapNodeIcons = table.concat(keys, ",")
+								return MenuResponse and MenuResponse.Refresh
+							end)
+						end
+					end)
+					if icons.SetSelectionText then
+						icons:SetSelectionText(function()
+							local ticked = {}
+							for _, iconKind in ipairs(ICON_KINDS) do
+								if IconOn(iconKind[1]) then ticked[#ticked + 1] = iconKind[2] end
+							end
+							return #ticked > 0 and table.concat(ticked, ", ") or L["None"]
+						end)
+					end
+					icons.Refresh = function(self) self:GenerateMenu() end
+					controls[#controls + 1] = icons
+					icons.rowName = iconsLabel
+					Tooltip(icons, L["The kinds ticked here get their icon on the node, the herb's own or the vein's ore, " ..
+						"kept there for as long as it's on the minimap."])
+					GreyUnless(icons, IfNodes)
+					icons.revealIndent = 16
+					previousReveal = icons
+				end
+			else
+				previousReveal = markLabel
+				for _, choice in ipairs(MARKS) do
+					local radio = Choice(content, "minimapNodeMark", choice.value, choice.text, MARK_TIP)
+					radio:SetPoint("TOPLEFT", previousReveal, "BOTTOMLEFT", previousReveal == markLabel and -4 or 0, -2)
+					GreyUnless(radio, IfNodes)
+					previousReveal = radio
+				end
+				previousReveal.revealIndent = 16
+			end
 		end
 	end
 	local onTaxi = Check(content, "minimapHideOnTaxi", L["Not on flight paths"],
@@ -12717,6 +12794,98 @@ local function CreateTooltipPanel()
 		laterOn = value > 0
 		LaterHeading(value)
 	end
+
+	-- Filtered tooltips: names CineMode never shows (Fishing Bobber...), a
+	-- row each (name, Remove), then a box to add one, like the Buffs/Debuffs
+	-- page's list. Saved as one comma-separated list (tooltipNeverShow),
+	-- which Effects.lua reads.
+	local filterHeader = Section(L["Filtered tooltips"])
+	local filterNote = PageIntro(content, filterHeader,
+		L["In CineMode, tooltips with these names never show, whatever the Show tooltips row says. " ..
+		"Hold your Show hidden tooltips key to see one anyway."])
+	local function FilterEntries()
+		local entries = {}
+		for entry in (ns.GetDB().tooltipNeverShow or ""):gmatch("[^,]+") do
+			entry = entry:match("^%s*(.-)%s*$")
+			if entry ~= "" then entries[#entries + 1] = entry end
+		end
+		return entries
+	end
+	local function SaveFilter(entries)
+		ns.GetDB().tooltipNeverShow = table.concat(entries, ", ")
+		Refresh()
+		FitContentHeight(content)
+	end
+	local filterRows = {}
+	local function FilterRow(i)
+		local row = filterRows[i]
+		if not row then
+			row = CreateFrame("Frame", nil, content)
+			row:SetSize(300, 22)
+			row.text = Label(row, "GameFontHighlight")
+			row.text:SetPoint("LEFT", 0, 0)
+			row.remove = ns.PanelButton(row)
+			row.remove:SetSize(70, 20)
+			row.remove:SetPoint("RIGHT", 0, 0)
+			row.remove:SetText(L["Remove"])
+			row.remove:SetScript("OnClick", function(self)
+				local entries = FilterEntries()
+				table.remove(entries, self:GetParent().index)
+				SaveFilter(entries)
+			end)
+			filterRows[i] = row
+		end
+		return row
+	end
+	local filterBox = ns.SkinEditBox(CreateFrame("EditBox", nil, content, "InputBoxTemplate"))
+	filterBox:SetSize(200, 20)
+	filterBox:SetAutoFocus(false)
+	local filterAdd = ns.PanelButton(content)
+	filterAdd:SetSize(70, 20)
+	filterAdd:SetPoint("LEFT", filterBox, "RIGHT", 8, 0)
+	filterAdd:SetText(L["Add"])
+	local function AddFilter()
+		local entry = filterBox:GetText():gsub(",", ""):match("^%s*(.-)%s*$")
+		filterBox:SetText("")
+		filterBox:ClearFocus()
+		if entry ~= "" then
+			local entries = FilterEntries()
+			for _, existing in ipairs(entries) do
+				if existing:lower() == entry:lower() then return end
+			end
+			entries[#entries + 1] = entry
+			SaveFilter(entries)
+		end
+	end
+	filterBox:SetScript("OnEnterPressed", AddFilter)
+	filterBox:SetScript("OnEscapePressed", function(self) self:SetText("") self:ClearFocus() end)
+	filterAdd:SetScript("OnClick", AddFilter)
+	local FILTER_TIP = L["Type a tooltip's name, its top line, as your game shows it (\"Fishing Bobber\"). " ..
+		"Any case."]
+	Tooltip(filterBox, FILTER_TIP)
+	Tooltip(filterAdd, FILTER_TIP)
+	-- Rebuilt as the page shows and after each change.
+	controls[#controls + 1] = { Refresh = function()
+		local enabled = ns.GetDB().handleTooltips and true or false
+		local last = filterNote
+		local entries = FilterEntries()
+		for i, entry in ipairs(entries) do
+			local row = FilterRow(i)
+			row.index = i
+			row.text:SetText(entry)
+			row.remove:SetEnabled(enabled)
+			row:ClearAllPoints()
+			row:SetPoint("TOPLEFT", last, "BOTTOMLEFT", i == 1 and 6 or 0, i == 1 and -6 or -2)
+			row:Show()
+			last = row
+		end
+		for i = #entries + 1, #filterRows do filterRows[i]:Hide() end
+		filterBox:ClearAllPoints()
+		filterBox:SetPoint("TOPLEFT", last, "BOTTOMLEFT", #entries == 0 and 12 or 6, -8)
+		filterBox:SetEnabled(enabled)
+		filterAdd:SetEnabled(enabled)
+	end }
+	RecordKey(content, "tooltipNeverShow") -- (for Reset page)
 
 	canvas:SetScript("OnShow", PageShown(Refresh, content))
 	canvas:Hide()

@@ -501,8 +501,8 @@ do
 		end
 	end)
 
-	-- Right-click to recast (fishRightClickCast): while the fish camera is on
-	-- and no bobber is out, a right-click in the world clicks a secure button
+	-- Right-click to cast (fishRightClickCast): with a pole equipped (standing
+	-- still, or in the fish camera) and no bobber out, a right-click in the world clicks a secure button
 	-- that casts Fishing. Every cast still comes from your own click (addons
 	-- can't cast by themselves). While the bobber is out, the loot window is
 	-- open or you're in combat, right-click is left alone (to click the bobber).
@@ -511,6 +511,10 @@ do
 	local combatSeenAt = -math.huge
 	local BOTH_BUTTONS_WINDOW = 0.25 -- seconds: a left-click this close before the right one counts as both
 	local leftDownAt = -math.huge
+	local bound = {} -- key -> "cast" or "reel" while it does that
+	-- (A mouse button's press and release always go to the binding that got the
+	-- press: swapping it mid-press can't send the release elsewhere (tested), so
+	-- right-click can't both turn the camera and cast on release.)
 	local leftWatcher = CreateFrame("Frame")
 	leftWatcher:RegisterEvent("GLOBAL_MOUSE_DOWN")
 	leftWatcher:SetScript("OnEvent", function(_, _, button)
@@ -521,7 +525,7 @@ do
 	-- Fishing now: the fish camera on, or a Fishing cast going (gamepad
 	-- presses don't bring the bars up then: see Frames.lua).
 	function ns.IsFishingNow()
-		if ns.IsFish and ns.IsFish() then
+		if ns.FishCamOn() then
 			return true
 		end
 		local channel = select(8, UnitChannelInfo("player"))
@@ -531,7 +535,6 @@ do
 
 	-- In gamepad mode a gamepad button does the same (fishGamepadCast, the
 	-- button: fishGamepadKey, X by default).
-	local bound = {} -- key -> "cast" or "reel" while it does that
 	local channelEndedAt = -math.huge
 	-- mode: "cast" (our button), "reel" (the game's interact key: see below), or false.
 	local function SetRecast(key, mode)
@@ -549,7 +552,7 @@ do
 		end
 	end
 
-	-- Right-click to reel in (fishRightClickReel): while a Fishing cast is going,
+	-- Reel in with same key/click (fishRightClickReel): while a Fishing cast is going,
 	-- right-click (and the gamepad cast button) is the game's "Interact with
 	-- target" key, which uses the soft interact pick: the bobber, wherever the
 	-- mouse is. The game's settings for that pick are held while you fish (and
@@ -567,7 +570,7 @@ do
 		return type(channel) == "number" and not (issecretvalue and issecretvalue(channel))
 			and IsFishingSpell(channel) or false
 	end
-	-- The same key reels in (fishKeyReel): the keys bound to an action button
+	-- The same key reels in (same switch): the keys bound to an action button
 	-- with Fishing on it (the spell, or a macro that casts it) reel in too while
 	-- the bobber is out, rather than casting again. The game's bars only (each
 	-- button's binding: ACTIONBUTTON1, MULTIACTIONBAR1BUTTON1...); looked up as
@@ -645,7 +648,7 @@ do
 		local found = {}
 		for key, from in pairs(fishKeys) do found[#found + 1] = key .. " (" .. from .. ")" end
 		table.sort(found)
-		ns.Print(("  same-key switch=%s | keys with Fishing on the bars: %s"):format(tostring(ns.db.fishKeyReel),
+		ns.Print(("  keys with Fishing on the bars: %s"):format(
 			#found > 0 and table.concat(found, ", ") or "none"))
 		ns.Print(("  SoftTargetInteract=%s Range=%s Arc=%s | bound: %s | combat=%s gamepad=%s mouseover=%s"):format(
 			tostring(GetCVar("SoftTargetInteract")), tostring(GetCVar("SoftTargetInteractRange")),
@@ -677,12 +680,13 @@ do
 			castButton = CreateFrame("Button", "CinematicFishingCastButton", UIParent, "SecureActionButtonTemplate")
 			castButton:SetAttribute("type", "spell")
 			castButton:SetAttribute("spell", SpellName(7620))
-			-- Click on key down or up, as the game's action buttons do (not both:
-			-- that would cast twice).
+			-- Click on key down or up, as the game's action buttons do (on Forever
+			-- always down: the setting is locked there) (not both: that would cast twice).
 			castButton:RegisterForClicks(GetCVarBool("ActionButtonUseKeyDown") and "AnyDown" or "AnyUp")
 			-- Both mouse buttons together runs you forward: no cast then. (Out
 			-- of combat, so the spell can be taken off just for this click.)
 			castButton:SetScript("PreClick", function(self)
+				self.clickedAt = GetTime() -- (a cast from here isn't "your own": see miss.OnSpell)
 				local both = IsMouseButtonDown("LeftButton") or GetTime() - leftDownAt < BOTH_BUTTONS_WINDOW
 				if not InCombatLockdown() then
 					self:SetAttribute("type", not both and "spell" or nil)
@@ -695,8 +699,8 @@ do
 			channelEndedAt = GetTime()
 		end
 	end)
-	-- A fishing pole in your main hand (fishPoleRightClickCast): right-click casts
-	-- the first time too, standing still out of the fish camera. Not while
+	-- Right-click to cast (fishRightClickCast) works only with a fishing pole in
+	-- your main hand: it casts the first time too, standing still out of the fish camera. Not while
 	-- the mouse is on a unit or an object you just moused over (an NPC,
 	-- a mailbox, a corpse to loot): right-click is theirs.
 	local poleEquipped = false
@@ -712,7 +716,16 @@ do
 	local poleWatcher = CreateFrame("Frame")
 	poleWatcher:RegisterEvent("PLAYER_ENTERING_WORLD")
 	poleWatcher:RegisterEvent("PLAYER_EQUIPMENT_CHANGED")
-	poleWatcher:SetScript("OnEvent", function() pcall(CheckPole) end)
+	-- (equippedAt: when you put a pole on, not counting one already on as you
+	-- log in. A clear sign you mean to fish: see the right-click cast watch.)
+	poleWatcher.equippedAt = -math.huge
+	poleWatcher:SetScript("OnEvent", function(self, event)
+		local had = poleEquipped
+		pcall(CheckPole)
+		if event == "PLAYER_EQUIPMENT_CHANGED" and poleEquipped and not had then
+			self.equippedAt = GetTime()
+		end
+	end)
 	-- World objects under the mouse: their tooltip appearing (it may be hidden
 	-- straight away by the tooltip options), and the mouse staying near there.
 	local objectAt, objectX, objectY = -math.huge, 0, 0
@@ -726,25 +739,101 @@ do
 			objectX, objectY = GetCursorPosition()
 		end
 	end)
-	-- "Your cast didn't land in fishable water": likely a pole left equipped
-	-- away from water, so right-click casting stands aside for fishMissPause sec.
-	-- Moving and then standing still for MISS_SETTLE seconds ends it early: a
-	-- new spot to fish from.
-	local MISS_SETTLE = 1
-	local missedAt = -math.huge
-	local movedSinceMiss = false
-	local stoppedAt -- standing still again since this time, after moving
+	-- A failed cast: likely a pole left equipped away from water, so
+	-- right-click casting stands aside for fishMissPause sec. The game says so:
+	-- the spell failing, or a red error ("Your cast didn't land in fishable
+	-- water", or any other) while a Fishing cast is just starting or just after
+	-- one that ended within 1.5 sec. (Reeling in yourself shows no error, and
+	-- a catch's channel runs longer, so "inventory full" as you loot doesn't count.)
+	-- It ends early when you show you're fishing: casting Fishing yourself (a key
+	-- or an action bar, not right-click), or a catch (fish loot proves water).
+	-- Or moving at least 20 yards from where it failed and then standing still
+	-- for 1 sec: a new spot to fish from. (Not a few steps up to a mining node
+	-- or herb: that kept casting Fishing on them. Where the game won't tell your
+	-- position, as in instances, only those end it, or the time running out.)
+	local miss = { at = -math.huge, moved = false } -- stoppedAt, x, y, chanStart, shortEnd, stillSince, busyAt
+	local MISS_QUIET = 5 -- seconds standing still, doing nothing else, that end a miss pause
+	local STAND_STILL = 1 -- seconds standing still before right-click casts
+	local SKILL_PAUSE = 30 -- ("Skill not high enough": see below)
+	local skillBlockedUntil = -math.huge
+	function miss.XY()
+		local ok, y, x = pcall(UnitPosition, "player")
+		if not ok or type(x) ~= "number" or type(y) ~= "number" or (issecretvalue and (issecretvalue(x) or issecretvalue(y))) then
+			return nil
+		end
+		return x, y
+	end
+	function miss.Start(why)
+		if GetTime() - miss.at < 2 then return end -- (one failure, several signs)
+		miss.at, miss.moved, miss.stoppedAt = GetTime(), false, nil
+		miss.x, miss.y = miss.XY()
+		ns.Log("fishing", "missed-cast pause: " .. why)
+	end
+	function miss.Clear(why)
+		if GetTime() - miss.at < (tonumber(ns.db and ns.db.fishMissPause) or 30) then
+			ns.Log("fishing", "missed-cast pause over: " .. why)
+		end
+		miss.at, miss.moved, miss.stoppedAt = -math.huge, false, nil
+		skillBlockedUntil = -math.huge
+	end
+	function miss.Far()
+		if not miss.x then return false end
+		local x, y = miss.XY()
+		return x ~= nil and (x - miss.x) ^ 2 + (y - miss.y) ^ 2 >= 20 ^ 2
+	end
+	-- Why the game won't let you fish now (nil: it would): right-click is left
+	-- alone then rather than trying a cast that can only fail.
+	function miss.CantFish()
+		if ns.Flag(IsSwimming()) then return "swimming" end
+		if ns.Flag(IsMounted()) then return "mounted" end
+		if ns.OnTaxi() then return "on a flight" end
+		if ns.Flag(IsFalling()) then return "falling" end
+		if ns.Flag(UnitIsDeadOrGhost("player")) then return "dead" end
+		if ns.Flag(UnitInVehicle("player")) then return "in a vehicle" end
+		if HasFullControl and not ns.Flag(HasFullControl()) then return "no control (stunned, feared...)" end
+		if C_PetBattles and C_PetBattles.IsInBattle and ns.Flag(C_PetBattles.IsInBattle()) then return "pet battle" end
+		return nil
+	end
+	-- Just after a Fishing cast began, or just after a quick one ended.
+	function miss.JustCast()
+		local now = GetTime()
+		return (miss.chanStart and now - miss.chanStart < 1.5) or (miss.shortEnd and now - miss.shortEnd < 1) or false
+	end
 	local missWatcher = CreateFrame("Frame")
 	missWatcher:RegisterEvent("UI_ERROR_MESSAGE")
+	missWatcher:RegisterUnitEvent("UNIT_SPELLCAST_FAILED", "player")
+	missWatcher:RegisterUnitEvent("UNIT_SPELLCAST_CHANNEL_START", "player")
+	missWatcher:RegisterUnitEvent("UNIT_SPELLCAST_CHANNEL_STOP", "player")
+	function miss.OnSpell(event, spellID)
+		if type(spellID) ~= "number" or (issecretvalue and issecretvalue(spellID)) or not IsFishingSpell(spellID) then
+			return
+		end
+		local now = GetTime()
+		if event == "UNIT_SPELLCAST_CHANNEL_START" then
+			miss.chanStart, miss.shortEnd = now, nil
+			if not (castButton and castButton.clickedAt and now - castButton.clickedAt < 1) then
+				miss.Clear("you cast Fishing yourself")
+			end
+		elseif event == "UNIT_SPELLCAST_CHANNEL_STOP" then
+			miss.shortEnd = miss.chanStart and now - miss.chanStart < 1.5 and now or nil
+			miss.chanStart = nil
+		else
+			miss.Start("Fishing failed")
+		end
+	end
 	-- "Skill not high enough": fishing water (or clicking something) beyond your
 	-- skill. Moving won't fix that, so right-click casting stands aside for
 	-- SKILL_PAUSE seconds whatever you do. (The game's own name for the message
-	-- isn't certain, so a few likely ones are tried, and the English text.)
-	local SKILL_PAUSE = 30
-	local skillBlockedUntil = -math.huge
-	local function IsSkillError(message)
-		for _, name in ipairs({ "ERR_SKILL_NOT_HIGH_ENOUGH",
-			"SPELL_FAILED_MIN_SKILL", "SPELL_FAILED_FISHING_TOO_LOW" }) do
+	-- isn't certain, so a few likely ones are tried, and the English text;
+	-- where the client gives the error's type, its name is matched first.)
+	local SKILL_ERRORS = { "ERR_SKILL_NOT_HIGH_ENOUGH", "SPELL_FAILED_MIN_SKILL", "SPELL_FAILED_FISHING_TOO_LOW" }
+	local function IsSkillError(message, typeName)
+		for _, name in ipairs(SKILL_ERRORS) do
+			if typeName == name then
+				return true
+			end
+		end
+		for _, name in ipairs(SKILL_ERRORS) do
 			local text = _G[name]
 			if type(text) == "string" then
 				-- (One with a number or name filled in: the part before that.)
@@ -760,27 +849,49 @@ do
 	local function Plain(text)
 		return (text:gsub("\226\128\153", "'"))
 	end
-	local function IsMissError(message)
-		return (type(SPELL_FAILED_NOT_FISHABLE) == "string" and Plain(message) == Plain(SPELL_FAILED_NOT_FISHABLE))
+	local function IsMissError(message, typeName)
+		return typeName == "SPELL_FAILED_NOT_FISHABLE"
+			or (type(SPELL_FAILED_NOT_FISHABLE) == "string" and Plain(message) == Plain(SPELL_FAILED_NOT_FISHABLE))
 			or Plain(message) == "Your cast didn't land in fishable water"
 	end
 	ns.fishErrorDebug = {} -- for /dump: the last red error seen, and what it was taken for
-	local function OnErrorText(message, via)
+	-- (typeName: the game's own name for the error, as GetGameMessageInfo gives
+	-- it for the error's number, same in every language; nil where the client
+	-- gives only the text.)
+	local function OnErrorText(message, via, typeName)
 		if type(message) ~= "string" or (issecretvalue and issecretvalue(message)) then
 			return
 		end
 		local taken
-		if IsMissError(message) then
-			missedAt, movedSinceMiss, stoppedAt = GetTime(), false, nil
-			taken = "miss"
-		elseif (poleEquipped or (ns.IsFish and ns.IsFish())) and IsSkillError(message) then
+		if (poleEquipped or ns.FishCamOn()) and IsSkillError(message, typeName) then
 			skillBlockedUntil = GetTime() + SKILL_PAUSE
 			taken = "skill"
+		elseif IsMissError(message, typeName) or miss.JustCast() then
+			miss.Start("red error: " .. (typeName or message))
+			taken = "miss"
 		end
-		ns.fishErrorDebug = { message = message, via = via, taken = taken, at = GetTime() }
+		ns.fishErrorDebug = { message = message, type = typeName, via = via, taken = taken, at = GetTime() }
+		if poleEquipped or (ns.IsFish and ns.IsFish()) or GetTime() - channelEndedAt < 3 then
+			ns.Log("fishing", ("red error: %s [%s] (%s)"):format(message, tostring(typeName), taken or "not counted"))
+		end
 	end
-	missWatcher:SetScript("OnEvent", function(_, _, a, b)
-		OnErrorText(type(b) == "string" and b or a, "event") -- (message second on newer clients)
+	missWatcher:RegisterEvent("LOOT_OPENED")
+	missWatcher:SetScript("OnEvent", function(_, event, a, b, c)
+		if event == "UI_ERROR_MESSAGE" then
+			-- (Newer clients: the error's number, then the text. Older: the text.)
+			local typeName
+			if type(a) == "number" and GetGameMessageInfo and not (issecretvalue and issecretvalue(a)) then
+				local ok, name = pcall(GetGameMessageInfo, a)
+				typeName = ok and type(name) == "string" and name or nil
+			end
+			OnErrorText(type(b) == "string" and b or a, "event", typeName)
+		elseif event == "LOOT_OPENED" then
+			if IsFishingLoot and ns.Flag(IsFishingLoot()) then
+				miss.Clear("a catch")
+			end
+		else
+			miss.OnSpell(event, c)
+		end
 	end)
 	local OBJECT_REACH = 40 -- pixels (UI scale aside) the mouse can wander and still be on it
 	local function MouseOnSomething()
@@ -802,13 +913,15 @@ do
 		-- mid-press sends the release to the other binding, so a right-drag
 		-- begun as the game's (turning) never got its stop and stayed stuck.
 		local rightHeld = IsMouseButtonDown("RightButton")
-		if missedAt > -math.huge then
+		if GetTime() - miss.at < (tonumber(ns.db and ns.db.fishMissPause) or 30) then
 			if ns.playerMoving then
-				movedSinceMiss, stoppedAt = true, nil
-			elseif movedSinceMiss then
-				stoppedAt = stoppedAt or GetTime()
-				if GetTime() - stoppedAt >= MISS_SETTLE then
-					missedAt, movedSinceMiss, stoppedAt = -math.huge, false, nil -- settled somewhere new
+				miss.stoppedAt = nil
+				if not miss.moved and miss.Far() then miss.moved = true end
+			elseif miss.moved or miss.Far() then
+				miss.moved = true
+				miss.stoppedAt = miss.stoppedAt or GetTime()
+				if GetTime() - miss.stoppedAt >= 1 then
+					miss.at, miss.moved, miss.stoppedAt = -math.huge, false, nil -- settled somewhere new
 				end
 			end
 		end
@@ -816,23 +929,50 @@ do
 		if inCombat then
 			combatSeenAt = GetTime()
 		end
-		local fishCam = ns.IsFish and ns.IsFish()
-		local poleReady = ns.db and ns.db.fishPoleRightClickCast and poleEquipped and not fishCam
-			and not ns.playerMoving and not ns.Flag(IsMounted()) and not ns.OnTaxi()
-			and not ns.Flag(UnitIsDeadOrGhost("player"))
+		local fishCam = ns.FishCamOn()
+		-- Standing still STAND_STILL sec first (fish camera or not), so walking up
+		-- to a mining node or herb and clicking it straight away doesn't cast, and
+		-- any step, a side-step while fishing too, starts the wait over. Not in
+		-- the first 10 sec after you put the pole on (you mean to fish), which
+		-- also ends a missed-cast pause.
+		local now = GetTime()
+		if ns.playerMoving then
+			miss.stillSince = nil
+		elseif not miss.stillSince or (ns.movingSince and ns.movingSince >= miss.stillSince) then
+			miss.stillSince = now -- (a step too quick to be seen moving still counts)
+		end
+		local poleFresh = now - poleWatcher.equippedAt < 10
+		if poleFresh and poleWatcher.equippedAt > miss.at and now - miss.at < (tonumber(ns.db and ns.db.fishMissPause) or 30) then
+			miss.Clear("you put a pole on")
+		end
+		-- Standing still MISS_QUIET sec after a miss, doing nothing else (no
+		-- cast such as mining or picking a herb, no loot window): likely still
+		-- fishing here, the cast just aimed wrong, so the pause ends.
+		if ns.Flag(UnitCastingInfo("player")) or ns.Flag(UnitChannelInfo("player"))
+			or (LootFrame and ns.Flag(LootFrame:IsShown())) then
+			miss.busyAt = now
+		end
+		if miss.stillSince and now - miss.at < (tonumber(ns.db and ns.db.fishMissPause) or 30)
+			and now - math.max(miss.stillSince, miss.at, miss.busyAt or -math.huge) >= MISS_QUIET then
+			miss.Clear(("stood still %d sec"):format(MISS_QUIET))
+		end
+		local settled = poleFresh or (miss.stillSince and now - miss.stillSince >= STAND_STILL) or false
+		local poleReady = poleEquipped and not fishCam and not ns.playerMoving and settled
+		local cantFish = miss.CantFish()
 		-- (The Fishing page's switch off: no casting from here.)
 		local ready = ns.db and ns.db.handleFishing and not ns.Flag(UnitChannelInfo("player"))
 			and not ns.Flag(UnitCastingInfo("player"))
 			and GetTime() - channelEndedAt >= (tonumber(ns.db.fishRecastDelay) or 0.5)
-			and GetTime() - missedAt >= (tonumber(ns.db.fishMissPause) or 30)
+			and GetTime() - miss.at >= (tonumber(ns.db.fishMissPause) or 30)
 			and GetTime() >= skillBlockedUntil
 			and not (LootFrame and ns.Flag(LootFrame:IsShown()))
 			and not inCombat and GetTime() - combatSeenAt >= AFTER_COMBAT
+			and not cantFish
 		-- (In the fish camera only units count: the spot you just looted the
 		-- bobber at would otherwise keep right-click from casting again there.)
 		-- (Left button held: right-click is the game's, so both together run you forward.)
-		local want = ready and ns.db.fishRightClickCast and not IsMouseButtonDown("LeftButton")
-			and ((fishCam and not ns.Flag(UnitExists("mouseover"))) or (poleReady and not MouseOnSomething()))
+		local want = ready and ns.db.fishRightClickCast and poleEquipped and not IsMouseButtonDown("LeftButton")
+			and ((fishCam and settled and not ns.Flag(UnitExists("mouseover"))) or (poleReady and not MouseOnSomething()))
 		-- Why right-click isn't casting now (for /cine debug fishing, and the
 		-- log as it changes while you're fishing: fish camera, or a pole and a
 		-- cast in the last 2 minutes).
@@ -841,23 +981,21 @@ do
 			local now = GetTime()
 			if not ns.db.handleFishing then why = "Fishing page off"
 			elseif not ns.db.fishRightClickCast then why = "right-click cast switch off"
-			elseif not fishCam and not poleEquipped then why = "no fish camera, no pole equipped"
-			elseif not fishCam and not ns.db.fishPoleRightClickCast then why = "pole switch off (no fish camera)"
+			elseif not poleEquipped then why = "no pole equipped"
 			elseif ns.Flag(UnitChannelInfo("player")) or ns.Flag(UnitCastingInfo("player")) then why = "casting"
 			elseif inCombat then why = "combat"
+			elseif cantFish then why = cantFish
 			elseif now - combatSeenAt < AFTER_COMBAT then why = ("after combat (%.0fs left)"):format(AFTER_COMBAT - (now - combatSeenAt))
 			elseif LootFrame and ns.Flag(LootFrame:IsShown()) then why = "loot window open"
 			elseif now - channelEndedAt < (tonumber(ns.db.fishRecastDelay) or 0.5) then why = "wait after a cast"
-			elseif now - missedAt < (tonumber(ns.db.fishMissPause) or 30) then
-				why = ("missed-cast pause (%.0fs left; move and stand still to end it)"):format(
-					(tonumber(ns.db.fishMissPause) or 30) - (now - missedAt))
+			elseif now - miss.at < (tonumber(ns.db.fishMissPause) or 30) then
+				why = ("missed-cast pause (%.0fs left; stand still 5 sec, or move and stand still, to end it)"):format(
+					(tonumber(ns.db.fishMissPause) or 30) - (now - miss.at))
 			elseif now < skillBlockedUntil then why = ("skill pause (%.0fs left)"):format(skillBlockedUntil - now)
 			elseif IsMouseButtonDown("LeftButton") then why = "left button held"
 			elseif ns.Flag(UnitExists("mouseover")) then why = "mouse on a player or NPC"
-			elseif not fishCam and ns.playerMoving then why = "moving (pole, no fish camera)"
-			elseif not fishCam and ns.Flag(IsMounted()) then why = "mounted"
-			elseif not fishCam and ns.OnTaxi() then why = "on a flight"
-			elseif not fishCam and ns.Flag(UnitIsDeadOrGhost("player")) then why = "dead"
+			elseif ns.playerMoving then why = "moving"
+			elseif not settled then why = ("just stopped moving (%d sec wait)"):format(STAND_STILL)
 			elseif not fishCam and MouseOnSomething() then
 				why = ("mouse near an object you hovered %.0fs ago"):format(now - objectAt)
 			else why = "?" end
@@ -872,7 +1010,7 @@ do
 		end
 		-- The bobber out: reel in (not on a player or NPC: right-click is theirs).
 		local fishing = FishingChannel()
-		local reelSwitch = ns.db and ns.db.handleFishing and (ns.db.fishRightClickReel or ns.db.fishKeyReel)
+		local reelSwitch = ns.db and ns.db.handleFishing and ns.db.fishRightClickReel
 		local reelAny = reelSwitch and fishing and not inCombat
 		if reelAny and not wasFishing then
 			SafeFindFishKeys() -- (a cast just started: the bars as they are now)
@@ -882,15 +1020,24 @@ do
 			reelHeldUntil = GetTime() + REEL_HOLD
 		end
 		if not InCombatLockdown() then
-			ns.ApplyCVarSet(REEL_CVARS, GetTime() < reelHeldUntil and reelSwitch and true or false)
+			local holdReel = GetTime() < reelHeldUntil and reelSwitch and true or false
+			-- Soft targeting on for keyboard and mouse brings the game's icon
+			-- over what it picks (a trainer's book over an NPC, drawn in the
+			-- world even with the plate hidden): held as your own settings
+			-- would show it, set as the hold starts.
+			if holdReel and not REEL_CVARS.active and ns.OwnSoftIconShows then
+				REEL_CVARS.values.SoftTargetIconInteract = ns.OwnSoftIconShows(false) and "1" or "0"
+				REEL_CVARS.values.SoftTargetIconGameObject = ns.OwnSoftIconShows(true) and "1" or "0"
+			end
+			ns.ApplyCVarSet(REEL_CVARS, holdReel)
 		end
-		local reel = reelAny and ns.db.fishRightClickReel
+		local reel = reelAny
 		local reelMouse = reel and not IsMouseButtonDown("LeftButton") and not ns.Flag(UnitExists("mouseover"))
 		if not rightHeld then
 			SetRecast("BUTTON2", (want and "cast") or (reelMouse and "reel"))
 		end
 		-- The keys that cast Fishing from the bars (held ones stay as pressed).
-		local reelKeys = reelAny and ns.db.fishKeyReel
+		local reelKeys = reelAny
 		for key in pairs(fishKeys) do
 			if not IsKeyHeld(key) then
 				SetRecast(key, reelKeys and "reel")
@@ -905,7 +1052,7 @@ do
 		end
 		if padKey and not IsKeyHeld(padKey) and not (reelKeys and fishKeys[padKey]) then
 			local padOn = ns.db.fishGamepadCast and ns.IsGamePadOn()
-			local padWant = ready and padOn and (fishCam or poleReady)
+			local padWant = ready and padOn and poleEquipped and ((fishCam and settled) or poleReady)
 			SetRecast(padKey, (padWant and "cast") or (reel and padOn and "reel"))
 		end
 	end))
@@ -1632,7 +1779,19 @@ function ns.ActiveEvent()
 	end
 	local key, camera = CurrentEvent()
 	camera = ns.ShotBase(camera) -- (a shot: its camera; Shots.lua)
-	if camera and EVENT_CAM[camera] and ns.IsCameraOffHere(EVENT_CAM[camera]) then
+	-- (Started from the camera wheel or a key binding: as its script too, as
+	-- the rows' cameras play: CameraScripts.lua.)
+	if key == "Manual" and ns.ScriptBuiltInsOn and ns.ScriptBuiltInsOn() then camera = ns.BuiltInAsScript(camera) end
+	-- (Turned off here: Enable Cameras, Stop camera... One of ours as its
+	-- script goes by the same, but not its rows: they picked it.)
+	local off
+	if camera and EVENT_CAM[camera] then
+		off = ns.IsCameraOffHere(EVENT_CAM[camera])
+	else
+		local standIn = ns.ScriptStandIn and ns.ScriptStandIn(camera)
+		off = standIn and ns.CameraOffBesidesRows(standIn)
+	end
+	if off then
 		key, camera = nil, nil
 	end
 	-- (Noted after: working it out can end an emote.)
@@ -1656,6 +1815,12 @@ end
 -- Fish: the vista camera with a narrower sway, for fishing.
 function ns.IsFish()
 	return select(2, ns.ActiveEvent()) == "fish"
+end
+
+-- The fish camera running, by its own code or as its script (fishing's
+-- right-click reel and the rest go by it).
+function ns.FishCamOn()
+	return ns.IsFish() or (ns.PlayingCameraKey ~= nil and ns.PlayingCameraKey(true) == "fish")
 end
 
 -- Cozy: the camera swings round to face you and sways in front. The tele
@@ -2681,16 +2846,32 @@ do
 	end
 end
 
-function ns.IsDeathCinematic()
-	if not ns.IsDead() or ns.IsCameraOffHere("death") then
-		return false
-	end
+-- (On ns, not a local: this file is at Lua's 200-local limit.)
+function ns.DeathConditionsMet()
 	if GetTime() < (ns.deathTestUntil or 0) then
 		return true
 	end
 	local encounter = _G.IsEncounterInProgress
 	return not ((ns.db.deathAfterBoss and encounter and ns.Flag(encounter()))
 		or (ns.db.deathOffWithSelfRes and ns.CanSelfResurrect()))
+end
+function ns.IsDeathCinematic()
+	if not ns.IsDead() or ns.IsCameraOffHere("death") then
+		return false
+	end
+	return ns.DeathConditionsMet()
+end
+-- The death camera wanted now, by its own code or as its script (the Death
+-- row set to it): for the script's start, the death song, camera follow off
+-- and the ghost screen.
+function ns.DeathCinematicWanted()
+	if not ns.IsDead() or ns.CameraOffBesidesRows("death") then
+		return false
+	end
+	if ns.CameraRowsOff("death") and not (ns.CameraRowsScripted and ns.CameraRowsScripted("death")) then
+		return false
+	end
+	return ns.DeathConditionsMet()
 end
 
 -- Exit camera: a button under the release popup while the death camera's on
@@ -3443,7 +3624,7 @@ function ns.UpdateOrbit(cinematic, elapsed)
 	-- The game's camera follow is off meanwhile, so it can't pull the view back.
 	-- It goes off as you die, not as the tilt starts: switched off then, while
 	-- it was still easing the view after your fall, it jolted the tilt's start.
-	local followOff = (dead and ns.db.enabled and ns.IsDeathCinematic()) or false
+	local followOff = (dead and ns.db.enabled and ns.DeathCinematicWanted()) or false
 	if followOff ~= (ns.DEATH_CVARS.active or false) then
 		ns.DeathTestLog(followOff and "camera follow off" or "camera follow back on")
 		-- The death song starts as you die too (starting music can hitch a frame:
@@ -3452,7 +3633,7 @@ function ns.UpdateOrbit(cinematic, elapsed)
 	end
 	ns.ApplyCVarSet(ns.DEATH_CVARS, followOff)
 	ns.UpdateDeathTilt(deathCam, elapsed)
-	ns.UpdateDeathExit(followOff)
+	ns.UpdateDeathExit(ns.orbit.deadSince ~= nil) -- (its own code's button: a script has its own)
 	-- RP walk camera: only while auto-walking (auto-run in walk mode; walking by
 	-- hand cancels the cameras). Stop and stand, and it's the standing-still
 	-- camera again.
@@ -3485,7 +3666,8 @@ function ns.UpdateOrbit(cinematic, elapsed)
 		or (ns.stillSince and now - ns.stillSince >= ns.db.idleOrbitDelay
 			and not ns.IsCameraOffHere("idle") and ns.StillRunsAFK() and "idle")))
 		or (ns.QuestCamActive and ns.QuestCamActive() and "quest")
-		or (ns.ChatCamActive and ns.ChatCamActive() and "chatcam") or nil -- (in or out of cinematic mode)
+		or (ns.ChatCamActive and ns.ChatCamActive() and "chatcam")
+		or (ns.PlayingCameraKey and ns.PlayingCameraKey(true)) or nil -- (in or out of cinematic mode; one of ours as its script)
 	-- (logged always; printed with /cine debug modes)
 	ns.ReportCameraMode(ns.activeCam)
 	if travel and cinematic then

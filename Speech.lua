@@ -430,7 +430,7 @@ function ns.MoveSpeechBehind(inEditMode)
 		inEditMode = true -- (the Move button while Edit Mode has it up: keep it Edit Mode's)
 	end
 	mover.inEditMode = inEditMode or nil
-	mover.label:SetText(inEditMode and ns.L["Speech from behind you\nDrag to move, right-click to reset"]
+	mover.label:SetText(inEditMode and ns.EditModeName(ns.L["Speech from behind you\nDrag to move, right-click to reset"])
 		or ns.L["Speech from behind you shows here.\nDrag it where you want it, left-click to set, right-click to reset."])
 	mover.close:SetShown(not inEditMode)
 	ns.EditModeLook(mover, inEditMode)

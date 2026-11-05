@@ -509,6 +509,8 @@ local function OwnIconShows(object)
 	local covered = mode == 3 or (mode == 1 and pad) or (mode == 2 and not pad)
 	return covered and Own(object and "SoftTargetIconGameObject" or "SoftTargetIconInteract") == "1"
 end
+-- (Also for the fishing reel, Camera.lua, which turns soft targeting on too.)
+ns.OwnSoftIconShows = OwnIconShows
 
 local function IconOf(plate)
 	local frame = plate and plate.UnitFrame and plate.UnitFrame.SoftTargetFrame
@@ -626,8 +628,29 @@ local function HealSaved()
 	end
 end
 
+-- Letting go with a key bound to Interact: your saved SoftTargetInteract
+-- (often the game's default 1, gamepad only) would leave that key unable to
+-- pick objects, though it did while we held 3. The keyboard part stays on
+-- (0 -> 2, 1 -> 3).
+local function KeepInteractKey()
+	local saved = ns.db.savedCVars
+	local mode = tonumber(saved.SoftTargetInteract)
+	if not (mode == 0 or mode == 1) or not GetBindingKey then
+		return
+	end
+	local ok, key = pcall(GetBindingKey, "INTERACTTARGET")
+	if ok and key then
+		saved.SoftTargetInteract = tostring(mode + 2)
+		ns.Log("cvar", ("SoftTargetInteract: yours was %d but %s is your Interact key, %d goes back"):format(mode,
+			tostring(key), mode + 2))
+	end
+end
+
 local function Update()
 	local on = Wanted()
+	if not on and CVARS.active then
+		KeepInteractKey()
+	end
 	-- Retail draws the icon over a creature-like interact pick (a hand over the
 	-- shears on a table) in the world, with no plate to hide it on: held as
 	-- your own settings would show it (followed as gamepad mode changes).

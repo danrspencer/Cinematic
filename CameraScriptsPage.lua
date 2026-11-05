@@ -31,12 +31,12 @@ local COLORS = {
 }
 local KIND_COLOR = { rotate = "move", tilt = "move", zoom = "move", zoomRand = "move", lineup = "move",
 	wait = "wait", together = "flow", ["repeat"] = "flow", emote = "misc", putback = "misc", turnTo = "move",
-	sway = "move", tiltRand = "move", spin = "move", ["until"] = "flow", waitRand = "wait", follow = "misc", aim = "move", ending = "flow",
+	sway = "move", tiltRand = "move", spin = "move", ["until"] = "flow", waitRand = "wait", aim = "move", ending = "flow",
 	play = "flow", endMusic = "misc" }
 local KIND_NAMES = { rotate = "Rotate", tilt = "Tilt", zoom = "Zoom", zoomRand = "Zoom at random",
 	lineup = "Line up", wait = "Wait", together = "Together", ["repeat"] = "Repeat", emote = "Emote",
 	putback = "Put back", turnTo = "Turn to", sway = "Sway", tiltRand = "Tilt at random", spin = "Spin",
-	["until"] = "Wait until", waitRand = "Wait at random", follow = "Follow", aim = "Aim at", play = "Play", endMusic = "End music" }
+	["until"] = "Wait until", waitRand = "Wait at random", aim = "Aim at", play = "Play", endMusic = "End music" }
 -- (A field's name: by its kind first, where the same key means something else there.)
 local FIELD_NAMES = { deg = "Degrees", secs = "Seconds", way = "Way", ease = "Ease", to = "Yards", min = "Nearest",
 	max = "Furthest", token = "Emote", times = "Times", of = "From", around = "Around", arc = "Arc", drift = "Drift",
@@ -51,12 +51,12 @@ local CHOICE_NAMES = { left = "Left", right = "Right", random = "Either way", on
 	speaker = "Who's talking", stay = "Stay", look = "Look round", ["past.no"] = "No", ["past.yes"] = "Yes",
 	["zoom.no"] = "No", ["zoom.yes"] = "Yes" }
 local RULE_NAMES = { camera = "You move the camera", fight = "A fight starts", walk = "You walk", zoom = "You zoom",
-	ends = "Its trigger ends" }
+	ends = "Its trigger ends", cast = "Your cast ends" }
 local ACTION_NAMES = { stop = "Stop, leave it there", putback = "Run When it ends", pause = "Pause, then carry on",
 	restart = "Start again", ignore = "Carry on" }
 local HINTS = {
 	rotate = "Turns the view, as your Turn view left and right keys do. One turn at a time. Picked once: either way, the same for every such turn in the script.",
-	tilt = "Positive tilts the view down, negative up. It waits for a turn to finish: the game won't do both at once.",
+	tilt = "Positive tilts the view down, negative up. Beside a turn (Together), both go at once.",
 	zoom = "Zooms to this many yards from you, or (From: your zoom) this many further out than you were as it started (negative: closer). Top speed (yards a second): quicker if it gets there sooner, Seconds the longest it takes; 0 goes by Seconds. Past max: further out than the game's own limit lets you.",
 	zoomRand = "Zooms somewhere between the two, picked each time it runs: yards from you, or from your distance as it started. Top speed and Past max as for Zoom.",
 	lineup = "Turns back to straight behind you, however far round it is.",
@@ -65,13 +65,12 @@ local HINTS = {
 	["repeat"] = "Runs the steps inside it again. 0 times: until the camera ends (the preview shows three).",
 	emote = "Your character does this emote (a word, like wave or cheer).",
 	putback = "Undoes every turn, tilt and zoom this script made. Zoom too off: the zoom stays, for a Zoom beside it in a Together to bring back at its own speed.",
-	turnTo = "Behind: the game's camera follow brings it around behind you, as the vista camera lines up. In front: turns to face you, counted from where it started.",
+	turnTo = "Turns to face you, counted from where it started.",
 	sway = "A random spot within Arc of behind (or in front), At least that far on; then it creeps on at Drift degrees a second through Pause, easing off before the edge. Middle: favor spots near the middle.",
 	tiltRand = "A random height: Middle degrees down (negative: up), give or take Down and Up. It waits for a turn to finish.",
 	spin = "Round and round, speeding up by Speed-up degrees a second each second to Top speed. 0 seconds: until the camera ends.",
 	["until"] = "Waits until a Hearthstone or teleport cast is that many seconds from done, you're that many seconds from landing (on a route you've flown before), you're back to life, or the seconds go by. Steps inside it run meanwhile and ease to a stop when it's time.",
 	waitRand = "Waits somewhere between the two, picked each time.",
-	follow = "From here on, after you turn and hold still this many seconds, camera follow glides the camera back behind you, as the RP walk and auto-run cameras do.",
 	aim = "Where you clicked: turns Degrees toward the side of the screen you clicked who you're talking to, as the quest cam does. Who's talking: swings toward the NPC talking now by their chat bubble, leaving them Degrees off the middle, as Chat Cam does. Not found (opened with a key, no bubble on screen): a turn either way, stay, or look round (a full turn at most) for their bubble. Top speed (degrees a second): slower than Seconds if the turn would go faster; 0 goes by Seconds.",
 	play = "Plays another camera's steps here, as they are now (a built-in one with your settings), then goes on. Not its stop rules or When it ends.",
 	endMusic = "Fades out the music a camera started, over this many seconds, and ends it (your own game music is left alone). The next steps go on meanwhile. Put it in When it ends to stop the music as the scene ends.",
@@ -120,11 +119,10 @@ local function StepText(step)
 		return L["Zoom somewhere from %s to %s yd over %s s"]:format(Num(step.min), Num(step.max), Num(step.secs))
 	elseif k == "lineup" then
 		return L["Line up behind you over %s s"]:format(Num(step.secs))
-	elseif k == "turnTo" and step.to == "front" and step.fit == "cast" then
+	elseif k == "turnTo" and step.fit == "cast" then
 		return L["Turn to face you before the cast ends"]
 	elseif k == "turnTo" then
-		return (step.to == "front" and L["Turn to face you over %s s"] or L["Turn around behind you over %s s"]):format(
-			Num(step.secs))
+		return L["Turn to face you over %s s"]:format(Num(step.secs))
 	elseif k == "until" then
 		local text = step.what == "cast" and (step.secs > 0 and L["Until the cast is %s s from done"]:format(Num(step.secs))
 			or L["Until the cast ends"])
@@ -135,8 +133,6 @@ local function StepText(step)
 		return #step.steps > 0 and text .. L[", doing these"] or text
 	elseif k == "waitRand" then
 		return L["Wait %s to %s s"]:format(Num(math.min(step.min, step.max)), Num(math.max(step.min, step.max)))
-	elseif k == "follow" then
-		return L["Follow: after you turn, glide behind you (after %s s still)"]:format(Num(step.after))
 	elseif k == "aim" then
 		return (step.at == "click" and L["Turn %s° toward where you clicked them over %s s"]
 			or L["Swing to who's talking, %s° off the middle, over %s s"]):format(Num(step.deg), Num(step.secs))
@@ -1590,8 +1586,8 @@ function ns.CreateCameraScriptsPanel(kit)
 			page.share:SetPoint("LEFT", not page.builtin and page.delete or script.edited and page.reset or page.copy,
 				"RIGHT", 4, 0)
 			page.tipStatus = not page.builtin and L["Yours: change anything."]
-				or script.edited and L["Built in, changed by you: change anything. Reset puts ours back. The camera itself still runs on its own code: set a row to this script to use it instead."]
-				or L["Built in, from your settings: change anything, and it's kept as yours of it (Reset puts ours back). The camera itself still runs on its own code: set a row to this script to use it instead."]
+				or script.edited and L["Built in, changed by you: change anything, and the camera plays your version. Reset puts ours back."]
+				or L["Built in, from your settings: this is what the camera plays. Change anything, and it's kept as yours of it (Reset puts ours back)."]
 			y = top + 4
 			local keys = ns.CameraScriptTriggers(script.id)
 			local names = {}

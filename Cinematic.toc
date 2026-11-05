@@ -53,6 +53,8 @@ Support\DBM.lua
 Support\Questie.lua
 Support\RestedXP.lua
 Support\NaowhForever.lua
+Support\DialogueUI.lua
+Support\Immersion.lua
 Frames.lua
 HealVisionFrames.lua
 Chat.lua

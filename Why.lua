@@ -226,6 +226,8 @@ local function ExplainTooltip()
 		Add(out, "on", L["CineMode was off, so tooltips show as usual"], "CineMode")
 	elseif last.keyDown then
 		Add(out, "on", L["You were holding the key that shows tooltips"], "Tooltips")
+	elseif last.why == "listed" then
+		Add(out, "block", L["On the Filtered tooltips list: never shown in CineMode"], "Tooltips")
 	elseif last.why == "until still" then
 		Add(out, "block", L["Hide until the mouse is still: the mouse hadn't been still long enough"], "Tooltips")
 	else

@@ -467,6 +467,21 @@ function ns.CameraRowsOff(cam)
 	return true
 end
 
+-- Whether a camera with a trigger of its own plays as its script now: the
+-- row its trigger goes by set to it while our cameras play their scripts
+-- (CameraScripts.lua). Its own code is off then (ns.CameraRowsOff), but it's
+-- still that camera: the death song, the ghost screen...
+local SCRIPT_OF = { flight = "flight", walk = "walk", run = "run", death = "death", chatcam = "chat", quest = "quest" }
+function ns.CameraRowsScripted(cam)
+	local keys = OWN_TRIGGER[cam]
+	if cam == "quest" then keys = { ns.QuestCamEvent and ns.QuestCamEvent() or "Quest" } end
+	if not keys or not SCRIPT_OF[cam] then return false end
+	for _, key in ipairs(keys) do
+		if TRIGGER[key] and ns.TriggerSetting(key, "camera") == "script:" .. SCRIPT_OF[cam] then return true end
+	end
+	return false
+end
+
 -- The same in words, for /cine debug mode: each of its trigger's rows, and
 -- why it isn't the one (ticked off, its When, or another camera).
 local PLACE_LISTS = { "worldShow", "cityShow", "instanceShow", "bgShow", "groupShow" }
