@@ -333,12 +333,17 @@ local zoom = 0 -- the camera's distance from you, this frame
 -- does this much), so a name shown alone fades out while its plate is
 -- dimmed, and back as its unit comes into sight. The game's names stay up
 -- through short gaps the plate dims for (the edge of a stair, seen on
--- video), so a name only goes once its plate has stayed dimmed a while (the
--- Name Style page's Hide delay). Full plates are left dimmed as the game
--- has them. [plate] = how far it shows (nil: all).
+-- video), so a name showing only goes once its plate has stayed dimmed a
+-- while (the Name Style page's Hide delay). That wait is for names already
+-- up: a new plate's name starts hidden and shows once its plate is clear,
+-- so units behind a wall as you walk up never show. The game's dimming
+-- flickers (1.00 to 0.5 and back in under half a second, logged), so only
+-- SIGHT_CLEAR of clear counts as clear. Full plates are left dimmed as the
+-- game has them. [plate] = how far it shows (nil: all).
 local sight = {}
 local dimSince = {} -- [plate] = when its plate was first seen dimmed
-local SIGHT_FADE = 0.4 -- seconds
+local clearSince = {} -- [plate] = when its plate was last seen go clear
+local SIGHT_CLEAR = 0.2 -- seconds (the fade itself: the page's Fade time)
 
 -- A name's size (times the plate's) and height at the camera's distance
 -- now; retail's, as the page says. (band: unused, see above.)
@@ -2406,11 +2411,15 @@ watcher:SetScript("OnEvent", function(_, event, unit)
 	if not plate then
 		return
 	end
+	-- (A new plate's name starts hidden: see sight.)
+	if event == "NAME_PLATE_UNIT_ADDED" then
+		sight[plate] = 0
+	end
 	if event == "NAME_PLATE_UNIT_REMOVED" then
 		plateClass[plate], plateRole[plate] = nil, nil
 		bodyShare[plate], nameShare[plate], markShare[plate], textShare[plate] = nil, nil, nil, nil
 		bandOf[plate], swaps[plate] = nil, nil
-		sight[plate], dimSince[plate] = nil, nil
+		sight[plate], dimSince[plate], clearSince[plate] = nil, nil, nil
 		if Usable(plate.UnitFrame) then
 			CentreName(plate.UnitFrame, false)
 			OwnName(plate, nil)
@@ -2500,10 +2509,18 @@ ns.SetOnUpdate(farWatch, ns.Profiled("Plate names", function(self, elapsed)
 		local level = sight[plate] or 1
 		local okAlpha, alpha = pcall(plate.GetAlpha, plate)
 		local dimmed = (bodyShare[plate] or 1) < 0.5 and okAlpha and Known(alpha) and alpha < 0.99
-		dimSince[plate] = dimmed and (dimSince[plate] or now) or nil
-		local target = (dimmed and now - dimSince[plate] >= Style("plateNameHideDelay")) and 0 or 1
+		if dimmed then
+			dimSince[plate], clearSince[plate] = dimSince[plate] or now, nil
+		else
+			clearSince[plate] = clearSince[plate] or now
+			if now - clearSince[plate] >= SIGHT_CLEAR then
+				dimSince[plate] = nil
+			end
+		end
+		local since = dimSince[plate]
+		local target = (since and (level < 1 or now - since >= Style("plateNameHideDelay"))) and 0 or 1
 		if level ~= target then
-			level = ns.Approach(level, target, elapsed, SIGHT_FADE)
+			level = ns.Approach(level, target, elapsed, Style("plateNameFadeTime"))
 			sight[plate] = level < 1 and level or nil
 			personal = personal or PersonalPlate()
 			ApplyPlate(plate, personal)

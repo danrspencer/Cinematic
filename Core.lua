@@ -966,7 +966,10 @@ DEFAULTS.plateStyleHeight = 1
 -- The game's Show Offscreen Nameplates on in CineMode (Effects'
 -- OFFSCREEN_PLATE_CVARS): plates for units out of view stay, so the elite
 -- rules find an elite behind you. Yours back after.
-DEFAULTS.plateShowOffscreen = true
+-- (Off: pinned plates make the game's big head name flash as a nearby unit
+-- crosses the screen's edge, tested on Forever. Elite rules then lose an
+-- elite off screen.)
+DEFAULTS.plateShowOffscreen = false
 for _, kind in ipairs({ "aggro", "focus", "mouseover", "others", "npc", "elite", "npcs", "players", "minions",
 	"all" }) do
 	DEFAULTS[kind .. "MarkAlpha"] = 1
@@ -1012,6 +1015,7 @@ DEFAULTS.plateNameAlpha = 1
 DEFAULTS.plateNameY = 0 -- up from where the game puts it (retail)
 DEFAULTS.plateNameFixedSize = true -- one size at any distance (retail: Forever's plates don't scale)
 DEFAULTS.plateNameHideDelay = 1.5 -- seconds a plate stays dimmed (out of sight) before its name hides
+DEFAULTS.plateNameFadeTime = 0.4 -- seconds a name takes to fade out or in as its unit leaves or comes into sight
 -- Forever: size and height with the camera zoomed all the way in, and about
 -- 34 yards out (see PlateParts' Look)
 DEFAULTS.plateNameCloseSize = 1.6
@@ -5108,6 +5112,18 @@ ticker:SetScript("OnEvent", ns.Profiled("Core events", function(self, event, arg
 				if type(saved) == "table" then saved.petWhenNotFull = nil end
 			end
 			ns.db.petWhenNotFullOffV1 = true
+		end
+		-- Off-screen plates in CineMode off to start with now (the game's head
+		-- names flashed at the screen's edge): off in every profile. Once.
+		if not ns.db.plateOffscreenOffV1 then
+			ns.db.plateShowOffscreen = false
+			for _, saved in pairs(ns.db.profiles or {}) do
+				if type(saved) == "table" then
+					saved.plateShowOffscreen = nil
+					if type(saved.settings) == "table" then saved.settings.plateShowOffscreen = nil end
+				end
+			end
+			ns.db.plateOffscreenOffV1 = true
 		end
 		-- The letterbox's height and opacity moved to the Style hub's Letterbox
 		-- page: a height or opacity of your own turns it on, to keep them. Once.

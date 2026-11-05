@@ -533,6 +533,8 @@ local function BoxLine(parent)
 			box.unitLabel = after
 			right = right + after:GetStringWidth() + 4
 		end
+		-- (Found by search: its page scrolls to it and it glows.)
+		box.searchEdges = { top = box, bottom = box, left = name, right = box.unitLabel or box }
 		line:SetWidth(right)
 		-- (Greyed, the box and its words dim: a disabled box alone looks the same.)
 		local setEnabled = box.SetEnabled
@@ -1293,11 +1295,38 @@ end
 
 -- /cine find <words>: the settings search's best match for them, opened as
 -- clicking it would (its page, scrolled to it, glowing). Returns its text and
--- its page's name, or nil with nothing found.
+-- its page's name, or nil with nothing found. Page|Page|words looks only on
+-- pages with all those names (ns.PageOnPath), as the same words are on many
+-- pages: Style|Names|fade time. After a pipe, the first word can be a page
+-- too: Style|Names fade time (tried first, then as all words). (Pipes come
+-- from the chat box doubled: any run of them splits.)
 function ns.FindSetting(query)
-	query = type(query) == "string" and query:match("^%s*(.-)%s*$") or ""
-	if query == "" then return nil end
-	local best = SearchMatches(BuildSearchIndex(), query)[1]
+	local parts = {}
+	for part in (type(query) == "string" and query or ""):gmatch("[^|]+") do
+		part = part:match("^%s*(.-)%s*$"):lower()
+		if part ~= "" then parts[#parts + 1] = part end
+	end
+	local words = table.remove(parts)
+	if not words then return nil end
+	local function Best(text)
+		local pages
+		if #parts > 0 then
+			pages = {}
+			for _, page in ipairs(searchPages) do
+				if ns.PageOnPath(page.key, parts) then pages[#pages + 1] = page end
+			end
+			if #pages == 0 then return nil end
+		end
+		return SearchMatches(BuildSearchIndex(pages), text)[1]
+	end
+	local best
+	local first, rest = words:match("^(%S+)%s+(.+)$")
+	if first and #parts > 0 then
+		parts[#parts + 1] = first
+		best = Best(rest)
+		parts[#parts] = nil
+	end
+	best = best or Best(words)
 	if not best then return nil end
 	ShowMatch(best)
 	return best.text, best.page.name or "Cinematic"
@@ -2409,6 +2438,45 @@ do
 			end
 		end
 		return L[name]
+	end
+
+	-- Whether a page (its English name; nil: the main page) goes by every
+	-- one of parts (lower case): each found in its name, its label, the page
+	-- it's a tab of, its hub's or the hub that's under, in English or the
+	-- language shown. (/cine find Style|Names|fade time.)
+	function ns.PageOnPath(name, parts)
+		local known = {}
+		local function add(text)
+			if type(text) == "string" then
+				known[#known + 1] = text:lower()
+				known[#known + 1] = L[text]:lower()
+			end
+		end
+		local function addHub(hub)
+			add(hub.name)
+			add(hub.label)
+		end
+		add(name or "Cinematic")
+		for _, hub in ipairs(HUBS) do
+			for _, page in ipairs(hub.pages) do
+				if page[1] == name then
+					add(page.label)
+					add(page.tabOf)
+					addHub(hub)
+					for _, each in ipairs(HUBS) do
+						if each.name == hub.under then addHub(each) end
+					end
+				end
+			end
+		end
+		for _, part in ipairs(parts) do
+			local found = false
+			for _, text in ipairs(known) do
+				if text:find(part, 1, true) then found = true break end
+			end
+			if not found then return false end
+		end
+		return true
 	end
 
 	-- A hub page's icon by its English name (nil for a page with none).
@@ -8295,6 +8363,9 @@ local function CreateNameStylePanel()
 		boxes:Box(L["Hide delay"], "plateNameHideDelay", 0, 10, 0.1, "%.1f", 1,
 			L["How long a unit has to stay out of sight before its name hides, so a short gap like the edge " ..
 			"of a stair doesn't take it away. 0: at once."], On, L["sec"])
+		boxes:Box(L["Fade time"], "plateNameFadeTime", 0, 5, 0.1, "%.1f", 1,
+			L["How long a name takes to fade out as its unit leaves sight, and in as it comes into sight. " ..
+			"0: at once."], On, L["sec"])
 	end
 	if ns.isRetail then
 		local sizes = rows.Boxes()
