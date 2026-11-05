@@ -1763,7 +1763,8 @@ do
 			{ "My Shots", "Interface\\Icons\\INV_Misc_Spyglass_02", section = "Cameras" }, -- (ShotsPage.lua)
 			-- (Surge Forward's own icon, from the game: SkyrideCam.lua, retail.)
 			{ "Skyriding Cam", function()
-				local ok, icon = pcall(C_Spell.GetSpellTexture, 372608)
+				local get = C_Spell and C_Spell.GetSpellTexture
+				local ok, icon = pcall(get or error, 372608)
 				return ok and icon or "Interface\\Icons\\INV_Misc_Spyglass_02"
 			end, section = "Cameras" },
 			{ "Camera Settings", "Interface\\Icons\\Trade_Engineering", dev = true, section = "Dev" }, -- (settings no script step uses)
