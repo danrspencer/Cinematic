@@ -4344,10 +4344,11 @@ end
 ns.shownBuffIcons = nil -- picture -> how many shown at the last look (nil: unknown)
 ns.shownBuffEnds = {} -- readable picture -> its latest end time then
 ns.shownBuffTotal = nil -- how many buffs then (the highest aura index)
+ns.shownBuffPictures = nil -- aura index -> its picture then (nil: secret or none)
 ns.fightNewBuffs = {} -- place from the top -> when its time is up (0: not one of these)
 function ns.CheckNewBuffIcons(peek)
 	C_Timer.After(0, function()
-		local shown, total, secretAt, ends = {}, 0, {}, {}
+		local shown, total, secretAt, ends, pictureAt = {}, 0, {}, {}, {}
 		ns.ForEachBuffIcon(function(button)
 			local okShown, isShown = pcall(button.IsShown, button)
 			if okShown and ns.Flag(isShown) then
@@ -4365,19 +4366,56 @@ function ns.CheckNewBuffIcons(peek)
 				if type(index) == "number" and not (issecretvalue and issecretvalue(index)) then
 					total = math.max(total, index)
 					secretAt[index] = secret
+					pictureAt[index] = not secret and icon or nil
 				end
 			end
 		end)
 		local before, totalBefore, endsBefore = ns.shownBuffIcons, ns.shownBuffTotal, ns.shownBuffEnds
+		local picturesBefore = ns.shownBuffPictures
 		ns.shownBuffIcons, ns.shownBuffTotal, ns.shownBuffEnds = shown, total, ends
+		ns.shownBuffPictures = pictureAt
 		-- (Every fight change, the count the same too: one buff ending as
 		-- another comes leaves it unchanged.)
 		if ns.auraDebug and peek then
 			local places = {}
 			for index = total, 1, -1 do
-				places[#places + 1] = index .. (secretAt[index] and ":S" or "")
+				places[#places + 1] = index .. (secretAt[index] and ":S" or (":" .. tostring(pictureAt[index])))
 			end
 			ns.AuraSay(("buffs %s -> %d, highest first: %s"):format(tostring(totalBefore), total, table.concat(places, " ")))
+		end
+		-- Fewer buffs than before: the new ones' places from the top move with
+		-- the ones that ended. Readable ones that went (their picture shown
+		-- fewer times) are known by their old places, and their marks go with
+		-- them. A secret one can't be told apart: the marks are dropped then
+		-- (the new ones fade early), else one slides onto an older buff and
+		-- that shows instead (seen: a proc ending, then Prayer of Fortitude
+		-- shown for a Lightning Shield). (Only when the count drops: pictures
+		-- turning secret as a fight starts look like ended ones too.)
+		if totalBefore and total < totalBefore and #ns.fightNewBuffs > 0 then
+			local gone = {}
+			for icon, times in pairs(before or {}) do
+				local left = times - (shown[icon] or 0)
+				for index = totalBefore, 1, -1 do
+					if left <= 0 then break end
+					if picturesBefore and picturesBefore[index] == icon then
+						gone[#gone + 1] = totalBefore - index + 1
+						left = left - 1
+					end
+				end
+			end
+			if #gone == totalBefore - total then
+				table.sort(gone, function(a, b) return a > b end)
+				for _, place in ipairs(gone) do
+					if place <= #ns.fightNewBuffs then
+						table.remove(ns.fightNewBuffs, place)
+					end
+				end
+			else
+				if ns.auraDebug then
+					ns.AuraSay("fight buff ended, can't tell which: new ones' places dropped")
+				end
+				wipe(ns.fightNewBuffs)
+			end
 		end
 		if not (peek and before) then
 			return
@@ -8154,6 +8192,9 @@ function ns.ReportMinimap()
 		Value(entry.alpha), Value(entry.applied), tostring(entry.shrunk or false), Value(SHRUNK_SCALE),
 		tostring(ns.IsParked(entry)), tostring(alphaHooked[frame] == entry)))
 	ns.Print(("  size to grow back to %s"):format(Value(entry.savedScale)))
+	-- (Inspect's reasons, what's keeping it up or down: printed last, half a
+	-- second on, once the fade has noted them.)
+	if ns.PrintWhyLater then ns.PrintWhyLater(entry, "  ") end
 	ns.Print("  " .. ns.MinimapIconState())
 	if entry.savedPoints then
 		ns.Print(("  anchors to put back (%d):"):format(#entry.savedPoints))

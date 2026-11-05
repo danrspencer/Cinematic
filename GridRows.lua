@@ -1309,14 +1309,28 @@ ns.ROW_LIST_LABEL_W = LIST_LABEL_W
 function ns.RowList(kit, parent, items)
 	local list = CreateFrame("Frame", nil, parent)
 	list:SetSize(LIST_ROW_W, LIST_ROW_H)
-	local rows, drawers, opened = {}, {}, {}
+	local rows, drawers, opened, titles = {}, {}, {}, {}
 	local function Layout()
-		local y = 0
+		local y, lastGroup, g, band = 0, nil, 0, 0
 		for i, item in ipairs(items) do
 			local row, drawer = rows[i], drawers[i]
+			-- (A title over each group's rows, as the emote page's moments: item.group.)
+			if item.group and item.group ~= lastGroup then
+				lastGroup, g, band = item.group, g + 1, 0
+				if g > 1 then y = y + 10 end
+				local title = titles[g] or kit.Label(list, "GameFontNormal", "")
+				titles[g] = title
+				title:SetText(item.group)
+				title:ClearAllPoints()
+				title:SetPoint("TOPLEFT", list, "TOPLEFT", 2, -y)
+				title.searchSkip = true
+				title:Show()
+				y = y + 20
+			end
+			band = band + 1
 			row:ClearAllPoints()
 			row:SetPoint("TOPLEFT", list, "TOPLEFT", 0, -y)
-			row.band:SetColorTexture(1, 1, 1, i % 2 == 1 and 0.04 or 0)
+			row.band:SetColorTexture(1, 1, 1, band % 2 == 1 and 0.04 or 0)
 			y = y + LIST_ROW_H
 			row.toggle:SetNormalTexture(opened[item.id] and "Interface\\Buttons\\UI-MinusButton-Up"
 				or "Interface\\Buttons\\UI-PlusButton-Up")

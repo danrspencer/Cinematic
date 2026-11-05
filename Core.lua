@@ -602,18 +602,39 @@ end
 -- off everywhere (Cameras page), as the events' "No camera" does.
 DEFAULTS.walkCamera = "walk"
 DEFAULTS.runCamera = "run"
--- Skyriding Cam (SkyrideCam.lua: dev copy, retail): in the air, the Skyriding
+-- Skyriding Cam (SkyrideCam.lua: retail): in the air, the Skyriding
 -- zoom script zooms out to skyrideCamDistance over skyrideCamZoomTime, and
--- back over skyrideCamBackTime as you land. Off to start with, in every
--- profile.
-DEFAULTS.skyrideCam = false
+-- back over skyrideCamBackTime as you land. On to start with, in every profile.
+DEFAULTS.skyrideCam = true
 DEFAULTS.skyrideCamAlways = true -- ...everywhere: its Show in row's Always
-DEFAULTS.skyrideCamDistance = 39 -- ...yards out
-DEFAULTS.skyrideCamZoomTime = 3 -- ...seconds zooming out
-DEFAULTS.skyrideCamBackTime = 2.5 -- ...seconds back in after landing
+DEFAULTS.skyrideCamDistance = 20 -- ...take-off: yards out (your cruise distance: surges go out from it, come back to it)
+DEFAULTS.skyrideCamZoomTime = 4 -- ...take-off: seconds zooming out
+DEFAULTS.skyrideCamBackTime = 3 -- ...seconds coming back in after landing
 DEFAULTS.skyrideCamStart = 0.5 -- ...seconds in the air before it starts (not for a hop)
-DEFAULTS.skyrideCamLand = 2 -- ...seconds on the ground before it ends (not for a touch between flaps)
+DEFAULTS.skyrideCamLand = 0.5 -- ...seconds on the ground before it starts coming back (not for a touch between flaps)
 DEFAULTS.skyrideCine = false -- ...CineMode while skyriding
+-- ...its moments, each as you cast it (SkyrideCam.lua): on, how much, how long.
+DEFAULTS.skyrideSurge, DEFAULTS.skyrideSurgeYards, DEFAULTS.skyrideSurgeTime = true, 6, 1 -- Surge Forward: zoom out by...
+DEFAULTS.skyrideSurgeHold, DEFAULTS.skyrideSurgeBack = 1, 2.5 -- ...held, then back to cruise over
+DEFAULTS.skyrideAscent, DEFAULTS.skyrideAscentDeg = true, 35 -- Skyward Ascent: tilt up by...
+DEFAULTS.skyrideAscentTime, DEFAULTS.skyrideAscentHold = 1.5, 2 -- ...over, held, then back
+DEFAULTS.skyrideWhirl, DEFAULTS.skyrideWhirlYards, DEFAULTS.skyrideWhirlTime = true, 39, 0.5 -- Whirling Surge: zoom out to...
+DEFAULTS.skyrideWhirlHold, DEFAULTS.skyrideWhirlBack = 3, 6 -- ...held, then back to cruise over
+DEFAULTS.skyrideHalt, DEFAULTS.skyrideHaltDeg = true, 150 -- Aerial Halt: swing round by...
+DEFAULTS.skyrideHaltTime, DEFAULTS.skyrideHaltHold = 1.5, 2 -- ...over, held, then back
+DEFAULTS.skyrideHaltYards = 15 -- ...zooming in to this meanwhile (0: no zoom)
+DEFAULTS.skyrideWind, DEFAULTS.skyrideWindYards, DEFAULTS.skyrideWindTime = false, 4, 1.5 -- Second Wind: in by, and back
+-- ...and while you climb, dive or turn (worked out from your speed and position): tilt or turn by, over.
+DEFAULTS.skyrideClimb, DEFAULTS.skyrideClimbDeg, DEFAULTS.skyrideClimbTime = true, 40, 1.5 -- climbing: tilt up with you, up to
+DEFAULTS.skyrideDive, DEFAULTS.skyrideDiveDeg, DEFAULTS.skyrideDiveTime = true, 60, 1.5 -- diving: tilt down with you, up to
+DEFAULTS.skyrideTurn, DEFAULTS.skyrideTurnDeg, DEFAULTS.skyrideTurnTime = true, 20, 1.5 -- turning: into the turn
+DEFAULTS.skyrideFollow, DEFAULTS.skyrideFollowAfter = true, 0.5 -- ...or follow your turns (auto-run's), gliding back after
+DEFAULTS.skyrideFollowMost = 50 -- ...falling behind a turn this far at most (degrees)
+-- ...Blend: the fastest each move goes (degrees or yards a second, at its top
+-- speed; a move that would go faster takes longer), and seconds a move going
+-- as the next moment starts slides into it instead of stopping first.
+DEFAULTS.skyrideMaxTurn, DEFAULTS.skyrideMaxTilt, DEFAULTS.skyrideMaxZoom = 180, 60, 30
+DEFAULTS.skyrideBlend = 1
 -- Seconds of auto-walking or auto-running before its camera starts (and its
 -- CineMode column with it); 0 is straight away.
 DEFAULTS.walkCameraDelay = 0
@@ -990,8 +1011,9 @@ DEFAULTS.plateNameSize = 1 -- times the game's (retail)
 DEFAULTS.plateNameAlpha = 1
 DEFAULTS.plateNameY = 0 -- up from where the game puts it (retail)
 DEFAULTS.plateNameFixedSize = true -- one size at any distance (retail: Forever's plates don't scale)
--- Forever: size and height with a unit about 10 yards from the camera, and
--- about 50 (see PlateParts' Look)
+DEFAULTS.plateNameHideDelay = 1.5 -- seconds a plate stays dimmed (out of sight) before its name hides
+-- Forever: size and height with the camera zoomed all the way in, and about
+-- 34 yards out (see PlateParts' Look)
 DEFAULTS.plateNameCloseSize = 1.6
 DEFAULTS.plateNameCloseY = -9
 DEFAULTS.plateNameFarSize = 0.3
@@ -1435,7 +1457,7 @@ DEFAULTS.nameInBGsEnemies = true
 DEFAULTS.nameInBGsEnemyMinions = true
 -- Both grids' Grouped column: the row stays up in a party or raid, in fights
 -- and out, whatever its other boxes say. Friendly players and their minions by
--- default. Their Always column likewise, everywhere (none by default).
+-- default. Their Always column likewise, everywhere (just Service NPCs' names by default).
 for _, kind in ipairs(ns.PLATE_KINDS) do
 	DEFAULTS["plateGroup" .. kind] = kind == "Friends" or kind == "FriendlyMinions"
 	DEFAULTS["plateAlways" .. kind] = false
@@ -1445,6 +1467,8 @@ for _, key in ipairs({ "Self", "HostileNPCs", "NeutralNPCs", "FriendlyNPCs", "Se
 	DEFAULTS["nameGroup" .. key] = false
 	DEFAULTS["nameAlways" .. key] = false
 end
+-- Service NPCs' titles (Repair Vendor, Innkeeper...) up always, in every profile.
+DEFAULTS.nameAlwaysServiceNPCs = true
 -- Both grids' Target dropdown: the row stays up out of fights while you have
 -- an enemy targeted (plateTargetEnemy<row>, nameTargetEnemy<row>), or anything
 -- else (...Friendly), as the Standard Frames page's Target columns. Off for
@@ -1831,6 +1855,34 @@ function ns.EndCalm(now)
 	local cut = now - (ns.db.calmTime or 0) - 0.01
 	for _, fn in ipairs(ns.calmEnders) do
 		fn(cut)
+	end
+end
+
+-- Cinematic's own events, for things the game has no event for (the cursor
+-- resting on a campfire...): one file finds it once and signals it, any
+-- other listens. ns.Listen(name, fn, wanted): fn(...) on each signal;
+-- wanted, a function, says whether it needs the signal now (nil: always),
+-- so a watch costing something runs only while a listener wants it
+-- (ns.SignalWanted). A listener's error is logged, the others still hear it.
+-- Names: CAMPFIRE_REST (name) Campfire.lua, the cursor stayed on a fire.
+ns.listeners = {}
+function ns.Listen(name, fn, wanted)
+	local list = ns.listeners[name] or {}
+	ns.listeners[name] = list
+	list[#list + 1] = { fn = fn, wanted = wanted }
+end
+function ns.SignalWanted(name)
+	for _, each in ipairs(ns.listeners[name] or {}) do
+		if not each.wanted then return true end
+		local ok, want = pcall(each.wanted)
+		if ok and want then return true end
+	end
+	return false
+end
+function ns.Signal(name, ...)
+	for _, each in ipairs(ns.listeners[name] or {}) do
+		local ok, err = pcall(each.fn, ...)
+		if not ok and ns.Log then ns.Log("signal", name .. ": " .. tostring(err)) end
 	end
 end
 
@@ -5029,6 +5081,24 @@ ticker:SetScript("OnEvent", ns.Profiled("Core events", function(self, event, arg
 				end
 			end
 			ns.db.healVisionDefaultsV1 = true
+		end
+		-- The Skyriding Cam, out of the dev copy, on to start with: every saved
+		-- setting of its back to its default, in every profile. Once. (Nobody
+		-- could have picked them: the release had no page, only old defaults
+		-- saved, off among them.)
+		if not ns.db.skyrideDefaultsV1 then
+			for key, value in pairs(DEFAULTS) do
+				if key:find("^skyride") then
+					ns.db[key] = value
+					for _, saved in pairs(ns.db.profiles or {}) do
+						if type(saved) == "table" then
+							saved[key] = nil
+							if type(saved.settings) == "table" then saved.settings[key] = nil end
+						end
+					end
+				end
+			end
+			ns.db.skyrideDefaultsV1 = true
 		end
 		-- The pet frame kept up until its health is full (Personal Resources)
 		-- off to start with now: off in every profile. Once.

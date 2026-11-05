@@ -1032,15 +1032,24 @@ end
 
 -- Sitting on a chair or bench: there's no event for it, so it's pieced
 -- together. The world tooltip's name is noted as it appears (before the
--- tooltip options hide it); a right-click while it names a seat, followed by
--- the brief snap onto the seat (a quick move that stops), counts as sitting.
--- Only a quick click counts: right-click held to steer or turn isn't one (the
--- game only uses a right-click on release, if it wasn't held).
+-- tooltip options hide it). It counts as sitting when all of these hold:
+-- - a quick right-click (held longer is steering or turning; the game only
+--   uses a right-click on release, if it wasn't held),
+-- - with the world tooltip still up naming a seat (the mouse is on it now),
+-- - in the middle of the screen, while you were standing still,
+-- - then the brief snap onto the seat (a quick move that stops),
+-- - and no walking of your own until SEAT.STILL seconds after the click.
 local lastWorldName, lastWorldNameAt = nil, 0
 local seatClickAt = -math.huge
-local SEAT_CLICK_WINDOW = 4   -- seconds between the seat's name appearing and the click
-local SEAT_SNAP_WINDOW = 3    -- seconds after the click for the snap onto the seat
-local SEAT_SNAP_MOVE = 0.15   -- yards: being moved at least this far onto it counts
+-- (One table: Camera.lua is near Lua's 200 locals cap.)
+local SEAT = {
+	CLICK_WINDOW = 4,   -- seconds between the seat's name appearing and the click
+	SNAP_WINDOW = 2,    -- seconds after the click for the snap onto the seat
+	STILL = 2,          -- seconds after the click without walking before it counts
+	SNAP_MOVE = 0.15,   -- yards: being moved at least this far onto it counts
+	SNAP_TIME = 0.6,    -- seconds: a move longer than this is walking, not the snap
+	MIDDLE = 0.25,      -- the click within this share of the screen from its center (each way)
+}
 
 local function IsSeatName(name)
 	if type(name) ~= "string" or (issecretvalue and issecretvalue(name)) or not ns.db then
@@ -1112,25 +1121,84 @@ function ns.HookCameraInput()
 		end
 	end
 	local seatX, seatY
+	local seatSnap -- how the snap onto the seat was seen, once it has been
 	local seatDownAt, seatDownName = -math.huge, nil
 	local SEAT_CLICK_HOLD = 0.4 -- seconds: a right-click held longer is steering, not a click
+	-- Each step of a right-click on a seat goes in the log too (/cine debug
+	-- emote shows the last one), so a sit that was missed can be read back.
+	local function SeatResult(text)
+		local d = ns.seatDebug
+		if d then
+			d.result = text
+			if d.seat then
+				ns.Log("seat", ("%s: %s, %.1fs after the click, cursor %s from the center, moving %s"):format(
+					tostring(d.name), text, GetTime() - d.at, tostring(d.cursor), tostring(ns.playerMoving)))
+			end
+		end
+	end
+	local function SeatDrop(why)
+		seatClickAt, seatSnap = -math.huge, nil
+		SeatResult(why)
+	end
 	local function Seated(how)
-		seatClickAt = -math.huge
+		seatClickAt, seatSnap = -math.huge, nil
+		SeatResult("sat down (" .. how .. ")")
 		emoteEvent = "Chair" -- the latest choice wins
 		ns.lastEmote = { token = "CHAIR", via = how .. " on " .. tostring(lastWorldName), at = GetTime() }
+	end
+	-- The world tooltip still up and naming the seat: the mouse is on it now.
+	-- (The tooltip options fade it with its alpha, so it stays shown.)
+	local function TooltipOnSeat(name)
+		if not GameTooltip:IsShown() then return false end
+		local owner = GameTooltip:GetOwner()
+		if not (owner == nil or owner == UIParent or owner == WorldFrame) then return false end
+		local ok, text = pcall(function() return GameTooltipTextLeft1 and GameTooltipTextLeft1:GetText() end)
+		return ok and text == name
+	end
+	-- The cursor in the middle of the screen (SEAT.MIDDLE of it from the center each way).
+	local function CursorInMiddle(d)
+		local x, y = GetCursorPosition()
+		local scale = UIParent:GetEffectiveScale()
+		local width, height = UIParent:GetWidth(), UIParent:GetHeight()
+		if not (x and scale and scale > 0 and width > 0 and height > 0) then return false end
+		local dx, dy = math.abs(x / scale - width / 2) / width, math.abs(y / scale - height / 2) / height
+		d.cursor = ("%.0f%% across, %.0f%% up/down"):format(dx * 100, dy * 100)
+		return dx <= SEAT.MIDDLE and dy <= SEAT.MIDDLE
 	end
 	local seatWatcher = CreateFrame("Frame")
 	seatWatcher:RegisterEvent("GLOBAL_MOUSE_DOWN")
 	seatWatcher:RegisterEvent("GLOBAL_MOUSE_UP")
 	seatWatcher:RegisterEvent("PLAYER_STOPPED_MOVING")
-	seatWatcher:SetScript("OnEvent", function(_, event, button)
+	seatWatcher:RegisterEvent("UI_ERROR_MESSAGE")
+	-- The game's "You are too far away." (and its kin): the click was out of
+	-- reach, so no snap is coming. (Whichever of these this client has.)
+	local TOO_FAR = {}
+	for _, key in ipairs({ "ERR_USE_TOO_FAR", "ERR_TOO_FAR_TO_INTERACT", "ERR_OUT_OF_RANGE" }) do
+		if type(_G[key]) == "string" then TOO_FAR[_G[key]] = true end
+	end
+	seatWatcher:SetScript("OnEvent", function(_, event, button, message)
 		local now = GetTime()
 		if event == "GLOBAL_MOUSE_DOWN" then
 			if button == "RightButton" then
-				ns.seatDebug = { name = lastWorldName, nameAge = now - lastWorldNameAt,
+				local d = { name = lastWorldName, nameAge = now - lastWorldNameAt,
 					seat = IsSeatName(lastWorldName), at = now }
+				ns.seatDebug = d
 				seatDownAt, seatDownName = -math.huge, nil
-				if now - lastWorldNameAt <= SEAT_CLICK_WINDOW and IsSeatName(lastWorldName) then
+				if now - lastWorldNameAt > SEAT.CLICK_WINDOW or not d.seat then
+					-- (Logged when a seat's name is or was about: the name too old, say.)
+					if d.seat then
+						ns.Log("seat", ("%s: name seen %.1fs before the click (over %ds): not counted"):format(
+							tostring(d.name), d.nameAge, SEAT.CLICK_WINDOW))
+					end
+					d.seat = false
+					d.result = "not a seat"
+				elseif not CursorInMiddle(d) then
+					SeatResult("click not in the middle of the screen")
+				elseif not TooltipOnSeat(lastWorldName) then
+					SeatResult("mouse wasn't on the seat")
+				elseif ns.playerMoving then
+					SeatResult("you were moving")
+				else
 					seatDownAt, seatDownName = now, lastWorldName
 					seatX, seatY = Position()
 				end
@@ -1142,22 +1210,53 @@ function ns.HookCameraInput()
 					ns.seatDebug.held = held
 				end
 				if held <= SEAT_CLICK_HOLD then
-					seatClickAt = now
+					seatClickAt, seatSnap = now, nil
+					SeatResult("waiting for the snap")
+				else
+					SeatResult("held (steering)")
 				end
 				seatDownAt, seatDownName = -math.huge, nil
 			end
-		elseif now - seatClickAt <= SEAT_SNAP_WINDOW then
-			Seated("snap (movement stopped)")
+		elseif event == "UI_ERROR_MESSAGE" then
+			if now - seatClickAt <= SEAT.SNAP_WINDOW and type(message) == "string"
+				and not (issecretvalue and issecretvalue(message)) then
+				if TOO_FAR[message] then
+					SeatDrop("too far away")
+				else
+					SeatResult("game error: " .. message) -- (still waiting: noted for the log)
+				end
+			end
+		elseif now - seatClickAt <= SEAT.SNAP_WINDOW and not seatSnap then
+			-- A move that stops: the snap if it was brief, walking if not.
+			if now - (ns.movingSince or now) > SEAT.SNAP_TIME then
+				SeatDrop("you walked")
+			else
+				seatSnap = "snap (movement stopped)"
+				SeatResult("snapped, waiting to stay still")
+			end
 		end
 	end)
-	-- The snap may not send a movement event: watch your position instead.
+	-- The snap may not send a movement event: watch your position too. Once
+	-- snapped, any walking of your own before SEAT.STILL is up calls it off.
 	ns.SetOnUpdate(seatWatcher, ns.Profiled("Seat watch", function()
-		if GetTime() - seatClickAt > SEAT_SNAP_WINDOW or not seatX then
+		if seatClickAt == -math.huge then
 			return
 		end
-		local x, y = Position()
-		if x and ((x - seatX) ^ 2 + (y - seatY) ^ 2) > SEAT_SNAP_MOVE ^ 2 and not ns.playerMoving then
-			Seated("snap (moved onto it)")
+		local since = GetTime() - seatClickAt
+		if not seatSnap then
+			if since > SEAT.SNAP_WINDOW then
+				SeatDrop("no snap onto the seat")
+				return
+			end
+			local x, y = Position()
+			if seatX and x and ((x - seatX) ^ 2 + (y - seatY) ^ 2) > SEAT.SNAP_MOVE ^ 2 and not ns.playerMoving then
+				seatSnap = "snap (moved onto it)"
+				SeatResult("snapped, waiting to stay still")
+			end
+		elseif ns.playerMoving and GetTime() - (ns.movingSince or 0) > SEAT.SNAP_TIME then
+			SeatDrop("you moved after the snap")
+		elseif since >= SEAT.STILL and not ns.playerMoving then
+			Seated(seatSnap)
 		end
 	end))
 	-- Emotes: whichever emote function this client uses, plus typed commands

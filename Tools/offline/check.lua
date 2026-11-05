@@ -258,10 +258,11 @@ if arg[1] and not update then
 	if not back or ns.CameraRowValue("AFK", "camera") ~= afkCamera or ns.GetDB().cameraRows.deleted ~= nil then
 		Problem("Add back didn't bring it back as it was")
 	end
-	-- Built-in scenes grouped by camera (CameraRows' SCENE_GROUPS): the cozy
-	-- ones are one row to start with, an edit to it reaches every member, a
-	-- member set apart is a row of its own, and deleting the group lists it
-	-- once for Add back.
+	-- Built-in scenes with several triggers (CameraRows' SCENE_GROUPS): the
+	-- cozy ones are one row to start with, an edit to it reaches every member,
+	-- who's in a scene doesn't change by itself, a trigger moved out is a row
+	-- of its own (and moved back joins again), moved into another scene takes
+	-- its camera, and deleting the group lists it once for Add back.
 	local function GroupProblem(text) print("problem\tScene groups: " .. text) end
 	local function Listed(id)
 		for _, each in ipairs(ns.CameraRowOrder()) do
@@ -278,9 +279,20 @@ if arg[1] and not update then
 	ns.EditScene("Campfire", function() ns.SetCameraRowValue("Campfire", "music", ns.DEFAULTS.eventCampfireMusic) end)
 	ns.SetCameraRowValue("Dance", "camera", "fish")
 	ns.CameraRowsChanged()
-	if not Listed("Dance") then GroupProblem("a member set apart isn't a row of its own") end
+	if Listed("Dance") then GroupProblem("a member split off by itself") end
 	ns.SetCameraRowValue("Dance", "camera", danceCamera)
 	ns.CameraRowsChanged()
+	ns.MoveTriggerToScene("Dance", "")
+	if not Listed("Dance") or ns.SceneLead("Dance") ~= "Dance" then GroupProblem("a member moved out isn't a row of its own") end
+	ns.MoveTriggerToScene("Dance", "Sit")
+	if Listed("Dance") or ns.SceneLead("Dance") ~= "Sit" or ns.CameraRowValue("Dance", "camera") ~= ns.CameraRowValue("Sit", "camera") then
+		GroupProblem("a trigger moved into Looking out didn't join it")
+	end
+	ns.MoveTriggerToScene("Dance", "Campfire")
+	if Listed("Dance") or ns.SceneLead("Dance") ~= "Campfire" or ns.GetDB().cameraRows["scene:Dance"] ~= nil
+		or ns.CameraRowValue("Dance", "camera") ~= danceCamera then
+		GroupProblem("a member moved back didn't rejoin its group as it was")
+	end
 	ns.SetSceneDeleted("Campfire", true)
 	local deletedList = ns.DeletedTriggers()
 	if #deletedList ~= 1 or deletedList[1] ~= "Campfire" then
@@ -325,7 +337,10 @@ if arg[1] and not update then
 		ns.ClearTriggerLib() -- (its trigger stays in the library: cleared to look for leftovers)
 		local leftover = {}
 		for key in pairs(ns.GetDB().cameraRows) do
-			if key ~= "order" then leftover[#leftover + 1] = tostring(key) end -- (the earlier copy's row order)
+			-- (The earlier copy's row order; the scenes fixed for this profile.)
+			if key ~= "order" and key ~= "scenesFixed" and not tostring(key):find("^scene:") then
+				leftover[#leftover + 1] = tostring(key)
+			end
 		end
 		if #leftover > 0 then ShotProblem("left behind: " .. table.concat(leftover, ", ")) end
 	end

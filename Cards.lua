@@ -129,6 +129,38 @@ local BY_ID = {}
 for _, event in ipairs(EVENTS) do BY_ID[event.id] = event end
 ns.CARD_BY_ID = BY_ID
 
+-- The Events tab's groups, in its order, a title over each (as the emote
+-- page's moments). An event left out of them goes in the last.
+ns.CARD_GROUPS = {
+	{ name = "Combat", "combatIn", "combatOut", "attack", "streak", "death", "revived" },
+	{ name = "Bosses and rares", "boss", "bossDown", "cleared", "rare", "felled" },
+	{ name = "Places and travel", "zone", "subzone", "discover", "departure", "arrival", "rested" },
+	{ name = "Your story", "login", "time", "quest" },
+	{ name = "Progress", "levelUp", "achievement", "reputation", "collect", "profession" },
+	{ name = "Player vs. player", "duel", "battleground" },
+}
+-- The events in the tab's order, each with its group's name (event.group).
+function ns.CardEventsGrouped()
+	local list, placed = {}, {}
+	for _, group in ipairs(ns.CARD_GROUPS) do
+		for _, id in ipairs(group) do
+			local event = BY_ID[id]
+			if event and not placed[id] then
+				placed[id] = true
+				event.group = group.name
+				list[#list + 1] = event
+			end
+		end
+	end
+	for _, event in ipairs(EVENTS) do
+		if not placed[event.id] then
+			event.group = ns.CARD_GROUPS[#ns.CARD_GROUPS].name
+			list[#list + 1] = event
+		end
+	end
+	return list
+end
+
 -- The look's settings: each field, the card drawing's settings it gives
 -- (CombatVision.lua's: going in, coming out), and the base look's value.
 local FIELDS = {

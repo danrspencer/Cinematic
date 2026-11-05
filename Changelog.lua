@@ -11,6 +11,10 @@
 local _, ns = ...
 
 ns.CHANGELOG_FEATURES = {
+	{ date = "2026-11-05", page = "Skyriding Cam", title = "Skyriding Cam", client = "retail",
+		text = "Skyriding gets a camera of its own: it pulls back as you take off, tilts as you climb and dive, " ..
+		"follows your turns, and answers Surge Forward, Skyward Ascent, Whirling Surge and Aerial Halt. Set each " ..
+		"moment on its page." },
 	{ date = "2026-11-05", page = "Triggers", title = "Triggers page",
 		text = "Every trigger in one place, in the Camera hub: make your own and set what starts it, what ends it, " ..
 		"an Only if rule, its timing and its priority, then use it in any scene. Ours take an Only if, timing and " ..

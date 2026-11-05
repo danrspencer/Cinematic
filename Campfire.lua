@@ -59,6 +59,7 @@ local restUntil = 0      -- shown and gone again: not again until then (REST)
 local alpha, sinceLook = 0, 0
 local HOVER = 0.5        -- seconds the cursor must stay on the campfire, you standing still, before it shows
 local hoverSince         -- when the cursor came onto the campfire (near the middle), or nil
+local signaledFor        -- the hoverSince CAMPFIRE_REST was signaled for (once per stay)
 local shownX, shownY     -- where you stood as it showed (yards)
 local walkedOff = false  -- moved (or WALK_OFF from there): going, whatever the cursor's on
 local leftIcon = false   -- the cursor has moved off it: going
@@ -137,11 +138,11 @@ local function Casting()
 	return false
 end
 
--- Times you can't (or wouldn't) sit down by a fire: the button's off (and
--- Emote Vision's campfire card too, with any = true), or you're sitting,
--- fighting, casting, mounted...
+-- Times you can't (or wouldn't) sit down by a fire: the button's off (and,
+-- with any = true, nothing listening for CAMPFIRE_REST either), or you're
+-- sitting, fighting, casting, mounted...
 local function CanSit(any)
-	if not (ns.Setting("campfireSitButton") or (any and ns.EmoteVisionCampfireOn and ns.EmoteVisionCampfireOn())) then
+	if not (ns.Setting("campfireSitButton") or (any and ns.SignalWanted("CAMPFIRE_REST"))) then
 		return false
 	end
 	if (ns.IsSitting and ns.IsSitting()) or Casting() or InCombatLockdown() or ns.Flag(UnitAffectingCombat("player")) or ns.Flag(UnitIsDeadOrGhost("player"))
@@ -398,10 +399,12 @@ local function OnUpdate(_, elapsed)
 			if now >= restUntil and (alpha > 0 or now - hoverSince >= HOVER) then
 				lastSeen = now
 			end
-			-- (Emote Vision: a card to sit, kneel or lie down, once you've stayed
-			-- on the fire as long; it ignores the same fire again for a while.)
-			if now - hoverSince >= HOVER and ns.EmoteVisionCampfire then
-				ns.EmoteVisionCampfire(lastText)
+			-- (CAMPFIRE_REST, once per stay on the fire, once you've stayed as
+			-- long as the icon needs; it waits like the icon: not in the REST
+			-- wait, not after a click. Emote Vision's card and triggers hear it.)
+			if now - hoverSince >= HOVER and now >= restUntil and not dismissed and signaledFor ~= hoverSince then
+				signaledFor = hoverSince
+				ns.Signal("CAMPFIRE_REST", lastText)
 			end
 		else
 			hoverSince = nil

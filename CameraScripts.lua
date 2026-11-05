@@ -696,15 +696,21 @@ local BUILT_IN = {
 			rules = { camera = "stop", fight = "stop", walk = "stop", zoom = "ignore", ends = "stop" },
 		}
 	end },
-	-- Skyriding (retail, the dev copy's Skyriding Cam page, SkyrideCam.lua):
+	-- Skyriding (retail, the Skyriding Cam page, SkyrideCam.lua):
 	-- out to skyrideCamDistance over skyrideCamZoomTime as you take to the
 	-- air, back over skyrideCamBackTime once you've landed. (Steering doesn't
 	-- stop it, nor walking: see Start's travel.)
 	{ id = "skyride", name = "Skyriding zoom", retail = true, make = function()
 		return {
-			steps = { Set(S("zoom", { to = Db("skyrideCamDistance", 39), secs = Db("skyrideCamZoomTime", 3),
-				past = "yes" }), "skyrideCamDistance", "skyrideCamZoomTime") },
-			ending = { Set(S("putback", { secs = Db("skyrideCamBackTime", 2.5) }), "skyrideCamBackTime") },
+			steps = { S("together", { steps = {
+				Set(S("zoom", { to = Db("skyrideCamDistance", 20), secs = Db("skyrideCamZoomTime", 4),
+					past = "yes" }), "skyrideCamDistance", "skyrideCamZoomTime"),
+				-- (Follow your turns, as the auto-run camera's: SkyrideCam.lua's moments carry it on.)
+				On(Set(S("follow", { after = Db("skyrideFollowAfter", 0.5), lazy = 1, top = 70, accel = 60,
+					corners = "yes", most = Db("skyrideFollowMost", 50) }), "skyrideFollow", "skyrideFollowAfter",
+					"skyrideFollowMost"),
+					Switch("skyrideFollow")) } }) },
+			ending = { Set(S("putback", { secs = Db("skyrideCamBackTime", 3) }), "skyrideCamBackTime") },
 			rules = { camera = "pause", cameraSecs = 3, fight = "putback", walk = "ignore", zoom = "ignore",
 				ends = "putback" },
 		}
@@ -788,7 +794,7 @@ local function Example()
 	}
 end
 -- (Skyriding's only where there's skyriding: retail; and in the dev copy only for now.)
-if not (ns.isDev and ns.isRetail and C_PlayerInfo and C_PlayerInfo.GetGlidingInfo) then
+if not (ns.isRetail and C_PlayerInfo and C_PlayerInfo.GetGlidingInfo) then
 	for i = #BUILT_IN, 1, -1 do
 		if BUILT_IN[i].retail then table.remove(BUILT_IN, i) end
 	end
@@ -1067,7 +1073,8 @@ function ns.SyncScriptCameras()
 	local values = {}
 	for _, script in ipairs(ns.CameraScripts()) do
 		local value = "script:" .. script.id
-		values[#values + 1] = value
+		-- (Not the Skyriding Cam page's own: that page plays it, no scene.)
+		if script.id ~= "skyride" then values[#values + 1] = value end
 		ns.CAMERA_NAMES[value] = L["Script: %s"]:format(script.name)
 	end
 	-- (Your own scenes' Camera menu too, before any scene of yours uses it.)
@@ -1140,6 +1147,11 @@ end
 local function Flat(ease)
 	local up, down = Ramps(ease)
 	return 1 - (up + down) / 2
+end
+-- An ease with neither ramp longer than most's.
+local function ShorterEase(ease, most)
+	local up, down = Ramps(ease)
+	return { math.min(up, most), math.min(down, most) }
 end
 
 -- Share (0-1) of a move covered at t along T seconds, with half-cosine
@@ -1567,6 +1579,7 @@ end
 -- the same way at once; Begin then carries it on at a new speed, with no
 -- stop, no STEP_GAP and no creep start. Nothing taking it over: DropHeld.
 local function DropHeld(m, now)
+	m.keepHeld = nil
 	local held = m.held
 	if not held then return end
 	m.held = nil
@@ -1628,6 +1641,7 @@ end
 local function Begin(m)
 	if m.blocked then return end -- (Follow your turns has the turn: this one waits)
 	local now = GetTime()
+	m.keepHeld = nil
 	local held = m.held
 	if held then
 		-- (Handed over: the same way carries straight on, the other way stops first.)
@@ -1688,9 +1702,15 @@ local function StepMove(m, elapsed)
 		local speed = held.sent * held.share
 		local step = (held.growing and speed or -speed) * elapsed
 		m.amount = m.amount + step
+		-- (keepHeld: steps played in place of the script's own, not begun yet:
+		-- a frame more for them to take it over, CameraScriptPlaySteps.)
 		if not m.pending then
-			DropHeld(m)
-			m.amount = m.amount - step -- (stopped this frame: the game doesn't move it)
+			if m.keepHeld then
+				m.keepHeld = nil
+			else
+				DropHeld(m)
+				m.amount = m.amount - step -- (stopped this frame: the game doesn't move it)
+			end
 		end
 	end
 	if m.pending then
@@ -1843,7 +1863,7 @@ end
 -- facing would read as a big turn).
 local function StopFollow()
 	ReleaseFollow(false)
-	follower.lastFacing, follower.armed = nil, false
+	follower.lastFacing, follower.armed, follower.carry = nil, false, nil
 end
 
 local function FollowFrame(step, dt)
@@ -1966,19 +1986,32 @@ local function StopZoom(now)
 	end
 end
 
--- (ease: the share of it spent speeding up and slowing down, gentle unless given.)
+-- (ease: the share of it spent speeding up and slowing down, gentle unless
+-- given. As short as ZOOM_MIN_TIME: a zoom can snap out, Skyriding Cam's
+-- Whirling Surge, where a turn or tilt that quick would jerk.)
+local ZOOM_MIN_TIME = 0.5
 local function ZoomTo(distance, T, ease)
 	StopZoom()
 	zoomer.suspended = nil
 	local now = Zoom()
 	if math.abs(distance - now) < ZOOM_DONE then return end
-	zoomer.goal, zoomer.T, zoomer.ease = distance, math.max(MOVE_MIN_TIME, T or 0), ease or EASES.gentle
+	zoomer.goal, zoomer.T, zoomer.ease = distance, math.max(ZOOM_MIN_TIME, T or 0), ease or EASES.gentle
 	zoomer.pending = true
 end
 
 local function BeginZoom()
 	if not ns.ClaimCamera(WHO, ns.zoomWhileSteering[WHO]) then return end
 	local now = Zoom()
+	-- (Blend: a zoom handed straight over to this one, the same way: its speed
+	-- slides from that one's, CameraScriptPlaySteps.)
+	local from = zoomer.handover
+	zoomer.handover, zoomer.blendFrom = nil, nil
+	if from and GetTime() - from.at < 0.5 and (zoomer.goal > now) == from.out then
+		-- (Its path up to speed quickly too, not from a standstill.)
+		-- (At most half the zoom: a short one blended its whole way never got up to speed.)
+		from.secs = math.min(from.secs, zoomer.T * 0.5)
+		zoomer.blendFrom, zoomer.ease = from, ShorterEase(zoomer.ease, EASES.steady)
+	end
 	zoomer.release, zoomer.yours = nil, nil
 	ns.HoldSpeed(ZOOM_WHO, ZOOM_CVAR)
 	zoomer.from, zoomer.t = now, 0
@@ -2024,6 +2057,10 @@ local function StepZoom(elapsed)
 	local speed = ZOOM_SETTLE_SPEED
 	if t < T then
 		speed = math.max(ZOOM_MIN_SPEED, zoomer.cruise * EaseShape(t, T, zoomer.ease) * ZOOM_HEADROOM + ZOOM_EXTRA)
+	end
+	local blend = zoomer.blendFrom
+	if blend and t < blend.secs then
+		speed = blend.speed + (speed - blend.speed) * EaseShape(t, 2 * blend.secs, 0.5)
 	end
 	if not zoomer.sent or math.abs(speed - zoomer.sent) > zoomer.sent * CHANGE then
 		ns.SetHeldSpeed(ZOOM_WHO, ZOOM_CVAR, speed)
@@ -2311,7 +2348,9 @@ function STEP.endMusic(step)
 end
 -- Follow your turns: every frame until the camera ends (FollowFrame).
 function STEP.follow(step)
-	StopFollow()
+	-- (carry: steps played in place of the script's own, with a Follow your
+	-- turns of their own, CameraScriptPlaySteps: it goes on as it was.)
+	if follower.carry then follower.carry = nil else StopFollow() end
 	while true do
 		FollowFrame(step, run.dt or 0)
 		Yield()
@@ -2479,7 +2518,11 @@ local function Finish(why)
 	if exitBox then exitBox:Hide() end
 	ns.ApplyCVarSet(FOLLOW_CVARS, false)
 	ns.Log("state", ("camera script %s ended (%s)"):format(run.script.name, why or "done"))
-	if run.trigger and run.triggerOn then stoppedFor = run.trigger .. run.camera end
+	-- (Not the Skyriding Cam's own end with you back in the air: that's a new
+	-- flight, not one to sit out with no camera.)
+	if run.trigger and run.triggerOn and not (why == "ends" and run.trigger == "Skyride") then
+		stoppedFor = run.trigger .. run.camera
+	end
 	-- (Stopped before its When it ends ran, or partway through: its End music
 	-- still ends the music.)
 	local endMusic = EndMusicIn(run.script.ending)
@@ -2617,7 +2660,12 @@ function ns.SkyridingNow()
 	else
 		sky.upSince = nil
 		sky.downSince = sky.downSince or now
-		if now - sky.downSince >= Db("skyrideCamLand", 2) then sky.on = false end
+		-- (Past coming back too: SkyrideCam.lua's landing plays it all back, from
+		-- skyrideCamLand on, so its When it ends finds nothing left to move.)
+		if now - sky.downSince >= Db("skyrideCamLand", 0.5) + Db("skyrideCamBackTime", 3) + 0.5
+			and not (ns.SkyrideLandingBusy and ns.SkyrideLandingBusy()) then
+			sky.on = false
+		end
 	end
 	return sky.on
 end
@@ -2783,6 +2831,13 @@ ns.SetOnUpdate(watcher, function(_, elapsed)
 	StepYourZoom(elapsed)
 	-- (Your zoom is the script's new start: its drifts and its zoom back at the
 	-- end go from where you put the camera, never back to where it began.)
+	-- (Not a scroll in the air on the Skyriding Cam: the camera's out where the
+	-- moments put it, so that's no distance of yours, and landing went back to
+	-- it: 39 yards after a scroll during a Whirling Surge. On the ground it counts.)
+	if run and yourZoom and yourZoom ~= run.rebasedFor and run.trigger == "Skyride" and ns.GlidingSpeed
+		and ns.GlidingSpeed() ~= nil then
+		run.rebasedFor, run.rebaseStill, run.rebaseLast = yourZoom, nil, nil
+	end
 	if run and yourZoom and yourZoom > run.startedAt and yourZoom ~= run.rebasedFor then
 		local zoom = Zoom()
 		run.rebaseStill = math.abs(zoom - (run.rebaseLast or zoom)) < ZOOM_STILL and (run.rebaseStill or 0) + elapsed or 0
@@ -2883,6 +2938,68 @@ function ns.OrbitCommand(arg)
 	end
 end
 
+-- Steps played now in place of the running script's own, while it's in its
+-- steps for trigger: the dev Skyriding Cam's moments (SkyrideCam.lua: a
+-- surge zooms out, a halt swings round...). What it was doing stops where it
+-- is; once these are done it holds there, as it does after its own steps,
+-- until its trigger's over and When it ends puts everything back. False if
+-- no script is running its steps for that trigger. blend (seconds, 0 or
+-- nil: none): a turn, tilt or zoom going now is handed over (Handover) to
+-- the new steps' first move of it the same way, its speed sliding into the
+-- new one's over that long, instead of stopping dead first.
+local function HasKind(list, kind)
+	for _, step in ipairs(list) do
+		if not step.off and (step.k == kind or (step.steps and HasKind(step.steps, kind))) then return true end
+	end
+	return false
+end
+function ns.CameraScriptPlaySteps(trigger, steps, why, blend)
+	if not run or run.trigger ~= trigger or run.phase ~= "steps" then return false end
+	local clean = ns.CleanCameraScript({ steps = steps }, "moment").steps
+	-- (A Follow your turns in them carries on the one going: no starting over.)
+	local keepFollow = HasKind(clean, "follow")
+	if not keepFollow then StopFollow() end
+	if blend and blend > 0 then
+		for _, m in pairs(movers) do
+			m.suspended = nil
+			if m.moving and m.sent and m.share then
+				EndMove(m)
+				m.keepHeld = true
+			elseif m.held and not m.moving then
+				m.pending = false
+				m.keepHeld = true
+			else
+				StopMove(m)
+			end
+		end
+		if zoomer.moving and zoomer.sent then
+			zoomer.handover = { speed = zoomer.sent, out = zoomer.goal > Zoom(), secs = blend, at = GetTime() }
+		end
+		StopZoom()
+		zoomer.suspended = nil
+	elseif keepFollow then
+		StopMove(movers.yaw)
+		StopMove(movers.pitch)
+		movers.yaw.suspended, movers.pitch.suspended = nil, nil
+		StopZoom()
+		zoomer.suspended = nil
+	else
+		StopAll()
+	end
+	follower.carry = keepFollow or nil
+	run.pausedUntil, run.pausedBy = nil, nil
+	run.co = coroutine.create(function() DoSteps(clean) end)
+	ns.Log("state", ("camera script %s: %s"):format(run.script.name, why or "steps played"))
+	return true
+end
+
+-- Corrects the running tilt total (a positive tilt lowers the camera): the
+-- Skyriding Cam's landing, the ground having stopped a lowered camera short of
+-- what was counted, so When it ends doesn't take off more than it came down.
+function ns.CameraScriptSetTilt(amount)
+	movers.pitch.amount = amount
+end
+
 -- The script playing now, or nil (the minimap button's menu lists it).
 function ns.PlayingCameraScript()
 	return run and run.script
@@ -2926,7 +3043,7 @@ function ns.CameraScriptState()
 	return {
 		script = run.script, phase = run.phase, step = run.step, t = run.t, trigger = run.trigger,
 		paused = run.pausedUntil and math.max(0, run.pausedUntil - GetTime()) or nil,
-		yaw = movers.yaw.amount, pitch = movers.pitch.amount,
+		yaw = movers.yaw.amount, pitch = movers.pitch.amount, startZoom = run.startZoom,
 	}
 end
 

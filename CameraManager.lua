@@ -36,6 +36,9 @@ local VALUE_SCRIPT = { cozy = "cozy", vista = "vista", fish = "fish", afk = "afk
 local INSIDE = { flight = "flyby" }
 local INNER = {}
 for _, id in pairs(INSIDE) do INNER[id] = true end
+-- (And the Skyriding Cam page's own: it plays it, made from that page, so it
+-- isn't a camera to pick for a scene. Its settings are all on that page.)
+INNER.skyride = true
 
 -- Every Scenes row that plays each script: uses[id] = { { row } ... }.
 local function Uses()

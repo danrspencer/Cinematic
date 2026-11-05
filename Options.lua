@@ -1761,9 +1761,13 @@ do
 			{ "Trigger Settings", "Interface\\Icons\\INV_Misc_PocketWatch_02", tabOf = "Triggers" },
 			{ "Camera Scripts", "Interface\\Icons\\INV_Scroll_05", label = "Scripts", section = "Cameras" }, -- (CameraScriptsPage.lua)
 			{ "My Shots", "Interface\\Icons\\INV_Misc_Spyglass_02", section = "Cameras" }, -- (ShotsPage.lua)
+			-- (Surge Forward's own icon, from the game: SkyrideCam.lua, retail.)
+			{ "Skyriding Cam", function()
+				local ok, icon = pcall(C_Spell.GetSpellTexture, 372608)
+				return ok and icon or "Interface\\Icons\\INV_Misc_Spyglass_02"
+			end, section = "Cameras" },
 			{ "Camera Settings", "Interface\\Icons\\Trade_Engineering", dev = true, section = "Dev" }, -- (settings no script step uses)
 			{ "Shoulder Cam", "Interface\\Icons\\INV_Shoulder_02", dev = true, section = "Dev" }, -- (ShoulderCam.lua)
-			{ "Skyriding Cam", "Interface\\Icons\\INV_Misc_Spyglass_03", dev = true, section = "Dev" }, -- (SkyrideCam.lua: retail)
 		} },
 		-- (label: the name on its icon, when the page is registered under another)
 		-- (the look and the sound: the visual effects' pages, then Audio)
@@ -5393,9 +5397,20 @@ local function CreateCamerasPanel()
 		return SceneName(trigger) .. (copy and " (" .. copy .. ")" or "")
 	end
 	-- (A built-in scene's own triggers' names: a group's members'.)
+	-- A built-in scene's own triggers: a list of { key, name } (a line each on
+	-- its page), or their names joined (less those taken off it).
+	local function BuiltInList(key)
+		local list = {}
+		for _, member in ipairs(ns.SceneGroupMembers(key)) do
+			list[#list + 1] = { key = member, name = LABELS[member] or member }
+		end
+		return list
+	end
 	local function BuiltInNames(key)
 		local names = {}
-		for _, member in ipairs(ns.SceneGroupMembers(key)) do names[#names + 1] = LABELS[member] or member end
+		for _, each in ipairs(BuiltInList(key)) do
+			if not ns.TriggerDropped(each.key) then names[#names + 1] = each.name end
+		end
 		return table.concat(names, ", ")
 	end
 	local function OwnName(id)
@@ -6129,7 +6144,7 @@ local function CreateCamerasPanel()
 			end
 			BlockAt(1, Label(drawer, "GameFontNormalSmall", L["Triggers"]), 6).searchSkip = true
 			ns.BuildCustomTriggerLines(drawer, id, { At = At, BlockAt = BlockAt, Changed = Changed, Tooltip = Tooltip,
-				x = LABEL_W, shareX = LABEL_W + 236, builtinLabel = not custom and BuiltInNames(key) or nil,
+				x = LABEL_W, shareX = LABEL_W + 236, builtinLabel = not custom and BuiltInList(key) or nil,
 				AddControl = function(control) controls[#controls + 1] = control end,
 				-- (The drawer grows and shrinks with them; the rows below move.)
 				resize = function(lines)
@@ -8270,11 +8285,16 @@ local function CreateNameStylePanel()
 	})
 
 	-- Size and height by distance. Retail's plates scale themselves: one of
-	-- each. WoW Forever's don't, so names are sized and placed by how far they
-	-- are from the camera (PlateParts' Look): set at two points, close and far,
-	-- and following perspective between and beyond them. The camera's distance
+	-- each. WoW Forever's don't, so names are sized and placed by the camera's
+	-- zoom (PlateParts' Look): set at two points, close and far, following
+	-- perspective between them and on past far. The camera's distance
 	-- now shows under them, to set each with the camera there. (Sizes and
 	-- the like as small boxes on a line, as the other Style pages'.)
+	local function HideDelayBox(boxes)
+		boxes:Box(L["Hide delay"], "plateNameHideDelay", 0, 10, 0.1, "%.1f", 1,
+			L["How long a unit has to stay out of sight before its name hides, so a short gap like the edge " ..
+			"of a stair doesn't take it away. 0: at once."], On, L["sec"])
+	end
 	if ns.isRetail then
 		local sizes = rows.Boxes()
 		sizes:Box(L["Size"], "plateNameSize", 50, 200, 5, "%d", 100,
@@ -8283,29 +8303,32 @@ local function CreateNameStylePanel()
 			L["Moves the names up (or down, below 0) from where the plates put them."], On)
 		sizes:Box(L["Opacity"], "plateNameAlpha", 20, 100, 5, "%d", 100,
 			L["How see-through the names are, on top of their fades."], On, "%")
+		HideDelayBox(sizes)
 		rows.Check("plateNameFixedSize", L["Same size at any distance"],
 			L["One size at any distance. Unticked, a name grows and shrinks with its plate as its unit comes " ..
 			"nearer or goes."], On)
 	else
-		rows.Boxes():Box(L["Opacity"], "plateNameAlpha", 20, 100, 5, "%d", 100,
+		local fades = rows.Boxes()
+		fades:Box(L["Opacity"], "plateNameAlpha", 20, 100, 5, "%d", 100,
 			L["How see-through the names are, on top of their fades."], On, "%")
-		stack:Header(content, L["Close (a unit about 10 yards from the camera)"])
+		HideDelayBox(fades)
+		stack:Header(content, L["Close (camera zoomed all the way in)"])
 		local close = rows.Boxes()
 		close:Box(L["Size"], "plateNameCloseSize", 50, 300, 5, "%d", 100,
-			L["How big a name is with its unit about 10 yards from the camera, next to the plates' own. " ..
-			"Nearer, bigger still; further, smaller, as the game's names over heads."], On, "%")
+			L["How big names are with the camera zoomed all the way in, next to the plates' own. Zooming " ..
+			"out, they shrink toward the Far size."], On, "%")
 		close:Box(L["Raise"], "plateNameCloseY", -40, 60, 1, "%d", 1,
-			L["Moves a name up (or down, below 0) from where the plates put it, with its unit about 10 yards " ..
-			"from the camera."], On)
-		stack:Header(content, L["Far (about 50 yards from the camera)"])
+			L["Moves names up (or down, below 0) from where the plates put them, with the camera zoomed " ..
+			"all the way in."], On)
+		stack:Header(content, L["Far (camera about 34 yards from you)"])
 		local far = rows.Boxes()
 		far:Box(L["Size"], "plateNameFarSize", 20, 100, 5, "%d", 100,
-			L["How big a name is with its unit about 50 yards from the camera: about the size of the game's " ..
-			"names where those take over, at the edge of nameplate range."], On, "%")
+			L["How big names are with the camera about 34 yards from you. Further out, they keep shrinking."],
+			On, "%")
 		far:Box(L["Raise"], "plateNameFarY", -60, 10, 1, "%d", 1,
-			L["Moves a name up (or down, below 0) with its unit about 50 yards from the camera, as the " ..
-			"game's names over heads sit closer to the head further off."], On)
-		-- (A unit's own distance from you comes in bands: under 11, 28 and 41 yards.)
+			L["Moves names up (or down, below 0) with the camera about 34 yards from you, as the game's " ..
+			"names over heads sit closer to the head further off."], On)
+		-- (Every unit counts as 16 yards from you: PlateParts' UNIT_YARDS.)
 		local cameraNote = stack:Note(content, "", 460)
 		cameraNote.searchSkip = true
 		local noteAt = 0
@@ -8315,8 +8338,8 @@ local function CreateNameStylePanel()
 			end
 			noteAt = GetTime() + 0.2
 			local zoom = math.floor((GetCameraZoom and GetCameraZoom() or 0) + 0.5)
-			cameraNote:SetText((L["The camera is %d yards from you: a unit next to you is about %d yards from it, " ..
-				"one at 20 yards about %d, one at 35 about %d."]):format(zoom, zoom + 4, zoom + 16, zoom + 35))
+			cameraNote:SetText((L["The camera is %d yards from you: every name is sized as if its unit were " ..
+				"about %d yards from it."]):format(zoom, zoom + 16))
 		end)
 	end
 
@@ -15404,7 +15427,7 @@ ns.lowHealthKit = { CreateScrollPage = CreateScrollPage, Label = Label, PageShow
 	Check = Check, Slider = Slider, GreyUnless = GreyUnless, Refresh = Refresh, Dropdown = Dropdown,
 	PageSwitch = PageSwitch, AddControl = function(control) controls[#controls + 1] = control end,
 	Header = Header, CreateKeybindButton = CreateKeybindButton, RefreshKeybinds = RefreshKeybinds,
-	StopListening = StopListening, FitContentHeight = FitContentHeight,
+	StopListening = StopListening, FitContentHeight = FitContentHeight, SectionState = SectionState,
 	Choice = Choice, OpenColorPicker = OpenColorPicker, BoxLine = BoxLine, RecordKey = RecordKey,
 	-- (fn after the page's Reset page has put its settings back)
 	OnReset = function(content, fn) resetHooks[content] = fn end }
@@ -15571,7 +15594,7 @@ ns.OnLanguage(function()
 	if ns.CreateShoulderCamPanel then -- (ShoulderCam.lua)
 		ns.CreateShoulderCamPanel(ns.lowHealthKit)
 	end
-	if ns.CreateSkyrideCamPanel then -- (SkyrideCam.lua: dev copy, retail)
+	if ns.CreateSkyrideCamPanel then -- (SkyrideCam.lua: retail)
 		ns.CreateSkyrideCamPanel(ns.lowHealthKit)
 	end
 	if ns.CreateCameraScriptsPanel then -- (CameraScriptsPage.lua, dev copy)

@@ -1671,9 +1671,9 @@ local function LeveledUp(level)
 		unit = "player", line = L["reached level %d"]:format(level), group = true })
 end
 
--- A campfire the cursor rests on (Campfire.lua's watch, name its tooltip's
--- first line): a card to sit, kneel or lie down by it. Once a minute at most,
--- whatever the repeat setting says (the watch asks ten times a second).
+-- A campfire the cursor rests on (Campfire.lua's CAMPFIRE_REST, name its
+-- tooltip's first line): a card to sit, kneel or lie down by it. Once a
+-- minute at most, whatever the repeat setting says.
 local CAMPFIRE_AGAIN = 60
 local campfireAt = -math.huge
 function ns.EmoteVisionCampfireOn()
@@ -1696,6 +1696,7 @@ function ns.EmoteVisionCampfire(name)
 	Fire({ kind = "Campfire", name = type(name) == "string" and name or L["Campfire"],
 		line = L["rest a while by the fire"], group = true, icon = "Interface\\Icons\\Spell_Fire_Fire" })
 end
+ns.Listen("CAMPFIRE_REST", ns.EmoteVisionCampfire, ns.EmoteVisionCampfireOn)
 
 -- Your duel's end (Effects.lua's duel line): moment "won" or "lost", other
 -- the one you fought.

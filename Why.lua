@@ -872,6 +872,35 @@ function Stop()
 end
 
 -- /cine debug why: what Inspect finds under the cursor, and why not.
+-- Inspect's reasons for one faded frame, printed to chat (for debug reports).
+-- (UpdateFrames notes only the frames in ns.whyLook: watch it a moment first.)
+function ns.PrintWhyLater(entry, indent)
+	indent = indent or ""
+	local look = ns.whyLook
+	local added = not look
+	if added then
+		look = {}
+		ns.whyLook = look
+	end
+	local had = look[entry]
+	look[entry] = true
+	C_Timer.After(0.5, function()
+		local ok, _, status, out = pcall(Explain, entry)
+		if not had and ns.whyLook == look then look[entry] = nil end
+		if added and ns.whyLook == look and not ns.whyPicking then ns.whyLook = nil end
+		if not ok then
+			ns.Print(indent .. "why: error " .. tostring(status))
+			return
+		end
+		ns.Print(indent .. "why: " .. tostring(status))
+		for _, reason in ipairs(out or NONE) do
+			ns.Print(("%s  [%s] %s%s"):format(indent, reason.state, reason.text,
+				reason.page and (" (" .. reason.page .. ")") or ""))
+		end
+		if #(out or NONE) == 0 then ns.Print(indent .. "  no reasons found") end
+	end)
+end
+
 function ns.DebugInspect()
 	local x, y = GetCursorPosition()
 	local focus = GetMouseFoci and GetMouseFoci()[1] or GetMouseFocus and GetMouseFocus()

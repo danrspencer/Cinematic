@@ -1,0 +1,344 @@
+<title>Skyriding Cam Flight Sim</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700&family=IBM+Plex+Sans:wght@400;500&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a flight recorder. Playback views and readout up top, three time-aligned traces under them, the moment log last. */
+:root {
+  --bg: #f3f5f7; --panel: #ffffff; --ink: #14202e; --muted: #5a6878; --line: #d7dde4;
+  --accent: #c7770d; --ghost: #7d8a99; --sky: #e4edf6; --ground: #c9d3dc; --you: #14202e;
+  --cast: #2f6fb3; --state: #6d55b5; --warn: #b3412f;
+  --display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0f151c; --panel: #17202a; --ink: #e6ecf2; --muted: #93a1b0; --line: #2a3644;
+  --accent: #f0a23a; --ghost: #6f7d8c; --sky: #1c2834; --ground: #2c3a47; --you: #e6ecf2;
+  --cast: #6aa8ea; --state: #a993ee; --warn: #ec7a66; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #0f151c; --panel: #17202a; --ink: #e6ecf2; --muted: #93a1b0; --line: #2a3644;
+  --accent: #f0a23a; --ghost: #6f7d8c; --sky: #1c2834; --ground: #2c3a47; --you: #e6ecf2;
+  --cast: #6aa8ea; --state: #a993ee; --warn: #ec7a66; color-scheme: dark }
+* { box-sizing: border-box }
+body { background: var(--bg); color: var(--ink); font: 15px/1.55 var(--body);
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 24px 48px }
+.wrap { max-width: 1080px; margin: 0 auto; display: grid; gap: 20px }
+h1 { font: 700 26px/1.15 var(--display); margin: 0; text-wrap: balance; letter-spacing: -0.01em }
+.sub { color: var(--muted); margin: 4px 0 0; max-width: 68ch }
+.bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--panel) }
+.seg { flex-wrap: wrap }
+.seg button { border: 0; background: none; color: var(--muted); font: 500 13px var(--body); padding: 7px 12px; cursor: pointer }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--bg) }
+.btn { border: 1px solid var(--line); background: var(--panel); color: var(--ink); border-radius: 8px;
+  font: 500 13px var(--body); padding: 7px 14px; cursor: pointer; min-width: 74px }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px }
+.scrub { flex: 1 1 240px; min-width: 0; accent-color: var(--accent) }
+.clock { font: 500 13px var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; min-width: 92px; text-align: right }
+.views { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.1fr); gap: 12px }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px; min-width: 0 }
+.card h2 { font: 500 11px var(--body); text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin: 0 0 8px }
+canvas { display: block; width: 100% }
+.view canvas { aspect-ratio: 1 / 1 }
+.read dl { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; margin: 0; font-size: 14px }
+.read dt { color: var(--muted) }
+.read dd { margin: 0; font: 500 14px var(--mono); font-variant-numeric: tabular-nums }
+.read .now { font: 500 15px var(--body); margin: 0 0 10px; min-height: 2.6em }
+.traces canvas { height: 300px }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 12px; color: var(--muted); margin-top: 8px }
+.legend i { display: inline-block; width: 18px; height: 0; border-top: 2px solid; vertical-align: middle; margin-right: 6px }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px }
+.stat b { display: block; font: 700 22px var(--display); font-variant-numeric: tabular-nums }
+.stat span { color: var(--muted); font-size: 13px }
+.log { display: grid; gap: 0; max-height: 320px; overflow-y: auto; font-size: 13px }
+.log button { display: grid; grid-template-columns: 56px 16px 1fr; gap: 8px; align-items: baseline; text-align: left;
+  border: 0; border-top: 1px solid var(--line); background: none; color: var(--ink); font: inherit; padding: 6px 4px; cursor: pointer }
+.log button:hover { background: var(--sky) }
+.log time { font-family: var(--mono); color: var(--muted); font-variant-numeric: tabular-nums }
+.dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block }
+.notes { color: var(--muted); font-size: 13px; max-width: 75ch; margin: 0 }
+.notes li { margin: 2px 0 }
+@media (max-width: 760px) { .views { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) } .read { grid-column: 1 / -1 } }
+@media (max-width: 440px) { .views { grid-template-columns: minmax(0, 1fr) } }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Skyriding Cam flight sim</h1>
+    <p class="sub">A made-up flight (two take-offs, a scroll after the first landing) through the real Skyriding Cam code, run offline. Speeds and turn rates come from your Run 2 and Run 3 logs. Compare the page's defaults (Follow your turns, your pitch keys starting climbs and dives) with no Blend, with Swing into the turn, and with mouse steering, where only the speed shows a climb or dive.</p>
+  </header>
+
+  <div class="bar" role="group" aria-label="Playback">
+    <div class="seg" role="group" aria-label="Which run">
+      <button id="v-page" aria-pressed="true">Blend on</button>
+      <button id="v-plain" aria-pressed="false">No Blend</button>
+      <button id="v-swing" aria-pressed="false">Swing into the turn</button>
+      <button id="v-mouse" aria-pressed="false">Mouse steering</button>
+    </div>
+    <button class="btn" id="play">Play</button>
+    <div class="seg" role="group" aria-label="Speed">
+      <button id="s1" aria-pressed="true">1x</button>
+      <button id="s2" aria-pressed="false">2x</button>
+      <button id="s05" aria-pressed="false">0.5x</button>
+    </div>
+    <input class="scrub" id="scrub" type="range" min="0" max="40" step="0.02" value="0" aria-label="Time">
+    <span class="clock" id="clock">0.00 s</span>
+  </div>
+
+  <div class="views">
+    <div class="card view"><h2>From above</h2><canvas id="top" width="300" height="300"></canvas></div>
+    <div class="card view"><h2>From the side</h2><canvas id="side" width="300" height="300"></canvas></div>
+    <div class="card read">
+      <h2>Now</h2>
+      <p class="now" id="now"></p>
+      <dl>
+        <dt>Turn</dt><dd id="r-turn"></dd>
+        <dt>Tilt</dt><dd id="r-tilt"></dd>
+        <dt>Zoom</dt><dd id="r-zoom"></dd>
+        <dt>Speed</dt><dd id="r-speed"></dd>
+        <dt>Facing</dt><dd id="r-facing"></dd>
+        <dt>Last moment</dt><dd id="r-last" style="font-family:var(--body)"></dd>
+      </dl>
+    </div>
+  </div>
+
+  <div class="card traces">
+    <h2>Turn, tilt and zoom over the flight</h2>
+    <canvas id="chart" aria-label="Turn, tilt and zoom over time, both runs; click to jump there"></canvas>
+    <div class="legend">
+      <span><i style="border-color:var(--accent)"></i>This run</span>
+      <span><i style="border-color:var(--ghost);border-top-style:dashed"></i>Blend on, for comparison (No Blend when you're on it)</span>
+      <span><span class="dot" style="background:var(--cast)"></span> Ability cast</span>
+      <span><span class="dot" style="background:var(--state)"></span> Climbing, diving or turning starts or ends</span>
+    </div>
+  </div>
+
+  <div class="stats" id="stats"></div>
+
+  <div class="card">
+    <h2>Moment log (click a line to jump there)</h2>
+    <div class="log" id="log"></div>
+  </div>
+
+  <ul class="notes">
+    <li>Built from the real SkyrideCam.lua and CameraScripts.lua, on a stand-in game camera that does only what the commands sent tell it to. Speed settings are the game's defaults: 180° a second to turn, 90° to tilt, 20 yards to zoom.</li>
+    <li>Not modelled: steering with the mouse (it stops our turns and tilts), fights, instances, and whether the game takes turns and tilts in the air at all. Run 4's probes answer that.</li>
+    <li>A positive tilt lowers the camera, so it looks up at you, as the quest cam's Lower the camera does. The stand-in camera starts 15° above you, and on the ground it stops at ground level.</li>
+    <li>Rebuild after a change: <code>python Tools/skyride-sim/build_sim.py out.html</code></li>
+  </ul>
+</div>
+
+<script>
+const SIM = /*SIM_DATA*/null;
+const C = { t: 0, turn: 1, tilt: 2, zoom: 3, facing: 4, speed: 5, gliding: 6, script: 7 };
+const SHORT = { "Surge Forward": "Surge", "Skyward Ascent": "Ascent", "Whirling Surge": "Whirl", "Aerial Halt": "Halt", "Second Wind": "Wind" };
+let variant = "page", t = 0, playing = false, rate = 1, last = null;
+const total = SIM.page.samples[SIM.page.samples.length - 1][0];
+const $ = id => document.getElementById(id);
+$("scrub").max = total.toFixed(2);
+
+function tok(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim() }
+function fit(canvas) {
+  const r = canvas.getBoundingClientRect(), d = window.devicePixelRatio || 1;
+  const w = Math.max(1, Math.round(r.width * d)), h = Math.max(1, Math.round(r.height * d));
+  if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h }
+  const g = canvas.getContext("2d"); g.setTransform(d, 0, 0, d, 0, 0); return [g, r.width, r.height];
+}
+function sample(run, time) {
+  const s = run.samples, dt = s[1][0] - s[0][0];
+  const i = Math.max(0, Math.min(s.length - 1, Math.round((time - s[0][0]) / dt)));
+  return s[i];
+}
+function segmentAt(time) {
+  let label = "";
+  for (const seg of SIM.page.segments) { if (seg.t <= time + 1e-6) label = seg.label }
+  return label;
+}
+function eventsOf(run) { return run.events.filter(e => e.kind !== "error") }
+function lastMoment(run, time) {
+  let found = null;
+  for (const e of eventsOf(run)) { if (e.kind === "camera" && e.t <= time + 1e-6) found = e }
+  return found;
+}
+
+function drawTop(row) {
+  const [g, w, h] = fit($("top")); g.clearRect(0, 0, w, h);
+  const cx = w / 2, cy = h / 2, R = Math.min(w, h) / 2 - 10, yard = R / 40;
+  g.strokeStyle = tok("--line"); g.lineWidth = 1; g.fillStyle = tok("--muted"); g.font = "11px " + tok("--mono");
+  for (const yd of [10, 20, 30, 39]) {
+    g.beginPath(); g.arc(cx, cy, yd * yard, 0, Math.PI * 2); g.stroke();
+    g.fillText(yd + " yd", cx + 3, cy - yd * yard + 12);
+  }
+  const height = Math.max(-5, Math.min(88, 15 - row[C.tilt]));
+  const flat = row[C.zoom] * Math.cos(height * Math.PI / 180) * yard;
+  const a = row[C.turn] * Math.PI / 180;
+  const px = cx + Math.sin(a) * flat, py = cy + Math.cos(a) * flat;
+  g.strokeStyle = tok("--accent"); g.globalAlpha = 0.35; g.lineWidth = 1.5;
+  const toward = Math.atan2(cy - py, cx - px);
+  for (const side of [-0.42, 0.42]) { g.beginPath(); g.moveTo(px, py); g.lineTo(px + Math.cos(toward + side) * R * 0.9, py + Math.sin(toward + side) * R * 0.9); g.stroke() }
+  g.globalAlpha = 1; g.beginPath(); g.moveTo(px, py); g.lineTo(cx, cy); g.stroke();
+  g.fillStyle = tok("--you"); g.beginPath(); g.moveTo(cx, cy - 9); g.lineTo(cx - 6, cy + 6); g.lineTo(cx + 6, cy + 6); g.closePath(); g.fill();
+  g.fillStyle = tok("--accent"); g.beginPath(); g.arc(px, py, 6, 0, Math.PI * 2); g.fill();
+  g.fillStyle = tok("--muted"); g.font = "11px " + tok("--body"); g.fillText("You, flying up the page", 8, h - 8);
+}
+function drawSide(row) {
+  const [g, w, h] = fit($("side")); g.clearRect(0, 0, w, h);
+  g.fillStyle = tok("--sky"); g.fillRect(0, 0, w, h * 0.78);
+  g.fillStyle = tok("--ground"); g.fillRect(0, h * 0.78, w, h * 0.22);
+  const ox = w * 0.78, oy = h * 0.62, yard = (w * 0.7) / 40;
+  const height = Math.max(-5, Math.min(88, 15 - row[C.tilt])) * Math.PI / 180;
+  const px = ox - Math.cos(height) * row[C.zoom] * yard, py = oy - Math.sin(height) * row[C.zoom] * yard;
+  g.strokeStyle = tok("--accent"); g.lineWidth = 1.5; g.beginPath(); g.moveTo(px, py); g.lineTo(ox, oy); g.stroke();
+  g.fillStyle = tok("--you"); g.beginPath(); g.moveTo(ox + 10, oy); g.lineTo(ox - 8, oy - 5); g.lineTo(ox - 8, oy + 5); g.closePath(); g.fill();
+  g.fillStyle = tok("--accent"); g.beginPath(); g.arc(px, py, 6, 0, Math.PI * 2); g.fill();
+  g.fillStyle = tok("--muted"); g.font = "11px " + tok("--mono");
+  g.fillText((15 - row[C.tilt]).toFixed(0) + "° above you", 8, 16);
+  g.font = "11px " + tok("--body"); g.fillText("You, flying right", 8, h - 8);
+}
+
+const LANES = [
+  { key: C.turn, label: "Turn (left +)", unit: "°" },
+  { key: C.tilt, label: "Tilt (lower +)", unit: "°" },
+  { key: C.zoom, label: "Zoom", unit: " yd" },
+];
+function range(key) {
+  let lo = Infinity, hi = -Infinity;
+  for (const v of Object.keys(SIM)) for (const r of SIM[v].samples) { lo = Math.min(lo, r[key]); hi = Math.max(hi, r[key]) }
+  const pad = Math.max(2, (hi - lo) * 0.08); return [lo - pad, hi + pad];
+}
+const RANGES = LANES.map(l => range(l.key));
+let chartBox = null;
+function drawChart() {
+  const [g, w, h] = fit($("chart")); g.clearRect(0, 0, w, h);
+  const left = 64, right = 10, top = 26, gap = 14, laneH = (h - top - gap * 2 - 18) / 3;
+  const x = time => left + (w - left - right) * time / total;
+  chartBox = { left, right, w };
+  g.font = "10px " + tok("--body");
+  let shade = false;
+  const segs = SIM.page.segments;
+  segs.forEach((seg, i) => {
+    const end = i + 1 < segs.length ? segs[i + 1].t : total;
+    if (shade) { g.fillStyle = tok("--sky"); g.fillRect(x(seg.t), top, x(end) - x(seg.t), h - top - 18) }
+    shade = !shade;
+  });
+  for (const e of eventsOf(SIM[variant])) {
+    if (e.kind !== "cast") continue;
+    g.strokeStyle = tok("--cast"); g.globalAlpha = 0.5; g.beginPath(); g.moveTo(x(e.t), top - 4); g.lineTo(x(e.t), h - 18); g.stroke(); g.globalAlpha = 1;
+    g.fillStyle = tok("--cast"); g.save(); g.translate(x(e.t) + 2, top - 6); g.fillText(SHORT[e.text] || e.text, 0, 0); g.restore();
+  }
+  LANES.forEach((lane, i) => {
+    const y0 = top + i * (laneH + gap), [lo, hi] = RANGES[i];
+    const y = v => y0 + laneH - (v - lo) / (hi - lo) * laneH;
+    g.strokeStyle = tok("--line"); g.lineWidth = 1; g.strokeRect(left, y0, w - left - right, laneH);
+    g.fillStyle = tok("--muted"); g.font = "11px " + tok("--body"); g.fillText(lane.label, 4, y0 + 12);
+    g.font = "10px " + tok("--mono");
+    const ticks = lane.key === C.zoom ? [15, 30, 39] : (hi - lo > 100 ? [0, 75, 150] : [-15, 0, 15]);
+    for (const v of ticks) {
+      if (v < lo || v > hi) continue;
+      g.strokeStyle = tok("--line"); g.setLineDash([2, 3]); g.beginPath(); g.moveTo(left, y(v)); g.lineTo(w - right, y(v)); g.stroke(); g.setLineDash([]);
+      g.fillStyle = tok("--muted"); g.fillText(v + lane.unit, left - 6 - g.measureText(v + lane.unit).width, y(v) + 3);
+    }
+    for (const v of [variant === "page" ? "plain" : "page", variant]) {
+      const mine = v === variant;
+      g.strokeStyle = tok(mine ? "--accent" : "--ghost"); g.lineWidth = mine ? 2 : 1.25; g.setLineDash(mine ? [] : [4, 3]);
+      g.beginPath();
+      SIM[v].samples.forEach((r, j) => { j ? g.lineTo(x(r[0]), y(r[lane.key])) : g.moveTo(x(r[0]), y(r[lane.key])) });
+      g.stroke(); g.setLineDash([]);
+    }
+    if (lane.key !== C.zoom) {
+      for (const e of eventsOf(SIM[variant])) {
+        if (e.kind !== "camera" || !/diving|climbing|turning|straight|level/.test(e.text)) continue;
+        const isTurn = /turn|straight/.test(e.text);
+        if ((lane.key === C.turn) !== isTurn) continue;
+        g.fillStyle = tok("--state"); g.beginPath(); g.arc(x(e.t), y0 + laneH - 5, 3.5, 0, Math.PI * 2); g.fill();
+      }
+    }
+  });
+  g.fillStyle = tok("--muted"); g.font = "10px " + tok("--mono");
+  for (let s = 0; s <= total; s += 5) g.fillText(s + " s", x(s) - 8, h - 4);
+  g.strokeStyle = tok("--ink"); g.lineWidth = 1.5; g.beginPath(); g.moveTo(x(t), top - 2); g.lineTo(x(t), h - 18); g.stroke();
+}
+
+function fmt(v, unit, sign) { return (sign && v > 0.05 ? "+" : "") + v.toFixed(1) + unit }
+function draw() {
+  const run = SIM[variant], row = sample(run, t);
+  drawTop(row); drawSide(row); drawChart();
+  $("clock").textContent = t.toFixed(2) + " s";
+  $("scrub").value = t.toFixed(2);
+  $("now").textContent = segmentAt(t);
+  $("r-turn").textContent = fmt(row[C.turn], "°", true);
+  $("r-tilt").textContent = fmt(row[C.tilt], "°", true);
+  $("r-zoom").textContent = row[C.zoom].toFixed(1) + " yd";
+  $("r-speed").textContent = row[C.gliding] ? row[C.speed].toFixed(0) + " yd/s" : "on the ground";
+  $("r-facing").textContent = (((row[C.facing] % 360) + 360) % 360).toFixed(0) + "°";
+  const m = lastMoment(run, t); $("r-last").textContent = m ? m.text + " (" + m.t.toFixed(1) + " s)" : "none yet";
+}
+
+function stats() {
+  const box = $("stats"); box.innerHTML = "";
+  const end = v => SIM[v].samples[SIM[v].samples.length - 1];
+  const items = [
+    [SIM.page.stops + " vs " + SIM.plain.stops, "times the camera stopped dead, Blend on vs no Blend"],
+    [fmt(end("swing")[C.turn], "°") + " / " + fmt(end("swing")[C.tilt], "°"), "turn and tilt left after landing, Swing into the turn"],
+    [fmt(end("page")[C.turn], "°") + " / " + fmt(end("page")[C.tilt], "°"), "turn and tilt left after landing, Blend on (0 = back level)"],
+    [String(SIM.page.events.filter(e => e.kind === "cast").length), "abilities cast in the flight"],
+    [SIM.page.settings.skyrideMaxTurn + "° · " + SIM.page.settings.skyrideMaxTilt + "° · " + SIM.page.settings.skyrideMaxZoom + " yd", "fastest turn, tilt and zoom a second (Blend on run); blend " + SIM.page.settings.skyrideBlend + " s"],
+  ];
+  for (const [big, small] of items) {
+    const d = document.createElement("div"); d.className = "card stat";
+    const b = document.createElement("b"); b.textContent = big; const s = document.createElement("span"); s.textContent = small;
+    d.append(b, s); box.append(d);
+  }
+}
+function buildLog() {
+  const box = $("log"); box.innerHTML = "";
+  for (const e of eventsOf(SIM[variant])) {
+    if (e.kind === "camera" && SHORT[e.text]) continue;
+    const b = document.createElement("button");
+    const tm = document.createElement("time"); tm.textContent = e.t.toFixed(2) + " s";
+    const dot = document.createElement("span"); dot.className = "dot";
+    dot.style.background = e.kind === "camera" ? "var(--state)" : "var(--cast)";
+    const tx = document.createElement("span");
+    tx.textContent = e.kind === "cast" ? (/^You /.test(e.text) ? e.text : "You cast " + e.text) : e.kind === "key" ? "You press " + e.text.replace(/^Key /, "") : "Camera: " + e.text;
+    b.append(tm, dot, tx); b.addEventListener("click", () => { t = e.t; playing = false; $("play").textContent = "Play"; draw() });
+    box.append(b);
+  }
+}
+
+function setVariant(v) {
+  variant = v; for (const o of ["page", "plain", "swing", "mouse"]) $("v-" + o).setAttribute("aria-pressed", v === o);
+  buildLog(); draw();
+}
+$("v-page").onclick = () => setVariant("page");
+$("v-plain").onclick = () => setVariant("plain");
+$("v-swing").onclick = () => setVariant("swing");
+$("v-mouse").onclick = () => setVariant("mouse");
+for (const [id, r] of [["s1", 1], ["s2", 2], ["s05", 0.5]]) $(id).onclick = () => {
+  rate = r; for (const o of ["s1", "s2", "s05"]) $(o).setAttribute("aria-pressed", o === id);
+};
+$("play").onclick = () => {
+  if (!playing && t >= total - 0.01) t = 0;
+  playing = !playing; $("play").textContent = playing ? "Pause" : "Play"; last = null;
+  if (playing) requestAnimationFrame(tick);
+};
+$("scrub").oninput = e => { t = parseFloat(e.target.value); draw() };
+$("chart").addEventListener("click", e => {
+  if (!chartBox) return;
+  const r = $("chart").getBoundingClientRect(), f = (e.clientX - r.left - chartBox.left) / (chartBox.w - chartBox.left - chartBox.right);
+  t = Math.max(0, Math.min(total, f * total)); draw();
+});
+function tick(now) {
+  if (!playing) return;
+  if (last !== null) t += (now - last) / 1000 * rate;
+  last = now;
+  if (t >= total) { t = total; playing = false; $("play").textContent = "Play" }
+  draw();
+  if (playing) requestAnimationFrame(tick);
+}
+window.addEventListener("resize", draw);
+try { matchMedia("(prefers-color-scheme: dark)").addEventListener("change", draw) } catch (e) {}
+new MutationObserver(draw).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+stats(); setVariant("page");
+</script>

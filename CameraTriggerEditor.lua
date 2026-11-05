@@ -149,23 +149,59 @@ ns.NextSceneTrigger = NextTrigger
 -- A scene's lines on parent: its Triggers, a line each (each a trigger of
 -- the library, picked, with Edit to open its page), and a line for + Add trigger
 -- (kit.actions: more controls for that line, { control, x }). A built-in
--- scene's own trigger comes first, locked (kit.builtinLabel). kit: At,
+-- scene's own triggers come first, locked, a line each (kit.builtinLabel). kit: At,
 -- BlockAt(line, control, x) (the Triggers lines, from 1), resize(lines) (the
 -- Triggers' lines shown now), Tooltip, AddControl, x, Saved(), typing(i, text).
 local function BuildLines(parent, store, kit)
 	local Tooltip, AddControl, x, Saved = kit.Tooltip, kit.AddControl, kit.x, kit.Saved
 	local offset = 0
 	local function Count() return #store.list() end
-	-- (A built-in scene's own triggers, locked, first: as many lines as they take.)
+	-- (A built-in scene's own triggers first: a line each, laid out as the
+	-- triggers of your own below them, "or" between. Each can be taken off
+	-- the scene (the x) and put back (the +): a taken-off one stays on its
+	-- line, dimmed, so the lines don't move.)
 	if kit.builtinLabel then
-		local own = parent:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-		own:SetWidth(440)
-		own:SetJustifyH("LEFT")
-		own:SetWordWrap(true)
-		own:SetText("|cff999999" .. L["Built in:"] .. "|r " .. kit.builtinLabel)
-		local textHeight = own:GetStringHeight()
-		offset = math.max(1, math.ceil(((type(textHeight) == "number" and textHeight or 0) + 8) / 34))
-		kit.BlockAt((offset + 1) / 2, own, x + 24)
+		for j, each in ipairs(kit.builtinLabel) do
+			local key = each.key
+			local function Dropped() return ns.TriggerDropped(key) end
+			if j > 1 then
+				kit.BlockAt(j, parent:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall"), x):SetText(L["or"])
+			end
+			local own = kit.BlockAt(j, parent:CreateFontString(nil, "OVERLAY", "GameFontHighlight"), x + 24)
+			own:SetWidth(270)
+			-- (Its page on the Triggers page: its Only if, timing, priority.)
+			local edit = kit.BlockAt(j, ns.PanelButton(parent), x + 300)
+			edit:SetSize(60, 22)
+			edit:SetText(L["Edit"])
+			edit.searchSkip = true
+			edit:SetScript("OnClick", function()
+				if ns.OpenTriggerPage then ns.OpenTriggerPage("b:" .. key) end
+			end)
+			Tooltip(edit, L["Opens this trigger's page (Triggers, Camera hub): its Only if, wait, cooldown, chance " ..
+				"and priority."])
+			own:SetJustifyH("LEFT")
+			own:SetWordWrap(false)
+			local toggle = kit.BlockAt(j, CreateFrame("Button", nil, parent), x + 424)
+			toggle:SetSize(16, 16)
+			toggle:SetHighlightTexture("Interface\\Buttons\\UI-Common-MouseHilight", "ADD")
+			toggle:SetScript("OnClick", function()
+				ns.SetTriggerDropped(key, not Dropped())
+				Saved()
+			end)
+			toggle.Refresh = function(self)
+				local dropped = Dropped()
+				-- (Both colors: they're one on Forever.)
+				local shade = dropped and 0.45 or 0.9
+				own:SetText(dropped and (each.name .. "  " .. L["(off)"]) or each.name)
+				own:SetTextColor(shade, shade, shade)
+				own:SetVertexColor(shade, shade, shade)
+				self:SetNormalTexture(dropped and "Interface\\Buttons\\UI-PlusButton-Up"
+					or "Interface\\Buttons\\UI-StopButton")
+			end
+			Tooltip(toggle, L["Take this trigger off the scene (it then starts nothing), or put it back."])
+			AddControl(toggle)
+		end
+		offset = math.max(1, #kit.builtinLabel)
 	end
 
 	-- A line per trigger: "or", the trigger (the library's, picked), Edit
@@ -272,7 +308,7 @@ end
 -- A saved scene's drawer: a scene of yours' Ends and Triggers lines and a
 -- Share button on its Name line, or a built-in scene's Triggers (its own,
 -- then yours). kit: At, BlockAt, resize, Changed(), Tooltip, AddControl, x,
--- shareX, builtinLabel (a built-in scene's own trigger's name).
+-- shareX, builtinLabel (a built-in scene's own triggers' names, a list).
 function ns.BuildCustomTriggerLines(drawer, id, kit)
 	local custom = kit.builtinLabel == nil
 	BuildLines(drawer, RowStore(id), { At = custom and kit.At or nil, BlockAt = kit.BlockAt, resize = kit.resize,

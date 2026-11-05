@@ -1042,6 +1042,37 @@ function ns.CreateTriggerSettingsPanel(kit)
 	end))
 	scenes:SetPoint("LEFT", LABEL_X + 270, 0)
 
+	-- (Ours: the scene it's in. Moving it takes on that scene's settings.)
+	local moveLine = Line(L["Its scene"], function()
+		local built = BuiltIn()
+		return built ~= nil and #ns.SceneMoveTargets(built.key) > 0
+	end)
+	local move = Menu(moveLine, 240, function()
+		local built = BuiltIn()
+		local list = {}
+		if not built then return list end
+		local lead = ns.SceneLead(built.key)
+		if #ns.SceneGroupMembers(lead) > 1 or lead ~= built.key then
+			list[#list + 1] = { value = lead, text = ns.SceneDisplayName(lead) }
+		end
+		list[#list + 1] = { value = "", text = L["A scene of its own"] }
+		for _, key in ipairs(ns.SceneMoveTargets(built.key)) do
+			list[#list + 1] = { value = key, text = ns.SceneDisplayName(key) }
+		end
+		return list
+	end, function()
+		local built = BuiltIn()
+		if not built then return nil end
+		local lead = ns.SceneLead(built.key)
+		if lead == built.key and #ns.SceneGroupMembers(lead) < 2 then return "" end
+		return lead
+	end, function(value)
+		local built = BuiltIn()
+		if built then ns.MoveTriggerToScene(built.key, value) end
+	end)
+	kit.Tooltip(move, L["The scene this trigger starts. Moved to another, it plays that scene's camera, music " ..
+		"and When; the scene it left carries on without it."])
+
 	-- The sentence at the top: the trigger in words.
 	local function Sentence()
 		local id, built = Id(), BuiltIn()

@@ -407,7 +407,7 @@ function ns.CreateCardsPanel(kit)
 	local grid = ns.GRID_KIT
 	local columns = ns.FRAME_COLUMNS
 	local items = {}
-	for i, event in ipairs(ns.CARD_EVENTS) do
+	for i, event in ipairs(ns.CardEventsGrouped()) do
 		local id, key, alwaysKey = event.id, "card:" .. event.id, "cardAlways_" .. event.id
 		local opts = event.fight and FIGHT_OPTS or STORY_OPTS
 		local function Key() return key end
@@ -421,7 +421,7 @@ function ns.CreateCardsPanel(kit)
 			grid.RecordRow(content, list, key)
 		end
 		items[i] = {
-			id = id, label = L[event.name], tip = L[TIPS[id]], on = event.on,
+			id = id, label = L[event.name], tip = L[TIPS[id]], on = event.on, group = L[event.group],
 			onTip = L["Ticked: this card shows where its row says. Unticked: never."],
 			dim = function()
 				return not (ns.GetDB()[event.on] and (not event.needs or ns.GetDB()[ns.CARD_BY_ID[event.needs].on]))

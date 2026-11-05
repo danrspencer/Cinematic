@@ -406,10 +406,11 @@ ns.BUILT_IN_SOURCE_NAMES = { depart = "Hearthstones and teleports", logout = "Lo
 function ns.SceneDisplayName(key)
 	local trigger = ns.CAMERA_TRIGGER and ns.CAMERA_TRIGGER[key]
 	if trigger and trigger.custom then return ns.CustomTriggerLabel(key) end
-	local group = ns.SceneGroupOf and ns.SceneGroupOf(ns.SceneLead(key))
+	local lead = ns.SceneLead and ns.SceneLead(key) or key
+	local group = ns.SceneGroupOf and ns.SceneGroupOf(lead)
 	if group then return group.name end
 	for _, each in ipairs(ns.BuiltInTriggers()) do
-		if each.key == key then return each.name end
+		if each.key == lead then return each.name end
 	end
 	return tostring(key)
 end

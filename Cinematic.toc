@@ -90,6 +90,7 @@ Triggers.lua
 Camera.lua
 ZoomGuard.lua
 QuestCam.lua
+SkyrideCam.lua
 CameraRows.lua
 TriggerLibrary.lua
 CustomTriggers.lua

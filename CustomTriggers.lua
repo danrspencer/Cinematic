@@ -47,6 +47,7 @@ ns.CUSTOM_TRIGGER_MOMENTS = {
 	{ value = "levelup", text = L["You level up"] }, { value = "achievement", text = L["You earn an achievement"] },
 	{ value = "quest", text = L["You turn in a quest"] }, { value = "boss", text = L["Your group kills a boss"] },
 	{ value = "alive", text = L["You come back to life"] },
+	{ value = "campfire", text = L["You rest the cursor on a campfire"] },
 }
 ns.CUSTOM_TRIGGER_STATES = {
 	{ value = "mounted", text = L["Mounted"] }, { value = "swimming", text = L["Swimming"] },
@@ -90,6 +91,8 @@ local MOMENT_EVENTS = {
 	levelup = { "PLAYER_LEVEL_UP" }, achievement = { "ACHIEVEMENT_EARNED" }, quest = { "QUEST_TURNED_IN" },
 	boss = { "ENCOUNTER_END" }, alive = { "PLAYER_UNGHOST", "PLAYER_ALIVE" },
 }
+-- ...and those of Cinematic's own signals (ns.Listen, Core.lua).
+local MOMENT_SIGNALS = { campfire = "CAMPFIRE_REST" }
 local SPELL_EVENTS = { "UNIT_SPELLCAST_START", "UNIT_SPELLCAST_CHANNEL_START", "UNIT_SPELLCAST_SUCCEEDED",
 	"UNIT_SPELLCAST_STOP", "UNIT_SPELLCAST_CHANNEL_STOP", "UNIT_SPELLCAST_INTERRUPTED", "UNIT_SPELLCAST_FAILED" }
 local PLACE_EVENTS = { "ZONE_CHANGED", "ZONE_CHANGED_INDOORS", "ZONE_CHANGED_NEW_AREA", "PLAYER_ENTERING_WORLD" }
@@ -547,6 +550,22 @@ watcher:SetScript("OnEvent", function(_, event, ...)
 		end
 	end
 end)
+
+-- The moments on Cinematic's own signals: heard always, wanted (so their
+-- watch runs) only while a trigger of yours uses them.
+for what, signal in pairs(MOMENT_SIGNALS) do
+	ns.Listen(signal, function()
+		local now = GetTime()
+		for _, unit in ipairs(units) do
+			if unit.kind == "moment" and unit.what == what then TryStart(unit, now) end
+		end
+	end, function()
+		for _, unit in ipairs(units) do
+			if unit.kind == "moment" and unit.what == what then return true end
+		end
+		return false
+	end)
+end
 
 -- A held kind's condition now, the other way round for a phase that starts
 -- as it stops (nil for the ones an event starts). Buffs and places are
