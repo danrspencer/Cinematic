@@ -405,6 +405,7 @@ end
 -- fading), or up for what the last sweep found; between sweeps, and while one
 -- can't run (in combat, the mouse on the minimap), the last answer stands.
 local sweptAt, seenAt = -math.huge, -math.huge
+local revealedBy -- the names that last revealed it, for /cine why (Why.lua)
 local last = {} -- the last sweep, for /cine debug tracking
 -- Whether the last sweep heard a quest's area on the minimap (not just its
 -- arrow on the rim): the faded minimap waits off the screen meanwhile
@@ -574,7 +575,7 @@ function ns.IsMinimapRevealed(now)
 		local found, probes, grown = ns.SweepMinimap(STEP, true, not marking and Wanted or nil)
 		last.at, last.why, last.grown, last.names = now, nil, grown, nil
 		if found then
-			local names = {}
+			local names, wantedNames = {}, {}
 			areaShown = false
 			for name, entry in pairs(found) do
 				local wanted = Wanted(name, entry)
@@ -582,7 +583,14 @@ function ns.IsMinimapRevealed(now)
 				if kind == "objective" and not OnlyAtRim(entry) then areaShown = true end
 				names[#names + 1] = ("%s (%s%s%s)"):format(name, kind,
 					QUEST_KINDS[kind] and OnlyAtRim(entry) and ", at the rim" or "", wanted and ", reveals" or "")
-				if wanted then seenAt = now end
+				if wanted then
+					seenAt = now
+					wantedNames[#wantedNames + 1] = name
+				end
+			end
+			if #wantedNames > 0 then
+				table.sort(wantedNames)
+				revealedBy = table.concat(wantedNames, ", ")
 			end
 			last.names, last.probes = table.concat(names, ", "), probes
 			PingNodes(found)
@@ -593,6 +601,14 @@ function ns.IsMinimapRevealed(now)
 	return now - seenAt < HOLD
 end
 ns.IsMinimapRevealed = ns.Profiled("Minimap sweep", ns.IsMinimapRevealed)
+
+-- For /cine why: whether a reveal holds the minimap up now, what the sweep
+-- last found that revealed it (names, or nil), and whether it's held up
+-- through a fight it was up at the start of.
+function ns.MinimapRevealWhy(now)
+	if not AnyReveal() or now - seenAt >= HOLD then return false end
+	return true, revealedBy, heldIntoFight == true
+end
 
 function ns.NodeSweepReport()
 	if not ns.CanSweepMinimap() then return "minimap sweep: this client can't move a pretend mouse over the minimap" end

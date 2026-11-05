@@ -496,6 +496,7 @@ function ns.StopMusicNow()
 		ns.music.managing = false
 		musicWritten = nil
 	end
+	ns.music.ending = nil
 end
 
 -- Music for standing still (not flagged AFK): Stand still's switch, or with
@@ -593,7 +594,10 @@ local function UpdateCombatMusic(elapsed, playerOverride)
 		combatMusic.camSeenAt = now
 	end
 	local leftCams = now - (combatMusic.camSeenAt or -math.huge) >= CAM_HANDOVER
-	if not (handlesMusic and ns.db.musicPauseWhenMoving) or inCam then
+	-- Music a camera started (managing) always ends this way: it's the scene's
+	-- music, and with CineMode staying on it otherwise played on till logout.
+	-- The setting is for your own music.
+	if not (handlesMusic and (ns.db.musicPauseWhenMoving or ns.music.managing)) or inCam then
 		combatMusic.movingPaused = false
 	elseif ns.playerMoving and leftCams then
 		combatMusic.movingPaused = true
@@ -604,8 +608,10 @@ local function UpdateCombatMusic(elapsed, playerOverride)
 	-- Music the move-on pause faded right out rests until the fatigue time
 	-- (Audio page) since it last started is up: a camera starting meanwhile
 	-- doesn't bring it back. Then it comes back as a fresh track.
+	-- (Your own music only rests with the setting on: scene music ending by
+	-- itself leaves yours alone.)
 	if combatMusic.rested and not moving then
-		if MusicFatigued() then
+		if MusicFatigued() and ns.db.musicPauseWhenMoving then
 			moving = true
 		else
 			combatMusic.rested = false
@@ -928,17 +934,28 @@ function ns.UpdateMusic(cinematic, elapsed)
 		return
 	end
 
-	local target = want and 1 or 0
+	-- (An End music step, camera scripts: out over its own seconds.)
+	local ending = ns.music.ending
+	local target = (want and not ending) and 1 or 0
 	local duck = MusicDuck()
 	if ns.music.level ~= target or duck < 1 or ns.music.combatApplied then
-		ns.music.level = ns.Approach(ns.music.level, target, elapsed, ns.db.musicFadeTime)
+		ns.music.level = ns.Approach(ns.music.level, target, elapsed, ending or ns.db.musicFadeTime)
 		-- (Switched off while muted: the slider shows your own volume meanwhile.)
 		SetMusicVolume(combatMusic.managedOff and ns.music.volume or ns.music.volume * ns.music.level * duck)
 		-- Keep writing until the mute level is back to full.
 		ns.music.combatApplied = duck < 1
 	end
-	if ns.music.level == 0 and not want then
+	if ns.music.level == 0 and (not want or ending) then
+		if ending then MusicTrace("END managed music: End music step") end
 		ns.StopMusicNow()
+	end
+end
+
+-- A camera script's End music step: the music a camera started fades out over
+-- secs (0: at once) and ends. Your own music, not started by one, is left alone.
+function ns.EndSceneMusic(secs)
+	if ns.music.managing then
+		ns.music.ending = math.max(0, tonumber(secs) or 0)
 	end
 end
 

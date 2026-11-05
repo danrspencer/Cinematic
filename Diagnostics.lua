@@ -644,6 +644,7 @@ do
 		"shadowTextureSize", "shadowSoft", "shadowRt", "ssao", "sunShafts", "depthEffects",
 		"refraction", "projectedTextures", "particleDensity", "weatherDensity",
 		"waterDetail", "reflectionMode", "rippleDetail",
+		"doodadLodScale", "groundEffectFade", "nameplateMaxDistance", "cameraDistanceMaxZoomFactor",
 	}
 	local snapshot -- name -> value, from the first run
 
@@ -688,6 +689,7 @@ do
 				end
 			end
 			snapshot = {}
+			ns.cvarsWrittenBy = {} -- (Graphics.lua: our own writes from now on, told apart below)
 			local count = 0
 			for _, name in ipairs(AllNames()) do
 				local value = Value(get, name)
@@ -706,7 +708,8 @@ do
 			local now = Value(get, name)
 			if now and now ~= before then
 				changed = changed + 1
-				ns.Log("cvars", ("menu changed %s: %s -> %s"):format(name, before, now))
+				local by = ns.cvarsWrittenBy and ns.cvarsWrittenBy[name:lower()]
+				ns.Log("cvars", ("%s changed %s: %s -> %s"):format(by or "menu", name, before, now))
 			end
 		end
 		snapshot = nil

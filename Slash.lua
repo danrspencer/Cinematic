@@ -112,6 +112,7 @@ local function PrintDebugHelp()
 	if ns.isDev then print("  /cine debug skyride [frames|probe zoom|turn|tilt|fov|follow] - skyriding: what the game says and the flight log (again to stop); the frames up; or one of our camera moves tried mid-flight") end
 	print("  /cine debug questlog - save every frame of the next quest cams (for tracking down snaps)")
 	print("  /cine debug zoom - the slow zoom's state")
+	print("  /cine debug zoomtrace - the last 30 sec of camera distance, to the log (a reload saves it too)")
 	print("  /cine debug turn - turn handling while walking (8 seconds)")
 	print("  /cine debug unitframes - log every part of the player, pet, target and focus frames (names, textures, sizes, held hidden) to the saved log")
 	print("  /cine debug plates - nameplate settings, and how the plates (and your target) are sorted")
@@ -986,6 +987,10 @@ local function HandleSlash(msg)
 		ns.SkyrideDebug(arg:match("^skyride%s+(.-)%s*$"))
 	elseif cmd == "debug" and arg == "help" then
 		PrintDebugHelp()
+	elseif cmd == "debug" and arg == "zoomtrace" and ns.ZoomTraceDump then
+		local lines = ns.ZoomTraceDump("asked for", 0.25, 0.5, 30)
+		ns.Print(("zoom trace: %d lines written to the log (the last 30 sec of camera distance)"):format(lines))
+		if ns.ZoomGuardDebug then ns.Print(ns.ZoomGuardDebug()) end
 	elseif cmd == "debug" and arg == "zoom" then
 		local zoom = ns.GetZoomDebug()
 		ns.Print(("camera distance now: %.2f, zoom speed: %s, max factor: %s"):format(

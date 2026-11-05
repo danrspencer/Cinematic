@@ -593,6 +593,14 @@ end
 -- zoom it is, nil for the quest cam's own).
 local function ZoomTo(distance, T, why, by)
 	local now = GetCameraZoom()
+	-- (Replaced while still moving: the commands already sent are still on
+	-- their way in the game, and counted from zero again the new zoom asked
+	-- for that much more. Still: nothing's on its way, the game's steps just
+	-- aren't exactly the size asked.)
+	local inFlight = 0
+	if zoomer.moving and math.abs(now - (zoomer.last or now)) >= ZOOM_STILL then
+		inFlight = zoomer.from + (zoomer.asked or 0) - now
+	end
 	if zoomer.moving then
 		ZoomLog(("replaced by a new zoom at %.1f yards (was heading %.1f -> %.1f, %d commands asking %+.1f yards)"):format(
 			now, zoomer.from, zoomer.goal, zoomer.sends or 0, zoomer.asked or 0))
@@ -606,7 +614,7 @@ local function ZoomTo(distance, T, why, by)
 	Note(("zoom to %.2f"):format(distance))
 	ZoomLog(("%s %.1f -> %.1f yards over %.1f sec (%s; max factor %s)"):format(by or "quest cam", now, distance,
 		math.max(MOVE_MIN_TIME, T), why or "?", tostring(GetCVar("cameraDistanceMaxZoomFactor"))))
-	zoomer.sends, zoomer.asked, zoomer.watch = 0, 0, nil
+	zoomer.sends, zoomer.asked, zoomer.watch = 0, inFlight, nil
 	zoomer.from, zoomer.goal, zoomer.t, zoomer.T = now, distance, 0, math.max(MOVE_MIN_TIME, T)
 	zoomer.cruise = math.abs(distance - now) / (zoomer.T * (1 - MOVE_EASE))
 	zoomer.last, zoomer.sentAt, zoomer.stillSince, zoomer.sent = now, 0, nil, nil
@@ -1374,7 +1382,11 @@ local function OnUpdate(_, elapsed)
 				onTaxi and "held zoom back out: flight" or pending.now and "held zoom back out: now"
 				or "held zoom back out: you walked off")
 			zoomer.leaving, zoomer.leavingSpeed = true, pending.speed
-			HurryZoom(ZOOM_HURRY)
+			-- (Hurried only once you've walked off: out at once (window closed,
+			-- nobody near) it runs at its own pace, the 2.7x rush read as a jolt.)
+			if not pending.now or onTaxi then
+				HurryZoom(ZOOM_HURRY)
+			end
 		end
 	end
 	-- A button down on the camera that isn't yours yet (with the window open a

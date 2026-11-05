@@ -183,6 +183,23 @@ local function InfoLine(text)
 		end
 	end
 end
+-- (The game's yellow "Discovered:" line goes the moment it's written, so
+-- it never draws: the card's fired right here if its event hasn't come yet,
+-- and the event's own call after is the same place again, skipped.)
+if UIErrorsFrame and UIErrorsFrame.AddMessage then
+	hooksecurefunc(UIErrorsFrame, "AddMessage", function(frame, text)
+		if not (ns.db and ns.CardOn("discover")) then return end
+		text = Plain(text)
+		if not text then return end
+		for _, pattern in ipairs(DISCOVERED) do
+			if text:match(pattern) then
+				InfoLine(text)
+				if GetTime() - shownAt < 5 and frame.Clear then pcall(frame.Clear, frame) end
+				return
+			end
+		end
+	end)
+end
 -- Zone's and Subzone's cards (ZoneCard.lua) ask first: true if Discovered's
 -- card has the place (one just shown, or one this check shows), so theirs
 -- isn't shown as well.

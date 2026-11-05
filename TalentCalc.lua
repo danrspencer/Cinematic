@@ -1455,6 +1455,15 @@ do
 			end)
 		end
 		ns.Print(("calculator sounds: add %s, take back %s"):format(tostring(Sound("add")), tostring(Sound("remove"))))
+		-- (The game's sound switches and volumes too: a sound that's played but
+		-- not heard is one of these.)
+		local parts = {}
+		for _, name in ipairs({ "Sound_EnableAllSound", "Sound_EnableSFX", "Sound_MasterVolume", "Sound_SFXVolume",
+			"Sound_EnableAmbience", "Sound_AmbienceVolume", "Sound_EnableSoundWhenGameIsInBG" }) do
+			parts[#parts + 1] = name:gsub("^Sound_", "") .. " " .. tostring(GetCVar(name))
+		end
+		ns.Print("sound: " .. table.concat(parts, ", ") .. (ns.db and ns.db.combatHeldAmbience
+			and (", ambience held at " .. tostring(ns.db.combatHeldAmbience)) or ""))
 		return watching
 	end
 end

@@ -32,11 +32,11 @@ local COLORS = {
 local KIND_COLOR = { rotate = "move", tilt = "move", zoom = "move", zoomRand = "move", lineup = "move",
 	wait = "wait", together = "flow", ["repeat"] = "flow", emote = "misc", putback = "misc", turnTo = "move",
 	sway = "move", tiltRand = "move", spin = "move", ["until"] = "flow", waitRand = "wait", follow = "misc", aim = "move", ending = "flow",
-	play = "flow" }
+	play = "flow", endMusic = "misc" }
 local KIND_NAMES = { rotate = "Rotate", tilt = "Tilt", zoom = "Zoom", zoomRand = "Zoom at random",
 	lineup = "Line up", wait = "Wait", together = "Together", ["repeat"] = "Repeat", emote = "Emote",
 	putback = "Put back", turnTo = "Turn to", sway = "Sway", tiltRand = "Tilt at random", spin = "Spin",
-	["until"] = "Wait until", waitRand = "Wait at random", follow = "Follow", aim = "Aim at", play = "Play" }
+	["until"] = "Wait until", waitRand = "Wait at random", follow = "Follow", aim = "Aim at", play = "Play", endMusic = "End music" }
 -- (A field's name: by its kind first, where the same key means something else there.)
 local FIELD_NAMES = { deg = "Degrees", secs = "Seconds", way = "Way", ease = "Ease", to = "Yards", min = "Nearest",
 	max = "Furthest", token = "Emote", times = "Times", of = "From", around = "Around", arc = "Arc", drift = "Drift",
@@ -74,6 +74,7 @@ local HINTS = {
 	follow = "From here on, after you turn and hold still this many seconds, camera follow glides the camera back behind you, as the RP walk and auto-run cameras do.",
 	aim = "Where you clicked: turns Degrees toward the side of the screen you clicked who you're talking to, as the quest cam does. Who's talking: swings toward the NPC talking now by their chat bubble, leaving them Degrees off the middle, as Chat Cam does. Not found (opened with a key, no bubble on screen): a turn either way, stay, or look round (a full turn at most) for their bubble. Top speed (degrees a second): slower than Seconds if the turn would go faster; 0 goes by Seconds.",
 	play = "Plays another camera's steps here, as they are now (a built-in one with your settings), then goes on. Not its stop rules or When it ends.",
+	endMusic = "Fades out the music a camera started, over this many seconds, and ends it (your own game music is left alone). The next steps go on meanwhile. Put it in When it ends to stop the music as the scene ends.",
 }
 local function Translate(map)
 	for key, text in pairs(map) do map[key] = L[text] end
@@ -160,6 +161,8 @@ local function StepText(step)
 		return L["Play %s"]:format(played and played.name or step.script)
 	elseif k == "emote" then
 		return L["Do /%s"]:format(step.token)
+	elseif k == "endMusic" then
+		return L["End the music over %s s"]:format(Num(step.secs))
 	elseif k == "putback" then
 		return (step.zoom == "no" and L["Put the turn and tilt back over %s s"] or L["Put everything back over %s s"]):format(
 			Num(step.secs))

@@ -879,6 +879,15 @@ function ns.ResetAddon(settingsOnly)
 	for _, switch in ipairs(PROFILE_SWITCHES) do
 		if ns.db[switch.turnedOn] and GetCVar(switch.cvar) == "1" then SetCVar(switch.cvar, "0") end
 	end
+	-- The game's own settings put back first: Graphics+'s and those held for
+	-- a feature (savedCVars). Wiped unrestored, ours stayed written for good
+	-- and Graphics+ took them for the game's own.
+	if ns.GraphicsPlusPutBack then ns.GraphicsPlusPutBack() end
+	if ns.db.savedCVars then
+		local held = {}
+		for cvar in pairs(ns.db.savedCVars) do held[#held + 1] = cvar end
+		for _, cvar in ipairs(held) do ns.RestoreCVar(cvar) end
+	end
 	-- (The dev copy keeps the Vitals Vision theme looks made with DEV SET
 	-- DEFAULT: work for LowHealthThemes.lua, not settings. resetKept: still a
 	-- fresh install to Core.lua.)

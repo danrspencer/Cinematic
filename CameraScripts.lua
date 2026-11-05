@@ -129,11 +129,14 @@ ns.CAMERA_SCRIPT_KINDS = {
 	-- they are now: a built-in one follows your settings. Cameras playing
 	-- cameras go MAX_PLAYS deep at most.
 	play = { fields = { { "script", "script", "flyby" } } },
+	-- Music a camera started fades out over secs and ends (your own game music
+	-- is left alone). It doesn't wait: the steps after it go on meanwhile.
+	endMusic = { fields = { { "secs", "num", 0, 60, 3 } } },
 	together = { group = true, fields = {} },
 	["repeat"] = { group = true, fields = { { "times", "num", 0, 100, 2 } } },
 }
 ns.CAMERA_SCRIPT_ADDABLE = { "rotate", "tilt", "zoom", "zoomRand", "lineup", "wait", "together", "repeat", "emote",
-	"putback", "turnTo", "sway", "tiltRand", "spin", "until", "waitRand", "follow", "aim", "play" }
+	"putback", "turnTo", "sway", "tiltRand", "spin", "until", "waitRand", "follow", "aim", "play", "endMusic" }
 local KINDS = ns.CAMERA_SCRIPT_KINDS
 
 -- The stop rules: each event's actions (the first is its default).
@@ -1743,6 +1746,9 @@ function STEP.follow(step)
 	run.follow = step.after
 	run.facing = nil
 end
+function STEP.endMusic(step)
+	if ns.EndSceneMusic then ns.EndSceneMusic(step.secs) end
+end
 -- Aim at: see KINDS.aim. (Where a bubble is goes stale as the camera
 -- turns: read before each swing, with the camera still.)
 local AIM_CORRECT = 6 -- degrees still off past deg after a swing at a speaker: one more (as ChatCam.lua's CORRECT)
@@ -2003,7 +2009,7 @@ heardFrame:SetScript("OnEvent", function(_, event, text, name)
 		if event == "CHAT_MSG_MONSTER_PARTY" or talk.open or now - talk.closedAt < TALKED_WINDOW
 			or (name ~= "?" and Plain(UnitName("target")) == name) then
 			key = "Chat"
-		elseif now - (talk.stillSince or now) < Db("chatNearbyDelay", 10) then
+		elseif now - (talk.stillSince or now) < Db("chatNearbyDelay", 3) then
 			return
 		end
 		if ScriptRow(key) then convo = { key = key, lastAt = now } end

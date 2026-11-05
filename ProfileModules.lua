@@ -244,9 +244,10 @@ ns.PROFILE_MODULES = {
 	-- Cinema's, page by page (keys pure-: what it was called before)
 	{ key = "pure-frames", name = "Cinema: frames",
 		scope = { "Standard Frames", "Personal Resources", "Advanced Frames/Supported addons", "Gamepad/top" },
-		tip = "Fights bring up only your health and resource bars: no portrait, target, buffs, minimap or swing timer, " ..
-		"nothing for an enemy or friend targeted, nothing in dungeons and raids, and the cast bar shows all " ..
-		"through CineMode. The player frame and resource display don't stay up until full; no focus's target of target; " ..
+		tip = "Fights bring up your health and resource bars, target, target of target, focus and focus's target " ..
+		"of target (these also for an enemy or friend targeted and in dungeons and raids), but no portrait, buffs, " ..
+		"minimap or swing timer; the cast bar shows all " ..
+		"through CineMode. The player frame and resource display don't stay up until full; " ..
 		"raid frames without names, buffs, threat, target markers, ready checks or titles in CineMode. Turns the " ..
 		"game's personal resource display on if it's off, whatever the layout.",
 		apply = function(set)
@@ -255,18 +256,26 @@ ns.PROFILE_MODULES = {
 			set("prdOnFights", true)
 			set("portraitWhenNotFull", false)
 			set("prdWhenNotFull", false)
-			set("unitPartsFocusToT", false)
+			set("unitPartsFocusToT", true)
 			set("cineShow", { castbar = true, raidnames = false, raidbuffs = false, raidthreat = false,
 				raidtarget = false, raidready = false, raidtitles = false })
-			set("combatShow", { prd = true, prdpower = true, player = false, petframe = false, target = false, tot = false,
-				focus = false, castbar = false, party = false, raidplayers = false, raidpets = false, minimap = false,
-				buffs = false, swing = false })
-			set("enemyShow", { target = false, tot = false, player = false, prd = false, prdpower = false,
-				party = false, raidplayers = false, raidpets = false, focus = false, buffs = false })
-			set("friendlyShow", { target = false, tot = false })
-			-- (Nor in dungeons, scenarios and raids, where the Instances column
-			-- starts with the party and raid frames ticked. The bars: pure-cdm's.)
-			set("instanceShow", EveryRow(false, false))
+			-- (The target, its target, the focus and the focus's target of
+			-- target: on in every column.)
+			local units = { "target", "tot", "focus", "focustot" }
+			local combat = { prd = true, prdpower = true, player = false, petframe = false, castbar = false,
+				party = false, raidplayers = false, raidpets = false, minimap = false, buffs = false, swing = false }
+			local enemy = { player = false, prd = false, prdpower = false, party = false, raidplayers = false,
+				raidpets = false, buffs = false }
+			local instance = EveryRow(false, false)
+			for _, list in ipairs({ combat, enemy, instance }) do
+				for _, row in ipairs(units) do list[row] = true end
+			end
+			set("combatShow", combat)
+			set("enemyShow", enemy)
+			set("friendlyShow", All(units, true))
+			-- (Nor the rest in dungeons, scenarios and raids, where the Instances
+			-- column starts with the party and raid frames ticked. The bars: pure-cdm's.)
+			set("instanceShow", instance)
 		end },
 	{ key = "pure-cdm", name = "Cinema: Cooldown Manager only",
 		scope = { "Cooldown Manager", "Standard Frames/Trackers", "Standard Frames/Action bars",
@@ -480,7 +489,7 @@ ns.PROFILE_MODULES = {
 		"General/top", "Card Vision" },
 		tip = "The cameras don't wait for things to calm down after a fight, auto-run carries on in cities and " ..
 		"instances (as RP walk always does), and the death camera runs in instances too. NPCs talking bring the chat camera, " ..
-		"those chatting nearby straight away, and it doesn't look round for speakers off screen. YOU DIED " ..
+		"those chatting nearby once you stand still 3 seconds, and it doesn't look round for speakers off screen. YOU DIED " ..
 		"shows as the death camera starts. Skyriding (retail) zooms the camera all the way out in the air.",
 		apply = function(set)
 			-- (Chat Cam: off to start with, on here. Its look-round setting's
@@ -488,7 +497,7 @@ ns.PROFILE_MODULES = {
 			if ns.DEFAULTS.chatCamSearch ~= nil then
 				set("chatCamera", "chat")
 				set("chatNearbyCamera", "chat")
-				set("chatNearbyDelay", 0)
+				set("chatNearbyDelay", 3)
 				if ns.isDev then set("chatCamSearch", false) end
 			end
 			-- (Standing still and music: still-afk and camera-music, in its choice.)

@@ -2640,11 +2640,10 @@ local function StartIdleZoom()
 	else
 		PlanZoom(idleZoom.saved + ZoomSetting("Distance")) -- the first move always pulls back
 	end
-	if idleZoom.context == "taxi" then
-		ns.Log("zoom", ("flight zoom: %.1f -> %.1f yards%s, max factor %s"):format(idleZoom.saved,
-			idleZoom.from + idleZoom.delta, Indoors() and " (indoors)" or "",
-			tostring(GetCVar("cameraDistanceMaxZoomFactor"))))
-	end
+	ns.Log("zoom", ("%s zoom: %.1f -> %.1f yards over %.1f sec%s, max factor %s"):format(
+		idleZoom.context == "taxi" and "flight" or tostring(idleZoom.context), idleZoom.saved,
+		idleZoom.from + idleZoom.delta, idleZoom.duration or 0, Indoors() and " (indoors)" or "",
+		tostring(GetCVar("cameraDistanceMaxZoomFactor"))))
 end
 
 local function StepIdleZoom(elapsed)
@@ -2706,6 +2705,10 @@ local function EndIdleZoom(restore)
 		return
 	end
 	idleZoom.active = false
+	ns.Log("zoom", ("%s zoom ends (%s) at %.1f yards: %s"):format(tostring(idleZoom.context),
+		tostring(ns.zoomEndWhy or "?"), GetCameraZoom and GetCameraZoom() or -1,
+		restore and idleZoom.saved and ("back to %.1f"):format(idleZoom.saved) or "left where it is"))
+	ns.zoomEndWhy = nil
 	if restore and idleZoom.saved and GetCameraZoom then
 		idleZoom.restoring = true
 		-- (The tele zoom only ends early on a cancelled cast: back quickly then.
@@ -2739,7 +2742,9 @@ function ns.GetLastCameraInput()
 end
 
 function CancelIdleZoom()
+	ns.zoomEndWhy = ns.zoomEndWhy or "you zoomed"
 	EndIdleZoom(false)
+	ns.zoomEndWhy = nil
 	if idleZoom.restoring then
 		FinishRestore() -- the player took over mid-restore
 	end
@@ -2858,6 +2863,7 @@ local function UpdateIdleZoom(cinematic, onTaxi, travel, now, elapsed)
 				idleZoom.phase = "hold"
 			end
 		else
+			ns.zoomEndWhy = ("now %s"):format(tostring(context))
 			EndIdleZoom(true) -- took off or landed mid-zoom
 		end
 	end
@@ -2870,6 +2876,11 @@ local function UpdateIdleZoom(cinematic, onTaxi, travel, now, elapsed)
 		StartIdleZoom()
 		idleZoom.done, idleZoom.doneContext = true, context
 	elseif not want then
+		if idleZoom.active then -- (why, for the log)
+			ns.zoomEndWhy = (not cinematic and "CineMode off") or (not allowed and ("off for %s"):format(context))
+				or (InCombatLockdown() and "combat") or (not ns.CombatWaitOver(context, now) and "Calm Timer")
+				or "quest cam zooming back"
+		end
 		EndIdleZoom(true)
 		-- Ready for the next standing-still spell / flight.
 		if (context == "idle" and not still) then
@@ -2882,6 +2893,8 @@ local function UpdateIdleZoom(cinematic, onTaxi, travel, now, elapsed)
 		if steeringNow and not idleZoom.steerClose then
 			idleZoom.steerClose = true
 			PlanPath(math.max(ZOOM_CLOSEST, idleZoom.saved - STEER_ZOOM_CLOSER), STEER_ZOOM_TIME, 0.5, "move")
+			ns.Log("zoom", ("%s zoom: steering a lot, in to %.1f (from %.1f)"):format(context,
+				idleZoom.from + idleZoom.delta, idleZoom.from))
 		elseif not steeringNow then
 			idleZoom.steerClose = false
 		end
@@ -2892,6 +2905,8 @@ local function UpdateIdleZoom(cinematic, onTaxi, travel, now, elapsed)
 		elseif not idleZoom.calmOut and not steeringNow then
 			idleZoom.calmOut = true
 			PlanPath(idleZoom.saved + ZoomSetting("Distance"), ZoomSetting("Time"), ZoomSetting("Ease"), "move")
+			ns.Log("zoom", ("%s zoom: going straight, out to %.1f (from %.1f)"):format(context,
+				idleZoom.from + idleZoom.delta, idleZoom.from))
 		end
 	end
 	-- A Camp Tent seen with the cozy zoom under way: in closer from here, over
@@ -3279,8 +3294,10 @@ function ns.UpdateOrbit(cinematic, elapsed)
 	ns.travelHeld = (travel and (inMenu or atNPC)) or false
 	-- Steering with the mouse while they run (ns.mouseSteering) doesn't stop
 	-- their zoom, as for camera scripts on the move; only your own zooming does.
+	-- Nor a zoom back to your own distance (a cast cancelled by moving off with
+	-- the mouse held: held up, it waited, then rushed out once let go).
 	if ns.zoomWhileSteering then
-		ns.zoomWhileSteering.modes = (travel and cinematic) and true or nil
+		ns.zoomWhileSteering.modes = ((travel and cinematic) or ns.GetZoomDebug().restoring) and true or nil
 	end
 	-- The camera running now, by its key in ns.CAMERA_OFF_CAMS (the Minimap
 	-- page hides the minimap by it).

@@ -5076,7 +5076,7 @@ local function CreateGraphicsPanel()
 					end
 					-- (Lower than the game's own in blue: it saves frame rate.)
 					return ((value < Own() and "|cff4fb3ff" or "") .. num .. "|r"):format(value) .. "  |cff9d9d9d" ..
-						L["(game's own: %s)"]:format(num:format(own))
+						L["(game: %s)"]:format(num:format(own)) -- (short: longer ran off the page)
 				end, nil, function()
 					Changed()
 					slider:Refresh() -- (its label: moved now, and against the game's own)

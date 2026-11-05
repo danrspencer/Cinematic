@@ -311,6 +311,36 @@ local function FadeLooseParts(entry, alpha)
 	end
 end
 
+-- A frame's alpha set by the game's own method when the frame's has been
+-- swapped for one that does nothing (Kaliel's Tracker: its frame's SetAlpha
+-- is a no-op, its own fades call the real one). Found once per frame, by the
+-- alpha not taking; frames without a SetAlpha of their own go straight there.
+-- (On ns, not a local: this file is at the 200 locals cap.)
+do
+	local raw = setmetatable({}, { __mode = "k" }) -- frame -> the game's SetAlpha
+	function ns.SetFrameAlpha(frame, alpha)
+		local set = raw[frame]
+		if set then
+			set(frame, alpha)
+			return
+		end
+		frame:SetAlpha(alpha)
+		if set == nil and rawget(frame, "SetAlpha") ~= nil then
+			local now = frame:GetAlpha()
+			local meta = getmetatable(frame)
+			local methods = meta and meta.__index
+			local real = type(methods) == "table" and methods.SetAlpha
+			if not (issecretvalue and issecretvalue(now)) and math.abs(now - alpha) > ALPHA_SLACK
+				and type(real) == "function" then
+				raw[frame] = real
+				real(frame, alpha)
+			else
+				raw[frame] = false
+			end
+		end
+	end
+end
+
 local function ApplyAlpha(entry)
 	local secret
 	if entry.ownAlpha then
@@ -327,7 +357,7 @@ local function ApplyAlpha(entry)
 			entry.applied = 0
 		end
 		entry.settingAlpha = true
-		entry.frame:SetAlpha(entry.applied)
+		ns.SetFrameAlpha(entry.frame, entry.applied)
 		entry.settingAlpha = false
 		if ns.profiling then
 			ns.ProfileCount("SetAlpha on faded frames")
@@ -813,7 +843,7 @@ local function RemoveFrame(frame)
 			if castBars.entries[frame] then
 				castBars.entries[frame] = false
 			end
-			frame:SetAlpha(frame.cinematicFishingHidden and 0 or entry.baseAlpha or 1)
+			ns.SetFrameAlpha(frame, frame.cinematicFishingHidden and 0 or entry.baseAlpha or 1)
 			if entry.looseParts then FadeLooseParts(entry, 1) end
 			if entry.shrunk and ns.ScaleBlocked(frame) then
 				local scale = entry.savedScale or 1

@@ -112,6 +112,29 @@ local function Add(out, state, text, page)
 	out[#out + 1] = { state = state, text = text, page = page }
 end
 
+-- What the Tracking event is now (Mouseover groups): which tracking under
+-- Keep open, or what a Reveal box found on the minimap (Minimap page).
+local function MinimapTrackingWhy(out)
+	local now = GetTime()
+	local gathering, creatures = false, false
+	if ns.IsKeepingMinimapForTracking then gathering, creatures = ns.IsKeepingMinimapForTracking(now) end
+	if gathering and not ns.IsTrackingOffHere() then
+		Add(out, "on", L["Keep open: herb, mineral or treasure tracking is on"], "Minimap")
+	end
+	if creatures then
+		Add(out, "on", L["Keep open: creature or fish tracking is on"], "Minimap")
+	end
+	local revealed, names, held = false, nil, false
+	if ns.MinimapRevealWhy then revealed, names, held = ns.MinimapRevealWhy(now) end
+	if revealed then
+		Add(out, "on", names and L["Reveal: the minimap shows %s"]:format(names)
+			or L["Reveal: something you ticked is on the minimap"], "Minimap")
+		if held then
+			Add(out, "on", L["It was up as this fight started, so it stays up through it"], "Minimap")
+		end
+	end
+end
+
 -- A row's columns: on (doing it now), off (ticked, would show it elsewhere
 -- or later) and block (keeping it hidden).
 local function Columns(key, out)
@@ -373,6 +396,7 @@ local function Explain(entry)
 		Add(out, "on", L["A chat message is peeking"], "Chat")
 	end
 	if n.tracking then
+		local before = #out
 		if entry.group == "minimap" then
 			if ns.db.alwaysShowMinimap then
 				Add(out, "on", L["Keep open: always"], "Minimap")
@@ -381,13 +405,18 @@ local function Explain(entry)
 				if ns.db.minimapIndoors and IsIndoors and ns.Flag(IsIndoors()) then
 					Add(out, "on", L["Keep open: indoors, and you're inside"], "Minimap")
 				end
-				if ns.db.minimapKeepQuest and ns.HasTrackedQuest() then
-					Add(out, "on", L["Keep open: a tracked quest"], "Minimap")
+				-- (As Frames.lua works it out: the quest one only a while after progress.)
+				local questFor = ns.db.minimapKeepQuestFor or 0
+				if ns.db.minimapKeepQuest and ns.HasTrackedQuest()
+					and (questFor <= 0 or GetTime() - (ns.questActivityAt or 0) < questFor * 60) then
+					Add(out, "on", questFor > 0 and L["Keep open: a tracked quest, for a while after progress on it"]
+						or L["Keep open: a tracked quest"], "Minimap")
 				end
 				if ns.db.minimapKeepPrey and ns.IsHuntingPrey(GetTime()) then
 					Add(out, "on", L["Keep open: hunting your prey"], "Minimap")
 				end
-				if ns.IsMinimapKeptInZone() then
+				local onTaxi = ns.db.minimapHideOnTaxi and ns.Flag(ns.OnTaxi())
+				if not onTaxi and ns.IsMinimapKeptInZone() then
 					Add(out, "on", L["Keep open: in this zone"], "Minimap")
 				end
 			end
@@ -403,6 +432,12 @@ local function Explain(entry)
 		for _, trigger in ipairs(n.triggers) do
 			Add(out, "on", L["Hover group \"%s\": %s"]:format(trigger.group.name or "?", TriggerLabel(trigger.key)),
 				"Mouseover groups")
+			if trigger.key == "tracking" then
+				MinimapTrackingWhy(out)
+			end
+		end
+		if #out == before then
+			Add(out, "on", L["Kept up by a setting Inspect can't name yet"])
 		end
 	end
 	if n.fightingShown and not n.listShown then

@@ -208,7 +208,7 @@ local watcher = CreateFrame("Frame")
 -- stood still chatNearbyDelay seconds: see Ambient).
 ns.DEFAULTS.chatCamera = "none"        -- (the Cinema profile's cameras: "chat", ProfileModules.lua)
 ns.DEFAULTS.chatNearbyCamera = "none"
-ns.DEFAULTS.chatNearbyDelay = 10
+ns.DEFAULTS.chatNearbyDelay = 3
 -- (Their CineMode ticks: with "Start in CineMode" off, a conversation brings it on. Camera.lua.)
 ns.DEFAULTS.chatCine = false
 ns.DEFAULTS.chatNearbyCine = false

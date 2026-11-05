@@ -17,8 +17,9 @@ local _, ns = ...
 -- on WoW Forever with /cine debug cvars); max: as far as the slider goes (from
 -- players' testing: past it there's nothing more to see, or a crash). values:
 -- the only ones it takes, in place of a range. also: settings written the
--- same value alongside it, but only ever raised. noMenu: not in the Graphics
--- menu at all. secure: can't change in a fight (it waits). resetToDefault:
+-- same value alongside it, but only ever raised (alsoMenu: their menu's
+-- most). noMenu: not in the Graphics menu at all. secure: can't change in a
+-- fight (it waits). resetToDefault:
 -- Reset page puts the game's default back, not just its own. decimals: shown
 -- with this many. group: the page's header it goes under (in this order).
 ns.GRAPHICS_PLUS = {
@@ -38,8 +39,8 @@ ns.GRAPHICS_PLUS = {
 	{ key = "graphicsPlusClutterFade", cvar = "groundEffectFade", min = 0, menu = 70, max = 500, step = 10,
 		group = "Ground clutter" },
 	-- (Where the land turns to the flat horizon, and how far anything's drawn: together.)
-	{ key = "graphicsPlusView", cvar = "horizonStart", also = { "farclip" }, min = 400, menu = 4000,
-		max = 24000, step = 400, group = "Land and buildings" },
+	{ key = "graphicsPlusView", cvar = "horizonStart", also = { "farclip" }, alsoMenu = { farclip = 10000 },
+		min = 400, menu = 4000, max = 24000, step = 400, group = "Land and buildings" },
 	{ key = "graphicsPlusTerrain", cvar = "terrainLodDist", min = 200, menu = 650, max = 2000, step = 50,
 		group = "Land and buildings" },
 	{ key = "graphicsPlusBuildings", cvar = "wmoLodDist", min = 250, menu = 400, max = 2000, step = 50,
@@ -50,8 +51,9 @@ ns.GRAPHICS_PLUS = {
 		group = "Objects and creatures" },
 	{ key = "graphicsPlusCreatures", cvar = "entityLodDist", min = 5, menu = 10, max = 1000, step = 5,
 		group = "Objects and creatures" },
+	-- (1536: what the menu's level 5 sets on WoW Forever.)
 	{ key = "graphicsPlusShadows", cvar = "shadowTextureSize", min = 512, menu = 2048, max = 4096,
-		values = { 512, 1024, 2048, 4096 }, group = "Shadows" },
+		values = { 512, 1024, 1536, 2048, 4096 }, group = "Shadows" },
 }
 
 local writing = false
@@ -62,10 +64,13 @@ local function Exists(cvar)
 end
 ns.GraphicsPlusExists = Exists
 
-local function Write(cvar, value)
+-- by: who wrote it, for /cine debug cvars (Graphics+ unless said).
+local function Write(cvar, value, by)
 	writing = true
 	SetCVar(cvar, value)
 	writing = false
+	ns.cvarsWrittenBy = ns.cvarsWrittenBy or {}
+	ns.cvarsWrittenBy[cvar:lower()] = by or "Graphics+"
 end
 
 local function Same(a, b)
@@ -76,7 +81,9 @@ end
 -- back). raiseOnly: only written when above the game's own.
 -- graphicsPlusSaved: [cvar] = the game's own value; graphicsPlusWritten:
 -- [cvar] = what we wrote, to tell the Graphics menu's changes from ours.
-local function ApplyOne(cvar, wanted, raiseOnly, saved, written)
+-- menu, max: the menu's most and the slider's max, so a value left at or
+-- past the max isn't taken for the game's own.
+local function ApplyOne(cvar, wanted, raiseOnly, saved, written, menu, max)
 	if ns.db.savedCVars and ns.db.savedCVars[cvar] ~= nil then
 		-- Borrowed for now (idle zoom raising the max zoom): looked at again
 		-- once it's put back.
@@ -89,11 +96,21 @@ local function ApplyOne(cvar, wanted, raiseOnly, saved, written)
 		ns.Log("graphics", ("%s changed to %s outside Graphics+"):format(cvar, tostring(now)))
 		saved[cvar] = now
 	end
-	if wanted and raiseOnly and wanted <= (tonumber(saved[cvar] or now) or 0) then
+	if wanted then
+		saved[cvar] = saved[cvar] or now
+	end
+	-- A game's own value at or past the slider's max (and past the menu's
+	-- most): one written over and never put back (by a reset that forgot it,
+	-- or /console), not the game's. The menu's most is noted instead.
+	if menu and max and max > menu and saved[cvar] ~= nil and (tonumber(saved[cvar]) or 0) >= max then
+		ns.Log("graphics", ("%s: the game's own %s is a leftover, %s noted instead"):format(cvar,
+			tostring(saved[cvar]), tostring(menu)))
+		saved[cvar] = tostring(menu)
+	end
+	if wanted and raiseOnly and wanted <= (tonumber(saved[cvar]) or 0) then
 		wanted = nil
 	end
 	if wanted then
-		saved[cvar] = saved[cvar] or now
 		local text = tostring(wanted)
 		if not Same(now, text) then
 			ns.Log("graphics", ("%s %s -> %s"):format(cvar, tostring(now), text))
@@ -120,14 +137,31 @@ function ns.ApplyGraphicsPlus()
 	for _, setting in ipairs(ns.GRAPHICS_PLUS) do
 		if Exists(setting.cvar) and not (setting.secure and InCombatLockdown()) then
 			local wanted = ns.Setting("graphicsPlus") and db[setting.key .. "On"] and db[setting.key] or nil
-			ApplyOne(setting.cvar, wanted, false, saved, written)
+			ApplyOne(setting.cvar, wanted, false, saved, written, setting.menu, setting.max)
 			for _, cvar in ipairs(setting.also or {}) do
 				if Exists(cvar) then
-					ApplyOne(cvar, wanted, true, saved, written)
+					ApplyOne(cvar, wanted, true, saved, written, setting.alsoMenu and setting.alsoMenu[cvar],
+						setting.max)
 				end
 			end
 		end
 	end
+end
+
+-- Every setting written put back as the game had it, and nothing noted:
+-- before Reset Settings / Reset Everything wipe what's saved, which
+-- otherwise left ours written for good. (Not in a fight: the reset waits.)
+function ns.GraphicsPlusPutBack()
+	local db = ns.db
+	local saved = db and db.graphicsPlusSaved
+	if not saved then return end
+	for cvar, value in pairs(saved) do
+		if Exists(cvar) and not Same(GetCVar(cvar), value) then
+			ns.Log("graphics", ("%s back to %s (reset)"):format(cvar, tostring(value)))
+			Write(cvar, value)
+		end
+	end
+	db.graphicsPlusSaved, db.graphicsPlusWritten = {}, {}
 end
 
 -- Reset page: settings marked resetToDefault go back to the game's default
@@ -244,7 +278,7 @@ do
 					local own = tonumber(ns.db.savedCVars[cvar]) or floor
 					local value = tostring(math.floor(own - (own - math.min(own, floor)) * to + 0.5))
 					if not Same(GetCVar(cvar), value) then
-						Write(cvar, value)
+						Write(cvar, value, "rain view distance")
 					end
 					written[cvar] = GetCVar(cvar)
 				elseif ns.db.savedCVars[cvar] ~= nil then
