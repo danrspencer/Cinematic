@@ -145,7 +145,6 @@ Cinema|cardStreakOn=true
 Cinema|chatCamSearch=false
 Cinema|chatCamera=chat
 Cinema|chatNearbyCamera=chat
-Cinema|chatNearbyDelay=3
 Cinema|chatPeekTypes.npc=false
 Cinema|chatSpeechBehind=true
 Cinema|cineShow.castbar=true
