@@ -120,6 +120,7 @@ local function SplitBarGroups(set)
 	for _, group in ipairs(ns.HOVER_GROUPS_DEFAULT) do
 		if group.preset == "bars" then
 			local bars = Copy(group)
+			bars.reach = nil -- (follows the default group's)
 			bars.name = L["Action bars 1-3"]
 			bars.members = { "mainbar", "bottomleft", "bottomright", "pet", "stance", "totems" }
 			groups[#groups + 1] = bars
@@ -128,7 +129,9 @@ local function SplitBarGroups(set)
 			groups[#groups + 1] = { icon = "Interface\\Icons\\INV_Misc_Book_09", name = L["XP bars"],
 				members = { "xp" } }
 		else
-			groups[#groups + 1] = Copy(group)
+			local copy = Copy(group)
+			copy.reach = nil -- (follows the default group's)
+			groups[#groups + 1] = copy
 		end
 	end
 	set("hoverGroups", groups)
@@ -139,9 +142,12 @@ end
 -- isn't there). No layout module: the player's own layout. ns.LAYOUT_PRESET:
 -- the game's own, a preset (Layouts.lua: the one they're on, else Modern).
 ns.LAYOUT_PRESET = "*preset"
+-- (Every layout's scope takes in the personal resource display's rows of the
+-- In combat column: a layout says whether fights bring it up, as one of
+-- its group replaces the one before.)
 local function Layout(key, name, layout, client, tip, also)
 	return { key = key, name = name, client = client, group = "layout", editMode = layout,
-		scope = { "Profiles/Edit Mode layout" }, tip = tip,
+		scope = { "Profiles/Edit Mode layout", "Standard Frames/Unit frames" }, tip = tip,
 		apply = function(set)
 			set("editModeLayout", layout)
 			if also then also(set) end
@@ -160,13 +166,17 @@ ns.PROFILE_MODULES = {
 		"not one the player's moved things in."),
 	Layout("layout-retail", "Retail Inspired layout", "Retail Inspired", "forever",
 		"Action bars centred along the bottom, the micro menu and bags in the corner, the XP bars under them, " ..
-		"as on retail."),
+		"as on retail. Fights bring up the player frame, not the personal resource display.",
+		function(set) set("combatShow", { prd = false, prdpower = false }) end),
 	Layout("layout-forever", "Forever-style layout", "CINE_RETAIL_FOREVER_LAYOUT", "retail",
 		"Retail laid out like WoW Forever's default."),
 	Layout("layout-pure", "Personal Resource Centered layout", "Personal Resource Centered", nil,
-		"The personal resource display in the middle, the Cooldown Manager above it. Turns the game's personal " ..
-		"resource display on if it's off.",
-		function(set) set("prdOn", true) end),
+		"The personal resource display in the middle, the Cooldown Manager above it; fights bring it up. Turns " ..
+		"the game's personal resource display on if it's off.",
+		function(set)
+			set("prdOn", true)
+			set("combatShow", { prd = true, prdpower = true })
+		end),
 
 	-- What fades, and when
 	{ key = "recovering", name = "Up while recovering", scope = { "Standard Frames/top", "Personal Resources" },
@@ -244,16 +254,13 @@ ns.PROFILE_MODULES = {
 	-- Cinema's, page by page (keys pure-: what it was called before)
 	{ key = "pure-frames", name = "Cinema: frames",
 		scope = { "Standard Frames", "Personal Resources", "Advanced Frames/Supported addons", "Gamepad/top" },
-		tip = "Fights bring up your health and resource bars, target, target of target, focus and focus's target " ..
+		tip = "Fights bring up your portrait, target, target of target, focus and focus's target " ..
 		"of target (these also for an enemy or friend targeted and in dungeons and raids) and the swing timer, but " ..
-		"no portrait, buffs or minimap; the cast bar shows all " ..
+		"no buffs or minimap (the personal resource display: as the layout has it); the cast bar shows all " ..
 		"through CineMode. The player frame and resource display don't stay up until full; " ..
-		"raid frames without names, buffs, threat, target markers, ready checks or titles in CineMode. Turns the " ..
-		"game's personal resource display on if it's off, whatever the layout.",
+		"raid frames without names, buffs, threat, target markers, ready checks or titles in CineMode.",
 		apply = function(set)
-			-- (Fights show its health and resource bars: on with any layout,
-			-- not just Personal Resource Centered, which turns it on too.)
-			set("prdOnFights", true)
+			-- (The personal resource display in fights: the layout module's.)
 			set("portraitWhenNotFull", false)
 			set("prdWhenNotFull", false)
 			set("unitPartsFocusToT", true)
@@ -262,7 +269,7 @@ ns.PROFILE_MODULES = {
 			-- (The target, its target, the focus and the focus's target of
 			-- target: on in every column.)
 			local units = { "target", "tot", "focus", "focustot" }
-			local combat = { prd = true, prdpower = true, player = false, petframe = false, castbar = false,
+			local combat = { player = true, petframe = false, castbar = false,
 				party = false, raidplayers = false, raidpets = false, minimap = false, buffs = false, swing = true }
 			local enemy = { player = false, prd = false, prdpower = false, party = false, raidplayers = false,
 				raidpets = false, buffs = false }

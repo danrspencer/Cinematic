@@ -1232,12 +1232,11 @@ do
 end
 
 -- Swing timer page: the ranged bar on top (it and the main hand's trade
--- places), per class so one profile suits them all. To start with, the
--- classes that shoot most: hunters, and the casters with wands.
+-- places), per class so one profile suits them all. Off for every class to
+-- start with.
 for _, class in ipairs({ "WARRIOR", "PALADIN", "HUNTER", "ROGUE", "PRIEST", "DEATHKNIGHT", "SHAMAN", "MAGE",
 	"WARLOCK", "MONK", "DRUID", "DEMONHUNTER", "EVOKER" }) do
-	DEFAULTS["swingRangedOnTop" .. class] = class == "HUNTER" or class == "MAGE" or class == "PRIEST"
-		or class == "WARLOCK"
+	DEFAULTS["swingRangedOnTop" .. class] = false
 end
 DEFAULTS.handleFishing = true -- right-click casting and the cast bar
 -- The Nameplates grid's rows for particular units, over the kinds above (see
@@ -1374,6 +1373,10 @@ DEFAULTS.unitPartsFocusToTSame = true
 DEFAULTS.unitPartsFocusToT = true -- the focus's target of target frame shows at all
 -- Raid-style party frames go by the raid frames' rows (Standard Frames page)
 DEFAULTS.raidStylePartySame = true
+-- The key names on the action bar buttons hidden (Standard Frames page,
+-- Action bars tab; Frames.lua's ns.ApplyHideKeybinds)
+DEFAULTS.hideKeybinds = false
+DEFAULTS.hideMacroText = false -- (and the macro names on them)
 -- And rows of our own: a class icon by friendly and by enemy players' health
 -- bars (as Duel Vision shows), and a role icon by group members' (tank,
 -- healer, damage), and a quest icon by quest mobs' (see QuestMobs), and an
@@ -1415,7 +1418,7 @@ end
 -- their names (ns.SERVICE_KINDS in PlateGuild.lua: Vendors, Repair...; Other
 -- any other title), and whether it shows their names and titles ("name") or
 -- just the titles, in the names' place ("title").
-DEFAULTS.nameServiceShow = "name"
+DEFAULTS.nameServiceShow = "title"
 for _, kind in ipairs({ "Vendor", "Repair", "Trainer", "Profession", "Flight", "Inn", "Bank", "Stable", "Other" }) do
 	DEFAULTS["nameService" .. kind] = true
 end

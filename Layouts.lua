@@ -178,24 +178,30 @@ local DESIGN = {
 	{ 0, 11, "BOTTOMLEFT", "MultiBarBottomLeft", "TOPLEFT", 0, 4 },         -- stance bar
 	{ 0, 12, "BOTTOMLEFT", "MultiBarBottomLeft", "TOPLEFT", 0, 4 },         -- pet bar
 	{ 0, 13, "BOTTOMLEFT", "MultiBarBottomLeft", "TOPLEFT", 0, 4 },         -- possess bar
-	{ 1, nil, "BOTTOM", "UIParent", "BOTTOM", 0, 358 },                     -- cast bar
-	-- (Its bottom on the same line as the pet bar's, at bar 2's right end.)
-	{ 4, nil, "BOTTOMRIGHT", "MultiBarBottomLeft", "TOPRIGHT", 0, 4 },      -- encounter bar (right of the pet bar)
+	-- (Above bar 3, clear of the swing timers in the middle.)
+	{ 4, nil, "BOTTOMLEFT", "MultiBarBottomRight", "TOPLEFT", 0, 4 },       -- encounter bar
 	{ 9, nil, "BOTTOMLEFT", "MultiBarBottomLeft", "TOPLEFT", 0, 4 },        -- vehicle leave button
 	{ 13, nil, "BOTTOMRIGHT", "UIParent", "BOTTOMRIGHT", -2, 2 },           -- micro menu
 	{ 14, nil, "BOTTOMRIGHT", "MicroMenuContainer", "TOPRIGHT", 0, 4 },     -- bags
 	-- (status bars' setting 3: width, 0 = 50%, 10 = 100%)
 	{ 15, 1, "BOTTOM", "UIParent", "BOTTOM", 0, 0, { [3] = 0 } },           -- status bar 1
 	{ 15, 2, "BOTTOM", "MainStatusTrackingBarContainer", "TOP", 0, 0, { [3] = 0 } }, -- status bar 2
-	{ 20, 1, "BOTTOM", "UtilityCooldownViewer", "TOP", -1, 4 },             -- cooldown viewers
-	{ 20, 2, "CENTER", "UIParent", "CENTER", 0, -149 },
-	{ 20, 3, "CENTER", "UIParent", "CENTER", 0, -187 },
 	{ 25, nil, "BOTTOMLEFT", "MultiBarBottomLeft", "TOPLEFT", 0, 4 },
 	{ 26, 1, "RIGHT", "MultiBarBottomLeft", "LEFT", 30, 13, { [0] = 1 } },  -- action bar end caps
 	{ 26, 2, "LEFT", "MultiBarBottomRight", "RIGHT", -30, 38.2, { [0] = 1 } },
-	{ 29, 1, "BOTTOMRIGHT", "SwingTimerOffHandFrame", "TOPRIGHT", 0, 4 },   -- swing timers
-	{ 29, 2, "BOTTOM", "UIParent", "BOTTOM", 0, 272 },
-	{ 29, 3, "TOPLEFT", "SwingTimerOffHandFrame", "BOTTOMLEFT", 0, -4 },
+	-- The centre stack, bottom up, each on top of the one below (so nothing
+	-- overlaps whatever the screen's height or UI scale: none of it is
+	-- placed from the screen's middle): the swing timers on bar 2 (in line
+	-- with the screen's middle: bar 1's -142 back), ranged, off hand, main
+	-- hand; the Cooldown Manager's utility and essential rows; then (below,
+	-- with the system's number) the personal resource display, the cast bar
+	-- and the Cooldown Manager's buff icons on top. (Swing timers' setting 3:
+	-- width, 0 the narrowest, as the dev set it in Edit Mode on 2026-11-05.)
+	{ 29, 3, "BOTTOM", "MultiBarBottomLeft", "TOP", 142, 6, { [3] = 0 } },   -- swing timers: ranged
+	{ 29, 2, "BOTTOM", "SwingTimerRangedFrame", "TOP", 0, 4, { [3] = 0 } },  -- off hand
+	{ 29, 1, "BOTTOM", "SwingTimerOffHandFrame", "TOP", 0, 4, { [3] = 0 } }, -- main hand
+	{ 20, 2, "BOTTOM", "SwingTimerMainHandFrame", "TOP", 0, 6 },            -- cooldown viewers: utility
+	{ 20, 1, "BOTTOM", "UtilityCooldownViewer", "TOP", 0, 4 },              -- essential
 	-- (No anchor: where Modern has it.)
 	{ UNIT_FRAME, PARTY, nil, nil, nil, nil, nil, { [RAID_STYLE_PARTY] = 1 } }, -- party frames: raid-style
 }
@@ -278,10 +284,18 @@ if not PRD_SYSTEM and Enum.EditModeSystem then
 	end
 end
 local FOREVER_PURE = PRD_SYSTEM and { { PRD_SYSTEM, nil, "CENTER", "UIParent", "CENTER", 0, -205 } } or {}
--- Retail Inspired's in the middle too, as retail has it: under the Cooldown
--- Manager's buff icons (CENTER -187), not in Modern's spot at the left.
-if PRD_SYSTEM then
-	DESIGN[#DESIGN + 1] = { PRD_SYSTEM, nil, "CENTER", "UIParent", "CENTER", 0, -240 }
+-- Retail Inspired's in the middle too, as retail has it, not in Modern's
+-- spot at the left: in the centre stack (DESIGN) on the essential row, the
+-- cast bar on it and the buff icons on that. (No such system: the cast bar
+-- on the essential row.)
+do
+	local below = "EssentialCooldownViewer"
+	if PRD_SYSTEM then
+		DESIGN[#DESIGN + 1] = { PRD_SYSTEM, nil, "BOTTOM", below, "TOP", 0, 4 }
+		below = "PersonalResourceDisplayFrame"
+	end
+	DESIGN[#DESIGN + 1] = { 1, nil, "BOTTOM", below, "TOP", 0, 4 }                     -- cast bar
+	DESIGN[#DESIGN + 1] = { 20, 3, "BOTTOM", "PlayerCastingBarFrame", "TOP", 0, 4 }    -- buff icons
 end
 
 -- Cinematic's own layouts, by the name Edit Mode lists them under. export:

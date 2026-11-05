@@ -1521,19 +1521,23 @@ local function IsInside(frame, ancestor)
 end
 
 -- An action bar's empty slots: the game hides a button with nothing on it, so
--- the mouse there is on the 3D world. Over one's rect counts as over the bar.
--- (Retail's bars list their buttons; Classic's go by name.)
-function ns.IsOverEmptySlot(frame)
+-- the mouse there is on the 3D world. Over one's rect counts as over the bar,
+-- and so does the mouse within pad (UI units) of any of its buttons, shown or
+-- not: the gaps between them are the 3D world too. (Retail's bars list their
+-- buttons; Classic's go by name.)
+ns.hoverReach = {} -- (row key -> its reach: its hover groups', set each tick)
+function ns.IsOverEmptySlot(frame, pad)
+	pad = pad or 0
 	local buttons, name = frame.actionButtons, frame:GetName()
 	local x, y = GetCursorPosition()
 	for i = 1, buttons and #buttons or 12 do
 		local button = buttons and buttons[i]
 			or _G[(name == "MainMenuBar" and "ActionButton" or (name or "") .. "Button") .. i]
-		if button and not IsForbidden(button) and not ns.Flag(button:IsShown()) then
+		if button and not IsForbidden(button) and (pad > 0 or not ns.Flag(button:IsShown())) then
 			local left, bottom, width, height = button:GetRect()
 			local scale = button:GetEffectiveScale()
-			if left and scale and scale > 0 and x / scale >= left and x / scale <= left + width
-				and y / scale >= bottom and y / scale <= bottom + height then
+			if left and scale and scale > 0 and x / scale >= left - pad and x / scale <= left + width + pad
+				and y / scale >= bottom - pad and y / scale <= bottom + height + pad then
 				return true
 			end
 		end
@@ -1632,7 +1636,7 @@ function ns.IsEntryHovered(entry)
 	-- bar's empty slots: see ns.IsOverEmptySlot.)
 	if entry.group ~= "chat" and not MouseFocus() then
 		return (entry.group == "bars" or entry.group == "sidebars") and ns.Flag(entry.frame:IsVisible())
-			and ns.IsOverEmptySlot(entry.frame)
+			and ns.IsOverEmptySlot(entry.frame, entry.row and ns.hoverReach[entry.row])
 	end
 	-- A chat window's scroll bar and jump-to-bottom button sit outside its
 	-- rect (Classic's button column too), and so does the dark background
@@ -2050,12 +2054,15 @@ ns.HOVER_TRIGGERS = {
 -- picture on the Mouseover groups page, one of HOVER_GROUP_ICONS for groups
 -- you make.)
 ns.HOVER_GROUPS_DEFAULT = {
-	{ preset = "bars", icon = "Interface\\Icons\\INV_Sword_04", name = L["Action bars"],
+	-- (reach: how far around its action bar buttons the mouse counts as on
+	-- them, UI units, so the gaps between them count; copies without one of
+	-- their own take their default group's, see ns.HoverGroupReach.)
+	{ preset = "bars", icon = "Interface\\Icons\\INV_Sword_04", name = L["Action bars"], reach = 8,
 		members = { "mainbar", "bottomleft", "bottomright", "pet", "stance", "totems", "micro", "bags", "xp" } },
-	{ preset = "side", icon = "Interface\\Icons\\Ability_Warrior_DefensiveStance", name = L["Side bars"],
+	{ preset = "side", icon = "Interface\\Icons\\Ability_Warrior_DefensiveStance", name = L["Side bars"], reach = 8,
 		members = { "right1", "right2" } },
 	-- (Off: with it off, the mouse on bars 6-8 brings up nothing: groupOnly.)
-	{ preset = "bars68", icon = "Interface\\Icons\\Ability_DualWield", name = L["Action bars 6-8"],
+	{ preset = "bars68", icon = "Interface\\Icons\\Ability_DualWield", name = L["Action bars 6-8"], reach = 8,
 		members = { "bar6", "bar7", "bar8" }, off = true },
 	{ preset = "player", icon = "Interface\\Icons\\INV_Misc_Head_Human_01", name = L["Player"],
 		members = { "player", "petframe", "totemtimers", "castbar" } },
@@ -2203,6 +2210,13 @@ do
 		return group.icon or preset and preset.icon or ns.HOVER_GROUP_ICONS[1]
 	end
 
+	-- A group's hover reach around action bar buttons: its own, else a
+	-- default group's, else none.
+	function ns.HoverGroupReach(group)
+		local preset = ns.HoverGroupPreset(group)
+		return group.reach or preset and preset.reach or 0
+	end
+
 	-- An icon no group has yet (for a new one), else the first.
 	function ns.UnusedHoverGroupIcon()
 		local used = {}
@@ -2229,7 +2243,9 @@ function ns.CopyHoverGroups()
 		for key, on in pairs(group.triggers or {}) do triggers[key] = on end
 		local preset = ns.HoverGroupPreset(group)
 		copy[#copy + 1] = { name = group.name, members = members, triggers = triggers, when = group.when,
-			off = group.off, preset = preset and preset.preset or nil, icon = group.icon }
+			off = group.off, preset = preset and preset.preset or nil, icon = group.icon,
+			-- (A default group's own reach isn't copied: it follows the default.)
+			reach = not (preset and group.reach == preset.reach) and group.reach or nil }
 	end
 	return copy
 end
@@ -8874,6 +8890,15 @@ function ns.UpdateFrames(cinematic, elapsed)
 	-- that's left out now. A group turned off (group.off) is always left out.)
 	local offWhen = fighting and "calm" or "combat"
 	local hovered, triggered, pinged = wipe(tickTables.hovered), wipe(tickTables.triggered), wipe(tickTables.pinged)
+	-- Each row's hover reach around its action bar buttons: the widest of
+	-- the groups it's in that work now (ns.IsEntryHovered reads it).
+	local reach = wipe(ns.hoverReach)
+	for _, group in ipairs(hoverGroups) do
+		local pad = ns.HoverGroupReach(group)
+		for _, key in ipairs(pad > 0 and not group.off and group.when ~= offWhen and group.members or NO_DEFAULTS) do
+			if pad > (reach[key] or 0) then reach[key] = pad end
+		end
+	end
 	-- The raid-style party frames set apart from the raid frames (Standard
 	-- Frames page): their own rows (rspGroup) decide for them, not the raid frames'.
 	local ownPartyRows = ns.db.raidStylePartySame == false
@@ -10684,5 +10709,59 @@ do
 	watcher:SetScript("OnEvent", function()
 		PinAll()
 		C_Timer.After(1, PinAll) -- (bars some addons and Edit Mode build a moment later)
+	end)
+end
+
+-- Hide Keybinds (Standard Frames page, Action bars tab): the key names on the
+-- game's action bar buttons (1, a-Q, s-2...) faded out, CineMode or not. Alpha
+-- only, nothing hidden or moved: the game shows, hides and recolors them
+-- (out of range red) as it likes, and a recolor can bring the alpha back, so
+-- it's set again after each.
+do
+	local BARS = {
+		{ "ActionButton", 12 }, { "MultiBarBottomLeftButton", 12 }, { "MultiBarBottomRightButton", 12 },
+		{ "MultiBarRightButton", 12 }, { "MultiBarLeftButton", 12 }, { "MultiBar5Button", 12 },
+		{ "MultiBar6Button", 12 }, { "MultiBar7Button", 12 }, { "BonusActionButton", 12 },
+		{ "OverrideActionBarButton", 6 }, { "PetActionButton", 10 }, { "StanceButton", 10 },
+		{ "ShapeshiftButton", 10 },
+	}
+	-- Each text: its key on the button, its global name's ending, the setting
+	-- that hides it (Hide macro names: the macro's name, TAR...).
+	local TEXTS = { { "HotKey", "HotKey", "hideKeybinds" }, { "Name", "Name", "hideMacroText" } }
+	local setting = {} -- (each text hooked: the setting that hides it)
+	local function Hidden(key)
+		return ns.db ~= nil and ns.db[key] == true
+	end
+	local function Fix(text)
+		if Hidden(setting[text]) then
+			text:SetAlpha(0)
+		end
+	end
+	function ns.ApplyHideKeybinds()
+		for _, bar in ipairs(BARS) do
+			for i = 1, bar[2] do
+				local button = _G[bar[1] .. i]
+				for _, kind in ipairs(button and TEXTS or {}) do
+					local text = button[kind[1]] or _G[bar[1] .. i .. kind[2]]
+					if text and text.SetAlpha then
+						if not setting[text] then
+							setting[text] = kind[3]
+							hooksecurefunc(text, "SetVertexColor", Fix)
+							if text.SetTextColor then
+								hooksecurefunc(text, "SetTextColor", Fix)
+							end
+						end
+						text:SetAlpha(Hidden(kind[3]) and 0 or 1)
+					end
+				end
+			end
+		end
+	end
+
+	local watcher = CreateFrame("Frame")
+	watcher:RegisterEvent("PLAYER_ENTERING_WORLD")
+	watcher:SetScript("OnEvent", function()
+		ns.ApplyHideKeybinds()
+		C_Timer.After(1, ns.ApplyHideKeybinds) -- (bars built a moment later)
 	end)
 end

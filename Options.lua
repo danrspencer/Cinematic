@@ -6438,7 +6438,10 @@ local function CreateCombatPanel()
 		Layout()
 		ns.OpenOptions("Standard Frames")
 	end
-	resetHooks[content] = Layout
+	resetHooks[content] = function()
+		Layout()
+		ns.ApplyHideKeybinds()
+	end
 	-- Set apart: its rows start as the raid frames' (ticks and rules),
 	-- unless they have choices of their own from before.
 	local function CopyRaidRows()
@@ -6537,6 +6540,26 @@ local function CreateCombatPanel()
 					end
 				end
 			end
+		end
+		-- (Under the action bars' rows: their key names hidden.)
+		if page == "bars" then
+			local keys = Check(content, "hideKeybinds", L["Hide keybinds"],
+				L["Hides the key names on the action bar buttons (1, a-Q, s-2...), CineMode or not."],
+				function(value)
+					ns.GetDB().hideKeybinds = value
+					ns.ApplyHideKeybinds()
+				end)
+			keys:SetParent(section.body)
+			keys:SetPoint("TOPLEFT", section.last, "BOTTOMLEFT", -4, -8)
+			local macros = Check(content, "hideMacroText", L["Hide macro names"],
+				L["Hides the macro names on the action bar buttons, CineMode or not."],
+				function(value)
+					ns.GetDB().hideMacroText = value
+					ns.ApplyHideKeybinds()
+				end)
+			macros:SetParent(section.body)
+			macros:SetPoint("TOPLEFT", keys, "BOTTOMLEFT", 0, 0)
+			section.last = macros
 		end
 		sections[#sections + 1] = section
 	end
@@ -11006,7 +11029,7 @@ local function CreateSwingPanel()
 	local className, class = UnitClass("player")
 	local rangedTop = Check(content, "swingRangedOnTop" .. class, L["Ranged bar on top for %s"]:format(className),
 		L["The ranged bar goes on top, where the main hand's was, and the main hand and off-hand bars " ..
-		"each move down one. Set for each class on its own (ticked for hunters, mages, priests and warlocks to start with), so one profile " ..
+		"each move down one. Set for each class on its own, so one profile " ..
 		"suits all your characters."])
 	rangedTop:SetPoint("TOPLEFT", offHand, "BOTTOMLEFT", 0, -2)
 
@@ -11134,7 +11157,7 @@ local function CreateCooldownPanel()
 	local flashHeading = Label(content, "GameFontNormalSmall", L["Flash"])
 	flashHeading:SetPoint("TOPLEFT", panelTop, "TOPLEFT", 12 + FLASH_X - 4, -10)
 	local noSpells = Label(content, "GameFontDisable", L["Nothing in the Cooldown Manager right now."])
-	noSpells:SetPoint("TOPLEFT", readyNote, "BOTTOMLEFT", 0, -42)
+	-- (Where the spell list goes: placed under the Flash style, once it's made.)
 
 	-- A heading over each bar's spells, as the Cooldown Manager's settings group them.
 	local GROUP_NAMES = {
@@ -11691,6 +11714,7 @@ local function CreateCooldownPanel()
 		GreyUnless(control, function(db) return db.handleCooldowns end)
 	end
 	panelTop:SetPoint("TOPLEFT", flashTime, "BOTTOMLEFT", 0, -16 - height)
+	noSpells:SetPoint("TOPLEFT", flashTime, "BOTTOMLEFT", 0, -20)
 
 	local shown = PageShown(Refresh, content)
 	canvas:SetScript("OnShow", function()
@@ -14533,6 +14557,21 @@ local function CreateMouseoverPanel()
 		return db.hoverGroups
 	end
 
+	-- Whether a group has an action bar in it (the rows of the faded bars:
+	-- its hover reach works only on those).
+	local function HasBarMember(group)
+		local barRows = {}
+		for _, entry in ipairs(ns.managed) do
+			if entry.group == "bars" or entry.group == "sidebars" then
+				barRows[entry.row or ns.HoverRowFor(entry)] = true
+			end
+		end
+		for _, key in ipairs(group.members) do
+			if barRows[key] then return true end
+		end
+		return false
+	end
+
 	local function GroupsWith(key, exceptIndex)
 		local names = {}
 		for i, group in ipairs(Groups()) do
@@ -15081,6 +15120,30 @@ local function CreateMouseoverPanel()
 				-- Add a frame: type to search the list.
 				At(AddBox("add", L["Add a frame: type to search..."], index), LEFT + 34, 4)
 				y = y + 30
+
+				-- Hover reach: only for a group with an action bar in it (the
+				-- one kind it works on).
+				if HasBarMember(group) then
+					local reach = Take("reach", function()
+						local slider
+						slider = Slider(content, {
+							get = function()
+								local current = slider.index and Groups()[slider.index]
+								return current and ns.HoverGroupReach(current) or 0
+							end,
+							set = function(value)
+								if slider.index then Writable()[slider.index].reach = value end
+							end,
+						}, L["Hover reach"], 0, 40, 1, L["%d px"])
+						Tooltip(slider, L["How close the mouse must come to this group's action bar buttons to " ..
+							"bring it up, so the gaps between the buttons count too. 0: only on the buttons themselves."])
+						return slider
+					end)
+					reach.index = index
+					At(reach, LEFT + 14, 20)
+					reach:Refresh()
+					y = y + 52
+				end
 
 				-- The events that bring the group up besides the mouse: one row
 				-- each, then a box to add more.
