@@ -8700,12 +8700,15 @@ do
 		-- (A Distance's name in the Distance dropdown, short beside a row's
 		-- name, and its tip.)
 		local DISTANCE_NAMES = { In11 = L["Within 11 yards"], In28 = L["Within 28 yards"],
-			In40 = L["Within 40 yards"], Past28 = L["Past 28 yards"], Past40 = L["Past 40 yards"] }
+			In40 = L["Within 40 yards"], Past28 = L["Past 28 yards"], Past40 = L["Past 40 yards"],
+			OutOfRange = L["Out of range"] }
 		local DISTANCE_SHORT = { In11 = L["in 11 yd"], In28 = L["in 28 yd"], In40 = L["in 40 yd"],
-			Past28 = L["past 28 yd"], Past40 = L["past 40 yd"] }
+			Past28 = L["past 28 yd"], Past40 = L["past 40 yd"], OutOfRange = L["out of range"] }
 		local DISTANCE_TIP = L["This row: just those about that far from you. 11 and 28 yards are the " ..
 			"game's interact distances; 40 asks a 40-yard spell on your action bars (harmful for enemies, " ..
-			"helpful for friends), and with none there the row fits no unit past 28 yards."]
+			"helpful for friends), and with none there the row fits no unit past 28 yards. Out of range: " ..
+			"none of the spells on your action bars reaches it (attacks for enemies, helpful spells for " ..
+			"friends), as their buttons turn red."]
 		-- A row's names and tip from its id: its kind's name (label), what's
 		-- under it (sub: its Who, Distance and number), all in one line (full);
 		-- a name of your own (markNames) for label and full instead, its own
@@ -9252,7 +9255,8 @@ do
 				end)
 			Tooltip(distancePick, L["Any distance: all of them, near or far. Within or past 11, 28 or 40 yards: just " ..
 				"those that far from you, say Any unit past 40 yards to fade the plates far off. 40 yards asks a " ..
-				"40-yard spell on your action bars; with none there, the row fits no unit past 28 yards."])
+				"40-yard spell on your action bars; with none there, the row fits no unit past 28 yards. Out of " ..
+				"range: none of the spells on your action bars reaches them, as their buttons turn red."])
 			return kindPick, function(after)
 				local kind = KindInfo(pick)
 				typePick:SetShown(kind[3] ~= nil)

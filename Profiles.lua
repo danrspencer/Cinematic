@@ -269,7 +269,7 @@ local OFF_UNTIL_PICKED = {
 	"handleHealVision", "damageVision", "lowHealth", "questVision", "questTalk", "rollWindow", "teleportVision",
 	"duelPlates", "emoteVision", "cards", "windGuide",
 	"handleQuality", "handleFishing", "handleHunter",
-	"cooldownManagerOn", "prdOn", -- (the game switches a profile turns on: ApplyProfileSwitches)
+	"cooldownManagerOn", "prdOn", "prdOnFights", -- (the game switches a profile turns on: ApplyProfileSwitches)
 }
 ns.OFF_UNTIL_PICKED = OFF_UNTIL_PICKED
 
@@ -366,19 +366,23 @@ end
 -- Game switches for profiles that use them: the Cooldown Manager
 -- (db.cooldownManagerOn, the CDM part; cooldownViewerEnabled, the same on
 -- both clients) and the personal resource display (db.prdOn, the Personal
--- Resource Centered layout; nameplateShowSelf). Each turned on if it's off,
--- and back off on switching to a profile without it, if Cinematic turned it
+-- Resource Centered layout, or also db.prdOnFights, Cinema's fights;
+-- nameplateShowSelf). Each turned on if it's off, and back off on switching to a profile without it, if Cinematic turned it
 -- on (db[turnedOn]). The player's own choice stands: switched by them
 -- meanwhile, it's left as they put it (db[leftAlone]) until they're on a
 -- profile without it again. Not in fights: once one ends.
 local PROFILE_SWITCHES = {
 	{ key = "cooldownManagerOn", cvar = "cooldownViewerEnabled", turnedOn = "cdmTurnedOn",
 		leftAlone = "cdmLeftAlone", name = "cooldown manager" },
-	{ key = "prdOn", cvar = "nameplateShowSelf", turnedOn = "prdTurnedOn",
+	{ key = "prdOn", also = "prdOnFights", cvar = "nameplateShowSelf", turnedOn = "prdTurnedOn",
 		leftAlone = "prdLeftAlone", name = "personal resource display" },
 }
 local switchFrame = CreateFrame("Frame")
 local switchWritten = {} -- (by cvar, the value just written: its CVAR_UPDATE isn't the player's)
+-- Whether the profile wants a switch on.
+local function Wanted(db, switch)
+	return db[switch.key] or (switch.also and db[switch.also]) or false
+end
 local function ApplyProfileSwitches()
 	local db = ns.db
 	if not db then return end
@@ -391,7 +395,7 @@ local function ApplyProfileSwitches()
 		if GetCVar(cvar) ~= nil then
 			local on = GetCVar(cvar) == "1"
 			local want
-			if db[switch.key] and db.enabled then
+			if Wanted(db, switch) and db.enabled then
 				-- (Our turnedOn with it off: switched off where its CVAR_UPDATE wasn't
 				-- seen, e.g. logged out. Stale: on again.)
 				if not on and not db[switch.leftAlone] then want = "1" end
@@ -426,7 +430,7 @@ switchFrame:SetScript("OnEvent", function(self, event, name)
 				-- (the player switching it themselves: theirs from now on)
 				switchWritten[cvar] = nil
 				ns.db[switch.turnedOn] = nil
-				if ns.db[switch.key] then ns.db[switch.leftAlone] = true end
+				if Wanted(ns.db, switch) then ns.db[switch.leftAlone] = true end
 				return
 			end
 		end

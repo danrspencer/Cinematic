@@ -316,6 +316,7 @@ local DEFAULTS = {
 	editModeLayout = "",       -- the profile's Edit Mode layout, switched to when it's picked ("": the player's own; Layouts.lua)
 	cooldownManagerOn = false, -- the profile turns the game's Cooldown Manager on if it's off (the CDM part; Profiles.lua)
 	prdOn = false,             -- ...and the personal resource display (the Personal Resource Centered layout)
+	prdOnFights = false,       -- ...the same for fights that show it (Cinema's frames)
 	centerPanels = true,      -- windows the game opens on the left open in the middle of the screen (CenterPanels.lua)
 	dragPanels = true,         -- ...and drag them to move them; they open where last dropped (panelSpots, CenterPanels.lua)
 	chatCopyButton = true,     -- an icon on each chat window opens its lines to copy (ChatCopy.lua)
@@ -801,8 +802,9 @@ for kind in pairs(ns.MARK_ROW_KINDS) do
 	DEFAULTS[prefix .. "PlateR"], DEFAULTS[prefix .. "PlateG"], DEFAULTS[prefix .. "PlateB"] = 1, 1, 1
 end
 -- A row's Distance, any kind's: its unit within about 11, 28 or 40 yards of
--- you, or past 28 or 40 (ns.UnitInBand). 40 asks a 40-yard spell on your bars.
-ns.MARK_DISTANCES = { "In11", "In28", "In40", "Past28", "Past40" }
+-- you, past 28 or 40, or out of range of your spells (ns.UnitInBand). 40
+-- asks a 40-yard spell on your bars; out of range, every one on them.
+ns.MARK_DISTANCES = { "In11", "In28", "In40", "Past28", "Past40", "OutOfRange" }
 -- A row's kind, Who (nil: all its units; one or more, in MARK_REACTIONS'
 -- order: "EnemyNeutral"), number (nil: the first) and Distance (nil: any):
 -- "npcEnemyPast403": "npc", "Enemy", 3, "Past40".
@@ -850,7 +852,7 @@ function ns.MarkRowDefault(key)
 	end
 	local id, rest = key:match("^(%l[%a%d]-)(Mark%u%a*)$")
 	if not id then id, rest = key:match("^(%l[%a%d]-)(Color%u%a*)$") end
-	if not id then id, rest = key:match("^(%l[%a%d]-)(When%a*)$") end
+	if not id then id, rest = key:match("^(%l[%a%d]-)(When[%a%d]*)$") end
 	if not id or not ns.MarkRowValid(id) then
 		return nil
 	end

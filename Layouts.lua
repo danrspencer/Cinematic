@@ -1,5 +1,6 @@
--- Edit Mode layouts: Cinematic's own (EDIT_MODE_LAYOUTS), and switching to
--- a profile's (ns.ApplyProfileLayout). A built-in profile whose
+-- Edit Mode layouts: Cinematic's own (EDIT_MODE_LAYOUTS), all made on logging
+-- in if missing (EnsureLayouts), and switching to a profile's
+-- (ns.ApplyProfileLayout). A built-in profile whose
 -- layout module names one (db.editModeLayout) switches Edit Mode to it when
 -- it's picked, making it first if it isn't there; a profile without one
 -- puts back the layout the player was on before. The dev build's Dev page
@@ -7,9 +8,9 @@
 --
 -- Each is the game's own: an account layout listed in Edit Mode beside the
 -- player's, which they can change there like any other. Making one never
--- touches their layouts. A new one works at once, no reload needed; one
--- brought up to date (the Dev page's Update) shows its old copy in Edit Mode
--- until a reload (and saving there would put that back), so that offers one.
+-- touches their layouts. Edit Mode only takes one made or brought up to date
+-- this session after a reload (and saving there before then would put its
+-- old copy back), so switching to one offers a reload (madeNow).
 
 local _, ns = ...
 local L = ns.L
@@ -243,6 +244,12 @@ local PURE_CINEMA_SYSTEMS = {
 -- resource display moved to the middle, where retail's has it (no export of
 -- Forever's yet; its system number by name, none on a client without it).
 local PRD_SYSTEM = Enum.EditModeSystem and Enum.EditModeSystem.PersonalResourceDisplay
+if not PRD_SYSTEM and Enum.EditModeSystem then
+	-- (another name on this client: any with "Personal" in it)
+	for key, value in pairs(Enum.EditModeSystem) do
+		if type(key) == "string" and key:find("Personal") then PRD_SYSTEM = value end
+	end
+end
 local FOREVER_PURE = PRD_SYSTEM and { { PRD_SYSTEM, nil, "CENTER", "UIParent", "CENTER", 0, -205 } } or {}
 
 -- Cinematic's own layouts, by the name Edit Mode lists them under. export:
@@ -279,9 +286,11 @@ local function ExportFromSystems(systems)
 end
 
 local function ApplyDesign(layout, design)
+	local found = {}
 	for _, system in ipairs(layout.systems or {}) do
-		for _, saved in ipairs(design) do
+		for i, saved in ipairs(design) do
 			if system.system == saved[1] and system.systemIndex == saved[2] then
+				found[i] = true
 				if saved[3] then
 					system.isInDefaultPosition = false
 					system.anchorInfo = { point = saved[3], relativeTo = saved[4], relativePoint = saved[5],
@@ -293,6 +302,77 @@ local function ApplyDesign(layout, design)
 				end
 			end
 		end
+	end
+	for i, saved in ipairs(design) do
+		if not found[i] then
+			ns.Log("state", ("edit mode layout: system %s index %s not in the preset"):format(
+				tostring(saved[1]), tostring(saved[2])))
+		end
+	end
+end
+
+-- /cine debug layout: what the game says about Edit Mode and the personal
+-- resource display, for Personal Resource Centered (Forever's designed).
+function ns.DescribeLayouts()
+	if not (C_EditMode and C_EditMode.GetLayouts) then ns.Print("no Edit Mode here") return end
+	local info = C_EditMode.GetLayouts()
+	local names = {}
+	for _, layout in ipairs(info.layouts) do names[#names + 1] = Named(layout) end
+	ns.Print(("client %s, on %s, saved: %s; in combat %s, Edit Mode open %s"):format(ns.CLIENT,
+		tostring(ActiveName(info)), table.concat(names, ", "), tostring(InCombatLockdown()),
+		tostring(_G.EditModeManagerFrame and _G.EditModeManagerFrame:IsShown())))
+	local keys = {}
+	for key, value in pairs(Enum.EditModeSystem or {}) do
+		if type(key) == "string" and key:find("Personal") then keys[#keys + 1] = key .. "=" .. tostring(value) end
+	end
+	ns.Print(("PRD system: %s (enum: %s); profile layout: %s"):format(tostring(PRD_SYSTEM),
+		#keys > 0 and table.concat(keys, ", ") or "none", tostring(ns.db and ns.db.editModeLayout)))
+	local function Describe(label, layout)
+		if not layout then ns.Print("  " .. label .. ": not there") return end
+		local systems = {}
+		for _, system in ipairs(layout.systems or {}) do
+			systems[#systems + 1] = tostring(system.system)
+			if system.system == PRD_SYSTEM then
+				local a = system.anchorInfo or {}
+				ns.Print(("  %s: PRD index %s, default spot %s, %s %s %s %s %s"):format(label,
+					tostring(system.systemIndex), tostring(system.isInDefaultPosition), tostring(a.point),
+					tostring(a.relativeTo), tostring(a.relativePoint), tostring(a.offsetX), tostring(a.offsetY)))
+				return
+			end
+		end
+		ns.Print(("  %s: no PRD system; has %s"):format(label, table.concat(systems, " ")))
+	end
+	Describe("Modern preset", Presets()[1])
+	local _, index = FindLayout("Personal Resource Centered")
+	Describe("Personal Resource Centered", index and info.layouts[index])
+	local frame = _G.PersonalResourceDisplayFrame
+	if frame then
+		local ok, point, relativeTo, relativePoint, x, y = pcall(frame.GetPoint, frame, 1)
+		local relName = ok and relativeTo and relativeTo.GetName and relativeTo:GetName()
+		ns.Print(("  PersonalResourceDisplayFrame: shown %s, %s"):format(tostring(frame:IsShown()),
+			ok and ("%s %s %s %s %s"):format(tostring(point), tostring(relName or relativeTo),
+				tostring(relativePoint), tostring(x), tostring(y)) or "point unreadable"))
+		ns.Print(("  system %s, nameplateShowSelf %s, scale %s"):format(tostring(frame.system),
+			tostring(GetCVar("nameplateShowSelf")), tostring(frame:GetScale())))
+		-- (Edit Mode's own copy of its place: whether the game applied the layout to it)
+		local sys = frame.systemInfo
+		local a = sys and sys.anchorInfo or {}
+		ns.Print(("  its systemInfo: %s, default spot %s, %s %s %s %s %s; isInDefaultPosition %s"):format(
+			sys and "yes" or "none", tostring(sys and sys.isInDefaultPosition), tostring(a.point),
+			tostring(a.relativeTo), tostring(a.relativePoint), tostring(a.offsetX), tostring(a.offsetY),
+			tostring(frame.isInDefaultPosition)))
+		local manager = _G.EditModeManagerFrame
+		local cached = manager and manager.layoutInfo
+		ns.Print(("  Edit Mode's cached layout: %s"):format(cached and tostring(ActiveName(cached)) or "none"))
+		for _, entry in ipairs(ns.managed or {}) do
+			if entry.frame == frame then
+				ns.Print(("  faded entry %s: alpha %s, shrunk %s, saved points %s, parked %s"):format(
+					tostring(entry.name or entry.group), tostring(entry.alpha), tostring(entry.shrunk),
+					entry.savedPoints and #entry.savedPoints or "none", tostring(ns.IsParked and ns.IsParked(entry))))
+			end
+		end
+	else
+		ns.Print("  no PersonalResourceDisplayFrame")
 	end
 end
 
@@ -311,6 +391,18 @@ local function BuildLayout(name)
 	if not layout then return nil end
 	layout.layoutName, layout.layoutType = name, AccountType()
 	return layout
+end
+
+-- Ours made or remade this session (by name). Edit Mode keeps the list it
+-- read at login, so switching to one of these moves nothing until a reload
+-- (tested on Forever: the PRD stayed in Modern's spot, centred after the
+-- reload). Switching to one offers that reload (OfferReload), after which
+-- it's switched to again (layoutPending).
+local madeNow = {}
+
+local function OfferReload(name)
+	ns.chardb.layoutPending = name
+	StaticPopup_Show("CINEMATIC_LAYOUT_RELOAD")
 end
 
 -- Why layouts can't be changed now (nil: they can).
@@ -348,6 +440,7 @@ function ns.MakeLayout(name)
 	ns.Log("state", ("edit mode layout %s %s: %s"):format(name, index and "updated" or "made",
 		active and "there" or "NOT there"))
 	if not active then return false, L["the game didn't keep the layout"] end
+	madeNow[name] = true
 	SetActive(active)
 	return true
 end
@@ -362,17 +455,14 @@ end
 
 -- One of ours made again from the code (the Customize panel's Regenerate, the
 -- Dev page's buttons), undoing changes made to it in Edit Mode, and switched
--- to. One that was there already offers a reload (Edit Mode shows its old
--- copy until then), after which it's switched to again.
+-- to. Offers a reload (Edit Mode shows its old copy, or none, until then),
+-- after which it's switched to again.
 function ns.RegenerateLayout(name)
-	local updating = ns.LayoutState(name) ~= nil
 	local ok, reason = ns.MakeLayout(name)
 	if not ok then
 		ns.Print(reason)
-	elseif updating then
-		-- (the reload puts Edit Mode back on the layout it had: switched again after it)
-		ns.chardb.layoutPending = name
-		StaticPopup_Show("CINEMATIC_LAYOUT_RELOAD")
+	else
+		OfferReload(name)
 	end
 	return ok
 end
@@ -396,6 +486,47 @@ local function RenameOld()
 	if renamed then C_EditMode.SaveLayouts(info) end
 end
 
+-- Ours for this client (def.client) that aren't in Edit Mode yet made, all
+-- in one save, without switching to any: so switching profile only changes
+-- the active layout. Added after the player's, so the active one's number
+-- stays. Any that don't fit (the account's layouts full) are left out: a
+-- profile that needs one says so then (ns.ApplyProfileLayout). On logging in
+-- and on a reset (ns.ResetLayouts). Switching to one made this session still
+-- needs a reload (madeNow): so they're made before they're needed.
+local function EnsureLayouts()
+	if Blocked() then return end
+	local info = C_EditMode.GetLayouts()
+	local max = Constants.EditModeConsts and Constants.EditModeConsts.EditModeMaxLayoutsPerType or 5
+	local count = 0
+	for _, layout in ipairs(info.layouts) do
+		if layout.layoutType == AccountType() then count = count + 1 end
+	end
+	local names = {}
+	for name, def in pairs(ns.EDIT_MODE_LAYOUTS) do
+		if (not def.client or def.client == ns.CLIENT) and not select(2, FindLayout(name)) then
+			names[#names + 1] = name
+		end
+	end
+	table.sort(names) -- (the same order every time)
+	local made = {}
+	for _, name in ipairs(names) do
+		if count >= max then
+			ns.Log("state", "edit mode layout not made, account layouts full: " .. name)
+		else
+			local layout = BuildLayout(name)
+			if layout then
+				info.layouts[#info.layouts + 1] = layout
+				count = count + 1
+				made[#made + 1] = name
+				madeNow[name] = true
+			end
+		end
+	end
+	if #made == 0 then return end
+	C_EditMode.SaveLayouts(info)
+	ns.Log("state", "edit mode layouts made: " .. table.concat(made, ", "))
+end
+
 -- On logging in (or a reload), once Edit Mode has its layouts: ours under
 -- old names renamed, then the layout just remade, switched to again;
 -- otherwise the profile's, as on switching to it. Edit Mode keeps a layout per character,
@@ -411,6 +542,7 @@ login:SetScript("OnEvent", function(self)
 	ns.chardb.layoutPending = nil
 	C_Timer.After(1, function()
 		RenameOld()
+		EnsureLayouts()
 		if not name then
 			if ns.ProfileChosen() then ns.ApplyProfileLayout() end
 			return
@@ -470,7 +602,9 @@ function ns.ApplyProfileLayout()
 	if not index then
 		if ns.EDIT_MODE_LAYOUTS[name] then
 			local ok, reason = ns.MakeLayout(name)
-			if not ok then
+			if ok then
+				OfferReload(name)
+			else
 				ns.Print(L["couldn't add this profile's Edit Mode layout: %s"]:format(reason))
 			end
 		elseif not missingSaid[name] then
@@ -482,6 +616,7 @@ function ns.ApplyProfileLayout()
 	if info.activeLayout ~= index then
 		SetActive(index)
 		ns.Log("state", "edit mode layout: " .. name)
+		if madeNow[name] then OfferReload(name) end
 	else
 		SyncBars(name) -- (on it already: its bars may still be off)
 	end
@@ -489,8 +624,11 @@ end
 
 -- Resetting Cinematic (ns.ResetAddon): back on the player's own layout (the
 -- one before a profile switched it; on one of ours with none saved, the
--- first preset), and Cinematic's own layouts deleted from Edit Mode. Not in
--- combat: false then (and done nothing).
+-- first preset), and Cinematic's own layouts made again from the code in
+-- their places (changes made to them in Edit Mode undone), any missing
+-- added: so after the reset's reload Edit Mode has them all, and switching
+-- profile needs no reload. Ones for the other client deleted. Not in combat:
+-- false then (and done nothing).
 function ns.ResetLayouts()
 	if not (C_EditMode and C_EditMode.GetLayouts) or not ns.chardb then return true end
 	if InCombatLockdown() then return false end
@@ -503,24 +641,31 @@ function ns.ResetLayouts()
 		active = Presets()[1] and Presets()[1].layoutName
 	end
 	ns.chardb.layoutOwn = nil
-	local kept, removed = {}, 0
+	local kept, remade, removed = {}, 0, 0
 	for _, layout in ipairs(info.layouts) do
-		if ns.EDIT_MODE_LAYOUTS[Named(layout)] then
+		local name = Named(layout)
+		local def = ns.EDIT_MODE_LAYOUTS[name]
+		if not def then
+			kept[#kept + 1] = layout
+		elseif def.client and def.client ~= ns.CLIENT then
 			removed = removed + 1
 		else
-			kept[#kept + 1] = layout
+			kept[#kept + 1] = BuildLayout(name) or layout
+			remade = remade + 1
 		end
 	end
-	if removed > 0 then
+	if remade + removed > 0 then
 		info.layouts = kept
 		info.activeLayout = (active and IndexOf(info, active)) or 1
 		if ns.UnshrinkForLayout then ns.UnshrinkForLayout() end
 		C_EditMode.SaveLayouts(info)
-		ns.Log("state", ("reset: %d edit mode layout(s) deleted, on %s"):format(removed, tostring(active)))
+		ns.Log("state", ("reset: %d edit mode layout(s) remade, %d deleted, on %s"):format(remade, removed,
+			tostring(active)))
 	end
 	local index = active and IndexOf(C_EditMode.GetLayouts(), active)
 	if index and C_EditMode.GetLayouts().activeLayout ~= index then SetActive(index) end
 	SyncBars(active)
+	EnsureLayouts()
 	return true
 end
 

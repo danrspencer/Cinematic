@@ -162,6 +162,7 @@ local function PrintDebugHelp()
 	print("  /cine debug target - print where your target's plate is on screen (x, y, angle off the middle), even faded (again to stop, /reload to save)")
 	print("  /cine debug speakers -log where each speaking NPC's bubble and plate are on screen, and the angle off the middle (again to stop, /reload to save)")
 	print("  /cine debug bubbles - log each chat bubble's place, frame by frame as it changes, and how far it's moved off the top (again to stop, /reload to save)")
+	print("  /cine debug layout - Edit Mode's layouts and where the personal resource display is")
 	print("  /cine debug layoutexport - save the Edit Mode layout you're on as an export string (in the saved settings: /reload after)")
 	print("  /cine debug changed - which settings make the Profiles page say (changed): each with the profile's value and the default")
 	print("  /cine debug cvars - graphics CVars: which exist here; run, move the Graphics sliders, run again to log what the menu changed")
@@ -382,6 +383,8 @@ local function HandleSlash(msg)
 		ns.turnTestUntil = GetTime() + 10
 		ns.Print("turn hold test for 10 seconds: stand still and hold a turn key. The camera " ..
 			"should keep looking the same way while your character turns.")
+	elseif cmd == "debug" and arg == "layout" then
+		ns.DescribeLayouts()
 	elseif cmd == "debug" and arg == "layoutexport" then
 		-- (For a layout of Cinematic's own: db.debugLayoutExport, read from the saved settings.)
 		local info = C_EditMode and C_EditMode.GetLayouts()

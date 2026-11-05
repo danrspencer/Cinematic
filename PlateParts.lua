@@ -1849,6 +1849,10 @@ local function MasterSizeOn()
 	local width, height = MasterSize()
 	return ns.isRetail and (math.abs(width - 1) > 0.001 or math.abs(height - 1) > 0.001)
 end
+-- (/cine debug plates: the row a unit's plate goes by now, and its place.)
+function ns.PlateRowNow(plate, unit)
+	return FittingRow(plate, unit)
+end
 local function PlateLook(plate, unit)
 	wipe(partKinds)
 	local kind, at = FittingRow(plate, unit)

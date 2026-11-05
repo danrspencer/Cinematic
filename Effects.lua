@@ -3040,6 +3040,12 @@ function ns.PrintPlatesDebug()
 		ns.Print(("  enemy=%s, friend=%s, reaction=%s, as %s, kept up=%s"):format(
 			tostring(ns.IsEnemyUnit("target")), okFriend and tostring(friend) or "?",
 			okReaction and tostring(reaction) or "?", tostring(ns.TargetNameRow("target")), tostring(TargetKeptUp())))
+		if plate and ns.PlateRowNow then
+			local okRow, row, at = pcall(ns.PlateRowNow, plate, "target")
+			ns.Print(("  mark row now: %s (place %s of %s)%s"):format(okRow and tostring(row) or "error",
+				tostring(at), ns.TargetMarkOrder and table.concat(ns.TargetMarkOrder(), ",") or "?",
+				ns.UnitInBand and (", out of range " .. tostring(ns.UnitInBand("target", "OutOfRange"))) or ""))
+		end
 		local frame = plate and plate.UnitFrame
 		if frame then
 			ns.Print(("  plate shown=%s alpha=%.2f, frame shown=%s alpha=%.2f, health bar shown=%s"):format(

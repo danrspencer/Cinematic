@@ -33,6 +33,7 @@ local KEY_ADDRESSES = {
 	editModeLayout = "Profiles/Edit Mode layout", -- (set by the Layout choices in Customize, on the Profiles page)
 	cooldownManagerOn = "Cooldown Manager/top", -- (the game's own switch: no box of ours)
 	prdOn = "Profiles/Edit Mode layout", -- (the game's own switch, with the layout centred on it)
+	prdOnFights = "Personal Resources", -- (the same switch, for fights that show it)
 	chatPeekChannelList = "Chat/Other",
 	-- (with the rows as dropdowns, what rows without a Calm Timer of their own go by)
 	combatShowCalm = "Standard Frames/top",
@@ -246,8 +247,12 @@ ns.PROFILE_MODULES = {
 		tip = "Fights bring up only your health and resource bars: no portrait, target, buffs, minimap or swing timer, " ..
 		"nothing for an enemy or friend targeted, nothing in dungeons and raids, and the cast bar shows all " ..
 		"through CineMode. The player frame and resource display don't stay up until full; no focus's target of target; " ..
-		"raid frames without names, buffs, threat, target markers, ready checks or titles in CineMode.",
+		"raid frames without names, buffs, threat, target markers, ready checks or titles in CineMode. Turns the " ..
+		"game's personal resource display on if it's off, whatever the layout.",
 		apply = function(set)
+			-- (Fights show its health and resource bars: on with any layout,
+			-- not just Personal Resource Centered, which turns it on too.)
+			set("prdOnFights", true)
 			set("portraitWhenNotFull", false)
 			set("prdWhenNotFull", false)
 			set("unitPartsFocusToT", false)
@@ -314,17 +319,32 @@ ns.PROFILE_MODULES = {
 	{ key = "ultra-plates", name = "Ultra responsive nameplates", scope = { "Nameplate Style" },
 		tip = "In fights the plates say what matters at a glance: the further a unit, the fainter its plate " ..
 		"(past 40, 28 and within 11 yards), normal NPCs faint and narrower while an elite's within 40 yards, an enemy after " ..
-		"someone else tinted orange, mobs that aren't your kill gray, and marks on your target and the unit under the mouse. No aggro mark, and " ..
+		"someone else tinted orange, mobs that aren't your kill gray, and marks on your target and the unit under the mouse, " ..
+		"your target's bar pale and faded while none of your spells reaches it. No aggro mark, and " ..
 		"plates change quicker.",
 		apply = function(set)
-			set("markOrder", "tapped,target,mouseover,focus,allPast40,allPast28,allIn11,npc,aggroother,aggro")
+			set("markOrder", "tapped,targetOutOfRange,target,mouseover,focus,allPast40,allPast28,allIn11,npc,aggroother,aggro")
 			set("markNames", { allPast40 = "Fade 40", allPast28 = "Fade 28", allIn11 = "Fade 11",
-				npc = "Fade non elite", aggroother = "Aggro not on you" })
+				npc = "Fade non elite", aggroother = "Aggro not on you", targetOutOfRange = "Target out of range" })
 			-- (Not your kill first: grey before anything else, the target's arrow still on it.)
 			set("plateStyleFadeTime", 0.6)
 			-- Your target's arrow and the mouseover's mark in fights too, a little lower.
 			set("targetWhenCombat", true)
 			set("targetArrowY", -10)
+			-- Your target out of reach of your spells (any target: neutral mobs
+			-- too; friends by your helpful spells): the Target row's arrow, its
+			-- bar pale pink (#F8B1FF) and the plate at half. Above Target, to come first.
+			-- Every setting written, as the page's Add row does: the page reads
+			-- the row's own.
+			local far = "targetOutOfRange"
+			for key, value in pairs({ Show = true, Style = "arrow", Color = "custom", R = 0.85, G = 0, B = 1,
+				Size = 1, Bob = true, Alpha = 0.5, AlsoSame = false, Opacity = 1, PlateWidth = 1, PlateHeight = 1,
+				PlateColor = "custom", PlateR = 0xF8 / 255, PlateG = 0xB1 / 255, PlateB = 1 }) do
+				set(far .. "Mark" .. key, value)
+			end
+			for part, on in pairs({ Name = false, Bar = true, Border = false }) do set(far .. "Color" .. part, on) end
+			set(far .. "When", true)
+			for _, word in ipairs(ns.MARK_WHEN_WORDS) do set(far .. "When" .. word[2], false) end
 			set("mouseoverWhen", false)
 			set("mouseoverWhenCombat", true)
 			-- Aggro on you: no mark.

@@ -2715,9 +2715,20 @@ do
 			if yards >= RANGE_BANDS[i].from then return i end
 		end
 	end
+	-- (Every harmful and helpful spell on your bars, the longest range
+	-- first, melee ones last: OutOfRange asks them in turn.)
+	local farSpells = { harmful = {}, helpful = {} }
+	local farYards = {}
+	local function ByRange(a, b)
+		if farYards[a] ~= farYards[b] then return farYards[a] > farYards[b] end
+		return a < b
+	end
 	local function FindRangeSpells()
 		rangeSpells.harmful, rangeSpells.helpful = nil, nil
 		for _, band in ipairs(bandSpells) do wipe(band) end
+		wipe(farSpells.harmful)
+		wipe(farSpells.helpful)
+		wipe(farYards)
 		local best = {}
 		for slot = 1, 180 do
 			local ok, kind, id = pcall(GetActionInfo, slot)
@@ -2736,6 +2747,19 @@ do
 				if type(minRange) == "number" and not (issecretvalue and issecretvalue(minRange))
 					and (type(maxRange) ~= "number" or (not (issecretvalue and issecretvalue(maxRange)) and minRange > maxRange)) then
 					maxRange = minRange
+				end
+				-- (Melee spells say 0 or nothing: still asked last, for the reach of your weapon.)
+				local yards = type(maxRange) == "number" and not (issecretvalue and issecretvalue(maxRange))
+					and maxRange or 0
+				if not farYards[id] then
+					for key, test in pairs(RANGE_TESTS) do
+						local okTest, is = pcall(test, id)
+						if okTest and is == true then
+							local list = farSpells[key]
+							list[#list + 1] = id
+							farYards[id] = yards
+						end
+					end
 				end
 				if type(maxRange) == "number" and not (issecretvalue and issecretvalue(maxRange))
 					and maxRange > 0 then
@@ -2756,6 +2780,8 @@ do
 				end
 			end
 		end
+		table.sort(farSpells.harmful, ByRange)
+		table.sort(farSpells.helpful, ByRange)
 	end
 	-- Whether a spell reaches a unit: true, false, or nil when it can't say.
 	local function SpellReaches(id, unit)
@@ -2864,13 +2890,20 @@ do
 		end
 		ns.Print(("  40-yard (elite40, Distance rows): harmful %s, helpful %s"):format(
 			tostring(rangeSpells.harmful), tostring(rangeSpells.helpful)))
+		ns.Print(("  Out of range rows: %d harmful, %d helpful, longest %s (%s yd) / %s (%s yd); target out of range %s"):format(
+			#farSpells.harmful, #farSpells.helpful, tostring(farSpells.harmful[1]),
+			tostring(farYards[farSpells.harmful[1] or 0]), tostring(farSpells.helpful[1]),
+			tostring(farYards[farSpells.helpful[1] or 0]),
+			ns.HasTarget() and tostring(ns.UnitInBand("target", "OutOfRange")) or "no target"))
 	end
 	-- Whether a unit's that far from you, for the Nameplates page's rows with
 	-- a Distance (Core's MARK_DISTANCES): In11, In28 and In40 within about 11,
-	-- 28 or 40 yards, Past28 and Past40 further. True or false; nil when
+	-- 28 or 40 yards, Past28 and Past40 further; OutOfRange past the reach
+	-- of your spells (FindRangeSpells' farSpells). True or false; nil when
 	-- nothing can say (40: no 40-yard spell on your bars that can). In a
 	-- fight, as InteractDistance has it.
 	local Within = InteractDistance
+	local FAR_KINDS = { "harmful", "helpful" }
 	local function Within40(unit)
 		if Within(unit, 4) then
 			return true
@@ -2883,6 +2916,18 @@ do
 		return answer
 	end
 	function ns.UnitInBand(unit, band)
+		if band == "OutOfRange" then
+			-- (Out of reach of every attack on your bars, or every helpful
+			-- spell for a friend: the longest that can say answers.)
+			LookForRangeSpells()
+			for _, key in ipairs(FAR_KINDS) do
+				for _, id in ipairs(farSpells[key]) do
+					local reaches = SpellReaches(id, unit)
+					if reaches ~= nil then return not reaches end
+				end
+			end
+			return nil
+		end
 		local within
 		if band == "In11" then
 			within = Within(unit, 2)
