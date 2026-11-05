@@ -40,6 +40,18 @@ ns.NAME_GROUPS = {
 		tip = L[" Beyond nameplate range, and in dungeons and raids, the game only shows friendly NPCs with " ..
 			"something for you (quest givers, vendors, flight masters...) unless all three NPC rows show: then " ..
 			"all of them, guards too."] },
+	-- Friendly and neutral NPCs with a title under their names (<Repair
+	-- Vendor>, <Innkeeper>), of the kinds its Kinds menu ticks (PlateGuild's
+	-- ns.PlateServiceMatch): their names kept on their plates whatever their
+	-- kind's row says, or just their titles (nameServiceShow). Beyond plate
+	-- range the game's own names for NPCs with something for you
+	-- (UnitNameInteractiveNPC, shared with Friendly NPCs: see cvarKeys).
+	{ key = "ServiceNPCs", label = L["Service NPCs"], indent = true, plate = true, cvars = { "UnitNameInteractiveNPC" },
+		shared = true,
+		tip = L[" Friendly and neutral NPCs with a title under their name (<Repair Vendor>, <Innkeeper>...), " ..
+			"whatever their own row says: Kinds picks which, Show whether their names show or just their titles. " ..
+			"Beyond nameplate range, and in dungeons and raids, the game shows the names of NPCs with something " ..
+			"for you (vendors, quest givers...), titles included."] },
 	{ key = "Critters", label = L["Critters and companions"], cvars = { "UnitNameNonCombatCreatureName" } },
 	{ key = "Friends", label = L["Friendly players"], plate = true, cvars = { "UnitNameFriendlyPlayerName" } },
 	{ key = "FriendlyMinions", label = L["Minions"], indent = true, plate = true,
@@ -70,12 +82,25 @@ ns.OnLanguage(function() ns.TranslateFields(ns.NAME_GROUPS, "label") end)
 local CVAR_SETS = {}
 for _, group in ipairs(ns.NAME_GROUPS) do
 	group.keys = group.rows or { group.key } -- (the grid rows its boxes are in)
-	local values = {}
-	for _, cvar in ipairs(group.cvars) do values[cvar] = "0" end
 	-- Secure: the game blocks changing name settings in combat. A fight's
 	-- names are set just before it starts (ns.UpdateCVarsForFight).
-	CVAR_SETS[#CVAR_SETS + 1] = ns.CVarSet("Names: " .. group.key, "CineMode hides this kind's names over heads",
-		{ key = group.key, values = values, secure = true, playerWins = true })
+	-- A setting a shared row (Service NPCs) has too goes in a set of its own,
+	-- kept while either row is up (InteractiveNPCs: see NameKeptHere), so no
+	-- two sets hold it. The shared row has no set of its own.
+	local values = {}
+	for _, cvar in ipairs(group.shared and {} or group.cvars) do
+		if cvar == "UnitNameInteractiveNPC" then
+			CVAR_SETS[#CVAR_SETS + 1] = ns.CVarSet("Names: interactive NPCs",
+				"CineMode hides them unless Friendly NPCs or Service NPCs names stay up",
+				{ key = "InteractiveNPCs", values = { [cvar] = "0" }, secure = true, playerWins = true })
+		else
+			values[cvar] = "0"
+		end
+	end
+	if not group.shared then
+		CVAR_SETS[#CVAR_SETS + 1] = ns.CVarSet("Names: " .. group.key, "CineMode hides this kind's names over heads",
+			{ key = group.key, values = values, secure = true, playerWins = true })
+	end
 end
 -- The game's All NPCs names: off unless all three NPC rows are kept up here.
 local NPC_ALL = "UnitNameNPC"
@@ -169,7 +194,24 @@ local function OwnOn(cvars)
 	return false
 end
 
+-- (A game setting two rows share, Friendly NPCs' and Service NPCs' names of
+-- NPCs with something for you, stays on while either row is ticked.)
 function ns.SyncNameRow(group)
+	ns.SyncNameRowAlone(group)
+	for _, cvar in ipairs(group.cvars) do
+		for _, other in ipairs(ns.NAME_GROUPS) do
+			if other ~= group and NameRowTicked(other) then
+				for _, theirs in ipairs(other.cvars) do
+					if theirs == cvar then
+						SetOwnValue(cvar, "1")
+					end
+				end
+			end
+		end
+	end
+end
+
+function ns.SyncNameRowAlone(group)
 	local on = NameRowTicked(group)
 	if not group.npcs then
 		for _, cvar in ipairs(group.cvars) do
@@ -260,6 +302,9 @@ local function NameKeptHere(key, inCombat)
 	end
 	if key == "Target" then
 		return NameKeptHere("YourTarget", inCombat) -- (the Target section's Names row)
+	end
+	if key == "InteractiveNPCs" then
+		return NameKeptHere("FriendlyNPCs", inCombat) or NameKeptHere("ServiceNPCs", inCombat)
 	end
 	-- (Its rule, edited on its row: name:<row>.)
 	local facts = ns.RuleFactsNow()
@@ -2765,31 +2810,44 @@ local function PlateAlphas(unit, plate)
 			end
 		end
 	end
+	-- The Names grid's Service NPCs row: friendly and neutral NPCs with a
+	-- title of its kinds, their names kept up, or just their titles (text:
+	-- how much of the name's own text shows, the rest only the title's).
+	local own, service = name, nameLevel.ServiceNPCs or 0
+	if service > name and platesForced and unit and plate ~= PersonalPlate() then
+		local kind = PlateKind(unit)
+		if (kind == "FriendlyNPCs" or kind == "NeutralNPCs") and ns.PlateServiceMatch(plate, unit) then
+			name = service
+		end
+	end
+	local text = name > own and ns.db.nameServiceShow == "title" and own / name or 1
 	local alpha = math.max(body, name, mark)
 	if alpha <= 0 or immersiveLevel >= 1 then
-		return 0, 1, 0, 0
+		return 0, 1, 0, 0, 1
 	end
 	-- (The Style hub's Nameplates page: its row's Opacity, over the whole plate;
 	-- Chat Cam's Ultra immersive fading every plate out.)
 	local opacity = (ns.PlateStyleOpacity and ns.PlateStyleOpacity(plate) or 1) * (1 - immersiveLevel)
-	return alpha * opacity, body / alpha, name / alpha, mark / alpha
+	return alpha * opacity, body / alpha, name / alpha, mark / alpha, text
 end
 
 -- (For /cine debug names: why a plate's name is kept or not.)
 function ns.DescribePlateNameKept(unit, plate)
 	local kind = unit and PlateKind(unit)
 	local targetRow = unit and IsTarget(unit) and ns.TargetNameRow(unit)
-	return ("kind=%s group=%s level=%s soft=%s forced=%s body=%.2f targetRow=%s targetLevel=%s kept=%s alphas=%s")
-		:format(tostring(kind),
+	return ("kind=%s group=%s level=%s service=%s/%s/%s %s soft=%s forced=%s body=%.2f targetRow=%s targetLevel=%s " ..
+		"kept=%s alphas=%s"):format(tostring(kind),
 		tostring(kind and KIND_NAME_GROUP[kind]), tostring(kind and nameLevel[KIND_NAME_GROUP[kind]]),
+		tostring(nameLevel.ServiceNPCs), tostring(unit and ns.PlateServiceMatch(plate, unit)), tostring(ns.db.nameServiceShow),
+		ns.DescribePlateTitle and ns.DescribePlateTitle(plate, unit) or "",
 		tostring(unit and ns.SoftPlateHidden(unit)), tostring(platesForced), PlateAlpha(unit, plate),
 		tostring(unit and IsTarget(unit) and (targetRow or "none")), tostring(targetRow and nameLevel.YourTarget),
 		tostring(targetRow and NameKeptHere("YourTarget", InCombatLockdown())),
 		table.concat({ PlateAlphas(unit, plate) }, "/"))
 end
 
-local function SetPlateAlphas(plate, alpha, body, name, mark)
-	ns.SetPlateBody(plate, body, name, mark)
+local function SetPlateAlphas(plate, alpha, body, name, mark, text)
+	ns.SetPlateBody(plate, body, name, mark, text)
 	ns.SetPlateAlpha(plate, alpha, alpha * body)
 end
 
@@ -2823,9 +2881,9 @@ end
 
 -- Sets a plate's alpha as worked out now (or lets go of it at full).
 local function ApplyPlateAlpha(plate, unit)
-	local alpha, body, name, mark = PlateAlphas(unit, plate)
+	local alpha, body, name, mark, text = PlateAlphas(unit, plate)
 	if alpha < 1 or body < 1 or PlatesFiltered() then
-		SetPlateAlphas(plate, alpha, body, name, mark)
+		SetPlateAlphas(plate, alpha, body, name, mark, text)
 	else
 		ns.SetPlateBody(plate, 1, 0)
 		if plate.UnitFrame and plate.UnitFrame.cinematicAlpha and not (plate.IsForbidden and plate:IsForbidden()) then
@@ -2873,6 +2931,7 @@ local function RefreshAllPlates()
 	end
 end
 RefreshAllPlates = ns.Profiled("RefreshAllPlates", RefreshAllPlates)
+ns.RefreshAllPlates = RefreshAllPlates -- (the Names grid's Service NPCs Show and Kinds: Options)
 
 -- For /cine debug plates: the game's plate settings, the fade, and how each
 -- visible plate (and the target) is sorted.
@@ -3499,7 +3558,8 @@ local function SideShown(side)
 		end
 	end
 	for kind in pairs(side.kinds) do
-		if (keptLevel[kind] or 0) > 0 or (combatCap[kind] or 0) > 0 or (nameLevel[KIND_NAME_GROUP[kind]] or 0) > 0 then
+		if (keptLevel[kind] or 0) > 0 or (combatCap[kind] or 0) > 0 or (nameLevel[KIND_NAME_GROUP[kind]] or 0) > 0
+			or ((kind == "FriendlyNPCs" or kind == "NeutralNPCs") and (nameLevel.ServiceNPCs or 0) > 0) then
 			return true
 		end
 	end

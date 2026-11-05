@@ -216,6 +216,7 @@ local DEFAULTS = {
 	nameKeepHostileNPCs = false,
 	nameKeepNeutralNPCs = false,
 	nameKeepFriendlyNPCs = false,
+	nameKeepServiceNPCs = false, -- (friendly and neutral NPCs with a title: <Repair Vendor>, <Innkeeper>...)
 	nameKeepCritters = false,
 	nameKeepFriends = false,
 	nameKeepFriendlyMinions = false,
@@ -1389,8 +1390,8 @@ for _, part in ipairs(ns.PLATE_ICONS_ALWAYS) do
 	DEFAULTS["plateAlwaysPart" .. part] = true
 end
 -- Names likewise (the groups are in Effects): kept up in fights, and in each place.
-for _, key in ipairs({ "Self", "HostileNPCs", "NeutralNPCs", "FriendlyNPCs", "Critters", "Friends", "FriendlyMinions",
-	"Enemies", "EnemyMinions", "Guild" }) do
+for _, key in ipairs({ "Self", "HostileNPCs", "NeutralNPCs", "FriendlyNPCs", "ServiceNPCs", "Critters", "Friends",
+	"FriendlyMinions", "Enemies", "EnemyMinions", "Guild" }) do
 	DEFAULTS["nameCombat" .. key], DEFAULTS["nameCombatPvP" .. key] = false, false
 	for _, suffix in ipairs(ns.PLATE_PLACES) do
 		DEFAULTS["nameIn" .. suffix .. key] = false
@@ -1404,6 +1405,14 @@ for _, key in ipairs(ns.NAME_TARGET_ROWS) do
 		DEFAULTS["nameIn" .. suffix .. key] = false
 	end
 end
+-- The Names grid's Service NPCs row: which NPCs it keeps, by the title under
+-- their names (ns.SERVICE_KINDS in PlateGuild.lua: Vendors, Repair...; Other
+-- any other title), and whether it shows their names and titles ("name") or
+-- just the titles, in the names' place ("title").
+DEFAULTS.nameServiceShow = "name"
+for _, kind in ipairs({ "Vendor", "Repair", "Trainer", "Profession", "Flight", "Inn", "Bank", "Stable", "Other" }) do
+	DEFAULTS["nameService" .. kind] = true
+end
 DEFAULTS.nameInPvPEnemies = true
 DEFAULTS.nameInPvPEnemyMinions = true
 DEFAULTS.nameInBGsEnemies = true
@@ -1415,8 +1424,8 @@ for _, kind in ipairs(ns.PLATE_KINDS) do
 	DEFAULTS["plateGroup" .. kind] = kind == "Friends" or kind == "FriendlyMinions"
 	DEFAULTS["plateAlways" .. kind] = false
 end
-for _, key in ipairs({ "Self", "HostileNPCs", "NeutralNPCs", "FriendlyNPCs", "Critters", "Friends", "FriendlyMinions",
-	"Enemies", "EnemyMinions", "Guild" }) do
+for _, key in ipairs({ "Self", "HostileNPCs", "NeutralNPCs", "FriendlyNPCs", "ServiceNPCs", "Critters", "Friends",
+	"FriendlyMinions", "Enemies", "EnemyMinions", "Guild" }) do
 	DEFAULTS["nameGroup" .. key] = false
 	DEFAULTS["nameAlways" .. key] = false
 end

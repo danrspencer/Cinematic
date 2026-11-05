@@ -11,6 +11,10 @@
 local _, ns = ...
 
 ns.CHANGELOG_FEATURES = {
+	{ date = "2026-11-05", page = "Nameplates", title = "Service NPCs",
+		text = "In CineMode, vendors, trainers, flight masters, innkeepers and other NPCs with a title keep their " ..
+		"names on their nameplates while guards and townsfolk stay hidden. Pick which kinds count, or show just " ..
+		"their titles (<Repair Vendor>) in place of their names." },
 	{ date = "2026-11-04", page = "Cursor Hide", title = "Cursor Hide (experimental)",
 		text = "In CineMode, your cursor gets out of the way: it shrinks to a tiny corner, vanishes once the mouse " ..
 		"has been still a while, or both. Moving the mouse brings it back. It's experimental: accept the warning " ..

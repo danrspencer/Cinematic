@@ -38,6 +38,9 @@ local levels = {}
 -- name ([plate] = 0 to 1, nil for none of its own). And one held up for a
 -- quest mark alone (Quest Vision's ! only): the mark's ([plate] = 0 to 1).
 local bodyShare, nameShare, markShare = {}, {}, {}
+-- [plate] = how much of a name shown alone its own text gets (nil: all): less
+-- with the Service NPCs row showing titles alone (PlateGuild's line stays).
+local textShare = {}
 
 local function Usable(frame)
 	return type(frame) == "table" and frame.SetAlpha and not (frame.IsForbidden and frame:IsForbidden())
@@ -484,7 +487,7 @@ local function OwnName(plate, alpha)
 	local text, ghost = texts[unitFrame], ghosts[unitFrame]
 	local name = unitFrame.name
 	local unit = UnitOf(plate)
-	if not (alpha and alpha > 0 and unit and Usable(name)) then
+	if not (alpha and alpha >= 0 and unit and Usable(name)) then
 		if text then
 			text:Hide()
 		end
@@ -561,17 +564,20 @@ local function ApplyPlate(plate, personal)
 	local nameOnly = crossfading and body < 0.5
 	local nameFade = crossfading and (nameOnly and 1 - 2 * body or 2 * body - 1) or 1
 	local nameAlpha = nameOnly and kept * nameFade * (sight[plate] or 1) or 0
+	-- (The name's own text, less of it for a title shown alone. Ours stays
+	-- shown at nothing then, for the title line to sit where it is.)
+	local textAlpha = nameAlpha * (textShare[plate] or 1)
 	-- (Our own text in its place, with the Nameplates page's tick: see texts.)
 	local ours = nameOnly and plate ~= personal and ns.StyleOn() and Style("plateNameStyle")
 	CentreName(unitFrame, nameOnly and not ours)
-	OwnName(plate, ours and nameAlpha * Style("plateNameAlpha") or nil)
+	OwnName(plate, ours and nameAlpha > 0 and textAlpha * Style("plateNameAlpha") or nil)
 	for _, part in ipairs(ns.PLATE_PARTS) do
 		local level = plate ~= personal and levels[part] or 1
 		if part == "Name" then
 			if ours then
 				level = 0
 			elseif nameOnly then
-				level = nameAlpha
+				level = textAlpha
 			elseif crossfading then
 				level = math.max(level, kept) * nameFade
 			else
@@ -584,7 +590,8 @@ local function ApplyPlate(plate, personal)
 	end
 	-- (And the guild line under a name shown alone: PlateGuild.lua. It sits
 	-- under our text, so it fades in with its new look.)
-	ns.SetPlateGuild(plate, plate ~= personal and nameAlpha * (ours and (SwapShares(SwapFade(plate))) or 1) or 0)
+	ns.SetPlateGuild(plate, plate ~= personal and nameAlpha * (ours and (SwapShares(SwapFade(plate))) or 1) or 0,
+		nameOnly and textShare[plate] or nil)
 	if nameOnly or crossfading then
 		RefreshQuestIcon(plate)
 	end
@@ -2410,7 +2417,7 @@ watcher:SetScript("OnEvent", function(_, event, unit)
 	end
 	if event == "NAME_PLATE_UNIT_REMOVED" then
 		plateClass[plate], plateRole[plate] = nil, nil
-		bodyShare[plate], nameShare[plate], markShare[plate] = nil, nil, nil
+		bodyShare[plate], nameShare[plate], markShare[plate], textShare[plate] = nil, nil, nil, nil
 		bandOf[plate], farChecked[plate], farSince[plate], swaps[plate] = nil, nil, nil, nil
 		sight[plate] = nil
 		if Usable(plate.UnitFrame) then
@@ -2450,17 +2457,18 @@ end)
 -- From Effects, with each plate's alpha: how much of it the plate's parts
 -- other than the name get (body, 0 to 1) and the name at least (name), for a
 -- plate held up for its name alone (Names rows: see Effects' nameLevel).
-function ns.SetPlateBody(plate, body, name, mark)
+function ns.SetPlateBody(plate, body, name, mark, text)
 	if not plate then
 		return
 	end
 	body = body < 1 and body or nil
 	name = name > 0 and name or nil
 	mark = mark and mark > 0 and mark or nil
-	if bodyShare[plate] == body and nameShare[plate] == name and markShare[plate] == mark then
+	text = name and text and text < 1 and text or nil
+	if bodyShare[plate] == body and nameShare[plate] == name and markShare[plate] == mark and textShare[plate] == text then
 		return
 	end
-	bodyShare[plate], nameShare[plate], markShare[plate] = body, name, mark
+	bodyShare[plate], nameShare[plate], markShare[plate], textShare[plate] = body, name, mark, text
 	-- (A name first kept up: its band straight away, no swap.)
 	if FAR_USED and name and not farChecked[plate] then
 		farChecked[plate] = true

@@ -7953,7 +7953,42 @@ local function CreatePlatesPanel()
 		"Unticked, they fade with the plates (the Plate parts row decides them on the plates that are up)."]
 		.. markerRangeTip
 	AddPlateRow(namesTop, r + 1, { "PartMarker", L["Raid marker"] })
-	EndSection(namesSection, lastLabel)
+	-- The Service NPCs row's own settings, under the grid: whether it shows
+	-- names or titles alone, and which titles it keeps (Effects, PlateGuild).
+	local serviceTitle = Label(content, "GameFontNormal", L["Service NPCs"])
+	serviceTitle:SetPoint("TOPLEFT", lastLabel, "BOTTOMLEFT", 0, -24)
+	local serviceShowLabel = Label(content, "GameFontHighlight", L["Show"])
+	serviceShowLabel:SetPoint("TOPLEFT", serviceTitle, "BOTTOMLEFT", 0, -16)
+	local serviceShowTip = L["Names and titles: a service NPC's name shows on its nameplate with its title under it. " ..
+		"Titles only: just its title (<Repair Vendor>) where its name would be, unless its own row (or your target's) " ..
+		"shows its name too. Beyond nameplate range, and in dungeons and raids, the game shows names and titles together."]
+	local serviceShow = Dropdown(content, "nameServiceShow", {
+		{ value = "name", text = L["Names and titles"] },
+		{ value = "title", text = L["Titles only"] },
+	}, 200, function()
+		if ns.RefreshAllPlates then ns.RefreshAllPlates() end
+	end)
+	if serviceShow then
+		serviceShow:SetPoint("LEFT", serviceShowLabel, "LEFT", GRID_LABEL + 30, 0)
+		Tooltip(serviceShow, serviceShowTip)
+	end
+	local serviceKindsLabel = Label(content, "GameFontHighlight", L["Kinds"])
+	serviceKindsLabel:SetPoint("TOPLEFT", serviceShowLabel, "BOTTOMLEFT", 0, -22)
+	local lastServiceKind = serviceKindsLabel
+	for i, kind in ipairs(ns.SERVICE_KINDS) do
+		local key = "nameService" .. kind.key
+		local tip = kind.key == "Other" and L["Any other title, lore titles too (<Ranger-General of Silvermoon>)."]
+			or L["NPCs whose title has one of these words in it: %s."]:format((kind.words:gsub(",", ", ")))
+		local check = Check(content, key, kind.label, tip, function(value)
+			ns.GetDB()[key] = value
+			if ns.ServiceKindsChanged then ns.ServiceKindsChanged() end
+			if ns.RefreshAllPlates then ns.RefreshAllPlates() end
+		end)
+		local column, row = (i - 1) % 2, math.floor((i - 1) / 2)
+		check:SetPoint("TOPLEFT", serviceKindsLabel, "TOPLEFT", GRID_LABEL + 26 + column * 200, 6 - row * 26)
+		if column == 0 then lastServiceKind = check end
+	end
+	EndSection(namesSection, lastServiceKind)
 
 	-- Your target: its plate and its name, whatever its kind's rows say, a
 	-- row each (their rules naming kinds of target where they differ). Made
