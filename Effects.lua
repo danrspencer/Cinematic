@@ -740,6 +740,8 @@ end
 -- The camera running ("flight", "walk"... or "quest"), and whether its start
 -- is still waiting to start music (held until CineMode is in, then used up).
 local musicCam, musicCamPending = nil, false
+-- (The script of each: the same name, but standing still's is the AFK camera's.)
+local MODE_SCRIPT = { idle = "afk" }
 
 -- Death song: while the death camera runs, a song of its own plays in place of
 -- the zone music, picked at random from deathSongFiles (music file IDs,
@@ -879,6 +881,13 @@ function ns.UpdateMusic(cinematic, elapsed)
 	-- camera to another counts as a start too.
 	local cam = (ns.CameraMode and ns.CameraMode()) or (ns.QuestCamActive and ns.QuestCamActive() and "quest") or nil
 	if cam ~= musicCam then
+		-- A built-in camera ending with an End music step in your edit of its
+		-- When it ends (Scripts page): it runs its own code, not the script.
+		-- (With the dev copy's /cine script builtins the script runs the step.)
+		if musicCam and ns.BuiltinEndMusicSecs and not (ns.ScriptBuiltInsOn and ns.ScriptBuiltInsOn()) then
+			local secs = ns.BuiltinEndMusicSecs(MODE_SCRIPT[musicCam] or musicCam)
+			if secs then ns.EndSceneMusic(secs) end
+		end
 		musicCam = cam
 		musicCamPending = cam ~= nil and CameraMusicOn(cam)
 	end

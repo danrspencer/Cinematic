@@ -787,6 +787,27 @@ function ns.CameraSectionMoved(section)
 	return keys
 end
 
+-- The seconds of the first End music step in a list of steps (groups too,
+-- not ones switched off), or nil.
+local function EndMusicIn(list)
+	for _, step in ipairs(type(list) == "table" and list or {}) do
+		if type(step) == "table" and not step.off then
+			if step.k == "endMusic" then return tonumber(step.secs) or 0 end
+			local inside = EndMusicIn(step.steps)
+			if inside then return inside end
+		end
+	end
+end
+
+-- A built-in camera's End music in your edit of its When it ends: the
+-- camera itself still runs its own code (not the script, outside the dev
+-- copy's /cine script builtins), so Effects.lua ends the music as it ends.
+function ns.BuiltinEndMusicSecs(id)
+	local edits = BuiltinEdits()
+	local script = edits and edits[id]
+	return type(script) == "table" and EndMusicIn(script.ending) or nil
+end
+
 function ns.FindCameraScript(id)
 	for _, script in ipairs(ns.CameraScripts()) do
 		if script.id == id then return script end
@@ -1913,6 +1934,10 @@ local function Finish(why)
 	ns.ApplyCVarSet(FOLLOW_CVARS, false)
 	ns.Log("state", ("camera script %s ended (%s)"):format(run.script.name, why or "done"))
 	if run.trigger and run.triggerOn then stoppedFor = run.trigger .. run.camera end
+	-- (Stopped before its When it ends ran, or partway through: its End music
+	-- still ends the music.)
+	local endMusic = EndMusicIn(run.script.ending)
+	if endMusic and ns.EndSceneMusic then ns.EndSceneMusic(endMusic) end
 	-- (A scene its key started: over too, so the next press starts it again.)
 	local trigger = run.trigger
 	run = nil
