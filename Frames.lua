@@ -548,7 +548,7 @@ end
 local GROUP_SWITCH = {
 	minimap = "handleMinimap", minimapheader = "handleMinimap", minimaptracking = "handleMinimap",
 	minimapcalendar = "handleMinimap", minimapzone = "handleMinimap", minimapclock = "handleMinimap",
-	minimapdial = "handleMinimap", quests = "handleQuests", questtimer = "handleQuests", waypoint = "handleQuests",
+	minimapdial = "handleMinimap", belowminimap = "handleMinimap", quests = "handleQuests", questtimer = "handleQuests", waypoint = "handleQuests",
 	buffs = "handleBuffs", cooldowns = "handleCooldowns", chat = "handleChat", swing = "handleSwing",
 	gamepadbars = "handleGamepad", gamepadlegend = "handleGamepad", gamepadreticle = "handleGamepad",
 }
@@ -1540,12 +1540,13 @@ function ns.IsEntryHovered(entry)
 		return ns.Flag(entry.frame:IsVisible()) and IsNearIcon(BUFF_HOVER_DEPTH,
 			ns.db.buffHoverPadX or 20, ns.db.buffHoverPadY or 20, entry.frame:GetChildren())
 	end
-	-- Retail's quest tracker only takes the mouse on its headers and quest
-	-- names, so the objective lines under them count by their rect: the mouse
-	-- over any shown section (Campaign, Quests...), which is as tall as its
-	-- quests, unlike the tracker itself. (NineSlice is the background, the
-	-- whole tracker.) A frame of something else on top has the mouse instead.
-	if entry.group == "quests" and ns.isRetail and entry.frame == _G.ObjectiveTrackerFrame then
+	-- The quest tracker (retail and WoW Forever) only takes the mouse on its
+	-- headers and quest names, so the objective lines under them count by
+	-- their rect: the mouse over any shown section (Campaign, Quests...),
+	-- which is as tall as its quests, unlike the tracker itself. (NineSlice is
+	-- the background, the whole tracker.) A frame of something else on top
+	-- has the mouse instead. (Classic Era has no ObjectiveTrackerFrame.)
+	if entry.group == "quests" and entry.frame == _G.ObjectiveTrackerFrame then
 		local tracker, focus = entry.frame, MouseFocus()
 		if not ns.Flag(tracker:IsVisible()) or (focus and not IsInside(focus, tracker)) then
 			return false
@@ -1713,6 +1714,14 @@ ns.COMBAT_SHOW = {
 	{ key = "minimapdial", label = L["Day/night dial"], default = true, groups = { "minimapdial" }, retail = false,
 		tip = L["The day and night dial by the minimap. Untick it to hide it in CineMode even while the minimap is up. " ..
 			"Hovering the minimap brings it up with the map."] },
+	-- The boxes under the minimap (a capture bar, a scenario's step): go with
+	-- the minimap, following its ticks until set (see ROW_FALLBACK), and in its
+	-- Mouseover group.
+	{ key = "belowminimap", label = L["Objective boxes (below the minimap)"], default = true,
+		frames = FRAME_GROUPS.belowminimap,
+		tip = L["The boxes the game puts under the minimap for a scenario's or quest's current step, " ..
+			"such as a capture bar. They come and go with the minimap until you change their ticks, " ..
+			"and hovering the minimap brings them up with the map."] },
 	-- (groups too: an addon's unnamed tracker parts, found by its scanner.)
 	{ key = "quests", label = L["Quest tracker"], default = false, frames = FRAME_GROUPS.quests, groups = { "quests" },
 		morePage = "Quest tracker" },
@@ -1720,12 +1729,6 @@ ns.COMBAT_SHOW = {
 	-- show the quest waypoint" (CINE_SHOW_SETTING).
 	{ key = "waypoint", label = L["Quest waypoint"], default = false, retail = true, groups = { "waypoint" },
 		morePage = "Minimap" },
-	-- Always ticked to start with (CINE_SHOW_DEFAULT); its other columns follow
-	-- the quest tracker's until set (see ROW_FALLBACK).
-	{ key = "belowminimap", label = L["Objective boxes (below the minimap)"], default = false,
-		frames = FRAME_GROUPS.belowminimap,
-		tip = L["The boxes the game puts under the minimap for a scenario's or quest's current step, " ..
-			"such as a capture bar. Always shown to start with."] },
 	-- Follows the quest tracker's ticks until set too.
 	{ key = "topcenter", label = L["Event boxes (top of the screen)"], default = false,
 		frames = FRAME_GROUPS.topcenter,
@@ -1842,8 +1845,8 @@ local ROW_SECTIONS = {
 	pet = "bars", stance = "bars", totems = "bars", extra = "bars",
 	right1 = "bars", right2 = "bars", bar6 = "bars", bar7 = "bars", bar8 = "bars",
 	minimap = "minimap", minimapheader = "minimap", minimaptracking = "minimap", minimapcalendar = "minimap",
-	minimapzone = "minimap", minimapclock = "minimap", minimapdial = "minimap",
-	quests = "interface", waypoint = "interface", belowminimap = "interface", topcenter = "interface", micro = "interface", bags = "interface", xp = "interface",
+	minimapzone = "minimap", minimapclock = "minimap", minimapdial = "minimap", belowminimap = "minimap",
+	quests = "interface", waypoint = "interface", topcenter = "interface", micro = "interface", bags = "interface", xp = "interface",
 	chat = "interface", voice = "interface",
 }
 for _, item in ipairs(ns.COMBAT_SHOW) do
@@ -2000,7 +2003,7 @@ ns.HOVER_GROUPS_DEFAULT = {
 		members = { "raidmanager" }, triggers = { roster = true }, when = "calm" },
 	{ preset = "minimap", icon = "Interface\\Icons\\INV_Misc_Map_01", name = L["Minimap"],
 		members = { "minimap", "minimapheader", "minimapzone", "minimaptracking", "minimapcalendar", "minimapclock",
-			"minimapdial" },
+			"minimapdial", "belowminimap" },
 		triggers = { ping = true, tracking = true } },
 	{ preset = "buffs", icon = "Interface\\Icons\\Spell_Holy_WordFortitude", name = L["Buffs"],
 		members = { "buffs", "buffcollapse" }, triggers = { aura = true } },
@@ -2221,7 +2224,7 @@ end
 local ROW_FALLBACK = {
 	art = "mainbar", petframe = "player", prdpower = "prd", focustot = "focus", minimapheader = "minimap", minimaptracking = "minimap", minimapcalendar = "minimap",
 	minimapzone = "minimap", minimapclock = "minimap", minimapdial = "minimap", bags = "micro",
-	belowminimap = "quests", topcenter = "quests",
+	belowminimap = "minimap", topcenter = "quests",
 	cooldownsutility = "cooldowns", cooldownsbuffs = "cooldowns", cooldownsbars = "cooldowns",
 	["addon:fecmAuras"] = "addon:fecm",
 }
@@ -2293,7 +2296,7 @@ local CINE_SHOW_DEFAULT = {
 	flags = true, castbar = true, partyroles = true, partynames = true, partystatus = true,
 	raidroles = true, raidnames = true, raidpetnames = true, raidtitles = true, raidbuffs = true,
 	raiddebuffs = true, raidthreat = true, raidtarget = true, raidready = true, extra = true, voice = true,
-	encounter = true, targetcircle = true, focustot = true, belowminimap = true,
+	encounter = true, targetcircle = true, focustot = true,
 }
 function ns.IsCineShowOn(key)
 	key = ns.FollowKey(key)

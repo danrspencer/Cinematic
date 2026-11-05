@@ -108,16 +108,21 @@ end
 -- you discovered ("Discovered: Goldshire"), a dungeon or raid you're in for
 -- the first time. A new zone's beats the subzone found with it.
 local DISCOVERED = { Pattern(ERR_ZONE_EXPLORED), Pattern(ERR_ZONE_EXPLORED_XP) }
-local zoneFoundAt, lastFound, lastFoundAt = 0, nil, 0
+local zoneFoundAt, lastFound, lastFoundAt, shownAt = 0, nil, 0, 0
 local function DiscoverCard(name, sub)
 	return { meta = L["Discovered"], name = name, sub = sub or "" }
 end
+-- (Its card playing, or to play: the game's own lines for the place go,
+-- ZoneCard.lua.)
 local function Discovered(name, sub)
 	if name == "" or (name == lastFound and GetTime() - lastFoundAt < 10) then return end
 	lastFound, lastFoundAt = name, GetTime()
 	ns.Cards.Cut("zone")
 	ns.Cards.Cut("subzone")
-	ns.Cards.Fire("discover", DiscoverCard(name, sub))
+	if ns.Cards.Fire("discover", DiscoverCard(name, sub)) then
+		shownAt = GetTime()
+		if ns.HideGameDiscovered then ns.HideGameDiscovered() end
+	end
 end
 -- (The game's own exploration where it has it: a zone with at most the one
 -- area you just found explored is new to you. Else, ours: a zone not seen
@@ -167,7 +172,11 @@ local function InfoLine(text)
 	for _, pattern in ipairs(DISCOVERED) do
 		local place = text:match(pattern)
 		if place then
-			if GetTime() - zoneFoundAt < 5 then return end -- (the new zone's card has it)
+			if GetTime() - zoneFoundAt < 5 then
+				-- (The new zone's card has it: the game's line goes, if that's playing.)
+				if GetTime() - shownAt < 5 and ns.HideGameDiscovered then ns.HideGameDiscovered() end
+				return
+			end
 			local zone = Zone()
 			Discovered(place, zone ~= place and zone or "")
 			return
@@ -180,7 +189,7 @@ end
 function ns.DiscoverHasIt()
 	if not ns.CardOn("discover") then return false end
 	ZoneEntered()
-	return lastFound ~= nil and GetTime() - lastFoundAt < 5
+	return GetTime() - shownAt < 5
 end
 samples.discover = function()
 	local sub, zone = Subzone(), Zone()

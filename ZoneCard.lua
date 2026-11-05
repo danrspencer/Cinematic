@@ -21,6 +21,10 @@ local SEPARATOR = " · "
 local LINES = { "ZoneTextString", "PVPInfoTextString", "PVPArenaTextString", "SubZoneTextString" }
 
 local function On() return ns.CardOn("zone") end
+-- (Discovered's card playing for the place: the game's lines go for that
+-- showing too, Zone's card on or not. Asked again as the game next shows.)
+local discovered = false
+local function Hiding() return On() or discovered end
 
 -- A line's text, or "" (none, or one the game keeps secret).
 local function Text(line)
@@ -38,13 +42,13 @@ end
 -- on Forever a color can carry the alpha, so it's kept clear after each.
 local hooked, fading = {}, false
 local function Keep(line)
-	if fading or not On() then return end
+	if fading or not Hiding() then return end
 	fading = true
 	line:SetAlpha(0)
 	fading = false
 end
 local function HideGame()
-	local on = On()
+	local on = Hiding()
 	for _, name in ipairs(LINES) do
 		local line = _G[name]
 		if line then
@@ -112,6 +116,8 @@ local function Shows()
 	waiting = false
 	local newArea, sub = zoneShown, subShown
 	zoneShown, subShown = false, false
+	-- (A place new to you, Discovered's card has it: none of the game's.)
+	discovered = ns.DiscoverHasIt and ns.CardOn("discover") and ns.DiscoverHasIt() or false
 	HideGame()
 	if not On() then return end
 	local zone = Text(ZoneTextString)
@@ -154,6 +160,17 @@ else
 	for _, frame in ipairs({ ZoneTextFrame, SubZoneTextFrame }) do
 		frame:HookScript("OnShow", Showing)
 	end
+end
+
+-- CardMoments.lua, as Discovered's card plays: the game's own lines for the
+-- place go (its zone text, and its yellow "Discovered:" line in the middle
+-- of the screen, a frame later so the game has added it).
+function ns.HideGameDiscovered()
+	discovered = true
+	HideGame()
+	C_Timer.After(0, function()
+		if UIErrorsFrame and UIErrorsFrame.Clear then pcall(UIErrorsFrame.Clear, UIErrorsFrame) end
+	end)
 end
 
 -- Core.lua at login (and the Last time Test): the time of day goes on the

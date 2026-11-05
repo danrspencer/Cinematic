@@ -4569,6 +4569,24 @@ ticker:SetScript("OnEvent", ns.Profiled("Core events", function(self, event, arg
 			end
 			ns.db.minimapDialHoverV1 = true
 		end
+		-- The objective boxes under the minimap went with the quest tracker
+		-- (always up); now with the minimap: into saved groups with it. Once.
+		if not ns.db.belowMinimapHoverV1 then
+			local function AddBelowRow(groups)
+				for _, group in ipairs(groups or {}) do
+					local has = {}
+					for _, key in ipairs(group.members or {}) do has[key] = true end
+					if has.minimap and not has.belowminimap then
+						table.insert(group.members, "belowminimap")
+					end
+				end
+			end
+			AddBelowRow(ns.db.hoverGroups)
+			for _, saved in pairs(ns.db.profiles or {}) do
+				if type(saved) == "table" then AddBelowRow(saved.hoverGroups) end
+			end
+			ns.db.belowMinimapHoverV1 = true
+		end
 		-- Roll Vision was first off by default; on once. Saved profiles too.
 		if not ns.db.rollWindowV1 then
 			ns.db.rollWindow = true

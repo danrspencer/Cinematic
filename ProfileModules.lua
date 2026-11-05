@@ -188,10 +188,10 @@ ns.PROFILE_MODULES = {
 			end
 		end },
 	{ key = "minimap-off-in-fights", name = "No minimap in fights", scope = { "Standard Frames/Minimap" },
-		tip = "No minimap in fights, nor its header, buttons, zone name and clock.",
+		tip = "No minimap in fights, nor its header, buttons, zone name, clock and the objective boxes under it.",
 		apply = function(set)
 			set("combatShow", All({ "minimap", "minimapheader", "minimaptracking", "minimapcalendar", "minimapzone",
-				"minimapclock" }, false))
+				"minimapclock", "belowminimap" }, false))
 		end },
 	{ key = "fewer-group-plates", name = "Fewer group nameplates", scope = { "Nameplates/Friendly nameplates" },
 		tip = "Group members' pets, and the Grouped column for friendly players and minions, don't stay up.",

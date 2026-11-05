@@ -19,7 +19,7 @@ DEFAULTS.emoteVisionStill = false      -- only while you stand still (moving: it
 DEFAULTS.emoteVisionRepeats = true     -- the same person's same moment again ignored...
 DEFAULTS.emoteVisionRepeatMins = 1     -- ...for this many minutes
 DEFAULTS.emoteVisionGroupBuffs = false -- buffs from your own party or raid ignored (no card)
-DEFAULTS.emoteVisionHold = 8           -- seconds a card stays (paused while the mouse is over it)
+DEFAULTS.emoteVisionHold = 10          -- seconds a card stays (paused while the mouse is over it)
 DEFAULTS.emoteVisionScale = 1
 DEFAULTS.emoteVisionPortrait = true    -- their face (or class icon) on the card
 DEFAULTS.emoteVisionSpot = "speech"   -- "speech": just above the lines from behind you (Speech.lua's spot); "own": X, Y
@@ -798,7 +798,7 @@ local function Create()
 		if moving or self.dragging then self:SetAlpha(1) return end
 		-- (The mouse over it: its time stands still.)
 		if not ns.Flag(self:IsMouseOver()) then self.age = self.age + elapsed end
-		local hold = tonumber(DB().emoteVisionHold) or 8
+		local hold = tonumber(DB().emoteVisionHold) or 10
 		local age = self.age
 		if self.leaving then
 			self.leaving = self.leaving + elapsed

@@ -88,6 +88,34 @@ local function Target(info, name)
 	return presets[1] and presets[1].layoutName
 end
 
+-- Shows or hides the extra action bars to match the game's toggles (bar 2 =
+-- toggles[1]) without a reload. Not MultiActionBar_Update: called from here it
+-- taints the bars' buttons, and their cooldowns then error on secret values.
+-- A visibility state driver set and cleared at once instead: the game's
+-- SecureStateDriverManager shows or hides the bar from its own secure code.
+-- False when it can't (in a fight, a vehicle or override bar up, a bar
+-- missing): the game shows them as toggled on the next reload.
+local TOGGLE_BARS = { "MultiBarBottomLeft", "MultiBarBottomRight", "MultiBarRight",
+	"MultiBarLeft", "MultiBar5", "MultiBar6", "MultiBar7" }
+local function ShowToggledBars(toggles)
+	if InCombatLockdown() or not (RegisterStateDriver and UnregisterStateDriver) then return false end
+	local main = _G.MainActionBar or _G.MainMenuBar
+	if not (main and main:IsShown()) then return false end
+	local ok = true
+	for i, name in ipairs(TOGGLE_BARS) do
+		local bar = _G[name]
+		local want = toggles[i] and true or false
+		if toggles[i] ~= nil and not bar then
+			ok = false
+		elseif bar and bar:IsShown() ~= want then
+			RegisterStateDriver(bar, "visibility", want and "show" or "hide")
+			UnregisterStateDriver(bar, "visibility")
+			if bar:IsShown() ~= want then ok = false end
+		end
+	end
+	return ok
+end
+
 -- The action bars one of ours lays out (def.bars: 2 = MultiBarBottomLeft, 3 =
 -- MultiBarBottomRight...), switched on when it's switched to: they're the
 -- game's Action Bars options, not part of a layout. The ones Cinematic
@@ -116,12 +144,11 @@ local function SyncBars(name)
 	end
 	ns.chardb.layoutBarsOn = next(on) and on or nil
 	if not changed then return end
-	-- (Not MultiActionBar_Update: called from here it taints the bars' buttons,
-	-- and their cooldowns then error on secret values. The game shows the
-	-- bars as toggled on the next reload.)
 	SetActionBarToggles(unpack(toggles))
-	StaticPopup_Show("CINEMATIC_BARS_RELOAD")
-	ns.Log("state", "edit mode layout action bars: " .. (def and "on" or "back off"))
+	local shown = ShowToggledBars(toggles)
+	if not shown then StaticPopup_Show("CINEMATIC_BARS_RELOAD") end
+	ns.Log("state", "edit mode layout action bars: " .. (def and "on" or "back off")
+		.. (shown and " (shown now)" or " (after a reload)"))
 end
 
 -- Switches Edit Mode's layout, with the faded frames at full size for it
@@ -251,6 +278,11 @@ if not PRD_SYSTEM and Enum.EditModeSystem then
 	end
 end
 local FOREVER_PURE = PRD_SYSTEM and { { PRD_SYSTEM, nil, "CENTER", "UIParent", "CENTER", 0, -205 } } or {}
+-- Retail Inspired's in the middle too, as retail has it: under the Cooldown
+-- Manager's buff icons (CENTER -187), not in Modern's spot at the left.
+if PRD_SYSTEM then
+	DESIGN[#DESIGN + 1] = { PRD_SYSTEM, nil, "CENTER", "UIParent", "CENTER", 0, -240 }
+end
 
 -- Cinematic's own layouts, by the name Edit Mode lists them under. export:
 -- an Edit Mode export string (Share > Copy to Clipboard); without one, design:
