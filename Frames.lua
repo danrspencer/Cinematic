@@ -8512,6 +8512,19 @@ do
 				order.swapped = nil -- (looked at next tick)
 			end
 			for _, bar in ipairs(bars) do hooksecurefunc(bar, "SetPoint", OnMoved) end
+			-- The player dragging a bar in Edit Mode: they place the bars
+			-- themselves now, so the swap goes off for this class (swapping
+			-- would move the bar they dropped into another bar's place).
+			local function OnDragStop()
+				if order.key and ns.db[order.key] then
+					ns.db[order.key] = false
+					ns.Print(L["You moved a swing timer bar, so \"Ranged bar on top\" is now off for %s and the bars stay where you put them."]
+						:format((UnitClass("player"))))
+				end
+			end
+			for _, bar in ipairs(bars) do
+				if type(bar.OnDragStop) == "function" then hooksecurefunc(bar, "OnDragStop", OnDragStop) end
+			end
 		end
 		if swap then
 			-- (where each bar goes: the place of the bar named)
@@ -8530,6 +8543,11 @@ do
 		-- (The class's setting name made once: a new string each tick was garbage.)
 		order.key = order.key or "swingRangedOnTop" .. select(2, UnitClass("player"))
 		local swap = ns.db.handleSwing and ns.db[order.key] and true or false
+		-- (In Edit Mode the bars sit in their own places, so the one you drag is the one that moves.)
+		local editMode = _G.EditModeManagerFrame
+		if swap and editMode and editMode.IsEditModeActive and ns.Flag(editMode:IsEditModeActive()) then
+			swap = false
+		end
 		if order.swapped ~= swap then
 			-- (Not swapped and the game's anchors not taken yet: nothing to put back.)
 			if swap or next(order.game) then
