@@ -86,6 +86,7 @@ PlateParts.lua
 PlateGuild.lua
 Triggers.lua
 Camera.lua
+ZoomGuard.lua
 QuestCam.lua
 CameraRows.lua
 CustomTriggers.lua

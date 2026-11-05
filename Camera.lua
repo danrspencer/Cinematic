@@ -2260,10 +2260,13 @@ local function CorrectZoomToward(desired, track)
 	end
 	track.lastZoom = zoom
 	local err, ahead = desired - zoom, desired - track.aim
+	track.refused = false
 	if math.abs(err) > ZOOM_DEADBAND and (ahead > 0) == (err > 0) then
 		local ask = math.min(math.abs(err) * ZOOM_GAIN, math.abs(ahead))
 		if CallCameraFunction(err > 0 and "CameraZoomOut" or "CameraZoomIn", ask) then -- (refused: another camera has the view)
 			track.aim = track.aim + (err > 0 and ask or -ask)
+		else
+			track.refused = true -- (the idle zoom's path waits meanwhile: StepIdleZoom)
 		end
 	end
 	return err
@@ -2656,6 +2659,12 @@ local function StepIdleZoom(elapsed)
 		desired = idleZoom.from + idleZoom.delta * EaseProgress(idleZoom.t, T, idleZoom.ease)
 	end
 	local err = CorrectZoomToward(desired, idleZoom)
+	-- Refused (you hold the camera, or another of ours has it): the path waits
+	-- where it is. Running on, it was far ahead once let go, and the camera
+	-- rushed out or in to catch up.
+	if idleZoom.refused then
+		idleZoom.t = idleZoom.t - elapsed
+	end
 
 	if idleZoom.phase == "restore" then
 		if (idleZoom.t >= T and math.abs(err) < ZOOM_RESTORE_DONE) or idleZoom.t >= T + ZOOM_RESTORE_GIVE_UP then
@@ -3268,6 +3277,11 @@ function ns.UpdateOrbit(cinematic, elapsed)
 	-- cameras still (sway, zoom and turn glide), as it does the others, until
 	-- it closes. (On ns: UpdateOrbit is close to Lua's upvalue limit.)
 	ns.travelHeld = (travel and (inMenu or atNPC)) or false
+	-- Steering with the mouse while they run (ns.mouseSteering) doesn't stop
+	-- their zoom, as for camera scripts on the move; only your own zooming does.
+	if ns.zoomWhileSteering then
+		ns.zoomWhileSteering.modes = (travel and cinematic) and true or nil
+	end
 	-- The camera running now, by its key in ns.CAMERA_OFF_CAMS (the Minimap
 	-- page hides the minimap by it).
 	ns.activeCam = (deathCam and "death") or (cinematic and ((onTaxi and ns.FlightCameraOn() and "flight")

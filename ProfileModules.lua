@@ -585,6 +585,13 @@ ns.PROFILE_MODULES = {
 	{ key = "no-cinemode-music", name = "No music in CineMode", scope = { "Audio/top" },
 		tip = "No music in CineMode.",
 		apply = function(set) set("musicInCinematic", false) end },
+	{ key = "music-calm", name = "Music out of fights", scope = { "Audio/Music plays in" },
+		tip = "Music plays in CineMode only out of fights, once the Calm Timer has run out after one.",
+		-- (As data: the music row's old grid settings go over after code
+		-- modules, and would put Always back. The ticks say it too, Out of
+		-- combat: what Reset to grid leaves.)
+		settings = { musicAlways = false, quietShow = { music = true }, calmShow = { music = false },
+			frameRules = { music = "not (combat or calm)" } } },
 	{ key = "no-npc-chat", name = "No NPC chatter", scope = { "Chat/Other" },
 		tip = "Chat doesn't peek for NPC speech (guards, vendors, ambient chatter).",
 		apply = function(set) set("chatPeekTypes", { npc = false }) end },

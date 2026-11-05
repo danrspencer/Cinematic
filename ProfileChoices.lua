@@ -198,7 +198,7 @@ ns.BUILTIN_PROFILES = {
 			"bring the world to life, most of the Visions and cards join in, and the camera takes over on " ..
 			"flights, when you go AFK and for your Hearthstone and teleports."],
 		picks = { layout = { forever = "preset" }, camera = "lite", chat = "lite" },
-		modules = With("zone-card", "damage-vision", "tint-balanced", "quest-talk"),
+		modules = With("zone-card", "damage-vision", "tint-balanced", "quest-talk", "music-calm"),
 		preview = "bars",
 	},
 	{
@@ -216,7 +216,7 @@ ns.BUILTIN_PROFILES = {
 		-- (Its own Visions and cards, apart from the slots' choices: picking a
 		-- choice for a slot then leaves them as they are.)
 		modules = With("zone-card", "story-cards", "damage-vision", "vitals-vision", "quest-talk",
-			"combat-vision", "heal-vision-everywhere", "cursor-hide"),
+			"combat-vision", "heal-vision-everywhere", "cursor-hide", "music-calm"),
 	},
 }
 

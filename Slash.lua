@@ -998,6 +998,7 @@ local function HandleSlash(msg)
 			tostring(zoom.done), tostring(zoom.doneContext), zoom.t or 0, zoom.duration or 0,
 			tostring(ns.lastCinematic), tostring(ns.IsRPWalking and ns.IsRPWalking()),
 			tostring(ns.db.walkZoom), GetTime() - (ns.GetLastCameraInput and ns.GetLastCameraInput() or 0)))
+		if ns.ZoomGuardDebug then ns.Print(ns.ZoomGuardDebug()) end
 	elseif cmd == "debug" and arg == "turn" then
 		-- Prints the RP walk turn handling four times a second for 8 seconds:
 		-- walk, then turn with the keys while walking.

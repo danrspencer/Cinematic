@@ -77,6 +77,7 @@ PlateParts.lua
 PlateGuild.lua
 Triggers.lua
 Camera.lua
+ZoomGuard.lua
 QuestCam.lua
 ShoulderCam.lua
 SkyrideCam.lua

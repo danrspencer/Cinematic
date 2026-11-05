@@ -548,10 +548,24 @@ function ns.QuestGiverNear(yards, skip)
 	return false
 end
 
+-- (A fight stops the sweep, SweepMinimap: a minimap revealed as it started
+-- stays up through it, rather than fading once the hold runs out and coming
+-- back as it ends. nil out of fights; true or false, latched at its start.)
+local heldIntoFight
 function ns.IsMinimapRevealed(now)
 	if not AnyReveal() then
 		nodes = {}
+		heldIntoFight = nil
 		return false
+	end
+	if InCombatLockdown() or ns.Flag(UnitAffectingCombat("player")) then
+		if heldIntoFight == nil then heldIntoFight = now - seenAt < HOLD end
+		if heldIntoFight then
+			seenAt = now
+			return true
+		end
+	else
+		heldIntoFight = nil
 	end
 	if now - sweptAt >= SWEEP_EVERY and (Minimap:GetEffectiveAlpha() < 0.99 or now - seenAt < HOLD) then
 		sweptAt = now
