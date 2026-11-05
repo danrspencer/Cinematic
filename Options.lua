@@ -1754,6 +1754,11 @@ do
 			pages = {
 			{ "Cameras", "Interface\\Icons\\INV_Misc_Spyglass_03", label = "General", section = "Cameras" },
 			{ "Scenes", "Interface\\Icons\\Spell_Holy_MindVision", section = "Cameras" }, -- (built with Cameras: CreateCamerasPanel)
+			-- (TriggersPage.lua: the list; its other pages tabs on it, or opened from a row)
+			{ "Triggers", "Interface\\Icons\\INV_Misc_PocketWatch_02", section = "Cameras" },
+			{ "Trigger Priority", "Interface\\Icons\\INV_Misc_PocketWatch_02", tabOf = "Triggers" },
+			{ "Trigger Log", "Interface\\Icons\\INV_Misc_PocketWatch_02", tabOf = "Triggers" },
+			{ "Trigger Settings", "Interface\\Icons\\INV_Misc_PocketWatch_02", tabOf = "Triggers" },
 			{ "Camera Scripts", "Interface\\Icons\\INV_Scroll_05", label = "Scripts", section = "Cameras" }, -- (CameraScriptsPage.lua)
 			{ "My Shots", "Interface\\Icons\\INV_Misc_Spyglass_02", section = "Cameras" }, -- (ShotsPage.lua)
 			{ "Camera Settings", "Interface\\Icons\\Trade_Engineering", dev = true, section = "Dev" }, -- (settings no script step uses)
@@ -5407,8 +5412,7 @@ local function CreateCamerasPanel()
 	end
 	-- (A trigger of your own: what starts it, "/cheer"; its name is the row's.)
 	local function TriggerName(trigger)
-		return trigger.custom and ns.DescribeTriggerSource(ns.GetDB().cameraRows[trigger.key .. ".source"])
-			or trigger.key
+		return trigger.custom and ns.DescribeTriggerSource(ns.SceneTriggers(trigger.key)[1]) or trigger.key
 	end
 	-- (A group's lead: the scene's name, CameraRows.lua's SCENE_GROUPS.)
 	local function SceneName(trigger)
@@ -6015,13 +6019,12 @@ local function CreateCamerasPanel()
 			return (member and EXTRAS[member].slider) and 46 or LINE_H
 		end
 		local LINES = { "Name", "Camera", "When" }
-		-- (A scene of yours: when it ends; and its Triggers, a line each, under
-		-- the rest, for a scene of yours or a built-in one that takes them:
-		-- CameraTriggerEditor.lua.)
+		-- (Its Triggers, a line each, under the rest, for a scene of yours or a
+		-- built-in one that takes them: CameraTriggerEditor.lua. When each
+		-- ends is the trigger's own: the Triggers page.)
 		local custom = trigger.custom and not copy
 		local takesTriggers = not copy and ns.SceneTakesTriggers(key)
-		if custom then LINES[#LINES + 1] = "Ends" end
-		local LINE_NAMES = { Name = L["Name"], Camera = L["Camera"], When = L["When"], Ends = L["Ends"] }
+		local LINE_NAMES = { Name = L["Name"], Camera = L["Camera"], When = L["When"] }
 		for _, member in ipairs(extras) do
 			LINES[#LINES + 1] = "Extra:" .. member
 			LINE_NAMES["Extra:" .. member] = EXTRAS[member][1]
@@ -15588,6 +15591,9 @@ ns.OnLanguage(function()
 	CreateGraphicsPanel()
 	CreateAudioPanel()
 	CreateCamerasPanel()
+	if ns.CreateTriggersPanels then -- (TriggersPage.lua)
+		ns.CreateTriggersPanels(ns.lowHealthKit)
+	end
 	-- Each camera's own settings, in a section apiece.
 	CreateCameraSettingsPanel()
 	if ns.CreateMyShotsPanel and not ns.SHOTS_RETIRED then -- (ShotsPage.lua; retired in the dev copy)

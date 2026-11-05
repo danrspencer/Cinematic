@@ -166,13 +166,30 @@ if arg[1] and not update then
 	if mismatches > 0 then
 		print(("problem\tTrigger sources pick differently from the old order in %d cases"):format(mismatches))
 	end
+	-- Our triggers in the library (TriggerLibrary.lua): a priority of its own
+	-- moves one past another, an Only if holds one back, Reset undoes both.
+	do
+		local cams = { AFK = "afk", Sit = "vista" }
+		local function CameraOf(key) return cams[key] end
+		local state = { afk = true, emote = "Sit" }
+		local function Pick() return (ns.PickTrigger(state, CameraOf)) end
+		local function OursProblem(text) print("problem\tOur triggers: " .. text) end
+		if Pick() ~= "AFK" then OursProblem("AFK doesn't beat /sit to start with") end
+		ns.SetTriggerField(ns.OursTriggerId("Sit"), "pri", 50)
+		if Pick() ~= "Sit" then OursProblem("/sit at priority 50 doesn't beat AFK") end
+		ns.ResetOursTrigger("Sit")
+		ns.SetTriggerField(ns.OursTriggerId("AFK"), "cond", "never")
+		if Pick() ~= "Sit" then OursProblem("AFK with Only if never isn't held back") end
+		ns.ResetOursTrigger("AFK")
+		if Pick() ~= "AFK" or ns.OursChanged("AFK") or ns.OursChanged("Sit") then OursProblem("Reset didn't undo them") end
+	end
 	-- Triggers of your own (CustomTriggers.lua): one added is a row with its
 	-- camera, sits after the emotes in the priority list (or first), starts
 	-- from its key, and taken off leaves nothing behind.
 	local function Problem(text) print("problem\tCustom triggers: " .. text) end
 	local function SourceOf(id)
 		for _, source in ipairs(ns.TRIGGER_SOURCES) do
-			if source.custom == id then return source end
+			if source.unit and source.unit.scene == id then return source end
 		end
 	end
 	local before = #ns.CAMERA_TRIGGERS
@@ -196,13 +213,24 @@ if arg[1] and not update then
 		if source and source.Key({}) ~= id then Problem("its key didn't start it") end
 		Cinematic_CustomTrigger(1)
 		if source and source.Key({}) ~= nil then Problem("its key didn't stop it") end
-		rows[id .. ".after"] = ""
-		ns.CustomTriggersChanged()
+		-- (Its trigger is the library's: its priority there moves the scene.)
+		local lib = tostring(ns.SceneTriggers(id)[1]):match("^t:(Trig%a+)$")
+		if not lib then Problem("its trigger isn't in the library: " .. tostring(ns.SceneTriggers(id)[1])) end
+		if lib then ns.SetTriggerField(lib, "pri", 50) end
 		source = SourceOf(id)
-		if not source or source.order >= 100 then Problem("after \"\" isn't first: " .. tostring(source and source.order)) end
+		if not source or source.order >= 100 then Problem("priority 50 isn't first: " .. tostring(source and source.order)) end
+		-- (A scene written before the library moves its trigger in, with its until and its place.)
+		rows[id .. ".triggers"], rows[id .. ".until"], rows[id .. ".after"] = "emote:wave", "time:8", "afk"
+		ns.CustomTriggersChanged()
+		local moved = tostring(ns.SceneTriggers(id)[1]):match("^t:(Trig%a+)$")
+		if not moved or ns.TriggerField(moved, "src") ~= "emote:wave" or ns.TriggerField(moved, "ends") ~= "time:8"
+			or ns.TriggerPri(moved) ~= 310 or rows[id .. ".until"] or rows[id .. ".after"] then
+			Problem("an old scene's trigger didn't move into the library whole")
+		end
 		local copy = ns.CopyCameraRow(id)
 		if copy ~= id .. "2" then Problem("its copy is " .. tostring(copy)) end
 		ns.RemoveCustomTrigger(id)
+		ns.ClearTriggerLib() -- (its triggers stay in the library: cleared for the checks after)
 		ns.SyncCustomTriggers()
 		if ns.CAMERA_TRIGGER[id] or #ns.CAMERA_TRIGGERS ~= before or SourceOf(id) then Problem("still there taken off") end
 		for key in pairs(rows) do
@@ -294,6 +322,7 @@ if arg[1] and not update then
 		ns.RemoveShot(shot)
 		if ns.CameraRowValue(trigger, "camera") ~= "vista" then ShotProblem("a deleted shot's row isn't back on its camera") end
 		ns.RemoveCustomTrigger(trigger)
+		ns.ClearTriggerLib() -- (its trigger stays in the library: cleared to look for leftovers)
 		local leftover = {}
 		for key in pairs(ns.GetDB().cameraRows) do
 			if key ~= "order" then leftover[#leftover + 1] = tostring(key) end -- (the earlier copy's row order)

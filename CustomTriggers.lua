@@ -4,14 +4,17 @@
 -- spell cast, a buff, a place, a moment (leveling up...), a state
 -- (mounted...) or one of five key bindings. Built-in scenes whose camera runs
 -- while you stand still can take triggers of yours beside their own. Each
--- scene of yours takes its place in the priority list (Triggers.lua) after a
--- built-in source; a built-in scene's extra triggers sit just after its own.
+-- trigger is one of the library's (TriggerLibrary.lua, the Triggers page),
+-- with its own phase, Only if, endings, timing and priority: each takes its
+-- place in the priority list (Triggers.lua) by its number.
 --
 -- Saved in db.cameraRows with the rows (so profiles, Save/Reset and share
 -- strings carry them): "custom" the ids of yours (MineA, MineB...: letters
 -- only, as a row id is a scene key and a copy number), "extras" the built-in
 -- scenes with triggers of yours, and per scene:
---   triggers  "|" between sources, each "<kind>:<what>": emote:cheer,
+--   triggers  "|" between sources: "t:<id>", a trigger of the library. Written
+--             before the library (moved into it as the scenes sync,
+--             TriggerLibrary.lua's MigrateSceneTriggers), "<kind>:<what>": emote:cheer,
 --             spell:7620 or spell:fishing, aura:<id or name>,
 --             place:<zone or subzone name>,
 --             moment:levelup|achievement|quest|boss|alive,
@@ -19,15 +22,14 @@
 --             interact:mail|bank|auction|map|npc (its window open: these
 --             play with it open, where other cameras wait for it to close),
 --             key:1-5 (a scene of yours from before: one in "source")
---   until     (yours) move (nil), ends (as the trigger that started it ends),
---             time:<sec>, key (pressed again); a built-in scene's extra
---             triggers end as their kind does on its own (KIND_UNTIL)
---   after     (yours) the built-in source it comes after (nil: "emote"; "": first)
+--   until     (yours, before the library) move (nil), ends, time:<sec>, key
+--   after     (yours, before the library) the built-in source it comes after
 --
 -- Each trigger is on for an episode: it starts as its thing happens (a state:
--- as it becomes true) and lasts until its until, or until you move (moving
--- ends every standing-still camera). A state still true after its episode
--- ended doesn't start another until it's been false.
+-- as it becomes true, or false for its other phase) and lasts until one of
+-- its endings, or until you move (moving ends every standing-still camera).
+-- A state still true after its episode ended doesn't start another until
+-- it's been false (unless its "rearm" is off).
 local _, ns = ...
 local L = ns.L
 
@@ -248,18 +250,45 @@ function ns.SetSceneTriggers(key, list)
 end
 
 -- Each trigger of a scene is a unit, on for an episode of its own; a scene is
--- on while any of its units is. Unit: { scene, index, custom (a scene of
--- yours), source, kind, what, spellID, untilText, untilKind, secs, on, since,
--- cond, done, casting, dirty, lookedAt, found, death, tele }.
+-- on while any of its units is. A unit's trigger is one of the library's
+-- ("t:<id>", TriggerLibrary.lua: its parts read from there) or, written
+-- before the library, its own "<kind>:<what>" with its scene's until. Unit:
+-- { scene, index, custom (a scene of yours), source, lib, label, kind, what,
+-- spellID, at, inverted, ends, hasEnd, secs, refs, delay, hold, cd, chance,
+-- rearm, condText, test, pri; on, since, cond, done, casting, dirty,
+-- lookedAt, found, death, tele, walks, pendingAt, stopAt, stopWhy,
+-- lastStart, skipWhy, lostLogged, tested }.
 local units = {}
 local sceneUnits = {} -- scene key -> its units
 local needSync = false
+local HELD = ns.TRIGGER_HELD_KINDS
+local INVERTED = { lose = true, leave = true, ["false"] = true, close = true }
 
--- A built-in scene's extra trigger ends as its kind would on its own.
+-- (A trigger written before the library: its scene's until, or its kind's.)
 local KIND_UNTIL = { emote = "move", spell = "ends", aura = "ends", place = "ends", moment = "time:5", state = "ends",
 	interact = "ends", key = "key" }
+local function OldEnds(untilText)
+	local secs = tonumber(tostring(untilText):match("^time:(%d+%.?%d*)$"))
+	if secs then return { { kind = "time", secs = secs } } end
+	if untilText == "ends" or untilText == "key" then return { { kind = untilText } } end
+	return { { kind = "never" } }
+end
+-- (Its place in the priority list, written before the library: after the
+-- built-in source a scene of yours named, a built-in scene's just after its own.)
+local BUILT_IN_ORDER = {}
+for _, source in ipairs(ns.TRIGGER_SOURCES) do BUILT_IN_ORDER[source.id] = source.order end
+local SCENE_SOURCE = { Hearth = "depart", Teleport = "depart", Logout = "logout", AFK = "afk", Weapon = "weapon",
+	Campfire = "campfire", Still = "still" }
+local function OldOrder(unit)
+	if unit.custom then
+		local after = Rows()[unit.scene .. ".after"]
+		local base = after == "" and 0 or BUILT_IN_ORDER[after or "emote"] or BUILT_IN_ORDER.emote
+		return base + 1
+	end
+	return (BUILT_IN_ORDER[SCENE_SOURCE[unit.scene] or "emote"] or BUILT_IN_ORDER.emote) + 0.5
+end
 
--- Reads a unit's source and until (again only when their text changes).
+-- Reads a unit's trigger (again only when it, or the library, changed).
 local function Parse(unit)
 	local rows = Rows()
 	if not rows then return end
@@ -268,58 +297,145 @@ local function Parse(unit)
 		needSync = true -- (its scene's list changed under it: units made afresh)
 		return
 	end
-	local kind = tostring(source or ""):match("^(%a+):")
-	local untilText = unit.custom and tostring(rows[unit.scene .. ".until"] or "move") or KIND_UNTIL[kind] or "move"
-	if unit.parsed and unit.untilText == untilText then return end
-	unit.source, unit.untilText, unit.parsed = source, untilText, true
-	local what
-	kind, what = tostring(source or ""):match("^(%a+):(.*)$")
+	local lib = tostring(source or ""):match("^t:(Trig%a+)$")
+	local untilText = not lib and (unit.custom and tostring(rows[unit.scene .. ".until"] or "move")
+		or KIND_UNTIL[tostring(source or ""):match("^(%a+):") or ""] or "move") or nil
+	if unit.parsed and unit.parsedAt == ns.triggerLibVersion and unit.untilText == untilText then return end
+	unit.source, unit.untilText, unit.parsed, unit.parsedAt = source, untilText, true, ns.triggerLibVersion
+	unit.lib = lib
+	local src = lib and ns.TriggerField(lib, "src") or source
+	local kind, what = tostring(src or ""):match("^(%a+):(.*)$")
 	unit.kind, unit.what = kind, what and what:lower() or ""
 	if kind == "emote" then unit.what = ns.EmoteToken(unit.what) end
+	if kind == "ours" then unit.what = what end -- (a key: Hearth, Dance...)
 	unit.spellID = (kind == "spell" or kind == "aura") and tonumber(unit.what) or nil
-	local secs = tonumber(untilText:match("^time:(%d+%.?%d*)$"))
-	unit.untilKind = secs and "time" or untilText
-	unit.secs = secs or DEFAULT_SECS
+	unit.label = lib and ns.TriggerLabel(lib) or ns.DescribeTriggerSource(source)
+	local phases = ns.TRIGGER_PHASES[kind or ""]
+	unit.at = lib and ns.TriggerField(lib, "at") or (phases and phases[1].value) or nil
+	unit.inverted = INVERTED[unit.at or ""] == true
+	unit.ends = lib and ns.TriggerEnds(lib) or OldEnds(untilText)
+	unit.hasEnd, unit.refs, unit.secs = {}, {}, nil
+	for _, each in ipairs(unit.ends) do
+		unit.hasEnd[each.kind] = true
+		if each.kind == "time" then unit.secs = math.min(unit.secs or each.secs, each.secs) end
+		if each.kind == "trig" then unit.refs[each.ref] = true end
+	end
+	local function Num(field, default, low, high)
+		local value = lib and tonumber(ns.TriggerField(lib, field)) or default
+		return math.max(low, math.min(high, value))
+	end
+	unit.delay, unit.hold, unit.cd = Num("delay", 0, 0, 600), Num("hold", 0, 0, 600), Num("cd", 0, 0, 86400)
+	unit.chance = Num("chance", 100, 1, 100)
+	unit.rearm = not (lib and ns.TriggerField(lib, "rearm") == "no")
+	local condText = lib and ns.TriggerField(lib, "cond") or nil
+	if type(condText) ~= "string" or not condText:find("%S") then condText = nil end
+	if condText ~= unit.condText or unit.test == nil then
+		unit.condText = condText
+		unit.test, unit.badCond = nil, false
+		if condText and ns.CompileRule then
+			local test = ns.CompileRule(condText)
+			unit.test, unit.badCond = test, test == nil
+		end
+	end
+	unit.pri = lib and ns.TriggerPri(lib) or OldOrder(unit)
 	unit.on, unit.cond, unit.done, unit.dirty = false, nil, false, true
+	unit.pendingAt, unit.stopAt = nil, nil
+end
+
+local function Log(what, unit, why)
+	if ns.TriggerLogAdd then ns.TriggerLogAdd(what, unit.label, why) end
+end
+-- A start held back: logged once for each new reason, until it starts.
+local function Skip(unit, why)
+	if unit.skipWhy ~= why then
+		unit.skipWhy = why
+		Log("skipped", unit, why)
+	end
 end
 
 -- Starting one: the tele camera needs a cast to spin and zoom over (a pretend
 -- one, its time long), the death camera runs as its test does (no event of
--- its own: SceneOn leaves it out, or the AFK camera would run too).
-local function Start(unit)
-	unit.on, unit.since, unit.done = true, GetTime(), false
+-- its own: the unit's Key leaves it out, or the AFK camera would run too).
+local Stop -- (below)
+local function Start(unit, tested)
+	local now = GetTime()
+	unit.on, unit.since, unit.done, unit.tested = true, now, false, tested or false
+	unit.lastStart, unit.skipWhy, unit.lostLogged = now, nil, false
+	unit.pendingAt, unit.stopAt = nil, nil
 	local camera = ns.TriggerSetting(unit.scene, "camera")
 	unit.death, unit.tele = camera == "death", camera == "tele"
 	-- (A script: moving doesn't end it here, its stop rules do; auto-walk
 	-- and auto-run carry it on, as they do our cameras.)
 	unit.walks = ns.IsScriptCamera and ns.IsScriptCamera(camera) or false
 	if camera == "tele" and ns.PretendDepartCast then
-		ns.PretendDepartCast(unit.untilKind == "time" and unit.secs or 10)
+		ns.PretendDepartCast(unit.secs or 10)
 	elseif unit.death then
-		ns.deathTestUntil, ns.deathTestLoud = GetTime() + (unit.untilKind == "time" and unit.secs or DEATH_FOR), false
+		ns.deathTestUntil, ns.deathTestLoud = GetTime() + (unit.secs or DEATH_FOR), false
+	end
+	Log("fired", unit, (L["%s. Scene: %s, camera: %s"]):format(tested and L["Fire now"] or L["Started"],
+		ns.SceneDisplayName(unit.scene), ns.CameraName and ns.CameraName(camera) or tostring(camera)))
+	-- (Triggers that end as this one starts.)
+	if unit.lib then
+		for _, other in ipairs(units) do
+			if other.on and other ~= unit and other.refs and other.refs[unit.lib] then
+				Stop(other, (L["%s started"]):format(unit.label))
+			end
+		end
 	end
 end
-local function Stop(unit)
-	unit.on, unit.done = false, true
+function Stop(unit, why)
+	if unit.on and why then Log("ended", unit, why) end
+	unit.on, unit.done, unit.stopAt, unit.tested = false, true, nil, false
+	-- (May start again while its thing is still on.)
+	if not unit.rearm and HELD[unit.kind] then unit.done = false end
 	if unit.death then
 		unit.death = false
 		ns.deathTestUntil = 0
 	end
 end
--- A scene's key while one of its units is on (and not the death camera's).
-local function SceneOn(key)
-	for _, unit in ipairs(sceneUnits[key] or EMPTY) do
-		if unit.on and not unit.death then return key end
+-- Its own ending: kept on to its least time ("Keep going at least").
+local function EndSoon(unit, now, why)
+	if not unit.on then return end
+	if unit.hold > 0 and now < unit.since + unit.hold then
+		unit.stopAt, unit.stopWhy = unit.since + unit.hold, why
+	else
+		Stop(unit, why)
 	end
-	return nil
+end
+-- Something says start: its cooldown, Only if and chance first, then its wait.
+local function TryStart(unit, now)
+	if unit.on or unit.pendingAt then return end
+	if unit.cd > 0 and unit.lastStart and now - unit.lastStart < unit.cd then
+		Skip(unit, (L["Cooldown: %d of %d sec left"]):format(math.ceil(unit.cd - (now - unit.lastStart)), unit.cd))
+		return
+	end
+	if unit.badCond then
+		Skip(unit, L["Its Only if rule can't be read: fix it on its page"])
+		return
+	end
+	if unit.test and not unit.test(ns.RuleFactsNow()) then
+		Skip(unit, (L["Only if is false: %s"]):format(unit.condText))
+		return
+	end
+	if unit.chance < 100 and math.random(100) > unit.chance then
+		Skip(unit, (L["Chance: not this time (%d%%)"]):format(unit.chance))
+		unit.done = true -- (a held one: not again until its thing stops)
+		return
+	end
+	if unit.delay > 0 then
+		unit.pendingAt = now + unit.delay
+		return
+	end
+	Start(unit)
 end
 -- The states you travel in: a scene of yours on through one of them, its
 -- camera a script, carries on while you move (a skyriding zoom-out), and
--- ends as the state does (until "move" can't end it: moving is the point).
+-- ends as the state does (moving can't end it: moving is the point).
 local TRAVEL_STATES = { mounted = true, flying = true, swimming = true }
 local function Travels(unit)
 	return unit.kind == "state" and TRAVEL_STATES[unit.what] and unit.walks or false
 end
+
 -- That scene on now (not on a flight path: the flight camera has those), or nil.
 function ns.CustomTravelScene()
 	if ns.OnTaxi and ns.Flag(ns.OnTaxi()) then return nil end
@@ -340,7 +456,7 @@ end
 -- ask before waiting for windows to close), as that window is the point.
 function ns.CustomInteractScene()
 	for _, unit in ipairs(units) do
-		if unit.on and unit.kind == "interact" and not unit.death then return unit.scene end
+		if unit.on and unit.kind == "interact" and not unit.inverted and not unit.death then return unit.scene end
 	end
 end
 -- Its script over by its own stop rules: the key's scene ends too, so one
@@ -406,35 +522,43 @@ end
 
 watcher:SetScript("OnEvent", function(_, event, ...)
 	local isCast = CAST_START[event] or CAST_END[event] or event == "UNIT_SPELLCAST_SUCCEEDED"
+	local now = GetTime()
 	for _, unit in ipairs(units) do
 		if unit.kind == "spell" and isCast then
 			if Safe(pcall(ScanSpell, (select(3, ...)), unit.spellID, unit.what)) then
-				if CAST_START[event] then
+				if unit.at == "success" then
+					-- (Its cast landing starts it; its time ends it, as a moment's.)
+					if event == "UNIT_SPELLCAST_SUCCEEDED" then TryStart(unit, now) end
+				elseif CAST_START[event] then
 					unit.casting = true
-					Start(unit)
+					TryStart(unit, now)
 				elseif CAST_END[event] then
 					unit.casting = false
-					if unit.on and unit.untilKind == "ends" then Stop(unit) end
+					unit.pendingAt = nil
+					if unit.on and unit.hasEnd.ends then EndSoon(unit, now, L["The cast ended"]) end
 				elseif not unit.casting and not unit.on then
-					Start(unit) -- (an instant cast: "ends" times out, as a moment)
+					TryStart(unit, now) -- (an instant cast: "ends" times out, as a moment)
 				end
 			end
 		elseif unit.kind == "moment" and MomentMatches(unit, event, ...) then
-			Start(unit)
+			TryStart(unit, now)
 		elseif unit.kind == "aura" or unit.kind == "place" then
 			unit.dirty = true
 		end
 	end
 end)
 
--- A state source's condition now (nil for the ones an event starts). Buffs
--- and places are looked at again on their events, or every SLOW_LOOK.
+-- A held kind's condition now, the other way round for a phase that starts
+-- as it stops (nil for the ones an event starts). Buffs and places are
+-- looked at again on their events, or every SLOW_LOOK.
 local function Condition(unit, now)
-	local kind = unit.kind
-	if kind == "state" then
-		return StateNow(unit.what)
+	local kind, raw = unit.kind, nil
+	if kind == "ours" then
+		raw = ns.OursOnNow and ns.OursOnNow(unit.what) or false -- (Triggers.lua: our camera code's say)
+	elseif kind == "state" then
+		raw = StateNow(unit.what)
 	elseif kind == "interact" then
-		return InteractNow(unit.what)
+		raw = InteractNow(unit.what)
 	elseif kind == "aura" or kind == "place" then
 		if unit.dirty or not unit.lookedAt or now - unit.lookedAt >= SLOW_LOOK then
 			unit.dirty, unit.lookedAt = false, now
@@ -444,16 +568,19 @@ local function Condition(unit, now)
 				unit.found = Safe(pcall(ScanPlace, unit.what))
 			end
 		end
-		return unit.found
+		raw = unit.found
 	end
+	if raw == nil then return nil end
+	if unit.inverted then return not raw end
+	return raw
 end
 
 -- Whether an episode on now has run its time: a set time, or "ends" for
--- what has no end of its own (a moment, an instant cast).
+-- what has no end of its own (a moment, an instant or landed cast).
 local function TimedOut(unit, now)
-	local timed = unit.untilKind == "time"
-		or (unit.untilKind == "ends" and (unit.kind == "moment" or (unit.kind == "spell" and not unit.casting)))
-	return timed and now - unit.since >= unit.secs
+	if unit.secs and now - unit.since >= unit.secs then return true end
+	local noEnd = unit.kind == "moment" or (unit.kind == "spell" and not unit.casting)
+	return unit.hasEnd.ends and noEnd and now - unit.since >= DEFAULT_SECS
 end
 
 local lastEmoteAt -- (the last emote's time already looked at)
@@ -467,10 +594,13 @@ local function Tick()
 		Parse(unit)
 		local cond = Condition(unit, now)
 		if cond ~= nil then
-			if cond and not unit.cond and not unit.done then Start(unit) end
+			-- (Starting as it stops: not at the first look, only once it has been on.)
+			if unit.cond == nil and unit.inverted and cond then unit.done = true end
+			if cond and not unit.done then TryStart(unit, now) end
 			if not cond then
-				if unit.on and (unit.untilKind == "ends" or (unit.untilKind == "move" and Travels(unit))) then
-					unit.on = false
+				unit.pendingAt, unit.skipWhy = nil, nil
+				if unit.on and not unit.tested and (unit.hasEnd.ends or Travels(unit)) then
+					EndSoon(unit, now, L["It ended"])
 				end
 				unit.done = false
 			end
@@ -479,12 +609,32 @@ local function Tick()
 		if newEmote and unit.kind == "emote" then
 			-- (Another emote ends it, as the built-in emotes' cameras end.)
 			if newEmote == unit.what then
-				Start(unit)
+				TryStart(unit, now)
 			elseif unit.on then
-				Stop(unit)
+				EndSoon(unit, now, L["Another emote"])
 			end
 		end
-		if unit.on and ((moving and not unit.walks) or TimedOut(unit, now)) then Stop(unit) end
+		if unit.pendingAt then
+			if moving and not unit.walks then
+				unit.pendingAt = nil
+			elseif now >= unit.pendingAt then
+				unit.pendingAt = nil
+				if unit.test and not unit.test(ns.RuleFactsNow()) then
+					Skip(unit, (L["Only if is false: %s"]):format(unit.condText))
+				elseif cond ~= false then
+					Start(unit)
+				end
+			end
+		end
+		if unit.on then
+			if moving and not unit.walks then
+				Stop(unit, L["You moved"])
+			elseif unit.stopAt and now >= unit.stopAt then
+				Stop(unit, unit.stopWhy)
+			elseif TimedOut(unit, now) then
+				Stop(unit, L["Its time ran out"])
+			end
+		end
 	end
 	if needSync then
 		needSync = false
@@ -504,32 +654,22 @@ ns.SetOnUpdate(ticker, function(_, elapsed)
 	end
 end)
 
--- Where a scene of yours sits in the priority list: just after the built-in
--- source it names, in the order they're listed. A built-in scene's extra
--- triggers sit just after its own source.
-local BUILT_IN_ORDER = {}
-for _, source in ipairs(ns.TRIGGER_SOURCES) do BUILT_IN_ORDER[source.id] = source.order end
-local function OrderOf(id, index)
-	local after = Rows()[id .. ".after"]
-	local base = after == "" and 0 or BUILT_IN_ORDER[after or "emote"] or BUILT_IN_ORDER.emote
-	return base + 1 + math.min(index, 98) / 100
-end
-local SCENE_SOURCE = { Hearth = "depart", Teleport = "depart", Logout = "logout", AFK = "afk", Weapon = "weapon",
-	Campfire = "campfire", Still = "still" }
-local function ExtraOrder(key)
-	return (BUILT_IN_ORDER[SCENE_SOURCE[key] or "emote"] or BUILT_IN_ORDER.emote) + 0.5
-end
-
 -- Brings the scenes and their units in line with the profile when it
 -- changes (one added or taken off, a trigger added, a profile loaded).
+-- Each unit takes its place in the priority list (Triggers.lua) by its
+-- trigger's priority, a scene's own order breaking a tie.
 local synced = { rows = false }
 local registered = {} -- (our scenes on the page, and our priority sources)
 local sources = {}
-function ns.SyncCustomTriggers(force)
+local function SyncNow(force)
 	local rows = Rows()
 	if not rows then return end
 	if not force and synced.rows == rows and synced.custom == rows.custom and synced.extras == rows.extras then return end
+	if synced.rows ~= rows then ns.triggerLibVersion = ns.triggerLibVersion + 1 end -- (another profile)
 	synced.rows, synced.custom, synced.extras = rows, rows.custom, rows.extras
+	if ns.ApplyBuiltInOrders then ns.ApplyBuiltInOrders() end
+	if ns.MigrateSceneTriggers then ns.MigrateSceneTriggers() end
+	synced.custom, synced.extras = rows.custom, rows.extras
 	local ids, seen = {}, {}
 	for id in tostring(rows.custom or ""):gmatch("[^,]+") do
 		-- (Never over a built-in scene.)
@@ -552,39 +692,55 @@ function ns.SyncCustomTriggers(force)
 	for _, unit in ipairs(units) do old[unit.scene .. "#" .. unit.index .. "#" .. tostring(unit.source)] = unit end
 	wipe(units)
 	wipe(sceneUnits)
+	local sceneNumber = 0
 	local function AddUnits(key, custom)
 		local list = {}
+		sceneNumber = sceneNumber + 1
 		for index, source in ipairs(ns.SceneTriggers(key)) do
 			local unit = old[key .. "#" .. index .. "#" .. source] or { scene = key, index = index }
 			unit.custom = custom
 			list[#list + 1] = unit
 			units[#units + 1] = unit
 			Parse(unit)
+			local id = "unit:" .. key .. "#" .. index
+			sources[#sources + 1] = id
+			ns.RegisterTriggerSource({ id = id, order = unit.pri + sceneNumber / 1000 + index / 100000, unit = unit,
+				label = unit.label, Key = function() return unit.on and not unit.death and key or nil end })
 		end
 		sceneUnits[key] = list
 	end
-	for i, id in ipairs(ids) do
+	for _, id in ipairs(ids) do
 		if not ns.CAMERA_TRIGGER[id] then
 			ns.RegisterCameraTrigger({ key = id, custom = true, cameras = CAMERAS, off = "none", music = true,
 				cine = true })
 		end
 		registered[id] = true
 		AddUnits(id, true)
-		sources[#sources + 1] = "custom:" .. id
-		ns.RegisterTriggerSource({ id = "custom:" .. id, order = OrderOf(id, i), custom = id,
-			Key = function() return SceneOn(id) end })
 	end
 	for key in tostring(rows.extras or ""):gmatch("[^,]+") do
-		if ns.SceneTakesTriggers(key) and not sceneUnits[key] then
-			AddUnits(key, false)
-			sources[#sources + 1] = "extra:" .. key
-			ns.RegisterTriggerSource({ id = "extra:" .. key, order = ExtraOrder(key), extra = key,
-				Key = function() return SceneOn(key) end })
-		end
+		if ns.SceneTakesTriggers(key) and not sceneUnits[key] then AddUnits(key, false) end
 	end
 	Watch()
 	ticker:SetShown(#units > 0)
 end
+-- (Moving old scenes over adds to the library, which asks for this again:
+-- asked while it runs, it runs once more after.)
+local syncing, again = false, false
+function ns.SyncCustomTriggers(force)
+	if syncing then
+		again = again or force or false
+		return
+	end
+	syncing = true
+	local ok, err = pcall(SyncNow, force)
+	if ok and again then
+		again = false
+		ok, err = pcall(SyncNow, true)
+	end
+	syncing, again = false, false
+	if not ok then error(err, 0) end
+end
+
 -- (A scene's triggers or place in the list changed: worked out afresh.)
 function ns.CustomTriggersChanged()
 	ns.SyncCustomTriggers(true)
@@ -592,6 +748,15 @@ end
 
 -- What starts a trigger, in words: "/cheer", "Cast Fishing", "Mounted"...
 function ns.DescribeTriggerSource(source)
+	local lib = tostring(source or ""):match("^t:(Trig%a+)$")
+	if lib then
+		return (ns.IsLibTrigger(lib) or ns.OursTrigger(lib)) and ns.TriggerLabel(lib) or L["(a deleted trigger)"]
+	end
+	local ours = tostring(source or ""):match("^ours:(%a+)$")
+	if ours then
+		local each = ns.OursTrigger(ours)
+		return each and each.name or ours
+	end
 	local kind, what = tostring(source or ""):match("^(%a+):(.*)$")
 	what = what or ""
 	if kind == "emote" then
@@ -640,9 +805,49 @@ function Cinematic_CustomTrigger(n)
 	local what = tostring(n)
 	for _, unit in ipairs(units) do
 		if unit.kind == "key" and unit.what == what then
-			if unit.on then Stop(unit) else Start(unit) end
+			if unit.on then
+				Stop(unit, L["Its key was pressed again"])
+			else
+				TryStart(unit, GetTime())
+			end
 		end
 	end
+end
+
+-- The Triggers page's Fire now: the trigger's units started now, whatever
+-- its Only if, cooldown and chance say (or stopped, if one is on). With no
+-- scene using it, only the log hears it (and it shows as on for a moment).
+local firedAlone = {}
+function ns.FireLibTrigger(id)
+	local any, on = false, false
+	for _, unit in ipairs(units) do
+		if unit.lib == id then
+			any = true
+			on = on or unit.on
+		end
+	end
+	if on then
+		for _, unit in ipairs(units) do
+			if unit.lib == id and unit.on then Stop(unit, L["Stopped on the Triggers page"]) end
+		end
+	elseif any then
+		for _, unit in ipairs(units) do
+			if unit.lib == id then Start(unit, true) end
+		end
+	elseif (firedAlone[id] or 0) > GetTime() then
+		firedAlone[id] = nil
+	else
+		firedAlone[id] = GetTime() + 3
+		if ns.TriggerLogAdd then ns.TriggerLogAdd("fired", ns.TriggerLabel(id), L["Fire now. Nothing uses it yet"]) end
+	end
+end
+-- Whether a trigger of the library is on now (any scene's).
+function ns.LibTriggerOn(id)
+	if (firedAlone[id] or 0) > GetTime() then return true end
+	for _, unit in ipairs(units) do
+		if unit.lib == id and (unit.on or unit.pendingAt) then return true end
+	end
+	return false
 end
 
 -- For the camera mode log: what set a scene's trigger of yours off.
@@ -678,8 +883,14 @@ function ns.AddCustomTrigger(source, untilText, camera, name)
 		end
 	end
 	if not id then return nil end
-	rows[id .. ".triggers"] = tostring(source):gsub("|", "")
-	rows[id .. ".until"] = untilText ~= "move" and untilText or nil
+	-- (A source written the old way: into the library, with its until.)
+	source = tostring(source or ""):gsub("|", "")
+	if not source:find("^t:") then
+		local lib = ns.LibTriggerFor(source, untilText or "move", ns.TRIGGER_DEFAULT_PRI)
+		if not lib then return nil end
+		source = "t:" .. lib
+	end
+	rows[id .. ".triggers"] = source
 	rows[id .. ".camera"] = camera or "cozy"
 	rows[id .. ".name"] = name
 	local key = ns.CameraRowKey(id)
@@ -734,11 +945,16 @@ function ns.DescribeCustomTriggers()
 	for _, unit in ipairs(units) do
 		local order = "-"
 		for _, each in ipairs(ns.TRIGGER_SOURCES) do
-			if each.custom == unit.scene or each.extra == unit.scene then order = ("%.2f"):format(each.order) end
+			if each.unit == unit then order = ("%.3f"):format(each.order) end
 		end
-		lines[#lines + 1] = ("%s #%d \"%s\": %s until %s (order %s) - %s%s%s, cond %s, row %s -> %s"):format(
+		local ends = {}
+		for _, each in ipairs(unit.ends or EMPTY) do
+			ends[#ends + 1] = each.kind .. (each.secs and ":" .. each.secs or "") .. (each.ref and ":" .. each.ref or "")
+		end
+		lines[#lines + 1] = ("%s #%d \"%s\": %s (%s) at %s ends %s, only if %s (order %s) - %s%s%s, cond %s, row %s -> %s"):format(
 			unit.scene, unit.index, unit.custom and ns.CustomTriggerLabel(unit.scene) or "built-in", tostring(unit.source),
-			tostring(unit.untilText), order, unit.on and "ON" or "off", unit.done and ", done" or "",
+			tostring(unit.label), tostring(unit.at), table.concat(ends, ","), tostring(unit.condText or "always"),
+			order, unit.on and "ON" or "off", unit.done and ", done" or "",
 			unit.casting and ", casting" or "", tostring(unit.cond), tostring(ns.TriggerRowNow(unit.scene)),
 			tostring(ns.TriggerSetting(unit.scene, "camera")))
 	end

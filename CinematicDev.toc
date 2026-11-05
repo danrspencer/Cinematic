@@ -84,9 +84,11 @@ QuestCam.lua
 ShoulderCam.lua
 SkyrideCam.lua
 CameraRows.lua
+TriggerLibrary.lua
 CustomTriggers.lua
 Shots.lua
 CameraTriggerEditor.lua
+TriggersPage.lua
 ShotsPage.lua
 CameraScripts.lua
 QuestTalk.lua

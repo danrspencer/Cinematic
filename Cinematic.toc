@@ -91,9 +91,11 @@ Camera.lua
 ZoomGuard.lua
 QuestCam.lua
 CameraRows.lua
+TriggerLibrary.lua
 CustomTriggers.lua
 Shots.lua
 CameraTriggerEditor.lua
+TriggersPage.lua
 ShotsPage.lua
 CameraScripts.lua
 QuestTalk.lua

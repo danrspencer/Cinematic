@@ -11,6 +11,10 @@
 local _, ns = ...
 
 ns.CHANGELOG_FEATURES = {
+	{ date = "2026-11-05", page = "Triggers", title = "Triggers page",
+		text = "Every trigger in one place, in the Camera hub: make your own and set what starts it, what ends it, " ..
+		"an Only if rule, its timing and its priority, then use it in any scene. Ours take an Only if, timing and " ..
+		"a priority of their own too." },
 	{ date = "2026-11-05", page = "Nameplates", title = "Service NPCs",
 		text = "In CineMode, vendors, trainers, flight masters, innkeepers and other NPCs with a title keep their " ..
 		"names on their nameplates while guards and townsfolk stay hidden. Pick which kinds count, or show just " ..

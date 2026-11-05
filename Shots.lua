@@ -332,6 +332,30 @@ local UNTIL_OK = { move = true, ends = true, key = true }
 local AFTER_OK = { [""] = true, depart = true, logout = true, afk = true, byFire = true, emote = true,
 	weapon = true, campfire = true, still = true }
 local CAMERA_OK = { cozy = true, vista = true, fish = true, afk = true, tele = true, death = true, none = true }
+-- A shared trigger's parts (TriggerLibrary.lua's), checked: a table, or nil.
+-- (An ending naming another trigger can't come along: dropped.)
+local AT_OK = { start = true, success = true, gain = true, lose = true, arrive = true, leave = true,
+	["true"] = true, ["false"] = true, open = true, close = true }
+local function CleanDef(def, source)
+	if type(def) ~= "table" then return nil end
+	local out = { src = source, name = Clean(def.name, MAX_NAME), cond = Clean(def.cond, 300),
+		at = AT_OK[def.at] and def.at or nil, rearm = def.rearm == "no" and "no" or nil }
+	if type(def.ends) == "string" then
+		local kept = {}
+		for each in def.ends:gmatch("[^|]+") do
+			if each == "ends" or each == "key" or each == "never" or each:find("^time:%d+%.?%d*$") then
+				kept[#kept + 1] = each
+			end
+		end
+		out.ends = #kept > 0 and table.concat(kept, "|") or nil
+	end
+	for field, range in pairs({ delay = { 0, 600 }, hold = { 0, 600 }, cd = { 0, 86400 }, chance = { 1, 100 },
+		pri = { -9999, 9999 } }) do
+		local value = tonumber(def[field])
+		if value and value == value then out[field] = math.max(range[1], math.min(range[2], value)) end
+	end
+	return out
+end
 
 local function ShotData(id)
 	local settings = {}
@@ -348,11 +372,23 @@ function ns.ExportCameraTrigger(id)
 	local camera = ns.CameraRowValue(id, "camera")
 	local shot = ns.ShotOf(camera)
 	-- (Its triggers as t1, t2...: the text's tables take named keys. source:
-	-- the first, for a Cinematic from before scenes had several.)
-	local triggers = {}
-	for i, source in ipairs(ns.SceneTriggers(id)) do triggers["t" .. i] = source end
+	-- the first, for a Cinematic from before scenes had several. A trigger
+	-- of the library goes as what starts it, its parts in defs beside it: a
+	-- Cinematic from before the library plays the source, as it reads it.)
+	local triggers, defs, first = {}, {}, nil
+	for i, source in ipairs(ns.SceneTriggers(id)) do
+		local lib = source:match("^t:(Trig%a+)$")
+		if lib then
+			local def = {}
+			for _, field in ipairs(ns.TRIGGER_FIELDS) do def[field] = ns.TriggerField(lib, field) end
+			triggers["t" .. i], defs["t" .. i] = def.src, def
+		else
+			triggers["t" .. i] = source
+		end
+		first = first or triggers["t" .. i]
+	end
 	return Pack({
-		kind = "trigger", name = rows[id .. ".name"], source = ns.SceneTriggers(id)[1], triggers = triggers,
+		kind = "trigger", name = rows[id .. ".name"], source = first, triggers = triggers, defs = defs,
 		["until"] = rows[id .. ".until"],
 		after = rows[id .. ".after"], camera = shot and "shot" or camera,
 		music = ns.CameraRowValue(id, "music") and true or nil, cine = ns.CameraRowValue(id, "cine") and true or nil,
@@ -389,10 +425,13 @@ function ns.ReadCameraShare(text)
 		shot.kind = "shot"
 		return shot
 	elseif data.kind == "trigger" then
-		local triggers = {}
+		local triggers, defs = {}, {}
 		for i = 1, ns.SCENE_TRIGGER_MAX do
 			local source = Clean(type(data.triggers) == "table" and data.triggers["t" .. i] or nil, MAX_SOURCE)
-			if source and source:find("^%a+:.") then triggers[#triggers + 1] = source end
+			if source and source:find("^%a+:.") then
+				triggers[#triggers + 1] = source
+				defs[#triggers] = CleanDef(type(data.defs) == "table" and data.defs["t" .. i] or nil, source)
+			end
 		end
 		if #triggers == 0 then
 			local source = Clean(data.source, MAX_SOURCE)
@@ -406,7 +445,7 @@ function ns.ReadCameraShare(text)
 		local shot = data.camera == "shot" and CleanShot(data.shot) or nil
 		return {
 			kind = "trigger", name = Clean(data.name, MAX_NAME), source = triggers[1], triggers = triggers,
-			["until"] = untilText,
+			defs = defs, ["until"] = untilText,
 			after = AFTER_OK[data.after] and data.after or nil,
 			camera = shot and "shot" or (CAMERA_OK[data.camera] and data.camera or "cozy"),
 			music = data.music == true, cine = data.cine == true, shot = shot,
@@ -434,11 +473,30 @@ function ns.AddCameraShare(info)
 		local shot = AddSharedShot(info.shot)
 		camera = shot and ("shot:" .. shot) or info.shot.base
 	end
-	local id = ns.AddCustomTrigger(info.source, info["until"] or "move", camera, info.name)
+	-- (Its triggers into the library: as shared, or made from the old way's
+	-- until and place in the list.)
+	local list = {}
+	local pri = (({ [""] = 0, depart = 100, logout = 200, afk = 300, byFire = 400, emote = 500, weapon = 600,
+		campfire = 700, still = 800 })[info.after == nil and "emote" or info.after] or 500) + 10
+	for i, source in ipairs(info.triggers or { info.source }) do
+		local def = info.defs and info.defs[i]
+		local lib
+		if def then
+			local fields = {}
+			for field, value in pairs(def) do
+				if field ~= "src" then fields[field] = value end
+			end
+			lib = ns.AddLibTrigger(source, fields)
+		else
+			lib = ns.LibTriggerFor(source, info["until"] or "move", pri)
+		end
+		if lib then list[#list + 1] = "t:" .. lib end
+	end
+	if #list == 0 then return nil, "full" end
+	local id = ns.AddCustomTrigger(list[1], nil, camera, info.name)
 	if not id then return nil, "full" end
-	ns.SetSceneTriggers(id, info.triggers or { info.source })
+	ns.SetSceneTriggers(id, list)
 	local rows = ns.GetDB().cameraRows
-	rows[id .. ".after"] = info.after
 	rows[id .. ".music"] = info.music or nil
 	rows[id .. ".cine"] = info.cine or nil
 	ns.CustomTriggersChanged()
