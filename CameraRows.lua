@@ -13,6 +13,9 @@
 -- your own), off (true: unticked, passed over), always and calm (the When's Always and the Calm Timer wait; nil
 -- on a trigger's own row: its camera's, below). A row's place ticks and rule
 -- are under "trig:<id>" in the shared lists (cityShow..., frameRules).
+-- A built-in trigger's own row is ticked off by its setting sceneOff<key>
+-- instead: a setting, so a built-in profile can have a scene off with its
+-- camera still on it (a saved cameraRows replaces the built-in's whole).
 --
 -- Triggers of your own (CustomTriggers.lua: custom = true) keep all of theirs
 -- in it too, their own row's included: "custom" their ids, and
@@ -76,6 +79,13 @@ function ns.UnregisterCameraTrigger(key)
 	ns.CameraRowsChanged()
 end
 
+-- A built-in trigger, its own row ticked off (off true) or on to start with.
+local function OwnScene(trigger, off)
+	trigger.sceneOff = "sceneOff" .. trigger.key
+	ns.DEFAULTS[trigger.sceneOff] = off
+	ns.RegisterCameraTrigger(trigger)
+end
+
 -- (A WoW Forever event has no row on retail.)
 local FOREVER_ONLY = {}
 for _, event in ipairs(ns.EVENTS) do
@@ -96,14 +106,14 @@ for _, trigger in ipairs({
 }) do
 	-- (A flight's music is the flight camera's own switch.)
 	if trigger.key == "Flight" then trigger.music = "musicCamFlight" end
-	if not (FOREVER_ONLY[trigger.key] and ns.isRetail) then ns.RegisterCameraTrigger(trigger) end
+	if not (FOREVER_ONLY[trigger.key] and ns.isRetail) then OwnScene(trigger, false) end
 end
 -- (The chat camera: ChatCam.lua; no music switch yet.)
 if ns.ChatCamCommand then
-	ns.RegisterCameraTrigger({ key = "Chat", camera = "chatCamera", cine = "chatCine", cameras = { "chat", "none" },
-		off = "none" })
-	ns.RegisterCameraTrigger({ key = "ChatNearby", camera = "chatNearbyCamera", cine = "chatNearbyCine",
-		cameras = { "chat", "none" }, off = "none" })
+	-- (Ticked off to start with: the Cinema profile's cameras tick them on.)
+	OwnScene({ key = "Chat", camera = "chatCamera", cine = "chatCine", cameras = { "chat", "none" }, off = "none" }, true)
+	OwnScene({ key = "ChatNearby", camera = "chatNearbyCamera", cine = "chatNearbyCine",
+		cameras = { "chat", "none" }, off = "none" }, true)
 	-- Capital cities' citizens never stop chatting: that row's Cities unticked
 	-- to start with (its other ticks follow the chat camera's).
 	ns.LIST_DEFAULTS.cityShow["trig:ChatNearby"] = false
@@ -289,9 +299,25 @@ end
 
 -- Whether a row's ticked on (its tick at the start of the row): off, its
 -- trigger passes it over, as if its When didn't fit.
-function ns.CameraRowOn(id) return not Rows()[id .. ".off"] end
+-- (A built-in trigger's own row: its setting. Its "off" from before there was
+-- one, in a shared profile say, still counts, and goes when it's ticked.)
+local function SceneOffKey(id)
+	local trigger, copy = ns.CameraRowTrigger(id)
+	return trigger and not copy and trigger.sceneOff or nil
+end
+function ns.CameraRowOn(id)
+	if Rows()[id .. ".off"] then return false end
+	local key, db = SceneOffKey(id), ns.db or ns.GetDB()
+	return not (key and db and db[key])
+end
 function ns.SetCameraRowOn(id, on)
-	ns.GetDB().cameraRows[id .. ".off"] = not on or nil
+	local db, key = ns.GetDB(), SceneOffKey(id)
+	if key then
+		db[key] = not on
+		db.cameraRows[id .. ".off"] = nil
+	else
+		db.cameraRows[id .. ".off"] = not on or nil
+	end
 	ns.CameraRowsChanged()
 end
 
@@ -583,7 +609,7 @@ function ns.CopyCameraRow(id)
 		rows[new .. ".always"] = db["camAlways" .. Leader(id)] and true or false
 	end
 	rows[new .. ".calm"] = ns.CameraRowCalm(id)
-	rows[new .. ".off"] = rows[id .. ".off"]
+	rows[new .. ".off"] = not ns.CameraRowOn(id) or nil
 	local IS_ON = { combatShow = ns.IsCombatShowOn, calmShow = ns.IsCalmShowOn, quietShow = ns.IsQuietShowOn,
 		camShow = ns.IsCamShowOn, enemyShow = ns.IsEnemyShowOn, friendlyShow = ns.IsFriendlyShowOn }
 	for _, list in ipairs(ns.CAMERA_ROW_LISTS) do
@@ -797,6 +823,7 @@ function ns.SyncSceneGroup(key)
 			for _, field in ipairs({ "off", "always", "calm" }) do
 				rows[member .. "." .. field] = rows[key .. "." .. field]
 			end
+			if TRIGGER[member].sceneOff then db[TRIGGER[member].sceneOff] = not ns.CameraRowOn(key) end
 			for _, each in ipairs(ns.CAMERA_ROW_LISTS) do
 				if type(db[each]) == "table" then db[each][ROW_KEY[member]] = db[each][ROW_KEY[key]] end
 			end
@@ -903,6 +930,49 @@ function ns.DescribeCameraRows()
 			tostring(ns.TriggerSetting(trigger.key, "camera")))
 	end
 	return lines
+end
+
+-- Scenes a profile had off used to lose their camera (No camera) or, for RP
+-- walk, auto-run and the death camera, every place tick: now they keep their
+-- camera and ticks and are ticked off, so each camera stays in its scene. t: a
+-- profile's settings, live or saved (nil: its base's). A camera on a row that
+-- played it stays on, its scene ticked on.
+local PLACE_OFF = { Walk = true, Run = true, Death = true }
+local PLACES = { "worldShow", "cityShow", "instanceShow" }
+local function OwnWhenIn(t, id)
+	local rows = type(t.cameraRows) == "table" and t.cameraRows or {}
+	if rows[id .. ".always"] ~= nil or rows[id .. ".calm"] ~= nil then return true end
+	for _, list in ipairs(ns.CAMERA_ROW_LISTS) do
+		if type(t[list]) == "table" and t[list][ROW_KEY[id]] ~= nil then return true end
+	end
+	return false
+end
+local function NoPlaces(t, key)
+	for _, list in ipairs(PLACES) do
+		if type(t[list]) ~= "table" then return false end
+		local tick = t[list][key]
+		if tick == nil then tick = ns.LIST_DEFAULTS[list][key] end
+		if tick then return false end
+	end
+	return true
+end
+function ns.ScenesOffKeepCameras(t)
+	if type(t) ~= "table" then return end
+	for _, trigger in ipairs(TRIGGERS) do
+		local own = trigger.sceneOff and ns.DEFAULTS[trigger.camera]
+		if own ~= nil and own ~= trigger.off then
+			local value, placed = t[trigger.camera], PLACE_OFF[trigger.key] and not OwnWhenIn(t, trigger.key)
+			local rowKey = placed and "cam:" .. CamOf(own)
+			if value == trigger.off then
+				t[trigger.camera], t[trigger.sceneOff] = own, true
+			elseif placed and NoPlaces(t, rowKey) then
+				t[trigger.sceneOff] = true
+				for _, list in ipairs(PLACES) do t[list][rowKey] = nil end
+			elseif value ~= nil or (placed and type(t.worldShow) == "table") then
+				t[trigger.sceneOff] = false
+			end
+		end
+	end
 end
 
 -- Dev copy, once (2026-11-03): the built-in rows a profile's Cameras off part

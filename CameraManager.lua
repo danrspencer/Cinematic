@@ -10,6 +10,8 @@ local WIDTH = 568
 local TILE_W, TILE_H, TILE_GAP, PER_ROW = 88, 84, 8, 6
 local LINK_H = 40
 local NONE_COLOR = { 0.85, 0.35, 0.28 }
+local PLAIN_COLOR = { 0.6, 0.6, 0.6 }
+local OFF_COLOR = { 0.45, 0.45, 0.45 }
 
 -- Each built-in camera's icon (by script id); yours have one you pick, or
 -- the spyglass.
@@ -57,6 +59,18 @@ local function Uses()
 		end
 	end
 	return uses
+end
+
+-- How many scenes play a camera, in words, and the color for it: with them
+-- all ticked off, that says so.
+local function ScenesLine(uses, none)
+	local on = 0
+	for _, use in ipairs(uses) do
+		if ns.CameraRowOn(use.row) then on = on + 1 end
+	end
+	if #uses == 0 then return none, NONE_COLOR end
+	if on == 0 then return #uses == 1 and L["Scene off"] or L["%d scenes off"]:format(#uses), OFF_COLOR end
+	return #uses == 1 and L["1 scene"] or L["%d scenes"]:format(#uses), PLAIN_COLOR
 end
 
 local function Paint(text, color)
@@ -272,12 +286,12 @@ function ns.CameraManager(kit, canvas, content, title, intro, switch, helper)
 				local script = list[i]
 				tile.script = script
 				if script then
-					local n = uses[script.id] and #uses[script.id] or 0
+					local line, color = ScenesLine(uses[script.id] or {}, L["In no scene"])
 					tile.icon:SetTexture(IconOf(script))
 					tile.icon:SetDesaturated(false)
 					tile.name:SetText(script.name)
-					tile.count:SetText(n == 0 and L["In no scene"] or n == 1 and L["1 scene"] or L["%d scenes"]:format(n))
-					Paint(tile.count, n == 0 and NONE_COLOR or { 0.6, 0.6, 0.6 })
+					tile.count:SetText(line)
+					Paint(tile.count, color)
 				else
 					tile.icon:SetTexture("Interface\\PaperDollInfoFrame\\Character-Plus")
 					tile.name:SetText(L["+ New camera"])
@@ -304,8 +318,7 @@ function ns.CameraManager(kit, canvas, content, title, intro, switch, helper)
 		bigIcon:SetTexture(IconOf(script))
 		camName:SetText(script.name)
 		local kind = script.builtin and L["Built-in camera"] or L["Your camera"]
-		camKind:SetText(kind .. " · " .. (#uses == 0 and L["in no scene"] or #uses == 1 and L["1 scene"]
-			or L["%d scenes"]:format(#uses)))
+		camKind:SetText(kind .. " · " .. (ScenesLine(uses, L["in no scene"])))
 		camDesc:SetText(script.desc or "")
 		camDesc:SetShown(script.desc ~= nil)
 		scriptHead:ClearAllPoints()

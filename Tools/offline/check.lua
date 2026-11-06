@@ -333,6 +333,38 @@ if arg[1] and not update then
 	if not back or ns.CameraRowValue("AFK", "camera") ~= afkCamera or ns.GetDB().cameraRows.deleted ~= nil then
 		Problem("Add back didn't bring it back as it was")
 	end
+	-- A scene a profile has off keeps its camera, ticked off (every built-in
+	-- camera in a scene), on any profile; and profiles saved when off meant No
+	-- camera or no place ticks move over, cameras that played staying on.
+	do
+		local base = ns.ProfileBase("Subtle")
+		for _, key in ipairs({ "sceneOffCampfire", "sceneOffFishing", "sceneOffQuest", "sceneOffWalk", "sceneOffDeath" }) do
+			if base[key] ~= true then Problem("Subtle's " .. key .. " isn't off") end
+		end
+		if base.eventCampfireCamera ~= "cozy" or base.walkCamera ~= "walk" or base.chatCamera ~= "chat" then
+			Problem("a scene Subtle has off lost its camera")
+		end
+		if base.sceneOffAFK or base.sceneOffFlight then Problem("Subtle's AFK or Flight scene is off") end
+		if ns.ProfileBase("Cinema").sceneOffChat ~= false then Problem("Cinema's chat scene isn't on") end
+		local db = ns.GetDB()
+		local was = db.sceneOffCampfire
+		ns.SetCameraRowOn("Campfire", false)
+		if db.sceneOffCampfire ~= true or ns.CameraRowOn("Campfire") or ns.TriggerSetting("Campfire", "camera") ~= "none" then
+			Problem("a scene ticked off still plays")
+		end
+		ns.SetCameraRowOn("Campfire", true)
+		if db.sceneOffCampfire ~= false or not ns.CameraRowOn("Campfire") then Problem("ticking a scene on didn't take") end
+		db.sceneOffCampfire = was
+		local old = { eventFishingCamera = "none", eventSitCamera = "cozy", chatCamera = "chat", worldShow = { ["cam:walk"] = false,
+			["cam:run"] = true }, cityShow = { ["cam:walk"] = false }, instanceShow = { ["cam:walk"] = false } }
+		ns.ScenesOffKeepCameras(old)
+		if old.eventFishingCamera ~= "fish" or old.sceneOffFishing ~= true then Problem("a saved No camera didn't move over") end
+		if old.sceneOffSit ~= false or old.eventSitCamera ~= "cozy" then Problem("a saved camera of your own was turned off") end
+		if old.sceneOffChat ~= false then Problem("a saved chat camera that played was turned off") end
+		if old.sceneOffWalk ~= true or old.worldShow["cam:walk"] ~= nil then Problem("a saved walk with no places didn't move over") end
+		if old.sceneOffRun ~= false then Problem("a saved run with a place ticked was turned off") end
+		if old.sceneOffFlight ~= nil or old.sceneOffStill ~= nil then Problem("a saved profile's untouched scenes were written") end
+	end
 	-- Built-in scenes with several triggers (CameraRows' SCENE_GROUPS): the
 	-- cozy ones are one row to start with, an edit to it reaches every member,
 	-- who's in a scene doesn't change by itself, a trigger moved out is a row
@@ -780,6 +812,52 @@ if arg[1] and not update then
 				print("problem	Subtle's " .. effect .. " shows outside CineMode, or not in it")
 			end
 		end
+	end
+	-- A flight's CineMode tick, with the flight camera playing as its script:
+	-- its own code is off then, and the tick still counts. Stop camera ends it.
+	do
+		local db = ns.GetDB()
+		local cine, camera = db.eventFlightCine, db.eventFlightCamera
+		local function Starts(tick, stopped)
+			db.eventFlightCine, db.eventFlightCamera, ns.stoppedCam = tick, "flight", stopped
+			ns.CameraRowsChanged()
+			return ns.TriggerStartsCine() and true or false
+		end
+		ns.testTravel = "flight"
+		ns.UpdateTaxi()
+		if not ns.CameraRowsScripted("flight") then print("problem	the flight camera isn't playing as its script") end
+		if not Starts(true) then print("problem	a flight's CineMode tick doesn't bring CineMode on") end
+		if Starts(false) or Starts(true, "flight") then
+			print("problem	a flight brings CineMode on unticked, or with its camera stopped")
+		end
+		ns.testTravel, ns.stoppedCam = nil, nil
+		ns.UpdateTaxi()
+		db.eventFlightCine, db.eventFlightCamera = cine, camera
+		ns.CameraRowsChanged()
+		-- The same for walking and running, and what goes with a quest giver's
+		-- or a conversation's camera, played as a script.
+		for _, cam in ipairs({ "walk", "run" }) do
+			local was, wait, always = db[cam .. "Camera"], db[cam .. "CameraDelay"], db["camAlways" .. cam]
+			local offKey = "sceneOff" .. (cam == "walk" and "Walk" or "Run")
+			local off = db[offKey]
+			db[cam .. "Camera"], db[cam .. "CameraDelay"], db["camAlways" .. cam], db[offKey] = cam, 0, true, false
+			ns.CameraRowsChanged()
+			if not ns.CameraPlaysHere(cam) then print("problem	the " .. cam .. " camera doesn't count as playing as its script") end
+			db[offKey] = true
+			ns.CameraRowsChanged()
+			if ns.CameraPlaysHere(cam) then print("problem	the " .. cam .. " camera plays with its scene ticked off") end
+			db[cam .. "Camera"], db[cam .. "CameraDelay"], db["camAlways" .. cam], db[offKey] = was, wait, always, off
+		end
+		local running, immersive = ns.CameraScriptRunning, db.chatCamImmersive
+		ns.CameraScriptRunning = function() return true end
+		if not ns.QuestCamActive() then print("problem	a quest giver's script doesn't count as the quest camera") end
+		ns.CameraScriptRunning = function(key) return key == "Chat" end
+		db.chatCamImmersive = true
+		if ns.ChatCamScene() ~= "Chat" or not ns.ChatCamActive() or not ns.ChatCamImmersive() then
+			print("problem	a conversation's script doesn't count as the chat camera")
+		end
+		ns.CameraScriptRunning, db.chatCamImmersive = running, immersive
+		ns.CameraRowsChanged()
 	end
 	-- Vitals Vision: a page's Reset (its settings back to the profile's) leaves
 	-- each theme's own look on them, not the plain defaults.

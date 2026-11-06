@@ -216,7 +216,7 @@ ns.BUILTIN_PROFILES = {
 		-- choice for a slot then leaves them as they are.)
 		modules = With("zone-card", "travel-cards", "story-cards", "damage-vision", "vitals-vision",
 			"combat-vision", "heal-vision-everywhere", "cursor-hide", "music-calm", "weather-view-distance",
-			"node-icons"),
+			"node-icons", "quest-talk"),
 	},
 }
 

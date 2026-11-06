@@ -2731,8 +2731,10 @@ end
 local OWN_CAM = { "flight", "death", "walk", "run", "quest", "chatcam" } -- (TriggerNow's own list, in order)
 local function TriggerNow()
 	if not ns.db or not ns.db.enabled or not ns.ActiveEvent then return nil end
-	-- (A scene of yours its key started: first, a window open or walking.)
-	local scene = ns.CustomKeyScene and ns.CustomKeyScene()
+	-- (A window open keeps them all from triggering, but those a window starts.)
+	local held = ns.WindowPausesCams()
+	-- (A scene of yours its key started: first, walking or not.)
+	local scene = not held and ns.CustomKeyScene and ns.CustomKeyScene()
 	if scene then
 		local camera = ns.TriggerSetting(scene, "camera")
 		if IsScript(camera) then return scene, camera end
@@ -2744,13 +2746,13 @@ local function TriggerNow()
 		if IsScript(camera) then return scene, camera end
 	end
 	-- (One of yours on while you're mounted, flying or swimming: on the move too.)
-	scene = ns.CustomTravelScene and ns.CustomTravelScene()
+	scene = not held and ns.CustomTravelScene and ns.CustomTravelScene()
 	if scene then
 		local camera = ns.TriggerSetting(scene, "camera")
 		if IsScript(camera) then return scene, camera end
 	end
 	-- (Skyriding Cam's page: its own script, made from its settings.)
-	if not ns.OnTaxi() and ns.SkyridingNow() then return "Skyride", "script:skyride" end
+	if not held and not ns.OnTaxi() and ns.SkyridingNow() then return "Skyride", "script:skyride" end
 	local now = GetTime()
 	local key, camera = ns.ActiveEvent()
 	-- (The Calm Timer after a fight, as the cameras' own code waits it out:
@@ -2765,10 +2767,11 @@ local function TriggerNow()
 	-- camera is off then, CameraRows.lua's ns.CameraRowsOff. Each goes by what
 	-- its own camera would: Enable Cameras, Stop camera, the auto-walk and
 	-- auto-run waits, the Calm Timer; dying, by the Death Cam's conditions.)
-	local own = { ns.OnTaxi() and "Flight",
-		(ns.DeathCinematicWanted and ns.DeathCinematicWanted() or false) and "Death",
-		ns.IsRPWalking and ns.IsRPWalking() and "Walk", ns.IsAutoRunning and ns.IsAutoRunning() and "Run",
-		ns.QuestTalkNow and ns.QuestTalkNow() or false, ChatNow() or false }
+	local own = { not held and ns.OnTaxi() and "Flight",
+		not held and (ns.DeathCinematicWanted and ns.DeathCinematicWanted() or false) and "Death",
+		not held and ns.IsRPWalking and ns.IsRPWalking() and "Walk",
+		not held and ns.IsAutoRunning and ns.IsAutoRunning() and "Run",
+		ns.QuestTalkNow and ns.QuestTalkNow() or false, not held and ChatNow() or false }
 	for i = 1, 6 do
 		local each = own[i]
 		local cam = OWN_CAM[i]
@@ -2869,12 +2872,23 @@ local watcher = CreateFrame("Frame")
 ns.SetOnUpdate(watcher, function(_, elapsed)
 	if not ns.db then return end
 	local key, camera = TriggerNow()
+	local held = ns.WindowPausesCams()
 	if run and run.trigger then
-		run.triggerOn = key == run.trigger and camera == run.camera
+		local on = key == run.trigger and camera == run.camera
+		-- (A window holding its trigger back: it waits where it is, however long,
+		-- and carries on as that closes; its trigger's looked at again then.)
+		local wait = held and not on
+		if wait and run.pausedBy ~= "window" then
+			if not run.pausedUntil then Suspend() end
+			run.pausedUntil, run.pausedBy = math.huge, "window"
+		elseif not wait and run.pausedBy == "window" then
+			run.pausedUntil, run.pausedBy = GetTime(), nil
+		end
+		run.triggerOn = on or wait
 	end
-	if not key then
+	if not key and not held then
 		stoppedFor = nil
-	elseif not run and stoppedFor ~= key .. camera and not InFight() then
+	elseif key and not run and stoppedFor ~= key .. camera and not InFight() then
 		local script = ns.FindCameraScript(camera:sub(8))
 		if script then Start(script, key, camera) end
 	end
@@ -3066,6 +3080,11 @@ function ns.PlayingCameraKey(triggered)
 	return ns.ScriptStandIn(id)
 end
 
+-- A script a trigger started is playing, paused or not.
+function ns.SceneScriptPlaying()
+	return run ~= nil and run.trigger ~= nil
+end
+
 -- A script playing its steps for this trigger now (not yet in When it ends).
 function ns.CameraScriptRunning(trigger)
 	return run ~= nil and trigger ~= nil and run.trigger == trigger and run.phase == "steps"
@@ -3145,9 +3164,10 @@ function ns.CameraScriptCommand(arg)
 		ns.Print(("scene started by its key: %s%s"):format(tostring(scene), scene and (" (row now %s, camera %s)"):format(
 			tostring(ns.TriggerRowNow(scene)), tostring(ns.TriggerSetting(scene, "camera"))) or ""))
 		scene = ns.CustomInteractScene and ns.CustomInteractScene()
-		ns.Print(("scene started by a window (Interaction): %s%s; NPC window open %s, menu window open %s"):format(
+		ns.Print(("scene started by a window (Interaction): %s%s; NPC window open %s, menu window open %s; pause cameras for windows %s, paused by a window now %s"):format(
 			tostring(scene), scene and (" (camera %s)"):format(tostring(ns.TriggerSetting(scene, "camera"))) or "",
-			tostring(ns.NPCWindowOpen and ns.NPCWindowOpen()), tostring(ns.MenuWindowOpen and ns.MenuWindowOpen())))
+			tostring(ns.NPCWindowOpen and ns.NPCWindowOpen()), tostring(ns.MenuWindowOpen and ns.MenuWindowOpen()),
+			tostring(ns.db.pauseCamsInWindows), tostring(ns.WindowPausesCams())))
 		if ns.isDev then
 			ns.Print(("our cameras as scripts (/cine script builtins): %s"):format(
 				ns.ScriptBuiltInsOn() and "ON" or "off"))

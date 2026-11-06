@@ -448,7 +448,8 @@ function ns.CustomTravelScene()
 end
 -- A scene you started with its key (Scene key N) that's on now,
 -- or nil: a camera script asks first (CameraScripts.lua's TriggerNow), so it
--- plays with a window open or you walking, as the key says to.
+-- plays with you walking, as the key says to. (A window open holds it, as it
+-- does the rest: ns.WindowPausesCams.)
 function ns.CustomKeyScene()
 	for _, unit in ipairs(units) do
 		if unit.on and unit.kind == "key" and not unit.death then return unit.scene end

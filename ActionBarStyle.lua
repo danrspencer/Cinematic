@@ -131,7 +131,35 @@ end
 -- (own: a square of ours has a mask too, a plain one. Bar 1's icons went missing
 -- behind the slot art with no mask on them at all, and only those: with one, as
 -- the game's own look and round both have, they draw.)
+-- The game's casting effects are square frames of their own over the button, which no
+-- mask of ours reaches: on a round button they show past its edge, so they go.
+local CAST_FX = { "SpellCastAnimFrame", "TargetReticleAnimFrame", "InterruptDisplay", "CooldownFlash" }
+local fxHidden, fxHooked = setmetatable({}, { __mode = "k" }), setmetatable({}, { __mode = "k" })
+local function KeepFxHidden(frame)
+	if fxHidden[frame] and not hiding then
+		hiding = true
+		frame:SetAlpha(0)
+		hiding = false
+	end
+end
+local function SetCastFx(button, hide)
+	for _, key in ipairs(CAST_FX) do
+		local frame = button[key]
+		if frame and frame.SetAlpha then
+			if hide and not fxHooked[frame] then
+				fxHooked[frame] = true
+				hooksecurefunc(frame, "SetAlpha", KeepFxHidden)
+			end
+			if hide ~= (fxHidden[frame] or false) then
+				fxHidden[frame] = hide or nil
+				frame:SetAlpha(hide and 0 or 1)
+			end
+		end
+	end
+end
+
 local function SetRound(button, part, round, own)
+	SetCastFx(button, round and true or false)
 	if own and not part.mask and button.CreateMaskTexture then
 		part.mask = button:CreateMaskTexture()
 		part.mask:SetAllPoints(button)

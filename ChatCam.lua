@@ -205,9 +205,10 @@ local watcher = CreateFrame("Frame")
 
 -- The Cameras page's rows (each "chat" or "none"): "NPCs you talk
 -- to" (chatCamera) and "NPCs chatting nearby" (chatNearbyCamera, once you've
--- stood still chatNearbyDelay seconds: see Ambient).
-ns.DEFAULTS.chatCamera = "none"        -- (the Cinema profile's cameras: "chat", ProfileModules.lua)
-ns.DEFAULTS.chatNearbyCamera = "none"
+-- stood still chatNearbyDelay seconds: see Ambient). Their scenes start ticked
+-- off (CameraRows.lua; the Cinema profile's cameras tick them on).
+ns.DEFAULTS.chatCamera = "chat"
+ns.DEFAULTS.chatNearbyCamera = "chat"
 ns.DEFAULTS.chatNearbyDelay = 3
 -- (Their CineMode ticks: with "Start in CineMode" off, a conversation brings it on. Camera.lua.)
 ns.DEFAULTS.chatCine = false
@@ -237,8 +238,12 @@ for _, where in ipairs(ns.CAMERA_OFF_WHERE) do
 	ns.DEFAULTS["chatcamOffIn" .. where] = where == "BGs"
 end
 ns.DEFAULTS.chatcamCalmWait = true
+-- Whether a row (Chat or ChatNearby) is on and set to this camera.
+local function RowPlays(key)
+	return ns.db[key == "Chat" and "chatCamera" or "chatNearbyCamera"] == "chat" and ns.CameraRowOn(key)
+end
 local function On()
-	return ns.db.enabled and (ns.db.chatCamera == "chat" or ns.db.chatNearbyCamera == "chat")
+	return ns.db.enabled and (RowPlays("Chat") or RowPlays("ChatNearby"))
 end
 local function Immersive()
 	return ns.db.chatCamImmersive and true or false
@@ -1576,8 +1581,8 @@ local function Ambient(event, name, now)
 	elseif event == "CHAT_MSG_MONSTER_PARTY" or talking or now - talkedAt < TALKED_WINDOW
 		or (name ~= "?" and Plain(UnitName("target")) == name) then
 		takenBy = "Chat"
-		return ns.db.chatCamera ~= "chat" and "NPCs you talk to: no camera" or nil
-	elseif ns.db.chatNearbyCamera ~= "chat" then
+		return not RowPlays("Chat") and "NPCs you talk to: no camera" or nil
+	elseif not RowPlays("ChatNearby") then
 		return "NPCs chatting nearby: no camera"
 	end
 	takenBy = "ChatNearby"
@@ -1586,6 +1591,12 @@ local function Ambient(event, name, now)
 	if now - stillSince < wait then
 		return ("NPC chatting nearby: stood still %d of %d sec"):format(now - stillSince, wait)
 	end
+end
+
+-- The scene playing the chat camera as its script, or nil. Its own code stays
+-- off then, with no convo, so what goes with a conversation asks this too.
+local function ScriptScene()
+	return (ns.CameraScriptRunning("Chat") and "Chat") or (ns.CameraScriptRunning("ChatNearby") and "ChatNearby") or nil
 end
 
 -- Why a line isn't taken, or nil.
@@ -1629,6 +1640,8 @@ watcher:SetScript("OnEvent", function(_, event, text, name, ...)
 	DebugLine(event, text, name, (select(10, ...)), why)
 	if not why then
 		Heard(text, name, event)
+	elseif Immersive() and ns.ShowSubtitle and not Secret(text) and ScriptScene() then
+		ns.ShowSubtitle(event, name, text)
 	end
 end)
 
@@ -1713,19 +1726,19 @@ end)
 -- Whether a conversation has the camera now (the Minimap page hides the
 -- minimap by it: ns.activeCam, Camera.lua).
 function ns.ChatCamActive()
-	return convo ~= nil
+	return convo ~= nil or ScriptScene() ~= nil
 end
 
 -- The scene whose row started the conversation going now ("Chat" or
 -- "ChatNearby"; nil for none, or a Test run).
 function ns.ChatCamScene()
-	return convo and convo.scene
+	return convo and convo.scene or ScriptScene()
 end
 
 -- Whether Ultra immersive has the screen now: a conversation going, with it
 -- on (the letterbox twice as tall, subtitles in it, the UI hidden).
 function ns.ChatCamImmersive()
-	return convo ~= nil and Immersive() and not ns.IsSuspended()
+	return ns.ChatCamActive() and Immersive() and not ns.IsSuspended()
 end
 
 -- Who's talking in the conversation now (for the camera mode log), or nil.
@@ -1765,8 +1778,10 @@ function ns.ChatCamCommand(arg)
 		return
 	end
 	-- (Both its Cameras page rows together, NPCs you talk to and chatting nearby.)
-	local value = On() and "none" or "chat"
-	ns.db.chatCamera, ns.db.chatNearbyCamera = value, value
+	local on = not On()
+	ns.db.chatCamera, ns.db.chatNearbyCamera = "chat", "chat"
+	ns.SetCameraRowOn("Chat", on)
+	ns.SetCameraRowOn("ChatNearby", on)
 	Say("(prototype) " .. (On() and "on" or "off") .. (ns.db.enabled and "" or " (Cinematic is off)")
 		.. ". If it turns away from whoever's talking: /cine chatcam flip", true)
 end
@@ -1779,6 +1794,7 @@ loader:SetScript("OnEvent", function()
 		-- dropped, the tested way being the default now.)
 		if ns.db.dialogueCam then
 			ns.db.chatCamera = "chat"
+			ns.SetCameraRowOn("Chat", true)
 		end
 		ns.db.chatCamSwap = ns.db.chatCamSwap or ns.db.dialogueCamSwap
 		ns.db.dialogueCam, ns.db.dialogueCamFlip, ns.db.dialogueCamSwap, ns.db.dialogueCamLog = nil, nil, nil, nil

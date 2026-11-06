@@ -1,0 +1,334 @@
+<title>Shoulder Cam Sim</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600&family=Source+Sans+3:wght@400;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a camera operator's monitor. The framed shot leads, with its overhead plan beside it, traces under them, then the shot tester. */
+:root {
+  --bg: #eef1f1; --panel: #ffffff; --ink: #16242b; --muted: #566870; --line: #d3dbdd;
+  --accent: #0b7a75; --frames: #c2510c; --warn: #b3362b; --ok: #2c7a4b; --plan: #5b53a8;
+  --sky: #cfe0e8; --sky2: #eaf0ee; --ground: #9db0a4; --ground2: #7f9587; --figure: #1d2d35; --guide: #16242b55;
+  --display: "Barlow Condensed", "Arial Narrow", Arial, sans-serif;
+  --body: "Source Sans 3", "Segoe UI", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #10171a; --panel: #182226; --ink: #e4ecee; --muted: #93a5ac; --line: #2b383e;
+  --accent: #45c4bc; --frames: #f08a4b; --warn: #ef7d70; --ok: #62c58a; --plan: #a79ff0;
+  --sky: #24353f; --sky2: #2e4149; --ground: #33463d; --ground2: #2a3a33; --figure: #dfe8ea; --guide: #e4ecee55;
+  color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #10171a; --panel: #182226; --ink: #e4ecee; --muted: #93a5ac; --line: #2b383e;
+  --accent: #45c4bc; --frames: #f08a4b; --warn: #ef7d70; --ok: #62c58a; --plan: #a79ff0;
+  --sky: #24353f; --sky2: #2e4149; --ground: #33463d; --ground2: #2a3a33; --figure: #dfe8ea; --guide: #e4ecee55;
+  color-scheme: dark }
+* { box-sizing: border-box }
+body { background: var(--bg); color: var(--ink); font: 16px/1.5 var(--body);
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 24px 48px }
+.wrap { max-width: 1100px; margin: 0 auto; display: grid; gap: 18px }
+h1 { font: 600 34px/1.1 var(--display); margin: 0; letter-spacing: .01em }
+h2 { font: 600 23px/1.2 var(--display); margin: 14px 0 0; letter-spacing: .01em }
+.sub { color: var(--muted); margin: 4px 0 0; max-width: 72ch }
+.bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center }
+.seg { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; background: var(--panel) }
+.seg button { border: 0; background: none; color: var(--muted); font: 600 14px var(--body); padding: 7px 12px; cursor: pointer }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--bg) }
+.btn { border: 1px solid var(--line); background: var(--panel); color: var(--ink); border-radius: 6px;
+  font: 600 14px var(--body); padding: 7px 14px; cursor: pointer; min-width: 72px }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px }
+.scrub { flex: 1 1 240px; min-width: 0; accent-color: var(--accent) }
+.clock { font: 500 13px var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; min-width: 88px; text-align: right }
+.views { display: grid; grid-template-columns: minmax(0, 2.2fr) minmax(0, 1fr); gap: 12px }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 12px; min-width: 0 }
+.label { font: 600 12px var(--body); text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 0 0 8px }
+canvas { display: block; width: 100%; max-width: 100% }
+.shot { aspect-ratio: 16 / 9 }
+.plan { aspect-ratio: 1 / 1 }
+.traces { height: 260px }
+.now { font-weight: 600; min-height: 1.6em; margin: 8px 0 0 }
+dl { display: grid; grid-template-columns: auto 1fr; gap: 2px 12px; margin: 10px 0 0; font-size: 14px }
+dt { color: var(--muted) }
+dd { margin: 0; font: 500 13px var(--mono); font-variant-numeric: tabular-nums; text-align: right }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 13px; color: var(--muted); margin-top: 8px }
+.legend i { display: inline-block; width: 18px; border-top: 2px solid; vertical-align: middle; margin-right: 6px }
+.split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px }
+.check { display: grid; grid-template-columns: 44px 1fr auto; gap: 8px; padding: 4px 0; border-top: 1px solid var(--line); font-size: 14px }
+.check:first-of-type { border-top: 0 }
+.pill { font: 500 12px var(--mono); text-align: center; border-radius: 3px; padding: 1px 0 }
+.pill.ok { color: var(--ok); border: 1px solid var(--ok) } .pill.bad { color: var(--bg); background: var(--warn) }
+.check span:last-child { color: var(--muted); font: 400 12px var(--mono); text-align: right }
+.log { max-height: 280px; overflow-y: auto; font-size: 14px }
+.log button { display: grid; grid-template-columns: 52px 1fr; gap: 8px; width: 100%; text-align: left; border: 0; border-top: 1px solid var(--line);
+  background: none; color: var(--ink); font: inherit; padding: 4px; cursor: pointer }
+.log time { font: 400 12px var(--mono); color: var(--muted); padding-top: 2px }
+.log b { font-weight: 600 }
+.controls { display: grid; gap: 10px }
+.ctl label { display: flex; justify-content: space-between; gap: 8px; font-size: 14px }
+.ctl output { font: 500 13px var(--mono); color: var(--muted) }
+.ctl input[type=range] { width: 100%; accent-color: var(--accent) }
+.tick { display: flex; gap: 8px; align-items: flex-start; font-size: 14px }
+.tick input { margin-top: 4px; accent-color: var(--plan) }
+.tag { font: 600 11px var(--body); color: var(--plan); border: 1px solid var(--plan); border-radius: 3px; padding: 0 4px; margin-left: 4px; letter-spacing: .04em }
+.note { color: var(--muted); font-size: 14px; max-width: 76ch; margin: 0 }
+@media (max-width: 760px) { .views, .split { grid-template-columns: minmax(0, 1fr) } .plan { max-width: 320px } .traces { height: 220px } }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Shoulder Cam Sim</h1>
+    <p class="sub">The real ShoulderCam.lua playing a made-up session, offline, on a stand-in for the game's camera. Three numbers in the stand-in are guesses until the sweeps measure them: how fast the game eases, how much mounts scale the offset, and how much a tall model scales it.</p>
+  </header>
+
+  <div class="bar">
+    <div class="seg" id="runs" role="group" aria-label="Session"></div>
+    <button class="btn" id="play" type="button">Play</button>
+    <input class="scrub" id="scrub" type="range" min="0" max="1000" value="0" aria-label="Time in the session">
+    <span class="clock" id="clock">0.0 s</span>
+  </div>
+
+  <section class="views">
+    <div class="card">
+      <p class="label">What you see</p>
+      <canvas class="shot" id="shot"></canvas>
+      <p class="now" id="now"></p>
+    </div>
+    <div class="card">
+      <p class="label">From above (side step drawn 3x)</p>
+      <canvas class="plan" id="plan"></canvas>
+      <dl>
+        <dt>Setting</dt><dd id="r-set"></dd>
+        <dt>Game's offset</dt><dd id="r-off"></dd>
+        <dt>Distance</dt><dd id="r-zoom"></dd>
+        <dt>You on screen</dt><dd id="r-you"></dd>
+        <dt>Cast bar</dt><dd id="r-bar"></dd>
+      </dl>
+    </div>
+  </section>
+
+  <section class="card">
+    <p class="label">The whole session</p>
+    <canvas class="traces" id="traces"></canvas>
+    <div class="legend">
+      <span><i style="border-color:var(--accent)"></i>You on screen</span>
+      <span><i style="border-color:var(--frames)"></i>Cast bar</span>
+      <span><i style="border-color:var(--muted);border-top-style:dashed"></i>Setting (yards, 2 = top)</span>
+    </div>
+  </section>
+
+  <section class="split">
+    <div class="card">
+      <p class="label">Checks on this session</p>
+      <div id="checks"></div>
+      <dl id="stats"></dl>
+    </div>
+    <div class="card">
+      <p class="label">What happened</p>
+      <div class="log" id="log"></div>
+    </div>
+  </section>
+
+  <h2>Try a shot</h2>
+  <p class="note">Set a shot by hand. The sum here is the same guess as above, so treat it as a sketch. Purple options are planned, not built.</p>
+  <section class="views">
+    <div class="card">
+      <canvas class="shot" id="lab"></canvas>
+      <p class="now" id="lab-now"></p>
+    </div>
+    <div class="card controls">
+      <div class="ctl"><label for="c-off">Offset <output id="o-off"></output></label><input id="c-off" type="range" min="0" max="6" step="0.25" value="1"></div>
+      <div class="ctl"><label for="c-zoom">Distance <output id="o-zoom"></output></label><input id="c-zoom" type="range" min="2" max="39" step="1" value="12"></div>
+      <div class="ctl"><label for="c-fov">Field of view <output id="o-fov"></output></label><input id="c-fov" type="range" min="50" max="90" step="5" value="90"></div>
+      <div class="ctl"><label for="c-size">What you are <output id="o-size"></output></label><input id="c-size" type="range" min="0" max="2" step="1" value="0"></div>
+      <div class="seg" id="side" role="group" aria-label="Shoulder">
+        <button type="button" data-side="1" aria-pressed="true">Right</button><button type="button" data-side="-1" aria-pressed="false">Left</button>
+      </div>
+      <label class="tick"><input id="t-hold" type="checkbox"><span>Hold your spot on screen<span class="tag">planned</span></span></label>
+      <div class="ctl"><label for="c-spot">Spot <output id="o-spot"></output></label><input id="c-spot" type="range" min="5" max="40" step="1" value="20"></div>
+      <label class="tick"><input id="t-fade" type="checkbox"><span>Ease to the middle up close<span class="tag">planned</span></span></label>
+      <label class="tick"><input id="t-size" type="checkbox"><span>Correct for model and mount size<span class="tag">planned</span></span></label>
+    </div>
+  </section>
+</div>
+
+<script>
+const RUNS = /*SIM_DATA*/null;
+const NAMES = { page: "Page defaults", mounted: "Mounted, no pause", tall: "Tall model", relog: "Relog", fight: "Off in a fight" };
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const $ = id => document.getElementById(id);
+let run, name = "page", at = 0, playing = false, last = 0;
+
+function fit(c) {
+  const r = c.getBoundingClientRect(), d = Math.min(devicePixelRatio || 1, 2);
+  const w = Math.round(r.width * d), h = Math.round(r.height * d);
+  if (c.width !== w || c.height !== h) { c.width = w; c.height = h; }
+  const g = c.getContext("2d"); g.setTransform(d, 0, 0, d, 0, 0);
+  return [g, r.width, r.height];
+}
+
+// The shot. you, bar, prd: -1 to 1 across the screen.
+function shot(c, s) {
+  const [g, w, h] = fit(c);
+  const horizon = h * .46;
+  let grad = g.createLinearGradient(0, 0, 0, horizon);
+  grad.addColorStop(0, css("--sky")); grad.addColorStop(1, css("--sky2"));
+  g.fillStyle = grad; g.fillRect(0, 0, w, horizon);
+  grad = g.createLinearGradient(0, horizon, 0, h);
+  grad.addColorStop(0, css("--ground2")); grad.addColorStop(1, css("--ground"));
+  g.fillStyle = grad; g.fillRect(0, horizon, w, h - horizon);
+  // Ground lines running to the vanishing point (the middle of the view).
+  g.strokeStyle = css("--guide"); g.lineWidth = 1;
+  for (let i = -6; i <= 6; i++) { g.beginPath(); g.moveTo(w / 2, horizon); g.lineTo(w / 2 + i * w * .32, h); g.stroke(); }
+  // Thirds.
+  g.setLineDash([4, 5]);
+  for (const x of [w / 3, w * 2 / 3]) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, h); g.stroke(); }
+  g.setLineDash([]);
+  // You: a plain figure, smaller with distance.
+  const x = (s.you / 2 + .5) * w, size = Math.max(.1, Math.min(.95, 3.4 / Math.max(2, s.zoom))) * h * (s.scale || 1);
+  const feet = horizon + (h - horizon) * .62;
+  g.fillStyle = css("--figure");
+  g.beginPath(); g.ellipse(x, feet - size * .9, size * .1, size * .11, 0, 0, 7); g.fill();
+  g.beginPath(); g.roundRect(x - size * .17, feet - size * .78, size * .34, size * .78, size * .1); g.fill();
+  if (s.mounted) { g.beginPath(); g.roundRect(x - size * .55, feet - size * .3, size * 1.1, size * .3, size * .1); g.fill(); }
+  // The frames.
+  const unit = w / 1707;
+  const box = (cx, y, bw, bh, color) => {
+    g.fillStyle = color; g.globalAlpha = .9; g.fillRect((cx / 2 + .5) * w - bw * unit / 2, y, bw * unit, bh * unit); g.globalAlpha = 1;
+  };
+  if (s.prd !== undefined) { box(s.prd, h - 230 * unit, 180, 12, css("--ok")); box(s.prd, h - 214 * unit, 180, 8, css("--accent")); }
+  if (s.bar !== undefined) box(s.bar, h - 180 * unit, 250, 18, css("--frames"));
+}
+
+// From above: you, the camera beside and behind you.
+function plan(c, s) {
+  const [g, w, h] = fit(c);
+  g.clearRect(0, 0, w, h);
+  const scale = h * .8 / 39, you = [w / 2, h * .14];
+  const cam = [you[0] + s.off * scale * 3, you[1] + s.zoom * scale];
+  const half = Math.tan(Math.PI / 4), far = s.zoom * scale + h * .1;
+  g.fillStyle = css("--line");
+  g.beginPath(); g.moveTo(cam[0], cam[1]); g.lineTo(cam[0] - half * far, cam[1] - far); g.lineTo(cam[0] + half * far, cam[1] - far); g.closePath(); g.fill();
+  g.strokeStyle = css("--muted"); g.setLineDash([3, 4]);
+  g.beginPath(); g.moveTo(cam[0], cam[1]); g.lineTo(cam[0], 0); g.stroke(); g.setLineDash([]);
+  g.fillStyle = css("--figure"); g.beginPath(); g.arc(you[0], you[1], 6, 0, 7); g.fill();
+  g.fillStyle = css("--accent"); g.fillRect(cam[0] - 7, cam[1] - 5, 14, 10);
+  g.fillStyle = css("--muted"); g.font = "12px " + css("--body");
+  g.fillText("you", you[0] + 10, you[1] + 4); g.fillText("camera", cam[0] + 10, Math.min(h - 4, cam[1] + 4));
+}
+
+function traces() {
+  const c = $("traces"), [g, w, h] = fit(c), rows = run.samples, end = rows[rows.length - 1][0];
+  g.clearRect(0, 0, w, h);
+  const L = 34, R = 8, T = 18, B = 18, X = t => L + (w - L - R) * t / end, Y = v => T + (h - T - B) * (.5 - v / .5);
+  g.strokeStyle = css("--line"); g.fillStyle = css("--muted"); g.font = "11px " + css("--mono"); g.lineWidth = 1;
+  for (const v of [-.2, 0, .2]) { g.beginPath(); g.moveTo(L, Y(v)); g.lineTo(w - R, Y(v)); g.stroke(); g.fillText(v.toFixed(1), 2, Y(v) + 4); }
+  for (const s of run.segments) { g.beginPath(); g.moveTo(X(s.t), T); g.lineTo(X(s.t), h - B); g.stroke(); }
+  for (let t = 0; t <= end; t += 10) g.fillText(t + "s", X(t) - 8, h - 4);
+  const line = (col, color, dash, k = 1) => {
+    g.strokeStyle = color; g.lineWidth = 2; g.setLineDash(dash); g.beginPath();
+    rows.forEach((r, i) => { const x = X(r[0]), y = Y(r[col] * k); i ? g.lineTo(x, y) : g.moveTo(x, y); });
+    g.stroke(); g.setLineDash([]);
+  };
+  line(1, css("--muted"), [4, 4], .125); line(5, css("--frames"), []); line(4, css("--accent"), []);
+  const t = rows[at][0];
+  g.strokeStyle = css("--ink"); g.lineWidth = 1; g.beginPath(); g.moveTo(X(t), T - 8); g.lineTo(X(t), h - B); g.stroke();
+}
+
+const pct = v => (v >= 0 ? "+" : "") + (v * 50).toFixed(1) + "%";
+function draw() {
+  const r = run.samples[at], t = r[0];
+  shot($("shot"), { you: r[4], bar: r[5], prd: r[6], zoom: r[3], mounted: r[7] });
+  plan($("plan"), { off: r[2], zoom: r[3] });
+  traces();
+  let seg = ""; for (const s of run.segments) if (s.t <= t + .01) seg = s.label;
+  $("now").textContent = seg;
+  $("r-set").textContent = r[1].toFixed(2) + " yd";
+  $("r-off").textContent = r[2].toFixed(2) + " yd";
+  $("r-zoom").textContent = r[3].toFixed(1) + " yd";
+  $("r-you").textContent = pct(r[4]);
+  $("r-bar").textContent = pct(r[5]);
+  $("clock").textContent = t.toFixed(1) + " s";
+  $("scrub").value = Math.round(at / (run.samples.length - 1) * 1000);
+}
+
+function pick(n) {
+  name = n; run = RUNS[n];
+  document.querySelectorAll("#runs button").forEach(b => b.setAttribute("aria-pressed", b.dataset.run === n));
+  const box = $("checks"); box.textContent = "";
+  for (const k of run.checks) {
+    const row = document.createElement("div"); row.className = "check";
+    const a = document.createElement("span"); a.className = "pill " + (k.ok ? "ok" : "bad"); a.textContent = k.ok ? "ok" : "fail";
+    const b = document.createElement("span"); b.textContent = k.name;
+    const d = document.createElement("span"); d.textContent = k.detail;
+    row.append(a, b, d); box.append(row);
+  }
+  const st = $("stats"); st.textContent = "";
+  for (const [k, v] of [["Writes to the offset", run.writes], ["Warnings shown", run.popups], ["Frames miss you, mean", (run.missMean * 100).toFixed(1) + "% of screen"], ["At worst", (run.missWorst * 100).toFixed(1) + "% at " + run.missWorstAt.toFixed(1) + " s"]]) {
+    const dt = document.createElement("dt"), dd = document.createElement("dd"); dt.textContent = k; dd.textContent = v; st.append(dt, dd);
+  }
+  const log = $("log"); log.textContent = "";
+  const items = run.segments.map(s => ({ t: s.t, text: s.label, part: true })).concat(run.events.map(e => ({ t: e.t, text: e.text })));
+  items.sort((a, b) => a.t - b.t);
+  for (const e of items) {
+    const b = document.createElement("button"); b.type = "button";
+    const time = document.createElement("time"); time.textContent = e.t.toFixed(1) + " s";
+    const s = document.createElement(e.part ? "b" : "span"); s.textContent = e.text;
+    b.append(time, s);
+    b.onclick = () => seek(e.t);
+    log.append(b);
+  }
+  seek(7);
+}
+function seek(t) {
+  const rows = run.samples; let i = 0;
+  while (i < rows.length - 1 && rows[i][0] < t) i++;
+  at = i; draw();
+}
+function loop(ts) {
+  if (!playing) return;
+  const dt = Math.min(.1, (ts - last) / 1000); last = ts;
+  const rows = run.samples, t = rows[at][0] + dt;
+  while (at < rows.length - 1 && rows[at][0] < t) at++;
+  draw();
+  if (at >= rows.length - 1) { playing = false; $("play").textContent = "Play"; return; }
+  requestAnimationFrame(loop);
+}
+$("play").onclick = () => {
+  playing = !playing; $("play").textContent = playing ? "Pause" : "Play";
+  if (playing) { if (at >= run.samples.length - 1) at = 0; last = performance.now(); requestAnimationFrame(loop); }
+};
+$("scrub").oninput = e => { at = Math.round(e.target.value / 1000 * (run.samples.length - 1)); draw(); };
+for (const n of Object.keys(RUNS)) {
+  const b = document.createElement("button"); b.type = "button"; b.dataset.run = n; b.textContent = NAMES[n] || n;
+  b.onclick = () => pick(n); $("runs").append(b);
+}
+
+// Try a shot.
+const SIZES = [["Standard model", 1], ["Tall model", 1.4], ["Big mount", 1.6]];
+let sideSign = 1;
+function lab() {
+  const off = +$("c-off").value, zoom = +$("c-zoom").value, fov = +$("c-fov").value, size = SIZES[+$("c-size").value], spot = +$("c-spot").value / 100;
+  const tan = Math.tan(fov * Math.PI / 360);
+  let yards = off;
+  if ($("t-hold").checked) yards = spot * 2 * zoom * tan;
+  if ($("t-fade").checked) { const k = Math.max(0, Math.min(1, (zoom - 2) / 6)); yards *= k * k * (3 - 2 * k); }
+  const scale = $("t-size").checked ? 1 : size[1];
+  const you = -sideSign * yards * scale / (Math.max(1.5, zoom) * tan);
+  const bar = -sideSign * yards / (Math.max(1.5, zoom) * tan);
+  shot($("lab"), { you: Math.max(-1, Math.min(1, you)), bar: Math.max(-.6, Math.min(.6, bar)), prd: Math.max(-.6, Math.min(.6, bar)), zoom, mounted: +$("c-size").value === 2 });
+  $("o-off").textContent = off.toFixed(2) + " yd"; $("o-zoom").textContent = zoom + " yd"; $("o-fov").textContent = fov + "°";
+  $("o-size").textContent = size[0]; $("o-spot").textContent = (spot * 100).toFixed(0) + "% off middle";
+  $("lab-now").textContent = `You sit ${Math.abs(you * 50).toFixed(1)}% of the screen off the middle, with the game's offset at ${(yards * scale).toFixed(2)} yards.`;
+}
+document.querySelectorAll(".controls input").forEach(i => i.addEventListener("input", lab));
+document.querySelectorAll("#side button").forEach(b => b.onclick = () => {
+  sideSign = +b.dataset.side;
+  document.querySelectorAll("#side button").forEach(o => o.setAttribute("aria-pressed", o === b));
+  lab();
+});
+function all() { draw(); lab(); }
+addEventListener("resize", all);
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", all);
+new MutationObserver(all).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+pick("page"); lab();
+</script>

@@ -19,7 +19,7 @@
 -- type, a party member's escort quest, a PvP quest) stay the game's own:
 -- they come up in the middle of the screen as usual.
 -- With no NPC to stand over (a quest from an item, a turn-in from the quest
--- tracker), the bubble sits above the middle of the screen.
+-- tracker), the bubble sits where the game's quest window opens.
 --
 -- Keys (questTalkKeys): 1-9 and 0 pick from the list, Space turns the page
 -- and then does the card's first button. Only out of fights (the game
@@ -31,7 +31,7 @@ local L = ns.L
 local TEXT_WIDTH = 360     -- the bubble's words, at most (its own units)
 local PAD_X, PAD_Y = 16, 12
 local PANEL_WIDTH = 440 -- the card's own width (below the bubble, as wide as it)
-local NO_NPC_Y = 0.66      -- the bubble's bottom with no NPC (share of the screen's height)
+local NO_NPC_Y = 0.66      -- Opposite clicked, till it's dragged: the bubble's bottom (share of the screen's height)
 local PORTRAIT = 54        -- the NPC's portrait, across (questTalkPortrait)
 local OPPOSITE_X = 0.7     -- Opposite clicked, till it's dragged: the bubble's middle this share across the screen
 local OVER_PLATE = 22      -- the tail's tip over the nameplate's top (clear of the interact arrow over it)
@@ -206,6 +206,7 @@ local SAME_NPC_TIME = 120 -- seconds
 local gameWindow = false -- "Show the game's window" for this conversation
 local bubble, panel
 local closeTimer
+local Place -- (below)
 
 ---------------------------------------------------------------------------
 -- The game's windows, parked off the screen while ours show.
@@ -224,6 +225,49 @@ local function TuckedAway(frame)
 	return parent ~= nil and parent ~= UIParent and not ns.Flag(parent:IsShown())
 end
 
+-- Another addon taking the conversation (questTalkFade: ours stay away): its
+-- window tucked away, or made see-through or sent off the screen by someone
+-- other than us (competed: till it hides). An addon that stops the window
+-- opening at all needs no check: ours only open over an open window.
+local competed = {}
+local function Competing(frame)
+	return ns.db and Setting("questTalkFade") and (TuckedAway(frame) or competed[frame] == true) or false
+end
+
+-- Where the game's windows open (their top left, UIParent's units), read off
+-- them before they're parked: the bubble's place till it's dragged (Home).
+local homes = {}
+local function NoteHome(frame)
+	local ok, left, top = pcall(function() return frame:GetLeft(), frame:GetTop() end)
+	left, top = ok and Plain(left), ok and Plain(top)
+	local scale, uiScale = Plain(frame:GetEffectiveScale()), Plain(UIParent:GetEffectiveScale())
+	if type(left) ~= "number" or type(top) ~= "number" or type(scale) ~= "number" or type(uiScale) ~= "number"
+		or uiScale <= 0 then
+		return
+	end
+	left, top = left * scale / uiScale, top * scale / uiScale
+	local wide = Plain(frame:GetWidth()) or 0
+	if left + wide * scale / uiScale < 0 or left > UIParent:GetWidth() or top < 0 then
+		-- (Not a place to open. Up there, another addon's doing: see Competing.)
+		if ns.Flag(frame:IsShown()) then competed[frame] = true end
+		return
+	end
+	local was = homes[frame]
+	homes[frame] = { left = left, top = top }
+	if bubble and bubble:IsShown() and not (was and math.abs(was.left - left) < 1 and math.abs(was.top - top) < 1) then
+		Place()
+	end
+end
+
+-- The quest window's, else the gossip window's, else where the game puts them.
+local function Home()
+	local home = homes[_G.QuestFrame] or homes[_G.GossipFrame]
+	if home then
+		return home.left, home.top
+	end
+	return 16, UIParent:GetHeight() - 116
+end
+
 local function SavePoints(frame)
 	local points = {}
 	for i = 1, Plain(frame:GetNumPoints()) or 0 do
@@ -235,17 +279,19 @@ local function SavePoints(frame)
 	return points
 end
 
+local PARKED_X = -5000
 local function Park(frame)
 	if not frame or InCombatLockdown() and frame:IsProtected() then
 		return
 	end
 	if not parked[frame] then
+		NoteHome(frame)
 		parked[frame] = { points = SavePoints(frame), clamped = frame:IsClampedToScreen() }
 	end
 	parking = true
 	frame:SetClampedToScreen(false)
 	frame:ClearAllPoints()
-	frame:SetPoint("TOPRIGHT", UIParent, "TOPLEFT", -5000, 0)
+	frame:SetPoint("TOPRIGHT", UIParent, "TOPLEFT", PARKED_X, 0)
 	frame:SetAlpha(0)
 	parking = false
 end
@@ -265,7 +311,7 @@ local function Unpark(frame)
 		frame:SetPoint(p[1], p[2], p[3], p[4], p[5])
 	end
 	frame:SetClampedToScreen(saved.clamped and true or false)
-	frame:SetAlpha(1)
+	frame:SetAlpha(saved.alpha or 1)
 	parking = false
 end
 
@@ -276,8 +322,25 @@ local function Moved(frame)
 	if parking or not parked[frame] then
 		return
 	end
+	-- (Still where we parked it: the game only asked, nothing's moved.)
+	local _, _, _, x = frame:GetPoint(1)
+	if Plain(x) == PARKED_X then
+		return
+	end
 	parked[frame].points = SavePoints(frame)
+	NoteHome(frame)
 	Park(frame)
+end
+
+-- Anyone else setting a window's alpha: gone see-through, it's another
+-- addon's doing, and what it comes back with once ours let go.
+local function AlphaSet(frame, alpha)
+	alpha = Plain(alpha)
+	if parking or type(alpha) ~= "number" then
+		return
+	end
+	if parked[frame] then parked[frame].alpha = alpha end
+	competed[frame] = alpha < 0.05 or nil
 end
 
 local function Shown()
@@ -624,12 +687,12 @@ function ns.TalkWindowSide(starting)
 	return ns.QuestCamSide and ns.QuestCamSide()
 end
 
-local function Place()
+function Place()
 	bubble:ClearAllPoints()
 	local mode = PlaceMode()
 	local plate = mode == "head" and NpcPlate()
-	-- (follow: the card goes beside it, over their head or Opposite clicked;
-	-- questTalkCardSide "separate": never, the card keeps its own spot.)
+	-- (follow: the card goes with it, below or beside it; questTalkCardSide
+	-- "separate": never, the card keeps its own spot.)
 	local separate = ns.db.questTalkCardSide == "separate"
 	bubble.free, bubble.side, bubble.follow = false, nil, not separate
 	-- (onPlate: the plate it's over. waiting: kept off it while the camera
@@ -653,12 +716,23 @@ local function Place()
 	local width, height = UIParent:GetWidth(), UIParent:GetHeight()
 	local scale = bubble:GetScale()
 	-- Not over anyone: where it was last dragged (db.questTalkBubbleSpot: its
-	-- bottom middle, as shares of the screen), else above the middle of the
-	-- screen (Opposite clicked: off to the right of it). It can be dragged
-	-- (bubble.free).
+	-- bottom middle, as shares of the screen), else where the game's quest
+	-- window opens (Opposite clicked: off to the right of the middle). It can
+	-- be dragged (bubble.free).
 	local spot = ns.db.questTalkBubbleSpot
-	local x, bottom = mode == "opposite" and OPPOSITE_X or 0.5, NO_NPC_Y
-	if type(spot) == "table" and type(spot.x) == "number" and type(spot.bottom) == "number" then
+	local dragged = type(spot) == "table" and type(spot.x) == "number" and type(spot.bottom) == "number"
+	bubble.free = true
+	bubble.follow = not separate
+	SetTail(false)
+	RoomAtTop(false)
+	if not dragged and mode ~= "opposite" then
+		-- (Its top left on the window's; its portrait, over that corner, kept on the screen.)
+		local left, top = Home()
+		bubble:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", math.max(left / scale, PORTRAIT / 2), top / scale)
+		return
+	end
+	local x, bottom = OPPOSITE_X, NO_NPC_Y
+	if dragged then
 		x, bottom = spot.x, spot.bottom
 	end
 	-- Opposite clicked: the other half of the screen from the NPC (NpcSide)
@@ -671,13 +745,7 @@ local function Place()
 		x = 1 - x
 	end
 	bubble:SetPoint("BOTTOM", UIParent, "BOTTOMLEFT", x * width / scale, bottom * height / scale)
-	-- (The card follows it in Opposite clicked even with no click to go by:
-	-- an object's talk, the interact key.)
-	bubble.follow = mode == "opposite" and not separate
 	bubble.side = mode == "opposite" and (x > 0.5 and "right" or "left") or nil
-	bubble.free = true
-	SetTail(false)
-	RoomAtTop(false)
 end
 
 -- The quest window's own page: its background's art where the client's
@@ -937,14 +1005,16 @@ local function ShowPage()
 	bubble.tall = height + PAD_Y * 2
 	-- (On parchment, the quest's emblem over the page, as the game's.)
 	local seal = talk.seal and bubble.page:IsShown() and talk.seal
-	-- (The top half of the game's page: the card below has the bottom.)
+	-- (The top half of the game's page, with the card right below it to have the
+	-- bottom. Apart, each cut half shows a straight edge: the page's middle.)
+	local part = talk.cardBelow and "top" or nil
 	local artW = math.floor(TEXT_WIDTH + (bubble.indent or PAD_X) + PAD_X + 0.5) - 6
 	local artH = math.floor(height + PAD_Y * 2 + 0.5) - 6
 	if talk.pageArt and bubble.page:IsShown() then
-		SetArtFitted(bubble.page, talk.pageArt, artW, artH, "top")
+		SetArtFitted(bubble.page, talk.pageArt, artW, artH, part)
 	end
 	if seal then
-		SetArtFitted(bubble.seal, seal, artW, artH, "top")
+		SetArtFitted(bubble.seal, seal, artW, artH, part)
 	end
 	bubble.seal:SetShown(seal and true or false)
 	bubble:SetScale(tonumber(Styled("questTalkScale")) or 1)
@@ -968,7 +1038,8 @@ local function CreateBubble()
 		ns.WhyRegister(bubble, L["Quest talk"], "Quest Vision", {
 			L["Quest talk is on: talking to an NPC, what they say and what you can say back show here " ..
 				"instead of the game's window"],
-			L["Show the game's window brings the game's own window back for the rest of the conversation"] })
+			L["Show the game's window brings the game's own window back for the rest of the conversation"],
+			L["Fade if another addon competes: it stays away while another addon has the conversation"] })
 	end
 	bubble:SetFrameStrata("HIGH")
 	bubble:SetClampedToScreen(true)
@@ -1143,7 +1214,7 @@ local function AddText(words, font, color, gap)
 end
 
 -- Words and a value after them, as the game's "Experience:  15,900": the
--- words in the quest font, the value in its number font, white, 15 after.
+-- words in the quest font, the value in its number font, white and outlined, 15 after.
 local function AddPair(words, value, color, gap)
 	local label = AddText(words, "QuestFont", color, gap)
 	local wide = label.GetUnboundedStringWidth and label:GetUnboundedStringWidth() or label:GetStringWidth()
@@ -1156,7 +1227,12 @@ local function AddPair(words, value, color, gap)
 		texts[textCount] = fs
 	end
 	fs:SetFontObject("NumberFontNormalLarge")
-	Font(fs)
+	-- (Its own font and outline whatever the page says, only its size: without
+	-- the outline, white is lost on parchment.)
+	local file, height, flags = fs:GetFont()
+	if file and height then
+		fs:SetFont(file, height * Styled("questTalkTextSize"), flags or "")
+	end
 	fs:SetWidth(0)
 	fs:SetText(value)
 	fs:SetTextColor(1, 1, 1)
@@ -1264,17 +1340,20 @@ local function IconWidth() return (panelWidth - 36) / 2 end
 -- The game's reward button art (QuestInfoRewardsFrameQuestInfoItem1, /cine
 -- debug questart): its icon size, the name frame, the quality frame over the
 -- icon and the highlight on a chosen one.
-local ICON, BUTTON_HIGH, ROW_STEP = 39, 41, 44
-local NAME_FRAME = "Interface\\QuestFrame\\UI-QuestItemNameFrame"
-local ICON_FRAME = "Interface\\Common\\WhiteIconFrame"
-local CHOSEN = "Interface\\QuestFrame\\UI-QuestItemHighlight"
+-- (One table, not a local each: this file's at Lua's limit of 200.)
+local ART = {
+	ICON = 39, BUTTON_HIGH = 41, ROW_STEP = 44,
+	NAME_FRAME = "Interface\\QuestFrame\\UI-QuestItemNameFrame",
+	ICON_FRAME = "Interface\\Common\\WhiteIconFrame",
+	CHOSEN = "Interface\\QuestFrame\\UI-QuestItemHighlight",
+	NAME_CUTS = { 0, 24, 104, 128 },
+	CHOSEN_CUTS = { 0, 61, 141, 256 },
+}
 -- (Our buttons are wider than the game's 147, so the name frame and the
 -- glow come in three: their ends as drawn, only the middle stretched; a
 -- whole stretched frame thickens its edges and pulls the glow off them.
 -- Cut at the name frame's x 24 and 104 of 128, the glow's 61 and 141 of 256
--- at -8 on the button: the same places on the game's button.)
-local NAME_CUTS = { 0, 24, 104, 128 }
-local CHOSEN_CUTS = { 0, 61, 141, 256 }
+-- at -8 on the button: the same places on the game's button: ART's cuts.)
 -- Three textures of file side by side from the first's anchor, cut at
 -- cuts (of the file's width); the middle one is sized later.
 local function ThreeParts(b, layer, sub, file, cuts, blend)
@@ -1300,14 +1379,14 @@ local function AddIcon(entry)
 		-- the icon, the name 15 into it, and the warband mark at the name's
 		-- top right.
 		b = CreateFrame("Button", nil, panel)
-		b.nameFrame = ThreeParts(b, "BACKGROUND", -1, NAME_FRAME, NAME_CUTS)
+		b.nameFrame = ThreeParts(b, "BACKGROUND", -1, ART.NAME_FRAME, ART.NAME_CUTS)
 		b.icon = b:CreateTexture(nil, "BACKGROUND")
-		b.icon:SetSize(ICON, ICON)
+		b.icon:SetSize(ART.ICON, ART.ICON)
 		b.icon:SetPoint("TOPLEFT")
 		b.nameFrame[1]:SetPoint("LEFT", b.icon, "RIGHT", -10, 0)
 		b.border = b:CreateTexture(nil, "OVERLAY", nil, 1)
 		b.border:SetAllPoints(b.icon)
-		b.border:SetTexture(ICON_FRAME)
+		b.border:SetTexture(ART.ICON_FRAME)
 		b.count = b:CreateFontString(nil, "OVERLAY", "NumberFontNormal")
 		b.count:SetPoint("BOTTOMRIGHT", b.icon, -1, 1)
 		b.name = b:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
@@ -1318,7 +1397,7 @@ local function AddIcon(entry)
 		b.mark:SetPoint("TOPLEFT", b.name, "TOPRIGHT", 0, 3)
 		-- (Over the name frame and icon, as the game's: under them only its
 		-- edges showed, a yellow bar above the button.)
-		b.chosen = ThreeParts(b, "ARTWORK", 0, CHOSEN, CHOSEN_CUTS, "ADD")
+		b.chosen = ThreeParts(b, "ARTWORK", 0, ART.CHOSEN, ART.CHOSEN_CUTS, "ADD")
 		-- (6 down, not the game's 7: at 7 it sat high on ours, tested.)
 		b.chosen[1]:SetPoint("TOPLEFT", b, "TOPLEFT", -8, 6)
 		b:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight", "ADD")
@@ -1347,17 +1426,17 @@ local function AddIcon(entry)
 	-- (Wider than the game's 147: the name frame's and glow's middles take
 	-- the extra.)
 	local wide = IconWidth()
-	b:SetSize(wide, BUTTON_HIGH)
+	b:SetSize(wide, ART.BUTTON_HIGH)
 	local middle = 80 + wide - 147
 	b.nameFrame[2]:SetWidth(middle)
 	b.chosen[2]:SetWidth(middle)
 	b.name:ClearAllPoints()
 	b.name:SetPoint("LEFT", b.nameFrame[1], "LEFT", 15, 0)
-	b.name:SetWidth(wide - ICON + 10 - 15 - 16)
+	b.name:SetWidth(wide - ART.ICON + 10 - 15 - 16)
 	b:ClearAllPoints()
 	b:SetPoint("TOPLEFT", 14 + iconColumn * (wide + 8), -cursor - 4)
 	if iconColumn == 1 then
-		cursor = cursor + ROW_STEP
+		cursor = cursor + ART.ROW_STEP
 	end
 	iconColumn = 1 - iconColumn
 	if entry.atlas then
@@ -1398,7 +1477,7 @@ end
 
 local function EndIcons()
 	if iconColumn == 1 then
-		cursor = cursor + ROW_STEP
+		cursor = cursor + ART.ROW_STEP
 		iconColumn = 0
 	end
 end
@@ -1440,13 +1519,12 @@ local function SetButtons(first, second)
 	cursor = cursor + 26
 end
 
--- Where the list goes: while the bubble's over the NPC's head (Over the
--- NPC's head, and they have a plate), beside it, following them, its top
--- level with the bubble's (on the right; on the left where that runs off the
--- screen, when it can be measured), and not dragged; else just below the
--- middle of the screen, or where it was last dragged (db.questTalkSpot: its
--- top middle, as shares of the screen, so it still fits after a change of
--- resolution or UI scale). Off a head, the two are dragged each on its own.
+-- Where the list goes: with the bubble, below it or beside it, its top level
+-- with the bubble's (on the right; on the left where that runs off the
+-- screen, when it can be measured), and moved by dragging either. Separate:
+-- just below the middle of the screen, or where it was last dragged
+-- (db.questTalkSpot: its top middle, as shares of the screen, so it still
+-- fits after a change of resolution or UI scale).
 local FOLLOW_GAP = 12 -- between the bubble and the list, beside it
 local function ToUI()
 	local scale, uiScale = Plain(panel:GetEffectiveScale()), Plain(UIParent:GetEffectiveScale())
@@ -1461,7 +1539,11 @@ local function PlacePanel()
 	panel.following = bubble ~= nil and bubble.follow == true
 	if panel.following and not bubble:IsShown() then
 		-- (No words, so no bubble: the card where it would be.)
-		panel:SetPoint("BOTTOM", bubble, "BOTTOM")
+		if PlaceMode() == "opposite" then
+			panel:SetPoint("BOTTOM", bubble, "BOTTOM")
+		else
+			panel:SetPoint("TOP", bubble, "TOP")
+		end
 		return
 	elseif panel.following and talk.cardBelow then
 		panel:SetPoint("TOP", bubble, "BOTTOM", 0, -FOLLOW_GAP)
@@ -1512,18 +1594,24 @@ local function Dropped()
 	PlacePanel()
 end
 
--- Dragging the list (or anything on it) moves it, unless it's following the
--- bubble over the NPC's head.
+-- Dragging the list (or anything on it) moves it; going with the bubble, it
+-- moves the bubble (not over the NPC's head: that follows them).
 function Draggable(frame)
 	frame:RegisterForDrag("LeftButton")
 	frame:SetScript("OnDragStart", function()
 		if panel.following then
+			if bubble:IsShown() then bubble:GetScript("OnDragStart")(bubble) end
 			return
 		end
 		panel.moving = true
 		panel:StartMoving()
 	end)
-	frame:SetScript("OnDragStop", Dropped)
+	frame:SetScript("OnDragStop", function()
+		if bubble.moving then
+			bubble:GetScript("OnDragStop")(bubble)
+		end
+		Dropped()
+	end)
 end
 
 -- The game's Edit Mode (Core.lua's ns.OnEditMode): with Quest Talk on, a box
@@ -1594,7 +1682,8 @@ do
 		return box
 	end
 	ns.OnEditMode(function()
-		if ns.QuestVisionSetting("questTalk") then
+		-- (Only Separate has a spot of its own: else it goes with the bubble.)
+		if ns.QuestVisionSetting("questTalk") and ns.db.questTalkCardSide == "separate" then
 			Box()
 			PlaceBox()
 			box:Show()
@@ -1631,11 +1720,12 @@ local function FinishPanel()
 	panel:SetHeight(high)
 	-- (A parchment card: the quest's emblem over its page, fitted to it.)
 	local seal = talk.seal and panel.page:IsShown() and talk.seal
+	local part = talk.cardBelow and "bottom" or nil -- (as the bubble's: ShowPage)
 	if talk.pageArt and panel.page:IsShown() then
-		SetArtFitted(panel.page, talk.pageArt, panelWidth - 6, high - 6, "bottom")
+		SetArtFitted(panel.page, talk.pageArt, panelWidth - 6, high - 6, part)
 	end
 	if seal then
-		SetArtFitted(panel.seal, seal, panelWidth - 6, high - 6, "bottom")
+		SetArtFitted(panel.seal, seal, panelWidth - 6, high - 6, part)
 	end
 	panel.seal:SetShown(seal and true or false)
 	panel:SetScale(tonumber(Styled("questTalkScale")) or 1)
@@ -2111,6 +2201,10 @@ function Show(keepPage)
 		CreateBubble()
 	end
 	local page = talk.page
+	-- (Read now, for the first Place: they're parked after it.)
+	for _, name in ipairs(WINDOWS) do
+		if _G[name] and not parked[_G[name]] then NoteHome(_G[name]) end
+	end
 	bubble.name:SetText(SpeakerName())
 	local portrait = bubble.portrait
 	local face = Styled("questTalkPortrait") and ns.Flag(UnitExists("npc"))
@@ -2123,12 +2217,9 @@ function Show(keepPage)
 	-- (Its words start right of the portrait, under it in the corner.)
 	bubble.indent = face and PORTRAIT / 2 + 6 or PAD_X
 	bubble.name:SetPoint("TOPLEFT", bubble.indent, -PAD_Y)
-	-- The card: below the bubble (questTalkCardSide) while that's over their
-	-- head, as wide as it; and dressed as it (questTalkCardSame), its colors
-	-- to suit.
-	local mode = PlaceMode()
+	-- The card: below the bubble (questTalkCardSide), as wide as it; and
+	-- dressed as it (questTalkCardSame), its colors to suit.
 	talk.cardBelow = ns.db.questTalkCardSide == "below"
-		and (mode == "head" and NpcPlate() ~= nil or mode == "opposite")
 	panelWidth = talk.cardBelow and TEXT_WIDTH + bubble.indent + PAD_X or PANEL_WIDTH
 	panel:SetWidth(panelWidth)
 	local look = CurrentLook()
@@ -2159,7 +2250,6 @@ function Show(keepPage)
 	-- On the bubble's right it's as tall as the bubble: more than fits there,
 	-- and the rewards' "also received" goes on a second page.
 	local beside = not talk.cardBelow and ns.db.questTalkCardSide ~= "separate"
-		and (mode == "head" and NpcPlate() ~= nil or mode == "opposite")
 	local limit = beside and FullHeight() + 12 + 4 + 14 + PAD_Y * 2 + (talk.title and 22 or 0)
 	if talk.canSplit and limit and cursor + 28 > limit then
 		talk.split = true
@@ -2244,7 +2334,8 @@ local function CreatePanel()
 		ns.WhyRegister(panel, L["Quest talk"], "Quest Vision", {
 			L["Quest talk is on: talking to an NPC, what they say and what you can say back show here " ..
 				"instead of the game's window"],
-			L["Show the game's window brings the game's own window back for the rest of the conversation"] })
+			L["Show the game's window brings the game's own window back for the rest of the conversation"],
+			L["Fade if another addon competes: it stays away while another addon has the conversation"] })
 	end
 	panel:SetFrameStrata("HIGH")
 	panel:SetWidth(PANEL_WIDTH)
@@ -2311,7 +2402,7 @@ local CLOSES = { GOSSIP_CLOSED = true, QUEST_FINISHED = true }
 local function TalkWindowOpen()
 	for _, name in ipairs(WINDOWS) do
 		local frame = _G[name]
-		if frame and ns.Flag(frame:IsShown()) and not TuckedAway(frame) then
+		if frame and ns.Flag(frame:IsShown()) and not Competing(frame) then
 			return true
 		end
 	end
@@ -2341,7 +2432,7 @@ function TalkState()
 	for _, name in ipairs(WINDOWS) do
 		local frame = _G[name]
 		if frame and ns.Flag(frame:IsShown()) then
-			open[#open + 1] = name .. (TuckedAway(frame) and " tucked away by an addon"
+			open[#open + 1] = name .. (Competing(frame) and " taken over by an addon"
 				or parked[frame] and " parked" or " in view")
 		end
 	end
@@ -2652,12 +2743,16 @@ local function HookWindows()
 		local frame = _G[name]
 		if frame then
 			hooksecurefunc(frame, "SetPoint", Moved)
+			hooksecurefunc(frame, "SetAlpha", AlphaSet)
 			-- (Parked as it shows, so it doesn't flash up for a frame first.)
 			frame:HookScript("OnShow", function(self)
-				if ns.db and Setting("questTalk") and not gameWindow and not TuckedAway(self) then Park(self) end
+				-- (See-through since before it showed: not our parking, so another addon's.)
+				if not parked[self] and (Plain(self:GetAlpha()) or 1) < 0.05 then competed[self] = true end
+				if ns.db and Setting("questTalk") and not gameWindow and not Competing(self) then Park(self) end
 				ns.LogDetail("questtalk", ("%s shown%s"):format(name, parked[self] and ", parked" or ""))
 			end)
-			frame:HookScript("OnHide", function()
+			frame:HookScript("OnHide", function(self)
+				competed[self] = nil
 				ns.LogDetail("questtalk", name .. " hidden")
 				if Shown() then ScheduleClose() end
 			end)

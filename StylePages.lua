@@ -738,6 +738,12 @@ local TEXTURES = {
 	{ "rime", "Rime", OURS .. "Rime" },
 	{ "reel", "Reel", OURS .. "Reel" },
 	{ "tile", "Tile", OURS .. "Tile" }, -- (smooth, for tall bars: the themes' raid frames)
+	-- (Quiet ones that hold up on a big bar: Media/make_shape_art.py.)
+	{ "brushed", "Brushed", OURS .. "Brushed" },
+	{ "worn", "Worn", OURS .. "Worn" },
+	{ "linen", "Linen", OURS .. "Linen" },
+	{ "satin", "Satin", OURS .. "Satin" },
+	{ "hammered", "Hammered", OURS .. "Hammered" },
 }
 
 -- Whether this client has a texture (an atlas: the game says; a file: assumed).
@@ -986,7 +992,7 @@ local function PlainNumber(value) return type(value) == "number" and not (issecr
 function ns.SetTextShadow(text, value)
 	if not (text and text.SetShadowOffset) then return end
 	local own = text.cineShadow
-	if value == "on" or value == "none" then
+	if value == "on" or value == "none" or value == "soft" then
 		if not own then
 			local _, x, y = pcall(text.GetShadowOffset, text)
 			local _, r, g, b, a = pcall(text.GetShadowColor, text)
@@ -996,6 +1002,9 @@ function ns.SetTextShadow(text, value)
 		if value == "on" then
 			text:SetShadowOffset(1, -1)
 			text:SetShadowColor(0, 0, 0, 1)
+		elseif value == "soft" then -- (a theme's: barely there, for clean lettering)
+			text:SetShadowOffset(0.5, -0.5)
+			text:SetShadowColor(0, 0, 0, 0.45)
 		else
 			text:SetShadowOffset(0, 0)
 		end

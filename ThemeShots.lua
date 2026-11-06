@@ -13,6 +13,7 @@
 local _, ns = ...
 
 local SETTLE, AFTER = 1.8, 0.7 -- (seconds: a card plays in; the shot's written)
+local QUICK_SETTLE, QUICK_AFTER = 0.5, 0.5 -- (the same with no card to wait for)
 local COLUMNS, CELL_W, CELL_H, HEAD_H, GAP = 3, 480, 300, 22, 12
 local STRIP_H = 30
 
@@ -188,8 +189,15 @@ local function LogCutWords(theme, scene)
 		table.concat(list, " | ")))
 end
 
-local function Steps(themes)
+local function Steps(themes, quick)
 	local steps = {}
+	for _, theme in ipairs(themes) do
+		-- (unitframes: a shot of the real screen each, nothing else up, quickly.)
+		if quick then
+			steps[#steps + 1] = { theme = theme, scene = "unit frames", quick = true }
+		end
+	end
+	if quick then return steps end
 	for _, theme in ipairs(themes) do
 		for _, board in ipairs(BOARDS) do
 			steps[#steps + 1] = { theme = theme, board = board, scene = board.name }
@@ -225,6 +233,8 @@ local function Play(steps, index, token)
 			GameTooltip:Hide()
 		else
 			screen:Hide()
+		end
+		if not step.board and not step.quick then
 			GameTooltip:SetOwner(UIParent, "ANCHOR_NONE")
 			GameTooltip:ClearAllPoints()
 			GameTooltip:SetPoint("CENTER", UIParent, "CENTER", 0, 120)
@@ -240,11 +250,12 @@ local function Play(steps, index, token)
 		Finish("themeshots: stopped on an error, your settings are back: " .. tostring(err))
 		return
 	end
-	C_Timer.After(SETTLE, function()
+	C_Timer.After(step.quick and QUICK_SETTLE or SETTLE, function()
 		if run ~= token then return end
 		LogCutWords(step.theme, step.scene)
+		if step.quick and ns.UnitStyleState then ns.Log("style", step.theme.key .. " " .. ns.UnitStyleState()) end
 		Screenshot()
-		C_Timer.After(AFTER, function() Play(steps, index + 1, token) end)
+		C_Timer.After(step.quick and QUICK_AFTER or AFTER, function() Play(steps, index + 1, token) end)
 	end)
 end
 
@@ -314,6 +325,53 @@ function ns.BubbleShots(text)
 	end)
 end
 
+-- /cine debug themecheck: every theme straight after every other, then the game's,
+-- checking the parts of the frames we move come back exactly where the game had them.
+-- A step a frame, so the game keeps drawing; your settings come back at the end.
+function ns.ThemeCheck()
+	if run or InCombatLockdown() or not ns.UnitStyleSpots then
+		ns.Print("themecheck: not now (in a fight, or shots running).")
+		return
+	end
+	local kept = ns.StyleSnapshot()
+	local list = ns.StyleThemeList()
+	ns.ApplyStyleTheme("game", true)
+	local want, bad, tried = ns.UnitStyleSpots(), {}, 0
+	local a, b = 1, 1
+	local function Done(text)
+		ns.RestoreStyleSnapshot(kept)
+		ns.Print(text)
+	end
+	local function Step()
+		if InCombatLockdown() then return Done("themecheck: stopped, a fight started. Your settings are back.") end
+		if not list[a] then
+			local count = 0
+			for _ in pairs(bad) do count = count + 1 end
+			return Done(("themecheck: %d theme pairs, %d parts didn't come back%s"):format(tried, count,
+				count > 0 and " (in the log)." or "."))
+		end
+		local ok, err = pcall(function()
+			ns.ApplyStyleTheme(list[a].key, true)
+			ns.ApplyStyleTheme(list[b].key, true)
+			ns.ApplyStyleTheme("game", true)
+		end)
+		if not ok then return Done("themecheck: stopped on an error: " .. tostring(err)) end
+		tried = tried + 1
+		local got = ns.UnitStyleSpots()
+		for key, was in pairs(want) do
+			if got[key] ~= was and not bad[key] then
+				bad[key] = true
+				ns.Log("style", ("themecheck %s > %s: %s was %s, now %s"):format(list[a].key, list[b].key, key, was, tostring(got[key])))
+			end
+		end
+		b = b + 1
+		if not list[b] then a, b = a + 1, 1 end
+		C_Timer.After(0, Step)
+	end
+	ns.Print(("themecheck: %d pairs, about a minute. Target something first for the target frame."):format(#list * #list))
+	Step()
+end
+
 function ns.ThemeShots(text)
 	text = (text or ""):match("^%s*(.-)%s*$"):lower()
 	if text == "off" then
@@ -336,6 +394,8 @@ function ns.ThemeShots(text)
 		ns.Print("themeshots: this client has no Screenshot.")
 		return
 	end
+	local quick = text == "unitframes" or text:find("^unitframes ") ~= nil
+	if quick then text = text:gsub("^unitframes%s*", "") end
 	local themes = {}
 	for _, theme in ipairs(ns.StyleThemeList()) do
 		if text == "" or text == theme.key or text == theme.name:lower() then themes[#themes + 1] = theme end
@@ -353,9 +413,9 @@ function ns.ThemeShots(text)
 	local held = PlatesOn(db)
 	Strip()
 	Boards()
-	local steps = Steps(themes)
+	local steps = Steps(themes, quick)
 	ns.Print(("themeshots: %d shots, about %d seconds. Client %s, theme now %s, Style %s, UI scale %.2f, UI alpha %.2f."):format(
-		#steps, math.ceil(#steps * (SETTLE + AFTER)), ns.isRetail and "retail" or "classic", tostring(db.styleTheme),
+		#steps, math.ceil(#steps * (quick and QUICK_SETTLE + QUICK_AFTER or SETTLE + AFTER)), ns.isRetail and "retail" or "classic", tostring(db.styleTheme),
 		db.styleGeneral and "on" or "off", UIParent:GetEffectiveScale(), UIParent:GetAlpha()))
 	-- (Two lines at most: three open the debug copy window, over the shots.)
 	ns.Print(("themeshots: %d nameplate settings held by CineMode, left alone. %s Best beside NPCs, with a target, outside CineMode."):format(

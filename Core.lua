@@ -183,6 +183,7 @@ local DEFAULTS = {
 	revealOnDrag = false,     -- bring the UI back while something's held on the cursor (dragging)
 	returnDelay = 15,         -- seconds things must stay calm (no cast, window...) before CineMode returns
 	stayWithWindows = true, -- stay cinematic when opening the spellbook, options and similar
+	pauseCamsInWindows = true, -- an open window pauses a playing scene and holds new ones (Scenes page)
 	portraitWhenNotFull = true, -- keep the player portrait up while health or power isn't full, within
 	                            -- the Calm Timer (calmTime) of combat or after coming back to life
 	prdWhenNotFull = true,      -- ...and the personal resource display (its own tick)
@@ -1046,9 +1047,11 @@ local questMarkDefault = (C_Texture and C_Texture.GetAtlasInfo and C_Texture.Get
 	and "crosshair_track_48" or "smallquestbang"
 DEFAULTS.questMarkStyle = questMarkDefault
 DEFAULTS.questMarkStyleEnemy = questMarkDefault
-DEFAULTS.targetQuestIcon = true -- a quest icon on the target frame while your target is one of them (see QuestMobs)
+DEFAULTS.targetQuestIcon = false -- a quest icon on the target frame while your target is one of them (see QuestMobs)
+DEFAULTS.questMarkFade = true -- our mark stays off a unit another addon has its own icon on (ns.QuestieMarks)
 -- The nearest tracked quest's item to use on a big button at the extra ability button's spot (see QuestItemButton)
 DEFAULTS.questItemButton = true
+DEFAULTS.questItemFade = true -- it stays away while another addon has a button for the item (ns.QuestieItemButton)
 DEFAULTS.questObjectGlow = false -- the quest object soft targeting picks glows (see QuestGlow; changes interact settings)
 DEFAULTS.hideObjectIcons = false -- the game's icon over objects held off while the glow isn't (QuestGlow)
 -- Talking to an NPC: their words in a bubble over them, the replies in a list,
@@ -1063,6 +1066,7 @@ DEFAULTS.questTalkStyle = "parchment" -- or "bubble" (the game's chat bubble)
 DEFAULTS.questTalkPlace = "fixed"
 DEFAULTS.questTalkShopFollow = true -- Opposite clicked: a shop window opened from the talk goes where the talk was
 DEFAULTS.questTalkGameButton = true -- "Show the game's window" on the card
+DEFAULTS.questTalkFade = true -- ours stay away while another addon has the conversation (QuestTalk's Competing)
 DEFAULTS.questTalkStill = true -- Over the head: the quest camera holds still (no drift) while it's up
 DEFAULTS.questTalkCamMove = "follow" -- Over the head, while the camera moves: "follow", "fade", "dim" or "wait" (see QuestTalk)
 DEFAULTS.questTalkKeys = true         -- 1-0 pick, Space turns the page / first button
@@ -1852,6 +1856,16 @@ function ns.MenuWindowOpen()
 end
 ns.MenuWindowOpen = ns.Profiled("MenuWindowOpen", OncePerFrame(ns.MenuWindowOpen))
 
+-- Whether an open window pauses the cameras (Scenes page's pauseCamsInWindows):
+-- no scene triggers, and a playing one waits where it is and carries on as the
+-- window closes. Every trigger asks, but those a window starts: a quest giver's
+-- or an Interaction's, whose window is the point. Not for a camera's Test
+-- button: the options are open then.
+function ns.WindowPausesCams()
+	if ns.cameraTesting or (ns.db and not ns.db.pauseCamsInWindows) then return false end
+	return ns.NPCWindowOpen() or ns.MenuWindowOpen()
+end
+
 local function AnyRevealFrameShown()
 	return (not ns.db.stayWithWindows and AnyShown(REVEAL_WHILE_SHOWN))
 		or (ns.db.revealAtNPCs and AnyShown(REVEAL_AT_NPCS))
@@ -2213,6 +2227,12 @@ function ns.IsCameraOffHere(cam)
 	return ns.CameraOffBesidesRows(cam) or ns.CameraRowsOff(cam)
 end
 ns.IsCameraOffHere = ns.Profiled("IsCameraOffHere", ns.IsCameraOffHere)
+-- Whether a camera plays here, its own code or as its script (off by
+-- ns.IsCameraOffHere then, but its row picked it): for what goes with it
+-- rather than what moves the view, like its row's CineMode tick.
+function ns.CameraPlaysHere(cam)
+	return not ns.IsCameraOffHere(cam) or (ns.CameraRowsScripted(cam) and not ns.CameraOffBesidesRows(cam))
+end
 -- Why ns.IsCameraOffHere has a camera off, in words (nil: it isn't), for
 -- /cine debug mode.
 function ns.CameraOffWhy(cam)
@@ -5414,6 +5434,15 @@ ticker:SetScript("OnEvent", ns.Profiled("Core events", function(self, event, arg
 			if (ns.db.liveProfile or ns.db.profile) == "Subtle" then ns.SubtleCineTravel(ns.db) end
 			ns.SubtleCineTravel(ns.db.profiles and ns.db.profiles.Subtle)
 			ns.db.subtleCineTravelV1 = true
+		end
+		-- Scenes a profile had off keep their cameras, ticked off: ns.ScenesOffKeepCameras. Once.
+		if not ns.db.scenesOffKeepCamerasV1 then
+			if not ns.newInstall then
+				ns.ScenesOffKeepCameras(ns.db)
+				for _, saved in pairs(ns.db.profiles or {}) do ns.ScenesOffKeepCameras(saved) end
+				for _, saved in pairs(ns.db.profileResetPoints or {}) do ns.ScenesOffKeepCameras(saved) end
+			end
+			ns.db.scenesOffKeepCamerasV1 = true
 		end
 		-- Always show tanks (healVisionTanks) is now the tank slider at 100%:
 		-- unticked, tanks went by the members' health, so they still do. Once,

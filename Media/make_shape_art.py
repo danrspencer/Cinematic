@@ -5,7 +5,6 @@ Textures/Themes/Shapes/:
 Panel<Name>.tga and Panel<Name>Edge.tga: a panel's fill and its line, 128x128, white
 on clear, drawn as nine pieces whose corners are a quarter each (ns.DressThemeSlice);
 twice the size they're drawn at, so a corner stays smooth at any UI scale.
-NameShade.tga: a soft patch behind a unit frame's name, 128x32.
 Tail.tga and TailEdge.tga: a chat bubble's tail and the line down its sides, 128x128.
 Bar<Name>.tga: a mask for a bar, 256x32, white on clear: what's clear is cut away.
 Portrait<Name>.tga and Portrait<Name>Ring.tga: a portrait's mask and the line
@@ -13,6 +12,7 @@ round it, 128x128, white on clear. Portrait<Name>Cut.tga: what cuts the real one
 """
 import math
 import os
+import random
 
 from PIL import Image, ImageChops, ImageDraw, ImageFilter
 
@@ -96,13 +96,17 @@ def mirrored(corner):
     return poly(list(reversed(top_left)) + top_right + bottom_right + bottom_left)
 
 
+def panel_soft(d, s):
+    d.rounded_rectangle((1 * s, 1 * s, 63 * s, 63 * s), radius=6 * s, fill=255)
+
+
 def panel_leaf(d, s):
     # (Two corners swept round, two left sharp: a leaf's outline.)
     d.rounded_rectangle((1 * s, 1 * s, 63 * s, 63 * s), radius=15 * s, fill=255, corners=(False, True, False, True))
 
 
 PANELS = {"Round": panel_round, "Chamfer": panel_chamfer, "Blade": panel_blade, "Notch": panel_notch,
-          "Sigil": panel_sigil, "Veil": panel_veil, "Leaf": panel_leaf,
+          "Sigil": panel_sigil, "Veil": panel_veil, "Leaf": panel_leaf, "Soft": panel_soft,
           # (Art deco steps, a plate's square-cut corners, a gem's two facets.)
           "Deco": lambda d, s: mirrored([(9, 1), (9, 5), (5, 5), (5, 9), (1, 9)])(d, s),
           "Plate": lambda d, s: mirrored([(7, 1), (7, 7), (1, 7)])(d, s),
@@ -137,14 +141,6 @@ def tail():
 # Bars: 256x32. A mask stretches with its bar, so the ends are drawn long.
 def bar_capsule(d, s):
     d.rounded_rectangle((0, 1 * s, 256 * s, 31 * s), radius=15 * s, fill=255)
-
-
-def bar_point(d, s):
-    poly([(0, 16), (12, 1), (244, 1), (256, 16), (244, 31), (12, 31)])(d, s)
-
-
-def bar_barb(d, s):
-    poly([(0, 1), (244, 1), (256, 16), (244, 31), (0, 31), (12, 16)])(d, s)
 
 
 def bar_chisel(d, s):
@@ -190,27 +186,177 @@ def portrait_eye(d, s):
 
 
 def portrait_shield(d, s):
-    # (Flat across the top, curving in to a point.)
-    side = [(120 - 56 * (i / 24) ** 2.4, 8 + 116 * (i / 24)) for i in range(25)]
-    d.polygon([(x * s, y * s) for x, y in [(8, 8)] + [(128 - x, y) for x, y in reversed(side)][:0] + side +
-               [(128 - x, y) for x, y in reversed(side)]], fill=255)
+    # (Flat across the top, straight sides, a full round bottom.)
+    side = []
+    for i in range(49):
+        t = i / 48
+        side.append((64 + 56 * max(0, 1 - t ** 3) ** 0.5, 8 + 116 * t))
+    d.polygon([(x * s, y * s) for x, y in [(8, 8)] + side + [(128 - x, y) for x, y in reversed(side)]], fill=255)
 
 
 def portrait_petal(d, s):
-    # (A circle drawn up to a point.)
-    cx, cy, r = 64, 78, 47
-    tip = (64, 2)
-    reach = math.acos(r / (cy - tip[1]))
-    arc = [(cx + r * math.cos(a), cy + r * math.sin(a))
-           for a in (-math.pi / 2 + reach + i * (2 * math.pi - 2 * reach) / 64 for i in range(65))]
-    d.polygon([(x * s, y * s) for x, y in [tip] + arc], fill=255)
+    # (Rounded, with two corners left sharp: the Leaf panel's outline.)
+    d.rounded_rectangle((4 * s, 4 * s, 124 * s, 124 * s), radius=50 * s, fill=255, corners=(False, True, False, True))
 
 
 PORTRAITS = {"Hex": poly(regular(6, math.pi / 6)), "Diamond": poly([(64, 2), (126, 64), (64, 126), (2, 64)]),
              "Arch": portrait_arch, "Eye": portrait_eye, "Shield": portrait_shield, "Petal": portrait_petal,
              "Octagon": poly(regular(8, math.pi / 8)),
-             "Crystal": poly([(64, 2), (104, 32), (104, 96), (64, 126), (24, 96), (24, 32)]),
-             "Shard": poly([(66, 2), (112, 30), (126, 78), (72, 126), (20, 106), (2, 44)])}
+             "Crystal": poly(regular(6, 0)),
+             "Cut": poly([(22, 2), (106, 2), (126, 22), (126, 106), (106, 126), (22, 126), (2, 106), (2, 22)])}
+
+
+def noise(size, seed, blur):
+    """Grey noise, the same each time the art's drawn, spread back out to full range."""
+    rng = random.Random(seed)
+    im = Image.new("L", size)
+    im.putdata([rng.randrange(256) for _ in range(size[0] * size[1])])
+    im = im.filter(ImageFilter.GaussianBlur(blur))
+    low, high = im.getextrema()
+    return im.point(lambda v: (v - low) * 255 // max(1, high - low))
+
+
+def worn(alpha):
+    """A ring as worn metal: lit from the top left, shaded to the bottom right, mottled.
+    Grey on its way to the theme's color, so wear shows in any of them."""
+    w, h = alpha.size
+    light = Image.new("L", (w, h))
+    light.putdata([int(255 - 60 * (x + y) / (w + h)) for y in range(h) for x in range(w)])
+    blotch = noise((w, h), 3, 2.2).point(lambda v: 205 + v * 50 // 255)
+    grey = ImageChops.multiply(light, blotch)
+    return Image.merge("RGBA", (grey, grey, grey, alpha))
+
+
+def shade(cut_alpha):
+    """Dark just inside a shape's edge: sets the picture back into its ring."""
+    outside = ImageChops.invert(cut_alpha).filter(ImageFilter.GaussianBlur(7))
+    edge = ImageChops.multiply(outside, cut_alpha).point(lambda v: min(255, v * 2))
+    black = Image.new("L", cut_alpha.size, 0)
+    return Image.merge("RGBA", (black, black, black, edge))
+
+
+def grit():
+    """Dirt to lay over flat fills: in patches, with bare stretches between, as dirt
+    gathers. Bigger than any bar, which each shows a patch of its own (UnitStyle.lua)."""
+    size = (512, 128)
+    patches = noise(size, 21, 16).point(lambda v: max(0, v - 118) * 3)
+    fine = noise(size, 11, 0.7).point(lambda v: max(0, v - 138) * 3)
+    specks = ImageChops.multiply(fine, patches)
+    smudge = ImageChops.multiply(noise(size, 12, 9).point(lambda v: max(0, v - 130)), patches)
+    dirt = ImageChops.add(specks, smudge)
+    d = ImageDraw.Draw(dirt)
+    rng = random.Random(13)
+    for _ in range(14):
+        x, y = rng.randrange(512), rng.randrange(128)
+        reach = rng.randrange(6, 26)
+        d.line([(x, y), (x + reach, y + rng.randrange(-3, 4))], fill=rng.randrange(50, 100))
+    black = Image.new("L", size, 0)
+    Image.merge("RGBA", (black, black, black, dirt)).save(os.path.join(OUT, "Grit.tga"), compression=None)
+
+
+def sheen():
+    """Light over a flat bar: bright along the top, falling to shade along the bottom,
+    darker toward both ends. One RGBA picture, white where it lights, black where it shades."""
+    w, h = 256, 64
+    grey, alpha = Image.new("L", (w, h)), Image.new("L", (w, h))
+    tones, strengths = [], []
+    for y in range(h):
+        t = y / (h - 1)
+        for x in range(w):
+            edge = abs(x / (w - 1) - 0.5) * 2
+            dark = 0.46 * max(0, (t - 0.42) / 0.58) ** 1.3 + 0.16 * edge ** 3
+            light = 0.12 * max(0, 1 - t / 0.42) ** 1.5
+            tones.append(255 if light > dark else 0)
+            # (Their difference: nothing where they meet, or that line shows as a curve.)
+            strengths.append(int(255 * abs(light - dark)))
+    grey.putdata(tones)
+    alpha.putdata(strengths)
+    Image.merge("RGBA", (grey, grey, grey, alpha)).save(os.path.join(OUT, "Sheen.tga"), compression=None)
+
+
+def collar():
+    """The piece between a portrait and its rows, 72x192, four times its size in the game:
+    a dark inside between a lit rim, its corners cut small at 45 degrees, in a soft shadow.
+    Tinted to the ring."""
+    # (Open at the rows' end, which it runs up to, with no margin there.)
+    w, h, m, c, r = 72, 192, 10, 9, 2
+    shape = [(m + c, m), (w - r - c, m), (w - r, m + c), (w - r, h - m - c), (w - r - c, h - m), (m + c, h - m),
+             (m, h - m - c), (m, m + c)]
+    big = Image.new("L", (w * SS, h * SS), 0)
+    ImageDraw.Draw(big).polygon([(x * SS, y * SS) for x, y in shape], fill=255)
+    body = big.resize((w, h), Image.LANCZOS)
+    rim = outline(big, 5).resize((w, h), Image.LANCZOS)
+    shadow = body.filter(ImageFilter.GaussianBlur(5)).point(lambda v: v * 150 // 255)
+    wear = noise((w, h), 41, 1.8).point(lambda v: 30 + v * 40 // 255)
+    # (Lit along the top of the rim, shaded along the bottom.)
+    light = ramp((w, h), 250, 130)
+    grey = Image.composite(light, wear, rim)
+    grey = Image.composite(grey, Image.new("L", (w, h), 0), body)
+    alpha = ImageChops.lighter(shadow, body)
+    # (The middle piece, right across: a lit strap tying the ring to the rows, with a
+    # dark line under it to set it on the box.)
+    strap = ImageDraw.Draw(grey)
+    mid = h // 2
+    # (As thin as the rim.)
+    strap.rectangle((0, mid - 2, w, mid + 2), fill=190)
+    strap.rectangle((0, mid + 3, w, mid + 4), fill=0)
+    ImageDraw.Draw(alpha).rectangle((0, mid - 2, w, mid + 4), fill=255)
+    Image.merge("RGBA", (grey, grey, grey, alpha)).save(os.path.join(OUT, "Collar.tga"), compression=None)
+
+
+def frame_shadow():
+    """A soft dark edge to lay behind a frame's rows, 128x64."""
+    big = Image.new("L", (128, 64), 0)
+    ImageDraw.Draw(big).rectangle((10, 10, 118, 54), fill=255)
+    soft = big.filter(ImageFilter.GaussianBlur(4)).point(lambda v: v * 170 // 255)
+    black = Image.new("L", (128, 64), 0)
+    Image.merge("RGBA", (black, black, black, soft)).save(os.path.join(OUT, "RowShadow.tga"), compression=None)
+
+
+def fill(name, grey):
+    """A bar fill in ../Bars: grey over white, the bar's color tints it. Opaque."""
+    w, h = grey.size
+    Image.merge("RGBA", (grey, grey, grey, Image.new("L", (w, h), 255))).save(
+        os.path.join(ROOT, "Textures", "Bars", name + ".tga"), compression=None)
+
+
+def ramp(size, top, bottom):
+    """Top to bottom, from one level of grey to another."""
+    w, h = size
+    im = Image.new("L", size)
+    im.putdata([int(top + (bottom - top) * y / (h - 1)) for y in range(h) for _ in range(w)])
+    return im
+
+
+def mix(base, texture, low):
+    """base darkened by texture, from low (0 to 1) of itself where texture's black."""
+    return ImageChops.multiply(base, texture.point(lambda v: int(255 * low + v * (1 - low))))
+
+
+def bars():
+    size = (256, 32)
+    base = ramp(size, 255, 226)
+    # (Long fine strokes along the bar, as on rubbed metal.)
+    rng = random.Random(31)
+    streaks = Image.new("L", size)
+    streaks.putdata([v for v in (rng.randrange(256) for _ in range(32)) for _ in range(256)])
+    long = noise(size, 32, 1).resize((1024, 32)).crop((0, 0, 256, 32))
+    fill("Brushed", mix(mix(base, streaks, 0.86), long, 0.9))
+    # (Blotches of wear, darker at the edges.)
+    worn = noise(size, 33, 5)
+    edges = ImageChops.multiply(ramp(size, 215, 255), ramp(size, 255, 205))
+    fill("Worn", mix(mix(ImageChops.multiply(base, edges), worn, 0.84), noise(size, 34, 0.7), 0.94))
+    # (A fine weave.)
+    weave = Image.new("L", size)
+    weave.putdata([255 if (x % 3 == 0) != (y % 3 == 0) else 190 for y in range(32) for x in range(256)])
+    fill("Linen", mix(base, weave, 0.86))
+    # (Smooth, full, with one soft band of light: cloth or lacquer.)
+    satin = Image.new("L", size)
+    satin.putdata([int(214 + 41 * math.sin(math.pi * min(1, y / 22)) ** 2) for y in range(32) for _ in range(256)])
+    fill("Satin", satin)
+    # (Dents from a hammer.)
+    dents = noise(size, 35, 2.4).point(lambda v: 255 if v > 120 else 150 + v * 105 // 120)
+    fill("Hammered", mix(base, dents.filter(ImageFilter.GaussianBlur(0.8)), 0.76))
 
 
 def cut(big):
@@ -222,31 +368,34 @@ def cut(big):
     return out
 
 
+def finish(big, name):
+    ring = outline(big, 5).resize((128, 128), Image.LANCZOS)
+    worn(ring).save(os.path.join(OUT, "Portrait" + name + "Ring.tga"), compression=None)
+    save(cut(big), "Portrait" + name + "Cut")
+    shade(cut(big)).save(os.path.join(OUT, "Portrait" + name + "Shade.tga"), compression=None)
+
+
 def portraits():
     for name, draw in PORTRAITS.items():
         big = Image.new("L", (128 * SS, 128 * SS), 0)
         draw(ImageDraw.Draw(big), SS)
         save(big.resize((128, 128), Image.LANCZOS), "Portrait" + name)
-        save(outline(big, 5).resize((128, 128), Image.LANCZOS), "Portrait" + name + "Ring")
-        save(cut(big), "Portrait" + name + "Cut")
+        finish(big, name)
     big = Image.new("L", (128 * SS, 128 * SS), 0)
     ImageDraw.Draw(big).ellipse((2 * SS, 2 * SS, 126 * SS, 126 * SS), fill=255)
-    save(cut(big), "PortraitCircleCut")
-
-
-def name_shade():
-    # (Soft on every side: it shouldn't read as a box.)
-    big = Image.new("L", (128, 32), 0)
-    ImageDraw.Draw(big).rounded_rectangle((14, 8, 114, 24), radius=8, fill=255)
-    save(big.filter(ImageFilter.GaussianBlur(5)), "NameShade")
+    finish(big, "Circle")
 
 
 def main():
+    grit()
+    sheen()
+    collar()
+    frame_shadow()
+    bars()
     panels()
-    name_shade()
     tail()
-    for name, draw in (("Capsule", bar_capsule), ("Point", bar_point),
-                       ("Barb", bar_barb), ("Chisel", bar_chisel),
+    for name, draw in (("Capsule", bar_capsule),
+                       ("Chisel", bar_chisel),
                        ("Soft", bar_soft), ("Bevel", bar_bevel)):
         # (Clear at both ends: past its own edges a mask repeats them, so a bar wider
         # than the shape would carry its last column on.)

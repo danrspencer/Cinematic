@@ -98,7 +98,7 @@ function ns.ApplyShoulderCam()
 		ns.db.shoulderCamYours = yours
 		-- (DialogueUI's camera sets the same offset for its talks, and puts
 		-- back what it found: hands off till it's done. Support/DialogueUI.lua.)
-		if not (ns.DialogueUICameraOn and ns.DialogueUICameraOn()) then
+		if not (ns.shoulderTestHold or (ns.DialogueUICameraOn and ns.DialogueUICameraOn())) then
 			Write(yours, "CameraKeepCharacterCentered", "0")
 			Write(yours, "test_cameraOverShoulder", ShoulderValue())
 		end

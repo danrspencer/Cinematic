@@ -82,7 +82,7 @@ local KEYS = {
 	ufShadow = "general",        -- ...shadow: "game", "on" or "none" (ns.SetTextShadow; general: General's)
 	ufNameCut = "game",          -- ...too long for its box: "game" (ends in "...") or "first" (FitName)
 	ufPortrait = "game",         -- "game" (their face) or "class" (a player's class icon)
-	ufShape = "game",            -- its shape: "game", "circle", "square", "hex", "diamond", "arch", "shard", "eye" or "none" (not "game": the frame art goes)
+	ufShape = "game",            -- its shape: "game", "circle", "square", one of StyleThemes.lua's shapes or "none" (not "game": the frame art goes)
 }
 local SHARED = { ufTexture = { "texture", "game" }, ufFont = { "font", "game" }, ufOutline = { "outline", 0 },
 	ufShadow = { "shadow", "game" }, ufBorder = { "border", "game" } }
@@ -213,6 +213,25 @@ local function OwnOf(object)
 	return saved
 end
 
+-- Dirt on a texture: its own patch of the art, kept for good, the art's own size
+-- (not stretched), turned or not. The same patch on every bar read as a pattern.
+local gritSpots = setmetatable({}, { __mode = "k" })
+local GRIT_W, GRIT_H = 340, 85
+local function ScatterGrit(texture, wide, tall)
+	if not (Readable(wide) and Readable(tall) and wide > 0 and tall > 0) then return end
+	local spot = gritSpots[texture]
+	if not spot then
+		spot = { math.random(), math.random(), math.random() < 0.5, math.random() < 0.5 }
+		gritSpots[texture] = spot
+	end
+	local across, down = math.min(1, wide / GRIT_W), math.min(1, tall / GRIT_H)
+	local left, top = spot[1] * (1 - across), spot[2] * (1 - down)
+	local right, bottom = left + across, top + down
+	if spot[3] then left, right = right, left end
+	if spot[4] then top, bottom = bottom, top end
+	texture:SetTexCoord(left, right, top, bottom)
+end
+
 -- Our border and background behind a bar (for any border but the game's).
 local function Skin(bar)
 	local skin = skins[bar]
@@ -224,11 +243,37 @@ local function Skin(bar)
 		skin.back:SetAllPoints()
 		skin.back:SetColorTexture(0, 0, 0, 1)
 		skin.border = ns.MakeStyleEdges(skin)
+		-- (The fine work the game's own bars have: light along the top, shade along the
+		-- bottom, so a flat fill reads as set into its frame.)
+		skin.shine = bar:CreateTexture(nil, "OVERLAY")
+		skin.shine:SetPoint("TOPLEFT", 0, -1)
+		skin.shine:SetPoint("TOPRIGHT", 0, -1)
+		skin.shine:SetHeight(1)
+		skin.shine:SetColorTexture(1, 1, 1, 0.1)
+		skin.dark = bar:CreateTexture(nil, "OVERLAY", nil, 1)
+		skin.dark:SetPoint("TOPLEFT")
+		skin.dark:SetPoint("TOPRIGHT")
+		skin.dark:SetHeight(1)
+		skin.dark:SetColorTexture(0, 0, 0, 0.5)
+		skin.shade = bar:CreateTexture(nil, "OVERLAY")
+		skin.shade:SetPoint("BOTTOMLEFT")
+		skin.shade:SetPoint("BOTTOMRIGHT")
+		skin.shade:SetHeight(2)
+		skin.shade:SetColorTexture(0, 0, 0, 0.38)
+		skin.grit = bar:CreateTexture(nil, "OVERLAY", nil, -1)
+		skin.grit:SetAllPoints()
+		skin.grit:SetTexture(ns.THEME_GRIT)
+		skin.grit:SetAlpha(0.3)
+		skin.sheen = bar:CreateTexture(nil, "OVERLAY", nil, -2)
+		skin.sheen:SetAllPoints()
+		skin.sheen:SetTexture(ns.THEME_SHEEN)
+		skin.depth = bar:CreateTexture(nil, "OVERLAY", nil, -3)
 		skins[bar] = skin
 	end
 	return skin
 end
 
+local BAR_GAP = 1 -- (between a bar and the one above it, their lines shared: FitBars)
 local function DressSkin(skin, view, under)
 	local kind, size, r, g, b = ns.StyleBorder(view, "ufBorder")
 	skin:SetShown(kind ~= "game")
@@ -243,8 +288,39 @@ local function DressSkin(skin, view, under)
 		skin:SetPoint("LEFT", under, "LEFT")
 		skin:SetPoint("RIGHT", under, "RIGHT")
 	end
-	-- (The style theme's bar shape: a straight border can't follow it.)
-	local shaped = ns.DressBarShape(skin:GetParent(), skin.back, view.isTile, skin)
+	-- (A cell of a shaped frame: square, in a line of its own, with the fine work. The
+	-- style theme's bar shape is for bars that stand alone: a straight border can't follow it.)
+	local cell = not view.isTile and view.ufShape and view.ufShape ~= "game" and ns.ThemeLayout() ~= "slab"
+	skin.shine:SetShown(cell and true or false)
+	skin.shade:SetShown(cell and true or false)
+	-- (A slab: no line or dirt to carry it, so it's light that stops it being one flat
+	-- block of color, and a touch of grain.)
+	local slab = not view.isTile and ns.ThemeLayout() == "slab"
+	skin.sheen:SetShown(slab or cell and true or false)
+	skin.sheen:SetAlpha(slab and 1 or 0.7)
+	-- (Fading in toward the bar's leading edge: the fill's own width, so it moves with it.)
+	local fill = skin:GetParent():GetStatusBarTexture()
+	local depth = (slab or cell) and fill and ns.ThemeBarDepth()
+	skin.depth:SetShown(depth and true or false)
+	if depth then
+		skin.depth:ClearAllPoints()
+		skin.depth:SetAllPoints(fill)
+		ns.ThemeGradient(skin.depth, depth[1], depth[2], depth[3], depth[4], 0)
+	end
+	skin.shine:SetShown((cell or slab) and true or false)
+	skin.grit:SetShown((cell or slab) and true or false)
+	skin.grit:SetAlpha(slab and 0.14 or 0.18)
+	skin.dark:SetShown(cell and true or false)
+	-- (On a thin bar these would be all there is of it.)
+	local barTall = skin:GetParent():GetHeight()
+	if Readable(barTall) and barTall < 8 then
+		skin.shade:SetHeight(1)
+		skin.dark:Hide()
+	else
+		skin.shade:SetHeight(2)
+	end
+	ScatterGrit(skin.grit, skin:GetParent():GetWidth(), skin:GetParent():GetHeight())
+	local shaped = ns.DressBarShape(skin:GetParent(), skin.back, view.isTile or cell, skin)
 	skin.border:SetShown(kind == "line" and not shaped)
 	if kind == "line" and not shaped then
 		ns.DressStyleEdges(skin.border, size, r, g, b, 1, true)
@@ -533,6 +609,12 @@ local function SetClear(texture, clear)
 	if clear and not keepHooked[texture] then
 		keepHooked[texture] = true
 		hooksecurefunc(texture, "SetAlpha", KeepClear)
+		-- (A texture's color carries its alpha: the aggro glow and the fight's red flash
+		-- came back through these, as streaks of red, with the rest of the art gone.)
+		if texture.SetVertexColor then hooksecurefunc(texture, "SetVertexColor", KeepClear) end
+		if texture.SetAlphaFromBoolean then hooksecurefunc(texture, "SetAlphaFromBoolean", KeepClear) end
+		if texture.Show then hooksecurefunc(texture, "Show", KeepClear) end
+		if texture.SetShown then hooksecurefunc(texture, "SetShown", KeepClear) end
 	end
 	if clear == (kept[texture] or false) then return end
 	kept[texture] = clear or nil
@@ -560,6 +642,8 @@ local function ArtExtras(frame)
 	local name = frame.GetName and frame:GetName()
 	local back = name and _G[name .. "Background"]
 	if back then list[#list + 1] = back end
+	-- (And everything the Unit Frames page knows as frame art: the threat glow among it.)
+	for _, art in ipairs(ns.UnitPartRegions and ns.UnitPartRegions(frame, "Art") or {}) do list[#list + 1] = art end
 	return list
 end
 
@@ -587,29 +671,550 @@ local function LiftLevel(frame, state, lift)
 	end
 end
 
--- A soft dark shade behind the name, for a shape with no frame art round it: the
--- theme's colored names go faint on snow and sky. Follows the name's alpha.
-local NAME_SHADE = "Interface\\AddOns\\" .. (...) .. "\\Textures\\Themes\\Shapes\\NameShade"
-local function ShadeName(frame, state, show)
-	local _, _, name = Parts(frame)
-	if not (name and name.GetObjectType) then return end
-	if show and not state.shade then
-		state.shade = frame:CreateTexture(nil, "BACKGROUND", nil, 1)
-		state.shade:SetTexture(NAME_SHADE)
-		state.shade:SetVertexColor(0, 0, 0, 0.4)
-		state.shade:SetPoint("TOPLEFT", name, "TOPLEFT", -10, 4)
-		state.shade:SetPoint("BOTTOMRIGHT", name, "BOTTOMRIGHT", 10, -4)
-		local shade = state.shade
-		hooksecurefunc(name, "SetAlpha", function(_, alpha) shade:SetAlpha(alpha) end)
+-- The name's own strip, over the bars, as the game's frame has: with the bars each in
+-- their own thin line right under it, nothing of a background shows round them.
+-- on: a theme with a panel, and a shape of ours.
+local function DressPlateLook(plate, on)
+	local back, edge = ns.ThemePanel()
+	plate:SetShown(on and back ~= nil)
+	if not (on and back) then return end
+	plate.back:SetColorTexture(back[1], back[2], back[3], 1)
+	ScatterGrit(plate.grit, plate:GetWidth(), plate:GetHeight())
+	-- (Light from the middle out, so the strip isn't one flat tone.)
+	local glow = ns.ThemeRing() or edge
+	ns.ThemeGradient(plate.left, glow[1], glow[2], glow[3], 0, 0.14)
+	ns.ThemeGradient(plate.right, glow[1], glow[2], glow[3], 0.14, 0)
+	plate.edges:Show()
+	ns.DressStyleEdges(plate.edges, 1, edge[1], edge[2], edge[3], 1, false)
+end
+
+local function MakePlate(parent)
+	local plate = CreateFrame("Frame", nil, parent)
+	plate.themeSliceCorner = 10
+	plate.back = plate:CreateTexture(nil, "BACKGROUND", nil, -7)
+	plate.back:SetAllPoints()
+	plate.grit = plate:CreateTexture(nil, "BACKGROUND", nil, -6)
+	plate.grit:SetAllPoints()
+	plate.grit:SetTexture(ns.THEME_GRIT)
+	plate.grit:SetAlpha(0.45)
+	plate.left = plate:CreateTexture(nil, "BACKGROUND", nil, -5)
+	plate.left:SetPoint("TOPLEFT")
+	plate.left:SetPoint("BOTTOMRIGHT", plate, "BOTTOM")
+	plate.right = plate:CreateTexture(nil, "BACKGROUND", nil, -5)
+	plate.right:SetPoint("TOPRIGHT")
+	plate.right:SetPoint("BOTTOMLEFT", plate, "BOTTOM")
+	plate.edges = ns.MakeStyleEdges(plate)
+	return plate
+end
+
+-- Its place: on top of the health bar, as wide as its line.
+local NAME_ROW, NAME_ROW_SMALL = 16, 13
+local function PlacePlate(plate, health)
+	local tall = health:GetHeight()
+	plate:ClearAllPoints()
+	plate:SetPoint("BOTTOMLEFT", health, "TOPLEFT", -1, 1)
+	plate:SetPoint("BOTTOMRIGHT", health, "TOPRIGHT", 1, 1)
+	plate:SetHeight(Readable(tall) and tall < 9 and NAME_ROW_SMALL or NAME_ROW)
+end
+
+-- A slab (ns.ThemeLayout): the name on the health bar and the value at its right.
+-- Only on a bar tall enough to hold a name: the small frames keep theirs above.
+local SLAB_HEIGHT = 12
+local function SlabOn(health)
+	if not (health and ns.StyleOn("ufStyle") and ns.ThemeLayout() == "slab") then return false end
+	local tall = health:GetHeight()
+	return Readable(tall) and tall >= SLAB_HEIGHT
+end
+
+-- The bridge from the portrait to the rows, as the game's frame has: a short, narrow
+-- piece of the ring's own metal off the health bar's end, running in under the ring.
+-- All textures of its own frame, so the picture covers it: lines on a frame above
+-- crossed the face.
+local function PlaceBridge(bridge, plate, health, bottom, flip, shape)
+	local near, far = flip and "RIGHT" or "LEFT", flip and "LEFT" or "RIGHT"
+	local tall = health:GetHeight()
+	local inset = Readable(tall) and tall < 9 and 2 or 6
+	-- (Short of the rows at both ends, and of the lines between them, so it doesn't read
+	-- as more of them. Its art has a margin for its shadow, so it's a little bigger.)
+	bridge:ClearAllPoints()
+	bridge:SetPoint("TOP" .. far, plate, "TOP" .. near, flip and -1 or 1, -inset + 2)
+	bridge:SetPoint("BOTTOM" .. far, bottom or health, "BOTTOM" .. near, flip and -1 or 1, inset - 2)
+	bridge:SetWidth(ns.ThemeBridgeReach(shape))
+	bridge.art:SetTexCoord(flip and 1 or 0, flip and 0 or 1, 0, 1) -- (its worked edge to the rows)
+end
+
+local function DressBridge(bridge, on)
+	local color = ns.ThemeRing()
+	bridge:SetShown(on and color ~= nil)
+	if not (on and color) then return end
+	bridge.art:SetVertexColor(color[1], color[2], color[3], 1)
+end
+
+local function MakeBridge(parent)
+	local bridge = CreateFrame("Frame", nil, parent)
+	bridge.art = bridge:CreateTexture(nil, "BACKGROUND", nil, -7)
+	bridge.art:SetAllPoints()
+	bridge.art:SetTexture(ns.THEME_COLLAR)
+	ns.ThemeNoSnap(bridge.art)
+	return bridge
+end
+
+-- A soft dark edge behind all the rows, which lifts them off the world.
+local function MakeRowShadow(parent)
+	local shadow = CreateFrame("Frame", nil, parent)
+	shadow.art = shadow:CreateTexture(nil, "BACKGROUND", nil, -8)
+	shadow.art:SetAllPoints()
+	shadow.art:SetTexture(ns.THEME_ROW_SHADOW)
+	return shadow
+end
+local function PlaceRowShadow(shadow, plate, bottom)
+	shadow:ClearAllPoints()
+	shadow:SetPoint("TOPLEFT", plate, "TOPLEFT", -9, 9)
+	shadow:SetPoint("BOTTOMRIGHT", bottom, "BOTTOMRIGHT", 9, -9)
+end
+
+local function FramePlate(frame, state, portrait, on, over, shape)
+	-- (A slab theme's whole point is nothing round its bars.)
+	if not (on and not over) or ns.ThemeLayout() == "slab" then
+		if state.plate then state.plate:Hide() end
+		if state.bridge then state.bridge:Hide() end
+		if state.shadow then state.shadow:Hide() end
+		return
 	end
-	if state.shade then state.shade:SetShown(show) end
+	local health, power = Parts(frame)
+	if not health then return end
+	if not InCombatLockdown() then
+		if not state.plate then
+			state.plate = MakePlate(frame)
+			state.plate:SetFrameLevel(frame:GetFrameLevel()) -- (under the name)
+		end
+		local portraitX, healthX = portrait:GetCenter(), health:GetCenter()
+		state.flip = Readable(portraitX) and Readable(healthX) and portraitX > healthX
+		PlacePlate(state.plate, health)
+		if not state.bridge then
+			state.bridge = MakeBridge(frame)
+			state.bridge:SetFrameLevel(frame:GetFrameLevel())
+		end
+		local shown = power and ns.Flag(power:IsShown()) and power or health
+		PlaceBridge(state.bridge, state.plate, health, shown, state.flip, shape)
+		if not state.shadow then
+			state.shadow = MakeRowShadow(frame)
+			state.shadow:SetFrameLevel(frame:GetFrameLevel())
+		end
+		PlaceRowShadow(state.shadow, state.plate, shown)
+		state.shadow:Show()
+	end
+	if state.plate then DressPlateLook(state.plate, true) end
+	if state.bridge then DressBridge(state.bridge, true) end
+end
+
+-- What a game region was before any of ours moved it, kept from the first touch.
+-- Every look that moves it goes back to these, not to what it found: so it doesn't
+-- matter which theme follows which, or what the last one left behind.
+local firstSpots, firstSizes, firstFonts = {}, {}, {}
+setmetatable(firstSpots, { __mode = "k" })
+setmetatable(firstSizes, { __mode = "k" })
+setmetatable(firstFonts, { __mode = "k" })
+local function SpotsOf(region)
+	if firstSpots[region] then return firstSpots[region] end
+	local spots = {}
+	for i = 1, tonumber(region:GetNumPoints()) or 0 do spots[i] = { region:GetPoint(i) } end
+	firstSpots[region] = spots
+	return spots
+end
+local function FirstSize(region)
+	if not firstSizes[region] then firstSizes[region] = { region:GetSize() } end
+	return firstSizes[region][1], firstSizes[region][2]
+end
+local function FirstFont(region)
+	if not firstFonts[region] then firstFonts[region] = { region:GetFont() } end
+	local font = firstFonts[region]
+	return font[1], font[2], font[3]
+end
+local function PutBack(region, spots)
+	region:ClearAllPoints()
+	-- (By number: a point on no frame has nil in the middle, which unpack stops at. Each
+	-- on its own, and said if it's refused: one bad spot took the whole frame's look with it.)
+	for _, spot in ipairs(spots) do
+		local ok, err = pcall(region.SetPoint, region, spot[1], spot[2], spot[3], spot[4], spot[5])
+		if not ok then
+			ns.Log("style", ("put back refused: %s; %s %s %s %s %s; %s"):format(tostring(region.GetDebugName and region:GetDebugName()),
+				tostring(spot[1]), tostring(spot[2]), tostring(spot[3]), tostring(spot[4]), tostring(spot[5]), tostring(err)))
+			pcall(region.SetPoint, region, spot[1] or "CENTER", spot[2] or region:GetParent(), spot[3] or spot[1] or "CENTER", 0, 0)
+		end
+	end
+end
+
+-- With no portrait the level's badge has nothing to sit on: it goes on the plate's
+-- end. Only where there's a badge (retail's level is text, already by the name).
+local function PlaceBadge(frame, state, on)
+	if InCombatLockdown() then return end
+	if on and not state.badgeSpots and state.plate and ns.UnitPartRegions
+		and #ns.UnitPartRegions(frame, "LevelBack") > 0 then
+		state.badgeSpots = {}
+		for _, region in ipairs(ns.UnitPartRegions(frame, "Level")) do
+			state.badgeSpots[region] = SpotsOf(region)
+			region:ClearAllPoints()
+			region:SetPoint("CENTER", state.plate, state.flip and "RIGHT" or "LEFT", state.flip and 8 or -8, 0)
+		end
+	elseif not on and state.badgeSpots then
+		for region, spots in pairs(state.badgeSpots) do PutBack(region, spots) end
+		state.badgeSpots = nil
+	end
+end
+
+-- A slab's bars at a slab's size: one tall bar, across where the portrait was with
+-- none showing, and thin power under it. The game's own bars, so out of fights only,
+-- on their frame's own spot, and put back as they were when the theme changes.
+local SLAB_TALL, SLAB_POWER = 26, 4
+local function SlabSpot(frame, health, portrait, bare)
+	local frameLeft, frameTop = frame:GetLeft(), frame:GetTop()
+	local left, right, top = health:GetLeft(), health:GetRight(), health:GetTop()
+	if not (Readable(frameLeft) and Readable(frameTop) and Readable(left) and Readable(right) and Readable(top)) then
+		return nil
+	end
+	local portraitLeft, portraitRight = portrait and portrait:GetLeft(), portrait and portrait:GetRight()
+	if bare and Readable(portraitLeft) and Readable(portraitRight) then
+		left, right = math.min(left, portraitLeft), math.max(right, portraitRight)
+	end
+	return { x = left - frameLeft, y = top - frameTop, wide = right - left }
+end
+
+-- (The game's masks on a bar's fill stay the size they were: left on a bigger bar,
+-- they cut the fill back to its old size.)
+local function StripMasks(state, bar)
+	local fill = bar:GetStatusBarTexture()
+	if not (fill and fill.GetNumMaskTextures) then return end
+	state.masks = state.masks or {}
+	if state.masks[fill] then return end
+	local list = {}
+	local count = fill:GetNumMaskTextures()
+	for i = (Readable(count) and count or 0), 1, -1 do
+		local mask = fill:GetMaskTexture(i)
+		if mask then
+			list[#list + 1] = mask
+			fill:RemoveMaskTexture(mask)
+		end
+	end
+	state.masks[fill] = list
+end
+
+local function SizeSlab(frame, state, bars, portrait, bare)
+	local health = bars[1]
+	for _, bar in ipairs(bars) do StripMasks(state, bar) end
+	if not state.spot then
+		state.spot = SlabSpot(frame, health, portrait, bare)
+		if not state.spot then return end
+		state.bars = {}
+		for _, bar in ipairs(bars) do
+			local wide, tall = FirstSize(bar)
+			state.bars[bar] = { spots = SpotsOf(bar), wide = wide, tall = tall }
+		end
+	end
+	local spot = state.spot
+	health:ClearAllPoints()
+	health:SetPoint("TOPLEFT", frame, "TOPLEFT", spot.x, spot.y)
+	health:SetSize(spot.wide, SLAB_TALL)
+	local above = health
+	for i = 2, #bars do
+		local bar = bars[i]
+		bar:ClearAllPoints()
+		bar:SetPoint("TOPLEFT", above, "BOTTOMLEFT", 0, 0)
+		bar:SetSize(spot.wide, SLAB_POWER)
+		above = bar
+		-- (Numbers don't fit on a line this thin.)
+		SetClear(bar.LeftText, true)
+		SetClear(bar.RightText, true)
+		SetClear(bar.TextString, true)
+	end
+end
+
+local function UnsizeSlab(state)
+	for fill, list in pairs(state.masks or {}) do
+		for _, mask in ipairs(list) do fill:AddMaskTexture(mask) end
+	end
+	for bar, was in pairs(state.bars or {}) do
+		PutBack(bar, was.spots)
+		if Readable(was.wide) and Readable(was.tall) then bar:SetSize(was.wide, was.tall) end
+		SetClear(bar.LeftText, false)
+		SetClear(bar.RightText, false)
+		SetClear(bar.TextString, false)
+	end
+end
+
+-- With a shape of ours the bars reach to the portrait: the game's stop short of where
+-- its frame art used to be. Same heights and gaps, just wider. As a slab's, out of
+-- fights and put back after. on nil: only take it off.
+local fits = setmetatable({}, { __mode = "k" })
+local BRIDGE = 1.5 -- (between the ring and the rows: what shows of the bridge)
+local RING_IN = 2 -- (the ring's inside the portrait's place by this: RING_INSET)
+local function FitBars(frame, bars, portrait, shape, on, name)
+	if InCombatLockdown() then return end
+	local state = fits[frame]
+	if not on then
+		if state then
+			fits[frame] = nil
+			for bar, was in pairs(state.bars) do
+				PutBack(bar, was.spots)
+				if Readable(was.wide) then bar:SetWidth(was.wide) end
+			end
+			for fill, list in pairs(state.masks or {}) do
+				for _, mask in ipairs(list) do fill:AddMaskTexture(mask) end
+			end
+			if state.name then PutBack(state.name, SpotsOf(state.name)) end
+		end
+		return
+	end
+	local health = bars[1]
+	if not state then
+		local frameLeft, frameTop = frame:GetLeft(), frame:GetTop()
+		local left, right, top = health:GetLeft(), health:GetRight(), health:GetTop()
+		local portraitLeft, portraitRight = portrait:GetLeft(), portrait:GetRight()
+		for _, value in ipairs({ frameLeft or false, frameTop or false, left or false, right or false, top or false,
+			portraitLeft or false, portraitRight or false }) do
+			if not Readable(value) then return end
+		end
+		local grow = (portraitRight - portraitLeft) * (ns.ThemePortraitFit(shape) - 1) / 2
+		-- (A shape narrower than its square stands that much further from the rows.)
+		local side = (portraitRight - portraitLeft + grow * 2) * ns.ThemePortraitSide(shape)
+		if portraitLeft > right then
+			right = math.max(right, portraitLeft - grow + RING_IN - BRIDGE + side)
+		else
+			left = math.min(left, portraitRight + grow - RING_IN + BRIDGE - side)
+		end
+		-- (The rows' middle on the portrait's: the name's strip sits on top of where the
+		-- game's rows began, so they'd hang high.)
+		local _, middle = portrait:GetCenter()
+		local tall = health:GetHeight()
+		local row = (Readable(tall) and tall < 9 and NAME_ROW_SMALL or NAME_ROW) + 1
+		local rows = row + (Readable(tall) and tall or 0)
+		for i = 2, #bars do
+			local height = bars[i]:GetHeight()
+			if ns.Flag(bars[i]:IsShown()) and Readable(height) then rows = rows + BAR_GAP + height end
+		end
+		if Readable(middle) then top = middle + rows / 2 - row end
+		state = { x = left - frameLeft, y = top - frameTop, wide = right - left, bars = {} }
+		for _, bar in ipairs(bars) do
+			state.bars[bar] = { spots = SpotsOf(bar), wide = (FirstSize(bar)) }
+		end
+		fits[frame] = state
+	end
+	for _, bar in ipairs(bars) do StripMasks(state, bar) end
+	health:ClearAllPoints()
+	health:SetPoint("TOPLEFT", frame, "TOPLEFT", state.x, state.y)
+	health:SetWidth(state.wide)
+	-- (The name in the middle of its strip.)
+	local dressed = shapes[frame]
+	if name and dressed and dressed.plate and ns.Flag(dressed.plate:IsShown()) then
+		SpotsOf(name)
+		state.name = name
+		name:ClearAllPoints()
+		name:SetPoint("CENTER", dressed.plate, "CENTER")
+	end
+	for i = 2, #bars do
+		bars[i]:ClearAllPoints()
+		-- (The game's overlap, its art covering the join: with none, a clean gap.)
+		bars[i]:SetPoint("TOPLEFT", bars[i - 1], "BOTTOMLEFT", 0, -BAR_GAP)
+		bars[i]:SetWidth(state.wide)
+	end
+end
+
+-- What else a frame can show, which sits where the art or portrait was: on a bare bar
+-- each needs a place of its own, or it lands on the name or floats. Dead and the like
+-- at the value's end, the raid marker on the bar's top edge, the leader's crown above
+-- its corner, a quest or boss mark off its end, a skull for the level with the level.
+local moved = setmetatable({}, { __mode = "k" })
+local function Extras(frame, health)
+	local list = {}
+	local function Add(region, point, to, x, y)
+		if region and region.SetPoint then list[#list + 1] = { region, point, to, x, y } end
+	end
+	local name = frame.GetName and frame:GetName() or ""
+	local parent = health:GetParent()
+	local content = frame.TargetFrameContent or frame.PlayerFrameContent
+	local context = content and (content.TargetFrameContentContextual or content.PlayerFrameContentContextual)
+	local main = content and (content.TargetFrameContentMain or content.PlayerFrameContentMain)
+	for _, text in ipairs({ frame.deadText or false, frame.unconsciousText or false, parent and parent.DeadText or false,
+		parent and parent.UnconsciousText or false, _G[name .. "TextureFrameDeadText"] or false,
+		_G[name .. "TextureFrameUnconsciousText"] or false }) do
+		Add(text, "RIGHT", "RIGHT", -7, 0)
+	end
+	Add(context and context.RaidTargetIcon or _G[name .. "TextureFrameRaidTargetIcon"], "CENTER", "TOP", 0, 3)
+	Add(context and context.LeaderIcon or _G[name .. "TextureFrameLeaderIcon"], "BOTTOMLEFT", "TOPLEFT", 0, 0)
+	Add(context and context.GuideIcon, "BOTTOMLEFT", "TOPLEFT", 0, 0)
+	Add(context and context.QuestIcon or _G[name .. "TextureFrameQuestIcon"], "LEFT", "RIGHT", 2, 0)
+	Add(context and context.BossIcon, "LEFT", "RIGHT", 2, 0)
+	Add(context and context.HighLevelTexture or main and main.HighLevelTexture or _G[name .. "TextureFrameHighLevelTexture"],
+		"LEFT", "LEFT", 6, 0)
+	return list
+end
+local function SlabExtras(frame, health, on)
+	if on then
+		local list = moved[frame] or {}
+		moved[frame] = list
+		for _, item in ipairs(Extras(frame, health)) do
+			local region = item[1]
+			list[region] = SpotsOf(region)
+			region:ClearAllPoints()
+			region:SetPoint(item[2], health, item[3], item[4], item[5])
+		end
+	elseif moved[frame] then
+		for region, spots in pairs(moved[frame]) do PutBack(region, spots) end
+		moved[frame] = nil
+	end
+end
+
+-- The name moves onto the bar, on a frame over it (it's drawn under the bar where
+-- it was), and the bar's middle number to its right, as the left one goes. Done
+-- again each time: the game places them again as the unit changes.
+local slabs = setmetatable({}, { __mode = "k" })
+local function DressSlab(frame, health, name, power, portrait, bare)
+	if InCombatLockdown() or not (health and name) then return end
+	local state = slabs[frame]
+	local on = state ~= nil and ns.StyleOn("ufStyle") and ns.ThemeLayout() == "slab" or SlabOn(health)
+	local middle = health.TextString
+	if on then
+		if not state then
+			state = { name = SpotsOf(name), parent = name:GetParent(), width = name:GetWidth(), justify = name:GetJustifyH(),
+				middle = middle and SpotsOf(middle), right = health.RightText and SpotsOf(health.RightText) }
+			state.top = CreateFrame("Frame", nil, frame)
+			state.top:SetAllPoints(health)
+			slabs[frame] = state
+		end
+		local bars = { health, power }
+		local second = frame == _G.PlayerFrame and _G.AlternatePowerBar
+		if second then bars[#bars + 1] = second end
+		local ok, err = pcall(SizeSlab, frame, state, bars, portrait, bare)
+		if not ok then ns.Log("style", "slab size failed: " .. tostring(err)) end
+		state.top:SetFrameLevel(health:GetFrameLevel() + 3)
+		name:SetParent(state.top)
+		name:ClearAllPoints()
+		-- (After the level, which goes on the bar too: no badge, just the number.)
+		local shape = shapes[frame]
+		if shape and shape.badge then
+			shape.badge:SetFrameLevel(math.max(frame:GetFrameLevel() + 7, health:GetFrameLevel() + 4))
+		end
+		local level
+		for _, region in ipairs(ns.UnitPartRegions and ns.UnitPartRegions(frame, "Level") or {}) do
+			if region.GetObjectType and region:GetObjectType() == "FontString" then
+				if not state.level then state.level = {} end
+				if not state.level[region] then
+					local file, size, flags = FirstFont(region)
+					state.level[region] = { spots = SpotsOf(region), file = file, size = size, flags = flags }
+					if file then region:SetFont(file, 11, flags or "") end
+				end
+				-- (Your own says nothing a sleek frame needs: only a target's stays.)
+				local own = frame == _G.PlayerFrame
+				SetClear(region, own)
+				region:ClearAllPoints()
+				region:SetPoint("LEFT", health, "LEFT", 7, 0)
+				level = not own or level
+			end
+		end
+		for _, region in ipairs(ns.UnitPartRegions and ns.UnitPartRegions(frame, "LevelBack") or {}) do SetClear(region, true) end
+		name:SetPoint("LEFT", health, "LEFT", level and 28 or 7, 0)
+		name:SetJustifyH("LEFT")
+		local wide = health:GetWidth()
+		if Readable(wide) then name:SetWidth(wide * 0.62) end
+		if middle then
+			middle:ClearAllPoints()
+			middle:SetPoint("RIGHT", health, "RIGHT", -7, 0)
+		end
+		if health.RightText then
+			health.RightText:ClearAllPoints()
+			health.RightText:SetPoint("RIGHT", health, "RIGHT", -7, 0)
+		end
+	elseif state then
+		slabs[frame] = nil
+		for region, was in pairs(state.level or {}) do
+			PutBack(region, was.spots)
+			SetClear(region, false)
+			if was.file then region:SetFont(was.file, was.size, was.flags or "") end
+		end
+		for _, region in ipairs(ns.UnitPartRegions and ns.UnitPartRegions(frame, "LevelBack") or {}) do SetClear(region, false) end
+		local ok, err = pcall(UnsizeSlab, state)
+		if not ok then ns.Log("style", "slab size back failed: " .. tostring(err)) end
+		if health.RightText and state.right then PutBack(health.RightText, state.right) end
+		name:SetParent(state.parent)
+		PutBack(name, state.name)
+		name:SetJustifyH(state.justify)
+		if Readable(state.width) then name:SetWidth(state.width) end
+		if middle and state.middle then PutBack(middle, state.middle) end
+	end
+	SetClear(health.LeftText, on)
+	SlabExtras(frame, health, on)
+	-- (Resting's Zzz: over a portrait it's a detail, over a lone bar a stray.)
+	local content = frame.PlayerFrameContent
+	local contextual = content and content.PlayerFrameContentContextual
+	SetClear(contextual and contextual.PlayerRestLoop, on)
+end
+
+-- The game's level badge is drawn for its big round portrait: a size down with a
+-- shape of ours, the number with it. Out of fights, and put back after.
+local BADGE_SIZE = 0.58
+local function ShrinkBadge(frame, state, on, portrait, shape)
+	if InCombatLockdown() or not ns.UnitPartRegions then return end
+	if on and state.small and state.badgeShape ~= shape and #ns.UnitPartRegions(frame, "LevelBack") > 0 then
+		state.badgeShape = nil
+	end
+	if on and not state.small and #ns.UnitPartRegions(frame, "LevelBack") > 0 then
+		state.small = {}
+		for _, region in ipairs(ns.UnitPartRegions(frame, "Level")) do
+			if region.GetObjectType and region:GetObjectType() == "FontString" then
+				local file, size, flags = FirstFont(region)
+				if file and size then
+					state.small[region] = { file = file, size = size, flags = flags, spots = SpotsOf(region) }
+					region:SetFont(file, size * BADGE_SIZE, flags or "")
+				end
+			elseif region.SetSize then
+				local wide, tall = FirstSize(region)
+				if Readable(wide) and Readable(tall) then
+					state.small[region] = { wide = wide, tall = tall, spots = SpotsOf(region) }
+					region:SetSize(wide * BADGE_SIZE, tall * BADGE_SIZE)
+				end
+			end
+		end
+	elseif not on and state.small then
+		for region, was in pairs(state.small) do
+			if was.file then region:SetFont(was.file, was.size, was.flags or "") else region:SetSize(was.wide, was.tall) end
+			PutBack(region, was.spots)
+		end
+		state.small, state.badgeShape = nil, nil
+	end
+	-- (On the shape's own spot: the portrait's far bottom corner, mirrored with it.)
+	if on and state.small and state.badgeShape ~= shape then
+		local wide = portrait:GetWidth()
+		if Readable(wide) then
+			state.badgeShape = shape
+			local spot = ns.ThemeBadgeSpot(shape)
+			local x, y = spot[1] * wide, spot[2] * wide
+			for region in pairs(state.small) do
+				region:ClearAllPoints()
+				region:SetPoint("CENTER", portrait, state.flip and "BOTTOMRIGHT" or "BOTTOMLEFT", state.flip and -x or x, y)
+			end
+		end
+	end
+end
+
+-- The level's badge in the theme's color, as its other rings are.
+local function TintBadge(frame, on)
+	local color = on and ns.ThemeRing()
+	for _, art in ipairs(ns.UnitPartRegions and ns.UnitPartRegions(frame, "LevelBack") or {}) do
+		if art.SetDesaturated and (color or tinted[art]) then
+			local _, _, _, alpha = art:GetVertexColor()
+			if not Readable(alpha) then alpha = nil end
+			art:SetDesaturated(color and true or false)
+			art:SetVertexColor(color and color[1] or 1, color and color[2] or 1, color and color[3] or 1, alpha)
+			tinted[art] = color and true or nil
+		end
+	end
 end
 
 -- (Inside the portrait's place: the bars start right at its edge, and a shaped
 -- bar's point needs air between them to read.)
 local RING_INSET = 2
 
-local function DressShape(frame, portrait, view)
+local function DressShape(frame, portrait, view, artOver)
 	local shape = view and view.ufShape or "game"
 	local state = shapes[frame]
 	if shape == "game" and not state then return end
@@ -622,10 +1227,24 @@ local function DressShape(frame, portrait, view)
 	for _, art in ipairs(FrameArt(frame)) do SetClear(art, own) end
 	for _, art in ipairs(ArtExtras(frame)) do SetClear(art, own) end
 	SetClear(portrait, shape == "none")
-	LiftLevel(frame, state, own and shape ~= "none")
-	-- (Classic clients only: retail's names sit left in a wide box, which leaves a
-	-- smear past a short name, and in instances its text can't be measured.)
-	if not ns.isRetail then ShadeName(frame, state, own) end
+	LiftLevel(frame, state, own)
+	FramePlate(frame, state, portrait, own, artOver, shape)
+	local slab = ns.ThemeLayout() == "slab"
+	PlaceBadge(frame, state, shape == "none" and not slab)
+	ShrinkBadge(frame, state, own and not slab and shape ~= "none", portrait, shape)
+	TintBadge(frame, own)
+	-- (A shape that'd cut the picture grows round it: ns.ThemePortraitFit.)
+	local wide = portrait:GetWidth()
+	local grow = Readable(wide) and wide * (ns.ThemePortraitFit(shape) - 1) / 2 or 0
+	-- (The arch's point is narrow and the game's picture sits to the left of its square:
+	-- a touch closer in, moved right and down, puts the face under the point.)
+	local arched = shape == "arch" and not OwnOf(portrait).iconed
+	if arched then
+		portrait:SetTexCoord(0, 0.9, 0, 0.92)
+	elseif state.arched then
+		portrait:SetTexCoord(0, 1, 0, 1)
+	end
+	state.arched = arched
 	-- (The game's mask isn't a true circle: it leaves corners of the picture for
 	-- the frame art to cover. A circle of ours has a mask of its own, just inside
 	-- the ring. Made out of fights only, as the ring is.)
@@ -640,7 +1259,8 @@ local function DressShape(frame, portrait, view)
 		if maskFile and state.round then
 			state.round:SetTexture(maskFile, "CLAMPTOBLACKADDITIONAL", "CLAMPTOBLACKADDITIONAL")
 			state.round:ClearAllPoints()
-			state.round:SetAllPoints(portrait)
+			state.round:SetPoint("TOPLEFT", portrait, "TOPLEFT", -grow, grow)
+			state.round:SetPoint("BOTTOMRIGHT", portrait, "BOTTOMRIGHT", grow, -grow)
 		end
 		local round = maskFile ~= nil and state.round ~= nil
 		local bare = shape == "square" or round
@@ -667,15 +1287,43 @@ local function DressShape(frame, portrait, view)
 		state.ring:SetPoint("BOTTOMRIGHT", -RING_INSET, RING_INSET)
 		state.ring:SetTexture(RING)
 		ns.ThemeNoSnap(state.ring)
+		-- (A thin dark line outside it: a pale ring goes on snow and sky without.)
+		state.ringBack = state.holder:CreateTexture(nil, "OVERLAY", nil, -1)
+		state.ringBack:SetPoint("TOPLEFT", RING_INSET - 1.5, -RING_INSET + 1.5)
+		state.ringBack:SetPoint("BOTTOMRIGHT", -RING_INSET + 1.5, RING_INSET - 1.5)
+		ns.ThemeNoSnap(state.ringBack)
+		state.inner = state.holder:CreateTexture(nil, "ARTWORK")
+		ns.ThemeNoSnap(state.inner)
+		state.inner:SetAlpha(0.75)
 		state.edges = ns.MakeStyleEdges(state.holder)
 	end
 	if state.holder then
 		local color = ns.ThemeRing() or { 0.8, 0.65, 0.25 }
 		state.holder:SetShown(own and shape ~= "none")
-		local ringFile = shape == "circle" and RING or ns.ThemePortraitRing(shape)
+		local ringFile = ns.ThemePortraitRing(shape)
+		local shadeFile = ns.ThemePortraitShade(shape)
+		state.inner:SetShown(shadeFile and true or false)
+		if shadeFile then
+			state.inner:SetTexture(shadeFile)
+			state.inner:ClearAllPoints()
+			state.inner:SetPoint("TOPLEFT", -grow, grow)
+			state.inner:SetPoint("BOTTOMRIGHT", grow, -grow)
+		end
 		state.ring:SetShown(ringFile and true or false)
-		if ringFile then state.ring:SetTexture(ringFile) end
+		state.ringBack:SetShown(ringFile and true or false)
+		if ringFile then
+			state.ring:SetTexture(ringFile)
+			state.ringBack:SetTexture(ringFile)
+		end
 		state.ring:SetVertexColor(color[1], color[2], color[3], 1)
+		state.ringBack:SetVertexColor(0, 0, 0, 0.75)
+		local inset = RING_INSET - grow
+		state.ring:ClearAllPoints()
+		state.ring:SetPoint("TOPLEFT", inset, -inset)
+		state.ring:SetPoint("BOTTOMRIGHT", -inset, inset)
+		state.ringBack:ClearAllPoints()
+		state.ringBack:SetPoint("TOPLEFT", inset - 1.5, -inset + 1.5)
+		state.ringBack:SetPoint("BOTTOMRIGHT", -inset + 1.5, inset - 1.5)
 		state.edges:SetShown(shape == "square")
 		if shape == "square" then ns.DressStyleEdges(state.edges, 2, color[1], color[2], color[3], 1, true) end
 	end
@@ -701,11 +1349,23 @@ local function DressFrame(info)
 			local health, power, text, portrait = Parts(frame)
 			local r, g, b
 			if view then r, g, b = HealthColor(view, unit) end
+			-- (A theme's color, fuller for a bar this big. Class colors stand as they are.)
+			if r and view.ufHealthColor == "custom" and ns.ThemeLayout() ~= "slab" and ns.ThemeRing() then
+				local vivid = ns.ThemeVivid({ r, g, b })
+				r, g, b = vivid[1], vivid[2], vivid[3]
+			end
 			DressBar(health, view, r, g, b, HEALTH_GREEN)
-			DressBar(power, view, nil, nil, nil, PowerTint(unit), health)
+			-- (Mana in the theme's color: rage, energy and the rest mean something by theirs.)
+			local mana = view and ns.ThemeMana() or nil
+			local tint = PowerTint(unit)
+			if mana and tint == MANA_BLUE then
+				DressBar(power, view, mana[1], mana[2], mana[3], tint, health)
+			else
+				DressBar(power, view, nil, nil, nil, tint, health)
+			end
 			-- (The player's second power, Elemental's mana say: drawn under the first.)
 			local second = frame == _G.PlayerFrame and _G.AlternatePowerBar or nil
-			DressBar(second, view, nil, nil, nil, MANA_BLUE, health)
+			DressBar(second, view, mana and mana[1], mana and mana[2], mana and mana[3], MANA_BLUE, health)
 			DressBarText(health, view)
 			DressBarText(power, view)
 			DressBarText(second, view)
@@ -713,7 +1373,23 @@ local function DressFrame(info)
 			FitName(text, view)
 			DressPortrait(portrait, view, unit)
 			DressFrameArt(frame, active)
-			DressShape(frame, portrait, view)
+			-- (A slab's taken off first: the badge measures the level's place next, and
+			-- would keep the bar as the spot to put it back to.)
+			local slabTheme = view and ns.ThemeLayout() == "slab"
+			local bare = view and view.ufShape == "none"
+			if not slabTheme then DressSlab(frame, health, text, power, portrait, bare) end
+			DressShape(frame, portrait, view, ns.StyleOverride("unitPart" .. info[2] .. "Art") == "hide")
+			-- (One's taken off before the other's measured from the game's own sizes.)
+			local fit = health and power and portrait and view and view.ufShape ~= "game" and view.ufShape ~= "none"
+				and ns.ThemeLayout() ~= "slab"
+			local bars = { health, power }
+			local extra = frame == _G.PlayerFrame and _G.AlternatePowerBar
+			if extra and health and power then bars[3] = extra end
+			local ok, err = true, nil
+			if not fit then ok, err = pcall(FitBars, frame, bars, portrait, nil, false) end
+			if slabTheme then DressSlab(frame, health, text, power, portrait, bare) end
+			if fit then ok, err = pcall(FitBars, frame, bars, portrait, view.ufShape, true, text) end
+			if not ok then ns.Log("style", "bar fit failed: " .. tostring(err)) end
 			-- (The game sets these again as the unit changes: ours after it.)
 			if not hooked[frame] then
 				hooked[frame] = true
@@ -753,6 +1429,37 @@ function Dress(info)
 end
 
 -- Every frame again (the page's settings changing, a new target...).
+-- For /cine debug themecheck: where the parts we move are, as text to compare.
+function ns.UnitStyleSpots()
+	local out = {}
+	for _, id in ipairs({ "PlayerFrame", "TargetFrame", "FocusFrame", "PetFrame" }) do
+		local frame = _G[id]
+		if frame then
+			local health, power, name = Parts(frame)
+			local list = { health = health or false, power = power or false, name = name or false,
+				second = frame == _G.PlayerFrame and _G.AlternatePowerBar or false }
+			for i, region in ipairs(ns.UnitPartRegions and ns.UnitPartRegions(frame, "Level") or {}) do list["level" .. i] = region end
+			for key, region in pairs(list) do
+				if region then
+					-- (To a tenth: the game's own sums wander in the last digits.)
+					local function Near(value) return type(value) == "number" and ("%.1f"):format(value) or tostring(value) end
+					-- (A text's width is its words': it isn't ours to size.)
+					local text = region.GetFont ~= nil
+					local words = { tostring(region:GetParent()), text and "" or Near(region:GetWidth()),
+						text and "" or Near(region:GetHeight()) }
+					for i = 1, tonumber(region:GetNumPoints()) or 0 do
+						local point, to, toPoint, x, y = region:GetPoint(i)
+						words[#words + 1] = table.concat({ tostring(point), tostring(to), tostring(toPoint), Near(x), Near(y) }, " ")
+					end
+					if region.GetFont then words[#words + 1] = tostring(select(2, region:GetFont())) end
+					out[id .. " " .. key] = table.concat(words, "; ")
+				end
+			end
+		end
+	end
+	return out
+end
+
 -- For the shots' log: what the player frame's meant to be and what it is.
 function ns.UnitStyleState()
 	local frame = _G.PlayerFrame
@@ -770,7 +1477,13 @@ end
 function ns.RefreshUnitStyle()
 	if not ns.db then return end
 	wipe(frameInfo)
-	for _, info in ipairs(FRAMES) do DressFrame(info) end
+	-- (Each on its own, so one's trouble leaves the others dressed, with where it was.)
+	for _, info in ipairs(FRAMES) do
+		local ok, err = xpcall(function() DressFrame(info) end, function(text)
+			return tostring(text) .. " at " .. tostring(debugstack and debugstack(2, 3, 0))
+		end)
+		if not ok then ns.Log("style", "unit frame " .. tostring(info[1]) .. " failed: " .. err) end
+	end
 end
 
 local watcher = CreateFrame("Frame")
@@ -897,6 +1610,21 @@ function ns.MakeUnitStylePreview(parent, width, onPick)
 			sample.flip and -6 or 6, -(sample.small and 9 or 13))
 		unit.power:SetPoint("TOP", unit.health, "BOTTOM", 0, -2)
 		unit.name:SetPoint("BOTTOM" .. side, unit.health, "TOP" .. side, 0, 2)
+		-- (Over the bars, for a slab's name.)
+		unit.nameTop = CreateFrame("Frame", nil, unit)
+		unit.nameTop:SetAllPoints()
+		unit.name:SetParent(unit.nameTop)
+		unit.value = unit.nameTop:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+		unit.value:SetPoint(sample.flip and "LEFT" or "RIGHT", unit.health, sample.flip and "LEFT" or "RIGHT",
+			sample.flip and 7 or -7, 0)
+		-- (On the stage, so it's under the portrait, as it is on the game's frames.)
+		unit.plate = MakePlate(stage)
+		unit.plate:SetFrameLevel(stage:GetFrameLevel())
+		unit.bridge = MakeBridge(stage)
+		unit.bridge:SetFrameLevel(stage:GetFrameLevel())
+		unit.rowShadow = MakeRowShadow(stage)
+		unit.rowShadow:SetFrameLevel(stage:GetFrameLevel())
+		PlacePlate(unit.plate, unit.health)
 		for _, bar in ipairs({ unit.health, unit.power }) do
 			bar:SetMinMaxValues(0, 1)
 			local ground = bar:CreateTexture(nil, "BACKGROUND", nil, -7)
@@ -934,12 +1662,67 @@ function ns.MakeUnitStylePreview(parent, width, onPick)
 					end
 					bar:SetStatusBarColor(r or 0, g or 0.8, b or 0)
 				else
-					bar:SetStatusBarColor(unpack(sample.power))
+					local mana = ns.ThemeMana()
+					if mana and sample.power[1] == 0 and sample.power[3] == 1 then
+						bar:SetStatusBarColor(mana[1], mana[2], mana[3])
+					else
+						bar:SetStatusBarColor(unpack(sample.power))
+					end
 				end
 				local kind = ns.StyleBorder(view, "ufBorder")
 				bar.game:SetShown(kind == "game")
-				DressSkin(Skin(bar), view)
+				DressSkin(Skin(bar), view, i == 2 and unit.health or nil)
 			end
+			DressPlateLook(unit.plate, view.ufShape ~= "game" and ns.ThemeLayout() ~= "slab")
+			-- (A slab: as the game's frames get it, with a taller bar, as they have.)
+			local slab = ns.ThemeLayout() == "slab" and not sample.small
+			local across = sample.small and 22 or 34
+			local bare = slab and view.ufShape == "none"
+			local side = sample.flip and "RIGHT" or "LEFT"
+			unit.health:ClearAllPoints()
+			if bare then
+				unit.health:SetPoint("TOP" .. side, unit.portrait, "TOP" .. side, 0, -6)
+			else
+				-- (A shape's rows in the portrait's middle, as FitBars puts them.)
+				local down = sample.small and 9 or 13
+				if view.ufShape ~= "game" and not slab then
+					local row = (sample.small and NAME_ROW_SMALL or NAME_ROW) + 1
+					local rows = row + (sample.small and 9 or 15) + BAR_GAP
+					down = (across - rows) / 2 + row
+				end
+				local gap = 6
+				if view.ufShape ~= "game" and not slab then
+					local fit = ns.ThemePortraitFit(view.ufShape)
+					gap = 4 + across * (fit - 1) / 2 - across * fit * ns.ThemePortraitSide(view.ufShape)
+				end
+				unit.health:SetPoint("TOP" .. side, unit.portrait, "TOP" .. (sample.flip and "LEFT" or "RIGHT"),
+					sample.flip and -gap or gap, -down)
+			end
+			unit.health:SetSize(sample.w + (bare and across + 6 or 0), slab and 22 or sample.small and 6 or 10)
+			unit.power:SetSize(sample.w + (bare and across + 6 or 0), slab and 4 or sample.small and 3 or 5)
+			unit.name:ClearAllPoints()
+			if slab then
+				unit.name:SetPoint(sample.flip and "RIGHT" or "LEFT", unit.health, sample.flip and "RIGHT" or "LEFT",
+					sample.flip and -7 or 7, 0)
+			else
+				local side = sample.flip and "RIGHT" or "LEFT"
+				if view.ufShape ~= "game" then
+					unit.name:SetPoint("CENTER", unit.plate, "CENTER")
+				else
+					unit.name:SetPoint("BOTTOM" .. side, unit.health, "TOP" .. side, 0, 2)
+				end
+			end
+			unit.nameTop:SetFrameLevel(unit.health:GetFrameLevel() + 3)
+			unit.value:SetShown(slab)
+			if slab then
+				unit.value:SetFontObject(_G.GameFontHighlightSmall)
+				unit.value:SetText(("%d%%"):format(sample.health * 100))
+			end
+			PlacePlate(unit.plate, unit.health)
+			PlaceBridge(unit.bridge, unit.plate, unit.health, unit.power, sample.flip, view.ufShape)
+			PlaceRowShadow(unit.rowShadow, unit.plate, unit.power)
+			unit.rowShadow:SetShown(view.ufShape ~= "game" and view.ufShape ~= "none" and ns.ThemeLayout() ~= "slab")
+			DressBridge(unit.bridge, view.ufShape ~= "game" and view.ufShape ~= "none" and ns.ThemeLayout() ~= "slab")
 			-- (The name.)
 			local object = sample.small and _G.GameFontNormalSmall or _G.GameFontNormal
 			unit.name:SetFontObject(object)
@@ -975,7 +1758,14 @@ function ns.MakeUnitStylePreview(parent, width, onPick)
 				unit.faceMasked = not square
 			end
 			local shapeFile = ns.ThemePortraitMask(shape) or "Interface\\CharacterFrame\\TempPortraitAlphaMask"
+			local grow = (sample.small and 22 or 34) * (ns.ThemePortraitFit(shape) - 1) / 2
+			unit.ring:ClearAllPoints()
+			unit.ring:SetPoint("TOPLEFT", unit.portrait, -2 - grow, 2 + grow)
+			unit.ring:SetPoint("BOTTOMRIGHT", unit.portrait, 2 + grow, -2 - grow)
 			if unit.faceMask then
+				unit.faceMask:ClearAllPoints()
+				unit.faceMask:SetPoint("TOPLEFT", unit.portrait, -grow, grow)
+				unit.faceMask:SetPoint("BOTTOMRIGHT", unit.portrait, grow, -grow)
 				unit.faceMask:SetTexture(shapeFile, "CLAMPTOBLACKADDITIONAL", "CLAMPTOBLACKADDITIONAL")
 			end
 			if square then
@@ -1224,12 +2014,12 @@ function ns.CreateUnitStylePanel(kit)
 		{ "hex", L["Hexagon"], L["A six-sided portrait, in place of the game's frame art."] },
 		{ "diamond", L["Diamond"], L["A diamond portrait, in place of the game's frame art."] },
 		{ "arch", L["Arch"], L["A portrait in a pointed window, in place of the game's frame art."] },
-		{ "shard", L["Shard"], L["A portrait in a broken crystal, in place of the game's frame art."] },
+		{ "cut", L["Cut square"], L["A square portrait with small cut corners, in place of the game's frame art."] },
 		{ "eye", L["Eye"], L["A tall, narrow portrait with a point at each end, in place of the game's frame art."] },
 		{ "octagon", L["Octagon"], L["An eight-sided portrait, in place of the game's frame art."] },
 		{ "shield", L["Shield"], L["A portrait on a shield, in place of the game's frame art."] },
-		{ "petal", L["Petal"], L["A round portrait with a point at the top, in place of the game's frame art."] },
-		{ "crystal", L["Crystal"], L["A tall cut crystal, in place of the game's frame art."] },
+		{ "petal", L["Leaf"], L["A rounded portrait with two sharp corners, in place of the game's frame art."] },
+		{ "crystal", L["Crystal"], L["A wide cut crystal, in place of the game's frame art."] },
 		{ "none", L["None"], L["No portrait and no frame art: just the name and bars."] },
 	}, Editable)
 	-- (The panel's bottom under the last row, its right at the page's.)

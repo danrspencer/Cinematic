@@ -112,7 +112,7 @@ local function PrintDebugHelp()
 	print("  /cine debug weapon - what the game says about your weapon, and the cozy weapon trigger")
 	print("  /cine debug quest - the quest cam: on or off, its turn and its zoom")
 	if ns.GetShoulderCamDebug then -- (dev copy: ShoulderCam.lua)
-		print("  /cine debug shoulder - the Shoulder Cam: on or off, the game's shoulder offset and Keep Character Centered")
+		print("  /cine debug shoulder [scan|frames|watch|sweep ...|try ...|on|off|left|right|offset N|strength N] - the Shoulder Cam: its state, or its tests (Tools/shoulder-test-plan.md)")
 	end
 	if ns.isDev then print("  /cine debug skyride [frames|probe zoom|turn|tilt|fov|follow] - skyriding: what the game says and the flight log (again to stop); the frames up; or one of our camera moves tried mid-flight") end
 	print("  /cine debug questlog - save every frame of the next quest cams (for tracking down snaps)")
@@ -124,8 +124,9 @@ local function PrintDebugHelp()
 	print("  /cine debug spec - every way this client might tell your spec, and what each says")
 	print("  /cine debug textures - a strip of every bar texture the Style pages offer, to see which this client has")
 	print("  /cine debug fonts - every font other addons share, and which are left out (no small letters)")
+	print("  /cine debug themecheck - every theme after every other: the frames' parts must come back where the game had them")
 	print("  /cine debug bubbleshot | off - a real chat bubble in each style theme: run it four times, outdoors, it says a line each go")
-	print("  /cine debug themeshots [theme] | off - screenshots of every style theme's frames; your settings come back after")
+	print("  /cine debug themeshots [unitframes] [theme] | off - screenshots of every style theme's frames; your settings come back after")
 	print("  /cine debug cardchat - plays a zone card and prints how it's kept clear of the chat windows")
 	print("  /cine debug platetextures - the textures your target's nameplate is drawn with (for the game's plate Styles)")
 	print("  /cine debug prdtextures - the personal resource display's textures and their alpha (its border pieces)")
@@ -627,6 +628,8 @@ local function HandleSlash(msg)
 		if seconds then ns.CursorHideRecord(seconds) else ns.CursorHideDebug() end
 	elseif cmd == "debug" and arg == "vitalspage" then
 		if ns.VitalsPageDepth then ns.VitalsPageDepth() else ns.Print("Open the Vitals Style page first.") end
+	elseif cmd == "debug" and arg == "themecheck" then
+		ns.ThemeCheck()
 	elseif cmd == "debug" and (arg == "bubbleshot" or arg:match("^bubbleshot ")) then
 		ns.BubbleShots(arg:match("^bubbleshot%s*(.-)$"))
 	elseif cmd == "debug" and (arg == "themeshots" or arg:match("^themeshots ")) then
@@ -1031,6 +1034,8 @@ local function HandleSlash(msg)
 			tostring(d.shoulder), tostring(d.centered), tostring(IsMounted and IsMounted()), tostring(InCombatLockdown())))
 		ns.Print(("  Frames follow you %s: slide %.0f of %.0f (UI units, - left), zoom %.1f, cameraFov %s; moving %s"):format(
 			tostring(d.follow), d.followShift, d.followTarget, GetCameraZoom and GetCameraZoom() or 0, tostring(GetCVar("cameraFov")), d.followed))
+	elseif cmd == "debug" and arg:find("^shoulder%s") and ns.ShoulderTest then
+		ns.ShoulderTest((arg:gsub("^shoulder%s+", "")))
 	elseif cmd == "debug" and (arg == "skyride" or arg:find("^skyride%s")) and ns.SkyrideDebug then
 		ns.SkyrideDebug(arg:match("^skyride%s+(.-)%s*$"))
 	elseif cmd == "debug" and arg == "help" then

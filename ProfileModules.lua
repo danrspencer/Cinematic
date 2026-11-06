@@ -44,27 +44,14 @@ local KEY_ADDRESSES = {
 -- row it follows, is where that row is.
 local ROW_RULE_LISTS = { frameRules = true, rowFollow = true }
 
--- Switches cameras off: an event's camera to none, or (for the ones no
--- event starts) its row of the Cameras page's "Turn off in" grid.
-local EVENT_CAMS = { flight = true, idle = true, cozy = true, tele = true, vista = true, fish = true,
-	quest = true }
+-- Switches cameras off: the scenes that play them ticked off, each keeping
+-- its camera, so a camera is always in a scene to tick on and try.
 local function CamsOff(set, cams)
 	local off = {}
 	for _, cam in ipairs(cams) do off[cam] = true end
-	for _, event in ipairs(ns.EVENTS or {}) do
-		local cam = event.camera == "afk" and "idle" or event.camera
-		if off[cam] then
-			set("event" .. event.key .. "Camera", "none")
-		end
-	end
-	for _, cam in ipairs(cams) do
-		if not EVENT_CAMS[cam] then
-			for _, where in ipairs(ns.CAMERA_OFF_WHERE) do
-				if not (ns.CAMERA_OFF_NEVER[cam] or {})[where] then
-					set(cam .. "OffIn" .. where, true)
-				end
-			end
-		end
+	for _, trigger in ipairs(ns.CAMERA_TRIGGERS) do
+		local mode = trigger.sceneOff and ns.CameraValueMode(ns.DEFAULTS[trigger.camera])
+		if mode and off[mode] then set(trigger.sceneOff, true) end
 	end
 end
 
@@ -388,20 +375,18 @@ ns.PROFILE_MODULES = {
 	-- (Key kept from when it hid the frame's parts until a fight: profiles
 	-- pick it by it.)
 	{ key = "minimal-target", name = "Target frame up",
-		scope = { "Standard Frames/Unit frames", "Quest Vision/top" },
-		tip = "The target frame stays through CineMode, every part of it showing. No quest icon on it.",
+		scope = { "Standard Frames/Unit frames" },
+		tip = "The target frame stays through CineMode, every part of it showing.",
 		apply = function(set)
 			set("cineShow", { target = true })
-			set("targetQuestIcon", false)
 		end },
-	-- (Off in every profile while Quest talk is being fixed: put this back, and
-	-- "quest-talk" into Balanced's and Cinema's modules in ProfileChoices.lua.)
-	-- { key = "quest-talk", name = "Quest talk", scope = { "Quest Vision/Talking to NPCs" },
-	-- 	tip = "Custom dialogue frames: speech bubbles and a reply list instead of the game's gossip and " ..
-	-- 	"quest windows.",
-	-- 	apply = function(set)
-	-- 		set("questTalk", true)
-	-- 	end },
+	-- (Just Cinema's.)
+	{ key = "quest-talk", name = "Quest talk", scope = { "Quest Vision/Talking to NPCs" },
+		tip = "Custom dialogue frames: speech bubbles and a reply list instead of the game's gossip and " ..
+		"quest windows.",
+		apply = function(set)
+			set("questTalk", true)
+		end },
 	{ key = "combat-vision", name = "Battle cards", scope = { "Card Vision" },
 		tip = "The Cards page's fights on: a card and sounds as you go into a fight and come out of it, and a " ..
 		"boss's name as its fight starts.",
@@ -417,13 +402,12 @@ ns.PROFILE_MODULES = {
 			set("bubblesOffTop", false)
 		end },
 	-- (Not Duel, Tele or Emote Vision, or the Cards page: they only show for
-	-- a moment, and every profile has them.)
+	-- a moment, and every profile has them. Nor Quest Vision: every profile has it.)
 	-- (Vitals and Damage Vision are off to start with: their modules turn them on.)
-	{ key = "no-visions", name = "No visions", scope = { "Heal Vision", "Quest Vision", "Roll Vision" },
-		tip = "The visions that change your UI and are on to start with, off: Heal, Quest and Roll Vision.",
+	{ key = "no-visions", name = "No visions", scope = { "Heal Vision", "Roll Vision" },
+		tip = "The visions that change your UI and are on to start with, off: Heal and Roll Vision.",
 		apply = function(set)
 			set("handleHealVision", false)
-			set("questVision", false)
 			set("rollWindow", false)
 		end },
 	{ key = "pure-tooltips", name = "Cinema: tooltips", scope = { "Tooltips" },
@@ -483,8 +467,8 @@ ns.PROFILE_MODULES = {
 			-- (Chat Cam: off to start with, on here. Its look-round setting's
 			-- page is dev-only.)
 			if ns.DEFAULTS.chatCamSearch ~= nil then
-				set("chatCamera", "chat")
-				set("chatNearbyCamera", "chat")
+				set("sceneOffChat", false)
+				set("sceneOffChatNearby", false)
 				set("chatNearbyDelay", 3)
 				if ns.isDev then set("chatCamSearch", false) end
 			end

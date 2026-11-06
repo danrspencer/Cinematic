@@ -22,6 +22,8 @@ DEFAULTS.emoteVisionGroupBuffs = false -- buffs from your own party or raid igno
 DEFAULTS.emoteVisionHold = 10          -- seconds a card stays (paused while the mouse is over it)
 DEFAULTS.emoteVisionScale = 1
 DEFAULTS.emoteVisionPortrait = true    -- their face (or class icon) on the card
+DEFAULTS.emoteVisionPlayerMenu = true  -- an Emote section on a player's right-click menu
+DEFAULTS.emoteVisionMenuEmotes = "HELLO,THANK,CHEER,LAUGH" -- ...the ones on it (the rest: More Emotes)
 DEFAULTS.emoteVisionSpot = "speech"   -- "speech": just above the lines from behind you (Speech.lua's spot); "own": X, Y
 DEFAULTS.emoteVisionX = 0              -- ...own: from the bottom middle of the screen (dragging it with Move)
 DEFAULTS.emoteVisionY = 260
@@ -2108,6 +2110,7 @@ function ns.EmoteVisionDebug()
 		moments[#moments + 1] = each.id .. (db[each.on] and "" or " (off)") .. ": " .. table.concat(list, ",")
 	end
 	ns.Print("  " .. table.concat(moments, "; "))
+	ns.Print(("  player menu: option %s; %s"):format(tostring(db.emoteVisionPlayerMenu), ns.EmotePlayerMenuDebug()))
 	local known = 0
 	for _ in pairs(ends) do known = known + 1 end
 	ns.Print(("  aura events %d, last: %s; buffs' end times known %d"):format(auraSeen.events,
@@ -2302,6 +2305,9 @@ local function Picker()
 		row:SetScript("OnClick", function(self, button)
 			if button == "RightButton" then
 				TryEmote(self.token)
+			elseif self.token and f.play then
+				f.play(self.token)
+				f:Hide()
 			elseif self.token and not self.taken and f.add then
 				f.add(self.token)
 				f.Refresh()
@@ -2310,7 +2316,11 @@ local function Picker()
 		row:SetScript("OnEnter", function(self)
 			GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
 			GameTooltip:SetText(EmoteName(self.token), 1, 1, 1)
-			GameTooltip:AddLine(self.taken and L["Already on this card (or the card is full). Right-click: play it."]
+			local menu = f.moment and f.moment.menu
+			GameTooltip:AddLine(f.play and L["Click: play it at them. Right-click: play it at no one."]
+				or menu and self.taken and L["Already on the menu (or the menu is full). Right-click: play it."]
+				or menu and L["Click: add it to the menu. Right-click: play it."]
+				or self.taken and L["Already on this card (or the card is full). Right-click: play it."]
 				or L["Click: add it to the card. Right-click: play it."], nil, nil, nil, true)
 			GameTooltip:Show()
 		end)
@@ -2371,7 +2381,11 @@ local function Picker()
 			end
 		end
 		f.empty:SetShown(#f.items == 0)
-		f.count:SetText(full and ("|cffff6060" .. L["%d of %d: the card is full"]:format(#list, MAX_EMOTES) .. "|r")
+		local menu = f.moment and f.moment.menu
+		f.count:SetText(f.play and ""
+			or menu and full and ("|cffff6060" .. L["%d of %d: the menu is full"]:format(#list, MAX_EMOTES) .. "|r")
+			or menu and L["%d of %d on the menu"]:format(#list, MAX_EMOTES)
+			or full and ("|cffff6060" .. L["%d of %d: the card is full"]:format(#list, MAX_EMOTES) .. "|r")
 			or L["%d of %d on this card"]:format(#list, MAX_EMOTES))
 	end
 
@@ -2426,12 +2440,215 @@ end
 -- add(token) adds one.
 function ns.OpenEmotePicker(owner, moment, getList, add)
 	local f = Picker()
-	f.moment, f.getList, f.add, f.offset = moment, getList, add, 0
+	f.moment, f.getList, f.add, f.play, f.offset = moment, getList, add, nil, 0
 	f.title:SetText(L["Add an emote: %s"]:format(L[moment.name]))
 	f:ClearAllPoints()
 	f:SetPoint("TOPLEFT", owner, "TOPRIGHT", 12, 80)
 	f:Show()
 	f.Refresh()
+end
+
+-- The Emote section on a player's right-click menu: the ones picked on the
+-- Settings tab, then More Emotes for the other common ones and All Emotes...
+-- for the picker. Always added at
+-- the menu's end: the game's own lines stay where it put them, as moving them
+-- from here could taint them (Edit Mode, Report Player). Not for you, enemies
+-- or anyone who isn't around to emote at (a friend list name far away).
+do
+	local TAGS = { "MENU_UNIT_PLAYER", "MENU_UNIT_PARTY", "MENU_UNIT_RAID_PLAYER", "MENU_UNIT_RAID",
+		"MENU_UNIT_FRIEND", "MENU_UNIT_TARGET" }
+	local hooked, last = 0, "none yet"
+
+	-- Who the menu's for: their unit, GUID and name. nil and why not, for no one to emote at.
+	local function MenuPlayer(context)
+		local name = Plain(context.name)
+		local server = Plain(context.server)
+		if type(name) == "string" and type(server) == "string" and server ~= "" and not name:find("-", 1, true) then
+			name = name .. "-" .. server
+		end
+		local unit = Plain(context.unit) or UnitFor(nil, name)
+		if not unit then return nil, "no unit" end
+		local guid = Plain(UnitGUID(unit))
+		-- (By GUID: UnitIsPlayer can say false for players on Forever.)
+		if guid and not guid:find("^Player%-") then return nil, "not a player" end
+		if ns.Flag(UnitIsUnit(unit, "player")) then return nil, "you" end
+		if ns.Flag(UnitCanAttack("player", unit)) then return nil, "enemy" end
+		return { unit = unit, guid = guid, name = Plain(UnitName(unit)) or name }
+	end
+
+	-- (The unit again by GUID: the menu's "target" may be someone else by the
+	-- picker's click. Out of sight the game would play it at everyone around.)
+	local function PlayAt(who, token)
+		local unit = who.unit
+		if who.guid then unit = UnitFor(who.guid) end
+		if not unit or not ns.Flag(UnitIsVisible(unit)) then
+			ns.Print(L["Emote Vision: %s is too far away now."]:format(who.name or L["That player"]))
+			return
+		end
+		ArmEcho(token)
+		pcall(DoEmote, token, unit)
+	end
+
+	local function OpenAllEmotes(who)
+		local f = Picker()
+		f.moment, f.getList, f.add, f.offset = nil, nil, nil, 0
+		f.play = function(token) PlayAt(who, token) end
+		f.title:SetText(L["Emote at %s"]:format(who.name or L["That player"]))
+		f:ClearAllPoints()
+		f:SetPoint("CENTER", UIParent, "CENTER")
+		f:Show()
+		f.Refresh()
+	end
+
+	local function AddSection(tag, root, context)
+		-- (Hooking runs this at once on the last menu built: no context then.)
+		if not root or type(context) ~= "table" then return end
+		if not (ns.Setting("emoteVision") and ns.Setting("emoteVisionPlayerMenu")) then return end
+		local who, why = MenuPlayer(context)
+		last = tag .. ": " .. (who and ("added for " .. tostring(who.unit)) or tostring(why))
+		if not who then return end
+		root:CreateDivider()
+		root:CreateTitle(L["Emote"])
+		local quick = {}
+		for _, token in ipairs(ParseEmotes(DB().emoteVisionMenuEmotes)) do
+			quick[token] = true
+			if HasEmote(token) then
+				root:CreateButton(EmoteName(token), function() PlayAt(who, token) end)
+			end
+		end
+		local more = root:CreateButton(L["More Emotes"])
+		for _, each in ipairs(EMOTES) do
+			local token = each[1]
+			if not quick[token] and HasEmote(token) then
+				more:CreateButton(EmoteName(token), function() PlayAt(who, token) end)
+			end
+		end
+		more:CreateButton(L["All Emotes..."], function() OpenAllEmotes(who) end)
+		local constants = _G.MenuConstants
+		if more.SetGridMode and constants and constants.VerticalGridDirection then
+			more:SetGridMode(constants.VerticalGridDirection, 2)
+		else
+			ns.ScrollMenu(more)
+		end
+	end
+
+	-- The Settings tab's list of the emotes on the menu itself: each with > to
+	-- try it, ^ to move it up and x to take it off (back under More Emotes),
+	-- Add an emote under them.
+	local PICKER = { name = "Player menu", menu = true }
+	function ns.EmoteMenuList(kit, content, stack)
+		local box = CreateFrame("Frame", nil, content)
+		box:SetSize(GRID_W, 40)
+		stack:Add(box, "label")
+		local note = kit.Label(box, "GameFontHighlightSmall",
+			L["On the menu itself, in this order. The rest stay under More Emotes."])
+		note:SetPoint("TOPLEFT", 2, 0)
+		local Rebuild
+		local function List() return ParseEmotes(DB().emoteVisionMenuEmotes) end
+		local function Save(list)
+			ns.GetDB().emoteVisionMenuEmotes = table.concat(list, ",")
+			Rebuild()
+		end
+		local rows = {}
+		local function Row(n)
+			if rows[n] then return rows[n] end
+			local row = CreateFrame("Frame", nil, box)
+			row:SetSize(GRID_W, ROW_H)
+			row.name = kit.Label(row, "GameFontHighlightSmall", "")
+			row.name:SetPoint("LEFT", 0, 0)
+			row.name:SetWidth(300)
+			row.name:SetJustifyH("LEFT")
+			row.name:SetWordWrap(false)
+			row.play = SmallButton(row, ">")
+			row.play:SetPoint("LEFT", row.name, "RIGHT", 8, 0)
+			row.up = SmallButton(row, "^")
+			row.up:SetPoint("LEFT", row.play, "RIGHT", 4, 0)
+			row.remove = SmallButton(row, "x")
+			row.remove:SetPoint("LEFT", row.up, "RIGHT", 4, 0)
+			kit.Tooltip(row.play, L["Play it, to see it (at no one)."])
+			kit.Tooltip(row.up, L["Move this emote up the menu."])
+			kit.Tooltip(row.remove, L["Take it off the menu."])
+			rows[n] = row
+			return row
+		end
+		local add = SmallButton(box, L["Add an emote"], 120)
+		kit.Tooltip(add, L["Pick an emote for the menu itself: a common one, any of the game's, or a voice " ..
+			"emote (said out loud). Up to six."])
+		add:SetScript("OnClick", function(self)
+			ns.OpenEmotePicker(self, PICKER, List, function(token)
+				local list = List()
+				for _, each in ipairs(list) do if each == token then return end end
+				if #list >= MAX_EMOTES then return end
+				list[#list + 1] = token
+				Save(list)
+			end)
+		end)
+		local defaults = SmallButton(box, L["Back to the defaults"], 160)
+		kit.Tooltip(defaults, L["The menu's emotes as they come."])
+		defaults:SetPoint("LEFT", add, "RIGHT", 8, 0)
+		defaults:SetScript("OnClick", function()
+			ns.GetDB().emoteVisionMenuEmotes = DEFAULTS.emoteVisionMenuEmotes
+			Rebuild()
+		end)
+
+		function Rebuild()
+			local open = (On() and DB().emoteVisionPlayerMenu) and true or false
+			local list = List()
+			for _, row in ipairs(rows) do row:Hide() end
+			local y = 18
+			for k, token in ipairs(list) do
+				local row = Row(k)
+				row:ClearAllPoints()
+				row:SetPoint("TOPLEFT", box, "TOPLEFT", 2, -y)
+				row:Show()
+				y = y + ROW_H
+				row.name:SetText(EmoteName(token) .. "  |cff808080" .. Command(token) .. "|r  " .. EmoteTags(token))
+				row.name:SetAlpha(open and 1 or 0.5)
+				row.play:SetScript("OnClick", function() TryEmote(token) end)
+				row.up:SetEnabled(open and k > 1)
+				row.remove:SetEnabled(open)
+				row.up:SetScript("OnClick", function()
+					local now = List()
+					now[k], now[k - 1] = now[k - 1], now[k]
+					Save(now)
+				end)
+				row.remove:SetScript("OnClick", function()
+					local now = List()
+					table.remove(now, k)
+					Save(now)
+				end)
+			end
+			add:ClearAllPoints()
+			add:SetPoint("TOPLEFT", box, "TOPLEFT", 2, -y - 4)
+			add:SetEnabled(open and #list < MAX_EMOTES)
+			defaults:SetEnabled(open)
+			box:SetHeight(y + 30)
+			if kit.FitContentHeight then kit.FitContentHeight(content) end
+		end
+
+		-- (Rebuilt as the page shows and as settings change: a profile, the tick.)
+		box.Refresh = function()
+			if content:IsVisible() then Rebuild() end
+		end
+		box.pageSwitch = false
+		kit.AddControl(box)
+		Rebuild()
+	end
+
+	-- Whether this client has the game's menus to add to (no: no option either).
+	function ns.EmotePlayerMenuAvailable() return hooked > 0 end
+	function ns.EmotePlayerMenuDebug()
+		return ("hooked %d of %d menus; last %s"):format(hooked, #TAGS, last)
+	end
+
+	if Menu and Menu.ModifyMenu then
+		for _, tag in ipairs(TAGS) do
+			local ok = pcall(Menu.ModifyMenu, tag, function(_, root, context)
+				ns.Guard(AddSection, tag, root, context)
+			end)
+			if ok then hooked = hooked + 1 end
+		end
+	end
 end
 local function MomentsGrid(kit, content, stack)
 	local box = CreateFrame("Frame", nil, content)
@@ -2715,6 +2932,15 @@ function ns.CreateEmoteVisionSettingsPanel(kit)
 		function(db) return db.emoteVision and db.emoteVisionRepeats end)
 	b.Number(L["Stays for:"], "emoteVisionHold", 3, 20, 1, 1, L["sec"],
 		L["How long a card stays before it fades. The mouse over it holds it."], On)
+	if ns.EmotePlayerMenuAvailable() then
+		stack:Header(content, L["Player menu"])
+		b.Toggles(L["Menu:"], {
+			{ "emoteVisionPlayerMenu", L["Emotes on the right-click menu"], L["Right-clicking a friendly player " ..
+				"adds an Emote section to the end of the menu: a few emotes, More Emotes, and every emote " ..
+				"under All Emotes."] },
+		}, On)
+		ns.EmoteMenuList(kit, content, stack)
+	end
 
 	canvas:SetScript("OnShow", kit.PageShown(kit.Refresh, content))
 	canvas:Hide()

@@ -1534,7 +1534,7 @@ end
 
 -- Whether the quest cam is running now.
 function ns.QuestCamActive()
-	return cam.active and true or false
+	return (cam.active or ScriptOn(cam.event)) and true or false
 end
 
 -- Running with the quest giver's window still open: a click on them for the

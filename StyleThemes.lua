@@ -103,8 +103,23 @@ local function Theme(info)
 	s.rfTexture, s.rfFont, s.rfNameSize, s.rfOutline, s.rfShadow = "tile", "friz", 1.15, 0, "on"
 	s.ufNameColor = "theme"
 	-- (Unit names are small too: the themes' thin fonts go faint there.)
-	s.ufFont, s.ufOutline, s.ufShadow = "friz", 0, "on"
+	s.ufFont, s.ufOutline, s.ufShadow = "friz", 0, info.layout == "slab" and "soft" or "on"
 	Bars(s, info.health, info.mana, info.back)
+	-- (A slab: the name on the bar in the theme's own font, the bar in class colors.)
+	-- With a thin black line and nothing else. (darkBars: charcoal, not class colors.)
+	if info.layout == "slab" then
+		s.ufFont, s.ufNameSize, s.ufOutline = s.styleFont, 1.1, 0
+		s.ufBorder, s.ufBorderSize, s.ufBorderR, s.ufBorderG, s.ufBorderB = "custom", 1, 0, 0, 0
+		if not info.darkBars then s.ufHealthColor = "class" end
+	end
+	-- (Bands of light on a texture read as cheap plastic on a bar this big: flat, with
+	-- the shape doing the work. The game's frame art keeps the theme's own.)
+	if s.ufShape and s.ufShape ~= "game" then s.ufTexture = info.unitBars or "flat" end
+	-- (Each bar in the theme's thin line, as the game's frame has them.)
+	if s.ufShape and s.ufShape ~= "game" and info.layout ~= "slab" then
+		s.ufBorder, s.ufBorderSize = "custom", 1
+		s.ufBorderR, s.ufBorderG, s.ufBorderB = info.line[1], info.line[2], info.line[3]
+	end
 	Panels(s, info.panel, info.panelAlpha)
 	Casts(s, info.cast, info.channel, info.locked, info.stop)
 	Line(s, info.lineSize, info.line)
@@ -115,7 +130,7 @@ local THEMES = {
 	{ key = "game", name = "The game's", tip = "Everything as the game draws it. Each Style page's own defaults.",
 		swatch = { { 0.10, 0.09, 0.08 }, { 1, 0.82, 0 }, { 0, 0.8, 0 }, { 0, 0.45, 1 } }, settings = {} },
 	Theme({
-		key = "reel", name = "Silver Screen",
+		key = "reel", name = "Silver Screen", unitBars = "brushed",
 		tip = "Black and silver, like an old film print. Thin lines, narrow lettering, nothing in the way of the picture.",
 		swatch = { { 0.05, 0.05, 0.06 }, { 0.86, 0.87, 0.9 }, { 0.55, 0.56, 0.6 }, { 0.94, 0.72, 0.3 } },
 		menu = { accent = { 0.9, 0.9, 0.93 }, edge = { 0.52, 0.53, 0.58 }, field = { 0.07, 0.07, 0.08 },
@@ -127,7 +142,7 @@ local THEMES = {
 		line = { 0.6, 0.61, 0.66 }, lineSize = 1,
 		cardColor = { 0.95, 0.95, 0.97 }, cardFont = "bebas",
 		settings = { styleTexture = "reel", styleFont = "barlow", styleOutline = 0, styleShadow = "on",
-			stylePanel = "deco",
+			stylePanel = "deco", styleBarShape = "bevel",
 			questTalkStyle = "dark", rollPanel = "flat", abShape = "square", ufShape = "octagon" },
 	}),
 	Theme({
@@ -144,10 +159,11 @@ local THEMES = {
 		line = { 0.68, 0.51, 0.24 }, lineSize = 1,
 		cardColor = { 0.96, 0.8, 0.44 }, cardFont = "almendra",
 		settings = { styleTexture = "gilt", styleFont = "marcellus", styleOutline = 0, styleShadow = "on",
-			questTalkStyle = "parchment", questTalkShadow = "none", rollPanel = "rounded" },
+			questTalkStyle = "parchment", questTalkShadow = "none", rollPanel = "rounded",
+			ufBorder = "game" }, -- (the frame art's its border: a line of ours crosses it)
 	}),
 	Theme({
-		key = "forge", name = "Emberforge",
+		key = "forge", name = "Emberforge", unitBars = "hammered",
 		tip = "Blackened iron, rivets and molten light. Heavy, loud and built to take a hit.",
 		swatch = { { 0.09, 0.085, 0.08 }, { 1, 0.5, 0.12 }, { 0.82, 0.24, 0.1 }, { 0.5, 0.48, 0.46 } },
 		menu = { accent = { 1, 0.55, 0.16 }, edge = { 0.46, 0.43, 0.4 }, field = { 0.11, 0.105, 0.1 },
@@ -164,7 +180,7 @@ local THEMES = {
 			questTalkStyle = "dark", rollPanel = "flat", abShape = "square", ufShape = "shield" },
 	}),
 	Theme({
-		key = "glade", name = "Moonlit Glade",
+		key = "glade", name = "Moonlit Glade", unitBars = "linen",
 		tip = "Night in an old forest: deep teal, soft silver and vines climbing the edges. Quiet and alive.",
 		swatch = { { 0.05, 0.11, 0.12 }, { 0.72, 0.9, 0.84 }, { 0.3, 0.72, 0.56 }, { 0.46, 0.42, 0.8 } },
 		menu = { accent = { 0.66, 0.92, 0.82 }, edge = { 0.3, 0.47, 0.46 }, field = { 0.05, 0.1, 0.11 },
@@ -181,7 +197,7 @@ local THEMES = {
 			questTalkStyle = "dark", rollPanel = "flat", ufShape = "petal" },
 	}),
 	Theme({
-		key = "rime", name = "Frostbound",
+		key = "rime", name = "Frostbound", unitBars = "brushed",
 		tip = "Cut ice over cold slate. Crisp lines and a clear head at the top of the world.",
 		swatch = { { 0.07, 0.1, 0.14 }, { 0.72, 0.88, 1 }, { 0.32, 0.66, 0.84 }, { 0.82, 0.9, 0.96 } },
 		menu = { accent = { 0.66, 0.86, 1 }, edge = { 0.36, 0.48, 0.6 }, field = { 0.07, 0.1, 0.14 },
@@ -198,7 +214,7 @@ local THEMES = {
 			questTalkStyle = "dark", rollPanel = "flat", ufShape = "crystal" },
 	}),
 	Theme({
-		key = "vanguard", name = "Crimson Vanguard",
+		key = "vanguard", name = "Crimson Vanguard", unitBars = "satin",
 		tip = "A war banner in motion: blades, cut bars and diamonds in crimson and ivory.",
 		swatch = { { 0.07, 0.05, 0.06 }, { 0.86, 0.13, 0.17 }, { 0.93, 0.89, 0.8 }, { 0.3, 0.32, 0.38 } },
 		menu = { accent = { 0.95, 0.27, 0.27 }, edge = { 0.5, 0.2, 0.22 }, field = { 0.1, 0.06, 0.07 },
@@ -206,7 +222,7 @@ local THEMES = {
 			thumb = { 0.62, 0.22, 0.24 } },
 		grain = "Reel", ornament = { 0.86, 0.13, 0.17 },
 		nameColor = { 0.95, 0.9, 0.82 }, -- (crimson names sink into a dusk sky)
-		health = { 0.8, 0.13, 0.17 }, mana = { 0.72, 0.68, 0.6 }, back = 0.8,
+		health = { 0.8, 0.13, 0.17 }, mana = { 0.3, 0.34, 0.44 }, back = 0.8,
 		panel = { 0.075, 0.055, 0.065 }, panelAlpha = 0.95,
 		cast = { 0.93, 0.89, 0.8 }, channel = { 0.86, 0.3, 0.3 }, locked = { 0.4, 0.38, 0.42 }, stop = { 0.5, 0.05, 0.08 },
 		line = { 0.86, 0.13, 0.17 }, lineSize = 1,
@@ -216,7 +232,7 @@ local THEMES = {
 			questTalkStyle = "dark", rollPanel = "flat", abShape = "square" },
 	}),
 	Theme({
-		key = "hearth", name = "Hearthside",
+		key = "hearth", name = "Hearthside", unitBars = "linen",
 		tip = "A warm inn at the end of the road: soft round panels, capsule bars and honey light. Nothing has a sharp edge.",
 		swatch = { { 0.17, 0.11, 0.08 }, { 0.95, 0.72, 0.38 }, { 0.56, 0.68, 0.42 }, { 0.84, 0.47, 0.34 } },
 		menu = { accent = { 0.97, 0.76, 0.44 }, edge = { 0.5, 0.36, 0.26 }, field = { 0.16, 0.11, 0.08 },
@@ -233,7 +249,7 @@ local THEMES = {
 			questTalkStyle = "dark", rollPanel = "flat", abShape = "round" },
 	}),
 	Theme({
-		key = "cathedral", name = "Cathedral",
+		key = "cathedral", name = "Cathedral", unitBars = "satin",
 		tip = "Stained glass at dusk: jewel colors behind dark lead, pointed bars and arched windows for portraits.",
 		swatch = { { 0.06, 0.06, 0.13 }, { 0.3, 0.42, 0.95 }, { 0.82, 0.17, 0.32 }, { 0.92, 0.72, 0.28 } },
 		menu = { accent = { 0.95, 0.76, 0.34 }, edge = { 0.32, 0.34, 0.58 }, field = { 0.07, 0.07, 0.15 },
@@ -246,11 +262,11 @@ local THEMES = {
 		line = { 0.92, 0.72, 0.28 }, lineSize = 1,
 		cardColor = { 0.96, 0.8, 0.45 }, cardFont = "cinzel",
 		settings = { styleTexture = "glass", styleFont = "marcellus", styleOutline = 0, styleShadow = "on",
-			stylePanel = "notch", styleBarShape = "point", ufShape = "arch",
+			stylePanel = "notch", styleBarShape = "soft", ufShape = "arch",
 			questTalkStyle = "dark", rollPanel = "flat" },
 	}),
 	Theme({
-		key = "rune", name = "Runestone",
+		key = "rune", name = "Runestone", unitBars = "worn",
 		tip = "Carved from old rock: heavy cut stone, hexagons and chiseled bars, lit by a faint glow in the runes.",
 		swatch = { { 0.13, 0.14, 0.13 }, { 0.42, 0.85, 0.72 }, { 0.5, 0.52, 0.48 }, { 0.7, 0.66, 0.55 } },
 		menu = { accent = { 0.5, 0.9, 0.76 }, edge = { 0.42, 0.44, 0.4 }, field = { 0.13, 0.135, 0.125 },
@@ -263,12 +279,12 @@ local THEMES = {
 		line = { 0.46, 0.48, 0.44 }, lineSize = 2,
 		cardColor = { 0.62, 0.95, 0.82 }, cardFont = "germania",
 		settings = { styleTexture = "forged", styleFont = "marcellus", styleOutline = 0, styleShadow = "on",
-			stylePanel = "chamfer", styleBarShape = "point", ufShape = "hex",
+			stylePanel = "chamfer", styleBarShape = "bevel", ufShape = "hex",
 			questTalkStyle = "dark", rollPanel = "flat", abShape = "square" },
 	}),
 	Theme({
-		key = "fel", name = "Fel Pact",
-		tip = "A warlock's bargain: near black, lit by sickly fel green, with broken crystal and barbed bars.",
+		key = "fel", name = "Fel Pact", unitBars = "worn",
+		tip = "A warlock's bargain: near black, lit by sickly fel green.",
 		swatch = { { 0.03, 0.04, 0.03 }, { 0.42, 0.86, 0.2 }, { 0.46, 0.24, 0.66 }, { 0.16, 0.2, 0.14 } },
 		menu = { accent = { 0.56, 0.92, 0.3 }, edge = { 0.2, 0.32, 0.16 }, field = { 0.05, 0.065, 0.045 },
 			window = { 0.03, 0.038, 0.028 }, well = { 0.015, 0.02, 0.014 }, knob = { 0.72, 0.95, 0.5 },
@@ -281,26 +297,81 @@ local THEMES = {
 		line = { 0.28, 0.56, 0.14 }, lineSize = 1,
 		cardColor = { 0.62, 0.95, 0.32 }, cardFont = "germania",
 		settings = { styleTexture = "forged", styleFont = "philosopher", styleOutline = 0, styleShadow = "on",
-			stylePanel = "sigil", styleBarShape = "barb", ufShape = "shard",
+			stylePanel = "sigil", styleBarShape = "chisel", ufShape = "cut",
 			questTalkStyle = "dark", rollPanel = "flat", abShape = "square" },
 	}),
 	Theme({
-		key = "void", name = "Void Whisper",
-		tip = "What shadow priests hear: black with a violet edge, drawn thin, with tall eyes watching from the frames.",
-		swatch = { { 0.03, 0.02, 0.055 }, { 0.6, 0.38, 0.92 }, { 0.2, 0.24, 0.62 }, { 0.82, 0.74, 0.98 } },
+		key = "void", name = "Void Whisper", unitBars = "satin",
+		tip = "What shadow priests hear: black, and something violet moving in it, with tall eyes watching from the frames.",
+		keepColors = true, barDepth = { 0, 0, 0, 0.82 },
+		swatch = { { 0.02, 0.015, 0.035 }, { 0.42, 0.3, 0.66 }, { 0.16, 0.22, 0.46 }, { 0.72, 0.68, 0.82 } },
 		menu = { accent = { 0.72, 0.54, 1 }, edge = { 0.26, 0.18, 0.42 }, field = { 0.055, 0.04, 0.09 },
 			window = { 0.032, 0.022, 0.058 }, well = { 0.016, 0.01, 0.03 }, knob = { 0.82, 0.74, 0.98 },
 			thumb = { 0.36, 0.24, 0.58 } },
-		grain = "Reel", ornament = { 0.6, 0.38, 0.92 }, veil = { raid = 0.46, plate = 0.26 },
-		nameColor = { 0.84, 0.76, 0.98 },
-		health = { 0.44, 0.22, 0.74 }, mana = { 0.22, 0.28, 0.68 }, back = 0.9,
-		panel = { 0.03, 0.02, 0.055 }, panelAlpha = 0.96,
+		grain = "Reel", ornament = { 0.42, 0.3, 0.66 }, veil = { raid = 0.46, plate = 0.26 },
+		nameColor = { 0.78, 0.74, 0.88 },
+		health = { 0.4, 0.2, 0.68 }, mana = { 0.14, 0.24, 0.5 }, back = 0.9,
+		panel = { 0.02, 0.015, 0.035 }, panelAlpha = 0.96,
 		cast = { 0.72, 0.52, 1 }, channel = { 0.38, 0.32, 0.86 }, locked = { 0.3, 0.27, 0.38 }, stop = { 0.5, 0.1, 0.32 },
-		line = { 0.6, 0.38, 0.92 }, lineSize = 1,
+		line = { 0.26, 0.2, 0.4 }, lineSize = 1,
 		cardColor = { 0.8, 0.68, 1 }, cardFont = "cinzel",
 		settings = { styleTexture = "lunar", styleFont = "marcellus", styleOutline = 0, styleShadow = "on",
 			stylePanel = "veil", styleBarShape = "capsule", ufShape = "eye",
 			questTalkStyle = "dark", rollPanel = "flat", abShape = "round" },
+	}),
+	Theme({
+		key = "slate", name = "Slate", unitBars = "satin", layout = "slab",
+		tip = "Clean type on one flat bar in your class color. No portraits, no ornament, nothing else.",
+		swatch = { { 0.085, 0.09, 0.1 }, { 0.74, 0.8, 0.88 }, { 0.36, 0.72, 0.58 }, { 0.3, 0.5, 0.85 } },
+		menu = { accent = { 0.78, 0.84, 0.92 }, edge = { 0.3, 0.33, 0.38 }, field = { 0.1, 0.105, 0.115 },
+			window = { 0.06, 0.063, 0.07 }, well = { 0.03, 0.032, 0.036 }, knob = { 0.86, 0.9, 0.95 },
+			thumb = { 0.42, 0.46, 0.52 } },
+		grain = "Reel", ornament = { 0.5, 0.55, 0.62 },
+		nameColor = { 1, 1, 1 },
+		health = { 0.36, 0.72, 0.58 }, mana = { 0.3, 0.5, 0.85 }, back = 0.85,
+		panel = { 0.085, 0.09, 0.1 }, panelAlpha = 0.92,
+		cast = { 0.74, 0.8, 0.88 }, channel = { 0.36, 0.72, 0.58 }, locked = { 0.4, 0.42, 0.46 }, stop = { 0.8, 0.3, 0.3 },
+		line = { 0.3, 0.33, 0.38 }, lineSize = 1,
+		cardColor = { 0.92, 0.94, 0.97 }, cardFont = "barlow",
+		settings = { styleTexture = "flat", styleFont = "barlow", styleOutline = 0, styleShadow = "on",
+			stylePanel = "soft", ufShape = "none",
+			questTalkStyle = "dark", rollPanel = "flat", abShape = "square" },
+	}),
+	Theme({
+		key = "obsidian", name = "Obsidian", layout = "slab", darkBars = true,
+		tip = "Black on black. No portraits: flat dark bars and one thin line of cold light.",
+		swatch = { { 0.02, 0.025, 0.03 }, { 0.25, 0.85, 0.95 }, { 0.2, 0.72, 0.84 }, { 0.45, 0.4, 0.95 } },
+		menu = { accent = { 0.3, 0.88, 0.97 }, edge = { 0.14, 0.32, 0.38 }, field = { 0.04, 0.05, 0.055 },
+			window = { 0.022, 0.027, 0.03 }, well = { 0.01, 0.012, 0.015 }, knob = { 0.6, 0.94, 1 },
+			thumb = { 0.16, 0.44, 0.5 } },
+		grain = "Reel", ornament = { 0.25, 0.85, 0.95 }, veil = { raid = 0.46, plate = 0.26 },
+		nameColor = { 1, 1, 1 },
+		health = { 0.27, 0.29, 0.32 }, mana = { 0.25, 0.85, 0.95 }, back = 0.8,
+		panel = { 0.02, 0.025, 0.03 }, panelAlpha = 0.94,
+		cast = { 0.3, 0.88, 0.97 }, channel = { 0.5, 0.45, 0.98 }, locked = { 0.28, 0.32, 0.36 }, stop = { 0.9, 0.25, 0.35 },
+		line = { 0.16, 0.5, 0.58 }, lineSize = 1,
+		cardColor = { 0.5, 0.92, 1 }, cardFont = "rajdhani",
+		settings = { styleTexture = "flat", styleFont = "rajdhani", styleOutline = 0, styleShadow = "on",
+			stylePanel = "soft", ufShape = "none",
+			questTalkStyle = "dark", rollPanel = "flat", abShape = "square" },
+	}),
+	Theme({
+		key = "carbon", name = "Carbon", unitBars = "brushed", layout = "slab",
+		tip = "Charcoal and amber, like the dash of a fast car. No portraits: flat class-colored bars over an amber line.",
+		swatch = { { 0.075, 0.075, 0.08 }, { 0.98, 0.68, 0.2 }, { 0.9, 0.6, 0.18 }, { 0.36, 0.5, 0.7 } },
+		menu = { accent = { 1, 0.72, 0.26 }, edge = { 0.34, 0.31, 0.26 }, field = { 0.095, 0.095, 0.1 },
+			window = { 0.055, 0.055, 0.06 }, well = { 0.028, 0.028, 0.03 }, knob = { 1, 0.84, 0.54 },
+			thumb = { 0.52, 0.4, 0.2 } },
+		grain = "Forge", ornament = { 0.98, 0.68, 0.2 },
+		nameColor = { 1, 1, 1 },
+		health = { 0.9, 0.6, 0.18 }, mana = { 0.98, 0.68, 0.2 }, back = 0.88,
+		panel = { 0.075, 0.075, 0.08 }, panelAlpha = 0.94,
+		cast = { 1, 0.72, 0.26 }, channel = { 0.5, 0.66, 0.86 }, locked = { 0.36, 0.36, 0.38 }, stop = { 0.85, 0.22, 0.16 },
+		line = { 0.4, 0.34, 0.24 }, lineSize = 1,
+		cardColor = { 1, 0.74, 0.3 }, cardFont = "bebas",
+		settings = { styleTexture = "flat", styleFont = "rajdhani", styleOutline = 0, styleShadow = "on",
+			stylePanel = "soft", ufShape = "none",
+			questTalkStyle = "dark", rollPanel = "flat", abShape = "square" },
 	}),
 }
 local BY_KEY = {}
@@ -340,6 +411,41 @@ function ns.ThemeAccent()
 	return theme.nameColor or (theme.menu and theme.menu.accent)
 end
 function ns.ThemeRing() return Active().ornament end
+-- A color fuller than a theme's own: its muted bars go chalky on a bar this size.
+local function Vivid(color)
+	if Active().keepColors then return color end
+	local top = math.max(color[1], color[2], color[3])
+	local out = {}
+	for i = 1, 3 do out[i] = math.max(0, top - (top - color[i]) * 1.35) * math.min(1.2, 0.85 / math.max(top, 0.01)) end
+	for i = 1, 3 do out[i] = math.min(1, math.max(out[i], color[i] * 0.8)) end
+	return out
+end
+ns.ThemeVivid = Vivid
+-- A texture faded across, from one alpha to another.
+function ns.ThemeGradient(texture, r, g, b, from, to)
+	texture:SetColorTexture(1, 1, 1, 1)
+	if texture.SetGradient and CreateColor then
+		texture:SetGradient("HORIZONTAL", CreateColor(r, g, b, from), CreateColor(r, g, b, to))
+	elseif texture.SetGradientAlpha then
+		texture:SetGradientAlpha("HORIZONTAL", r, g, b, from, r, g, b, to)
+	else
+		texture:SetColorTexture(r, g, b, (from + to) / 2)
+	end
+end
+
+-- What a bar's fill fades from, toward its leading edge: so no bar's one color. r, g, b, a.
+function ns.ThemeBarDepth()
+	local theme = Active()
+	local deep = theme.barDepth or theme.panel
+	if not deep then return nil end
+	return { deep[1], deep[2], deep[3], deep[4] or 0.5 }
+end
+
+function ns.ThemeMana()
+	local mana = Active().mana
+	return mana and Vivid(mana)
+end
+function ns.ThemeLayout() return Active().layout end
 
 -- Our menus' colors (Skin.lua's roles): nil for its own.
 function ns.MenuPalette() return Active().menu end
@@ -372,9 +478,9 @@ end
 -- any can be picked on top of any theme.
 local SHAPES = ART .. "Shapes\\"
 local PANEL_ART = { round = "Round", chamfer = "Chamfer", blade = "Blade", notch = "Notch", sigil = "Sigil",
-	veil = "Veil", deco = "Deco", plate = "Plate", leaf = "Leaf", facet = "Facet" }
-local BAR_ART = { capsule = "Capsule", point = "Point", barb = "Barb", chisel = "Chisel", soft = "Soft", bevel = "Bevel" }
-local PORTRAIT_ART = { hex = "Hex", diamond = "Diamond", arch = "Arch", shard = "Shard", eye = "Eye",
+	veil = "Veil", deco = "Deco", plate = "Plate", leaf = "Leaf", facet = "Facet", soft = "Soft" }
+local BAR_ART = { capsule = "Capsule", chisel = "Chisel", soft = "Soft", bevel = "Bevel" }
+local PORTRAIT_ART = { hex = "Hex", diamond = "Diamond", arch = "Arch", cut = "Cut", eye = "Eye",
 	octagon = "Octagon", shield = "Shield", petal = "Petal", crystal = "Crystal" }
 local CLAMP = "CLAMPTOBLACKADDITIONAL"
 
@@ -388,9 +494,40 @@ function ns.ThemePortraitCut(shape)
 	if shape == "circle" then return SHAPES .. "PortraitCircleCut" end
 	return PORTRAIT_ART[shape] and SHAPES .. "Portrait" .. PORTRAIT_ART[shape] .. "Cut"
 end
+-- How much bigger than the portrait's place a shape's drawn. A shape narrower than
+-- a square cuts into the picture, and the picture can't be moved or shrunk (it's the
+-- game's): so the shape grows round it, until only its background's lost.
+local PORTRAIT_FIT = { diamond = 1.32, hex = 1.12, crystal = 1.12, cut = 1.03, eye = 1.18, shield = 1.1,
+	arch = 1.05, petal = 1.04, octagon = 1.05 }
+function ns.ThemePortraitFit(shape) return PORTRAIT_FIT[shape] or 1 end
+
+-- How much of its square a shape leaves empty at the side, at the rows' height.
+local PORTRAIT_SIDE = { hex = 0.07, eye = 0.07, shield = 0.05, octagon = 0.01, circle = 0.015 }
+function ns.ThemePortraitSide(shape) return PORTRAIT_SIDE[shape] or 0 end
+
+-- How far the bridge to the rows runs: well under the ring (the picture covers it), a
+-- shape that falls away from them there longer.
+local BRIDGE_REACH = { shield = 18, eye = 18 }
+function ns.ThemeBridgeReach(shape) return BRIDGE_REACH[shape] or 16 end
+
+-- Where the level's badge sits on each shape: on its ring, as parts of the portrait's
+-- width from the outer bottom corner. A shape with a point below hangs it off that.
+local PORTRAIT_BADGE = { circle = { 0.16, 0.14 }, square = { 0.04, 0.04 }, octagon = { 0.12, 0.1 }, hex = { 0.5, -0.06 },
+	diamond = { 0.5, -0.16 }, shield = { 0.5, -0.03 }, eye = { 0.5, -0.09 }, crystal = { 0.1, 0.1 }, cut = { 0.08, 0.06 },
+	arch = { 0.03, 0.03 }, petal = { 0.06, 0.06 } }
+function ns.ThemeBadgeSpot(shape) return PORTRAIT_BADGE[shape] or PORTRAIT_BADGE.circle end
 function ns.ThemePortraitRing(shape)
+	if shape == "circle" then return SHAPES .. "PortraitCircleRing" end
 	return PORTRAIT_ART[shape] and SHAPES .. "Portrait" .. PORTRAIT_ART[shape] .. "Ring"
 end
+-- Dark inside a shape's edge, and dirt for flat fills: the game's frames are worn, and
+-- clean ones look cheap beside them.
+function ns.ThemePortraitShade(shape)
+	if shape == "circle" then return SHAPES .. "PortraitCircleShade" end
+	return PORTRAIT_ART[shape] and SHAPES .. "Portrait" .. PORTRAIT_ART[shape] .. "Shade"
+end
+ns.THEME_GRIT, ns.THEME_SHEEN, ns.THEME_COLLAR = SHAPES .. "Grit", SHAPES .. "Sheen", SHAPES .. "Collar"
+ns.THEME_ROW_SHADOW = SHAPES .. "RowShadow"
 
 -- A veil of the theme's panel color over a bar's fill, under its words: raid tiles'
 -- bright class colors and the plates' reds drawn into the theme, whatever color the
@@ -462,7 +599,9 @@ local function MakePieces(frame, sub)
 	tr:SetPoint("TOPRIGHT", out, out)
 	bl:SetPoint("BOTTOMLEFT", -out, -out)
 	br:SetPoint("BOTTOMRIGHT", out, -out)
-	for _, corner in ipairs({ tl, tr, bl, br }) do corner:SetSize(CORNER, CORNER) end
+	-- (frame.themeSliceCorner: smaller corners, for a panel too short for these.)
+	local corner = frame.themeSliceCorner or CORNER
+	for _, piece in ipairs({ tl, tr, bl, br }) do piece:SetSize(corner, corner) end
 	local function Between(piece, a, aPoint, b, bPoint)
 		piece:SetPoint("TOPLEFT", a, aPoint)
 		piece:SetPoint("BOTTOMRIGHT", b, bPoint)
@@ -516,8 +655,9 @@ end
 -- caller leaves that off). skip: this bar keeps its corners (a raid tile, too
 -- tall for these).
 local barShapes = setmetatable({}, { __mode = "k" })
--- (rect: the frame the shape's cut to, if not the bar: see UnitStyle's DressSkin.)
-function ns.DressBarShape(bar, back, skip, rect)
+-- (rect: the frame the shape's cut to, if not the bar: see UnitStyle's DressSkin.
+-- gap: that much off its top, so a bar right under another stands apart from it.)
+function ns.DressBarShape(bar, back, skip, rect, gap)
 	local db = ns.db
 	local art = not skip and db and db.styleGeneral and BAR_ART[db.styleBarShape] or nil
 	local state = barShapes[bar]
@@ -549,10 +689,13 @@ function ns.DressBarShape(bar, back, skip, rect)
 	local file = SHAPES .. "Bar" .. art
 	state.mask:SetTexture(file, CLAMP, CLAMP)
 	state.backMask:SetTexture(file, CLAMP, CLAMP)
-	if rect and state.rect ~= rect then
-		state.rect = rect
-		state.mask:ClearAllPoints()
-		state.mask:SetAllPoints(rect)
+	if rect and (state.rect ~= rect or state.gap ~= gap) then
+		state.rect, state.gap = rect, gap
+		for _, mask in ipairs({ state.mask, state.backMask }) do
+			mask:ClearAllPoints()
+			mask:SetPoint("TOPLEFT", rect, "TOPLEFT", 0, -(gap or 0))
+			mask:SetPoint("BOTTOMRIGHT", rect, "BOTTOMRIGHT")
+		end
 	end
 	if fill and not state.fill then
 		-- (The game's own rounding off first: it'd keep the fill's ends round, inside ours.)

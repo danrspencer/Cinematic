@@ -157,7 +157,7 @@ end
 -- Whether a camera ticked in the CineMode column is running (or, for the
 -- standing-still events, due to start).
 function ns.TriggerStartsCine()
-	if ns.FlightCameraOn() and ns.TriggerSetting("Flight", "cine") then
+	if ns.FlightStarted() and ns.CameraPlaysHere("flight") and ns.TriggerSetting("Flight", "cine") then
 		return true
 	end
 	if ns.QuestCamActive and ns.QuestCamActive() and ns.TriggerSetting(ns.QuestCamEvent(), "cine") then
@@ -174,7 +174,7 @@ function ns.TriggerStartsCine()
 		or (ns.IsAutoRunning and ns.IsAutoRunning() and "run") or nil
 	if travel then
 		ns.travelCine = ns.TriggerSetting(travel == "walk" and "Walk" or "Run", "cine")
-			and not ns.IsCameraOffHere(travel) or false
+			and ns.CameraPlaysHere(travel) or false
 	elseif not (ns.autoRunning and ns.playerMoving and not ns.OnTaxi()) then
 		ns.travelCine = false
 	end
@@ -1408,8 +1408,8 @@ end
 function ns.UpdateMouseSteer()
 	local was = ns.mouseSteering
 	local walking = ns.IsRPWalking and ns.IsRPWalking()
-	local travel = (walking and not ns.IsCozy() and not ns.IsCameraOffHere("walk"))
-		or (not walking and ns.IsAutoRunning and ns.IsAutoRunning() and not ns.IsCameraOffHere("run"))
+	local travel = (walking and not ns.IsCozy() and ns.CameraPlaysHere("walk"))
+		or (not walking and ns.IsAutoRunning and ns.IsAutoRunning() and ns.CameraPlaysHere("run"))
 	ns.mouseSteering = (travel and IsMouselooking and IsMouselooking() and not IsMouseButtonDown("LeftButton")
 		and not ns.OnTaxi()) or false
 	if ns.mouseSteering then
@@ -1772,7 +1772,7 @@ do
 			-- cozy camera: it swings round in front of you as you walk (a "hero walk").
 			local heroWalk = weapon and EventCamera("Weapon") == "cozy" and ns.IsRPWalking and ns.IsRPWalking()
 			ns.StopEventsOnMove(heroWalk and "Weapon")
-			if heroWalk then
+			if heroWalk and not ns.WindowPausesCams() then
 				return "Weapon", "cozy"
 			end
 			return nil
@@ -1784,11 +1784,8 @@ do
 		if interactCamera then
 			return interact, interactCamera
 		end
-		if ns.NPCWindowOpen and ns.NPCWindowOpen() then
-			return nil -- talking to an NPC: waits until the window closes
-		end
-		if ns.MenuWindowOpen and ns.MenuWindowOpen() and not ns.cameraTesting then
-			return nil -- in a menu or game window: waits until it closes (not for a Test button's run)
+		if ns.WindowPausesCams() then
+			return nil -- an NPC's, a menu or a game window: waits until it closes
 		end
 		if ns.manualCam then
 			return "Manual", ns.manualCam -- started from a key binding (Cinematic_StartCam)
@@ -3576,7 +3573,8 @@ function ns.ReportCameraGates()
 		local why = ns.CameraOffWhy(cam)
 		Check("allowed here (Scenes page)", not why, why)
 		Check("its sway on (" .. T.orbit .. ")", db[T.orbit])
-		Check("no menu or NPC window open", not ns.travelHeld)
+		Check("no menu or NPC window in the way", not ns.WindowPausesCams(),
+			not ns.db.pauseCamsInWindows and "cameras play on with windows open" or nil)
 		Check("not turning", not g.turnBlocks, ("last turn %s sec ago, needs %s"):format(Secs(g.sinceTurn),
 			TRAVEL_START_AFTER_TURN))
 		Check("Calm Timer", ns.CombatWaitOver(T.orbit, now), ns.CameraWaitsForCalm(cam) and "waits for it" or nil)
@@ -3621,9 +3619,9 @@ function ns.UpdateOrbit(cinematic, elapsed)
 	-- An NPC window open (auction house, vendor, quest giver...): you're busy,
 	-- not idling, so the standing-still timer waits too.
 	local atNPC = ns.NPCWindowOpen and ns.NPCWindowOpen()
-	-- Same for a menu or game window (options, spellbook...), but not while a
-	-- camera's Test button runs one (the options are open then).
-	local inMenu = ns.MenuWindowOpen and ns.MenuWindowOpen() and not ns.cameraTesting
+	-- Same for a menu or game window (options, spellbook...). (Neither with the
+	-- Scenes page's tick for it, nor while a camera's Test button runs one.)
+	local windowHolds = ns.WindowPausesCams()
 	-- Casting (crafting, say) is busy too. (The cozy camera keeps going: cooking
 	-- at a campfire is still cozy.) So is a Chat Cam conversation (NPCs talking to you).
 	local casting = (ns.Flag(UnitCastingInfo("player")) or ns.Flag(UnitChannelInfo("player")))
@@ -3631,7 +3629,8 @@ function ns.UpdateOrbit(cinematic, elapsed)
 	-- A movie or in-game cutscene playing: you're watching, not standing about,
 	-- so the timer starts once it's over.
 	local movie = (MovieFrame and ns.Flag(MovieFrame:IsShown())) or (CinematicFrame and ns.Flag(CinematicFrame:IsShown()))
-	if onTaxi or active or atNPC or inMenu or movie or (casting and not ns.IsCozy())
+	-- (A scene paused by the window keeps its timer, to carry on as it closes.)
+	if onTaxi or active or (windowHolds and not ns.SceneScriptPlaying()) or movie or (casting and not ns.IsCozy())
 		or (ns.ChatCamActive and ns.ChatCamActive()) then
 		ns.stillSince = nil
 	elseif not ns.stillSince then
@@ -3720,7 +3719,7 @@ function ns.UpdateOrbit(cinematic, elapsed)
 	-- A menu or game window open (options, spellbook, map...) holds the travel
 	-- cameras still (sway, zoom and turn glide), as it does the others, until
 	-- it closes. (On ns: UpdateOrbit is close to Lua's upvalue limit.)
-	ns.travelHeld = (travel and (inMenu or atNPC)) or false
+	ns.travelHeld = (travel and windowHolds) or false
 	-- Steering with the mouse while they run (ns.mouseSteering) doesn't stop
 	-- their zoom, as for camera scripts on the move; only your own zooming does.
 	-- Nor a zoom back to your own distance (a cast cancelled by moving off with
@@ -3739,7 +3738,8 @@ function ns.UpdateOrbit(cinematic, elapsed)
 		or (ns.PlayingCameraKey and ns.PlayingCameraKey(true)) or nil -- (in or out of cinematic mode; one of ours as its script)
 	-- (logged always; printed with /cine debug modes)
 	ns.ReportCameraMode(ns.activeCam)
-	if travel and cinematic then
+	local scripted = ns.PlayingCameraKey(true) -- (as their scripts, travel's nil)
+	if (travel or scripted == "walk" or scripted == "run") and cinematic then
 		walkHandoff = true
 	elseif onTaxi or (active and not travel and ns.playerMoving) then
 		walkHandoff = false -- running or flying: the next stop starts the timer afresh

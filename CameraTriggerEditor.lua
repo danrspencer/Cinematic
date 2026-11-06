@@ -428,7 +428,7 @@ function ns.BuildTriggerDraft(parent, kit)
 	end), LABEL_W + 4)
 	kit.Tooltip(camera, L[ns.CUSTOM_CAMERA_TIP])
 	own[#own + 1] = camera
-	local function Tick(label, field, x, tip, usable)
+	local function Tick(label, field, x, tip)
 		local check = ns.SkinCheck(CreateFrame("CheckButton", nil, panel, "UICheckButtonTemplate"))
 		check:SetSize(26, 26)
 		local text = check.Text or check.text or check:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
@@ -438,16 +438,13 @@ function ns.BuildTriggerDraft(parent, kit)
 		check:SetScript("OnClick", function(self) data[field] = self:GetChecked() and true or nil end)
 		check.Refresh = function(self)
 			self:SetChecked(data[field] and true or false)
-			local on = not usable or usable()
-			self:SetEnabled(on)
-			self:SetAlpha(on and 1 or 0.4)
 		end
 		kit.Tooltip(check, tip)
 		own[#own + 1] = At("Camera", check, x)
 	end
 	Tick(L["Music"], "music", LABEL_W + 170, L["Music starts as its camera starts (Audio page)."])
 	Tick("CineMode", "cine", LABEL_W + 260, L["With \"Start in CineMode\" off (Cinematic's main page), its camera " ..
-		"starting brings CineMode on, and it ends with the camera."], function() return not ns.GetDB().fadeUI end)
+		"starting brings CineMode on, and it ends with the camera."])
 
 	save = ns.PanelButton(panel)
 	save:SetSize(90, 22)

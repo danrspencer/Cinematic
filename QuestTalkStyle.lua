@@ -82,12 +82,11 @@ function ns.CreateQuestTalkStylePanel(kit)
 	-- Vision page's Where they go).
 	stack:Header(content, L["Layout"])
 	local SIDE_TIP = L["Where the quest card (the objective, rewards and buttons, or the list of replies) " ..
-		"goes beside the bubble. Below: as wide as the bubble, which moves up to make room for it. Side: " ..
+		"goes beside the bubble. Below: right under it, as wide as it (over a head, the bubble moves up to make room). Side: " ..
 		"with Opposite clicked, on the bubble's outer side (away from the middle of the screen), else on " ..
 		"the right. Right or Left: always that side. Beside it, it's as tall as the bubble."] .. " " ..
 		L["Separate: the card stays where you drag it (or at the list's height), wherever the bubble goes."]
-	-- (Default leaves the card where it is: under the bubble or the list's own spot.)
-	local function SideOn(db) return db.questTalk and db.questTalkPlace ~= "fixed" end
+	local function SideOn(db) return db.questTalk end
 	local side = kit.Dropdown(content, "questTalkCardSide", {
 		{ value = "below", text = L["Below"] },
 		{ value = "side", text = L["Side"] },
@@ -114,7 +113,8 @@ function ns.CreateQuestTalkStylePanel(kit)
 			ns.GetDB().questTalkSpot = nil -- (the box decides again)
 			Changed()
 		end, nil, "%")
-	kit.GreyUnless(listY, rows.On)
+	-- (Only Separate's: else the card goes with the bubble.)
+	kit.GreyUnless(listY, function(db) return rows.On(db) and db.questTalkCardSide == "separate" end)
 
 	stack:Header(content, L["Words"])
 	rows.Look(L["Look:"], L["Words"], {

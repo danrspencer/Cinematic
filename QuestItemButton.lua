@@ -2,10 +2,12 @@
 -- questItemButton). The item the nearest tracked quest gives you to use
 -- (the small square beside it in the quest tracker), on a big button where
 -- your extra ability button goes: at the extra abilities frame's place (Edit
--- Mode's spot), or beside it while the game has an extra action or zone
+-- Mode's spot; left in its default place and empty, over the game's stack above
+-- the action bars), or beside it while the game has an extra action or zone
 -- ability in it. Ours, not the game's: an addon can't put an item on that one.
 -- Shows within NEAR_YARDS of the quest's area, until its objectives are done
--- (once used: the objectives the item moved). A secure button: it can only
+-- (once used: the objectives the item moved), and (questItemFade) not while
+-- Questie's tracker has a button for the same item. A secure button: it can only
 -- show, hide, change item or move out of combat, so in a fight it stays as it
 -- was (its cooldown and count still follow). Key binding: CLICK
 -- CinematicQuestItemButton:LeftButton. Not one of the frames CineMode fades:
@@ -18,6 +20,7 @@ local NEAR_YARDS = 300
 local CHECK_EVERY = 2 -- seconds (you move: the nearest quest changes)
 local BINDING = "CLICK CinematicQuestItemButton:LeftButton"
 local GAP = 10 -- beside the game's extra button: this far to its right
+local STACK_RISE = 60 -- over the game's stack: the extra frame's middle (it's 120 tall)
 
 _G["BINDING_NAME_" .. BINDING] = "Cinematic: " .. L["Use the quest item"]
 ns.OnLanguage(function()
@@ -632,22 +635,68 @@ local function ExtraSpot()
 	return container, busy
 end
 
-local placedAt -- (the spot it was put at: "free" or "busy", and where)
+-- Where a frame is, in UIParent's units: its middle, width and top. Nil if it
+-- has no place: no anchors, or the game won't say.
+local function Number(value)
+	return type(value) == "number" and Known(value)
+end
+local function Spot(frame)
+	if not frame then
+		return
+	end
+	local okPoints, points = pcall(frame.GetNumPoints, frame)
+	if not (okPoints and Number(points) and points > 0) then
+		return
+	end
+	local ok, x, y = pcall(frame.GetCenter, frame)
+	local okWidth, width = pcall(frame.GetWidth, frame)
+	local okTop, top = pcall(frame.GetTop, frame)
+	local okScale, scale = pcall(frame.GetEffectiveScale, frame)
+	if ok and okWidth and okTop and okScale and Number(x) and Number(y) and Number(width) and Number(top)
+		and Number(scale) then
+		local ratio = scale / UIParent:GetEffectiveScale()
+		return x * ratio, y * ratio, width * ratio, top * ratio
+	end
+end
+
+-- Whether the extra abilities frame is empty in its default place: the game's
+-- stack only places it while something's in it, so its own place then means
+-- nothing (left as it is, it's the screen's top left).
+local function Parked(container, busy)
+	if busy or not (container and container.IsInDefaultPosition) then
+		return false
+	end
+	local ok, default = pcall(container.IsInDefaultPosition, container)
+	return ok and ns.Flag(default)
+end
+
+-- Pinned to the screen, not to that frame: the frame can lose its place in a
+-- fight (its ability ending), when this button can't move.
+local placedAt -- (the spot it was put at)
 local function Place()
 	local container, busy = ExtraSpot()
-	local spot = (container and tostring(container) or "none") .. (busy and "busy" or "free")
+	local x, y, width
+	if not Parked(container, busy) then
+		x, y, width = Spot(container)
+	end
+	if x and busy then
+		x = x + width / 2 + GAP + button:GetWidth() / 2
+	elseif not x then
+		-- (The game's stack over the action bars, as the frame would be on it.)
+		local stackX, _, _, stackTop = Spot(_G.UIParentBottomManagedFrameContainer)
+		if stackX then
+			x, y = stackX, stackTop + STACK_RISE
+		else
+			x, y = UIParent:GetWidth() / 2, 250
+		end
+	end
+	local spot = ("%.0f %.0f"):format(x, y)
 	if placedAt == spot then
 		return
 	end
 	placedAt = spot
 	button:ClearAllPoints()
-	if not container then
-		button:SetPoint("CENTER", UIParent, "BOTTOM", 0, 250)
-	elseif busy then
-		button:SetPoint("LEFT", container, "RIGHT", GAP, 0)
-	else
-		button:SetPoint("CENTER", container, "CENTER")
-	end
+	button:SetPoint("CENTER", UIParent, "BOTTOMLEFT", x, y)
 end
 
 -- What can change in a fight: cooldown, count, key.
@@ -677,7 +726,7 @@ function ns.RefreshQuestItemButton()
 		return
 	end
 	local quest = ns.QuestVisionSetting("questItemButton") and Nearest()
-	if not quest then
+	if not quest or ns.QuestieItemButton(quest.itemID) then
 		current = nil
 		button:SetAttribute("item", nil)
 		button:Hide()
@@ -749,7 +798,17 @@ end
 function ns.DescribeQuestItemButton()
 	local quest = Nearest(function(text) ns.Print("quest item: " .. text) end)
 	local container, busy = ExtraSpot()
-	return ("button: %s, nearest quest with an item: %s (item %s), extra frame: %s (%s)"):format(
-		button:IsShown() and "shown" or "hidden", tostring(quest and quest.questID), tostring(quest and quest.itemID),
-		container and (container:GetName() or "?") or "none", busy and "in use: ours beside it" or "free")
+	local function Where(frame)
+		local x, y = Spot(frame)
+		return x and ("%.0f, %.0f"):format(x, y) or "no place"
+	end
+	local okPoints, points = pcall(container and container.GetNumPoints or error, container)
+	return ("button: %s at %s, nearest quest with an item: %s (item %s), extra frame: %s (%s) at %s, %s point(s), " ..
+		"shown %s, default place and empty %s, game's stack at %s, stepping aside for Questie's button %s (questItemFade %s)"):format(
+		button:IsShown() and "shown" or "hidden", Where(button), tostring(quest and quest.questID),
+		tostring(quest and quest.itemID), container and (container:GetName() or "?") or "none",
+		busy and "in use: ours beside it" or "free", Where(container), okPoints and tostring(points) or "?",
+		tostring(container and Shown(container:GetName() or "")), tostring(Parked(container, busy)),
+		Where(_G.UIParentBottomManagedFrameContainer), tostring(quest and ns.QuestieItemButton(quest.itemID)),
+		tostring(ns.Setting("questItemFade")))
 end

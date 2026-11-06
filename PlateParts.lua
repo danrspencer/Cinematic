@@ -995,11 +995,12 @@ function ns.DescribeGameIcon(unit)
 	local icon = type(frame) == "table" and not (frame.IsForbidden and frame:IsForbidden()) and frame.Icon
 	local icons = questIcons[plate]
 	return ("game icon: shows=%s | SoftTargetFrame %s | its Icon %s | softinteract=%s softfriend=%s"
-		.. " | SoftTargetInteract=%s SoftTargetIconInteract=%s SoftTargetIconFriend=%s | our mark shown=%s alpha=%s"):format(
+		.. " | SoftTargetInteract=%s SoftTargetIconInteract=%s SoftTargetIconFriend=%s | questie icon=%s"
+		.. " | our mark shown=%s alpha=%s"):format(
 		tostring(GameIconShows(plate, unit)), State(frame), State(icon),
 		tostring(Ask(UnitIsUnit, unit, "softinteract")), tostring(Ask(UnitIsUnit, unit, "softfriend")),
 		tostring(GetCVar("SoftTargetInteract")), tostring(GetCVar("SoftTargetIconInteract")),
-		tostring(GetCVar("SoftTargetIconFriend")), tostring(icons and icons:IsShown()),
+		tostring(GetCVar("SoftTargetIconFriend")), tostring(ns.QuestieMarks(unit)), tostring(icons and icons:IsShown()),
 		tostring(icons and icons:GetAlpha()))
 end
 
@@ -1018,7 +1019,7 @@ function RefreshQuestIcon(plate)
 	local unit
 	if level > 0 and plate ~= PersonalPlate() then
 		unit = plate.namePlateUnitToken or (plate.UnitFrame and plate.UnitFrame.unit)
-		if not (unit and ns.IsQuestMob(unit)) or GameIconShows(plate, unit) then
+		if not (unit and ns.IsQuestMob(unit)) or GameIconShows(plate, unit) or ns.QuestieMarks(unit) then
 			level = 0
 		end
 	end

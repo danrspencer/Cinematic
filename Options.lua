@@ -5445,7 +5445,14 @@ local function CreateCamerasPanel()
 	-- trigger panel opens under it, the rows below that.)
 	local bar = CreateFrame("Frame", nil, content)
 	bar:SetSize(ROW_W, 26)
-	bar:SetPoint("TOPLEFT", help, "BOTTOMLEFT", 0, -6)
+	do
+		local windows = Check(content, "pauseCamsInWindows", L["Pause cameras while a window is open"],
+			L["With a window like the spellbook, the map or these options open, a playing scene waits where it is " ..
+			"and carries on as the window closes, and no new one starts. A quest giver's scene and Interaction " ..
+			"triggers still play, as their window is what starts them."])
+		windows:SetPoint("TOPLEFT", help, "BOTTOMLEFT", 0, -4)
+		bar:SetPoint("TOPLEFT", windows, "BOTTOMLEFT", 0, -2)
+	end
 	local grid = CreateFrame("Frame", nil, content)
 	grid:SetSize(ROW_W, ROW_H)
 	grid:SetPoint("TOPLEFT", bar, "BOTTOMLEFT", 0, -2)
@@ -5879,7 +5886,7 @@ local function CreateCamerasPanel()
 	RecordKey(content, "cameraRows")
 	for _, list in ipairs(ns.CAMERA_ROW_LISTS) do RecordKey(content, list) end
 	for _, trigger in ipairs(ns.CAMERA_TRIGGERS) do
-		for _, field in ipairs({ "camera", "music", "cine" }) do
+		for _, field in ipairs({ "camera", "music", "cine", "sceneOff" }) do
 			if type(trigger[field]) == "string" then RecordKey(content, trigger[field]) end
 		end
 		if INSTANT[trigger.key] then RecordKey(content, INSTANT[trigger.key]) end
@@ -6178,7 +6185,7 @@ local function CreateCamerasPanel()
 				Changed()
 			end)
 			cine.Refresh = function(self) self:SetChecked(ns.CameraRowValue(id, "cine") and true or false) end
-			GreyUnless(cine, function(db) return not db.fadeUI and HasCamera(id) end)
+			GreyUnless(cine, function() return HasCamera(id) end)
 			At("Camera", cine, x)
 			x = x + 100
 		end
@@ -11999,6 +12006,18 @@ local function CreateVisionPanel()
 		"Nameplates page enabled."])
 	GreyUnless(questIcon, function(db) return db.handlePlates and not db.questMobsMark end)
 	questStack:Add(questIcon, "check")
+	questIcon:HookScript("OnClick", Refresh) -- (grey out / enable what needs it)
+	-- (Indented under it, as its sub-option.)
+	local markFade = Check(content, "questMarkFade", L["Fade if another addon competes"],
+		L["When another addon has its own icon on a unit (Questie, on nameplates and the target frame), Cinematic's " ..
+		"quest mark stays off it, so only one shows. Unticked, both show."], function(value)
+			ns.GetDB().questMarkFade = value
+			if ns.RefreshTargetQuestIcon then ns.RefreshTargetQuestIcon() end
+		end)
+	questStack:Add(markFade, "check", 16)
+	GreyUnless(markFade, function(db)
+		return db.targetQuestIcon or (db.handlePlates and (db.questMobsMark or db.plateAlwaysPartQuestIcon))
+	end)
 	-- The mark's icon, one for friendly NPCs and one for enemies: a button
 	-- showing the icon picked, and on a click the icon browser (search and
 	-- scroll, as for profile icons: IconBrowser.lua) with every quest, talk and
@@ -12070,6 +12089,17 @@ local function CreateVisionPanel()
 		if ns.RefreshQuestItemButton then ns.RefreshQuestItemButton() end
 	end)
 	questStack:Add(questItem, "check")
+	questItem:HookScript("OnClick", Refresh) -- (grey out / enable what needs it)
+	-- (Indented under it, as its sub-option.)
+	local itemFade = Check(content, "questItemFade", L["Fade if another addon competes"],
+		L["When another addon has a button up for the same item (Questie, in its tracker), Cinematic's big button " ..
+		"stays away, so only one shows, and its key does nothing until it's back. Unticked, both show."],
+		function(value)
+			ns.GetDB().questItemFade = value
+			if ns.RefreshQuestItemButton then ns.RefreshQuestItemButton() end
+		end)
+	questStack:Add(itemFade, "check", 16)
+	GreyUnless(itemFade, function(db) return db.questItemButton end)
 	local questGlow = Check(content, "questObjectGlow", L["Glow on quest objects"],
 		L["The thing on the ground you pick up or use for a quest objective glows gold, with the quest mark " ..
 		"over it, in CineMode and out. One at a time: the one in front of you that your interact key would " ..
@@ -12129,6 +12159,13 @@ local function CreateVisionPanel()
 				ApplyTalk()
 			end), "check")
 		talk:HookScript("OnClick", Refresh) -- (grey out / enable what needs it)
+		-- (Indented under it, as its sub-option.)
+		local talkFade = Check(content, "questTalkFade", L["Fade if another addon competes"],
+			L["When another addon takes over talking to NPCs (Immersion, Dialogue UI and the like), Cinematic's " ..
+			"dialogue frames stay out of the way, so only one shows. Unticked, they show as well wherever the " ..
+			"game's window still opens. An addon that stops that window opening always wins."])
+		questStack:Add(talkFade, "check", 16)
+		GreyUnless(talkFade, TalkOn)
 		-- Where they go (the bubble and list; with quest talk off, the game's windows).
 		local PLACES = {
 			{ value = "fixed", text = L["Default"] },
@@ -12136,7 +12173,7 @@ local function CreateVisionPanel()
 			{ value = "opposite", text = L["Opposite clicked"] },
 		}
 		local PLACE_TIP = L["Where the bubble goes. Over the head: over the NPC's nameplate, following them on " ..
-			"the screen. Default: above the middle of the screen, or wherever you drag it. Opposite clicked: " ..
+			"the screen. Default: where the game's quest window opens, or wherever you drag it. Opposite clicked: " ..
 			"wherever you drag it, but when you clicked the NPC on that half of the screen, at the same spot on " ..
 			"the other half (they stand where you clicked, so that half is clearer), the quest card beside it. " ..
 			"With nobody to stand over or no click (a quest from an item, or the interact key), it goes where " ..

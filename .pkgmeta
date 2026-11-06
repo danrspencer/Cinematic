@@ -15,6 +15,8 @@ ignore:
   - Textures/WindGuide
   # (Portal scout: /cine debug portal, trying the game's portal models, dev copy only)
   - PortalScout.lua
+  # (Shoulder Cam test: /cine debug shoulder, dev copy only)
+  - ShoulderCamTest.lua
   # (Screen effects: /cine debug screenfx, the game's full-screen effects animated, dev copy only;
   # ScreenEffectsData.lua and ScreenEffects.lua ship: Vitals Vision's game effects)
   - ScreenEffectScout.lua

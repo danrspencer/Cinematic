@@ -348,12 +348,10 @@ function ns.CreateGeneralStylePanel(kit)
 			{ value = "notch", text = L["Notched"] }, { value = "sigil", text = L["Sigil"] },
 			{ value = "veil", text = L["Veil"] }, { value = "deco", text = L["Stepped"] },
 			{ value = "plate", text = L["Plate"] }, { value = "leaf", text = L["Leaf"] },
-			{ value = "facet", text = L["Faceted"] } }
+			{ value = "facet", text = L["Faceted"] }, { value = "soft", text = L["Soft"] } }
 	end, L["The outline of tooltips, chat bubbles, dialogue and roll panels."])
 	rows.Dropdown(L["Bar shape:"], ns.ThemeQuickField("styleBarShape"), function()
 		return { { value = "square", text = L["Square"] }, { value = "capsule", text = L["Capsule"] },
-			{ value = "point", text = L["Pointed"] },
-			{ value = "barb", text = L["Barbed"] },
 			{ value = "chisel", text = L["Chiseled"] }, { value = "soft", text = L["Soft"] },
 			{ value = "bevel", text = L["Beveled"] } }
 	end, L["The ends of unit frame and personal resource bars. A straight border can't follow a shape, so it goes " ..

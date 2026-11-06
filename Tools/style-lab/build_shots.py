@@ -27,7 +27,8 @@ START = datetime(2026, 11, 5, 22, 0)  # (the first run: older shots aren't these
 THEMES = [("game", "The game's"), ("reel", "Silver Screen"), ("codex", "Gilded Codex"), ("forge", "Emberforge"),
           ("glade", "Moonlit Glade"), ("rime", "Frostbound"),
           ("vanguard", "Crimson Vanguard"), ("hearth", "Hearthside"), ("cathedral", "Cathedral"), ("rune", "Runestone"),
-          ("fel", "Fel Pact"), ("void", "Void Whisper")]
+          ("fel", "Fel Pact"), ("void", "Void Whisper"),
+          ("slate", "Slate"), ("obsidian", "Obsidian"), ("carbon", "Carbon")]
 SCENES = ["HUD", "Visions", "Real frames"]
 MAX_GAP = 4  # (seconds between two shots of one run)
 WIDTH = 1720
@@ -81,7 +82,11 @@ def main():
         for run in runs_of(shots):
             key = client + ":" + run[0][1]
             # (More than one theme: always in the list's order, a run cut short too.)
-            if len(run) > 3:
+            # (unitframes: one shot a theme.)
+            per = 1 if len(run) == len(THEMES) else 3
+            if per == 1:
+                themes = [k for k, _ in THEMES]
+            elif len(run) > 3:
                 themes = [k for k, _ in THEMES][:len(run) // 3]
             elif index.get(key, ["unknown"])[0] != "unknown":
                 themes = index[key]
@@ -97,9 +102,9 @@ def main():
                     if im.width > WIDTH:
                         im = im.resize((WIDTH, round(im.height * WIDTH / im.width)), Image.LANCZOS)
                     im.save(path, quality=80, optimize=True)
-                theme = themes[i // 3]
+                theme = themes[i // per]
                 items.append({"file": "shots/" + local, "theme": theme, "themeName": names.get(theme, theme),
-                              "scene": SCENES[i % 3]})
+                              "scene": "Real frames" if per == 1 else SCENES[i % 3]})
             runs.append({"id": key, "client": client, "at": run[0][0].strftime("%Y-%m-%d %H:%M"),
                          "label": "%s, %s" % (client, run[0][0].strftime("%b %-d %H:%M" if os.name != "nt" else "%b %#d %H:%M")),
                          "full": len(run) == 18, "items": items})

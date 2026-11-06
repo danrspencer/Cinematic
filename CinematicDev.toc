@@ -82,6 +82,7 @@ Camera.lua
 ZoomGuard.lua
 QuestCam.lua
 ShoulderCam.lua
+ShoulderCamTest.lua
 SkyrideCam.lua
 CameraRows.lua
 TriggerLibrary.lua
