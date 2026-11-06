@@ -46,6 +46,18 @@ def outline(big, width):
     return ImageChops.subtract(big, inner)
 
 
+def even_outline(big, width):
+    """The band just inside a big shape, the same width all round. outline()'s square
+    filter cuts 1.4 times deeper on the diagonals, which shows on a curved ring."""
+    half = big.resize((big.width // 2, big.height // 2), Image.LANCZOS)
+    r = width * SS // 2
+    inner = half
+    for i in range(64):
+        a = i * 2 * math.pi / 64
+        inner = ImageChops.darker(inner, ImageChops.offset(half, round(r * math.cos(a)), round(r * math.sin(a))))
+    return ImageChops.subtract(half, inner)
+
+
 def poly(points):
     def draw(d, s):
         d.polygon([(x * s, y * s) for x, y in points], fill=255)
@@ -216,14 +228,53 @@ def noise(size, seed, blur):
     return im.point(lambda v: (v - low) * 255 // max(1, high - low))
 
 
-def worn(alpha):
+def cracked(alpha, seed):
+    """Hairline cracks and small nicks scattered round a ring, a different scatter for each
+    shape: gives what to multiply its tone by, and its alpha with the nicks taken out."""
+    w, h = alpha.size
+    rng = random.Random(seed)
+    on_ring = [(x, y) for y in range(h) for x in range(w) if alpha.getpixel((x, y)) > 200]
+    tone = Image.new("L", (w * 4, h * 4), 255)
+    d = ImageDraw.Draw(tone)
+    for _ in range(rng.randrange(13, 19)):
+        x, y = rng.choice(on_ring)
+        heading = rng.uniform(0, 2 * math.pi)
+        points = [(x * 4, y * 4)]
+        for _ in range(rng.randrange(3, 7)):
+            heading += rng.uniform(-0.9, 0.9)
+            step = rng.uniform(4, 9)
+            points.append((points[-1][0] + step * math.cos(heading), points[-1][1] + step * math.sin(heading)))
+        d.line(points, fill=rng.randrange(70, 130), width=rng.choice((2, 3, 3, 4)))
+    tone = tone.resize((w, h), Image.LANCZOS)
+    nicks = Image.new("L", (w * 4, h * 4), 255)
+    d = ImageDraw.Draw(nicks)
+    for _ in range(rng.randrange(6, 10)):
+        x, y = rng.choice(on_ring)
+        r = rng.uniform(2.5, 5)
+        d.ellipse((x * 4 - r, y * 4 - r, x * 4 + r, y * 4 + r), fill=rng.randrange(40, 130))
+    return tone, ImageChops.multiply(alpha, nicks.resize((w, h), Image.LANCZOS))
+
+
+def worn(alpha, seed=1, overhead=False):
     """A ring as worn metal: lit from the top left, shaded to the bottom right, mottled.
     Grey on its way to the theme's color, so wear shows in any of them."""
     w, h = alpha.size
     light = Image.new("L", (w, h))
     light.putdata([int(255 - 60 * (x + y) / (w + h)) for y in range(h) for x in range(w)])
     blotch = noise((w, h), 3, 2.2).point(lambda v: 205 + v * 50 // 255)
-    grey = ImageChops.multiply(light, blotch)
+    grey = ImageChops.multiply(light, blotch).point(lambda v: v * 80 // 100)
+    # (Raised along its middle: light from the top left falls on the slopes facing it, and
+    # those facing away go dark, so the ring stands up from the frame.)
+    height = alpha.filter(ImageFilter.GaussianBlur(1.6))
+    # (overhead: a shape all on the diagonal, lit from above so its four sides match.)
+    dx = 0 if overhead else 1
+    up, down = ImageChops.offset(height, -dx, -1), ImageChops.offset(height, dx, 1)
+    grey = ImageChops.add(grey, ImageChops.subtract(up, down).point(lambda v: min(255, v * 9 // 10)))
+    grey = ImageChops.subtract(grey, ImageChops.subtract(down, up).point(lambda v: min(255, v * 11 // 10)))
+    # (Never near black: its dark slope would vanish, and that side look thinner.)
+    grey = grey.point(lambda v: max(v, 100))
+    tone, alpha = cracked(alpha, seed)
+    grey = ImageChops.multiply(grey, tone)
     return Image.merge("RGBA", (grey, grey, grey, alpha))
 
 
@@ -275,33 +326,33 @@ def sheen():
 
 
 def collar():
-    """The piece between a portrait and its rows, 72x192, four times its size in the game:
-    a dark inside between a lit rim, its corners cut small at 45 degrees, in a soft shadow.
-    Tinted to the ring."""
-    # (Open at the rows' end, which it runs up to, with no margin there.)
-    w, h, m, c, r = 72, 192, 10, 9, 2
-    shape = [(m + c, m), (w - r - c, m), (w - r, m + c), (w - r, h - m - c), (w - r - c, h - m), (m + c, h - m),
-             (m, h - m - c), (m, m + c)]
-    big = Image.new("L", (w * SS, h * SS), 0)
-    ImageDraw.Draw(big).polygon([(x * SS, y * SS) for x, y in shape], fill=255)
-    body = big.resize((w, h), Image.LANCZOS)
-    rim = outline(big, 5).resize((w, h), Image.LANCZOS)
-    shadow = body.filter(ImageFilter.GaussianBlur(5)).point(lambda v: v * 150 // 255)
-    wear = noise((w, h), 41, 1.8).point(lambda v: 30 + v * 40 // 255)
-    # (Lit along the top of the rim, shaded along the bottom.)
-    light = ramp((w, h), 250, 130)
-    grey = Image.composite(light, wear, rim)
-    grey = Image.composite(grey, Image.new("L", (w, h), 0), body)
-    alpha = ImageChops.lighter(shadow, body)
-    # (The middle piece, right across: a lit strap tying the ring to the rows, with a
-    # dark line under it to set it on the box.)
-    strap = ImageDraw.Draw(grey)
-    mid = h // 2
-    # (As thin as the rim.)
-    strap.rectangle((0, mid - 2, w, mid + 2), fill=190)
-    strap.rectangle((0, mid + 3, w, mid + 4), fill=0)
-    ImageDraw.Draw(alpha).rectangle((0, mid - 2, w, mid + 4), fill=255)
-    Image.merge("RGBA", (grey, grey, grey, alpha)).save(os.path.join(OUT, "Collar.tga"), compression=None)
+    """Shading over the connector between a portrait and its rows, 32x96: black falling
+    away from the portrait and in from its top and bottom, so its middle stands lightest,
+    with a little wear. Its fill and lines are the rows' own."""
+    w, h = 32, 96
+    wear = noise((w, h), 41, 1.8)
+    data = []
+    for y in range(h):
+        t = abs(y / (h - 1) - 0.5) * 2
+        for x in range(w):
+            across = 0.72 * (1 - x / (w - 1)) ** 1.5
+            down = 0.66 * max(0, (t - 0.45) / 0.55) ** 1.6
+            dark = 1 - (1 - across) * (1 - down) * (1 - 0.1)
+            data.append(max(0, min(255, int(255 * dark + (wear.getpixel((x, y)) - 128) * 0.2))))
+    a = Image.new("L", (w, h))
+    a.putdata(data)
+    black = Image.new("L", (w, h), 0)
+    Image.merge("RGBA", (black, black, black, a)).save(os.path.join(OUT, "Collar.tga"), compression=None)
+    # (A cell's corner, top left: metal cut across at 45 degrees, tinted to the frame,
+    # with a dark line along the cut.)
+    n = 24
+    big = Image.new("L", (n * SS, n * SS), 0)
+    ImageDraw.Draw(big).polygon([(0, 0), (n * SS, 0), (0, n * SS)], fill=255)
+    tone = Image.new("L", (n * SS, n * SS), 255)
+    ImageDraw.Draw(tone).line([(n * SS, 0), (0, n * SS)], fill=0, width=7 * SS)
+    alpha = ImageChops.lighter(big, ImageChops.invert(tone))
+    g = tone.resize((n, n), Image.LANCZOS)
+    Image.merge("RGBA", (g, g, g, alpha.resize((n, n), Image.LANCZOS))).save(os.path.join(OUT, "CellCorner.tga"), compression=None)
 
 
 def frame_shadow():
@@ -368,11 +419,21 @@ def cut(big):
     return out
 
 
+def hole(big, name):
+    """White with the shape, a touch smaller, clear in its middle: for a mask twice the
+    portrait's size, which keeps what's under it out of the picture."""
+    small = big.resize((60, 60), Image.LANCZOS)
+    out = Image.new("L", (128, 128), 0)
+    out.paste(small, (34, 34))
+    save(ImageChops.invert(out), "Portrait" + name + "Out")
+
+
 def finish(big, name):
-    ring = outline(big, 5).resize((128, 128), Image.LANCZOS)
-    worn(ring).save(os.path.join(OUT, "Portrait" + name + "Ring.tga"), compression=None)
+    ring = even_outline(big, 5).resize((128, 128), Image.LANCZOS)
+    worn(ring, sum(ord(c) for c in name), name == "Diamond").save(os.path.join(OUT, "Portrait" + name + "Ring.tga"), compression=None)
     save(cut(big), "Portrait" + name + "Cut")
     shade(cut(big)).save(os.path.join(OUT, "Portrait" + name + "Shade.tga"), compression=None)
+    hole(big, name)
 
 
 def portraits():
@@ -384,6 +445,8 @@ def portraits():
     big = Image.new("L", (128 * SS, 128 * SS), 0)
     ImageDraw.Draw(big).ellipse((2 * SS, 2 * SS, 126 * SS, 126 * SS), fill=255)
     finish(big, "Circle")
+    big = Image.new("L", (128 * SS, 128 * SS), 255)
+    hole(big, "Square")
 
 
 def main():

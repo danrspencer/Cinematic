@@ -20,6 +20,17 @@ local ART = "Interface\\AddOns\\" .. ADDON_NAME .. "\\Textures\\Themes\\"
 -- A health and mana pair, and the rest of what a theme says about bars, the
 -- same way in each. health/mana: { r, g, b }. Unit and raid frames, and the
 -- personal display.
+-- A theme's line as the metal of a unit frame: a strong color pulled toward grey and
+-- darkened, or the outline shouts over the bars inside it. A quiet one's left near as it is.
+local function Metal(line)
+	local top, low = math.max(line[1], line[2], line[3]), math.min(line[1], line[2], line[3])
+	local grey = (line[1] + line[2] + line[3]) / 3
+	local pull = math.min(0.5, (top - low) * 0.6)
+	local out = {}
+	for i = 1, 3 do out[i] = (line[i] + (grey - line[i]) * pull) * (1 - pull * 0.5) end
+	return out
+end
+
 local function Bars(settings, health, mana, back)
 	-- (Raid frames keep their class colors: telling your group apart at a glance
 	-- matters more than the theme, and one color made every tile the same.)
@@ -110,15 +121,17 @@ local function Theme(info)
 	if info.layout == "slab" then
 		s.ufFont, s.ufNameSize, s.ufOutline = s.styleFont, 1.1, 0
 		s.ufBorder, s.ufBorderSize, s.ufBorderR, s.ufBorderG, s.ufBorderB = "custom", 1, 0, 0, 0
-		if not info.darkBars then s.ufHealthColor = "class" end
+		-- (ownBars: the theme's color, a gauge rather than a nameplate.)
+		if not (info.darkBars or info.ownBars) then s.ufHealthColor = "class" end
 	end
 	-- (Bands of light on a texture read as cheap plastic on a bar this big: flat, with
 	-- the shape doing the work. The game's frame art keeps the theme's own.)
 	if s.ufShape and s.ufShape ~= "game" then s.ufTexture = info.unitBars or "flat" end
 	-- (Each bar in the theme's thin line, as the game's frame has them.)
 	if s.ufShape and s.ufShape ~= "game" and info.layout ~= "slab" then
-		s.ufBorder, s.ufBorderSize = "custom", 1
-		s.ufBorderR, s.ufBorderG, s.ufBorderB = info.line[1], info.line[2], info.line[3]
+		s.ufBorder, s.ufBorderSize = "custom", 2
+		local metal = Metal(info.line)
+		s.ufBorderR, s.ufBorderG, s.ufBorderB = metal[1], metal[2], metal[3]
 	end
 	Panels(s, info.panel, info.panelAlpha)
 	Casts(s, info.cast, info.channel, info.locked, info.stop)
@@ -164,6 +177,7 @@ local THEMES = {
 	}),
 	Theme({
 		key = "forge", name = "Emberforge", unitBars = "hammered",
+		barDepth = { 0, 0, 0, 0.3 },
 		tip = "Blackened iron, rivets and molten light. Heavy, loud and built to take a hit.",
 		swatch = { { 0.09, 0.085, 0.08 }, { 1, 0.5, 0.12 }, { 0.82, 0.24, 0.1 }, { 0.5, 0.48, 0.46 } },
 		menu = { accent = { 1, 0.55, 0.16 }, edge = { 0.46, 0.43, 0.4 }, field = { 0.11, 0.105, 0.1 },
@@ -302,8 +316,8 @@ local THEMES = {
 	}),
 	Theme({
 		key = "void", name = "Void Whisper", unitBars = "satin",
-		tip = "What shadow priests hear: black, and something violet moving in it, with tall eyes watching from the frames.",
-		keepColors = true, barDepth = { 0, 0, 0, 0.82 },
+		tip = "What shadow priests hear: black, and something violet moving in it, watching from the frames.",
+		keepColors = true, barDepth = { 0, 0, 0, 0.7 },
 		swatch = { { 0.02, 0.015, 0.035 }, { 0.42, 0.3, 0.66 }, { 0.16, 0.22, 0.46 }, { 0.72, 0.68, 0.82 } },
 		menu = { accent = { 0.72, 0.54, 1 }, edge = { 0.26, 0.18, 0.42 }, field = { 0.055, 0.04, 0.09 },
 			window = { 0.032, 0.022, 0.058 }, well = { 0.016, 0.01, 0.03 }, knob = { 0.82, 0.74, 0.98 },
@@ -316,11 +330,12 @@ local THEMES = {
 		line = { 0.26, 0.2, 0.4 }, lineSize = 1,
 		cardColor = { 0.8, 0.68, 1 }, cardFont = "cinzel",
 		settings = { styleTexture = "lunar", styleFont = "marcellus", styleOutline = 0, styleShadow = "on",
-			stylePanel = "veil", styleBarShape = "capsule", ufShape = "eye",
+			stylePanel = "veil", styleBarShape = "capsule", ufShape = "circle",
 			questTalkStyle = "dark", rollPanel = "flat", abShape = "round" },
 	}),
 	Theme({
 		key = "slate", name = "Slate", unitBars = "satin", layout = "slab",
+		barDepth = { 0, 0, 0, 0.3 },
 		tip = "Clean type on one flat bar in your class color. No portraits, no ornament, nothing else.",
 		swatch = { { 0.085, 0.09, 0.1 }, { 0.74, 0.8, 0.88 }, { 0.36, 0.72, 0.58 }, { 0.3, 0.5, 0.85 } },
 		menu = { accent = { 0.78, 0.84, 0.92 }, edge = { 0.3, 0.33, 0.38 }, field = { 0.1, 0.105, 0.115 },
@@ -339,6 +354,7 @@ local THEMES = {
 	}),
 	Theme({
 		key = "obsidian", name = "Obsidian", unitBars = "satin", layout = "slab", darkBars = true,
+		barDepth = { 0, 0, 0, 0.42 },
 		tip = "Black on black. No portraits: flat dark bars and one thin line of cold light.",
 		swatch = { { 0.02, 0.025, 0.03 }, { 0.25, 0.85, 0.95 }, { 0.2, 0.72, 0.84 }, { 0.45, 0.4, 0.95 } },
 		menu = { accent = { 0.3, 0.88, 0.97 }, edge = { 0.14, 0.32, 0.38 }, field = { 0.04, 0.05, 0.055 },
@@ -357,14 +373,16 @@ local THEMES = {
 	}),
 	Theme({
 		key = "carbon", name = "Carbon", unitBars = "brushed", layout = "slab",
-		tip = "Charcoal and amber, like the dash of a fast car. No portraits: flat class-colored bars over an amber line.",
+		barDepth = { 0, 0, 0, 0.3 },
+		tip = "A dash at night: amber gauges on charcoal, a steel line under them, and no portraits.",
+		ownBars = true,
 		swatch = { { 0.075, 0.075, 0.08 }, { 0.98, 0.68, 0.2 }, { 0.9, 0.6, 0.18 }, { 0.36, 0.5, 0.7 } },
 		menu = { accent = { 1, 0.72, 0.26 }, edge = { 0.34, 0.31, 0.26 }, field = { 0.095, 0.095, 0.1 },
 			window = { 0.055, 0.055, 0.06 }, well = { 0.028, 0.028, 0.03 }, knob = { 1, 0.84, 0.54 },
 			thumb = { 0.52, 0.4, 0.2 } },
 		grain = "Forge", ornament = { 0.98, 0.68, 0.2 }, veil = { raid = 0.4, plate = 0.3 },
 		nameColor = { 1, 1, 1 },
-		health = { 0.9, 0.6, 0.18 }, mana = { 0.98, 0.68, 0.2 }, back = 0.88,
+		health = { 0.9, 0.6, 0.18 }, mana = { 0.42, 0.56, 0.76 }, back = 0.88,
 		panel = { 0.075, 0.075, 0.08 }, panelAlpha = 0.94,
 		cast = { 1, 0.72, 0.26 }, channel = { 0.5, 0.66, 0.86 }, locked = { 0.36, 0.36, 0.38 }, stop = { 0.85, 0.22, 0.16 },
 		line = { 0.4, 0.34, 0.24 }, lineSize = 1,
@@ -411,6 +429,10 @@ function ns.ThemeAccent()
 	return theme.nameColor or (theme.menu and theme.menu.accent)
 end
 function ns.ThemeRing() return Active().ornament end
+function ns.ThemeMetal()
+	local line = Active().line
+	return line and Metal(line) or { 0.5, 0.5, 0.5 }
+end
 -- A color fuller than a theme's own: its muted bars go chalky on a bar this size.
 local function Vivid(color)
 	if Active().keepColors then return color end
@@ -497,25 +519,27 @@ end
 -- How much bigger than the portrait's place a shape's drawn. A shape narrower than
 -- a square cuts into the picture, and the picture can't be moved or shrunk (it's the
 -- game's): so the shape grows round it, until only its background's lost.
-local PORTRAIT_FIT = { diamond = 1.32, hex = 1.12, crystal = 1.12, cut = 1.03, eye = 1.18, shield = 1.1,
-	arch = 1.05, petal = 1.04, octagon = 1.05 }
+local PORTRAIT_FIT = { diamond = 1.26, hex = 1.12, crystal = 1.12, cut = 1.03, eye = 1.18, shield = 1.1,
+	arch = 1.05, petal = 1.04, octagon = 1.15 }
 function ns.ThemePortraitFit(shape) return PORTRAIT_FIT[shape] or 1 end
 
 -- How much of its square a shape leaves empty at the side, at the rows' height.
-local PORTRAIT_SIDE = { hex = 0.07, eye = 0.07, shield = 0.05, octagon = 0.01, circle = 0.015 }
+local PORTRAIT_SIDE = { hex = 0.08, eye = 0.09, shield = 0.06, octagon = 0.05, circle = 0.03, arch = 0.015,
+	petal = 0.03, cut = 0.015, diamond = -0.03, crystal = -0.015 }
 function ns.ThemePortraitSide(shape) return PORTRAIT_SIDE[shape] or 0 end
 
--- How far the bridge to the rows runs: well under the ring (the picture covers it), a
--- shape that falls away from them there longer.
-local BRIDGE_REACH = { shield = 18, eye = 18 }
-function ns.ThemeBridgeReach(shape) return BRIDGE_REACH[shape] or 16 end
-
 -- Where the level's badge sits on each shape: on its ring, as parts of the portrait's
--- width from the outer bottom corner. A shape with a point below hangs it off that.
-local PORTRAIT_BADGE = { circle = { 0.16, 0.14 }, square = { 0.04, 0.04 }, octagon = { 0.12, 0.1 }, hex = { 0.5, -0.06 },
-	diamond = { 0.5, -0.16 }, shield = { 0.5, -0.03 }, eye = { 0.5, -0.09 }, crystal = { 0.1, 0.1 }, cut = { 0.08, 0.06 },
-	arch = { 0.03, 0.03 }, petal = { 0.06, 0.06 } }
+-- width from the outer bottom corner: always on the ring, never off a point.
+local PORTRAIT_BADGE = { circle = { 0.16, 0.14 }, square = { 0.04, 0.04 }, octagon = { 0.13, 0.11 }, hex = { 0.17, 0.2 },
+	diamond = { 0.2, 0.2 }, shield = { 0.17, 0.16 }, eye = { 0.2, 0.14 }, crystal = { 0.12, 0.2 }, cut = { 0.08, 0.06 },
+	arch = { 0.12, 0.14, true }, petal = { 0.19, 0.17, false, 0.06, 0.06 } } -- (true: the top corner, where an arch leaves room)
 function ns.ThemeBadgeSpot(shape) return PORTRAIT_BADGE[shape] or PORTRAIT_BADGE.circle end
+-- A mask twice a portrait's size, clear in the shape's middle: what's under a picture cut
+-- away, so it can't show through as the frame fades.
+function ns.ThemePortraitOut(shape)
+	if shape == "circle" or shape == "square" then return SHAPES .. "Portrait" .. (shape == "circle" and "Circle" or "Square") .. "Out" end
+	return PORTRAIT_ART[shape] and SHAPES .. "Portrait" .. PORTRAIT_ART[shape] .. "Out"
+end
 function ns.ThemePortraitRing(shape)
 	if shape == "circle" then return SHAPES .. "PortraitCircleRing" end
 	return PORTRAIT_ART[shape] and SHAPES .. "Portrait" .. PORTRAIT_ART[shape] .. "Ring"
@@ -528,6 +552,7 @@ function ns.ThemePortraitShade(shape)
 end
 ns.THEME_GRIT, ns.THEME_SHEEN, ns.THEME_COLLAR = SHAPES .. "Grit", SHAPES .. "Sheen", SHAPES .. "Collar"
 ns.THEME_ROW_SHADOW = SHAPES .. "RowShadow"
+ns.THEME_CELL_CORNER = SHAPES .. "CellCorner"
 
 -- A veil of the theme's panel color over a bar's fill, under its words: raid tiles'
 -- bright class colors and the plates' reds drawn into the theme, whatever color the
@@ -869,7 +894,16 @@ end
 
 -- The theme over the settings (what's there kept for Undo). noUndo: leave Undo
 -- as it is.
+-- (A theme moves and sizes parts of the game's frames, which can't be done in a fight: it'd
+-- come out half done. Gives whether it's clear to go.)
+local function OutOfFights()
+	if not InCombatLockdown() then return true end
+	ns.Print(L["Style themes can't be changed in a fight."])
+	return false
+end
+
 function ns.ApplyStyleTheme(key, noUndo)
+	if not OutOfFights() then return false end
 	local db = ns.GetDB()
 	local theme = BY_KEY[key]
 	if not (db and theme) then return end
@@ -880,10 +914,12 @@ function ns.ApplyStyleTheme(key, noUndo)
 	local settings, base = SettingsOf(theme), Base()
 	for _, each in ipairs(keys) do db[each] = ThemeValue(each, settings, base) end
 	ShowTheme()
+	return true
 end
 
 -- The settings as they were before the last pick.
 function ns.UndoStyleTheme()
+	if not OutOfFights() then return end
 	local db = ns.GetDB()
 	local kept = db and db.styleThemeKept
 	if type(kept) ~= "table" then return end
@@ -1060,7 +1096,7 @@ function ns.MakeThemePicker(kit, parent, width, changed)
 	local cardW = (width - (PER_ROW - 1) * CARD_GAP) / PER_ROW
 	local cards = {}
 	local function Pick(key)
-		ns.ApplyStyleTheme(key)
+		if not ns.ApplyStyleTheme(key) then return end
 		changed()
 		kit.Refresh()
 		ns.PlayThemeCard()

@@ -38,7 +38,7 @@ local function CampfireNames()
 	return names
 end
 
-local CENTER_REACH = 0.1 -- how near the middle the cursor must be: this much of the screen's height
+local CENTER_REACH = 0.25 -- how near the middle the cursor must be: this much of the screen's height
 local OBJECT_REACH = 40  -- UI units the cursor may wander from where a hidden tooltip's campfire was found
 local LINGER = 1.5       -- seconds a sighting of the fire counts for, to bring it up
 local REST = 2.5         -- seconds after it's gone before it can show again
@@ -71,10 +71,14 @@ local function CursorPosition()
 	return x / scale, y / scale
 end
 
-local function NearCenter(x, y)
+-- How far the cursor is from the middle, as a share of the screen's height.
+local function CenterOffset(x, y)
 	local width, height = UIParent:GetSize()
-	local reach = height * CENTER_REACH
-	return (x - width / 2) ^ 2 + (y - height / 2) ^ 2 <= reach * reach
+	return math.sqrt((x - width / 2) ^ 2 + (y - height / 2) ^ 2) / height
+end
+
+local function NearCenter(x, y)
+	return CenterOffset(x, y) <= CENTER_REACH
 end
 
 -- What counts as a tent: things the camera goes through that sit beside a
@@ -412,8 +416,8 @@ local function OnUpdate(_, elapsed)
 			hoverSince = nil
 			if onFire and alpha == 0 and not blockedLogged then
 				blockedLogged = true
-				ns.Log("campfire", ("on a campfire, but no button: moving %s, cursor near the middle %s"):format(
-					tostring(ns.playerMoving), tostring(NearCenter(CursorPosition()))))
+				ns.Log("campfire", ("on a campfire, but no button: moving %s, cursor near the middle %s (%.2f of the screen's height off it, %.2f allowed)"):format(
+					tostring(ns.playerMoving), tostring(NearCenter(CursorPosition())), CenterOffset(CursorPosition()), CENTER_REACH))
 			end
 			if not onFire then
 				dismissed = false

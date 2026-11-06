@@ -28,6 +28,7 @@ DEFAULTS.cardThirdY = 0.22             -- ...and their bottom, a share of its he
 DEFAULTS.cardClearChat = true          -- a lower third card that'd land on a chat window you can see moves up off it
 
 local FADE_IN, FADE_OUT = 0.35, 0.5
+local BAR_IN, BAR_OUT = 0.3, 0.3      -- a card's own bar: all in before its words start, going once they've gone
 local SMALL_OUTLINE_MIN = 16          -- a card's small lines this big or more get a thin outline
 local REVEAL = 1.1                 -- Reveal: seconds the words take to open
 local REVEAL_OUT = 0.9             -- ...and to fade out, slower
@@ -550,6 +551,8 @@ local function Setup(cue, look, enter, width, height, scale, boss)
 	cue.look, cue.enter, cue.width, cue.height, cue.scale = look, enter, width, height, scale
 	cue.barLook = cue.barSide and setmetatable({ letterboxSizeBy = "height", letterboxSize = cue.barShare,
 		letterboxMotion = "slide" }, { __index = ns.LetterboxLook() })
+	-- (With a bar of its own: the words wait for it.)
+	cue.barLead = cue.barSide and cue.ownBar and BAR_IN or 0
 end
 
 -- How far cue is faded in age seconds in (0 to 1, before easing), and its
@@ -737,18 +740,24 @@ local function ClearChat(cue)
 	cue.over:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", 0, lift)
 end
 
--- Draws cue age seconds in. Gives false once it's over (and hidden). Cut
+-- Draws cue whole seconds in. Gives false once it's over (and hidden). Cut
 -- short (cue.cutAt, cue.cutFrom: when, and how shown then), it fades out
--- from there in CUT_OUT.
-local function Draw(cue, age)
+-- from there in CUT_OUT. With a bar of its own, the bar comes first and goes
+-- last: its words play between (age: seconds into them).
+local function Draw(cue, whole)
 	local look = cue.look
+	local lead = cue.barLead
+	local age = math.max(whole - lead, 0)
 	local a, length = Shown(cue, age)
 	local cut = 1
+	local wordsEnd = lead + length
 	if cue.cutAt then
-		cut = 1 - (age - cue.cutAt) / CUT_OUT
+		cut = math.max(1 - (whole - cue.cutAt) / CUT_OUT, 0)
 		a = math.min(a, cue.cutFrom * cut)
+		wordsEnd = math.min(wordsEnd, cue.cutAt + CUT_OUT)
 	end
-	if age >= length or cut <= 0 then
+	local ends = wordsEnd + (lead > 0 and BAR_OUT or 0)
+	if whole >= ends then
 		cue.bars:Hide()
 		cue.pulse:Hide()
 		cue.over:Hide()
@@ -813,7 +822,8 @@ local function Draw(cue, age)
 	cue.bars:SetShown(cue.barSide ~= nil and cue.ownBar)
 	if cue.barSide and cue.ownBar then
 		local bars = cue.bars
-		ns.DrawLetterbox(bars, cue.barLook, cue.width, cue.height, a, cue.scale)
+		local t = math.max(math.min(whole / lead, (ends - whole) / BAR_OUT, 1), 0)
+		ns.DrawLetterbox(bars, cue.barLook, cue.width, cue.height, t * t * (3 - 2 * t), cue.scale)
 		local other = cue.barSide == "TOP" and "bottom" or "top"
 		bars[other]:Hide()
 		bars[other .. "Feather"]:Hide()
@@ -903,7 +913,9 @@ local function Play(frame, look, enter, width, height, scale, boss, after)
 	-- Cut short: a quick fade out from as shown as it is now.
 	cue.cut = function()
 		if cue.cutAt then return end
-		cue.cutAt, cue.cutFrom = age, (Shown(cue, age))
+		local shown, length = Shown(cue, math.max(age - cue.barLead, 0))
+		if age >= cue.barLead + length then return end -- (only its bar left, going already)
+		cue.cutAt, cue.cutFrom = age, shown
 	end
 	Draw(cue, 0)
 	PlaceClick(cue)
