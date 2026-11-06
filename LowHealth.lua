@@ -17,6 +17,8 @@ DEFAULTS.lowHealthAlways = true    -- ...everywhere: its Show in row's Always (t
 DEFAULTS.lowHealthTheme = "auto"   -- a theme's key (LowHealthThemes.lua), or by class and talents
 DEFAULTS.lowHealthStart = 0.75     -- health (0-1) they start creeping in below
 DEFAULTS.lowHealthFull = 0.15      -- ...and are all the way in at
+DEFAULTS.lowHealthSound = "auto"   -- played on reaching that: your class and spec's, "off", or a file number
+DEFAULTS.lowHealthSoundVolume = 1  -- ...at this share of your ambient volume (over 1: louder)
 DEFAULTS.lowHealthReach = 0.3      -- share of the screen's height the top and bottom shadow covers at full
 DEFAULTS.lowHealthReachSides = 0.3 -- ...and of its width, the sides' (each reach has a Sides, the same way)
 DEFAULTS.lowHealthDark = 0.85      -- the shadow's darkness at full
@@ -169,6 +171,7 @@ local secretCurves = {} -- (health that's secret: its alpha from the game, by th
 -- (Health secret, so Update can't see hits: the hit event's, since the last
 -- frame. Lost: a share of your health.)
 local woundLost, woundHit = 0, false
+local healthGuess -- (your health while it's secret: the last plain share, less hits, plus heals)
 local lostAdding = 0 -- (lost since the last flash, for Hits adding up to; again each fight)
 local shadowColor = { 0, 0, 0 }
 
@@ -524,35 +527,102 @@ local function TreeWithMostPoints()
 	return best
 end
 
+-- Forever: one spec a class (its number says nothing: 1 for everyone), and its
+-- talents one trait tree, the three classic trees being groups in it
+-- (TalentCalc.lua). Each tree's points and name, in the talents window's
+-- order; nil on a client without them, false if they aren't there yet (just
+-- logged in).
+function ns.TalentTreePoints()
+	if ns.isRetail or not (C_ClassTalents and C_ClassTalents.GetActiveConfigID and C_Traits
+		and C_Traits.GetGroupDisplayInfoByTreeID) then
+		return nil
+	end
+	local ok, points, names = pcall(function()
+		local configID = C_ClassTalents.GetActiveConfigID()
+		local config = configID and C_Traits.GetConfigInfo(configID)
+		local treeID = config and config.treeIDs and config.treeIDs[1]
+		if not treeID then return nil end
+		local groups = C_Traits.GetGroupDisplayInfoByTreeID(treeID) or {}
+		table.sort(groups, function(a, b) return a.orderIndex < b.orderIndex end)
+		local counts, labels, byGroup = {}, {}, {}
+		for i, group in ipairs(groups) do
+			counts[i], labels[i], byGroup[group.groupID] = 0, group.displayName, i
+		end
+		for _, nodeID in ipairs(C_Traits.GetTreeNodes(treeID) or {}) do
+			local info = C_Traits.GetNodeInfo(configID, nodeID)
+			local rank = info and info.isVisible and (info.ranksPurchased or info.activeRank)
+			if type(rank) == "number" and not Secret(rank) and rank > 0 then
+				for _, groupID in ipairs(info.groupIDs or {}) do
+					local tree = byGroup[groupID]
+					if tree then
+						counts[tree] = counts[tree] + rank
+						break
+					end
+				end
+			end
+		end
+		return counts, labels
+	end)
+	if ok and points and #points > 1 then return points, names end
+	return false
+end
+
+-- Auto's pick has no talents to go by (the class's own sound, then).
+local autoNoTree = false
+-- Picked before your talents had loaded: when to look again. (Nothing says
+-- when they do: tested on Forever, a pick at login stayed.)
+local AUTO_AGAIN = 5
+local autoAgainAt
 -- (byClass, bySpec: our themes' lists, or Game art's.)
 local function AutoTheme(byClass, bySpec, fallback)
 	local _, class = UnitClass("player")
 	local list = byClass[class]
 	if not list then return fallback end
 	local tree
-	-- (MoP Classic: only C_SpecializationInfo's.)
-	local getSpec = GetSpecialization
-		or C_SpecializationInfo and C_SpecializationInfo.GetSpecialization
-	if getSpec then
-		local ok, spec = pcall(getSpec)
-		if ok and type(spec) == "number" and spec > 0 then
-			list = bySpec[class] or list
-			tree = spec
+	local points = ns.TalentTreePoints()
+	if points then
+		local most = 0
+		for i, count in ipairs(points) do
+			if count > most then tree, most = i, count end -- (a tie: the first tree)
+		end
+	else
+		-- (MoP Classic: only C_SpecializationInfo's.)
+		local getSpec = GetSpecialization
+			or C_SpecializationInfo and C_SpecializationInfo.GetSpecialization
+		if getSpec then
+			local ok, spec = pcall(getSpec)
+			if ok and type(spec) == "number" and spec > 0 then
+				list = bySpec[class] or list
+				tree = spec
+			end
+		end
+		if not tree and not GetSpecialization then
+			tree = TreeWithMostPoints()
 		end
 	end
-	if not tree and not GetSpecialization then
-		tree = TreeWithMostPoints()
-	end
+	autoNoTree = not tree
+	autoAgainAt = (points == false or autoNoTree) and GetTime() + AUTO_AGAIN or nil
 	return tree and list[tree] or list.none or list[1]
+end
+local function AutoExpired()
+	if autoAgainAt and GetTime() >= autoAgainAt then
+		autoAgainAt, autoTheme, autoGameTheme = nil, nil, nil
+	end
+end
+function ns.LowHealthAutoNoTree()
+	ns.LowHealthAutoTheme()
+	return autoNoTree
 end
 
 function ns.LowHealthAutoTheme()
+	AutoExpired()
 	autoTheme = autoTheme or AutoTheme(ns.LOW_HEALTH_CLASS_THEMES, ns.LOW_HEALTH_SPEC_THEMES, "blood")
 	return autoTheme
 end
 
 -- Auto, Game art: the game's edge in your class and spec's colour.
 function ns.LowHealthAutoGameTheme()
+	AutoExpired()
 	autoGameTheme = autoGameTheme
 		or AutoTheme(ns.LOW_HEALTH_GAME_CLASS_THEMES, ns.LOW_HEALTH_GAME_SPEC_THEMES, "game_low")
 	return autoGameTheme
@@ -1429,6 +1499,22 @@ end
 
 local belowStart = false -- health known to be under Starts (not when secret)
 
+-- The sound at Full, once each time down: above it by this again before the
+-- next (nor at login, already under it). A quick look comes down to its own
+-- low, so it's heard with Full set under that too.
+local SOUND_AGAIN = 0.05
+local soundReady = false
+local function SoundAtFull(share)
+	local _, full = Thresholds()
+	if test and test.quiet then full = math.max(full, test.to) end
+	if share > full + SOUND_AGAIN then
+		soundReady = true
+	elseif soundReady and share <= full then
+		soundReady = false
+		ns.PlayVitalsSound(db.lowHealthSound)
+	end
+end
+
 local function Update(_, elapsed)
 	local now = GetTime()
 	local look = Look()
@@ -1439,6 +1525,11 @@ local function Update(_, elapsed)
 		UseTheme(screen, theme, look)
 	end
 	local share, on, testing, dead = Wanted(now)
+	if share and on and not testing then healthGuess = share end
+	if on or testing then
+		local known = share or healthGuess
+		if known then SoundAtFull(known) end
+	end
 	-- A big hit, or smaller ones adding up to Hits adding up to: a flash (only
 	-- by what was shown: a heal doesn't).
 	-- (Secret health, in fights on retail: by the hit event's amounts, plain.)
@@ -1566,6 +1657,7 @@ end
 -- then back to your own health. (Its test done, its edges still easing out
 -- are cut too: else they'd show on the next level.)
 function ns.StopVitalsFlash()
+	ns.StopVitalsSound()
 	if not (test and test.quiet) and not (glimpse and not test) then return end
 	test, lastHealth, glimpse = nil, nil, nil
 	level, flash, liftSpeed = 0, 0, 0
@@ -1576,6 +1668,7 @@ end
 
 function ns.StopLowHealthTest()
 	test = nil
+	ns.StopVitalsSound()
 	Wake()
 end
 
@@ -1853,7 +1946,7 @@ end
 
 -- (Events a client may not have: registering those would error.)
 local TALENT_EVENTS = { "PLAYER_TALENT_UPDATE", "CHARACTER_POINTS_CHANGED", "ACTIVE_TALENT_GROUP_CHANGED",
-	"PLAYER_SPECIALIZATION_CHANGED", "PLAYER_LEVEL_UP" }
+	"PLAYER_SPECIALIZATION_CHANGED", "PLAYER_LEVEL_UP", "TRAIT_CONFIG_UPDATED", "TRAIT_CONFIG_LIST_UPDATED" }
 local isTalentEvent = {}
 for _, event in ipairs(TALENT_EVENTS) do isTalentEvent[event] = true end
 
@@ -1862,10 +1955,18 @@ events:RegisterEvent("PLAYER_LOGIN")
 events:SetScript("OnEvent", function(_, event, _, action, _, amount)
 	if event == "UNIT_COMBAT" then
 		-- A hit while your health is secret (retail fights): the amount still
-		-- comes plain, so it's counted by that. (Plain health: Update's.)
-		if action ~= "WOUND" or Secret(amount) or type(amount) ~= "number" or HealthShare() then return end
+		-- comes plain, so it's counted by that. (Plain health: Update's.) Heals
+		-- too, for the guess at your health the sound at Full goes by.
+		if action ~= "WOUND" and action ~= "HEAL" then return end
+		if Secret(amount) or type(amount) ~= "number" or HealthShare() then return end
 		local max = UnitHealthMax("player")
 		if Secret(max) or type(max) ~= "number" or max <= 0 then return end
+		if action == "HEAL" then
+			if healthGuess then healthGuess = math.min(1, healthGuess + amount / max) end
+			Wake()
+			return
+		end
+		if healthGuess then healthGuess = math.max(0, healthGuess - amount / max) end
 		woundLost = woundLost + amount / max
 		woundHit = woundHit or amount / max >= db.lowHealthFlashHit
 	elseif event == "PLAYER_REGEN_ENABLED" or event == "PLAYER_REGEN_DISABLED" then
@@ -2486,6 +2587,16 @@ function ns.CreateVitalsStylePanel(kit)
 		end
 		return list
 	end
+	-- A class in the menus: its name in its color, marked if only retail has it.
+	local RETAIL = " |cff999999(" .. L["retail"] .. ")|r"
+	local function ThemeClassName(class)
+		local name = LOCALIZED_CLASS_NAMES_MALE and LOCALIZED_CLASS_NAMES_MALE[class[1]] or L[class[2]]
+		local color = RAID_CLASS_COLORS and RAID_CLASS_COLORS[class[1]]
+		if color then
+			name = ("|cff%02x%02x%02x%s|r"):format(color.r * 255, color.g * 255, color.b * 255, name)
+		end
+		return name .. (class.retail and RETAIL or "")
+	end
 	local themePicker, themeName = Pick("lowHealthTheme", L["Theme:"], Choices,
 		L["The look: Auto picks your class and spec's (by the talent tree you've put most into, on clients " ..
 		"without specs), or pick any. Each class has a theme for each spec. Create theme makes a blank one of " ..
@@ -2517,7 +2628,6 @@ function ns.CreateVitalsStylePanel(kit)
 	if themePicker.SetupMenu then
 		-- By class: Auto, then a submenu for each class (in its colour), each
 		-- spec in it with its theme. (Replaces the flat list the helper made.)
-		local RETAIL = " |cff999999(" .. L["retail"] .. ")|r"
 		local function PickTheme(key)
 			ns.GetDB().lowHealthTheme = key
 			SyncThemeLook(WantedTheme()) -- (its defaults on the page before it shows)
@@ -2528,19 +2638,11 @@ function ns.CreateVitalsStylePanel(kit)
 			local d = ns.GetDB()
 			return d ~= nil and d.lowHealthTheme == key
 		end
-		local function ClassName(class)
-			local name = LOCALIZED_CLASS_NAMES_MALE and LOCALIZED_CLASS_NAMES_MALE[class[1]] or L[class[2]]
-			local color = RAID_CLASS_COLORS and RAID_CLASS_COLORS[class[1]]
-			if color then
-				name = ("|cff%02x%02x%02x%s|r"):format(color.r * 255, color.g * 255, color.b * 255, name)
-			end
-			return name .. (class.retail and RETAIL or "")
-		end
 		themePicker:SetupMenu(function(_, root)
 			root:CreateRadio(AutoText(), function() return Picked("auto") end, function() PickTheme("auto") end)
 			root:CreateDivider()
 			for _, class in ipairs(ns.LOW_HEALTH_MENU) do
-				local menu = root:CreateButton(ClassName(class))
+				local menu = root:CreateButton(ThemeClassName(class))
 				for _, spec in ipairs(class[3]) do
 					local key = spec[2]
 					menu:CreateRadio(L[spec[1]] .. ": " .. ThemeName(key) .. (spec.retail and RETAIL or ""),
@@ -2672,6 +2774,52 @@ function ns.CreateVitalsStylePanel(kit)
 			function(theme) return not theme.mine and not theme.edited end, function() Made(ns.CreateVitalsTheme()) end)
 		create = ThemeButton(L["Copy theme"], L["A theme of your own, made from the one shown."], made,
 			function(theme) return not theme.mine and not theme.edited end, function() Made(ns.CreateVitalsTheme(true)) end)
+	end
+
+	-- The sound at Full, under the theme and picked the same way: Auto, Off,
+	-- then a submenu for each class. Each is heard as it's picked.
+	local soundPicker, soundName = Pick("lowHealthSound", L["Sound:"], ns.VitalsSoundChoices,
+		L["Plays as your health reaches Full, the edges all the way in, and when you pick the Cinema profile. Auto " ..
+		"picks your class and spec's, or pick any, or Off."])
+	soundPicker:ClearAllPoints()
+	soundPicker:SetPoint("LEFT", soundName, "LEFT", themeName:GetStringWidth() + 10, 0)
+	-- Beside it, how loud. (Only with a sound to be loud.)
+	local soundLoudness = rows.Boxes(soundName)
+	soundLoudness:ClearAllPoints()
+	soundLoudness:SetPoint("LEFT", soundPicker, "RIGHT", 14, 0)
+	soundLoudness:Box(L["Ambient volume"], "lowHealthSoundVolume", 0, 200, 5, "%d", 100,
+		L["How loud the sound plays, next to your ambient volume in the game's Sound settings: at 100% the same, " ..
+		"at 200% twice that, as far as the game's top volume. While it plays, the game's other ambient sounds " ..
+		"follow it. With the game's ambient sound off, it plays at your sound effects volume instead."],
+		function(d) return On(d) and d.lowHealthSound ~= "off" end, "%")
+	if soundPicker.SetupMenu then
+		local function PickSound(value)
+			ns.GetDB().lowHealthSound = value
+			ns.PlayVitalsSound(value)
+			Changed()
+			kit.Refresh() -- (the volume box greys with Off)
+		end
+		local function Radio(menu, text, value)
+			menu:CreateRadio(text, function()
+				local d = ns.GetDB()
+				return d ~= nil and d.lowHealthSound == value
+			end, function() PickSound(value) end)
+		end
+		soundPicker:SetupMenu(function(_, root)
+			local choices = ns.VitalsSoundChoices()
+			Radio(root, choices[1].text, "auto")
+			Radio(root, choices[2].text, "off")
+			root:CreateDivider()
+			for _, class in ipairs(ns.LOW_HEALTH_MENU) do
+				local menu = root:CreateButton(ThemeClassName(class))
+				Radio(menu, L[class.soundName], class.sound)
+				for _, spec in ipairs(class[3]) do
+					if spec.sound then
+						Radio(menu, L[spec[1]] .. ": " .. L[spec.soundName], spec.sound)
+					end
+				end
+			end
+		end)
 	end
 
 	-- The theme's own settings (the theme shown, Auto's pick with Auto): fields

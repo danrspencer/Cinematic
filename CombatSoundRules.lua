@@ -138,16 +138,18 @@ local function Stop(fadeMs)
 	end
 end
 local BELLS = { Alliance = 6594, Horde = 6595 } -- BellTollAlliance, BellTollHorde
-local function Start(id, channel, seconds)
+-- (file: id is a file of the game's, not a sound kit. True if the game took it.)
+local function Start(id, channel, seconds, file)
 	Stop(CUT_MS)
 	if id == ns.FACTION_BELL then id = BELLS[UnitFactionGroup("player") or ""] or BELLS.Alliance end
-	local ok, willPlay, handle = pcall(PlaySound, id, channel)
+	local ok, willPlay, handle = pcall(file and PlaySoundFile or PlaySound, id, channel)
 	if ok and willPlay and handle then
 		playing = handle
 		C_Timer.After(math.max(0, seconds - 0.15), function()
 			if playing == handle then Stop(FADE_MS) end
 		end)
 	end
+	return ok and willPlay and true or false
 end
 -- Which of the list's sounds this client has: the classic clients lack the
 -- later expansions' sound kits, and the game won't play them. Tried once,
@@ -174,24 +176,57 @@ function ns.CombatSoundsPlayable()
 	return playable
 end
 
+-- On the ambience channel with its volume at level (0-1), held till it's done.
+local function StartHeld(id, level, seconds, file)
+	local db = ns.db
+	if not db.combatHeldAmbience then db.combatHeldAmbience = GetCVar("Sound_AmbienceVolume") end
+	rampToken = rampToken + 1 -- (an easing back still going: stopped, this cue's level instead)
+	pcall(SetCVar, "Sound_AmbienceVolume", ("%.2f"):format(math.max(0, math.min(1, level))))
+	if not Start(id, "Ambience", seconds, file) then
+		Restore(true)
+		return false
+	end
+	-- (Eased back once this one has faded out: the one before stopped.)
+	local done = seconds - 0.15 + FADE_MS / 1000 + 0.05
+	restoreAt = GetTime() + done
+	C_Timer.After(done + 0.05, RestoreWhenDone)
+	return true
+end
+
 function ns.PlayCombatSound(id, volume)
 	local entry = SOUND[id]
 	local seconds = entry and entry[4] or 3
-	local db = ns.db
 	if GetCVar("Sound_EnableAmbience") ~= "1" then
 		Start(id, "SFX", seconds)
 		return
 	end
 	local effects = tonumber(GetCVar("Sound_SFXVolume")) or 1
-	local level = math.max(0, math.min(1, (db.combatCueVolume or 1) * (volume or 1) * effects))
-	if not db.combatHeldAmbience then db.combatHeldAmbience = GetCVar("Sound_AmbienceVolume") end
-	rampToken = rampToken + 1 -- (an easing back still going: stopped, this cue's level instead)
-	pcall(SetCVar, "Sound_AmbienceVolume", ("%.2f"):format(level))
-	Start(id, "Ambience", seconds)
-	-- (Eased back once this one has faded out: the one before stopped.)
-	local done = seconds - 0.15 + FADE_MS / 1000 + 0.05
-	restoreAt = GetTime() + done
-	C_Timer.After(done + 0.05, RestoreWhenDone)
+	StartHeld(id, (ns.db.combatCueVolume or 1) * (volume or 1) * effects, seconds)
+end
+
+-- A file of the game's at share (1: your ambient volume; more, louder, up to
+-- the channel's top), as the cues play. True if the game took it. With the
+-- game's ambient sound off: at your sound effects volume, share not heard.
+local fileSound -- (its handle, while it may be playing)
+function ns.PlayAmbienceFile(id, share, seconds)
+	local played
+	if GetCVar("Sound_EnableAmbience") ~= "1" then
+		played = Start(id, "SFX", seconds, true)
+	else
+		local yours = tonumber(ns.db.combatHeldAmbience or GetCVar("Sound_AmbienceVolume")) or 1
+		played = StartHeld(id, yours * (share or 1), seconds, true)
+	end
+	fileSound = played and playing or nil
+	return played
+end
+
+-- That file cut short, a cue playing since left alone.
+function ns.StopAmbienceFile()
+	if fileSound and playing == fileSound then
+		Stop(CUT_MS)
+		Restore()
+	end
+	fileSound = nil
 end
 
 -- A boss fight's rule: its condition has the word boss (the Boss event's).

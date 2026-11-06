@@ -120,6 +120,7 @@ local function PrintDebugHelp()
 	print("  /cine debug turn - turn handling while walking (8 seconds)")
 	print("  /cine debug unitframes - log every part of the player, pet, target and focus frames (names, textures, sizes, held hidden) to the saved log")
 	print("  /cine debug plates - nameplate settings, and how the plates (and your target) are sorted")
+	print("  /cine debug spec - every way this client might tell your spec, and what each says")
 	print("  /cine debug textures - a strip of every bar texture the Style pages offer, to see which this client has")
 	print("  /cine debug fonts - every font other addons share, and which are left out (no small letters)")
 	print("  /cine debug themeshots [theme] | off - screenshots of every style theme's frames; your settings come back after")
@@ -218,6 +219,7 @@ local function PrintDebugHelp()
 	print("  /cine recaptest - plays your login now with the Last time line (a sample if nothing counted yet), and this session's counts")
 	print("  /cine tinttest [seconds] - each time of day's tint with its title, AFK camera on (8 each; again to stop)")
 	print("  /cine soundtest <id> - play a game sound by its ID (stops after 10 seconds)")
+	print("  /cine soundtest vitals [all] - Vitals Vision's sound: yours, or every class and spec's")
 	print("  /cine songtest [file ID] - play a random death song, or any music file (again to stop)")
 	if ns.DemoCommand then
 		print("  /cine demo [name|list|stop] - the Demo Hub: every demo tool and recording script (dev copy)")
@@ -362,6 +364,8 @@ local function HandleSlash(msg)
 		Cinematic_FlyBy()
 	elseif cmd == "hideui" then
 		Cinematic_ToggleUI()
+	elseif cmd == "debug" and arg == "spec" then
+		ns.SpecDebug()
 	elseif cmd == "debug" and arg == "fishing" and ns.FishingReelDebug then
 		ns.FishingReelDebug()
 	elseif cmd == "debug" and arg == "flybys" then
@@ -826,6 +830,11 @@ local function HandleSlash(msg)
 	elseif cmd == "soundtest" then
 		-- Plays a game sound by its ID (Wowhead's sound=ID), stopping it after 10
 		-- seconds in case it loops. /cine soundtest stops one that's playing.
+		-- /cine soundtest vitals: Vitals Vision's sound (all: every one).
+		if arg:match("^vitals") then
+			ns.TestVitalsSound(arg:match("all$") and true or false)
+			return
+		end
 		if ns.testSound then
 			StopSound(ns.testSound)
 			ns.testSound = nil

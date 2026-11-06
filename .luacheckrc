@@ -232,7 +232,7 @@ read_globals = {
 	"GetChatWindowInfo",
 	"NumTaxiNodes",
 	"PlayMusic",
-	"PlaySound",
+	"PlaySound", "PlaySoundFile",
 	"SOUNDKIT", "GameMenuFrame", "ShowUIPanel", "CloseMenus", "CloseAllWindows", "ToggleFriendsFrame", "FriendsFrame", "FRIENDS",
 	"AreAllPanelsDisallowed", "SettingsPanel",
 	"CHAT_SAY_GET", -- (DemoHub.lua)

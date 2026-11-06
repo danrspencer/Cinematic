@@ -102,6 +102,7 @@ ScreenEffectsData.lua
 ScreenEffects.lua
 LowHealthThemes.lua
 LowHealth.lua
+VitalsSound.lua
 TeleportVision.lua
 PortalScout.lua
 ScreenEffectScout.lua

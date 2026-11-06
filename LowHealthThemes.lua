@@ -541,30 +541,63 @@ ns.LOW_HEALTH_SPEC_THEMES = {
 
 -- The page's theme menu: a submenu for each class (its token, for its
 -- colour, and name), each spec in it with its theme. (Retail: marks specs
--- and classes only retail has.)
+-- and classes only retail has.) sound, soundName: Vitals Vision's sound, a
+-- file of the game's (VitalsSound.lua): the class's own (the older files), and
+-- a spec's where it has another.
 ns.LOW_HEALTH_MENU = {
-	{ "WARRIOR", "Warrior", { { "Arms", "wounds" }, { "Fury", "rage" }, { "Protection", "shield" },
+	{ "WARRIOR", "Warrior", sound = 568028, soundName = "Battle Shout", {
+		{ "Arms", "wounds", sound = 568664, soundName = "Colossus Smash" },
+		{ "Fury", "rage", sound = 1337826, soundName = "Recklessness" },
+		{ "Protection", "shield", sound = 569193, soundName = "Shockwave" },
 		{ "No talents yet", "blood" } } },
-	{ "PALADIN", "Paladin", { { "Holy", "holylight" }, { "Protection", "holyshield" },
-		{ "Retribution", "judgement" } } },
-	{ "HUNTER", "Hunter", { { "Beast Mastery", "claws" }, { "Marksmanship", "lonewolf" },
-		{ "Survival", "thorns" } } },
-	{ "ROGUE", "Rogue", { { "Assassination", "poison" }, { "Combat", "bruise" }, { "Outlaw", "outlaw", retail = true },
-		{ "Subtlety", "shadow" } } },
-	{ "PRIEST", "Priest", { { "Discipline", "ward" }, { "Holy", "feathers" }, { "Shadow", "void" } } },
-	{ "SHAMAN", "Shaman", { { "Elemental", "storm" }, { "Enhancement", "gale" }, { "Restoration", "water" } } },
-	{ "MAGE", "Mage", { { "Arcane", "arcane" }, { "Fire", "fire" }, { "Frost", "frost" } } },
-	{ "WARLOCK", "Warlock", { { "Affliction", "agony" }, { "Demonology", "fel" }, { "Destruction", "felfire" } } },
-	{ "DRUID", "Druid", { { "Balance", "eclipse" }, { "Feral", "claws" }, { "Guardian", "bear", retail = true },
-		{ "Restoration", "leaves" } } },
-	{ "DEATHKNIGHT", "Death Knight", retail = true, { { "Blood", "bloodrune" }, { "Frost", "runefrost" },
-		{ "Unholy", "decay" } } },
-	{ "MONK", "Monk", retail = true, { { "Brewmaster", "stagger" }, { "Mistweaver", "mist" },
+	{ "PALADIN", "Paladin", sound = 569738, soundName = "Divine Shield", {
+		{ "Holy", "holylight", sound = 568366, soundName = "Holy Radiance" },
+		{ "Protection", "holyshield", sound = 598382, soundName = "Guardian of Ancient Kings" },
+		{ "Retribution", "judgement", sound = 569123, soundName = "Templar's Verdict" } } },
+	{ "HUNTER", "Hunter", sound = 568637, soundName = "Rapid Fire", {
+		{ "Beast Mastery", "claws", sound = 1451134, soundName = "Bestial Wrath" },
+		{ "Marksmanship", "lonewolf", sound = 1590095, soundName = "Aimed Shot" },
+		{ "Survival", "thorns", sound = 568953, soundName = "Lock and Load" } } },
+	{ "ROGUE", "Rogue", sound = 568798, soundName = "Vanish", {
+		{ "Assassination", "poison", sound = 568848, soundName = "Vendetta" },
+		{ "Combat", "bruise", sound = 1348439, soundName = "Adrenaline Rush" },
+		{ "Outlaw", "outlaw", retail = true, sound = 1360714, soundName = "Pistol Shot" },
+		{ "Subtlety", "shadow", sound = 1315153, soundName = "Shadow Blades" } } },
+	{ "PRIEST", "Priest", sound = 569402, soundName = "Holy Bolt", {
+		{ "Discipline", "ward", sound = 568534, soundName = "Power Infusion" },
+		{ "Holy", "feathers", sound = 568964, soundName = "Archangel" },
+		{ "Shadow", "void", sound = 569689, soundName = "Dark Angel" } } },
+	{ "SHAMAN", "Shaman", sound = 568049, soundName = "Thunder", {
+		{ "Elemental", "storm", sound = 2182425, soundName = "Thunderstorm" },
+		{ "Enhancement", "gale", sound = 1369112, soundName = "Stormstrike" },
+		{ "Restoration", "water", sound = 568648, soundName = "Ancestral Awakening" } } },
+	{ "MAGE", "Mage", sound = 568678, soundName = "Arcane Explosion", {
+		{ "Arcane", "arcane", sound = 5520037, soundName = "Arcane surge" },
+		{ "Fire", "fire", sound = 1392377, soundName = "Pyroblast" },
+		{ "Frost", "frost", sound = 1394324, soundName = "Icy Veins" } } },
+	{ "WARLOCK", "Warlock", sound = 568042, soundName = "Soulshatter", {
+		{ "Affliction", "agony" },
+		{ "Demonology", "fel", sound = 568198, soundName = "Metamorphosis" },
+		{ "Destruction", "felfire", sound = 593894, soundName = "Conflagrate" } } },
+	{ "DRUID", "Druid", sound = 568546, soundName = "Shapeshift", {
+		{ "Balance", "eclipse", sound = 569338, soundName = "Eclipse" },
+		{ "Feral", "claws", sound = 568401, soundName = "Berserk" },
+		{ "Guardian", "bear", retail = true, sound = 569539, soundName = "Stampeding Roar" },
+		{ "Restoration", "leaves", sound = 569008, soundName = "Flourish" } } },
+	{ "DEATHKNIGHT", "Death Knight", retail = true, sound = 568179, soundName = "Death Gate", {
+		{ "Blood", "bloodrune", sound = 568473, soundName = "Blood Boil" },
+		{ "Frost", "runefrost", sound = 568272, soundName = "Howling Blast" },
+		{ "Unholy", "decay", sound = 3092194, soundName = "Army of the Dead" } } },
+	{ "MONK", "Monk", retail = true, sound = 606907, soundName = "Touch of Death", {
+		{ "Brewmaster", "stagger", sound = 644413, soundName = "Ox Stance" },
+		{ "Mistweaver", "mist", sound = 613904, soundName = "Revival" },
 		{ "Windwalker", "chi" } } },
-	{ "DEMONHUNTER", "Demon Hunter", retail = true, { { "Havoc", "demon" }, { "Vengeance", "souls" },
+	{ "DEMONHUNTER", "Demon Hunter", retail = true, sound = 1259931, soundName = "Metamorphosis", {
+		{ "Havoc", "demon" },
+		{ "Vengeance", "souls", sound = 1345254, soundName = "Soul Cleave" },
 		{ "Devourer", "devour" } } },
-	{ "EVOKER", "Evoker", retail = true, { { "Devastation", "dragonfire" }, { "Preservation", "dream" },
-		{ "Augmentation", "sands" } } },
+	{ "EVOKER", "Evoker", retail = true, sound = 4556734, soundName = "Fire Breath", {
+		{ "Devastation", "dragonfire" }, { "Preservation", "dream" }, { "Augmentation", "sands" } } },
 }
 
 -- Who each is for (from the menu: "Arms Warrior", or more than one).
