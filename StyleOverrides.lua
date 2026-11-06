@@ -142,15 +142,45 @@ function ns.CreateStyleOverridesPanel(kit)
 		row:Refresh()
 		parts[#parts + 1] = row
 	end
-	for _, section in ipairs(Sections()) do
-		stack:Header(content, section[1])
+	-- Each section a folder tab, on the panel under them, down to its last row. The
+	-- tab last picked is kept across reloads (SectionState).
+	local sections, tabs, holders = Sections(), {}, {}
+	local picked = { id = "Style Overrides/tab", open = sections[1][1] }
+	local panel, ShowTab
+	local function Layout()
+		local shown = 1
+		for i, section in ipairs(sections) do
+			if section[1] == picked.open then shown = i end
+		end
+		for i, holder in ipairs(holders) do holder:SetShown(i == shown) end
+		ShowTab(shown)
+		panel:SetPoint("BOTTOMRIGHT", holders[shown], "BOTTOMRIGHT", 12, -12)
+		kit.FitContentHeight(content)
+	end
+	for i, section in ipairs(sections) do tabs[i] = { section[1] } end
+	local _, base, height
+	panel, _, ShowTab, base, height = ns.FolderTabs(content, tabs, function(i)
+		kit.SectionState.Save(picked, sections[i][1])
+		Layout()
+	end, nil, NAME_W + 264)
+	local panelTop = CreateFrame("Frame", nil, content)
+	panelTop:SetSize(1, 1)
+	panelTop:SetPoint("TOPLEFT", clear, "BOTTOMLEFT", 0, -14 - height)
+	panel:SetPoint("TOPLEFT", panelTop, "TOPLEFT")
+	base:SetPoint("TOPLEFT", panelTop, "TOPLEFT")
+	for i, section in ipairs(sections) do
 		local holder = CreateFrame("Frame", nil, content)
 		holder:SetSize(NAME_W + 240, #section[2] * ROW_H)
-		stack:Add(holder, "label")
-		for i, row in ipairs(section[2]) do PartRow(holder, i, row[2], PREFIX .. row[1]) end
+		holder:SetPoint("TOPLEFT", panelTop, "TOPLEFT", 12, -10)
+		holders[i] = holder
+		for r, row in ipairs(section[2]) do PartRow(holder, r, row[2], PREFIX .. row[1]) end
 	end
+	kit.SectionState.Restore(picked)
+	Layout()
 	local shown = kit.PageShown(kit.Refresh, content)
 	canvas:SetScript("OnShow", function()
+		kit.SectionState.Restore(picked) -- (the page is built before the settings load)
+		Layout()
 		for _, row in ipairs(parts) do row:Refresh() end
 		shown()
 	end)
