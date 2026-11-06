@@ -75,7 +75,7 @@ local KEYS = {
 	ufBack = 0.5,                -- the dark behind them, with a border of ours
 	ufHealthColor = "game",      -- the health bar: "game", "class" (class or reaction) or "custom"
 	ufHealthR = 0.2, ufHealthG = 0.8, ufHealthB = 0.4,
-	ufNameColor = "game",        -- the name: "game", "class" (class or reaction) or "white"
+	ufNameColor = "game",        -- the name: "game", "class" (class or reaction), "white" or "theme" (its accent)
 	ufFont = "general",          -- the name's font (ns.QUEST_ITEM_FONTS' names)
 	ufOutline = -1,              -- ...outline: 0 none, 1 thin, 2 thick (-1: General's)
 	ufNameSize = 1,              -- ...times its usual size
@@ -286,6 +286,9 @@ local function DressName(text, view, unit)
 		r, g, b = UnitColor(unit)
 	elseif color == "white" then
 		r, g, b = 1, 1, 1
+	elseif color == "theme" then
+		local accent = ns.ThemeAccent()
+		if accent then r, g, b = accent[1], accent[2], accent[3] end
 	end
 	if r then
 		text:SetTextColor(r, g, b)
@@ -357,6 +360,37 @@ local function Parts(frame)
 		frame.portrait or frame.Portrait
 end
 
+-- The game's frame art, in the style theme's ornament color: one texture draws
+-- the portrait ring and the name box (the names as Frames.lua's Art lists them).
+-- Nothing's touched with no theme, and what was tinted goes back.
+local tinted = setmetatable({}, { __mode = "k" })
+local function FrameArt(frame)
+	local list = {}
+	local name = frame.GetName and frame:GetName()
+	local holder = frame.PlayerFrameContainer or frame.TargetFrameContainer
+	for _, art in ipairs({ holder and holder.FrameTexture or false, holder and holder.AlternatePowerFrameTexture or false,
+		holder and holder.VehicleFrameTexture or false, holder and holder.BossPortraitFrameTexture or false,
+		frame.FrameTexture or false, name and _G[name .. "Texture"] or false,
+		name and _G[name .. "TextureFrameTexture"] or false }) do
+		if art and art.SetVertexColor and art.SetDesaturated then list[#list + 1] = art end
+	end
+	return list
+end
+
+local function DressFrameArt(frame, active)
+	local color = active and ns.ThemeRing()
+	for _, art in ipairs(FrameArt(frame)) do
+		if not (art.IsForbidden and art:IsForbidden()) and (color or tinted[art]) then
+			-- (Its alpha as it is: left out, it'd be set to 1, undoing a frame's fade.)
+			local _, _, _, alpha = art:GetVertexColor()
+			if not Readable(alpha) then alpha = nil end
+			art:SetDesaturated(color and true or false)
+			art:SetVertexColor(color and color[1] or 1, color and color[2] or 1, color and color[3] or 1, alpha)
+			tinted[art] = color and true or nil
+		end
+	end
+end
+
 local hooked = setmetatable({}, { __mode = "k" })
 local Dress
 local HEALTH_GREEN = { 0, 0.8, 0 }
@@ -381,6 +415,7 @@ local function DressFrame(info)
 			DressBar(power, view, nil, nil, nil, PowerTint(unit))
 			DressName(text, view, unit)
 			DressPortrait(portrait, view, unit)
+			DressFrameArt(frame, active)
 			-- (The game sets these again as the unit changes: ours after it.)
 			if not hooked[frame] then
 				hooked[frame] = true
@@ -608,8 +643,12 @@ function ns.MakeUnitStylePreview(parent, width, onPick)
 				nr, ng, nb = SampleColor(sample)
 			elseif view.ufNameColor == "white" then
 				nr, ng, nb = 1, 1, 1
+			elseif view.ufNameColor == "theme" and ns.ThemeAccent() then
+				nr, ng, nb = unpack(ns.ThemeAccent())
 			end
 			unit.name:SetTextColor(nr, ng, nb)
+			local ring = ns.ThemeRing() or { 0.8, 0.65, 0.25 }
+			unit.ring:SetVertexColor(ring[1], ring[2], ring[3])
 			-- (The portrait: a class icon for a player with Class icon picked.)
 			local coords = view.ufPortrait == "class" and sample.class and _G.CLASS_ICON_TCOORDS
 				and _G.CLASS_ICON_TCOORDS[sample.class]
@@ -822,6 +861,7 @@ function ns.CreateUnitStylePanel(kit)
 				{ "game", L["The game's"] },
 				{ "class", L["Class or reaction"] },
 				{ "white", L["White"] },
+				{ "theme", L["The theme's"] },
 			}, Editable)
 		end,
 		outline = { "ufOutline", nil, names = { [0] = L["None"], L["Thin"], L["Thick"] }, test = Editable },

@@ -87,6 +87,7 @@ local function Theme(info)
 	local s = info.settings
 	for _, key in ipairs(SWITCHES) do s[key] = true end
 	s.rfOutline = 1 -- (white names on any class's color: pale ones lose them otherwise)
+	s.ufNameColor = "theme"
 	Bars(s, info.health, info.mana, info.back)
 	Panels(s, info.panel, info.panelAlpha)
 	Casts(s, info.cast, info.channel, info.locked, info.stop)
@@ -206,6 +207,14 @@ function ns.ThemePanel()
 	local p, e = theme.panel, theme.line
 	return { p[1], p[2], p[3], theme.panelAlpha or 1 }, { e[1], e[2], e[3], 1 }, theme.grain and ART .. theme.grain .. "Grain"
 end
+
+-- The theme's accent (a name's color) and ornament (the frames' rings): nil
+-- with no theme.
+function ns.ThemeAccent()
+	local menu = Active().menu
+	return menu and menu.accent
+end
+function ns.ThemeRing() return Active().ornament end
 
 -- Our menus' colors (Skin.lua's roles): nil for its own.
 function ns.MenuPalette() return Active().menu end
