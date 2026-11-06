@@ -72,33 +72,54 @@ end
 -- resurrect, or at your corpse or a spirit healer with the UI hidden (by our
 -- key or the game's), it comes back. (CineMode's fade still hides the rest:
 -- the death camera's included. The popups are never faded.)
-local resWatcher = CreateFrame("Frame")
-for _, event in ipairs({ "PLAYER_DEAD", "RESURRECT_REQUEST", "CORPSE_IN_RANGE", "CONFIRM_XP_LOSS" }) do
-	pcall(resWatcher.RegisterEvent, resWatcher, event) -- (each client that has them)
-end
-resWatcher:SetScript("OnEvent", function()
+-- (SetUIVisibility is blocked in a fight, from an addon: tested. So is
+-- UIParent. Here it waits for the fight to end.)
+local showAfterFight = false
+local function BringBack()
 	if UIParent:IsShown() then
+		showAfterFight = false
 		return
 	end
+	if InCombatLockdown() then
+		showAfterFight = true
+		return
+	end
+	showAfterFight = false
 	if SetUIVisibility then
 		SetUIVisibility(true)
-	elseif not InCombatLockdown() then
+	else
 		UIParent:Show()
 	end
 	if UIParent:IsShown() then
 		Restore()
 	end
+end
+ns.BringBackUI = BringBack
+
+local resWatcher = CreateFrame("Frame")
+for _, event in ipairs({ "PLAYER_DEAD", "RESURRECT_REQUEST", "CORPSE_IN_RANGE", "CONFIRM_XP_LOSS",
+	"PLAYER_REGEN_ENABLED" }) do
+	pcall(resWatcher.RegisterEvent, resWatcher, event) -- (each client that has them)
+end
+resWatcher:SetScript("OnEvent", function(_, event)
+	if event ~= "PLAYER_REGEN_ENABLED" or showAfterFight then
+		BringBack()
+	end
 end)
 
 function ns.ToggleUI()
+	if InCombatLockdown() then
+		ns.Print(L["can't hide or show the UI in a fight: the game's own key still can"])
+		return
+	end
 	local show = not UIParent:IsShown()
 	if not show then
 		Detach()
 	end
 	if SetUIVisibility then
-		-- What Blizzard's key uses: works in combat and hides nameplates too.
+		-- What Blizzard's key uses: hides nameplates too.
 		SetUIVisibility(show)
-	elseif not InCombatLockdown() then
+	else
 		UIParent:SetShown(show)
 	end
 	if UIParent:IsShown() then
@@ -130,8 +151,8 @@ local function ShotDone()
 		shotTimer = nil
 	end
 	-- (Unless something brought the UI back in the meantime: Blizzard's key.)
-	if shotHidUI and not UIParent:IsShown() then
-		ns.ToggleUI()
+	if shotHidUI then
+		BringBack()
 	end
 	shotHidUI = false
 end
@@ -146,7 +167,7 @@ function ns.TakeScreenshot()
 	if shotPending then
 		return
 	end
-	-- (UIParent can't be hidden in a fight.)
+	-- (The UI can't be hidden in a fight: see BringBack.)
 	if InCombatLockdown() then
 		ns.Print(L["can't take a CineShot in a fight: try again once it's over"])
 		return
@@ -160,5 +181,6 @@ function ns.TakeScreenshot()
 		ns.ToggleUI()
 	end
 	shotTimer = C_Timer.NewTimer(SHOT_TIMEOUT, ShotDone)
-	C_Timer.After(0, Screenshot)
+	-- (Called from a function of ours: the timer may turn the game's own down.)
+	C_Timer.After(0, function() Screenshot() end)
 end

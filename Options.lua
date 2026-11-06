@@ -13844,14 +13844,15 @@ end
 -- Sub-page: keybinds. The same bindings as Key Bindings > AddOns, with two
 -- key slots each like Blizzard's page. section: a header above that row.
 local KEYBINDS = {
-	{ action = "CINEMATIC_HIDEUI", label = L["Hide the UI"], section = L["General"],
+	{ action = "CINEMATIC_TOGGLE", label = L["Toggle CineMode"], section = L["General"],
+		tip = L["Turns CineMode on or off, leaving the rest of Cinematic running. Off lasts until you press " ..
+			"it again or reload."] },
+	{ action = "CINEMATIC_HIDEUI", label = L["Hide the UI"],
 		tip = L["Like Blizzard's Alt+Z: hides the whole UI, but keeps the tint, letterbox " ..
-			"and time-of-day title. Press again (or Blizzard's key) to bring it back."] },
+			"and time-of-day title. Press again (or Blizzard's key) to bring it back. Not in a fight."] },
 	{ action = "CINEMATIC_SCREENSHOT", label = L["Take a CineShot"],
 		tip = L["Hides the UI but keeps the tint and letterbox, takes a screenshot, then brings the UI " ..
 			"straight back. Not in a fight."] },
-	{ action = "CINEMATIC_TOGGLE", label = L["Toggle CineMode"],
-		tip = L["Turns CineMode on or off, like /cine."] },
 	{ action = "CINEMATIC_TOGGLEEFFECTS", label = L["Toggle visual effects"],
 		tip = L["Turns the visual effects on or off (their Enable Visual Effects switch): the letterbox, tint, " ..
 			"vignette, weather and the rest."] },
@@ -13866,9 +13867,9 @@ local KEYBINDS = {
 			"let go to open it, then click what you want on it. Tap it instead and the wheel stays up for you " ..
 			"to click one. The camera wheel can't open in a fight."] },
 	{ action = "CINEMATIC_CAMWHEEL", label = L["Camera wheel"],
-		tip = L["Hold to bring up a wheel of the cameras below, an icon for each: point at one and let go " ..
-			"to start it. Tap it instead and the wheel stays up for you to click one. Picking the camera " ..
-			"that's running stops it."] },
+		tip = L["Hold to bring up a wheel of the cameras on the Cameras tab, an icon " ..
+			"for each: point at one and let go to start it. Tap it instead and the wheel stays up for you to " ..
+			"click one. Picking the camera that's running stops it. It can't open in a fight."] },
 	{ action = "CLICK CinematicMenuWheelButton:LeftButton", label = L["Menu wheel"],
 		tip = L["Hold to bring up a wheel of the game's menu buttons (character, spellbook, quest log...), " ..
 			"the ones on your menu bar: point at one and let go to open its window, even with the UI hidden. " ..
@@ -13900,6 +13901,15 @@ local KEYBINDS = {
 		tip = L["Turns Roll Vision on or off."] },
 	{ action = "CINEMATIC_VISION_VITALS", label = L["Toggle Vitals Vision"],
 		tip = L["Turns Vitals Vision on or off (its Enable Page switch)."] },
+	{ action = "CINEMATIC_VISION_DAMAGE", label = L["Toggle Damage Vision"],
+		show = function() return C_DamageMeter ~= nil end,
+		tip = L["Turns Damage Vision on or off (its Enable Page switch)."] },
+	{ action = "CINEMATIC_VISION_TELE", label = L["Toggle Tele Vision"],
+		tip = L["Turns Tele Vision on or off (its Enable Page switch)."] },
+	{ action = "CINEMATIC_VISION_EMOTE", label = L["Toggle Emote Vision"],
+		tip = L["Turns Emote Vision on or off (its Enable Page switch)."] },
+	{ action = "CINEMATIC_VISION_CARD", label = L["Toggle Card Vision"],
+		tip = L["Turns Card Vision on or off (its Enable Page switch)."] },
 	{ action = "CINEMATIC_CAM_IDLE", label = L["AFK camera"], section = L["Cameras"],
 		tip = L["Starts the AFK camera now, without waiting out its delay. " ..
 			"Press again, move or jump to stop it."] },
@@ -13921,13 +13931,16 @@ local KEYBINDS = {
 	{ action = "CINEMATIC_CAM_DEATH", label = L["Death camera test"],
 		tip = L["Pretends you're dead for 30 seconds so the death camera runs. Press again to stop. " ..
 			"Like /cine deathtest."] },
+	{ action = "CINEMATIC_STOPCAM", label = L["Stop the camera"],
+		tip = L["Stops whichever of Cinematic's cameras is running now, however it started."] },
 }
--- Your own scenes' keys (a scene whose trigger is Custom camera trigger N).
+-- Your own scenes' keys (a trigger on the Triggers page set to Scene key N).
+-- (number: put in the label as the page is built, once it's translated.)
 for n = 1, 5 do
-	KEYBINDS[#KEYBINDS + 1] = { action = "CINEMATIC_CUSTOMTRIGGER" .. n, label = L["Custom camera trigger %d"]:format(n),
-		section = n == 1 and L["Your scenes"] or nil,
-		tip = L["Plays the scenes of yours whose trigger is this key: set a scene's trigger to it on the Scenes page. " ..
-			"Press again to stop it."] }
+	KEYBINDS[#KEYBINDS + 1] = { action = "CINEMATIC_CUSTOMTRIGGER" .. n, label = "Scene key %d", number = n,
+		section = n == 1 and L["Scene keys"] or nil,
+		tip = L["Plays your scenes that use this key: on the Triggers page make a Key binding trigger for it, " ..
+			"then pick that trigger for a scene on the Scenes page. Press again to stop it."] }
 end
 for _, each in ipairs({
 	{ action = "CINEMATIC_SHOWTOOLTIPS", label = L["Show hidden tooltips"], section = L["Tooltips"],
@@ -13937,7 +13950,7 @@ for _, each in ipairs({
 	{ action = "CINEMATIC_TOGGLETOOLTIPS", label = L["Toggle tooltip hiding"],
 		tip = L["Turns the Tooltips page on or off (its Enable Page switch)."] },
 }) do KEYBINDS[#KEYBINDS + 1] = each end
-if ns.ChatCamCommand then -- (ChatCam.lua, so here rather than in Bindings.xml)
+if ns.ChatCamCommand then -- (ChatCam.lua)
 	KEYBINDS[#KEYBINDS + 1] = { action = "CLICK CinematicChatTargetButton:LeftButton",
 		label = L["Target the last speaker"], section = L["Chat Cam"],
 		tip = L["Targets the last NPC who spoke near you (your character turns their head to them). " ..
@@ -14065,7 +14078,7 @@ local function CreateKeybindsPanel()
 
 	local subtitle = PageIntro(content, title,
 		L["Keys for Cinematic. These are the same bindings as under Key Bindings > AddOns, " ..
-		"so setting them in either place works."])
+		"so setting them in either place works. The keys for wheels you make are on the Wheels page."])
 
 	local previous, afterHeader = subtitle, false
 	for _, bind in ipairs(KEYBINDS) do
@@ -14075,7 +14088,7 @@ local function CreateKeybindsPanel()
 		end
 		-- (A key for something this client doesn't have: no row.)
 		if not bind.show or bind.show() then
-			local label = Label(content, "GameFontHighlight", bind.label)
+			local label = Label(content, "GameFontHighlight", bind.number and bind.label:format(bind.number) or bind.label)
 			label:SetPoint("TOPLEFT", previous, "BOTTOMLEFT", 0, afterHeader and -14 or -12)
 			label:SetWidth(200)
 			local first = CreateKeybindButton(content, bind.action, 1)
@@ -15543,7 +15556,7 @@ ns.OnLanguage(function()
 	end
 	ns.TranslateFields(FRAME_COLUMNS, 1, 5)
 	ns.TranslateFields(THIRD_PARTY_COLUMNS, 1) -- (the rest are FRAME_COLUMNS' own)
-	ns.TranslateFields(KEYBINDS, "label", "tip")
+	ns.TranslateFields(KEYBINDS, "label", "tip", "section")
 	for _, popup in ipairs({ "CINEMATIC_RESET_PAGE", "CINEMATIC_RESET_PART", "CINEMATIC_PROFILE_RENAME",
 		"CINEMATIC_PROFILE_NOTE", "CINEMATIC_PROFILE_DELETE", "CINEMATIC_PROFILE_RESET", "CINEMATIC_PROFILE_RESET_POINT",
 		"CINEMATIC_ADDON_RESET", "CINEMATIC_ADDON_RESET_ALL", "CINEMATIC_RESET_SECTION" }) do

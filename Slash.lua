@@ -660,8 +660,10 @@ local function HandleSlash(msg)
 		if GetTime() < (ns.deathTestUntil or 0) then
 			ns.deathTestUntil = 0
 			ns.Print("death camera test stopped")
+		elseif not ns.db.enabled then
+			ns.Print(L["Cinematic is off: turn it on first"])
 		elseif not ns.db.deathOrbit then
-			ns.Print("the death camera is off: turn it on with /cine death first")
+			ns.Print(L["the death camera is off: turn it on for Death on the Scenes page"])
 		else
 			local seconds = num or 30
 			ns.deathTestUntil, ns.deathTestLoud = GetTime() + seconds, true

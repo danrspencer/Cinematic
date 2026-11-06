@@ -1488,10 +1488,13 @@ end
 -- Targeting the last speaker (which turns your character's head to them).
 -- Addons can't target, or clear a target: TargetUnit and ClearTarget are
 -- protected, only a key press or click may. So a secure button whose
--- /targetexact names them, pressed by its key (Key Bindings page:
--- CLICK CinematicChatTargetButton:LeftButton, no Bindings.xml entry).
+-- /targetexact names them, pressed by its key (Bindings.xml:
+-- CLICK CinematicChatTargetButton:LeftButton).
 -- The name's set as each real line comes, out of fights (a secure button
 -- can't change in one).
+ns.OnLanguage(function()
+	_G["BINDING_NAME_CLICK CinematicChatTargetButton:LeftButton"] = "Cinematic: " .. ns.L["Target the last speaker"]
+end)
 local targetButton = CreateFrame("Button", "CinematicChatTargetButton", UIParent, "SecureActionButtonTemplate")
 targetButton:SetAttribute("type", "macro")
 targetButton:SetAttribute("macrotext", "")

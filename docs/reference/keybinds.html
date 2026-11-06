@@ -119,11 +119,12 @@ dl.faq dd { margin: 2px 0 0; color: var(--muted) }
     <div class="eyebrow">General</div>
     <h2>CineMode and the UI</h2>
     <dl class="rows">
-      <div class="row"><dt>Toggle CineMode</dt><dd>Turns CineMode on or off, like <code>/cine</code>.</dd></div>
-      <div class="row"><dt>Hide the UI (keep the look) <span class="muted">— Hide the UI</span></dt><dd>Like the game's Alt+Z: hides the whole UI, but keeps the tint, letterbox and time-of-day title. Made for screenshots. Press again (or the game's own key) to bring it back.</dd></div>
+      <div class="row"><dt>Toggle CineMode</dt><dd>Turns CineMode on or off, leaving the rest of Cinematic running. Off lasts until you press it again or reload.</dd></div>
+      <div class="row"><dt>Hide the UI (keep the look) <span class="muted">— Hide the UI</span></dt><dd>Like the game's Alt+Z: hides the whole UI, but keeps the tint, letterbox and time-of-day title. Made for screenshots. Press again (or the game's own key) to bring it back. Not in a fight.</dd></div>
       <div class="row"><dt>Take a CineShot</dt><dd>Hides the UI but keeps the tint and letterbox, takes a screenshot, then brings the UI straight back, all in one press. With the UI already hidden, it stays hidden. Not in a fight.</dd></div>
       <div class="row"><dt>Toggle visual effects</dt><dd>Turns the visual effects on or off (their <b>Enable Visual Effects</b> switch): the letterbox, tint, vignette, weather and the rest.</dd></div>
       <div class="row"><dt>Toggle letterbox bars</dt><dd>Brings the letterbox bars in, or takes them out, in or out of CineMode. Turning CineMode on or off puts them back as the Letterbox settings say.</dd></div>
+      <div class="row"><dt>Reload the UI</dt><dd>Reloads the UI, like <code>/reload</code>. With <b>Keep windows open across a reload</b> ticked (Quality of life › General), what you had open opens again after.</dd></div>
     </dl>
   </section>
 
@@ -152,6 +153,10 @@ dl.faq dd { margin: 2px 0 0; color: var(--muted) }
       <div class="row"><dt>Toggle Duel Vision</dt><dd>Turns Duel Vision on or off.</dd></div>
       <div class="row"><dt>Toggle Roll Vision</dt><dd>Turns Roll Vision on or off. Only on game versions that keep a loot history.</dd></div>
       <div class="row"><dt>Toggle Vitals Vision</dt><dd>Turns Vitals Vision on or off (its Enable Page switch).</dd></div>
+      <div class="row"><dt>Toggle Damage Vision</dt><dd>Turns Damage Vision on or off (its Enable Page switch). Only on game versions with the damage meter.</dd></div>
+      <div class="row"><dt>Toggle Tele Vision</dt><dd>Turns Tele Vision on or off (its Enable Page switch).</dd></div>
+      <div class="row"><dt>Toggle Emote Vision</dt><dd>Turns Emote Vision on or off (its Enable Page switch).</dd></div>
+      <div class="row"><dt>Toggle Card Vision</dt><dd>Turns Card Vision on or off (its Enable Page switch).</dd></div>
     </dl>
     <p class="muted">What each vision does is in the <a href="../guides/visions.html">Visions guide</a>.</p>
   </section>
@@ -167,9 +172,20 @@ dl.faq dd { margin: 2px 0 0; color: var(--muted) }
       <div class="row"><dt>Start the fish camera <span class="muted">— Fish camera</span></dt><dd>Starts the fish camera now, without casting.</dd></div>
       <div class="row"><dt>Start the tele camera <span class="muted">— Tele camera</span></dt><dd>Starts the tele camera now, as if you were casting your Hearthstone.</dd></div>
       <div class="row"><dt>Test the death camera <span class="muted">— Death camera test</span></dt><dd>Pretends you're dead for 30 seconds so the death camera runs. Press again to stop. The death camera has to be turned on.</dd></div>
-      <div class="row"><dt>Custom camera trigger 1 to 5</dt><dd>Starts the scenes with a trigger set to that key (Scenes page, a scene's Triggers: Key binding). Press again to stop. Set them here in Key Bindings; on their own they do nothing.</dd></div>
+      <div class="row"><dt>Start the RP walk camera <span class="muted">— RP walk camera</span></dt><dd>Starts the RP walk camera now, walking or not. Press again to stop it; its stop rules say what else does.</dd></div>
+      <div class="row"><dt>Start the auto-run camera <span class="muted">— Auto-run camera</span></dt><dd>Starts the auto-run camera now, running or not. Press again to stop it; its stop rules say what else does.</dd></div>
+      <div class="row"><dt>Stop the camera</dt><dd>Stops whichever of Cinematic's cameras is running now, however it started.</dd></div>
+      <div class="row"><dt>Scene key 1 to 5</dt><dd>Plays your scenes that use this key: on the Triggers page make a Key binding trigger for it, then pick that trigger for a scene on the Scenes page. Press again to stop it. With no scene using it, the key just says so.</dd></div>
     </dl>
     <p class="muted">More in <a href="../guides/cameras.html">The cameras</a>.</p>
+  </section>
+
+  <section id="chatcam">
+    <div class="eyebrow">Chat Cam</div>
+    <h2>Talking to NPCs</h2>
+    <dl class="rows">
+      <div class="row"><dt>Target the last speaker</dt><dd>Targets the last NPC who spoke near you (your character turns their head to them). Addons can't target on their own: the game only lets a key press do it. Out of fights.</dd></div>
+    </dl>
   </section>
 
   <section id="tooltips">

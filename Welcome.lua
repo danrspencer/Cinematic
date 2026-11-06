@@ -49,17 +49,6 @@ local VISION_LINES = {
 }
 -- (Visions the vision wheel doesn't have, ticked here as the wheel's are:
 -- their setting on or off. The profiles turn them on: ProfileChoices.lua.)
-local MORE_VISIONS = {
-	{ key = "tele", setting = "teleportVision", label = "Tele Vision",
-		icon = "Interface\\Icons\\Spell_Arcane_TeleportStormWind" },
-	{ key = "emote", setting = "emoteVision", label = "Emote Vision",
-		icon = "Interface\\Icons\\Spell_Holy_PrayerOfFortitude" },
-	{ key = "damage", setting = "damageVision", label = "Damage Vision",
-		icon = "Interface\\Icons\\Ability_Warrior_Rampage",
-		Apply = function() if ns.RefreshDamageVision then ns.RefreshDamageVision() end end,
-		-- (Only in a game with the damage meter it reads.)
-		available = function() return C_DamageMeter ~= nil end },
-}
 -- (A slot with no choices on this client isn't listed: Layout on retail.)
 for _, slot in ipairs({ "frames", "bars", "layout", "camera", "vfx", "visions", "chat", "sound" }) do
 	if slot == "visions" then
@@ -665,12 +654,10 @@ function ns.CustomizePanel(parent, width, onChange, skinned)
 		if shown.visions then
 			-- (each a row that's ticked on or off, its icon as the vision wheel has it)
 			choices = {}
-			for _, list in ipairs({ ns.VISION_LIST or {}, MORE_VISIONS }) do
-				for _, vision in ipairs(list) do
-					if not vision.available or vision.available() then
-						choices[#choices + 1] = { vision = vision, label = L[vision.label], icon = vision.icon,
-							line = VISION_LINES[vision.key] }
-					end
+			for _, vision in ipairs(ns.VISION_LIST or {}) do
+				if not vision.notWelcome then
+					choices[#choices + 1] = { vision = vision, label = L[vision.label], icon = vision.icon,
+						line = VISION_LINES[vision.key] }
 				end
 			end
 		elseif #choices > 0 then

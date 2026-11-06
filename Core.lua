@@ -34,7 +34,7 @@ local function SetBindingNames()
 	BINDING_NAME_CINEMATIC_CAM_DEATH = "Cinematic: " .. L["Test the death camera"]
 	BINDING_NAME_CINEMATIC_STOPCAM = "Cinematic: " .. L["Stop the camera"]
 	for n = 1, 5 do
-		_G["BINDING_NAME_CINEMATIC_CUSTOMTRIGGER" .. n] = "Cinematic: " .. (L["Custom camera trigger %d"]):format(n)
+		_G["BINDING_NAME_CINEMATIC_CUSTOMTRIGGER" .. n] = "Cinematic: " .. (L["Scene key %d"]):format(n)
 	end
 	BINDING_NAME_CINEMATIC_SHOWTOOLTIPS = "Cinematic: " .. L["Show hidden tooltips (hold)"]
 	BINDING_NAME_CINEMATIC_TOGGLETOOLTIPS = "Cinematic: " .. L["Toggle tooltip hiding"]
@@ -3269,7 +3269,7 @@ local function RestoreEverything()
 	end
 	Try(GameTooltip.SetAlpha, GameTooltip, 1)
 	if not UIParent:IsShown() then
-		Try(ns.ToggleUI) -- hidden with the Hide the UI key
+		Try(ns.BringBackUI) -- hidden with the Hide the UI key (in a fight: once it ends)
 	end
 	-- Anything still held (a game setting the parts above didn't cover).
 	Try(RestoreSavedCVars)
@@ -3332,6 +3332,7 @@ function ns.SetEnabled(enabled)
 	lastBusy = GetTime()
 	quickStart = enabled
 	if enabled then
+		snoozeUntil = 0 -- (the Toggle CineMode key's pause: turned on means on)
 		-- Starting at once covers turning it on too: straight in, as at login.
 		startSnapUntil = GetTime() + START_SNAP_WINDOW
 		snapRound = snapRound + 1
@@ -3366,6 +3367,32 @@ function Cinematic_Toggle()
 	end
 end
 
+-- The Toggle CineMode key: CineMode alone, the rest of Cinematic (cameras,
+-- styling) carrying on. Off is a snooze with no end (the minimap button's
+-- tooltip says Paused), till the key again or a reload; on comes in at once,
+-- as turning Cinematic on does.
+function Cinematic_ToggleCineMode()
+	if not ns.ProfileChosen() then
+		ns.ShowWelcome()
+		return
+	end
+	if not ns.db.enabled then
+		ns.Print(L["Cinematic is off (/cine turns it on)"])
+		return
+	end
+	if ns.GetSnoozeLeft() then
+		ns.Unsnooze()
+		quickStart = true
+		startSnapUntil = GetTime() + START_SNAP_WINDOW
+		snapRound = snapRound + 1
+		ns.Print(L["CineMode on"])
+	else
+		ns.Snooze(math.huge)
+		ns.Print(L["CineMode off"])
+	end
+	if ns.UpdateMinimapButton then ns.UpdateMinimapButton() end
+end
+
 function Cinematic_FlyBy()
 	local _, message = ns.ToggleFlyBy()
 	if message then
@@ -3391,8 +3418,10 @@ function Cinematic_StartCam(camera, quiet, via)
 			ns.deathTestUntil = 0
 			ns.StandUpFromDeathTest()
 			Print(L["death camera test stopped"])
+		elseif not ns.db.enabled then
+			Print(L["Cinematic is off: turn it on first"])
 		elseif not ns.db.deathOrbit then
-			Print(L["the death camera is off: turn it on with /cine death first"])
+			Print(L["the death camera is off: turn it on for Death on the Scenes page"])
 		elseif ns.playerMoving then
 			-- (Moving ends the test, like the other cameras.)
 			Print(L["stand still to start the %s"]:format(L["death camera"]))
@@ -3448,7 +3477,7 @@ function Cinematic_StartCam(camera, quiet, via)
 		return
 	end
 	if camera == "idle" and not ns.db.idleOrbit then
-		Print(L["the AFK camera's rotation is off in Camera Settings"])
+		Print(L["the AFK camera's rotation is off: see its Scripts page"])
 		return
 	end
 	ns.manualCam, ns.manualCamVia = manual, via or "key binding"
@@ -3675,7 +3704,7 @@ ns.Unsnooze = function()
 	lastBusy = GetTime()
 	quickStart = false
 end
--- Seconds left on a snooze (math.huge until logout), or nil if not snoozed.
+-- Seconds left on a snooze (math.huge until a reload), or nil if not snoozed.
 ns.GetSnoozeLeft = function()
 	local left = snoozeUntil - GetTime()
 	return left > 0 and left or nil

@@ -802,7 +802,7 @@ function ns.CreateTriggerSettingsPanel(kit)
 	local pickLine = Line(L["Which"], function() return Mine() and FIXED[Kind()] ~= nil end)
 	local pick = Menu(pickLine, 240, function() return FIXED[Kind()] or {} end, function() return select(2, Src(Id())) end,
 		function(value) Set("src", Kind() .. ":" .. value) end)
-	kit.Tooltip(pick, L["Which one. Key bindings are set in the game's Key Bindings, under Cinematic."])
+	kit.Tooltip(pick, L["Which one. Set its key on Cinematic's Keybinds page or in the game's Key Bindings."])
 	local atLine = Line(L["When"], function() return Mine() and ns.TRIGGER_PHASES[Kind()] ~= nil end)
 	Menu(atLine, 200, function() return ns.TRIGGER_PHASES[Kind()] or {} end, function()
 		local list = ns.TRIGGER_PHASES[Kind()]

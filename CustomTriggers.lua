@@ -62,14 +62,14 @@ ns.CUSTOM_TRIGGER_INTERACTIONS = {
 }
 ns.CUSTOM_TRIGGER_KEYS = {}
 for n = 1, 5 do
-	ns.CUSTOM_TRIGGER_KEYS[n] = { value = tostring(n), text = (L["Custom camera trigger %d"]):format(n) }
+	ns.CUSTOM_TRIGGER_KEYS[n] = { value = tostring(n), text = (L["Scene key %d"]):format(n) }
 end
 ns.OnLanguage(function()
 	for _, list in ipairs({ ns.CUSTOM_TRIGGER_KINDS, ns.CUSTOM_TRIGGER_MOMENTS, ns.CUSTOM_TRIGGER_STATES,
 		ns.CUSTOM_TRIGGER_INTERACTIONS }) do
 		ns.TranslateFields(list, "text")
 	end
-	for n, each in ipairs(ns.CUSTOM_TRIGGER_KEYS) do each.text = (L["Custom camera trigger %d"]):format(n) end
+	for n, each in ipairs(ns.CUSTOM_TRIGGER_KEYS) do each.text = (L["Scene key %d"]):format(n) end
 end)
 local function ChoiceText(list, value)
 	for _, each in ipairs(list) do
@@ -446,7 +446,7 @@ function ns.CustomTravelScene()
 		if unit.on and Travels(unit) then return unit.scene end
 	end
 end
--- A scene you started with its key (Custom camera trigger N) that's on now,
+-- A scene you started with its key (Scene key N) that's on now,
 -- or nil: a camera script asks first (CameraScripts.lua's TriggerNow), so it
 -- plays with a window open or you walking, as the key says to.
 function ns.CustomKeyScene()
@@ -796,7 +796,7 @@ function ns.DescribeTriggerSource(source)
 	elseif kind == "interact" then
 		return ChoiceText(ns.CUSTOM_TRIGGER_INTERACTIONS, what) or what
 	elseif kind == "key" then
-		return (L["Custom camera trigger %d"]):format(tonumber(what) or 1)
+		return (L["Scene key %d"]):format(tonumber(what) or 1)
 	end
 	return tostring(source or "?")
 end
@@ -818,18 +818,23 @@ function ns.CustomCastCounts()
 	return false
 end
 
--- The key bindings (Cinematic custom trigger 1-5): start the triggers set
--- to that key, or stop them if they're on.
+-- The key bindings (Scene key 1-5): start the triggers set to that key, or
+-- stop them if they're on. No scene on it: says so, or the key seems broken.
 function Cinematic_CustomTrigger(n)
 	local what = tostring(n)
+	local used = false
 	for _, unit in ipairs(units) do
 		if unit.kind == "key" and unit.what == what then
+			used = true
 			if unit.on then
 				Stop(unit, L["Its key was pressed again"])
 			else
 				TryStart(unit, GetTime())
 			end
 		end
+	end
+	if not used then
+		ns.Print(L["no scene uses %s yet: give it a trigger on the Triggers page"]:format(L["Scene key %d"]:format(n)))
 	end
 end
 

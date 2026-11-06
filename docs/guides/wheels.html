@@ -153,7 +153,7 @@ dl.faq dd { margin: 2px 0 0; color: var(--muted) }
     <h2>What each one holds</h2>
     <div class="opts">
       <div class="opt" id="master"><span class="l">Master wheel</span><span class="d">One icon for each of the other wheels: point at one and let go to open it, then click what you want on it. One key for all of them. Choose which wheels sit on it, and in what order, on its page (<b>Wheels on it</b>, with <b>Usual order</b> to start over).</span></div>
-      <div class="opt" id="camera"><span class="l">Camera wheel</span><span class="d">The cameras you can start by hand: AFK, Cozy, Vista, Fish, Tele and the Death camera. Picking the camera that's running stops it. It can't open in a fight.</span></div>
+      <div class="opt" id="camera"><span class="l">Camera wheel</span><span class="d">The cameras you can start by hand: AFK, Cozy, Vista, Fish, Tele, RP walk, Auto-run and the Death camera. Picking the camera that's running stops it. It can't open in a fight.</span></div>
       <div class="opt" id="menu"><span class="l">Menu wheel</span><span class="d">The game's menu buttons, the ones your menu bar has on your game version, in its order: character, spellbook, talents, quest log and the rest. Opens their windows even with the UI hidden, in a fight too. Picking a window that's open closes it.</span></div>
       <div class="opt" id="marker"><span class="l">Marker wheel</span><span class="d">The raid target markers (skull, cross, square...) for your target, or with none, whatever the cursor is on. <b>None</b> takes theirs off. In a fight it always marks your target.</span></div>
       <div class="opt" id="ground"><span class="l">Ground marker wheel</span><span class="d">The colored lights you drop on the floor: it drops under the cursor where you let go. Picking one that's already down moves it; <b>Clear all</b> takes them all up. Only in a group, on game versions with ground markers.</span></div>
@@ -209,7 +209,8 @@ dl.faq dd { margin: 2px 0 0; color: var(--muted) }
     { key: "camera", name: "Camera wheel", foot: "Picking the camera that's running stops it.", pick: "Starts the %s", toggle: true,
       on: "running: pick it to stop it",
       slots: [{ n: "AFK camera", g: "z", c: "#9fb6ff" }, { n: "Cozy camera", g: "♨", c: "#ff9a4a" }, { n: "Vista camera", g: "⛰", c: "#cfe0a0" },
-        { n: "Fish camera", g: "≈", c: "#7fd0ff" }, { n: "Tele camera", g: "✧", c: "#b98cff" }, { n: "Death camera", g: "✝", c: "#c8c8c8" }] },
+        { n: "Fish camera", g: "≈", c: "#7fd0ff" }, { n: "Tele camera", g: "✧", c: "#b98cff" },
+        { n: "RP walk camera", g: "⚘", c: "#e0c090" }, { n: "Auto-run camera", g: "»", c: "#ffd27a" }, { n: "Death camera", g: "✝", c: "#c8c8c8" }] },
     { key: "menu", name: "Menu wheel", foot: "An example: yours has the buttons on your own menu bar.", pick: "Opens %s", toggle: true,
       on: "open: pick it to close it",
       slots: [{ n: "Character", g: "☺", c: "#e8d3a2" }, { n: "Spellbook", g: "✦", c: "#ffd27a" }, { n: "Talents", g: "❖", c: "#9fd59f" },

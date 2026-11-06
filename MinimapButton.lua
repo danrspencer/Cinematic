@@ -167,7 +167,7 @@ end
 
 local function FormatTime(seconds)
 	if seconds == math.huge then
-		return L["until logout"]
+		return L["until reload"]
 	end
 	return (L["%d:%02d left"]):format(math.floor(seconds / 60), math.floor(seconds % 60))
 end

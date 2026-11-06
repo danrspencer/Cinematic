@@ -798,6 +798,24 @@ VISIONS[#VISIONS + 1] = { key = "vitals", setting = "lowHealth", label = "Vitals
 	Apply = function()
 		if ns.RefreshLowHealth then ns.RefreshLowHealth() end
 	end }
+-- (Only in a game with the damage meter it reads.)
+if C_DamageMeter then
+	VISIONS[#VISIONS + 1] = { key = "damage", setting = "damageVision", label = "Damage Vision",
+		icon = "Interface\\Icons\\Ability_Warrior_Rampage", trim = true, color = { 1, 0.5, 0.2 },
+		Apply = function()
+			if ns.RefreshDamageVision then ns.RefreshDamageVision() end
+		end }
+end
+VISIONS[#VISIONS + 1] = { key = "tele", setting = "teleportVision", label = "Tele Vision",
+	icon = "Interface\\Icons\\Spell_Arcane_TeleportStormWind", trim = true, color = { 0.6, 0.45, 1 } }
+VISIONS[#VISIONS + 1] = { key = "emote", setting = "emoteVision", label = "Emote Vision",
+	icon = "Interface\\Icons\\Spell_Holy_PrayerOfFortitude", trim = true, color = { 1, 0.65, 0.8 },
+	Apply = function()
+		if ns.RefreshEmoteVision then ns.RefreshEmoteVision() end
+	end }
+-- (notWelcome: not one of the welcome window's rows.)
+VISIONS[#VISIONS + 1] = { key = "card", setting = "cards", label = "Card Vision", notWelcome = true,
+	icon = "Interface\\Icons\\INV_Misc_Book_09", trim = true, color = { 0.9, 0.8, 0.55 } }
 local visionByKey = {}
 for _, vision in ipairs(VISIONS) do
 	visionByKey[vision.key] = vision
@@ -832,11 +850,11 @@ end
 -- (The welcome window's Visions page ticks them too: Welcome.lua.)
 ns.VISION_LIST, ns.VisionOn, ns.ToggleVision = VISIONS, VisionOn, ToggleVision
 
--- The Toggle Heal Vision (Quest, Duel, Roll) keybinds (Bindings.xml).
+-- The Toggle Heal Vision (Quest, Duel...) keybinds (Bindings.xml).
 function Cinematic_ToggleVision(key)
 	local vision = visionByKey[key]
 	if not vision then
-		ns.Print(L["this game has no Roll Vision"])
+		ns.Print(L["this game doesn't have that vision"])
 		return
 	end
 	ToggleVision(vision)
@@ -848,6 +866,10 @@ local function SetVisionBindingNames()
 	BINDING_NAME_CINEMATIC_VISION_DUEL = "Cinematic: " .. L["Toggle Duel Vision"]
 	BINDING_NAME_CINEMATIC_VISION_ROLL = "Cinematic: " .. L["Toggle Roll Vision"]
 	BINDING_NAME_CINEMATIC_VISION_VITALS = "Cinematic: " .. L["Toggle Vitals Vision"]
+	BINDING_NAME_CINEMATIC_VISION_DAMAGE = "Cinematic: " .. L["Toggle Damage Vision"]
+	BINDING_NAME_CINEMATIC_VISION_TELE = "Cinematic: " .. L["Toggle Tele Vision"]
+	BINDING_NAME_CINEMATIC_VISION_EMOTE = "Cinematic: " .. L["Toggle Emote Vision"]
+	BINDING_NAME_CINEMATIC_VISION_CARD = "Cinematic: " .. L["Toggle Card Vision"]
 end
 SetVisionBindingNames()
 ns.OnLanguage(SetVisionBindingNames)

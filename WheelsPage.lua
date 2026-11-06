@@ -77,7 +77,7 @@ local WHEELS = {
 		Entries = function()
 			local list = {}
 			for _, camera in ipairs(ns.CAMERA_WHEEL_LIST or {}) do
-				list[#list + 1] = { label = L[camera.label], icon = camera.icon, trim = true }
+				list[#list + 1] = { label = L[camera.label], icon = ns.CameraWheelIcon(camera), trim = true }
 			end
 			return list
 		end },

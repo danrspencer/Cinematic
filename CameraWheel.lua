@@ -1,6 +1,6 @@
 -- Cinematic: the camera wheel. Holding its key brings up a ring of icons
 -- round the cursor, one for each camera its own key starts (the
--- standing-still ones and the death camera test): point the cursor at one
+-- standing-still ones, RP walk, auto-run and the death camera test): point the cursor at one
 -- and let go to start it. Tapping the key instead leaves the wheel up to
 -- click one; clicking the middle, Escape or the key again puts it away.
 -- Picking the camera that's running stops it (like pressing its key again).
@@ -13,9 +13,19 @@ local CAMERAS = {
 	{ key = "vista", manual = "vista", label = "Vista camera", icon = "Interface\\Icons\\INV_Misc_Spyglass_03" },
 	{ key = "fish", manual = "fish", label = "Fish camera", icon = "Interface\\Icons\\Trade_Fishing" },
 	{ key = "tele", manual = "tele", label = "Tele camera", icon = "Interface\\Icons\\INV_Misc_Rune_01" },
+	-- (moving: its key plays its script, walking or not.)
+	{ key = "walk", moving = true, label = "RP walk camera", icon = "Interface\\Icons\\INV_Boots_01" },
+	{ key = "run", moving = true, label = "Auto-run camera", icon = "Interface\\Icons\\Ability_Rogue_Sprint" },
 	{ key = "death", label = "Death camera", icon = "Interface\\Icons\\Ability_Rogue_FeignDeath" },
 }
 ns.CAMERA_WHEEL_LIST = CAMERAS -- (the Wheels page's preview)
+
+-- The icon its script has now, as the Scripts page shows it (the player can
+-- change it); the list's is for before the scripts are there.
+function ns.CameraWheelIcon(camera)
+	local script = ns.FindCameraScript and ns.FindCameraScript(camera.key == "idle" and "afk" or camera.key)
+	return script and ns.CameraIcon and ns.CameraIcon(script) or camera.icon
+end
 local MASK = "Interface\\AddOns\\" .. ADDON_NAME .. "\\Textures\\RoundIcon" -- soft rounded corners
 local CIRCLE = "Interface\\CHARACTERFRAME\\TempPortraitAlphaMask" -- (a round mask every client has)
 local RADIUS = 110     -- from the middle to each icon's centre (UI units)
@@ -49,6 +59,10 @@ local function IsRunning(camera)
 	if camera.key == "death" then
 		return GetTime() < (ns.deathTestUntil or 0)
 	end
+	if camera.moving then
+		local playing = ns.PlayingCameraScript and ns.PlayingCameraScript()
+		return playing ~= nil and playing.id == camera.key
+	end
 	return ns.manualCam == camera.manual
 end
 
@@ -58,7 +72,10 @@ local function CanStart(camera)
 		return false
 	end
 	if camera.key == "death" then
-		return db.deathOrbit and not ns.playerMoving
+		return db.enabled and db.deathOrbit and not ns.playerMoving
+	end
+	if camera.moving then
+		return db.enabled and true or false
 	end
 	if not db.enabled or ns.playerMoving or ns.Flag(ns.OnTaxi()) then
 		return false
@@ -130,6 +147,7 @@ local function Choose(index)
 end
 
 local function Open()
+	for i, camera in ipairs(CAMERAS) do slots[i].icon:SetTexture(ns.CameraWheelIcon(camera)) end
 	-- (One wheel at a time. It only opens out of a fight, so ours may hide
 	-- the secure ones.)
 	for _, other in ipairs({ CinematicMenuWheel, CinematicMarkerWheel, CinematicMasterWheel, CinematicVisionWheel,
@@ -215,6 +233,7 @@ function Cinematic_CameraWheel(keystate)
 			return
 		end
 		if InCombatLockdown() or ns.Flag(UnitAffectingCombat("player")) then
+			ns.Print(L["the camera wheel can't open in a fight"])
 			return
 		end
 		Open()
