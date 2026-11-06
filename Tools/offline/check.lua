@@ -40,6 +40,28 @@ if arg[1] and not update then
 		-- (The minimap button compares the stand-in's numbers: not the addon's.)
 		if not warning:find("^PLAYER_LOGIN: MinimapButton") then print("problem\t" .. warning) end
 	end
+	-- The game's /follow moves you with no key held: moving by hand, not auto-run.
+	do
+		local function Problem(text) print("problem\t/follow: " .. text) end
+		local kept = {}
+		for name, value in pairs({ IsMouseButtonDown = false, UnitOnTaxi = false, IsFlying = false, GetUnitSpeed = 7 }) do
+			kept[name], _G[name] = rawget(_G, name), function() return value end
+		end
+		ns.playerMoving, ns.movingSince, ns.autoRunning = true, -5, false
+		if not ns.IsAutoRunning() then Problem("hands-free moving isn't auto-run without it") end
+		ns.autoRunning = false
+		wow.Fire("AUTOFOLLOW_BEGIN", "Someone")
+		if ns.IsAutoRunning() then Problem("counted as auto-run") end
+		if ns.autoRunning then Problem("auto-run inferred") end
+		if not ns.MovingManually() then Problem("not moving by hand") end
+		wow.Fire("AUTOFOLLOW_END")
+		if ns.MovingManually() or not ns.IsAutoRunning() then Problem("still on after it ended") end
+		wow.Fire("AUTOFOLLOW_BEGIN", "Someone")
+		wow.Fire("PLAYER_ENTERING_WORLD")
+		if ns.autoFollowing then Problem("still on after a loading screen") end
+		ns.playerMoving, ns.movingSince, ns.autoRunning = false, nil, false
+		for _, name in ipairs({ "IsMouseButtonDown", "UnitOnTaxi", "IsFlying", "GetUnitSpeed" }) do _G[name] = kept[name] end
+	end
 	-- A new player (load.lua: a fresh install): every page off until a profile's
 	-- picked (Profiles.lua), then the profile's own. (The rest: as after a pick.)
 	do

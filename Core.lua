@@ -6684,12 +6684,26 @@ ticker:SetScript("OnEvent", ns.Profiled("Core events", function(self, event, arg
 		ns.autoRunning = false
 		-- Also worked out from what you're doing, for when the key was missed
 		-- (say, a /reload mid-auto-run): moving for a moment with no movement key
-		-- held and not steering with both mouse buttons can only be auto-run.
+		-- held and not steering with both mouse buttons is auto-run, unless
+		-- you're on the game's /follow.
 		local movementKeys = {}
+		-- /follow counts as moving by hand: you move hands-free, but the game
+		-- keeps turning you and stops whenever they do, which the travel cameras
+		-- would take for your own turns and for auto-run ending and starting.
+		do
+			local followWatcher = CreateFrame("Frame")
+			for _, name in ipairs({ "AUTOFOLLOW_BEGIN", "AUTOFOLLOW_END", "PLAYER_ENTERING_WORLD" }) do
+				pcall(followWatcher.RegisterEvent, followWatcher, name)
+			end
+			followWatcher:SetScript("OnEvent", function(_, name)
+				ns.autoFollowing = name == "AUTOFOLLOW_BEGIN"
+			end)
+		end
 		-- Strafing doesn't end an auto-run (you drift sideways and carry on),
 		-- so once auto-run is on, the strafe keys don't count as moving by hand.
 		local STRAFE = { StrafeLeft = true, StrafeRight = true }
 		local function AnyMovementKey()
+			if ns.autoFollowing then return true end
 			for key, held in pairs(movementKeys) do
 				if held and not (ns.autoRunning and STRAFE[key]) then return true end
 			end
@@ -6709,6 +6723,7 @@ ticker:SetScript("OnEvent", ns.Profiled("Core events", function(self, event, arg
 		-- (In words, for /cine debug mode: what counts as moving by hand now.)
 		function ns.HeldMovementWhat()
 			local held = {}
+			if ns.autoFollowing then held[#held + 1] = "/follow" end
 			for key, down in pairs(movementKeys) do
 				if down and not (ns.autoRunning and STRAFE[key]) then held[#held + 1] = key end
 			end
