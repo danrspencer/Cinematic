@@ -1326,14 +1326,16 @@ end
 -- of target go as the target's section says until their "Same as target" is
 -- unticked. All shown to start with, as the game has them. The hit text only
 -- on your and your pet's portraits, the strip behind the name only on the
--- target's and focus's frames (UNIT_PART_ONLY). (The cast bar: the
+-- target's and focus's frames, the ring behind the level on yours, the target's
+-- and the focus's (UNIT_PART_ONLY). (The cast bar: the
 -- target's and focus's only, the frames that have one.)
 ns.UNIT_PART_FRAMES = { "Player", "Pet", "Target", "ToT", "Focus", "FocusToT" }
-ns.UNIT_PARTS = { "Portrait", "Name", "NameBack", "Level", "Health", "Power", "Numbers", "Art", "PvP", "Icons", "Auras", "CombatText",
+ns.UNIT_PARTS = { "Portrait", "Name", "NameBack", "Level", "LevelBack", "Health", "Power", "Numbers", "Art", "PvP", "Icons", "Auras", "CombatText",
 	"Threat", "CastBar" }
 ns.UNIT_PART_ONLY = {
 	CombatText = { Player = true, Pet = true },
 	NameBack = { Target = true, Focus = true },
+	LevelBack = { Player = true, Target = true, Focus = true },
 }
 for _, part in ipairs(ns.UNIT_PARTS) do
 	local only = ns.UNIT_PART_ONLY[part]

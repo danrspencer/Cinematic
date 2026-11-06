@@ -10267,6 +10267,8 @@ do
 	local PLAYER = {
 		Portrait = { "PlayerFrameContainer.PlayerPortrait", "_G.PlayerPortrait" },
 		Level = { "PlayerFrameContent.PlayerFrameContentMain.LevelBackgroundCircle", "_G.PlayerLevelText" },
+		-- (The ring behind the number alone, or with it by the Level row.)
+		LevelBack = { "PlayerFrameContent.PlayerFrameContentMain.LevelBackgroundCircle" },
 		Name = { "_G.PlayerName" },
 		-- The health and power bars (the containers retail and WoW Forever
 		-- hold them in; healthbar and manabar: the keys the game keeps them on,
@@ -10348,6 +10350,7 @@ do
 			"TargetFrameContent.TargetFrameContentMain.LevelText",
 			"TargetFrameContent.TargetFrameContentContextual.HighLevelTexture",
 			"@TextureFrameLevelText", "@TextureFrameHighLevelTexture" },
+		LevelBack = { "TargetFrameContent.TargetFrameContentMain.LevelBackgroundCircle" },
 		-- (The coloured strip behind it with it, or alone by its own row.)
 		Name = { "TargetFrameContent.TargetFrameContentMain.Name",
 			"TargetFrameContent.TargetFrameContentMain.ReputationColor",
@@ -10481,6 +10484,11 @@ do
 			return value
 		end
 	end
+
+	-- (A client whose level has no ring of its own, the badge being in the frame
+	-- art, gets no Level background row.)
+	if not Field(_G.PlayerFrame, PLAYER.LevelBack[1]) then PLAYER.LevelBack = nil end
+	if not Field(_G.TargetFrame, TARGET.LevelBack[1]) then TARGET.LevelBack = nil end
 
 	local function Ask(fn, ...)
 		local ok, value = pcall(fn, ...)
