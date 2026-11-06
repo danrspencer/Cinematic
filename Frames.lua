@@ -10340,10 +10340,11 @@ do
 			"TargetFrameContent.TargetFrameContentMain.LevelText",
 			"TargetFrameContent.TargetFrameContentContextual.HighLevelTexture",
 			"@TextureFrameLevelText", "@TextureFrameHighLevelTexture" },
-		-- (The coloured strip behind it with it.)
+		-- (The coloured strip behind it with it, or alone by its own row.)
 		Name = { "TargetFrameContent.TargetFrameContentMain.Name",
 			"TargetFrameContent.TargetFrameContentMain.ReputationColor",
 			"@TextureFrameName", "@NameBackground" },
+		NameBack = { "TargetFrameContent.TargetFrameContentMain.ReputationColor", "@NameBackground" },
 		-- (Older frames' "Dead" label over the bar with it: retail keeps its
 		-- own inside HealthBarsContainer.)
 		Health = { "TargetFrameContent.TargetFrameContentMain.HealthBarsContainer", "healthbar",

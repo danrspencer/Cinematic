@@ -6696,6 +6696,8 @@ local function CreatePortraitsPanel()
 		"can fight."] .. " " .. L["Cast bar is the bar under the target and focus frames as they cast."] ..
 		" " .. L["Health bar and Power bar are the bars (Power: mana, rage, energy...). Bar numbers are the " ..
 		"percent and value on them, hidden with their bar too."] ..
+		" " .. L["Name background is the colored strip behind the name on the target and focus frames, " ..
+		"hidden with the name too."] ..
 		" " .. L["Keeping a frame up, always or in fights, is on the Game Frames page; your own while you " ..
 		"recover, on the Resource Display page."]
 		or L["Which parts of the player, target, focus and pet frames show. Keeping a frame up, always or " ..
@@ -6719,7 +6721,8 @@ local function CreatePortraitsPanel()
 
 		local LABEL_WIDTH, ROW_HEIGHT = 150, 24
 		local PARTS = {
-			{ "Portrait", L["Portrait"] }, { "Name", L["Name"] }, { "Level", L["Level"] },
+			{ "Portrait", L["Portrait"] }, { "Name", L["Name"] }, { "NameBack", L["Name background"] },
+			{ "Level", L["Level"] },
 			{ "Health", L["Health bar"] }, { "Power", L["Power bar"] }, { "Numbers", L["Bar numbers"] },
 			{ "Art", L["Frame art"] },
 			{ "PvP", L["PvP icon"] }, { "Icons", L["Icons"] }, { "Auras", L["Auras"] },
