@@ -310,6 +310,8 @@ local function MakePreview(content)
 	return holder
 end
 
+ns.MakeActionBarPreview = MakePreview
+
 -- The page itself.
 local PRESET_KEYS = { "abEdge", "abEdgeSize", "abEdgeR", "abEdgeG", "abEdgeB", "abShape", "abSlots" }
 

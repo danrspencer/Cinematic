@@ -11,6 +11,9 @@
 local _, ns = ...
 
 ns.CHANGELOG_FEATURES = {
+	{ date = "2026-11-05", page = "Style General", title = "Style themes",
+		text = "A whole new look in one click: Silver Screen, Gilded Codex, Emberforge, Moonlit Glade and Frostbound " ..
+		"each change your frames, fonts, panels and menus. Pick one on the Style hub's General page." },
 	{ date = "2026-11-05", page = "Skyriding Cam", title = "Skyriding Cam", client = "retail",
 		text = "Skyriding gets a camera of its own: it pulls back as you take off, tilts as you climb and dive, " ..
 		"follows your turns, and answers Surge Forward, Skyward Ascent, Whirling Surge and Aerial Halt. Set each " ..

@@ -11,6 +11,57 @@ local _, ns = ...
 local skinned = setmetatable({}, { __mode = "k" }) -- (thing -> its function putting it in a look)
 local applied -- (the look they're in)
 
+-- HD's colors, by what each is for. A style theme gives its own
+-- (ns.MenuPalette, StyleThemes.lua); these are the ones with none.
+local ROLES = { accent = { 1, 0.82, 0 }, edge = { 0.5, 0.5, 0.5 }, field = { 0.06, 0.06, 0.08 },
+	window = { 0.04, 0.04, 0.05 }, well = { 0, 0, 0 }, knob = { 0.85, 0.85, 0.85 }, thumb = { 0.7, 0.7, 0.7 } }
+local function Role(role)
+	local palette = ns.MenuPalette and ns.MenuPalette()
+	return palette and palette[role] or ROLES[role]
+end
+local ROUND = "Interface\\CHARACTERFRAME\\TempPortraitAlphaMask"
+local function PaintTexture(texture, round, r, g, b, a)
+	if round then
+		texture:SetTexture(ROUND)
+		texture:SetVertexColor(r, g, b, a)
+	else
+		texture:SetColorTexture(r, g, b, a)
+	end
+end
+-- Things in a role's color, painted again as the theme changes.
+local toned = setmetatable({}, { __mode = "k" }) -- (texture -> { role, alpha, round })
+local tonedText = setmetatable({}, { __mode = "k" }) -- (gold text -> true)
+local function PaintTone(texture, how)
+	local color = Role(how[1])
+	PaintTexture(texture, how[3], color[1], color[2], color[3], how[2])
+end
+local function Tone(texture, role, alpha, round)
+	local how = { role, alpha, round }
+	toned[texture] = how
+	PaintTone(texture, how)
+end
+-- (Text, both ways: on Forever text and vertex color are one.)
+local function PaintText(text)
+	local color = Role("accent")
+	text:SetTextColor(color[1], color[2], color[3])
+	if text.SetVertexColor then text:SetVertexColor(color[1], color[2], color[3]) end
+end
+local paletteKey = "game" -- (the theme the colors are in)
+-- A heading in the game's gold: the theme's accent while there is one.
+function ns.ToneText(text)
+	tonedText[text] = true
+	if paletteKey ~= "game" then PaintText(text) end
+	return text
+end
+local function Repaint()
+	local key = ns.MenuPaletteKey and ns.MenuPaletteKey() or "game"
+	if key == paletteKey then return false end
+	paletteKey = key
+	for texture, how in pairs(toned) do PaintTone(texture, how) end
+	for text in pairs(tonedText) do PaintText(text) end
+	return true
+end
+
 -- The look things are in now (or will be, made now). Worked out once, not
 -- for each thing made; ns.ApplyMenuSkin looks again.
 function ns.CurrentMenuSkin()
@@ -32,7 +83,8 @@ end
 -- Every skinned thing in the look, when it's changed (force: all the same).
 function ns.ApplyMenuSkin(force)
 	local skin = ns.MenuSkin()
-	if skin == applied and not force then return end
+	local repainted = Repaint()
+	if skin == applied and not force and not repainted then return end
 	applied = skin
 	for thing, apply in pairs(skinned) do Apply(thing, apply, skin) end
 end
@@ -84,18 +136,16 @@ local function SnapEdge(frame, edge, left)
 	Snap()
 	frame:HookScript("OnShow", Snap)
 end
-local function Flat(frame, r, g, b, a, edgeAlpha)
+local function Flat(frame, role, a, edgeAlpha)
 	local edge = frame:CreateTexture(nil, "BACKGROUND", nil, -8)
 	SnapEdge(frame, edge)
-	edge:SetColorTexture(0.5, 0.5, 0.5, edgeAlpha)
+	Tone(edge, "edge", edgeAlpha)
 	local bg = frame:CreateTexture(nil, "BACKGROUND", nil, -7)
 	bg:SetAllPoints()
-	bg:SetColorTexture(r, g, b, a)
+	Tone(bg, role, a)
 	NoSnap(bg)
 	return edge, bg
 end
-
-local ACCENT = { 1, 0.82, 0 }
 
 -- frame's textures (made by its template: call before adding ours), but keep's.
 local function TexturesOf(frame, keep)
@@ -137,11 +187,11 @@ end
 -- one that's on or wrong.
 function ns.SkinButton(button)
 	local art = ButtonArt(button)
-	local edge, bg = Flat(button, 0.06, 0.06, 0.08, 0.9, 0.5)
+	local edge, bg = Flat(button, "field", 0.9, 0.5)
 	local hover = button:CreateTexture(nil, "HIGHLIGHT")
 	hover:SetAllPoints()
 	hover:SetColorTexture(1, 1, 1, 0.08)
-	local edgeColor, tint = { 0.5, 0.5, 0.5, 0.5 }, nil
+	local edgeColor, tint = nil, nil -- (edgeColor: its own, else the theme's)
 	local function Paint(self, skin)
 		local hd = skin == "HD"
 		edge:SetShown(hd)
@@ -150,8 +200,10 @@ function ns.SkinButton(button)
 		bg:SetAlpha(Enabled(self) and 1 or 0.5)
 		if tint then
 			edge:SetColorTexture(tint[1], tint[2], tint[3], 0.8)
-		else
+		elseif edgeColor then
 			edge:SetColorTexture(edgeColor[1], edgeColor[2], edgeColor[3], edgeColor[4])
+		else
+			PaintTone(edge, toned[edge])
 		end
 		-- (Alpha, not Hide: the game's button shows its own art again as it's pressed.)
 		for _, piece in ipairs(art) do
@@ -169,9 +221,16 @@ function ns.SkinButton(button)
 		tint = r and { r, g, b } or nil
 		Paint(self, ns.CurrentMenuSkin())
 	end
+	-- (Its words: the game's gold, the theme's accent while there is one. The
+	-- game puts its gold back each time it's enabled.)
+	local label = button.GetFontString and button:GetFontString()
+	if label then ns.ToneText(label) end
 	-- (Hooked: the game's button has its own, for its art.)
 	button:HookScript("OnDisable", function() bg:SetAlpha(0.5) end)
-	button:HookScript("OnEnable", function() bg:SetAlpha(1) end)
+	button:HookScript("OnEnable", function()
+		bg:SetAlpha(1)
+		if label then ns.ToneText(label) end
+	end)
 	Register(button, Paint)
 	return button
 end
@@ -260,7 +319,7 @@ function ns.SkinClose(button)
 	square:SetSize(18, 18)
 	square:SetPoint("CENTER")
 	square:SetFrameLevel(button:GetFrameLevel())
-	local edge, bg = Flat(square, 0.06, 0.06, 0.08, 0.9, 0.5)
+	local edge, bg = Flat(square, "field", 0.9, 0.5)
 	local hover = button:CreateTexture(nil, "HIGHLIGHT")
 	hover:SetAllPoints(square)
 	hover:SetColorTexture(1, 1, 1, 0.12)
@@ -287,9 +346,9 @@ function ns.SkinWindow(frame, inset)
 	local borderColor = info and { frame:GetBackdropBorderColor() }
 	local edge, bg
 	if inset then
-		edge, bg = Flat(frame, 0, 0, 0, 0.8, 0.5)
+		edge, bg = Flat(frame, "well", 0.8, 0.5)
 	else
-		edge, bg = Flat(frame, 0.04, 0.04, 0.05, 0.95, 0.6)
+		edge, bg = Flat(frame, "window", 0.95, 0.6)
 	end
 	Register(frame, function(self, skin)
 		local hd = skin == "HD" or not info
@@ -312,33 +371,24 @@ end
 -- in the middle of the game's room for it, a gold square in it while ticked,
 -- dimmed while greyed. Its label stays as it is. round: a radio button's,
 -- a circle with a gold dot.
-local ROUND = "Interface\\CHARACTERFRAME\\TempPortraitAlphaMask"
-local function Paint(texture, round, r, g, b, a)
-	if round then
-		texture:SetTexture(ROUND)
-		texture:SetVertexColor(r, g, b, a)
-	else
-		texture:SetColorTexture(r, g, b, a)
-	end
-end
 function ns.SkinCheck(check, round)
 	local art = TexturesOf(check)
 	local box = CreateFrame("Frame", nil, check)
 	box:SetSize(14, 14)
 	box:SetPoint("CENTER")
 	box:SetFrameLevel(check:GetFrameLevel())
-	local edge, bg = Flat(box, 0.06, 0.06, 0.08, 0.9, 0.6)
+	local edge, bg = Flat(box, "field", 0.9, 0.6)
 	if round then
-		Paint(edge, true, 0.5, 0.5, 0.5, 0.6)
-		Paint(bg, true, 0.06, 0.06, 0.08, 0.9)
+		Tone(edge, "edge", 0.6, true)
+		Tone(bg, "field", 0.9, true)
 	end
 	local tick = box:CreateTexture(nil, "ARTWORK")
 	tick:SetSize(8, 8)
 	tick:SetPoint("CENTER")
-	Paint(tick, round, ACCENT[1], ACCENT[2], ACCENT[3], 1)
+	Tone(tick, "accent", 1, round)
 	local hover = check:CreateTexture(nil, "HIGHLIGHT")
 	hover:SetAllPoints(box)
-	Paint(hover, round, 1, 1, 1, 0.12)
+	PaintTexture(hover, round, 1, 1, 1, 0.12)
 	local hd = false
 	local function Show()
 		tick:SetShown(hd and check:GetChecked() and true or false)
@@ -374,18 +424,18 @@ function ns.SkinSlider(slider)
 	track:SetPoint("RIGHT")
 	track:SetHeight(4)
 	track:SetFrameLevel(slider:GetFrameLevel())
-	Flat(track, 0.06, 0.06, 0.08, 0.9, 0.6)
+	Flat(track, "field", 0.9, 0.6)
 	local fill, knob
 	if thumb then
 		fill = track:CreateTexture(nil, "ARTWORK")
 		fill:SetPoint("LEFT", track, "LEFT")
 		fill:SetPoint("RIGHT", thumb, "CENTER")
 		fill:SetHeight(4)
-		fill:SetColorTexture(ACCENT[1], ACCENT[2], ACCENT[3], 0.75)
+		Tone(fill, "accent", 0.75)
 		knob = slider:CreateTexture(nil, "OVERLAY")
 		knob:SetSize(8, 14)
 		knob:SetPoint("CENTER", thumb, "CENTER")
-		knob:SetColorTexture(0.85, 0.85, 0.85, 1)
+		Tone(knob, "knob", 1)
 	end
 	local function Dim()
 		local alpha = Enabled(slider) and 1 or 0.45
@@ -407,7 +457,7 @@ end
 -- edge, a lighter hover; its arrow and text stay.
 function ns.SkinDropdown(dropdown)
 	local art = TexturesOf(dropdown, dropdown.Arrow and { [dropdown.Arrow] = true })
-	local edge, bg = Flat(dropdown, 0.06, 0.06, 0.08, 0.9, 0.5)
+	local edge, bg = Flat(dropdown, "field", 0.9, 0.5)
 	local hover = dropdown:CreateTexture(nil, "HIGHLIGHT")
 	hover:SetAllPoints()
 	hover:SetColorTexture(1, 1, 1, 0.08)
@@ -496,11 +546,11 @@ function ns.SkinEditBox(box)
 	if #art == 0 then art = TexturesOf(box) end
 	local edge = box:CreateTexture(nil, "BACKGROUND", nil, -8)
 	SnapEdge(box, edge, 5)
-	edge:SetColorTexture(0.5, 0.5, 0.5, 0.5)
+	Tone(edge, "edge", 0.5)
 	local bg = box:CreateTexture(nil, "BACKGROUND", nil, -7)
 	bg:SetPoint("TOPLEFT", -5, 0)
 	bg:SetPoint("BOTTOMRIGHT")
-	bg:SetColorTexture(0, 0, 0, 0.8)
+	Tone(bg, "well", 0.8)
 	NoSnap(bg)
 	Register(box, function(_, skin)
 		local hd = skin == "HD"
@@ -532,12 +582,12 @@ function ns.SkinScroll(scroll)
 	track:SetPoint("BOTTOM", 0, -14)
 	track:SetWidth(6)
 	track:SetFrameLevel(bar:GetFrameLevel())
-	Flat(track, 0.06, 0.06, 0.08, 0.6, 0.35)
+	Flat(track, "field", 0.6, 0.35)
 	local knob = bar:CreateTexture(nil, "OVERLAY")
 	knob:SetWidth(6)
 	knob:SetPoint("TOP", thumb, "TOP", 0, -2)
 	knob:SetPoint("BOTTOM", thumb, "BOTTOM", 0, 2)
-	knob:SetColorTexture(0.7, 0.7, 0.7, 0.9)
+	Tone(knob, "thumb", 0.9)
 	Register(bar, function(_, skin)
 		local hd = skin == "HD"
 		track:SetShown(hd)

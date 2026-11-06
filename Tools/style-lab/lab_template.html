@@ -1,0 +1,270 @@
+<title>Cinematic Style Lab</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Marcellus&family=Archivo+Narrow:wght@400;600&family=Metamorphous&family=Federo&family=Almendra:wght@700&family=Philosopher&family=Cinzel+Decorative&family=Germania+One&family=Barlow+Condensed:wght@500&family=Bebas+Neue&family=Rajdhani:wght@600&display=swap" rel="stylesheet">
+<style>
+:root {
+	--bg: #101114; --panel: #181a1f; --line: #2b2e36; --text: #e8e6e1; --dim: #9a9ca5; --accent: #e0b84c; color-scheme: dark;
+}
+@media (prefers-color-scheme: light) {
+	:root:not([data-theme="dark"]) { --bg: #f4f2ee; --panel: #fff; --line: #dcd9d2; --text: #1d1d20; --dim: #66666e; --accent: #94700f; color-scheme: light; }
+}
+:root[data-theme="light"] { --bg: #f4f2ee; --panel: #fff; --line: #dcd9d2; --text: #1d1d20; --dim: #66666e; --accent: #94700f; color-scheme: light; }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.45 "Archivo Narrow", "Arial Narrow", sans-serif; }
+header { background: var(--bg); border-bottom: 1px solid var(--line); padding-block: 12px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+h1 { font: 500 20px/1.2 Marcellus, serif; margin: 0 0 8px; letter-spacing: .02em; }
+.bar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.bar button { font: inherit; color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 5px 10px; cursor: pointer; display: inline-flex; gap: 7px; align-items: center; }
+.bar button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+.sw { display: inline-flex; }
+.sw i { width: 9px; height: 14px; display: block; }
+.note { color: var(--dim); margin: 8px 0 0; max-width: 90ch; }
+main { padding-block: 16px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+section > h2 { font: 600 14px/1.2 "Archivo Narrow", sans-serif; color: var(--dim); text-transform: uppercase; letter-spacing: .08em; margin: 22px 0 10px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 480px), 1fr)); gap: 16px; align-items: start; }
+figure { margin: 0; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+figcaption { padding: 7px 10px; display: flex; justify-content: space-between; gap: 10px; font-size: 13px; }
+figcaption span { color: var(--dim); }
+canvas { display: block; width: 100%; height: auto; background: #000; }
+.bar button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.warn { color: #d9764a; white-space: pre-wrap; font-size: 12px; }
+</style>
+<header>
+	<h1>Cinematic Style Lab</h1>
+	<div class="bar" id="themes"></div>
+	<div class="bar" id="views" style="margin-top:8px"></div>
+	<p class="note" id="note"></p>
+	<p class="note">Every frame here is drawn by the addon's own code. The game's art (icons, portraits, its bars) is a stand-in. The themes' fonts are the real ones, and the game's own fonts are near matches. Check final looks in the game.</p>
+</header>
+<main id="main"></main>
+<script>
+const DATA = /*DATA*/null;
+// The fonts we bundle are the real thing here; the game's four are near matches.
+const FONT_MAP = [[/friz/i, "Marcellus"], [/arialn/i, "'Archivo Narrow'"], [/morpheus/i, "Metamorphous"], [/skurri/i, "Federo"],
+	[/Marcellus-/, "Marcellus"], [/Almendra-Bold/, "700 @Almendra"], [/Philosopher-/, "Philosopher"], [/CinzelDecorative-/, "'Cinzel Decorative'"],
+	[/GermaniaOne-/, "'Germania One'"], [/BarlowCondensed-/, "500 @'Barlow Condensed'"], [/BebasNeue-/, "'Bebas Neue'"], [/Rajdhani-/, "600 @Rajdhani"]];
+const fontOf = f => { for (const [re, name] of FONT_MAP) if (re.test(f || "")) return name; return "Marcellus"; };
+const images = {};
+function loadAssets() {
+	return Promise.all(Object.entries(DATA.assets).map(([k, src]) => new Promise(done => {
+		const im = new Image(); im.onload = () => { images[k] = im; done(); }; im.onerror = done; im.src = src;
+	})));
+}
+const css = (c, a = 1) => `rgba(${Math.round((c[0] ?? 0) * 255)},${Math.round((c[1] ?? 0) * 255)},${Math.round((c[2] ?? 0) * 255)},${(c[3] ?? 1) * a})`;
+
+// A texture, its crop and color laid over it as the game's vertex color does.
+function tinted(item, w, h, dpr) {
+	const im = images[item.file || item.atlas];
+	if (!im) return null;
+	const W = Math.max(1, Math.ceil(w * dpr)), H = Math.max(1, Math.ceil(h * dpr));
+	const c = document.createElement("canvas"); c.width = W; c.height = H;
+	const g = c.getContext("2d");
+	let sx = 0, sy = 0, sw = im.width, sh = im.height;
+	const co = item.coord;
+	if (co && co.length === 4) { sx = co[0] * im.width; sw = (co[1] - co[0]) * im.width; sy = co[2] * im.height; sh = (co[3] - co[2]) * im.height; }
+	else if (co && co.length === 8) { sx = co[0] * im.width; sy = co[1] * im.height; sw = (co[6] - co[0]) * im.width; sh = (co[7] - co[1]) * im.height; }
+	if (item.part != null) sw *= item.part || 0.001;
+	if (item.desat) g.filter = "grayscale(1)";
+	g.imageSmoothingQuality = "high";
+	if (Math.abs(sw) < 0.01 || Math.abs(sh) < 0.01) return null;
+	g.drawImage(im, sx, sy, sw, sh, 0, 0, W, H);
+	g.filter = "none";
+	const v = item.vc;
+	if (v && (v[0] < 1 || v[1] < 1 || v[2] < 1)) {
+		g.globalCompositeOperation = "multiply";
+		g.fillStyle = css([v[0], v[1], v[2], 1]);
+		g.fillRect(0, 0, W, H);
+		g.globalCompositeOperation = "destination-in";
+		g.drawImage(im, sx, sy, sw, sh, 0, 0, W, H);
+	}
+	return c;
+}
+
+function roundClip(g, item) {
+	g.beginPath();
+	g.ellipse(item.x + item.w / 2, item.y + item.h / 2, item.w / 2, item.h / 2, 0, 0, 6.2832);
+	g.clip();
+}
+
+// Text with the game's |cffrrggbb codes, as runs of one color.
+function runs(text, base) {
+	const out = []; let color = base, at = 0;
+	const re = /\|c([0-9a-fA-F]{8})|\|r|\|T.*?\|t|\|n|\|H.*?\|h|\|h/g; let m;
+	while ((m = re.exec(text))) {
+		if (m.index > at) out.push([text.slice(at, m.index), color]);
+		if (m[1]) { const h = m[1]; color = [parseInt(h.slice(2, 4), 16) / 255, parseInt(h.slice(4, 6), 16) / 255, parseInt(h.slice(6, 8), 16) / 255, base[3] ?? 1]; }
+		else if (m[0] === "|r") color = base;
+		else if (m[0] === "|n") out.push(["\n", color]);
+		at = re.lastIndex;
+	}
+	if (at < text.length) out.push([text.slice(at), color]);
+	return out;
+}
+function wrapLines(g, pieces, width, wrap) {
+	const lines = [[]]; let x = 0;
+	for (const [t, c] of pieces) {
+		for (const part of t.split(/(\n|\s+)/)) {
+			if (!part) continue;
+			if (part === "\n") { lines.push([]); x = 0; continue; }
+			const w = g.measureText(part).width;
+			if (wrap && width > 0 && x + w > width + 1 && x > 0 && part.trim()) { lines.push([]); x = 0; }
+			if (!part.trim() && x === 0) continue;
+			lines[lines.length - 1].push([part, c, w]); x += w;
+		}
+	}
+	return lines;
+}
+function drawText(g, item) {
+	const size = item.size || 12;
+	const face = fontOf(item.font).split("@");
+	g.font = face.length > 1 ? `${face[0]}${size}px ${face[1]}` : `${size}px ${face[0]}`;
+	g.textBaseline = "alphabetic";
+	const base = item.color || [1, 1, 1, 1];
+	const fixed = item.ax == null;
+	const lines = wrapLines(g, runs(item.text, base), fixed ? item.w : 0, fixed && item.wrap !== false);
+	const lh = size * 1.14 + (item.spacing || 0);
+	const total = lines.length * lh;
+	const jv = item.justV || "MIDDLE";
+	let y = item.y + (jv === "TOP" ? 0 : jv === "BOTTOM" ? item.h - total : (item.h - total) / 2) + size * 0.92;
+	const thick = /THICK/.test(item.flags), outline = /OUTLINE/.test(item.flags);
+	for (const line of lines) {
+		const lw = line.reduce((a, p) => a + p[2], 0);
+		const how = fixed ? (item.justH || "CENTER") : ({ l: "LEFT", c: "CENTER", r: "RIGHT" })[item.ax];
+		let x = how === "LEFT" ? item.x : how === "RIGHT" ? item.x + item.w - lw : item.x + (item.w - lw) / 2;
+		for (const [t, c, w] of line) {
+			if (item.shadow && (item.shadow[0] || item.shadow[1])) {
+				g.fillStyle = css(item.shadowColor || [0, 0, 0, 1], item.a);
+				g.fillText(t, x + item.shadow[0], y - item.shadow[1]);
+			}
+			if (outline) {
+				g.lineJoin = "round"; g.lineWidth = thick ? 2.6 : 1.5;
+				g.strokeStyle = `rgba(0,0,0,${item.a})`; g.strokeText(t, x, y);
+			}
+			g.fillStyle = css(c, item.a);
+			g.fillText(t, x, y); x += w;
+		}
+		y += lh;
+	}
+}
+
+function draw(canvas, shot, zoom = 1) {
+	const dpr = 2 * zoom;
+	// (A crop: words true to the screen's scale are too small to judge whole.)
+	const c = shot.crop || [0, 0, shot.w, shot.h];
+	canvas.width = c[2] * dpr; canvas.height = c[3] * dpr;
+	const g = canvas.getContext("2d");
+	g.scale(dpr, dpr);
+	g.translate(-c[0], -c[1]);
+	g.fillStyle = "#14161a"; g.fillRect(0, 0, shot.w, shot.h);
+	for (const item of shot.items) {
+		g.save();
+		if (item.clip) { g.beginPath(); g.rect(item.clip[0], item.clip[1], item.clip[2], item.clip[3]); g.clip(); }
+		g.globalAlpha = 1;
+		if (item.k === "text") { drawText(g, item); g.restore(); continue; }
+		if (item.k === "backdrop") {
+			const bgIm = images[item.bg];
+			if (bgIm && item.bgColor && /Grain/.test(item.bg)) {
+				const c = tinted({ file: item.bg, vc: item.bgColor }, bgIm.width, bgIm.height, 1);
+				g.globalAlpha = (item.bgColor[3] ?? 1) * item.a;
+				g.fillStyle = g.createPattern(c, "repeat"); g.save(); g.translate(item.x, item.y); g.fillRect(2, 2, item.w - 4, item.h - 4); g.restore();
+				g.globalAlpha = 1;
+			} else if (item.bgColor) { g.fillStyle = css(item.bgColor, item.a); g.fillRect(item.x, item.y, item.w, item.h); }
+			else if (item.bg) { g.fillStyle = `rgba(16,16,20,${0.9 * item.a})`; g.fillRect(item.x, item.y, item.w, item.h); }
+			if (item.edge) { g.strokeStyle = css(item.edgeColor || [0.6, 0.6, 0.65, 1], item.a); g.lineWidth = Math.max(1, (item.edgeSize || 8) / 6); g.strokeRect(item.x + 1, item.y + 1, item.w - 2, item.h - 2); }
+			g.restore(); continue;
+		}
+		if (item.blend === "ADD") g.globalCompositeOperation = "lighter";
+		if (item.mask) roundClip(g, item);
+		if (item.rot) { g.translate(item.x + item.w / 2, item.y + item.h / 2); g.rotate(-item.rot); g.translate(-item.x - item.w / 2, -item.y - item.h / 2); }
+		const v = item.vc; const va = v ? (v[3] ?? 1) : 1;
+		if (item.color && !item.grad) {
+			g.fillStyle = css(item.color, item.a * va);
+			g.fillRect(item.x, item.y, item.w, item.h);
+		} else if (item.grad && !item.atlas && (!item.file || /white8x8/i.test(item.file))) {
+			const [o, a, b] = item.grad;
+			const gr = o === "HORIZONTAL" ? g.createLinearGradient(item.x, 0, item.x + item.w, 0) : g.createLinearGradient(0, item.y + item.h, 0, item.y);
+			gr.addColorStop(0, css(a, item.a)); gr.addColorStop(1, css(b, item.a));
+			g.fillStyle = gr; g.fillRect(item.x, item.y, item.w, item.h);
+		} else {
+			const im = images[item.file];
+			if (item.tile && im) {
+				const c = tinted({ ...item, coord: null, part: null }, im.width, im.height, 1);
+				g.globalAlpha = item.a * va;
+				g.fillStyle = g.createPattern(c, "repeat");
+				g.translate(item.x, item.y); g.fillRect(0, 0, item.w, item.h);
+				g.restore(); continue;
+			}
+			const c = tinted(item, item.w, item.h, dpr);
+			if (c) { g.globalAlpha = item.a * va; g.drawImage(c, item.x, item.y, item.w, item.h); }
+		}
+		g.restore();
+	}
+}
+
+const state = { theme: DATA.themes[0].key, view: "theme", frame: DATA.frames[0].id };
+try { const s = JSON.parse(localStorage.getItem("styleLab") || "{}"); Object.assign(state, s); } catch (e) {}
+const save = () => { try { localStorage.setItem("styleLab", JSON.stringify(state)); } catch (e) {} };
+if (!DATA.shots[state.theme]) state.theme = DATA.themes[0].key;
+const params = new URLSearchParams(location.search);
+for (const k of ["theme", "view", "frame"]) if (params.get(k)) state[k] = params.get(k);
+
+function figure(shot, title, sub) {
+	const f = document.createElement("figure");
+	const c = document.createElement("canvas");
+	const cap = document.createElement("figcaption");
+	cap.textContent = title;
+	if (sub) { const s = document.createElement("span"); s.textContent = sub; cap.append(s); }
+	f.append(c, cap);
+	if (shot) { const box = shot.crop || [0, 0, shot.w, shot.h]; c.style.aspectRatio = `${box[2]} / ${box[3]}`; draw(c, shot); }
+	return f;
+}
+function themeBar() {
+	const bar = document.getElementById("themes"); bar.textContent = "";
+	for (const t of DATA.themes) {
+		const b = document.createElement("button");
+		b.setAttribute("aria-pressed", t.key === state.theme);
+		if (t.swatch) {
+			const sw = document.createElement("span"); sw.className = "sw";
+			for (const c of t.swatch) { const i = document.createElement("i"); i.style.background = css(c); sw.append(i); }
+			b.append(sw);
+		}
+		b.append(t.name);
+		b.onclick = () => { state.theme = t.key; if (state.view === "compare") state.view = "theme"; render(); };
+		bar.append(b);
+	}
+}
+function viewBar() {
+	const bar = document.getElementById("views"); bar.textContent = "";
+	const add = (label, on, go) => { const b = document.createElement("button"); b.textContent = label; b.setAttribute("aria-pressed", on); b.onclick = go; bar.append(b); };
+	add("All frames", state.view === "theme", () => { state.view = "theme"; render(); });
+	for (const f of DATA.frames) add(f.name, state.view === "compare" && state.frame === f.id, () => { state.view = "compare"; state.frame = f.id; render(); });
+}
+function render() {
+	save(); themeBar(); viewBar();
+	const main = document.getElementById("main"); main.textContent = "";
+	const t = DATA.themes.find(x => x.key === state.theme);
+	document.getElementById("note").textContent = state.view === "compare"
+		? "One frame in every theme." : (t.tip || "");
+	if (state.view === "compare") {
+		const f = DATA.frames.find(x => x.id === state.frame);
+		const s = document.createElement("section"); const grid = document.createElement("div"); grid.className = "grid";
+		for (const th of DATA.themes) grid.append(figure(DATA.shots[th.key][f.id], th.name, f.page));
+		s.append(grid); main.append(s);
+	} else {
+		const groups = [...new Set(DATA.frames.map(f => f.group))];
+		for (const name of groups) {
+			const s = document.createElement("section"); const h = document.createElement("h2"); h.textContent = name;
+			const grid = document.createElement("div"); grid.className = "grid";
+			for (const f of DATA.frames.filter(x => x.group === name)) grid.append(figure(DATA.shots[state.theme][f.id], f.name, f.page));
+			s.append(h, grid); main.append(s);
+		}
+	}
+	if (DATA.warnings && DATA.warnings.length) {
+		const w = document.createElement("p"); w.className = "warn"; w.textContent = DATA.warnings.join("\n"); main.append(w);
+	}
+}
+const families = ['16px "Marcellus"', '16px "Archivo Narrow"', '16px "Metamorphous"', '16px "Federo"', '700 16px "Almendra"', '16px "Philosopher"',
+	'16px "Cinzel Decorative"', '16px "Germania One"', '500 16px "Barlow Condensed"', '16px "Bebas Neue"', '600 16px "Rajdhani"'];
+Promise.all([loadAssets(), ...families.map(f => document.fonts.load(f).catch(() => {}))]).then(render);
+</script>

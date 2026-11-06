@@ -817,17 +817,21 @@ local function Dress(frame, look)
 	else
 		-- (A flat fill for a look: the tooltip's own background darkens the
 		-- color, and the bubble's point under it wouldn't match.)
+		-- (Dark panels in the style theme's color and grain; the parchment stays paper.)
+		local themeBack, themeEdge, grain
+		if look ~= LOOKS.parchment then themeBack, themeEdge, grain = ns.ThemePanel() end
 		frame:SetBackdrop({
-			bgFile = look and "Interface\\Buttons\\WHITE8X8" or "Interface\\Tooltips\\UI-Tooltip-Background",
+			bgFile = grain or (look and "Interface\\Buttons\\WHITE8X8" or "Interface\\Tooltips\\UI-Tooltip-Background"),
 			edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-			tile = true, tileSize = 16, edgeSize = 14,
+			tile = true, tileSize = grain and 128 or 16, edgeSize = 14,
 			insets = { left = 3, right = 3, top = 3, bottom = 3 },
 		})
 		local own = look or CARD
-		local bg, edge = own.bg or { 0, 0, 0, 0.85 }, own.edge or { 0.6, 0.6, 0.6, 1 }
+		local bg, edge = themeBack or own.bg or { 0, 0, 0, 0.85 }, themeEdge or own.edge or { 0.6, 0.6, 0.6, 1 }
 		frame:SetBackdropColor(bg[1], bg[2], bg[3], bg[4] * alpha)
 		frame:SetBackdropBorderColor(edge[1], edge[2], edge[3], edge[4] * alpha)
 	end
+	if not chat then ns.ThemeOrnament(frame) end
 	local art = not chat and look and look.art and PageArt()
 	if art then SetArt(frame.page, art) end
 	frame.page:SetShown(art and true or false)
@@ -839,7 +843,7 @@ end
 -- What a frame's dressing goes by (its look, the page's opacity and font),
 -- to dress it again only once one changes.
 local function DressKey(look)
-	return tostring(look) .. ":" .. Styled("questTalkAlpha") .. ":" .. FontKey()
+	return tostring(look) .. ":" .. Styled("questTalkAlpha") .. ":" .. FontKey() .. ":" .. ns.ActiveStyleTheme().key
 end
 
 -- What Dress needs on a frame: its chat bubble nine-slice and page texture.

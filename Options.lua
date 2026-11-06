@@ -206,6 +206,8 @@ local function Label(parent, font, text)
 	local fs = parent:CreateFontString(nil, "OVERLAY", font)
 	fs:SetJustifyH("LEFT")
 	fs:SetText(text or "")
+	-- (Titles and headings: in the style theme's accent.)
+	if font and font:find("^GameFontNormal") and ns.ToneText then ns.ToneText(fs) end
 	return fs
 end
 

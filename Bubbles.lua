@@ -120,6 +120,7 @@ function ns.MakeBubbleSkin(parent)
 	tail:SetDesaturated(true)
 	skin.tail = tail
 	skin.border = ns.MakeStyleEdges(skin, "BORDER")
+	skin.border.ornate = true
 	return skin
 end
 
@@ -129,6 +130,7 @@ function ns.DressBubbleSkin(skin, look)
 	skin:SetShown(r ~= nil)
 	if not r then return end
 	local alpha = tonumber(look.bubblesAlpha) or 1
+	ns.DressThemeGrain(skin.back)
 	skin.back:SetVertexColor(r, g, b, alpha)
 	for _, edge in ipairs(skin.edges) do edge:Hide() end -- (the old 1-pixel lines: ours now, any thickness)
 	-- (Thin and Thick: a soft grey, as the bubble's always had; Custom: its own.)

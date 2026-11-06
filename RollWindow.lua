@@ -399,7 +399,9 @@ end
 local function StylePanel(frame, look)
 	local panel = look.rollPanel
 	frame.bg:SetShown(panel ~= "none")
-	frame.bg:SetColorTexture(0.03, 0.03, 0.04, look.rollAlpha)
+	local back = ns.ThemePanel() or { 0.03, 0.03, 0.04 } -- (the style theme's panel)
+	frame.bg:SetColorTexture(back[1], back[2], back[3], look.rollAlpha)
+	if panel ~= "none" then ns.ThemeOrnament(frame) end
 	frame.outer:SetShown(panel == "rounded")
 	frame.border:SetShown(panel == "rounded")
 	frame.flat:SetShown(panel == "flat")

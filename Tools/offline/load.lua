@@ -5,10 +5,11 @@
 --
 --   local ns, wow = dofile("Tools/offline/load.lua")("forever")
 
-return function(client, toc)
+return function(client, toc, onInstall)
 	package.path = "Tools/offline/?.lua;" .. package.path
 	local wow = dofile("Tools/offline/wow.lua")
 	wow.Install(client)
+	if onInstall then onInstall(wow) end -- (Tools/style-lab: real layout, before any frame is made)
 	toc = toc or "Cinematic.toc"
 	local addonName = toc:match("([^/]+)%.toc$")
 	local ns = {}

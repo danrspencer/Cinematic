@@ -122,6 +122,7 @@ local function PrintDebugHelp()
 	print("  /cine debug plates - nameplate settings, and how the plates (and your target) are sorted")
 	print("  /cine debug textures - a strip of every bar texture the Style pages offer, to see which this client has")
 	print("  /cine debug fonts - every font other addons share, and which are left out (no small letters)")
+	print("  /cine debug themeshots [theme] | off - screenshots of every style theme's frames; your settings come back after")
 	print("  /cine debug platetextures - the textures your target's nameplate is drawn with (for the game's plate Styles)")
 	print("  /cine debug prdtextures - the personal resource display's textures and their alpha (its border pieces)")
 	print("  /cine debug cdm - each Cooldown Manager spell: its cooldown, charges, what it costs and in which resource (run in and out of combat)")
@@ -618,6 +619,8 @@ local function HandleSlash(msg)
 		if seconds then ns.CursorHideRecord(seconds) else ns.CursorHideDebug() end
 	elseif cmd == "debug" and arg == "vitalspage" then
 		if ns.VitalsPageDepth then ns.VitalsPageDepth() else ns.Print("Open the Vitals Style page first.") end
+	elseif cmd == "debug" and (arg == "themeshots" or arg:match("^themeshots ")) then
+		ns.ThemeShots(arg:match("^themeshots%s*(.-)$"))
 	elseif cmd == "debug" and (arg == "texreel" or arg:match("^texreel ")) then
 		ns.TextureReel(arg:match("^texreel%s*(.-)$"))
 	elseif cmd == "debug" and (arg == "gameart" or arg:match("^gameart ")) then
@@ -1100,6 +1103,7 @@ local function HandleSlash(msg)
 		ns.LogUnitFrames()
 	elseif cmd == "debug" and arg == "plates" then
 		ns.PrintPlatesDebug()
+		ns.ReportPlateHealthStyle()
 	elseif cmd == "debug" and arg == "range" then
 		ns.PrintRangeDebug()
 	elseif cmd == "debug" and arg == "cdm" then

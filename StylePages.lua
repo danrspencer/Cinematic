@@ -242,6 +242,8 @@ function ns.DressStyleEdges(holder, size, r, g, b, a, outside)
 		end
 	end
 	for _, line in ipairs(holder.lines) do line:SetVertexColor(r, g, b, a or 1) end
+	-- (Round a panel, marked by whoever made it: the style theme's ornament.)
+	if holder.ornate and ns.DressThemeCorners then ns.DressThemeCorners(holder, a) end
 end
 
 -- A shared setting's value as a page would show it now (for the options:
@@ -729,6 +731,12 @@ local TEXTURES = {
 	{ "striped", "Striped", OURS .. "Striped" },
 	{ "minimal", "Minimal", OURS .. "Minimal" },
 	{ "rounded", "Rounded", OURS .. "Rounded" },
+	-- (The style themes': StyleThemes.lua, Media/make_theme_art.py.)
+	{ "gilt", "Gilt", OURS .. "Gilt" },
+	{ "forged", "Forged", OURS .. "Forged" },
+	{ "lunar", "Lunar", OURS .. "Lunar" },
+	{ "rime", "Rime", OURS .. "Rime" },
+	{ "reel", "Reel", OURS .. "Reel" },
 }
 
 -- Whether this client has a texture (an atlas: the game says; a file: assumed).

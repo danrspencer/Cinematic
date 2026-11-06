@@ -70,8 +70,26 @@ ns.QUEST_ITEM_FONTS = {
 	{ "morpheus", "Morpheus", "Fonts\\MORPHEUS.TTF" },
 	{ "skurri", "Skurri", "Fonts\\SKURRI.TTF" },
 }
-local FONT_FILES = {}
-for _, font in ipairs(ns.QUEST_ITEM_FONTS) do FONT_FILES[font[1]] = font[3] end
+-- Our own, for the style themes: open fonts, unchanged, each under the SIL Open
+-- Font License (Fonts/Licenses, which must ship with them).
+for _, font in ipairs({
+	{ "marcellus", "Marcellus", "Marcellus-Regular" },
+	{ "almendra", "Almendra", "Almendra-Bold" },
+	{ "philosopher", "Philosopher", "Philosopher-Regular" },
+	{ "cinzel", "Cinzel Decorative", "CinzelDecorative-Regular" },
+	{ "germania", "Germania One", "GermaniaOne-Regular" },
+	{ "barlow", "Barlow Condensed", "BarlowCondensed-Medium" },
+	{ "bebas", "Bebas Neue", "BebasNeue-Regular" },
+	{ "rajdhani", "Rajdhani", "Rajdhani-SemiBold" },
+}) do
+	ns.QUEST_ITEM_FONTS[#ns.QUEST_ITEM_FONTS + 1] = { font[1], font[2],
+		"Interface\\AddOns\\" .. ADDON_NAME .. "\\Fonts\\" .. font[3] .. ".ttf", own = true }
+end
+local FONT_FILES, OWN_FONTS = {}, {}
+for _, font in ipairs(ns.QUEST_ITEM_FONTS) do
+	FONT_FILES[font[1]] = font[3]
+	OWN_FONTS[font[1]] = font.own
+end
 ns.OnLanguage(function() ns.QUEST_ITEM_FONTS[1][2] = L["The game's"] end)
 
 -- Fonts other addons share through LibSharedMedia (none of theirs bundled)
@@ -97,8 +115,7 @@ local function Widths(letters)
 	end
 	return widths, even
 end
-local function Readable(path)
-	if readable[path] ~= nil then return readable[path] end
+local function Probe()
 	if not probe then
 		-- (Shown, see-through: the game may not load a font for hidden text.)
 		local holder = CreateFrame("Frame", nil, UIParent)
@@ -108,6 +125,23 @@ local function Readable(path)
 		probe = holder:CreateFontString(nil, "ARTWORK")
 		probe:SetPoint("BOTTOMLEFT")
 	end
+	return probe
+end
+
+-- Whether one of our own fonts is there: the game errors on a file it can't
+-- find (a new font needs the game restarted), which would stop a page being
+-- made. One that isn't: as if it weren't picked, the game's font showing.
+local ownLoads = {}
+local function OwnLoads(path)
+	if ownLoads[path] == nil then
+		ownLoads[path] = pcall(Probe().SetFont, Probe(), path, 20, "")
+	end
+	return ownLoads[path]
+end
+
+local function Readable(path)
+	if readable[path] ~= nil then return readable[path] end
+	Probe()
 	local ok, set = pcall(probe.SetFont, probe, path, 20, "")
 	if not ok or set == false then
 		-- (Refused: not loaded yet, or not there. Kept, uncached, so it's
@@ -139,6 +173,9 @@ end
 -- A font value's file (nil: the game's, or a shared one no longer there or
 -- with no small letters).
 function ns.StyleFontFile(value)
+	if OWN_FONTS[value] then
+		return OwnLoads(FONT_FILES[value]) and FONT_FILES[value] or nil
+	end
 	if FONT_FILES[value] then return FONT_FILES[value] end
 	local path = SharedFile(value)
 	if path and Readable(path) then return path end
@@ -193,7 +230,7 @@ local ROMAN = not ({ ruRU = true, koKR = true, zhCN = true, zhTW = true })[GetLo
 function ns.StyleFontChoices()
 	local list, known = {}, {}
 	for _, info in ipairs(ns.QUEST_ITEM_FONTS) do
-		list[#list + 1] = { value = info[1], text = info[2], font = ROMAN and info[3] or nil }
+		list[#list + 1] = { value = info[1], text = info[2], font = ROMAN and ns.StyleFontFile(info[1]) or nil }
 		if info[3] then known[info[3]:lower()] = true end
 	end
 	local media = SharedMedia()

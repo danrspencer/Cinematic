@@ -93,6 +93,7 @@ local function MakeSkin(parent, inside)
 	skin.back:SetAllPoints()
 	skin.back:SetTexture(WHITE)
 	skin.border = ns.MakeStyleEdges(skin, "BORDER")
+	skin.border.ornate = true
 	skin.edges = {}
 	for i, side in ipairs(SIDES) do
 		local edge = skin:CreateTexture(nil, "BORDER")
@@ -110,7 +111,10 @@ local function DressSkin(skin, look, r, g, b)
 	local alpha = tonumber(look.tooltipAlpha) or 1
 	local br, bg, bb = BackColor(look)
 	skin.back:SetShown(br ~= nil)
-	if br then skin.back:SetVertexColor(br, bg, bb, alpha) end
+	if br then
+		ns.DressThemeGrain(skin.back)
+		skin.back:SetVertexColor(br, bg, bb, alpha)
+	end
 	for _, line in ipairs(skin.edges) do line:Hide() end -- (the old 1-pixel lines: ours now, any thickness)
 	local kind, size, er, eg, eb = ns.StyleBorder(look, "tooltipEdge")
 	if kind == "colored" then er, eg, eb = r or 0.6, g or 0.6, b or 0.6 end
@@ -251,6 +255,11 @@ local function Dress(tooltip, look, r, g, b)
 		skins[tooltip] = skin
 	end
 	if skin then
+		-- (Under the tooltip's own words, which are on the tooltip itself, not
+		-- over them; its lines and corners stay on top.)
+		local level = tooltip:GetFrameLevel()
+		skin:SetFrameLevel(math.max(level - 1, 0))
+		skin.border:SetFrameLevel(level + 1)
 		if look then DressSkin(skin, look, r, g, b) else skin:Hide() end
 	end
 end

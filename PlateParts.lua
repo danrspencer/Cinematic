@@ -397,6 +397,10 @@ local function DrawName(text, name, unit)
 			object = _G.SystemFont_NamePlate or _G.GameFontNormal
 			file, size, flags = object:GetFont()
 		end
+		-- (The Style hub's General font, a style theme's: the family keeps the
+		-- game's for other alphabets.)
+		local db = ns.db
+		file = db and db.styleGeneral and ns.StyleFontFile(db.styleFont) or file
 		SetNameFont(text, object, file, size, text.size, Outlined(flags, Style("plateNameOutline")))
 		if Style("plateNameShadow") then
 			text:SetShadowOffset(Style("plateNameShadowX"), Style("plateNameShadowY"))

@@ -26,7 +26,7 @@ local function RefreshAll()
 	for _, refresh in ipairs({ ns.RefreshPersonalStyle, ns.RefreshTooltipStyle, ns.RefreshBubbleStyle,
 		ns.RefreshQuestTalkStyle, ns.RefreshQuestItemStyle, ns.RefreshRollStyle, ns.RefreshPlateCastStyle,
 		ns.RefreshUnitStyle, ns.RefreshRaidStyle, ns.RefreshTargetArrows, ns.RefreshPlateNameStyle,
-		ns.RefreshActionBarStyle }) do
+		ns.RefreshActionBarStyle, ns.RefreshPlateHealthStyle }) do
 		if refresh then pcall(refresh) end
 	end
 end
@@ -272,6 +272,7 @@ function ns.CreateGeneralStylePanel(kit)
 	local pageRows = {}
 	local function Changed()
 		RefreshAll()
+		ns.ApplyMenuSkin() -- (Style off or on: the theme's menu colors go or come back)
 		if preview then preview:Refresh() end
 		for _, row in ipairs(pageRows) do row:Refresh() end
 	end
@@ -281,6 +282,12 @@ function ns.CreateGeneralStylePanel(kit)
 		"Each page keeps its settings for when you turn this back on."], intro, Changed)
 	local stack = kit.Stack(switch, "check")
 	local rows = ns.StyleRows(kit, content, stack, Changed, "styleGeneral")
+
+	-- (The whole look in one pick: StyleThemes.lua.)
+	stack:Header(content, L["Theme"])
+	stack:Help(content, L["A whole look for the addon: bars, fonts, borders, panels, colors and these menus. Every " ..
+		"setting below stays yours to change after you pick one. Undo puts back what you had."])
+	stack:Add(ns.MakeThemePicker(kit, content, 480, function() Changed() end), "label")
 
 	preview = ns.MakeStyleJumbotron(kit, content, stack, 480)
 
@@ -397,6 +404,7 @@ function ns.CreateGeneralStylePanel(kit)
 		for _, page in ipairs(pages) do
 			for _, key in ipairs(page[3]) do db[key] = base[key] end
 		end
+		db.styleTheme = base.styleTheme -- (its palette and art; the pages' own settings stay theirs)
 		Changed()
 	end)
 

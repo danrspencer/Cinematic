@@ -31,6 +31,7 @@ M.Stub = Stub
 local frames = {}
 M.frames = frames
 local Methods = {}
+M.Methods = Methods -- (Tools/style-lab/frames.lua puts real layout on these)
 local frameMeta = {
 	__index = function(self, key)
 		if Methods[key] then return Methods[key] end
@@ -48,6 +49,7 @@ local function NewObject(kind, name, parent)
 	end
 	return object
 end
+M.NewObject = NewObject
 function Methods:GetParent() return self._parent end
 function Methods:SetParent(parent) self._parent = parent end
 function Methods:GetName() return self._name end

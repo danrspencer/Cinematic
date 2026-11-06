@@ -104,6 +104,7 @@ PortalScout.lua
 ScreenEffectScout.lua
 PersonalResources.lua
 StylePages.lua
+StyleThemes.lua
 LetterboxStyle.lua
 QuestItemStyle.lua
 RollStyle.lua
@@ -125,9 +126,11 @@ PersonalMana.lua
 PersonalManaCost.lua
 PersonalManaText.lua
 PlateCastStyle.lua
+PlateHealthStyle.lua
 UnitStyle.lua
 RaidStyle.lua
 GeneralStyle.lua
+ThemeShots.lua
 VisionsStyle.lua
 EmoteVision.lua
 WindGuideStyles.lua

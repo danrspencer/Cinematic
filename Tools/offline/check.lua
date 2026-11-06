@@ -412,6 +412,80 @@ if arg[1] and not update then
 		if ns.SHARED_STYLE.tooltipFont.visions then print("problem\tVisions Style: tooltipFont marked a Vision's") end
 		for _, key in ipairs(keys) do db[key] = saved[key] end
 	end
+	-- Style themes: every setting a theme writes is a real one, a pick shows as
+	-- no change of yours, and Undo gives back what was there.
+	do
+		local themeDb = ns.GetDB()
+		local before = {}
+		for key, value in pairs(themeDb) do before[key] = value end
+		for _, info in ipairs(ns.StyleThemeList()) do
+			ns.ApplyStyleTheme(info.key)
+			if ns.StyleThemeEdited() then print("problem\tStyle theme " .. info.key .. ": shows as edited just after a pick") end
+			if themeDb.styleTheme ~= info.key then print("problem\tStyle theme " .. info.key .. ": not picked") end
+			ns.UndoStyleTheme()
+		end
+		for key, value in pairs(before) do
+			if themeDb[key] ~= value and type(value) ~= "table" then
+				print(("problem\tStyle themes: Undo left %s as %s, not %s"):format(key, tostring(themeDb[key]), tostring(value)))
+			end
+		end
+		for key in pairs(themeDb) do
+			if before[key] == nil and themeDb[key] ~= "default" then
+				print("problem\tStyle themes: Undo left new setting " .. key)
+			end
+			if before[key] == nil then themeDb[key] = nil end
+		end
+		for _, key in ipairs(ns.StyleThemeSettingKeys()) do
+			if ns.DEFAULTS[key] == nil and not key:find("^cardLook") then
+				print("problem\tStyle themes: no such setting " .. key)
+			end
+		end
+	end
+	-- Our own fonts: each path is one the game can read, to a file that's here.
+	for _, font in ipairs(ns.QUEST_ITEM_FONTS) do
+		if font.own then
+			local rest = font[3]:match("^Interface\\AddOns\\[^\\]+\\(.+)$")
+			local file = rest and not rest:find("\\\\", 1, true) and io.open((rest:gsub("\\", "/")), "rb")
+			if file then
+				file:close()
+			else
+				print("problem	Font " .. font[1] .. ": no file at " .. font[3])
+			end
+		end
+	end
+	-- /cine debug themeshots: it runs to the end and leaves the settings as they were.
+	do
+		local shotDb, timers, shots = ns.GetDB(), {}, 0
+		local timer = _G.C_Timer
+		local after, screenshot = timer.After, _G.Screenshot
+		timer.After = function(_, fn) timers[#timers + 1] = fn end
+		_G.Screenshot = function() shots = shots + 1 end
+		-- (A stub for a zone's name would loop for ever in a card's letter by letter text.)
+		local names = { "GetRealZoneText", "GetZoneText", "GetSubZoneText", "GetMinimapZoneText" }
+		for _, name in ipairs(names) do rawset(_G, name, function() return "Darkshore" end) end
+		local before = { theme = shotDb.styleTheme, general = shotDb.styleGeneral, texture = shotDb.styleTexture,
+			undo = shotDb.styleThemeKept }
+		-- (Stuck is a problem to report, not a hang.)
+		local chat = ns.Print
+		ns.Print = function() end -- (every line printed here counts as a problem)
+		debug.sethook(function() error("stuck") end, "", 2000000000)
+		local ran, why = pcall(function()
+			ns.ThemeShots("")
+			while #timers > 0 do table.remove(timers, 1)() end
+		end)
+		debug.sethook()
+		ns.Print = chat
+		timer.After, _G.Screenshot = after, screenshot
+		for _, name in ipairs(names) do rawset(_G, name, nil) end
+		if not ran then print("problem	themeshots: " .. tostring(why)) end
+		if shots == 0 then print("problem	themeshots: took no screenshots") end
+		if shotDb.themeShotsKept or shotDb.themeShotsCVars then print("problem	themeshots: left its kept settings behind") end
+		if shotDb.styleTheme ~= before.theme or shotDb.styleGeneral ~= before.general
+			or shotDb.styleTexture ~= before.texture or shotDb.styleThemeKept ~= before.undo then
+			print("problem	themeshots: the settings didn't come back")
+		end
+		shotDb.themeShotsLast = nil
+	end
 	-- Vitals Vision: a page's Reset (its settings back to the profile's) leaves
 	-- each theme's own look on them, not the plain defaults.
 	local db, base = ns.GetDB(), ns.ProfileBase()
