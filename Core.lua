@@ -3750,6 +3750,17 @@ function ns.SubtleCineEffect(t, effect)
 	t.cineModeShow = t.cineModeShow or {}
 	t.cineModeShow[key] = true
 end
+-- Subtle's flights, teleports and AFK bring CineMode on now, AFK with its camera
+-- (the module travel-cinemode). Only a Subtle still on its flights and teleports
+-- with no AFK camera: the Never choice, or an AFK camera of your own, stays.
+function ns.SubtleCineTravel(t)
+	if type(t) ~= "table" or t.eventAFKCamera ~= "none"
+		or (t.eventFlightCamera == "none" and t.eventHearthCamera == "none") then
+		return
+	end
+	t.eventAFKCamera = "afk"
+	for _, event in ipairs({ "Flight", "Hearth", "Teleport", "AFK" }) do t["event" .. event .. "Cine"] = true end
+end
 -- Every profile's tint is at full strength to start with now. Subtle's 33%
 -- and Balanced's 66% go (the slider's steps of 5 can't have made them).
 function ns.FullTint(t)
@@ -5397,6 +5408,12 @@ ticker:SetScript("OnEvent", ns.Profiled("Core events", function(self, event, arg
 				ns.SubtleCineEffect(ns.db.profiles and ns.db.profiles.Subtle, effect)
 			end
 			ns.db.subtleCineEffectsV1 = true
+		end
+		-- Subtle's flights, teleports and AFK come with CineMode: ns.SubtleCineTravel. Once.
+		if not ns.db.subtleCineTravelV1 then
+			if (ns.db.liveProfile or ns.db.profile) == "Subtle" then ns.SubtleCineTravel(ns.db) end
+			ns.SubtleCineTravel(ns.db.profiles and ns.db.profiles.Subtle)
+			ns.db.subtleCineTravelV1 = true
 		end
 		-- Always show tanks (healVisionTanks) is now the tank slider at 100%:
 		-- unticked, tanks went by the members' health, so they still do. Once,

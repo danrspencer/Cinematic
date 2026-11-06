@@ -753,7 +753,27 @@ if arg[1] and not update then
 			or ownTint.cineModeShow or ownTint.tintStrength ~= 0.5 then
 			print("problem	Subtle's tint or the tint's strength wasn't moved over as it should be")
 		end
+		-- Subtle's flights, teleports and AFK moved onto CineMode: the Never choice
+		-- and an AFK camera of the player's own left alone.
+		local travel = { eventAFKCamera = "none" }
+		ns.SubtleCineTravel(travel)
+		local never = { eventAFKCamera = "none", eventFlightCamera = "none", eventHearthCamera = "none" }
+		ns.SubtleCineTravel(never)
+		local ownAFK = { eventAFKCamera = "cozy" }
+		ns.SubtleCineTravel(ownAFK)
+		if travel.eventAFKCamera ~= "afk" or not travel.eventFlightCine or not travel.eventAFKCine
+			or never.eventAFKCine or never.eventAFKCamera ~= "none" or ownAFK.eventAFKCine then
+			print("problem	Subtle's flights, teleports and AFK weren't moved onto CineMode as they should be")
+		end
 		local subtle = ns.ProfileBase("Subtle")
+		if subtle.eventAFKCamera ~= "afk" or subtle.deathCine then
+			print("problem	Subtle: going AFK has no camera, or dying brings CineMode")
+		end
+		for _, event in ipairs({ "Flight", "Hearth", "Teleport", "AFK" }) do
+			if not subtle["event" .. event .. "Cine"] then
+				print("problem	Subtle: " .. event .. " doesn't bring CineMode on")
+			end
+		end
 		for _, effect in ipairs(ns.EFFECT_GRID) do
 			local row = "effect:" .. effect
 			if subtle.quietShow[row] or subtle[effect .. "Always"] or not subtle.cineModeShow[row] then

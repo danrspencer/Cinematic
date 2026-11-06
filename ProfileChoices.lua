@@ -71,7 +71,7 @@ ns.SLOT_CHOICES = {
 			modules = { "recovering" } },
 		{ part = "solo", label = "Only when solo", line = "Out in the world on your own; normal in groups",
 			modules = { "recovering", "solo-only" } },
-		{ part = "nofade", label = "Never", line = "Your UI stays as the game has it",
+		{ part = "nofade", label = "Never", line = "Your UI stays as the game has it, unless a camera brings CineMode on",
 			modules = { "recovering", "no-fading" } },
 	} },
 	-- (Each client's own groups to start with: Forever's Classic group, retail's split.)
@@ -102,8 +102,9 @@ ns.SLOT_CHOICES = {
 			modules = { "lite-cameras" } },
 		{ part = "off", label = "Never", line = "The camera is all yours", modules = { "no-cameras" } },
 		-- (Only Subtle's: not offered.)
-		{ part = "travel", hidden = true, label = "Flights and teleports",
-			line = "Just flights, and your Hearthstone and teleports", modules = { "travel-cameras" } },
+		{ part = "travel", hidden = true, label = "Flights, teleports and AFK",
+			line = "Flights, going AFK, and your Hearthstone and teleports, each in CineMode",
+			modules = { "lite-cameras", "travel-cinemode" } },
 		-- (Only the plain defaults': not offered.)
 		{ part = "standard", hidden = true, label = "Every camera", line = "Every camera, as the defaults have them",
 			modules = {} },
@@ -175,10 +176,11 @@ ns.BUILTIN_PROFILES = {
 		label = "Subtle", -- (shown in your language)
 		oldNames = { "VFX Only" },
 		icon = "Interface\\Icons\\Spell_Nature_Lightning",
-		tip = L["A light touch that leaves your UI exactly as it is. The letterbox, color tint, vignette and " ..
-			"weather wait for CineMode, and only the quiet extras join in: the camera sweeps along on flights and teleports, " ..
-			"a portal opens as you hearth, and small cards mark your big moments, the places you reach, your " ..
-			"duels and the players who buff or emote at you."],
+		tip = L["A light touch. Your UI stays as it is while you play, and fades only when you're just along for " ..
+			"the ride: on flights, as you hearth or teleport, and when you go AFK. That's when the camera sweeps " ..
+			"along and the letterbox, color tint, vignette and weather come in. A portal opens as you hearth, and " ..
+			"small cards mark your big moments, the places you reach, your duels and the players who buff or " ..
+			"emote at you."],
 		picks = { layout = { forever = "preset" }, frames = "nofade", camera = "travel", vfx = "cinebars",
 			sound = "nomusic" },
 		modules = With("zone-card", "travel-cards", "no-visions", "no-custom-bubbles"),
@@ -235,7 +237,7 @@ ns.OLD_PROFILES = {
 -- The welcome window's levels (Welcome.lua), and the profile each picks,
 -- each with its own short line; the longer tip is its profile's (below).
 ns.WELCOME_LEVELS = {
-	{ label = "Subtle", profile = "Subtle", line = "A light touch. Your UI stays just as it is." },
+	{ label = "Subtle", profile = "Subtle", line = "A light touch. Your UI fades only when you're along for the ride." },
 	{ label = "Balanced", profile = "Balanced", line = "Your UI fades away, and comes back when you need it." },
 	-- (flash: something shown for a moment when it's picked, besides the
 	-- profile's preview: "vitals", Vitals Vision's screen edges.)

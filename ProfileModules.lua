@@ -467,10 +467,11 @@ ns.PROFILE_MODULES = {
 		apply = function(set)
 			CamsOff(set, { "flight", "idle", "cozy", "tele", "vista", "fish", "walk", "run", "death", "quest" })
 		end },
-	{ key = "travel-cameras", name = "Just flights and teleports", scope = { "Cameras", "Scenes" },
-		tip = "Only flights (and fly-bys), your Hearthstone and teleports move the camera on their own.",
+	{ key = "travel-cinemode", name = "CineMode on flights, teleports and AFK", scope = { "Scenes" },
+		tip = "With Start in CineMode off, flights, your Hearthstone, teleports and going AFK bring CineMode on " ..
+			"while their camera runs: the times you're just along for the ride.",
 		apply = function(set)
-			CamsOff(set, { "idle", "cozy", "vista", "fish", "walk", "run", "death", "quest" })
+			for _, event in ipairs({ "Flight", "Hearth", "Teleport", "AFK" }) do set("event" .. event .. "Cine", true) end
 		end },
 	{ key = "pure-cameras", name = "Cinema: cameras", scope = { "Scenes", "Camera Settings/Chat Cam",
 		"General/top", "Card Vision" },
