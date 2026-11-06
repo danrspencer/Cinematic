@@ -265,6 +265,7 @@ L["no extra frames."] = "추가된 창이 없습니다."
 L["Chat"] = "대화"
 
 -- MinimapButton.lua
+L["not available in gamepad mode: use /cine instead."] = "게임패드 모드에서는 사용할 수 없습니다. 대신 /cine을 사용하세요."
 L["until logout"] = "로그아웃까지"
 L["%d:%02d left"] = "%d:%02d 남음"
 L["Tint"] = "색조"

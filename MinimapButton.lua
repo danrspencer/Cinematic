@@ -1,20 +1,21 @@
 -- Cinematic minimap button: left-click for a quick menu, right-click for the
 -- settings, drag to move it around the minimap's edge.
 --
--- The minimap shrinks to almost nothing while fully faded, so the button isn't
--- attached to it. It lives on UIParent and is moved to the minimap's edge
--- whenever the minimap is at full size. It's in the minimap fade group, so it
--- fades with the minimap and hovering it reveals the minimap.
+-- It's the minimap's child, like LibDBIcon's buttons, so addons that gather
+-- minimap buttons find it (they scan the minimap's children, and our name
+-- passes their checks). It shrinks and parks with the minimap while faded;
+-- hovering the map's empty spot still brings it back (see ShrinkEntry).
+-- Gathered, it's the gatherer's: left where it's put, and no longer faded with
+-- the map (ns.MinimapButtonGathered), or it'd be invisible in their popout.
 local _, ns = ...
 local L = ns.L
 
 local ICON = "Interface\\Icons\\INV_Misc_Spyglass_03"
 local EDGE_OFFSET = 10 -- how far outside the minimap's rim the button sits
 local button
--- With EllesmereUI's minimap, the button is the minimap's child instead, so its
--- button drawer collects it (it only takes the minimap's own children). It's
--- then anchored to the minimap and left alone, as EllesmereUI lays it out.
-local onMinimap
+-- EllesmereUI's minimap keeps the button on the minimap and lays it out in its
+-- drawer, so it's anchored once, then left alone (and still fades with the map).
+local inDrawer
 
 local function Print(msg)
 	ns.Print(msg)
@@ -127,39 +128,26 @@ local function RimOffset(angle, halfWidth, halfHeight)
 	return x * stretch * halfWidth, y * stretch * halfHeight
 end
 
-local function UpdatePosition()
+local function Place()
 	local db = ns.GetDB()
 	if not button or not db then
 		return
 	end
-	if onMinimap then
-		local x, y = RimOffset(math.rad(db.minimapAngle),
-			Minimap:GetWidth() / 2 + EDGE_OFFSET, Minimap:GetHeight() / 2 + EDGE_OFFSET)
-		button:ClearAllPoints()
-		button:SetPoint("CENTER", Minimap, "CENTER", x, y)
-		return
-	end
-	if Minimap:GetScale() < 0.5 then
-		return -- minimap is shrunk while faded; keep the last good position
-	end
-	local mx, my = Minimap:GetCenter()
-	if not mx then
-		return
-	end
-	local minimapScale, buttonScale = Minimap:GetEffectiveScale(), button:GetEffectiveScale()
-	-- Faded but kept full size (a Reveal tick, Minimap page), the minimap is
-	-- moved off the screen: following it there left the button gone after it
-	-- came back, until the next scan. Keep the last good position.
-	local uiScale = UIParent:GetEffectiveScale()
-	if mx * minimapScale / uiScale > UIParent:GetWidth() then
-		return
-	end
-	local cx, cy = mx * minimapScale / buttonScale, my * minimapScale / buttonScale
 	local x, y = RimOffset(math.rad(db.minimapAngle),
-		(Minimap:GetWidth() / 2) * minimapScale / buttonScale + EDGE_OFFSET,
-		(Minimap:GetHeight() / 2) * minimapScale / buttonScale + EDGE_OFFSET)
+		Minimap:GetWidth() / 2 + EDGE_OFFSET, Minimap:GetHeight() / 2 + EDGE_OFFSET)
 	button:ClearAllPoints()
-	button:SetPoint("CENTER", UIParent, "BOTTOMLEFT", cx + x, cy + y)
+	button:SetPoint("CENTER", Minimap, "CENTER", x, y)
+end
+
+-- Whether the button is ours to place: on the minimap's rim, not in a drawer
+-- or another addon's collection.
+local function OnRim()
+	return button ~= nil and not inDrawer and button:GetParent() == Minimap
+end
+
+-- Whether another addon took the button off the minimap (see the top).
+function ns.MinimapButtonGathered()
+	return button ~= nil and not inDrawer and button:GetParent() ~= Minimap
 end
 
 local function UpdateIcon()
@@ -169,11 +157,9 @@ local function UpdateIcon()
 	-- (Not in gamepad mode with hideMinimapButtonGamepad: clicking it there
 	-- tends to freeze WoW Forever.)
 	local shown = db.minimapButton and not (db.hideMinimapButtonGamepad and ns.IsGamePadOn())
-	if not onMinimap then
-		button:SetShown(shown)
-	elseif shown ~= button.wanted then
-		-- Only on a change, and with Show/Hide, which EllesmereUI follows: it
-		-- hides drawer buttons itself.
+	if shown ~= button.wanted then
+		-- Only on a change, and with Show/Hide, which addons gathering the
+		-- button follow: they hide it themselves too.
 		button.wanted = shown
 		if shown then button:Show() else button:Hide() end
 	end
@@ -263,6 +249,7 @@ local function ShowMenu(owner)
 end
 
 local function OnEnter(self)
+	local canDrag = self == button and OnRim()
 	GameTooltip:SetOwner(self, "ANCHOR_LEFT")
 	GameTooltip:SetText("Cinematic")
 	local db = ns.GetDB()
@@ -271,7 +258,7 @@ local function OnEnter(self)
 	if not ns.ProfileChosen() then
 		GameTooltip:AddLine(L["No profile yet"], 1, 0.5, 0)
 		GameTooltip:AddLine(L["Click: pick a profile"], 1, 1, 1)
-		if not onMinimap then
+		if canDrag then
 			GameTooltip:AddLine(L["Drag: move"], 1, 1, 1)
 		end
 		GameTooltip:Show()
@@ -293,10 +280,21 @@ local function OnEnter(self)
 	end
 	GameTooltip:AddLine(L["Left-click: options"], 1, 1, 1)
 	GameTooltip:AddLine(L["Right-click: settings"], 1, 1, 1)
-	if not onMinimap then
+	if canDrag then
 		GameTooltip:AddLine(L["Drag: move"], 1, 1, 1)
 	end
 	GameTooltip:Show()
+end
+
+local function OnClick(owner, mouseButton)
+	GameTooltip:Hide()
+	if not ns.ProfileChosen() then
+		ns.ShowWelcome()
+	elseif mouseButton == "RightButton" then
+		ns.OpenOptions()
+	else
+		ShowMenu(owner)
+	end
 end
 
 -- Dragging moves the button around the minimap's rim.
@@ -309,18 +307,20 @@ local function OnDragUpdate()
 	local x, y = GetCursorPosition()
 	x, y = x / scale, y / scale
 	ns.GetDB().minimapAngle = math.deg(math.atan2(y - my, x - mx))
-	UpdatePosition()
+	Place()
 end
 
 local function Create()
 	local isLoaded = C_AddOns and C_AddOns.IsAddOnLoaded or IsAddOnLoaded
-	onMinimap = isLoaded("EllesmereUIMinimap") and true or false
-	button = CreateFrame("Button", "CinematicMinimapButton", onMinimap and Minimap or UIParent)
+	inDrawer = isLoaded("EllesmereUIMinimap") and true or false
+	button = CreateFrame("Button", "CinematicMinimapButton", Minimap)
 	button:SetSize(31, 31)
 	button:SetFrameStrata("MEDIUM")
+	button:SetFixedFrameStrata(true)
 	button:SetFrameLevel(8)
+	button:SetFixedFrameLevel(true)
 	button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
-	if not onMinimap then -- (EllesmereUI places it: dragging would pull it out of the drawer)
+	if not inDrawer then -- (EllesmereUI places it: dragging would pull it out of the drawer)
 		button:RegisterForDrag("LeftButton")
 	end
 	button:SetHighlightTexture("Interface\\Minimap\\UI-Minimap-ZoomButton-Highlight")
@@ -362,16 +362,7 @@ local function Create()
 	fade:SetSmoothing("IN_OUT")
 	button.glow = glow
 
-	button:SetScript("OnClick", function(self, mouseButton)
-		GameTooltip:Hide()
-		if not ns.ProfileChosen() then
-			ns.ShowWelcome()
-		elseif mouseButton == "RightButton" then
-			ns.OpenOptions()
-		else
-			ShowMenu(self)
-		end
-	end)
+	button:SetScript("OnClick", OnClick)
 	button:SetScript("OnEnter", OnEnter)
 	button:SetScript("OnLeave", function() GameTooltip:Hide() end)
 	button:SetScript("OnDragStart", function(self)
@@ -387,17 +378,17 @@ local function Create()
 		end
 	end)
 
-	UpdatePosition()
+	Place()
 	UpdateIcon()
 end
 
 -- Called by Core: at login, and on its regular scan so the button follows the
--- minimap if it moves (and the icon catches a pause running out).
+-- map's shape if an addon changes it (and the icon catches a pause running out).
 function ns.UpdateMinimapButton()
 	if not button then
 		Create()
-	elseif not onMinimap then
-		UpdatePosition()
+	elseif OnRim() then
+		Place()
 	end
 	UpdateIcon()
 end
@@ -407,4 +398,27 @@ function ns.ToggleMinimapButton()
 	db.minimapButton = not db.minimapButton
 	ns.UpdateMinimapButton()
 	Print(db.minimapButton and L["minimap button shown"] or L["minimap button hidden"])
+end
+
+-- The game's addon compartment (retail and WoW Forever; the .toc names these):
+-- the same clicks and tooltip, for when the button's hidden or gathered away.
+-- Not in gamepad mode with hideMinimapButtonGamepad: the button's hidden there
+-- as clicking it tends to freeze WoW Forever, and this would open the same.
+function Cinematic_OnCompartmentClick(_, mouseButton)
+	local db = ns.GetDB()
+	if db.hideMinimapButtonGamepad and ns.IsGamePadOn() then
+		Print(L["not available in gamepad mode: use /cine instead."])
+		return
+	end
+	-- (A frame later: the compartment's own menu is closing. UIParent: that
+	-- menu's button goes with it.)
+	C_Timer.After(0, function() OnClick(UIParent, mouseButton) end)
+end
+
+function Cinematic_OnCompartmentEnter(_, frame)
+	OnEnter(frame)
+end
+
+function Cinematic_OnCompartmentLeave()
+	GameTooltip:Hide()
 end

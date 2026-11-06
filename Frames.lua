@@ -113,7 +113,7 @@ local FRAME_GROUPS = {
 	minimapdial = {},
 	-- Addons' buttons on the minimap's edge (ours, LibDBIcon's: found by
 	-- FindMinimapHeader) and the coordinates under it (found by their text).
-	minimapaddons = { "CinematicMinimapButton" },
+	minimapaddons = {},
 	-- The game's addon compartment button by the minimap (retail and Forever).
 	minimapcompartment = { "AddonCompartmentFrame" },
 	minimapcoords = {},
@@ -1177,6 +1177,14 @@ do
 		-- The zone's name: its button, whose bar art ignores its fade (above).
 		AddFrame(bar, "minimapzone")
 		AddFrame(cluster and cluster.DielFrame, "minimapdial")
+		-- Our button, unless an addon gathering minimap buttons took it: then it
+		-- shows in that addon's popout, so it's not faded with the map.
+		local ours = _G.CinematicMinimapButton
+		if ours and ns.MinimapButtonGathered() then
+			if RemoveFrame(ours) and ours.SetIgnoreParentAlpha then ours:SetIgnoreParentAlpha(false) end
+		else
+			AddFrame(ours, "minimapaddons")
+		end
 		-- Addons' buttons on the minimap (LibDBIcon's: LibDBIcon10_<addon>).
 		if type(Minimap) == "table" and Minimap.GetChildren and not leftAlone.Minimap then
 			for _, child in ipairs({ Minimap:GetChildren() }) do

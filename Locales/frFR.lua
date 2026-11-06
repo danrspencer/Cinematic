@@ -265,6 +265,7 @@ L["Instances"] = "Instances"
 L["Start / Menu"] = "Start / Menu"
 
 -- MinimapButton.lua
+L["not available in gamepad mode: use /cine instead."] = "indisponible en mode manette : utilisez plutôt /cine."
 L["until logout"] = "jusqu'à la déconnexion"
 L["%d:%02d left"] = "encore %d:%02d"
 L["Tint"] = "Teinte"
