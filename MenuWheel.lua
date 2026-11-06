@@ -303,7 +303,7 @@ gameMenuButton:SetScript("OnClick", function()
 		return
 	end
 	if SettingsPanel and SettingsPanel:IsShown() then
-		SettingsPanel:Close()
+		SettingsPanel:Close(true) -- (true: not back to the Game Menu, blocked for addons)
 	end
 	CloseMenus()
 	CloseAllWindows()

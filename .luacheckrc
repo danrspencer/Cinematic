@@ -10,7 +10,7 @@ ignore = { "542", "212/self", "421", "422", "431" }
 globals = {
 	"CinematicDB", "CinematicCharDB", "SlashCmdList", "StaticPopupDialogs", "ColorPickerFrame", "DAMAGE_TEXT_FONT",
 	"ClickCastFrames",
-	"Cinematic_Toggle", "Cinematic_ToggleCineMode", "Cinematic_ToggleUI", "Cinematic_TakeScreenshot", "Cinematic_Reload", "BINDING_NAME_CINEMATIC_RELOAD", "Cinematic_StartCam", "Cinematic_StopCamera", "Cinematic_CustomTrigger", "Cinematic_FlyBy", "Cinematic_ShowTooltips", "Cinematic_ToggleTooltips", "Cinematic_ToggleVisualEffects", "Cinematic_ToggleLetterbox",
+	"Cinematic_Toggle", "Cinematic_ToggleCineMode", "Cinematic_ToggleUI", "Cinematic_TakeScreenshot", "Cinematic_Reload", "BINDING_NAME_CINEMATIC_RELOAD", "Cinematic_ToggleSettings", "BINDING_NAME_CINEMATIC_TOGGLESETTINGS", "Cinematic_StartCam", "Cinematic_StopCamera", "Cinematic_CustomTrigger", "Cinematic_FlyBy", "Cinematic_ShowTooltips", "Cinematic_ToggleTooltips", "Cinematic_ToggleVisualEffects", "Cinematic_ToggleLetterbox",
 	"Cinematic_CameraWheel", "BINDING_NAME_CINEMATIC_CAMWHEEL", "Cinematic_ToggleVision", "AddonCompartmentFrame",
 	"BINDING_NAME_CINEMATIC_VISION_HEAL", "BINDING_NAME_CINEMATIC_VISION_QUEST", "BINDING_NAME_CINEMATIC_VISION_DUEL",
 	"BINDING_NAME_CINEMATIC_VISION_ROLL",

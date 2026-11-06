@@ -36,7 +36,7 @@ local UI_WIDTH, UI_HEIGHT = 1707, 960
 GetTime = function() return now end
 local timers = {}
 C_Timer.After = function(secs, fn) timers[#timers + 1] = { at = now + secs, fn = fn } end
-local cvars = { [SHOULDER] = "0.000000", [CENTERED] = "1", cameraFov = "90", test_cameraHeadMovementStrength = "0" }
+local cvars = { [SHOULDER] = "0.000000", [CENTERED] = "1", CameraReduceUnexpectedMovement = "1", cameraFov = "90", test_cameraHeadMovementStrength = "0" }
 local writes = { total = 0, popups = 0 }
 local accepted = false
 local events = {}
@@ -87,7 +87,7 @@ local function MoveCamera(dt)
 	local d = cam.goal - cam.zoom
 	cam.zoom = math.abs(d) <= step and cam.goal or cam.zoom + (d > 0 and step or -step)
 	local want = tonumber(cvars[SHOULDER]) or 0
-	if cvars[CENTERED] == "1" then want = 0 end
+	if cvars[CENTERED] == "1" or cvars.CameraReduceUnexpectedMovement == "1" then want = 0 end
 	want = want * me.scale * (me.mounted and GAME.mountScale or 1)
 	cam.offset = cam.offset + (want - cam.offset) * math.min(1, dt * GAME.ease)
 end
@@ -361,6 +361,7 @@ local function Check(name, ok, detail) checks[#checks + 1] = { name = name, ok =
 local function Num(v) return tonumber(v) or 0 end
 Check("Offset back to yours after turning off", Num(cvars[SHOULDER]) == 0, "reads " .. tostring(cvars[SHOULDER]))
 Check("Keep Character Centered back to yours", cvars[CENTERED] == "1", "reads " .. tostring(cvars[CENTERED]))
+Check("Reduce Unexpected Movement back to yours", cvars.CameraReduceUnexpectedMovement == "1", "reads " .. tostring(cvars.CameraReduceUnexpectedMovement))
 Check("Cast bar back on its place", math.abs(Share(bar, home.bar)) < 0.001, ("%.1f UI units off"):format(Share(bar, home.bar) * UI_WIDTH / 2))
 Check("PRD back on its place", math.abs(Share(prd, home.prd)) < 0.001, ("%.1f UI units off"):format(Share(prd, home.prd) * UI_WIDTH / 2))
 local errors = 0

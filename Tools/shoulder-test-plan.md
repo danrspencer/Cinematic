@@ -46,7 +46,7 @@ Everything goes to the saved log under `shoulder:`. A `/reload` saves it.
 | `/cine debug shoulder scan` | Every camera setting and its default, which ones this client lacks, who you are |
 | `/cine debug shoulder frames` | How the cast bar and PRD are anchored, and whether they're protected |
 | `/cine debug shoulder watch` | Toggle, stays on over reloads. Logs every camera setting change and **who made it**, the warning popup, mounts and forms, and values at each login and logout |
-| `/cine debug shoulder quiet` | Toggle, stays on over reloads. Tests keeping the warning away by not letting UIParent hear its event |
+| `/cine debug shoulder quiet` | Toggle, stays on over reloads; off takes a /reload. Tests keeping the warning away by stopping its event, as DynamicCam does |
 | `/cine debug shoulder sweep offsets` | **Measures.** Says a line in /say, steps the offset 0 to 2, -1, -2, and reads your bubble at each step |
 | `/cine debug shoulder sweep zoom` | The same at 5, 8, 12, 15, 20 and 28 yards. It moves your zoom |
 | `/cine debug shoulder sweep ease` | Logs every 0.05 s through a big step: how fast the game eases |
@@ -106,7 +106,7 @@ Answers: does the value survive a reload, a relog and a restart, and what writes
 /cine debug shoulder quiet
 ```
 
-Then `/cine debug shoulder watch`, `/cine debug shoulder on`, `/reload`, and check for the warning. Then a full relog. Then turn off `on`, `quiet` and `watch` the same way.
+First make sure DynamicCam and DialogueUI are off: both hide the warning themselves. Then `/cine debug shoulder watch`, `/cine debug shoulder on`, `/reload`, and check for the warning. Then a full relog. Then turn off `on`, `quiet` and `watch` the same way.
 
 Answers: does stopping the event keep the warning away, is anything broken by it, and does it work on retail?
 
@@ -150,7 +150,8 @@ Each phase ends with the sim passing, including its new checks, then one game te
 
 ### Phase 1: solid ground (after Runs 1 and 2)
 
-- Settle the login warning. If the value doesn't survive, the honest options are: accept one warning per login, delay the write until you first need it, or find another way. This decides whether it can ever be on by default.
+- Settle the login warning: keep it away as DynamicCam does, if Run 2b works. If it can't, accept one warning per session.
+- Step aside when DynamicCam is on.
 - Fix the frames left moved after a fight: keep them and put them back when the fight ends.
 - Frames follow you on chained layouts: move the first frame in the chain that's ours to move, and let what's anchored to it ride along, never both.
 - Correct the file header's claim about logout.
@@ -189,7 +190,6 @@ Only what passes the look test: head movement, dynamic pitch, target focus. Each
 - A scene step in camera scripts: set the shoulder for a shot, put it back after.
 - Replace the pause with real handovers: quest cam and Chat Cam choose a side based on who you're talking to.
 - Frames follow you for more frames, if wanted.
-- DynamicCam: step aside when it's loaded, as with DialogueUI.
 - Release: Cinematic.toc, What's new, docs page, translations at release.
 
 ## Decisions for you
@@ -198,6 +198,22 @@ Only what passes the look test: head movement, dynamic pitch, target focus. Each
 - Is one warning per login acceptable, if that's what Run 2 shows?
 - Is the sweep's line in /say OK, or should it use a party or a private way? A private way may not make a bubble.
 - Does the Shoulder Cam go public, and on which clients? That waits on Runs 1 and 2.
+
+## What DynamicCam does (read 2026-11-06, v2.21.6, MIT license)
+
+| Topic | What it does | For us |
+| --- | --- | --- |
+| The warning | Never shows it: `GameEvent.UnregisterInternalEvent("EXPERIMENTAL_CVAR_CONFIRMATION_NEEDED")`, or `UIParent:UnregisterEvent(...)` before WoW 12.1. DialogueUI does the same | The likely answer to bug 1. `quiet` tests it |
+| Blocking settings | Turns off `CameraKeepCharacterCentered` **and** `CameraReduceUnexpectedMovement` (needed since 11.0.2), and prints that it did | We missed the second. Fixed: held and restored like the first |
+| Timing | Waits 0.1 s after startup: "the camera doesn't like changing cvars on startup" | We write at PLAYER_ENTERING_WORLD. Delay it if a login looks wrong |
+| While zooming | Doesn't write the offset mid-zoom | Check in Run 5 |
+| Range | Offset -15 to 15 | Our 2 is far too low: Phase 3 |
+| Zoom | The offset can follow a curve you draw against distance, with easing | Same aim as Hold your spot; ours is one spot instead of a curve |
+| Situations | Eases the offset per situation, with its own timing | Phase 4 |
+| Model and mount size | **Not in DynamicCam.** It's a separate addon, CameraOverShoulder Fix, which DynamicCam calls if present (`cosFix`) | Still ours to measure: Phase 2 |
+| Screen frames | Doesn't move them | Frames follow you is ours alone |
+
+If DynamicCam is on, it owns the offset and writes it constantly, so we must step aside. That moves up from Phase 6 to Phase 1.
 
 ## Sources
 

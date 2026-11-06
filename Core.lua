@@ -39,6 +39,7 @@ local function SetBindingNames()
 	BINDING_NAME_CINEMATIC_SHOWTOOLTIPS = "Cinematic: " .. L["Show hidden tooltips (hold)"]
 	BINDING_NAME_CINEMATIC_TOGGLETOOLTIPS = "Cinematic: " .. L["Toggle tooltip hiding"]
 	BINDING_NAME_CINEMATIC_RELOAD = "Cinematic: " .. L["Reload the UI"]
+	BINDING_NAME_CINEMATIC_TOGGLESETTINGS = "Cinematic: " .. L["Toggle settings"]
 end
 SetBindingNames()
 ns.OnLanguage(SetBindingNames)

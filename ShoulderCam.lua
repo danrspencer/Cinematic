@@ -2,7 +2,8 @@
 -- left: shoulderCamSide), you to the side of the screen. It's the game's
 -- test_cameraOverShoulder offset (yards: shoulderCamOffset, negative for the
 -- left), which it eases over to on its own. The game ignores that while Keep
--- Character Centered (Accessibility) is on, so that's turned off meanwhile.
+-- Character Centered (Accessibility) is on, so that's turned off meanwhile, and
+-- CameraReduceUnexpectedMovement too (the same since 11.0.2, as DynamicCam found).
 -- It's one of Blizzard's experimental camera settings: writing it brings up
 -- their warning. Accept saves nothing; it's the write that brings it up, once
 -- a session. The game clears the offset at every reload and login, and keeps
@@ -100,6 +101,7 @@ function ns.ApplyShoulderCam()
 		-- back what it found: hands off till it's done. Support/DialogueUI.lua.)
 		if not (ns.shoulderTestHold or (ns.DialogueUICameraOn and ns.DialogueUICameraOn())) then
 			Write(yours, "CameraKeepCharacterCentered", "0")
+			Write(yours, "CameraReduceUnexpectedMovement", "0")
 			Write(yours, "test_cameraOverShoulder", ShoulderValue())
 		end
 		poller:Show()
@@ -321,8 +323,8 @@ function ns.CreateShoulderCamPanel(kit)
 	local switch = kit.PageSwitch(content, "shoulderCam", L["Enable Page"],
 		L["On: the camera moves over your shoulder. This uses one of Blizzard's experimental " ..
 		"camera settings: the game shows its experimental camera warning (Accept keeps it working). " ..
-		"The game's Keep Character Centered option (Accessibility) stops it, so that's turned off " ..
-		"meanwhile. Off: your own settings come back."], intro, ns.ApplyShoulderCam)
+		"The game's Keep Character Centered and motion sickness options stop it, so those are turned " ..
+		"off meanwhile. Off: your own settings come back."], intro, ns.ApplyShoulderCam)
 	local function IfOn() return ns.Setting("shoulderCam") end
 	local stack = kit.Stack(switch, "check")
 

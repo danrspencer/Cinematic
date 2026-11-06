@@ -12,9 +12,9 @@
 --   It says a line (the game puts your chat bubble right over you), then steps
 --   the offset or the zoom and reads the bubble. A bubble doesn't last: when
 --   it's gone the sweep waits, and "sweep next" says another line and goes on.
--- quiet: (again to stop; stays on over a reload) stops the game's UIParent
---   hearing the event that brings up the experimental warning, to see if that
---   keeps it away. Off by default, for testing only so far.
+-- quiet: (stays on over a reload; again and /reload to stop) stops the game
+--   hearing the event that brings up the experimental warning, as DynamicCam
+--   and DialogueUI do, to see if that keeps it away here. For testing so far.
 -- try pitch|head|enemy|interact|off: one of the game's other experimental
 --   camera settings on (again: off), for a look. "try off" puts all back.
 local _, ns = ...
@@ -24,8 +24,9 @@ local EASE_TIME = 3    -- seconds the ease run follows one step for
 local SAMPLE = 0.05    -- seconds between bubble reads
 local LINE = "Testing my camera, please ignore this line of text for a moment."
 local SHOULDER, CENTERED = "test_cameraOverShoulder", "CameraKeepCharacterCentered"
+local REDUCE = "CameraReduceUnexpectedMovement"
 
-local CAMERA_CVARS = { SHOULDER, CENTERED, "test_cameraDynamicPitch", "test_cameraDynamicPitchBaseFovPad",
+local CAMERA_CVARS = { SHOULDER, CENTERED, REDUCE, "test_cameraDynamicPitch", "test_cameraDynamicPitchBaseFovPad",
 	"test_cameraDynamicPitchBaseFovPadDownScale", "test_cameraDynamicPitchBaseFovPadFlying",
 	"test_cameraDynamicPitchSmartPivotCutoffDist", "test_cameraHeadMovementStrength",
 	"test_cameraHeadMovementRangeScale", "test_cameraHeadMovementMovingStrength",
@@ -195,10 +196,20 @@ end
 -- quiet: whether the warning stays away with the game not told to show it.
 local WARNING_EVENT = "EXPERIMENTAL_CVAR_CONFIRMATION_NEEDED"
 local function SetQuiet(on)
+	-- (Since 12.1 the game hears it through GameEvent, not UIParent.)
+	local game = _G.GameEvent
+	local internal = game and game.UnregisterInternalEvent
 	local was = UIParent:IsEventRegistered(WARNING_EVENT)
-	local ok, err = pcall(on and UIParent.UnregisterEvent or UIParent.RegisterEvent, UIParent, WARNING_EVENT)
-	Log(("quiet %s: UIParent was listening %s, now %s%s"):format(on and "on" or "off", Text(was),
-		Text(UIParent:IsEventRegistered(WARNING_EVENT)), ok and "" or (", error " .. Text(err))))
+	local ok, err = true, nil
+	if on then
+		if internal then ok, err = pcall(internal, WARNING_EVENT) end
+		UIParent:UnregisterEvent(WARNING_EVENT)
+	elseif not internal then
+		UIParent:RegisterEvent(WARNING_EVENT)
+	end
+	Log(("quiet %s: GameEvent way here %s, UIParent was listening %s, now %s%s"):format(on and "on" or "off",
+		Text(internal ~= nil), Text(was), Text(UIParent:IsEventRegistered(WARNING_EVENT)),
+		ok and "" or (", error " .. Text(err))))
 end
 local boot = CreateFrame("Frame")
 boot:RegisterEvent("ADDON_LOADED")
@@ -441,7 +452,7 @@ function ns.ShoulderTest(arg)
 	elseif what == "quiet" then
 		ns.db.shoulderTestQuiet = not ns.db.shoulderTestQuiet or nil
 		SetQuiet(ns.db.shoulderTestQuiet and true or false)
-		ns.Print(("shoulder quiet %s (stays over a reload)"):format(ns.db.shoulderTestQuiet and "on" or "off"))
+		ns.Print(("shoulder quiet %s (stays over a reload; off takes a /reload)"):format(ns.db.shoulderTestQuiet and "on" or "off"))
 	elseif what == "sweep" then Sweep(rest)
 	elseif what == "try" then Try(rest)
 	elseif what == "on" then Set("shoulderCam", true)

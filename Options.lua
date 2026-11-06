@@ -1753,6 +1753,8 @@ local function CreatePanel()
 	mainCanvas:SetScript("OnShow", PageShown(Refresh, panel))
 	mainCanvas:Hide() -- so OnShow fires on the first visit too
 	searchPages[1] = { canvas = mainCanvas }
+	-- (Back on the main page: the key opens there next. Cinematic_ToggleSettings)
+	CreateFrame("Frame", nil, mainCanvas):SetScript("OnShow", function() ns.lastOptionsPage = nil end)
 
 	if Settings and Settings.RegisterCanvasLayoutCategory then
 		category = Settings.RegisterCanvasLayoutCategory(mainCanvas, "Cinematic")
@@ -2556,6 +2558,7 @@ local function RegisterSubpage(subpanel, name, shown)
 	-- while hidden. A child of its own, so the page's OnShow stays the page's.)
 	local watch = CreateFrame("Frame", nil, subpanel)
 	watch:SetScript("OnShow", function()
+		ns.lastOptionsPage = name -- (Cinematic_ToggleSettings)
 		if subpanel.stale then
 			subpanel.stale = nil
 			Refresh()
@@ -13924,6 +13927,8 @@ local KEYBINDS = {
 	{ action = "CINEMATIC_RELOAD", label = L["Reload the UI"],
 		tip = L["Reloads the UI, like /reload. With Keep windows open across a reload ticked (Quality of " ..
 			"life > General), what you had open opens again after."] },
+	{ action = "CINEMATIC_TOGGLESETTINGS", label = L["Toggle settings"],
+		tip = L["Opens Cinematic's settings at the page you were last on. Press it again to close them."] },
 	{ action = "CLICK CinematicMasterWheelButton:LeftButton", label = L["Master wheel"], section = L["Wheels"],
 		tip = L["Hold to bring up a wheel of the wheels below (camera, menu, marker...): point at one and " ..
 			"let go to open it, then click what you want on it. Tap it instead and the wheel stays up for you " ..
@@ -14257,6 +14262,24 @@ function ns.OpenOptions(page)
 		-- Called twice: the first call can land on the wrong page in old clients.
 		InterfaceOptionsFrame_OpenToCategory(subpages[page] or mainCanvas)
 		InterfaceOptionsFrame_OpenToCategory(subpages[page] or mainCanvas)
+	end
+end
+
+-- The key (Bindings.xml): opens the settings at the Cinematic page last shown,
+-- or closes them. Close(true): without it the window goes back to the Game
+-- Menu, and ToggleGameMenu is blocked for addons. In a fight it goes as
+-- ns.OpenOptions does: hidden directly where the window isn't protected, left
+-- open where it is (Escape still closes it).
+function Cinematic_ToggleSettings()
+	local panel = SettingsPanel or InterfaceOptionsFrame
+	if not (panel and ns.Flag(panel:IsShown())) then
+		ns.OpenOptions(ns.lastOptionsPage)
+	elseif InCombatLockdown() then
+		if not panel:IsProtected() then panel:Hide() end
+	elseif panel.Close then
+		panel:Close(true) -- (through GuardGamepadClose's reload, in gamepad mode)
+	else
+		HideUIPanel(panel)
 	end
 end
 
