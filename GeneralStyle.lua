@@ -104,6 +104,7 @@ function ns.MakeGeneralPlatePreview(parent, width)
 			health:GetStatusBarTexture():SetDesaturated(false)
 		end
 		health:SetStatusBarColor(0.85, 0.12, 0.1)
+		ns.DressThemeVeil(health, "plate")
 		-- (Its border: General's, or the game's ground with its outline.)
 		local kind, size, r, g, b = ns.StyleBorder(general, "styleBorder")
 		local game = kind == "game"
@@ -345,12 +346,16 @@ function ns.CreateGeneralStylePanel(kit)
 		return { { value = "square", text = L["Square"] }, { value = "round", text = L["Rounded"] },
 			{ value = "chamfer", text = L["Chamfered"] }, { value = "blade", text = L["Blade"] },
 			{ value = "notch", text = L["Notched"] }, { value = "sigil", text = L["Sigil"] },
-			{ value = "veil", text = L["Veil"] } }
+			{ value = "veil", text = L["Veil"] }, { value = "deco", text = L["Stepped"] },
+			{ value = "plate", text = L["Plate"] }, { value = "leaf", text = L["Leaf"] },
+			{ value = "facet", text = L["Faceted"] } }
 	end, L["The outline of tooltips, chat bubbles, dialogue and roll panels."])
 	rows.Dropdown(L["Bar shape:"], ns.ThemeQuickField("styleBarShape"), function()
 		return { { value = "square", text = L["Square"] }, { value = "capsule", text = L["Capsule"] },
-			{ value = "slant", text = L["Slanted"] }, { value = "point", text = L["Pointed"] },
-			{ value = "barb", text = L["Barbed"] }, { value = "taper", text = L["Tapered"] } }
+			{ value = "point", text = L["Pointed"] },
+			{ value = "barb", text = L["Barbed"] },
+			{ value = "chisel", text = L["Chiseled"] }, { value = "soft", text = L["Soft"] },
+			{ value = "bevel", text = L["Beveled"] } }
 	end, L["The ends of unit frame and personal resource bars. A straight border can't follow a shape, so it goes " ..
 		"while one's picked. Raid tiles and nameplates stay square."])
 	-- (The game's own nameplate Style, retail's Options > Nameplates: held while

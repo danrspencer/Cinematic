@@ -165,6 +165,7 @@ local function Dress(frame)
 		-- game keeps it lower down.)
 		local fill = view and health:GetStatusBarTexture()
 		if fill and fill.SetDrawLayer then fill:SetDrawLayer("BORDER") end
+		ns.DressThemeVeil(health, view and "raid")
 		if view and view.ufBorder ~= "game" then skinned[health] = true end
 	end
 	ns.UnitStyleDressName(frame.name, view, unit)
@@ -262,6 +263,7 @@ function ns.MakeRaidStylePreview(parent, width, onPick)
 			local r, g, b = ClassColor(class)
 			if view.ufHealthColor == "custom" then r, g, b = view.ufHealthR, view.ufHealthG, view.ufHealthB end
 			tile.health:SetStatusBarColor(r, g, b)
+			ns.DressThemeVeil(tile.health, "raid")
 			local kind, size, er, eg, eb = ns.StyleBorder(view, "ufBorder")
 			tile.edge:SetShown(kind == "line" or kind == "game")
 			if kind == "line" then

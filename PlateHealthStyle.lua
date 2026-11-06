@@ -95,6 +95,7 @@ local function Dress(bar)
 		state.on = false
 	end
 	busy = false
+	ns.DressThemeVeil(bar, texture and "plate" or nil)
 	if kind == "line" then
 		state.edges = state.edges or ns.MakeStyleEdges(bar)
 		ns.DressStyleEdges(state.edges, size, r, g, b, 1, true)

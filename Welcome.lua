@@ -36,6 +36,9 @@ local OWN_PROFILE = "My setup"
 local SECTIONS = {}
 local VISIONS = { label = "Visions", page = "Heal Vision", question = "Which Visions do you want?",
 	visions = true }
+-- (The Style hub's themes, a row each: StyleThemes.lua. Not a slot: a theme is
+-- its own set of settings, which no slot's choices touch.)
+local THEMES = { label = "Theme", page = "Style General", question = "How should your UI look?", themes = true }
 -- What each Vision does, in a line (the vision wheel's list: MarkerWheel.lua).
 local VISION_LINES = {
 	heal = "Party and raid frames show only who needs healing",
@@ -50,16 +53,18 @@ local VISION_LINES = {
 -- (Visions the vision wheel doesn't have, ticked here as the wheel's are:
 -- their setting on or off. The profiles turn them on: ProfileChoices.lua.)
 -- (A slot with no choices on this client isn't listed: Layout on retail.)
-for _, slot in ipairs({ "frames", "bars", "layout", "camera", "vfx", "visions", "chat", "sound" }) do
+for _, slot in ipairs({ "frames", "bars", "layout", "camera", "vfx", "themes", "visions", "chat", "sound" }) do
 	if slot == "visions" then
 		tinsert(SECTIONS, VISIONS)
+	elseif slot == "themes" then
+		tinsert(SECTIONS, THEMES)
 	elseif ns.SlotChoices(slot) then
 		tinsert(SECTIONS, setmetatable({ slot = slot }, { __index = ns.SLOT_CHOICES[slot] }))
 	end
 end
 ns.OnLanguage(function()
 	OWN_PROFILE = L[OWN_PROFILE]
-	ns.TranslateFields({ VISIONS }, "label", "question")
+	ns.TranslateFields({ VISIONS, THEMES }, "label", "question")
 	for key, line in pairs(VISION_LINES) do VISION_LINES[key] = L[line] end
 end)
 
@@ -501,11 +506,14 @@ function ns.CustomizePanel(parent, width, onChange, skinned)
 		-- window: the page's refresh as it's shown does it. Matching every
 		-- choice is slow, too much on top of the build on a slower client.)
 		if not ns.db or building then return end
-		local any = shown.visions
+		-- (A theme since changed: its row stays gold, and the note says it's a mix.)
+		local any = shown.visions or shown.themes and not ns.StyleThemeEdited()
 		for _, option in ipairs(options) do
 			local vision = option.choice and option.choice.vision
 			if vision then
 				option.active = option:IsShown() and ns.VisionOn(vision)
+			elseif option.choice.theme then
+				option.active = option:IsShown() and option.choice.theme == ns.ActiveStyleTheme().key
 			elseif option.choice.custom then
 				-- (Custom, last: shown and gold only when no choice matches)
 				option.active = not any
@@ -518,7 +526,7 @@ function ns.CustomizePanel(parent, width, onChange, skinned)
 			option:SetBackdropBorderColor(unpack(option.active and GOLD or EDGE))
 		end
 		local active = ns.ActiveProfile()
-		if not shown.slot and not shown.visions then
+		if not shown.slot and not shown.visions and not shown.themes then
 			saved:SetText("")
 		elseif ns.IsBuiltinProfile(active) then
 			saved:SetText(L["A change here starts a profile of your own, %s."]:format(OWN_PROFILE))
@@ -570,6 +578,14 @@ function ns.CustomizePanel(parent, width, onChange, skinned)
 		option.line:SetPoint("TOPLEFT", option.name, "BOTTOMLEFT", 0, -3)
 		option.line:SetWordWrap(true) -- (wrapped: the row grows to fit it)
 		option.line:SetJustifyH("LEFT")
+		-- (a theme's colors, at the end of its name's line)
+		option.chips = {}
+		for j = 1, 3 do
+			local chip = option:CreateTexture(nil, "ARTWORK")
+			chip:SetSize(16, 5)
+			chip:SetPoint("TOPRIGHT", -10 - (3 - j) * 19, -11)
+			option.chips[j] = chip
+		end
 		-- (and once it's in Edit Mode, Regenerate: made again from the code,
 		-- Edit Mode then back on the profile's layout if this isn't it)
 		option.regenerate = FlatButton(option, L["Regenerate"], "box", function()
@@ -631,6 +647,18 @@ function ns.CustomizePanel(parent, width, onChange, skinned)
 				Changed()
 				return
 			end
+			local theme = self.choice.theme
+			if theme then
+				if self.active then return end
+				if not ns.db.enabled then ns.SetEnabled(true) end
+				ns.EnsureOwnProfile(OWN_PROFILE)
+				ns.ApplyStyleTheme(theme)
+				ns.SaveProfile()
+				UpdateChoices()
+				Changed()
+				ns.PlayThemeCard()
+				return
+			end
 			if self.active or self.choice.custom then return end -- (already so: no profile of your own for nothing)
 			if not ns.db.enabled then ns.SetEnabled(true) end
 			ns.ApplyPart(shown.slot, self.choice.part, OWN_PROFILE)
@@ -659,6 +687,11 @@ function ns.CustomizePanel(parent, width, onChange, skinned)
 					choices[#choices + 1] = { vision = vision, label = L[vision.label], icon = vision.icon,
 						line = VISION_LINES[vision.key] }
 				end
+			end
+		elseif shown.themes then
+			choices = {}
+			for _, theme in ipairs(ns.StyleThemeList()) do
+				choices[#choices + 1] = { theme = theme.key, label = theme.name, line = theme.tip, swatch = theme.swatch }
 			end
 		elseif #choices > 0 then
 			-- (and Custom, for settings none of them has)
@@ -701,6 +734,12 @@ function ns.CustomizePanel(parent, width, onChange, skinned)
 			option.name:SetWidth(0)
 			option.name:SetText(choice.label)
 			option.tag:SetShown(choice.made == true)
+			-- (The swatch's first color is the theme's panel: the rest are what show on it.)
+			for k, chip in ipairs(option.chips) do
+				local color = choice.swatch and choice.swatch[k + 1]
+				if color then chip:SetColorTexture(color[1], color[2], color[3], 1) end
+				chip:SetShown(color ~= nil)
+			end
 			option.layout = choice.made and MadeLayout(choice) or nil
 			local regenerate = option.layout ~= nil and ns.LayoutState(option.layout) ~= nil
 			option.regenerate:SetShown(regenerate)

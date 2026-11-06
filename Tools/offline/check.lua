@@ -471,6 +471,12 @@ if arg[1] and not update then
 		local themeDb = ns.GetDB()
 		local before = {}
 		for key, value in pairs(themeDb) do before[key] = value end
+		-- (Customize's Theme section: a slot's choice mustn't undo a theme's settings.)
+		for _, key in ipairs(ns.StyleThemeSettingKeys()) do
+			if ns.SettingSlot(key) then
+				print(("problem	Style themes: %s is also the %s slot's"):format(key, ns.SettingSlot(key)))
+			end
+		end
 		for _, info in ipairs(ns.StyleThemeList()) do
 			ns.ApplyStyleTheme(info.key)
 			if ns.StyleThemeEdited() then print("problem\tStyle theme " .. info.key .. ": shows as edited just after a pick") end

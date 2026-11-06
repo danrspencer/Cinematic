@@ -1226,6 +1226,10 @@ function ns.CreateUnitStylePanel(kit)
 		{ "arch", L["Arch"], L["A portrait in a pointed window, in place of the game's frame art."] },
 		{ "shard", L["Shard"], L["A portrait in a broken crystal, in place of the game's frame art."] },
 		{ "eye", L["Eye"], L["A tall, narrow portrait with a point at each end, in place of the game's frame art."] },
+		{ "octagon", L["Octagon"], L["An eight-sided portrait, in place of the game's frame art."] },
+		{ "shield", L["Shield"], L["A portrait on a shield, in place of the game's frame art."] },
+		{ "petal", L["Petal"], L["A round portrait with a point at the top, in place of the game's frame art."] },
+		{ "crystal", L["Crystal"], L["A tall cut crystal, in place of the game's frame art."] },
 		{ "none", L["None"], L["No portrait and no frame art: just the name and bars."] },
 	}, Editable)
 	-- (The panel's bottom under the last row, its right at the page's.)

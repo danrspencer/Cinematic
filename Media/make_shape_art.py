@@ -58,25 +58,25 @@ def panel_round(d, s):
 
 
 def panel_chamfer(d, s):
-    c = 11
+    c = 7
     poly([(1 + c, 1), (63 - c, 1), (63, 1 + c), (63, 63 - c), (63 - c, 63), (1 + c, 63), (1, 63 - c), (1, 1 + c)])(d, s)
 
 
 def panel_blade(d, s):
-    c = 14
+    c = 9
     poly([(1 + c, 1), (63, 1), (63, 63 - c), (63 - c, 63), (1, 63), (1, 1 + c)])(d, s)
 
 
 def panel_notch(d, s):
     d.rectangle((1 * s, 1 * s, 63 * s, 63 * s), fill=255)
-    r = 10
+    r = 7
     for cx, cy in ((1, 1), (63, 1), (1, 63), (63, 63)):
         d.ellipse(((cx - r) * s, (cy - r) * s, (cx + r) * s, (cy + r) * s), fill=0)
 
 
 def panel_sigil(d, s):
     # (Each corner pulled in to a point.)
-    a, b = 15, 9
+    a, b = 9, 5
     poly([(1 + a, 1), (63 - a, 1), (63 - b, 1 + b), (63, 1 + a), (63, 63 - a), (63 - b, 63 - b), (63 - a, 63),
           (1 + a, 63), (1 + b, 63 - b), (1, 63 - a), (1, 1 + a), (1 + b, 1 + b)])(d, s)
 
@@ -86,8 +86,27 @@ def panel_veil(d, s):
     d.rounded_rectangle((1 * s, 1 * s, 63 * s, 63 * s), radius=15 * s, fill=255, corners=(True, True, False, False))
 
 
+def mirrored(corner):
+    """A rectangle with its corner cut the same at all four: corner's points run from the
+    top edge to the left edge, and go round clockwise from the left edge."""
+    top_left = list(corner)
+    top_right = [(64 - x, y) for x, y in top_left]
+    bottom_right = [(64 - x, 64 - y) for x, y in reversed(top_left)]
+    bottom_left = [(x, 64 - y) for x, y in top_left]
+    return poly(list(reversed(top_left)) + top_right + bottom_right + bottom_left)
+
+
+def panel_leaf(d, s):
+    # (Two corners swept round, two left sharp: a leaf's outline.)
+    d.rounded_rectangle((1 * s, 1 * s, 63 * s, 63 * s), radius=15 * s, fill=255, corners=(False, True, False, True))
+
+
 PANELS = {"Round": panel_round, "Chamfer": panel_chamfer, "Blade": panel_blade, "Notch": panel_notch,
-          "Sigil": panel_sigil, "Veil": panel_veil}
+          "Sigil": panel_sigil, "Veil": panel_veil, "Leaf": panel_leaf,
+          # (Art deco steps, a plate's square-cut corners, a gem's two facets.)
+          "Deco": lambda d, s: mirrored([(9, 1), (9, 5), (5, 5), (5, 9), (1, 9)])(d, s),
+          "Plate": lambda d, s: mirrored([(7, 1), (7, 7), (1, 7)])(d, s),
+          "Facet": lambda d, s: mirrored([(8, 1), (3, 3), (1, 8)])(d, s)}
 
 
 def panels():
@@ -120,10 +139,6 @@ def bar_capsule(d, s):
     d.rounded_rectangle((0, 1 * s, 256 * s, 31 * s), radius=15 * s, fill=255)
 
 
-def bar_slant(d, s):
-    poly([(14, 1), (256, 1), (242, 31), (0, 31)])(d, s)
-
-
 def bar_point(d, s):
     poly([(0, 16), (12, 1), (244, 1), (256, 16), (244, 31), (12, 31)])(d, s)
 
@@ -132,8 +147,16 @@ def bar_barb(d, s):
     poly([(0, 1), (244, 1), (256, 16), (244, 31), (0, 31), (12, 16)])(d, s)
 
 
-def bar_taper(d, s):
-    poly([(0, 1), (256, 7), (256, 25), (0, 31)])(d, s)
+def bar_chisel(d, s):
+    poly([(0, 1), (256, 1), (256, 17), (240, 31), (0, 31)])(d, s)
+
+
+def bar_bevel(d, s):
+    poly([(0, 9), (8, 1), (248, 1), (256, 9), (256, 23), (248, 31), (8, 31), (0, 23)])(d, s)
+
+
+def bar_soft(d, s):
+    d.rounded_rectangle((0, 1 * s, 256 * s, 31 * s), radius=7 * s, fill=255)
 
 
 # Portraits: 128x128.
@@ -166,8 +189,27 @@ def portrait_eye(d, s):
     d.polygon([(x * s, y * s) for x, y in right + left], fill=255)
 
 
+def portrait_shield(d, s):
+    # (Flat across the top, curving in to a point.)
+    side = [(120 - 56 * (i / 24) ** 2.4, 8 + 116 * (i / 24)) for i in range(25)]
+    d.polygon([(x * s, y * s) for x, y in [(8, 8)] + [(128 - x, y) for x, y in reversed(side)][:0] + side +
+               [(128 - x, y) for x, y in reversed(side)]], fill=255)
+
+
+def portrait_petal(d, s):
+    # (A circle drawn up to a point.)
+    cx, cy, r = 64, 78, 47
+    tip = (64, 2)
+    reach = math.acos(r / (cy - tip[1]))
+    arc = [(cx + r * math.cos(a), cy + r * math.sin(a))
+           for a in (-math.pi / 2 + reach + i * (2 * math.pi - 2 * reach) / 64 for i in range(65))]
+    d.polygon([(x * s, y * s) for x, y in [tip] + arc], fill=255)
+
+
 PORTRAITS = {"Hex": poly(regular(6, math.pi / 6)), "Diamond": poly([(64, 2), (126, 64), (64, 126), (2, 64)]),
-             "Arch": portrait_arch, "Eye": portrait_eye,
+             "Arch": portrait_arch, "Eye": portrait_eye, "Shield": portrait_shield, "Petal": portrait_petal,
+             "Octagon": poly(regular(8, math.pi / 8)),
+             "Crystal": poly([(64, 2), (104, 32), (104, 96), (64, 126), (24, 96), (24, 32)]),
              "Shard": poly([(66, 2), (112, 30), (126, 78), (72, 126), (20, 106), (2, 44)])}
 
 
@@ -203,8 +245,9 @@ def main():
     panels()
     name_shade()
     tail()
-    for name, draw in (("Capsule", bar_capsule), ("Slant", bar_slant), ("Point", bar_point),
-                       ("Barb", bar_barb), ("Taper", bar_taper)):
+    for name, draw in (("Capsule", bar_capsule), ("Point", bar_point),
+                       ("Barb", bar_barb), ("Chisel", bar_chisel),
+                       ("Soft", bar_soft), ("Bevel", bar_bevel)):
         # (Clear at both ends: past its own edges a mask repeats them, so a bar wider
         # than the shape would carry its last column on.)
         out = Image.new("L", (256, 32), 0)

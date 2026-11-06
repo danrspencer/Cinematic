@@ -120,14 +120,15 @@ local THEMES = {
 		swatch = { { 0.05, 0.05, 0.06 }, { 0.86, 0.87, 0.9 }, { 0.55, 0.56, 0.6 }, { 0.94, 0.72, 0.3 } },
 		menu = { accent = { 0.9, 0.9, 0.93 }, edge = { 0.52, 0.53, 0.58 }, field = { 0.07, 0.07, 0.08 },
 			window = { 0.03, 0.03, 0.035 }, well = { 0, 0, 0 }, knob = { 0.95, 0.95, 0.97 }, thumb = { 0.72, 0.72, 0.76 } },
-		grain = "Reel", corner = "Reel", ornament = { 0.86, 0.87, 0.9 }, cornerSize = 26,
+		grain = "Reel", ornament = { 0.86, 0.87, 0.9 },
 		health = { 0.62, 0.64, 0.69 }, mana = { 0.42, 0.48, 0.58 }, back = 0.75,
 		panel = { 0.045, 0.045, 0.055 }, panelAlpha = 0.94,
 		cast = { 0.94, 0.72, 0.3 }, channel = { 0.72, 0.76, 0.82 }, locked = { 0.45, 0.46, 0.5 }, stop = { 0.8, 0.25, 0.22 },
 		line = { 0.6, 0.61, 0.66 }, lineSize = 1,
 		cardColor = { 0.95, 0.95, 0.97 }, cardFont = "bebas",
 		settings = { styleTexture = "reel", styleFont = "barlow", styleOutline = 0, styleShadow = "on",
-			questTalkStyle = "dark", rollPanel = "flat", abShape = "square", ufShape = "square" },
+			stylePanel = "deco",
+			questTalkStyle = "dark", rollPanel = "flat", abShape = "square", ufShape = "octagon" },
 	}),
 	Theme({
 		key = "codex", name = "Gilded Codex",
@@ -152,14 +153,15 @@ local THEMES = {
 		menu = { accent = { 1, 0.55, 0.16 }, edge = { 0.46, 0.43, 0.4 }, field = { 0.11, 0.105, 0.1 },
 			window = { 0.06, 0.055, 0.05 }, well = { 0.025, 0.02, 0.02 }, knob = { 1, 0.74, 0.42 },
 			thumb = { 0.66, 0.42, 0.22 } },
-		grain = "Forge", corner = "Forge", ornament = { 0.56, 0.53, 0.5 }, cornerSize = 28,
+		grain = "Forge", ornament = { 0.62, 0.58, 0.54 },
 		health = { 0.86, 0.34, 0.1 }, mana = { 0.28, 0.44, 0.62 }, back = 0.8,
 		panel = { 0.13, 0.125, 0.12 }, panelAlpha = 0.97,
 		cast = { 1, 0.6, 0.12 }, channel = { 0.95, 0.82, 0.4 }, locked = { 0.46, 0.44, 0.42 }, stop = { 0.75, 0.1, 0.06 },
-		line = { 0.03, 0.03, 0.03 }, lineSize = 2,
+		line = { 0.46, 0.43, 0.4 }, lineSize = 2,
 		cardColor = { 1, 0.62, 0.2 }, cardFont = "germania",
 		settings = { styleTexture = "forged", styleFont = "germania", styleOutline = 0, styleShadow = "on",
-			questTalkStyle = "dark", rollPanel = "flat", abShape = "square", ufShape = "square" },
+			stylePanel = "plate", styleBarShape = "chisel",
+			questTalkStyle = "dark", rollPanel = "flat", abShape = "square", ufShape = "shield" },
 	}),
 	Theme({
 		key = "glade", name = "Moonlit Glade",
@@ -168,14 +170,15 @@ local THEMES = {
 		menu = { accent = { 0.66, 0.92, 0.82 }, edge = { 0.3, 0.47, 0.46 }, field = { 0.05, 0.1, 0.11 },
 			window = { 0.03, 0.065, 0.075 }, well = { 0.015, 0.035, 0.04 }, knob = { 0.82, 0.96, 0.9 },
 			thumb = { 0.42, 0.62, 0.58 } },
-		grain = "Glade", corner = "Glade", ornament = { 0.72, 0.9, 0.84 }, cornerSize = 34,
+		grain = "Glade", ornament = { 0.72, 0.9, 0.84 },
 		health = { 0.3, 0.72, 0.56 }, mana = { 0.46, 0.42, 0.82 }, back = 0.65,
 		panel = { 0.055, 0.12, 0.13 }, panelAlpha = 0.93,
 		cast = { 0.68, 0.84, 0.92 }, channel = { 0.62, 0.52, 0.9 }, locked = { 0.4, 0.48, 0.5 }, stop = { 0.8, 0.3, 0.4 },
 		line = { 0.34, 0.52, 0.5 }, lineSize = 1,
 		cardColor = { 0.82, 0.96, 0.9 }, cardFont = "cinzel",
 		settings = { styleTexture = "lunar", styleFont = "philosopher", styleOutline = 0, styleShadow = "on",
-			questTalkStyle = "dark", rollPanel = "rounded", ufShape = "circle" },
+			stylePanel = "leaf", styleBarShape = "soft",
+			questTalkStyle = "dark", rollPanel = "flat", ufShape = "petal" },
 	}),
 	Theme({
 		key = "rime", name = "Frostbound",
@@ -184,18 +187,19 @@ local THEMES = {
 		menu = { accent = { 0.66, 0.86, 1 }, edge = { 0.36, 0.48, 0.6 }, field = { 0.07, 0.1, 0.14 },
 			window = { 0.04, 0.06, 0.09 }, well = { 0.02, 0.03, 0.05 }, knob = { 0.86, 0.95, 1 },
 			thumb = { 0.46, 0.6, 0.74 } },
-		grain = "Rime", corner = "Rime", ornament = { 0.72, 0.88, 1 }, cornerSize = 34,
+		grain = "Rime", ornament = { 0.72, 0.88, 1 },
 		health = { 0.32, 0.72, 0.8 }, mana = { 0.3, 0.42, 0.9 }, back = 0.7,
 		panel = { 0.075, 0.11, 0.155 }, panelAlpha = 0.93,
 		cast = { 0.72, 0.9, 1 }, channel = { 0.56, 0.62, 0.95 }, locked = { 0.46, 0.52, 0.58 }, stop = { 0.9, 0.34, 0.4 },
 		line = { 0.46, 0.64, 0.8 }, lineSize = 1,
 		cardColor = { 0.84, 0.94, 1 }, cardFont = "rajdhani",
 		settings = { styleTexture = "rime", styleFont = "rajdhani", styleOutline = 0, styleShadow = "on",
-			questTalkStyle = "dark", rollPanel = "flat", ufShape = "circle" },
+			stylePanel = "facet", styleBarShape = "bevel",
+			questTalkStyle = "dark", rollPanel = "flat", ufShape = "crystal" },
 	}),
 	Theme({
 		key = "vanguard", name = "Crimson Vanguard",
-		tip = "A war banner in motion: blades, slanted bars and diamonds in crimson and ivory. Everything leans forward.",
+		tip = "A war banner in motion: blades, cut bars and diamonds in crimson and ivory.",
 		swatch = { { 0.07, 0.05, 0.06 }, { 0.86, 0.13, 0.17 }, { 0.93, 0.89, 0.8 }, { 0.3, 0.32, 0.38 } },
 		menu = { accent = { 0.95, 0.27, 0.27 }, edge = { 0.5, 0.2, 0.22 }, field = { 0.1, 0.06, 0.07 },
 			window = { 0.055, 0.04, 0.045 }, well = { 0.03, 0.02, 0.025 }, knob = { 0.95, 0.9, 0.82 },
@@ -208,7 +212,7 @@ local THEMES = {
 		line = { 0.86, 0.13, 0.17 }, lineSize = 1,
 		cardColor = { 0.95, 0.9, 0.82 }, cardFont = "bebas",
 		settings = { styleTexture = "minimal", styleFont = "rajdhani", styleOutline = 0, styleShadow = "on",
-			stylePanel = "blade", styleBarShape = "slant", ufShape = "diamond",
+			stylePanel = "blade", styleBarShape = "chisel", ufShape = "diamond",
 			questTalkStyle = "dark", rollPanel = "flat", abShape = "square" },
 	}),
 	Theme({
@@ -269,7 +273,7 @@ local THEMES = {
 		menu = { accent = { 0.56, 0.92, 0.3 }, edge = { 0.2, 0.32, 0.16 }, field = { 0.05, 0.065, 0.045 },
 			window = { 0.03, 0.038, 0.028 }, well = { 0.015, 0.02, 0.014 }, knob = { 0.72, 0.95, 0.5 },
 			thumb = { 0.26, 0.44, 0.18 } },
-		grain = "Forge", ornament = { 0.34, 0.68, 0.17 },
+		grain = "Forge", ornament = { 0.34, 0.68, 0.17 }, veil = { raid = 0.46, plate = 0.26 },
 		nameColor = { 0.74, 0.95, 0.54 },
 		health = { 0.3, 0.66, 0.14 }, mana = { 0.46, 0.24, 0.66 }, back = 0.88,
 		panel = { 0.03, 0.04, 0.028 }, panelAlpha = 0.96,
@@ -287,7 +291,7 @@ local THEMES = {
 		menu = { accent = { 0.72, 0.54, 1 }, edge = { 0.26, 0.18, 0.42 }, field = { 0.055, 0.04, 0.09 },
 			window = { 0.032, 0.022, 0.058 }, well = { 0.016, 0.01, 0.03 }, knob = { 0.82, 0.74, 0.98 },
 			thumb = { 0.36, 0.24, 0.58 } },
-		grain = "Reel", ornament = { 0.6, 0.38, 0.92 },
+		grain = "Reel", ornament = { 0.6, 0.38, 0.92 }, veil = { raid = 0.46, plate = 0.26 },
 		nameColor = { 0.84, 0.76, 0.98 },
 		health = { 0.44, 0.22, 0.74 }, mana = { 0.22, 0.28, 0.68 }, back = 0.9,
 		panel = { 0.03, 0.02, 0.055 }, panelAlpha = 0.96,
@@ -295,7 +299,7 @@ local THEMES = {
 		line = { 0.6, 0.38, 0.92 }, lineSize = 1,
 		cardColor = { 0.8, 0.68, 1 }, cardFont = "cinzel",
 		settings = { styleTexture = "lunar", styleFont = "marcellus", styleOutline = 0, styleShadow = "on",
-			stylePanel = "veil", styleBarShape = "taper", ufShape = "eye",
+			stylePanel = "veil", styleBarShape = "capsule", ufShape = "eye",
 			questTalkStyle = "dark", rollPanel = "flat", abShape = "round" },
 	}),
 }
@@ -368,9 +372,10 @@ end
 -- any can be picked on top of any theme.
 local SHAPES = ART .. "Shapes\\"
 local PANEL_ART = { round = "Round", chamfer = "Chamfer", blade = "Blade", notch = "Notch", sigil = "Sigil",
-	veil = "Veil" }
-local BAR_ART = { capsule = "Capsule", slant = "Slant", point = "Point", barb = "Barb", taper = "Taper" }
-local PORTRAIT_ART = { hex = "Hex", diamond = "Diamond", arch = "Arch", shard = "Shard", eye = "Eye" }
+	veil = "Veil", deco = "Deco", plate = "Plate", leaf = "Leaf", facet = "Facet" }
+local BAR_ART = { capsule = "Capsule", point = "Point", barb = "Barb", chisel = "Chisel", soft = "Soft", bevel = "Bevel" }
+local PORTRAIT_ART = { hex = "Hex", diamond = "Diamond", arch = "Arch", shard = "Shard", eye = "Eye",
+	octagon = "Octagon", shield = "Shield", petal = "Petal", crystal = "Crystal" }
 local CLAMP = "CLAMPTOBLACKADDITIONAL"
 
 function ns.ThemePortraitMask(shape)
@@ -385,6 +390,33 @@ function ns.ThemePortraitCut(shape)
 end
 function ns.ThemePortraitRing(shape)
 	return PORTRAIT_ART[shape] and SHAPES .. "Portrait" .. PORTRAIT_ART[shape] .. "Ring"
+end
+
+-- A veil of the theme's panel color over a bar's fill, under its words: raid tiles'
+-- bright class colors and the plates' reds drawn into the theme, whatever color the
+-- game gives them (often not one an addon can read). kind: "raid" or "plate"; nil
+-- takes it off.
+local veils = setmetatable({}, { __mode = "k" })
+local VEIL = { raid = 0.34, plate = 0.2 }
+function ns.DressThemeVeil(bar, kind)
+	local theme = Active()
+	local veil = veils[bar]
+	local fill = bar:GetStatusBarTexture()
+	if not (kind and theme.panel and fill) then
+		if veil then veil:Hide() end
+		return
+	end
+	if not veil then
+		veil = bar:CreateTexture()
+		veils[bar] = veil
+	end
+	local layer, sub = fill:GetDrawLayer()
+	veil:SetDrawLayer(layer or "ARTWORK", math.min(7, (sub or 0) + 1))
+	veil:ClearAllPoints()
+	veil:SetAllPoints(fill)
+	local p = theme.panel
+	veil:SetColorTexture(p[1], p[2], p[3], (theme.veil and theme.veil[kind]) or VEIL[kind])
+	veil:Show()
 end
 
 -- The panel shape in use (nil: plain rectangles).
@@ -851,6 +883,14 @@ local function MakeCard(parent, theme, width, onPick, Tooltip)
 	return card
 end
 
+-- The zone card, to see a theme just picked on the real thing. Another Test of
+-- the same card would only stop the one running, so that goes first.
+function ns.PlayThemeCard()
+	if not ns.CardTest then return end
+	if ns.CardTestRunning and ns.CardTestRunning("zone") then pcall(ns.CardTest, "zone") end
+	pcall(ns.CardTest, "zone")
+end
+
 -- kit: the page's. changed: a pick's been made. Gives the picker, with its
 -- Refresh, for the page's stack.
 function ns.MakeThemePicker(kit, parent, width, changed)
@@ -864,12 +904,7 @@ function ns.MakeThemePicker(kit, parent, width, changed)
 		ns.ApplyStyleTheme(key)
 		changed()
 		kit.Refresh()
-		-- (Its zone card plays, to see the theme on the real thing. Another Test of the
-		-- same card would only stop the one running, so that goes first.)
-		if ns.CardTest then
-			if ns.CardTestRunning and ns.CardTestRunning("zone") then pcall(ns.CardTest, "zone") end
-			pcall(ns.CardTest, "zone")
-		end
+		ns.PlayThemeCard()
 	end
 	for i, theme in ipairs(THEMES) do
 		local card = MakeCard(holder, theme, cardW, Pick, kit.Tooltip)
