@@ -16,11 +16,10 @@
 -- Notes (two choices of a slot that come out the same) are listed but pass. Exits 1 on any
 -- problem.
 --
--- And each built-in profile's settings, retired ones too, as they come out
+-- And each built-in profile's settings, as they come out
 -- (what each changes from the defaults), against the ones saved in
 -- Tools/offline/profile-settings-<client>.txt: a change to a module or a
--- choice changes the profiles using it, and a retired one is made again
--- from them for a player coming back. Any difference is a problem until
+-- choice changes the profiles using it. Any difference is a problem until
 -- it's saved with --update.
 
 -- (The Lua that runs each run: run.py sets CINE_LUA to itself.)
@@ -39,6 +38,63 @@ if arg[1] and not update then
 	for _, warning in ipairs(wow.warnings) do
 		-- (The minimap button compares the stand-in's numbers: not the addon's.)
 		if not warning:find("^PLAYER_LOGIN: MinimapButton") then print("problem\t" .. warning) end
+	end
+	-- Your own lines and Hide your messages' exception (Chat.lua): lines you type
+	-- with no bubble show chat, emotes and loot don't, and it's all off without it.
+	do
+		local function Problem(text) print("problem\town lines: " .. text) end
+		local filters = {}
+		local keptFilter, keptCVar = rawget(_G, "ChatFrame_AddMessageEventFilter"), rawget(_G, "GetCVarBool")
+		_G.ChatFrame_AddMessageEventFilter = function(event, filter) filters[event] = filter end
+		ns.RegisterChatPeek()
+		local me = UnitName("player")
+		local frame = { IsShown = function() return true end }
+		local function Peeks(event, author)
+			ns.chatPeekUntil[frame] = nil
+			filters[event](frame, event, "hello", author or me)
+			return ns.chatPeekUntil[frame] ~= nil
+		end
+		local db = ns.db
+		if db.chatOwnNoBubble ~= true then Problem("the exception isn't on by default") end
+		local kept = { db.chatPeek, db.handleChat, db.chatHideOwn, db.chatOwnNoBubble }
+		local keptGuild, keptChannels = db.chatPeekTypes.guild, db.chatPeekChannels
+		db.chatPeek, db.handleChat, db.chatHideOwn, db.chatOwnNoBubble = true, true, true, true
+		for _, event in ipairs({ "CHAT_MSG_GUILD", "CHAT_MSG_PARTY" }) do
+			if not Peeks(event) then Problem(event .. " with no bubble didn't show chat") end
+		end
+		-- (Rows that are off are for other people's lines: General off, as players have it.)
+		db.chatPeekTypes.guild, db.chatPeekChannels = false, false
+		if not Peeks("CHAT_MSG_GUILD") then Problem("a guild line hid with the guild row off") end
+		if not Peeks("CHAT_MSG_CHANNEL") then Problem("a channel line hid with the channel off") end
+		if Peeks("CHAT_MSG_GUILD", "Someone") then Problem("someone else's guild line showed with the row off") end
+		db.chatPeekTypes.guild, db.chatPeekChannels = keptGuild, keptChannels
+		-- (A whisper to no one: the game sends only this system line.)
+		local keptError = rawget(_G, "ERR_CHAT_PLAYER_NOT_FOUND_S")
+		_G.ERR_CHAT_PLAYER_NOT_FOUND_S = "No player named '%s' is currently playing."
+		ns.chatPeekUntil[frame] = nil
+		filters.CHAT_MSG_SYSTEM(frame, "CHAT_MSG_SYSTEM", "No player named 'Test' is currently playing.", "")
+		if not ns.chatPeekUntil[frame] then Problem("a whisper to no one didn't show chat") end
+		ns.chatPeekUntil[frame] = nil
+		filters.CHAT_MSG_SYSTEM(frame, "CHAT_MSG_SYSTEM", "Some other system line.", "")
+		if ns.chatPeekUntil[frame] then Problem("another system line showed chat") end
+		_G.ERR_CHAT_PLAYER_NOT_FOUND_S = keptError
+		if not Peeks("CHAT_MSG_WHISPER_INFORM", "Someone") then Problem("a sent whisper didn't show chat") end
+		for _, event in ipairs({ "CHAT_MSG_EMOTE", "CHAT_MSG_TEXT_EMOTE" }) do
+			if Peeks(event) then Problem(event .. " showed chat") end
+		end
+		_G.GetCVarBool = function() return true end -- (bubbles on: the line waits for its bubble)
+		if Peeks("CHAT_MSG_SAY") then Problem("a say showed chat before its bubble could") end
+		_G.GetCVarBool = keptCVar
+		db.chatOwnNoBubble = false
+		for _, event in ipairs({ "CHAT_MSG_GUILD", "CHAT_MSG_PARTY" }) do
+			if Peeks(event) then Problem(event .. " showed chat with the exception off") end
+		end
+		if Peeks("CHAT_MSG_WHISPER_INFORM", "Someone") then Problem("a sent whisper showed chat with it off") end
+		db.chatHideOwn = false
+		if not Peeks("CHAT_MSG_WHISPER_INFORM", "Someone") then Problem("a sent whisper hid with Hide your messages off") end
+		db.chatPeek, db.handleChat, db.chatHideOwn, db.chatOwnNoBubble = kept[1], kept[2], kept[3], kept[4]
+		_G.ChatFrame_AddMessageEventFilter = keptFilter
+		ns.chatPeekUntil[frame] = nil
 	end
 	-- The game's /follow moves you with no key held: moving by hand, not auto-run.
 	do
@@ -85,15 +141,12 @@ if arg[1] and not update then
 		if db.offUntilPicked then print("problem\tpicked a profile: still off") end
 	end
 	local problems, _, absent, nowhere, notes = ns.CheckModules(client, ns.ALL_BUILTIN_PROFILES)
-	-- Each built-in's settings, retired ones too (the dev build's run: it
-	-- has every profile).
+	-- Each built-in's settings (the dev build's run: it has every profile).
 	if toc == "CinematicDev.toc" then
 		local byName, list = {}, {}
-		for _, group in ipairs({ ns.ALL_BUILTIN_PROFILES, ns.RETIRED_PROFILES or {} }) do
-			for _, profile in ipairs(group) do
-				byName[profile.name] = profile
-				list[#list + 1] = profile
-			end
+		for _, profile in ipairs(ns.ALL_BUILTIN_PROFILES) do
+			byName[profile.name] = profile
+			list[#list + 1] = profile
 		end
 		local base = ns.ModuleBase(client)
 		for _, profile in ipairs(list) do
@@ -638,6 +691,70 @@ if arg[1] and not update then
 		if not ran then print("problem\tCard clear of chat: /cine debug cardchat: " .. tostring(why)) end
 		chatDb.cardClearChat = wasClear
 	end
+	-- The Show in tables' CineMode column: its tick shows the row in CineMode
+	-- only, and reads as the rule word both ways. And the Toggle CineMode key
+	-- with Start in CineMode off: it starts CineMode, then stops it, no snooze.
+	do
+		local cineDb, key = ns.GetDB(), "effect:letterbox"
+		local wasTick = cineDb.cineModeShow[key]
+		cineDb.cineModeShow[key] = true
+		if ns.RuleShows(key, { cinemode = true }) ~= true or ns.RuleShows(key, { cinemode = false }) ~= nil then
+			print("problem\tCineMode column: its tick doesn't show the row in CineMode only")
+		end
+		if not ns.RowTicksRule(key):find("cinemode") then
+			print("problem\tCineMode column: its tick isn't in the row's ticks as a rule")
+		end
+		cineDb.cineModeShow[key] = wasTick
+		local always, ticked = ns.ReadGridRule("cinemode or combat", { cinemode = true, combat = true })
+		if always ~= false or not ticked.cinemode then
+			print("problem\tCineMode column: a rule of its word doesn't go back into the column")
+		end
+		local wasFade, wasEnabled, wasChosen, wasPrint = cineDb.fadeUI, cineDb.enabled, ns.ProfileChosen, ns.Print
+		cineDb.fadeUI, cineDb.enabled = false, true
+		ns.ProfileChosen, ns.Print = function() return true end, function() end
+		Cinematic_ToggleCineMode()
+		if not ns.cineKeyOn or ns.GetSnoozeLeft() then
+			print("problem\tToggle CineMode with Start in CineMode off: the key doesn't start it")
+		end
+		Cinematic_ToggleCineMode()
+		if ns.cineKeyOn or ns.GetSnoozeLeft() then
+			print("problem\tToggle CineMode with Start in CineMode off: the key doesn't stop it, or snoozes")
+		end
+		cineDb.fadeUI, cineDb.enabled, ns.ProfileChosen, ns.Print = wasFade, wasEnabled, wasChosen, wasPrint
+		-- Subtle's bars moved over: off ones only, and Always or a rule left alone.
+		local moved = { letterbox = false, quietShow = { [key] = true } }
+		ns.SubtleCineBars(moved)
+		if moved.letterbox ~= true or not moved.cineModeShow[key] or moved.quietShow[key] ~= false then
+			print("problem	Subtle's bars: an old Subtle isn't moved onto the Cine tick")
+		end
+		local mine = { letterbox = false, letterboxAlways = true }
+		ns.SubtleCineBars(mine)
+		local ruled = { letterbox = false, frameRules = { [key] = "city" } }
+		ns.SubtleCineBars(ruled)
+		local on = { letterbox = true }
+		ns.SubtleCineBars(on)
+		if mine.letterbox ~= false or ruled.letterbox ~= false or on.cineModeShow then
+			print("problem	Subtle's bars: settings of the player's own were changed")
+		end
+		-- Subtle's tint and the old strengths, the same way.
+		local tint = { tintAlways = true, tintStrength = 0.33 }
+		ns.SubtleCineEffect(tint, "tint")
+		ns.FullTint(tint)
+		local ownTint = { tintAlways = false, tintStrength = 0.5 }
+		ns.SubtleCineEffect(ownTint, "tint")
+		ns.FullTint(ownTint)
+		if tint.tintAlways ~= false or not tint.cineModeShow["effect:tint"] or tint.tintStrength ~= 1
+			or ownTint.cineModeShow or ownTint.tintStrength ~= 0.5 then
+			print("problem	Subtle's tint or the tint's strength wasn't moved over as it should be")
+		end
+		local subtle = ns.ProfileBase("Subtle")
+		for _, effect in ipairs(ns.EFFECT_GRID) do
+			local row = "effect:" .. effect
+			if subtle.quietShow[row] or subtle[effect .. "Always"] or not subtle.cineModeShow[row] then
+				print("problem	Subtle's " .. effect .. " shows outside CineMode, or not in it")
+			end
+		end
+	end
 	-- Vitals Vision: a page's Reset (its settings back to the profile's) leaves
 	-- each theme's own look on them, not the plain defaults.
 	local db, base = ns.GetDB(), ns.ProfileBase()
@@ -666,6 +783,22 @@ if arg[1] and not update then
 			print(("problem\tVitals theme %s: the profile shows (changed): %s"):format(theme.key, table.concat(diff, ", ")))
 		end
 		base.lowHealthTheme = baseTheme
+	end
+	-- A player on a built-in that's gone keeps their settings as a profile of
+	-- their own, and one they're not on is deleted. (Last: it changes profile.)
+	db.liveProfile, db.profile, db.tintStrength = "Camera Only", "Camera Only", 0.4
+	db.profiles["Solo Explorer"] = { tintStrength = 0.2 }
+	ns.InitProfiles()
+	if db.profiles["Solo Explorer"] then
+		print("problem\tOld built-ins: one you're not on is still saved")
+	end
+	-- (Twice: the next login mustn't take what was kept for the old built-in.)
+	for _ = 1, 2 do
+		if ns.ActiveProfile() ~= "Camera Only" or not db.profiles["Camera Only"] or db.tintStrength ~= 0.4
+			or db.profiles["Camera Only"].tintStrength ~= 0.4 then
+			print("problem\tOld built-ins: the one you're on isn't kept as a profile of your own, as it was")
+		end
+		ns.InitProfiles()
 	end
 	return
 end

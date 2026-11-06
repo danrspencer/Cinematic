@@ -1,5 +1,6 @@
 -- Cinematic minimap button: left-click for a quick menu, right-click for the
--- settings, drag to move it around the minimap's edge.
+-- settings, drag to move it around the minimap's edge. With no profile picked
+-- yet, left-click opens the welcome window and right-click has the menu.
 --
 -- It's the minimap's child, like LibDBIcon's buttons, so addons that gather
 -- minimap buttons find it (they scan the minimap's children, and our name
@@ -7,7 +8,7 @@
 -- hovering the map's empty spot still brings it back (see ShrinkEntry).
 -- Gathered, it's the gatherer's: left where it's put, and no longer faded with
 -- the map (ns.MinimapButtonGathered), or it'd be invisible in their popout.
-local _, ns = ...
+local ADDON_NAME, ns = ...
 local L = ns.L
 
 local ICON = "Interface\\Icons\\INV_Misc_Spyglass_03"
@@ -198,9 +199,8 @@ end
 
 local function ShowMenu(owner)
 	if not (MenuUtil and MenuUtil.CreateContextMenu) then
-		-- No menu system on this client: just toggle.
-		ns.SetEnabled(not ns.GetDB().enabled)
-		UpdateIcon()
+		-- No menu system on this client: the settings, which have it all.
+		ns.OpenOptions()
 		return
 	end
 	local menu = ns.ContextMenu(owner, function(_, root)
@@ -225,17 +225,30 @@ local function ShowMenu(owner)
 			root:CreateDivider()
 		end
 		root:CreateTitle("Cinematic")
-		root:CreateCheckbox(L["Enable Cinematic"], function() return db.enabled end, function()
-			ns.SetEnabled(not db.enabled)
-			UpdateIcon()
-		end)
-		-- (Ticked whenever the menu is open: unticking hides the button.)
+		-- (No switch without a profile: Cinematic stays off whatever it says.)
+		if ns.ProfileChosen() then
+			root:CreateCheckbox(L["Enable Cinematic"], function() return db.enabled end, function()
+				ns.SetEnabled(not db.enabled)
+				UpdateIcon()
+			end)
+		end
+		-- (Unticked only in a menu opened from the addon compartment.)
 		root:CreateCheckbox(L["Show minimap button"], function() return db.minimapButton end, function()
-			db.minimapButton = false
+			db.minimapButton = not db.minimapButton
 			UpdateIcon()
-			Print(L["minimap button hidden. Bring it back with /cine button or the " ..
+			Print(db.minimapButton and L["minimap button shown"]
+				or L["minimap button hidden. Bring it back with /cine button or the " ..
 				"\"Show minimap button\" option."])
 		end)
+		if AddonCompartmentFrame then
+			root:CreateCheckbox(L["Show in addon compartment"], function() return db.addonCompartment end, function()
+				db.addonCompartment = not db.addonCompartment
+				ns.UpdateMinimapButton()
+				Print(db.addonCompartment and L["addon compartment entry shown"]
+					or L["addon compartment entry hidden. Bring it back with the " ..
+					"\"Show in addon compartment\" option."])
+			end)
+		end
 		root:CreateDivider()
 		-- (A frame later: the menu's own click is done with by then.)
 		root:CreateButton(L["Why is it showing?"], function() C_Timer.After(0, ns.ToggleInspect) end)
@@ -254,10 +267,12 @@ local function OnEnter(self)
 	GameTooltip:SetText("Cinematic")
 	local db = ns.GetDB()
 	local left = ns.GetSnoozeLeft()
-	-- (No profile picked yet: Cinematic does nothing, and a click opens the welcome window.)
+	-- (No profile picked yet: Cinematic does nothing, and a left-click opens the
+	-- welcome window. Right-click has the menu, to hide the button.)
 	if not ns.ProfileChosen() then
 		GameTooltip:AddLine(L["No profile yet"], 1, 0.5, 0)
-		GameTooltip:AddLine(L["Click: pick a profile"], 1, 1, 1)
+		GameTooltip:AddLine(L["Left-click: pick a profile"], 1, 1, 1)
+		GameTooltip:AddLine(L["Right-click: options"], 1, 1, 1)
 		if canDrag then
 			GameTooltip:AddLine(L["Drag: move"], 1, 1, 1)
 		end
@@ -288,12 +303,13 @@ end
 
 local function OnClick(owner, mouseButton)
 	GameTooltip:Hide()
-	if not ns.ProfileChosen() then
-		ns.ShowWelcome()
-	elseif mouseButton == "RightButton" then
-		ns.OpenOptions()
-	else
+	local right = mouseButton == "RightButton"
+	if ns.ProfileChosen() then
+		if right then ns.OpenOptions() else ShowMenu(owner) end
+	elseif right then
 		ShowMenu(owner)
+	else
+		ns.ShowWelcome()
 	end
 end
 
@@ -382,6 +398,56 @@ local function Create()
 	UpdateIcon()
 end
 
+-- The game's addon compartment (retail and WoW Forever): the same clicks and
+-- tooltip, for when the button's hidden or gathered away. Added from here, not
+-- the .toc, so "Show in addon compartment" can take it out again: the game has
+-- no call for that, so it's taken off the frame's list, as LibDBIcon does.
+-- Not in gamepad mode with hideMinimapButtonGamepad: the button's hidden there
+-- as clicking it tends to freeze WoW Forever, and this would open the same.
+local compartmentEntry
+
+local function OnCompartmentClick(_, input)
+	local db = ns.GetDB()
+	if db.hideMinimapButtonGamepad and ns.IsGamePadOn() then
+		Print(L["not available in gamepad mode: use /cine instead."])
+		return
+	end
+	local mouseButton = type(input) == "table" and input.buttonName or "LeftButton"
+	-- (A frame later: the compartment's own menu is closing. UIParent: that
+	-- menu's button goes with it.)
+	C_Timer.After(0, function() OnClick(UIParent, mouseButton) end)
+end
+
+local function UpdateCompartment()
+	local frame = AddonCompartmentFrame
+	if not (frame and frame.RegisterAddon) then
+		return
+	end
+	local wanted = ns.GetDB().addonCompartment
+	if wanted and not compartmentEntry then
+		local title = C_AddOns and C_AddOns.GetAddOnMetadata and C_AddOns.GetAddOnMetadata(ADDON_NAME, "Title")
+		compartmentEntry = {
+			text = title or "Cinematic",
+			icon = ICON,
+			notCheckable = true,
+			registerForAnyClick = true,
+			func = OnCompartmentClick,
+			funcOnEnter = function(_, menuButton) OnEnter(menuButton) end,
+			funcOnLeave = function() GameTooltip:Hide() end,
+		}
+		frame:RegisterAddon(compartmentEntry)
+	elseif not wanted and compartmentEntry then
+		local list = frame.registeredAddons or {}
+		for index = #list, 1, -1 do
+			if list[index] == compartmentEntry then
+				table.remove(list, index)
+				frame:UpdateDisplay()
+			end
+		end
+		compartmentEntry = nil
+	end
+end
+
 -- Called by Core: at login, and on its regular scan so the button follows the
 -- map's shape if an addon changes it (and the icon catches a pause running out).
 function ns.UpdateMinimapButton()
@@ -391,6 +457,7 @@ function ns.UpdateMinimapButton()
 		Place()
 	end
 	UpdateIcon()
+	UpdateCompartment()
 end
 
 function ns.ToggleMinimapButton()
@@ -398,27 +465,4 @@ function ns.ToggleMinimapButton()
 	db.minimapButton = not db.minimapButton
 	ns.UpdateMinimapButton()
 	Print(db.minimapButton and L["minimap button shown"] or L["minimap button hidden"])
-end
-
--- The game's addon compartment (retail and WoW Forever; the .toc names these):
--- the same clicks and tooltip, for when the button's hidden or gathered away.
--- Not in gamepad mode with hideMinimapButtonGamepad: the button's hidden there
--- as clicking it tends to freeze WoW Forever, and this would open the same.
-function Cinematic_OnCompartmentClick(_, mouseButton)
-	local db = ns.GetDB()
-	if db.hideMinimapButtonGamepad and ns.IsGamePadOn() then
-		Print(L["not available in gamepad mode: use /cine instead."])
-		return
-	end
-	-- (A frame later: the compartment's own menu is closing. UIParent: that
-	-- menu's button goes with it.)
-	C_Timer.After(0, function() OnClick(UIParent, mouseButton) end)
-end
-
-function Cinematic_OnCompartmentEnter(_, frame)
-	OnEnter(frame)
-end
-
-function Cinematic_OnCompartmentLeave()
-	GameTooltip:Hide()
 end

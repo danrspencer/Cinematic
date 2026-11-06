@@ -453,8 +453,9 @@ local function HandleSlash(msg)
 		-- (An NPC's emote as an off-screen bubble shows it, and what lets real ones show.)
 		local db = ns.db
 		ns.Print(("emote test; Chat bubbles page %s, off-screen bubbles %s, emotes too %s, hide bubbled %s, "
-			.. "show chat on message %s, hide own %s"):format(OnOff(db.handleBubbles), OnOff(db.chatSpeechBehind),
-			OnOff(db.chatSpeechEmotes), OnOff(db.chatHideBubbled), OnOff(db.chatPeek), OnOff(db.chatHideOwn)))
+			.. "show chat on message %s, hide own %s, except no bubble %s"):format(OnOff(db.handleBubbles),
+			OnOff(db.chatSpeechBehind), OnOff(db.chatSpeechEmotes), OnOff(db.chatHideBubbled), OnOff(db.chatPeek),
+			OnOff(db.chatHideOwn), OnOff(db.chatOwnNoBubble)))
 		if ns.ShowSpeechBehind then
 			ns.ShowSpeechBehind("CHAT_MSG_MONSTER_EMOTE", "Dariness the Learned", "%s looks around thoughtfully.")
 		end

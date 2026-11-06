@@ -50,6 +50,7 @@ local DEFAULTS = {
 	enabled = true,
 	fadeUI = true,            -- CineMode fades the UI (off: just the visual effects, over the normal UI)
 	minimapButton = true,     -- show the minimap button
+	addonCompartment = true,  -- list Cinematic in the game's addon compartment
 	minimapAngle = 205,       -- its position around the minimap, in degrees (clear of the dungeon finder's eye)
 	hideCombatText = false,   -- no floating combat text (heals, regen) in cinematic mode out of combat (after the Calm Timer)
 	hideErrorsInCombat = false,    -- no red error text ("Target not in line of sight") in fights (and the Calm Timer after)
@@ -265,6 +266,7 @@ local DEFAULTS = {
 	chatUntilWhisperRead = true, -- keep chat up while a whisper tab is flashing (until it's clicked)
 	chatShowWhileTyping = false, -- typing brings up the chat windows, not just the input box
 	chatHideOwn = true, -- your own messages (emotes, say, party...) don't show chat
+	chatOwnNoBubble = true, -- ...except lines you type that have no bubble (whispers, guild...)
 	chatHideBubbled = true, -- say/yell you can see as a bubble on screen doesn't show chat
 	chatSpeechBehind = false, -- ...and one with no bubble on screen shows low on the screen instead
 	chatSpeechEmotes = true, -- ...emotes (no bubble ever) show there too, in a bubble with no tail
@@ -1519,8 +1521,8 @@ end
 -- combat alone; without, Out of combat and Calm Timer). music: its places
 -- were its own (Cities, Dungeons, Raids, PvP).
 ns.LIST_DEFAULTS = {}
-for _, list in ipairs({ "combatShow", "calmShow", "quietShow", "camShow", "worldShow", "cityShow", "bgShow",
-	"instanceShow", "groupShow", "enemyShow", "friendlyShow" }) do
+for _, list in ipairs({ "combatShow", "calmShow", "quietShow", "camShow", "cineModeShow", "worldShow", "cityShow",
+	"bgShow", "instanceShow", "groupShow", "enemyShow", "friendlyShow" }) do
 	ns.LIST_DEFAULTS[list] = {}
 end
 -- Rows' own rules to start from (row key -> rule text): in every profile's
@@ -1905,10 +1907,11 @@ function ns.FadeOutTime()
 end
 
 -- How long things take to fade in: the Combat fade in time during a fight
--- (the UI coming back as one starts), the Fade in time otherwise.
+-- (the UI coming back as one starts) or a cast a rule names, the Fade in time
+-- otherwise.
 function ns.FadeInTime()
 	local db = ns.db
-	if InCombatLockdown() or ns.Flag(UnitAffectingCombat("player")) then
+	if InCombatLockdown() or ns.Flag(UnitAffectingCombat("player")) or ns.CastingRuleOn() then
 		return db.combatFadeInTime
 	end
 	return db.fadeInTime
@@ -2382,13 +2385,13 @@ local function ShouldBeCinematic(now)
 	-- (switched on, or you leave), straight back, at the fade out time. With
 	-- "Start in CineMode" off, only while a camera ticked in the Camera
 	-- Triggers page's CineMode column runs.
-	if not ns.db.enabled or not (ns.db.fadeUI or ns.TriggerStartsCine()) or not ns.ProfileChosen()
+	if not ns.db.enabled or not (ns.db.fadeUI or ns.cineKeyOn or ns.TriggerStartsCine()) or not ns.ProfileChosen()
 		or GetTime() < snoozeUntil
 		or IsInDisabledZone() or IsInDisabledGroup() then
 		quickStart = false
 		-- (For the log: why CineMode is off. See OnUpdate.)
 		ns.cineOffWhy = (not ns.db.enabled and "switched off")
-			or (not ns.db.fadeUI and not ns.TriggerStartsCine() and ("no CineMode trigger (place %s, moving %s, " ..
+			or (not ns.db.fadeUI and not ns.cineKeyOn and not ns.TriggerStartsCine() and ("no CineMode trigger (place %s, moving %s, " ..
 				"auto-run flag %s, auto-running %s, run cam off here %s)"):format(tostring(ns.GetPlaceType()),
 				tostring(ns.playerMoving), tostring(ns.autoRunning), tostring(ns.IsAutoRunning and ns.IsAutoRunning()),
 				tostring(ns.IsCameraOffHere("run"))))
@@ -3372,7 +3375,9 @@ end
 -- The Toggle CineMode key: CineMode alone, the rest of Cinematic (cameras,
 -- styling) carrying on. Off is a snooze with no end (the minimap button's
 -- tooltip says Paused), till the key again or a reload; on comes in at once,
--- as turning Cinematic on does.
+-- as turning Cinematic on does. With Start in CineMode off nothing brings it
+-- on by itself, so the key does (ns.cineKeyOn, till the key again or a reload);
+-- off then just drops that, leaving the camera triggers free to start it.
 function Cinematic_ToggleCineMode()
 	if not ns.ProfileChosen() then
 		ns.ShowWelcome()
@@ -3382,14 +3387,17 @@ function Cinematic_ToggleCineMode()
 		ns.Print(L["Cinematic is off (/cine turns it on)"])
 		return
 	end
-	if ns.GetSnoozeLeft() then
+	local triggered = ns.db.fadeUI or ns.TriggerStartsCine()
+	if ns.GetSnoozeLeft() or not (triggered or ns.cineKeyOn) then
 		ns.Unsnooze()
+		ns.cineKeyOn = not ns.db.fadeUI or nil
 		quickStart = true
 		startSnapUntil = GetTime() + START_SNAP_WINDOW
 		snapRound = snapRound + 1
 		ns.Print(L["CineMode on"])
 	else
-		ns.Snooze(math.huge)
+		ns.cineKeyOn = nil
+		if triggered then ns.Snooze(math.huge) end
 		ns.Print(L["CineMode off"])
 	end
 	if ns.UpdateMinimapButton then ns.UpdateMinimapButton() end
@@ -3538,6 +3546,8 @@ function ns.EnsureTables()
 	-- that offer them (Visual Effects, music, tooltips...): row -> true/false.
 	ns.db.quietShow = ns.db.quietShow or {}
 	ns.db.camShow = ns.db.camShow or {}
+	-- The Show in tables' CineMode column: row -> true/false.
+	ns.db.cineModeShow = ns.db.cineModeShow or {}
 	ns.db.cooldownReadyOnly = ns.db.cooldownReadyOnly or {} -- Cooldown Manager page: spell ID -> true
 	ns.db.cooldownReadyEarly = ns.db.cooldownReadyEarly or {} -- ...spell ID -> seconds early it comes back
 	ns.db.cooldownEarlyOn = ns.db.cooldownEarlyOn or {} -- ...spell ID -> true: Show early ticked
@@ -3712,6 +3722,39 @@ ns.GetSnoozeLeft = function()
 	return left > 0 and left or nil
 end
 ns.RefreshLetterbox = function() ns.letterboxDirty = true end
+-- Subtle's letterbox was off; now it's the row's CineMode tick alone (the
+-- module letterbox-in-cinemode). t: the live settings or Subtle's saved ones.
+-- Only bars still off with nothing else asking for them: Always or a rule of
+-- your own stays as it is.
+function ns.SubtleCineBars(t)
+	local key = "effect:letterbox"
+	if type(t) ~= "table" or t.letterbox ~= false or t.letterboxAlways == true
+		or (type(t.frameRules) == "table" and t.frameRules[key]) then
+		return
+	end
+	t.letterbox = true
+	t.cineModeShow = t.cineModeShow or {}
+	t.cineModeShow[key] = true
+	t.quietShow = t.quietShow or {}
+	t.quietShow[key] = false
+end
+-- The same for Subtle's other effects (tint, vignette, weather), which were on
+-- the whole time: the row's Always ticked (unticked, or a rule: your own, left
+-- as it is).
+function ns.SubtleCineEffect(t, effect)
+	local key, always = "effect:" .. effect, effect .. "Always"
+	if type(t) ~= "table" or t[always] ~= true or (type(t.frameRules) == "table" and t.frameRules[key]) then
+		return
+	end
+	t[always] = false
+	t.cineModeShow = t.cineModeShow or {}
+	t.cineModeShow[key] = true
+end
+-- Every profile's tint is at full strength to start with now. Subtle's 33%
+-- and Balanced's 66% go (the slider's steps of 5 can't have made them).
+function ns.FullTint(t)
+	if type(t) == "table" and (t.tintStrength == 0.33 or t.tintStrength == 0.66) then t.tintStrength = 1 end
+end
 ns.GetStillSince = function() return ns.stillSince end
 ns.Flag = Flag
 ns.GetLetterbox = function() return ns.letterbox end
@@ -5332,6 +5375,28 @@ ticker:SetScript("OnEvent", ns.Profiled("Core events", function(self, event, arg
 				ns.db[key] = true
 			end
 			ns.db.stylePagesOnV1 = true
+		end
+		-- Subtle's bars come with CineMode now: ns.SubtleCineBars. Once, live and saved.
+		if not ns.db.subtleCineBarsV1 then
+			if (ns.db.liveProfile or ns.db.profile) == "Subtle" then ns.SubtleCineBars(ns.db) end
+			ns.SubtleCineBars(ns.db.profiles and ns.db.profiles.Subtle)
+			ns.db.subtleCineBarsV1 = true
+		end
+		-- Subtle's tint comes with CineMode too, and the tint's strength is full. Once.
+		if not ns.db.fullTintV1 then
+			if (ns.db.liveProfile or ns.db.profile) == "Subtle" then ns.SubtleCineEffect(ns.db, "tint") end
+			ns.SubtleCineEffect(ns.db.profiles and ns.db.profiles.Subtle, "tint")
+			ns.FullTint(ns.db)
+			for _, saved in pairs(ns.db.profiles or {}) do ns.FullTint(saved) end
+			ns.db.fullTintV1 = true
+		end
+		-- And its vignette and weather. Once.
+		if not ns.db.subtleCineEffectsV1 then
+			for _, effect in ipairs({ "vignette", "weather" }) do
+				if (ns.db.liveProfile or ns.db.profile) == "Subtle" then ns.SubtleCineEffect(ns.db, effect) end
+				ns.SubtleCineEffect(ns.db.profiles and ns.db.profiles.Subtle, effect)
+			end
+			ns.db.subtleCineEffectsV1 = true
 		end
 		-- Always show tanks (healVisionTanks) is now the tank slider at 100%:
 		-- unticked, tanks went by the members' health, so they still do. Once,

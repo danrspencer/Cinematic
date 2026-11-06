@@ -52,8 +52,6 @@ ns.SLOT_CHOICES = {
 		-- (Cinematic's own layouts first, then the player's and the game's)
 		{ part = "retail", client = "forever", label = "Retail Inspired", made = true,
 			line = "Action bars centered along the bottom, menus in the corner", modules = { "layout-retail" } },
-		{ part = "forever", client = "retail", hidden = true, label = "Like WoW Forever",
-			line = "Laid out like WoW Forever's default", modules = { "layout-forever" } },
 		{ part = "pure", label = "Personal Resource Centered", made = true,
 			line = "Your resources in the middle, the Cooldown Manager above", modules = { "layout-pure" } },
 		{ part = "own", label = "Your own", line = "Cinematic leaves your Edit Mode layout as it is",
@@ -93,10 +91,6 @@ ns.SLOT_CHOICES = {
 		{ part = "pure", noCDM = "grouped", label = "Cooldown Manager",
 			line = "In fights just the Cooldown Manager: no bars or menus",
 			modules = { { retail = "retail-groups" }, "pure-cdm" } },
-		-- (Only the retired CDM profiles'.)
-		{ part = "cdm", hidden = true, noCDM = "grouped", label = "Cooldown Manager, pet and stance bars",
-			line = "The Cooldown Manager in fights, pet and stance bars too",
-			modules = { { retail = "retail-groups" }, "cdm", "micro-off-in-fights" } },
 	} },
 	camera = { label = "Camera", page = "Cameras", question = "When does the camera move on its own?",
 		default = "standard", choices = {
@@ -110,10 +104,7 @@ ns.SLOT_CHOICES = {
 		-- (Only Subtle's: not offered.)
 		{ part = "travel", hidden = true, label = "Flights and teleports",
 			line = "Just flights, and your Hearthstone and teleports", modules = { "travel-cameras" } },
-		-- (Only the retired Camera Only profile's, and the plain defaults: not offered.)
-		{ part = "cinemode", hidden = true, label = "Cameras bring CineMode",
-			line = "Every camera brings CineMode on, and can start music", modules = { "cameras-bring-cinemode", "still-afk", "camera-music",
-				"walk-run-music" } },
+		-- (Only the plain defaults': not offered.)
 		{ part = "standard", hidden = true, label = "Every camera", line = "Every camera, as the defaults have them",
 			modules = {} },
 	} },
@@ -124,6 +115,10 @@ ns.SLOT_CHOICES = {
 			modules = { "no-letterbox" } },
 		{ part = "cameras", label = "During cameras", line = "The effects only while a camera mode runs",
 			modules = { "effects-in-cameras" } },
+		-- (Only Subtle's: not offered.)
+		{ part = "cinebars", hidden = true, label = "In CineMode",
+			line = "The letterbox, tint, vignette and weather only in CineMode",
+			modules = { "letterbox-in-cinemode", "tint-in-cinemode", "effects-in-cinemode" } },
 		{ part = "pure", label = "Through fights", line = "Fights don't bring the letterbox down",
 			modules = { "letterbox-in-fights" } },
 	} },
@@ -180,13 +175,13 @@ ns.BUILTIN_PROFILES = {
 		label = "Subtle", -- (shown in your language)
 		oldNames = { "VFX Only" },
 		icon = "Interface\\Icons\\Spell_Nature_Lightning",
-		tip = L["A light touch that leaves your UI exactly as it is. A color tint, vignette and weather set " ..
-			"the mood, and only the quiet extras join in: the camera sweeps along on flights and teleports, " ..
-			"a portal opens as you hearth, and small cards mark your big moments, your duels and the " ..
-			"players who buff or emote at you."],
-		picks = { layout = { forever = "preset" }, frames = "nofade", camera = "travel", vfx = "noletterbox",
+		tip = L["A light touch that leaves your UI exactly as it is. The letterbox, color tint, vignette and " ..
+			"weather wait for CineMode, and only the quiet extras join in: the camera sweeps along on flights and teleports, " ..
+			"a portal opens as you hearth, and small cards mark your big moments, the places you reach, your " ..
+			"duels and the players who buff or emote at you."],
+		picks = { layout = { forever = "preset" }, frames = "nofade", camera = "travel", vfx = "cinebars",
 			sound = "nomusic" },
-		modules = With("no-visions", "no-custom-bubbles", "tint-subtle"),
+		modules = With("zone-card", "travel-cards", "no-visions", "no-custom-bubbles"),
 	},
 	{
 		name = "Balanced",
@@ -199,7 +194,7 @@ ns.BUILTIN_PROFILES = {
 			"bring the world to life, most of the Visions and cards join in, and the camera takes over on " ..
 			"flights, when you go AFK and for your Hearthstone and teleports."],
 		picks = { layout = { forever = "preset" }, camera = "lite", chat = "lite" },
-		modules = With("zone-card", "damage-vision", "tint-balanced", "music-calm", "node-icons"),
+		modules = With("zone-card", "travel-cards", "damage-vision", "music-calm", "node-icons"),
 		preview = "bars",
 	},
 	{
@@ -217,38 +212,24 @@ ns.BUILTIN_PROFILES = {
 			bars = { forever = "split", retail = "pure" }, camera = "pure", vfx = "pure", chat = "pure" },
 		-- (Its own Visions and cards, apart from the slots' choices: picking a
 		-- choice for a slot then leaves them as they are.)
-		modules = With("zone-card", "story-cards", "damage-vision", "vitals-vision",
+		modules = With("zone-card", "travel-cards", "story-cards", "damage-vision", "vitals-vision",
 			"combat-vision", "heal-vision-everywhere", "cursor-hide", "music-calm", "weather-view-distance",
 			"node-icons"),
 	},
 }
 
--- Built-ins no longer offered, as they were: one you were on or had saved
--- becomes a profile of your own at login, its settings as they were
--- (ns.InitProfiles). Their picks and modules stay so that comes out right.
-ns.RETIRED_PROFILES = {
-	{ name = "Forever Default", label = "Default", client = "forever", icon = "Interface\\Icons\\Spell_Holy_MindVision",
-		picks = { layout = "preset", frames = "immersive", camera = "immersive", chat = "quietnpcs",
-			sound = "spaced" } },
-	{ name = "Forever CDM", label = "CDM", client = "forever", icon = "Interface\\Icons\\Spell_Shadow_AntiShadow",
-		from = "Forever Default", picks = { bars = "cdm" } },
-	{ name = "Forever Retail", label = "Retail", client = "forever", icon = "Interface\\Icons\\INV_Misc_Wrench_01",
-		from = "Forever Default", picks = { layout = "retail", bars = "split" },
-		modules = { "micro-off-in-fights" } }, -- (the split choice had it then)
-	{ name = "Retail Default", label = "Default", client = "retail", icon = "Interface\\Icons\\Spell_Holy_PowerInfusion",
-		picks = { frames = "immersive", bars = "split", camera = "immersive", chat = "quietnpcs",
-			sound = "spaced" },
-		modules = { "micro-off-in-fights" } }, -- (the split choice had it then)
-	{ name = "Retail CDM", label = "CDM", client = "retail", icon = "Interface\\Icons\\Ability_Rogue_Preparation",
-		from = "Retail Default", picks = { bars = "cdm" } },
-	{ name = "Retail Forever", label = "Forever", client = "retail", icon = "Interface\\Icons\\INV_Misc_PocketWatch_01",
-		picks = { layout = "forever", frames = "immersive", bars = "grouped", camera = "immersive",
-			chat = "quietnpcs", sound = "spaced" } },
-	{ name = "Camera Only", icon = "Interface\\Icons\\INV_Misc_Spyglass_03",
-		picks = { layout = { forever = "preset" }, frames = "nofade", camera = "cinemode", vfx = "cameras",
-			chat = "quietnpcs" } },
-	{ name = "Solo Explorer", icon = "Interface\\Icons\\Ability_Mount_RidingHorse",
-		picks = { layout = { forever = "preset" }, frames = "solo" } },
+-- Names of built-ins Cinematic used to have, for what a player still has under
+-- one (ns.InitProfiles): label, what it's kept as if you're on it; drop: never
+-- kept. Just their names: the three above are all the built-ins there are.
+ns.OLD_PROFILES = {
+	{ name = "Forever Default", label = "Default", drop = true },
+	{ name = "Forever CDM", label = "CDM", drop = true },
+	{ name = "Forever Retail", label = "Retail", drop = true },
+	{ name = "Retail Default", label = "Default" },
+	{ name = "Retail CDM", label = "CDM" },
+	{ name = "Retail Forever", label = "Forever" },
+	{ name = "Camera Only" },
+	{ name = "Solo Explorer" },
 }
 
 -- The welcome window's levels (Welcome.lua), and the profile each picks,

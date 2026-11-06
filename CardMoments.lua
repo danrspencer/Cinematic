@@ -4,7 +4,7 @@
 -- card (ns.Cards.Fire), with its made-up one for the Test buttons
 -- (ns.CardSamples). The page's tick for each is its row's; all off to start
 -- with (ProfileModules.lua: "milestone-cards" in every built-in profile,
--- "story-cards" the rest in Cinema).
+-- "travel-cards" in all three too, "story-cards" the rest in Cinema).
 
 local _, ns = ...
 local L = ns.L

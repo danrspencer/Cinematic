@@ -97,10 +97,6 @@ local function EveryRow(bars, value)
 	return list
 end
 
--- The action bars as Cinema and the CDM module hide them: action bars
--- 1 to 3 (and 4 to 8) with the art.
-local MAIN_BARS = { "mainbar", "art", "bottomleft", "bottomright" }
-local EXTRA_BARS = { "right1", "right2", "bar6", "bar7", "bar8" }
 -- The micro menu, bags and XP bars (the Info and menus section's).
 local MICRO_ROWS = { "micro", "bags", "xp" }
 
@@ -168,8 +164,6 @@ ns.PROFILE_MODULES = {
 		"Action bars centred along the bottom, the micro menu and bags in the corner, the XP bars under them, " ..
 		"as on retail. Fights bring up the player frame, not the personal resource display.",
 		function(set) set("combatShow", { prd = false, prdpower = false }) end),
-	Layout("layout-forever", "Forever-style layout", "CINE_RETAIL_FOREVER_LAYOUT", "retail",
-		"Retail laid out like WoW Forever's default."),
 	Layout("layout-pure", "Personal Resource Centered layout", "Personal Resource Centered", nil,
 		"The personal resource display in the middle, the Cooldown Manager above it; fights bring it up. Turns " ..
 		"the game's personal resource display on if it's off.",
@@ -222,22 +216,6 @@ ns.PROFILE_MODULES = {
 		apply = function(set)
 			set("combatShow", All(MICRO_ROWS, false))
 			set("enemyShow", All(MICRO_ROWS, false))
-		end },
-	{ key = "cdm", name = "Cooldown Manager in fights",
-		scope = { "Cooldown Manager", "Standard Frames/Trackers", "Standard Frames/Action bars" },
-		tip = "The Cooldown Manager in place of action bars 1 to 8 in fights and with an enemy targeted (the " ..
-		"pet, stance and totem bars still come up). After a fight it stays up until its cooldowns are ready, " ..
-		"within the Calm Timer. Turns the game's Cooldown Manager on if it's off.",
-		apply = function(set)
-			set("cooldownManagerOn", true)
-			set("cooldownWhileRecharging", true)
-			set("cooldownUtilityWhileRecharging", true)
-			for _, list in ipairs({ "combatShow", "enemyShow" }) do
-				local rows = All(MAIN_BARS, false)
-				for row in pairs(All(EXTRA_BARS, false)) do rows[row] = false end
-				for _, row in ipairs({ "cooldowns", "pet", "stance", "totems" }) do rows[row] = true end
-				set(list, rows)
-			end
 		end },
 
 	{ key = "bars-always", name = "Action bars always up",
@@ -494,22 +472,6 @@ ns.PROFILE_MODULES = {
 		apply = function(set)
 			CamsOff(set, { "idle", "cozy", "vista", "fish", "walk", "run", "death", "quest" })
 		end },
-	{ key = "cameras-bring-cinemode", name = "Cameras bring CineMode", scope = { "Scenes",
-		"Camera Settings/Death Cam", "Card Vision" },
-		tip = "Every camera brings CineMode on, and no death screen.",
-		apply = function(set)
-			for _, event in ipairs(ns.EVENTS or {}) do
-				if ns.DEFAULTS["event" .. event.key .. "Cine"] ~= nil then
-					set("event" .. event.key .. "Cine", true)
-				end
-			end
-			set("walkCine", true)
-			set("runCine", true)
-			set("deathCine", true)
-			-- (Death Cam's page is dev-only.)
-			if ns.isDev then set("deathScreen", false) end
-			set("cardDeathOn", false)
-		end },
 	{ key = "pure-cameras", name = "Cinema: cameras", scope = { "Scenes", "Camera Settings/Chat Cam",
 		"General/top", "Card Vision" },
 		tip = "The cameras don't wait for things to calm down after a fight, auto-run carries on in cities and " ..
@@ -541,7 +503,7 @@ ns.PROFILE_MODULES = {
 	{ key = "duel-card", name = "Duel card", scope = { "Card Vision" },
 		tip = "Your own duels show as the Cards page's card: a challenge, the start and who won.",
 		apply = function(set) set("cardDuelOn", true) end },
-	-- (The big, rare moments: every profile has them. The rest: story-cards.)
+	-- (The big, rare moments: every profile has them. The rest: travel-cards, story-cards.)
 	{ key = "milestone-cards", name = "Milestone cards", scope = { "Card Vision" },
 		tip = "Your character's big moments as the Cards page's cards: a level, an achievement, a new mount or " ..
 			"pet, a dungeon cleared and a boss down.",
@@ -551,13 +513,19 @@ ns.PROFILE_MODULES = {
 				set(key, true)
 			end
 		end },
-	{ key = "story-cards", name = "Story cards", scope = { "Card Vision" },
-		tip = "The rest of your character's story as the Cards page's cards: a place discovered, a flight's start and end, " ..
-			"an inn, a new standing or profession rank, a story quest done, a rare spotted, a battleground and a " ..
-			"kill streak.",
+	{ key = "travel-cards", name = "Travel cards", scope = { "Card Vision" },
+		tip = "Where you've got to as the Cards page's cards: a place discovered and a flight's start and end.",
 		apply = function(set)
-			for _, key in ipairs({ "cardDiscoverOn", "cardDepartureOn", "cardArrivalOn", "cardRestedOn", "cardReputationOn",
-				"cardProfessionOn", "cardQuestOn", "cardRareOn", "cardBattlegroundOn", "cardStreakOn" }) do
+			for _, key in ipairs({ "cardDiscoverOn", "cardDepartureOn", "cardArrivalOn" }) do
+				set(key, true)
+			end
+		end },
+	{ key = "story-cards", name = "Story cards", scope = { "Card Vision" },
+		tip = "The rest of your character's story as the Cards page's cards: an inn, a new standing or profession " ..
+			"rank, a story quest done, a rare spotted, a battleground and a kill streak.",
+		apply = function(set)
+			for _, key in ipairs({ "cardRestedOn", "cardReputationOn", "cardProfessionOn", "cardQuestOn", "cardRareOn",
+				"cardBattlegroundOn", "cardStreakOn" }) do
 				set(key, true)
 			end
 		end },
@@ -573,16 +541,19 @@ ns.PROFILE_MODULES = {
 		apply = function(set) set("emoteVision", true) end },
 
 	-- The look
-	-- (The tint's strength per level: Cinema keeps the default, 100%.)
-	{ key = "tint-subtle", name = "Subtle tint", scope = { "Tint/How strong" },
-		tip = "The tint at a third of its strength (33%).",
-		apply = function(set) set("tintStrength", 0.33) end },
-	{ key = "tint-balanced", name = "Balanced tint", scope = { "Tint/How strong" },
-		tip = "The tint at two thirds of its strength (66%).",
-		apply = function(set) set("tintStrength", 0.66) end },
 	{ key = "no-letterbox", name = "No letterbox", scope = { "Letterbox/Show in" },
 		tip = "No letterbox: the other effects show over the normal UI.",
 		apply = function(set) set("letterbox", false) end },
+	{ key = "letterbox-in-cinemode", name = "Letterbox in CineMode only", scope = { "Letterbox/Show in" },
+		tip = "The bars only in CineMode, not over the normal UI: the row's Cine tick alone.",
+		settings = { quietShow = { ["effect:letterbox"] = false }, cineModeShow = { ["effect:letterbox"] = true } } },
+	{ key = "tint-in-cinemode", name = "Tint in CineMode only", scope = { "Tint/Show in" },
+		tip = "The tint only in CineMode, not over the normal UI: the row's Cine tick alone.",
+		settings = { tintAlways = false, cineModeShow = { ["effect:tint"] = true } } },
+	{ key = "effects-in-cinemode", name = "Vignette and weather in CineMode only", scope = { "Effects/Show in" },
+		tip = "The vignette and weather only in CineMode, not over the normal UI: their rows' Cine ticks alone.",
+		settings = { vignetteAlways = false, weatherAlways = false,
+			cineModeShow = { ["effect:vignette"] = true, ["effect:weather"] = true } } },
 	{ key = "effects-in-cameras", name = "Effects only in cameras", scope = { "Effects/Show in", "Letterbox/Show in", "Tint/Show in" },
 		tip = "The letterbox, tint, vignette and weather only while a camera mode runs; no soft edges.",
 		apply = function(set)

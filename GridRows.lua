@@ -9,7 +9,7 @@
 -- NOT, other words) is the row's rule, shown in its place, its words in
 -- their groups' colours.
 
-local _, ns = ...
+local ADDON_NAME, ns = ...
 local L = ns.L
 
 -- A tip on hover (the widget's own OnEnter and OnLeave).
@@ -91,7 +91,7 @@ function ns.RulePieces()
 		{ L["Nearby"], { 1, 0.5, 0.8 }, { { "elite11", L["Elite near (11 yards)"] },
 			{ "elite28", L["Elite near (28 yards)"] }, { "elite40", L["Elite near (40 yards)"] } } },
 		{ L["Location"], { 0.45, 0.75, 1 }, location },
-		{ L["You"], { 0.8, 0.6, 1 }, { { "mounted", L["Mounted"] }, { "flagged", L["PvP flagged"] },
+		{ L["You"], { 0.8, 0.6, 1 }, { { "mounted", L["Mounted"] }, { "casting", L["Casting"] }, { "flagged", L["PvP flagged"] },
 			{ "group", L["Grouped"] }, { "cinemode", L["In CineMode"] } } },
 		{ L["Role"], { 0.4, 0.85, 0.5 }, { { "tank", L["Tank"] }, { "healer", L["Healer"] }, { "damage", L["Damage"] } } },
 		{ L["Class"], { 0.85, 0.75, 0.6 }, classes },
@@ -297,6 +297,16 @@ local function BuildEditor()
 	local heading = editor:CreateFontString(nil, "OVERLAY", "GameFontNormal")
 	heading:SetPoint("TOP", 0, -10)
 	heading:SetWidth(EDIT_W - 220) -- (clear of Pop out)
+	-- (The language's name, over the rule's left edge, and what it is on hover.)
+	local cql = CreateFrame("Frame", nil, editor)
+	cql:SetPoint("TOPLEFT", 14, -8)
+	cql:SetSize(32, 18)
+	cql:EnableMouse(true)
+	local cqlText = cql:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+	cqlText:SetPoint("LEFT")
+	cqlText:SetText("CQL")
+	Tip(cql, L["CQL (Cinematic Query Language): the words a rule is written in. Join them with AND, OR and " ..
+		"NOT, and group them with brackets, to say exactly when this shows."])
 
 	-- The rule, a few lines' room; a click anywhere on it types there.
 	local well = CreateFrame("Frame", nil, editor, BACKDROP)
@@ -664,8 +674,11 @@ local FOLLOW_COLOR = { 0.79, 0.73, 1 }
 -- The targets' names in a menu (the rest are their columns').
 local MENU_NAMES = { combatShow = "In combat", enemyShow = "Enemy targeted", friendlyShow = "Friend targeted" }
 
--- Across a row, from the label's end: Always, the dropdowns, Edit.
-local ALWAYS_W, MENU_W, RULE_W, GAP = 46, 96, 40, 2
+-- Across a row, from the label's end: Always, CineMode (the Show in tables'),
+-- the dropdowns, Edit. (Its icons: Media/make_quill.py, Media/make_grid_icon.py.)
+local ALWAYS_W, CINE_W, MENU_W, RULE_W, GAP = 40, 44, 96, 22, 2
+local EDIT_ICON = "Interface\\AddOns\\" .. ADDON_NAME .. "\\Textures\\Quill"
+local GRID_ICON = "Interface\\AddOns\\" .. ADDON_NAME .. "\\Textures\\GridIcon"
 -- The dot at the end of a row's name (room kept for it in the label).
 ns.GRID_DOT_ROOM = 18
 
@@ -679,12 +692,16 @@ end
 
 -- Where a grid's columns go across a row, labelWidth in. layout: { groups,
 -- the dropdowns it has ({ 1, 2, 3 } when nil); always = false: no Always
--- column; edit: that column }.
+-- column; cine: the CineMode column; edit: that column }.
 local function Columns(layout)
 	local x, cols = 0, { menus = {} }
 	if layout.always ~= false then
 		cols.always = x
 		x = x + ALWAYS_W + GAP
+	end
+	if layout.cine then
+		cols.cine = x
+		x = x + CINE_W + GAP
 	end
 	for _, g in ipairs(layout.groups or { 1, 2, 3 }) do
 		cols.menus[g] = x
@@ -700,6 +717,13 @@ local function Columns(layout)
 end
 -- How wide a grid's columns are (the label's not counted).
 function ns.GridWidth(layout) return Columns(layout).width end
+-- The Show in tables (ns.GridTable): their columns, and what the CineMode
+-- column takes off the names, so they still fit beside the scrollbar.
+local TABLE_LAYOUT, TABLE_LABEL_TRIM = { cine = true, edit = true }, 12
+-- How wide one is, whole, for names labelWidth wide.
+function ns.GridTableWidth(labelWidth)
+	return labelWidth - TABLE_LABEL_TRIM + ns.GridWidth(TABLE_LAYOUT)
+end
 
 -- The headings over a grid's columns: at top's top left, labelWidth in
 -- (kit.FrameHeading's height, kit.headingHeight). Gives them, to show and hide.
@@ -713,10 +737,11 @@ function ns.GridHeadings(kit, parent, top, labelWidth, layout)
 		made[#made + 1] = heading
 	end
 	if cols.always then Heading(layout.alwaysHeading or L["Always"], cols.always, ALWAYS_W) end
+	-- (Short: CineMode in full ran into Always and was cut off. Its tip says it in full.)
+	if cols.cine then Heading(L["Cine"], cols.cine, CINE_W) end
 	for g, group in ipairs(MENU_GROUPS) do
 		if cols.menus[g] then Heading(L[group.heading], cols.menus[g], MENU_W, group.color) end
 	end
-	if cols.edit then Heading(L["Edit"], cols.edit, RULE_W) end
 	return made
 end
 
@@ -738,6 +763,7 @@ end
 -- the caller, labelWidth wide, to the row's left). kit: the page helpers
 -- (Options.lua's Tooltip, Refresh, controls, RecordKey...). spec:
 --   always = { isOn(), set(value), tip } (nil: an empty cell);
+--   cine = { isOn(), set(value), tip }: the CineMode column's (nil: an empty cell);
 --   menus = { [dropdown] = { { name, isOn(), toggle(), usable() or nil, tip }... } };
 --   follow = { key(), choices() giving { { key, label }... }: the rows it
 --     may follow, picked in the rule editor } (nil: none): following one, it
@@ -810,6 +836,17 @@ function ns.GridRow(kit, parent, labelWidth, layout, spec)
 			Changed()
 		end)
 		Tooltip(always, spec.always.tip)
+	end
+	local cine
+	if spec.cine and cols.cine then
+		cine = ns.SkinCheck(CreateFrame("CheckButton", nil, row, "UICheckButtonTemplate"))
+		cine:SetSize(26, 26)
+		cine:SetPoint("LEFT", cols.cine + (CINE_W - 26) / 2, 0)
+		cine:SetScript("OnClick", function(self)
+			spec.cine.set(self:GetChecked() and true or false)
+			Changed()
+		end)
+		Tooltip(cine, spec.cine.tip)
 	end
 
 	-- The dropdowns, each its items' ticks.
@@ -926,8 +963,9 @@ function ns.GridRow(kit, parent, labelWidth, layout, spec)
 		edit = ns.PanelButton(row)
 		edit:SetSize(RULE_W, 20)
 		edit:SetPoint("LEFT", cols.edit, 0)
-		edit:SetNormalFontObject("GameFontHighlightSmall")
-		edit:SetDisabledFontObject("GameFontDisableSmall")
+		edit.icon = edit:CreateTexture(nil, "OVERLAY")
+		edit.icon:SetSize(14, 14)
+		edit.icon:SetPoint("CENTER")
 		if edit.SetMotionScriptsWhileDisabled then edit:SetMotionScriptsWhileDisabled(true) end -- (its tip says why)
 		edit:SetScript("OnClick", function()
 			local text = Rule()
@@ -1007,6 +1045,12 @@ function ns.GridRow(kit, parent, labelWidth, layout, spec)
 			always:SetChecked(on)
 			always:SetEnabled(enabled)
 		end
+		if cine then
+			cine:SetShown(full and not text and not leader)
+			cine:SetChecked(spec.cine.isOn())
+			cine:SetEnabled(enabled and not on)
+			cine:SetAlpha((enabled and not on) and 1 or 0.35)
+		end
 		for _, menu in ipairs(menus) do
 			menu:SetShown(full and not text and not leader)
 			menu:Refresh()
@@ -1025,9 +1069,12 @@ function ns.GridRow(kit, parent, labelWidth, layout, spec)
 				ruleText:SetSkinTint(not ns.CompileRule(text) and 1 or nil, 0.45, 0.45)
 			end
 			edit:SetShown(full)
-			edit:SetText((text or leader) and L["Grid"] or L["Edit"])
-			edit:SetEnabled(enabled and (leader or not text or not rule.grid or ns.ReadGridRule(text, rule.grid) ~= nil)
-				and true or false)
+			edit.icon:SetTexture((text or leader) and GRID_ICON or EDIT_ICON)
+			local usable = enabled and (leader or not text or not rule.grid or ns.ReadGridRule(text, rule.grid) ~= nil)
+				and true or false
+			edit:SetEnabled(usable)
+			edit.icon:SetDesaturated(not usable)
+			edit.icon:SetAlpha(usable and 1 or 0.4)
 		end
 		if live then
 			if full then Live() else live:Hide() end
@@ -1089,6 +1136,7 @@ end
 -- tick of its own: In combat, Calm Timer (calmShow: after a fight, till it's
 -- run out) and Out of combat (quietShow: the rest). opts (nil: none):
 --   quiet, cam: Out of combat (quietShow) and In a camera mode (camShow) in Combat too;
+--   cinemode: the row has the CineMode column (cineModeShow), its word in the row's rule;
 --   anyFight: its In combat in any fight (not greyed while CineMode doesn't stay on in them);
 --   omit: lists left out (list -> true: In combat, the targets, a place);
 --   calmItem: in place of the Calm Timer, a menu entry of its own (cameras' wait).
@@ -1109,7 +1157,8 @@ function ns.ListRowParts(Key, columns, columnTips, setAlways, opts)
 		ns.GetDB()[columns[c][3]][Key()] = value
 	end
 	-- (The lists that aren't columns: Calm Timer, Out of combat, In a camera mode.)
-	local EXTRA_ON = { calmShow = ns.IsCalmShowOn, quietShow = ns.IsQuietShowOn, camShow = ns.IsCamShowOn }
+	local EXTRA_ON = { calmShow = ns.IsCalmShowOn, quietShow = ns.IsQuietShowOn, camShow = ns.IsCamShowOn,
+		cineModeShow = ns.IsCineModeShowOn }
 	local function ExtraOn(list) return EXTRA_ON[list](Key()) and true or false end
 	local function SetExtra(list, value)
 		KeepFollowers(list, EXTRA_ON[list])
@@ -1185,6 +1234,7 @@ function ns.ListRowParts(Key, columns, columnTips, setAlways, opts)
 	end
 	local function Words()
 		local words = {}
+		if opts.cinemode and ExtraOn("cineModeShow") then words[1] = "cinemode" end
 		for c = 2, #columns do
 			if not omit[columns[c][3]] and Ticked(c) then words[#words + 1] = LIST_WORD[columns[c][3]] end
 			if c == combatColumn and not opts.calmItem and ExtraOn("calmShow") then words[#words + 1] = "calm" end
@@ -1201,6 +1251,7 @@ function ns.ListRowParts(Key, columns, columnTips, setAlways, opts)
 		if combatColumn and not opts.calmItem then SetExtra("calmShow", ticked.calm and true or false) end
 		if opts.quiet then SetExtra("quietShow", ticked.nocombat and true or false) end
 		if opts.cam then SetExtra("camShow", ticked.camera and true or false) end
+		if opts.cinemode then SetExtra("cineModeShow", ticked.cinemode and true or false) end
 	end
 	-- (The words this row's dropdowns hold, for reading a rule back into them.)
 	local grid = {}
@@ -1211,15 +1262,18 @@ function ns.ListRowParts(Key, columns, columnTips, setAlways, opts)
 	end
 	grid.nocombat = opts.quiet or nil
 	grid.camera = opts.cam or nil
-	return { menus = menus, words = Words, apply = Apply, grid = grid, keepFollowers = KeepFollowers }
+	grid.cinemode = opts.cinemode or nil
+	return { menus = menus, words = Words, apply = Apply, grid = grid, keepFollowers = KeepFollowers,
+		cine = { isOn = function() return ExtraOn("cineModeShow") end,
+			set = function(value) SetExtra("cineModeShow", value) end } }
 end
 
 -- The Standard Frames table, a row per item, as dropdowns (ShowTable does
 -- the rest: its kit is the page helpers it shares). Returns the last row's
 -- label, to place what comes below.
 function ns.GridTable(content, columnTop, rows, kit)
-	local LABEL_WIDTH, ROW_HEIGHT, COLUMNS = kit.labelWidth, kit.rowHeight, kit.columns
-	local LAYOUT = { edit = true }
+	local LABEL_WIDTH, ROW_HEIGHT, COLUMNS = kit.labelWidth - TABLE_LABEL_TRIM, kit.rowHeight, kit.columns
+	local LAYOUT = TABLE_LAYOUT
 	-- (The rows a row may follow: the table's others.)
 	local choices = {}
 	for _, item in ipairs(rows) do
@@ -1257,9 +1311,10 @@ function ns.GridTable(content, columnTop, rows, kit)
 		local opts = {}
 		for k, v in pairs(rows.opts or {}) do opts[k] = v end
 		for k, v in pairs(item.opts or {}) do opts[k] = v end
+		opts.cinemode = not item.alwaysOnly
 		if not item.alwaysOnly then
 			-- (frameRules too: its rule. Left out, Reset page kept a row's rule.)
-			for _, list in ipairs({ "calmShow", "quietShow", "camShow", "rowFollow", "frameRules" }) do
+			for _, list in ipairs({ "calmShow", "quietShow", "camShow", "cineModeShow", "rowFollow", "frameRules" }) do
 				kit.RecordKey(content, list)
 				kit.RecordRow(content, list, item.key)
 			end
@@ -1291,6 +1346,9 @@ function ns.GridTable(content, columnTop, rows, kit)
 			enabled = item.showKey and function() return kit.RowShown(item) end or nil,
 		}
 		if not item.alwaysOnly then
+			spec.cine = { isOn = parts.cine.isOn, set = parts.cine.set,
+				tip = L["Shows it while CineMode is on, whatever the other columns say. Outside CineMode this " ..
+				"tick does nothing."] }
 			spec.menus = parts.menus
 			spec.follow = { key = Key, choices = Choices }
 			spec.rule = { key = Key, label = function() return item.label end, grid = parts.grid,

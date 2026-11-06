@@ -154,6 +154,11 @@ local function Columns(key, out)
 		Add(out, "on", L["Always is ticked"], page)
 		found = true
 	end
+	if ns.IsCineModeShowOn(key) then
+		Add(out, facts.cinemode and "on" or "off", facts.cinemode and L["CineMode is ticked, and CineMode is on"]
+			or L["CineMode is ticked: it shows once CineMode is on"], page)
+		found = true
+	end
 	local place = ns.GetPlaceType()
 	local here = (place == "pvp" and "bgShow") or ((place == "dungeon" or place == "raid") and "instanceShow")
 		or (place == "city" and "cityShow") or "worldShow"
@@ -975,7 +980,7 @@ end
 -- fades, what it's doing now and why, kept up to date while the page is open
 -- (UpdateFrames notes the first frame of each row, as Inspect's are).
 local NOW_WORDS = { "cinemode", "combat", "calm", "nocombat", "camera", "target", "enemy", "friendly", "boss",
-	"world", "city", "inn", "dungeon", "raid", "bg", "arena", "group", "mounted", "flagged" }
+	"world", "city", "inn", "dungeon", "raid", "bg", "arena", "group", "mounted", "casting", "flagged" }
 local FILTERS = { { "shown", "Showing" }, { "hidden", "Hidden" }, { "all", "All" } }
 local SORTS = { { "name", "Name" }, { "visible", "Visible first" } }
 -- (Visible first: showing, then partly, hidden, and the ones it can't tell.)

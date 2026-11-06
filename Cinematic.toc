@@ -14,9 +14,6 @@
 ## Author: sapo
 ## Category: UI
 ## IconTexture: Interface\Icons\INV_Misc_Spyglass_03
-## AddonCompartmentFunc: Cinematic_OnCompartmentClick
-## AddonCompartmentFuncOnEnter: Cinematic_OnCompartmentEnter
-## AddonCompartmentFuncOnLeave: Cinematic_OnCompartmentLeave
 ## Version: @project-version@
 ## X-Curse-Project-ID: 1730730
 ## SavedVariables: CinematicDB

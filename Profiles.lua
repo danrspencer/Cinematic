@@ -20,7 +20,7 @@ local _, ns = ...
 local L = ns.L
 
 local GLOBAL_KEYS = {
-	enabled = true, minimapButton = true, minimapAngle = true, logDetail = true, language = true,
+	enabled = true, minimapButton = true, addonCompartment = true, minimapAngle = true, logDetail = true, language = true,
 	masterWheelOrder = true, masterWheelOff = true, customWheels = true, wheelExtras = true, -- (Wheels pages)
 	cameraScripts = true, -- (CameraScripts.lua: your scripts, the same in every profile)
 	stylePreviewPos = true, -- (StylePages.lua: where you dragged the Style preview window)
@@ -30,7 +30,7 @@ local GLOBAL_KEYS = {
 -- Lists kept as tables that belong to a profile (their defaults are in code;
 -- see EnsureTables in Core.lua). Missing from a profile: emptied, which means defaults.
 local PROFILE_TABLES = {
-	"chatPeekTypes", "chatPeekChannelList", "combatShow", "calmShow", "quietShow", "camShow", "cineShow", "targetShow", "enemyShow",
+	"chatPeekTypes", "chatPeekChannelList", "combatShow", "calmShow", "quietShow", "camShow", "cineModeShow", "cineShow", "targetShow", "enemyShow",
 	"friendlyShow", "bgShow", "worldShow", "cityShow", "groupShow", "instanceShow", "addonFrames", "gamepadPressButtons",
 	"hoverGroups", "cooldownReadyOnly", "cooldownReadyEarly", "cooldownEarlyOn", "cooldownRechargeOnly", "cooldownNeedsPower",
 	"cooldownGroupDefaults", "cooldownProcOnly", "cooldownAlwaysShow", "cooldownBuffMode", "cooldownFlashReady",
@@ -84,18 +84,9 @@ for _, profile in ipairs(ns.ALL_BUILTIN_PROFILES) do
 	allBuiltinByName[profile.name] = profile
 end
 ns.ALL_BUILTIN_BY_NAME = allBuiltinByName
--- Retired built-ins (ns.RETIRED_PROFILES) and old names, this client's:
--- what was saved under one is a change from its values until it's moved
--- over at login (ns.InitProfiles).
-local retiredByName, retiredHere, oldNameOf, otherClientRetired = {}, {}, {}, {}
-for _, profile in ipairs(ns.RETIRED_PROFILES or {}) do
-	retiredByName[profile.name] = profile
-	if not profile.client or profile.client == ns.CLIENT then
-		retiredHere[#retiredHere + 1] = profile
-	else
-		otherClientRetired[profile.name] = true
-	end
-end
+-- Built-ins' old names: what was saved under one is a change from its values
+-- until it's moved over at login (ns.InitProfiles).
+local oldNameOf = {}
 for _, profile in ipairs(ns.BUILTIN_PROFILES) do
 	for _, old in ipairs(profile.oldNames or {}) do oldNameOf[old] = profile end
 end
@@ -156,17 +147,13 @@ function ns.BuiltinModules(profile)
 end
 
 -- A profile's built-in modules: a built-in's, or (until moved over at
--- login) an old name's or a retired built-in's. nil: your own.
+-- login) an old name's. nil: your own.
 local function ModulesFor(name)
 	local builtin = builtinByName[name]
 	if builtin then return ns.BuiltinModules(builtin) end
 	local db = ns.db or {}
 	builtin = oldNameOf[name]
 	if builtin and not (db.profiles and db.profiles[builtin.name]) then return ns.BuiltinModules(builtin) end
-	local retired = retiredByName[name]
-	if retired and not (db.retiredProfiles and db.retiredProfiles[name]) then
-		return ns.ResolveModules(retired, ns.CLIENT, retiredByName)
-	end
 end
 
 -- The rows' default rules (ns.RULE_DEFAULTS) put into values.frameRules where
@@ -479,7 +466,7 @@ function ns.ProfileNames()
 	for name in pairs(ns.db.profiles) do
 		-- (Not one of the other built-ins: another client's, or hidden. Their
 		-- settings stay saved for when they're listed again.)
-		if not builtinByName[name] and not allBuiltinNames[name] and not otherClientRetired[name] then
+		if not builtinByName[name] and not allBuiltinNames[name] then
 			own[#own + 1] = name
 		end
 	end
@@ -907,7 +894,7 @@ function ns.ResetAddon(settingsOnly)
 		for name, saved in pairs(ns.db.profiles) do
 			if type(saved) ~= "table" then
 				-- (nothing to keep)
-			elseif not builtinByName[name] and not allBuiltinNames[name] and not otherClientRetired[name] then
+			elseif not builtinByName[name] and not allBuiltinNames[name] then
 				profiles[name] = saved -- (your own: as it is)
 			else
 				-- A built-in: its changes backed up, then only what you made in it.
@@ -1073,14 +1060,9 @@ function ns.InitProfiles()
 	db.profileNotes = db.profileNotes or {}
 	db.profileIcons = db.profileIcons or {}
 	db.devRecipes, db.devModules = nil, nil -- (the Profile Builder's changes, from before the Module Editor)
-	-- Built-ins called something else before (retired ones' too): their
-	-- settings and picks move over.
+	-- Built-ins called something else before: their settings and picks move over.
 	local liveRenamed = false
-	local renaming = {}
-	for _, list in ipairs({ ns.BUILTIN_PROFILES, retiredHere }) do
-		for _, profile in ipairs(list) do renaming[#renaming + 1] = profile end
-	end
-	for _, profile in ipairs(renaming) do
+	for _, profile in ipairs(ns.BUILTIN_PROFILES) do
 		for _, old in ipairs(profile.oldNames or {}) do
 			if db.profiles[old] and not db.profiles[profile.name] then
 				db.profiles[profile.name], db.profiles[old] = db.profiles[old], nil
@@ -1094,15 +1076,15 @@ function ns.InitProfiles()
 			end
 		end
 	end
-	-- Built-ins no longer offered (ns.RETIRED_PROFILES): one you're on or
-	-- have saved becomes a profile of your own, named as it was shown, its
-	-- settings as they were. Characters with it as theirs follow when they
-	-- next log in (db.retiredProfiles: the old name, and what it's called now).
+	-- Built-ins Cinematic no longer has (ns.OLD_PROFILES): the one you're on
+	-- becomes a profile of your own, named as it was shown, your settings as
+	-- they are; one you're not on is deleted, its modules gone with it.
+	-- Characters with a kept one as theirs follow when they next log in
+	-- (db.retiredProfiles: the old name, and what it's called now).
 	db.retiredProfiles = db.retiredProfiles or {}
-	for _, profile in ipairs(retiredHere) do
+	for _, profile in ipairs(ns.OLD_PROFILES) do
 		local old = profile.name
-		local inUse = db.profile == old or db.liveProfile == old or chardb.profile == old
-		if profile.client == "forever" then
+		if profile.drop then
 			-- (Forever's old built-ins date from before it was out: nobody's to
 			-- keep, so only the three built-ins show. Ones kept before go too;
 			-- whoever was on one gets the default profile, below.)
@@ -1112,10 +1094,12 @@ function ns.InitProfiles()
 				db.profiles[kept], db.profileIcons[kept], db.profileNotes[kept] = nil, nil, nil
 			end
 			db.profiles[old], db.retiredProfiles[old] = nil, nil
-		elseif (db.profiles[old] or inUse) and not db.retiredProfiles[old] then
-			-- (The live one's settings as they are now; others' as saved.)
-			local saved = db.liveProfile == old and Snapshot(old) or db.profiles[old] or {}
-			local own = AgainstDefaults(saved, ns.ProfileBase(old))
+		elseif db.retiredProfiles[old] == old then
+			-- (Kept under the same name: yours now, not the old built-in's.)
+		elseif db.liveProfile ~= old or db.retiredProfiles[old] then
+			db.profiles[old] = nil
+		else
+			local own = AgainstDefaults(Snapshot(old), ns.ProfileBase(old))
 			db.profiles[old] = nil
 			local label = profile.label or old
 			local name, n = label, 1
@@ -1124,7 +1108,6 @@ function ns.InitProfiles()
 				name = label .. " " .. n
 			end
 			db.profiles[name] = own
-			db.profileIcons[name] = profile.icon
 			db.profileNotes[name] = L["Kept from the %s profile, which Cinematic no longer has."]:format(label)
 			db.retiredProfiles[old] = name
 		end

@@ -299,7 +299,6 @@ do
 end
 
 -- Retail laid out like WoW Forever's default: its party frames raid-style.
-local RETAIL_FOREVER = { { UNIT_FRAME, PARTY, nil, nil, nil, nil, nil, { [RAID_STYLE_PARTY] = 1 } } }
 
 -- Action bars 6-8 at the top middle in all of ours, not in the middle of the
 -- screen where Modern has them. Each from the screen's top, not chained to the
@@ -310,7 +309,7 @@ local TOP_BARS = {
 	{ 0, 7, "TOP", "UIParent", "TOP", 0, -52 },
 	{ 0, 8, "TOP", "UIParent", "TOP", 0, -102 },
 }
-for _, design in ipairs({ DESIGN, FOREVER_PURE, RETAIL_FOREVER }) do
+for _, design in ipairs({ DESIGN, FOREVER_PURE }) do
 	for _, bar in ipairs(TOP_BARS) do design[#design + 1] = bar end
 end
 
@@ -324,7 +323,6 @@ ns.EDIT_MODE_LAYOUTS = {
 	-- Retail laid out like WoW Forever's default (the retail profile "Forever").
 	-- Not designed yet: a copy of Modern until its export string's in (its
 	-- party frames raid-style, as Forever's).
-	CINE_RETAIL_FOREVER_LAYOUT = { export = nil, design = RETAIL_FOREVER, client = "retail" },
 	-- (the Cinema profile's: retail's from the dev's own, Forever's designed)
 	["Personal Resource Centered"] = ns.isRetail and { systems = PURE_CINEMA_SYSTEMS, client = "retail" }
 		or { design = FOREVER_PURE, client = "forever" },

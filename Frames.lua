@@ -2540,6 +2540,9 @@ function ns.IsPlaceShowOn(list, key) return IsListOn(list, key, PlaceDefaults(li
 -- that offer them (Visual Effects, music, tooltips...).
 function ns.IsQuietShowOn(key) return IsListOn("quietShow", key, NO_DEFAULTS) end
 function ns.IsCamShowOn(key) return IsListOn("camShow", key, NO_DEFAULTS) end
+-- The Show in tables' CineMode column (not cineShow, their Always): on while
+-- CineMode is, for every kind of row (ns.RuleShows reads it).
+function ns.IsCineModeShowOn(key) return IsListOn("cineModeShow", key, NO_DEFAULTS) end
 
 -- The place columns that apply where you are now.
 -- Tables UpdateFrames (and what it calls) fills afresh each tick, kept rather
@@ -2599,7 +2602,7 @@ ns.RULE_WORDS = {
 	bg = "bg", bgs = "bg", pvp = "bg", battleground = "battleground", arena = "arena", arenas = "arena",
 	world = "world", group = "group", grouped = "group", instance = "instance",
 	dungeon = "dungeon", raid = "raid", city = "city", inn = "inn",
-	flagged = "flagged", mounted = "mounted",
+	flagged = "flagged", mounted = "mounted", casting = "casting", cast = "casting", channeling = "casting",
 	-- (CineMode on: always so for the rows read in it, the frames'; the Cards page's are read any time.)
 	cinemode = "cinemode", cine = "cinemode",
 	-- (A fight starting or ending: only the Cards page's fight rows are read then.)
@@ -2741,6 +2744,7 @@ do
 		if ns.IsCineShowOn(key) then return "always" end
 		local words = {}
 		local function Add(on, word) if on then words[#words + 1] = word end end
+		Add(ns.IsCineModeShowOn(key), "cinemode")
 		Add(ns.IsCombatShowOn(key), "combat")
 		Add(ns.IsCalmShowOn(key), "calm")
 		Add(ns.IsQuietShowOn(key), "nocombat")
@@ -2798,6 +2802,10 @@ do
 		if test then
 			return test(facts) and true or false
 		end
+		-- (No rule: the CineMode column's tick shows it now; else the row's other ticks say.)
+		if facts.cinemode and ns.IsCineModeShowOn(key) then
+			return true
+		end
 	end
 	-- The row's rule, compiled, when it has one that reads. (Kept per row till
 	-- its text changes: asked for each row on every tick.)
@@ -2814,6 +2822,30 @@ do
 		end
 		ruleText[key], ruleTest[key] = text, test
 		return test
+	end
+
+	-- Whether you're casting and a rule names it: such a cast counts as a fight
+	-- for the fades (ns.FadeInTime), or the Fade in time would use up a short
+	-- cast. Worked out once a frame, the rules read only during a cast.
+	local castRuleAt, castRuleOn
+	function ns.CastingRuleOn()
+		local now = GetTime()
+		if now == castRuleAt then
+			return castRuleOn
+		end
+		castRuleAt, castRuleOn = now, false
+		if ns.db.frameRules and (ns.Flag(UnitCastingInfo("player")) or ns.Flag(UnitChannelInfo("player"))) then
+			for _, text in pairs(ns.db.frameRules) do
+				if type(text) == "string" then
+					local lower = text:lower()
+					if lower:find("%f[%w_]cast") or lower:find("%f[%w_]channeling") then
+						castRuleOn = true
+						break
+					end
+				end
+			end
+		end
+		return castRuleOn
 	end
 
 	-- Whether a unit is within an interact distance (the rules' near: 2,
@@ -3305,6 +3337,8 @@ do
 		facts.group = ns.InGroup() and true or false
 		facts.flagged = ns.IsPvPFlagged() and true or false
 		facts.mounted = ns.Flag(IsMounted()) and true or false
+		-- (Casting or channeling. Secret in a fight on some clients, so false there.)
+		facts.casting = ns.Flag(UnitCastingInfo("player")) or ns.Flag(UnitChannelInfo("player"))
 		-- (A boss fight: an encounter on, the game's boss frames up, or a boss
 		-- targeted: a world boss, or in a dungeon or raid an elite at ?? or 2+
 		-- levels above you (retail's dungeon bosses are +2, trash +0: tested).
@@ -3555,7 +3589,7 @@ do
 			-- (Your bars held back at a fight's start, Personal Resources page:
 			-- up only where Always or a place keeps them.)
 			if ticked and (fighting or isOn == CastIsOn) and ns.FightHold(item.key)
-				and not (ns.IsCineShowOn(item.key) or KeptHere(placeLists, item.key)) then
+				and not (ns.IsCineShowOn(item.key) or ns.IsCineModeShowOn(item.key) or KeptHere(placeLists, item.key)) then
 				ticked = false
 			end
 			if applies and ticked then
@@ -3583,7 +3617,7 @@ do
 	end
 	-- (Every row's rule and ticks were worked out every frame. Now at most
 	-- every SHOWN_HOLD seconds, and at once when the fight, the Calm Timer,
-	-- the target or a cast at an enemy changes: the rest of a rule's facts
+	-- the target, a cast at an enemy or one a rule names changes: the rest of a rule's facts
 	-- (moving, mounted...) count a moment later, well inside a fade.)
 	-- (The renewal every SHOWN_HOLD is done in the tick's second half,
 	-- ns.WarmCombatShown from Core.lua's tickRest, so it doesn't stack with
@@ -3592,18 +3626,20 @@ do
 	local SHOWN_HOLD, SHOWN_GRACE = 0.1, 0.1
 	local Compute = GetCombatShownFrames
 	local keptAt, keptShown, askedAt = -1, nil, -math.huge
-	local wasFighting, wasCalm, wasTarget, wasEnemy, wasCast
+	local wasFighting, wasCalm, wasTarget, wasEnemy, wasCast, wasRuleCast
 	local function Kept(now, hold)
 		local fighting = InCombatLockdown() or ns.Flag(UnitAffectingCombat("player"))
 		local calm = not fighting and now - lastCombatAt < (ns.db.calmTime or 0)
 		local target = HasAnyTarget() and true or false
 		local enemy = target and ns.IsEnemyUnit("target") and not ns.Flag(UnitIsDeadOrGhost("target")) or false
 		local cast = ns.HostileCastLeft(now) ~= nil
+		local ruleCast = ns.CastingRuleOn()
 		if keptShown and now >= keptAt and now - keptAt < hold and fighting == wasFighting
-			and calm == wasCalm and target == wasTarget and enemy == wasEnemy and cast == wasCast then
+			and calm == wasCalm and target == wasTarget and enemy == wasEnemy and cast == wasCast
+			and ruleCast == wasRuleCast then
 			return keptShown
 		end
-		wasFighting, wasCalm, wasTarget, wasEnemy, wasCast = fighting, calm, target, enemy, cast
+		wasFighting, wasCalm, wasTarget, wasEnemy, wasCast, wasRuleCast = fighting, calm, target, enemy, cast, ruleCast
 		keptAt, keptShown = now, Compute()
 		return keptShown
 	end
@@ -10512,12 +10548,12 @@ do
 	-- (For /cine debug unitframes: which regions are held hidden.)
 	ns.unitPartsHidden = hidden
 	local setting = false
-	-- (Held at none, or as far as the mouse has faded its frame back in:
-	-- FRAMES.show, below.)
+	-- (Held at none, or as far as the mouse has faded its frame back in,
+	-- FRAMES.show, or its rule has it right now, FRAMES.fade: both below.)
 	local function KeepHidden(region)
 		if hidden[region] and not setting then
 			setting = true
-			region:SetAlpha(hidden[region] * (FRAMES.show[FRAMES.owner[region]] or 0))
+			region:SetAlpha(hidden[region] * math.max(FRAMES.show[FRAMES.owner[region]] or 0, FRAMES.fade[region] or 0))
 			setting = false
 		end
 	end
@@ -10549,12 +10585,24 @@ do
 					hooksecurefunc(region, "SetShown", KeepHidden)
 				end
 			end
+			-- (A part with a rule fades out; not as first applied, at login.)
+			if FRAMES.ruled[region] and FRAMES.applied[region] then
+				FRAMES.fade[region] = 1
+			end
 			KeepHidden(region)
 		elseif not hide and hidden[region] then
-			local alpha = hidden[region]
-			hidden[region] = nil
-			region:SetAlpha(alpha)
+			if FRAMES.ruled[region] then
+				-- (Let go once faded in: FRAMES.StepFades.)
+				FRAMES.fade[region] = FRAMES.fade[region] or 0
+			else
+				local alpha = hidden[region]
+				hidden[region] = nil
+				FRAMES.fade[region] = nil
+				region:SetAlpha(alpha)
+			end
 		end
+		FRAMES.goal[region] = not hide and 1 or 0
+		FRAMES.applied[region] = true
 	end
 
 	-- Whether this client's frames have the parts (the Unit Frames page shows the grid then).
@@ -10591,6 +10639,29 @@ do
 	-- fade in with them at the fade in time, and out at the fade out time.
 	-- (show[frame name]: 0 to 1, how far in; owner[region]: its frame's name.)
 	FRAMES.show, FRAMES.owner = {}, {}
+	-- Parts with a rule fade as it changes, at the fade times, not at once.
+	-- (fade[region]: 0 to 1, how far in, only while fading; goal[region]: where
+	-- to; ruled[region]: its row has a rule; applied[region]: been set before.)
+	FRAMES.fade, FRAMES.goal, FRAMES.ruled, FRAMES.applied = {}, {}, {}, {}
+	function FRAMES.StepFades(elapsed)
+		for region, level in pairs(FRAMES.fade) do
+			local goal = FRAMES.goal[region] or 0
+			level = ns.Approach(level, goal, elapsed, goal > level and ns.FadeInTime() or ns.FadeOutTime())
+			if level ~= goal then
+				FRAMES.fade[region] = level
+				KeepHidden(region)
+			else
+				FRAMES.fade[region] = nil
+				if goal == 1 and hidden[region] then
+					local alpha = hidden[region]
+					hidden[region] = nil
+					region:SetAlpha(alpha)
+				else
+					KeepHidden(region)
+				end
+			end
+		end
+	end
 	ns.UNIT_PART_FRAME_NAMES = {}
 	for _, entry in ipairs(FRAMES) do
 		ns.UNIT_PART_FRAME_NAMES[entry[1]] = true
@@ -10619,6 +10690,7 @@ do
 		end
 		local want = FRAMES.want
 		FRAMES.dynamic = false
+		wipe(FRAMES.ruled)
 		for _, entry in ipairs(FRAMES) do
 			local frame = _G[entry[1]]
 			if frame then
@@ -10627,11 +10699,13 @@ do
 					-- (The Style hub's Overrides tab over the row, page switch or not.)
 					local over = ns.StyleOverride(key)
 					local hide = over == "hide" or not over and ns.db.handleUnitFrames ~= false and FRAMES.Hidden(key)
+					local ruled = key and not over and ns.RuleTest(key) ~= nil
 					local paths = entry[2][part]
 					if type(paths) == "function" then
 						for _, region in ipairs(paths(frame)) do
 							want[region] = want[region] or hide
 							FRAMES.owner[region] = FRAMES.owner[region] or entry[1]
+							FRAMES.ruled[region] = FRAMES.ruled[region] or ruled
 						end
 					else
 						for _, path in ipairs(paths or NO_DEFAULTS) do
@@ -10639,6 +10713,7 @@ do
 							if region then
 								want[region] = want[region] or hide
 								FRAMES.owner[region] = FRAMES.owner[region] or entry[1]
+								FRAMES.ruled[region] = FRAMES.ruled[region] or ruled
 							end
 						end
 					end
@@ -10831,14 +10906,16 @@ do
 	end)
 	-- Parts shown by more than Always (FRAMES.dynamic, as last applied):
 	-- applied again when what their rows know changes (a fight, a place, a
-	-- group...), checked 4 times a second.
-	local lastFacts, since = {}, 0
+	-- group...), checked 4 times a second, and at once for a cast a rule names.
+	local lastFacts, since, lastCast = {}, 0, false
 	ns.SetOnUpdate(watcher, function(_, elapsed)
+		FRAMES.StepFades(elapsed)
 		since = since + elapsed
-		if since < 0.25 or not ns.db then
+		local cast = ns.db and FRAMES.dynamic and ns.CastingRuleOn() or false
+		if (since < 0.25 and cast == lastCast) or not ns.db then
 			return
 		end
-		since = 0
+		since, lastCast = 0, cast
 		if not FRAMES.dynamic then
 			return
 		end

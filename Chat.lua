@@ -19,7 +19,8 @@ ns.CHAT_PEEK_TYPES = {
 	{ key = "say", label = L["Say"], events = { "CHAT_MSG_SAY" } },
 	{ key = "yell", label = L["Yell"], events = { "CHAT_MSG_YELL" } },
 	{ key = "emote", label = L["Emotes"], events = { "CHAT_MSG_EMOTE", "CHAT_MSG_TEXT_EMOTE" } },
-	{ key = "whisper", label = L["Whispers"], events = { "CHAT_MSG_WHISPER", "CHAT_MSG_BN_WHISPER" } },
+	{ key = "whisper", label = L["Whispers"], events = { "CHAT_MSG_WHISPER", "CHAT_MSG_BN_WHISPER",
+		"CHAT_MSG_WHISPER_INFORM", "CHAT_MSG_BN_WHISPER_INFORM" } },
 	{ key = "party", label = L["Party"], events = { "CHAT_MSG_PARTY", "CHAT_MSG_PARTY_LEADER" } },
 	{ key = "raid", label = L["Raid"], events = { "CHAT_MSG_RAID", "CHAT_MSG_RAID_LEADER" } },
 	{ key = "raidwarning", label = L["Raid warnings"], events = { "CHAT_MSG_RAID_WARNING" } },
@@ -144,6 +145,14 @@ local function FormatToPattern(format, capture)
 	end
 	pattern = pattern:gsub("\1s", ".+"):gsub("\1d", "%%d+")
 	return "^" .. pattern .. "$"
+end
+
+-- A whisper to someone not online: the game sends only this system line back,
+-- no line of your whisper.
+local function IsWhisperToNoOne(text)
+	local format = _G.ERR_CHAT_PLAYER_NOT_FOUND_S
+	return type(format) == "string" and type(text) == "string" and not (issecretvalue and issecretvalue(text))
+		and text:find(FormatToPattern(format)) ~= nil
 end
 
 local function IsLootRollLine(text)
@@ -379,7 +388,22 @@ end
 -- With "Hide your messages" (db.chatHideOwn), your own lines don't peek: your
 -- emotes ("You bow.", the campfire button's sit or kneel), says, party lines...
 -- You know you did them. Told by the sender's GUID, or by name where a client
--- doesn't pass one.
+-- doesn't pass one. With "Except lines with no bubble" (db.chatOwnNoBubble), a
+-- line you typed still peeks unless its bubble shows: Enter otherwise shows
+-- you nothing at all.
+
+-- Whispers you sent: these name who they went to, not you.
+local SENT_LINES = { CHAT_MSG_WHISPER_INFORM = true, CHAT_MSG_BN_WHISPER_INFORM = true }
+-- Lines you type (not your emotes, or your loot and the like): the game setting
+-- for their bubble, or true for none ever.
+local TYPED_LINES = {
+	CHAT_MSG_SAY = "chatBubbles", CHAT_MSG_YELL = "chatBubbles",
+	CHAT_MSG_PARTY = "chatBubblesParty", CHAT_MSG_PARTY_LEADER = "chatBubblesParty",
+	CHAT_MSG_WHISPER_INFORM = true, CHAT_MSG_BN_WHISPER_INFORM = true,
+	CHAT_MSG_RAID = true, CHAT_MSG_RAID_LEADER = true, CHAT_MSG_RAID_WARNING = true,
+	CHAT_MSG_INSTANCE_CHAT = true, CHAT_MSG_INSTANCE_CHAT_LEADER = true,
+	CHAT_MSG_GUILD = true, CHAT_MSG_OFFICER = true, CHAT_MSG_CHANNEL = true,
+}
 
 local function IsFromPlayer(author, guid)
 	if type(guid) == "string" and guid ~= "" and not (issecretvalue and issecretvalue(guid)) then
@@ -503,7 +527,11 @@ local function WatchBubbles()
 			table.remove(waiting, i)
 		elseif now >= line[3] then
 			table.remove(waiting, i)
-			SpeakOrPeek(line)
+			if line[8] then
+				PeekWindow(line[1]) -- (your own line: chat, not speech from behind you)
+			else
+				SpeakOrPeek(line)
+			end
 		end
 	end
 	if #waiting == 0 then
@@ -536,6 +564,21 @@ local function PeekUnlessBubble(chatFrame, event, text, author, guid)
 	ns.SetOnUpdate(bubbleWatch, OnBubbleWatch)
 end
 
+-- A line you typed, with Hide your messages on and its exception ticked: peeks
+-- unless its bubble shows, whatever Hide speech you can see as a bubble says.
+-- bubbleCVar: from TYPED_LINES.
+local function PeekOwnLine(chatFrame, event, text, author, guid, bubbleCVar)
+	local kind = ns.BUBBLE_KIND_OF and ns.BUBBLE_KIND_OF[event]
+	if bubbleCVar == true or type(text) ~= "string" or (issecretvalue and issecretvalue(text))
+			or not (GetCVarBool and GetCVarBool(bubbleCVar)) or (kind and ns.BubbleKindOff(kind)) then
+		PeekWindow(chatFrame)
+		return
+	end
+	waiting[#waiting + 1] = { chatFrame, text, GetTime() + BUBBLE_WAIT, event, author, guid,
+		ns.UnreadableBubbles and ns.UnreadableBubbles() or 0, true }
+	ns.SetOnUpdate(bubbleWatch, OnBubbleWatch)
+end
+
 -- Message filters run once per chat window that will show the message, which
 -- tells us exactly which window to reveal. Never filters anything out.
 local function ChatPeekFilter(chatFrame, event, text, author, _, channelString, _, _, _, channelNumber, channelBaseName,
@@ -545,8 +588,15 @@ local function ChatPeekFilter(chatFrame, event, text, author, _, channelString, 
 		return false
 	end
 	local wanted
-	if ns.db.chatHideOwn and IsFromPlayer(author, guid) then
+	local hiddenOwn = ns.db.chatHideOwn and (SENT_LINES[event] or IsFromPlayer(author, guid))
+	local typedOwn = hiddenOwn and ns.db.chatOwnNoBubble and TYPED_LINES[event]
+	if typedOwn then
+		wanted = true -- (rows that are off are for other people's lines)
+	elseif hiddenOwn then
 		wanted = false
+	elseif event == "CHAT_MSG_SYSTEM" and (ns.db.chatOwnNoBubble or not ns.db.chatHideOwn)
+			and IsWhisperToNoOne(text) then
+		wanted = true
 	elseif event == "CHAT_MSG_CHANNEL" then
 		wanted = IsChannelPeekNow(ChannelPeekName(channelNumber, channelBaseName, channelString))
 	elseif event == "CHAT_MSG_SYSTEM" and GetTime() < ns.levelUpUntil and IsPeekTypeOn("levelup") then
@@ -562,7 +612,9 @@ local function ChatPeekFilter(chatFrame, event, text, author, _, channelString, 
 	else
 		wanted = IsPeekTypeOn(EVENT_PEEK_TYPE[event])
 	end
-	if wanted then
+	if wanted and typedOwn then
+		PeekOwnLine(chatFrame, event, text, author, guid, typedOwn)
+	elseif wanted then
 		PeekUnlessBubble(chatFrame, event, text, author, guid)
 	elseif BUBBLE_SPEECH[event] then
 		SpeechTrace(event .. " not shown here (your own line, or that message type is off on the Chat page)")

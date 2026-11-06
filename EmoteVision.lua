@@ -235,8 +235,8 @@ local MOMENTS = {
 		near = true, tip = "Someone near you leaves your party or raid.",
 		sample = { name = "Velmora", class = "WARLOCK", line = "left your group" } },
 	{ id = "Joined", on = "emoteVisionJoined", name = "You join a group", emotes = { "HELLO", "WAVE" },
-		tip = "You join someone's party or raid with one of them near you: the emotes go to everyone, not " ..
-			"one person.",
+		tip = "You join someone's party or raid with one of them near you: the emotes go to everyone, or " ..
+			"to them if it's just the two of you.",
 		sample = { name = "Your group", line = "you joined a group", group = true,
 			icon = "Interface\\Icons\\INV_Misc_GroupNeedMore" } },
 	{ id = "Achievement", on = "emoteVisionAchievement", name = "Someone earns an achievement",
@@ -1516,6 +1516,13 @@ local function RosterChanged(quiet)
 	if quiet or not was then return end
 	if inGroup and not wasGrouped then
 		if not GroupNear() then return end -- (joined from across the world: no one to greet)
+		-- (Just the two of you: the card and its emotes are for them. A name not
+		-- known yet: the group's card.)
+		local guid, who = next(now)
+		if guid and not next(now, guid) and who.name and who.name ~= _G.UNKNOWNOBJECT then
+			FireFor("Joined", who.name, guid, L["grouped with you"], { class = who.class })
+			return
+		end
 		Fire({ kind = "Joined", name = L["Your group"], line = L["you joined a group"], group = true,
 			icon = "Interface\\Icons\\INV_Misc_GroupNeedMore" })
 		return
