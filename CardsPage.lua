@@ -21,7 +21,7 @@ local CARD = { now = "combatIn", style = "third" }
 local function CardTabs(content, title, picked)
 	local panel = ns.PageTabs(content, {
 		{ L["Events"], "Card Vision", L["Each event's card on or off, and where it shows."] },
-		{ L["Card Types"], "Card Styles", L["The styles the cards start from: change one for every card using it."] },
+		{ L["Card Types"], "Card Styles", L["The card types the cards start from: change one for every card using it."] },
 	}, picked)
 	title:ClearAllPoints()
 	title:SetPoint("TOPLEFT", panel, "BOTTOMLEFT", 8, -14)
@@ -40,7 +40,7 @@ local PAGES = {
 local function CardTop(kit, content, title, picked)
 	local panel = ns.PageTabs(content, {
 		{ L["Events"], "Card Vision", L["Back to every card's row."], true },
-		{ L["Card Types"], "Card Styles", L["The styles the cards start from: change one for every card using it."] },
+		{ L["Card Types"], "Card Styles", L["The card types the cards start from: change one for every card using it."] },
 	}, 1)
 	local icon = content:CreateTexture(nil, "ARTWORK")
 	icon:SetSize(24, 24)
@@ -138,107 +138,6 @@ local function List(choices)
 	end
 end
 
--- The Style tab's look rows (rows: ns.StyleRows', their keys the base
--- look's: the tab's fieldOf turns them into the picked event's). icon: a
--- button for an event's own icon, after the Icon tick.
-local function LookRows(content, stack, rows, icon)
-	local On, Get = rows.On, rows.Get
-	local function Banner() return Get("cardStyle") == "banner" end
-	local function InBar(db)
-		local place = Get("cardPlace")
-		return On(db) and not Banner() and (place == "top" or place == "bottom")
-	end
-	stack:Header(content, L["Where"])
-	rows.Dropdown(L["Place:"], "cardPlace", List({
-		{ "screen", L["On the screen"], L["In the middle of the screen (a subtitle: low on it)."] },
-		{ "top", L["Top letterbox bar"] },
-		{ "bottom", L["Bottom letterbox bar"] },
-		{ "third", L["Lower third"], L["Low on the left of the screen, as a film names someone, its line fading " ..
-			"out to the right."] },
-	}), L["Where the card shows: in the middle of the screen, in a letterbox bar or in the lower third. (A " ..
-		"banner goes across the middle.)"], function(db) return On(db) and not Banner() end)
-	local move = rows.Slider("cardOffsetX", L["Move across"], -50, 50, 0.5, "%.1f%%", 100,
-		L["Moves the card from where its place puts it: right, or left below 0, as a share of the screen's width."])
-	move:Box(L["Move up"], rows.K("cardOffsetY"), -50, 50, 0.5, "%.1f", 100,
-		L["Moves the card from where its place puts it: up, or down below 0, as a share of the screen's height."],
-		nil, "%")
-	rows.Dropdown(L["In the bar:"], "cardAlign", List({
-		{ "left", L["Left"] },
-		{ "center", L["Center"] },
-		{ "right", L["Right"] },
-	}), L["Where in the letterbox bar the card sits."], InBar)
-	rows.Slider("cardBarScale", L["Letterbox scale"], 20, 100, 1, "%d%%", 100,
-		L["The words' height next to the bar's: they grow and shrink with your letterbox. (With no letterbox " ..
-		"up, a bar as tall as your letterbox's comes in for the card.)"], InBar)
-	rows.Check("cardBarFallback", L["Lower third with no letterbox"],
-		L["Ticked: while no letterbox is up, the card shows in the lower third. Unticked: a bar of its own " ..
-		"comes in for it."], InBar)
-
-	stack:Header(content, L["Text"])
-	rows.Dropdown(L["Style:"], "cardStyle", List({
-		{ "title", L["Title card"], L["Big words in the middle of the screen, the rest under them."] },
-		{ "subtitle", L["Subtitle"], L["A small line low on the screen, where a film's subtitles go."] },
-		{ "chapter", L["Chapter line"], L["The words over a line that draws out, as a new scene starts."] },
-		{ "banner", L["Banner"], L["Across the middle of the screen on a dark band with soft edges, coming in " ..
-			"and going slowly, as YOU DIED does."] },
-	}), L["How the card is set: a title card, a subtitle, a chapter line or a banner."])
-	rows.Dropdown(L["Animation:"], "cardAnim", List({
-		{ "fade", L["Fade"], L["The card fades in and out."] },
-		{ "reveal", L["Reveal"], L["The words open out from their middle (or from their side, in the lower third " ..
-			"or at a bar's side), the line drawing out with them; the other lines rise in after."] },
-		{ "track", L["Tracking in"], L["The letters start spread apart and close up, as a film's title comes in; " ..
-			"the other lines rise in after. A name the game keeps secret (a boss's before its fight, on retail) " ..
-			"opens as Reveal instead."] },
-		{ "type", L["Typewriter"], L["The words come in a letter at a time from the left, as if typed; the " ..
-			"other lines rise in after. A secret name opens as Reveal instead."] },
-	}), L["How the card comes in."])
-	rows.Look(L["Look:"], L["Words"], {
-		font = { "cardFont", L["Words in Russian, Korean or Chinese keep the game's font, so their letters show."] },
-		textSize = function(look)
-			look.Slider("cardSize", L["Size"], 14, 80, 1, "%d", 1,
-				L["How tall the words are on the screen; the other lines go by them. (In a letterbox bar: " ..
-				"Letterbox scale.)"], function(db) return On(db) and not InBar(db) end)
-		end,
-		outline = { "cardOutline", L["A border around the letters."], names = { [0] = L["None"], L["Thin"], L["Thick"] } },
-		outlineColor = function(look)
-			look.Color(L["Outline color"], { "cardOutlineR", "cardOutlineG", "cardOutlineB" },
-				L["Pick the outline's color."], function(db)
-					local value = look.Get("cardOutline")
-					if value == -1 then value = ns.GeneralStyleValue("cardOutline") end
-					return look.On(db) and (tonumber(value) or 0) > 0
-				end)
-		end,
-		textColor = function(look)
-			look.Color(L["Color"], { "cardR", "cardG", "cardB" },
-				L["The words' color; the lines with them in a lighter shade."])
-			-- (The small lines over and under the words: Cards.lua's Small...)
-			look.Font("cardSmallFont", L["The small lines' font, over and under the words."], nil,
-				{ "same", L["Same as the words"] }, L["Small lines' font:"])
-			look.Slider("cardSmallSize", L["Small lines' size"], 50, 250, 5, "%d%%", 100,
-				L["The small lines over and under the words, bigger or smaller than they come (100%: as they come, " ..
-				"by the words' size)."])
-			local last = look.Choices(L["Small lines' color:"], "cardSmallColor", {
-				{ "auto", L["Automatic"], L["Under the words: their color, lighter. Over them: a pale gray."] },
-				{ "custom", L["Custom"], L["A color of your own (the swatch), for both lines."] },
-			})
-			look.Swatch(last, "cardSmallColor", { "cardSmallR", "cardSmallG", "cardSmallB" },
-				L["Pick the small lines' color."])
-		end,
-		shadow = { "cardShadow" },
-	})
-
-	stack:Header(content, L["Timing and extras"])
-	rows.Slider("cardHold", L["Stays"], 0.5, 12, 0.5, "%.1f s", 1,
-		L["How long the card stays between fading in and out (Typewriter: once typed)."])
-	local pulse = rows.Slider("cardPulse", L["Edge pulse"], 0, 100, 1, "%d%%", 100,
-		L["The edges of the screen flash for a moment as the card shows, this strongly. 0: no pulse."])
-	rows.Swatch(pulse, nil, { "cardPulseR", "cardPulseG", "cardPulseB" }, L["Pick the pulse's color."],
-		function(db) return On(db) and (tonumber(Get("cardPulse")) or 0) > 0 end)
-	local iconCheck = rows.Check("cardIconShow", L["Icon"], L["An icon before the words: each event's own (a map " ..
-		"for a zone, a skull for a boss...), unless it's given another with the button beside this."])
-	if icon then icon(iconCheck) end
-end
-
 -- The settings an event can have of its own, as the Style tab lists them.
 local GROUPS = {
 	{ "Place", { "Place" } }, { "Position", { "OffsetX", "OffsetY" } }, { "In the bar", { "Align" } }, { "Letterbox scale", { "BarScale" } },
@@ -269,6 +168,420 @@ local function OwnNames(id)
 	return names
 end
 
+-- The look's settings on one screen, for the Style and Card Types tabs: two
+-- columns of small groups under the preview, each setting's choices in sight.
+-- Each row is an ordinary style row (ns.StyleRows), placed by the grid instead
+-- of a stack. fieldOf: the tab's (the picked event's or style's settings). own:
+-- { Is(group), Put(group), tip }: a setting changed here shows a gold dot, and
+-- a click on it puts that one back. icon: a button for an event's own icon,
+-- after the Icon tick.
+local CELL_ROW, CELL_W, CELL_GAP = 28, 280, 26
+local CELL_NAMES = { 78, 66 }              -- the names' width in each column: controls start past it
+local CELL_LEFT = 12                       -- (room for the dots, left of each column)
+local CELL_RIGHT = CELL_LEFT + CELL_W + CELL_GAP
+local CELL_PAD, CELL_HEAD = 7, 22          -- a group's panel round it, its name's height
+local CELL_SPLIT = 6                       -- the gap between two groups' panels
+local CELL_BOX_NUDGE = 5                   -- a number box draws this far left of where it's put
+local CELL_TICK_NUDGE = 5                  -- ...and a tick's box this far right
+local CELL_SECOND_X, CELL_SECOND_W = 136, 66 -- a second number on a row: its name's place and width
+local function LookGrid(kit, content, stack, fieldOf, changed, own, icon)
+	local grid = CreateFrame("Frame", nil, content)
+	stack:Add(grid, "label")
+	-- (What the rows place themselves with, in stack's place.)
+	local at = { x = CELL_LEFT, y = CELL_PAD, name = CELL_NAMES[1] }
+	function at:Add(control)
+		control:SetPoint("TOPLEFT", grid, "TOPLEFT", self.x, -self.y)
+		self.last = control
+		self.y = self.y + CELL_ROW
+		return control
+	end
+	local rows = ns.StyleRows(kit, content, at, changed, "cards", fieldOf)
+	local On, Get = rows.On, rows.Get
+	local function Banner() return Get("cardStyle") == "banner" end
+	local function BarUp()
+		local place = Get("cardPlace")
+		return not Banner() and (place == "top" or place == "bottom")
+	end
+	local function InBar(db) return On(db) and BarUp() end
+
+	-- A group's name and, later, the panel behind it (on the page itself:
+	-- under every control).
+	local function Head(text)
+		local head = kit.Label(content, "GameFontNormal", text)
+		head:SetPoint("TOPLEFT", grid, "TOPLEFT", at.x, -at.y)
+		at.y = at.y + CELL_HEAD
+		return head
+	end
+	local function Panel(x, top, bottom)
+		local panel = content:CreateTexture(nil, "BACKGROUND")
+		panel:SetPoint("TOPLEFT", grid, "TOPLEFT", x - CELL_LEFT + 1, -(top - CELL_PAD))
+		panel:SetSize(CELL_W + CELL_LEFT + 8, bottom - top + CELL_PAD * 2)
+		panel:SetColorTexture(1, 1, 1, 0.045)
+		panel.top = top
+		return panel
+	end
+	local function PanelTo(panel, bottom) panel:SetHeight(bottom - panel.top + CELL_PAD * 2) end
+	-- A control's width after a row's name, in the column it's in.
+	local function Field() return CELL_W - at.name - 4 end
+	-- This row's dot (the groups it stands for by their names in GROUPS),
+	-- shown while any has a value of its own. only: and while this holds.
+	local function Dot(names, only)
+		local dot = CreateFrame("Button", nil, content)
+		dot:SetSize(9, 9)
+		dot:SetPoint("TOPLEFT", grid, "TOPLEFT", at.x - 12, -(at.y + 7))
+		local mark = dot:CreateTexture(nil, "ARTWORK")
+		mark:SetAllPoints()
+		mark:SetTexture("Interface\\CharacterFrame\\TempPortraitAlphaMask")
+		mark:SetVertexColor(1, 0.82, 0, 1)
+		kit.Tooltip(dot, own.tip)
+		dot.pageSwitch = false
+		dot.searchSkip = true
+		local function Each(fn)
+			for _, group in ipairs(GROUPS) do
+				for _, name in ipairs(names) do
+					if group[1] == name and fn(group) then return true end
+				end
+			end
+		end
+		dot:SetScript("OnClick", function()
+			Each(function(group) own.Put(group) end)
+			changed()
+			kit.Refresh()
+		end)
+		dot.Refresh = function(self)
+			self:SetShown((not only or only()) and Each(own.Is) or false)
+		end
+		kit.AddControl(dot)
+		return dot
+	end
+	local function Name(label)
+		local name = at:Add(kit.Label(content, "GameFontHighlight", label))
+		name:SetSize(at.name, 24)
+		name:SetJustifyH("LEFT")
+		name:SetJustifyV("MIDDLE")
+		return name
+	end
+	-- A row's name as a style row left it, narrowed; dropdown: its dropdown.
+	-- label: the name, where the row has its own way of writing it.
+	local function Narrow(dropdown, width, label)
+		if not dropdown then return end
+		at.last:SetSize(at.name, 24)
+		if label then at.last:SetText(label) end
+		dropdown:SetWidth(width or Field())
+		return dropdown
+	end
+	-- A number with its name at the left, its box where the column's controls
+	-- start. second: the second on the row just made, in a place of its own,
+	-- so the numbers line up from row to row. Gives its line and name.
+	local dimmed = {}
+	local function Number(key, label, minV, maxV, step, fmt, scale, tip, test, second)
+		local x, width = at.x, at.name
+		if second then
+			at.x, at.y, width = x + CELL_SECOND_X, at.y - CELL_ROW, CELL_SECOND_W
+		end
+		local name = Name(label)
+		name:SetWidth(width)
+		if second then name:SetJustifyH("RIGHT") end
+		at.x, at.y = at.x + width + 4 + CELL_BOX_NUDGE, at.y - CELL_ROW + 1
+		local line = rows.Slider(key, "", minV, maxV, step, fmt, scale, tip, test)
+		at.x, at.y = x, at.y - 1
+		if test then dimmed[#dimmed + 1] = { name, test } end
+		return line, name
+	end
+	-- A tick, its box in line with the rows' names.
+	local function Tick(key, label, tip, test)
+		at.x = at.x - CELL_TICK_NUDGE
+		local check = rows.Check(key, label, tip, test)
+		at.x = at.x + CELL_TICK_NUDGE
+		return check
+	end
+	-- A flat button for one value of key, lit while it's picked.
+	local function Flat(width, height, key, value, text, tip, test)
+		local button = CreateFrame("Button", nil, content)
+		button:SetSize(width, height)
+		local level = button:GetFrameLevel()
+		local edge = button:CreateTexture(nil, "BACKGROUND")
+		edge:SetAllPoints()
+		local fill = button:CreateTexture(nil, "BORDER")
+		fill:SetPoint("TOPLEFT", 1, -1)
+		fill:SetPoint("BOTTOMRIGHT", -1, 1)
+		local glow = button:CreateTexture(nil, "HIGHLIGHT")
+		glow:SetAllPoints(fill)
+		glow:SetColorTexture(1, 1, 1, 0.08)
+		local label = kit.Label(button, "GameFontHighlightSmall", text)
+		label:SetPoint("BOTTOMLEFT", 2, 5)
+		label:SetPoint("BOTTOMRIGHT", -2, 5)
+		label:SetJustifyH("CENTER")
+		label:SetWordWrap(false)
+		label.searchSkip = true
+		button.searchLabel = text
+		if tip then kit.Tooltip(button, tip) end
+		button:SetScript("OnClick", function()
+			rows.Put(key, value)
+			changed()
+			kit.Refresh()
+		end)
+		button:SetScript("OnEnable", function(self) self:SetAlpha(1) end)
+		button:SetScript("OnDisable", function(self) self:SetAlpha(0.4) end)
+		button.Refresh = function()
+			local on = Get(key) == value
+			button:SetFrameLevel(level + (on and 1 or 0)) -- (over its neighbors, whose edges overlap its)
+			edge:SetColorTexture(on and 1 or 0.34, on and 0.82 or 0.29, on and 0 or 0.2, 1)
+			fill:SetColorTexture(on and 0.3 or 0, on and 0.23 or 0, on and 0.05 or 0, 0.85)
+			local r, g, b = 0.75, 0.72, 0.65
+			if on then r, g, b = 1, 0.85, 0.4 end
+			label:SetTextColor(r, g, b, 1)
+			label:SetVertexColor(r, g, b, 1) -- (one and the same on Forever)
+		end
+		kit.GreyUnless(button, test or On)
+		kit.AddControl(button)
+		return button
+	end
+	-- A row of them: { value, text, tip } each, after a row's name. Gives what
+	-- to put more after, and its buttons.
+	local function Buttons(name, key, list, test, width)
+		width = width or Field()
+		local each = (width + #list - 1) / #list -- (their edges overlap by 1)
+		local holder = CreateFrame("Frame", nil, content)
+		holder:SetSize(width, 22)
+		holder:SetPoint("LEFT", name, "RIGHT", 4, 0)
+		local made = {}
+		for i, choice in ipairs(list) do
+			made[i] = Flat(each, 22, key, choice[1], choice[2], choice[3], test)
+			made[i]:SetPoint("LEFT", holder, "LEFT", (i - 1) * (each - 1), 0)
+		end
+		return holder, made
+	end
+
+	-- Left: where it goes.
+	local top = at.y
+	Head(L["Where"])
+	Dot({ "Place" })
+	local TILE_H, TILE_GAP = 52, 5
+	local tileW = (CELL_W - TILE_GAP * 3) / 4
+	-- { value, name, tip, the picture's bar: left and width of the screen, up its height, its height }
+	local tiles = {
+		{ "screen", L["Screen"], L["In the middle of the screen (a subtitle: low on it)."], 0.3, 0.4, 0.42, 0.16 },
+		{ "top", L["Top bar"], L["Top letterbox bar"], 0, 1, 0.76, 0.24 },
+		{ "bottom", L["Bottom bar"], L["Bottom letterbox bar"], 0, 1, 0, 0.24 },
+		{ "third", L["Lower third"], L["Low on the left of the screen, as a film names someone, its line fading " ..
+			"out to the right."], 0.08, 0.42, 0.2, 0.16 },
+	}
+	local function PlaceOn(db) return On(db) and not Banner() end
+	local SCREEN_H = 28
+	for i, tile in ipairs(tiles) do
+		local button = Flat(tileW, TILE_H, "cardPlace", tile[1], tile[2], tile[3], PlaceOn)
+		button:SetPoint("TOPLEFT", grid, "TOPLEFT", at.x + (i - 1) * (tileW + TILE_GAP), -at.y)
+		local screen = button:CreateTexture(nil, "ARTWORK")
+		screen:SetPoint("TOPLEFT", 5, -5)
+		screen:SetPoint("TOPRIGHT", -5, -5)
+		screen:SetHeight(SCREEN_H)
+		screen:SetColorTexture(0.17, 0.21, 0.26, 1)
+		local spot = button:CreateTexture(nil, "OVERLAY")
+		local wide = tileW - 10
+		spot:SetSize(wide * tile[5], SCREEN_H * tile[7])
+		spot:SetPoint("BOTTOMLEFT", screen, "BOTTOMLEFT", wide * tile[4], SCREEN_H * tile[6])
+		spot:SetColorTexture(0.95, 0.75, 0.25, 1)
+	end
+	at.y = at.y + TILE_H + 6
+	Dot({ "Position" })
+	Number("cardOffsetX", L["Move across"], -50, 50, 0.5, "%.1f%%", 100,
+		L["Moves the card from where its place puts it: right, or left below 0, as a share of the screen's width."])
+	Number("cardOffsetY", L["Move up"], -50, 50, 0.5, "%.1f%%", 100,
+		L["Moves the card from where its place puts it: up, or down below 0, as a share of the screen's height."],
+		nil, true)
+	Panel(at.x, top, at.y - 4)
+
+	-- ...how long, and what comes with it.
+	at.y = at.y + CELL_PAD * 2 + CELL_SPLIT
+	top = at.y
+	Head(L["Timing and extras"])
+	Dot({ "Stays", "Edge pulse", "Pulse color" })
+	Number("cardHold", L["Stays"], 0.5, 12, 0.5, "%.1f s", 1,
+		L["How long the card stays between fading in and out (Typewriter: once typed)."])
+	local pulse = Number("cardPulse", L["Edge pulse"], 0, 100, 1, "%d%%", 100,
+		L["The edges of the screen flash for a moment as the card shows, this strongly. 0: no pulse."], nil, true)
+	-- (At the column's end, where the Text column's swatches are at theirs.)
+	local pulseColor = rows.Swatch(pulse, nil, { "cardPulseR", "cardPulseG", "cardPulseB" },
+		L["Pick the pulse's color."], function(db) return On(db) and (tonumber(Get("cardPulse")) or 0) > 0 end)
+	pulseColor:ClearAllPoints()
+	pulseColor:SetPoint("TOPLEFT", grid, "TOPLEFT", at.x + CELL_W - 18, -(at.y - CELL_ROW + 3))
+	Dot({ "Icon", "Icon picture" })
+	local iconCheck = Tick("cardIconShow", L["Icon"], L["An icon before the words: each event's own (a map " ..
+		"for a zone, a skull for a boss...), unless it's given another with the button beside this."])
+	if icon then icon(iconCheck) end
+	local timingEnd = at.y - 4
+	local timingPanel = Panel(at.x, top, timingEnd)
+
+	-- ...and in a bar, with a bar picked: its group goes with it.
+	at.y = at.y + CELL_PAD * 2 + CELL_SPLIT
+	top = at.y
+	local barParts = { Head(L["In the bar"]) }
+	Dot({ "In the bar" }, BarUp)
+	local barName = Name(L["Align"])
+	local barAlign, barButtons = Buttons(barName, "cardAlign", {
+		{ "left", L["Left"] },
+		{ "center", L["Center"] },
+		{ "right", L["Right"] },
+	}, InBar)
+	Dot({ "Letterbox scale" }, BarUp)
+	local barScale, barScaleName = Number("cardBarScale", L["Scale"], 20, 100, 1, "%d%%", 100,
+		L["The words' height next to the bar's: they grow and shrink with your letterbox. (With no letterbox " ..
+		"up, a bar as tall as your letterbox's comes in for the card.)"], InBar)
+	Dot({ "Lower third with no letterbox" }, BarUp)
+	local barFallback = Tick("cardBarFallback", L["Lower third with no letterbox"],
+		L["Ticked: while no letterbox is up, the card shows in the lower third. Unticked: a bar of its own " ..
+		"comes in for it."], InBar)
+	local barEnd = at.y - 4
+	local barPanel = Panel(at.x, top, barEnd)
+	for _, part in ipairs({ barPanel, barName, barAlign, barScale, barScaleName, barFallback }) do
+		barParts[#barParts + 1] = part
+	end
+	for _, part in ipairs(barButtons) do barParts[#barParts + 1] = part end
+
+	-- Right: the words.
+	at.x, at.y, at.name = CELL_RIGHT, CELL_PAD, CELL_NAMES[2]
+	Head(L["Text"])
+	Dot({ "Style" })
+	Buttons(Name(L["Style"]), "cardStyle", {
+		{ "title", L["Title"], L["Big words in the middle of the screen, the rest under them."] },
+		{ "subtitle", L["Subtitle"], L["A small line low on the screen, where a film's subtitles go."] },
+		{ "chapter", L["Chapter"], L["The words over a line that draws out, as a new scene starts."] },
+		{ "banner", L["Banner"], L["Across the middle of the screen on a dark band with soft edges, coming in " ..
+			"and going slowly, as YOU DIED does."] },
+	})
+	Dot({ "Animation" })
+	Buttons(Name(L["Animation"]), "cardAnim", {
+		{ "fade", L["Fade"], L["The card fades in and out."] },
+		{ "reveal", L["Reveal"], L["The words open out from their middle (or from their side, in the lower third " ..
+			"or at a bar's side), the line drawing out with them; the other lines rise in after."] },
+		{ "track", L["Tracking"], L["The letters start spread apart and close up, as a film's title comes in; " ..
+			"the other lines rise in after. A name the game keeps secret (a boss's before its fight, on retail) " ..
+			"opens as Reveal instead."] },
+		{ "type", L["Type"], L["The words come in a letter at a time from the left, as if typed; the " ..
+			"other lines rise in after. A secret name opens as Reveal instead."] },
+	})
+	Dot({ "Font" })
+	Narrow(rows.Font("cardFont", L["Words in Russian, Korean or Chinese keep the game's font, so their letters show."],
+		nil, nil, L["Font"]))
+	Dot({ "Size" })
+	Number("cardSize", L["Size"], 14, 80, 1, "%d", 1,
+		L["How tall the words are on the screen; the other lines go by them. (In a letterbox bar: " ..
+		"Letterbox scale.)"], function(db) return On(db) and not BarUp() end)
+	-- (On its row, its swatch under the row's end, over the Outline's.)
+	local COLOR_NAME = 60
+	at.x, at.y = CELL_RIGHT + CELL_W - 28 - COLOR_NAME, at.y - CELL_ROW
+	Dot({ "Color" })
+	rows.Color(L["Color"], { "cardR", "cardG", "cardB" },
+		L["The words' color; the lines with them in a lighter shade."])
+	at.last:SetSize(COLOR_NAME, 24)
+	at.last:SetJustifyH("RIGHT")
+	at.last:SetJustifyV("MIDDLE")
+	at.x = CELL_RIGHT
+	Dot({ "Outline", "Outline color" })
+	local outline = Narrow(rows.Outline("cardOutline", L["Outline"], 2, { [0] = L["None"], L["Thin"], L["Thick"] },
+		L["A border around the letters."]), Field() - 28, L["Outline"])
+	if outline then
+		local after = CreateFrame("Frame", nil, content)
+		after:SetSize(1, 1)
+		after:SetPoint("LEFT", outline, "RIGHT", 0, 0)
+		rows.Swatch(after, nil, { "cardOutlineR", "cardOutlineG", "cardOutlineB" }, L["Pick the outline's color."],
+			function(db)
+				local value = Get("cardOutline")
+				if value == -1 then value = ns.GeneralStyleValue("cardOutline") end
+				return On(db) and (tonumber(value) or 0) > 0
+			end)
+	end
+	Dot({ "Shadow" })
+	Narrow(rows.Dropdown(L["Shadow"], "cardShadow", function()
+		return {
+			{ value = "general", text = ns.SharedStyleSource("cardShadow") },
+			{ value = "game", text = L["The game's"] },
+			{ value = "on", text = L["Shadow"], tip = L["A dark copy of the letters just behind them, down and to " ..
+				"the right."] },
+			{ value = "none", text = L["None"] },
+		}
+	end))
+	at.y = at.y + 6
+	Head(L["Small lines"])
+	Dot({ "Small lines' font" })
+	Narrow(rows.Font("cardSmallFont", L["The small lines' font, over and under the words."], nil,
+		{ "same", L["Same as the words"] }, L["Font"]))
+	Dot({ "Small lines' size" })
+	Number("cardSmallSize", L["Size"], 50, 250, 5, "%d%%", 100,
+		L["The small lines over and under the words, bigger or smaller than they come (100%: as they come, " ..
+		"by the words' size)."])
+	Dot({ "Small lines' color" })
+	local smallColor = Buttons(Name(L["Color"]), "cardSmallColor", {
+		{ "auto", L["Automatic"], L["Under the words: their color, lighter. Over them: a pale gray."] },
+		{ "custom", L["Custom"], L["A color of your own (the swatch), for both lines."] },
+	}, nil, Field() - 28)
+	rows.Swatch(smallColor, "cardSmallColor", { "cardSmallR", "cardSmallG", "cardSmallB" },
+		L["Pick the small lines' color."])
+	local textEnd = at.y - 4
+	local textPanel = Panel(at.x, CELL_PAD, textEnd)
+
+	grid:SetSize(CELL_RIGHT + CELL_W, math.max(barEnd, textEnd) + CELL_PAD * 2)
+	-- (The bar's group, only with a bar: at the column's bottom, so no gap's
+	-- left. The two columns' panels end level, whichever's longer.)
+	local watch = CreateFrame("Frame", nil, content)
+	watch:SetSize(1, 1)
+	watch:Hide()
+	watch.pageSwitch = false
+	watch.Refresh = function()
+		local shown = BarUp()
+		for _, part in ipairs(barParts) do part:SetShown(shown) end
+		local bottom = math.max(textEnd, shown and barEnd or timingEnd)
+		PanelTo(textPanel, bottom)
+		PanelTo(barPanel, bottom)
+		PanelTo(timingPanel, shown and timingEnd or bottom)
+		grid:SetHeight(bottom + CELL_PAD * 2)
+		for _, each in ipairs(dimmed) do each[1]:SetAlpha(each[2](ns.GetDB()) and 1 or 0.5) end
+	end
+	kit.AddControl(watch)
+end
+
+-- "2 of its own" and a button putting them all back, after after (x past it).
+-- Count(): how many; Text(count): the words; All(): puts them back.
+local function OwnLine(kit, content, after, x, width, Count, Text, All, tip, changed, On)
+	local label = kit.Label(content, "GameFontHighlightSmall", "")
+	label:SetWidth(width)
+	label:SetJustifyH("LEFT")
+	label:SetWordWrap(false)
+	label:SetPoint("LEFT", after, "RIGHT", x, 0)
+	local reset = ns.PanelButton(content)
+	reset:SetSize(80, 22)
+	reset:SetText(L["Reset all"])
+	reset:SetPoint("LEFT", label, "RIGHT", 6, 0)
+	reset.pageSwitch = false
+	kit.Tooltip(reset, tip)
+	reset:SetScript("OnClick", function()
+		All()
+		changed()
+		kit.Refresh()
+	end)
+	label.pageSwitch = false
+	label.Refresh = function(self)
+		local count = Count()
+		self:SetText(Text(count))
+		reset:SetShown(count > 0)
+		reset:SetEnabled(On(ns.GetDB()))
+	end
+	kit.AddControl(label)
+end
+
+-- The preview on these tabs: low, so the settings fit under it. (As the screen
+-- it's the page's width: the words are as big as in a taller one.)
+local CARD_PREVIEW_H = 170
+local function LowPreview(preview)
+	local refresh = preview.Refresh
+	preview.headHeight = CARD_PREVIEW_H - ns.StylePreviewHeight()
+	function preview.Refresh(self)
+		self.headHeight = CARD_PREVIEW_H - ns.StylePreviewHeight()
+		return refresh(self)
+	end
+end
+
 -- The style an event starts from, by name: a ready-made one (Cards.lua's
 -- CARD_STYLES), or for a subzone following the zone, the zone's.
 local function BaseName(id)
@@ -296,7 +609,7 @@ local function StyleChoices(id)
 	local event = ns.CARD_BY_ID[id]
 	if event and event.parent then
 		list[#list + 1] = { value = "follow", text = L["Follows %s"]:format(L[ns.CARD_BY_ID[event.parent].name]),
-			tip = L["Whatever style that event starts from."] }
+			tip = L["Whatever card type that event starts from."] }
 	end
 	for _, style in ipairs(ns.CARD_STYLES) do list[#list + 1] = { value = style.id, text = L[style.name] } end
 	return list
@@ -403,6 +716,9 @@ function ns.CreateCardsPanel(kit)
 		"slider")
 	kit.Tooltip(cardScale, L["Every card's words bigger or smaller, for a big or wide screen (a card in a " ..
 		"letterbox bar goes by the bar's height instead)."])
+	stack:Add(kit.Check(content, "cardClearChat", L["Move cards clear of the chat"],
+		L["Ticked: a lower third card that would land on a chat window you can see moves up just enough to " ..
+		"clear it. Unticked: it stays where its place puts it."]), "check")
 	stack:Header(content, L["Events"])
 	local grid = ns.GRID_KIT
 	local columns = ns.FRAME_COLUMNS
@@ -462,7 +778,7 @@ function ns.CreateCardsPanel(kit)
 					local base = kit.Dropdown(drawer, BaseField(id), function() return StyleChoices(id) end, 170)
 					if base then
 						At(base)
-						kit.Tooltip(base, L["The style this card starts from. Settings you give it on the Style tab go " ..
+						kit.Tooltip(base, L["The card type this card starts from. Settings you give it on the Style tab go " ..
 							"over it."])
 					end
 					-- (Buttons to it on the Settings, Style and Sounds tabs.)
@@ -496,8 +812,8 @@ function ns.CreateCardsPanel(kit)
 	end
 	local list = ns.RowList(kit, content, items)
 	stack:Add(list, "label")
-	stack:Note(content, L["A style with +2 has two settings of its own over the one it starts from (the Style tab " ..
-		"lists them)."], NOTE_W)
+	stack:Note(content, L["A card type with +2 has two settings of its own over the one it starts from (the Style tab " ..
+		"marks them with gold dots)."], NOTE_W)
 
 	canvas:SetScript("OnShow", kit.PageShown(kit.Refresh, content))
 	canvas:Hide()
@@ -585,8 +901,8 @@ function ns.CreateCardStylePanel(kit)
 	local title = kit.Label(content, "GameFontNormalLarge", L["Card Vision"])
 	local under = CardTop(kit, content, title, 2)
 	local intro = kit.PageIntro(content, title,
-		L["How this card looks. It starts from a style (a subzone's, the zone's), each setting following it until " ..
-		"you change it here, then the card's own until you put it back. Change the style itself on the Card Types " ..
+		L["How this card looks. It starts from a card type (a subzone's, the zone's), each setting following it " ..
+		"until you change it here, then the card's own until you put it back. Change the card type itself on the Card Types " ..
 		"tab, for every card using it. Changes play at once in the preview."], under)
 	local preview
 	local function Changed()
@@ -618,8 +934,9 @@ function ns.CreateCardStylePanel(kit)
 	for _, event in ipairs(ns.CARD_EVENTS) do kit.RecordKey(content, "cardBase_" .. event.id) end
 	local rows = ns.StyleRows(kit, content, stack, Changed, "cards", FieldOf)
 
-	preview = ns.MakeCardPreview(content, 480, nil, function() return CARD.now end)
+	preview = ns.MakeCardPreview(content, 480, CARD_PREVIEW_H, function() return CARD.now end)
 	preview.pageSwitch = false
+	LowPreview(preview)
 	stack:Add(preview, "label")
 	ns.StylePopout(preview, kit.Tooltip) -- (StylePages.lua)
 	kit.AddControl(preview)
@@ -633,54 +950,30 @@ function ns.CreateCardStylePanel(kit)
 
 	-- The style the event starts from, and a button to change that style
 	-- itself (the Card Types tab, it picked).
-	local base = rows.Dropdown(L["Starts from:"], { get = function() return ns.GetDB()["cardBase_" .. CARD.now] end,
+	local base = rows.Dropdown(L["Starts from"], { get = function() return ns.GetDB()["cardBase_" .. CARD.now] end,
 		set = function(value) ns.GetDB()["cardBase_" .. CARD.now] = value end },
 		function() return StyleChoices(CARD.now) end,
-		L["The style this card starts from. The settings below that you change go over it, as its own."])
+		L["The card type this card starts from. The settings below that you change go over it, as its own."])
 	if base then
+		stack.last:SetSize(84, 30)
+		base:SetWidth(170)
 		local edit = ns.PanelButton(content)
 		edit:SetSize(110, 22)
-		edit:SetText(L["Edit style"])
+		edit:SetText(L["Edit card type"])
 		edit:SetPoint("LEFT", base, "RIGHT", 10, 0)
 		edit.pageSwitch = false
-		kit.Tooltip(edit, L["Opens this style on the Card Types tab: a change there is for every card using it."])
+		kit.Tooltip(edit, L["Opens this card type on the Card Types tab: a change there is for every card using it."])
 		edit:SetScript("OnClick", function()
 			CARD.style = ns.CardBase(CARD.now)
 			ns.ShowHubPage("Card Styles")
 		end)
-	end
-
-	-- Which settings it has of its own, and a dropdown to put one back.
-	local own = kit.Label(content, "GameFontHighlightSmall", "")
-	own:SetWidth(NOTE_W)
-	own:SetJustifyH("LEFT")
-	stack:Add(own, "label")
-	own.Refresh = function(self)
-		local names = OwnNames(CARD.now)
-		if #names == 0 then
-			self:SetText(L["None of its own: it's all %s."]:format(BaseName(CARD.now)))
-		else
-			self:SetText(L["Its own: %s. The rest: %s."]:format(table.concat(names, ", "), BaseName(CARD.now)))
-		end
-	end
-	kit.AddControl(own)
-	local back = rows.Dropdown(L["Back to its style:"], { get = function() return nil end, set = function(index)
-		if index == "all" then
+		-- How many it has of its own (each with a gold dot beside it), and all back.
+		OwnLine(kit, content, edit, 12, 110, function() return #OwnNames(CARD.now) end, function(count)
+			return count == 0 and L["None of its own"] or L["%d of its own"]:format(count)
+		end, function()
 			for _, group in ipairs(GROUPS) do Follow(CARD.now, group) end
-		elseif GROUPS[index] then
-			Follow(CARD.now, GROUPS[index])
-		end
-	end }, function()
-		local list = {}
-		for i, group in ipairs(GROUPS) do
-			if OwnGroup(CARD.now, group) then list[#list + 1] = { value = i, text = L[group[1]] } end
-		end
-		if #list > 1 then list[#list + 1] = { value = "all", text = L["All of them"] } end
-		return list
-	end, L["Puts one of the event's own settings back, to come from the style it starts from again."], function(db)
-		return #OwnNames(CARD.now) > 0 and rows.On(db)
-	end)
-	if back and back.SetDefaultText then back:SetDefaultText(L["Pick a setting"]) end
+		end, L["Puts all of this card's own settings back, to come from its card type again."], Changed, rows.On)
+	end
 
 	-- The icon's own picture: a button after the Icon tick opening every icon
 	-- the game has (IconBrowser.lua). Right-click: back to the event's own.
@@ -723,7 +1016,11 @@ function ns.CreateCardStylePanel(kit)
 		kit.GreyUnless(button, function(db) return rows.On(db) and ns.CardRaw(CARD.now, "IconShow") end)
 		kit.AddControl(button)
 	end
-	LookRows(content, stack, rows, IconButton)
+	LookGrid(kit, content, stack, FieldOf, Changed, {
+		Is = function(group) return OwnGroup(CARD.now, group) end,
+		Put = function(group) Follow(CARD.now, group) end,
+		tip = L["This card's own setting. Click to go back to its card type."],
+	}, IconButton)
 
 
 	canvas:SetScript("OnShow", kit.PageShown(kit.Refresh, content)) -- (its refresh plays the preview)
@@ -738,7 +1035,7 @@ function ns.CreateCardStylesPanel(kit)
 	local title = kit.Label(content, "GameFontNormalLarge", L["Card Vision"])
 	CardTabs(content, title, 2)
 	local intro = kit.PageIntro(content, title,
-		L["The styles the cards start from. Change one here and every card that starts from it changes too, " ..
+		L["The card types the cards start from. Change one here and every card that starts from it changes too, " ..
 		"except where a card has a setting of its own (its Style page, from its row on the Events tab). Changes " ..
 		"play at once in the preview."])
 	local preview
@@ -746,7 +1043,7 @@ function ns.CreateCardStylesPanel(kit)
 		if preview then preview:Refresh() end
 	end
 	local switch = kit.PageSwitch(content, "cards", L["Enable Page"],
-		L["On: each card shows as the Events tab says, in its style. Off: none of them do. Each setting keeps " ..
+		L["On: each card shows as the Events tab says, in its card type. Off: none of them do. Each setting keeps " ..
 		"its value for when you turn this back on."], intro, Changed)
 	local stack = kit.Stack(switch, "check")
 
@@ -809,7 +1106,7 @@ function ns.CreateCardStylesPanel(kit)
 		picker:SetPoint("LEFT", editing, "RIGHT", 12, 0)
 		picker:SetFrameLevel(bar:GetFrameLevel() + 3)
 		picker.pageSwitch = false
-		kit.Tooltip(picker, L["The style this tab shows and sets."])
+		kit.Tooltip(picker, L["The card type this tab shows and sets."])
 		barLine:SetPoint("LEFT", picker, "RIGHT", 12, 0)
 	else
 		barLine:SetPoint("LEFT", editing, "RIGHT", 12, 0)
@@ -823,8 +1120,10 @@ function ns.CreateCardStylesPanel(kit)
 	end
 	kit.AddControl(bar)
 
-	preview = ns.MakeCardPreview(content, 480, nil, Sample, function() return ns.CardStyleLook(CARD.style, Sample()) end)
+	preview = ns.MakeCardPreview(content, 480, CARD_PREVIEW_H, Sample,
+		function() return ns.CardStyleLook(CARD.style, Sample()) end)
 	preview.pageSwitch = false
+	LowPreview(preview)
 	stack:Add(preview, "label")
 	ns.StylePopout(preview, kit.Tooltip) -- (StylePages.lua)
 	kit.AddControl(preview)
@@ -838,42 +1137,31 @@ function ns.CreateCardStylesPanel(kit)
 			ns.Cards.Fire(id, card, true)
 		end)
 
-	-- What's changed from how it comes, and a dropdown to put one back.
-	local own = kit.Label(content, "GameFontHighlightSmall", "")
-	own:SetWidth(NOTE_W)
-	own:SetJustifyH("LEFT")
-	stack:Add(own, "label")
-	own.Refresh = function(self)
-		local names = Changes(CARD.style)
-		self:SetText(#names == 0 and L["As it comes: nothing changed."]
-			or L["Changed: %s."]:format(table.concat(names, ", ")))
-	end
-	kit.AddControl(own)
-	local back = rows.Dropdown(L["Back as it comes:"], { get = function() return nil end, set = function(index)
+	-- How many are changed from how it comes (each with a gold dot beside it),
+	-- and all back.
+	local function PutBack(group)
 		local db = ns.GetDB()
-		for i, group in ipairs(GROUPS) do
-			if index == "all" or index == i then
-				for _, field in ipairs(group[2]) do db[ns.CardStyleKey(field, CARD.style)] = "default" end
-			end
-		end
-	end }, function()
-		local list = {}
-		for i, group in ipairs(GROUPS) do
-			for _, field in ipairs(group[2]) do
-				if ns.CardStyleIsOwn(CARD.style, field) then
-					list[#list + 1] = { value = i, text = L[group[1]] }
-					break
-				end
-			end
-		end
-		if #list > 1 then list[#list + 1] = { value = "all", text = L["All of them"] } end
-		return list
-	end, L["Puts one of your changes to the style back, as it comes."], function(db)
-		return #Changes(CARD.style) > 0 and rows.On(db)
-	end)
-	if back and back.SetDefaultText then back:SetDefaultText(L["Pick a setting"]) end
+		for _, field in ipairs(group[2]) do db[ns.CardStyleKey(field, CARD.style)] = "default" end
+	end
+	local ownRow = CreateFrame("Frame", nil, content)
+	ownRow:SetSize(1, 22)
+	stack:Add(ownRow, "label")
+	OwnLine(kit, content, ownRow, 0, 200, function() return #Changes(CARD.style) end, function(count)
+		return count == 0 and L["As it comes: nothing changed."] or L["%d changed"]:format(count)
+	end, function()
+		for _, group in ipairs(GROUPS) do PutBack(group) end
+	end, L["Puts all your changes to this card type back, as it comes."], Changed, rows.On)
 
-	LookRows(content, stack, rows)
+	LookGrid(kit, content, stack, FieldOf, Changed, {
+		Is = function(group)
+			for _, field in ipairs(group[2]) do
+				if ns.CardStyleIsOwn(CARD.style, field) then return true end
+			end
+			return false
+		end,
+		Put = PutBack,
+		tip = L["Changed from how this card type comes. Click to put it back."],
+	})
 
 	canvas:SetScript("OnShow", kit.PageShown(kit.Refresh, content)) -- (its refresh plays the preview)
 	canvas:Hide()
@@ -1081,7 +1369,7 @@ function ns.CreateCardSettingsPanel(kit)
 		parts.Part(id, function()
 			SoulsWordsRows(id)
 			if ns.CARD_BY_ID[id].inFight then FightRow(id) end
-			stack:Note(content, L["Its look is the Victory style's (the Style tab), its sound on the Sounds tab."],
+			stack:Note(content, L["Its look is the Victory card type's (the Style tab), its sound on the Sounds tab."],
 				NOTE_W)
 		end)
 	end

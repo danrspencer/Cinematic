@@ -25,6 +25,7 @@ DEFAULTS.combatBossSub = true          -- the dungeon and difficulty under the n
 DEFAULTS.combatBossCount = true        -- "Boss 2 of 3" over it, where the Journal knows (on the pull)
 DEFAULTS.cardThirdX = 0.07             -- the lower third's spot: its words' left edge, a share of the screen's width
 DEFAULTS.cardThirdY = 0.22             -- ...and their bottom, a share of its height up (moved in Edit Mode)
+DEFAULTS.cardClearChat = true          -- a lower third card that'd land on a chat window you can see moves up off it
 
 local FADE_IN, FADE_OUT = 0.35, 0.5
 local SMALL_OUTLINE_MIN = 16          -- a card's small lines this big or more get a thin outline
@@ -40,6 +41,10 @@ local TOAST_GAP = 12               -- a card pushed under Blizzard's toast: this
 local TOAST_SLIDE = 6              -- ...sliding there this fast (share of the way each second, about)
 local TOAST_GUESS = 0.32           -- ...its bottom this far down the screen when it can't be read
 local TOAST_MOST = 0.45            -- ...but pushed no more than this share of the screen
+local CHAT_PARTS = { "", "Tab", "EditBox" } -- a card kept off these of each chat window (ChatFrame1, ChatFrame1Tab...)
+local CHAT_SEEN = 0.1              -- ...when one's this shown or more (CineMode fades them)
+local CHAT_GAP = 10                -- ...this far over the highest it'd touch
+local CHAT_LIFT_MOST = 0.4         -- ...but lifted no more than this share of the screen: else it stays put
 local OUTLINES = { [0] = "", "OUTLINE", "THICKOUTLINE" }
 -- Banner: the words across the middle of the screen on a dark band with soft
 -- edges (the death banner's), coming in and going slowly, or a picture on a
@@ -235,6 +240,8 @@ local function Setup(cue, look, enter, width, height, scale, boss)
 	-- while it's up. In a bar or low down it's clear of it.)
 	cue.toastable = scale == 1 and place ~= "top" and place ~= "bottom" and place ~= "third" and style ~= "subtitle"
 	cue.toastPush, cue.pushNow, cue.pushAge = 0, 0, 0
+	-- (On the real screen only: a preview's card isn't near your chat.)
+	cue.clearChat, cue.chatLift = scale == 1 and cue.third and ns.db.cardClearChat, 0
 	cue.over:ClearAllPoints()
 	cue.over:SetAllPoints()
 	local x, y, point, relative = 0, 0, "CENTER", "CENTER"
@@ -615,6 +622,121 @@ local function DodgeToast(cue, age)
 	cue.over:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", 0, -cue.pushNow)
 end
 
+-- Whether every value given is a plain number (a frame's place can be
+-- secret in a fight).
+local function Numbers(...)
+	for i = 1, select("#", ...) do
+		local value = select(i, ...)
+		if type(value) ~= "number" or issecretvalue and issecretvalue(value) then return false end
+	end
+	return true
+end
+
+-- part's left, right, bottom and top in over's units (nil if they can't be read).
+local function RectIn(part, over)
+	local left, right, bottom, top = part:GetLeft(), part:GetRight(), part:GetBottom(), part:GetTop()
+	local own, theirs = part:GetEffectiveScale(), over:GetEffectiveScale()
+	if not Numbers(left, right, bottom, top, own, theirs) or theirs == 0 then return end
+	local k = own / theirs
+	return left * k, right * k, bottom * k, top * k
+end
+
+-- The box round the shown parts of cue that can be read (nil if none can: a
+-- secret name's size is secret).
+local function CardBox(cue)
+	local box
+	for _, part in ipairs({ cue.text, cue.line, cue.sub, cue.meta, cue.icon }) do
+		if ns.Flag(part:IsShown()) then
+			local left, right, bottom, top = RectIn(part, cue.over)
+			if left then
+				-- (The line's still to draw out as the card starts.)
+				if part == cue.line and cue.lineWidth then right = left + cue.lineWidth end
+				box = box or { left = left, right = right, bottom = bottom, top = top }
+				box.left, box.right = math.min(box.left, left), math.max(box.right, right)
+				box.bottom, box.top = math.min(box.bottom, bottom), math.max(box.top, top)
+			end
+		end
+	end
+	return box
+end
+
+-- Whether part's on the screen and shown enough to count.
+local function ChatSeen(part)
+	if not ns.Flag(part:IsVisible()) then return false end
+	local alpha = part:GetEffectiveAlpha()
+	return Numbers(alpha) and alpha >= CHAT_SEEN
+end
+
+-- What's up of the chat windows, as boxes in over's units. Only what you can
+-- see, and can read the place of; with a window up, all its tabs however
+-- faint: the game fades them with the mouse away and brings them back with it
+-- on the chat, under a card that took them for gone. (Trace: /cine debug cardchat.)
+local function ChatBoxes(over, Trace)
+	local boxes, chatUp = {}, false
+	for i = 1, NUM_CHAT_WINDOWS or 10 do
+		local window = _G["ChatFrame" .. i]
+		chatUp = chatUp or window ~= nil and ChatSeen(window)
+	end
+	for i = 1, NUM_CHAT_WINDOWS or 10 do
+		for _, suffix in ipairs(CHAT_PARTS) do
+			local name = "ChatFrame" .. i .. suffix
+			local part = _G[name]
+			if part and ns.Flag(part:IsVisible()) then
+				local left, right, bottom, top = RectIn(part, over)
+				local seen = suffix == "Tab" and chatUp or ChatSeen(part)
+				if Trace then
+					Trace(("%s: alpha %s, left %s right %s bottom %s top %s%s"):format(name,
+						tostring(part:GetEffectiveAlpha()), tostring(left),
+						tostring(right), tostring(bottom), tostring(top), seen and left and "" or " (not counted)"))
+				end
+				if seen and left then
+					boxes[#boxes + 1] = { left = left, right = right, bottom = bottom, top = top }
+				end
+			end
+		end
+	end
+	return boxes
+end
+
+-- How far box must go up to clear boxes by CHAT_GAP (0: it's clear of them).
+-- (A lift can put it on the next one up, a window's tabs over it: so again,
+-- at most once for each.)
+local function LiftOver(box, boxes)
+	local lift = 0
+	for _ = 1, #boxes do
+		for _, other in ipairs(boxes) do
+			if box.left < other.right and box.right > other.left
+				and box.bottom + lift < other.top + CHAT_GAP and box.top + lift > other.bottom then
+				lift = other.top + CHAT_GAP - box.bottom
+			end
+		end
+	end
+	return lift
+end
+
+-- Lifts a lower third cue just clear of the chat, as it starts (it's still
+-- faded out: no slide to see), and leaves it there: a window peeking in later
+-- doesn't move it. Anything unreadable, or a lift too big: where it was.
+local function ClearChat(cue)
+	local Trace = ns.CardChatTrace
+	local box = CardBox(cue)
+	local boxes = ChatBoxes(cue.over, Trace)
+	if Trace then
+		Trace(box and ("card: left %.1f right %.1f bottom %.1f top %.1f"):format(box.left, box.right, box.bottom, box.top)
+			or "card: can't be read")
+	end
+	if not box then return end
+	local lift = LiftOver(box, boxes)
+	local fits = lift <= cue.height * CHAT_LIFT_MOST and box.top + lift <= cue.height
+	if Trace then Trace(("lift wanted %.1f, %s"):format(lift, fits and "used" or "too big: stays put")) end
+	if lift <= 0 or not fits then return end
+	local frame = cue.over:GetParent()
+	cue.chatLift = lift
+	cue.over:ClearAllPoints()
+	cue.over:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, lift)
+	cue.over:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", 0, lift)
+end
+
 -- Draws cue age seconds in. Gives false once it's over (and hidden). Cut
 -- short (cue.cutAt, cue.cutFrom: when, and how shown then), it fades out
 -- from there in CUT_OUT.
@@ -636,6 +758,11 @@ local function Draw(cue, age)
 	cue.over:Show()
 	cue.over:SetAlpha(a)
 	if cue.toastable then DodgeToast(cue, age) end
+	if cue.clearChat and age == 0 then
+		-- (Before the small lines start low for their rise: from where they end up.)
+		local ok, why = pcall(ClearChat, cue)
+		if not ok and ns.CardChatTrace then ns.CardChatTrace("error: " .. tostring(why)) end
+	end
 	-- (Reveal: the window opening, eased out; the line drawing out with it.)
 	local open = a
 	if cue.reveal then
@@ -799,6 +926,22 @@ end
 -- width x height, scale next to the real screen.
 function ns.PlayCard(frame, look, width, height, scale, card, after)
 	Play(frame, look, true, width, height, scale, card, after)
+end
+
+-- /cine debug cardchat: a zone card on your screen, and what the lift made of
+-- the chat windows.
+function ns.CardChatTest()
+	ns.Print(("cardchat: option %s, %s, game %s, UI scale %s"):format(tostring(ns.db.cardClearChat),
+		ns.Flag(UnitAffectingCombat("player")) and "in combat" or "out of combat",
+		tostring((select(4, GetBuildInfo()))), tostring(UIParent:GetEffectiveScale())))
+	ns.CardChatTrace = function(line) ns.Print("cardchat: " .. line) end
+	local card = ns.CardSample("zone")
+	card.name = card.name or GetRealZoneText()
+	local shown = ns.Cards.Fire("zone", card, true)
+	ns.CardChatTrace = nil
+	local cue = _G.CinematicCard and _G.CinematicCard.cue
+	ns.Print(("cardchat: card shown %s, lower third %s, lift %s, Zone card's place %s"):format(tostring(shown),
+		tostring(cue and cue.third), tostring(cue and cue.chatLift), tostring(ns.CardLook("zone").combatPlace)))
 end
 
 -- The card playing on frame cut short: a quick fade out from as shown now.

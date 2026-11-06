@@ -486,6 +486,158 @@ if arg[1] and not update then
 		end
 		shotDb.themeShotsLast = nil
 	end
+	-- Visions Style: a card left on "default" follows, so nothing shows as its own after a reset.
+	do
+		local visionDb, keys = ns.GetDB(), { "cardFont", "cardFont_zone", "cardLookFont_third" }
+		local kept = {}
+		for i, key in ipairs(keys) do kept[i] = visionDb[key] end
+		visionDb.cardFont, visionDb.cardFont_zone, visionDb.cardLookFont_third = "general", "default", "default"
+		if #ns.VisionOwnKinds(keys) > 0 then print("problem	Visions Style: \"default\" counts as a card's own") end
+		visionDb.cardLookFont_third = "bebas"
+		if #ns.VisionOwnKinds(keys) ~= 1 then print("problem	Visions Style: a card type's own font doesn't show") end
+		for i, key in ipairs(keys) do visionDb[key] = kept[i] end
+	end
+	-- The Card Types tab's grid: its buttons set their setting, a bar's group shows
+	-- with a bar picked, and the gold dots put a change back.
+	do
+		local kit, made = ns.lowHealthKit, {}
+		local page = setmetatable({
+			AddControl = function(control)
+				made[#made + 1] = control
+			end,
+			RegisterSubpage = function() end,
+			-- (Just this page: other pages' controls need the real game.)
+			Refresh = function()
+				for _, control in ipairs(made) do control:Refresh() end
+			end,
+		}, { __index = kit })
+		-- (The stand-in's sizes never match what a preview was given: it'd fit itself for ever.)
+		local fit = ns.FitStylePreview
+		ns.FitStylePreview = function() end
+		-- (And a stub for a zone's name would loop for ever: as themeshots, above.)
+		local gridZones = { "GetRealZoneText", "GetZoneText", "GetSubZoneText", "GetMinimapZoneText" }
+		for _, name in ipairs(gridZones) do rawset(_G, name, function() return "Darkshore" end) end
+		ns.CreateCardStylesPanel(page)
+		local function Named(name)
+			for _, control in ipairs(made) do
+				if control.searchLabel == name and control.GetScript and control:GetScript("OnClick") then return control end
+			end
+			print("problem\tCard grid: no " .. name .. " button")
+		end
+		local function Click(control) if control then control:GetScript("OnClick")(control) end end
+		local function Field(field, want, doing)
+			local value = ns.CardStyleRaw("third", field)
+			if value ~= want then
+				print(("problem\tCard grid: %s: %s is %s, not %s"):format(doing, field, tostring(value), tostring(want)))
+			end
+		end
+		page.Refresh()
+		local left = Named("Left")
+		local wasStyle, wasPlace = ns.CardStyleRaw("third", "Style"), ns.CardStyleRaw("third", "Place")
+		if left and left:IsShown() then print("problem\tCard grid: a bar's group shows with no bar") end
+		Click(Named("Banner"))
+		Field("Style", "banner", "clicking Banner")
+		Click(Named("Top bar"))
+		Field("Place", "top", "clicking Top bar")
+		if left and left:IsShown() then print("problem\tCard grid: a bar's group shows on a banner") end
+		Click(Named("Title"))
+		if left and not left:IsShown() then print("problem\tCard grid: a bar's group doesn't show with a bar") end
+		local dots = 0
+		for _, control in ipairs(made) do
+			if control.searchSkip and control:IsShown() and control.GetScript and control:GetScript("OnClick") then
+				dots = dots + 1
+				Click(control)
+			end
+		end
+		if dots ~= 2 then print("problem\tCard grid: " .. dots .. " dots for 2 changes") end
+		Field("Style", wasStyle, "its dot")
+		Field("Place", wasPlace, "its dot")
+		ns.FitStylePreview = fit
+		for _, name in ipairs(gridZones) do rawset(_G, name, nil) end
+	end
+	-- A lower third card moves up clear of a chat window you can see, and only then.
+	do
+		local chatDb = ns.GetDB()
+		local wasClear, wasSecret = chatDb.cardClearChat, rawget(_G, "issecretvalue")
+		local stage = CreateFrame("Frame", nil, UIParent)
+		local look = setmetatable({ combatPlace = "third", combatStyle = "chapter" }, { __index = ns.CardLook("zone") })
+		local card = { name = "Kharanos", sub = "Dun Morogh" }
+		ns.PlayCard(stage, look, 1000, 600, 1, card)
+		local cue = stage.cue
+		-- (Text 100-300 across, the sub line under it down to 120; chat's top at 140, its tabs to 165.)
+		local function Place(part, left, right, bottom, top)
+			function part:GetLeft() return left end
+			function part:GetRight() return right end
+			function part:GetBottom() return bottom end
+			function part:GetTop() return top end
+		end
+		Place(cue.text, 100, 300, 150, 190)
+		Place(cue.sub, 100, 220, 120, 140)
+		Place(cue.line, 100, 100, 145, 146)
+		local chat, tab = CreateFrame("Frame"), CreateFrame("Frame")
+		local function Lift(place, scale)
+			rawset(_G, "ChatFrame1", chat)
+			rawset(_G, "ChatFrame1Tab", tab)
+			chat:Show()
+			tab:Show()
+			Place(chat, 30, 460, 20, 140)
+			Place(tab, 30, 110, 140, 165)
+			function chat:GetEffectiveAlpha() return 1 end
+			function tab:GetEffectiveAlpha() return 1 end
+			if place then place() end
+			ns.PlayCard(stage, look, 1000, 600, scale or 1, card)
+			ns.SetOnUpdate(stage, nil)
+			rawset(_G, "ChatFrame1", nil)
+			rawset(_G, "ChatFrame1Tab", nil)
+			rawset(_G, "issecretvalue", wasSecret)
+			return cue.chatLift
+		end
+		local function Expect(name, want, place, scale)
+			local lift = Lift(place, scale)
+			if math.abs(lift - want) > 1e-6 then
+				print(("problem\tCard clear of chat: %s lifted %s, not %s"):format(name, tostring(lift), tostring(want)))
+			end
+		end
+		chatDb.cardClearChat = true
+		Expect("a card on the chat and its tabs", 55) -- (bottom 120 to tabs' 165 + 10)
+		Expect("a window's faded tabs", 55, function()
+			function tab:GetEffectiveAlpha() return 0 end
+		end)
+		Expect("a faded window and its tabs", 0, function()
+			function chat:GetEffectiveAlpha() return 0 end
+			function tab:GetEffectiveAlpha() return 0 end
+		end)
+		Expect("a chat window hidden", 0, function() chat:Hide(); tab:Hide() end)
+		Expect("a faded chat window", 0, function()
+			function chat:GetEffectiveAlpha() return 0 end
+			tab:Hide()
+		end)
+		Expect("a chat window elsewhere", 0, function() Place(chat, 700, 900, 20, 140); tab:Hide() end)
+		Expect("a chat window too tall to clear", 0, function() Place(chat, 30, 460, 20, 500); tab:Hide() end)
+		Expect("a secret chat place", 0, function()
+			rawset(_G, "issecretvalue", function(value) return value == 140 or value == 165 end)
+		end)
+		Expect("a preview", 0, nil, 0.3)
+		look.combatPlace, look.combatBarFallback = "top", false
+		Expect("a card in a letterbox bar", 0)
+		look.combatPlace = "third"
+		chatDb.cardClearChat = false
+		Expect("the option off", 0)
+		chatDb.cardClearChat = true
+		-- (/cine debug cardchat runs. A stub for a zone's name would loop for ever: as themeshots, above.)
+		local chatPrint = ns.Print
+		ns.Print = function() end
+		local zoneNames = { "GetRealZoneText", "GetZoneText", "GetSubZoneText", "GetMinimapZoneText" }
+		for _, name in ipairs(zoneNames) do rawset(_G, name, function() return "Darkshore" end) end
+		rawset(_G, "ChatFrame1", chat)
+		local ran, why = pcall(ns.CardChatTest)
+		rawset(_G, "ChatFrame1", nil)
+		for _, name in ipairs(zoneNames) do rawset(_G, name, nil) end
+		ns.Print = chatPrint
+		ns.Cards.Cut("zone")
+		if not ran then print("problem\tCard clear of chat: /cine debug cardchat: " .. tostring(why)) end
+		chatDb.cardClearChat = wasClear
+	end
 	-- Vitals Vision: a page's Reset (its settings back to the profile's) leaves
 	-- each theme's own look on them, not the plain defaults.
 	local db, base = ns.GetDB(), ns.ProfileBase()

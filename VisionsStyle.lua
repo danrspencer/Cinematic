@@ -49,13 +49,15 @@ local function OwnKinds(keys)
 	for _, key in ipairs(keys) do
 		local value = db and db[key]
 		local kind = ns.SHARED_STYLE[key].kind
-		if value ~= nil and not ns.IsGeneralStyle(value) and not seen[kind] then
+		-- (A card's or card type's "default": nothing of its own, it follows its type.)
+		if value ~= nil and value ~= "default" and not ns.IsGeneralStyle(value) and not seen[kind] then
 			seen[kind] = true
 			own[#own + 1] = L[KIND_NAMES[kind] or "Texture"]
 		end
 	end
 	return own
 end
+ns.VisionOwnKinds = OwnKinds -- (for the offline check)
 
 local function RefreshVisions()
 	if ns.RefreshAllStyles then ns.RefreshAllStyles() end
