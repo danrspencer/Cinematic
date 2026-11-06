@@ -168,6 +168,24 @@ local function HealthColor(view, unit)
 	end
 end
 
+-- A unit's power color, for a fill of ours where the game's power bar is white
+-- (retail and Forever: mana's blue, rage's red... are in the art, per power).
+-- Mana's the blue of that art, not the table's darker one; unknown or secret
+-- in a fight, mana's too, as anything beats a white bar.
+local MANA_BLUE = { 0, 0.55, 1 }
+local function PowerTint(unit)
+	if not Readable(unit) then return MANA_BLUE end
+	local ok, tint = pcall(function()
+		local _, token, r, g, b = UnitPowerType(unit)
+		if not Readable(token) or token == "MANA" then return end
+		local colors = _G.PowerBarColor
+		local info = colors and colors[token]
+		if info and Readable(info.r) then return { info.r, info.g, info.b } end
+		if Readable(r) then return { r, g, b } end
+	end)
+	return ok and tint or MANA_BLUE
+end
+
 -- What we've changed, to put back: bar -> its own fill and color; skins.
 local own = setmetatable({}, { __mode = "k" })
 local skins = setmetatable({}, { __mode = "k" })
@@ -360,7 +378,7 @@ local function DressFrame(info)
 			local r, g, b
 			if view then r, g, b = HealthColor(view, unit) end
 			DressBar(health, view, r, g, b, HEALTH_GREEN)
-			DressBar(power, view)
+			DressBar(power, view, nil, nil, nil, PowerTint(unit))
 			DressName(text, view, unit)
 			DressPortrait(portrait, view, unit)
 			-- (The game sets these again as the unit changes: ours after it.)
@@ -373,6 +391,22 @@ local function DressFrame(info)
 				end
 				if health and health.SetStatusBarColor then
 					hooksecurefunc(health, "SetStatusBarColor", function() if not dressing then Dress(info) end end)
+				end
+				-- (A power bar's fill and color change with the unit's power: the
+				-- game's newest is what's ours to tint and to put back. It sets
+				-- the color after the fill, so that's ours to follow too.)
+				if power and power.SetStatusBarColor then
+					hooksecurefunc(power, "SetStatusBarTexture", function(_, fill)
+						local saved = own[power]
+						if dressing or not saved then return end
+						if type(fill) == "string" or type(fill) == "number" then saved.atlas, saved.file = fill, nil end
+					end)
+					hooksecurefunc(power, "SetStatusBarColor", function(_, r, g, b)
+						if dressing then return end
+						local saved = own[power]
+						if saved and Readable(r) then saved.color = { r, g, b } end
+						Dress(info)
+					end)
 				end
 			end
 		end
