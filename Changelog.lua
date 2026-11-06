@@ -11,6 +11,9 @@
 local _, ns = ...
 
 ns.CHANGELOG_FEATURES = {
+	{ date = "2026-11-06", page = "General", title = "Chat history",
+		text = "Tick Keep chat history on the Quality of life page and your chat windows bring back their last 200 lines " ..
+		"after a reload or login, for up to a day, with the time each was said if you like." },
 	{ date = "2026-11-06", page = "Style Overrides", title = "Style overrides",
 		text = "Hide or show parts of the unit frames and nameplates from one tab, whatever their Interface rows say. Themes can use it too, and an overridden row says so." },
 	{ date = "2026-11-05", page = "Style General", title = "Style themes",

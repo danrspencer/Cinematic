@@ -333,8 +333,10 @@ local DEFAULTS = {
 	prdOnFights = false,       -- ...the same for fights that show it (Cinema's frames)
 	centerPanels = false,     -- windows the game opens on the left open in the middle of the screen (CenterPanels.lua)
 	dragPanels = true,         -- ...and drag them to move them; they open where last dropped (panelSpots, CenterPanels.lua)
-	chatCopyButton = false,    -- an icon on each chat window opens its lines to copy (ChatCopy.lua; the dev copy: always)
+	chatCopyButton = ADDON_NAME == "CinematicDev", -- an icon on each chat window opens its lines to copy (ChatCopy.lua; off for players, on in the dev copy)
 	chatCopyColours = true,    -- ...its lines in their chat colours (the Colours tick in that window)
+	chatHistory = ADDON_NAME == "CinematicDev", -- chat windows keep their lines across a reload or logout (ChatCopy.lua; off for players, on in the dev copy)
+	chatHistoryTime = ADDON_NAME == "CinematicDev", -- ...each brought-back line starts with the time it was said
 	loginZoom = false,         -- after a login or /reload, zoom to loginZoomDistance (Camera.lua)
 	loginZoomDistance = 15,    -- ...yards
 	reloadButton = false,      -- a Reload button on the screen (Reload.lua)
@@ -1355,7 +1357,7 @@ DEFAULTS.handleHealVision = true -- (read by ns.HealVisionHere; Quest Vision's s
 local PAGE_SWITCH = {}
 for page, keys in pairs({
 	handleQuality = { "campfireSitButton", "dragEquipCharacter", "talentLink", "talentCalc",
-		"centerPanels", "dragPanels", "chatCopyButton", "loginZoom",
+		"centerPanels", "dragPanels", "chatCopyButton", "chatHistory", "chatHistoryTime", "loginZoom",
 		"reloadButton", "reloadKeepWindows" },
 	handleHunter = { "hunterRightClickShot", "hunterAmmoSort", "hunterQuiverFill", "petUnhappyShow" },
 	duelPlates = { "duelCC", "duelHideOthers" }, -- Duel Vision's page
@@ -5164,6 +5166,12 @@ ticker:SetScript("OnEvent", ns.Profiled("Core events", function(self, event, arg
 				end
 			end
 			ns.db.chatCopyOffV1 = true
+		end
+		-- The dev copy starts with it on, now its tick shows there too. Once: untick
+		-- it and it stays.
+		if ns.isDev and not ns.db.chatCopyDevOnV1 then
+			ns.db.chatCopyButton = true
+			ns.db.chatCopyDevOnV1 = true
 		end
 		-- Open windows in the middle of the screen off to start with now: players
 		-- want the game's own window spots, and couldn't find what moved them.

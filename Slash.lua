@@ -84,6 +84,7 @@ local function PrintDebugHelp()
 	print("  /cine debug prey - how the addon tells you're hunting your prey (retail), widget sets and all")
 	print("  /cine debug ping - print each minimap ping and whether it brings the minimap up (again to stop)")
 	print("  /cine debug chatcopy - Copy chat shows each line's codes as text, to see how its colors come (again to stop)")
+	print("  /cine debug chathistory - how many chat lines are saved for each window, how old and how big")
 	print("  /cine debug minimapicons - the minimap's methods for its player arrow and icons on this client")
 	print("  /cine debug nodes [raw] [grow [update]|park|stay] [seconds] - sweep a pretend mouse over the minimap and list the names its tooltip gives (herbs, veins), faded or not; grow gives the faded minimap its size back for each sweep only; park keeps it full size off the screen while it watches (60 seconds), stay full size in its place; update has the game place its dots first; raw shows each name's line as the game wrote it; with seconds, once a second, then all of it in the copy window (again to stop early)")
 	print("  /cine debug nodeoffset - for 20 seconds: rest the mouse on a vein's or herb's dot on the minimap, then move it off; prints how far the pretend mouse hears it from where your mouse did")
@@ -1149,6 +1150,8 @@ local function HandleSlash(msg)
 			.. (on and " (5 minutes, or run this again)" or "") .. (why and (" - not shown now: " .. why) or ""))
 	elseif cmd == "debug" and arg == "questglow" then
 		ns.PrintQuestGlowDebug()
+	elseif cmd == "debug" and arg == "chathistory" then
+		ns.ChatHistoryReport()
 	elseif cmd == "debug" and arg == "chatcopy" then
 		ns.Print("Copy chat shows each line's codes as text: " .. OnOff(ns.ToggleChatCopyRaw()))
 	elseif cmd == "debug" and arg == "questmob" then

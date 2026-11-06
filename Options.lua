@@ -7125,12 +7125,18 @@ local function CreateQualityPanel()
 		end
 	end)
 	stack:Add(putBack, "label", 24)
-	-- (ChatCopy.lua. The dev copy has it always, so no tick.)
-	if not ns.isDev then
-		stack:Add(Check(content, "chatCopyButton", L["Copy chat button"],
-			L["A small icon in the bottom right of a chat window, while your mouse is over it, opens " ..
-			"that window's lines as text you can select and copy with Ctrl+C."]), "check")
-	end
+	-- (ChatCopy.lua.)
+	stack:Add(Check(content, "chatCopyButton", L["Copy chat button"],
+		L["A small icon in the bottom right of a chat window, while your mouse is over it, opens " ..
+		"that window's lines as text you can select and copy with Ctrl+C."]), "check")
+	local keepChat = stack:Add(Check(content, "chatHistory", L["Keep chat history"],
+		L["Chat windows bring back their last 200 lines after a reload or login, for up to a day. " ..
+		"Lines are saved on your computer, whispers too. Turn this off and they're deleted at your next login."]), "check")
+	keepChat:HookScript("OnClick", Refresh) -- grey out / enable the option below
+	local chatTime = stack:Add(Check(content, "chatHistoryTime", L["Show the time on those lines"],
+		L["Lines brought back start with the time they were said. Not needed with the game's own Chat Timestamps " ..
+		"on: their lines have the time already, so nothing is added."]), "check", 24)
+	GreyUnless(chatTime, function(db) return db.chatHistory end)
 	-- (Camera.lua.)
 	local loginZoom = stack:Add(Check(content, "loginZoom", L["Reset the zoom on login and /reload"],
 		L["After you log in or /reload, the camera zooms to the distance below, rather than staying " ..

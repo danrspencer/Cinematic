@@ -2,6 +2,7 @@
 -- window (while the mouse is over it) opens that window's lines as text, to
 -- select and copy with Ctrl+C. Addons can't put text on the clipboard, so a
 -- box to copy from is as close as it gets (chatCopyButton, Quality of life).
+-- Chat history at the end of the file: lines kept across a reload or logout.
 local ADDON_NAME, ns = ...
 local L = ns.L
 
@@ -23,7 +24,7 @@ local function Readable(text)
 end
 
 local function Number(value)
-	return type(value) == "number" and value or nil
+	return type(value) == "number" and not (issecretvalue and issecretvalue(value)) and value or nil
 end
 
 local function Hex(r, g, b)
@@ -441,5 +442,128 @@ ns.SetOnUpdate(watcher, ns.Profiled("Chat copy button", function(_, elapsed)
 		return
 	end
 	sinceCheck = 0
-	Update(ns.isDev or ns.Setting("chatCopyButton")) -- (the dev copy: always, its tick not shown)
+	Update(ns.Setting("chatCopyButton"))
 end))
+
+-- Chat history (chatHistory): each chat window's newest lines, by character
+-- in CinematicCharDB.chatHistory[window number], come back at login and
+-- /reload. A line is { time, text, "rrggbb" or false, chat type id or false }.
+-- Written as lines arrive, so there's nothing to do at logout and a crash
+-- loses nothing. 200 lines a window is about 50KB, a day's limit on top: the
+-- saved file stays small however long you play. Restored lines keep their
+-- first time, so they still age out a day after they were said.
+local HISTORY_LINES = 200
+local HISTORY_AGE = 24 * 60 * 60
+local HISTORY_LONGEST = 1000 -- (longer: an addon's dump, not chat)
+
+-- Battle.net names are tokens that mean someone else next session.
+local function HistoryText(text)
+	text = text:gsub("|HBNplayer:.-|h(.-)|h", "%1"):gsub("|K.-|k", "?")
+	return text
+end
+
+local function SaveLine(index, text, r, g, b, id)
+	if not ns.Setting("chatHistory") or not Readable(text) or text == "" or #text > HISTORY_LONGEST then
+		return
+	end
+	local history = ns.chardb.chatHistory
+	if not history then
+		history = {}
+		ns.chardb.chatHistory = history
+	end
+	local lines = history[index]
+	if not lines then
+		lines = {}
+		history[index] = lines
+	end
+	r, g, b = Number(r), Number(g), Number(b)
+	lines[#lines + 1] = { time(), HistoryText(text), r and g and b and Hex(r, g, b):sub(5) or false, Number(id) or false }
+	if #lines > HISTORY_LINES then
+		table.remove(lines, 1)
+	end
+end
+
+-- The lines young enough to keep, the newest HISTORY_LINES of them.
+local function FreshLines(lines)
+	local fresh = {}
+	local oldest = time() - HISTORY_AGE
+	for _, line in ipairs(lines) do
+		if type(line) == "table" and type(line[1]) == "number" and line[1] >= oldest and type(line[2]) == "string" then
+			fresh[#fresh + 1] = line
+		end
+	end
+	while #fresh > HISTORY_LINES do
+		table.remove(fresh, 1)
+	end
+	return fresh
+end
+
+-- The format for a restored line's time (chatHistoryTime), as the game's clock
+-- shows it, or nil: off, or the game's Chat Timestamps put the time in the
+-- line already.
+local function TimeFormat()
+	local gameStamp = C_CVar.GetCVar("showTimestamps")
+	if not ns.Setting("chatHistoryTime") or (gameStamp and gameStamp ~= "none") then
+		return nil
+	end
+	return C_CVar.GetCVarBool("timeMgrUseMilitaryTime") and "%H:%M" or "%I:%M %p"
+end
+
+local function Restore(chatFrame, lines)
+	local timeFormat = TimeFormat()
+	for _, line in ipairs(lines) do
+		local colour = line[3]
+		local text = timeFormat and ("|cff999999[%s]|r %s"):format(date(timeFormat, line[1]), line[2]) or line[2]
+		if type(colour) == "string" then
+			chatFrame:AddMessage(text, tonumber(colour:sub(1, 2), 16) / 255, tonumber(colour:sub(3, 4), 16) / 255,
+				tonumber(colour:sub(5, 6), 16) / 255, line[4] or nil)
+		else
+			chatFrame:AddMessage(text, nil, nil, nil, line[4] or nil)
+		end
+	end
+	if #lines > 0 then
+		chatFrame:AddMessage(L["Earlier chat is above this line"], 0.6, 0.6, 0.6)
+	end
+end
+
+local historyLoader = CreateFrame("Frame")
+historyLoader:RegisterEvent("PLAYER_LOGIN")
+historyLoader:SetScript("OnEvent", function()
+	local on = ns.Setting("chatHistory")
+	if not on then
+		ns.chardb.chatHistory = nil -- (off: nothing stays on disk)
+	end
+	local history = ns.chardb.chatHistory
+	for index = 1, NUM_CHAT_WINDOWS or 10 do
+		local chatFrame = _G["ChatFrame" .. index]
+		if chatFrame and index ~= 2 then -- (2: the combat log, all noise)
+			if history and type(history[index]) == "table" then
+				history[index] = FreshLines(history[index])
+				ns.Guard(Restore, chatFrame, history[index])
+			end
+			-- (After restoring, so those lines aren't saved twice.)
+			hooksecurefunc(chatFrame, "AddMessage", ns.Profiled("Chat history", function(_, text, r, g, b, id)
+				SaveLine(index, text, r, g, b, id)
+			end))
+		end
+	end
+end)
+
+-- /cine debug chathistory
+function ns.ChatHistoryReport()
+	local history = ns.chardb and ns.chardb.chatHistory
+	ns.Print(("Chat history: setting %s, %d lines a window, %d hours"):format(
+		tostring(ns.Setting("chatHistory")), HISTORY_LINES, HISTORY_AGE / 3600))
+	local total = 0
+	for index, lines in pairs(history or {}) do
+		local bytes = 0
+		for _, line in ipairs(lines) do
+			bytes = bytes + #line[2] + 60 -- (60: the time, color and the file's table marks)
+		end
+		total = total + bytes
+		local age = lines[1] and (time() - lines[1][1]) / 3600 or 0
+		ns.Print(("  window %d (%s): %d lines, oldest %.1f hours, about %.1f KB"):format(index,
+			tostring(GetChatWindowInfo and GetChatWindowInfo(index) or "?"), #lines, age, bytes / 1024))
+	end
+	ns.Print(("  about %.1f KB in this character's saved file"):format(total / 1024))
+end
