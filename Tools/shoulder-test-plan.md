@@ -12,8 +12,8 @@ The Shoulder Cam stays a held setting, not a camera: it doesn't move the view an
 
 | # | What | Evidence | Fix in |
 | --- | --- | --- | --- |
-| 1 | The warning may come back at every login. The file header says the game keeps the offset over logout, but it isn't in `config-cache.wtf`, and logs showed `0.000000 -> 1.00` at a session's start. | Config file, log | Run 2, Phase 1 |
-| 2 | "It keeps resetting even when off" was never explained. The log only showed it rewriting while on. | Log, 2026-11-04 | Run 2 |
+| 1 | The warning comes at every session, /reload included: the game clears the offset, so we must write it again. | Run 2, Forever | Run 2b, Phase 1 |
+| 2 | "It keeps resetting even when off" wasn't reproduced on Forever in Run 2. Retail, where it was reported, is untested. | Run 2 | `watch` on retail if it comes back |
 | 3 | Turned off in a fight, a protected frame stays moved for good: `PutBack` forgets it even if `Place` refused. | Sim: "Off in a fight" | Not on Forever: Run 1 shows neither frame protected out of a fight. Retail and Classic Era still to check |
 | 4 | Frames follow you ignores model and mount size. The game scales the offset by them, so frames miss on anything but a standard model. | Sim: "Tall model", community reports | Phase 2 |
 | 5 | At normal distance the offset barely shows. If the sum is right, 2 yards at 12 yards away is only 8% of the screen off the middle; a real third would take 4 yards. | Sim page, Try a shot | Phase 3 |
@@ -46,6 +46,7 @@ Everything goes to the saved log under `shoulder:`. A `/reload` saves it.
 | `/cine debug shoulder scan` | Every camera setting and its default, which ones this client lacks, who you are |
 | `/cine debug shoulder frames` | How the cast bar and PRD are anchored, and whether they're protected |
 | `/cine debug shoulder watch` | Toggle, stays on over reloads. Logs every camera setting change and **who made it**, the warning popup, mounts and forms, and values at each login and logout |
+| `/cine debug shoulder quiet` | Toggle, stays on over reloads. Tests keeping the warning away by not letting UIParent hear its event |
 | `/cine debug shoulder sweep offsets` | **Measures.** Says a line in /say, steps the offset 0 to 2, -1, -2, and reads your bubble at each step |
 | `/cine debug shoulder sweep zoom` | The same at 5, 8, 12, 15, 20 and 28 yards. It moves your zoom |
 | `/cine debug shoulder sweep ease` | Logs every 0.05 s through a big step: how fast the game eases |
@@ -99,6 +100,16 @@ Answers: do these settings exist on Forever and Classic Era, are the frames prot
 
 Answers: does the value survive a reload, a relog and a restart, and what writes it while it's off?
 
+### Run 2b: can the warning stay away? (3 minutes)
+
+```
+/cine debug shoulder quiet
+```
+
+Then `/cine debug shoulder watch`, `/cine debug shoulder on`, `/reload`, and check for the warning. Then a full relog. Then turn off `on`, `quiet` and `watch` the same way.
+
+Answers: does stopping the event keep the warning away, is anything broken by it, and does it work on retail?
+
 ### Run 3: the real numbers (10 minutes, outdoors, somewhere quiet)
 
 ```
@@ -128,7 +139,7 @@ Answers: where does it feel wrong, which experimental settings are worth keeping
 | 1 | Forever | 2026-11-06 | Every camera setting and ResetTestCvars are there. Offset 0, Keep Character Centered 1, max zoom factor 1. Cast bar on PRD, PRD on EssentialCooldownViewer, neither protected, so Frames follow you moves nothing. Screen 1835 x 768 |
 | 1 | Retail | | |
 | 1 | Classic Era | | |
-| 2 | | | |
+| 2 | Forever | 2026-11-06 | The game clears the offset to 0 at every /reload, relog and restart; Keep Character Centered stays. So we write it each session and the warning comes each time (you saw it 3 of 3). It shows about a second after the write. Turned off, it restored both settings and nothing else wrote them for the 29 seconds logged. The reported "keeps resetting while off" didn't happen here |
 | 3 | | | |
 | 4 | | | |
 | 5 | | | |

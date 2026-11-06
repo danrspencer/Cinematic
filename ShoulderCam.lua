@@ -4,15 +4,15 @@
 -- left), which it eases over to on its own. The game ignores that while Keep
 -- Character Centered (Accessibility) is on, so that's turned off meanwhile.
 -- It's one of Blizzard's experimental camera settings: writing it brings up
--- their warning. Accept saves nothing; it's the write that brings it up. So
--- while it's on, the settings stay as they are over logout (the game keeps
--- them), and are only written when they differ: Accept once, not each login.
--- (Tested: once accepted, 0 and back again in the same session brings no
--- warning, so pausing below is fine.)
+-- their warning. Accept saves nothing; it's the write that brings it up, once
+-- a session. The game clears the offset at every reload and login, and keeps
+-- Keep Character Centered (tested on Forever, Run 2 of
+-- Tools/shoulder-test-plan.md), so that write and its warning come every
+-- session for now. Once accepted, 0 and back in the same session brings no
+-- warning, so pausing below is fine.
 -- Your own settings (db.shoulderCamYours) come back as it's turned off.
 -- Disable (ResetTestCvars) turns it off here too.
--- (Not ns.ApplyCVarSet: that puts them back on logout and writes them again
--- on login, the warning each time.)
+-- (Not ns.ApplyCVarSet: Keep Character Centered would be put back on logout.)
 --
 -- It's a held setting, not a camera: it doesn't move the view, so it doesn't
 -- claim the camera lock. It goes to 0 (paused) while mounted

@@ -12,6 +12,9 @@
 --   It says a line (the game puts your chat bubble right over you), then steps
 --   the offset or the zoom and reads the bubble. A bubble doesn't last: when
 --   it's gone the sweep waits, and "sweep next" says another line and goes on.
+-- quiet: (again to stop; stays on over a reload) stops the game's UIParent
+--   hearing the event that brings up the experimental warning, to see if that
+--   keeps it away. Off by default, for testing only so far.
 -- try pitch|head|enemy|interact|off: one of the game's other experimental
 --   camera settings on (again: off), for a look. "try off" puts all back.
 local _, ns = ...
@@ -125,7 +128,7 @@ local watcher = CreateFrame("Frame")
 watcher:Hide()
 local hooked, popupUp
 local function Caller()
-	local stack = debugstack and debugstack(3, 2, 0) or ""
+	local stack = debugstack and debugstack(4, 2, 0) or ""
 	return (stack:gsub("\n.*", ""):gsub("^.-AddOns[/\\]", ""):sub(1, 90))
 end
 local function Hook()
@@ -189,11 +192,20 @@ local function SetWatch(on)
 		watcher:Hide()
 	end
 end
+-- quiet: whether the warning stays away with the game not told to show it.
+local WARNING_EVENT = "EXPERIMENTAL_CVAR_CONFIRMATION_NEEDED"
+local function SetQuiet(on)
+	local was = UIParent:IsEventRegistered(WARNING_EVENT)
+	local ok, err = pcall(on and UIParent.UnregisterEvent or UIParent.RegisterEvent, UIParent, WARNING_EVENT)
+	Log(("quiet %s: UIParent was listening %s, now %s%s"):format(on and "on" or "off", Text(was),
+		Text(UIParent:IsEventRegistered(WARNING_EVENT)), ok and "" or (", error " .. Text(err))))
+end
 local boot = CreateFrame("Frame")
 boot:RegisterEvent("ADDON_LOADED")
 boot:SetScript("OnEvent", function(self)
 	if ns.db then
 		self:UnregisterAllEvents()
+		if ns.db.shoulderTestQuiet then SetQuiet(true) end
 		if ns.db.shoulderTestWatch then
 			SetWatch(true)
 			Values("addon loaded")
@@ -426,6 +438,10 @@ function ns.ShoulderTest(arg)
 		SetWatch(ns.db.shoulderTestWatch and true or false)
 		if watcher.on then Values("watch on") end
 		ns.Print(("shoulder watch %s (stays over a reload; /reload saves the log)"):format(watcher.on and "on" or "off"))
+	elseif what == "quiet" then
+		ns.db.shoulderTestQuiet = not ns.db.shoulderTestQuiet or nil
+		SetQuiet(ns.db.shoulderTestQuiet and true or false)
+		ns.Print(("shoulder quiet %s (stays over a reload)"):format(ns.db.shoulderTestQuiet and "on" or "off"))
 	elseif what == "sweep" then Sweep(rest)
 	elseif what == "try" then Try(rest)
 	elseif what == "on" then Set("shoulderCam", true)
@@ -434,7 +450,7 @@ function ns.ShoulderTest(arg)
 	elseif what == "offset" and tonumber(rest) then Set("shoulderCamOffset", tonumber(rest))
 	elseif what == "strength" and tonumber(rest) then Set("shoulderCamFramesStrength", tonumber(rest) / 100)
 	else
-		ns.Print("shoulder: scan, frames, watch, sweep offsets|zoom|ease|next|stop, try pitch|head|enemy|interact|off, " ..
+		ns.Print("shoulder: scan, frames, watch, quiet, sweep offsets|zoom|ease|next|stop, try pitch|head|enemy|interact|off, " ..
 			"on, off, left, right, offset <yards>, strength <percent>")
 	end
 end

@@ -937,6 +937,18 @@ local function FramePlate(frame, state, portrait, on, over, shape)
 	if state.bridge then DressBridge(state.bridge, true) end
 end
 
+-- What a style theme draws in place of a frame's art: the plate, its connector and
+-- shadow, and the portrait's ring (Frames.lua holds them hidden with the art).
+function ns.UnitThemeArt(frame)
+	local state, list = shapes[frame], {}
+	if state then
+		for _, key in ipairs({ "plate", "bridge", "shadow", "holder" }) do
+			if state[key] then list[#list + 1] = state[key] end
+		end
+	end
+	return list
+end
+
 -- What a game region was before any of ours moved it, kept from the first touch.
 -- Every look that moves it goes back to these, not to what it found: so it doesn't
 -- matter which theme follows which, or what the last one left behind.
@@ -963,15 +975,24 @@ local function FirstFont(region)
 	local font = firstFonts[region]
 	return font[1], font[2], font[3]
 end
--- A bar's numbers back on it. Retail's hold secret text, so what's read of their place
--- can't be trusted, and put back as read they vanished: their usual spots, as the game has them.
+-- A bar's numbers back on it. Retail's on a unit in view hold secret text, so what's read of
+-- their place can't be trusted, and put back as read they vanished: those go to their usual
+-- spots. The ones that read clean (Pet, Focus: each has its own offsets) go back as read.
+local function ReadsClean(spots)
+	for _, spot in ipairs(spots) do
+		for i = 1, 5 do
+			if not Readable(spot[i]) then return false end
+		end
+	end
+	return #spots > 0
+end
 local GAME_NUMBERS = { LeftText = { "LEFT", 2 }, RightText = { "RIGHT", -2 }, TextString = { "CENTER", 0 } }
 local PutBack
 local function PutBackNumber(bar, key)
 	local text = bar[key]
 	if not text then return end
 	local spots = firstSpots[text]
-	if not ns.isRetail and spots and #spots > 0 then return PutBack(text, spots) end
+	if spots and (not ns.isRetail and #spots > 0 or ReadsClean(spots)) then return PutBack(text, spots) end
 	local spot = GAME_NUMBERS[key]
 	text:ClearAllPoints()
 	text:SetPoint(spot[1], bar, spot[1], spot[2], 0)

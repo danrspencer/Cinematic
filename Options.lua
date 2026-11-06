@@ -923,6 +923,18 @@ local SCROLLBAR_WIDTH = 26
 -- Lists whose defaults are in code and that are nil until changed (emptied,
 -- they'd be an empty list rather than the defaults).
 local RESET_TO_NIL = { hoverGroups = true }
+
+-- The unit frames' parts and their names, in the order the pages list them.
+function ns.UnitPartLabels()
+	return {
+		{ "Portrait", L["Portrait"] }, { "Name", L["Name"] }, { "NameBack", L["Name background"] },
+		{ "Level", L["Level"] }, { "LevelBack", L["Level background"] },
+		{ "Health", L["Health bar"] }, { "Power", L["Power bar"] }, { "Numbers", L["Bar numbers"] },
+		{ "Art", L["Frame art"] },
+		{ "PvP", L["PvP icon"] }, { "Icons", L["Icons"] }, { "Auras", L["Auras"] },
+		{ "CombatText", L["Hit text"] }, { "Threat", L["Threat"] }, { "CastBar", L["Cast bar"] },
+	}
+end
 -- Lists holding what you made beside settings: a page's Reset leaves those
 -- entries as they are, as Reset Settings does (Profiles.lua's
 -- RESET_PROFILE_KEEPS). [key] = fn(entry): true for one of yours.
@@ -6738,14 +6750,7 @@ local function CreatePortraitsPanel()
 			"every part showing as the game has it."], subtitle, function() ns.ApplyUnitFrameParts() end)
 
 		local LABEL_WIDTH, ROW_HEIGHT = 150, 24
-		local PARTS = {
-			{ "Portrait", L["Portrait"] }, { "Name", L["Name"] }, { "NameBack", L["Name background"] },
-			{ "Level", L["Level"] }, { "LevelBack", L["Level background"] },
-			{ "Health", L["Health bar"] }, { "Power", L["Power bar"] }, { "Numbers", L["Bar numbers"] },
-			{ "Art", L["Frame art"] },
-			{ "PvP", L["PvP icon"] }, { "Icons", L["Icons"] }, { "Auras", L["Auras"] },
-			{ "CombatText", L["Hit text"] }, { "Threat", L["Threat"] }, { "CastBar", L["Cast bar"] },
-		}
+		local PARTS = ns.UnitPartLabels()
 		-- Each section: its title, its frame (unit: the settings' unitPart<unit><part>),
 		-- the frame's parts and its "Same as target" setting.
 		local SECTIONS = {
@@ -14977,6 +14982,45 @@ local function CreateMouseoverPanel()
 		return names
 	end
 
+	-- The unit frames' rows: each one's section (as the Unit Frames page's) and parts.
+	local UNIT_ROWS = {
+		player = { "Player", ns.UNIT_PARTS_PLAYER }, petframe = { "Pet", ns.UNIT_PARTS_PET },
+		target = { "Target", ns.UNIT_PARTS_TARGET }, tot = { "ToT", ns.UNIT_PARTS_TOT },
+		focus = { "Focus", ns.UNIT_PARTS_TARGET },
+	}
+	-- The parts a row's frame has here, or nil for a frame that hasn't any.
+	local function RowParts(key)
+		local info = UNIT_ROWS[key]
+		if not (info and MenuUtil and ns.HasUnitFrameParts and ns.HasUnitFrameParts()) then return nil end
+		local list = {}
+		for _, part in ipairs(ns.UnitPartLabels()) do
+			local only = ns.UNIT_PART_ONLY[part[1]]
+			if info[2][part[1]] ~= nil and (not only or only[info[1]] == true) then
+				list[#list + 1] = part
+			end
+		end
+		return list
+	end
+	local function PartOff(index, key, part)
+		local group = Groups()[index]
+		local off = group and group.parts and group.parts[key]
+		return off and off[part] or false
+	end
+	-- (Only what's unticked is kept: none, and the group has every part, as
+	-- groups made before there were parts have.)
+	local function SetRowOff(index, key, off)
+		local group = Writable()[index]
+		local parts = group.parts or {}
+		parts[key] = off and next(off) and off or nil
+		group.parts = next(parts) and parts or nil
+	end
+	local function TogglePart(index, key, part)
+		local group = Writable()[index]
+		local off = group.parts and group.parts[key] or {}
+		off[part] = not off[part] or nil
+		SetRowOff(index, key, off)
+	end
+
 	local triggers = {}
 	for _, trigger in ipairs(ns.HOVER_TRIGGERS) do
 		if not trigger.gamepad or (C_GamePad and not ns.isRetail) then
@@ -15256,6 +15300,40 @@ local function CreateMouseoverPanel()
 		return frame
 	end
 
+	-- In a unit frame's row, for its label: its name and how many parts come up
+	-- with the group, a click ticking them. (index, key, label: the row it's on now.)
+	local function PartsMenu()
+		local _, menu = ns.MenuDropdown(content)
+		menu:SetSize(250, 22)
+		menu.searchSkip = true -- (it shows the current ticks, not a label)
+		menu:SetupMenu(function(_, root)
+			root:CreateButton(L["All parts"], function()
+				SetRowOff(menu.index, menu.key, nil)
+				return MenuResponse and MenuResponse.Refresh
+			end)
+			if root.CreateDivider then root:CreateDivider() end
+			for _, part in ipairs(RowParts(menu.key) or {}) do
+				root:CreateCheckbox(part[2], function() return not PartOff(menu.index, menu.key, part[1]) end, function()
+					TogglePart(menu.index, menu.key, part[1])
+					return MenuResponse and MenuResponse.Refresh
+				end)
+			end
+		end)
+		if menu.SetSelectionText then
+			menu:SetSelectionText(function()
+				local parts, ticked = RowParts(menu.key) or {}, 0
+				for _, part in ipairs(parts) do
+					if not PartOff(menu.index, menu.key, part[1]) then ticked = ticked + 1 end
+				end
+				if ticked == #parts then return L["%s (all parts)"]:format(menu.label) end
+				return L["%s (%d of %d parts)"]:format(menu.label, ticked, #parts)
+			end)
+		end
+		Tooltip(menu, L["Which parts of this frame come up with this group. An unticked part stays hidden while " ..
+			"this group is what's bringing the frame up. Up for anything else, like a fight, it shows as usual."])
+		return menu
+	end
+
 	-- A type-to-search box adding to group number index: frames, or with
 	-- events set, the events that bring the group up.
 	local function AddBox(kind, hint, index, events)
@@ -15490,7 +15568,21 @@ local function CreateMouseoverPanel()
 						listed = listed + 1
 						local row = Take("member", MemberRow)
 						At(row, LEFT + 4)
-						row.text:SetText(item and item.label or key:gsub("^extra:", ""))
+						local label = item and item.label or key:gsub("^extra:", "")
+						row.text:SetText(label)
+						row.also:ClearAllPoints()
+						row.also:SetPoint("LEFT", row.text, "RIGHT", 10, 0)
+						-- (A unit frame's label is its menu of parts.)
+						if RowParts(key) then
+							local menu = Take("partsMenu", PartsMenu)
+							menu.index, menu.key, menu.label = index, key, label
+							At(menu, LEFT + 30, 1)
+							menu:GenerateMenu()
+							row.text:SetText("")
+							row.also:ClearAllPoints()
+							row.also:SetPoint("LEFT", menu, "RIGHT", 10, 0)
+							y = y + 8 -- (a menu fills its row: a gap, or they touch)
+						end
 						local others = GroupsWith(key, index)
 						row.also:SetText(#others > 0 and L["also in %s"]:format(table.concat(others, ", "))
 							or (item and item.tag) or (item and "" or L["custom"]))
@@ -15499,6 +15591,7 @@ local function CreateMouseoverPanel()
 							for i, member in ipairs(members) do
 								if member == key then table.remove(members, i) break end
 							end
+							SetRowOff(index, key, nil)
 							Layout()
 						end)
 						y = y + ROW

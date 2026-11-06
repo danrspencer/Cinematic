@@ -2316,8 +2316,15 @@ function ns.CopyHoverGroups()
 		local members, triggers = {}, {}
 		for i, key in ipairs(group.members or {}) do members[i] = key end
 		for key, on in pairs(group.triggers or {}) do triggers[key] = on end
+		-- (Its frames' unticked parts, row key -> { part = true }: none, every part.)
+		local parts
+		for key, off in pairs(group.parts or {}) do
+			parts = parts or {}
+			parts[key] = {}
+			for part in pairs(off) do parts[key][part] = true end
+		end
 		local preset = ns.HoverGroupPreset(group)
-		copy[#copy + 1] = { name = group.name, members = members, triggers = triggers, when = group.when,
+		copy[#copy + 1] = { name = group.name, members = members, triggers = triggers, parts = parts, when = group.when,
 			off = group.off, preset = preset and preset.preset or nil, icon = group.icon,
 			-- (A default group's own reach isn't copied: it follows the default.)
 			reach = not (preset and group.reach == preset.reach) and group.reach or nil }
@@ -2550,7 +2557,7 @@ function ns.IsCineModeShowOn(key) return IsListOn("cineModeShow", key, NO_DEFAUL
 local tickTables = {
 	hovered = {}, triggered = {}, pinged = {}, mouseRows = {}, mouseGroups = {}, events = {},
 	combatShown = {}, placeLists = {}, auraOnly = {}, cooldownBarUp = {},
-	partsHovered = {}, partsHeldUntil = {}, deathKept = {},
+	partsHovered = {}, partsHeldUntil = {}, deathKept = {}, groupsUp = {},
 	-- ("extra:<name>", an added frame's row key, made once for each name.)
 	extraKey = setmetatable({}, { __index = function(keys, name)
 		local key = "extra:" .. name
@@ -9084,6 +9091,9 @@ function ns.UpdateFrames(cinematic, elapsed)
 	-- that's left out now. A group turned off (group.off) is always left out.)
 	local offWhen = fighting and "calm" or "combat"
 	local hovered, triggered, pinged = wipe(tickTables.hovered), wipe(tickTables.triggered), wipe(tickTables.pinged)
+	-- (The groups up this tick, for the mouse or an event: which parts of a unit
+	-- frame they bring, ns.SetUnitPartsOff.)
+	wipe(tickTables.groupsUp)
 	-- Each row's hover reach around its action bar buttons: the widest of
 	-- the groups it's in that work now (ns.IsEntryHovered reads it).
 	local reach = wipe(ns.hoverReach)
@@ -9157,31 +9167,11 @@ function ns.UpdateFrames(cinematic, elapsed)
 			end
 		end
 		for _, group in ipairs(mouseGroups) do
+			tickTables.groupsUp[group] = true
 			for _, member in ipairs(group.members) do
 				hovered[member] = true
 			end
 		end
-	end
-	-- Mouseover wins over the Unit Frames page: a unit frame up for the mouse
-	-- (or with its Mouseover groups) fades in the parts that page hides. Out
-	-- of CineMode, the frame under the mouse, held as long (the fade out counted).
-	if ns.SetUnitPartsHovered then
-		local partsHovered, partsHeldUntil = wipe(tickTables.partsHovered), tickTables.partsHeldUntil
-		for _, entry in ipairs(ns.db.mouseover and ns.managed or NO_DEFAULTS) do
-			local name = entry.name
-			if name and ns.UNIT_PART_FRAME_NAMES[name] then
-				if cinematic then
-					entry.row = entry.row or ns.HoverRowFor(entry)
-					partsHovered[name] = hovered[ownPartyRows and entry.rspGroup or entry.row]
-				else
-					if ns.IsEntryHovered(entry) then
-						partsHeldUntil[name] = now + math.max(0, ns.HoldTime("mouseoverHold") - ns.FadeOutTime())
-					end
-					partsHovered[name] = (partsHeldUntil[name] or 0) > now
-				end
-			end
-		end
-		ns.SetUnitPartsHovered(partsHovered, elapsed)
 	end
 	local events = tickTables.events
 	events.chat, events.whisper, events.typing = dockPeek, whisperUnread, typingWindows
@@ -9246,11 +9236,36 @@ function ns.UpdateFrames(cinematic, elapsed)
 						if not triggered[member] then auraOnly[member] = key == "aura" or nil end
 						if key ~= "aura" then auraOnly[member] = nil end
 						triggered[member] = true
+						tickTables.groupsUp[group] = true
 						if key == "ping" then pinged[member] = true end
 					end
 				end
 			end
 		end
+	end
+	-- Mouseover wins over the Unit Frames page: a unit frame up for the mouse
+	-- (or with its Mouseover groups) fades in the parts that page hides. Out
+	-- of CineMode, the frame under the mouse, held as long (the fade out counted).
+	-- (All but the parts unticked in its groups. After the events: they're
+	-- groups up too. Out of CineMode no group's up: any group it's in counts.)
+	if ns.SetUnitPartsHovered then
+		ns.SetUnitPartsOff(hoverGroups, cinematic and tickTables.groupsUp or nil, offWhen)
+		local partsHovered, partsHeldUntil = wipe(tickTables.partsHovered), tickTables.partsHeldUntil
+		for _, entry in ipairs(ns.db.mouseover and ns.managed or NO_DEFAULTS) do
+			local name = entry.name
+			if name and ns.UNIT_PART_FRAME_NAMES[name] then
+				if cinematic then
+					entry.row = entry.row or ns.HoverRowFor(entry)
+					partsHovered[name] = hovered[ownPartyRows and entry.rspGroup or entry.row]
+				else
+					if ns.IsEntryHovered(entry) then
+						partsHeldUntil[name] = now + math.max(0, ns.HoldTime("mouseoverHold") - ns.FadeOutTime())
+					end
+					partsHovered[name] = (partsHeldUntil[name] or 0) > now
+				end
+			end
+		end
+		ns.SetUnitPartsHovered(partsHovered, elapsed)
 	end
 
 	-- Dead, with the death camera watching: everything goes, quickly, whatever
@@ -9400,6 +9415,14 @@ function ns.UpdateFrames(cinematic, elapsed)
 			target = 0
 		elseif ns.previewRows and not immersive then
 			target = ns.previewRows[row] and 1 or 0
+		end
+		-- A unit frame up only for a group: the parts unticked there stay hidden
+		-- (and while it fades out, or they'd show for the fade). Up for anything
+		-- else, a fight or a target, they're as they'd be.
+		if ns.HoldUnitParts and ns.UNIT_PART_FRAME_NAMES[entry.name] then
+			ns.HoldUnitParts(entry.name, cinematic and target > 0 and (hovered[row] or triggered[row])
+				and not fightingShown and not (petUnhappyUp and entry.name == "PetFrame")
+				and not (deathFade and deathKept[row]) and not ns.previewRows, target == 0 and entry.alpha > 0)
 		end
 		-- (Inspect, Why.lua: what decided it, for the frame being looked at.)
 		if ns.whyLook and ns.whyLook[entry] then
@@ -10553,7 +10576,7 @@ do
 	local function KeepHidden(region)
 		if hidden[region] and not setting then
 			setting = true
-			region:SetAlpha(hidden[region] * math.max(FRAMES.show[FRAMES.owner[region]] or 0, FRAMES.fade[region] or 0))
+			region:SetAlpha(hidden[region] * math.max(FRAMES.Reveal(region), FRAMES.fade[region] or 0))
 			setting = false
 		end
 	end
@@ -10666,6 +10689,118 @@ do
 	for _, entry in ipairs(FRAMES) do
 		ns.UNIT_PART_FRAME_NAMES[entry[1]] = true
 	end
+	-- The parts a Hover group leaves out of a frame (group.parts, by its row
+	-- there: the focus's target of target has none of its own and goes with
+	-- the target's). off[frame name]: the parts no group up has ticked, a table
+	-- swapped for a new one as they change, nil for none. held[frame name]: the
+	-- ones kept hidden right now. partOf[region]: the parts it's in.
+	FRAMES.rows = { PlayerFrame = "player", PetFrame = "petframe", TargetFrame = "target", TargetFrameToT = "tot",
+		FocusFrame = "focus", FocusFrameToT = "target" }
+	FRAMES.off, FRAMES.held, FRAMES.themeHeld, FRAMES.partOf, FRAMES.scratch = {}, {}, {}, {}, {}
+	-- How far the mouse has a hidden region up: none if its groups leave it out.
+	function FRAMES.Reveal(region)
+		local name = FRAMES.owner[region]
+		local off = FRAMES.off[name] or FRAMES.held[name]
+		if off then
+			for part in pairs(FRAMES.partOf[region] or NO_DEFAULTS) do
+				if off[part] then return 0 end
+			end
+		end
+		return FRAMES.show[name] or 0
+	end
+	-- What one group says of a row: its unticked parts, false for every part
+	-- ticked, nil when the row isn't in it.
+	function FRAMES.GroupOff(group, row)
+		for _, member in ipairs(group.members or NO_DEFAULTS) do
+			if member == row then
+				local off = group.parts and group.parts[row]
+				return off and next(off) and off or false
+			end
+		end
+	end
+	-- A part stays out only if every group up leaves it out: gathered in scratch.
+	-- Returns whether any group up has the row, and whether scratch is the answer.
+	function FRAMES.OffFor(row, groups, up, offWhen)
+		local scratch, found, some = wipe(FRAMES.scratch), false, true
+		for _, group in ipairs(groups) do
+			local counts
+			if up then counts = up[group] else counts = not group.off and group.when ~= offWhen end
+			local off
+			if counts then off = FRAMES.GroupOff(group, row) end
+			if off == false then
+				found, some = true, false
+			elseif off and not found then
+				found = true
+				for part in pairs(off) do scratch[part] = true end
+			elseif off then
+				for part in pairs(scratch) do
+					if not off[part] then scratch[part] = nil end
+				end
+			end
+		end
+		return found, some and next(scratch) ~= nil
+	end
+	-- (groups: all of them; up: those up now, nil to count every one that's on.
+	-- With no group up, what's off stands until the mouse's fade is done, or a
+	-- part left out would show as the frame's other parts fade away.)
+	function ns.SetUnitPartsOff(groups, up, offWhen)
+		local used = false
+		for _, group in ipairs(groups) do
+			if group.parts and next(group.parts) then used = true break end
+		end
+		if not used and not next(FRAMES.off) then return end
+		local changed = false
+		for name, row in pairs(FRAMES.rows) do
+			local was = FRAMES.off[name]
+			local found, some = FRAMES.OffFor(row, used and groups or NO_DEFAULTS, up, offWhen)
+			if found or (FRAMES.show[name] or 0) <= 0 then
+				local same = (was ~= nil) == some
+				for part in pairs(some and was and FRAMES.scratch or NO_DEFAULTS) do
+					same = same and was[part] == true
+				end
+				for part in pairs(some and was or NO_DEFAULTS) do
+					same = same and FRAMES.scratch[part] == true
+				end
+				if not same then
+					local off = nil
+					if some then
+						off = {}
+						for part in pairs(FRAMES.scratch) do off[part] = true end
+					end
+					FRAMES.off[name] = off
+					changed = true
+				end
+			end
+		end
+		if changed then
+			for region in pairs(hidden) do
+				KeepHidden(region)
+			end
+		end
+	end
+	-- (up: the frame's up for a group alone; fading: fading out, held as it was.)
+	function ns.HoldUnitParts(name, up, fading)
+		local was = FRAMES.held[name]
+		local held = up and FRAMES.off[name] or (not up and fading and was) or nil
+		if held ~= was then
+			FRAMES.held[name] = held
+			ns.ApplyUnitFrameParts()
+		end
+	end
+	-- A region of a frame's part: gathered in want, and known to be that part's.
+	-- (keep: held by a group. At once, not at a rule's fade, or it'd show as the
+	-- frame comes up.)
+	function FRAMES.Claim(region, name, part, hide, keep, ruled)
+		FRAMES.want[region] = FRAMES.want[region] or hide or keep
+		FRAMES.owner[region] = FRAMES.owner[region] or name
+		FRAMES.ruled[region] = FRAMES.ruled[region] or (ruled and not keep)
+		local parts = FRAMES.partOf[region]
+		if not parts then
+			parts = {}
+			FRAMES.partOf[region] = parts
+		end
+		parts[part] = true
+	end
 	function ns.SetUnitPartsHovered(names, elapsed)
 		local changed = false
 		for name in pairs(ns.UNIT_PART_FRAME_NAMES) do
@@ -10694,28 +10829,35 @@ do
 		for _, entry in ipairs(FRAMES) do
 			local frame = _G[entry[1]]
 			if frame then
+				local held = FRAMES.held[entry[1]]
 				for _, part in ipairs(ns.UNIT_PARTS) do
 					local key = FRAMES.Key(entry, part)
 					-- (The Style hub's Overrides tab over the row, page switch or not.)
 					local over = ns.StyleOverride(key)
 					local hide = over == "hide" or not over and ns.db.handleUnitFrames ~= false and FRAMES.Hidden(key)
 					local ruled = key and not over and ns.RuleTest(key) ~= nil
+					local keep = not over and held and held[part] or false
 					local paths = entry[2][part]
 					if type(paths) == "function" then
 						for _, region in ipairs(paths(frame)) do
-							want[region] = want[region] or hide
-							FRAMES.owner[region] = FRAMES.owner[region] or entry[1]
-							FRAMES.ruled[region] = FRAMES.ruled[region] or ruled
+							FRAMES.Claim(region, entry[1], part, hide, keep, ruled)
 						end
 					else
 						for _, path in ipairs(paths or NO_DEFAULTS) do
 							local region = Field(frame, path)
 							if region then
-								want[region] = want[region] or hide
-								FRAMES.owner[region] = FRAMES.owner[region] or entry[1]
-								FRAMES.ruled[region] = FRAMES.ruled[region] or ruled
+								FRAMES.Claim(region, entry[1], part, hide, keep, ruled)
 							end
 						end
+					end
+				end
+				-- (A style theme's ring and plate stand in for the frame art: held
+				-- with it. Asked only while that's so, and once more to let go.)
+				local keepArt = ns.UnitThemeArt and held and held.Art or false
+				if keepArt or FRAMES.themeHeld[entry[1]] then
+					FRAMES.themeHeld[entry[1]] = keepArt or nil
+					for _, region in ipairs(ns.UnitThemeArt(frame)) do
+						FRAMES.Claim(region, entry[1], "Art", false, keepArt, false)
 					end
 				end
 			end
