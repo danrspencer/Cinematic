@@ -2672,6 +2672,9 @@ function ns.UpdatePlateParts(active, elapsed)
 	local changed = false
 	for _, part in ipairs(ns.PLATE_PARTS) do
 		local target = (not active or ns.PlateRowWanted("Part" .. part)) and 1 or 0
+		-- (The Style hub's Overrides tab over the row, in CineMode or out of it.)
+		local over = ns.StyleOverride("platePart" .. part)
+		if over then target = over == "show" and 1 or 0 end
 		local level = levels[part]
 		if level == nil then
 			levels[part] = target -- logging in: no fade

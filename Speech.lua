@@ -150,6 +150,7 @@ local function SetLook(line, words)
 	local own = ns.BubbleBackColor and ns.BubbleBackColor(look)
 	if boxed and own and not line.skin and ns.MakeBubbleSkin then
 		line.skin = ns.MakeBubbleSkin(line.frame)
+		line.skin.gameTail = true
 		line.skin:SetFrameLevel(line.frame:GetFrameLevel() + 1)
 	end
 	if boxed and not own and not line.bubble then

@@ -123,6 +123,7 @@ local function PrintDebugHelp()
 	print("  /cine debug spec - every way this client might tell your spec, and what each says")
 	print("  /cine debug textures - a strip of every bar texture the Style pages offer, to see which this client has")
 	print("  /cine debug fonts - every font other addons share, and which are left out (no small letters)")
+	print("  /cine debug bubbleshot | off - a real chat bubble in each style theme: run it four times, outdoors, it says a line each go")
 	print("  /cine debug themeshots [theme] | off - screenshots of every style theme's frames; your settings come back after")
 	print("  /cine debug cardchat - plays a zone card and prints how it's kept clear of the chat windows")
 	print("  /cine debug platetextures - the textures your target's nameplate is drawn with (for the game's plate Styles)")
@@ -624,6 +625,8 @@ local function HandleSlash(msg)
 		if seconds then ns.CursorHideRecord(seconds) else ns.CursorHideDebug() end
 	elseif cmd == "debug" and arg == "vitalspage" then
 		if ns.VitalsPageDepth then ns.VitalsPageDepth() else ns.Print("Open the Vitals Style page first.") end
+	elseif cmd == "debug" and (arg == "bubbleshot" or arg:match("^bubbleshot ")) then
+		ns.BubbleShots(arg:match("^bubbleshot%s*(.-)$"))
 	elseif cmd == "debug" and (arg == "themeshots" or arg:match("^themeshots ")) then
 		ns.ThemeShots(arg:match("^themeshots%s*(.-)$"))
 	elseif cmd == "debug" and arg == "cardchat" then

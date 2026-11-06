@@ -1033,10 +1033,32 @@ function ns.GridRow(kit, parent, labelWidth, layout, spec)
 			if full then Live() else live:Hide() end
 		end
 	end
-	function row:Refresh() Paint() end
+	-- (spec.override: words for a row something else decides, the Style hub's
+	-- Overrides tab: they stand in for its ticks, a click away from the tab.)
+	local note
+	local function PaintRow()
+		Paint()
+		local text = spec.override and spec.override()
+		if not (text or note) then return end
+		if not note then
+			note = CreateFrame("Button", nil, row)
+			note:SetPoint("TOPLEFT")
+			note:SetPoint("BOTTOMRIGHT")
+			note.label = note:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+			note.label:SetPoint("LEFT", 6, 0)
+			note:SetScript("OnClick", function() ns.OpenOptions("Style Overrides") end)
+			Tooltip(note, L["Set on the Style hub's Overrides tab. Click to open it."])
+		end
+		for _, child in ipairs({ row:GetChildren() }) do
+			if child ~= note then child:SetShown(not text) end
+		end
+		note:SetShown(text and true or false)
+		note.label:SetText(text or "")
+	end
+	function row:Refresh() PaintRow() end
 	function row:SetEnabled(enabled)
 		self.enabled = enabled and true or false
-		Paint()
+		PaintRow()
 	end
 	kit.controls[#kit.controls + 1] = row
 	return row

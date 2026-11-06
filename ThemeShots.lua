@@ -158,6 +158,36 @@ local function Finish(text)
 	ns.Print(text)
 end
 
+-- Words that don't fit, by the game's own measure (only it has the real fonts):
+-- cut off with dots, or wider than their button. Logged for each theme, as text
+-- that fits in one font can run over in another.
+local function CutWords(frame, found, depth)
+	if depth > 24 or not ns.Flag(frame:IsVisible()) then return end
+	for _, region in ipairs({ frame:GetRegions() }) do
+		if region.IsTruncated and ns.Flag(region:IsVisible()) then
+			local words = region:GetText()
+			local over = frame.GetObjectType and frame:GetObjectType() == "Button"
+				and region:GetStringWidth() > frame:GetWidth() + 1
+			if type(words) == "string" and words ~= "" and (over or ns.Flag(region:IsTruncated())) then
+				found[words:sub(1, 40)] = true
+			end
+		end
+	end
+	for _, child in ipairs({ frame:GetChildren() }) do CutWords(child, found, depth + 1) end
+end
+
+local function LogCutWords(theme, scene)
+	local found = {}
+	for _, frame in ipairs({ screen or false, _G.SettingsPanel or false }) do
+		if frame then pcall(CutWords, frame, found, 0) end
+	end
+	local list = {}
+	for words in pairs(found) do list[#list + 1] = words end
+	table.sort(list)
+	ns.Log("style", ("textfit %s, %s: %d cut%s%s"):format(theme.key, scene, #list, #list > 0 and ": " or "",
+		table.concat(list, " | ")))
+end
+
 local function Steps(themes)
 	local steps = {}
 	for _, theme in ipairs(themes) do
@@ -203,6 +233,7 @@ local function Play(steps, index, token)
 			if ns.CardTest then pcall(ns.CardTest, "zone") end
 			if ns.TestDamageVision then pcall(ns.TestDamageVision, true) end
 			if ns.ReportPlateHealthStyle then pcall(ns.ReportPlateHealthStyle, true) end
+			if ns.ButtonLayers then ns.Log("style", "bar 1 " .. step.theme.key .. ": " .. ns.ButtonLayers()) end
 		end
 	end)
 	if not ok then
@@ -211,8 +242,75 @@ local function Play(steps, index, token)
 	end
 	C_Timer.After(SETTLE, function()
 		if run ~= token then return end
+		LogCutWords(step.theme, step.scene)
 		Screenshot()
 		C_Timer.After(AFTER, function() Play(steps, index + 1, token) end)
+	end)
+end
+
+-- /cine debug bubbleshot | off: a real chat bubble in each theme. Outdoors the game
+-- only lets /say through on a key press (tested: from a timer it's blocked), so
+-- each use of the command says one line, and that one bubble is shot in the next
+-- few themes while it's up. Four goes for twelve themes; off, or the last go, puts
+-- your settings back.
+local BUBBLE_THEMES, BUBBLE_FIRST, BUBBLE_GAP, BUBBLE_SETTLE = 3, 0.5, 1.4, 0.8
+local bubbleRun
+function ns.BubbleShots(text)
+	text = (text or ""):match("^%s*(.-)%s*$"):lower()
+	if text == "off" then
+		if bubbleRun then
+			bubbleRun = nil
+			Finish("bubbleshot: stopped. Your settings are back.")
+		else
+			ns.Print("bubbleshot: not running.")
+		end
+		return
+	end
+	if run then
+		ns.Print("bubbleshot: themeshots is running.")
+		return
+	end
+	if bubbleRun and bubbleRun.busy then
+		ns.Print("bubbleshot: still on this go.")
+		return
+	end
+	if InCombatLockdown() then
+		ns.Print("bubbleshot: not in a fight.")
+		return
+	end
+	if not bubbleRun then
+		local db = ns.GetDB()
+		db.themeShotsKept = ns.StyleSnapshot()
+		Strip()
+		bubbleRun = { list = ns.StyleThemeList(), next = 1 }
+	end
+	local go = bubbleRun
+	local first = go.next
+	local last = math.min(first + BUBBLE_THEMES - 1, #go.list)
+	go.next, go.busy = last + 1, true
+	_G.SendChatMessage("Trying this chat bubble in a few different looks to see how each of them turns out.", "SAY")
+	for i = first, last do
+		local theme, wait = go.list[i], BUBBLE_FIRST + (i - first) * BUBBLE_GAP
+		C_Timer.After(wait, function()
+			if bubbleRun ~= go then return end
+			ns.ApplyStyleTheme(theme.key, true)
+			Label(theme, "chat bubble", i, #go.list)
+			ns.Log("style", theme.key .. " " .. ns.UnitStyleState())
+			ns.Log("style", theme.key .. " " .. ns.ActionBarState())
+		end)
+		C_Timer.After(wait + BUBBLE_SETTLE, function()
+			if bubbleRun == go then Screenshot() end
+		end)
+	end
+	C_Timer.After(BUBBLE_FIRST + (last - first) * BUBBLE_GAP + BUBBLE_SETTLE + 0.6, function()
+		if bubbleRun ~= go then return end
+		go.busy = nil
+		if last >= #go.list then
+			bubbleRun = nil
+			Finish("bubbleshot: done, in the Screenshots folder. Your settings are back.")
+		else
+			ns.Print(("bubbleshot: %d of %d themes done. Run it again."):format(last, #go.list))
+		end
 	end)
 end
 

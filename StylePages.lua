@@ -737,6 +737,7 @@ local TEXTURES = {
 	{ "lunar", "Lunar", OURS .. "Lunar" },
 	{ "rime", "Rime", OURS .. "Rime" },
 	{ "reel", "Reel", OURS .. "Reel" },
+	{ "tile", "Tile", OURS .. "Tile" }, -- (smooth, for tall bars: the themes' raid frames)
 }
 
 -- Whether this client has a texture (an atlas: the game says; a file: assumed).

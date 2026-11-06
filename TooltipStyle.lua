@@ -107,6 +107,7 @@ local function MakeSkin(parent, inside)
 end
 
 -- color: the unit's or item's (r, g, b), for In its color.
+local SHAPE_OUT, BAR_GAP, SHAPE_BAR_INSET = 5, 3, 10
 local function DressSkin(skin, look, r, g, b)
 	local alpha = tonumber(look.tooltipAlpha) or 1
 	local br, bg, bb = BackColor(look)
@@ -119,8 +120,14 @@ local function DressSkin(skin, look, r, g, b)
 	local kind, size, er, eg, eb = ns.StyleBorder(look, "tooltipEdge")
 	if kind == "colored" then er, eg, eb = r or 0.6, g or 0.6, b or 0.6 end
 	local lined = kind == "line" or kind == "colored"
-	skin.border:SetShown(lined)
-	if lined then ns.DressStyleEdges(skin.border, size, er, eg, eb, 1, false) end
+	-- (A shaped panel in place of the rectangle and its lines, a little bigger
+	-- than the tooltip: the first and last lines sit close to its corners.)
+	skin.themeSliceOut = SHAPE_OUT
+	local shaped = br ~= nil and ns.DressThemeSlice(skin, br, bg, bb, alpha, er or 0.5, eg or 0.5, eb or 0.5, 1)
+	if br == nil then ns.HideThemeSlice(skin) end
+	if shaped then skin.back:Hide() end
+	skin.border:SetShown(lined and not shaped)
+	if lined and not shaped then ns.DressStyleEdges(skin.border, size, er, eg, eb, 1, false) end
 	skin:SetShown(br ~= nil or lined)
 end
 
@@ -189,6 +196,24 @@ local function DressFonts(look)
 	end
 end
 
+-- The health bar clear of a panel with a line or a shape, inside its cut
+-- corners. False: there's neither (the game's place is fine).
+function ns.TooltipBarSpot(bar, tooltip, look)
+	local shaped = ns.ThemePanelShape() and BackColor(look) ~= nil
+	local kind = ns.StyleBorder(look, "tooltipEdge")
+	if not (shaped or kind == "line" or kind == "colored") then return false end
+	local inset = shaped and SHAPE_BAR_INSET or 2
+	local away = BAR_GAP + (shaped and SHAPE_OUT or 0)
+	if look.tooltipBar == "top" then
+		bar:SetPoint("BOTTOMLEFT", tooltip, "TOPLEFT", inset, away)
+		bar:SetPoint("BOTTOMRIGHT", tooltip, "TOPRIGHT", -inset, away)
+	else
+		bar:SetPoint("TOPLEFT", tooltip, "BOTTOMLEFT", inset, -away)
+		bar:SetPoint("TOPRIGHT", tooltip, "BOTTOMRIGHT", -inset, -away)
+	end
+	return true
+end
+
 -- The health bar: its place, texture and height (the game's, as first seen,
 -- put back with the look's as the game's), its dark ground and color.
 local barOwn
@@ -221,11 +246,13 @@ local function DressBar(bar, tooltip, look)
 	local where = look and look.tooltipBar or "under"
 	local height = look and tonumber(look.tooltipBarHeight) or barOwn.height
 	bar:ClearAllPoints()
-	if where == "top" then
-		bar:SetPoint("BOTTOMLEFT", tooltip, "TOPLEFT", 2, 2)
-		bar:SetPoint("BOTTOMRIGHT", tooltip, "TOPRIGHT", -2, 2)
-	else
-		for _, point in ipairs(barOwn.points) do bar:SetPoint(unpack(point)) end
+	if not (look and ns.TooltipBarSpot(bar, tooltip, look)) then
+		if where == "top" then
+			bar:SetPoint("BOTTOMLEFT", tooltip, "TOPLEFT", 2, 2)
+			bar:SetPoint("BOTTOMRIGHT", tooltip, "TOPRIGHT", -2, 2)
+		else
+			for _, point in ipairs(barOwn.points) do bar:SetPoint(unpack(point)) end
+		end
 	end
 	if Readable(height) then bar:SetHeight(height) end
 	bar:SetAlpha(where == "none" and 0 or 1)
@@ -303,7 +330,11 @@ end
 function ns.RefreshTooltipStyle()
 	local look = ns.StyleOn("tooltipStyle") and Look() or nil
 	DressFonts(look)
-	if GameTooltip then DressBar(_G.GameTooltipStatusBar or GameTooltip.StatusBar, GameTooltip, look) end
+	if GameTooltip then
+		local bar = _G.GameTooltipStatusBar or GameTooltip.StatusBar
+		DressBar(bar, GameTooltip, look)
+		if bar and bar.cineGround then ns.DressBarShape(bar, bar.cineGround, not look) end
+	end
 	for _, name in ipairs(TOOLTIPS) do
 		local tooltip = _G[name]
 		if tooltip and tooltip.NineSlice then Apply(tooltip) end
@@ -395,6 +426,8 @@ local function PreviewTip(holder, info)
 		bar:SetMinMaxValues(0, 1)
 		bar:SetValue(info.health)
 		bar:SetStatusBarColor(0, 0.83, 0)
+		bar.cineGround = bar:CreateTexture(nil, "BACKGROUND", nil, -8)
+		bar.cineGround:SetAllPoints()
 		tip.bar = bar
 	end
 	return tip
@@ -444,12 +477,14 @@ function ns.MakeTooltipPreview(parent, width)
 		end
 		local bar = unit.bar
 		bar:ClearAllPoints()
-		if look.tooltipBar == "top" then
-			bar:SetPoint("BOTTOMLEFT", unit, "TOPLEFT", 2, 2)
-			bar:SetPoint("BOTTOMRIGHT", unit, "TOPRIGHT", -2, 2)
-		else
-			bar:SetPoint("TOPLEFT", unit, "BOTTOMLEFT", 2, -1)
-			bar:SetPoint("TOPRIGHT", unit, "BOTTOMRIGHT", -2, -1)
+		if not ns.TooltipBarSpot(bar, unit, look) then
+			if look.tooltipBar == "top" then
+				bar:SetPoint("BOTTOMLEFT", unit, "TOPLEFT", 2, 2)
+				bar:SetPoint("BOTTOMRIGHT", unit, "TOPRIGHT", -2, 2)
+			else
+				bar:SetPoint("TOPLEFT", unit, "BOTTOMLEFT", 2, -1)
+				bar:SetPoint("TOPRIGHT", unit, "BOTTOMRIGHT", -2, -1)
+			end
 		end
 		bar:SetHeight(tonumber(look.tooltipBarHeight) or 8)
 		bar:SetShown(look.tooltipBar ~= "none")
@@ -457,7 +492,13 @@ function ns.MakeTooltipPreview(parent, width)
 			bar:SetStatusBarTexture("Interface\\TargetingFrame\\UI-StatusBar")
 			bar:GetStatusBarTexture():SetDesaturated(false)
 		end
-		bar:SetStatusBarColor(0, 0.83, 0)
+		if look.tooltipBarColor == "custom" then
+			bar:SetStatusBarColor(look.tooltipBarR or 0, look.tooltipBarG or 0.83, look.tooltipBarB or 0)
+		else
+			bar:SetStatusBarColor(0, 0.83, 0)
+		end
+		bar.cineGround:SetColorTexture(0, 0, 0, tonumber(look.tooltipBarGround) or 0)
+		ns.DressBarShape(bar, bar.cineGround)
 	end
 	holder:SetScript("OnShow", holder.Refresh)
 	return holder

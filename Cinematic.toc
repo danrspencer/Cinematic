@@ -142,6 +142,7 @@ PlateHealthStyle.lua
 UnitStyle.lua
 RaidStyle.lua
 GeneralStyle.lua
+StyleOverrides.lua
 ThemeShots.lua
 VisionsStyle.lua
 EmoteVision.lua

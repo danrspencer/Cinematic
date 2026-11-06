@@ -68,6 +68,7 @@ local function View(id)
 	local view = views[id]
 	if not view then
 		view = setmetatable({}, { __index = function(_, key)
+			if key == "isTile" then return true end -- (tall: no bar shapes, UnitStyle.lua)
 			key = key:gsub("^uf", "rf")
 			local look = ns.StyleLook("rfStyle")
 			local db = ns.db
@@ -160,6 +161,10 @@ local function Dress(frame)
 			r, g, b = view.ufHealthR, view.ufHealthG, view.ufHealthB
 		end
 		ns.UnitStyleDressBar(health, view, r, g, b)
+		-- (A new fill comes back on the bar's usual layer, over the role icon: the
+		-- game keeps it lower down.)
+		local fill = view and health:GetStatusBarTexture()
+		if fill and fill.SetDrawLayer then fill:SetDrawLayer("BORDER") end
 		if view and view.ufBorder ~= "game" then skinned[health] = true end
 	end
 	ns.UnitStyleDressName(frame.name, view, unit)

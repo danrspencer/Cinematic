@@ -1,0 +1,125 @@
+<meta charset="utf-8">
+<title>Cinematic Shot Review</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Marcellus&family=Archivo+Narrow:wght@400;600&display=swap">
+<style>
+/* A light table for film: dark, so the shots carry the color. Controls stay in one strip; the grid is the page. */
+:root { --bg: #0e0f12; --panel: #17191e; --line: #2a2d35; --text: #e9e6df; --dim: #9b9da6; --accent: #e3bb55; --good: #6fc08b; --open: #e0975a; color-scheme: dark;
+	--display: Marcellus, Georgia, serif; --body: "Archivo Narrow", "Arial Narrow", sans-serif; }
+@media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) { --bg: #eceae5; --panel: #fff; --line: #d6d3cb; --text: #1c1c20; --dim: #62626a; --accent: #8c6a0c; --good: #1f7a45; --open: #a85a17; color-scheme: light; } }
+:root[data-theme="light"] { --bg: #eceae5; --panel: #fff; --line: #d6d3cb; --text: #1c1c20; --dim: #62626a; --accent: #8c6a0c; --good: #1f7a45; --open: #a85a17; color-scheme: light; }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.4 var(--body); padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 14px 40px; }
+h1 { font: 400 22px/1.2 var(--display); margin: 0; }
+.top { display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: baseline; margin-bottom: 10px; }
+.top p { margin: 0; color: var(--dim); }
+.strip { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; padding: 8px 0; border-block: 1px solid var(--line); margin-bottom: 12px; }
+.group { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.group > span { color: var(--dim); margin-right: 3px; }
+button, select { font: inherit; color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: 5px; padding: 4px 9px; cursor: pointer; }
+button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+input[type=range] { accent-color: var(--accent); width: 120px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, var(--cell, 460px)), 1fr)); gap: 10px; }
+figure { margin: 0; min-width: 0; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.view { position: relative; overflow: hidden; aspect-ratio: var(--ratio, 16 / 10); cursor: crosshair; background: #000; }
+.view img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; transform-origin: 0 0; }
+figcaption { display: flex; justify-content: space-between; gap: 8px; padding: 4px 8px; font-size: 15px; }
+figcaption span { color: var(--dim); }
+figcaption button { padding: 0 7px; font-size: 14px; }
+.notes { margin-top: 18px; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); gap: 4px 24px; }
+.notes h2 { font: 400 17px/1.3 var(--display); margin: 0 0 4px; grid-column: 1 / -1; }
+.notes div { min-width: 0; }
+.notes b { font-weight: 600; margin-right: 6px; }
+.notes .open { color: var(--open); } .notes .fixed { color: var(--good); }
+.empty { color: var(--dim); padding: 20px 0; }
+dialog { border: 0; padding: 0; background: #000; max-width: 96vw; max-height: 96vh; }
+dialog::backdrop { background: rgba(0, 0, 0, .85); }
+dialog img { display: block; max-width: 96vw; max-height: 92vh; }
+dialog p { margin: 0; padding: 5px 10px; color: #ddd; background: #000; display: flex; justify-content: space-between; gap: 12px; }
+</style>
+<div class="top"><h1>Cinematic Shot Review</h1><p>Real game screenshots from <code>/cine debug themeshots</code>. Click a shot to set the spot, then zoom: every shot follows.</p></div>
+<div class="strip">
+	<div class="group" id="modes"></div>
+	<div class="group"><span>Run</span><select id="run" aria-label="Run"></select></div>
+	<div class="group" id="scenes"></div>
+	<div class="group" id="themes"></div>
+	<div class="group"><label for="zoom"><span>Zoom</span></label><input id="zoom" type="range" min="1" max="6" step="0.25" value="1"><span id="zoomv">1×</span><button id="reset">Whole shot</button></div>
+	<div class="group"><label for="size"><span>Size</span></label><input id="size" type="range" min="260" max="1000" step="20" value="460"></div>
+</div>
+<div class="grid" id="grid"></div>
+<div class="notes" id="notes"></div>
+<dialog id="big"><img id="bigimg" alt=""><p><span id="bigcap"></span><button id="close">Close</button></p></dialog>
+<script>
+const DATA = /*DATA*/null;
+const state = { mode: "compare", run: DATA.runs.find(r => r.full)?.id || DATA.runs[0]?.id, scene: "Real frames", theme: "codex", zoom: 1, fx: 0.5, fy: 0.5, size: 460 };
+try { Object.assign(state, JSON.parse(localStorage.getItem("shotReview") || "{}")); } catch (e) {}
+if (!DATA.runs.some(r => r.id === state.run)) state.run = DATA.runs[0]?.id;
+const save = () => { try { localStorage.setItem("shotReview", JSON.stringify(state)); } catch (e) {} };
+const $ = id => document.getElementById(id);
+function buttons(box, list, on, pick, label) {
+	box.textContent = "";
+	if (label) { const s = document.createElement("span"); s.textContent = label; box.append(s); }
+	for (const [value, text] of list) {
+		const b = document.createElement("button"); b.textContent = text;
+		b.setAttribute("aria-pressed", value === on); b.onclick = () => { pick(value); render(); }; box.append(b);
+	}
+}
+function place(view) {
+	const img = view.querySelector("img"), z = state.zoom;
+	// The spot stays in the middle, without showing past the shot's edges.
+	const x = Math.min(Math.max(0.5 - state.fx * z, 1 - z), 0), y = Math.min(Math.max(0.5 - state.fy * z, 1 - z), 0);
+	img.style.transform = z === 1 ? "none" : `translate(${x * 100}%, ${y * 100}%) scale(${z})`;
+}
+const placeAll = () => document.querySelectorAll(".view").forEach(place);
+function shot(item, title, sub) {
+	const f = document.createElement("figure"), view = document.createElement("div"), img = new Image();
+	view.className = "view"; img.src = item.file; img.alt = `${title}, ${sub}`; img.loading = "lazy";
+	img.onload = () => { view.style.setProperty("--ratio", `${img.naturalWidth} / ${img.naturalHeight}`); };
+	view.append(img);
+	view.onclick = e => {
+		const r = view.getBoundingClientRect(), z = state.zoom;
+		const x = Math.min(Math.max(0.5 - state.fx * z, 1 - z), 0), y = Math.min(Math.max(0.5 - state.fy * z, 1 - z), 0);
+		state.fx = ((e.clientX - r.left) / r.width - x) / z; state.fy = ((e.clientY - r.top) / r.height - y) / z;
+		if (state.zoom === 1) { state.zoom = 3; $("zoom").value = 3; $("zoomv").textContent = "3×"; }
+		save(); placeAll();
+	};
+	const cap = document.createElement("figcaption"), left = document.createElement("div"), s = document.createElement("span"), open = document.createElement("button");
+	left.textContent = title + " "; s.textContent = sub; left.append(s); open.textContent = "Full";
+	open.onclick = () => { $("bigimg").src = item.file; $("bigimg").alt = title; $("bigcap").textContent = `${title}, ${sub}`; $("big").showModal(); };
+	cap.append(left, open); f.append(view, cap); place(view); return f;
+}
+function render() {
+	save();
+	buttons($("modes"), [["compare", "All themes"], ["time", "Over time"]], state.mode, v => state.mode = v);
+	const sel = $("run"); sel.textContent = "";
+	for (const r of DATA.runs) { const o = document.createElement("option"); o.value = r.id; o.textContent = r.label + (r.full ? "" : ` (${r.items[0].themeName})`); sel.append(o); }
+	sel.value = state.run; sel.disabled = state.mode === "time"; sel.onchange = () => { state.run = sel.value; render(); };
+	buttons($("scenes"), DATA.scenes.map(s => [s, s]), state.scene, v => state.scene = v);
+	$("themes").hidden = state.mode !== "time";
+	if (state.mode === "time") buttons($("themes"), DATA.themes.map(t => [t.key, t.name]), state.theme, v => state.theme = v);
+	const grid = $("grid"); grid.textContent = ""; grid.style.setProperty("--cell", state.size + "px");
+	let shots = [];
+	if (state.mode === "compare") {
+		const run = DATA.runs.find(r => r.id === state.run);
+		shots = (run ? run.items : []).filter(i => i.scene === state.scene).map(i => [i, i.themeName, run.label]);
+	} else {
+		for (const r of [...DATA.runs].reverse()) for (const i of r.items) if (i.scene === state.scene && i.theme === state.theme) shots.push([i, r.label, i.themeName]);
+	}
+	for (const s of shots) grid.append(shot(...s));
+	if (!shots.length) { const p = document.createElement("p"); p.className = "empty"; p.textContent = "No shots of this in that run. Pick another run, or run the command again."; grid.append(p); }
+}
+$("zoom").value = state.zoom; $("zoomv").textContent = state.zoom + "×"; $("size").value = state.size;
+$("zoom").oninput = e => { state.zoom = +e.target.value; $("zoomv").textContent = state.zoom + "×"; save(); placeAll(); };
+$("size").oninput = e => { state.size = +e.target.value; save(); $("grid").style.setProperty("--cell", state.size + "px"); };
+$("reset").onclick = () => { state.zoom = 1; $("zoom").value = 1; $("zoomv").textContent = "1×"; save(); placeAll(); };
+$("close").onclick = () => $("big").close();
+$("big").onclick = e => { if (e.target === $("big")) $("big").close(); };
+const notes = $("notes"), h = document.createElement("h2"); h.textContent = "Quality notes"; notes.append(h);
+for (const n of [...DATA.notes].sort((a, b) => (a.state > b.state ? -1 : 1))) {
+	const d = document.createElement("div"), b = document.createElement("b"); b.className = n.state; b.textContent = n.state === "open" ? "Open" : "Fixed";
+	d.append(b, n.text); notes.append(d);
+}
+render();
+</script>

@@ -6,18 +6,31 @@
 local _, ns = ...
 local L = ns.L
 
--- The pages that share settings, as the list shows them: name, the page to
--- open (ns.OpenOptions), its shared settings.
+-- The list on the Pages tab, in the hubs' order: name, the page to open
+-- (ns.OpenOptions), its shared settings. fixed: what it says instead, for a
+-- page with no shared settings of its own. group: a heading over it. visions:
+-- it follows the Visions hub's Style page first.
 local PAGES = {
-	{ "Unit Frames", "Unit Style", { "ufTexture", "ufFont", "ufOutline", "ufShadow", "ufBorder" } },
+	{ "Unit Frames", "Unit Style", { "ufTexture", "ufFont", "ufOutline", "ufShadow", "ufBorder" }, group = "Interface" },
 	{ "Raid Frames", "Raid Style", { "rfTexture", "rfFont", "rfOutline", "rfShadow", "rfBorder" } },
+	{ "Action Bars", "Action Style", {}, fixed = "Its own settings" },
 	{ "Personal Resource Display", "Personal Style", { "prdTexture", "prdBorder" } },
 	{ "Tooltips", "Tooltip Style", { "tooltipBarTexture", "tooltipFont", "tooltipOutline", "tooltipShadow", "tooltipEdge" } },
+	-- (These two read General directly: PlateHealthStyle.lua, PlateParts.lua.)
+	{ "Nameplates", "Nameplate Style", {}, fixed = "Follows General" },
+	{ "Names", "Name Style", {}, fixed = "Follows General" },
 	{ "Cast Bars", "Cast Bar Style", { "plateCastFill", "plateCastFont", "plateCastOutline", "plateCastShadow", "plateCastBorder" } },
 	{ "Chat Bubbles", "Bubble Style", { "bubblesFont", "bubblesOutline", "bubblesEdge" } },
-	-- (The Visions follow the Visions hub's Style page, and it follows General.)
-	{ "Visions", "Visions Style", { "visionStyleTexture", "visionStyleFont", "visionStyleOutline", "visionStyleShadow",
-		"visionStyleBorder" } },
+	{ "Visions Style", "Visions Style", { "visionStyleTexture", "visionStyleFont", "visionStyleOutline", "visionStyleShadow",
+		"visionStyleBorder" }, group = "Visions" },
+	{ "Damage Vision", "Damage Vision Look", { "damageVisionTexture", "damageVisionFont", "damageVisionOutline",
+		"damageVisionShadow" }, visions = true },
+	{ "Dialogue", "Quest Talk Style", { "questTalkFont", "questTalkOutline", "questTalkShadow" }, visions = true },
+	{ "Quest Item Button", "Quest Item Style", { "questItemFont", "questItemOutline", "questItemShadow", "questItemFrame" },
+		visions = true },
+	{ "Roll Vision", "Roll Style", { "rollBarTexture", "rollFont", "rollOutline", "rollShadow" }, visions = true },
+	{ "Card Vision", "Card Styles", { "cardFont", "cardOutline", "cardShadow" }, visions = true },
+	{ "Emote Vision", "Emote Vision Style", { "emoteFont", "emoteOutline", "emoteShadow", "emoteBorder" }, visions = true },
 }
 local KIND_NAMES = { texture = "Texture", font = "Font", outline = "Outline", shadow = "Shadow", border = "Border" }
 
@@ -27,7 +40,12 @@ local function RefreshAll()
 		ns.RefreshQuestTalkStyle, ns.RefreshQuestItemStyle, ns.RefreshRollStyle, ns.RefreshPlateCastStyle,
 		ns.RefreshUnitStyle, ns.RefreshRaidStyle, ns.RefreshTargetArrows, ns.RefreshPlateNameStyle,
 		ns.RefreshActionBarStyle, ns.RefreshPlateHealthStyle }) do
-		if refresh then pcall(refresh) end
+		if refresh then
+			-- (Kept going past a page's error, but said: a page that fails here just
+			-- looks unstyled, with nothing else to show why.)
+			local ok, err = pcall(refresh)
+			if not ok then ns.Log("style", "refresh failed: " .. tostring(err)) end
+		end
 	end
 end
 ns.RefreshAllStyles = RefreshAll
@@ -246,35 +264,54 @@ function ns.MakeStyleJumbotron(kit, content, stack, width, list)
 end
 
 -- The pages list: each page, whether it follows General, and a button to
--- put it back on General.
+-- put it back on General. Gives what's the page's own, and whether any of it
+-- is as the theme set it (that isn't yours: the themes' raid names, say).
 local function PageStatus(keys)
 	local db = ns.GetDB()
-	local own = {}
+	local own, themed = {}, false
 	for _, key in ipairs(keys) do
 		if db and not ns.IsGeneralStyle(db[key]) then
-			local entry = ns.SHARED_STYLE[key]
-			own[#own + 1] = L[KIND_NAMES[entry and entry.kind] or "Texture"]
+			local theme = ns.ThemeSetting(key)
+			if theme ~= nil and db[key] == theme then
+				themed = true
+			else
+				local entry = ns.SHARED_STYLE[key]
+				own[#own + 1] = L[KIND_NAMES[entry and entry.kind] or "Texture"]
+			end
 		end
 	end
-	return own
+	return own, themed
 end
 
+
+-- General's two folder tabs: General and Pages (picked 1 or 2). title: the
+-- page's, put under them.
+local function StyleTabs(content, title, picked)
+	local panel = ns.PageTabs(content, {
+		{ L["General"], "Style General", L["The theme, quick settings and the switch for every Style page."] },
+		{ L["Pages"], "Style Pages", L["Which Style pages follow General, and which have settings of their own."] },
+		{ L["Overrides"], "Style Overrides", L["Hide or show parts of the unit frames and nameplates, whatever the Interface pages' rows say."] },
+	}, picked)
+	title:ClearAllPoints()
+	title:SetPoint("TOPLEFT", panel, "BOTTOMLEFT", 8, -14)
+end
+
+ns.StyleTabs = StyleTabs -- (StyleOverrides.lua)
 
 function ns.CreateGeneralStylePanel(kit)
 	local canvas, content = kit.CreateScrollPage()
 	local title = kit.Label(content, "GameFontNormalLarge", L["General"])
-	title:SetPoint("TOPLEFT", 16, -16)
+	StyleTabs(content, title, 1)
 	local intro = kit.PageIntro(content, title,
 		L["Every Style page at once: a switch for them all, and the settings they share. Each page's shared " ..
 		"settings start on General and follow it; change one on its page and it's that page's own."])
 
-	local preview -- (below: drawn again as each setting changes)
-	local pageRows = {}
+	local preview, sample -- (below: drawn again as each setting changes)
 	local function Changed()
 		RefreshAll()
 		ns.ApplyMenuSkin() -- (Style off or on: the theme's menu colors go or come back)
 		if preview then preview:Refresh() end
-		for _, row in ipairs(pageRows) do row:Refresh() end
+		if sample then sample:Refresh() end
 	end
 
 	local switch = kit.PageSwitch(content, "styleGeneral", L["Enable Style"],
@@ -283,31 +320,79 @@ function ns.CreateGeneralStylePanel(kit)
 	local stack = kit.Stack(switch, "check")
 	local rows = ns.StyleRows(kit, content, stack, Changed, "styleGeneral")
 
+	preview = ns.MakeStyleJumbotron(kit, content, stack, 480)
+
 	-- (The whole look in one pick: StyleThemes.lua.)
 	stack:Header(content, L["Theme"])
 	stack:Help(content, L["A whole look for the addon: bars, fonts, borders, panels, colors and these menus. Every " ..
 		"setting below stays yours to change after you pick one. Undo puts back what you had."])
 	stack:Add(ns.MakeThemePicker(kit, content, 480, function() Changed() end), "label")
 
-	preview = ns.MakeStyleJumbotron(kit, content, stack, 480)
+	-- (On top of whichever theme's picked: each shows as the theme's "with your changes".)
+	stack:Header(content, L["Quick settings"])
+	stack:Help(content, L["Make a theme your own. These stay until you pick a theme or use Reapply theme."])
+	local titleFont = ns.ThemeTitleFontField()
+	rows.Font(ns.ThemeQuickField("styleFont"), L["The words on every page that follows General. Russian, Korean or " ..
+		"Chinese text keeps the game's, so its letters show."], nil, nil, L["Text font:"])
+	rows.Font(titleFont, L["The big words on cards, like a zone's name. Cards with a look of their own keep it."],
+		nil, nil, L["Title font:"])
+	rows.Font(ns.ThemeSmallFontField(), L["The names on unit and raid frames. They're small, so a sturdy font reads " ..
+		"best."], nil, nil, L["Small names font:"])
+	rows.Texture(L["Bar texture:"], ns.ThemeQuickField("styleTexture"), L["Every page's bars that follow General. The game's: each " ..
+		"page's own. Below the game's own few: any other addon shares (through LibSharedMedia)."], nil,
+		{ 0.25, 0.75, 0.3 })
+	rows.Dropdown(L["Panel shape:"], ns.ThemeQuickField("stylePanel"), function()
+		return { { value = "square", text = L["Square"] }, { value = "round", text = L["Rounded"] },
+			{ value = "chamfer", text = L["Chamfered"] }, { value = "blade", text = L["Blade"] },
+			{ value = "notch", text = L["Notched"] }, { value = "sigil", text = L["Sigil"] },
+			{ value = "veil", text = L["Veil"] } }
+	end, L["The outline of tooltips, chat bubbles, dialogue and roll panels."])
+	rows.Dropdown(L["Bar shape:"], ns.ThemeQuickField("styleBarShape"), function()
+		return { { value = "square", text = L["Square"] }, { value = "capsule", text = L["Capsule"] },
+			{ value = "slant", text = L["Slanted"] }, { value = "point", text = L["Pointed"] },
+			{ value = "barb", text = L["Barbed"] }, { value = "taper", text = L["Tapered"] } }
+	end, L["The ends of unit frame and personal resource bars. A straight border can't follow a shape, so it goes " ..
+		"while one's picked. Raid tiles and nameplates stay square."])
+	-- (The game's own nameplate Style, retail's Options > Nameplates: held while
+	-- one's picked, yours back after, PlateHealthStyle.lua. Only where the client
+	-- has it: the classic clients keep the CVar, 6 there, with no such option.)
+	local styles = ns.GamePlateStyles()
+	if styles then
+		rows.Dropdown(L["Nameplate style:"], "stylePlate", function()
+			local list = { { value = "game", text = L["The game's"], tip = L["Whatever the game's own Options have."] } }
+			for i, name in ipairs(styles) do list[#list + 1] = { value = i - 1, text = L[name] } end
+			return list
+		end, L["The size and shape of the game's nameplates (Options, Nameplates, Style). Your own setting comes " ..
+			"back if you pick The game's or turn Style off, and changing it in the game's Options wins."])
+	end
 
-	rows.PresetMenu({
-		{ L["Like the game's"], L["Each page as its own defaults have it (the game's look)."], {} },
-		{ L["Clean"], L["Flat bars and Arial Narrow, thinly outlined."],
-			{ styleTexture = "flat", styleFont = "arial", styleOutline = 1 } },
-		{ L["Cinematic"], L["Soft bars and Friz Quadrata, thinly outlined."],
-			{ styleTexture = "soft", styleFont = "friz", styleOutline = 1 } },
-		{ L["Glass"], L["Glass bars, the game's fonts."], { styleTexture = "glass" } },
-	}, { "styleTexture", "styleFont", "styleOutline", "styleShadow", "styleBorder", "styleBorderSize", "styleBorderR", "styleBorderG",
-		"styleBorderB" })
+	-- (The fonts as they'll look, here and now: a card only shows when one plays.)
+	sample = CreateFrame("Frame", nil, content)
+	sample:SetSize(480, 62)
+	local sampleTitle = sample:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+	sampleTitle:SetPoint("TOPLEFT", 0, -6)
+	sampleTitle.searchSkip = true
+	local sampleText = sample:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+	sampleText:SetPoint("TOPLEFT", sampleTitle, "BOTTOMLEFT", 0, -6)
+	sampleText.searchSkip = true
+	local titleSize, textSize = select(2, sampleTitle:GetFont()), select(2, sampleText:GetFont())
+	local gameTitle, gameText = sampleTitle:GetFont(), sampleText:GetFont()
+	function sample:Refresh()
+		local db = ns.GetDB()
+		if ROMAN and db then
+			sampleTitle:SetFont(ns.StyleFontFile(titleFont.get()) or gameTitle, titleSize * 1.5, "")
+			sampleText:SetFont(ns.StyleFontFile(db.styleFont) or gameText, textSize, "")
+		end
+		sampleTitle:SetText(L["Windrunner Spire"])
+		sampleText:SetText(L["Something has been taking the turnips at night."])
+	end
+	sample.pageSwitch = false
+	stack:Add(sample, "label")
+	kit.AddControl(sample)
 
-	stack:Header(content, L["Shared look"])
-	rows.Look(L["Look:"], L["Shared look"], {
-		texture = { "styleTexture", L["Every page's bars that follow General. The game's: each page's own. Below " ..
-			"the game's own few: any other addon shares (through LibSharedMedia)."], label = L["Bar texture:"],
-			tint = { 0.25, 0.75, 0.3 } },
-		font = { "styleFont", L["Every page's words that follow General. The game's: each page's own. Russian, " ..
-			"Korean or Chinese text keeps the game's, so its letters show."] },
+	rows.Look(L["Outline and border:"], L["Shared look"], {
+		texture = false,
+		font = false,
 		outline = { "styleOutline", L["A black border around the letters, on every page that follows General. " ..
 			"The game's: as each page's default has it."], names = { [0] = L["None"], L["Thin"], L["Thick"] },
 			own = L["The game's"] },
@@ -320,43 +405,42 @@ function ns.CreateGeneralStylePanel(kit)
 			opts = { game = true } },
 	})
 
-	-- The game's own nameplate Style (retail's Options > Nameplates), shown
-	-- for what it is: greyed, as we leave it alone. Only where the client
-	-- has it: the classic clients keep the CVar (6 there) with no Style
-	-- option in their menu, so a value that isn't one of retail's styles
-	-- hides the row.
-	local STYLES = { [0] = "Modern", "Thin Bars", "Blocky Bars", "Clean Health", "Blocky Cast", "Legacy Red" }
-	local okStyle, gameStyle = pcall(GetCVar, "nameplateStyle")
-	if okStyle and STYLES[tonumber(gameStyle) or -1] then
-		local styleName = stack:Add(kit.Label(content, "GameFontHighlight", L["Game's nameplate style:"]), "label")
-		styleName:SetSize(150, 30)
-		styleName:SetJustifyV("MIDDLE")
-		local box = ns.PanelButton(content)
-		box:SetSize(200, 22)
-		box:SetPoint("LEFT", styleName, "RIGHT", 4, 0)
-		box:Disable()
-		kit.Tooltip(box, L["The game's own setting (Options, Nameplates, Style): the size and color of its plates' " ..
-			"bars, all in the same texture. Shown here for what it is; Cinematic doesn't change it."])
-		box:SetMotionScriptsWhileDisabled(true) -- (its tooltip still shows)
-		box.Refresh = function(self)
-			local ok, value = pcall(GetCVar, "nameplateStyle")
-			local name = ok and STYLES[tonumber(value) or -1]
-			self:SetText(name and L[name] or tostring(value))
-		end
-		box.pageSwitch = false
-		kit.AddControl(box)
+	-- (Reset page: the theme's palette and art as the profile has them; every
+	-- other page's own settings stay theirs.)
+	kit.OnReset(content, function()
+		ns.GetDB().styleTheme = ns.ResetBase().styleTheme
+		Changed()
+	end)
+
+	canvas:SetScript("OnShow", kit.PageShown(kit.Refresh, content))
+	canvas:Hide()
+	kit.RegisterSubpage(canvas, "Style General", L["General"])
+end
+
+-- The Pages tab: which pages follow General, kept off the General tab to keep
+-- that one simple.
+function ns.CreateStylePagesPanel(kit)
+	local canvas, content = kit.CreateScrollPage()
+	local title = kit.Label(content, "GameFontNormalLarge", L["Pages"])
+	StyleTabs(content, title, 2)
+	local intro = kit.PageIntro(content, title,
+		L["Which pages follow General, or the Visions' Style page. From the theme: as the theme you picked set " ..
+		"it. A page with a setting of your own shows which; Use General puts them back. The page's name opens it."])
+	local stack = kit.Stack(intro, "label")
+	local pageRows = {}
+	local function Changed()
+		RefreshAll()
+		for _, row in ipairs(pageRows) do row:Refresh() end
 	end
 
-	stack:Header(content, L["Pages"])
-	stack:Help(content, L["Which pages follow General. A page with a setting of its own shows which; Use " ..
-		"General puts them all back on General. The page's name opens it."])
 	-- (Only the pages this client has: one it lacks, like Roll Vision with no
 	-- loot history, never set its defaults.)
 	local pages = {}
 	for _, page in ipairs(PAGES) do
-		if ns.DEFAULTS[page[3][1]] ~= nil then pages[#pages + 1] = page end
+		if not page[3][1] or ns.DEFAULTS[page[3][1]] ~= nil then pages[#pages + 1] = page end
 	end
 	for _, page in ipairs(pages) do
+		if page.group then stack:Header(content, L[page.group]) end
 		local row = CreateFrame("Frame", nil, content)
 		row:SetSize(480, 22)
 		stack:Add(row, "label")
@@ -376,17 +460,21 @@ function ns.CreateGeneralStylePanel(kit)
 		back:SetSize(100, 20)
 		back:SetPoint("LEFT", status, "RIGHT", 10, 0)
 		back:SetText(L["Use General"])
-		kit.Tooltip(back, L["This page's shared settings back on General."])
+		kit.Tooltip(back, L["This page's shared settings back on General, or as the theme set them."])
 		back:SetScript("OnClick", function()
 			local db = ns.GetDB()
-			for _, key in ipairs(page[3]) do db[key] = ns.DEFAULTS[key] end
+			for _, key in ipairs(page[3]) do
+				local theme = ns.ThemeSetting(key)
+				if theme ~= nil then db[key] = theme else db[key] = ns.DEFAULTS[key] end
+			end
 			Changed()
 			kit.Refresh()
 		end)
 		function row:Refresh()
-			local own = PageStatus(page[3])
+			local own, themed = PageStatus(page[3])
 			if #own == 0 then
-				status:SetText(L["Follows General"])
+				local follows = page.visions and L["Follows Visions Style"] or L["Follows General"]
+				status:SetText(page.fixed and L[page.fixed] or themed and L["From the theme"] or follows)
 				status:SetTextColor(0.6, 0.6, 0.6)
 				back:Hide()
 			else
@@ -398,13 +486,12 @@ function ns.CreateGeneralStylePanel(kit)
 		pageRows[#pageRows + 1] = row
 	end
 
-	-- (Reset page: the pages listed back on General too, as the profile has them.)
+	-- (Reset page: the pages listed back on General, as the profile has them.)
 	kit.OnReset(content, function()
 		local db, base = ns.GetDB(), ns.ResetBase()
 		for _, page in ipairs(pages) do
 			for _, key in ipairs(page[3]) do db[key] = base[key] end
 		end
-		db.styleTheme = base.styleTheme -- (its palette and art; the pages' own settings stay theirs)
 		Changed()
 	end)
 
@@ -414,5 +501,5 @@ function ns.CreateGeneralStylePanel(kit)
 		shown()
 	end)
 	canvas:Hide()
-	kit.RegisterSubpage(canvas, "Style General", L["General"])
+	kit.RegisterSubpage(canvas, "Style Pages", L["Pages"])
 end

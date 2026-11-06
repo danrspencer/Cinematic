@@ -1823,6 +1823,8 @@ do
 			HUD = { 0.35, 0.6, 0.9 }, Overhead = { 0.65, 0.45, 0.9 },
 		}, pages = {
 			{ "Style General", "Interface\\Icons\\INV_Misc_Gear_08", label = "General" },
+			{ "Style Pages", "Interface\\Icons\\INV_Misc_Gear_08", tabOf = "Style General" }, -- (GeneralStyle.lua)
+			{ "Style Overrides", "Interface\\Icons\\INV_Misc_Gear_08", tabOf = "Style General" }, -- (StyleOverrides.lua)
 			{ "Unit Style", "Interface\\Icons\\INV_Misc_Head_Human_01", label = "Unit Frames", section = "HUD" },
 			{ "Raid Style", "Interface\\Icons\\INV_Misc_GroupNeedMore", label = "Raid Frames", section = "HUD" },
 			{ "Action Style", "Interface\\Icons\\Ability_DualWield", label = "Action Bars", section = "HUD" },
@@ -6907,6 +6909,7 @@ local function CreatePortraitsPanel()
 						changed = ns.ApplyUnitFrameParts,
 						-- (Greyed while it goes by the target's.)
 						enabled = same and function() return ns.GetDB()[same] == false end or nil,
+						override = function() return ns.StyleOverrideText(key) end,
 					})
 					row.debugName = section.title .. ": " .. part[2] -- (for the dev copy's page timing)
 					row:SetPoint("TOPLEFT", frame, "TOPLEFT", LABEL_WIDTH, y)
@@ -7854,6 +7857,7 @@ local function CreatePlatesPanel()
 			menus = { [ns.GRID_COMBAT] = combat, [ns.GRID_TARGET] = targets, [ns.GRID_LOCATION] = places },
 			help = { [ns.GRID_COMBAT] = L["Shown in fights: any of them, or only while you're PvP flagged."] },
 			enabled = Available,
+			override = part and function() return ns.StyleOverrideText("plate" .. kind[1]) end or nil,
 			rule = layout.edit and { key = RuleKey, label = function() return kind[2] end,
 				changed = function()
 					local text = ns.GetDB().frameRules[ruleKey]
@@ -15669,6 +15673,8 @@ ns.OnLanguage(function()
 	end
 	if ns.CreateGeneralStylePanel then -- (GeneralStyle.lua)
 		ns.CreateGeneralStylePanel(ns.lowHealthKit)
+		ns.CreateStylePagesPanel(ns.lowHealthKit)
+		ns.CreateStyleOverridesPanel(ns.lowHealthKit)
 	end
 	if ns.CreateVisionsStylePanel then -- (VisionsStyle.lua)
 		ns.CreateVisionsStylePanel(ns.lowHealthKit)

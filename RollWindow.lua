@@ -297,7 +297,7 @@ end
 -- card washed in its quality colour, a stripe of it down the left.
 
 local CARD_W = WIDTH
-local GAP = 6                        -- between the roll panels
+local GAP = 8                        -- between the roll panels
 local INSET = 8                      -- inside a card
 local HEAD = ICON + 2 * INSET        -- a card's icon row
 local GOLD = { 1, 0.82, 0 }
@@ -399,12 +399,19 @@ end
 local function StylePanel(frame, look)
 	local panel = look.rollPanel
 	frame.bg:SetShown(panel ~= "none")
-	local back = ns.ThemePanel() or { 0.03, 0.03, 0.04 } -- (the style theme's panel)
+	local back, edge = ns.ThemePanel() -- (the style theme's panel)
+	back = back or { 0.03, 0.03, 0.04 }
 	frame.bg:SetColorTexture(back[1], back[2], back[3], look.rollAlpha)
 	if panel ~= "none" then ns.ThemeOrnament(frame) end
-	frame.outer:SetShown(panel == "rounded")
-	frame.border:SetShown(panel == "rounded")
-	frame.flat:SetShown(panel == "flat")
+	-- (A shaped panel in place of the rectangle and its edges.)
+	frame.themeSliceOut = 2 -- (the item's icon sits close to the cut corner)
+	local shaped = edge and panel ~= "none" and ns.DressThemeSlice(frame, back[1], back[2], back[3], look.rollAlpha,
+		edge[1], edge[2], edge[3], 1)
+	if not shaped then ns.HideThemeSlice(frame) end
+	if shaped then frame.bg:Hide() end
+	frame.outer:SetShown(panel == "rounded" and not shaped)
+	frame.border:SetShown(panel == "rounded" and not shaped)
+	frame.flat:SetShown(panel == "flat" and not shaped)
 end
 
 local function BorderColor(card, r, g, b, a)

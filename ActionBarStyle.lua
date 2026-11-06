@@ -112,7 +112,7 @@ end
 
 -- The art that shows over a round button and needs its corners cut too.
 local function RoundArt(button, part)
-	local list = { part.icon }
+	local list = { part.icon, part.ground or false }
 	for _, texture in ipairs({
 		button.GetPushedTexture and button:GetPushedTexture() or false,
 		button.GetHighlightTexture and button:GetHighlightTexture() or false,
@@ -122,17 +122,26 @@ local function RoundArt(button, part)
 	}) do
 		if texture and texture.AddMaskTexture then list[#list + 1] = texture end
 	end
+	for i = #list, 1, -1 do
+		if not list[i] then table.remove(list, i) end
+	end
 	return list
 end
 
-local function SetRound(button, part, round)
-	if round and not part.mask and button.CreateMaskTexture then
+-- (own: a square of ours has a mask too, a plain one. Bar 1's icons went missing
+-- behind the slot art with no mask on them at all, and only those: with one, as
+-- the game's own look and round both have, they draw.)
+local function SetRound(button, part, round, own)
+	if own and not part.mask and button.CreateMaskTexture then
 		part.mask = button:CreateMaskTexture()
 		part.mask:SetAllPoints(button)
-		part.mask:SetTexture(CIRCLE, "CLAMPTOBLACKADDITIONAL", "CLAMPTOBLACKADDITIONAL")
 	end
 	if part.mask then
-		if round then
+		if own and part.maskRound ~= round then
+			part.maskRound = round
+			part.mask:SetTexture(round and CIRCLE or SQUARE_SWIPE, "CLAMPTOBLACKADDITIONAL", "CLAMPTOBLACKADDITIONAL")
+		end
+		if own then
 			for _, texture in ipairs(RoundArt(button, part)) do
 				if not part.roundOn[texture] then
 					part.roundOn[texture] = true
@@ -178,6 +187,14 @@ local function Dress(button, plan)
 	part.dressed = true
 
 	SetHidden(button.GetNormalTexture and button:GetNormalTexture(), plan.own)
+	-- (A dark ground for empty slots: on the classic clients the game's slot art is
+	-- the normal texture just hidden, which leaves them see-through.)
+	if plan.own and not part.ground then
+		part.ground = button:CreateTexture(nil, "BACKGROUND", nil, -8)
+		part.ground:SetAllPoints()
+		part.ground:SetColorTexture(0, 0, 0, 0.5)
+	end
+	if part.ground then part.ground:SetShown(plan.own and plan.slots) end
 	for _, back in ipairs(part.backs) do SetHidden(back, not plan.slots) end
 
 	-- The game's mask (rounded corners on retail art) goes with its shape.
@@ -194,7 +211,10 @@ local function Dress(button, plan)
 	else
 		part.icon:SetTexCoord(0, 1, 0, 1)
 	end
-	SetRound(button, part, plan.round)
+	-- (And above the slot art for certain: they can share a draw layer.)
+	if not part.iconLayer then part.iconLayer, part.iconSub = part.icon:GetDrawLayer() end
+	part.icon:SetDrawLayer(part.iconLayer, math.min(7, (part.iconSub or 0) + (plan.own and 1 or 0)))
+	SetRound(button, part, plan.round, plan.own)
 	SetOutline(button, part, plan)
 end
 
@@ -220,9 +240,42 @@ function ns.RefreshActionBarStyle()
 	waiting = false
 	if OthersSkinThem() then return end
 	local plan = Plan()
+	local failed
 	EachButton(function(button)
-		if not (button.IsForbidden and button:IsForbidden()) then pcall(Dress, button, plan) end
+		if not (button.IsForbidden and button:IsForbidden()) then
+			local ok, err = pcall(Dress, button, plan)
+			if not ok then failed = err end
+		end
 	end)
+	if failed then ns.Log("style", "action buttons failed: " .. tostring(failed)) end
+	-- (The square band bar 1 sits on: round buttons on it look out of place.)
+	if ns.SetBarBorderOff then ns.SetBarBorderOff(plan.round) end
+end
+
+-- For the shots' log: what the page means to do and what's come of it.
+function ns.ActionBarState()
+	local plan, dressed, counted = Plan(), 0, 0
+	EachButton(function(button)
+		counted = counted + 1
+		if parts[button] and parts[button].dressed then dressed = dressed + 1 end
+	end)
+	local button = _G.ActionButton1
+	local normal = button and button.GetNormalTexture and button:GetNormalTexture()
+	return ("bars: own %s line %s round %s others %s dressed %d/%d normal alpha %s"):format(tostring(plan.own), tostring(plan.line),
+		tostring(plan.round), tostring(OthersSkinThem()), dressed, counted, tostring(normal and normal:GetAlpha()))
+end
+
+-- For the theme shots' log: whether bar 1's first icon can draw.
+function ns.ButtonLayers()
+	local button = _G.ActionButton1
+	if not (button and button.icon) then return "no ActionButton1" end
+	local function Of(texture)
+		if not texture then return "none" end
+		local layer, sub = texture:GetDrawLayer()
+		return ("%s %s shown %s alpha %s masks %s"):format(tostring(layer), tostring(sub), tostring(texture:IsShown()),
+			tostring(texture:GetAlpha()), tostring(texture.GetNumMaskTextures and texture:GetNumMaskTextures()))
+	end
+	return ("icon %s; slot back %s; slot art %s"):format(Of(button.icon), Of(button.SlotBackground), Of(button.SlotArt))
 end
 
 local watcher = CreateFrame("Frame")

@@ -281,8 +281,20 @@ function F.Install(wow)
 				end
 			end
 		end
+		-- (A texture or text moves with its list too: hiding the new parent hides it.)
+		local region = false
+		if old and rawget(old, "_regions") then
+			for i, each in ipairs(old._regions) do
+				if each == self then
+					table.remove(old._regions, i)
+					region = true
+					break
+				end
+			end
+		end
 		self._parent = parent
 		if parent and rawget(parent, "_children") then table.insert(parent._children, self) end
+		if region and parent and rawget(parent, "_regions") then table.insert(parent._regions, self) end
 		Dirty()
 	end)
 	local function Own(self, fn)
@@ -730,7 +742,11 @@ function F.Dump(root)
 				item.part = hi > lo and math.max(0, math.min(1, (value - lo) / (hi - lo))) or 0
 			end
 			local mask = get("_mask")
-			if mask then item.mask = rawget(mask, "_file") end
+			if mask then
+				item.mask = rawget(mask, "_file")
+				local ml, mb, mw, mh = Rect(mask)
+				if ml then item.maskRect = { ml - rl, Top(mb + mh), mw, mh } end
+			end
 		end
 		items[#items + 1] = item
 	end

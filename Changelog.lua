@@ -11,6 +11,8 @@
 local _, ns = ...
 
 ns.CHANGELOG_FEATURES = {
+	{ date = "2026-11-06", page = "Style Overrides", title = "Style overrides",
+		text = "Hide or show parts of the unit frames and nameplates from one tab, whatever their Interface rows say. Themes can use it too, and an overridden row says so." },
 	{ date = "2026-11-05", page = "Style General", title = "Style themes",
 		text = "A whole new look in one click: Silver Screen, Gilded Codex, Emberforge, Moonlit Glade and Frostbound " ..
 		"each change your frames, fonts, panels and menus. Pick one on the Style hub's General page." },

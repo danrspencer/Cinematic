@@ -157,7 +157,23 @@ function draw(canvas, shot, zoom = 1) {
 	g.scale(dpr, dpr);
 	g.translate(-c[0], -c[1]);
 	g.fillStyle = "#14161a"; g.fillRect(0, 0, shot.w, shot.h);
-	for (const item of shot.items) {
+	paintItems(g, shot.items, dpr, shot);
+}
+
+// A masked item goes on a layer of its own, cut by its mask's picture.
+function paintItems(g, items, dpr, shot) {
+	for (const item of items) {
+		if (item.mask && images[item.mask]) {
+			const layer = document.createElement("canvas");
+			layer.width = shot.w * dpr; layer.height = shot.h * dpr;
+			const og = layer.getContext("2d"); og.scale(dpr, dpr);
+			paintItems(og, [{ ...item, mask: null }], dpr, shot);
+			const r = item.maskRect || [item.x, item.y, item.w, item.h];
+			og.globalCompositeOperation = "destination-in";
+			og.drawImage(images[item.mask], r[0], r[1], r[2], r[3]);
+			g.drawImage(layer, 0, 0, shot.w, shot.h);
+			continue;
+		}
 		g.save();
 		if (item.clip) { g.beginPath(); g.rect(item.clip[0], item.clip[1], item.clip[2], item.clip[3]); g.clip(); }
 		g.globalAlpha = 1;
@@ -175,7 +191,6 @@ function draw(canvas, shot, zoom = 1) {
 			g.restore(); continue;
 		}
 		if (item.blend === "ADD") g.globalCompositeOperation = "lighter";
-		if (item.mask) roundClip(g, item);
 		if (item.rot) { g.translate(item.x + item.w / 2, item.y + item.h / 2); g.rotate(-item.rot); g.translate(-item.x - item.w / 2, -item.y - item.h / 2); }
 		const v = item.vc; const va = v ? (v[3] ?? 1) : 1;
 		if (item.color && !item.grad) {

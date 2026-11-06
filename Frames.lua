@@ -1072,10 +1072,11 @@ local BAR_ART_KEYS = {
 	MainMenuBar = { "EndCaps", "BorderArt" },
 	MainActionBar = { "EndCaps", "BorderArt" },
 }
-local barArt, barArtSeen = {}, {}
+local barArt, barArtSeen = {}, { off = false }
 local artStandIn
 
-local function AddBarArt(region)
+-- (border: the band the buttons sit on, which round buttons take off: ns.SetBarBorderOff.)
+local function AddBarArt(region, border)
 	if type(region) ~= "table" or barArtSeen[region] or type(region.SetAlpha) ~= "function"
 		or IsForbidden(region) then
 		return
@@ -1086,7 +1087,7 @@ local function AddBarArt(region)
 		return
 	end
 	barArtSeen[region] = true
-	barArt[#barArt + 1] = { region = region, bar = bar and bar:GetName() }
+	barArt[#barArt + 1] = { region = region, bar = bar and bar:GetName(), border = border }
 	if region.SetIgnoreParentAlpha then
 		region:SetIgnoreParentAlpha(true)
 	end
@@ -1095,11 +1096,18 @@ local function AddBarArt(region)
 		artStandIn:SetAllPoints(bar or region)
 		hooksecurefunc(artStandIn, "SetAlpha", function(_, alpha)
 			for _, art in ipairs(barArt) do
-				art.region:SetAlpha(alpha)
+				art.region:SetAlpha(art.border and barArtSeen.off and 0 or alpha)
 			end
 		end)
 	end
-	region:SetAlpha(artStandIn:GetAlpha())
+	region:SetAlpha(border and barArtSeen.off and 0 or artStandIn:GetAlpha())
+end
+
+function ns.SetBarBorderOff(off)
+	barArtSeen.off = off and true or false
+	for _, art in ipairs(barArt) do
+		if art.border then art.region:SetAlpha(off and 0 or artStandIn:GetAlpha()) end
+	end
 end
 
 local function FindBarArt()
@@ -1110,7 +1118,7 @@ local function FindBarArt()
 		local bar = _G[barName]
 		if type(bar) == "table" then
 			for _, key in ipairs(keys) do
-				AddBarArt(bar[key])
+				AddBarArt(bar[key], key == "BorderArt")
 			end
 		end
 	end
@@ -10616,7 +10624,9 @@ do
 			if frame then
 				for _, part in ipairs(ns.UNIT_PARTS) do
 					local key = FRAMES.Key(entry, part)
-					local hide = ns.db.handleUnitFrames ~= false and FRAMES.Hidden(key)
+					-- (The Style hub's Overrides tab over the row, page switch or not.)
+					local over = ns.StyleOverride(key)
+					local hide = over == "hide" or not over and ns.db.handleUnitFrames ~= false and FRAMES.Hidden(key)
 					local paths = entry[2][part]
 					if type(paths) == "function" then
 						for _, region in ipairs(paths(frame)) do
@@ -10659,6 +10669,21 @@ do
 			SetHidden(region, hide)
 		end
 		wipe(want)
+	end
+
+	-- A frame's regions for a part (UnitStyle.lua: the level, lifted over a shape's ring).
+	function ns.UnitPartRegions(frame, part)
+		local list = {}
+		for _, entry in ipairs(FRAMES) do
+			if _G[entry[1]] == frame then
+				local paths = entry[2][part]
+				for _, path in ipairs(type(paths) == "table" and paths or NO_DEFAULTS) do
+					local region = Field(frame, path)
+					if region then list[#list + 1] = region end
+				end
+			end
+		end
+		return list
 	end
 
 	-- (For /cine debug unitframes: what a part of the target and focus frames

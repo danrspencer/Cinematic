@@ -25,6 +25,9 @@ local ns, wow = dofile("Tools/offline/load.lua")(client, "CinematicDev.toc", fun
 	-- (No font families here: text keeps the plain font it's given.)
 	rawset(_G, "CreateFontFamily", false)
 	_G.GetBindingKey = function() return nil end
+	-- (Lists of spells on a page, shown by name.)
+	_G.C_Spell = _G.C_Spell or {}
+	_G.C_Spell.GetSpellInfo = function() return { name = "Spell", iconID = 134400 } end
 	_G.GetTime = function() return F.now or 0 end
 	_G.ChatTypeInfo = { SAY = { r = 1, g = 1, b = 1 }, YELL = { r = 1, g = 0.25, b = 0.25 } }
 	_G.GetRealZoneText = function() return "Darkshore" end
@@ -103,7 +106,10 @@ local FRAMES = {
 }
 -- Whole settings pages, drawn as the menu draws them.
 local PAGES = {
+	{ id = "page-cinemode", name = "CineMode page", group = "Menu", page = "CineMode", pageName = "CineMode" },
 	{ id = "page-general", name = "Style: General page", group = "Menu", page = "Style > General", pageName = "Style General" },
+	{ id = "page-pages", name = "Style: Pages tab", group = "Menu", page = "Style > General > Pages", pageName = "Style Pages" },
+	{ id = "page-overrides", name = "Style: Overrides tab", group = "Menu", page = "Style > General > Overrides", pageName = "Style Overrides" },
 	{ id = "page-tooltip", name = "Style: Tooltips page", group = "Menu", page = "Style > Tooltips", pageName = "Tooltip Style" },
 	{ id = "page-cast", name = "Style: Cast Bars page", group = "Menu", page = "Style > Cast Bars", pageName = "Cast Bar Style" },
 	{ id = "page-damage", name = "Damage Vision: Style page", group = "Menu", page = "Damage Vision > Style", pageName = "Damage Vision Look" },

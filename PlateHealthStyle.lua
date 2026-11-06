@@ -8,6 +8,30 @@
 
 local _, ns = ...
 
+ns.DEFAULTS.stylePlate = "game" -- the game's nameplate Style: "game" (left alone) or its number, 0 up
+
+-- The game's own Style setting, as the General page says: held like any other
+-- game setting of ours (yours saved and put back, a change of yours in its
+-- Options wins), so it's on the Held Game Settings page too. Only while Style's on.
+local STYLE_NAMES = { "Modern", "Thin Bars", "Blocky Bars", "Clean Health", "Blocky Cast", "Legacy Red" }
+local STYLE_SET = ns.CVarSet("Nameplate style", "Style hub's General page: the nameplate style picked there",
+	{ secure = true, playerWins = true, values = { nameplateStyle = "0" } })
+
+-- The styles' names, on a client whose menu has them (nil: not this one).
+function ns.GamePlateStyles()
+	local ok, value = pcall(GetCVar, "nameplateStyle")
+	if ok and STYLE_NAMES[(tonumber(value) or -1) + 1] then return STYLE_NAMES end
+end
+
+local function HoldPlateStyle()
+	local db = ns.db
+	if not (db and ns.GamePlateStyles()) then return end
+	local value = db.styleGeneral and db.stylePlate ~= "game" and tostring(db.stylePlate) or nil
+	if STYLE_SET.active and value ~= STYLE_SET.values.nameplateStyle then ns.ApplyCVarSet(STYLE_SET, false) end
+	if value then STYLE_SET.values.nameplateStyle = value end
+	if not (STYLE_SET.active and not value) then ns.ApplyCVarSet(STYLE_SET, value ~= nil) end
+end
+
 local states = setmetatable({}, { __mode = "k" }) -- [bar] = { game's fill, our edges, on }
 local hooked = setmetatable({}, { __mode = "k" })
 local busy = false -- (while we set the fill: not the game setting its own)
@@ -116,6 +140,7 @@ local function TryPlate(plate)
 end
 
 function ns.RefreshPlateHealthStyle()
+	HoldPlateStyle()
 	if not (ns.db and C_NamePlate and C_NamePlate.GetNamePlates) then return end
 	for _, plate in ipairs(C_NamePlate.GetNamePlates()) do TryPlate(plate) end
 end
@@ -157,16 +182,24 @@ function ns.ReportPlateHealthStyle(quiet)
 			styled = styled + 1
 		end
 	end
-	local line = ("plate health style: texture %s, border %s, theme %s; %d plates, %d styled, %d kept from addons, in instance %s"):format(
+	local line = ("plate health style: texture %s, border %s, theme %s; %d plates, %d styled, %d kept from addons, in instance %s, style %s (picked %s, held %s)"):format(
 		tostring(texture or "game"), tostring(kind), ns.ActiveStyleTheme().key, total, styled, kept,
-		tostring((IsInInstance())))
+		tostring((IsInInstance())), tostring(GetCVar("nameplateStyle")), tostring(ns.db and ns.db.stylePlate),
+		tostring(STYLE_SET.active or false))
 	ns.Log("plates", line)
 	if not quiet then ns.Print(line) end
 end
 
 local watcher = CreateFrame("Frame")
 watcher:RegisterEvent("NAME_PLATE_UNIT_ADDED")
-watcher:SetScript("OnEvent", function(_, _, unit)
+-- (A held setting can't change in a fight: tried again as one ends.)
+watcher:RegisterEvent("PLAYER_ENTERING_WORLD")
+watcher:RegisterEvent("PLAYER_REGEN_ENABLED")
+watcher:SetScript("OnEvent", function(_, event, unit)
+	if event ~= "NAME_PLATE_UNIT_ADDED" then
+		HoldPlateStyle()
+		return
+	end
 	if not (ns.db and C_NamePlate and C_NamePlate.GetNamePlateForUnit) then return end
 	TryPlate(C_NamePlate.GetNamePlateForUnit(unit))
 end)

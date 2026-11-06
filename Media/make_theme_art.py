@@ -55,15 +55,15 @@ def noise1(n, scale):
 
 def gilt(u, v):
     # (Beaten gold: a bright rim above, a dark rim below, a soft band of light.)
+    # (Nothing along its length: on a tall raid tile that stretches into streaks.)
     body = 0.70 + 0.22 * np.exp(-((v - 0.32) / 0.2) ** 2)
-    body = body + 0.035 * noise1(256, 18)[None, :]
     rim = np.where(v < 0.07, 1.0, np.where(v > 0.92, 0.42, body))
     return rim
 
 
 def forged(u, v):
     # (Hammered iron: dents along the bar over a heavy bevel.)
-    dents = (noise1(256, 26)[None, :] * noise1(32, 6)[:, None]) * 0.08
+    dents = (noise1(256, 26)[None, :] * noise1(32, 6)[:, None]) * 0.04
     body = 0.84 - 0.34 * smooth((v - 0.2) / 0.8) + dents
     return np.where(v < 0.06, 1.0, np.where(v > 0.9, 0.3, body))
 
@@ -83,6 +83,12 @@ def rime(u, v):
 def reel(u, v):
     # (A strip of film: flat, a hairline at each edge.)
     return np.where((v < 0.05) | (v > 0.95), 0.55, 0.9 - 0.08 * v)
+
+
+def tile(u, v):
+    # (For tall raid tiles: one smooth shade with no bands to stretch, darkest at
+    # the top, where the name sits, so light words stand out on any class color.)
+    return 0.56 + 0.40 * smooth(v / 0.75)
 
 
 # Grains: tiling noise, shaped.
@@ -249,25 +255,38 @@ def glade():
 
 
 def rime_corner():
-    # (Ice crystals growing out of the corner, each cut in two facets.)
+    # (Hoarfrost: a six-armed crystal on the corner, big enough to read on a small
+    # tooltip, a line running off each way that thins to nothing, and a few cut
+    # chips of ice along it, each smaller than the last.)
     im, d = canvas()
+    bright, soft = (255, 255, 255, 255), (204, 226, 244, 255)
+    cx, cy = 13, 13
 
-    def shard(angle, length, width):
+    def arm(angle, length, width, fill):
         ca, sa = math.cos(angle), math.sin(angle)
-        px, py = -sa, ca
-        base = (2.5, 2.5)
-        tip = (base[0] + ca * length, base[1] + sa * length)
-        mid = (base[0] + ca * length * 0.32, base[1] + sa * length * 0.32)
-        a = (mid[0] + px * width, mid[1] + py * width)
-        b = (mid[0] - px * width, mid[1] - py * width)
-        d.polygon([tuple(S(*p)) for p in (base, a, tip)], fill=(255, 255, 255, 255))
-        d.polygon([tuple(S(*p)) for p in (base, b, tip)], fill=(176, 196, 214, 255))
+        stroke(d, [(cx, cy, 1.0), (cx + ca * length, cy + sa * length, 0.3)], width, fill)
+        bx, by = cx + ca * length * 0.56, cy + sa * length * 0.56
+        for side in (-1, 1):
+            a = angle + side * math.pi / 3
+            stroke(d, [(bx, by, 0.85), (bx + math.cos(a) * length * 0.38, by + math.sin(a) * length * 0.38, 0.25)],
+                   width, fill)
 
-    for angle, length, width in ((0.04, 56, 3.2), (1.53, 56, 3.2), (0.27, 34, 2.8), (1.3, 34, 2.8), (0.52, 22, 2.8),
-                                 (1.05, 22, 2.8), (0.785, 30, 4)):
-        shard(angle, length, width)
-    for x, y, s in ((41, 13, 1.6), (13, 41, 1.6), (29, 22, 1.2), (22, 29, 1.2)):
-        d.polygon([tuple(S(*p)) for p in ((x, y - s * 2), (x + s, y), (x, y + s * 2), (x - s, y))], fill=(255, 255, 255, 255))
+    for i in range(6):
+        arm(i * math.pi / 3 + math.pi / 12, 12.5, 1.9, bright if i % 2 == 0 else soft)
+    d.polygon([tuple(S(cx + math.cos(i * math.pi / 3 + math.pi / 12) * 3.4, cy + math.sin(i * math.pi / 3 + math.pi / 12) * 3.4))
+               for i in range(6)], fill=bright)
+
+    for flip in (False, True):
+        def P(pts):
+            return [(y, x, w) if flip else (x, y, w) for x, y, w in pts]
+
+        def chip(x, y, half, fill):
+            pts = [(x - half * 1.7, y), (x, y - half), (x + half * 1.7, y), (x, y + half)]
+            d.polygon([tuple(S(*((q[1], q[0]) if flip else q))) for q in pts], fill=fill)
+
+        stroke(d, P([(26, 4, 1.0), (44, 4, 0.7), (62, 4, 0.1)]), 1.7, soft)
+        for x, half in ((31, 2.4), (40, 1.8), (48, 1.3)):
+            chip(x, 4, half, bright)
     return finish(im)
 
 
@@ -285,7 +304,8 @@ def reel_corner():
 
 
 def main():
-    for name, level in (("Gilt", gilt), ("Forged", forged), ("Lunar", lunar), ("Rime", rime), ("Reel", reel)):
+    for name, level in (("Gilt", gilt), ("Forged", forged), ("Lunar", lunar), ("Rime", rime), ("Reel", reel),
+                        ("Tile", tile)):
         save(bar(level), os.path.join(BARS, name + ".tga"))
     for name, values in grains().items():
         save(grain(values), os.path.join(THEMES, name + "Grain.tga"))

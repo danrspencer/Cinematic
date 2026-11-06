@@ -1,0 +1,70 @@
+[
+  {
+    "state": "open",
+    "text": "Detail pass 2026-11-06: art off the pixel grid, panels at twice the size, ring gap, bar numbers fit, second power bar, tail with a line. Needs a game run; themeshots now logs textfit lines."
+  },
+  {
+    "state": "open",
+    "text": "Four shape themes (Crimson Vanguard, Hearthside, Cathedral, Runestone): masks on real bars and portraits need a game run."
+  },
+  {
+    "state": "open",
+    "text": "Nameplates and cast bars stay square: the game's own art sits around them."
+  },
+  {
+    "state": "open",
+    "text": "New ice corner art: needs a game look on Frostbound."
+  },
+  {
+    "state": "open",
+    "text": "Still unstyled: bags, swing timer, quest objectives, minimap, buffs, combat text, chat."
+  },
+  {
+    "state": "open",
+    "text": "Raid frames look nearly alike across themes now: only the border differs."
+  },
+  {
+    "state": "open",
+    "text": "Chat bubble tail looks detached in most themes."
+  },
+  {
+    "state": "open",
+    "text": "Corner art: some still looks basic. Class-themed art not started."
+  },
+  {
+    "state": "open",
+    "text": "Zone card overlaps chat: in its own session."
+  },
+  {
+    "state": "fixed",
+    "text": "Tooltip words hidden behind the panel."
+  },
+  {
+    "state": "fixed",
+    "text": "Party frames lost class colors."
+  },
+  {
+    "state": "fixed",
+    "text": "Vertical streaks and hard bands on tall raid tiles."
+  },
+  {
+    "state": "fixed",
+    "text": "Nameplates ignored themes (friendly plates in dungeons still can't be reached)."
+  },
+  {
+    "state": "fixed",
+    "text": "Raid and party names hard to read: smooth tile and sturdy font confirmed on real party frames."
+  },
+  {
+    "state": "fixed",
+    "text": "Party role icons hidden by themes."
+  },
+  {
+    "state": "fixed",
+    "text": "Heavy, cartoony text outlines: soft shadows now."
+  },
+  {
+    "state": "fixed",
+    "text": "Portrait shapes work on real frames (circle, square)."
+  }
+]

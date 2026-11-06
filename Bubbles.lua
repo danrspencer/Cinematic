@@ -108,7 +108,10 @@ function ns.MakeBubbleSkin(parent)
 		if i <= 2 then edge:SetHeight(1) else edge:SetWidth(1) end
 		skin.edges[i] = edge
 	end
-	local tail = skin:CreateTexture(nil, "BORDER")
+	-- (On a frame of its own, over the panel's line, which a tail of ours breaks.)
+	skin.tailFrame = CreateFrame("Frame", nil, skin)
+	skin.tailFrame:SetAllPoints()
+	local tail = skin.tailFrame:CreateTexture(nil, "ARTWORK")
 	if C_Texture and C_Texture.GetAtlasInfo and C_Texture.GetAtlasInfo("ChatBubble-Tail") then
 		tail:SetAtlas("ChatBubble-Tail", true)
 		skin.tailInto = 5 -- (how far it overlaps the edge)
@@ -119,13 +122,20 @@ function ns.MakeBubbleSkin(parent)
 	end
 	tail:SetDesaturated(true)
 	skin.tail = tail
+	-- (With a shaped panel: the line down the tail's sides, joining the panel's.)
+	skin.tailEdge = skin.tailFrame:CreateTexture(nil, "ARTWORK", nil, 1)
+	skin.tailEdge:SetAllPoints(tail)
+	skin.tailEdge:Hide()
+	ns.ThemeNoSnap(skin.tailEdge)
 	skin.border = ns.MakeStyleEdges(skin, "BORDER")
 	skin.border.ornate = true
 	return skin
 end
 
 -- A skin dressed as look says (shown only for Dark and Custom).
+local TAIL_W, TAIL_H = 24, 18 -- (a tail of ours)
 function ns.DressBubbleSkin(skin, look)
+	skin.tailFrame:SetFrameLevel(skin:GetFrameLevel() + 3)
 	local r, g, b = ns.BubbleBackColor(look)
 	skin:SetShown(r ~= nil)
 	if not r then return end
@@ -135,12 +145,43 @@ function ns.DressBubbleSkin(skin, look)
 	for _, edge in ipairs(skin.edges) do edge:Hide() end -- (the old 1-pixel lines: ours now, any thickness)
 	-- (Thin and Thick: a soft grey, as the bubble's always had; Custom: its own.)
 	local kind, size, er, eg, eb = ns.StyleBorder(look, "bubblesEdge", { 0.65, 0.65, 0.65 })
-	skin.border:SetShown(kind == "line")
-	if kind == "line" then
+	-- (A shaped panel in place of the rectangle and its lines.)
+	local shaped = ns.DressThemeSlice(skin, r, g, b, alpha, er or 0.5, eg or 0.5, eb or 0.5, alpha)
+	skin.back:SetShown(not shaped)
+	skin.border:SetShown(kind == "line" and not shaped)
+	if kind == "line" and not shaped then
 		ns.DressStyleEdges(skin.border, size, er, eg, eb, look.bubblesEdge == "custom" and alpha or 0.7 * alpha, false)
+	end
+	-- (Its tail to match: the game's art has no line, and hangs off a lined panel.)
+	-- (Not on Speech's own bubbles: those turn their tail with its texture's corners.)
+	local ours = (shaped or kind == "line") and not skin.gameTail
+	if ours then
+		-- (Its top level with the top of the panel's line, so the two lines meet: a
+		-- shaped panel's is two thick, a pixel in from its edge.)
+		local thin = not shaped and (tonumber(size) or 1) <= 1
+		skin.tailTop = shaped and 3 or tonumber(size) or 1
+		local fill, edge = ns.ThemeTailArt(thin)
+		skin.tail:SetTexture(fill)
+		skin.tail:SetTexCoord(0, 1, 0, 1)
+		skin.tail:SetSize(TAIL_W, TAIL_H)
+		skin.tail:SetDesaturated(false)
+		skin.tailEdge:SetTexture(edge)
+		local lineAlpha = (shaped or look.bubblesEdge == "custom") and alpha or 0.7 * alpha
+		skin.tailEdge:SetVertexColor(er or 0.5, eg or 0.5, eb or 0.5, lineAlpha)
+		ns.ThemeNoSnap(skin.tail)
+		skin.tailOurs = true
+	elseif skin.tailOurs then
+		skin.tailOurs = nil
+		if C_Texture and C_Texture.GetAtlasInfo and C_Texture.GetAtlasInfo("ChatBubble-Tail") then
+			skin.tail:SetAtlas("ChatBubble-Tail", true)
+		else
+			skin.tail:SetTexture("Interface\\Tooltips\\ChatBubble-Tail")
+		end
+		skin.tail:SetDesaturated(true)
 	end
 	skin.tail:SetVertexColor(r, g, b, alpha)
 	skin.tail:SetShown(look.bubblesTail and true or false)
+	skin.tailEdge:SetShown(ours and look.bubblesTail and true or false)
 end
 
 -- On the game's bubbles: their background, border and tail (every texture
@@ -272,9 +313,19 @@ local function Skin(bubble, inside, look)
 	end
 	skin.tail:ClearAllPoints()
 	if gameTail then
-		skin.tail:SetAllPoints(gameTail)
+		if skin.tailOurs then
+			-- (Under the game's tail, its own size, its top just inside our panel.)
+			local bottom, top = skin:GetBottom(), gameTail:GetTop()
+			local up = type(bottom) == "number" and type(top) == "number" and bottom + skin.tailTop - top or 3
+			skin.tail:SetPoint("TOP", gameTail, "TOP", 0, up)
+		else
+			-- (As far up as our back sits inside the bubble, or it hangs off short of it.)
+			skin.tail:SetPoint("TOPLEFT", gameTail, "TOPLEFT", 0, SKIN_INSET)
+			skin.tail:SetPoint("BOTTOMRIGHT", gameTail, "BOTTOMRIGHT", 0, SKIN_INSET)
+		end
 	else
 		skin.tail:Hide()
+		skin.tailEdge:Hide()
 	end
 end
 
@@ -507,6 +558,7 @@ local function DressCopy(copy, inside, text)
 		copy.game.tail:SetShown(tailOn)
 	end
 	copy.skin.tail:SetShown(tailOn)
+	copy.skin.tailEdge:SetShown(tailOn and copy.skin.tailOurs and true or false)
 	local gameTail = inside.Tail
 	if not gameTail then
 		for i = 1, select("#", inside:GetRegions()) do
@@ -963,6 +1015,8 @@ local function DressPreviewBubble(frame, look, words, color, most)
 	local boxed = look.bubblesBack ~= "none"
 	ns.DressBubbleSkin(frame.skin, look)
 	frame.skin:SetShown(boxed and own ~= nil)
+	frame.skin.tail:ClearAllPoints()
+	frame.skin.tail:SetPoint("TOP", frame.skin, "BOTTOM", -20, frame.skin.tailOurs and frame.skin.tailTop or frame.skin.tailInto)
 	if frame.game then
 		frame.game:SetShown(boxed and not own)
 		frame.game:SetAlpha(tonumber(look.bubblesAlpha) or 1)

@@ -171,8 +171,10 @@ local function DressSkin(skin, look)
 	local kind, size, r, g, b = ns.StyleBorder(look, "prdBorder")
 	skin:SetShown(kind ~= "game")
 	skin.back:SetAlpha(tonumber(look.prdBack) or 0.5)
-	skin.border:SetShown(kind == "line")
-	if kind == "line" then ns.DressStyleEdges(skin.border, size, r, g, b, 1, true) end
+	-- (The style theme's bar shape: a straight border can't follow it.)
+	local shaped = ns.DressBarShape(skin:GetParent(), skin.back)
+	skin.border:SetShown(kind == "line" and not shaped)
+	if kind == "line" and not shaped then ns.DressStyleEdges(skin.border, size, r, g, b, 1, true) end
 end
 
 -- The space between two bars with a border of ours: their lines (just

@@ -831,6 +831,16 @@ local function Dress(frame, look)
 		frame:SetBackdropColor(bg[1], bg[2], bg[3], bg[4] * alpha)
 		frame:SetBackdropBorderColor(edge[1], edge[2], edge[3], edge[4] * alpha)
 	end
+	-- (A shaped panel in place of the backdrop, on the theme's dark ones.)
+	local themeBack, themeEdge = nil, nil
+	if look ~= LOOKS.parchment and not chat and not (look and look.bare) then themeBack, themeEdge = ns.ThemePanel() end
+	if themeBack and ns.DressThemeSlice(frame, themeBack[1], themeBack[2], themeBack[3], themeBack[4] * alpha,
+		themeEdge[1], themeEdge[2], themeEdge[3], alpha) then
+		frame:SetBackdropColor(0, 0, 0, 0)
+		frame:SetBackdropBorderColor(0, 0, 0, 0)
+	else
+		ns.HideThemeSlice(frame)
+	end
 	if not chat then ns.ThemeOrnament(frame) end
 	local art = not chat and look and look.art and PageArt()
 	if art then SetArt(frame.page, art) end
