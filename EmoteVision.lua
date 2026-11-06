@@ -14,7 +14,7 @@ local L = ns.L
 
 local DEFAULTS = ns.DEFAULTS
 DEFAULTS.emoteVision = false           -- at all (its page's switch)
-DEFAULTS.emoteVisionAlways = false     -- its Show in row's Always: everywhere
+DEFAULTS.emoteVisionAlways = true      -- its Show in row's Always: everywhere (fights still wait: WhyWaiting)
 DEFAULTS.emoteVisionStill = false      -- only while you stand still (moving: it waits)
 DEFAULTS.emoteVisionRepeats = true     -- the same person's same moment again ignored...
 DEFAULTS.emoteVisionRepeatMins = 1     -- ...for this many minutes
@@ -329,16 +329,37 @@ for _, moment in ipairs(MOMENTS) do
 	DEFAULTS[moment.key] = table.concat(moment.emotes, ",")
 end
 
--- Where: its Show in row, Out of combat ticked to start with (anywhere, so
--- long as you're not fighting or just out of a fight).
+-- Where: its Show in row, Always ticked to start with in every profile (a
+-- fight still holds a card back: WhyWaiting). Unticked, Out of combat is.
 local ROW_KEY = "emote:vision"
 ns.CINE_SHOW_SETTING[ROW_KEY] = "emoteVisionAlways"
 ns.LIST_DEFAULTS.quietShow[ROW_KEY] = true
--- ...and its rule, given once (yours kept if you've written one): out of a
--- fight, anywhere.
-local DEFAULT_RULE = "not combat"
-local OLD_RULE = "not combat and world" -- (the first one given: changed to the new one if still unedited)
-local function GiveRule()
+-- The rules this row was once given (not written by you). A rule beats Always,
+-- so they go. (The second as Core's world-or-city change left the first.)
+local GIVEN_RULES = { ["not combat"] = true, ["not combat and world"] = true,
+	["not combat and (world or city)"] = true }
+-- Any of these on the row is a choice of yours. (Not quietShow: Out of combat
+-- is its start, and unticked it's the empty row.)
+local CHOICE_LISTS = { "combatShow", "calmShow", "camShow", "cineModeShow", "enemyShow", "friendlyShow", "bgShow",
+	"worldShow", "cityShow", "groupShow", "instanceShow", "rowFollow" }
+-- Always ticked on a row left empty or as it was given. t: the live settings
+-- or a saved profile. A rule or ticks of your own stay: a saved profile's
+-- Always is written off then, or the new default would tick it over them.
+local function AlwaysOnEmptyRow(t)
+	local rules = type(t.frameRules) == "table" and t.frameRules or nil
+	local rule = rules and rules[ROW_KEY]
+	local own = type(rule) == "string" and rule:find("%S") and not GIVEN_RULES[rule]
+	for _, list in ipairs(CHOICE_LISTS) do
+		if type(t[list]) == "table" and t[list][ROW_KEY] then own = true end
+	end
+	if own then
+		t.emoteVisionAlways = t.emoteVisionAlways or false
+		return
+	end
+	if rules then rules[ROW_KEY] = nil end
+	t.emoteVisionAlways = true
+end
+local function SetUpOnce()
 	local db = ns.db
 	if not db then return end
 	-- (Your group wipes started off in the dev copy, then on: on, once.)
@@ -352,15 +373,15 @@ local function GiveRule()
 		db.emoteVisionRepeatV2 = true
 		if db.emoteVisionRepeatMins == 10 then db.emoteVisionRepeatMins = 1 end
 	end
-	if db.emoteVisionRuleV1 and not db.emoteVisionRuleV2 and db.frameRules
-		and db.frameRules[ROW_KEY] == OLD_RULE then
-		db.frameRules[ROW_KEY] = DEFAULT_RULE
+	-- (Always for everyone, saved profiles too. Once.)
+	if not db.emoteVisionAlwaysV1 then
+		db.emoteVisionAlwaysV1 = true
+		db.emoteVisionRuleV1, db.emoteVisionRuleV2 = nil, nil
+		AlwaysOnEmptyRow(db)
+		for _, saved in pairs(db.profiles or {}) do
+			if type(saved) == "table" then AlwaysOnEmptyRow(saved) end
+		end
 	end
-	db.emoteVisionRuleV2 = true
-	if db.emoteVisionRuleV1 then return end
-	db.emoteVisionRuleV1 = true
-	db.frameRules = db.frameRules or {}
-	if db.frameRules[ROW_KEY] == nil then db.frameRules[ROW_KEY] = DEFAULT_RULE end
 end
 
 local WIDTH = 300
@@ -1782,7 +1803,7 @@ watcher:SetScript("OnEvent", function(_, event, ...)
 		LearnEnds()
 		C_Timer.After(1, Next)
 	elseif event == "PLAYER_ENTERING_WORLD" then
-		GiveRule()
+		SetUpOnce()
 		dead = ns.Flag(UnitIsDeadOrGhost("player")) and true or false
 		ScanOld(true)
 		LearnEnds()
