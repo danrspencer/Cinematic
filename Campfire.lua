@@ -85,6 +85,9 @@ local TENT_NAMES = { "camp tent", "tanning rack" }
 -- names (lastWasCampfire, lastWasTent) is worked out only when it changes, so
 -- looking often makes no garbage.
 local lastWasCampfire, lastWasTent
+local function TooltipFirstLine()
+	return GameTooltipTextLeft1 and GameTooltipTextLeft1:GetText()
+end
 local function LookAtTooltip()
 	if not ns.Flag(GameTooltip:IsShown()) then
 		return false
@@ -93,7 +96,7 @@ local function LookAtTooltip()
 	if not (owner == nil or owner == UIParent or owner == WorldFrame) then
 		return false
 	end
-	local ok, text = pcall(function() return GameTooltipTextLeft1 and GameTooltipTextLeft1:GetText() end)
+	local ok, text = pcall(TooltipFirstLine)
 	if not ok or type(text) ~= "string" or (issecretvalue and issecretvalue(text)) then
 		return false
 	end
@@ -125,17 +128,16 @@ local function TooltipIsCampfire()
 end
 
 -- Whether you're casting or channeling (cooking at the fire, fishing...).
--- Unreadable counts as no.
-local function Casting()
-	for _, Info in ipairs({ UnitCastingInfo or false, UnitChannelInfo or false }) do
-		if Info then
-			local ok, name = pcall(Info, "player")
-			if ok and type(name) == "string" then
-				return true
-			end
-		end
+-- Unreadable counts as no. (Asked over 100 times a second: no tables here.)
+local function HasSpellName(Info)
+	if not Info then
+		return false
 	end
-	return false
+	local ok, name = pcall(Info, "player")
+	return ok and type(name) == "string"
+end
+local function Casting()
+	return HasSpellName(UnitCastingInfo) or HasSpellName(UnitChannelInfo)
 end
 
 -- Times you can't (or wouldn't) sit down by a fire: the button's off (and,
@@ -431,9 +433,11 @@ local function OnUpdate(_, elapsed)
 	end
 	-- (Up already: stays while the cursor's on it. Not up: needs a fresh
 	-- sighting of the fire, and the REST wait over.)
-	local want = not dismissed and not walkedOff and not leftIcon and CanSit()
+	-- (CanSit last: it's the dear one, and most frames no fire's been seen.)
+	local want = not dismissed and not walkedOff and not leftIcon
 		and (alpha > 0 or now >= restUntil)
 		and (now - lastSeen < LINGER or (button:IsShown() and button:IsMouseOver()))
+		and CanSit()
 	if want then
 		fadingLogged = false
 		if alpha == 0 then

@@ -224,9 +224,9 @@ local PURE_CINEMA_SYSTEMS = {
 	"0 2 1 7 7 UIParent 0.0 45.0 -1 ##$$%/&('%(#,$",
 	"0 3 1 5 5 UIParent -5.0 -77.0 -1 #$$$%/&('%(#,$",
 	"0 4 1 5 5 UIParent -5.0 -77.0 -1 #$$$%/&('%(#,$",
-	"0 5 1 1 4 UIParent 0.0 0.0 -1 ##$$%/&('%(#,$",
-	"0 6 1 1 4 UIParent 0.0 -50.0 -1 ##$$%/&('%(#,$",
-	"0 7 1 1 4 UIParent 0.0 -100.0 -1 ##$$%/&('%(#,$",
+	"0 5 0 1 1 UIParent 0.0 -2.0 -1 ##$$%/&('%(#,$",    -- bars 6-8: top middle (as TOP_BARS)
+	"0 6 0 1 1 UIParent 0.0 -52.0 -1 ##$$%/&('%(#,$",
+	"0 7 0 1 1 UIParent 0.0 -102.0 -1 ##$$%/&('%(#,$",
 	"0 10 1 7 7 UIParent 0.0 45.0 -1 ##$$&('%",
 	"0 11 1 7 7 UIParent 0.0 45.0 -1 ##$$&('%,#",
 	"0 12 1 7 7 UIParent 0.0 45.0 -1 ##$$&('%",
@@ -298,6 +298,22 @@ do
 	DESIGN[#DESIGN + 1] = { 20, 3, "BOTTOM", "PlayerCastingBarFrame", "TOP", 0, 4 }    -- buff icons
 end
 
+-- Retail laid out like WoW Forever's default: its party frames raid-style.
+local RETAIL_FOREVER = { { UNIT_FRAME, PARTY, nil, nil, nil, nil, nil, { [RAID_STYLE_PARTY] = 1 } } }
+
+-- Action bars 6-8 at the top middle in all of ours, not in the middle of the
+-- screen where Modern has them. Each from the screen's top, not chained to the
+-- one above: these bars are often off, and a bar pinned to one that's off goes
+-- to the screen's top left. 50 apart, Modern's own spacing.
+local TOP_BARS = {
+	{ 0, 6, "TOP", "UIParent", "TOP", 0, -2 },
+	{ 0, 7, "TOP", "UIParent", "TOP", 0, -52 },
+	{ 0, 8, "TOP", "UIParent", "TOP", 0, -102 },
+}
+for _, design in ipairs({ DESIGN, FOREVER_PURE, RETAIL_FOREVER }) do
+	for _, bar in ipairs(TOP_BARS) do design[#design + 1] = bar end
+end
+
 -- Cinematic's own layouts, by the name Edit Mode lists them under. export:
 -- an Edit Mode export string (Share > Copy to Clipboard); without one, design:
 -- changes to the Modern preset (as DESIGN). bars: the action bars it lays
@@ -308,9 +324,7 @@ ns.EDIT_MODE_LAYOUTS = {
 	-- Retail laid out like WoW Forever's default (the retail profile "Forever").
 	-- Not designed yet: a copy of Modern until its export string's in (its
 	-- party frames raid-style, as Forever's).
-	CINE_RETAIL_FOREVER_LAYOUT = { export = nil,
-		design = { { UNIT_FRAME, PARTY, nil, nil, nil, nil, nil, { [RAID_STYLE_PARTY] = 1 } } },
-		client = "retail" },
+	CINE_RETAIL_FOREVER_LAYOUT = { export = nil, design = RETAIL_FOREVER, client = "retail" },
 	-- (the Cinema profile's: retail's from the dev's own, Forever's designed)
 	["Personal Resource Centered"] = ns.isRetail and { systems = PURE_CINEMA_SYSTEMS, client = "retail" }
 		or { design = FOREVER_PURE, client = "forever" },

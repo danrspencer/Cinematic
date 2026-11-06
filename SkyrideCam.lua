@@ -360,7 +360,8 @@ end
 -- Landed: back to your distance, level and behind you, all as one move over
 -- skyrideCamBackTime, starting skyrideCamLand after you touch down. (The
 -- script's When it ends then has nothing left to do. A zoom of yours stops
--- this one's and stays: its stop rules.)
+-- this one's and stays: its stop rules. The Landing tab's zoom off: the turn
+-- and tilt only, the distance staying for a scene of yours to change.)
 local LAND_ZOOM_SPEED = 8 -- yards a second: the landing zoom's path at its fastest (the runner's headroom takes it to about 10)
 local LAND_LOWERED = 15 -- degrees: the most a camera can have come down before the ground stops it, about
 local function Land(db)
@@ -375,13 +376,14 @@ local function Land(db)
 	local yaw = (state.yaw + 180) % 360 - 180 -- (the short way round)
 	-- (You've zoomed yourself since touching down: that's where it stays.)
 	local yours = ns.lastPlayerZoomAt and watch.downAt and ns.lastPlayerZoomAt >= watch.downAt
-	pose.landedBy = GetTime() + math.max(secs, zoomSecs) + 0.5
 	-- (A camera lowered as you land stops at the ground, so it's come down less
 	-- than counted: taking the whole count off would lift it over your head.)
 	local tilt = math.min(state.pitch, LAND_LOWERED)
 	if ns.CameraScriptSetTilt then ns.CameraScriptSetTilt(tilt) end
-	Play(List(Together(not yours and ZoomStep(Zoom(), home, zoomSecs, "smooth") or nil,
-		TiltStep(tilt, 0, secs), TurnStep(yaw, 0, secs))), "landing")
+	local zoom = db.skyrideCamZoomBack and not yours and ZoomStep(Zoom(), home, zoomSecs, "smooth") or nil
+	local steps = List(Together(zoom, TiltStep(tilt, 0, secs), TurnStep(yaw, 0, secs)))
+	pose.landedBy = GetTime() + (#steps > 0 and math.max(secs, zoom and zoomSecs or 0) + 0.5 or 0)
+	Play(steps, "landing")
 end
 -- (Whether the landing's still coming back, a long way in: SkyridingNow waits for it.)
 function ns.SkyrideLandingBusy()
@@ -403,7 +405,8 @@ ns.SetOnUpdate(watcher, function(_, elapsed)
 	end
 	if not watch.flying then
 		watch.flying, watch.since, watch.upAt = true, 0, GetTime()
-		pose.cruise = db.skyrideCamDistance -- (the take-off zoom's)
+		-- (The take-off zoom's, or with that off, where you are.)
+		pose.cruise = db.skyrideCamZoomOut and db.skyrideCamDistance or Zoom()
 		pose.following = db.skyrideFollow and true or false -- (the built-in script's own follow)
 	end
 	watch.since = watch.since + elapsed
@@ -539,9 +542,12 @@ function ns.CreateSkyrideCamPanel(kit)
 		end)
 		return slider
 	end
-	-- A moment's tick: its move on or off.
+	-- A tick of the page: greyed with the page off, or unless's setting on. A
+	-- click refreshes the page, as sliders and other ticks grey by it.
 	local function Tick(key, label, tip, unless)
-		kit.GreyUnless(Put(kit.Check(content, key, label, tip), "check"), function()
+		local check = Put(kit.Check(content, key, label, tip), "check")
+		check:HookScript("OnClick", kit.Refresh)
+		kit.GreyUnless(check, function()
 			return IfOn() and not (unless and ns.GetDB()[unless]) and true or false
 		end)
 	end
@@ -549,10 +555,13 @@ function ns.CreateSkyrideCamPanel(kit)
 	local HOLD_TIP = L["How long the camera stays there before going back."]
 
 	Section("takeoff", L["Take off"])
+	Tick("skyrideCamZoomOut", L["Zoom out"], L["Taking to the air zooms the camera out. Off: it stays at your own " ..
+		"distance, and surges go out from there."])
 	Slider("skyrideCamDistance", L["Zoom out to"], 10, 39, 1, YARDS,
 		L["How far out the camera goes as you take to the air: your cruise distance. Surges go out from here and " ..
-		"come back to it. 39 is as far as the game allows, past your own max camera distance for the flight."])
-	Slider("skyrideCamZoomTime", L["Over"], 1, 10, 0.5, SECS)
+		"come back to it. 39 is as far as the game allows, past your own max camera distance for the flight."],
+		"skyrideCamZoomOut")
+	Slider("skyrideCamZoomTime", L["Over"], 1, 10, 0.5, SECS, nil, "skyrideCamZoomOut")
 	Slider("skyrideCamStart", L["Start after"], 0, 3, 0.25, L["%.2f sec"],
 		L["How long you're in the air before the camera zooms out, so a hop doesn't start it."])
 
@@ -619,10 +628,10 @@ function ns.CreateSkyrideCamPanel(kit)
 		"yourself, so this only shows when you turn with the keys."], "skyrideFollow")
 	Slider("skyrideTurnDeg", L["By"], 5, 60, 5, DEGREES, nil, "skyrideTurn", "skyrideFollow")
 	Slider("skyrideTurnTime", L["Over"], 1, 5, 0.5, SECS, nil, "skyrideTurn", "skyrideFollow")
-	kit.GreyUnless(Put(kit.Check(content, "skyrideFollow", L["Follow your turns"],
+	Tick("skyrideFollow", L["Follow your turns"],
 		L["As the auto-run camera does: while you turn, the camera holds its direction, so you bank across the " ..
 		"screen, then glides around behind you once you straighten out. In place of Swing into the turn. Steering " ..
-		"with the mouse keeps the camera behind you, as ever."]), "check"), IfOn)
+		"with the mouse keeps the camera behind you, as ever."])
 	Slider("skyrideFollowAfter", L["Glide back after"], 0, 3, 0.25, L["%.2f sec"],
 		L["How long after you stop turning the camera starts gliding back behind you."], "skyrideFollow")
 	Slider("skyrideFollowMost", L["Fall behind at most"], 10, 120, 5, DEGREES,
@@ -630,6 +639,9 @@ function ns.CreateSkyrideCamPanel(kit)
 		"never ends with it in front of you."], "skyrideFollow")
 
 	Section("land", L["Landing"])
+	Tick("skyrideCamZoomBack", L["Zoom back to your distance"], L["Landing brings the camera back to the distance " ..
+		"you took off at. Off: it stays where the flight left it, for you or a scene of yours to change. Any " ..
+		"turn or tilt still comes back."])
 	Slider("skyrideCamBackTime", L["Back to your distance over"], 0.5, 10, 0.5, SECS,
 		L["How long the camera takes to come back to your own distance (and any turn or tilt undone) after " ..
 		"you land, as one smooth move."])

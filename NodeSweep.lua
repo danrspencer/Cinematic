@@ -296,19 +296,22 @@ end
 
 -- The names the pretend mouse hears at px, py (minimap units from the middle),
 -- as the tooltip lines; nil and why if the game refused.
+local NO_LINES = {} -- (read only)
+local function MouseoverAt(x, y)
+	Minimap:UpdateMouseoverAtPoint(x, y)
+	return C_TooltipInfo.GetMinimapMouseover()
+end
 local function Listen(px, py)
 	local left, bottom = Minimap:GetLeft(), Minimap:GetBottom()
 	local scale, width = Minimap:GetEffectiveScale(), Minimap:GetWidth()
 	if not (left and bottom and scale and width) or width <= 0 then return nil, "the minimap has no place" end
 	local half = width / 2
-	local ok, data = pcall(function()
-		Minimap:UpdateMouseoverAtPoint((left + half + px) * scale, (bottom + half + py) * scale)
-		return C_TooltipInfo.GetMinimapMouseover()
-	end)
+	if ns.profiling then ns.ProfileCount("minimap points") end
+	local ok, data = pcall(MouseoverAt, (left + half + px) * scale, (bottom + half + py) * scale)
 	Pause()
 	if not ok then return nil, "the game refused: " .. tostring(data) end
 	local lines = not Secret(data) and type(data) == "table" and data.lines
-	return type(lines) == "table" and not Secret(lines) and lines or {}
+	return type(lines) == "table" and not Secret(lines) and lines or NO_LINES
 end
 
 -- Whether the game wrote a tooltip line gray: a dot on the other side of
@@ -1074,6 +1077,7 @@ end
 -- of a step off a dot, or the gap between two. nil when it hears nothing.
 local lastAnchor -- (for /cine debug tracking)
 local function CloseLook(name, x, y, far)
+	if ns.profiling then ns.ProfileCount("minimap close looks") end
 	local spots = Locate(name, x, y, math.min(48, far + hearRadius + LOOK))
 	return type(spots) == "table" and #spots > 0 and spots or nil
 end
@@ -1209,6 +1213,7 @@ local function Sweep()
 	local marking = ns.db.minimapRevealNodes and ((ns.db.minimapNodeMark or "off") ~= "off"
 		or (ns.db.minimapNodeIcons or "") ~= "")
 	local found, probes, grown = ns.SweepMinimap(STEP, true, not marking and Wanted or nil)
+	if ns.profiling then ns.ProfileCount("minimap sweeps") end
 	last.at, last.why, last.grown, last.names = now, nil, grown, nil
 	if not found then
 		last.why = probes

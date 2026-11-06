@@ -331,9 +331,9 @@ local DEFAULTS = {
 	cooldownManagerOn = false, -- the profile turns the game's Cooldown Manager on if it's off (the CDM part; Profiles.lua)
 	prdOn = false,             -- ...and the personal resource display (the Personal Resource Centered layout)
 	prdOnFights = false,       -- ...the same for fights that show it (Cinema's frames)
-	centerPanels = true,      -- windows the game opens on the left open in the middle of the screen (CenterPanels.lua)
+	centerPanels = false,     -- windows the game opens on the left open in the middle of the screen (CenterPanels.lua)
 	dragPanels = true,         -- ...and drag them to move them; they open where last dropped (panelSpots, CenterPanels.lua)
-	chatCopyButton = true,     -- an icon on each chat window opens its lines to copy (ChatCopy.lua)
+	chatCopyButton = false,    -- an icon on each chat window opens its lines to copy (ChatCopy.lua; the dev copy: always)
 	chatCopyColours = true,    -- ...its lines in their chat colours (the Colours tick in that window)
 	loginZoom = false,         -- after a login or /reload, zoom to loginZoomDistance (Camera.lua)
 	loginZoomDistance = 15,    -- ...yards
@@ -607,6 +607,8 @@ DEFAULTS.runCamera = "run"
 -- back over skyrideCamBackTime as you land. On to start with, in every profile.
 DEFAULTS.skyrideCam = true
 DEFAULTS.skyrideCamAlways = true -- ...everywhere: its Show in row's Always
+DEFAULTS.skyrideCamZoomOut = true -- ...take-off: zoom out at all (off: it stays at your distance)
+DEFAULTS.skyrideCamZoomBack = true -- ...landing: zoom back at all (off: it stays where the flight left it)
 DEFAULTS.skyrideCamDistance = 20 -- ...take-off: yards out (your cruise distance: surges go out from it, come back to it)
 DEFAULTS.skyrideCamZoomTime = 4 -- ...take-off: seconds zooming out
 DEFAULTS.skyrideCamBackTime = 3 -- ...seconds coming back in after landing
@@ -1362,7 +1364,7 @@ for page, keys in pairs({
 	cameraModes = { "shoulderCam", "skyrideCam" }, -- Cameras > General's Enable Cameras: Shoulder Cam, Skyriding Cam
 	visualEffects = { "letterboxPage", "tintPage", "graphicsPlus", "musicInCinematic" }, -- (the Atmosphere hub's pages' switches)
 	-- Style > General's Enable Style: the Style hub's pages' switches.
-	styleGeneral = { "ufStyle", "rfStyle", "prdStyle", "tooltipStyle", "handlePlateStyle", "plateNameStyle",
+	styleGeneral = { "ufStyle", "rfStyle", "abStyle", "prdStyle", "tooltipStyle", "handlePlateStyle", "plateNameStyle",
 		"plateCastStyle", "bubblesStyle" },
 }) do
 	for _, key in ipairs(keys) do PAGE_SWITCH[key] = page end
@@ -2025,7 +2027,7 @@ local function IsBusy()
 	-- release button, a popup, shows anyway). A ghost keeps cinematic mode as
 	-- usual: the corpse run is just travel (Return to Graveyard isn't faded).
 	local corpse = Flag(UnitIsDead("player")) and not Flag(UnitIsGhost("player"))
-	return (corpse and not (ns.IsDeathCinematic and ns.IsDeathCinematic()))
+	return (corpse and not (ns.DeathCinematicWanted and ns.DeathCinematicWanted()))
 		or (ns.db.revealOnCast and (Flag(UnitCastingInfo("player")) or Flag(UnitChannelInfo("player")))
 			and not (ns.IsFishingEvent and ns.IsFishingEvent())
 			and not (ns.IsDepartEvent and ns.IsDepartEvent())
@@ -2405,7 +2407,7 @@ local function ShouldBeCinematic(now)
 		or (ns.db.walkInstant and ns.IsRPWalking())
 		or (ns.db.runInstant and ns.IsAutoRunning())
 		or (ns.ActiveEvent and ns.ActiveEvent())
-		or (ns.IsDeathCinematic and ns.IsDeathCinematic())
+		or (ns.DeathCinematicWanted and ns.DeathCinematicWanted())
 		or LongMove()
 	-- Moving: back once you've moved on, or stood still, for its own time
 	-- (not the "Back into CineMode after" one).
@@ -5117,6 +5119,31 @@ ticker:SetScript("OnEvent", ns.Profiled("Core events", function(self, event, arg
 				end
 			end
 			ns.db.questGlowOffV1 = true
+		end
+		-- The copy chat button off to start with now: other chat addons have
+		-- their own. Off in every profile. Once: tick it again and it stays.
+		if not ns.db.chatCopyOffV1 then
+			ns.db.chatCopyButton = false
+			for _, saved in pairs(ns.db.profiles or {}) do
+				if type(saved) == "table" then
+					saved.chatCopyButton = nil
+					if type(saved.settings) == "table" then saved.settings.chatCopyButton = nil end
+				end
+			end
+			ns.db.chatCopyOffV1 = true
+		end
+		-- Open windows in the middle of the screen off to start with now: players
+		-- want the game's own window spots, and couldn't find what moved them.
+		-- Off in every profile. Once: tick it again and it stays.
+		if not ns.db.centerPanelsOffV1 then
+			ns.db.centerPanels = false
+			for _, saved in pairs(ns.db.profiles or {}) do
+				if type(saved) == "table" then
+					saved.centerPanels = nil
+					if type(saved.settings) == "table" then saved.settings.centerPanels = nil end
+				end
+			end
+			ns.db.centerPanelsOffV1 = true
 		end
 		-- Bubble position's Opposite clicked was the default until v2.0.27, and
 		-- it stayed saved: the game's quest window jumped across the screen, over

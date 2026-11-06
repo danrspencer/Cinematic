@@ -47,6 +47,10 @@
 -- It waits questCamDelay seconds after the window opens before starting, so
 -- a quest picked up and gone at once gets no camera at all. Each new window
 -- after (the next quest's text, the reward) adds WINDOW_EXTRA to the wait.
+-- As a camera script (the Quest row's camera): done with one quest giver, with
+-- another near (GIVER_NEAR), the script plays on (cam.held) so the next
+-- conversation carries on from it, until you've walked ZOOM_OUT_DISTANCE off
+-- or it stops some other way. Nobody near, or you left (Escape, Goodbye): over.
 local _, ns = ...
 
 local CLOSE_GRACE = 3 -- seconds held after the window closes (going from gossip to a quest closes one window before opening the next)
@@ -953,6 +957,50 @@ local function Start()
 	end
 end
 
+-- A camera script playing now for this trigger, its When it ends not begun.
+local function ScriptOn(trigger)
+	return ns.CameraScriptRunning ~= nil and ns.CameraScriptRunning(trigger)
+end
+
+-- A conversation over (left: you left, or a fight): with a script playing for
+-- it and another quest giver near, it's held on for them. Where the minimap
+-- can't say (nil), it's held too, as the zoom back out was.
+local function HoldForNextGiver(left)
+	local on = not left and ScriptOn(cam.event)
+	local near = on and ns.QuestGiverNear and ns.QuestGiverNear(GIVER_NEAR)
+	if on and near ~= false then
+		cam.held = { event = cam.event, x = cam.talkX, y = cam.talkY, walked = 0 }
+		ns.Log("questcam", ("window closed: script held on (quest giver near: %s)"):format(tostring(near)))
+	else
+		if on then ns.Log("questcam", "window closed: no quest giver near, script ends") end
+		cam.held = nil
+	end
+end
+
+-- The hold's end: the script stopped, a flight, or you've walked off.
+local function StepHold(elapsed)
+	local held = cam.held
+	if not held then return end
+	local why
+	if not ScriptOn(held.event) then
+		why = "the script stopped"
+	elseif ns.OnTaxi() then
+		why = "flight"
+	elseif ns.playerMoving then
+		local x, y = PlayerPosition()
+		if x and held.x then
+			if (x - held.x) ^ 2 + (y - held.y) ^ 2 >= ZOOM_OUT_DISTANCE ^ 2 then why = "you walked off" end
+		else
+			held.walked = held.walked + elapsed
+			if held.walked >= ZOOM_OUT_WALK_TIME then why = "you walked off" end
+		end
+	end
+	if why then
+		ns.Log("questcam", "script hold over: " .. why)
+		cam.held = nil
+	end
+end
+
 local function Stop()
 	cam.active, cam.closingAt = false, nil
 	-- The zoom out and the turn back behind you together, then the tilt up.
@@ -1209,6 +1257,11 @@ local function OnEvent(_, event)
 		if not cam.since then
 			cam.since, cam.cancelled, cam.test = now, nil, false -- a new conversation
 			cam.npcName, cam.leftNpc = NpcName(), nil
+			cam.talkX, cam.talkY = PlayerPosition()
+			-- (Held on from the last one: walking off now counts from here.)
+			if cam.held then
+				cam.held.x, cam.held.y, cam.held.walked = cam.talkX, cam.talkY, 0
+			end
 			-- Opened by clicking them (not an interact key): the side they were on.
 			local clickX, how = ClickedNpcX()
 			cam.clickSide = clickX and (clickX > 0.5 and "right" or "left") or nil
@@ -1252,6 +1305,7 @@ local function OnEvent(_, event)
 		if cam.since then
 			cam.closingAt = 0 -- a fight: ends now
 		end
+		cam.held = nil
 		zoomer.pending = nil
 		-- (And the zoom stops where it is, your zoom speed back, so it's yours
 		-- for the fight: the zoom back out is slow.)
@@ -1331,6 +1385,8 @@ local function OnUpdate(_, elapsed)
 		return -- stopped after an error (Diagnostics.lua)
 	end
 	local now = GetTime()
+	-- (The zoom back out goes on while you steer off with the mouse held.)
+	ns.zoomWhileSteering[WHO] = (zoomer.leaving and zoomer.moving) or nil
 	-- (The moves carry on after the window closes, going back.)
 	StepMove(movers.yaw, elapsed)
 	StepMove(movers.pitch, elapsed)
@@ -1372,8 +1428,9 @@ local function OnUpdate(_, elapsed)
 			far = pending.walked >= ZOOM_OUT_WALK_TIME
 		end
 		-- (Once the view's ours: another camera holding it lets go for this, see
-		-- the camera lock below.)
-		if far and not ns.ClaimCamera("quest") then
+		-- the camera lock below. Your mouse on the camera doesn't hold it up: you
+		-- often walk off steering, and it would wait till you let go.)
+		if far and not ns.ClaimCamera("quest", true) then
 			zoomer.wantsAt = now
 		elseif far then
 			zoomer.pending = nil
@@ -1410,11 +1467,14 @@ local function OnUpdate(_, elapsed)
 		Log(now)
 	end
 	WatchLog(now)
+	StepHold(elapsed)
 	if not cam.since then
 		return
 	end
 	if cam.closingAt and now - cam.closingAt >= CLOSE_GRACE then
+		local left = cam.closingAt == 0
 		cam.since, cam.closingAt = nil, nil
+		HoldForNextGiver(left)
 		if cam.active then
 			ns.Log("questcam", "window closed: going back")
 			Stop()
@@ -1430,6 +1490,9 @@ local function OnUpdate(_, elapsed)
 	elseif not cam.active and not cam.closingAt and not cam.cancelled and not ns.playerMoving
 		and now >= cam.startAt and Wanted() and ns.ClaimCamera("quest") then
 		Start() -- (after the wait: a quest picked up and gone sooner gets no camera)
+	elseif not cam.closingAt and not cam.held and not cam.cancelled and ns.playerMoving and ScriptOn(cam.event) then
+		ns.Log("questcam", "you walked off: script ends")
+		cam.cancelled = true -- (as above: no more until the next conversation)
 	end
 end
 
@@ -1476,9 +1539,10 @@ end
 
 -- Running with the quest giver's window still open: a click on them for the
 -- next quest isn't moving the camera (ns.IsMouseOnCamera waits on it). Once
--- the window's closed, a held button is yours at once.
+-- the window's closed, a held button is yours at once. (As a script, not until
+-- it's over: the click on the next quest giver comes after the window closes.)
 function ns.QuestCamWindowOpen()
-	return cam.active and not cam.closingAt
+	return (cam.active and not cam.closingAt) or cam.held ~= nil or ScriptOn(cam.event)
 end
 
 -- A quest giver's conversation open now, the quest cam running or not (for
@@ -1487,11 +1551,15 @@ end
 -- once its row's wait is over (questCamDelay or questCamGossipDelay, each
 -- window before then adding a little, as for the quest cam: a quest picked
 -- up and gone sooner starts no camera). A window closing for the next one
--- (within CLOSE_GRACE) doesn't end it; leaving, or a fight, does.
+-- (within CLOSE_GRACE) doesn't end it; leaving, or a fight, does. Walking off
+-- with the window open ends it, and none starts on the move. Held on for
+-- another quest giver (cam.held): still on, a new conversation's wait or not.
 function ns.QuestTalkNow()
-	local now = GetTime()
-	if cam.since and cam.event and now >= (cam.scriptsAt or 0)
-		and (not cam.closingAt or now - cam.closingAt < CLOSE_GRACE) then
+	if cam.held then
+		return cam.held.event, cam.clickSide
+	end
+	if cam.since and cam.event and not cam.cancelled and GetTime() >= (cam.scriptsAt or 0)
+		and (ScriptOn(cam.event) or not ns.playerMoving) then
 		return cam.event, cam.clickSide
 	end
 end
@@ -1624,6 +1692,15 @@ function ns.QuestCamHoldZoomOut(distance, speed)
 	zoomer.pending = { to = distance, x = x, y = y, since = GetTime(), walked = 0, speed = speed }
 	ZoomLog(("chat cam's zoom back out to %.1f yards held till you walk off (at %.1f now)"):format(
 		distance, GetCameraZoom()))
+end
+
+-- A zoom back out still held till you walk off, taken over by the quest
+-- script starting now: its distance, or nil. (Its start, so When it ends goes
+-- back out there, not to the close-in spot the last quest giver left you at.)
+function ns.QuestCamTakeHeldZoom()
+	local to = zoomer.pending and zoomer.pending.to
+	zoomer.pending = nil
+	return to
 end
 
 -- For /cine debug: whether the quest cam is on now and its moves.

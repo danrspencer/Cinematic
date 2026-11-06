@@ -276,8 +276,40 @@ local LANDINGS = {
 	scroll = Then({ 0.3, "ground", label = "Down" }, { 0, "scroll", -10, label = "You scroll in at once" }),
 	scrolllate = Then({ 1.5, "ground", label = "Down" }, { 0, "scroll", -3, label = "You scroll in as it comes back" }),
 }
+-- (Scenes: "scene" plays a script zooming to part[3], its When it ends zooming
+-- back if part.back; "drag" is your mouse on the camera, which stops a When it
+-- ends under way.)
+local function Before(...)
+	local list = { ... }
+	for _, part in ipairs(Then()) do list[#list + 1] = part end
+	return list
+end
+local function After(...)
+	local list = Then()
+	for i = 1, select("#", ...) do list[#list + 1] = select(i, ...) end
+	return list
+end
+local CUT_OFF = { { 0, "scene", 3, back = true, label = "A scene zooms in" }, { 2.5, "ground", label = "It starts back" },
+	{ 0, "drag", label = "You drag the camera: the scene's cut off" }, { 1, "ground", label = "Left close in" } }
+LANDINGS.cutoff = Before(unpack(CUT_OFF))
+local cutScroll = { unpack(CUT_OFF) }
+cutScroll[#cutScroll + 1] = { 0, "scroll", 2, label = "You scroll: this is your distance now" }
+cutScroll[#cutScroll + 1] = { 1, "ground" }
+LANDINGS.cutscroll = Before(unpack(cutScroll))
+LANDINGS.sceneset = Before({ 0, "scene", 8, label = "A scene sets a distance and ends" }, { 3, "ground" })
+-- (Take off's and Landing's zooms off.)
+LANDINGS.keepzoom = Then()
+LANDINGS.keepsurge = Then({ 0, "cast", "Surge Forward" }, { 0.6, "fly", rate = -7, flat = 1 })
+LANDINGS.keepdive = LANDINGS.dive
+LANDINGS.keepscene = After({ 0, "scene", 12, label = "Your scene sets the distance" }, { 4, "ground" })
+LANDINGS.notakeoff = Then()
+LANDINGS.notakeoffsurge = Then({ 0, "cast", "Surge Forward" }, { 0.6, "fly", rate = -7, flat = 1 })
 local landing = variant:match("^land:(.+)$")
-if landing then FLIGHT = assert(LANDINGS[landing], "no such landing") end
+if landing then
+	FLIGHT = assert(LANDINGS[landing], "no such landing")
+	if landing:find("^keep") then ns.db.skyrideCamZoomBack = false end
+	if landing:find("^notakeoff") then ns.db.skyrideCamZoomOut = false end
+end
 
 local samples, segments = {}, {}
 local function Tick()
@@ -313,6 +345,12 @@ for _, part in ipairs(FLIGHT) do
 			events[#events + 1] = { t = now - 100, kind = "key", text = "Key " .. part[3] }
 			_G[part[3]]()
 		end
+	elseif what == "scene" then
+		events[#events + 1] = { t = now - 100, kind = "cast", text = part.label or "A scene" }
+		ns.PlayCameraScript({ id = "simscene", name = "Sim scene", steps = { { k = "zoom", to = part[3], secs = 1 } },
+			ending = part.back and { { k = "putback", secs = 4 } } or {} })
+	elseif what == "drag" then
+		yourInput = now
 	elseif what == "scroll" then
 		events[#events + 1] = { t = now - 100, kind = "cast", text = ("You scroll %+d yards"):format(part[3]) }
 		cam.goal = cam.goal + part[3]

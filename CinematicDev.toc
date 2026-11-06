@@ -119,6 +119,7 @@ FlightLine.lua
 QuestTalkStyle.lua
 BubbleStyle.lua
 TooltipStyle.lua
+ActionBarStyle.lua
 PersonalStyle.lua
 PersonalMana.lua
 PersonalManaCost.lua

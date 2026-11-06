@@ -25,7 +25,8 @@ local KIND_NAMES = { texture = "Texture", font = "Font", outline = "Outline", sh
 local function RefreshAll()
 	for _, refresh in ipairs({ ns.RefreshPersonalStyle, ns.RefreshTooltipStyle, ns.RefreshBubbleStyle,
 		ns.RefreshQuestTalkStyle, ns.RefreshQuestItemStyle, ns.RefreshRollStyle, ns.RefreshPlateCastStyle,
-		ns.RefreshUnitStyle, ns.RefreshRaidStyle, ns.RefreshTargetArrows, ns.RefreshPlateNameStyle }) do
+		ns.RefreshUnitStyle, ns.RefreshRaidStyle, ns.RefreshTargetArrows, ns.RefreshPlateNameStyle,
+		ns.RefreshActionBarStyle }) do
 		if refresh then pcall(refresh) end
 	end
 end

@@ -1317,6 +1317,7 @@ function ns.StyleRows(kit, content, stack, changed, switchKey, fieldOf)
 		opts = opts or {}
 		local function Name(value)
 			if value == "game" and type(opts.game) == "string" then return opts.game end
+			if value == "colored" and type(opts.colored) == "string" then return opts.colored end
 			return ns.L[BORDER_NAMES[value] or "None"]
 		end
 		local dropdown = DropdownRow(label, key, function()

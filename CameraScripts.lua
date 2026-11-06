@@ -703,14 +703,16 @@ local BUILT_IN = {
 	{ id = "skyride", name = "Skyriding zoom", retail = true, make = function()
 		return {
 			steps = { S("together", { steps = {
-				Set(S("zoom", { to = Db("skyrideCamDistance", 20), secs = Db("skyrideCamZoomTime", 4),
-					past = "yes" }), "skyrideCamDistance", "skyrideCamZoomTime"),
+				On(Set(S("zoom", { to = Db("skyrideCamDistance", 20), secs = Db("skyrideCamZoomTime", 4),
+					past = "yes" }), "skyrideCamZoomOut", "skyrideCamDistance", "skyrideCamZoomTime"),
+					Switch("skyrideCamZoomOut")),
 				-- (Follow your turns, as the auto-run camera's: SkyrideCam.lua's moments carry it on.)
 				On(Set(S("follow", { after = Db("skyrideFollowAfter", 0.5), lazy = 1, top = 70, accel = 60,
 					corners = "yes", most = Db("skyrideFollowMost", 50) }), "skyrideFollow", "skyrideFollowAfter",
 					"skyrideFollowMost"),
 					Switch("skyrideFollow")) } }) },
-			ending = { Set(S("putback", { secs = Db("skyrideCamBackTime", 3) }), "skyrideCamBackTime") },
+			ending = { Set(S("putback", { secs = Db("skyrideCamBackTime", 3),
+				zoom = Switch("skyrideCamZoomBack") and "yes" or "no" }), "skyrideCamBackTime", "skyrideCamZoomBack") },
 			rules = { camera = "pause", cameraSecs = 3, fight = "putback", walk = "ignore", zoom = "ignore",
 				ends = "putback" },
 		}
@@ -721,9 +723,8 @@ local BUILT_IN = {
 	-- them, at random, or always one way), down questCamLower, then a slow
 	-- drift to and fro of questCamDrift about there. The zooms go at
 	-- questCamZoomSpeed and questCamZoomOutSpeed (0: it stays in), taking
-	-- questCamZoomMaxTime at most. Leaving, it all goes back. (Not the same
-	-- yet: the zoom back out waits till you walk off, and only if no other
-	-- quest giver's near.)
+	-- questCamZoomMaxTime at most. Leaving, it all goes back, once you've walked
+	-- off, with another quest giver near (QuestCam.lua's cam.held).
 	{ id = "quest", name = "Quest camera", make = function()
 		local side, angle = ns.db and ns.db.questCamSide or "click", Db("questCamAngle", 30)
 		local turn
@@ -747,7 +748,9 @@ local BUILT_IN = {
 					S("rotate", { deg = math.max(1, drift), secs = 7, way = "right", ease = "gentle" }) } }), "questCamDrift"),
 					drift > 0) },
 			ending = ZoomOutEnding("questCam"),
-			rules = { camera = "stop", fight = "putback", walk = "putback", zoom = "stop", ends = "putback" },
+			-- (Walking: its trigger says, QuestCam.lua's ns.QuestTalkNow. It stays
+			-- on as you walk to another quest giver, a few steps away.)
+			rules = { camera = "stop", fight = "putback", walk = "ignore", zoom = "stop", ends = "putback" },
 		}
 	end },
 	-- Chat Cam: in to chatCamDistance while swinging toward whoever's talking
@@ -2476,6 +2479,25 @@ function DoStep(step)
 	end
 end
 
+local function IsQuestTrigger(trigger)
+	return trigger == "Quest" or trigger == "QuestGossip"
+end
+
+-- A script cut off before its When it ends zoomed back (zoomer.left: where it
+-- left the camera, and the distance it was going back to). That's no distance
+-- of yours, so the next script's start is the one it was going back to: taking
+-- off just after, the Skyriding Cam's landing went back in to a scene's close
+-- up. Not once you've zoomed, or the camera's moved on since.
+-- (On zoomer, as this file's main chunk is at Lua's 200 locals.)
+function zoomer.StartDistance()
+	local left, zoom = zoomer.left, Zoom()
+	zoomer.left = nil
+	if left and math.abs(zoom - left.at) < 1 and (ns.lastPlayerZoomAt or -math.huge) < left.when then
+		return left.home
+	end
+	return zoom
+end
+
 -- Starts a script (trigger: the trigger key it's running for; nil, played
 -- from its page or /cine script play).
 local function Start(script, trigger, camera)
@@ -2488,7 +2510,8 @@ local function Start(script, trigger, camera)
 	run = {
 		script = script, trigger = trigger, camera = camera, t = 0, phase = "steps", paths = paths, active = {},
 		builtinId = builtinId,
-		startZoom = Zoom(), startedAt = GetTime(), inputSeen = ns.GetLastCameraInput and ns.GetLastCameraInput() or 0,
+		startZoom = IsQuestTrigger(trigger) and ns.QuestCamTakeHeldZoom() or zoomer.StartDistance(),
+		startedAt = GetTime(), inputSeen = ns.GetLastCameraInput and ns.GetLastCameraInput() or 0,
 		triggerOn = trigger ~= nil, onceLeft = math.random() < 0.5, swayCenters = {},
 		-- (Played for Skyriding, or a scene of yours on the move, mounted or flying: walking
 		-- and steering are what you do then. Walk doesn't stop it, and your
@@ -2509,9 +2532,38 @@ local stoppedFor -- trigger..camera a script was stopped for: not again until th
 local maxHeldTo
 local exitBox -- the Stop button (a script's button option)
 
+local function HasKind(list, kind)
+	for _, step in ipairs(list) do
+		if not step.off and (step.k == kind or (step.steps and HasKind(step.steps, kind))) then return true end
+	end
+	return false
+end
+
+-- Whether a list of steps zooms: a zoom, or a Put back with its zoom.
+function zoomer.GoesBack(list)
+	for _, step in ipairs(list) do
+		if not step.off and (step.k == "zoom" or (step.k == "putback" and step.zoom == "yes")
+			or (step.steps and zoomer.GoesBack(step.steps))) then
+			return true
+		end
+	end
+	return false
+end
+
 local function Finish(why)
 	if not run then return end
 	StopAll()
+	-- (Its When it ends never got the camera back: zoomer.StartDistance.)
+	if not run.endingDone and zoomer.GoesBack(run.script.ending) and math.abs(Zoom() - run.startZoom) > 0.5 then
+		zoomer.left = { at = Zoom(), home = run.startZoom, when = GetTime() }
+	end
+	-- (You took the camera from a quest script whose When it ends zooms back: the
+	-- turn's yours, but the zoom back out still comes as you walk off, or a
+	-- right-drag away from a quest giver left you close in.)
+	if why == "camera" and IsQuestTrigger(run.trigger) and HasKind(run.script.ending, "zoom")
+		and math.abs(Zoom() - run.startZoom) > 0.5 then
+		ns.QuestCamHoldZoomOut(run.startZoom, math.max(0.25, Db("questCamZoomOutSpeed", 0.5)))
+	end
 	if run.raisedMax and ns.LowerZoomMax then
 		if Zoom() > run.startZoom + 0.5 then maxHeldTo = run.startZoom else ns.LowerZoomMax() end
 	end
@@ -2661,8 +2713,11 @@ function ns.SkyridingNow()
 		sky.upSince = nil
 		sky.downSince = sky.downSince or now
 		-- (Past coming back too: SkyrideCam.lua's landing plays it all back, from
-		-- skyrideCamLand on, so its When it ends finds nothing left to move.)
-		if now - sky.downSince >= Db("skyrideCamLand", 0.5) + Db("skyrideCamBackTime", 3) + 0.5
+		-- skyrideCamLand on, so its When it ends finds nothing left to move.
+		-- Landing's zoom off: only as long as its turn and tilt take, so a scene of
+		-- yours can follow on; the half second is the landing's time to start.)
+		local back = Switch("skyrideCamZoomBack") and Db("skyrideCamBackTime", 3) or 0.5
+		if now - sky.downSince >= Db("skyrideCamLand", 0.5) + back + 0.5
 			and not (ns.SkyrideLandingBusy and ns.SkyrideLandingBusy()) then
 			sky.on = false
 		end
@@ -2801,6 +2856,7 @@ local function Update(elapsed)
 	end
 	if coroutine.status(run.co) == "dead" then
 		if run.phase == "ending" then
+			run.endingDone = true
 			Finish(run.why)
 		elseif not run.trigger then
 			BeginEnding("done")
@@ -2947,12 +3003,6 @@ end
 -- nil: none): a turn, tilt or zoom going now is handed over (Handover) to
 -- the new steps' first move of it the same way, its speed sliding into the
 -- new one's over that long, instead of stopping dead first.
-local function HasKind(list, kind)
-	for _, step in ipairs(list) do
-		if not step.off and (step.k == kind or (step.steps and HasKind(step.steps, kind))) then return true end
-	end
-	return false
-end
 function ns.CameraScriptPlaySteps(trigger, steps, why, blend)
 	if not run or run.trigger ~= trigger or run.phase ~= "steps" then return false end
 	local clean = ns.CleanCameraScript({ steps = steps }, "moment").steps
@@ -3014,6 +3064,11 @@ function ns.PlayingCameraKey(triggered)
 	local id = run and run.builtinId
 	if type(id) ~= "string" or (triggered and not run.trigger) then return nil end
 	return ns.ScriptStandIn(id)
+end
+
+-- A script playing its steps for this trigger now (not yet in When it ends).
+function ns.CameraScriptRunning(trigger)
+	return run ~= nil and trigger ~= nil and run.trigger == trigger and run.phase == "steps"
 end
 
 function ns.StopCameraScript()

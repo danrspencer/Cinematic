@@ -19,6 +19,10 @@ DEFAULTS.storyZoneNotFlying = true    -- none on a flight path (the Flight depar
 local SEPARATOR = " · "
 -- The game's lines: zone, PvP status, arena/sanctuary note, subzone.
 local LINES = { "ZoneTextString", "PVPInfoTextString", "PVPArenaTextString", "SubZoneTextString" }
+-- Seconds a card waits for the game's "Discovered:" line, which the server
+-- sends after the place's name: a place known to you, and one new to this
+-- character (once each, so the Discovered card can have it alone).
+local KNOWN_WAIT, NEW_WAIT = 0.5, 3
 
 local function On() return ns.CardOn("zone") end
 -- (Discovered's card playing for the place: the game's lines go for that
@@ -112,6 +116,19 @@ end
 -- for a zone you're already in.
 local zoneShown, subShown, waiting = false, false, false
 local lastZone -- (the zone the last Zone card was for)
+-- The card waiting to see if Discovered's has the place, as { place }.
+local holding
+local function Hold(place, seconds, zone, subzone, newArea)
+	local hold = { place = place }
+	holding = hold
+	C_Timer.After(seconds, function()
+		if holding ~= hold then return end -- (you've moved on)
+		holding = nil
+		if ns.DiscoverHasIt() then return end
+		ns.Log("card", ("no Discovered line for %s after %.1f sec: its Zone card plays"):format(place, seconds))
+		Card(zone, subzone, newArea)
+	end)
+end
 local function Shows()
 	waiting = false
 	local newArea, sub = zoneShown, subShown
@@ -123,6 +140,10 @@ local function Shows()
 	local zone = Text(ZoneTextString)
 	local subzone = Shown(SubZoneTextFrame) and Text(SubZoneTextString) or ""
 	if subzone == zone then subzone = "" end
+	local place = subzone ~= "" and subzone or zone
+	-- (The same name shown again keeps its wait going; any other ends it.)
+	if holding and holding.place == place then return end
+	holding = nil
 	if newArea and zone ~= "" and zone == lastZone then
 		-- (The same zone's line again: a subzone's card if it's a new one.)
 		newArea = false
@@ -130,12 +151,13 @@ local function Shows()
 	end
 	if not newArea and not (sub and subzone ~= "" and ns.CardOn("subzone")) then return end
 	if newArea then lastZone = zone end
-	-- (A place new to you: Discovered's card in place of this one. A moment
-	-- later, as the game's "Discovered:" line can come just after its name.)
+	-- (A place new to you: Discovered's card in place of this one, so this
+	-- one waits, as the game's "Discovered:" line comes after its name.)
 	if ns.DiscoverHasIt and ns.CardOn("discover") then
-		C_Timer.After(0.5, function()
-			if not ns.DiscoverHasIt() then Card(zone, subzone, newArea) end
-		end)
+		if ns.DiscoverHasIt() then return end
+		local new = ns.PlaceIsNew(zone, place)
+		ns.Log("card", ("%s shown (%s): Zone card waits for a Discovered line"):format(place, new and "new here" or "known"))
+		Hold(place, new and NEW_WAIT or KNOWN_WAIT, zone, subzone, newArea)
 		return
 	end
 	Card(zone, subzone, newArea)

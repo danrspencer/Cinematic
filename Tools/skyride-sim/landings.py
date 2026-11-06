@@ -6,7 +6,8 @@ import json, os, subprocess, sys, tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
-NAMES = ["cruise", "surge", "whirl", "glide", "dive", "turning", "halt", "touch", "touchlate", "again", "climbing", "ascent", "scroll", "scrolllate"]
+NAMES = ["cruise", "surge", "whirl", "glide", "dive", "turning", "halt", "touch", "touchlate", "again", "climbing", "ascent", "scroll", "scrolllate",
+         "cutoff", "cutscroll", "sceneset", "keepzoom", "keepsurge", "keepdive", "keepscene", "notakeoff", "notakeoffsurge"]
 START = 15  # yards: the distance the sim takes off at
 
 
@@ -56,7 +57,8 @@ def measure(run):
         dip = rows[first_down][3] - min(r[3] for r in window)
     errors = [e["text"][:60] for e in run["events"] if e["kind"] == "error"]
     falsedive = [e["text"] for e in run["events"] if e["kind"] == "camera" and "diving (by speed" in e["text"]]
-    return dict(dip=dip, cruise=rows[down - 5][3], at=at0, moved=moved, settled=settled, top=max(home or [0]), stall=stall, end=end[1:4], errors=errors,
+    scriptfor = max((r[0] - t0 for r in after if r[7] == 1), default=0)
+    return dict(scriptfor=scriptfor, dip=dip, cruise=rows[down - 5][3], at=at0, moved=moved, settled=settled, top=max(home or [0]), stall=stall, end=end[1:4], errors=errors,
                 falsedive=falsedive)
 
 
@@ -68,7 +70,8 @@ def main():
             m = measure(fly(name, tmp))
             turn, tilt, zoom = m["at"]
             eturn, etilt, ezoom = m["end"]
-            want = {"scroll": 10, "scrolllate": None}.get(name, START)
+            want = {"scroll": 10, "scrolllate": None, "cutscroll": None, "sceneset": 8, "keepzoom": 20, "keepdive": 20,
+                    "keepsurge": None, "keepscene": 12}.get(name, START)
             bad = []
             # (Tilt: above where it started is the bug to catch; a little below, the
             # ground holds it there anyway.)
@@ -78,11 +81,19 @@ def main():
                 bad.append("not back up")
             if want is not None and abs(ezoom - want) > 1.5:
                 bad.append(f"zoom {ezoom:.1f}, wanted {want}")
+            if name == "cutscroll" and abs(ezoom - START) < 1.5:
+                bad.append("your scroll was ignored")
+            if name == "notakeoff" and abs(m["cruise"] - START) > 1:
+                bad.append(f"zoomed out to {m['cruise']:.1f} at take-off")
+            if name.startswith("keep") and name != "keepscene" and m["scriptfor"] > 2.5 and name != "keepdive":
+                bad.append(f"script held on {m['scriptfor']:.1f}s after touchdown")
+            if name == "keepsurge" and abs(ezoom - zoom) > 1.5:
+                bad.append(f"zoom moved after landing: {zoom:.1f} to {ezoom:.1f}")
             if m["stall"] > 0.3:
                 bad.append("stalled")
             if name == "again" and abs(m["cruise"] - 20) > 1:
                 bad.append(f"second flight at {m['cruise']:.1f} yd, not cruise")
-            if m["top"] > 11 and name not in ("scroll", "scrolllate"):
+            if m["top"] > 11 and name not in ("scroll", "scrolllate", "keepscene"):
                 bad.append("comes in too fast")
             if m["errors"]:
                 bad.append(str(m["errors"]))

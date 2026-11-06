@@ -384,6 +384,32 @@ ns.SetOnUpdate(armer, function(self)
 	StartRecording(seconds, deep)
 end)
 
+-- /cine profiler [seconds] [deep], or stop: the Record button from chat, starting
+-- at once. Length and Detailed as picked on the page unless typed. (The page
+-- turns on: its results are where the recording ends up.)
+function ns.ProfilerCommand(arg)
+	arg = arg or ""
+	if arg == "stop" then
+		local armed = armedSeconds
+		armedSeconds, armedDeep = nil, nil
+		armer:Hide()
+		if not ns.StopProfile() and not armed then
+			ns.Print(L["No recording is running."])
+		end
+		return
+	end
+	if ns.IsProfiling() then
+		ns.Print(L["Already recording: /cine profiler stop ends it early."])
+		return
+	end
+	local db = ns.GetDB()
+	db.profilerPage = true
+	armedSeconds, armedDeep = nil, nil
+	armer:Hide()
+	StartRecording(tonumber(arg:match("%d+")) or db.profilerSeconds or 120,
+		(db.profilerDetailed or arg:find("deep")) and true or false)
+end
+
 -- Clear all data: the graph's samples, the last recording and what's saved.
 -- (The game's own figures for each addon are its own: they start again only
 -- when it does.)

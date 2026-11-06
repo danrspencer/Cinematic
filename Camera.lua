@@ -164,7 +164,7 @@ function ns.TriggerStartsCine()
 		return true
 	end
 	-- (Dead with the death camera on, CineMode stays: the release popup shows over it.)
-	if ns.IsDeathCinematic() and ns.TriggerSetting("Death", "cine") then
+	if ns.DeathCinematicWanted() and ns.TriggerSetting("Death", "cine") then
 		return true
 	end
 	-- Auto-walking and auto-running start it as their camera would. Strafing
@@ -2930,8 +2930,9 @@ function ns.IsDeathCinematic()
 	return ns.DeathConditionsMet()
 end
 -- The death camera wanted now, by its own code or as its script (the Death
--- row set to it): for the script's start, the death song, camera follow off
--- and the ghost screen.
+-- row set to it): for the script's start, the death song, camera follow off,
+-- the ghost screen, CineMode staying on, the fade and the death card.
+-- (ns.IsDeathCinematic is its own code only: true for the script it's false.)
 function ns.DeathCinematicWanted()
 	if not ns.IsDead() or ns.CameraOffBesidesRows("death") then
 		return false

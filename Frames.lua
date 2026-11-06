@@ -9204,7 +9204,7 @@ function ns.UpdateFrames(cinematic, elapsed)
 	-- Dead, with the death camera watching: everything goes, quickly, whatever
 	-- would normally keep it up (the release button is a popup: it stays).
 	-- Hovering still shows it.
-	local deathFade = cinematic and ns.IsDeathCinematic and ns.IsDeathCinematic()
+	local deathFade = cinematic and ns.DeathCinematicWanted and ns.DeathCinematicWanted()
 	-- (But the rows of the groups picked on the Death Cam page: up throughout.)
 	local deathKept = wipe(tickTables.deathKept)
 	if deathFade and ns.db.deathKeepGroups then

@@ -95,8 +95,10 @@ end
 -- A deep profile (the Profiler page's): every function on ns is wrapped too
 -- while it runs, as "ns.<name>", and put back after. (Ones held elsewhere
 -- under another name aren't, nor local functions.) Left out: the profiler's
--- own, the log's, and tiny ones called so often the wrapping would swamp them.
-local DEEP_SKIP = { Profiled = true, ProfileMark = true, ProfileStep = true, ProfileName = true,
+-- own, the log's, tiny ones called so often the wrapping would swamp them, and
+-- SweepMinimap: it waits across frames in a coroutine, so its timer would count
+-- the frames between (and their garbage) as its own. "Minimap sweep" times it.
+local DEEP_SKIP = { SweepMinimap = true, Profiled = true, ProfileMark = true, ProfileStep = true, ProfileName = true,
 	ProfileCount = true, StartProfile = true, StopProfile = true, IsProfiling = true, ProfileGameMetric = true,
 	ProfileTimeLeft = true, ShowProfileTimer = true,
 	Print = true, Log = true, LogDetail = true, Verbose = true, Flag = true, Approach = true, GetDB = true }
@@ -281,7 +283,7 @@ local function BuildReport()
 	end
 	table.sort(countNames)
 	for _, name in ipairs(countNames) do
-		Add("count %s: %.1f a frame", name, counts[name] / frames)
+		Add("count %s: %.3f a frame", name, counts[name] / frames)
 	end
 	return lines
 end

@@ -441,5 +441,5 @@ ns.SetOnUpdate(watcher, ns.Profiled("Chat copy button", function(_, elapsed)
 		return
 	end
 	sinceCheck = 0
-	Update(ns.Setting("chatCopyButton"))
+	Update(ns.isDev or ns.Setting("chatCopyButton")) -- (the dev copy: always, its tick not shown)
 end))

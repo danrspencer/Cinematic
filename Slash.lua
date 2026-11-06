@@ -64,6 +64,7 @@ local function PrintHelp()
 	Command("/cine walk flip", L["fix it if it has walk and run backwards"])
 	Heading(L["More"])
 	Command("/cine report", L["your damage report for this run: boss by boss, the rest, the whole party (test: made up)"])
+	Command("/cine profiler", L["record what the addon costs, results on the Profiler page (deep: in detail, stop: end it early)"])
 	Command("/cine debug help", L["troubleshooting commands"])
 	Command("/cine log", L["copy the log and your setup for a bug report (/cine log clear empties it)"])
 	Command("/cine panic", L["stop for this session and put your UI and settings back (/cine resume to restart)"])
@@ -77,7 +78,7 @@ local function PrintDebugHelp()
 	print("  /cine log - copy the log for a bug report: what's printed below goes in it too")
 	print("  /cine selftest - check the game is still as the addon expects on this client (read only); results in the log and the copy window")
 	print("  /cine debug record - also log game setting changes and music in detail (again to stop)")
-	print("  /cine debug cpu [seconds|stop] - time what the addon spends its time on (30 seconds), report in the log")
+	print("  /cine debug cpu [seconds|stop] [deep] - time what the addon spends its time on (30 seconds; deep: every function, 120 seconds), report in the log")
 	print("  /cine debug frame <name> - how faded frames with <name> in their name or group stand")
 	print("  /cine debug minimap - the minimap's settings, where it's anchored, and whether it's shrunk and moved off the screen")
 	print("  /cine debug prey - how the addon tells you're hunting your prey (retail), widget sets and all")
@@ -246,6 +247,7 @@ local function HandleSlash(msg)
 		ns.Print(ns.Resume() and L["started again"] or L["isn't stopped"])
 	elseif cmd == "debug" and arg:find("^cpu") then
 		local seconds = tonumber(arg:match("^cpu%s+(%d+)"))
+		local deep = arg:find("%sdeep") ~= nil -- (the Profiler page's Detailed)
 		if arg == "cpu stop" then
 			if not ns.StopProfile() then
 				ns.Print("no cpu profile running")
@@ -253,9 +255,9 @@ local function HandleSlash(msg)
 		elseif ns.IsProfiling() then
 			ns.Print("a cpu profile is already running: /cine debug cpu stop ends it early")
 		else
-			seconds = seconds or 30
-			ns.StartProfile(seconds)
-			ns.Print(("cpu profile for %d seconds (/cine debug cpu stop ends it early): play as usual"):format(seconds))
+			seconds = seconds or (deep and 120 or 30)
+			ns.StartProfile(seconds, false, deep)
+			ns.Print(("%scpu profile for %d seconds (/cine debug cpu stop ends it early): play as usual"):format(deep and "deep " or "", seconds))
 		end
 	elseif cmd == "verbose" then
 		-- (Unlisted: for a player helping track a bug down. Always on in the dev copy.)
@@ -450,6 +452,8 @@ local function HandleSlash(msg)
 		end
 	elseif cmd == "demo" and ns.DemoCommand then -- (DemoHub.lua: the dev copy only)
 		ns.DemoCommand(arg)
+	elseif cmd == "profiler" then -- (ProfilerPage.lua)
+		ns.ProfilerCommand(arg)
 	elseif cmd == "chatcam" and ns.ChatCamCommand then -- (ChatCam.lua)
 		ns.ChatCamCommand(arg)
 	elseif cmd == "script" and ns.CameraScriptCommand then -- (CameraScripts.lua, dev copy)
@@ -1512,6 +1516,8 @@ local function HandleSlash(msg)
 		ns.ReportSpellRange()
 	elseif cmd == "debug" and arg == "textures" then
 		ns.ShowStyleTextures()
+	elseif cmd == "debug" and arg == "buttons" then
+		ns.ReportActionBarStyle()
 	elseif cmd == "debug" and arg == "fonts" then
 		ns.ReportStyleFonts()
 	elseif cmd == "debug" and arg == "platetextures" then

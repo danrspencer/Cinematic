@@ -121,6 +121,7 @@ end
 local function Discovered(name, sub)
 	if name == "" or (name == lastFound and GetTime() - lastFoundAt < 10) then return end
 	lastFound, lastFoundAt = name, GetTime()
+	ns.Log("card", "Discovered: " .. name)
 	if ns.LetterboxOnDiscover then ns.LetterboxOnDiscover() end
 	if not ns.CardOn("discover") then return end
 	ns.Cards.Cut("zone")
@@ -213,6 +214,18 @@ function ns.DiscoverHasIt()
 	if not ns.CardOn("discover") then return false end
 	ZoneEntered()
 	return GetTime() - shownAt < 5
+end
+-- True the first time this character's shown a place (a zone's subzone, or
+-- the zone), as far as we've kept count: the game has no way to ask, so
+-- ZoneCard.lua gives these longer for a "Discovered:" line to come.
+function ns.PlaceIsNew(zone, place)
+	local seen = Seen()
+	if not seen then return false end
+	seen.places = seen.places or {}
+	local key = zone .. "|" .. place
+	if seen.places[key] then return false end
+	seen.places[key] = true
+	return true
 end
 samples.discover = function()
 	local sub, zone = Subzone(), Zone()

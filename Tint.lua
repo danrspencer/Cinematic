@@ -983,7 +983,7 @@ local function UpdateDeathScreen(elapsed)
 	if not deathFrame then
 		return
 	end
-	local want = db.enabled and db.deathScreen and ns.IsDeathCinematic and ns.IsDeathCinematic()
+	local want = db.enabled and db.deathScreen and ns.DeathCinematicWanted and ns.DeathCinematicWanted()
 	local target = want and 1 or 0
 	local run = CorpseRunLevel(elapsed)
 	local creepTarget = run or target
@@ -1071,12 +1071,12 @@ ns.CardSamples.death = function() return DeathCard() end
 -- check), its card a moment later; cut short as soon as it stops.
 local deathWas, deathAt
 local function UpdateDeathBanner()
-	local want = db.enabled and ns.IsDeathCinematic and ns.IsDeathCinematic() or false
+	local want = db.enabled and ns.DeathCinematicWanted and ns.DeathCinematicWanted() or false
 	if want and deathWas == false then
 		local at, style = GetTime(), db.deathBannerStyle
 		deathAt = at
 		C_Timer.After(style == "wasted" and WASTED_WAIT or BANNER_WAIT, function()
-			if deathAt == at and ns.IsDeathCinematic and ns.IsDeathCinematic() then
+			if deathAt == at and ns.DeathCinematicWanted and ns.DeathCinematicWanted() then
 				ns.Cards.Fire("death", DeathCard(style))
 			end
 		end)
