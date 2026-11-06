@@ -163,6 +163,11 @@ local function MakeSkin(bar)
 	skin.back:SetAllPoints()
 	skin.back:SetColorTexture(0, 0, 0, 1)
 	skin.border = ns.MakeStyleEdges(skin)
+	-- (As the unit frames' bars: a style theme's light, and a fade to the bar's end.)
+	skin.sheen = bar:CreateTexture(nil, "OVERLAY", nil, -2)
+	skin.sheen:SetAllPoints()
+	skin.sheen:SetTexture(ns.THEME_SHEEN)
+	skin.depth = bar:CreateTexture(nil, "OVERLAY", nil, -3)
 	return skin
 end
 ns.MakePersonalSkin = MakeSkin
@@ -173,6 +178,19 @@ local function DressSkin(skin, look)
 	skin.back:SetAlpha(tonumber(look.prdBack) or 0.5)
 	-- (The style theme's bar shape: a straight border can't follow it.)
 	local shaped = ns.DressBarShape(skin:GetParent(), skin.back)
+	local bar = skin:GetParent()
+	local fill = bar.GetStatusBarTexture and bar:GetStatusBarTexture()
+	local depth = fill and ns.ThemeBarDepth()
+	local tall = bar:GetHeight()
+	local thick = type(tall) == "number" and not (issecretvalue and issecretvalue(tall)) and tall >= 8
+	skin.sheen:SetShown(depth and thick and true or false)
+	skin.depth:SetShown(depth and thick and true or false)
+	if depth then
+		skin.depth:ClearAllPoints()
+		skin.depth:SetAllPoints(fill)
+		ns.ThemeGradient(skin.depth, depth[1], depth[2], depth[3], depth[4], 0)
+	end
+	ns.MaskBarExtras(bar, shaped, { skin.sheen, skin.depth })
 	skin.border:SetShown(kind == "line" and not shaped)
 	if kind == "line" and not shaped then ns.DressStyleEdges(skin.border, size, r, g, b, 1, true) end
 end

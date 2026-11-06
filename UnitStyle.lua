@@ -296,11 +296,21 @@ local function DressSkin(skin, view, under)
 	-- (A slab: no line or dirt to carry it, so it's light that stops it being one flat
 	-- block of color, and a touch of grain.)
 	local slab = not view.isTile and ns.ThemeLayout() == "slab"
-	skin.sheen:SetShown(slab or cell and true or false)
+	-- (Not on a thin bar: the shading would be all there is of it, and dim it to nothing.)
+	local barTall = skin:GetParent():GetHeight()
+	local thin = Readable(barTall) and barTall < 8
+	skin.sheen:SetShown((slab or cell) and not thin and true or false)
 	skin.sheen:SetAlpha(slab and 1 or 0.7)
+	-- (What's empty in the theme's own dark, not black: an empty bar's still part of it.)
+	local ring = (slab or cell) and ns.ThemeRing()
+	if ring then
+		skin.back:SetColorTexture(ring[1] * 0.2, ring[2] * 0.2, ring[3] * 0.2, 1)
+	else
+		skin.back:SetColorTexture(0, 0, 0, 1)
+	end
 	-- (Fading in toward the bar's leading edge: the fill's own width, so it moves with it.)
 	local fill = skin:GetParent():GetStatusBarTexture()
-	local depth = (slab or cell) and fill and ns.ThemeBarDepth()
+	local depth = (slab or cell) and fill and not thin and ns.ThemeBarDepth()
 	skin.depth:SetShown(depth and true or false)
 	if depth then
 		skin.depth:ClearAllPoints()
@@ -308,12 +318,10 @@ local function DressSkin(skin, view, under)
 		ns.ThemeGradient(skin.depth, depth[1], depth[2], depth[3], depth[4], 0)
 	end
 	skin.shine:SetShown((cell or slab) and true or false)
-	skin.grit:SetShown((cell or slab) and true or false)
+	skin.grit:SetShown((cell or slab) and not thin and true or false)
 	skin.grit:SetAlpha(slab and 0.14 or 0.18)
 	skin.dark:SetShown(cell and true or false)
-	-- (On a thin bar these would be all there is of it.)
-	local barTall = skin:GetParent():GetHeight()
-	if Readable(barTall) and barTall < 8 then
+	if thin then
 		skin.shade:SetHeight(1)
 		skin.dark:Hide()
 	else
@@ -796,6 +804,9 @@ local function FramePlate(frame, state, portrait, on, over, shape)
 			state.bridge:SetFrameLevel(frame:GetFrameLevel())
 		end
 		local shown = power and ns.Flag(power:IsShown()) and power or health
+		-- (Your second power, drawn under the first: the rows end there.)
+		local extra = frame == _G.PlayerFrame and _G.AlternatePowerBar
+		if extra and ns.Flag(extra:IsShown()) then shown = extra end
 		PlaceBridge(state.bridge, state.plate, health, shown, state.flip, shape)
 		if not state.shadow then
 			state.shadow = MakeRowShadow(frame)
@@ -866,7 +877,7 @@ end
 -- A slab's bars at a slab's size: one tall bar, across where the portrait was with
 -- none showing, and thin power under it. The game's own bars, so out of fights only,
 -- on their frame's own spot, and put back as they were when the theme changes.
-local SLAB_TALL, SLAB_POWER = 26, 4
+local SLAB_TALL, SLAB_POWER = 26, 5
 local function SlabSpot(frame, health, portrait, bare)
 	local frameLeft, frameTop = frame:GetLeft(), frame:GetTop()
 	local left, right, top = health:GetLeft(), health:GetRight(), health:GetTop()
@@ -961,7 +972,11 @@ local function FitBars(frame, bars, portrait, shape, on, name)
 			for fill, list in pairs(state.masks or {}) do
 				for _, mask in ipairs(list) do fill:AddMaskTexture(mask) end
 			end
-			if state.name then PutBack(state.name, SpotsOf(state.name)) end
+			if state.name then
+				PutBack(state.name, SpotsOf(state.name))
+				state.name:SetJustifyH(state.justify or "LEFT")
+			end
+			for level in pairs(state.levels or {}) do PutBack(level, SpotsOf(level)) end
 		end
 		return
 	end
@@ -1007,9 +1022,27 @@ local function FitBars(frame, bars, portrait, shape, on, name)
 	local dressed = shapes[frame]
 	if name and dressed and dressed.plate and ns.Flag(dressed.plate:IsShown()) then
 		SpotsOf(name)
+		if not state.name then state.justify = name:GetJustifyH() end
 		state.name = name
 		name:ClearAllPoints()
 		name:SetPoint("CENTER", dressed.plate, "CENTER")
+		name:SetJustifyH("CENTER") -- (retail's box is wider than its words)
+		-- (Retail's level has no badge: it goes in the strip, not on the line under it.)
+		if ns.UnitPartRegions and #ns.UnitPartRegions(frame, "LevelBack") == 0 then
+			-- (Its name to the left, as the game has it, across from the level.)
+			name:ClearAllPoints()
+			name:SetPoint("LEFT", dressed.plate, "LEFT", 6, 0)
+			name:SetJustifyH("LEFT")
+			state.levels = state.levels or {}
+			for _, level in ipairs(ns.UnitPartRegions(frame, "Level")) do
+				if level.GetObjectType and level:GetObjectType() == "FontString" then
+					SpotsOf(level)
+					state.levels[level] = true
+					level:ClearAllPoints()
+					level:SetPoint("RIGHT", dressed.plate, "RIGHT", -5, 0)
+				end
+			end
+		end
 	end
 	for i = 2, #bars do
 		bars[i]:ClearAllPoints()

@@ -326,19 +326,19 @@ local THEMES = {
 		menu = { accent = { 0.78, 0.84, 0.92 }, edge = { 0.3, 0.33, 0.38 }, field = { 0.1, 0.105, 0.115 },
 			window = { 0.06, 0.063, 0.07 }, well = { 0.03, 0.032, 0.036 }, knob = { 0.86, 0.9, 0.95 },
 			thumb = { 0.42, 0.46, 0.52 } },
-		grain = "Reel", ornament = { 0.5, 0.55, 0.62 },
+		grain = "Reel", ornament = { 0.5, 0.55, 0.62 }, veil = { raid = 0.4, plate = 0.3 },
 		nameColor = { 1, 1, 1 },
 		health = { 0.36, 0.72, 0.58 }, mana = { 0.3, 0.5, 0.85 }, back = 0.85,
 		panel = { 0.085, 0.09, 0.1 }, panelAlpha = 0.92,
 		cast = { 0.74, 0.8, 0.88 }, channel = { 0.36, 0.72, 0.58 }, locked = { 0.4, 0.42, 0.46 }, stop = { 0.8, 0.3, 0.3 },
 		line = { 0.3, 0.33, 0.38 }, lineSize = 1,
 		cardColor = { 0.92, 0.94, 0.97 }, cardFont = "barlow",
-		settings = { styleTexture = "flat", styleFont = "barlow", styleOutline = 0, styleShadow = "on",
+		settings = { styleTexture = "satin", styleFont = "barlow", styleOutline = 0, styleShadow = "on",
 			stylePanel = "soft", ufShape = "none",
 			questTalkStyle = "dark", rollPanel = "flat", abShape = "square" },
 	}),
 	Theme({
-		key = "obsidian", name = "Obsidian", layout = "slab", darkBars = true,
+		key = "obsidian", name = "Obsidian", unitBars = "satin", layout = "slab", darkBars = true,
 		tip = "Black on black. No portraits: flat dark bars and one thin line of cold light.",
 		swatch = { { 0.02, 0.025, 0.03 }, { 0.25, 0.85, 0.95 }, { 0.2, 0.72, 0.84 }, { 0.45, 0.4, 0.95 } },
 		menu = { accent = { 0.3, 0.88, 0.97 }, edge = { 0.14, 0.32, 0.38 }, field = { 0.04, 0.05, 0.055 },
@@ -351,7 +351,7 @@ local THEMES = {
 		cast = { 0.3, 0.88, 0.97 }, channel = { 0.5, 0.45, 0.98 }, locked = { 0.28, 0.32, 0.36 }, stop = { 0.9, 0.25, 0.35 },
 		line = { 0.16, 0.5, 0.58 }, lineSize = 1,
 		cardColor = { 0.5, 0.92, 1 }, cardFont = "rajdhani",
-		settings = { styleTexture = "flat", styleFont = "rajdhani", styleOutline = 0, styleShadow = "on",
+		settings = { styleTexture = "satin", styleFont = "rajdhani", styleOutline = 0, styleShadow = "on",
 			stylePanel = "soft", ufShape = "none",
 			questTalkStyle = "dark", rollPanel = "flat", abShape = "square" },
 	}),
@@ -362,14 +362,14 @@ local THEMES = {
 		menu = { accent = { 1, 0.72, 0.26 }, edge = { 0.34, 0.31, 0.26 }, field = { 0.095, 0.095, 0.1 },
 			window = { 0.055, 0.055, 0.06 }, well = { 0.028, 0.028, 0.03 }, knob = { 1, 0.84, 0.54 },
 			thumb = { 0.52, 0.4, 0.2 } },
-		grain = "Forge", ornament = { 0.98, 0.68, 0.2 },
+		grain = "Forge", ornament = { 0.98, 0.68, 0.2 }, veil = { raid = 0.4, plate = 0.3 },
 		nameColor = { 1, 1, 1 },
 		health = { 0.9, 0.6, 0.18 }, mana = { 0.98, 0.68, 0.2 }, back = 0.88,
 		panel = { 0.075, 0.075, 0.08 }, panelAlpha = 0.94,
 		cast = { 1, 0.72, 0.26 }, channel = { 0.5, 0.66, 0.86 }, locked = { 0.36, 0.36, 0.38 }, stop = { 0.85, 0.22, 0.16 },
 		line = { 0.4, 0.34, 0.24 }, lineSize = 1,
 		cardColor = { 1, 0.74, 0.3 }, cardFont = "bebas",
-		settings = { styleTexture = "flat", styleFont = "rajdhani", styleOutline = 0, styleShadow = "on",
+		settings = { styleTexture = "brushed", styleFont = "rajdhani", styleOutline = 0, styleShadow = "on",
 			stylePanel = "soft", ufShape = "none",
 			questTalkStyle = "dark", rollPanel = "flat", abShape = "square" },
 	}),
@@ -655,6 +655,22 @@ end
 -- caller leaves that off). skip: this bar keeps its corners (a raid tile, too
 -- tall for these).
 local barShapes = setmetatable({}, { __mode = "k" })
+-- Textures over a shaped bar, cut to its shape: nil-safe, and taken off with it.
+function ns.MaskBarExtras(bar, shaped, list)
+	local state = barShapes[bar]
+	if not (state and state.mask) then return end
+	state.extras = state.extras or {}
+	for _, texture in ipairs(list) do
+		if shaped and not state.extras[texture] then
+			texture:AddMaskTexture(state.mask)
+			state.extras[texture] = true
+		elseif state.extras[texture] and not shaped then
+			texture:RemoveMaskTexture(state.mask)
+			state.extras[texture] = nil
+		end
+	end
+end
+
 -- (rect: the frame the shape's cut to, if not the bar: see UnitStyle's DressSkin.
 -- gap: that much off its top, so a bar right under another stands apart from it.)
 function ns.DressBarShape(bar, back, skip, rect, gap)
