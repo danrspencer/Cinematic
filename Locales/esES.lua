@@ -315,6 +315,7 @@ L["no extra frames."] = "no hay marcos adicionales."
 L["Chat"] = "Chat"
 
 -- MinimapButton.lua
+L["not available in gamepad mode: use /cine instead."] = "no disponible en modo mando: usa /cine en su lugar."
 L["until logout"] = "hasta salir del juego"
 L["%d:%02d left"] = "quedan %d:%02d"
 L["Tint"] = "Tinte"

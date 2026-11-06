@@ -265,6 +265,7 @@ L["Instances"] = "Подземелья"
 L["Start / Menu"] = "Start / Меню"
 
 -- MinimapButton.lua
+L["not available in gamepad mode: use /cine instead."] = "недоступно в режиме геймпада: используйте /cine."
 L["until logout"] = "до выхода из игры"
 L["%d:%02d left"] = "осталось %d:%02d"
 L["Tint"] = "Оттенок"
