@@ -13,8 +13,8 @@
 -- as they are: the third argument).
 --
 -- GUESSES, each to be replaced by a measured number (Tools/shoulder-test-plan.md):
--- GAME.ease, GAME.mountScale and GAME.tallScale, and that the offset's screen
--- shift goes as offset / (distance x tan(fov / 2)).
+-- GAME.mountScale and GAME.tallScale. Measured (Run 3): the ease, and that the
+-- screen shift goes as offset / distance at the field of view.
 -- Not modelled: walls, the pivot, head movement, dynamic pitch.
 -- luacheck: ignore 111 121 122 (it stands in for the game's functions on purpose)
 local variant, outPath, savedPath = ...
@@ -28,17 +28,24 @@ local TICK = 0.02
 local now = 100
 local SHOULDER, CENTERED = "test_cameraOverShoulder", "CameraKeepCharacterCentered"
 
-local GAME = { ease = 3, mountScale = 1.6, tallScale = 1.4 }
+-- (ease: measured in Run 3, over in about 0.3 s; the sizes are still guesses.)
+local GAME = { ease = 12, mountScale = 1.6, tallScale = 1.4 }
 local UI_WIDTH, UI_HEIGHT = 1707, 960
 
 -- The game: time, settings. A write to a test_ setting brings up the warning
--- until it's been accepted this session (tested on retail).
+-- until it's been accepted this session (tested on retail), unless its event's
+-- been stopped (GameEvent, as Forever's: Run 2b). Our own notice is answered
+-- Accept, or Cancel in the "decline" session.
 GetTime = function() return now end
 local timers = {}
 C_Timer.After = function(secs, fn) timers[#timers + 1] = { at = now + secs, fn = fn } end
 local cvars = { [SHOULDER] = "0.000000", [CENTERED] = "1", CameraReduceUnexpectedMovement = "1", cameraFov = "90", test_cameraHeadMovementStrength = "0" }
 local writes = { total = 0, popups = 0 }
-local accepted = false
+local accepted, stopped = false, false
+local notices = 0
+GameEvent = { UnregisterInternalEvent = function(event)
+	if event == "EXPERIMENTAL_CVAR_CONFIRMATION_NEEDED" then stopped = true end
+end }
 local events = {}
 local function Note(kind, text) events[#events + 1] = { t = now - 100, kind = kind, text = text } end
 GetCVar = function(name) return cvars[name] end
@@ -46,7 +53,7 @@ SetCVar = function(name, value)
 	cvars[name] = tostring(value)
 	if name:find("^test_") then
 		writes.total = writes.total + 1
-		if not accepted then
+		if not accepted and not stopped then
 			accepted = true
 			writes.popups = writes.popups + 1
 			Note("popup", "The game's warning comes up (Accept)")
@@ -93,8 +100,10 @@ local function MoveCamera(dt)
 end
 -- Where you really are on screen: -1 left edge, 1 right edge.
 local function YouOnScreen()
+	-- (As measured in Run 3: cameraFov across a 16:9 screen, the height kept.)
 	local fov = tonumber(cvars.cameraFov) or 90
-	return -cam.offset / (math.max(1.5, cam.zoom) * math.tan(math.rad(fov / 2)))
+	local width = math.tan(math.rad(fov / 2)) * (UI_WIDTH / UI_HEIGHT) / (16 / 9)
+	return -cam.offset / (math.max(1.5, cam.zoom) * width)
 end
 
 -- The frames that follow you: stand-ins with real anchors.
@@ -117,7 +126,25 @@ end
 local protected = variant == "fight"
 local bar = StandIn("PlayerCastingBarFrame", 0, 180, protected)
 local prd = StandIn("PersonalResourceDisplayFrame", 0, 240, protected)
-local home = { bar = 0, prd = 0 }
+-- chained: Forever's layout (Run 1): the cast bar on the PRD, the PRD on the
+-- cooldowns, which stay put.
+local cooldowns = StandIn("EssentialCooldownViewer", 0, 300, false)
+local function Layout(x)
+	if variant == "chained" then
+		prd.points = { { "BOTTOM", cooldowns, "TOP", x or 0, 4 } }
+		bar.points = { { "BOTTOM", prd, "TOP", 0, 4 } }
+	else
+		bar.points = { { "BOTTOM", nil, "BOTTOM", x or 0, 180 } }
+	end
+end
+Layout()
+-- Where a stand-in is across the screen: its offset, plus its anchor's.
+local function ScreenX(f)
+	local p = f.points[1]
+	if not p then return 0 end
+	return p[4] + (type(p[2]) == "table" and p[2].points and ScreenX(p[2]) or 0)
+end
+local home = { bar = ScreenX(bar), prd = ScreenX(prd) }
 
 -- Only the two files' frames tick (the rest of the addon idles).
 local mine = {}
@@ -167,7 +194,15 @@ ns.RefreshOptions = function() end
 if variant ~= "yours" then
 	ns.db.enabled, ns.db.cameraModes = true, true
 end
+StaticPopup_Show = function(name)
+	local dialog = StaticPopupDialogs[name]
+	if not dialog then return end
+	notices = notices + 1
+	Note("notice", ("Our notice: %s"):format(variant == "decline" and "Cancel" or "Accept"))
+	if variant == "decline" then dialog.OnCancel() else dialog.OnAccept() end
+end
 if variant == "mounted" then ns.db.shoulderCamNotMounted = false end
+local noticedAtStart = ns.db.shoulderCamNoticed
 
 local realLog = ns.Log
 ns.Log = function(kind, text, ...)
@@ -200,8 +235,7 @@ end }
 
 local samples, segments = {}, {}
 local function Share(frame, base)
-	local p = frame.points[1]
-	return p and (p[4] - base) / (UI_WIDTH / 2) or 0
+	return (ScreenX(frame) - base) / (UI_WIDTH / 2)
 end
 local function Tick()
 	now = now + TICK
@@ -273,13 +307,13 @@ local function Day()
 	SetCVar(SHOULDER, "0")
 	Wait(2)
 	Part("The game lays out its frames again")
-	bar.points = { { "BOTTOM", nil, "BOTTOM", 0, 180 } }
+	Layout()
 	Wait(2)
 	Part("Edit Mode")
 	me.editMode = true
 	Wait(3)
-	bar.points = { { "BOTTOM", nil, "BOTTOM", 120, 180 } } -- (you drag the cast bar)
-	home.bar = 120
+	Layout(120) -- (you drag the cast bar, or the PRD with it on a chain)
+	home.bar, home.prd = ScreenX(bar), ScreenX(prd)
 	Wait(1)
 	me.editMode = false
 	Part("Edit Mode closed")
@@ -312,7 +346,8 @@ local function Day()
 	Wait(3)
 	if variant == "relog" then
 		Part("Logs in again (the game has forgotten the offset)")
-		cvars[SHOULDER], accepted = "0.000000", false
+		cvars[SHOULDER], accepted, stopped = "0.000000", false, false
+		ns.ResetShoulderSession()
 		wow.Fire("PLAYER_ENTERING_WORLD")
 		Wait(3)
 	end
@@ -364,10 +399,34 @@ Check("Keep Character Centered back to yours", cvars[CENTERED] == "1", "reads " 
 Check("Reduce Unexpected Movement back to yours", cvars.CameraReduceUnexpectedMovement == "1", "reads " .. tostring(cvars.CameraReduceUnexpectedMovement))
 Check("Cast bar back on its place", math.abs(Share(bar, home.bar)) < 0.001, ("%.1f UI units off"):format(Share(bar, home.bar) * UI_WIDTH / 2))
 Check("PRD back on its place", math.abs(Share(prd, home.prd)) < 0.001, ("%.1f UI units off"):format(Share(prd, home.prd) * UI_WIDTH / 2))
+-- Your spot held (Phase 3): how far you sat from it while it was on and the
+-- game had caught up, 4 to 30 yards away, on a standard model on foot.
+local spotMiss, spotCount = 0, 0
+for _, row in ipairs(samples) do
+	local caught = math.abs(row[3] - row[2]) < 0.05
+	if row[2] ~= 0 and caught and row[4] >= 4 and row[4] <= 30 and row[8] == 0 then
+		spotMiss, spotCount = spotMiss + math.abs(math.abs(row[5]) - (ns.db.shoulderCamSpot or 0.2)), spotCount + 1
+	end
+end
+if variant ~= "tall" and variant ~= "decline" and variant ~= "sweep" then
+	Check("Your spot held as you zoom", spotCount > 0 and spotMiss / spotCount < 0.01,
+		spotCount > 0 and ("%.2f%% off it on average"):format(spotMiss / spotCount * 100) or "never on")
+end
 local errors = 0
 for _, e in ipairs(events) do if e.kind == "error" then errors = errors + 1 end end
 Check("No errors", errors == 0, errors .. " errors")
-Check("One warning this session", writes.popups <= 1, writes.popups .. " warnings")
+local ours = 0
+for _, e in ipairs(events) do if e.kind == "write" then ours = ours + 1 end end
+if variant == "decline" then
+	-- (Your own /console write in DAY still brings the game's warning: nothing's kept quiet.)
+	Check("Declined: nothing written by us", ours == 0, ours .. " writes")
+	Check("Declined: switched off", ns.db.shoulderCam == false, "switch " .. tostring(ns.db.shoulderCam))
+else
+	Check("The game's warning never shows", writes.popups == 0, writes.popups .. " warnings")
+	-- (Answered before, in your saved settings: not again.)
+	local want = noticedAtStart and 0 or 1
+	Check(want == 1 and "Our notice once" or "No notice: answered before", notices == want, notices .. " notices")
+end
 
 -- How far the frames were from you, in share of the screen's width, while
 -- the camera was off to the side.
@@ -403,7 +462,7 @@ local function Encode(v)
 end
 local out = { variant = variant, tick = TICK, events = events, segments = segments, samples = samples, checks = checks,
 	writes = writes.total, popups = writes.popups, missMean = count > 0 and sum / count or 0, missWorst = worst,
-	missWorstAt = worstAt, guesses = GAME, offset = ns.db.shoulderCamOffset, side = ns.db.shoulderCamSide,
+	missWorstAt = worstAt, guesses = GAME, spot = ns.db.shoulderCamSpot, side = ns.db.shoulderCamSide,
 	columns = { "t", "setting", "offset", "zoom", "you", "bar", "prd", "mounted" } }
 local file = assert(io.open(outPath or ("shoulder-sim-" .. variant .. ".json"), "wb"))
 file:write(Encode(out))

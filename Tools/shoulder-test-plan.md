@@ -12,14 +12,15 @@ The Shoulder Cam stays a held setting, not a camera: it doesn't move the view an
 
 | # | What | Evidence | Fix in |
 | --- | --- | --- | --- |
-| 1 | The warning comes at every session, /reload included: the game clears the offset, so we must write it again. | Run 2, Forever | Run 2b, Phase 1 |
+| 1 | The warning comes at every session, /reload included: the game clears the offset, so we must write it again. Stopping its event keeps it away (Run 2b, Forever). | Run 2, 2b | Phase 1: your decision below |
 | 2 | "It keeps resetting even when off" wasn't reproduced on Forever in Run 2. Retail, where it was reported, is untested. | Run 2 | `watch` on retail if it comes back |
 | 3 | Turned off in a fight, a protected frame stays moved for good: `PutBack` forgets it even if `Place` refused. | Sim: "Off in a fight" | Not on Forever: Run 1 shows neither frame protected out of a fight. Retail and Classic Era still to check |
 | 4 | Frames follow you ignores model and mount size. The game scales the offset by them, so frames miss on anything but a standard model. | Sim: "Tall model", community reports | Phase 2 |
 | 5 | At normal distance the offset barely shows. If the sum is right, 2 yards at 12 yards away is only 8% of the screen off the middle; a real third would take 4 yards. | Sim page, Try a shot | Phase 3 |
 | 6 | Whether any of this exists on Classic Era and retail's frames is unknown. Forever has every setting. | Run 1, Forever | Run 1 |
-| 7 | Frames follow you does nothing on Forever with a chained layout: the cast bar is anchored to the PRD, the PRD to EssentialCooldownViewer, and only frames anchored to the screen move. | Run 1, Forever | Phase 1 |
-| 8 | The sum assumes `cameraFov` is the view across the screen. Forever ran at 1835 x 768, an ultrawide shape, so it may be off there. | Run 1, Forever | Run 3 |
+| 7 | Frames follow you did nothing on Forever with a chained layout (cast bar on the PRD, the PRD on EssentialCooldownViewer). Fixed 2026-11-07: the first of ours in a chain moves, the rest ride along; plates stay. **Tested in a recording (left shoulder, Forever): the cast bar sits right under you at normal distances.** Zoomed right in (~1.5 yd) it went well past your body, to where your head-top is: frames now stop sliding further in than 3 yards | Run 1, recording | Done |
+| 8 | ~~The sum assumed `cameraFov` is across your screen.~~ Fixed: it's across a 16:9 screen, the height kept (Run 3). | Run 3 | Done |
+| 9 | The cast bar slid over the player frame: in Retail Inspired it sat on the PRD, and with empty Cooldown Manager rows (a low character) the stack sank it into the unit frames' band. Fixed 2026-11-07: the cast bar is 400 units up from the screen's bottom, as the unit frames are placed. **Tested: works** | Screenshot, frames log | Done |
 
 ## What we think the game does
 
@@ -48,7 +49,7 @@ Everything goes to the saved log under `shoulder:`. A `/reload` saves it.
 | `/cine debug shoulder watch` | Toggle, stays on over reloads. Logs every camera setting change and **who made it**, the warning popup, mounts and forms, and values at each login and logout |
 | `/cine debug shoulder quiet` | Toggle, stays on over reloads; off takes a /reload. Tests keeping the warning away by stopping its event, as DynamicCam does |
 | `/cine debug shoulder sweep offsets` | **Measures.** Says a line in /say, steps the offset 0 to 2, -1, -2, and reads your bubble at each step |
-| `/cine debug shoulder sweep zoom` | The same at 5, 8, 12, 15, 20 and 28 yards. It moves your zoom |
+| `/cine debug shoulder sweep zoom` | The same at 5, 8, 12, 15, 20 and 28 yards, leaving out any past your max zoom. It puts your zoom back after |
 | `/cine debug shoulder sweep ease` | Logs every 0.05 s through a big step: how fast the game eases |
 | `/cine debug shoulder sweep next` | A bubble only lasts a few seconds. Says a new line and carries on |
 | `/cine debug shoulder sweep stop` | Stops and puts everything back |
@@ -139,8 +140,11 @@ Answers: where does it feel wrong, which experimental settings are worth keeping
 | 1 | Forever | 2026-11-06 | Every camera setting and ResetTestCvars are there. Offset 0, Keep Character Centered 1, max zoom factor 1. Cast bar on PRD, PRD on EssentialCooldownViewer, neither protected, so Frames follow you moves nothing. Screen 1835 x 768 |
 | 1 | Retail | | |
 | 1 | Classic Era | | |
+| Notice | Forever | 2026-11-07 | Built and tested: our notice once, then no warning from Blizzard at the switch or a /reload. "Works" |
+| 2b | Forever | 2026-11-07 | **No warning** with `quiet` on: not at the write, the /reload or the relog. Forever hears the event through GameEvent (`GameEvent.UnregisterInternalEvent` is there); UIParent wasn't listening at all, so the old way alone would have done nothing. Once stopped, the event stays stopped until a /reload. CameraReduceUnexpectedMovement was already 0 here, so it wasn't written |
 | 2 | Forever | 2026-11-06 | The game clears the offset to 0 at every /reload, relog and restart; Keep Character Centered stays. So we write it each session and the warning comes each time (you saw it 3 of 3). It shows about a second after the write. Turned off, it restored both settings and nothing else wrote them for the 29 seconds logged. The reported "keeps resetting while off" didn't happen here |
-| 3 | | | |
+| 3 | Forever | 2026-11-07 | Done, second try (the long line's bubble lasted the whole sweep). Dwarf, zoom 9: 0.5, 1, 1.5, 2 yards moved you 4.2%, 8.4%, 12.6%, 16.8% off the middle (shares of half the screen), and -1, -2 the same to the right: **negative is the left shoulder**, and it's a straight line, 1.01 of the fixed sum. Zoom 8, 12, 15: 0.98-1.01. **Zoom 5: only 0.44**, but the reading may have come while the zoom still moved; rerun with closer steps. The game eases over in about 0.3 s. First try: the ultrawide screen (2.39:1) made the old sum 0.74 too big; cameraFov is across a 16:9 screen, the height kept |
+| 3b | Forever | 2026-11-07 | **No fade up close**: 1 yard moved you 4.9%, 6.2%, 9.4%, 12.6%, 15.3%, 19.3%, 26.3%, 41.0% at 15, 12, 8, 6, 5, 4, 3, 2 yards: 1.00-1.04 of the sum down to 4 yards, 1.06 at 3, 1.11 at 2 (as if the camera were ~0.17 yd nearer than its zoom reads: not worth a fix). Run 3's 0.44 at 5 yards was read mid-zoom. Up close you're near the top of the screen (bubble y 0.9 at 2 yards) |
 | 4 | | | |
 | 5 | | | |
 
@@ -150,7 +154,7 @@ Each phase ends with the sim passing, including its new checks, then one game te
 
 ### Phase 1: solid ground (after Runs 1 and 2)
 
-- Settle the login warning: keep it away as DynamicCam does, if Run 2b works. If it can't, accept one warning per session.
+- Settle the login warning: **built 2026-11-07.** Our notice once (Accept or Cancel), then the game's warning kept quiet while it's on. You chose this over one warning per session.
 - Step aside when DynamicCam is on.
 - Fix the frames left moved after a fight: keep them and put them back when the fight ends.
 - Frames follow you on chained layouts: move the first frame in the chain that's ours to move, and let what's anchored to it ride along, never both.
@@ -168,6 +172,8 @@ Each phase ends with the sim passing, including its new checks, then one game te
 - Sim: real factors in `GAME`; a new check that framing holds through a mount.
 
 ### Phase 3: framing that holds (after Run 3)
+
+**Built 2026-11-07:** Spot on screen replaces Offset (you chose replace). Default 20% of the way to the edge, 5-40%. The offset follows your zoom every frame (written when it changes by 0.02 yd or more, up to 15 yd), and eases to the middle closer than 4 yards. Sim check: your spot holds as you zoom. Untested in game.
 
 - **Hold your spot on screen:** you pick a spot, say 20% off the middle, and the offset grows with distance so it stays there as you zoom. Probably the biggest improvement to the look.
 - **Ease to the middle up close,** so first person and tight shots don't throw you off.

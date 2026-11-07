@@ -2,7 +2,7 @@
 -- or more in the saved log (category "shoulder"), so a run's read from the
 -- file after a /reload. Tools/shoulder-test-plan.md has the runs.
 --
--- on, off, left, right, offset <yards>, strength <percent>: set it from chat.
+-- on, off, left, right, spot <percent>, strength <percent>: set it from chat.
 -- scan: every camera setting the client has, its default, who you are.
 -- frames: where the frames that follow you are anchored, and can they move.
 -- watch: (again to stop; stays on over a reload) every change to a camera
@@ -19,10 +19,15 @@
 --   camera settings on (again: off), for a look. "try off" puts all back.
 local _, ns = ...
 
-local SETTLE = 1.6     -- seconds a step waits for the game to ease over
-local EASE_TIME = 3    -- seconds the ease run follows one step for
+local SETTLE = 0.6     -- seconds a step waits at least (the game eases over in about 0.3: Run 3)
+local STILL = 0.3      -- ...and until the bubble's been still this long (a zoom takes longer)
+local SETTLE_MOST = 4  -- ...but never longer than this
+local EASE_TIME = 1.2  -- seconds the ease run follows one step for
 local SAMPLE = 0.05    -- seconds between bubble reads
-local LINE = "Testing my camera, please ignore this line of text for a moment."
+-- (Long, in case a longer line's bubble lasts longer: each sweep logs how long it did.)
+local LINE = "Testing my camera, please ignore this line of text for a moment. I am measuring where my " ..
+	"character sits on the screen while the camera moves over my shoulder, so it needs a bubble that " ..
+	"stays up a little while. Thanks for your patience!"
 local SHOULDER, CENTERED = "test_cameraOverShoulder", "CameraKeepCharacterCentered"
 local REDUCE = "CameraReduceUnexpectedMovement"
 
@@ -101,8 +106,25 @@ local function Scan()
 		#CAMERA_CVARS - #missing, #missing))
 end
 
+-- (frames: also where these are, for the layout's centre stack and what a
+-- sliding frame might cover.)
+local NEIGHBOURS = { "PlayerFrame", "TargetFrame", "FocusFrame", "EssentialCooldownViewer", "UtilityCooldownViewer",
+	"BuffIconCooldownViewer" }
+local function Rect(frame)
+	local ok, left, bottom, width, height = pcall(frame.GetRect, frame)
+	if not ok or type(left) ~= "number" then return "can't read" end
+	local scale = frame:GetEffectiveScale() / UIParent:GetEffectiveScale()
+	return ("left %.0f bottom %.0f top %.0f width %.0f (UI units)"):format(left * scale, bottom * scale,
+		(bottom + height) * scale, width * scale)
+end
+
 local function Frames()
-	for _, name in ipairs(FOLLOW_FRAMES) do
+	local list = {}
+	for _, name in ipairs(FOLLOW_FRAMES) do list[#list + 1] = name end
+	for _, name in ipairs(NEIGHBOURS) do list[#list + 1] = name end
+	Log(("frames: screen %.0f x %.0f UI units, in combat %s"):format(UIParent:GetWidth(), UIParent:GetHeight(),
+		Text(InCombatLockdown())))
+	for _, name in ipairs(list) do
 		local frame = _G[name]
 		if not frame then
 			Log(("frames: %s: not on this client"):format(name))
@@ -115,8 +137,8 @@ local function Frames()
 				parts[i] = ok and ("%s on %s %s %s,%s"):format(Text(point), Text(toName), Text(toPoint), Text(x), Text(y))
 					or "can't read"
 			end
-			Log(("frames: %s: shown %s, protected %s, scale %s, points: %s"):format(name, Text(ns.Flag(frame:IsShown())),
-				Text(ns.Flag(frame:IsProtected())), Text(frame:GetEffectiveScale()),
+			Log(("frames: %s: shown %s, protected %s, scale %s, %s, points: %s"):format(name, Text(ns.Flag(frame:IsShown())),
+				Text(ns.Flag(frame:IsProtected())), Text(frame:GetEffectiveScale()), Rect(frame),
 				#parts > 0 and table.concat(parts, "; ") or "none"))
 		end
 	end
@@ -260,8 +282,7 @@ end
 -- What the Frames follow you sum says for an offset at this zoom, as a share
 -- of the screen (-1 to 1): what a sweep's readings are checked against.
 local function WorkedOut(yards)
-	local fov = tonumber(GetCVar("cameraFov")) or 90
-	return -yards / (math.max(1.5, Zoom()) * math.tan(math.rad(fov / 2)))
+	return -yards / (math.max(1.5, Zoom()) * ns.ShoulderViewWidth())
 end
 
 -- A sweep: steps of { offset, zoom (or nil) }, run in turn while a bubble's up.
@@ -279,6 +300,11 @@ local function EndSweep()
 	if not sweep then return end
 	SetCVar(SHOULDER, sweep.held.offset)
 	SetCVar(CENTERED, sweep.held.centered)
+	-- (Your zoom back as it was.)
+	local delta = sweep.held.zoom - Zoom()
+	if math.abs(delta) > 0.1 then
+		ns.CallCameraFunction(delta > 0 and "CameraZoomOut" or "CameraZoomIn", math.abs(delta))
+	end
 	ns.shoulderTestHold = nil
 	if ns.ApplyShoulderCam then ns.ApplyShoulderCam() end
 	local total, count = 0, 0
@@ -329,6 +355,10 @@ ns.SetOnUpdate(stepper, function(_, elapsed)
 	local x, y = BubbleSpot()
 	sweep.waited = sweep.waited + dt
 	if not x then
+		if sweep.bubbleAt then
+			Log(("sweep: the bubble lasted %.1f s"):format(GetTime() - sweep.bubbleAt))
+			sweep.bubbleAt = nil
+		end
 		if sweep.hadBubble or sweep.waited > 1 then
 			sweep.paused = true
 			stepper:Hide()
@@ -338,12 +368,14 @@ ns.SetOnUpdate(stepper, function(_, elapsed)
 		return
 	end
 	sweep.hadBubble = true
+	sweep.bubbleAt = sweep.bubbleAt or GetTime()
 	if sweep.last and math.abs(x - sweep.last) > 0.001 then sweep.moved = sweep.waited end
 	sweep.last = x
 	if sweep.name == "ease" then
 		Log(("ease: step %d, %.2f s: bubble x %.4f"):format(sweep.at, sweep.waited, x))
 	end
-	if sweep.waited >= (sweep.name == "ease" and EASE_TIME or SETTLE) then
+	local settled = sweep.waited >= SETTLE and (sweep.waited - sweep.moved >= STILL or sweep.waited >= SETTLE_MOST)
+	if sweep.name == "ease" and sweep.waited >= EASE_TIME or sweep.name ~= "ease" and settled then
 		Reading(sweep.steps[sweep.at], x, y)
 		sweep.at = sweep.at + 1
 		if sweep.steps[sweep.at] then
@@ -356,7 +388,8 @@ end)
 
 local SWEEPS = {
 	offsets = { { 0 }, { 0.5 }, { 1 }, { 1.5 }, { 2 }, { -1 }, { -2 } },
-	zoom = { { 0, 15 }, { 1, 15 }, { 1, 5 }, { 1, 8 }, { 1, 12 }, { 1, 20 }, { 1, 28 } },
+	zoom = { { 0, 15 }, { 1, 15 }, { 1, 12 }, { 1, 8 }, { 1, 6 }, { 1, 5 }, { 1, 4 }, { 1, 3 }, { 1, 2 },
+		{ 1, 20 }, { 1, 28 } },
 	ease = { { 0 }, { 2 }, { -2 } },
 }
 
@@ -386,8 +419,15 @@ local function Sweep(what)
 		ns.Print("shoulder sweep: not in a fight")
 		return
 	end
-	sweep = { name = what, steps = steps, at = 1, readings = {},
-		held = { offset = GetCVar(SHOULDER), centered = GetCVar(CENTERED) } }
+	-- (Steps past the farthest the camera goes here left out: 15 yards times
+	-- cameraDistanceMaxZoomFactor, 1 on Forever.)
+	local farthest = 15 * (tonumber(GetCVar("cameraDistanceMaxZoomFactor")) or 1) + 0.5
+	local kept = {}
+	for _, step in ipairs(steps) do
+		if not step[2] or step[2] <= farthest then kept[#kept + 1] = step end
+	end
+	sweep = { name = what, steps = kept, at = 1, readings = {},
+		held = { offset = GetCVar(SHOULDER), centered = GetCVar(CENTERED), zoom = Zoom() } }
 	ns.shoulderTestHold = true -- (ShoulderCam.lua keeps its hands off meanwhile)
 	SetCVar(CENTERED, "0")
 	Log(("sweep %s starting: %s | offset %s, zoom %.2f, cameraFov %s, chatBubbles %s"):format(what, Who(),
@@ -458,10 +498,10 @@ function ns.ShoulderTest(arg)
 	elseif what == "on" then Set("shoulderCam", true)
 	elseif what == "off" then Set("shoulderCam", false)
 	elseif what == "left" or what == "right" then Set("shoulderCamSide", what)
-	elseif what == "offset" and tonumber(rest) then Set("shoulderCamOffset", tonumber(rest))
+	elseif what == "spot" and tonumber(rest) then Set("shoulderCamSpot", tonumber(rest) / 100)
 	elseif what == "strength" and tonumber(rest) then Set("shoulderCamFramesStrength", tonumber(rest) / 100)
 	else
 		ns.Print("shoulder: scan, frames, watch, quiet, sweep offsets|zoom|ease|next|stop, try pitch|head|enemy|interact|off, " ..
-			"on, off, left, right, offset <yards>, strength <percent>")
+			"on, off, left, right, spot <percent>, strength <percent>")
 	end
 end

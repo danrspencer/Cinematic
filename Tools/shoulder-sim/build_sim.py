@@ -9,9 +9,9 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
 OUT = sys.argv[1]
 EVERY = 5  # samples kept: every fifth one (0.1 s apart)
-SESSIONS = ("page", "mounted", "tall", "relog", "fight")
+SESSIONS = ("page", "chained", "mounted", "tall", "relog", "fight", "decline")
 # Checks expected to fail until Phase 1 of Tools/shoulder-test-plan.md fixes them.
-KNOWN = {("relog", "One warning this session"), ("fight", "Cast bar back on its place"),
+KNOWN = {("fight", "Cast bar back on its place"),
          ("fight", "PRD back on its place")}
 
 runs, failed = {}, []

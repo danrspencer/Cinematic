@@ -1,16 +1,23 @@
 -- Shoulder Cam (shoulderCam): the camera sits over your shoulder (right, or
 -- left: shoulderCamSide), you to the side of the screen. It's the game's
--- test_cameraOverShoulder offset (yards: shoulderCamOffset, negative for the
--- left), which it eases over to on its own. The game ignores that while Keep
+-- test_cameraOverShoulder offset (yards, negative for the left), which it
+-- eases over to on its own (in about 0.3 s: Run 3). That's a fixed distance,
+-- so the closer the camera the further aside it pushes you: 1 yard is 5% of
+-- the way to the screen's edge at 15 yards away, 41% at 2 (Run 3b). So you
+-- pick a spot instead (shoulderCamSpot: that share of the way from the middle
+-- to the edge) and the offset follows your zoom to hold you there, eased back
+-- to the middle closer than SPOT_EASE_TO yards. The game ignores that while Keep
 -- Character Centered (Accessibility) is on, so that's turned off meanwhile, and
 -- CameraReduceUnexpectedMovement too (the same since 11.0.2, as DynamicCam found).
 -- It's one of Blizzard's experimental camera settings: writing it brings up
--- their warning. Accept saves nothing; it's the write that brings it up, once
--- a session. The game clears the offset at every reload and login, and keeps
--- Keep Character Centered (tested on Forever, Run 2 of
--- Tools/shoulder-test-plan.md), so that write and its warning come every
--- session for now. Once accepted, 0 and back in the same session brings no
--- warning, so pausing below is fine.
+-- their warning, once a session, and the game clears the offset at every
+-- reload and login (Forever, Run 2 of Tools/shoulder-test-plan.md), so theirs
+-- would come every session. Ours instead, once ever (db.shoulderCamNoticed,
+-- not part of a profile): until it's accepted nothing's written, and Cancel
+-- turns the Shoulder Cam off. After that the game's warning is kept quiet
+-- while it's on: its event stopped, as DynamicCam and DialogueUI do (Run 2b:
+-- none at the write, a reload or a relog). The game can't be told to hear it
+-- again, so after turning off it's back from the next /reload.
 -- Your own settings (db.shoulderCamYours) come back as it's turned off.
 -- Disable (ResetTestCvars) turns it off here too.
 -- (Not ns.ApplyCVarSet: Keep Character Centered would be put back on logout.)
@@ -65,26 +72,93 @@ local function PauseReason()
 end
 
 -- The offset to write: yards, negative for the left shoulder; "0" paused.
-local function ShoulderValue()
-	if PauseReason() then
-		return "0"
-	end
-	local offset = ns.db.shoulderCamOffset or 1
-	return ("%.2f"):format(ns.db.shoulderCamSide == "left" and -offset or offset)
+local SPOT_EASE_FROM, SPOT_EASE_TO = 1, 4 -- yards: in the middle at 1, eased out to your spot by 4
+local OFFSET_MOST = 15 -- yards (DynamicCam's range too)
+local OFFSET_STEP = 0.02 -- yards: a smaller change to the offset isn't written
+local paused -- (PauseReason at the last check, every POLL)
+
+-- The offset that holds you at your spot at this distance (Run 3: you sit
+-- yards / (distance x view width) of the way to the edge).
+local function SpotYards()
+	local distance = GetCameraZoom and GetCameraZoom() or 8
+	local yards = (ns.db.shoulderCamSpot or 0.2) * distance * ns.ShoulderViewWidth()
+	local k = math.min(1, math.max(0, (distance - SPOT_EASE_FROM) / (SPOT_EASE_TO - SPOT_EASE_FROM)))
+	return math.min(OFFSET_MOST, yards * k * k * (3 - 2 * k))
 end
 
+local function ShoulderValue(again)
+	if not again then paused = PauseReason() end
+	if paused then
+		return "0"
+	end
+	local yards = SpotYards()
+	return ("%.2f"):format(ns.db.shoulderCamSide == "left" and -yards or yards)
+end
+
+-- (The offset's following your zoom: logged in full only to the detail log.)
 local function Write(yours, cvar, value)
 	local now = GetCVar(cvar)
 	if now ~= nil and not Same(now, value) then
 		if yours[cvar] == nil then
 			yours[cvar] = now
 		end
-		ns.Log("cvar", ("Shoulder Cam: %s %s -> %s"):format(cvar, now, value))
+		local text = ("Shoulder Cam: %s %s -> %s"):format(cvar, now, value)
+		if cvar == "test_cameraOverShoulder" and tonumber(now) ~= 0 and tonumber(value) ~= 0 then
+			ns.LogDetail("cvar", text)
+		else
+			ns.Log("cvar", text)
+		end
 		SetCVar(cvar, value)
 	end
 end
 
 local UpdateFollow -- (below: the frames that follow you)
+
+-- The game's warning kept quiet (since WoW 12.1 its event goes through
+-- GameEvent; before, UIParent heard it).
+local WARNING_EVENT = "EXPERIMENTAL_CVAR_CONFIRMATION_NEEDED"
+local quieted
+local function QuietWarning()
+	if quieted then return end
+	quieted = true
+	local game = _G.GameEvent
+	if game and game.UnregisterInternalEvent then pcall(game.UnregisterInternalEvent, WARNING_EVENT) end
+	pcall(UIParent.UnregisterEvent, UIParent, WARNING_EVENT)
+	ns.Log("cvar", "Shoulder Cam: the game's experimental camera warning kept quiet")
+end
+
+-- (Tools/shoulder-sim: a new session, as a reload starts this file again.)
+function ns.ResetShoulderSession() quieted = nil end
+
+-- Our notice, once: Accept and it starts; Cancel turns it off.
+local asking
+local function Answered(yes)
+	asking = nil
+	if yes then
+		ns.db.shoulderCamNoticed = true
+	else
+		ns.db.shoulderCam = false
+	end
+	ns.ApplyShoulderCam()
+	if ns.RefreshOptions then ns.RefreshOptions() end
+end
+local function AskNotice()
+	if asking then return end
+	asking = true
+	if not StaticPopupDialogs.CINEMATIC_SHOULDER_NOTICE then
+		StaticPopupDialogs.CINEMATIC_SHOULDER_NOTICE = {
+			text = L["The Shoulder Cam uses one of Blizzard's experimental camera settings. The game would " ..
+				"warn about it every time you log in, so Cinematic keeps that warning away while the Shoulder " ..
+				"Cam is on. If the camera ever acts up, turn the Shoulder Cam off and your own camera " ..
+				"settings come back."],
+			button1 = ACCEPT or L["Accept"], button2 = CANCEL or L["Cancel"],
+			OnAccept = function() Answered(true) end,
+			OnCancel = function() Answered(false) end,
+			timeout = 0, whileDead = true, hideOnEscape = false,
+		}
+	end
+	StaticPopup_Show("CINEMATIC_SHOULDER_NOTICE")
+end
 
 local poller = CreateFrame("Frame")
 poller:Hide()
@@ -94,7 +168,10 @@ function ns.ApplyShoulderCam()
 		return
 	end
 	local yours = ns.db.shoulderCamYours
-	if ns.Setting("shoulderCam") then
+	if ns.Setting("shoulderCam") and not ns.db.shoulderCamNoticed then
+		AskNotice() -- (nothing written till it's answered)
+	elseif ns.Setting("shoulderCam") then
+		QuietWarning()
 		yours = yours or {}
 		ns.db.shoulderCamYours = yours
 		-- (DialogueUI's camera sets the same offset for its talks, and puts
@@ -120,13 +197,21 @@ function ns.ApplyShoulderCam()
 	if UpdateFollow then UpdateFollow() end
 end
 
--- (Picks up pauses, and the page's sliders and ticks, a moment later.)
+-- (Picks up pauses, and the page's sliders and ticks, a moment later; the
+-- offset follows your zoom every frame in between.)
 local waited = 0
 ns.SetOnUpdate(poller, function(_, elapsed)
 	waited = waited + elapsed
 	if waited >= POLL then
 		waited = 0
 		ns.ApplyShoulderCam()
+		return
+	end
+	local yours = ns.db and ns.db.shoulderCamYours
+	if paused or not yours or ns.shoulderTestHold or (ns.DialogueUICameraOn and ns.DialogueUICameraOn()) then return end
+	local value = ShoulderValue(true)
+	if math.abs((tonumber(GetCVar("test_cameraOverShoulder")) or 0) - tonumber(value)) >= OFFSET_STEP then
+		Write(yours, "test_cameraOverShoulder", value)
 	end
 end)
 
@@ -149,18 +234,21 @@ local SWAP_ACTION = "CLICK " .. swap:GetName() .. ":LeftButton"
 -- on screen can't be read (plates can't be measured), so it's worked out:
 -- the game's offset now (test_cameraOverShoulder, 0 while paused) over the
 -- camera's distance, as a share of half the screen's width at its field of
--- view (cameraFov, across). Right shoulder: you're left of the middle.
--- shoulderCamFramesStrength scales it (the sum's a guess: tune in game).
--- Only frames anchored to the screen move (retail's PRD on your own plate
--- already follows you). Their points are kept as the game set them and
+-- view (ns.ShoulderViewWidth). Right shoulder: you're left of the middle.
+-- Measured with your chat bubble (Run 3): it holds for a standard model.
+-- shoulderCamFramesStrength scales it.
+-- A frame on a nameplate stays (retail's PRD on your own plate already
+-- follows you), and of a chain (cast bar on the PRD, the PRD on the cooldowns:
+-- Forever, Run 1) only the first of ours moves; the rest ride along. Points are kept as the game set them and
 -- given back with the slide added; when the game sets them again (its
 -- layout, Edit Mode), that's taken as their place from then on. Nothing
 -- moves while Edit Mode is open, nor a protected frame in a fight.
 local FOLLOW_FRAMES = { "PlayerCastingBarFrame", "CastingBarFrame", "GamepadPlayerCastingBarFrame",
 	"PersonalResourceDisplayFrame", "CinematicPersonalResource" }
-local FOLLOW_EASE = 4      -- how quickly the frames catch up (per second)
+local FOLLOW_EASE = 12     -- how quickly the frames catch up (per second; the game eases over in ~0.3 s)
 local FOLLOW_MAX = 0.3     -- never more than this share of the screen's width
-local FOLLOW_MIN_ZOOM = 1.5 -- (closer than this, as this: first person has no side)
+local FOLLOW_MIN_ZOOM = 3 -- (closer, as this: in a 2026-11-07 recording at ~1.5 yards the bar went
+                           -- to where your head-top is, well past your body; first person has no side)
 local followed = {}        -- frame -> { points = the game's, ours = what we put on, shift = ours in UI units }
 local followShift = 0      -- the slide now (UIParent units, + right), easing to the target
 
@@ -193,11 +281,32 @@ local function SamePoints(a, b)
 	return true
 end
 
--- On the screen: every point on UIParent (or nothing), not a nameplate.
-local function OnScreen(points)
-	for _, p in ipairs(points) do
-		if p[2] ~= nil and p[2] ~= UIParent then return false end
+local FOLLOWS = {}
+for _, name in ipairs(FOLLOW_FRAMES) do FOLLOWS[name] = true end
+
+-- What a frame hangs on, up its chain of anchors (first points): "plate" if
+-- a nameplate (it follows you already), another of FOLLOW_FRAMES (it rides
+-- along when that one moves: never moved twice), else nil (the screen, or a
+-- frame that stays put, as Forever's PRD on EssentialCooldownViewer: Run 1).
+local function Hangs(frame)
+	local at = frame
+	for _ = 1, 8 do
+		local ok, _, to = pcall(at.GetPoint, at, 1)
+		if not ok or type(to) ~= "table" or to == UIParent then return nil end
+		local okName, name = pcall(to.GetName, to)
+		name = okName and type(name) == "string" and name or ""
+		if name:find("^NamePlate") or to.UnitFrame or to.namePlateUnitToken then return "plate" end
+		if FOLLOWS[name] and to ~= frame then return to end
+		at = to
 	end
+end
+
+-- Whether this frame is the one to move: not on a plate, and not riding
+-- along with another of ours that moves.
+local function Mover(frame)
+	local hangs = Hangs(frame)
+	if hangs == "plate" then return false end
+	if hangs then return not (Hangs(hangs) ~= "plate" and ReadPoints(hangs)) end
 	return true
 end
 
@@ -223,15 +332,24 @@ local function PutBack()
 	followShift = 0
 end
 
+-- How wide the view is: the tangent of half the field of view across the
+-- screen. cameraFov is across a 16:9 screen; a wider or narrower one keeps its
+-- height (Run 3, Forever: a 2.39:1 ultrawide measured 0.73-0.77 of the plain
+-- 16:9 sum, which says 0.74).
+function ns.ShoulderViewWidth()
+	local fov = math.min(120, math.max(30, tonumber(GetCVar("cameraFov")) or 90))
+	local aspect = WorldFrame:GetWidth() / math.max(1, WorldFrame:GetHeight())
+	return math.tan(math.rad(fov / 2)) * aspect / (16 / 9)
+end
+
 local function TargetShift()
 	local db = ns.db
 	if not (db and ns.Setting("shoulderCam") and db.shoulderCamFrames) then return 0 end
 	local yards = tonumber(GetCVar("test_cameraOverShoulder")) or 0
 	if yards == 0 then return 0 end
 	local distance = math.max(FOLLOW_MIN_ZOOM, GetCameraZoom and GetCameraZoom() or 5)
-	local fov = math.min(120, math.max(30, tonumber(GetCVar("cameraFov")) or 90))
 	local half = UIParent:GetWidth() / 2
-	local shift = -yards / (distance * math.tan(math.rad(fov / 2))) * half * (db.shoulderCamFramesStrength or 1)
+	local shift = -yards / (distance * ns.ShoulderViewWidth()) * half * (db.shoulderCamFramesStrength or 1)
 	local most = UIParent:GetWidth() * FOLLOW_MAX
 	return math.max(-most, math.min(most, shift))
 end
@@ -252,12 +370,13 @@ ns.SetOnUpdate(follower, function(self, elapsed)
 			local entry, now = followed[frame], ReadPoints(frame)
 			-- (Moved by the game since: its new place.)
 			if now and (not entry or not SamePoints(now, entry.ours)) then
-				if OnScreen(now) then
-					entry = { points = now, ours = now, shift = 0 }
-					followed[frame] = entry
-				else
-					entry, followed[frame] = nil, nil
-				end
+				entry = { points = now, ours = now, shift = 0 }
+				followed[frame] = entry
+			end
+			-- (Riding along with another, or on a plate: back on its own place.)
+			if entry and not Mover(frame) then
+				if entry.shift ~= 0 then Place(frame, entry, 0) end
+				entry, followed[frame] = nil, nil
 			end
 			if entry and math.abs(entry.shift - followShift) >= 0.5 then
 				Place(frame, entry, followShift)
@@ -283,7 +402,7 @@ function ns.GetShoulderCamDebug()
 	return {
 		setting = db and db.shoulderCam, applied = db and db.shoulderCamYours ~= nil,
 		shoulder = GetCVar("test_cameraOverShoulder"), centered = GetCVar("CameraKeepCharacterCentered"),
-		side = db and db.shoulderCamSide, offset = db and db.shoulderCamOffset,
+		side = db and db.shoulderCamSide, spot = db and db.shoulderCamSpot,
 		follow = db and db.shoulderCamFrames, followShift = followShift, followTarget = TargetShift(),
 		followed = (function()
 			local names = {}
@@ -340,11 +459,12 @@ function ns.CreateShoulderCamPanel(kit)
 	stack:Continue(lastRow, "label")
 
 	stack:Header(content, L["Shoulder"])
-	local offset = stack:Add(kit.Slider(content, "shoulderCamOffset", L["Offset"], 0.25, 2, 0.25,
-		L["%.2f yards"]), "slider")
-	kit.Tooltip(offset, L["How far to the side the camera moves. About 1 is subtle; 1.5 to 2 is a strong " ..
-		"over-the-shoulder look."])
-	kit.GreyUnless(offset, IfOn)
+	local spot = stack:Add(kit.Slider(content, "shoulderCamSpot", L["Spot on screen"], 5, 40, 1, "%d%%", 100),
+		"slider")
+	kit.Tooltip(spot, L["How far off the middle of the screen you sit, as a share of the way to its edge. " ..
+		"The camera moves as you zoom to keep you there, and eases you back to the middle when you zoom " ..
+		"right in. 33% puts you on the line a third of the way across."])
+	kit.GreyUnless(spot, IfOn)
 	stack:Add(kit.Label(content, "GameFontHighlight", L["Side"]), "label")
 	for _, side in ipairs({ { "right", L["Right shoulder"] }, { "left", L["Left shoulder"] } }) do
 		kit.GreyUnless(stack:Add(kit.Choice(content, "shoulderCamSide", side[1], side[2],

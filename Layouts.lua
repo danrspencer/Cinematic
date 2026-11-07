@@ -285,16 +285,20 @@ if not PRD_SYSTEM and Enum.EditModeSystem then
 end
 local FOREVER_PURE = PRD_SYSTEM and { { PRD_SYSTEM, nil, "CENTER", "UIParent", "CENTER", 0, -205 } } or {}
 -- Retail Inspired's in the middle too, as retail has it, not in Modern's
--- spot at the left: in the centre stack (DESIGN) on the essential row, the
--- cast bar on it and the buff icons on that. (No such system: the cast bar
--- on the essential row.)
+-- spot at the left: in the centre stack (DESIGN) on the essential row. The
+-- cast bar's not on the stack, though: with the Cooldown Manager's rows
+-- empty (a low character) they're 1 unit tall in play, and the stack sank
+-- the cast bar to 292 units up, into the player and target frames' band
+-- (250-350: Modern's, from the screen's bottom), where the Shoulder Cam's
+-- Frames follow you slid it over the player frame (Forever, 2026-11-07).
+-- So it's from the screen's bottom too, as they are, above them: clear of
+-- both whatever the screen's size, and of the stack full (Edit Mode's
+-- placeholder rows put its top at about 383). Buff icons on it.
 do
-	local below = "EssentialCooldownViewer"
 	if PRD_SYSTEM then
-		DESIGN[#DESIGN + 1] = { PRD_SYSTEM, nil, "BOTTOM", below, "TOP", 0, 4 }
-		below = "PersonalResourceDisplayFrame"
+		DESIGN[#DESIGN + 1] = { PRD_SYSTEM, nil, "BOTTOM", "EssentialCooldownViewer", "TOP", 0, 4 }
 	end
-	DESIGN[#DESIGN + 1] = { 1, nil, "BOTTOM", below, "TOP", 0, 4 }                     -- cast bar
+	DESIGN[#DESIGN + 1] = { 1, nil, "BOTTOM", "UIParent", "BOTTOM", 0, 400 }            -- cast bar
 	DESIGN[#DESIGN + 1] = { 20, 3, "BOTTOM", "PlayerCastingBarFrame", "TOP", 0, 4 }    -- buff icons
 end
 
