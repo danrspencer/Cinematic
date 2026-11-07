@@ -122,6 +122,7 @@ local function PrintDebugHelp()
 	print("  /cine debug unitframes - log every part of the player, pet, target and focus frames (names, textures, sizes, held hidden) to the saved log")
 	print("  /cine debug plates - nameplate settings, and how the plates (and your target) are sorted")
 	print("  /cine debug spec - every way this client might tell your spec, and what each says")
+	print("  /cine debug rolls - Roll Vision's settings and every drop in the loot history with its picks")
 	print("  /cine debug textures - a strip of every bar texture the Style pages offer, to see which this client has")
 	print("  /cine debug fonts - every font other addons share, and which are left out (no small letters)")
 	print("  /cine debug themecheck - every theme after every other: the frames' parts must come back where the game had them")
@@ -369,6 +370,8 @@ local function HandleSlash(msg)
 		Cinematic_ToggleUI()
 	elseif cmd == "debug" and arg == "spec" then
 		ns.SpecDebug()
+	elseif cmd == "debug" and arg == "rolls" and ns.RollDebug then
+		ns.RollDebug()
 	elseif cmd == "debug" and arg == "fishing" and ns.FishingReelDebug then
 		ns.FishingReelDebug()
 	elseif cmd == "debug" and arg == "flybys" then

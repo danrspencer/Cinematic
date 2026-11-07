@@ -12312,7 +12312,7 @@ local function CreateVisionPanel()
 			{ value = 4, text = L["Epic and up"] },
 		}
 		local QUALITY_TIP = L["Only items of this quality and better get a panel in the window. Rolls on the " ..
-			"rest are only in chat. The test (/cine rolls test) goes by it too."]
+			"rest are only in chat, unless the game asks you to roll on one. The test (/cine rolls test) goes by it too."]
 		-- Which items get a panel, then whose rolls each lists, then where the window goes.
 		stack:Header(content, L["Which items"])
 		stack:Add(Label(content, "GameFontHighlight", L["Show rolls on"]), "label")
@@ -12329,7 +12329,8 @@ local function CreateVisionPanel()
 		end
 		local usable = stack:Add(Check(content, "rollUsableOnly", L["Only items you can use"],
 			L["Items you can't use (armor or weapons you can't wear, another class's, or a level you're not " ..
-			"yet: anything in red on its tooltip) don't get a panel. Their rolls are only in chat."]), "check")
+			"yet: anything in red on its tooltip) don't get a panel, unless the game asks you to roll on one. " ..
+			"Their rolls are only in chat."]), "check")
 		GreyUnless(usable, RollsOn)
 		GreyUnless(stack:Add(BoxLine(content), "label"):Box(L["Items shown at once"], "rollMaxPanels", 1, 8, 1, "%d",
 			1, L["The window shows this many items at once, newest at the top: four down, the " ..

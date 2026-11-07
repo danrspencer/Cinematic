@@ -313,6 +313,7 @@ local shown = {}    -- the drops on show, newest first: { key, encounterID, loot
 local pinned = false -- opened with /cine rolls: stays until closed
 local testing        -- the test's fake drops, while it runs
 local dismissed = {} -- drops whose window was closed by hand mid-roll: not brought back for them
+local RollPicks -- (Picks, below: a drop's picks as one log line)
 
 local function SetStateIcon(texture, state)
 	texture:SetDesaturated(false)
@@ -1385,20 +1386,48 @@ FindDrop = Find
 -- is still going (finished ones turn up after a reload, or someone else's
 -- roll ended: not news). Straight away, so you see the others' picks (a need
 -- already in?) while you choose in the game's roll frame, just above.
+-- (each drop's picks in one line, for the log: "Name:state/roll ...")
+local function Picks(info)
+	local parts = {}
+	for _, roll in ipairs(info.rollInfos or {}) do
+		local ok, text = pcall(function()
+			return ("%s:%s/%s"):format(ShortName(roll.playerName) or "?", tostring(roll.state),
+				tostring(roll.roll))
+		end)
+		parts[#parts + 1] = ok and text or "secret"
+	end
+	return #parts > 0 and table.concat(parts, " ") or "none"
+end
+RollPicks = Picks
+
 local function Seen(encounterID, lootListID, info)
 	if testing or type(info) ~= "table" then
 		return
 	end
 	local key = Key(encounterID, lootListID)
 	local _, drop = Find(key)
+	local why
 	if drop then
 		drop.info = info
-	elseif not Done(info) and not dismissed[key] and Wanted(info) then
+		why = "refreshed"
+	elseif Done(info) then
+		why = "skipped: already done"
+	elseif dismissed[key] then
+		why = "skipped: closed by hand"
+	elseif not Wanted(info) and not YourChoiceDue(info) then
+		-- (still yours to pick on: shown whatever the filters say, so you see
+		-- the others' picks while you choose)
+		why = "skipped: below min quality or unusable"
+	else
 		table.insert(shown, 1, { key = key, encounterID = encounterID, lootListID = lootListID, info = info })
 		for i = #shown, Panels() + 1, -1 do
 			shown[i] = nil
 		end
-	else
+		why = "added"
+	end
+	ns.Log("rolls", ("drop %s %s: %s; picks %s"):format(key, tostring(ItemText(info.itemHyperlink)), why,
+		Picks(info)))
+	if why:find("^skipped") then
 		return
 	end
 	Show()
@@ -1424,7 +1453,23 @@ end
 
 local watcher = CreateFrame("Frame")
 watcher:SetScript("OnEvent", function(_, event, encounterID, lootListID)
+	if event == "START_LOOT_ROLL" then
+		-- (only for the log: does the loot history have it yet, as you're asked?)
+		local open = 0
+		for _, encounter in ipairs(AllEncounters()) do
+			local ok, drops = pcall(History.GetSortedDropsForEncounter, encounter.encounterID)
+			for _, info in ipairs(ok and type(drops) == "table" and drops or {}) do
+				if not Done(info) then
+					open = open + 1
+				end
+			end
+		end
+		ns.Log("rolls", ("roll %s starts (Roll Vision %s): loot history has %d unfinished drop(s)"):format(
+			tostring(encounterID), Enabled() and "on" or "off", open))
+		return
+	end
 	if not Enabled() then
+		ns.Log("rolls", event .. ": Roll Vision is off")
 		return
 	end
 	if event == "LOOT_HISTORY_UPDATE_DROP" and encounterID and lootListID then
@@ -1439,7 +1484,8 @@ watcher:SetScript("OnEvent", function(_, event, encounterID, lootListID)
 		Close()
 	end
 end)
-for _, event in ipairs({ "LOOT_HISTORY_UPDATE_DROP", "LOOT_HISTORY_UPDATE_ENCOUNTER", "LOOT_HISTORY_CLEAR_HISTORY" }) do
+for _, event in ipairs({ "LOOT_HISTORY_UPDATE_DROP", "LOOT_HISTORY_UPDATE_ENCOUNTER", "LOOT_HISTORY_CLEAR_HISTORY",
+	"START_LOOT_ROLL" }) do
 	pcall(watcher.RegisterEvent, watcher, event)
 end
 
@@ -1470,6 +1516,39 @@ function ns.ToggleRollWindow()
 	end
 	pinned = true
 	Show()
+end
+
+-- /cine debug rolls: Roll Vision's settings, the window, the game's roll
+-- frames, and every drop in the loot history with its picks.
+function ns.RollDebug()
+	local function Say(line)
+		ns.Print(line)
+	end
+	Say(("Roll Vision %s; min quality %s; usable only %s; panels %d; in combat %s"):format(
+		Enabled() and "on" or "off", tostring(ns.Setting("rollMinQuality")), tostring(ns.Setting("rollUsableOnly")),
+		Panels(), tostring(InCombatLockdown())))
+	Say(("window %s; %d card(s) on show; test %s; pinned %s"):format(
+		window and (window:IsShown() and "shown" or "hidden") or "not made", #shown, tostring(testing ~= nil),
+		tostring(pinned)))
+	local frames = {}
+	for i = 1, 10 do
+		local frame = _G["GroupLootFrame" .. i]
+		if frame and ns.Flag(frame:IsVisible()) then
+			frames[#frames + 1] = ("%d (roll %s)"):format(i, tostring(frame.rollID))
+		end
+	end
+	Say("game roll frames up: " .. (#frames > 0 and table.concat(frames, ", ") or "none"))
+	local encounters = AllEncounters()
+	Say(("loot history: %d encounter(s)"):format(#encounters))
+	for _, encounter in ipairs(encounters) do
+		local ok, drops = pcall(History.GetSortedDropsForEncounter, encounter.encounterID)
+		for _, info in ipairs(ok and type(drops) == "table" and drops or {}) do
+			local key = Key(encounter.encounterID, ListID(info))
+			Say(("  %s %s: %s, wanted %s%s; picks %s"):format(key, tostring(ItemText(info.itemHyperlink)),
+				Done(info) and "done" or "rolling", tostring(Wanted(info)),
+				dismissed[key] and ", closed by hand" or "", RollPicks(info)))
+		end
+	end
 end
 
 -- Whether the window is up now (the minimap button's glow).
