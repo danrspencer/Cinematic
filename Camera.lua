@@ -961,6 +961,18 @@ do
 		if not castButton then
 			return
 		end
+		-- Nothing to do with fishing going on (no pole on, no cast out, not the
+		-- fish camera, none of its bindings or settings still held): idle, only
+		-- noting a fight for the after-combat wait. (A profile showed it every
+		-- frame for everyone.)
+		if not poleEquipped and not next(bound) and not REEL_CVARS.active and GetTime() >= reelHeldUntil
+			and not ns.FishCamOn() and not FishingChannel() then
+			if InCombatLockdown() or ns.Flag(UnitAffectingCombat("player")) then
+				combatSeenAt = GetTime()
+			end
+			fishCastWhy, loggedWhy, wasFishing = "no pole equipped", nil, false
+			return
+		end
 		-- Right button held: the binding stays as it was pressed. Swapping it
 		-- mid-press sends the release to the other binding, so a right-drag
 		-- begun as the game's (turning) never got its stop and stayed stuck.
@@ -1924,15 +1936,23 @@ end
 -- one whose camera is turned off here (Cameras page) doesn't count.
 local EVENT_CAM = { cozy = "cozy", vista = "vista", fish = "fish", afk = "idle", tele = "tele" }
 -- Asked a dozen times a frame (the tick, the orbit, the focus haze...), so
--- worked out once a frame. What it goes by changes with events and key
--- presses, which come between frames, or by the orbit within one (the
--- standing-still time, an emote or key binding's camera ended by moving):
--- those are checked too. (CurrentEvent's own changes come out the same
--- however often it's called in a frame.)
+-- worked out once per camera director decision (Director.lua: about 10 a
+-- second, and at once as things change; ns.directorGen counts them), or
+-- once a frame while the director isn't running. What it goes by changes
+-- with events and key presses, which come between frames, or by the orbit
+-- within one (the standing-still time, an emote or key binding's camera
+-- ended by moving): those are checked too. (CurrentEvent's own changes
+-- come out the same however often it's called.)
 local activeEventCache = { at = -1 }
 function ns.ActiveEvent()
 	local cache, now = activeEventCache, GetTime()
-	if cache.at == now and cache.still == ns.stillSince and cache.emote == emoteEvent
+	local fresh
+	if ns.DirectorRunning and ns.DirectorRunning() then
+		fresh = cache.gen == ns.directorGen
+	else
+		fresh = cache.at == now
+	end
+	if fresh and cache.still == ns.stillSince and cache.emote == emoteEvent
 		and cache.manual == ns.manualCam and cache.moving == ns.playerMoving and cache.campfire == atCampfire then
 		return cache.key, cache.camera
 	end
@@ -1954,7 +1974,7 @@ function ns.ActiveEvent()
 		key, camera = nil, nil
 	end
 	-- (Noted after: working it out can end an emote.)
-	cache.at, cache.still, cache.emote, cache.manual = now, ns.stillSince, emoteEvent, ns.manualCam
+	cache.at, cache.gen, cache.still, cache.emote, cache.manual = now, ns.directorGen, ns.stillSince, emoteEvent, ns.manualCam
 	cache.moving, cache.campfire, cache.key, cache.camera = ns.playerMoving, atCampfire, key, camera
 	return key, camera
 end
@@ -2570,6 +2590,12 @@ end
 -- camera input is handled separately in UpdateOrbit.)
 local function IsPlayerActive()
 	return ns.playerMoving or turnKeys.left or turnKeys.right or IsMouseOnCamera()
+end
+ns.IsPlayerActive = IsPlayerActive -- (Director.lua: the scene's "active")
+-- The emote (or seat, cast...) the event cameras go by now, for the camera
+-- director to see it change (Director.lua).
+function ns.EmoteEventNow()
+	return emoteEvent
 end
 
 -- Idle zoom: after standing still for the standing-still delay, the camera
@@ -3687,11 +3713,15 @@ function ns.ResetCameraModeReport()
 	report.mode = false
 end
 
-function ns.UpdateOrbit(cinematic, elapsed)
-	local onTaxi = ns.OnTaxi()
-	local active = IsPlayerActive()
-	local now = GetTime()
-	ns.UpdateMouseSteer()
+-- The scene now: what the cameras go by, worked out from the world as it is
+-- (standing still, an event, travel, death...), with the bookkeeping that
+-- goes with it (the standing-still timer, emotes ended by moving or
+-- turning, auto-walk and auto-run times). Sets ns.activeCam. Asked by the
+-- orbit every frame for now; the camera director will ask it on its own
+-- ticks (Tools/camera-director-plan.md). One table, filled each time.
+local scene = {}
+ns.scene = scene
+function ns.DecideScene(cinematic, now, onTaxi, active)
 	if InCombatLockdown() or ns.Flag(UnitAffectingCombat("player")) then
 		lastCombatAt = now
 	end
@@ -3769,19 +3799,6 @@ function ns.UpdateOrbit(cinematic, elapsed)
 		ns.StandUpFromDeathTest() -- (the wheel's test is over)
 	end
 	local deathCam = ns.orbit.deadSince ~= nil and ns.db.enabled and now - ns.orbit.deadSince >= ns.db.deathOrbitDelay
-	-- The game's camera follow is off meanwhile, so it can't pull the view back.
-	-- It goes off as you die, not as the tilt starts: switched off then, while
-	-- it was still easing the view after your fall, it jolted the tilt's start.
-	local followOff = (dead and ns.db.enabled and ns.DeathCinematicWanted()) or false
-	if followOff ~= (ns.DEATH_CVARS.active or false) then
-		ns.DeathTestLog(followOff and "camera follow off" or "camera follow back on")
-		-- The death song starts as you die too (starting music can hitch a frame:
-		-- better then than as the tilt starts).
-		if ns.SetDeathSong then ns.SetDeathSong(followOff) end
-	end
-	ns.ApplyCVarSet(ns.DEATH_CVARS, followOff)
-	ns.UpdateDeathTilt(deathCam, elapsed)
-	ns.UpdateDeathExit(ns.orbit.deadSince ~= nil) -- (its own code's button: a script has its own)
 	-- RP walk camera: only while auto-walking (auto-run in walk mode; walking by
 	-- hand cancels the cameras). Stop and stand, and it's the standing-still
 	-- camera again.
@@ -3824,6 +3841,83 @@ function ns.UpdateOrbit(cinematic, elapsed)
 	elseif onTaxi or (active and not travel and ns.playerMoving) then
 		walkHandoff = false -- running or flying: the next stop starts the timer afresh
 	end
+	scene.onTaxi, scene.active, scene.dead, scene.deathCam = onTaxi, active, dead, deathCam
+	scene.travel, scene.T, scene.vista, scene.fish = travel, T, vista, fish
+	scene.cozy, scene.tele, scene.idle, scene.cam = cozy, tele, idle, ns.activeCam
+	return scene
+end
+ns.DecideScene = ns.Profiled("ns.DecideScene", ns.DecideScene)
+
+-- The orbit sleeps (its OnUpdate off) while no camera of its has anything to
+-- do, and the camera director wakes it as soon as one may
+-- (Tools/camera-director-plan.md, phase 3). Quiet: no camera on, not dead or
+-- on a flight, no script playing, no fly-by asked for, and in CineMode none
+-- of the standing-still, event or travel scenes on.
+function ns.OrbitQuiet(s)
+	return s.cam == nil and not s.dead and not s.onTaxi and not ns.DEATH_CVARS.active
+		and not ns.DeathCameraBusy() and not ns.orbit.flyByWanted and ns.PlayingCameraScript() == nil
+		and not (ns.lastCinematic and (s.idle or s.vista or s.fish or s.cozy or s.tele or s.travel))
+end
+-- Quiet, and nothing of its own still easing out: a turn back, the idle
+-- zoom, a held or glided turn, a fly-by.
+local function OrbitMaySleep(s)
+	local o = ns.orbit
+	return ns.OrbitQuiet(s) and o.level <= 0 and not o.back and not o.returnPending and not o.afkReturnDue
+		and o.special == nil and yawExtra == 0 and not idleZoom.active and not idleZoom.restoring
+		and not idleZoom.limitHeldTo and not ns.mouseSteering
+end
+function ns.OrbitAsleep()
+	return ns.orbitFrame:GetScript("OnUpdate") == nil
+end
+function ns.WakeOrbit()
+	if not ns.OrbitAsleep() or not ns.OrbitOnUpdate then return end
+	-- (Turning as it wakes counts as a turn just now: a travel camera then
+	-- waits, as it would have seen it awake.)
+	lastFacing = nil
+	if turnKeys.left or turnKeys.right or IsMouseOnCamera() then
+		lastAnyTurnAt = GetTime()
+	end
+	ns.orbitFrame:SetScript("OnUpdate", ns.OrbitOnUpdate)
+	ns.orbitSleeps = (ns.orbitSleeps or 0) + 1
+end
+-- Asleep, the mouse held on the camera still counts as your camera input
+-- (camera scripts and the input pauses go by it), as the orbit noted it awake.
+function ns.NoteHeldCameraInput()
+	if IsMouseOnCamera() then
+		lastCameraInput = GetTime()
+		ns.lastCameraInputWhat = "mouse on the camera"
+	end
+end
+
+function ns.UpdateOrbit(cinematic, elapsed)
+	local onTaxi = ns.OnTaxi()
+	local active = IsPlayerActive()
+	local now = GetTime()
+	ns.UpdateMouseSteer()
+	-- The scene: the camera director's (Director.lua), worked out about 10
+	-- times a second and as things change. A change waiting is worked out
+	-- first, so the orbit never runs on the scene from before it.
+	local s
+	if ns.DirectorStep then
+		s = ns.DirectorStep()
+	else
+		s = ns.DecideScene(cinematic, now, onTaxi, active)
+	end
+	local dead, deathCam, travel, T = s.dead, s.deathCam, s.travel, s.T
+	local vista, fish, cozy, tele, idle = s.vista, s.fish, s.cozy, s.tele, s.idle
+	-- The game's camera follow is off meanwhile, so it can't pull the view back.
+	-- It goes off as you die, not as the tilt starts: switched off then, while
+	-- it was still easing the view after your fall, it jolted the tilt's start.
+	local followOff = (dead and ns.db.enabled and ns.DeathCinematicWanted()) or false
+	if followOff ~= (ns.DEATH_CVARS.active or false) then
+		ns.DeathTestLog(followOff and "camera follow off" or "camera follow back on")
+		-- The death song starts as you die too (starting music can hitch a frame:
+		-- better then than as the tilt starts).
+		if ns.SetDeathSong then ns.SetDeathSong(followOff) end
+	end
+	ns.ApplyCVarSet(ns.DEATH_CVARS, followOff)
+	ns.UpdateDeathTilt(deathCam, elapsed)
+	ns.UpdateDeathExit(ns.orbit.deadSince ~= nil) -- (its own code's button: a script has its own)
 	-- (Dead: the death camera has the zoom.)
 	UpdateIdleZoom(cinematic and not dead, onTaxi, travel or (vista and "vista") or (fish and "fish") or (tele and "tele") or (cozy and "cozy") or nil, now, elapsed)
 
@@ -4043,6 +4137,11 @@ function ns.UpdateOrbit(cinematic, elapsed)
 			DriveYaw(0)
 		else
 			ns.StopOrbitNow()
+			-- Nothing for it to do: asleep until the director wakes it.
+			if OrbitMaySleep(s) then
+				ns.mouseSteering = false
+				ns.orbitFrame:SetScript("OnUpdate", nil)
+			end
 		end
 		return
 	end

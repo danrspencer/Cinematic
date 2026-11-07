@@ -3273,8 +3273,27 @@ do
 	-- it). Worked out once a frame (the nameplates ask for each kind); only
 	-- combat and nocombat go by inCombat, set again on each call (callers
 	-- asking both ways in one frame had it all worked out again each time).
+	-- Held FACTS_HOLD seconds across frames (a profile had them asked ~6
+	-- times a frame, worked out afresh each frame), and worked out afresh at
+	-- once when a fight starts or ends or the events below change them
+	-- (target, casts, mount, place, group); the camera words each frame.
 	local facts = {}
-	local factsAt
+	local factsAt, factsFight, factsCameraAt -- (not in facts: Frames.lua walks its fields for changes)
+	local FACTS_HOLD = 0.1
+	do
+		local factsWatch = CreateFrame("Frame")
+		for _, event in ipairs({ "PLAYER_TARGET_CHANGED", "PLAYER_MOUNT_DISPLAY_CHANGED", "ZONE_CHANGED",
+			"ZONE_CHANGED_NEW_AREA", "ZONE_CHANGED_INDOORS", "PLAYER_ENTERING_WORLD", "GROUP_ROSTER_UPDATE",
+			"PLAYER_FLAGS_CHANGED", "UNIT_FACTION", "ENCOUNTER_START", "ENCOUNTER_END",
+			"INSTANCE_ENCOUNTER_ENGAGE_UNIT", "PLAYER_ROLES_ASSIGNED", "PLAYER_SPECIALIZATION_CHANGED" }) do
+			pcall(factsWatch.RegisterEvent, factsWatch, event)
+		end
+		for _, event in ipairs({ "UNIT_SPELLCAST_START", "UNIT_SPELLCAST_STOP", "UNIT_SPELLCAST_CHANNEL_START",
+			"UNIT_SPELLCAST_CHANNEL_STOP", "UNIT_SPELLCAST_INTERRUPTED", "UNIT_SPELLCAST_FAILED" }) do
+			pcall(factsWatch.RegisterUnitEvent, factsWatch, event, "player")
+		end
+		factsWatch:SetScript("OnEvent", function() factsAt = nil end)
+	end
 	-- (target, enemy and friendly as worked out, before SetTargetWords.)
 	local anyTarget, enemyTarget = false, false -- (enemyTarget nil: the game won't say)
 	-- target, enemy and friendly mean what the grids' Enemy targeted and
@@ -3308,13 +3327,25 @@ do
 		facts.tipenemy, facts.tipfriendly = tip and tip.tipenemy or false, tip and tip.tipfriendly or false
 		facts.tipgather, facts.tipquest = tip and tip.tipgather or false, tip and tip.tipquest or false
 		facts.tipother = tip and tip.tipother or false
-		if factsAt == now then
+		local fight = (InCombatLockdown() or ns.Flag(UnitAffectingCombat("player"))) and true or false
+		if factsAt and now >= factsAt and now - factsAt < FACTS_HOLD and fight == factsFight then
 			facts.combat = inCombat
 			facts.nocombat = not inCombat and not facts.calm
+			-- (The camera words: as they are this frame.)
+			if factsAt ~= now and factsCameraAt ~= now then
+				factsCameraAt = now
+				local script = ns.PlayingCameraScript ~= nil and ns.PlayingCameraScript() ~= nil
+				facts.camera = ns.activeCam ~= nil or script
+				local scripted = ns.PlayingCameraKey and ns.PlayingCameraKey()
+				for _, cam in ipairs(ns.RULE_CAMERAS) do
+					if cam[2] then facts[cam[1]] = ns.activeCam == cam[2] or scripted == cam[2] end
+				end
+				facts.cam_script = script
+			end
 			SetTargetWords()
 			return facts
 		end
-		factsAt = now
+		factsAt, factsFight = now, fight
 		local place = ns.GetPlaceType()
 		local hasTarget = ns.HasTarget()
 		-- (Dead: as a friend, as the ticks have it. nil: the game won't say, so
@@ -6157,6 +6188,36 @@ ns.SetOnUpdate(padWatcher, ns.Profiled("Gamepad watch", function()
 	end
 	padMoveHeld = moving
 end))
+-- The watch runs only in gamepad mode: hidden otherwise (its button event
+-- still comes). Checked at login, as the setting or the gamepad bar
+-- changes, and every second in case neither says.
+do
+local function SyncPadWatcher()
+	if ns.IsGamePadOn() then
+		padWatcher:Show()
+	elseif padWatcher:IsShown() then
+		padWatcher:Hide()
+		padMoveHeld, pendingPress = false, nil
+		wipe(padHeld)
+	end
+end
+local padModeWatch = CreateFrame("Frame")
+padModeWatch:RegisterEvent("PLAYER_LOGIN")
+padModeWatch:RegisterEvent("CVAR_UPDATE")
+padModeWatch:SetScript("OnEvent", function(_, event, name)
+	if event == "PLAYER_LOGIN" then
+		local bar = _G.GamepadMainActionBarFrame
+		if type(bar) == "table" and bar.HookScript then
+			bar:HookScript("OnShow", SyncPadWatcher)
+			bar:HookScript("OnHide", SyncPadWatcher)
+		end
+		C_Timer.NewTicker(1, function() SyncPadWatcher() end)
+	elseif not (type(name) == "string" and name:lower() == "gamepadenable") then
+		return
+	end
+	SyncPadWatcher()
+end)
+end
 
 -- A quest timer running (Classic clients; retail has no quest timer box).
 -- Clients without GetQuestTimers go by the box: the game only shows it while
@@ -9327,6 +9388,9 @@ function ns.UpdateFrames(cinematic, elapsed)
 	-- (Up unless their rows' frames are faded below: let go, they're up.)
 	personalPower.health, personalPower.level, personalPower.mana = 1, 1, 1
 	local chatButtonsAlpha
+	-- (Every frame at its alpha, none fading: ns.framesSettled, so the tick
+	-- can run this pass less often, Core.lua.)
+	local settled = not ns.layoutFadeUntil and not ns.previewRows
 	for _, entry in ipairs(ns.managed) do
 		if entry.ownAlpha then
 			SyncOwnAlpha(entry)
@@ -9468,6 +9532,10 @@ function ns.UpdateFrames(cinematic, elapsed)
 			ns.QuestFocusTick(entry, shownAnyway or not ns.db.questRevealOnlyThat, elapsed,
 				trackerTimerUp and not shownAnyway and (not triggered[row] or (questReveal and ns.db.questRevealOnlyThat)))
 		end
+		if entry.alpha ~= target or (entry.backgroundAlpha and entry.backgroundAlpha > 0
+			and entry.backgroundAlpha < 1) then
+			settled = false
+		end
 		if typingShown and entry.alpha < 1 then
 			-- Pressing Enter shows the chat input (and its window) at once.
 			ns.SetEntryAlpha(entry, 1)
@@ -9559,6 +9627,7 @@ function ns.UpdateFrames(cinematic, elapsed)
 			ns.FadeRelative(column, chatButtonsAlpha or 1)
 		end
 	end
+	ns.framesSettled = settled
 end
 
 -- Frames beyond the built-in list (and built-in ones kept up): added ones (including auto-matched) and

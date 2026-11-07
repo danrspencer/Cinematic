@@ -129,7 +129,8 @@ CreateFrame = function(...)
 		src = info and info.source or ""
 		level = level + 1
 	until not info or not src:find("skyride%-sim")
-	if src:find("CameraScripts") or src:find("SkyrideCam") then mine[#mine + 1] = f end
+	-- (The camera director too: the scripts take their trigger from its decisions.)
+	if src:find("CameraScripts") or src:find("SkyrideCam") or src:find("Director") then mine[#mine + 1] = f end
 	return f
 end
 -- (yours: the saved settings in place before the addon loads, as in game.)

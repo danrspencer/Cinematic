@@ -3667,12 +3667,45 @@ local function ReleasePlates()
 		and not (ns.db.savedPlateClicks and next(ns.db.savedPlateClicks))
 end
 
+-- Outside CineMode, once the last pass changed nothing: the pass runs again
+-- only as something it goes by changes (CineMode, a fight, your target, the
+-- place, Chat Cam's Ultra immersive) or every ns.plates.SETTLED_EVERY seconds (a
+-- setting, a Show in row of its own...). In CineMode, every tick as before.
+-- (A profile showed it every tick for everyone, mostly finding no change.)
+-- (On ns.plates: this file's main chunk is at Lua's 200 locals.)
+ns.plates.SETTLED_EVERY = 0.5
+ns.plates.seen = {}
+function ns.plates.SameAsBefore(cinematic, now)
+	local seen = ns.plates.seen
+	local fight = (InCombatLockdown() or ns.Flag(UnitAffectingCombat("player"))) and true or false
+	local target = ns.Flag(UnitExists("target")) and true or false
+	local place = ns.GetPlaceType() or false
+	local immersive = (ns.ChatCamImmersive and ns.ChatCamImmersive()) and true or false
+	local same = seen.cinematic == cinematic and seen.fight == fight and seen.target == target
+		and seen.place == place and seen.immersive == immersive and now - (seen.at or -math.huge) < ns.plates.SETTLED_EVERY
+	if not same then
+		seen.cinematic, seen.fight, seen.target, seen.place, seen.immersive, seen.at = cinematic, fight, target, place,
+			immersive, now
+	end
+	return same
+end
+-- (Its target changing to another one: the game's event, for the pass's skip.)
+do
+	local targetWatch = CreateFrame("Frame")
+	targetWatch:RegisterEvent("PLAYER_TARGET_CHANGED")
+	targetWatch:SetScript("OnEvent", function() ns.plates.seen.at = nil end)
+end
+
 function ns.UpdatePlates(cinematic, elapsed)
 	if not ns.db.handlePlates then
 		if not platesReleased then
 			ReleasePlates()
 		end
 		ns.UpdatePlateParts(false, elapsed)
+		return
+	end
+	cinematic = cinematic and true or false
+	if not cinematic and ns.plates.settled and not platesReleased and ns.plates.SameAsBefore(cinematic, GetTime()) then
 		return
 	end
 	platesReleased = false
@@ -3823,6 +3856,10 @@ function ns.UpdatePlates(cinematic, elapsed)
 		ns.ApplyCVarSet(PLATE_CVARS, true)
 		ns.plates.off = true
 	end
+	-- (Nothing moving: the next passes outside CineMode may be skipped.)
+	ns.plates.settled = not changed and not filtered and next(combatCap) == nil and next(leavingTargets) == nil
+		and next(pendingPlateRows) == nil
+	if not ns.plates.settled then ns.plates.seen.at = nil end
 end
 
 -- World tooltips (units and objects under the cursor) use the default anchor,

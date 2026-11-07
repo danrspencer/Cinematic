@@ -2912,11 +2912,40 @@ local function Update(elapsed)
 	end
 end
 
+-- The trigger and its camera now, and a window holding them back: worked out
+-- once per camera director decision (Director.lua: about 10 a second and at
+-- once as things change), or once a frame while it isn't running. Gives
+-- true fourth when worked out afresh. (On zoomer: this file's main chunk is
+-- at Lua's 200 locals.)
+zoomer.triggerSeen = { gen = -1, at = -1 }
+function zoomer.TriggerNowSeen()
+	local seen, now = zoomer.triggerSeen, GetTime()
+	local fresh
+	if ns.DirectorRunning and ns.DirectorRunning() then
+		fresh = seen.gen == ns.directorGen
+	else
+		fresh = seen.at == now
+	end
+	if fresh then return seen.key, seen.camera, seen.held, false end
+	seen.key, seen.camera = TriggerNow()
+	seen.held = ns.WindowPausesCams()
+	seen.gen, seen.at = ns.directorGen, now
+	return seen.key, seen.camera, seen.held, true
+end
+ns.ScriptTriggerNow = zoomer.TriggerNowSeen -- (the offline checks)
+
 local watcher = CreateFrame("Frame")
 ns.SetOnUpdate(watcher, function(_, elapsed)
 	if not ns.db then return end
-	local key, camera = TriggerNow()
-	local held = ns.WindowPausesCams()
+	local key, camera, held, afresh = zoomer.TriggerNowSeen()
+	-- No script playing and nothing of one still easing back (its zoom, your
+	-- zoom held, a raised max, its Stop button): the only thing to do is start
+	-- one, and that changes only when the trigger's worked out afresh.
+	if not afresh and not run and not zoomer.yours and not zoomer.release and not zoomer.moving
+		and not maxHeldTo and not (exitBox and exitBox:IsShown()) then
+		zoomer.seenYourZoom = ns.lastPlayerZoomAt
+		return
+	end
 	if run and run.trigger then
 		-- (Another trigger taking over with this same camera, like the Campfire
 		-- button's sit giving way to the campfire's buff: the run is its now and

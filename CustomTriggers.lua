@@ -363,6 +363,7 @@ local Stop -- (below)
 local function Start(unit, tested)
 	local now = GetTime()
 	unit.on, unit.since, unit.done, unit.tested = true, now, false, tested or false
+	if ns.WakeDirector then ns.WakeDirector("your scene started") end -- (Director.lua: the cameras look again now)
 	unit.lastStart, unit.skipWhy, unit.lostLogged = now, nil, false
 	unit.pendingAt, unit.stopAt = nil, nil
 	local camera = ns.TriggerSetting(unit.scene, "camera")
@@ -389,6 +390,7 @@ end
 function Stop(unit, why)
 	if unit.on and why then Log("ended", unit, why) end
 	unit.on, unit.done, unit.stopAt, unit.tested = false, true, nil, false
+	if ns.WakeDirector then ns.WakeDirector("your scene ended") end
 	-- (May start again while its thing is still on.)
 	if not unit.rearm and HELD[unit.kind] then unit.done = false end
 	if unit.death then

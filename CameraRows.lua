@@ -430,16 +430,24 @@ local function RowFits(id)
 end
 
 -- The row a trigger goes by now: the first of its rows whose When fits, or
--- nil (no camera). Worked out once a frame for each trigger.
+-- nil (no camera). Worked out for each trigger at most every NOW_HOLD
+-- seconds (the orbit asks every frame, and the rules behind a row's When
+-- cost; a profile showed it), and afresh when a fight or a flight starts or
+-- ends.
+local NOW_HOLD = 0.1
 local nowCache = { at = -1 }
 function ns.TriggerRowNow(key)
 	if ns.db and DroppedSet()[key] then return nil end -- (taken off its scene's Triggers)
 	if ns.db and TRIGGER[key] then key = ns.SceneLead(key) end -- (a group's member: its lead's rows)
 	if not ns.db or not TRIGGER[key] or DeletedSet()[key] then return nil end
 	local now = GetTime()
-	if nowCache.at ~= now then
+	local fight = ns.Flag(UnitAffectingCombat("player")) and true or false
+	local taxi = ns.OnTaxi() and true or false
+	if now - nowCache.at >= NOW_HOLD or now < nowCache.at or nowCache.fight ~= fight or nowCache.taxi ~= taxi then
 		wipe(nowCache)
 		nowCache.at = now
+		nowCache.fight = fight
+		nowCache.taxi = taxi
 	end
 	local id = nowCache[key]
 	if id == nil then

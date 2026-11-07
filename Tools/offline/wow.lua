@@ -24,6 +24,12 @@ stubMeta.__lt = function() return false end
 stubMeta.__le = function() return true end
 stubMeta.__tostring = function() return "stub" end
 setmetatable(Stub, stubMeta)
+-- (A window the stand-in has no frame for isn't open: as the stub, every
+-- window the camera code waits for - the Escape menu, the map, a quest
+-- giver's - counted as shown, and no camera script ever started in the
+-- Skyriding sim.)
+rawset(Stub, "IsShown", function() return false end)
+rawset(Stub, "IsVisible", function() return false end)
 M.Stub = Stub
 
 -- Frames: methods named in Methods work; any other Capitalised one is a

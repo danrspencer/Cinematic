@@ -118,6 +118,174 @@ if arg[1] and not update then
 		ns.playerMoving, ns.movingSince, ns.autoRunning = false, nil, false
 		for _, name in ipairs({ "IsMouseButtonDown", "UnitOnTaxi", "IsFlying", "GetUnitSpeed" }) do _G[name] = kept[name] end
 	end
+	-- The scene (ns.DecideScene, Camera.lua): its table is ns.scene, it sets
+	-- ns.activeCam to its own cam, standing still past the wait is the idle
+	-- scene, and moving ends it (Tools/camera-director-plan.md, phase 1).
+	do
+		local function Problem(text) print("problem\tScene: " .. text) end
+		local db = ns.db
+		local kept = { db.idleOrbit, ns.stillSince, ns.activeCam, ns.playerMoving }
+		local keptApi = {}
+		for name, value in pairs({ IsMouseButtonDown = false, UnitOnTaxi = false, IsFlying = false, GetUnitSpeed = 7 }) do
+			keptApi[name], _G[name] = rawget(_G, name), function() return value end
+		end
+		db.idleOrbit = true
+		ns.playerMoving, ns.stillSince = false, -1000
+		local scene = ns.DecideScene(true, 0, false, false)
+		if scene ~= ns.scene then Problem("not ns.scene") end
+		if ns.activeCam ~= scene.cam then Problem(("ns.activeCam %s, scene %s"):format(tostring(ns.activeCam), tostring(scene.cam))) end
+		if scene.idle and scene.cam ~= "idle" and not scene.vista and not scene.cozy and not scene.fish then
+			Problem("idle with no event, but its camera is " .. tostring(scene.cam))
+		end
+		if scene.cam == "idle" and not scene.idle then Problem("the idle camera without the idle scene") end
+		ns.playerMoving = true
+		scene = ns.DecideScene(true, 0, false, true)
+		if scene.idle or scene.cam == "idle" then Problem("still idle while moving") end
+		if ns.stillSince ~= nil then Problem("moving didn't end the standing-still timer") end
+		db.idleOrbit, ns.stillSince, ns.activeCam, ns.playerMoving = kept[1], kept[2], kept[3], kept[4]
+		for name in pairs(keptApi) do _G[name] = keptApi[name] end
+	end
+	-- The camera director (Director.lua): decides once a frame at most, not
+	-- again with nothing changed until its tick, then on the tick, and at
+	-- once when woken (phase 2).
+	do
+		local function Problem(text) print("problem\tDirector: " .. text) end
+		local keptTime, t = GetTime, 1000
+		_G.GetTime = function() return t end
+		local stats = ns.directorStats
+		ns.DirectorStep() -- (settles what it's seen)
+		t = t + 0.02
+		ns.DirectorStep()
+		local decides = stats.decides
+		t = t + 0.02
+		ns.DirectorStep()
+		if stats.decides ~= decides then Problem("decided again with nothing changed, before its tick") end
+		t = t + 0.2
+		ns.DirectorStep()
+		if stats.decides ~= decides + 1 then Problem("didn't decide on its tick") end
+		decides = stats.decides
+		t = t + 0.02
+		ns.WakeDirector("check")
+		ns.DirectorStep()
+		if stats.decides ~= decides + 1 then Problem("didn't decide at once when woken") end
+		ns.WakeDirector("check")
+		ns.DirectorStep()
+		if stats.decides ~= decides + 1 then Problem("decided twice in one frame") end
+		t = t + 0.02
+		ns.DirectorStep()
+		if stats.decides ~= decides + 2 then Problem("a wake in a frame it had stepped in was lost") end
+		-- The orbit asleep (phase 3): quiet with no camera, not with one;
+		-- stays asleep through a quiet step, and the director wakes it.
+		local keptScript, keptCine = ns.orbitFrame:GetScript("OnUpdate"), ns.lastCinematic
+		if not ns.OrbitOnUpdate then Problem("no ns.OrbitOnUpdate to wake the orbit with") end
+		if not ns.OrbitQuiet({}) then Problem("not quiet with no scene") end
+		if ns.OrbitQuiet({ cam = "idle" }) then Problem("quiet with a camera on") end
+		if ns.OrbitQuiet({ dead = true }) then Problem("quiet dead") end
+		if ns.OrbitQuiet({ onTaxi = true }) then Problem("quiet on a flight") end
+		ns.lastCinematic = true
+		if ns.OrbitQuiet({ idle = true }) then Problem("quiet in CineMode standing still") end
+		ns.lastCinematic = false
+		if not ns.OrbitQuiet({ idle = true }) then Problem("not quiet standing still out of CineMode") end
+		ns.orbitFrame:SetScript("OnUpdate", nil)
+		t = t + 0.02
+		ns.DirectorStep()
+		if ns.OrbitQuiet(ns.scene) and not ns.OrbitAsleep() then Problem("a quiet step woke the orbit") end
+		ns.WakeOrbit()
+		if ns.OrbitAsleep() or ns.orbitFrame:GetScript("OnUpdate") ~= ns.OrbitOnUpdate then
+			Problem("ns.WakeOrbit didn't wake it")
+		end
+		-- (Awake, out of CineMode with nothing on: a few frames and it sleeps.)
+		for _ = 1, 3 do
+			t = t + 0.02
+			if not ns.OrbitAsleep() then ns.UpdateOrbit(false, 0.02) end
+		end
+		if not ns.OrbitAsleep() then Problem("awake out of CineMode with nothing on, after 3 frames") end
+		ns.orbitFrame:SetScript("OnUpdate", keptScript)
+		ns.lastCinematic = keptCine
+		-- ns.ActiveEvent (phase 4): with the director running, worked out once
+		-- per decision, not each frame; again after the next decision.
+		local wasRunning = ns.DirectorRunning()
+		ns.SetDirectorRunning(true)
+		-- (Counted by ns.ShotBase, which each working out ends with.)
+		local keptShot, works = ns.ShotBase, 0
+		ns.ShotBase = function(...) works = works + 1 return keptShot(...) end
+		t = t + 0.02
+		ns.WakeDirector("check")
+		ns.DirectorStep()
+		if works == 0 then Problem("a decision didn't work ns.ActiveEvent out again") end
+		local after = works
+		for _ = 1, 3 do
+			t = t + 0.02
+			ns.ActiveEvent()
+		end
+		if works ~= after then
+			Problem(("ns.ActiveEvent worked out %d more times between decisions"):format(works - after))
+		end
+		ns.ShotBase = keptShot
+		-- The nameplates pass (Effects.lua): outside CineMode, settled, it's
+		-- skipped until something it goes by changes or its 0.5 s are up; in
+		-- CineMode it runs every tick. (Counted by ns.PlateSuffix: once or more a pass.)
+		local keptPlates, keptSuffix, passes = ns.db.handlePlates, ns.PlateSuffix, 0
+		ns.db.handlePlates = true
+		ns.PlateSuffix = function(...) passes = passes + 1 return keptSuffix(...) end
+		for _ = 1, 4 do
+			t = t + 0.03
+			ns.UpdatePlates(false, 0.03)
+		end
+		local settledPasses = passes
+		for _ = 1, 3 do
+			t = t + 0.03
+			ns.UpdatePlates(false, 0.03)
+		end
+		if ns.plates.settled and passes ~= settledPasses then
+			Problem(("nameplates: %d passes outside CineMode with nothing changed"):format(passes - settledPasses))
+		end
+		if not ns.plates.settled then print("note\tnameplates never settled here: the skip isn't checked") end
+		t = t + 0.6
+		ns.UpdatePlates(false, 0.03)
+		if ns.plates.settled and passes == settledPasses then Problem("nameplates: no pass after its 0.5 s") end
+		settledPasses = passes
+		for _ = 1, 2 do
+			t = t + 0.03
+			ns.UpdatePlates(true, 0.03)
+		end
+		if passes < settledPasses + 2 then Problem("nameplates: skipped in CineMode") end
+		ns.PlateSuffix, ns.db.handlePlates = keptSuffix, keptPlates
+		-- The rule facts (Frames.lua): held 0.1 s across frames, worked out
+		-- afresh after that or when the target changes. (Counted by
+		-- ns.GetPlaceType, which each working out asks once.)
+		local keptPlace, works2 = ns.GetPlaceType, 0
+		ns.GetPlaceType = function(...) works2 = works2 + 1 return keptPlace(...) end
+		t = t + 1
+		ns.RuleFacts(false)
+		local w = works2
+		t = t + 0.02
+		ns.RuleFacts(false)
+		t = t + 0.02
+		ns.RuleFacts(true)
+		if works2 ~= w then Problem("rule facts worked out again within 0.1 s") end
+		t = t + 0.2
+		ns.RuleFacts(false)
+		if works2 == w then Problem("rule facts not worked out again after 0.1 s") end
+		w = works2
+		t = t + 0.02
+		wow.Fire("PLAYER_TARGET_CHANGED")
+		ns.RuleFacts(false)
+		if works2 == w then Problem("rule facts not worked out again as the target changed") end
+		ns.GetPlaceType = keptPlace
+		-- The camera script watcher's trigger (CameraScripts.lua): the same,
+		-- once per decision.
+		t = t + 0.02
+		ns.WakeDirector("check")
+		ns.DirectorStep()
+		local _, _, _, afresh = ns.ScriptTriggerNow()
+		if not afresh then Problem("the script trigger wasn't worked out afresh after a decision") end
+		t = t + 0.02
+		_, _, _, afresh = ns.ScriptTriggerNow()
+		if afresh then Problem("the script trigger worked out again between decisions") end
+		ns.SetDirectorRunning(wasRunning)
+		_G.GetTime = keptTime
+	end
 	-- A new player (load.lua: a fresh install): every page off until a profile's
 	-- picked (Profiles.lua), then the profile's own. (The rest: as after a pick.)
 	do

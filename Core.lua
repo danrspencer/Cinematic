@@ -3086,6 +3086,7 @@ local function OnOrbitUpdate(_, elapsed)
 	Step(ns.UpdateOrbit, ns.lastCinematic, elapsed)
 end
 OnOrbitUpdate = ns.Profiled("Orbit camera (every frame)", OnOrbitUpdate)
+ns.OrbitOnUpdate = OnOrbitUpdate -- (Director.lua wakes the orbit with it)
 
 -- Set at login (and on turning it on) when cinematic mode starts at once: the first cinematic tick
 -- within this window snaps straight to cinematic. Expires so a busy login
@@ -3114,6 +3115,7 @@ local calmTrace = { fighting = false } -- (and for its log lines: a fight was on
 -- cinematic and elapsed, waiting for the second half. (At low frame rates, with a
 -- tick due every frame, both halves still run in one.)
 local tickRest = {}
+local framesPass = { elapsed = 0 }
 
 local function OnUpdate(_, elapsed)
 	-- Every frame (with EllesmereUI, or watching with /cine debug alpha): frames
@@ -3262,7 +3264,24 @@ local function OnUpdate(_, elapsed)
 	if ns.layoutFadeUntil and (GetTime() >= ns.layoutFadeUntil or ns.AllFaded() or InCombatLockdown()) then
 		Step(ns.FinishLayoutFade)
 	end
-	Step(ns.UpdateFrames, cinematic or ns.previewRows ~= nil or ns.layoutFadeUntil ~= nil, elapsed)
+	-- The frames pass: with every frame settled at its alpha last time, and
+	-- nothing new since (CineMode, a fight, the mouse, a key down), every
+	-- other tick only, the skipped tick's time added to the next (a profile
+	-- showed it the tick's biggest part).
+	local fadeOn = cinematic or ns.previewRows ~= nil or ns.layoutFadeUntil ~= nil
+	local fight = InCombatLockdown() or Flag(UnitAffectingCombat("player"))
+	local x, y = GetCursorPosition()
+	local pass = framesPass
+	if pass.skip and ns.framesSettled and fadeOn == pass.fadeOn and fight == pass.fight
+		and x == pass.x and y == pass.y and not IsModifierKeyDown() and not (ns.IsChatActive and ns.IsChatActive()) then
+		pass.skip = false
+		pass.elapsed = pass.elapsed + elapsed
+	else
+		pass.skip = true
+		pass.fadeOn, pass.fight, pass.x, pass.y = fadeOn, fight, x, y
+		Step(ns.UpdateFrames, fadeOn, elapsed + pass.elapsed)
+		pass.elapsed = 0
+	end
 	-- (The rest next frame, see tickRest.)
 	tickRest.cinematic, tickRest.elapsed = cinematic, elapsed
 end
@@ -3343,6 +3362,7 @@ function ns.Suspend(reason)
 	tickRest.cinematic = nil
 	ticker:SetScript("OnUpdate", nil)
 	ns.orbitFrame:SetScript("OnUpdate", nil)
+	if ns.SetDirectorRunning then ns.SetDirectorRunning(false) end
 	RestoreEverything()
 	if InCombatLockdown() then
 		combatRetry:RegisterEvent("PLAYER_REGEN_ENABLED")
@@ -3366,6 +3386,7 @@ function ns.Resume()
 	if started then
 		ticker:SetScript("OnUpdate", OnUpdate)
 		ns.orbitFrame:SetScript("OnUpdate", OnOrbitUpdate)
+		if ns.SetDirectorRunning then ns.SetDirectorRunning(true) end
 	end
 	ns.Log("safety", "resumed")
 	return true
@@ -7090,6 +7111,7 @@ ticker:SetScript("OnEvent", ns.Profiled("Core events", function(self, event, arg
 		if not suspended then
 			self:SetScript("OnUpdate", OnUpdate)
 			ns.orbitFrame:SetScript("OnUpdate", OnOrbitUpdate)
+			if ns.SetDirectorRunning then ns.SetDirectorRunning(true) end
 		end
 	elseif event == "LOADING_SCREEN_DISABLED" then
 		ns.stillSince = nil -- the AFK timer starts once you can see the world
