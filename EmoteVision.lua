@@ -332,35 +332,63 @@ for _, moment in ipairs(MOMENTS) do
 	DEFAULTS[moment.key] = table.concat(moment.emotes, ",")
 end
 
--- Where: its Show in row, Always ticked to start with in every profile (a
--- fight still holds a card back: WhyWaiting). Unticked, Out of combat is.
-local ROW_KEY = "emote:vision"
-ns.CINE_SHOW_SETTING[ROW_KEY] = "emoteVisionAlways"
-ns.LIST_DEFAULTS.quietShow[ROW_KEY] = true
--- The rules this row was once given (not written by you). A rule beats Always,
--- so they go. (The second as Core's world-or-city change left the first.)
+-- Where: a Show in row for each moment ("emote:<id>", its Always
+-- emoteVisionAlways<Id>), Always ticked to start with (a fight still holds a
+-- card back: WhyWaiting); unticked, Out of combat is. An outside moment's
+-- (Buff): World and City, no Always. A soon moment (a boss kill's) has none:
+-- it waits for no Show in row.
+local function RowKey(id) return "emote:" .. id end
+local function AlwaysKey(id) return "emoteVisionAlways" .. id end
+for _, moment in ipairs(MOMENTS) do
+	if not moment.soon then
+		local key = RowKey(moment.id)
+		DEFAULTS[AlwaysKey(moment.id)] = not moment.outside
+		ns.CINE_SHOW_SETTING[key] = AlwaysKey(moment.id)
+		if moment.outside then
+			ns.LIST_DEFAULTS.worldShow[key] = true
+			ns.LIST_DEFAULTS.cityShow[key] = true
+		else
+			ns.LIST_DEFAULTS.quietShow[key] = true
+		end
+	end
+end
+-- The one row all the moments had before (its Always: emoteVisionAlways).
+local OLD_ROW = "emote:vision"
+-- The rules that row was once given (not written by you).
 local GIVEN_RULES = { ["not combat"] = true, ["not combat and world"] = true,
 	["not combat and (world or city)"] = true }
--- Any of these on the row is a choice of yours. (Not quietShow: Out of combat
--- is its start, and unticked it's the empty row.)
+-- Any of these on it is a choice of yours. (Not quietShow: Out of combat is
+-- its start.)
 local CHOICE_LISTS = { "combatShow", "calmShow", "camShow", "cineModeShow", "enemyShow", "friendlyShow", "bgShow",
 	"worldShow", "cityShow", "groupShow", "instanceShow", "rowFollow" }
--- Always ticked on a row left empty or as it was given. t: the live settings
--- or a saved profile. A rule or ticks of your own stay: a saved profile's
--- Always is written off then, or the new default would tick it over them.
-local function AlwaysOnEmptyRow(t)
+local ROW_LISTS = { "combatShow", "calmShow", "quietShow", "camShow", "cineModeShow", "enemyShow", "friendlyShow",
+	"bgShow", "worldShow", "cityShow", "groupShow", "instanceShow", "rowFollow" }
+-- The old row onto each moment's, then gone. t: the live settings or a saved
+-- profile. Left as it came (Always, no rule or ticks of yours): each moment's
+-- own start (Buff's: not in instances). Your own choices: onto every row.
+local function SplitOldRow(t)
 	local rules = type(t.frameRules) == "table" and t.frameRules or nil
-	local rule = rules and rules[ROW_KEY]
-	local own = type(rule) == "string" and rule:find("%S") and not GIVEN_RULES[rule]
+	local rule = rules and rules[OLD_ROW]
+	local own = type(rule) == "string" and rule:find("%S") and not GIVEN_RULES[rule] and true or false
 	for _, list in ipairs(CHOICE_LISTS) do
-		if type(t[list]) == "table" and t[list][ROW_KEY] then own = true end
+		if type(t[list]) == "table" and t[list][OLD_ROW] then own = true end
 	end
-	if own then
-		t.emoteVisionAlways = t.emoteVisionAlways or false
-		return
+	if t.emoteVisionAlways == false then own = true end
+	for _, moment in ipairs(MOMENTS) do
+		if own and not moment.soon then
+			local key = RowKey(moment.id)
+			t[AlwaysKey(moment.id)] = t.emoteVisionAlways == true
+			for _, list in ipairs(ROW_LISTS) do
+				if type(t[list]) == "table" and t[list][OLD_ROW] ~= nil then t[list][key] = t[list][OLD_ROW] end
+			end
+			if rules and rule and not GIVEN_RULES[rule] then rules[key] = rule end
+		end
 	end
-	if rules then rules[ROW_KEY] = nil end
-	t.emoteVisionAlways = true
+	for _, list in ipairs(ROW_LISTS) do
+		if type(t[list]) == "table" then t[list][OLD_ROW] = nil end
+	end
+	if rules then rules[OLD_ROW] = nil end
+	t.emoteVisionAlways = nil
 end
 local function SetUpOnce()
 	local db = ns.db
@@ -376,13 +404,14 @@ local function SetUpOnce()
 		db.emoteVisionRepeatV2 = true
 		if db.emoteVisionRepeatMins == 10 then db.emoteVisionRepeatMins = 1 end
 	end
-	-- (Always for everyone, saved profiles too. Once.)
-	if not db.emoteVisionAlwaysV1 then
-		db.emoteVisionAlwaysV1 = true
-		db.emoteVisionRuleV1, db.emoteVisionRuleV2 = nil, nil
-		AlwaysOnEmptyRow(db)
+	-- (One Show in row for all the moments, then one each: split, saved
+	-- profiles too. Once.)
+	if not db.emoteVisionRowsV1 then
+		db.emoteVisionRowsV1 = true
+		db.emoteVisionAlwaysV1, db.emoteVisionRuleV1, db.emoteVisionRuleV2 = nil, nil, nil
+		SplitOldRow(db)
 		for _, saved in pairs(db.profiles or {}) do
-			if type(saved) == "table" then AlwaysOnEmptyRow(saved) end
+			if type(saved) == "table" then SplitOldRow(saved) end
 		end
 	end
 end
@@ -1173,8 +1202,9 @@ local function WhyWaiting(moment)
 		if moment.after and GetTime() < moment.after then return "just killed" end
 		return nil
 	end
-	local ok, here = pcall(ns.RowOnNow, ROW_KEY, nil, true)
-	if not (ok and here) then return "its Show in row says no (the calm after a fight, or its rule)" end
+	if not kind then return nil end
+	local ok, here = pcall(ns.RowOnNow, RowKey(kind.id), nil, true)
+	if not (ok and here) then return "its Show in row says no (the place, the calm after a fight, or its rule)" end
 end
 local function Allowed(moment)
 	return WhyWaiting(moment) == nil
@@ -2108,10 +2138,22 @@ end
 
 -- /cine debug emotevision: what it would do now, and why.
 function ns.EmoteVisionDebug()
-	local ok, here = pcall(ns.RowOnNow, ROW_KEY, nil, true)
 	local db = DB()
-	ns.Print(("emotevision: page %s; Show in %s; fighting %s; moving %s (still only %s); queued %d; card %s"):format(
-		tostring(ns.Setting("emoteVision")), ok and tostring(here) or ("error: " .. tostring(here)),
+	-- (Each row's answer now: the moments that say no.)
+	local no = {}
+	for _, moment in ipairs(MOMENTS) do
+		if not moment.soon then
+			local ok, here = pcall(ns.RowOnNow, RowKey(moment.id), nil, true)
+			if not ok then
+				no[#no + 1] = moment.id .. " (error)"
+			elseif not here then
+				no[#no + 1] = moment.id
+			end
+		end
+	end
+	ns.Print(("emotevision: page %s; Show in says no for %s; place %s; fighting %s; moving %s (still only %s); " ..
+		"queued %d; card %s"):format(
+		tostring(ns.Setting("emoteVision")), #no > 0 and table.concat(no, ", ") or "none", tostring(ns.GetPlaceType()),
 		tostring(Fighting()), tostring(ns.playerMoving), tostring(db.emoteVisionStill), #queue,
 		card and card:IsShown() and tostring(showing and showing.name) or "hidden"))
 	ns.Print(("  repeats ignored %s (%s min); dead %s; res offer %s; summon offer %s; trade with %s; group levels %d"):format(
@@ -2689,6 +2731,46 @@ local function MomentsGrid(kit, content, stack)
 		end)
 	end
 
+	-- Each moment's Show in row, a When line at the top of its open section, as
+	-- a scene's or a card's drawer has it (a boss kill's: none, it waits for no
+	-- row). Its lists kept for the page's Reset.
+	local grid = ns.GRID_KIT
+	local WHEN_OPTS = { anyFight = true, quiet = true, omit = { enemyShow = true, friendlyShow = true } }
+	local WHEN_LAYOUT = { groups = { ns.GRID_COMBAT, ns.GRID_LOCATION }, edit = true }
+	local WHEN_LABEL_W = 60
+	local whens = {}
+	for _, moment in ipairs(MOMENTS) do
+		if not moment.soon then
+			local key = RowKey(moment.id)
+			kit.RecordKey(content, AlwaysKey(moment.id))
+			for _, list in ipairs({ "combatShow", "calmShow", "quietShow", "camShow", "enemyShow", "friendlyShow",
+				"bgShow", "worldShow", "cityShow", "groupShow", "instanceShow", "frameRules" }) do
+				kit.RecordKey(content, list)
+				grid.RecordRow(content, list, key)
+			end
+		end
+	end
+	local function When(moment)
+		if moment.soon or not ns.GRID_MENUS then return nil end
+		if whens[moment.id] then return whens[moment.id] end
+		local key, alwaysKey = RowKey(moment.id), AlwaysKey(moment.id)
+		local function Key() return key end
+		local function SetAlways(value) ns.GetDB()[alwaysKey] = value end
+		local parts = ns.ListRowParts(Key, ns.FRAME_COLUMNS, nil, SetAlways, WHEN_OPTS)
+		local label = kit.Label(box, "GameFontNormalSmall", L["When"])
+		local row = ns.GridRow(grid, box, WHEN_LABEL_W, WHEN_LAYOUT, {
+			always = { isOn = function() return ns.GetDB()[alwaysKey] and true or false end, set = SetAlways,
+				tip = L["Shows wherever you are. (Never in a fight: a card from one waits for it to end.)"] },
+			menus = parts.menus,
+			rule = { key = Key, label = function() return L[moment.name] end, grid = parts.grid,
+				words = parts.words, apply = parts.apply },
+			enabled = function() return On() and DB()[moment.on] and true or false end,
+			changed = Changed,
+		})
+		whens[moment.id] = { label = label, row = row }
+		return whens[moment.id]
+	end
+
 	local heads, rows, groupTitles = {}, {}, {}
 	-- (Each moment closed to start, its emotes summed up on its band; open:
 	-- its rows and Add an emote under it. Kept while the settings stay open.)
@@ -2762,6 +2844,7 @@ local function MomentsGrid(kit, content, stack)
 		for _, head in ipairs(heads) do head:Hide() head.add:Hide() end
 		for _, row in ipairs(rows) do row:Hide() end
 		for _, title in ipairs(groupTitles) do title:Hide() end
+		for _, when in pairs(whens) do when.label:Hide() when.row:Hide() end
 		local y, n, lastGroup, g = 0, 0, nil, 0
 		for i, moment in ipairs(MOMENTS) do
 			-- (A header over each group's moments.)
@@ -2806,6 +2889,20 @@ local function MomentsGrid(kit, content, stack)
 			local names = {}
 			for _, token in ipairs(list) do names[#names + 1] = EmoteName(token) end
 			head.summary:SetText(not expanded and table.concat(names, ", ") or "")
+			-- (Open: its When line first, then its emotes.)
+			local when = expanded and When(moment)
+			if when then
+				when.row:ClearAllPoints()
+				when.row:SetPoint("TOPLEFT", box, "TOPLEFT", 26 + WHEN_LABEL_W, -y - 2)
+				when.label:ClearAllPoints()
+				when.label:SetPoint("LEFT", when.row, "LEFT", -WHEN_LABEL_W, 0)
+				when.label:SetFontObject(open and "GameFontNormalSmall" or "GameFontDisableSmall")
+				when.label:SetText(L["When"])
+				when.label:Show()
+				when.row:Show()
+				when.row:Refresh()
+				y = y + 28
+			end
 			for k, token in ipairs(expanded and list or {}) do
 				n = n + 1
 				local row = Row(n)
@@ -2892,24 +2989,14 @@ function ns.CreateEmoteVisionPanel(kit)
 		"you turn this back on."], intro, Changed)
 	local stack = kit.Stack(switch, "check")
 
-	local header = stack:Header(content, L["Show in"])
-	local lastRow = ns.ShowTable(content, header, {
-		underHeader = true,
-		{ key = ROW_KEY, label = L["Emote Vision"], alwaysKey = "emoteVisionAlways",
-			alwaysOn = function() return ns.GetDB().emoteVisionAlways end,
-			setAlways = function(value) ns.GetDB().emoteVisionAlways = value Changed() end,
-			alwaysTip = L["Shows wherever you are. (Never in a fight: a card from one waits for it to end.)"],
-			apply = Changed },
-	}, L["Emote Vision"])
-	stack:Continue(lastRow, "label")
-
+	-- (Where each moment shows: its When line, in its section below.)
 	local moments = stack:Header(content, L["Moments"])
 	local test = TestButton(content)
 	-- (After the "?" its help puts beside it, 6 + 18 wide: PageIntro's.)
 	test:SetPoint("LEFT", moments, "RIGHT", 36, 0)
 	kit.Tooltip(test, L[TEST_TIP])
 	stack:Help(content, L["Each moment's card has a button for each emote under it, in that order. Untick a " ..
-		"moment for no card at all. + opens a moment."])
+		"moment for no card at all. + opens a moment: When, where its card shows, then its emotes."])
 	MomentsGrid(kit, content, stack)
 
 	canvas:SetScript("OnShow", kit.PageShown(kit.Refresh, content))
