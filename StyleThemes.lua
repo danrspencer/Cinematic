@@ -315,7 +315,7 @@ local THEMES = {
 			questTalkStyle = "dark", rollPanel = "flat", abShape = "square" },
 	}),
 	Theme({
-		key = "void", name = "Void Whisper", unitBars = "satin",
+		key = "void", name = "Void Whisper", unitBars = "satin", portraitBack = "Eye",
 		tip = "What shadow priests hear: black, and something violet moving in it, watching from the frames.",
 		keepColors = true, barDepth = { 0, 0, 0, 0.7 },
 		swatch = { { 0.02, 0.015, 0.035 }, { 0.42, 0.3, 0.66 }, { 0.16, 0.22, 0.46 }, { 0.72, 0.68, 0.82 } },
@@ -539,6 +539,15 @@ function ns.ThemeBadgeSpot(shape) return PORTRAIT_BADGE[shape] or PORTRAIT_BADGE
 function ns.ThemePortraitOut(shape)
 	if shape == "circle" or shape == "square" then return SHAPES .. "Portrait" .. (shape == "circle" and "Circle" or "Square") .. "Out" end
 	return PORTRAIT_ART[shape] and SHAPES .. "Portrait" .. PORTRAIT_ART[shape] .. "Out"
+end
+-- Art behind a theme's portrait and under its rows (Void Whisper's eye): nil for none.
+-- Made round a circle, so for a circle only. Its file, its shape's mask, and the mist
+-- that drifts in it.
+function ns.ThemePortraitBack(shape)
+	local back = Active().portraitBack
+	if not (back and shape == "circle") then return nil end
+	local file = SHAPES .. "PortraitBack" .. back
+	return file, file .. "Mask", file .. "Mist"
 end
 function ns.ThemePortraitRing(shape)
 	if shape == "circle" then return SHAPES .. "PortraitCircleRing" end

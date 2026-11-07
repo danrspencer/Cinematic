@@ -6543,6 +6543,7 @@ local function CreateCombatPanel()
 	resetHooks[content] = function()
 		Layout()
 		ns.ApplyHideKeybinds()
+		if ns.ApplyMirrorTimers then ns.ApplyMirrorTimers() end
 	end
 	-- Set apart: its rows start as the raid frames' (ticks and rules),
 	-- unless they have choices of their own from before.
@@ -6662,6 +6663,60 @@ local function CreateCombatPanel()
 			macros:SetParent(section.body)
 			macros:SetPoint("TOPLEFT", keys, "BOTTOMLEFT", 0, 0)
 			section.last = macros
+		end
+		-- (Under the trackers' rows: the breath bar's look, and hiding it
+		-- always. MirrorTimerStyle.lua.)
+		if page == "combat" then
+			local function Apply()
+				if ns.ApplyMirrorTimers then ns.ApplyMirrorTimers() end
+				Refresh()
+			end
+			local function Shown(db) return not db.mirrorHide end
+			local function Worded(db) return not db.mirrorHide and not db.mirrorHideText end
+			local heading = Label(section.body, "GameFontNormal", L["Breath bar"])
+			heading:SetPoint("TOPLEFT", section.last, "BOTTOMLEFT", 0, -14)
+			local hide = Check(content, "mirrorHide", L["Hide the breath bar"],
+				L["Hides the bar that runs down while you hold your breath underwater, and the game's other bars " ..
+				"like it (fatigue in deep water, Feign Death), CineMode or not."], function(value)
+					ns.GetDB().mirrorHide = value
+					Apply()
+				end)
+			hide:SetParent(section.body)
+			hide:SetPoint("TOPLEFT", heading, "BOTTOMLEFT", -4, -4)
+			local words = Check(content, "mirrorHideText", L["Hide its text"],
+				L["Hides the word on the bar (Breath, Fatigue...), leaving the bar."], function(value)
+					ns.GetDB().mirrorHideText = value
+					Apply()
+				end)
+			words:SetParent(section.body)
+			words:SetPoint("TOPLEFT", hide, "BOTTOMLEFT", 0, 0)
+			GreyUnless(words, Shown)
+			local last = words
+			-- (A dropdown with its name before it; nil where the client has no menus.)
+			local function Pick(label, key, choices, tip, test)
+				local dropdown = Dropdown(content, key, choices, 180, Apply)
+				if not dropdown then return end
+				local name = Label(section.body, "GameFontHighlight", label)
+				name:SetPoint("TOPLEFT", last, "BOTTOMLEFT", last == words and 4 or 0, -10)
+				name:SetSize(90, 30)
+				name:SetJustifyV("MIDDLE")
+				dropdown:SetParent(section.body)
+				dropdown:SetPoint("LEFT", name, "RIGHT", 4, 0)
+				Tooltip(dropdown, tip)
+				GreyUnless(dropdown, test)
+				last = name
+			end
+			Pick(L["Bar texture:"], "mirrorTexture", function() return ns.StyleTextureChoices() end,
+				L["The bar's fill. The game's: as it comes."], Shown)
+			Pick(L["Font:"], "mirrorFont", function() return ns.StyleFontChoices() end,
+				L["The font of the word on the bar. (In Russian, Korean and Chinese it stays the game's.)"], Worded)
+			local size = Slider(content, "mirrorTextScale", L["Text size"], 50, 200, 5, "%d%%", 100,
+				function() if ns.ApplyMirrorTimers then ns.ApplyMirrorTimers() end end)
+			size:SetParent(section.body)
+			size:SetPoint("TOPLEFT", last, "BOTTOMLEFT", last == words and 4 or 0, -22)
+			Tooltip(size, L["The size of the word on the bar, against the game's."])
+			GreyUnless(size, Worded)
+			section.last = size
 		end
 		sections[#sections + 1] = section
 	end
@@ -7307,6 +7362,31 @@ local function CreateFishingPanel()
 			end
 		end
 	end
+
+	-- (Camera.lua: the volumes go up as a Fishing cast starts, back after.)
+	stack:Header(content, L["Sound"])
+	local volume = stack:Add(Check(content, "fishVolume", L["Louder while fishing"],
+		L["While your bobber is out, the game's volume goes up to the levels below, so you hear a bite " ..
+		"even with the game on another screen. It goes back to your own levels a few seconds after " ..
+		"your last cast ends. It never turns a volume down, and a volume you change yourself while " ..
+		"fishing is kept."]), "check")
+	volume:HookScript("OnClick", function()
+		if not ns.db.fishVolume and ns.FishVolumeRestore then ns.FishVolumeRestore() end
+		Refresh()
+	end)
+	local function IfVolume(db) return db.fishVolume end
+	local master = stack:Add(Slider(content, "fishMasterVolume", L["Master volume"], 0, 100, 5, "%d%%", 100),
+		"slider")
+	Tooltip(master, L["The game's master volume while you fish."])
+	GreyUnless(master, IfVolume)
+	local effects = stack:Add(Slider(content, "fishSfxVolume", L["Sound effects volume"], 0, 100, 5, "%d%%", 100),
+		"slider")
+	Tooltip(effects, L["The game's sound effects volume while you fish: the splash of a bite is a sound effect."])
+	GreyUnless(effects, IfVolume)
+	local background = stack:Add(Check(content, "fishVolumeBackground", L["Sound in the background too"],
+		L["While you fish, the game's sound keeps playing with another window in front (the game's " ..
+		"Sound in Background setting), and goes back to your own setting after."]), "check", 16)
+	GreyUnless(background, IfVolume)
 
 	canvas:SetScript("OnShow", PageShown(Refresh, content))
 	canvas:Hide()
@@ -7996,7 +8076,7 @@ local function CreatePlatesPanel()
 		return top
 	end
 	local partsTop = PartsSection(L["Plate parts"], "Parts")
-	local ourPartsTop = PartsSection(L["Cinematic plate parts"], "CinematicParts", L["Cinematic parts"], true)
+	local ourPartsTop = PartsSection(L["Cinematic plate parts"], "CinematicParts", L["Cinematic"], true)
 
 	-- Names, laid out the same way. Outside cinematic mode the game's own
 	-- name options decide.
@@ -12933,7 +13013,10 @@ local function CreateTooltipPanel()
 		Border = { L["Background and border"], L["The box around the tooltip. Unticked, just the text shows."] },
 		Health = { L["Health bar"], L["The health bar under the tooltips of players, NPCs and mobs."] },
 		Guild = { L["Guild and title (<...>)"], L["A player's <Guild> line, or an NPC's <Innkeeper>-style title."] },
-		Level = { L["Level"], L["The level line (for players, with their race and class)."] },
+		Level = { L["Level (friends)"], L["The level line of players, NPCs and mobs you can't attack " ..
+			"(for players, with their race and class)."] },
+		LevelEnemy = { L["Level (enemies)"], L["The level line of players, NPCs and mobs you can attack " ..
+			"(for players, with their race and class)."] },
 		Spec = { L["Spec and class"], L["A player's spec and class line (\"Fury Warrior\")."] },
 		Type = { L["Creature type"], L["The kind of creature: Elemental, Beast, Humanoid and so on."] },
 		Corpse = { L["Corpse"], L["The Corpse line on a dead player, NPC or mob."] },
@@ -12944,6 +13027,8 @@ local function CreateTooltipPanel()
 			L["The names of your quests the unit is for, and their objectives (\"5/7 Thistle Boar slain\")."] },
 		ObjQuest = { L["Quest lines on objects"],
 			L["The same on things in the world you use or pick up for a quest (\"0/1 Palehill Runestone\")."] },
+		Hint = { L["Right-click hint"],
+			L["The <Right click for Frame Settings> line on the tooltips of your player, target and party frames."] },
 	}
 	local PART_TIPS = { First = L["Shown as soon as the tooltip appears."],
 		Later = L["Shown once you've hovered as long as set above."] }

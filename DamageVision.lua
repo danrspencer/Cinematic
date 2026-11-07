@@ -107,7 +107,17 @@ end
 -- Whether the game's meter is on (Options > Gameplay Enhancements > Enable
 -- Damage Meter: off, it keeps nothing). Ours to ask, not to turn on. (Its
 -- Auto Reset starts the meter afresh, which is when The whole run starts.)
+-- (IsDamageMeterAvailable says the meter can run here, not that it's ticked:
+-- the tick is its own CVar, so that's asked first.)
+local METER_CVAR = "damageMeterEnabled"
+local function MeterCVar()
+	local value = C_CVar and C_CVar.GetCVar and C_CVar.GetCVar(METER_CVAR)
+	if type(value) ~= "string" then return nil end
+	return value ~= "0"
+end
+
 local function MeterOn()
+	if MeterCVar() == false then return false end
 	if not C_DamageMeter.IsDamageMeterAvailable then return true end
 	local ok, available = pcall(C_DamageMeter.IsDamageMeterAvailable)
 	return not ok or available ~= false
@@ -1115,8 +1125,9 @@ function ns.DamageVisionDebug()
 		tostring(encounter), tostring(kind), tostring(ns.lastCinematic and true or false), test and "on" or "off"))
 	if not HasMeter() then return end
 	local ok, available, reason = pcall(C_DamageMeter.IsDamageMeterAvailable)
-	ns.Print(("  game's meter on: %s%s"):format(ok and tostring(available) or "error",
-		reason ~= nil and (" (" .. tostring(reason) .. ")") or ""))
+	ns.Print(("  game's meter available: %s%s; %s CVar: %s"):format(ok and tostring(available) or "error",
+		reason ~= nil and (" (" .. tostring(reason) .. ")") or "", METER_CVAR,
+		tostring(C_CVar and C_CVar.GetCVar and C_CVar.GetCVar(METER_CVAR))))
 	local sessionType, label = SessionType()
 	local rows = Rows(sessionType, MeterType())
 	ns.Print(("  counting %s (%s), %s"):format(label, MeterType() == Enum.DamageMeterType.HealingDone and "healing"
@@ -1153,7 +1164,7 @@ events:SetScript("OnEvent", function(_, event, ...)
 		ns.SetOnUpdate(frame, Update)
 		for _, other in ipairs({ "PLAYER_REGEN_DISABLED", "PLAYER_REGEN_ENABLED", "ENCOUNTER_START", "ENCOUNTER_END",
 			"PLAYER_ENTERING_WORLD", "LFG_COMPLETION_REWARD", "CHALLENGE_MODE_COMPLETED",
-			"DAMAGE_METER_COMBAT_SESSION_UPDATED", "DAMAGE_METER_RESET", "ADDON_RESTRICTION_STATE_CHANGED" }) do
+			"DAMAGE_METER_COMBAT_SESSION_UPDATED", "DAMAGE_METER_RESET", "ADDON_RESTRICTION_STATE_CHANGED", "CVAR_UPDATE" }) do
 			pcall(events.RegisterEvent, events, other)
 		end
 	elseif event == "ENCOUNTER_START" then

@@ -473,6 +473,86 @@ do
 		end
 	end)
 
+	-- Fishing volume (fishVolume): while a Fishing cast is out, the game's
+	-- master and sound effects volumes go up to the page's levels (never
+	-- down), and sound plays with the game in the background, so a bite is
+	-- heard from another screen. They go back a few seconds after the last
+	-- cast ends (time to loot and cast again). Your own levels wait in the
+	-- saved settings (fishHeldVolume), so a crash or /reload mid-cast still
+	-- gives them back; one you changed yourself meanwhile is left as it is.
+	do
+		local RESTORE_AFTER = 4
+		local BACKGROUND = "Sound_EnableSoundWhenGameIsInBG"
+		local VOLUMES = {
+			{ cvar = "Sound_MasterVolume", key = "fishMasterVolume" },
+			{ cvar = "Sound_SFXVolume", key = "fishSfxVolume" },
+		}
+		local token = 0
+		local function Restore()
+			local held = ns.db and ns.db.fishHeldVolume
+			if type(held) ~= "table" then return end
+			for cvar, entry in pairs(held) do
+				local now = GetCVar(cvar)
+				local same = now == entry.to
+					or (tonumber(now) and tonumber(entry.to) and math.abs(tonumber(now) - tonumber(entry.to)) < 0.005)
+				if same and entry.from ~= nil then
+					pcall(SetCVar, cvar, entry.from)
+				end
+			end
+			ns.db.fishHeldVolume = nil
+		end
+		local function Hold(held, cvar, value)
+			if held[cvar] then return end -- (already up, from an earlier cast)
+			local from = GetCVar(cvar)
+			if from == nil then return end
+			if pcall(SetCVar, cvar, value) then
+				held[cvar] = { from = from, to = value }
+			end
+		end
+		local function Raise()
+			local db = ns.db
+			if not db or not db.handleFishing or not db.fishVolume then return end
+			local held = type(db.fishHeldVolume) == "table" and db.fishHeldVolume or {}
+			for _, volume in ipairs(VOLUMES) do
+				local want = tonumber(db[volume.key])
+				local now = tonumber(GetCVar(volume.cvar))
+				if want and now and now < want - 0.005 then
+					Hold(held, volume.cvar, ("%.2f"):format(want))
+				end
+			end
+			if db.fishVolumeBackground and GetCVar(BACKGROUND) == "0" then
+				Hold(held, BACKGROUND, "1")
+			end
+			db.fishHeldVolume = next(held) and held or nil
+		end
+		function ns.FishVolumeRestore() Restore() end
+		local volumeWatcher = CreateFrame("Frame")
+		volumeWatcher:RegisterEvent("PLAYER_ENTERING_WORLD")
+		volumeWatcher:RegisterEvent("PLAYER_LOGOUT")
+		volumeWatcher:RegisterUnitEvent("UNIT_SPELLCAST_CHANNEL_START", "player")
+		volumeWatcher:RegisterUnitEvent("UNIT_SPELLCAST_CHANNEL_STOP", "player")
+		volumeWatcher:SetScript("OnEvent", ns.Profiled("Fishing volume", function(self, event, _, _, spellID)
+			if event == "PLAYER_ENTERING_WORLD" or event == "PLAYER_LOGOUT" then
+				if event == "PLAYER_ENTERING_WORLD" then self:UnregisterEvent(event) end
+				token = token + 1
+				Restore() -- (left up by a crash or /reload mid-cast)
+				return
+			end
+			if type(spellID) ~= "number" or (issecretvalue and issecretvalue(spellID)) or not IsFishingSpell(spellID) then
+				return
+			end
+			token = token + 1
+			if event == "UNIT_SPELLCAST_CHANNEL_START" then
+				Raise()
+			elseif ns.db and ns.db.fishHeldVolume then
+				local mine = token
+				C_Timer.After(RESTORE_AFTER, function()
+					if mine == token then Restore() end
+				end)
+			end
+		end))
+	end
+
 	-- Right-click to cast (fishRightClickCast): with a pole equipped (standing
 	-- still, or in the fish camera) and no bobber out, a right-click in the world clicks a secure button
 	-- that casts Fishing. Every cast still comes from your own click (addons

@@ -116,6 +116,7 @@ local function PrintDebugHelp()
 	end
 	if ns.isDev then print("  /cine debug skyride [frames|probe zoom|turn|tilt|fov|follow] - skyriding: what the game says and the flight log (again to stop); the frames up; or one of our camera moves tried mid-flight") end
 	print("  /cine debug questlog - save every frame of the next quest cams (for tracking down snaps)")
+	print("  /cine debug questlines - log whether the game says where quests are offered on this map")
 	print("  /cine debug zoom - the slow zoom's state")
 	print("  /cine debug zoomtrace - the last 30 sec of camera distance, to the log (a reload saves it too)")
 	print("  /cine debug turn - turn handling while walking (8 seconds)")
@@ -125,6 +126,7 @@ local function PrintDebugHelp()
 	print("  /cine debug rolls - Roll Vision's settings and every drop in the loot history with its picks")
 	print("  /cine debug textures - a strip of every bar texture the Style pages offer, to see which this client has")
 	print("  /cine debug fonts - every font other addons share, and which are left out (no small letters)")
+	print("  /cine debug mirror - the breath, fatigue and Feign Death bars: their parts and settings")
 	print("  /cine debug themecheck - every theme after every other: the frames' parts must come back where the game had them")
 	print("  /cine debug bubbleshot | off - a real chat bubble in each style theme: run it four times, outdoors, it says a line each go")
 	print("  /cine debug themeshots [unitframes] [theme] | off - screenshots of every style theme's frames; your settings come back after")
@@ -1026,6 +1028,84 @@ local function HandleSlash(msg)
 		ns.Print("quest cam log " .. (ns.db.debugQuestCam and
 			"on: each quest cam's frames are saved; /reload after one so they can be read (again to stop)"
 			or "off"))
+	elseif cmd == "debug" and arg == "questlines" then
+		-- Whether the game tells addons where quests are offered (C_QuestLine,
+		-- the world map's ! marks): for an Available quests reveal on Forever.
+		local function S(v)
+			if issecretvalue and issecretvalue(v) then return "secret" end
+			return tostring(v)
+		end
+		local api = type(_G.C_QuestLine) == "table" and _G.C_QuestLine or nil
+		local names = {}
+		for name in pairs(api or {}) do names[#names + 1] = name end
+		table.sort(names)
+		ns.Log("questlines", ("client %s; C_QuestLine %s: %s"):format(S(select(4, GetBuildInfo())),
+			api and "exists" or "MISSING", #names > 0 and table.concat(names, ", ") or "-"))
+		ns.Log("questlines", ("map pin mixins: QuestOfferDataProviderMixin %s, QuestHubDataProviderMixin %s, " ..
+			"QuestDataProviderMixin %s; C_TaskQuest %s"):format(tostring(_G.QuestOfferDataProviderMixin ~= nil),
+			tostring(_G.QuestHubDataProviderMixin ~= nil), tostring(_G.QuestDataProviderMixin ~= nil),
+			tostring(_G.C_TaskQuest ~= nil)))
+		local mapID = C_Map and C_Map.GetBestMapForUnit("player")
+		ns.Log("questlines", ("map %s, in combat %s"):format(S(mapID), tostring(InCombatLockdown())))
+		if not (api and api.GetAvailableQuestLines and mapID) then
+			ns.Print("questlines: no C_QuestLine.GetAvailableQuestLines here (see the log)")
+			return
+		end
+		if api.RequestQuestLinesForMap then pcall(api.RequestQuestLinesForMap, mapID) end
+		-- (Its parent map too: the list may only be kept for the zone.)
+		local info = C_Map.GetMapInfo and C_Map.GetMapInfo(mapID)
+		local maps = { mapID }
+		if info and info.parentMapID and info.parentMapID ~= 0 then maps[2] = info.parentMapID end
+		ns.Log("questlines", ("map %s is %s (type %s), parent %s"):format(S(mapID), S(info and info.name),
+			S(info and info.mapType), S(maps[2])))
+		for _, id in ipairs(maps) do
+			if api.RequestQuestLinesForMap then pcall(api.RequestQuestLinesForMap, id) end
+		end
+		local function LogLines(when, last)
+			for _, id in ipairs(maps) do
+				local here
+				local pos = C_Map.GetPlayerMapPosition(id, "player")
+				if pos and C_Map.GetWorldPosFromMapPos then here = select(2, C_Map.GetWorldPosFromMapPos(id, pos)) end
+				local ok, lines = pcall(api.GetAvailableQuestLines, id)
+				local forced = api.GetForceVisibleQuests and select(2, pcall(api.GetForceVisibleQuests, id))
+				ns.Log("questlines", ("after %d sec, map %s: GetAvailableQuestLines %s, GetForceVisibleQuests %s"):format(
+					when, S(id), not ok and ("error " .. tostring(lines)) or type(lines) == "table" and (#lines .. " lines") or type(lines),
+					type(forced) == "table" and (#forced .. " quests") or type(forced)))
+				for i, q in ipairs(type(lines) == "table" and lines or {}) do
+					local yards = "?"
+					if here and type(q.x) == "number" and type(q.y) == "number" and not (issecretvalue and issecretvalue(q.x)) then
+						local _, there = C_Map.GetWorldPosFromMapPos(id, CreateVector2D(q.x, q.y))
+						if there then yards = ("%.0f"):format(math.sqrt((here.x - there.x) ^ 2 + (here.y - there.y) ^ 2)) end
+					end
+					ns.Log("questlines", ("  %d. %s (quest %s, line %s) at %s, %s; %s yd; hidden %s, daily %s, campaign %s"):format(
+						i, S(q.questName), S(q.questID), S(q.questLineName), S(q.x), S(q.y), yards,
+						S(q.isHidden), S(q.isDaily), S(q.isCampaign)))
+				end
+			end
+			-- What the open world map draws: every pin kind, and the quest ones' spots.
+			local map = _G.WorldMapFrame
+			if map and map:IsShown() and type(map.pinPools) == "table" then
+				for template, pool in pairs(map.pinPools) do
+					local count, shown = 0, {}
+					for pin in pool:EnumerateActive() do
+						count = count + 1
+						if tostring(template):find("Quest") and #shown < 15 then
+							shown[#shown + 1] = ("%s %s,%s"):format(S(pin.questID), S(pin.normalizedX), S(pin.normalizedY))
+						end
+					end
+					if count > 0 then
+						ns.Log("questlines", ("  world map (%s) pins %s: %d%s"):format(S(map:GetMapID()), tostring(template),
+							count, #shown > 0 and (" - " .. table.concat(shown, "; ")) or ""))
+					end
+				end
+			elseif when == 2 then
+				ns.Log("questlines", "world map not open: no pins logged")
+			end
+			if last then ns.Print("questlines: logged; /reload so the log can be read") end
+		end
+		ns.Print("questlines: asked the game, logging after 2 and 6 seconds")
+		C_Timer.After(2, function() LogLines(2) end)
+		C_Timer.After(6, function() LogLines(6, true) end)
 	elseif cmd == "debug" and arg == "quest" then
 		local q = ns.GetQuestCamDebug()
 		ns.Print(("quest cam: %s, event camera %s; turned %.1f°, lowered %.1f°%s; your distance %s, zoomed to %s"):format(
@@ -1037,6 +1117,7 @@ local function HandleSlash(msg)
 			tostring(d.shoulder), tostring(d.centered), tostring(IsMounted and IsMounted()), tostring(InCombatLockdown())))
 		ns.Print(("  Frames follow you %s: slide %.0f of %.0f (UI units, - left), zoom %.1f, cameraFov %s; moving %s"):format(
 			tostring(d.follow), d.followShift, d.followTarget, GetCameraZoom and GetCameraZoom() or 0, tostring(GetCVar("cameraFov")), d.followed))
+		ns.Print(("  Model %s: size factor %.2f (%s)"):format(tostring(d.model), d.scale or 1, tostring(d.scaleFrom)))
 	elseif cmd == "debug" and arg:find("^shoulder%s") and ns.ShoulderTest then
 		ns.ShoulderTest((arg:gsub("^shoulder%s+", "")))
 	elseif cmd == "debug" and (arg == "skyride" or arg:find("^skyride%s")) and ns.SkyrideDebug then
@@ -1555,6 +1636,8 @@ local function HandleSlash(msg)
 		ns.ReportActionBarStyle()
 	elseif cmd == "debug" and arg == "fonts" then
 		ns.ReportStyleFonts()
+	elseif cmd == "debug" and arg == "mirror" then
+		ns.ReportMirrorTimers()
 	elseif cmd == "debug" and arg == "platetextures" then
 		ns.ReportPlateTextures()
 	elseif cmd == "debug" and arg == "prdtextures" then

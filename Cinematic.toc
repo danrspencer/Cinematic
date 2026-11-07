@@ -111,6 +111,7 @@ VitalsSound.lua
 TeleportVision.lua
 PersonalResources.lua
 StylePages.lua
+MirrorTimerStyle.lua
 StyleThemes.lua
 LetterboxStyle.lua
 QuestItemStyle.lua

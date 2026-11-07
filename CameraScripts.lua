@@ -2809,6 +2809,11 @@ local function Update(elapsed)
 			or (run.pausedBy == "walk" and ns.playerMoving) then
 			run.pausedUntil = now + PauseSecs(run.script.rules, run.pausedBy)
 		end
+		-- (Your zoom meanwhile, its rule Ignore: yours wins, as below. Its zoom put
+		-- off gives up too, or carrying on it went back toward its old goal from
+		-- where you'd put the camera: out 5 yards after you zoomed in.)
+		local rules = run.script.rules
+		if zoomed and (rules.zoom == "ignore" or rules.zoomOn == false) then zoomer.suspended = nil end
 		if InFight() and Act("fight") then return end
 		if run.trigger and not run.triggerOn and Act("ends") then return end
 		-- (Its zoom speed still eases back to yours meanwhile: left at the crawl,
@@ -2874,6 +2879,13 @@ ns.SetOnUpdate(watcher, function(_, elapsed)
 	local key, camera = TriggerNow()
 	local held = ns.WindowPausesCams()
 	if run and run.trigger then
+		-- (Another trigger taking over with this same camera, like the Campfire
+		-- button's sit giving way to the campfire's buff: the run is its now and
+		-- carries on, never put back and started over.)
+		if key and key ~= run.trigger and camera == run.camera and run.phase == "steps" then
+			ns.Log("state", ("camera script %s carries on for %s (was %s)"):format(run.script.name, key, run.trigger))
+			run.trigger = key
+		end
 		local on = key == run.trigger and camera == run.camera
 		-- (A window holding its trigger back: it waits where it is, however long,
 		-- and carries on as that closes; its trigger's looked at again then.)

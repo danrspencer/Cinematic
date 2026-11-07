@@ -145,6 +145,7 @@ Answers: where does it feel wrong, which experimental settings are worth keeping
 | 2 | Forever | 2026-11-06 | The game clears the offset to 0 at every /reload, relog and restart; Keep Character Centered stays. So we write it each session and the warning comes each time (you saw it 3 of 3). It shows about a second after the write. Turned off, it restored both settings and nothing else wrote them for the 29 seconds logged. The reported "keeps resetting while off" didn't happen here |
 | 3 | Forever | 2026-11-07 | Done, second try (the long line's bubble lasted the whole sweep). Dwarf, zoom 9: 0.5, 1, 1.5, 2 yards moved you 4.2%, 8.4%, 12.6%, 16.8% off the middle (shares of half the screen), and -1, -2 the same to the right: **negative is the left shoulder**, and it's a straight line, 1.01 of the fixed sum. Zoom 8, 12, 15: 0.98-1.01. **Zoom 5: only 0.44**, but the reading may have come while the zoom still moved; rerun with closer steps. The game eases over in about 0.3 s. First try: the ultrawide screen (2.39:1) made the old sum 0.74 too big; cameraFov is across a 16:9 screen, the height kept |
 | 3b | Forever | 2026-11-07 | **No fade up close**: 1 yard moved you 4.9%, 6.2%, 9.4%, 12.6%, 15.3%, 19.3%, 26.3%, 41.0% at 15, 12, 8, 6, 5, 4, 3, 2 yards: 1.00-1.04 of the sum down to 4 yards, 1.06 at 3, 1.11 at 2 (as if the camera were ~0.17 yd nearer than its zoom reads: not worth a fix). Run 3's 0.44 at 5 yards was read mid-zoom. Up close you're near the top of the screen (bubble y 0.9 at 2 yards) |
+| 4 | Forever | 2026-11-07 | Skyborne (sex 2: male), on foot, 15 yd: **0.86** of the Dwarf's (0.84-0.87 over 0.5 to 2 yards, both sides): a straight scale, so one number per model. Dwarf is 1.00. Still to do: other races, mounts, forms |
 | 4 | | | |
 | 5 | | | |
 
@@ -163,6 +164,8 @@ Each phase ends with the sim passing, including its new checks, then one game te
 - Sim: fix the `KNOWN` failures in build_sim.py.
 
 ### Phase 2: size correction (after Runs 3 and 4)
+
+**Started 2026-11-07:** a size factor per race and sex (Dwarf 1.00, Skyborne 0.86 built in). Each `sweep offsets` on foot saves yours; Spot on screen and Frames follow you both use it. `/cine debug shoulder` shows it. Mounts and forms still to measure.
 
 - Our own measured factors, by race, and by mount size if a pattern holds.
 - A **calibrate** button: say a line, read the bubble, save the factor for what you're on now. This covers every mount without a table.

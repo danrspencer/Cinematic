@@ -313,6 +313,17 @@ local function EndSweep()
 	end
 	Say(("sweep %s done: %d steps, real/worked-out mean %s | %s (/reload to save it)"):format(sweep.name,
 		sweep.at - 1, count > 0 and ("%.2f"):format(total / count) or "none", Who()))
+	-- (offsets, on foot: the mean's your model's size factor, ShoulderCam.lua.)
+	local onFoot = not (IsMounted and ns.Flag(IsMounted())) and not (GetShapeshiftFormID and GetShapeshiftFormID())
+	if sweep.name == "offsets" and count >= 3 and onFoot and ns.ShoulderModelKey then
+		local key, factor = ns.ShoulderModelKey(), tonumber(("%.2f"):format(total / count))
+		ns.db.shoulderCamScales = ns.db.shoulderCamScales or {}
+		ns.db.shoulderCamScales[key] = factor
+		if ns.ApplyShoulderCam then ns.ApplyShoulderCam() end
+		Say(("size factor for %s saved: %.2f"):format(key, factor))
+	elseif sweep.name == "offsets" then
+		Say("size factor not saved: on foot and out of forms only, for now")
+	end
 	sweep = nil
 end
 

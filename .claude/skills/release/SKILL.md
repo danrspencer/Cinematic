@@ -151,6 +151,17 @@ between them: nothing is committed, pushed or tagged until the user says go.
     and GitHub releases (`gh` isn't installed). Give the user the link
     https://github.com/sapowowdev/Cinematic/actions to watch it.
 
+    **While GitHub is down** (the sapowowdev account suspended, see the
+    github-suspension memory): don't push anything. Tag locally
+    (`git tag -a vX.Y.Z -m "vX.Y.Z"`), then
+    `python -I Tools/build-zip.py vX.Y.Z` builds
+    `Release/Cinematic-vX.Y.Z.zip` from the tag, like the packager. The user
+    uploads it on CurseForge (Files > Add File): display name `vX.Y.Z`,
+    Release, the same game versions as the last file, and the changelog
+    from `git log --format="- %s" <prev tag>..vX.Y.Z`. The Discord post
+    doesn't go out this way. Once the account is back, push main and the
+    tags made meanwhile (the workflow will run for each tag: say so first).
+
 15. **Report**: the version, the commits (`git log --oneline <prev tag>..`),
     and what's left uncommitted, if anything. If a commit answers a GitHub
     issue, offer a short draft reply for it and leave the issue open.
@@ -181,6 +192,7 @@ offline check still runs (step 2a): GitHub runs it on every push.
 4. **One commit** with everything: `git add <files>` (never `-A`), subject in
    the house style ("Area: what changed, for players", American English,
    dev-only work only in the body, no "Fixes #N"), Co-Authored-By line.
-5. Push, tag, push the tag (step 14), then report the version, the commit,
+5. Push, tag, push the tag (step 14; while GitHub is down, its manual
+   zip instead), then report the version, the commit,
    the Actions link, and what was left out. Mention that translations and
    the guidebook can catch up in the next full `/release`.

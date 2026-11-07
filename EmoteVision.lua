@@ -14,7 +14,7 @@ local L = ns.L
 
 local DEFAULTS = ns.DEFAULTS
 DEFAULTS.emoteVision = false           -- at all (its page's switch)
-DEFAULTS.emoteVisionAlways = true      -- its Show in row's Always: everywhere (fights still wait: WhyWaiting)
+-- (Each moment's Show in row's Always, emoteVisionAlways<Id>: with the rows, below.)
 DEFAULTS.emoteVisionStill = false      -- only while you stand still (moving: it waits)
 DEFAULTS.emoteVisionRepeats = true     -- the same person's same moment again ignored...
 DEFAULTS.emoteVisionRepeatMins = 1     -- ...for this many minutes
@@ -203,6 +203,7 @@ end
 -- same back, and a pretend one for Test.
 local MOMENTS = {
 	{ id = "Buff", on = "emoteVisionBuffs", name = "Someone buffs you", emotes = { "THANK", "BOW", "SALUTE" },
+		outside = true, -- (its Show in row: World and City to start with, not dungeons, raids or battlegrounds)
 		tip = "A buff of a minute or more someone else puts on you (Fortitude, Arcane Intellect, a blessing...). " ..
 			"Not heals over time.",
 		sample = { name = "Aelwyn", class = "PRIEST", line = "gave you %s", spell = "Power Word: Fortitude",
@@ -1636,14 +1637,27 @@ local function Known(unit)
 		if ok and ns.Flag(ally) then return guid, "Ally" end
 	end
 end
-local function Spotted(unit)
+-- (A plate can show before the game has their name and look: "Unknown" and
+-- a blank face. Asked again a second later, a few times, still the same one.)
+local SPOTTED_TRIES = 5
+local function Spotted(unit, tries)
 	if loading or Fighting() then return end
 	local guid, kind = Known(unit)
 	if not guid or not DB()[MOMENT[kind].on] then return end
 	local now = GetTime()
 	if met[guid] and now - met[guid] < MET_AGAIN then return end
+	local name = Plain(UnitName(unit))
+	if type(name) ~= "string" or name == "" or name == _G.UNKNOWNOBJECT then
+		tries = (tries or 0) + 1
+		if tries < SPOTTED_TRIES then
+			C_Timer.After(1, function()
+				if Plain(UnitGUID(unit)) == guid then Spotted(unit, tries) end
+			end)
+		end
+		return
+	end
 	met[guid] = now
-	FireFor(kind, Plain(UnitName(unit)), guid,
+	FireFor(kind, name, guid,
 		kind == "Guild" and L["is in your guild"] or L["grouped with you before"])
 end
 

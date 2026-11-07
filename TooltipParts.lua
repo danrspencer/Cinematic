@@ -132,17 +132,40 @@ local function ThreatPattern()
 	return threatPattern
 end
 
+-- The PvP line ("PvP", as the game words it; any case) and the faction lines.
+local function IsFactionLine(text)
+	if text == FACTION_HORDE or text == FACTION_ALLIANCE then
+		return true
+	end
+	local plain = text:match("^%s*(.-)%s*$"):lower()
+	for _, word in ipairs({ PVP or false, PVP_ENABLED or false, "PvP" }) do
+		if type(word) == "string" and plain == word:lower() then
+			return true
+		end
+	end
+	return false
+end
+
+-- The "<Right click for Frame Settings>" line of a unit frame's tooltip.
+local function IsHintLine(text)
+	local hint = type(UNIT_POPUP_RIGHT_CLICK) == "string" and UNIT_POPUP_RIGHT_CLICK or nil
+	return text == hint or text == "<Right click for Frame Settings>"
+end
+
 -- The lines taken out: line number -> true. An object in the world (object
 -- set) has just its quest lines taken out, by their own row (ObjQuest).
 local function LinesToCut(tooltip, count, unit, object)
 	local cut = {}
 	local level = LEVEL or "Level"
 	local creatureType, className, isPlayer, guildName
+	local enemy = false -- (one you can attack: its level is LevelEnemy's)
 	if unit then
 		local okPlayer, player = pcall(function()
 			return ns.Flag(UnitIsPlayer(unit)) or tostring(UnitGUID(unit)):find("^Player%-") ~= nil
 		end)
 		isPlayer = okPlayer and player
+		local okEnemy, canAttack = pcall(function() return ns.Flag(UnitCanAttack("player", unit)) end)
+		enemy = okEnemy and canAttack or false
 		local ok, kind = pcall(UnitCreatureType, unit)
 		creatureType = ok and kind or nil
 		local okClass, class = pcall(UnitClass, unit)
@@ -171,17 +194,19 @@ local function LinesToCut(tooltip, count, unit, object)
 			inQuest = false
 			if text == (CORPSE or "Corpse") then
 				return "Corpse"
+			elseif IsHintLine(text) then
+				return "Hint" -- (before Guild: it's in <...> too)
 			elseif text:find("^<.*>$") then
 				return "Guild"
 			elseif guildName and text:find(guildName, 1, true) then
 				return "Guild" -- (a player's guild with no brackets, as on retail: "Top Opp")
 			elseif text:find(level, 1, true) then
-				return "Level"
+				return enemy and "LevelEnemy" or "Level"
 			elseif className and isPlayer and text:find(className, 1, true) then
 				return "Spec" -- (a player's "Fury Warrior")
 			elseif Same(text, creatureType) then
 				return "Type"
-			elseif text == FACTION_HORDE or text == FACTION_ALLIANCE or text == PVP then
+			elseif IsFactionLine(text) then
 				return "Faction"
 			elseif RepFactions()[text] then
 				return "Rep"
@@ -302,7 +327,8 @@ local function CutLines(tooltip, object)
 	end
 end
 
-local LINE_PARTS = { "Guild", "Level", "Spec", "Type", "Corpse", "Faction", "Rep", "Threat", "Quest" }
+local LINE_PARTS = { "Guild", "Level", "LevelEnemy", "Spec", "Type", "Corpse", "Faction", "Rep", "Threat", "Quest",
+	"Hint" }
 local function AnyLineCut()
 	for _, part in ipairs(LINE_PARTS) do
 		if Cut(part) then
@@ -561,8 +587,8 @@ function ns.TooltipFadeCancel()
 	end
 end
 
--- /cine debug tooltipparts: the next tooltip's shown parts, bar its lines'
--- text (name, kind, size, where), printed a moment after it shows.
+-- /cine debug tooltipparts: the next tooltip's shown parts (name, kind,
+-- size, where) and its lines' text, printed a moment after it shows.
 local listParts = false
 function ns.TooltipPartsDebug()
 	listParts = true
@@ -603,6 +629,14 @@ local function ListParts(tooltip)
 		end
 	end
 	pcall(Walk, tooltip, 0)
+	-- Then each line's text, for a line the parts grid misses (secret: "?").
+	pcall(function()
+		for i = 1, tooltip:NumLines() do
+			local text = Left(i) and Left(i):GetText()
+			local plain = type(text) == "string" and not (issecretvalue and issecretvalue(text))
+			ns.Print(("Line %d: %s"):format(i, plain and ("%q"):format(text) or "?"))
+		end
+	end)
 end
 
 function ns.HookTooltipParts()
@@ -624,6 +658,18 @@ function ns.HookTooltipParts()
 	else
 		hooksecurefunc(GameTooltip, "SetUnit", OnUnitTooltip)
 	end
+	-- Lines the game adds after a unit's tooltip is filled (a unit frame's
+	-- right-click hint, a PvP line): taken out as it shows the tooltip again
+	-- to fit them. (cutting: our own Show, as CutLines resizes it.)
+	local cutting = false
+	hooksecurefunc(GameTooltip, "Show", function(tooltip)
+		if cutting or refilling or not AnyLineCut() or not TooltipUnit(tooltip) then
+			return
+		end
+		cutting = true
+		pcall(CutLines, tooltip)
+		cutting = false
+	end)
 	GameTooltip:HookScript("OnShow", function(tooltip)
 		if refilling then
 			return

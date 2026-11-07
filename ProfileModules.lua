@@ -292,7 +292,7 @@ ns.PROFILE_MODULES = {
 	{ key = "pure-plates", name = "Cinema: nameplates", scope = { "Nameplates", "Nameplate Style" },
 		tip = "Enemies' nameplates (and their minions') in fights, not kept up otherwise; in PvP and " ..
 		"battlegrounds, none; in instances, friendly players' and NPCs' hidden; no group members' or friendly " ..
-		"targets'; an arrow over your target's plate all through CineMode " ..
+		"targets'; your target's name always; an arrow over your target's plate all through CineMode " ..
 		"(the marks themselves: ultra-plates).",
 		apply = function(set)
 			for _, key in ipairs({ "plateAlwaysGroupMembers", "plateAlwaysGroupMinions", "plateGroupFriends",
@@ -305,6 +305,8 @@ ns.PROFILE_MODULES = {
 			set("plateCombatEnemyMinions", true)
 			-- (Your target's plate kept up unless it's friendly.)
 			set("frameRules", { ["plate:YourTarget"] = "enemyplayer or hostilenpc or neutralplayer or neutralnpc" })
+			-- Your target's name up always (the Target section's Names row).
+			set("nameAlwaysYourTarget", true)
 			-- An arrow over your target's plate all through CineMode, with no
 			-- target frame to show what you've targeted.
 			for _, prefix in ipairs({ "plateCinematic", "plateCombat", "plateInPvP", "plateInBGs", "plateInInstances" }) do

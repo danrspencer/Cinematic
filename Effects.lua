@@ -2988,6 +2988,15 @@ function ns.PrintPlatesDebug()
 	ns.Print(("pvp fights=%s"):format(tostring(InPvPFight())))
 	ns.Print(("place=%s, kept up here=%s"):format(placeSuffix or "open world",
 		#keptHere > 0 and table.concat(keptHere, ", ") or "none"))
+	-- Friendly plates in dungeons and raids: each kind's choice, and whether
+	-- its game settings are held off now (only in CineMode, out of fights).
+	local instanceKinds = {}
+	for _, kind in ipairs(ns.PLATE_INSTANCE_KINDS) do
+		local set = ns.LOCKED_PLATE_SETS and ns.LOCKED_PLATE_SETS[kind]
+		instanceKinds[#instanceKinds + 1] = ("%s=%s (%s)"):format(kind, tostring(ns.db["plateInstance" .. kind]),
+			set and set.active and "held off" or "not held")
+	end
+	ns.Print("dungeon friendly plates: " .. table.concat(instanceKinds, ", ") .. (", in instance=%s"):format(tostring((IsInInstance()))))
 	local function describe(unit)
 		local name = UnitName(unit)
 		local isPlayer, faction = UnitIsPlayer(unit), UnitFactionGroup(unit)

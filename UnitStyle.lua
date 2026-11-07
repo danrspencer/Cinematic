@@ -188,6 +188,23 @@ local function PowerTint(unit)
 	return ok and tint or MANA_BLUE
 end
 
+-- Whether a color the game put on a unit's power bar is that power's own
+-- (Classic Era's blue mana, a vehicle's...). Else it's not one to follow:
+-- on Forever a mage's buff (more max mana) turns the target's mana bar green.
+local function PowerOwnColor(unit, c)
+	if not (c and Readable(unit)) then return false end
+	local ok, same = pcall(function()
+		local _, token, altR, altG, altB = UnitPowerType(unit)
+		local colors = _G.PowerBarColor
+		local info = Readable(token) and colors and colors[token]
+		local r, g, b
+		if info and Readable(info.r) then r, g, b = info.r, info.g, info.b
+		elseif Readable(altR) then r, g, b = altR, altG, altB end
+		return r and math.abs(r - c[1]) < 0.02 and math.abs(g - c[2]) < 0.02 and math.abs(b - c[3]) < 0.02
+	end)
+	return ok and same or false
+end
+
 -- What we've changed, to put back: bar -> its own fill and color; skins.
 local own = setmetatable({}, { __mode = "k" })
 local skins = setmetatable({}, { __mode = "k" })
@@ -699,8 +716,9 @@ local function ArtExtras(frame)
 end
 
 -- The level over a shape's ring: on the classic clients it's a badge on the
--- portrait's corner, and the ring would cut through it. Out of fights, as the
--- ring is made. (Its regions change parent, not place.)
+-- portrait's corner, and the ring would cut through it. The status icons too (the
+-- combat swords, rest, leader): they sit on the portrait. Out of fights, as the
+-- ring is made. (Their regions change parent, not place.)
 local function LiftLevel(frame, state, lift)
 	if InCombatLockdown() then return end
 	if lift and not state.lifted then
@@ -710,10 +728,12 @@ local function LiftLevel(frame, state, lift)
 			state.badge:SetFrameLevel(frame:GetFrameLevel() + 7)
 		end
 		state.lifted = {}
-		for _, region in ipairs(ns.UnitPartRegions and ns.UnitPartRegions(frame, "Level") or {}) do
-			if region.SetParent then
-				state.lifted[region] = region:GetParent()
-				pcall(region.SetParent, region, state.badge)
+		for _, part in ipairs({ "Level", "Icons" }) do
+			for _, region in ipairs(ns.UnitPartRegions and ns.UnitPartRegions(frame, part) or {}) do
+				if region.SetParent and not state.lifted[region] then
+					state.lifted[region] = region:GetParent()
+					pcall(region.SetParent, region, state.badge)
+				end
 			end
 		end
 	elseif state.lifted and not lift then
@@ -934,7 +954,8 @@ local function FramePlate(frame, state, portrait, on, over, shape)
 		state.shadow:Show()
 	end
 	if state.plate then DressPlateLook(state.plate, true) end
-	if state.bridge then DressBridge(state.bridge, true) end
+	-- (Art behind the portrait, Void Whisper's eye, reaches under the rows itself.)
+	if state.bridge then DressBridge(state.bridge, not ns.ThemePortraitBack(shape)) end
 end
 
 -- What a style theme draws in place of a frame's art: the plate, its connector and
@@ -942,7 +963,7 @@ end
 function ns.UnitThemeArt(frame)
 	local state, list = shapes[frame], {}
 	if state then
-		for _, key in ipairs({ "plate", "bridge", "shadow", "holder" }) do
+		for _, key in ipairs({ "plate", "bridge", "shadow", "holder", "back" }) do
 			if state[key] then list[#list + 1] = state[key] end
 		end
 	end
@@ -1524,6 +1545,65 @@ end
 -- (Inside the portrait's place: the bars start right at its edge, and a shaped
 -- bar's point needs air between them to read.)
 local RING_INSET = 2
+local EYE_SPAN = 1.75 -- (the eye's square, in its circle's widths: Media/make_shape_art.py)
+-- (One strata down: under the game's frame, and all that's drawn on it.)
+local LOWER_STRATA = { LOW = "BACKGROUND", MEDIUM = "LOW", HIGH = "MEDIUM", DIALOG = "HIGH" }
+-- The mist in Void Whisper's eye: layers of wisps crossing slowly, each its own way,
+-- wandering, and each swelling and sinking away on a beat of its own, never quite in
+-- step: so parts of it well up and fade, as if something's moving in there. Under them a
+-- layer of shadow (dark), and one turning slowly round the face (swirl).
+local MIST = {
+	{ dark = true, peak = 0.4, scale = 1.0, speed = 0.004, sway = 0.11, breath = 0.23, phase = 1.0 },
+	{ scale = 1.4, speed = 0.012, sway = 0.21, breath = 0.53, phase = 0 },
+	{ scale = 1.1, speed = -0.009, sway = 0.17, breath = 0.37, phase = 2.1 },
+	{ scale = 0.8, speed = 0.006, sway = 0.29, breath = 0.71, phase = 4.4 },
+	{ scale = 1.7, speed = -0.005, sway = 0.13, breath = 0.29, phase = 3.3 },
+	{ scale = 0.6, speed = 0.015, sway = 0.37, breath = 0.89, phase = 5.6 },
+	{ swirl = 0.05, breath = 0.43, phase = 0.7 },
+}
+local MIST_PEAK = 0.32
+-- How restless it is, 0 to 1: calm, in a fight (half), and more the lower the unit's
+-- health goes under a third. (Health can be secret on retail in fights: then the fight alone.)
+local function MistUnrest(back)
+	local unit = back:GetParent().unit
+	if not Readable(unit) then return 0 end
+	local ok, fighting = pcall(UnitAffectingCombat, unit)
+	local unrest = ok and Readable(fighting) and fighting and 0.5 or 0
+	local okHealth, health = pcall(UnitHealth, unit)
+	local okMost, most = pcall(UnitHealthMax, unit)
+	if okHealth and okMost and Readable(health) and Readable(most) and type(health) == "number"
+		and type(most) == "number" and most > 0 then
+		local share = health / most
+		if share > 0 and share < 0.35 then unrest = math.max(unrest, 0.5 + (0.35 - share) / 0.35 * 0.5) end
+	end
+	return unrest
+end
+local function DriftMist(back, elapsed)
+	back.check = (back.check or 0) - elapsed
+	if back.check <= 0 then
+		back.check = 0.5
+		back.want = MistUnrest(back)
+	end
+	-- (Eased toward it: it stirs up over a couple of seconds, and settles as slowly.)
+	back.unrest = (back.unrest or 0) + ((back.want or 0) - (back.unrest or 0)) * math.min(1, elapsed * 0.6)
+	local unrest = back.unrest
+	back.drift = (back.drift or 0) + elapsed * (1 + unrest)
+	local t = back.drift
+	for i, mist in ipairs(back.mist) do
+		local way = MIST[i]
+		if way.swirl then
+			if mist.SetRotation then mist:SetRotation(t * way.swirl) end
+		else
+			local u = (t * way.speed + math.sin(t * way.sway * 0.7 + way.phase) * 0.06) % 1
+			local v = math.sin(t * way.sway) * 0.08
+			mist:SetTexCoord(u, u + way.scale, v, v + way.scale)
+		end
+		-- (Mostly faint, now and then welling up: two beats multiplied, squared.)
+		local swell = (0.5 + 0.5 * math.sin(t * way.breath + way.phase))
+			* (0.6 + 0.4 * math.sin(t * way.breath * 2.3 + way.phase * 1.7))
+		mist:SetAlpha(math.min(1, (way.peak or MIST_PEAK) * (1 + 0.4 * unrest) * swell * swell))
+	end
+end
 
 -- A shape's portrait stands a little taller than the rows beside it, about its own
 -- middle. The game's picture, so out of fights, and put back after.
@@ -1567,8 +1647,13 @@ local function DressShape(frame, portrait, view, artOver)
 	end
 	local own = shape ~= "game"
 	SizePortrait(frame, state, portrait, own and shape ~= "none")
-	for _, art in ipairs(FrameArt(frame)) do SetClear(art, own) end
-	for _, art in ipairs(ArtExtras(frame)) do SetClear(art, own) end
+	-- (Kept: the game's elite and rare art round the portrait, the gold or silver
+	-- dragon, tinted with the rest. It tells you what you're up against.)
+	local holder = frame.TargetFrameContainer
+	local rank = holder and holder.BossPortraitFrameTexture
+	local keepRank = shape ~= "none" and ns.ThemeLayout() ~= "slab"
+	for _, art in ipairs(FrameArt(frame)) do SetClear(art, own and not (keepRank and art == rank)) end
+	for _, art in ipairs(ArtExtras(frame)) do SetClear(art, own and not (keepRank and art == rank)) end
 	SetClear(portrait, shape == "none")
 	LiftLevel(frame, state, own)
 	FramePlate(frame, state, portrait, own, artOver, shape)
@@ -1670,6 +1755,86 @@ local function DressShape(frame, portrait, view, artOver)
 		state.edges:SetShown(shape == "square")
 		if shape == "square" then ns.DressStyleEdges(state.edges, 2, color[1], color[2], color[3], 1, true) end
 	end
+	-- (Art behind the portrait and under the rows: Void Whisper's eye round its circle.
+	-- Cut away inside the ring, so it can't show through the picture as it fades.)
+	local backFile, backMask, backMist
+	if own and not artOver and ns.ThemeLayout() ~= "slab" then backFile, backMask, backMist = ns.ThemePortraitBack(shape) end
+	if backFile and not state.back and not InCombatLockdown() then
+		state.back = CreateFrame("Frame", nil, frame)
+		local lower = LOWER_STRATA[frame:GetFrameStrata()]
+		if lower then
+			state.back:SetFrameStrata(lower)
+		else
+			state.back:SetFrameLevel(math.max(0, frame:GetFrameLevel() - 1))
+		end
+		-- (Cut off where the rows start: under them it shows through as the frame fades.)
+		state.back.clip = CreateFrame("Frame", nil, state.back)
+		if state.back.clip.SetClipsChildren then state.back.clip:SetClipsChildren(true) end
+		local inner = CreateFrame("Frame", nil, state.back.clip)
+		inner:SetAllPoints(state.back.clip)
+		state.back.inner = inner
+		state.back.art = inner:CreateTexture(nil, "BACKGROUND")
+		ns.ThemeNoSnap(state.back.art)
+		state.back.hole = inner:CreateMaskTexture()
+		ns.ThemeNoSnap(state.back.hole)
+		state.back.art:AddMaskTexture(state.back.hole)
+		-- (Mist drifting in it, added on, kept to its shape and out of the ring.)
+		state.back.shape = inner:CreateMaskTexture()
+		ns.ThemeNoSnap(state.back.shape)
+		state.back.mist = {}
+		for i, way in ipairs(MIST) do
+			local mist = inner:CreateTexture(nil, "BACKGROUND", nil, i)
+			mist:SetBlendMode(way.dark and "BLEND" or "ADD")
+			ns.ThemeNoSnap(mist)
+			mist:AddMaskTexture(state.back.shape)
+			mist:AddMaskTexture(state.back.hole)
+			state.back.mist[i] = mist
+		end
+		ns.SetOnUpdate(state.back, DriftMist)
+	end
+	if state.back then
+		local shown = backFile and Readable(wide) and true or false
+		state.back:SetShown(shown)
+		if shown then
+			local color = ns.ThemeRing() or { 0.8, 0.65, 0.25 }
+			local size = (wide - RING_INSET * 2) * 124 / 128 * EYE_SPAN
+			state.back.art:SetTexture(backFile)
+			state.back.art:ClearAllPoints()
+			state.back.art:SetPoint("CENTER", portrait, "CENTER")
+			state.back.art:SetSize(size, size)
+			state.back.art:SetVertexColor(color[1], color[2], color[3], 1)
+			-- (From its far point to just under the rows' metal.)
+			local clip, middle = state.back.clip, portrait:GetCenter()
+			local edge = state.plate and (state.flip and state.plate:GetRight() or state.plate:GetLeft())
+			clip:ClearAllPoints()
+			if Readable(middle) and Readable(edge) then
+				local far = state.flip and middle + size / 2 or middle - size / 2
+				local cut = state.flip and edge + BAR_GAP - 1 or edge - BAR_GAP + 1
+				clip:SetPoint("CENTER", portrait, "CENTER", (far + cut) / 2 - middle, 0)
+				clip:SetSize(math.max(1, math.abs(cut - far)), size)
+			else
+				clip:SetPoint("CENTER", portrait, "CENTER")
+				clip:SetSize(size, size)
+			end
+			state.back.hole:SetTexture(ns.ThemePortraitOut(shape), "CLAMPTOBLACKADDITIONAL", "CLAMPTOBLACKADDITIONAL")
+			state.back.hole:ClearAllPoints()
+			state.back.hole:SetPoint("CENTER", portrait, "CENTER")
+			state.back.hole:SetSize(wide * 2, wide * 2)
+			state.back.shape:SetTexture(backMask, "CLAMPTOBLACKADDITIONAL", "CLAMPTOBLACKADDITIONAL")
+			state.back.shape:ClearAllPoints()
+			state.back.shape:SetAllPoints(state.back.art)
+			for i, mist in ipairs(state.back.mist) do
+				mist:SetTexture(backMist, "REPEAT", "REPEAT")
+				mist:SetAllPoints(state.back.art)
+				if MIST[i].dark then
+					mist:SetVertexColor(0, 0, 0, 1)
+				else
+					mist:SetVertexColor(math.min(1, color[1] * 1.6 + 0.1), math.min(1, color[2] * 1.6 + 0.1),
+						math.min(1, color[3] * 1.6 + 0.1), 1)
+				end
+			end
+		end
+	end
 end
 
 local hooked = setmetatable({}, { __mode = "k" })
@@ -1701,11 +1866,16 @@ local function DressFrame(info)
 			-- (Mana in the theme's color: rage, energy and the rest mean something by theirs.)
 			local mana = view and ns.ThemeMana() or nil
 			local tint = PowerTint(unit)
+			local pr, pg, pb
 			if mana and tint == MANA_BLUE then
-				DressBar(power, view, mana[1], mana[2], mana[3], tint, health)
-			else
-				DressBar(power, view, nil, nil, nil, tint, health)
+				pr, pg, pb = mana[1], mana[2], mana[3]
+			elseif view and power then
+				-- (The game's color stands only if it's this power's: not a green mana bar.)
+				local c = own[power] and own[power].color
+				local white = c and c[1] > 0.95 and c[2] > 0.95 and c[3] > 0.95
+				if c and not white and not PowerOwnColor(unit, c) then pr, pg, pb = tint[1], tint[2], tint[3] end
 			end
+			DressBar(power, view, pr, pg, pb, tint, health)
 			-- (The player's second power, Elemental's mana say: drawn under the first.)
 			local second = frame == _G.PlayerFrame and _G.AlternatePowerBar or nil
 			DressBar(second, view, mana and mana[1], mana and mana[2], mana and mana[3], MANA_BLUE, health)
@@ -1766,7 +1936,12 @@ local function DressFrame(info)
 					hooksecurefunc(power, "SetStatusBarColor", function(_, r, g, b)
 						if dressing then return end
 						local saved = own[power]
-						if saved and Readable(r) then saved.color = { r, g, b } end
+						if saved and Readable(r) then
+							saved.color = { r, g, b }
+							if Readable(g) and Readable(b) and not (r > 0.95 and g > 0.95 and b > 0.95) and not PowerOwnColor(frame.unit, saved.color) then
+								ns.Log("style", ("power bar: game set %.2f %.2f %.2f, not the unit's power color"):format(r, g, b))
+							end
+						end
 						Dress(info)
 					end)
 				end
@@ -2083,7 +2258,8 @@ function ns.MakeUnitStylePreview(parent, width, onPick)
 			PlaceBridge(unit.bridge, unit.plate, unit.power, sample.flip, unit.portrait, true, view.ufShape)
 			PlaceRowShadow(unit.rowShadow, unit.plate, unit.power)
 			unit.rowShadow:SetShown(view.ufShape ~= "game" and view.ufShape ~= "none" and ns.ThemeLayout() ~= "slab")
-			DressBridge(unit.bridge, view.ufShape ~= "game" and view.ufShape ~= "none" and ns.ThemeLayout() ~= "slab")
+			DressBridge(unit.bridge, view.ufShape ~= "game" and view.ufShape ~= "none" and ns.ThemeLayout() ~= "slab"
+				and not ns.ThemePortraitBack(view.ufShape))
 			-- (The name.)
 			local object = sample.small and _G.GameFontNormalSmall or _G.GameFontNormal
 			unit.name:SetFontObject(object)
@@ -2139,6 +2315,23 @@ function ns.MakeUnitStylePreview(parent, width, onPick)
 				unit.face:Hide()
 				unit.ring:Hide()
 				unit.portrait:Hide()
+			end
+			-- (Art behind it, on the stage under the rows: Void Whisper's eye.)
+			local back = not coords and ns.ThemeLayout() ~= "slab" and ns.ThemePortraitBack(shape)
+			if back and not unit.back then
+				unit.back = unit.bridge:GetParent():CreateTexture(nil, "BACKGROUND", nil, -8)
+				ns.ThemeNoSnap(unit.back)
+			end
+			if unit.back then
+				unit.back:SetShown(back and true or false)
+				if back then
+					local size = ((sample.small and 22 or 34) + 4) * EYE_SPAN
+					unit.back:SetTexture(back)
+					unit.back:ClearAllPoints()
+					unit.back:SetPoint("CENTER", unit.portrait, "CENTER")
+					unit.back:SetSize(size, size)
+					unit.back:SetVertexColor(ring[1], ring[2], ring[3], 1)
+				end
 			end
 			if coords then
 				unit.portrait:SetTexture(CLASS_ICONS)

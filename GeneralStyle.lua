@@ -307,12 +307,11 @@ function ns.CreateGeneralStylePanel(kit)
 		L["Every Style page at once: a switch for them all, and the settings they share. Each page's shared " ..
 		"settings start on General and follow it; change one on its page and it's that page's own."])
 
-	local preview, sample -- (below: drawn again as each setting changes)
+	local preview -- (below: drawn again as each setting changes)
 	local function Changed()
 		RefreshAll()
 		ns.ApplyMenuSkin() -- (Style off or on: the theme's menu colors go or come back)
 		if preview then preview:Refresh() end
-		if sample then sample:Refresh() end
 	end
 
 	local switch = kit.PageSwitch(content, "styleGeneral", L["Enable Style"],
@@ -368,30 +367,6 @@ function ns.CreateGeneralStylePanel(kit)
 		end, L["The size and shape of the game's nameplates (Options, Nameplates, Style). Your own setting comes " ..
 			"back if you pick The game's or turn Style off, and changing it in the game's Options wins."])
 	end
-
-	-- (The fonts as they'll look, here and now: a card only shows when one plays.)
-	sample = CreateFrame("Frame", nil, content)
-	sample:SetSize(480, 62)
-	local sampleTitle = sample:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-	sampleTitle:SetPoint("TOPLEFT", 0, -6)
-	sampleTitle.searchSkip = true
-	local sampleText = sample:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-	sampleText:SetPoint("TOPLEFT", sampleTitle, "BOTTOMLEFT", 0, -6)
-	sampleText.searchSkip = true
-	local titleSize, textSize = select(2, sampleTitle:GetFont()), select(2, sampleText:GetFont())
-	local gameTitle, gameText = sampleTitle:GetFont(), sampleText:GetFont()
-	function sample:Refresh()
-		local db = ns.GetDB()
-		if ROMAN and db then
-			sampleTitle:SetFont(ns.StyleFontFile(titleFont.get()) or gameTitle, titleSize * 1.5, "")
-			sampleText:SetFont(ns.StyleFontFile(db.styleFont) or gameText, textSize, "")
-		end
-		sampleTitle:SetText(L["Windrunner Spire"])
-		sampleText:SetText(L["Something has been taking the turnips at night."])
-	end
-	sample.pageSwitch = false
-	stack:Add(sample, "label")
-	kit.AddControl(sample)
 
 	rows.Look(L["Outline and border:"], L["Shared look"], {
 		texture = false,

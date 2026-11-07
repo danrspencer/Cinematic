@@ -203,6 +203,8 @@ StaticPopup_Show = function(name)
 end
 if variant == "mounted" then ns.db.shoulderCamNotMounted = false end
 local noticedAtStart = ns.db.shoulderCamNoticed
+-- (tall: its size factor measured, as a sweep on it would have saved.)
+if variant == "tall" then ns.db.shoulderCamScales = { ["Human-2"] = GAME.tallScale } end
 
 local realLog = ns.Log
 ns.Log = function(kind, text, ...)
@@ -403,12 +405,16 @@ Check("PRD back on its place", math.abs(Share(prd, home.prd)) < 0.001, ("%.1f UI
 -- game had caught up, 4 to 30 yards away, on a standard model on foot.
 local spotMiss, spotCount = 0, 0
 for _, row in ipairs(samples) do
-	local caught = math.abs(row[3] - row[2]) < 0.05
+	local caught = math.abs(row[3] - row[2] * me.scale) < 0.05
 	if row[2] ~= 0 and caught and row[4] >= 4 and row[4] <= 30 and row[8] == 0 then
 		spotMiss, spotCount = spotMiss + math.abs(math.abs(row[5]) - (ns.db.shoulderCamSpot or 0.2)), spotCount + 1
 	end
 end
-if variant ~= "tall" and variant ~= "decline" and variant ~= "sweep" then
+if variant == "sweep" then
+	local saved = ns.db.shoulderCamScales and ns.db.shoulderCamScales["Human-2"]
+	Check("The offset sweep saved the size factor", saved and math.abs(saved - me.scale) < 0.03, "saved " .. tostring(saved))
+end
+if variant ~= "decline" and variant ~= "sweep" then
 	Check("Your spot held as you zoom", spotCount > 0 and spotMiss / spotCount < 0.01,
 		spotCount > 0 and ("%.2f%% off it on average"):format(spotMiss / spotCount * 100) or "never on")
 end

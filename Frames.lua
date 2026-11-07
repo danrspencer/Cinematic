@@ -1914,6 +1914,13 @@ ns.COMBAT_SHOW = {
 		frames = { "BuffIconCooldownViewer" }, morePage = "Cooldown Manager" },
 	{ key = "cooldownsbars", label = L["Tracked Bars"], default = false, addon = "Blizzard_CooldownViewer",
 		frames = { "BuffBarCooldownViewer" }, morePage = "Cooldown Manager" },
+	-- The game's breath, fatigue and Feign Death bars (Classic Era's numbered,
+	-- retail's in their container). Always ticked to start with
+	-- (CINE_SHOW_DEFAULT), as before it had a row. Their look, and hiding them
+	-- always: under the Trackers tab's table (MirrorTimerStyle.lua).
+	{ key = "mirror", label = L["Breath bar"], default = false,
+		frames = { "MirrorTimerContainer", "MirrorTimer1", "MirrorTimer2", "MirrorTimer3" },
+		tip = L["The bar that runs down while you hold your breath underwater, and the game's other bars like it: fatigue in deep water and Feign Death."] },
 	-- Always ticked to start with (CINE_SHOW_DEFAULT): a boss's or quest's bar to watch.
 	{ key = "encounter", label = L["Encounter bar"], default = false, frames = FRAME_GROUPS.encounter,
 		tip = L["The extra bar some bosses, quests and vehicles bring up, such as a boss's own power."] },
@@ -1993,6 +2000,7 @@ local ROW_SECTIONS = {
 	targetcircle = "units",
 	buffs = "combat", buffcollapse = "combat", swing = "combat", castbar = "combat", meters = "combat", cooldowns = "combat",
 	cooldownsutility = "combat", cooldownsbuffs = "combat", cooldownsbars = "combat", encounter = "combat",
+	mirror = "combat",
 	mainbar = "bars", art = "bars", bottomleft = "bars", bottomright = "bars",
 	pet = "bars", stance = "bars", totems = "bars", extra = "bars",
 	right1 = "bars", right2 = "bars", bar6 = "bars", bar7 = "bars", bar8 = "bars",
@@ -2469,7 +2477,7 @@ local CINE_SHOW_DEFAULT = {
 	flags = true, castbar = true, partyroles = true, partynames = true, partystatus = true,
 	raidroles = true, raidnames = true, raidpetnames = true, raidtitles = true, raidbuffs = true,
 	raiddebuffs = true, raidthreat = true, raidtarget = true, raidready = true, extra = true, voice = true,
-	encounter = true, targetcircle = true, focustot = true,
+	encounter = true, targetcircle = true, focustot = true, mirror = true,
 }
 function ns.IsCineShowOn(key)
 	key = ns.FollowKey(key)

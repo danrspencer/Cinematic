@@ -79,9 +79,28 @@ local paused -- (PauseReason at the last check, every POLL)
 
 -- The offset that holds you at your spot at this distance (Run 3: you sit
 -- yards / (distance x view width) of the way to the edge).
+-- The model's size factor (Run 4): how far the game moves you for an offset,
+-- as a share of how far it moves a Dwarf (a Skyborne 0.86). Ours, measured
+-- (never another addon's tables): each `/cine debug shoulder sweep offsets`
+-- on foot saves the one for your race and sex (db.shoulderCamScales, not part
+-- of a profile), over the ones measured so far here. 1 until measured.
+-- (Mounts and forms change it too: not measured yet.)
+local MEASURED_SCALES = { ["Dwarf-2"] = 1, ["Skyborne-2"] = 0.86 }
+function ns.ShoulderModelKey()
+	local _, race = UnitRace("player")
+	return ("%s-%s"):format(tostring(race), tostring(UnitSex("player")))
+end
+function ns.ShoulderModelScale()
+	local key = ns.ShoulderModelKey()
+	local saved = ns.db and ns.db.shoulderCamScales and ns.db.shoulderCamScales[key]
+	if type(saved) == "number" and saved > 0.2 then return saved, "measured here" end
+	if MEASURED_SCALES[key] then return MEASURED_SCALES[key], "built in" end
+	return 1, "not measured"
+end
+
 local function SpotYards()
 	local distance = GetCameraZoom and GetCameraZoom() or 8
-	local yards = (ns.db.shoulderCamSpot or 0.2) * distance * ns.ShoulderViewWidth()
+	local yards = (ns.db.shoulderCamSpot or 0.2) * distance * ns.ShoulderViewWidth() / ns.ShoulderModelScale()
 	local k = math.min(1, math.max(0, (distance - SPOT_EASE_FROM) / (SPOT_EASE_TO - SPOT_EASE_FROM)))
 	return math.min(OFFSET_MOST, yards * k * k * (3 - 2 * k))
 end
@@ -349,7 +368,8 @@ local function TargetShift()
 	if yards == 0 then return 0 end
 	local distance = math.max(FOLLOW_MIN_ZOOM, GetCameraZoom and GetCameraZoom() or 5)
 	local half = UIParent:GetWidth() / 2
-	local shift = -yards / (distance * ns.ShoulderViewWidth()) * half * (db.shoulderCamFramesStrength or 1)
+	local shift = -yards * ns.ShoulderModelScale() / (distance * ns.ShoulderViewWidth()) * half
+		* (db.shoulderCamFramesStrength or 1)
 	local most = UIParent:GetWidth() * FOLLOW_MAX
 	return math.max(-most, math.min(most, shift))
 end
@@ -402,7 +422,8 @@ function ns.GetShoulderCamDebug()
 	return {
 		setting = db and db.shoulderCam, applied = db and db.shoulderCamYours ~= nil,
 		shoulder = GetCVar("test_cameraOverShoulder"), centered = GetCVar("CameraKeepCharacterCentered"),
-		side = db and db.shoulderCamSide, spot = db and db.shoulderCamSpot,
+		side = db and db.shoulderCamSide, spot = db and db.shoulderCamSpot, model = ns.ShoulderModelKey(),
+		scale = (ns.ShoulderModelScale()), scaleFrom = select(2, ns.ShoulderModelScale()),
 		follow = db and db.shoulderCamFrames, followShift = followShift, followTarget = TargetShift(),
 		followed = (function()
 			local names = {}

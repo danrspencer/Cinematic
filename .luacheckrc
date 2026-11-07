@@ -31,6 +31,8 @@ read_globals = {
 	"MovieFrame",
 	"CORPSE",
 	"FACTION_ALLIANCE",
+	"PVP_ENABLED",
+	"UNIT_POPUP_RIGHT_CLICK",
 	"FACTION_HORDE",
 	"PVP",
 	"THREAT_TOOLTIP",

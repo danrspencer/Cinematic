@@ -9,6 +9,7 @@ Tail.tga and TailEdge.tga: a chat bubble's tail and the line down its sides, 128
 Bar<Name>.tga: a mask for a bar, 256x32, white on clear: what's clear is cut away.
 Portrait<Name>.tga and Portrait<Name>Ring.tga: a portrait's mask and the line
 round it, 128x128, white on clear. Portrait<Name>Cut.tga: what cuts the real one.
+PortraitBackEye.tga: an eye behind a circle portrait (Void Whisper), 256x256.
 """
 import math
 import os
@@ -226,6 +227,92 @@ def noise(size, seed, blur):
     im = im.filter(ImageFilter.GaussianBlur(blur))
     low, high = im.getextrema()
     return im.point(lambda v: (v - low) * 255 // max(1, high - low))
+
+
+def eye_back():
+    """Void Whisper's eye: behind a circle portrait, wider than it, a point out to each
+    side and a dark upper lid. The circle is 1/1.75 of it across (EYE_SPAN in
+    UnitStyle.lua). Grey, tinted to the ring's color; its shadow black. Shaded as a
+    lid: lighter round the circle, dark toward its points, the upper lid's shadow
+    falling in and a little light on the lower rim; grit and hairline cracks.
+    PortraitBackEyeMask.tga: its shape, for the mist drifting in it.
+    PortraitBackEyeMist.tga: the mist, 128x128, wisps that tile."""
+    n = 256 * 4
+    c, d = n / 2, n / 1.75
+    a, b = d * 1.575 / 2, d * 1.1 / 2
+    k = d / 328  # (the mockup's scale: its numbers below)
+    r = (a * a + b * b) / (2 * b)
+    reach = math.asin(a / r)
+    top = [(c + r * math.sin(t), c - (b - r + r * math.cos(t)))
+           for t in (-reach + i * 2 * reach / 96 for i in range(97))]
+    outline = top + [(x, 2 * c - y) for x, y in reversed(top)]
+    shape = Image.new("L", (n, n), 0)
+    ImageDraw.Draw(shape).polygon(outline, fill=255)
+    save(shape.resize((256, 256), Image.LANCZOS), "PortraitBackEyeMask")
+    # (Toward its points: by how far across from the middle.)
+    body = Image.new("L", (n, n))
+    body.putdata([int(175 - 150 * min(1, max(0, (abs(x - c) / a - 0.5) / 0.5)) ** 0.7)
+                  for y in range(n) for x in range(n)])
+    outside = ImageChops.invert(shape)
+    fall = ImageChops.offset(outside, 0, round(14 * k)).filter(ImageFilter.GaussianBlur(16 * k))
+    body = ImageChops.subtract(body, fall.point(lambda v: v * 170 // 255))
+    rim = ImageChops.offset(outside, 0, -round(6 * k)).filter(ImageFilter.GaussianBlur(4 * k))
+    low = Image.new("L", (n, n), 0)
+    ImageDraw.Draw(low).rectangle((0, c + d * 0.1, n, n), fill=255)
+    body = ImageChops.add(body, ImageChops.multiply(rim, low).point(lambda v: v * 70 // 255))
+    patches = noise((n // 4, n // 4), 21, 3).resize((n, n), Image.BICUBIC).point(lambda v: max(0, v - 110) * 2)
+    fine = noise((n, n), 11, 1.2 * k).point(lambda v: max(0, v - 140) * 2)
+    body = ImageChops.subtract(body, ImageChops.multiply(fine, patches).point(lambda v: v * 60 // 255))
+    rng = random.Random(7)
+    cracks = Image.new("L", (n, n), 0)
+    draw = ImageDraw.Draw(cracks)
+    room = [(x, y) for y in range(0, n, 6) for x in range(0, n, 6)
+            if shape.getpixel((x, y)) > 200 and math.hypot(x - c, y - c) > d / 2]
+    for _ in range(9):
+        x, y = rng.choice(room)
+        heading = rng.uniform(0, 2 * math.pi)
+        points = [(x, y)]
+        for _ in range(rng.randrange(3, 6)):
+            heading += rng.uniform(-0.8, 0.8)
+            step = rng.uniform(8, 16) * k
+            points.append((points[-1][0] + step * math.cos(heading), points[-1][1] + step * math.sin(heading)))
+        draw.line(points, fill=rng.randrange(120, 200), width=round(2 * k))
+    body = ImageChops.subtract(body, cracks.filter(ImageFilter.GaussianBlur(0.6 * k)).point(lambda v: v * 100 // 255))
+    lid = Image.new("L", (n, n), 0)
+    ImageDraw.Draw(lid).line(top, fill=255, width=round(15 * k), joint="curve")
+    lid = lid.filter(ImageFilter.GaussianBlur(2 * k))
+    # (Its edge as the portrait rings have theirs: a band as thick as theirs on screen,
+    # worn metal, raised and cracked, with a thin dark line just outside it.)
+    band = Image.new("L", (n, n), 0)
+    ImageDraw.Draw(band).line(outline + [outline[0]], fill=255, width=round(0.08 * d), joint="curve")
+    band = ImageChops.multiply(band, shape)
+    rim_line = Image.new("L", (n, n), 0)
+    ImageDraw.Draw(rim_line).line(outline + [outline[0]], fill=255, width=22, joint="curve")
+    black, clear = Image.new("L", (n, n), 0), Image.new("RGBA", (n, n), (0, 0, 0, 0))
+
+    def layer(grey, alpha):
+        g = grey if isinstance(grey, Image.Image) else Image.new("L", (n, n), grey)
+        return Image.merge("RGBA", (g, g, g, alpha))
+    out = Image.alpha_composite(clear, layer(black, shape.filter(ImageFilter.GaussianBlur(18)).point(lambda v: v * 110 // 255)))
+    out = Image.alpha_composite(out, layer(body, shape.point(lambda v: v * 215 // 255)))
+    out = Image.alpha_composite(out, layer(10, lid))
+    out = Image.alpha_composite(out, layer(black, rim_line.point(lambda v: v * 190 // 255)))
+    out = out.resize((256, 256), Image.LANCZOS)
+    out = Image.alpha_composite(out, worn(band.resize((256, 256), Image.LANCZOS), sum(ord(ch) for ch in "Eye")))
+    out.save(os.path.join(OUT, "PortraitBackEye.tga"), compression=None)
+    # (Mist: soft wisps that meet themselves at every edge, so it can drift for ever.)
+    m = 128
+    rng = random.Random(31)
+    seeds = Image.new("L", (m, m))
+    seeds.putdata([rng.randrange(256) for _ in range(m * m)])
+    big = Image.new("L", (m * 3, m * 3))
+    for tx in range(3):
+        for ty in range(3):
+            big.paste(seeds, (tx * m, ty * m))
+    wisps = big.filter(ImageFilter.GaussianBlur(7)).crop((m, m, 2 * m, 2 * m))
+    lo, hi = wisps.getextrema()
+    wisps = wisps.point(lambda v: min(255, max(0, (v - lo) * 255 // max(1, hi - lo) - 110) * 2))
+    white(wisps).save(os.path.join(OUT, "PortraitBackEyeMist.tga"), compression=None)
 
 
 def cracked(alpha, seed):
@@ -454,6 +541,7 @@ def main():
     sheen()
     collar()
     frame_shadow()
+    eye_back()
     bars()
     panels()
     tail()

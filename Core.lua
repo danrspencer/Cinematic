@@ -491,6 +491,10 @@ DEFAULTS.fishRightClickReel = true -- right-click, the Fishing action bar key an
 DEFAULTS.fishRecastDelay = 0.3    --...seconds after a cast ends before it does
 DEFAULTS.fishMissPause = 30        -- ...seconds it stands aside after a cast misses the water
 DEFAULTS.hideFishingCastBar = true -- no cast bar while it shows Fishing (other spells still show it)
+DEFAULTS.fishVolume = false        -- while fishing, the game's volumes go up to these (never down)...
+DEFAULTS.fishMasterVolume = 1      -- ...master volume (0 to 1)
+DEFAULTS.fishSfxVolume = 1         -- ...sound effects volume (the splash of a bite)
+DEFAULTS.fishVolumeBackground = true -- ...and sound plays with the game in the background
 DEFAULTS.fishGamepadCast = true    -- in gamepad mode, a gamepad button casts as right-click does...
 DEFAULTS.fishGamepadKey = "PAD3"   -- ...this one (the left face button: X on an Xbox pad, square on a PlayStation one)
 DEFAULTS.gamepadPressReveal = true -- a gamepad button press shows its action bars for the mouseover time
@@ -563,8 +567,10 @@ ns.EFFECT_GRID = { "letterbox", "tint", "vignette", "weather" }
 -- The Tooltips page's parts grid (TooltipParts.lua): each part shows on
 -- first hover (tooltipShow<part>First) and after tooltipFullAfter seconds
 -- (...Later). To start with, just the border at first and all after.
-ns.TOOLTIP_PARTS = { "Border", "Health", "Guild", "Level", "Spec", "Type", "Corpse", "Faction", "Rep", "Threat",
-	"Quest", "ObjQuest" }
+-- (Level: units you can't attack; LevelEnemy: ones you can. Hint: the
+-- "<Right click for Frame Settings>" line on unit frames' tooltips.)
+ns.TOOLTIP_PARTS = { "Border", "Health", "Guild", "Level", "LevelEnemy", "Spec", "Type", "Corpse", "Faction", "Rep",
+	"Threat", "Quest", "ObjQuest", "Hint" }
 for _, part in ipairs(ns.TOOLTIP_PARTS) do
 	DEFAULTS["tooltipShow" .. part .. "First"] = part == "Border"
 	DEFAULTS["tooltipShow" .. part .. "Later"] = true
@@ -1426,6 +1432,14 @@ DEFAULTS.raidStylePartySame = true
 -- Action bars tab; Frames.lua's ns.ApplyHideKeybinds)
 DEFAULTS.hideKeybinds = false
 DEFAULTS.hideMacroText = false -- (and the macro names on them)
+-- The game's breath, fatigue and Feign Death bars (Standard Frames page,
+-- Trackers tab; MirrorTimerStyle.lua): hidden always, their words hidden,
+-- their fill ("game" or a Style texture), their words' font and size.
+DEFAULTS.mirrorHide = false
+DEFAULTS.mirrorHideText = false
+DEFAULTS.mirrorTexture = "game"
+DEFAULTS.mirrorFont = "game"
+DEFAULTS.mirrorTextScale = 1
 -- And rows of our own: a class icon by friendly and by enemy players' health
 -- bars (as Duel Vision shows), and a role icon by group members' (tank,
 -- healer, damage), and a quest icon by quest mobs' (see QuestMobs), and an
@@ -5243,6 +5257,17 @@ ticker:SetScript("OnEvent", ns.Profiled("Core events", function(self, event, arg
 			end
 			ns.db.bossDownWaitV1 = true
 		end
+		-- Your target's name (Nameplates page, Target: Names) up always in the
+		-- Cinema profile now: it goes as your profile has it, and saved profiles
+		-- drop theirs, to follow their base. Once.
+		if not ns.db.targetNameCinemaV1 then
+			local base = ns.ProfileBase and ns.ProfileBase() or DEFAULTS
+			ns.db.nameAlwaysYourTarget = base.nameAlwaysYourTarget and true or false
+			for _, saved in pairs(ns.db.profiles or {}) do
+				if type(saved) == "table" then saved.nameAlwaysYourTarget = nil end
+			end
+			ns.db.targetNameCinemaV1 = true
+		end
 		-- The copy chat button off to start with now: other chat addons have
 		-- their own. Off in every profile. Once: tick it again and it stays.
 		if not ns.db.chatCopyOffV1 then
@@ -5267,6 +5292,26 @@ ticker:SetScript("OnEvent", ns.Profiled("Core events", function(self, event, arg
 				end
 			end
 			ns.db.keepGatheringOnV1 = true
+		end
+		-- The Tooltips page's Level row split in two, for friends and enemies:
+		-- the enemies' row starts as the Level row was set, here and in saved
+		-- profiles. Once.
+		if not ns.db.tooltipLevelEnemyV1 then
+			local function Copy(t)
+				for _, column in ipairs({ "First", "Later" }) do
+					if t["tooltipShowLevel" .. column] ~= nil then
+						t["tooltipShowLevelEnemy" .. column] = t["tooltipShowLevel" .. column]
+					end
+				end
+			end
+			Copy(ns.db)
+			for _, saved in pairs(ns.db.profiles or {}) do
+				if type(saved) == "table" then
+					Copy(saved)
+					if type(saved.settings) == "table" then Copy(saved.settings) end
+				end
+			end
+			ns.db.tooltipLevelEnemyV1 = true
 		end
 		-- The dev copy starts with it on, now its tick shows there too. Once: untick
 		-- it and it stays.
