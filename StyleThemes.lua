@@ -541,13 +541,13 @@ function ns.ThemePortraitOut(shape)
 	return PORTRAIT_ART[shape] and SHAPES .. "Portrait" .. PORTRAIT_ART[shape] .. "Out"
 end
 -- Art behind a theme's portrait and under its rows (Void Whisper's eye): nil for none.
--- Made round a circle, so for a circle only. Its file, its shape's mask, and the mist
--- that drifts in it.
+-- Made round a circle, so for a circle only. Its file, its shape's mask, the mist
+-- that drifts in it, and its vessels' glow.
 function ns.ThemePortraitBack(shape)
 	local back = Active().portraitBack
 	if not (back and shape == "circle") then return nil end
 	local file = SHAPES .. "PortraitBack" .. back
-	return file, file .. "Mask", file .. "Mist"
+	return file, file .. "Mask", file .. "Mist", file .. "Veins"
 end
 function ns.ThemePortraitRing(shape)
 	if shape == "circle" then return SHAPES .. "PortraitCircleRing" end

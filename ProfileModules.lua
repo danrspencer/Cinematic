@@ -406,11 +406,11 @@ ns.PROFILE_MODULES = {
 	-- (Not Duel, Tele or Emote Vision, or the Cards page: they only show for
 	-- a moment, and every profile has them. Nor Quest Vision: every profile has it.)
 	-- (Vitals and Damage Vision are off to start with: their modules turn them on.)
-	{ key = "no-visions", name = "No visions", scope = { "Heal Vision", "Roll Vision" },
-		tip = "The visions that change your UI and are on to start with, off: Heal and Roll Vision.",
+	{ key = "no-visions", name = "No visions", scope = { "Heal Vision" },
+		tip = "The visions that change your UI and are on to start with, off: Heal Vision. (Not Roll Vision: " ..
+			"every profile has it, and it stays away while another roll addon is in use.)",
 		apply = function(set)
 			set("handleHealVision", false)
-			set("rollWindow", false)
 		end },
 	{ key = "pure-tooltips", name = "Cinema: tooltips", scope = { "Tooltips" },
 		tip = "The Tooltips page on: shown all through CineMode, fights too; no Mouse still.",

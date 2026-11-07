@@ -31,7 +31,8 @@ local function PrintHelp()
 	logPrints = false
 	ns.Print(L["commands"])
 	Heading(L["General"])
-	Command("/cine", L["toggle CineMode (also /cine on, /cine off)"])
+	Command("/cine", L["toggle CineMode"])
+	Command("/cine off", L["turn Cinematic off completely: asks, then turns it off in the AddOns list and reloads"])
 	Command("/cine config", L["open the settings"])
 	Command("/cine find <words>", L["open the settings at the setting or page with those words, e.g. /cine find minimap"])
 	Command("/cine find <page>||<page> <words>", L["look only on those pages, e.g. /cine find Style||Names fade time"])
@@ -45,6 +46,7 @@ local function PrintHelp()
 	Command("/cine export", L["share the active profile as text to copy"])
 	Command("/cine import", L["add a profile someone shared with you"])
 	Command("/cine welcome", L["the welcome window, to pick a profile"])
+	Command("/cine keys [words]", L["show or hide the keyboard map: what each of your keys does (with words: find them on it)"])
 	if ns.ToggleTalentCalc then
 		Command("/cine talents", L["the talent calculator, to plan a build"])
 	end
@@ -123,6 +125,7 @@ local function PrintDebugHelp()
 	print("  /cine debug unitframes - log every part of the player, pet, target and focus frames (names, textures, sizes, held hidden) to the saved log")
 	print("  /cine debug plates - nameplate settings, and how the plates (and your target) are sorted")
 	print("  /cine debug spec - every way this client might tell your spec, and what each says")
+	print("  /cine debug keys - the keyboard map's layout and layer, and what each bound key counts as")
 	print("  /cine debug rolls - Roll Vision's settings and every drop in the loot history with its picks")
 	print("  /cine debug textures - a strip of every bar texture the Style pages offer, to see which this client has")
 	print("  /cine debug fonts - every font other addons share, and which are left out (no small letters)")
@@ -285,7 +288,7 @@ local function HandleSlash(msg)
 		ns.Print("detailed logging (game settings, music): " .. OnOff(ns.db.logDetail) ..
 			(ns.db.logDetail and ". Reproduce the problem, then /cine log." or ""))
 	elseif cmd == "" or cmd == "toggle" then
-		Cinematic_Toggle()
+		Cinematic_ToggleCineMode() -- (as the help says; /cine off is Cinematic off)
 	elseif cmd == "config" or cmd == "options" then
 		ns.OpenOptions()
 	elseif cmd == "find" then
@@ -301,9 +304,11 @@ local function HandleSlash(msg)
 				ns.Print(L["nothing in the settings matches \"%s\""]:format(words))
 			end
 		end
-	elseif cmd == "on" or cmd == "off" then
-		ns.SetEnabled(cmd == "on")
-		ns.Print(ns.db.enabled and L["enabled"] or L["disabled"])
+	elseif cmd == "off" then
+		ns.TurnOffCompletely() -- (asks, then off in the AddOns list and a reload)
+	elseif cmd == "on" then
+		ns.SetEnabled(true)
+		ns.Print(L["enabled"])
 		if ns.IsSuspended() then
 			ns.Print(L["(still stopped after an error: /cine resume starts it again)"])
 		end
@@ -370,6 +375,12 @@ local function HandleSlash(msg)
 		Cinematic_FlyBy()
 	elseif cmd == "hideui" then
 		Cinematic_ToggleUI()
+	elseif (cmd == "keys" or cmd == "keyboard") and arg ~= "" then
+		ns.KeyboardMapSearch(arg)
+	elseif cmd == "keys" or cmd == "keyboard" then
+		ns.KeyboardMapToggle()
+	elseif cmd == "debug" and arg == "keys" then
+		ns.KeyboardMapDebug()
 	elseif cmd == "debug" and arg == "spec" then
 		ns.SpecDebug()
 	elseif cmd == "debug" and arg == "rolls" and ns.RollDebug then

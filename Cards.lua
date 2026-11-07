@@ -169,7 +169,7 @@ local FIELDS = {
 	{ "OffsetX", { "combatOffsetX" }, 0 },       -- moved right (left below 0), a share of the screen's width
 	{ "OffsetY", { "combatOffsetY" }, 0 },       -- ...and up, a share of its height
 	{ "BarScale", { "combatBarScale" }, 0.5 },   -- in a bar: the words' height, a share of the bar's
-	{ "BarFallback", { "combatBarFallback" }, true }, -- in a bar with no letterbox up: the lower third
+	{ "BarFallback", { "combatBarFallback" }, "third" }, -- in a bar with no letterbox up: "bar" (one of its own), "third", "screen"
 	{ "Style", { "combatStyle" }, "chapter" },   -- "title", "subtitle", "chapter" or "banner"
 	{ "Anim", { "combatAnim" }, "track" },       -- "fade", "reveal", "track" or "type"
 	{ "Font", { "combatFont" }, "general" },     -- QUEST_ITEM_FONTS (general: General's)
@@ -229,15 +229,15 @@ local STYLES = {
 	-- (Its words drawn at the chapter line's 65%: 52 for them to read.)
 	{ id = "place", name = "Place", look = { Size = 52, Outline = 1, SmallSize = 1.3, R = 0.95, G = 0.88, B = 0.65,
 		PulseR = 0.95, PulseG = 0.88, PulseB = 0.65 } },
-	{ id = "ticker", name = "Ticker", look = { Place = "top", Align = "left", BarScale = 0.55, BarFallback = false,
+	{ id = "ticker", name = "Ticker", look = { Place = "top", Align = "left", BarScale = 0.55, BarFallback = "bar",
 		Style = "title", Anim = "fade", Outline = 1, Hold = 2.5, SmallColor = "custom", SmallR = 1, SmallG = 0.82,
 		SmallB = 0.35, R = 0.95, G = 0.88, B = 0.65 } },
-	{ id = "danger", name = "Danger", look = { Place = "top", BarScale = 0.62, BarFallback = false, Style = "title",
+	{ id = "danger", name = "Danger", look = { Place = "top", BarScale = 0.62, BarFallback = "bar", Style = "title",
 		Anim = "fade", Size = 34, Outline = 1, R = 0.89, G = 0.13, B = 0.22, Hold = 1.5, Pulse = 0.03 } },
 	{ id = "third", name = "Lower third", look = { Outline = 0 } },
-	{ id = "combat", name = "Combat", look = { Place = "top", BarScale = 0.62, BarFallback = false, Style = "title",
+	{ id = "combat", name = "Combat", look = { Place = "top", BarScale = 0.62, BarFallback = "bar", Style = "title",
 		Anim = "fade", Size = 34, R = 0.89, G = 0.13, B = 0.22, Hold = 1, Pulse = 0.03 } },
-	{ id = "respite", name = "Respite", look = { Place = "top", BarScale = 0.62, BarFallback = false, Style = "title",
+	{ id = "respite", name = "Respite", look = { Place = "top", BarScale = 0.62, BarFallback = "bar", Style = "title",
 		Anim = "fade", Size = 34, Outline = 1, R = 0.71, G = 0.73, B = 0.51, Hold = 1, Pulse = 0.01, PulseR = 0.71, PulseG = 0.73,
 		PulseB = 0.51 } }, -- (#B5BA81)
 	{ id = "boss", name = "Boss", look = { BarScale = 0.62, Size = 44, Outline = 0, R = 0.85, G = 0.71, B = 0.35,
@@ -297,6 +297,9 @@ for _, event in ipairs(EVENTS) do
 end
 DEFAULTS.cardAlign_rested = "center" -- (the Ticker's top bar, in its middle)
 DEFAULTS.cardAlign_streak = "center"
+-- (Entering and Leaving combat with no letterbox up: the middle of the screen.)
+DEFAULTS.cardBarFallback_combatIn = "screen"
+DEFAULTS.cardBarFallback_combatOut = "screen"
 
 -- All the cards bigger or smaller (their words' size, not a bar's): for a
 -- big or wide screen.
@@ -822,7 +825,7 @@ end
 local OLD_LOOKS = {
 	combatIn = { Place = { "combatPlace", "top" }, BarScale = { "combatBarScale", 0.62 },
 		Align = { "combatAlign", "center" }, Style = { "combatStyle", "title" }, Anim = { "combatAnim", "fade" },
-		BarFallback = { "combatBarFallback", false }, Font = { "combatFont", "general" }, Size = { "combatSize", 34 },
+		BarFallback = { "combatBarFallback", "bar" }, Font = { "combatFont", "general" }, Size = { "combatSize", 34 },
 		Outline = { "combatOutline", -1 }, Shadow = { "combatShadow", "general" },
 		OutlineRGB = { "combatOutline", { 0, 0, 0 } }, RGB = { "combatIn", { 0.89, 0.13, 0.22 } },
 		Hold = { "combatHoldIn", 1 }, Pulse = { "combatPulseIn", 0.03 },
@@ -830,7 +833,7 @@ local OLD_LOOKS = {
 		Icon = { "combatIconIn", "Interface\\Icons\\Ability_DualWield" } },
 	combatOut = { Place = { "combatPlace", "top" }, BarScale = { "combatBarScale", 0.62 },
 		Align = { "combatAlign", "center" }, Style = { "combatStyle", "title" }, Anim = { "combatAnim", "fade" },
-		BarFallback = { "combatBarFallback", false }, Font = { "combatFont", "general" }, Size = { "combatSize", 34 },
+		BarFallback = { "combatBarFallback", "bar" }, Font = { "combatFont", "general" }, Size = { "combatSize", 34 },
 		Outline = { "combatOutline", -1 }, Shadow = { "combatShadow", "general" },
 		OutlineRGB = { "combatOutline", { 0, 0, 0 } }, RGB = { "combatOut", { 0.49, 0.67, 0.73 } },
 		Hold = { "combatHoldOut", 1 }, Pulse = { "combatPulseOut", 0.01 },
@@ -838,7 +841,7 @@ local OLD_LOOKS = {
 		Icon = { "combatIconOut", 132320 } },
 	boss = { Place = { "combatBossPlace", "third" }, BarScale = { "combatBossBarScale", 0.62 },
 		Align = { "combatBossAlign", "center" }, Style = { "combatBossStyle", "chapter" },
-		Anim = { "combatBossAnim", "track" }, BarFallback = { "combatBossBarFallback", true },
+		Anim = { "combatBossAnim", "track" }, BarFallback = { "combatBossBarFallback", "third" },
 		Font = { "combatBossFont", "general" }, Size = { "combatBossSize", 44 }, Outline = { "combatBossOutline", -1 },
 		Shadow = { "combatBossShadow", "general" }, OutlineRGB = { "combatBossOutline", { 0, 0, 0 } },
 		RGB = { "combatBoss", { 0.85, 0.71, 0.35 } }, Hold = { "combatBossHold", 2.5 }, Pulse = { "combatBossPulse", 0 },

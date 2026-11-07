@@ -379,7 +379,6 @@ Subtle|fadeUI=false
 Subtle|handleHealVision=false
 Subtle|musicInCinematic=false
 Subtle|quietShow.effect:letterbox=false
-Subtle|rollWindow=false
 Subtle|sceneOffCampfire=true
 Subtle|sceneOffChair=true
 Subtle|sceneOffDance=true

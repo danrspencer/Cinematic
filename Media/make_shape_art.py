@@ -229,12 +229,117 @@ def noise(size, seed, blur):
     return im.point(lambda v: (v - low) * 255 // max(1, high - low))
 
 
+def eye_iris(n, c, d, a, shape):
+    """What's in Void Whisper's eye, round the circle (radius d/2): fine fibers
+    reaching out from it, faintly wavy, and a few vessels winding in from the edge,
+    branching and thinning to a hair, each with a lighter core. Kept inside the worn
+    edge. Gives (fibers, vessels, cores, halo, room) as numpy arrays: fibers about -3
+    to 3 (dark below 0, light above), the rest 0 to 1."""
+    import numpy as np
+    rc = d / 2
+    f = rc / 164  # (the mockup's scale: its numbers below)
+    # (Room: inside the eye's worn edge, out of the circle.)
+    small = shape.resize((n // 4, n // 4), Image.BILINEAR).point(lambda v: 255 if v > 128 else 0)
+    inner = small.filter(ImageFilter.MinFilter(2 * round(12 * f / 4) + 1)).resize((n, n), Image.BILINEAR)
+    hole = Image.new("L", (n, n), 255)
+    ImageDraw.Draw(hole).ellipse((c - rc * 0.99, c - rc * 0.99, c + rc * 0.99, c + rc * 0.99), fill=0)
+    inner = ImageChops.multiply(inner, hole)
+    room = np.asarray(inner.filter(ImageFilter.GaussianBlur(2 * f)), np.float32) / 255
+
+    def free(x, y):
+        return inner.getpixel((int(x), int(y))) if 0 <= x < n and 0 <= y < n else 0
+    ys, xs = np.mgrid[0:n, 0:n].astype(np.float32)
+    rho = np.hypot(xs - c, ys - c)
+    theta = np.arctan2(ys - c, xs - c)
+
+    def streaks(count, blur, seed, wiggle):
+        v = np.random.default_rng(seed).random(count)
+        kernel = np.exp(-0.5 * (np.arange(-3 * blur, 3 * blur + 1) / blur) ** 2)
+        kernel /= kernel.sum()
+        pad = len(kernel)
+        v = np.convolve(np.concatenate([v[-pad:], v, v[:pad]]), kernel, "same")[pad:-pad]
+        v = (v - v.min()) / (v.max() - v.min())
+        s = rho / f
+        t = theta + wiggle * (np.sin(s * 0.03 + theta * 37 + seed) + 0.6 * np.sin(s * 0.075 + theta * 91 + 2 * seed)
+                              + 0.4 * np.sin(s * 0.16 + theta * 13))
+        i = ((t / (2 * np.pi)) % 1) * count
+        lo, part = i.astype(int) % count, i - np.floor(i)
+        return v[lo] * (1 - part) + v[(lo + 1) % count] * part
+    reach = (np.clip((rho - rc * 0.99) / (rc * 0.03), 0, 1)
+             * np.clip(1 - (rho - rc) / (rc * 0.75), 0, 1) ** 1.3)
+    field = 0.6 * streaks(2600, 1.1, 3, 0.007) + 0.4 * streaks(700, 1.5, 5, 0.012)
+    fibers = (field - field.mean()) / field.std() * reach * room
+    # (Vessels: smooth winding paths, each bend easing into the next, drawn as tapered
+    # strips at twice the size.)
+    rng = random.Random(15)
+    S = 2
+    body, core = Image.new("L", (n * S, n * S), 0), Image.new("L", (n * S, n * S), 0)
+    draws = (ImageDraw.Draw(body), ImageDraw.Draw(core))
+
+    def strip(draw, points, widths, scale):
+        for (x0, y0), (x1, y1), w0, w1 in zip(points, points[1:], widths, widths[1:]):
+            side = math.atan2(y1 - y0, x1 - x0) + math.pi / 2
+            cs, sn = math.cos(side), math.sin(side)
+            h0, h1 = w0 * scale / 2, w1 * scale / 2
+            draw.polygon([((x0 + cs * h0) * S, (y0 + sn * h0) * S), ((x1 + cs * h1) * S, (y1 + sn * h1) * S),
+                          ((x1 - cs * h1) * S, (y1 - sn * h1) * S), ((x0 - cs * h0) * S, (y0 - sn * h0) * S)],
+                         fill=255)
+            draw.ellipse(((x1 - h1) * S, (y1 - h1) * S, (x1 + h1) * S, (y1 + h1) * S), fill=255)
+
+    def grow(x, y, heading, width, length, depth):
+        points, widths = [(x, y)], [width]
+        curve = rng.uniform(-0.05, 0.05)
+        steps = max(6, int(length / (2 * f)))
+        for step in range(steps):
+            near = min(1, max(0, (math.hypot(x - c, y - c) - rc) / (rc * 0.12)))
+            left = (1 - step / steps) * near
+            if left < 0.04:
+                break
+            curve = max(-0.14, min(0.14, curve * 0.9 + rng.uniform(-0.05, 0.05)))
+            toward = math.atan2(c - y, c - x)
+            heading += curve + math.atan2(math.sin(toward - heading), math.cos(toward - heading)) * 0.015
+            nx, ny = x + 2 * f * math.cos(heading), y + 2 * f * math.sin(heading)
+            if free(nx, ny) < 90:
+                break
+            x, y = nx, ny
+            points.append((x, y))
+            widths.append(max(0.5 * f, width * left ** 0.75))
+            if depth < 3 and step > 5 and rng.random() < 0.075:
+                grow(x, y, heading + rng.choice((-1, 1)) * rng.uniform(0.4, 0.8), widths[-1] * 0.7,
+                     length * left * 0.6, depth + 1)
+        if len(points) > 2:
+            strip(draws[0], points, widths, 1.0)
+            strip(draws[1], points, widths, 0.4)
+    for out in (-1, 1):
+        base = math.pi if out < 0 else 0
+        for i in range(9):
+            t = base + (-1 + i / 4) * 1.1 + rng.uniform(-0.1, 0.1)
+            for dist in range(int(a), int(rc), -2):
+                x, y = c + dist * math.cos(t), c + dist * math.sin(t)
+                if free(x, y) > 200:
+                    break
+            else:
+                continue
+            grow(x, y, math.atan2(c - y, c - x) + rng.choice((-1, 1)) * rng.uniform(0.7, 1.1),
+                 rng.uniform(3, 4.2) * f, rng.uniform(110, 210) * f, 0)
+    got = []
+    for im in (body, core):
+        im = im.filter(ImageFilter.GaussianBlur(0.8 * S * f)).resize((n, n), Image.LANCZOS)
+        got.append(np.asarray(ImageChops.multiply(im, shape), np.float32) / 255)
+    halo = Image.fromarray(np.uint8(got[0] * 255)).filter(ImageFilter.GaussianBlur(4 * f))
+    return fibers, got[0], got[1], np.asarray(halo, np.float32) / 255, room
+
+
 def eye_back():
     """Void Whisper's eye: behind a circle portrait, wider than it, a point out to each
     side and a dark upper lid. The circle is 1/1.75 of it across (EYE_SPAN in
     UnitStyle.lua). Grey, tinted to the ring's color; its shadow black. Shaded as a
     lid: lighter round the circle, dark toward its points, the upper lid's shadow
-    falling in and a little light on the lower rim; grit and hairline cracks.
+    falling in and a little light on the lower rim; grit. In it fine fibers reach out
+    from the circle and a few dark vessels wind in from the edge (eye_iris), with a
+    soft gloss up top.
+    PortraitBackEyeVeins.tga: the vessels and the fibers by the circle, white, for
+    their glow in fights and at low health.
     PortraitBackEyeMask.tga: its shape, for the mist drifting in it.
     PortraitBackEyeMist.tga: the mist, 128x128, wisps that tile."""
     n = 256 * 4
@@ -263,21 +368,26 @@ def eye_back():
     patches = noise((n // 4, n // 4), 21, 3).resize((n, n), Image.BICUBIC).point(lambda v: max(0, v - 110) * 2)
     fine = noise((n, n), 11, 1.2 * k).point(lambda v: max(0, v - 140) * 2)
     body = ImageChops.subtract(body, ImageChops.multiply(fine, patches).point(lambda v: v * 60 // 255))
-    rng = random.Random(7)
-    cracks = Image.new("L", (n, n), 0)
-    draw = ImageDraw.Draw(cracks)
-    room = [(x, y) for y in range(0, n, 6) for x in range(0, n, 6)
-            if shape.getpixel((x, y)) > 200 and math.hypot(x - c, y - c) > d / 2]
-    for _ in range(9):
-        x, y = rng.choice(room)
-        heading = rng.uniform(0, 2 * math.pi)
-        points = [(x, y)]
-        for _ in range(rng.randrange(3, 6)):
-            heading += rng.uniform(-0.8, 0.8)
-            step = rng.uniform(8, 16) * k
-            points.append((points[-1][0] + step * math.cos(heading), points[-1][1] + step * math.sin(heading)))
-        draw.line(points, fill=rng.randrange(120, 200), width=round(2 * k))
-    body = ImageChops.subtract(body, cracks.filter(ImageFilter.GaussianBlur(0.6 * k)).point(lambda v: v * 100 // 255))
+    # (Fibers, vessels and gloss: what's in it.)
+    import numpy as np
+    fibers, vessels, cores, halo, room = eye_iris(n, c, d, a, shape)
+    rc = d / 2
+    ys, xs = np.mgrid[0:n, 0:n].astype(np.float32)
+    gloss = np.exp(-(((xs - (c - rc * 1.05)) / (rc * 0.55)) ** 2 + ((ys - (c - rc * 0.62)) / (rc * 0.28)) ** 2)) * room
+    spot = np.exp(-(((xs - (c - rc * 1.2)) / (rc * 0.09)) ** 2 + ((ys - (c - rc * 0.5)) / (rc * 0.06)) ** 2)) * room
+    light = np.clip((fibers - 0.3) * 0.32, 0, 1)
+    grey = np.asarray(body, np.float32)
+    grey *= 1 - 0.55 * np.clip(-fibers * 0.3, 0, 1)
+    grey += 150 * 0.35 * light
+    grey = grey * (1 - 0.6 * vessels) + 30 * 0.6 * vessels
+    grey += 45 * 0.3 * cores
+    grey += 150 * 0.22 * gloss + 240 * 0.6 * spot
+    body = Image.fromarray(np.uint8(np.clip(grey, 0, 255)))
+    # (The glow: the vessels, their core brighter, a soft halo; the light fibers, most by the circle.)
+    near = np.clip(1 - (np.hypot(xs - c, ys - c) - rc * 0.99) / (rc * 0.28), 0, 1) ** 2 * room
+    glow = np.maximum.reduce([vessels * 0.8, cores, halo * 0.55, light * (0.5 + near)])
+    white(Image.fromarray(np.uint8(np.clip(glow, 0, 1) * 255)).resize((256, 256), Image.LANCZOS)).save(
+        os.path.join(OUT, "PortraitBackEyeVeins.tga"), compression=None)
     lid = Image.new("L", (n, n), 0)
     ImageDraw.Draw(lid).line(top, fill=255, width=round(15 * k), joint="curve")
     lid = lid.filter(ImageFilter.GaussianBlur(2 * k))

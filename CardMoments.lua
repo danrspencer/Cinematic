@@ -721,7 +721,7 @@ samples.revived = function() return ReviveCard() end
 local match = { started = false, ended = false }
 -- (The result in the top bar's middle: the game's scoreboard takes the
 -- middle of the screen as a match ends.)
-local RESULT_LOOK = { Place = "top", Align = "center", BarScale = 0.62, BarFallback = false }
+local RESULT_LOOK = { Place = "top", Align = "center", BarScale = 0.62, BarFallback = "bar" }
 local function BattleCard(moment, name)
 	if moment == "start" then return { meta = L["Battleground"], name = name, sub = L["The battle begins"] } end
 	local card = { meta = name, name = moment == "won" and L["Victory"] or L["Defeat"], sub = name,

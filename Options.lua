@@ -1502,8 +1502,19 @@ local function CreatePanel()
 	-- Left column: general
 	local general = Header(panel, L["General"], subtitle, -54)
 
-	local enabled = Check(panel, "enabled", L["Enable Cinematic"],
-		L["Also toggled with /cine or the keybind under Key Bindings > AddOns."], ns.SetEnabled)
+	local enabled
+	enabled = Check(panel, "enabled", L["Enable Cinematic"],
+		L["Off turns Cinematic off completely: it asks, then turns it off in the game's AddOns list and " ..
+		"reloads, so nothing of it runs. Tick it in the AddOns list to bring it back. Also with /cine."],
+		function(value)
+			if value then
+				ns.SetEnabled(true)
+			else
+				-- (Stays ticked till the reload; ticked again if you cancel.)
+				enabled:SetChecked(true)
+				ns.TurnOffCompletely()
+			end
+		end)
 	enabled:SetPoint("TOPLEFT", general, "BOTTOMLEFT", -2, -6)
 
 	local fadeUI = Check(panel, "fadeUI", L["Start in CineMode (fade UI, queue music, etc.)"],
@@ -1842,9 +1853,9 @@ do
 		-- (section: its pages on a band in its color, its name above it; all in
 		-- one row: the HUD's frames, then what floats over heads in the world.
 		-- The picked page's band in gold, the rest faded. Cinematic's own looks
-		-- are Style tabs on their own pages. under: in the settings list under
-		-- UI Manager, not under Cinematic.)
-		{ name = "Style", under = "UI Manager", colors = {
+		-- are Style tabs on their own pages. after: listed right after UI
+		-- Manager, at the same level.)
+		{ name = "Style", after = "UI Manager", colors = {
 			HUD = { 0.35, 0.6, 0.9 }, Overhead = { 0.65, 0.45, 0.9 },
 		}, pages = {
 			{ "Style General", "Interface\\Icons\\INV_Misc_Gear_08", label = "General" },
@@ -1896,9 +1907,9 @@ do
 			{ "General", "Interface\\Icons\\INV_Misc_Bag_07" },
 			{ "Fishing", "Interface\\Icons\\Trade_Fishing", section = "Helpers" },
 			{ "Hunter", "Interface\\Icons\\INV_Weapon_Bow_07", section = "Helpers" },
+			{ "Keyboard Map", "Interface\\Icons\\INV_Misc_Note_06", section = "Helpers" }, -- (KeyboardMap.lua)
 		} },
-		-- (WheelsPage.lua's pages; listed under Quality of life, as Style is under
-		-- UI Manager. The master wheel first, plain; the wheels it opens on a band.)
+		-- (WheelsPage.lua's pages; listed under Quality of life. The master wheel first, plain; the wheels it opens on a band.)
 		{ name = "Wheels", under = "Quality of life", colors = { Wheels = { 0.65, 0.45, 0.9 } }, pages = {
 			{ "Master wheel", "Interface\\Icons\\Spell_Nature_WispSplode" },
 			{ "Your wheels", "Interface\\Icons\\INV_Misc_Note_01" },
@@ -2094,10 +2105,12 @@ do
 
 	-- (made when its first page comes, so it's listed where that page would be)
 	local function CreateHub(hub)
-		-- (hub.under: listed under that hub, made first, not under Cinematic)
+		-- (hub.under: listed under that hub, made first, not under Cinematic.
+		-- hub.after: that hub made first, so this one is listed right after it.)
 		local parentHub
 		for _, each in ipairs(HUBS) do
 			if each.name == hub.under then parentHub = each end
+			if each.name == hub.after and not each.frame then CreateHub(each) end
 		end
 		if parentHub and not parentHub.frame then CreateHub(parentHub) end
 		local frame = CreateFrame("Frame")
@@ -12386,6 +12399,14 @@ local function CreateVisionPanel()
 			"when you turn this back on."], note, function() ns.RefreshRollWindow() end)
 		stack = Stack(rollSwitch, "check")
 		local function RollsOn(db) return db.rollWindow end
+		local rollFade = stack:Add(Check(content, "rollFade", L["Fade if another addon competes"],
+			L["While another addon has the loot rolls (XLoot, ElvUI's Loot Roll, or any that takes over the " ..
+			"game's roll frames), the window stays away and leaves them to it. /cine rolls still opens it."],
+			function(value)
+				ns.GetDB().rollFade = value
+				ns.RefreshRollWindow()
+			end), "check")
+		GreyUnless(rollFade, RollsOn)
 		local QUALITIES = {
 			{ value = 2, text = L["Uncommon and up"] },
 			{ value = 3, text = L["Rare and up"] },
@@ -14029,6 +14050,10 @@ local KEYBINDS = {
 			"life > General), what you had open opens again after."] },
 	{ action = "CINEMATIC_TOGGLESETTINGS", label = L["Toggle settings"],
 		tip = L["Opens Cinematic's settings at the page you were last on. Press it again to close them."] },
+	{ action = "CINEMATIC_KEYMAP", label = L["Keyboard map"],
+		tip = L["Hold to see your keyboard with what each key does (Shift, Ctrl and Alt show their keys too); let " ..
+			"go and it's gone. Tap it instead and it stays up till you press it again. Its settings are on " ..
+			"Quality of life > Keyboard Map."] },
 	{ action = "CLICK CinematicMasterWheelButton:LeftButton", label = L["Master wheel"], section = L["Wheels"],
 		tip = L["Hold to bring up a wheel of the wheels below (camera, menu, marker...): point at one and " ..
 			"let go to open it, then click what you want on it. Tap it instead and the wheel stays up for you " ..
@@ -16040,6 +16065,9 @@ ns.OnLanguage(function()
 	end
 	CreateFishingPanel()
 	CreateQualityPanel()
+	if ns.CreateKeyboardMapPage then -- (KeyboardMap.lua)
+		ns.CreateKeyboardMapPage(ns.lowHealthKit)
+	end
 	CreateKeybindsPanel()
 	-- Community, last (WhatsNew.lua, with the helpers it shares from here).
 	if ns.CreateWhatsNewPanels then

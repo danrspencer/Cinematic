@@ -422,8 +422,10 @@ local function DressBar(bar, view, r, g, b, tint, under)
 		if fill and fill.SetDesaturated then fill:SetDesaturated(true) end -- (a colored fill of the game's tints clean)
 		bar:SetStatusBarColor(r, g, b)
 		saved.colored = true
+		saved.want = { r, g, b }
 	elseif saved.colored then
 		saved.colored = nil
+		saved.want = nil
 		if saved.color then bar:SetStatusBarColor(unpack(saved.color)) end
 		if not saved.ours then
 			local fill = bar:GetStatusBarTexture()
@@ -439,6 +441,50 @@ local function DressBar(bar, view, r, g, b, tint, under)
 			skin:Hide()
 		end
 	end
+	dressing = false
+end
+
+-- A bar we've colored keeps it: on Forever the mana bar turns green now and then
+-- (full mana, a buff to max mana) by a way none of our setter hooks hear. Checked
+-- as its value changes, cheap: only the fill's color against ours. A bar left in
+-- the game's color that turns to one not its power's is dressed again (redress).
+local keepLogged = false
+local function KeepColor(bar, unit, redress)
+	if dressing then return end
+	local saved = own[bar]
+	if not saved then return end
+	local fill = bar:GetStatusBarTexture()
+	if not (fill and fill.GetVertexColor) then return end
+	local r, g, b, a = fill:GetVertexColor()
+	if not (Readable(r) and Readable(g) and Readable(b)) then return end
+	local want = saved.want
+	if not want then
+		if not redress or (r > 0.95 and g > 0.95 and b > 0.95) or not ns.StyleOn("ufStyle") then return end
+		local c = { r, g, b }
+		if PowerOwnColor(unit, c) then return end
+		-- (Once per color: a frame this page leaves alone isn't dressed every tick.)
+		local key = ("%.2f %.2f %.2f"):format(r, g, b)
+		if saved.redressed == key then return end
+		saved.redressed = key
+		if not keepLogged then
+			keepLogged = true
+			ns.Log("style", ("bar color changed outside our hooks: %.2f %.2f %.2f, dressed again"):format(r, g, b))
+		end
+		saved.color = c
+		redress()
+		return
+	end
+	local desat = fill.IsDesaturated and fill:IsDesaturated()
+	if math.abs(r - want[1]) < 0.02 and math.abs(g - want[2]) < 0.02 and math.abs(b - want[3]) < 0.02
+		and (desat == nil or desat) then return end
+	if not keepLogged then
+		keepLogged = true
+		ns.Log("style", ("bar color changed outside our hooks: %.2f %.2f %.2f, put back"):format(r, g, b))
+	end
+	dressing = true
+	if fill.SetDesaturated then fill:SetDesaturated(true) end
+	-- (Its alpha as it is: a fade stays.)
+	bar:SetStatusBarColor(want[1], want[2], want[3], Readable(a) and a or 1)
 	dressing = false
 end
 
@@ -644,8 +690,19 @@ local function FrameArt(frame)
 end
 
 local function DressFrameArt(frame, active)
-	local color = active and ns.ThemeRing()
+	local ring = active and ns.ThemeRing()
+	-- (The dragon by the portrait in the theme's color only for a plain elite: rares,
+	-- rare elites and bosses keep the game's own, its silver telling them apart.)
+	local holder = frame.TargetFrameContainer
+	local rank = holder and holder.BossPortraitFrameTexture
+	local plainElite = false
+	if rank and Readable(frame.unit) then
+		local ok, class = pcall(UnitClassification, frame.unit)
+		plainElite = ok and Readable(class) and class == "elite"
+	end
 	for _, art in ipairs(FrameArt(frame)) do
+		local color = ring
+		if art == rank and not plainElite then color = nil end
 		if not (art.IsForbidden and art:IsForbidden()) and (color or tinted[art]) then
 			-- (Its alpha as it is: left out, it'd be set to 1, undoing a frame's fade.)
 			local _, _, _, alpha = art:GetVertexColor()
@@ -1603,6 +1660,16 @@ local function DriftMist(back, elapsed)
 			* (0.6 + 0.4 * math.sin(t * way.breath * 2.3 + way.phase * 1.7))
 		mist:SetAlpha(math.min(1, (way.peak or MIST_PEAK) * (1 + 0.4 * unrest) * swell * swell))
 	end
+	-- (Its vessels: dark in the art when calm, glowing a little in a fight, and at low
+	-- health throbbing, faster the lower it goes.)
+	local veins = back.veins
+	if veins then
+		local fight = math.min(1, unrest * 2)
+		local low = math.max(0, unrest - 0.5) * 2
+		back.beat = ((back.beat or 0) + elapsed * (0.8 + 0.9 * low)) % 1
+		local pulse = 0.5 + 0.5 * math.sin(back.beat * 2 * math.pi)
+		veins:SetAlpha(math.min(1, 0.3 * fight + low * (0.3 + 0.7 * pulse * pulse)))
+	end
 end
 
 -- A shape's portrait stands a little taller than the rows beside it, about its own
@@ -1757,8 +1824,10 @@ local function DressShape(frame, portrait, view, artOver)
 	end
 	-- (Art behind the portrait and under the rows: Void Whisper's eye round its circle.
 	-- Cut away inside the ring, so it can't show through the picture as it fades.)
-	local backFile, backMask, backMist
-	if own and not artOver and ns.ThemeLayout() ~= "slab" then backFile, backMask, backMist = ns.ThemePortraitBack(shape) end
+	local backFile, backMask, backMist, backVeins
+	if own and not artOver and ns.ThemeLayout() ~= "slab" then
+		backFile, backMask, backMist, backVeins = ns.ThemePortraitBack(shape)
+	end
 	if backFile and not state.back and not InCombatLockdown() then
 		state.back = CreateFrame("Frame", nil, frame)
 		local lower = LOWER_STRATA[frame:GetFrameStrata()]
@@ -1790,6 +1859,12 @@ local function DressShape(frame, portrait, view, artOver)
 			mist:AddMaskTexture(state.back.hole)
 			state.back.mist[i] = mist
 		end
+		-- (Its vessels' glow, over the mist.)
+		state.back.veins = inner:CreateTexture(nil, "BORDER")
+		state.back.veins:SetBlendMode("ADD")
+		ns.ThemeNoSnap(state.back.veins)
+		state.back.veins:AddMaskTexture(state.back.hole)
+		state.back.veins:SetAlpha(0)
 		ns.SetOnUpdate(state.back, DriftMist)
 	end
 	if state.back then
@@ -1833,6 +1908,11 @@ local function DressShape(frame, portrait, view, artOver)
 						math.min(1, color[3] * 1.6 + 0.1), 1)
 				end
 			end
+			-- (A hotter shade of the ring's color: toward magenta.)
+			state.back.veins:SetTexture(backVeins)
+			state.back.veins:SetAllPoints(state.back.art)
+			state.back.veins:SetVertexColor(math.min(1, color[1] * 1.6 + 0.25), color[2] * 1.2,
+				math.min(1, color[3] * 1.6 + 0.1))
 		end
 	end
 end
@@ -1944,6 +2024,12 @@ local function DressFrame(info)
 						end
 						Dress(info)
 					end)
+					-- (And whatever else turns it: checked as the power changes.)
+					local function Keep() KeepColor(power, frame.unit, function() Dress(info) end) end
+					hooksecurefunc(power, "SetValue", Keep)
+					hooksecurefunc(power, "SetMinMaxValues", Keep)
+					local fill = power:GetStatusBarTexture()
+					if fill and fill.SetVertexColor then hooksecurefunc(fill, "SetVertexColor", Keep) end
 				end
 			end
 		end
@@ -1988,6 +2074,38 @@ function ns.UnitStyleSpots()
 					words[#words + 1] = Readable(alpha) and Near(alpha) or "secret"
 					out[id .. " " .. key] = table.concat(words, "; ")
 				end
+			end
+		end
+	end
+	return out
+end
+
+-- For /cine debug themecheck: each frame's health/power color and fill, and
+-- its name's color, as text to compare (a theme and back leaves the game's).
+function ns.UnitStyleColors()
+	local out = {}
+	local function Near(v)
+		if v == nil then return "nil" end
+		if not Readable(v) then return "secret" end
+		return type(v) == "number" and ("%.2f"):format(v) or tostring(v)
+	end
+	for _, id in ipairs({ "PlayerFrame", "TargetFrame", "FocusFrame", "PetFrame" }) do
+		local frame = _G[id]
+		if frame then
+			local health, power, name = Parts(frame)
+			for key, bar in pairs({ health = health or false, power = power or false }) do
+				if bar and bar.GetStatusBarColor then
+					local r, g, b = bar:GetStatusBarColor()
+					local fill = bar:GetStatusBarTexture()
+					local file = fill and fill:GetTexture()
+					local atlas = fill and fill.GetAtlas and fill:GetAtlas()
+					out[id .. " " .. key .. " color"] = table.concat({ Near(r), Near(g), Near(b),
+						Near(atlas), Near(file), fill and fill.IsDesaturated and tostring(fill:IsDesaturated()) or "" }, " ")
+				end
+			end
+			if name and name.GetTextColor then
+				local r, g, b = name:GetTextColor()
+				out[id .. " name color"] = table.concat({ Near(r), Near(g), Near(b) }, " ")
 			end
 		end
 	end

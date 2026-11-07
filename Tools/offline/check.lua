@@ -709,7 +709,7 @@ if arg[1] and not update then
 			rawset(_G, "issecretvalue", function(value) return value == 140 or value == 165 end)
 		end)
 		Expect("a preview", 0, nil, 0.3)
-		look.combatPlace, look.combatBarFallback = "top", false
+		look.combatPlace, look.combatBarFallback = "top", "bar"
 		Expect("a card in a letterbox bar", 0)
 		look.combatPlace = "third"
 		chatDb.cardClearChat = false

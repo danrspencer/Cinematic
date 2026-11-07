@@ -225,12 +225,10 @@ local function ShowMenu(owner)
 			root:CreateDivider()
 		end
 		root:CreateTitle("Cinematic")
-		-- (No switch without a profile: Cinematic stays off whatever it says.)
-		if ns.ProfileChosen() then
-			root:CreateCheckbox(L["Enable Cinematic"], function() return db.enabled end, function()
-				ns.SetEnabled(not db.enabled)
-				UpdateIcon()
-			end)
+		-- (Same as the Toggle CineMode key; only while Cinematic is on, as the
+		-- key does nothing otherwise.)
+		if ns.ProfileChosen() and db.enabled then
+			root:CreateCheckbox(L["CineMode"], ns.IsCineModeOn, Cinematic_ToggleCineMode)
 		end
 		-- (Unticked only in a menu opened from the addon compartment.)
 		root:CreateCheckbox(L["Show minimap button"], function() return db.minimapButton end, function()
@@ -253,6 +251,15 @@ local function ShowMenu(owner)
 		-- (A frame later: the menu's own click is done with by then.)
 		root:CreateButton(L["Why is it showing?"], function() C_Timer.After(0, ns.ToggleInspect) end)
 		root:CreateButton(L["Settings"], ns.OpenOptions)
+		-- (Last, on its own: off is the whole addon and a reload. No switch
+		-- without a profile: Cinematic stays off whatever it says.)
+		if ns.ProfileChosen() then
+			root:CreateDivider()
+			root:CreateCheckbox(L["Enable Cinematic"], function() return db.enabled end, function()
+				Cinematic_Toggle()
+				UpdateIcon()
+			end)
+		end
 	end)
 	-- The menu opens at the cursor and is only kept on screen; keep it a little
 	-- way off the edges too. (Once it has its size, a frame later.)

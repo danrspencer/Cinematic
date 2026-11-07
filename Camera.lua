@@ -4393,7 +4393,7 @@ function ns.ToggleFlyBy(quiet)
 		return true, L["stopped"]
 	end
 	if not ns.db.enabled then
-		return false, L["Cinematic is off (/cine turns it on)"]
+		return false, L["Cinematic is off (/cine on turns it on)"]
 	end
 	if InCombatLockdown() then
 		return false, L["not in combat"]

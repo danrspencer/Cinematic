@@ -261,7 +261,12 @@ local faded = setmetatable({}, { __mode = "k" }) -- piece -> true, while faded o
 local skins = setmetatable({}, { __mode = "k" })
 local textured = setmetatable({}, { __mode = "k" }) -- bar -> true, while in a fill of ours
 local sized = setmetatable({}, { __mode = "k" }) -- holder -> true, while at a height of ours
+local colored = setmetatable({}, { __mode = "k" }) -- bar -> true, while in a color of ours
+local gameColor = setmetatable({}, { __mode = "k" }) -- bar -> { r, g, b }, the game's last
 local dressing = false -- (our own setters: not the game's, for the hooks)
+local function Plain(v)
+	return type(v) == "number" and not (issecretvalue and issecretvalue(v))
+end
 
 -- One bar (and its holder: the frame whose height it takes, and whose
 -- pieces are its border) as look says; look nil: as the game had it.
@@ -283,8 +288,19 @@ local function DressBar(bar, holder, look, heightKey, color)
 		local now = bar:GetStatusBarTexture()
 		if now and now.SetDesaturated then now:SetDesaturated(false) end
 	end
+	-- Its color: ours, or the game's put back once ours is dropped (a theme
+	-- or pick going back to "game": nothing else sets it again till a reload).
 	if color then
+		if not colored[bar] then
+			colored[bar] = true
+			local r, g, b = bar:GetStatusBarColor()
+			if Plain(r) and Plain(g) and Plain(b) then gameColor[bar] = { r, g, b } end
+		end
 		bar:SetStatusBarColor(color[1], color[2], color[3])
+	elseif colored[bar] then
+		colored[bar] = nil
+		local c = gameColor[bar]
+		if c then bar:SetStatusBarColor(c[1], c[2], c[3]) end
 	end
 	-- Its height.
 	-- (Left alone at the game's height unless we'd changed it: Edit Mode's
@@ -361,9 +377,12 @@ function Apply()
 	-- power changes (a druid's form): ours again after it.
 	if health and not healthHooked and health.SetStatusBarColor then
 		healthHooked = true
-		hooksecurefunc(health, "SetStatusBarColor", function(self)
+		hooksecurefunc(health, "SetStatusBarColor", function(self, r, g, b)
+			if dressing then return end
+			-- (The game's own, kept to put back.)
+			if Plain(r) and Plain(g) and Plain(b) then gameColor[self] = { r, g, b } end
 			local now = ns.StyleOn("prdStyle") and Look()
-			if dressing or not now then return end
+			if not now then return end
 			local cr, cg, cb = HealthColor(now)
 			if cr then
 				dressing = true
@@ -384,6 +403,41 @@ function Apply()
 	end
 end
 ns.RefreshPersonalStyle = Apply
+
+-- For /cine debug themecheck: the bars' color, fill, height and border
+-- pieces' alpha, as text to compare (a theme and back must leave the game's).
+function ns.PersonalStyleSpots()
+	local out = {}
+	local root, holder, health, power = Parts()
+	if not root then return out end
+	local function Near(v)
+		if v == nil then return "nil" end
+		if not Plain(v) then return type(v) == "number" and "secret" or tostring(v) end
+		return ("%.2f"):format(v)
+	end
+	for key, bar in pairs({ health = health or false, power = power or false }) do
+		if bar then
+			local words = {}
+			if bar.GetStatusBarColor then
+				local r, g, b = bar:GetStatusBarColor()
+				words[#words + 1] = "color " .. Near(r) .. " " .. Near(g) .. " " .. Near(b)
+			end
+			local fill = bar.GetStatusBarTexture and bar:GetStatusBarTexture()
+			if fill then
+				local atlas = fill.GetAtlas and fill:GetAtlas()
+				local file = fill:GetTexture()
+				words[#words + 1] = "fill " .. ((Plain(atlas) or type(atlas) == "string") and tostring(atlas) or "?")
+					.. " " .. ((type(file) == "string" or Plain(file)) and tostring(file) or "?")
+				if fill.IsDesaturated then words[#words + 1] = "desat " .. tostring(fill:IsDesaturated()) end
+			end
+			local sizer = key == "health" and holder or bar
+			words[#words + 1] = "height " .. Near(sizer:GetHeight())
+			for i, piece in ipairs(Trim(sizer)) do words[#words + 1] = "trim" .. i .. " " .. Near(piece:GetAlpha()) end
+			out["PRD " .. key] = table.concat(words, "; ")
+		end
+	end
+	return out
+end
 
 local loader = CreateFrame("Frame")
 loader:RegisterEvent("PLAYER_LOGIN")

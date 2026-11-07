@@ -336,7 +336,18 @@ function ns.ThemeCheck()
 	local kept = ns.StyleSnapshot()
 	local list = ns.StyleThemeList()
 	ns.ApplyStyleTheme("game", true)
-	local want, bad, tried = ns.UnitStyleSpots(), {}, 0
+	-- (Where the parts are, and the PRD's and unit bars' colors and fills.)
+	local function Spots()
+		local out = ns.UnitStyleSpots()
+		if ns.PersonalStyleSpots then
+			for key, value in pairs(ns.PersonalStyleSpots()) do out[key] = value end
+		end
+		if ns.UnitStyleColors then
+			for key, value in pairs(ns.UnitStyleColors()) do out[key] = value end
+		end
+		return out
+	end
+	local want, bad, tried = Spots(), {}, 0
 	local a, b = 1, 1
 	local function Done(text)
 		ns.RestoreStyleSnapshot(kept)
@@ -357,7 +368,7 @@ function ns.ThemeCheck()
 		end)
 		if not ok then return Done("themecheck: stopped on an error: " .. tostring(err)) end
 		tried = tried + 1
-		local got = ns.UnitStyleSpots()
+		local got = Spots()
 		for key, was in pairs(want) do
 			if got[key] ~= was and not bad[key] then
 				bad[key] = true

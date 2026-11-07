@@ -1158,6 +1158,83 @@ local function Close()
 	end
 end
 
+---------------------------------------------------------------------------
+-- Another roll addon (rollFade: ours stays away). Three signs:
+--   a roll addon of the few known to take over the game's roll frames, loaded
+--   (ElvUI only with its Loot Roll on);
+--   the game's roll frames never told of rolls (UIParent off START_LOOT_ROLL);
+--   a roll ours to pick on and none of the game's roll frames shown since, a
+--   moment in (shown, not visible: our own fading of the UI doesn't count; a
+--   pick made in that moment hid it, but it showed). Checked at every roll.
+local IsLoaded = (C_AddOns and C_AddOns.IsAddOnLoaded) or IsAddOnLoaded
+local KNOWN = { "XLoot_Group" }
+local takenOver = false -- the last roll's frames: none shown (the third sign)
+
+local function ElvUIRolls()
+	local ok, on = pcall(function()
+		local E = _G.ElvUI and _G.ElvUI[1]
+		return E and E.private and E.private.general and E.private.general.lootRoll
+	end)
+	return ok and on == true
+end
+
+-- What's got the rolls (a name, for the log and /cine debug rolls), or nil.
+local function Competitor()
+	for _, name in ipairs(KNOWN) do
+		if IsLoaded and ns.Flag(IsLoaded(name)) then
+			return name
+		end
+	end
+	if ElvUIRolls() then
+		return "ElvUI's Loot Roll"
+	end
+	if _G.GroupLootFrame_OpenNewFrame and UIParent.IsEventRegistered then
+		local ok, registered = pcall(UIParent.IsEventRegistered, UIParent, "START_LOOT_ROLL")
+		if ok and registered == false then
+			return "an addon (the game's roll frames are turned off)"
+		end
+	end
+	if takenOver then
+		return "an addon (the game's roll frames didn't show)"
+	end
+end
+
+local function Competing()
+	return ns.Setting("rollFade") and Competitor() ~= nil
+end
+
+local frameShown = false -- one of the game's roll frames shown since the last check
+local hooked = {}
+local function HookRollFrames()
+	for i = 1, 10 do
+		local frame = _G["GroupLootFrame" .. i]
+		if not frame then
+			break
+		end
+		if not hooked[frame] then
+			hooked[frame] = true
+			frame:HookScript("OnShow", function() frameShown = true end)
+		end
+	end
+end
+HookRollFrames()
+
+local function AnyRollFrameShown()
+	if frameShown then
+		return true
+	end
+	for i = 1, 10 do
+		local frame = _G["GroupLootFrame" .. i]
+		if not frame then
+			break
+		end
+		if ns.Flag(frame:IsShown()) then
+			return true
+		end
+	end
+	return false
+end
+
 -- One roll's panel goes (its x, or its time's up); the last one fades the lot.
 local function Remove(key, byHand)
 	for i, drop in ipairs(shown) do
@@ -1404,6 +1481,13 @@ local function Seen(encounterID, lootListID, info)
 	if testing or type(info) ~= "table" then
 		return
 	end
+	if Competing() then
+		ns.Log("rolls", "drop skipped: Roll Vision stays away, " .. tostring(Competitor()) .. " has the rolls")
+		if not pinned then
+			Close()
+		end
+		return
+	end
 	local key = Key(encounterID, lootListID)
 	local _, drop = Find(key)
 	local why
@@ -1466,6 +1550,20 @@ watcher:SetScript("OnEvent", function(_, event, encounterID, lootListID)
 		end
 		ns.Log("rolls", ("roll %s starts (Roll Vision %s): loot history has %d unfinished drop(s)"):format(
 			tostring(encounterID), Enabled() and "on" or "off", open))
+		-- (the game's roll frame up a moment in? Not: another addon has it)
+		HookRollFrames()
+		C_Timer.After(0.5, function()
+			local was = takenOver
+			takenOver = not AnyRollFrameShown()
+			frameShown = false -- (from here on: shown since this check)
+			if takenOver ~= was then
+				ns.Log("rolls", takenOver and "no game roll frame shown: another addon has the rolls"
+					or "game roll frames show again")
+			end
+			if Competing() and not pinned and not testing then
+				Close()
+			end
+		end)
 		return
 	end
 	if not Enabled() then
@@ -1538,6 +1636,8 @@ function ns.RollDebug()
 		end
 	end
 	Say("game roll frames up: " .. (#frames > 0 and table.concat(frames, ", ") or "none"))
+	Say(("another roll addon: %s; Fade if another addon competes %s"):format(tostring(Competitor() or "none"),
+		ns.Setting("rollFade") and "on" or "off"))
 	local encounters = AllEncounters()
 	Say(("loot history: %d encounter(s)"):format(#encounters))
 	for _, encounter in ipairs(encounters) do
@@ -1571,7 +1671,7 @@ end
 
 -- The setting turned off: away it goes.
 function ns.RefreshRollWindow()
-	if not Enabled() then
+	if not Enabled() or (Competing() and not pinned and not testing) then
 		Close()
 	elseif window then
 		window.placedX = nil -- (put again: under or beside the game's frames)

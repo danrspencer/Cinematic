@@ -20,6 +20,9 @@
 	<Binding name="CINEMATIC_TOGGLESETTINGS" category="ADDONS">
 		Cinematic_ToggleSettings()
 	</Binding>
+	<Binding name="CINEMATIC_KEYMAP" category="ADDONS" runOnUp="true">
+		Cinematic_KeyboardMap(keystate)
+	</Binding>
 	<Binding name="CLICK CinematicMasterWheelButton:LeftButton" category="ADDONS">
 	</Binding>
 	<Binding name="CINEMATIC_CAMWHEEL" category="ADDONS" runOnUp="true">

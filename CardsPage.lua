@@ -141,7 +141,7 @@ end
 -- The settings an event can have of its own, as the Style tab lists them.
 local GROUPS = {
 	{ "Place", { "Place" } }, { "Position", { "OffsetX", "OffsetY" } }, { "In the bar", { "Align" } }, { "Letterbox scale", { "BarScale" } },
-	{ "Lower third with no letterbox", { "BarFallback" } }, { "Style", { "Style" } }, { "Animation", { "Anim" } },
+	{ "No letterbox", { "BarFallback" } }, { "Style", { "Style" } }, { "Animation", { "Anim" } },
 	{ "Font", { "Font" } }, { "Size", { "Size" } }, { "Outline", { "Outline" } },
 	{ "Outline color", { "OutlineR", "OutlineG", "OutlineB" } }, { "Shadow", { "Shadow" } },
 	{ "Color", { "R", "G", "B" } }, { "Small lines' font", { "SmallFont" } }, { "Small lines' size", { "SmallSize" } },
@@ -428,13 +428,16 @@ local function LookGrid(kit, content, stack, fieldOf, changed, own, icon)
 	local barScale, barScaleName = Number("cardBarScale", L["Scale"], 20, 100, 1, "%d%%", 100,
 		L["The words' height next to the bar's: they grow and shrink with your letterbox. (With no letterbox " ..
 		"up, a bar as tall as your letterbox's comes in for the card.)"], InBar)
-	Dot({ "Lower third with no letterbox" }, BarUp)
-	local barFallback = Tick("cardBarFallback", L["Lower third with no letterbox"],
-		L["Ticked: while no letterbox is up, the card shows in the lower third. Unticked: a bar of its own " ..
-		"comes in for it."], InBar)
+	Dot({ "No letterbox" }, BarUp)
+	local barFallback = Narrow(rows.Dropdown(L["No letterbox"], "cardBarFallback", List({
+		{ "bar", L["Its own bar"], L["A bar as tall as your letterbox's comes in for the card."] },
+		{ "third", L["Lower third"], L["The card shows in the lower third."] },
+		{ "screen", L["Screen center"], L["The card shows in the middle of the screen."] },
+	}), L["Where the card shows while no letterbox is up."], InBar))
+	local barFallbackName = at.last
 	local barEnd = at.y - 4
 	local barPanel = Panel(at.x, top, barEnd)
-	for _, part in ipairs({ barPanel, barName, barAlign, barScale, barScaleName, barFallback }) do
+	for _, part in ipairs({ barPanel, barName, barAlign, barScale, barScaleName, barFallback, barFallbackName }) do
 		barParts[#barParts + 1] = part
 	end
 	for _, part in ipairs(barButtons) do barParts[#barParts + 1] = part end

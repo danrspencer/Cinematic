@@ -178,6 +178,14 @@ local function LinesToCut(tooltip, count, unit, object)
 	local inQuest = false
 	for i = 2, count do
 		local text = Left(i) and Left(i):GetText()
+		-- A line we emptied and hid on an earlier cut, still counted: lines
+		-- added after it (Questie's quest lines) would sit under a blank gap.
+		local okShown, hidden = pcall(function()
+			return text == nil and not ns.Flag(Left(i):IsShown())
+		end)
+		if okShown and hidden then
+			cut[i] = true
+		end
 		local ok, key = pcall(function()
 			if type(text) ~= "string" or (issecretvalue and issecretvalue(text)) then
 				return nil

@@ -2985,7 +2985,7 @@ end
 
 -- Plays a script now, from its page or a command. False and why if it can't.
 function ns.PlayCameraScript(script)
-	if not ns.db.enabled then return false, L["Cinematic is off (/cine turns it on)"] end
+	if not ns.db.enabled then return false, L["Cinematic is off (/cine on turns it on)"] end
 	if InFight() then return false, L["not in combat"] end
 	stoppedFor = nil
 	Start(script, nil, nil)

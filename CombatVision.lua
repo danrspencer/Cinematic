@@ -219,11 +219,14 @@ local function Setup(cue, look, enter, width, height, scale, boss)
 	local banner = style == "banner" or picture and true or false
 	if banner then place = "screen" end
 	if picture or (not secret and word == "") then style = "none" end
-	-- (In a bar with no letterbox up, if it says so: the lower third.)
-	if (place == "top" or place == "bottom") and look.combatBarFallback
+	-- (In a bar with no letterbox up: where it says, the lower third or the
+	-- middle of the screen; "bar": a bar of its own. Old saves: true, false.)
+	local fallback = look.combatBarFallback
+	if fallback == true then fallback = "third" elseif fallback ~= "third" and fallback ~= "screen" then fallback = nil end
+	if (place == "top" or place == "bottom") and fallback
 		and not (ns.db.letterbox and (scale ~= 1 or ns.lastCinematic)
 		and ns.LetterboxHeight(ns.LetterboxLook(), width, height) >= 1) then
-		place = "third"
+		place = fallback
 	end
 	local size = look.combatSize * scale
 	if style == "subtitle" then

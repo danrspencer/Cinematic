@@ -40,6 +40,7 @@ local function SetBindingNames()
 	BINDING_NAME_CINEMATIC_TOGGLETOOLTIPS = "Cinematic: " .. L["Toggle tooltip hiding"]
 	BINDING_NAME_CINEMATIC_RELOAD = "Cinematic: " .. L["Reload the UI"]
 	BINDING_NAME_CINEMATIC_TOGGLESETTINGS = "Cinematic: " .. L["Toggle settings"]
+	BINDING_NAME_CINEMATIC_KEYMAP = "Cinematic: " .. L["Keyboard map (hold, or tap to keep it up)"]
 end
 SetBindingNames()
 ns.OnLanguage(SetBindingNames)
@@ -347,6 +348,7 @@ local DEFAULTS = {
 	reloadButton = false,      -- a Reload button on the screen (Reload.lua)
 	reloadKeepWindows = true,  -- after a reload, the windows that were open open again (Reload.lua)
 	rollWindow = true,         -- a window of the group's loot rolls, instead of reading them in chat (RollWindow.lua)
+	rollFade = true,           -- ...stays away while another addon has the rolls (RollWindow.lua's Competitor)
 	rollMinQuality = 3,        -- ...only items of this quality and up (2 uncommon, 3 rare, 4 epic)
 	rollRaidRows = 3,          -- ...in a raid, the top this many players' rolls per item (a party: all)
 	rollTopPick = true,        -- ...only players on the best pick made (need over greed); the rest counted
@@ -3395,14 +3397,46 @@ function ns.RestartTimers()
 	end
 end
 
+-- Off is all or nothing: our hooks can't be taken out once in, so off is the
+-- game's own AddOns list (for every character, as the dev copy found by name
+-- didn't stick) and a reload, with nothing of ours loaded after. Back on is
+-- ticking it in that list. Asked first; onCancel puts a switch back.
+-- (An off saved before this, db.enabled false, still works as it did, and
+-- turning on clears it.)
+function ns.TurnOffCompletely(onCancel)
+	StaticPopupDialogs.CINEMATIC_TURN_OFF = {
+		text = L["Turn Cinematic off completely?\n\nThe game reloads and Cinematic doesn't load at all, " ..
+			"so you can tell whether a problem is ours. Your settings are kept.\n\nTo bring it back, " ..
+			"tick Cinematic in the AddOns list (Game Menu or character select)."],
+		button1 = L["Turn off and reload"],
+		button2 = CANCEL,
+		OnAccept = function()
+			local DisableAddOn = (C_AddOns and C_AddOns.DisableAddOn) or DisableAddOn
+			local SaveAddOns = (C_AddOns and C_AddOns.SaveAddOns) or SaveAddOns
+			DisableAddOn(ADDON_NAME)
+			SaveAddOns()
+			ReloadUI()
+		end,
+		OnCancel = function() if onCancel then onCancel() end end,
+		timeout = 0,
+		whileDead = true,
+		hideOnEscape = true,
+	}
+	StaticPopup_Show("CINEMATIC_TURN_OFF")
+end
+
 function Cinematic_Toggle()
 	-- No profile picked yet: nothing to turn on; ask for one.
 	if not ns.ProfileChosen() then
 		ns.ShowWelcome()
 		return
 	end
-	ns.SetEnabled(not ns.db.enabled)
-	ns.Print(ns.db.enabled and L["enabled"] or L["disabled"])
+	if ns.db.enabled then
+		ns.TurnOffCompletely()
+		return
+	end
+	ns.SetEnabled(true)
+	ns.Print(L["enabled"])
 	if ns.IsSuspended() then
 		ns.Print(L["(still stopped after an error: /cine resume starts it again)"])
 	end
@@ -3414,17 +3448,24 @@ end
 -- as turning Cinematic on does. With Start in CineMode off nothing brings it
 -- on by itself, so the key does (ns.cineKeyOn, till the key again or a reload);
 -- off then just drops that, leaving the camera triggers free to start it.
+-- On as the key sees it: not paused, and Start in CineMode, a camera trigger
+-- or the key itself bringing it in. (The minimap menu's tick.)
+function ns.IsCineModeOn()
+	if not (ns.db and ns.db.enabled) or ns.GetSnoozeLeft() then return false end
+	return (ns.db.fadeUI or ns.TriggerStartsCine() or ns.cineKeyOn) and true or false
+end
+
 function Cinematic_ToggleCineMode()
 	if not ns.ProfileChosen() then
 		ns.ShowWelcome()
 		return
 	end
 	if not ns.db.enabled then
-		ns.Print(L["Cinematic is off (/cine turns it on)"])
+		ns.Print(L["Cinematic is off (/cine on turns it on)"])
 		return
 	end
 	local triggered = ns.db.fadeUI or ns.TriggerStartsCine()
-	if ns.GetSnoozeLeft() or not (triggered or ns.cineKeyOn) then
+	if not ns.IsCineModeOn() then
 		ns.Unsnooze()
 		ns.cineKeyOn = not ns.db.fadeUI or nil
 		quickStart = true
@@ -4996,6 +5037,15 @@ ticker:SetScript("OnEvent", ns.Profiled("Core events", function(self, event, arg
 				if type(saved) == "table" then saved.rollWindow = true end
 			end
 			ns.db.rollWindowV1 = true
+		end
+		-- Roll Vision on again for Subtle, which turned it off (it stays away by
+		-- itself now while another roll addon is in use). Live and saved; any
+		-- other profile's off is yours and stays. Once.
+		if not ns.db.rollWindowV2 then
+			if (ns.db.liveProfile or ns.db.profile) == "Subtle" then ns.db.rollWindow = true end
+			local subtle = type(ns.db.profiles) == "table" and ns.db.profiles.Subtle
+			if type(subtle) == "table" then subtle.rollWindow = true end
+			ns.db.rollWindowV2 = true
 		end
 		-- The vignette and weather went with the tint's row of the Visual
 		-- Effects grid: rows of their own now, starting as the tint's was. Once.
@@ -6839,6 +6889,29 @@ ticker:SetScript("OnEvent", ns.Profiled("Core events", function(self, event, arg
 				if type(saved) == "table" then Third(saved) end
 			end
 			ns.db.cardsV11 = true
+		end
+		-- No letterbox (a card in a bar with none up) went from a tick to a
+		-- choice: ticked the lower third, unticked a bar of its own; Entering
+		-- and Leaving combat still following their style, onto the middle of
+		-- the screen (Cards.lua). Saved profiles too. Once.
+		if not ns.db.cardsV12 then
+			local function Choice(t)
+				for key, value in pairs(t) do
+					if type(key) == "string" and type(value) == "boolean"
+						and (key:find("^cardBarFallback") or key:find("^cardLookBarFallback")) then
+						t[key] = value and "third" or "bar"
+					end
+				end
+				for _, id in ipairs({ "combatIn", "combatOut" }) do
+					local key = "cardBarFallback_" .. id
+					if t[key] == "default" then t[key] = DEFAULTS[key] end
+				end
+			end
+			Choice(ns.db)
+			for _, saved in pairs(ns.db.profiles or {}) do
+				if type(saved) == "table" then Choice(saved) end
+			end
+			ns.db.cardsV12 = true
 		end
 		-- New settings start as the active profile has them (a built-in's
 		-- changes to the defaults included). A fresh install (or Reset addon)

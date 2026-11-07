@@ -119,7 +119,7 @@ Add("Recording helpers", { key = "hideui", name = "Hide UI, keep the look",
 	tip = "/cine hideui: the UI goes, the tint, letterbox and titles stay. Again to bring it back.",
 	run = function() ns.ToggleUI() end })
 Add("Recording helpers", { key = "cine", name = "CineMode on or off", tip = "/cine",
-	run = function() Cinematic_Toggle() end })
+	run = function() Cinematic_ToggleCineMode() end })
 Add("Recording helpers", { key = "letterbox", name = "Letterbox sweep",
 	tip = "The bars close in to 12% of the screen, hold, and ease back to your size.",
 	script = function(d)

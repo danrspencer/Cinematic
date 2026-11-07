@@ -11,6 +11,10 @@
 local _, ns = ...
 
 ns.CHANGELOG_FEATURES = {
+	{ date = "2026-11-07", page = "Keyboard Map", title = "Keyboard Map",
+		text = "See your keyboard on screen with what every key does: its spell's icon, cooldown and count, or the " ..
+		"command's name. Hold its key to peek, tap it to keep it up, or type /cine keys. Hold Shift, Ctrl or Alt to " ..
+		"see those keys." },
 	{ date = "2026-11-06", page = "General", title = "Chat history",
 		text = "Tick Keep chat history on the Quality of life page and your chat windows bring back their last 200 lines " ..
 		"after a reload or login, for up to a day, with the time each was said if you like." },

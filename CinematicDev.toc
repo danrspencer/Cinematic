@@ -147,6 +147,7 @@ NodeSweep.lua
 Slash.lua
 Why.lua
 CursorHide.lua
+KeyboardMap.lua
 SelfTest.lua
 ProfileModules.lua
 ProfileChoices.lua

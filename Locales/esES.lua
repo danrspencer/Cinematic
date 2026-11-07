@@ -2404,6 +2404,8 @@ L["Moves the names up (or down, below 0) from where the plates put them."] = "Su
 
 -- What's new (WhatsNew.lua, Changelog.lua)
 L["What's new"] = "Novedades"
+L["Keyboard Map"] = "Mapa del teclado"
+L["See your keyboard on screen with what every key does: its spell's icon, cooldown and count, or the command's name. Hold its key to peek, tap it to keep it up, or type /cine keys. Hold Shift, Ctrl or Alt to see those keys."] = "Ve tu teclado en pantalla con lo que hace cada tecla: el icono de su hechizo, su reutilización y su cantidad, o el nombre del comando. Mantén pulsada su tecla para echar un vistazo, tócala para dejarlo abierto o escribe /cine keys. Mantén pulsado Mayús, Ctrl o Alt para ver esas teclas."
 L["New features"] = "Funciones nuevas"
 L["All changes"] = "Todos los cambios"
 L["Show me"] = "Ver"

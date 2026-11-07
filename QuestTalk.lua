@@ -1164,6 +1164,10 @@ end
 local rows, rowCount = {}, 0       -- menu rows (buttons), reused
 local icons, iconCount = {}, 0     -- reward/required item buttons, reused
 local texts, textCount = {}, 0     -- lines of text, reused
+-- (AddPair's values apart: their outlined number font, once set, stays on a
+-- line after SetFontObject, and Font keeps it, so words reusing one came out
+-- outlined and too big.)
+local values, valueCount = {}, 0
 local buttons = {}                 -- the card's buttons (two)
 local keyed = {}                   -- [number key] = function, for the rows shown
 local cursor                       -- how far down the panel the next thing goes
@@ -1184,8 +1188,9 @@ local function ResetPanel()
 	for i = 1, rowCount do rows[i]:Hide() end
 	for i = 1, iconCount do icons[i]:Hide() end
 	for i = 1, textCount do texts[i]:Hide() end
+	for i = 1, valueCount do values[i]:Hide() end
 	for _, button in ipairs(buttons) do button:Hide() end
-	rowCount, iconCount, textCount = 0, 0, 0
+	rowCount, iconCount, textCount, valueCount = 0, 0, 0, 0
 	wipe(keyed)
 	cursor = 12
 end
@@ -1219,12 +1224,12 @@ local function AddPair(words, value, color, gap)
 	local label = AddText(words, "QuestFont", color, gap)
 	local wide = label.GetUnboundedStringWidth and label:GetUnboundedStringWidth() or label:GetStringWidth()
 	label:SetWidth((Plain(wide) or 100) + 2)
-	textCount = textCount + 1
-	local fs = texts[textCount]
+	valueCount = valueCount + 1
+	local fs = values[valueCount]
 	if not fs then
 		fs = panel:CreateFontString(nil, "OVERLAY")
 		fs:SetJustifyH("LEFT")
-		texts[textCount] = fs
+		values[valueCount] = fs
 	end
 	fs:SetFontObject("NumberFontNormalLarge")
 	-- (Its own font and outline whatever the page says, only its size: without
@@ -1461,11 +1466,13 @@ local function AddIcon(entry)
 	b.count:SetText(count and count > 1 and (count >= 1000 and AbbreviateNumbers and AbbreviateNumbers(count)
 		or tostring(count)) or "")
 	b.name:SetText(entry.name or "")
-	-- (Red: one you can't use, as on the game's window.)
+	-- (One you can't use: its icon tinted red, its name left white, as on the
+	-- game's window.)
+	b.name:SetTextColor(1, 1, 1)
 	if entry.red then
-		b.name:SetTextColor(1, 0.3, 0.3)
+		b.icon:SetVertexColor(0.9, 0, 0)
 	else
-		b.name:SetTextColor(1, 1, 1)
+		b.icon:SetVertexColor(1, 1, 1)
 	end
 	b.tip, b.pick, b.link = entry.tip, entry.pick, entry.link
 	for _, part in ipairs(b.chosen) do

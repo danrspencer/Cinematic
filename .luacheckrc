@@ -11,7 +11,7 @@ globals = {
 	"CinematicDB", "CinematicCharDB", "SlashCmdList", "StaticPopupDialogs", "ColorPickerFrame", "DAMAGE_TEXT_FONT",
 	"ClickCastFrames",
 	"Cinematic_Toggle", "Cinematic_ToggleCineMode", "Cinematic_ToggleUI", "Cinematic_TakeScreenshot", "Cinematic_Reload", "BINDING_NAME_CINEMATIC_RELOAD", "Cinematic_ToggleSettings", "BINDING_NAME_CINEMATIC_TOGGLESETTINGS", "Cinematic_StartCam", "Cinematic_StopCamera", "Cinematic_CustomTrigger", "Cinematic_FlyBy", "Cinematic_ShowTooltips", "Cinematic_ToggleTooltips", "Cinematic_ToggleVisualEffects", "Cinematic_ToggleLetterbox",
-	"Cinematic_CameraWheel", "BINDING_NAME_CINEMATIC_CAMWHEEL", "Cinematic_ToggleVision", "AddonCompartmentFrame",
+	"Cinematic_CameraWheel", "BINDING_NAME_CINEMATIC_CAMWHEEL", "Cinematic_KeyboardMap", "BINDING_NAME_CINEMATIC_KEYMAP", "Cinematic_ToggleVision", "AddonCompartmentFrame",
 	"BINDING_NAME_CINEMATIC_VISION_HEAL", "BINDING_NAME_CINEMATIC_VISION_QUEST", "BINDING_NAME_CINEMATIC_VISION_DUEL",
 	"BINDING_NAME_CINEMATIC_VISION_ROLL",
 	"BINDING_NAME_CINEMATIC_VISION_VITALS", "BINDING_NAME_CINEMATIC_VISION_DAMAGE", "BINDING_NAME_CINEMATIC_VISION_TELE",
@@ -26,6 +26,8 @@ globals = {
 
 -- The WoW API the addon uses (add new ones here as they come up)
 read_globals = {
+	-- (KeyboardMap.lua)
+	"ActionButton_CalculateAction", "PlaceAction", "SetBindingSpell", "SetBindingMacro", "SetBindingItem", "GetBinding", "GetMacroInfo", "GetNumBindings", "GetActionText", "GetActionInfo", "C_ActionBar", "CooldownFrame_Set", "GetActionCooldown", "GetActionTexture", "GetNumShapeshiftForms", "GetPetActionCooldown", "GetPetActionInfo", "GetShapeshiftFormCooldown", "GetShapeshiftFormInfo", "HasAction",
 	"CinematicFrame",
 	"GetZoneText", "DELETE", "CLOSE", -- (the camera trigger editor and My Shots)
 	"MovieFrame",
