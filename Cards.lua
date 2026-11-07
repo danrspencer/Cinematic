@@ -68,7 +68,7 @@ local EVENTS = {
 		icon = "Interface\\TargetingFrame\\UI-TargetingFrame-Skull", fight = true },
 	-- (Over Dungeon cleared's: the kill's own banner first, the run's after.)
 	{ id = "bossDown", name = "Boss defeated", on = "cardBossDownOn", priority = 85,
-		icon = "Interface\\Icons\\INV_Misc_Bone_HumanSkull_01", inFight = "show" },
+		icon = "Interface\\Icons\\INV_Misc_Bone_HumanSkull_01", inFight = "wait" },
 	{ id = "cleared", name = "Dungeon cleared", on = "cardClearedOn", priority = 75,
 		icon = "Interface\\Icons\\Achievement_Dungeon_ClassicDungeonMaster",
 		has = EJ_GetInstanceForMap ~= nil, inFight = "wait" },

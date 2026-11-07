@@ -5231,6 +5231,18 @@ ticker:SetScript("OnEvent", ns.Profiled("Core events", function(self, event, arg
 			end
 			ns.db.questGlowOffV1 = true
 		end
+		-- Boss defeated's card waits till after the fight now (it showed in the
+		-- middle of it, with adds still up). Once: pick Show again and it stays.
+		if not ns.db.bossDownWaitV1 then
+			if ns.db.cardFight_bossDown == "show" then ns.db.cardFight_bossDown = "wait" end
+			for _, saved in pairs(ns.db.profiles or {}) do
+				if type(saved) == "table" then
+					saved.cardFight_bossDown = nil
+					if type(saved.settings) == "table" then saved.settings.cardFight_bossDown = nil end
+				end
+			end
+			ns.db.bossDownWaitV1 = true
+		end
 		-- The copy chat button off to start with now: other chat addons have
 		-- their own. Off in every profile. Once: tick it again and it stays.
 		if not ns.db.chatCopyOffV1 then
