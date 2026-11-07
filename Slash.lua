@@ -112,6 +112,7 @@ local function PrintDebugHelp()
 	print("  /cine debug tent [seen|cozy [left|right]|clear] - whether a Camp Tent's been moused over near here (seen fakes one on that side of the screen, cozy also starts the cozy camera)")
 	print("  /cine debug fishing - the last red error message, and whether it paused right-click casting")
 	print("  /cine debug weapon - what the game says about your weapon, and the cozy weapon trigger")
+	print("  /cine debug framepass - where the frames' fade pass spends its time, over 20 seconds, written to the log")
 	print("  /cine debug cvarcost - what writing a camera speed setting costs (the restyling it sets off), written to the log")
 	print("  /cine debug director - the camera director: how often it decided the scene, and each scene change in chat (again to stop)")
 	print("  /cine debug quest - the quest cam: on or off, its turn and its zoom")
@@ -1031,6 +1032,24 @@ local function HandleSlash(msg)
 			ns.Print(t and "cozy sway: not going yet (it steers clear of the tent once the cozy camera starts)"
 				or "cozy sway: no tent to steer clear of")
 		end
+	elseif cmd == "debug" and arg == "framepass" then
+		-- Where the frames' fade pass spends its time, over 20 seconds: its parts
+		-- per pass, and the per-frame loop per frame (Frames.lua's ns.UpdateFrames).
+		ns.framePassTimes = { passes = 0, entries = 0, setup = 0, hover = 0, events = 0, target = 0, apply = 0,
+			after = 0, mouseMoved = 0 }
+		ns.Print("framepass: timing the frames' pass for 20 seconds (stand as you are)")
+		C_Timer.After(20, function()
+			local t = ns.framePassTimes
+			ns.framePassTimes = nil
+			if not t or t.passes == 0 then ns.Print("framepass: no passes ran") return end
+			local n = t.passes
+			local total = t.setup + t.hover + t.events + t.target + t.apply + t.after
+			local line = ("framepass: %d passes (%.1f a second), %.3f ms each, %d frames each; setup %.3f, mouse hover %.3f (mouse moved in %d%%), events %.3f, loop: targets %.3f + applying %.3f (%.2f microseconds a frame), after %.3f"):format(
+				n, n / 20, total / n, t.entries / n, t.setup / n, t.hover / n, 100 * t.mouseMoved / n, t.events / n,
+				t.target / n, t.apply / n, 1000 * (t.target + t.apply) / math.max(1, t.entries), t.after / n)
+			ns.Print(line)
+			ns.Log("framepass", line)
+		end)
 	elseif cmd == "debug" and arg == "cvarcost" then
 		ns.DebugCVarCost()
 	elseif cmd == "debug" and arg == "director" then

@@ -9126,6 +9126,9 @@ end
 tickTables.hoverMouse = { at = -math.huge }
 
 function ns.UpdateFrames(cinematic, elapsed)
+	-- (/cine debug framepass: where a pass's time goes, ns.framePassTimes.)
+	local clock = ns.framePassTimes and debugprofilestop
+	local tick0 = clock and clock()
 	local now = GetTime()
 	SyncSwitches() -- (UpdateReadyOnly: the tick's second half, Core.lua)
 	if not ns.isRetail then
@@ -9245,6 +9248,7 @@ function ns.UpdateFrames(cinematic, elapsed)
 	-- Frames page): their own rows (rspGroup) decide for them, not the raid frames'.
 	local ownPartyRows = ns.db.raidStylePartySame == false
 	-- (Not while Inspect is picking frames, Why.lua: pointing at one would bring it up.)
+	local tick1 = clock and clock()
 	if cinematic and ns.db.mouseover and not ns.whyPicking then
 		local mouseRows = wipe(tickTables.mouseRows)
 		-- (Asked of every faded frame, many times a second: with the mouse
@@ -9311,6 +9315,7 @@ function ns.UpdateFrames(cinematic, elapsed)
 			end
 		end
 	end
+	local tick2 = clock and clock()
 	local events = tickTables.events
 	events.chat, events.whisper, events.typing = dockPeek, whisperUnread, typingWindows
 	-- (The Minimap, Quest tracker, Buffs/debuffs and Cooldown Manager pages'
@@ -9439,7 +9444,9 @@ function ns.UpdateFrames(cinematic, elapsed)
 	-- (Every frame at its alpha, none fading: ns.framesSettled, so the tick
 	-- can run this pass less often, Core.lua.)
 	local settled = not ns.layoutFadeUntil and not ns.previewRows
+	local tick3, targetTime = clock and clock(), 0
 	for _, entry in ipairs(ns.managed) do
+		local entryStart = clock and clock()
 		if entry.ownAlpha then
 			SyncOwnAlpha(entry)
 		end
@@ -9584,6 +9591,7 @@ function ns.UpdateFrames(cinematic, elapsed)
 			and entry.backgroundAlpha < 1) then
 			settled = false
 		end
+		if clock then targetTime = targetTime + clock() - entryStart end
 		if typingShown and entry.alpha < 1 then
 			-- Pressing Enter shows the chat input (and its window) at once.
 			ns.SetEntryAlpha(entry, 1)
@@ -9660,6 +9668,7 @@ function ns.UpdateFrames(cinematic, elapsed)
 			personalPower.mana = entry.alpha
 		end
 	end
+	local tick4 = clock and clock()
 	if personalPower.standIn then
 		personalPower.Apply()
 	end
@@ -9676,6 +9685,14 @@ function ns.UpdateFrames(cinematic, elapsed)
 		end
 	end
 	ns.framesSettled = settled
+	if clock then
+		local t = ns.framePassTimes
+		local tick5 = clock()
+		t.passes, t.entries = t.passes + 1, t.entries + #ns.managed
+		t.setup, t.hover, t.events = t.setup + tick1 - tick0, t.hover + tick2 - tick1, t.events + tick3 - tick2
+		t.target, t.apply, t.after = t.target + targetTime, t.apply + (tick4 - tick3 - targetTime), t.after + tick5 - tick4
+		t.mouseMoved = t.mouseMoved + ((tickTables.hoverMouse.at == GetTime()) and 1 or 0)
+	end
 end
 
 -- Frames beyond the built-in list (and built-in ones kept up): added ones (including auto-matched) and
