@@ -32,7 +32,9 @@ local WHO = "script"
 local MOVE_MIN_TIME = 1     -- seconds: the shortest turn, tilt or zoom
 local MIN_SETTING = 1       -- the lowest speed setting sent (lower, the game uses its full speed)
 local MIN_SPEED = 1         -- degrees a second: the slowest a move goes (its end creeps in at this)
-local CHANGE = 0.02         -- speed setting changes smaller than this share aren't sent
+local CHANGE = 0.05         -- speed setting changes smaller than this share aren't sent (each
+                            -- write costs the game ~0.7 ms: 2% had 20 a second; the moves'
+                            -- distances stay exact, as they add up the speed sent)
 local PRIME_TIME = 0.2      -- seconds the lowest setting goes in before a move starts...
 local PRIME_SHARE = 0.001   -- ...creeping meanwhile at this share of it (see FLYBY.PRIME_SHARE)
 local RESTORE_DELAY = 0.3   -- seconds after a move stops before your speed setting comes back
