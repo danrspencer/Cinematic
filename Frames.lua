@@ -2833,7 +2833,13 @@ do
 		for _, role in ipairs(OLD_ROLES) do db[role[1]] = nil end
 	end
 
-	function ns.RuleShows(key, facts)
+	-- (Each row's answer kept while the shared facts' stamp stays the same:
+	-- asked ~20 times a frame in CineMode, mostly the same rows again.)
+	-- (Rule or ticks alike, mostly ticks: kept at most SHOWN_KEEP seconds, so a
+	-- rule or tick changed on a page shows within that.)
+	local SHOWN_KEEP = 0.5
+	local shown, shownStamp, shownAt = {}, {}, {}
+	local function Shows(key, facts)
 		local test = ns.RuleTest(key)
 		if test then
 			return test(facts) and true or false
@@ -2842,6 +2848,15 @@ do
 		if facts.cinemode and ns.IsCineModeShowOn(key) then
 			return true
 		end
+	end
+	function ns.RuleShows(key, facts)
+		if facts ~= ns.sharedFacts or key == nil then return Shows(key, facts) end
+		local stamp, now = ns.factsStamp, GetTime()
+		local at = shownAt[key]
+		if shownStamp[key] == stamp and at and now >= at and now - at < SHOWN_KEEP then return shown[key] end
+		local answer = Shows(key, facts)
+		shown[key], shownStamp[key], shownAt[key] = answer, stamp, now
+		return answer
 	end
 	-- The row's rule, compiled, when it has one that reads. (Kept per row till
 	-- its text changes: asked for each row on every tick.)
@@ -3278,6 +3293,7 @@ do
 	-- once when a fight starts or ends or the events below change them
 	-- (target, casts, mount, place, group); the camera words each frame.
 	local facts = {}
+	local factsBefore = {} -- (its values as last stamped: see the end of ns.RuleFacts)
 	local factsAt, factsFight, factsCameraAt -- (not in facts: Frames.lua walks its fields for changes)
 	local FACTS_HOLD = 0.1
 	do
@@ -3309,7 +3325,18 @@ do
 		facts.target = counts and anyTarget
 		facts.enemy = counts and enemyTarget == true
 		facts.friendly = counts and anyTarget and enemyTarget == false
+		-- The stamp of the facts as handed out now (ns.factsStamp: not in facts,
+		-- whose fields are walked for changes): the last full working out, and
+		-- the words each call sets. ns.RuleShows keeps each row's answer till
+		-- it changes. (ns.sharedFacts: the one table it holds for.)
+		local sig = (facts.combat and 1 or 0) + (facts.nocombat and 2 or 0) + (facts.cinemode and 4 or 0)
+			+ (facts.entering and 8 or 0) + (facts.leaving and 16 or 0) + (facts.tipenemy and 32 or 0)
+			+ (facts.tipfriendly and 64 or 0) + (facts.tipgather and 128 or 0) + (facts.tipquest and 256 or 0)
+			+ (facts.tipother and 512 or 0) + (facts.target and 1024 or 0) + (facts.enemy and 2048 or 0)
+			+ (facts.friendly and 4096 or 0)
+		ns.factsStamp = ns.factsGen * 8192 + sig
 	end
+	ns.factsGen, ns.sharedFacts = 0, facts
 	function ns.RuleFacts(inCombat)
 		local now = GetTime()
 		inCombat = inCombat and true or false
@@ -3335,12 +3362,17 @@ do
 			if factsAt ~= now and factsCameraAt ~= now then
 				factsCameraAt = now
 				local script = ns.PlayingCameraScript ~= nil and ns.PlayingCameraScript() ~= nil
-				facts.camera = ns.activeCam ~= nil or script
+				local camera = ns.activeCam ~= nil or script
+				local changed = facts.camera ~= camera or facts.cam_script ~= script
+				facts.camera, facts.cam_script = camera, script
 				local scripted = ns.PlayingCameraKey and ns.PlayingCameraKey()
 				for _, cam in ipairs(ns.RULE_CAMERAS) do
-					if cam[2] then facts[cam[1]] = ns.activeCam == cam[2] or scripted == cam[2] end
+					if cam[2] then
+						local on = ns.activeCam == cam[2] or scripted == cam[2]
+						if facts[cam[1]] ~= on then facts[cam[1]], changed = on, true end
+					end
 				end
-				facts.cam_script = script
+				if changed then ns.factsGen = ns.factsGen + 1 end -- (a camera word changed: the rows' answers too)
 			end
 			SetTargetWords()
 			return facts
@@ -3425,6 +3457,18 @@ do
 		-- (Your class: true for its word; the others never set, so nil.)
 		local _, class = UnitClass("player")
 		if class then facts[class:lower()] = true end
+		-- (The stamp moves only when a fact did: standing still, the rows'
+		-- answers stay kept across workings out.)
+		local changed = false
+		for word, value in pairs(facts) do
+			if factsBefore[word] ~= value then
+				factsBefore[word], changed = value, true
+			end
+		end
+		if changed then
+			ns.factsGen = ns.factsGen + 1
+			SetTargetWords()
+		end
 		return facts
 	end
 	-- The same, in a fight only while really in one (the nameplates and unit frame parts).

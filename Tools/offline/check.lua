@@ -273,6 +273,22 @@ if arg[1] and not update then
 		ns.RuleFacts(false)
 		if works2 == w then Problem("rule facts not worked out again as the target changed") end
 		ns.GetPlaceType = keptPlace
+		-- A row's Show in answer (ns.RuleShows): kept while the facts' stamp
+		-- holds, worked out again as it changes (a fight, the next working out),
+		-- and never kept for facts of the caller's own.
+		local keptRules = ns.db.frameRules
+		ns.db.frameRules = { ["check:row"] = "combat" }
+		t = t + 1
+		local facts = ns.RuleFacts(false)
+		if ns.RuleShows("check:row", facts) ~= false then Problem("rule 'combat' shows out of a fight") end
+		facts = ns.RuleFacts(true)
+		if ns.RuleShows("check:row", facts) ~= true then Problem("a kept answer outlived the fight word changing") end
+		ns.db.frameRules = { ["check:row"] = "not combat" }
+		t = t + 0.6
+		facts = ns.RuleFacts(true)
+		if ns.RuleShows("check:row", facts) ~= false then Problem("a kept answer outlived its rule's change by 0.5 s") end
+		if ns.RuleShows("check:row", { combat = false }) ~= true then Problem("an answer kept for the caller's own facts") end
+		ns.db.frameRules = keptRules
 		-- The camera script watcher's trigger (CameraScripts.lua): the same,
 		-- once per decision.
 		t = t + 0.02
