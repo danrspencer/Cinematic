@@ -965,3 +965,139 @@ function ns.PrintQuestGlowDebug()
 		type(icon) ~= "table" and "none" or hiddenIcons[icon] and "hidden by us" or "left alone",
 		tostring(OwnIconShows(IsObject(SOFT)))))
 end
+
+-- /cine debug questcursor: for a "Quest givers nearby" minimap reveal that
+-- works without Questie. The game shows a quest cursor over an NPC with a
+-- quest for you ("Quest" for one on offer, "QuestTurnIn" for a hand-in, and
+-- "Unable..." ones, greyed, out of reach): asked for every NPC nameplate up
+-- now (SetUnitCursorTexture, as CursorOf), each answer named by the cursor
+-- file it is. Says how far each NPC is too, as the game will tell.
+do
+	local NAMES = { "Quest", "QuestRepeatable", "QuestTurnIn", "QuestInteract", "CampaignQuest",
+		"CampaignQuestTurnIn", "LegendaryQuest", "LegendaryQuestTurnIn", "Important", "ImportantTurnIn",
+		"Recurring", "RecurringTurnIn", "Wrapper", "WrapperTurnIn", "Point", "Speak", "Interact", "Buy",
+		"Repair", "Taxi", "Innkeeper", "Mail", "Trainer", "Attack", "Inspect", "Pickup", "Gather",
+		"Mine", "Herb", "LootAll", "Directions" }
+	local fileNames
+	local function FileNames()
+		if fileNames then return fileNames end
+		fileNames = {}
+		local test = CreateFrame("Frame"):CreateTexture()
+		for _, folder in ipairs(CURSOR_FOLDERS) do
+			for _, name in ipairs(NAMES) do
+				for _, variant in ipairs({ name, "Unable" .. name }) do
+					test:SetTexture(nil)
+					pcall(test.SetTexture, test, folder .. variant)
+					local file = test:GetTexture()
+					if type(file) == "number" and Known(file) and not fileNames[file] then
+						fileNames[file] = variant .. (folder:find("Crosshair") and " (crosshair)" or "")
+					end
+				end
+			end
+		end
+		return fileNames
+	end
+
+	function ns.QuestCursorDebug()
+		local names = FileNames()
+		local count, known = 0, 0
+		for _ in pairs(names) do known = known + 1 end
+		ns.Log("questcursor", ("game %s, %d cursor files known, SetUnitCursorTexture %s"):format(
+			tostring(select(2, GetBuildInfo())), known, tostring(SetUnitCursorTexture ~= nil)))
+		for i = 1, 40 do
+			local unit = "nameplate" .. i
+			if UnitExists(unit) and not ns.Flag(UnitIsPlayer(unit)) then
+				count = count + 1
+				local cursor = CursorOf(unit)
+				local named = type(cursor) == "number" and names[cursor] or nil
+				local inRange = CheckInteractDistance and select(2, pcall(CheckInteractDistance, unit, 4))
+				ns.Log("questcursor", ("  %s %s: cursor %s (%s), within 28 yd %s, quest cursor %s"):format(unit,
+					Known(UnitName(unit)) and tostring(UnitName(unit)) or "secret", tostring(cursor),
+					named or (type(cursor) == "string" and "atlas" or "unknown"),
+					Known(inRange) and tostring(inRange) or "secret", tostring(QuestCursor(cursor))))
+			end
+		end
+		if count == 0 then ns.Log("questcursor", "  no NPC nameplates up (friendly NPC nameplates off?)") end
+		ns.Print(("questcursor: %d NPC nameplates asked, /reload to save the log"):format(count))
+	end
+end
+
+-- Quest givers nearby (Minimap page, Reveal): the minimap comes up while an
+-- NPC with a quest for you has its nameplate up near you, by the cursor the
+-- game would show over them (CursorOf): a quest one, greyed ("Unable...") or
+-- not, for a quest on offer; a turn-in one with Quest turn-ins ticked. Works
+-- without any other addon. (NodeSweep.lua's ns.IsMinimapRevealed asks.)
+do
+	local LOOK_EVERY = 1 -- seconds between two looks
+	local HOLD = 3       -- seconds it stays up after the last look that found one
+	local GIVER_CURSORS = { "Quest", "QuestRepeatable", "CampaignQuest", "LegendaryQuest", "Important",
+		"Recurring", "Wrapper" }
+	local giverFiles -- cursor file -> "offer" or "turnin"
+	local function GiverFiles()
+		if giverFiles then return giverFiles end
+		giverFiles = {}
+		local test = CreateFrame("Frame"):CreateTexture()
+		for _, folder in ipairs(CURSOR_FOLDERS) do
+			for _, name in ipairs(GIVER_CURSORS) do
+				for _, variant in ipairs({ name, "Unable" .. name, name .. "TurnIn", "Unable" .. name .. "TurnIn" }) do
+					test:SetTexture(nil)
+					pcall(test.SetTexture, test, folder .. variant)
+					local file = test:GetTexture()
+					if type(file) == "number" and Known(file) and not giverFiles[file] then
+						giverFiles[file] = variant:find("TurnIn") and "turnin" or "offer"
+					end
+				end
+			end
+		end
+		return giverFiles
+	end
+
+	-- What the cursor over unit says: "offer", "turnin" or nil.
+	local function GiverKind(unit)
+		local cursor = CursorOf(unit)
+		if type(cursor) == "number" then return GiverFiles()[cursor] end
+		if type(cursor) == "string" then
+			local name = cursor:lower()
+			if not name:find("quest", 1, true) then return nil end
+			return name:find("turnin", 1, true) and "turnin" or "offer"
+		end
+		return nil
+	end
+
+	local look = { at = -math.huge, seenAt = -math.huge, names = nil }
+
+	function ns.QuestGiversPossible()
+		return SetUnitCursorTexture ~= nil
+	end
+
+	function ns.QuestGiversRevealed(now)
+		local db = ns.db
+		if not (db and db.handleMinimap ~= false and db.minimapQuestGivers == true and SetUnitCursorTexture) then
+			return false
+		end
+		if now - look.at >= LOOK_EVERY then
+			look.at = now
+			local ok, names = pcall(function()
+				local found = {}
+				for i = 1, 40 do
+					local unit = "nameplate" .. i
+					if UnitExists(unit) and not ns.Flag(UnitIsPlayer(unit)) then
+						local kind = GiverKind(unit)
+						if kind == "offer" or (kind == "turnin" and db.minimapRevealTurnIns == true) then
+							local name = UnitName(unit)
+							found[#found + 1] = Known(name) and type(name) == "string" and name or "a quest giver"
+						end
+					end
+				end
+				return found
+			end)
+			if ok and #names > 0 then
+				table.sort(names)
+				look.seenAt = now
+				look.names = table.concat(names, ", ")
+			end
+		end
+		if now - look.seenAt < HOLD then return true, look.names end
+		return false
+	end
+end

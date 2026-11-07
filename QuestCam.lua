@@ -1546,11 +1546,17 @@ function ns.QuestCamZoomingBack()
 	return (zoomer.leaving and zoomer.moving) or zoomer.pending ~= nil
 end
 
--- A quest giver's window just closed (accepted, handed in...), the
--- conversation not over yet (CLOSE_GRACE): quest scripts hold where they
--- are meanwhile (CameraScripts.lua). Not once you've left (Escape, Goodbye).
-function ns.QuestCamClosing()
-	return cam.since ~= nil and cam.closingAt ~= nil and cam.closingAt ~= 0
+-- When a quest giver's window closed as you stepped on (accepted, handed
+-- in, picked the next), the conversation not over yet (CLOSE_GRACE): for a
+-- quest script's Its quest window closes rule (CameraScripts.lua). Nil
+-- with a window open, once you've left (Escape, Goodbye), or till the next
+-- frame has said which it was (LeftOrStepped).
+function ns.QuestCamClosedAt()
+	if cam.since and cam.closingAt and cam.closingAt ~= 0 and not cam.closedAt then return cam.closingAt end
+end
+-- A quest giver's window open now (the next one, after a close).
+function ns.QuestCamWindowUp()
+	return cam.since ~= nil and cam.closingAt == nil
 end
 
 -- Whether the quest cam is running now.

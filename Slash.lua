@@ -1354,6 +1354,18 @@ local function HandleSlash(msg)
 		ns.Print(("minimap icon methods (%d): %s"):format(#methods, #methods > 0 and table.concat(methods, ", ") or "none"))
 	elseif cmd == "debug" and arg == "nodeoffset" then
 		ns.NodeOffsetWatch()
+	elseif cmd == "debug" and arg == "questcursor" then
+		-- (The quest cursor over each NPC nameplate: QuestGlow.lua.)
+		ns.QuestCursorDebug()
+	elseif cmd == "debug" and arg == "questie" then
+		-- (Use Questie DB on the Minimap page: what Questie's icons say now, Support/QuestieMinimap.lua.)
+		for _, line in ipairs(ns.QuestieMinimapReport()) do ns.Print("questie: " .. line) end
+	elseif cmd == "debug" and arg:find("^blips") then
+		-- (The minimap's dots from a picture of ours: NodeSweep.lua.)
+		ns.BlipsTest(arg:match("^blips%s*(.*)$"))
+	elseif cmd == "debug" and arg:find("^offers") then
+		-- (Quests on offer near you, the minimap's "!": NodeSweep.lua.)
+		ns.OffersTest()
 	elseif cmd == "debug" and arg:find("^nodes") then
 		ns.NodesDebug(arg:match("^nodes%s*(.*)$"))
 	elseif cmd == "facing" then

@@ -6539,7 +6539,7 @@ local function CreateCombatPanel()
 			section.body:SetShown(i == shown)
 		end
 		ShowTab(shown)
-		panel:SetPoint("BOTTOMRIGHT", sections[shown].last, "BOTTOMLEFT", sections[shown].width + 12, -12)
+		panel:SetPoint("BOTTOMRIGHT", sections[shown].last, "BOTTOMLEFT", sections[shown].width + 6, -12)
 		FitContentHeight(content)
 	end
 	local function Pick(section)
@@ -7552,7 +7552,7 @@ end
 -- tabs (hidden ones are left out), Show(i) to light tab i and lay out those
 -- shown, the base (the caller puts it at the panel's
 -- top left: the bottom row's bottom left) and how high the tabs reach above it.
-ns.FOLDER_TAB_HEIGHT = 24
+ns.FOLDER_TAB_HEIGHT = 20
 function ns.FolderTabs(parent, list, onClick, width, maxWidth, onRightClick)
 	local TAB_H, TAB_GAP = ns.FOLDER_TAB_HEIGHT, 3
 	local PANEL_BG, TAB_BG = { 0.12, 0.12, 0.13, 0.9 }, { 0.04, 0.04, 0.05, 0.9 }
@@ -7562,6 +7562,10 @@ function ns.FolderTabs(parent, list, onClick, width, maxWidth, onRightClick)
 	local function Line(frame, color)
 		local line = frame:CreateTexture(nil, "BORDER")
 		line:SetColorTexture(unpack(color))
+		-- (Off the pixel grid: snapped, a line this thin can round to nothing
+		-- on some rows, like the panel's bottom under the Keybinds rows.)
+		if line.SetSnapToPixelGrid then line:SetSnapToPixelGrid(false) end
+		if line.SetTexelSnappingBias then line:SetTexelSnappingBias(0) end
 		return line
 	end
 	local panelBg = panel:CreateTexture(nil, "BACKGROUND")
@@ -7580,6 +7584,20 @@ function ns.FolderTabs(parent, list, onClick, width, maxWidth, onRightClick)
 	local topLeft, topRight = Line(panel, EDGE), Line(panel, EDGE)
 	topLeft:SetHeight(1)
 	topRight:SetHeight(1)
+	-- The panel's edges one screen pixel thick, whatever the scale (a fixed 1
+	-- is less than a pixel in the settings), worked out each time it shows.
+	local function EdgeThickness()
+		local scale = panel:GetEffectiveScale()
+		if not (PixelUtil and PixelUtil.GetPixelToUIUnitFactor and scale and scale > 0) then return end
+		local px = math.max(1, PixelUtil.GetPixelToUIUnitFactor() / scale)
+		leftEdge:SetWidth(px)
+		rightEdge:SetWidth(px)
+		bottomEdge:SetHeight(px)
+		topLeft:SetHeight(px)
+		topRight:SetHeight(px)
+	end
+	EdgeThickness()
+	panel:HookScript("OnShow", EdgeThickness)
 	local function PaintTab(tab, on)
 		tab:SetHeight(on and TAB_H + 4 or TAB_H)
 		tab.bg:SetColorTexture(unpack(on and PANEL_BG or TAB_BG))
@@ -7596,11 +7614,11 @@ function ns.FolderTabs(parent, list, onClick, width, maxWidth, onRightClick)
 	local tabs = {}
 	for i, each in ipairs(list) do
 		local tab = CreateFrame("Button", nil, parent)
-		tab.label = tab:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+		tab.label = tab:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
 		tab.label:SetPoint("CENTER", 0, 1)
 		tab:SetFontString(tab.label)
 		tab:SetText(each[1])
-		tab:SetSize(width or math.max(48, math.ceil(tab.label:GetStringWidth()) + 14), TAB_H)
+		tab:SetSize(width or math.max(40, math.ceil(tab.label:GetStringWidth()) + 12), TAB_H)
 		tab.bg = tab:CreateTexture(nil, "BACKGROUND")
 		tab.bg:SetAllPoints()
 		tab.left, tab.right, tab.top = Line(tab, EDGE), Line(tab, EDGE), Line(tab, EDGE)
@@ -11018,6 +11036,34 @@ local function CreateMinimapPanel()
 				previousReveal.revealIndent = 16
 			end
 		end
+	end
+	-- Quest givers nearby (QuestGlow.lua): NPC nameplates the game would show
+	-- a quest cursor over. (Hidden on a client without SetUnitCursorTexture.)
+	if ns.QuestGiversPossible and ns.QuestGiversPossible() then
+		local givers = Check(content, "minimapQuestGivers", L["Quest givers nearby"],
+			L["The minimap comes up while an NPC with a quest you can pick up is near you, as the game's quest " ..
+			"cursor over them says (no other addon needed), and an NPC you can hand a quest in to with Quest " ..
+			"turn-ins ticked. Only NPCs with their nameplate up count: turn on friendly NPC nameplates in the " ..
+			"game's settings. The minimap fades again a few seconds after they're gone."])
+		givers:SetPoint("TOPLEFT", previousReveal, "BOTTOMLEFT", -(previousReveal.revealIndent or 0),
+			previousReveal.revealIndent and -6 or -2)
+		previousReveal = givers
+	end
+	-- Use Questie DB (Support/QuestieMinimap.lua): Questie's own minimap
+	-- icons reveal it too. Greyed out while Questie isn't loaded; hidden on
+	-- retail, which Questie never runs on.
+	if ns.QuestieMinimapPossible and ns.QuestieMinimapPossible() then
+		local questie = Check(content, "minimapQuestie", L["Use Questie DB"],
+			L["With Questie loaded, the minimap comes up while one of Questie's own icons for a quest you can pick " ..
+			"up (its \"!\") is on it, and its turn-ins (\"?\") too with Quest turn-ins ticked. A quest giver who " ..
+			"walks around counts anywhere along their route, and when their nameplate is near you. Questie's own " ..
+			"settings decide which icons it shows (its level filter, for one), and only those count. Cinematic " ..
+			"checks every second; the minimap fades again a few seconds after the last one is gone."] ..
+			(ns.QuestieLoaded() and "" or ("\n\n" .. L["Needs Questie: it isn't loaded."])))
+		questie:SetPoint("TOPLEFT", previousReveal, "BOTTOMLEFT", -(previousReveal.revealIndent or 0),
+			previousReveal.revealIndent and -6 or -2)
+		GreyUnless(questie, function() return ns.QuestieLoaded() end)
+		previousReveal = questie
 	end
 	local onTaxi = Check(content, "minimapHideOnTaxi", L["Not on flight paths"],
 		L["On a flight path the minimap stays hidden: pings, the reveals above and the tracking and zones under " ..

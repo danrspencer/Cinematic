@@ -147,6 +147,7 @@ EmoteVision.lua
 Focus.lua
 Tracking.lua
 NodeSweep.lua
+Support\QuestieMinimap.lua
 Slash.lua
 Why.lua
 CursorHide.lua

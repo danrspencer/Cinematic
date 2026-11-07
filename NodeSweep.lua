@@ -1550,12 +1550,30 @@ end
 -- stays up through it, rather than fading once the hold runs out and coming
 -- back as it ends. nil out of fights; true or false, latched at its start.)
 local heldIntoFight
+-- (Quest givers nearby, QuestGlow.lua: an NPC nameplate with a quest cursor;
+-- Use Questie DB, Support/QuestieMinimap.lua: Questie's own "!" and "?"
+-- icons near you. Each counts as found, on top of the rest; guarded there too.)
+local GIVER_CHECKS = { "QuestGiversRevealed", "QuestieMinimapRevealed" }
+local function GiversFound(now)
+	local any = false
+	for _, key in ipairs(GIVER_CHECKS) do
+		local ok, shown, names = false, nil, nil
+		if ns[key] then ok, shown, names = pcall(ns[key], now) end
+		if ok and shown then
+			seenAt = now
+			revealedBy = names
+			any = true
+		end
+	end
+	return any
+end
 function ns.IsMinimapRevealed(now)
-	if QuestReveal() then return QuestReveals(now) end
+	local questie = GiversFound(now)
+	if QuestReveal() then return QuestReveals(now) or questie end
 	if not AnyReveal() then
 		nodes = {}
 		heldIntoFight = nil
-		return false
+		return questie
 	end
 	if InCombatLockdown() or ns.Flag(UnitAffectingCombat("player")) then
 		if heldIntoFight == nil then heldIntoFight = now - seenAt < HOLD end
@@ -1581,7 +1599,9 @@ end
 -- last found that revealed it (names, or nil), and whether it's held up
 -- through a fight it was up at the start of.
 function ns.MinimapRevealWhy(now)
-	if not (AnyReveal() or QuestReveal()) or now - seenAt >= HOLD then return false end
+	local givers = ns.QuestieMinimapOn and ns.QuestieMinimapOn()
+		or ns.db and ns.db.minimapQuestGivers == true and ns.QuestGiversPossible and ns.QuestGiversPossible()
+	if not (AnyReveal() or QuestReveal() or givers) or now - seenAt >= HOLD then return false end
 	return true, revealedBy, heldIntoFight == true
 end
 
@@ -1721,4 +1741,329 @@ function ns.NodeSweepReport()
 			or (("%d points %d apart (over a few frames), heard %s"):format(last.probes or 0, last.step or STEP,
 				last.names ~= "" and last.names or "nothing")),
 		seenAt > -math.huge and ("%.1fs ago"):format(GetTime() - seenAt) or "never")
+end
+
+-- /cine debug offers: tests for finding quests on offer near you (the "!" on
+-- the minimap) on WoW Forever, whose game 70862 answers the pretend mouse only
+-- for where the REAL mouse is (NodeSpacesTest). So: move the faded minimap so
+-- each grid point sits under your real mouse, and ask then. Tried two ways: all
+-- points in one call ("same frame"), and one point a frame ("frame by frame",
+-- in case the game only sees the move on the next frame), each with and
+-- without the soft cursor. Then a scan of the game's functions for any that
+-- name quests on offer, and what NPC nameplates say. All to the log.
+do
+	local OFFER_STEP = 16 -- minimap units between grid points
+	local job -- the frame-by-frame run while it goes
+	local function Log(text) ns.Log("offers", text) end
+
+	-- The heard lines (text -> count, how it was heard, the line's fields), into found.
+	local function Note(found, data, how)
+		if Secret(data) or type(data) ~= "table" then return end
+		local lines = data.lines
+		if type(lines) ~= "table" or Secret(lines) then return end
+		for _, line in ipairs(lines) do
+			local text = line.leftText
+			if type(text) == "string" and not Secret(text) then
+				local entry = found[text]
+				if not entry then
+					local keys = {}
+					for key, value in pairs(line) do
+						keys[#keys + 1] = ("%s=%s"):format(tostring(key),
+							Secret(value) and "secret" or type(value) == "table" and "table" or tostring(value))
+					end
+					table.sort(keys)
+					entry = { count = 0, how = {}, fields = table.concat(keys, " ") }
+					found[text] = entry
+				end
+				entry.count = entry.count + 1
+				entry.how[how] = true
+			end
+		end
+	end
+
+	local function Report(label, found, points)
+		local names = {}
+		for text, entry in pairs(found) do
+			local hows = {}
+			for how in pairs(entry.how) do hows[#hows + 1] = how end
+			table.sort(hows)
+			names[#names + 1] = ("\"%s\" x%d [%s] {%s}"):format((text:gsub("|", "||")), entry.count,
+				table.concat(hows, ","), entry.fields)
+		end
+		table.sort(names)
+		Log(("%s: %d points, heard %s"):format(label, points, #names > 0 and table.concat(names, "; ") or "NOTHING"))
+	end
+
+	-- The grid's points (minimap units from the middle).
+	local function Grid()
+		local half = (Minimap:GetWidth() or 0) / 2
+		local points = {}
+		for x = -half, half, OFFER_STEP do
+			for y = -half, half, OFFER_STEP do
+				if x * x + y * y <= half * half then points[#points + 1] = { x, y } end
+			end
+		end
+		return points
+	end
+
+	-- Puts the minimap's point dx, dy right under the real mouse; returns the
+	-- mouse's screen pixels.
+	local function UnderMouse(dx, dy)
+		local cx, cy = GetCursorPosition()
+		local s = Minimap:GetEffectiveScale()
+		Minimap:ClearAllPoints()
+		Minimap:SetPoint("CENTER", UIParent, "BOTTOMLEFT", cx / s - dx, cy / s - dy)
+		return cx, cy
+	end
+
+	local function Ask(found, cx, cy)
+		pcall(Minimap.SetUsingSoftCursor, Minimap, true)
+		Note(found, select(2, pcall(MouseoverAt, cx, cy)), "soft")
+		pcall(Minimap.SetUsingSoftCursor, Minimap, false)
+		Note(found, select(2, pcall(C_TooltipInfo.GetMinimapMouseover)), "plain")
+	end
+
+	-- The minimap as it is (grown to full size if faded), to put back after.
+	local function Save()
+		local saved = { scale = Minimap:GetScale(), points = {} }
+		for i = 1, Minimap:GetNumPoints() do saved.points[i] = { Minimap:GetPoint(i) } end
+		local ok, putBack = pcall(Grow)
+		saved.putBack = ok and putBack or nil
+		saved.grownScale = Minimap:GetScale()
+		return saved
+	end
+	local function Restore(saved)
+		pcall(Minimap.SetUsingSoftCursor, Minimap, false)
+		if saved.putBack then
+			pcall(saved.putBack)
+			return
+		end
+		Minimap:SetScale(saved.scale)
+		Minimap:ClearAllPoints()
+		for _, p in ipairs(saved.points) do Minimap:SetPoint(unpack(p)) end
+	end
+
+	local function Show(v)
+		if Secret(v) then return "secret" end
+		if type(v) == "table" then
+			local n = 0
+			for _ in pairs(v) do n = n + 1 end
+			return ("table of %d"):format(n)
+		end
+		return tostring(v)
+	end
+
+	-- What else could name quests on offer: the game's functions, and NPCs.
+	local function Scan()
+		local hits = {}
+		for space, api in pairs(_G) do
+			if type(space) == "string" and space:find("^C_") and type(api) == "table" then
+				for name, fn in pairs(api) do
+					if type(name) == "string" and type(fn) == "function"
+						and (name:find("Avail") or name:find("Offer") or name:find("Giver") or name:find("Hub")
+							or (space:find("Quest") and (name:find("Near") or name:find("POI") or name:find("Map")))) then
+						hits[#hits + 1] = space .. "." .. name
+					end
+				end
+			end
+		end
+		table.sort(hits)
+		Log("functions: " .. (#hits > 0 and table.concat(hits, ", ") or "none"))
+		local mapID = C_Map and C_Map.GetBestMapForUnit("player")
+		for _, path in ipairs(hits) do
+			local space, name = path:match("^(.-)%.(.+)$")
+			-- (Only the ones that look like they list things for a map, and only
+			-- ones that just read: Get, Is, Has, Does. Called with it.)
+			if (name:find("Avail") or name:find("Offer") or name:find("Hub"))
+				and (name:find("^Get") or name:find("^Is") or name:find("^Has") or name:find("^Does")) then
+				local ok, a, b = pcall(_G[space][name], mapID)
+				Log(("  %s(map %s): %s"):format(path, tostring(mapID),
+					ok and (Show(a) .. ", " .. Show(b)) or ("error " .. tostring(a))))
+			end
+		end
+		local npcs = 0
+		for i = 1, 40 do
+			local unit = "nameplate" .. i
+			if UnitExists(unit) and not ns.Flag(UnitIsPlayer(unit)) then
+				npcs = npcs + 1
+				local related = C_QuestLog and C_QuestLog.UnitIsRelatedToActiveQuest
+					and select(2, pcall(C_QuestLog.UnitIsRelatedToActiveQuest, unit))
+				local texts = {}
+				local ok, data = pcall(C_TooltipInfo and C_TooltipInfo.GetUnit or error, unit)
+				if ok and type(data) == "table" and not Secret(data) and type(data.lines) == "table" then
+					for _, line in ipairs(data.lines) do
+						texts[#texts + 1] = Show(line.leftText) .. "/" .. Show(line.type)
+					end
+				end
+				Log(("  npc %s: %s, related %s, tooltip [%s]"):format(unit, Show(UnitName(unit)), Show(related),
+					table.concat(texts, " | ")))
+			end
+		end
+		if npcs == 0 then Log("  no NPC nameplates up (friendly nameplates off?)") end
+	end
+
+	local function Finish(found, points)
+		Report("under the mouse, frame by frame" .. (InCombatLockdown() and " (cut short by a fight)" or ""),
+			found, points)
+		pcall(Scan)
+		-- (Not ReloadUI here: from a timer the game blocks it, tested.)
+		ns.Print("offers: done, /reload to save the log")
+	end
+
+	function ns.OffersTest()
+		if job then return ns.Print("offers: already running") end
+		if InCombatLockdown() then return ns.Print("offers: not in a fight") end
+		if not HasSweepApi() then
+			Log("this client has no pretend mouse for the minimap")
+			pcall(Scan)
+			return
+		end
+		Log(("game %s, minimap alpha %.2f, mouse %s it"):format(tostring(select(2, GetBuildInfo())),
+			Minimap:GetEffectiveAlpha(), ns.Flag(Minimap:IsMouseOver()) and "on" or "off"))
+		ns.minimapUnderTest = true -- (Frames.lua: the minimap under your mouse isn't hovered)
+		local grid = Grid()
+		-- 1. The old way, as a check: each point asked where it is (should hear nothing now).
+		local saved = Save()
+		local found = {}
+		local ok, err = pcall(function()
+			local left, bottom = Minimap:GetLeft(), Minimap:GetBottom()
+			local s, half = Minimap:GetEffectiveScale(), Minimap:GetWidth() / 2
+			pcall(Minimap.SetUsingSoftCursor, Minimap, true)
+			for _, p in ipairs(grid) do
+				Note(found, select(2, pcall(MouseoverAt, (left + half + p[1]) * s, (bottom + half + p[2]) * s)), "soft")
+			end
+		end)
+		if not ok then Log("old way stopped: " .. tostring(err)) end
+		Report("old way (point asked)", found, #grid)
+		-- 2. Same frame: the minimap moved under the mouse for each point.
+		found = {}
+		ok, err = pcall(function()
+			for _, p in ipairs(grid) do Ask(found, UnderMouse(p[1], p[2])) end
+		end)
+		if not ok then Log("same frame stopped: " .. tostring(err)) end
+		Report("under the mouse, same frame", found, #grid)
+		Restore(saved)
+		-- 3. Frame by frame: moved on one frame, asked on the next.
+		found = {}
+		saved = Save()
+		local i, moved = 0, false
+		job = CreateFrame("Frame")
+		local function Stop(self, why)
+			self:Hide()
+			job = nil
+			pcall(Restore, saved)
+			ns.minimapUnderTest = nil
+			if why then Log("frame by frame stopped: " .. tostring(why)) end
+			Finish(found, i)
+		end
+		ns.SetOnUpdate(job, function(self)
+			-- (Any error puts the minimap back first.)
+			local okStep, why = pcall(function()
+				if moved then
+					Ask(found, GetCursorPosition())
+					moved = false
+				end
+			end)
+			if not okStep then return Stop(self, why) end
+			if i >= #grid or InCombatLockdown() then return Stop(self) end
+			i = i + 1
+			local okMove
+			okMove, why = pcall(function()
+				Minimap:SetScale(saved.grownScale) -- (in case the fade shrank it again)
+				UnderMouse(grid[i][1], grid[i][2])
+			end)
+			moved = okMove
+			if not okMove then return Stop(self, why) end
+		end)
+		ns.Print(("offers: testing %d points, about %d seconds; keep the mouse still"):format(#grid,
+			math.ceil(#grid / 30) + 1))
+	end
+end
+
+-- /cine debug blips [16|8|blank|off]: can the minimap's dots be drawn from a
+-- picture of ours (Minimap:SetBlipTexture)? All its dots come from one grid of
+-- little icons; ours is a numbered grid (Textures/BlipGrid16: 16 by 16 cells,
+-- BlipGrid8: 8 by 8; our own art), so the number on the "!" says which cell
+-- the game uses for quests on offer. Then only that cell could be left in, and
+-- a faded minimap (its dots ignore its alpha) would show just the "!" marks.
+-- 15 seconds as is, icons bigger; 15 seconds with the minimap at alpha 0; then
+-- everything goes back. Run it with the minimap up (out of CineMode).
+do
+	local PICS = { ["16"] = "BlipGrid16", ["8"] = "BlipGrid8", blank = "BlipBlank" }
+	local DEFAULT_BLIPS = "Interface\\Minimap\\ObjectIconsAtlas"
+	local SHOWN, FADED = 15, 15 -- seconds of each part
+	local BIG = 2 -- icon scale while it runs (the numbers are small)
+	local run -- { frame, started, before } while it runs
+	local function Log(text) ns.Log("blips", text) end
+	local MinimapCluster = _G.MinimapCluster
+
+	local function PutBack()
+		if not run then return end
+		local before = run.before
+		run.frame:Hide()
+		pcall(Minimap.SetBlipTexture, Minimap, before.blips)
+		if Minimap.SetIconScale then
+			settingIcons = true
+			pcall(Minimap.SetIconScale, Minimap, iconScale)
+			settingIcons = false
+		end
+		Minimap:SetAlpha(before.alpha)
+		if MinimapCluster then MinimapCluster:SetAlpha(before.cluster) end
+		run = nil
+		ns.Print("blips: put back")
+	end
+
+	function ns.BlipsTest(arg)
+		arg = arg or ""
+		if arg:find("off") then
+			if run then PutBack() else ns.Print("blips: not running") end
+			return
+		end
+		if run then return ns.Print("blips: already running (/cine debug blips off)") end
+		local methods = {}
+		local index = getmetatable(Minimap) and getmetatable(Minimap).__index
+		for name in pairs(type(index) == "table" and index or {}) do
+			if type(name) == "string" and (name:find("Blip") or name:find("IconScale")) then methods[#methods + 1] = name end
+		end
+		table.sort(methods)
+		local current = Minimap.GetBlipTexture and select(2, pcall(Minimap.GetBlipTexture, Minimap))
+		Log(("game %s, minimap methods: %s; blip picture now %s"):format(tostring(select(2, GetBuildInfo())),
+			#methods > 0 and table.concat(methods, ", ") or "none", tostring(current)))
+		if not Minimap.SetBlipTexture then
+			ns.Print("blips: this client has no Minimap:SetBlipTexture (in the log)")
+			return
+		end
+		local pic = PICS[arg:match("%S+") or "16"] or PICS["16"]
+		local path = "Interface\\AddOns\\" .. ADDON_NAME .. "\\Textures\\" .. pic
+		local before = {
+			blips = type(current) == "string" and current ~= "" and current or DEFAULT_BLIPS,
+			alpha = Minimap:GetAlpha(),
+			cluster = MinimapCluster and MinimapCluster:GetAlpha() or 1,
+		}
+		local ok, err = pcall(Minimap.SetBlipTexture, Minimap, path)
+		Log(("SetBlipTexture(%s): %s"):format(pic, ok and "ok" or ("error " .. tostring(err))))
+		if not ok then return ns.Print("blips: the game refused the picture (in the log)") end
+		if Minimap.SetIconScale then
+			settingIcons = true
+			pcall(Minimap.SetIconScale, Minimap, BIG)
+			settingIcons = false
+		end
+		run = { frame = CreateFrame("Frame"), started = GetTime(), before = before }
+		local faded = false
+		ns.SetOnUpdate(run.frame, function()
+			local t = GetTime() - run.started
+			if t >= SHOWN + FADED then return PutBack() end
+			if t >= SHOWN then
+				if not faded then
+					faded = true
+					ns.Print("blips: minimap at alpha 0 now: do only the dots and your arrow show?")
+				end
+				-- (Every frame: CineMode's fade would set its own alpha back.)
+				Minimap:SetAlpha(0)
+				if MinimapCluster then MinimapCluster:SetAlpha(0) end
+			end
+		end)
+		ns.Print(("blips: the minimap's dots are %s for %d seconds: what number is on the \"!\"?"):format(
+			pic, SHOWN))
+	end
 end

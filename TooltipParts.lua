@@ -229,6 +229,28 @@ local function LinesToCut(tooltip, count, unit, object)
 			cut[i] = true
 		end
 	end
+	-- Blank lines left at the bottom once others are cut (the game's spacer
+	-- above a unit frame's right-click hint): an empty strip under the last line.
+	if next(cut) then
+		for i = count, 2, -1 do
+			if not cut[i] then
+				local okBlank, blank = pcall(function()
+					local function Empty(fs)
+						local t = fs and ns.Flag(fs:IsShown()) and fs:GetText()
+						if issecretvalue and issecretvalue(t) then
+							return false
+						end
+						return t == nil or t == false or (type(t) == "string" and not t:find("%S"))
+					end
+					return Empty(Left(i)) and Empty(Right(i))
+				end)
+				if not (okBlank and blank) then
+					break
+				end
+				cut[i] = true
+			end
+		end
+	end
 	return cut
 end
 

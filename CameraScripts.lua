@@ -192,6 +192,17 @@ ns.CAMERA_SCRIPT_RULES = {
 	-- (A cast or channel of yours ending or cancelled while it plays: a
 	-- Hearthstone's, however long haste makes it. Carry on unless set.)
 	{ key = "cast", actions = { "ignore", "putback", "stop" } },
+	-- (A window opening while it plays, with Pause cameras in windows on (the
+	-- Scenes page): Pause waits however long it's open. Not for scenes a
+	-- window starts, a quest giver's or an interaction's.)
+	{ key = "window", actions = { "pause", "ignore", "putback", "stop" }, noSecs = true },
+	-- (A quest giver's window closing as you accept, hand in or pick the next:
+	-- QuestCam.lua's ns.QuestCamClosedAt. Pause holds it still that long, the
+	-- conversation's end waiting for it; the next window opening carries on.)
+	{ key = "closed", actions = { "pause", "ignore", "putback", "stop" }, secs = 3 },
+	-- (Its steps all done, played for a trigger: Hold waits where it got to
+	-- till the trigger's over. Played by hand there's no trigger: When it ends.)
+	{ key = "done", actions = { "hold", "putback", "stop" }, noSecs = true },
 }
 local RULE_ACTIONS = {}
 for _, rule in ipairs(ns.CAMERA_SCRIPT_RULES) do
@@ -372,7 +383,7 @@ function ns.CleanCameraScript(script, id, keepSet, paths)
 		local action = given[rule.key]
 		rules[rule.key] = RULE_ACTIONS[rule.key][action] and action or rule.actions[1]
 		local secs = tonumber(given[rule.key .. "Secs"])
-		rules[rule.key .. "Secs"] = secs and math.max(1, math.min(60, secs)) or 5
+		rules[rule.key .. "Secs"] = secs and math.max(1, math.min(60, secs)) or rule.secs or 5
 		-- (Its tick: off, the event leaves it running; see Act.)
 		rules[rule.key .. "On"] = given[rule.key .. "On"] ~= false
 	end
@@ -488,23 +499,29 @@ end
 -- Cozy: half a turn round (180 degrees from where it started) while zooming in to cozyZoomClose,
 -- then the same round your front, its zoom drifting about the close-up.
 -- Leaving, the zoom goes back to where it began; the turn stays (as theirs
--- do). (Not the same yet: the cozy camera doesn't keep clear of Camp Tents.)
+-- do). A Camp Tent seen nearby: in to cozyTentClose, no drifting further out.
 function RestCamera(cam)
 	local o, z = cam .. "Orbit", cam .. "Zoom"
 	local front = cam == "cozy"
 	local loop = SwayLoop(o, Db(cam .. "Level", 5), cam .. "Level", front)
 	local steps
 	if front then
-		local close, near, far, time = Db("cozyZoomClose", 10), Db(z .. "In", 2), Db(z .. "Distance", 2), Db(z .. "Time", 10)
+		local close, near, far, time = Db("cozyZoomClose", 8), Db(z .. "In", 2), Db(z .. "Distance", 2), Db(z .. "Time", 10)
+		-- A Camp Tent seen nearby (Campfire.lua): closer still, and no drifting
+		-- further out, so the half turn doesn't swing through it.
+		local tent = ns.TentNearby and ns.TentNearby()
+		if tent then close, far = math.min(close, Db("cozyTentClose", 5)), 0 end
 		local pause, vary = Db(z .. "Pause", 4), Db(z .. "PauseVary", 0)
 		local wait = Set(vary > 0 and S("waitRand", { min = math.max(0, pause - vary), max = pause + vary })
 			or S("wait", { secs = pause }), z .. "Pause", z .. "PauseVary")
 		local drifts = On(Set(S("repeat", { times = 0, steps = { wait,
-			Set(ZoomStepOf(z, "zoomRand", { min = close - near, max = close + far, secs = time }), "cozyZoomClose",
-				z .. "In", z .. "Distance", z .. "Time", z .. "Ease", z .. "PastMax") } }), z .. "Random"),
+			Set(ZoomStepOf(z, "zoomRand", { min = math.max(1, close - near), max = close + far, secs = time }),
+				"cozyZoomClose", z .. "In", z .. "Distance", z .. "Time", z .. "Ease", z .. "PastMax",
+				tent and "cozyTentClose" or nil) } }), z .. "Random"),
 			Switch(z) and Switch(z .. "Random"))
 		steps = { S("together", { steps = { S("rotate", { deg = 180, secs = 14, way = "random" }),
-				On(Set(S("zoom", { to = close, secs = 9 }), z, "cozyZoomClose"), Switch(z)) } }),
+				On(Set(S("zoom", { to = close, secs = 9 }), z, "cozyZoomClose", tent and "cozyTentClose" or nil),
+					Switch(z)) } }),
 			S("together", { steps = { loop, drifts } }) }
 	else
 		-- (No line-up behind you first: camera follow never turns a camera
@@ -2601,6 +2618,14 @@ local function PauseSecs(rules, event)
 	return rules[event .. "On"] == false and 1 or rules[event .. "Secs"]
 end
 
+-- What one of the rules with no camera-input fallback says now: its tick off
+-- carries on (Hold, for Its steps run out).
+-- (On zoomer, as this file's main chunk is at Lua's 200 locals.)
+function zoomer.RuleAction(rules, event)
+	if rules[event .. "On"] == false then return event == "done" and "hold" or "ignore" end
+	return rules[event]
+end
+
 -- What a stop rule says to do. Off, its event carries on, except your
 -- camera input: that's still yours, carrying on a moment after you let go.
 local function Act(event)
@@ -2817,12 +2842,16 @@ local function Update(elapsed)
 		-- (Held as its quest window closed: your input meanwhile goes by its rules, as playing.)
 		if run.pausedBy == "closed" and (zoomed or moved) and Act(zoomed and "zoom" or "camera") then return end
 		if InFight() and Act("fight") then return end
-		if run.trigger and not run.triggerOn and Act("ends") then return end
+		-- (Held for its quest window closing: the trigger's end waits for the
+		-- hold, then comes without carrying on first.)
+		local forClosed = run.pausedBy == "closed"
+		if not forClosed and run.trigger and not run.triggerOn and Act("ends") then return end
 		-- (Its zoom speed still eases back to yours meanwhile: left at the crawl,
 		-- every pause of a steered auto-run kept your zoom creeping.)
 		if not zoomer.moving and zoomer.release then StepZoom(elapsed) end
 		if now < run.pausedUntil then return end
-		run.pausedUntil = nil
+		run.pausedUntil, run.pausedBy = nil, nil
+		if forClosed and run.trigger and not run.triggerOn and Act("ends") then return end
 		Resume()
 	end
 	if moved and run.travel then
@@ -2869,9 +2898,17 @@ local function Update(elapsed)
 			run.endingDone = true
 			Finish(run.why)
 		elseif not run.trigger then
-			BeginEnding("done")
+			BeginEnding("done") -- (played by hand: no trigger to hold for)
+		else
+			-- Played for a trigger (Its steps run out rule): Hold waits where it
+			-- got to until the trigger's over.
+			local doneDo = zoomer.RuleAction(run.script.rules, "done")
+			if doneDo == "putback" then
+				BeginEnding("done")
+			elseif doneDo == "stop" then
+				Finish("done")
+			end
 		end
-		-- (Run for a trigger: it holds where it got to until the trigger's over.)
 	end
 end
 
@@ -2889,29 +2926,44 @@ ns.SetOnUpdate(watcher, function(_, elapsed)
 			run.trigger = key
 		end
 		local on = key == run.trigger and camera == run.camera
-		-- (A window holding its trigger back: it waits where it is, however long,
-		-- and carries on as that closes; its trigger's looked at again then.)
+		-- A window holding its trigger back (A window opens rule). Pause: it
+		-- waits where it is, however long, and carries on as that closes; Carry
+		-- on: it plays on meanwhile. Either way its trigger counts as on till
+		-- the window closes, and is looked at again then.
 		local wait = held and not on
-		if wait and run.pausedBy ~= "window" then
+		local windowDo = zoomer.RuleAction(run.script.rules, "window")
+		if wait and (windowDo == "putback" or windowDo == "stop") and run.phase == "steps" then
+			ns.Log("state", "camera script: a window opened")
+			if windowDo == "stop" then Finish("window") else BeginEnding("window") end
+		elseif wait and windowDo == "pause" and run.pausedBy ~= "window" then
 			if not run.pausedUntil then Suspend() end
 			run.pausedUntil, run.pausedBy = math.huge, "window"
-		elseif not wait and run.pausedBy == "window" then
+		elseif not (wait and windowDo == "pause") and run.pausedBy == "window" then
 			run.pausedUntil, run.pausedBy = GetTime(), nil
 		end
-		run.triggerOn = on or wait
-		-- (A quest script, its window just closed: you accepted or handed in.
-		-- It stops where it is, a zoom in under way too, and holds; the zoom
-		-- back out comes once the conversation's over (QuestCam.lua's
-		-- CLOSE_GRACE), or it carries on if the next window opens. Turning
-		-- straight round to zoom out just after starting in jerked.)
-		local closed = on and run.phase == "steps" and IsQuestTrigger(run.trigger) and ns.QuestCamClosing
-			and ns.QuestCamClosing()
-		if closed and not run.pausedUntil then
-			Suspend()
-			run.pausedUntil, run.pausedBy = math.huge, "closed"
-			ns.Log("state", "camera script held: quest window closed")
-		elseif not closed and run.pausedBy == "closed" then
-			run.pausedUntil, run.pausedBy = GetTime(), nil
+		if run then run.triggerOn = on or wait end
+		-- A quest script, its window just closed as you accepted, handed in
+		-- or picked the next (Its quest window closes rule), once per close.
+		-- Pause: it stops where it is, a zoom in under way too, and holds
+		-- that long, the conversation's end waiting for it; the next window
+		-- opening carries on at once. (Turning straight round to zoom out just
+		-- after starting in jerked.)
+		local closedAt = run and run.phase == "steps" and IsQuestTrigger(run.trigger) and ns.QuestCamClosedAt
+			and ns.QuestCamClosedAt()
+		if closedAt and closedAt ~= run.closedSeen then
+			run.closedSeen = closedAt
+			local closedDo = zoomer.RuleAction(run.script.rules, "closed")
+			if closedDo ~= "ignore" then ns.Log("state", "camera script: quest window closed, " .. closedDo) end
+			if closedDo == "pause" then
+				if not run.pausedUntil then Suspend() end
+				run.pausedUntil, run.pausedBy = closedAt + run.script.rules.closedSecs, "closed"
+			elseif closedDo == "putback" then
+				BeginEnding("closed")
+			elseif closedDo == "stop" then
+				Finish("closed")
+			end
+		elseif run and run.pausedBy == "closed" and ns.QuestCamWindowUp and ns.QuestCamWindowUp() then
+			run.pausedUntil, run.pausedBy = GetTime(), nil -- (the next window: on at once)
 		end
 	end
 	if not key and not held then

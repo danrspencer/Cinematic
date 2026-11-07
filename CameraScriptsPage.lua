@@ -59,9 +59,16 @@ local CHOICE_NAMES = { left = "Left", right = "Right", random = "Either way", on
 	["steer.no"] = "No", ["steer.yes"] = "Quicker", ["rand.no"] = "No", ["rand.between"] = "Between two",
 	["rand.give"] = "Give or take" }
 local RULE_NAMES = { camera = "You move the camera", fight = "A fight starts", walk = "You walk", zoom = "You zoom",
-	ends = "Its trigger ends", cast = "Your cast ends" }
+	ends = "Its trigger ends", cast = "Your cast ends", window = "A window opens",
+	closed = "Its quest window closes", done = "Its steps run out" }
+-- (The rules a few words don't say enough for: the dropdown's tooltip.)
+local RULE_TIPS = {
+	window = "A quest giver's, a vendor's, the game menu, your bags...: any window that pauses the cameras (Pause cameras in windows on the Scenes page). Pause: it waits where it is, however long the window's open, and carries on as it closes. Scenes a window starts (a quest giver, an Interaction) aren't held by their own window.",
+	closed = "Played for a quest giver: you accepted, handed in or picked the next quest, and their window closed. Pause: it stops where it is (a zoom in under way too) and holds that many seconds before going on; its trigger ending meanwhile (the conversation's over 3 seconds after the last window) waits for it, so the zoom back out comes after the pause. The next quest's window opening carries on at once. Leaving (Escape, Goodbye) isn't this: that ends the trigger.",
+	done = "Every step played, for a trigger. Hold: it stays where it got to until its trigger's over, then runs When it ends. (Played by hand, with Run, there's no trigger: When it ends runs.)",
+}
 local ACTION_NAMES = { stop = "Stop, leave it there", putback = "Run When it ends", pause = "Pause, then carry on",
-	restart = "Start again", ignore = "Carry on" }
+	restart = "Start again", ignore = "Carry on", hold = "Hold till its trigger ends" }
 local HINTS = {
 	rotate = "Turns the view. Picked once: one way for every such turn in the script. Slow down None ends at full speed, for a turn the same way next to carry straight on; Speed match: seconds to go from that speed to its own.",
 	tilt = "Positive tilts down, negative up; beside a turn (Together) both go at once. Random Give or take: to Height from where the scene started, give or take Higher by and Lower by, picked each time. Slow down None ends at full speed, for a tilt the same way next to carry straight on; Speed match: seconds to go from that speed to its own.",
@@ -82,7 +89,9 @@ local function Translate(map)
 	for key, text in pairs(map) do map[key] = L[text] end
 end
 ns.OnLanguage(function()
-	for _, map in ipairs({ KIND_NAMES, FIELD_NAMES, CHOICE_NAMES, RULE_NAMES, ACTION_NAMES, HINTS }) do Translate(map) end
+	for _, map in ipairs({ KIND_NAMES, FIELD_NAMES, CHOICE_NAMES, RULE_NAMES, RULE_TIPS, ACTION_NAMES, HINTS }) do
+		Translate(map)
+	end
 end)
 
 local function Num(n)
@@ -1281,6 +1290,7 @@ function ns.CreateCameraScriptsPanel(kit)
 				page.SetRule(rule.key, action)
 			end, function(action) return ACTION_NAMES[action] end)
 		row.pick:SetPoint("LEFT", RULE_X + 128, 0)
+		if RULE_TIPS[rule.key] then kit.Tooltip(row.pick, RULE_TIPS[rule.key]) end
 		row.secsLabel = kit.Label(row, "GameFontHighlightSmall", L["for"])
 		row.secsLabel:SetPoint("LEFT", row.pick, "RIGHT", 8, 0)
 		row.secs = Box(row, 34)
@@ -1525,7 +1535,7 @@ function ns.CreateCameraScriptsPanel(kit)
 	local tabsPanel, tabs, ShowTab, tabsBase
 	tabsPanel, tabs, ShowTab, tabsBase = ns.FolderTabs(content, {
 		{ L["Script"], L["The camera's steps, in order, and what it does when it ends."] },
-		{ L["Stop rules"], L["What happens when you move the camera, a fight starts, you walk, you zoom or its trigger ends; and its edge haze and Stop button while it runs."] },
+		{ L["Stop rules"], L["What happens when you move the camera, a fight starts, you walk, you zoom, its trigger ends, a window opens or closes, or its steps run out; and its edge haze and Stop button while it runs."] },
 	}, function(i)
 		page.tab, page.selected = i, nil
 		ShowTab(i)
@@ -1849,7 +1859,7 @@ function ns.CreateCameraScriptsPanel(kit)
 					row.pick:SetAlpha(on and 1 or 0.6) -- (greyed whatever the dropdown's look)
 					local pause = on and script.rules[key] == "pause"
 					local set = pause and page.hasSettings and script.ruleSet and script.ruleSet[key]
-					local showSecs = pause and not set
+					local showSecs = pause and not set and not row.rule.noSecs
 					row.secsLabel:SetShown(showSecs)
 					row.secs:SetShown(showSecs)
 					row.secsUnit:SetShown(showSecs)

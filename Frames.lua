@@ -1160,6 +1160,22 @@ do
 		region:SetAlpha(headerStandIn:GetAlpha())
 	end
 
+	-- The coordinates text among a frame's regions (passed as GetRegions'
+	-- values), or nil: a FontString reading like "41.5, 39.3".
+	local function RegionText(region)
+		return region:GetObjectType() == "FontString" and region:GetText()
+	end
+	local function CoordsRegion(...)
+		for i = 1, select("#", ...) do
+			local region = select(i, ...)
+			local okText, text = pcall(RegionText, region)
+			if okText and type(text) == "string" and not (issecretvalue and issecretvalue(text))
+				and text:find("^%s*%d+%.?%d*%s*,%s*%d+%.?%d*%s*$") then
+				return region
+			end
+		end
+	end
+
 	function ns.FindMinimapHeader()
 		local cluster = type(_G.MinimapCluster) == "table" and _G.MinimapCluster or nil
 		-- An addon that hides the cluster for good (EllesmereUI's minimap
@@ -1204,15 +1220,15 @@ do
 		end
 		-- The coordinates: a text reading like "41.5, 39.3" in the cluster or
 		-- on the map (its frame, unless it sits on one of those directly).
+		-- (No tables or closures per frame: the minimap's children include every
+		-- pin an addon put on it, Questie's hundreds of quest icons among them,
+		-- and this runs on every scan.)
 		local function FindCoords(frame, depth)
 			if type(frame) ~= "table" or not frame.GetRegions or IsForbidden(frame) then return end
-			for _, region in ipairs({ frame:GetRegions() }) do
-				local okText, text = pcall(function() return region:GetObjectType() == "FontString" and region:GetText() end)
-				if okText and type(text) == "string" and not (issecretvalue and issecretvalue(text))
-					and text:find("^%s*%d+%.?%d*%s*,%s*%d+%.?%d*%s*$") then
-					AddFrame((frame ~= cluster and frame ~= Minimap) and frame or region, "minimapcoords")
-					return
-				end
+			local region = CoordsRegion(frame:GetRegions())
+			if region then
+				AddFrame((frame ~= cluster and frame ~= Minimap) and frame or region, "minimapcoords")
+				return
 			end
 			if depth > 0 then
 				for _, child in ipairs({ frame:GetChildren() }) do
@@ -1665,6 +1681,10 @@ function ns.IsEntryHovered(entry)
 	if PART_GROUPS[entry.group] then
 		return false
 	end
+	-- (/cine debug offers moves the minimap under your mouse: not a hover.)
+	if ns.minimapUnderTest and entry.frame == Minimap then
+		return false
+	end
 	if entry.shrunk or entry.parkedFullSize then
 		-- (Its spot is a bare rect test: a window dragged over it, like
 		-- Settings, has the mouse instead.)
@@ -1767,10 +1787,11 @@ ns.COMBAT_SHOW = {
 	{ key = "focus", label = L["Focus"], default = true, frames = { "FocusFrame" } },
 	-- Follows the focus's ticks until set (see ROW_FALLBACK), as it did inside
 	-- the focus frame. (noHoverRow: hovering it is hovering the target's group.)
-	-- On WoW Forever, a box before its name turns the frame off altogether,
-	-- CineMode or not (showKey; retail shows it as the game says).
+	-- On Classic Era, a box before its name turns the frame off altogether,
+	-- CineMode or not (showKey; retail and WoW Forever show it as the game says,
+	-- since their game has its own focus target setting).
 	{ key = "focustot", label = L["Focus target of target"], default = true, frames = { "FocusFrameToT" },
-		noHoverRow = true, showKey = not ns.isRetail and "unitPartsFocusToT" or nil,
+		noHoverRow = true, showKey = ns.isClassicEra and "unitPartsFocusToT" or nil,
 		showTip = L["Unticked: the small frame by the focus frame, showing who your focus is targeting, doesn't " ..
 			"show at all, CineMode or not. Which of its parts show is on the Unit Frames page."],
 		showChanged = function() if ns.ApplyUnitFrameParts then ns.ApplyUnitFrameParts() end end },
@@ -10871,11 +10892,11 @@ do
 			end
 		end
 		-- The focus's target of target as a whole (its Standard Frames row's box,
-		-- WoW Forever only): held at no alpha, and not clickable either. (Its
+		-- Classic Era only): held at no alpha, and not clickable either. (Its
 		-- mouse only out of combat: the game guards it in one; set after the fight.)
 		local tot = _G.FocusFrameToT
 		if tot then
-			local hide = not ns.isRetail and ns.db.handleFrames ~= false and ns.db.unitPartsFocusToT == false
+			local hide = ns.isClassicEra and ns.db.handleFrames ~= false and ns.db.unitPartsFocusToT == false
 			want[tot] = hide
 			-- (Shown again at the alpha its Standard Frames row fades it to now,
 			-- not the one it had when hidden.)

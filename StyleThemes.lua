@@ -315,7 +315,9 @@ local THEMES = {
 			questTalkStyle = "dark", rollPanel = "flat", abShape = "square" },
 	}),
 	Theme({
-		key = "void", name = "Void Whisper", unitBars = "satin", portraitBack = "Eye",
+		key = "void", name = "Void Whisper", unitBars = "satin",
+		-- (Its eye behind the portrait, parked for now: portraitBack = "Eye" brings it back,
+		-- in place of the connector. Art: make_shape_art.py eye_back.)
 		tip = "What shadow priests hear: black, and something violet moving in it, watching from the frames.",
 		keepColors = true, barDepth = { 0, 0, 0, 0.7 },
 		swatch = { { 0.02, 0.015, 0.035 }, { 0.42, 0.3, 0.66 }, { 0.16, 0.22, 0.46 }, { 0.72, 0.68, 0.82 } },

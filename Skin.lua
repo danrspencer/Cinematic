@@ -377,6 +377,17 @@ function ns.SkinCheck(check, round)
 	box:SetSize(14, 14)
 	box:SetPoint("CENTER")
 	box:SetFrameLevel(check:GetFrameLevel())
+	-- (Its left on a whole screen pixel: a column that lands between two lost
+	-- its 1-pixel side edges, the top and bottom still drawn. Across only:
+	-- scrolling moves it down and up.)
+	box:HookScript("OnShow", function()
+		local left = check:GetLeft()
+		local scale = box:GetEffectiveScale()
+		if not (left and scale and scale > 0 and PixelUtil and PixelUtil.GetPixelToUIUnitFactor) then return end
+		local px = PixelUtil.GetPixelToUIUnitFactor() / scale
+		local at = (left + (check:GetWidth() - box:GetWidth()) / 2) / px
+		box:SetPoint("CENTER", (math.floor(at + 0.5) - at) * px, 0)
+	end)
 	local edge, bg = Flat(box, "field", 0.9, 0.6)
 	if round then
 		Tone(edge, "edge", 0.6, true)
