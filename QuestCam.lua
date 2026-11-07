@@ -1149,8 +1149,8 @@ local OPENS = {
 -- just before is you leaving (Escape, Goodbye): the camera goes back at once.
 local steppedAt = -math.huge
 local function Stepped() steppedAt = GetTime() end
-for _, name in ipairs({ "AcceptQuest", "CompleteQuest", "GetQuestReward", "SelectAvailableQuest",
-	"SelectActiveQuest", "SelectGossipAvailableQuest", "SelectGossipActiveQuest", "SelectGossipOption" }) do
+for _, name in ipairs({ "AcceptQuest", "AcknowledgeAutoAcceptQuest", "CompleteQuest", "GetQuestReward",
+	"SelectAvailableQuest", "SelectActiveQuest", "SelectGossipAvailableQuest", "SelectGossipActiveQuest", "SelectGossipOption" }) do
 	if _G[name] then hooksecurefunc(name, Stepped) end
 end
 for _, name in ipairs({ "SelectAvailableQuest", "SelectActiveQuest", "SelectOption", "SelectOptionByIndex" }) do
@@ -1292,7 +1292,7 @@ local function OnEvent(_, event)
 			end
 		end
 		cam.windowAt = now
-		cam.closingAt = nil
+		cam.closingAt, cam.closedAt = nil, nil
 	elseif event == "PLAYER_LOGOUT" then
 		-- No time to glide: everything goes straight back (the zoom isn't saved).
 		for _, m in pairs(movers) do
@@ -1314,12 +1314,25 @@ local function OnEvent(_, event)
 			StopZoom(true, "fight")
 			ns.RestoreZoomLimit()
 		end
-	elseif cam.since and GetTime() - steppedAt > LEAVE_WINDOW then
+	elseif cam.since then
+		-- (Left or stepped on: looked at next frame, LeftOrStepped. Accepting,
+		-- the window can close inside AcceptQuest, before its hook notes the
+		-- step: read at once, that was you leaving, and it all went back.)
+		cam.closingAt = cam.closingAt or GetTime()
+		cam.closedAt = GetTime()
+	end
+end
+
+-- A window closed last frame: with no step on (accept, pick a quest...)
+-- just before or as it closed, you left (Escape, Goodbye): it ends now.
+local function LeftOrStepped(now)
+	local closedAt = cam.closedAt
+	if not closedAt or now <= closedAt then return end
+	cam.closedAt = nil
+	if cam.since and cam.closingAt and cam.closingAt ~= 0 and closedAt - steppedAt > LEAVE_WINDOW then
 		Note("left the conversation")
 		cam.closingAt = 0 -- you left (Escape, Goodbye): ends now
 		cam.leftNpc = cam.npcName
-	elseif cam.since then
-		cam.closingAt = cam.closingAt or GetTime()
 	end
 end
 
@@ -1471,6 +1484,7 @@ local function OnUpdate(_, elapsed)
 	if not cam.since then
 		return
 	end
+	LeftOrStepped(now)
 	if cam.closingAt and now - cam.closingAt >= CLOSE_GRACE then
 		local left = cam.closingAt == 0
 		cam.since, cam.closingAt = nil, nil
@@ -1530,6 +1544,13 @@ ns.SetOnUpdate(frame, ns.Profiled("Quest cam", OnUpdate))
 -- and auto-run cameras' own zoom waits for it, rather than starting from close in).
 function ns.QuestCamZoomingBack()
 	return (zoomer.leaving and zoomer.moving) or zoomer.pending ~= nil
+end
+
+-- A quest giver's window just closed (accepted, handed in...), the
+-- conversation not over yet (CLOSE_GRACE): quest scripts hold where they
+-- are meanwhile (CameraScripts.lua). Not once you've left (Escape, Goodbye).
+function ns.QuestCamClosing()
+	return cam.since ~= nil and cam.closingAt ~= nil and cam.closingAt ~= 0
 end
 
 -- Whether the quest cam is running now.

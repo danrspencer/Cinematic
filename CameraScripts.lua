@@ -2814,6 +2814,8 @@ local function Update(elapsed)
 		-- where you'd put the camera: out 5 yards after you zoomed in.)
 		local rules = run.script.rules
 		if zoomed and (rules.zoom == "ignore" or rules.zoomOn == false) then zoomer.suspended = nil end
+		-- (Held as its quest window closed: your input meanwhile goes by its rules, as playing.)
+		if run.pausedBy == "closed" and (zoomed or moved) and Act(zoomed and "zoom" or "camera") then return end
 		if InFight() and Act("fight") then return end
 		if run.trigger and not run.triggerOn and Act("ends") then return end
 		-- (Its zoom speed still eases back to yours meanwhile: left at the crawl,
@@ -2897,6 +2899,20 @@ ns.SetOnUpdate(watcher, function(_, elapsed)
 			run.pausedUntil, run.pausedBy = GetTime(), nil
 		end
 		run.triggerOn = on or wait
+		-- (A quest script, its window just closed: you accepted or handed in.
+		-- It stops where it is, a zoom in under way too, and holds; the zoom
+		-- back out comes once the conversation's over (QuestCam.lua's
+		-- CLOSE_GRACE), or it carries on if the next window opens. Turning
+		-- straight round to zoom out just after starting in jerked.)
+		local closed = on and run.phase == "steps" and IsQuestTrigger(run.trigger) and ns.QuestCamClosing
+			and ns.QuestCamClosing()
+		if closed and not run.pausedUntil then
+			Suspend()
+			run.pausedUntil, run.pausedBy = math.huge, "closed"
+			ns.Log("state", "camera script held: quest window closed")
+		elseif not closed and run.pausedBy == "closed" then
+			run.pausedUntil, run.pausedBy = GetTime(), nil
+		end
 	end
 	if not key and not held then
 		stoppedFor = nil

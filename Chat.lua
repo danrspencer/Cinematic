@@ -356,7 +356,7 @@ ns.chatTypingUntil = 0 -- typing shows the whole chat group without leaving cine
 -- Only a window you'd see peeks: a docked tab that isn't the selected one is
 -- hidden, and peeking it would bring up just the dock's tabs.
 local function PeekWindow(chatFrame)
-	if ns.Flag(chatFrame:IsShown()) then
+	if chatFrame.IsShown and ns.Flag(chatFrame:IsShown()) then
 		ns.chatPeekUntil[chatFrame] = GetTime() + ns.HoldTime("chatPeekTime")
 	end
 end
@@ -583,6 +583,8 @@ end
 -- tells us exactly which window to reveal. Never filters anything out.
 local function ChatPeekFilter(chatFrame, event, text, author, _, channelString, _, _, _, channelNumber, channelBaseName,
 		_, _, guid)
+	-- (WIM runs the filters with its own table, not a chat window: nothing to peek.)
+	if type(chatFrame) ~= "table" or not chatFrame.IsShown then return false end
 	if not ns.db.chatPeek or ns.db.handleChat == false then
 		if BUBBLE_SPEECH[event] then SpeechTrace("\"Show chat when a message arrives\" or the Chat page is off") end
 		return false
