@@ -233,9 +233,45 @@ end
 
 -- Whether this client lets the minimap be swept at all (retail doesn't,
 -- tested: its Reveal boxes that need a sweep are hidden, Options.lua).
-function ns.CanSweepMinimap()
+local function HasSweepApi()
 	return Minimap.UpdateMouseoverAtPoint ~= nil and Minimap.SetUsingSoftCursor ~= nil
 		and C_TooltipInfo ~= nil and C_TooltipInfo.GetMinimapMouseover ~= nil
+end
+
+-- Whether the game answers the pretend mouse at all (answer.state: nil not
+-- known yet, "yes", "no"). WoW Forever's game 70862 has the functions but
+-- answers only for where the real mouse is (tested: every point heard what the
+-- real mouse was on, and nothing with it off the minimap, whatever the point's
+-- units). Asked again each login, at your arrow in the minimap's middle while
+-- it's shown (AnswerCheck, further down); a sweep that hears anything is a yes.
+local answer = { state = nil, fails = 0 }
+local ANSWER_TRIES = 3
+-- (Known up front from WoW Forever's game 70862 on, so the Minimap page never
+-- offers what can't work, even opened in the first seconds: no tries. If a
+-- later patch answers again, /cine debug nodes spaces shows it: then raise
+-- this to the build that broke it for good, or drop it.)
+local NO_ANSWER_FROM = 70862
+do
+	local build = GetBuildInfo and tonumber((select(2, GetBuildInfo())))
+	if not ns.isRetail and not ns.isClassicEra and build and build >= NO_ANSWER_FROM then
+		answer.state = "no"
+	end
+end
+
+-- One more try that heard nothing; enough of them and it's a no.
+function ns.CountNoAnswer()
+	answer.fails = answer.fails + 1
+	if answer.fails >= ANSWER_TRIES and not answer.state then
+		answer.state = "no"
+		ns.Log("nodes", "the game doesn't answer the pretend mouse: minimap Reveal is off this login")
+	end
+end
+
+-- Whether the minimap can be swept here: the functions, and the game answering
+-- (retail has no such functions, tested: Reveal boxes that need a sweep are
+-- hidden there, Options.lua; nor once the game doesn't answer).
+function ns.CanSweepMinimap()
+	return HasSweepApi() and answer.state ~= "no"
 end
 
 -- The pretend mouse's turn on the minimap (OnMinimap): the faded minimap
@@ -252,10 +288,12 @@ local sweepJob -- the Reveal sweep's coroutine while it runs
 
 -- Why the pretend mouse can't have the minimap now, or nil.
 local function NotReady()
-	if not ns.CanSweepMinimap() then return "this client can't move a pretend mouse over the minimap" end
+	-- (Not ns.CanSweepMinimap: /cine debug nodes still tries once the game stopped answering.)
+	if not HasSweepApi() then return "this client can't move a pretend mouse over the minimap" end
 	-- (Not in combat; nor with your own mouse there, whose tooltip it would change.)
 	if InCombatLockdown() then return "in combat" end
-	if ns.Flag(Minimap:IsMouseOver()) then return "your mouse is over the minimap" end
+	-- (/cine debug nodes mouse: tried with your mouse there anyway.)
+	if ns.Flag(Minimap:IsMouseOver()) and not ns.sweepWithMouse then return "your mouse is over the minimap" end
 	local entry = MinimapEntry()
 	if entry and entry.parkedFullSize and ns.IsEntryHovered(entry) then return "your mouse is over the minimap" end
 end
@@ -434,6 +472,85 @@ end
 -- update; radius: only that far from the middle, as Probe.)
 function ns.SweepMinimap(step, grow, stop, refresh, radius, cx, cy)
 	return OnMinimap(grow, refresh, function() return Probe(step or STEP, {}, stop, radius, cx, cy) end)
+end
+
+-- /cine debug nodes spaces: the grid tried in each way the game might want
+-- Minimap:UpdateMouseoverAtPoint's point (game 70862 stopped hearing screen
+-- pixels: every point heard what the real mouse was on). Returns a line each.
+function ns.NodeSpacesTest()
+	local why = NotReady()
+	if why then return { "can't: " .. why } end
+	local turn = { grow = true }
+	why = Enter(turn)
+	if why then return { "can't: " .. why } end
+	local lines = {}
+	local ok, err = pcall(function()
+		local w, left, bottom = Minimap:GetWidth(), Minimap:GetLeft(), Minimap:GetBottom()
+		local s, half = Minimap:GetEffectiveScale(), Minimap:GetWidth() / 2
+		local spaces = {
+			{ "screen pixels", function(x, y) return (left + half + x) * s, (bottom + half + y) * s end },
+			{ "UI units", function(x, y) return left + half + x, bottom + half + y end },
+			{ "from the middle", function(x, y) return x, y end },
+			{ "from the middle, y down", function(x, y) return x, -y end },
+			{ "from bottom-left", function(x, y) return half + x, half + y end },
+			{ "from top-left", function(x, y) return half + x, half - y end },
+			{ "0 to 1", function(x, y) return (half + x) / w, (half + y) / w end },
+			{ "0 to 1, y down", function(x, y) return (half + x) / w, (half - y) / w end },
+			{ "-1 to 1", function(x, y) return x / half, y / half end },
+		}
+		for _, space in ipairs(spaces) do
+			local heard, points = {}, 0
+			for x = -half, half, 12 do
+				for y = -half, half, 12 do
+					if x * x + y * y <= half * half then
+						points = points + 1
+						local px, py = space[2](x, y)
+						local data = select(2, pcall(MouseoverAt, px, py))
+						local got = not Secret(data) and type(data) == "table" and data.lines
+						if type(got) == "table" and not Secret(got) then
+							for _, line in ipairs(got) do
+								local text = line.leftText
+								if type(text) == "string" and not Secret(text) then
+									text = text:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""):gsub("|T.-|t", "")
+									for name in text:gmatch("[^\n]+") do heard[name] = (heard[name] or 0) + 1 end
+								end
+							end
+						end
+					end
+				end
+			end
+			local names = {}
+			for name, count in pairs(heard) do names[#names + 1] = ("%s (%d)"):format(name, count) end
+			table.sort(names)
+			lines[#lines + 1] = ("%s: %s of %d points"):format(space[1],
+				#names > 0 and table.concat(names, ", ") or "nothing", points)
+		end
+	end)
+	Leave(turn)
+	if not ok then lines[#lines + 1] = "stopped: " .. tostring(err) end
+	-- (Without the soft cursor too, at your arrow in the middle.)
+	local left, bottom, half = Minimap:GetLeft(), Minimap:GetBottom(), Minimap:GetWidth() / 2
+	local s = Minimap:GetEffectiveScale()
+	local data = select(2, pcall(MouseoverAt, (left + half) * s, (bottom + half) * s))
+	local got = not Secret(data) and type(data) == "table" and data.lines
+	lines[#lines + 1] = ("no soft cursor, middle: %s line(s)"):format(type(got) == "table" and #got or 0)
+	-- (What else this build has to ask the minimap with.)
+	local found = {}
+	for key, value in pairs(getmetatable(Minimap).__index) do
+		if type(value) == "function" and (key:find("Mouse") or key:find("Cursor") or key:find("Blip")
+			or key:find("Point") or key:find("Tooltip") or key:find("Track") or key:find("Ping")) then
+			found[#found + 1] = key
+		end
+	end
+	table.sort(found)
+	lines[#lines + 1] = "Minimap functions: " .. table.concat(found, ", ")
+	found = {}
+	for key in pairs(C_Minimap or {}) do found[#found + 1] = key end
+	table.sort(found)
+	lines[#lines + 1] = "C_Minimap: " .. (#found > 0 and table.concat(found, ", ") or "none")
+	local vignettes = _G.C_VignetteInfo and _G.C_VignetteInfo.GetVignettes and _G.C_VignetteInfo.GetVignettes()
+	lines[#lines + 1] = ("vignettes now: %s"):format(type(vignettes) == "table" and #vignettes or "no such function")
+	return lines
 end
 
 -- Reveal (Minimap page): which kinds of name bring the minimap up. (Group
@@ -1251,6 +1368,13 @@ local function Sweep()
 		last.why = probes
 		return
 	end
+	-- (A whole sweep hearing nothing, not even your arrow in the middle, counts as
+	-- a try of the answer check too: the minimap may be faded the whole time.)
+	if next(found) then
+		answer.state = "yes"
+	elseif not answer.state then
+		ns.CountNoAnswer()
+	end
 	local names, wantedNames = {}, {}
 	areaShown = false
 	for name, entry in pairs(found) do
@@ -1302,11 +1426,132 @@ ns.SetOnUpdate(sweepDriver, function(self)
 	if not sweepJob then self:Hide() end
 end)
 
+-- Does the game answer the pretend mouse (answer, at the top)? Every few
+-- seconds after login until it's known: with the minimap shown, its icons at
+-- their size and your mouse off it, a few points on your arrow in its middle,
+-- which always has your name. Three tries hearing nothing and it's a no for
+-- this login: Reveal stops (the faded minimap shrinks away as usual, nothing
+-- shows through it) and its boxes are hidden.
+local ANSWER_EVERY = 4
+local answerCheck = CreateFrame("Frame")
+local answerWait = ANSWER_EVERY
+ns.SetOnUpdate(answerCheck, function(self, elapsed)
+	if answer.state or not HasSweepApi() then
+		self:Hide()
+		return
+	end
+	answerWait = answerWait - elapsed
+	if answerWait > 0 then return end
+	answerWait = ANSWER_EVERY
+	if sweepJob or iconsHidden or InCombatLockdown() or not ns.Flag(Minimap:IsVisible())
+		or Minimap:GetEffectiveAlpha() < 0.9 or ns.Flag(Minimap:IsMouseOver()) or not Minimap:GetLeft() then
+		return
+	end
+	local heard = false
+	local turn = {}
+	if Enter(turn) then return end
+	pcall(function()
+		for _, point in ipairs({ { 0, 0 }, { 1.5, 1.5 }, { -1.5, -1.5 }, { 0, 2.5 }, { 0, -2.5 } }) do
+			local lines = Listen(point[1], point[2])
+			if lines and #lines > 0 then
+				heard = true
+				return
+			end
+		end
+	end)
+	Leave(turn)
+	if heard then
+		answer.state = "yes"
+	else
+		ns.CountNoAnswer()
+	end
+end)
+
+-- Without the sweep (the game not answering it, above): Quest areas and Quest
+-- turn-ins from the quest log instead. Each quest's spot on the zone map
+-- (C_QuestLog.GetQuestsOnMap: the middle of its area, or where it's handed in
+-- once done), how far it is from you in yards, and the minimap's view radius:
+-- within it, it's on the minimap. (An area reaches a little past its middle:
+-- QUEST_AREA_REACH yards more for those.)
+local QUEST_AREA_REACH = 25
+local questLook = { at = -math.huge, report = "hasn't looked yet" }
+
+function ns.CanRevealQuestsOnly()
+	return HasSweepApi() and answer.state == "no" and C_QuestLog ~= nil and C_QuestLog.GetQuestsOnMap ~= nil
+		and C_Map ~= nil and C_Map.GetWorldPosFromMapPos ~= nil
+end
+
+local function QuestReveal()
+	local db = ns.db
+	return db and db.handleMinimap ~= false and ns.CanRevealQuestsOnly()
+		and (db.minimapRevealAreas or db.minimapRevealTurnIns) or false
+end
+
+local function Known(value)
+	return value ~= nil and not Secret(value)
+end
+
+-- The quests on the minimap now: names that reveal it, and a report line.
+local function QuestsOnMinimap()
+	local db = ns.db
+	local mapID = C_Map.GetBestMapForUnit("player")
+	if not Known(mapID) or not mapID then return nil, "no map here" end
+	local pos = C_Map.GetPlayerMapPosition(mapID, "player")
+	if not pos then return nil, "no position on the map here" end
+	local _, here = C_Map.GetWorldPosFromMapPos(mapID, pos)
+	local ok, radius = pcall(C_Minimap.GetViewRadius)
+	if not (here and Known(here.x) and ok and type(radius) == "number") then return nil, "no world position" end
+	local quests = C_QuestLog.GetQuestsOnMap(mapID)
+	if type(quests) ~= "table" then return nil, "no quests on the map" end
+	local wanted, parts = {}, {}
+	for _, quest in ipairs(quests) do
+		local id, x, y = quest.questID, quest.x, quest.y
+		if Known(id) and Known(x) and Known(y) then
+			local _, there = C_Map.GetWorldPosFromMapPos(mapID, CreateVector2D(x, y))
+			if there and Known(there.x) then
+				local yards = math.sqrt((here.x - there.x) ^ 2 + (here.y - there.y) ^ 2)
+				local done = C_QuestLog.IsComplete and C_QuestLog.IsComplete(id) == true
+				local reach = done and radius or radius + QUEST_AREA_REACH
+				local title = C_QuestLog.GetTitleForQuestID and C_QuestLog.GetTitleForQuestID(id) or tostring(id)
+				local on = yards <= reach
+				local reveals = on and (done and db.minimapRevealTurnIns or not done and db.minimapRevealAreas)
+				if reveals then wanted[#wanted + 1] = title end
+				parts[#parts + 1] = ("%s (%s, %.0f yd%s)"):format(title, done and "done" or "area", yards,
+					reveals and ", reveals" or on and ", on it" or "")
+			end
+		end
+	end
+	return wanted, ("view radius %.0f yd: %s"):format(radius, #parts > 0 and table.concat(parts, "; ") or "no quests")
+end
+
+local function QuestReveals(now)
+	if now - questLook.at >= SWEEP_EVERY then
+		questLook.at = now
+		local ok, wanted, report = pcall(QuestsOnMinimap)
+		questLook.report = ok and report or ("failed: " .. tostring(wanted))
+		if ok and wanted and #wanted > 0 then
+			table.sort(wanted)
+			seenAt = now
+			revealedBy = table.concat(wanted, ", ")
+		end
+	end
+	return now - seenAt < HOLD
+end
+
+-- For /cine debug tracking: what the quest log look last saw.
+function ns.QuestRevealReport()
+	if not ns.CanRevealQuestsOnly() then return nil end
+	return ("minimap quests (no sweep): %s, %.1fs ago; last reveal %s"):format(questLook.report,
+		GetTime() - (questLook.at > -math.huge and questLook.at or GetTime()),
+		seenAt > -math.huge and ("%.1fs ago"):format(GetTime() - seenAt) or "never")
+end
+
 -- (A fight stops the sweep, SweepMinimap: a minimap revealed as it started
 -- stays up through it, rather than fading once the hold runs out and coming
 -- back as it ends. nil out of fights; true or false, latched at its start.)
 local heldIntoFight
 function ns.IsMinimapRevealed(now)
+	if QuestReveal() then return QuestReveals(now) end
 	if not AnyReveal() then
 		nodes = {}
 		heldIntoFight = nil
@@ -1336,7 +1581,7 @@ end
 -- last found that revealed it (names, or nil), and whether it's held up
 -- through a fight it was up at the start of.
 function ns.MinimapRevealWhy(now)
-	if not AnyReveal() or now - seenAt >= HOLD then return false end
+	if not (AnyReveal() or QuestReveal()) or now - seenAt >= HOLD then return false end
 	return true, revealedBy, heldIntoFight == true
 end
 
@@ -1440,7 +1685,16 @@ do
 end
 
 function ns.NodeSweepReport()
-	if not ns.CanSweepMinimap() then return "minimap sweep: this client can't move a pretend mouse over the minimap" end
+	if not HasSweepApi() then return "minimap sweep: this client can't move a pretend mouse over the minimap" end
+	if answer.state == "no" then
+		return answer.fails >= ANSWER_TRIES
+			and "minimap sweep: off this login, the game doesn't answer the pretend mouse (nothing at your arrow, 3 tries)"
+			or ("minimap sweep: off, game %d and later don't answer the pretend mouse (tested)"):format(NO_ANSWER_FROM)
+	end
+	if not answer.state then
+		ns.Print(("minimap sweep: does the game answer it? not known yet, %d of %d tries heard nothing"):format(
+			answer.fails, ANSWER_TRIES))
+	end
 	if not last.at then return "minimap sweep: hasn't run (needs a Reveal box ticked, Minimap page)" end
 	-- (Each node's place in the world should stay put as you move: if it drifts,
 	-- the sums turning minimap offsets into yards are off.)

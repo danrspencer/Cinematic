@@ -1512,6 +1512,8 @@ local function HandleSlash(msg)
 			tostring(gathering), gathering and ns.IsTrackingOffHere() and " (but not here: Except in, Minimap page)" or "",
 			tostring(creatures)))
 		ns.Print(ns.NodeSweepReport())
+		local quests = ns.QuestRevealReport()
+		if quests then ns.Print(quests) end
 	elseif cmd == "debug" and arg == "prey" then
 		-- How a prey hunt is told (Keep open while hunting, Minimap page).
 		ns.ReportPrey()

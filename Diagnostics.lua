@@ -1547,8 +1547,12 @@ do
 
 	-- The sweep is NodeSweep.lua's, every name kept (not just herbs and veins).
 	local refreshing = false -- /cine debug nodes update: Minimap:UpdateBlips before each sweep
+	local withMouse = false -- /cine debug nodes mouse: sweeps even with your mouse on the minimap
 	local function Sweep(grow)
-		return ns.SweepMinimap(STEP, grow, nil, refreshing)
+		ns.sweepWithMouse = withMouse
+		local found, probes, grown = ns.SweepMinimap(STEP, grow, nil, refreshing)
+		ns.sweepWithMouse = nil
+		return found, probes, grown
 	end
 
 	local function State()
@@ -1575,7 +1579,11 @@ do
 	end
 
 	local function Report(onlyChanges)
+		local mouseOn = ns.Flag(Minimap:IsMouseOver())
 		local found, probes, grown = Sweep(growing and not ns.parkMinimapFullSize)
+		if withMouse then
+			ns.Print(("nodes: your mouse %s the minimap"):format(mouseOn and "on" or "off"))
+		end
 		local text = (grown and "(grown for the sweep) " or "")
 			.. (found and Describe(found) or ("can't sweep: " .. probes))
 		-- (the minimap fading or coming back counts as a change too)
@@ -1612,10 +1620,15 @@ do
 
 	function ns.NodesDebug(args)
 		args = args or ""
+		if args:find("spaces") then
+			for _, line in ipairs(ns.NodeSpacesTest()) do ns.Print("nodes, " .. line) end
+			return
+		end
 		local seconds = tonumber(args:match("%d+"))
 		growing = args:find("grow") ~= nil
 		showRaw = args:find("raw") ~= nil
 		refreshing = args:find("update") ~= nil
+		withMouse = args:find("mouse") ~= nil
 		if (args:find("park") or args:find("stay")) and not seconds then seconds = 60 end
 		lastFound = nil
 		if not seconds and watcher and watcher:IsShown() then

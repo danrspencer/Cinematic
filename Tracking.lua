@@ -207,8 +207,9 @@ end
 
 -- Whether this client has prey hunts at all (the Minimap page's row is hidden
 -- where it doesn't).
+-- (Retail only: WoW Forever has some of the same functions but no prey hunts.)
 function ns.HasPreyHunts()
-	return (C_QuestLog and C_QuestLog.GetActivePreyQuest) ~= nil or next(PreyWidgetTypes()) ~= nil
+	return ns.isRetail and ((C_QuestLog and C_QuestLog.GetActivePreyQuest) ~= nil or next(PreyWidgetTypes()) ~= nil)
 end
 
 -- Called from Frames.lua's frame update: hunting prey right now.

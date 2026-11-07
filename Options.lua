@@ -10809,9 +10809,23 @@ local function CreateMinimapPanel()
 		"mouse would (not in combat), and the minimap fades again a few seconds after it's gone. While " ..
 		"any of these is ticked, the faded minimap stays in its place, invisible, instead of being " ..
 		"shrunk away."]
+	-- (The game not answering the sweep, NodeSweep.lua: only the quest boxes,
+	-- from the quest log instead.)
+	local questsOnly = not ns.CanSweepMinimap() and ns.CanRevealQuestsOnly()
+	if questsOnly then
+		SWEEP_NOTE = L["Cinematic checks every second or two how far that place is from you on the map."]
+	end
+	local function RevealKinds(list)
+		if not questsOnly then return list end
+		local kept = {}
+		for _, kind in ipairs(list) do
+			if kind[1] == "minimapRevealTurnIns" or kind[1] == "minimapRevealAreas" then kept[#kept + 1] = kind end
+		end
+		return kept
+	end
 	local previousReveal = pingSpacer
-	-- (Hidden where the minimap can't be swept: retail.)
-	for _, kind in ipairs(not ns.CanSweepMinimap() and {} or {
+	-- (Hidden where the minimap can't be swept: retail, and Forever once the game stopped answering, NodeSweep.lua.)
+	for _, kind in ipairs(RevealKinds(not (ns.CanSweepMinimap() or questsOnly) and {} or {
 		{ "minimapRevealNodes", L["Nearby ore, herbs and treasure"],
 			L["With Find Minerals, Find Herbs or Find Treasure on, the minimap comes up while a vein, " ..
 			"herb or chest shows on it."] },
@@ -10824,7 +10838,7 @@ local function CreateMinimapPanel()
 			L["The minimap comes up while anything else with a name shows on it: quest givers with a " ..
 			"quest for you, flight masters and innkeepers you track and the like. Your group and pets " ..
 			"don't count."] },
-	}) do
+	})) do
 		local check = Check(content, kind[1], kind[2], kind[3] .. " " .. SWEEP_NOTE,
 			kind[1] == "minimapRevealNodes" and function(value)
 				ns.GetDB().minimapRevealNodes = value

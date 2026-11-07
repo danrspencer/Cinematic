@@ -171,7 +171,8 @@ local DEFAULTS = {
 		.. "minimapaddons,minimapcompartment,minimapcoords",
 	-- Keep open (Minimap page): the minimap stays up the whole time this tracking is on.
 	minimapKeepCreatures = false, -- creatures (hunter, druid, warlock) or fish
-	minimapKeepGathering = false, -- herbs, minerals or treasure...
+	-- (On since 2026-11-07: Reveal can't find ore and herbs on WoW Forever any more, NodeSweep.lua.)
+	minimapKeepGathering = true, -- herbs, minerals or treasure...
 	trackingOffInCities = true,  -- ...except in these places (no nodes there; dungeons have some)
 	trackingOffInDungeons = true,
 	trackingOffInRaids = true,
@@ -5241,6 +5242,19 @@ ticker:SetScript("OnEvent", ns.Profiled("Core events", function(self, event, arg
 				end
 			end
 			ns.db.chatCopyOffV1 = true
+		end
+		-- Keep open while tracking herbs, minerals or treasure on to start with
+		-- now: WoW Forever's November update stopped Reveal finding ore and herbs
+		-- (NodeSweep.lua). On in every profile. Once: untick it and it stays.
+		if not ns.db.keepGatheringOnV1 then
+			ns.db.minimapKeepGathering = true
+			for _, saved in pairs(ns.db.profiles or {}) do
+				if type(saved) == "table" then
+					saved.minimapKeepGathering = nil
+					if type(saved.settings) == "table" then saved.settings.minimapKeepGathering = nil end
+				end
+			end
+			ns.db.keepGatheringOnV1 = true
 		end
 		-- The dev copy starts with it on, now its tick shows there too. Once: untick
 		-- it and it stays.
