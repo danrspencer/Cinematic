@@ -14,6 +14,8 @@ local ADDON_NAME, ns = ...
 
 local STEP = 12          -- minimap units between two points of the grid (each sweep sets it: SweepStep)
 local RIM_BAND = 24      -- minimap units in from the rim: a quest name heard only there is its rim arrow
+local RIM_PROBE_IN = 4   -- minimap units in from the rim: the full sweep's ring of points (Probe)
+local hearRadius         -- (set with the dot hearing, further down: OnlyAtRim reads it)
 local SWEEP_EVERY = 1.5  -- seconds between two sweeps
 local HOLD = 3           -- seconds the answer stays yes after the last sweep that found one
 
@@ -338,42 +340,64 @@ local function Probe(step, found, stop, radius, cx, cy)
 	local probes = 0
 	local half = width / 2
 	local reach = math.min(radius or half, half)
+	-- One point: what it hears goes into found. Returns true to stop (stop
+	-- said yes), or nil and why the game refused.
+	local function Hear(dx, dy)
+		probes = probes + 1
+		local lines, why = Listen(dx, dy)
+		if not lines then return nil, why end
+		for _, line in ipairs(lines) do
+			local text, color = line.leftText, line.leftColor
+			if type(text) == "string" and not Secret(text) then
+				local gray = GrayLine(text, color)
+				-- (Colour codes and icons out, one name a line.)
+				local plain = text:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
+					:gsub("|T.-|t", ""):gsub("|A.-|a", "")
+				for name in plain:gmatch("[^\n]+") do
+					name = name:match("^%s*(.-)%s*$")
+					if name ~= "" then
+						local entry = found[name] or { points = 0 }
+						entry.points = entry.points + 1
+						-- (Each point, offset from the minimap's centre: where its dots are.)
+						entry.list = entry.list or {}
+						entry.list[#entry.list + 1], entry.list[#entry.list + 2] = dx, dy
+						entry.gray = entry.gray or gray
+						-- (The line as the game wrote it, and its colour: for /cine debug nodes raw.)
+						entry.raw = entry.raw or text
+						entry.color = entry.color or (type(color) == "table" and not Secret(color)
+							and type(color.r) == "number" and ("%02x%02x%02x"):format(color.r * 255,
+							color.g * 255, color.b * 255)) or nil
+						found[name] = entry
+						if stop and stop(name, entry) then return true end
+					end
+				end
+			end
+		end
+		return false
+	end
+	local full = not radius and not cx
 	cx, cy = cx or 0, cy or 0
 	for gx = -reach, reach, step do
 		for gy = -reach, reach, step do
 			local dx, dy = cx + gx, cy + gy
 			if gx * gx + gy * gy <= reach * reach and dx * dx + dy * dy <= half * half then
-				probes = probes + 1
-				local lines, why = Listen(dx, dy)
-				if not lines then return nil, why end
-				for _, line in ipairs(lines) do
-					local text, color = line.leftText, line.leftColor
-					if type(text) == "string" and not Secret(text) then
-						local gray = GrayLine(text, color)
-						-- (Colour codes and icons out, one name a line.)
-						local plain = text:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
-							:gsub("|T.-|t", ""):gsub("|A.-|a", "")
-						for name in plain:gmatch("[^\n]+") do
-							name = name:match("^%s*(.-)%s*$")
-							if name ~= "" then
-								local entry = found[name] or { points = 0 }
-								entry.points = entry.points + 1
-								-- (Each point, offset from the minimap's centre: where its dots are.)
-								entry.list = entry.list or {}
-								entry.list[#entry.list + 1], entry.list[#entry.list + 2] = dx, dy
-								entry.gray = entry.gray or gray
-								-- (The line as the game wrote it, and its colour: for /cine debug nodes raw.)
-								entry.raw = entry.raw or text
-								entry.color = entry.color or (type(color) == "table" and not Secret(color)
-									and type(color.r) == "number" and ("%02x%02x%02x"):format(color.r * 255,
-									color.g * 255, color.b * 255)) or nil
-								found[name] = entry
-								if stop and stop(name, entry) then return found, probes end
-							end
-						end
-					end
-				end
+				local done, why = Hear(dx, dy)
+				if done == nil then return nil, why end
+				if done then return found, probes end
 			end
+		end
+	end
+	-- (The whole minimap: a ring just inside its rim too. A quest's area that
+	-- only just reaches over the rim is a thin sliver the grid can miss, and
+	-- its outline still shows on a faded full-size minimap.)
+	if full then
+		local r = half - RIM_PROBE_IN
+		local count = math.max(8, math.ceil(2 * math.pi * r / step))
+		for i = 0, count - 1 do
+			local angle = 2 * math.pi * i / count
+			local done, why = Hear(r * math.cos(angle), r * math.sin(angle))
+			if done == nil then return nil, why end
+			if done then return found, probes end
 		end
 	end
 	return found, probes
@@ -432,6 +456,14 @@ local function OnlyAtRim(entry)
 	local inner = (half - RIM_BAND) ^ 2
 	for i = 1, #list, 2 do
 		if list[i] ^ 2 + list[i + 1] ^ 2 < inner then return false end
+	end
+	-- (Heard along more of the rim than one arrow can be, every point being
+	-- within hearRadius of it: the edge of an area reaching over the rim.)
+	local span = (2 * (hearRadius or 15) + 10) ^ 2
+	for i = 1, #list, 2 do
+		for j = i + 2, #list, 2 do
+			if (list[i] - list[j]) ^ 2 + (list[i + 1] - list[j + 1]) ^ 2 > span then return false end
+		end
 	end
 	return true
 end
@@ -642,7 +674,7 @@ end
 -- The disc's radius is learned from the dots found whole (hearRadius).
 -- Returns { { x, y }, ... }, or nil and why.
 local LOOK = 3 -- minimap units between points
-local hearRadius = 15 -- minimap units a dot is heard around it (11 to 24)
+hearRadius = 15 -- minimap units a dot is heard around it (11 to 24; declared at the top)
 local EDGE_STEPS = 5 -- halvings when finding an edge (to under a unit)
 local ARC = 2 -- minimap units an outline point may be off a fitted disc
 local MIN_ARC = 6 -- outline points a fitted disc has to explain
