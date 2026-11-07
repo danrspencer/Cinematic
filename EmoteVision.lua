@@ -728,6 +728,180 @@ local function WordButton()
 	return button
 end
 
+-- The card's Target button: a click targets them, to see who it was. Addons
+-- can't target, only a click may: the button you see (card.target, in the
+-- style's look) is covered by a secure one (as Combat Vision's rare portraits
+-- have), out of fights only (a secure button can't move, show or hide in one),
+-- off as one starts. It has no parent, so the card stays free to move; placed
+-- by the button's place on the screen, as the card fades or moves.
+local nameLink = {}
+function nameLink.Button()
+	if nameLink.button then return nameLink.button end
+	local button = CreateFrame("Button", "CinematicEmoteTargetButton", nil, "SecureActionButtonTemplate")
+	button:SetFrameStrata("FULLSCREEN")
+	button:SetAttribute("type", "macro")
+	button:SetAttribute("macrotext", "")
+	-- (Both the press and the release, as the game's own action buttons since
+	-- 10.0: the secure template acts on the one ActionButtonUseKeyDown picks,
+	-- stuck on the press on Forever, and skips the other. The release alone,
+	-- with useOnKeyDown off, came to the button and did nothing (tested).
+	-- Left only: a right-click goes on to the card, closing it.)
+	button:RegisterForClicks("LeftButtonDown", "LeftButtonUp")
+	button:SetScript("OnEnter", function(self)
+		local shown = card and card.target
+		if shown then
+			if shown.LockHighlight then shown:LockHighlight() end
+			if shown.text then shown.text:SetAlpha(0.7) end
+		end
+		GameTooltip:SetOwner(self, "ANCHOR_TOP")
+		GameTooltip:SetText(L["Click to target %s"]:format(self.who or ""), 1, 1, 1, 1, true)
+		GameTooltip:Show()
+	end)
+	button:SetScript("OnLeave", function()
+		local shown = card and card.target
+		if shown then
+			if shown.UnlockHighlight then shown:UnlockHighlight() end
+			if shown.text then shown.text:SetAlpha(1) end
+		end
+		GameTooltip:Hide()
+	end)
+	-- (What a click did, in the log: the target before, just after and a moment
+	-- later, so a click that targets no one shows why.)
+	button:HookScript("PreClick", function(self, which, down)
+		self.before = Plain(UnitName("target"))
+		ns.Log("emote", ("Target click %s %s: aims %s %s, useOnKeyDown %s, target before %s"):format(
+			tostring(which), down and "down" or "up", tostring(self:GetAttribute("type")),
+			tostring(self:GetAttribute("macrotext")),
+			tostring(self:GetAttribute("useOnKeyDown")), tostring(self.before)))
+	end)
+	button:HookScript("PostClick", function()
+		ns.Log("emote", ("Target click done: target now %s (exists %s)"):format(
+			tostring(Plain(UnitName("target"))), tostring(ns.Flag(UnitExists("target")))))
+		C_Timer.After(0.5, function()
+			ns.Log("emote", ("Target click, half a second on: target %s"):format(tostring(Plain(UnitName("target")))))
+		end)
+	end)
+	button:HookScript("OnClick", function(self)
+		local how = self:GetAttribute("type") == "target" and ("unit " .. tostring(self:GetAttribute("unit")))
+			or self:GetAttribute("macrotext")
+		nameLink.clicked = { at = GetTime(), macro = how }
+		-- (Its time starts again: room to answer them, now you've seen who.)
+		if card and card:IsShown() then
+			-- (From fully faded in: from 0 it'd fade in all over again.)
+			card.age, card.leaving = FADE_IN, nil
+			card:SetAlpha(1)
+		end
+	end)
+	button:SetScript("OnMouseUp", function(_, which)
+		if which == "RightButton" then Hide() end
+	end)
+	-- (PLAYER_REGEN_DISABLED comes just before the lockdown: still free to hide.)
+	button:RegisterEvent("PLAYER_REGEN_DISABLED")
+	button:SetScript("OnEvent", function(self)
+		self.who = nil
+		self:Hide()
+		if card then
+			card.targetPanel:Hide()
+			card.targetWord:Hide()
+		end
+	end)
+	button:Hide()
+	nameLink.button = button
+	return button
+end
+-- Who the moment's Target button would target (a player's, not your group's
+-- or a test's sample), or nil.
+function nameLink.Wanted(moment)
+	local who = moment and not moment.group and (moment.fullName or moment.name)
+	local guid = moment and moment.guid
+	if who and not (moment.test and not moment.tried) and (not guid or guid:find("^Player%-")) then return who end
+end
+-- Sets it up for the moment on the card, or puts it away.
+function nameLink.Arm(moment)
+	local button = nameLink.button
+	local who = card and card.target and nameLink.Wanted(moment)
+	if who then
+		if InCombatLockdown() then return end
+		button = nameLink.Button()
+		button.who, button.whoFull, button.guid = moment.name, who, moment.guid
+		nameLink.Aim(button)
+	elseif button and not InCombatLockdown() then
+		button.who, button.guid = nil, nil
+		button:Hide()
+	end
+end
+-- Over the card's Target button wherever the card is now; hidden while the
+-- card's faded most of the way, moved for Edit Mode, or gone.
+-- Aims it at them by name, each way it may be written: on Forever "Thoros
+-- Risenhart" comes as "Thoros" and "Risenhart" (a realm's place), so
+-- "Thoros", "Thoros-Risenhart" and "Thoros Risenhart"; elsewhere "Name-Realm".
+-- Exact names only, so no one else is picked; one that finds no one leaves
+-- the target as it is. Not by unit: /target [@nameplate3] targeted no one on
+-- Forever, even typed in chat (tested; by name works); "mouseover" is no one with the mouse
+-- on the button.
+function nameLink.Aim(button)
+	local full = button.whoFull or button.who or ""
+	local first, rest = full:match("^([^%-]+)%-(.+)$")
+	local lines = {}
+	if first then
+		lines[1] = "/targetexact " .. first
+		lines[2] = "/targetexact " .. first .. " " .. rest
+		lines[3] = "/targetexact " .. full
+	else
+		lines[1] = "/targetexact " .. full
+	end
+	local macro = table.concat(lines, "\n")
+	if button:GetAttribute("macrotext") ~= macro then button:SetAttribute("macrotext", macro) end
+end
+function nameLink.Place()
+	local button = nameLink.button
+	if not button or InCombatLockdown() then return end
+	local shown = card and card.target
+	-- (Already your target: no Target button, back if you target someone else.)
+	if shown and button.guid then
+		local targeted = Plain(UnitGUID("target")) == button.guid
+		if targeted == shown:IsShown() then shown:SetShown(not targeted) end
+	end
+	local x, y
+	if shown then x, y = shown:GetCenter() end
+	if not (button.who and x and shown:IsVisible() and card:GetAlpha() > 0.3 and not moving)
+		or UnitAffectingCombat("player") then
+		button:Hide()
+		return
+	end
+	local ui = UIParent:GetEffectiveScale()
+	local k = shown:GetEffectiveScale() / ui
+	button:SetScale(ui)
+	button:ClearAllPoints()
+	button:SetPoint("CENTER", UIParent, "BOTTOMLEFT", x * k, y * k)
+	button:SetSize(shown:GetWidth() * k, shown:GetHeight() * k)
+	if not button:IsShown() then button:Show() end
+end
+-- (For the debug commands: the Target button's state, and its last click.)
+function nameLink.Report(prefix)
+	local button, shown = nameLink.button, card and card.target
+	if not button then
+		ns.Print(prefix .. "Target button: not made yet (no card with a Target button since login)")
+		return
+	end
+	local x, y = button:GetCenter()
+	local tx, ty
+	if shown then tx, ty = shown:GetCenter() end
+	local foci = GetMouseFoci and GetMouseFoci() or { GetMouseFocus and GetMouseFocus() }
+	local focus = foci and foci[1]
+	local clicked = nameLink.clicked
+	local how = button:GetAttribute("type") == "target" and ("unit " .. tostring(button:GetAttribute("unit")))
+		or button:GetAttribute("macrotext")
+	ns.Print(("%sTarget button: shown %s, who %s, aims at %q, at %s,%s size %dx%d, strata %s level %d; "
+		.. "its look shown %s at %s,%s; key down %s; mouse on %s; last click %s"):format(prefix,
+		tostring(button:IsShown()), tostring(button.who), tostring(how),
+		tostring(x and math.floor(x)), tostring(y and math.floor(y)), button:GetWidth(), button:GetHeight(),
+		button:GetFrameStrata(), button:GetFrameLevel(), tostring(shown and shown:IsVisible()),
+		tostring(tx and math.floor(tx)), tostring(ty and math.floor(ty)), tostring(GetCVarBool("ActionButtonUseKeyDown")),
+		tostring(focus and (focus.GetName and focus:GetName() or "a frame without a name")),
+		clicked and ("%q %.0f s ago"):format(tostring(clicked.macro), GetTime() - clicked.at) or "none"))
+end
+
 local function Create()
 	card = CreateFrame("Frame", "CinematicEmoteVision", UIParent)
 	card:SetSize(WIDTH, 96)
@@ -826,6 +1000,16 @@ local function Create()
 		card.buttons[i] = button
 		card.words[i] = WordButton()
 	end
+	-- (The Target button's look, in both kinds: nameLink's secure button over
+	-- it takes the clicks, so these take no mouse themselves.)
+	card.targetPanel = ns.PanelButton(front)
+	card.targetPanel:SetSize(BUTTON_W, BUTTON_H)
+	card.targetWord = WordButton()
+	for _, each in ipairs({ card.targetPanel, card.targetWord }) do
+		each:SetScript("OnClick", nil)
+		each:EnableMouse(false)
+		each:Hide()
+	end
 
 	card.bar = front:CreateTexture(nil, "ARTWORK")
 	card.bar:SetHeight(2)
@@ -897,6 +1081,7 @@ local function Create()
 	end)
 
 	ns.SetOnUpdate(card, function(self, elapsed)
+		nameLink.Place()
 		if moving or self.dragging then self:SetAlpha(1) return end
 		-- (The mouse over it: its time stands still.)
 		if not ns.Flag(self:IsMouseOver()) then self.age = self.age + elapsed end
@@ -917,6 +1102,7 @@ local function Create()
 	end)
 	card:SetScript("OnHide", function()
 		showing = nil
+		nameLink.Arm(nil)
 		if not moving then C_Timer.After(0.3, function() Next() end) end
 	end)
 
@@ -944,46 +1130,55 @@ local function Face(moment)
 	end
 end
 
+-- One button in the style's look: its panel button (panelButton) or word
+-- (word), labeled text, its width set; the other one hidden. Gives it.
+local function StyleButton(style, look, panelButton, word, text)
+	panelButton:Hide()
+	word:Hide()
+	local button
+	if style.buttons == "panel" then
+		button = panelButton
+		StyleText(button:GetFontString(), look)
+		button:SetText(text)
+		-- (fit: as wide as its name, the wheel's, not all the same width)
+		button.width = style.fit and math.max(56, math.ceil(button:GetFontString():GetStringWidth()) + 22)
+			or BUTTON_W
+		button:SetWidth(button.width)
+	else
+		button = word
+		StyleText(button.text, look, style.outline)
+		button.text:SetText(text)
+		Color(button.text, style.link)
+		local tab, box = style.buttons == "tab", style.buttons == "box"
+		button.back:SetShown(tab)
+		local back = style.tab or { 0, 0, 0, 0.45 }
+		if tab then button.back:SetColorTexture(back[1], back[2], back[3], back[4]) end
+		-- (A frame: the banner's boxes, or a tab's own edge, the letter's.)
+		local color = style.tabEdge or style.link or GOLD
+		for _, edge in ipairs(button.edges) do
+			edge:SetShown(box or style.tabEdge ~= nil)
+			edge:SetColorTexture(color[1], color[2], color[3], 0.9)
+		end
+		button.under:SetShown(style.underline == true)
+		button.under:SetColorTexture(color[1], color[2], color[3], 0.8)
+		button.width = math.ceil(button.text:GetStringWidth()) + ((tab or box) and 22 or 8)
+		button:SetSize(button.width, BUTTON_H - 2)
+	end
+	return button
+end
+
 -- The emotes' buttons as the style has them, each with its token and width.
 local function EmoteButtons(style, emotes, look)
 	local list = {}
 	for i = 1, MAX_EMOTES do
-		local panelButton, word = card.buttons[i], card.words[i]
-		panelButton:Hide()
-		word:Hide()
 		local token = emotes[i]
 		if token then
-			local button
-			if style.buttons == "panel" then
-				button = panelButton
-				StyleText(button:GetFontString(), look)
-				button:SetText(EmoteName(token))
-				-- (fit: as wide as its name, the wheel's, not all the same width)
-				button.width = style.fit and math.max(56, math.ceil(button:GetFontString():GetStringWidth()) + 22)
-					or BUTTON_W
-				button:SetWidth(button.width)
-			else
-				button = word
-				StyleText(button.text, look, style.outline)
-				button.text:SetText(EmoteName(token))
-				Color(button.text, style.link)
-				local tab, box = style.buttons == "tab", style.buttons == "box"
-				button.back:SetShown(tab)
-				local back = style.tab or { 0, 0, 0, 0.45 }
-				if tab then button.back:SetColorTexture(back[1], back[2], back[3], back[4]) end
-				-- (A frame: the banner's boxes, or a tab's own edge, the letter's.)
-				local color = style.tabEdge or style.link or GOLD
-				for _, edge in ipairs(button.edges) do
-					edge:SetShown(box or style.tabEdge ~= nil)
-					edge:SetColorTexture(color[1], color[2], color[3], 0.9)
-				end
-				button.under:SetShown(style.underline == true)
-				button.under:SetColorTexture(color[1], color[2], color[3], 0.8)
-				button.width = math.ceil(button.text:GetStringWidth()) + ((tab or box) and 22 or 8)
-				button:SetSize(button.width, BUTTON_H - 2)
-			end
+			local button = StyleButton(style, look, card.buttons[i], card.words[i], EmoteName(token))
 			button.token = token
 			list[#list + 1] = button
+		else
+			card.buttons[i]:Hide()
+			card.words[i]:Hide()
 		end
 	end
 	return list
@@ -1064,6 +1259,22 @@ local function Show(moment)
 	local buttons = EmoteButtons(style, emotes, look)
 	local width = style.width
 	local height
+	-- (Their Target button, at the top: only out of fights, as its secure
+	-- button can only be set up then. As wide as its word.)
+	local target
+	card.targetPanel:Hide()
+	card.targetWord:Hide()
+	if nameLink.Wanted(moment) and not InCombatLockdown() then
+		target = StyleButton(style, look, card.targetPanel, card.targetWord, L["Target"])
+		if target == card.targetPanel then
+			target.width = math.max(56, math.ceil(target:GetFontString():GetStringWidth()) + 22)
+			target:SetWidth(target.width)
+		end
+		target:ClearAllPoints()
+	end
+	card.target = target
+	local targetRoom = target and target.width + 8 or 0
+	local targetRight = style.close and -26 or -10
 	for _, text in ipairs({ card.name, card.line, card.heading }) do text:ClearAllPoints() end
 	card.portrait:ClearAllPoints()
 	card.bar:ClearAllPoints()
@@ -1079,7 +1290,8 @@ local function Show(moment)
 		card.name:SetJustifyH("LEFT")
 		card.line:SetJustifyH("LEFT")
 		card.name:SetPoint("TOPLEFT", card, "TOPLEFT", left, -12)
-		card.name:SetPoint("RIGHT", card, "RIGHT", -24, 0)
+		card.name:SetPoint("RIGHT", card, "RIGHT", target and targetRight - targetRoom or -24, 0)
+		if target then target:SetPoint("TOPRIGHT", card, "TOPRIGHT", targetRight, -8) end
 		card.line:SetPoint("TOPLEFT", card.name, "BOTTOMLEFT", 0, -3)
 		card.line:SetPoint("RIGHT", card, "RIGHT", -12, 0)
 		local top = 14 + card.name:GetStringHeight() + 3 + card.line:GetStringHeight()
@@ -1121,7 +1333,8 @@ local function Show(moment)
 		card.name:SetJustifyH("CENTER")
 		card.line:SetJustifyH("CENTER")
 		card.name:SetPoint("TOP", card, "TOP", 0, -top)
-		card.name:SetWidth(width - 40)
+		card.name:SetWidth(width - 40 - targetRoom * 2)
+		if target then target:SetPoint("TOPRIGHT", card, "TOPRIGHT", targetRight, -6) end
 		top = top + card.name:GetStringHeight() + 3
 		card.line:SetPoint("TOP", card, "TOP", 0, -top)
 		card.line:SetWidth(width - 24)
@@ -1170,10 +1383,17 @@ local function Show(moment)
 		card.line:SetWidth(width + 60)
 		card.line:SetPoint("TOP", card.name, "BOTTOM", 0, -2)
 		height = width + 8 + card.name:GetStringHeight() + card.line:GetStringHeight()
+		-- (Its Target button under the line.)
+		if target then
+			target:SetPoint("TOP", card.line, "BOTTOM", 0, -4)
+			height = height + 4 + target:GetHeight()
+		end
 	end
 	-- (Whole pixels: the bubble's and the letter's tiled edges went crooked, seams
 	-- showing, on a size from the words' heights.)
 	card:SetSize(math.floor(width + 0.5), math.floor(height + 0.5))
+	if target then target:Show() end
+	nameLink.Arm(moment)
 	card.age, card.leaving = 0, nil
 	card.UpdateCover()
 	card:SetAlpha(0)
@@ -1487,7 +1707,8 @@ local function Emoted(text, author, guid)
 	local name = Short(author)
 	local line = text
 	if line:sub(1, #name) == name then line = line:sub(#name + 1):gsub("^%s+", "") end
-	FireFor("Emote", name, guid, line, { same = same })
+	-- (Their whole name for who the emote goes to: the card shows it short.)
+	FireFor("Emote", author, guid, line, { same = same })
 end
 
 -- A summon you accepted: its card a moment later, once you're there (after
@@ -2139,6 +2360,7 @@ end
 -- /cine debug emotevision: what it would do now, and why.
 function ns.EmoteVisionDebug()
 	local db = DB()
+	nameLink.Report("emotevision: ")
 	-- (Each row's answer now: the moments that say no.)
 	local no = {}
 	for _, moment in ipairs(MOMENTS) do
@@ -2193,6 +2415,51 @@ function ns.EmoteVisionDebug()
 			UnitIsInMyGuild and tostring(Plain(UnitIsInMyGuild("target"))) or "no API", ally,
 			tostring((select(2, Known("target")))), met[target] and ("%d s ago"):format(GetTime() - met[target]) or "never"))
 	end
+end
+
+-- /cine debug fakeemote [emote]: a player near you (your target, mouseover,
+-- a nameplate's or your group's) "waves at you" (or the emote given), as if
+-- the game said so in chat: their card, as a real one would come. Nothing is
+-- played or said, and the once-an-hour wait for them is skipped.
+local FAKE_LINES = {
+	wave = "waves at you.", bow = "bows before you.", hug = "hugs you.", thank = "thanks you.",
+	cheer = "cheers at you.", hello = "greets you warmly.", greet = "greets you warmly.", dance = "dances with you.",
+	kiss = "blows you a kiss.", salute = "salutes you with respect.", smile = "smiles at you.",
+	wink = "winks at you.", laugh = "laughs at you.", applaud = "applauds at you. Bravo!",
+	flex = "flexes at you.", roar = "roars with bestial vigor at you.", love = "loves you.",
+}
+function ns.EmoteVisionFake(word)
+	word = (word or "wave"):lower()
+	local units = { "target", "mouseover" }
+	for i = 1, 40 do units[#units + 1] = "nameplate" .. i end
+	local group = IsInRaid() and "raid" or "party"
+	for i = 1, IsInRaid() and 40 or 4 do units[#units + 1] = group .. i end
+	local found
+	for _, unit in ipairs(units) do
+		if ns.Flag(UnitExists(unit)) and ns.Flag(UnitIsPlayer(unit)) and not ns.Flag(UnitIsUnit(unit, "player"))
+			and ns.Flag(UnitIsVisible(unit)) then
+			local name, realm = UnitName(unit)
+			name, realm = Plain(name), Plain(realm)
+			local guid = Plain(UnitGUID(unit))
+			if type(name) == "string" and guid then
+				found = { unit = unit, guid = guid, name = name,
+					full = (type(realm) == "string" and realm ~= "") and (name .. "-" .. realm) or name }
+				break
+			end
+		end
+	end
+	if not found then
+		ns.Print("fakeemote: no player near you (target one, or stand where their nameplate shows)")
+		return
+	end
+	local text = found.name .. " " .. (FAKE_LINES[word] or (word .. "s at you."))
+	ns.Print(("fakeemote: %s (%s, %s): \"%s\"; Emote Vision %s, its emotes row %s, waiting: %s"):format(found.full,
+		found.unit, found.guid, text, ns.Setting("emoteVision") and "on" or "off",
+		DB().emoteVisionEmotes and "on" or "off",
+		tostring(WhyWaiting({ kind = "Emote" }) or "no")))
+	lastFrom["Emote:" .. found.guid] = nil
+	Emoted(text, found.full, found.guid)
+	C_Timer.After(1, function() nameLink.Report("fakeemote: ") end)
 end
 
 ---------------------------------------------------------------------------

@@ -1549,11 +1549,16 @@ local function CreatePanel()
 		"the camera running, with a link to its page."])
 	glowHelper:SetPoint("TOPLEFT", aboveGlow, "BOTTOMLEFT", 0, -2)
 
+	local slashComplete = Check(panel, "slashComplete", L["Suggest /cine commands while typing"],
+		L["Typing /cine in the chat box lists the commands that fit, the ones you use most first. " ..
+		"Up and Down pick one (Enter runs it), Tab or a click fills it in and shows what can follow it."])
+	slashComplete:SetPoint("TOPLEFT", glowHelper, "BOTTOMLEFT", 0, -2)
+
 	-- The language Cinematic's text is in: for the account, not a profile, and
 	-- set as the addon loads (Locales.lua), so a change asks to reload. Each
 	-- language is named in itself.
 	local languageLabel = Label(panel, "GameFontHighlight", L["Language"])
-	languageLabel:SetPoint("TOPLEFT", glowHelper, "BOTTOMLEFT", 4, -14)
+	languageLabel:SetPoint("TOPLEFT", slashComplete, "BOTTOMLEFT", 4, -14)
 	local LANGUAGES = {
 		{ value = "auto", text = L["Game language"] },
 		{ value = "enUS", text = "English" },

@@ -26,6 +26,7 @@ globals = {
 
 -- The WoW API the addon uses (add new ones here as they come up)
 read_globals = {
+	"FCF_OpenTemporaryWindow", "ChatEdit_ActivateChat", -- (SlashComplete.lua)
 	-- (KeyboardMap.lua)
 	"ActionButton_CalculateAction", "PlaceAction", "SetBindingSpell", "SetBindingMacro", "SetBindingItem", "GetBinding", "GetMacroInfo", "GetNumBindings", "GetActionText", "GetActionInfo", "C_ActionBar", "CooldownFrame_Set", "GetActionCooldown", "GetActionTexture", "GetNumShapeshiftForms", "GetPetActionCooldown", "GetPetActionInfo", "GetShapeshiftFormCooldown", "GetShapeshiftFormInfo", "HasAction",
 	"CinematicFrame",

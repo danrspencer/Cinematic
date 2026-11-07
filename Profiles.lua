@@ -21,6 +21,7 @@ local L = ns.L
 
 local GLOBAL_KEYS = {
 	enabled = true, minimapButton = true, addonCompartment = true, minimapAngle = true, logDetail = true, language = true,
+	slashComplete = true, slashUsage = true, -- (SlashComplete.lua: the account's)
 	masterWheelOrder = true, masterWheelOff = true, customWheels = true, wheelExtras = true, -- (Wheels pages)
 	cameraScripts = true, -- (CameraScripts.lua: your scripts, the same in every profile)
 	stylePreviewPos = true, -- (StylePages.lua: where you dragged the Style preview window)
@@ -838,6 +839,7 @@ local RESET_KEEPS = {
 	"extraFrames", -- (frames you added)
 	"devEdits", -- (the dev copy's Module Editor)
 	"flightTimes", "questDrops", "frameAddons", "smartFindLooks", "goodSpeeds", "ownSpeeds", "selfTest",
+	"slashUsage", -- (the /cine commands you use most: SlashComplete.lua)
 }
 -- What a built-in profile keeps of your changes on Reset Settings: the lists
 -- you made in it (its settings go back to the built-in's).

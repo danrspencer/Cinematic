@@ -203,63 +203,22 @@ local function ShowMenu(owner)
 		ns.OpenOptions()
 		return
 	end
+	-- The menu is the CineMode switch alone (same as the Toggle CineMode key).
+	-- It only works while Cinematic is on with a profile, so otherwise the
+	-- settings open instead of an empty menu.
+	if not (ns.ProfileChosen() and ns.GetDB().enabled) then
+		ns.OpenOptions()
+		return
+	end
 	local menu = ns.ContextMenu(owner, function(_, root)
-		local db = ns.GetDB()
-		-- (The camera in use first, a link to its tab on the Cameras page.)
-		local camera = CameraInUse()
-		if camera then
-			root:CreateTitle(L["Cameras in use"])
-			root:CreateButton(VisionText(camera, camera.label), function()
-				if ns.ShowCameraTab then ns.ShowCameraTab(camera.id) else ns.OpenOptions("Cameras") end
-			end)
-			root:CreateDivider()
-		end
-		-- (Then the visions in use, each a link to its page.)
-		UpdateInUse()
-		if inUse[1] then
-			root:CreateTitle(L["Visions in use"])
-			for _, vision in ipairs(inUse) do
-				local page = vision.page
-				root:CreateButton(VisionText(vision, L[vision.label]), function() ns.OpenOptions(page) end)
-			end
-			root:CreateDivider()
-		end
 		root:CreateTitle("Cinematic")
-		-- (Same as the Toggle CineMode key; only while Cinematic is on, as the
-		-- key does nothing otherwise.)
-		if ns.ProfileChosen() and db.enabled then
-			root:CreateCheckbox(L["CineMode"], ns.IsCineModeOn, Cinematic_ToggleCineMode)
-		end
-		-- (Unticked only in a menu opened from the addon compartment.)
-		root:CreateCheckbox(L["Show minimap button"], function() return db.minimapButton end, function()
-			db.minimapButton = not db.minimapButton
-			UpdateIcon()
-			Print(db.minimapButton and L["minimap button shown"]
-				or L["minimap button hidden. Bring it back with /cine button or the " ..
-				"\"Show minimap button\" option."])
-		end)
-		if AddonCompartmentFrame then
-			root:CreateCheckbox(L["Show in addon compartment"], function() return db.addonCompartment end, function()
-				db.addonCompartment = not db.addonCompartment
-				ns.UpdateMinimapButton()
-				Print(db.addonCompartment and L["addon compartment entry shown"]
-					or L["addon compartment entry hidden. Bring it back with the " ..
-					"\"Show in addon compartment\" option."])
+		root:CreateCheckbox(L["CineMode"] .. " " .. L["(UI comes back in combat)"],
+			ns.IsCineModeOn, function()
+				Cinematic_ToggleCineMode()
+				-- (Turned on: the menu closes with the rest of the UI. The
+				-- callback's answer is the menu's response to the click.)
+				if ns.IsCineModeOn() and MenuResponse then return MenuResponse.Close end
 			end)
-		end
-		root:CreateDivider()
-		-- (A frame later: the menu's own click is done with by then.)
-		root:CreateButton(L["Why is it showing?"], function() C_Timer.After(0, ns.ToggleInspect) end)
-		root:CreateButton(L["Settings"], ns.OpenOptions)
-		-- (Last, on its own: off is the whole addon and a reload. No switch
-		-- without a profile: Cinematic stays off whatever it says.)
-		if ns.ProfileChosen() then
-			root:CreateDivider()
-			root:CreateCheckbox(L["Enable Cinematic"], function() return db.enabled end, function()
-				Cinematic_Toggle()
-				UpdateIcon()
-			end)
-		end
 	end)
 	-- The menu opens at the cursor and is only kept on screen; keep it a little
 	-- way off the edges too. (Once it has its size, a frame later.)

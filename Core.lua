@@ -53,6 +53,7 @@ local DEFAULTS = {
 	fadeUI = true,            -- CineMode fades the UI (off: just the visual effects, over the normal UI)
 	minimapButton = true,     -- show the minimap button
 	addonCompartment = true,  -- list Cinematic in the game's addon compartment
+	slashComplete = true,     -- suggestions over the chat box while typing /cine (SlashComplete.lua)
 	minimapAngle = 205,       -- its position around the minimap, in degrees (clear of the dungeon finder's eye)
 	hideCombatText = false,   -- no floating combat text (heals, regen) in cinematic mode out of combat (after the Calm Timer)
 	hideErrorsInCombat = false,    -- no red error text ("Target not in line of sight") in fights (and the Calm Timer after)
@@ -1553,6 +1554,8 @@ end
 -- base unless its modules give the row one (Profiles.lua's WithRuleDefaults),
 -- so Reset page, a profile's reset and Reset Settings put them back.
 ns.RULE_DEFAULTS = {}
+-- The Names grid's Service NPCs row: titles up whenever no camera plays.
+ns.RULE_DEFAULTS["name:ServiceNPCs"] = "not camera"
 do
 	local OFF_GRID_ROWS, OLD_GRID_DEFAULTS = {}, {}
 

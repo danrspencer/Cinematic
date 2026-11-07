@@ -5,7 +5,16 @@ local L = ns.L
 -- What the commands print goes in the log too (/cine log), so troubleshooting
 -- output can be sent in one paste. The help lists are left out.
 local logPrints = true
+-- (Set by ns.SlashHelpList: the help's commands go in it instead of chat.)
+local collecting
 local function print(...)
+	if collecting then
+		-- (The debug help's "  /cine debug zoom - what it does" lines.)
+		local line = tostring((...))
+		local command, text = line:match("^%s*(/cine.-)%s+%-%s*(.-)%s*$")
+		if command then collecting[#collecting + 1] = { command = command, text = text } end
+		return
+	end
 	if logPrints then
 		local parts = {}
 		for i = 1, select("#", ...) do parts[i] = tostring((select(i, ...))) end
@@ -19,17 +28,22 @@ local function OnOff(value)
 end
 
 local function Heading(text)
+	if collecting then return end
 	print("|cffffd100" .. text .. "|r")
 end
 
 -- A command and what it does (the command itself is the same in every language).
 local function Command(command, text)
+	if collecting then
+		collecting[#collecting + 1] = { command = command, text = text }
+		return
+	end
 	print("  " .. command .. " - " .. text)
 end
 
 local function PrintHelp()
 	logPrints = false
-	ns.Print(L["commands"])
+	if not collecting then ns.Print(L["commands"]) end
 	Heading(L["General"])
 	Command("/cine", L["toggle CineMode"])
 	Command("/cine off", L["turn Cinematic off completely: asks, then turns it off in the AddOns list and reloads"])
@@ -70,12 +84,14 @@ local function PrintHelp()
 	Command("/cine debug help", L["troubleshooting commands"])
 	Command("/cine log", L["copy the log and your setup for a bug report (/cine log clear empties it)"])
 	Command("/cine panic", L["stop for this session and put your UI and settings back (/cine resume to restart)"])
-	print("  " .. L["Keybinds (toggle CineMode, hide the UI, start a camera) are on the Keybinds settings page."])
+	if not collecting then
+		print("  " .. L["Keybinds (toggle CineMode, hide the UI, start a camera) are on the Keybinds settings page."])
+	end
 	logPrints = true
 end
 
 local function PrintDebugHelp()
-	ns.Print("troubleshooting commands")
+	if not collecting then ns.Print("troubleshooting commands") end
 	logPrints = false
 	print("  /cine log - copy the log for a bug report: what's printed below goes in it too")
 	print("  /cine selftest - check the game is still as the addon expects on this client (read only); results in the log and the copy window")
@@ -175,6 +191,7 @@ local function PrintDebugHelp()
 	print("  /cine debug emotestop [emote] - plays a looping emote (dance if none given), then tries each way to stop it 4 seconds apart, naming each in chat (again to stop)")
 	print("  /cine debug emotescan [first [last] | more] - every emote of the game's in turn at no one (or from first to last; more: the few still to check, 10 seconds each), 5 seconds each, its number and command big at the top, for a recording (logged in CinematicDB.emoteScan; again to stop)")
 	print("  /cine debug emotevision -Emote Vision: whether it shows here now, what's queued, a resurrection offer, and the unit your target's card would emote at")
+	print("  /cine debug fakeemote [emote] - a player near you (target, mouseover, nameplate or group) seems to wave at you (or the emote given, e.g. bow, hug): their Emote Vision card, nothing played or said")
 	print("  /cine debug damagevision - Damage Vision: showing or why not, the session and meter it reads, your place and whether the totals are secret")
 	print("  /cine debug modules - profile modules: any writing outside their pages and sections, or two of a profile's setting the same thing (in the log)")
 	print("  /cine debug speech - show a sample line of speech from behind you, and print what happens to each say and yell (again to stop)")
@@ -237,6 +254,16 @@ local function PrintDebugHelp()
 		print("  /cine demo [name|list|stop] - the Demo Hub: every demo tool and recording script (dev copy)")
 	end
 	logPrints = true
+end
+
+-- The /cine help's commands, then the debug help's, in their order: { command = "/cine find <words>",
+-- text = what it does } each (SlashComplete.lua's suggestions).
+function ns.SlashHelpList()
+	collecting = {}
+	local ok = pcall(PrintHelp) and pcall(PrintDebugHelp) -- (the debug ones after)
+	local list = collecting
+	collecting, logPrints = nil, true
+	return ok and list or {}
 end
 
 local function HandleSlash(msg)
@@ -1354,6 +1381,8 @@ local function HandleSlash(msg)
 		ns.HealthFadeDebug(arg:match("^healthfade%s+(%S+)"))
 	elseif cmd == "debug" and arg == "emotevision" then
 		ns.EmoteVisionDebug()
+	elseif cmd == "debug" and (arg == "fakeemote" or arg:find("^fakeemote%s")) then
+		ns.EmoteVisionFake(arg:match("^fakeemote%s+(%S+)"))
 	elseif cmd == "debug" and (arg == "emotestop" or arg:find("^emotestop%s")) then
 		ns.EmoteStopTest(arg:match("^emotestop%s+(%S+)"))
 	elseif cmd == "debug" and (arg == "emotescan" or arg:find("^emotescan%s")) then
@@ -1763,14 +1792,17 @@ local function HandleSlash(msg)
 		end
 	else
 		PrintHelp()
+		return false -- (not a command: not counted for the suggestions)
 	end
+	return true
 end
 
 function ns.HandleSlash(msg)
 	local cmd, arg = msg:lower():match("^%s*(%S*)%s*(.-)%s*$")
 	if (cmd == "debug" and arg ~= "help") or cmd == "list" or cmd == "selftest" then
 		ns.CaptureDebug("/cine " .. msg:match("^%s*(.-)%s*$"), function() HandleSlash(msg) end)
-	else
-		HandleSlash(msg)
+		if ns.RecordSlashUse then ns.RecordSlashUse(msg) end
+	elseif HandleSlash(msg) and ns.RecordSlashUse then
+		ns.RecordSlashUse(msg) -- (SlashComplete.lua: what you use most comes first)
 	end
 end

@@ -147,6 +147,7 @@ Tracking.lua
 NodeSweep.lua
 Support\QuestieMinimap.lua
 Slash.lua
+SlashComplete.lua
 Why.lua
 CursorHide.lua
 KeyboardMap.lua
