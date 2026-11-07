@@ -3853,9 +3853,17 @@ ns.DecideScene = ns.Profiled("ns.DecideScene", ns.DecideScene)
 -- (Tools/camera-director-plan.md, phase 3). Quiet: no camera on, not dead or
 -- on a flight, no script playing, no fly-by asked for, and in CineMode none
 -- of the standing-still, event or travel scenes on.
+-- (A camera moving the view with code of its own, not the orbit's: one playing
+-- as its script, the quest camera, Chat Cam.)
+local OWN_CODE_CAMS = { quest = true, chatcam = true }
 function ns.OrbitQuiet(s)
-	return s.cam == nil and not s.dead and not s.onTaxi and not ns.DEATH_CVARS.active
-		and not ns.DeathCameraBusy() and not ns.orbit.flyByWanted and ns.PlayingCameraScript() == nil
+	local cam = s.cam
+	if cam ~= nil and not OWN_CODE_CAMS[cam] and not (ns.PlayingCameraScript() ~= nil and ns.PlayingCameraKey
+		and ns.PlayingCameraKey(true) == cam) then
+		return false
+	end
+	return not s.dead and not s.onTaxi and not ns.DEATH_CVARS.active
+		and not ns.DeathCameraBusy() and not ns.orbit.flyByWanted
 		and not (ns.lastCinematic and (s.idle or s.vista or s.fish or s.cozy or s.tele or s.travel))
 end
 -- Quiet, and nothing of its own still easing out: a turn back, the idle

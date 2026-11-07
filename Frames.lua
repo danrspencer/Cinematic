@@ -7239,7 +7239,11 @@ do
 		Update()
 	end)
 	watcher:RegisterEvent("CVAR_UPDATE")
-	watcher:SetScript("OnEvent", function() since = 1 end) -- (on the next frame)
+	-- (On the next frame; only for its own setting: a camera script's speed
+	-- writes, 20 a second, had it going over every icon each time.)
+	watcher:SetScript("OnEvent", function(_, _, name)
+		if type(name) == "string" and name:lower() == "countdownforcooldowns" then since = 1 end
+	end)
 	ns.ApplyCooldownNumbers = Update
 end
 

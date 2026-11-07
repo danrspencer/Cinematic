@@ -1157,6 +1157,11 @@ events:SetScript("OnEvent", function(_, event, ...)
 		lastRank = nil
 		nextRead = 0
 		return
+	elseif event == "CVAR_UPDATE" then
+		-- (Only the meter's own tick, METER_CVAR: any other setting, like a
+		-- camera script's speed 20 times a second, re-dressed it all each time.)
+		local name = ...
+		if type(name) ~= "string" or name:lower() ~= METER_CVAR:lower() then return end
 	end
 	if event == "PLAYER_LOGIN" then
 		db = ns.GetDB()

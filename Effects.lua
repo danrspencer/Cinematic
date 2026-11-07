@@ -1466,6 +1466,28 @@ local function KeptHere(kind)
 		and true or false
 end
 
+-- Both asked for every kind by the pass and again for each plate: one answer
+-- per kind a frame. (A profile showed them ~10 times a frame in CineMode.)
+do
+	local function PerFrame(fn)
+		local at, answers = -1, {}
+		return function(kind)
+			local now = GetTime()
+			if now ~= at then
+				at = now
+				wipe(answers)
+			end
+			local answer = answers[kind]
+			if answer == nil then
+				answer = fn(kind) and true or false
+				answers[kind] = answer
+			end
+			return answer
+		end
+	end
+	KeptHere, ShownInFights = PerFrame(KeptHere), PerFrame(ShownInFights)
+end
+
 -- How far each kind is held up by KeptHere, faded so moving between places
 -- (or changing the ticks) doesn't pop plates on or off. kind -> 0 to 1.
 local keptLevel = {}

@@ -2162,6 +2162,7 @@ function ns.GetOptionPlace()
 	end
 	return place ~= "inn" and place or nil
 end
+ns.GetOptionPlace = OncePerFrame(ns.GetOptionPlace) -- (asked ~10 times a frame in CineMode)
 
 local OFF_IN = {
 	city = "offInCities", dungeon = "offInDungeons", raid = "offInRaids", pvp = "offInPvP",
@@ -2175,6 +2176,7 @@ function ns.PlaceSuffix()
 	local place = ns.GetOptionPlace()
 	return place and PLACE_SUFFIX[place]
 end
+ns.PlaceSuffix = OncePerFrame(ns.PlaceSuffix)
 
 -- The same for the Nameplates page, whose columns are its own: capital
 -- cities ("Cities"), dungeons and raids as one ("Instances"), and
@@ -2189,6 +2191,7 @@ function ns.PlateSuffix()
 	end
 	return place and PLACE_SUFFIX[place]
 end
+ns.PlateSuffix = OncePerFrame(ns.PlateSuffix)
 
 -- A camera mode ("flight", "idle", "cozy"... see ns.CAMERA_OFF_CAMS) turned
 -- off where you are. Where: a capital city, an

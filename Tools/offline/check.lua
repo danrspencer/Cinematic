@@ -186,6 +186,14 @@ if arg[1] and not update then
 		if ns.OrbitQuiet({ idle = true }) then Problem("quiet in CineMode standing still") end
 		ns.lastCinematic = false
 		if not ns.OrbitQuiet({ idle = true }) then Problem("not quiet standing still out of CineMode") end
+		-- (A camera moving the view with its own code: its script, the quest
+		-- camera, Chat Cam. Not one of ours with no script playing.)
+		if not ns.OrbitQuiet({ cam = "quest" }) then Problem("not quiet in the quest camera") end
+		local keptScript2, keptKey = ns.PlayingCameraScript, ns.PlayingCameraKey
+		ns.PlayingCameraScript, ns.PlayingCameraKey = function() return {} end, function() return "run" end
+		if not ns.OrbitQuiet({ cam = "run" }) then Problem("not quiet with the run camera playing as its script") end
+		ns.PlayingCameraScript, ns.PlayingCameraKey = keptScript2, keptKey
+		if ns.OrbitQuiet({ cam = "run" }) then Problem("quiet with the run camera's own code") end
 		ns.orbitFrame:SetScript("OnUpdate", nil)
 		t = t + 0.02
 		ns.DirectorStep()

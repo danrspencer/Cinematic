@@ -29,6 +29,13 @@ ns.directorStats = stats
 function ns.WakeDirector(why)
 	wake = wake or why or "?"
 end
+-- A scene or trigger setting changed (ns.CameraRowsChanged): what's kept per
+-- decision (ns.ActiveEvent, ns.PerDecision's) is worked out afresh as next
+-- asked, and the scene on the next step.
+function ns.DirectorSettingsChanged()
+	ns.directorGen = (ns.directorGen or 0) + 1
+	ns.WakeDirector("settings")
+end
 
 local function Changed(key, value)
 	if seen[key] ~= value then
@@ -113,6 +120,9 @@ function ns.DirectorStep()
 	-- something to do; meanwhile the mouse held on the camera is noted for it.
 	if ns.OrbitAsleep() then
 		ns.NoteHeldCameraInput()
+		-- (Steering with the mouse while a travel camera plays as its script:
+		-- the script's turns go by it.)
+		if ns.PlayingCameraScript() ~= nil then ns.UpdateMouseSteer() end
 		if not ns.OrbitQuiet(scene) then
 			ns.WakeOrbit()
 			if ns.directorDebug then ns.Print("director: orbit awake (" .. tostring(why or "tick") .. ")") end
@@ -162,6 +172,68 @@ end
 frame:SetScript("OnEvent", function(_, event)
 	ns.WakeDirector(event)
 end)
+
+-- Worked out once per decision (once a frame while it isn't running):
+-- questions about the scene that are asked every frame. fn(key) by its key.
+function ns.PerDecision(fn)
+	local gen, at, answers = -1, -1, {}
+	return function(key)
+		local now = GetTime()
+		local fresh
+		if running then fresh = gen == ns.directorGen else fresh = at == now end
+		if not fresh then
+			gen, at = ns.directorGen, now
+			wipe(answers)
+		end
+		local answer = answers[key]
+		if answer == nil then
+			answer = fn(key) and true or false
+			answers[key] = answer
+		end
+		return answer
+	end
+end
+-- (The orbit's mouse steering asked it every frame: 0.1 ms in a profile.)
+ns.CameraPlaysHere = ns.PerDecision(ns.CameraPlaysHere)
+
+-- /cine debug cvarcost: what one camera speed write costs, as camera scripts
+-- make them (ns.SetHeldSpeed: 1.8 ms each in a profile, restyling bars and
+-- text). Writes it 20 times (your own value back after), counting the style
+-- calls it sets off, and logs the first caller's stack to see whose they are.
+function ns.DebugCVarCost()
+	local cvar = "cameraYawMoveSpeed"
+	local yours = GetCVar(cvar)
+	if not yours or InCombatLockdown() then ns.Print("cvarcost: not now (in a fight, or no such setting)") return end
+	local names = { "DressStyleEdges", "SetBarTexture", "OutlinedFlags", "StyleFontFile", "SetTextShadow", "RefreshPlate" }
+	local kept, counts, stack = {}, {}, nil
+	for _, name in ipairs(names) do
+		local fn = ns[name]
+		if type(fn) == "function" then
+			kept[name], counts[name] = fn, 0
+			ns[name] = function(...)
+				counts[name] = counts[name] + 1
+				if not stack then stack = debugstack and debugstack(2, 12, 0) or "?" end
+				return fn(...)
+			end
+		end
+	end
+	local start = debugprofilestop and debugprofilestop() or 0
+	for i = 1, 20 do
+		SetCVar(cvar, (tonumber(yours) or 180) + (i % 2 == 1 and 1 or 0))
+	end
+	SetCVar(cvar, yours)
+	local ms = (debugprofilestop and debugprofilestop() or 0) - start
+	for name, fn in pairs(kept) do ns[name] = fn end
+	local parts = {}
+	for _, name in ipairs(names) do
+		if counts[name] then parts[#parts + 1] = name .. " " .. counts[name] end
+	end
+	local line = ("cvarcost: 21 writes of %s took %.2f ms (%.3f each); style calls: %s"):format(cvar, ms, ms / 21,
+		table.concat(parts, ", "))
+	ns.Print(line)
+	ns.Log("cvarcost", line)
+	ns.Log("cvarcost", "first style call from: " .. (tostring(stack):gsub("%c+", " | ")))
+end
 
 -- /cine debug director: its counts, and each scene change in chat (again to stop).
 function ns.DirectorDebug()

@@ -467,6 +467,8 @@ function ns.CameraRowsChanged()
 	wipe(nowCache)
 	nowCache.at = -1
 	if ns.InvalidateSceneGroups then ns.InvalidateSceneGroups() end
+	-- (The camera director's answers kept per decision go stale at once too.)
+	if ns.DirectorSettingsChanged then ns.DirectorSettingsChanged() end
 end
 
 -- A trigger's setting now (camera, music, cine), from the row it goes by:

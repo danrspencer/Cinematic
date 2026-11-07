@@ -112,6 +112,7 @@ local function PrintDebugHelp()
 	print("  /cine debug tent [seen|cozy [left|right]|clear] - whether a Camp Tent's been moused over near here (seen fakes one on that side of the screen, cozy also starts the cozy camera)")
 	print("  /cine debug fishing - the last red error message, and whether it paused right-click casting")
 	print("  /cine debug weapon - what the game says about your weapon, and the cozy weapon trigger")
+	print("  /cine debug cvarcost - what writing a camera speed setting costs (the restyling it sets off), written to the log")
 	print("  /cine debug director - the camera director: how often it decided the scene, and each scene change in chat (again to stop)")
 	print("  /cine debug quest - the quest cam: on or off, its turn and its zoom")
 	if ns.GetShoulderCamDebug then -- (dev copy: ShoulderCam.lua)
@@ -1030,6 +1031,8 @@ local function HandleSlash(msg)
 			ns.Print(t and "cozy sway: not going yet (it steers clear of the tent once the cozy camera starts)"
 				or "cozy sway: no tent to steer clear of")
 		end
+	elseif cmd == "debug" and arg == "cvarcost" then
+		ns.DebugCVarCost()
 	elseif cmd == "debug" and arg == "director" then
 		ns.DirectorDebug()
 	elseif cmd == "debug" and arg == "weapon" then
