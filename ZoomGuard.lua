@@ -104,6 +104,7 @@ local JUMP_SPEED = 30   -- ...and faster than this (yards a second): a jump, not
 local trace = { n = 0, head = 0, t = {}, z = {}, ask = {}, who = {}, refused = {}, ctx = {}, phase = {}, steer = {}, max = {} }
 local lastJumpLog, lastSwingLog = -math.huge, -math.huge
 local SWING_LOG_GAP = 30 -- seconds between logs of swings that weren't ours
+local IDLE_RECORD = 0.25 -- seconds between trace lines while the camera's still
 
 local function Record(now, zoom)
 	trace.head = trace.head % TRACE_MAX + 1
@@ -156,6 +157,13 @@ local function Watch(_, elapsed)
 	local zoom = GetCameraZoom()
 	if type(zoom) ~= "number" then return end
 	local prev = trace.n > 0 and trace.z[trace.head] or zoom
+	-- (The camera still, none of ours or yours lately, nothing sent this
+	-- frame: nothing for the guard, and the trace takes a line only every
+	-- IDLE_RECORD seconds. Most of the time, standing about.)
+	if trace.n > 0 and zoom == prev and now - guard.oursAt >= OURS_RECENT and (guard.frameAsk or 0) == 0 and not guard.frameRefused
+		and now - trace.t[trace.head] < IDLE_RECORD then
+		return
+	end
 	Record(now, zoom)
 	local ours = now - guard.oursAt < OURS_RECENT
 	local yours = now - (ns.lastPlayerZoomAt or -math.huge) < YOURS_RECENT
@@ -176,7 +184,8 @@ local function Watch(_, elapsed)
 	end
 	if yours then
 		-- Yours to move: start afresh from here.
-		guard.extreme, guard.dir, guard.turns = zoom, nil, {}
+		guard.extreme, guard.dir = zoom, nil
+		wipe(guard.turns)
 		return
 	end
 	guard.extreme = guard.extreme or zoom

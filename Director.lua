@@ -46,11 +46,13 @@ local function Changed(key, value)
 end
 
 -- The cheap things, looked at every frame: the first changed one, or nil.
+-- (Look is made once: a closure made each frame was garbage every frame.)
+local why
+local function Look(key, value)
+	if Changed(key, value) and not why then why = key end
+end
 local function WhatChanged()
-	local why
-	local function Look(key, value)
-		if Changed(key, value) and not why then why = key end
-	end
+	why = nil
 	Look("cinematic", ns.lastCinematic or false)
 	Look("moving", ns.playerMoving or false)
 	Look("taxi", ns.OnTaxi() and true or false)
@@ -67,7 +69,9 @@ local function WhatChanged()
 	Look("glide", (ns.GlidingSpeed and ns.GlidingSpeed() ~= nil) and true or false) -- (taking off, landing)
 	Look("script", (ns.PlayingCameraKey and ns.PlayingCameraKey(true)) or false)
 	Look("test", ns.testTravel or ns.cameraTesting or false)
-	return why
+	local changed = why
+	why = nil
+	return changed
 end
 
 ns.directorGen = 0 -- decisions so far: ns.ActiveEvent works itself out again on each
@@ -134,7 +138,19 @@ ns.DirectorStep = ns.Profiled("Camera director", ns.DirectorStep)
 
 -- (Its frame runs with the addon: Core.lua starts and stops it with the
 -- orbit's, ns.SetDirectorRunning.)
-local function OnUpdate()
+-- With the orbit asleep (no camera of ours moving the view) and no script
+-- steering with the mouse, its own frame steps it IDLE_STEP apart rather
+-- than every frame: what it looks at changes far slower than a frame, and a
+-- wake (an event) still steps it on the next frame. Awake, the orbit steps it
+-- every frame itself.
+local IDLE_STEP = 1 / 30 -- seconds
+local sinceStep = 0
+local function OnUpdate(_, elapsed)
+	sinceStep = sinceStep + (elapsed or 0)
+	if sinceStep < IDLE_STEP and not wake and ns.OrbitAsleep() and ns.PlayingCameraScript() == nil then
+		return
+	end
+	sinceStep = 0
 	ns.DirectorStep()
 end
 -- (A plain flag: asked several times a frame.)

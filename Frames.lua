@@ -8076,6 +8076,7 @@ do
 		return false
 	end
 
+	local anyDrawn = true -- (a flash drawn last frame: hidden once it's done)
 	local function Update()
 		local now = GetTime()
 		if now - checkedAt >= 0.1 and ns.db then
@@ -8087,10 +8088,16 @@ do
 				wipe(wasRecharging) -- (a flash under way plays out: the page's Test needs none ticked)
 			end
 		end
+		-- (Nothing flashing, none left up from last frame: nothing to draw or hide.)
+		if not next(flashUntil) and not anyDrawn then
+			return
+		end
+		anyDrawn = false
 		for icon, flash in pairs(flashes) do
 			local untilAt = flashUntil[icon]
 			if untilAt and now < untilAt and not IsForbidden(icon) then
 				Draw(icon, flash, untilAt - now)
+				anyDrawn = true
 			else
 				flash:Hide()
 				flashUntil[icon], flashSpell[icon] = nil, nil
