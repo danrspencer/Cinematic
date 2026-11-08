@@ -903,13 +903,22 @@ end
 -- Normal NPC - Enemy...): the default its kind's would have, so profiles
 -- keep it and shared ones bring it; nil for any other key. Its settings:
 -- <id>Mark<key>, <id>Color<part>, <id>When and <id>When<word>.
+-- (Each key's split, kept: the profile code asks this of every setting,
+-- thousands at a time. false: not a row's setting's shape.)
+local markRowSplit = {}
 function ns.MarkRowDefault(key)
 	if type(key) ~= "string" or DEFAULTS[key] ~= nil then
 		return nil
 	end
-	local id, rest = key:match("^(%l[%a%d]-)(Mark%u%a*)$")
-	if not id then id, rest = key:match("^(%l[%a%d]-)(Color%u%a*)$") end
-	if not id then id, rest = key:match("^(%l[%a%d]-)(When[%a%d]*)$") end
+	local split = markRowSplit[key]
+	if split == nil then
+		local id, rest = key:match("^(%l[%a%d]-)(Mark%u%a*)$")
+		if not id then id, rest = key:match("^(%l[%a%d]-)(Color%u%a*)$") end
+		if not id then id, rest = key:match("^(%l[%a%d]-)(When[%a%d]*)$") end
+		split = id and { id, rest } or false
+		markRowSplit[key] = split
+	end
+	local id, rest = split and split[1], split and split[2]
 	if not id or not ns.MarkRowValid(id) then
 		return nil
 	end
@@ -2423,6 +2432,13 @@ local function OffInChanged()
 	return changed
 end
 
+-- (Why CineMode's off with no trigger, made into words only when read:
+-- tostring(ns.cineOffWhy).)
+local noTriggerWhy = setmetatable({}, { __tostring = function()
+	return ("no CineMode trigger (place %s, moving %s, auto-run flag %s, auto-running %s, run cam off here %s)")
+		:format(tostring(ns.GetPlaceType()), tostring(ns.playerMoving), tostring(ns.autoRunning),
+			tostring(ns.IsAutoRunning and ns.IsAutoRunning()), tostring(ns.IsCameraOffHere("run")))
+end })
 local function ShouldBeCinematic(now)
 	ns.cineOffWhy = "an error (see /cine log)" -- (until a return below says otherwise)
 	local changed = OffInChanged()
@@ -2431,16 +2447,17 @@ local function ShouldBeCinematic(now)
 	-- (switched on, or you leave), straight back, at the fade out time. With
 	-- "Start in CineMode" off, only while a camera ticked in the Camera
 	-- Triggers page's CineMode column runs.
-	if not ns.db.enabled or not (ns.db.fadeUI or ns.cineKeyOn or ns.TriggerStartsCine()) or not ns.ProfileChosen()
+	-- (Asked once a tick: with Start in CineMode off, the Subtle profile, it's
+	-- asked every tick.)
+	local triggered = ns.db.enabled and (ns.db.fadeUI or ns.cineKeyOn or ns.TriggerStartsCine())
+	if not triggered or not ns.ProfileChosen()
 		or GetTime() < snoozeUntil
 		or IsInDisabledZone() or IsInDisabledGroup() then
 		quickStart = false
-		-- (For the log: why CineMode is off. See OnUpdate.)
+		-- (For the log: why CineMode is off. See OnUpdate. The no-trigger
+		-- one's details are worked out only when it's read.)
 		ns.cineOffWhy = (not ns.db.enabled and "switched off")
-			or (not ns.db.fadeUI and not ns.cineKeyOn and not ns.TriggerStartsCine() and ("no CineMode trigger (place %s, moving %s, " ..
-				"auto-run flag %s, auto-running %s, run cam off here %s)"):format(tostring(ns.GetPlaceType()),
-				tostring(ns.playerMoving), tostring(ns.autoRunning), tostring(ns.IsAutoRunning and ns.IsAutoRunning()),
-				tostring(ns.IsCameraOffHere("run"))))
+			or (not triggered and noTriggerWhy)
 			or (GetTime() < snoozeUntil and "snoozed") or "turned off here"
 		return false
 	end
@@ -3092,6 +3109,15 @@ local function OnOrbitUpdate(_, elapsed)
 	Step(ns.UpdateOrbit, ns.lastCinematic, elapsed)
 end
 OnOrbitUpdate = ns.Profiled("Orbit camera (every frame)", OnOrbitUpdate)
+do -- (timed for /cine debug loops, like the loops set with ns.SetOnUpdate)
+	local orbit = OnOrbitUpdate
+	OnOrbitUpdate = function(self, elapsed)
+		if not ns.loopAudit then return orbit(self, elapsed) end
+		local started = debugprofilestop()
+		orbit(self, elapsed)
+		ns.LoopAuditAdd("Core.lua orbit camera", debugprofilestop() - started)
+	end
+end
 ns.OrbitOnUpdate = OnOrbitUpdate -- (Director.lua wakes the orbit with it)
 
 -- Set at login (and on turning it on) when cinematic mode starts at once: the first cinematic tick
@@ -3112,6 +3138,8 @@ local GRID_EFFECTS = { "letterbox", "tint", "vignette", "weather" }
 local EFFECT_ROWS = {} -- (their Show in rows' keys, made once)
 for _, key in ipairs(GRID_EFFECTS) do EFFECT_ROWS[key] = "effect:" .. key end
 local effectWanted = {}
+local effectAsk = { at = -math.huge } -- (the effects' rows' answers, when last asked, and for what)
+local EFFECT_ASK = 0.1 -- (seconds, out of CineMode)
 local lastFightAt = -math.huge
 ns.OnCalmEnd(function(cut) lastFightAt = math.min(lastFightAt, cut) end)
 local calmHealthySince -- (Exit Calm Timer when healthy: when you were last back to full)
@@ -3122,6 +3150,7 @@ local calmTrace = { fighting = false } -- (and for its log lines: a fight was on
 -- tick due every frame, both halves still run in one.)
 local tickRest = {}
 local framesPass = { elapsed = 0 }
+local IDLE_PASS = 0.5 -- (seconds: the frames pass out of CineMode, all settled)
 
 local function OnUpdate(_, elapsed)
 	-- Every frame (with EllesmereUI, or watching with /cine debug alpha): frames
@@ -3192,13 +3221,24 @@ local function OnUpdate(_, elapsed)
 		-- (Each on while its Show in row, effect:<effect>, is: Visual Effects page;
 		-- the letterbox and tint while their own page's Enable Page is on too.)
 		-- (Show me's effects demo, ShowMe.lua: just its effects, for its few seconds.)
-		for _, key in ipairs(GRID_EFFECTS) do
-			if ns.effectsDemo then
-				effectWanted[key] = ns.effectsDemo[key] or false
-			else
-				effectWanted[key] = effectsOn and ns.db.visualEffects and ns.db[key .. "Page"] ~= false
-					and ns.RowOnNow(EFFECT_ROWS[key], ns.db[key .. "Always"], true) or false
+		-- (Out of CineMode, the Subtle profile's effects over the normal UI,
+		-- their rows asked only every EFFECT_ASK seconds, or at once when the
+		-- fight or effectsOn changes: their fades still run every tick.)
+		local ask = cinematic or ns.effectsDemo or effectAsk.fight ~= inCombat or effectAsk.on ~= effectsOn
+			or now - effectAsk.at >= EFFECT_ASK
+		if ask then
+			effectAsk.fight, effectAsk.on, effectAsk.at = inCombat, effectsOn, now
+			for _, key in ipairs(GRID_EFFECTS) do
+				if ns.effectsDemo then
+					effectAsk[key] = ns.effectsDemo[key] or false
+				else
+					effectAsk[key] = effectsOn and ns.db.visualEffects and ns.db[key .. "Page"] ~= false
+						and ns.RowOnNow(EFFECT_ROWS[key], ns.db[key .. "Always"], true) or false
+				end
 			end
+		end
+		for _, key in ipairs(GRID_EFFECTS) do
+			effectWanted[key] = effectAsk[key]
 		end
 		-- (The letterbox key and a new place's few seconds: Effects.lua.)
 		if not ns.effectsDemo and ns.LetterboxExtra then
@@ -3277,14 +3317,26 @@ local function OnUpdate(_, elapsed)
 	local fadeOn = cinematic or ns.previewRows ~= nil or ns.layoutFadeUntil ~= nil
 	local fight = InCombatLockdown() or Flag(UnitAffectingCombat("player"))
 	local x, y = GetCursorPosition()
+	-- (Out of CineMode the mouse only matters over a unit frame with parts
+	-- hidden, Unit Frames page: they come up under it.)
+	if not fadeOn and not (ns.AnyUnitPartHidden and ns.AnyUnitPartHidden()) then
+		x, y = 0, 0
+	end
+	-- Out of CineMode (the Subtle profile's normal UI) with every frame
+	-- settled, nearly every frame is just up as usual: the pass then runs
+	-- only every IDLE_PASS seconds (for slow changes: an unused swing bar,
+	-- the quest tracker), or at once when something above changes.
 	local pass = framesPass
-	if pass.skip and ns.framesSettled and fadeOn == pass.fadeOn and fight == pass.fight
-		and x == pass.x and y == pass.y and not IsModifierKeyDown() and not (ns.IsChatActive and ns.IsChatActive()) then
+	local immersive = ns.ChatCamImmersive and ns.ChatCamImmersive() or false
+	local same = ns.framesSettled and fadeOn == pass.fadeOn and fight == pass.fight and immersive == pass.immersive
+		and x == pass.x and y == pass.y and not IsModifierKeyDown() and not (ns.IsChatActive and ns.IsChatActive())
+	local idle = same and not fadeOn and not immersive and pass.elapsed + elapsed < IDLE_PASS
+	if (pass.skip and same) or idle then
 		pass.skip = false
 		pass.elapsed = pass.elapsed + elapsed
 	else
 		pass.skip = true
-		pass.fadeOn, pass.fight, pass.x, pass.y = fadeOn, fight, x, y
+		pass.fadeOn, pass.fight, pass.immersive, pass.x, pass.y = fadeOn, fight, immersive, x, y
 		Step(ns.UpdateFrames, fadeOn, elapsed + pass.elapsed)
 		pass.elapsed = 0
 	end
@@ -3292,6 +3344,15 @@ local function OnUpdate(_, elapsed)
 	tickRest.cinematic, tickRest.elapsed = cinematic, elapsed
 end
 OnUpdate = ns.Profiled("Update tick", OnUpdate)
+do -- (timed for /cine debug loops)
+	local tick = OnUpdate
+	OnUpdate = function(self, elapsed)
+		if not ns.loopAudit then return tick(self, elapsed) end
+		local started = debugprofilestop()
+		tick(self, elapsed)
+		ns.LoopAuditAdd("Core.lua main tick", debugprofilestop() - started)
+	end
+end
 ns.ProfileName(UpdateDroppedTarget, "UpdateDroppedTarget")
 ns.ProfileName(ShouldBeCinematic, "ShouldBeCinematic")
 

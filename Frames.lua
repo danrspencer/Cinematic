@@ -9391,6 +9391,7 @@ function ns.UpdateFrames(cinematic, elapsed)
 	-- of CineMode, the frame under the mouse, held as long (the fade out counted).
 	-- (All but the parts unticked in its groups. After the events: they're
 	-- groups up too. Out of CineMode no group's up: any group it's in counts.)
+	local partsBusy = false
 	if ns.SetUnitPartsHovered then
 		ns.SetUnitPartsOff(hoverGroups, cinematic and tickTables.groupsUp or nil, offWhen)
 		local partsHovered, partsHeldUntil = wipe(tickTables.partsHovered), tickTables.partsHeldUntil
@@ -9405,10 +9406,12 @@ function ns.UpdateFrames(cinematic, elapsed)
 						partsHeldUntil[name] = now + math.max(0, ns.HoldTime("mouseoverHold") - ns.FadeOutTime())
 					end
 					partsHovered[name] = (partsHeldUntil[name] or 0) > now
+					-- (Held after the mouse left: the pass keeps going till it lets go.)
+					if partsHovered[name] then partsBusy = true end
 				end
 			end
 		end
-		ns.SetUnitPartsHovered(partsHovered, elapsed)
+		if ns.SetUnitPartsHovered(partsHovered, elapsed) then partsBusy = true end
 	end
 
 	-- Dead, with the death camera watching: everything goes, quickly, whatever
@@ -9443,7 +9446,7 @@ function ns.UpdateFrames(cinematic, elapsed)
 	local chatButtonsAlpha
 	-- (Every frame at its alpha, none fading: ns.framesSettled, so the tick
 	-- can run this pass less often, Core.lua.)
-	local settled = not ns.layoutFadeUntil and not ns.previewRows
+	local settled = not ns.layoutFadeUntil and not ns.previewRows and not partsBusy
 	local tick3, targetTime = clock and clock(), 0
 	for _, entry in ipairs(ns.managed) do
 		local entryStart = clock and clock()
@@ -10981,6 +10984,11 @@ do
 				KeepHidden(region)
 			end
 		end
+		return changed -- (still fading in or out)
+	end
+	-- (Any unit frame part hidden: then the mouse over a unit frame matters out of CineMode too.)
+	function ns.AnyUnitPartHidden()
+		return next(hidden) ~= nil
 	end
 	function ns.ApplyUnitFrameParts()
 		if not ns.db then

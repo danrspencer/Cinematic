@@ -129,6 +129,7 @@ local function PrintDebugHelp()
 	print("  /cine debug fishing - the last red error message, and whether it paused right-click casting")
 	print("  /cine debug weapon - what the game says about your weapon, and the cozy weapon trigger")
 	print("  /cine debug framepass - where the frames' fade pass spends its time, over 20 seconds, written to the log")
+	print("  /cine debug loops [seconds] - which update loops run every frame and their time, over 20 seconds, written to the log")
 	print("  /cine debug cvarcost - what writing a camera speed setting costs (the restyling it sets off), written to the log")
 	print("  /cine debug director - the camera director: how often it decided the scene, and each scene change in chat (again to stop)")
 	print("  /cine debug quest - the quest cam: on or off, its turn and its zoom")
@@ -1076,6 +1077,60 @@ local function HandleSlash(msg)
 				t.target / n, t.apply / n, 1000 * (t.target + t.apply) / math.max(1, t.entries), t.after / n)
 			ns.Print(line)
 			ns.Log("framepass", line)
+		end)
+	elseif cmd == "debug" and (arg == "loops" or arg:match("^loops %d+$")) then
+		-- Every update loop that runs (each one set with ns.SetOnUpdate, plus the
+		-- main tick and the orbit), its calls and time, over some seconds.
+		local seconds = tonumber(arg:match("%d+")) or 20
+		if ns.loopAudit then ns.Print("loops: already measuring") return end
+		ns.loopAudit = {}
+		local frames0, start = GetTime(), debugprofilestop()
+		local frameCount = 0
+		-- (And the game's own count of all our time, each frame's, where it has
+		-- one: what's left after the loops is events, hooks and timers.)
+		local Metric = ns.ProfileGameMetric
+		local gameMs, appMs = 0, 0
+		local counter = CreateFrame("Frame")
+		counter:SetScript("OnUpdate", function()
+			frameCount = frameCount + 1
+			gameMs = gameMs + (Metric and Metric("addon", "LastTime") or 0)
+			appMs = appMs + (Metric and Metric("app", "LastTime") or 0)
+		end)
+		local fighting = InCombatLockdown() and true or false
+		ns.Print(("loops: measuring for %d seconds (stand as you are)"):format(seconds))
+		C_Timer.After(seconds, function()
+			counter:SetScript("OnUpdate", nil)
+			local audit = ns.loopAudit
+			ns.loopAudit = nil
+			local wall = (debugprofilestop() - start) / 1000
+			local frames = math.max(1, frameCount)
+			local rows, total = {}, 0
+			for label, row in pairs(audit) do
+				rows[#rows + 1] = { label = label, calls = row.calls, ms = row.ms, worst = row.worst }
+				total = total + row.ms
+			end
+			table.sort(rows, function(a, b) return a.ms > b.ms end)
+			local head = ("loops: %d loops ran, %.3f ms a frame in all over %d frames (%.0f fps, %.0f s); %s, %s, profile %s, %s, %d faded frames tracked%s"):format(
+				#rows, total / frames, frames, frames / math.max(0.1, wall), GetTime() - frames0,
+				ns.isRetail and "retail" or "Forever/Classic", ns.lastCinematic and "CineMode" or "normal UI",
+				ns.ActiveProfile and tostring(ns.ProfileLabel(ns.ActiveProfile())) or "?",
+				(fighting or InCombatLockdown()) and "a fight" or "no fight", ns.managed and #ns.managed or 0,
+				ns.db and ns.db.fadeUI == false and ", Start in CineMode off" or "")
+			ns.Print(head)
+			ns.Log("loops", head)
+			if gameMs > 0 then
+				local game = ("loops: the game counts %.3f ms a frame for all of the addon (%.1f%% of the game's %.2f ms a frame): %.3f ms outside these loops (events, hooks, timers)"):format(
+					gameMs / frames, appMs > 0 and 100 * gameMs / appMs or 0, appMs / frames, (gameMs - total) / frames)
+				ns.Print(game)
+				ns.Log("loops", game)
+			end
+			for i, row in ipairs(rows) do
+				local line = ("loops: %s  %.3f ms a frame, %.1f calls a frame, worst %.2f ms"):format(
+					row.label, row.ms / frames, row.calls / frames, row.worst)
+				if i <= 8 then ns.Print(line) end
+				ns.Log("loops", line)
+			end
+			if #rows > 8 then ns.Print(("loops: %d more in the log (/cine log)"):format(#rows - 8)) end
 		end)
 	elseif cmd == "debug" and arg == "cvarcost" then
 		ns.DebugCVarCost()

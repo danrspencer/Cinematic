@@ -293,7 +293,26 @@ local function Breaker(frame, wrapped, why)
 		pcall(frame.SetScript, frame, "OnUpdate", nil)
 	end
 end
-local function Protect(fn, hooked)
+-- /cine debug loops: which update loops run, and how long they take, over a
+-- few seconds. Each loop is named by the file and line that set it (read once,
+-- when it's set). ns.loopAudit is nil except while measuring.
+local function LoopLabel()
+	local stack = debugstack and debugstack(3, 1, 0) or ""
+	local file, line = stack:match("([%w_]+%.lua)\"?%]?:(%d+)")
+	return file and (file .. ":" .. line) or "?"
+end
+function ns.LoopAuditAdd(label, ms)
+	local audit = ns.loopAudit
+	if not audit then return end
+	local row = audit[label]
+	if not row then
+		row = { calls = 0, ms = 0, worst = 0 }
+		audit[label] = row
+	end
+	row.calls, row.ms = row.calls + 1, row.ms + ms
+	if ms > row.worst then row.worst = ms end
+end
+local function Protect(fn, hooked, label)
 	local self_, elapsed_
 	local function Run() return fn(self_, elapsed_) end
 	local state = { dead = false, windowStart = 0, inWindow = 0 }
@@ -301,7 +320,9 @@ local function Protect(fn, hooked)
 	wrapped = function(frame, elapsed)
 		if state.dead then return end
 		self_, elapsed_ = frame, elapsed
+		local started = ns.loopAudit and debugprofilestop()
 		local ok, err = xpcall(Run, LoopHandler)
+		if started then ns.LoopAuditAdd(label, debugprofilestop() - started) end
 		self_, elapsed_ = nil, nil
 		if ok or Harmless(err) then return end
 		pcall(ns.ReportError, err, loopStack, true)
@@ -320,13 +341,13 @@ end
 
 -- frame:SetScript("OnUpdate", fn), protected (nil clears it as usual).
 function ns.SetOnUpdate(frame, fn)
-	frame:SetScript("OnUpdate", fn and Protect(fn, false) or nil)
+	frame:SetScript("OnUpdate", fn and Protect(fn, false, LoopLabel()) or nil)
 end
 
 -- frame:HookScript("OnUpdate", fn), protected. (A hook can't be removed: a
 -- failing one just stops doing anything.)
 function ns.HookOnUpdate(frame, fn)
-	frame:HookScript("OnUpdate", Protect(fn, true))
+	frame:HookScript("OnUpdate", Protect(fn, true, LoopLabel() .. " (hook)"))
 end
 
 -- fn(...) protected, for one-off setup steps (login): an error is logged and
