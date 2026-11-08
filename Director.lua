@@ -212,6 +212,27 @@ end
 -- (The orbit's mouse steering asked it every frame: 0.1 ms in a profile.)
 ns.CameraPlaysHere = ns.PerDecision(ns.CameraPlaysHere)
 
+-- fn() worked out once per decision too (once a frame while it isn't
+-- running), its answer kept whatever it is (nil included).
+local function PerDecisionValue(fn)
+	local gen, at, value = -1, -1, nil
+	return function()
+		local now = GetTime()
+		local fresh
+		if running then fresh = gen == ns.directorGen else fresh = at == now end
+		if not fresh then
+			gen, at = ns.directorGen, now
+			value = fn()
+		end
+		return value
+	end
+end
+-- (Asked every tick: the music asks which camera mode it is, and the CineMode
+-- check whether a camera trigger starts CineMode. What they go by changes
+-- only as the scene does.)
+ns.CameraMode = PerDecisionValue(ns.CameraMode)
+ns.TriggerStartsCine = PerDecisionValue(ns.TriggerStartsCine)
+
 -- /cine debug cvarcost: what one camera speed write costs, as camera scripts
 -- make them (ns.SetHeldSpeed: 1.8 ms each in a profile, restyling bars and
 -- text). Writes it 20 times (your own value back after), counting the style

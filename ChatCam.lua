@@ -1740,6 +1740,7 @@ end
 function ns.ChatCamImmersive()
 	return ns.ChatCamActive() and Immersive() and not ns.IsSuspended()
 end
+ns.ChatCamImmersive = ns.OncePerFrame(ns.ChatCamImmersive) -- (asked over once a frame)
 
 -- Who's talking in the conversation now (for the camera mode log), or nil.
 function ns.ChatCamSpeaker()

@@ -1850,6 +1850,7 @@ local function OncePerFrame(fn)
 		return value
 	end
 end
+ns.OncePerFrame = OncePerFrame
 
 -- Talking to an NPC: their windows, plus quest givers, gossip and the flight
 -- map. The camera modes wait while one is open.
@@ -1882,6 +1883,7 @@ for _, name in ipairs(REVEAL_WHILE_SHOWN) do MENU_WINDOWS[#MENU_WINDOWS + 1] = n
 function ns.OnTaxi()
 	return ns.testTravel == "flight" or UnitOnTaxi("player")
 end
+ns.OnTaxi = OncePerFrame(ns.OnTaxi) -- (asked about 5 times a frame)
 
 function ns.MenuWindowOpen()
 	return AnyShown(MENU_WINDOWS)
@@ -3814,6 +3816,7 @@ function ns.GetPlayerSpeed()
 	end
 	return speed
 end
+ns.GetPlayerSpeed = OncePerFrame(ns.GetPlayerSpeed) -- (asked 2-3 times a frame)
 
 -- How long things stay up after a mouseover or a peek. In the camera modes
 -- (flying, RP walking, standing still past the standing-still delay) these use
@@ -7047,7 +7050,8 @@ ticker:SetScript("OnEvent", ns.Profiled("Core events", function(self, event, arg
 		ns.walking = false
 		-- RP walking: auto-walking (auto-run in walk mode). Walking by hand
 		-- cancels the camera modes like any other movement (ns.MovingManually).
-		ns.IsRPWalking = function()
+		-- (Each kept for the frame: asked a few times a frame.)
+		ns.IsRPWalking = OncePerFrame(function()
 			if ns.testTravel then
 				return ns.testTravel == "walk" -- (a camera test pretending: CameraTests.lua)
 			end
@@ -7062,7 +7066,7 @@ ticker:SetScript("OnEvent", ns.Profiled("Core events", function(self, event, arg
 				ns.walkingFromSpeed = false
 			end
 			return ns.walking and not ns.MovingManually()
-		end
+		end)
 		if ToggleRun then
 			Guard(hooksecurefunc, "ToggleRun", function() ns.walking = not ns.walking end)
 		end
@@ -7120,7 +7124,7 @@ ticker:SetScript("OnEvent", ns.Profiled("Core events", function(self, event, arg
 			end
 			return #held > 0 and table.concat(held, ", ") or nil
 		end
-		ns.IsAutoRunning = function()
+		ns.IsAutoRunning = OncePerFrame(function()
 			if ns.testTravel then
 				return ns.testTravel == "run"
 			end
@@ -7134,7 +7138,7 @@ ticker:SetScript("OnEvent", ns.Profiled("Core events", function(self, event, arg
 				ns.autoRunning = true
 			end
 			return ns.autoRunning and not ns.IsRPWalking()
-		end
+		end)
 		local function Hook(name, fn)
 			if _G[name] then Guard(hooksecurefunc, name, fn) end
 		end
