@@ -8047,6 +8047,7 @@ end
 -- stacked with GetCombatShownFrames' pass into 5 ms frames. SyncSwitches
 -- stays in ns.UpdateFrames.)
 local viewersUp, viewersAskedAt = true, -math.huge
+local readyCenteredAt = -math.huge
 function UpdateReadyOnly(elapsed, now)
 	if not GroupHandled("cooldowns") or not ns.PageOn("handleCooldowns") then
 		return
@@ -8077,7 +8078,13 @@ function UpdateReadyOnly(elapsed, now)
 			passNow, passInCombat = now, InCombatLockdown() or ns.Flag(UnitAffectingCombat("player"))
 			EachCooldownIcon(ReadyTarget)
 		end
-		ns.CenterCooldownIcons()
+		-- (Centered bars: placed again as the game lays a bar out, its own
+		-- hook. With no spell or bar on a mode of its own, no icon comes or
+		-- goes by our fade, so only once a second, in case.)
+		if any or now - readyCenteredAt >= 1 then
+			readyCenteredAt = now
+			ns.CenterCooldownIcons()
+		end
 	end
 	ns.SlideCooldownIcons(elapsed)
 	for icon, target in pairs(readyTargets) do

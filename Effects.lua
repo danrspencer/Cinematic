@@ -941,6 +941,15 @@ end
 
 function ns.UpdateMusic(cinematic, elapsed)
 	ReportMusic(cinematic)
+	-- (Music in cinematic mode off, no music of ours or death song playing,
+	-- your own music not muted or ducked or being watched: nothing here can do
+	-- anything. Most ticks for Subtle and the like.)
+	if not ns.music.managing and not deathSong.file and not deathSong.playing and combatMusic.level >= 1
+		and not combatMusic.ducking and not combatMusic.musicOff and not combatMusic.managedOff
+		and not combatMusic.override and not combatMusic.rested and not musicWritten
+		and not ns.Setting("musicInCinematic") then
+		return
+	end
 	-- A camera starting (or the quest cam) may start music; switching from one
 	-- camera to another counts as a start too.
 	local cam = (ns.CameraMode and ns.CameraMode()) or (ns.QuestCamActive and ns.QuestCamActive() and "quest") or nil

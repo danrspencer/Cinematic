@@ -1232,6 +1232,13 @@ local function UpdateTint(cinematic, elapsed, vignetteOn, weatherOn)
 	local target = TintWanted(cinematic) and 1 or 0
 	local vignetteWant = TintWanted(vignetteOn) and 1 or 0
 	local weatherWant = TintWanted(weatherOn) and 1 or 0
+	-- (None of the three wanted or showing, nothing to redraw: the colour's
+	-- inputs (the preset swap, an inn, the weather, the zone's mood) aren't
+	-- looked at. Picked up again as one's wanted: its checks are due by then.)
+	if target == 0 and vignetteWant == 0 and weatherWant == 0 and tintLevel == 0 and layerLevel.vignette == 0
+		and layerLevel.weather == 0 and not tintDirty and not daySweep then
+		return
+	end
 	if UpdatePresetSwap(elapsed) then
 		tintDirty = true
 	end

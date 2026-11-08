@@ -5216,6 +5216,12 @@ function ns.UpdateTaxi()
 		end
 	end
 	ns.wasOnTaxi = onTaxi
+	-- (On the ground with no flight, no recenter swing and nothing of either
+	-- still held: nothing below has anything to do. Most ticks, for everyone.)
+	if not onTaxi and not flightSince and not travelRecenter and now >= recenterUntil
+		and not ns.RECENTER_CVARS.active and not ns.FLIGHT_CVARS.active then
+		return
+	end
 	if onTaxi and not flightSince then
 		-- Already in the air after a /reload: the camera carries on, no takeoff swing.
 		-- (Login sets wasOnTaxi, so the takeoff branch above doesn't run.)
