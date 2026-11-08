@@ -700,7 +700,9 @@ ns.UpdateQuestGlow = Update
 
 local ticker = CreateFrame("Frame")
 ticker.at = 0
-ns.SetOnUpdate(ticker, function(self)
+-- (Runs only while the glow's switched on, or something of it is still on
+-- or held: no loop at all otherwise.)
+ns.FeatureLoop(ticker, function(self)
 	local now = GetTime()
 	if now < self.at then
 		return
@@ -711,6 +713,11 @@ ns.SetOnUpdate(ticker, function(self)
 	else
 		UpdateIconHold()
 	end
+end, function()
+	return (ns.db and ns.QuestVisionSetting("questObjectGlow")) or CVARS.active or glow:IsShown()
+		or next(hiddenIcons) ~= nil
+		-- (Hide object icons, its own switch, goes by this loop too.)
+		or (ns.db and ns.QuestVisionSetting("hideObjectIcons")) or ICON_CVARS.active
 end)
 
 local watcher = CreateFrame("Frame")

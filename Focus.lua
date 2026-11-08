@@ -40,6 +40,9 @@ end
 
 local function OnUpdate(_, elapsed)
 	local want = WantedStrength()
+	if want <= 0 and level == 0 then
+		return -- (off and all faded: nothing to draw)
+	end
 	if want > 0 then
 		level = math.min(1, level + elapsed / FOCUS_IN_TIME)
 		-- Coming in from nothing, start at the new strength; otherwise (one mode
@@ -77,7 +80,13 @@ haze:SetBlendMode("BLEND")
 haze:SetAlpha(0)
 haze:Hide()
 
-ns.SetOnUpdate(frame, ns.Profiled("Depth of field", OnUpdate))
+-- (Runs only while it's on and in CineMode, or a demo or a fade's still
+-- going. CineMode starting: on within the second, before its slow pull in.)
+ns.FeatureLoop(frame, ns.Profiled("Depth of field", OnUpdate), function()
+	local db = ns.db
+	return level > 0 or GetTime() < stopAt
+		or (db and db.enabled and db.visualEffects and db.depthOfField and ns.lastCinematic) and true or false
+end)
 
 -- Shows the haze for a while (default 30 seconds), at `value` (0-1) or the
 -- demo strength. Returns false if a demo was already showing and has now
@@ -92,6 +101,7 @@ function ns.FocusDemo(seconds, value)
 		strength = demoStrength -- (show a new value at once, for comparing)
 	end
 	stopAt = GetTime() + (seconds or DEFAULT_SECONDS)
+	ns.WakeFeatureLoop(frame)
 	return true
 end
 

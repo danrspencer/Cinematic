@@ -1005,7 +1005,9 @@ local targetWatcher = CreateFrame("Frame")
 targetWatcher.at = 0
 targetWatcher:RegisterEvent("PLAYER_TARGET_CHANGED")
 targetWatcher:SetScript("OnEvent", ns.RefreshTargetQuestIcon)
-ns.SetOnUpdate(targetWatcher, function(self)
+-- (Runs only while the target's quest icon is on, or still shows: no loop
+-- at all otherwise.)
+ns.FeatureLoop(targetWatcher, function(self)
 	local now = GetTime()
 	if now >= self.at then
 		self.at = now + TARGET_EVERY
@@ -1013,6 +1015,8 @@ ns.SetOnUpdate(targetWatcher, function(self)
 			ns.RefreshTargetQuestIcon()
 		end
 	end
+end, function()
+	return (ns.db and ns.db.targetQuestIcon) or (targetIcon and targetIcon:IsShown()) and true or false
 end)
 
 -- For /cine debug plates: what the target's quest lines say.

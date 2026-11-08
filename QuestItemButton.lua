@@ -773,9 +773,12 @@ watcher:SetScript("OnEvent", function(self, event, _, _, _, spellID)
 	-- several at a time, and each refresh reads the log again.)
 	self.at = 0
 	self.anyway = true
+	ns.WakeFeatureLoop(self)
 end)
 watcher.at = 0
-ns.SetOnUpdate(watcher, function(self)
+-- (Runs only while the button's switched on, still shows, or an event asked
+-- for one refresh: no loop at all otherwise.)
+ns.FeatureLoop(watcher, function(self)
 	local now = GetTime()
 	if now >= self.at then
 		self.at = now + CHECK_EVERY
@@ -784,6 +787,8 @@ ns.SetOnUpdate(watcher, function(self)
 		end
 		self.anyway = false
 	end
+end, function()
+	return watcher.anyway or (ns.db and ns.db.questItemButton) or button:IsShown() and true or false
 end)
 -- The zone ability can come and go with no event of its own we hear.
 for _, name in ipairs({ "ExtraActionBarFrame", "ZoneAbilityFrame" }) do

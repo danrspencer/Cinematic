@@ -218,8 +218,9 @@ local function PerDecisionValue(fn)
 	local gen, at, value = -1, -1, nil
 	return function()
 		local now = GetTime()
-		local fresh
-		if running then fresh = gen == ns.directorGen else fresh = at == now end
+		-- (A settings change, ns.DirectorSettingsChanged, counts as a new
+		-- decision either way.)
+		local fresh = gen == ns.directorGen and (running or at == now)
 		if not fresh then
 			gen, at = ns.directorGen, now
 			value = fn()

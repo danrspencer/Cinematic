@@ -2528,7 +2528,12 @@ local LOCKOUT_WAIT = 1.5
 local LOCKOUT_MOVING = 10
 local watcher = CreateFrame("Frame")
 local watched, unseen, hiddenFor, stray = 0, 0, 0, 0
-ns.SetOnUpdate(watcher, function(_, elapsed)
+-- (This and the follower below run only while Quest talk is on, or ours
+-- still show: no loop at all otherwise.)
+local function QuestTalkLoopWanted()
+	return (ns.db and ns.db.questTalk) or talk.kind ~= nil
+end
+ns.FeatureLoop(watcher, function(_, elapsed)
 	watched = watched + elapsed
 	if watched < WATCH_EVERY then
 		return
@@ -2565,7 +2570,7 @@ ns.SetOnUpdate(watcher, function(_, elapsed)
 		ns.Log("questtalk", ("locked out: the game's window parked with no talk of ours, back: %s"):format(TalkState()))
 		ParkWindows(false)
 	end
-end)
+end, QuestTalkLoopWanted)
 
 -- While the camera moves (questTalkCamMove, see MoveMode), every frame: the
 -- bubble and the card beside it faded out or down, back once it's still;
@@ -2573,7 +2578,7 @@ end)
 local MOVE_DIM = 0.35
 local FADE_OUT, FADE_IN = 0.15, 0.3 -- seconds, all the way
 local follower = CreateFrame("Frame")
-ns.SetOnUpdate(follower, function(_, elapsed)
+ns.FeatureLoop(follower, function(_, elapsed)
 	local now = GetTime()
 	if (ns.QuestCamMoving and ns.QuestCamMoving()) or (ns.IsMouseOnCamera and ns.IsMouseOnCamera()) then
 		camMove.at = now
@@ -2624,7 +2629,7 @@ ns.SetOnUpdate(follower, function(_, elapsed)
 	end
 	bubble:SetAlpha(camMove.alpha)
 	panel:SetAlpha((panel.following or mode == "wait") and camMove.alpha or 1)
-end)
+end, QuestTalkLoopWanted)
 
 -- A plate came or went while ours show. A quest accepted refreshes the
 -- NPC's plate (its mark goes) as the talk ends, when "npc" is gone: ours

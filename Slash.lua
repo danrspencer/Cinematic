@@ -129,7 +129,7 @@ local function PrintDebugHelp()
 	print("  /cine debug fishing - the last red error message, and whether it paused right-click casting")
 	print("  /cine debug weapon - what the game says about your weapon, and the cozy weapon trigger")
 	print("  /cine debug framepass - where the frames' fade pass spends its time, over 20 seconds, written to the log")
-	print("  /cine debug loops [seconds] - which update loops run every frame and their time, over 20 seconds, written to the log")
+	print("  /cine debug loops [seconds] [all] - which update loops run every frame and their time, over 20 seconds, written to the log (all: every feature's loop on, as if every feature were)")
 	print("  /cine debug cvarcost - what writing a camera speed setting costs (the restyling it sets off), written to the log")
 	print("  /cine debug director - the camera director: how often it decided the scene, and each scene change in chat (again to stop)")
 	print("  /cine debug quest - the quest cam: on or off, its turn and its zoom")
@@ -1078,11 +1078,21 @@ local function HandleSlash(msg)
 			ns.Print(line)
 			ns.Log("framepass", line)
 		end)
-	elseif cmd == "debug" and (arg == "loops" or arg:match("^loops %d+$")) then
+	elseif cmd == "debug" and (arg == "loops" or arg:match("^loops %d+$") or arg:match("^loops all$")
+		or arg:match("^loops %d+ all$")) then
 		-- Every update loop that runs (each one set with ns.SetOnUpdate, plus the
-		-- main tick and the orbit), its calls and time, over some seconds.
+		-- main tick and the orbit), its calls and time, over some seconds. With
+		-- "all": the feature loops that are off for now run too, as if every
+		-- feature were on (ns.FeatureLoop), to see what each costs.
 		local seconds = tonumber(arg:match("%d+")) or 20
+		local all = arg:find("all") ~= nil
 		if ns.loopAudit then ns.Print("loops: already measuring") return end
+		local loopsOff, loopsAll = 0, 0
+		if ns.FeatureLoopsOff then loopsOff, loopsAll = ns.FeatureLoopsOff() end
+		if all then
+			ns.featureLoopsForced = true
+			ns.SyncFeatureLoops()
+		end
 		ns.loopAudit = {}
 		local frames0, start = GetTime(), debugprofilestop()
 		local frameCount = 0
@@ -1102,6 +1112,10 @@ local function HandleSlash(msg)
 			counter:SetScript("OnUpdate", nil)
 			local audit = ns.loopAudit
 			ns.loopAudit = nil
+			if all then
+				ns.featureLoopsForced = nil
+				ns.SyncFeatureLoops()
+			end
 			local wall = (debugprofilestop() - start) / 1000
 			local frames = math.max(1, frameCount)
 			local rows, total = {}, 0
@@ -1116,6 +1130,8 @@ local function HandleSlash(msg)
 				ns.ActiveProfile and tostring(ns.ProfileLabel(ns.ActiveProfile())) or "?",
 				(fighting or InCombatLockdown()) and "a fight" or "no fight", ns.managed and #ns.managed or 0,
 				ns.db and ns.db.fadeUI == false and ", Start in CineMode off" or "")
+				.. (all and ("; ALL feature loops forced on (%d of %d were off)"):format(loopsOff, loopsAll)
+					or ("; %d of %d feature loops off (their feature off)"):format(loopsOff, loopsAll))
 			ns.Print(head)
 			ns.Log("loops", head)
 			if gameMs > 0 then

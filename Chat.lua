@@ -670,7 +670,9 @@ local function WatchServerMessages()
 	end
 	local watcher = CreateFrame("Frame")
 	local sinceCheck = 0
-	ns.SetOnUpdate(watcher, ns.Profiled("Server message watch", function(_, elapsed)
+	-- (Runs only while server messages peek: no loop at all otherwise. Off,
+	-- where chat's up to is forgotten, so turning it on peeks at nothing old.)
+	ns.FeatureLoop(watcher, ns.Profiled("Server message watch", function(_, elapsed)
 		sinceCheck = sinceCheck + elapsed
 		if sinceCheck < SERVER_CHECK_INTERVAL then
 			return
@@ -680,7 +682,13 @@ local function WatchServerMessages()
 		for chatFrame, watch in pairs(serverWatch) do
 			CheckServerLines(chatFrame, watch, peekOn)
 		end
-	end))
+	end), function()
+		local on = ns.db and ns.db.chatPeek and ns.db.handleChat ~= false and IsPeekTypeOn("server") and true or false
+		if not on then
+			for _, watch in pairs(serverWatch) do watch.newest, watch.server = nil, nil end
+		end
+		return on
+	end)
 end
 
 -- Whisper tabs (the ones the game opens for each conversation) with a whisper

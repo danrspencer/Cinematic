@@ -2297,7 +2297,8 @@ end
 -- starts or stops fitting (a fight starting, a zone changing...).
 local WHEN_CHECK = 0.5
 local whenAt = 0
-ns.SetOnUpdate(CreateFrame("Frame"), function()
+-- (Runs only while the marks are on: no loop at all otherwise.)
+ns.FeatureLoop(CreateFrame("Frame"), function()
 	local now = GetTime()
 	if now < whenAt then
 		return
@@ -2308,6 +2309,8 @@ ns.SetOnUpdate(CreateFrame("Frame"), function()
 	if (levels.TargetArrow or 0) > 0 and (UpdateWhen() or AggroRowsOn() or DistanceRowsOn()) then
 		RefreshMarks()
 	end
+end, function()
+	return (levels.TargetArrow or 0) > 0
 end)
 
 local mouseoverAt = 0

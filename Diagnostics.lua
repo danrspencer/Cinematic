@@ -344,6 +344,51 @@ function ns.SetOnUpdate(frame, fn)
 	frame:SetScript("OnUpdate", fn and Protect(fn, false, LoopLabel()) or nil)
 end
 
+-- A feature's update loop that runs only while wanted() says it's needed
+-- (its feature on, or something of it still showing or fading): with it not
+-- needed, the frame has no OnUpdate at all, so it costs nothing. wanted() is
+-- asked once a second (a setting changed on a page, a profile loaded: on
+-- within the second), and at once on ns.WakeFeatureLoop(frame), for a
+-- feature started by an event (a cast, a click). Gives a function that asks
+-- for that frame at once too.
+local featureLoops = {} -- { frame, run, wanted, on }
+local function SyncFeatureLoop(loop)
+	local ok, want = pcall(loop.wanted)
+	want = not ok or want and true or false -- (an error in it: kept running)
+	-- (/cine debug loops all: every one running, as if every feature were on,
+	-- to measure them all.)
+	if ns.featureLoopsForced then want = true end
+	if want ~= loop.on then
+		loop.on = want
+		loop.frame:SetScript("OnUpdate", want and loop.run or nil)
+	end
+end
+function ns.FeatureLoop(frame, fn, wanted)
+	local loop = { frame = frame, run = Protect(fn, false, LoopLabel()), wanted = wanted, on = nil }
+	featureLoops[#featureLoops + 1] = loop
+	featureLoops[frame] = loop
+	SyncFeatureLoop(loop)
+	return function() SyncFeatureLoop(loop) end
+end
+function ns.WakeFeatureLoop(frame)
+	local loop = featureLoops[frame]
+	if loop then SyncFeatureLoop(loop) end
+end
+-- (All of them, as a setting may have changed: once a second, and after a
+-- profile loads, ns.SyncFeatureLoops.)
+function ns.SyncFeatureLoops()
+	for _, loop in ipairs(featureLoops) do SyncFeatureLoop(loop) end
+end
+C_Timer.NewTicker(1, function() ns.SyncFeatureLoops() end)
+-- (/cine debug loops: which feature loops are off now.)
+function ns.FeatureLoopsOff()
+	local off = 0
+	for _, loop in ipairs(featureLoops) do
+		if not loop.on then off = off + 1 end
+	end
+	return off, #featureLoops
+end
+
 -- frame:HookScript("OnUpdate", fn), protected. (A hook can't be removed: a
 -- failing one just stops doing anything.)
 function ns.HookOnUpdate(frame, fn)

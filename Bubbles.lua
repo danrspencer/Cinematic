@@ -916,11 +916,14 @@ end
 -- camera mode starting, a rule's other words.
 local ticker = CreateFrame("Frame")
 local sinceCheck = 0
-ns.SetOnUpdate(ticker, function(_, elapsed)
+-- (Runs only while the page is on: no loop at all otherwise.)
+ns.FeatureLoop(ticker, function(_, elapsed)
 	sinceCheck = sinceCheck + elapsed
 	if sinceCheck < 1 then return end
 	sinceCheck = 0
 	if ns.db and ns.db.handleBubbles then ApplyCVars(ns.db) end
+end, function()
+	return ns.db and ns.db.handleBubbles and true or false
 end)
 
 local wasOn = false

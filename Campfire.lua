@@ -529,7 +529,15 @@ button:Hide()
 ns.AddOverlay(button) -- (stays with the UI hidden, like the bars)
 
 local driver = CreateFrame("Frame")
-ns.SetOnUpdate(driver, ns.Profiled("Campfire sit button", OnUpdate))
+-- (Runs only while something wants it: the sit button, a listener for the
+-- cursor resting on a fire (Emote Vision's card, a trigger), the Campfire
+-- scene's cozy camera (it looks for your tent), or the button still up. No
+-- loop at all otherwise.)
+ns.FeatureLoop(driver, ns.Profiled("Campfire sit button", OnUpdate), function()
+	if alpha > 0 or cozy.on then return true end
+	if not ns.db then return false end
+	return ns.Setting("campfireSitButton") or not ns.db.sceneOffCampfire or ns.SignalWanted("CAMPFIRE_REST")
+end)
 
 GameTooltip:HookScript("OnShow", OnTooltipShow)
 

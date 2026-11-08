@@ -726,7 +726,9 @@ watcher:SetScript("OnEvent", function(_, event, unit)
 		end
 	end
 end)
-ns.SetOnUpdate(watcher, function(_, elapsed)
+-- (Runs only while a Heal Vision is on or still has frames: no loop at all
+-- otherwise.)
+ns.FeatureLoop(watcher, function(_, elapsed)
 	if not next(members) and not next(touched) and not ns.HealVisionAny() then
 		return
 	end
@@ -768,6 +770,8 @@ ns.SetOnUpdate(watcher, function(_, elapsed)
 		Scan()
 	end
 	UpdateAll()
+end, function()
+	return next(members) ~= nil or next(touched) ~= nil or ns.HealVisionAny()
 end)
 
 -- /cine debug healwatch [seconds]: logs every frame, for a while, each raid

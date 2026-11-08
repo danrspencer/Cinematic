@@ -286,7 +286,9 @@ local function Update()
 end
 
 local driver = CreateFrame("Frame")
-ns.SetOnUpdate(driver, function()
+-- (Runs only while Teleport Vision's on, a test plays, or it still shows:
+-- no loop at all otherwise.)
+ns.FeatureLoop(driver, function()
 	if not ns.GetDB() then return end
 	-- (Nothing to do with no cast, or one over a while: not every frame's work.)
 	local cast = Cast()
@@ -296,6 +298,8 @@ ns.SetOnUpdate(driver, function()
 	end
 	if not frame then Create() end
 	Update()
+end, function()
+	return test ~= nil or (frame ~= nil and frame:IsShown()) or (ns.GetDB() and ns.Setting("teleportVision")) and true or false
 end)
 
 -- Your cast bar and the tooltip faded out over the cast's first CAST_FADE
@@ -396,6 +400,7 @@ function ns.TestTeleportVision(skip, quiet)
 	skip = math.max(0, math.min(TEST_TIME - 1, skip or 0))
 	test = { startAt = now - skip, endsAt = now + TEST_TIME - skip, shownAt = skip > 0 and now or nil,
 		quiet = quiet or nil }
+	ns.WakeFeatureLoop(driver)
 end
 function ns.TeleportVisionTesting() return test ~= nil and not test.done end
 
@@ -457,6 +462,7 @@ function ns.TeleportColorReel(arg)
 		reelLabel:GetParent():Show()
 		local now = GetTime()
 		test = { startAt = now, endsAt = now + seconds, themeKey = entry.key }
+		ns.WakeFeatureLoop(driver)
 	end
 	Next()
 	reel = C_Timer.NewTicker(seconds + GONE_TIME + 0.3, Next)

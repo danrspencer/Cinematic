@@ -596,6 +596,7 @@ end
 -- Zooms to `distance` yards over T seconds (`why` for the log; `by`: whose
 -- zoom it is, nil for the quest cam's own).
 local function ZoomTo(distance, T, why, by)
+	if ns.QuestCamWake then ns.QuestCamWake() end -- (its loop on, if it was resting)
 	local now = GetCameraZoom()
 	-- (Replaced while still moving: the commands already sent are still on
 	-- their way in the game, and counted from zero again the new zoom asked
@@ -1219,6 +1220,7 @@ local MOVIE_EVENTS = { PLAY_MOVIE = true, CINEMATIC_START = true, STOP_MOVIE = f
 -- cam.closingAt when its window closed (it ends after CLOSE_GRACE, unless
 -- another opens meanwhile, going from gossip to the quest text).
 local function OnEvent(_, event)
+	if ns.QuestCamWake then C_Timer.After(0, ns.QuestCamWake) end -- (after it's handled: its loop on if needed)
 	if MOVIE_EVENTS[event] ~= nil then
 		OnMovie(MOVIE_EVENTS[event])
 	elseif OPENS[event] then
@@ -1538,7 +1540,18 @@ for _, name in ipairs({ "MoveViewLeftStart", "MoveViewLeftStop", "MoveViewRightS
 		end)
 	end
 end
-ns.SetOnUpdate(frame, ns.Profiled("Quest cam", OnUpdate))
+-- (Runs only while there's something to do: a conversation, a move or zoom
+-- under way or held, a hold, a zoom being watched for the log. Woken by its
+-- events and its zooms; otherwise no update loop at all.)
+local function QuestCamIdle()
+	return not cam.since and not cam.active and #cam.steps == 0 and not cam.held and not cam.closingAt
+		and not movers.yaw.moving and not movers.pitch.moving and not zoomer.moving and not zoomer.release
+		and not zoomer.yours and not zoomer.pending and not zoomer.watch
+		and GetTime() - (zoomer.wantsAt or -math.huge) >= 0.5
+end
+ns.QuestCamWake = ns.FeatureLoop(frame, ns.Profiled("Quest cam", OnUpdate), function()
+	return not QuestCamIdle()
+end)
 
 -- Whether the quest cam is zooming back out to your distance (the RP walk
 -- and auto-run cameras' own zoom waits for it, rather than starting from close in).
@@ -1613,6 +1626,7 @@ function ns.QuestCamTest(on)
 		cam.since, cam.cancelled, cam.clickSide, cam.test = now, nil, nil, true
 		cam.left, cam.npcName, cam.leftNpc = PickSide(), nil, nil
 		cam.startAt, cam.windowAt, cam.closingAt, cam.scriptsAt = now, now, nil, now
+		ns.QuestCamWake()
 		return true
 	end
 	if cam.test and cam.since then
@@ -1717,6 +1731,7 @@ end
 function ns.QuestCamHoldZoomOut(distance, speed)
 	local x, y = PlayerPosition()
 	zoomer.pending = { to = distance, x = x, y = y, since = GetTime(), walked = 0, speed = speed }
+	ns.QuestCamWake()
 	ZoomLog(("chat cam's zoom back out to %.1f yards held till you walk off (at %.1f now)"):format(
 		distance, GetCameraZoom()))
 end

@@ -145,6 +145,30 @@ end
 if ns.isRetail and _G.PersonalResourceDisplayFrame then
 	CreateFrame("Frame", "CinematicPersonalMana", UIParent)
 end
+-- Whether the game's personal resource display is on at all (its setting,
+-- nameplateShowSelf; a client without the setting: on). Off, its rows, its
+-- power bars and its mana bar are left out of the frames' pass entirely.
+-- Kept from the setting's own event, not asked every pass.
+personalPower.displayOn = true
+do
+	local function Read()
+		local value = GetCVar and GetCVar("nameplateShowSelf")
+		personalPower.displayOn = value == nil or (issecretvalue and issecretvalue(value)) or value ~= "0"
+	end
+	local watch = CreateFrame("Frame")
+	watch:RegisterEvent("PLAYER_LOGIN")
+	watch:RegisterEvent("CVAR_UPDATE")
+	watch:SetScript("OnEvent", function(_, event, name)
+		if event == "PLAYER_LOGIN" or (type(name) == "string" and name:lower() == "nameplateshowself") then
+			Read()
+		end
+	end)
+	pcall(Read)
+end
+function ns.PersonalDisplayOn()
+	return personalPower.displayOn
+end
+personalPower.GROUPS = { prd = true, prdpower = true, prdmana = true }
 
 -- The queue eye (dungeon finder, battlegrounds): Forever pins it to the
 -- minimap, retail puts it beside the micro menu, so it goes with either.
@@ -207,6 +231,7 @@ local followsRow = {}
 
 ns.managed = {}       -- { frame, name, group, alpha, baseAlpha }
 local seen = {}
+seen.none = {} -- (an empty list, for a loop with nothing to go over: no new table each time)
 -- A managed frame inside another managed frame already fades with its
 -- parent; fading it too would multiply the two and make it lag (half way
 -- through a fade-in it would show at 25%, not 50%). Nested frames still track
@@ -911,7 +936,14 @@ end
 ns.IsWindow = IsWindow -- (the frame guesser: FrameGuess.lua)
 
 local function ScanTopLevelFrames()
-	for _, frame in ipairs({ UIParent:GetChildren() }) do
+	-- (The look over every top-level frame is only for the game's damage
+	-- meter and swing timer, found by name: neither page on, it's skipped.
+	-- The added frames are found by their names below either way.)
+	local anyAuto = false
+	for _, group in pairs(AUTO_PATTERNS) do
+		if GroupHandled(group) then anyAuto = true end
+	end
+	for _, frame in ipairs(anyAuto and { UIParent:GetChildren() } or seen.none) do
 		if not seen[frame] and not (frame.IsForbidden and frame:IsForbidden()) then
 			local name = frame:GetName()
 			if name then
@@ -1176,7 +1208,16 @@ do
 		end
 	end
 
+	local HEADER_GROUPS = { "minimapheader", "minimapzone", "minimaptracking", "minimapdial", "minimapaddons",
+		"minimapcoords" }
+	local coordsFound -- (the coordinates' frame once found: not looked for again while it's faded)
 	function ns.FindMinimapHeader()
+		-- (None of the minimap's parts handled, its page off: nothing to find.)
+		local any = false
+		for _, group in ipairs(HEADER_GROUPS) do
+			if GroupHandled(group) then any = true break end
+		end
+		if not any then return end
 		local cluster = type(_G.MinimapCluster) == "table" and _G.MinimapCluster or nil
 		-- An addon that hides the cluster for good (EllesmereUI's minimap
 		-- keeps it at alpha 0): its parts are left in it, or ignoring its
@@ -1210,7 +1251,7 @@ do
 			AddFrame(ours, "minimapaddons")
 		end
 		-- Addons' buttons on the minimap (LibDBIcon's: LibDBIcon10_<addon>).
-		if type(Minimap) == "table" and Minimap.GetChildren and not leftAlone.Minimap then
+		if type(Minimap) == "table" and Minimap.GetChildren and not leftAlone.Minimap and GroupHandled("minimapaddons") then
 			for _, child in ipairs({ Minimap:GetChildren() }) do
 				local ok, name = pcall(child.GetName, child)
 				if ok and type(name) == "string" and name:find("^LibDBIcon10_") then
@@ -1227,7 +1268,8 @@ do
 			if type(frame) ~= "table" or not frame.GetRegions or IsForbidden(frame) then return end
 			local region = CoordsRegion(frame:GetRegions())
 			if region then
-				AddFrame((frame ~= cluster and frame ~= Minimap) and frame or region, "minimapcoords")
+				coordsFound = (frame ~= cluster and frame ~= Minimap) and frame or region
+				AddFrame(coordsFound, "minimapcoords")
 				return
 			end
 			if depth > 0 then
@@ -1240,8 +1282,11 @@ do
 				end
 			end
 		end
-		if cluster then FindCoords(cluster, 2) end
-		if type(Minimap) == "table" and not leftAlone.Minimap then FindCoords(Minimap, 1) end
+		-- (Found and still faded with it: not looked for again. The look goes
+		-- over every pin an addon put on the map.)
+		local lookForCoords = GroupHandled("minimapcoords") and not (coordsFound and seen[coordsFound])
+		if cluster and lookForCoords then FindCoords(cluster, 2) end
+		if type(Minimap) == "table" and not leftAlone.Minimap and lookForCoords then FindCoords(Minimap, 1) end
 		local calendar = _G.GameTimeFrame
 		if type(calendar) == "table" and calendar.GetRegions and not IsForbidden(calendar)
 			and not leftAlone.GameTimeFrame then
@@ -2587,6 +2632,7 @@ local tickTables = {
 	hovered = {}, triggered = {}, pinged = {}, mouseRows = {}, mouseGroups = {}, events = {},
 	combatShown = {}, placeLists = {}, auraOnly = {}, cooldownBarUp = {},
 	partsHovered = {}, partsHeldUntil = {}, deathKept = {}, groupsUp = {},
+	passEntries = {}, -- (the frames' pass's frames, when some are left out)
 	-- ("extra:<name>", an added frame's row key, made once for each name.)
 	extraKey = setmetatable({}, { __index = function(keys, name)
 		local key = "extra:" .. name
@@ -6656,6 +6702,25 @@ ns.COOLDOWN_BAR_GROUPS = { EssentialCooldownViewer = "essential", UtilityCooldow
 -- Its tracked buffs and bars: groups of their own, with modes of their own
 -- (ns.CooldownBuffMode), and not counted for recharging.
 ns.COOLDOWN_BUFF_GROUPS = { BuffIconCooldownViewer = "buffs", BuffBarCooldownViewer = "bars" }
+
+-- Whether any of the game's Cooldown Manager bars is up: none with the game's
+-- Cooldown Manager switched off (or its bars hidden in Edit Mode), and then
+-- the page's ticks and flashes have no icons to go over. (A secret answer
+-- counts as up.)
+do
+	local CDM_VIEWERS = { "EssentialCooldownViewer", "UtilityCooldownViewer", "BuffIconCooldownViewer",
+		"BuffBarCooldownViewer" }
+	function ns.CooldownViewersShown()
+		for _, name in ipairs(CDM_VIEWERS) do
+			local viewer = _G[name]
+			if viewer and viewer.IsShown then
+				local ok, shown = pcall(viewer.IsShown, viewer)
+				if not ok or (issecretvalue and issecretvalue(shown)) or shown then return true end
+			end
+		end
+		return false
+	end
+end
 -- (The Mouseover groups' cooldown bar rows, and whose Stay up while
 -- recharging brings each up.)
 ns.COOLDOWN_MEMBER_BAR = { cooldowns = "essential", ["addon:fecm"] = "essential", cooldownsutility = "utility" }
@@ -7232,11 +7297,15 @@ do
 
 	local since = 0
 	local watcher = CreateFrame("Frame")
-	ns.SetOnUpdate(watcher, function(_, elapsed)
+	-- (Runs only while Follow Show Numbers is on, or the game's own still
+	-- need putting back: no loop at all otherwise.)
+	ns.FeatureLoop(watcher, function(_, elapsed)
 		since = since + elapsed
 		if since < 0.5 then return end
 		since = 0
 		Update()
+	end, function()
+		return want ~= nil or (ns.db and ns.db.cooldownFollowNumbers and ns.PageOn("handleCooldowns")) and true or false
 	end)
 	watcher:RegisterEvent("CVAR_UPDATE")
 	-- (On the next frame; only for its own setting: a camera script's speed
@@ -7919,8 +7988,19 @@ end
 -- (In the tick's second half, Core.lua's tickRest: in the frames' half it
 -- stacked with GetCombatShownFrames' pass into 5 ms frames. SyncSwitches
 -- stays in ns.UpdateFrames.)
+local viewersUp, viewersAskedAt = true, -math.huge
 function UpdateReadyOnly(elapsed, now)
 	if not GroupHandled("cooldowns") or not ns.PageOn("handleCooldowns") then
+		return
+	end
+	-- (The game's Cooldown Manager off: nothing to do, once nothing's left
+	-- fading back. Asked as often as the icons are: its bars can be set to
+	-- show only in fights, and must be caught as they come up.)
+	if now - viewersAskedAt >= 0.1 then
+		viewersAskedAt = now
+		viewersUp = ns.CooldownViewersShown()
+	end
+	if not viewersUp and not next(readyAlpha) then
 		return
 	end
 	if now - readyCheckedAt >= 0.1 then
@@ -8081,7 +8161,7 @@ do
 		local now = GetTime()
 		if now - checkedAt >= 0.1 and ns.db then
 			checkedAt = now
-			if AnyFlash() and GroupHandled("cooldowns") and ns.PageOn("handleCooldowns") then
+			if AnyFlash() and GroupHandled("cooldowns") and ns.PageOn("handleCooldowns") and ns.CooldownViewersShown() then
 				passNow = now
 				EachCooldownIcon(Look)
 			else
@@ -8128,6 +8208,7 @@ do
 	end
 	function ns.TestCooldownFlash()
 		testUntil = GetTime() + TEST_LEAD + (ns.db.cooldownFlashTime or 3) + 0.5
+		if ns.WakeCooldownFlash then ns.WakeCooldownFlash() end
 		C_Timer.After(TEST_LEAD, StartTest)
 	end
 
@@ -8137,7 +8218,14 @@ do
 	end
 
 	local watcher = CreateFrame("Frame")
-	ns.SetOnUpdate(watcher, ns.Profiled("CooldownFlash", Update))
+	-- (Runs only while some icon's set to flash and the game's Cooldown
+	-- Manager shows, or a flash or the page's Test is still going: no loop at
+	-- all otherwise.)
+	ns.FeatureLoop(watcher, ns.Profiled("CooldownFlash", Update), function()
+		if anyDrawn or next(flashUntil) or GetTime() < testUntil then return true end
+		return ns.db and ns.PageOn("handleCooldowns") and AnyFlash() and ns.CooldownViewersShown() or false
+	end)
+	ns.WakeCooldownFlash = function() ns.WakeFeatureLoop(watcher) end
 end
 
 -- /cine debug cooldowns: what the Cooldown Manager check sees.
@@ -9091,6 +9179,8 @@ do
 
 	-- Each tick: the bars as the setting (and the page's master switch) say.
 	function ns.UpdateSwingOrder()
+		-- (The Swing timer page off, and nothing of ours swapped: nothing to do.)
+		if not ns.db.handleSwing and not order.swapped and not next(order.game) then return end
 		-- (The class's setting name made once: a new string each tick was garbage.)
 		order.key = order.key or "swingRangedOnTop" .. select(2, UnitClass("player"))
 		-- In Edit Mode the bars sit in their own places, so the one you drag is
@@ -9455,7 +9545,17 @@ function ns.UpdateFrames(cinematic, elapsed)
 	-- can run this pass less often, Core.lua.)
 	local settled = not ns.layoutFadeUntil and not ns.previewRows and not partsBusy
 	local tick3, targetTime = clock and clock(), 0
-	for _, entry in ipairs(ns.managed) do
+	-- (The personal resource display switched off in the game: its rows
+	-- have nothing to fade, so they're left out, as they are, till it's back.)
+	local displayOff = not personalPower.displayOn
+	local entries = ns.managed
+	if displayOff then
+		entries = wipe(tickTables.passEntries)
+		for _, entry in ipairs(ns.managed) do
+			if not personalPower.GROUPS[entry.group] then entries[#entries + 1] = entry end
+		end
+	end
+	for _, entry in ipairs(entries) do
 		local entryStart = clock and clock()
 		if entry.ownAlpha then
 			SyncOwnAlpha(entry)
@@ -9679,12 +9779,14 @@ function ns.UpdateFrames(cinematic, elapsed)
 		end
 	end
 	local tick4 = clock and clock()
-	if personalPower.standIn then
+	-- (Display off: its bars let go once, then nothing.)
+	if personalPower.standIn and (not displayOff or next(personalPower.held)) then
 		personalPower.Apply()
 	end
-	if ns.FadePersonalMana then
+	if ns.FadePersonalMana and (not displayOff or not personalPower.manaLetGo) then
 		ns.FadePersonalMana(personalPower.health, personalPower.mana)
 	end
+	personalPower.manaLetGo = displayOff or nil
 	-- A chat window's button column (inside the window on Classic clients)
 	-- draws a strip of the window's dark background: it comes and goes with
 	-- the chat buttons, so a window peeking for a message has no empty strip.
@@ -10406,7 +10508,9 @@ do
 				local standIn = CreateFrame("Frame", nil, UIParent)
 				standIn:SetSize(1, 1)
 				standIn:SetPoint("TOPLEFT")
-				ns.SetOnUpdate(standIn, function(self)
+				-- (As its alpha's set, rather than every frame: it only
+				-- changes when the fade sets it.)
+				hooksecurefunc(standIn, "SetAlpha", function(self)
 					ns.ApplyCVarSet(set, self:GetAlpha() < 0.5)
 				end)
 				auraStandIns[group] = standIn
@@ -11227,8 +11331,10 @@ do
 	-- Parts shown by more than Always (FRAMES.dynamic, as last applied):
 	-- applied again when what their rows know changes (a fight, a place, a
 	-- group...), checked 4 times a second, and at once for a cast a rule names.
+	-- (Runs only while some part's shown by more than Always, or a part's
+	-- fading: no loop at all otherwise. Woken as the parts are applied.)
 	local lastFacts, since, lastCast = {}, 0, false
-	ns.SetOnUpdate(watcher, function(_, elapsed)
+	ns.WakeUnitPartsLoop = ns.FeatureLoop(watcher, function(_, elapsed)
 		FRAMES.StepFades(elapsed)
 		since = since + elapsed
 		local cast = ns.db and FRAMES.dynamic and ns.CastingRuleOn() or false
@@ -11249,7 +11355,16 @@ do
 		if changed then
 			ns.ApplyUnitFrameParts()
 		end
+	end, function()
+		return FRAMES.dynamic or next(FRAMES.fade) ~= nil
 	end)
+	do
+		local apply = ns.ApplyUnitFrameParts
+		ns.ApplyUnitFrameParts = function(...)
+			apply(...)
+			ns.WakeUnitPartsLoop()
+		end
+	end
 end
 
 -- The game's red flash on an action button (Auto Shot, Shoot or Auto Attack

@@ -777,6 +777,7 @@ do
 		if event == "PLAYER_EQUIPMENT_CHANGED" and poleEquipped and not had then
 			self.equippedAt = GetTime()
 		end
+		if poleEquipped ~= had then ns.WakeFeatureLoop(recastWatcher) end
 	end)
 	-- World objects under the mouse: their tooltip appearing (it may be hidden
 	-- straight away by the tooltip options), and the mouse staying near there.
@@ -957,7 +958,16 @@ do
 		return (x - objectX) ^ 2 + (y - objectY) ^ 2 < OBJECT_REACH ^ 2
 	end
 
-	ns.SetOnUpdate(recastWatcher, ns.Profiled("Right-click cast watch", function()
+	-- (A fight's end noted for the after-combat wait while this watch rests.)
+	do
+		local fightEnd = CreateFrame("Frame")
+		fightEnd:RegisterEvent("PLAYER_REGEN_ENABLED")
+		fightEnd:SetScript("OnEvent", function() combatSeenAt = GetTime() end)
+	end
+	-- (Runs only while there's fishing to watch: a pole on, a cast out, the
+	-- fish camera, its bindings or settings still held. No loop at all
+	-- otherwise; a pole put on wakes it.)
+	ns.FeatureLoop(recastWatcher, ns.Profiled("Right-click cast watch", function()
 		if not castButton then
 			return
 		end
@@ -1119,7 +1129,10 @@ do
 			local padWant = ready and padOn and poleEquipped and ((fishCam and settled) or poleReady)
 			SetRecast(padKey, (padWant and "cast") or (reel and padOn and "reel"))
 		end
-	end))
+	end), function()
+		return castButton ~= nil and (poleEquipped or next(bound) ~= nil or REEL_CVARS.active
+			or GetTime() < reelHeldUntil or ns.FishCamOn() or FishingChannel()) and true or false
+	end)
 end
 
 -- Sitting on a chair or bench: there's no event for it, so it's pieced
@@ -1309,6 +1322,7 @@ function ns.HookCameraInput()
 				end
 				if held <= SEAT_CLICK_HOLD then
 					seatClickAt, seatSnap = now, nil
+					if ns.WakeSeatWatch then ns.WakeSeatWatch() end
 					SeatResult("waiting for the snap")
 				else
 					SeatResult("held (steering)")
@@ -1336,7 +1350,9 @@ function ns.HookCameraInput()
 	end)
 	-- The snap may not send a movement event: watch your position too. Once
 	-- snapped, any walking of your own before SEAT.STILL is up calls it off.
-	ns.SetOnUpdate(seatWatcher, ns.Profiled("Seat watch", function()
+	-- (Runs only after a click on a seat, till it's settled: no loop at all
+	-- otherwise. Woken by the click.)
+	ns.WakeSeatWatch = ns.FeatureLoop(seatWatcher, ns.Profiled("Seat watch", function()
 		if seatClickAt == -math.huge then
 			return
 		end
@@ -1356,7 +1372,9 @@ function ns.HookCameraInput()
 		elseif since >= SEAT.STILL and not ns.playerMoving then
 			Seated(seatSnap)
 		end
-	end))
+	end), function()
+		return seatClickAt ~= -math.huge
+	end)
 	-- Emotes: whichever emote function this client uses, plus typed commands
 	-- (see below), all end up here with the emote's token ("DANCE", "SIT", ...).
 	local function OnEmote(token, via)

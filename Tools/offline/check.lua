@@ -103,6 +103,10 @@ if arg[1] and not update then
 		for name, value in pairs({ IsMouseButtonDown = false, UnitOnTaxi = false, IsFlying = false, GetUnitSpeed = 7 }) do
 			kept[name], _G[name] = rawget(_G, name), function() return value end
 		end
+		-- (Each ask a frame of its own: the answers are kept for the frame,
+		-- and the events below come between frames in the game.)
+		local clock = 0
+		kept.GetTime, _G.GetTime = rawget(_G, "GetTime"), function() clock = clock + 0.001 return clock end
 		ns.playerMoving, ns.movingSince, ns.autoRunning = true, -5, false
 		if not ns.IsAutoRunning() then Problem("hands-free moving isn't auto-run without it") end
 		ns.autoRunning = false
@@ -116,7 +120,7 @@ if arg[1] and not update then
 		wow.Fire("PLAYER_ENTERING_WORLD")
 		if ns.autoFollowing then Problem("still on after a loading screen") end
 		ns.playerMoving, ns.movingSince, ns.autoRunning = false, nil, false
-		for _, name in ipairs({ "IsMouseButtonDown", "UnitOnTaxi", "IsFlying", "GetUnitSpeed" }) do _G[name] = kept[name] end
+		for _, name in ipairs({ "IsMouseButtonDown", "UnitOnTaxi", "IsFlying", "GetUnitSpeed", "GetTime" }) do _G[name] = kept[name] end
 	end
 	-- The scene (ns.DecideScene, Camera.lua): its table is ns.scene, it sets
 	-- ns.activeCam to its own cam, standing still past the wait is the idle
@@ -1015,6 +1019,9 @@ if arg[1] and not update then
 			ns.CameraRowsChanged()
 			return ns.TriggerStartsCine() and true or false
 		end
+		-- (Each ask a frame of its own: on a flight or not is kept for the frame.)
+		local keptTime, clock = rawget(_G, "GetTime"), 100
+		_G.GetTime = function() clock = clock + 0.001 return clock end
 		ns.testTravel = "flight"
 		ns.UpdateTaxi()
 		if not ns.CameraRowsScripted("flight") then print("problem	the flight camera isn't playing as its script") end
@@ -1024,6 +1031,7 @@ if arg[1] and not update then
 		end
 		ns.testTravel, ns.stoppedCam = nil, nil
 		ns.UpdateTaxi()
+		_G.GetTime = keptTime
 		db.eventFlightCine, db.eventFlightCamera = cine, camera
 		ns.CameraRowsChanged()
 		-- The same for walking and running, and what goes with a quest giver's
