@@ -292,6 +292,12 @@ function ns.ActiveProfile()
 	return ns.db and ns.db.liveProfile or DEFAULT_PROFILE
 end
 
+-- On Blank Slate (every page off, no Customize step): nothing is worked out
+-- ahead for Customize at login.
+function ns.OnBlankSlate()
+	return ns.ActiveProfile() == "Blank Slate"
+end
+
 -- This character has a profile of its own (not the account's).
 function ns.IsCharacterProfile()
 	return ns.chardb ~= nil and ns.chardb.profile ~= nil
@@ -599,6 +605,7 @@ do
 	-- (Not in fights: it waits.)
 	local WARM_DELAY, WARM_STEP = 15, 0.1 -- seconds after login; between choices
 	function ns.WarmPartValues()
+		if ns.OnBlankSlate() then return end -- (worked out if Customize asks)
 		local todo = {}
 		for _, slot in ipairs(ns.PROFILE_SLOTS or {}) do
 			for _, choice in ipairs(ns.SlotChoices(slot.key) or {}) do

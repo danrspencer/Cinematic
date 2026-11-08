@@ -26,6 +26,10 @@ DEFAULTS.cardProfessionOn = false
 DEFAULTS.cardQuestOn = false
 DEFAULTS.cardClearedOn = false
 DEFAULTS.cardRareOn = false
+-- With RareScanner loaded: whose alert a rare it finds shows as, "ours"
+-- (Rare spotted's card, its button hidden) or "theirs" (its button, our
+-- card quiet for that rare). Support/RareScanner.lua.
+DEFAULTS.rareScannerAlert = "ours"
 DEFAULTS.cardBattlegroundOn = false
 DEFAULTS.cardStreakOn = false
 DEFAULTS.cardBossDownOn = false
@@ -641,6 +645,20 @@ end
 local function RareCard(name, elite, key)
 	return { meta = elite and L["Rare elite"] or L["Rare"], name = name, sub = "", portrait = key and Portrait(key) }
 end
+-- (Its icon a click to target it, out of fights: CombatVision.lua.)
+local function Clickable(card, name)
+	card.clickMacro = "/targetexact " .. name
+	card.clickTip = L["Click to target %s"]:format(name)
+	return card
+end
+-- (A rare RareScanner showed its own button for: our card stays quiet for
+-- it, by name, as it may come with another GUID or none.)
+local rareScannerHad = {}
+local function SpotNow(name, key, elite)
+	if raresSeen[key] or raresSeen[name] or rareScannerHad[name] then return end
+	raresSeen[key], raresSeen[name] = true, true
+	ns.Cards.Fire("rare", Clickable(RareCard(name, elite, key), name))
+end
 local function Spot(unit)
 	if not ns.CardOn("rare") or not ns.Flag(UnitExists(unit)) then return end
 	if ns.Flag(UnitIsPlayer(unit)) or ns.Flag(UnitIsDead(unit)) then return end
@@ -648,13 +666,59 @@ local function Spot(unit)
 	if class ~= "rare" and class ~= "rareelite" then return end
 	local name = Plain(UnitName(unit))
 	local key = Plain(UnitGUID(unit)) or name
-	if not (name and key) or raresSeen[key] then return end
-	raresSeen[key] = true
-	-- (Its icon a click to target it, out of fights: CombatVision.lua.)
-	local card = RareCard(name, class == "rareelite", key)
-	card.clickMacro = "/targetexact " .. name
-	card.clickTip = L["Click to target %s"]:format(name)
-	ns.Cards.Fire("rare", card)
+	if not (name and key) or raresSeen[key] or raresSeen[name] then return end
+	-- (RareScanner's button wanted, which hears the same unit events: a
+	-- moment for it to say it has this one.)
+	if ns.Setting("rareScannerAlert") == "theirs" and ns.AddOnLoaded("RareScanner") then
+		C_Timer.After(0.3, function() SpotNow(name, key, class == "rareelite") end)
+		return
+	end
+	SpotNow(name, key, class == "rareelite")
+end
+
+-- RareScanner found a rare and is showing its button (Support/RareScanner.lua):
+-- "theirs" notes it so ours stays quiet; "ours" fires Rare spotted's card in
+-- its place. True if our card shows (or waits to): its button can go. guid:
+-- the rare's, if known; displayID: its model, for the portrait when no unit
+-- of it is about.
+function ns.RareScannerFound(name, guid, displayID)
+	name = Plain(name)
+	if not name then return false end
+	if ns.Setting("rareScannerAlert") == "theirs" then
+		rareScannerHad[name] = true
+		return false
+	end
+	if not ns.CardOn("rare") then return false end
+	guid = Plain(guid)
+	if raresSeen[name] or (guid and raresSeen[guid]) then
+		-- (Ours already showed for it: theirs would be a second one.)
+		return true
+	end
+	-- (Rare elite if a unit of it says so; its portrait from that unit, else
+	-- its model.)
+	local key = guid or name
+	local elite = false
+	for _, unit in ipairs({ "target", "mouseover", "focus" }) do
+		if SameUnit(unit, key) or SameUnit(unit, name) then
+			elite = Plain(UnitClassification(unit)) == "rareelite"
+			key = Plain(UnitGUID(unit)) or key
+			break
+		end
+	end
+	local card = Clickable(RareCard(name, elite, key), name)
+	local fromUnit = card.portrait
+	card.portrait = function(texture)
+		if fromUnit and fromUnit(texture) then return true end
+		local fromModel = _G.SetPortraitTextureFromCreatureDisplayID
+		if displayID and fromModel then
+			return (pcall(fromModel, texture, displayID))
+		end
+		return false
+	end
+	if not ns.Cards.Fire("rare", card) then return false end
+	raresSeen[name] = true
+	if guid then raresSeen[guid] = true end
+	return true
 end
 -- (Made up: your target's portrait if you have one, so the Test shows it.)
 samples.rare = function()

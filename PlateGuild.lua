@@ -131,7 +131,12 @@ local function LineText(plate, unit)
 	if IsPlayer(unit) then
 		return GuildText(unit), true
 	end
-	return PlateTitle(plate, unit), false
+	local title = PlateTitle(plate, unit)
+	-- (Service NPCs' Brackets unticked: Baker, not <Baker>.)
+	if title and ns.db.nameServiceBrackets == false then
+		title = title:sub(2, -2)
+	end
+	return title, false
 end
 
 -- The Names grid's Service NPCs row's kinds (its Kinds menu, settings
@@ -144,7 +149,8 @@ ns.SERVICE_KINDS = {
 	{ key = "Vendor", label = L["Vendors"], words = L["vendor,merchant,goods,supplies,supplier,provisions," ..
 		"provisioner,quartermaster,reagents,trader,armorer,weaponsmith,bowyer,gunsmith,butcher,baker,food,drink,wine"] },
 	{ key = "Repair", label = L["Repair"], words = L["repair"] },
-	{ key = "Trainer", label = L["Trainers"], words = L["trainer"] },
+	-- (Weapon Masters teach weapon skills but have no "trainer" in their title.)
+	{ key = "Trainer", label = L["Trainers"], words = L["trainer,weapon master"] },
 	-- (Word stems: Fisherman and Fishing, Enchanter and Enchanting...)
 	{ key = "Profession", label = L["Professions"], words = L["fish,cook,first aid,alchem,herbal,mining,miner," ..
 		"skinn,blacksmith,leatherwork,tailor,enchant,engineer,jewelcraft,inscription,scribe,archaeolog"] },

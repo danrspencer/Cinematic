@@ -48,6 +48,7 @@ ns.PROFILE_SLOTS = {
 -- or { forever = key, retail = key }).
 ns.SLOT_CHOICES = {
 	layout = { label = "Layout", page = "Profiles", question = "Where should your bars and menus sit?",
+		about = "The Edit Mode layout you play with: where your bars, menus and frames go.",
 		default = "own", choices = {
 		-- (Cinematic's own layouts first, then the player's and the game's)
 		{ part = "retail", client = "forever", label = "Retail Inspired", made = true,
@@ -59,7 +60,8 @@ ns.SLOT_CHOICES = {
 		{ part = "preset", client = "forever", label = ns.isClassicEra and "Classic's" or "WoW Forever's",
 			line = "The game's own layout", modules = { "layout-preset" } },
 	} },
-	frames = { label = "Interface", page = "Standard Frames", question = "When does your UI fade?",
+	frames = { label = "UI Auto Fade", page = "Standard Frames", question = "When does your UI fade?",
+		about = "CineMode fades your UI so you see the world. This is when it fades, and what brings it back.",
 		default = "standard", choices = {
 		-- (From the most fading to the least.)
 		{ part = "pure", label = "Almost always", line = "As little UI as possible, even in fights",
@@ -75,24 +77,26 @@ ns.SLOT_CHOICES = {
 			modules = { "recovering", "no-fading" } },
 	} },
 	-- (Each client's own groups to start with: Forever's Classic group, retail's split.)
-	bars = { label = "Action bars", page = "Mouseover groups", question = "When do your action bars show?",
+	bars = { label = "Hover Groups", page = "Mouseover groups", question = "When do your action bars show?",
+		about = "While your UI is faded, the bars that come back together when you point at one of them.",
 		default = { forever = "grouped", retail = "standard" }, choices = {
 		{ part = "always", label = "Always show", line = "Your action bars stay up all through CineMode",
 			modules = { "bars-always" } },
-		{ part = "grouped", label = "Action bars (Classic group)",
+		{ part = "grouped", label = "Classic group",
 			line = "Point at one and the bars, menus and XP bar come up", modules = {} },
 		-- (Retail Group: on retail the client's own, standard, which is the
 		-- default there; on Forever, whose own is Classic Group, split.)
-		{ part = "split", hidden = "retail", label = "Action bars (Retail group)",
+		{ part = "split", hidden = "retail", label = "Retail group",
 			line = "Point at the bars, the menus or the XP bar; fights bring up just the bars",
 			modules = { "retail-groups", "micro-off-in-fights" } },
-		{ part = "standard", client = "retail", label = "Action bars (Retail group)",
+		{ part = "standard", client = "retail", label = "Retail group",
 			line = "Point at the bars, the menus or the XP bar", modules = { { retail = "retail-groups" } } },
 		{ part = "pure", noCDM = "grouped", label = "Cooldown Manager",
 			line = "In fights just the Cooldown Manager: no bars or menus",
 			modules = { { retail = "retail-groups" }, "pure-cdm" } },
 	} },
 	camera = { label = "Camera", page = "Cameras", question = "When does the camera move on its own?",
+		about = "Cinematic's cameras take over the view at moments like flights, quests and going AFK.",
 		default = "standard", choices = {
 		{ part = "pure", label = "All the time", line = "Every camera, standing still too, and none waits after a fight",
 			modules = { "pure-cameras", "still-afk", "camera-music" } },
@@ -109,7 +113,8 @@ ns.SLOT_CHOICES = {
 		{ part = "standard", hidden = true, label = "Every camera", line = "Every camera, as the defaults have them",
 			modules = {} },
 	} },
-	vfx = { label = "Look", page = "Effects", question = "How should the world look?", default = "standard", choices = {
+	vfx = { label = "Look", page = "Effects", question = "How should the world look?",
+		about = "Screen effects in CineMode: letterbox bars, a color tint, a vignette and weather.", default = "standard", choices = {
 		{ part = "standard", label = "Letterbox and tint", line = "Bars top and bottom, a color tint, vignette and weather",
 			modules = {} },
 		{ part = "noletterbox", label = "Tint only", line = "The tint, vignette and weather, no letterbox",
@@ -125,7 +130,8 @@ ns.SLOT_CHOICES = {
 	} },
 	-- (From the most chatter to the least. Public channels don't bring chat
 	-- up unless a choice turns them on: chatPeekChannels is off.)
-	chat = { label = "Chat", page = "Chat", question = "How much chatter?", default = "standard", choices = {
+	chat = { label = "Chat", page = "Chat", question = "How much chatter?",
+		about = "Chat hides in CineMode. This is which messages bring it back up.", default = "standard", choices = {
 		{ part = "lite", label = "General and Trade too", line = "NPC speech, and the General and Trade channels",
 			modules = { "lite-channels" } },
 		{ part = "standard", label = "NPC speech", line = "NPC speech brings chat up; public channels don't",
@@ -136,7 +142,8 @@ ns.SLOT_CHOICES = {
 			line = "No NPC chatter; speech from behind you shows low on the screen",
 			modules = { "no-npc-chat", "pure-chat" } },
 	} },
-	sound = { label = "Sound", page = "Audio", question = "How much music?", default = "standard", choices = {
+	sound = { label = "Sound", page = "Audio", question = "How much music?",
+		about = "Cinematic can bring in music while its cameras play.", default = "standard", choices = {
 		{ part = "standard", label = "Music on cameras", line = "A camera can bring music in, as the defaults have it",
 			modules = {} },
 		{ part = "spaced", label = "Spaced out", line = "Music on cameras, with half a minute between starts",
@@ -218,6 +225,19 @@ ns.BUILTIN_PROFILES = {
 			"combat-vision", "heal-vision-everywhere", "cursor-hide", "music-calm", "weather-view-distance",
 			"node-icons", "quest-talk"),
 	},
+	-- Nothing on: for players who want just a few parts (Roll, Emote Vision,
+	-- cards...) and turn on only those pages. The welcome window's last
+	-- choice; none of EVERY_PROFILE's extras.
+	{
+		name = "Blank Slate",
+		label = "Blank Slate", -- (shown in your language)
+		icon = "Interface\\Icons\\INV_Misc_Note_01",
+		tip = L["Start from scratch: every part of Cinematic is off, your UI and camera stay as the game has " ..
+			"them. Turn on only the pages you want, Roll Vision, Emote Vision or the cards, say, with each " ..
+			"page's Enable switch or a right-click on its icon."],
+		picks = { frames = "nofade" },
+		modules = { "all-pages-off" },
+	},
 }
 
 -- Names of built-ins Cinematic used to have, for what a player still has under
@@ -242,6 +262,9 @@ ns.WELCOME_LEVELS = {
 	-- (flash: something shown for a moment when it's picked, besides the
 	-- profile's preview: "vitals", Vitals Vision's screen edges.)
 	{ label = "Cinema", profile = "Cinema", flash = "vitals", line = "Full immersion: just you and the world." },
+	-- (noCustomize: no Next to Customize, whose parts it has all off.)
+	{ label = "Blank Slate", profile = "Blank Slate", noCustomize = true,
+		line = "Everything off. Turn on only the parts you want." },
 }
 
 -- Each level's tip: its profile's, in English until both are translated.
@@ -256,7 +279,7 @@ end
 ns.OnLanguage(function()
 	ns.TranslateFields(ns.WELCOME_LEVELS, "label", "line", "tip")
 	for _, info in pairs(ns.SLOT_CHOICES) do
-		ns.TranslateFields({ info }, "label", "question")
+		ns.TranslateFields({ info }, "label", "question", "about")
 		ns.TranslateFields(info.choices, "label", "line")
 	end
 end)

@@ -618,6 +618,15 @@ ns.HANDLE_SWITCHES = {
 	"handleFrames", "handleAddonFrames", "handleGamepad", "handleMinimap", "handleQuests", "handleBuffs",
 	"handleCooldowns", "handleChat", "handleSwing",
 }
+-- Any page that fades frames is on (the frame scan has nothing to do otherwise).
+function ns.AnyFramePageOn()
+	local db = ns.db
+	if not db then return false end
+	for _, key in ipairs(ns.HANDLE_SWITCHES) do
+		if db[key] then return true end
+	end
+	return false
+end
 local function GroupHandled(group)
 	local db = ns.db
 	if group:find("^addon:") or group:find("^extra:") then
@@ -632,6 +641,48 @@ local function GroupHandled(group)
 	return db[GROUP_SWITCH[group]] and true or false
 end
 ns.GroupHandled = GroupHandled
+
+-- Parts that fade apart from the frame they sit in (the action bar's art, the
+-- cast bars, the minimap's header...) ignore its alpha, but only while
+-- Cinematic is fading something and their page is on. The rest of the time
+-- they follow it again, so another addon fading the frame takes them along.
+-- (parts: region -> { group, on }; below: entries faded below 1 by us.)
+do
+	local parts, below, belowCount = {}, {}, 0
+	local function Set(region, info, on)
+		if info.on ~= on and not (region.IsForbidden and region:IsForbidden()) then
+			info.on = on
+			region:SetIgnoreParentAlpha(on)
+		end
+	end
+	function ns.RefreshDetached()
+		local fading = belowCount > 0
+		for region, info in pairs(parts) do
+			Set(region, info, fading and GroupHandled(info.group))
+		end
+	end
+	function ns.DetachWhileFading(region, group)
+		if type(region) ~= "table" or not region.SetIgnoreParentAlpha or parts[region] then return end
+		local info = { group = group, on = false }
+		parts[region] = info
+		Set(region, info, belowCount > 0 and GroupHandled(group))
+	end
+	function ns.Reattach(region)
+		local info = parts[region]
+		if info then
+			Set(region, info, false)
+			parts[region] = nil
+		end
+	end
+	-- (From ns.SetEntryAlpha and RemoveFrame: alpha nil once it's let go.)
+	function ns.NoteEntryAlpha(entry, alpha)
+		local now = alpha and alpha < 1 or nil
+		if below[entry] == now then return end
+		below[entry] = now
+		belowCount = belowCount + (now and 1 or -1)
+		if belowCount == 0 or (now and belowCount == 1) then ns.RefreshDetached() end
+	end
+end
 
 -- Whether a page's switch is on, for its extras (Keep open, reveals, peeks...).
 function ns.PageOn(switch)
@@ -662,9 +713,8 @@ local function AddFrame(frame, group)
 	-- (Cast bars too, so their row alone decides: see castBars. And what's on
 	-- the minimap's header (minimapzone, minimapclock...), so it can go while
 	-- the map stays.)
-	if (group == "questtimer" or group == "castbar" or group == "buffcollapse" or group:find("^minimap."))
-		and frame.SetIgnoreParentAlpha then
-		frame:SetIgnoreParentAlpha(true)
+	if group == "questtimer" or group == "castbar" or group == "buffcollapse" or group:find("^minimap.") then
+		ns.DetachWhileFading(frame, group)
 	end
 	if group == "castbar" then
 		castBars.Hook(entry)
@@ -672,14 +722,13 @@ local function AddFrame(frame, group)
 	-- Classic clients' raid frames sit inside the Raid Frame Manager: they
 	-- don't fade with it (their own rows fade them).
 	local raidFrames = _G.CompactRaidFrameContainer
-	if group == "raidmanager" and raidFrames and raidFrames.SetIgnoreParentAlpha
-		and raidFrames:GetParent() == frame then
-		raidFrames:SetIgnoreParentAlpha(true)
+	if group == "raidmanager" and raidFrames and raidFrames:GetParent() == frame then
+		ns.DetachWhileFading(raidFrames, group)
 	end
 	-- Classic clients' pet frame sits inside the player frame: it fades on its
 	-- own, so an unhappy pet can stay up while the portrait goes.
-	if name == "PetFrame" and frame.SetIgnoreParentAlpha and frame:GetParent() == _G.PlayerFrame then
-		frame:SetIgnoreParentAlpha(true)
+	if name == "PetFrame" and frame:GetParent() == _G.PlayerFrame then
+		ns.DetachWhileFading(frame, group)
 	end
 
 	-- Chat frames manage their own alpha (the input bar sits faint until you
@@ -894,6 +943,10 @@ local function RemoveFrame(frame)
 			end
 			table.remove(ns.managed, i)
 			entry.removed = true -- (for script hooks still holding it: see HookPartyScripts)
+			-- (Its parts that ignored its alpha follow it again.)
+			ns.NoteEntryAlpha(entry, nil)
+			ns.Reattach(frame)
+			if entry.group == "raidmanager" then ns.Reattach(_G.CompactRaidFrameContainer) end
 			seen[frame] = nil
 			RecomputeNesting()
 			return true
@@ -1120,9 +1173,7 @@ local function AddBarArt(region, border)
 	end
 	barArtSeen[region] = true
 	barArt[#barArt + 1] = { region = region, bar = bar and bar:GetName(), border = border }
-	if region.SetIgnoreParentAlpha then
-		region:SetIgnoreParentAlpha(true)
-	end
+	ns.DetachWhileFading(region, "barart")
 	if not artStandIn then
 		artStandIn = CreateFrame("Frame", nil, UIParent)
 		artStandIn:SetAllPoints(bar or region)
@@ -1143,6 +1194,8 @@ function ns.SetBarBorderOff(off)
 end
 
 local function FindBarArt()
+	-- (Its page off: the art left as the game has it.)
+	if not GroupHandled("barart") then return end
 	for _, name in ipairs(BAR_ART_NAMES) do
 		AddBarArt(_G[name])
 	end
@@ -1177,9 +1230,7 @@ do
 		end
 		headerSeen[region] = true
 		headerArt[#headerArt + 1] = region
-		if region.SetIgnoreParentAlpha then
-			region:SetIgnoreParentAlpha(true)
-		end
+		ns.DetachWhileFading(region, "minimapheader")
 		if not headerStandIn then
 			headerStandIn = CreateFrame("Frame", nil, UIParent)
 			headerStandIn:SetAllPoints(over or region)
@@ -1246,7 +1297,7 @@ do
 		-- shows in that addon's popout, so it's not faded with the map.
 		local ours = _G.CinematicMinimapButton
 		if ours and ns.MinimapButtonGathered() then
-			if RemoveFrame(ours) and ours.SetIgnoreParentAlpha then ours:SetIgnoreParentAlpha(false) end
+			RemoveFrame(ours)
 		else
 			AddFrame(ours, "minimapaddons")
 		end
@@ -1363,6 +1414,7 @@ function ns.BuildManagedList()
 	ns.FindMinimapHeader()
 	AddFrame(type(_G.BuffFrame) == "table" and _G.BuffFrame.CollapseAndExpandButton or nil, "buffcollapse")
 	RecomputeNesting()
+	ns.RefreshDetached() -- (a page switched on or off)
 end
 
 -- The same scan a piece at a time, for the regular one every few seconds
@@ -1402,6 +1454,7 @@ do
 		elseif k == 3 then
 			FindIssueReporter()
 			FindBarArt()
+			ns.RefreshDetached()
 		elseif k == 4 then
 			ns.FindMinimapHeader()
 		else
@@ -1600,6 +1653,7 @@ end
 
 function ns.SetEntryAlpha(entry, alpha)
 	entry.alpha = alpha
+	ns.NoteEntryAlpha(entry, alpha)
 	ns.UpdateEntryClicks(entry, alpha)
 	if entry.shrinkWhenFaded then
 		if alpha > 0 then
@@ -10388,9 +10442,7 @@ local function ReleaseBarArt(barName)
 	for i = #barArt, 1, -1 do
 		local art = barArt[i]
 		if art.bar == barName then
-			if art.region.SetIgnoreParentAlpha then
-				art.region:SetIgnoreParentAlpha(false)
-			end
+			ns.Reattach(art.region)
 			art.region:SetAlpha(1)
 			table.remove(barArt, i)
 		end
@@ -10592,6 +10644,19 @@ do
 	-- the game's options wins (playerWins), as for the addon's other settings.
 	local AURA_CVAR_ROWS = { raidbuffs = "raidFramesDisplayBuffs", raiddebuffs = "raidFramesDisplayDebuffs" }
 	local auraStandIns = {}
+	function auraStandIns.Apply(standIn)
+		ns.ApplyCVarSet(standIn.cvarSet, (standIn:GetAlpha() < 0.5 and IsInGroup()) and true or false)
+	end
+	-- (Joining or leaving a group: switched to match at once.)
+	do
+		local groupWatch = CreateFrame("Frame")
+		groupWatch:RegisterEvent("GROUP_ROSTER_UPDATE")
+		groupWatch:SetScript("OnEvent", function()
+			for _, standIn in pairs(auraStandIns) do
+				if type(standIn) == "table" and standIn.cvarSet then auraStandIns.Apply(standIn) end
+			end
+		end)
+	end
 	local function AddAuraStandIns()
 		if _G.CompactUnitFrame_UtilSetBuff then
 			return -- (aura icons as frames: faded as parts)
@@ -10604,10 +10669,11 @@ do
 				standIn:SetSize(1, 1)
 				standIn:SetPoint("TOPLEFT")
 				-- (As its alpha's set, rather than every frame: it only
-				-- changes when the fade sets it.)
-				hooksecurefunc(standIn, "SetAlpha", function(self)
-					ns.ApplyCVarSet(set, self:GetAlpha() < 0.5)
-				end)
+				-- changes when the fade sets it. Only in a group, where the
+				-- raid-style frames are: each switch has the game rebuild
+				-- them, a frame of 30 ms, for nothing when solo.)
+				standIn.cvarSet = set
+				hooksecurefunc(standIn, "SetAlpha", auraStandIns.Apply)
 				auraStandIns[group] = standIn
 			end
 			if auraStandIns[group] then

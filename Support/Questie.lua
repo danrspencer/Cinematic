@@ -7,9 +7,13 @@
 -- they're hooked. The tracker leaves its own alpha alone.
 --
 -- It draws objective icons of its own on nameplates and the target frame (on
--- to start with, each its own option): our quest mark steps aside for them,
--- unit by unit (ns.QuestieMarks). So does our quest item button for an item
--- it has a button for (ns.QuestieItemButton).
+-- to start with, each its own option). Quest Vision's Questie's icons
+-- dropdown picks which shows where both would: ours (Questie's hidden there:
+-- PlateParts' RefreshQuestIcon and ns.QuestieTargetIcon below), Questie's
+-- (ours steps aside, unit by unit: ns.QuestieMarks) or both. Where ours is
+-- off, Questie's nameplate icon still goes where ours would (PlateParts). Our
+-- quest item button steps aside for an item it has a button for
+-- (ns.QuestieItemButton).
 local _, ns = ...
 local L = ns.L
 
@@ -18,22 +22,29 @@ table.insert(ns.ADDON_NOTES, {
 	addon = "Questie", label = "Questie",
 	works = L["Follows the Quest tracker row"],
 	about = L["Questie's quest tracker and its quest item buttons fade with the Quest tracker row on the " ..
-		"Game Frames page. Where Questie puts its own icon on a nameplate or the target frame, Quest Vision's " ..
-		"quest mark stays off it, and the quest item button stays away while its tracker has a button for that item."],
+		"Game Frames page. Its quest icons on nameplates sit where Quest Vision's quest mark would, and where " ..
+		"both would show, Quest Vision's Questie's icons setting picks which. The quest item button stays away " ..
+		"while its tracker has a button for that item."],
 })
 
--- Whether Questie has its objective icon on the unit: on its nameplate, or
--- with onTargetFrame on the target frame. Its own checks, as it draws: its
--- option, none in instances on Forever, and an unfinished objective it knows
--- for the NPC (quests it doesn't know keep our mark). Unreadable counts as no,
--- and so does all of it with questMarkFade unticked.
+-- Quest Vision's Questie's icons choice: "ours", "questie" or "both".
+function ns.QuestieIconsMode()
+	local mode = ns.Setting("questieIcons")
+	return (mode == "questie" or mode == "both") and mode or "ours"
+end
+
+-- Whether our quest mark steps aside for Questie's objective icon on the
+-- unit: on its nameplate, or with onTargetFrame on the target frame. Only
+-- with Questie's icons winning. Its own checks, as it draws: its option, none
+-- in instances on Forever, and an unfinished objective it knows for the NPC
+-- (quests it doesn't know keep our mark). Unreadable counts as no.
 function ns.QuestieMarks(unit, onTargetFrame)
 	local questie, loader = _G.Questie, _G.QuestieLoader
 	local profile = questie and questie.db and questie.db.profile
 	if not (profile and loader and profile[onTargetFrame and "nameplateTargetFrameEnabled" or "nameplateEnabled"]) then
 		return false
 	end
-	if not ns.QuestVisionSetting("questMarkFade") or (questie.IsForever and IsInInstance()) then
+	if not ns.Setting("questVision") or ns.QuestieIconsMode() ~= "questie" or (questie.IsForever and IsInInstance()) then
 		return false
 	end
 	local okGuid, guid = pcall(UnitGUID, unit)
@@ -46,6 +57,32 @@ function ns.QuestieMarks(unit, onTargetFrame)
 	end
 	local okIcon, icon = pcall(plates.GetIcon, guid)
 	return okIcon and icon ~= nil
+end
+
+-- Questie's icon on the target frame: a plain unnamed frame with an .Icon it
+-- puts on the target frame (a new one each time it draws one). With ours
+-- showing there and ours winning (yield), it's made see-through; otherwise
+-- what we made see-through is put back.
+local hiddenTargetIcons = {}
+function ns.QuestieTargetIcon(yield)
+	if not yield then
+		for frame in pairs(hiddenTargetIcons) do
+			frame:SetAlpha(1)
+			hiddenTargetIcons[frame] = nil
+		end
+		return
+	end
+	local parent = _G.TargetFrame
+	if not (_G.QuestieLoader and parent and ns.QuestieIconsMode() == "ours") then
+		return
+	end
+	for _, child in ipairs({ parent:GetChildren() }) do
+		if not (child.IsForbidden and child:IsForbidden()) and rawget(child, "Icon") and not child:GetName()
+			and child:GetObjectType() == "Frame" then
+			child:SetAlpha(0)
+			hiddenTargetIcons[child] = true
+		end
+	end
 end
 
 -- Its item buttons, one per quest you can hold (made up front).

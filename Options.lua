@@ -217,6 +217,7 @@ end
 local function PageIntro(parent, title, text, under)
 	-- (A page's first: its intro, behind the "?" on its card on the CineMode page.)
 	if parent.introText == nil then parent.introText = text end
+	local first = not parent.pageHelp -- (the page's title's "?": its on/off switch goes past it)
 	local anchor = CreateFrame("Frame", nil, parent)
 	anchor:SetSize(1, 1)
 	anchor:SetPoint("TOPLEFT", under or title, "BOTTOMLEFT", 0, -2)
@@ -239,6 +240,7 @@ local function PageIntro(parent, title, text, under)
 	help:HookScript("OnLeave", function() mark:SetTextColor(1, 0.82, 0) end)
 	help.searchNote = text
 	help.searchEdges = { top = title, bottom = title, left = title, right = help }
+	if first then parent.pageHelp, parent.pageTitle = help, title end
 	return anchor
 end
 
@@ -724,35 +726,132 @@ local function PageOf(control)
 	return frame
 end
 
+-- A control on no settings page, its parent hidden: refreshed as that shows
+-- (once, however many Refreshes passed it by).
+local function StaleTillShown(control, parent)
+	control.staleTillShown = true
+	if parent.staleControls then
+		parent.staleControls[control] = true
+		return
+	end
+	parent.staleControls = { [control] = true }
+	parent:HookScript("OnShow", function(self)
+		for each in pairs(self.staleControls) do
+			self.staleControls[each] = nil
+			if each.staleTillShown then
+				each.staleTillShown = nil
+				RefreshControl(each)
+			end
+		end
+	end)
+end
+
 -- Every control as its setting is now. Only the pages on screen: a page out
 -- of sight is marked stale and refreshed as it comes into view (its
 -- pageWatch), as a switch of profile refreshing them all took ~130 ms.
 local function Refresh()
 	if not ns.GetDB() then return end
-	local timing = ns.isDev and { count = #controls, slowest = {} }
+	local timing = (ns.isDev or ns.pageRun) and { count = #controls, refreshed = 0, slowest = {} }
 	ns.pageTiming = timing
 	for _, control in ipairs(controls) do
 		local page = PageOf(control)
+		local parent = not page and control.GetParent and control:GetParent()
 		if page and not page:IsVisible() then
 			page.stale = true
+		elseif parent and not parent:IsVisible() then
+			-- (On no settings page and out of sight (the Customize window's, a
+			-- popup's): refreshed as its parent shows. ~400 of these refreshed on
+			-- every page opened took 20-35 ms.)
+			StaleTillShown(control, parent)
 		else
 			if page then page.stale = nil end -- (refreshed now: its pageWatch needn't again)
+			control.staleTillShown = nil
 			RefreshControl(control, timing)
+			if timing then timing.refreshed = timing.refreshed + 1 end
 		end
 	end
 	if ns.PaintPageSwitches then ns.PaintPageSwitches() end -- (the hub icons' Off marks)
+	if ns.PaintHeaderSwitches then ns.PaintHeaderSwitches() end -- (the switches by page titles)
 end
 
 -- A page's master switch at the top (below anchor): "CineMode <page>". Not
 -- shown: a right-click on the page's icon (or folder tab) flips it, and the
 -- icon says whether it's on. (Kept, 1 high, for the page's layout and greying.)
+-- Shown instead: an On/Off switch right of the page's title, past its "?"
+-- (and before a Style link there, moved along), the same as that right-click.
+-- Made as the page first shows, its title's parts all there by then.
+local function PaintHeaderSwitch(toggle)
+	if not ns.GetDB() then return end
+	local master = ns.PageSwitchOf(toggle.key)
+	local held = master and ns.GetDB()[master] == false
+	local on = not held and KeyGet(toggle.key) and true or false
+	toggle.fill:SetColorTexture(on and 0.16 or 0.22, on and 0.52 or 0.07, on and 0.2 or 0.05, 1)
+	toggle.knob:ClearAllPoints()
+	toggle.knob:SetPoint(on and "RIGHT" or "LEFT", on and -2 or 2, 0)
+	toggle.text:ClearAllPoints()
+	toggle.text:SetPoint("CENTER", on and -7 or 7, 0)
+	toggle.text:SetText(on and L["On"] or L["Off"])
+	toggle.text:SetTextColor(1, 1, 1, held and 0.4 or 1)
+	toggle:SetEnabled(not held)
+end
+local function MakeHeaderSwitch(content, switch)
+	if switch.header or not (switch.check and content.pageHelp) then return end
+	local toggle = CreateFrame("Button", nil, content.pageHelp:GetParent())
+	toggle:SetSize(46, 18)
+	toggle:SetPoint("LEFT", content.pageHelp, "RIGHT", 8, 0)
+	toggle:SetFrameLevel(content.pageHelp:GetFrameLevel())
+	toggle.key, toggle.check = switch.key, switch.check
+	local edge = toggle:CreateTexture(nil, "BACKGROUND")
+	edge:SetAllPoints()
+	edge:SetColorTexture(0.45, 0.38, 0.2, 1)
+	toggle.fill = toggle:CreateTexture(nil, "BORDER")
+	toggle.fill:SetPoint("TOPLEFT", 1, -1)
+	toggle.fill:SetPoint("BOTTOMRIGHT", -1, 1)
+	toggle.knob = toggle:CreateTexture(nil, "ARTWORK")
+	toggle.knob:SetSize(14, 14)
+	toggle.knob:SetColorTexture(0.85, 0.8, 0.65, 1)
+	toggle.text = toggle:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+	toggle.text.searchSkip = true
+	local hl = toggle:CreateTexture(nil, "HIGHLIGHT")
+	hl:SetPoint("TOPLEFT", 1, -1)
+	hl:SetPoint("BOTTOMRIGHT", -1, 1)
+	hl:SetColorTexture(1, 1, 1, 0.12)
+	Tooltip(toggle, L["Turns this page on or off (as a right-click on its icon)."])
+	toggle:SetScript("OnClick", function(self)
+		local on = KeyGet(self.key) and true or false
+		self.check:SetChecked(not on)
+		self.check:GetScript("OnClick")(self.check, "LeftButton")
+		if PlaySound and SOUNDKIT then
+			PlaySound(on and SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_OFF or SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
+		end
+		PaintHeaderSwitch(self)
+		if ns.PaintPageSwitches then ns.PaintPageSwitches() end
+	end)
+	toggle:SetScript("OnShow", PaintHeaderSwitch)
+	-- (A Style link right of the title: now right of the switch.)
+	local link = content.titleLink
+	if link and link.linkTitle == content.pageTitle then
+		link:ClearAllPoints()
+		link:SetPoint("LEFT", toggle, "RIGHT", 8, 0)
+	end
+	switch.header = toggle
+	PaintHeaderSwitch(toggle)
+end
+ns.PaintHeaderSwitches = function()
+	for _, switch in pairs(pageSwitches) do
+		if switch.header and switch.header:IsVisible() then PaintHeaderSwitch(switch.header) end
+	end
+end
 local function RegisterPageSwitch(content, key, check)
-	pageSwitches[content] = { key = key, check = check }
+	local switch = { key = key, check = check }
+	pageSwitches[content] = switch
 	if check then
 		check:Hide()
 		check:SetHeight(1)
 		check.searchLabel = nil
 		check.hiddenSwitch = true -- (the stack under it starts close: Stack's Add)
+		content:HookScript("OnShow", function() MakeHeaderSwitch(content, switch) end)
+		if content:IsVisible() then MakeHeaderSwitch(content, switch) end
 	end
 end
 local function PageSwitch(content, key, label, tip, anchor, onChange)
@@ -1107,6 +1206,9 @@ end
 -- once text and anchors have settled).
 local function PageShown(refresh, content)
 	return function()
+		-- (/cine debug pages: a page opened from the list, not its icon, timed on its own)
+		local own = not ns.pageRun and CinematicDB and CinematicDB.pageTimesOn
+			and ns.StartPageRun(((PageOf(content) or {}).pageName or "?") .. " (from the list)")
 		local started = debugprofilestop()
 		ns.ApplyMenuSkin() -- (the Menu look, as it is now: Forever's Character Models may have changed)
 		local looked = debugprofilestop()
@@ -1126,8 +1228,66 @@ local function PageShown(refresh, content)
 				fitted - started, looked - started, refreshed - looked, timing and timing.count or "?",
 				#slow > 0 and table.concat(slow, ", ") or "-", fitted - refreshed))
 		end
-		C_Timer.After(0, function() FitContentHeight(content) end)
+		local run = ns.pageRun
+		if run then
+			local timing = ns.pageTiming
+			run.look, run.refresh, run.fit = looked - started, refreshed - looked, fitted - refreshed
+			run.controls = timing and ("%d of %d"):format(timing.refreshed or 0, timing.count or 0)
+			local slow = {}
+			for _, each in ipairs(timing and timing.slowest or {}) do
+				slow[#slow + 1] = ("%s %.1f"):format(each[2], each[1])
+			end
+			run.slowest = table.concat(slow, ", ")
+		end
+		if own then
+			own.show = fitted - started
+			ns.EndPageRun(own)
+		end
+		C_Timer.After(0, function()
+			local fitStart = run and debugprofilestop()
+			FitContentHeight(content)
+			if run then run.laterFit = (run.laterFit or 0) + debugprofilestop() - fitStart end
+		end)
 	end
+end
+
+-- (/cine debug pages: each page switch timed into CinematicDB.pageTimes, the
+-- last 30, for finding why switching pages lags. Its steps' ms, then the whole
+-- frame's: from the click to the next frame, the game's layout and drawing too.)
+function ns.StartPageRun(name)
+	if not (CinematicDB and CinematicDB.pageTimesOn) then
+		ns.pageRun = nil
+		return
+	end
+	ns.pageVisits = ns.pageVisits or {}
+	ns.pageVisits[name] = (ns.pageVisits[name] or 0) + 1
+	local run = { name = name, started = debugprofilestop(), fps = GetFramerate(), visit = ns.pageVisits[name] }
+	ns.pageRun = run
+	return run
+end
+-- (ns.pageRunWatch: the first OnUpdate after a switch: when the game's own drawing of it is done)
+function ns.EndPageRun(run)
+	if not run or ns.pageRun ~= run then return end
+	run.lua = debugprofilestop() - run.started
+	ns.pageRun = nil
+	ns.pageRunWatch = ns.pageRunWatch or CreateFrame("Frame")
+	ns.pageRunWatch:SetScript("OnUpdate", function(self)
+		self:SetScript("OnUpdate", nil)
+		run.update = debugprofilestop() - run.started
+	end)
+	C_Timer.After(0, function()
+		local frame = debugprofilestop() - run.started
+		local list = CinematicDB.pageTimes or {}
+		CinematicDB.pageTimes = list
+		table.insert(list, 1, ("%s (visit %d): lua %.1f ms (select %.1f, show %.1f [look %.1f, refresh %.1f, fit %.1f], "
+			.. "switches %.1f), first OnUpdate at %.1f, later fit %.1f, to next frame %.1f ms (a frame is %.1f); "
+			.. "controls %s; slowest: %s"):format(
+			tostring(run.name), run.visit, run.lua, run.select or 0, run.show or 0, run.look or 0, run.refresh or 0,
+			run.fit or 0, run.switches or 0, run.update or -1, run.laterFit or -1, frame,
+			1000 / math.max(run.fps, 1), run.controls or "-",
+			run.slowest ~= "" and run.slowest or "-"))
+		list[31] = nil
+	end)
 end
 
 -- The pages' sections that open and close with a click remember it across
@@ -2093,6 +2253,7 @@ do
 	local function Select(tile)
 		local hub = tile.hub
 		if hub.current == tile then return end
+		local run = ns.StartPageRun(tile.english)
 		local previous = hub.current
 		if previous then
 			if previous.canvas ~= tile.canvas then previous.canvas:Hide() end
@@ -2102,10 +2263,16 @@ do
 		Light(Lit(tile), true)
 		PaintBands(hub)
 		if tile.onSelect then tile.onSelect() end
+		local shown = run and debugprofilestop()
+		if run then run.select = shown - run.started end
 		tile.canvas:Show()
+		local painted = run and debugprofilestop()
+		if run then run.show = painted - shown end
 		-- (Reset page: for a page with settings of its own)
 		hub.reset:SetShown(pageKeys[tile.resetContent or tile.canvas.content] ~= nil)
 		if ns.PaintPageSwitches then ns.PaintPageSwitches() end -- (its off card)
+		if run then run.switches = debugprofilestop() - painted end
+		ns.EndPageRun(run)
 	end
 
 	-- (made when its first page comes, so it's listed where that page would be)
@@ -2216,23 +2383,23 @@ do
 			GameTooltip:AddLine(L["Off. Right-click to turn this page on."], 1, 0.25, 0.25, true)
 		end
 	end
-	-- A page's icon darkened, "Off" on it, while its switch is off.
+	-- A page's on/off dot in its icon's corner (green on, red off; none for a
+	-- page without a switch), and the icon darkened while it's off.
 	local function PaintSwitch(tile)
 		local switch = TileSwitch(tile)
-		local off = switch and not SwitchState(switch) or false
-		if off and not tile.offMark then
+		if not switch and not tile.switchDot then return end
+		if not tile.switchDot then
 			tile.offMark = tile:CreateTexture(nil, "OVERLAY")
 			tile.offMark:SetAllPoints(tile.icon)
 			tile.offMark:SetColorTexture(0, 0, 0, 0.55)
-			tile.offText = tile:CreateFontString(nil, "OVERLAY", "GameFontRedSmall")
-			tile.offText:SetPoint("BOTTOM", tile.icon, "BOTTOM", 0, 2)
-			tile.offText.searchSkip = true
+			tile.switchDot = tile:CreateTexture(nil, "OVERLAY", nil, 7)
+			tile.switchDot:SetSize(12, 12)
+			tile.switchDot:SetPoint("BOTTOMRIGHT", tile.icon, "BOTTOMRIGHT", 1, -1)
 		end
-		if tile.offMark then
-			tile.offText:SetText(L["Off"])
-			tile.offMark:SetShown(off)
-			tile.offText:SetShown(off)
-		end
+		local off = switch and not SwitchState(switch) or false
+		tile.offMark:SetShown(off)
+		tile.switchDot:SetShown(switch ~= nil)
+		tile.switchDot:SetTexture(off and "Interface\\COMMON\\Indicator-Red" or "Interface\\COMMON\\Indicator-Green")
 	end
 	-- The switch with a box behind one (a page following its hub's master:
 	-- the master's own, Enable Cameras on the Scenes page), or nil.
@@ -8233,8 +8400,18 @@ local function CreatePlatesPanel()
 		serviceShow:SetPoint("LEFT", serviceShowLabel, "LEFT", GRID_LABEL + 30, 0)
 		Tooltip(serviceShow, serviceShowTip)
 	end
+	-- The < > round NPC titles (<Baker>); guild names keep theirs.
+	local serviceBracketsLabel = Label(content, "GameFontHighlight", L["Brackets"])
+	serviceBracketsLabel:SetPoint("TOPLEFT", serviceShowLabel, "BOTTOMLEFT", 0, -22)
+	local serviceBrackets = Check(content, "nameServiceBrackets", L["Around titles (<Baker>)"],
+		L["Ticked, NPC titles under or in place of names show as the game writes them (<Baker>). " ..
+			"Unticked, without the < > (Baker). Players' guild names keep theirs."], function(value)
+		ns.GetDB().nameServiceBrackets = value
+		if ns.RefreshAllPlates then ns.RefreshAllPlates() end
+	end)
+	serviceBrackets:SetPoint("TOPLEFT", serviceBracketsLabel, "TOPLEFT", GRID_LABEL + 26, 6)
 	local serviceKindsLabel = Label(content, "GameFontHighlight", L["Kinds"])
-	serviceKindsLabel:SetPoint("TOPLEFT", serviceShowLabel, "BOTTOMLEFT", 0, -22)
+	serviceKindsLabel:SetPoint("TOPLEFT", serviceBracketsLabel, "BOTTOMLEFT", 0, -22)
 	local lastServiceKind = serviceKindsLabel
 	for i, kind in ipairs(ns.SERVICE_KINDS) do
 		local key = "nameService" .. kind.key
@@ -8404,6 +8581,42 @@ local function CreateNameStylePanel()
 		end
 	end
 	controls[#controls + 1] = preview
+
+	-- Where these names are right now: a warning while they aren't drawn (out
+	-- of CineMode, or in it where plates aren't kept on), a calm line while
+	-- they are. The game's own names over heads can't be styled by addons.
+	local whereNote = stack:Note(content, "", 460)
+	whereNote.searchSkip = true
+	local WARN = "|TInterface\\DialogFrame\\UI-Dialog-Icon-AlertNew:14:14|t "
+	local OK = "|TInterface\\RaidFrame\\ReadyCheck-Ready:14:14|t "
+	local whereState
+	local function UpdateWhere()
+		local cine = ns.lastCinematic and true or false
+		local state = not cine and "out" or (ns.PlatesForcedHere(cine) and "on" or "here")
+		if state == whereState then return end
+		whereState = state
+		if state == "on" then
+			whereNote:SetText(OK .. L["In CineMode: names near you are drawn by their nameplates and look as this " ..
+				"page says. Further off, the game's own names show, which addons can't resize or fade."])
+			whereNote:SetTextColor(0.6, 0.9, 0.6)
+		elseif state == "here" then
+			whereNote:SetText(WARN .. L["In CineMode, but names here are the game's own (in dungeons and raids, " ..
+				"or with the Nameplates page off): this page doesn't change them, and addons can't resize or fade them. " ..
+				"The preview shows this page's look."])
+			whereNote:SetTextColor(1, 0.82, 0)
+		else
+			whereNote:SetText(WARN .. L["Not in CineMode: names over heads are the game's own, which addons can't " ..
+				"resize or fade. This page's look shows on names near you once you're in CineMode (the preview shows it now)."])
+			whereNote:SetTextColor(1, 0.82, 0)
+		end
+	end
+	local whereAt = 0
+	ns.HookOnUpdate(canvas, function()
+		if GetTime() < whereAt then return end
+		whereAt = GetTime() + 0.25
+		UpdateWhere()
+	end)
+	canvas:HookScript("OnShow", UpdateWhere)
 
 	-- (The Style pages' rows, StylePages.lua: each greyed by this page's own
 	-- switch, as General's doesn't reach these names.)
@@ -12180,16 +12393,34 @@ local function CreateVisionPanel()
 	questStack:Add(questIcon, "check")
 	questIcon:HookScript("OnClick", Refresh) -- (grey out / enable what needs it)
 	-- (Indented under it, as its sub-option.)
-	local markFade = Check(content, "questMarkFade", L["Fade if another addon competes"],
-		L["When another addon has its own icon on a unit (Questie, on nameplates and the target frame), Cinematic's " ..
-		"quest mark stays off it, so only one shows. Unticked, both show."], function(value)
-			ns.GetDB().questMarkFade = value
+	-- Questie's own quest icons, where ours would show too (Support/Questie.lua).
+	-- Shown with Questie loaded only.
+	if C_AddOns and C_AddOns.IsAddOnLoaded and C_AddOns.IsAddOnLoaded("Questie") then
+		local QUESTIE_ICONS = {
+			{ value = "ours", text = L["Cinematic's wins"] },
+			{ value = "questie", text = L["Questie's wins"] },
+			{ value = "both", text = L["Both show"] },
+		}
+		local QUESTIE_ICONS_TIP = L["Questie puts quest icons of its own on nameplates and the target frame. " ..
+			"Where Cinematic's quest mark shows on the same unit: Cinematic's wins hides Questie's there, " ..
+			"Questie's wins keeps Cinematic's off, Both show puts them side by side. Either way, Questie's " ..
+			"nameplate icons sit where Cinematic's mark would (beside the name, or over the unit when its " ..
+			"plate is faded), not at the plate's far left."]
+		local questieIcons = Dropdown(content, "questieIcons", QUESTIE_ICONS, 180, function()
 			if ns.RefreshTargetQuestIcon then ns.RefreshTargetQuestIcon() end
+			if ns.RefreshClassIcon and C_NamePlate and C_NamePlate.GetNamePlates then
+				for _, plate in ipairs(C_NamePlate.GetNamePlates()) do ns.RefreshClassIcon(plate) end
+			end
 		end)
-	questStack:Add(markFade, "check", 16)
-	GreyUnless(markFade, function(db)
-		return db.targetQuestIcon or (db.handlePlates and (db.questMobsMark or db.plateAlwaysPartQuestIcon))
-	end)
+		if questieIcons then
+			questStack:Add(Label(content, "GameFontHighlight", L["Questie's icons"]), "label", 16)
+			questStack:Add(questieIcons, "dropdown", 16)
+			Tooltip(questieIcons, QUESTIE_ICONS_TIP)
+			GreyUnless(questieIcons, function(db)
+				return db.targetQuestIcon or (db.handlePlates and (db.questMobsMark or db.plateAlwaysPartQuestIcon))
+			end)
+		end
+	end
 	-- The mark's icon, one for friendly NPCs and one for enemies: a button
 	-- showing the icon picked, and on a click the icon browser (search and
 	-- scroll, as for profile icons: IconBrowser.lua) with every quest, talk and

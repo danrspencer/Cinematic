@@ -271,6 +271,13 @@ end
 
 local function OnClick(owner, mouseButton)
 	GameTooltip:Hide()
+	-- Off the minimap (EllesmereUI's button grid, a collector's popout), the
+	-- menu isn't tied to the button: the game closes a menu whose owner hides,
+	-- and EllesmereUI's grid hides on the press on our menu (it's not in the
+	-- grid), so the menu's click was lost. (It opens at the cursor either way.)
+	if owner == button and button:GetParent() ~= Minimap then
+		owner = UIParent
+	end
 	local right = mouseButton == "RightButton"
 	if ns.ProfileChosen() then
 		if right then ns.OpenOptions() else ShowMenu(owner) end

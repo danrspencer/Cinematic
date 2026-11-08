@@ -397,6 +397,23 @@ ns.PROFILE_MODULES = {
 			set("combatOnLeave", true)
 			set("cardBossOn", true)
 		end },
+	-- (The Blank Slate profile's: every page's switch off, as before a
+	-- profile's picked (ns.OFF_UNTIL_PICKED, Profiles.lua), for players who
+	-- turn on just the pages they want.)
+	{ key = "all-pages-off", name = "Every page off", scope = { "Action Style/top", "Advanced Frames/Supported addons",
+		"Audio/top", "Bubble Style/top", "Buffs/debuffs/top", "Cameras/top", "Card Vision/top", "Cast Bar Style/top",
+		"Chat/top", "Cooldown Manager/top", "Duel Vision/top", "Effects/top", "Fishing/top", "Gamepad/top",
+		"General/top", "Graphics+/top", "Heal Vision/top", "Hunter/top", "Letterbox/top", "Minimap/top",
+		"Mouseover groups/top", "Name Style/top", "Nameplate Style/top", "Nameplates/top", "Personal Resources/top",
+		"Personal Style/top", "Quest Vision/top", "Quest tracker/top", "Raid Style/top", "Roll Vision/top",
+		"Skyriding Cam/top", "Standard Frames/top", "Style General/top", "Swing timer/top", "Tint/top",
+		"Tooltip Style/top", "Unit Frames/top", "Unit Style/top" },
+		tip = "Every page's Enable switch off: Cinematic does nothing until you turn a page on.",
+		apply = function(set)
+			for _, key in ipairs(ns.OFF_UNTIL_PICKED or {}) do
+				if ns.DEFAULTS[key] ~= nil and ns.DEFAULTS[key] ~= false then set(key, false) end
+			end
+		end },
 	{ key = "no-custom-bubbles", name = "No custom bubbles", scope = { "Chat bubbles/Custom bubbles" },
 		tip = "Only the game's own chat bubbles: no off-screen ones, and none brought down from the top of the screen.",
 		apply = function(set)
@@ -1008,6 +1025,7 @@ do
 	builder:RegisterEvent("PLAYER_ENTERING_WORLD")
 	builder:SetScript("OnEvent", function(self)
 		self:UnregisterEvent("PLAYER_ENTERING_WORLD")
+		if ns.OnBlankSlate and ns.OnBlankSlate() then return end -- (built if Customize asks: ns.SettingSlot)
 		wait = 5 -- (seconds: after the login's own work)
 		ns.SetOnUpdate(self, function(_, elapsed)
 			wait = wait - elapsed

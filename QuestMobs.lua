@@ -977,6 +977,10 @@ function ns.RefreshTargetQuestIcon()
 	elseif targetIcon then
 		targetIcon:Hide()
 	end
+	-- (Ours winning over Questie's: its icon there made see-through. See Support/Questie.lua.)
+	if ns.QuestieTargetIcon then
+		ns.QuestieTargetIcon(show and targetIcon ~= nil)
+	end
 end
 
 -- Whether Quest Vision is showing anything now (the minimap button's glow):

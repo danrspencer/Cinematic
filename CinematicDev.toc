@@ -46,6 +46,7 @@ Support\RestedXP.lua
 Support\NaowhForever.lua
 Support\DialogueUI.lua
 Support\Immersion.lua
+Support\RareScanner.lua
 Frames.lua
 HealVisionFrames.lua
 Chat.lua

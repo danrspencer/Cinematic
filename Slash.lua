@@ -169,6 +169,7 @@ local function PrintDebugHelp()
 	print("  /cine debug duels - duel nameplates: watching or why not, and which nearby players can attack each other")
 	print("  /cine debug duels test - pretend duels between friendly players around you, to see how they look")
 	print("  /cine debug questglow - quest object glow: what soft targeting picked and why it glows or not")
+	print("  /cine debug questiepin - show the spot Questie's nameplate icon is pinned to as a quest mark (again to hide it)")
 	print("  /cine debug questmob - the unit under your mouse: the cursor the game gives it, its quest checks and quest items")
 	print("  /cine debug questgaps - print when the quest tracker's Close the gaps copies show and what they copied (again to stop)")
 	print("  /cine debug questitem - print each cast aimed at an NPC and whether it counts as a quest item used on it (again to stop)")
@@ -410,6 +411,12 @@ local function HandleSlash(msg)
 		ns.KeyboardMapSearch(arg)
 	elseif cmd == "keys" or cmd == "keyboard" then
 		ns.KeyboardMapToggle()
+	elseif cmd == "debug" and arg == "pages" then
+		-- (Each page switch in the settings timed into CinematicDB.pageTimes.)
+		CinematicDB.pageTimesOn = not CinematicDB.pageTimesOn or nil
+		if CinematicDB.pageTimesOn then CinematicDB.pageTimes = nil end
+		ns.Print("page switch timing: " .. OnOff(CinematicDB.pageTimesOn)
+			.. (CinematicDB.pageTimesOn and ". Click through some pages, then /reload." or ""))
 	elseif cmd == "debug" and arg == "keys" then
 		ns.KeyboardMapDebug()
 	elseif cmd == "debug" and arg == "spec" then
@@ -1378,6 +1385,8 @@ local function HandleSlash(msg)
 		ns.ChatHistoryReport()
 	elseif cmd == "debug" and arg == "chatcopy" then
 		ns.Print("Copy chat shows each line's codes as text: " .. OnOff(ns.ToggleChatCopyRaw()))
+	elseif cmd == "debug" and arg == "questiepin" and ns.ToggleQuestiePinView then
+		ns.Print("questiepin: " .. ns.ToggleQuestiePinView())
 	elseif cmd == "debug" and arg == "questmob" then
 		ns.PrintQuestMobDebug()
 	elseif cmd == "debug" and arg == "iconwatch" then

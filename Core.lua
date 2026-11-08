@@ -1077,7 +1077,10 @@ local questMarkDefault = (C_Texture and C_Texture.GetAtlasInfo and C_Texture.Get
 DEFAULTS.questMarkStyle = questMarkDefault
 DEFAULTS.questMarkStyleEnemy = questMarkDefault
 DEFAULTS.targetQuestIcon = false -- a quest icon on the target frame while your target is one of them (see QuestMobs)
-DEFAULTS.questMarkFade = true -- our mark stays off a unit another addon has its own icon on (ns.QuestieMarks)
+-- Questie's own quest icons on nameplates and the target frame: "ours" (where
+-- Cinematic's quest mark shows, Questie's is hidden), "questie" (ours stays
+-- off a unit Questie marks) or "both". (Was questMarkFade: unticked = both.)
+DEFAULTS.questieIcons = "ours"
 -- The nearest tracked quest's item to use on a big button at the extra ability button's spot (see QuestItemButton)
 DEFAULTS.questItemButton = true
 DEFAULTS.questItemFade = true -- it stays away while another addon has a button for the item (ns.QuestieItemButton)
@@ -1503,9 +1506,14 @@ end
 -- their names (ns.SERVICE_KINDS in PlateGuild.lua: Vendors, Repair...; Other
 -- any other title), and whether it shows their names and titles ("name") or
 -- just the titles, in the names' place ("title").
+-- Vendors, Repair, Trainers and Professions on by default; the rest off.
 DEFAULTS.nameServiceShow = "title"
-for _, kind in ipairs({ "Vendor", "Repair", "Trainer", "Profession", "Flight", "Inn", "Bank", "Stable", "Other" }) do
+DEFAULTS.nameServiceBrackets = true -- the < > round NPC titles under names
+for _, kind in ipairs({ "Vendor", "Repair", "Trainer", "Profession" }) do
 	DEFAULTS["nameService" .. kind] = true
+end
+for _, kind in ipairs({ "Flight", "Inn", "Bank", "Stable", "Other" }) do
+	DEFAULTS["nameService" .. kind] = false
 end
 DEFAULTS.nameInPvPEnemies = true
 DEFAULTS.nameInPvPEnemyMinions = true
@@ -3317,11 +3325,18 @@ local function OnUpdate(_, elapsed)
 	end
 	if sinceScan >= (starting and START_SCAN_INTERVAL or ns.SCAN_INTERVAL) then
 		sinceScan = 0
-		if starting or not ns.BuildManagedListStep then
-			Step(ns.BuildManagedList)
-		else
-			framesPass.scanning = true
+		-- (Every page that fades frames off, as on Blank Slate: nothing it could
+		-- find would be faded, so no scan. One more round as the last one goes
+		-- off, so what it had is let go.)
+		local wanted = not ns.AnyFramePageOn or ns.AnyFramePageOn()
+		if wanted or framesPass.scanWanted ~= false then
+			if starting or not ns.BuildManagedListStep then
+				Step(ns.BuildManagedList)
+			else
+				framesPass.scanning = true
+			end
 		end
+		framesPass.scanWanted = wanted
 		if ns.UpdateMinimapButton then Step(ns.UpdateMinimapButton) end
 	end
 
@@ -6865,12 +6880,25 @@ ticker:SetScript("OnEvent", ns.Profiled("Core events", function(self, event, arg
 		for _, saved in pairs(ns.db.profiles or {}) do
 			if type(saved) == "table" then PageTurnOff(saved) end
 		end
+		-- The Fade if another addon competes tick is the Questie's icons
+		-- dropdown now: unticked (both showed) stays both; ticked takes the
+		-- new default, Cinematic's mark winning.
+		local function QuestieIconsFrom(saved)
+			if rawget(saved, "questMarkFade") == false and rawget(saved, "questieIcons") == nil then
+				saved.questieIcons = "both"
+			end
+		end
+		QuestieIconsFrom(ns.db)
+		for _, saved in pairs(ns.db.profiles or {}) do
+			if type(saved) == "table" then QuestieIconsFrom(saved) end
+		end
 		-- Settings from removed or renamed features, now that the migrations
 		-- above have read what they need.
 		for _, key in ipairs({
 			"keepRaidMarkers", -- (now the Raid Markers grid)
 			"minimapNodePing", -- (now minimapNodeMark)
 			"storyRecapSound", -- (now Last time's sound rules)
+			"questMarkFade", -- (now questieIcons)
 			"cozyInstant", "cozyBuffsOn", "cozySit", "cozySleep", "cozyDance", "cozyKneel", "cozyChair",
 			"cozyWeapon", "vistaInstant", "vistaStare", "eventsV2", "eventDelay",
 			"taxiShotHold", "taxiShotBlendTime",

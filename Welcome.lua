@@ -12,8 +12,10 @@
 local ADDON_NAME, ns = ...
 local L = ns.L
 
-local WIDTH, PAD, GAP = 560, 22, 14
-local CARD_W = (WIDTH - 2 * PAD - 2 * GAP) / 3
+-- (A card per level, 3 to a 560 wide window; each one more, 120 wider.)
+local COLS = math.max(3, #ns.WELCOME_LEVELS)
+local WIDTH, PAD, GAP = 560 + (COLS - 3) * 120, 22, 14
+local CARD_W = (WIDTH - 2 * PAD - (COLS - 1) * GAP) / COLS
 local MASK = "Interface\\AddOns\\" .. ADDON_NAME .. "\\Textures\\RoundIcon" -- soft rounded corners
 
 -- Colours: the window, an edge, a lit edge (hovered), gold (picked, the main
@@ -26,7 +28,7 @@ local GOLD = { 1, 0.82, 0 }
 local BUTTON, BUTTON_LIT = { 0.5, 0.38, 0.05 }, { 0.62, 0.48, 0.08 }
 local WHITE, SOFT, DIM = { 1, 1, 1 }, { 0.78, 0.78, 0.78 }, { 0.5, 0.5, 0.52 }
 
--- The three levels (ns.WELCOME_LEVELS), and each slot's question and
+-- The levels (ns.WELCOME_LEVELS), and each slot's question and
 -- choices (ns.SLOT_CHOICES, ns.SlotChoices): ProfileChoices.lua.
 local LEVELS = ns.WELCOME_LEVELS
 
@@ -35,10 +37,11 @@ local LEVELS = ns.WELCOME_LEVELS
 local OWN_PROFILE = "My setup"
 local SECTIONS = {}
 local VISIONS = { label = "Visions", page = "Heal Vision", question = "Which Visions do you want?",
-	visions = true }
+	about = "Helpers you tick on: each shows you something only when it matters.", visions = true }
 -- (The Style hub's themes, a row each: StyleThemes.lua. Not a slot: a theme is
 -- its own set of settings, which no slot's choices touch.)
-local THEMES = { label = "Theme", page = "Style General", question = "How should your UI look?", themes = true }
+local THEMES = { label = "Theme", page = "Style General", question = "How should your UI look?",
+	about = "A ready-made look for your frames, bars and fonts, in one click.", themes = true }
 -- What each Vision does, in a line (the vision wheel's list: MarkerWheel.lua).
 local VISION_LINES = {
 	heal = "Party and raid frames show only who needs healing",
@@ -53,7 +56,7 @@ local VISION_LINES = {
 -- (Visions the vision wheel doesn't have, ticked here as the wheel's are:
 -- their setting on or off. The profiles turn them on: ProfileChoices.lua.)
 -- (A slot with no choices on this client isn't listed: Layout on retail.)
-for _, slot in ipairs({ "frames", "bars", "layout", "camera", "vfx", "themes", "visions", "chat", "sound" }) do
+for _, slot in ipairs({ "frames", "layout", "bars", "camera", "vfx", "themes", "visions", "chat", "sound" }) do
 	if slot == "visions" then
 		tinsert(SECTIONS, VISIONS)
 	elseif slot == "themes" then
@@ -64,7 +67,7 @@ for _, slot in ipairs({ "frames", "bars", "layout", "camera", "vfx", "themes", "
 end
 ns.OnLanguage(function()
 	OWN_PROFILE = L[OWN_PROFILE]
-	ns.TranslateFields({ VISIONS, THEMES }, "label", "question")
+	ns.TranslateFields({ VISIONS, THEMES }, "label", "question", "about")
 	for key, line in pairs(VISION_LINES) do VISION_LINES[key] = L[line] end
 end)
 
@@ -275,8 +278,10 @@ local function UpdatePicked()
 		status:SetText(L["Nothing runs until you pick one."])
 	end
 	finish:SetLabel(ns.ProfileChosen() and L["See Profile"] or L["Decide later"])
-	-- (Next only once a level's picked: Customize changes a level)
-	if pages[1]:IsShown() then primary:SetUsable(active and true or false) end
+	-- (Next only once a level's picked: Customize changes a level. Not for
+	-- one with noCustomize, Blank Slate: its parts are all off.)
+	local level = levelOf[active]
+	if pages[1]:IsShown() then primary:SetUsable(active and not (level and level.noCustomize) and true or false) end
 	Describe(levelOf[active])
 end
 
@@ -431,7 +436,7 @@ local function BuildDemoRow(page, width)
 	return row
 end
 
--- Page 1: the three levels.
+-- Page 1: the levels.
 local function BuildLevels(page)
 	local title = Text(page, "GameFontNormalHuge", L["Welcome to Cinematic"], GOLD)
 	title:SetPoint("TOPLEFT")
@@ -492,7 +497,7 @@ function ns.CustomizePanel(parent, width, onChange, skinned)
 	local NAV_W, PANEL_H, FOOT_H = 140, 360, 36
 	local holder = CreateFrame("Frame", nil, parent)
 	holder:SetSize(width, PANEL_H)
-	local rows, question, soon, saved, panel, scroll, list
+	local rows, question, about, soon, saved, panel, scroll, list
 	local options = {} -- the choices shown, as rows
 	local panelW = width - NAV_W - GAP
 	local shown -- (the section shown)
@@ -678,6 +683,7 @@ function ns.CustomizePanel(parent, width, onChange, skinned)
 		end
 		shown = SECTIONS[i]
 		question:SetText(shown.question)
+		about:SetText(shown.about or "")
 		local choices = shown.slot and ns.SlotChoices(shown.slot) or {}
 		if shown.visions then
 			-- (each a row that's ticked on or off, its icon as the vision wheel has it)
@@ -704,12 +710,13 @@ function ns.CustomizePanel(parent, width, onChange, skinned)
 		-- (rows under the question, each as tall as its line wrapped needs;
 		-- when they don't all fit, the list scrolls and its bar takes room
 		-- off the rows' right: laid out again that much narrower)
-		local fits = PANEL_H - 14 - math.ceil(question:GetStringHeight()) - 12 - FOOT_H
+		local fits = PANEL_H - 14 - math.ceil(question:GetStringHeight()) - 4 - math.ceil(about:GetStringHeight())
+			- 12 - FOOT_H
 		local total = Lay(choices, panelW - 28)
 		local overflow = total > fits
 		if overflow then total = Lay(choices, panelW - 28 - 22) end
 		scroll:ClearAllPoints()
-		scroll:SetPoint("TOPLEFT", question, "BOTTOMLEFT", 0, -12)
+		scroll:SetPoint("TOPLEFT", about, "BOTTOMLEFT", 0, -12)
 		scroll:SetPoint("BOTTOMRIGHT", panel, "BOTTOMRIGHT", -14 - (overflow and 22 or 0), FOOT_H)
 		if scroll.ScrollBar then scroll.ScrollBar:SetShown(overflow) end
 		list:SetSize(panelW - 28 - (overflow and 22 or 0), math.max(1, total))
@@ -796,12 +803,15 @@ function ns.CustomizePanel(parent, width, onChange, skinned)
 	if skinned then Skinnable(panel) end
 	question = Text(panel, "GameFontHighlightLarge", "", WHITE, panelW - 28)
 	question:SetPoint("TOPLEFT", 14, -14)
+	-- (under the question, a line on what the section does)
+	about = Text(panel, "GameFontHighlightSmall", "", DIM, panelW - 28)
+	about:SetPoint("TOPLEFT", question, "BOTTOMLEFT", 0, -4)
 	scroll = ns.SkinScroll(CreateFrame("ScrollFrame", nil, panel, "UIPanelScrollFrameTemplate"))
 	list = CreateFrame("Frame", nil, scroll)
 	list:SetSize(1, 1)
 	scroll:SetScrollChild(list)
 	soon = Text(panel, "GameFontHighlightSmall", L["Its choices come next."], DIM)
-	soon:SetPoint("TOPLEFT", question, "BOTTOMLEFT", 0, -8)
+	soon:SetPoint("TOPLEFT", about, "BOTTOMLEFT", 0, -8)
 	saved = Text(panel, "GameFontHighlightSmall", "", DIM, panelW - 28)
 	saved:SetPoint("BOTTOMLEFT", 14, 12)
 	Show(1, true)

@@ -853,6 +853,11 @@ function ns.PrintQuestMobDebug()
 	if ns.DescribeGameIcon then
 		ns.Print("  " .. ns.DescribeGameIcon(unit))
 	end
+	if ns.DescribeQuestieIcon then
+		local frame, why = ns.DescribeQuestieIcon(unit)
+		ns.Print("  " .. frame)
+		ns.Print("  " .. why)
+	end
 	ns.Print("  " .. ns.DescribeQuestSpent(unit))
 	ns.Print("  " .. ns.DescribeQuestKills(unit))
 	local info, lineTypes = C_TooltipInfo, Enum and Enum.TooltipDataLineType

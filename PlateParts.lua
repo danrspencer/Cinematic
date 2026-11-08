@@ -545,6 +545,7 @@ function ns.PlateNameText(plate)
 end
 
 local RefreshQuestIcon -- (below: its quest mark goes by the name shown alone)
+local questieIcons = {} -- [plate] = Questie's icon frame on it (see RefreshQuestIcon)
 
 local function ApplyPlate(plate, personal)
 	local unitFrame = plate and plate.UnitFrame
@@ -592,7 +593,7 @@ local function ApplyPlate(plate, personal)
 	-- under our text, so it fades in with its new look.)
 	ns.SetPlateGuild(plate, plate ~= personal and nameAlpha * (ours and (SwapShares(SwapFade(plate))) or 1) or 0,
 		nameOnly and textShare[plate] or nil)
-	if nameOnly or crossfading then
+	if nameOnly or crossfading or questieIcons[plate] then
 		RefreshQuestIcon(plate)
 	end
 	if next(held) then
@@ -1004,6 +1005,94 @@ function ns.DescribeGameIcon(unit)
 		tostring(icons and icons:GetAlpha()))
 end
 
+-- Questie's objective icon on a plate: a frame of its own on the plate, held
+-- by the plate's LEFT edge (its nameplateX/Y), so far left of a name shown
+-- alone, or floating by itself where the plate is faded out. We place it
+-- instead, whatever our own quest mark settings: where our mark would go
+-- (left of the bar, or of the name shown alone), drifting to the middle of
+-- where the plate is as the plate fades out. Where our mark shows too, Quest
+-- Vision's Questie's icons picks: ours (Questie's made see-through under it)
+-- or both (Questie's beside ours); with Questie's winning ours stays off.
+-- Otherwise its fade stays its own. Found among the plate's children (its frame has
+-- .Icon and .lastIcon) a frame after the plate comes (Questie makes it then);
+-- it goes back on its own anchor as it hides (Questie reuses its frames).
+local function QuestieIcon(plate)
+	local frame = questieIcons[plate]
+	if frame and frame:GetParent() == plate and frame:IsShown() and frame.lastIcon then
+		return frame
+	end
+	questieIcons[plate] = nil
+end
+local function FindQuestieIcon(plate)
+	local ok, children = pcall(function() return { plate:GetChildren() } end)
+	for _, child in ipairs(ok and children or {}) do
+		if not (child.IsForbidden and child:IsForbidden()) and rawget(child, "lastIcon") and rawget(child, "Icon")
+			and child:IsShown() then
+			questieIcons[plate] = child
+			return child
+		end
+	end
+end
+local function ReleaseQuestieIcon(frame)
+	if not (frame and frame.cineMoved) then
+		return
+	end
+	frame.cineMoved, frame.cinePoint = nil, nil
+	if frame.cineHidden then
+		frame.cineHidden = nil
+		frame:SetAlpha(1)
+	end
+	local profile = _G.Questie and _G.Questie.db and _G.Questie.db.profile
+	frame:ClearAllPoints()
+	frame:SetPoint("LEFT", profile and profile.nameplateX or -17, profile and profile.nameplateY or -7)
+end
+local function PinQuestieIcon(frame, icon, beside, hidden)
+	if not frame.cineHooked then
+		frame.cineHooked = true
+		frame:HookScript("OnHide", ReleaseQuestieIcon)
+	end
+	if (hidden or nil) ~= frame.cineHidden then
+		frame.cineHidden = hidden or nil
+		frame:SetAlpha(hidden and 0 or 1)
+	end
+	local point = beside and "RIGHT" or "CENTER"
+	if frame.cineMoved == icon and frame.cinePoint == point then
+		return
+	end
+	frame.cineMoved, frame.cinePoint = icon, point
+	frame:ClearAllPoints()
+	if beside then
+		frame:SetPoint("RIGHT", icon, "LEFT", -2, 0)
+	else
+		frame:SetPoint("CENTER", icon, "CENTER")
+	end
+end
+
+-- For /cine debug questmob: Questie's icon on the unit's plate and where it is.
+function ns.DescribeQuestieIcon(unit)
+	local ok, plate = pcall(C_NamePlate.GetNamePlateForUnit, unit)
+	if not (ok and plate) then
+		return "questie: no plate", ""
+	end
+	local found = {}
+	local okKids, children = pcall(function() return { plate:GetChildren() } end)
+	for _, child in ipairs(okKids and children or {}) do
+		if not (child.IsForbidden and child:IsForbidden()) and rawget(child, "lastIcon") ~= nil then
+			local okPoint, point, rel, relPoint, x, y = pcall(child.GetPoint, child, 1)
+			found[#found + 1] = ("shown=%s alpha=%s ours=%s pinned=%s point=%s %s %s %s %s"):format(
+				tostring(child:IsShown()), tostring(child:GetAlpha()), tostring(questieIcons[plate] == child),
+				tostring(child.cinePoint), tostring(okPoint and point),
+				tostring(rel == plate and "plate" or rel == questIcons[plate] and "ourMark" or rel),
+				tostring(relPoint), tostring(x), tostring(y))
+		end
+	end
+	local icon = questIcons[plate]
+	return "questie: " .. (#found > 0 and table.concat(found, " ; ") or "no Questie icon on the plate"),
+		("questie plate: body=%s name=%s mark=%s, our mark shown=%s alpha=%s, questie wins=%s"):format(
+			tostring(bodyShare[plate]), tostring(nameShare[plate]), tostring(markShare[plate]),
+			tostring(icon and icon:IsShown()), tostring(icon and icon:GetAlpha()), tostring(ns.QuestieMarks(unit)))
+end
+
 function RefreshQuestIcon(plate)
 	if not plate or (plate.IsForbidden and plate:IsForbidden()) then
 		return
@@ -1016,27 +1105,73 @@ function RefreshQuestIcon(plate)
 	local level = math.max(levels.QuestIcon or 0, ns.QuestMarkLevel and ns.QuestMarkLevel() or 0)
 		* math.max(share, mark)
 	local icon = questIcons[plate]
-	local unit
-	if level > 0 and plate ~= PersonalPlate() then
-		unit = plate.namePlateUnitToken or (plate.UnitFrame and plate.UnitFrame.unit)
-		if not (unit and ns.IsQuestMob(unit)) or GameIconShows(plate, unit) or ns.QuestieMarks(unit) then
-			level = 0
-		end
+	local personal = plate == PersonalPlate()
+	local unit = not personal and (plate.namePlateUnitToken or (plate.UnitFrame and plate.UnitFrame.unit)) or nil
+	local questie = not personal and QuestieIcon(plate)
+	if level > 0 and (not (unit and ns.IsQuestMob(unit)) or GameIconShows(plate, unit) or ns.QuestieMarks(unit)) then
+		level = 0
 	end
-	if level <= 0 then
+	if level <= 0 and not questie then
 		if icon then
 			icon:Hide()
 		end
 		return
 	end
 	icon = QuestIcon(plate)
-	if icon then
-		-- (Its look by the unit: enemy, friendly, or the "in progress" mark. See QuestMobs.)
-		ns.SetQuestMark(icon.texture, unit)
+	if not icon then
+		return
+	end
+	-- (Its look by the unit: enemy, friendly, or the "in progress" mark. See QuestMobs.)
+	ns.SetQuestMark(icon.texture, unit)
+	if level > 0 then
 		PlaceQuestIcon(icon, plate, body, kept, share, mark)
 		icon:SetAlpha(level)
-		icon:Show()
+	else
+		-- (Only there to hold Questie's icon: to the middle as the bar goes,
+		-- faded by its Health row or the plate's fade, and there at once on a
+		-- plate with nothing drawn, its bar hidden by the game, as with enemy
+		-- plates turned off: the plate's still made. A name shown alone keeps
+		-- it left of the name.)
+		if not nameOnly then
+			share = (levels.Health or 1) * body
+		end
+		if ns.Flag(icon.bar:IsVisible()) == false then
+			share = 0
+		end
+		PlaceQuestIcon(icon, plate, body, kept, share, math.max(mark, 1 - share))
+		icon:SetAlpha(ns.questiePinView and 1 or 0)
 	end
+	icon:Show()
+	if questie then
+		local both = level > 0 and ns.QuestieIconsMode and ns.QuestieIconsMode() == "both"
+		PinQuestieIcon(questie, icon, both, level > 0 and not both)
+	end
+end
+
+-- /cine debug questiepin: shows the spot Questie's icon is pinned to as a
+-- quest mark (again to hide it), and what each Questie icon we hold is on.
+function ns.ToggleQuestiePinView()
+	ns.questiePinView = not ns.questiePinView
+	local lines = {}
+	for plate, frame in pairs(questieIcons) do
+		RefreshQuestIcon(plate)
+		local okN, count = pcall(frame.GetNumPoints, frame)
+		local okP, _, rel = pcall(frame.GetPoint, frame, 1)
+		lines[#lines + 1] = ("pinned=%s shown=%s points=%s on=%s"):format(tostring(frame.cinePoint),
+			tostring(frame:IsShown()), okN and tostring(count) or "restricted",
+			okP and (rel == questIcons[plate] and "our spot" or rel == plate and "plate" or tostring(rel)) or "restricted")
+	end
+	return (ns.questiePinView and "our spot shown as a quest mark" or "our spot hidden again") .. "; "
+		.. (#lines > 0 and table.concat(lines, " | ") or "no Questie icons held")
+end
+
+-- A new plate: Questie puts its icon on as it comes, so looked for a frame on.
+function ns.FindQuestieIconSoon(plate)
+	C_Timer.After(0, function()
+		if FindQuestieIcon(plate) then
+			RefreshQuestIcon(plate)
+		end
+	end)
 end
 
 -- The Target Arrow row: a mark on your target's plate, for when no target
@@ -2416,6 +2551,9 @@ watcher:SetScript("OnEvent", function(_, event, unit)
 	-- (A new plate's name starts hidden: see sight.)
 	if event == "NAME_PLATE_UNIT_ADDED" then
 		sight[plate] = 0
+		if _G.QuestieLoader then
+			ns.FindQuestieIconSoon(plate)
+		end
 	end
 	if event == "NAME_PLATE_UNIT_REMOVED" then
 		plateClass[plate], plateRole[plate] = nil, nil
@@ -2435,6 +2573,7 @@ watcher:SetScript("OnEvent", function(_, event, unit)
 		if questIcons[plate] then
 			questIcons[plate]:Hide()
 		end
+		questieIcons[plate] = nil
 		if arrows[plate] then
 			arrows[plate]:Hide()
 			arrows[plate].styled = false

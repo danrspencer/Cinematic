@@ -157,8 +157,10 @@ between them: nothing is committed, pushed or tagged until the user says go.
     `python -I Tools/build-zip.py vX.Y.Z` builds
     `Release/Cinematic-vX.Y.Z.zip` from the tag, like the packager. The user
     uploads it on CurseForge (Files > Add File): display name `vX.Y.Z`,
-    Release, the same game versions as the last file, and the changelog
-    from `git log --format="- %s" <prev tag>..vX.Y.Z`. The Discord post
+    Release, the same game versions as the last file, and the changelog:
+    the script also writes `Release/changelog-vX.Y.Z.md`; tell the user to
+    paste it into the Changelog box with type Markdown (left empty, the file
+    has no changelog on CurseForge or in its app). The Discord post
     doesn't go out this way. Once the account is back, push main and the
     tags made meanwhile (the workflow will run for each tag: say so first).
 

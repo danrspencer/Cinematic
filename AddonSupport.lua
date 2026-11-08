@@ -52,6 +52,19 @@ function ns.IsSupportedAddon(addon)
 	return false
 end
 
+-- Loaded, or ticked on for this character and so loading this session: for
+-- pages built as Cinematic loads, before addons later in the alphabet are in.
+function ns.AddOnWillLoad(addon)
+	if ns.AddOnLoaded(addon) then return true end
+	if not ns.AddOnInstalled(addon) then return false end
+	local state = C_AddOns and C_AddOns.GetAddOnEnableState or _G.GetAddOnEnableState
+	if not state then return false end
+	-- (Its arguments the other way round on older clients.)
+	local ok, value = pcall(state, addon, UnitName("player"))
+	if not ok or type(value) ~= "number" then ok, value = pcall(state, UnitName("player"), addon) end
+	return ok and type(value) == "number" and value > 0
+end
+
 local function IsLoaded(addon)
 	local isLoaded = C_AddOns and C_AddOns.IsAddOnLoaded or IsAddOnLoaded
 	return isLoaded and isLoaded(addon) and true or false

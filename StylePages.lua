@@ -316,6 +316,9 @@ function ns.StyleLink(content, title, page, tip, Tooltip, label, after)
 		button:SetPoint("LEFT", after, "RIGHT", 6, 0)
 	else
 		button:SetPoint("LEFT", title, "RIGHT", 44, 0)
+		-- (moved right of the page's on/off switch, if it has one: Options.lua)
+		button.linkTitle = title
+		if not content.titleLink then content.titleLink = button end
 	end
 	Tooltip(button, tip)
 	button:SetScript("OnClick", function() ns.OpenOptions(page) end)

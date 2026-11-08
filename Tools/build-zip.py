@@ -5,7 +5,9 @@ down): tag the release locally, then
 
     python -I Tools/build-zip.py v2.0.44
 
-and upload Release/Cinematic-v2.0.44.zip on CurseForge (Files > Add File).
+and upload Release/Cinematic-v2.0.44.zip on CurseForge (Files > Add File),
+pasting Release/changelog-v2.0.44.md into the Changelog box (type Markdown):
+the packager used to send it, a manual upload has none unless it's pasted.
 
 It packs the files committed at that tag (never the working tree, so
 uncommitted work stays out), leaves out what .pkgmeta's ignore: lists and the
@@ -71,6 +73,17 @@ def changelog_commits(tag):
     return ("\n".join(lines) + "\n").encode("utf-8")
 
 
+def release_notes(tag):
+    """The packager's changelog: the commits since the tag before, as Markdown."""
+    tags = git("tag", "--list", "v*", "--merged", tag, "--sort=v:refname").split()
+    prev = tags[tags.index(tag) - 1] if tag in tags and tags.index(tag) > 0 else ""
+    date = git("log", "-1", "--format=%as", tag).strip()
+    rows = git("log", "--no-merges", "--format=%s", f"{prev}..{tag}" if prev else tag).splitlines()
+    lines = ["# Cinematic", "", f"## {tag} ({date})", ""]
+    lines += [f"- {r}" for r in rows]
+    return "\n".join(lines) + "\n"
+
+
 def main():
     if len(sys.argv) != 2 or not sys.argv[1].startswith("v"):
         sys.exit("usage: python -I Tools/build-zip.py vX.Y.Z  (a tag that exists)")
@@ -100,6 +113,10 @@ def main():
     if f"{name}.toc" not in tocs:
         sys.exit(f"{name}.toc had no @project-version@ to fill in: check the zip")
     print(f"wrote {os.path.relpath(out, ROOT)}: {count} files, version {tag}")
+    notes = os.path.join(ROOT, "Release", f"changelog-{tag}.md")
+    with open(notes, "w", encoding="utf-8", newline="\n") as f:
+        f.write(release_notes(tag))
+    print(f"wrote {os.path.relpath(notes, ROOT)}: paste it into CurseForge's Changelog box (Markdown)")
 
 
 if __name__ == "__main__":
