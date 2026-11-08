@@ -3936,6 +3936,34 @@ end
 function ns.FullTint(t)
 	if type(t) == "table" and (t.tintStrength == 0.33 or t.tintStrength == 0.66) then t.tintStrength = 1 end
 end
+-- The grids whose rows only act in CineMode (Game Frames, Gamepad, Tooltips,
+-- Cursor Hide) have no CineMode column now: there it was Always again. A
+-- row's CineMode tick goes onto its Always (t: the live settings or a saved
+-- profile), which shows it the same.
+function ns.CineTicksToAlways(t)
+	local ticks = type(t) == "table" and t.cineModeShow
+	if type(ticks) ~= "table" then return end
+	local function Move(key, Set)
+		if ticks[key] == true then Set() end
+		ticks[key] = nil
+	end
+	for _, item in ipairs(ns.COMBAT_SHOW or {}) do
+		local key = item.key
+		if type(key) == "string" and not key:find("^addon:") then
+			Move(key, function()
+				local setting = ns.CINE_SHOW_SETTING and ns.CINE_SHOW_SETTING[key]
+				if setting then
+					t[setting] = true
+				else
+					t.cineShow = type(t.cineShow) == "table" and t.cineShow or {}
+					t.cineShow[key] = true
+				end
+			end)
+		end
+	end
+	Move("tooltip:All", function() t.tooltipAlways = true end)
+	Move("cursor:hide", function() t.cursorHideAlways = true end)
+end
 ns.GetStillSince = function() return ns.stillSince end
 ns.Flag = Flag
 ns.GetLetterbox = function() return ns.letterbox end
@@ -5688,6 +5716,14 @@ ticker:SetScript("OnEvent", ns.Profiled("Core events", function(self, event, arg
 			for _, saved in pairs(ns.db.profiles or {}) do TargetSlider(saved) end
 			ns.db.healVisionTargetBelowV1 = nil
 			ns.db.healVisionTargetAlphaV1 = true
+		end
+		-- No CineMode column on the grids that only act in CineMode: its ticks
+		-- go onto Always (ns.CineTicksToAlways). Once, in every profile.
+		if not ns.db.cineTicksToAlwaysV1 then
+			ns.CineTicksToAlways(ns.db)
+			for _, saved in pairs(ns.db.profiles or {}) do ns.CineTicksToAlways(saved) end
+			for _, saved in pairs(ns.db.profileResetPoints or {}) do ns.CineTicksToAlways(saved) end
+			ns.db.cineTicksToAlwaysV1 = true
 		end
 		-- Tanks and pets have an opacity of their own now: each starts as the
 		-- one opacity was. Once, in every profile.

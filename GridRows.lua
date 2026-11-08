@@ -692,9 +692,11 @@ end
 
 -- Where a grid's columns go across a row, labelWidth in. layout: { groups,
 -- the dropdowns it has ({ 1, 2, 3 } when nil); always = false: no Always
--- column; cine: the CineMode column; edit: that column }.
+-- column; cine: the CineMode column; edit: that column; menuW: the dropdowns'
+-- width (nil: MENU_W) }.
 local function Columns(layout)
-	local x, cols = 0, { menus = {} }
+	local menuW = layout.menuW or MENU_W
+	local x, cols = 0, { menus = {}, menuW = menuW }
 	if layout.always ~= false then
 		cols.always = x
 		x = x + ALWAYS_W + GAP
@@ -705,7 +707,7 @@ local function Columns(layout)
 	end
 	for _, g in ipairs(layout.groups or { 1, 2, 3 }) do
 		cols.menus[g] = x
-		x = x + MENU_W + GAP
+		x = x + menuW + GAP
 	end
 	cols.menusEnd = x
 	if layout.edit then
@@ -720,9 +722,13 @@ function ns.GridWidth(layout) return Columns(layout).width end
 -- The Show in tables (ns.GridTable): their columns, and what the CineMode
 -- column takes off the names, so they still fit beside the scrollbar.
 local TABLE_LAYOUT, TABLE_LABEL_TRIM = { cine = true, edit = true }, 12
+-- A table whose rows only act in CineMode (rows.noCine: Game Frames, Gamepad,
+-- Tooltips, Cursor Hide), where a CineMode tick would only be Always again:
+-- no such column, its room shared out to the dropdowns.
+local NO_CINE_LAYOUT = { edit = true, menuW = MENU_W + math.floor((CINE_W + GAP) / 3) }
 -- How wide one is, whole, for names labelWidth wide.
-function ns.GridTableWidth(labelWidth)
-	return labelWidth - TABLE_LABEL_TRIM + ns.GridWidth(TABLE_LAYOUT)
+function ns.GridTableWidth(labelWidth, noCine)
+	return labelWidth - TABLE_LABEL_TRIM + ns.GridWidth(noCine and NO_CINE_LAYOUT or TABLE_LAYOUT)
 end
 
 -- The headings over a grid's columns: at top's top left, labelWidth in
@@ -740,7 +746,7 @@ function ns.GridHeadings(kit, parent, top, labelWidth, layout)
 	-- (Short: CineMode in full ran into Always and was cut off. Its tip says it in full.)
 	if cols.cine then Heading(L["Cine"], cols.cine, CINE_W) end
 	for g, group in ipairs(MENU_GROUPS) do
-		if cols.menus[g] then Heading(L[group.heading], cols.menus[g], MENU_W, group.color) end
+		if cols.menus[g] then Heading(L[group.heading], cols.menus[g], cols.menuW, group.color) end
 	end
 	return made
 end
@@ -855,7 +861,7 @@ function ns.GridRow(kit, parent, labelWidth, layout, spec)
 		local entries = spec.menus and spec.menus[g]
 		if cols.menus[g] and entries and #entries > 0 then
 			local color, heading, help = group.color, L[group.heading], spec.help and spec.help[g] or L[group.help]
-			local button = ns.GridMenuButton(row, MENU_W)
+			local button = ns.GridMenuButton(row, cols.menuW)
 			button:SetPoint("LEFT", cols.menus[g], 0)
 			button:SetSkinEdge(color[1], color[2], color[3], 0.45)
 			button:SetScript("OnClick", function(self) ns.TickMenu(self, entries, Changed) end)
@@ -1273,7 +1279,7 @@ end
 -- label, to place what comes below.
 function ns.GridTable(content, columnTop, rows, kit)
 	local LABEL_WIDTH, ROW_HEIGHT, COLUMNS = kit.labelWidth - TABLE_LABEL_TRIM, kit.rowHeight, kit.columns
-	local LAYOUT = TABLE_LAYOUT
+	local LAYOUT = rows.noCine and NO_CINE_LAYOUT or TABLE_LAYOUT
 	-- (The rows a row may follow: the table's others.)
 	local choices = {}
 	for _, item in ipairs(rows) do
@@ -1311,7 +1317,7 @@ function ns.GridTable(content, columnTop, rows, kit)
 		local opts = {}
 		for k, v in pairs(rows.opts or {}) do opts[k] = v end
 		for k, v in pairs(item.opts or {}) do opts[k] = v end
-		opts.cinemode = not item.alwaysOnly
+		opts.cinemode = not item.alwaysOnly and not rows.noCine
 		if not item.alwaysOnly then
 			-- (frameRules too: its rule. Left out, Reset page kept a row's rule.)
 			for _, list in ipairs({ "calmShow", "quietShow", "camShow", "cineModeShow", "rowFollow", "frameRules" }) do
@@ -1346,7 +1352,7 @@ function ns.GridTable(content, columnTop, rows, kit)
 			enabled = item.showKey and function() return kit.RowShown(item) end or nil,
 		}
 		if not item.alwaysOnly then
-			spec.cine = { isOn = parts.cine.isOn, set = parts.cine.set,
+			spec.cine = not rows.noCine and { isOn = parts.cine.isOn, set = parts.cine.set,
 				tip = L["Shows it while CineMode is on, whatever the other columns say. Outside CineMode this " ..
 				"tick does nothing."] }
 			spec.menus = parts.menus

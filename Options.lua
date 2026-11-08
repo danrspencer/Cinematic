@@ -6591,7 +6591,7 @@ local function CreateCombatPanel()
 		return set
 	end
 
-	local SECTION_WIDTH = ns.GRID_MENUS and ns.GridTableWidth(FRAME_LABEL_WIDTH)
+	local SECTION_WIDTH = ns.GRID_MENUS and ns.GridTableWidth(FRAME_LABEL_WIDTH, true)
 		or FRAME_LABEL_WIDTH + #FRAME_COLUMNS * FRAME_COLUMN_WIDTH
 	-- (tab: its tab's name, nil: heading. link: { page, tip, label }, a button
 	-- to the page with the rest of its settings, right of its heading, named
@@ -6646,6 +6646,7 @@ local function CreateCombatPanel()
 		end
 		local before = Widgets()
 		sectionRows.underHeader = true
+		sectionRows.noCine = true -- (frames only fade in CineMode: Always says it all)
 		section.last = ShowTable(content, frame, sectionRows, "Standard Frames", heading)
 		for object in pairs(Widgets()) do
 			if not before[object] then
@@ -7436,6 +7437,7 @@ local function CreateGamepadPanel()
 		L["On: CineMode fades the gamepad's bars, button hints and reticle as this page says. Off: it " ..
 		"leaves them alone."], subtitle)
 	rows.underHeader = true
+	rows.noCine = true -- (CineMode only: Always says it all)
 	local lastRow = ShowTable(content, switch, rows, "Gamepad")
 
 	-- The prompt sits on a nameplate, not a frame of its own: a setting for
@@ -13017,7 +13019,7 @@ local function CreateTooltipPanel()
 		L["In CineMode, where and when tooltips show; the rest of the time they're hidden. For some kinds " ..
 		"only (enemies, friendlies, gatherables, quest objectives, anything else), Edit its rule: the " ..
 		"Tooltip line has a word for each."])
-	local tooltipRows = { opts = { quiet = true, cam = true, anyFight = true }, underHeader = true,
+	local tooltipRows = { opts = { quiet = true, cam = true, anyFight = true }, underHeader = true, noCine = true,
 		{ key = "tooltip:All", label = L["Tooltips"],
 			tip = L["Every tooltip: units, things in the world and the UI's (action bars, bags, menus and the rest)."],
 			alwaysKey = "tooltipAlways",

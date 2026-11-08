@@ -522,7 +522,7 @@ function ns.CreateCursorHidePage(kit)
 	local stack = kit.Stack(switch, "check")
 	local header = stack:Header(content, L["Show in"])
 	local lastRow = ns.ShowTable(content, header, {
-		opts = { anyFight = true }, underHeader = true,
+		opts = { anyFight = true }, underHeader = true, noCine = true, -- (CineMode only: Always says it all)
 		{ key = ROW_KEY, label = L["Cursor Hide"], alwaysKey = "cursorHideAlways",
 			alwaysOn = function() return ns.GetDB().cursorHideAlways end,
 			setAlways = function(value) ns.GetDB().cursorHideAlways = value end,
