@@ -429,9 +429,9 @@ keyButton:SetScript("PreClick", function(_, _, down)
 		ShowUIFor(SlotAtCursor())
 	end
 end)
-_G["BINDING_NAME_CLICK " .. KEY_BUTTON .. ":LeftButton"] = "Cinematic: " .. L["Menu wheel (hold)"]
+_G["BINDING_NAME_CLICK " .. KEY_BUTTON .. ":LeftButton"] = L["Menu wheel (hold)"]
 ns.OnLanguage(function()
-	_G["BINDING_NAME_CLICK " .. KEY_BUTTON .. ":LeftButton"] = "Cinematic: " .. L["Menu wheel (hold)"]
+	_G["BINDING_NAME_CLICK " .. KEY_BUTTON .. ":LeftButton"] = L["Menu wheel (hold)"]
 end)
 
 -- Down: up round the cursor (or, already up, away). Up: opens the slot the

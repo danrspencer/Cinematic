@@ -21,7 +21,8 @@
 -- With no NPC to stand over (a quest from an item, a turn-in from the quest
 -- tracker), the bubble sits where the game's quest window opens.
 --
--- Keys (questTalkKeys): 1-9 and 0 pick from the list, Space turns the page
+-- Keys (questTalkKeys): 1-9 and 0 pick from the list (and a reward
+-- choice, then the card's buttons), Space turns the page
 -- and then does the card's first button. Only out of fights (the game
 -- doesn't let addons hold keys back in one), and only keys that do
 -- something here: the rest go through to the game as usual.
@@ -139,7 +140,12 @@ local function FontKey()
 		Styled("questTalkTextG"), Styled("questTalkTextB"))
 end
 
+-- (Quest talk counts as off in gamepad mode with questTalkPadGame: the
+-- game's windows take the controller, ours don't, so theirs show.)
 local function Setting(key)
+	if key == "questTalk" and ns.db and ns.db.questTalkPadGame and ns.IsGamePadOn and ns.IsGamePadOn() then
+		return false
+	end
 	return ns.QuestVisionSetting(key)
 end
 
@@ -1394,7 +1400,10 @@ local function AddIcon(entry)
 		b.border:SetTexture(ART.ICON_FRAME)
 		b.count = b:CreateFontString(nil, "OVERLAY", "NumberFontNormal")
 		b.count:SetPoint("BOTTOMRIGHT", b.icon, -1, 1)
-		b.name = b:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+		-- (A reward choice's number key, just left of the icon, as the rows' are.)
+		b.key = b:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+		b.key:SetPoint("RIGHT", b.icon, "LEFT", -1, 0)
+		b.name =b:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
 		b.name:SetJustifyH("LEFT")
 		if b.name.SetMaxLines then b.name:SetMaxLines(2) end
 		b.mark = b:CreateTexture(nil, "OVERLAY", nil, 2)
@@ -1475,6 +1484,14 @@ local function AddIcon(entry)
 		b.icon:SetVertexColor(1, 1, 1)
 	end
 	b.tip, b.pick, b.link = entry.tip, entry.pick, entry.link
+	-- (A choice to pick: a number key too, in order with the rows' and buttons'.)
+	local key
+	if entry.pick and #keyed < 10 then
+		key = #keyed + 1
+		keyed[key] = entry.pick
+	end
+	b.key:SetText(key and Setting("questTalkKeys") and tostring(key % 10) or "")
+	b.key:SetAlpha(Styled("questTalkNumberAlpha"))
 	for _, part in ipairs(b.chosen) do
 		part:SetShown(entry.chosen and true or false)
 	end

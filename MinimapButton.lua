@@ -228,8 +228,10 @@ local function ShowMenu(owner)
 end
 
 local function OnEnter(self)
-	local canDrag = self == button and OnRim()
-	GameTooltip:SetOwner(self, "ANCHOR_LEFT")
+	local canDrag = self ~= nil and self == button and OnRim()
+	if self then -- (nil: the caller has set the owner already)
+		GameTooltip:SetOwner(self, "ANCHOR_LEFT")
+	end
 	GameTooltip:SetText("Cinematic")
 	local db = ns.GetDB()
 	local left = ns.GetSnoozeLeft()
@@ -398,7 +400,19 @@ local function UpdateCompartment()
 			notCheckable = true,
 			registerForAnyClick = true,
 			func = OnCompartmentClick,
-			funcOnEnter = function(_, menuButton) OnEnter(menuButton) end,
+			-- (The game passes (button, menuButton); other addons that gather
+			-- compartment entries, like FlareUI's minimap bag, may pass only one
+			-- or none: use the first frame given, else the cursor.)
+			funcOnEnter = function(first, menuButton)
+				local owner = type(menuButton) == "table" and menuButton.IsObjectType and menuButton
+					or type(first) == "table" and first.IsObjectType and first
+				if owner then
+					OnEnter(owner)
+				else
+					GameTooltip:SetOwner(UIParent, "ANCHOR_CURSOR")
+					OnEnter(nil)
+				end
+			end,
 			funcOnLeave = function() GameTooltip:Hide() end,
 		}
 		frame:RegisterAddon(compartmentEntry)

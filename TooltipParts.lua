@@ -563,12 +563,44 @@ local function StartCountdown(tooltip)
 	end
 end
 
--- A new unit in the tooltip (its name changed) starts again, taken out.
+-- A hide followed at once by a show from the same owner is the game setting
+-- the tooltip again, not a new one: a unit frame does it every moment while
+-- hovered (SetOwner hides it, SetUnit fills it again). That keeps its look
+-- (shown in full stays in full, the countdown runs on) instead of starting
+-- again, taken out. pendingHide: hidden, not yet known which.
 local shownName
+local pendingHide, hiddenOwner = false, nil
+-- The last hide was the game setting it again (for the show that follows).
+local carriedOn = false
+local function Owner(tooltip)
+	local ok, owner = pcall(tooltip.GetOwner, tooltip)
+	return ok and owner or nil
+end
+local function StartsAgain(tooltip)
+	if not pendingHide then
+		return false
+	end
+	pendingHide = false
+	local owner = Owner(tooltip)
+	carriedOn = owner ~= nil and owner == hiddenOwner and GetTime() - hiddenAt <= KEEP_UP
+	if carriedOn then
+		return false
+	end
+	if fullTimer then
+		fullTimer:Cancel()
+		fullTimer = nil
+	end
+	revealed, linesCut, shownName = false, false, nil
+	hiddenBars = {}
+	return true
+end
+
+-- A new unit in the tooltip (its name changed) starts again, taken out.
 local function OnUnitTooltip(tooltip)
 	if tooltip ~= GameTooltip then
 		return
 	end
+	StartsAgain(tooltip)
 	local name = Left(1) and Left(1):GetText()
 	if not refilling and not Same(name, shownName) then
 		shownName = name
@@ -704,10 +736,16 @@ function ns.HookTooltipParts()
 		if refilling then
 			return
 		end
-		-- (A unit's lines are cut before it shows: linesCut stays as it is.)
-		revealed = false
+		-- (A unit's lines are cut before it shows: linesCut stays as it is.
+		-- The game setting it again keeps its look and countdown.)
+		StartsAgain(tooltip)
+		local again = not carriedOn
+		carriedOn = false
+		if again then
+			revealed = false
+			StartCountdown(tooltip)
+		end
 		UpdateBorder(tooltip)
-		StartCountdown(tooltip)
 		if FadeTime() and tooltip == GameTooltip then
 			local from = GetTime() - hiddenAt <= KEEP_UP and hiddenAlpha or 0
 			StartFade("in", from, 1, FadeTime() * (1 - from))
@@ -722,13 +760,10 @@ function ns.HookTooltipParts()
 			C_Timer.After(0.3, function() ListParts(tooltip) end)
 		end
 	end)
-	GameTooltip:HookScript("OnHide", function()
-		if fullTimer then
-			fullTimer:Cancel()
-			fullTimer = nil
-		end
-		revealed, linesCut, shownName = false, false, nil
-		hiddenBars = {}
+	GameTooltip:HookScript("OnHide", function(tooltip)
+		-- (Cleared on the next show, unless that's the game setting it again.
+		-- A countdown that ends while it's hidden reveals nothing.)
+		pendingHide, hiddenOwner = true, Owner(tooltip)
 		hiddenAt, hiddenAlpha = GetTime(), Alpha(GameTooltip) or (fade and fade.set) or 1
 		StopFade(true)
 	end)

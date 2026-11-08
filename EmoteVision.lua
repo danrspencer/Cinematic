@@ -568,6 +568,8 @@ local HEADINGS = { Buff = "A KINDNESS", Res = "SAVED", Emote = "A GREETING", Sum
 	Leave = "FAREWELL", Joined = "WELL MET", Achievement = "WELL DONE", Boss = "VICTORY", Wipe = "NEXT TIME",
 	YouLevel = "LEVEL UP", Guild = "WELL MET", Ally = "WELL MET", Eyes = "EYES MEET", Campfire = "A WARM FIRE" }
 local BUTTON_W, BUTTON_H, BUTTON_GAP, ROW_GAP = 84, 24, 8, 6
+-- The face's glow: circles this far out past the face, and how strong each.
+local GLOW_STEPS = { { 4, 0.35 }, { 6, 0.25 }, { 8, 0.17 }, { 10, 0.1 }, { 12, 0.06 } }
 local WHEEL_DISC, WHEEL_REACH = 170, 74 -- the wheel's disc, and how far out its emotes sit (on its edge)
 
 local ROMAN = not ({ ruRU = true, koKR = true, zhCN = true, zhTW = true })[GetLocale and GetLocale() or ""]
@@ -728,12 +730,12 @@ local function WordButton()
 	return button
 end
 
--- The card's Target button: a click targets them, to see who it was. Addons
--- can't target, only a click may: the button you see (card.target, in the
--- style's look) is covered by a secure one (as Combat Vision's rare portraits
--- have), out of fights only (a secure button can't move, show or hide in one),
--- off as one starts. It has no parent, so the card stays free to move; placed
--- by the button's place on the screen, as the card fades or moves.
+-- A click on their face targets them, to see who it was. Addons can't target,
+-- only a click may: their face is covered by a secure button (as Combat
+-- Vision's rare portraits are), out of fights only (a secure button can't
+-- move, show or hide in one), off as one starts. It has no parent, so the card
+-- stays free to move; placed by the face's place on the screen, as the card
+-- fades or moves.
 local nameLink = {}
 function nameLink.Button()
 	if nameLink.button then return nameLink.button end
@@ -748,20 +750,15 @@ function nameLink.Button()
 	-- Left only: a right-click goes on to the card, closing it.)
 	button:RegisterForClicks("LeftButtonDown", "LeftButtonUp")
 	button:SetScript("OnEnter", function(self)
-		local shown = card and card.target
-		if shown then
-			if shown.LockHighlight then shown:LockHighlight() end
-			if shown.text then shown.text:SetAlpha(0.7) end
-		end
+		if card and card.spotOf then card.spotOf:SetAlpha(0.75) end
 		GameTooltip:SetOwner(self, "ANCHOR_TOP")
 		GameTooltip:SetText(L["Click to target %s"]:format(self.who or ""), 1, 1, 1, 1, true)
 		GameTooltip:Show()
 	end)
 	button:SetScript("OnLeave", function()
-		local shown = card and card.target
-		if shown then
-			if shown.UnlockHighlight then shown:UnlockHighlight() end
-			if shown.text then shown.text:SetAlpha(1) end
+		if card then
+			card.portrait:SetAlpha(1)
+			card.name:SetAlpha(1)
 		end
 		GameTooltip:Hide()
 	end)
@@ -782,9 +779,7 @@ function nameLink.Button()
 		end)
 	end)
 	button:HookScript("OnClick", function(self)
-		local how = self:GetAttribute("type") == "target" and ("unit " .. tostring(self:GetAttribute("unit")))
-			or self:GetAttribute("macrotext")
-		nameLink.clicked = { at = GetTime(), macro = how }
+		nameLink.clicked = { at = GetTime(), macro = self:GetAttribute("macrotext") }
 		-- (Its time starts again: room to answer them, now you've seen who.)
 		if card and card:IsShown() then
 			-- (From fully faded in: from 0 it'd fade in all over again.)
@@ -801,16 +796,16 @@ function nameLink.Button()
 		self.who = nil
 		self:Hide()
 		if card then
-			card.targetPanel:Hide()
-			card.targetWord:Hide()
+			card.portrait:SetAlpha(1)
+			card.name:SetAlpha(1)
 		end
 	end)
 	button:Hide()
 	nameLink.button = button
 	return button
 end
--- Who the moment's Target button would target (a player's, not your group's
--- or a test's sample), or nil.
+-- Who a click on the moment's face would target (a player's, not your
+-- group's or a test's sample), or nil.
 function nameLink.Wanted(moment)
 	local who = moment and not moment.group and (moment.fullName or moment.name)
 	local guid = moment and moment.guid
@@ -819,7 +814,7 @@ end
 -- Sets it up for the moment on the card, or puts it away.
 function nameLink.Arm(moment)
 	local button = nameLink.button
-	local who = card and card.target and nameLink.Wanted(moment)
+	local who = card and card.targetable and nameLink.Wanted(moment)
 	if who then
 		if InCombatLockdown() then return end
 		button = nameLink.Button()
@@ -830,8 +825,6 @@ function nameLink.Arm(moment)
 		button:Hide()
 	end
 end
--- Over the card's Target button wherever the card is now; hidden while the
--- card's faded most of the way, moved for Edit Mode, or gone.
 -- Aims it at them by name, each way it may be written: on Forever "Thoros
 -- Risenhart" comes as "Thoros" and "Risenhart" (a realm's place), so
 -- "Thoros", "Thoros-Risenhart" and "Thoros Risenhart"; elsewhere "Name-Realm".
@@ -853,35 +846,86 @@ function nameLink.Aim(button)
 	local macro = table.concat(lines, "\n")
 	if button:GetAttribute("macrotext") ~= macro then button:SetAttribute("macrotext", macro) end
 end
+-- Where a click targets them from (card.spot, an empty texture): their face,
+-- or on a card without one their name, its words only (not the whole width
+-- the name may have). Its glow round it: circles round a face, ovals round a
+-- name. Set after the card's laid out.
+function nameLink.Fit(face)
+	local spot = card.spot
+	spot:ClearAllPoints()
+	if face then
+		spot:SetPoint("CENTER", card.portrait, "CENTER")
+		local size = card.portrait:GetWidth()
+		spot:SetSize(size, size)
+		card.spotOf = card.portrait
+	else
+		local w, h = card.name:GetStringWidth(), card.name:GetStringHeight()
+		local justify = card.name:GetJustifyH()
+		if justify == "LEFT" then
+			spot:SetPoint("CENTER", card.name, "LEFT", w / 2, 0)
+		elseif justify == "RIGHT" then
+			spot:SetPoint("CENTER", card.name, "RIGHT", -w / 2, 0)
+		else
+			spot:SetPoint("CENTER", card.name, "CENTER")
+		end
+		spot:SetSize(w + 8, h + 4)
+		card.spotOf = card.name
+	end
+	local w, h = spot:GetSize()
+	for i, circle in ipairs(card.glow) do
+		local out = GLOW_STEPS[i][1]
+		-- (Round a name: flat, in its own row, and faint; as strong as the
+		-- face's it stacked into a solid lump over the heading.)
+		if face then circle:SetSize(w + out * 2, h + out * 2) else circle:SetSize(w + out * 3, h + out * 0.5) end
+	end
+	card.glowStrength = face and 0.5 or 0.4
+end
+-- Over the spot wherever the card is now; hidden while the card's faded most
+-- of the way, moved for Edit Mode, or gone.
+-- The spot's glow: breathing while a click on it would target them (out of
+-- fights, not yet your target), else off.
+local GLOW_BREATH = 1.6 -- seconds a breath
+function nameLink.Glow()
+	local glow = card and card.glow
+	if not glow then return end
+	local button = nameLink.button
+	local on = button and button.who and card.spotOf and card.spotOf:IsShown() and not InCombatLockdown()
+		and Plain(UnitGUID("target")) ~= button.guid
+	local breath = on and 0.4 + 0.6 * (0.5 + 0.5 * math.sin(GetTime() * 2 * math.pi / GLOW_BREATH))
+	for i, circle in ipairs(glow) do
+		if not on then
+			if circle:IsShown() then circle:Hide() end
+		else
+			if not circle:IsShown() then circle:Show() end
+			circle:SetAlpha(GLOW_STEPS[i][2] * breath * (card.glowStrength or 1))
+		end
+	end
+end
 function nameLink.Place()
+	nameLink.Glow()
 	local button = nameLink.button
 	if not button or InCombatLockdown() then return end
-	local shown = card and card.target
-	-- (Already your target: no Target button, back if you target someone else.)
-	if shown and button.guid then
-		local targeted = Plain(UnitGUID("target")) == button.guid
-		if targeted == shown:IsShown() then shown:SetShown(not targeted) end
-	end
+	local face = card and card.spot
 	local x, y
-	if shown then x, y = shown:GetCenter() end
-	if not (button.who and x and shown:IsVisible() and card:GetAlpha() > 0.3 and not moving)
+	if face and card.spotOf and card.spotOf:IsShown() then x, y = face:GetCenter() end
+	if not (button.who and x and card.spotOf:IsVisible() and card:GetAlpha() > 0.3 and not moving)
 		or UnitAffectingCombat("player") then
 		button:Hide()
 		return
 	end
 	local ui = UIParent:GetEffectiveScale()
-	local k = shown:GetEffectiveScale() / ui
+	local k = face:GetEffectiveScale() / ui
 	button:SetScale(ui)
 	button:ClearAllPoints()
 	button:SetPoint("CENTER", UIParent, "BOTTOMLEFT", x * k, y * k)
-	button:SetSize(shown:GetWidth() * k, shown:GetHeight() * k)
+	button:SetSize(face:GetWidth() * k, face:GetHeight() * k)
 	if not button:IsShown() then button:Show() end
 end
--- (For the debug commands: the Target button's state, and its last click.)
+-- (For the debug commands: the face's click button's state, and its last click.)
 function nameLink.Report(prefix)
-	local button, shown = nameLink.button, card and card.target
+	local button, shown = nameLink.button, card and card.portrait
 	if not button then
-		ns.Print(prefix .. "Target button: not made yet (no card with a Target button since login)")
+		ns.Print(prefix .. "Face click: not made yet (no card you could target from since login)")
 		return
 	end
 	local x, y = button:GetCenter()
@@ -890,11 +934,9 @@ function nameLink.Report(prefix)
 	local foci = GetMouseFoci and GetMouseFoci() or { GetMouseFocus and GetMouseFocus() }
 	local focus = foci and foci[1]
 	local clicked = nameLink.clicked
-	local how = button:GetAttribute("type") == "target" and ("unit " .. tostring(button:GetAttribute("unit")))
-		or button:GetAttribute("macrotext")
-	ns.Print(("%sTarget button: shown %s, who %s, aims at %q, at %s,%s size %dx%d, strata %s level %d; "
-		.. "its look shown %s at %s,%s; key down %s; mouse on %s; last click %s"):format(prefix,
-		tostring(button:IsShown()), tostring(button.who), tostring(how),
+	ns.Print(("%sFace click: shown %s, who %s, aims at %q, at %s,%s size %dx%d, strata %s level %d; "
+		.. "face shown %s at %s,%s; key down %s; mouse on %s; last click %s"):format(prefix,
+		tostring(button:IsShown()), tostring(button.who), tostring(button:GetAttribute("macrotext")),
 		tostring(x and math.floor(x)), tostring(y and math.floor(y)), button:GetWidth(), button:GetHeight(),
 		button:GetFrameStrata(), button:GetFrameLevel(), tostring(shown and shown:IsVisible()),
 		tostring(tx and math.floor(tx)), tostring(ty and math.floor(ty)), tostring(GetCVarBool("ActionButtonUseKeyDown")),
@@ -972,6 +1014,20 @@ local function Create()
 	card.ring:SetSize(44, 44)
 	card.ring:SetPoint("CENTER", card.portrait, "CENTER")
 	card.ring:SetColorTexture(1, 1, 1, 1)
+	-- (A soft glow round the ring, in its color, breathing while a click on the
+	-- face would target them: see nameLink.Place.)
+	-- Round: circles a little bigger each and fainter, added together (the
+	-- game's action-button glow is square round a round face).
+	card.spot = front:CreateTexture(nil, "BACKGROUND") -- (no picture: just a place, see nameLink.Fit)
+	card.glow = {}
+	for i = 1, #GLOW_STEPS do
+		local circle = front:CreateTexture(nil, "BACKGROUND")
+		circle:SetPoint("CENTER", card.spot, "CENTER")
+		circle:SetTexture("Interface\\CharacterFrame\\TempPortraitAlphaMask")
+		circle:SetBlendMode("ADD")
+		circle:Hide()
+		card.glow[i] = circle
+	end
 	-- (All round: mask textures, not SetMask, which forbids the icons' tex coords.)
 	if card.CreateMaskTexture then
 		for _, texture in ipairs({ card.portrait, card.ring, card.disc, card.discEdge }) do
@@ -999,16 +1055,6 @@ local function Create()
 		button:SetScript("OnClick", function(self) Answer(self.token) end)
 		card.buttons[i] = button
 		card.words[i] = WordButton()
-	end
-	-- (The Target button's look, in both kinds: nameLink's secure button over
-	-- it takes the clicks, so these take no mouse themselves.)
-	card.targetPanel = ns.PanelButton(front)
-	card.targetPanel:SetSize(BUTTON_W, BUTTON_H)
-	card.targetWord = WordButton()
-	for _, each in ipairs({ card.targetPanel, card.targetWord }) do
-		each:SetScript("OnClick", nil)
-		each:EnableMouse(false)
-		each:Hide()
 	end
 
 	card.bar = front:CreateTexture(nil, "ARTWORK")
@@ -1242,6 +1288,7 @@ local function Show(moment)
 	Color(card.line, style.line or GOLD)
 	local ring = style.ring or (class and { class.r, class.g, class.b }) or GOLD
 	card.ring:SetVertexColor(ring[1], ring[2], ring[3], 1)
+	for _, circle in ipairs(card.glow) do circle:SetVertexColor(ring[1], ring[2], ring[3]) end
 	card.heading:SetShown(style.heading == true)
 	if style.heading then
 		card.heading:SetText(L[HEADINGS[moment.kind] or "A KINDNESS"])
@@ -1253,28 +1300,18 @@ local function Show(moment)
 	card.portrait:SetSize(faceSize, faceSize)
 	card.ring:SetSize(faceSize + 4, faceSize + 4)
 	card.portrait:SetShown(face)
+	-- (In case they were left dimmed by a hover.)
+	card.portrait:SetAlpha(1)
+	card.name:SetAlpha(1)
 	card.ring:SetShown(face)
 	if face then Face(moment) end
 	card.close:SetShown(style.close == true)
 	local buttons = EmoteButtons(style, emotes, look)
 	local width = style.width
 	local height
-	-- (Their Target button, at the top: only out of fights, as its secure
-	-- button can only be set up then. As wide as its word.)
-	local target
-	card.targetPanel:Hide()
-	card.targetWord:Hide()
-	if nameLink.Wanted(moment) and not InCombatLockdown() then
-		target = StyleButton(style, look, card.targetPanel, card.targetWord, L["Target"])
-		if target == card.targetPanel then
-			target.width = math.max(56, math.ceil(target:GetFontString():GetStringWidth()) + 22)
-			target:SetWidth(target.width)
-		end
-		target:ClearAllPoints()
-	end
-	card.target = target
-	local targetRoom = target and target.width + 8 or 0
-	local targetRight = style.close and -26 or -10
+	-- (A click on their face targets them: only set up out of fights, as its
+	-- secure button can only be then.)
+	card.targetable = nameLink.Wanted(moment) and not InCombatLockdown()
 	for _, text in ipairs({ card.name, card.line, card.heading }) do text:ClearAllPoints() end
 	card.portrait:ClearAllPoints()
 	card.bar:ClearAllPoints()
@@ -1290,8 +1327,7 @@ local function Show(moment)
 		card.name:SetJustifyH("LEFT")
 		card.line:SetJustifyH("LEFT")
 		card.name:SetPoint("TOPLEFT", card, "TOPLEFT", left, -12)
-		card.name:SetPoint("RIGHT", card, "RIGHT", target and targetRight - targetRoom or -24, 0)
-		if target then target:SetPoint("TOPRIGHT", card, "TOPRIGHT", targetRight, -8) end
+		card.name:SetPoint("RIGHT", card, "RIGHT", -24, 0)
 		card.line:SetPoint("TOPLEFT", card.name, "BOTTOMLEFT", 0, -3)
 		card.line:SetPoint("RIGHT", card, "RIGHT", -12, 0)
 		local top = 14 + card.name:GetStringHeight() + 3 + card.line:GetStringHeight()
@@ -1333,8 +1369,7 @@ local function Show(moment)
 		card.name:SetJustifyH("CENTER")
 		card.line:SetJustifyH("CENTER")
 		card.name:SetPoint("TOP", card, "TOP", 0, -top)
-		card.name:SetWidth(width - 40 - targetRoom * 2)
-		if target then target:SetPoint("TOPRIGHT", card, "TOPRIGHT", targetRight, -6) end
+		card.name:SetWidth(width - 40)
 		top = top + card.name:GetStringHeight() + 3
 		card.line:SetPoint("TOP", card, "TOP", 0, -top)
 		card.line:SetWidth(width - 24)
@@ -1383,16 +1418,11 @@ local function Show(moment)
 		card.line:SetWidth(width + 60)
 		card.line:SetPoint("TOP", card.name, "BOTTOM", 0, -2)
 		height = width + 8 + card.name:GetStringHeight() + card.line:GetStringHeight()
-		-- (Its Target button under the line.)
-		if target then
-			target:SetPoint("TOP", card.line, "BOTTOM", 0, -4)
-			height = height + 4 + target:GetHeight()
-		end
 	end
 	-- (Whole pixels: the bubble's and the letter's tiled edges went crooked, seams
 	-- showing, on a size from the words' heights.)
 	card:SetSize(math.floor(width + 0.5), math.floor(height + 0.5))
-	if target then target:Show() end
+	nameLink.Fit(face)
 	nameLink.Arm(moment)
 	card.age, card.leaving = 0, nil
 	card.UpdateCover()
@@ -1532,6 +1562,16 @@ local function FireFor(kind, name, guid, line, extra)
 	-- (Emotes only reach those near you: someone far away is no moment.)
 	if MOMENT[kind] and MOMENT[kind].near and not Near(unit) then return end
 	guid = guid or (unit and Plain(UnitGUID(unit)))
+	-- (The second part of their name, when it came without it: on Forever (one
+	-- big realm) players have a first and last name, and UnitName gives the
+	-- last one where a realm would be; elsewhere it's another realm's. A
+	-- guildie seen on a plate came as just "Xiao", and the Target button's
+	-- /targetexact found no one. The button tries "Xiao Last" from this.)
+	if unit and type(name) == "string" and not name:find("-", 1, true) then
+		local _, realm = UnitName(unit)
+		realm = Plain(realm)
+		if type(realm) == "string" and realm ~= "" then name = name .. "-" .. realm:gsub(" ", "") end
+	end
 	local moment = extra or {}
 	moment.kind, moment.name, moment.unit, moment.guid = kind, Short(name), unit, guid
 	moment.fullName = name -- (with its realm, if from another: who the emote goes to)
@@ -2110,6 +2150,10 @@ function ns.TestEmoteVision()
 	if name then
 		local guid = Plain(UnitGUID("target"))
 		moment.name, moment.unit, moment.guid, moment.test, moment.tried = name, "target", guid, nil, true
+		-- (With their last name, as a real card has it: see FireFor.)
+		local _, last = UnitName("target")
+		last = Plain(last)
+		if type(last) == "string" and last ~= "" then moment.fullName = name .. "-" .. last:gsub(" ", "") end
 		moment.class = guid and guid:find("^Player%-") and ClassOf(guid, "target") or nil
 	end
 	if not Show(moment) then

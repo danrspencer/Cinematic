@@ -10272,6 +10272,10 @@ function ns.FadeWithRow(rowKey, group, names, own, hook)
 		if row and row.frames then
 			AddName(row.frames, name)
 		end
+		-- (Its Hover Groups row too: that list was made before this addon loaded.)
+		if row and not row.noHoverRow and row.key ~= "gamepadxp" then
+			HOVER_ROW_BY_NAME[name] = HOVER_ROW_BY_NAME[name] or rowKey
+		end
 		ownAlphaNames[name] = own or nil
 		hookedNames[name] = hook or nil
 		LetGo(name)

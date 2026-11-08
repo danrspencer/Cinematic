@@ -18,29 +18,36 @@ ns.isClassicEra = not ns.isRetail and GetBuildInfo ~= nil and (select(4, GetBuil
 BINDING_HEADER_CINEMATIC = "Cinematic"
 -- (Set again once the language is known: see Locales.lua.)
 local function SetBindingNames()
-	BINDING_NAME_CINEMATIC_TOGGLE = "Cinematic: " .. L["Toggle CineMode"]
-	BINDING_NAME_CINEMATIC_HIDEUI = "Cinematic: " .. L["Hide the UI (keep the look)"]
-	BINDING_NAME_CINEMATIC_SCREENSHOT = "Cinematic: " .. L["Take a CineShot"]
-	BINDING_NAME_CINEMATIC_TOGGLEEFFECTS = "Cinematic: " .. L["Toggle visual effects"]
-	BINDING_NAME_CINEMATIC_TOGGLELETTERBOX = "Cinematic: " .. L["Toggle letterbox bars"]
-	BINDING_NAME_CINEMATIC_CAMWHEEL = "Cinematic: " .. L["Camera wheel (hold)"]
-	BINDING_NAME_CINEMATIC_CAM_IDLE = "Cinematic: " .. L["Start the AFK camera"]
-	BINDING_NAME_CINEMATIC_CAM_COZY = "Cinematic: " .. L["Start the cozy camera"]
-	BINDING_NAME_CINEMATIC_CAM_VISTA = "Cinematic: " .. L["Start the vista camera"]
-	BINDING_NAME_CINEMATIC_CAM_FISH = "Cinematic: " .. L["Start the fish camera"]
-	BINDING_NAME_CINEMATIC_CAM_TELE = "Cinematic: " .. L["Start the tele camera"]
-	BINDING_NAME_CINEMATIC_CAM_WALK = "Cinematic: " .. L["Start the RP walk camera"]
-	BINDING_NAME_CINEMATIC_CAM_RUN = "Cinematic: " .. L["Start the auto-run camera"]
-	BINDING_NAME_CINEMATIC_CAM_DEATH = "Cinematic: " .. L["Test the death camera"]
-	BINDING_NAME_CINEMATIC_STOPCAM = "Cinematic: " .. L["Stop the camera"]
+	-- (Our group's sub-headings: Bindings.xml's header="...".)
+	BINDING_HEADER_CINEMATIC_GENERAL = L["General"]
+	BINDING_HEADER_CINEMATIC_CAMERAS = L["Cameras"]
+	BINDING_HEADER_CINEMATIC_VISIONS = L["Visions"]
+	BINDING_HEADER_CINEMATIC_WHEELS = L["Wheels"]
+	BINDING_HEADER_CINEMATIC_QUESTCHAT = L["Quests and chat"]
+	BINDING_NAME_CINEMATIC_TOGGLE = L["Toggle CineMode"]
+	BINDING_NAME_CINEMATIC_HIDEUI = L["Hide the UI (keep the look)"]
+	BINDING_NAME_CINEMATIC_SCREENSHOT = L["Take a CineShot"]
+	BINDING_NAME_CINEMATIC_TOGGLEEFFECTS = L["Toggle visual effects"]
+	BINDING_NAME_CINEMATIC_TOGGLELETTERBOX = L["Toggle letterbox bars"]
+	BINDING_NAME_CINEMATIC_CAMWHEEL = L["Camera wheel (hold)"]
+	BINDING_NAME_CINEMATIC_CAM_IDLE = L["Start the AFK camera"]
+	BINDING_NAME_CINEMATIC_CAM_COZY = L["Start the cozy camera"]
+	BINDING_NAME_CINEMATIC_CAM_VISTA = L["Start the vista camera"]
+	BINDING_NAME_CINEMATIC_CAM_FISH = L["Start the fish camera"]
+	BINDING_NAME_CINEMATIC_CAM_TELE = L["Start the tele camera"]
+	BINDING_NAME_CINEMATIC_CAM_WALK = L["Start the RP walk camera"]
+	BINDING_NAME_CINEMATIC_CAM_RUN = L["Start the auto-run camera"]
+	BINDING_NAME_CINEMATIC_CAM_DEATH = L["Test the death camera"]
+	BINDING_NAME_CINEMATIC_STOPCAM = L["Stop the camera"]
 	for n = 1, 5 do
-		_G["BINDING_NAME_CINEMATIC_CUSTOMTRIGGER" .. n] = "Cinematic: " .. (L["Scene key %d"]):format(n)
+		_G["BINDING_NAME_CINEMATIC_CUSTOMTRIGGER" .. n] = (L["Scene key %d"]):format(n)
 	end
-	BINDING_NAME_CINEMATIC_SHOWTOOLTIPS = "Cinematic: " .. L["Show hidden tooltips (hold)"]
-	BINDING_NAME_CINEMATIC_TOGGLETOOLTIPS = "Cinematic: " .. L["Toggle tooltip hiding"]
-	BINDING_NAME_CINEMATIC_RELOAD = "Cinematic: " .. L["Reload the UI"]
-	BINDING_NAME_CINEMATIC_TOGGLESETTINGS = "Cinematic: " .. L["Toggle settings"]
-	BINDING_NAME_CINEMATIC_KEYMAP = "Cinematic: " .. L["Keyboard map (hold, or tap to keep it up)"]
+	BINDING_NAME_CINEMATIC_SHOWTOOLTIPS = L["Show hidden tooltips (hold)"]
+	BINDING_NAME_CINEMATIC_TOGGLETOOLTIPS = L["Toggle tooltip hiding"]
+	BINDING_NAME_CINEMATIC_HIDECURSOR = L["Hide Cursor till moves"]
+	BINDING_NAME_CINEMATIC_RELOAD = L["Reload the UI"]
+	BINDING_NAME_CINEMATIC_TOGGLESETTINGS = L["Toggle settings"]
+	BINDING_NAME_CINEMATIC_KEYMAP = L["Keyboard map (hold, or tap to keep it up)"]
 end
 SetBindingNames()
 ns.OnLanguage(SetBindingNames)
@@ -1092,6 +1099,7 @@ DEFAULTS.questTalkFade = true -- ours stay away while another addon has the conv
 DEFAULTS.questTalkStill = true -- Over the head: the quest camera holds still (no drift) while it's up
 DEFAULTS.questTalkCamMove = "follow" -- Over the head, while the camera moves: "follow", "fade", "dim" or "wait" (see QuestTalk)
 DEFAULTS.questTalkKeys = true         -- 1-0 pick, Space turns the page / first button
+DEFAULTS.questTalkPadGame = true      -- gamepad mode: the game's own windows (they work with the controller), not ours
 DEFAULTS.questTalkScale = 1
 DEFAULTS.questTalkTopGap = 0.03       -- the bubble kept this share of the screen down from its top (and the bar)
 DEFAULTS.questTalkLines = 7          -- the bubble's height, in lines of its words
@@ -1806,11 +1814,21 @@ local REVEAL_WHILE_SHOWN = {
 	"TalentFrame", "PlayerTalentFrame", "SettingsPanel",
 	"KeyBindingFrame", "InterfaceOptionsFrame", "EditModeManagerFrame",
 }
+-- More game windows that bring the UI back with them (the same switch,
+-- stayWithWindows), but don't pause the cameras the way the ones above do
+-- (through MENU_WINDOWS): bags, professions, the map, the journals...
+-- Names a client doesn't have are skipped.
+local REVEAL_ALSO = {
+	"ContainerFrameCombinedBags", "WorldMapFrame", "QuestLogFrame", "ProfessionsFrame", "TradeSkillFrame",
+	"CraftFrame", "FriendsFrame", "PVEFrame", "CollectionsJournal", "EncounterJournal", "AchievementFrame",
+	"CommunitiesFrame", "GuildFrame", "InspectFrame", "AddonList", "ChatConfigFrame", "VideoOptionsFrame",
+}
+for i = 1, 13 do REVEAL_ALSO[#REVEAL_ALSO + 1] = "ContainerFrame" .. i end
 -- Windows opened by talking to an NPC; these only reveal the UI if the player
 -- chooses (revealAtNPCs). The windows themselves aren't faded either way.
 local REVEAL_AT_NPCS = {
 	"MerchantFrame", "TradeFrame", "AuctionFrame", "AuctionHouseFrame", "BankFrame",
-	"MailFrame", "ClassTrainerFrame",
+	"MailFrame", "ClassTrainerFrame", "GossipFrame", "QuestFrame",
 }
 
 local lastBusy = 0
@@ -1855,12 +1873,12 @@ ns.OncePerFrame = OncePerFrame
 -- Talking to an NPC: their windows, plus quest givers, gossip and the flight
 -- map. The camera modes wait while one is open.
 local NPC_WINDOWS = {
-	"GossipFrame", "QuestFrame", "TaxiFrame", "ItemTextFrame",
+	"TaxiFrame", "ItemTextFrame", -- (and gossip and quest givers: in REVEAL_AT_NPCS)
 }
 for _, name in ipairs(REVEAL_AT_NPCS) do NPC_WINDOWS[#NPC_WINDOWS + 1] = name end
 -- Windows /cine add must never fade (see Frames.lua).
 ns.WINDOWS = {}
-for _, list in ipairs({ REVEAL_WHILE_SHOWN, NPC_WINDOWS }) do
+for _, list in ipairs({ REVEAL_WHILE_SHOWN, REVEAL_ALSO, NPC_WINDOWS }) do
 	for _, name in ipairs(list) do ns.WINDOWS[name] = true end
 end
 function ns.NPCWindowOpen()
@@ -1901,7 +1919,7 @@ function ns.WindowPausesCams()
 end
 
 local function AnyRevealFrameShown()
-	return (not ns.db.stayWithWindows and AnyShown(REVEAL_WHILE_SHOWN))
+	return (not ns.db.stayWithWindows and (AnyShown(REVEAL_WHILE_SHOWN) or AnyShown(REVEAL_ALSO)))
 		or (ns.db.revealAtNPCs and AnyShown(REVEAL_AT_NPCS))
 end
 

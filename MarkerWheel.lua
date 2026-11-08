@@ -432,8 +432,8 @@ local function MakeWheel(spec)
 	-- (Its name in the game's key bindings: spec.BindingName() if it has one,
 	-- for a wheel of the player's own. wheel.RefreshBindingName() sets it again.)
 	function wheel.RefreshBindingName()
-		_G["BINDING_NAME_CLICK " .. keyName .. ":LeftButton"] = "Cinematic: "
-			.. (spec.BindingName and spec.BindingName() or L[spec.binding])
+		_G["BINDING_NAME_CLICK " .. keyName .. ":LeftButton"] =
+			spec.BindingName and spec.BindingName() or L[spec.binding]
 	end
 	wheel.RefreshBindingName()
 	ns.OnLanguage(wheel.RefreshBindingName)
@@ -861,15 +861,15 @@ function Cinematic_ToggleVision(key)
 end
 
 local function SetVisionBindingNames()
-	BINDING_NAME_CINEMATIC_VISION_HEAL = "Cinematic: " .. L["Toggle Heal Vision"]
-	BINDING_NAME_CINEMATIC_VISION_QUEST = "Cinematic: " .. L["Toggle Quest Vision"]
-	BINDING_NAME_CINEMATIC_VISION_DUEL = "Cinematic: " .. L["Toggle Duel Vision"]
-	BINDING_NAME_CINEMATIC_VISION_ROLL = "Cinematic: " .. L["Toggle Roll Vision"]
-	BINDING_NAME_CINEMATIC_VISION_VITALS = "Cinematic: " .. L["Toggle Vitals Vision"]
-	BINDING_NAME_CINEMATIC_VISION_DAMAGE = "Cinematic: " .. L["Toggle Damage Vision"]
-	BINDING_NAME_CINEMATIC_VISION_TELE = "Cinematic: " .. L["Toggle Tele Vision"]
-	BINDING_NAME_CINEMATIC_VISION_EMOTE = "Cinematic: " .. L["Toggle Emote Vision"]
-	BINDING_NAME_CINEMATIC_VISION_CARD = "Cinematic: " .. L["Toggle Card Vision"]
+	BINDING_NAME_CINEMATIC_VISION_HEAL = L["Toggle Heal Vision"]
+	BINDING_NAME_CINEMATIC_VISION_QUEST = L["Toggle Quest Vision"]
+	BINDING_NAME_CINEMATIC_VISION_DUEL = L["Toggle Duel Vision"]
+	BINDING_NAME_CINEMATIC_VISION_ROLL = L["Toggle Roll Vision"]
+	BINDING_NAME_CINEMATIC_VISION_VITALS = L["Toggle Vitals Vision"]
+	BINDING_NAME_CINEMATIC_VISION_DAMAGE = L["Toggle Damage Vision"]
+	BINDING_NAME_CINEMATIC_VISION_TELE = L["Toggle Tele Vision"]
+	BINDING_NAME_CINEMATIC_VISION_EMOTE = L["Toggle Emote Vision"]
+	BINDING_NAME_CINEMATIC_VISION_CARD = L["Toggle Card Vision"]
 end
 SetVisionBindingNames()
 ns.OnLanguage(SetVisionBindingNames)

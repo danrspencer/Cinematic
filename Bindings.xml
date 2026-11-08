@@ -1,134 +1,137 @@
 <Bindings>
-	<Binding name="CINEMATIC_TOGGLE" header="CINEMATIC" category="ADDONS">
+	<Binding name="CINEMATIC_TOGGLE" header="CINEMATIC_GENERAL" category="Cinematic">
 		Cinematic_ToggleCineMode()
 	</Binding>
-	<Binding name="CINEMATIC_HIDEUI" category="ADDONS">
+	<Binding name="CINEMATIC_HIDEUI" category="Cinematic">
 		Cinematic_ToggleUI()
 	</Binding>
-	<Binding name="CINEMATIC_SCREENSHOT" category="ADDONS">
+	<Binding name="CINEMATIC_SCREENSHOT" category="Cinematic">
 		Cinematic_TakeScreenshot()
 	</Binding>
-	<Binding name="CINEMATIC_TOGGLEEFFECTS" category="ADDONS">
+	<Binding name="CINEMATIC_TOGGLEEFFECTS" category="Cinematic">
 		Cinematic_ToggleVisualEffects()
 	</Binding>
-	<Binding name="CINEMATIC_TOGGLELETTERBOX" category="ADDONS">
+	<Binding name="CINEMATIC_TOGGLELETTERBOX" category="Cinematic">
 		Cinematic_ToggleLetterbox()
 	</Binding>
-	<Binding name="CINEMATIC_RELOAD" category="ADDONS">
-		Cinematic_Reload()
+	<Binding name="CINEMATIC_HIDECURSOR" category="Cinematic">
+		Cinematic_HideCursor()
 	</Binding>
-	<Binding name="CINEMATIC_TOGGLESETTINGS" category="ADDONS">
-		Cinematic_ToggleSettings()
-	</Binding>
-	<Binding name="CINEMATIC_KEYMAP" category="ADDONS" runOnUp="true">
-		Cinematic_KeyboardMap(keystate)
-	</Binding>
-	<Binding name="CLICK CinematicMasterWheelButton:LeftButton" category="ADDONS">
-	</Binding>
-	<Binding name="CINEMATIC_CAMWHEEL" category="ADDONS" runOnUp="true">
-		Cinematic_CameraWheel(keystate)
-	</Binding>
-	<Binding name="CLICK CinematicMenuWheelButton:LeftButton" category="ADDONS">
-	</Binding>
-	<Binding name="CLICK CinematicMarkerWheelButton:LeftButton" category="ADDONS">
-	</Binding>
-	<Binding name="CLICK CinematicWorldMarkerWheelButton:LeftButton" category="ADDONS">
-	</Binding>
-	<Binding name="CLICK CinematicVisionWheelButton:LeftButton" category="ADDONS">
-	</Binding>
-	<Binding name="CLICK CinematicCustomWheel1Button:LeftButton" category="ADDONS">
-	</Binding>
-	<Binding name="CLICK CinematicCustomWheel2Button:LeftButton" category="ADDONS">
-	</Binding>
-	<Binding name="CLICK CinematicCustomWheel3Button:LeftButton" category="ADDONS">
-	</Binding>
-	<Binding name="CLICK CinematicCustomWheel4Button:LeftButton" category="ADDONS">
-	</Binding>
-	<Binding name="CLICK CinematicCustomWheel5Button:LeftButton" category="ADDONS">
-	</Binding>
-	<Binding name="CLICK CinematicCustomWheel6Button:LeftButton" category="ADDONS">
-	</Binding>
-	<Binding name="CLICK CinematicCustomWheel7Button:LeftButton" category="ADDONS">
-	</Binding>
-	<Binding name="CLICK CinematicCustomWheel8Button:LeftButton" category="ADDONS">
-	</Binding>
-	<Binding name="CINEMATIC_VISION_HEAL" category="ADDONS">
-		Cinematic_ToggleVision("heal")
-	</Binding>
-	<Binding name="CINEMATIC_VISION_QUEST" category="ADDONS">
-		Cinematic_ToggleVision("quest")
-	</Binding>
-	<Binding name="CLICK CinematicQuestItemButton:LeftButton" category="ADDONS">
-	</Binding>
-	<Binding name="CINEMATIC_VISION_DUEL" category="ADDONS">
-		Cinematic_ToggleVision("duel")
-	</Binding>
-	<Binding name="CINEMATIC_VISION_ROLL" category="ADDONS">
-		Cinematic_ToggleVision("roll")
-	</Binding>
-	<Binding name="CINEMATIC_VISION_VITALS" category="ADDONS">
-		Cinematic_ToggleVision("vitals")
-	</Binding>
-	<Binding name="CINEMATIC_VISION_DAMAGE" category="ADDONS">
-		Cinematic_ToggleVision("damage")
-	</Binding>
-	<Binding name="CINEMATIC_VISION_TELE" category="ADDONS">
-		Cinematic_ToggleVision("tele")
-	</Binding>
-	<Binding name="CINEMATIC_VISION_EMOTE" category="ADDONS">
-		Cinematic_ToggleVision("emote")
-	</Binding>
-	<Binding name="CINEMATIC_VISION_CARD" category="ADDONS">
-		Cinematic_ToggleVision("card")
-	</Binding>
-	<Binding name="CINEMATIC_CAM_IDLE" category="ADDONS">
-		Cinematic_StartCam("idle")
-	</Binding>
-	<Binding name="CINEMATIC_CAM_COZY" category="ADDONS">
-		Cinematic_StartCam("cozy")
-	</Binding>
-	<Binding name="CINEMATIC_CAM_VISTA" category="ADDONS">
-		Cinematic_StartCam("vista")
-	</Binding>
-	<Binding name="CINEMATIC_CAM_FISH" category="ADDONS">
-		Cinematic_StartCam("fish")
-	</Binding>
-	<Binding name="CINEMATIC_CAM_TELE" category="ADDONS">
-		Cinematic_StartCam("tele")
-	</Binding>
-	<Binding name="CINEMATIC_CAM_WALK" category="ADDONS">
-		Cinematic_StartCam("walk")
-	</Binding>
-	<Binding name="CINEMATIC_CAM_RUN" category="ADDONS">
-		Cinematic_StartCam("run")
-	</Binding>
-	<Binding name="CINEMATIC_CAM_DEATH" category="ADDONS">
-		Cinematic_StartCam("death")
-	</Binding>
-	<Binding name="CINEMATIC_STOPCAM" category="ADDONS">
-		Cinematic_StopCamera()
-	</Binding>
-	<Binding name="CINEMATIC_CUSTOMTRIGGER1" category="ADDONS">
-		Cinematic_CustomTrigger(1)
-	</Binding>
-	<Binding name="CINEMATIC_CUSTOMTRIGGER2" category="ADDONS">
-		Cinematic_CustomTrigger(2)
-	</Binding>
-	<Binding name="CINEMATIC_CUSTOMTRIGGER3" category="ADDONS">
-		Cinematic_CustomTrigger(3)
-	</Binding>
-	<Binding name="CINEMATIC_CUSTOMTRIGGER4" category="ADDONS">
-		Cinematic_CustomTrigger(4)
-	</Binding>
-	<Binding name="CINEMATIC_CUSTOMTRIGGER5" category="ADDONS">
-		Cinematic_CustomTrigger(5)
-	</Binding>
-	<Binding name="CINEMATIC_SHOWTOOLTIPS" category="ADDONS" runOnUp="true">
+	<Binding name="CINEMATIC_SHOWTOOLTIPS" category="Cinematic" runOnUp="true">
 		Cinematic_ShowTooltips(keystate)
 	</Binding>
-	<Binding name="CINEMATIC_TOGGLETOOLTIPS" category="ADDONS">
+	<Binding name="CINEMATIC_TOGGLETOOLTIPS" category="Cinematic">
 		Cinematic_ToggleTooltips()
 	</Binding>
-	<Binding name="CLICK CinematicChatTargetButton:LeftButton" category="ADDONS">
+	<Binding name="CINEMATIC_TOGGLESETTINGS" category="Cinematic">
+		Cinematic_ToggleSettings()
+	</Binding>
+	<Binding name="CINEMATIC_KEYMAP" category="Cinematic" runOnUp="true">
+		Cinematic_KeyboardMap(keystate)
+	</Binding>
+	<Binding name="CINEMATIC_RELOAD" category="Cinematic">
+		Cinematic_Reload()
+	</Binding>
+	<Binding name="CINEMATIC_CAM_IDLE" header="CINEMATIC_CAMERAS" category="Cinematic">
+		Cinematic_StartCam("idle")
+	</Binding>
+	<Binding name="CINEMATIC_CAM_COZY" category="Cinematic">
+		Cinematic_StartCam("cozy")
+	</Binding>
+	<Binding name="CINEMATIC_CAM_VISTA" category="Cinematic">
+		Cinematic_StartCam("vista")
+	</Binding>
+	<Binding name="CINEMATIC_CAM_FISH" category="Cinematic">
+		Cinematic_StartCam("fish")
+	</Binding>
+	<Binding name="CINEMATIC_CAM_TELE" category="Cinematic">
+		Cinematic_StartCam("tele")
+	</Binding>
+	<Binding name="CINEMATIC_CAM_WALK" category="Cinematic">
+		Cinematic_StartCam("walk")
+	</Binding>
+	<Binding name="CINEMATIC_CAM_RUN" category="Cinematic">
+		Cinematic_StartCam("run")
+	</Binding>
+	<Binding name="CINEMATIC_CAM_DEATH" category="Cinematic">
+		Cinematic_StartCam("death")
+	</Binding>
+	<Binding name="CINEMATIC_STOPCAM" category="Cinematic">
+		Cinematic_StopCamera()
+	</Binding>
+	<Binding name="CINEMATIC_CUSTOMTRIGGER1" category="Cinematic">
+		Cinematic_CustomTrigger(1)
+	</Binding>
+	<Binding name="CINEMATIC_CUSTOMTRIGGER2" category="Cinematic">
+		Cinematic_CustomTrigger(2)
+	</Binding>
+	<Binding name="CINEMATIC_CUSTOMTRIGGER3" category="Cinematic">
+		Cinematic_CustomTrigger(3)
+	</Binding>
+	<Binding name="CINEMATIC_CUSTOMTRIGGER4" category="Cinematic">
+		Cinematic_CustomTrigger(4)
+	</Binding>
+	<Binding name="CINEMATIC_CUSTOMTRIGGER5" category="Cinematic">
+		Cinematic_CustomTrigger(5)
+	</Binding>
+	<Binding name="CINEMATIC_VISION_HEAL" header="CINEMATIC_VISIONS" category="Cinematic">
+		Cinematic_ToggleVision("heal")
+	</Binding>
+	<Binding name="CINEMATIC_VISION_QUEST" category="Cinematic">
+		Cinematic_ToggleVision("quest")
+	</Binding>
+	<Binding name="CINEMATIC_VISION_DUEL" category="Cinematic">
+		Cinematic_ToggleVision("duel")
+	</Binding>
+	<Binding name="CINEMATIC_VISION_ROLL" category="Cinematic">
+		Cinematic_ToggleVision("roll")
+	</Binding>
+	<Binding name="CINEMATIC_VISION_VITALS" category="Cinematic">
+		Cinematic_ToggleVision("vitals")
+	</Binding>
+	<Binding name="CINEMATIC_VISION_DAMAGE" category="Cinematic">
+		Cinematic_ToggleVision("damage")
+	</Binding>
+	<Binding name="CINEMATIC_VISION_TELE" category="Cinematic">
+		Cinematic_ToggleVision("tele")
+	</Binding>
+	<Binding name="CINEMATIC_VISION_EMOTE" category="Cinematic">
+		Cinematic_ToggleVision("emote")
+	</Binding>
+	<Binding name="CINEMATIC_VISION_CARD" category="Cinematic">
+		Cinematic_ToggleVision("card")
+	</Binding>
+	<Binding name="CLICK CinematicMasterWheelButton:LeftButton" header="CINEMATIC_WHEELS" category="Cinematic">
+	</Binding>
+	<Binding name="CINEMATIC_CAMWHEEL" category="Cinematic" runOnUp="true">
+		Cinematic_CameraWheel(keystate)
+	</Binding>
+	<Binding name="CLICK CinematicMenuWheelButton:LeftButton" category="Cinematic">
+	</Binding>
+	<Binding name="CLICK CinematicMarkerWheelButton:LeftButton" category="Cinematic">
+	</Binding>
+	<Binding name="CLICK CinematicWorldMarkerWheelButton:LeftButton" category="Cinematic">
+	</Binding>
+	<Binding name="CLICK CinematicVisionWheelButton:LeftButton" category="Cinematic">
+	</Binding>
+	<Binding name="CLICK CinematicCustomWheel1Button:LeftButton" category="Cinematic">
+	</Binding>
+	<Binding name="CLICK CinematicCustomWheel2Button:LeftButton" category="Cinematic">
+	</Binding>
+	<Binding name="CLICK CinematicCustomWheel3Button:LeftButton" category="Cinematic">
+	</Binding>
+	<Binding name="CLICK CinematicCustomWheel4Button:LeftButton" category="Cinematic">
+	</Binding>
+	<Binding name="CLICK CinematicCustomWheel5Button:LeftButton" category="Cinematic">
+	</Binding>
+	<Binding name="CLICK CinematicCustomWheel6Button:LeftButton" category="Cinematic">
+	</Binding>
+	<Binding name="CLICK CinematicCustomWheel7Button:LeftButton" category="Cinematic">
+	</Binding>
+	<Binding name="CLICK CinematicCustomWheel8Button:LeftButton" category="Cinematic">
+	</Binding>
+	<Binding name="CLICK CinematicQuestItemButton:LeftButton" header="CINEMATIC_QUESTCHAT" category="Cinematic">
+	</Binding>
+	<Binding name="CLICK CinematicChatTargetButton:LeftButton" category="Cinematic">
 	</Binding>
 </Bindings>

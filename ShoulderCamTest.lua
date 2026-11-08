@@ -511,8 +511,10 @@ function ns.ShoulderTest(arg)
 	elseif what == "left" or what == "right" then Set("shoulderCamSide", what)
 	elseif what == "spot" and tonumber(rest) then Set("shoulderCamSpot", tonumber(rest) / 100)
 	elseif what == "strength" and tonumber(rest) then Set("shoulderCamFramesStrength", tonumber(rest) / 100)
+	-- (The Shoulder Cam layout, Layouts.lua: made, or made again from the code, and switched to; offers the reload.)
+	elseif what == "layout" then ns.RegenerateLayout("Shoulder Cam")
 	else
 		ns.Print("shoulder: scan, frames, watch, quiet, sweep offsets|zoom|ease|next|stop, try pitch|head|enemy|interact|off, " ..
-			"on, off, left, right, spot <percent>, strength <percent>")
+			"on, off, left, right, spot <percent>, strength <percent>, layout")
 	end
 end

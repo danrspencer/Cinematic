@@ -20,6 +20,10 @@
 -- through) is up while ours is set, and ours is set again each frame.
 -- Back from gone as the mouse moves, a button's pressed, you type or steer;
 -- yours back as the cursor picks something up or the row stops showing.
+-- The Hide Cursor till moves keybind: gone now, anywhere (CineMode or not, the page
+-- on or not), till the mouse moves, a button's pressed, you type or the key's
+-- pressed again. (The same software-cursor trick as above; only once the
+-- page's warning has been accepted.)
 -- /cine debug cursor: its state. The Cinema profile has it on in cameras
 -- (ProfileModules.lua's cursor-hide).
 local ADDON_NAME, ns = ...
@@ -61,6 +65,7 @@ local shownAt
 local needMove -- (after it came back for something else: not gone again till the mouse has moved)
 local lastBlock, lastShowWhy
 local rowShows, rowReadAt = false, -1
+local manualAt -- (the keybind hid it: when)
 
 local cover
 local function Cover()
@@ -154,6 +159,20 @@ local function Update()
 		cursorX, cursorY, stillSince = x, y, now
 		if now - (shownAt or 0) > LAND then needMove = nil end
 	end
+	if manualAt then
+		-- (the keybind's: only a move, a button, typing or something picked up
+		-- brings it back; a move inside LAND is the cursor landing)
+		local back = (moved and now - manualAt > LAND and "mouse moved") or Busy()
+			or (GetCursorInfo() ~= nil and "cursor holding something") or (not gone and "not gone")
+		if back then
+			manualAt = nil
+			Show(back)
+			ns.ApplyCursorHide()
+		else
+			pcall(SetCursor, BLANK)
+		end
+		return
+	end
 	local method, always = ns.db.cursorHideMethod, TinyAlways()
 	local blocked = Blocked(now)
 	local busy = blocked or Busy()
@@ -194,7 +213,9 @@ function ns.CursorHideAccepted()
 end
 
 local function Apply()
-	if ns.db and ns.db.cursorHide and ns.CursorHideAccepted() then
+	if manualAt then
+		ns.SetOnUpdate(driver, Update) -- (the keybind's till it's back)
+	elseif ns.db and ns.db.cursorHide and ns.CursorHideAccepted() then
 		ns.SetOnUpdate(driver, Update)
 	else
 		Show("turned off")
@@ -203,6 +224,32 @@ local function Apply()
 end
 ns.ApplyCursorHide = Apply
 
+-- The Hide Cursor till moves keybind (Bindings.xml): gone now; pressed again, back.
+function Cinematic_HideCursor()
+	if not ns.db then return end
+	if manualAt then
+		manualAt = nil
+		Show("key pressed again")
+		Apply()
+		return
+	end
+	-- (Experimental, as the page: nothing till its warning's been accepted.)
+	if not ns.CursorHideAccepted() then
+		ns.Print(L["Hide Cursor till moves: accept the warning on the Cursor Hide page first."])
+		-- (its page, out of fights; in one, just the line)
+		if not InCombatLockdown() and ns.OpenOptions then ns.OpenOptions("Cursor Hide") end
+		return
+	end
+	if GetCursorInfo() ~= nil then return end -- (holding something: yours stays)
+	local now = GetTime()
+	Show("key") -- (from tiny, say)
+	cursorX, cursorY = GetCursorPosition()
+	Set(BLANK, now, true)
+	if not gone then return end -- (SetCursor failed)
+	manualAt = now
+	ns.SetOnUpdate(driver, Update)
+end
+
 -- Everything the cursor features change, put back (/cine reset; for anyone
 -- stuck with a hidden or odd cursor): Cursor Hide stopped and its warning
 -- to accept again, the hardware cursor back on, the test commands' Cursor
@@ -210,6 +257,7 @@ ns.ApplyCursorHide = Apply
 local picTester
 function ns.CursorHideReset()
 	if CinematicDB then CinematicDB.cursorHideAccepted = nil end
+	manualAt = nil
 	Show("reset")
 	if driver then ns.SetOnUpdate(driver, nil) end
 	if picTester then ns.SetOnUpdate(picTester, nil) end

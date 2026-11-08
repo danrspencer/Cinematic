@@ -1498,7 +1498,7 @@ end
 -- The name's set as each real line comes, out of fights (a secure button
 -- can't change in one).
 ns.OnLanguage(function()
-	_G["BINDING_NAME_CLICK CinematicChatTargetButton:LeftButton"] = "Cinematic: " .. ns.L["Target the last speaker"]
+	_G["BINDING_NAME_CLICK CinematicChatTargetButton:LeftButton"] = ns.L["Target the last speaker"]
 end)
 local targetButton = CreateFrame("Button", "CinematicChatTargetButton", UIParent, "SecureActionButtonTemplate")
 targetButton:SetAttribute("type", "macro")

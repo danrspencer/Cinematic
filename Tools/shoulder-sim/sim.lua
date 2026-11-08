@@ -10,7 +10,9 @@
 -- "relog" (a session where the game forgets the offset at login), "fight" (the
 -- frames protected in a fight, Shoulder Cam switched off in it), "sweep" (the
 -- test commands against a stand-in chat bubble), "yours" (your saved settings
--- as they are: the third argument).
+-- as they are: the third argument), "hud" (the Shoulder Cam layout, Layouts.lua:
+-- everything hung off the PRD on the screen's bottom, the portraits too, so
+-- protected in fights).
 --
 -- GUESSES, each to be replaced by a measured number (Tools/shoulder-test-plan.md):
 -- GAME.mountScale and GAME.tallScale. Measured (Run 3): the ease, and that the
@@ -123,14 +125,36 @@ local function StandIn(name, x, y, protectedInFights)
 	_G[name] = f
 	return f
 end
-local protected = variant == "fight"
+local protected = variant == "fight" or variant == "hud"
 local bar = StandIn("PlayerCastingBarFrame", 0, 180, protected)
 local prd = StandIn("PersonalResourceDisplayFrame", 0, 240, protected)
 -- chained: Forever's layout (Run 1): the cast bar on the PRD, the PRD on the
 -- cooldowns, which stay put.
 local cooldowns = StandIn("EssentialCooldownViewer", 0, 300, false)
+-- hud: the rest of the Shoulder Cam layout's stack, riding on the PRD.
+local riders = {}
+if variant == "hud" then
+	for _, name in ipairs({ "PlayerFrame", "TargetFrame", "SwingTimerMainHandFrame", "SwingTimerOffHandFrame",
+		"SwingTimerRangedFrame", "UtilityCooldownViewer", "BuffIconCooldownViewer" }) do
+		riders[#riders + 1] = StandIn(name, 0, 0, true)
+	end
+	riders[#riders + 1], riders[#riders + 2] = bar, cooldowns
+end
 local function Layout(x)
-	if variant == "chained" then
+	if variant == "hud" then
+		prd.points = { { "BOTTOM", nil, "BOTTOM", x or 0, 210 } }
+		bar.points = { { "BOTTOM", prd, "TOP", 0, 4 } }
+		cooldowns.points = { { "BOTTOM", bar, "TOP", 0, 6 } }
+		local on = { PlayerFrame = { "RIGHT", prd, "LEFT", -200, 0 }, TargetFrame = { "LEFT", prd, "RIGHT", 200, 0 },
+			SwingTimerMainHandFrame = { "TOP", prd, "BOTTOM", 0, -4 },
+			SwingTimerOffHandFrame = { "TOP", _G.SwingTimerMainHandFrame, "BOTTOM", 0, -4 },
+			SwingTimerRangedFrame = { "TOP", _G.SwingTimerOffHandFrame, "BOTTOM", 0, -4 },
+			UtilityCooldownViewer = { "BOTTOM", cooldowns, "TOP", 0, 4 },
+			BuffIconCooldownViewer = { "BOTTOM", _G.UtilityCooldownViewer, "TOP", 0, 4 } }
+		for _, f in ipairs(riders) do
+			if on[f.name] then f.points = { on[f.name] } end
+		end
+	elseif variant == "chained" then
 		prd.points = { { "BOTTOM", cooldowns, "TOP", x or 0, 4 } }
 		bar.points = { { "BOTTOM", prd, "TOP", 0, 4 } }
 	else
@@ -145,6 +169,12 @@ local function ScreenX(f)
 	return p[4] + (type(p[2]) == "table" and p[2].points and ScreenX(p[2]) or 0)
 end
 local home = { bar = ScreenX(bar), prd = ScreenX(prd) }
+local function RiderHomes()
+	for _, f in ipairs(riders) do home[f.name] = ScreenX(f) end
+end
+RiderHomes()
+-- (hud: how far any rider strayed from moving with the PRD, and how far the PRD went.)
+local hud = { worst = 0, worstName = "-", most = 0 }
 
 -- Only the two files' frames tick (the rest of the addon idles).
 local mine = {}
@@ -255,6 +285,12 @@ local function Tick()
 		end
 	end
 	MoveCamera(TICK)
+	local prdMoved = ScreenX(prd) - home.prd
+	hud.most = math.max(hud.most, math.abs(prdMoved))
+	for _, f in ipairs(riders) do
+		local off = math.abs(ScreenX(f) - home[f.name] - prdMoved)
+		if off > hud.worst then hud.worst, hud.worstName = off, f.name end
+	end
 	samples[#samples + 1] = { now - 100, tonumber(cvars[SHOULDER]) or 0, cam.offset, cam.zoom, YouOnScreen(),
 		Share(bar, home.bar), Share(prd, home.prd), me.mounted and 1 or 0 }
 end
@@ -316,6 +352,7 @@ local function Day()
 	Wait(3)
 	Layout(120) -- (you drag the cast bar, or the PRD with it on a chain)
 	home.bar, home.prd = ScreenX(bar), ScreenX(prd)
+	RiderHomes()
 	Wait(1)
 	me.editMode = false
 	Part("Edit Mode closed")
@@ -417,6 +454,11 @@ end
 if variant ~= "decline" and variant ~= "sweep" then
 	Check("Your spot held as you zoom", spotCount > 0 and spotMiss / spotCount < 0.01,
 		spotCount > 0 and ("%.2f%% off it on average"):format(spotMiss / spotCount * 100) or "never on")
+end
+if variant == "hud" then
+	Check("The HUD slid with you (the PRD, its root)", hud.most > 20, ("%.0f UI units at most"):format(hud.most))
+	Check("Portraits, swing timers and cooldowns moved with it", hud.worst < 0.01,
+		("%.2f UI units off at worst (%s)"):format(hud.worst, hud.worstName))
 end
 local errors = 0
 for _, e in ipairs(events) do if e.kind == "error" then errors = errors + 1 end end

@@ -310,6 +310,11 @@ local function SectionOf(command)
 					elseif each ~= "" then
 						local categoryText = type(category) == "string" and _G[category] or nil
 						if type(categoryText) ~= "string" then categoryText = nil end
+						-- (An addon's own group, as ours and Questie's: its name is the category.)
+						if not categoryText and type(category) == "string" and category ~= "ADDONS"
+							and not category:find("^BINDING_") then
+							categoryText = category
+						end
 						-- (Addons' all share AddOns: their header says whose.)
 						sections[each] = (category == "ADDONS" and header) or categoryText or header
 					end

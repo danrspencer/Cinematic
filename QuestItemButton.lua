@@ -22,9 +22,9 @@ local BINDING = "CLICK CinematicQuestItemButton:LeftButton"
 local GAP = 10 -- beside the game's extra button: this far to its right
 local STACK_RISE = 60 -- over the game's stack: the extra frame's middle (it's 120 tall)
 
-_G["BINDING_NAME_" .. BINDING] = "Cinematic: " .. L["Use the quest item"]
+_G["BINDING_NAME_" .. BINDING] = L["Use the quest item"]
 ns.OnLanguage(function()
-	_G["BINDING_NAME_" .. BINDING] = "Cinematic: " .. L["Use the quest item"]
+	_G["BINDING_NAME_" .. BINDING] = L["Use the quest item"]
 end)
 
 local function Known(value)

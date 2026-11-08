@@ -298,6 +298,45 @@ do
 	DESIGN[#DESIGN + 1] = { 20, 3, "BOTTOM", "PlayerCastingBarFrame", "TOP", 0, 4 }    -- buff icons
 end
 
+-- Shoulder Cam (dev only, Forever): a centred HUD that moves as one, for the
+-- Shoulder Cam's Frames follow you (ShoulderCam.lua). Retail Inspired's
+-- action bars and the rest, but its centre stack made again around one root,
+-- the personal resource display, on the screen's bottom (the only frame
+-- placed on the screen): the cast bar on it, the Cooldown Manager's rows and
+-- buff icons above that (so the PRD, cast bar and portraits sit at the same
+-- height whether the rows are full or empty: 1 unit tall), the swing timers
+-- hanging down under it (main hand, off hand, ranged), and the player and
+-- target frames each side of it, 200 out (300 from the middle, as Retail
+-- Inspired's, clear of a 12-icon essential row). Frames follow you moves the
+-- PRD and the rest ride along. (The portraits are protected, so the game
+-- locks the frames they hang on in fights: the HUD holds still in a fight
+-- and catches up after.) No PRD system: the cast bar is the root.
+-- Mockup: https://claude.ai/artifact/PPvLu5DMCUPEgBpNG2zEy6 (2026-11-07).
+local SHOULDER_HUD = {}
+do
+	local STACK = { [29] = true, [20] = true, [1] = true }
+	if PRD_SYSTEM then STACK[PRD_SYSTEM] = true end
+	for _, row in ipairs(DESIGN) do
+		if not STACK[row[1]] then SHOULDER_HUD[#SHOULDER_HUD + 1] = row end
+	end
+	local indices = Enum.EditModeUnitFrameSystemIndices or {}
+	local root, rootName = 1, "PlayerCastingBarFrame"
+	local add = function(row) SHOULDER_HUD[#SHOULDER_HUD + 1] = row end
+	if PRD_SYSTEM then
+		root, rootName = PRD_SYSTEM, "PersonalResourceDisplayFrame"
+		add({ 1, nil, "BOTTOM", rootName, "TOP", 0, 4 })                              -- cast bar
+	end
+	add({ root, nil, "BOTTOM", "UIParent", "BOTTOM", 0, 210 })                         -- the root
+	add({ 20, 1, "BOTTOM", "PlayerCastingBarFrame", "TOP", 0, 6 })                    -- cooldowns: essential
+	add({ 20, 2, "BOTTOM", "EssentialCooldownViewer", "TOP", 0, 4 })                  -- utility
+	add({ 20, 3, "BOTTOM", "UtilityCooldownViewer", "TOP", 0, 4 })                    -- buff icons
+	add({ 29, 1, "TOP", rootName, "BOTTOM", 0, -4, { [3] = 0 } })                     -- swing timers: main hand
+	add({ 29, 2, "TOP", "SwingTimerMainHandFrame", "BOTTOM", 0, -4, { [3] = 0 } })    -- off hand
+	add({ 29, 3, "TOP", "SwingTimerOffHandFrame", "BOTTOM", 0, -4, { [3] = 0 } })     -- ranged
+	add({ UNIT_FRAME, indices.Player or 1, "RIGHT", rootName, "LEFT", -200, 0 })      -- player frame
+	add({ UNIT_FRAME, indices.Target or 2, "LEFT", rootName, "RIGHT", 200, 0 })       -- target frame
+end
+
 -- Retail laid out like WoW Forever's default: its party frames raid-style.
 
 -- Action bars 6-8 at the top middle in all of ours, not in the middle of the
@@ -309,7 +348,7 @@ local TOP_BARS = {
 	{ 0, 7, "TOP", "UIParent", "TOP", 0, -52 },
 	{ 0, 8, "TOP", "UIParent", "TOP", 0, -102 },
 }
-for _, design in ipairs({ DESIGN, FOREVER_PURE }) do
+for _, design in ipairs({ DESIGN, FOREVER_PURE, SHOULDER_HUD }) do
 	for _, bar in ipairs(TOP_BARS) do design[#design + 1] = bar end
 end
 
@@ -327,6 +366,12 @@ ns.EDIT_MODE_LAYOUTS = {
 	["Personal Resource Centered"] = ns.isRetail and { systems = PURE_CINEMA_SYSTEMS, client = "retail" }
 		or { design = FOREVER_PURE, client = "forever" },
 }
+-- (Dev build only, and not made on logging in, so it never takes one of the
+-- player's account layout slots unasked: /cine debug shoulder layout.)
+if ns.isDev then
+	ns.EDIT_MODE_LAYOUTS["Shoulder Cam"] = { design = SHOULDER_HUD, bars = { 2, 3 }, client = "forever",
+		onDemand = true }
+end
 
 -- A layout from systems lines (as PURE_CINEMA_SYSTEMS): the export string is
 -- a format version, the number of systems, then the lines. (The Edit Mode
@@ -561,7 +606,7 @@ local function EnsureLayouts()
 	end
 	local names = {}
 	for name, def in pairs(ns.EDIT_MODE_LAYOUTS) do
-		if (not def.client or def.client == ns.CLIENT) and not select(2, FindLayout(name)) then
+		if (not def.client or def.client == ns.CLIENT) and not def.onDemand and not select(2, FindLayout(name)) then
 			names[#names + 1] = name
 		end
 	end

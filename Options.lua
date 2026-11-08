@@ -2884,34 +2884,33 @@ local function CreateRevealPanel()
 		L["Includes mounting and hearthstone casts."])
 	cast:SetPoint("TOPLEFT", revealHeader, "BOTTOMLEFT", -2, -6)
 
-	local npcs = Check(content, "revealAtNPCs", L["At vendors, banks, mail and trainers"],
-		L["Exit CineMode while a vendor, bank, mailbox, class trainer, trade or auction " ..
-		"house window is open. When off, the window still shows but the rest stays hidden."])
-	npcs:SetPoint("TOPLEFT", cast, "BOTTOMLEFT", 0, -2)
+	-- (Opening windows and Talking to NPCs show, in the stack: see below.)
+	local npcs = Check(content, "revealAtNPCs", L["Talking to NPCs"],
+		L["Exit CineMode while a quest giver, gossip, vendor, bank, mailbox, class trainer, trade or " ..
+		"auction house window is open. When off, the window still shows but the rest stays hidden."])
 
 	-- Stored the other way round (stayWithWindows), like the rest of this
 	-- section reading as what brings the UI back.
 	local windows = Check(content, "stayWithWindows", L["Opening windows"],
-		L["Exit CineMode while the spellbook, character sheet, talents, macros, key " ..
-		"bindings or these options are open. When off, the window still shows but the rest " ..
-		"stays hidden."], function(value)
+		L["Exit CineMode while a game window is open: your bags, character sheet, spellbook, talents, " ..
+		"professions, the map, the group finder, collections, achievements, macros, key bindings, these " ..
+		"options... When off, the window still shows but the rest stays hidden."], function(value)
 			ns.GetDB().stayWithWindows = not value
 		end)
 	windows.Refresh = function(self) self:SetChecked(not ns.GetDB().stayWithWindows) end
-	windows:SetPoint("TOPLEFT", npcs, "BOTTOMLEFT", 0, -2)
 
 	local drag = Check(content, "revealOnDrag", L["While dragging something"],
 		L["Picking up an item or spell (to drag it to your action bars, say) brings the UI back " ..
 		"until you put it down. Off: picking things up never does; mouse over a faded bar to " ..
 		"see it when dragging there."])
-	drag:SetPoint("TOPLEFT", windows, "BOTTOMLEFT", 0, -2)
+	drag:SetPoint("TOPLEFT", cast, "BOTTOMLEFT", 0, -2)
 
 	local returnDelay = Slider(content, "returnDelay", L["Back into CineMode after"], 0, 60, 1, L["%d sec"])
 	returnDelay:SetPoint("TOPLEFT", drag, "BOTTOMLEFT", 4, -26)
 	Tooltip(returnDelay, L["How long things must stay calm (no cast, window, dragging and the like) " ..
 		"before CineMode comes back. After a fight it comes back at once instead. 0 returns at once."])
 
-	for _, control in ipairs({ revealHeader, cast, npcs, windows, drag, returnDelay }) do
+	for _, control in ipairs({ revealHeader, cast, drag, returnDelay }) do
 		setAside[#setAside + 1] = control
 	end
 	for _, control in ipairs(setAside) do
@@ -2925,6 +2924,11 @@ local function CreateRevealPanel()
 		"at the Combat fade in time."])
 	stack:Add(hostileCast, "check")
 	GreyUnless(hostileCast, function(db) return db.stayInCombat end)
+
+	-- What brings the whole UI back (the rest of the Exit CineMode section, set aside above).
+	stack:Header(content, L["Exit CineMode"])
+	stack:Add(windows, "check")
+	stack:Add(npcs, "check")
 
 	stack:Header(content, L["Combat text"])
 
@@ -12334,6 +12338,18 @@ local function CreateVisionPanel()
 			"game's window still opens. An addon that stops that window opening always wins."])
 		questStack:Add(talkFade, "check", 16)
 		GreyUnless(talkFade, TalkOn)
+		do
+			-- (Ours take no controller input; the game's windows do.)
+			local talkPad = Check(content, "questTalkPadGame", L["Game's window with a controller"],
+				L["In gamepad mode, the game's own gossip and quest windows show instead of Cinematic's, " ..
+				"so you can pick replies and rewards with your controller. Unticked, Cinematic's show " ..
+				"with a controller too (picked with the mouse or number keys)."], function(value)
+					ns.GetDB().questTalkPadGame = value
+					ApplyTalk()
+				end)
+			questStack:Add(talkPad, "check", 16)
+			GreyUnless(talkPad, TalkOn)
+		end
 		-- Where they go (the bubble and list; with quest talk off, the game's windows).
 		local PLACES = {
 			{ value = "fixed", text = L["Default"] },
