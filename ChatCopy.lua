@@ -435,15 +435,9 @@ local function Update(enabled)
 end
 
 local watcher = CreateFrame("Frame")
-local sinceCheck = 0
 -- (Runs only while the button's switched on, or one's still up: no loop at
 -- all otherwise.)
-ns.FeatureLoop(watcher, ns.Profiled("Chat copy button", function(_, elapsed)
-	sinceCheck = sinceCheck + elapsed
-	if sinceCheck < CHECK_INTERVAL then
-		return
-	end
-	sinceCheck = 0
+ns.FeatureLoop(watcher, ns.Profiled("Chat copy button", function()
 	Update(ns.Setting("chatCopyButton"))
 end), function()
 	if ns.db and ns.Setting("chatCopyButton") then return true end
@@ -451,7 +445,7 @@ end), function()
 		if button:IsShown() then return true end
 	end
 	return false
-end)
+end, CHECK_INTERVAL)
 
 -- Chat history (chatHistory): each chat window's newest lines, by character
 -- in CinematicCharDB.chatHistory[window number], come back at login and

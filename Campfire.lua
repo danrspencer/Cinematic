@@ -66,7 +66,7 @@ local leftIcon = false   -- the cursor has moved off it: going
 local blockedLogged, fadingLogged = false, false -- (logged once each, for /cine log)
 
 local function CursorPosition()
-	local x, y = GetCursorPosition()
+	local x, y = ns.CursorPosition()
 	local scale = UIParent:GetEffectiveScale()
 	return x / scale, y / scale
 end

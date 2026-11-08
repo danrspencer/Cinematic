@@ -1869,6 +1869,18 @@ local function OncePerFrame(fn)
 	end
 end
 ns.OncePerFrame = OncePerFrame
+-- The cursor's place, read once a frame for everything that asks (the tick,
+-- the hover checks, the cameras...): GetCursorPosition's two values.
+do
+	local cursor = { at = -1, x = 0, y = 0 }
+	function ns.CursorPosition()
+		local now = GetTime()
+		if now ~= cursor.at then
+			cursor.at, cursor.x, cursor.y = now, GetCursorPosition()
+		end
+		return cursor.x, cursor.y
+	end
+end
 
 -- Talking to an NPC: their windows, plus quest givers, gossip and the flight
 -- map. The camera modes wait while one is open.
@@ -3171,6 +3183,7 @@ local calmTrace = { fighting = false } -- (and for its log lines: a fight was on
 local tickRest = {}
 local framesPass = { elapsed = 0 }
 local IDLE_PASS = 0.5 -- (seconds: the frames pass out of CineMode, all settled)
+local CINE_IDLE_PASS = 0.25 -- (seconds: in CineMode, out of fights, all settled and nothing changed)
 
 local function OnUpdate(_, elapsed)
 	-- Every frame (with EllesmereUI, or watching with /cine debug alpha): frames
@@ -3297,9 +3310,18 @@ local function OnUpdate(_, elapsed)
 	-- Some frames (like the damage meter) are created on demand, so keep looking.
 	local starting = GetTime() < startSnapUntil
 	sinceScan = sinceScan + elapsed
+	-- (Logging in, all at once, so the frames are found quickly. Then a piece
+	-- of the scan a tick, ns.BuildManagedListStep, so no one frame takes it all.)
+	if framesPass.scanning and not starting then
+		if Step(ns.BuildManagedListStep) then framesPass.scanning = false end
+	end
 	if sinceScan >= (starting and START_SCAN_INTERVAL or ns.SCAN_INTERVAL) then
 		sinceScan = 0
-		Step(ns.BuildManagedList)
+		if starting or not ns.BuildManagedListStep then
+			Step(ns.BuildManagedList)
+		else
+			framesPass.scanning = true
+		end
 		if ns.UpdateMinimapButton then Step(ns.UpdateMinimapButton) end
 	end
 
@@ -3336,7 +3358,7 @@ local function OnUpdate(_, elapsed)
 	-- showed it the tick's biggest part).
 	local fadeOn = cinematic or ns.previewRows ~= nil or ns.layoutFadeUntil ~= nil
 	local fight = InCombatLockdown() or Flag(UnitAffectingCombat("player"))
-	local x, y = GetCursorPosition()
+	local x, y = ns.CursorPosition()
 	-- (Out of CineMode the mouse only matters over a unit frame with parts
 	-- hidden, Unit Frames page: they come up under it.)
 	if not fadeOn and not (ns.AnyUnitPartHidden and ns.AnyUnitPartHidden()) then
@@ -3350,11 +3372,19 @@ local function OnUpdate(_, elapsed)
 	local immersive = ns.ChatCamImmersive and ns.ChatCamImmersive() or false
 	local same = ns.framesSettled and fadeOn == pass.fadeOn and fight == pass.fight and immersive == pass.immersive
 		and x == pass.x and y == pass.y and not IsModifierKeyDown() and not (ns.IsChatActive and ns.IsChatActive())
-	local idle = same and not fadeOn and not immersive and pass.elapsed + elapsed < IDLE_PASS
-	if (pass.skip and same) or idle then
+	-- In CineMode too, out of fights: every CINE_IDLE_PASS seconds, or at once
+	-- when something the pass goes by changes (ns.framesWake: Frames.lua's
+	-- events, the reveals and peeks). In fights, as often as ever.
+	local wait = not immersive and (not fadeOn and IDLE_PASS or (not fight and CINE_IDLE_PASS)) or nil
+	-- (Out of CineMode nothing it goes by needs the pass at once: kept to its
+	-- IDLE_PASS whatever comes, as before.)
+	local woken = fadeOn and ns.framesWake
+	local idle = same and wait and not woken and pass.elapsed + elapsed < wait
+	if (pass.skip and same and not woken) or idle then
 		pass.skip = false
 		pass.elapsed = pass.elapsed + elapsed
 	else
+		ns.framesWake = nil
 		pass.skip = true
 		pass.fadeOn, pass.fight, pass.immersive, pass.x, pass.y = fadeOn, fight, immersive, x, y
 		Step(ns.UpdateFrames, fadeOn, elapsed + pass.elapsed)

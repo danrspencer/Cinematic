@@ -358,6 +358,7 @@ ns.chatTypingUntil = 0 -- typing shows the whole chat group without leaving cine
 local function PeekWindow(chatFrame)
 	if chatFrame.IsShown and ns.Flag(chatFrame:IsShown()) then
 		ns.chatPeekUntil[chatFrame] = GetTime() + ns.HoldTime("chatPeekTime")
+		ns.framesWake = true -- (the frames' pass at once: Core.lua)
 	end
 end
 
@@ -367,6 +368,7 @@ function ns.PeekChat(chatFrame, seconds)
 	if chatFrame and ns.Flag(chatFrame:IsShown()) then
 		local untilTime = GetTime() + math.max(seconds, ns.HoldTime("chatPeekTime"))
 		ns.chatPeekUntil[chatFrame] = math.max(ns.chatPeekUntil[chatFrame] or 0, untilTime)
+		ns.framesWake = true -- (the frames' pass at once: Core.lua)
 	end
 end
 
@@ -380,6 +382,7 @@ function ns.HoldScrolledChat(now)
 			local atBottom = chatFrame:AtBottom()
 			if not (issecretvalue and issecretvalue(atBottom)) and atBottom == false then
 				ns.chatPeekUntil[chatFrame] = now + ns.HoldTime("chatPeekTime")
+				ns.framesWake = true -- (the frames' pass at once: Core.lua)
 			end
 		end
 	end
@@ -669,15 +672,9 @@ local function WatchServerMessages()
 		return
 	end
 	local watcher = CreateFrame("Frame")
-	local sinceCheck = 0
 	-- (Runs only while server messages peek: no loop at all otherwise. Off,
 	-- where chat's up to is forgotten, so turning it on peeks at nothing old.)
-	ns.FeatureLoop(watcher, ns.Profiled("Server message watch", function(_, elapsed)
-		sinceCheck = sinceCheck + elapsed
-		if sinceCheck < SERVER_CHECK_INTERVAL then
-			return
-		end
-		sinceCheck = 0
+	ns.FeatureLoop(watcher, ns.Profiled("Server message watch", function()
 		local peekOn = ns.db.chatPeek and ns.db.handleChat ~= false and IsPeekTypeOn("server")
 		for chatFrame, watch in pairs(serverWatch) do
 			CheckServerLines(chatFrame, watch, peekOn)
@@ -688,7 +685,7 @@ local function WatchServerMessages()
 			for _, watch in pairs(serverWatch) do watch.newest, watch.server = nil, nil end
 		end
 		return on
-	end)
+	end, SERVER_CHECK_INTERVAL)
 end
 
 -- Whisper tabs (the ones the game opens for each conversation) with a whisper

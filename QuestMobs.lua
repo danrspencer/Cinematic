@@ -1002,22 +1002,17 @@ end
 
 local TARGET_EVERY = 0.5
 local targetWatcher = CreateFrame("Frame")
-targetWatcher.at = 0
 targetWatcher:RegisterEvent("PLAYER_TARGET_CHANGED")
 targetWatcher:SetScript("OnEvent", ns.RefreshTargetQuestIcon)
 -- (Runs only while the target's quest icon is on, or still shows: no loop
 -- at all otherwise.)
-ns.FeatureLoop(targetWatcher, function(self)
-	local now = GetTime()
-	if now >= self.at then
-		self.at = now + TARGET_EVERY
-		if (ns.db and ns.db.targetQuestIcon) or (targetIcon and targetIcon:IsShown()) then
-			ns.RefreshTargetQuestIcon()
-		end
+ns.FeatureLoop(targetWatcher, function()
+	if (ns.db and ns.db.targetQuestIcon) or (targetIcon and targetIcon:IsShown()) then
+		ns.RefreshTargetQuestIcon()
 	end
 end, function()
 	return (ns.db and ns.db.targetQuestIcon) or (targetIcon and targetIcon:IsShown()) and true or false
-end)
+end, TARGET_EVERY)
 
 -- For /cine debug plates: what the target's quest lines say.
 function ns.DescribeQuestMob(unit)

@@ -2296,14 +2296,8 @@ end
 -- The When grid's rows looked at twice a second, the marks again as one
 -- starts or stops fitting (a fight starting, a zone changing...).
 local WHEN_CHECK = 0.5
-local whenAt = 0
 -- (Runs only while the marks are on: no loop at all otherwise.)
 ns.FeatureLoop(CreateFrame("Frame"), function()
-	local now = GetTime()
-	if now < whenAt then
-		return
-	end
-	whenAt = now + WHEN_CHECK
 	-- (The aggro rows too: an enemy joining a fight has no event of its own;
 	-- and the rows with a Distance: none for moving either.)
 	if (levels.TargetArrow or 0) > 0 and (UpdateWhen() or AggroRowsOn() or DistanceRowsOn()) then
@@ -2311,7 +2305,7 @@ ns.FeatureLoop(CreateFrame("Frame"), function()
 	end
 end, function()
 	return (levels.TargetArrow or 0) > 0
-end)
+end, WHEN_CHECK)
 
 local mouseoverAt = 0
 ns.SetOnUpdate(mouseoverWatch, function(self)

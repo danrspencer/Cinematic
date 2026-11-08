@@ -393,7 +393,14 @@ end
 -- Other addons' shown frames that nothing fades, by addon: byAddon[addon] =
 -- { frames = { { name (nil: unnamed), row, why, text }... } }, order (the
 -- addons as found), and what was passed over, for the report.
-local function Collect()
+-- (wantText: each frame's line for the log, GuessFrames; the background
+-- look doesn't use them, and making them was much of its work. Run inside
+-- the background look's coroutine, it yields every few top-level frames.)
+local findThread
+local COLLECT_SLICE = 20 -- top-level frames looked at between yields
+local NAMED_SLICE = 150 -- named frames looked at between yields (FindNamedFrames)
+local GLOBALS_SLICE = 4000 -- globals gone over between yields (FindNamedFrames)
+local function Collect(wantText)
 	local screen = UIParent:GetWidth() * UIParent:GetHeight()
 	local hiddenGame = HiddenGameFrames()
 	local byAddon, order = {}, {}
@@ -431,7 +438,7 @@ local function Collect()
 		elseif not source then
 			if depth == 0 then
 				unnamedCount = unnamedCount + 1
-				if #unnamed < MAX_UNNAMED then
+				if wantText and #unnamed < MAX_UNNAMED then
 					local inside, insideSource = NamedInside(frame, 2)
 					unnamed[#unnamed + 1] = ("  %s %s %dx%d at %d,%d strata=%s holds %s%s"):format(
 						frame:GetDebugName(), frame:GetObjectType(), width, height, left, bottom,
@@ -465,15 +472,17 @@ local function Collect()
 		local alpha = frame:GetAlpha()
 		entry.frames[#entry.frames + 1] = {
 			name = name, row = row, why = why, kept = status == "you keep it shown", top = depth == 0, holder = big,
-			text = ("  %s %s %dx%d at %d,%d strata=%s alpha=%s mouse=%s%s -> %s (%s)%s")
+			text = wantText and ("  %s %s %dx%d at %d,%d strata=%s alpha=%s mouse=%s%s -> %s (%s)%s")
 				:format(name or ("(unnamed: %s) %s"):format(how, frame:GetDebugName()), frame:GetObjectType(),
 				width, height, left, bottom, frame:GetFrameStrata(),
 				Plain(alpha) and ("%.2f"):format(alpha) or "secret", tostring(ns.Flag(frame:IsMouseEnabled())),
 				holder and (" in " .. holder) or "", row, why, status and (", " .. status) or ""),
 		}
 	end
-	for _, frame in ipairs({ UIParent:GetChildren() }) do
+	local inThread = findThread ~= nil and coroutine.running() == findThread
+	for i, frame in ipairs({ UIParent:GetChildren() }) do
 		Consider(frame, 0)
+		if inThread and i % COLLECT_SLICE == 0 then coroutine.yield() end
 	end
 	return {
 		byAddon = byAddon, order = order, unnamed = unnamed, unnamedCount = unnamedCount, windows = windows,
@@ -491,7 +500,7 @@ function ns.GuessFrames()
 		ns.lastCinematic and "in CineMode (rows' game frames faded by us aren't spots)" or "not in CineMode",
 		InCombatLockdown() and "in combat" or "out of combat", IsInRaid() and "in a raid"
 			or IsInGroup() and "in a group" or "solo"))
-	local found = Collect()
+	local found = Collect(true)
 	local byAddon, order, unnamed, unnamedCount = found.byAddon, found.order, found.unnamed, found.unnamedCount
 	local windows, own, hiddenGame = found.windows, found.own, found.hiddenGame
 	local covered, empty = found.covered, found.empty
@@ -703,15 +712,47 @@ function ns.FindNamedFrames()
 	end
 	local db = ns.db
 	local byAddon = {}
-	for name, frame in pairs(_G) do
+	-- (First the names that could be frames, then the dear look at each,
+	-- both a slice a frame inside the background look's coroutine: all at
+	-- once it took 80 ms, the trip over the globals alone 30. Addons add
+	-- globals between slices, which can upset next(): then the trip starts
+	-- over, keeping the names already found, as it's only a guess anyway.)
+	local inThread = findThread ~= nil and coroutine.running() == findThread
+	local names, have = {}, {}
+	local key, count, restarts = nil, 0, 0
+	repeat
+		local ok, name, frame = pcall(next, _G, key)
+		if not ok then
+			-- (The globals changed under it: from the top. Over and over: not
+			-- this look, the next one tries again.)
+			restarts = restarts + 1
+			if restarts > 3 then return end
+			key = nil
+		else
+			key = name
+			if type(name) == "string" and not have[name] and type(frame) == "table"
+				and type(frame.GetObjectType) == "function" and type(frame.SetAlpha) == "function" then
+				have[name] = true
+				names[#names + 1] = name
+			end
+			count = count + 1
+			if inThread and count % GLOBALS_SLICE == 0 then coroutine.yield() end
+		end
+	until ok and key == nil
+	if inThread then coroutine.yield() end
+	for i, name in ipairs(names) do
+		local frame = _G[name]
 		-- (pcall: a mixin table can look like a frame and error on its methods.)
-		if type(name) == "string" and type(frame) == "table" and type(frame.GetObjectType) == "function"
-			and type(frame.SetAlpha) == "function" then
+		if type(frame) == "table" then
 			local ok, addon = pcall(NamedFrameAddon, frame, name)
 			if ok and addon then
 				byAddon[addon] = byAddon[addon] or {}
 				table.insert(byAddon[addon], name)
 			end
+		end
+		if inThread and i % NAMED_SLICE == 0 then
+			coroutine.yield()
+			if InCombatLockdown() then return end -- (a fight started: next look)
 		end
 	end
 	local listed = {}
@@ -739,6 +780,7 @@ function ns.FindNamedFrames()
 			Follow(name, follow)
 		end
 	end
+	return true
 end
 
 -- The addon a found or added frame belongs to, or nil (the game's, or not
@@ -916,20 +958,47 @@ login:SetScript("OnEvent", function()
 	-- now and then, so frames that come and go (another addon's popups) are
 	-- caught while they're up. Only while an addon is new to it (NewAddons),
 	-- and not in fights.
+	-- (Each look a slice of the top-level frames a frame, in a coroutine,
+	-- rather than all of them in one frame: it took 2.5 ms in one go.)
 	local lookedByName = false
+	local function Look(new)
+		ns.FindFoundFrames()
+		if not lookedByName then
+			-- (Done once a session; cut short by a fight, the next look tries again.)
+			lookedByName = ns.FindNamedFrames() and true or false
+		end
+		local looks = ns.db.smartFindLooks
+		for _, addon in ipairs(new) do
+			looks[addon] = (looks[addon] or 0) + 1
+		end
+	end
+	local driver = CreateFrame("Frame")
+	local function Resume()
+		if InCombatLockdown() then return end -- (waits out a fight)
+		local ok, err = coroutine.resume(findThread)
+		if not ok then
+			ns.Log("guess", "background look failed: " .. tostring(err))
+		end
+		if not ok or coroutine.status(findThread) == "dead" then
+			findThread = nil
+			ns.SetOnUpdate(driver, nil)
+		end
+	end
 	C_Timer.NewTicker(FIND_EVERY, ns.Profiled("Find found frames", function()
-		if ns.db.smartFindBackground and ns.db.handleAddonFrames and not InCombatLockdown() then
-			local new = ns.NewAddons()
-			if #new > 0 then
-				ns.FindFoundFrames()
-				if not lookedByName then
-					lookedByName = true
-					ns.FindNamedFrames()
-				end
-				local looks = ns.db.smartFindLooks
-				for _, addon in ipairs(new) do
-					looks[addon] = (looks[addon] or 0) + 1
-				end
+		if findThread or not (ns.db.smartFindBackground and ns.db.handleAddonFrames) or InCombatLockdown() then
+			return
+		end
+		local new = ns.NewAddons()
+		if #new > 0 then
+			findThread = coroutine.create(Look)
+			local ok, err = coroutine.resume(findThread, new)
+			if not ok then
+				ns.Log("guess", "background look failed: " .. tostring(err))
+				findThread = nil
+			elseif coroutine.status(findThread) ~= "dead" then
+				ns.SetOnUpdate(driver, Resume)
+			else
+				findThread = nil
 			end
 		end
 	end))

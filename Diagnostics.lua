@@ -360,11 +360,31 @@ local function SyncFeatureLoop(loop)
 	if ns.featureLoopsForced then want = true end
 	if want ~= loop.on then
 		loop.on = want
-		loop.frame:SetScript("OnUpdate", want and loop.run or nil)
+		if not loop.every then
+			loop.frame:SetScript("OnUpdate", want and loop.run or nil)
+		elseif want then
+			-- (Every few seconds: on a game timer, which sleeps in between,
+			-- not an update loop counting time every frame.)
+			loop.lastAt = GetTime()
+			loop.ticker = C_Timer.NewTicker(loop.every, loop.tick)
+		elseif loop.ticker then
+			loop.ticker:Cancel()
+			loop.ticker = nil
+		end
 	end
 end
-function ns.FeatureLoop(frame, fn, wanted)
-	local loop = { frame = frame, run = Protect(fn, false, LoopLabel()), wanted = wanted, on = nil }
+-- every (optional): fn runs every that many seconds, on a game timer, rather
+-- than every frame; fn(frame, seconds since its last run) as for an update loop.
+function ns.FeatureLoop(frame, fn, wanted, every)
+	local loop = { frame = frame, run = Protect(fn, false, LoopLabel()), wanted = wanted, on = nil, every = every }
+	if every then
+		loop.tick = function()
+			local now = GetTime()
+			local elapsed = now - (loop.lastAt or now)
+			loop.lastAt = now
+			loop.run(frame, elapsed)
+		end
+	end
 	featureLoops[#featureLoops + 1] = loop
 	featureLoops[frame] = loop
 	SyncFeatureLoop(loop)
@@ -373,6 +393,20 @@ end
 function ns.WakeFeatureLoop(frame)
 	local loop = featureLoops[frame]
 	if loop then SyncFeatureLoop(loop) end
+end
+-- A timed loop's next run brought forward to the next frame (once, however
+-- often asked meanwhile): for an event that wants a look at once.
+function ns.RunFeatureLoopSoon(frame)
+	local loop = featureLoops[frame]
+	if not loop then return end
+	SyncFeatureLoop(loop)
+	if not loop.on or loop.soon then return end
+	if not loop.every then return end -- (an update loop runs next frame anyway)
+	loop.soon = true
+	C_Timer.After(0, function()
+		loop.soon = nil
+		if loop.on then loop.tick() end
+	end)
 end
 -- (All of them, as a setting may have changed: once a second, and after a
 -- profile loads, ns.SyncFeatureLoops.)
@@ -500,6 +534,11 @@ watcher:SetScript("OnEvent", function(_, event, addon, action)
 		for _, line in ipairs(ErrorCounts()) do
 			ns.Log("errors", line)
 		end
+	elseif event ~= "PLAYER_LOGOUT" and addon ~= ADDON_NAME then
+		-- (Another addon's: the game's "Interface action failed because of an
+		-- AddOn" names no one, so it's logged whose it was.)
+		ns.Log("blocked", ("%s by %s: %s (%s)"):format(event, tostring(addon), tostring(action),
+			InCombatLockdown() and "in combat" or "out of combat"))
 	elseif addon == ADDON_NAME then
 		ns.Log("BLOCKED", ("%s: %s"):format(event, tostring(action)))
 		-- (The event comes during the blocked call, so the stack says whose it

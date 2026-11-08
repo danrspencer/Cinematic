@@ -954,7 +954,7 @@ do
 		if GetTime() - objectAt > 30 then
 			return false
 		end
-		local x, y = GetCursorPosition()
+		local x, y = ns.CursorPosition()
 		return (x - objectX) ^ 2 + (y - objectY) ^ 2 < OBJECT_REACH ^ 2
 	end
 
@@ -1268,7 +1268,7 @@ function ns.HookCameraInput()
 	end
 	-- The cursor in the middle of the screen (SEAT.MIDDLE of it from the center each way).
 	local function CursorInMiddle(d)
-		local x, y = GetCursorPosition()
+		local x, y = ns.CursorPosition()
 		local scale = UIParent:GetEffectiveScale()
 		local width, height = UIParent:GetWidth(), UIParent:GetHeight()
 		if not (x and scale and scale > 0 and width > 0 and height > 0) then return false end

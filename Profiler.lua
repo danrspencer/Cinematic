@@ -98,7 +98,9 @@ end
 -- own, the log's, tiny ones called so often the wrapping would swamp them, and
 -- SweepMinimap: it waits across frames in a coroutine, so its timer would count
 -- the frames between (and their garbage) as its own. "Minimap sweep" times it.
-local DEEP_SKIP = { SweepMinimap = true, Profiled = true, ProfileMark = true, ProfileStep = true, ProfileName = true,
+-- (FindFoundFrames and FindNamedFrames likewise, in the background look's
+-- coroutine, FrameGuess.lua.)
+local DEEP_SKIP = { SweepMinimap = true, FindFoundFrames = true, FindNamedFrames = true, Profiled = true, ProfileMark = true, ProfileStep = true, ProfileName = true,
 	ProfileCount = true, StartProfile = true, StopProfile = true, IsProfiling = true, ProfileGameMetric = true,
 	ProfileTimeLeft = true, ShowProfileTimer = true,
 	Print = true, Log = true, LogDetail = true, Verbose = true, Flag = true, Approach = true, GetDB = true }

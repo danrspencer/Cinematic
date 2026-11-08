@@ -4155,7 +4155,7 @@ end
 local stillX, stillY, stillSince = nil, nil, 0
 
 local function NoteCursor()
-	local x, y = GetCursorPosition()
+	local x, y = ns.CursorPosition()
 	if x ~= stillX or y ~= stillY or IsMouselooking() then
 		stillX, stillY, stillSince = x, y, GetTime()
 	end
@@ -4376,7 +4376,7 @@ local function HideTooltip(tooltip, why)
 	local world, hasUnit = WorldOwned(), TooltipHasUnit(tooltip)
 	hid = nil
 	if world or hasUnit then
-		local x, y = GetCursorPosition()
+		local x, y = ns.CursorPosition()
 		local px, py, facing = PlayerView()
 		hid = {
 			name = TooltipName(), owner = tooltip:GetOwner(), world = world, unit = hasUnit,
@@ -4396,7 +4396,7 @@ local function StillOver(note)
 	if note.unit then
 		return ns.Flag(UnitExists("mouseover"))
 	end
-	local x, y = GetCursorPosition()
+	local x, y = ns.CursorPosition()
 	local reach = CURSOR_REACH * UIParent:GetEffectiveScale()
 	return math.abs(x - note.x) <= reach and math.abs(y - note.y) <= reach and MouseOverWorld()
 		and not ViewMoved(note)

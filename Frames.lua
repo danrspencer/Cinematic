@@ -1365,6 +1365,59 @@ function ns.BuildManagedList()
 	RecomputeNesting()
 end
 
+-- The same scan a piece at a time, for the regular one every few seconds
+-- (Core.lua): one piece each call, so no one frame takes the whole scan (it
+-- took 2-4 ms in one go). Gives true once the round's done. The parents check
+-- (RecomputeNesting, a walk up every frame's parents) runs at the end only
+-- if the round found new frames, or every few rounds in case one was moved.
+-- ns.BuildManagedList stays whole, for the times it's wanted at once.
+do
+	local step, countBefore, rounds = 0, 0, 0
+	local NESTING_EVERY = 6 -- rounds
+	function ns.BuildManagedListStep()
+		step = step + 1
+		if step == 1 then
+			countBefore = #ns.managed
+			for group, names in pairs(FRAME_GROUPS) do
+				for _, name in ipairs(names) do
+					AddFrame(_G[name], group)
+				end
+			end
+			for i = 1, (NUM_CHAT_WINDOWS or 10) do
+				AddFrame(_G["ChatFrame" .. i], "chat")
+				AddFrame(_G["ChatFrame" .. i .. "EditBox"], "chat")
+			end
+			return false
+		end
+		local k = step - 1
+		if k <= #scanners then
+			scanners[k]()
+			return false
+		end
+		k = k - #scanners
+		if k == 1 then
+			ScanTopLevelFrames()
+		elseif k == 2 then
+			ScanAddonFrames()
+		elseif k == 3 then
+			FindIssueReporter()
+			FindBarArt()
+		elseif k == 4 then
+			ns.FindMinimapHeader()
+		else
+			AddFrame(type(_G.BuffFrame) == "table" and _G.BuffFrame.CollapseAndExpandButton or nil, "buffcollapse")
+			rounds = rounds + 1
+			if #ns.managed ~= countBefore or rounds >= NESTING_EVERY then
+				rounds = 0
+				RecomputeNesting()
+			end
+			step = 0
+			return true
+		end
+		return false
+	end
+end
+
 -- Switching a supported addon off puts its frames back at once;
 -- switching it on fades them from the next scan.
 function ns.SetAddonFramesOn(key, on)
@@ -1610,7 +1663,7 @@ local function IsCursorInSavedRect(entry)
 	if not left then
 		return false
 	end
-	local x, y = GetCursorPosition()
+	local x, y = ns.CursorPosition()
 	x, y = x / entry.savedEffectiveScale, y / entry.savedEffectiveScale
 	return x >= left and x <= left + width and y >= bottom and y <= bottom + height
 end
@@ -1662,7 +1715,7 @@ ns.hoverReach = {} -- (row key -> its reach: its hover groups', set each tick)
 function ns.IsOverEmptySlot(frame, pad)
 	pad = pad or 0
 	local buttons, name = frame.actionButtons, frame:GetName()
-	local x, y = GetCursorPosition()
+	local x, y = ns.CursorPosition()
 	for i = 1, buttons and #buttons or 12 do
 		local button = buttons and buttons[i]
 			or _G[(name == "MainMenuBar" and "ActionButton" or (name or "") .. "Button") .. i]
@@ -4073,6 +4126,7 @@ end
 -- your debuffs are gone with debuffPeekUntilGone.
 function ns.StartDebuffPeek(hold)
 	ns.debuffPeekUntil = math.max(ns.debuffPeekUntil, GetTime() + (hold or ns.HoldTime("debuffPeekTime")))
+	ns.framesWake = true -- (the frames' pass at once: Core.lua)
 	if ns.db.debuffPeekUntilGone then
 		debuffHeld = true
 	end
@@ -4441,6 +4495,7 @@ function ns.StartBuffPeek(hold, found, enchant, byPlace)
 	ns.newBuffEnchant = ns.newBuffEnchant or enchant or false
 	-- (a short buff peek doesn't cut a longer debuff one short)
 	buffPeekUntil = math.max(buffPeekUntil, GetTime() + hold)
+	ns.framesWake = true -- (the frames' pass at once: Core.lua)
 	ns.buffPeekStartedAt = GetTime()
 end
 
@@ -5703,6 +5758,7 @@ do
 				hold = math.max(hold, ns.db.calmTime or 0)
 			end
 			questRevealUntil = GetTime() + ns.FadeInTime() + math.max(0, hold)
+			ns.framesWake = true -- (the frames' pass at once: Core.lua)
 		end
 	end
 	-- When a quest was last picked up, or a tracked one moved on (Keep open's
@@ -6009,6 +6065,7 @@ do
 			return
 		end
 		pingRevealUntil = GetTime() + ns.FadeInTime() + ns.db.minimapPingTime
+		ns.framesWake = true -- (the frames' pass at once: Core.lua)
 		if ns.pingDebug then
 			ns.Print(("%s: minimap up for %.1f sec"):format(how, pingRevealUntil - GetTime()))
 		end
@@ -6065,6 +6122,7 @@ do
 		groupSize = size
 		local hold = ns.HoldTime("mouseoverHold") - ns.FadeOutTime()
 		rosterRevealUntil = GetTime() + ns.FadeInTime() + math.max(0, hold)
+		ns.framesWake = true -- (the frames' pass at once: Core.lua)
 	end)
 end
 
@@ -6214,6 +6272,7 @@ local function CheckPendingPress()
 		pendingPress = nil
 		DebugPress(press.button, "reveals")
 		padRevealUntil = ns.PadRevealEnd()
+		ns.framesWake = true -- (the frames' pass at once: Core.lua)
 	end
 end
 local padWatcher = CreateFrame("Frame")
@@ -6275,6 +6334,7 @@ ns.SetOnUpdate(padWatcher, ns.Profiled("Gamepad watch", function()
 	end
 	if keepUp and not Fishing() then
 		padRevealUntil = ns.PadRevealEnd()
+		ns.framesWake = true -- (the frames' pass at once: Core.lua)
 	end
 	padMoveHeld = moving
 end))
@@ -7295,23 +7355,19 @@ do
 		EachCooldownIcon(Apply, true)
 	end
 
-	local since = 0
 	local watcher = CreateFrame("Frame")
 	-- (Runs only while Follow Show Numbers is on, or the game's own still
-	-- need putting back: no loop at all otherwise.)
-	ns.FeatureLoop(watcher, function(_, elapsed)
-		since = since + elapsed
-		if since < 0.5 then return end
-		since = 0
+	-- need putting back, twice a second on a game timer: nothing otherwise.)
+	ns.FeatureLoop(watcher, function()
 		Update()
 	end, function()
 		return want ~= nil or (ns.db and ns.db.cooldownFollowNumbers and ns.PageOn("handleCooldowns")) and true or false
-	end)
+	end, 0.5)
 	watcher:RegisterEvent("CVAR_UPDATE")
 	-- (On the next frame; only for its own setting: a camera script's speed
 	-- writes, 20 a second, had it going over every icon each time.)
 	watcher:SetScript("OnEvent", function(_, _, name)
-		if type(name) == "string" and name:lower() == "countdownforcooldowns" then since = 1 end
+		if type(name) == "string" and name:lower() == "countdownforcooldowns" then ns.RunFeatureLoopSoon(watcher) end
 	end)
 	ns.ApplyCooldownNumbers = Update
 end
@@ -9222,6 +9278,29 @@ end
 -- Where the mouse was when the hover checks last ran (see below).
 tickTables.hoverMouse = { at = -math.huge }
 
+-- In CineMode, out of fights, with every frame settled, the frames' pass runs
+-- only a few times a second (Core.lua); these bring it on at once, as what it
+-- goes by changes: your target and focus, your auras, health and power
+-- (Vitals, your frames kept up while you recover), cooldowns, casts, the
+-- group, the place, the mouse on a unit. (ns.framesWake; the reveals and
+-- peeks set it too.)
+do
+	local wake = CreateFrame("Frame")
+	for _, event in ipairs({ "PLAYER_TARGET_CHANGED", "PLAYER_FOCUS_CHANGED", "SPELL_UPDATE_COOLDOWN",
+		"GROUP_ROSTER_UPDATE", "ZONE_CHANGED", "ZONE_CHANGED_INDOORS", "ZONE_CHANGED_NEW_AREA",
+		"UPDATE_MOUSEOVER_UNIT", "PLAYER_UPDATE_RESTING", "UPDATE_SHAPESHIFT_FORM", "PLAYER_MOUNT_DISPLAY_CHANGED",
+		"MINIMAP_PING", "QUEST_LOG_UPDATE", "BAG_UPDATE_DELAYED", "PLAYER_EQUIPMENT_CHANGED",
+		"UNIT_PET", "PET_BAR_UPDATE" }) do
+		pcall(wake.RegisterEvent, wake, event)
+	end
+	for _, event in ipairs({ "UNIT_AURA", "UNIT_HEALTH", "UNIT_MAXHEALTH", "UNIT_POWER_UPDATE", "UNIT_DISPLAYPOWER",
+		"UNIT_SPELLCAST_START", "UNIT_SPELLCAST_STOP", "UNIT_SPELLCAST_CHANNEL_START", "UNIT_SPELLCAST_CHANNEL_STOP",
+		"UNIT_SPELLCAST_INTERRUPTED", "UNIT_SPELLCAST_SUCCEEDED" }) do
+		pcall(wake.RegisterUnitEvent, wake, event, "player", "pet")
+	end
+	wake:SetScript("OnEvent", function() ns.framesWake = true end)
+end
+
 function ns.UpdateFrames(cinematic, elapsed)
 	-- (/cine debug framepass: where a pass's time goes, ns.framePassTimes.)
 	local clock = ns.framePassTimes and debugprofilestop
@@ -9352,9 +9431,12 @@ function ns.UpdateFrames(cinematic, elapsed)
 		-- still, on the same thing, each frame's answer stands, asked again a
 		-- few times a second in case a frame showed or moved under it.)
 		local mouse = tickTables.hoverMouse
-		local x, y = GetCursorPosition()
+		local x, y = ns.CursorPosition()
 		local focus = MouseFocus()
-		local still = x == mouse.x and y == mouse.y and focus == mouse.focus and now - mouse.at < 0.25
+		-- (Turning the camera with the mouse, mouselook: the cursor's hidden
+		-- and nothing new is under it, so last time's answers stand.)
+		local still = (x == mouse.x and y == mouse.y and focus == mouse.focus or (IsMouselooking and IsMouselooking()))
+			and now - mouse.at < 0.25
 		if not still then
 			mouse.x, mouse.y, mouse.focus, mouse.at = x, y, focus, now
 		end

@@ -2544,19 +2544,14 @@ local WATCH_EVERY = 0.2
 local LOCKOUT_WAIT = 1.5
 local LOCKOUT_MOVING = 10
 local watcher = CreateFrame("Frame")
-local watched, unseen, hiddenFor, stray = 0, 0, 0, 0
+local unseen, hiddenFor, stray = 0, 0, 0
 -- (This and the follower below run only while Quest talk is on, or ours
 -- still show: no loop at all otherwise.)
 local function QuestTalkLoopWanted()
 	return (ns.db and ns.db.questTalk) or talk.kind ~= nil
 end
 ns.FeatureLoop(watcher, function(_, elapsed)
-	watched = watched + elapsed
-	if watched < WATCH_EVERY then
-		return
-	end
-	local step = watched
-	watched = 0
+	local step = elapsed -- (every WATCH_EVERY, on a game timer)
 	if talk.kind and not closeTimer and not TalkWindowOpen() then
 		ScheduleClose()
 	end
@@ -2587,7 +2582,7 @@ ns.FeatureLoop(watcher, function(_, elapsed)
 		ns.Log("questtalk", ("locked out: the game's window parked with no talk of ours, back: %s"):format(TalkState()))
 		ParkWindows(false)
 	end
-end, QuestTalkLoopWanted)
+end, QuestTalkLoopWanted, WATCH_EVERY)
 
 -- While the camera moves (questTalkCamMove, see MoveMode), every frame: the
 -- bubble and the card beside it faded out or down, back once it's still;

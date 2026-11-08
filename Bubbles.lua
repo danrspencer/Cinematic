@@ -915,16 +915,13 @@ end
 -- And once a second while the page is on: the Calm Timer running out, a
 -- camera mode starting, a rule's other words.
 local ticker = CreateFrame("Frame")
-local sinceCheck = 0
--- (Runs only while the page is on: no loop at all otherwise.)
-ns.FeatureLoop(ticker, function(_, elapsed)
-	sinceCheck = sinceCheck + elapsed
-	if sinceCheck < 1 then return end
-	sinceCheck = 0
+-- (Runs only while the page is on, once a second on a game timer: no loop
+-- at all otherwise.)
+ns.FeatureLoop(ticker, function()
 	if ns.db and ns.db.handleBubbles then ApplyCVars(ns.db) end
 end, function()
 	return ns.db and ns.db.handleBubbles and true or false
-end)
+end, 1)
 
 local wasOn = false
 -- The settings changing (on the page, a profile, a reset) or a new place.
