@@ -3833,7 +3833,9 @@ do
 	-- ns.WarmCombatShown from Core.lua's tickRest, so it doesn't stack with
 	-- the frames' pass: that one takes the kept list up to SHOWN_GRACE more,
 	-- working it out itself only on a change or if the warming didn't run.)
-	local SHOWN_HOLD, SHOWN_GRACE = 0.1, 0.1
+	-- (0.2: the pass itself runs only every quarter second in CineMode with
+	-- nothing changing, Core.lua; renewing it every 0.1 was work no pass used.)
+	local SHOWN_HOLD, SHOWN_GRACE = 0.2, 0.1
 	local Compute = GetCombatShownFrames
 	local keptAt, keptShown, askedAt = -1, nil, -math.huge
 	local wasFighting, wasCalm, wasTarget, wasEnemy, wasCast, wasRuleCast

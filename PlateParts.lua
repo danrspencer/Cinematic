@@ -2715,6 +2715,8 @@ function ns.UpdatePlateParts(active, elapsed)
 			RefreshQuestIcon(plate)
 		end
 	end
+	-- (Still fading: the plates' pass keeps running, Effects.lua.)
+	return changed or iconsChanged
 end
 
 -- For /cine debug plates: which of each part's frames the plate has, then

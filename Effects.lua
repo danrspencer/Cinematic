@@ -364,11 +364,30 @@ do
 end
 
 -- fightStarting: called as a fight starts, just before combat lockdown.
+-- (Asked every tick, it sets them only as what they go by changes: CineMode,
+-- a fight and its linger, Chat Cam's Ultra immersive, your target, the place;
+-- and every half second (cvarsSeen.every) for the rest (a row's rule, a setting). A
+-- fight starting, fightStarting, always.)
+-- (On ns: this file's main chunk is at Lua's 200 locals.)
+ns.cvarsSeen = { at = -math.huge, every = 0.5 }
 function ns.UpdateCVars(cinematic, fightStarting)
 	lastCinematic = cinematic
 	local inCombat = fightStarting or InCombatLockdown() or ns.Flag(UnitAffectingCombat("player"))
 	-- (Chat Cam's Ultra immersive: names and the target circle go too.)
 	local immersive = ns.ChatCamImmersive and ns.ChatCamImmersive() or false
+	local now = GetTime()
+	local lingering = (ns.FightLingering and ns.FightLingering()) and true or false
+	local target = ns.Flag(UnitExists("target"))
+	local place = ns.GetPlaceType() or false
+	local seen = ns.cvarsSeen
+	if not fightStarting and seen.cinematic == (cinematic and true or false) and seen.inCombat == (inCombat and true or false)
+		and seen.immersive == immersive and seen.lingering == lingering and seen.target == target and seen.place == place
+		and seen.enabled == ns.db.enabled and now - seen.at < seen.every then
+		return
+	end
+	seen.cinematic, seen.inCombat, seen.immersive, seen.lingering = cinematic and true or false, inCombat and true or false,
+		immersive, lingering
+	seen.target, seen.place, seen.enabled, seen.at = target, place, ns.db.enabled, now
 	for _, set in ipairs(CVAR_SETS) do
 		-- (Nameplates page's master switch off: names are left to the game.)
 		local want = (cinematic and ns.db.handlePlates and not NameKeptHere(set.key, inCombat)) or immersive
@@ -3711,10 +3730,15 @@ function ns.plates.SameAsBefore(cinematic, now)
 	end
 	return same
 end
--- (Its target changing to another one: the game's event, for the pass's skip.)
+-- (Its target changing to another one, and in CineMode what else the plates
+-- go by: the mouse on a unit, raid markers, focus, a duel, plates coming and
+-- going. The game's events, for the pass's skip.)
 do
 	local targetWatch = CreateFrame("Frame")
-	targetWatch:RegisterEvent("PLAYER_TARGET_CHANGED")
+	for _, event in ipairs({ "PLAYER_TARGET_CHANGED", "PLAYER_FOCUS_CHANGED", "UPDATE_MOUSEOVER_UNIT",
+		"RAID_TARGET_UPDATE", "DUEL_REQUESTED", "DUEL_FINISHED", "NAME_PLATE_UNIT_ADDED", "NAME_PLATE_UNIT_REMOVED" }) do
+		pcall(targetWatch.RegisterEvent, targetWatch, event)
+	end
 	targetWatch:SetScript("OnEvent", function() ns.plates.seen.at = nil end)
 end
 
@@ -3727,7 +3751,13 @@ function ns.UpdatePlates(cinematic, elapsed)
 		return
 	end
 	cinematic = cinematic and true or false
+	-- (In CineMode too, once nothing's moving: filtered plates refresh on
+	-- their own inputs anyway, platesDirty and the half-second cap.)
 	if not cinematic and ns.plates.settled and not platesReleased and ns.plates.SameAsBefore(cinematic, GetTime()) then
+		return
+	end
+	if cinematic and ns.plates.quiet and not platesDirty and not platesReleased
+		and ns.plates.SameAsBefore(cinematic, GetTime()) then
 		return
 	end
 	platesReleased = false
@@ -3871,7 +3901,7 @@ function ns.UpdatePlates(cinematic, elapsed)
 		RefreshAllPlates()
 	end
 	platesWereFiltered = filtered
-	ns.UpdatePlateParts(platesActive, elapsed)
+	if ns.UpdatePlateParts(platesActive, elapsed) then changed = true end
 	UpdatePlateClicks()
 
 	if hide and not keep and ns.plates.level == 0 and not ns.plates.off and not InCombatLockdown() then
@@ -3879,9 +3909,10 @@ function ns.UpdatePlates(cinematic, elapsed)
 		ns.plates.off = true
 	end
 	-- (Nothing moving: the next passes outside CineMode may be skipped.)
-	ns.plates.settled = not changed and not filtered and next(combatCap) == nil and next(leavingTargets) == nil
+	ns.plates.quiet = not changed and next(combatCap) == nil and next(leavingTargets) == nil
 		and next(pendingPlateRows) == nil
-	if not ns.plates.settled then ns.plates.seen.at = nil end
+	ns.plates.settled = ns.plates.quiet and not filtered
+	if not ns.plates.quiet or (not cinematic and not ns.plates.settled) then ns.plates.seen.at = nil end
 end
 
 -- World tooltips (units and objects under the cursor) use the default anchor,
