@@ -15,11 +15,12 @@ It is not part of the addon (Tools/ is left out of the CurseForge package).
 3. On **Bot**, press **Reset Token** and copy the token. It is only used to register the command (step 4). Don't save it anywhere else.
 4. On **Installation**, under Guild Install, add the scope `applications.commands`. Copy the install link, open it, and add the app to your server.
 
-### 2. GitHub token
-1. Go to https://github.com/settings/personal-access-tokens/new (fine-grained).
-2. Resource owner: `sapo-wow-dev`. Repository access: **Only select repositories**, `Cinematic`.
-3. Permissions > Repository > **Issues: Read and write**. Leave everything else off.
-4. Set an expiry date (you'll need a new token when it runs out), then generate and copy it.
+### 2. GitHub App (issues show as opened by the bot, not by a person)
+1. Go to https://github.com/organizations/sapo-wow-dev/settings/apps/new.
+2. Name it (e.g. "Cinematic Bugs"), Homepage URL: the repo's address. Untick **Webhook > Active**.
+3. Permissions > Repository > **Issues: Read and write**. Leave everything else off. **Only on this account**. Create.
+4. Copy the **App ID** at the top. Further down, **Generate a private key**: a .pem file downloads.
+5. **Install App** (left menu) > Install on `sapo-wow-dev` > **Only select repositories** > `Cinematic`.
 
 ### 3. Cloudflare Worker
 1. Sign up at https://dash.cloudflare.com (free plan).
@@ -28,7 +29,8 @@ It is not part of the addon (Tools/ is left out of the CurseForge package).
 4. **Settings > Variables and Secrets**, add these as type **Secret**:
    - `DISCORD_PUBLIC_KEY`: from step 1.2
    - `DISCORD_APP_ID`: from step 1.2
-   - `GITHUB_TOKEN`: from step 2
+   - `GITHUB_APP_ID`: from step 2.4
+   - `GITHUB_APP_KEY`: open the .pem in Notepad and paste all of it, BEGIN and END lines too; then delete the file
 5. Copy the Worker's URL (`https://cinematic-bug-bot.<you>.workers.dev`).
 
 ### 4. Connect them

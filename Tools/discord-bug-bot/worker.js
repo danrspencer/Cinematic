@@ -5,7 +5,9 @@
 // Secrets (Worker > Settings > Variables and Secrets):
 //   DISCORD_PUBLIC_KEY  Discord app's public key (General Information)
 //   DISCORD_APP_ID      Discord app's application ID
-//   GITHUB_TOKEN        fine-grained token: sapo-wow-dev/Cinematic, Issues read/write only
+//   GITHUB_APP_ID       the org's GitHub App ID (issues show as opened by the app's bot)
+//   GITHUB_APP_KEY      that app's private key: the whole .pem file, pasted as is
+//   (or GITHUB_TOKEN    a personal token instead: issues then show that person's account)
 // Optional plain variables:
 //   GITHUB_REPO         default "sapo-wow-dev/Cinematic"
 //   SHOW_REPORTER       "1" puts the reporter's Discord name in the issue (public!)
@@ -97,14 +99,10 @@ async function fileIssue(interaction, user, env) {
 
   let message
   try {
+    const token = await githubToken(env, repo)
     const res = await fetch(`https://api.github.com/repos/${repo}/issues`, {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${env.GITHUB_TOKEN}`,
-        Accept: "application/vnd.github+json",
-        "User-Agent": "cinematic-bug-bot",
-        "X-GitHub-Api-Version": "2022-11-28",
-      },
+      headers: ghHeaders(token),
       body: JSON.stringify({ title: clean(v.title), body: lines.join("\n"), labels: LABELS }),
     })
     if (res.ok) {
@@ -126,6 +124,56 @@ async function fileIssue(interaction, user, env) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ content: message, allowed_mentions: { parse: [] } }),
   })
+}
+
+function ghHeaders(token) {
+  return {
+    Authorization: `Bearer ${token}`,
+    Accept: "application/vnd.github+json",
+    "User-Agent": "cinematic-bug-bot",
+    "X-GitHub-Api-Version": "2022-11-28",
+  }
+}
+
+// GitHub App: sign a short JWT with the app's key, find the app's install on
+// the repo, and trade the JWT for an hour-long install token (kept till near expiry).
+let appToken = null
+async function githubToken(env, repo) {
+  if (!env.GITHUB_APP_ID || !env.GITHUB_APP_KEY) return env.GITHUB_TOKEN
+  if (appToken && appToken.expires - Date.now() > 5 * 60 * 1000) return appToken.token
+  const jwt = await appJwt(env.GITHUB_APP_ID, env.GITHUB_APP_KEY)
+  const inst = await fetch(`https://api.github.com/repos/${repo}/installation`, { headers: ghHeaders(jwt) })
+  if (!inst.ok) throw new Error(`installation lookup ${inst.status}: ${await inst.text()}`)
+  const { id } = await inst.json()
+  const res = await fetch(`https://api.github.com/app/installations/${id}/access_tokens`, {
+    method: "POST",
+    headers: ghHeaders(jwt),
+  })
+  if (!res.ok) throw new Error(`install token ${res.status}: ${await res.text()}`)
+  const data = await res.json()
+  appToken = { token: data.token, expires: Date.parse(data.expires_at) }
+  return appToken.token
+}
+
+async function appJwt(appId, pem) {
+  const now = Math.floor(Date.now() / 1000)
+  const b64url = (bytes) => btoa(String.fromCharCode(...bytes)).replace(/=+$/, "").replace(/\+/g, "-").replace(/\//g, "_")
+  const enc = (obj) => b64url(new TextEncoder().encode(JSON.stringify(obj)))
+  const data = `${enc({ alg: "RS256", typ: "JWT" })}.${enc({ iat: now - 60, exp: now + 540, iss: String(appId) })}`
+  const key = await crypto.subtle.importKey("pkcs8", pkcs8(pem), { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" }, false, ["sign"])
+  const sig = new Uint8Array(await crypto.subtle.sign("RSASSA-PKCS1-v1_5", key, new TextEncoder().encode(data)))
+  return `${data}.${b64url(sig)}`
+}
+
+// GitHub hands out "BEGIN RSA PRIVATE KEY" (PKCS#1); WebCrypto wants PKCS#8,
+// so wrap it: SEQUENCE { 0, rsaEncryption, OCTET STRING { key } }.
+function pkcs8(pem) {
+  const der = Uint8Array.from(atob(pem.replace(/-----[^-]+-----|\s/g, "")), (c) => c.charCodeAt(0))
+  if (!pem.includes("BEGIN RSA PRIVATE KEY")) return der
+  const len = (n) => (n < 128 ? [n] : n < 256 ? [0x81, n] : n < 65536 ? [0x82, n >> 8, n & 255] : [0x83, n >> 16, (n >> 8) & 255, n & 255])
+  const tlv = (tag, bytes) => [tag, ...len(bytes.length), ...bytes]
+  const algo = [0x30, 0x0d, 0x06, 0x09, 0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x01, 0x01, 0x05, 0x00]
+  return new Uint8Array(tlv(0x30, [0x02, 0x01, 0x00, ...algo, ...tlv(0x04, [...der])]))
 }
 
 // Stop "@name" in a report from pinging that GitHub user.
