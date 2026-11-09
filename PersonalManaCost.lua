@@ -11,6 +11,9 @@
 -- Mana and its max can be secret in fights: the stretch is a status bar of
 -- its own, drawn reversed from the fill's right edge and given them as they
 -- are, clipped to the bar (a cost over what you have runs out at its left).
+-- Some casts take their mana as they start (seen on Forever: an arcane
+-- mage's casts): once your mana has dropped by the cost since the cast
+-- began, it's paid and the stretch goes (else it took the cost twice).
 
 local _, ns = ...
 
@@ -27,6 +30,9 @@ local overlays = setmetatable({}, { __mode = "k" }) -- bar -> its overlay
 local gameCost = setmetatable({}, { __mode = "k" }) -- the game's own cost pieces -> true, while faded for ours
 local casting -- the cast going on, while it costs mana (its guid, or true)
 local cost -- ...its mana cost
+local paid -- ...true once its mana was taken (some take it as they start)
+local startMana -- your mana as the cast began (nil: secret)
+local lastMana, beforeMana, changedAt -- your mana at its last change, before it, and when
 
 local function Readable(value)
 	return value ~= nil and not (issecretvalue and issecretvalue(value))
@@ -133,7 +139,7 @@ local function Update()
 	for where, key in pairs(KEYS) do
 		local bar = bars[where]
 		if bar and db and db[key] and ns.PersonalResourcesOn(db) then
-			if casting and Draw(bar) then drawn[bar] = true end
+			if casting and not paid and Draw(bar) then drawn[bar] = true end
 			for _, piece in ipairs(GameCost(bar)) do mute[piece] = true end
 		end
 	end
@@ -152,14 +158,34 @@ local function Update()
 		end
 	end
 	-- (And the mana after the cast, by the same cast: PersonalManaText.lua.)
-	if ns.UpdateManaAfter then ns.UpdateManaAfter(casting and cost or nil, bars) end
+	if ns.UpdateManaAfter then ns.UpdateManaAfter(casting and not paid and cost or nil, bars) end
 end
 ns.UpdateManaCost = Update
+
+-- Your mana now (nil: secret), and on a change, whether this cast's cost
+-- was taken: down by at least half of it since the cast began (half:
+-- regen ticks in between).
+local function ReadMana()
+	local mana = UnitPower("player", MANA)
+	if Readable(mana) then return mana end
+end
+
+local function CheckPaid()
+	if paid or not casting or not startMana or not Readable(cost) then return end
+	local mana = ReadMana()
+	if mana and startMana - mana >= cost * 0.5 then paid = true end
+end
 
 local function Start(castGUID, spellID)
 	cost = ManaCost(spellID)
 	casting = type(cost) == "number" and (castGUID or true) or nil
 	if not casting then cost = nil end
+	paid = nil
+	-- (Taken this very moment, before the cast's start reached us: the
+	-- mana from before that.)
+	startMana = ReadMana()
+	if startMana and changedAt == GetTime() and beforeMana and lastMana == startMana then startMana = beforeMana end
+	CheckPaid()
 	Update()
 end
 
@@ -168,7 +194,7 @@ end
 local function Stop(castGUID)
 	if not casting then return end
 	if Readable(castGUID) and Readable(casting) and castGUID ~= casting then return end
-	casting, cost = nil, nil
+	casting, cost, paid, startMana = nil, nil, nil, nil
 	Update()
 end
 
@@ -187,7 +213,7 @@ function ns.DescribeManaCost()
 	return ("mana cost: resource bar %s (%s), player frame %s (%s), casting %s, cost %s"):format(
 		db.manaCostDisplay and "on" or "off", ns.DescribeManaBar(bars.display),
 		db.manaCostPortrait and "on" or "off", ns.DescribeManaBar(bars.portrait),
-		casting and "a spell" or "nothing", Readable(cost) and tostring(cost) or cost and "secret" or "none")
+		casting and (paid and "a spell (paid at its start)" or "a spell") or "nothing", Readable(cost) and tostring(cost) or cost and "secret" or "none")
 end
 
 local watcher = CreateFrame("Frame")
@@ -212,9 +238,16 @@ watcher:SetScript("OnEvent", function(_, event, _, arg2, spellID)
 	elseif event == "PLAYER_ENTERING_WORLD" or event == "UNIT_DISPLAYPOWER" then
 		-- (A frame on: our mana bar comes or goes on these too, PersonalMana.lua.)
 		C_Timer.After(0, Update)
-	elseif casting then
+	else
 		-- (Your mana changing: drawn again. arg2: the power's token; a secret
 		-- one maybe mana.)
-		if event ~= "UNIT_POWER_FREQUENT" or not Readable(arg2) or arg2 == "MANA" then Update() end
+		if event == "UNIT_POWER_FREQUENT" and (not Readable(arg2) or arg2 == "MANA") then
+			local mana = ReadMana()
+			if mana ~= lastMana then beforeMana, lastMana, changedAt = lastMana, mana, GetTime() end
+		end
+		if casting and (event ~= "UNIT_POWER_FREQUENT" or not Readable(arg2) or arg2 == "MANA") then
+			CheckPaid()
+			Update()
+		end
 	end
 end)

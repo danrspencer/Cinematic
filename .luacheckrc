@@ -321,6 +321,7 @@ read_globals = {
 	"C_SpecializationInfo",
 	"GetNumTalentTabs",
 	"LOCALIZED_CLASS_NAMES_MALE",
+	"LOCALIZED_CLASS_NAMES_FEMALE",
 	"GetTalentTabInfo",
 	"GetPartyAssignment",
 	"UnitIsConnected",

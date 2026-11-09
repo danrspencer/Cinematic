@@ -146,6 +146,45 @@ local function IsFactionLine(text)
 	return false
 end
 
+-- A class's name alone on a line ("Paladin"): the class line of a party
+-- member's short tooltip, from the game's own class names.
+local function IsClassName(text)
+	for _, names in ipairs({ LOCALIZED_CLASS_NAMES_MALE or false, LOCALIZED_CLASS_NAMES_FEMALE or false }) do
+		if type(names) == "table" then
+			for _, name in pairs(names) do
+				if text == name then
+					return true
+				end
+			end
+		end
+	end
+	return false
+end
+
+-- A unit frame's own unit (party1, target...), while its tooltip is about a
+-- unit or built by hand. A party member out of sight gets the game's short
+-- tooltip (name, guild, class, zone, right-click hint), with no unit the
+-- tooltip can give: without this, none of it was taken out (tested in videos,
+-- WoW Forever 2026-11-09, in and out of fights).
+local function FrameUnit(tooltip)
+	local ok, unit = pcall(function()
+		if tooltip.GetTooltipData then
+			local data = tooltip:GetTooltipData()
+			local kinds = Enum and Enum.TooltipDataType
+			if data and data.type ~= nil and kinds and data.type ~= kinds.Unit then
+				return nil -- (an aura's or item's tooltip, owned by the frame)
+			end
+		end
+		local owner = tooltip:GetOwner()
+		local unit = owner and owner.unit
+		if type(unit) ~= "string" or (issecretvalue and issecretvalue(unit)) then
+			return nil
+		end
+		return unit
+	end)
+	return ok and unit or nil
+end
+
 -- The "<Right click for Frame Settings>" line of a unit frame's tooltip.
 local function IsHintLine(text)
 	local hint = type(UNIT_POPUP_RIGHT_CLICK) == "string" and UNIT_POPUP_RIGHT_CLICK or nil
@@ -212,6 +251,12 @@ local function LinesToCut(tooltip, count, unit, object)
 				return enemy and "LevelEnemy" or "Level"
 			elseif className and isPlayer and text:find(className, 1, true) then
 				return "Spec" -- (a player's "Fury Warrior")
+			elseif unit and IsClassName(text) then
+				return "Spec" -- (a party member's short tooltip: the class alone)
+			elseif unit and IsClassName(Left(i - 1):GetText()) then
+				return "Spec" -- (and the zone under the class there: "Stormwind City")
+			elseif i == 2 and unit and Left(3) and IsClassName(Left(3):GetText()) then
+				return "Guild" -- (the short tooltip's guild, over its class: "Requiem")
 			elseif Same(text, creatureType) then
 				return "Type"
 			elseif IsFactionLine(text) then
@@ -308,6 +353,13 @@ local function CutLines(tooltip, object)
 		local _, u = tooltip:GetUnit()
 		unit = u
 	end)
+	-- (No unit, or a secret one, as in instances and fights: the frame's own.)
+	local okPlain, plain = pcall(function()
+		return not (issecretvalue and issecretvalue(unit)) and unit ~= nil
+	end)
+	if not (okPlain and plain) and not object then
+		unit = FrameUnit(tooltip)
+	end
 	local cut = LinesToCut(tooltip, count, unit, object)
 	if not next(cut) then
 		return
@@ -520,7 +572,7 @@ local function ShowLater(tooltip)
 			pcall(tooltip.SetUnit, tooltip, unit)
 		end
 		refilling = false
-	elseif unit then
+	elseif unit or FrameUnit(tooltip) then
 		CutLines(tooltip)
 	elseif IsWorldObject(tooltip) then
 		CutLines(tooltip, true)
@@ -725,7 +777,7 @@ function ns.HookTooltipParts()
 	-- to fit them. (cutting: our own Show, as CutLines resizes it.)
 	local cutting = false
 	hooksecurefunc(GameTooltip, "Show", function(tooltip)
-		if cutting or refilling or not AnyLineCut() or not TooltipUnit(tooltip) then
+		if cutting or refilling or not AnyLineCut() or not (TooltipUnit(tooltip) or FrameUnit(tooltip)) then
 			return
 		end
 		cutting = true

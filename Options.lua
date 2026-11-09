@@ -13840,7 +13840,7 @@ local function CreateExtrasPanel()
 			group.title = group.title or row.known.suite
 		end
 		for _, row in ipairs(notes) do
-			local group = Group(row.note.addon)
+			local group = Group(GroupOf(row.note.addon)) -- (a suite's part's under the suite)
 			group.notes[#group.notes + 1] = row
 			group.loaded = group.loaded or ns.AddOnLoaded(row.note.addon)
 			group.title = group.title or row.note.label

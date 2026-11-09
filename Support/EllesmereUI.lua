@@ -118,6 +118,17 @@ for _, known in ipairs({
 	table.insert(ns.ADDON_FRAMES, known)
 end
 
+-- Its unit frames have no row here: they follow the game's on the Game Frames
+-- page. A note says so, so they're not looked for on this page.
+table.insert(ns.ADDON_NOTES, {
+	addon = "EllesmereUIUnitFrames", label = "Unit Frames",
+	works = L["Follow the Game Frames page's rows"],
+	about = L["Its player, target, target of target and focus frames fade with the Player frame, Target, " ..
+		"Target of target and Focus rows on the Game Frames page, its party frames with Party frames and its " ..
+		"raid frames with Players. " ..
+		"Set when they come back, or tick Always, there. Hover Find leaves them out and says which row."],
+})
+
 -- The core: its visibility pass sets its frames' alpha (and some of the
 -- game's) a frame after target changes and the like. Fade them again
 -- straight after, from its own list of visibility updates (kept last in it:
@@ -336,6 +347,11 @@ local function FindChat()
 			ok, data = pcall(chatData, chatFrame)
 		end
 		if ok and type(data) == "table" then
+			-- (Its panel draws the window's lines, not the chat frame: a
+			-- message peeking the window brings the panel up with it.)
+			if IsUsable(data.bg) then
+				ns.chatPeekPanels[chatFrame] = data.bg
+			end
 			for _, key in ipairs({ "bg", "sidebar", "scrollBtn" }) do
 				if IsUsable(data[key]) then
 					parts[data[key]] = true

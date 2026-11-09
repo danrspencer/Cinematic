@@ -344,7 +344,16 @@ local function ChannelPeekName(number, baseName, channelString)
 end
 ns.chatPeekUntil = {} -- [chat frame] = GetTime() when it may fade again
 ns.chatPeekHolders = {} -- [frame] = true: holds a peeking chat window (Frames.lua)
+-- [chat frame] = the frame that draws its lines instead, where an addon draws
+-- them on a panel of its own (EllesmereUI's chat): peeking the window brings
+-- that panel up too, or nothing shows.
+ns.chatPeekPanels = {}
 function ns.MarkChatHolders(frame)
+	local panel = ns.chatPeekPanels[frame]
+	if panel then
+		ns.chatPeekHolders[panel] = true
+		ns.MarkChatHolders(panel)
+	end
 	local parent = frame:GetParent()
 	while parent and parent ~= UIParent do
 		ns.chatPeekHolders[parent] = true

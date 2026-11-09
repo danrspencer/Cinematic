@@ -8448,9 +8448,13 @@ function ns.ReportFrames(text)
 	ns.Print(("addon on %s, CineMode %s, Game Frames switch %s, unit parts switch %s, in combat %s"):format(
 		tostring(ns.db.enabled), ns.lastCinematic and "on" or ("off: " .. tostring(ns.cineOffWhy)),
 		tostring(ns.db.handleFrames), tostring(ns.db.handleUnitFrames), tostring(InCombatLockdown())))
+	-- ([group]: only that fade group, exactly: [party] leaves out the raid-style
+	-- party frames' parts and the game's hidden party frames.)
+	local onlyGroup = text:match("^%[(.+)%]$")
 	for _, entry in ipairs(ns.managed) do
 		local name = entry.name or entry.frame:GetDebugName()
-		if name:lower():find(text, 1, true) or entry.group:lower():find(text, 1, true) then
+		if (onlyGroup and entry.group:lower() == onlyGroup)
+			or (not onlyGroup and (name:lower():find(text, 1, true) or entry.group:lower():find(text, 1, true))) then
 			found = true
 			local frame = entry.frame
 			local function Number(value)
@@ -8470,6 +8474,24 @@ function ns.ReportFrames(text)
 				parent and (parent:GetName() or parent:GetDebugName()) or "none",
 				tostring(parent and parent:IsShown()), Number(parent and parent:GetAlpha()),
 				Number(frame.GetEffectiveAlpha and frame:GetEffectiveAlpha())))
+			-- (The parents above, up to UIParent: an addon's wrapper at alpha 0,
+			-- like EllesmereUI's player frame's, hides it whatever its row says.)
+			local chain, up = {}, parent and parent:GetParent()
+			while up and up ~= UIParent and #chain < 4 do
+				chain[#chain + 1] = ("%s %s"):format(up:GetName() or "unnamed", Number(up:GetAlpha()))
+				up = up:GetParent()
+			end
+			if #chain > 0 then
+				ns.Print("  above: " .. table.concat(chain, " < "))
+			end
+			-- (The Game Frames row it follows, and that row's settings.)
+			local rowKey = ns.HoverRowFor(entry)
+			local rowLabel
+			for _, row in ipairs(ns.HOVER_ROWS) do
+				if row.key == rowKey then rowLabel = row.label end
+			end
+			ns.Print(("  row %s (%s): Always %s, In combat %s"):format(tostring(rowKey), tostring(rowLabel or "-"),
+				tostring(ns.IsCineShowOn(rowKey)), tostring(ns.IsCombatShowOn(rowKey))))
 			-- (Where it sits, and how many of its parts the Unit Frames grid holds hidden.)
 			local ok, point, relativeTo, relativePoint, x, y = pcall(frame.GetPoint, frame, 1)
 			local held = 0
@@ -10212,7 +10234,34 @@ do
 		return not (game or source == ADDON_NAME or IsWindow(frame, name))
 	end
 
-	local function CheckUnderMouse()
+	-- Under the cursor, a frame faded already as a Game Frames row (an addon's
+	-- unit frames standing in for the game's): said once which row, so it's
+	-- clear where to set it rather than nothing happening.
+	local told = {} -- row keys told so far this time
+	local function TellFollowedRow()
+		local focus = MouseFocus()
+		while focus and focus ~= UIParent and not IsForbidden(focus) do
+			if seen[focus] then
+				for _, entry in ipairs(ns.managed) do
+					if entry.frame == focus then
+						local key = ns.HoverRowFor(entry)
+						for _, row in ipairs(ns.HOVER_ROWS) do
+							if row.key == key and not told[key] then
+								told[key] = true
+								ns.Print(L["This frame fades with the %s row on the Game Frames page: set it there."]
+									:format(row.label))
+							end
+						end
+						return
+					end
+				end
+			end
+			focus = focus:GetParent()
+		end
+	end
+
+	-- Picks the frame under the cursor: true if it did.
+	local function PickUnderMouse()
 		local frame, inner = GetTopLevelFrameUnderMouse(Pickable)
 		-- One already picked or faded can sit over one that isn't (an action bar
 		-- addon's buttons over its art bar): the smallest one under the cursor
@@ -10242,6 +10291,13 @@ do
 		ShowOverlay(frame, name)
 		ns.Print(L["found %s"]:format(name) .. (source and (" (" .. source .. ")") or ""))
 		AddModeChanged()
+		return true
+	end
+
+	local function CheckUnderMouse()
+		if not PickUnderMouse() then
+			TellFollowedRow()
+		end
 	end
 
 	-- The frames picked so far, in the order found.
@@ -10318,7 +10374,7 @@ do
 			overlay:Hide()
 		end
 		local names = pending
-		pending, overlays, skipped = {}, {}, {}
+		pending, overlays, skipped, told = {}, {}, {}, {}
 		return names
 	end
 
