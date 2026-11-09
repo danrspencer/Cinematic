@@ -38,7 +38,7 @@ local function CampfireNames()
 	return names
 end
 
-local CENTER_REACH = 0.25 -- how near the middle the cursor must be: this much of the screen's height
+local CENTER_REACH = 0.1 -- how near the middle the cursor must be: this much of the screen's height
 local OBJECT_REACH = 40  -- UI units the cursor may wander from where a hidden tooltip's campfire was found
 local LINGER = 1.5       -- seconds a sighting of the fire counts for, to bring it up
 local REST = 2.5         -- seconds after it's gone before it can show again
@@ -63,6 +63,8 @@ local signaledFor        -- the hoverSince CAMPFIRE_REST was signaled for (once 
 local shownX, shownY     -- where you stood as it showed (yards)
 local walkedOff = false  -- moved (or WALK_OFF from there): going, whatever the cursor's on
 local leftIcon = false   -- the cursor has moved off it: going
+local restX, restY       -- where you stood as CAMPFIRE_REST was signaled (yards), or nil
+local restOut = false    -- CAMPFIRE_REST signaled, CAMPFIRE_LEFT not yet
 local blockedLogged, fadingLogged = false, false -- (logged once each, for /cine log)
 
 local function CursorPosition()
@@ -321,13 +323,15 @@ function ns.TentTest(clear, side)
 	end
 end
 
--- Whether you've moved WALK_OFF yards from where you stood as it showed.
-local function WalkedOff()
-	if not shownX then
+-- Whether you've moved WALK_OFF yards from fromX, fromY (where it showed, if
+-- not given).
+local function WalkedOff(fromX, fromY)
+	fromX, fromY = fromX or shownX, fromY or shownY
+	if not fromX then
 		return false
 	end
 	local x, y = PlayerPosition()
-	return x ~= nil and (x - shownX) ^ 2 + (y - shownY) ^ 2 > WALK_OFF * WALK_OFF
+	return x ~= nil and (x - fromX) ^ 2 + (y - fromY) ^ 2 > WALK_OFF * WALK_OFF
 end
 
 -- Whether the cursor is on a campfire now: its tooltip is up, or (with
@@ -410,6 +414,7 @@ local function OnUpdate(_, elapsed)
 			-- wait, not after a click. Emote Vision's card and triggers hear it.)
 			if now - hoverSince >= HOVER and now >= restUntil and not dismissed and signaledFor ~= hoverSince then
 				signaledFor = hoverSince
+				restOut, restX, restY = true, PlayerPosition()
 				ns.Signal("CAMPFIRE_REST", lastText)
 			end
 		else
@@ -428,6 +433,13 @@ local function OnUpdate(_, elapsed)
 		-- report, like a knockback.)
 		if alpha > 0 and not walkedOff and (ns.playerMoving or WalkedOff()) then
 			walkedOff = true
+		end
+		-- (Moving away puts Emote Vision's campfire card away too, by the
+		-- same rule as the button: CAMPFIRE_LEFT, once per CAMPFIRE_REST.)
+		if restOut and (ns.playerMoving or WalkedOff(restX, restY)) then
+			restOut, restX, restY = false, nil, nil
+			ns.Log("campfire", "moved away from the campfire: CAMPFIRE_LEFT")
+			ns.Signal("CAMPFIRE_LEFT")
 		end
 	end
 	-- It shows under the cursor, so once it's up the cursor leaving it puts it

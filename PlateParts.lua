@@ -83,6 +83,16 @@ local function EachPartFrame(unitFrame, part, fn, ...)
 	end
 end
 
+-- A part's frames on a unit frame, as a list (Heal Vision's plates fade the
+-- layers inside them: HealVisionFrames.lua).
+function ns.PlatePartFrames(unitFrame, part)
+	local list = {}
+	if PART_FRAMES[part] then
+		EachPartFrame(unitFrame, part, function(frame) list[#list + 1] = frame end)
+	end
+	return list
+end
+
 -- The game sets some of these parts' alpha itself (the cast bar fades out
 -- after a cast), so while a part is faded its alpha is put back to ours every
 -- frame, as with the plates. [part frame] = alpha.
@@ -395,9 +405,93 @@ local function UnitOf(plate)
 	return plate.namePlateUnitToken or (plate.UnitFrame and plate.UnitFrame.unit)
 end
 
+-- Health fill (the Heal Vision page's Health fill tick; idea and first code by
+-- pkecerski): our text is drawn grey, and a colored copy of it goes over it,
+-- clipped to the filled part of a see-through status bar laid over the text.
+-- A StatusBar takes the game's health as it is (secret values too), so no
+-- numbers are read or compared here.
+-- Fill.texts[our text] = { bar = StatusBar, clip = clipping frame, lit = colored copy }.
+-- (All in one table: this file is near Lua's limit of 200 locals.)
+local Fill = { texts = {}, GREY = { 0.45, 0.45, 0.45 } } -- (GREY: the missing health's part of the name)
+
+function Fill.On()
+	-- (Heal Vision page's tick: off with its page switched off, ns.Setting.)
+	return ns.Setting("plateNameHealthFill") and true or false
+end
+
+-- A text's fill, made the first time it's needed.
+function Fill.Of(text)
+	local fill = Fill.texts[text]
+	if fill then
+		return fill
+	end
+	local unitFrame = text:GetParent()
+	local bar = CreateFrame("StatusBar", nil, unitFrame)
+	bar:SetStatusBarTexture("Interface\\Buttons\\WHITE8X8")
+	bar:SetStatusBarColor(0, 0, 0, 0) -- (only its filled part's size is used)
+	bar:SetMinMaxValues(0, 1)
+	bar:SetValue(1)
+	bar:SetAllPoints(text)
+	bar:SetFrameLevel((unitFrame.GetFrameLevel and unitFrame:GetFrameLevel() or 0) + 10)
+	local clip = CreateFrame("Frame", nil, bar)
+	clip:SetClipsChildren(true)
+	clip:SetAllPoints(bar:GetStatusBarTexture())
+	local lit = clip:CreateFontString(nil, "OVERLAY")
+	lit:SetPoint("CENTER", text, "CENTER", 0, 0)
+	fill = { bar = bar, clip = clip, lit = lit }
+	Fill.texts[text] = fill
+	-- (Its copy gets its font with the text's look: drawn anew now, or the copy
+	-- has none and shows nothing till that look next changes.)
+	text.dirty = true
+	return fill
+end
+
+-- How far a fill's bar is filled: the unit's health. Its share of the most
+-- where the client has one (others' max health is secret on WoW Forever),
+-- else health of the most.
+function Fill.Health(fill, unit)
+	if UnitHealthPercent then
+		local ok = pcall(function()
+			fill.bar:SetMinMaxValues(0, 1)
+			fill.bar:SetValue(UnitHealthPercent(unit))
+		end)
+		if ok then return end
+	end
+	pcall(function()
+		fill.bar:SetMinMaxValues(0, UnitHealthMax(unit))
+		fill.bar:SetValue(UnitHealth(unit))
+	end)
+end
+
+-- Colors our text: with the fill on, its colored copy takes the color and
+-- the text itself goes grey (the part of the name past the unit's health).
+function Fill.Colour(text, r, g, b)
+	local fill = Fill.texts[text]
+	if fill and fill.bar:IsShown() then
+		fill.lit:SetTextColor(r, g, b)
+		text:SetTextColor(Fill.GREY[1], Fill.GREY[2], Fill.GREY[3])
+	else
+		text:SetTextColor(r, g, b)
+	end
+end
+
+-- Our text's colored copy while it's drawn with its health fill (nil: none),
+-- for its title line's color (PlateGuild.lua).
+function ns.PlateNameLit(text)
+	local fill = text and Fill.texts[text]
+	return fill and fill.bar:IsShown() and fill.lit or nil
+end
+
 -- Draws our text over the game's name: its look when that changed (dirty),
 -- then its words and colour, which the game may change at any time.
 local function DrawName(text, name, unit)
+	-- (Only the main text gets a fill, not a swap's ghost copy.)
+	local filled = Fill.On() and texts[text:GetParent()] == text
+	local fill = filled and Fill.Of(text) or Fill.texts[text]
+	if fill then
+		fill.bar:SetShown(filled) -- (hidden with the text: OwnName)
+		if filled then Fill.Watch() end -- (again after the tick's been off)
+	end
 	if text.dirty then
 		text.dirty = nil
 		local object = name.GetFontObject and name:GetFontObject()
@@ -417,6 +511,13 @@ local function DrawName(text, name, unit)
 		else
 			text:SetShadowOffset(0, 0)
 		end
+		-- (The fill's colored copy in the same look, so its letters sit
+		-- exactly on the grey ones. Its shadow is left off: the grey text's
+		-- shows under both.)
+		if fill then
+			SetNameFont(fill.lit, object, file, size, text.size, Outlined(flags, Style("plateNameOutline")))
+			fill.lit:SetShadowOffset(0, 0)
+		end
 		-- (Further off, lower: a plate's name sits a fixed height over the unit's
 		-- head, and the game's names over heads come down closer to it with distance.)
 		text:ClearAllPoints()
@@ -429,6 +530,9 @@ local function DrawName(text, name, unit)
 	end
 	if ok then
 		pcall(text.SetText, text, words)
+		if fill then
+			pcall(fill.lit.SetText, fill.lit, words)
+		end
 	end
 	-- (Colour only: on WoW Forever a FontString's colour carries its alpha, and
 	-- the game's name is faded out under ours, so its alpha is 0, tested.)
@@ -462,6 +566,15 @@ local function DrawName(text, name, unit)
 	if targetTint and targetTint.name and text.baseR then
 		text:SetTextColor(Blend(text.baseR, text.baseG, text.baseB, targetTint, "name"))
 	end
+	-- (With the fill on: the color just painted goes to the colored copy,
+	-- straight from text to text so a secret color passes too, and the text
+	-- itself goes grey.)
+	if fill and filled then
+		pcall(function() fill.lit:SetTextColor(text:GetTextColor()) end)
+		fill.lit:SetAlpha(1)
+		text:SetTextColor(Fill.GREY[1], Fill.GREY[2], Fill.GREY[3])
+		Fill.Health(fill, unit)
+	end
 	text:SetAlpha(alpha)
 	-- Retail's plates grow as their units come nearer: undone, for one size.
 	if ns.isRetail and text.SetScale then
@@ -474,6 +587,9 @@ local function DrawName(text, name, unit)
 			end
 		end
 		text:SetScale(scale)
+		if fill then
+			fill.lit:SetScale(scale)
+		end
 	end
 end
 
@@ -496,6 +612,9 @@ local function OwnName(plate, alpha)
 	if not (alpha and alpha >= 0 and unit and Usable(name)) then
 		if text then
 			text:Hide()
+			if Fill.texts[text] then
+				Fill.texts[text].bar:Hide()
+			end
 		end
 		if ghost then
 			ghost:Hide()
@@ -514,6 +633,10 @@ local function OwnName(plate, alpha)
 	DrawName(text, name, unit)
 	text:SetAlpha(alpha * into)
 	text:Show()
+	local fill = Fill.texts[text]
+	if fill and fill.bar:IsShown() then
+		fill.bar:SetAlpha(alpha * into) -- (the colored copy fades with the text)
+	end
 	local swap = swaps[plate]
 	if swap and share < 1 then
 		if not ghost then
@@ -1738,7 +1861,7 @@ do
 					local text = texts[unitFrame]
 					if text and text.baseR then
 						local alpha = text:GetAlpha()
-						text:SetTextColor(Blend(text.baseR, text.baseG, text.baseB, tint, "name"))
+						Fill.Colour(text, Blend(text.baseR, text.baseG, text.baseB, tint, "name"))
 						text:SetAlpha(alpha)
 					end
 				end
@@ -1766,7 +1889,7 @@ do
 		local text = texts[unitFrame]
 		if text and text.baseR then
 			local alpha = text:GetAlpha()
-			text:SetTextColor(text.baseR, text.baseG, text.baseB)
+			Fill.Colour(text, text.baseR, text.baseG, text.baseB)
 			text:SetAlpha(alpha)
 		end
 		tints[unitFrame] = nil
@@ -2757,6 +2880,38 @@ end))
 
 function ns.WatchFarNames()
 	farWatch:Show()
+end
+
+-- Health fill: a plate's fill follows its unit's health as it changes.
+-- Listened to only once a fill's been made, and dropped while the tick's off
+-- (UNIT_HEALTH comes for every unit). UNIT_HEALTH_FREQUENT only on clients
+-- that still have it.
+do
+	local healthWatch = CreateFrame("Frame")
+	local watching = false
+	function Fill.Watch()
+		if watching then return end
+		watching = true
+		for _, event in ipairs({ "UNIT_HEALTH", "UNIT_MAXHEALTH", "UNIT_HEALTH_FREQUENT" }) do
+			pcall(healthWatch.RegisterEvent, healthWatch, event)
+		end
+	end
+	healthWatch:SetScript("OnEvent", function(self, _, unit)
+		if not Fill.On() then
+			self:UnregisterAllEvents()
+			watching = false
+			return
+		end
+		if type(unit) ~= "string" or not unit:find("^nameplate") then
+			return
+		end
+		local plate = C_NamePlate and C_NamePlate.GetNamePlateForUnit and C_NamePlate.GetNamePlateForUnit(unit)
+		local text = plate and plate.UnitFrame and texts[plate.UnitFrame]
+		local fill = text and Fill.texts[text]
+		if fill and fill.bar:IsShown() then
+			Fill.Health(fill, unit)
+		end
+	end)
 end
 
 -- /cine debug names: every 0.1 s, each player's plate's name state, logged

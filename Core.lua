@@ -503,7 +503,7 @@ DEFAULTS.fishRightClickReel = true -- right-click, the Fishing action bar key an
 DEFAULTS.fishRecastDelay = 0.3    --...seconds after a cast ends before it does
 DEFAULTS.fishMissPause = 30        -- ...seconds it stands aside after a cast misses the water
 DEFAULTS.hideFishingCastBar = true -- no cast bar while it shows Fishing (other spells still show it)
-DEFAULTS.fishVolume = false        -- while fishing, the game's volumes go up to these (never down)...
+DEFAULTS.fishVolume = true         -- while fishing, the game's volumes go up to these (never down)...
 DEFAULTS.fishMasterVolume = 1      -- ...master volume (0 to 1)
 DEFAULTS.fishSfxVolume = 1         -- ...sound effects volume (the splash of a bite)
 DEFAULTS.fishVolumeBackground = true -- ...and sound plays with the game in the background
@@ -580,7 +580,8 @@ ns.EFFECT_GRID = { "letterbox", "tint", "vignette", "weather" }
 -- first hover (tooltipShow<part>First) and after tooltipFullAfter seconds
 -- (...Later). To start with, just the border at first and all after.
 -- (Level: units you can't attack; LevelEnemy: ones you can. Hint: the
--- "<Right click for Frame Settings>" line on unit frames' tooltips.)
+-- "<Right click for Frame Settings>" line on unit frames' tooltips, and
+-- items' green "<Right Click to Read>"-style lines.)
 ns.TOOLTIP_PARTS = { "Border", "Health", "Guild", "Level", "LevelEnemy", "Spec", "Type", "Corpse", "Faction", "Rep",
 	"Threat", "Quest", "ObjQuest", "Hint" }
 for _, part in ipairs(ns.TOOLTIP_PARTS) do
@@ -1062,6 +1063,7 @@ DEFAULTS.plateNameShadow = false -- (barely shows: off)
 DEFAULTS.plateNameShadowX = 1
 DEFAULTS.plateNameShadowY = -1
 DEFAULTS.plateNameShadowAlpha = 1
+DEFAULTS.plateNameHealthFill = false -- name-only names: the colored part shows the unit's health, the rest grey
 DEFAULTS.questVision = true -- the Quest Vision page's switch: off, none of the four below works
 -- What of units for a quest objective you haven't finished shows in CineMode
 -- (see Effects), any of: their nameplates, just their names (on their plates),
@@ -1082,7 +1084,7 @@ DEFAULTS.targetQuestIcon = false -- a quest icon on the target frame while your 
 -- off a unit Questie marks) or "both". (Was questMarkFade: unticked = both.)
 DEFAULTS.questieIcons = "ours"
 -- The nearest tracked quest's item to use on a big button at the extra ability button's spot (see QuestItemButton)
-DEFAULTS.questItemButton = true
+DEFAULTS.questItemButton = false -- (off by default since 2026-11-09)
 DEFAULTS.questItemFade = true -- it stays away while another addon has a button for the item (ns.QuestieItemButton)
 DEFAULTS.questObjectGlow = false -- the quest object soft targeting picks glows (see QuestGlow; changes interact settings)
 DEFAULTS.hideObjectIcons = false -- the game's icon over objects held off while the glow isn't (QuestGlow)
@@ -1314,7 +1316,7 @@ for _, class in ipairs({ "WARRIOR", "PALADIN", "HUNTER", "ROGUE", "PRIEST", "DEA
 	"WARLOCK", "MONK", "DRUID", "DEMONHUNTER", "EVOKER" }) do
 	DEFAULTS["swingRangedOnTop" .. class] = false
 end
-DEFAULTS.handleFishing = true -- right-click casting and the cast bar
+DEFAULTS.handleFishing = false -- right-click casting and the cast bar
 -- The Nameplates grid's rows for particular units, over the kinds above (see
 -- Effects): your target, your pet, and your party or raid's players and their
 -- pets. Same columns as the kinds. Your target and group members (with their
@@ -1391,7 +1393,7 @@ DEFAULTS.handleUnitFrames = true -- the Unit Frame Parts page's switch
 -- (handle<page>): off, none of the page's helpers work. ns.Setting reads one
 -- of them as its page's switch leaves it.
 DEFAULTS.handleQuality = true -- Quality of life > General
-DEFAULTS.handleHunter = true
+DEFAULTS.handleHunter = false
 DEFAULTS.handleHealVision = true -- (read by ns.HealVisionHere; Quest Vision's switch is questVision)
 local PAGE_SWITCH = {}
 for page, keys in pairs({
@@ -1400,6 +1402,7 @@ for page, keys in pairs({
 		"reloadButton", "reloadKeepWindows" },
 	handleHunter = { "hunterRightClickShot", "hunterAmmoSort", "hunterQuiverFill", "petUnhappyShow" },
 	duelPlates = { "duelCC", "duelHideOthers" }, -- Duel Vision's page
+	handleHealVision = { "plateNameHealthFill", "healVisionPlates" }, -- Heal Vision's page: its Names and Nameplates ticks
 	-- The Cards page's rows (Cards.lua) and the time of day at login.
 	cards = { "combatOnEnter", "combatOnLeave", "cardBossOn", "storyZoneCard", "storyZoneSubzones", "storyRecap",
 		"timeOfDayMessage", "timeOfDayChange", "chatAttackAlert", "cardDuelOn", "cardDeathOn", "cardLevelUpOn",
@@ -1509,6 +1512,12 @@ end
 -- Vendors, Repair, Trainers and Professions on by default; the rest off.
 DEFAULTS.nameServiceShow = "title"
 DEFAULTS.nameServiceBrackets = false -- the < > round NPC titles under names
+-- Trainers: another class's trainer (<Hunter Trainer>) left out.
+DEFAULTS.nameServiceClassOnly = true
+-- Each kind's icon in place of titles (PlateGuild's SERVICE_ICONS); Other's
+-- names instead.
+DEFAULTS.nameServiceIcons = false
+DEFAULTS.nameServiceIconScale = 1 -- (their size, 0.5 to 2)
 for _, kind in ipairs({ "Vendor", "Repair", "Trainer", "Profession" }) do
 	DEFAULTS["nameService" .. kind] = true
 end
@@ -5493,6 +5502,18 @@ ticker:SetScript("OnEvent", ns.Profiled("Core events", function(self, event, arg
 				end
 			end
 			ns.db.questGlowOffV1 = true
+		end
+		-- Quest item button off to start with now (2026-11-09). Off in every
+		-- profile. Once: tick it again and it stays.
+		if not ns.db.questItemButtonOffV1 then
+			ns.db.questItemButton = false
+			for _, saved in pairs(ns.db.profiles or {}) do
+				if type(saved) == "table" then
+					saved.questItemButton = nil
+					if type(saved.settings) == "table" then saved.settings.questItemButton = nil end
+				end
+			end
+			ns.db.questItemButtonOffV1 = true
 		end
 		-- Boss defeated's card waits till after the fight now (it showed in the
 		-- middle of it, with adds still up). Once: pick Show again and it stays.

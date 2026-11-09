@@ -2032,6 +2032,20 @@ function ns.EmoteVisionCampfire(name)
 		line = L["rest a while by the fire"], group = true, icon = "Interface\\Icons\\Spell_Fire_Fire" })
 end
 ns.Listen("CAMPFIRE_REST", ns.EmoteVisionCampfire, ns.EmoteVisionCampfireOn)
+-- Moved away from the fire (Campfire.lua's CAMPFIRE_LEFT, as its button goes):
+-- its card fades too, and one still waiting is dropped.
+ns.Listen("CAMPFIRE_LEFT", function()
+	for i = #queue, 1, -1 do
+		if queue[i].kind == "Campfire" then
+			table.remove(queue, i)
+			ns.Log("emote", "Campfire card dropped unseen: moved away from the fire")
+		end
+	end
+	if showing and showing.kind == "Campfire" and not showing.test and card and card:IsShown() and not card.leaving then
+		ns.Log("emote", "Campfire card going: moved away from the fire")
+		Hide()
+	end
+end, ns.EmoteVisionCampfireOn)
 
 -- Your duel's end (Effects.lua's duel line): moment "won" or "lost", other
 -- the one you fought.

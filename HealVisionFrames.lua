@@ -78,6 +78,8 @@ end
 local function Floor(kind)
 	local floor = tonumber(Setting(kind.alpha)) or 0
 	if kind.raise then floor = math.max(floor, tonumber(Setting(kind.raise)) or 1) end
+	-- (The plate under the mouse: Mouseover, at least. See the plates' HoverOf.)
+	if kind.raiseHover then floor = math.max(floor, tonumber(Setting(kind.raiseHover)) or 0) end
 	return floor
 end
 
@@ -90,7 +92,8 @@ local function Shown(step, kind)
 end
 
 -- Health percent to alpha: 1 below the kind's health setting; at or above
--- it, Shown(step). 100% there means any damage (full is 1), 0% never.
+-- it, Shown(step). 100% there means always (full health too), on every
+-- line, as tanks' always did; 99% is any damage. 0% never.
 local function Curve(step, kind)
 	local floor = Floor(kind)
 	local below = Setting(kind.below)
@@ -107,8 +110,10 @@ local function Curve(step, kind)
 	local ok, curve = pcall(C_CurveUtil.CreateCurve)
 	if ok and curve then
 		curve:SetType(Enum.LuaCurveType.Step)
-		below = math.min(tonumber(below) or 0.95, 0.9995)
-		if below > 0 then
+		below = tonumber(below) or 0.95
+		if below >= 1 then
+			curve:AddPoint(0, 1) -- (100%: always shown, at full health too, on every line)
+		elseif below > 0 then
 			curve:AddPoint(0, 1)
 			curve:AddPoint(below, Shown(step, kind))
 		else
@@ -692,6 +697,7 @@ function ns.ApplyHealVisionFrames()
 	sinceScan = RESCAN_EVERY
 	Scan()
 	UpdateAll()
+	if ns.ApplyHealVisionPlates then ns.ApplyHealVisionPlates() end -- (the plates go by the same settings: below)
 end
 
 -- Whether it's handling any frames now (the minimap button's glow).
@@ -876,4 +882,357 @@ function ns.HealWatchDebug(seconds)
 		end
 	end)
 	ns.Print(("healwatch: logging the raid frames' alpha for %d seconds"):format(seconds))
+end
+
+-- Heal Vision on nameplates (the page's Nameplates tick): a friendly
+-- player's or minion's plate (yours too: your pet) shows only while they need
+-- healing, by the same health and opacity settings as the frames (their
+-- role's: tanks, healers, damage, pets), your target's raise and the dead's
+-- opacity. Its parts fade but those ticked in Don't fade (the name, to start
+-- with). As on the frames, the addon never knows anyone's health: it goes
+-- through the kind's curve straight into each layer's alpha.
+-- The Plate parts grid sets its own alpha on each part's frame (PlateParts.lua
+-- PART_FRAMES), and a secret alpha can't be multiplied with it here, so the
+-- fade goes one layer down: the textures, texts and frames inside each part's
+-- frame (a part that is a texture or text itself: that). Each layer's own
+-- alpha is noted the first time and the curve scaled by it, so a faint one
+-- (a highlight) never comes back brighter, and given back when let go.
+-- Plates the game locks (friendly ones in dungeons and raids) aren't reachable.
+-- In CineMode or not: it's for healing.
+ns.DEFAULTS.healVisionPlates = false
+-- The parts it can fade (as the Plate parts grid names them), each with a
+-- Don't fade tick: healVisionPlatesKeep<part>. Only the name kept to start with.
+ns.HEAL_PLATE_PARTS = { "Health", "Name", "CastBar", "Buffs", "Debuffs", "RaidMarker", "Level", "Highlight",
+	"Widgets" }
+for _, part in ipairs(ns.HEAL_PLATE_PARTS) do
+	ns.DEFAULTS["healVisionPlatesKeep" .. part] = part == "Name"
+end
+local plateLayers = {} -- [nameplate unit] = { [layer] = its own alpha }, the layers faded on its plate
+local plateParts = {} -- [nameplate unit] = { [part] = layers faded } (for /cine debug healplates)
+
+local function Reachable(region)
+	if type(region) ~= "table" or not region.SetAlpha then return false end
+	local forbidden = Forbidden(region)
+	return not (Secret(forbidden) or forbidden)
+end
+
+-- A plate's unit frame, if the game lets addons at it.
+local function PlateFrame(unit)
+	local plate = C_NamePlate and C_NamePlate.GetNamePlateForUnit and C_NamePlate.GetNamePlateForUnit(unit)
+	local unitFrame = plate and plate.UnitFrame
+	return Reachable(unitFrame) and unitFrame or nil
+end
+
+-- The layers to fade on a plate, by part: [layer] = its part; and how many
+-- each part has.
+local function PlateLayersOf(unitFrame)
+	if not ns.PlatePartFrames then return nil end
+	local found, byPart = {}, {}
+	local function Add(layer, part)
+		if Reachable(layer) and not found[layer] then
+			found[layer] = part
+			byPart[part] = (byPart[part] or 0) + 1
+		end
+	end
+	for _, part in ipairs(ns.HEAL_PLATE_PARTS) do
+		if not ns.Setting("healVisionPlatesKeep" .. part) then
+			for _, frame in ipairs(ns.PlatePartFrames(unitFrame, part)) do
+				if frame.IsObjectType and frame:IsObjectType("Frame") then
+					for _, region in ipairs({ frame:GetRegions() }) do Add(region, part) end
+					for _, child in ipairs({ frame:GetChildren() }) do Add(child, part) end
+				else
+					Add(frame, part)
+				end
+			end
+		end
+	end
+	return found, byPart
+end
+
+-- The settings a plate's unit goes by (nil: not one it fades): pets', or a
+-- player's by role (anyone not in your group has none: Damage's).
+local function PlateKindOf(unit)
+	if Plain(UnitIsUnit(unit, "player")) ~= false then return nil end
+	local kind = ns.PlateKind and ns.PlateKind(unit)
+	if kind == "FriendlyMinions" then return PETS end
+	-- (A friendly NPC only in your group: follower dungeon and delve
+	-- companions, healed like players. Guards, vendors and the rest: not.)
+	if kind == "FriendlyNPCs" then
+		local grouped = (UnitInParty and Plain(UnitInParty(unit)) == true)
+			or (UnitInRaid and type(Plain(UnitInRaid(unit))) == "number")
+		if not grouped then return nil end
+	elseif kind ~= "Friends" then
+		return nil
+	end
+	if Tank(unit) then return TANKS end
+	if Plain(UnitGroupRolesAssigned and UnitGroupRolesAssigned(unit)) == "HEALER" then return HEALERS end
+	return OTHERS
+end
+
+-- A kind's curve as Curve makes it (step 0), its values times a layer's own
+-- alpha. [kind] = { below, floor, [own] = curve (false: none) }.
+local scaledCurves = {}
+local function ScaledCurve(kind, own)
+	local below, floor = Setting(kind.below), Shown(0, kind)
+	local made = scaledCurves[kind]
+	if not made or made.below ~= below or made.floor ~= floor then
+		made = { below = below, floor = floor }
+		scaledCurves[kind] = made
+	end
+	own = math.floor(own * 100 + 0.5) / 100
+	if made[own] ~= nil then return made[own] end
+	made[own] = false
+	if not (C_CurveUtil and C_CurveUtil.CreateCurve and Enum.LuaCurveType and UnitHealthPercent) then return false end
+	local ok, curve = pcall(C_CurveUtil.CreateCurve)
+	if ok and curve then
+		curve:SetType(Enum.LuaCurveType.Step)
+		below = tonumber(below) or 0.95
+		if below >= 1 then
+			curve:AddPoint(0, own) -- (100%: always shown)
+		elseif below > 0 then
+			curve:AddPoint(0, own)
+			curve:AddPoint(below, floor * own)
+		else
+			curve:AddPoint(0, floor * own)
+		end
+		made[own] = curve
+	end
+	return made[own]
+end
+
+-- The plate under the mouse shows no fainter than Mouseover, at least (the
+-- frames' setting too; 0%: off; not the dead): [kind] = that kind with it.
+-- hoverUnit: that plate's unit (nil: none), found on UPDATE_MOUSEOVER_UNIT
+-- and let go once the mouse is off it (polled: the game says nothing then).
+local hoverKinds = {}
+local hoverUnit
+local function HoverOf(kind)
+	local made = hoverKinds[kind]
+	if not made then
+		made = { below = kind.below, alpha = kind.alpha, raise = kind.raise, raiseHover = "healVisionMouseoverAlpha" }
+		hoverKinds[kind] = made
+	end
+	return made
+end
+
+-- Gives a plate's faded layers back their own alpha: all, or those not in keep.
+local function ReleasePlate(unit, keep)
+	local layers = plateLayers[unit]
+	if not layers then return end
+	for layer, own in pairs(layers) do
+		if not (keep and keep[layer]) then
+			pcall(layer.SetAlpha, layer, own)
+			layers[layer] = nil
+		end
+	end
+	if not next(layers) then plateLayers[unit] = nil end
+end
+
+local function UpdatePlate(unit)
+	local unitFrame = PlateFrame(unit)
+	local kind = unitFrame and ns.Setting("healVisionPlates") and PlateKindOf(unit)
+	local wanted, byPart
+	if kind then wanted, byPart = PlateLayersOf(unitFrame) end
+	ReleasePlate(unit, wanted)
+	plateParts[unit] = byPart
+	if not (wanted and next(wanted)) then return end
+	local dead = UnitIsDeadOrGhost and Plain(UnitIsDeadOrGhost(unit)) == true
+	if not dead and IsTarget(unit) then kind = TargetOf(kind) end
+	if unit == hoverUnit then kind = HoverOf(kind) end
+	local layers = plateLayers[unit] or {}
+	plateLayers[unit] = layers
+	for layer in pairs(wanted) do
+		local own = layers[layer]
+		if not own then
+			-- (Its own alpha, the first time: a secret one counts as full. The
+			-- cast bar's always full: the game fades it out after each cast, and
+			-- read then, it would stay that faint.)
+			local ok, alpha = pcall(layer.GetAlpha, layer)
+			own = wanted[layer] ~= "CastBar" and ok and type(alpha) == "number" and not Secret(alpha) and alpha or 1
+			layers[layer] = own
+		end
+		local alpha = own
+		if dead then
+			alpha = Shown(0, DEAD) * own
+		else
+			local fade = ScaledCurve(kind, own)
+			if fade then
+				local ok, value = pcall(UnitHealthPercent, unit, false, fade)
+				if ok and type(value) ~= "nil" then alpha = value end
+			end
+		end
+		if not pcall(layer.SetAlpha, layer, alpha) then pcall(layer.SetAlpha, layer, own) end
+	end
+end
+
+local plateWatch = CreateFrame("Frame")
+local PLATE_EVENTS = { "NAME_PLATE_UNIT_ADDED", "NAME_PLATE_UNIT_REMOVED", "UNIT_HEALTH", "UNIT_MAXHEALTH",
+	"PLAYER_TARGET_CHANGED", "GROUP_ROSTER_UPDATE", "PLAYER_ROLES_ASSIGNED", "UNIT_FLAGS", "UPDATE_MOUSEOVER_UNIT",
+	-- (Each cast shows the cast bar afresh at full: faded again at once, and
+	-- the next frame, after the game has set it up. Seen blinking per cast
+	-- with only the half-second pass.)
+	"UNIT_SPELLCAST_START", "UNIT_SPELLCAST_STOP", "UNIT_SPELLCAST_FAILED", "UNIT_SPELLCAST_INTERRUPTED",
+	"UNIT_SPELLCAST_SUCCEEDED",
+	"UNIT_SPELLCAST_DELAYED", "UNIT_SPELLCAST_CHANNEL_START", "UNIT_SPELLCAST_CHANNEL_STOP",
+	"UNIT_SPELLCAST_EMPOWER_START", "UNIT_SPELLCAST_EMPOWER_STOP" }
+local CAST_EVENTS = {}
+for _, event in ipairs(PLATE_EVENTS) do
+	if event:find("^UNIT_SPELLCAST_") then CAST_EVENTS[event] = true end
+end
+-- A cast ending: the game flashes its cast bar and fades it out itself,
+-- setting its alpha every frame for a moment (it lit up at the end of each
+-- cast, seen on video), so that plate is faded again every frame meanwhile.
+-- Polled, not a hook on the game's cast bar. [unit] = until when.
+local CAST_ENDS = { UNIT_SPELLCAST_STOP = true, UNIT_SPELLCAST_FAILED = true, UNIT_SPELLCAST_INTERRUPTED = true,
+	UNIT_SPELLCAST_SUCCEEDED = true, UNIT_SPELLCAST_CHANNEL_STOP = true, UNIT_SPELLCAST_EMPOWER_STOP = true }
+local CAST_END_HOLD = 1 -- seconds
+local castEnding = {}
+local castHolder = CreateFrame("Frame")
+castHolder:Hide()
+
+local function UpdateAllPlates()
+	for unit in pairs(plateLayers) do UpdatePlate(unit) end
+	if not ns.Setting("healVisionPlates") then return end
+	for _, plate in ipairs(C_NamePlate and C_NamePlate.GetNamePlates and C_NamePlate.GetNamePlates() or {}) do
+		local unit = plate.namePlateUnitToken or (plate.UnitFrame and plate.UnitFrame.unit)
+		if type(unit) == "string" and not Secret(unit) then UpdatePlate(unit) end
+	end
+end
+
+-- Parts come and go on a plate (auras, a cast) and the game sets some
+-- layers' alpha itself: every plate again twice a second while it's on.
+local plateTicker
+
+-- After the tick or a Heal Vision setting changes: listened to only while
+-- it's on (UNIT_HEALTH comes for every unit), every plate faded let go when off.
+function ns.ApplyHealVisionPlates()
+	local on = ns.Setting("healVisionPlates") and true or false
+	for _, event in ipairs(PLATE_EVENTS) do
+		if on then
+			pcall(plateWatch.RegisterEvent, plateWatch, event)
+		else
+			pcall(plateWatch.UnregisterEvent, plateWatch, event)
+		end
+	end
+	if on and not plateTicker then
+		plateTicker = C_Timer.NewTicker(0.5, function() UpdateAllPlates() end)
+	elseif not on and plateTicker then
+		plateTicker:Cancel()
+		plateTicker = nil
+	end
+	UpdateAllPlates()
+end
+
+plateWatch:SetScript("OnEvent", function(_, event, unit)
+	if event == "NAME_PLATE_UNIT_REMOVED" then
+		ReleasePlate(unit) -- (the plate goes back to the game for another unit)
+		plateParts[unit] = nil
+		if hoverUnit == unit then hoverUnit = nil end
+	elseif event == "PLAYER_TARGET_CHANGED" or event == "GROUP_ROSTER_UPDATE" or event == "PLAYER_ROLES_ASSIGNED" then
+		UpdateAllPlates()
+	elseif event == "UPDATE_MOUSEOVER_UNIT" then
+		-- (Which plate's unit the mouse is on: none of them, nothing to do.)
+		local was = hoverUnit
+		hoverUnit = nil
+		for _, plate in ipairs(C_NamePlate and C_NamePlate.GetNamePlates and C_NamePlate.GetNamePlates() or {}) do
+			local each = plate.namePlateUnitToken or (plate.UnitFrame and plate.UnitFrame.unit)
+			if type(each) == "string" and not Secret(each) and Plain(UnitIsUnit(each, "mouseover")) == true then
+				hoverUnit = each
+				break
+			end
+		end
+		if was and was ~= hoverUnit then UpdatePlate(was) end
+		if hoverUnit then
+			UpdatePlate(hoverUnit)
+			castHolder:Show() -- (watches for the mouse leaving it)
+		end
+	elseif type(unit) == "string" and not Secret(unit) and unit:find("^nameplate") then
+		UpdatePlate(unit)
+		if CAST_EVENTS[event] then
+			C_Timer.After(0, function() UpdatePlate(unit) end)
+		end
+		if CAST_ENDS[event] and plateLayers[unit] then
+			castEnding[unit] = GetTime() + CAST_END_HOLD
+			castHolder:Show()
+		end
+	end
+end)
+
+ns.SetOnUpdate(castHolder, function(self)
+	-- (The mouse off the plate it was on: that plate goes back to its fade.)
+	if hoverUnit and Plain(UnitIsUnit(hoverUnit, "mouseover")) ~= true then
+		local was = hoverUnit
+		hoverUnit = nil
+		UpdatePlate(was)
+	end
+	local now = GetTime()
+	for unit, untilWhen in pairs(castEnding) do
+		if now > untilWhen or not plateLayers[unit] then
+			castEnding[unit] = nil
+		else
+			UpdatePlate(unit)
+		end
+	end
+	if not next(castEnding) and not hoverUnit then self:Hide() end
+end)
+
+-- Set up at login with the saved tick (the frames' Apply comes later too).
+plateWatch:RegisterEvent("PLAYER_LOGIN")
+plateWatch:HookScript("OnEvent", function(self, event)
+	if event == "PLAYER_LOGIN" then
+		self:UnregisterEvent("PLAYER_LOGIN")
+		ns.ApplyHealVisionPlates()
+	end
+end)
+
+-- /cine debug healplates: each plate it fades, its parts and how many layers
+-- each, and what each kind's curve gives at full health (a plain number: 1.0
+-- in, so it can be read).
+function ns.HealVisionPlatesDebug()
+	for _, pair in ipairs({ { "tanks", TANKS }, { "healers", HEALERS }, { "damage", OTHERS }, { "pets", PETS } }) do
+		local curve = Curve(0, pair[2])
+		local ok, value = false, nil
+		if curve and curve.Evaluate then ok, value = pcall(curve.Evaluate, curve, 1) end
+		ns.Print(("  curve %s: below %s, opacity %s, at full health gives %s"):format(pair[1],
+			tostring(Setting(pair[2].below)), tostring(Setting(pair[2].alpha)),
+			curve and (ok and tostring(value) or "error") or "no curve"))
+	end
+	local kept = {}
+	for _, part in ipairs(ns.HEAL_PLATE_PARTS) do
+		if ns.Setting("healVisionPlatesKeep" .. part) then kept[#kept + 1] = part end
+	end
+	ns.Print(("heal vision plates: tick %s, page %s, don't fade: %s"):format(tostring(ns.db and ns.db.healVisionPlates),
+		tostring(ns.Setting("handleHealVision")), #kept > 0 and table.concat(kept, ", ") or "nothing"))
+	-- (Plates the game locks from addons, friendly ones in dungeons and raids:
+	-- listed only when asked for, and then only counted.)
+	local okAll, all = pcall(C_NamePlate.GetNamePlates, true)
+	local okOpen, open = pcall(C_NamePlate.GetNamePlates)
+	local locked = 0
+	if okAll and type(all) == "table" then
+		for _, plate in ipairs(all) do
+			local forbidden = Forbidden(plate)
+			if Secret(forbidden) or forbidden then locked = locked + 1 end
+		end
+	end
+	local inInstance, instanceType = IsInInstance()
+	ns.Print(("  plates: %s open to addons, %s locked (in instance %s, %s)"):format(
+		okOpen and type(open) == "table" and tostring(#open) or "?", okAll and tostring(locked) or "?",
+		tostring(inInstance), tostring(instanceType)))
+	for _, plate in ipairs(C_NamePlate and C_NamePlate.GetNamePlates and C_NamePlate.GetNamePlates() or {}) do
+		local unit = plate.namePlateUnitToken or (plate.UnitFrame and plate.UnitFrame.unit)
+		if type(unit) == "string" then
+			local okName, who = pcall(UnitName, unit)
+			local kind = PlateKindOf(unit)
+			local parts = {}
+			for _, part in ipairs(ns.HEAL_PLATE_PARTS) do
+				local count = plateParts[unit] and plateParts[unit][part]
+				if count then parts[#parts + 1] = ("%s %d"):format(part, count) end
+			end
+			ns.Print(("  %s (%s): plate kind %s, settings %s, reachable %s, layers faded: %s"):format(
+				okName and not Secret(who) and tostring(who) or "?", unit, tostring(ns.PlateKind and ns.PlateKind(unit)),
+				kind == TANKS and "tanks" or kind == HEALERS and "healers" or kind == PETS and "pets"
+					or kind == OTHERS and "damage" or "none",
+				tostring(PlateFrame(unit) ~= nil), #parts > 0 and table.concat(parts, ", ") or "none"))
+		end
+	end
 end

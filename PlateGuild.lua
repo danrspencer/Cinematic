@@ -11,9 +11,6 @@ local L = ns.L
 
 local lines = {} -- [plate] = guild text
 local shares = {} -- [plate] = how far its name shows on a name-only plate (0 to 1)
--- [plate] = how much of its name's own text shows (nil: all). Less with the
--- Service NPCs row showing titles alone: the title moves up into its place.
-local textShares = {}
 -- [plate] = its NPC's title, or false for none; nil not read yet (or the
 -- game wouldn't say: read again in a while, or after the fight).
 local titles = {}
@@ -21,6 +18,14 @@ local titleTried = {} -- [plate] = when its title was last asked for and not giv
 local titleUnit = {} -- [plate] = the GUID its title is for (a plate given a new unit reads it anew)
 local serviceMatch = {} -- [plate] = whether its title fits a Service NPCs kind ticked; nil not worked out yet
 local TITLE_RETRY = 2 -- seconds
+local ServiceIcon -- (below: the Icons tick's icon for a title)
+local titleIcons = {} -- [title] = its Icons tick's icon file, or false for none
+local SERVICE_ICON_SIZE = 20 -- (its height on plates, before the name's scale)
+-- (Times Service NPCs' Icons size slider, nameServiceIconScale.)
+local function IconSize()
+	local scale = tonumber(ns.db.nameServiceIconScale) or 1
+	return math.max(4, math.floor(SERVICE_ICON_SIZE * scale + 0.5))
+end
 
 local function Known(value)
 	return not (issecretvalue and issecretvalue(value))
@@ -132,6 +137,17 @@ local function LineText(plate, unit)
 		return GuildText(unit), true
 	end
 	local title = PlateTitle(plate, unit)
+	-- (Service NPCs' Icons ticked: its kind's icon in its place; a title of
+	-- no kind with one, none: just the name.)
+	if title and ns.db.nameServiceIcons then
+		local icon = ServiceIcon(title)
+		if not icon then
+			return nil, false
+		end
+		-- (One size for all, IconSize: not by the name's font, which
+		-- differs plate to plate, or can't be read and left the icon small.)
+		return icon, false, true
+	end
 	-- (Service NPCs' Brackets unticked: Baker, not <Baker>.)
 	if title and not ns.db.nameServiceBrackets then
 		title = title:sub(2, -2)
@@ -187,12 +203,14 @@ function ns.DescribePlateTitle(plate, unit)
 			kinds[#kinds + 1] = kind.key .. (ns.db["nameService" .. kind.key] and "+" or "-")
 		end
 	end
-	return ("title=%s kinds=%s %s"):format(title, table.concat(kinds, ","), quest)
+	return ("title=%s kinds=%s icon=%s %s"):format(title, table.concat(kinds, ","),
+		tostring(ns.db.nameServiceIcons and ServiceIcon(title) or "-"), quest)
 end
 
 -- From the Kinds menu (and a new language): every plate's match worked out again.
 function ns.ServiceKindsChanged()
 	wipe(serviceMatch)
+	wipe(titleIcons)
 end
 
 ns.OnLanguage(function()
@@ -227,6 +245,135 @@ function ns.TitleKinds(title)
 		fits.Other = true
 	end
 	return fits
+end
+
+-- Trainers' Your class only (nameServiceClassOnly): whether a title names a
+-- class other than yours (<Hunter Trainer> for a druid), by the game's class
+-- names, longest first and taken out as found ("Demon Hunter" isn't a
+-- hunter's). Pet and demon trainers go with hunters and warlocks.
+local classWords
+local function OtherClassTitle(title)
+	if not classWords then
+		classWords = {}
+		for _, names in ipairs({ LOCALIZED_CLASS_NAMES_MALE or {}, LOCALIZED_CLASS_NAMES_FEMALE or {} }) do
+			for class, name in pairs(names) do
+				if type(name) == "string" and name ~= "" then
+					classWords[#classWords + 1] = { word = name:lower(), class = class }
+				end
+			end
+		end
+		classWords[#classWords + 1] = { word = L["pet trainer"]:lower(), class = "HUNTER" }
+		classWords[#classWords + 1] = { word = L["demon trainer"]:lower(), class = "WARLOCK" }
+		table.sort(classWords, function(a, b) return #a.word > #b.word end)
+	end
+	local _, mine = UnitClass("player")
+	local lower, other = title:lower(), false
+	for _, entry in ipairs(classWords) do
+		local from, to = lower:find(entry.word, 1, true)
+		if from then
+			if entry.class == mine then
+				return false
+			end
+			other = true
+			lower = lower:sub(1, from - 1) .. lower:sub(to + 1)
+		end
+	end
+	return other
+end
+ns.OnLanguage(function() classWords = nil end)
+
+-- Service NPCs' Icons tick (nameServiceIcons): each kind's icon, shown in
+-- place of the title. Picked in this order where a title fits more than one
+-- (<Repair Vendor>: Repair), among the kinds ticked; Other has none (just the
+-- name shows). Each a list of files, the first this client has: the minimap
+-- tracking menu's icons, else the game's cursors.
+local TRACKING, CURSOR = "Interface\\Minimap\\Tracking\\", "Interface\\Cursor\\"
+local SERVICE_ICONS = {
+	{ "Repair", { TRACKING .. "Repair", CURSOR .. "Repair" } },
+	-- (Before Trainers: <Blacksmithing Trainer> gets the anvil, not the book.)
+	{ "Profession", { TRACKING .. "Profession", CURSOR .. "Trainer" } },
+	{ "Trainer", { TRACKING .. "Class", CURSOR .. "Trainer" } },
+	{ "Flight", { TRACKING .. "FlightMaster", CURSOR .. "Taxi" } },
+	{ "Inn", { TRACKING .. "Innkeeper", CURSOR .. "Innkeeper" } },
+	{ "Bank", { TRACKING .. "Banker", TRACKING .. "Auctioneer", CURSOR .. "Buy" } },
+	{ "Stable", { TRACKING .. "StableMaster", CURSOR .. "Interact" } },
+	{ "Vendor", { CURSOR .. "Buy" } },
+}
+-- Professions: each its own icon (the game's spell icons, edges cropped), by
+-- the words of its title (as the Professions kind's words; translators: as
+-- your language's titles have them). One none fits: the kind's icon.
+local ICONS = "Interface\\Icons\\"
+local PROFESSION_ICONS = {
+	{ L["alchem"], { ICONS .. "Trade_Alchemy" } },
+	{ L["blacksmith"], { ICONS .. "Trade_BlackSmithing" } },
+	{ L["enchant"], { ICONS .. "Trade_Engraving" } },
+	{ L["engineer"], { ICONS .. "Trade_Engineering" } },
+	{ L["herbal"], { ICONS .. "Trade_Herbalism", ICONS .. "Spell_Nature_NatureTouchGrow" } },
+	{ L["inscription,scribe"], { ICONS .. "INV_Inscription_Tradeskill01", ICONS .. "INV_Feather_05" } },
+	{ L["jewelcraft"], { ICONS .. "INV_Misc_Gem_01" } },
+	{ L["leatherwork"], { ICONS .. "Trade_LeatherWorking", ICONS .. "INV_Misc_ArmorKit_17" } },
+	{ L["mining,miner"], { ICONS .. "Trade_Mining" } },
+	{ L["skinn"], { ICONS .. "INV_Misc_Pelt_Wolf_01" } },
+	{ L["tailor"], { ICONS .. "Trade_Tailoring" } },
+	{ L["fish"], { ICONS .. "Trade_Fishing" } },
+	{ L["cook"], { ICONS .. "INV_Misc_Food_15" } },
+	{ L["first aid"], { ICONS .. "Spell_Holy_SealOfSacrifice" } },
+	{ L["archaeolog"], { ICONS .. "Trade_Archaeology" } },
+}
+local CROP = ":0:0:64:64:5:59:5:59" -- (a spell icon's border trimmed)
+
+-- The first of a list of files this client has, or nil.
+local fileFound = {} -- [list] = its file, or false
+local function FirstFile(list)
+	if fileFound[list] == nil then
+		fileFound[list] = false
+		for _, file in ipairs(list) do
+			local ok, id = true, true
+			if GetFileIDFromPath then
+				ok, id = pcall(GetFileIDFromPath, file)
+			end
+			if ok and id then
+				fileFound[list] = file
+				break
+			end
+		end
+	end
+	return fileFound[list] or nil
+end
+
+local function ProfessionIcon(lower)
+	for _, entry in ipairs(PROFESSION_ICONS) do
+		for word in entry[1]:gmatch("[^,]+") do
+			word = word:match("^%s*(.-)%s*$"):lower()
+			if word ~= "" and lower:find(word, 1, true) then
+				local file = FirstFile(entry[2])
+				return file and ("|T%s:%d:%d" .. CROP .. "|t"):format(file, IconSize(), IconSize())
+			end
+		end
+	end
+end
+
+-- The icon for a title, as text for a font string ("|T...|t"), or nil.
+function ServiceIcon(title)
+	local icon = titleIcons[title]
+	if icon == nil then
+		icon = false
+		local fits = ns.TitleKinds(title)
+		local otherClass = ns.db.nameServiceClassOnly and OtherClassTitle(title)
+		for _, entry in ipairs(SERVICE_ICONS) do
+			local key = entry[1]
+			if fits[key] and ns.db["nameService" .. key] and not (key == "Trainer" and otherClass) then
+				icon = key == "Profession" and ProfessionIcon(title:lower()) or false
+				if not icon then
+					local file = FirstFile(entry[2])
+					icon = file and ("|T%s:%d:%d|t"):format(file, IconSize(), IconSize()) or false
+				end
+				if icon then break end
+			end
+		end
+		titleIcons[title] = icon
+	end
+	return icon or nil
 end
 
 -- The Quest givers kind: whether a plate's NPC has a quest for you, to pick up
@@ -269,8 +416,9 @@ function ns.PlateServiceMatch(plate, unit)
 		local title = PlateTitle(plate, unit)
 		if title then
 			match = false
+			local otherClass = ns.db.nameServiceClassOnly and OtherClassTitle(title)
 			for key in pairs(ns.TitleKinds(title)) do
-				if ns.db["nameService" .. key] then
+				if ns.db["nameService" .. key] and not (key == "Trainer" and otherClass) then
 					match = true
 					break
 				end
@@ -280,6 +428,11 @@ function ns.PlateServiceMatch(plate, unit)
 		-- (No title, or not known yet: asked again in a while.)
 	end
 	if match then
+		-- (Icons ticked: a title without one, Other's, shows the name instead.)
+		if ns.db.nameServiceIcons then
+			local title = PlateTitle(plate, unit)
+			return true, not (title and ServiceIcon(title))
+		end
 		return true, false
 	end
 	if ns.db.nameServiceQuest and PlateQuestGiver(plate, unit) then
@@ -304,7 +457,7 @@ local function Refresh(plate)
 		Hide(plate)
 		return
 	end
-	local text, guild = LineText(plate, unit)
+	local text, guild, isIcon = LineText(plate, unit)
 	if guild then
 		share = share * (ns.plateGuildLevel or 0)
 	end
@@ -318,14 +471,11 @@ local function Refresh(plate)
 		lines[plate] = line
 	end
 	-- (Its parent can change with the plate's unit frame: anchored anew each time.)
+	-- Always under the name, even while the name's text is faded out (Titles
+	-- only): it stays put as the name comes up (your target), rather than
+	-- moving up into the name's place and back down a line.
 	line:ClearAllPoints()
-	local alone = 1 - (textShares[plate] or 1)
-	local height = 0
-	if alone > 0 then
-		local okHeight, value = pcall(name.GetStringHeight, name)
-		height = okHeight and Known(value) and type(value) == "number" and value or 10
-	end
-	line:SetPoint("TOP", name, "BOTTOM", 0, -1 + (height + 1) * alone)
+	line:SetPoint("TOP", name, "BOTTOM", 0, -1)
 	-- (Its font object, not its file: a file has one alphabet, and a guild in
 	-- another, Cyrillic say, would show as boxes. The name's is a family.)
 	local object = name.GetFontObject and name:GetFontObject()
@@ -340,7 +490,12 @@ local function Refresh(plate)
 	pcall(function()
 		line:SetShadowOffset(name:GetShadowOffset())
 		line:SetShadowColor(name:GetShadowColor())
-		local r, g, b = name:GetTextColor()
+		-- (With the name's health fill on, its own text is the grey part: the
+		-- colored copy's color instead.)
+		local source = ns.PlateNameLit and ns.PlateNameLit(name) or name
+		local r, g, b = source:GetTextColor()
+		-- (An icon in its own colors.)
+		if isIcon then r, g, b = 1, 1, 1 end
 		line:SetTextColor(r, g, b)
 		if line.SetVertexColor then line:SetVertexColor(r, g, b) end
 		if name.GetScale then line:SetScale(name:GetScale()) end
@@ -351,11 +506,11 @@ local function Refresh(plate)
 end
 
 -- From PlateParts, each time it lays out a plate: how far its name shows
--- while the plate shows its name alone (0: not name-only), and how much of
--- that the name's own text gets (text: Service NPCs' titles alone, less).
-function ns.SetPlateGuild(plate, share, text)
+-- while the plate shows its name alone (0: not name-only). (Its name's own
+-- text faded for Service NPCs' Titles only is PlateParts' doing: the line
+-- stays under it either way.)
+function ns.SetPlateGuild(plate, share)
 	shares[plate] = share > 0 and share or nil
-	textShares[plate] = text and text < 1 and text or nil
 	if shares[plate] or lines[plate] then
 		Refresh(plate)
 	end
@@ -395,7 +550,7 @@ watcher:SetScript("OnEvent", function(_, event, unit)
 		titles[plate], titleTried[plate], serviceMatch[plate], titleUnit[plate] = nil, nil, nil, nil
 	end
 	if event == "NAME_PLATE_UNIT_REMOVED" then
-		shares[plate], textShares[plate] = nil, nil
+		shares[plate] = nil
 		Hide(plate)
 	elseif shares[plate] then
 		Refresh(plate)

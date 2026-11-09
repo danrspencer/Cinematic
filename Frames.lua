@@ -3169,7 +3169,10 @@ do
 				if not farYards[id] then
 					for key, test in pairs(RANGE_TESTS) do
 						local okTest, is = pcall(test, id)
-						if okTest and is == true then
+						-- (A helpful spell with no range is self-only, Demon Skin or
+						-- Life Tap: it answers "not in range" on anyone else, your
+						-- pet beside you too. Melee attacks do say 0 and stay.)
+						if okTest and is == true and (key == "harmful" or yards > 0) then
 							local list = farSpells[key]
 							list[#list + 1] = id
 							farYards[id] = yards
@@ -3319,6 +3322,8 @@ do
 	-- fight, as InteractDistance has it.
 	local Within = InteractDistance
 	local FAR_KINDS = { "harmful", "helpful" }
+	local ENEMY_KINDS = { "harmful" }
+	local FRIEND_KINDS = { "helpful" }
 	local function Within40(unit)
 		if Within(unit, 4) then
 			return true
@@ -3333,9 +3338,13 @@ do
 	function ns.UnitInBand(unit, band)
 		if band == "OutOfRange" then
 			-- (Out of reach of every attack on your bars, or every helpful
-			-- spell for a friend: the longest that can say answers.)
+			-- spell for a friend: the longest that can say answers. A friend
+			-- asks helpful ones only and an enemy attacks only: an attack can
+			-- answer "not in range" on your own pet stood beside you.)
 			LookForRangeSpells()
-			for _, key in ipairs(FAR_KINDS) do
+			local enemy = ns.IsEnemyUnit(unit)
+			local kinds = enemy == true and ENEMY_KINDS or enemy == false and FRIEND_KINDS or FAR_KINDS
+			for _, key in ipairs(kinds) do
 				for _, id in ipairs(farSpells[key]) do
 					local reaches = SpellReaches(id, unit)
 					if reaches ~= nil then return not reaches end

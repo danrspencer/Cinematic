@@ -597,27 +597,56 @@ local function Tracked(quest)
 	return true
 end
 
+-- The quests the game puts on the map you're on (questID = true), or nil if
+-- it won't say.
+local function QuestsOnThisMap()
+	local log, map = C_QuestLog, C_Map
+	if not (log and log.GetQuestsOnMap and map and map.GetBestMapForUnit) then
+		return nil
+	end
+	local okMap, mapID = pcall(map.GetBestMapForUnit, "player")
+	if not (okMap and type(mapID) == "number" and Known(mapID)) then
+		return nil
+	end
+	local ok, quests = pcall(log.GetQuestsOnMap, mapID)
+	if not (ok and type(quests) == "table") then
+		return nil
+	end
+	local here = {}
+	for _, quest in ipairs(quests) do
+		if type(quest) == "table" and type(quest.questID) == "number" and Known(quest.questID) then here[quest.questID] = true end
+	end
+	return here
+end
+
 -- The tracked quest with an item to use nearest you, within NEAR_YARDS of its
--- area (where the game won't say how far: one anyway, if nothing nearer). nil
--- if none. say: a function told each quest's distance (/cine debug questitem).
+-- area. Where the game won't say how far: only if the quest is on the map
+-- you're on (one anyway, if nothing nearer), else not at all (it showed
+-- anywhere in the world on Forever). nil if none. say: a function told each
+-- quest's distance (/cine debug questitem).
 local function Nearest(say)
 	local log = C_QuestLog
 	local best, bestDistance
+	local onThisMap -- (read once, the first time a distance is unknown)
 	for _, quest in ipairs(ns.QuestLogItems(say)) do
 		local tracked = Tracked(quest)
 		if say and not tracked then
 			say(("  quest %s: not tracked"):format(quest.questID))
 		end
 		if tracked and not (quest.complete or Done(quest.questID)) then
-			local distance = math.huge
+			local distance
 			local ok, distanceSq, onContinent = pcall(log.GetDistanceSqToQuest or error, quest.questID)
-			if ok and type(distanceSq) == "number" and Known(distanceSq) then
+			local known = ok and type(distanceSq) == "number" and Known(distanceSq)
+			if known then
 				distance = (onContinent and distanceSq <= NEAR_YARDS * NEAR_YARDS) and distanceSq or nil
+			else
+				onThisMap = onThisMap or QuestsOnThisMap() or {}
+				distance = onThisMap[quest.questID] and math.huge or nil
 			end
 			if say then
-				say(("  quest %s: %s"):format(quest.questID, ok and type(distanceSq) == "number" and Known(distanceSq)
+				say(("  quest %s: %s"):format(quest.questID, known
 					and ("%.0f yards, on this continent %s"):format(math.sqrt(distanceSq), tostring(onContinent))
-					or "distance unknown"))
+					or ("distance unknown, on this map %s"):format(tostring(onThisMap[quest.questID] or false))))
 			end
 			if distance and (not bestDistance or distance < bestDistance) then
 				best, bestDistance = quest, distance
@@ -808,7 +837,9 @@ function ns.DescribeQuestItemButton()
 		return x and ("%.0f, %.0f"):format(x, y) or "no place"
 	end
 	local okPoints, points = pcall(container and container.GetNumPoints or error, container)
-	return ("button: %s at %s, nearest quest with an item: %s (item %s), extra frame: %s (%s) at %s, %s point(s), " ..
+	return ("settings: questVision %s, questItemButton %s, in a fight %s; "):format(tostring(ns.db and ns.db.questVision),
+		tostring(ns.db and ns.db.questItemButton), tostring(InCombatLockdown() and true or false)) ..
+		("button: %s at %s, nearest quest with an item: %s (item %s), extra frame: %s (%s) at %s, %s point(s), " ..
 		"shown %s, default place and empty %s, game's stack at %s, stepping aside for Questie's button %s (questItemFade %s)"):format(
 		button:IsShown() and "shown" or "hidden", Where(button), tostring(quest and quest.questID),
 		tostring(quest and quest.itemID), container and (container:GetName() or "?") or "none",

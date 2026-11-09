@@ -4,8 +4,8 @@
 -- seconds or not (...Later): the background and border, the health bar
 -- under unit tooltips, and lines of unit tooltips (players, NPCs and mobs):
 -- guild and titles, level, spec and class, creature type, corpse, faction and PvP,
--- reputation faction, threat, quest lines; and the quest lines of objects
--- in the world.
+-- reputation faction, threat, quest lines; the quest lines of objects
+-- in the world; and items' green click hints ("<Right Click to Read>").
 -- A line is taken out by moving the lines under it up one (text and colour,
 -- both sides) and clearing the last, then letting the tooltip size itself
 -- again. Unreadable (secret) lines are kept, and a tooltip whose lines can't
@@ -194,6 +194,20 @@ local function IsHintLine(text)
 	return text == hint or text == "<Right click for Frame Settings>"
 end
 
+-- An item's green click hint ("<Right Click to Read>", "<Right Click to
+-- Open>", "<Shift Right Click to Socket>"), from the game's own wording;
+-- else an English "<...Click...>" (not "<Made by ...>", green too).
+local ITEM_HINTS = { "ITEM_READABLE", "ITEM_OPENABLE", "ITEM_SOCKETABLE", "ITEM_AZERITE_EMPOWERED_VIEWABLE",
+	"ITEM_AZERITE_ESSENCES_VIEWABLE", "ITEM_ARTIFACT_VIEWABLE" }
+local function IsItemHint(text)
+	for _, name in ipairs(ITEM_HINTS) do
+		if text == _G[name] then
+			return true
+		end
+	end
+	return text:find("^<.*[Cc]lick.*>$") ~= nil
+end
+
 -- Whether a line is in the game's green for instruction lines (the hint's).
 local function IsHintColor(fs)
 	local ok, green = pcall(function()
@@ -218,7 +232,8 @@ local function Unreadable(fs)
 end
 
 -- The lines taken out: line number -> true. An object in the world (object
--- set) has just its quest lines taken out, by their own row (ObjQuest).
+-- "object") has just its quest lines taken out, by their own row (ObjQuest);
+-- an item ("item") just its green click hints, by the Hint row.
 local function LinesToCut(tooltip, count, unit, object)
 	local cut = {}
 	local level = LEVEL or "Level"
@@ -293,7 +308,13 @@ local function LinesToCut(tooltip, count, unit, object)
 				return "Guild" -- (an NPC's title with no brackets: "Ranger-General of Silvermoon")
 			end
 		end)
-		if object then
+		if object == "item" then
+			local okHint, hint = pcall(function()
+				return type(text) == "string" and not (issecretvalue and issecretvalue(text))
+					and IsItemHint(text) and IsHintColor(Left(i))
+			end)
+			key = okHint and hint and "Hint" or nil
+		elseif object then
 			key = key == "Quest" and "ObjQuest" or nil
 		end
 		if ok and key and Cut(key) then
@@ -526,6 +547,15 @@ local function IsWorldObject(tooltip)
 	return ok and isObject
 end
 
+-- Whether the tooltip shows an item (in your bags, on a bar, a link).
+local function IsItemTooltip(tooltip)
+	local ok, item = pcall(function()
+		local _, link = tooltip:GetItem()
+		return link ~= nil and not (issecretvalue and issecretvalue(link))
+	end)
+	return ok and item
+end
+
 -- Fade in/out (tooltipFadeTime seconds, Tooltips page, with its switch off
 -- too): tooltips fade in as they show, cross-fade into the After column's
 -- look, and fade out before Effects.lua hides one for the mouse being still
@@ -618,6 +648,8 @@ local function ShowLater(tooltip)
 		CutLines(tooltip)
 	elseif IsWorldObject(tooltip) then
 		CutLines(tooltip, true)
+	elseif IsItemTooltip(tooltip) then
+		CutLines(tooltip, "item")
 	end
 end
 
@@ -723,6 +755,13 @@ local function OnObjectTooltip(tooltip)
 	end
 end
 
+-- An item: its green click hints ("<Right Click to Read>"), by the Hint row.
+local function OnItemTooltip(tooltip)
+	if tooltip == GameTooltip and Cut("Hint") and IsItemTooltip(tooltip) then
+		CutLines(tooltip, "item")
+	end
+end
+
 -- Fades the tooltip out and then runs done (Effects.lua's hide). False with
 -- fading off: the caller hides it now.
 function ns.TooltipFadeOut(done)
@@ -824,6 +863,7 @@ function ns.HookTooltipParts()
 		TooltipDataProcessor.AddTooltipPostCall(TooltipDataProcessor.AllTypes or "ALL", function(tooltip, data)
 			if not (data and data.type == Enum.TooltipDataType.Unit) then
 				OnObjectTooltip(tooltip)
+				OnItemTooltip(tooltip)
 			end
 		end)
 	elseif GameTooltip:HasScript("OnTooltipSetUnit") then
@@ -867,6 +907,7 @@ function ns.HookTooltipParts()
 		end
 		if not processor then
 			OnObjectTooltip(tooltip)
+			OnItemTooltip(tooltip)
 		end
 		if listParts then
 			listParts = false

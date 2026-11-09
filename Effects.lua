@@ -1435,6 +1435,7 @@ local function PlateKind(unit)
 	end
 	return neutral and "NeutralNPCs" or "EnemyNPCs"
 end
+ns.PlateKind = PlateKind -- (Heal Vision's plates: HealVisionFrames.lua)
 ns.PlateKindOf = PlateKind -- (the Style hub's Nameplates page's Players and Minions rows: PlateParts)
 
 -- The Nameplates page only steers plates in cinematic mode: outside it the
@@ -2798,6 +2799,12 @@ local function PlateAlpha(unit, plate)
 	alpha = math.max(alpha, TargetPlateLevel(plate), duels.Level(plate))
 	if plate and plate == targetHidden.plate then
 		alpha = math.min(alpha, targetHidden.level)
+		-- (My pet and the group rows name the unit itself: they still keep
+		-- it up when Your target's rule leaves its kind out, your imp included.)
+		local kind = unit and PlateKind(unit)
+		if kind then
+			alpha = math.max(alpha, UnitRowAlpha(unit, kind))
+		end
 	end
 	return alpha
 end

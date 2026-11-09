@@ -8488,14 +8488,37 @@ local function CreatePlatesPanel()
 		if ns.RefreshPlateGuilds then ns.RefreshPlateGuilds() end
 	end)
 	serviceBrackets:SetPoint("TOPLEFT", serviceBracketsLabel, "TOPLEFT", GRID_LABEL + 26, 6)
+	GreyUnless(serviceBrackets, function(db) return not db.nameServiceIcons end)
+	-- Icons: each kind's icon in place of its title (PlateGuild's SERVICE_ICONS).
+	local serviceIconsLabel = Label(content, "GameFontHighlight", L["Icons"])
+	serviceIconsLabel:SetPoint("TOPLEFT", serviceBracketsLabel, "BOTTOMLEFT", 0, -22)
+	local serviceIcons = Check(content, "nameServiceIcons", L["In place of titles"],
+		L["Ticked, a service NPC shows its kind's icon (an anvil for repair, a book for trainers...) instead of " ..
+			"its title, in the middle where its name or title would be. Other titles have no icon: their names " ..
+			"show instead."], function(value)
+		ns.GetDB().nameServiceIcons = value
+		if ns.ServiceKindsChanged then ns.ServiceKindsChanged() end
+		if ns.RefreshAllPlates then ns.RefreshAllPlates() end
+		if ns.RefreshPlateGuilds then ns.RefreshPlateGuilds() end
+		Refresh()
+	end)
+	serviceIcons:SetPoint("TOPLEFT", serviceIconsLabel, "TOPLEFT", GRID_LABEL + 26, 6)
+	-- Their size, beside it (greyed while unticked).
+	local serviceIconScale = Slider(content, "nameServiceIconScale", L["Size"], 50, 200, 5, "%d%%", 100, function()
+		if ns.ServiceKindsChanged then ns.ServiceKindsChanged() end
+		if ns.RefreshPlateGuilds then ns.RefreshPlateGuilds() end
+	end)
+	serviceIconScale:SetWidth(160)
+	serviceIconScale:SetPoint("LEFT", serviceIcons, "LEFT", 220, -4)
+	Tooltip(serviceIconScale, L["How big the icons are."])
+	GreyUnless(serviceIconScale, function(db) return db.nameServiceIcons end)
 	local serviceKindsLabel = Label(content, "GameFontHighlight", L["Kinds"])
-	serviceKindsLabel:SetPoint("TOPLEFT", serviceBracketsLabel, "BOTTOMLEFT", 0, -22)
-	local lastServiceKind = serviceKindsLabel
+	serviceKindsLabel:SetPoint("TOPLEFT", serviceIconsLabel, "BOTTOMLEFT", 0, -22)
 	-- (Quest givers: by the game's quest cursor, or Questie's icons. Hidden on
 	-- a client with neither.)
 	local questiePossible = ns.QuestieMinimapPossible and ns.QuestieMinimapPossible()
 	local questPossible = (ns.QuestGiversPossible and ns.QuestGiversPossible()) or questiePossible
-	local cell = 0
+	local cell, subRow, lastServiceKind = 0, nil, serviceKindsLabel
 	for _, kind in ipairs(ns.SERVICE_KINDS) do
 		if kind.key ~= "Quest" or questPossible then
 			local key = "nameService" .. kind.key
@@ -8504,7 +8527,7 @@ local function CreatePlatesPanel()
 				tip = L["Any other title, lore titles too (<Ranger-General of Silvermoon>)."]
 			elseif kind.key == "Quest" then
 				tip = L["NPCs with a quest for you to pick up or hand in, title or not, as the game's quest cursor over " ..
-					"them says (with Use Questie DB ticked, as Questie's \"!\" and \"?\" do). Their name shows, even " ..
+					"them says (with Quest NPCs (Use Questie DB) ticked, as Questie's \"!\" and \"?\" do). Their name shows, even " ..
 					"with Titles only. Checked every second, so a quest you've just taken or handed in can take a moment."]
 			else
 				tip = L["NPCs whose title has one of these words in it: %s."]:format((kind.words:gsub(",", ", ")))
@@ -8513,20 +8536,41 @@ local function CreatePlatesPanel()
 				ns.GetDB()[key] = value
 				if ns.ServiceKindsChanged then ns.ServiceKindsChanged() end
 				if ns.RefreshAllPlates then ns.RefreshAllPlates() end
+				-- (Trainers greys out its Your class only.)
+				if kind.key == "Trainer" then Refresh() end
 			end)
+			-- (The row under Trainers is its Your class only's own.)
+			if math.floor(cell / 2) == subRow then cell = cell + 2 end
 			local column, row = cell % 2, math.floor(cell / 2)
 			cell = cell + 1
 			check:SetPoint("TOPLEFT", serviceKindsLabel, "TOPLEFT", GRID_LABEL + 26 + column * 200, 6 - row * 26)
 			if column == 0 then lastServiceKind = check end
+			-- Trainers' sub-option, indented under it: your class's trainers
+			-- only (PlateGuild's OtherClassTitle). Greyed out while Trainers is
+			-- unticked.
+			if kind.key == "Trainer" then
+				local classOnly = Check(content, "nameServiceClassOnly", L["Your class only"],
+					L["Ticked, another class's trainer (<Hunter Trainer> for a druid) is left out of Trainers. " ..
+						"Weapon masters and profession trainers stay."], function(value)
+					ns.GetDB().nameServiceClassOnly = value
+					if ns.ServiceKindsChanged then ns.ServiceKindsChanged() end
+					if ns.RefreshAllPlates then ns.RefreshAllPlates() end
+				end)
+				classOnly:SetPoint("TOPLEFT", check, "BOTTOMLEFT", 20, 0)
+				GreyUnless(classOnly, function(db) return db.nameServiceTrainer end)
+				subRow = row + 1
+				if column == 0 then lastServiceKind = classOnly end
+			end
 		end
 	end
+	if subRow and math.ceil(cell / 2) <= subRow then cell = (subRow + 1) * 2 end
 	-- Use Questie DB (Support/QuestieMinimap.lua's ns.QuestieGiverNames): Quest
 	-- givers by Questie's icons. Greyed out while Questie isn't loaded;
 	-- hidden on retail, which Questie never runs on.
 	if questiePossible then
 		local questieLabel = Label(content, "GameFontHighlight", L["Questie"])
 		questieLabel:SetPoint("TOPLEFT", serviceKindsLabel, "TOPLEFT", 0, -math.ceil(cell / 2) * 26 - 6)
-		local questie = Check(content, "nameServiceQuestie", L["Use Questie DB"],
+		local questie = Check(content, "nameServiceQuestie", L["Quest NPCs (Use Questie DB)"],
 			L["With Questie loaded, Quest givers keeps the names of the NPCs Questie shows a \"!\" or \"?\" for, " ..
 			"its own settings deciding which (its level filter, for one), instead of the game's quest cursor. " ..
 			"It goes by their names."] .. (ns.QuestieLoaded() and "" or ("\n\n" .. L["Needs Questie: it isn't loaded."])),
@@ -12965,8 +13009,8 @@ local function CreateVisionPanel()
 		local healTitle = Label(content, "GameFontNormalLarge", L["Heal Vision"])
 		healTitle:SetPoint("TOPLEFT", 16, -16)
 		local healIntro = PageIntro(content, healTitle,
-			L["The game's party and raid frames show only who needs healing: everyone (pets too) while below full " ..
-			"health, and tanks as set below. The group titles hide. The members stay " ..
+			L["The game's party and raid frames show only who needs healing: everyone (pets too) while their " ..
+			"health is below what's set for their role below (100%: always shown). The group titles hide. The members stay " ..
 			"in their places, so there are gaps. Out of combat, the mouse over the frames brings everyone back. " ..
 			"Ticked in the grid, it's on there. Always: everywhere. Party and Raid: while you're in one, wherever you are. " ..
 			"Members with debuffs can't be shown: the game doesn't let addons see your group's debuffs in fights."])
@@ -13069,29 +13113,43 @@ local function CreateVisionPanel()
 				set = function(value) ns.GetDB()[editing and key .. "_" .. editing or key] = value end }
 		end
 		local ROLE_NAMES = { TANK = L["Tank"], HEALER = L["Healer"], DAMAGER = L["Damage"] }
-		local TABS = { false, "TANK", "HEALER", "DAMAGER" }
+		-- (Then the Nameplates tab: not a role's, it holds the Nameplates and
+		-- Names sections instead of the table. plates: it's the one showing.)
+		local TABS = { false, "TANK", "HEALER", "DAMAGER", "PLATES" }
 		local ROLE_ICONS = { TANK = "0:19:22:41", HEALER = "20:39:1:20", DAMAGER = "20:39:22:41" }
 		local ownCheck, tabNote
+		local plates = false
+		local roleWidgets, plateWidgets = {}, {} -- (shown on the role tabs, or on the Nameplates tab)
+		local ShowSection -- (below, once both sets are made)
 		-- Folder tabs (ns.FolderTabs), a role's each after Default's.
 		local TAB_H = ns.FOLDER_TAB_HEIGHT
+		local NOTE_H = 20 -- (Current role, over the tabs)
 		local list = {}
 		for i, role in ipairs(TABS) do
-			list[i] = { role and ROLE_NAMES[role] or L["Default"], role and L["The settings below as they are " ..
-				"while you're this role (your specialization's, or the one picked in the group finder)."]
-				or L["The settings below for every role that uses the default settings."] }
+			if role == "PLATES" then
+				list[i] = { L["Nameplates"], L["Heal Vision on friendly nameplates, and health on names. By the " ..
+					"Default tab's health settings, or your role's."] }
+			else
+				list[i] = { role and ROLE_NAMES[role] or L["Default"], role and L["The settings below as they are " ..
+					"while you're this role (your specialization's, or the one picked in the group finder)."]
+					or L["The settings below for every role that uses the default settings."] }
+			end
 		end
 		local panel, tabs, ShowTab, base = ns.FolderTabs(content, list, function(i)
-			editing = TABS[i] or nil
+			plates = TABS[i] == "PLATES"
+			editing = (not plates and TABS[i]) or nil
+			ShowSection()
 			Refresh() -- (the tabs too: ownCheck's Refresh)
 		end, 90)
-		panel:SetPoint("TOPLEFT", row, "BOTTOMLEFT", 0, -14 - TAB_H - 4)
+		panel:SetPoint("TOPLEFT", row, "BOTTOMLEFT", 0, -14 - NOTE_H - TAB_H - 4)
 		-- (On the row, not the panel: the panel's bottom hangs on the rows under them.)
-		base:SetPoint("TOPLEFT", row, "BOTTOMLEFT", 0, -14 - TAB_H - 4)
+		base:SetPoint("TOPLEFT", row, "BOTTOMLEFT", 0, -14 - NOTE_H - TAB_H - 4)
 		local function ShowTabs()
 			local db = ns.GetDB()
 			if not db then return end
+			local current = plates and "PLATES" or editing
 			for i, role in ipairs(TABS) do
-				if (role or nil) == editing then ShowTab(i) end
+				if (role or nil) == current then ShowTab(i) end
 			end
 			ownCheck:SetShown(editing ~= nil)
 			local role = ns.PlayerRole()
@@ -13100,7 +13158,7 @@ local function CreateVisionPanel()
 				or L["None"]))
 		end
 		tabNote = Label(content, "GameFontHighlight")
-		tabNote:SetPoint("LEFT", tabs[#tabs], "BOTTOMRIGHT", 10, TAB_H / 2)
+		tabNote:SetPoint("BOTTOMLEFT", tabs[1], "TOPLEFT", 4, 6)
 		tabNote.searchSkip = true
 		for _, role in ipairs(ns.HEAL_VISION_ROLES) do RecordKey(content, "healVisionOwn_" .. role) end
 		-- Use default settings: unticked, the role goes by its own values (each kept while ticked).
@@ -13132,6 +13190,7 @@ local function CreateVisionPanel()
 			check:SetPoint("TOPLEFT", previous, "BOTTOMLEFT", previous == tabsEnd and -2 or 0, -2)
 			GreyUnless(check, function(db) return Editable(db) and (not enabled or enabled(db)) end)
 			previous = check
+			roleWidgets[#roleWidgets + 1] = check
 		end
 		-- (Any debuff takes in the ones you can dispel: that box greys while it's ticked.)
 		-- Off for now on both clients: they won't let addons see members'
@@ -13145,7 +13204,7 @@ local function CreateVisionPanel()
 		end
 
 		-- A table, a line each: tanks, healers and damage, then pets, with the
-		-- health they show below (100%: any damage; tanks: always) and how
+		-- health they show below (100%: always, every line; 99%: any damage) and how
 		-- faded they are while hidden (0: gone); neither goes past the other: one
 		-- set past pushes the other along. Then your target, hidden no fainter
 		-- than its box (100%: always shown), and the dead, offline and far away:
@@ -13165,6 +13224,7 @@ local function CreateVisionPanel()
 		local heads = CreateFrame("Frame", nil, content)
 		heads:SetSize(NAME_W + 2 * COLUMN_W, 16)
 		heads:SetPoint("TOPLEFT", previous, "BOTTOMLEFT", previous == tabsEnd and 0 or 2, -10)
+		roleWidgets[#roleWidgets + 1] = heads
 		for column, text in ipairs({ L["Show below health"], L["Opacity while hidden"] }) do
 			local head = Label(heads, "GameFontNormal", text)
 			head:SetPoint("LEFT", heads, "LEFT", NAME_W + (column - 1) * COLUMN_W, 0)
@@ -13179,6 +13239,7 @@ local function CreateVisionPanel()
 			label:SetPoint("LEFT")
 			label.searchSkip = true
 			lastRow = row
+			roleWidgets[#roleWidgets + 1] = row
 			return row
 		end
 		-- A box in a column (1: show below, 2: opacity); searchName: what search finds it by.
@@ -13216,17 +13277,18 @@ local function CreateVisionPanel()
 			"100% shows tanks always, at full health too."],
 			"healVisionTankAlpha", L["How much of a hidden tank still shows. 0% hides them completely."])
 		Kind(ROLE_ICON:format("20:39:1:20"), L["Healers"], "healVisionHealerBelow",
-			L["A healer shows once their health drops below this. 100% shows them at any damage; lower " ..
-			"keeps them hidden through small hits."],
+			L["A healer shows once their health drops below this. 100% shows them always, at full health " ..
+			"too; 99% at any damage; lower keeps them hidden through small hits."],
 			"healVisionHealerAlpha", L["How much of a hidden healer still shows. 0% hides them completely."])
 		-- (Anyone without a tank's or healer's role goes by these, and the group titles' opacity.)
 		Kind(ROLE_ICON:format("20:39:22:41"), L["Damage"], "healVisionShowBelow",
 			L["A damage dealer (or anyone without a role) shows once their health drops below this. 100% " ..
-			"shows them at any damage; lower keeps them hidden through small hits."],
+			"shows them always, at full health too; 99% at any damage; lower keeps them hidden through small hits."],
 			"healVisionMinAlpha", L["How much of a hidden damage dealer still shows, and of the group titles. " ..
 			"0% hides them completely."])
 		Kind(PET_ICON, L["Pets"], "healVisionPetBelow",
-			L["A pet shows once its health drops below this. 100% shows it at any damage."],
+			L["A pet shows once its health drops below this. 100% shows it always, at full health too; 99% at " ..
+				"any damage."],
 			"healVisionPetAlpha", L["How much of a hidden pet still shows. 0% hides them completely."])
 
 		Cell(Row(TARGET_ICON, L["Your target, at least"], 12), 2, Field("healVisionTargetAlpha"),
@@ -13235,7 +13297,8 @@ local function CreateVisionPanel()
 			"say) keeps it. 100% always shows them, at full health too."])
 		Cell(Row(MOUSE_ICON, L["Mouseover, at least"]), 2, Field("healVisionMouseoverAlpha"),
 			L["Mouseover min opacity"], L["The member under your mouse fades in to at least this, in fights too, " ..
-			"and starts fading out the moment the mouse leaves them. 0% turns it off."])
+			"and starts fading out the moment the mouse leaves them. With Health bars only while hurt, a nameplate " ..
+			"under your mouse shows at least this too. 0% turns it off."])
 		Cell(Row(SKULL_ICON, L["Dead"], 12), 2, Field("healVisionDeadAlpha"), L["Dead opacity"],
 			L["Dead members are hidden whatever their health, debuffs or role (unless one is your " ..
 			"target). How much of them still shows. 0% hides them completely."])
@@ -13248,7 +13311,99 @@ local function CreateVisionPanel()
 			"in it with you. In battlegrounds, where WoW Forever won't say how far anyone is, members out of " ..
 			"range of your heals (about 40 yards) fade to this instead of the game's own dimming, on top of the " ..
 			"rest of the page. 100% leaves them be; 0% hides them completely."])
-		panel:SetPoint("BOTTOMRIGHT", lastRow, "BOTTOMRIGHT", 12, -12)
+		-- The Nameplates tab, in the same panel: first Nameplates (friendly
+		-- players' and minions' plates by the role tabs' table:
+		-- HealVisionFrames.lua's plates), then Names (names drawn by their
+		-- plates in CineMode show health: PlateParts.lua's Fill; idea and first
+		-- code: pkecerski). Neither by the grid's places.
+		local barsHead = Label(content, "GameFontNormal", L["Nameplates"])
+		barsHead:SetPoint("TOPLEFT", tabsEnd, "TOPLEFT", 2, -4)
+		local barsCheck = Check(content, "healVisionPlates", L["Health bars only while hurt"],
+			L["Friendly players' and minions' nameplates (your pet's too, and NPCs in your group: follower and " ..
+			"delve companions) show their health bar only while they " ..
+			"need healing, by the health and opacity set on the role tabs for their role (tanks, healers, damage, " ..
+			"pets), your target's, the mouseover's and the dead's too. The parts in Don't fade stay. In CineMode or " ..
+			"not. Not in dungeons and raids: the game locks friendly nameplates there."], function(value)
+				ns.GetDB().healVisionPlates = value
+				if ns.ApplyHealVisionPlates then ns.ApplyHealVisionPlates() end
+				Refresh() -- (Don't fade greys with it)
+			end)
+		barsCheck:SetPoint("TOPLEFT", barsHead, "BOTTOMLEFT", -2, -6)
+		GreyUnless(barsCheck, function() return ns.Setting("handleHealVision") end)
+
+		-- Don't fade: the parts that stay while the rest fades (a tick menu;
+		-- healVisionPlatesKeep<part>, the name only to start with).
+		local KEEP_NAMES = { Health = L["Health bar"], Name = L["Name"], CastBar = L["Cast bar"], Buffs = L["Buffs"],
+			Debuffs = L["Debuffs"], RaidMarker = L["Raid marker"], Level = L["Level"],
+			Highlight = L["Target highlight"], Widgets = L["Quest/widget icons"] }
+		local keepLabel = Label(content, "GameFontHighlight", L["Don't fade:"])
+		keepLabel:SetPoint("TOPLEFT", barsCheck, "BOTTOMLEFT", 26, -8)
+		local keepButton = ns.GridMenuButton(content, 180)
+		keepButton:SetPoint("LEFT", keepLabel, "RIGHT", 8, 0)
+		local keepEntries = {}
+		for _, part in ipairs(ns.HEAL_PLATE_PARTS or {}) do
+			local key = "healVisionPlatesKeep" .. part
+			RecordKey(content, key)
+			keepEntries[#keepEntries + 1] = { KEEP_NAMES[part] or part,
+				function() return ns.Setting(key) and true or false end,
+				function() ns.GetDB()[key] = not ns.GetDB()[key] end }
+		end
+		keepButton.Refresh = function(self)
+			local names = {}
+			for _, entry in ipairs(keepEntries) do
+				if entry[2]() then names[#names + 1] = entry[1] end
+			end
+			self:SetText(#names == 0 and "|cff808080-|r" or #names == 1 and names[1]
+				or #names == #keepEntries and L["All"] or (L["%d of %d"]):format(#names, #keepEntries))
+		end
+		keepButton:SetScript("OnClick", function(self)
+			ns.TickMenu(self, keepEntries, function()
+				self:Refresh()
+				if ns.ApplyHealVisionPlates then ns.ApplyHealVisionPlates() end
+			end)
+		end)
+		Tooltip(keepButton, L["The parts of a plate that stay while the rest fades with health (the name, to start " ..
+			"with). The target highlight sits on the health bar: it fades with the bar whatever this says."])
+		GreyUnless(keepButton, function(db) return ns.Setting("handleHealVision") and db.healVisionPlates end)
+		controls[#controls + 1] = keepButton -- (refreshed with the page)
+		keepLabel.searchSkip = true
+
+		local namesHead = Label(content, "GameFontNormal", L["Names"])
+		namesHead:SetPoint("TOPLEFT", keepLabel, "BOTTOMLEFT", -24, -18)
+		local fillCheck = Check(content, "plateNameHealthFill", L["Health fill"],
+			L["Names over heads show health like a bar: the colored part is the health left, and the rest of " ..
+			"the name turns grey as the unit takes damage. Only names drawn by their nameplates in CineMode " ..
+			"(the Names rows, and your target's), with the Name Style page on."], function(value)
+				ns.GetDB().plateNameHealthFill = value
+				if ns.RefreshPlateNameStyle then ns.RefreshPlateNameStyle() end
+			end)
+		fillCheck:SetPoint("TOPLEFT", namesHead, "BOTTOMLEFT", -2, -6)
+		GreyUnless(fillCheck, function() return ns.Setting("handleHealVision") end)
+		-- (Where neither can work, at the foot of the tab, under both: tested on
+		-- retail in a follower dungeon, every friendly plate locked from addons;
+		-- Forever locks them too. Names are drawn by those plates.)
+		local lockedNote = Label(content, "GameFontDisableSmall",
+			L["Nameplates and Names don't work in dungeons and raids: the game locks friendly nameplates from " ..
+			"addons there. Heal Vision on your party and raid frames still works there."])
+		lockedNote:SetPoint("TOPLEFT", fillCheck, "BOTTOMLEFT", 2, -14)
+		lockedNote:SetWidth(NAME_W + 2 * COLUMN_W - 4)
+		lockedNote:SetJustifyH("LEFT")
+		lockedNote.searchSkip = true
+		-- (The panel's bottom while this tab shows: as wide as the table.)
+		local platesEnd = CreateFrame("Frame", nil, content)
+		platesEnd:SetSize(NAME_W + 2 * COLUMN_W, 1)
+		platesEnd:SetPoint("TOPLEFT", lockedNote, "BOTTOMLEFT", -2, 0)
+		for _, widget in ipairs({ barsHead, barsCheck, keepLabel, keepButton, lockedNote, namesHead, fillCheck }) do
+			plateWidgets[#plateWidgets + 1] = widget
+		end
+
+		-- One tab's set shown, the other's hidden, the panel round the shown one.
+		function ShowSection()
+			for _, widget in ipairs(roleWidgets) do widget:SetShown(not plates) end
+			for _, widget in ipairs(plateWidgets) do widget:SetShown(plates) end
+			panel:SetPoint("BOTTOMRIGHT", plates and platesEnd or lastRow, "BOTTOMRIGHT", 12, -12)
+		end
+		ShowSection()
 	end
 
 	canvas:SetScript("OnShow", PageShown(Refresh, content))
@@ -13462,8 +13617,9 @@ local function CreateTooltipPanel()
 			L["The names of your quests the unit is for, and their objectives (\"5/7 Thistle Boar slain\")."] },
 		ObjQuest = { L["Quest lines on objects"],
 			L["The same on things in the world you use or pick up for a quest (\"0/1 Palehill Runestone\")."] },
-		Hint = { L["Right-click hint"],
-			L["The <Right click for Frame Settings> line on the tooltips of your player, target and party frames."] },
+		Hint = { L["Right-click hints"],
+			L["The <Right click for Frame Settings> line on the tooltips of your player, target and party frames, " ..
+				"and the green click lines on items (\"<Right Click to Read>\", \"<Right Click to Open>\")."] },
 	}
 	local PART_TIPS = { First = L["Shown as soon as the tooltip appears."],
 		Later = L["Shown once you've hovered as long as set above."] }
