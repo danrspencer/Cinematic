@@ -382,13 +382,6 @@ ns.PROFILE_MODULES = {
 		apply = function(set)
 			set("cineShow", { target = true })
 		end },
-	-- (Just Cinema's.)
-	{ key = "quest-talk", name = "Quest talk", scope = { "Quest Vision/Talking to NPCs" },
-		tip = "Custom dialogue frames: speech bubbles and a reply list instead of the game's gossip and " ..
-		"quest windows.",
-		apply = function(set)
-			set("questTalk", true)
-		end },
 	{ key = "combat-vision", name = "Battle cards", scope = { "Card Vision" },
 		tip = "The Cards page's fights on: a card and sounds as you go into a fight and come out of it, and a " ..
 		"boss's name as its fight starts.",
