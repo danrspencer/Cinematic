@@ -278,6 +278,7 @@ local DEFAULTS = {
 	chatPeekChannels = false, -- old "include public channels"; now the default for channels not yet set
 	chatPeekTime = 8,         -- seconds the chat window stays up
 	chatUntilWhisperRead = true, -- keep chat up while a whisper tab is flashing (until it's clicked)
+	chatHideTabHint = false, -- chat tabs' tooltips drop their green "<Right click for Tab Settings>" line (Chat.lua)
 	chatShowWhileTyping = false, -- typing brings up the chat windows, not just the input box
 	chatHideOwn = true, -- your own messages (emotes, say, party...) don't show chat
 	chatOwnNoBubble = true, -- ...except lines you type that have no bubble (whispers, guild...)
@@ -5252,6 +5253,25 @@ ticker:SetScript("OnEvent", ns.Profiled("Core events", function(self, event, arg
 				if type(saved) == "table" then AddBelowRow(saved.hoverGroups) end
 			end
 			ns.db.belowMinimapHoverV1 = true
+		end
+		-- The chat menu button got a Mouseover row of its own (it was the chat
+		-- window's): into saved groups with chat, so nothing changes till it's
+		-- taken out. Once.
+		if not ns.db.chatMenuHoverV1 then
+			local function AddChatMenuRow(groups)
+				for _, group in ipairs(type(groups) == "table" and groups or {}) do
+					local has = {}
+					for _, key in ipairs(group.members or {}) do has[key] = true end
+					if has.chat and not has.chatmenu then
+						table.insert(group.members, "chatmenu")
+					end
+				end
+			end
+			AddChatMenuRow(ns.db.hoverGroups)
+			for _, saved in pairs(type(ns.db.profiles) == "table" and ns.db.profiles or {}) do
+				if type(saved) == "table" then AddChatMenuRow(saved.hoverGroups) end
+			end
+			ns.db.chatMenuHoverV1 = true
 		end
 		-- Roll Vision was first off by default; on once. Saved profiles too.
 		if not ns.db.rollWindowV1 then

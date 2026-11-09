@@ -3620,7 +3620,7 @@ function ns.CreateVitalsVisionPanel(kit)
 			"game's own red flash is hidden under them."], Edges)
 		local state = kit.Label(content, "GameFontHighlightSmall")
 		state:SetPoint("LEFT", follow.Text or follow.text or follow, "RIGHT", 16, 0) -- (after the label: no overlap)
-		kit.AddControl({ Refresh = function()
+		kit.AddControl({ debugName = "game flash setting", owner = content, Refresh = function()
 			if ns.GameLowHealthFlashOff() then
 				state:SetText(L["Game setting: |cffff8000no flash|r (edges off while followed)"])
 			else

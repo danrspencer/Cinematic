@@ -137,7 +137,7 @@ between them: nothing is committed, pushed or tagged until the user says go.
    commit, check the staged copies:
    `git checkout-index -a --prefix=<scratchpad>/staged/` then luacompile the
    staged `.lua` files, and read `git diff --cached --stat`. Commit messages
-   end with the Co-Authored-By line. If something changed in the working tree
+   have no Co-Authored-By line (the addon page says it's AI developed). If something changed in the working tree
    since the review (another session still working), list it and ask whether
    it goes in.
 
@@ -191,7 +191,7 @@ offline check still runs (step 2a): GitHub runs it on every push.
    report.
 4. **One commit** with everything: `git add <files>` (never `-A`), subject in
    the house style ("Area: what changed, for players", American English,
-   dev-only work only in the body, no "Fixes #N"), Co-Authored-By line.
+   dev-only work only in the body, no "Fixes #N"), no Co-Authored-By line.
 5. Push, tag, push the tag (step 14; while GitHub is down, its manual
    zip instead), then report the version, the commit,
    the Actions link, and what was left out. Mention that translations and

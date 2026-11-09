@@ -718,7 +718,8 @@ end
 -- not on one (the welcome window's, a popup's).
 local function PageOf(control)
 	if control.onSettingsPage then return control.onSettingsPage end
-	local frame = control.GetParent and control:GetParent()
+	-- (A plain table's owner: the frame it lays out, so it's skipped with it.)
+	local frame = control.GetParent and control:GetParent() or control.owner
 	while frame and not frame.pageWatch do
 		frame = frame:GetParent()
 	end
@@ -755,7 +756,7 @@ local function Refresh()
 	ns.pageTiming = timing
 	for _, control in ipairs(controls) do
 		local page = PageOf(control)
-		local parent = not page and control.GetParent and control:GetParent()
+		local parent = not page and (control.GetParent and control:GetParent() or control.owner)
 		if page and not page:IsVisible() then
 			page.stale = true
 		elseif parent and not parent:IsVisible() then
@@ -1908,7 +1909,7 @@ local function CreatePanel()
 	local profileLabel = Label(panel, "GameFontHighlightSmall")
 	profileLabel:SetPoint("RIGHT", defaults, "LEFT", -10, 0)
 	profileLabel:SetJustifyH("RIGHT")
-	controls[#controls + 1] = { Refresh = function()
+	controls[#controls + 1] = { debugName = "active profile label", owner = panel, Refresh = function()
 		if not ns.ProfileChosen() then
 			profileLabel:SetText(L["Profile: |cffff8000none yet|r (pick one on the Profiles page)"])
 			return
@@ -3436,7 +3437,7 @@ local function CreateBuffsPanel()
 	Tooltip(addButton, ADD_TIP)
 
 	-- Rebuilt as the page shows and after each change.
-	local ignoreList = { Refresh = function()
+	local ignoreList = { debugName = "buff ignore list", owner = content, Refresh = function()
 		local enabled = IfAnyPeek(ns.GetDB()) and true or false
 		local previous = ignoreLabel
 		local entries = IgnoreEntries()
@@ -11023,10 +11024,15 @@ do
 			"while that tab flashes, until you click it. Whispers that land in the tab you're " ..
 			"looking at don't flash, so they just show as above."])
 		untilRead:SetPoint("TOPLEFT", windowBody, "TOPLEFT", -2, -6)
+		local tabHint = Check(windowBody, "chatHideTabHint", L["Hide the tabs' right-click hint"],
+			L["Hovering a chat tab shows just its name, without the green <Right click for Tab Settings> " ..
+			"line. Right-clicking a tab still opens its settings."] .. " " .. L["Works with this page switched off too."])
+		tabHint.pageSwitch = false -- (not greyed with the switch: see SwitchOf)
+		tabHint:SetPoint("TOPLEFT", untilRead, "BOTTOMLEFT", 0, -2)
 		-- What of the window a new message brings up with it (hovering,
 		-- typing and unread whispers still bring it all).
 		local partsLabel = Label(windowBody, "GameFontHighlight", L["A message shows"])
-		partsLabel:SetPoint("TOPLEFT", untilRead, "BOTTOMLEFT", 2, -10)
+		partsLabel:SetPoint("TOPLEFT", tabHint, "BOTTOMLEFT", 2, -10)
 		local PARTS_TIP = L["Hovering the chat, typing or a whisper to read still brings it all up."]
 		for i, part in ipairs({
 			{ "chatPeekBackground", L["Background"], L["The chat window's dark background comes up with a new " ..
@@ -11640,7 +11646,7 @@ local function CreateMinimapPanel()
 	Tooltip(addZone, L["In the zones listed here, the minimap stays up during CineMode: say, one where " ..
 		"you do a lot of dailies. Caves and towns inside a zone count as the zone."])
 	-- Rebuilt as the page shows and after each change.
-	controls[#controls + 1] = { Refresh = function()
+	controls[#controls + 1] = { debugName = "minimap zone list", owner = content, Refresh = function()
 		local previous = zonesLabel
 		local entries = ZoneEntries()
 		local here, listed = ns.CurrentZoneMap(), false
@@ -12966,7 +12972,7 @@ local function CreateVisionPanel()
 		-- (Shown as the position is: refreshed with the page, so picking
 		-- another in the dropdown swaps them.)
 		controls[#controls + 1] = {
-			debugName = "bubble position's settings",
+			debugName = "bubble position's settings", owner = content,
 			Refresh = function()
 				local mode = ns.GetDB().questTalkPlace
 				for each, list in pairs(byPlace) do
@@ -13858,7 +13864,7 @@ local function CreateTooltipPanel()
 	Tooltip(filterBox, FILTER_TIP)
 	Tooltip(filterAdd, FILTER_TIP)
 	-- Rebuilt as the page shows and after each change.
-	controls[#controls + 1] = { Refresh = function()
+	controls[#controls + 1] = { debugName = "tooltip filter list", owner = content, Refresh = function()
 		local enabled = ns.GetDB().handleTooltips and true or false
 		local last = filterNote
 		local entries = FilterEntries()
@@ -15748,8 +15754,8 @@ local function CreateProfilesPanel()
 		end
 		FitContentHeight(content)
 	end
-	controls[#controls + 1] = { Refresh = function()
-		if canvas:IsShown() then Layout() end
+	controls[#controls + 1] = { debugName = "Profiles page layout", owner = canvas, Refresh = function()
+		if canvas:IsVisible() then Layout() end -- (IsShown stays true with its hub hidden: ~20 ms on every page switch)
 	end }
 
 	canvas:SetScript("OnShow", function()
@@ -16540,8 +16546,8 @@ local function CreateMouseoverPanel()
 		FitContentHeight(content)
 	end
 	-- (Laid out again whenever the page refreshes, a Reset page included.)
-	controls[#controls + 1] = { Refresh = function()
-		if canvas:IsShown() then Layout() end
+	controls[#controls + 1] = { debugName = "Hover Groups layout", owner = canvas, Refresh = function()
+		if canvas:IsVisible() then Layout() end -- (IsShown stays true with its hub hidden: ~20 ms on every page switch)
 	end }
 
 	canvas:SetScript("OnShow", function()

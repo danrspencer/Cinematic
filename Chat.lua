@@ -770,6 +770,72 @@ do
 	frame:SetScript("OnEvent", ns.Profiled("Attack alert", OnChannelMessage))
 end
 
+-- A chat tab's tooltip ("General Tab") without its green "<Right click for
+-- Tab Settings>" line (chatHideTabHint; works with the page switched off too).
+-- After the game shows it, it's set again with every line but the green
+-- "<...>" ones. (Our own Show, to fit it: rebuilding.)
+do
+	local rebuilding = false
+
+	local function IsTabHint(fs)
+		local text = fs and fs:GetText()
+		if type(text) ~= "string" or (issecretvalue and issecretvalue(text)) or not text:find("^<.*>$") then
+			return false
+		end
+		local r, g, b = fs:GetTextColor()
+		if issecretvalue and (issecretvalue(r) or issecretvalue(g) or issecretvalue(b)) then
+			return false
+		end
+		local c = _G.GREEN_FONT_COLOR
+		local gr, gg, gb = c and c.r or 0.1, c and c.g or 1, c and c.b or 0.1
+		return math.abs(r - gr) < 0.03 and math.abs(g - gg) < 0.03 and math.abs(b - gb) < 0.03
+	end
+
+	local function DropTabHint(tooltip)
+		local owner = tooltip:GetOwner()
+		local name = owner and owner.GetName and owner:GetName()
+		if type(name) ~= "string" or not name:find("^ChatFrame%d+Tab$") then
+			return
+		end
+		local count = tooltip:NumLines()
+		local keep, dropped = {}, false
+		for i = 1, count do
+			local fs = _G["GameTooltipTextLeft" .. i]
+			if IsTabHint(fs) then
+				dropped = true
+			else
+				local text = fs and fs:GetText()
+				if type(text) ~= "string" then
+					return -- (a line we can't copy: left as it is)
+				end
+				keep[#keep + 1] = { text, fs:GetTextColor() }
+			end
+		end
+		-- (Blank spacer lines left at the bottom go too.)
+		while #keep > 1 and not keep[#keep][1]:find("%S") do
+			keep[#keep] = nil
+		end
+		if not dropped or #keep == 0 then
+			return
+		end
+		tooltip:SetText(keep[1][1], keep[1][2], keep[1][3], keep[1][4])
+		for i = 2, #keep do
+			local line = keep[i]
+			tooltip:AddLine(line[1], line[2], line[3], line[4], true)
+		end
+		tooltip:Show()
+	end
+
+	hooksecurefunc(GameTooltip, "Show", function(tooltip)
+		if rebuilding or not (ns.db and ns.db.chatHideTabHint) then
+			return
+		end
+		rebuilding = true
+		pcall(DropTabHint, tooltip)
+		rebuilding = false
+	end)
+end
+
 function ns.RegisterChatPeek()
 	local addFilter = ChatFrame_AddMessageEventFilter
 		or (ChatFrameUtil and ChatFrameUtil.AddMessageEventFilter)

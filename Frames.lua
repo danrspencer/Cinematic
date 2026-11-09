@@ -2306,6 +2306,11 @@ local HOVER_EXTRA_ROWS = {
 	{ key = "durability", label = L["Durability figure"], frames = { "DurabilityFrame" } },
 	{ key = "questtimer", label = L["Quest timer"], frames = { "QuestTimerFrame" } },
 	{ key = "waypoint", label = L["Quest waypoint"], frames = { "SuperTrackedFrame" } },
+	-- The chat menu button (languages, emotes) apart from the chat windows: in
+	-- the Chat group by default, so it comes and goes with chat; taken out of
+	-- it, only the mouse on the button brings it up. (Still faded with the
+	-- chat row's ticks and peeks: its fade group stays chat.)
+	{ key = "chatmenu", label = L["Chat menu button"], frames = { "ChatFrameMenuButton" } },
 }
 ns.HOVER_ROWS = {}
 ns.HOVER_GROUP_ONLY = {} -- row key -> true: rows marked groupOnly (above)
@@ -2408,7 +2413,7 @@ ns.HOVER_GROUPS_DEFAULT = {
 	{ preset = "gamepad", icon = "Interface\\Icons\\INV_Gizmo_01", name = L["Gamepad action bars"],
 		members = { "gamepadbars" }, triggers = { gamepad = true } },
 	{ preset = "chat", icon = "Interface\\Icons\\INV_Scroll_03", name = L["Chat"],
-		members = { "chat" }, triggers = { whisper = true, typing = true } },
+		members = { "chat", "chatmenu" }, triggers = { whisper = true, typing = true } },
 	{ preset = "cooldowns", icon = "Interface\\Icons\\INV_Misc_PocketWatch_01", name = L["Cooldowns"],
 		members = { "cooldowns", "cooldownsutility", "cooldownsbuffs", "cooldownsbars", "addon:fecm", "addon:fecmAuras" },
 		triggers = { cooldown = true } },
