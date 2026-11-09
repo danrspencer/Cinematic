@@ -6766,7 +6766,8 @@ local function CreateCombatPanel()
 
 	-- Each section a tab of its own, in Heal Vision's folder look
 	-- (ns.FolderTabs, made once every section is): the picked one's table
-	-- shows on the panel under them, its full name at its top. The raid-style
+	-- shows on the panel under them, its full name at its top. (The party
+	-- frames' two sections share the Party tab, raid-style second.) The raid-style
 	-- party frames' (page = "rsparty") rows are greyed while its "Same as raid
 	-- frames" is ticked, when the raid frames' rows decide for them; unticked,
 	-- they're rows of their own, starting from the raid frames' choices.
@@ -6781,25 +6782,52 @@ local function CreateCombatPanel()
 	local panelTop = CreateFrame("Frame", nil, content)
 	panelTop:SetSize(1, 1)
 	local panel, ShowTab
+	-- (Sections sharing a tab name share its tab, stacked: the party frames,
+	-- raid-style and not. tabs[i] = { label, sections }.)
+	local tabs = {}
 	local function OwnPartyRows()
 		-- (The page is built before the settings load: the default then.)
 		local db = ns.GetDB()
 		return db ~= nil and db.raidStylePartySame == false
 	end
-	-- Shows the picked section, the panel down to its last row.
+	-- Shows the picked section's tab (its sections one under another, the one
+	-- the game uses now tagged In use), the panel down to its last row.
 	local function Layout()
 		SectionState.Restore(picked)
 		local shown
-		for i, section in ipairs(sections) do
-			if section.key == picked.open then shown = i end
+		for i, tab in ipairs(tabs) do
+			for _, section in ipairs(tab.sections) do
+				if section.key == picked.open then shown = i end
+			end
 		end
 		shown = shown or 1
-		for i, section in ipairs(sections) do
-			section.frame:SetShown(i == shown)
-			section.body:SetShown(i == shown)
+		for _, section in ipairs(sections) do
+			section.frame:Hide()
+			section.body:Hide()
+		end
+		local order = {}
+		for _, section in ipairs(tabs[shown].sections) do
+			local inUse = #tabs[shown].sections > 1 and section.inUse and section.inUse()
+			if section.inUseTag then section.inUseTag:SetShown(inUse == true) end
+			order[#order + 1] = section
+		end
+		-- (The raid-style party frames' grid folded away while Same as raid
+		-- frames is ticked: just their heading, the raid frames' rows decide.)
+		local above, bottom
+		for _, section in ipairs(order) do
+			section.frame:ClearAllPoints()
+			if bottom then
+				section.frame:SetPoint("TOPLEFT", bottom, "BOTTOMLEFT", 0, -28)
+			else
+				section.frame:SetPoint("TOPLEFT", panelTop, "TOPLEFT", 12, -10)
+			end
+			local folded = section.key == "rsparty" and not OwnPartyRows()
+			section.frame:Show()
+			section.body:SetShown(not folded)
+			above, bottom = section, folded and section.frame or section.last
 		end
 		ShowTab(shown)
-		panel:SetPoint("BOTTOMRIGHT", sections[shown].last, "BOTTOMLEFT", sections[shown].width + 6, -12)
+		panel:SetPoint("BOTTOMRIGHT", bottom, "BOTTOMLEFT", above.width + 6, -12)
 		FitContentHeight(content)
 	end
 	local function Pick(section)
@@ -6870,9 +6898,39 @@ local function CreateCombatPanel()
 		section.frame = frame
 		local title = Label(frame, "GameFontNormal", heading)
 		title:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, -3)
+		local after = title -- (what the next button or the In use tag goes right of)
+		-- (The raid-style party frames: a button to the Raid tab, whose rows
+		-- they follow while Same as raid frames is ticked.)
+		if page == "rsparty" then
+			local raid = ns.PanelButton(frame)
+			raid:SetSize(70, 20)
+			raid:SetText(L["Raid"] .. " »")
+			raid:SetWidth(math.max(70, raid:GetFontString():GetStringWidth() + 24))
+			raid:SetPoint("LEFT", title, "RIGHT", 12, 0)
+			Tooltip(raid, L["Opens the Raid tab: its rows decide for these frames while Same as raid frames is ticked."])
+			raid:SetScript("OnClick", function()
+				for _, each in ipairs(sections) do
+					if each.key == "raid" then Pick(each) end
+				end
+			end)
+			after = raid
+		end
 		if link then
-			ns.StyleLink(frame, title, link[1], link[2], Tooltip, (link[3] or ns.PageLabel(link[1])) .. " »")
-				:SetPoint("LEFT", title, "RIGHT", 12, 0)
+			local style = ns.StyleLink(frame, title, link[1], link[2], Tooltip, (link[3] or ns.PageLabel(link[1])) .. " »")
+			style:SetPoint("LEFT", after, "RIGHT", after == title and 12 or 6, 0)
+			after = style
+		end
+		-- (The party frames: which of their two kinds the game draws now, the
+		-- Edit Mode setting. Its section is tagged on their tab.)
+		if (page == "party" or page == "rsparty") and ns.RaidStyleParty then
+			local raid = page == "rsparty"
+			section.inUse = function() return ns.RaidStyleParty() == raid end
+			local tag = Label(frame, "GameFontHighlightSmall", L["In use"])
+			tag:SetTextColor(0.3, 0.9, 0.3)
+			tag:SetPoint("LEFT", after, "RIGHT", 12, 0)
+			tag.searchSkip = true
+			tag:Hide()
+			section.inUseTag = tag
 		end
 		section.body = CreateFrame("Frame", nil, content)
 		section.body:SetPoint("TOPLEFT", frame, "TOPLEFT")
@@ -6890,6 +6948,7 @@ local function CreateCombatPanel()
 					CopyRaidRows()
 				end
 				Refresh()
+				Layout() -- (its grid folds away while ticked)
 			end)
 			-- (At the right end of its name: the label on the right edge, the
 			-- box left of it, whatever its width. Hidden with its tab.)
@@ -7004,15 +7063,27 @@ local function CreateCombatPanel()
 		{ "party", L["Party frames (not raid-style)"], L["Party"] },
 		-- (Their look: the Style hub's Raid frames page, RaidStyle.lua.)
 		{ "raid", L["Raid frames"], L["Raid"], raidStyle },
-		{ "rsparty", L["Party frames (raid-style)"], L["Raid-style"], raidStyle },
+		-- (On the Party tab too, under the not raid-style ones.)
+		{ "rsparty", L["Party frames (raid-style)"], L["Party"], raidStyle },
 		{ false, L["Other"] }, -- (any row not given a section)
 	}
 	for _, section in ipairs(SECTIONS) do
 		Section(section[1] or nil, section[2], section[3], section[4])
 	end
 	local list, _, base, height = {}
-	for i, section in ipairs(sections) do list[i] = { section.tab } end
-	panel, _, ShowTab, base, height = ns.FolderTabs(content, list, function(i) Pick(sections[i]) end, nil,
+	for _, section in ipairs(sections) do
+		local tab
+		for _, each in ipairs(tabs) do
+			if each.label == section.tab then tab = each end
+		end
+		if not tab then
+			tab = { label = section.tab, sections = {} }
+			tabs[#tabs + 1] = tab
+			list[#list + 1] = { section.tab }
+		end
+		tab.sections[#tab.sections + 1] = section
+	end
+	panel, _, ShowTab, base, height = ns.FolderTabs(content, list, function(i) Pick(tabs[i].sections[1]) end, nil,
 		SECTION_WIDTH + 8)
 	panelTop:SetPoint("TOPLEFT", lastCheck, "BOTTOMLEFT", 2 - lastIndent, -16 - height) -- (back to the column edge)
 	panel:SetPoint("TOPLEFT", panelTop, "TOPLEFT")
