@@ -49,6 +49,7 @@ local function PrintHelp()
 	Command("/cine off", L["turn Cinematic off completely: asks, then turns it off in the AddOns list and reloads"])
 	Command("/cine config", L["open the settings"])
 	Command("/cine find <words>", L["open the settings at the setting or page with those words, e.g. /cine find minimap"])
+	Command("/cine find <page names>", L["open a page by its names from the left list down, e.g. /cine find ui visibility minimap"])
 	Command("/cine find <page>||<page> <words>", L["look only on those pages, e.g. /cine find Style||Names fade time"])
 	Command("/cine hideui", L["hide the UI but keep the look (again to bring it back)"])
 	Command("/cine size <percent>", L["letterbox bar height (now %s%%)"]:format(ns.db.letterboxSize * 100))
@@ -73,6 +74,7 @@ local function PrintHelp()
 	Command("/cine keep", L["always show it"])
 	Command("/cine list", L["show the extra faded frames"])
 	Command("/cine why", L["click any frame to see why it's showing or hidden"])
+	Command("/cine plates", L["why friendly nameplates near you are showing, as text to copy and send us"])
 	Heading(L["Camera"])
 	Command("/cine behind", L["swing the camera back behind your character"])
 	Command("/cine flyby", L["turn the camera slowly round to look back, then back behind you (again to stop)"])
@@ -364,6 +366,8 @@ local function HandleSlash(msg)
 		ns.RemoveUnderMouse()
 	elseif cmd == "why" then
 		ns.ToggleInspect()
+	elseif cmd == "plates" then
+		ns.PlatesReport()
 	elseif cmd == "report" then
 		ns.ToggleDamageReport(arg == "test")
 	elseif cmd == "debug" and arg == "why" then
@@ -1818,6 +1822,10 @@ local function HandleSlash(msg)
 		ns.ReportActionBarStyle()
 	elseif cmd == "debug" and arg == "minimapstyle" then
 		ns.ReportMinimapStyle()
+	elseif cmd == "debug" and arg == "questtracker" then
+		ns.ReportQuestTrackerStyle()
+	elseif cmd == "debug" and arg == "recolor" then
+		ns.ReportInterfaceRecolor()
 	elseif cmd == "debug" and arg == "fonts" then
 		ns.ReportStyleFonts()
 	elseif cmd == "debug" and arg == "mirror" then

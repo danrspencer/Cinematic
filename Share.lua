@@ -439,6 +439,23 @@ function ns.ShowExport(name)
 	window.box:HighlightText()
 end
 
+-- Any read-only text to copy, export's way (/cine plates' report).
+function ns.ShowReportText(title, hint, text)
+	if not window then CreateWindow() end
+	window.mode = "export"
+	window.text = text
+	window.title:SetText(title)
+	window.hint:SetText(hint)
+	window.status:SetText("")
+	window.nameRow:Hide()
+	window.accept:Hide()
+	window.selectAll:Show()
+	window:Show()
+	window.box:SetText(text)
+	window.box:SetFocus()
+	window.box:HighlightText()
+end
+
 -- Import: an empty box to paste into.
 function ns.ShowImport()
 	if not window then CreateWindow() end

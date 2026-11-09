@@ -1113,6 +1113,8 @@ local function ResetPage(content, only)
 	if ns.ApplyUnitFrameParts then ns.ApplyUnitFrameParts() end
 	if ns.RefreshActionBarStyle then ns.RefreshActionBarStyle() end
 	if ns.RefreshMinimapStyle then ns.RefreshMinimapStyle() end
+	if ns.RefreshQuestTrackerStyle then ns.RefreshQuestTrackerStyle() end
+	if ns.RefreshInterfaceRecolor then ns.RefreshInterfaceRecolor() end
 	if ns.ApplyGraphicsPlus then ns.ApplyGraphicsPlus() end
 	Refresh()
 end
@@ -1485,6 +1487,29 @@ function ns.FindSetting(query)
 	end
 	local words = table.remove(parts)
 	if not words then return nil end
+	-- Only page names (ui visibility minimap): that page opened, at its top.
+	-- The words name the page's path in menu order, top down, and the page
+	-- with the most of them in its own name wins (the first listed on a tie).
+	if #parts == 0 then
+		local list = {}
+		for word in words:gmatch("%S+") do list[#list + 1] = word end
+		local bestPage, bestScore = nil, 0
+		for _, page in ipairs(searchPages) do
+			if ns.PageOnPathInOrder(page.key, list) then
+				local own = ((page.key or "Cinematic") .. " " .. (page.name or "") .. " "
+					.. (ns.PageLabel(page.key or "Cinematic") or "")):lower()
+				local score = 0
+				for _, word in ipairs(list) do
+					if own:find(word, 1, true) then score = score + 1 end
+				end
+				if score > bestScore then bestPage, bestScore = page, score end
+			end
+		end
+		if bestPage then
+			ShowMatch({ page = bestPage })
+			return bestPage.name or "Cinematic", L["page"]
+		end
+	end
 	local function Best(text)
 		local pages
 		if #parts > 0 then
@@ -2023,7 +2048,7 @@ do
 			{ "Unit Style", "Interface\\Icons\\INV_Misc_Head_Human_01", label = "Unit Frame Style", section = "HUD" },
 			{ "Raid Style", "Interface\\Icons\\INV_Misc_GroupNeedMore", label = "Raid Frame Style", section = "HUD" },
 			{ "Action Style", "Interface\\Icons\\Ability_DualWield", label = "Action Bar Style", section = "HUD" },
-			{ "Minimap Style", "Interface\\Icons\\INV_Misc_Map_01", label = "Minimap Style", section = "HUD" },
+			{ "Interface Recolor", "Interface\\Icons\\INV_Misc_Gem_01", label = "Interface Recolor", section = "HUD" },
 			{ "Personal Style", "Interface\\Icons\\Spell_Holy_SealOfVengeance", label = "Personal Resource Style",
 				section = "HUD" },
 			{ "Tooltip Style", "Interface\\Icons\\INV_Misc_Note_05", label = "Tooltip Style", section = "HUD" },
@@ -2753,6 +2778,59 @@ do
 				if text:find(part, 1, true) then found = true break end
 			end
 			if not found then return false end
+		end
+		return true
+	end
+
+	-- Whether words (lower case) name a page (its English name; nil: the main
+	-- page) in menu order, top down: the left list's page, the icon group, the
+	-- page it's a tab of, the page itself (in English or the language shown).
+	-- A name of many words takes them all (/cine find ui visibility minimap).
+	function ns.PageOnPathInOrder(name, words)
+		local levels = {}
+		local function level(...)
+			local known = {}
+			for i = 1, select("#", ...) do
+				local text = select(i, ...)
+				if type(text) == "string" then
+					known[#known + 1] = text:lower()
+					known[#known + 1] = L[text]:lower()
+				end
+			end
+			if #known > 0 then levels[#levels + 1] = known end
+		end
+		local found
+		for _, hub in ipairs(HUBS) do
+			for _, page in ipairs(hub.pages) do
+				if not found and page[1] == name then
+					found = true
+					for _, each in ipairs(HUBS) do
+						if each.name == hub.under then level(each.name, each.label) end
+					end
+					level(hub.name, hub.label)
+					level(page.section)
+					level(page.tabOf)
+				end
+			end
+		end
+		local page
+		for _, hub in ipairs(HUBS) do
+			for _, each in ipairs(hub.pages) do
+				if each[1] == name then page = each end
+			end
+		end
+		level(name or "Cinematic", page and page.label)
+		local at = 1
+		for _, word in ipairs(words) do
+			local hit
+			for i = at, #levels do
+				for _, text in ipairs(levels[i]) do
+					if text:find(word, 1, true) then hit = i break end
+				end
+				if hit then break end
+			end
+			if not hit then return false end
+			at = hit
 		end
 		return true
 	end
@@ -16752,8 +16830,8 @@ ns.OnLanguage(function()
 	if ns.CreateActionBarStylePanel then -- (ActionBarStyle.lua)
 		ns.CreateActionBarStylePanel(ns.lowHealthKit)
 	end
-	if ns.CreateMinimapStylePanel then -- (MinimapStyle.lua)
-		ns.CreateMinimapStylePanel(ns.lowHealthKit)
+	if ns.CreateInterfaceRecolorPanel then -- (InterfaceRecolor.lua)
+		ns.CreateInterfaceRecolorPanel(ns.lowHealthKit)
 	end
 	if ns.CreatePersonalStylePanel then -- (PersonalStyle.lua)
 		ns.CreatePersonalStylePanel(ns.lowHealthKit)

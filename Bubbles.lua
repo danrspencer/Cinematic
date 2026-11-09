@@ -250,8 +250,32 @@ local function StyleText(region, look)
 	end
 end
 
+-- With a style theme picked, a Dark or Custom bubble is the game's own art, its
+-- shape, border and rounded tail, turned grey and tinted with the theme's line color:
+-- the border takes the color, the dark fill stays dark. (Our own back and tail are
+-- for no theme.) Gives the color, or nil.
+local tintedArt = setmetatable({}, { __mode = "k" }) -- texture -> true, while tinted
+function ns.BubbleThemeTint(look)
+	if not (look and ns.BubbleBackColor(look) and ns.ThemeRing()) then return nil end
+	local _, edge = ns.ThemePanel()
+	return edge or ns.ThemeRing()
+end
+local function TintArt(region, color)
+	if color then
+		tintedArt[region] = true
+		region:SetDesaturated(true)
+		region:SetVertexColor(color[1], color[2], color[3], 1)
+	elseif tintedArt[region] then
+		tintedArt[region] = nil
+		region:SetDesaturated(false)
+		region:SetVertexColor(1, 1, 1, 1)
+	end
+end
+ns.TintBubbleArt = TintArt
+
 local function Style(inside, look, ...)
-	local game = look and look.bubblesBack == "game"
+	local tint = ns.BubbleThemeTint(look)
+	local game = look and (look.bubblesBack == "game" or tint ~= nil)
 	local alpha = game and tonumber(look.bubblesAlpha) or 1
 	local scale = look and tonumber(look.bubblesTextScale) or 1
 	for i = 1, select("#", ...) do
@@ -265,6 +289,7 @@ local function Style(inside, look, ...)
 			else
 				SetAlphaOf(region, alpha)
 			end
+			TintArt(region, tint)
 		elseif kind == "FontString" then
 			StyleText(region, look)
 			if region.SetTextScale and (scale ~= 1 or scaled[region]) then
@@ -299,7 +324,7 @@ local function Skin(bubble, inside, look)
 		skin:SetPoint("TOPLEFT", inside, "TOPLEFT", SKIN_INSET, -SKIN_INSET)
 		skin:SetPoint("BOTTOMRIGHT", inside, "BOTTOMRIGHT", -SKIN_INSET, SKIN_INSET)
 	end
-	if not look then
+	if not look or ns.BubbleThemeTint(look) then
 		skin:Hide()
 		return
 	end
@@ -560,7 +585,8 @@ local function DressCopy(copy, inside, text)
 	copy.text:ClearAllPoints()
 	copy.text:SetPoint("TOPLEFT", copy, "TOPLEFT", text:GetLeft() - inside:GetLeft(), text:GetTop() - inside:GetTop())
 	local look = ns.StyleOn("bubblesStyle") and Look() or nil
-	local own = look and ns.BubbleBackColor(look)
+	local tint = ns.BubbleThemeTint(look)
+	local own = look and not tint and ns.BubbleBackColor(look)
 	local boxed = not look or look.bubblesBack ~= "none"
 	if look then ns.DressBubbleSkin(copy.skin, look) end
 	copy.skin:SetShown(boxed and own ~= nil)
@@ -569,6 +595,9 @@ local function DressCopy(copy, inside, text)
 		copy.game:SetShown(boxed and not own)
 		copy.game:SetAlpha(look and tonumber(look.bubblesAlpha) or 1)
 		copy.game.tail:SetShown(tailOn)
+		for _, region in ipairs({ copy.game:GetRegions() }) do
+			if region:GetObjectType() == "Texture" then TintArt(region, tint) end
+		end
 	end
 	copy.skin.tail:SetShown(tailOn)
 	copy.skin.tailEdge:SetShown(tailOn and copy.skin.tailOurs and true or false)
@@ -1024,16 +1053,21 @@ local function DressPreviewBubble(frame, look, words, color, most)
 	local wide = text:GetStringWidth()
 	if type(wide) == "number" and wide < most then text:SetWidth(math.ceil(wide) + 2) end
 	frame:SetSize(text:GetWidth() + PREVIEW_PAD_X * 2, text:GetStringHeight() + PREVIEW_PAD_Y * 2)
-	local own = ns.BubbleBackColor(look)
+	-- (With a theme, as the bubbles in the world are: the game's art, tinted.)
+	local tint = ns.BubbleThemeTint(look)
+	local own = not tint and ns.BubbleBackColor(look)
 	local boxed = look.bubblesBack ~= "none"
 	ns.DressBubbleSkin(frame.skin, look)
-	frame.skin:SetShown(boxed and own ~= nil)
+	frame.skin:SetShown(boxed and own ~= nil and own ~= false)
 	frame.skin.tail:ClearAllPoints()
 	frame.skin.tail:SetPoint("TOP", frame.skin, "BOTTOM", -20, frame.skin.tailOurs and frame.skin.tailTop or frame.skin.tailInto)
 	if frame.game then
 		frame.game:SetShown(boxed and not own)
 		frame.game:SetAlpha(tonumber(look.bubblesAlpha) or 1)
 		frame.game.tail:SetShown(look.bubblesTail and true or false)
+		for _, region in ipairs({ frame.game:GetRegions() }) do
+			if region:GetObjectType() == "Texture" then ns.TintBubbleArt(region, tint) end
+		end
 	end
 end
 

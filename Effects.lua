@@ -3277,6 +3277,70 @@ function ns.PrintPlatesDebug()
 	ns.Print(table.concat(names, ", "))
 end
 
+-- /cine plates: a short report a player can copy and paste to us, of why
+-- the friendly plates near them show. Where they are, the friendly rows'
+-- ticks (a rule says "rule"), and each friendly plate up now with what holds
+-- it up: its row (kind), a group or pet row, the target fade, a duel.
+function ns.PlatesReport()
+	local out = {}
+	local function Add(text) out[#out + 1] = text end
+	local function Flag(value) return value and "yes" or "no" end
+	local function Level(value) return ("%.2f"):format(tonumber(value) or 0) end
+	Add(("Cinematic %s, %s"):format(ns.Version and ns.Version() or "?",
+		ns.isRetail and "retail" or ("game " .. tostring(select(4, GetBuildInfo())))))
+	local inInstance, instanceType = IsInInstance()
+	Add(("CineMode=%s, steering plates=%s, place=%s (%s), group=%s, raid=%s, combat=%s, pvp fight=%s"):format(
+		Flag(ns.lastCinematic), Flag(platesActive), placeSuffix or "open world",
+		inInstance and tostring(instanceType) or "not in instance", Flag(ns.InGroup and ns.InGroup()),
+		Flag(IsInRaid and IsInRaid()), Flag(InCombatLockdown()), Flag(InPvPFight())))
+	Add(("Nameplates page on=%s, all plates kept on=%s, fade=%s, duel plates=%s (watching %s), heal vision plates=%s")
+		:format(Flag(ns.db.handlePlates), Flag(platesForced), Level(ns.plates.level), Flag(ns.db.duelPlates),
+		Flag(duels.watching), Flag(ns.db.healVisionPlates)))
+	local PREFIXES = { "plateAlways", "plateGroup", "plateCombat", "plateCombatPvP", "plateCinematic", "plateInCities",
+		"plateInInstances", "plateInPvP", "plateInBGs", "plateTargetEnemy", "plateTargetFriendly" }
+	for _, row in ipairs({ "Friends", "FriendlyMinions", "MyPet", "GroupMembers", "GroupMinions" }) do
+		local ticks = {}
+		if ns.RuleTest(PLATE_RULE_KEY[row]) then ticks[#ticks + 1] = "rule" end
+		for _, prefix in ipairs(PREFIXES) do
+			if ns.db[prefix .. row] then ticks[#ticks + 1] = prefix:gsub("^plate", "") end
+		end
+		local kind = unitRowLevel[row] == nil and row or nil -- (the unit rows have a level of their own)
+		Add(("  %s: %s%s"):format(row, #ticks > 0 and table.concat(ticks, ",") or "none",
+			kind and (" | fights=%s here=%s kept=%s"):format(Flag(ShownInFights(kind)), Flag(KeptHere(kind)),
+				Level(keptLevel[kind])) or (" | level=%s"):format(Level(unitRowLevel[row]))))
+	end
+	local instance = {}
+	for _, kind in ipairs(ns.PLATE_INSTANCE_KINDS) do
+		instance[#instance + 1] = kind .. "=" .. tostring(ns.db["plateInstance" .. kind])
+	end
+	Add("  dungeons and raids: " .. table.concat(instance, ", "))
+	local shown = 0
+	for _, plate in ipairs(C_NamePlate and C_NamePlate.GetNamePlates and C_NamePlate.GetNamePlates() or {}) do
+		local unit = plate.namePlateUnitToken or (plate.UnitFrame and plate.UnitFrame.unit)
+		local kind = type(unit) == "string" and PlateKind(unit)
+		if (kind == "Friends" or kind == "FriendlyMinions") and plate ~= PersonalPlate() then
+			local body, name = PlateAlphas(unit, plate)
+			if (body or 0) > 0.05 or (name or 0) > 0.05 then
+				shown = shown + 1
+				if shown <= 12 then
+					local rows = {}
+					for _, row in ipairs({ "MyPet", "GroupMembers", "GroupMinions" }) do
+						if InUnitRow(row, unit, kind) then rows[#rows + 1] = row end
+					end
+					local who = UnitName(unit)
+					Add(("  %s (%s): plate %s, name %s | row %s, unit rows %s (%s), target %s, duel %s"):format(
+						Known(who) and tostring(who) or "?", kind, Level(body), Level(name), Level(KindAlpha(unit)),
+						#rows > 0 and table.concat(rows, ",") or "none", Level(UnitRowAlpha(unit, kind)),
+						Level(TargetPlateLevel(plate)), Level(duels.Level(plate))))
+				end
+			end
+		end
+	end
+	Add(("%d friendly plates showing%s"):format(shown, shown > 12 and " (first 12 listed)" or ""))
+	ns.ShowReportText(L["Nameplates report"], L["Press Ctrl+C to copy this, then paste it to us on Discord. " ..
+		"Run it while the plates you're asking about are showing."], table.concat(out, "\n"))
+end
+
 -- One line of a unit's debuffs for /cine debug duels: name, spell id,
 -- duration and time left (whether other players' are readable, for the
 -- duel plates' crowd-control icon).

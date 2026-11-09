@@ -14,7 +14,7 @@ local PAGES = {
 	{ "Unit Frames", "Unit Style", { "ufTexture", "ufFont", "ufOutline", "ufShadow", "ufBorder" }, group = "Interface" },
 	{ "Raid Frames", "Raid Style", { "rfTexture", "rfFont", "rfOutline", "rfShadow", "rfBorder" } },
 	{ "Action Bars", "Action Style", {}, fixed = "Its own settings" },
-	{ "Minimap", "Minimap Style", {}, fixed = "Follows General" },
+	{ "Interface Recolor", "Interface Recolor", {}, fixed = "Follows General" },
 	{ "Personal Resource Display", "Personal Style", { "prdTexture", "prdBorder" } },
 	{ "Tooltips", "Tooltip Style", { "tooltipBarTexture", "tooltipFont", "tooltipOutline", "tooltipShadow", "tooltipEdge" } },
 	-- (These two read General directly: PlateHealthStyle.lua, PlateParts.lua.)
@@ -36,17 +36,32 @@ local PAGES = {
 local KIND_NAMES = { texture = "Texture", font = "Font", outline = "Outline", shadow = "Shadow", border = "Border" }
 
 -- Every page's look again (General's settings changing).
+local REFRESH_NAMES = { "personal", "tooltip", "bubble", "quest talk", "quest item", "roll", "plate cast", "unit",
+	"raid", "target arrows", "plate name", "action bar", "minimap", "quest tracker", "recolor", "plate health" }
 local function RefreshAll()
-	for _, refresh in ipairs({ ns.RefreshPersonalStyle, ns.RefreshTooltipStyle, ns.RefreshBubbleStyle,
-		ns.RefreshQuestTalkStyle, ns.RefreshQuestItemStyle, ns.RefreshRollStyle, ns.RefreshPlateCastStyle,
-		ns.RefreshUnitStyle, ns.RefreshRaidStyle, ns.RefreshTargetArrows, ns.RefreshPlateNameStyle,
-		ns.RefreshActionBarStyle, ns.RefreshMinimapStyle, ns.RefreshPlateHealthStyle }) do
+	-- (Each page's time, in the log when the whole takes long: a theme pick's hitch.)
+	local times, total = {}, debugprofilestop()
+	for i, refresh in ipairs({ ns.RefreshPersonalStyle or false, ns.RefreshTooltipStyle or false,
+		ns.RefreshBubbleStyle or false, ns.RefreshQuestTalkStyle or false, ns.RefreshQuestItemStyle or false,
+		ns.RefreshRollStyle or false, ns.RefreshPlateCastStyle or false, ns.RefreshUnitStyle or false,
+		ns.RefreshRaidStyle or false, ns.RefreshTargetArrows or false, ns.RefreshPlateNameStyle or false,
+		ns.RefreshActionBarStyle or false, ns.RefreshMinimapStyle or false, ns.RefreshQuestTrackerStyle or false,
+		ns.RefreshInterfaceRecolor or false, ns.RefreshPlateHealthStyle or false }) do
 		if refresh then
+			local started = debugprofilestop()
 			-- (Kept going past a page's error, but said: a page that fails here just
 			-- looks unstyled, with nothing else to show why.)
 			local ok, err = pcall(refresh)
 			if not ok then ns.Log("style", "refresh failed: " .. tostring(err)) end
+			times[#times + 1] = { REFRESH_NAMES[i], debugprofilestop() - started }
 		end
+	end
+	total = debugprofilestop() - total
+	if total > 20 then
+		table.sort(times, function(a, b) return a[2] > b[2] end)
+		local slow = {}
+		for i = 1, math.min(5, #times) do slow[i] = ("%s %.0f"):format(times[i][1], times[i][2]) end
+		ns.Log("style", ("refresh all: %.0f ms; slowest %s"):format(total, table.concat(slow, ", ")))
 	end
 end
 ns.RefreshAllStyles = RefreshAll

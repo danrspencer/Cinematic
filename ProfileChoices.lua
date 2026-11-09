@@ -190,7 +190,8 @@ ns.BUILTIN_PROFILES = {
 			"emote at you."],
 		picks = { layout = { forever = "preset" }, frames = "nofade", camera = "travel", vfx = "cinebars",
 			sound = "nomusic" },
-		modules = With("zone-card", "travel-cards", "no-visions", "no-custom-bubbles", "tint-light"),
+		modules = With("zone-card", "travel-cards", "no-visions", "no-custom-bubbles", "tint-light",
+			"advanced-pages-off"),
 	},
 	{
 		name = "Balanced",

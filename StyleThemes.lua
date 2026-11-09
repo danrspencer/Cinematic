@@ -107,6 +107,9 @@ local function Theme(info)
 	-- (A shape of ours: the game's strip behind the target's name was drawn for its
 	-- frame art, and floats alone without it. On the Overrides tab, so it can be undone.)
 	if s.ufShape and s.ufShape ~= "game" then s.styleOver_unitPartTargetNameBack = "hide" end
+	-- (The modern themes: flat and clean, where a stone gryphon at each end of the bar
+	-- looks out of place. Also on the Overrides tab.)
+	if info.layout == "slab" then s.styleOver_barArt = "hide" end
 	-- (Raid frames, one way in every theme. Their tiles are tall, which stretches a
 	-- bar texture's bands into shapes, and their names are small on bright class
 	-- colors: a smooth fill, dark under the name, in the game's font for small text.)
@@ -179,15 +182,16 @@ local THEMES = {
 		key = "forge", name = "Emberforge", unitBars = "hammered",
 		barDepth = { 0, 0, 0, 0.3 },
 		tip = "Blackened iron, rivets and molten light. Heavy, loud and built to take a hit.",
-		swatch = { { 0.09, 0.085, 0.08 }, { 1, 0.5, 0.12 }, { 0.82, 0.24, 0.1 }, { 0.5, 0.48, 0.46 } },
-		menu = { accent = { 1, 0.55, 0.16 }, edge = { 0.46, 0.43, 0.4 }, field = { 0.11, 0.105, 0.1 },
+		swatch = { { 0.09, 0.085, 0.08 }, { 1, 0.5, 0.12 }, { 0.82, 0.24, 0.1 }, { 0.56, 0.36, 0.22 } },
+		menu = { accent = { 1, 0.55, 0.16 }, edge = { 0.56, 0.36, 0.22 }, field = { 0.11, 0.1, 0.09 },
 			window = { 0.06, 0.055, 0.05 }, well = { 0.025, 0.02, 0.02 }, knob = { 1, 0.74, 0.42 },
 			thumb = { 0.66, 0.42, 0.22 } },
-		grain = "Forge", ornament = { 0.62, 0.58, 0.54 },
+		-- (Its rings hot copper, its lines heated iron: the forge's glow on the metal.)
+		grain = "Forge", ornament = { 0.88, 0.47, 0.2 },
 		health = { 0.86, 0.34, 0.1 }, mana = { 0.28, 0.44, 0.62 }, back = 0.8,
-		panel = { 0.13, 0.125, 0.12 }, panelAlpha = 0.97,
+		panel = { 0.135, 0.115, 0.1 }, panelAlpha = 0.97,
 		cast = { 1, 0.6, 0.12 }, channel = { 0.95, 0.82, 0.4 }, locked = { 0.46, 0.44, 0.42 }, stop = { 0.75, 0.1, 0.06 },
-		line = { 0.46, 0.43, 0.4 }, lineSize = 2,
+		line = { 0.56, 0.36, 0.22 }, lineSize = 2,
 		cardColor = { 1, 0.62, 0.2 }, cardFont = "germania",
 		settings = { styleTexture = "forged", styleFont = "germania", styleOutline = 0, styleShadow = "on",
 			stylePanel = "plate", styleBarShape = "chisel",
@@ -889,9 +893,27 @@ local function Base() return ns.ResetBase and ns.ResetBase() or ns.DEFAULTS end
 
 -- Everything back on after a pick.
 local function ShowTheme()
-	if ns.RefreshAllStyles then ns.RefreshAllStyles() end
-	if ns.ApplyMenuSkin then ns.ApplyMenuSkin(true) end
-	if ns.ApplyUnitFrameParts then ns.ApplyUnitFrameParts() end -- (a theme's overrides)
+	-- (Each step's time in the log when the whole is slow: a pick's hitch.)
+	local started = debugprofilestop()
+	local marks = {}
+	local function Step(name, run)
+		if not run then return end
+		local at = debugprofilestop()
+		run()
+		marks[#marks + 1] = ("%s %.0f"):format(name, debugprofilestop() - at)
+	end
+	Step("styles", ns.RefreshAllStyles)
+	Step("menu skin", ns.ApplyMenuSkin and function() ns.ApplyMenuSkin(true) end)
+	Step("unit parts", ns.ApplyUnitFrameParts) -- (a theme's overrides)
+	Step("bar art", ns.ApplyBarArtOverride)
+	local total = debugprofilestop() - started
+	if total > 20 then ns.Log("style", ("theme shown: %.0f ms (%s)"):format(total, table.concat(marks, ", "))) end
+	-- (And the work left for the next frame: the recolor, the tracker, the settings page.)
+	local nextAt = debugprofilestop()
+	C_Timer.After(0, function()
+		local gap = debugprofilestop() - nextAt
+		if gap > 50 then ns.Log("style", ("theme shown: next frame came %.0f ms later"):format(gap)) end
+	end)
 end
 
 -- Everything a pick changes, as it is now, and that put back.

@@ -102,8 +102,8 @@ local function Parts(button)
 		cooldown = button.cooldown or (name and _G[name .. "Cooldown"]),
 		backs = {}, roundOn = {},
 	}
-	for _, back in ipairs({ button.SlotBackground or false, button.SlotArt or false,
-		name and _G[name .. "FloatingBG"] or false }) do
+	part.floating = name and _G[name .. "FloatingBG"] or nil
+	for _, back in ipairs({ button.SlotBackground or false, button.SlotArt or false, part.floating or false }) do
 		if back then part.backs[#part.backs + 1] = back end
 	end
 	parts[button] = part
@@ -246,6 +246,52 @@ local function Dress(button, plan)
 	SetOutline(button, part, plan)
 end
 
+-- Retail's bar 1 has a divider between its buttons: small frames of the bar's own
+-- (from a pool, no names), each with a TopEdge and a BottomEdge. Hidden only by the
+-- Overrides tab's Button dividers row (by alpha, kept so as the game sets it again).
+local DIVIDER_BARS = { "MainActionBar", "MainMenuBar" }
+local dividerHidden, dividerHooked = setmetatable({}, { __mode = "k" }), setmetatable({}, { __mode = "k" })
+local function KeepDividerHidden(frame)
+	if hiding or not dividerHidden[frame] then return end
+	hiding = true
+	frame:SetAlpha(0)
+	hiding = false
+end
+local dividerBarsHooked = false
+local function SetDividers()
+	local over = ns.StyleOverride and ns.StyleOverride("barDividers")
+	local hide = over == "hide"
+	for _, name in ipairs(DIVIDER_BARS) do
+		local bar = _G[name]
+		if type(bar) == "table" and bar.GetChildren then
+			for _, kid in ipairs({ bar:GetChildren() }) do
+				if kid.TopEdge and kid.BottomEdge and not (kid.IsForbidden and kid:IsForbidden()) then
+					if hide and not dividerHooked[kid] then
+						dividerHooked[kid] = true
+						hooksecurefunc(kid, "SetAlpha", KeepDividerHidden)
+					end
+					if hide then
+						dividerHidden[kid] = true
+						KeepDividerHidden(kid)
+					elseif dividerHidden[kid] then
+						dividerHidden[kid] = nil
+						kid:SetAlpha(1)
+					end
+				end
+			end
+		end
+	end
+	-- (The game lays them out again as the bar changes: hidden again after it.)
+	if dividerBarsHooked then return end
+	dividerBarsHooked = true
+	for _, name in ipairs(DIVIDER_BARS) do
+		local bar = _G[name]
+		if type(bar) == "table" and type(bar.UpdateDividers) == "function" then
+			hooksecurefunc(bar, "UpdateDividers", function() C_Timer.After(0, SetDividers) end)
+		end
+	end
+end
+
 local function EachButton(apply)
 	for _, bar in ipairs(BARS) do
 		for i = 1, bar[2] do
@@ -256,6 +302,88 @@ local function EachButton(apply)
 	local pad = _G.GamepadMainActionBarFrame
 	if pad and type(pad.actionButtons) == "table" then
 		for _, button in ipairs(pad.actionButtons) do apply(button) end
+	end
+end
+
+-- The game's Cooldown Manager (retail): its icons round with round buttons, so
+-- the two read as one set. Each icon's art cut by a circle, its cooldown sweep
+-- round, and the outline's ring round it as the buttons have. Its icons come and
+-- go (a spec, a talent): dressed again as its viewers lay them out.
+local CDM_VIEWERS = { "EssentialCooldownViewer", "UtilityCooldownViewer", "BuffIconCooldownViewer" }
+local cdmParts = setmetatable({}, { __mode = "k" })
+local function EachCdmIcon(visit)
+	local function Look(frame, depth)
+		local okKids, kids = pcall(function() return { frame:GetChildren() } end)
+		for _, kid in ipairs(okKids and kids or {}) do
+			local icon = kid.Icon
+			if type(icon) == "table" and icon.GetObjectType and icon:GetObjectType() == "Texture" then
+				visit(kid, icon)
+			elseif depth < 2 then
+				Look(kid, depth + 1)
+			end
+		end
+	end
+	for _, name in ipairs(CDM_VIEWERS) do
+		local viewer = _G[name]
+		if type(viewer) == "table" and viewer.GetChildren then Look(viewer, 0) end
+	end
+end
+local function DressCdmIcon(item, icon, plan)
+	local part = cdmParts[item]
+	if not part then
+		if not plan.round then return end
+		part = { on = {} }
+		part.mask = item:CreateMaskTexture()
+		part.mask:SetAllPoints(icon)
+		part.mask:SetTexture(CIRCLE, "CLAMPTOBLACKADDITIONAL", "CLAMPTOBLACKADDITIONAL")
+		cdmParts[item] = part
+	end
+	-- (Every texture of the icon's: its picture and any square border or overlay.)
+	for _, region in ipairs({ item:GetRegions() }) do
+		if region:GetObjectType() == "Texture" and region.AddMaskTexture then
+			if plan.round and not part.on[region] then
+				part.on[region] = true
+				region:AddMaskTexture(part.mask)
+			elseif not plan.round and part.on[region] then
+				part.on[region] = nil
+				region:RemoveMaskTexture(part.mask)
+			end
+		end
+	end
+	local cooldown = item.Cooldown
+	if cooldown and cooldown.SetSwipeTexture and (plan.round or part.swipe) then
+		cooldown:SetSwipeTexture(plan.round and CIRCLE or SQUARE_SWIPE)
+		part.swipe = plan.round or nil
+	end
+	local ring = plan.round and plan.line
+	if ring and not part.ring then
+		part.ring = item:CreateTexture(nil, "OVERLAY", nil, 7)
+		part.ring:SetAllPoints(icon)
+	end
+	if part.ring then
+		part.ring:SetShown(ring and true or false)
+		if ring then
+			part.ring:SetTexture(RING .. math.min(MAX_RING, plan.size))
+			part.ring:SetVertexColor(plan.r, plan.g, plan.b, 1)
+		end
+	end
+end
+local cdmHooked = false
+function ns.RefreshCooldownShape()
+	local plan = Plan()
+	EachCdmIcon(function(item, icon)
+		local ok, err = pcall(DressCdmIcon, item, icon, plan)
+		if not ok then ns.Log("style", "cooldown icon failed: " .. tostring(err)) end
+	end)
+	if cdmHooked then return end
+	cdmHooked = true
+	for _, name in ipairs(CDM_VIEWERS) do
+		local viewer = _G[name]
+		if type(viewer) == "table" then
+			local function Again() C_Timer.After(0, ns.RefreshCooldownShape) end
+			if type(viewer.RefreshLayout) == "function" then hooksecurefunc(viewer, "RefreshLayout", Again) end
+			if viewer.HookScript then viewer:HookScript("OnShow", Again) end
+		end
 	end
 end
 
@@ -276,6 +404,8 @@ function ns.RefreshActionBarStyle()
 		end
 	end)
 	if failed then ns.Log("style", "action buttons failed: " .. tostring(failed)) end
+	ns.RefreshCooldownShape()
+	SetDividers()
 	-- (The square band bar 1 sits on: round buttons on it look out of place.)
 	if ns.SetBarBorderOff then ns.SetBarBorderOff(plan.round) end
 end

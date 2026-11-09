@@ -145,7 +145,7 @@ local TOURS = {
 	{ "tour-ui", "Interface", { "Standard Frames", "Advanced Frames", "Mouseover groups", "Gamepad", "Unit Frames",
 		"Personal Resources", "Buffs/debuffs", "Cooldown Manager", "Swing timer", "Minimap", "Quest tracker",
 		"Tooltips", "Chat", "Nameplates", "Chat bubbles" } },
-	{ "tour-style", "Style", { "Style General", "Unit Style", "Raid Style", "Action Style", "Minimap Style", "Personal Style",
+	{ "tour-style", "Style", { "Style General", "Unit Style", "Raid Style", "Action Style", "Interface Recolor", "Personal Style",
 		"Tooltip Style", "Nameplate Style", "Name Style", "Cast Bar Style", "Bubble Style" } },
 	{ "tour-camera", "Camera", { "Cameras", "Scenes", "Camera Scripts", "My Shots" } },
 	{ "tour-look", "Atmosphere", { "Effects", "Tint", "Tint Style", "Letterbox", "Letterbox Style", "Graphics+",

@@ -18,6 +18,8 @@ for _, frame in ipairs(ns.UNIT_PART_FRAMES) do
 	end
 end
 for _, part in ipairs(ns.PLATE_PARTS) do DEFAULTS[PREFIX .. "platePart" .. part] = "row" end
+DEFAULTS[PREFIX .. "barArt"] = "row" -- (action bar 1's art: InterfaceRecolor.lua's ns.ApplyBarArtOverride)
+DEFAULTS[PREFIX .. "barDividers"] = "row" -- (the dividers between bar 1's buttons: ActionBarStyle.lua)
 
 -- (The frames that go as the target's do so here too, set apart from it or not:
 -- the tab has the one Target section.)
@@ -74,6 +76,8 @@ local function Sections()
 		if not (part[1] == "Level" and ns.isRetail) then plates[#plates + 1] = { "platePart" .. part[1], part[2] } end
 	end
 	list[#list + 1] = { L["Nameplates"], plates }
+	list[#list + 1] = { L["Action bars"], { { "barArt", L["Action bar art"] },
+		{ "barDividers", L["Button dividers"] } } }
 	return list
 end
 
@@ -88,6 +92,8 @@ function ns.CreateStyleOverridesPanel(kit)
 	local parts = {} -- (each row, to show its pick again)
 	local function Changed()
 		if ns.ApplyUnitFrameParts then ns.ApplyUnitFrameParts() end
+		if ns.ApplyBarArtOverride then ns.ApplyBarArtOverride() end
+		if ns.RefreshActionBarStyle then ns.RefreshActionBarStyle() end
 		kit.Refresh()
 		for _, row in ipairs(parts) do row:Refresh() end
 	end

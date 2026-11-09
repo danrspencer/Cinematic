@@ -81,12 +81,36 @@ local function Apply(thing, apply, skin)
 end
 
 -- Every skinned thing in the look, when it's changed (force: all the same).
+-- Only what shows now: the rest waits (pending) for its page to open, which calls
+-- this again. (Every control on every page at once took 50 ms a theme pick.)
+local pending = setmetatable({}, { __mode = "k" })
+local function Visible(thing)
+	if type(thing) ~= "table" or type(thing.IsVisible) ~= "function" then return true end
+	local ok, shown = pcall(thing.IsVisible, thing)
+	return not ok or shown ~= false
+end
 function ns.ApplyMenuSkin(force)
 	local skin = ns.MenuSkin()
 	local repainted = Repaint()
-	if skin == applied and not force and not repainted then return end
+	if skin == applied and not force and not repainted then
+		-- (Nothing new: just what was left for later and shows now.)
+		for thing in pairs(pending) do
+			if Visible(thing) then
+				pending[thing] = nil
+				if skinned[thing] then Apply(thing, skinned[thing], skin) end
+			end
+		end
+		return
+	end
 	applied = skin
-	for thing, apply in pairs(skinned) do Apply(thing, apply, skin) end
+	for thing, apply in pairs(skinned) do
+		if Visible(thing) then
+			pending[thing] = nil
+			Apply(thing, apply, skin)
+		else
+			pending[thing] = true
+		end
+	end
 end
 
 local function Register(thing, apply)

@@ -135,6 +135,8 @@ BubbleStyle.lua
 TooltipStyle.lua
 ActionBarStyle.lua
 MinimapStyle.lua
+QuestTrackerStyle.lua
+InterfaceRecolor.lua
 PersonalStyle.lua
 PersonalMana.lua
 PersonalManaCost.lua

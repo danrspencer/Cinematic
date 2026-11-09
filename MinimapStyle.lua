@@ -1,4 +1,4 @@
--- The Style hub's Minimap page: the minimap's own ring in the theme's color (the
+-- The minimap's part of the Style hub's Interface Recolor page (InterfaceRecolor.lua): the minimap's own ring in the theme's color (the
 -- game's art, turned grey and tinted, so its light, shadow and north point stay
 -- just as the game draws them), with a little dark just inside it. The buttons
 -- on it take the color too: their rings (the game's tracking border art, which
@@ -10,10 +10,8 @@
 -- another addon made square or skins itself is left be.
 
 local _, ns = ...
-local L = ns.L
 
 local DEFAULTS = ns.DEFAULTS
-DEFAULTS.mmStyle = true -- the page's switch
 DEFAULTS.mmShade = true -- the dark just inside the ring
 DEFAULTS.mmButtons = true -- the round buttons' rings in the theme's color
 DEFAULTS.mmZoneBar = true -- the zone's bar as the theme's panel
@@ -31,7 +29,7 @@ local BUTTON_HOLDERS = { "Minimap", "MinimapCluster", "MinimapBackdrop", "GameTi
 local SHADE_INNER = 114 / 128 -- (the shade's circle, of its size: Media/make_shape_art.py's MINIMAP_INNER)
 
 local function Look()
-	return ns.StyleLook("mmStyle")
+	return ns.StyleLook("irStyle")
 end
 
 local function OthersSkinIt()
@@ -341,7 +339,7 @@ end
 function ns.RefreshMinimapStyle()
 	local map = _G.Minimap
 	if type(map) ~= "table" or not map.GetWidth then return end
-	local color = ns.StyleOn("mmStyle") and ns.ThemeRing()
+	local color = ns.StyleOn("irStyle") and ns.ThemeRing()
 	local on = color and not OthersSkinIt() and true or false
 	TintRings(on and color or nil)
 	TintButtons(on and Look().mmButtons ~= false and color or nil)
@@ -377,7 +375,7 @@ end)
 function ns.ReportMinimapStyle()
 	local map = _G.Minimap
 	print(("Cinematic: Minimap Style: page %s, theme ring %s, others skin it %s, shape %s, game %s"):format(
-		tostring(ns.StyleOn("mmStyle")), tostring(ns.ThemeRing() ~= nil), tostring(OthersSkinIt()),
+		tostring(ns.StyleOn("irStyle")), tostring(ns.ThemeRing() ~= nil), tostring(OthersSkinIt()),
 		tostring(type(_G.GetMinimapShape) == "function" and _G.GetMinimapShape() or "none"),
 		tostring(select(4, GetBuildInfo()))))
 	if map then
@@ -456,32 +454,4 @@ function ns.ReportMinimapStyle()
 		end
 	end
 	if cluster then Others(cluster, "Cluster", 0) end
-end
-
--- The page itself.
-function ns.CreateMinimapStylePanel(kit)
-	local canvas, content = kit.CreateScrollPage()
-	local title = kit.Label(content, "GameFontNormalLarge", L["Minimap Style"])
-	title:SetPoint("TOPLEFT", 16, -16)
-	local intro = kit.PageIntro(content, title,
-		L["The minimap's ring, its buttons and the zone's bar in your theme's colors. Only with a theme picked " ..
-		"on General. A minimap another addon makes square or dresses itself keeps its own look."])
-
-	local function Changed() ns.RefreshMinimapStyle() end
-
-	local switch = kit.PageSwitch(content, "mmStyle", L["Enable Page"],
-		L["On: the minimap's ring and buttons take the theme's color. Off: the game's own."], intro, Changed)
-	local stack = kit.Stack(switch, "check")
-	local rows = ns.StyleRows(kit, content, stack, Changed, "mmStyle")
-	stack:Header(content, L["Look"])
-	rows.Check("mmShade", L["Shade inside the edge"], L["A little dark just inside the ring, so the map sits " ..
-		"back in it."])
-	rows.Check("mmButtons", L["Color the buttons' rings"], L["The rings round the round buttons on the minimap " ..
-		"(tracking, mail, addon buttons...) in the theme's color too."])
-	rows.Check("mmZoneBar", L["Zone bar"], L["The bar with the zone's name above the minimap in the theme's panel " ..
-		"look: its shape, color and line."])
-
-	canvas:SetScript("OnShow", kit.PageShown(kit.Refresh, content))
-	canvas:Hide()
-	kit.RegisterSubpage(canvas, "Minimap Style", L["Minimap Style"])
 end

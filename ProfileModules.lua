@@ -397,7 +397,7 @@ ns.PROFILE_MODULES = {
 		"Audio/top", "Bubble Style/top", "Buffs/debuffs/top", "Cameras/top", "Card Vision/top", "Cast Bar Style/top",
 		"Chat/top", "Cooldown Manager/top", "Duel Vision/top", "Effects/top", "Fishing/top", "Gamepad/top",
 		"General/top", "Graphics+/top", "Heal Vision/top", "Hunter/top", "Letterbox/top", "Minimap/top",
-		"Minimap Style/top", "Mouseover groups/top", "Name Style/top", "Nameplate Style/top", "Nameplates/top", "Personal Resources/top",
+		"Interface Recolor/top", "Mouseover groups/top", "Name Style/top", "Nameplate Style/top", "Nameplates/top", "Personal Resources/top",
 		"Personal Style/top", "Quest Vision/top", "Quest tracker/top", "Raid Style/top", "Roll Vision/top",
 		"Skyriding Cam/top", "Standard Frames/top", "Style General/top", "Swing timer/top", "Tint/top",
 		"Tooltip Style/top", "Unit Frames/top", "Unit Style/top" },
@@ -413,9 +413,24 @@ ns.PROFILE_MODULES = {
 			set("chatSpeechBehind", false)
 			set("bubblesOffTop", false)
 		end },
+	-- (The UI Visibility hub's HUD Advanced and Overhead Advanced pages, each
+	-- frame's own rules: Subtle's UI stays as the game has it.)
+	{ key = "advanced-pages-off", name = "Advanced pages off", scope = { "Personal Resources/top",
+		"Buffs/debuffs/top", "Cooldown Manager/top", "Swing timer/top", "Minimap/top", "Quest tracker/top",
+		"Tooltips/top", "Chat/top", "Nameplates/top", "Chat bubbles/top" },
+		tip = "The UI Visibility hub's HUD Advanced and Overhead Advanced pages off: the personal resources, " ..
+			"buffs, Cooldown Manager, swing timer, minimap, quest tracker, tooltips, chat, nameplates and chat " ..
+			"bubbles keep the game's own ways.",
+		apply = function(set)
+			for _, key in ipairs({ "personalResources", "handleBuffs", "handleCooldowns", "handleSwing",
+				"handleMinimap", "handleQuests", "handleTooltips", "handleChat", "handlePlates", "handleBubbles" }) do
+				set(key, false)
+			end
+		end },
 	-- (Not Duel, Tele or Emote Vision, or the Cards page: they only show for
-	-- a moment, and every profile has them. Nor Quest Vision: every profile has it.)
-	-- (Vitals and Damage Vision are off to start with: their modules turn them on.)
+	-- a moment, and every profile has them.)
+	-- (Vitals and Damage Vision are off to start with: their modules turn them on.
+	-- Quest Vision is off in every profile.)
 	{ key = "no-visions", name = "No visions", scope = { "Heal Vision" },
 		tip = "The visions that change your UI and are on to start with, off: Heal Vision. (Not Roll Vision: " ..
 			"every profile has it, and it stays away while another roll addon is in use.)",

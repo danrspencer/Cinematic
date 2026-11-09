@@ -1065,14 +1065,14 @@ DEFAULTS.plateNameShadowX = 1
 DEFAULTS.plateNameShadowY = -1
 DEFAULTS.plateNameShadowAlpha = 1
 DEFAULTS.plateNameHealthFill = false -- name-only names: the colored part shows the unit's health, the rest grey
-DEFAULTS.questVision = true -- the Quest Vision page's switch: off, none of the four below works
+DEFAULTS.questVision = false -- (off in every profile) the Quest Vision page's switch: off, none of the four below works
 -- What of units for a quest objective you haven't finished shows in CineMode
 -- (see Effects), any of: their nameplates, just their names (on their plates),
 -- a quest mark (added to a plate or name shown, else alone). None ticked: as
 -- the Nameplates page's rows say.
 DEFAULTS.questMobsPlate = false
 DEFAULTS.questMobsName = false
-DEFAULTS.questMobsMark = false
+DEFAULTS.questMobsMark = true
 -- The quest mark's icon on friendly NPCs, and on enemies: one of QUEST_MARK_ICONS (see QuestMobs' PaintMark) (the ! where a client lacks it).
 -- The track cursor where the client has it (retail, Forever), else the small gold ! (Classic Era).
 local questMarkDefault = (C_Texture and C_Texture.GetAtlasInfo and C_Texture.GetAtlasInfo("crosshair_track_48"))
@@ -1414,7 +1414,7 @@ for page, keys in pairs({
 	visualEffects = { "letterboxPage", "tintPage", "graphicsPlus", "musicInCinematic" }, -- (the Atmosphere hub's pages' switches)
 	-- Style > General's Enable Style: the Style hub's pages' switches.
 	styleGeneral = { "ufStyle", "rfStyle", "abStyle", "prdStyle", "tooltipStyle", "handlePlateStyle", "plateNameStyle",
-		"plateCastStyle", "bubblesStyle", "mmStyle" },
+		"plateCastStyle", "bubblesStyle", "irStyle" },
 }) do
 	for _, key in ipairs(keys) do PAGE_SWITCH[key] = page end
 end
