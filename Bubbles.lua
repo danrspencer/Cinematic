@@ -288,6 +288,7 @@ end
 -- Our back behind a bubble's inside (Dark, Custom), its tail where the
 -- game's is (faded out, it still says where).
 local SKIN_INSET = 4
+local SKIN_TAIL_EDGE = 14 -- (our tail stays this far in from the panel's sides)
 local function Skin(bubble, inside, look)
 	local skin = skins[bubble]
 	if not skin then
@@ -314,10 +315,22 @@ local function Skin(bubble, inside, look)
 	skin.tail:ClearAllPoints()
 	if gameTail then
 		if skin.tailOurs then
-			-- (Under the game's tail, its own size, its top just inside our panel.)
-			local bottom, top = skin:GetBottom(), gameTail:GetTop()
-			local up = type(bottom) == "number" and type(top) == "number" and bottom + skin.tailTop - top or 3
-			skin.tail:SetPoint("TOP", gameTail, "TOP", 0, up)
+			-- (Along our panel's bottom edge under the game's tail, its top just inside the
+			-- panel. The game slides its tail toward the speaker, out past the bubble's
+			-- corner and up its side with them off to one side: ours stays on the bottom,
+			-- kept in from the corners, or it floats off beside the bubble.)
+			local left, right, skinLeft = gameTail:GetLeft(), gameTail:GetRight(), skin:GetLeft()
+			local wide = skin:GetWidth()
+			local x = 20
+			if type(left) == "number" and type(right) == "number" and type(skinLeft) == "number"
+				and not (issecretvalue and (issecretvalue(left) or issecretvalue(right) or issecretvalue(skinLeft))) then
+				x = (left + right) / 2 - skinLeft
+			end
+			local half = TAIL_W / 2
+			if type(wide) == "number" and not (issecretvalue and issecretvalue(wide)) then
+				x = math.max(SKIN_TAIL_EDGE + half, math.min(math.max(SKIN_TAIL_EDGE + half, wide - SKIN_TAIL_EDGE - half), x))
+			end
+			skin.tail:SetPoint("TOP", skin, "BOTTOMLEFT", x, skin.tailTop)
 		else
 			-- (As far up as our back sits inside the bubble, or it hangs off short of it.)
 			skin.tail:SetPoint("TOPLEFT", gameTail, "TOPLEFT", 0, SKIN_INSET)

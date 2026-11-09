@@ -551,9 +551,12 @@ function ns.ThemePortraitBack(shape)
 	local file = SHAPES .. "PortraitBack" .. back
 	return file, file .. "Mask", file .. "Mist", file .. "Veins"
 end
-function ns.ThemePortraitRing(shape)
-	if shape == "circle" then return SHAPES .. "PortraitCircleRing" end
-	return PORTRAIT_ART[shape] and SHAPES .. "Portrait" .. PORTRAIT_ART[shape] .. "Ring"
+-- wear: 1 to 4, the ring worn a different way (its cracks and nicks elsewhere), so
+-- frames side by side don't match.
+function ns.ThemePortraitRing(shape, wear)
+	local art = shape == "circle" and "Circle" or PORTRAIT_ART[shape]
+	if not art then return nil end
+	return SHAPES .. "Portrait" .. art .. "Ring" .. ((wear and wear > 1) and wear or "")
 end
 -- Dark inside a shape's edge, and dirt for flat fills: the game's frames are worn, and
 -- clean ones look cheap beside them.
@@ -563,6 +566,10 @@ function ns.ThemePortraitShade(shape)
 end
 ns.THEME_GRIT, ns.THEME_SHEEN, ns.THEME_COLLAR = SHAPES .. "Grit", SHAPES .. "Sheen", SHAPES .. "Collar"
 ns.THEME_ROW_SHADOW = SHAPES .. "RowShadow"
+-- The dark just inside the minimap's ring (Media/make_shape_art.py's minimap()).
+ns.THEME_MINIMAP_SHADE = SHAPES .. "MinimapRimShade"
+-- A square button's frame alone, as a mask (the minimap's calendar: its frame tinted).
+ns.THEME_SQUARE_FRAME_MASK = SHAPES .. "SquareFrameMask"
 ns.THEME_CELL_CORNER = SHAPES .. "CellCorner"
 
 -- A veil of the theme's panel color over a bar's fill, under its words: raid tiles'

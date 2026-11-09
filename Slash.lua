@@ -1816,6 +1816,8 @@ local function HandleSlash(msg)
 		ns.ShowStyleTextures()
 	elseif cmd == "debug" and arg == "buttons" then
 		ns.ReportActionBarStyle()
+	elseif cmd == "debug" and arg == "minimapstyle" then
+		ns.ReportMinimapStyle()
 	elseif cmd == "debug" and arg == "fonts" then
 		ns.ReportStyleFonts()
 	elseif cmd == "debug" and arg == "mirror" then

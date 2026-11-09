@@ -340,7 +340,7 @@ dl.faq dd { margin: 2px 0 0; color: var(--muted) }
       var k = KINDS[m.kind];
       var shown = !hvOn || m.kind === "tank" || m.hp < k.below;
       var b = document.createElement("button");
-      b.type = "button"; b.className = "member"; b.style.opacity = shown ? 1 : 0.05;
+      b.type = "button"; b.className = "member"; b.style.opacity = shown ? 1 : 0.25;
       b.setAttribute("aria-label", m.name + ", " + Math.round(m.hp * 100) + "% health" + (shown ? "" : ", hidden"));
       var role = document.createElement("span"); role.className = "role"; role.style.background = k.color; role.textContent = k.t;
       var bar = document.createElement("span"); bar.className = "bar";

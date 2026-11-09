@@ -1705,13 +1705,16 @@ local function SizePortrait(frame, state, portrait, on)
 	end
 end
 
+-- (Each frame's ring worn its own way, in turn: player, target and the rest don't match.)
+local RING_WEARS, lastWear = 4, 0
 local function DressShape(frame, portrait, view, artOver)
 	local shape = view and view.ufShape or "game"
 	local state = shapes[frame]
 	if shape == "game" and not state then return end
 	if not portrait then return end
 	if not state then
-		state = {}
+		lastWear = lastWear % RING_WEARS + 1
+		state = { wear = lastWear }
 		shapes[frame] = state
 	end
 	local own = shape ~= "game"
@@ -1797,7 +1800,7 @@ local function DressShape(frame, portrait, view, artOver)
 	if state.holder then
 		local color = ns.ThemeRing() or { 0.8, 0.65, 0.25 }
 		state.holder:SetShown(own and shape ~= "none")
-		local ringFile = ns.ThemePortraitRing(shape)
+		local ringFile = ns.ThemePortraitRing(shape, state.wear)
 		local shadeFile = ns.ThemePortraitShade(shape)
 		state.inner:SetShown(shadeFile and true or false)
 		if shadeFile then

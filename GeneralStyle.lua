@@ -14,6 +14,7 @@ local PAGES = {
 	{ "Unit Frames", "Unit Style", { "ufTexture", "ufFont", "ufOutline", "ufShadow", "ufBorder" }, group = "Interface" },
 	{ "Raid Frames", "Raid Style", { "rfTexture", "rfFont", "rfOutline", "rfShadow", "rfBorder" } },
 	{ "Action Bars", "Action Style", {}, fixed = "Its own settings" },
+	{ "Minimap", "Minimap Style", {}, fixed = "Follows General" },
 	{ "Personal Resource Display", "Personal Style", { "prdTexture", "prdBorder" } },
 	{ "Tooltips", "Tooltip Style", { "tooltipBarTexture", "tooltipFont", "tooltipOutline", "tooltipShadow", "tooltipEdge" } },
 	-- (These two read General directly: PlateHealthStyle.lua, PlateParts.lua.)
@@ -39,7 +40,7 @@ local function RefreshAll()
 	for _, refresh in ipairs({ ns.RefreshPersonalStyle, ns.RefreshTooltipStyle, ns.RefreshBubbleStyle,
 		ns.RefreshQuestTalkStyle, ns.RefreshQuestItemStyle, ns.RefreshRollStyle, ns.RefreshPlateCastStyle,
 		ns.RefreshUnitStyle, ns.RefreshRaidStyle, ns.RefreshTargetArrows, ns.RefreshPlateNameStyle,
-		ns.RefreshActionBarStyle, ns.RefreshPlateHealthStyle }) do
+		ns.RefreshActionBarStyle, ns.RefreshMinimapStyle, ns.RefreshPlateHealthStyle }) do
 		if refresh then
 			-- (Kept going past a page's error, but said: a page that fails here just
 			-- looks unstyled, with nothing else to show why.)

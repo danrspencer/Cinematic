@@ -182,6 +182,8 @@ local function Sit()
 	ns.Log("campfire", "button clicked: " .. token)
 	-- (Its own Cameras page row, cozy by default, rather than the emote's.)
 	if ns.SatByButton then ns.SatByButton() end
+	-- (Emote Vision's campfire card is done once you've sat.)
+	ns.Signal("CAMPFIRE_SAT")
 end
 
 -- Where you are, in yards; nil where the game won't say (some instances).

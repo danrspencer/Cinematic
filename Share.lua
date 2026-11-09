@@ -177,7 +177,7 @@ function ns.ExportProfile(name)
 	local data = {
 		format = FORMAT,
 		version = Version(),
-		name = name,
+		name = ns.IsBuiltinProfile(name) and ns.ProfileLabel(name) or name,
 		note = not ns.IsBuiltinProfile(name) and ns.ProfileNote(name) or nil,
 		icon = ns.ProfileIcon(name),
 		from = UnitName("player"),
@@ -420,16 +420,12 @@ end
 -- Export: the profile as text, selected and ready to copy.
 function ns.ShowExport(name)
 	name = name or ns.ActiveProfile()
-	-- (Everyone has the built-in ones: a copy made with New profile can go.)
-	if ns.IsBuiltinProfile(name) then
-		ns.Print(L["%s is a built-in profile, which everyone has already. To share your changes to it, " ..
-			"make a copy with Copy profile on the Profiles page and export that."]:format(ns.ProfileLabel(name)))
-		return
-	end
+	-- (A built-in one too, with your changes: its settings go out against the
+	-- defaults, so it imports as a profile of their own, named by its label.)
 	if not window then CreateWindow() end
 	window.mode = "export"
 	window.text = ns.ExportProfile(name)
-	window.title:SetText(L["Export profile: %s"]:format(name))
+	window.title:SetText(L["Export profile: %s"]:format(ns.ProfileLabel(name)))
 	window.hint:SetText(L["Press Ctrl+C to copy this, then paste it wherever your friends will see it. " ..
 		"They add it with Import on their Cinematic Profiles page (or /cine import)."])
 	window.status:SetText(L["Only Cinematic settings are in it: nothing about you or your character " ..

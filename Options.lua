@@ -1111,6 +1111,7 @@ local function ResetPage(content, only)
 	if ns.ApplyBubbles then ns.ApplyBubbles() end
 	if ns.ApplyUnitFrameParts then ns.ApplyUnitFrameParts() end
 	if ns.RefreshActionBarStyle then ns.RefreshActionBarStyle() end
+	if ns.RefreshMinimapStyle then ns.RefreshMinimapStyle() end
 	if ns.ApplyGraphicsPlus then ns.ApplyGraphicsPlus() end
 	Refresh()
 end
@@ -2021,6 +2022,7 @@ do
 			{ "Unit Style", "Interface\\Icons\\INV_Misc_Head_Human_01", label = "Unit Frame Style", section = "HUD" },
 			{ "Raid Style", "Interface\\Icons\\INV_Misc_GroupNeedMore", label = "Raid Frame Style", section = "HUD" },
 			{ "Action Style", "Interface\\Icons\\Ability_DualWield", label = "Action Bar Style", section = "HUD" },
+			{ "Minimap Style", "Interface\\Icons\\INV_Misc_Map_01", label = "Minimap Style", section = "HUD" },
 			{ "Personal Style", "Interface\\Icons\\Spell_Holy_SealOfVengeance", label = "Personal Resource Style",
 				section = "HUD" },
 			{ "Tooltip Style", "Interface\\Icons\\INV_Misc_Note_05", label = "Tooltip Style", section = "HUD" },
@@ -13396,7 +13398,7 @@ local function CreateVisionPanel()
 			local below, alpha
 			below = Cell(row, 1, belowField, heading .. ": " .. L["Show below health"], belowTip, function(value)
 				-- (Below the opacity: takes it down too.)
-				if value < Percent(alphaField.get(), 0.05) then
+				if value < Percent(alphaField.get(), 0.25) then
 					alphaField.set(value / 100)
 					alpha:Refresh()
 				end
@@ -15629,7 +15631,7 @@ local function CreateProfilesPanel()
 			"built-in one back to its own values (your own profiles keep your changes as you go)."], AskResetProfile)
 		reset:SetPoint("TOPLEFT", backups, "BOTTOMLEFT", 0, -8)
 		export = Button(buttons, L["Export"], 84, L["The active profile as a line of text to copy and paste " ..
-			"wherever your friends will see it, so they can import it (your own ones only: everyone has the built-in ones)."], function()
+			"wherever your friends will see it, so they can import it (a built-in one too, with your changes)."], function()
 			ns.ShowExport()
 		end)
 		export:SetPoint("LEFT", reset, "RIGHT", 8, 0)
@@ -15659,8 +15661,8 @@ local function CreateProfilesPanel()
 				root:CreateButton(L["Rename"], function() StaticPopup_Show("CINEMATIC_PROFILE_RENAME", nil, nil, name) end)
 				root:CreateButton(L["Description"], function() StaticPopup_Show("CINEMATIC_PROFILE_NOTE", nil, nil, name) end)
 				root:CreateButton(L["Change icon"], function() picker:Open(cell, name, ns.ProfileIcon(name)) end)
-				root:CreateButton(L["Export"], function() ns.ShowExport(name) end)
 			end
+			root:CreateButton(L["Export"], function() ns.ShowExport(name) end)
 			if name == active and (not own or ns.HasResetPoint(name)) then
 				root:CreateButton(L["Reset"], AskResetProfile)
 			end
@@ -15741,7 +15743,7 @@ local function CreateProfilesPanel()
 			note:SetEnabled(own)
 			delete:SetEnabled(own)
 			reset:SetEnabled(active ~= nil and (not own or ns.HasResetPoint(active)))
-			export:SetEnabled(own)
+			export:SetEnabled(active ~= nil)
 			savePoint:SetEnabled(active ~= nil)
 		end
 		FitContentHeight(content)
@@ -16743,6 +16745,9 @@ ns.OnLanguage(function()
 	end
 	if ns.CreateActionBarStylePanel then -- (ActionBarStyle.lua)
 		ns.CreateActionBarStylePanel(ns.lowHealthKit)
+	end
+	if ns.CreateMinimapStylePanel then -- (MinimapStyle.lua)
+		ns.CreateMinimapStylePanel(ns.lowHealthKit)
 	end
 	if ns.CreatePersonalStylePanel then -- (PersonalStyle.lua)
 		ns.CreatePersonalStylePanel(ns.lowHealthKit)

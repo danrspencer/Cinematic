@@ -1019,7 +1019,16 @@ local function ScanTopLevelFrames()
 		local frame = _G[name]
 		if type(frame) == "table" and frame.GetFrameStrata and not (frame.IsForbidden and frame:IsForbidden())
 			and not IsWindow(frame, name) then
-			AddFrame(frame, "extra:" .. name)
+			-- (One holding a row's frames, found only once they're faded:
+			-- EllesmereUI's full-screen EllesmereUIUnitFrames_Hider holds its
+			-- unit frames, made after login's prune. Faded, it hid them
+			-- whatever their rows said.)
+			if ns.HeldBuiltIn(frame) then
+				ns.ForgetExtraFrame(name)
+				ns.Log("state", "dropped added frame " .. name .. ": it holds built-in frames")
+			else
+				AddFrame(frame, "extra:" .. name)
+			end
 		end
 	end
 end
@@ -1368,6 +1377,46 @@ function ns.PruneBuiltInExtras()
 	for _, names in pairs(FRAME_GROUPS) do
 		for _, name in ipairs(names) do
 			ns.db.extraFrames[name] = nil
+		end
+	end
+	-- And ones holding built-in frames (the game's PartyFrame, holding the
+	-- party member frames): faded, they hid those whatever their rows said.
+	for name in pairs(ns.db.extraFrames) do
+		local frame = _G[name]
+		if IsFrame(frame) and ns.HeldBuiltIn(frame) then
+			ns.ForgetExtraFrame(name)
+			ns.Log("state", "dropped added frame " .. name .. ": it holds built-in frames")
+		end
+	end
+end
+
+-- A built-in frame (a Game Frames row's) inside holder, not holder itself:
+-- its managed entry if faded now, else true; nil if none. Adding holder
+-- would fade it too, whatever its row says. (Inside: within this function,
+-- the file being near Lua's 200-local cap.)
+function ns.HeldBuiltIn(holder)
+	-- Whether frame is holder or inside it (its parents, up to the top).
+	local function Inside(frame)
+		local depth = 0
+		while frame and depth < 30 do
+			if frame == holder then return true end
+			if IsForbidden(frame) then return false end
+			frame = frame:GetParent()
+			depth = depth + 1
+		end
+		return false
+	end
+	for _, entry in ipairs(ns.managed) do
+		if entry.frame ~= holder and not entry.group:find("^extra:") and Inside(entry.frame) then
+			return entry
+		end
+	end
+	for _, names in pairs(FRAME_GROUPS) do
+		for _, name in ipairs(names) do
+			local frame = _G[name]
+			if IsFrame(frame) and frame ~= holder and Inside(frame) then
+				return true
+			end
 		end
 	end
 end
@@ -8502,7 +8551,12 @@ function ns.ReportFrames(text)
 			-- like EllesmereUI's player frame's, hides it whatever its row says.)
 			local chain, up = {}, parent and parent:GetParent()
 			while up and up ~= UIParent and #chain < 4 do
-				chain[#chain + 1] = ("%s %s"):format(up:GetName() or "unnamed", Number(up:GetAlpha()))
+				-- (Ours to fade too? Then the group fading it.)
+				local by = ""
+				for _, other in ipairs(ns.managed) do
+					if other.frame == up then by = " (faded by us: " .. other.group .. ")" end
+				end
+				chain[#chain + 1] = ("%s %s%s"):format(up:GetName() or "unnamed", Number(up:GetAlpha()), by)
 				up = up:GetParent()
 			end
 			if #chain > 0 then
@@ -10205,6 +10259,20 @@ function ns.AddUnderMouse(name)
 			return
 		end
 	end
+	-- (One holding a row's frames, like the game's PartyFrame: faded, it
+	-- would hide them whatever their row says.)
+	local held = ns.HeldBuiltIn(frame)
+	if held then
+		local label
+		local key = type(held) == "table" and ns.HoverRowFor and ns.HoverRowFor(held)
+		for _, row in ipairs(ns.HOVER_ROWS or {}) do
+			if row.key == key then label = row.label end
+		end
+		ns.Print(label and L["%s holds frames that fade with the %s row on the Game Frames page: set it there."]
+			:format(name, label)
+			or L["%s holds frames that fade with a row on the Game Frames page: set them there."]:format(name))
+		return
+	end
 	ns.db.ignoredFrames[name] = nil
 	ns.db.extraFrames[name] = true
 	AddFrame(frame, "extra:" .. name)
@@ -10460,7 +10528,7 @@ do
 		local added = 0
 		for _, name in ipairs(EndAddMode()) do
 			local frame = _G[name]
-			if IsFrame(frame) then
+			if IsFrame(frame) and not ns.HeldBuiltIn(frame) then -- (as /cine add)
 				ns.db.ignoredFrames[name] = nil
 				ns.db.extraFrames[name] = true
 				AddFrame(frame, "extra:" .. name)

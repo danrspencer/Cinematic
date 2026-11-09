@@ -404,7 +404,7 @@ ns.PROFILE_MODULES = {
 		"Audio/top", "Bubble Style/top", "Buffs/debuffs/top", "Cameras/top", "Card Vision/top", "Cast Bar Style/top",
 		"Chat/top", "Cooldown Manager/top", "Duel Vision/top", "Effects/top", "Fishing/top", "Gamepad/top",
 		"General/top", "Graphics+/top", "Heal Vision/top", "Hunter/top", "Letterbox/top", "Minimap/top",
-		"Mouseover groups/top", "Name Style/top", "Nameplate Style/top", "Nameplates/top", "Personal Resources/top",
+		"Minimap Style/top", "Mouseover groups/top", "Name Style/top", "Nameplate Style/top", "Nameplates/top", "Personal Resources/top",
 		"Personal Style/top", "Quest Vision/top", "Quest tracker/top", "Raid Style/top", "Roll Vision/top",
 		"Skyriding Cam/top", "Standard Frames/top", "Style General/top", "Swing timer/top", "Tint/top",
 		"Tooltip Style/top", "Unit Frames/top", "Unit Style/top" },

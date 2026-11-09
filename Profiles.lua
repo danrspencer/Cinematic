@@ -253,7 +253,7 @@ local OFF_UNTIL_PICKED = {
 	"cameraModes", "shoulderCam", "skyrideCam",
 	"visualEffects", "letterboxPage", "tintPage", "graphicsPlus", "musicInCinematic",
 	"styleGeneral", "ufStyle", "rfStyle", "abStyle", "prdStyle", "tooltipStyle", "handlePlateStyle", "plateNameStyle",
-	"plateCastStyle", "bubblesStyle",
+	"plateCastStyle", "bubblesStyle", "mmStyle",
 	"handleHealVision", "damageVision", "lowHealth", "questVision", "questTalk", "rollWindow", "teleportVision",
 	"duelPlates", "emoteVision", "cards", "windGuide",
 	"handleQuality", "handleFishing", "handleHunter",
@@ -445,6 +445,7 @@ local function SettingsChanged()
 	if ns.ApplyBubbles then ns.ApplyBubbles() end
 	if ns.ApplyUnitFrameParts then ns.ApplyUnitFrameParts() end
 	if ns.RefreshActionBarStyle then ns.RefreshActionBarStyle() end
+	if ns.RefreshMinimapStyle then ns.RefreshMinimapStyle() end
 	if ns.SwitchProfileLayout then ns.SwitchProfileLayout() end
 	if ns.ApplyShoulderCam then ns.ApplyShoulderCam() end
 	ApplyProfileSwitches()

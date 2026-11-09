@@ -1195,17 +1195,17 @@ ns.VISION_WHERE = { "World", "Cities", "Dungeons", "Raids", "BGs" }
 local VISION_PLACE = { city = "Cities", dungeon = "Dungeons", raid = "Raids", pvp = "BGs" }
 DEFAULTS.healVision = false
 -- (Damage and the rest, tanks, healers and pets: each kind has its health and opacity.)
-DEFAULTS.healVisionMinAlpha = 0.05 -- how much of the members it hides still shows (0-1)
+DEFAULTS.healVisionMinAlpha = 0.25 -- how much of the members it hides still shows (0-1)
 DEFAULTS.healVisionShowBelow = 0.8 -- members show below this much health (0-1; 1: any damage)
 DEFAULTS.healVisionTankBelow = 0.95 -- tanks below this (1: always, full health too)
-DEFAULTS.healVisionTankAlpha = 0.05
+DEFAULTS.healVisionTankAlpha = 0.25
 DEFAULTS.healVisionHealerBelow = 0.7 -- healers below this
-DEFAULTS.healVisionHealerAlpha = 0.05
+DEFAULTS.healVisionHealerAlpha = 0.25
 DEFAULTS.healVisionPetBelow = 0.35 -- and pets below this
-DEFAULTS.healVisionPetAlpha = 0.05
-DEFAULTS.healVisionDeadAlpha = 0.05 -- the dead: always hidden, this much shows
-DEFAULTS.healVisionOfflineAlpha = 0.05 -- and the offline
-DEFAULTS.healVisionFarAlpha = 0.05 -- those more than 100 yards away (another zone...), whatever else: 1, off
+DEFAULTS.healVisionPetAlpha = 0.25
+DEFAULTS.healVisionDeadAlpha = 0.25 -- the dead: always hidden, this much shows
+DEFAULTS.healVisionOfflineAlpha = 0.25 -- and the offline
+DEFAULTS.healVisionFarAlpha = 0.25 -- those more than 100 yards away (another zone...), whatever else: 1, off
 DEFAULTS.healVisionTargetAlpha = 1 -- your target while hidden, if more than their kind's (1: always shown)
 DEFAULTS.healVisionMouseoverAlpha = 0 -- the member under the mouse fades in to this, in fights too (0: off)
 DEFAULTS.healVisionDispel = true -- so do members with a debuff you can dispel
@@ -1224,7 +1224,7 @@ local HEAL_VISION_ROLE_STARTS = {
 	TANK = { healVisionTankBelow = 1, healVisionHealerBelow = 0.95, healVisionShowBelow = 0.95 },
 	HEALER = { healVisionTankBelow = 1, healVisionHealerBelow = 0.95, healVisionShowBelow = 0.95 },
 	DAMAGER = { healVisionTankBelow = 0.5, healVisionHealerBelow = 0.5, healVisionShowBelow = 0.35,
-		healVisionPetBelow = 0.05 },
+		healVisionPetBelow = 0.25 },
 }
 for _, role in ipairs(ns.HEAL_VISION_ROLES) do
 	DEFAULTS["healVisionOwn_" .. role] = false
@@ -1413,7 +1413,7 @@ for page, keys in pairs({
 	visualEffects = { "letterboxPage", "tintPage", "graphicsPlus", "musicInCinematic" }, -- (the Atmosphere hub's pages' switches)
 	-- Style > General's Enable Style: the Style hub's pages' switches.
 	styleGeneral = { "ufStyle", "rfStyle", "abStyle", "prdStyle", "tooltipStyle", "handlePlateStyle", "plateNameStyle",
-		"plateCastStyle", "bubblesStyle" },
+		"plateCastStyle", "bubblesStyle", "mmStyle" },
 }) do
 	for _, key in ipairs(keys) do PAGE_SWITCH[key] = page end
 end

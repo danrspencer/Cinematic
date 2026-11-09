@@ -62,6 +62,7 @@ Blank Slate|handleQuests=false
 Blank Slate|handleSwing=false
 Blank Slate|handleUnitFrames=false
 Blank Slate|letterboxPage=false
+Blank Slate|mmStyle=false
 Blank Slate|mouseover=false
 Blank Slate|musicInCinematic=false
 Blank Slate|personalResources=false

@@ -584,6 +584,12 @@ end
 -- with the Default row's settings as they are now, Always too. (Changing that
 -- row later leaves it be: Copy to all is for that.)
 function ns.AdoptFoundFrame(name)
+	-- (Not one holding a Game Frames row's frames: faded, it would hide them.)
+	local frame = _G[name]
+	if frame and ns.HeldBuiltIn and ns.HeldBuiltIn(frame) then
+		ns.Print(ns.L["%s holds frames that fade with a row on the Game Frames page: set them there."]:format(name))
+		return
+	end
 	ns.db.extraFrames[name] = true
 	ns.ApplyExtraDefault(name, true)
 	ns.BuildManagedList()

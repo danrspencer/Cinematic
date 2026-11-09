@@ -8,7 +8,12 @@ twice the size they're drawn at, so a corner stays smooth at any UI scale.
 Tail.tga and TailEdge.tga: a chat bubble's tail and the line down its sides, 128x128.
 Bar<Name>.tga: a mask for a bar, 256x32, white on clear: what's clear is cut away.
 Portrait<Name>.tga and Portrait<Name>Ring.tga: a portrait's mask and the line
-round it, 128x128, white on clear. Portrait<Name>Cut.tga: what cuts the real one.
+round it, 128x128, white on clear. Portrait<Name>Ring2 to 4.tga: the same line worn
+another way (its cracks, nicks and mottling elsewhere), so frames side by side don't
+match. Portrait<Name>Cut.tga: what cuts the real one.
+MinimapRimShade.tga: dark just inside the minimap's ring (the game's own, tinted),
+256x256, its circle at MINIMAP_INNER of the way out. SquareFrameMask.tga: a square
+button's frame alone, for tinting just that.
 PortraitBackEye.tga: an eye behind a circle portrait (Void Whisper), 256x256.
 """
 import math
@@ -425,7 +430,7 @@ def eye_back():
     white(wisps).save(os.path.join(OUT, "PortraitBackEyeMist.tga"), compression=None)
 
 
-def cracked(alpha, seed):
+def cracked(alpha, seed, grain=1):
     """Hairline cracks and small nicks scattered round a ring, a different scatter for each
     shape: gives what to multiply its tone by, and its alpha with the nicks taken out."""
     w, h = alpha.size
@@ -439,39 +444,43 @@ def cracked(alpha, seed):
         points = [(x * 4, y * 4)]
         for _ in range(rng.randrange(3, 7)):
             heading += rng.uniform(-0.9, 0.9)
-            step = rng.uniform(4, 9)
+            step = rng.uniform(4, 9) * grain
             points.append((points[-1][0] + step * math.cos(heading), points[-1][1] + step * math.sin(heading)))
-        d.line(points, fill=rng.randrange(70, 130), width=rng.choice((2, 3, 3, 4)))
+        d.line(points, fill=rng.randrange(70, 130), width=rng.choice((2, 3, 3, 4)) * grain)
     tone = tone.resize((w, h), Image.LANCZOS)
     nicks = Image.new("L", (w * 4, h * 4), 255)
     d = ImageDraw.Draw(nicks)
     for _ in range(rng.randrange(6, 10)):
         x, y = rng.choice(on_ring)
-        r = rng.uniform(2.5, 5)
+        r = rng.uniform(2.5, 5) * grain
         d.ellipse((x * 4 - r, y * 4 - r, x * 4 + r, y * 4 + r), fill=rng.randrange(40, 130))
     return tone, ImageChops.multiply(alpha, nicks.resize((w, h), Image.LANCZOS))
 
 
-def worn(alpha, seed=1, overhead=False):
+def worn(alpha, seed=1, overhead=False, mottle=3, grain=1, clean=False):
     """A ring as worn metal: lit from the top left, shaded to the bottom right, mottled.
-    Grey on its way to the theme's color, so wear shows in any of them."""
+    Grey on its way to the theme's color, so wear shows in any of them. seed: where its
+    cracks and nicks go; mottle: its blotches; grain: how big its wear is (2 for art
+    drawn at twice a portrait's size, so it looks as rough); clean: no wear at all, just
+    the light on it (the modern themes')."""
     w, h = alpha.size
     light = Image.new("L", (w, h))
     light.putdata([int(255 - 60 * (x + y) / (w + h)) for y in range(h) for x in range(w)])
-    blotch = noise((w, h), 3, 2.2).point(lambda v: 205 + v * 50 // 255)
+    blotch = noise((w, h), mottle, 2.2 * grain).point(lambda v: 230 if clean else 205 + v * 50 // 255)
     grey = ImageChops.multiply(light, blotch).point(lambda v: v * 80 // 100)
     # (Raised along its middle: light from the top left falls on the slopes facing it, and
     # those facing away go dark, so the ring stands up from the frame.)
-    height = alpha.filter(ImageFilter.GaussianBlur(1.6))
+    height = alpha.filter(ImageFilter.GaussianBlur(1.6 * grain))
     # (overhead: a shape all on the diagonal, lit from above so its four sides match.)
-    dx = 0 if overhead else 1
-    up, down = ImageChops.offset(height, -dx, -1), ImageChops.offset(height, dx, 1)
+    dx = 0 if overhead else grain
+    up, down = ImageChops.offset(height, -dx, -grain), ImageChops.offset(height, dx, grain)
     grey = ImageChops.add(grey, ImageChops.subtract(up, down).point(lambda v: min(255, v * 9 // 10)))
     grey = ImageChops.subtract(grey, ImageChops.subtract(down, up).point(lambda v: min(255, v * 11 // 10)))
     # (Never near black: its dark slope would vanish, and that side look thinner.)
     grey = grey.point(lambda v: max(v, 100))
-    tone, alpha = cracked(alpha, seed)
-    grey = ImageChops.multiply(grey, tone)
+    if not clean:
+        tone, alpha = cracked(alpha, seed, grain)
+        grey = ImageChops.multiply(grey, tone)
     return Image.merge("RGBA", (grey, grey, grey, alpha))
 
 
@@ -625,12 +634,53 @@ def hole(big, name):
     save(ImageChops.invert(out), "Portrait" + name + "Out")
 
 
+RING_WEARS = 4
+
+
 def finish(big, name):
     ring = even_outline(big, 5).resize((128, 128), Image.LANCZOS)
-    worn(ring, sum(ord(c) for c in name), name == "Diamond").save(os.path.join(OUT, "Portrait" + name + "Ring.tga"), compression=None)
+    seed = sum(ord(c) for c in name)
+    worn(ring, seed, name == "Diamond").save(os.path.join(OUT, "Portrait" + name + "Ring.tga"), compression=None)
+    ring_wears(ring, name)
     save(cut(big), "Portrait" + name + "Cut")
     shade(cut(big)).save(os.path.join(OUT, "Portrait" + name + "Shade.tga"), compression=None)
     hole(big, name)
+
+
+def ring_wears(ring, name):
+    """Portrait<Name>Ring2 to 4: the ring worn other ways."""
+    seed = sum(ord(c) for c in name)
+    for wear in range(2, RING_WEARS + 1):
+        worn(ring, seed + 977 * wear, name == "Diamond", 3 + 11 * wear).save(
+            os.path.join(OUT, "Portrait" + name + "Ring" + str(wear) + ".tga"), compression=None)
+
+
+MINIMAP_OUTER, MINIMAP_WIDTH = 124, 10  # (of 128: where the shade's circle comes from)
+MINIMAP_INNER = (MINIMAP_OUTER - MINIMAP_WIDTH) / 128
+
+
+def frame_mask():
+    """SquareFrameMask.tga: a square button's frame and none of its middle, 64x64,
+    white on clear (the frame FRAME_BAND of its size thick): for a tinted copy of a
+    button's art that colors its frame alone (the minimap's calendar)."""
+    n = 64
+    band = round(n * FRAME_BAND) * SS
+    big = Image.new("L", (n * SS, n * SS), 255)
+    ImageDraw.Draw(big).rounded_rectangle((band, band, n * SS - band, n * SS - band), radius=2 * SS, fill=0)
+    save(big.resize((n, n), Image.LANCZOS), "SquareFrameMask")
+
+
+FRAME_BAND = 0.17
+
+
+def minimap():
+    frame_mask()
+    n = 256
+    c = n * SS / 2
+    inside = Image.new("L", (n * SS, n * SS), 0)
+    r = MINIMAP_INNER * n * SS / 2
+    ImageDraw.Draw(inside).ellipse((c - r, c - r, c + r, c + r), fill=255)
+    shade(inside.resize((n, n), Image.LANCZOS)).save(os.path.join(OUT, "MinimapRimShade.tga"), compression=None)
 
 
 def portraits():
@@ -664,6 +714,7 @@ def main():
         out.paste(stamp((256, 32), draw).resize((248, 32), Image.LANCZOS), (4, 0))
         save(out, "Bar" + name)
     portraits()
+    minimap()
 
 
 if __name__ == "__main__":
