@@ -924,7 +924,18 @@ local function Play(frame, look, enter, width, height, scale, boss, after)
 	PlaceClick(cue)
 	ns.SetOnUpdate(frame, function(self, elapsed)
 		age = age + elapsed
-		local going = Draw(cue, age)
+		-- (An error drawing it: the card gone, bar and all, and the next one
+		-- free to play, rather than the loop's safety turning it off with the
+		-- card frozen on screen till a /reload. The error's still reported.)
+		local drew, going = pcall(Draw, cue, age)
+		if not drew then
+			cue.click = nil
+			for _, part in ipairs({ cue.bars, cue.pulse, cue.over }) do pcall(part.Hide, part) end
+			ns.SetOnUpdate(self, nil)
+			PlaceClick(cue)
+			if after then pcall(after) end
+			error(going, 0)
+		end
 		if not going then cue.click = nil end
 		-- (Off once it's faded most of the way: not a click on nothing.)
 		if cue.click and cue.over:GetAlpha() < 0.3 and age > 1 then cue.click = nil end

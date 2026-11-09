@@ -1071,7 +1071,7 @@ DEFAULTS.questVision = true -- the Quest Vision page's switch: off, none of the 
 -- the Nameplates page's rows say.
 DEFAULTS.questMobsPlate = false
 DEFAULTS.questMobsName = false
-DEFAULTS.questMobsMark = true
+DEFAULTS.questMobsMark = false
 -- The quest mark's icon on friendly NPCs, and on enemies: one of QUEST_MARK_ICONS (see QuestMobs' PaintMark) (the ! where a client lacks it).
 -- The track cursor where the client has it (retail, Forever), else the small gold ! (Classic Era).
 local questMarkDefault = (C_Texture and C_Texture.GetAtlasInfo and C_Texture.GetAtlasInfo("crosshair_track_48"))
