@@ -793,6 +793,15 @@ local function QuestIcon(plate)
 	icon.texture = icon:CreateTexture(nil, "OVERLAY")
 	icon.texture:SetAllPoints()
 	ns.SetQuestMark(icon.texture)
+	-- (Hidden mid-glide: put on its spot, so a reused plate's mark never glides from the last unit's.)
+	icon:SetScript("OnHide", function(self)
+		if self.glideX and type(self.x) == "number" then
+			self.glideX, self.glideY = nil, nil
+			ns.SetOnUpdate(self, nil)
+			self:ClearAllPoints()
+			self:SetPoint("CENTER", self.bar, "CENTER", self.x, self.y)
+		end
+	end)
 	questIcons[plate] = icon
 	return icon
 end
@@ -887,6 +896,7 @@ local function QuestIconSpot(icon, plate, body, kept, shown, mark)
 	local half = icon:GetWidth() / 2
 	local width = Measure(icon.bar, "GetWidth")
 	if not width then
+		icon.spotMiss = "bar width unreadable"
 		return nil
 	end
 	local x, y = PastSideIcons(icon, plate.UnitFrame, -(width / 2 + 3 + half)), 0
@@ -903,18 +913,49 @@ local function QuestIconSpot(icon, plate, body, kept, shown, mark)
 			local words = Measure(unitFrame.name, "GetStringWidth")
 			left, nameY = nameX and words and nameX - words / 2, centreY
 		end
-		if not (barX and left and nameY) then
-			return nil
+		-- (A name the game won't measure (a secret one on Forever): its part
+		-- of the move left out, the bar's spot kept, so the mark still slides
+		-- from the middle. Giving up here dropped it to the fallback anchors,
+		-- in the middle until it jumped left of the bar.)
+		if barX and left and nameY then
+			local nameX = left - 2 - half - barX
+			local t = QuestMove(body)
+			x, y = nameX + (x - nameX) * t, (nameY - barY) * (1 - t)
+		else
+			icon.spotMiss = ("bar=%s nameLeft=%s nameY=%s textShown=%s"):format(tostring(barX), tostring(left),
+				tostring(nameY), tostring(text and text:IsShown()))
 		end
-		local nameX = left - 2 - half - barX
-		local t = QuestMove(body)
-		x, y = nameX + (x - nameX) * t, (nameY - barY) * (1 - t)
 	end
 	if mark > 0 then
 		local t = QuestMove(shown / mark)
 		x, y = x * t, y * t
 	end
 	return x, y
+end
+
+-- Each frame while a quest mark glides: closes in on its spot (icon.x, .y)
+-- from where it's drawn (glideX, glideY), eased out: about 95% of the way in
+-- half a second (rate 6 a second); there, its loop stops. (On ns: this
+-- file's main chunk is near Lua's 200 locals.)
+function ns.GlideQuestIcon(icon, elapsed)
+	local goalX, goalY = icon.x, icon.y
+	local x, y = icon.glideX, icon.glideY
+	if type(goalX) ~= "number" or type(x) ~= "number" or not icon:IsShown() then
+		icon.glideX, icon.glideY = nil, nil
+		ns.SetOnUpdate(icon, nil)
+		return
+	end
+	local step = 1 - math.exp(-6 * math.min(elapsed, 0.1))
+	x, y = x + (goalX - x) * step, y + (goalY - y) * step
+	if math.abs(goalX - x) < 0.5 and math.abs(goalY - y) < 0.5 then
+		x, y = goalX, goalY
+		icon.glideX, icon.glideY = nil, nil
+		ns.SetOnUpdate(icon, nil)
+	else
+		icon.glideX, icon.glideY = x, y
+	end
+	icon:ClearAllPoints()
+	icon:SetPoint("CENTER", icon.bar, "CENTER", x, y)
 end
 
 -- Puts a quest mark in its spot. (Where the game won't say where things
@@ -924,6 +965,8 @@ local function PlaceQuestIcon(icon, plate, body, kept, shown, mark)
 	local anchor
 	if x then
 		x, y, anchor = math.floor(x + 0.5), math.floor(y + 0.5), icon.bar
+	elseif type(icon.x) == "number" and icon.anchor == icon.bar and icon:IsShown() then
+		return -- (unreadable for a moment: kept where it was, not jumped to the fallback spots)
 	else
 		local text = kept and body < 0.5 and texts[plate.UnitFrame]
 		anchor = (text and text:IsShown()) and text or icon.bar
@@ -932,7 +975,19 @@ local function PlaceQuestIcon(icon, plate, body, kept, shown, mark)
 	if icon.anchor == anchor and icon.x == x and icon.y == y then
 		return
 	end
+	-- (A measured spot, the mark already showing at one: it glides there, so
+	-- a spot that jumps (the name popping in, a fade too quick for its share
+	-- of it) is still one smooth move. See GlideQuestIcon.)
+	local glide = type(x) == "number" and type(icon.x) == "number" and icon.anchor == icon.bar and icon:IsShown()
+	local fromX, fromY = icon.x, icon.y
 	icon.anchor, icon.x, icon.y = anchor, x, y
+	if glide then
+		icon.glideX, icon.glideY = icon.glideX or fromX, icon.glideY or fromY
+		ns.SetOnUpdate(icon, ns.GlideQuestIcon)
+		return
+	end
+	icon.glideX, icon.glideY = nil, nil
+	ns.SetOnUpdate(icon, nil)
 	icon:ClearAllPoints()
 	if x == "alone" then
 		icon:SetPoint("CENTER", icon.bar, "CENTER")
@@ -1088,9 +1143,10 @@ function ns.DescribeQuestieIcon(unit)
 	end
 	local icon = questIcons[plate]
 	return "questie: " .. (#found > 0 and table.concat(found, " ; ") or "no Questie icon on the plate"),
-		("questie plate: body=%s name=%s mark=%s, our mark shown=%s alpha=%s, questie wins=%s"):format(
+		("questie plate: body=%s name=%s mark=%s, our mark shown=%s alpha=%s spot=%s,%s last miss=%s, questie wins=%s"):format(
 			tostring(bodyShare[plate]), tostring(nameShare[plate]), tostring(markShare[plate]),
-			tostring(icon and icon:IsShown()), tostring(icon and icon:GetAlpha()), tostring(ns.QuestieMarks(unit)))
+			tostring(icon and icon:IsShown()), tostring(icon and icon:GetAlpha()), tostring(icon and icon.x),
+			tostring(icon and icon.y), tostring(icon and icon.spotMiss), tostring(ns.QuestieMarks(unit)))
 end
 
 function RefreshQuestIcon(plate)
@@ -1124,7 +1180,10 @@ function RefreshQuestIcon(plate)
 	-- (Its look by the unit: enemy, friendly, or the "in progress" mark. See QuestMobs.)
 	ns.SetQuestMark(icon.texture, unit)
 	if level > 0 then
-		PlaceQuestIcon(icon, plate, body, kept, share, mark)
+		-- (What shows of the plate for the slide from the middle: the name alone's
+		-- share drops as the bar fills in, so the bar's own counts too, or the
+		-- mark slid back to the middle and jumped out again at the switch.)
+		PlaceQuestIcon(icon, plate, body, kept, nameOnly and math.max(share, body) or share, mark)
 		icon:SetAlpha(level)
 	else
 		-- (Only there to hold Questie's icon: to the middle as the bar goes,

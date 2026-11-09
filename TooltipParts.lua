@@ -171,7 +171,10 @@ local function FrameUnit(tooltip)
 		if tooltip.GetTooltipData then
 			local data = tooltip:GetTooltipData()
 			local kinds = Enum and Enum.TooltipDataType
-			if data and data.type ~= nil and kinds and data.type ~= kinds.Unit then
+			-- (A secret kind, as an enemy's in a dungeon: taken as a unit's.
+			-- Comparing it errored, so an enemy target's hint stayed.)
+			local secret = issecretvalue and (issecretvalue(data) or (data and issecretvalue(data.type)))
+			if not secret and data and data.type ~= nil and kinds and data.type ~= kinds.Unit then
 				return nil -- (an aura's or item's tooltip, owned by the frame)
 			end
 		end
@@ -189,6 +192,29 @@ end
 local function IsHintLine(text)
 	local hint = type(UNIT_POPUP_RIGHT_CLICK) == "string" and UNIT_POPUP_RIGHT_CLICK or nil
 	return text == hint or text == "<Right click for Frame Settings>"
+end
+
+-- Whether a line is in the game's green for instruction lines (the hint's).
+local function IsHintColor(fs)
+	local ok, green = pcall(function()
+		local r, g, b = fs:GetTextColor()
+		if issecretvalue and (issecretvalue(r) or issecretvalue(g) or issecretvalue(b)) then
+			return false
+		end
+		local c = _G.GREEN_FONT_COLOR
+		local gr, gg, gb = c and c.r or 0.1, c and c.g or 1, c and c.b or 0.1
+		return math.abs(r - gr) < 0.03 and math.abs(g - gg) < 0.03 and math.abs(b - gb) < 0.03
+	end)
+	return ok and green
+end
+
+-- Whether a line's text can't be read (secret).
+local function Unreadable(fs)
+	local ok, secret = pcall(function()
+		local text = fs:GetText()
+		return issecretvalue and issecretvalue(text) or false
+	end)
+	return not ok or secret
 end
 
 -- The lines taken out: line number -> true. An object in the world (object
@@ -273,6 +299,13 @@ local function LinesToCut(tooltip, count, unit, object)
 		if ok and key and Cut(key) then
 			cut[i] = true
 		end
+	end
+	-- A unit frame's hint whose text can't be read (an enemy target's tooltip
+	-- in a dungeon): the last line, in the hint's green.
+	local last = Left(count)
+	if Cut("Hint") and not object and not cut[count] and last and Unreadable(last) and IsHintColor(last)
+		and FrameUnit(tooltip) then
+		cut[count] = true
 	end
 	-- Blank lines left at the bottom once others are cut (the game's spacer
 	-- above a unit frame's right-click hint): an empty strip under the last line.
@@ -364,9 +397,18 @@ local function CutLines(tooltip, object)
 	if not next(cut) then
 		return
 	end
+	-- (Lines above the first cut stay as they are, untouched: an enemy's
+	-- secret lines in a dungeon over its cut hint aren't set again.)
+	local first = count
+	for i in pairs(cut) do
+		first = math.min(first, i)
+	end
 	local kept, newIndex = {}, {}
 	for i = 2, count do
-		if not cut[i] then
+		if i < first then
+			kept[#kept + 1] = false
+			newIndex[i] = i
+		elseif not cut[i] then
 			local line = Snapshot(i)
 			if not line then
 				return -- (unreadable: leave the tooltip as it is)
@@ -376,7 +418,7 @@ local function CutLines(tooltip, object)
 		end
 	end
 	pcall(function()
-		for n = 2, count do
+		for n = first, count do
 			local line, left, right = kept[n - 1], Left(n), Right(n)
 			if line then
 				left:SetText(line.left)
@@ -748,8 +790,27 @@ local function ListParts(tooltip)
 		for i = 1, tooltip:NumLines() do
 			local text = Left(i) and Left(i):GetText()
 			local plain = type(text) == "string" and not (issecretvalue and issecretvalue(text))
-			ns.Print(("Line %d: %s"):format(i, plain and ("%q"):format(text) or "?"))
+			local okColor, color = pcall(function()
+				local r, g, b = Left(i):GetTextColor()
+				return ("%.2f %.2f %.2f"):format(r, g, b)
+			end)
+			ns.Print(("Line %d: %s (color %s%s)"):format(i,
+				plain and ("%q"):format(text) or (Unreadable(Left(i)) and "secret" or "?"),
+				okColor and color or "secret", IsHintColor(Left(i)) and ", hint green" or ""))
 		end
+	end)
+	-- And what the hint's taking out goes by: the unit, the frame's, the data kind.
+	pcall(function()
+		local okData, kind = pcall(function()
+			local data = tooltip.GetTooltipData and tooltip:GetTooltipData()
+			if issecretvalue and (issecretvalue(data) or (data and issecretvalue(data.type))) then
+				return "secret"
+			end
+			return data and tostring(data.type) or "none"
+		end)
+		ns.Print(("Unit %s | frame's unit %s | data kind %s | secret unit %s | hint cut %s"):format(
+			tostring(TooltipUnit(tooltip)), tostring(FrameUnit(tooltip)), okData and kind or "error",
+			tostring(UnitSecret(tooltip)), tostring(Cut("Hint"))))
 	end)
 end
 

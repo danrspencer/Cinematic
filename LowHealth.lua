@@ -14,6 +14,7 @@ local DEFAULTS = ns.DEFAULTS
 DEFAULTS.lowHealth = false         -- Vitals Vision at all (its page's switch)
 DEFAULTS.lowHealthEdges = true     -- the screen's edges closing in (the health bars are below)
 DEFAULTS.lowHealthAlways = true    -- ...everywhere: its Show in row's Always (the rest: ROW_KEY's ticks and rule)
+DEFAULTS.lowHealthFollowGame = true -- no edges while the game's "Do Not Flash Screen at Low Health" is ticked
 DEFAULTS.lowHealthTheme = "auto"   -- a theme's key (LowHealthThemes.lua), or by class and talents
 DEFAULTS.lowHealthStart = 0.75     -- health (0-1) they start creeping in below
 DEFAULTS.lowHealthFull = 0.15      -- ...and are all the way in at
@@ -1472,6 +1473,43 @@ local function RowShows(now)
 	return rowShows
 end
 
+-- The game's own low-health warning: a red flash at the screen's edges, off
+-- with its Accessibility tick "Do Not Flash Screen at Low Health" (this CVar).
+-- nil: the client has no such setting.
+local GAME_FLASH_CVAR = "doNotFlashLowHealthWarning"
+function ns.GameLowHealthFlashOff()
+	local value = GetCVar(GAME_FLASH_CVAR)
+	if value == nil then return nil end
+	return value == "1"
+end
+
+-- The edges held back by that tick (Follow the game's setting).
+local function GameSaysNoFlash()
+	return db.lowHealthFollowGame and ns.GameLowHealthFlashOff() == true
+end
+
+-- While our edges show, the game's red flash is hidden under them (its
+-- alpha: it pulses by setting its own, so that's hooked too). Back as it
+-- was once ours are gone. Only its alpha: the game still shows and hides it.
+local hideGameFlash, gameFlashHooked = false, false
+local function GameFlashHidden(hide)
+	local gameFrame = _G.LowHealthFrame
+	if not gameFrame or hide == hideGameFlash then return end
+	hideGameFlash = hide
+	if not gameFlashHooked then
+		gameFlashHooked = true
+		local setting = false
+		hooksecurefunc(gameFrame, "SetAlpha", function(self)
+			if hideGameFlash and not setting then
+				setting = true
+				self:SetAlpha(0)
+				setting = false
+			end
+		end)
+	end
+	gameFrame:SetAlpha(hide and 0 or 1)
+end
+
 local function Wanted(now)
 	if test then
 		local t = now - test.start
@@ -1488,7 +1526,7 @@ local function Wanted(now)
 			return test.from + (test.to - test.from) * progress, db.lowHealthEdges, true
 		end
 	end
-	if not ns.Setting("lowHealth") or not db.lowHealthEdges or not RowShows(now) then
+	if not ns.Setting("lowHealth") or not db.lowHealthEdges or GameSaysNoFlash() or not RowShows(now) then
 		return 1, false
 	end
 	if ns.Flag(UnitIsDeadOrGhost("player")) then
@@ -1597,6 +1635,7 @@ local function Update(_, elapsed)
 	-- profile switch that showed them.)
 	if shown ~= screen.wasShown then
 		screen.wasShown = shown
+		GameFlashHidden(shown)
 		if shown then
 			ns.Log("vitals", ("edges up: %s, on %s, health %s, level %.2f, flash %.2f, profile %s"):format(
 				test and (test.quiet and "quick look" or "test") or glimpse and "quick look easing out" or "health",
@@ -2032,6 +2071,9 @@ function ns.ReportVitals()
 	ns.Print(("Vitals: on %s, edges %s, art opacity %s, combat %s, test %s"):format(Show(db.lowHealth),
 		Show(db.lowHealthEdges), Show(db.lowHealthBloodAlpha), Show(ns.Flag(UnitAffectingCombat("player"))),
 		Show(test ~= nil)))
+	ns.Print(("Game's low health flash: setting %s, followed %s, its frame %s, hidden under ours %s"):format(
+		Show(GetCVar(GAME_FLASH_CVAR)), Show(db.lowHealthFollowGame), _G.LowHealthFrame and "here" or "none",
+		Show(hideGameFlash)))
 	ns.Print(("  health %s / %s, share %s, curve %s, level %.2f, art size %.2f screens"):format(Show(health),
 		Show(max), Show(HealthShare()), Show(SecretCurve() and true), level, screen.artScale))
 	ns.Print(("  theme %s (edge %s), frame shown %s, alpha %s, driver %s"):format(Show(screen.shown and screen.shown.key),
@@ -3564,6 +3606,23 @@ function ns.CreateVitalsVisionPanel(kit)
 	Boxes({ "lowHealthCalm", L["Strength out of combat"], 0, 100, 5, "%d%%", 100,
 		L["How strong the edges are out of a fight (eating and drinking back up, say), next to in one. Some " ..
 		"clients keep your health secret in fights; there the edges only fade in and out with it."], Edges })
+	-- The game's "Do Not Flash Screen at Low Health" (Accessibility): followed
+	-- if ticked, with what it's set to now beside it. (Not on a client without it.)
+	if ns.GameLowHealthFlashOff() ~= nil then
+		local follow = Tick("lowHealthFollowGame", L["Replace game's low health flash setting"],
+			L["When the game's own setting Do Not Flash Screen at Low Health (Options > Accessibility) is " ..
+			"ticked, the edges don't show. Beside it: what that setting is now.\n\nWhile the edges show, the " ..
+			"game's own red flash is hidden under them."], Edges)
+		local state = kit.Label(content, "GameFontHighlightSmall")
+		state:SetPoint("LEFT", follow.Text or follow.text or follow, "RIGHT", 16, 0) -- (after the label: no overlap)
+		kit.AddControl({ Refresh = function()
+			if ns.GameLowHealthFlashOff() then
+				state:SetText(L["Game setting: |cffff8000no flash|r (edges off while followed)"])
+			else
+				state:SetText(L["Game setting: |cff00ff00flash on|r"])
+			end
+		end })
+	end
 
 	stack:Header(content, L["How fast"])
 	Boxes({ "lowHealthFollow", L["Close in over"], 0, 1, 0.05, "%.2fs", 1,

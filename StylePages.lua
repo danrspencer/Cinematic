@@ -1142,7 +1142,7 @@ local LOOK_BUILD = {
 		local list = {}
 		if shared[made[1]] then
 			list[1] = { "general", ns.SharedStyleSource(made[1]), shared[made[1]].visions
-				and ns.L["As the Visions hub's Style page says."] or ns.L["As the Style hub's General page says."] }
+				and ns.L["As the Visions Style page says."] or ns.L["As the Style hub's General page says."] }
 		end
 		list[#list + 1] = { "game", ns.L["The game's"] }
 		list[#list + 1] = { "on", ns.L["Shadow"], ns.L["A dark copy of the letters just behind them, down and to " ..
@@ -1591,7 +1591,7 @@ function ns.StyleRows(kit, content, stack, changed, switchKey, fieldOf)
 			if shared[sharedKeys[1]].visions then
 				back:SetWidth(140)
 				back:SetText(ns.L["Use Visions Style"])
-				kit.Tooltip(back, ns.L["These settings back on the Visions hub's Style page."])
+				kit.Tooltip(back, ns.L["These settings back on the Visions Style page."])
 			else
 				back:SetText(ns.L["Use General"])
 				kit.Tooltip(back, ns.L["These settings back on General."])

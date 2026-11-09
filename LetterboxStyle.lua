@@ -57,7 +57,7 @@ end
 -- borders' timing, each slider on one line with its name (stack: inline).
 EFFECT_PAGES.tint.More = function(kit, content, stack)
 	stack:Header(content, L["How strong"])
-	local strength = stack:Add(kit.Slider(content, "tintStrength", L["Strength"], 5, 100, 5, "%d%%", 100,
+	local strength = stack:Add(kit.Slider(content, "tintStrength", L["Strength"], 5, 100, 1, "%d%%", 100,
 		ns.RefreshTint), "slider")
 	kit.Tooltip(strength, L["How strongly the tint colors the world, for every preset."])
 	if not ns.isRetail then -- (retail's world shows the tint as it is)

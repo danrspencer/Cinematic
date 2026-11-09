@@ -416,7 +416,7 @@ function ns.TeleportColorReel(arg)
 	if reel or arg == "off" then
 		StopReel()
 		if test and not test.done then test.done, test.doneAt = "cancelled", GetTime() end
-		ns.Print(L["Tele Vision colors: stopped."])
+		ns.Print(L["Teleport Vision colors: stopped."])
 		return
 	end
 	if not reelLabel then
@@ -453,7 +453,7 @@ function ns.TeleportColorReel(arg)
 		local entry = list[at]
 		if not entry then
 			StopReel()
-			ns.Print(L["Tele Vision colors: all %d shown."]:format(#list))
+			ns.Print(L["Teleport Vision colors: all %d shown."]:format(#list))
 			return
 		end
 		local theme = ns.LOW_HEALTH_THEME[entry.key]
@@ -466,7 +466,7 @@ function ns.TeleportColorReel(arg)
 	end
 	Next()
 	reel = C_Timer.NewTicker(seconds + GONE_TIME + 0.3, Next)
-	ns.Print(L["Tele Vision colors: %d specs, %d seconds each (/cine teleport colors again to stop)."]:format(
+	ns.Print(L["Teleport Vision colors: %d specs, %d seconds each (/cine teleport colors again to stop)."]:format(
 		#list, seconds))
 end
 
@@ -477,7 +477,7 @@ ns.TILE_TOOLTIPS["Teleport Vision"] = "Tele Vision (Rules the Nation)"
 -- The page (Visions, World): its switch, the colour, the strength, the motes and a test.
 function ns.CreateTeleportVisionPanel(kit)
 	local canvas, content = kit.CreateScrollPage()
-	local title = kit.Label(content, "GameFontNormalLarge", L["Tele Vision"])
+	local title = kit.Label(content, "GameFontNormalLarge", L["Teleport Vision"])
 	title:SetPoint("TOPLEFT", 16, -16)
 	local intro = kit.PageIntro(content, title,
 		L["As you cast your Hearthstone, Astral Recall or a teleport, a portal's glowing rim closes in around " ..

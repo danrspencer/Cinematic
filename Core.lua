@@ -1386,7 +1386,7 @@ for _, part in ipairs(ns.UNIT_PARTS) do
 		end
 	end
 end
-DEFAULTS.handleUnitFrames = true -- the Unit Frames page's switch
+DEFAULTS.handleUnitFrames = true -- the Unit Frame Parts page's switch
 -- Pages of helpers, each ticked on its own, with an Enable Page switch
 -- (handle<page>): off, none of the page's helpers work. ns.Setting reads one
 -- of them as its page's switch leaves it.
@@ -1508,13 +1508,15 @@ end
 -- just the titles, in the names' place ("title").
 -- Vendors, Repair, Trainers and Professions on by default; the rest off.
 DEFAULTS.nameServiceShow = "title"
-DEFAULTS.nameServiceBrackets = true -- the < > round NPC titles under names
+DEFAULTS.nameServiceBrackets = false -- the < > round NPC titles under names
 for _, kind in ipairs({ "Vendor", "Repair", "Trainer", "Profession" }) do
 	DEFAULTS["nameService" .. kind] = true
 end
-for _, kind in ipairs({ "Flight", "Inn", "Bank", "Stable", "Other" }) do
+for _, kind in ipairs({ "Flight", "Inn", "Bank", "Stable", "Other", "Quest" }) do
 	DEFAULTS["nameService" .. kind] = false
 end
+-- Quest givers by Questie's "!" and "?" rather than the game's quest cursor.
+DEFAULTS.nameServiceQuestie = false
 DEFAULTS.nameInPvPEnemies = true
 DEFAULTS.nameInPvPEnemyMinions = true
 DEFAULTS.nameInBGsEnemies = true
@@ -4129,6 +4131,10 @@ ticker:SetScript("OnEvent", ns.Profiled("Core events", function(self, event, arg
 		end
 		ns.db.plateEnemyNamesCinematic = nil
 		ns.db.markOther = nil
+		-- The main page's Enable Cinematic box is gone (off is the AddOns
+		-- list): an off saved before, or left by a demo cut short by a
+		-- reload, would have no box to undo it. Loaded means on.
+		if ns.db.enabled == false then ns.db.enabled = true end
 		-- The AFK camera's "Turn rotation off in" and "Turn zoom off in" (and
 		-- before them "Turn camera effects off in") are now its row of the
 		-- "Turn off in" grid: off there if either was.
@@ -4444,6 +4450,15 @@ ticker:SetScript("OnEvent", ns.Profiled("Core events", function(self, event, arg
 		if not ns.db.flyByLookOffV1 then
 			if ns.db.flyByLook == true then ns.db.flyByLook = nil end
 			ns.db.flyByLookOffV1 = true
+		end
+		-- Service NPCs' titles first kept their < > by default; off now, for
+		-- everyone and every saved profile. Once.
+		if not ns.db.serviceBracketsOffV1 then
+			ns.db.nameServiceBrackets = nil
+			for _, saved in pairs(type(ns.db.profiles) == "table" and ns.db.profiles or {}) do
+				if type(saved) == "table" then saved.nameServiceBrackets = nil end
+			end
+			ns.db.serviceBracketsOffV1 = true
 		end
 		-- Still too low (the ground pulled the camera in); once, unless changed.
 		if not ns.db.cozySettingsV5 then

@@ -510,11 +510,11 @@ local PRESET_KEYS = { "tooltipBack", "tooltipAlpha", "tooltipEdge", "tooltipFont
 
 function ns.CreateTooltipStylePanel(kit)
 	local canvas, content = kit.CreateScrollPage()
-	local title = kit.Label(content, "GameFontNormalLarge", L["Tooltips"])
+	local title = kit.Label(content, "GameFontNormalLarge", L["Tooltip Style"])
 	title:SetPoint("TOPLEFT", 16, -16)
 	local intro = kit.PageIntro(content, title,
 		L["How the game's tooltips look: their background, edge and words, names in their colors and the " ..
-		"health bar. Which lines show and when: the Interface hub's Tooltips page."])
+		"health bar. Which lines show and when: the UI Visibility hub's Tooltips page."])
 
 	local preview -- (below: drawn again as each setting changes)
 	local function Changed()
@@ -610,5 +610,5 @@ function ns.CreateTooltipStylePanel(kit)
 
 	canvas:SetScript("OnShow", kit.PageShown(kit.Refresh, content))
 	canvas:Hide()
-	kit.RegisterSubpage(canvas, "Tooltip Style", L["Tooltips"])
+	kit.RegisterSubpage(canvas, "Tooltip Style", L["Tooltip Style"])
 end

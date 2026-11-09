@@ -806,7 +806,7 @@ if C_DamageMeter then
 			if ns.RefreshDamageVision then ns.RefreshDamageVision() end
 		end }
 end
-VISIONS[#VISIONS + 1] = { key = "tele", setting = "teleportVision", label = "Tele Vision",
+VISIONS[#VISIONS + 1] = { key = "tele", setting = "teleportVision", label = "Teleport Vision",
 	icon = "Interface\\Icons\\Spell_Arcane_TeleportStormWind", trim = true, color = { 0.6, 0.45, 1 } }
 VISIONS[#VISIONS + 1] = { key = "emote", setting = "emoteVision", label = "Emote Vision",
 	icon = "Interface\\Icons\\Spell_Holy_PrayerOfFortitude", trim = true, color = { 1, 0.65, 0.8 },
@@ -867,7 +867,7 @@ local function SetVisionBindingNames()
 	BINDING_NAME_CINEMATIC_VISION_ROLL = L["Toggle Roll Vision"]
 	BINDING_NAME_CINEMATIC_VISION_VITALS = L["Toggle Vitals Vision"]
 	BINDING_NAME_CINEMATIC_VISION_DAMAGE = L["Toggle Damage Vision"]
-	BINDING_NAME_CINEMATIC_VISION_TELE = L["Toggle Tele Vision"]
+	BINDING_NAME_CINEMATIC_VISION_TELE = L["Toggle Teleport Vision"]
 	BINDING_NAME_CINEMATIC_VISION_EMOTE = L["Toggle Emote Vision"]
 	BINDING_NAME_CINEMATIC_VISION_CARD = L["Toggle Card Vision"]
 end

@@ -199,7 +199,7 @@ local function Columns(key, out)
 		found = true
 	end
 	if fighting and ns.FightHold(key) and not ns.IsCineShowOn(key) then
-		Add(out, "block", L["Held back at the fight's start while you're at rest (Resource Display page)"],
+		Add(out, "block", L["Held back at the fight's start while you're at rest (Personal Resource Display page)"],
 			"Personal Resources")
 	end
 	if not found then

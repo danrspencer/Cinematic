@@ -82,8 +82,35 @@ local function Color(s, c)
 end
 
 local FLAT = { bgFile = "Interface\\Buttons\\WHITE8x8", edgeFile = "Interface\\Buttons\\WHITE8x8", edgeSize = 1 }
+-- (Its edge one whole screen pixel, and its pieces not snapped to the pixel
+-- grid: snapped, an edge that thin can round to nothing where it lands
+-- between two pixels, so some boxes and buttons lost a side: the cards' and
+-- See it first buttons' tops, the description box's bottom.)
+local FLAT_BY_SIZE = {}
+local BACKDROP_PIECES = { "TopLeftCorner", "TopRightCorner", "BottomLeftCorner", "BottomRightCorner",
+	"TopEdge", "BottomEdge", "LeftEdge", "RightEdge", "Center" }
+local function NoSnap(frame)
+	for _, key in ipairs(BACKDROP_PIECES) do
+		local piece = frame[key]
+		if piece and piece.SetSnapToPixelGrid then
+			piece:SetSnapToPixelGrid(false)
+			if piece.SetTexelSnappingBias then piece:SetTexelSnappingBias(0) end
+		end
+	end
+end
 local function Flat(frame, bg, edge)
-	frame:SetBackdrop(FLAT)
+	local size = 1
+	if PixelUtil and PixelUtil.GetNearestPixelSize then
+		size = PixelUtil.GetNearestPixelSize(1, frame:GetEffectiveScale(), 1)
+	end
+	local backdrop = FLAT_BY_SIZE[size]
+	if not backdrop then
+		backdrop = { bgFile = FLAT.bgFile, edgeFile = FLAT.edgeFile, edgeSize = size }
+		FLAT_BY_SIZE[size] = backdrop
+	end
+	frame:SetBackdrop(backdrop)
+	NoSnap(frame)
+	frame.cineFlat = backdrop
 	frame:SetBackdropColor(unpack(bg or RAISED))
 	frame:SetBackdropBorderColor(unpack(edge or EDGE))
 end
@@ -138,7 +165,8 @@ local function Skinnable(frame, plain)
 	end
 	ns.OnMenuSkin(frame, function(self, skin)
 		sd = skin ~= "HD"
-		self:SetBackdrop(not sd and FLAT or plain and SD_PLAIN or SD_EDGED)
+		self:SetBackdrop(not sd and (self.cineFlat or FLAT) or plain and SD_PLAIN or SD_EDGED)
+		if not sd then NoSnap(self) end
 		self:SetBackdropColor(unpack(bg))
 		self:SetBackdropBorderColor(unpack(edge))
 	end)
@@ -289,6 +317,8 @@ local function Pick(name, level)
 	if InCombatLockdown() then ns.ProfileSwitchBlocked() return end -- (says so)
 	if not ns.db.enabled then ns.SetEnabled(true) end
 	ns.SetProfile(name)
+	-- (the profile's tint strength on the slider)
+	if demoRow and demoRow.ShowStrength then demoRow.ShowStrength() end
 	if ns.RestartTimers then ns.RestartTimers() end
 	ns.PreviewProfile(name)
 	-- (Cinema: Vitals Vision's screen edges for a moment, too. Another level
@@ -362,13 +392,79 @@ local function BuildDemoRow(page, width)
 	for _, demo in ipairs(DEMO_ROW) do
 		if ns.ShowMeAvailable and ns.ShowMeAvailable(demo.key) then list[#list + 1] = demo end
 	end
+	-- Under the buttons, with the Tint demo: the tint's strength (the
+	-- profile's). Dragging it plays the Tint demo, or keeps
+	-- it playing, so you see the strength you pick.
+	local strengthH = 0
+	if ns.ShowMeAvailable and ns.ShowMeAvailable("tint") and ns.db then
+		strengthH = 24
+		local label = Text(row, "GameFontHighlightSmall", L["Tint strength"], SOFT)
+		label:SetPoint("BOTTOMLEFT", 12, 12)
+		local value = Text(row, "GameFontHighlightSmall", "", SOFT)
+		value:SetJustifyH("LEFT")
+		value:SetWidth(40)
+		local slider = CreateFrame("Slider", nil, row)
+		slider:SetOrientation("HORIZONTAL")
+		slider:SetHeight(14)
+		-- (short: a full-width line made small changes look like nothing)
+		slider:SetWidth(200)
+		slider:SetPoint("LEFT", label, "RIGHT", 12, 0)
+		value:SetPoint("LEFT", slider, "RIGHT", 10, 0)
+		local track = slider:CreateTexture(nil, "BACKGROUND")
+		track:SetColorTexture(unpack(EDGE))
+		track:SetHeight(4)
+		track:SetPoint("LEFT")
+		track:SetPoint("RIGHT")
+		local thumb = slider:CreateTexture(nil, "OVERLAY")
+		thumb:SetColorTexture(unpack(GOLD))
+		thumb:SetSize(8, 14)
+		slider:SetThumbTexture(thumb)
+		slider:SetMinMaxValues(5, 100)
+		slider:SetValueStep(1)
+		if slider.SetObeyStepOnDrag then slider:SetObeyStepOnDrag(true) end
+		slider:EnableMouseWheel(true)
+		local setting -- (set from the setting: not a drag, so no demo)
+		local function Show()
+			setting = true
+			slider:SetValue(math.floor((ns.db.tintStrength or 1) * 100 + 0.5))
+			setting = false
+			value:SetText(("%d%%"):format(slider:GetValue()))
+		end
+		slider:SetScript("OnValueChanged", function(_, v)
+			v = math.floor(v + 0.5)
+			value:SetText(("%d%%"):format(v))
+			if setting then return end
+			ns.db.tintStrength = v / 100
+			if ns.RefreshTint then ns.RefreshTint() end
+			if ns.ShowMeRunning("tint") then
+				ns.ShowMeKeep("tint", 3)
+			elseif not ns.ShowMeBlocked("tint", true) then
+				ns.ShowMe("tint", window, true)
+			end
+		end)
+		slider:SetScript("OnMouseWheel", function(self, delta)
+			self:SetValue(math.max(5, math.min(100, self:GetValue() + delta)))
+		end)
+		slider:SetScript("OnEnter", function()
+			thumb:SetColorTexture(unpack(WHITE))
+			about:SetText("|cffffd100" .. L["Tint strength"] .. "|r   " ..
+				L["How strongly the tint colors the world."])
+		end)
+		slider:SetScript("OnLeave", function()
+			thumb:SetColorTexture(unpack(GOLD))
+			Describe(levelOf[Active()])
+		end)
+		row.ShowStrength = Show
+		Show()
+	end
+	row:SetHeight(DEMO_ROW_H + strengthH)
 	local gap = 6
-	local buttonW = (width - 24 - gap * math.max(0, #list - 1)) / math.max(1, #list)
+	local buttonW = math.floor((width - 24 - gap * math.max(0, #list - 1)) / math.max(1, #list))
 	local buttons = {}
 	for i, demo in ipairs(list) do
 		local b = CreateFrame("Button", nil, row, BackdropTemplateMixin and "BackdropTemplate")
 		b:SetSize(buttonW, 38)
-		b:SetPoint("BOTTOMLEFT", 12 + (i - 1) * (buttonW + gap), 10)
+		b:SetPoint("BOTTOMLEFT", 12 + (i - 1) * (buttonW + gap), 10 + strengthH)
 		Flat(b, RAISED, EDGE)
 		-- (its icon on the left, rounded as the level cards' are; the name
 		-- and its In or Not in beside it)
@@ -431,7 +527,11 @@ local function BuildDemoRow(page, width)
 	row:RegisterEvent("PLAYER_REGEN_DISABLED")
 	row:RegisterEvent("PLAYER_REGEN_ENABLED")
 	row:SetScript("OnEvent", Recheck)
-	row:SetScript("OnShow", Recheck)
+	row:SetScript("OnShow", function()
+		-- (the strength changed on the Tint page meanwhile)
+		if row.ShowStrength then row.ShowStrength() end
+		Recheck()
+	end)
 	row:SetScript("OnHide", function() if ns.StopShowMe then ns.StopShowMe() end end)
 	return row
 end
@@ -459,7 +559,7 @@ local function BuildLevels(page)
 	if ns.ShowMe then
 		demoRow = BuildDemoRow(page, WIDTH - 2 * PAD)
 		demoRow:SetPoint("TOPLEFT", sub, "BOTTOMLEFT", 0, -18 - 124 - 12)
-		rowH = DEMO_ROW_H + 12
+		rowH = demoRow:GetHeight() + 12
 	end
 	local box = CreateFrame("Frame", nil, page, BackdropTemplateMixin and "BackdropTemplate")
 	box:SetPoint("TOPLEFT", sub, "BOTTOMLEFT", 0, -18 - 124 - 12 - rowH)

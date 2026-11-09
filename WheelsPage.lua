@@ -70,10 +70,10 @@ end
 -- now (each: label, and icon with trim and color, or Paint(icon, under)).
 -- extras: the player can put icons of their own on it (MarkerWheel.lua).
 local WHEELS = {
-	{ key = "master", label = "Master wheel", action = "CLICK CinematicMasterWheelButton:LeftButton",
+	{ key = "master", label = "Master wheel", title = "Master Wheel", action = "CLICK CinematicMasterWheelButton:LeftButton",
 		Entries = function() return SlotsOf("master") end },
-	{ key = "yours", label = "Your wheels" },
-	{ key = "camera", label = "Camera wheel", action = "CINEMATIC_CAMWHEEL",
+	{ key = "yours", label = "Your wheels", title = "Your Wheels" },
+	{ key = "camera", label = "Camera wheel", title = "Camera Wheel", action = "CINEMATIC_CAMWHEEL",
 		Entries = function()
 			local list = {}
 			for _, camera in ipairs(ns.CAMERA_WHEEL_LIST or {}) do
@@ -81,13 +81,13 @@ local WHEELS = {
 			end
 			return list
 		end },
-	{ key = "menu", label = "Menu wheel", action = "CLICK CinematicMenuWheelButton:LeftButton",
+	{ key = "menu", label = "Menu wheel", title = "Menu Wheel", action = "CLICK CinematicMenuWheelButton:LeftButton",
 		Entries = function() return ns.MenuWheelPreview and ns.MenuWheelPreview() or {} end },
-	{ key = "marker", label = "Marker wheel", action = "CLICK CinematicMarkerWheelButton:LeftButton", extras = true,
+	{ key = "marker", label = "Marker wheel", title = "Marker Wheel", action = "CLICK CinematicMarkerWheelButton:LeftButton", extras = true,
 		Entries = function() return SlotsOf("marker") end },
-	{ key = "world", label = "Ground marker wheel", action = "CLICK CinematicWorldMarkerWheelButton:LeftButton",
+	{ key = "world", label = "Ground marker wheel", title = "Ground Marker Wheel", action = "CLICK CinematicWorldMarkerWheelButton:LeftButton",
 		extras = true, Entries = function() return SlotsOf("world") end },
-	{ key = "vision", label = "Vision wheel", action = "CLICK CinematicVisionWheelButton:LeftButton", extras = true,
+	{ key = "vision", label = "Vision wheel", title = "Vision Wheel", action = "CLICK CinematicVisionWheelButton:LeftButton", extras = true,
 		Entries = function() return SlotsOf("vision") end },
 }
 
@@ -248,7 +248,7 @@ end
 
 -- A page's title and what the wheel does, under it.
 local function Top(kit, content, info)
-	local title = kit.Label(content, "GameFontNormalLarge", L[info.label])
+	local title = kit.Label(content, "GameFontNormalLarge", L[info.title])
 	title:SetPoint("TOPLEFT", 16, -16)
 	local text = kit.Label(content, "GameFontHighlight", L[TIPS[info.key]])
 	text:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -10)
@@ -269,7 +269,7 @@ local function Finish(kit, canvas, content, info, RefreshPage, OnHide)
 		if OnHide then OnHide() end
 	end)
 	canvas:Hide()
-	kit.RegisterSubpage(canvas, info.label)
+	kit.RegisterSubpage(canvas, info.label, L[info.title])
 end
 
 local refreshMaster -- the master wheel's page, laid out again (once made)

@@ -817,7 +817,9 @@ local function DressPlateLook(plate, on)
 	-- (The metal round it as the bars have, the health bar's top being its bottom.)
 	ns.DressStyleEdges(plate.edges, BAR_GAP, edge[1], edge[2], edge[3], 1, true)
 	plate.edges.lines[2]:Hide()
-	DressCell(plate.cell, true, edge, plate:GetHeight() < 14 and 1.5 or 2)
+	-- (Its height can be secret on Forever, as a party druid shifts: the bigger corners then.)
+	local tall = plate:GetHeight()
+	DressCell(plate.cell, true, edge, Readable(tall) and tall < 14 and 1.5 or 2)
 end
 
 local function MakePlate(parent)
@@ -1316,7 +1318,7 @@ function FitBars(frame, bars, portrait, shape, on, name)
 		local portraitLeft, portraitRight = portrait:GetLeft(), portrait:GetRight()
 		for _, value in ipairs({ frameLeft or false, frameTop or false, left or false, right or false, top or false,
 			portraitLeft or false, portraitRight or false }) do
-			if not Readable(value) then return end
+			if value == false or not Readable(value) then return end
 		end
 		local grow = (portraitRight - portraitLeft) * (ns.ThemePortraitFit(shape) - 1) / 2
 		-- (A shape narrower than its square stands that much further from the rows.)
@@ -2470,12 +2472,12 @@ for _, info in ipairs(FRAMES) do TAB_NAMES[info[1]] = info[2] end
 
 function ns.CreateUnitStylePanel(kit)
 	local canvas, content = kit.CreateScrollPage()
-	local title = kit.Label(content, "GameFontNormalLarge", L["Unit Frames"])
+	local title = kit.Label(content, "GameFontNormalLarge", L["Unit Frame Style"])
 	title:SetPoint("TOPLEFT", 16, -16)
 	local intro = kit.PageIntro(content, title,
 		L["How your player, target, focus, pet, target of target and party frames look. The Default tab's " ..
 		"settings are every frame's until its own tab has Same as the Default tab unticked. Which parts show: " ..
-		"the Interface hub's Unit Frames page."])
+		"the UI Visibility hub's Unit Frame Parts page."])
 
 	-- The tab being edited (nil: Default), and each setting as the field it edits:
 	-- the frame's own copy while it has one, else Default's (shown greyed).
@@ -2700,5 +2702,5 @@ function ns.CreateUnitStylePanel(kit)
 
 	canvas:SetScript("OnShow", kit.PageShown(kit.Refresh, content))
 	canvas:Hide()
-	kit.RegisterSubpage(canvas, "Unit Style", L["Unit Frames"])
+	kit.RegisterSubpage(canvas, "Unit Style", L["Unit Frame Style"])
 end

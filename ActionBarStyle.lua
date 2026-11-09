@@ -398,7 +398,7 @@ local PRESET_KEYS = { "abEdge", "abEdgeSize", "abEdgeR", "abEdgeG", "abEdgeB", "
 
 function ns.CreateActionBarStylePanel(kit)
 	local canvas, content = kit.CreateScrollPage()
-	local title = kit.Label(content, "GameFontNormalLarge", L["Action Bars"])
+	local title = kit.Label(content, "GameFontNormalLarge", L["Action Bar Style"])
 	title:SetPoint("TOPLEFT", 16, -16)
 	local intro = kit.PageIntro(content, title,
 		L["How the game's action buttons look: their outline, their shape and the background of empty slots. " ..
@@ -443,5 +443,5 @@ function ns.CreateActionBarStylePanel(kit)
 
 	canvas:SetScript("OnShow", kit.PageShown(kit.Refresh, content))
 	canvas:Hide()
-	kit.RegisterSubpage(canvas, "Action Style", L["Action Bars"])
+	kit.RegisterSubpage(canvas, "Action Style", L["Action Bar Style"])
 end

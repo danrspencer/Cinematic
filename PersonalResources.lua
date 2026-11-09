@@ -170,7 +170,7 @@ end
 -- The page.
 function ns.CreatePersonalResourcesPanel(kit)
 	local canvas, content = kit.CreateScrollPage()
-	local title = kit.Label(content, "GameFontNormalLarge", L["Resource Display"])
+	local title = kit.Label(content, "GameFontNormalLarge", L["Personal Resource Display"])
 	title:SetPoint("TOPLEFT", 16, -16)
 	local hasDisplay = _G.CinematicPersonalPower ~= nil
 	local intro = kit.PageIntro(content, title,
@@ -178,8 +178,7 @@ function ns.CreatePersonalResourcesPanel(kit)
 		"after a fight or run low on mana, and held back at the start of a fight until there's something to " ..
 		"see. When they come up at all (always, in fights, in places) is their rows' on the Game Frames page."])
 	-- Their look: the Style hub's Personal Resource Display page (PersonalStyle.lua).
-	local styleLink = ns.StyleLink(content, title, "Personal Style", L["Opens the Style hub's Personal Resource " ..
-		"Display page: how the bars look."], kit.Tooltip)
+	local styleLink = ns.StyleLink(content, title, "Personal Style", L["Opens the Personal Resource Style page: how the bars look."], kit.Tooltip)
 	ns.FramesLink(content, title, "units", styleLink)
 	local switch = kit.PageSwitch(content, "personalResources", L["Enable Page"],
 		L["On: your player frame, pet frame and personal resource display stay up or wait as this page says, " ..
@@ -312,5 +311,5 @@ function ns.CreatePersonalResourcesPanel(kit)
 
 	canvas:SetScript("OnShow", kit.PageShown(kit.Refresh, content))
 	canvas:Hide()
-	kit.RegisterSubpage(canvas, "Personal Resources", L["Resource Display"])
+	kit.RegisterSubpage(canvas, "Personal Resources", L["Personal Resource Display"])
 end

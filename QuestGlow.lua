@@ -1070,6 +1070,13 @@ do
 		return nil
 	end
 
+	-- (For the Names grid's Service NPCs row's Quest givers kind, PlateGuild:
+	-- "offer", "turnin" or nil for a unit, by the same cursor.)
+	function ns.UnitQuestGiver(unit)
+		local ok, kind = pcall(GiverKind, unit)
+		return ok and kind or nil
+	end
+
 	local look = { at = -math.huge, seenAt = -math.huge, names = nil }
 
 	function ns.QuestGiversPossible()

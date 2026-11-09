@@ -259,6 +259,13 @@ function ns.StopShowMe()
 	Notify()
 end
 
+-- A demo running for at least seconds more (the welcome window's tint
+-- strength slider, dragged while the Tint demo plays).
+function ns.ShowMeKeep(key, seconds)
+	local run = current
+	if run and run.key == key then run.untilAt = math.max(run.untilAt, GetTime() + seconds) end
+end
+
 local function Tick()
 	local run = current
 	if not run then return end

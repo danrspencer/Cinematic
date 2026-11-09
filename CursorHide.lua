@@ -1,4 +1,4 @@
--- Cursor Hide (Interface hub, Overhead): in CineMode, the cursor gets out of
+-- Cursor Hide (UI Visibility hub, CineMode Autohide; on Forever a tab after Gamepad): in CineMode, the cursor gets out of
 -- the way, where its Show in row says. Three ways:
 --   tiny: the game's tiniest cursor all the time (SetCursor; just a corner).
 --     SetCursor's hardware cursor takes only the game's own Interface\Cursor
@@ -563,6 +563,7 @@ function ns.CreateCursorHidePage(kit)
 	local canvas, content = kit.CreateScrollPage()
 	local title = kit.Label(content, "GameFontNormalLarge", L["Cursor Hide"])
 	title:SetPoint("TOPLEFT", 16, -16)
+	ns.GroupTabs(content, title, "Cursor Hide")
 	local intro = kit.PageIntro(content, title, L["In CineMode, the cursor gets out of the way: tiny, gone once " ..
 		"the mouse has been still a while, or tiny and then gone. Moving the mouse brings it back from gone."])
 	local switch = kit.PageSwitch(content, "cursorHide", L["Enable Page"],

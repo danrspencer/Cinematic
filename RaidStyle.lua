@@ -307,7 +307,7 @@ for _, group in ipairs(GROUPS) do TAB_NAMES[group[1]] = group[2] end
 
 function ns.CreateRaidStylePanel(kit)
 	local canvas, content = kit.CreateScrollPage()
-	local title = kit.Label(content, "GameFontNormalLarge", L["Raid Frames"])
+	local title = kit.Label(content, "GameFontNormalLarge", L["Raid Frame Style"])
 	title:SetPoint("TOPLEFT", 16, -16)
 	local intro = kit.PageIntro(content, title,
 		L["How the raid frames look, the party's when the game draws them raid-style, and the arena's. The " ..
@@ -446,7 +446,7 @@ function ns.CreateRaidStylePanel(kit)
 	kit.AddControl(ownCheck)
 	-- (Party, while the game draws it as its own frames: the Unit frames page's.)
 	partyNote = kit.Label(content, "GameFontHighlightSmall", L["Your party uses its own frames, not raid-style " ..
-		"ones: they follow the Unit Frames page's Party tab."])
+		"ones: they follow the Unit Frame Parts page's Party tab."])
 	partyNote:SetPoint("LEFT", ownCheck.Text or ownCheck.text or ownCheck, "RIGHT", 16, 0)
 	partyNote:SetWidth(300)
 	partyNote:SetJustifyH("LEFT")
@@ -513,5 +513,5 @@ function ns.CreateRaidStylePanel(kit)
 
 	canvas:SetScript("OnShow", kit.PageShown(kit.Refresh, content))
 	canvas:Hide()
-	kit.RegisterSubpage(canvas, "Raid Style", L["Raid Frames"])
+	kit.RegisterSubpage(canvas, "Raid Style", L["Raid Frame Style"])
 end

@@ -326,7 +326,9 @@ if arg[1] and not update then
 		end
 		-- (Its settings are in before the stand-in's frames fall short of what
 		-- the settings' refresh after needs: Bubbles' GetChildren.)
-		pcall(ns.SetProfile, ns.ActiveProfile())
+		-- (Balanced, not the default: Blank Slate has every page off, and the
+		-- checks after need its features on.)
+		pcall(ns.SetProfile, "Balanced")
 		local base = ns.ProfileBase()
 		for _, key in ipairs(ns.OFF_UNTIL_PICKED) do
 			if ns.IsProfileKey(key) and db[key] ~= base[key] then

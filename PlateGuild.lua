@@ -133,7 +133,7 @@ local function LineText(plate, unit)
 	end
 	local title = PlateTitle(plate, unit)
 	-- (Service NPCs' Brackets unticked: Baker, not <Baker>.)
-	if title and ns.db.nameServiceBrackets == false then
+	if title and not ns.db.nameServiceBrackets then
 		title = title:sub(2, -2)
 	end
 	return title, false
@@ -160,15 +160,26 @@ ns.SERVICE_KINDS = {
 	{ key = "Bank", label = L["Bankers and auctioneers"], words = L["banker,auctioneer,bank,auction"] },
 	{ key = "Stable", label = L["Stable masters"], words = L["stable"] },
 	{ key = "Other", label = L["Other titles"] },
+	-- Not by title (most quest givers have none): an NPC with a quest for you
+	-- to pick up or hand in, by the game's quest cursor over them (QuestGlow's
+	-- ns.UnitQuestGiver), or by Questie's "!" and "?" with Use Questie DB
+	-- ticked (nameServiceQuestie). See PlateQuestGiver.
+	{ key = "Quest", label = L["Quest givers"], noTitle = true },
 }
 -- (For /cine debug names: a plate's title and the kinds it fits.)
 function ns.DescribePlateTitle(plate, unit)
 	if not plate or not unit then
 		return "title=?"
 	end
+	local cursor = ns.UnitQuestGiver and ns.UnitQuestGiver(unit)
+	local questie = ns.QuestieGiverNames and ns.QuestieGiverNames()
+	local okName, name = pcall(UnitName, unit)
+	local inQuestie = questie and okName and Known(name) and questie[name] == true
+	local quest = ("quest=%s cursor=%s questie=%s"):format(ns.db.nameServiceQuest and "+" or "-", tostring(cursor),
+		questie and tostring(inQuestie) .. (ns.db.nameServiceQuestie and "(used)" or "(not used)") or "n/a")
 	local title = PlateTitle(plate, unit)
 	if not title then
-		return "title=" .. tostring(titles[plate])
+		return "title=" .. tostring(titles[plate]) .. " " .. quest
 	end
 	local kinds, fits = {}, ns.TitleKinds(title)
 	for _, kind in ipairs(ns.SERVICE_KINDS) do
@@ -176,7 +187,7 @@ function ns.DescribePlateTitle(plate, unit)
 			kinds[#kinds + 1] = kind.key .. (ns.db["nameService" .. kind.key] and "+" or "-")
 		end
 	end
-	return ("title=%s kinds=%s"):format(title, table.concat(kinds, ","))
+	return ("title=%s kinds=%s %s"):format(title, table.concat(kinds, ","), quest)
 end
 
 -- From the Kinds menu (and a new language): every plate's match worked out again.
@@ -218,8 +229,37 @@ function ns.TitleKinds(title)
 	return fits
 end
 
--- Whether a plate's NPC has a title of a kind the Service NPCs row keeps (for
--- Effects: friendly and neutral NPCs). Known titles only.
+-- The Quest givers kind: whether a plate's NPC has a quest for you, to pick up
+-- or hand in. Asked again every QUEST_EVERY seconds (taking or handing in a
+-- quest changes it), or as the plate gets a new unit.
+local QUEST_EVERY = 1
+local questAt, questIs, questUnit = {}, {}, {}
+local function PlateQuestGiver(plate, unit)
+	local ok, guid = pcall(UnitGUID, unit)
+	guid = ok and Known(guid) and guid or nil
+	local now = GetTime()
+	if questUnit[plate] == guid and now - (questAt[plate] or -QUEST_EVERY) < QUEST_EVERY then
+		return questIs[plate]
+	end
+	questUnit[plate], questAt[plate] = guid, now
+	local giver = false
+	local questie = ns.db.nameServiceQuestie == true and ns.QuestieGiverNames and ns.QuestieGiverNames()
+	if questie then
+		-- (Questie's own settings decide: its level filter, for one.)
+		local okName, name = pcall(UnitName, unit)
+		giver = okName and Known(name) and type(name) == "string" and questie[name] == true or false
+	elseif ns.UnitQuestGiver then
+		giver = ns.UnitQuestGiver(unit) ~= nil
+	end
+	questIs[plate] = giver
+	return giver
+end
+
+-- Whether a plate's NPC is of a kind the Service NPCs row keeps (for
+-- Effects: friendly and neutral NPCs): a title of a ticked kind (known titles
+-- only), or a quest for you with Quest givers ticked. Its second value: true
+-- when only the quest counts, so its name shows rather than its title (most
+-- quest givers have none).
 function ns.PlateServiceMatch(plate, unit)
 	if not plate or not unit then
 		return false
@@ -227,19 +267,25 @@ function ns.PlateServiceMatch(plate, unit)
 	local match = serviceMatch[plate]
 	if match == nil then
 		local title = PlateTitle(plate, unit)
-		if not title then
-			return false -- (no title, or not known yet: asked again in a while)
-		end
-		match = false
-		for key in pairs(ns.TitleKinds(title)) do
-			if ns.db["nameService" .. key] then
-				match = true
-				break
+		if title then
+			match = false
+			for key in pairs(ns.TitleKinds(title)) do
+				if ns.db["nameService" .. key] then
+					match = true
+					break
+				end
 			end
+			serviceMatch[plate] = match
 		end
-		serviceMatch[plate] = match
+		-- (No title, or not known yet: asked again in a while.)
 	end
-	return match
+	if match then
+		return true, false
+	end
+	if ns.db.nameServiceQuest and PlateQuestGiver(plate, unit) then
+		return true, true
+	end
+	return false
 end
 
 local function Hide(plate)

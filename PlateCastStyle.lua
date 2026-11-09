@@ -1076,7 +1076,7 @@ for _, info in ipairs(BARS) do TAB_NAMES[info[1]] = info[2] end
 
 function ns.CreatePlateCastStylePanel(kit)
 	local canvas, content = kit.CreateScrollPage()
-	local title = kit.Label(content, "GameFontNormalLarge", L["Cast Bars"])
+	local title = kit.Label(content, "GameFontNormalLarge", L["Cast Bar Style"])
 	title:SetPoint("TOPLEFT", 16, -16)
 	local intro = kit.PageIntro(content, title,
 		L["How the cast bars look: on nameplates, yours, your target's and focus's, and the bosses' and arena " ..
@@ -1414,7 +1414,7 @@ function ns.CreatePlateCastStylePanel(kit)
 
 	canvas:SetScript("OnShow", kit.PageShown(kit.Refresh, content))
 	canvas:Hide()
-	kit.RegisterSubpage(canvas, "Cast Bar Style", L["Cast Bars"])
+	kit.RegisterSubpage(canvas, "Cast Bar Style", L["Cast Bar Style"])
 end
 
 -- One sample cast bar, for the General page's nameplate preview: dressed as

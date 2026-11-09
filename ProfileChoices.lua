@@ -190,20 +190,19 @@ ns.BUILTIN_PROFILES = {
 			"emote at you."],
 		picks = { layout = { forever = "preset" }, frames = "nofade", camera = "travel", vfx = "cinebars",
 			sound = "nomusic" },
-		modules = With("zone-card", "travel-cards", "no-visions", "no-custom-bubbles"),
+		modules = With("zone-card", "travel-cards", "no-visions", "no-custom-bubbles", "tint-light"),
 	},
 	{
 		name = "Balanced",
 		label = "Balanced", -- (shown in your language)
 		oldNames = { "Lite" },
-		default = true,
 		icon = "Interface\\Icons\\Spell_Holy_HolyBolt",
 		tip = L["The best of both. Your UI fades away and comes right back for a fight, a quest or a look " ..
 			"with the mouse, with your bars and frames where you know them. The letterbox, tint and weather " ..
 			"bring the world to life, most of the Visions and cards join in, and the camera takes over on " ..
 			"flights, when you go AFK and for your Hearthstone and teleports."],
 		picks = { layout = { forever = "preset" }, camera = "lite", chat = "lite" },
-		modules = With("zone-card", "travel-cards", "damage-vision", "music-calm", "node-icons"),
+		modules = With("zone-card", "travel-cards", "damage-vision", "music-calm", "node-icons", "tint-medium"),
 		preview = "bars",
 	},
 	{
@@ -231,12 +230,15 @@ ns.BUILTIN_PROFILES = {
 	{
 		name = "Blank Slate",
 		label = "Blank Slate", -- (shown in your language)
+		-- (the default: a new player's settings until they pick a level are
+		-- everything off anyway, ns.OFF_UNTIL_PICKED)
+		default = true,
 		icon = "Interface\\Icons\\INV_Misc_Note_01",
 		tip = L["Start from scratch: every part of Cinematic is off, your UI and camera stay as the game has " ..
 			"them. Turn on only the pages you want, Roll Vision, Emote Vision or the cards, say, with each " ..
 			"page's Enable switch or a right-click on its icon."],
 		picks = { frames = "nofade" },
-		modules = { "all-pages-off" },
+		modules = { "all-pages-off", "tint-half" },
 	},
 }
 

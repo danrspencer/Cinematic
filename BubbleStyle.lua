@@ -13,11 +13,11 @@ local PRESET_KEYS = { "bubblesBack", "bubblesAlpha", "bubblesEdge", "bubblesTail
 
 function ns.CreateBubbleStylePanel(kit)
 	local canvas, content = kit.CreateScrollPage()
-	local title = kit.Label(content, "GameFontNormalLarge", L["Chat Bubbles"])
+	local title = kit.Label(content, "GameFontNormalLarge", L["Chat Bubble Style"])
 	title:SetPoint("TOPLEFT", 16, -16)
 	local intro = kit.PageIntro(content, title,
-		L["How chat bubbles look, and speech from behind you with them. Where bubbles show: the UI " ..
-		"Manager's Chat bubbles page. Bubbles already showing change with the next thing said."])
+		L["How chat bubbles look, and speech from behind you with them. Where bubbles show: the " ..
+		"UI Visibility hub's Chat Bubbles page. Bubbles already showing change with the next thing said."])
 
 	local preview -- (below: drawn again as each setting changes)
 	local function Changed()
@@ -90,7 +90,7 @@ function ns.CreateBubbleStylePanel(kit)
 	-- while it's off there.
 	local speechHeader = stack:Header(content, L["Speech from behind you"])
 	stack:Help(content, L["Says and yells whose bubble isn't on your screen, shown low on the screen instead. " ..
-		"Turn it on on the Interface hub's Chat bubbles page (with that page on)."])
+		"Turn it on on the UI Visibility hub's Chat bubbles page (with that page on)."])
 	-- (Test and Move buttons beside its "?": a line from you, where they show;
 	-- the Move box, to drag where they show.)
 	local speechTest = ns.PanelButton(content)
@@ -167,5 +167,5 @@ function ns.CreateBubbleStylePanel(kit)
 
 	canvas:SetScript("OnShow", kit.PageShown(kit.Refresh, content))
 	canvas:Hide()
-	kit.RegisterSubpage(canvas, "Bubble Style", L["Chat Bubbles"])
+	kit.RegisterSubpage(canvas, "Bubble Style", L["Chat Bubble Style"])
 end

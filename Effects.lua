@@ -2864,14 +2864,18 @@ local function PlateAlphas(unit, plate)
 	-- The Names grid's Service NPCs row: friendly and neutral NPCs with a
 	-- title of its kinds, their names kept up, or just their titles (text:
 	-- how much of the name's own text shows, the rest only the title's).
-	local own, service = name, nameLevel.ServiceNPCs or 0
+	-- (A quest giver kept by Quest givers alone shows its name: most have no title.)
+	local own, service, nameNotTitle = name, nameLevel.ServiceNPCs or 0, false
 	if service > name and platesForced and unit and plate ~= PersonalPlate() then
 		local kind = PlateKind(unit)
-		if (kind == "FriendlyNPCs" or kind == "NeutralNPCs") and ns.PlateServiceMatch(plate, unit) then
-			name = service
+		if kind == "FriendlyNPCs" or kind == "NeutralNPCs" then
+			local match, byQuest = ns.PlateServiceMatch(plate, unit)
+			if match then
+				name, nameNotTitle = service, byQuest
+			end
 		end
 	end
-	local text = name > own and ns.db.nameServiceShow == "title" and own / name or 1
+	local text = name > own and not nameNotTitle and ns.db.nameServiceShow == "title" and own / name or 1
 	local alpha = math.max(body, name, mark)
 	if alpha <= 0 or immersiveLevel >= 1 then
 		return 0, 1, 0, 0, 1

@@ -794,6 +794,12 @@ local function RecomputeNesting()
 		end
 	end
 end
+-- A chat window docked or pulled out moves its tab in or out of the dock bar.
+for _, fname in ipairs({ "FCF_DockFrame", "FCF_UnDockFrame" }) do
+	if type(_G[fname]) == "function" then
+		hooksecurefunc(fname, function() ns.Guard(RecomputeNesting) end)
+	end
+end
 
 -- The minimap's size can't change in combat if an addon put a secure button
 -- on it (that makes it protected): the shrink waits for the fight to end.
@@ -1403,6 +1409,9 @@ function ns.BuildManagedList()
 		-- faded on its own (it sets its own alpha too: see AddFrame).
 		AddFrame(_G["ChatFrame" .. i], "chat")
 		AddFrame(_G["ChatFrame" .. i .. "EditBox"], "chat")
+		-- Its tab: docked, it's inside the dock bar and goes with it (nested);
+		-- a window of its own has its tab on UIParent, faded with the chat.
+		AddFrame(_G["ChatFrame" .. i .. "Tab"], "chat")
 	end
 	for _, scan in ipairs(scanners) do
 		scan()
@@ -1438,6 +1447,7 @@ do
 			for i = 1, (NUM_CHAT_WINDOWS or 10) do
 				AddFrame(_G["ChatFrame" .. i], "chat")
 				AddFrame(_G["ChatFrame" .. i .. "EditBox"], "chat")
+				AddFrame(_G["ChatFrame" .. i .. "Tab"], "chat")
 			end
 			return false
 		end
@@ -1933,7 +1943,7 @@ ns.COMBAT_SHOW = {
 	{ key = "prdmana", label = L["Personal mana bar"], default = false, frames = { "CinematicPersonalMana" },
 		morePage = "Personal Resources",
 		tip = L["Your mana under your character when it isn't your power (Elemental Shaman, Shadow Priest...): " ..
-			"once it's on, on the Resource Display page."] },
+			"once it's on, on the Personal Resource Display page."] },
 	{ key = "target", label = L["Target"], default = true, frames = { "TargetFrame" } },
 	{ key = "tot", label = L["Target of target"], default = true, frames = { "TargetFrameToT" } },
 	{ key = "focus", label = L["Focus"], default = true, frames = { "FocusFrame" } },
@@ -1945,7 +1955,7 @@ ns.COMBAT_SHOW = {
 	{ key = "focustot", label = L["Focus target of target"], default = true, frames = { "FocusFrameToT" },
 		noHoverRow = true, showKey = ns.isClassicEra and "unitPartsFocusToT" or nil,
 		showTip = L["Unticked: the small frame by the focus frame, showing who your focus is targeting, doesn't " ..
-			"show at all, CineMode or not. Which of its parts show is on the Unit Frames page."],
+			"show at all, CineMode or not. Which of its parts show is on the Unit Frame Parts page."],
 		showChanged = function() if ns.ApplyUnitFrameParts then ns.ApplyUnitFrameParts() end end },
 	-- The game's circle on the ground under your target: not a frame but a
 	-- setting (Effects.lua, ns.RowOnNow). Always ticked to start with

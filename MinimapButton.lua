@@ -212,7 +212,7 @@ local function ShowMenu(owner)
 	end
 	local menu = ns.ContextMenu(owner, function(_, root)
 		root:CreateTitle("Cinematic")
-		root:CreateCheckbox(L["CineMode"] .. " " .. L["(UI comes back in combat)"],
+		root:CreateCheckbox(L["CineMode"],
 			ns.IsCineModeOn, function()
 				Cinematic_ToggleCineMode()
 				-- (Turned on: the menu closes with the rest of the UI. The

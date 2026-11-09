@@ -552,11 +552,11 @@ local PRESET_KEYS = { "prdTexture", "prdBorder", "prdBorderSize", "prdBorderR", 
 
 function ns.CreatePersonalStylePanel(kit)
 	local canvas, content = kit.CreateScrollPage()
-	local title = kit.Label(content, "GameFontNormalLarge", L["Personal Resource Display"])
+	local title = kit.Label(content, "GameFontNormalLarge", L["Personal Resource Style"])
 	title:SetPoint("TOPLEFT", 16, -16)
 	local intro = kit.PageIntro(content, title,
 		L["How the personal resource display under your character looks: its health and power bars, and " ..
-		"your class resource. When the bars come up: the Interface hub's Resource Display page."])
+		"your class resource. When the bars come up: the UI Visibility hub's Personal Resource Display page."])
 
 	local preview -- (below: drawn again as each setting changes)
 	local function Changed()
@@ -639,5 +639,5 @@ function ns.CreatePersonalStylePanel(kit)
 
 	canvas:SetScript("OnShow", kit.PageShown(kit.Refresh, content))
 	canvas:Hide()
-	kit.RegisterSubpage(canvas, "Personal Style", L["Personal Resource Display"])
+	kit.RegisterSubpage(canvas, "Personal Style", L["Personal Resource Style"])
 end

@@ -291,7 +291,7 @@ local function StyleTabs(content, title, picked)
 	local panel = ns.PageTabs(content, {
 		{ L["General"], "Style General", L["The theme, quick settings and the switch for every Style page."] },
 		{ L["Pages"], "Style Pages", L["Which Style pages follow General, and which have settings of their own."] },
-		{ L["Overrides"], "Style Overrides", L["Hide or show parts of the unit frames and nameplates, whatever the Interface pages' rows say."] },
+		{ L["Overrides"], "Style Overrides", L["Hide or show parts of the unit frames and nameplates, whatever the UI Visibility pages' rows say."] },
 	}, picked)
 	title:ClearAllPoints()
 	title:SetPoint("TOPLEFT", panel, "BOTTOMLEFT", 8, -14)

@@ -1662,34 +1662,14 @@ local function CreatePanel()
 	-- Left column: general
 	local general = Header(panel, L["General"], subtitle, -54)
 
-	local enabled
-	enabled = Check(panel, "enabled", L["Enable Cinematic"],
-		L["Off turns Cinematic off completely: it asks, then turns it off in the game's AddOns list and " ..
-		"reloads, so nothing of it runs. Tick it in the AddOns list to bring it back. Also with /cine."],
-		function(value)
-			if value then
-				ns.SetEnabled(true)
-			else
-				-- (Stays ticked till the reload; ticked again if you cancel.)
-				enabled:SetChecked(true)
-				ns.TurnOffCompletely()
-			end
-		end)
-	enabled:SetPoint("TOPLEFT", general, "BOTTOMLEFT", -2, -6)
-
-	local fadeUI = Check(panel, "fadeUI", L["Start in CineMode (fade UI, queue music, etc.)"],
-		L["Off: the UI stays as it is and the camera's left to you, with just the visual effects " ..
-		"over it (as the Visual Effects page says), as in the Subtle profile. Triggers with CineMode " ..
-		"ticked on the Scenes page still bring CineMode on while their camera " ..
-		"runs: standing still or going AFK, say, for a screensaver."])
-	fadeUI:SetPoint("TOPLEFT", enabled, "BOTTOMLEFT", 0, -2)
-
+	-- (No Enable Cinematic box: off is the game's AddOns list, or /cine,
+	-- which asks and reloads with it off there. ns.TurnOffCompletely.)
 	local minimapButton = Check(panel, "minimapButton", L["Show minimap button"],
 		L["Click it for quick options and a link to these settings, drag to move it."], function(value)
 			ns.GetDB().minimapButton = value
 			if ns.UpdateMinimapButton then ns.UpdateMinimapButton() end
 		end)
-	minimapButton:SetPoint("TOPLEFT", fadeUI, "BOTTOMLEFT", 0, -2)
+	minimapButton:SetPoint("TOPLEFT", general, "BOTTOMLEFT", -2, -6)
 
 	-- (Only where the game has a compartment.)
 	local aboveGlow = minimapButton
@@ -1836,12 +1816,22 @@ local function CreatePanel()
 		controls[#controls + 1] = skinMenu
 	end
 
-	-- Right column: places
-	local placesHeader = Label(panel, "GameFontNormal", L["Turn off in"])
-	placesHeader:SetPoint("TOPLEFT", general, "TOPLEFT", 320, 0)
+	-- Right column: CineMode, coming in and going out together.
+	local cineHeader = Label(panel, "GameFontNormal", L["CineMode"])
+	cineHeader:SetPoint("TOPLEFT", general, "TOPLEFT", 320, 0)
+
+	local fadeUI = Check(panel, "fadeUI", L["Start in CineMode"],
+		L["On: CineMode comes in by itself between fights, fading the UI and queuing music. Off: the UI stays as it is and the camera's left to you, with just the visual effects " ..
+		"over it (as the Visual Effects page says), as in the Subtle profile. Triggers with CineMode " ..
+		"ticked on the Scenes page still bring CineMode on while their camera " ..
+		"runs: standing still or going AFK, say, for a screensaver."])
+	fadeUI:SetPoint("TOPLEFT", cineHeader, "BOTTOMLEFT", -2, -6)
+
+	local placesHeader = Label(panel, "GameFontNormal", L["Exit CineMode"])
+	placesHeader:SetPoint("TOPLEFT", fadeUI, "BOTTOMLEFT", 2, -14)
 
 	-- Stored the other way round (stayInCombat), as the Standard Frames page's lists apply while staying.
-	local combat = Check(panel, "stayInCombat", L["Combat"],
+	local combat = Check(panel, "stayInCombat", L["In combat"],
 		L["Being in combat brings the UI back. Unticked, CineMode stays on in fights: only the frames " ..
 		"ticked under In combat on the Game Frames page show. (Targeting an enemy only ever shows " ..
 		"the frames chosen for it there.)"], function(value)
@@ -1852,34 +1842,34 @@ local function CreatePanel()
 	combat:SetPoint("TOPLEFT", placesHeader, "BOTTOMLEFT", -2, -6)
 
 	-- Places in the same order as every other place list (PlaceList).
-	local world = Check(panel, "offInWorld", L["Open world"],
+	local world = Check(panel, "offInWorld", L["In the open world"],
 		L["Anywhere outside cities, dungeons and raids (inns too), while you're not PvP flagged. " ..
 		"Flights still go cinematic."])
 	world:SetPoint("TOPLEFT", combat, "BOTTOMLEFT", 0, -2)
 
-	local cities = Check(panel, "offInCities", L["Cities"],
+	local cities = Check(panel, "offInCities", L["In cities"],
 		L["Capital cities, including Dalaran. Flights leaving a city still go cinematic."])
 	cities:SetPoint("TOPLEFT", world, "BOTTOMLEFT", 0, -2)
 
-	local dungeons = Check(panel, "offInDungeons", L["Dungeons"],
+	local dungeons = Check(panel, "offInDungeons", L["In dungeons"],
 		L["Keep the normal UI in dungeons and scenarios."])
 	dungeons:SetPoint("TOPLEFT", cities, "BOTTOMLEFT", 0, -2)
 
-	local raids = Check(panel, "offInRaids", L["Raids"])
+	local raids = Check(panel, "offInRaids", L["In raids"])
 	raids:SetPoint("TOPLEFT", dungeons, "BOTTOMLEFT", 0, -2)
 
-	local pvp = Check(panel, "offInPvP", L["PvP"], PVP_TIP)
+	local pvp = Check(panel, "offInPvP", L["In PvP"], PVP_TIP)
 	pvp:SetPoint("TOPLEFT", raids, "BOTTOMLEFT", 0, -2)
 
-	local party = Check(panel, "offInParty", L["Party"],
+	local party = Check(panel, "offInParty", L["In a party"],
 		L["Keep the normal UI while you're in a party (but not a raid group)."])
 	party:SetPoint("TOPLEFT", pvp, "BOTTOMLEFT", 0, -2)
 
-	local raidGroup = Check(panel, "offInRaidGroup", L["Raid group"],
+	local raidGroup = Check(panel, "offInRaidGroup", L["In a raid group"],
 		L["Keep the normal UI while you're in a raid group, wherever you are."])
 	raidGroup:SetPoint("TOPLEFT", party, "BOTTOMLEFT", 0, -2)
 
-	local moving = Check(panel, "offWhileMoving", L["Moving"],
+	local moving = Check(panel, "offWhileMoving", L["When moving"],
 		L["Walking or riding about yourself brings the UI back (names too), say to look for an NPC " ..
 		"in a city. CineMode comes back once you've stood still, or kept moving, for the time " ..
 		"below. Auto-run, RP walking and flights stay in CineMode."],
@@ -1953,33 +1943,35 @@ do
 	-- Each hub (by English name) and its pages in order, with their icons
 	-- (or a function that gives one).
 	local HUBS = {
-		-- (sections: when frames show (Visibility), then each frame's own page:
+		-- (sections: the grids of what shows (CineMode Autohide), then each frame's own rules:
 		-- the HUD's, then what floats over heads, as on the Style hub. label: the
 		-- hub's name as shown, its pages' ids staying "UI Manager"'s.)
-		{ name = "UI Manager", label = "Interface", colors = {
-			Visibility = { 0.75, 0.65, 0.45 }, HUD = { 0.35, 0.6, 0.9 }, Overhead = { 0.65, 0.45, 0.9 },
+		{ name = "UI Manager", label = "UI Visibility", colors = {
+			["CineMode Autohide"] = { 0.75, 0.65, 0.45 }, ["HUD Advanced"] = { 0.35, 0.6, 0.9 },
+			["Overhead Advanced"] = { 0.65, 0.45, 0.9 },
 		}, pages = {
 			-- (A standard: your faction's battle banner.)
 			{ "Standard Frames", function()
 				return UnitFactionGroup("player") == "Horde" and "Interface\\Icons\\INV_BannerPVP_01"
 					or "Interface\\Icons\\INV_BannerPVP_02"
-			end, label = "Game Frames", section = "Visibility" },
-			{ "Advanced Frames", "Interface\\Icons\\INV_Misc_Gear_01", label = "Addon Frames", section = "Visibility" },
-			{ "Mouseover groups", "Interface\\Icons\\Spell_Holy_MindVision", label = "Hover Groups", section = "Visibility" },
-			{ "Gamepad", "Interface\\Icons\\INV_Gizmo_01", label = "Gamepad Frames", section = "Visibility" },
-			{ "Unit Frames", "Interface\\Icons\\INV_Misc_Head_Dwarf_01", section = "HUD" },
+			end, label = "Game Frames", section = "CineMode Autohide" },
+			{ "Unit Frames", "Interface\\Icons\\INV_Misc_Head_Dwarf_01", label = "Unit Frame Parts", section = "CineMode Autohide" },
+			{ "Advanced Frames", "Interface\\Icons\\INV_Misc_Gear_01", label = "Addon Frames", section = "CineMode Autohide" },
+			{ "Mouseover groups", "Interface\\Icons\\Spell_Holy_MindVision", label = "Hover Groups", section = "CineMode Autohide" },
+			{ "Gamepad", "Interface\\Icons\\INV_Gizmo_01", label = "Gamepad Frames", section = "CineMode Autohide" },
+			{ "Cursor Hide", "Interface\\Icons\\INV_Misc_Eye_01", section = "CineMode Autohide" }, -- (CursorHide.lua)
 			{ "Personal Resources", "Interface\\Icons\\Ability_Racial_BloodRage", -- (Bloodrage: health into power)
-				label = "Resource Display", section = "HUD" },
-			{ "Buffs/debuffs", "Interface\\Icons\\Spell_Holy_WordFortitude", label = "Buffs/Debuffs", section = "HUD" },
-			{ "Cooldown Manager", "Interface\\Icons\\INV_Misc_PocketWatch_01", section = "HUD" },
-			{ "Swing timer", "Interface\\Icons\\INV_Sword_04", label = "Swing Timer", section = "HUD" },
-			{ "Minimap", "Interface\\Icons\\INV_Misc_Map_01", section = "HUD" },
-			{ "Quest tracker", "Interface\\Icons\\INV_Misc_Note_01", label = "Quest Tracker", section = "HUD" },
-			{ "Tooltips", "Interface\\Icons\\INV_Misc_Book_09", section = "HUD" },
-			{ "Chat", "Interface\\Icons\\INV_Scroll_03", section = "HUD" },
-			{ "Nameplates", "Interface\\Icons\\Ability_Hunter_SniperShot", section = "Overhead" },
-			{ "Chat bubbles", "Interface\\Icons\\Ability_Warrior_BattleShout", label = "Chat Bubbles", section = "Overhead" },
-			{ "Cursor Hide", "Interface\\Icons\\INV_Misc_Eye_01", section = "Overhead" }, -- (CursorHide.lua)
+				label = "Personal Resource Display", section = "HUD Advanced" },
+			{ "Buffs/debuffs", "Interface\\Icons\\Spell_Holy_WordFortitude", label = "Buffs/Debuffs", section = "HUD Advanced" },
+			{ "Cooldown Manager", "Interface\\Icons\\INV_Misc_PocketWatch_01", section = "HUD Advanced" },
+			{ "Swing timer", "Interface\\Icons\\INV_Sword_04", label = "Swing Timer", section = "HUD Advanced" },
+			{ "Minimap", "Interface\\Icons\\INV_Misc_Map_01", section = "HUD Advanced" },
+			{ "Quest tracker", "Interface\\Icons\\INV_Misc_Note_01", label = "Quest Tracker", section = "HUD Advanced" },
+			{ "Tooltips", "Interface\\Icons\\INV_Misc_Book_09", section = "HUD Advanced" },
+			{ "Chat", "Interface\\Icons\\INV_Scroll_03", section = "HUD Advanced" },
+			{ "Nameplates", "Interface\\Icons\\Ability_Hunter_SniperShot", section = "Overhead Advanced" },
+			{ "Chat bubbles", "Interface\\Icons\\Ability_Warrior_BattleShout", label = "Chat Bubbles",
+				section = "Overhead Advanced" },
 		} },
 		-- (Cameras: what everyone has; Dev: the dev copy's own, to the right)
 		-- (master: Enable Cameras; its pages with no switch of their own show Off with it)
@@ -2012,7 +2004,7 @@ do
 			{ "Tint Style", "Interface\\Icons\\INV_Misc_Gem_Variety_02", tabOf = "Tint" },
 			{ "Letterbox", "Interface\\Icons\\Spell_Shadow_ShadesOfDarkness", section = "Visuals" },
 			{ "Letterbox Style", "Interface\\Icons\\Spell_Shadow_ShadesOfDarkness", tabOf = "Letterbox" },
-			{ "Graphics+", "Interface\\Icons\\INV_Misc_Gem_Pearl_04", section = "Visuals" },
+			{ "Graphics+", "Interface\\Icons\\INV_Misc_Gem_Pearl_04", label = "Graphics Boost", section = "Visuals" },
 			{ "Audio", "Interface\\Icons\\INV_Misc_Drum_01", section = "Audio" },
 		} },
 		-- (section: its pages on a band in its color, its name above it; all in
@@ -2026,22 +2018,22 @@ do
 			{ "Style General", "Interface\\Icons\\INV_Misc_Gear_08", label = "General" },
 			{ "Style Pages", "Interface\\Icons\\INV_Misc_Gear_08", tabOf = "Style General" }, -- (GeneralStyle.lua)
 			{ "Style Overrides", "Interface\\Icons\\INV_Misc_Gear_08", tabOf = "Style General" }, -- (StyleOverrides.lua)
-			{ "Unit Style", "Interface\\Icons\\INV_Misc_Head_Human_01", label = "Unit Frames", section = "HUD" },
-			{ "Raid Style", "Interface\\Icons\\INV_Misc_GroupNeedMore", label = "Raid Frames", section = "HUD" },
-			{ "Action Style", "Interface\\Icons\\Ability_DualWield", label = "Action Bars", section = "HUD" },
-			{ "Personal Style", "Interface\\Icons\\Spell_Holy_SealOfVengeance", label = "Personal Resource Display",
+			{ "Unit Style", "Interface\\Icons\\INV_Misc_Head_Human_01", label = "Unit Frame Style", section = "HUD" },
+			{ "Raid Style", "Interface\\Icons\\INV_Misc_GroupNeedMore", label = "Raid Frame Style", section = "HUD" },
+			{ "Action Style", "Interface\\Icons\\Ability_DualWield", label = "Action Bar Style", section = "HUD" },
+			{ "Personal Style", "Interface\\Icons\\Spell_Holy_SealOfVengeance", label = "Personal Resource Style",
 				section = "HUD" },
-			{ "Tooltip Style", "Interface\\Icons\\INV_Misc_Note_05", label = "Tooltips", section = "HUD" },
-			{ "Nameplate Style", "Interface\\Icons\\Ability_Marksmanship", label = "Nameplates", section = "Overhead" },
-			{ "Name Style", "Interface\\Icons\\INV_Misc_Note_02", label = "Names", section = "Overhead" },
-			{ "Cast Bar Style", "Interface\\Icons\\Spell_Nature_Lightning", label = "Cast Bars", section = "Overhead" },
-			{ "Bubble Style", "Interface\\Icons\\Ability_Warrior_RallyingCry", label = "Chat Bubbles",
+			{ "Tooltip Style", "Interface\\Icons\\INV_Misc_Note_05", label = "Tooltip Style", section = "HUD" },
+			{ "Nameplate Style", "Interface\\Icons\\Ability_Marksmanship", label = "Nameplate Style", section = "Overhead" },
+			{ "Name Style", "Interface\\Icons\\INV_Misc_Note_02", label = "Name Style", section = "Overhead" },
+			{ "Cast Bar Style", "Interface\\Icons\\Spell_Nature_Lightning", label = "Cast Bar Style", section = "Overhead" },
+			{ "Bubble Style", "Interface\\Icons\\Ability_Warrior_RallyingCry", label = "Chat Bubble Style",
 				section = "Overhead" },
 		} },
 		-- (General and the dev copy's Wind Guide in no section: plain icons)
 		{ name = "Visions", colors = { Combat = { 0.85, 0.3, 0.25 }, World = { 0.35, 0.6, 0.9 } }, pages = {
 			-- (VisionsStyle.lua: the look they share; in no section, a band of its own)
-			{ "Visions Style", "Interface\\Icons\\INV_Misc_Gear_08", label = "Style" },
+			{ "Visions Style", "Interface\\Icons\\INV_Misc_Gear_08" },
 			{ "Heal Vision", "Interface\\Icons\\Spell_Holy_FlashHeal", section = "Combat" },
 			-- (tabOf: no icon of its own, a folder tab on that page's (ns.PageTabs))
 			{ "Damage Vision", "Interface\\Icons\\Ability_Warrior_Rampage", section = "Combat" }, -- (DamageVision.lua)
@@ -2053,7 +2045,7 @@ do
 			{ "Quest Item Style", "Interface\\Icons\\INV_Misc_Key_03", tabOf = "Quest Vision" },
 			{ "Roll Vision", "Interface\\Icons\\INV_Misc_Dice_01", section = "World" },
 			{ "Roll Style", "Interface\\Icons\\INV_Misc_Dice_02", tabOf = "Roll Vision" },
-			{ "Teleport Vision", "Interface\\Icons\\Spell_Arcane_TeleportStormWind", label = "Tele Vision",
+			{ "Teleport Vision", "Interface\\Icons\\Spell_Arcane_TeleportStormWind",
 				section = "World" }, -- (TeleportVision.lua; its tooltip: ns.TILE_TOOLTIPS)
 			{ "Duel Vision", "Interface\\Icons\\Ability_DualWield", section = "World" },
 			{ "Emote Vision", "Interface\\Icons\\Spell_Holy_PrayerOfFortitude", section = "World" }, -- (EmoteVision.lua)
@@ -2068,7 +2060,7 @@ do
 			{ "Card Sounds", "Interface\\Icons\\INV_Misc_Book_09", tabOf = "Card Vision" },
 			{ "Wind Guide", "Interface\\Icons\\Spell_Nature_Cyclone", dev = true },
 		} },
-		{ name = "Quality of life", colors = { Helpers = { 0.3, 0.7, 0.5 } }, pages = {
+		{ name = "Quality of life", label = "Quality of Life", colors = { Helpers = { 0.3, 0.7, 0.5 } }, pages = {
 			{ "General", "Interface\\Icons\\INV_Misc_Bag_07" },
 			{ "Fishing", "Interface\\Icons\\Trade_Fishing", section = "Helpers" },
 			{ "Hunter", "Interface\\Icons\\INV_Weapon_Bow_07", section = "Helpers" },
@@ -2076,21 +2068,22 @@ do
 		} },
 		-- (WheelsPage.lua's pages; listed under Quality of life. The master wheel first, plain; the wheels it opens on a band.)
 		{ name = "Wheels", under = "Quality of life", colors = { Wheels = { 0.65, 0.45, 0.9 } }, pages = {
-			{ "Master wheel", "Interface\\Icons\\Spell_Nature_WispSplode" },
-			{ "Your wheels", "Interface\\Icons\\INV_Misc_Note_01" },
-			{ "Camera wheel", "Interface\\Icons\\INV_Misc_Spyglass_03", section = "Wheels" },
-			{ "Menu wheel", "Interface\\Icons\\INV_Misc_Gear_01", section = "Wheels" },
-			{ "Marker wheel", "Interface\\TargetingFrame\\UI-RaidTargetingIcon_8", section = "Wheels" },
-			{ "Ground marker wheel", "Interface\\TargetingFrame\\UI-RaidTargetingIcon_6", section = "Wheels" },
-			{ "Vision wheel", "Interface\\Icons\\Ability_EyeOfTheOwl", section = "Wheels" },
+			{ "Master wheel", "Interface\\Icons\\Spell_Nature_WispSplode", label = "Master Wheel" },
+			{ "Your wheels", "Interface\\Icons\\INV_Misc_Note_01", label = "Your Wheels" },
+			{ "Camera wheel", "Interface\\Icons\\INV_Misc_Spyglass_03", label = "Camera Wheel", section = "Wheels" },
+			{ "Menu wheel", "Interface\\Icons\\INV_Misc_Gear_01", label = "Menu Wheel", section = "Wheels" },
+			{ "Marker wheel", "Interface\\TargetingFrame\\UI-RaidTargetingIcon_8", label = "Marker Wheel", section = "Wheels" },
+			{ "Ground marker wheel", "Interface\\TargetingFrame\\UI-RaidTargetingIcon_6", label = "Ground Marker Wheel",
+				section = "Wheels" },
+			{ "Vision wheel", "Interface\\Icons\\Ability_EyeOfTheOwl", label = "Vision Wheel", section = "Wheels" },
 		} },
 		-- (WhatsNew.lua's pages, after Keybinds)
 		-- (Help: where to read up and report a problem, and the Profiler; Dev:
 		-- the dev copy's own tools)
 		{ name = "Community", colors = { Updates = { 0.35, 0.6, 0.9 }, People = { 0.3, 0.7, 0.5 },
 			Help = { 0.85, 0.6, 0.3 }, Dev = { 0.85, 0.3, 0.25 } }, pages = {
-			{ "New features", "Interface\\Icons\\INV_Misc_Gift_01", section = "Updates" },
-			{ "All changes", "Interface\\Icons\\INV_Misc_Book_11", section = "Updates" },
+			{ "New features", "Interface\\Icons\\INV_Misc_Gift_01", label = "New Features", section = "Updates" },
+			{ "All changes", "Interface\\Icons\\INV_Misc_Book_11", label = "All Changes", section = "Updates" },
 			{ "Socials", "Interface\\Icons\\INV_Letter_15", section = "People" },
 			{ "Thanks", "Interface\\Icons\\INV_ValentinesCard02", section = "People" },
 			{ "Help", "Interface\\Icons\\INV_Misc_QuestionMark", section = "Help" }, -- (WhatsNew.lua)
@@ -2104,6 +2097,71 @@ do
 			{ "Demo Commands", "Interface\\Icons\\INV_Misc_Film_01", dev = true }, -- (DemoHub.lua)
 		} },
 	}
+	-- Pages sharing one icon, a folder tab each, where this client has more
+	-- than one of them: the first it has gets the icon, named label; the rest
+	-- are its tabs (tabOf). Each page: { English name, tab name, tab tip }.
+	local PAGE_GROUPS = {
+		{ label = "Gamepad & Cursor", pages = {
+			{ "Gamepad", "Gamepad", "The frames gamepad mode adds: its action bars, button hints and reticle." },
+			{ "Cursor Hide", "Cursor", "In CineMode, the cursor gets out of the way." },
+		} },
+		{ label = "Timers", pages = {
+			{ "Cooldown Manager", "Cooldown Manager", "When the Cooldown Manager comes up in CineMode." },
+			{ "Swing timer", "Swing Timer", "Which of the game's swing timer bars show." },
+		} },
+	}
+	-- (Whether this client makes the page: as the calls at the end of this file decide.)
+	local GROUP_HAS = {
+		["Cursor Hide"] = function() return ns.CreateCursorHidePage ~= nil end,
+		Gamepad = function() return C_GamePad ~= nil and not ns.isRetail end,
+		["Cooldown Manager"] = function() return ns.HasCooldownManager() end,
+		["Swing timer"] = function() return not ns.isRetail end,
+	}
+	local groupsDone
+	-- (Once, as the first page comes into its hub: each group's pages this
+	-- client has, and their icon and tabs set on HUBS' entries.)
+	local function PageGroups()
+		if groupsDone then return end
+		groupsDone = true
+		for _, group in ipairs(PAGE_GROUPS) do
+			local have = {}
+			for _, each in ipairs(group.pages) do
+				if GROUP_HAS[each[1]]() then have[#have + 1] = each end
+			end
+			group.have = have
+			if #have > 1 then
+				for _, hub in ipairs(HUBS) do
+					for _, page in ipairs(hub.pages) do
+						for i, each in ipairs(have) do
+							if page[1] == each[1] then
+								if i == 1 then page.label = group.label else page.tabOf = have[1][1] end
+							end
+						end
+					end
+				end
+			end
+		end
+	end
+	-- A grouped page's folder tabs, its title moved under them (none when
+	-- this client has just the one page of its group).
+	function ns.GroupTabs(content, title, english)
+		PageGroups()
+		for _, group in ipairs(PAGE_GROUPS) do
+			if #group.have > 1 then
+				local list, picked = {}, nil
+				for i, each in ipairs(group.have) do
+					list[i] = { L[each[2]], each[1], L[each[3]] }
+					if each[1] == english then picked = i end
+				end
+				if picked then
+					local panel = ns.PageTabs(content, list, picked)
+					title:ClearAllPoints()
+					title:SetPoint("TOPLEFT", panel, "BOTTOMLEFT", 8, -14)
+					return panel
+				end
+			end
+		end
+	end
 	-- Pages still being worked on: "(WIP)" after the name on their icon's mouseover.
 	-- (dev = true on a page above: it's only in the dev copy (CinematicDev.toc), and
 	-- its icon has a red X over it and "(dev only)" on mouseover. Every dev-only
@@ -2544,6 +2602,7 @@ do
 	end
 
 	function HubAdd(canvas, name, searchPage)
+		PageGroups()
 		for _, hub in ipairs(HUBS) do
 			for order, page in ipairs(hub.pages) do
 				local english = page[1]
@@ -2783,7 +2842,7 @@ local function CreateRevealPanel()
 	-- then Settings, this page's own (everything made on it below the cards,
 	-- moved onto host).
 	local OVERVIEW_HUBS = {
-		{ "UI Manager", L["Interface"], L["What fades in CineMode, and what brings it back."] },
+		{ "UI Manager", L["UI Visibility"], L["What fades in CineMode, and what brings it back."] },
 		{ "Atmosphere", L["Atmosphere"], L["How the world looks and sounds in CineMode."] },
 		{ "Camera", L["Camera"], L["The camera coming alive while CineMode is on."] },
 	}
@@ -2988,22 +3047,27 @@ local function CreateRevealPanel()
 		"one starts, and anything else that shows mid-fight. Other times use the Fade in time."] .. " " ..
 		L["Casts count too when a rule uses Casting."])
 
-	local calm = stack:Add(Slider(content, "calmTime", L["Calm Timer"], 0, 120, 5, L["%d sec after a fight"]), "slider")
+	local calmFull, calmPet -- (below; hidden while the Calm Timer is Off)
+	local calm = stack:Add(Slider(content, "calmTime", L["Calm Timer"], 0, 120, 5, function(value)
+		return value == 0 and L["Off"] or L["%d sec after a fight"]:format(value)
+	end, nil, function()
+		if calmFull then calmFull:Refresh() end
+		if calmPet then calmPet:Refresh() end
+	end), "slider")
 	Tooltip(calm, L["How long things take to settle back into CineMode after a fight. " ..
 		"Nameplates and names ticked In combat stay up this long (so they don't drop away " ..
 		"between pulls), and visual effects that step aside for fights wait this " ..
 		"long before fading back in. Your portrait and buffs, if they only show after combat, " ..
 		"count a fight as recent for this long too, the RP walk, auto-run and cozy cameras " ..
 		"wait this long before starting, and music muted for fights comes back after it. Then " ..
-		"things fade out at the Fade out time. 0 settles at once. Exit Calm Timer when healthy, " ..
-		"below, can end it early."])
+		"things fade out at the Fade out time. Off: things fade as soon as the fight ends. " ..
+		"Exit Calm Timer when healthy, below, can end it early."])
 
 	-- Off at the left end; past it, how long after you're back to full the
 	-- Calm Timer ends (calmEndsAtFull and calmFullAfter).
 	RecordKey(content, "calmEndsAtFull")
 	RecordKey(content, "calmFullAfter")
-	local calmPet -- (below; greys out with this Off)
-	local calmFull = Slider(content, {
+	calmFull = Slider(content, {
 		get = function()
 			local db = ns.GetDB()
 			return db.calmEndsAtFull and (db.calmFullAfter or 0) or -1
@@ -3037,6 +3101,17 @@ local function CreateRevealPanel()
 		"No pet, or a dead one: just yours counts."])
 	stack:Add(calmPet, "check", 16)
 	GreyUnless(calmPet, function(db) return db.calmEndsAtFull end)
+
+	-- (Both do nothing with the Calm Timer Off: hidden, their room kept.)
+	for _, control in ipairs({ calmFull, calmPet }) do
+		local refresh = control.Refresh
+		control.Refresh = function(self)
+			refresh(self)
+			local shown = (tonumber(ns.GetDB().calmTime) or 0) > 0
+			self:SetShown(shown)
+			if self.rowName then self.rowName:SetShown(shown) end
+		end
+	end
 
 	-- Set aside for now (hidden, their settings kept as they are): the Exit
 	-- CineMode section. (Mouseover has its own page.)
@@ -3856,7 +3931,7 @@ end
 local EVENT_TIPS = {
 	Campfire = L["Standing or sitting still with any of the buffs listed below (like Welcoming Campfire)."],
 	Sit = L["Doing the emote (or pressing the sit key). Moving, jumping or another emote ends it."],
-	SitButton = L["Clicking the Campfire button (Quality of life page). Once the campfire's buff " ..
+	SitButton = L["Clicking the Campfire button (Quality of Life page). Once the campfire's buff " ..
 		"comes, the first row's camera takes over. Moving, jumping or another emote ends it."],
 	Sleep = L["Doing the emote. Moving, jumping or another emote ends it."],
 	Dance = L["Doing the emote. Moving, jumping or another emote ends it."],
@@ -4559,7 +4634,7 @@ ns.OpenColorPicker = OpenColorPicker
 local function VisualEffectsSwitch(content, anchor)
 	local master = Check(content, "visualEffects", L["Enable Visual Effects"],
 		L["Turns the whole Atmosphere hub on or off at once: the letterbox, tint, time of day, zone tints, " ..
-		"vignette, inn glow, weather, depth of field, Graphics+ and Audio. Each keeps its own settings for " ..
+		"vignette, inn glow, weather, depth of field, Graphics Boost and Audio. Each keeps its own settings for " ..
 		"when you turn this back on."], function(value)
 			ns.GetDB().visualEffects = value
 			ns.letterboxDirty = true
@@ -5230,7 +5305,7 @@ end
 local function CreateGraphicsPanel()
 	local canvas, content = CreateScrollPage()
 
-	local title = Label(content, "GameFontNormalLarge", L["Graphics+"])
+	local title = Label(content, "GameFontNormalLarge", L["Graphics Boost"])
 	title:SetPoint("TOPLEFT", 16, -16)
 
 	local subtitle = PageIntro(content, title,
@@ -5381,7 +5456,7 @@ local function CreateGraphicsPanel()
 
 	canvas:SetScript("OnShow", PageShown(Refresh, content))
 	canvas:Hide()
-	RegisterSubpage(canvas, "Graphics+")
+	RegisterSubpage(canvas, "Graphics+", L["Graphics Boost"])
 end
 
 -- Sub-page for audio: music during cinematic mode.
@@ -6910,10 +6985,10 @@ local function CreateCombatPanel()
 		end
 		sections[#sections + 1] = section
 	end
-	local raidStyle = { "Raid Style", L["Opens the Style hub's Raid frames page: how the raid and raid-style " ..
+	local raidStyle = { "Raid Style", L["Opens the Raid Frame Style page: how the raid and raid-style " ..
 		"party frames look."], L["Style"] }
 	local SECTIONS = {
-		{ "units", L["Unit frames"], nil, { "Unit Frames", L["Opens the Unit Frames page: which parts of your " ..
+		{ "units", L["Unit frames"], nil, { "Unit Frames", L["Opens the Unit Frame Parts page: which parts of your " ..
 			"own, your target's and the other unit frames show, and when."], L["Parts"] } },
 		{ "bars", L["Action bars"] }, { "combat", L["Trackers"] },
 		{ "interface", L["Info and menus"] }, { "minimap", L["Minimap"] },
@@ -6950,10 +7025,10 @@ end
 local function CreatePortraitsPanel()
 	local canvas, content = CreateScrollPage()
 
-	local title = Label(content, "GameFontNormalLarge", L["Unit Frames"])
+	local title = Label(content, "GameFontNormalLarge", L["Unit Frame Parts"])
 	title:SetPoint("TOPLEFT", 16, -16)
 	-- Their look: the Style hub's Unit frames page (UnitStyle.lua).
-	local styleLink = ns.StyleLink(content, title, "Unit Style", L["Opens the Style hub's Unit frames page: how the " ..
+	local styleLink = ns.StyleLink(content, title, "Unit Style", L["Opens the Unit Frame Style page: how the " ..
 		"frames look."], Tooltip)
 	ns.FramesLink(content, title, "units", styleLink)
 
@@ -6977,9 +7052,9 @@ local function CreatePortraitsPanel()
 		"hidden with the name too."] ..
 		" " .. L["Level background is the ring behind the level number, hidden with the level too."] ..
 		" " .. L["Keeping a frame up, always or in fights, is on the Game Frames page; your own while you " ..
-		"recover, on the Resource Display page."]
+		"recover, on the Personal Resource Display page."]
 		or L["Which parts of the player, target, focus and pet frames show. Keeping a frame up, always or " ..
-		"in fights, is on the Game Frames page; your own while you recover, on the Resource Display page."])
+		"in fights, is on the Game Frames page; your own while you recover, on the Personal Resource Display page."])
 
 	-- The Unit frame parts (frames laid out as retail's: see
 	-- ns.ApplyUnitFrameParts), a section per frame that opens and closes with
@@ -7204,7 +7279,7 @@ local function CreatePortraitsPanel()
 		pageShown()
 	end)
 	canvas:Hide()
-	RegisterSubpage(canvas, "Unit Frames")
+	RegisterSubpage(canvas, "Unit Frames", L["Unit Frame Parts"])
 end
 
 -- Sub-page: chat bubbles (where they show; how they look: BubbleStyle.lua).
@@ -7215,13 +7290,13 @@ local function CreateBubblesPanel()
 	title:SetPoint("TOPLEFT", 16, -16)
 
 	local subtitle = PageIntro(content, title,
-		L["Where chat bubbles show. How they look: the Style hub's Chat bubbles page."])
+		L["Where chat bubbles show. How they look: the Chat Bubble Style page."])
 	-- Their look: the Style hub's Chat bubbles page (BubbleStyle.lua), a
 	-- button away, right of the page's title (past its "?").
 	local styleButton = ns.PanelButton(content)
 	styleButton:SetSize(120, 22)
 	styleButton:SetText(L["Style"])
-	Tooltip(styleButton, L["Opens the Style hub's Chat bubbles page: how the bubbles and speech from behind " ..
+	Tooltip(styleButton, L["Opens the Chat Bubble Style page: how the bubbles and speech from behind " ..
 		"you look."])
 	styleButton:SetScript("OnClick", function() ns.OpenOptions("Bubble Style") end)
 	styleButton:SetPoint("LEFT", title, "RIGHT", 34, 0)
@@ -7255,7 +7330,7 @@ local function CreateBubblesPanel()
 	stack:Help(content, L["The game only shows a bubble over someone on your screen, and puts one from someone " ..
 		"above you at the very top of the screen, under the letterbox bar. So Cinematic draws bubbles of its own, " ..
 		"looking like the game's, for speech whose bubble you can't see. How they look, and where speech from " ..
-		"behind you shows: the Style hub's Chat bubbles page."])
+		"behind you shows: the Chat Bubble Style page."])
 	local offScreen = stack:Add(Check(content, "chatSpeechBehind", L["Show off-screen bubbles"],
 		L["Says and yells whose bubble isn't on your screen (the speaker is behind you, or out of view) show in " ..
 		"a bubble low on the screen, with the speaker's name, instead of bringing up chat. It needs the Chat " ..
@@ -7267,7 +7342,7 @@ local function CreateBubblesPanel()
 	offScreenStyle:SetSize(70, 20)
 	offScreenStyle:SetText(L["Style"])
 	offScreenStyle:SetPoint("LEFT", offScreen.Text or offScreen.text, "RIGHT", 16, 0)
-	Tooltip(offScreenStyle, L["Opens the Style hub's Chat bubbles page: how off-screen bubbles look and where they show."])
+	Tooltip(offScreenStyle, L["Opens the Chat Bubble Style page: how off-screen bubbles look and where they show."])
 	offScreenStyle:SetScript("OnClick", function() ns.OpenOptions("Bubble Style") end)
 	local emotes = stack:Add(Check(content, "chatSpeechEmotes", L["Show emotes too"],
 		L["Emotes (someone's /point, an NPC that laughs or looks around) never have a bubble: they show with " ..
@@ -7590,6 +7665,7 @@ local function CreateGamepadPanel()
 
 	local title = Label(content, "GameFontNormalLarge", L["Gamepad Frames"])
 	title:SetPoint("TOPLEFT", 16, -16)
+	ns.GroupTabs(content, title, "Gamepad")
 
 	local subtitle = PageIntro(content, title,
 		L["The frames gamepad mode adds (Options, Controls, Gamepad): its action bars, the button hints " ..
@@ -7886,11 +7962,11 @@ local function CreatePlatesPanel()
 	title:SetPoint("TOPLEFT", 16, -16)
 	-- Their look: the Style hub's Nameplates, Names and Cast bars pages.
 	local plateLink = ns.StyleLink(content, title, "Nameplate Style",
-		L["Opens the Style hub's Nameplates page: how nameplates look."], Tooltip, L["Plate style"])
+		L["Opens the Nameplate Style page: how nameplates look."], Tooltip, L["Plate style"])
 	local nameLink = ns.StyleLink(content, title, "Name Style",
-		L["Opens the Style hub's Names page: how names over heads look."], Tooltip, L["Name style"], plateLink)
+		L["Opens the Name Style page: how names over heads look."], Tooltip, L["Name style"], plateLink)
 	ns.StyleLink(content, title, "Cast Bar Style",
-		L["Opens the Style hub's Cast bars page: how nameplate cast bars look."], Tooltip, L["Cast bar style"],
+		L["Opens the Cast Bar Style page: how nameplate cast bars look."], Tooltip, L["Cast bar style"],
 		nameLink)
 
 	local subtitle = PageIntro(content, title,
@@ -8262,7 +8338,7 @@ local function CreatePlatesPanel()
 			icon = true },
 		{ "TargetArrow", L["Target Indicator"], L[" A mark on your target's nameplate (and its name, health bar or " ..
 			"border in its color), shown even while the rest of the plate is faded or shows just its name. Its " ..
-			"look: the Style hub's Nameplates page."], icon = true },
+			"look: the Nameplate Style page."], icon = true },
 	}
 	-- (The class and role icons and the arrow are the addon's own: off unless
 	-- ticked, outside CineMode shown only with Always ticked, and in a section
@@ -8303,7 +8379,7 @@ local function CreatePlatesPanel()
 		"plate, Cinematic draws it on the plate itself, made to look like the game's names: colored, and " ..
 		"smaller further off. Beyond nameplate range the game's own names show, so a name can " ..
 		"change a little in size or place as its unit crosses that range."] ..
-		L[" Their look: the Style hub's Names page."]
+		L[" Their look: the Name Style page."]
 	Tooltip(namesNote, namesNoteText)
 	namesNote.searchNote = namesNoteText
 	namesNote.searchEdges = { top = namesHeader, bottom = namesHeader, left = namesHeader, right = namesNote }
@@ -8407,24 +8483,60 @@ local function CreatePlatesPanel()
 		L["Ticked, NPC titles under or in place of names show as the game writes them (<Baker>). " ..
 			"Unticked, without the < > (Baker). Players' guild names keep theirs."], function(value)
 		ns.GetDB().nameServiceBrackets = value
-		if ns.RefreshAllPlates then ns.RefreshAllPlates() end
+		-- (The title lines drawn again: a plate's layout skips itself when its
+		-- shares haven't changed, so RefreshAllPlates alone leaves the old text.)
+		if ns.RefreshPlateGuilds then ns.RefreshPlateGuilds() end
 	end)
 	serviceBrackets:SetPoint("TOPLEFT", serviceBracketsLabel, "TOPLEFT", GRID_LABEL + 26, 6)
 	local serviceKindsLabel = Label(content, "GameFontHighlight", L["Kinds"])
 	serviceKindsLabel:SetPoint("TOPLEFT", serviceBracketsLabel, "BOTTOMLEFT", 0, -22)
 	local lastServiceKind = serviceKindsLabel
-	for i, kind in ipairs(ns.SERVICE_KINDS) do
-		local key = "nameService" .. kind.key
-		local tip = kind.key == "Other" and L["Any other title, lore titles too (<Ranger-General of Silvermoon>)."]
-			or L["NPCs whose title has one of these words in it: %s."]:format((kind.words:gsub(",", ", ")))
-		local check = Check(content, key, kind.label, tip, function(value)
-			ns.GetDB()[key] = value
-			if ns.ServiceKindsChanged then ns.ServiceKindsChanged() end
-			if ns.RefreshAllPlates then ns.RefreshAllPlates() end
-		end)
-		local column, row = (i - 1) % 2, math.floor((i - 1) / 2)
-		check:SetPoint("TOPLEFT", serviceKindsLabel, "TOPLEFT", GRID_LABEL + 26 + column * 200, 6 - row * 26)
-		if column == 0 then lastServiceKind = check end
+	-- (Quest givers: by the game's quest cursor, or Questie's icons. Hidden on
+	-- a client with neither.)
+	local questiePossible = ns.QuestieMinimapPossible and ns.QuestieMinimapPossible()
+	local questPossible = (ns.QuestGiversPossible and ns.QuestGiversPossible()) or questiePossible
+	local cell = 0
+	for _, kind in ipairs(ns.SERVICE_KINDS) do
+		if kind.key ~= "Quest" or questPossible then
+			local key = "nameService" .. kind.key
+			local tip
+			if kind.key == "Other" then
+				tip = L["Any other title, lore titles too (<Ranger-General of Silvermoon>)."]
+			elseif kind.key == "Quest" then
+				tip = L["NPCs with a quest for you to pick up or hand in, title or not, as the game's quest cursor over " ..
+					"them says (with Use Questie DB ticked, as Questie's \"!\" and \"?\" do). Their name shows, even " ..
+					"with Titles only. Checked every second, so a quest you've just taken or handed in can take a moment."]
+			else
+				tip = L["NPCs whose title has one of these words in it: %s."]:format((kind.words:gsub(",", ", ")))
+			end
+			local check = Check(content, key, kind.label, tip, function(value)
+				ns.GetDB()[key] = value
+				if ns.ServiceKindsChanged then ns.ServiceKindsChanged() end
+				if ns.RefreshAllPlates then ns.RefreshAllPlates() end
+			end)
+			local column, row = cell % 2, math.floor(cell / 2)
+			cell = cell + 1
+			check:SetPoint("TOPLEFT", serviceKindsLabel, "TOPLEFT", GRID_LABEL + 26 + column * 200, 6 - row * 26)
+			if column == 0 then lastServiceKind = check end
+		end
+	end
+	-- Use Questie DB (Support/QuestieMinimap.lua's ns.QuestieGiverNames): Quest
+	-- givers by Questie's icons. Greyed out while Questie isn't loaded;
+	-- hidden on retail, which Questie never runs on.
+	if questiePossible then
+		local questieLabel = Label(content, "GameFontHighlight", L["Questie"])
+		questieLabel:SetPoint("TOPLEFT", serviceKindsLabel, "TOPLEFT", 0, -math.ceil(cell / 2) * 26 - 6)
+		local questie = Check(content, "nameServiceQuestie", L["Use Questie DB"],
+			L["With Questie loaded, Quest givers keeps the names of the NPCs Questie shows a \"!\" or \"?\" for, " ..
+			"its own settings deciding which (its level filter, for one), instead of the game's quest cursor. " ..
+			"It goes by their names."] .. (ns.QuestieLoaded() and "" or ("\n\n" .. L["Needs Questie: it isn't loaded."])),
+			function(value)
+				ns.GetDB().nameServiceQuestie = value
+				if ns.RefreshAllPlates then ns.RefreshAllPlates() end
+			end)
+		questie:SetPoint("TOPLEFT", questieLabel, "TOPLEFT", GRID_LABEL + 26, 6)
+		GreyUnless(questie, function() return ns.QuestieLoaded() end)
+		lastServiceKind = questie
 	end
 	EndSection(namesSection, lastServiceKind)
 
@@ -8474,7 +8586,7 @@ end
 local function CreateNameStylePanel()
 	local canvas, content = CreateScrollPage()
 
-	local title = Label(content, "GameFontNormalLarge", L["Names"])
+	local title = Label(content, "GameFontNormalLarge", L["Name Style"])
 	title:SetPoint("TOPLEFT", 16, -16)
 	local subtitle = PageIntro(content, title,
 		L["How names look on nameplates showing just the name: in CineMode, away from dungeons and raids, " ..
@@ -8793,7 +8905,7 @@ local function CreateNameStylePanel()
 
 	canvas:SetScript("OnShow", PageShown(Refresh, content))
 	canvas:Hide()
-	RegisterSubpage(canvas, "Name Style", "Name Style")
+	RegisterSubpage(canvas, "Name Style", L["Name Style"])
 end
 
 -- The Style hub's Nameplates page (Nameplate Style): how the Nameplates page's Target
@@ -8880,7 +8992,7 @@ do
 	function CreateTargetArrowPanel()
 		local canvas, content = CreateScrollPage()
 
-		local title = Label(content, "GameFontNormalLarge", L["Nameplates"])
+		local title = Label(content, "GameFontNormalLarge", L["Nameplate Style"])
 		title:SetPoint("TOPLEFT", 16, -16)
 		local subtitle = PageIntro(content, title,
 			L["How your target, focus and the unit under the mouse stand out on the nameplates, for when no " ..
@@ -10543,7 +10655,7 @@ do
 
 		canvas:SetScript("OnShow", PageShown(Refresh, content))
 		canvas:Hide()
-		RegisterSubpage(canvas, "Nameplate Style", L["Nameplates"])
+		RegisterSubpage(canvas, "Nameplate Style", L["Nameplate Style"])
 	end
 end
 
@@ -11566,6 +11678,7 @@ local function CreateSwingPanel()
 
 	local title = Label(content, "GameFontNormalLarge", L["Swing Timer"])
 	title:SetPoint("TOPLEFT", 16, -16)
+	ns.GroupTabs(content, title, "Swing timer")
 	ns.FramesLink(content, title, "combat")
 
 	local subtitle = PageIntro(content, title,
@@ -11614,6 +11727,7 @@ local function CreateCooldownPanel()
 
 	local title = Label(content, "GameFontNormalLarge", L["Cooldown Manager"])
 	title:SetPoint("TOPLEFT", 16, -16)
+	ns.GroupTabs(content, title, "Cooldown Manager")
 	ns.FramesLink(content, title, "combat")
 
 	local subtitle = PageIntro(content, title,
@@ -13154,7 +13268,7 @@ local function CreateTooltipPanel()
 	local note = PageIntro(content, title, L["Only in CineMode. Hold your Show hidden tooltips " ..
 		"key (set it on the Keybinds page) to see a hidden one anyway."])
 	-- Their look: the Style hub's Tooltips page (TooltipStyle.lua).
-	ns.StyleLink(content, title, "Tooltip Style", L["Opens the Style hub's Tooltips page: how tooltips look."], Tooltip)
+	ns.StyleLink(content, title, "Tooltip Style", L["Opens the Tooltip Style page: how tooltips look."], Tooltip)
 	local switch = PageSwitch(content, "handleTooltips", L["Enable Page"],
 		L["On: CineMode hides tooltips as this page says. Off: every tooltip shows as normal."], note)
 
@@ -14353,7 +14467,7 @@ local KEYBINDS = {
 	{ action = "CINEMATIC_KEYMAP", label = L["Keyboard map"],
 		tip = L["Hold to see your keyboard with what each key does (Shift, Ctrl and Alt show their keys too); let " ..
 			"go and it's gone. Tap it instead and it stays up till you press it again. Its settings are on " ..
-			"Quality of life > Keyboard Map."] },
+			"Quality of Life > Keyboard Map."] },
 	{ action = "CLICK CinematicMasterWheelButton:LeftButton", label = L["Master wheel"], section = L["Wheels"],
 		tip = L["Hold to bring up a wheel of the wheels below (camera, menu, marker...): point at one and " ..
 			"let go to open it, then click what you want on it. Tap it instead and the wheel stays up for you " ..
@@ -14396,8 +14510,8 @@ local KEYBINDS = {
 	{ action = "CINEMATIC_VISION_DAMAGE", label = L["Toggle Damage Vision"],
 		show = function() return C_DamageMeter ~= nil end,
 		tip = L["Turns Damage Vision on or off (its Enable Page switch)."] },
-	{ action = "CINEMATIC_VISION_TELE", label = L["Toggle Tele Vision"],
-		tip = L["Turns Tele Vision on or off (its Enable Page switch)."] },
+	{ action = "CINEMATIC_VISION_TELE", label = L["Toggle Teleport Vision"],
+		tip = L["Turns Teleport Vision on or off (its Enable Page switch)."] },
 	{ action = "CINEMATIC_VISION_EMOTE", label = L["Toggle Emote Vision"],
 		tip = L["Turns Emote Vision on or off (its Enable Page switch)."] },
 	{ action = "CINEMATIC_VISION_CARD", label = L["Toggle Card Vision"],

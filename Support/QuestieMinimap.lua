@@ -302,6 +302,44 @@ function ns.QuestieMinimapRevealed(now)
 	return false
 end
 
+-- For the Names grid's Service NPCs row's Quest givers kind with Use Questie
+-- DB ticked (PlateGuild): the names of the NPCs Questie shows a "!" or "?"
+-- for, on any map, its own settings deciding (an icon it hides doesn't
+-- count). A set, gathered again every GIVERS_EVERY seconds; nil while Questie
+-- can't be read.
+local GIVERS_EVERY = 2
+local giverSet, giverSetAt, giverErrors, giverSetRead = {}, -math.huge, 0, false
+local function AddGiver(frame)
+	if frame.hidden == true then return end
+	local data = Plain(frame.data, "table")
+	local kind = data and Plain(data.Type, "string")
+	local name = (kind == "available" or kind == "complete") and Plain(data.Name, "string")
+	if name then giverSet[name] = true end
+end
+function ns.QuestieGiverNames()
+	if look.broken or not ns.QuestieLoaded() then return nil end
+	local now = GetTime()
+	if now - giverSetAt >= GIVERS_EVERY then
+		giverSetAt = now
+		wipe(giverSet)
+		local ok, count, why = pcall(ForEachIcon, AddGiver)
+		if not ok then
+			giverSetRead = false
+			giverErrors = giverErrors + 1
+			look.lastError = tostring(count)
+			if giverErrors >= MAX_ERRORS then
+				look.broken = look.lastError
+				ns.Log("questie", "Questie's icons can't be read (a Questie update?), off this login: " .. look.lastError)
+			end
+			return nil
+		end
+		giverErrors = 0
+		giverSetRead = count ~= nil
+		if not count then look.why = why end
+	end
+	return giverSetRead and giverSet or nil
+end
+
 -- For /cine debug questie: what kinds of icon there are, and the nearest
 -- quests on offer with their distance, whatever the reach.
 local function Survey(lines)

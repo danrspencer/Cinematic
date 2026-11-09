@@ -96,7 +96,7 @@ function ns.CreateStyleOverridesPanel(kit)
 	local clear = ns.PanelButton(content)
 	clear:SetSize(130, 22)
 	clear:SetText(L["Clear overrides"])
-	kit.Tooltip(clear, L["Every part back to what its row on the Interface pages says."])
+	kit.Tooltip(clear, L["Every part back to what its row on the UI Visibility pages says."])
 	clear:SetScript("OnClick", function()
 		local db = ns.GetDB()
 		for key, value in pairs(DEFAULTS) do
@@ -107,7 +107,7 @@ function ns.CreateStyleOverridesPanel(kit)
 	stack:Add(clear, "label")
 
 	-- A row: its name and the three picks side by side, so the whole tab reads at a glance.
-	local CHOICES = { { "row", L["Interface page"], 110 }, { "hide", L["Hide"], 60 }, { "show", L["Show"], 60 } }
+	local CHOICES = { { "row", L["UI Visibility page"], 120 }, { "hide", L["Hide"], 60 }, { "show", L["Show"], 60 } }
 	local ROW_H, NAME_W = 25, 170
 	local function PartRow(holder, index, name, key)
 		local row = CreateFrame("Frame", nil, holder)

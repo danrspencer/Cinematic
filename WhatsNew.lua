@@ -45,9 +45,9 @@ end
 -- New features: by day, newest first; each with its page's icon and Show me.
 local function CreateFeaturesPanel(kit)
 	local canvas, content = kit.CreateScrollPage()
-	local last = Heading(kit, content, L["New features"],
+	local last = Heading(kit, content, L["New Features"],
 		L["What's new in Cinematic, newest first. Show me opens the page a feature is on. " ..
-		"Every change, fixes too, is on the All changes page."])
+		"Every change, fixes too, is on the All Changes page."])
 
 	local entries = {}
 	for i, entry in ipairs(ns.CHANGELOG_FEATURES or {}) do
@@ -125,13 +125,13 @@ local function CreateFeaturesPanel(kit)
 	content:HookScript("OnSizeChanged", Fit)
 	canvas:SetScript("OnShow", kit.PageShown(Fit, content))
 	canvas:Hide()
-	kit.RegisterSubpage(canvas, "New features")
+	kit.RegisterSubpage(canvas, "New features", L["New Features"])
 end
 
 -- All changes: every commit message as written, by release, newest first.
 local function CreateCommitsPanel(kit)
 	local canvas, content = kit.CreateScrollPage()
-	local intro = Heading(kit, content, L["All changes"],
+	local intro = Heading(kit, content, L["All Changes"],
 		L["Every change made to Cinematic, newest first, as written when it was made (in English)."])
 
 	-- (built the first time it's shown: a few hundred lines)
@@ -171,7 +171,7 @@ local function CreateCommitsPanel(kit)
 
 	canvas:SetScript("OnShow", kit.PageShown(Build, content))
 	canvas:Hide()
-	kit.RegisterSubpage(canvas, "All changes")
+	kit.RegisterSubpage(canvas, "All changes", L["All Changes"])
 end
 
 -- Socials: where to find Cinematic outside the game. Addons can't open a

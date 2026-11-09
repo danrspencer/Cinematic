@@ -536,8 +536,8 @@ ns.PROFILE_MODULES = {
 	{ key = "damage-vision", name = "Damage Vision", scope = { "Damage Vision" },
 		tip = "Damage Vision on: your race with #1 (or your lead over #2) in fights in dungeons, delves and raids.",
 		apply = function(set) set("damageVision", true) end },
-	{ key = "tele-vision", name = "Tele Vision", scope = { "Teleport Vision" },
-		tip = "Tele Vision on: a portal opens around you as you cast your Hearthstone, Astral Recall or a teleport.",
+	{ key = "tele-vision", name = "Teleport Vision", scope = { "Teleport Vision" },
+		tip = "Teleport Vision on: a portal opens around you as you cast your Hearthstone, Astral Recall or a teleport.",
 		apply = function(set) set("teleportVision", true) end },
 	{ key = "emote-vision", name = "Emote Vision", scope = { "Emote Vision" },
 		tip = "Emote Vision on: a card shows who buffed you, brought you back or emoted at you, with emotes to " ..
@@ -569,6 +569,17 @@ ns.PROFILE_MODULES = {
 	{ key = "letterbox-in-fights", name = "Letterbox stays in fights", scope = { "Letterbox/Show in" },
 		tip = "Fights don't bring the letterbox down.",
 		apply = function(set) set("letterboxOffInCombat", false) end },
+	-- (The tint's strength: Subtle's a third, Blank Slate's half (should you
+	-- turn its tint on), Balanced's two thirds, Cinema's full.)
+	{ key = "tint-light", name = "Light tint", scope = { "Tint/How strong" },
+		tip = "The tint at a third of its strength (Strength 33%).",
+		apply = function(set) set("tintStrength", 0.33) end },
+	{ key = "tint-half", name = "Half tint", scope = { "Tint/How strong" },
+		tip = "The tint at half its strength (Strength 50%).",
+		apply = function(set) set("tintStrength", 0.5) end },
+	{ key = "tint-medium", name = "Medium tint", scope = { "Tint/How strong" },
+		tip = "The tint at two thirds of its strength (Strength 66%).",
+		apply = function(set) set("tintStrength", 0.66) end },
 	{ key = "weather-view-distance", name = "View distance in bad weather", scope = { "Effects/Show in" },
 		tip = "In rain, snow or a sandstorm the view distance comes all the way in (Reduce view distance in bad " ..
 			"weather at 100%).",
