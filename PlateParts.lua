@@ -122,8 +122,17 @@ local function Fade(frame, alpha)
 		frame:SetAlpha(held[frame])
 	elseif held[frame] then
 		held[frame] = nil -- (let go: back to the game's own, then the game's again)
-		frame:SetAlpha(own[frame] or 1)
+		local base = own[frame] or 1
+		frame:SetAlpha(base)
 		own[frame] = nil
+		-- Total RP 3 keeps the name's color, alpha too, each time the game sets
+		-- it, and puts it back whenever its plate data changes: kept while we had
+		-- the name faded, that brought names back see-through or gone, at random
+		-- as plates were reused. Its kept alpha is put back to the game's own.
+		local trp = rawget(frame, "TRP3_originalColor")
+		if type(trp) == "table" then
+			trp.a = base
+		end
 	end
 end
 
