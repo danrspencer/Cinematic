@@ -94,6 +94,14 @@ local FRAME_ONLY_ATLASES = { "ui-hud-minimap-calendar-button", "ui-hud-minimap-t
 local function Plain(value)
 	return not (issecretvalue and issecretvalue(value)) and value or nil
 end
+-- The theme's color a little brighter for the game's art, which goes darker grey than
+-- ours: by a quarter, or less so no part tops out (a gold capped at full red and green
+-- would turn yellow-green).
+local function Brighter(color)
+	local top = math.max(color[1], color[2], color[3], 0.01)
+	local lift = math.min(1.25, 1 / top)
+	return color[1] * lift, color[2] * lift, color[3] * lift
+end
 local function IsButtonRing(region, inDial)
 	if type(region) ~= "table" or not region.GetObjectType then return false end
 	local okType, kind = pcall(region.GetObjectType, region)
@@ -167,7 +175,7 @@ end
 local function TintButtons(color)
 	for _, copy in pairs(copies) do copy:Hide() end
 	if color then
-		local r, g, b = math.min(1, color[1] * 1.25), math.min(1, color[2] * 1.25), math.min(1, color[3] * 1.25)
+		local r, g, b = Brighter(color)
 		local placed = {}
 		EachButtonRing(function(ring, kind)
 			if kind == "frame" then
@@ -302,7 +310,7 @@ local function TintRings(color)
 		if type(ring) == "table" and ring.SetDesaturated then
 			if color then
 				ringsTinted[ring] = true
-				local r, g, b = math.min(1, color[1] * 1.25), math.min(1, color[2] * 1.25), math.min(1, color[3] * 1.25)
+				local r, g, b = Brighter(color)
 				ring:SetDesaturated(true)
 				ring:SetVertexColor(r, g, b, 1)
 				local lift = Lift(ring)
