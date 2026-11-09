@@ -1,7 +1,7 @@
 # Cinematic bug bot
 
 A `/bug` command in the Discord server. A player picks their client, fills a
-short form, and the bot opens a GitHub issue on `sapowowdev/Cinematic` and
+short form, and the bot opens a GitHub issue on `sapo-wow-dev/Cinematic` and
 replies (only to them) with the link.
 
 It runs as a Cloudflare Worker on the free plan: no server, nothing on your PC.
@@ -17,7 +17,7 @@ It is not part of the addon (Tools/ is left out of the CurseForge package).
 
 ### 2. GitHub token
 1. Go to https://github.com/settings/personal-access-tokens/new (fine-grained).
-2. Resource owner: `sapowowdev`. Repository access: **Only select repositories**, `Cinematic`.
+2. Resource owner: `sapo-wow-dev`. Repository access: **Only select repositories**, `Cinematic`.
 3. Permissions > Repository > **Issues: Read and write**. Leave everything else off.
 4. Set an expiry date (you'll need a new token when it runs out), then generate and copy it.
 

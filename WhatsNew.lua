@@ -178,13 +178,13 @@ end
 -- browser or reach the clipboard, so each link sits selected in a box, ready
 -- for Ctrl+C.
 local SOCIALS = {
-	{ name = "Discord", url = "https://sapowowdev.github.io/Cinematic/discord.html", icon = "Interface\\Icons\\INV_Letter_15",
+	{ name = "Discord", url = "https://sapo-wow-dev.github.io/Cinematic/discord.html", icon = "Interface\\Icons\\INV_Letter_15",
 		text = "Ideas, feedback and bug reports, and where new versions are announced." },
 	{ name = "YouTube", url = "https://www.youtube.com/@Sapo-ac", icon = "Interface\\Icons\\INV_Misc_Spyglass_03",
 		text = "Videos of Cinematic's cameras and features." },
 	{ name = "CurseForge", url = "https://www.curseforge.com/wow/addons/cinematic", icon = "Interface\\Icons\\INV_Box_01",
 		text = "Download and update Cinematic." },
-	{ name = "GitHub", url = "https://github.com/sapowowdev/Cinematic", icon = "Interface\\Icons\\Trade_Engineering",
+	{ name = "GitHub", url = "https://github.com/sapo-wow-dev/Cinematic", icon = "Interface\\Icons\\Trade_Engineering",
 		text = "Cinematic's code, and a form to report bugs." },
 }
 
@@ -285,15 +285,15 @@ end
 -- Help: where to read up and where to report a problem, then how to send
 -- your log with it, and the Profiler for a slow game.
 local HELP_LINKS = {
-	{ name = "Guidebook", url = "https://sapowowdev.github.io/Cinematic/", icon = "Interface\\Icons\\INV_Misc_Book_09",
+	{ name = "Guidebook", url = "https://sapo-wow-dev.github.io/Cinematic/", icon = "Interface\\Icons\\INV_Misc_Book_09",
 		text = "How every page, camera and Vision works." },
-	{ name = "Troubleshooting", url = "https://sapowowdev.github.io/Cinematic/help/troubleshooting.html",
+	{ name = "Troubleshooting", url = "https://sapo-wow-dev.github.io/Cinematic/help/troubleshooting.html",
 		icon = "Interface\\Icons\\INV_Misc_Wrench_01",
 		text = "Fixes for common problems: start here if something looks wrong." },
-	{ name = "Report a bug", url = "https://github.com/sapowowdev/Cinematic/issues/new?template=bug_report.yml",
+	{ name = "Report a bug", url = "https://github.com/sapo-wow-dev/Cinematic/issues/new?template=bug_report.yml",
 		icon = "Interface\\Icons\\Trade_Engineering",
 		text = "A form on GitHub (it takes a free account). Paste your log into it: see below." },
-	{ name = "Discord", url = "https://sapowowdev.github.io/Cinematic/discord.html", icon = "Interface\\Icons\\INV_Letter_15",
+	{ name = "Discord", url = "https://sapo-wow-dev.github.io/Cinematic/discord.html", icon = "Interface\\Icons\\INV_Letter_15",
 		text = "No GitHub account? Post in #bug-reports, with your log as a .txt file." },
 }
 

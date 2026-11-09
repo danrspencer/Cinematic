@@ -15,7 +15,7 @@ import subprocess
 import sys
 import urllib.request
 
-NOTES = "https://sapowowdev.github.io/Cinematic/updates/patch-notes.html"
+NOTES = "https://sapo-wow-dev.github.io/Cinematic/updates/patch-notes.html"
 CLIENTS = {"forever": "WoW Forever only", "retail": "Retail only"}
 GOLD = 0xE2B53F
 

@@ -51,7 +51,7 @@ def main():
         headers={
             "Authorization": f"Bot {token}",
             "Content-Type": "application/json",
-            "User-Agent": "cinematic-bug-bot (https://github.com/sapowowdev/Cinematic, 1)",
+            "User-Agent": "cinematic-bug-bot (https://github.com/sapo-wow-dev/Cinematic, 1)",
         },
     )
     try:

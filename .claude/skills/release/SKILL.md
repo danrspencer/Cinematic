@@ -149,10 +149,9 @@ between them: nothing is committed, pushed or tagged until the user says go.
     ```
     The "Package and release" workflow builds it and uploads to CurseForge
     and GitHub releases (`gh` isn't installed). Give the user the link
-    https://github.com/sapowowdev/Cinematic/actions to watch it.
+    https://github.com/sapo-wow-dev/Cinematic/actions to watch it.
 
-    **While GitHub is down** (the sapowowdev account suspended, see the
-    github-suspension memory): don't push anything. Tag locally
+    **If the workflow can't run** (GitHub down again): tag locally
     (`git tag -a vX.Y.Z -m "vX.Y.Z"`), then
     `python -I Tools/build-zip.py vX.Y.Z` builds
     `Release/Cinematic-vX.Y.Z.zip` from the tag, like the packager. The user
@@ -161,8 +160,7 @@ between them: nothing is committed, pushed or tagged until the user says go.
     the script also writes `Release/changelog-vX.Y.Z.md`; tell the user to
     paste it into the Changelog box with type Markdown (left empty, the file
     has no changelog on CurseForge or in its app). The Discord post
-    doesn't go out this way. Once the account is back, push main and the
-    tags made meanwhile (the workflow will run for each tag: say so first).
+    doesn't go out this way.
 
 15. **Report**: the version, the commits (`git log --oneline <prev tag>..`),
     and what's left uncommitted, if anything. If a commit answers a GitHub

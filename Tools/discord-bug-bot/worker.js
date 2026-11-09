@@ -5,9 +5,9 @@
 // Secrets (Worker > Settings > Variables and Secrets):
 //   DISCORD_PUBLIC_KEY  Discord app's public key (General Information)
 //   DISCORD_APP_ID      Discord app's application ID
-//   GITHUB_TOKEN        fine-grained token: sapowowdev/Cinematic, Issues read/write only
+//   GITHUB_TOKEN        fine-grained token: sapo-wow-dev/Cinematic, Issues read/write only
 // Optional plain variables:
-//   GITHUB_REPO         default "sapowowdev/Cinematic"
+//   GITHUB_REPO         default "sapo-wow-dev/Cinematic"
 //   SHOW_REPORTER       "1" puts the reporter's Discord name in the issue (public!)
 
 const COOLDOWN_SECONDS = 300 // one report per player per 5 minutes
@@ -78,7 +78,7 @@ function bugForm(client) {
 }
 
 async function fileIssue(interaction, user, env) {
-  const repo = env.GITHUB_REPO || "sapowowdev/Cinematic"
+  const repo = env.GITHUB_REPO || "sapo-wow-dev/Cinematic"
   const client = interaction.data.custom_id.slice(4)
   const v = {}
   for (const row of interaction.data.components) {
