@@ -1163,9 +1163,16 @@ end
 -- The face: their portrait when in sight, else their class's icon, else the
 -- moment's own icon.
 local function Face(moment)
+	-- (Only while the unit is still them and in sight: the game draws no face
+	-- for one out of sight, and a token like nameplate3 can be someone else by
+	-- now. Either left the card a bare ring, colored by their class.)
 	local unit = moment.unit and Plain(UnitExists(moment.unit)) and moment.unit
-	if unit then
-		SetPortraitTexture(card.portrait, unit)
+	if unit and not (ns.Flag(UnitIsVisible(unit))
+		and (not moment.guid or Plain(UnitGUID(unit)) == moment.guid)) then
+		unit = nil
+	end
+	card.portrait:SetTexture(nil) -- (so a face that fails to draw isn't mistaken for the last card's picture)
+	if unit and pcall(SetPortraitTexture, card.portrait, unit) and card.portrait:GetTexture() then
 		card.portrait:SetTexCoord(0, 1, 0, 1)
 	elseif moment.class and CLASS_ICON_TCOORDS and CLASS_ICON_TCOORDS[moment.class] then
 		card.portrait:SetTexture("Interface\\GLUES\\CHARACTERCREATE\\UI-CHARACTERCREATE-CLASSES")

@@ -388,7 +388,6 @@ Cinema|plateStyleFadeTime=0.6
 Cinema|prdOn=true
 Cinema|prdWhenNotFull=false
 Cinema|questCalmWait=false
-Cinema|questTalk=true
 Cinema|quietShow.effect:letterbox=false
 Cinema|quietShow.music=true
 Cinema|quietShow.tooltip:All=false

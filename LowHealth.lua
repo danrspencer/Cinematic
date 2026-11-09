@@ -573,6 +573,7 @@ local autoNoTree = false
 -- Picked before your talents had loaded: when to look again. (Nothing says
 -- when they do: tested on Forever, a pick at login stayed.)
 local AUTO_AGAIN = 5
+local TALENT_LEVEL = 10 -- (the first talent point's level)
 local autoAgainAt
 -- (byClass, bySpec: our themes' lists, or Game art's.)
 local function AutoTheme(byClass, bySpec, fallback)
@@ -602,7 +603,11 @@ local function AutoTheme(byClass, bySpec, fallback)
 		end
 	end
 	autoNoTree = not tree
-	autoAgainAt = (points == false or autoNoTree) and GetTime() + AUTO_AGAIN or nil
+	-- (Under level 10 there are no talents yet: no tree is the real answer,
+	-- not one that hasn't loaded. A point spent anyway, or a level gained,
+	-- picks again by the talent events.)
+	local noTalentsYet = (UnitLevel("player") or 0) < TALENT_LEVEL
+	autoAgainAt = (points == false or autoNoTree) and not noTalentsYet and GetTime() + AUTO_AGAIN or nil
 	return tree and list[tree] or list.none or list[1]
 end
 local function AutoExpired()

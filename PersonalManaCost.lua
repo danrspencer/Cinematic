@@ -14,6 +14,13 @@
 -- Some casts take their mana as they start (seen on Forever: an arcane
 -- mage's casts): once your mana has dropped by the cost since the cast
 -- began, it's paid and the stretch goes (else it took the cost twice).
+-- The drop can reach us a little before the cast's start (a Discipline
+-- priest's Smite, 2026-11-09), and your mana can't always be read: a spell
+-- seen paying at its start is remembered (by character and by name, so
+-- every rank of it: chardb.manaAtStart) and its casts show no stretch from
+-- then on. (A cost a buff takes away: the game's cost for it reads 0 if the
+-- game counts it, and no stretch; a spell paying at its start shows none
+-- either way.)
 
 local _, ns = ...
 
@@ -33,6 +40,10 @@ local cost -- ...its mana cost
 local paid -- ...true once its mana was taken (some take it as they start)
 local startMana -- your mana as the cast began (nil: secret)
 local lastMana, beforeMana, changedAt -- your mana at its last change, before it, and when
+local castSpell -- the cast's spell, by name: all its ranks (nil: unreadable)
+local stoppedAt -- when a cast last ended (its mana, if taken at its end, comes then)
+local lastStart -- for /cine debug: how the last cast's start was read
+local EARLY = 0.5 -- seconds: a drop this soon before a cast's start can be its cost
 
 local function Readable(value)
 	return value ~= nil and not (issecretvalue and issecretvalue(value))
@@ -170,10 +181,23 @@ local function ReadMana()
 	if Readable(mana) then return mana end
 end
 
+-- The spells seen paying at their start (name -> true).
+local function AtStart()
+	local char = ns.chardb
+	if not char then return {} end
+	char.manaAtStart = char.manaAtStart or {}
+	return char.manaAtStart
+end
+
+local function SetPaid()
+	paid = true
+	if castSpell then AtStart()[castSpell] = true end
+end
+
 local function CheckPaid()
 	if paid or not casting or not startMana or not Readable(cost) then return end
 	local mana = ReadMana()
-	if mana and startMana - mana >= cost * 0.5 then paid = true end
+	if mana and startMana - mana >= cost * 0.5 then SetPaid() end
 end
 
 local function Start(castGUID, spellID)
@@ -181,10 +205,19 @@ local function Start(castGUID, spellID)
 	casting = type(cost) == "number" and (castGUID or true) or nil
 	if not casting then cost = nil end
 	paid = nil
-	-- (Taken this very moment, before the cast's start reached us: the
-	-- mana from before that.)
+	local name = Readable(spellID) and (C_Spell and C_Spell.GetSpellName and C_Spell.GetSpellName(spellID)
+		or _G.GetSpellInfo and (_G.GetSpellInfo(spellID))) or nil
+	castSpell = Readable(name) and name ~= "" and name or nil
+	-- (Taken just before the cast's start reached us: the mana from before
+	-- that. Not a drop with a cast's end: that cast's, if it pays at its end.)
+	local now = GetTime()
 	startMana = ReadMana()
-	if startMana and changedAt == GetTime() and beforeMana and lastMana == startMana then startMana = beforeMana end
+	local early = startMana and changedAt and now - changedAt <= EARLY and beforeMana and lastMana == startMana
+		and not (stoppedAt and math.abs(changedAt - stoppedAt) <= 0.2)
+	if early then startMana = beforeMana end
+	lastStart = { cost = Readable(cost) and cost or nil, readable = startMana ~= nil,
+		ago = changedAt and now - changedAt or nil, early = early and true or false }
+	if casting and castSpell and AtStart()[castSpell] then paid = true end
 	CheckPaid()
 	Update()
 end
@@ -192,9 +225,10 @@ end
 -- (Only for the cast that's on: some spells go off on their own mid-cast.
 -- A cast whose guid can't be read: taken as it.)
 local function Stop(castGUID)
+	stoppedAt = GetTime()
 	if not casting then return end
 	if Readable(castGUID) and Readable(casting) and castGUID ~= casting then return end
-	casting, cost, paid, startMana = nil, nil, nil, nil
+	casting, cost, paid, startMana, castSpell = nil, nil, nil, nil, nil
 	Update()
 end
 
@@ -210,10 +244,17 @@ end
 function ns.DescribeManaCost()
 	local db = ns.GetDB() or {}
 	local bars = ManaBars()
-	return ("mana cost: resource bar %s (%s), player frame %s (%s), casting %s, cost %s"):format(
+	local learned = 0
+	for _ in pairs(AtStart()) do learned = learned + 1 end
+	local last = lastStart and ("; last cast: cost %s, mana %s, mana changed %s before, %s"):format(
+		tostring(lastStart.cost or "unread"), lastStart.readable and "read" or "secret",
+		lastStart.ago and ("%.2fs"):format(lastStart.ago) or "never",
+		lastStart.early and "taken just before" or "not taken before") or ""
+	return ("mana cost: resource bar %s (%s), player frame %s (%s), casting %s, cost %s, %d spells pay at start%s"):format(
 		db.manaCostDisplay and "on" or "off", ns.DescribeManaBar(bars.display),
 		db.manaCostPortrait and "on" or "off", ns.DescribeManaBar(bars.portrait),
-		casting and (paid and "a spell (paid at its start)" or "a spell") or "nothing", Readable(cost) and tostring(cost) or cost and "secret" or "none")
+		casting and (paid and "a spell (paid at its start)" or "a spell") or "nothing", Readable(cost) and tostring(cost) or cost and "secret" or "none",
+		learned, last)
 end
 
 local watcher = CreateFrame("Frame")

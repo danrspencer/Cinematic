@@ -300,6 +300,9 @@ DEFAULTS.cardAlign_streak = "center"
 -- (Entering and Leaving combat with no letterbox up: the middle of the screen.)
 DEFAULTS.cardBarFallback_combatIn = "screen"
 DEFAULTS.cardBarFallback_combatOut = "screen"
+-- (...and with no edge pulse: their styles' is left for the other cards on them.)
+DEFAULTS.cardPulse_combatIn = 0
+DEFAULTS.cardPulse_combatOut = 0
 
 -- All the cards bigger or smaller (their words' size, not a bar's): for a
 -- big or wide screen.

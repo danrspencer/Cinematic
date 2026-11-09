@@ -309,7 +309,13 @@ function ns.CreatePersonalResourcesPanel(kit)
 	redrawer.Refresh = Redraw
 	kit.AddControl(redrawer)
 
-	canvas:SetScript("OnShow", kit.PageShown(kit.Refresh, content))
+	-- Addon Frame Links (last): which addon's bars they are (FrameLinks.lua).
+	local links = ns.BuildLinkSection(content, stack.last, "prd")
+
+	canvas:SetScript("OnShow", kit.PageShown(function()
+		kit.Refresh()
+		links.Show()
+	end, content))
 	canvas:Hide()
 	kit.RegisterSubpage(canvas, "Personal Resources", L["Personal Resource Display"])
 end

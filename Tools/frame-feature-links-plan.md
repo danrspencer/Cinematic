@@ -545,3 +545,78 @@ Still open:
    they are, or later make them settings of the Tabs / Buttons part rows?
 4. Build order after Chat: Minimap, Quest Tracker, then Buffs/Debuffs,
    Cooldown Manager, Unit Frames, Resource Display, Swing Timer (3.6)?
+
+---
+
+## 8. Built so far (2026-11-09, uncommitted, untested in game)
+
+Milestone 1, chat only, EllesmereUI:
+- `FrameLinks.lua` (new, after `AddonSupport.lua` in both .toc files): groups
+  and parts (`ns.LINK_GROUPS`: chat → Window, Tabs, Buttons), support file
+  claims (`ns.ClaimLinkPart(addon, part, frame, info)`), the pick rule
+  (`ns.LinkResolve`: part pick, then group pick, then the one claimant;
+  two or more = clash, the game's own), `db.frameLinks.parts/groups`, and
+  `ns.ApplyFrameLinks()` filling `ns.chatPeekPanels`, `ns.chatLinkRole`,
+  `ns.chatLinkBackdrop`, `ns.chatPanelOwner`. Plus the two UI builders.
+- `Frames.lua`: a linked addon's tabs/buttons come up with a docked peek as
+  the Chat page ticks Tabs/Buttons; a linked panel's backdrop fades as
+  Background says (by the window it draws).
+- `Support/EllesmereUI.lua`: claims its chat panels (Window, with their
+  backdrop: own textures + Forever's `fvHost`), sidebar/scroll button
+  (Buttons), and the frame anchored to the dock (Tabs). No more direct
+  `ns.chatPeekPanels` write.
+- Chat page: last section "Addon Frame Links" (group row: Automatic /
+  Blizzard / addon; part rows: Same as Chat window / Blizzard / addon, with
+  status). Closed at first unless something's linked or clashing.
+- Addon Frames page: new "Support files" tab (last, after Not running):
+  clashes with a pick each, then each addon's groups with "x of y parts in
+  use" and a button to its page.
+- Not yet: other pages/groups, the frame search for parts, Game Frames grey
+  names, a tab badge, finer Questie claims, `/cine why` lines.
+
+Milestone 2 (2026-11-09, uncommitted, untested): Quest tracker.
+- `ns.LINK_GROUPS` "quests" with one part, Tracker (`questtracker`). Option B
+  from the talk: claimed trackers fade with the Quest tracker row as before,
+  linked or not; the link says which addon's it is (nothing extra applied yet).
+- EllesmereUI: its WoW Forever Custom Quest Tracker (`EUI_CustomQuestTracker`)
+  now fades with the Quest tracker row (before, only `EllesmereUIQTBackground`
+  of its skin mode did) and is claimed as the Tracker. Its item buttons sit in
+  an unnamed layer that copies the tracker's alpha (its own SetAlpha hook), so
+  they fade with it.
+- `ns.BuildLinkSection(content, anchor, group)`: the reusable last-section
+  builder (band + rows); the Quest Tracker page uses it. Options.lua hands
+  SectionBand, SectionState, BAND_HEIGHT, ContentDepth, FitContentHeight to
+  `ns.GRID_KIT` for it.
+- Not yet: other quest addons' claims (Questie, Horizon Suite, FlareUI,
+  DaylightUI), a Quest item buttons part.
+
+Milestone 3 (2026-11-09, uncommitted, untested): every HUD page, EllesmereUI.
+- New groups: Unit frames (Player, Pet, Target, Target of target, Focus, Focus
+  target), Buffs and debuffs (Buffs, Debuffs), Minimap (Zone name, Clock,
+  Coordinates), Cooldown Manager (Essential, Utility, Tracked buffs),
+  Personal resource display (Health and power bars), Swing timer (Swing bars).
+- EllesmereUI claims them by name (`LINKS` in its support file, looked up each
+  scan): its unit frames and aura bars, `_EBS_LocationBg/_ClockBg/_CoordFrame`,
+  `ECME_CDMBar_cooldowns/utility/buffs`, `EllesmereUIResourceBarsFrame`,
+  `ERB_SwingTimerFrame`. Fading unchanged (they fade as before); the link is
+  which addon's each part is.
+- Addon Frame Links section added at the bottom of Unit Frames, Buffs/Debuffs,
+  Minimap, Cooldown Manager, Personal Resources and Swing Timer.
+- Not claimed: its minimap map (it moves the game's own), addon buttons, its
+  tracked buff bars (`ECME_TBBWrapN`), action bars, raid/party frames (no HUD
+  page section for those yet).
+
+Milestone 4 (2026-11-09, uncommitted, untested): Find a frame + links.
+- Each part's dropdown ends with "Find a frame...": a search under the rows
+  (`ns.FindAddableFrames`, hover marks with `ns.MarkFrame`), for addons with no
+  support file. The pick is saved as `db.frameLinks.parts[part] = "frame:<name>"`,
+  wins over support files (a clash it causes is the player's), and the frame
+  fades with the part's Game Frames row (`PART_ROW` -> `ns.FadeWithRow`, once a
+  session; a pick taken back keeps fading till /reload). A chat Window picked
+  this way comes up with any window's message (which window it draws isn't
+  known). Named frames only, and only ones not faded already (the search's own
+  rule).
+- Rows always show now (before: hidden with no supported addon), so the search
+  is there for unsupported addons.
+- Support files buttons: one width (the widest label), and they open the page
+  scrolled to its Addon Frame Links section, opened (`ns.OpenLinkSection`).

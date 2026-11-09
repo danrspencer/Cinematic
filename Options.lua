@@ -3458,8 +3458,13 @@ local function CreateBuffsPanel()
 	end }
 	controls[#controls + 1] = ignoreList
 	RecordKey(content, "buffPeekIgnore") -- (for Reset page)
+	-- Addon Frame Links (last): which addon's frames the buffs are (FrameLinks.lua).
+	local links = ns.BuildLinkSection(content, addBox, "buffs")
 
-	canvas:SetScript("OnShow", PageShown(Refresh, content))
+	canvas:SetScript("OnShow", PageShown(function()
+		Refresh()
+		links.Show()
+	end, content))
 	canvas:Hide()
 	RegisterSubpage(canvas, "Buffs/debuffs", L["Buffs/Debuffs"])
 end
@@ -5584,7 +5589,8 @@ end
 -- The page helpers the dropdown grids share (GridRows.lua's ns.GridRow).
 ns.GRID_KIT = { controls = controls, Label = Label, Tooltip = Tooltip,
 	FrameHeading = FrameHeading, RecordKey = RecordKey, RecordRow = RecordRow,
-	Refresh = Refresh, headingHeight = FRAME_HEADING_HEIGHT, ShowBox = ShowBox, RowShown = RowShown }
+	Refresh = Refresh, headingHeight = FRAME_HEADING_HEIGHT, ShowBox = ShowBox, RowShown = RowShown,
+	Dropdown = Dropdown } -- (Dropdown: FrameLinks.lua's Addon Frame Links)
 
 -- Sub-page: the cameras (CameraRows.lua). A row per trigger (an emote, a
 -- campfire, going AFK, a flight, dying...) and the camera it starts, as the
@@ -6709,6 +6715,9 @@ local function SectionBand(frame, title, onClick, check)
 	end
 	return nameRow
 end
+-- (For the pages' Addon Frame Links sections: FrameLinks.lua.)
+ns.GRID_KIT.SectionBand, ns.GRID_KIT.SectionState, ns.GRID_KIT.BAND_HEIGHT = SectionBand, SectionState, BAND_HEIGHT
+ns.GRID_KIT.ContentDepth, ns.GRID_KIT.FitContentHeight = ContentDepth, FitContentHeight
 
 -- Sub-page for combat: staying cinematic in fights, and what to show then.
 local function CreateCombatPanel()
@@ -7067,6 +7076,7 @@ local function CreatePortraitsPanel()
 	-- ticked, the rows grey and the section closes, and the frame goes by the
 	-- target's; unticked, it opens with the target's rows to start from.
 	local OpenSections -- (opens You, your pet and Target, and the frames set apart from the target)
+	local linksAnchor = subtitle -- (what Addon Frame Links goes under: the parts' panel, made below)
 	if hasParts then
 		local note = PageSwitch(content, "handleUnitFrames", L["Enable Page"],
 			L["On: the unit frames show the parts the grids below say. Off: CineMode leaves them alone, " ..
@@ -7271,12 +7281,16 @@ local function CreatePortraitsPanel()
 		-- (On panelTop, not the panel: the panel's bottom hangs on the rows under them.)
 		base:SetPoint("TOPLEFT", panelTop, "TOPLEFT")
 		OpenSections()
+		linksAnchor = panel
 	end
+	-- Addon Frame Links (last): which addon's frame each unit frame is (FrameLinks.lua).
+	local links = ns.BuildLinkSection(content, linksAnchor, "units")
 
 	local pageShown = PageShown(Refresh, content)
 	canvas:SetScript("OnShow", function()
 		if OpenSections then OpenSections() end
 		pageShown()
+		links.Show()
 	end)
 	canvas:Hide()
 	RegisterSubpage(canvas, "Unit Frames", L["Unit Frame Parts"])
@@ -8486,9 +8500,20 @@ local function CreatePlatesPanel()
 		-- (The title lines drawn again: a plate's layout skips itself when its
 		-- shares haven't changed, so RefreshAllPlates alone leaves the old text.)
 		if ns.RefreshPlateGuilds then ns.RefreshPlateGuilds() end
+		Refresh()
 	end)
 	serviceBrackets:SetPoint("TOPLEFT", serviceBracketsLabel, "TOPLEFT", GRID_LABEL + 26, 6)
 	GreyUnless(serviceBrackets, function(db) return not db.nameServiceIcons end)
+	-- Beside it: brackets kept while the name shows over the title (greyed
+	-- while Brackets is ticked: they're always there then).
+	local serviceBracketsName = Check(content, "nameServiceBracketsWithName", L["When the name shows too"],
+		L["Ticked, a title under its NPC's name keeps its < > (Uualla Suncrest, <General Goods>), " ..
+			"and only a title shown alone drops them."], function(value)
+		ns.GetDB().nameServiceBracketsWithName = value
+		if ns.RefreshPlateGuilds then ns.RefreshPlateGuilds() end
+	end)
+	serviceBracketsName:SetPoint("LEFT", serviceBrackets, "LEFT", 220, 0)
+	GreyUnless(serviceBracketsName, function(db) return not db.nameServiceIcons and not db.nameServiceBrackets end)
 	-- Icons: each kind's icon in place of its title (PlateGuild's SERVICE_ICONS).
 	local serviceIconsLabel = Label(content, "GameFontHighlight", L["Icons"])
 	serviceIconsLabel:SetPoint("TOPLEFT", serviceBracketsLabel, "BOTTOMLEFT", 0, -22)
@@ -8530,7 +8555,7 @@ local function CreatePlatesPanel()
 					"them says (with Quest NPCs (Use Questie DB) ticked, as Questie's \"!\" and \"?\" do). Their name shows, even " ..
 					"with Titles only. Checked every second, so a quest you've just taken or handed in can take a moment."]
 			else
-				tip = L["NPCs whose title has one of these words in it: %s."]:format((kind.words:gsub(",", ", ")))
+				tip = L["NPCs whose title has one of these words in it: %s."]:format(((kind.words .. (kind.moreWords and "," .. kind.moreWords or "")):gsub(",", ", ")))
 			end
 			local check = Check(content, key, kind.label, tip, function(value)
 				ns.GetDB()[key] = value
@@ -11014,9 +11039,31 @@ do
 		RecordKey(chatPanel, "chatPeekTypes")
 		RecordKey(chatPanel, "chatPeekChannelList")
 
+		-- Addon Frame Links (last; made after the Always boxes' keys are
+		-- recorded, so those stay Other's): which frame each part of the chat is, the
+		-- game's or an addon's that draws its own (FrameLinks.lua). Closed while
+		-- they're all the game's, till opened with a click.
+		local linksBody = Section(L["Addon Frame Links"], "Addon Frame Links")
+		local linksSection = sections[#sections]
+		linksSection.open = false
+		local linkBand = ns.BuildLinkBand(linksBody, "chat", Layout)
+		ns.RegisterLinkSection("chat", linksSection.frame, linksBody.openSection)
+		ToPage(linksBody)
+		ns.WatchFrameLinks(function()
+			if chatCanvas:IsVisible() then
+				linkBand.Refresh()
+				Layout()
+			end
+		end)
+
 		chatCanvas:SetScript("OnShow", PageShown(function()
 			if ns.GetDB() then RefreshChannels() end
 			Refresh() -- (after: new channels' rows too)
+			-- (Addon Frame Links: open at first only while it has something.)
+			if ns.db and ns.db.sectionsOpen and ns.db.sectionsOpen[linksSection.id] == nil then
+				linksSection.open = ns.LinkBandOpen("chat")
+			end
+			linkBand.Refresh()
 			Layout()
 		end, chatPanel))
 		chatCanvas:Hide()
@@ -11587,6 +11634,7 @@ local function CreateMinimapPanel()
 	}
 	-- (In a row.)
 	local PLACE_COLUMN = 120
+	local placesRow -- (the row's first box: Addon Frame Links goes under it)
 	for i, place in ipairs(PLACES) do
 		-- (PvP here is battlegrounds and arenas only, so it's named for them.)
 		local label = place[1] == "PvP" and L["BGs"] or place[2]
@@ -11594,8 +11642,14 @@ local function CreateMinimapPanel()
 			L["Tracking doesn't keep the minimap up here. Hovering it still shows it."])
 		check:SetPoint("TOPLEFT", exceptIn, "BOTTOMLEFT", 12 + (i - 1) * PLACE_COLUMN, -4)
 		GreyUnless(check, function(db) return db.minimapKeepGathering end)
+		if i == 1 then placesRow = check end
 	end
-	canvas:SetScript("OnShow", PageShown(Refresh, content))
+	-- Addon Frame Links (last): which addon's frames the minimap's parts are (FrameLinks.lua).
+	local links = ns.BuildLinkSection(content, placesRow, "minimap")
+	canvas:SetScript("OnShow", PageShown(function()
+		Refresh()
+		links.Show()
+	end, content))
 	canvas:Hide()
 	RegisterSubpage(canvas, "Minimap")
 end
@@ -11710,7 +11764,13 @@ local function CreateQuestTrackerPanel()
 	GreyUnless(durabilityCam, function(db) return db.durabilityShow end)
 	durabilityCam.pageSwitch = false
 
-	canvas:SetScript("OnShow", PageShown(Refresh, content))
+	-- Addon Frame Links (last): which addon's tracker it is (FrameLinks.lua).
+	local links = ns.BuildLinkSection(content, durabilityCam, "quests")
+
+	canvas:SetScript("OnShow", PageShown(function()
+		Refresh()
+		links.Show()
+	end, content))
 	canvas:Hide()
 	RegisterSubpage(canvas, L["Quest tracker"], L["Quest Tracker"])
 end
@@ -11759,8 +11819,13 @@ local function CreateSwingPanel()
 		"each move down one. Set for each class on its own, so one profile " ..
 		"suits all your characters."])
 	rangedTop:SetPoint("TOPLEFT", offHand, "BOTTOMLEFT", 0, -2)
+	-- Addon Frame Links (last): which addon's swing timer it is (FrameLinks.lua).
+	local links = ns.BuildLinkSection(content, rangedTop, "swing")
 
-	canvas:SetScript("OnShow", PageShown(Refresh, content))
+	canvas:SetScript("OnShow", PageShown(function()
+		Refresh()
+		links.Show()
+	end, content))
 	canvas:Hide()
 	RegisterSubpage(canvas, L["Swing timer"], L["Swing Timer"])
 end
@@ -12444,10 +12509,13 @@ local function CreateCooldownPanel()
 	panelTop:SetPoint("TOPLEFT", flashTime, "BOTTOMLEFT", 0, -16 - height)
 	noSpells:SetPoint("TOPLEFT", flashTime, "BOTTOMLEFT", 0, -20)
 
+	-- Addon Frame Links (last, under the spells' panel): which addon's bars they are (FrameLinks.lua).
+	local links = ns.BuildLinkSection(content, panel, "cooldowns")
 	local shown = PageShown(Refresh, content)
 	canvas:SetScript("OnShow", function()
 		ListSpells()
 		shown()
+		links.Show()
 	end)
 	canvas:Hide()
 	RegisterSubpage(canvas, L["Cooldown Manager"])
@@ -12704,7 +12772,7 @@ local function CreateVisionPanel()
 				"ticked or not, so an alt still sees the story's."]), "check")
 		end
 		questStack:Header(content, L["Talking to NPCs"])
-		-- Quest talk itself (questTalk; off to start with, on in the Cinema
+		-- Quest talk itself (questTalk; off to start with in every
 		-- profile). How it looks, the "Show the game's window" link and the
 		-- number keys: the Quest talk tab (QuestTalkStyle.lua).
 		local talk = questStack:Add(Check(content, "questTalk", L["Custom dialogue frames"],
@@ -13787,7 +13855,8 @@ local function CreateExtrasPanel()
 	box:SetSize(PANEL_W - 16, 1)
 	content.box = box
 	local Layout, RefreshFound
-	local tab = 1 -- (the tab picked: 1 Loaded, 2 Find frames, 3 Not running)
+	local tab = 1 -- (the tab picked: 1 Loaded, 2 Find frames, 3 Not running, 4 Support files)
+	local supportPanel -- (the Support files tab's: FrameLinks.lua)
 	-- (The Find frames tab's parts, made further down.)
 	local smart, foundHead, noneFound
 	local foundRows, foundCount = {}, 0
@@ -13807,11 +13876,21 @@ local function CreateExtrasPanel()
 		{ L["Loaded"], L["The addons loaded now: their frames, and the ones you added."] },
 		{ L["Find frames"], L["Find other addons' frames to fade: search, hover, or Smart Find."] },
 		{ L["Not running"], L["Addons installed but not loaded, and the ones supported but not installed."] },
+		{ L["Support files"], L["Addons that draw their own frames in place of the game's (chat panels, tabs...): " ..
+			"what each replaces, and which addon's to use where two of them do."] },
 	}, PickTab)
 	tabsBase:SetPoint("TOPLEFT", holder, "TOPLEFT", 0, -tabsHeight)
 	tabsPanel:SetPoint("TOPLEFT", tabsBase, "TOPLEFT")
 	tabsPanel:SetSize(PANEL_W, 1)
 	box:SetPoint("TOPLEFT", tabsPanel, "TOPLEFT", 8, -10)
+	supportPanel = ns.BuildSupportFilesPanel(box, PANEL_W - 16)
+	supportPanel.onResize = function()
+		Layout()
+		FitContentHeight(content)
+	end
+	ns.WatchFrameLinks(function()
+		if tab == 4 and box:IsVisible() then supportPanel.onResize() end
+	end)
 
 	local LABEL_WIDTH, ROW_HEIGHT, INDENT = THIRD_PARTY_LABEL_WIDTH, 24, 18
 	local COLUMNS = THIRD_PARTY_COLUMNS
@@ -14015,7 +14094,7 @@ local function CreateExtrasPanel()
 			row.grid:Hide()
 		end
 		for _, row in ipairs(extraRows) do row:Hide() end
-		for _, region in ipairs({ tools, headings, defaultRow, smart, foundHead, noneFound, missingNote }) do
+		for _, region in ipairs({ tools, headings, defaultRow, smart, foundHead, noneFound, missingNote, supportPanel }) do
 			region:Hide()
 		end
 		for _, row in ipairs(foundRows) do row:Hide() end
@@ -14037,6 +14116,13 @@ local function CreateExtrasPanel()
 			else
 				Place(noneFound, 0, noneFound:GetStringHeight() + 6)
 			end
+			Fit()
+			return
+		end
+
+		-- Support files: the clashes to pick, and what each addon replaces.
+		if tab == 4 then
+			Place(supportPanel, 0, supportPanel.Refresh())
 			Fit()
 			return
 		end

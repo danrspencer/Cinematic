@@ -5815,13 +5815,18 @@ do
 			focus.on = false
 		end
 		local want = (focus.on or timers) and 0 or 1
-		if want == 1 and focus.othersAlpha == 1 and not questGaps.up then
+		if want == 1 and focus.othersAlpha == 1 and not questGaps.up and not ns.questFocusOthersUp then
 			return
 		end
 		-- (Hidden with the tracker: no fade to see.)
 		focus.othersAlpha = entry.alpha == 0 and want
 			or ns.Approach(focus.othersAlpha, want, elapsed, want > 0 and ns.FadeInTime() or ns.FadeOutTime())
-		if not ApplyFocus(entry.frame, focus.othersAlpha, timers, want == 0) and focus.on and now - focus.since > FOCUS_FIND_TIME then
+		local found = ApplyFocus(entry.frame, focus.othersAlpha, timers, want == 0)
+		-- (Other addons' trackers in its place: AddonSupport.lua.)
+		for _, apply in ipairs(ns.QUEST_FOCUS_TRACKERS) do
+			if apply(focus.othersAlpha, focus.quests, timers, want == 0) then found = true end
+		end
+		if not found and focus.on and now - focus.since > FOCUS_FIND_TIME then
 			focus.on = false
 		end
 	end
@@ -9402,7 +9407,8 @@ do
 		"UNIT_SPELLCAST_INTERRUPTED", "UNIT_SPELLCAST_SUCCEEDED" }) do
 		pcall(wake.RegisterUnitEvent, wake, event, "player", "pet")
 	end
-	wake:SetScript("OnEvent", function() ns.framesWake = true end)
+	-- (The event's name: /cine debug framepass says what woke it.)
+	wake:SetScript("OnEvent", function(_, event) ns.framesWake = event end)
 end
 
 function ns.UpdateFrames(cinematic, elapsed)
@@ -9539,8 +9545,10 @@ function ns.UpdateFrames(cinematic, elapsed)
 		local focus = MouseFocus()
 		-- (Turning the camera with the mouse, mouselook: the cursor's hidden
 		-- and nothing new is under it, so last time's answers stand.)
+		-- (0.6 s: longer than CineMode's idle pass, 0.25 s, Core.lua, or the
+		-- answers were always out of date by the next pass and asked again.)
 		local still = (x == mouse.x and y == mouse.y and focus == mouse.focus or (IsMouselooking and IsMouselooking()))
-			and now - mouse.at < 0.25
+			and now - mouse.at < 0.6
 		if not still then
 			mouse.x, mouse.y, mouse.focus, mouse.at = x, y, focus, now
 		end
@@ -9730,6 +9738,10 @@ function ns.UpdateFrames(cinematic, elapsed)
 	-- (Every frame at its alpha, none fading: ns.framesSettled, so the tick
 	-- can run this pass less often, Core.lua.)
 	local settled = not ns.layoutFadeUntil and not ns.previewRows and not partsBusy
+	if clock and partsBusy then
+		local unsettled = ns.framePassTimes.unsettled
+		unsettled["unit frame parts held after the mouse"] = (unsettled["unit frame parts held after the mouse"] or 0) + 1
+	end
 	local tick3, targetTime = clock and clock(), 0
 	-- (The personal resource display switched off in the game: its rows
 	-- have nothing to fade, so they're left out, as they are, till it's back.)
@@ -9759,6 +9771,9 @@ function ns.UpdateFrames(cinematic, elapsed)
 			-- Chat page ticks them.)
 			or (dockPeek and (entry.name == "GeneralDockManager" and ns.db.chatPeekTabs
 				or entry.group == "chat" and NEVER_NESTED[entry.name] and ns.db.chatPeekButtons))
+			-- (An addon's tabs or buttons linked in their place: FrameLinks.lua.)
+			or (dockPeek and (ns.chatLinkRole[entry.frame] == "tabs" and ns.db.chatPeekTabs
+				or ns.chatLinkRole[entry.frame] == "buttons" and ns.db.chatPeekButtons))
 		entry.row = entry.row or ns.HoverRowFor(entry)
 		-- (Its own row's group is its row too: see ns.RAID_STYLE_PARTY.)
 		local ownRow = ownPartyRows and entry.rspGroup
@@ -9886,6 +9901,15 @@ function ns.UpdateFrames(cinematic, elapsed)
 		if entry.alpha ~= target or (entry.backgroundAlpha and entry.backgroundAlpha > 0
 			and entry.backgroundAlpha < 1) then
 			settled = false
+			-- (/cine debug framepass: which frames keep the pass from settling.)
+			if clock then
+				local name = ("%s (%s)"):format(tostring(entry.name or entry.group), tostring(entry.group))
+				local unsettled = ns.framePassTimes.unsettled
+				unsettled[name] = (unsettled[name] or 0) + 1
+				-- (The last one seen, for the report.)
+				ns.framePassTimes.unsettledLast[name] = ("alpha %.3f to %.3f%s"):format(entry.alpha, target,
+					entry.alpha == target and (", background %.3f"):format(entry.backgroundAlpha) or "")
+			end
 		end
 		if clock then targetTime = targetTime + clock() - entryStart end
 		if typingShown and entry.alpha < 1 then
@@ -9930,16 +9954,21 @@ function ns.UpdateFrames(cinematic, elapsed)
 			entry.isChatWindow = entry.group == "chat" and type(entry.name) == "string"
 				and entry.name:match("^ChatFrame%d+$") ~= nil
 		end
-		if entry.isChatWindow then
+		-- (An addon's chat panel linked as a window: its backdrop's regions
+		-- the same way, by the window it draws: FrameLinks.lua.)
+		if entry.isChatWindow or ns.chatLinkBackdrop[entry.frame] then
 			if target > 0 then
-				local peekOnly = cinematic and (ns.chatPeekUntil[entry.frame] or 0) > now
+				local peekOnly = cinematic
+					and (ns.chatPeekUntil[ns.chatPanelOwner[entry.frame] or entry.frame] or 0) > now
 					and not hovered[row] and not typingShown and not tracking and not fightingShown
 				entry.backgroundAlpha = ns.Approach(entry.backgroundAlpha or 1,
 					(peekOnly and not ns.db.chatPeekBackground) and 0 or 1, elapsed, GroupFadeTime(entry.group, false))
 			end
 			if (entry.backgroundAlpha or 1) < 1 or entry.backgroundFaded then
 				entry.backgroundFaded = entry.backgroundAlpha < 1
-				if not entry.backgroundTextures then
+				if ns.chatLinkBackdrop[entry.frame] then
+					entry.backgroundTextures = ns.chatLinkBackdrop[entry.frame]
+				elseif not entry.backgroundTextures then
 					entry.backgroundTextures = {}
 					for _, key in ipairs(ns.CHAT_BACKGROUND_TEXTURES) do
 						local texture = _G[entry.name .. key]

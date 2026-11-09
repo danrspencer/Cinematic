@@ -29,6 +29,7 @@ Skin.lua
 GridRows.lua
 HideUI.lua
 AddonSupport.lua
+FrameLinks.lua
 Support\Details.lua
 Support\CooldownManagerCentered.lua
 Support\ForeverEnhancedCooldownManager.lua

@@ -1071,10 +1071,14 @@ local function HandleSlash(msg)
 	elseif cmd == "debug" and arg == "framepass" then
 		-- Where the frames' fade pass spends its time, over 20 seconds: its parts
 		-- per pass, and the per-frame loop per frame (Frames.lua's ns.UpdateFrames).
-		ns.framePassTimes = { passes = 0, entries = 0, setup = 0, hover = 0, events = 0, target = 0, apply = 0,
-			after = 0, mouseMoved = 0 }
-		ns.Print("framepass: timing the frames' pass for 20 seconds (stand as you are)")
-		C_Timer.After(20, function()
+		-- (From 5 seconds on: typing the command brings chat up, and its fade
+		-- back out would count as frames not settling.)
+		ns.Print("framepass: timing the frames' pass for 20 seconds from 5 seconds now (hands off)")
+		C_Timer.After(5, function()
+			ns.framePassTimes = { passes = 0, entries = 0, setup = 0, hover = 0, events = 0, target = 0, apply = 0,
+				after = 0, mouseMoved = 0, why = {}, unsettled = {}, unsettledLast = {} }
+		end)
+		C_Timer.After(25, function()
 			local t = ns.framePassTimes
 			ns.framePassTimes = nil
 			if not t or t.passes == 0 then ns.Print("framepass: no passes ran") return end
@@ -1085,6 +1089,24 @@ local function HandleSlash(msg)
 				t.target / n, t.apply / n, 1000 * (t.target + t.apply) / math.max(1, t.entries), t.after / n)
 			ns.Print(line)
 			ns.Log("framepass", line)
+			-- (Why each pass ran, most first: Core.lua.)
+			local reasons = {}
+			for why, count in pairs(t.why) do reasons[#reasons + 1] = { why, count } end
+			table.sort(reasons, function(a, b) return a[2] > b[2] end)
+			for i, reason in ipairs(reasons) do reasons[i] = ("%s %d"):format(reason[1], reason[2]) end
+			local whyLine = "framepass: passes ran for: " .. (#reasons > 0 and table.concat(reasons, ", ") or "nothing noted")
+			ns.Print(whyLine)
+			ns.Log("framepass", whyLine)
+			-- (The frames that kept a pass from settling, most first: Frames.lua.)
+			local frames = {}
+			for name, count in pairs(t.unsettled) do frames[#frames + 1] = { name, count } end
+			table.sort(frames, function(a, b) return a[2] > b[2] end)
+			for i = 1, math.min(#frames, 8) do
+				local frameLine = ("framepass: not settled: %s, %d passes (last: %s)"):format(frames[i][1], frames[i][2],
+					t.unsettledLast[frames[i][1]] or "?")
+				ns.Print(frameLine)
+				ns.Log("framepass", frameLine)
+			end
 		end)
 	elseif cmd == "debug" and (arg == "loops" or arg:match("^loops %d+$") or arg:match("^loops all$")
 		or arg:match("^loops %d+ all$")) then

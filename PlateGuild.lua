@@ -11,6 +11,7 @@ local L = ns.L
 
 local lines = {} -- [plate] = guild text
 local shares = {} -- [plate] = how far its name shows on a name-only plate (0 to 1)
+local textShares = {} -- [plate] = how much of the name's own text shows (less for Titles only)
 -- [plate] = its NPC's title, or false for none; nil not read yet (or the
 -- game wouldn't say: read again in a while, or after the fight).
 local titles = {}
@@ -148,8 +149,10 @@ local function LineText(plate, unit)
 		-- differs plate to plate, or can't be read and left the icon small.)
 		return icon, false, true
 	end
-	-- (Service NPCs' Brackets unticked: Baker, not <Baker>.)
-	if title and not ns.db.nameServiceBrackets then
+	-- (Service NPCs' Brackets unticked: Baker, not <Baker>. With its When the
+	-- name shows too ticked, kept while the name's text is up over it.)
+	local nameShown = (textShares[plate] or 1) >= 0.5
+	if title and not ns.db.nameServiceBrackets and not (ns.db.nameServiceBracketsWithName and nameShown) then
 		title = title:sub(2, -2)
 	end
 	return title, false
@@ -163,7 +166,11 @@ end
 -- language, comma separated: "Repair Vendor", "Innkeeper"...)
 ns.SERVICE_KINDS = {
 	{ key = "Vendor", label = L["Vendors"], words = L["vendor,merchant,goods,supplies,supplier,provisions," ..
-		"provisioner,quartermaster,reagents,trader,armorer,weaponsmith,bowyer,gunsmith,butcher,baker,food,drink,wine"] },
+		"provisioner,quartermaster,reagents,trader,armorer,weaponsmith,bowyer,gunsmith,butcher,baker,food,drink,wine"],
+		-- (And what a shop sells, with no vendor word: <Cloth & Leather Armor>,
+		-- <Axes & Maces>. "weapons", not "weapon": Weapon Masters train.)
+		moreWords = L["armor,weapons,shield,bows,guns,axes,maces,swords,daggers,blades,staves,clothier,fletcher," ..
+		"tradesman,tradeswoman,bags,robes"] },
 	{ key = "Repair", label = L["Repair"], words = L["repair"] },
 	-- (Weapon Masters teach weapon skills but have no "trainer" in their title.)
 	{ key = "Trainer", label = L["Trainers"], words = L["trainer,weapon master"] },
@@ -214,7 +221,7 @@ function ns.ServiceKindsChanged()
 end
 
 ns.OnLanguage(function()
-	ns.TranslateFields(ns.SERVICE_KINDS, "label", "words")
+	ns.TranslateFields(ns.SERVICE_KINDS, "label", "words", "moreWords")
 	for _, kind in ipairs(ns.SERVICE_KINDS) do
 		kind.list = nil -- (read again in the new language)
 	end
@@ -227,7 +234,7 @@ function ns.TitleKinds(title)
 	for _, kind in ipairs(ns.SERVICE_KINDS) do
 		if kind.words and not kind.list then
 			kind.list = {}
-			for word in kind.words:gmatch("[^,]+") do
+			for word in (kind.words .. "," .. (kind.moreWords or "")):gmatch("[^,]+") do
 				word = word:match("^%s*(.-)%s*$")
 				if word ~= "" then
 					kind.list[#kind.list + 1] = word:lower()
@@ -509,8 +516,9 @@ end
 -- while the plate shows its name alone (0: not name-only). (Its name's own
 -- text faded for Service NPCs' Titles only is PlateParts' doing: the line
 -- stays under it either way.)
-function ns.SetPlateGuild(plate, share)
+function ns.SetPlateGuild(plate, share, text)
 	shares[plate] = share > 0 and share or nil
+	textShares[plate] = shares[plate] and text or nil
 	if shares[plate] or lines[plate] then
 		Refresh(plate)
 	end

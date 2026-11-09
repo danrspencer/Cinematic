@@ -111,6 +111,18 @@ end)
 
 -- Helpers for the setups ------------------------------------------------------
 
+-- Quest trackers of other addons that do the Quest tracker page's "Show just
+-- that quest" (and "Close the gaps") their own way: each tick the game's
+-- tracker does it, fn(othersAlpha, quests, timers, active) runs too (quests:
+-- quest ID -> true, the ones a reveal shows; timers: the same for a running
+-- timer, or nil; active: just those wanted now). It returns whether it has
+-- any of them, and sets ns.questFocusOthersUp while it has anything faded or
+-- moved, so it's called again till it's all back (Frames.lua).
+ns.QUEST_FOCUS_TRACKERS = {}
+function ns.AddQuestFocusTracker(fn)
+	table.insert(ns.QUEST_FOCUS_TRACKERS, fn)
+end
+
 -- Its frames standing in for the game's, by Standard Frames row: each row is
 -- { row, fade group, frame names... }. They set their own alpha and are its
 -- own frames, so they're hooked.

@@ -183,6 +183,36 @@ ns.WhenAddonLoads("EllesmereUIActionBars", function()
 	ns.LeaveAlone({ "MainActionBar" })
 end)
 
+-- Its frames standing in for the game's, linked as those parts (Addon Frame
+-- Links: FrameLinks.lua), by its addon -> part -> its frame's name. Looked
+-- up with each scan till found: most are made after loading.
+local LINKS = {
+	EllesmereUIUnitFrames = {
+		unitplayer = "EllesmereUIUnitFrames_Player", unitpet = "EllesmereUIUnitFrames_Pet",
+		unittarget = "EllesmereUIUnitFrames_Target", unittot = "EllesmereUIUnitFrames_TargetTarget",
+		unitfocus = "EllesmereUIUnitFrames_Focus", unitfocustot = "EllesmereUIUnitFrames_FocusTarget",
+		aurabuffs = "EllesmereUIPlayerAuraBars_Buffs", auradebuffs = "EllesmereUIPlayerAuraBars_Debuffs",
+	},
+	EllesmereUIMinimap = { mapzone = "_EBS_LocationBg", mapclock = "_EBS_ClockBg", mapcoords = "_EBS_CoordFrame" },
+	EllesmereUICooldownManager = {
+		cdessential = "ECME_CDMBar_cooldowns", cdutility = "ECME_CDMBar_utility", cdbuffs = "ECME_CDMBar_buffs",
+	},
+	EllesmereUIResourceBars = { prdbars = "EllesmereUIResourceBarsFrame", swingbars = "ERB_SwingTimerFrame" },
+}
+for addon, parts in pairs(LINKS) do
+	ns.WhenAddonLoads(addon, function()
+		ns.AddScanner(function()
+			for part, name in pairs(parts) do
+				local frame = _G[name]
+				if type(frame) == "table" and type(frame.GetObjectType) == "function"
+					and not (frame.IsForbidden and frame:IsForbidden()) then
+					ns.ClaimLinkPart("EllesmereUI", part, frame)
+				end
+			end
+		end)
+	end)
+end
+
 -- Its raid and party frames fade with the game's on the Standard Frames page:
 -- the raid ones (with its healer mana, boss and extra frames) as Players, the
 -- party ones (unnamed) as Party frames.
@@ -275,8 +305,141 @@ do
 	end)
 end
 
+-- Its quest tracker: the game's skinned (with a background of its own), or
+-- on WoW Forever its Custom Quest Tracker, a tracker of its own in place of
+-- the game's (which it keeps at alpha 0). Its item buttons sit in a layer
+-- outside it that takes its alpha, so they fade with it. Linked as the
+-- Quest tracker's tracker (Quest Tracker page's Addon Frame Links).
+-- The Quest Tracker page's "Show just that quest" and "Close the gaps" on its
+-- custom tracker (ns.AddQuestFocusTracker). Its rows are pooled Buttons in
+-- its scroll frame's child, each with its kind ("zone", "quest", "obj"), id
+-- (a quest's rows: the quest ID) and the spot it put it at (lastX, lastY,
+-- under the child's top). The quests a reveal shows stay; the rest of the
+-- rows, the zone names, its header, background and scroll bar fade. Closing
+-- the gaps moves those quests' rows up under the first row, quest under
+-- quest, and puts them back at their own spots after (it sets a row's spot
+-- again only when its own changes). Its item buttons (secure, in a layer of
+-- their own, by screen position) aren't moved: a moved quest's button fades
+-- for the while, as the game tracker's copies do; the others' with the rest.
+local customItemLayer -- (found by the scan: the layer holding its item buttons)
+do
+	local QUEST_GAP = 6 -- between quests moved up (its units)
+	local moved = {} -- [row] = true while not at its own spot
+	local wanted, shifted, place = {}, {}, {} -- (kept, refilled each tick)
+	local function ScrollChild(tracker)
+		for _, part in ipairs({ tracker:GetChildren() }) do
+			if part:GetObjectType() == "ScrollFrame" and part.GetScrollChild then
+				return part, part:GetScrollChild()
+			end
+		end
+	end
+	local function ByY(a, b) return a.lastY < b.lastY end
+	local function Put(row, y)
+		row:ClearAllPoints()
+		row:SetPoint("TOPLEFT", row:GetParent(), "TOPLEFT", row.lastX or 0, -y)
+	end
+	local function Apply(othersAlpha, quests, timers, active)
+		local tracker = _G.EUI_CustomQuestTracker
+		if type(tracker) ~= "table" or not tracker.GetChildren then return false end
+		local scroll, child = ScrollChild(tracker)
+		if not child then return false end
+		for _, part in ipairs({ tracker:GetChildren() }) do
+			if part ~= scroll then ns.FadeRelative(part, othersAlpha) end
+		end
+		wipe(wanted)
+		wipe(shifted)
+		local found, top = false, nil
+		for _, row in ipairs({ child:GetChildren() }) do
+			if type(row.lastY) == "number" and row:IsShown() then
+				local want = (row.kind == "quest" or row.kind == "obj")
+					and (quests[row.id] or (timers and timers[row.id])) and true or false
+				ns.FadeRelative(row, want and 1 or othersAlpha)
+				if want then
+					found = true
+					wanted[#wanted + 1] = row
+				end
+				if not top or row.lastY < top then top = row.lastY end
+			end
+		end
+		-- Close the gaps: only while just those quests are wanted.
+		local collapse = active and ns.db.questRevealOnlyThat and ns.db.questRevealCollapse and #wanted > 0
+		wipe(place)
+		if collapse then
+			table.sort(wanted, ByY)
+			-- (A quest's focus ring, left of its title, rises above it: its
+			-- tracker starts the first quest that far down, or the clip cuts
+			-- the ring off. The same here: its button is 6 over the title's
+			-- font, sits 3 higher, and its art reaches half its size above.)
+			local ring = wanted[1].focus
+			if ring and ring:IsShown() then
+				top = math.max(top, math.ceil(3 + ring:GetHeight() * 0.5))
+			end
+			local cursor, offset, lastID, bottom = top, 0, nil, nil
+			for _, row in ipairs(wanted) do
+				if row.id ~= lastID then
+					if bottom then cursor = bottom + QUEST_GAP end
+					offset = cursor - row.lastY
+					lastID = row.id
+				end
+				local y = row.lastY + offset
+				local height = row:GetHeight()
+				bottom = math.max(bottom or 0, y + (type(height) == "number" and height or 0))
+				if offset < -0.5 then
+					place[row] = y
+					shifted[row.id] = true
+				end
+			end
+		end
+		for row in pairs(moved) do
+			if not place[row] then
+				Put(row, row.lastY)
+				moved[row] = nil
+			end
+		end
+		for row, y in pairs(place) do
+			Put(row, y)
+			moved[row] = true
+		end
+		-- Its item buttons, by their quest.
+		if customItemLayer then
+			for _, button in ipairs({ customItemLayer:GetChildren() }) do
+				if button.questID then
+					local want = quests[button.questID] or (timers and timers[button.questID])
+					ns.FadeRelative(button, want and (shifted[button.questID] and 0 or 1) or othersAlpha)
+				end
+			end
+		end
+		ns.questFocusOthersUp = othersAlpha < 1 or next(moved) ~= nil or next(shifted) ~= nil
+		return found
+	end
+	ns.WhenAddonLoads("EllesmereUIQuestTracker", function()
+		ns.AddQuestFocusTracker(Apply)
+	end)
+end
+
 ns.WhenAddonLoads("EllesmereUIQuestTracker", function()
-	ns.FadeWithRows({ { "quests", "quests", "EllesmereUIQTBackground" } })
+	ns.FadeWithRows({ { "quests", "quests", "EllesmereUIQTBackground", "EUI_CustomQuestTracker" } })
+	ns.AddScanner(function()
+		local tracker = _G.EUI_CustomQuestTracker
+		if type(tracker) == "table" and type(tracker.GetObjectType) == "function" then
+			ns.ClaimLinkPart("EllesmereUI", "questtracker", tracker)
+			-- (Its item buttons' layer: on UIParent, unnamed, holding buttons
+			-- that each know their quest and have a cooldown.)
+			if not customItemLayer then
+				-- (Forbidden frames first: even asking one its name errors.)
+				for _, layer in ipairs({ UIParent:GetChildren() }) do
+					if not (layer.IsForbidden and layer:IsForbidden()) and not layer:GetName() then
+						local first = select(1, layer:GetChildren())
+						if type(first) == "table" and not (first.IsForbidden and first:IsForbidden())
+							and first.questID ~= nil and first.cd then
+							customItemLayer = layer
+							break
+						end
+					end
+				end
+			end
+		end
+	end)
 end)
 
 ns.WhenAddonLoads("EllesmereUIResourceBars", function()
@@ -347,15 +510,26 @@ local function FindChat()
 			ok, data = pcall(chatData, chatFrame)
 		end
 		if ok and type(data) == "table" then
-			-- (Its panel draws the window's lines, not the chat frame: a
-			-- message peeking the window brings the panel up with it.)
+			-- (Its panel draws the window's lines, not the chat frame: linked
+			-- as the window's panel, a message peeking the window brings it up,
+			-- its backdrop as the Chat page's Background says: FrameLinks.lua.
+			-- The backdrop: the panel's own textures, and on WoW Forever the
+			-- bronze boxes it builds on it. Its message frame is a child.)
 			if IsUsable(data.bg) then
-				ns.chatPeekPanels[chatFrame] = data.bg
+				local backdrop = {}
+				for _, region in ipairs({ data.bg:GetRegions() }) do
+					if region.GetObjectType and region:GetObjectType() == "Texture" then
+						backdrop[#backdrop + 1] = region
+					end
+				end
+				if IsUsable(data.fvHost) then backdrop[#backdrop + 1] = data.fvHost end
+				ns.ClaimLinkPart("EllesmereUI", "chatwindow", data.bg, { window = chatFrame, backdrop = backdrop })
 			end
 			for _, key in ipairs({ "bg", "sidebar", "scrollBtn" }) do
 				if IsUsable(data[key]) then
 					parts[data[key]] = true
 					ns.AddFoundFrame(data[key], "chat", true, true)
+					if key ~= "bg" then ns.ClaimLinkPart("EllesmereUI", "chatbuttons", data[key]) end
 				end
 			end
 		end
@@ -363,13 +537,19 @@ local function FindChat()
 	if not next(parts) then
 		return
 	end
-	if _G.GeneralDockManager then
-		parts[_G.GeneralDockManager] = true
+	local dock = _G.GeneralDockManager
+	if dock then
+		parts[dock] = true
 	end
 	for _, frame in ipairs({ UIParent:GetChildren() }) do
-		if not ns.IsFaded(frame) and IsUsable(frame) and not frame:GetName()
-			and IsAnchoredTo(frame, parts) then
-			ns.AddFoundFrame(frame, "chat", true, true)
+		if IsUsable(frame) and not frame:GetName() and IsAnchoredTo(frame, parts) then
+			if not ns.IsFaded(frame) then
+				ns.AddFoundFrame(frame, "chat", true, true)
+			end
+			-- (Its tab strip lies over the dock, anchored to it.)
+			if dock and IsAnchoredTo(frame, { [dock] = true }) then
+				ns.ClaimLinkPart("EllesmereUI", "chattabs", frame)
+			end
 		end
 	end
 end

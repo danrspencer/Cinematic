@@ -1512,6 +1512,7 @@ end
 -- Vendors, Repair, Trainers and Professions on by default; the rest off.
 DEFAULTS.nameServiceShow = "title"
 DEFAULTS.nameServiceBrackets = false -- the < > round NPC titles under names
+DEFAULTS.nameServiceBracketsWithName = true -- ...kept while the NPC's name shows over its title
 -- Trainers: another class's trainer (<Hunter Trainer>) left out.
 DEFAULTS.nameServiceClassOnly = true
 -- Each kind's icon in place of titles (PlateGuild's SERVICE_ICONS); Other's
@@ -3410,6 +3411,20 @@ local function OnUpdate(_, elapsed)
 		pass.skip = false
 		pass.elapsed = pass.elapsed + elapsed
 	else
+		-- (/cine debug framepass: why this pass ran, Slash.lua.)
+		local times = ns.framePassTimes
+		if times then
+			local why
+			if not ns.framesSettled then why = "a frame still fading"
+			elseif fadeOn ~= pass.fadeOn or fight ~= pass.fight or immersive ~= pass.immersive then why = "CineMode, fight or immersive changed"
+			elseif x ~= pass.x or y ~= pass.y then why = "mouse moved"
+			elseif IsModifierKeyDown() then why = "modifier key down"
+			elseif ns.IsChatActive and ns.IsChatActive() then why = "typing in chat"
+			elseif woken then why = "woken: " .. (type(woken) == "string" and woken or "other")
+			elseif not wait then why = "fight or immersive (every other tick)"
+			else why = "its timer" end
+			times.why[why] = (times.why[why] or 0) + 1
+		end
 		ns.framesWake = nil
 		pass.skip = true
 		pass.fadeOn, pass.fight, pass.immersive, pass.x, pass.y = fadeOn, fight, immersive, x, y
@@ -5683,6 +5698,21 @@ ticker:SetScript("OnEvent", ns.Profiled("Core events", function(self, event, arg
 			end
 			ns.db.questTalkOffV1 = true
 		end
+		-- Custom dialogue frames off in every profile, Cinema too (it no longer
+		-- turns them on): off once, saved profiles too. Tick it again and it stays.
+		if not ns.db.questTalkOffV2 then
+			ns.db.questTalk = false
+			for _, saved in pairs(ns.db.profiles or {}) do
+				if type(saved) == "table" then
+					saved.questTalk = false
+					if type(saved.settings) == "table" then saved.settings.questTalk = false end
+				end
+			end
+			for _, point in pairs(ns.db.profileResetPoints or {}) do
+				if type(point) == "table" then point.questTalk = false end
+			end
+			ns.db.questTalkOffV2 = true
+		end
 		-- Combat Vision is off to start with, on in the Cinema profile: it goes
 		-- as your profile has it, and saved profiles drop theirs. Once.
 		if not ns.db.combatVisionProfileV1 then
@@ -7153,6 +7183,21 @@ ticker:SetScript("OnEvent", ns.Profiled("Core events", function(self, event, arg
 				if type(saved) == "table" then Choice(saved) end
 			end
 			ns.db.cardsV12 = true
+		end
+		-- Entering and Leaving combat: no edge pulse (Cards.lua), in every profile.
+		-- Once: set it again and it stays.
+		if not ns.db.cardsV13 then
+			local function NoPulse(t)
+				t.cardPulse_combatIn, t.cardPulse_combatOut = 0, 0
+			end
+			NoPulse(ns.db)
+			for _, saved in pairs(ns.db.profiles or {}) do
+				if type(saved) == "table" then NoPulse(saved) end
+			end
+			for _, point in pairs(ns.db.profileResetPoints or {}) do
+				if type(point) == "table" then NoPulse(point) end
+			end
+			ns.db.cardsV13 = true
 		end
 		-- New settings start as the active profile has them (a built-in's
 		-- changes to the defaults included). A fresh install (or Reset addon)
