@@ -1,0 +1,1 @@
+Thanks, glad you're enjoying it! That's the minimap ping Cinematic puts on new nodes, and the game doesn't let us ping without the sound. For now, untick it at Options > AddOns > Cinematic > Interface > Minimap > Reveal > "Ping where it is". In the next update that becomes a "Mark where it is" dropdown with our own silent ring as an option ("Our mark (no sound)").
