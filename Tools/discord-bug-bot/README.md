@@ -48,20 +48,21 @@ Then type `/bug` in the server.
 ### 5. Make it private
 So no one else can add the app to their server: **Installation > Install Link** = None (save), then **Bot > Public Bot** off (save). Servers that already have it keep it. To add it to another server of yours later, turn both back on for a moment.
 
-### 6. Bug forum: new posts get the "Open" tag (optional)
-So you can filter the forum to bugs not fixed yet. Every 2 minutes the Worker looks
-for posts from the last day that have neither **Open** nor **Fixed** and adds **Open**.
-When you fix one, swap Open for Fixed and it stays that way.
+### 6. Bug + request forums: new posts get the "Open" tag (optional)
+So you can filter each forum to posts not finished yet. Every 2 minutes the Worker
+looks for posts from the last day that have no **Open** and no finished tag
+(**Fixed** in the bug forum, **Done** in the request forum) and adds **Open**.
+When you finish one, swap Open for Fixed/Done and it stays that way.
 
-1. In the forum: **Edit Channel > Tags**, make tags named `Open` and `Fixed`. Tick
-   **Only allow moderators to apply this tag** on both so players can't change them.
+1. In each forum: **Edit Channel > Tags**, make `Open` plus `Fixed` (bugs) or `Done`
+   (requests). Tick **Only allow moderators to apply this tag** so players can't change them.
 2. Add the bot user to the server: Discord app > **OAuth2 > URL Generator**, tick scope
    `bot`, permissions **View Channels** and **Manage Threads**, open the link, pick the server.
    (If it refuses, turn **Bot > Public Bot** on for a moment, as in step 5.)
 3. Discord app > **Bot > Reset Token**, copy it. Worker > **Settings > Variables and Secrets**:
    - `DISCORD_BOT_TOKEN` (Secret): the token
-   - `BUG_FORUM_ID` (Text): right-click the forum > **Copy Channel ID** (needs
-     User Settings > Advanced > Developer Mode).
+   - `BUG_FORUM_ID` and `REQUEST_FORUM_ID` (Text): right-click each forum > **Copy Channel ID**
+     (needs User Settings > Advanced > Developer Mode). Leave one out to skip that forum.
    Then **Edit code**, paste the new `worker.js`, Deploy.
 4. Worker > **Settings > Trigger Events > Add > Cron Triggers**: `*/2 * * * *`, save.
 5. Make a test post: within 2 minutes it shows **Open**. Worker > **Logs** shows why if not.

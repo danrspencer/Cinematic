@@ -11,9 +11,10 @@
 // Optional plain variables:
 //   GITHUB_REPO         default "sapo-wow-dev/Cinematic"
 //   SHOW_REPORTER       "1" puts the reporter's Discord name in the issue (public!)
-// Bug forum "Open" tag (optional, README step 6):
+// Forum "Open" tags (optional, README step 6):
 //   DISCORD_BOT_TOKEN   secret: the Discord bot's token
-//   BUG_FORUM_ID        plain: the bug forum channel's ID
+//   BUG_FORUM_ID        plain: the bug forum channel's ID (closed tag: Fixed)
+//   REQUEST_FORUM_ID    plain: the request forum channel's ID (closed tag: Done)
 
 const COOLDOWN_SECONDS = 300 // one report per player per 5 minutes
 const LABELS = ["bug", "from-discord"]
@@ -69,39 +70,58 @@ export default {
   },
 }
 
-// ---- Bug forum: every new post gets the "Open" tag ----
+// ---- Forums: every new post gets the "Open" tag ----
 // A Worker can't hear "new post" events live (that needs an always-on bot),
 // so the cron looks every few minutes. A post is left alone once it has Open
-// or a closed tag, so swapping Open for Fixed sticks. Posts older than
-// NEW_POST_HOURS are never touched, so old posts are not tagged in bulk.
+// or one of its forum's closed tags, so swapping Open for Fixed/Done sticks.
+// Posts older than NEW_POST_HOURS are never touched, so old posts are not
+// tagged in bulk.
 const OPEN_TAG = "Open"
-const CLOSED_TAGS = ["Fixed"] // add more (e.g. "Won't fix") if the forum gets them
+const FORUMS = [
+  // idVar: the Worker variable holding the forum's channel ID
+  // closed: tags that mean "finished" (add more, e.g. "Won't fix", if the forum gets them)
+  { idVar: "BUG_FORUM_ID", closed: ["Fixed"] },
+  { idVar: "REQUEST_FORUM_ID", closed: ["Done"] },
+]
 const NEW_POST_HOURS = 24
 
 async function tagNewBugPosts(env) {
-  const forumId = env.BUG_FORUM_ID
-  if (!forumId || !env.DISCORD_BOT_TOKEN) return
-  try {
-    const forum = await discord(env, "GET", `/channels/${forumId}`)
-    const byName = (name) => (forum.available_tags || []).find((t) => t.name.toLowerCase() === name.toLowerCase())
-    const open = byName(OPEN_TAG)
-    if (!open) return console.log(`The forum has no "${OPEN_TAG}" tag`)
-    const skip = [open, ...CLOSED_TAGS.map(byName)].filter(Boolean).map((t) => t.id)
-
-    const { threads } = await discord(env, "GET", `/guilds/${forum.guild_id}/threads/active`)
-    const since = Date.now() - NEW_POST_HOURS * 3600 * 1000
-    for (const post of threads) {
-      if (post.parent_id !== forumId || snowflakeTime(post.id) < since) continue
-      const applied = post.applied_tags || []
-      if (applied.some((id) => skip.includes(id)) || applied.length >= 5) continue // 5 = Discord's max
-      try {
-        await discord(env, "PATCH", `/channels/${post.id}`, { applied_tags: [...applied, open.id] })
-      } catch (err) {
-        console.log(`Couldn't tag post ${post.id}:`, err.message)
+  if (!env.DISCORD_BOT_TOKEN) return
+  const activeByGuild = new Map() // one active-threads fetch per server
+  for (const { idVar, closed } of FORUMS) {
+    const forumId = env[idVar]
+    if (!forumId) continue
+    try {
+      const forum = await discord(env, "GET", `/channels/${forumId}`)
+      const byName = (name) => (forum.available_tags || []).find((t) => t.name.toLowerCase() === name.toLowerCase())
+      const open = byName(OPEN_TAG)
+      if (!open) {
+        console.log(`Forum ${forum.name} has no "${OPEN_TAG}" tag`)
+        continue
       }
+      const skip = [open, ...closed.map(byName)].filter(Boolean).map((t) => t.id)
+
+      if (!activeByGuild.has(forum.guild_id)) {
+        activeByGuild.set(forum.guild_id, (await discord(env, "GET", `/guilds/${forum.guild_id}/threads/active`)).threads)
+      }
+      const since = Date.now() - NEW_POST_HOURS * 3600 * 1000
+      let seen = 0, tagged = 0
+      for (const post of activeByGuild.get(forum.guild_id)) {
+        if (post.parent_id !== forumId || snowflakeTime(post.id) < since) continue
+        seen++
+        const applied = post.applied_tags || []
+        if (applied.some((id) => skip.includes(id)) || applied.length >= 5) continue // 5 = Discord's max
+        try {
+          await discord(env, "PATCH", `/channels/${post.id}`, { applied_tags: [...applied, open.id] })
+          tagged++
+        } catch (err) {
+          console.log(`Couldn't tag post ${post.id}:`, err.message)
+        }
+      }
+      console.log(`${forum.name}: ${seen} post(s) from the last ${NEW_POST_HOURS}h, tagged ${tagged}`)
+    } catch (err) {
+      console.log(`Tagging ${idVar} failed:`, err.message)
     }
-  } catch (err) {
-    console.log("Bug forum tagging failed:", err.message)
   }
 }
 
