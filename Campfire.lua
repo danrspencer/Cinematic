@@ -621,12 +621,50 @@ local function StandUp()
 	ns.Log("campfire", ("stand up: %s %s"):format(tostring(ok), ok and "" or tostring(err)))
 end
 
+-- Eating or drinking: sitting down to eat by a campfire can bring Camp
+-- Benefits too, and standing then stops the food (a player had to click it
+-- twice). Food and drink are spells you cast whose buff of the same ID lasts
+-- while you sit, half a minute or less: one of your last few casts still on
+-- you that short means you're eating. (By spell ID: no food names to match
+-- in every game language.)
+local EAT_LONGEST = 35 -- seconds: food and drink buffs are this long or shorter
+local recentCasts = {} -- the last few spell IDs you cast, newest first
+local function NoteCast(spellID)
+	if type(spellID) ~= "number" or (issecretvalue and issecretvalue(spellID)) then
+		return
+	end
+	table.insert(recentCasts, 1, spellID)
+	recentCasts[5] = nil
+end
+local function Eating()
+	if not (C_UnitAuras and C_UnitAuras.GetPlayerAuraBySpellID) then
+		return false
+	end
+	for _, spellID in ipairs(recentCasts) do
+		local ok, aura = pcall(C_UnitAuras.GetPlayerAuraBySpellID, spellID)
+		if ok and type(aura) == "table" then
+			local okLong, long = pcall(function() return aura.duration end)
+			long = okLong and Number(long) or nil
+			-- (How long unknown: taken as food, better to stay sat.)
+			if not long or (long > 0 and long <= EAT_LONGEST) then
+				return true, spellID
+			end
+		end
+	end
+	return false
+end
+
 local had, hadEnds -- nil until the first look after loading in
 local campWatcher = CreateFrame("Frame")
 campWatcher:RegisterUnitEvent("UNIT_AURA", "player")
+campWatcher:RegisterUnitEvent("UNIT_SPELLCAST_SUCCEEDED", "player")
 campWatcher:RegisterEvent("PLAYER_ENTERING_WORLD")
-campWatcher:SetScript("OnEvent", ns.Profiled("UNIT_AURA (camp benefits)", function(_, event)
+campWatcher:SetScript("OnEvent", ns.Profiled("UNIT_AURA (camp benefits)", function(_, event, _, _, spellID)
 	if not ns.HasCampBenefits() then
+		return
+	end
+	if event == "UNIT_SPELLCAST_SUCCEEDED" then
+		NoteCast(spellID)
 		return
 	end
 	local has, ends = CampBenefits()
@@ -640,6 +678,11 @@ campWatcher:SetScript("OnEvent", ns.Profiled("UNIT_AURA (camp benefits)", functi
 	local db = ns.db
 	-- (It only comes while you sit, so no need to ask whether you are.)
 	if gained and ns.Setting("campfireSitButton") and db.campfireStandUp then
-		StandUp()
+		local eating, food = Eating()
+		if eating then
+			ns.Log("campfire", ("stand up skipped: eating or drinking (spell %s)"):format(tostring(food)))
+		else
+			StandUp()
+		end
 	end
 end))
