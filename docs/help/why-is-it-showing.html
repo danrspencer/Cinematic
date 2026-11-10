@@ -102,7 +102,7 @@ a.card { text-decoration: none; color: inherit } a.card:hover { border-color: va
     <div class="inner">
       <div class="eyebrow">Help · why is it showing?</div>
       <h1>Why is that on my screen?</h1>
-      <p>Point at any frame and Cinematic tells you why it's showing or hidden right now, and which settings say so. No more guessing which tick or rule is keeping your minimap up.</p>
+      <p>One window lists every part of your interface, whether it's showing or hidden right now, why, and which settings say so. Or point at any frame and ask about just that one. No more guessing which tick or rule is keeping your minimap up.</p>
     </div>
   </div>
   <div class="band"></div>
@@ -111,17 +111,37 @@ a.card { text-decoration: none; color: inherit } a.card:hover { border-color: va
 <main class="gutter" style="padding-block:48px 40px">
 <div class="col">
 
+  <section id="window">
+    <div class="eyebrow">Start here</div>
+    <h2>The Why window</h2>
+    <p>Type <code>/cine why</code>. A window opens that you can drag aside and keep up while you play. It lists every part of the interface Cinematic fades, and says in plain words what each is doing right now.</p>
+    <dl class="rows">
+      <div class="row"><dt>CineMode is on / off</dt><dd>The box at the top. If CineMode is <b>off</b>, Cinematic isn't hiding anything, and the box says what's keeping it off: a fight, a cast, an open window, a place it's turned off in, or the few seconds before it comes back. Click the box to open that setting.</dd></div>
+      <div class="row"><dt>Right now you are</dt><dd>What Cinematic sees you doing: in or out of combat, your target, where you are, your group, mounted. These are what the ticks and rules go by.</dd></div>
+      <div class="row"><dt>Each row</dt><dd>A part of the interface, as on the Game Frames page, with a colored edge: <b>Showing</b> (green), <b>Hidden</b> (red), <b>Partly shown</b> (gold) or <b>Not on screen</b> (grey), and the main reason under its name.</dd></div>
+      <div class="row"><dt>Not on screen</dt><dd>Cinematic isn't hiding it. The game just has nothing to draw there: no target, no group, or the frame is switched off in the game or by another addon.</dd></div>
+      <div class="row"><dt>Click a row</dt><dd>It opens to every reason (see <a href="#card">what they mean</a>). Click a reason to open its setting, <b>Open settings</b> for the row's page, or <b>Show me where it is</b> to flash a gold box on the frame, even one that's faded out.</dd></div>
+      <div class="row"><dt>Search and filters</dt><dd>Type part of a name to find it. <b>All</b>, <b>Showing</b> and <b>Hidden</b> filter the list, each with a count.</dd></div>
+      <div class="row"><dt>Pick a frame on screen</dt><dd>For anything you can't find in the list: starts Inspect, below. Stopping Inspect brings the window back.</dd></div>
+      <div class="row"><dt>Copy report</dt><dd>The whole list as text, to paste to us on Discord or in a bug report when you're stuck.</dd></div>
+    </dl>
+    <p class="note">The list keeps itself up to date. Start a fight, target something or walk into a city with it open and watch the rows change.</p>
+    <div class="cmds">
+<div class="cmd"><code id="cmd0">/cine why</code><span class="what">Opens the Why window (type it again to close it)</span><button type="button" class="copy" data-for="cmd0">Copy</button></div>
+    </div>
+  </section>
+
   <section id="inspect">
     <div class="eyebrow">Ask about one frame</div>
     <h2>Inspect</h2>
     <ol class="steps">
-      <li><div><h3>Start it</h3><p class="muted">Type <code>/cine why</code>, or left-click the minimap button and pick <b>Why is it showing?</b> A bar at the top of the screen says Inspect is on.</p></div></li>
+      <li><div><h3>Start it</h3><p class="muted">Click <b>Pick a frame on screen</b> in the Why window, or type <code>/cine why pick</code>. A bar at the top of the screen says Inspect is on.</p></div></li>
       <li><div><h3>Point at a frame</h3><p class="muted">A gold box shows its name and whether it's <b>showing</b> or <b>hidden</b>. Faded-out frames count too: point where they'd be. While Inspect is on, pointing at a frame doesn't bring it up, so you see things as they really are.</p></div></li>
       <li><div><h3>Click it</h3><p class="muted">A card opens beside it with every reason, and keeps itself up to date: start a fight or target something and watch it change. Click a line to open its setting. Click another frame to look at that one instead.</p></div></li>
       <li><div><h3>Stop</h3><p class="muted">Right-click, press Escape, or close the card.</p></div></li>
     </ol>
     <div class="cmds">
-<div class="cmd"><code id="cmd1">/cine why</code><span class="what">Starts Inspect (type it again to stop)</span><button type="button" class="copy" data-for="cmd1">Copy</button></div>
+<div class="cmd"><code id="cmd1">/cine why pick</code><span class="what">Starts Inspect (type it again to stop)</span><button type="button" class="copy" data-for="cmd1">Copy</button></div>
     </div>
   </section>
 
@@ -156,8 +176,9 @@ a.card { text-decoration: none; color: inherit } a.card:hover { border-color: va
       <li>Click a row for all its reasons and an <b>Open settings</b> button.</li>
       <li>The <b>Now</b> line shows which situations are true right now (combat, world, city, group, mounted...): the same words rules use.</li>
       <li><b>Pick a frame in game</b> closes the settings and starts Inspect.</li>
+      <li><b>Open as a window</b> closes the settings and opens the Why window.</li>
     </ul>
-    <p class="note">Neither Inspect nor the page costs anything while it's closed: they only work while you're using them.</p>
+    <p class="note">The window, Inspect and the page cost nothing while they're closed: they only work while you're using them.</p>
   </section>
 
 </div>

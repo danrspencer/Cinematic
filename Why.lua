@@ -1,4 +1,4 @@
--- Inspect (/cine why, or the minimap button's menu): point at any frame
+-- Inspect (/cine why pick, or the Why window's button, WhyPanel.lua): point at any frame
 -- Cinematic fades, even one faded out, and click it to see why it's showing
 -- or hidden right now, and which settings say so. UpdateFrames notes what
 -- decided the frame being looked at (ns.WhyNote); the Standard Frames row's
@@ -371,6 +371,11 @@ local function Explain(entry)
 	local status = n.target >= 1 and "shown" or n.target > 0 and "partly" or "hidden"
 	if not n.cinematic then
 		Add(out, "on", L["CineMode is off, so nothing fades"], "CineMode")
+		-- (Why it's off, in a player's words: Core.lua.)
+		if not ns.lastCinematic and ns.CineOffReason then
+			local text, page = ns.CineOffReason()
+			Add(out, "on", text, page)
+		end
 		return title, status, out, key
 	end
 	-- What's keeping it hidden, over anything else.
@@ -464,6 +469,17 @@ local function Explain(entry)
 	end
 	for _, reason in ipairs(columns) do
 		if reason.state == "off" then out[#out + 1] = reason end
+	end
+	-- Hidden with nothing above doing it: CineMode itself is, as nothing ticked applies.
+	if status == "hidden" then
+		local doing = false
+		for _, reason in ipairs(out) do
+			if reason.state ~= "off" then doing = true break end
+		end
+		if not doing then
+			table.insert(out, 1, { state = "block", page = FramePage(key),
+				text = L["CineMode hides it: nothing ticked on its row applies right now"] })
+		end
 	end
 	return title, status, out, key
 end
@@ -610,6 +626,14 @@ local function OpenPage(page)
 	ns.OpenOptions(page)
 end
 
+-- Stopped by hand (right-click, Escape, the card's close button): back to the
+-- Why window, when Inspect was started from it (WhyPanel.lua).
+local function StopByHand()
+	local back = ns.whyBackToWindow
+	Stop()
+	if back and ns.ShowWhyWindow then ns.ShowWhyWindow() end
+end
+
 local function ReasonLine(index)
 	local line = card.lines[index]
 	if line then return line end
@@ -692,7 +716,7 @@ local function MakeCard()
 	local close = CreateFrame("Button", nil, card, "UIPanelCloseButton")
 	if ns.SkinClose then ns.SkinClose(close) end
 	close:SetPoint("TOPRIGHT", -2, -2)
-	close:SetScript("OnClick", function() Stop() end)
+	close:SetScript("OnClick", StopByHand)
 	card.row = card:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
 	card.row:SetPoint("TOPLEFT", card.title, "BOTTOMLEFT", 0, -4)
 	card.lines, card.headings, card.headingsUsed = {}, {}, 0
@@ -857,17 +881,17 @@ local function MakeOverlay()
 	end)
 	overlay:SetScript("OnMouseUp", function(_, button)
 		if button == "RightButton" then
-			Stop()
+			StopByHand()
 		elseif box.entry then
 			Pick(box.entry)
 		end
 	end)
-	overlay:SetScript("OnHide", function() Stop() end)
+	overlay:SetScript("OnHide", StopByHand) -- (Escape; Stop's own hide finds it stopped already)
 end
 
 function Stop()
 	if not ns.whyPicking then return end
-	ns.whyPicking, ns.whyLook, picked = nil, nil, nil
+	ns.whyPicking, ns.whyLook, picked, ns.whyBackToWindow = nil, nil, nil, nil
 	if overlay then overlay:Hide() end
 	if box then
 		box:Hide()
@@ -976,6 +1000,42 @@ function ns.ToggleInspect()
 	overlay:Show()
 end
 
+-- One entry for each row of frames, for the lists of them all (the page below
+-- and the Why window, WhyPanel.lua): the first that's on screen, else the first.
+local function RowEntries()
+	local order, first = {}, {}
+	for _, entry in ipairs(ns.managed or NONE) do
+		local item = RowItem(entry)
+		local key = item and item.key or (ns.HoverRowFor and ns.HoverRowFor(entry)) or entry.group
+		local ok, left = pcall(EntryRect, entry)
+		if key and (not first[key] or (not first[key].onScreen and ok and left)) then
+			if not first[key] then order[#order + 1] = key end
+			first[key] = { entry = entry, onScreen = ok and left ~= nil }
+		end
+	end
+	return order, first
+end
+
+-- UpdateFrames notes those rows' frames while a list is open (one table for
+-- both lists), unless Inspect is looking at its own.
+local rowLook = {}
+local function LookAtRows(order, first)
+	if ns.whyPicking then return end
+	wipe(rowLook)
+	for _, key in ipairs(order) do rowLook[first[key].entry] = true end
+	ns.whyLook = rowLook
+end
+local function LookAway()
+	if not ns.whyPicking and ns.whyLook == rowLook then ns.whyLook = nil end
+end
+
+-- For WhyPanel.lua, the Why window.
+ns.why = {
+	Explain = Explain, RowEntries = RowEntries, LookAtRows = LookAtRows, LookAway = LookAway,
+	RowItem = RowItem, FramePage = FramePage, EntryRect = EntryRect, StatusText = StatusText,
+	MakeBox = MakeBox, PlaceOver = PlaceOver, ICON = ICON,
+}
+
 -- The UI Manager's "Why Is It Showing?" page: every row of frames Cinematic
 -- fades, what it's doing now and why, kept up to date while the page is open
 -- (UpdateFrames notes the first frame of each row, as Inspect's are).
@@ -993,7 +1053,7 @@ function ns.CreateWhyPanel(kit)
 	title:SetPoint("TOPLEFT", 16, -16)
 	local intro = kit.Label(content, "GameFontHighlight", L["What each row of frames is doing right now, and the " ..
 		"settings behind it. Click a row for all its reasons. To ask about one frame on the screen, pick it in " ..
-		"game (or type /cine why)."])
+		"game. /cine why opens this list as a window you can keep up while you play."])
 	intro:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -8)
 	intro:SetPoint("RIGHT", content, "RIGHT", -16, 0)
 	intro:SetJustifyH("LEFT")
@@ -1006,6 +1066,16 @@ function ns.CreateWhyPanel(kit)
 		local panel = _G.SettingsPanel or _G.InterfaceOptionsFrame
 		if panel and not InCombatLockdown() then pcall(HideUIPanel, panel) end
 		if not ns.whyPicking then ns.ToggleInspect() end
+	end)
+	-- (The same list in a window of its own, to keep open while you play.)
+	local float = ns.PanelButton(content)
+	float:SetSize(170, 24)
+	float:SetText(L["Open as a window"])
+	float:SetPoint("LEFT", pick, "RIGHT", 8, 0)
+	float:SetScript("OnClick", function()
+		local panel = _G.SettingsPanel or _G.InterfaceOptionsFrame
+		if panel and not InCombatLockdown() then pcall(HideUIPanel, panel) end
+		if ns.ShowWhyWindow then ns.ShowWhyWindow() end
 	end)
 	local now = kit.Label(content, "GameFontHighlightSmall", "")
 	now:SetPoint("TOPLEFT", pick, "BOTTOMLEFT", 0, -12)
@@ -1065,7 +1135,7 @@ function ns.CreateWhyPanel(kit)
 	list:SetPoint("TOPLEFT", filterButtons[1], "BOTTOMLEFT", 0, -10)
 	list:SetPoint("RIGHT", content, "RIGHT", -16, 0)
 	list:SetHeight(1)
-	local rows, open, look = {}, {}, {}
+	local rows, open = {}, {}
 
 	local function Row(i)
 		if rows[i] then return rows[i] end
@@ -1110,21 +1180,6 @@ function ns.CreateWhyPanel(kit)
 		return row
 	end
 
-	-- One entry for each row: the first that's on screen, else the first.
-	local function RowEntries()
-		local order, first = {}, {}
-		for _, entry in ipairs(ns.managed or NONE) do
-			local item = RowItem(entry)
-			local key = item and item.key or (ns.HoverRowFor and ns.HoverRowFor(entry)) or entry.group
-			local ok, left = pcall(EntryRect, entry)
-			if key and (not first[key] or (not first[key].onScreen and ok and left)) then
-				if not first[key] then order[#order + 1] = key end
-				first[key] = { entry = entry, onScreen = ok and left ~= nil }
-			end
-		end
-		return order, first
-	end
-
 	function Fill()
 		for _, button in ipairs(filterButtons) do
 			-- (The one picked in gold: the skin's highlight alone hardly shows.)
@@ -1143,12 +1198,7 @@ function ns.CreateWhyPanel(kit)
 		end
 		now:SetText(L["Now: %s"]:format(table.concat(words, "  ")))
 		local order, first = RowEntries()
-		-- (Noted for this page, unless Inspect is looking at its own.)
-		if not ns.whyPicking then
-			wipe(look)
-			for _, key in ipairs(order) do look[first[key].entry] = true end
-			ns.whyLook = look
-		end
+		LookAtRows(order, first) -- (noted for this page)
 		local counts, shownRows = { shown = 0, hidden = 0, all = 0 }, 0
 		local items = {}
 		for _, key in ipairs(order) do
@@ -1226,7 +1276,8 @@ function ns.CreateWhyPanel(kit)
 	end)
 	canvas:SetScript("OnShow", function() Fill() end)
 	canvas:SetScript("OnHide", function()
-		if not ns.whyPicking and ns.whyLook == look then ns.whyLook = nil end
+		-- (The Why window, still open, looks at them again on its next fill.)
+		LookAway()
 	end)
 	canvas:Hide()
 	kit.RegisterSubpage(canvas, "Why showing", L["Why Is It Showing?"])

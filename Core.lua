@@ -2494,6 +2494,7 @@ local noTriggerWhy = setmetatable({}, { __tostring = function()
 end })
 local function ShouldBeCinematic(now)
 	ns.cineOffWhy = "an error (see /cine log)" -- (until a return below says otherwise)
+	ns.cineOffCode = "error" -- (the same, for ns.CineOffReason: the Why window's words)
 	local changed = OffInChanged()
 	MovingFor() -- (each tick, so its timer sees every auto-run and stop)
 	-- Switched off, or in a place or group where it's off: once that ends
@@ -2512,6 +2513,9 @@ local function ShouldBeCinematic(now)
 		ns.cineOffWhy = (not ns.db.enabled and "switched off")
 			or (not triggered and noTriggerWhy)
 			or (GetTime() < snoozeUntil and "snoozed") or "turned off here"
+		ns.cineOffCode = (not ns.db.enabled and "off") or (not triggered and "notrigger")
+			or (not ns.ProfileChosen() and "profile") or (GetTime() < snoozeUntil and "snoozed")
+			or (IsInDisabledZone() and "place") or "group"
 		return false
 	end
 	if changed then
@@ -2525,6 +2529,7 @@ local function ShouldBeCinematic(now)
 		if fight then switchedProfile = false end
 		quickStart = switchedProfile or (not ns.db.stayInCombat and fight) and true or false
 		ns.cineOffWhy = "busy (combat, cast, window or cursor)"
+		ns.cineOffCode = "busy"
 		return false
 	end
 	-- Flights: right away with the option on, or as the flight event's delay ends.
@@ -2542,6 +2547,7 @@ local function ShouldBeCinematic(now)
 		lastMovingOff = now
 		offForMoving = true
 		ns.cineOffWhy = "moving (Off while moving)"
+		ns.cineOffCode = "moving"
 		return false
 	end
 	if instant or travelCine or not ns.db.offWhileMoving then
@@ -2549,6 +2555,7 @@ local function ShouldBeCinematic(now)
 	elseif now - lastMovingOff < MovingWait() then
 		offForMoving = true
 		ns.cineOffWhy = "just moved (Off while moving)"
+		ns.cineOffCode = "moved"
 		return false
 	end
 	-- Otherwise things must stay calm (no cast, window or the like) for the
@@ -2559,7 +2566,60 @@ local function ShouldBeCinematic(now)
 		return true
 	end
 	ns.cineOffWhy = ("waiting out Back into CineMode after (%.0f of %d sec)"):format(now - lastBusy, delay)
+	ns.cineOffCode = "waiting"
+	ns.cineOffLeft = delay - (now - lastBusy)
 	return false
+end
+
+-- Why CineMode is off right now, in a player's words (the Why window and
+-- Inspect's card, Why.lua), and the settings page that says so (nil: the main
+-- page). Read from what ShouldBeCinematic last found (ns.cineOffCode), with
+-- "busy" looked at again here for which of its things it is.
+local PLACE_BOX = { city = "In cities", dungeon = "In dungeons", raid = "In raids", pvp = "In PvP" }
+function ns.CineOffReason()
+	local code = ns.cineOffCode
+	local exit = L["Exit CineMode: %s is ticked."]
+	if ns.IsSuspended() then
+		return L["Cinematic stopped itself for this session after an error. Type /cine resume to start it again."]
+	elseif code == "off" or not ns.db.enabled then
+		return L["Cinematic is switched off. Type /cine on to turn it back on."]
+	elseif code == "profile" then
+		return L["You haven't picked a profile yet: finish the welcome window first."]
+	elseif code == "notrigger" then
+		return L["Start in CineMode is unticked, so CineMode only comes on while one of your camera scenes runs."]
+	elseif code == "snoozed" then
+		return L["You turned it off for a while from the minimap button's menu."]
+	elseif code == "place" then
+		local place = ns.GetOptionPlace()
+		return L["CineMode is set to stay off here."] .. " " .. exit:format(L[PLACE_BOX[place] or "In the open world"])
+	elseif code == "group" then
+		return L["CineMode is set to stay off in your group."] .. " "
+			.. exit:format(ns.InRaid() and L["In a raid group"] or L["In a party"])
+	elseif code == "moving" then
+		return L["You're moving."] .. " " .. exit:format(L["When moving"])
+	elseif code == "moved" then
+		return L["You just moved: CineMode comes back once you've stood still, or kept going, for a moment."]
+	elseif code == "waiting" then
+		return L["CineMode comes back in %d sec (Back into CineMode after)."]
+			:format(math.max(1, math.ceil(ns.cineOffLeft or 1))), "CineMode"
+	elseif code == "busy" then
+		if (InCombatLockdown() or Flag(UnitAffectingCombat("player"))) and not ns.db.stayInCombat then
+			return L["You're in combat."] .. " " .. exit:format(L["In combat"])
+		elseif Flag(UnitIsDead("player")) and not Flag(UnitIsGhost("player")) then
+			return L["You're dead: the UI comes back until you release or get up."]
+		elseif ns.db.revealOnCast and (Flag(UnitCastingInfo("player")) or Flag(UnitChannelInfo("player"))) then
+			return L["You're casting."] .. " " .. exit:format(L["While casting"]), "CineMode"
+		elseif CursorBusy() then
+			return L["You're holding something on the cursor."] .. " " .. exit:format(L["While dragging something"]),
+				"CineMode"
+		elseif not ns.db.stayWithWindows and (AnyShown(REVEAL_WHILE_SHOWN) or AnyShown(REVEAL_ALSO)) then
+			return L["A game window is open."] .. " " .. exit:format(L["Opening windows"]), "CineMode"
+		elseif ns.db.revealAtNPCs and AnyShown(REVEAL_AT_NPCS) then
+			return L["An NPC's window is open."] .. " " .. exit:format(L["Talking to NPCs"]), "CineMode"
+		end
+		return L["Something just brought the UI back (a fight, a cast or a window)."], "CineMode"
+	end
+	return L["Something went wrong: type /cine log and send it to us."]
 end
 
 -- Settings held by a set marked playerWins, and the value written: if the

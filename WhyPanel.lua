@@ -1,0 +1,597 @@
+-- The Why window (/cine why): every row of frames Cinematic fades in one
+-- window you can keep up while you play, each saying in a line whether it's
+-- showing and why, by section as the Game Frames page has them. At its top,
+-- whether CineMode is on (and when it isn't, what's keeping it off) and what
+-- you're doing right now. A row opens to all its reasons, a button to its
+-- settings and one that points it out on the screen. Pick a frame on screen
+-- starts Inspect (Why.lua), which comes back here when stopped; Copy report
+-- gives the whole list as text to send us.
+-- The reasons are Inspect's (ns.why.Explain); the list is filled twice a
+-- second while the window is up, and nothing runs while it's closed.
+
+local _, ns = ...
+local L = ns.L
+local why = ns.why
+
+local GREEN, GREY, GOLD = "|cff8fe39a", "|cff9d9585", "|cffffd100"
+local WIDTH, HEIGHT = 480, 580
+local LIST_WIDTH = WIDTH - 16 - 34 -- (the list's rows: the window less its edges and scroll bar)
+local ROW_HEIGHT, HEADER_HEIGHT = 38, 24
+local STATUS_COLOR = {
+	shown = { 0.56, 0.89, 0.60 }, partly = { 1, 0.82, 0 }, hidden = { 0.95, 0.64, 0.64 },
+	idle = { 0.5, 0.5, 0.5 }, unknown = { 0.5, 0.5, 0.5 },
+}
+-- The Game Frames page's sections, in its order, then the rest.
+local SECTIONS = {
+	{ "units", "Unit frames" }, { "bars", "Action bars" }, { "combat", "Trackers" },
+	{ "interface", "Info and menus" }, { "minimap", "Minimap" }, { "party", "Party frames (not raid-style)" },
+	{ "raid", "Raid frames" }, { "rsparty", "Party frames (raid-style)" }, { "gamepad", "Gamepad" },
+	{ "addons", "Other addons' frames" }, { "other", "Everything else" },
+}
+local SECTION_ORDER, SECTION_LABEL = {}, {}
+for i, section in ipairs(SECTIONS) do
+	SECTION_ORDER[section[1]], SECTION_LABEL[section[1]] = i, section[2]
+end
+local FILTERS = { { "all", "All" }, { "shown", "Showing" }, { "hidden", "Hidden" } }
+
+local window, list, detail, flash
+local filter, search, openKey = "all", "", nil
+local items = {} -- (the rows as last filled: Copy report's too)
+local Fill -- (below)
+
+-- A row's place in the list: its section, and where it comes on the Game Frames page.
+local rowPlace
+local function RowPlace(key)
+	if not rowPlace then
+		rowPlace = {}
+		for i, item in ipairs(ns.COMBAT_SHOW) do
+			rowPlace[item.key] = { section = SECTION_ORDER[item.page] and item.page or nil, at = i }
+		end
+	end
+	local place = rowPlace[key]
+	local section = place and place.section
+	if not section then
+		section = type(key) == "string" and (key:find("^addon:") or key:find("^extra:")) and "addons" or "other"
+	end
+	return section, place and place.at or 1000
+end
+
+local function StatusText(status)
+	if status == "idle" then return GREY .. L["NOT ON SCREEN"] .. "|r" end
+	return why.StatusText(status)
+end
+
+-- Text as it reads, without the game's color codes (for the report and the search).
+local function Bare(text)
+	return (tostring(text):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""):gsub("||", "|"))
+end
+
+-- What you're doing right now, in words: what the ticks and rules go by.
+local function NowWords()
+	local words = {}
+	local fighting = InCombatLockdown() or ns.Flag(UnitAffectingCombat("player"))
+	words[#words + 1] = fighting and L["in combat"] or (ns.InCalm() and L["just out of combat (Calm Timer)"])
+		or L["out of combat"]
+	if ns.HasTarget() then
+		local enemy = ns.IsEnemyUnit("target") and not ns.Flag(UnitIsDeadOrGhost("target"))
+		words[#words + 1] = enemy and L["targeting an enemy"] or L["targeting a friend"]
+	else
+		words[#words + 1] = L["no target"]
+	end
+	local place = ns.GetPlaceType()
+	words[#words + 1] = (place == "city" and L["in a city"]) or (place == "dungeon" and L["in a dungeon"])
+		or (place == "raid" and L["in a raid"]) or (place == "pvp" and L["in a battleground or arena"])
+		or (place == "inn" and L["at an inn"]) or L["in the open world"]
+	if ns.InGroup() then
+		words[#words + 1] = ns.InRaid() and L["in a raid group"] or L["in a party"]
+	end
+	if IsMounted and ns.Flag(IsMounted()) then words[#words + 1] = L["mounted"] end
+	return table.concat(words, ", ")
+end
+
+-- The rows, each with its status and reasons, in the list's order; and how
+-- many are showing, hidden and in all (before the filter and the search).
+local function Gather()
+	local order, first = why.RowEntries()
+	why.LookAtRows(order, first)
+	local counts = { all = 0, shown = 0, hidden = 0 }
+	local found = wipe(items)
+	local words = search:lower()
+	for _, key in ipairs(order) do
+		local info = first[key]
+		local ok, title, status, reasons = pcall(why.Explain, info.entry)
+		if ok then
+			title = tostring(title)
+			-- (Not hidden by Cinematic, and not drawn by the game either: no
+			-- target, no group, a bar switched off.)
+			if (status == "shown" or status == "partly") and not info.onScreen then
+				status = "idle"
+				table.insert(reasons, 1, { state = "on", text = L["Cinematic isn't hiding it. The game has nothing to " ..
+					"show there right now (no target, no group, or it's switched off in the game or by another addon)."] })
+			end
+			local kind = (status == "shown" or status == "partly") and "shown" or (status == "hidden" and "hidden") or nil
+			counts.all = counts.all + 1
+			if kind then counts[kind] = counts[kind] + 1 end
+			local section, at = RowPlace(key)
+			local sectionLabel = L[SECTION_LABEL[section]]
+			if (filter == "all" or filter == kind) and (words == ""
+				or title:lower():find(words, 1, true) or sectionLabel:lower():find(words, 1, true)) then
+				-- (The line under its name: the first reason doing it now, else the first.)
+				local main = reasons[1]
+				for _, reason in ipairs(reasons) do
+					if reason.state ~= "off" then main = reason break end
+				end
+				found[#found + 1] = { key = key, entry = info.entry, title = title, status = status, reasons = reasons,
+					main = main, section = section, sectionLabel = sectionLabel, at = at }
+			end
+		end
+	end
+	table.sort(found, function(a, b)
+		if a.section ~= b.section then return SECTION_ORDER[a.section] < SECTION_ORDER[b.section] end
+		if a.at ~= b.at then return a.at < b.at end
+		if a.title ~= b.title then return a.title < b.title end
+		return tostring(a.key) < tostring(b.key)
+	end)
+	return found, counts
+end
+
+-- The heading over a row's reasons: those doing it now, then those that would.
+local function HeadingText(status, kind)
+	if kind == "off" then
+		return status == "hidden" and L["ANY OF THESE WOULD SHOW IT"] or L["NOT SHOWING IT NOW"]
+	end
+	return (status == "hidden" and L["KEEPING IT HIDDEN"]) or (status == "idle" and L["RIGHT NOW"])
+		or L["SHOWN BECAUSE"]
+end
+
+-- Points a row's frame out on the screen for a few seconds: a gold box
+-- where it is (or where it would be, faded out).
+local function PointOut(item)
+	if not flash then flash = why.MakeBox() end
+	if not why.PlaceOver(flash, item.entry) then
+		ns.Print(L["%s isn't on the screen right now, so there's nothing to point at."]:format(item.title))
+		return
+	end
+	flash.label:SetText(("%s  %s"):format(item.title, StatusText(item.status)))
+	flash.endsAt = GetTime() + 4
+	ns.SetOnUpdate(flash, function(self)
+		local left = self.endsAt - GetTime()
+		if left <= 0 then
+			self:Hide()
+			ns.SetOnUpdate(self, nil)
+		else
+			-- (Blinking, so it's found at a glance.)
+			self:SetAlpha(0.55 + 0.45 * math.abs(math.sin(left * 4)))
+		end
+	end)
+end
+
+local function CopyReport()
+	-- (Every row, whatever the list is showing; the next fill puts the list back.)
+	local keptFilter, keptSearch = filter, search
+	filter, search = "all", ""
+	local found = Gather()
+	filter, search = keptFilter, keptSearch
+	local out = {}
+	out[#out + 1] = ("Cinematic %s, %s"):format(ns.Version and ns.Version() or "?",
+		ns.isRetail and "retail" or ("game " .. tostring(select(4, GetBuildInfo()))))
+	if ns.lastCinematic then
+		out[#out + 1] = "CineMode: ON"
+	else
+		out[#out + 1] = "CineMode: OFF - " .. Bare(ns.CineOffReason())
+	end
+	out[#out + 1] = "Right now: " .. NowWords()
+	local section
+	for _, item in ipairs(found) do
+		if item.section ~= section then
+			section = item.section
+			out[#out + 1] = ""
+			out[#out + 1] = "== " .. item.sectionLabel .. " =="
+		end
+		out[#out + 1] = ("[%s] %s"):format(Bare(StatusText(item.status)), item.title)
+		for _, reason in ipairs(item.reasons) do
+			out[#out + 1] = ("    %s %s%s"):format(reason.state == "on" and "+" or (reason.state == "block" and "x") or "-",
+				Bare(reason.text), reason.page and (" (" .. ns.PageLabel(reason.page) .. ")") or "")
+		end
+	end
+	ns.ShowReportText(L["Why is it showing? report"], L["Press Ctrl+C to copy this, then paste it to us on Discord " ..
+		"or in a bug report. It lists each row of frames, whether it's showing, and why."], table.concat(out, "\n"))
+end
+
+-- A row's reasons, under it while it's open: one frame, moved to the open row.
+local function DetailLine(index)
+	local line = detail.lines[index]
+	if line then return line end
+	line = CreateFrame("Button", nil, detail)
+	line.icon = line:CreateTexture(nil, "ARTWORK")
+	line.icon:SetSize(14, 14)
+	line.icon:SetPoint("TOPLEFT", 0, -1)
+	line.text = line:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+	line.text:SetPoint("TOPLEFT", line.icon, "TOPRIGHT", 6, 0)
+	line.text:SetWidth(LIST_WIDTH - 46)
+	line.text:SetJustifyH("LEFT")
+	line.where = line:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+	line.where:SetPoint("TOPLEFT", line.text, "BOTTOMLEFT", 0, -2)
+	line.where:SetJustifyH("LEFT")
+	local glow = line:CreateTexture(nil, "HIGHLIGHT")
+	glow:SetAllPoints()
+	glow:SetColorTexture(1, 0.82, 0, 0.08)
+	line:SetScript("OnClick", function(self)
+		if self.page then ns.OpenOptions(self.page) end
+	end)
+	detail.lines[index] = line
+	return line
+end
+
+local function DetailHeading(index)
+	local heading = detail.headings[index]
+	if not heading then
+		heading = detail:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+		heading:SetJustifyH("LEFT")
+		detail.headings[index] = heading
+	end
+	return heading
+end
+
+-- Fills it for a row; gives its height.
+local function FillDetail(item)
+	detail.item = item
+	local y, lines, headings, lastKind = 2, 0, 0, nil
+	for _, reason in ipairs(item.reasons) do
+		local kind = reason.state == "off" and "off" or "now"
+		if kind ~= lastKind then
+			headings = headings + 1
+			local heading = DetailHeading(headings)
+			heading:ClearAllPoints()
+			heading:SetPoint("TOPLEFT", detail, "TOPLEFT", 0, -(y + 4))
+			heading:SetText(HeadingText(item.status, kind))
+			heading:Show()
+			y = y + 4 + heading:GetStringHeight() + 4
+			lastKind = kind
+		end
+		lines = lines + 1
+		local line = DetailLine(lines)
+		local off = reason.state == "off"
+		line.icon:SetTexture(why.ICON[reason.state])
+		line.icon:SetDesaturated(off)
+		line.text:SetText(reason.text)
+		line.text:SetTextColor(off and 0.62 or 1, off and 0.58 or 1, off and 0.52 or 1)
+		line.page = reason.page
+		line.where:SetText(reason.page and L["Settings: %s"]:format(ns.PageLabel(reason.page)) or "")
+		local height = line.text:GetStringHeight() + (reason.page and line.where:GetStringHeight() + 2 or 0) + 2
+		line:ClearAllPoints()
+		line:SetPoint("TOPLEFT", detail, "TOPLEFT", 0, -y)
+		line:SetSize(LIST_WIDTH - 24, height)
+		line:Show()
+		y = y + height + 5
+	end
+	for i = lines + 1, #detail.lines do detail.lines[i]:Hide() end
+	for i = headings + 1, #detail.headings do detail.headings[i]:Hide() end
+	detail.open:ClearAllPoints()
+	detail.open:SetPoint("TOPLEFT", detail, "TOPLEFT", 0, -(y + 4))
+	-- (The page of what's doing it now, else the row's own.)
+	detail.open.page = (item.main and item.main.page) or why.FramePage(item.key)
+	y = y + 4 + 22 + 10
+	detail:SetHeight(y)
+	return y
+end
+
+local function MakeDetail()
+	detail = CreateFrame("Frame", nil, list)
+	detail.lines, detail.headings = {}, {}
+	detail.open = ns.PanelButton(detail)
+	detail.open:SetSize(120, 22)
+	detail.open:SetText(L["Open settings"])
+	detail.open:SetScript("OnClick", function(self)
+		if self.page then ns.OpenOptions(self.page) end
+	end)
+	detail.point = ns.PanelButton(detail)
+	detail.point:SetSize(150, 22)
+	detail.point:SetText(L["Show me where it is"])
+	detail.point:SetPoint("LEFT", detail.open, "RIGHT", 8, 0)
+	detail.point:SetScript("OnClick", function()
+		if detail.item then PointOut(detail.item) end
+	end)
+end
+
+local function Row(index)
+	local row = list.rows[index]
+	if row then return row end
+	row = CreateFrame("Button", nil, list)
+	row:SetSize(LIST_WIDTH, ROW_HEIGHT)
+	local glow = row:CreateTexture(nil, "HIGHLIGHT")
+	glow:SetAllPoints()
+	glow:SetColorTexture(1, 0.82, 0, 0.08)
+	-- (Its status as a stripe down its left edge, to read the list at a glance.)
+	row.stripe = row:CreateTexture(nil, "ARTWORK")
+	row.stripe:SetPoint("TOPLEFT", 0, -3)
+	row.stripe:SetSize(3, ROW_HEIGHT - 6)
+	row.name = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+	row.name:SetPoint("TOPLEFT", 12, -4)
+	row.name:SetWidth(LIST_WIDTH - 12 - 120)
+	row.name:SetJustifyH("LEFT")
+	row.name:SetWordWrap(false)
+	row.status = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+	row.status:SetPoint("TOPRIGHT", -6, -6)
+	row.status:SetJustifyH("RIGHT")
+	row.reason = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+	row.reason:SetPoint("TOPLEFT", row.name, "BOTTOMLEFT", 0, -3)
+	row.reason:SetWidth(LIST_WIDTH - 12 - 8)
+	row.reason:SetJustifyH("LEFT")
+	row.reason:SetWordWrap(false)
+	row.reason:SetTextColor(0.78, 0.76, 0.7)
+	row:SetScript("OnClick", function(self)
+		openKey = openKey ~= self.key and self.key or nil
+		Fill()
+	end)
+	list.rows[index] = row
+	return row
+end
+
+local function Header(index)
+	local header = list.headers[index]
+	if header then return header end
+	header = list:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+	header:SetJustifyH("LEFT")
+	header:SetTextColor(0.62, 0.58, 0.52)
+	header.line = list:CreateTexture(nil, "ARTWORK")
+	header.line:SetColorTexture(1, 1, 1, 0.12)
+	header.line:SetHeight(1)
+	header.line:SetPoint("BOTTOMLEFT", header, "BOTTOMLEFT", 0, -3)
+	header.line:SetWidth(LIST_WIDTH)
+	list.headers[index] = header
+	return header
+end
+
+function Fill()
+	if not (window and list and detail and ns.Flag(window:IsShown())) then return end
+	-- The top: CineMode on or off, and what's keeping it off.
+	local banner = window.banner
+	if ns.lastCinematic then
+		banner.stripe:SetColorTexture(0.56, 0.89, 0.60)
+		banner.title:SetText(L["CineMode is %s"]:format(GREEN .. L["ON"] .. "|r"))
+		banner.text:SetText(L["Cinematic is hiding parts of your interface. Each row below says whether it's " ..
+			"showing right now, and why."])
+		banner.page = "CineMode"
+	else
+		local text, page = ns.CineOffReason()
+		banner.stripe:SetColorTexture(1, 0.82, 0)
+		banner.title:SetText(L["CineMode is %s"]:format(GOLD .. L["OFF"] .. "|r"))
+		banner.text:SetText(L["So Cinematic isn't hiding anything right now."] .. " " .. text)
+		banner.page = page
+	end
+	banner.now:SetText(L["Right now you are: %s"]:format(NowWords()))
+	banner:SetHeight(10 + banner.title:GetStringHeight() + 4 + banner.text:GetStringHeight() + 6
+		+ banner.now:GetStringHeight() + 10)
+
+	local found, counts = Gather()
+	for _, button in ipairs(window.filters) do
+		local chosen = button.key == filter
+		button:SetText(("%s (%d)"):format(L[button.label], counts[button.key]))
+		if chosen then button:LockHighlight() else button:UnlockHighlight() end
+		local text = button:GetFontString()
+		if text then
+			if chosen then text:SetTextColor(1, 0.82, 0) else text:SetTextColor(1, 1, 1) end
+		end
+	end
+
+	local y, rows, headers, section, opened = 0, 0, 0, nil, false
+	for _, item in ipairs(found) do
+		if item.section ~= section then
+			section = item.section
+			headers = headers + 1
+			local header = Header(headers)
+			header:ClearAllPoints()
+			header:SetPoint("TOPLEFT", list, "TOPLEFT", 2, -(y + 8))
+			header:SetText(item.sectionLabel:upper())
+			header:Show()
+			header.line:Show()
+			y = y + HEADER_HEIGHT
+		end
+		rows = rows + 1
+		local row = Row(rows)
+		row.key = item.key
+		local color = STATUS_COLOR[item.status] or STATUS_COLOR.unknown
+		row.stripe:SetColorTexture(color[1], color[2], color[3])
+		row.name:SetText(item.title)
+		row.status:SetText(StatusText(item.status))
+		row.reason:SetText(item.main and item.main.text or "")
+		row:ClearAllPoints()
+		row:SetPoint("TOPLEFT", list, "TOPLEFT", 0, -y)
+		row:Show()
+		y = y + ROW_HEIGHT
+		if item.key == openKey then
+			opened = true
+			local height = FillDetail(item)
+			detail:ClearAllPoints()
+			detail:SetPoint("TOPLEFT", list, "TOPLEFT", 14, -y)
+			detail:SetWidth(LIST_WIDTH - 14)
+			detail:Show()
+			y = y + height
+		end
+	end
+	for i = rows + 1, #list.rows do list.rows[i]:Hide() end
+	for i = headers + 1, #list.headers do
+		list.headers[i]:Hide()
+		list.headers[i].line:Hide()
+	end
+	if not opened then detail:Hide() end
+	window.empty:SetShown(rows == 0)
+	if rows == 0 then
+		window.empty:SetText((counts.all == 0 and L["Cinematic isn't fading any frames right now: its frame pages " ..
+			"are off, or it has only just started. Give it a moment."])
+			or (search ~= "" and L["Nothing here is called \"%s\"."]:format(search)) or L["Nothing in this list right now."])
+	end
+	list:SetHeight(math.max(1, y + 8))
+end
+
+local function MakeWindow()
+	window = CreateFrame("Frame", "CinematicWhyWindow", UIParent, BackdropTemplateMixin and "BackdropTemplate")
+	window:SetSize(WIDTH, HEIGHT)
+	window:SetPoint("RIGHT", UIParent, "RIGHT", -80, 0)
+	window:SetFrameStrata("HIGH")
+	window:SetToplevel(true)
+	window:SetClampedToScreen(true)
+	window:EnableMouse(true)
+	-- (Dragged by any empty part of it, out of the way of what you're looking at.)
+	window:SetMovable(true)
+	window:RegisterForDrag("LeftButton")
+	window:SetScript("OnDragStart", window.StartMoving)
+	window:SetScript("OnDragStop", window.StopMovingOrSizing)
+	if window.SetBackdrop then
+		window:SetBackdrop({
+			bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background-Dark",
+			edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+			tile = true, tileSize = 16, edgeSize = 16,
+			insets = { left = 4, right = 4, top = 4, bottom = 4 },
+		})
+	end
+	if ns.SkinWindow then ns.SkinWindow(window) end
+	tinsert(UISpecialFrames, "CinematicWhyWindow") -- Escape closes it
+
+	local title = window:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+	title:SetPoint("TOPLEFT", 16, -14)
+	title:SetText(L["Why Is It Showing?"])
+	local close = CreateFrame("Button", nil, window, "UIPanelCloseButton")
+	if ns.SkinClose then ns.SkinClose(close) end
+	close:SetPoint("TOPRIGHT", -2, -2)
+
+	-- CineMode on or off, why, and what you're doing: click it for the setting.
+	local banner = CreateFrame("Button", nil, window)
+	banner:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -10)
+	banner:SetPoint("RIGHT", window, "RIGHT", -16, 0)
+	banner:SetHeight(70)
+	local back = banner:CreateTexture(nil, "BACKGROUND")
+	back:SetAllPoints()
+	back:SetColorTexture(1, 1, 1, 0.05)
+	local glow = banner:CreateTexture(nil, "HIGHLIGHT")
+	glow:SetAllPoints()
+	glow:SetColorTexture(1, 0.82, 0, 0.06)
+	banner.stripe = banner:CreateTexture(nil, "ARTWORK")
+	banner.stripe:SetPoint("TOPLEFT")
+	banner.stripe:SetPoint("BOTTOMLEFT")
+	banner.stripe:SetWidth(3)
+	banner.title = banner:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+	banner.title:SetPoint("TOPLEFT", 12, -10)
+	banner.text = banner:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+	banner.text:SetPoint("TOPLEFT", banner.title, "BOTTOMLEFT", 0, -4)
+	banner.text:SetWidth(WIDTH - 32 - 24)
+	banner.text:SetJustifyH("LEFT")
+	banner.now = banner:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+	banner.now:SetPoint("TOPLEFT", banner.text, "BOTTOMLEFT", 0, -6)
+	banner.now:SetWidth(WIDTH - 32 - 24)
+	banner.now:SetJustifyH("LEFT")
+	banner:SetScript("OnClick", function(self) ns.OpenOptions(self.page) end)
+	window.banner = banner
+
+	-- Find a row by name, and the filters with their counts.
+	local okBox, box = pcall(CreateFrame, "EditBox", nil, window, "SearchBoxTemplate")
+	if not okBox then box = CreateFrame("EditBox", nil, window, "InputBoxTemplate") end
+	box:SetSize(130, 20)
+	box:SetAutoFocus(false)
+	box:SetPoint("TOPLEFT", banner, "BOTTOMLEFT", 6, -10)
+	box:HookScript("OnTextChanged", function(self)
+		local text = self:GetText()
+		search = type(text) == "string" and text:match("^%s*(.-)%s*$") or ""
+		Fill()
+	end)
+	box:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
+	box:SetScript("OnEnterPressed", function(self) self:ClearFocus() end)
+	window.filters = {}
+	for i, info in ipairs(FILTERS) do
+		local button = ns.PanelButton(window)
+		button:SetSize(90, 22)
+		button.key, button.label = info[1], info[2]
+		if i == 1 then
+			button:SetPoint("LEFT", box, "RIGHT", 10, 0)
+		else
+			button:SetPoint("LEFT", window.filters[i - 1], "RIGHT", 4, 0)
+		end
+		button:SetScript("OnClick", function(self)
+			filter = self.key
+			Fill()
+		end)
+		window.filters[i] = button
+	end
+
+	-- At the bottom: Inspect, the report, and how to read the list.
+	local pick = ns.PanelButton(window)
+	pick:SetSize(180, 24)
+	pick:SetText(L["Pick a frame on screen"])
+	pick:SetPoint("BOTTOMLEFT", 16, 14)
+	pick:SetScript("OnClick", function()
+		window:Hide()
+		if not ns.whyPicking then ns.ToggleInspect() end
+		ns.whyBackToWindow = true -- (stopped by hand, it comes back here: Why.lua)
+	end)
+	local report = ns.PanelButton(window)
+	report:SetSize(120, 24)
+	report:SetText(L["Copy report"])
+	report:SetPoint("LEFT", pick, "RIGHT", 8, 0)
+	report:SetScript("OnClick", CopyReport)
+	local hint = window:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+	hint:SetPoint("BOTTOMLEFT", pick, "TOPLEFT", 0, 8)
+	hint:SetPoint("RIGHT", window, "RIGHT", -16, 0)
+	hint:SetHeight(36) -- (three lines' room, so the list's bottom edge stays put)
+	hint:SetJustifyH("LEFT")
+	hint:SetJustifyV("BOTTOM")
+	hint:SetText(L["Click a row for all its reasons and its settings. It keeps itself up to date: start a fight " ..
+		"or target something and watch it change. Not in the list? Pick it on screen."])
+
+	local scroll = CreateFrame("ScrollFrame", nil, window, "UIPanelScrollFrameTemplate")
+	if ns.SkinScroll then ns.SkinScroll(scroll) end
+	scroll:SetPoint("TOPLEFT", box, "BOTTOMLEFT", -6, -10)
+	scroll:SetPoint("BOTTOMRIGHT", window, "BOTTOMRIGHT", -34, 14 + 24 + 8 + 36 + 8) -- (over the hint and buttons)
+	list = CreateFrame("Frame", nil, scroll)
+	list:SetSize(LIST_WIDTH, 1)
+	list.rows, list.headers = {}, {}
+	scroll:SetScrollChild(list)
+	window.empty = window:CreateFontString(nil, "OVERLAY", "GameFontDisable")
+	window.empty:SetPoint("TOPLEFT", scroll, "TOPLEFT", 4, -16)
+	window.empty:SetWidth(LIST_WIDTH - 8)
+	window.empty:SetJustifyH("LEFT")
+	MakeDetail()
+
+	local elapsedSince = 0
+	ns.SetOnUpdate(window, function(_, elapsed)
+		elapsedSince = elapsedSince + elapsed
+		if elapsedSince > 0.5 then
+			elapsedSince = 0
+			Fill()
+		end
+	end)
+	window:SetScript("OnShow", function()
+		-- (Filled at once, and again as soon as UpdateFrames has noted the rows.)
+		elapsedSince = 0.3
+		Fill()
+	end)
+	window:SetScript("OnHide", function()
+		window:StopMovingOrSizing()
+		if flash then flash:Hide() end
+		why.LookAway()
+	end)
+end
+
+function ns.ShowWhyWindow()
+	if not window then
+		MakeWindow()
+		window:Hide()
+	end
+	window:Show()
+end
+
+-- /cine why: the window, or away with it (and with Inspect, started from it).
+function ns.ToggleWhyWindow()
+	if ns.whyPicking then
+		ns.ToggleInspect()
+	elseif window and ns.Flag(window:IsShown()) then
+		window:Hide()
+	else
+		ns.ShowWhyWindow()
+	end
+end
+
+-- What the window lists now (its rows and counts), for checks outside the game.
+function ns.WhyWindowRows()
+	return Gather()
+end

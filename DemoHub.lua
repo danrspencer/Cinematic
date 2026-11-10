@@ -207,7 +207,7 @@ Add("1. Settings & menus", { key = "menu-look", name = "Menu look: HD, then SD",
 		end
 	end })
 Add("1. Settings & menus", { key = "why", name = "Inspect: why is it showing?",
-	tip = "/cine why: then click a frame and Inspect says what keeps it up. Again to stop.",
+	tip = "/cine why: a window of every frame and why it shows. Pick a frame on screen, then click one, for Inspect.",
 	run = function() ns.HandleSlash("why") end })
 Add("1. Settings & menus", { key = "welcome", name = "Welcome window", tip = "/cine welcome",
 	run = function() ns.ShowWelcome() end })

@@ -73,7 +73,8 @@ local function PrintHelp()
 	Command("/cine add mode", L["pick up every frame you hover over, then again to fade them all"])
 	Command("/cine keep", L["always show it"])
 	Command("/cine list", L["show the extra faded frames"])
-	Command("/cine why", L["click any frame to see why it's showing or hidden"])
+	Command("/cine why", L["a window listing every frame, whether it's showing right now, and why"])
+	Command("/cine why pick", L["click any frame to see why it's showing or hidden"])
 	Command("/cine plates", L["why friendly nameplates near you are showing, as text to copy and send us"])
 	Heading(L["Camera"])
 	Command("/cine behind", L["swing the camera back behind your character"])
@@ -365,7 +366,8 @@ local function HandleSlash(msg)
 	elseif cmd == "remove" or cmd == "keep" then
 		ns.RemoveUnderMouse()
 	elseif cmd == "why" then
-		ns.ToggleInspect()
+		-- (The window of every row; /cine why pick: straight to pointing at a frame.)
+		if arg == "pick" then ns.ToggleInspect() else ns.ToggleWhyWindow() end
 	elseif cmd == "plates" then
 		ns.PlatesReport()
 	elseif cmd == "report" then
