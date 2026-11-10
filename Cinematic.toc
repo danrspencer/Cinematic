@@ -70,6 +70,7 @@ Campfire.lua
 Hunter.lua
 HunterAmmo.lua
 DragEquip.lua
+CombineBags.lua
 TalentLink.lua
 TalentCalc.lua
 CenterPanels.lua
