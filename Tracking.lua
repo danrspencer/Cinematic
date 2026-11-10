@@ -128,6 +128,31 @@ local function IsTrackingSomethingWanted()
 	return gathering, creatures
 end
 
+-- Whether Find Minerals, Find Herbs or Find Treasure is on, whatever's ticked
+-- under Keep open (the cursor sweep, NodeSweep.lua, looks only then). Auras
+-- are secret in combat: the last answer is kept until it's over.
+local gatheringOn = false
+function ns.IsGatheringTrackingOn()
+	if InCombatLockdown() or ns.Flag(UnitAffectingCombat("player")) then return gatheringOn end
+	if trackingChanged then
+		trackingChanged = false
+		FillActiveTrackingSpells(wipe(activeSpells))
+		activeIcon = GetActiveTrackingIcon()
+	end
+	gatheringOn = false
+	for _, kind in ipairs(TRACKING) do
+		if kind.gathering then
+			for _, spellID in ipairs(kind.spells) do
+				if activeSpells[spellID] then gatheringOn = true end
+			end
+			for _, trackingIcon in ipairs(kind.icons) do
+				if activeIcon and activeIcon == trackingIcon then gatheringOn = true end
+			end
+		end
+	end
+	return gatheringOn
+end
+
 -- Called from Frames.lua's frame update: whether to keep the minimap up for
 -- gathering tracking, and for creature or fish tracking. Auras are secret in
 -- combat, so the last answer is kept until it's over.

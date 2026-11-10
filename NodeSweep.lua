@@ -1466,6 +1466,12 @@ cursor.DEPTH = 4    -- generations of the minimap's children whose mouse is turn
 cursor.LOOTED = 12  -- yards: looting this near a node's spot drops it
 cursor.SETTLE = 5   -- seconds after a login or /reload before the first one (10 was a guess; 5 on trial 2026-11-10)
 cursor.KEEP = 0.85  -- of the minimap's view radius: a node further than this from you lets it go
+-- Frames between two looks at the world: the minimap back off the pointer
+-- for a frame, and the sweep stops if the mouse is on someone or something
+-- then (under the minimap the game can't see them: one that came under the
+-- pointer mid-sweep had its cursor flick to the arrow and back, seen
+-- 2026-11-10). At most this many frames of that before it stops.
+cursor.PEEK = 6
 
 function cursor.Can()
 	return Minimap.AdjustPointsOffset ~= nil and Minimap.SetIconScale ~= nil and GetCursorPosition ~= nil
@@ -1504,6 +1510,16 @@ local function InMinimap(frame)
 	return false
 end
 
+-- Whether the mouse is on a unit or a thing in the world (a chest, a herb:
+-- the game's world tooltip), as a reason, or nil.
+function cursor.OnWorldThing()
+	if ns.Flag(UnitExists("mouseover")) then return "your mouse is on someone" end
+	local owner = GameTooltip and ns.Flag(GameTooltip:IsShown()) and GameTooltip:GetOwner()
+	if owner ~= nil and (owner == UIParent or owner == WorldFrame) then
+		return "your mouse is on something in the world"
+	end
+end
+
 -- Why the cursor sweep can't run (or go on, started) now, or nil.
 function cursor.NotReady(started)
 	-- (In fights with In combat too ticked, or /cine debug cursorsweep combat
@@ -1515,6 +1531,15 @@ function cursor.NotReady(started)
 		return "in combat"
 	end
 	if not ns.Flag(Minimap:IsVisible()) then return "the minimap is hidden" end
+	-- (Nothing to find without ore, herb or treasure tracking on, and not in
+	-- the places ticked under its Except in, Minimap page. Only before a
+	-- sweep starts: one going on finishes.)
+	if not started and not cursor.diag then
+		if ns.IsGatheringTrackingOn and not ns.IsGatheringTrackingOn() then
+			return "no ore, herb or treasure tracking is on"
+		end
+		if ns.IsNodeScanOffHere and ns.IsNodeScanOffHere() then return "not here (Except in, Minimap page)" end
+	end
 	if Minimap:GetEffectiveAlpha() > 0.01 then return "the minimap is up" end
 	-- (Not in the first seconds after a login or /reload: the game is still
 	-- laying the minimap out and puts its icons' size back, and they flashed
@@ -1528,6 +1553,13 @@ function cursor.NotReady(started)
 		return "you're turning the camera"
 	end
 	if not started and ns.Flag(Minimap:IsMouseOver()) then return "your mouse is over the minimap" end
+	-- (The minimap under the pointer takes it off the world: a unit's or a
+	-- chest's cursor (sword, hand, gear) would flick to the arrow and back
+	-- all through the sweep, seen 2026-11-10. Not while the mouse is on one.)
+	if not started then
+		local why = cursor.OnWorldThing()
+		if why then return why end
+	end
 	local focus = MouseFocus()
 	if focus and focus ~= WorldFrame and not InMinimap(focus) then return "your mouse is on a window" end
 end
@@ -1542,8 +1574,11 @@ function cursor.Begin()
 	if not (s.left and s.bottom and s.scale and s.width and s.width > 0 and #s.points > 0) then
 		return nil, "the minimap has no place"
 	end
+	s.seen = {}
 	local function Mute(frame, depth)
 		if Secret(frame) or (frame.IsForbidden and frame:IsForbidden()) then return end
+		if s.seen[frame] then return end
+		s.seen[frame] = true
 		-- (A protected frame can't be changed in a fight: left as it is.)
 		local locked = InCombatLockdown() and frame.IsProtected and frame:IsProtected()
 		if locked then s.skipped = (s.skipped or 0) + 1 end
@@ -1562,6 +1597,7 @@ function cursor.Begin()
 		end
 	end
 	Mute(Minimap, 0)
+	s.Mute, s.children = Mute, Minimap:GetNumChildren()
 	if Minimap.IsMouseWheelEnabled then
 		s.wheel = Minimap:IsMouseWheelEnabled()
 		pcall(Minimap.EnableMouseWheel, Minimap, false)
@@ -1628,6 +1664,16 @@ function cursor.Look(px, py)
 	for _ = 1, cursor.TRIES do
 		local s = cursor.s
 		if not (s and sweepJob and coroutine.running() == sweepJob) then error({ stopped = "the minimap came up" }) end
+		if s.frames - (s.peeked or 0) >= cursor.PEEK and not cursor.diag then
+			s.peeked = s.frames
+			Minimap:AdjustPointsOffset(-s.ox, -s.oy)
+			s.ox, s.oy = 0, 0
+			coroutine.yield()
+			if cursor.s ~= s then error({ stopped = cursor.endedBy or "the minimap came up" }) end
+			local why = cursor.OnWorldThing() or cursor.NotReady(true)
+			if why then error({ stopped = why }) end
+			s.cx, s.cy = GetCursorPosition()
+		end
 		local cx, cy = GetCursorPosition()
 		local ex, ey = 2 * cx - (s.cx or cx), 2 * cy - (s.cy or cy)
 		s.cx, s.cy = cx, cy
@@ -1647,6 +1693,21 @@ function cursor.Look(px, py)
 		local diag = cursor.diag
 		-- (/cine debug cursorsweep test: turning the camera is counted, not a stop.)
 		if why and not (diag and why == "you're turning the camera") then error({ stopped = why }) end
+		-- (Pins put on the minimap since it began (Questie adds its quest icons
+		-- any time) take the mouse too: their tooltips flashed by the pointer,
+		-- seen 2026-11-10. Muted as they come, and one that got the mouse
+		-- anyway is muted then and its tooltip put away.)
+		local count = Minimap:GetNumChildren()
+		if count ~= s.children then
+			s.children = count
+			for _, child in ipairs({ Minimap:GetChildren() }) do s.Mute(child, 1) end
+		end
+		local focus = MouseFocus()
+		if focus and focus ~= Minimap and InMinimap(focus) then
+			s.seen[focus] = nil
+			s.Mute(focus, cursor.DEPTH)
+			if GameTooltip and GameTooltip:GetOwner() == focus then GameTooltip:Hide() end
+		end
 		local nx, ny = GetCursorPosition()
 		if diag then
 			diag.reads = diag.reads + 1
@@ -2076,7 +2137,7 @@ local function QuestsOnMinimap()
 	if not (here and Known(here.x) and ok and type(radius) == "number") then return nil, "no world position" end
 	local quests = C_QuestLog.GetQuestsOnMap(mapID)
 	if type(quests) ~= "table" then return nil, "no quests on the map" end
-	local wanted, parts = {}, {}
+	local wanted, parts, area = {}, {}, false
 	for _, quest in ipairs(quests) do
 		local id, x, y = quest.questID, quest.x, quest.y
 		if Known(id) and Known(x) and Known(y) then
@@ -2087,6 +2148,7 @@ local function QuestsOnMinimap()
 				local reach = done and radius or radius + QUEST_AREA_REACH
 				local title = C_QuestLog.GetTitleForQuestID and C_QuestLog.GetTitleForQuestID(id) or tostring(id)
 				local on = yards <= reach
+				if on and not done then area = true end
 				local reveals = on and (done and db.minimapRevealTurnIns or not done and db.minimapRevealAreas)
 				if reveals then wanted[#wanted + 1] = title end
 				parts[#parts + 1] = ("%s (%s, %.0f yd%s)"):format(title, done and "done" or "area", yards,
@@ -2094,21 +2156,27 @@ local function QuestsOnMinimap()
 			end
 		end
 	end
-	return wanted, ("view radius %.0f yd: %s"):format(radius, #parts > 0 and table.concat(parts, "; ") or "no quests")
+	return wanted, ("view radius %.0f yd: %s"):format(radius, #parts > 0 and table.concat(parts, "; ") or "no quests"),
+		area
 end
 
-local function QuestReveals(now)
+-- (reveal false: only to know whether a quest's area is on the minimap, for
+-- the cursor sweep: its outline shows through alpha 0 on Forever, so the
+-- faded minimap waits off the screen meanwhile (Frames.lua), and the sweep,
+-- which needs it in its place, waits too. Seen at the pointer 2026-11-10.)
+local function QuestReveals(now, reveal)
 	if now - questLook.at >= SWEEP_EVERY then
 		questLook.at = now
-		local ok, wanted, report = pcall(QuestsOnMinimap)
+		local ok, wanted, report, area = pcall(QuestsOnMinimap)
 		questLook.report = ok and report or ("failed: " .. tostring(wanted))
-		if ok and wanted and #wanted > 0 then
+		if ok then areaShown = area == true end
+		if reveal and ok and wanted and #wanted > 0 then
 			table.sort(wanted)
 			seenAt = now
 			revealedBy = table.concat(wanted, ", ")
 		end
 	end
-	return now - seenAt < HOLD
+	return reveal and now - seenAt < HOLD or false
 end
 
 -- For /cine debug tracking: what the quest log look last saw.
@@ -2144,10 +2212,11 @@ function ns.IsMinimapRevealed(now)
 	local questie = GiversFound(now)
 	-- (Nodes by the cursor sweep, quests from the quest log: both can be on.)
 	if cursor.On() then
+		local quests = QuestReveals(now, QuestReveal())
 		local nodesUp = cursor.Reveal(now)
-		return (QuestReveal() and QuestReveals(now)) or nodesUp or questie
+		return quests or nodesUp or questie
 	end
-	if QuestReveal() then return QuestReveals(now) or questie end
+	if QuestReveal() then return QuestReveals(now, true) or questie end
 	if not AnyReveal() then
 		nodes = {}
 		heldIntoFight = nil

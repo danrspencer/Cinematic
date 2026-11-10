@@ -3758,8 +3758,11 @@ function ns.DecideScene(cinematic, now, onTaxi, active)
 	-- A movie or in-game cutscene playing: you're watching, not standing about,
 	-- so the timer starts once it's over.
 	local movie = (MovieFrame and ns.Flag(MovieFrame:IsShown())) or (CinematicFrame and ns.Flag(CinematicFrame:IsShown()))
-	-- (A scene paused by the window keeps its timer, to carry on as it closes.)
-	if onTaxi or active or (windowHolds and not ns.SceneScriptPlaying()) or movie or (casting and not ns.IsCozy())
+	-- (A scene paused by a menu keeps its timer, to carry on as it closes; one
+	-- paused by an NPC's window doesn't: talking to them isn't standing about,
+	-- so the AFK camera doesn't pick up again as their window closes.)
+	if onTaxi or active or (windowHolds and (atNPC or not ns.SceneScriptPlaying())) or movie
+		or (casting and not ns.IsCozy())
 		or (ns.ChatCamActive and ns.ChatCamActive()) then
 		ns.stillSince = nil
 	elseif not ns.stillSince then
@@ -3855,7 +3858,10 @@ function ns.DecideScene(cinematic, now, onTaxi, active)
 	-- (logged always; printed with /cine debug modes)
 	ns.ReportCameraMode(ns.activeCam)
 	local scripted = ns.PlayingCameraKey(true) -- (as their scripts, travel's nil)
-	if (travel or scripted == "walk" or scripted == "run") and cinematic then
+	-- (Not once the timer's running: the frame you stop, the auto-run camera
+	-- still plays as the timer takes the handoff, and re-arming it there let a
+	-- right-click or camera drag just after restart the AFK camera, not end it.)
+	if (travel or scripted == "walk" or scripted == "run") and cinematic and not ns.stillSince then
 		walkHandoff = true
 	elseif onTaxi or (active and not travel and ns.playerMoving) then
 		walkHandoff = false -- running or flying: the next stop starts the timer afresh

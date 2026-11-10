@@ -11809,13 +11809,25 @@ local function CreateMinimapPanel()
 			fights:SetPoint("TOPLEFT", previousReveal, "BOTTOMLEFT", 20 - (previousReveal.revealIndent or 0),
 				previousReveal.revealIndent and -6 or -2)
 			GreyUnless(fights, function(db) return db.minimapNodesByCursor end)
+			-- Places it doesn't look in (nodesOffIn<place>), a row like tracking's Except in.
+			local nodesExcept = Label(content, "GameFontHighlight", L["Except in"])
+			nodesExcept:SetPoint("TOPLEFT", fights, "BOTTOMLEFT", 4, -4)
+			local nodesFirst
+			for i, place in ipairs(PLACES) do
+				local placeCheck = Check(content, "nodesOffIn" .. place[1], place[1] == "PvP" and L["BGs"] or place[2],
+					L["It doesn't look for ore, herbs and treasure here, so the workaround never touches the " ..
+					"minimap or your mouse pointer here."])
+				placeCheck:SetPoint("TOPLEFT", nodesExcept, "BOTTOMLEFT", 12 + (i - 1) * 120, -4)
+				GreyUnless(placeCheck, function(db) return db.minimapNodesByCursor end)
+				if i == 1 then nodesFirst = placeCheck end
+			end
 			-- (What the workaround costs, said where it's ticked.)
 			local warning = Label(content, "GameFontRedSmall",
 				L["A workaround: every few seconds the hidden minimap is moved under your mouse pointer for about " ..
 				"a second. Meanwhile the minimap and its buttons don't take clicks. It doesn't look while you hold " ..
 				"the left or right mouse button (or both), turn the camera or point at a window, so if you steer " ..
 				"with the mouse a lot it only looks in the gaps. Other minimap addons may not like it."])
-			warning:SetPoint("TOPLEFT", fights, "BOTTOMLEFT", 4, -4)
+			warning:SetPoint("TOPLEFT", nodesFirst, "BOTTOMLEFT", -12, -6)
 			warning:SetWidth(440)
 			warning:SetJustifyH("LEFT")
 			warning.revealIndent = 24

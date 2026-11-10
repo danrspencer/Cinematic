@@ -174,7 +174,11 @@ local DEFAULTS = {
 	-- your real mouse (NodeSweep.lua). Off to start with: it's a workaround.
 	minimapNodesByCursor = true, -- (on to start with since 2026-11-10: tested, the user wants it)
 	minimapNodePing = true,       -- ...and pings where it heard what it found (NodeSweep.lua cursor.Mark)
-	minimapNodesInCombat = true, -- ...and it goes on in fights (tested 2026-11-10: nothing blocked)
+	minimapNodesInCombat = false, -- ...and in fights (works, tested 2026-11-10; off to start with, user's ask)
+	nodesOffInCities = true,     -- ...but not in these places (cities have no nodes; instances and BGs
+	nodesOffInDungeons = true,   -- are kept clear of the workaround, user's ask 2026-11-10)
+	nodesOffInRaids = true,
+	nodesOffInPvP = true,
 	minimapRevealTurnIns = true, -- quests of yours that are done
 	minimapRevealAreas = false,  -- the areas of quests of yours that aren't (off to start with since 2026-11-10)
 	minimapRevealIcons = true,   -- anything else (quest givers, flight masters...)
@@ -2424,6 +2428,12 @@ end
 function ns.IsTrackingOffHere()
 	local place = PLACE_SUFFIX[ns.GetPlaceType() or ""]
 	return place ~= nil and ns.db["trackingOffIn" .. place] or false
+end
+
+-- The cursor sweep doesn't look here (Minimap page, its own "Except in").
+function ns.IsNodeScanOffHere()
+	local place = PLACE_SUFFIX[ns.GetPlaceType() or ""]
+	return place ~= nil and ns.db["nodesOffIn" .. place] or false
 end
 
 -- The zone map you're on (its ID), up through the small maps inside it
