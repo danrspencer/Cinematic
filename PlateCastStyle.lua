@@ -21,6 +21,9 @@ local DEFAULTS = ns.DEFAULTS
 DEFAULTS.plateCastStyle = true
 DEFAULTS.plateCastWidth = 1        -- times the game's, about its middle
 DEFAULTS.plateCastHeight = 1       -- times the game's, its top kept
+DEFAULTS.plateCastPlayerWidth = 1  -- your cast bar's width, times the game's (the You tab, with its own look)
+DEFAULTS.plateCastPlayerWidthUnit = "pct" -- ...or "px": plateCastPlayerWidthPx pixels on screen
+DEFAULTS.plateCastPlayerWidthPx = 0
 DEFAULTS.plateCastFill = "general" -- the fill: "game" (its own, and its colors) or a texture (general: General's)
 DEFAULTS.plateCastR, DEFAULTS.plateCastG, DEFAULTS.plateCastB = 1, 0.7, 0                       -- a cast
 DEFAULTS.plateCastChannelR, DEFAULTS.plateCastChannelG, DEFAULTS.plateCastChannelB = 0.25, 0.75, 0.35 -- a channel
@@ -545,6 +548,57 @@ local function HeightOnly(bar, state, height)
 	state.sizeWhy = nil
 end
 
+-- The bar's wide effects (the interrupt glow, its flashes and sparkles: a
+-- texture or frame of the game's on it at least half its width, with a width
+-- of its own, not pinned at both sides) widened as the bar is (ratio: its
+-- width now over its own, own); the small ones (icon, spark, shield) and
+-- text left. Each one's own width kept as the game last set it (it may set
+-- one again as it plays: we follow on the bar's next event), put back at 1.
+local function WidenEffects(bar, state, ratio, own)
+	if not (own and own > 0) then
+		return
+	end
+	state.effects = state.effects or setmetatable({}, { __mode = "k" })
+	local ours = {}
+	for _, value in pairs(state) do
+		if type(value) == "table" then ours[value] = true end
+	end
+	local fill = bar.GetStatusBarTexture and bar:GetStatusBarTexture()
+	local pieces = {}
+	pcall(function()
+		for _, region in ipairs({ bar:GetRegions() }) do pieces[#pieces + 1] = region end
+		for _, child in ipairs({ bar:GetChildren() }) do pieces[#pieces + 1] = child end
+	end)
+	for _, piece in ipairs(pieces) do
+		local kind = piece.GetObjectType and piece:GetObjectType()
+		if piece ~= fill and not ours[piece] and kind ~= "FontString" and Usable(piece) and piece.SetWidth then
+			local points = ReadPoints(piece)
+			local left, right = false, false
+			for _, p in ipairs(points or {}) do
+				if p[1]:find("LEFT") then left = true end
+				if p[1]:find("RIGHT") then right = true end
+			end
+			local saved = state.effects[piece]
+			local now = Number(pcall(piece.GetWidth, piece))
+			if points and not (left and right) and now and now > 0 then
+				if not saved or Reset(now, saved.ours) then
+					saved = { own = now }
+					state.effects[piece] = saved
+				end
+				if saved.own >= own * 0.5 then
+					if math.abs(ratio - 1) < 0.001 then
+						if saved.ours then pcall(piece.SetWidth, piece, saved.own) end
+						saved.ours = nil
+					else
+						saved.ours = saved.own * ratio
+						pcall(piece.SetWidth, piece, saved.ours)
+					end
+				end
+			end
+		end
+	end
+end
+
 local function SizeBar(bar, state, look)
 	local width, height = look.plateCastWidth or 1, look.plateCastHeight or 1
 	local wanted = math.abs(width - 1) > 0.001 or math.abs(height - 1) > 0.001
@@ -576,6 +630,7 @@ local function SizeBar(bar, state, look)
 				pcall(bar.SetSize, bar, own.width, own.height)
 			end
 		end
+		if state.effects then WidenEffects(bar, state, 1, own and own.width) end
 		state.sized, state.sizedPoints, state.sizedWidth, state.sizedHeight, state.sizeWhy = false, nil, nil, nil, nil
 		return
 	end
@@ -614,6 +669,7 @@ local function SizeBar(bar, state, look)
 		state.sizedHeight = own.height * height
 		pcall(bar.SetHeight, bar, state.sizedHeight)
 	end
+	WidenEffects(bar, state, width, own.width)
 	state.sized, state.sizedPoints, state.sizeWhy = true, mine, nil
 end
 
@@ -648,16 +704,81 @@ local function SizeIcon(bar, state, height)
 	end
 end
 
--- (sized: the bar's own size too, the nameplates' alone; the rest keep the
--- game's, yours set in Edit Mode.)
+-- Yours: its width alone (the You tab's own Width), set about the point it
+-- hangs from, its anchors left be (Edit Mode's; PersonalMana.lua moves it
+-- down under our mana bar). Pinned at both sides: left at the game's. Its
+-- own width kept as the game last set it, put back at 100%.
+-- (width: { scale = times the game's } or { px = pixels on screen }.)
+local function WidthOnly(bar, state, width)
+	local now = Number(pcall(bar.GetWidth, bar))
+	if now and now > 0 and Reset(now, state.widthOnly) then
+		state.widthOwn = now
+	end
+	local own = state.widthOwn
+	local target = own and (width.px and ns.PixelsToUnits and ns.PixelsToUnits(bar, width.px)
+		or own * (width.scale or 1))
+	local points = ReadPoints(bar)
+	local left, right = false, false
+	for _, p in ipairs(points or {}) do
+		if p[1]:find("LEFT") then left = true end
+		if p[1]:find("RIGHT") then right = true end
+	end
+	if not target or math.abs(target - own) < 0.01 or (left and right) then
+		if state.widthOnly and own then
+			pcall(bar.SetWidth, bar, own)
+		end
+		if state.effects then WidenEffects(bar, state, 1, own) end
+		state.widthOnly = nil
+		return
+	end
+	state.widthOnly = target
+	pcall(bar.SetWidth, bar, target)
+	WidenEffects(bar, state, target / own, own)
+end
+
+local GAME_WIDTH = { scale = 1 }
+
+-- (sized: the bar's own size too, the nameplates' alone; a table: its
+-- width alone, as WidthOnly's (yours with a look of its own); the rest
+-- keep the game's, yours set in Edit Mode.)
 local UNSIZED = { plateCastWidth = 1, plateCastHeight = 1 }
 local function Size(bar, state, look, sized)
 	SizeIcon(bar, state, look.plateCastIconSize or 1)
-	if sized then
+	-- (Each way's own size back before the other reads it: a preview's
+	-- sample, its tab changed.)
+	if type(sized) ~= "table" and state.widthOnly then
+		WidthOnly(bar, state, GAME_WIDTH)
+	end
+	if sized == true then
 		SizeBar(bar, state, look)
 	elseif state.sized or state.barHeight then
-		SizeBar(bar, state, UNSIZED) -- (a preview's sample, its tab changed: its own size back)
+		SizeBar(bar, state, UNSIZED)
 	end
+	if type(sized) == "table" then
+		WidthOnly(bar, state, sized)
+	end
+end
+
+-- How a kind of bar is sized: the nameplates' wholly, yours by the You
+-- tab's Width while it's restyled with a look of its own.
+local function SizedAs(id, db)
+	if id == "PLATE" then return true end
+	db = db or ns.db
+	if id == "PLAYER" and db and db.plateCastOwn_PLAYER and Active(id, db) then
+		local px = db.plateCastPlayerWidthUnit == "px" and tonumber(db.plateCastPlayerWidthPx)
+		if px and px > 0 then return { px = px } end
+		return { scale = tonumber(db.plateCastPlayerWidth) or 1 }
+	end
+	return false
+end
+
+-- Your cast bar's width on screen now, in whole pixels (the page fills its
+-- px box with it when picked).
+local function PlayerBarPixels()
+	local bar = _G.PlayerCastingBarFrame or _G.CastingBarFrame
+	local width = bar and Number(pcall(bar.GetWidth, bar))
+	local px = width and width > 0 and ns.UnitsToPixels and ns.UnitsToPixels(bar, width)
+	return px and math.floor(px + 0.5)
 end
 
 -- Puts the look on a bar (the game's where a setting says the game's). The
@@ -738,7 +859,7 @@ local function Restyle(bar)
 	if not active and not (state and state.on) then
 		return
 	end
-	Apply(bar, Look(id), nil, id == "PLATE")
+	Apply(bar, Look(id), nil, SizedAs(id))
 	if not active then
 		states[bar].on = false
 	end
@@ -1107,7 +1228,7 @@ function ns.CreatePlateCastStylePanel(kit)
 	end
 
 	local preview -- (below: drawn again as each setting changes)
-	local tabs, lookPick, sizes
+	local tabs, lookPick, sizes, playerSizes
 	local function Changed()
 		ns.RefreshPlateCastStyle()
 		if preview then preview:Refresh() end
@@ -1185,7 +1306,7 @@ function ns.CreatePlateCastStylePanel(kit)
 					bar:SetStatusBarColor(unpack(GAME_COLORS[kind]))
 				end
 			end
-			Apply(bar, look, true, not editing or editing == "PLATE")
+			Apply(bar, look, true, not editing or SizedAs(editing, ns.GetDB()))
 		end
 	end
 	local started = GetTime()
@@ -1258,6 +1379,9 @@ function ns.CreatePlateCastStylePanel(kit)
 		local sized = not editing or editing == "PLATE"
 		sizes:SetShown(sized)
 		sizes:SetHeight(sized and 22 or 0.01)
+		local yours = editing == "PLAYER"
+		playerSizes:SetShown(yours)
+		playerSizes:SetHeight(yours and 22 or 0.01)
 	end
 	-- (Every setting the page has, Default's and each kind's, for its Reset.)
 	for _, key in ipairs(BAR_KEYS) do kit.RecordKey(content, key) end
@@ -1340,6 +1464,24 @@ function ns.CreatePlateCastStylePanel(kit)
 	sizes:Box(L["Height"], Field("plateCastHeight"), 50, 300, 10, "%d", 100,
 		L["Its height, next to the game's (nameplates only). The health bar and name ride up on it."],
 		Editable, "%")
+	-- (Yours: its width alone, the rest of its size Edit Mode's.)
+	-- (A percent of the game's, or pixels on screen: the round pick before
+	-- each says which; px picked empty, it's filled with the bar's width now.)
+	playerSizes = rows.Boxes()
+	local widthTip = L["Your cast bar's width, about the point it hangs from (its height and place: Edit Mode's)."]
+	playerSizes:Pick(L["Width"], "plateCastPlayerWidthUnit", "pct", L["Its width as a percent of the game's."],
+		Editable)
+	playerSizes:Box("", "plateCastPlayerWidth", 20, 200, 5, "%d", 100, widthTip,
+		function(db) return Editable(db) and db.plateCastPlayerWidthUnit ~= "px" end, "%")
+	playerSizes:Pick("", "plateCastPlayerWidthUnit", "px",
+		L["Its width in pixels on screen: the same number on two bars, the same width."], Editable, function()
+			local db = ns.GetDB()
+			if (tonumber(db.plateCastPlayerWidthPx) or 0) <= 0 then
+				db.plateCastPlayerWidthPx = PlayerBarPixels() or 200
+			end
+		end)
+	playerSizes:Box("", "plateCastPlayerWidthPx", 10, 2000, 5, "%d", 1, widthTip,
+		function(db) return Editable(db) and db.plateCastPlayerWidthUnit == "px" end, "px")
 	local function Filled(db)
 		local fill = rows.Get("plateCastFill")
 		if ns.IsGeneralStyle(fill) then fill = ns.GeneralStyleValue("plateCastFill") end

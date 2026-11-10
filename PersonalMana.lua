@@ -161,13 +161,16 @@ local function Place()
 	-- (Spaced for a border of ours: PersonalStyle.lua.)
 	local gap = ns.PersonalBarGap and ns.PersonalBarGap() or GAP
 	bar:ClearAllPoints()
+	-- (Its width: the Personal Resource Style page's Mana width.)
+	local inset, wide = 0, nil
+	if ns.PersonalManaInset then inset, wide = ns.PersonalManaInset(power) end
 	if above == power then
-		bar:SetPoint("TOPLEFT", power, "BOTTOMLEFT", 0, -gap)
-		bar:SetPoint("TOPRIGHT", power, "BOTTOMRIGHT", 0, -gap)
+		bar:SetPoint("TOPLEFT", power, "BOTTOMLEFT", inset, -gap)
+		bar:SetPoint("TOPRIGHT", power, "BOTTOMRIGHT", -inset, -gap)
 	else
 		bar:SetPoint("TOP", above, "BOTTOM", 0, -gap)
 		local ok, width = pcall(power.GetWidth, power)
-		bar:SetWidth(ok and Readable(width) and width > 0 and width or 200)
+		bar:SetWidth(wide or ok and Readable(width) and width > 0 and width or 200)
 	end
 end
 

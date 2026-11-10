@@ -29,7 +29,7 @@ DEFAULTS.irBarArt = true
 -- The raid and party frames (raid-style): their chrome here; health and the
 -- ground behind it in RaidStyle.lua (ns.RecolorOf).
 DEFAULTS.irRaidFrame = true
-DEFAULTS.irRaidHealth = false -- (off: health colors say something)
+DEFAULTS.irRaidHealth = true
 DEFAULTS.irRaidGround = true
 
 local DEPTH = 5 -- (how deep into a frame its art is looked for)
@@ -572,6 +572,7 @@ function ns.RefreshInterfaceRecolor()
 		local started = debugprofilestop()
 		Refresh()
 		if ns.RefreshSwingTimerStyle then ns.RefreshSwingTimerStyle() end
+		if ns.RefreshXpBarStyle then ns.RefreshXpBarStyle() end
 		if ns.RefreshDamageMeterStyle then ns.RefreshDamageMeterStyle() end
 		if ns.RefreshRaidStyle then ns.RefreshRaidStyle() end
 		local took = debugprofilestop() - started
@@ -604,7 +605,9 @@ local function KeepArtHidden(art)
 	busy = false
 end
 function ns.ApplyBarArtOverride()
-	local hide = ns.StyleOverride and ns.StyleOverride("barArt") == "hide"
+	local over = ns.StyleOverride and ns.StyleOverride("barArt")
+	-- (Round action buttons take the gryphons away too, unless it says Show: ActionBarStyle.lua.)
+	local hide = over == "hide" or (over ~= "show" and ns.ActionBarsRound and ns.ActionBarsRound())
 	for _, art in ipairs(BarArt()) do
 		if hide then
 			if not artHooked[art] then
@@ -774,6 +777,13 @@ function ns.CreateInterfaceRecolorPanel(kit)
 			"own color."])
 		rows.Check("swFont", L["Text font"], L["The bars' words in General's text font."])
 	end
+	-- (Their frames' chrome here (irStatus); the fill and words: XpBarStyle.lua.)
+	stack:Header(content, L["XP and reputation bars"])
+	rows.Check("irStatus", L["Frame color"], L["The experience, reputation and honor bars' frames in the theme's " ..
+		"color. What fills them keeps its color."])
+	rows.Check("xpBars", L["Bar color"], L["The experience bar's fill in the theme's mana color, the game's own art " ..
+		"kept. Reputation and honor keep their colors."])
+	rows.Check("xpFont", L["Text font"], L["Their numbers in General's text font."])
 	-- (The raid's chrome here; its health and ground: RaidStyle.lua's Dress.)
 	stack:Header(content, L["Raid frames"])
 	rows.Check("irRaidFrame", L["Frame color"], L["The borders round the raid and party frames (raid-style), " ..
@@ -788,7 +798,6 @@ function ns.CreateInterfaceRecolorPanel(kit)
 	rows.Check("irChat", L["Chat"], L["The chat windows' tabs, the box you type in and their buttons."])
 	rows.Check("irBuffs", L["Buffs"], L["The buffs' borders by the minimap. Debuffs keep the game's colors: they " ..
 		"say what kind each is."])
-	rows.Check("irStatus", L["XP and reputation bars"], L["The bars' frames. What fills them keeps its color."])
 	rows.Check("irMicro", L["Menu and bag buttons"], L["The frames round the small buttons at the bottom right and your bags. " ..
 		"Their pictures keep their colors."])
 	rows.Check("irCast", L["Your cast bar"], L["Its frame. What fills it keeps its color."])

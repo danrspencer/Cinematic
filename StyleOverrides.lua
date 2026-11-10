@@ -179,6 +179,13 @@ function ns.CreateStyleOverridesPanel(kit)
 		holder:SetSize(NAME_W + 240, #section[2] * ROW_H)
 		holder:SetPoint("TOPLEFT", panelTop, "TOPLEFT", 12, -10)
 		holders[i] = holder
+		-- (A tab not picked still counts for the settings search, which picks it:
+		-- /cine find button dividers found nothing behind the Action bars tab.)
+		holder.searchAlways = true
+		holder.openSection = function()
+			kit.SectionState.Save(picked, section[1])
+			Layout()
+		end
 		for r, row in ipairs(section[2]) do PartRow(holder, r, row[2], PREFIX .. row[1]) end
 	end
 	kit.SectionState.Restore(picked)

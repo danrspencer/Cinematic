@@ -130,6 +130,7 @@ ActionBarStyle.lua
 MinimapStyle.lua
 QuestTrackerStyle.lua
 SwingTimerStyle.lua
+XpBarStyle.lua
 DamageMeterStyle.lua
 InterfaceRecolor.lua
 Support\QuestieTracker.lua

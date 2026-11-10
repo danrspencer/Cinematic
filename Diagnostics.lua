@@ -1773,7 +1773,7 @@ do
 		ns.parkMinimapFullSize = on or nil
 		for _, entry in ipairs(ns.managed or {}) do
 			if entry.frame == Minimap and entry.shrunk then
-				Minimap:SetScale(on and (entry.savedScale or 1) or ns.SHRUNK_SCALE)
+				ns.FrameCall(Minimap, "SetScale", on and (entry.savedScale or 1) or ns.SHRUNK_SCALE)
 			end
 		end
 	end
@@ -1788,7 +1788,7 @@ do
 		if not on then return end
 		for _, entry in ipairs(ns.managed or {}) do
 			if entry.frame == Minimap and entry.shrunk then
-				Minimap:SetScale(entry.savedScale or 1)
+				ns.FrameCall(Minimap, "SetScale", entry.savedScale or 1)
 				ns.UnparkShrunk(entry)
 				entry.shrunk = false
 			elseif entry.frame == Minimap and entry.parkedFullSize then

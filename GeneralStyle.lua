@@ -371,6 +371,11 @@ function ns.CreateGeneralStylePanel(kit)
 			{ value = "bevel", text = L["Beveled"] } }
 	end, L["The ends of unit frame and personal resource bars. A straight border can't follow a shape, so it goes " ..
 		"while one's picked. Raid tiles and nameplates stay square."])
+	-- (The Action Bars page's Shape row, ActionBarStyle.lua.)
+	rows.Dropdown(L["Button shape:"], ns.ThemeQuickField("abShape"), function()
+		return { { value = "game", text = L["The game's"] }, { value = "square", text = L["Square"] },
+			{ value = "round", text = L["Round"] } }
+	end, L["The shape of the action buttons and the spell icons on them, as the Action Bars page's Shape row."])
 	-- (The game's own nameplate Style, retail's Options > Nameplates: held while
 	-- one's picked, yours back after, PlateHealthStyle.lua. Only where the client
 	-- has it: the classic clients keep the CVar, 6 there, with no such option.)

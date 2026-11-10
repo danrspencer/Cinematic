@@ -4960,6 +4960,21 @@ function CenterCamera(duration, yawSpeed, pitchSpeed, ramp)
 	ns.ApplyCVarSet(ns.RECENTER_CVARS, true)
 end
 
+-- A swing CenterCamera started, ended now (a camera script's Swing behind
+-- you stopped partway). On flights, follow goes back off with the flight's
+-- own setting on the next UpdateTaxi.
+function ns.StopCenterCamera()
+	recenterUntil = 0
+	recenterRamp.script = nil
+	ns.ApplyCVarSet(ns.RECENTER_CVARS, false)
+end
+-- A camera script's swing (Swing behind you): as CenterCamera, but moving
+-- doesn't cancel it (it only turns while you move), its step's time does.
+function ns.ScriptCenterCamera(duration, yawSpeed, pitchSpeed, ramp)
+	CenterCamera(duration, yawSpeed, pitchSpeed, ramp)
+	recenterRamp.script = true
+end
+
 -- Camera following ("Smart"/"Always") keeps pulling the camera back behind a
 -- moving character, which fights the orbit and makes it jitter. Turn it off
 -- for the whole flight; orbit offsets then stay put relative to the character
@@ -5293,7 +5308,10 @@ function ns.UpdateTaxi()
 		or (ns.IsCozy and ns.IsCozy()) -- (the cozy camera lines up the same way)
 		or (ns.IsVista and ns.IsVista()) -- (and so does the vista camera)
 		or (ns.IsFish and ns.IsFish()) -- (and the fish camera)
-	if travelRecenter then
+	if recenterRamp.script then
+		-- (A camera script's Swing behind you: its own step ends it.)
+		if now >= recenterUntil then recenterRamp.script = nil end
+	elseif travelRecenter then
 		if not traveling or IsMouseOnCamera() then
 			recenterUntil = 0
 		end

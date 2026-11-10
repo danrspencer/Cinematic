@@ -2532,7 +2532,10 @@ local function ShouldBeCinematic(now)
 		-- one's details are worked out only when it's read.)
 		ns.cineOffWhy = (not ns.db.enabled and "switched off")
 			or (not triggered and noTriggerWhy)
-			or (GetTime() < snoozeUntil and "snoozed") or "turned off here"
+			or (GetTime() < snoozeUntil and "snoozed")
+			or (not ns.ProfileChosen() and "no profile chosen")
+			or (IsInDisabledZone() and ("turned off here (" .. tostring(ns.GetOptionPlace() or "world") .. ")"))
+			or "turned off in this group"
 		ns.cineOffCode = (not ns.db.enabled and "off") or (not triggered and "notrigger")
 			or (not ns.ProfileChosen() and "profile") or (GetTime() < snoozeUntil and "snoozed")
 			or (IsInDisabledZone() and "place") or "group"
@@ -3456,6 +3459,15 @@ local function OnUpdate(_, elapsed)
 	if cinematic ~= ns.lastCinematic then
 		ns.Log("state", cinematic and "cinematic" or ("normal UI: " .. tostring(ns.cineOffWhy)))
 	end
+	-- (Off for a lasting reason (switched off, a place or group, no trigger):
+	-- logged as it starts, at login too, where no change above says why.)
+	local offCode = not cinematic and ns.cineOffCode
+	local stickyOff = (offCode == "off" or offCode == "notrigger" or offCode == "profile" or offCode == "snoozed"
+		or offCode == "place" or offCode == "group") and offCode or nil
+	if stickyOff ~= ns.loggedStickyOff and not starting then
+		if stickyOff then ns.Log("state", "CineMode stays off: " .. tostring(ns.cineOffWhy)) end
+		ns.loggedStickyOff = stickyOff
+	end
 	-- Just picked a profile on the Profiles page or in the welcome window: the
 	-- frames fade as in CineMode for a moment, its preview group up
 	-- (ns.PreviewProfile). Not the letterbox or the other effects.
@@ -4106,6 +4118,22 @@ function ns.SubtleCineTravel(t)
 	end
 	t.eventAFKCamera = "afk"
 	for _, event in ipairs({ "Flight", "Hearth", "Teleport", "AFK" }) do t["event" .. event .. "Cine"] = true end
+end
+-- Balanced's cameras (Sometimes: the module some-cameras) have the Cozy
+-- moments and Looking out scenes and death too now. Only a Balanced with all
+-- of those still off as it had them: one you ticked on yourself stays as it is.
+function ns.BalancedMoreScenes(t)
+	if type(t) ~= "table" then return end
+	local keys = {}
+	for _, scene in ipairs({ "Campfire", "SitButton", "Sleep", "Dance", "Kneel", "Chair", "Weapon", "Logout",
+		"Sit", "Stare", "Death" }) do
+		local trigger = ns.CAMERA_TRIGGER and ns.CAMERA_TRIGGER[scene]
+		if trigger and trigger.sceneOff then
+			if t[trigger.sceneOff] ~= true then return end
+			keys[#keys + 1] = trigger.sceneOff
+		end
+	end
+	for _, key in ipairs(keys) do t[key] = false end
 end
 -- Every profile's tint is at full strength to start with now. Subtle's 33%
 -- and Balanced's 66% go (the slider's steps of 5 can't have made them).
@@ -5631,6 +5659,32 @@ ticker:SetScript("OnEvent", ns.Profiled("Core events", function(self, event, arg
 			end
 			ns.db.questGlowOffV1 = true
 		end
+		-- Interface Recolor's raid Health bars on to start with now (2026-11-10):
+		-- it began off, which saved off without anyone choosing it. Once: untick
+		-- it again and it stays.
+		if not ns.db.irRaidHealthOnV1 then
+			ns.db.irRaidHealth = true
+			for _, saved in pairs(ns.db.profiles or {}) do
+				if type(saved) == "table" then
+					saved.irRaidHealth = nil
+					if type(saved.settings) == "table" then saved.settings.irRaidHealth = nil end
+				end
+			end
+			ns.db.irRaidHealthOnV1 = true
+		end
+		-- Interface Recolor's XP bar color off to start with now (2026-11-10): it
+		-- began on, which saved on without anyone choosing it. Once: tick it again
+		-- and it stays.
+		if not ns.db.xpBarsOffV1 then
+			ns.db.xpBars = false
+			for _, saved in pairs(ns.db.profiles or {}) do
+				if type(saved) == "table" then
+					saved.xpBars = nil
+					if type(saved.settings) == "table" then saved.settings.xpBars = nil end
+				end
+			end
+			ns.db.xpBarsOffV1 = true
+		end
 		-- Quest item button off to start with now (2026-11-09). Off in every
 		-- profile. Once: tick it again and it stays.
 		if not ns.db.questItemButtonOffV1 then
@@ -5966,6 +6020,12 @@ ticker:SetScript("OnEvent", ns.Profiled("Core events", function(self, event, arg
 				for _, saved in pairs(ns.db.profileResetPoints or {}) do ns.ScenesOffKeepCameras(saved) end
 			end
 			ns.db.scenesOffKeepCamerasV1 = true
+		end
+		-- Balanced's resting, logout and death cameras: ns.BalancedMoreScenes. Once.
+		if not ns.db.balancedMoreScenesV1 then
+			if (ns.db.liveProfile or ns.db.profile) == "Balanced" then ns.BalancedMoreScenes(ns.db) end
+			ns.BalancedMoreScenes(ns.db.profiles and ns.db.profiles.Balanced)
+			ns.db.balancedMoreScenesV1 = true
 		end
 		-- Always show tanks (healVisionTanks) is now the tank slider at 100%:
 		-- unticked, tanks went by the members' health, so they still do. Once,

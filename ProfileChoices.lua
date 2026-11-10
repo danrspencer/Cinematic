@@ -102,8 +102,8 @@ ns.SLOT_CHOICES = {
 			modules = { "pure-cameras", "still-afk", "camera-music" } },
 		{ part = "immersive", label = "Often", line = "Flights, campfires, vistas, fishing, quests, going AFK and more",
 			modules = { "walk-run-music" } },
-		{ part = "lite", label = "Sometimes", line = "Flights, going AFK, and your Hearthstone and teleports",
-			modules = { "lite-cameras" } },
+		{ part = "lite", label = "Sometimes", line = "Flights, AFK, your Hearthstone, cozy moments, sitting and death",
+			modules = { "some-cameras" } },
 		{ part = "off", label = "Never", line = "The camera is all yours", modules = { "no-cameras" } },
 		-- (Only Subtle's: not offered.)
 		{ part = "travel", hidden = true, label = "Flights, teleports and AFK",
@@ -201,7 +201,8 @@ ns.BUILTIN_PROFILES = {
 		tip = L["The best of both. Your UI fades away and comes right back for a fight, a quest or a look " ..
 			"with the mouse, with your bars and frames where you know them. The letterbox, tint and weather " ..
 			"bring the world to life, most of the Visions and cards join in, and the camera takes over on " ..
-			"flights, when you go AFK and for your Hearthstone and teleports."],
+			"flights, when you go AFK, for your Hearthstone and teleports, at cozy moments like a campfire, " ..
+			"and when you die."],
 		picks = { layout = { forever = "preset" }, camera = "lite", chat = "lite" },
 		modules = With("zone-card", "travel-cards", "damage-vision", "music-calm", "node-icons", "tint-medium"),
 		preview = "bars",

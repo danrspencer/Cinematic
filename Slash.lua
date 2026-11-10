@@ -1848,6 +1848,14 @@ local function HandleSlash(msg)
 		ns.ReportSpellRange()
 	elseif cmd == "debug" and arg == "textures" then
 		ns.ShowStyleTextures()
+	elseif cmd == "debug" and arg == "xpbar" then
+		ns.ReportXpBarStyle()
+	elseif cmd == "debug" and arg == "partyportrait" then
+		ns.ReportPartyPortrait()
+	elseif cmd == "debug" and arg == "playername" then
+		ns.ReportPlayerName()
+	elseif cmd == "debug" and arg == "buttonframe" then
+		ns.ToggleButtonFrameGhost()
 	elseif cmd == "debug" and arg == "buttons" then
 		ns.ReportActionBarStyle()
 	elseif cmd == "debug" and arg == "minimapstyle" then
@@ -1858,6 +1866,8 @@ local function HandleSlash(msg)
 		ns.ReportInterfaceRecolor()
 	elseif cmd == "debug" and arg:find("^recolor ") then
 		ns.ReportRecolorFrame(arg:match("^recolor%s+(.+)$"))
+	elseif cmd == "debug" and arg == "raidcolor" then
+		ns.ReportRaidRecolor()
 	elseif cmd == "debug" and arg == "micro" then
 		ns.ReportMicroButtons()
 	elseif cmd == "debug" and arg == "meterstyle" then

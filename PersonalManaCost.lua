@@ -39,9 +39,10 @@ local casting -- the cast going on, while it costs mana (its guid, or true)
 local cost -- ...its mana cost
 local paid -- ...true once its mana was taken (some take it as they start)
 local startMana -- your mana as the cast began (nil: secret)
-local lastMana, beforeMana, changedAt -- your mana at its last change, before it, and when
+local lastMana -- your mana at its last change
+local changes = {} -- your mana's changes this last second: { at, before }
 local castSpell -- the cast's spell, by name: all its ranks (nil: unreadable)
-local stoppedAt -- when a cast last ended (its mana, if taken at its end, comes then)
+local stoppedAt -- when a cast of ours that pays at its end last ended (its mana comes then)
 local lastStart -- for /cine debug: how the last cast's start was read
 local EARLY = 0.5 -- seconds: a drop this soon before a cast's start can be its cost
 
@@ -208,15 +209,22 @@ local function Start(castGUID, spellID)
 	local name = Readable(spellID) and (C_Spell and C_Spell.GetSpellName and C_Spell.GetSpellName(spellID)
 		or _G.GetSpellInfo and (_G.GetSpellInfo(spellID))) or nil
 	castSpell = Readable(name) and name ~= "" and name or nil
-	-- (Taken just before the cast's start reached us: the mana from before
-	-- that. Not a drop with a cast's end: that cast's, if it pays at its end.)
+	-- (Taken just before the cast's start reached us: the most mana you had
+	-- this last half second, even with a regen tick after the drop (heals,
+	-- 2026-11-10). Not a drop with the end of a cast that paid at its end.)
 	local now = GetTime()
 	startMana = ReadMana()
-	local early = startMana and changedAt and now - changedAt <= EARLY and beforeMana and lastMana == startMana
-		and not (stoppedAt and math.abs(changedAt - stoppedAt) <= 0.2)
-	if early then startMana = beforeMana end
+	local early, ago = false, nil
+	if startMana then
+		for _, change in ipairs(changes) do
+			if now - change.at <= EARLY and change.before > startMana
+				and not (stoppedAt and math.abs(change.at - stoppedAt) <= 0.2) then
+				startMana, early, ago = change.before, true, now - change.at
+			end
+		end
+	end
 	lastStart = { cost = Readable(cost) and cost or nil, readable = startMana ~= nil,
-		ago = changedAt and now - changedAt or nil, early = early and true or false }
+		ago = ago or (changes[#changes] and now - changes[#changes].at) or nil, early = early }
 	if casting and castSpell and AtStart()[castSpell] then paid = true end
 	CheckPaid()
 	Update()
@@ -225,9 +233,11 @@ end
 -- (Only for the cast that's on: some spells go off on their own mid-cast.
 -- A cast whose guid can't be read: taken as it.)
 local function Stop(castGUID)
-	stoppedAt = GetTime()
 	if not casting then return end
 	if Readable(castGUID) and Readable(casting) and castGUID ~= casting then return end
+	-- (Only a cast of ours yet to pay: a failed key press or another spell's
+	-- end hid the drop of the next cast's cost.)
+	if not paid then stoppedAt = GetTime() end
 	casting, cost, paid, startMana, castSpell = nil, nil, nil, nil, nil
 	Update()
 end
@@ -283,8 +293,12 @@ watcher:SetScript("OnEvent", function(_, event, _, arg2, spellID)
 		-- (Your mana changing: drawn again. arg2: the power's token; a secret
 		-- one maybe mana.)
 		if event == "UNIT_POWER_FREQUENT" and (not Readable(arg2) or arg2 == "MANA") then
-			local mana = ReadMana()
-			if mana ~= lastMana then beforeMana, lastMana, changedAt = lastMana, mana, GetTime() end
+			local mana, now = ReadMana(), GetTime()
+			if mana ~= lastMana then
+				if mana and lastMana then changes[#changes + 1] = { at = now, before = lastMana } end
+				lastMana = mana
+				while changes[1] and now - changes[1].at > 1 do table.remove(changes, 1) end
+			end
 		end
 		if casting and (event ~= "UNIT_POWER_FREQUENT" or not Readable(arg2) or arg2 == "MANA") then
 			CheckPaid()

@@ -1295,8 +1295,20 @@ function ns.GridTable(content, columnTop, rows, kit)
 
 	local made = {}
 	local lastLabel = columnTop
+	-- (rows.kindHeadings: { frames, parts }, a heading over each kind's rows,
+	-- the frames' beside the column headings, the parts' a row's height down.)
+	local gap, lastKind = 0, nil
 	for r, item in ipairs(rows) do
-		local y = -kit.headingHeight - 4 - (r - 1) * ROW_HEIGHT
+		local kind = item.part and 2 or 1
+		if rows.kindHeadings and kind ~= lastKind then
+			local head = kit.Label(content, "GameFontNormalSmall", rows.kindHeadings[kind])
+			head:SetPoint("TOPLEFT", columnTop, "TOPLEFT", 0,
+				lastKind and -kit.headingHeight - 4 - (r - 1) * ROW_HEIGHT - gap - 6 or -2)
+			head.searchSkip = true
+			if lastKind then gap = gap + ROW_HEIGHT end
+			lastKind = kind
+		end
+		local y = -kit.headingHeight - 4 - (r - 1) * ROW_HEIGHT - gap
 		local rowLabel = kit.Label(content, "GameFontHighlight", item.label)
 		rowLabel:SetPoint("TOPLEFT", columnTop, "TOPLEFT", 0, y - 5)
 		rowLabel:SetWidth(LABEL_WIDTH - 4 - ns.GRID_DOT_ROOM)

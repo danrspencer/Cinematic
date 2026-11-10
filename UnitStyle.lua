@@ -2707,3 +2707,103 @@ function ns.CreateUnitStylePanel(kit)
 	canvas:Hide()
 	kit.RegisterSubpage(canvas, "Unit Style", L["Unit Frame Style"])
 end
+
+-- For /cine debug playername: where the player frame's name, its strip and its
+-- bars are, and what our layout kept from when it first measured them (to the
+-- log). After a reload the name sometimes sat low, cut by the health bar.
+function ns.ReportPlayerName()
+	local frame = _G.PlayerFrame
+	if not frame then return ns.Print("No player frame.") end
+	local function Say(text) ns.Log("style", "playername: " .. text) end
+	local function N(value) return Readable(value) and type(value) == "number" and ("%.1f"):format(value) or tostring(value) end
+	local function Box(label, region)
+		if not region then return Say(label .. ": none") end
+		local points = {}
+		for i = 1, (region.GetNumPoints and region:GetNumPoints() or 0) do
+			local point, to, toPoint, x, y = region:GetPoint(i)
+			local okName, toName = pcall(function() return to and (to.GetDebugName and to:GetDebugName() or to:GetName()) end)
+			points[#points + 1] = ("%s>%s.%s %s,%s"):format(tostring(point), tostring(okName and toName), tostring(toPoint),
+				N(x), N(y))
+		end
+		Say(("%s: shown %s, top %s bottom %s left %s, %sx%s, level %s, points %s"):format(label,
+			tostring(region.IsShown and region:IsShown()), N(region:GetTop()), N(region:GetBottom()), N(region:GetLeft()),
+			N(region:GetWidth()), N(region:GetHeight()), tostring(region.GetFrameLevel and region:GetFrameLevel()
+			or (region.GetParent and region:GetParent() and region:GetParent():GetFrameLevel())), table.concat(points, "; ")))
+	end
+	local health, power, name, portrait = Parts(frame)
+	Say(("client %s, combat %s, ufStyle %s, layout %s"):format(tostring(select(4, GetBuildInfo())),
+		tostring(InCombatLockdown()), tostring(ns.StyleOn("ufStyle")), tostring(ns.ThemeLayout and ns.ThemeLayout())))
+	Box("frame", frame)
+	Box("portrait", portrait)
+	Box("health", health)
+	Box("power", power)
+	Box("name", name)
+	if name and name.GetFont then
+		local file, size, flags = name:GetFont()
+		Say(("name font %s %s %s, string height %s, text %s"):format(tostring(file), N(size), tostring(flags),
+			N(name:GetStringHeight()), tostring(Readable(name:GetText()) and name:GetText())))
+	end
+	local dressed = shapes[frame]
+	Box("strip (plate)", dressed and dressed.plate)
+	local state = fits[frame]
+	if state then
+		Say(("kept: x %s y %s wide %s middle %s shape %s"):format(N(state.x), N(state.y), N(state.wide),
+			N(state.middle), tostring(state.shape)))
+	else
+		Say("kept: none")
+	end
+	Say("slab: " .. tostring(slabs[frame] ~= nil))
+	ns.Print("Player name layout written to the log.")
+end
+
+-- For /cine debug partyportrait: the first party frame's portrait and what our
+-- shape put on it (to the log). With a theme its picture went missing, the ring
+-- left round nothing.
+function ns.ReportPartyPortrait()
+	local function Say(text) ns.Log("style", "partyportrait: " .. text) end
+	-- (The first with a portrait: retail's holder has other children first, its Selection.)
+	local frame
+	for _, each in ipairs(PartyFrames()) do
+		local okKid, kidName = pcall(function() return each:GetDebugName() end)
+		local _, _, _, picture = Parts(each)
+		Say(("party child %s: portrait %s, shown %s"):format(tostring(okKid and kidName), tostring(picture ~= nil),
+			tostring(each:IsShown())))
+		if picture and not frame then frame = each end
+	end
+	if not frame then return ns.Print("No party frame with a portrait up (or the party is raid-style).") end
+	local function N(value) return Readable(value) and type(value) == "number" and ("%.2f"):format(value) or tostring(value) end
+	local _, _, _, portrait = Parts(frame)
+	local okName, frameName = pcall(function() return frame:GetDebugName() end)
+	Say(("client %s, combat %s, frame %s, ufStyle %s, layout %s, raid-style %s"):format(tostring(select(4, GetBuildInfo())),
+		tostring(InCombatLockdown()), tostring(okName and frameName), tostring(ns.StyleOn("ufStyle")),
+		tostring(ns.ThemeLayout and ns.ThemeLayout()), tostring(ns.RaidStyleParty())))
+	if not portrait then return Say("no portrait") end
+	local okFile, file = pcall(portrait.GetTexture, portrait)
+	local layer, sub = portrait:GetDrawLayer()
+	local parent = portrait:GetParent()
+	Say(("portrait: shown %s visible %s, alpha %s parent effective %s, file %s, %sx%s, layer %s %s, parent level %s, masks %s"):format(
+		tostring(portrait:IsShown()), tostring(portrait:IsVisible()), N(portrait:GetAlpha()), N(parent and parent:GetEffectiveAlpha()),
+		tostring(okFile and file), N(portrait:GetWidth()), N(portrait:GetHeight()), tostring(layer), tostring(sub),
+		tostring(parent and parent:GetFrameLevel()), tostring(portrait.GetNumMaskTextures and portrait:GetNumMaskTextures())))
+	for i = 1, (portrait.GetNumMaskTextures and portrait:GetNumMaskTextures() or 0) do
+		local mask = portrait:GetMaskTexture(i)
+		local okMask, maskFile = pcall(function() return mask:GetTexture() end)
+		local okMaskName, maskName = pcall(function() return mask:GetDebugName() end)
+		Say(("  mask %d: %s, file %s, %sx%s, shown %s"):format(i, tostring(okMaskName and maskName),
+			tostring(okMask and maskFile), N(mask:GetWidth()), N(mask:GetHeight()), tostring(mask:IsShown())))
+	end
+	local mask = PortraitMask(frame)
+	Say("game's PortraitMask: " .. tostring(mask ~= nil))
+	local state = shapes[frame]
+	if not state then return Say("shape state: none") end
+	Say(("shape state: bare %s round %s rounded %s arched %s sized %s, holder %s level %s, inner %s %s alpha %s"):format(
+		tostring(state.bare), tostring(state.round ~= nil), tostring(state.rounded), tostring(state.arched),
+		tostring(state.sized), tostring(state.holder and state.holder:IsShown()),
+		tostring(state.holder and state.holder:GetFrameLevel()), tostring(state.inner and state.inner:IsShown()),
+		tostring(state.inner and state.inner:GetTexture()), N(state.inner and state.inner:GetAlpha())))
+	if state.round then
+		Say(("our round mask: file %s, %sx%s"):format(tostring(state.round:GetTexture()), N(state.round:GetWidth()),
+			N(state.round:GetHeight())))
+	end
+	ns.Print("Party portrait written to the log.")
+end

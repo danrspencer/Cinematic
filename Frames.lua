@@ -807,6 +807,21 @@ function ns.ScaleBlocked(frame)
 	return InCombatLockdown() and ns.Flag(frame:IsProtected())
 end
 
+-- The minimap's size and place are set past other addons' hooks on them, with
+-- the frame type's own method (a hooksecurefunc replaces only the frame's own
+-- copy). SexyMap's hook on Minimap:SetScale errors on every call (it calls
+-- SetPoint with the scale), which also cut our shrink off halfway, and its
+-- SetPoint hook puts the map back on its spot, so it couldn't be moved off the
+-- screen while shrunk (GitHub issue 6). Other frames: their own method, as before.
+function ns.FrameCall(frame, method, ...)
+	if frame == Minimap then
+		local mt = getmetatable(frame)
+		local base = mt and type(mt.__index) == "table" and mt.__index[method]
+		if base then return base(frame, ...) end
+	end
+	return frame[method](frame, ...)
+end
+
 -- Shrunk, the minimap still collapses into its anchor corner, where its
 -- player arrow (which ignores alpha) shows as a single pixel. So while shrunk
 -- it's also moved off the right edge of the screen, and its own anchors are
@@ -858,8 +873,8 @@ function ns.ParkShrunk(entry)
 		points[i] = { point, relativeTo, relativePoint, x, y }
 	end
 	entry.savedPoints = points or entry.savedPoints
-	frame:ClearAllPoints()
-	frame:SetPoint("TOPLEFT", UIParent, "TOPRIGHT", PARK_OFFSET, 0)
+	ns.FrameCall(frame, "ClearAllPoints")
+	ns.FrameCall(frame, "SetPoint", "TOPLEFT", UIParent, "TOPRIGHT", PARK_OFFSET, 0)
 	if frame.IsClampedToScreen and ns.Flag(frame:IsClampedToScreen()) then
 		entry.savedClamped = true
 		frame:SetClampedToScreen(false)
@@ -891,9 +906,9 @@ function ns.UnparkShrunk(entry)
 		return
 	end
 	local frame = entry.frame
-	frame:ClearAllPoints()
+	ns.FrameCall(frame, "ClearAllPoints")
 	for _, p in ipairs(points) do
-		frame:SetPoint(p[1], p[2], p[3], p[4], p[5])
+		ns.FrameCall(frame, "SetPoint", p[1], p[2], p[3], p[4], p[5])
 	end
 end
 
@@ -938,11 +953,11 @@ local function RemoveFrame(frame)
 				waiter:RegisterEvent("PLAYER_REGEN_ENABLED")
 				waiter:SetScript("OnEvent", function(self)
 					self:UnregisterAllEvents()
-					frame:SetScale(scale)
+					ns.FrameCall(frame, "SetScale", scale)
 					ns.UnparkShrunk(entry)
 				end)
 			elseif entry.shrunk then
-				frame:SetScale(entry.savedScale or 1)
+				ns.FrameCall(frame, "SetScale", entry.savedScale or 1)
 				ns.UnparkShrunk(entry)
 			elseif entry.parkedFullSize and not ns.ScaleBlocked(frame) then
 				ns.UnparkFullSize(entry)
@@ -1574,7 +1589,7 @@ local function ShrinkEntry(entry)
 	end
 	-- (/cine debug nodes park: kept full size off the screen instead, to see
 	-- whether the game keeps adding tracking dots to it there.)
-	frame:SetScale(ns.parkMinimapFullSize and frame == Minimap and entry.savedScale or SHRUNK_SCALE)
+	ns.FrameCall(frame, "SetScale", ns.parkMinimapFullSize and frame == Minimap and entry.savedScale or SHRUNK_SCALE)
 	if not parked then
 		ns.ParkShrunk(entry)
 	end
@@ -1615,7 +1630,7 @@ local function RedrawMinimapWhenShown()
 end
 
 local function UnshrinkEntry(entry)
-	entry.frame:SetScale(entry.savedScale or 1)
+	ns.FrameCall(entry.frame, "SetScale", entry.savedScale or 1)
 	ns.UnparkShrunk(entry)
 	entry.shrunk = false
 	if entry.frame == Minimap and Minimap.GetZoomLevels and IsIndoors and ns.Flag(IsIndoors()) then

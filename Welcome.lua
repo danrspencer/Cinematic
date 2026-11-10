@@ -357,8 +357,9 @@ local function Card(parent, profile, level)
 end
 
 -- See it first: a row of demos under the level cards, each a few seconds
--- of one look (ShowMe.lua), Stop while it runs. Under each, whether the
--- level hovered (else the one picked) has it. A Vision's test plays with
+-- of one look (ShowMe.lua), Stop while it runs. Under each, when the
+-- level hovered (else the one picked) shows it (In CineMode, 4 scenes, Off:
+-- ns.ShowMeWhen), and hovered, that in words in the description box. A Vision's test plays with
 -- its switch off too: trying it is the point.
 local DEMO_ROW = {
 	-- (each its settings page's icon, or its Vision's; tip: the description
@@ -461,6 +462,7 @@ local function BuildDemoRow(page, width)
 	local gap = 6
 	local buttonW = math.floor((width - 24 - gap * math.max(0, #list - 1)) / math.max(1, #list))
 	local buttons = {}
+	local show -- (the level the tags are for: Describe's, nil for none)
 	for i, demo in ipairs(list) do
 		local b = CreateFrame("Button", nil, row, BackdropTemplateMixin and "BackdropTemplate")
 		b:SetSize(buttonW, 38)
@@ -483,7 +485,13 @@ local function BuildDemoRow(page, width)
 		b:SetScript("OnClick", function() ns.ShowMe(demo.key, window, true) end)
 		b:SetScript("OnEnter", function(self)
 			if self:IsEnabled() then self:SetBackdropBorderColor(unpack(LIT)) end
-			about:SetText("|cffffd100" .. L[demo.label] .. "|r   " .. L[demo.tip])
+			-- (and when it shows in the level the tags are for)
+			local when
+			if show then
+				local _, _, sentence = ns.ShowMeWhen(demo.key, show.profile)
+				when = sentence and "\n|cffffd100" .. (L["In %s"]):format(show.label) .. ":|r " .. sentence
+			end
+			about:SetText("|cffffd100" .. L[demo.label] .. "|r   " .. L[demo.tip] .. (when or ""))
 			local why = ns.ShowMeBlocked(demo.key, true)
 			if why then
 				GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
@@ -499,7 +507,6 @@ local function BuildDemoRow(page, width)
 		b.demo = demo
 		buttons[i] = b
 	end
-	local show -- (the level the tags are for: Describe's, nil for none)
 	-- keep: the same level as last time (a demo started or ended, a fight).
 	function row:Update(level, keep)
 		if not keep then show = level end
@@ -513,13 +520,11 @@ local function BuildDemoRow(page, width)
 			b.icon:SetDesaturated(blocked and true or false)
 			b.icon:SetAlpha(blocked and 0.5 or 1)
 			b:SetBackdropBorderColor(unpack(running and GOLD or EDGE))
-			local has = show and ns.ShowMeInProfile(key, show.profile)
-			if has == nil then
-				b.tag:SetText("")
-			else
-				b.tag:SetText((has and L["In %s"] or L["Not in %s"]):format(show.label))
-				Color(b.tag, has and GOLD or DIM)
-			end
+			-- (when it shows in that level: In CineMode, 4 scenes, Off...)
+			local tag, has = nil, nil
+			if show then tag, has = ns.ShowMeWhen(key, show.profile) end
+			b.tag:SetText(tag or "")
+			if tag then Color(b.tag, has and GOLD or DIM) end
 		end
 	end
 	local function Recheck() if row:IsVisible() then row:Update(nil, true) end end

@@ -204,6 +204,66 @@ local function Dress(frame)
 	dressing = false
 end
 
+-- For /cine debug raidcolor: what Interface Recolor's Raid frames rows find on
+-- this client, to the log: the rows, the theme, and the first member's parts
+-- (each border, the background, the health bar) with their art and colors.
+function ns.ReportRaidRecolor()
+	local function Say(text) ns.Log("recolor", "raid: " .. text) end
+	local function Safe(value)
+		if issecretvalue and issecretvalue(value) then return "secret" end
+		return type(value) == "number" and ("%.2f"):format(value) or tostring(value)
+	end
+	local function Art(texture)
+		if not texture then return "none" end
+		local okAtlas, atlas = pcall(function() return texture.GetAtlas and texture:GetAtlas() end)
+		local okFile, file = pcall(function() return texture:GetTexture() end)
+		local r, g, b, a = texture:GetVertexColor()
+		local okName, name = pcall(function() return texture:GetDebugName() end)
+		return ("%s shown=%s alpha=%s atlas=%s file=%s color=%s,%s,%s,%s desat=%s layer=%s"):format(
+			tostring(okName and name), tostring(texture:IsShown()), Safe(texture:GetAlpha()),
+			tostring(okAtlas and atlas), tostring(okFile and file), Safe(r), Safe(g), Safe(b), Safe(a),
+			tostring(texture.IsDesaturated and texture:IsDesaturated()), tostring((texture:GetDrawLayer())))
+	end
+	local look = ns.StyleLook("irStyle")
+	Say(("client %s, combat %s, irStyle %s, theme ring %s, irRaidFrame %s irRaidHealth %s irRaidGround %s, " ..
+		"rfStyle %s, RecolorOf %s"):format(tostring(select(4, GetBuildInfo())), tostring(InCombatLockdown()),
+		tostring(ns.StyleOn("irStyle")), tostring(ns.ThemeRing() and table.concat(ns.ThemeRing(), ",")),
+		tostring(look.irRaidFrame), tostring(look.irRaidHealth), tostring(look.irRaidGround), tostring(ns.StyleOn("rfStyle")),
+		tostring(ns.RecolorOf and ns.RecolorOf("irRaidFrame") and table.concat(ns.RecolorOf("irRaidFrame"), ","))))
+	for _, name in ipairs({ "CompactPartyFrame", "CompactRaidFrameContainer", "CompactRaidGroup1", "CompactRaidFrameManager" }) do
+		local holder = _G[name]
+		if type(holder) == "table" then
+			local border = holder.borderFrame or _G[name .. "BorderFrame"]
+			local title = holder.title or _G[name .. "Title"]
+			Say(("%s: shown %s, borderFrame %s, title %s"):format(name, tostring(holder:IsVisible()),
+				tostring(border and (border.GetDebugName and border:GetDebugName() or "yes")),
+				tostring(title and title.GetObjectType and title:GetObjectType())))
+			local okRegions, regions = pcall(function() return { holder:GetRegions() } end)
+			for _, region in ipairs(okRegions and regions or {}) do
+				if region.GetObjectType and region:GetObjectType() == "Texture" then Say("  region " .. Art(region)) end
+			end
+		else
+			Say(name .. ": none")
+		end
+	end
+	local members = Members()
+	Say(("members: %d"):format(#members))
+	local frame = members[1]
+	if frame then
+		local okName, name = pcall(frame.GetName, frame)
+		Say(("first: %s, group %s"):format(tostring(okName and name), tostring(GroupOf(frame))))
+		for _, field in ipairs(BORDERS) do Say(("  %s: %s"):format(field, Art(frame[field]))) end
+		Say("  background: " .. Art(frame.background))
+		local fill = frame.healthBar and frame.healthBar:GetStatusBarTexture()
+		Say("  health fill: " .. Art(fill))
+		local okRegions, regions = pcall(function() return { frame:GetRegions() } end)
+		for _, region in ipairs(okRegions and regions or {}) do
+			if region.GetObjectType and region:GetObjectType() == "Texture" then Say("  region " .. Art(region)) end
+		end
+	end
+	ns.Print("Raid frame recolor written to the log.")
+end
+
 function ns.RefreshRaidStyle()
 	if not ns.db then return end
 	for _, frame in ipairs(Members()) do Dress(frame) end

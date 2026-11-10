@@ -219,15 +219,15 @@ local function Grow()
 	if not (entry and (entry.shrunk or entry.parkedFullSize)) then return nil end
 	local scale, points = Minimap:GetScale(), {}
 	for i = 1, Minimap:GetNumPoints() do points[i] = { Minimap:GetPoint(i) } end
-	if entry.shrunk then Minimap:SetScale(entry.savedScale or 1) end
+	if entry.shrunk then ns.FrameCall(Minimap, "SetScale", entry.savedScale or 1) end
 	if entry.savedPoints then
-		Minimap:ClearAllPoints()
-		for _, p in ipairs(entry.savedPoints) do Minimap:SetPoint(p[1], p[2], p[3], p[4], p[5]) end
+		ns.FrameCall(Minimap, "ClearAllPoints")
+		for _, p in ipairs(entry.savedPoints) do ns.FrameCall(Minimap, "SetPoint", p[1], p[2], p[3], p[4], p[5]) end
 	end
 	return function()
-		Minimap:SetScale(scale)
-		Minimap:ClearAllPoints()
-		for _, p in ipairs(points) do Minimap:SetPoint(unpack(p)) end
+		ns.FrameCall(Minimap, "SetScale", scale)
+		ns.FrameCall(Minimap, "ClearAllPoints")
+		for _, p in ipairs(points) do ns.FrameCall(Minimap, "SetPoint", unpack(p)) end
 	end
 end
 
@@ -1811,8 +1811,8 @@ do
 	local function UnderMouse(dx, dy)
 		local cx, cy = GetCursorPosition()
 		local s = Minimap:GetEffectiveScale()
-		Minimap:ClearAllPoints()
-		Minimap:SetPoint("CENTER", UIParent, "BOTTOMLEFT", cx / s - dx, cy / s - dy)
+		ns.FrameCall(Minimap, "ClearAllPoints")
+		ns.FrameCall(Minimap, "SetPoint", "CENTER", UIParent, "BOTTOMLEFT", cx / s - dx, cy / s - dy)
 		return cx, cy
 	end
 
@@ -1838,9 +1838,9 @@ do
 			pcall(saved.putBack)
 			return
 		end
-		Minimap:SetScale(saved.scale)
-		Minimap:ClearAllPoints()
-		for _, p in ipairs(saved.points) do Minimap:SetPoint(unpack(p)) end
+		ns.FrameCall(Minimap, "SetScale", saved.scale)
+		ns.FrameCall(Minimap, "ClearAllPoints")
+		for _, p in ipairs(saved.points) do ns.FrameCall(Minimap, "SetPoint", unpack(p)) end
 	end
 
 	local function Show(v)
@@ -1969,7 +1969,7 @@ do
 			i = i + 1
 			local okMove
 			okMove, why = pcall(function()
-				Minimap:SetScale(saved.grownScale) -- (in case the fade shrank it again)
+				ns.FrameCall(Minimap, "SetScale", saved.grownScale) -- (in case the fade shrank it again)
 				UnderMouse(grid[i][1], grid[i][2])
 			end)
 			moved = okMove

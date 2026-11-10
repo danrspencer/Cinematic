@@ -10,7 +10,8 @@
 --   Vision's test with its switch off (the levels page's See it first row).
 -- ns.ShowMeRunning(key), ns.ShowMeBlocked(key) (why it can't run now, or
 -- nil), ns.StopShowMe(), ns.ShowMeListen(fn) (fn runs when one starts or
--- stops), ns.ShowMeInProfile(key, profile) (whether a profile has that look).
+-- stops), ns.ShowMeInProfile(key, profile) (whether a profile has that look),
+-- ns.ShowMeWhen(key, profile) (when it shows there: the row's tags).
 --
 -- The effects demos set ns.effectsDemo, which Core.lua's effects step reads
 -- in place of the effects' own Show in rows (Effects.lua's letterbox shows
@@ -152,6 +153,99 @@ function ns.ShowMeInProfile(key, name)
 		if not On(base, each) then return false end
 	end
 	return true
+end
+
+-- When a profile's look shows (the See it first row's tags): ns.ShowMeWhen(key,
+-- profile) gives the tag ("In CineMode", "4 scenes", "Off"...), whether the
+-- profile has it, and a sentence for the description box (nil for none).
+-- The letterbox and tint by their Show in rows: Always, the CineMode tick
+-- alone, Out of fights alone, else Sometimes. The camera by its scenes ticked
+-- on (a built-in's own rows: copies and triggers of your own aren't in a profile).
+local SHOW_LISTS = { "combatShow", "calmShow", "quietShow", "camShow", "worldShow", "cityShow", "bgShow",
+	"instanceShow", "groupShow", "enemyShow", "friendlyShow" }
+local EFFECT_OF = { bars = "letterbox", tint = "tint" }
+local function Ticked(base, list, key)
+	local on = type(base[list]) == "table" and base[list][key]
+	if on == nil then on = ns.LIST_DEFAULTS[list] and ns.LIST_DEFAULTS[list][key] end
+	return on and true or false
+end
+-- The names in a list, "A, B and C" (past max: "A, B and 3 more").
+local function Names(list, max)
+	if #list > max then
+		local shown = {}
+		for i = 1, max - 1 do shown[i] = list[i] end
+		return (L["%s and %d more"]):format(table.concat(shown, ", "), #list - max + 1)
+	end
+	if #list == 1 then return list[1] end
+	return (L["%s and %s"]):format(table.concat(list, ", ", 1, #list - 1), list[#list])
+end
+-- A profile's scenes ticked on, by name; cine: those that bring CineMode on;
+-- picks: up to three of these to name for many (the scenes' own names don't
+-- all read in a sentence: "resting with a listed buff (campfire)").
+local PICKS = { { "Campfire", "sit by a campfire" }, { "Flight", "take a flight" }, { "Dance", "dance" },
+	{ "Fishing", "fish" }, { "Sit", "sit down" } }
+local function Scenes(base)
+	local all, cine, on = {}, {}, {}
+	for _, trigger in ipairs(ns.CAMERA_TRIGGERS or {}) do
+		if trigger.sceneOff and not base[trigger.sceneOff] and base[trigger.camera] ~= trigger.off then
+			-- (its name, "Take a flight", mid-sentence: "take a flight")
+			local name = ns.CameraTriggerName and ns.CameraTriggerName(trigger.key) or trigger.key
+			name = tostring(name):gsub("^%u%l", string.lower)
+			all[#all + 1] = name
+			on[trigger.key] = true
+			if trigger.cine and base[trigger.cine] then cine[#cine + 1] = name end
+		end
+	end
+	local picks = {}
+	for _, pick in ipairs(PICKS) do
+		if on[pick[1]] and #picks < 3 then picks[#picks + 1] = L[pick[2]] end
+	end
+	return all, cine, picks
+end
+function ns.ShowMeWhen(key, name)
+	local has = ns.ShowMeInProfile(key, name)
+	if has == nil then return nil end
+	if not has then return L["Off"], false, L["Not in this profile."] end
+	local base = ns.ProfileBase(name)
+	local effect = EFFECT_OF[key]
+	if effect then
+		local row = "effect:" .. effect
+		local rule = type(base.frameRules) == "table" and base.frameRules[row]
+		if base[effect .. "Always"] then return L["Always"], true, L["All the time."] end
+		local others = type(rule) == "string" and rule:find("%S") and true or false
+		local quiet = false
+		for _, list in ipairs(SHOW_LISTS) do
+			if Ticked(base, list, row) then
+				if list == "quietShow" then quiet = true else others = true end
+			end
+		end
+		local cine = Ticked(base, "cineModeShow", row)
+		if not others and cine and not quiet then
+			local _, cineScenes = Scenes(base)
+			if #cineScenes > 0 then
+				return L["In CineMode"], true,
+					(L["Only in CineMode, which comes on when you %s."]):format(Names(cineScenes, 5))
+			end
+			return L["In CineMode"], true, L["Only while CineMode is on."]
+		end
+		if quiet and not others and not cine then
+			return L["Out of fights"], true, L["Whenever you're out of a fight."]
+		end
+		if not (others or quiet or cine) then return L["Off"], false, L["Not in this profile."] end
+		return L["Sometimes"], true, L["At the moments its Show in row ticks."]
+	end
+	if key == "camera" then
+		local scenes, _, picks = Scenes(base)
+		if #scenes == 0 then return L["Off"], false, L["Not in this profile."] end
+		local tag = #scenes == 1 and L["1 scene"] or (L["%d scenes"]):format(#scenes)
+		if #scenes > 5 and #picks > 0 then
+			return tag, true, (L["Plays at %d moments, like when you %s."]):format(#scenes, Names(picks, 3))
+		end
+		return tag, true, (L["Plays when you %s."]):format(Names(scenes, 5))
+	end
+	if key == "vitals" then return L["Low health"], true, L["As your health drops."] end
+	if key == "tele" then return L["On hearth"], true, L["As you hearth or teleport."] end
+	return L["On"], true, nil
 end
 
 -- The orbit: the camera turns round you, easing in and out. It claims the

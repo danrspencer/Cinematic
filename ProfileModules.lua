@@ -473,6 +473,12 @@ ns.PROFILE_MODULES = {
 		apply = function(set)
 			CamsOff(set, { "cozy", "vista", "fish", "walk", "run", "death", "quest" })
 		end },
+	{ key = "some-cameras", name = "Some cameras", scope = { "Scenes" },
+		tip = "Flights (and fly-bys), AFK, your Hearthstone and teleports, cozy moments (a campfire, a chair, " ..
+		"/sleep, emotes, logging out), looking out (/sit, /stare) and death: no fish, RP walk, auto-run or quest cameras.",
+		apply = function(set)
+			CamsOff(set, { "fish", "walk", "run", "quest" })
+		end },
 	{ key = "no-cameras", name = "No cameras", scope = { "Cameras", "Scenes" },
 		tip = "No camera moves on its own.",
 		apply = function(set)

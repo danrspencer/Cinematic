@@ -115,6 +115,13 @@ ns.CAMERA_SCRIPT_KINDS = {
 	-- input starts the total again from where you leave it (ForgetTurns).
 	-- (zoom "no": the zoom left where it is, a zoom step beside it say.)
 	putback = { fields = { { "secs", "num", 0.5, 600, 3 }, { "zoom", "pick", { "yes", "no" }, "yes" } } },
+	-- Swing behind you: the game's camera follow, set to Always with a slowed
+	-- turn speed (degrees a second at most) for secs, brings the view round
+	-- behind you (ns.CenterCamera, the old flight takeoff swing). Turning
+	-- only, the height left as it is. Only while you move (a flight, walking):
+	-- standing still the game never turns it. Where it ends counts as where
+	-- the scene started, for Undo its turns and the sways.
+	behind = { fields = { { "secs", "num", 1, 60, 5 }, { "speed", "num", 5, 180, 45 } } },
 	-- (No Turn to or Line up: the game never says which way the camera
 	-- points, let alone where you are on screen, so "face you" was only 180
 	-- degrees from the start and "behind you" only back to it. Older ones
@@ -173,7 +180,7 @@ ns.CAMERA_SCRIPT_KINDS = {
 }
 -- The page's add buttons, in their groups (headers: CameraScriptsPage.lua).
 ns.CAMERA_SCRIPT_ADD_GROUPS = {
-	{ key = "move", kinds = { "rotate", "tilt", "zoom", "spin", "sway", "aim", "follow", "putback" } },
+	{ key = "move", kinds = { "rotate", "tilt", "zoom", "spin", "sway", "aim", "follow", "putback", "behind" } },
 	{ key = "wait", kinds = { "wait" } },
 	{ key = "group", kinds = { "together", "repeat" } },
 	{ key = "other", kinds = { "emote", "play", "endMusic" } },
@@ -662,7 +669,10 @@ local BUILT_IN = {
 			Set(cruise, "taxiFlyBy")
 		end
 		return {
-			steps = { Set(S("until", { what = "landing", secs = settle and Db("taxiSettleLead", 5) + 12 + 3 or 0, steps = {
+			-- (First, round behind you at takeoff, as the flight camera did
+			-- before it was a script: camera follow turns it, you're moving.)
+			steps = { S("behind", { secs = 5, speed = 45 }),
+				Set(S("until", { what = "landing", secs = settle and Db("taxiSettleLead", 5) + 12 + 3 or 0, steps = {
 					cruise } }), "taxiSettle", "taxiSettleLead"),
 				On(Set(S("zoom", { to = 0, secs = 3, of = "yours" }), "taxiSettle"), settle),
 				On(Set(S("putback", { secs = 12, zoom = "no" }), "taxiSettle"), settle) },
@@ -1438,6 +1448,10 @@ function ns.PlanCameraScript(script, start)
 			local turned = Move("yaw", state.yaw - Wrap(state.yaw), t, step.secs, 0.5, top)
 			if step.zoom == "yes" then Move("zoom", start.zoom, t, step.secs, EASES.gentle, top) end
 			ending = math.max(turned, Move("pitch", start.pitch, t, step.secs, 0.5, top))
+		elseif k == "behind" then
+			-- (The preview's start stands for behind you: round to it.)
+			ending = Move("yaw", state.yaw - Wrap(state.yaw), t, step.secs, 0.5, top)
+			swayCenters = {}
 		elseif k == "emote" then
 			ending = Hold(t, 0.5, top)
 		elseif k == "together" then
@@ -2147,6 +2161,10 @@ end
 -- Every move stopped where it is (nothing kept to carry on with).
 local function StopAll()
 	StopFollow()
+	if run and run.swinging then -- (a Swing behind you cut short)
+		run.swinging = nil
+		if ns.StopCenterCamera then ns.StopCenterCamera() end
+	end
 	StopMove(movers.yaw)
 	StopMove(movers.pitch)
 	movers.yaw.suspended, movers.pitch.suspended = nil, nil
@@ -2289,6 +2307,23 @@ function STEP.putback(step)
 	WaitMover(yaw)
 	WaitMover(pitch)
 	if step.zoom == "yes" then WaitZoom() end
+end
+-- Swing behind you (KINDS.behind): camera follow brings it round while you
+-- move; then the turn total starts again from there (behind you now).
+function STEP.behind(step)
+	local yaw, pitch = movers.yaw, movers.pitch
+	DropHeld(yaw)
+	DropHeld(pitch)
+	StopMove(yaw)
+	StopMove(pitch)
+	if not ns.ScriptCenterCamera then return end
+	run.swinging = true
+	ns.ScriptCenterCamera(step.secs, step.speed, 0, math.min(1.5, step.secs / 2))
+	WaitSeconds(step.secs)
+	run.swinging = nil
+	ns.StopCenterCamera()
+	yaw.amount = 0
+	run.swayCenters = {}
 end
 -- Whether a Wait until's moment has come.
 local UNTIL = {

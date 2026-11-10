@@ -1,7 +1,7 @@
 -- The Style hub's Personal Resource Display page: how the game's personal resource
 -- display (the bars under your character) looks. Its health and power bars'
 -- texture, border and background, the health bar's color, each bar's
--- height, and your class resource's size. When the bars come up: the UI
+-- width and height, and your class resource's size. When the bars come up: the UI
 -- Manager's Personal Resources page and the Standard Frames grid
 -- (PersonalResources.lua, Frames.lua).
 -- Its parts are found by their fields (they differ a little between
@@ -21,6 +21,14 @@ DEFAULTS.prdHealthColor = "game"     -- the health bar: "game", "class" or "cust
 DEFAULTS.prdHealthR, DEFAULTS.prdHealthG, DEFAULTS.prdHealthB = 0.2, 0.8, 0.4
 DEFAULTS.prdHealthHeight = 1         -- the health bar's height, times the game's
 DEFAULTS.prdPowerHeight = 1          -- the power bar's, times the game's
+DEFAULTS.prdHealthWidth = 1          -- the health bar's width, times the game's, about its middle
+DEFAULTS.prdPowerWidth = 1           -- the power bar's, times the game's
+DEFAULTS.prdManaWidth = 1            -- our mana bar's, times the game's power bar's
+-- (Each width in pixels on screen instead, its Unit "px": <key>Px.)
+for _, key in ipairs({ "prdHealthWidth", "prdPowerWidth", "prdManaWidth" }) do
+	DEFAULTS[key .. "Unit"] = "pct"
+	DEFAULTS[key .. "Px"] = 0
+end
 DEFAULTS.prdPiecesScale = 1          -- your class resource (combo points, holy power, runes...), times its size
 DEFAULTS.prdManaColor = "game"       -- our mana bar's color (on: prdMana, PersonalResources.lua): "game" or "custom" (prdManaR/G/B)
 DEFAULTS.prdManaR, DEFAULTS.prdManaG, DEFAULTS.prdManaB = 0, 0.55, 1
@@ -46,6 +54,16 @@ local function HealthColor(look)
 	end
 end
 
+-- The power bar's, while your power is mana: the mana color's (a theme's), so it
+-- matches your unit frame's and our own mana bar. Other powers keep the game's.
+local MANA = Enum and Enum.PowerType and Enum.PowerType.Mana or 0
+local function PowerColor(look)
+	if not (look and look.prdManaColor == "custom") then return nil end
+	local ok, kind = pcall(UnitPowerType, "player")
+	if not (ok and kind == MANA) then return nil end
+	return look.prdManaR, look.prdManaG, look.prdManaB
+end
+
 -- The parts: the health bar (in its holder), the power bar, the class
 -- resource. Any can be missing.
 local function Parts()
@@ -63,7 +81,7 @@ local own = setmetatable({}, { __mode = "k" })
 local function OwnOf(frame)
 	local saved = own[frame]
 	if not saved then
-		saved = { height = frame:GetHeight() }
+		saved = { height = frame:GetHeight(), width = frame:GetWidth() }
 		if frame.GetStatusBarTexture then
 			local fill = frame:GetStatusBarTexture()
 			saved.file = fill and fill:GetTexture()
@@ -208,9 +226,10 @@ function ns.PersonalBarGap(look)
 	return size * 2 + 1, size
 end
 
--- The power bar under the health bar, at the gap above while it's ours: its
--- points on the health bar's holder moved, the game's put back after.
-local spaced -- { own = its points, ours = the points we gave it }, while moved
+-- The bars' points, moved while ours (a width of ours; the power bar under
+-- the health bar at the gap above, for a border of ours) and the game's put
+-- back after: frame -> { own = its points, ours = the points we gave it }.
+local placed = setmetatable({}, { __mode = "k" })
 
 local function Points(frame)
 	local points = {}
@@ -231,30 +250,138 @@ local function SetPoints(frame, points)
 	for _, p in ipairs(points) do frame:SetPoint(p[1], p[2], p[3], p[4], p[5]) end
 end
 
-local function SpacePower(holder, power, gap)
-	if not power then return end
-	if spaced then
+-- Shift(own): the points to give it from its own, or nil for its own.
+local function PlaceFrame(frame, Shift)
+	local ok, now = pcall(Points, frame)
+	if not ok then return end
+	local own, was = now, placed[frame]
+	if was then
 		-- (Moved since by the game: its own spot is the new one.)
-		local ok, now = pcall(Points, power)
-		if ok and SamePoints(now, spaced.ours) then SetPoints(power, spaced.own) end
-		spaced = nil
+		local same, alike = pcall(SamePoints, now, was.ours)
+		if same and alike then own = was.own end
+		placed[frame] = nil
 	end
-	if not (gap and holder) then return end
-	-- (Only its points under the holder: top to the holder's bottom.)
-	local ok, own = pcall(Points, power)
-	if not ok or #own == 0 then return end
-	local ours, moved = {}, false
-	for i, p in ipairs(own) do
-		ours[i] = { p[1], p[2], p[3], p[4], p[5] }
-		if p[2] == holder and type(p[1]) == "string" and p[1]:find("^TOP") and type(p[3]) == "string"
-			and p[3]:find("^BOTTOM") then
-			ours[i][5] = -gap
-			moved = true
+	local ours = #own > 0 and Shift(own)
+	if ours then
+		SetPoints(frame, ours)
+		placed[frame] = { own = own, ours = Points(frame) }
+	elseif own ~= now then
+		SetPoints(frame, own)
+	end
+end
+
+local function Plain(v)
+	return type(v) == "number" and not (issecretvalue and issecretvalue(v))
+end
+
+-- Pixels on screen to a frame's own units, and back: by its scale and the
+-- screen's (768 units tall at scale 1). nil: not readable.
+local function PixelRatio(frame)
+	local get = _G.GetPhysicalScreenSize
+	if not get then return end
+	local _, tall = get()
+	local ok, scale = pcall(frame.GetEffectiveScale, frame)
+	if not (ok and Plain(scale) and scale > 0 and Plain(tall) and tall > 0) then return end
+	return tall * scale / 768
+end
+function ns.PixelsToUnits(frame, px)
+	local ratio = frame and PixelRatio(frame)
+	return ratio and px / ratio
+end
+function ns.UnitsToPixels(frame, units)
+	local ratio = frame and PixelRatio(frame)
+	return ratio and units * ratio
+end
+
+-- A width setting (key, times the game's; key.."Unit" "px": key.."Px"
+-- pixels on screen instead) for frame, its own width own: in its units.
+local function TargetWidth(look, key, frame, own)
+	look = look or ns.DEFAULTS
+	if look[key .. "Unit"] == "px" then
+		local px = tonumber(look[key .. "Px"])
+		local units = px and px > 0 and ns.PixelsToUnits(frame, px)
+		if units then return units end
+	end
+	return own * (tonumber(look[key]) or 1)
+end
+
+local widened = setmetatable({}, { __mode = "k" }) -- frame -> true, while at a width of ours (SetWidth)
+
+-- One bar's width (key: times its own) and, with gap, the power bar's space
+-- under holder. Pinned at both sides, each side moves in by half the change
+-- (less what the frame it's pinned to grew by: grown, those sized here
+-- first); else its width is set, about the point it hangs from.
+local function SizeWidth(frame, look, key, grown, holder, gap)
+	if not frame then return end
+	local saved = OwnOf(frame)
+	if not (Plain(saved.width) and saved.width > 0) and not widened[frame] then
+		local ok, width = pcall(frame.GetWidth, frame)
+		if ok and Plain(width) and width > 0 then saved.width = width end
+	end
+	local width = Plain(saved.width) and saved.width > 0 and saved.width or nil
+	local target = width and TargetWidth(look, key, frame, width)
+	local changed = target and math.abs(target - width) > 0.01
+	grown[frame] = target and target - width or 0
+	local pinned = false
+	PlaceFrame(frame, function(own)
+		local left, right = false, false
+		for _, p in ipairs(own) do
+			if type(p[1]) == "string" then
+				if p[1]:find("LEFT") then left = true end
+				if p[1]:find("RIGHT") then right = true end
+			end
 		end
+		pinned = left and right
+		local ours, moved = {}, false
+		for i, p in ipairs(own) do
+			local x, y = p[4], p[5]
+			if pinned and target and Plain(x) then
+				local d = (width + (grown[p[2]] or 0) - target) / 2
+				if math.abs(d) > 0.01 then
+					if p[1]:find("LEFT") then x, moved = x + d, true end
+					if p[1]:find("RIGHT") then x, moved = x - d, true end
+				end
+			end
+			-- (The power bar: only its points under the holder, top to its bottom.)
+			if gap and p[2] == holder and type(p[1]) == "string" and p[1]:find("^TOP") and type(p[3]) == "string"
+				and p[3]:find("^BOTTOM") then
+				y, moved = -gap, true
+			end
+			ours[i] = { p[1], p[2], p[3], x, y }
+		end
+		return moved and ours or nil
+	end)
+	if pinned then
+		if widened[frame] and width then pcall(frame.SetWidth, frame, width) end
+		widened[frame] = nil
+	elseif width and (changed or widened[frame]) then
+		pcall(frame.SetWidth, frame, target)
+		widened[frame] = changed or nil
 	end
-	if not moved then return end
-	SetPoints(power, ours)
-	spaced = { own = own, ours = Points(power) }
+end
+
+-- Our mana bar against the power bar it's pinned to: how far in each side
+-- goes, and its width hung on its own (the page's Mana width: times the
+-- power bar's own, or pixels; nil: not known, the power bar's now).
+function ns.PersonalManaInset(power)
+	local look = ns.StyleOn("prdStyle") and Look()
+	if not (look and power) then return 0 end
+	local own = OwnOf(power).width
+	if not (Plain(own) and own > 0) then return 0 end
+	local ours, theirs = TargetWidth(look, "prdManaWidth", power, own), TargetWidth(look, "prdPowerWidth", power, own)
+	return (theirs - ours) / 2, ours
+end
+
+-- A bar's width on screen now, in whole pixels (the page fills a px box
+-- with it when picked): "health", "power" or "mana".
+function ns.PersonalBarPixels(which)
+	local _, holder, _, power = Parts()
+	local frame = which == "health" and holder or which == "power" and power
+		or which == "mana" and ns.PersonalManaBar and ns.PersonalManaBar()
+	if not frame then return end
+	local ok, width = pcall(frame.GetWidth, frame)
+	local px = ok and Plain(width) and width > 0 and ns.UnitsToPixels(frame, width)
+	return px and math.floor(px + 0.5)
 end
 
 local faded = setmetatable({}, { __mode = "k" }) -- piece -> true, while faded out
@@ -264,9 +391,6 @@ local sized = setmetatable({}, { __mode = "k" }) -- holder -> true, while at a h
 local colored = setmetatable({}, { __mode = "k" }) -- bar -> true, while in a color of ours
 local gameColor = setmetatable({}, { __mode = "k" }) -- bar -> { r, g, b }, the game's last
 local dressing = false -- (our own setters: not the game's, for the hooks)
-local function Plain(v)
-	return type(v) == "number" and not (issecretvalue and issecretvalue(v))
-end
 
 -- One bar (and its holder: the frame whose height it takes, and whose
 -- pieces are its border) as look says; look nil: as the game had it.
@@ -361,8 +485,15 @@ function Apply()
 	local r, g, b
 	if look then r, g, b = HealthColor(look) end
 	DressBar(health, holder, look, "prdHealthHeight", r and { r, g, b } or nil)
-	DressBar(power, nil, look, "prdPowerHeight")
-	SpacePower(holder, power, ns.PersonalBarGap(look or false))
+	local pr, pg, pb = PowerColor(look)
+	DressBar(power, nil, look, "prdPowerHeight", pr and { pr, pg, pb } or nil)
+	-- (The game's mana fill is blue in its art: grey under our color, so it takes it.)
+	local powerFill = power and power:GetStatusBarTexture()
+	if powerFill and powerFill.SetDesaturated and not textured[power] then powerFill:SetDesaturated(pr ~= nil) end
+	-- (Their widths, the health bar's first: the power bar may hang off it.)
+	local grown = {}
+	SizeWidth(holder, look, "prdHealthWidth", grown)
+	SizeWidth(power, look, "prdPowerWidth", grown, holder, ns.PersonalBarGap(look or false))
 	if mana then
 		CopyTrim(power, mana)
 		DressBar(mana, nil, look, "prdManaHeight")
@@ -387,6 +518,19 @@ function Apply()
 			if cr then
 				dressing = true
 				self:SetStatusBarColor(cr, cg, cb)
+				dressing = false
+			end
+		end)
+	end
+	if power and not powerHooked and power.SetStatusBarColor then
+		hooksecurefunc(power, "SetStatusBarColor", function(self, cr, cg, cb)
+			if dressing then return end
+			if Plain(cr) and Plain(cg) and Plain(cb) then gameColor[self] = { cr, cg, cb } end
+			local now = ns.StyleOn("prdStyle") and Look()
+			local mr, mg, mb = PowerColor(now)
+			if mr then
+				dressing = true
+				self:SetStatusBarColor(mr, mg, mb)
 				dressing = false
 			end
 		end)
@@ -450,6 +594,7 @@ loader:SetScript("OnEvent", function() Apply() end)
 local PREVIEW_PIECES = { ROGUE = 5, PALADIN = 5, WARLOCK = 5, DEATHKNIGHT = 6, MONK = 5, EVOKER = 5, DRUID = 5,
 	MAGE = 4 }
 local PREVIEW_POWER = { 0, 0.55, 1 } -- (mana's blue)
+local PREVIEW_WIDTH = 200
 
 function ns.MakePersonalPreview(parent, width)
 	local holder = CreateFrame("Frame", nil, parent)
@@ -463,7 +608,7 @@ function ns.MakePersonalPreview(parent, width)
 		local bar = CreateFrame("StatusBar", nil, holder)
 		bar:SetMinMaxValues(0, 1)
 		bar:SetValue(value)
-		bar:SetWidth(200)
+		bar:SetWidth(PREVIEW_WIDTH)
 		bar.game = bar:CreateTexture(nil, "BACKGROUND")
 		bar.game:SetPoint("TOPLEFT", -2, 2)
 		bar.game:SetPoint("BOTTOMRIGHT", 2, -2)
@@ -507,8 +652,9 @@ function ns.MakePersonalPreview(parent, width)
 		power:SetPoint("TOP", health, "BOTTOM", 0, -(gap or 3))
 		mana:SetPoint("TOP", power, "BOTTOM", 0, -(gap or 3))
 		pieces:SetPoint("TOP", withMana and mana or power, "BOTTOM", 0, -6 - (reach or 0))
-		for _, info in ipairs({ { health, realHealth, "prdHealthHeight", 10 }, { power, realPower, "prdPowerHeight", 8 },
-			{ mana, realPower, "prdManaHeight", 8 } }) do
+		for _, info in ipairs({ { health, realHealth, "prdHealthHeight", 10, "prdHealthWidth" },
+			{ power, realPower, "prdPowerHeight", 8, "prdPowerWidth" },
+			{ mana, realPower, "prdManaHeight", 8, "prdManaWidth" } }) do
 			local bar = info[1]
 			if not ns.SetBarTexture(bar, look.prdTexture) then
 				local atlas, file = GameFill(info[2])
@@ -516,6 +662,7 @@ function ns.MakePersonalPreview(parent, width)
 				bar:GetStatusBarTexture():SetDesaturated(false)
 			end
 			bar:SetHeight(info[4] * (tonumber(look[info[3]]) or 1))
+			bar:SetWidth(TargetWidth(look, info[5], bar, PREVIEW_WIDTH))
 			bar.game:SetShown(look.prdBorder == "game")
 			DressSkin(bar.skin, look)
 		end
@@ -548,7 +695,9 @@ end
 
 -- The page itself.
 local PRESET_KEYS = { "prdTexture", "prdBorder", "prdBorderSize", "prdBorderR", "prdBorderG", "prdBorderB", "prdBack",
-	"prdHealthColor", "prdHealthHeight", "prdPowerHeight", "prdPiecesScale", "prdManaHeight" }
+	"prdHealthColor", "prdHealthHeight", "prdPowerHeight", "prdPiecesScale", "prdManaHeight", "prdHealthWidth", "prdPowerWidth",
+	"prdManaWidth", "prdHealthWidthUnit", "prdPowerWidthUnit", "prdManaWidthUnit", "prdHealthWidthPx", "prdPowerWidthPx",
+	"prdManaWidthPx" }
 
 function ns.CreatePersonalStylePanel(kit)
 	local canvas, content = kit.CreateScrollPage()
@@ -623,8 +772,34 @@ function ns.CreatePersonalStylePanel(kit)
 			"under it)."], opts = { game = true } },
 	})
 
-	-- Each bar's size, next to the game's.
+	-- Each bar's size, next to the game's: widths on a line, heights under.
 	stack:Header(content, L["Sizes"])
+	-- (Each width a line: a percent of the game's, or pixels on screen, the
+	-- round pick before each saying which; px picked empty, it's filled
+	-- with the bar's width now.)
+	local function WidthLine(label, key, which, tip, test)
+		test = test or rows.On
+		local unit = key .. "Unit"
+		local line = rows.Boxes()
+		line.nameWidth = 90
+		line:Pick(label, unit, "pct", L["Its width as a percent of the game's."], test)
+		line:Box("", key, 20, 200, 5, "%d", 100, tip, function(db) return test(db) and db[unit] ~= "px" end, "%")
+		line:Pick("", unit, "px", L["Its width in pixels on screen: the same number on two bars, the same width."],
+			test, function()
+				local db = ns.GetDB()
+				if (tonumber(db[key .. "Px"]) or 0) <= 0 then
+					db[key .. "Px"] = ns.PersonalBarPixels(which) or math.floor(PREVIEW_WIDTH + 0.5)
+				end
+			end)
+		line:Box("", key .. "Px", 10, 2000, 5, "%d", 1, tip, function(db) return test(db) and db[unit] == "px" end,
+			"px")
+	end
+	WidthLine(L["Health width"], "prdHealthWidth", "health", L["The health bar's width, about its middle."])
+	WidthLine(L["Power width"], "prdPowerWidth", "power", L["The power bar's width, about its middle."])
+	if ns.PERSONAL_MANA then
+		WidthLine(L["Mana width"], "prdManaWidth", "mana",
+			L["The mana bar's width, about its middle (a percent of the game's power bar's)."], ManaOn)
+	end
 	local sizes = rows.Boxes()
 	sizes:Box(L["Health"], "prdHealthHeight", 0, 100, 5, "%d", 100, L["The health bar's height, next to the game's."],
 		nil, "%")

@@ -655,6 +655,48 @@ local function BoxLine(parent)
 		Tooltip(box, (tip and tip .. " " or "") .. L["Scroll the mouse wheel over it, or type a number and press Enter."])
 		return box, name
 	end
+	-- A round pick before the next box (its name first, if any): ticked
+	-- while setting key is value, a click sets it (onPick(value) after: the
+	-- box's number filled in, say). Two on a line: one or the other.
+	function line.Pick(_, label, key, value, tip, onChange, onPick)
+		RecordKey(parent, key)
+		local name = Label(line, "GameFontHighlight", label or "")
+		name:SetPoint("LEFT", line, "LEFT", right, 0)
+		name.searchSkip = true
+		local hasName = label and label ~= ""
+		local ok, pick = pcall(CreateFrame, "CheckButton", nil, line, "UIRadioButtonTemplate")
+		if ok and pick then
+			ns.SkinCheck(pick, true)
+		else
+			pick = ns.SkinCheck(CreateFrame("CheckButton", nil, line, "UICheckButtonTemplate"))
+		end
+		pick:SetSize(18, 18)
+		-- (line.nameWidth: names at least so wide, lines of picks lined up.)
+		local nameWidth = hasName and math.max(name:GetStringWidth(), line.nameWidth or 0) + 8 or 0
+		pick:SetPoint("LEFT", line, "LEFT", right + nameWidth, 0)
+		-- (The box after it clear of it: an input box's art reaches out left.)
+		right = right + nameWidth + 18 + 12
+		line:SetWidth(right)
+		pick.searchLabel = hasName and label or nil
+		pick.settingKey = key
+		pick:SetScript("OnClick", function()
+			ns.GetDB()[key] = value
+			if onPick then onPick(value) end
+			if onChange then onChange(value) end
+		end)
+		local setEnabled = pick.SetEnabled
+		function pick.SetEnabled(self, enabled)
+			if setEnabled then setEnabled(self, enabled) end
+			self:SetAlpha(enabled and 1 or 0.5)
+			name:SetAlpha(enabled and 1 or 0.5)
+		end
+		pick.Refresh = function(self)
+			self:SetChecked(ns.GetDB()[key] == value)
+		end
+		controls[#controls + 1] = pick
+		if tip then Tooltip(pick, tip) end
+		return pick, name
+	end
 	return line
 end
 
@@ -6740,8 +6782,19 @@ local function ShowTable(content, anchor, rows, ...)
 	end
 
 	local lastLabel = columnTop
+	-- (rows.kindHeadings: as GridRows.lua's ns.GridTable has them.)
+	local gap, lastKind = 0, nil
 	for r, item in ipairs(rows) do
-		local y = -FRAME_HEADING_HEIGHT - 4 - (r - 1) * ROW_HEIGHT
+		local kind = item.part and 2 or 1
+		if rows.kindHeadings and kind ~= lastKind then
+			local head = Label(content, "GameFontNormalSmall", rows.kindHeadings[kind])
+			head:SetPoint("TOPLEFT", columnTop, "TOPLEFT", 0,
+				lastKind and -FRAME_HEADING_HEIGHT - 4 - (r - 1) * ROW_HEIGHT - gap - 6 or -2)
+			head.searchSkip = true
+			if lastKind then gap = gap + ROW_HEIGHT end
+			lastKind = kind
+		end
+		local y = -FRAME_HEADING_HEIGHT - 4 - (r - 1) * ROW_HEIGHT - gap
 		local rowLabel = Label(content, "GameFontHighlight", item.label)
 		rowLabel:SetPoint("TOPLEFT", columnTop, "TOPLEFT", 0, y - 5)
 		rowLabel:SetWidth(LABEL_WIDTH - 4)
@@ -7020,6 +7073,15 @@ local function CreateCombatPanel()
 		end
 		if #sectionRows == 0 then
 			return
+		end
+		-- (Whole frames first, then the parts drawn inside them, each kind under
+		-- a heading of its own: the raid tab's Raid Frame Manager up with Players.)
+		local whole, inside = {}, {}
+		for _, item in ipairs(sectionRows) do table.insert(item.part and inside or whole, item) end
+		if #whole > 0 and #inside > 0 then
+			sectionRows = whole
+			for _, item in ipairs(inside) do sectionRows[#sectionRows + 1] = item end
+			sectionRows.kindHeadings = { L["Frames"], L["Parts"] }
 		end
 		local section = { key = page or "other", tab = tab or heading, width = SECTION_WIDTH }
 		local frame = CreateFrame("Frame", nil, content)

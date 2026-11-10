@@ -1406,6 +1406,18 @@ function ns.StyleRows(kit, content, stack, changed, switchKey, fieldOf)
 			end
 			return box
 		end
+		-- (A round pick before a box, greyed as the rest: :Pick(label, key,
+		-- value, tip, test, onPick).)
+		local pick = line.Pick
+		function line.Pick(_, label, key, value, tip, test, onPick)
+			-- (The page's controls again after: the other pick, the boxes' greying.)
+			local button = pick(line, label, key, value, tip, function(v)
+				changed(v)
+				kit.Refresh()
+			end, onPick)
+			kit.GreyUnless(button, test or On)
+			return button
+		end
 		return line
 	end
 

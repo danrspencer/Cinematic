@@ -32,12 +32,12 @@ local COLORS = {
 local KIND_COLOR = { rotate = "move", tilt = "move", zoom = "move",
 	wait = "wait", together = "flow", ["repeat"] = "flow", emote = "misc", putback = "misc",
 	sway = "move", spin = "move", aim = "move", ending = "flow",
-	play = "flow", endMusic = "misc", follow = "move" }
+	play = "flow", endMusic = "misc", follow = "move", behind = "move" }
 local KIND_NAMES = { rotate = "Rotate", tilt = "Tilt", zoom = "Zoom",
 	wait = "Wait", together = "Together", ["repeat"] = "Repeat", emote = "Emote",
 	putback = "Undo its turns", sway = "Sway", spin = "Spin",
 	aim = "Aim at", play = "Play script", endMusic = "End music",
-	follow = "Follow your turns" }
+	follow = "Follow your turns", behind = "Swing behind you" }
 -- The add buttons' groups (CameraScripts.lua's ns.CAMERA_SCRIPT_ADD_GROUPS).
 local ADD_GROUP_NAMES = { move = "Move the camera", wait = "Wait", group = "Group steps", other = "Other" }
 -- (A field's name: by its kind first, where the same key means something else there.)
@@ -49,7 +49,7 @@ local FIELD_NAMES = { deg = "Degrees", secs = "Seconds", way = "Way", ease = "Ea
 	fit = "Time", at = "At", miss = "Not found",
 	speed = "Top speed", past = "Past max", ["putback.zoom"] = "Zoom too", script = "Camera",
 	["follow.after"] = "Glide after", lazy = "Laziness", top = "Top speed", corners = "Corners", steer = "Steering",
-	["follow.most"] = "Fall behind at most" }
+	["follow.most"] = "Fall behind at most", ["behind.speed"] = "Turn speed" }
 local CHOICE_NAMES = { left = "Left", right = "Right", random = "Either way", once = "Picked once",
 	smooth = "Smooth", gentle = "Gentle", steady = "Steady", none = "None", short = "Short", medium = "Medium", long = "Long", yards = "You", yours = "Your zoom",
 	yes = "Favor", no = "Anywhere", cast = "The cast", landing = "Landing", alive = "Back to life",
@@ -78,6 +78,7 @@ local HINTS = {
 	["repeat"] = "Runs the steps inside it again. 0 times: until the camera ends (the preview shows three).",
 	emote = "Your character does this emote (a word, like wave or cheer).",
 	putback = "Undoes every turn, tilt and zoom this scene made, all at once, by adding up its own turns (the game never says which way the camera points). If you move the camera yourself, it starts counting again from where you leave it. Zoom too off: the zoom stays, for a Zoom beside it in a Together to bring back at its own speed.",
+	behind = "Swings the view round behind you over this many seconds, turning at Turn speed (degrees a second) at most; the height stays. Only while you're moving (a flight, walking or running): standing still, the game doesn't turn the camera. Where it ends counts as where the scene started, for Undo its turns and Sway.",
 	sway = "A random spot within Arc of where the camera was as this sway first ran, At least that far on; then it creeps on at Drift degrees a second through Pause, easing off before the edge. Middle: favor spots near the middle.",
 	spin = "Round and round from Start speed, speeding up by Speed-up each second to Top speed (degrees a second); 0 seconds: until the camera ends. Speed match: seconds to go from the turn before's speed to its own.",
 	aim = "Where you clicked: turns Degrees toward the side of the screen you clicked who you're talking to, as the quest cam does. Who's talking: swings toward the NPC talking now by their chat bubble, leaving them Degrees off the middle, as Chat Cam does. Not found (opened with a key, no bubble on screen): a turn either way, stay, or look round (a full turn at most) for their bubble. Top speed (degrees a second): slower than Seconds if the turn would go faster; 0 goes by Seconds.",
@@ -172,6 +173,8 @@ local function StepText(step)
 		return L["End the music over %s s"]:format(Num(step.secs))
 	elseif k == "follow" then
 		return L["Follow your turns, catching up %s s after"]:format(Num(step.after))
+	elseif k == "behind" then
+		return L["Swing behind you over %s s"]:format(Num(step.secs))
 	elseif k == "putback" then
 		return (step.zoom == "no" and L["Undo its turns and tilts over %s s"] or L["Undo its turns, tilts and zoom over %s s"]):format(
 			Num(step.secs))
