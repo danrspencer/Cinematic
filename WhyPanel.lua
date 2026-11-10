@@ -106,8 +106,10 @@ local function Gather()
 			-- target, no group, a bar switched off.)
 			if (status == "shown" or status == "partly") and not info.onScreen then
 				status = "idle"
-				table.insert(reasons, 1, { state = "on", text = L["Cinematic isn't hiding it. The game has nothing to " ..
-					"show there right now (no target, no group, or it's switched off in the game or by another addon)."] })
+				table.insert(reasons, 1, { state = "on",
+					text = L["Cinematic isn't hiding it: the game has nothing to show there right now"] })
+				table.insert(reasons, 2, { state = "on", text = L["For example: no target, no group, or it's switched " ..
+					"off in the game's own options or by another addon"] })
 			end
 			local kind = (status == "shown" or status == "partly") and "shown" or (status == "hidden" and "hidden") or nil
 			counts.all = counts.all + 1
@@ -459,8 +461,7 @@ local function MakeWindow()
 	-- CineMode on or off, why, and what you're doing: click it for the setting.
 	local banner = CreateFrame("Button", nil, window)
 	banner:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -10)
-	banner:SetPoint("RIGHT", window, "RIGHT", -16, 0)
-	banner:SetHeight(70)
+	banner:SetSize(WIDTH - 32, 70)
 	local back = banner:CreateTexture(nil, "BACKGROUND")
 	back:SetAllPoints()
 	back:SetColorTexture(1, 1, 1, 0.05)
@@ -531,7 +532,7 @@ local function MakeWindow()
 	report:SetScript("OnClick", CopyReport)
 	local hint = window:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
 	hint:SetPoint("BOTTOMLEFT", pick, "TOPLEFT", 0, 8)
-	hint:SetPoint("RIGHT", window, "RIGHT", -16, 0)
+	hint:SetWidth(WIDTH - 32)
 	hint:SetHeight(36) -- (three lines' room, so the list's bottom edge stays put)
 	hint:SetJustifyH("LEFT")
 	hint:SetJustifyV("BOTTOM")
