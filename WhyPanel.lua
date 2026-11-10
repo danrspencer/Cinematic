@@ -330,6 +330,12 @@ local function CopyReport()
 		out[#out + 1] = "CineMode: OFF - " .. Bare(ns.CineOffReason())
 	end
 	out[#out + 1] = "Right now: " .. NowWords()
+	local calmLeft, calmTotal = ns.CalmLeft()
+	if calmLeft then
+		local full = ns.CalmFullLeft and ns.CalmFullLeft()
+		out[#out + 1] = ("Calm Timer: %.0f of %.0f sec left%s"):format(calmLeft, calmTotal,
+			full and (", health and power full: ends in %.0f"):format(full) or "")
+	end
 	local section
 	for _, item in ipairs(found) do
 		if item.section ~= section then
@@ -559,6 +565,15 @@ function Fill()
 	end
 
 	local y, rows, headers, section, opened = 0, 0, 0, nil, false
+	-- The Calm Timer, while it runs: a bar of the time left, over the first section.
+	local calmBar = window.calmBar
+	local calmLeft = ns.CalmLeft()
+	calmBar:SetShown(calmLeft ~= nil)
+	if calmLeft then
+		calmBar:ClearAllPoints()
+		calmBar:SetPoint("TOPLEFT", list, "TOPLEFT", 0, -6)
+		y = y + 6 + calmBar:GetHeight() + 2
+	end
 	for _, item in ipairs(found) do
 		if item.section ~= section then
 			section = item.section
@@ -769,8 +784,52 @@ local function MakeWindow()
 		"Addon Frames page. For any other addon's frame, use Pick a frame on screen."])
 	MakeDetail()
 
+	-- The Calm Timer bar (placed by Fill, at the list's top while it runs):
+	-- its time left, draining every frame; click it for its setting.
+	local calmBar = CreateFrame("Button", nil, list)
+	calmBar:SetSize(LIST_WIDTH, 34)
+	calmBar.back = calmBar:CreateTexture(nil, "BACKGROUND")
+	calmBar.back:SetAllPoints()
+	calmBar.back:SetColorTexture(1, 1, 1, 0.05)
+	local calmGlow = calmBar:CreateTexture(nil, "HIGHLIGHT")
+	calmGlow:SetAllPoints()
+	calmGlow:SetColorTexture(1, 0.82, 0, 0.08)
+	calmBar.label = calmBar:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+	calmBar.label:SetPoint("TOPLEFT", 10, -4)
+	calmBar.label:SetText(L["Calm Timer"])
+	calmBar.left = calmBar:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+	calmBar.left:SetPoint("TOPRIGHT", -8, -4)
+	calmBar.left:SetJustifyH("RIGHT")
+	calmBar.track = calmBar:CreateTexture(nil, "ARTWORK")
+	calmBar.track:SetPoint("BOTTOMLEFT", 10, 6)
+	calmBar.track:SetSize(LIST_WIDTH - 18, 6)
+	calmBar.track:SetColorTexture(0, 0, 0, 0.5)
+	calmBar.fill = calmBar:CreateTexture(nil, "OVERLAY")
+	calmBar.fill:SetPoint("LEFT", calmBar.track, "LEFT")
+	calmBar.fill:SetHeight(6)
+	calmBar.fill:SetColorTexture(1, 0.82, 0, 0.85)
+	calmBar:SetScript("OnClick", function()
+		if not (ns.OpenSettingByKey and ns.OpenSettingByKey("calmTime")) then ns.OpenOptions("CineMode") end
+	end)
+	calmBar:Hide()
+	window.calmBar = calmBar
+	local function DrawCalm()
+		local left, total = ns.CalmLeft()
+		if not left then return end
+		local full = ns.CalmFullLeft and ns.CalmFullLeft()
+		if full and full < left then
+			calmBar.left:SetText(L["%.0f sec (health and power full: ends in %.0f)"]:format(left, full))
+		else
+			calmBar.left:SetText(L["%.0f sec left"]:format(left))
+		end
+		local width = (LIST_WIDTH - 18) * (total > 0 and math.min(1, left / total) or 0)
+		calmBar.fill:SetWidth(math.max(0.01, width))
+		calmBar.fill:SetShown(width > 0.5)
+	end
+
 	local elapsedSince = 0
 	ns.SetOnUpdate(window, function(_, elapsed)
+		if ns.Flag(calmBar:IsShown()) then DrawCalm() end
 		elapsedSince = elapsedSince + elapsed
 		if elapsedSince > 0.5 then
 			elapsedSince = 0

@@ -3719,6 +3719,12 @@ function ns.InCalm()
 	local fighting = InCombatLockdown() or ns.Flag(UnitAffectingCombat("player"))
 	return not fighting and GetTime() - lastCombatAt < (ns.db.calmTime or 0)
 end
+-- The Calm Timer's seconds left and its whole length, while it runs (else nil).
+function ns.CalmLeft()
+	if not ns.InCalm() then return nil end
+	local total = ns.db.calmTime or 0
+	return math.max(0, total - (GetTime() - lastCombatAt)), total
+end
 -- The facts a row's rule is read with where it's used, for the rule
 -- editor's "Right now" and dots: the nameplates', names', plate parts' (<kind>When)
 -- and Heal Vision's in a fight only while really in one (ns.RuleFactsNow); the

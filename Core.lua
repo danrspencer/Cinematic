@@ -3277,6 +3277,12 @@ local lastFightAt = -math.huge
 ns.OnCalmEnd(function(cut) lastFightAt = math.min(lastFightAt, cut) end)
 local calmHealthySince -- (Exit Calm Timer when healthy: when you were last back to full)
 local calmTrace = { fighting = false } -- (and for its log lines: a fight was on last tick)
+-- (The Why window's Calm Timer bar: with Exit Calm Timer when healthy on and
+-- you back to full, the seconds till that ends it; nil while not.)
+function ns.CalmFullLeft()
+	if not (calmHealthySince and ns.db.calmEndsAtFull) then return nil end
+	return math.max(0, (ns.db.calmFullAfter or 0) - (GetTime() - calmHealthySince))
+end
 -- The tick is done in two halves, the frames in one frame and the rest (effects,
 -- CVars, music, nameplates...) in the next, so no one frame takes it all: its
 -- cinematic and elapsed, waiting for the second half. (At low frame rates, with a
