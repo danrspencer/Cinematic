@@ -2849,8 +2849,11 @@ local function PlateAlphas(unit, plate)
 	elseif platesForced and unit and plate ~= PersonalPlate() then
 		local kind = PlateKind(unit)
 		name = kind and nameLevel[KIND_NAME_GROUP[kind]] or 0
-		-- (Your target's, as the Target section's Names row says.)
-		if IsTarget(unit) and ns.TargetNameRow(unit) and (nameLevel.YourTarget or 0) > name then
+		-- (Your target's, as the Target section's Names row says. Not while its
+		-- Nameplates row keeps the plate up: the plate wins, fading in whole
+		-- with its own name, rather than a name-only look flashing first.)
+		if IsTarget(unit) and ns.TargetNameRow(unit) and (nameLevel.YourTarget or 0) > name
+			and not (ns.HasTarget() and AlwaysShownTarget(unit)) then
 			name = nameLevel.YourTarget
 		end
 	end
@@ -2899,13 +2902,14 @@ function ns.DescribePlateNameKept(unit, plate)
 	local kind = unit and PlateKind(unit)
 	local targetRow = unit and IsTarget(unit) and ns.TargetNameRow(unit)
 	return ("kind=%s group=%s level=%s service=%s/%s/%s %s soft=%s forced=%s body=%.2f targetRow=%s targetLevel=%s " ..
-		"kept=%s alphas=%s"):format(tostring(kind),
+		"kept=%s plateWins=%s alphas=%s"):format(tostring(kind),
 		tostring(kind and KIND_NAME_GROUP[kind]), tostring(kind and nameLevel[KIND_NAME_GROUP[kind]]),
 		tostring(nameLevel.ServiceNPCs), tostring(unit and ns.PlateServiceMatch(plate, unit)), tostring(ns.db.nameServiceShow),
 		ns.DescribePlateTitle and ns.DescribePlateTitle(plate, unit) or "",
 		tostring(unit and ns.SoftPlateHidden(unit)), tostring(platesForced), PlateAlpha(unit, plate),
 		tostring(unit and IsTarget(unit) and (targetRow or "none")), tostring(targetRow and nameLevel.YourTarget),
 		tostring(targetRow and NameKeptHere("YourTarget", InCombatLockdown())),
+		tostring(targetRow and ns.HasTarget() and AlwaysShownTarget(unit) or false),
 		table.concat({ PlateAlphas(unit, plate) }, "/"))
 end
 
