@@ -212,7 +212,8 @@ local MOMENTS = {
 		tip = "Someone resurrects you and you accept.",
 		sample = { name = "Thornbrook", class = "DRUID", line = "brought you back to life" } },
 	{ id = "Emote", on = "emoteVisionEmotes", name = "Someone emotes at you", emotes = { SAME, "WAVE", "SMILE" },
-		same = true, tip = "Someone waves, bows, hugs or the like at you. Same back: the one they did.",
+		same = true, tip = "Someone waves, bows, hugs or the like at you: buttons that answer it (Thank for a " ..
+			"congratulation) while this list is as it started. Same back: the one they did, or its answer.",
 		sample = { name = "Pip", class = "MAGE", line = "waves at you.", same = "WAVE" } },
 	{ id = "Summon", on = "emoteVisionSummon", name = "You're summoned", emotes = { "THANK", "WAVE" },
 		tip = "A warlock's summon, or a meeting stone's, that you accept: once you're there.",
@@ -436,6 +437,36 @@ local EMOTE_WORDS = {
 	{ "goodbye", "BYE" }, { "grin", "GRIN" }, { "wink", "WINK" }, { "laugh", "LAUGH" }, { "giggle", "GIGGLE" },
 	{ "love", "LOVE" }, { "flex", "FLEX" }, { "roar", "ROAR" }, { "apolog", "APOLOGIZE" }, { "kneel", "KNEEL" },
 }
+-- Each emote at you, its answers: the card's buttons while the Emote list is
+-- still its start (a list of yours is kept). Its first one is also what Same
+-- back plays (a congratulation isn't congratulated back: thanked).
+local PRAISED = { "THANK", "BOW", "BLUSH" }
+local EMOTE_REPLIES = {
+	THANK = { "YW", "BOW", "SMILE" },
+	HIGHFIVE = { "HIGHFIVE", "CHEER", "GRIN" },
+	WAVE = { "WAVE", "HELLO", "SMILE" },
+	BOW = { "BOW", "SALUTE", "SMILE" },
+	HUG = { "HUG", "SMILE", "BLUSH" },
+	CHEER = PRAISED, APPLAUD = PRAISED, CONGRATULATE = PRAISED,
+	HELLO = { "HELLO", "WAVE", "SMILE" },
+	SALUTE = { "SALUTE", "BOW", "WAVE" },
+	SMILE = { "SMILE", "WAVE", "WINK" },
+	KISS = { "BLUSH", "KISS", "GIGGLE" },
+	DANCE = { "DANCE", "CHEER", "APPLAUD" },
+	CURTSEY = { "BOW", "CURTSEY", "SMILE" },
+	WELCOME = { "THANK", "WAVE", "SMILE" },
+	BYE = { "BYE", "WAVE", "SMILE" },
+	GRIN = { "GRIN", "WINK", "LAUGH" },
+	WINK = { "WINK", "BLUSH", "GIGGLE" },
+	LAUGH = { "LAUGH", "GIGGLE", "GRIN" },
+	GIGGLE = { "GIGGLE", "WINK", "SMILE" },
+	LOVE = { "BLUSH", "HUG", "LOVE" },
+	FLEX = { "APPLAUD", "FLEX", "LAUGH" },
+	ROAR = { "ROAR", "FLEX", "CHEER" },
+	APOLOGIZE = { "FORGIVE", "HUG", "SMILE" },
+	KNEEL = { "BOW", "SALUTE", "BLUSH" },
+}
+EMOTE_NAMES.YW, EMOTE_NAMES.BLUSH, EMOTE_NAMES.FORGIVE = "You're welcome", "Blush", "Forgive"
 
 local card, queue, lastFrom = nil, {}, {}
 local showing -- (the moment on the card: { kind, name, unit, guid, class, line, same, group, test })
@@ -1755,7 +1786,14 @@ local function Emoted(text, author, guid)
 	local line = text
 	if line:sub(1, #name) == name then line = line:sub(#name + 1):gsub("^%s+", "") end
 	-- (Their whole name for who the emote goes to: the card shows it short.)
-	FireFor("Emote", author, guid, line, { same = same })
+	-- (Its answers: the buttons while the list is its start; Same back plays
+	-- the first.)
+	local replies = EMOTE_REPLIES[same]
+	local key = MOMENT.Emote.key
+	local list = DB()[key]
+	local own = list ~= nil and list ~= DEFAULTS[key]
+	FireFor("Emote", author, guid, line, { same = replies and replies[1] or same,
+		emotes = not own and replies or nil })
 end
 
 -- A summon you accepted: its card a moment later, once you're there (after

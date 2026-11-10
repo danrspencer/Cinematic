@@ -63,6 +63,7 @@ read_globals = {
 	"C_CooldownViewer",
 	"C_SpellActivationOverlay",
 	"C_CVar",
+	"C_CombatLog",
 	"C_ChatBubbles",
 	"C_TalkingHead",
 	"C_GamePad",

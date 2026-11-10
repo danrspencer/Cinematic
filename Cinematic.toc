@@ -146,6 +146,7 @@ PersonalManaCost.lua
 PersonalManaText.lua
 PlateCastStyle.lua
 PlateHealthStyle.lua
+CombatTextStyle.lua
 UnitStyle.lua
 RaidStyle.lua
 GeneralStyle.lua

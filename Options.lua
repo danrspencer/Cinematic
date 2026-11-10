@@ -2109,6 +2109,8 @@ do
 			{ "Cast Bar Style", "Interface\\Icons\\Spell_Nature_Lightning", label = "Cast Bar Style", section = "Overhead" },
 			{ "Bubble Style", "Interface\\Icons\\Ability_Warrior_RallyingCry", label = "Chat Bubble Style",
 				section = "Overhead" },
+			{ "Combat Text Style", "Interface\\Icons\\Ability_Warrior_Riposte", label = "Combat Text Style",
+				section = "Overhead" },
 		} },
 		-- (General and the dev copy's Wind Guide in no section: plain icons)
 		{ name = "Visions", colors = { Combat = { 0.85, 0.3, 0.25 }, World = { 0.35, 0.6, 0.9 } }, pages = {
@@ -3316,15 +3318,8 @@ local function CreateRevealPanel()
 		"combat text settings are put back when the UI returns."])
 	stack:Add(combatText, "check")
 
-	local worldText = Check(content, "hideWorldText", L["Hide all floating text: XP, damage, healing (restart required)"],
-		L["The game has no way to hide just the XP you gain over your character: it draws that, " ..
-		"the damage and healing numbers, misses and the like all in one font. This blanks that " ..
-		"font, so they all go, always (not just in CineMode). Takes effect after you fully " ..
-		"restart the game; /reload isn't enough."])
-	stack:Add(worldText, "check")
-	worldText:HookScript("OnClick", function()
-		StaticPopup_Show("CINEMATIC_WORLD_TEXT_RESTART")
-	end)
+	-- (Hide all floating text, XP too: on the Style hub's Combat Text Style
+	-- page since 2026-11-10, CombatTextStyle.lua.)
 
 	-- The red error text at the top of the screen, in and out of fights
 	-- (CineMode or not).
@@ -16964,9 +16959,10 @@ ns.OnLanguage(function()
 	}
 	-- The game keeps the floating-text font it first loaded, so only a fresh start applies it
 	StaticPopupDialogs.CINEMATIC_WORLD_TEXT_RESTART = {
-		text = L["Floating text changes after you fully restart the game (/reload isn't enough). Exit the game now?"],
-		button1 = EXIT_GAME or L["Exit game"], button2 = L["Later"],
-		OnAccept = Quit,
+		-- (No Exit button: Quit is the game's alone, forbidden from an addon's
+		-- popup, tested on Forever 2026-11-10.)
+		text = L["Floating text changes after you fully restart the game (/reload isn't enough)."],
+		button1 = CLOSE or L["Close"],
 		timeout = 0, whileDead = true, hideOnEscape = true,
 	}
 
@@ -17056,6 +17052,9 @@ ns.OnLanguage(function()
 	end
 	if ns.CreateBubbleStylePanel then -- (BubbleStyle.lua)
 		ns.CreateBubbleStylePanel(ns.lowHealthKit)
+	end
+	if ns.CreateCombatTextStylePanel then -- (CombatTextStyle.lua)
+		ns.CreateCombatTextStylePanel(ns.lowHealthKit)
 	end
 	if ns.CreateTooltipStylePanel then -- (TooltipStyle.lua)
 		ns.CreateTooltipStylePanel(ns.lowHealthKit)

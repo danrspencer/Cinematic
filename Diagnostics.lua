@@ -844,6 +844,173 @@ do
 		end
 		ns.Print(("cvars: %d named like \"%s\" (in /cine log)"):format(#found, words))
 	end
+
+	-- /cine debug worldtext: the floating world text CVars (XP gained, damage
+	-- numbers) this client has, by name: Forever can't list its CVars, so the
+	-- word search above finds nothing there. For a way to hide XP text alone.
+	local WORLD_TEXT = {
+		"WorldTextScale", "WorldTextScreenY", "WorldTextCritScreenY", "WorldTextMinSize",
+		"WorldTextMinAlpha", "WorldTextRandomXY", "WorldTextRandomZMin", "WorldTextRandomZMax",
+		"WorldTextNonRandomZ", "WorldTextGravity", "WorldTextRampDuration", "WorldTextRampPow",
+		"WorldTextRampPowCrit", "WorldTextStartPosRandomness",
+		"floatingCombatTextCombatState", "floatingCombatTextCombatXP", "floatingCombatTextExperience",
+		"floatingCombatTextRepChanges", "floatingCombatTextHonorGains", "floatingCombatTextFloatMode",
+		"enableFloatingCombatText", "CombatTextExperience", "showXPGain", "xpBarText",
+	}
+	function ns.WorldTextDebug()
+		local get = (C_CVar and C_CVar.GetCVar) or GetCVar
+		local getDefault = (C_CVar and C_CVar.GetCVarDefault) or GetCVarDefault
+		local have = 0
+		for _, base in ipairs(WORLD_TEXT) do
+			for _, name in ipairs({ base, base .. "_v2" }) do
+				local value = Value(get, name)
+				if value then
+					have = have + 1
+					ns.Log("worldtext", ("%s = %s (default %s)"):format(name, value,
+						tostring(getDefault and Value(getDefault, name))))
+				end
+			end
+		end
+		ns.Log("worldtext", ("client %s, CVar list: %s, hideWorldText %s, DAMAGE_TEXT_FONT %s"):format(
+			tostring((select(4, GetBuildInfo()))),
+			(C_Console and C_Console.GetAllCommands) and "C_Console"
+				or (ConsoleGetAllCommands and "ConsoleGetAllCommands") or "none",
+			tostring(ns.db and ns.db.hideWorldText), tostring(DAMAGE_TEXT_FONT)))
+		ns.Print(("worldtext: %d world text CVars on this client (in /cine log)"):format(have))
+	end
+end
+
+-- /cine debug combattext: for 30 seconds, every UNIT_COMBAT the game sends
+-- (for the Combat Text Style page, Tools/combat-text-plan.md): from one
+-- listener for all units and one per nameplate, each value plain or secret,
+-- whether a secret amount still goes on a text (SetText), and whether its
+-- plate is locked (forbidden). Also the first COMBAT_LOG_MESSAGEs, for
+-- telling whose hit it was later. Run it again to stop early.
+do
+	local SECONDS, MAX_LINES, MAX_LOG_LINES = 30, 150, 8
+	local probe, plateFrames, stats, lines, logLines, stopAt
+	local scratch -- (a hidden text: does a secret amount go on it?)
+
+	local function State(value)
+		if issecretvalue and issecretvalue(value) then return "<secret>" end
+		return tostring(value)
+	end
+
+	local function PlateInfo(unit)
+		local get = C_NamePlate and C_NamePlate.GetNamePlateForUnit
+		if not get or type(unit) ~= "string" or issecretvalue and issecretvalue(unit) then return "plate ?" end
+		local ok, plate = pcall(get, unit)
+		if not ok then return "plate error" end
+		if not plate then return "no plate" end
+		local forbidden = plate.IsForbidden and plate:IsForbidden()
+		return forbidden and "plate LOCKED" or "plate open"
+	end
+
+	local function TryText(amount)
+		if not scratch then
+			scratch = UIParent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+			scratch:Hide()
+		end
+		local ok = pcall(scratch.SetText, scratch, amount)
+		if not ok then stats.textFail = stats.textFail + 1 end
+		return ok and "text ok" or "TEXT FAILED"
+	end
+
+	local function Line(tag, text)
+		lines = lines + 1
+		if lines <= MAX_LINES then ns.Log("combattext", tag .. " " .. text) end
+	end
+
+	local function OnCombat(tag, unit, action, flag, amount, school)
+		stats.events = stats.events + 1
+		local secret = issecretvalue and issecretvalue(amount)
+		if secret then stats.secretAmounts = stats.secretAmounts + 1 end
+		local isTarget = "?"
+		if type(unit) == "string" and not (issecretvalue and issecretvalue(unit)) then
+			local ok, same = pcall(UnitIsUnit, unit, "target")
+			isTarget = ok and State(same) or "error"
+		end
+		Line(tag, ("unit=%s action=%s flag=%s amount=%s school=%s target=%s %s %s combat=%s"):format(
+			State(unit), State(action), State(flag), State(amount), State(school), isTarget,
+			PlateInfo(unit), TryText(amount), tostring(InCombatLockdown())))
+	end
+
+	local function WatchPlate(unit)
+		if plateFrames[unit] then return end
+		local frame = CreateFrame("Frame")
+		frame:SetScript("OnEvent", function(_, _, ...) OnCombat("plate", ...) end)
+		local ok = pcall(frame.RegisterUnitEvent, frame, "UNIT_COMBAT", unit)
+		plateFrames[unit] = frame
+		if not ok then Line("plate", unit .. ": RegisterUnitEvent UNIT_COMBAT refused") end
+	end
+
+	local function Stop(why)
+		if not probe then return end
+		probe:UnregisterAllEvents()
+		ns.SetOnUpdate(probe, nil)
+		for _, frame in pairs(plateFrames) do frame:UnregisterAllEvents() end
+		ns.Log("combattext", ("stopped (%s): %d UNIT_COMBAT, %d with a secret amount, %d SetText failures,"
+			.. " %d combat log lines%s"):format(why, stats.events, stats.secretAmounts, stats.textFail,
+			stats.logLines, lines > MAX_LINES and (", " .. (lines - MAX_LINES) .. " lines not logged") or ""))
+		ns.Print(("combattext: stopped, %d events (in /cine log)"):format(stats.events))
+		probe = nil
+	end
+
+	function ns.CombatTextProbe()
+		if probe then Stop("run again") return end
+		probe, plateFrames, lines, logLines = CreateFrame("Frame"), {}, 0, 0
+		stats = { events = 0, secretAmounts = 0, textFail = 0, logLines = 0 }
+		stopAt = GetTime() + SECONDS
+		local get = (C_CVar and C_CVar.GetCVar) or GetCVar
+		local function CVar(name) local ok, v = pcall(get, name) return ok and tostring(v) or "error" end
+		local loaded = C_AddOns and C_AddOns.IsAddOnLoaded or IsAddOnLoaded
+		local function Loaded(name) local ok, v = pcall(loaded or error, name) return ok and tostring(v) or "?" end
+		local plates = C_NamePlate and C_NamePlate.GetNamePlates and C_NamePlate.GetNamePlates() or {}
+		ns.Log("combattext", ("client %s, combat=%s, target=%s (%s), plates=%d, damage_v2=%s healing_v2=%s,"
+			.. " hideWorldText=%s, DAMAGE_TEXT_FONT=%s, ForeverCombatText=%s MSBT=%s"):format(
+			tostring((select(4, GetBuildInfo()))), tostring(InCombatLockdown()), State(UnitName("target")),
+			State(UnitClassification and UnitClassification("target")), #plates,
+			CVar("floatingCombatTextCombatDamage_v2"), CVar("floatingCombatTextCombatHealing_v2"),
+			tostring(ns.db and ns.db.hideWorldText), tostring(DAMAGE_TEXT_FONT),
+			Loaded("ForeverCombatText"), Loaded("MikScrollingBattleText")))
+		local logOn = "no C_CombatLog"
+		if C_CombatLog and C_CombatLog.AreFilteredEventsEnabled then
+			local ok, on = pcall(C_CombatLog.AreFilteredEventsEnabled)
+			logOn = ok and State(on) or "error"
+		end
+		local globalOK = pcall(probe.RegisterEvent, probe, "UNIT_COMBAT")
+		local logOK = pcall(probe.RegisterEvent, probe, "COMBAT_LOG_MESSAGE")
+		probe:RegisterEvent("NAME_PLATE_UNIT_ADDED")
+		ns.Log("combattext", ("listeners: all units %s, COMBAT_LOG_MESSAGE %s (combat log filtered events on: %s)")
+			:format(globalOK and "on" or "REFUSED", logOK and "on" or "REFUSED", logOn))
+		for i = 1, 40 do
+			local unit = "nameplate" .. i
+			if UnitExists(unit) then WatchPlate(unit) end
+		end
+		probe:SetScript("OnEvent", function(_, event, ...)
+			if event == "UNIT_COMBAT" then
+				OnCombat("all", ...)
+			elseif event == "NAME_PLATE_UNIT_ADDED" then
+				local unit = ...
+				if type(unit) == "string" and not (issecretvalue and issecretvalue(unit)) then WatchPlate(unit) end
+			elseif event == "COMBAT_LOG_MESSAGE" then
+				stats.logLines = stats.logLines + 1
+				logLines = logLines + 1
+				if logLines <= MAX_LOG_LINES then
+					local parts = {}
+					for i = 1, math.min(select("#", ...), 8) do
+						local value = select(i, ...)
+						parts[#parts + 1] = type(value) .. ":" .. State(value)
+					end
+					ns.Log("combattext", "log " .. table.concat(parts, " | "))
+				end
+			end
+		end)
+		ns.SetOnUpdate(probe, function()
+			if GetTime() >= stopAt then Stop("30 seconds") end
+		end)
+		ns.Print(("combattext: listening %d seconds, hit something (run again to stop)"):format(SECONDS))
+	end
 end
 
 -- /cine debug settings <words>: every option in the game's Settings panel whose

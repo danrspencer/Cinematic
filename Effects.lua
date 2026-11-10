@@ -4824,6 +4824,23 @@ end
 function ns.CreateLetterbox()
 	ns.letterbox = CreateFrame("Frame", "CinematicLetterbox", UIParent)
 	ns.letterbox:SetAllPoints(UIParent)
+	-- On a Mac with a camera notch the game moves UIParent down under it, but
+	-- the world still draws to the top of the screen: the bars' frame reaches
+	-- up to the world's top so the top bar sits on the screen's edge.
+	function ns.letterbox:Fit()
+		local scale = UIParent:GetEffectiveScale()
+		local top, uiTop = WorldFrame:GetTop(), UIParent:GetTop()
+		local gap = 0
+		if top and uiTop and scale and scale > 0 then
+			gap = math.max(0, top * WorldFrame:GetEffectiveScale() / scale - uiTop)
+		end
+		if math.abs(gap - (self.gap or 0)) > 0.5 then
+			self.gap = gap
+			self:ClearAllPoints()
+			self:SetPoint("TOPLEFT", UIParent, "TOPLEFT", 0, gap)
+			self:SetPoint("BOTTOMRIGHT", UIParent, "BOTTOMRIGHT")
+		end
+	end
 	ns.letterbox:SetFrameStrata("BACKGROUND")
 	ns.letterbox:SetFrameLevel(2) -- (over the tint and Vitals Vision, Tint.lua)
 	ns.letterbox:EnableMouse(false)
@@ -4942,16 +4959,17 @@ function ns.UpdateLetterbox(cinematic, elapsed)
 	letterboxProgress = ns.Approach(letterboxProgress, target, elapsed,
 		ns.LetterboxTime(look, target > letterboxProgress))
 	immersiveProgress = ns.Approach(immersiveProgress, grow, elapsed, ns.LetterboxTime(look, grow > immersiveProgress))
+	ns.letterbox:Fit()
+	local screenW, screenH = UIParent:GetWidth(), UIParent:GetHeight() + (ns.letterbox.gap or 0)
 	if immersiveProgress > 0 then
 		local g = immersiveProgress * immersiveProgress * (3 - 2 * immersiveProgress)
-		local screenH = UIParent:GetHeight()
-		local share = screenH > 0 and ns.LetterboxHeight(look, UIParent:GetWidth(), screenH) / screenH or 0
+		local share = screenH > 0 and ns.LetterboxHeight(look, screenW, screenH) / screenH or 0
 		look = setmetatable({ letterboxSizeBy = "height", letterboxSize = share * (1 + g) }, { __index = look })
 	end
 
 	-- Smoothstep so the bars ease in and out.
 	local t = letterboxProgress * letterboxProgress * (3 - 2 * letterboxProgress)
-	local height = ns.DrawLetterbox(ns.letterbox, look, UIParent:GetWidth(), UIParent:GetHeight(), t)
+	local height = ns.DrawLetterbox(ns.letterbox, look, screenW, screenH, t)
 	ns.letterbox:SetShown(letterboxProgress > 0)
 	LiftFramerate(letterboxProgress > 0 and height or 0)
 end

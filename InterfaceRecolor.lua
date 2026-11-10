@@ -26,6 +26,11 @@ DEFAULTS.irCast = true
 DEFAULTS.irSmall = true
 DEFAULTS.irBig = true
 DEFAULTS.irBarArt = true
+-- The raid and party frames (raid-style): their chrome here; health and the
+-- ground behind it in RaidStyle.lua (ns.RecolorOf).
+DEFAULTS.irRaidFrame = true
+DEFAULTS.irRaidHealth = false -- (off: health colors say something)
+DEFAULTS.irRaidGround = true
 
 local DEPTH = 5 -- (how deep into a frame its art is looked for)
 
@@ -71,6 +76,21 @@ local function BarArt()
 end
 ns.ActionBarArt = BarArt
 
+-- The raid frames' chrome: the box round each group (the party's, each raid
+-- group's, the whole raid's) and the raid manager's tab at the screen's left.
+-- Each member's own border: RaidStyle.lua, as members come and go (ns.RecolorRaidTexture).
+local RAID_HOLDERS = Join("CompactPartyFrame", "CompactRaidFrameContainer", Numbered("CompactRaidGroup", 1, 8))
+local function RaidChrome()
+	local list = {}
+	if type(_G.CompactRaidFrameManager) == "table" then list[1] = _G.CompactRaidFrameManager end
+	for _, name in ipairs(RAID_HOLDERS) do
+		local holder = _G[name]
+		local border = type(holder) == "table" and (holder.borderFrame or _G[name .. "BorderFrame"])
+		if type(border) == "table" then list[#list + 1] = border end
+	end
+	return list
+end
+
 local GROUPS = {
 	{ key = "irBarArt", all = true, metal = true, get = BarArt },
 	{ key = "irChat", names = Join(Numbered("ChatFrame", 1, 10, "Tab"), Numbered("ChatFrame", 1, 10, "EditBox"),
@@ -87,6 +107,7 @@ local GROUPS = {
 	{ key = "dmFrame", get = function() return ns.DamageMeterWindows and ns.DamageMeterWindows() or {} end },
 	-- (The swing timer's frames; its fill and words: SwingTimerStyle.lua.)
 	{ key = "swFrame", names = { "SwingTimerMainHandFrame", "SwingTimerOffHandFrame", "SwingTimerRangedFrame" } },
+	{ key = "irRaidFrame", get = RaidChrome },
 	{ key = "irSmall", names = Join(Numbered("StaticPopup", 1, 4), { "LootFrame", "ReadyCheckFrame", "GameMenuFrame",
 		"QueueStatusButton", "QueueStatusFrame", "LFGDungeonReadyDialog", "RolePollPopup", "GroupLootContainer" }) },
 	{ key = "irBig", names = Join(Numbered("ContainerFrame", 1, 13), { "ContainerFrameCombinedBags", "BankFrame",
@@ -107,7 +128,9 @@ local FRAME_ART = { "iconframe" }
 local CHROME = { "border", "edge", "corner", "nineslice", "tab", "divider", "bevel", "header", "title", "trim",
 	"ring", "metal", "frame", "rim", "bracket", "filigree", "button-up", "button-down", "closebutton" }
 local NOT_CHROME = { "icon", "portrait", "model", "highlight", "glow", "flash", "bg", "background", "inset",
-	"fill", "spark", "shadow", "mask", "swipe", "cooldown", "check", "parchment", "texture", "debuff" }
+	"fill", "spark", "shadow", "mask", "swipe", "cooldown", "check", "parchment", "texture", "debuff",
+	-- (The band behind a window's title, _UI-Frame-TopTileStreaks: background art.)
+	"streaks" }
 -- (The three pieces of a tab or a box you type in, by their own names alone.)
 local PIECES = { left = true, right = true, mid = true, middle = true, selectedleft = true, selectedright = true,
 	selectedmiddle = true, activeleft = true, activeright = true, activemiddle = true }
@@ -156,7 +179,9 @@ local function IsChrome(region, all)
 	local own, full = OwnName(region)
 	-- (A debuff's border says what kind it is.)
 	if full:find("debuff", 1, true) then return false end
-	if full:find("nineslice", 1, true) then return not Has(own, NOT_CHROME) end
+	-- (A nine-slice's center is the box's background: the macro window's text box
+	-- came out teal with it tinted.)
+	if full:find("nineslice", 1, true) then return own ~= "center" and not Has(own, NOT_CHROME) end
 	-- (Only a tab's or an edit box's: a button's three pieces are its face, which the
 	-- game shades in parts, and tinted they come out patchy.)
 	if PIECES[own] then
@@ -463,35 +488,78 @@ local function DressMicro(color)
 	end
 end
 
+-- The groups' titles over the raid frames ("Party", "Group 1"...): the theme's
+-- color, or back to the game's gold.
+local titled = setmetatable({}, { __mode = "k" })
+local function DressRaidTitles(color)
+	for _, name in ipairs(RAID_HOLDERS) do
+		local holder = _G[name]
+		local title = type(holder) == "table" and (holder.title or _G[name .. "Title"])
+		local text = type(title) == "table" and title.GetFontString and title:GetFontString()
+		if text and not (text.IsForbidden and text:IsForbidden()) then
+			if color then
+				titled[text] = true
+				text:SetTextColor(color[1], color[2], color[3])
+			elseif titled[text] then
+				titled[text] = nil
+				local gold = _G.NORMAL_FONT_COLOR
+				text:SetTextColor(gold and gold.r or 1, gold and gold.g or 0.82, gold and gold.b or 0)
+			end
+		end
+	end
+end
+
+local function RefreshGroup(group)
+	local color = ColorOf(group)
+	if not color then
+		for texture, info in pairs(tinted) do
+			if info.group == group.key then
+				Tint(texture, nil)
+				if group.metal then Glint(texture, nil) end
+			end
+		end
+	end
+	local count = 0
+	local frames = {}
+	if group.get then
+		frames = group.get()
+	else
+		for _, name in ipairs(group.names) do
+			if type(_G[name]) == "table" then frames[#frames + 1] = _G[name] end
+		end
+	end
+	for _, frame in ipairs(frames) do
+		local kind = frame.GetObjectType and Kind(frame)
+		if kind then
+			if kind ~= "Texture" then Watch(frame, group) end
+			if color and Shown(frame) then count = count + DressFrame(frame, group, color) end
+		end
+	end
+	counts[group.key] = count
+	if group.key == "irMicro" then DressMicro(color) end
+	if group.key == "irRaidFrame" then DressRaidTitles(color) end
+end
 local function Refresh()
+	for _, group in ipairs(GROUPS) do RefreshGroup(group) end
+end
+
+-- A row's color now (the theme's, brightened for the game's art), or nil: the
+-- page or the row is off, or there's no theme. For other files' parts (RaidStyle.lua).
+function ns.RecolorOf(key)
+	return ColorOf({ key = key })
+end
+-- One texture of the game's in a row's color, or back to its own (as the row's
+-- frames are): the raid members' borders, which come and go with the group.
+function ns.RecolorTexture(texture, key)
+	if not texture or (texture.IsForbidden and texture:IsForbidden()) then return end
+	local color = ColorOf({ key = key })
+	if color or tinted[texture] then Tint(texture, color, key) end
+end
+-- Only the raid frames' boxes and titles again: a group's box is made when the
+-- group first fills, long after the page's pass.
+function ns.RefreshRaidRecolor()
 	for _, group in ipairs(GROUPS) do
-		local color = ColorOf(group)
-		if not color then
-			for texture, info in pairs(tinted) do
-				if info.group == group.key then
-					Tint(texture, nil)
-					if group.metal then Glint(texture, nil) end
-				end
-			end
-		end
-		local count = 0
-		local frames = {}
-		if group.get then
-			frames = group.get()
-		else
-			for _, name in ipairs(group.names) do
-				if type(_G[name]) == "table" then frames[#frames + 1] = _G[name] end
-			end
-		end
-		for _, frame in ipairs(frames) do
-			local kind = frame.GetObjectType and Kind(frame)
-			if kind then
-				if kind ~= "Texture" then Watch(frame, group) end
-				if color and Shown(frame) then count = count + DressFrame(frame, group, color) end
-			end
-		end
-		counts[group.key] = count
-		if group.key == "irMicro" then DressMicro(color) end
+		if group.key == "irRaidFrame" then RefreshGroup(group) end
 	end
 end
 -- (Many calls in one frame (a profile switch, a theme pick) make one pass.)
@@ -505,6 +573,7 @@ function ns.RefreshInterfaceRecolor()
 		Refresh()
 		if ns.RefreshSwingTimerStyle then ns.RefreshSwingTimerStyle() end
 		if ns.RefreshDamageMeterStyle then ns.RefreshDamageMeterStyle() end
+		if ns.RefreshRaidStyle then ns.RefreshRaidStyle() end
 		local took = debugprofilestop() - started
 		if took > 10 then ns.Log("style", ("recolor pass: %.0f ms"):format(took)) end
 	end)
@@ -585,6 +654,25 @@ function ns.LogTextures(tag, frame)
 			Plain(g) or -1, Plain(b) or -1, Plain(alpha) or -1, tostring(IsChrome(texture)),
 			tostring(tinted[texture] ~= nil)))
 	end, {})
+end
+
+-- For /cine debug recolor <window>: one recolored window's textures to the log
+-- (the first of its group's frames whose name has those words: macro -> MacroFrame).
+function ns.ReportRecolorFrame(words)
+	Refresh()
+	for _, group in ipairs(GROUPS) do
+		for _, name in ipairs(group.names or {}) do
+			local frame = _G[name]
+			if type(frame) == "table" and name:lower():find(words, 1, true) then
+				ns.Log("recolor", ("frame %s (%s): shown %s, theme ring %s, %s %s"):format(name, group.key,
+					tostring(Shown(frame)), tostring(ns.ThemeRing() ~= nil), group.key,
+					tostring(ns.StyleLook("irStyle")[group.key])))
+				ns.LogTextures(name, frame)
+				return ns.Print(("%s's textures written to the log."):format(name))
+			end
+		end
+	end
+	ns.Print(("No recolored window named like %q (open it first: some load when first opened)."):format(words))
 end
 
 -- For /cine debug micro: each menu button's textures, to the log: what they are
@@ -686,6 +774,14 @@ function ns.CreateInterfaceRecolorPanel(kit)
 			"own color."])
 		rows.Check("swFont", L["Text font"], L["The bars' words in General's text font."])
 	end
+	-- (The raid's chrome here; its health and ground: RaidStyle.lua's Dress.)
+	stack:Header(content, L["Raid frames"])
+	rows.Check("irRaidFrame", L["Frame color"], L["The borders round the raid and party frames (raid-style), " ..
+		"their group titles, and the raid manager's tab at the left of the screen in the theme's color."])
+	rows.Check("irRaidHealth", L["Health bars"], L["The health bars in the theme's color, where the Raid Frame " ..
+		"Style page leaves their color as the game's."])
+	rows.Check("irRaidGround", L["Background"], L["The dark behind each health bar in a dark shade of the theme's " ..
+		"color, where the Raid Frame Style page leaves the background as the game's."])
 	stack:Header(content, L["Recolor"])
 	rows.Check("irBarArt", L["Action bar art"], L["The gryphons (or wyverns) at the ends of action bar 1, and " ..
 		"the band its buttons sit on."])

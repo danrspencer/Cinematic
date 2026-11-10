@@ -33,6 +33,11 @@ ns.CHAT_PEEK_TYPES = {
 		"CHAT_MSG_MONSTER_EMOTE" } },
 	{ key = "boss", label = L["Boss emotes"],
 		events = { "CHAT_MSG_RAID_BOSS_EMOTE", "CHAT_MSG_RAID_BOSS_WHISPER" } },
+	-- Anyone's line naming or linking a quest in your log, in any chat or
+	-- channel, even ones that are off above; see MentionsYourQuest below.
+	{ key = "quests", label = L["Your quests"],
+		tip = L["Someone links or names a quest you're on, in any chat or channel (General, Looking for Group, " ..
+		"party, guild...), even ones that don't show chat themselves."], events = {} },
 
 	-- Guild members' comings and goings arrive as system messages; see IsGuildLine below.
 	{ key = "guildmembers", label = L["Guild members"], section = "game",
@@ -268,6 +273,94 @@ local function IsGroupLine(text)
 	for _, pattern in ipairs(groupPatterns) do
 		if text:find(pattern) then
 			return true
+		end
+	end
+	return false
+end
+
+-- Players' lines that a quest of yours in them shows chat for (the "quests"
+-- type): links to it (|Hquest:<id>), or its name typed out as whole words,
+-- case ignored. Names shorter than QUEST_NAME_MIN letters count only as links
+-- ("Bounty" turns up in too much chat). The log is read again after it changes.
+local QUEST_LINE_EVENTS = {
+	CHAT_MSG_SAY = true, CHAT_MSG_YELL = true, CHAT_MSG_EMOTE = true,
+	CHAT_MSG_WHISPER = true, CHAT_MSG_BN_WHISPER = true,
+	CHAT_MSG_PARTY = true, CHAT_MSG_PARTY_LEADER = true, CHAT_MSG_RAID = true, CHAT_MSG_RAID_LEADER = true,
+	CHAT_MSG_RAID_WARNING = true, CHAT_MSG_INSTANCE_CHAT = true, CHAT_MSG_INSTANCE_CHAT_LEADER = true,
+	CHAT_MSG_GUILD = true, CHAT_MSG_OFFICER = true, CHAT_MSG_CHANNEL = true,
+}
+local QUEST_NAME_MIN = 6
+local yourQuests -- { ids = { [questID] = true }, names = { lower-case name, ... } }, nil = read again
+
+local function ReadYourQuests()
+	local ids, names = {}, {}
+	local function Add(title, questID)
+		if type(questID) == "number" then
+			ids[questID] = true
+		end
+		if type(title) == "string" and #title >= QUEST_NAME_MIN then
+			names[#names + 1] = title:lower()
+		end
+	end
+	pcall(function()
+		if C_QuestLog and C_QuestLog.GetInfo and C_QuestLog.GetNumQuestLogEntries then
+			for i = 1, C_QuestLog.GetNumQuestLogEntries() do
+				local info = C_QuestLog.GetInfo(i)
+				if info and not info.isHeader and not info.isHidden then
+					Add(info.title, info.questID)
+				end
+			end
+		elseif GetQuestLogTitle and GetNumQuestLogEntries then
+			for i = 1, GetNumQuestLogEntries() do
+				local title, _, _, isHeader, _, _, _, questID = GetQuestLogTitle(i)
+				if title and not isHeader then
+					Add(title, questID)
+				end
+			end
+		end
+	end)
+	return { ids = ids, names = names }
+end
+
+do
+	local questWatch = CreateFrame("Frame")
+	for _, event in ipairs({ "QUEST_LOG_UPDATE", "QUEST_ACCEPTED", "QUEST_REMOVED", "QUEST_TURNED_IN",
+			"PLAYER_ENTERING_WORLD" }) do
+		pcall(questWatch.RegisterEvent, questWatch, event)
+	end
+	questWatch:SetScript("OnEvent", function() yourQuests = nil end)
+end
+
+-- (A letter or digit on either side: part of a longer word, not the name.)
+local function WholeWordAt(text, first, last)
+	return not text:sub(first - 1, first - 1):find("%w") and not text:sub(last + 1, last + 1):find("%w")
+end
+
+local function MentionsYourQuest(text)
+	if type(text) ~= "string" or (issecretvalue and issecretvalue(text)) then
+		return false
+	end
+	yourQuests = yourQuests or ReadYourQuests()
+	for id in text:gmatch("|Hquest:(%d+)") do
+		if yourQuests.ids[tonumber(id)] then
+			return true
+		end
+	end
+	if #yourQuests.names == 0 then
+		return false
+	end
+	local lower = text:lower()
+	for _, name in ipairs(yourQuests.names) do
+		local start = 1
+		while true do
+			local first, last = lower:find(name, start, true)
+			if not first then
+				break
+			end
+			if WholeWordAt(lower, first, last) then
+				return true
+			end
+			start = first + 1
 		end
 	end
 	return false
@@ -611,6 +704,9 @@ local function ChatPeekFilter(chatFrame, event, text, author, _, channelString, 
 		wanted = false
 	elseif event == "CHAT_MSG_SYSTEM" and (ns.db.chatOwnNoBubble or not ns.db.chatHideOwn)
 			and IsWhisperToNoOne(text) then
+		wanted = true
+	elseif QUEST_LINE_EVENTS[event] and IsPeekTypeOn("quests") and not IsFromPlayer(author, guid)
+			and MentionsYourQuest(text) then
 		wanted = true
 	elseif event == "CHAT_MSG_CHANNEL" then
 		wanted = IsChannelPeekNow(ChannelPeekName(channelNumber, channelBaseName, channelString))

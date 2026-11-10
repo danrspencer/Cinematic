@@ -1434,7 +1434,7 @@ for page, keys in pairs({
 	visualEffects = { "letterboxPage", "tintPage", "graphicsPlus", "musicInCinematic" }, -- (the Atmosphere hub's pages' switches)
 	-- Style > General's Enable Style: the Style hub's pages' switches.
 	styleGeneral = { "ufStyle", "rfStyle", "abStyle", "prdStyle", "tooltipStyle", "handlePlateStyle", "plateNameStyle",
-		"plateCastStyle", "bubblesStyle", "irStyle" },
+		"plateCastStyle", "bubblesStyle", "irStyle", "combatTextStyle" },
 }) do
 	for _, key in ipairs(keys) do PAGE_SWITCH[key] = page end
 end
@@ -4173,7 +4173,14 @@ ticker:SetScript("OnEvent", ns.Profiled("Core events", function(self, event, arg
 		-- Floating world text (the XP gained over you, and damage numbers with it:
 		-- one font) drawn in a font whose letters are specks too small to see.
 		-- The game keeps the font it first loaded, so changes need a game restart.
-		if ns.db.hideWorldText then
+		-- (On the Combat Text Style page since 2026-11-10, gated by it: one who
+		-- had it on gets the page on, its own numbers off, so nothing changes.)
+		if ns.db.hideWorldText and ns.db.combatTextStyle == nil then
+			ns.db.combatTextStyle = true
+			ns.db.combatTextNumbers = false
+			ns.db.combatTextHideGame = false
+		end
+		if ns.db.hideWorldText and ns.db.combatTextStyle and ns.db.styleGeneral ~= false then
 			DAMAGE_TEXT_FONT = "Interface\\AddOns\\" .. ADDON_NAME .. "\\Fonts\\Blank.ttf"
 		end
 		-- Vitals Vision's reaches: one for all four edges, now the top and

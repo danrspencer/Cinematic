@@ -1492,6 +1492,12 @@ local function HandleSlash(msg)
 		ns.ProfileChangedDebug()
 	elseif cmd == "debug" and arg == "cvars" then
 		ns.CVarsDebug()
+	elseif cmd == "debug" and arg == "worldtext" then
+		ns.WorldTextDebug()
+	elseif cmd == "debug" and arg == "combattext" then
+		ns.CombatTextProbe()
+	elseif cmd == "debug" and arg == "combatnumbers" then
+		ns.CombatNumbersToggle()
 	elseif cmd == "debug" and arg:find("^cvars%s") then
 		ns.CVarsFind(arg:match("^cvars%s+(.+)"))
 	elseif cmd == "debug" and arg:find("^settings%s") then
@@ -1850,6 +1856,8 @@ local function HandleSlash(msg)
 		ns.ReportQuestTrackerStyle()
 	elseif cmd == "debug" and arg == "recolor" then
 		ns.ReportInterfaceRecolor()
+	elseif cmd == "debug" and arg:find("^recolor ") then
+		ns.ReportRecolorFrame(arg:match("^recolor%s+(.+)$"))
 	elseif cmd == "debug" and arg == "micro" then
 		ns.ReportMicroButtons()
 	elseif cmd == "debug" and arg == "meterstyle" then

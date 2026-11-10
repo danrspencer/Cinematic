@@ -126,16 +126,34 @@ local function SetAlphaOf(texture, alpha)
 	end
 end
 
--- The game's background tinted as the page says (white: its own).
-local tinted = setmetatable({}, { __mode = "k" }) -- texture -> true, while we've tinted it
+-- The game's background tinted as the page says, or the theme's color where
+-- it says the game's (Interface Recolor's Background row); untinted: back to
+-- the game's own tint, kept from before ours. (The game's art is light, made
+-- dark by its tint: the theme's pale ring color over it came out a bright patch
+-- where health was missing, on Forever. The theme's is a dark shade of it.)
+local THEME_SHADE = 0.22
+local tinted = setmetatable({}, { __mode = "k" }) -- texture -> the game's tint, while we've tinted it
 local function TintOf(texture, view)
 	if not (texture and texture.SetVertexColor) then return end
+	local theme = not (view and view.ufGroundColor == "custom") and ns.RecolorOf and ns.RecolorOf("irRaidGround")
+	local r, g, b
 	if view and view.ufGroundColor == "custom" then
-		tinted[texture] = true
-		texture:SetVertexColor(view.ufGroundR or 1, view.ufGroundG or 1, view.ufGroundB or 1, 1)
+		r, g, b = view.ufGroundR or 1, view.ufGroundG or 1, view.ufGroundB or 1
+	elseif theme then
+		r, g, b = theme[1] * THEME_SHADE, theme[2] * THEME_SHADE, theme[3] * THEME_SHADE
+	end
+	if r then
+		if not tinted[texture] then
+			local or_, og, ob = texture:GetVertexColor()
+			local readable = type(or_) == "number" and type(og) == "number" and type(ob) == "number"
+				and not (issecretvalue and (issecretvalue(or_) or issecretvalue(og) or issecretvalue(ob)))
+			tinted[texture] = readable and { or_, og, ob } or { 1, 1, 1 }
+		end
+		texture:SetVertexColor(r, g, b, 1)
 	elseif tinted[texture] then
+		local own = tinted[texture]
 		tinted[texture] = nil
-		texture:SetVertexColor(1, 1, 1, 1)
+		texture:SetVertexColor(own[1], own[2], own[3], 1)
 	end
 end
 
@@ -159,6 +177,10 @@ local function Dress(frame)
 			r, g, b = ns.UnitStyleColor(unit)
 		elseif view and view.ufHealthColor == "custom" then
 			r, g, b = view.ufHealthR, view.ufHealthG, view.ufHealthB
+		else
+			-- (Interface Recolor's Health bars row: where this page says the game's.)
+			local theme = ns.RecolorOf and ns.RecolorOf("irRaidHealth")
+			if theme then r, g, b = theme[1], theme[2], theme[3] end
 		end
 		ns.UnitStyleDressBar(health, view, r, g, b)
 		-- (A new fill comes back on the bar's usual layer, over the role icon: the
@@ -172,7 +194,11 @@ local function Dress(frame)
 	-- (The game's border round the frame faded out for ours; its background as
 	-- the page says.)
 	local ours = view and view.ufBorder ~= "game"
-	for _, field in ipairs(BORDERS) do SetAlphaOf(frame[field], ours and 0 or 1) end
+	for _, field in ipairs(BORDERS) do
+		SetAlphaOf(frame[field], ours and 0 or 1)
+		-- (The game's, in the theme's color: Interface Recolor's Frame color row.)
+		if ns.RecolorTexture and frame[field] then ns.RecolorTexture(frame[field], "irRaidFrame") end
+	end
 	TintOf(frame.background, view)
 	SetAlphaOf(frame.background, view and tonumber(view.ufGround) or 1)
 	dressing = false
@@ -193,7 +219,11 @@ local watcher = CreateFrame("Frame")
 for _, event in ipairs({ "PLAYER_LOGIN", "GROUP_ROSTER_UPDATE", "PLAYER_REGEN_ENABLED" }) do
 	watcher:RegisterEvent(event)
 end
-watcher:SetScript("OnEvent", function() ns.RefreshRaidStyle() end)
+watcher:SetScript("OnEvent", function()
+	ns.RefreshRaidStyle()
+	-- (A group's box is made as it first fills: in the theme's color too.)
+	if ns.RefreshRaidRecolor then ns.RefreshRaidRecolor() end
+end)
 
 -- The preview: a party column and a raid grid, each tile dressed as its
 -- group's look says (a tile clicked opens its tab: onPick(id)).
