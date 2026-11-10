@@ -868,6 +868,10 @@ end
 
 function ns.ParkShrunk(entry)
 	local frame = entry.frame
+	-- (The cursor sweep has the minimap under your pointer: put back first,
+	-- or that spot is saved as its place and it comes up there, in the middle
+	-- of the screen, seen 2026-11-10 when a quest area parked it mid-sweep.)
+	if frame == Minimap and ns.EndCursorSweep then ns.EndCursorSweep("it was moved off the screen") end
 	local points = {}
 	for i = 1, frame:GetNumPoints() do
 		local ok, point, relativeTo, relativePoint, x, y = pcall(frame.GetPoint, frame, i)

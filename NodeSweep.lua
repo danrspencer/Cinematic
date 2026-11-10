@@ -1652,7 +1652,8 @@ end
 -- (Frames.lua, as the faded minimap starts to come up: put back at once.)
 function ns.EndCursorSweep(alpha)
 	if not cursor.s then return end
-	cursor.endedBy = ("the minimap came up (alpha %.2f)"):format(tonumber(alpha) or -1)
+	cursor.endedBy = type(alpha) == "string" and alpha
+		or ("the minimap came up (alpha %.2f)"):format(tonumber(alpha) or -1)
 	cursor.End()
 end
 
