@@ -172,7 +172,7 @@ local DEFAULTS = {
 	-- ...the same box where the game stopped answering the pretend mouse (WoW
 	-- Forever game 70862 on): the cursor sweep, the faded minimap moved under
 	-- your real mouse (NodeSweep.lua). Off to start with: it's a workaround.
-	minimapNodesByCursor = true, -- (on to start with since 2026-11-10: tested, the user wants it)
+	minimapNodesByCursor = false, -- (off again 2026-11-10: on Forever a quest area's outline showed through the faded minimap while it looked)
 	minimapNodePing = true,       -- ...and pings where it heard what it found (NodeSweep.lua cursor.Mark)
 	minimapNodesInCombat = false, -- ...and in fights (works, tested 2026-11-10; off to start with, user's ask)
 	nodesOffInCities = true,     -- ...but not in these places (cities have no nodes; instances and BGs
@@ -192,9 +192,9 @@ local DEFAULTS = {
 	-- Keep open (Minimap page's Tracking dropdown): the minimap stays up the whole time this tracking
 	-- is on (Tracking.lua). (Ore, herbs, treasure on since 2026-11-07 where Reveal can't find them; on
 	-- WoW Forever the cursor sweep does again since 2026-11-10, NodeSweep.lua: None there.)
-	minimapKeepOre = ns.isRetail or ns.isClassicEra,  -- gathering: ore, herbs, treasure...
-	minimapKeepHerbs = ns.isRetail or ns.isClassicEra,
-	minimapKeepTreasure = ns.isRetail or ns.isClassicEra,
+	minimapKeepOre = true,       -- gathering: ore, herbs, treasure... (on everywhere again 2026-11-10)
+	minimapKeepHerbs = true,
+	minimapKeepTreasure = true,
 	minimapKeepHumanoids = false, -- creatures (hunter, druid, warlock, paladin) and fish
 	minimapKeepFish = false,
 	minimapKeepBeasts = false,
@@ -5674,6 +5674,22 @@ ticker:SetScript("OnEvent", ns.Profiled("Core events", function(self, event, arg
 		-- setting of its back to its default, in every profile. Once. (Nobody
 		-- could have picked them: the release had no page, only old defaults
 		-- saved, off among them.)
+		-- The cursor sweep (Nearby ore, herbs and treasure on WoW Forever) off
+		-- again and Keep open's gathering tracking on again, in every profile,
+		-- once: v2.0.71 turned the sweep on for everyone, and on Forever it let a
+		-- quest area's outline show over the screen.
+		if not ns.db.minimapNodesOffV1 then
+			for _, key in ipairs({ "minimapNodesByCursor", "minimapKeepOre", "minimapKeepHerbs", "minimapKeepTreasure" }) do
+				ns.db[key] = DEFAULTS[key]
+				for _, saved in pairs(ns.db.profiles or {}) do
+					if type(saved) == "table" then
+						saved[key] = nil
+						if type(saved.settings) == "table" then saved.settings[key] = nil end
+					end
+				end
+			end
+			ns.db.minimapNodesOffV1 = true
+		end
 		if not ns.db.skyrideDefaultsV1 then
 			for key, value in pairs(DEFAULTS) do
 				if key:find("^skyride") then
