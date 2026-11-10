@@ -712,7 +712,7 @@ local last = {} -- the last sweep, for /cine debug tracking
 -- stays in its place: off the screen the game adds no new dots, tested.
 local areaShown = false
 function ns.MinimapAreaShown()
-	return areaShown
+	return areaShown or (cursor.On() and cursor.AreaNear()) or false
 end
 
 -- Nearby ore, herbs and treasure's Mark where it is (minimapNodeMark): our
@@ -1763,6 +1763,45 @@ function cursor.Keep(name, list)
 		math.sqrt(x * x + y * y) * perUnit))
 end
 
+-- A quest's area heard by the cursor sweep (Forever): its outline shows
+-- through the faded minimap, at its corner and under the pointer while it
+-- sweeps, seen 2026-11-10. The quest log only gives an area's middle, not its
+-- size, so where it was heard is kept: the faded minimap waits off the screen
+-- (Frames.lua, ns.MinimapAreaShown) and no sweep runs while you're within the
+-- minimap's view of that spot and AREA_REACH yards more (an area reaches past
+-- where it was heard), or AREA_HOLD seconds where you are isn't known.
+cursor.AREA_REACH = 60
+cursor.AREA_HOLD = 60
+function cursor.AreaAt(x, y)
+	local perUnit, facing = View()
+	local n, w = Here()
+	if not (perUnit and n) then
+		cursor.area = { at = GetTime() }
+		return
+	end
+	local cos, sin = math.cos(facing), math.sin(facing)
+	cursor.area = { n = n + (sin * x + cos * y) * perUnit, w = w + (-cos * x + sin * y) * perUnit, at = GetTime() }
+	ns.Log("nodes", ("cursor sweep heard a quest area %.0f yd away: waits off the screen"):format(
+		math.sqrt(x * x + y * y) * perUnit))
+end
+
+function cursor.AreaNear()
+	local area = cursor.area
+	if not area then return false end
+	local now = GetTime()
+	local n, w = Here()
+	local ok, radius = pcall(C_Minimap.GetViewRadius)
+	if not (area.n and n and ok and type(radius) == "number" and not Secret(radius)) then
+		if now - area.at < cursor.AREA_HOLD then return true end
+		cursor.area = nil
+		return false
+	end
+	if (n - area.n) ^ 2 + (w - area.w) ^ 2 <= (radius + cursor.AREA_REACH) ^ 2 then return true end
+	ns.Log("nodes", "cursor sweep: walked away from the quest area heard: back in place")
+	cursor.area = nil
+	return false
+end
+
 -- Ping where it is (minimapNodePing) on a find: the game's ping where it was
 -- heard, the middle of the grid points that heard it (a few yards off the dot
 -- at most). (Our ring was tried too; the user wanted just the ping.)
@@ -1848,7 +1887,37 @@ local function CursorSweep(all)
 		return
 	end
 	local function IsNode(name) return NODE_KINDS[ns.NodeKind(name)] == true end
-	local found, probes = Probe(STEP, {}, not all and IsNode or nil, s.width / 2)
+	-- (A quest's area heard inside the rim (its name: a rim arrow is only at
+	-- the rim) stops it too: the outline is on the minimap, which waits off
+	-- the screen meanwhile, cursor.AreaNear.)
+	local inner = (s.width / 2 - RIM_BAND) ^ 2
+	local area
+	local function Stop(name, entry)
+		if IsNode(name) then return true end
+		local kind = ns.NodeKind(name)
+		if kind == "objective" or kind == "line" then
+			local list = entry.list
+			local x, y = list[#list - 1], list[#list]
+			if x * x + y * y < inner then
+				area = { x, y }
+				return true
+			end
+		end
+	end
+	local found, probes = Probe(STEP, {}, not all and Stop or nil, s.width / 2)
+	-- (Only at the rim: an area just reaching over it, heard along more of the
+	-- rim than one arrow can be (OnlyAtRim), counts too: its edge peeked in at
+	-- the minimap's corner, seen.)
+	if not area and not all and type(found) == "table" then
+		for name, entry in pairs(found) do
+			local kind = ns.NodeKind(name)
+			if (kind == "objective" or kind == "line") and entry.list and #entry.list >= 2 and not OnlyAtRim(entry) then
+				area = { entry.list[1], entry.list[2] }
+				break
+			end
+		end
+	end
+	if area and not all then cursor.AreaAt(area[1], area[2]) end
 	-- (The test: how far from where each name was heard it still answers,
 	-- out along the four ways, a unit at a time: the size of a dot's answer.)
 	if all and type(found) == "table" then
