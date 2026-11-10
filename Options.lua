@@ -11877,20 +11877,75 @@ local function CreateMinimapPanel()
 		prey:SetPoint("TOPLEFT", questFor, "BOTTOMLEFT", -24, -10)
 		aboveCreatures, creaturesGap = prey, { 0, -2 }
 	end
-	local creatures = Check(content, "minimapKeepCreatures", L["Tracking creatures or fish"],
-		L["While hunter, druid or warlock creature tracking, or Find Fish, is on, the minimap stays " ..
-		"up during CineMode."])
-	creatures:SetPoint("TOPLEFT", aboveCreatures, "BOTTOMLEFT", creaturesGap[1], creaturesGap[2])
-	local gathering = Check(content, "minimapKeepGathering", L["Tracking herbs, minerals or treasure"],
-		L["While Find Herbs, Find Minerals or Find Treasure is on, the minimap stays up during CineMode, " ..
-		"except in the places below."], function(value)
-			ns.GetDB().minimapKeepGathering = value
-			Refresh()
+	-- Tracking (Tracking.lua, minimapKeep<kind>): a tick per kind of tracking
+	-- that keeps the minimap up while it's on.
+	local TRACK_NAMES = { Ore = L["Ore"], Herbs = L["Herbs"], Treasure = L["Treasure"], Humanoids = L["Humanoids"],
+		Fish = L["Fish"], Beasts = L["Beasts"], Demons = L["Demons"], Undead = L["Undead"], Dragonkin = L["Dragonkin"],
+		Elementals = L["Elementals"], Giants = L["Giants"], Hidden = L["Hidden"] }
+	local TRACK_TIP = L["While tracking ticked here is on, the minimap stays up during CineMode: Find Minerals, " ..
+		"Find Herbs, Find Treasure, Find Fish, or a hunter's, druid's, warlock's or paladin's creature tracking. " ..
+		"Ore, herbs and treasure: except in the places below."]
+	local function GatheringTicked(db)
+		for _, kind in ipairs(ns.TRACKING_KINDS) do
+			if kind.gathering and db[kind.key] then return true end
+		end
+		return false
+	end
+	local trackLabel = Label(content, "GameFontHighlight", L["Tracking"])
+	trackLabel:SetPoint("TOPLEFT", aboveCreatures, "BOTTOMLEFT", creaturesGap[1] + 4, creaturesGap[2] - 6)
+	local aboveExcept, exceptX = trackLabel, 20
+	local okTrack, track = ns.MenuDropdown(content)
+	if okTrack and track and track.SetupMenu then
+		track:SetPoint("TOPLEFT", trackLabel, "BOTTOMLEFT", -4, -4)
+		track:SetWidth(240)
+		-- (Found by its name and key, not the ticks it shows.)
+		trackLabel.searchSkip = true
+		track.searchLabel, track.settingKey = L["Tracking"], "minimapKeepOre"
+		track.searchEdges = { top = trackLabel, bottom = track, left = track, right = track }
+		track:SetupMenu(function(_, root)
+			for _, kind in ipairs(ns.TRACKING_KINDS) do
+				root:CreateCheckbox(TRACK_NAMES[kind.kind] or kind.kind,
+					-- (SetupMenu builds the menu right away, before saved settings load.)
+					function()
+						local db = ns.GetDB()
+						return db ~= nil and db[kind.key] and true or false
+					end,
+					function()
+						local db = ns.GetDB()
+						db[kind.key] = not db[kind.key]
+						Refresh()
+						return MenuResponse and MenuResponse.Refresh
+					end)
+			end
 		end)
-	gathering:SetPoint("TOPLEFT", creatures, "BOTTOMLEFT", 0, -2)
+		if track.SetSelectionText then
+			track:SetSelectionText(function()
+				local db, ticked = ns.GetDB(), {}
+				for _, kind in ipairs(ns.TRACKING_KINDS) do
+					if db and db[kind.key] then ticked[#ticked + 1] = TRACK_NAMES[kind.kind] or kind.kind end
+				end
+				return #ticked > 0 and table.concat(ticked, ", ") or L["None"]
+			end)
+		end
+		track.Refresh = function(self) self:GenerateMenu() end
+		controls[#controls + 1] = track
+		track.rowName = trackLabel
+		Tooltip(track, TRACK_TIP)
+		aboveExcept, exceptX = track, 24
+	else
+		for _, kind in ipairs(ns.TRACKING_KINDS) do
+			local check = Check(content, kind.key, TRACK_NAMES[kind.kind] or kind.kind, TRACK_TIP, function(value)
+				ns.GetDB()[kind.key] = value
+				Refresh()
+			end)
+			check:SetPoint("TOPLEFT", aboveExcept, "BOTTOMLEFT", aboveExcept == trackLabel and -4 or 0, -2)
+			aboveExcept, exceptX = check, 20
+		end
+	end
+	for _, kind in ipairs(ns.TRACKING_KINDS) do RecordKey(content, kind.key) end
 	-- Places where gathering tracking doesn't keep the minimap up, in the usual place order.
 	local exceptIn = Label(content, "GameFontHighlight", L["Except in"])
-	exceptIn:SetPoint("TOPLEFT", gathering, "BOTTOMLEFT", 20, -4)
+	exceptIn:SetPoint("TOPLEFT", aboveExcept, "BOTTOMLEFT", exceptX, -4)
 	local PLACE_TIPS = {
 		Cities = L["Capital cities. "],
 		PvP = L["Battlegrounds and arenas (being flagged for PvP out in the world doesn't count). " ..
@@ -11905,7 +11960,7 @@ local function CreateMinimapPanel()
 		local check = Check(content, "trackingOffIn" .. place[1], label, (PLACE_TIPS[place[1]] or "") ..
 			L["Tracking doesn't keep the minimap up here. Hovering it still shows it."])
 		check:SetPoint("TOPLEFT", exceptIn, "BOTTOMLEFT", 12 + (i - 1) * PLACE_COLUMN, -4)
-		GreyUnless(check, function(db) return db.minimapKeepGathering end)
+		GreyUnless(check, GatheringTicked)
 		if i == 1 then placesRow = check end
 	end
 	-- Addon Frame Links (last): which addon's frames the minimap's parts are (FrameLinks.lua).

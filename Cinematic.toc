@@ -137,6 +137,7 @@ ActionBarStyle.lua
 MinimapStyle.lua
 QuestTrackerStyle.lua
 InterfaceRecolor.lua
+Support\QuestieTracker.lua
 PersonalStyle.lua
 PersonalMana.lua
 PersonalManaCost.lua

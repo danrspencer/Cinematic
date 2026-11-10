@@ -2339,6 +2339,10 @@ local function OnKeyDown(self, key)
 			elseif buttons[1]:IsShown() and buttons[1]:IsEnabled() then
 				buttons[1].onClick()
 				handled = true
+			elseif keyed[1] then
+				-- (No button, as on a chat screen: the first row, as key 1.)
+				keyed[1]()
+				handled = true
 			end
 		end
 	end

@@ -22,7 +22,8 @@ table.insert(ns.ADDON_NOTES, {
 	addon = "Questie", label = "Questie",
 	works = L["Follows the Quest tracker row"],
 	about = L["Questie's quest tracker and its quest item buttons fade with the Quest tracker row on the " ..
-		"Game Frames page. Its quest icons on nameplates sit where Quest Vision's quest mark would, and where " ..
+		"Game Frames page, and does the Quest Tracker page's Show just that quest and Close the gaps. With a theme " ..
+		"picked, the Interface Recolor page's Quest tracker rows style it too. Its quest icons on nameplates sit where Quest Vision's quest mark would, and where " ..
 		"both would show, Quest Vision's Questie's icons setting picks which. The quest item button stays away " ..
 		"while its tracker has a button for that item."],
 })

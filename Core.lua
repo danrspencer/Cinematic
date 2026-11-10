@@ -180,10 +180,21 @@ local DEFAULTS = {
 	-- ping brings it up; "" = just the map (hovering shows all). Default: all of them.
 	minimapRevealParts = "minimapzone,minimapheader,minimaptracking,minimapcalendar,minimapclock,minimapdial,"
 		.. "minimapaddons,minimapcompartment,minimapcoords",
-	-- Keep open (Minimap page): the minimap stays up the whole time this tracking is on.
-	minimapKeepCreatures = false, -- creatures (hunter, druid, warlock) or fish
-	-- (On since 2026-11-07: Reveal can't find ore and herbs on WoW Forever any more, NodeSweep.lua.)
-	minimapKeepGathering = true, -- herbs, minerals or treasure...
+	-- Keep open (Minimap page's Tracking dropdown): the minimap stays up the whole time this tracking
+	-- is on (Tracking.lua). (Ore, herbs, treasure on since 2026-11-07: Reveal can't find ore and herbs
+	-- on WoW Forever any more, NodeSweep.lua.)
+	minimapKeepOre = true,       -- gathering: ore, herbs, treasure...
+	minimapKeepHerbs = true,
+	minimapKeepTreasure = true,
+	minimapKeepHumanoids = false, -- creatures (hunter, druid, warlock, paladin) and fish
+	minimapKeepFish = false,
+	minimapKeepBeasts = false,
+	minimapKeepDemons = false,
+	minimapKeepUndead = false,
+	minimapKeepDragonkin = false,
+	minimapKeepElementals = false,
+	minimapKeepGiants = false,
+	minimapKeepHidden = false,
 	trackingOffInCities = true,  -- ...except in these places (no nodes there; dungeons have some)
 	trackingOffInDungeons = true,
 	trackingOffInRaids = true,
@@ -5679,6 +5690,31 @@ ticker:SetScript("OnEvent", ns.Profiled("Core events", function(self, event, arg
 				end
 			end
 			ns.db.keepGatheringOnV1 = true
+		end
+		-- Keep open's two tracking boxes became one Tracking dropdown, a tick per
+		-- kind: gathering's tick goes to ore, herbs and treasure, creatures or
+		-- fish's to each creature kind and fish, here and in saved profiles. Once.
+		if not ns.db.trackingKindsV1 then
+			local GATHERING = { "Ore", "Herbs", "Treasure" }
+			local CREATURES = { "Humanoids", "Fish", "Beasts", "Demons", "Undead", "Dragonkin", "Elementals",
+				"Giants", "Hidden" }
+			local function Split(t)
+				if type(t) ~= "table" then return end
+				for old, kinds in pairs({ minimapKeepGathering = GATHERING, minimapKeepCreatures = CREATURES }) do
+					if t[old] ~= nil then
+						for _, kind in ipairs(kinds) do t["minimapKeep" .. kind] = t[old] and true or false end
+						t[old] = nil
+					end
+				end
+			end
+			Split(ns.db)
+			for _, saved in pairs(ns.db.profiles or {}) do
+				if type(saved) == "table" then
+					Split(saved)
+					Split(saved.settings)
+				end
+			end
+			ns.db.trackingKindsV1 = true
 		end
 		-- The Tooltips page's Level row split in two, for friends and enemies:
 		-- the enemies' row starts as the Level row was set, here and in saved

@@ -124,10 +124,10 @@ local function MinimapTrackingWhy(out)
 	local gathering, creatures = false, false
 	if ns.IsKeepingMinimapForTracking then gathering, creatures = ns.IsKeepingMinimapForTracking(now) end
 	if gathering and not ns.IsTrackingOffHere() then
-		Add(out, "on", L["Keep open: herb, mineral or treasure tracking is on"], "Minimap", "minimapKeepGathering")
+		Add(out, "on", L["Keep open: herb, mineral or treasure tracking is on"], "Minimap", "minimapKeepOre")
 	end
 	if creatures then
-		Add(out, "on", L["Keep open: creature or fish tracking is on"], "Minimap", "minimapKeepCreatures")
+		Add(out, "on", L["Keep open: creature or fish tracking is on"], "Minimap", "minimapKeepOre")
 	end
 	local revealed, names, held = false, nil, false
 	if ns.MinimapRevealWhy then revealed, names, held = ns.MinimapRevealWhy(now) end
@@ -146,7 +146,7 @@ local TRIGGER_PAGE = { chat = "Chat", whisper = "Chat", typing = "Chat", aura = 
 	cooldown = "Cooldown Manager" }
 -- (Each event's own setting, for its link; the cooldowns' by bar, below.)
 local TRIGGER_SETTING = { chat = "chatPeek", whisper = "chatUntilWhisperRead", typing = "chatShowWhileTyping",
-	aura = "buffPeek", ping = "minimapRevealOnPing", tracking = "minimapKeepGathering", quest = "questRevealOnAccept",
+	aura = "buffPeek", ping = "minimapRevealOnPing", tracking = "minimapKeepOre", quest = "questRevealOnAccept",
 	cooldown = "cooldownWhileRecharging" }
 local TRIGGER_SWITCH = { chat = "handleChat", whisper = "handleChat", typing = "handleChat", aura = "handleBuffs",
 	ping = "handleMinimap", tracking = "handleMinimap", quest = "handleQuests", gamepad = "handleGamepad",

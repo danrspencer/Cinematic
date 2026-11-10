@@ -106,6 +106,18 @@ end
 -- a dot of that color in front of it. originals: the name as the game set it.
 local DOT = "Interface\\AddOns\\" .. ADDON_NAME .. "\\Textures\\Themes\\Shapes\\PortraitCircleCut"
 local originals = {}
+-- A quest name's words without their color codes, with a dot of the first one's
+-- color in front (size: the font's). Unchanged if it has no color code.
+local function DotName(raw, size)
+	local hex = raw:match("|c%x%x(%x%x%x%x%x%x)")
+	local plain = raw:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
+	if hex then
+		local dot = math.floor((size or 12) * 0.8 + 0.5)
+		plain = ("|T%s:%d:%d:0:0:128:128:0:128:0:128:%d:%d:%d|t %s"):format(DOT, dot, dot,
+			tonumber(hex:sub(1, 2), 16), tonumber(hex:sub(3, 4), 16), tonumber(hex:sub(5, 6), 16), plain)
+	end
+	return plain
+end
 local function Accent(text)
 	if not accent then return end
 	local okColor, r, g, b, a = pcall(text.GetTextColor, text)
@@ -125,14 +137,8 @@ local function Rewrite(text)
 	raw = okText and Plain(raw)
 	-- (Already ours: just its color, which the game may have set again.)
 	if type(raw) ~= "string" or raw:find("|T", 1, true) then return Accent(text) end
-	local hex = raw:match("|c%x%x(%x%x%x%x%x%x)")
-	local plain = raw:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
-	if hex then
-		local okFont, _, size = pcall(text.GetFont, text)
-		local dot = math.floor((okFont and Plain(size) or 12) * 0.8 + 0.5)
-		plain = ("|T%s:%d:%d:0:0:128:128:0:128:0:128:%d:%d:%d|t %s"):format(DOT, dot, dot,
-			tonumber(hex:sub(1, 2), 16), tonumber(hex:sub(3, 4), 16), tonumber(hex:sub(5, 6), 16), plain)
-	end
+	local okFont, _, size = pcall(text.GetFont, text)
+	local plain = DotName(raw, okFont and Plain(size) or nil)
 	if plain ~= raw then
 		originals[text] = raw
 		busy = true
@@ -155,13 +161,14 @@ end
 
 -- A header's panel: under it (so its words show over it), where its bar was.
 local panels = {}
-local function DressHeader(header, art, on)
+-- (place(panel), for a header with no art: its caller puts the panel in place.)
+local function DressHeader(header, art, on, place)
 	SetHidden(art, on)
 	local panel = panels[header]
 	if on and not panel then
 		panel = CreateFrame("Frame", nil, header)
 		panel:SetFrameLevel(math.max(0, header:GetFrameLevel() - 1))
-		panel:SetAllPoints(art)
+		if art then panel:SetAllPoints(art) end
 		panel:EnableMouse(false)
 		panel.themeSliceCorner = HEADER_CORNER
 		panel.back = panel:CreateTexture(nil, "BACKGROUND", nil, -7)
@@ -172,6 +179,7 @@ local function DressHeader(header, art, on)
 	if not panel then return end
 	panel:SetShown(on)
 	if not on then return end
+	if place then place(panel) end
 	local back, edge = ns.ThemePanel()
 	back = back or { 0.05, 0.05, 0.06, 0.85 }
 	edge = edge or ns.ThemeRing() or { 0.5, 0.5, 0.5, 1 }
@@ -328,9 +336,11 @@ local function HeaderArt(frame)
 end
 
 local function Restyle()
+	local plan = Plan()
+	-- (Other addons' trackers in the game's place: Support/QuestieTracker.lua.)
+	if ns.RestyleQuestieTracker then ns.RestyleQuestieTracker(plan) end
 	local tracker = Tracker()
 	if type(tracker) ~= "table" then return end
-	local plan = Plan()
 	accent = plan and plan.accent or nil
 	found = { headers = 0, titles = 0, words = 0, bars = 0, buttons = 0 }
 	Each(tracker, 0, function(frame)
@@ -390,6 +400,14 @@ local function Restyle()
 		titles, originals = {}, {}
 	end
 end
+
+-- For other addons' trackers (Support/QuestieTracker.lua): the same looks, put
+-- back the same way.
+ns.QuestTrackerKit = {
+	SetFont = SetFontOf, SetShadow = SetShadowOf, Tint = Tint, DressHeader = DressHeader, DotName = DotName,
+	-- (A font string its addon just set its own font on: ours forgotten, not put back.)
+	ForgetFont = function(text) fonts[text] = nil end,
+}
 
 -- Coalesced: many updates in one frame (a quest log change) restyle once.
 local pending = false

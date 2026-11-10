@@ -1,6 +1,6 @@
 -- Cinematic tracking detection: keeps the minimap up while gathering or
--- creature tracking is active (Keep open, Minimap page: minimapKeepGathering,
--- minimapKeepCreatures), or a prey hunt (minimapKeepPrey).
+-- creature tracking is active (Keep open, Minimap page's Tracking dropdown:
+-- minimapKeep<kind>), or a prey hunt (minimapKeepPrey).
 local _, ns = ...
 
 -- Gathering and creature tracking. There's no API for what appears on the
@@ -8,20 +8,31 @@ local _, ns = ...
 -- up while it's on. Matched by spell ID (language-independent), through the
 -- player's auras and the client's tracking list, plus the active tracking icon
 -- on clients that only expose that.
+-- In the Minimap page's Tracking dropdown's order (ns.TRACKING_KINDS):
+-- gathering ones (kept off in the places under it) first.
 local TRACKING = {
-	{ option = "minimapKeepGathering", spells = { 2383 }, -- Find Herbs
-		icons = { 136065, "interface\\icons\\inv_misc_flower_02" } },
-	{ option = "minimapKeepGathering", spells = { 2580 }, -- Find Minerals
+	{ kind = "Ore", gathering = true, spells = { 2580 }, -- Find Minerals
 		icons = { 136025, "interface\\icons\\spell_nature_earthquake" } },
-	{ option = "minimapKeepGathering", spells = { 2481 }, -- Find Treasure
+	{ kind = "Herbs", gathering = true, spells = { 2383 }, -- Find Herbs
+		icons = { 136065, "interface\\icons\\inv_misc_flower_02" } },
+	{ kind = "Treasure", gathering = true, spells = { 2481 }, -- Find Treasure
 		icons = { 135725, "interface\\icons\\racial_dwarf_findtreasure" } },
-	{ option = "minimapKeepCreatures", spells = { 43308 }, icons = {} }, -- Find Fish
-	{ option = "minimapKeepCreatures", icons = {}, spells = {
-		1494, 19878, 19879, 19880, 19882, 19883, 19884, 19885, -- hunter tracking
-		5225,                                                -- druid: Track Humanoids
-		5500, 5502,                                          -- Sense Demons, Sense Undead
-	} },
+	{ kind = "Humanoids", spells = { 19883, 5225 }, icons = {} }, -- hunter, druid
+	{ kind = "Fish", spells = { 43308 }, icons = {} },             -- Find Fish
+	{ kind = "Beasts", spells = { 1494 }, icons = {} },
+	{ kind = "Demons", spells = { 19878, 5500 }, icons = {} },     -- hunter, warlock's Sense Demons
+	{ kind = "Undead", spells = { 19884, 5502 }, icons = {} },     -- hunter, paladin's Sense Undead
+	{ kind = "Dragonkin", spells = { 19879 }, icons = {} },
+	{ kind = "Elementals", spells = { 19880 }, icons = {} },
+	{ kind = "Giants", spells = { 19882 }, icons = {} },
+	{ kind = "Hidden", spells = { 19885 }, icons = {} },
 }
+-- The kinds, in order: { kind, setting, gathering }.
+ns.TRACKING_KINDS = {}
+for _, entry in ipairs(TRACKING) do
+	entry.option = "minimapKeep" .. entry.kind
+	ns.TRACKING_KINDS[#ns.TRACKING_KINDS + 1] = { kind = entry.kind, key = entry.option, gathering = entry.gathering }
+end
 local TRACKING_CHECK_INTERVAL = 0.5
 local trackingCheckedAt, keepForGathering, keepForCreatures = 0, false, false
 
@@ -87,8 +98,8 @@ changeWatcher:SetScript("OnEvent", function(_, event, unit)
 	end
 end)
 
--- Whether tracking that's ticked under Keep open is on: gathering (herbs,
--- minerals, treasure), and creatures or fish.
+-- Whether tracking that's ticked under Keep open is on: gathering (ore,
+-- herbs, treasure), and creatures or fish.
 local function IsTrackingSomethingWanted()
 	local db = ns.GetDB()
 	if trackingChanged then
@@ -107,7 +118,7 @@ local function IsTrackingSomethingWanted()
 			for _, trackingIcon in ipairs(kind.icons) do
 				if icon and icon == trackingIcon then on = true end
 			end
-			if on and kind.option == "minimapKeepGathering" then
+			if on and kind.gathering then
 				gathering = true
 			elseif on then
 				creatures = true
