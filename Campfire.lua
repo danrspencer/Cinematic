@@ -251,7 +251,8 @@ end
 
 -- Following the cozy camera starting and ending (looked at every LOOK_EVERY).
 local function WatchCozy()
-	local now = ns.IsCozy and ns.IsCozy() or false
+	-- (Or the cozy camera playing as its script: CameraScripts.lua.)
+	local now = (ns.IsCozy and ns.IsCozy()) or (ns.PlayingCameraKey and ns.PlayingCameraKey() == "cozy") or false
 	if now and not cozy.on then
 		cozy.on, cozy.at, cozy.ended, cozy.tentAtStart, cozy.tentAfter = true, GetTime(), nil, tent ~= nil, nil
 		ns.Log("campfire", "cozy camera started, Camp Tent " .. (tent and "already seen" or "not seen"))
@@ -296,6 +297,65 @@ end
 function ns.TentSighting()
 	if tent then
 		return tent.seq, tent.offset, tent.facing, tent.duringCozy
+	end
+end
+
+-- For a camera script's sway with Camp Tent on (the cozy camera's): the
+-- tent's angle in the script's own turn total (amount: the total now; 0 is
+-- where the script started, taken to be behind you, as the old cozy camera
+-- took it), or nil; and whether it's a new sighting since last asked. As
+-- Camera.lua's ns.CozyTentAngle: seen at an angle a off the middle of the
+-- view, the tent is where the camera's circle meets it, 180 - 2a degrees
+-- round (a positive turn, "view left", carries the camera away from a tent
+-- on the right), kept as a bearing so your turning doesn't lose it.
+do
+	local VIEW_HALF_HEIGHT = 0.47 -- tan of half the view's height
+	local lastSeq, bearing
+
+	local function Wrap(angle) return (angle + 180) % 360 - 180 end
+
+	function ns.ScriptTentAngle(amount)
+		if not tent then
+			lastSeq, bearing = nil, nil
+			return nil
+		end
+		local now = Facing() or 0
+		local new = tent.seq ~= lastSeq
+		if new then
+			lastSeq = tent.seq
+			local off = math.deg(math.atan(math.abs(tent.offset) * VIEW_HALF_HEIGHT))
+			local round = 180 - 2 * off
+			-- (Seen during the cozy camera: from where the camera is now; before
+			-- it, from where it starts, as you faced then.)
+			local from = tent.duringCozy and amount or 0
+			bearing = from + (tent.offset > 0 and -round or round) - (tent.duringCozy and now or tent.facing or now)
+		end
+		return Wrap(bearing + now), new
+	end
+
+	-- Whether a turn from `from` by `delta` degrees passes the tent.
+	function ns.TentOnPath(from, delta, tentAngle)
+		return ((tentAngle - from) * (delta >= 0 and 1 or -1)) % 360 <= math.abs(delta)
+	end
+
+	-- A sway's end (target: degrees from its middle, center) clear of the tent
+	-- (TENT_CLEAR) and not past it from where the camera is (from): as picked,
+	-- mirrored, or an edge of the arc; failing those, the one furthest from it.
+	function ns.TentClearTarget(target, center, arc, tentAngle, from)
+		local TENT_CLEAR = 90
+		local furthest, best = -1, target
+		for _, candidate in ipairs({ target, -target, arc, -arc }) do
+			local angle = center + candidate
+			local clear = math.abs(Wrap(angle - tentAngle))
+			-- (The turn as the script makes it: straight there, not wrapped.)
+			if clear >= TENT_CLEAR and not ns.TentOnPath(from, angle - from, tentAngle) then
+				return candidate
+			end
+			if clear > furthest then
+				furthest, best = clear, candidate
+			end
+		end
+		return best
 	end
 end
 

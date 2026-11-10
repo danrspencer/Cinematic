@@ -32,12 +32,12 @@ local COLORS = {
 local KIND_COLOR = { rotate = "move", tilt = "move", zoom = "move",
 	wait = "wait", together = "flow", ["repeat"] = "flow", emote = "misc", putback = "misc",
 	sway = "move", spin = "move", aim = "move", ending = "flow",
-	play = "flow", endMusic = "misc", follow = "move", behind = "move" }
+	play = "flow", endMusic = "misc", follow = "move", behind = "move", keepup = "move" }
 local KIND_NAMES = { rotate = "Rotate", tilt = "Tilt", zoom = "Zoom",
 	wait = "Wait", together = "Together", ["repeat"] = "Repeat", emote = "Emote",
 	putback = "Undo its turns", sway = "Sway", spin = "Spin",
 	aim = "Aim at", play = "Play script", endMusic = "End music",
-	follow = "Follow your turns", behind = "Swing behind you" }
+	follow = "Follow your turns", behind = "Swing behind you", keepup = "Keep up with who's talking" }
 -- The add buttons' groups (CameraScripts.lua's ns.CAMERA_SCRIPT_ADD_GROUPS).
 local ADD_GROUP_NAMES = { move = "Move the camera", wait = "Wait", group = "Group steps", other = "Other" }
 -- (A field's name: by its kind first, where the same key means something else there.)
@@ -49,15 +49,16 @@ local FIELD_NAMES = { deg = "Degrees", secs = "Seconds", way = "Way", ease = "Ea
 	fit = "Time", at = "At", miss = "Not found",
 	speed = "Top speed", past = "Past max", ["putback.zoom"] = "Zoom too", script = "Camera",
 	["follow.after"] = "Glide after", lazy = "Laziness", top = "Top speed", corners = "Corners", steer = "Steering",
-	["follow.most"] = "Fall behind at most", ["behind.speed"] = "Turn speed" }
+	["follow.most"] = "Fall behind at most", ["follow.lower"] = "Steering: lower", ["follow.closer"] = "Steering: closer",
+	["follow.floor"] = "Lowest tilt", ["keepup.frame"] = "Framing", ["keepup.most"] = "Turn at most", ["sway.tent"] = "Camp Tent", ["behind.speed"] = "Turn speed" }
 local CHOICE_NAMES = { left = "Left", right = "Right", random = "Either way", once = "Picked once",
 	smooth = "Smooth", gentle = "Gentle", steady = "Steady", none = "None", short = "Short", medium = "Medium", long = "Long", yards = "You", yours = "Your zoom",
 	yes = "Favor", no = "Anywhere", cast = "The cast", landing = "Landing", alive = "Back to life",
-	time = "Seconds go by", secs = "Its seconds", talk = "Someone new talks", click = "Where you clicked",
+	time = "Seconds go by", secs = "Its seconds", talk = "Someone new talks", flyby = "A fly-by's time", click = "Where you clicked",
 	speaker = "Who's talking", stay = "Stay", look = "Look round", ["past.no"] = "No", ["past.yes"] = "Yes",
 	["zoom.no"] = "No", ["zoom.yes"] = "Yes", ["corners.no"] = "No", ["corners.yes"] = "Quicker",
 	["steer.no"] = "No", ["steer.yes"] = "Quicker", ["rand.no"] = "No", ["rand.between"] = "Between two",
-	["rand.give"] = "Give or take" }
+	["rand.give"] = "Give or take", ["tent.no"] = "No", ["tent.yes"] = "Keep clear" }
 local RULE_NAMES = { camera = "You move the camera", fight = "A fight starts", walk = "You walk", zoom = "You zoom",
 	ends = "Its trigger ends", cast = "Your cast ends", window = "A window opens",
 	closed = "Its quest window closes", done = "Its steps run out" }
@@ -73,18 +74,19 @@ local HINTS = {
 	rotate = "Turns the view. Picked once: one way for every such turn in the script. Slow down None ends at full speed, for a turn the same way next to carry straight on; Speed match: seconds to go from that speed to its own.",
 	tilt = "Positive tilts down, negative up; beside a turn (Together) both go at once. Random Give or take: to Height from where the scene started, give or take Higher by and Lower by, picked each time. Slow down None ends at full speed, for a tilt the same way next to carry straight on; Speed match: seconds to go from that speed to its own.",
 	zoom = "Zooms to this many yards from you, or (From: your zoom) this many further out than you were as it started. Random Between two: somewhere from Nearest to Up to, picked each time. Top speed (yards a second): quicker if it gets there sooner; 0 goes by Seconds. Past max: beyond the game's own limit.",
-	wait = "Until: seconds, or a Hearthstone or teleport cast that many seconds from done, that many seconds before landing, back to life, or someone new talks. Waiting on something, steps added while it's picked go inside it and run meanwhile, easing to a stop when it's time.",
+	wait = "Until: seconds, or a Hearthstone or teleport cast that many seconds from done, that many seconds before landing, back to life, someone new talks, or a fly-by's time (on a flight: random times between the Fly-by settings' From and To, each done before landing; on a route not flown before, one soon after takeoff; none left, it waits till the flight's over). Waiting on something, steps added while it's picked go inside it and run meanwhile, easing to a stop when it's time.",
 	together = "Runs the steps inside it at once; it's done when the longest is. Pick it and add steps to put them inside.",
 	["repeat"] = "Runs the steps inside it again. 0 times: until the camera ends (the preview shows three).",
 	emote = "Your character does this emote (a word, like wave or cheer).",
 	putback = "Undoes every turn, tilt and zoom this scene made, all at once, by adding up its own turns (the game never says which way the camera points). If you move the camera yourself, it starts counting again from where you leave it. Zoom too off: the zoom stays, for a Zoom beside it in a Together to bring back at its own speed.",
+	keepup = "Runs until the camera ends, or the Wait it's in: put it in a Together beside the rest. The one an Aim at (Who's talking) swung to, walking off past Framing degrees from the middle (or where the swing left them) while their bubble shows, is followed by a steady turn their way, Top speed (degrees a second) at most, easing to a stop once they're back. Turn at most: degrees from where the camera started. The script's other turns wait meanwhile. Not beside a Follow your turns.",
 	behind = "Swings the view round behind you over this many seconds, turning at Turn speed (degrees a second) at most; the height stays. Only while you're moving (a flight, walking or running): standing still, the game doesn't turn the camera. Where it ends counts as where the scene started, for Undo its turns and Sway.",
-	sway = "A random spot within Arc of where the camera was as this sway first ran, At least that far on; then it creeps on at Drift degrees a second through Pause, easing off before the edge. Middle: favor spots near the middle.",
+	sway = "A random spot within Arc of where the camera was as this sway first ran, At least that far on; then it creeps on at Drift degrees a second through Pause, easing off before the edge. Middle: favor spots near the middle. Camp Tent Keep clear: with a Camp Tent seen nearby (your cursor was on it), each sway ends well away from it and never turns past it, and one first seen mid-turn with the tent ahead slows it to a stop (the camera goes through tents).",
 	spin = "Round and round from Start speed, speeding up by Speed-up each second to Top speed (degrees a second); 0 seconds: until the camera ends. Speed match: seconds to go from the turn before's speed to its own.",
 	aim = "Where you clicked: turns Degrees toward the side of the screen you clicked who you're talking to, as the quest cam does. Who's talking: swings toward the NPC talking now by their chat bubble, leaving them Degrees off the middle, as Chat Cam does. Not found (opened with a key, no bubble on screen): a turn either way, stay, or look round (a full turn at most) for their bubble. Top speed (degrees a second): slower than Seconds if the turn would go faster; 0 goes by Seconds.",
 	play = "Plays another camera's steps here, as they are now (a built-in one with your settings), then goes on. Not its stop rules or When it ends.",
 	endMusic = "Fades out the music a camera started, over this many seconds, and ends it (your own game music is left alone). The next steps go on meanwhile. Put it in When it ends to stop the music as the scene ends.",
-	follow = "Runs until the camera ends: put it in a Together beside the rest. While you turn, the view holds its direction instead of swinging round with you. Glide after seconds of not turning, it glides round after you, to where it was before you turned: Laziness (seconds) says how lazily (the further off, the quicker), Top speed (degrees a second) the fastest, Speed-up how quickly it gets going and slows down. Corners: bigger turns glide back quicker, small ones gentler. Steering: several turns in a row glide sooner and quicker. Fall behind at most (degrees, 0: no limit): the furthest it lets you turn away from the view; past it, the view turns with you. The script's other turns wait while it glides, then carry on.",
+	follow = "Runs until the camera ends: put it in a Together beside the rest. While you turn, the view holds its direction instead of swinging round with you. Glide after seconds of not turning, it glides round after you, to where it was before you turned: Laziness (seconds) says how lazily (the further off, the quicker), Top speed (degrees a second) the fastest, Speed-up how quickly it gets going and slows down. Corners: bigger turns glide back quicker, small ones gentler. Steering: several turns in a row glide sooner and quicker; then Steering: lower (degrees) brings the camera down that far, no lower than Lowest tilt below where it started, and Steering: closer (yards) brings it in that much inside your distance, at once and until you settle down (0: neither). Fall behind at most (degrees, 0: no limit): the furthest it lets you turn away from the view; past it, the view turns with you. The script's other turns wait while it glides, then carry on.",
 }
 local function Translate(map)
 	for key, text in pairs(map) do map[key] = L[text] end
@@ -144,6 +146,7 @@ local function StepText(step)
 			or step.what == "landing" and L["Until %s s before landing"]:format(Num(step.secs))
 			or step.what == "alive" and L["Until you're back to life"]
 			or step.what == "talk" and L["Until someone new talks"]
+			or step.what == "flyby" and L["Until a fly-by's time on this flight"]
 			or step.rand == "between" and L["Until %s to %s s go by"]:format(Num(math.min(step.secs, step.max)),
 				Num(math.max(step.secs, step.max)))
 			or L["Until %s s go by"]:format(Num(step.secs))
@@ -173,6 +176,8 @@ local function StepText(step)
 		return L["End the music over %s s"]:format(Num(step.secs))
 	elseif k == "follow" then
 		return L["Follow your turns, catching up %s s after"]:format(Num(step.after))
+	elseif k == "keepup" then
+		return L["Keep up with who's talking, %s°/s at most"]:format(Num(step.speed))
 	elseif k == "behind" then
 		return L["Swing behind you over %s s"]:format(Num(step.secs))
 	elseif k == "putback" then
@@ -886,10 +891,13 @@ local function FieldHidden(step, key, speeds)
 	local k = step.k
 	if k == "zoom" and key == "max" then return step.rand ~= "between" end
 	if k == "tilt" and (key == "up" or key == "down") then return step.rand ~= "give" end
+	if k == "follow" and (key == "lower" or key == "closer" or key == "floor") then
+		return step.steer ~= "yes" or (key == "floor" and (step.lower or 0) <= 0)
+	end
 	if k == "wait" then
 		if key == "rand" then return step.what ~= "time" end
 		if key == "max" then return step.what ~= "time" or step.rand ~= "between" end
-		if key == "secs" then return step.what == "alive" or step.what == "talk" end
+		if key == "secs" then return step.what == "alive" or step.what == "talk" or step.what == "flyby" end
 	end
 	return false
 end

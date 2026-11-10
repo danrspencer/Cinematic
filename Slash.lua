@@ -1830,6 +1830,14 @@ local function HandleSlash(msg)
 		ns.Print("cities: " .. (#names > 0 and table.concat(names, ", ") or "none found"))
 	elseif cmd == "orbit" then
 		ns.OrbitCommand(arg)
+	elseif cmd == "debug" and arg == "behind" then
+		-- The Swing behind you step on its own (5 sec at 45°/s, as the Flight
+		-- script's): try it mid-flight with the camera turned aside. Each second
+		-- of it goes in the log (UpdateTaxi).
+		ns.ScriptCenterCamera(5, 45, 0, 1.5)
+		ns.Print(("swing behind you: 5 sec (on a flight %s, moving %s, follow %s, yaw speed %s)"):format(
+			tostring(ns.OnTaxi()), tostring(ns.playerMoving), tostring(GetCVar("cameraSmoothStyle")),
+			tostring(GetCVar("cameraYawSmoothSpeed"))))
 	elseif cmd == "debug" and arg == "orbit" then
 		-- Run mid-flight to see what the camera rotation thinks it's doing.
 		ns.Print(("onTaxi=%s cinematic=%s enabled=%s orbitOption=%s mode=%s"):format(

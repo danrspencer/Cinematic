@@ -4828,6 +4828,37 @@ function ns.UpdateAutoFlyBy(now, onTaxi, cinematic, adjusting)
 	ns.ToggleFlyBy(true)
 end
 
+-- For a camera script's Wait until a fly-by (the Flight script): this
+-- flight's random fly-by times, planned as the old flight camera did
+-- (PlanAutoFlyBys: taxiFlyByFrom to taxiFlyByTo % of a known route, each over
+-- before the arrival; a new route, one FLYBY.FIRST after takeoff). Returns
+-- "go" (its time has come: taken), "wait" (the next one's later) or "none"
+-- (no more this flight). One whose latest start went by (you held the
+-- camera meanwhile) is skipped.
+function ns.TakeFlightFlyBy(now)
+	if not ns.OnTaxi() or not flightSince then return "none" end
+	if autoFlyBys.key ~= flightSince then
+		autoFlyBys = PlanAutoFlyBys()
+		if ns.db.debugFlyBy then
+			local times = {}
+			for _, slot in ipairs(autoFlyBys.times) do
+				times[#times + 1] = ("in %d sec"):format(math.max(0, slot.at - now))
+			end
+			ns.Print(("fly-by (script): planned for this flight: %s"):format(
+				#times > 0 and table.concat(times, ", ") or "none"))
+		end
+	end
+	while autoFlyBys.times[1] and now > autoFlyBys.times[1].latest do
+		table.remove(autoFlyBys.times, 1)
+		if ns.db.debugFlyBy then ns.Print("fly-by (script): skipped, its time went by") end
+	end
+	local nextOne = autoFlyBys.times[1]
+	if not nextOne then return "none" end
+	if now < nextOne.at then return "wait" end
+	table.remove(autoFlyBys.times, 1)
+	return "go"
+end
+
 -- With /cine debug flybys on, every frame of each fly-by (and the 3 seconds
 -- after it, as the flight camera takes over) is recorded in the saved
 -- settings (flyByLog, the latest one only, and flyBySettleLog for the settle
@@ -4972,7 +5003,7 @@ end
 -- doesn't cancel it (it only turns while you move), its step's time does.
 function ns.ScriptCenterCamera(duration, yawSpeed, pitchSpeed, ramp)
 	CenterCamera(duration, yawSpeed, pitchSpeed, ramp)
-	recenterRamp.script = true
+	recenterRamp.script, recenterRamp.loggedAt = true, nil
 end
 
 -- Camera following ("Smart"/"Always") keeps pulling the camera back behind a
@@ -5311,6 +5342,14 @@ function ns.UpdateTaxi()
 	if recenterRamp.script then
 		-- (A camera script's Swing behind you: its own step ends it.)
 		if now >= recenterUntil then recenterRamp.script = nil end
+		-- (Logged once a second: what the game's camera follow is set to.)
+		if not recenterRamp.loggedAt or now - recenterRamp.loggedAt >= 1 then
+			recenterRamp.loggedAt = now
+			ns.Log("state", ("swing behind you: %.1f s left, follow %s, yaw speed %s, on a flight %s, moving %s, mouselook %s"):format(
+				math.max(0, recenterUntil - now), tostring(GetCVar("cameraSmoothStyle")),
+				tostring(GetCVar("cameraYawSmoothSpeed")), tostring(onTaxi), tostring(ns.playerMoving),
+				tostring(IsMouselooking and IsMouselooking() or false)))
+		end
 	elseif travelRecenter then
 		if not traveling or IsMouseOnCamera() then
 			recenterUntil = 0

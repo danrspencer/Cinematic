@@ -106,7 +106,9 @@ ns.CAMERA_SCRIPT_KINDS = {
 	-- and, once it's time, eases them to a stop and goes on. (No cast, flight
 	-- or death under way: nothing to end, it waits on, running them.) Was
 	-- Wait, Wait at random and Wait until.
-	wait = { group = true, fields = { { "what", "pick", { "time", "cast", "landing", "alive", "talk" }, "time" },
+	-- (flyby: the flight's next random fly-by time, Camera.lua's
+	-- ns.TakeFlightFlyBy, planned as the old flight camera did.)
+	wait = { group = true, fields = { { "what", "pick", { "time", "cast", "landing", "alive", "talk", "flyby" }, "time" },
 		{ "rand", "pick", { "no", "between" }, "no" }, { "secs", "num", 0, 3600, 2 }, { "max", "num", 0, 3600, 6 } } },
 	emote = { fields = { { "token", "text", "wave" } } },
 	-- Undo its turns: every turn and tilt the scene made taken back, by the
@@ -133,7 +135,12 @@ ns.CAMERA_SCRIPT_KINDS = {
 	-- before the arc's edge.
 	sway = { fields = { { "arc", "num", 1, 180, 30 },
 		{ "min", "num", 0, 180, 10 }, { "secs", "num", 0.5, 600, 10 }, { "ease", "pick", SWAY_EASES, "smooth" },
-		{ "drift", "num", 0, 30, 0.5 }, { "pause", "num", 0, 600, 15 }, { "favor", "pick", { "no", "yes" }, "no" } } },
+		{ "drift", "num", 0, 30, 0.5 }, { "pause", "num", 0, 600, 15 }, { "favor", "pick", { "no", "yes" }, "no" },
+		-- (tent "yes": keeps clear of a Camp Tent seen nearby, as the cozy
+		-- camera did: each end 90 degrees off it and not turning past it; one
+		-- seen mid-turn with the tent ahead brakes it to a stop. Campfire.lua's
+		-- ns.ScriptTentAngle.)
+		{ "tent", "pick", { "no", "yes" }, "no" } } },
 	-- Round and round, from start degrees a second (0: from still), speeding
 	-- up accel degrees a second each second to max; secs 0: until the camera ends.
 	spin = { fields = { { "start", "num", 0, 360, 0 }, { "accel", "num", 0.5, 100, 8 }, { "max", "num", 1, 360, 120 }, { "secs", "num", 0, 3600, 0 },
@@ -172,15 +179,25 @@ ns.CAMERA_SCRIPT_KINDS = {
 	-- meanwhile: the script's other turns wait for it (a sway carries on
 	-- after). (The RP walk and auto-run cameras' turn follow, Camera.lua's
 	-- UpdateTurnFollow.)
+	-- Keep up with who's talking, until the camera (or the Wait it's in)
+	-- ends: the one last aimed at walking off past frame degrees from the
+	-- middle (or where the swing left them) is followed by a steady turn, speed
+	-- degrees a second at most, most degrees from where it started at most
+	-- (STEP.keepup, as ChatCam.lua's keeping up).
+	keepup = { fields = { { "frame", "num", 0, 45, 6 }, { "speed", "num", 1, 90, 15 }, { "most", "num", 5, 180, 90 } } },
 	follow = { fields = { { "after", "num", 0, 10, 1.5 }, { "lazy", "num", 0.2, 10, 1.6 }, { "top", "num", 5, 180, 40 },
 		{ "accel", "num", 5, 360, 30 }, { "corners", "pick", { "no", "yes" }, "no" },
-		{ "steer", "pick", { "yes", "no" }, "yes" }, { "most", "num", 0, 180, 0 } } },
+		{ "steer", "pick", { "yes", "no" }, "yes" }, { "most", "num", 0, 180, 0 },
+		-- (Steering, as the auto-run camera did: lower degrees lower, floor at
+		-- most below where the scene started, and closer yards inside your
+		-- distance, at once and for the sways and zooms till you settle; 0: not.)
+		{ "lower", "num", 0, 45, 0 }, { "closer", "num", 0, 10, 0 }, { "floor", "num", 0, 45, 45 } } },
 	together = { group = true, fields = {} },
 	["repeat"] = { group = true, fields = { { "times", "num", 0, 100, 2 } } },
 }
 -- The page's add buttons, in their groups (headers: CameraScriptsPage.lua).
 ns.CAMERA_SCRIPT_ADD_GROUPS = {
-	{ key = "move", kinds = { "rotate", "tilt", "zoom", "spin", "sway", "aim", "follow", "putback", "behind" } },
+	{ key = "move", kinds = { "rotate", "tilt", "zoom", "spin", "sway", "aim", "keepup", "follow", "putback", "behind" } },
 	{ key = "wait", kinds = { "wait" } },
 	{ key = "group", kinds = { "together", "repeat" } },
 	{ key = "other", kinds = { "emote", "play", "endMusic" } },
@@ -468,15 +485,28 @@ local function SwayLoop(o, level, levelKey, front)
 	local height = S("tiltRand", { deg = level, down = Db(o .. "PitchDown", 3), up = Db(o .. "PitchUp", 5),
 		secs = Db(o .. "MoveTime", 10) })
 	if levelKey then Set(height, levelKey, o .. "PitchDown", o .. "PitchUp") else Set(height, o .. "PitchDown", o .. "PitchUp") end
-	-- (Auto-run's lowest tilt: the real camera's, while you steer; shown here.)
-	if o == "runOrbit" then table.insert(height.set, "runOrbitPitchFloor") end
 	local sway = Set(S("sway", { arc = Db(o .. "BackArc", 30),
 		min = Db(o .. "MinChange", 10), secs = Db(o .. "MoveTime", 10), ease = NearestEase(Db(o .. "Ease", 0.5)),
 		drift = Switch(o .. "Drift") and Db(o .. "DriftSpeed", 0.5) or 0, pause = Db(o .. "Pause", 15),
-		favor = front and "no" or "yes" }), o .. "BackArc", o .. "MinChange", o .. "MoveTime", o .. "Ease", o .. "Pause",
+		-- (Leaning to the middle: walk, auto-run, vista and fish, as Camera.lua's
+		-- TRAVEL_ORBIT did; the flight's and cozy's spread evenly over the arc.)
+		favor = (front or o == "taxiOrbit") and "no" or "yes", tent = front and "yes" or "no" }), o .. "BackArc", o .. "MinChange", o .. "MoveTime", o .. "Ease", o .. "Pause",
 		o .. "Drift", o .. "DriftSpeed")
 	table.insert(height.set, o .. "MoveTime")
 	return On(Set(S("repeat", { times = 0, steps = { S("together", { steps = { height, sway } }) } }), o), Switch(o))
+end
+
+-- The sways with an opening drift first (Camera.lua's old idleOpeningDrift,
+-- the "behind" style's): idleOpeningDrift seconds creeping at <o>DriftSpeed,
+-- either way, building up from still and handing over at speed, so the first
+-- sway doesn't set off from a dead stop. (Not the cozy camera's: it opens
+-- with its half turn. Nor AFK's or the flight's, which never had it.)
+local function OpeningSways(o, loop)
+	local opening = Db("idleOpeningDrift", 5)
+	if opening <= 0 then return loop end
+	local drift = Set(S("rotate", { deg = math.max(1, Db(o .. "DriftSpeed", 0.5) * opening), secs = math.max(0.5, opening),
+		way = "random", speedUp = "long", slowDown = "none" }), "idleOpeningDrift", o .. "DriftSpeed")
+	return On(S("repeat", { times = 1, steps = { drift, loop } }), Switch(o))
 end
 
 -- The slow zoom beside it (z: the zoom setting prefix, a switch itself):
@@ -535,7 +565,7 @@ function RestCamera(cam)
 	else
 		-- (No line-up behind you first: camera follow never turns a camera
 		-- while you stand still, so it was only a wait.)
-		steps = { S("together", { steps = { loop, ZoomGroup(z) } }) }
+		steps = { S("together", { steps = { OpeningSways(o, loop), ZoomGroup(z) } }) }
 	end
 	local dof = "dof" .. cam:sub(1, 1):upper() .. cam:sub(2)
 	return {
@@ -551,19 +581,23 @@ end
 -- The RP walk and auto-run cameras (walkOrbit, runOrbit): swaying and
 -- zooming, and following your turns (<cam>SwingBehind: held, then a glide
 -- back behind you <cam>GlideDelay after; auto-run's quicker, and quicker
--- still round corners). Stopping: the zoom goes back. (Not the same yet:
--- auto-run steering lower and closer, and the walk camera handing over to
--- standing still.) No line-up behind you: that leaned on the game's camera
+-- still round corners; steering a lot, lower and closer). Stopping: the zoom
+-- goes back. (Not the same yet: the walk camera handing over to standing
+-- still.) No line-up behind you: that leaned on the game's camera
 -- follow, which doesn't turn the camera (user, 2026-11-05).
 local FOLLOW_OF = { walk = { lazy = 1.6, top = 40, accel = 30, corners = "no" },
 	run = { lazy = 1, top = 70, accel = 60, corners = "yes" } }
 function MovingCamera(cam)
 	local glide = FOLLOW_OF[cam]
+	-- (Steering a lot: 12 degrees lower, auto-run's no lower than its Lowest
+	-- tilt, and 1.5 yards closer, as the cameras did before scripts.)
 	local follow = On(Set(S("follow", { after = Db(cam .. "GlideDelay", cam == "run" and 0.5 or 1.5), lazy = glide.lazy,
-		top = glide.top, accel = glide.accel, corners = glide.corners }), cam .. "SwingBehind", cam .. "GlideDelay"),
-		Switch(cam .. "SwingBehind"))
+		top = glide.top, accel = glide.accel, corners = glide.corners, lower = 12, closer = 1.5,
+		floor = cam == "run" and Db("runOrbitPitchFloor", 10) or 45 }), cam .. "SwingBehind", cam .. "GlideDelay",
+		cam == "run" and "runOrbitPitchFloor" or nil), Switch(cam .. "SwingBehind"))
 	return {
-		steps = { S("together", { steps = { SwayLoop(cam .. "Orbit", 0), ZoomGroup(cam .. "Zoom"), follow } }) },
+		steps = { S("together", { steps = { OpeningSways(cam .. "Orbit", SwayLoop(cam .. "Orbit", 0)), ZoomGroup(cam .. "Zoom"),
+			follow } }) },
 		ending = { On(Set(S("zoom", { to = 0, secs = 2, of = "yours" }), cam .. "Zoom"), Switch(cam .. "Zoom")) },
 		rules = { camera = "pause", cameraSecs = Db(cam .. "InputPause", 2), fight = "stop", walk = "ignore", zoom = "ignore",
 			ends = "putback" },
@@ -590,21 +624,43 @@ local BUILT_IN = {
 	-- second at most, then a pause of Pause seconds, creeping on at
 	-- DriftSpeed meanwhile (Drift), round and round; and the slow zoom
 	-- (ZoomGroup). Leaving, it turns back and zooms back to where it began.
-	-- (Not the same yet: the real one's turn flows into its drift without the
-	-- short gap between moves, and turns a little slower as it starts after a
-	-- turn of yours.)
+	-- With the drift on, the turns and drift flow into each other.
+	-- (Not the same yet: the real one turns a little slower as it starts
+	-- after a turn of yours.)
 	{ id = "afk", name = "AFK camera", make = function()
 		local step, speed, ease = Db("idleOrbitStep", 40), Db("idleOrbitSpeed", 6), Db("idleOrbitEase", 0.5)
 		local pause = Db("idleOrbitPause", 20)
 		local way = "once"
 		if ns.db and not ns.db.idleOrbitRandomDir then way = ns.db.idleOrbitRight and "right" or "left" end
-		local turn = Set(S("rotate", { deg = step, secs = step / math.max(0.5, speed * (1 - math.min(0.9, ease))), way = way,
-			ease = NearestEase(ease) }), "idleOrbitStep", "idleOrbitSpeed", "idleOrbitEase", "idleOrbitRandomDir",
+		local drift = Switch("idleOrbitDrift") and Db("idleOrbitDriftSpeed", 1) or 0
+		local turnFields = { deg = step, secs = step / math.max(0.5, speed * (1 - math.min(0.9, ease))), way = way,
+			ease = NearestEase(ease) }
+		local hold
+		if drift > 0 and speed > drift then
+			-- The turn flows into the drift and the drift into the next turn, as
+			-- the real camera's drift runs under its turns (no slowing near to a
+			-- stop between them): the turn ends at full speed, and the drift's
+			-- Speed match slides from it to drift speed over as long as the turn
+			-- spent speeding up. That slide goes extra degrees, taken off the turn
+			-- and added to the drift with the time they take at drift speed, so
+			-- each sweep and pause come out as set. The next turn slides up from
+			-- drift speed.
+			local RAMP_OF = { smooth = "long", gentle = "medium", steady = "short" }
+			local up = RAMP_OF[turnFields.ease]
+			local slide = math.min(10, pause, RAMP[up] * turnFields.secs)
+			local extra = (speed - drift) / 2 * slide
+			local deg = math.max(1, step - extra)
+			turnFields = { deg = deg, secs = deg / math.max(0.5, speed * (1 - RAMP[up] / 2)), way = way,
+				speedUp = up, slowDown = "none", blend = 1.5 }
+			hold = S("rotate", { deg = math.max(1, drift * pause + extra), secs = math.max(0.5, pause + extra / drift),
+				way = way, speedUp = "none", slowDown = "none", blend = slide })
+		else
+			hold = drift > 0 and S("rotate", { deg = math.max(1, drift * pause), secs = pause, way = way, ease = "steady" })
+				or S("wait", { secs = pause })
+		end
+		local turn = Set(S("rotate", turnFields), "idleOrbitStep", "idleOrbitSpeed", "idleOrbitEase", "idleOrbitRandomDir",
 			"idleOrbitRight")
-		local hold = Set(Switch("idleOrbitDrift")
-			and S("rotate", { deg = math.max(1, Db("idleOrbitDriftSpeed", 1) * pause), secs = pause, way = way,
-				ease = "steady" })
-			or S("wait", { secs = pause }), "idleOrbitPause", "idleOrbitDrift", "idleOrbitDriftSpeed")
+		Set(hold, "idleOrbitPause", "idleOrbitDrift", "idleOrbitDriftSpeed")
 		local sweeps = On(Set(S("repeat", { times = 0, steps = { turn, hold } }), "idleOrbit"), Switch("idleOrbit"))
 		return {
 			steps = { S("together", { steps = { sweeps, ZoomGroup("idleZoom") } }) },
@@ -655,15 +711,17 @@ local BUILT_IN = {
 	-- the zoom and the turn), then the zoom back and the turn back behind you.
 	-- Landing, the zoom goes back to your distance (taxiLandZoom). With
 	-- taxiFlyBy, a fly-by (the Fly-by camera, played) each taxiFlyByEvery
-	-- seconds of it. (Not the same yet: the fly-bys come at even times, not
-	-- at random ones kept clear of takeoff and landing, taxiFlyByFrom/To; and
-	-- the sway's tracking of the flight's turns.)
+	-- seconds or so of it, at random times between taxiFlyByFrom and taxiFlyByTo %
+	-- of a route flown before, each over before the arrival (Wait until a
+	-- fly-by's time). (The flight's turns: the camera stays put round you as
+	-- you bank, camera follow off meanwhile, as the old flight camera had it.)
 	{ id = "flight", name = "Flight camera", make = function()
 		local settle = Switch("taxiSettle")
 		local cruise = S("together", { steps = { SwayLoop("taxiOrbit", 0), ZoomGroup("taxiZoom") } })
 		if Switch("taxiFlyBy") then
 			cruise = S("repeat", { times = 0, steps = {
-				Set(S("until", { what = "time", secs = Db("taxiFlyByEvery", 60), steps = { cruise } }), "taxiFlyByEvery"),
+				Set(S("until", { what = "flyby", secs = 0, steps = { cruise } }), "taxiFlyByEvery", "taxiFlyByFrom",
+				"taxiFlyByTo"),
 				Set(S("play", { script = "flyby" }), "taxiFlyBy") } })
 		else
 			Set(cruise, "taxiFlyBy")
@@ -787,8 +845,9 @@ local BUILT_IN = {
 	-- drifting chatCamDrift to and fro, until someone else talks, and
 	-- swinging to them (chatCamSwingSpeed at most; chatCamSearch: looking
 	-- round for one off screen). Over (chatCamQuiet with no one talking): it
-	-- all goes back. (Not the same yet: no keeping up with one walking off, no
-	-- learning how far a swing moves them.)
+	-- all goes back. Each swing learns how far it moves them on screen (Aim at),
+	-- and one walking off is kept up with while they talk (Keep up with who's
+	-- talking, beside the drift).
 	{ id = "chat", name = "Chat camera", make = function()
 		local function Aim()
 			return Set(S("aim", { at = "speaker", deg = Db("chatCamFrame", 6), secs = 3, speed = Db("chatCamSwingSpeed", 15),
@@ -803,7 +862,9 @@ local BUILT_IN = {
 			steps = { S("together", { steps = { Set(S("zoom", { to = Db("chatCamDistance", 4),
 				secs = Db("chatCamZoomMaxTime", 8), speed = Db("chatCamZoomSpeed", 0.5) }), "chatCamDistance",
 				"chatCamZoomSpeed", "chatCamZoomMaxTime"), Aim() } }),
-				S("repeat", { times = 0, steps = { S("until", { what = "talk", secs = 0, steps = { hold } }), Aim() } }) },
+				S("repeat", { times = 0, steps = { S("until", { what = "talk", secs = 0, steps = { S("together", { steps = {
+					hold, Set(S("keepup", { frame = Db("chatCamFrame", 6), speed = Db("chatCamSwingSpeed", 15), most = 90 }),
+						"chatCamFrame", "chatCamSwingSpeed") } }) } }), Aim() } }) },
 			ending = ZoomOutEnding("chatCam"),
 			rules = { camera = "stop", fight = "putback", walk = "stop", zoom = "stop", ends = "putback" },
 		}
@@ -1339,7 +1400,7 @@ local heard = { at = -math.huge } -- the last line an NPC said: text, name, at (
 -- endStart, total }. Repeat-until-it-ends goes three times. start: { yaw,
 -- pitch, zoom } as it begins.
 local PREVIEW_REPEATS = 3
-local PREVIEW_UNTIL = { cast = 10, landing = 90, alive = 40, talk = 8 } -- (seconds a Wait until stands in for)
+local PREVIEW_UNTIL = { cast = 10, landing = 90, alive = 40, talk = 8, flyby = 45 } -- (seconds a Wait until stands in for)
 local PREVIEW_SPEAKER = 10 -- degrees off the middle the preview's speaker stands (Aim at a speaker)
 function ns.PlanCameraScript(script, start)
 	local moves, spans = {}, {}
@@ -1383,7 +1444,22 @@ function ns.PlanCameraScript(script, start)
 		local k = not step.off and step.k
 		if k == "rotate" then
 			local way = Way(step, Random, onceLeft)
-			ending = Move("yaw", state.yaw + (way == "left" and step.deg or -step.deg), t, step.secs, StepEase(step), top)
+			local secs = step.secs
+			-- (Speed match from a turn the same way ending at speed just before:
+			-- the slide goes further than its own speed would, so it gets there
+			-- that much sooner, as the runner does. Its own speed taken as flat.)
+			local prev
+			for i = #moves, 1, -1 do
+				if moves[i].axis == "yaw" then prev = moves[i] break end
+			end
+			if (step.blend or 0) > 0 and prev and not prev.curve and math.abs(prev.t1 - t) < 0.02
+				and (prev.to >= prev.from) == (way == "left") and prev.step and prev.step.slowDown == "none" then
+				local from = math.abs(prev.to - prev.from) / math.max(0.01, (prev.t1 - prev.t0) * Flat(prev.ease or 0.5))
+				local own = step.deg / math.max(0.01, secs * Flat(StepEase(step)))
+				local blend = math.min(step.blend, secs)
+				secs = math.max(0.5, secs - (from - own) / 2 * blend / math.max(0.01, own))
+			end
+			ending = Move("yaw", state.yaw + (way == "left" and step.deg or -step.deg), t, secs, StepEase(step), top)
 		elseif k == "tilt" and step.rand == "give" then
 			ending = Move("pitch", start.pitch + TiltTarget(step, Random), t, step.secs, StepEase(step), top)
 		elseif k == "tilt" then
@@ -1922,6 +1998,7 @@ local function FollowFrame(step, dt)
 	f.wasTurning = turning
 	while f.starts[1] and now - f.starts[1] > FOLLOW_BURST_SECS do table.remove(f.starts, 1) end
 	local steering = step.steer == "yes" and #f.starts >= FOLLOW_BURST
+	f.steering = steering -- (for STEP.follow: lower and closer while steering)
 	if turning then f.lastAnyTurnAt = now end
 	-- (The mouse on the camera, or steering with it: mouselook keeps the
 	-- camera behind you.) Only taking a turn once you've stopped turning a
@@ -2232,7 +2309,11 @@ end
 function STEP.tilt(step)
 	local m = movers.pitch
 	if step.rand == "give" then
-		MoveTo(m, TiltTarget(step, math.random), step.secs, StepEase(step), step.blend)
+		local target = TiltTarget(step, math.random)
+		-- (Steering a lot, with Follow your turns' Lower: that much lower, Lowest tilt at most.)
+		local steer = run.steer
+		if steer and steer.lower > 0 then target = math.min(target + steer.lower, math.max(target, steer.floor)) end
+		MoveTo(m, target, step.secs, StepEase(step), step.blend)
 		WaitMover(m)
 		return
 	end
@@ -2248,6 +2329,10 @@ local function ZoomStep(step, goal, secs)
 		ns.RaiseZoomMax()
 		run.raisedMax = true
 	end
+	-- (Steering a lot, with Follow your turns' Closer: no further out than that
+	-- much inside your distance.)
+	local steer = run.steer
+	if steer and steer.closer > 0 then goal = math.min(goal, math.max(1, run.startZoom - steer.closer)) end
 	ZoomTo(goal, ZoomSecs(step, secs, goal - Zoom()), StepEase(step))
 	WaitZoom()
 end
@@ -2263,10 +2348,34 @@ function STEP.sway(step)
 	run.swayCenters[step] = run.swayCenters[step] or m.amount
 	local center = run.swayCenters[step]
 	local delta = SwayTurn(step, m.amount, math.random, center)
+	-- (Camp Tent: an end clear of it, not past it.)
+	local tent = step.tent == "yes" and ns.ScriptTentAngle and ns.ScriptTentAngle(m.amount)
+	if tent then
+		delta = center + ns.TentClearTarget(m.amount + delta - center, center, step.arc, tent, m.amount) - m.amount
+	end
 	local curve, secs, top, still = SwayCurve(step, delta, m.amount, center)
 	if curve then
+		local goal = m.amount + delta -- (its end: a curve's m.target is only a far-off stand-in)
 		MoveCurve(m, delta >= 0, curve, secs, top)
-		WaitMover(m)
+		while not MoverDone(m) do
+			-- (A tent first seen mid-turn, ahead: braked to a stop over 2 seconds
+			-- from the speed it's going, as BrakeAll does; the next sway heads away.)
+			local angle, new
+			if step.tent == "yes" and ns.ScriptTentAngle then angle, new = ns.ScriptTentAngle(m.amount) end
+			local left = goal - m.amount
+			if new and angle and m.moving and (left >= 0) == (delta >= 0) and ns.TentOnPath(m.amount, left, angle) then
+				if m.sent and m.share then
+					local speed = m.sent * m.share
+					m.curve = function(t) return speed * (1 + math.cos(math.pi * math.min(1, t / 2))) / 2 end
+					m.top, m.curveGrowing, m.t, m.T = speed, m.growing, 0, 2
+					m.target = m.amount + (m.growing and 1e6 or -1e6)
+				else
+					StopMove(m)
+				end
+				ns.Log("state", ("camera script: Camp Tent seen ahead at %.0f, braking"):format(angle - center))
+			end
+			Yield()
+		end
 		WaitSeconds(still)
 	else
 		if math.abs(delta) >= 0.5 then
@@ -2339,6 +2448,12 @@ local UNTIL = {
 	alive = function() return not ns.IsDead() end,
 	-- (Someone other than the one last aimed at.)
 	talk = function() return heard.at > run.startedAt and heard.name ~= run.aimedAt end,
+	-- (Its time come: taken, so the next wait goes on to the one after. Not
+	-- on a flight, Run on its page: every taxiFlyByEvery seconds, as a stand-in.)
+	flyby = function(_, since)
+		if not ns.OnTaxi() then return run.t - since >= Db("taxiFlyByEvery", 60) end
+		return ns.TakeFlightFlyBy ~= nil and ns.TakeFlightFlyBy(GetTime()) == "go"
+	end,
 }
 
 -- Every move eased to a stop over a moment, from the speed it's going (a
@@ -2379,12 +2494,13 @@ function STEP.wait(step)
 	local check = step.what == "time" and function() return false end or UNTIL[step.what]
 	local underWay = UNDER_WAY[step.what]
 	local seen = not underWay
+	local since = run.t
 	local function done()
 		if not seen then
 			seen = underWay()
 			if not seen then return false end
 		end
-		return check(step)
+		return check(step, since)
 	end
 	local untilT = step.what == "time" and run.t + secs or math.huge
 	local kid = #step.steps > 0 and coroutine.create(function() DoSteps(step.steps) end)
@@ -2408,8 +2524,30 @@ function STEP.follow(step)
 	-- (carry: steps played in place of the script's own, with a Follow your
 	-- turns of their own, CameraScriptPlaySteps: it goes on as it was.)
 	if follower.carry then follower.carry = nil else StopFollow() end
+	local lower, closer = step.lower or 0, step.closer or 0
 	while true do
 		FollowFrame(step, run.dt or 0)
+		-- Steering a lot (Steering on): lower by Lower (Lowest tilt at most) and
+		-- Closer yards inside your distance, as the auto-run camera did. Set off
+		-- at once, over STEER_SECS (not waiting for the sway's next height or
+		-- the zoom's next move, which then keep to it till you settle down).
+		local steering = follower.steering and (lower > 0 or closer > 0) or false
+		if steering ~= (run.steer ~= nil) then
+			if steering then
+				local STEER_SECS = 3
+				local floor = step.floor or 45
+				run.steer = { lower = lower, closer = closer, floor = floor }
+				local m = movers.pitch
+				if lower > 0 and m.amount < math.min(lower, floor) then
+					MoveTo(m, math.min(lower, floor), STEER_SECS, EASES.smooth)
+				end
+				local close = math.max(1, run.startZoom - closer)
+				if closer > 0 and Zoom() > close + 0.2 then ZoomTo(close, STEER_SECS, EASES.smooth) end
+				ns.Log("state", ("camera script: steering a lot, %d° lower, %.1f yd closer"):format(lower, closer))
+			else
+				run.steer = nil
+			end
+		end
 		Yield()
 	end
 end
@@ -2428,14 +2566,15 @@ local function SpeakerTurn(step, wait)
 		Yield()
 	end
 	if not angle then return nil end
-	if math.abs(angle) <= step.deg then return 0, 0 end
+	if math.abs(angle) <= step.deg then return 0, 0, angle end
 	-- (MoveViewLeft, ours growing, brings what's on the right toward the
 	-- middle: ChatCam.lua's Command.)
 	-- (AIM_MOST from where it started, or from where a look round found them.)
+	-- (The gain: learnt from this run's swings, STEP.aim; a guess till then.)
 	local m, center = movers.yaw, run.aimCenter or 0
 	local off = angle - (angle > 0 and step.deg or -step.deg)
-	local turn = math.max(-AIM_MOST, math.min(AIM_MOST, off / AIM_GAIN))
-	return math.max(-AIM_MOST, math.min(AIM_MOST, m.amount + turn - center)) + center - m.amount, math.abs(off)
+	local turn = math.max(-AIM_MOST, math.min(AIM_MOST, off / (run.aimGain or AIM_GAIN)))
+	return math.max(-AIM_MOST, math.min(AIM_MOST, m.amount + turn - center)) + center - m.amount, math.abs(off), angle
 end
 -- Looking round for a speaker off screen (miss "look"): LOOK_STEP at a time
 -- one way, a full turn at most (ending where it began), until their bubble
@@ -2456,7 +2595,7 @@ local function LookRound(step)
 end
 function STEP.aim(step)
 	local m = movers.yaw
-	local turn
+	local turn, before, _
 	if step.at == "click" then
 		local side = ns.QuestTalkNow and select(2, ns.QuestTalkNow())
 		-- (QuestCam.lua's PickSide and Command: a click on the right turns the
@@ -2464,8 +2603,8 @@ function STEP.aim(step)
 		if side then turn = side == "right" and -step.deg or step.deg end
 	else
 		run.aimedAt = heard.name
-		turn = SpeakerTurn(step, AIM_WAIT)
-		if not turn and step.miss == "look" and heard.text then turn = LookRound(step) end
+		turn, _, before = SpeakerTurn(step, AIM_WAIT)
+		if not turn and step.miss == "look" and heard.text then turn, before = LookRound(step), nil end
 	end
 	if not turn and step.miss == "random" then
 		local deg = step.at == "click" and step.deg or 12
@@ -2477,11 +2616,71 @@ function STEP.aim(step)
 	if step.at == "speaker" then
 		-- (Still well off, a swing cut short by how far it may go: one more.)
 		WaitSeconds(0.3)
-		local again, off = SpeakerTurn(step, 0)
+		local again, off, after = SpeakerTurn(step, 0)
+		-- How far the swing really moved them on screen per degree turned (the
+		-- gain, as ChatCam.lua learns it): the next swings go by it. Only a
+		-- swing big enough to measure.
+		if before and after and math.abs(turn) >= 3 then
+			local gain = (before - after) / turn
+			if gain > 0 then
+				run.aimGain = math.max(0.15, math.min(1, gain))
+				ns.Log("state", ("camera script: aim gain %.2f (%+.1f° turned moved them %+.1f°)"):format(run.aimGain, turn,
+					before - after))
+			end
+		end
 		if again and off > AIM_CORRECT and math.abs(again) >= 0.5 then
 			MoveTo(m, m.amount + again, AimSecs(step, again), StepEase(step))
 			WaitMover(m)
+			WaitSeconds(0.3)
+			_, _, after = SpeakerTurn(step, 0)
 		end
+		-- (Where the swing left them, short of the framing as the gain's a
+		-- guess: the framing Keep up with who's talking goes by, till the next.)
+		run.aimLeft = after and math.abs(after) or nil
+	end
+end
+
+-- Keep up with who's talking (KINDS.keepup): every look (each 0.25 s),
+-- the one last aimed at, walking off past the framing (frame, or where the
+-- last swing left them), followed by one steady turn their way at the speed
+-- that makes up the gap in a second (speed at most), easing to a stop once
+-- they're back or their bubble's gone; most degrees from where the script
+-- started at most. As ChatCam.lua keeps up. Its turn takes the view from
+-- the script's other turns meanwhile, as Follow your turns does (so not
+-- beside one).
+function STEP.keepup(step)
+	local LOOK_EVERY, CATCH, EASE, STILL, START = 0.25, 1, 0.6, 0.2, 2
+	local speed, sign, wantNow, lookAt = 0, 1, 0, -math.huge
+	while true do
+		local dt = run.dt or 0
+		if run.t - lookAt >= LOOK_EVERY then
+			lookAt = run.t
+			wantNow = 0
+			local angle = heard.name == run.aimedAt and heard.text and ns.ChatBubbleAngle
+				and ns.ChatBubbleAngle(heard.text)
+			if angle then
+				local frame = math.max(step.frame, run.aimLeft or 0)
+				local off = math.abs(angle) - frame
+				local way = angle > 0 and 1 or -1
+				local room = step.most - way * movers.yaw.amount
+				if off > START and room > 0 then
+					wantNow = math.min(step.speed, off / (run.aimGain or AIM_GAIN) / CATCH)
+					sign = way
+				end
+			end
+		end
+		-- (Eased toward each look's speed: the looks jump about.)
+		speed = speed + (wantNow - speed) * math.min(1, dt / EASE)
+		if speed >= STILL then
+			TakeYaw()
+			DriveFollow(sign * speed)
+			if follower.drive.moving then movers.yaw.amount = movers.yaw.amount + sign * speed * dt end
+		elseif follower.took then
+			speed = 0
+			StopFollowDrive()
+			GiveYaw()
+		end
+		Yield()
 	end
 end
 
@@ -2614,9 +2813,12 @@ local function Finish(why)
 	-- (You took the camera from a quest script whose When it ends zooms back: the
 	-- turn's yours, but the zoom back out still comes as you walk off, or a
 	-- right-drag away from a quest giver left you close in.)
-	if why == "camera" and IsQuestTrigger(run.trigger) and HasKind(run.script.ending, "zoom")
+	-- (Chat Cam's the same, at its own zoom out speed, as ChatCam.lua held it.)
+	local chat = run.trigger == "Chat" or run.trigger == "ChatNearby"
+	if why == "camera" and (IsQuestTrigger(run.trigger) or chat) and HasKind(run.script.ending, "zoom")
 		and math.abs(Zoom() - run.startZoom) > 0.5 then
-		ns.QuestCamHoldZoomOut(run.startZoom, math.max(0.25, Db("questCamZoomOutSpeed", 0.5)))
+		local speed = chat and Db("chatCamZoomOutSpeed", 0.5) or Db("questCamZoomOutSpeed", 0.5)
+		if speed > 0 then ns.QuestCamHoldZoomOut(run.startZoom, math.max(0.25, speed)) end
 	end
 	if run.raisedMax and ns.LowerZoomMax then
 		if Zoom() > run.startZoom + 0.5 then maxHeldTo = run.startZoom else ns.LowerZoomMax() end
@@ -2955,6 +3157,9 @@ end
 -- true fourth when worked out afresh. (On zoomer: this file's main chunk is
 -- at Lua's 200 locals.)
 zoomer.triggerSeen = { gen = -1, at = -1 }
+-- The foot cameras, for the walk camera's handover (the watcher): travel
+-- ones hand over to any of these.
+zoomer.FOOT = { walk = "travel", run = "travel", afk = "still", cozy = "still", vista = "still", fish = "still" }
 function zoomer.TriggerNowSeen()
 	local seen, now = zoomer.triggerSeen, GetTime()
 	local fresh
@@ -3031,6 +3236,16 @@ ns.SetOnUpdate(watcher, function(_, elapsed)
 		elseif run and run.pausedBy == "closed" and ns.QuestCamWindowUp and ns.QuestCamWindowUp() then
 			run.pausedUntil, run.pausedBy = GetTime(), nil -- (the next window: on at once)
 		end
+	end
+	-- Stopping from the RP walk or auto-run camera into a foot camera
+	-- (standing still, cozy, vista, fish, or the other of the two): handed
+	-- straight over, as the old cameras did, with no zoom back first. Its
+	-- When it ends is cut off, so the next one starts from this zoom with your
+	-- own distance as its home (zoomer.StartDistance).
+	if run and run.phase == "ending" and run.why == "ends" and zoomer.FOOT[run.builtinId] == "travel" and key
+		and IsScript(camera) and zoomer.FOOT[camera:sub(8)] and not InFight() then
+		ns.Log("state", ("camera script %s hands over to %s"):format(run.script.name, camera))
+		Finish("handover")
 	end
 	if not key and not held then
 		stoppedFor = nil
