@@ -8994,6 +8994,7 @@ local PORTRAIT_FRAMES = {
 	PersonalResourceDisplayFrame = "prdWhenNotFull", CinematicPersonalResource = "prdWhenNotFull",
 	CinematicPersonalPower = "prdWhenNotFull", CinematicPersonalMana = "prdWhenNotFull",
 }
+ns.PORTRAIT_FRAMES = PORTRAIT_FRAMES -- (Why.lua: which "until full" setting each goes by)
 
 -- Swing timer page (Classic clients' own swing timer): a bar fades out once
 -- its weapon hasn't been used for a while, and the off-hand's can go for
@@ -9811,6 +9812,18 @@ function ns.UpdateFrames(cinematic, elapsed)
 		for _, entry in ipairs(ns.managed) do
 			if not personalPower.GROUPS[entry.group] then entries[#entries + 1] = entry end
 		end
+	end
+	-- (Inspect and the Why window, Why.lua: this tick's Advanced pages' state,
+	-- for the frames being looked at.)
+	if ns.whyLook then
+		local w = tickTables.whyTick or {}
+		tickTables.whyTick = w
+		w.debuffsOnly, w.auraOnly, w.buffPeekUp = debuffsOnly, auraOnly, buffPeekUntil > now
+		w.flashTestUp, w.trackerTimerUp, w.questTimerUp = flashTestUp, trackerTimerUp, questTimerUp
+		w.taxiHidesMinimap, w.trackingPaused, w.cooldownBarUp = taxiHidesMinimap, trackingPaused, barUp
+		w.portraitAllowed, w.fighting, w.calm, w.offWhen = portraitAllowed, fighting, calm, offWhen
+		w.displayOff, w.chatPage, w.typing = displayOff, chatPage, typing
+		ns.whyTick = w
 	end
 	for _, entry in ipairs(entries) do
 		local entryStart = clock and clock()
@@ -11452,8 +11465,8 @@ do
 				local held = FRAMES.held[entry[1]]
 				for _, part in ipairs(ns.UNIT_PARTS) do
 					local key = FRAMES.Key(entry, part)
-					-- (The Style hub's Overrides tab over the row, page switch or not.)
-					local over = ns.StyleOverride(key)
+					-- (The Style hub's Overrides tab over the row, with the page on.)
+					local over = ns.db.handleUnitFrames ~= false and ns.StyleOverride(key) or nil
 					local hide = over == "hide" or not over and ns.db.handleUnitFrames ~= false and FRAMES.Hidden(key)
 					local ruled = key and not over and ns.RuleTest(key) ~= nil
 					local keep = not over and held and held[part] or false
@@ -11534,7 +11547,7 @@ do
 					end
 					if has then
 						local key = FRAMES.Key(entry, part)
-						local over = ns.StyleOverride(key)
+						local over = not pageOff and ns.StyleOverride(key) or nil
 						out[#out + 1] = { part = part, key = key, over = over, pageOff = pageOff,
 							hidden = over == "hide" or (not over and not pageOff and FRAMES.Hidden(key)) or false,
 							held = not over and held and held[part] or false,

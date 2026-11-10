@@ -313,6 +313,11 @@ local function RecentNow()
 	return seconds <= 0 or GetTime() - lastUsed < seconds
 end
 
+-- (The Why window, Why.lua: whether it's up for having used mana, and the seconds.)
+function ns.PersonalManaRecent()
+	return RecentNow(), ns.db and tonumber(ns.db.prdManaRecent) or 0
+end
+
 -- (Runs while it's in use and fading, or kept to a while: off otherwise.)
 local recentDriver = CreateFrame("Frame")
 recentDriver:Hide()

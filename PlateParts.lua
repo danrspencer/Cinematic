@@ -725,7 +725,7 @@ local function ApplyPlate(plate, personal)
 	-- under our text, so it fades in with its new look.)
 	ns.SetPlateGuild(plate, plate ~= personal and nameAlpha * (ours and (SwapShares(SwapFade(plate))) or 1) or 0,
 		nameOnly and textShare[plate] or nil)
-	if nameOnly or crossfading or questieIcons[plate] then
+	if nameOnly or crossfading or questieIcons[plate] or (ns.eqolMarks and ns.eqolMarks[plate]) then
 		RefreshQuestIcon(plate)
 	end
 	if next(held) then
@@ -1220,27 +1220,37 @@ local function FindQuestieIcon(plate)
 		end
 	end
 end
-local function ReleaseQuestieIcon(frame)
-	if not (frame and frame.cineMoved) then
+-- (anchorOnly: back on its own anchor, its alpha left as it is.)
+local function ReleaseQuestieIcon(frame, anchorOnly)
+	if not frame then
 		return
 	end
-	frame.cineMoved, frame.cinePoint = nil, nil
-	if frame.cineHidden then
+	if frame.cineHidden and anchorOnly ~= true then
 		frame.cineHidden = nil
 		frame:SetAlpha(1)
 	end
+	if not frame.cineMoved then
+		return
+	end
+	frame.cineMoved, frame.cinePoint = nil, nil
 	local profile = _G.Questie and _G.Questie.db and _G.Questie.db.profile
 	frame:ClearAllPoints()
 	frame:SetPoint("LEFT", profile and profile.nameplateX or -17, profile and profile.nameplateY or -7)
 end
-local function PinQuestieIcon(frame, icon, beside, hidden)
+-- (stay: Addon Support's Move Questie's nameplate icons off: left on its own
+-- anchor, only made see-through under ours.)
+local function PinQuestieIcon(frame, icon, beside, hidden, stay)
 	if not frame.cineHooked then
 		frame.cineHooked = true
-		frame:HookScript("OnHide", ReleaseQuestieIcon)
+		frame:HookScript("OnHide", function(self) ReleaseQuestieIcon(self) end)
 	end
 	if (hidden or nil) ~= frame.cineHidden then
 		frame.cineHidden = hidden or nil
 		frame:SetAlpha(hidden and 0 or 1)
+	end
+	if stay then
+		ReleaseQuestieIcon(frame, true)
+		return
 	end
 	local point = beside and "RIGHT" or "CENTER"
 	if frame.cineMoved == icon and frame.cinePoint == point then
@@ -1296,10 +1306,17 @@ function RefreshQuestIcon(plate)
 	local personal = plate == PersonalPlate()
 	local unit = not personal and (plate.namePlateUnitToken or (plate.UnitFrame and plate.UnitFrame.unit)) or nil
 	local questie = not personal and QuestieIcon(plate)
+	local stay = questie and ns.Setting("questieMoveIcons") == false
+	-- (EnhanceQoL's quest "!": held while Addon Support moves it. See ns.EQoLMark.)
+	local eqol = not personal and ns.EQoLMark(plate)
 	if level > 0 and (not (unit and ns.IsQuestMob(unit)) or GameIconShows(plate, unit) or ns.QuestieMarks(unit)) then
 		level = 0
 	end
-	if level <= 0 and not questie then
+	if level <= 0 and (not questie or stay) and not eqol then
+		-- (Not moved: left as Questie has it, ours not needed to hold it.)
+		if stay then
+			ReleaseQuestieIcon(questie)
+		end
 		if icon then
 			icon:Hide()
 		end
@@ -1326,6 +1343,10 @@ function RefreshQuestIcon(plate)
 		if not nameOnly then
 			share = (levels.Health or 1) * body
 		end
+		-- (And the plate's own fade: Effects' SetPlateAlpha fades its unit
+		-- frame, which Questie's icon isn't on, so a faded-out plate left it
+		-- floating left of a bar no one sees. Out: over the unit; in: left.)
+		share = share * (plate.UnitFrame and plate.UnitFrame.cinematicAlpha or 1)
 		if ns.Flag(icon.bar:IsVisible()) == false then
 			share = 0
 		end
@@ -1335,7 +1356,126 @@ function RefreshQuestIcon(plate)
 	icon:Show()
 	if questie then
 		local both = level > 0 and ns.QuestieIconsMode and ns.QuestieIconsMode() == "both"
-		PinQuestieIcon(questie, icon, both, level > 0 and not both)
+		PinQuestieIcon(questie, icon, both, level > 0 and not both, stay)
+	end
+	if eqol then
+		-- (Under our own mark where that shows: two "!" marks in one spot.)
+		ns.PinEQoLMark(plate, eqol, icon, level > 0)
+	end
+end
+
+-- EnhanceQoL's quest "!" on a plate (its Nameplates' Show quest icons): a
+-- texture on the plate's unit frame, right of the health bar, so it fades
+-- with the plate (Effects' SetPlateAlpha) and sits under our level box. With
+-- Addon Support's switch on it goes on a frame of ours on the plate (not
+-- faded) and where Questie's icon goes: over the unit with the plate faded
+-- out, sliding left of the bar as it comes in. EQoL anchors it again as it
+-- updates (ClearAllPoints, SetPoint): its SetPoint hooked, put back on ours.
+-- Found by its atlas, QuestNormal, and its .progress text. (On ns, and its
+-- state in ns tables by plate: this file's near the 200 locals cap.)
+function ns.EQoLMark(plate)
+	local marks = ns.eqolMarks
+	local mark = marks and marks[plate]
+	if not mark then
+		return nil
+	end
+	if ns.Setting("eqolMoveIcons") == false then
+		ns.ReleaseEQoLMark(plate, mark)
+		marks[plate] = nil
+		return nil
+	end
+	return mark
+end
+
+function ns.EQoLRepin(mark)
+	local on = mark.cineOn
+	if not on then
+		return
+	end
+	mark.cinePinning = true
+	mark:ClearAllPoints()
+	mark:SetPoint("CENTER", on, "CENTER")
+	mark.cinePinning = nil
+end
+
+function ns.FindEQoLMark(plate)
+	local marks = ns.eqolMarks
+	if not marks or marks[plate] or (plate.IsForbidden and plate:IsForbidden()) then
+		return marks and marks[plate]
+	end
+	local unitFrame = plate.UnitFrame
+	if not unitFrame or (unitFrame.IsForbidden and unitFrame:IsForbidden()) then
+		return nil
+	end
+	local ok, regions = pcall(function() return { unitFrame:GetRegions() } end)
+	for _, region in ipairs(ok and regions or {}) do
+		local get = region.GetAtlas
+		local okAtlas, atlas = false, nil
+		if get then okAtlas, atlas = pcall(get, region) end
+		if okAtlas and Known(atlas) and atlas == "QuestNormal" and rawget(region, "progress") then
+			if not region.cineHooked then
+				region.cineHooked = true
+				hooksecurefunc(region, "SetPoint", function(self, ...)
+					if self.cinePinning then
+						return
+					end
+					-- (EQoL's own spot, kept to give it back: Release.)
+					self.cineTheirs = { n = select("#", ...), ... }
+					ns.EQoLRepin(self)
+				end)
+			end
+			marks[plate] = region
+			return region
+		end
+	end
+end
+
+function ns.PinEQoLMark(plate, mark, icon, under)
+	local holders = ns.eqolHolders
+	local holder = holders[plate]
+	if not holder then
+		holder = CreateFrame("Frame", nil, plate)
+		holder:SetSize(1, 1)
+		holder:SetPoint("CENTER")
+		holder:SetFrameStrata("HIGH")
+		holders[plate] = holder
+	end
+	if mark:GetParent() ~= holder then
+		mark:SetParent(holder)
+	end
+	local alpha = under and 0 or 1
+	if mark.cineAlpha ~= alpha then
+		mark.cineAlpha = alpha
+		mark:SetAlpha(alpha)
+	end
+	if mark.cineOn ~= icon then
+		mark.cineOn = icon
+		ns.EQoLRepin(mark)
+	end
+end
+
+-- Back on the plate's unit frame where EQoL put it (or its default spot,
+-- right of the bar, if it hasn't anchored it since we took it).
+function ns.ReleaseEQoLMark(plate, mark)
+	local unitFrame = plate.UnitFrame
+	if unitFrame and mark:GetParent() ~= unitFrame then
+		mark:SetParent(unitFrame)
+	end
+	if mark.cineAlpha then
+		mark.cineAlpha = nil
+		mark:SetAlpha(1)
+	end
+	if mark.cineOn then
+		mark.cineOn = nil
+		mark.cinePinning = true
+		mark:ClearAllPoints()
+		local theirs = mark.cineTheirs
+		if theirs then
+			mark:SetPoint(unpack(theirs, 1, theirs.n))
+		elseif unitFrame then
+			mark:SetPoint("LEFT", unitFrame.HealthBarsContainer or unitFrame, "RIGHT", 2, 0)
+		end
+		mark.cinePinning = nil
 	end
 end
 
@@ -1348,12 +1488,25 @@ function ns.ToggleQuestiePinView()
 		RefreshQuestIcon(plate)
 		local okN, count = pcall(frame.GetNumPoints, frame)
 		local okP, _, rel = pcall(frame.GetPoint, frame, 1)
-		lines[#lines + 1] = ("pinned=%s shown=%s points=%s on=%s"):format(tostring(frame.cinePoint),
-			tostring(frame:IsShown()), okN and tostring(count) or "restricted",
-			okP and (rel == questIcons[plate] and "our spot" or rel == plate and "plate" or tostring(rel)) or "restricted")
+		local spot = questIcons[plate]
+		lines[#lines + 1] = ("pinned=%s shown=%s points=%s on=%s plateFade=%s body=%s spot=%s,%s move=%s"):format(
+			tostring(frame.cinePoint), tostring(frame:IsShown()), okN and tostring(count) or "restricted",
+			okP and (rel == questIcons[plate] and "our spot" or rel == plate and "plate" or tostring(rel)) or "restricted",
+			tostring(plate.UnitFrame and plate.UnitFrame.cinematicAlpha or 1), tostring(bodyShare[plate] or 1),
+			tostring(spot and spot.x), tostring(spot and spot.y), tostring(ns.Setting("questieMoveIcons")))
 	end
 	return (ns.questiePinView and "our spot shown as a quest mark" or "our spot hidden again") .. "; "
 		.. (#lines > 0 and table.concat(lines, " | ") or "no Questie icons held")
+end
+
+-- A plate's fade changed (Effects' SetPlateAlpha): Questie's icon on it slides
+-- with it, from over the unit (faded out) to left of the bar (shown).
+function ns.QuestiePlateFaded(plate, alpha)
+	local frame = questieIcons[plate] or (ns.eqolMarks and ns.eqolMarks[plate])
+	if frame and frame.cinePlateAlpha ~= alpha then
+		frame.cinePlateAlpha = alpha
+		RefreshQuestIcon(plate)
+	end
 end
 
 -- A new plate: Questie puts its icon on as it comes, so looked for a frame on.
@@ -2745,6 +2898,12 @@ watcher:SetScript("OnEvent", function(_, event, unit)
 		if _G.QuestieLoader then
 			ns.FindQuestieIconSoon(plate)
 		end
+		-- (EnhanceQoL makes its "!" as the plate comes, after us or before.)
+		if ns.eqolMarks and ns.Setting("eqolMoveIcons") ~= false then
+			C_Timer.After(0, function()
+				if ns.FindEQoLMark(plate) then RefreshQuestIcon(plate) end
+			end)
+		end
 	end
 	if event == "NAME_PLATE_UNIT_REMOVED" then
 		plateClass[plate], plateRole[plate] = nil, nil
@@ -3075,6 +3234,33 @@ function ns.UpdatePlateParts(active, elapsed)
 		questIconsAt = GetTime() + QUEST_ICONS_EVERY
 		for _, plate in ipairs(C_NamePlate and C_NamePlate.GetNamePlates and C_NamePlate.GetNamePlates() or {}) do
 			RefreshQuestIcon(plate)
+		end
+	end
+	-- (Questie's icon can come after its plate, or hide and come back (quest
+	-- taken, objective updated, its own timer): looked for again now and then,
+	-- or it stayed on Questie's anchor, the faded plate's left edge.)
+	-- (Its timer on ns: this file's near the 200 locals cap.)
+	-- (Not with Addon Support's page or its Questie switch off: ns.Setting reads both.)
+	-- (EnhanceQoL's "!", the same: its tables made once you're in, with it
+	-- loaded; false without it, so nothing more is done.)
+	if ns.eqolMarks == nil and _G.IsLoggedIn and _G.IsLoggedIn() then
+		ns.eqolMarks = ns.AddOnLoaded("EnhanceQoL") and setmetatable({}, { __mode = "k" }) or false
+		ns.eqolHolders = ns.eqolMarks and setmetatable({}, { __mode = "k" }) or nil
+	end
+	if ns.eqolMarks and GetTime() >= (ns.eqolMarksAt or 0) and ns.Setting("eqolMoveIcons") ~= false then
+		ns.eqolMarksAt = GetTime() + QUEST_ICONS_EVERY
+		for _, plate in ipairs(C_NamePlate and C_NamePlate.GetNamePlates and C_NamePlate.GetNamePlates() or {}) do
+			if not ns.eqolMarks[plate] and ns.FindEQoLMark(plate) then
+				RefreshQuestIcon(plate)
+			end
+		end
+	end
+	if _G.QuestieLoader and GetTime() >= (ns.questieIconsAt or 0) and ns.Setting("questieMoveIcons") ~= false then
+		ns.questieIconsAt = GetTime() + QUEST_ICONS_EVERY
+		for _, plate in ipairs(C_NamePlate and C_NamePlate.GetNamePlates and C_NamePlate.GetNamePlates() or {}) do
+			if not (plate.IsForbidden and plate:IsForbidden()) and not QuestieIcon(plate) and FindQuestieIcon(plate) then
+				RefreshQuestIcon(plate)
+			end
 		end
 	end
 	-- (Still fading: the plates' pass keeps running, Effects.lua.)

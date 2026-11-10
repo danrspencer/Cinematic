@@ -167,6 +167,69 @@ function ns.KeepYourFrameUp(setting, entry, afterFight, fighting)
 	return ns.IsPlayerRecovering() or db.drainWhenNotEmpty and PowerDraining() or false
 end
 
+-- The same, in words, for the Why window (Why.lua): each of this page's
+-- settings that can keep this frame up, and whether it is now, every one
+-- that applies (overlapping too). add(state, text, settingKey): "on" keeping
+-- it up, "off" ticked but not now. As KeepYourFrameUp works it out.
+function ns.YourFrameWhy(setting, entry, afterFight, fighting, add)
+	local db = ns.db
+	local page = L["Personal Resource Display"]
+	local pet = entry.name == "PetFrame"
+	local row = pet and "petframe" or (setting == "prdWhenNotFull" and entry.group or "player")
+	local manaBar = ns.PersonalManaShown and ns.PersonalManaShown()
+	local lowManaRow = not pet and setting and (row == (manaBar and "prdmana" or "prdpower")
+		or row == "player" and (db.lowManaPortrait or not personalPower))
+	local untilKey = pet and "petWhenNotFull" or setting
+	local untilFull = untilKey and db[untilKey]
+	if not ns.PersonalResourcesOn(db) then
+		if untilFull or lowManaRow and (db.lowManaShare or 0) > 0 then
+			add("off", L["The %s page is off, so its settings don't keep this up"]:format(page), "personalResources")
+		end
+		return
+	end
+	if lowManaRow and (db.lowManaShare or 0) > 0 then
+		local share = ("%d%%"):format(math.floor(db.lowManaShare * 100 + 0.5))
+		if LowMana(manaBar) then
+			add("on", L["Your mana is under %s (Show below this much mana)"]:format(share), "lowManaShare")
+		else
+			add("off", L["Shows whenever your mana is under %s (Show below this much mana)"]:format(share), "lowManaShare")
+		end
+	end
+	if not untilFull then return end
+	-- (Each reason that holds, as KeepYourFrameUp has them: after a fight, a
+	-- fall or resurrecting, and not held back at a fight's start.)
+	local held = fighting and not pet and ns.FightHold(row)
+	local any = false
+	if afterFight and not held then
+		if pet then
+			if ns.IsPetRecovering() then
+				add("on", L["Your pet's health isn't full yet, just after a fight"], untilKey)
+				any = true
+			end
+		elseif row == "prdmana" then
+			if manaBar and ManaRecovering() then
+				add("on", L["Your mana isn't full yet, just after a fight"], untilKey)
+				any = true
+			end
+		else
+			if ns.IsPlayerRecovering() then
+				add("on", L["Your health or power isn't full yet, just after a fight"], untilKey)
+				any = true
+			end
+			if db.drainWhenNotEmpty and PowerDraining() then
+				add("on", L["Your rage, runic power or the like isn't drained yet, just after a fight"],
+					"drainWhenNotEmpty")
+				any = true
+			end
+		end
+	end
+	if not any then
+		add("off", pet and L["After a fight, it stays up until your pet's health is full"]
+			or (afterFight and not held and L["After a fight it stays up until your health and power are full: they are"])
+			or L["After a fight, a fall or resurrecting, it stays up until your health and power are full"], untilKey)
+	end
+end
+
 -- The page.
 function ns.CreatePersonalResourcesPanel(kit)
 	local canvas, content = kit.CreateScrollPage()

@@ -801,6 +801,9 @@ function ns.GridRow(kit, parent, labelWidth, layout, spec)
 		return type(text) == "string" and text:find("%S") and text or nil
 	end
 	local function Rule() return RuleOf(RuleKey()) end
+	-- (Its id, its rule's key: /cine find row:<key> and the Why window's links
+	-- find the row by it, Options.lua's search index; its tooltips show it.)
+	row.RowId = RuleKey
 	local function SetRule(text)
 		local db = ns.GetDB()
 		db.frameRules = db.frameRules or {}

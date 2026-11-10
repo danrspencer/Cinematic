@@ -130,8 +130,9 @@ function ns.ShowMeBlocked(key, force)
 end
 
 -- Whether a profile has a demo's look (the See it first row's In and Not in):
--- its settings, under their pages' switches. Every level moves the camera.
-local IN_PROFILE = { bars = { "letterboxPage", "letterbox" }, tint = { "tintPage" }, camera = {},
+-- its settings, under their pages' switches. Camera: the Cameras page's
+-- Enable switch (off on Blank Slate, which leaves the camera as the game has it).
+local IN_PROFILE = { bars = { "letterboxPage", "letterbox" }, tint = { "tintPage" }, camera = { "cameraModes" },
 	vitals = { "lowHealth" }, tele = { "teleportVision" } }
 local function On(base, key)
 	local page = ns.PageSwitchOf(key)

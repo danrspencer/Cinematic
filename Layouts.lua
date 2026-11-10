@@ -170,10 +170,12 @@ local RAID_STYLE_PARTY = Enum.EditModeUnitFrameSetting and Enum.EditModeUnitFram
 local DESIGN = {
 	-- (Bar 3's two rows beside bars 1 and 2: its bottom row on bar 1's, and bar 2
 	-- level with its top row, so the gap between 1 and 2 is its own rows' gap.)
+	-- (Bars 2 and 3 2 apart, the gap between buttons in a bar (measured on
+	-- Forever, 2026-11-10), so the three look like one block.)
 	-- (Bar 1 left of centre by half of bar 3 and the gap, so bars 1-3 together are centred.)
-	{ 0, 1, "BOTTOM", "UIParent", "BOTTOM", -142, 42, { [6] = 1 } },        -- action bar 1 (no bar art)
-	{ 0, 2, "TOPRIGHT", "MultiBarBottomRight", "TOPLEFT", -4, 0 },          -- 2
-	{ 0, 3, "BOTTOMLEFT", "MainActionBar", "BOTTOMRIGHT", 4, 0, { [1] = 2 } }, -- 3 (2 rows)
+	{ 0, 1, "BOTTOM", "UIParent", "BOTTOM", -141, 42, { [6] = 1 } },        -- action bar 1 (no bar art)
+	{ 0, 2, "TOPRIGHT", "MultiBarBottomRight", "TOPLEFT", -2, 0 },          -- 2
+	{ 0, 3, "BOTTOMLEFT", "MainActionBar", "BOTTOMRIGHT", 2, 0, { [1] = 2 } }, -- 3 (2 rows)
 	-- (Stance and pet bars in the same spot above bar 2: a class has one or the other.)
 	{ 0, 11, "BOTTOMLEFT", "MultiBarBottomLeft", "TOPLEFT", 0, 4 },         -- stance bar
 	{ 0, 12, "BOTTOMLEFT", "MultiBarBottomLeft", "TOPLEFT", 0, 4 },         -- pet bar
@@ -192,12 +194,12 @@ local DESIGN = {
 	-- The centre stack, bottom up, each on top of the one below (so nothing
 	-- overlaps whatever the screen's height or UI scale: none of it is
 	-- placed from the screen's middle): the swing timers on bar 2 (in line
-	-- with the screen's middle: bar 1's -142 back), ranged, off hand, main
+	-- with the screen's middle: bar 1's -141 back), ranged, off hand, main
 	-- hand; the Cooldown Manager's utility and essential rows; then (below,
 	-- with the system's number) the personal resource display, the cast bar
 	-- and the Cooldown Manager's buff icons on top. (Swing timers' setting 3:
 	-- width, 0 the narrowest, as the dev set it in Edit Mode on 2026-11-05.)
-	{ 29, 3, "BOTTOM", "MultiBarBottomLeft", "TOP", 142, 6, { [3] = 0 } },   -- swing timers: ranged
+	{ 29, 3, "BOTTOM", "MultiBarBottomLeft", "TOP", 141, 6, { [3] = 0 } },   -- swing timers: ranged
 	{ 29, 2, "BOTTOM", "SwingTimerRangedFrame", "TOP", 0, 4, { [3] = 0 } },  -- off hand
 	{ 29, 1, "BOTTOM", "SwingTimerOffHandFrame", "TOP", 0, 4, { [3] = 0 } }, -- main hand
 	{ 20, 2, "BOTTOM", "SwingTimerMainHandFrame", "TOP", 0, 6 },            -- cooldown viewers: utility

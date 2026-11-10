@@ -858,6 +858,9 @@ function ns.PrintQuestMobDebug()
 		ns.Print("  " .. frame)
 		ns.Print("  " .. why)
 	end
+	if ns.DescribeEQoLMarker then
+		for _, line in ipairs(ns.DescribeEQoLMarker(unit)) do ns.Print("  " .. line) end
+	end
 	ns.Print("  " .. ns.DescribeQuestSpent(unit))
 	ns.Print("  " .. ns.DescribeQuestKills(unit))
 	local info, lineTypes = C_TooltipInfo, Enum and Enum.TooltipDataLineType
@@ -1113,4 +1116,96 @@ do
 		if now - look.seenAt < HOLD then return true, look.names end
 		return false
 	end
+end
+
+-- For /cine debug questmob: EnhanceQoL's quest "!" on the unit's plate (a
+-- texture of its own on the plate's unit frame, atlas QuestNormal, right of
+-- the health bar by default), whether it shows, and which frames on the
+-- plate cover its middle (a frame draws over its parent's textures).
+function ns.DescribeEQoLMarker(unit)
+	if not (ns.AddOnLoaded and ns.AddOnLoaded("EnhanceQoL")) then
+		return { "eqol: not loaded" }
+	end
+	local ok, plate = pcall(C_NamePlate.GetNamePlateForUnit, unit)
+	if not (ok and plate) then
+		return { "eqol: no plate for the unit" }
+	end
+	local unitFrame = plate.UnitFrame
+	if not unitFrame or (unitFrame.IsForbidden and unitFrame:IsForbidden()) then
+		return { "eqol: plate's unit frame forbidden" }
+	end
+	local function N(fn, ...)
+		local okN, a, b = pcall(fn, ...)
+		if not okN then return "err" end
+		if not Known(a) or not Known(b) then return "secret" end
+		return b ~= nil and (tostring(a) .. "," .. tostring(b)) or tostring(a)
+	end
+	local function Num(fn, ...)
+		local okN, a = pcall(fn, ...)
+		return okN and Known(a) and type(a) == "number" and a or nil
+	end
+	local lines = {}
+	-- (EQoL skips a unit whose identity the game makes secret: C_Secrets.)
+	local secrets = _G.C_Secrets
+	lines[1] = ("eqol: in instance=%s, plate fade=%s, unit frame alpha=%s, quest mob (ours)=%s, identity secret=%s"):format(
+		tostring(IsInInstance()), tostring(unitFrame.cinematicAlpha or 1), N(unitFrame.GetAlpha, unitFrame),
+		tostring(ns.IsQuestMob and ns.IsQuestMob(unit)),
+		secrets and secrets.ShouldUnitIdentityBeSecret and N(secrets.ShouldUnitIdentityBeSecret, unit) or "no api")
+	local okR, regions = pcall(function() return { unitFrame:GetRegions() } end)
+	local found
+	for _, region in ipairs(okR and regions or {}) do
+		local okA, atlas = pcall(function() return region.GetAtlas and region:GetAtlas() end)
+		if okA and Known(atlas) and atlas == "QuestNormal" and rawget(region, "progress") then
+			found = region
+		end
+	end
+	-- (Moved onto our frame on the plate: held in PlateParts' ns.eqolMarks.)
+	local held = ns.eqolMarks and ns.eqolMarks[plate]
+	found = found or held
+	if not found then
+		lines[2] = "eqol marker: none on this plate (EQoL hasn't made one: not a quest mob to it, or its option off)"
+		return lines
+	end
+	local okP, point, rel, relPoint, x, y = pcall(found.GetPoint, found, 1)
+	local relName = okP and rel and (rel == unitFrame.HealthBarsContainer and "HealthBarsContainer"
+		or rel == unitFrame.healthBar and "healthBar" or rel == unitFrame and "unitFrame"
+		or (rel.GetName and rel:GetName()) or tostring(rel)) or "?"
+	local okL, layer, sub = pcall(found.GetDrawLayer, found)
+	lines[2] = ("eqol marker: shown=%s visible=%s alpha=%s effective=%s size=%s layer=%s/%s point=%s %s %s %s,%s"):format(
+		N(found.IsShown, found), N(found.IsVisible, found), N(found.GetAlpha, found),
+		N(found.GetEffectiveAlpha, found), N(found.GetSize, found), tostring(okL and layer), tostring(okL and sub),
+		tostring(okP and point), relName, tostring(okP and relPoint), tostring(okP and x), tostring(okP and y))
+	lines[2] = lines[2] .. (" | moved=%s on our spot=%s hidden under ours=%s, its own anchor kept=%s, switch=%s"):format(
+		tostring(held ~= nil and held == found), tostring(found.cineOn ~= nil), tostring(found.cineAlpha == 0),
+		tostring(found.cineTheirs ~= nil), tostring(ns.Setting("eqolMoveIcons")))
+	-- What covers its middle: frames on the unit frame (drawn over its textures).
+	local cx, cy = Num(function() return (found:GetCenter()) end), Num(function() return select(2, found:GetCenter()) end)
+	if not (cx and cy) then
+		lines[3] = "eqol marker: its spot is unreadable"
+		return lines
+	end
+	-- (And the plate's own: ours and other addons' that sit on it, unit frame apart.)
+	local covers = {}
+	local okK, kids = pcall(function()
+		local list = { unitFrame:GetChildren() }
+		for _, kid in ipairs({ plate:GetChildren() }) do
+			if kid ~= unitFrame then list[#list + 1] = kid end
+		end
+		return list
+	end)
+	for _, kid in ipairs(okK and kids or {}) do
+		if not (kid.IsForbidden and kid:IsForbidden()) and ns.Flag(kid:IsVisible()) then
+			local l, r = Num(kid.GetLeft, kid), Num(kid.GetRight, kid)
+			local b, t = Num(kid.GetBottom, kid), Num(kid.GetTop, kid)
+			if l and r and b and t and cx >= l and cx <= r and cy >= b and cy <= t then
+				local alpha = Num(kid.GetEffectiveAlpha, kid)
+				covers[#covers + 1] = ("%s (level %s, alpha %s, %dx%d)"):format(
+					(kid.GetName and kid:GetName()) or (kid == unitFrame.HealthBarsContainer and "HealthBarsContainer")
+					or (kid == unitFrame.PlayerLevelDiffFrame and "PlayerLevelDiffFrame") or "unnamed",
+					tostring(Num(kid.GetFrameLevel, kid)), alpha and ("%.2f"):format(alpha) or "?", r - l, t - b)
+			end
+		end
+	end
+	lines[3] = "eqol marker: frames over its middle: " .. (#covers > 0 and table.concat(covers, "; ") or "none")
+	return lines
 end

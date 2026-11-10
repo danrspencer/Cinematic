@@ -360,7 +360,7 @@ end
 -- new] link to the page (a release of fixes only says nothing). Told by the
 -- newest feature's date (db.lastFeatureDate), so the dev copy gets it too.
 -- Not on a fresh install: the welcome window is enough then. Off with
--- db.updateNotice (Chat page).
+-- db.updateNotice, or with the Chat page switched off.
 local LINK = "garrmission:cinematic:whatsnew" -- (a type every client passes to SetItemRef quietly)
 
 -- How many of this client's features are newer than date (nil: all), and the newest date.
@@ -401,7 +401,7 @@ notice:SetScript("OnEvent", function(self, _, isLogin, isReload)
 	self:UnregisterAllEvents()
 	local db = ns.db
 	local newest = select(2, FeaturesSince(nil))
-	if db.updateNotice ~= false and not ns.newInstall and newest and newest > (db.lastFeatureDate or "") then
+	if db.updateNotice ~= false and db.handleChat ~= false and not ns.newInstall and newest and newest > (db.lastFeatureDate or "") then
 		-- (no count the first time: every feature would be new)
 		local count = db.lastFeatureDate and FeaturesSince(db.lastFeatureDate) or nil
 		C_Timer.After(3, function() ns.ShowUpdateNotice(count) end) -- (after the login chat)

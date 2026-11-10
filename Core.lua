@@ -258,8 +258,8 @@ local DEFAULTS = {
 	tooltipStillMode = "hide", -- "hide": Hide when the mouse is still; "show": Hide until the mouse is still; "off"
 	tooltipHideStill = 10,    -- seconds a world or unit tooltip stays up with the mouse still (0: off)
 	tooltipShowStill = 2,     -- seconds the mouse is still before a world or unit tooltip shows (0: off)
-	tooltipCursorMode = "corner", -- tooltips the game puts in the bottom-right corner: "corner", "cursor" or "combat" (cursor in fights; switch or not)
-	tooltipFadeTime = 0.2,    -- seconds tooltips take to fade in, and out when the mouse is still too long (0: no fading; switch or not)
+	tooltipCursorMode = "corner", -- tooltips the game puts in the bottom-right corner: "corner", "cursor" or "combat" (cursor in fights; with the page on)
+	tooltipFadeTime = 0.2,    -- seconds tooltips take to fade in, and out when the mouse is still too long (0: no fading; only with the page switched on)
 	tooltipFullAfter = 2,     -- seconds hovering before the parts grid's After column takes over (0: never)
 	tooltipNeverShow = "Fishing Bobber", -- comma-separated tooltip names (first line) CineMode always hides; each matches its translation too (Effects.lua)
 	musicFadeTime = 3,        -- seconds for music to fade in or out
@@ -1084,6 +1084,13 @@ DEFAULTS.targetQuestIcon = false -- a quest icon on the target frame while your 
 -- Cinematic's quest mark shows, Questie's is hidden), "questie" (ours stays
 -- off a unit Questie marks) or "both". (Was questMarkFade: unticked = both.)
 DEFAULTS.questieIcons = "ours"
+-- Questie's nameplate icons moved where our quest mark would go (beside the
+-- name, over the unit as its plate fades), not its plate's far left. (Quality
+-- of Life > Addon Support; PlateParts' RefreshQuestIcon.)
+DEFAULTS.questieMoveIcons = true
+-- EnhanceQoL's nameplate quest "!" moved the same way, off the faded part of
+-- the plate (Quality of Life > Addon Support; PlateParts' ns.EQoLMark).
+DEFAULTS.eqolMoveIcons = true
 -- The nearest tracked quest's item to use on a big button at the extra ability button's spot (see QuestItemButton)
 DEFAULTS.questItemButton = false -- (off by default since 2026-11-09)
 DEFAULTS.questItemFade = true -- it stays away while another addon has a button for the item (ns.QuestieItemButton)
@@ -1395,6 +1402,7 @@ DEFAULTS.handleUnitFrames = true -- the Unit Frame Parts page's switch
 -- of them as its page's switch leaves it.
 DEFAULTS.handleQuality = true -- Quality of life > General
 DEFAULTS.handleHunter = false
+DEFAULTS.handleAddonSupport = true -- Quality of life > Addon Support (only built with one of its addons loaded)
 DEFAULTS.handleHealVision = true -- (read by ns.HealVisionHere; Quest Vision's switch is questVision)
 local PAGE_SWITCH = {}
 for page, keys in pairs({
@@ -1402,6 +1410,7 @@ for page, keys in pairs({
 		"centerPanels", "dragPanels", "chatCopyButton", "chatHistory", "chatHistoryTime", "loginZoom",
 		"reloadButton", "reloadKeepWindows" },
 	handleHunter = { "hunterRightClickShot", "hunterAmmoSort", "hunterQuiverFill", "petUnhappyShow" },
+	handleAddonSupport = { "questieMoveIcons", "eqolMoveIcons" },
 	duelPlates = { "duelCC", "duelHideOthers" }, -- Duel Vision's page
 	handleHealVision = { "plateNameHealthFill", "healVisionPlates" }, -- Heal Vision's page: its Names and Nameplates ticks
 	-- The Cards page's rows (Cards.lua) and the time of day at login.

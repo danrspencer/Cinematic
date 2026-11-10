@@ -1194,6 +1194,12 @@ function ns.CreateCardSettingsPanel(kit)
 		return check
 	end
 	local function Header(text) stack:Header(content, text) end
+	-- Zone's and Subzone's gap: one setting, on both their tabs.
+	local function GapRow()
+		local gap = stack:Add(kit.Slider(content, "storyZoneGap", L["Not again within"], 0, 30, 1, "%d s"), "slider")
+		kit.Tooltip(gap, L["After a Zone or Subzone card, no other comes for this long, so passing through " ..
+			"places quickly doesn't bring one after another. 0: every time."])
+	end
 	-- In a fight (or just out of one): shown now, held till after, or not at
 	-- all. (Not for the fight's own cards.)
 	local function FightRow(id)
@@ -1253,9 +1259,7 @@ function ns.CreateCardSettingsPanel(kit)
 			"Night as you log in or reload: over the name on this card, or under the game's zone name with Zone " ..
 			"unticked. Follows the clock picked on the Tint page."])
 		Header(L["When"])
-		local gap = stack:Add(kit.Slider(content, "storyZoneGap", L["Not again within"], 0, 30, 1, "%d s"), "slider")
-		kit.Tooltip(gap, L["After a Zone or Subzone card, no other comes for this long, so passing through " ..
-			"places quickly doesn't bring one after another. 0: every time."])
+		GapRow()
 		Check("storyZoneNotFlying", L["Not on flights"], L["No Zone or Subzone card on a flight path: the " ..
 			"places you fly over don't bring one after another, and the Flight departure and arrival cards say " ..
 			"where you're going."])
@@ -1264,6 +1268,8 @@ function ns.CreateCardSettingsPanel(kit)
 	parts.Part("subzone", function()
 		stack:Note(content, L["Only with Zone ticked: it takes the game's zone text away. Its look follows Zone's " ..
 			"until it's given its own here; its lines are Zone's."], NOTE_W)
+		Header(L["When"])
+		GapRow()
 		FightRow("subzone")
 	end)
 	parts.Part("login", function()

@@ -42,6 +42,10 @@ function ns.WhyNote(entry, target, row, cinematic, hovered, triggered, tracking,
 	note.keepIndoors, note.questTimerUp, note.durabilityUp, note.petUnhappyUp = keepIndoors, questTimerUp,
 		durabilityUp, petUnhappyUp
 	note.follows = follows
+	-- (Every event's state this tick, and the Advanced pages' extras: Frames.lua's ns.whyTick.)
+	note.events = note.events or {}
+	for _, trigger in ipairs(ns.HOVER_TRIGGERS) do note.events[trigger.key] = events[trigger.key] and true or false end
+	note.tick, note.offWhen = ns.whyTick or NONE, offWhen
 	note.followsUp = follows and (hovered[follows] or triggered[follows]
 		or (combatShown and combatShown["group:" .. follows])) or false
 	-- (The Mouseover groups' events that brought it up: group, trigger key.)
@@ -108,8 +112,9 @@ local function ColorRule(text, facts)
 	end))
 end
 
-local function Add(out, state, text, page)
-	out[#out + 1] = { state = state, text = text, page = page }
+-- (setting: the id of the setting behind it, for its link: ns.OpenSettingByKey.)
+local function Add(out, state, text, page, setting)
+	out[#out + 1] = { state = state, text = text, page = page, setting = setting }
 end
 
 -- What the Tracking event is now (Mouseover groups): which tracking under
@@ -119,10 +124,10 @@ local function MinimapTrackingWhy(out)
 	local gathering, creatures = false, false
 	if ns.IsKeepingMinimapForTracking then gathering, creatures = ns.IsKeepingMinimapForTracking(now) end
 	if gathering and not ns.IsTrackingOffHere() then
-		Add(out, "on", L["Keep open: herb, mineral or treasure tracking is on"], "Minimap")
+		Add(out, "on", L["Keep open: herb, mineral or treasure tracking is on"], "Minimap", "minimapKeepGathering")
 	end
 	if creatures then
-		Add(out, "on", L["Keep open: creature or fish tracking is on"], "Minimap")
+		Add(out, "on", L["Keep open: creature or fish tracking is on"], "Minimap", "minimapKeepCreatures")
 	end
 	local revealed, names, held = false, nil, false
 	if ns.MinimapRevealWhy then revealed, names, held = ns.MinimapRevealWhy(now) end
@@ -135,12 +140,227 @@ local function MinimapTrackingWhy(out)
 	end
 end
 
+-- The Advanced pages' events (ns.HOVER_TRIGGERS): which page has each one's rules.
+local TRIGGER_PAGE = { chat = "Chat", whisper = "Chat", typing = "Chat", aura = "Buffs/debuffs", ping = "Minimap",
+	tracking = "Minimap", quest = "Quest tracker", gamepad = "Gamepad", roster = "Mouseover groups",
+	cooldown = "Cooldown Manager" }
+-- (Each event's own setting, for its link; the cooldowns' by bar, below.)
+local TRIGGER_SETTING = { chat = "chatPeek", whisper = "chatUntilWhisperRead", typing = "chatShowWhileTyping",
+	aura = "buffPeek", ping = "minimapRevealOnPing", tracking = "minimapKeepGathering", quest = "questRevealOnAccept",
+	cooldown = "cooldownWhileRecharging" }
+local TRIGGER_SWITCH = { chat = "handleChat", whisper = "handleChat", typing = "handleChat", aura = "handleBuffs",
+	ping = "handleMinimap", tracking = "handleMinimap", quest = "handleQuests", gamepad = "handleGamepad",
+	cooldown = "handleCooldowns" }
+local function TriggerSetting(key, row, n)
+	local switch = TRIGGER_SWITCH[key]
+	if switch and not ns.PageOn(switch) then return switch end
+	if key == "aura" and not ns.db.buffPeek then return "debuffPeek" end
+	if key == "cooldown" and ns.COOLDOWN_MEMBER_BAR and ns.COOLDOWN_MEMBER_BAR[row] == "utility" then
+		return "cooldownUtilityWhileRecharging"
+	end
+	if (key == "ping" or key == "tracking") and n.tick and n.tick.taxiHidesMinimap then return "minimapHideOnTaxi" end
+	return TRIGGER_SETTING[key]
+end
+
+-- What an event going on now is, in words.
+local function TriggerNow(key, n)
+	if key == "aura" then
+		return n.tick.buffPeekUp and L["You just gained or refreshed a buff"] or L["You just gained or refreshed a debuff"]
+	end
+	return L[({ chat = "A chat message is peeking", whisper = "A whisper is waiting to be read",
+		typing = "You're typing in chat", ping = "Someone pinged the minimap",
+		tracking = "The minimap is up for tracking, or a Reveal found something",
+		quest = "You just accepted a quest or moved one on", gamepad = "You pressed a gamepad button",
+		roster = "Someone just joined or left your group", cooldown = "A cooldown is recharging" })[key] or key]
+end
+
+-- When an event would happen, by its page's settings, and what's keeping it
+-- from happening now (its page off, a flight, a setting unticked...).
+local function TriggerWaits(key, n, row)
+	local db, tick = ns.db, n.tick
+	local switch = TRIGGER_SWITCH[key]
+	if switch and not ns.PageOn(switch) then
+		return L["%s: the %s page is off"]:format(TriggerLabel(key), ns.PageLabel(TRIGGER_PAGE[key]))
+	end
+	if key == "chat" then
+		return L["Shows when a chat message peeks"]
+	elseif key == "whisper" then
+		return db.chatUntilWhisperRead and L["Shows while a whisper is unread"]
+			or L["Unread whispers: Keep chat up until whispers are read is off"]
+	elseif key == "typing" then
+		return L["Shows while you type in chat"]
+	elseif key == "aura" then
+		if not (db.buffPeek or db.debuffPeek) then
+			return L["New buffs or debuffs: both of the page's peeks are off"]
+		end
+		local text = (db.buffPeek and db.debuffPeek and L["Shows for a moment when you gain or refresh a buff or debuff"])
+			or (db.buffPeek and L["Shows for a moment when you gain or refresh a buff"])
+			or L["Shows for a moment when you gain or refresh a debuff"]
+		local only = {}
+		if db.buffPeek and db.buffPeekAfterCombat then only[#only + 1] = L["buffs only just after a fight"] end
+		if db.debuffPeek and db.debuffPeekAfterCombat then only[#only + 1] = L["debuffs only just after a fight"] end
+		if ns.Flag(ns.OnTaxi()) then only[#only + 1] = L["not on flights, and you're on one"] end
+		if #only > 0 then text = text .. " (" .. table.concat(only, "; ") .. ")" end
+		return text
+	elseif key == "ping" or key == "tracking" then
+		if tick.taxiHidesMinimap then
+			return L["%s: not on flight paths (Not on flight paths), and you're on one"]:format(TriggerLabel(key))
+		end
+		if key == "ping" then return L["Shows when someone in your group pings the minimap"] end
+		return tick.trackingPaused and L["Tracking doesn't count here (Except in), but a Reveal still does"]
+			or L["Shows while the minimap is up for herb, mineral or creature tracking, or a Reveal finds something"]
+	elseif key == "quest" then
+		if not (db.questRevealOnAccept or db.questRevealOnProgress or db.questRevealOnScenario) then
+			return L["Quest progress: none of the page's Reveal settings is ticked"]
+		end
+		return L["Shows for a while when you accept a quest or move one on"]
+	elseif key == "gamepad" then
+		return L["Shows when you press a gamepad button"]
+	elseif key == "roster" then
+		return L["Shows when someone joins or leaves your group"]
+	elseif key == "cooldown" then
+		local bar = ns.COOLDOWN_MEMBER_BAR and ns.COOLDOWN_MEMBER_BAR[row]
+		local essential = db.cooldownWhileRecharging and (bar == nil or bar == "essential")
+		local utility = db.cooldownUtilityWhileRecharging and (bar == nil or bar == "utility")
+		if not (essential or utility) then
+			return L["Cooldowns: stay up while a cooldown is recharging is off for this bar"]
+		end
+		local afterOnly = (not essential or db.cooldownAfterCombat) and (not utility or db.cooldownUtilityAfterCombat)
+		if afterOnly and not tick.calm and not tick.fighting then
+			return L["Shows while a cooldown recharges, but only just after a fight (Only after combat)"]
+		end
+		return L["Shows while a cooldown recharges"]
+	end
+	return TriggerLabel(key)
+end
+
+-- Whether an event can bring this row up at all (as Frames.lua's events loop has it).
+local function TriggerFits(key, row)
+	if key == "aura" and row == "buffcollapse" then return false end
+	if (key == "tracking" or key == "ping") and ns.MinimapRevealHides and ns.MinimapRevealHides(row) then
+		return false
+	end
+	if key == "gamepad" and not (ns.IsGamePadOn and ns.IsGamePadOn()) then return false end
+	return true
+end
+
+-- Each event a Hover group with this row ticks: "on" the ones bringing it
+-- up now, "off" the others, with what they wait for.
+local function EventLines(row, n, out, which)
+	if not (row and ns.GetHoverGroups) then return end
+	local events, tick = n.events or NONE, n.tick or NONE
+	local seen = {}
+	for _, group in ipairs(ns.GetHoverGroups()) do
+		local member = false
+		for _, key in ipairs(not group.off and group.triggers and group.members or NONE) do
+			if key == row then member = true break end
+		end
+		for _, trigger in ipairs(member and ns.HOVER_TRIGGERS or NONE) do
+			local key = trigger.key
+			if group.triggers[key] and TriggerFits(key, row) then
+				local idle = group.when == n.offWhen
+				local bar = key == "cooldown" and ns.COOLDOWN_MEMBER_BAR and ns.COOLDOWN_MEMBER_BAR[row]
+				local active = not idle and events[key] and (not bar or (tick.cooldownBarUp or NONE)[bar])
+				local name = group.name or "?"
+				-- (Chat's own, said already: Explain's typing and peeking lines.)
+				local said = (key == "chat" or key == "whisper" or key == "typing") and (n.chatShowing or n.typingShown)
+				if which == "on" and active and not said then
+					Add(out, "on", L["%s (Hover group \"%s\")"]:format(TriggerNow(key, n), name), TRIGGER_PAGE[key],
+						TriggerSetting(key, row, n))
+				elseif which == "off" and not active and not seen[key] then
+					seen[key] = true
+					local text = idle and (group.when == "combat" and L["Hover group \"%s\" works only in fights"]
+						or L["Hover group \"%s\" works only out of fights"]):format(name) .. ": " .. TriggerLabel(key)
+						or L["%s (Hover group \"%s\")"]:format(TriggerWaits(key, n, row), name)
+					Add(out, "off", text, idle and "Mouseover groups" or TRIGGER_PAGE[key],
+						not idle and TriggerSetting(key, row, n) or nil)
+				end
+			end
+		end
+	end
+end
+
+-- The Advanced pages' settings that aren't events, doing something now:
+-- which buffs a peek shows, Show just that quest.
+local function AdvancedNow(entry, n, out)
+	local db, tick = ns.db, n.tick or NONE
+	local name, row = entry.name, n.row
+	local auraOnly = tick.auraOnly and tick.auraOnly[row]
+	if name == "BuffFrame" or name == "TemporaryEnchantFrame" then
+		if tick.debuffsOnly and auraOnly and not n.hovered then
+			Add(out, "block", L["A debuff peek brings up only your debuffs, not your buffs"], "Buffs/debuffs", "debuffPeek")
+		elseif db.buffPeekOnlyNew and tick.buffPeekUp and auraOnly and not n.hovered and not n.fightingShown then
+			Add(out, "on", L["Just the new one: only the buff you gained shows, the others stay faded"], "Buffs/debuffs",
+				"buffPeekOnlyNew")
+		end
+	end
+	if name == "ObjectiveTrackerFrame" and db.questRevealOnlyThat and (n.events or NONE).quest and not n.hovered
+		and not n.fightingShown then
+		Add(out, "on", L["Show just that quest: only the quest that moved on shows, the rest stay faded"],
+			"Quest tracker", "questRevealOnlyThat")
+	end
+	if name == "CinematicPersonalMana" and ns.PersonalManaRecent then
+		local recent, seconds = ns.PersonalManaRecent()
+		if seconds > 0 and not recent then
+			Add(out, "block", L["Only after you use mana: it fades %d seconds after you last spent mana"]:format(seconds),
+				"Personal Resources", "prdManaRecent")
+		end
+	end
+	if entry.group == "minimap" and tick.taxiHidesMinimap and not n.hovered then
+		Add(out, "block", L["You're on a flight path (Not on flight paths): no tracking, reveal or ping brings it up"],
+			"Minimap", "minimapHideOnTaxi")
+	end
+	if entry.group == "misc" and ns.PageOn("handleQuests") and db.durabilityShow and db.durabilityHideInCam and ns.activeCam
+		and ns.HasDurabilityAlert and ns.HasDurabilityAlert() then
+		Add(out, "block", L["Your gear is damaged, but a camera mode is running (Hide in camera modes)"], "Quest tracker",
+			"durabilityHideInCam")
+	end
+end
+
+-- The Advanced pages' keep-it-up settings that are ticked but not doing it now.
+local function AdvancedWaiting(entry, n, out)
+	local db, tick = ns.db, n.tick or NONE
+	local group = entry.group
+	if group == "minimap" and ns.PageOn("handleMinimap") and not db.alwaysShowMinimap then
+		if db.minimapIndoors and not (IsIndoors and ns.Flag(IsIndoors())) then
+			Add(out, "off", L["Keep open: indoors (you're outdoors)"], "Minimap", "minimapIndoors")
+		end
+		if db.minimapKeepQuest and not ns.HasTrackedQuest() then
+			Add(out, "off", L["Keep open: tracking a quest (none tracked)"], "Minimap", "minimapKeepQuest")
+		end
+		if db.minimapKeepPrey and ns.isRetail and not ns.IsHuntingPrey(GetTime()) then
+			Add(out, "off", L["Keep open: hunting your prey (you aren't)"], "Minimap", "minimapKeepPrey")
+		end
+	end
+	if ns.PageOn("handleQuests") then
+		if db.questTimerShow and not (tick.questTimerUp or tick.trackerTimerUp)
+			and (group == "questtimer" or (group == "quests" and entry.frame == _G.ObjectiveTrackerFrame and ns.isRetail)) then
+			Add(out, "off", L["Shows while a quest timer is running"], "Quest tracker", "questTimerShow")
+		end
+		if group == "misc" and ns.PageOn("handleQuests") and db.durabilityShow and not (ns.HasDurabilityAlert and ns.HasDurabilityAlert()) then
+			Add(out, "off", L["Shows when your gear is damaged"], "Quest tracker", "durabilityShow")
+		end
+	end
+	if entry.name == "PetFrame" and ns.Setting("petUnhappyShow") and not n.petUnhappyUp then
+		Add(out, "off", L["Shows when your pet isn't happy"], "Hunter", "petUnhappyShow")
+	end
+end
+
 -- A row's columns: on (doing it now), off (ticked, would show it elsewhere
 -- or later) and block (keeping it hidden).
 -- (always, anyFight, page: for a row that isn't a frame's, as ns.RowOnNow
 -- takes them: a unit frame's part, whose Always is its own setting and whose
 -- In combat counts in any fight, on the Unit Frame Parts page.)
+local ColumnsOf -- (below: the lines; Columns tags them with the row's id)
 local function Columns(key, out, always, anyFight, page)
+	local first = #out + 1
+	ColumnsOf(key, out, always, anyFight, page)
+	-- (Each line's link: its Show in row, by id, unless it names a setting of its own.)
+	for i = first, #out do
+		if not out[i].setting and type(key) == "string" then out[i].setting = "row:" .. key end
+	end
+end
+function ColumnsOf(key, out, always, anyFight, page)
 	page = page or FramePage(key)
 	local fighting = Fighting()
 	local calm = ns.InCalm()
@@ -203,8 +423,10 @@ local function Columns(key, out, always, anyFight, page)
 		found = true
 	end
 	if fighting and ns.FightHold(key) and not always then
+		local wait = { player = "fightWaitPortrait", prd = "fightWaitHealth", prdpower = "fightWaitPower",
+			prdmana = "fightWaitPower" }
 		Add(out, "block", L["Held back at the fight's start while you're at rest (Personal Resource Display page)"],
-			"Personal Resources")
+			"Personal Resources", wait[key])
 	end
 	if not found then
 		Add(out, "off", L["Nothing is ticked on its row: tick Always to keep it up"], page)
@@ -368,6 +590,15 @@ local function Explain(entry)
 	local out = {}
 	local n = notes[entry]
 	n = n and GetTime() - n.at < 1 and n
+	-- (The game's own personal resource display switched off: Cinematic
+	-- leaves its bars out till it's back, Frames.lua.)
+	local tick = ns.whyTick
+	if not n and tick and tick.displayOff and (entry.group == "prd" or entry.group == "prdpower"
+		or entry.group == "prdmana") then
+		Add(out, "on", L["The game's Personal Resource Display is switched off in its options, so Cinematic " ..
+			"leaves these bars as the game has them"], "Personal Resources")
+		return title, "unknown", out, key
+	end
 	if not n then
 		Add(out, "off", L["Cinematic isn't fading frames right now (it's off or paused)"], "CineMode")
 		return title, "unknown", out, key
@@ -415,21 +646,21 @@ local function Explain(entry)
 		local before = #out
 		if entry.group == "minimap" then
 			if ns.db.alwaysShowMinimap then
-				Add(out, "on", L["Keep open: always"], "Minimap")
+				Add(out, "on", L["Keep open: always"], "Minimap", "alwaysShowMinimap")
 			end
 			if n.keepIndoors then
 				if ns.db.minimapIndoors and IsIndoors and ns.Flag(IsIndoors()) then
-					Add(out, "on", L["Keep open: indoors, and you're inside"], "Minimap")
+					Add(out, "on", L["Keep open: indoors, and you're inside"], "Minimap", "minimapIndoors")
 				end
 				-- (As Frames.lua works it out: the quest one only a while after progress.)
 				local questFor = ns.db.minimapKeepQuestFor or 0
 				if ns.db.minimapKeepQuest and ns.HasTrackedQuest()
 					and (questFor <= 0 or GetTime() - (ns.questActivityAt or 0) < questFor * 60) then
 					Add(out, "on", questFor > 0 and L["Keep open: a tracked quest, for a while after progress on it"]
-						or L["Keep open: a tracked quest"], "Minimap")
+						or L["Keep open: a tracked quest"], "Minimap", "minimapKeepQuest")
 				end
 				if ns.db.minimapKeepPrey and ns.IsHuntingPrey(GetTime()) then
-					Add(out, "on", L["Keep open: hunting your prey"], "Minimap")
+					Add(out, "on", L["Keep open: hunting your prey"], "Minimap", "minimapKeepPrey")
 				end
 				local onTaxi = ns.db.minimapHideOnTaxi and ns.Flag(ns.OnTaxi())
 				if not onTaxi and ns.IsMinimapKeptInZone() then
@@ -437,28 +668,49 @@ local function Explain(entry)
 				end
 			end
 		elseif entry.group == "waypoint" and ns.db.alwaysShowWaypoint then
-			Add(out, "on", L["Always show the waypoint is on"])
+			Add(out, "on", L["Always show the waypoint is on"], nil, "alwaysShowWaypoint")
 		elseif entry.group == "questtimer" and n.questTimerUp then
-			Add(out, "on", L["A quest timer is running"], "Quest tracker")
+			Add(out, "on", L["A quest timer is running"], "Quest tracker", "questTimerShow")
 		elseif entry.group == "misc" and n.durabilityUp then
-			Add(out, "on", L["Your gear is damaged (durability alert)"], "Quest tracker")
+			Add(out, "on", L["Your gear is damaged (durability alert)"], "Quest tracker", "durabilityShow")
 		elseif entry.name == "PetFrame" and n.petUnhappyUp then
-			Add(out, "on", L["Your pet is unhappy"], "Hunter")
+			Add(out, "on", L["Your pet is unhappy"], "Hunter", "petUnhappyShow")
 		end
+		if n.tick.trackerTimerUp and entry.group == "quests" and entry.frame == _G.ObjectiveTrackerFrame then
+			Add(out, "on", L["A timer in the quest tracker is running (Show timers in the quest tracker)"], "Quest tracker",
+				"questTimerShow")
+		end
+		if n.tick.flashTestUp and ns.COOLDOWN_BAR_GROUPS and ns.COOLDOWN_BAR_GROUPS[entry.name] then
+			Add(out, "on", L["The Cooldown Manager page's Flash Test is playing"], "Cooldown Manager")
+		end
+		-- (The Advanced pages' events, by the Hover groups that tick them.)
+		EventLines(n.row, n, out, "on")
 		for _, trigger in ipairs(n.triggers) do
-			Add(out, "on", L["Hover group \"%s\": %s"]:format(trigger.group.name or "?", TriggerLabel(trigger.key)),
-				"Mouseover groups")
 			if trigger.key == "tracking" then
 				MinimapTrackingWhy(out)
+				break
 			end
 		end
 		if #out == before then
 			Add(out, "on", L["Kept up by a setting Inspect can't name yet"])
 		end
 	end
-	if n.fightingShown and not n.listShown then
+	-- (Personal Resource Display page: your frames kept up after a fight or on
+	-- low mana; what it has ticked that isn't keeping them up now, below.)
+	local yours = {}
+	local setting = ns.PORTRAIT_FRAMES and ns.PORTRAIT_FRAMES[entry.name]
+	if (setting or entry.name == "PetFrame") and ns.YourFrameWhy then
+		ns.YourFrameWhy(setting, entry, n.tick.portraitAllowed, n.tick.fighting, function(state, text, settingKey)
+			yours[#yours + 1] = { state = state, text = text, page = "Personal Resources", setting = settingKey }
+		end)
+	end
+	for _, reason in ipairs(yours) do
+		if reason.state ~= "off" then out[#out + 1] = reason end
+	end
+	if n.fightingShown and not n.listShown and #yours == 0 then
 		Add(out, "on", L["Your frame stays up while you recover"], "Personal Resources")
 	end
+	AdvancedNow(entry, n, out)
 	if status == "partly" and not n.listShown and not n.tracking and not n.hovered then
 		Add(out, "on", L["Vitals Vision shows it as far as your health says"], "Vitals Vision")
 	end
@@ -474,6 +726,12 @@ local function Explain(entry)
 	for _, reason in ipairs(columns) do
 		if reason.state == "off" then out[#out + 1] = reason end
 	end
+	-- (The Advanced pages' events and settings that would bring it up, and why they aren't now.)
+	EventLines(n.row, n, out, "off")
+	for _, reason in ipairs(yours) do
+		if reason.state == "off" then out[#out + 1] = reason end
+	end
+	AdvancedWaiting(entry, n, out)
 	-- Hidden with nothing above doing it: CineMode itself is, as nothing ticked applies.
 	if status == "hidden" then
 		local doing = false
@@ -1033,11 +1291,44 @@ local function LookAway()
 	if not ns.whyPicking and ns.whyLook == rowLook then ns.whyLook = nil end
 end
 
+-- The Chat Bubbles page in one row: each kind of bubble (its Show in row,
+-- Bubbles.lua) showing or not here and now, and why. Status and reasons.
+local BUBBLE_KINDS = { { "Say", "Say" }, { "Yell", "Yell" }, { "Party", "Party" }, { "NPC", "NPCs" } }
+local function BubblesWhy()
+	local out, page = {}, "Chat bubbles"
+	if not ns.db.handleBubbles then
+		Add(out, "on", L["The Chat Bubbles page is off, so the game's own chat bubble settings decide"], page)
+		return "shown", out
+	end
+	local shown, hidden, off = {}, {}, {}
+	for _, kind in ipairs(BUBBLE_KINDS) do
+		local label = L[kind[2]]
+		local columns = {}
+		Columns("bubble:" .. kind[1], columns, ns.db["bubbles" .. kind[1] .. "Always"] or false, true, page)
+		if ns.BubbleKindOff and ns.BubbleKindOff(kind[1]) then
+			hidden[#hidden + 1] = label
+		else
+			shown[#shown + 1] = label
+		end
+		-- (Each kind's own lines, named: what's doing it now first, then what would.)
+		for _, reason in ipairs(columns) do
+			local line = { state = reason.state, text = ("%s: %s"):format(label, reason.text), page = page }
+			if reason.state == "off" then off[#off + 1] = line else out[#out + 1] = line end
+		end
+	end
+	if #shown > 0 then table.insert(out, 1, { state = "on", page = page,
+		text = L["Showing here and now: %s"]:format(table.concat(shown, ", ")) }) end
+	if #hidden > 0 then table.insert(out, #shown > 0 and 2 or 1, { state = "block", page = page,
+		text = L["Hidden here and now: %s"]:format(table.concat(hidden, ", ")) }) end
+	for _, line in ipairs(off) do out[#out + 1] = line end
+	return (#hidden == 0 and "shown") or (#shown == 0 and "hidden") or "partly", out
+end
+
 -- For WhyPanel.lua, the Why window.
 ns.why = {
 	Explain = Explain, RowEntries = RowEntries, LookAtRows = LookAtRows, LookAway = LookAway,
 	RowItem = RowItem, FramePage = FramePage, EntryRect = EntryRect, StatusText = StatusText,
-	MakeBox = MakeBox, PlaceOver = PlaceOver, ICON = ICON, Columns = Columns,
+	MakeBox = MakeBox, PlaceOver = PlaceOver, ICON = ICON, Columns = Columns, BubblesWhy = BubblesWhy,
 }
 
 -- The UI Manager's "Why Is It Showing?" page: every row of frames Cinematic

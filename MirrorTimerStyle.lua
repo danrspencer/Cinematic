@@ -92,8 +92,18 @@ local function StyleText(entry, font, scale)
 	if type(words) == "string" then text:SetText(words) end
 end
 
-local function Style(timer)
+-- The settings, as the Standard Frames page's switch leaves them: off, the
+-- game's own look (no texture, font or size of ours, nothing hidden).
+local GAME_LOOK = {}
+local function Settings()
 	local db = ns.GetDB()
+	if not db then return nil end
+	if not (db.enabled and ns.PageOn("handleFrames")) then return GAME_LOOK end
+	return db
+end
+
+local function Style(timer)
+	local db = Settings()
 	if not db then return end
 	local parts = Parts(timer)
 	if parts.bar then
@@ -124,7 +134,7 @@ local function Hook(timer)
 	hooked[timer] = true
 	timer:HookScript("OnShow", function(self)
 		ns.Guard(function()
-			local db = ns.GetDB()
+			local db = Settings()
 			if db and db.mirrorHide then
 				self:Hide()
 			else
@@ -137,7 +147,7 @@ end
 -- Every timer made so far, as the settings say now. (One turned back on
 -- shows with the next breath, fatigue or Feign Death.)
 function ns.ApplyMirrorTimers()
-	local db = ns.GetDB()
+	local db = Settings()
 	if not db then return end
 	Each(function(timer)
 		Hook(timer)

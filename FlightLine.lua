@@ -67,6 +67,7 @@ end
 -- Whether it may show now (asked every CHECK seconds, not every frame).
 local function Wanted()
 	if not (ns.db and ns.db.cardDepartureLine) then return false end
+	if not (test or ns.Setting("cards")) then return false end -- (the Cards page switched off)
 	if test then return TEST_TIME - (GetTime() - test.start) > GONE_BEFORE end
 	if not (ns.lastCinematic and Flying()) then return false end
 	local duration, gone = ns.FlightDuration()
@@ -154,7 +155,7 @@ ns.SetOnUpdate(line, Update)
 -- the flight camera's takeoff (CardMoments.lua's ns.OnTakeoff), and on
 -- coming into the world still in the air (a /reload on the way).
 local function Start()
-	if not (ns.db and ns.db.cardDepartureLine) or line:IsShown() then return end
+	if not (ns.db and ns.db.cardDepartureLine and (test or ns.Setting("cards"))) or line:IsShown() then return end
 	Register()
 	alpha, wanted, sinceCheck = 0, false, CHECK
 	line:SetAlpha(0)

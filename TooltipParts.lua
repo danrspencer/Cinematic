@@ -29,9 +29,11 @@ local function Cut(part)
 	return not db["tooltipShow" .. part .. (revealed and "Later" or "First")]
 end
 
--- Fade in/out's seconds (tooltipFadeTime; nil: no fading).
+-- Fade in/out's seconds (tooltipFadeTime; nil: no fading, as with the
+-- Tooltips page switched off: then tooltips are left as the game has them).
 local function FadeTime()
-	local time = ns.db and ns.db.enabled and ns.db.tooltipFadeTime
+	local db = ns.db
+	local time = db and db.enabled and db.handleTooltips and db.tooltipFadeTime
 	return time and time > 0 and time or nil
 end
 
@@ -556,8 +558,8 @@ local function IsItemTooltip(tooltip)
 	return ok and item
 end
 
--- Fade in/out (tooltipFadeTime seconds, Tooltips page, with its switch off
--- too): tooltips fade in as they show, cross-fade into the After column's
+-- Fade in/out (tooltipFadeTime seconds, Tooltips page, with its switch
+-- on): tooltips fade in as they show, cross-fade into the After column's
 -- look, and fade out before Effects.lua hides one for the mouse being still
 -- too long. The game hides others at once (or fades a world one out
 -- itself), so those can't. A fade stops once something else takes the
@@ -653,6 +655,33 @@ local function ShowLater(tooltip)
 	end
 end
 
+-- Whether showing in full changes anything on this tooltip: lines filled in
+-- or taken out, the border or a health bar. A tooltip it leaves as it is
+-- (a settings button's tip) isn't faded out and in again for nothing: that
+-- looked like the tooltip blinking a few seconds into hovering.
+local function RevealChanges(tooltip)
+	if linesCut then
+		return true
+	end
+	revealed = true -- (Cut reads the After column)
+	local border, health = Cut("Border"), Cut("Health")
+	local lines = ((TooltipUnit(tooltip) or FrameUnit(tooltip)) and AnyLineCut())
+		or (IsWorldObject(tooltip) and Cut("ObjQuest"))
+		or (IsItemTooltip(tooltip) and Cut("Hint"))
+	revealed = false
+	if lines or (tooltip.NineSlice and border ~= borderHidden) or (not health and next(hiddenBars)) then
+		return true
+	end
+	if health then
+		for _, bar in ipairs(bars) do
+			if ns.Flag(bar:IsShown()) then
+				return true
+			end
+		end
+	end
+	return false
+end
+
 -- With Fade in/out, the whole tooltip fades out, takes on the After look
 -- while it can't be seen (the lines move and the box resizes then), and
 -- fades back in: half the fade time each way.
@@ -661,7 +690,7 @@ local function Reveal(tooltip)
 		return -- (already on its way, or fading out to hide)
 	end
 	local time = FadeTime()
-	if not time then
+	if not time or not RevealChanges(tooltip) then
 		ShowLater(tooltip)
 		return
 	end
@@ -680,7 +709,9 @@ local function StartCountdown(tooltip)
 		fullTimer:Cancel()
 		fullTimer = nil
 	end
-	local after = ns.db and ns.db.tooltipFullAfter or 0
+	-- (Page switched off: the After column changes nothing, so no countdown.)
+	local db = ns.db
+	local after = db and db.enabled and db.handleTooltips and db.tooltipFullAfter or 0
 	if after > 0 then
 		fullTimer = C_Timer.NewTimer(after, function()
 			fullTimer = nil

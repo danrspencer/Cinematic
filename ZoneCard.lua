@@ -13,7 +13,7 @@ local DEFAULTS = ns.DEFAULTS
 DEFAULTS.storyZoneCard = false        -- the Zone row (off: the game's own)
 DEFAULTS.storyZoneSubzones = true     -- the Subzone row: a card as you come into a subzone, too
 DEFAULTS.storyZoneTerritory = false   -- "Contested Territory" and such under it, as the game says
-DEFAULTS.storyZoneGap = 5             -- seconds after a Zone or Subzone card before the next can come
+DEFAULTS.storyZoneGap = 10            -- seconds after a Zone or Subzone card before the next can come
 DEFAULTS.storyZoneNotFlying = true    -- none on a flight path (the Flight departure and arrival cards say where)
 
 local SEPARATOR = " · "

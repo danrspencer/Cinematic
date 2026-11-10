@@ -112,6 +112,30 @@ local function SetLabelFont(label, font)
 	end
 end
 
+-- A control's id for /cine find: its setting's key, or its Show in grid
+-- row's (row:<key>) for the controls on one. Nil: none.
+function ns.SettingIdOf(widget)
+	if type(widget.settingKey) == "string" then return widget.settingKey end
+	local parent = widget.GetParent and widget:GetParent()
+	local rowId = parent and parent.RowId
+	if rowId then
+		local ok, id = pcall(rowId)
+		if ok and type(id) == "string" then return "row:" .. id end
+	end
+end
+-- (Shift pressed or let go over a setting: its tooltip again, with or
+-- without its id.)
+do
+	local watch = CreateFrame("Frame")
+	watch:RegisterEvent("MODIFIER_STATE_CHANGED")
+	watch:SetScript("OnEvent", function(_, _, key)
+		if key ~= "LSHIFT" and key ~= "RSHIFT" then return end
+		local owner = GameTooltip:IsShown() and GameTooltip:GetOwner()
+		local onEnter = owner and owner.searchTip and owner:GetScript("OnEnter")
+		if onEnter and ns.SettingIdOf(owner) then onEnter(owner) end
+	end)
+end
+
 local function Tooltip(widget, tip)
 	widget.searchTip = tip
 	widget:SetScript("OnEnter", function(self)
@@ -131,6 +155,11 @@ local function Tooltip(widget, tip)
 			GameTooltip:AddLine(tip, 1, 1, 1, true)
 		else
 			GameTooltip:SetText(tip, 1, 1, 1, 1, true)
+		end
+		-- (Shift held: its id, as the command that opens it, to give players.)
+		local id = ns.SettingIdOf(self)
+		if id and IsShiftKeyDown() then
+			GameTooltip:AddLine("/cine find " .. id, 0.6, 0.6, 0.6)
 		end
 		GameTooltip:Show()
 	end)
@@ -529,6 +558,7 @@ local function BoxLine(parent)
 		box:SetMaxLetters(6)
 		box:EnableMouseWheel(true)
 		box.searchLabel = label
+		box.settingKey = key -- (its id, as Remember gives a checkbox: the Why window's links, /cine find <key>)
 		right = right + (label ~= "" and name:GetStringWidth() + 8 or 0) + (width or 36) + 18
 		if unit then
 			local after = Label(line, "GameFontHighlight", unit)
@@ -1338,9 +1368,11 @@ end
 -- Every page's settings, headings and notes as they are now (pages show and
 -- hide rows as settings change). rank: 0 a page, 1 a label or heading, 3 a note.
 -- pages: just those pages' (a sub-page's or hub's own search box).
+-- Also the controls by their setting's key (frame.settingKey, set by
+-- Remember): keyed[key] = the first such entry found.
 local function BuildSearchIndex(pages)
 	Refresh() -- (slider titles and some rows are only filled in on refresh)
-	local entries = {}
+	local entries, keyed = {}, {}
 	local named = not pages or #pages > 1 -- (pages to pick among: their names count too)
 	for _, page in ipairs(pages or searchPages) do
 		local seen = {}
@@ -1358,6 +1390,19 @@ local function BuildSearchIndex(pages)
 			-- pages that aren't open)
 			-- (A closed section's settings count: finding one opens it.)
 			if frame.searchSkip or not (frame:IsShown() or frame.searchAlways) then return end
+			-- (A Show in grid row: row:<its rule's key>, GridRows.lua.)
+			if frame.RowId then
+				local ok, id = pcall(frame.RowId)
+				if ok and type(id) == "string" and not keyed["row:" .. id] then
+					keyed["row:" .. id] = { page = page, text = id,
+						edges = { top = frame, bottom = frame, left = frame, right = frame } }
+				end
+			end
+			local settingKey = frame.settingKey
+			if type(settingKey) == "string" and not keyed[settingKey] then
+				keyed[settingKey] = { page = page, text = SearchText(frame.searchLabel) or settingKey,
+					edges = frame.searchEdges or { top = frame, bottom = frame, left = frame, right = frame } }
+			end
 			if frame.searchNote then -- (a page intro behind its "?")
 				add(frame.searchNote, nil, 3, frame.searchEdges)
 				return
@@ -1381,7 +1426,7 @@ local function BuildSearchIndex(pages)
 		end
 		walk(page.canvas.content)
 	end
-	return entries
+	return entries, keyed
 end
 
 -- The best matches for what's typed (every word in the label, or in the
@@ -1480,6 +1525,13 @@ end
 -- too: Style|Names fade time (tried first, then as all words). (Pipes come
 -- from the chat box doubled: any run of them splits.)
 function ns.FindSetting(query)
+	-- A setting's id (/cine find portraitWhenNotFull), or a Show in row's
+	-- (/cine find row:player): straight to its control.
+	local id = type(query) == "string" and (query:match("^%s*([%w_]+)%s*$") or query:match("^%s*(row:%S+)%s*$"))
+	if id and (ns.DEFAULTS[id] ~= nil or id:find("^row:")) and ns.OpenSettingByKey then
+		local text, pageName = ns.OpenSettingByKey(id)
+		if text then return text, pageName end
+	end
 	local parts = {}
 	for part in (type(query) == "string" and query or ""):gmatch("[^|]+") do
 		part = part:match("^%s*(.-)%s*$"):lower()
@@ -2093,6 +2145,8 @@ do
 			{ "Fishing", "Interface\\Icons\\Trade_Fishing", section = "Helpers" },
 			{ "Hunter", "Interface\\Icons\\INV_Weapon_Bow_07", section = "Helpers" },
 			{ "Keyboard Map", "Interface\\Icons\\INV_Misc_Note_06", section = "Helpers" }, -- (KeyboardMap.lua)
+			-- (CreateQualityPanel's end: only with one of its addons loaded)
+			{ "Addon Support", "Interface\\Icons\\INV_Misc_Gear_02", section = "Helpers" },
 		} },
 		-- (WheelsPage.lua's pages; listed under Quality of life. The master wheel first, plain; the wheels it opens on a band.)
 		{ name = "Wheels", under = "Quality of life", colors = { Wheels = { 0.65, 0.45, 0.9 } }, pages = {
@@ -6828,6 +6882,7 @@ local function CreateCombatPanel()
 		"alone, the minimap, quest tracker, buffs and Cooldown Manager included (their pages' " ..
 		"switches only count while this is on)."], subtitle, function()
 		if ns.ApplyUnitFrameParts then ns.ApplyUnitFrameParts() end
+		if ns.ApplyMirrorTimers then ns.ApplyMirrorTimers() end
 	end)
 	-- (With the rows as dropdowns, each row's Combat dropdown has a Calm Timer
 	-- of its own instead, GridRows.lua; this stays what rows without one go by.)
@@ -7708,6 +7763,64 @@ local function CreateQualityPanel()
 		canvas:Hide()
 		RegisterSubpage(canvas, "Hunter")
 	end
+
+	-- Addon Support: a section for each addon Cinematic has a rule of its own
+	-- for, shown only with that addon loaded; the page only with one of them.
+	-- (Here, not a function of its own: this file's near the 200 locals cap.)
+	do
+		local function RefreshPlates()
+			if ns.RefreshClassIcon and C_NamePlate and C_NamePlate.GetNamePlates then
+				for _, plate in ipairs(C_NamePlate.GetNamePlates()) do ns.RefreshClassIcon(plate) end
+			end
+		end
+		local SUPPORT = {
+			-- (Support/Questie.lua; the icons' pin in PlateParts' RefreshQuestIcon.)
+			{ addon = "Questie", label = "Questie", build = function(page, list)
+				list:Add(Check(page, "questieMoveIcons", L["Move Questie's nameplate icons"],
+					L["Questie puts its quest icons at a nameplate's far left. On: they sit where Cinematic's " ..
+					"quest mark would, beside the name, and over the unit once its plate fades out. Off: they stay " ..
+					"where Questie puts them."], function(value)
+						KeyPut("questieMoveIcons", value)
+						RefreshPlates()
+					end), "check")
+			end },
+			-- (Its Nameplates' Show quest icons; the mark's pin in PlateParts' ns.EQoLMark.)
+			{ addon = "EnhanceQoL", label = "EnhanceQoL", build = function(page, list)
+				list:Add(Check(page, "eqolMoveIcons", L["Move EnhanceQoL's nameplate quest marks"],
+					L["EnhanceQoL's Show quest icons puts a quest mark on the nameplate, which fades away with the " ..
+					"plate. On: it stays up, over the unit while the plate is faded out, and moves beside the name " ..
+					"as the plate shows, where Cinematic's quest mark would go. Where Cinematic's own quest mark " ..
+					"shows on the unit, EnhanceQoL's is hidden under it. Off: it stays where EnhanceQoL puts it."],
+					function(value)
+						KeyPut("eqolMoveIcons", value)
+						RefreshPlates()
+					end), "check")
+			end },
+		}
+		local have = {}
+		for _, each in ipairs(SUPPORT) do
+			-- (Will load: built as Cinematic loads, before addons later in the alphabet are in.)
+			if ns.AddOnWillLoad(each.addon) then have[#have + 1] = each end
+		end
+		if #have > 0 then
+			canvas, content = CreateScrollPage()
+			title = Label(content, "GameFontNormalLarge", L["Addon Support"])
+			title:SetPoint("TOPLEFT", 16, -16)
+			local intro = PageIntro(content, title, L["Settings for how Cinematic works with your other addons. " ..
+				"Only the addons you have loaded are listed."])
+			switch = PageSwitch(content, "handleAddonSupport", L["Enable Page"],
+				L["On: everything below works as ticked. Off: none of it does, and each keeps its tick for " ..
+				"when you turn this back on."], intro, RefreshPlates)
+			stack = Stack(switch, "check")
+			for _, each in ipairs(have) do
+				stack:Header(content, each.label)
+				each.build(content, stack)
+			end
+			canvas:SetScript("OnShow", PageShown(Refresh, content))
+			canvas:Hide()
+			RegisterSubpage(canvas, "Addon Support")
+		end
+	end
 end
 
 -- Sub-page: fishing (casting with right-click or a gamepad button, the cast bar).
@@ -7848,7 +7961,9 @@ local function CreateGamepadPanel()
 	end
 	local switch = PageSwitch(content, "handleGamepad", L["Enable Page"],
 		L["On: CineMode fades the gamepad's bars, button hints and reticle as this page says. Off: it " ..
-		"leaves them alone."], subtitle)
+		"leaves them alone."], subtitle, function()
+		if ns.UpdateMinimapButton then ns.UpdateMinimapButton() end
+	end)
 	rows.underHeader = true
 	rows.noCine = true -- (CineMode only: Always says it all)
 	local lastRow = ShowTable(content, switch, rows, "Gamepad")
@@ -7937,25 +8052,20 @@ local function CreateGamepadPanel()
 	Tooltip(fadeOut, L["How long the gamepad action bars take to fade out."])
 
 	stack:Header(content, L["Settings window"])
-	-- (These two guard against freezes, so they work with the page off too: not greyed with it.)
-	local forceReload = stack:Add(Check(content, "forceReloadOnSettingsExit", L["Force reload on Settings exit"],
+	stack:Add(Check(content, "forceReloadOnSettingsExit", L["Force reload on Settings exit"],
 		L["A workaround for a game bug: in gamepad mode, closing the Settings window after using an " ..
 		"addon's settings (any addon's, not just Cinematic's) can freeze the game. With this on, once " ..
 		"you've opened a Cinematic page, closing Settings (X, Close, Escape or the gamepad) reloads " ..
 		"the UI instead, which closes it without the freeze. Your settings are saved first, as they are " ..
-		"on every reload. Turning it off takes effect after a reload."] .. " "
-		.. L["Works with this page switched off too."]), "check")
-	forceReload.pageSwitch = false -- (not greyed with the switch: see SwitchOf)
-	local hideButton = stack:Add(Check(content, "hideMinimapButtonGamepad", L["Hide the minimap button in gamepad mode"],
+		"on every reload. Turning it off takes effect after a reload."]), "check")
+	stack:Add(Check(content, "hideMinimapButtonGamepad", L["Hide the minimap button in gamepad mode"],
 		L["Using Cinematic's minimap button in gamepad mode tends to freeze the game, like closing " ..
 		"Settings does. With this on, the button is hidden while gamepad mode is on and comes back " ..
-		"when it's off. Cinematic's settings are still in the game's Settings (AddOns tab), or type /cine."]
-		.. " " .. L["Works with this page switched off too."],
+		"when it's off. Cinematic's settings are still in the game's Settings (AddOns tab), or type /cine."],
 		function(value)
 			ns.GetDB().hideMinimapButtonGamepad = value
 			if ns.UpdateMinimapButton then ns.UpdateMinimapButton() end
 		end), "check")
-	hideButton.pageSwitch = false
 
 	canvas:SetScript("OnShow", PageShown(Refresh, content))
 	canvas:Hide()
@@ -11104,8 +11214,7 @@ do
 		untilRead:SetPoint("TOPLEFT", windowBody, "TOPLEFT", -2, -6)
 		local tabHint = Check(windowBody, "chatHideTabHint", L["Hide the tabs' right-click hint"],
 			L["Hovering a chat tab shows just its name, without the green <Right click for Tab Settings> " ..
-			"line. Right-clicking a tab still opens its settings."] .. " " .. L["Works with this page switched off too."])
-		tabHint.pageSwitch = false -- (not greyed with the switch: see SwitchOf)
+			"line. Right-clicking a tab still opens its settings."])
 		tabHint:SetPoint("TOPLEFT", untilRead, "BOTTOMLEFT", 0, -2)
 		-- What of the window a new message brings up with it (hovering,
 		-- typing and unread whispers still bring it all).
@@ -11184,9 +11293,7 @@ do
 		attackAlert:SetPoint("TOPLEFT", otherBody, "TOPLEFT", 0, -6)
 		local updateNotice = Check(otherBody, "updateNotice", L["Get notified of updates"],
 			L["The first time you log in after Cinematic updates, a line in chat says so, with a " ..
-			"What's new link to what's been added. Chat shows for it while the UI is faded."] .. " "
-			.. L["Works with this page switched off too."])
-		updateNotice.pageSwitch = false -- (not greyed with the switch: see SwitchOf)
+			"What's new link to what's been added. Chat shows for it while the UI is faded."])
 		updateNotice:SetPoint("TOPLEFT", attackAlert, "BOTTOMLEFT", -2, -4)
 
 		for _, section in ipairs(sections) do
@@ -11904,22 +12011,19 @@ local function CreateQuestTrackerPanel()
 	timer:SetPoint("TOPLEFT", combatCalm, "BOTTOMLEFT", 0, -2)
 	local lastQuest = timer
 
-	-- The durability figure: not the quest tracker's, so the page's switch
-	-- leaves it be (pageSwitch = false).
+	-- The durability figure (with the page on, as the rest).
 	local durability = Check(content, "durabilityShow", L["Show the durability figure when gear is damaged"],
 		L["Keeps the armor figure (by the minimap) up in CineMode, and in fights, while the game shows it: " ..
 		"some of your gear is badly damaged (yellow) or broken (red). It goes again once you repair. Off, " ..
 		"it fades with the rest of the UI."])
 	durability:SetPoint("TOPLEFT", lastQuest, "BOTTOMLEFT", 0, -16)
 	durability:HookScript("OnClick", Refresh) -- grey out / enable the option below
-	durability.pageSwitch = false
 
 	local durabilityCam = Check(content, "durabilityHideInCam", L["Hide in camera modes"],
 		L["While a camera mode runs (AFK, auto-run, RP walk, flights and the rest), the figure fades " ..
 		"with the rest of the UI. It comes back when the camera mode ends."])
 	durabilityCam:SetPoint("TOPLEFT", durability, "BOTTOMLEFT", QUEST_INDENT, -2)
 	GreyUnless(durabilityCam, function(db) return db.durabilityShow end)
-	durabilityCam.pageSwitch = false
 
 	-- Addon Frame Links (last): which addon's tracker it is (FrameLinks.lua).
 	local links = ns.BuildLinkSection(content, durabilityCam, "quests")
@@ -12778,7 +12882,7 @@ local function CreateVisionPanel()
 	-- (Indented under it, as its sub-option.)
 	-- Questie's own quest icons, where ours would show too (Support/Questie.lua).
 	-- Shown with Questie loaded only.
-	if C_AddOns and C_AddOns.IsAddOnLoaded and C_AddOns.IsAddOnLoaded("Questie") then
+	if ns.AddOnWillLoad("Questie") then
 		local QUESTIE_ICONS = {
 			{ value = "ours", text = L["Cinematic's wins"] },
 			{ value = "questie", text = L["Questie's wins"] },
@@ -12786,9 +12890,8 @@ local function CreateVisionPanel()
 		}
 		local QUESTIE_ICONS_TIP = L["Questie puts quest icons of its own on nameplates and the target frame. " ..
 			"Where Cinematic's quest mark shows on the same unit: Cinematic's wins hides Questie's there, " ..
-			"Questie's wins keeps Cinematic's off, Both show puts them side by side. Either way, Questie's " ..
-			"nameplate icons sit where Cinematic's mark would (beside the name, or over the unit when its " ..
-			"plate is faded), not at the plate's far left."]
+			"Questie's wins keeps Cinematic's off, Both show puts them side by side. Where they go on the " ..
+			"nameplate is set on Quality of Life > Addon Support."]
 		local questieIcons = Dropdown(content, "questieIcons", QUESTIE_ICONS, 180, function()
 			if ns.RefreshTargetQuestIcon then ns.RefreshTargetQuestIcon() end
 			if ns.RefreshClassIcon and C_NamePlate and C_NamePlate.GetNamePlates then
@@ -13652,14 +13755,13 @@ local function CreateTooltipPanel()
 	local switch = PageSwitch(content, "handleTooltips", L["Enable Page"],
 		L["On: CineMode hides tooltips as this page says. Off: every tooltip shows as normal."], note)
 
-	-- Fade in/out (tooltipFadeTime): with the page switched off too.
+	-- Fade in/out (tooltipFadeTime): only with the page switched on.
 	local fade = Slider(content, "tooltipFadeTime", L["Fade in/out"], 0, 3, 0.1, function(value)
 		return value <= 0 and L["Off"] or L["%.1f sec"]:format(value)
 	end)
 	fade:SetPoint("TOPLEFT", switch, "BOTTOMLEFT", 6, -30)
 	Tooltip(fade, L["How long tooltips take to fade in as they show, and to fade out when the mouse has been " ..
-		"still too long (Mouse still, below). Off: no fading."] .. " " .. L["Works with this page switched off too."])
-	fade.pageSwitch = false -- (not greyed with the switch: see SwitchOf)
+		"still too long (Mouse still, below). Off: no fading."])
 
 	-- Mouse still: hide when or until the mouse is still, and the seconds
 	-- beside it (each choice keeps its own: tooltipHideStill or tooltipShowStill).
@@ -13770,8 +13872,7 @@ local function CreateTooltipPanel()
 	previous = ShowTable(content, hideHeader, tooltipRows, L["Tooltips"])
 	previous.sectionX = 0
 
-	-- Tooltip look: where tooltips show (tooltipCursorMode, with the page
-	-- switched off too), how long until the After column, then a grid of
+	-- Tooltip look: where tooltips show (tooltipCursorMode), how long until the After column, then a grid of
 	-- the parts (rows) by when each shows: on first hover, and after
 	-- tooltipFullAfter seconds (columns).
 	local partsHeader = Section(L["Tooltip look"])
@@ -13780,7 +13881,7 @@ local function CreateTooltipPanel()
 		"hovered as long as set above, until you mouse over something else. In and out of CineMode."])
 	local CURSOR_TIP = L["Where the game's tooltips (things in the world, unit frames, action bars, bags) show: " ..
 		"in their default position (the bottom-right corner, or wherever you've moved it), or by the mouse " ..
-		"cursor, following it (or just in fights)."] .. " " .. L["Works with this page switched off too."]
+		"cursor, following it (or just in fights)."]
 	local CURSOR_MODES = {
 		{ value = "corner", text = L["Default position"] },
 		{ value = "cursor", text = L["At the mouse cursor"] },
@@ -13791,14 +13892,12 @@ local function CreateTooltipPanel()
 	if cursorMode then
 		cursorMode:SetPoint("TOPLEFT", partsNote, "BOTTOMLEFT", 4, -10)
 		Tooltip(cursorMode, CURSOR_TIP)
-		cursorMode.pageSwitch = false -- (not greyed with the switch: see SwitchOf)
 		lastCursor = cursorMode
 	else
 		lastCursor = partsNote
 		for _, choice in ipairs(CURSOR_MODES) do
 			local check = Choice(content, "tooltipCursorMode", choice.value, choice.text, CURSOR_TIP)
 			check:SetPoint("TOPLEFT", lastCursor, "BOTTOMLEFT", lastCursor == partsNote and 2 or 0, -2)
-			check.pageSwitch = false
 			lastCursor = check
 		end
 	end
@@ -15201,6 +15300,84 @@ function ns.OpenOptions(page)
 		InterfaceOptionsFrame_OpenToCategory(subpages[page] or mainCanvas)
 		InterfaceOptionsFrame_OpenToCategory(subpages[page] or mainCanvas)
 	end
+end
+
+-- A page opened at one of its rows: scrolled to it and glowing, as a search
+-- match is (the Why window's links). label: the row's text, matched whole;
+-- not found on the page, the page alone opens.
+function ns.OpenOptionsAt(page, label, settingKey)
+	page = MOVED_PAGES[page] or page
+	local found
+	for _, each in ipairs(searchPages) do
+		if each.key == page or (page and each.key == L[page]) then found = each break end
+	end
+	-- (By its setting's key first: that control, on its page or any.)
+	if settingKey and not InCombatLockdown() and ns.OpenSettingByKey(settingKey, found) then return end
+	local wanted = SearchText(label)
+	if found and wanted and not InCombatLockdown() then
+		wanted = wanted:lower()
+		for _, entry in ipairs((BuildSearchIndex({ found }))) do
+			if entry.lower == wanted and entry.edges then
+				ShowMatch(entry)
+				return
+			end
+		end
+	end
+	ns.OpenOptions(page)
+end
+
+-- A setting's own control, by its key (its id: portraitWhenNotFull, and so
+-- on): its page opened, scrolled to it and glowing. page: looked on first
+-- (a key can have a control on more than one page). False: none found.
+function ns.OpenSettingByKey(settingKey, page)
+	if type(settingKey) ~= "string" or settingKey == "" then return false end
+	local _, keyed = BuildSearchIndex(page and { page } or nil)
+	local entry = keyed[settingKey]
+	if not entry and page then
+		_, keyed = BuildSearchIndex()
+		entry = keyed[settingKey]
+	end
+	if not entry then return false end
+	ShowMatch(entry)
+	return entry.text, entry.page.name or "Cinematic"
+end
+
+-- /cine debug ids: every page's controls, those with an id (/cine find <id>)
+-- and those without one yet (a checkbox, slider, box or button you could
+-- click, made without a setting's key or a grid row), as text to copy.
+-- (Hidden ones too: a closed section's, another tab's.)
+function ns.SettingIdsReport()
+	Refresh()
+	local CONTROLS = { CheckButton = true, Slider = true, EditBox = true, Button = true }
+	local with, without, seen = {}, {}, {}
+	for _, page in ipairs(searchPages) do
+		local pageName = page.name or "Cinematic"
+		local function walk(frame)
+			if frame.searchSkip then return end
+			local id = ns.SettingIdOf(frame)
+			if not id and frame.RowId then
+				local ok, rowId = pcall(frame.RowId)
+				id = ok and type(rowId) == "string" and ("row:" .. rowId) or nil
+			end
+			local label = SearchText(frame.searchLabel)
+			if id and not seen[id] then
+				seen[id] = true
+				with[#with + 1] = ("%s | %s | %s"):format(id, pageName, label or "")
+			elseif not id and label and CONTROLS[frame:GetObjectType()] then
+				without[#without + 1] = ("%s | %s"):format(pageName, label)
+			end
+			for _, child in ipairs({ frame:GetChildren() }) do walk(child) end
+		end
+		walk(page.canvas.content)
+	end
+	table.sort(with)
+	local out = { ("Cinematic %s: %d ids, %d controls without one"):format(ns.Version and ns.Version() or "?",
+		#with, #without), "", "== Without an id (page | label) ==" }
+	for _, line in ipairs(without) do out[#out + 1] = line end
+	out[#out + 1] = ""
+	out[#out + 1] = "== Ids (id | page | label): /cine find <id> =="
+	for _, line in ipairs(with) do out[#out + 1] = line end
+	ns.ShowReportText("Setting ids", "Press Ctrl+C to copy.", table.concat(out, "\n"))
 end
 
 -- The key (Bindings.xml): opens the settings at the Cinematic page last shown,
@@ -16658,7 +16835,8 @@ local function GuardGamepadClose()
 		return
 	end
 	local function Wanted()
-		return ns.db and ns.db.forceReloadOnSettingsExit and InputUtil.IsGamepadUIEnabled()
+		return ns.db and ns.db.forceReloadOnSettingsExit and ns.db.handleGamepad ~= false
+			and InputUtil.IsGamepadUIEnabled()
 	end
 	local function Install()
 		local Close = panel.Close

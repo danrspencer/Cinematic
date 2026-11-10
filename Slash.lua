@@ -207,6 +207,7 @@ local function PrintDebugHelp()
 	print("  /cine debug bubbles - log each chat bubble's place, frame by frame as it changes, and how far it's moved off the top (again to stop, /reload to save)")
 	print("  /cine debug layout - Edit Mode's layouts and where the personal resource display is")
 	print("  /cine debug layoutexport - save the Edit Mode layout you're on as an export string (in the saved settings: /reload after)")
+	print("  /cine debug ids - every setting's /cine find id, and the controls on the settings pages that have none yet, to copy")
 	print("  /cine debug changed - which settings make the Profiles page say (changed): each with the profile's value and the default")
 	print("  /cine debug cvars - graphics CVars: which exist here; run, move the Graphics sliders, run again to log what the menu changed")
 	print("  /cine debug cvars <words> - log every CVar whose name has any of the words in it, with its value and default")
@@ -226,6 +227,7 @@ local function PrintDebugHelp()
 	print("  /cine debug vitals - Vitals Vision now: your health as read, how far in, the theme's art (run it in a fight)")
 	print("  /cine debug gameedge [number|back|blend|off] - step through the game's full-screen effect textures over the whole screen, one each time, to pick edges for Vitals Vision's Game art")
 	print("  /cine debug portal [number|file|back|near|far|up|down|turn|tilt|scale N|alpha N|reset|reel [seconds]|off] - (dev copy) show the game's portal and swirl models over the screen, one each time, to see which load and how they sit, for Vitals Vision")
+	print("  /cine debug bargap - the left and right edges of action bars 1-3 and their end buttons, to line up the gaps between bars")
 	print("  /cine debug screenfx [number | id N | find words | speed N | tile N | shots [from] | back | off] - dev copy: the game's full-screen effects (all of them, from its data) animated over the screen, one at a time; Space: next, Backspace: back; shots: a screenshot of each")
 	if ns.isDev then print("  /cine debug cursorsize [value | cycle | back | cvars [word] | hardware 0/1/back | pic blank/small/red/tiny/off] - the game's Cursor Size setting (cursorSizePreferred): what it is, set it, step through -1 to 4 three seconds each, put yours back, list every game setting with cursor (or the word) in its name, switch the hardware cursor, or show a test picture as the cursor") end
 	print("  /cine debug cursor [log [seconds]] - Cursor Hide: on or off, its method, whether its Show in row is on here, what's holding it back, the turn speeds and camera; log: a record of it all for 30 seconds (or the seconds given), saved by a /reload")
@@ -681,6 +683,24 @@ local function HandleSlash(msg)
 			ns.ScoutScreenEffects(arg:match("^screenfx%s*(.-)$"))
 		else
 			ns.Print("/cine debug screenfx is in the dev copy only.")
+		end
+	elseif cmd == "debug" and arg == "bargap" then
+		-- Gaps between action bar buttons and bars (Layouts.lua's bar 3 offset),
+		-- in UI units: each frame's left and right edges.
+		local function edges(name)
+			local f = _G[name]
+			if not f then return name .. " missing" end
+			local l, r = f:GetLeft(), f:GetRight()
+			if not l then return name .. " not placed" end
+			return ("%s %.1f-%.1f (%s)"):format(name, l, r, f:IsShown() and "shown" or "hidden")
+		end
+		local bar1 = _G.MainActionBar and "MainActionBar" or "MainMenuBar"
+		ns.Print("bar gap: layout " .. tostring(C_EditMode and C_EditMode.GetLayouts
+			and (C_EditMode.GetLayouts().activeLayout or "?") or "?"))
+		for _, name in ipairs({ "ActionButton11", "ActionButton12", bar1, "MultiBarBottomRight",
+			"MultiBarBottomRightButton1", "MultiBarBottomRightButton2", "MultiBarBottomLeft",
+			"MultiBarBottomLeftButton12" }) do
+			ns.Print("  " .. edges(name))
 		end
 	elseif cmd == "debug" and ns.isDev and (arg == "cursorsize" or arg:match("^cursorsize ")) then
 		ns.CursorSizeTest(arg:match("^cursorsize%s*(.-)$"))
@@ -1379,6 +1399,8 @@ local function HandleSlash(msg)
 		ns.ViewDistTest()
 	elseif cmd == "debug" and arg == "unitframes" then
 		ns.LogUnitFrames()
+	elseif cmd == "debug" and arg == "ids" then
+		if ns.SettingIdsReport then ns.SettingIdsReport() end
 	elseif cmd == "debug" and arg == "plates" then
 		ns.PrintPlatesDebug()
 		ns.ReportPlateHealthStyle()

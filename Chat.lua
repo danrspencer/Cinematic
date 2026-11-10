@@ -771,7 +771,7 @@ do
 end
 
 -- A chat tab's tooltip ("General Tab") without its green "<Right click for
--- Tab Settings>" line (chatHideTabHint; works with the page switched off too).
+-- Tab Settings>" line (chatHideTabHint, with the Chat page on).
 -- After the game shows it, it's set again with every line but the green
 -- "<...>" ones. (Our own Show, to fit it: rebuilding.)
 do
@@ -827,7 +827,7 @@ do
 	end
 
 	hooksecurefunc(GameTooltip, "Show", function(tooltip)
-		if rebuilding or not (ns.db and ns.db.chatHideTabHint) then
+		if rebuilding or not (ns.db and ns.db.chatHideTabHint and ns.db.handleChat ~= false) then
 			return
 		end
 		rebuilding = true

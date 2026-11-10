@@ -17,8 +17,9 @@ local _, ns = ...
 local L = ns.L
 local why = ns.why
 
-local GREEN, GREY, GOLD = "|cff8fe39a", "|cff9d9585", "|cffffd100"
+local GREEN, GREY, RED = "|cff8fe39a", "|cff9d9585", "|cffff4040"
 local WIDTH, HEIGHT = 480, 620
+local TOGGLE_WIDTH = 140 -- (the big CineMode button in the top box)
 local LIST_WIDTH = WIDTH - 16 - 34 -- (the list's rows: the window less its edges and scroll bar)
 local ROW_HEIGHT, HEADER_HEIGHT = 38, 24
 local STATUS_COLOR = {
@@ -30,6 +31,7 @@ local SECTIONS = {
 	{ "units", "Unit frames" }, { "bars", "Action bars" }, { "combat", "Trackers" },
 	{ "interface", "Info and menus" }, { "minimap", "Minimap" }, { "party", "Party frames (not raid-style)" },
 	{ "raid", "Raid frames" }, { "rsparty", "Party frames (raid-style)" }, { "gamepad", "Gamepad" },
+	{ "overhead", "Nameplates and chat bubbles" },
 	{ "addons", "Other addons' frames" }, { "other", "Everything else" },
 }
 local SECTION_ORDER, SECTION_LABEL = {}, {}
@@ -235,6 +237,18 @@ local function Gather()
 			table.sort(item.parts, function(a, b) return a.at < b.at end)
 		end
 	end
+	-- Nameplates and chat bubbles: a row each for its whole page (one per unit
+	-- would be a row for everyone nearby), with no frame to point at.
+	for i, overhead in ipairs({ { "overhead:plates", "Nameplates", ns.PlatesWhy },
+		{ "overhead:bubbles", "Chat Bubbles", why.BubblesWhy } }) do
+		local ok, status, reasons = pcall(overhead[3] or error)
+		if ok and type(reasons) == "table" then
+			tops[#tops + 1] = { key = overhead[1], title = L[overhead[2]], status = status, kind = Kind(status),
+				reasons = reasons, main = MainReason(reasons), section = "overhead",
+				sectionLabel = L[SECTION_LABEL.overhead], at = i, wholePage = true, settingsPage = overhead[2] == "Nameplates"
+					and "Nameplates" or "Chat bubbles" }
+		end
+	end
 	table.sort(tops, function(a, b)
 		if a.section ~= b.section then return SECTION_ORDER[a.section] < SECTION_ORDER[b.section] end
 		if a.at ~= b.at then return a.at < b.at end
@@ -334,6 +348,22 @@ local function CopyReport()
 		"or in a bug report. It lists each row of frames and its parts, whether it's showing, and why."], table.concat(out, "\n"))
 end
 
+-- A settings link: its page opened at the setting behind it (setting: its
+-- id, ns.OpenSettingByKey), glowing; else, on the row's own page (Game
+-- Frames, Unit Frame Parts...), at its row there by its name; else the page alone.
+-- (By name only there: another page can have a label like the row's, the
+-- Personal Resource Display page's "Player frame" heading.)
+local function OpenAtRow(page, setting)
+	local item = detail and detail.item
+	local ownPage = item and (item.settingsPage or why.FramePage(item.key))
+	local title = item and not item.wholePage and page == ownPage and item.title
+	if ns.OpenOptionsAt and (setting or type(title) == "string") then
+		ns.OpenOptionsAt(page, title or nil, setting)
+	else
+		ns.OpenOptions(page)
+	end
+end
+
 -- A row's reasons, under it while it's open: one frame, moved to the open row.
 local function DetailLine(index)
 	local line = detail.lines[index]
@@ -353,7 +383,7 @@ local function DetailLine(index)
 	glow:SetAllPoints()
 	glow:SetColorTexture(1, 0.82, 0, 0.08)
 	line:SetScript("OnClick", function(self)
-		if self.page then ns.OpenOptions(self.page) end
+		if self.page then OpenAtRow(self.page, self.setting) end
 	end)
 	detail.lines[index] = line
 	return line
@@ -393,7 +423,7 @@ local function FillDetail(item)
 		line.icon:SetDesaturated(off)
 		line.text:SetText(reason.text)
 		line.text:SetTextColor(off and 0.62 or 1, off and 0.58 or 1, off and 0.52 or 1)
-		line.page = reason.page
+		line.page, line.setting = reason.page, reason.setting
 		line.where:SetText(reason.page and L["Settings: %s"]:format(ns.PageLabel(reason.page)) or "")
 		line.text:SetWidth(width - 32)
 		local height = line.text:GetStringHeight() + (reason.page and line.where:GetStringHeight() + 2 or 0) + 2
@@ -409,6 +439,7 @@ local function FillDetail(item)
 	detail.open:SetPoint("TOPLEFT", detail, "TOPLEFT", 0, -(y + 4))
 	-- (The page of what's doing it now, else the row's own.)
 	detail.open.page = (item.main and item.main.page) or item.settingsPage or why.FramePage(item.key)
+	detail.open.setting = item.main and item.main.page == detail.open.page and item.main.setting or nil
 	detail:SetWidth(width)
 	y = y + 4 + 22 + 10
 	detail:SetHeight(y)
@@ -422,7 +453,7 @@ local function MakeDetail()
 	detail.open:SetSize(120, 22)
 	detail.open:SetText(L["Open settings"])
 	detail.open:SetScript("OnClick", function(self)
-		if self.page then ns.OpenOptions(self.page) end
+		if self.page then OpenAtRow(self.page, self.setting) end
 	end)
 	detail.point = ns.PanelButton(detail)
 	detail.point:SetSize(150, 22)
@@ -497,20 +528,24 @@ function Fill()
 	local banner = window.banner
 	if ns.lastCinematic then
 		banner.stripe:SetColorTexture(0.56, 0.89, 0.60)
+		banner.back:SetColorTexture(1, 1, 1, 0.05)
 		banner.title:SetText(L["CineMode is %s"]:format(GREEN .. L["ON"] .. "|r"))
 		banner.text:SetText(L["Cinematic is hiding parts of your interface. Each row below says whether it's " ..
 			"showing right now, and why."])
 		banner.page = "CineMode"
 	else
 		local text, page = ns.CineOffReason()
-		banner.stripe:SetColorTexture(1, 0.82, 0)
-		banner.title:SetText(L["CineMode is %s"]:format(GOLD .. L["OFF"] .. "|r"))
+		-- (Off: red, so it can't be missed.)
+		banner.stripe:SetColorTexture(1, 0.25, 0.25)
+		banner.back:SetColorTexture(1, 0.15, 0.15, 0.18)
+		banner.title:SetText(L["CineMode is %s"]:format(RED .. L["OFF"] .. "|r"))
 		banner.text:SetText(L["So Cinematic isn't hiding anything right now."] .. " " .. text)
 		banner.page = page
 	end
 	banner.now:SetText(L["Right now you are: %s"]:format(NowWords()))
-	banner:SetHeight(10 + banner.title:GetStringHeight() + 4 + banner.text:GetStringHeight() + 6
-		+ banner.now:GetStringHeight() + 10)
+	banner.toggle:SetText(ns.IsCineModeOn() and L["Turn CineMode Off"] or L["Turn CineMode On"])
+	banner:SetHeight(math.max(34 + 20, 10 + banner.title:GetStringHeight() + 4 + banner.text:GetStringHeight() + 6
+		+ banner.now:GetStringHeight() + 10))
 
 	local found, counts = Gather()
 	for _, button in ipairs(window.filters) do
@@ -595,7 +630,7 @@ end
 local function MakeWindow()
 	window = CreateFrame("Frame", "CinematicWhyWindow", UIParent, BackdropTemplateMixin and "BackdropTemplate")
 	window:SetSize(WIDTH, HEIGHT)
-	window:SetPoint("RIGHT", UIParent, "RIGHT", -80, 0)
+	window:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
 	window:SetFrameStrata("HIGH")
 	window:SetToplevel(true)
 	window:SetClampedToScreen(true)
@@ -618,7 +653,7 @@ local function MakeWindow()
 
 	local title = window:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
 	title:SetPoint("TOPLEFT", 16, -14)
-	title:SetText(L["Why Is It Showing?"])
+	title:SetText(L["Why Is It Showing/Hiding?"])
 	local close = CreateFrame("Button", nil, window, "UIPanelCloseButton")
 	if ns.SkinClose then ns.SkinClose(close) end
 	close:SetPoint("TOPRIGHT", -2, -2)
@@ -627,9 +662,9 @@ local function MakeWindow()
 	local banner = CreateFrame("Button", nil, window)
 	banner:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -10)
 	banner:SetSize(WIDTH - 32, 70)
-	local back = banner:CreateTexture(nil, "BACKGROUND")
-	back:SetAllPoints()
-	back:SetColorTexture(1, 1, 1, 0.05)
+	banner.back = banner:CreateTexture(nil, "BACKGROUND")
+	banner.back:SetAllPoints()
+	banner.back:SetColorTexture(1, 1, 1, 0.05)
 	local glow = banner:CreateTexture(nil, "HIGHLIGHT")
 	glow:SetAllPoints()
 	glow:SetColorTexture(1, 0.82, 0, 0.06)
@@ -641,13 +676,23 @@ local function MakeWindow()
 	banner.title:SetPoint("TOPLEFT", 12, -10)
 	banner.text = banner:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
 	banner.text:SetPoint("TOPLEFT", banner.title, "BOTTOMLEFT", 0, -4)
-	banner.text:SetWidth(WIDTH - 32 - 24)
+	-- (The text leaves room on the right for the CineMode button.)
+	banner.text:SetWidth(WIDTH - 32 - 24 - TOGGLE_WIDTH - 10)
 	banner.text:SetJustifyH("LEFT")
 	banner.now = banner:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
 	banner.now:SetPoint("TOPLEFT", banner.text, "BOTTOMLEFT", 0, -6)
-	banner.now:SetWidth(WIDTH - 32 - 24)
+	banner.now:SetWidth(WIDTH - 32 - 24 - TOGGLE_WIDTH - 10)
 	banner.now:SetJustifyH("LEFT")
 	banner:SetScript("OnClick", function(self) ns.OpenOptions(self.page) end)
+	-- A big button that turns CineMode on or off (the Toggle CineMode key).
+	local toggle = ns.PanelButton(banner)
+	toggle:SetSize(TOGGLE_WIDTH, 34)
+	toggle:SetPoint("RIGHT", banner, "RIGHT", -10, 0)
+	toggle:SetScript("OnClick", function()
+		Cinematic_ToggleCineMode()
+		Fill()
+	end)
+	banner.toggle = toggle
 	window.banner = banner
 
 	-- Find a row by name, and the filters with their counts.

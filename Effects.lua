@@ -1372,6 +1372,7 @@ function ns.SetPlateAlpha(plate, alpha, bodyAlpha)
 		end
 		frame:SetAlpha(alpha)
 		KeepRaidMarker(frame, alpha)
+		if ns.QuestiePlateFaded then ns.QuestiePlateFaded(plate, alpha) end -- (PlateParts: its icon slides with it)
 	end
 end
 
@@ -3341,6 +3342,65 @@ function ns.PlatesReport()
 		"Run it while the plates you're asking about are showing."], table.concat(out, "\n"))
 end
 
+-- The Why window's Nameplates row (WhyPanel.lua): which kinds of plate show
+-- here and now and why, as UpdatePlates decides it. Gives a status ("shown",
+-- "partly", "hidden") and its reasons ({ state, text, page }).
+-- (No new locals here: this file's main chunk is at Lua's 200.)
+function ns.PlatesWhy()
+	local out, page = {}, "Nameplates"
+	local function Add(state, text, where)
+		out[#out + 1] = { state = state, text = text, page = where or page }
+	end
+	if not ns.db.handlePlates then
+		Add("on", L["The Nameplates page is off, so the game's own nameplate options decide"])
+		return "shown", out
+	end
+	if not platesActive then
+		Add("on", L["CineMode is off, so the game's own nameplate options decide"], "CineMode")
+		return "shown", out
+	end
+	if ns.ChatCamImmersive and ns.ChatCamImmersive() then
+		Add("block", L["Chat Cam's Ultra immersive hides them in a conversation"], "Cameras")
+		return "hidden", out
+	end
+	local labels = { Enemies = "Enemy players", EnemyMinions = "Enemy minions", EnemyNPCs = "Hostile NPCs",
+		EnemyMinor = "Minor hostile NPCs", NeutralNPCs = "Neutral NPCs", NeutralMinor = "Minor neutral NPCs",
+		Friends = "Friendly players", FriendlyMinions = "Friendly minions", FriendlyNPCs = "Friendly NPCs" }
+	local fighting, lingering = InCombatLockdown(), FightLingering()
+	local shown, hidden = {}, {}
+	for _, kind in ipairs(ns.PLATE_KINDS) do
+		-- (In a fight: its fight ticks. Just after: those or its place's. Else its place's.)
+		local up = (fighting and ShownInFights(kind)) or (not fighting and KeptHere(kind))
+			or (lingering and ShownInFights(kind))
+		local label = L[labels[kind] or kind]
+		if ns.RuleTest(PLATE_RULE_KEY[kind]) then label = L["%s (by its rule)"]:format(label) end
+		if up then shown[#shown + 1] = label else hidden[#hidden + 1] = label end
+	end
+	local when = (fighting and L["in this fight"]) or (lingering and L["just after a fight"])
+		or L["here, out of combat"]
+	if #shown > 0 then Add("on", L["Showing %s: %s"]:format(when, table.concat(shown, ", "))) end
+	if #hidden > 0 then Add("block", L["Hidden %s: %s"]:format(when, table.concat(hidden, ", "))) end
+	-- (What keeps single plates up whatever their kind's row says.)
+	local target = TargetKeptUp()
+	if target then Add("on", L["Your target's plate stays up (Your target row)"]) end
+	local rowLabels = { MyPet = "Your pet's plate", GroupMembers = "Group members' plates",
+		GroupMinions = "Group members' minions' plates", QuestMobs = "Quest mobs' plates" }
+	for row, level in pairs(unitRowLevel) do
+		if level > 0.5 and rowLabels[row] then
+			Add("on", L["%s stay up (their own row)"]:format(L[rowLabels[row]]), row == "QuestMobs" and "Quest Vision" or page)
+		end
+	end
+	if MarkersKeptUp() then Add("on", L["Plates with a raid marker stay up (Raid markers row)"]) end
+	if placeSuffix == "Instances" then
+		Add("off", L["In dungeons and raids the game doesn't let addons fade friendly plates: Friendly plates in " ..
+			"dungeons and raids decides them"])
+	end
+	if #hidden > 0 then
+		Add("off", L["Tick a kind's row for where you are, or for fights, to show it"])
+	end
+	return (#hidden == 0 and "shown") or ((#shown == 0 and not target) and "hidden") or "partly", out
+end
+
 -- One line of a unit's debuffs for /cine debug duels: name, spell id,
 -- duration and time left (whether other players' are readable, for the
 -- duel plates' crowd-control icon).
@@ -4543,11 +4603,11 @@ local function ShowAgain(note)
 end
 
 -- At the mouse cursor (tooltipCursorMode "cursor", or "combat" in fights;
--- Tooltips page, with its switch off too): tooltips the game puts in the
+-- Tooltips page, with its switch on): tooltips the game puts in the
 -- bottom-right corner follow the cursor instead. (SetDefaultAnchor runs before the tooltip gets its lines.)
 function ns.OnTooltipDefaultAnchor(tooltip, parent)
 	local db = ns.db
-	local mode = db and db.enabled and db.tooltipCursorMode
+	local mode = db and db.enabled and db.handleTooltips and db.tooltipCursorMode
 	if mode == "cursor" or (mode == "combat" and (InCombatLockdown() or ns.Flag(UnitAffectingCombat("player")))) then
 		tooltip:SetOwner(parent or UIParent, "ANCHOR_CURSOR")
 	end
