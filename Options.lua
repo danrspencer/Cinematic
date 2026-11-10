@@ -3228,19 +3228,16 @@ local function CreateRevealPanel()
 
 	local calmFull, calmPet -- (below; hidden while the Calm Timer is Off)
 	local calm = stack:Add(Slider(content, "calmTime", L["Calm Timer"], 0, 120, 5, function(value)
-		return value == 0 and L["Off"] or L["%d sec after a fight"]:format(value)
+		return value == 0 and L["CineMode comes back as a fight ends"]
+			or L["CineMode comes back %d sec after a fight"]:format(value)
 	end, nil, function()
 		if calmFull then calmFull:Refresh() end
 		if calmPet then calmPet:Refresh() end
 	end), "slider")
-	Tooltip(calm, L["How long things take to settle back into CineMode after a fight. " ..
-		"Nameplates and names ticked In combat stay up this long (so they don't drop away " ..
-		"between pulls), and visual effects that step aside for fights wait this " ..
-		"long before fading back in. Your portrait and buffs, if they only show after combat, " ..
-		"count a fight as recent for this long too, the RP walk, auto-run and cozy cameras " ..
-		"wait this long before starting, and music muted for fights comes back after it. Then " ..
-		"things fade out at the Fade out time. Off: things fade as soon as the fight ends. " ..
-		"Exit Calm Timer when healthy, below, can end it early."])
+	Tooltip(calm, L["How long after a fight before CineMode comes back. Until then it's still the fight: " ..
+		"everything ticked In combat stays up, and the letterbox, effects, music and cameras that step " ..
+		"aside for fights stay away. Rows with Always ticked don't wait. Then things fade out at the " ..
+		"Fade out time. Exit Calm Timer when healthy, below, can end it early."])
 
 	-- Off at the left end; past it, how long after you're back to full the
 	-- Calm Timer ends (calmEndsAtFull and calmFullAfter).
@@ -4845,18 +4842,20 @@ local function CreateEffectsPanel()
 	local gridHeader = Header(content, L["Show in"], master, -18)
 	gridHeader:SetPoint("TOPLEFT", master, "BOTTOMLEFT", 2, -18)
 	PageIntro(content, gridHeader,
-		L["Where and when each effect shows in CineMode. Always: everywhere. Combat: In combat, Calm Timer (after a " ..
-		"fight, till it's run out), Out of combat (the rest of the time), In a camera mode (flights, AFK, cozy and the " ..
-		"rest). Location: the places. Nothing ticked: it's off."])
+		L["Where and when each effect shows in CineMode. Always: all the time, fights too. Combat: In combat (the " ..
+		"fight and the Calm Timer after it), Out of combat (the rest of the time), In a camera mode (flights, AFK, " ..
+		"cozy and the rest). Location: the places. Nothing ticked: it's off."])
 	local EFFECT_LABELS = { vignette = L["Vignette"], weather = L["Weather"] }
-	local effectRows = { opts = { quiet = true, cam = true, anyFight = true }, underHeader = true }
+	-- (No CineMode column: the effects only show in CineMode, so Always says it all.)
+	local effectRows = { opts = { quiet = true, cam = true, anyFight = true }, underHeader = true, noCine = true }
 	for _, effect in ipairs(ns.EFFECT_GRID) do
 		if EFFECT_LABELS[effect] then
 			local key, alwaysKey = "effect:" .. effect, effect .. "Always"
 			effectRows[#effectRows + 1] = { key = key, label = EFFECT_LABELS[effect], alwaysKey = alwaysKey,
 				alwaysOn = function() return ns.GetDB()[alwaysKey] end,
 				setAlways = function(value) ns.GetDB()[alwaysKey] = value end,
-				alwaysTip = L["Shows all through CineMode. (The other columns then have nothing to add.)"],
+				alwaysTip = L["Shows all through CineMode, fights and the Calm Timer after them too. " ..
+					"(The other columns then have nothing to add.)"],
 				apply = function()
 					local switch = ns.EFFECT_SWITCHES[effect]
 					if switch then ns.GetDB()[switch] = ns.RowOnAnywhere(key, ns.GetDB()[alwaysKey]) end
@@ -5663,7 +5662,7 @@ local function CreateAudioPanel()
 	stack:Help(content,
 		L["Where and when music can play in CineMode; anywhere else it fades out (your own game music too) " ..
 		"and back in after. Always: everywhere. Out of combat: back once the Calm Timer has run out after a " ..
-		"fight (with Calm Timer too: as soon as the fight ends)."])
+		"fight."])
 	-- (underHeader: the column names level with the header, as on the Letterbox page.)
 	local lastRow = ns.ShowTable(content, playsHeader, {
 		opts = { quiet = true, cam = true, anyFight = true }, underHeader = true, {
@@ -6932,21 +6931,12 @@ local function CreateCombatPanel()
 		if ns.ApplyUnitFrameParts then ns.ApplyUnitFrameParts() end
 		if ns.ApplyMirrorTimers then ns.ApplyMirrorTimers() end
 	end)
-	-- (With the rows as dropdowns, each row's Combat dropdown has a Calm Timer
-	-- of its own instead, GridRows.lua; this stays what rows without one go by.)
-	local calm
-	if not ns.GRID_MENUS then
-		calm = Check(content, "combatShowCalm", L["In combat rows stay for the Calm Timer"],
-			L["Frames ticked In combat (here and on the Addon Frames page) stay up after a fight " ..
-			"until the Calm Timer (CineMode page) has run out, then fade. Off: they fade as soon as the fight ends."])
-		calm:SetPoint("TOPLEFT", switch, "BOTTOMLEFT", 0, -2)
-		GreyUnless(calm, function(db) return db.stayInCombat end)
-	end
+	-- (In combat rows stay for the Calm Timer after a fight: it's the fight still.)
 
 	-- (Your player frame kept up while you recover: the Personal Resources page.)
 	-- (Pet happiness: the Quality of life > Hunter page.)
 	-- The lowest option so far, and how far in from the column edge it sits.
-	local lastCheck, lastIndent = calm or switch, 0
+	local lastCheck, lastIndent = switch, 0
 
 	-- Each section a tab of its own, in Heal Vision's folder look
 	-- (ns.FolderTabs, made once every section is): the picked one's table
@@ -12102,11 +12092,7 @@ local function CreateQuestTrackerPanel()
 		return db.questRevealOnlyThat and (db.questRevealOnAccept or db.questRevealOnProgress or db.questRevealOnScenario)
 	end)
 
-	local combatCalm = Check(content, "questCombatCalm", L["Stay up for the Calm Timer after a fight"],
-		L["With the quest tracker ticked In combat (Game Frames page), it stays up after a fight " ..
-		"until the Calm Timer (CineMode page) has run out, then fades. Off: it fades as soon as the fight ends."])
-	combatCalm:SetPoint("TOPLEFT", questCollapse, "BOTTOMLEFT", -QUEST_INDENT, -2)
-	GreyUnless(combatCalm, function(db) return db.stayInCombat end)
+	-- (Ticked In combat, the tracker stays for the Calm Timer after a fight: it's the fight still.)
 
 	-- Classic's quest timer box; retail shows timers in the tracker itself.
 	local timer
@@ -12120,7 +12106,7 @@ local function CreateQuestTrackerPanel()
 			"a scenario's or assault's timer, a dungeon's clock, a timed quest's bar. Just the timer's quest " ..
 			"or scenario: the rest of the tracker stays faded. Hovering it shows it all."])
 	end
-	timer:SetPoint("TOPLEFT", combatCalm, "BOTTOMLEFT", 0, -2)
+	timer:SetPoint("TOPLEFT", questCollapse, "BOTTOMLEFT", -QUEST_INDENT, -2)
 	local lastQuest = timer
 
 	-- The durability figure (with the page on, as the rest).
@@ -12994,7 +12980,7 @@ local function CreateVisionPanel()
 	-- (Indented under it, as its sub-option.)
 	-- Questie's own quest icons, where ours would show too (Support/Questie.lua).
 	-- Shown with Questie loaded only.
-	if ns.AddOnWillLoad("Questie") then
+	if ns.AddOnWillLoad("Questie") and ns.AddonSupportOn("Questie") then
 		local QUESTIE_ICONS = {
 			{ value = "ours", text = L["Cinematic's wins"] },
 			{ value = "questie", text = L["Questie's wins"] },
@@ -14311,6 +14297,12 @@ local function CreateExtrasPanel()
 		end
 	end
 
+	StaticPopupDialogs.CINEMATIC_SUPPORT_RELOAD = {
+		text = L["Switching an addon's support on or off counts after a reload. Reload now?"],
+		button1 = RELOADUI or L["Reload"], button2 = L["Later"],
+		OnAccept = ReloadUI,
+		timeout = 0, whileDead = true, hideOnEscape = true,
+	}
 	-- A row per installed addon supported with no frames of its own (Support/,
 	-- ns.ADDON_NOTES): its name and, across the columns, what's done for it.
 	local notes = {}
@@ -14328,6 +14320,25 @@ local function CreateExtrasPanel()
 			row.works = Label(row.frame, "GameFontDisable", "")
 			row.works:SetPoint("TOPLEFT", LABEL_WIDTH, -5)
 			Tooltip(row.frame, "")
+			-- Its support on or off, in the Always column (only with setup code:
+			-- a note alone has nothing to switch off). Counts after a /reload.
+			if ns.HasAddonSetup(note.addon) then
+				local addon = note.addon
+				local supportBox = ns.SkinCheck(CreateFrame("CheckButton", nil, row.frame, "UICheckButtonTemplate"))
+				supportBox:SetSize(26, 26)
+				supportBox:SetPoint("LEFT", LABEL_WIDTH + (ns.GRID_ALWAYS_W - 26) / 2, 0)
+				row.works:ClearAllPoints()
+				row.works:SetPoint("TOPLEFT", LABEL_WIDTH + ns.GRID_ALWAYS_W + ns.GRID_GAP, -5)
+				supportBox:SetScript("OnClick", function(self)
+					local off = ns.GetDB().addonSupportOff
+					off[addon] = not self:GetChecked() or nil
+					row.works:SetAlpha(off[addon] and 0.5 or 1)
+					StaticPopup_Show("CINEMATIC_SUPPORT_RELOAD")
+				end)
+				Tooltip(supportBox, L["Ticked: Cinematic's support for this addon is on (what's said here). Unticked: off, " ..
+					"Cinematic's own code for it doesn't run. Counts after a reload."])
+				row.support = supportBox
+			end
 			notes[#notes + 1] = row
 		end
 	end
@@ -14625,6 +14636,11 @@ local function CreateExtrasPanel()
 			for _, row in ipairs(group.notes) do
 				row.label:SetText(row.note.label)
 				row.works:SetText(row.note.works)
+				if row.support then
+					local on = ns.AddonSupportOn(row.note.addon)
+					row.support:SetChecked(on)
+					row.works:SetAlpha(on and 1 or 0.5)
+				end
 				Tooltip(row.frame, row.note.about)
 				Place(row.frame, INDENT, ROW_HEIGHT)
 			end
@@ -17023,7 +17039,7 @@ ns.OnLanguage(function()
 	StaticPopupDialogs.CINEMATIC_WORLD_TEXT_RESTART = {
 		-- (No Exit button: Quit is the game's alone, forbidden from an addon's
 		-- popup, tested on Forever 2026-11-10.)
-		text = L["Floating text changes after you fully restart the game (/reload isn't enough)."],
+		text = L["Floating text changes after you fully restart the game (/reload isn't enough). The same goes for getting it back: until a full restart it stays hidden, even with Cinematic turned off."],
 		button1 = CLOSE or L["Close"],
 		timeout = 0, whileDead = true, hideOnEscape = true,
 	}

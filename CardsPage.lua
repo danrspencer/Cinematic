@@ -757,7 +757,6 @@ function ns.CreateCardsPanel(kit)
 					for c = 2, #columns do
 						if not opts.omit[columns[c][3]] and columns[c][2](key) then names[#names + 1] = columns[c][1] end
 					end
-					if not opts.omit.combatShow and ns.IsCalmShowOn(key) then names[#names + 1] = L["Calm Timer"] end
 					if opts.quiet and ns.IsQuietShowOn(key) then names[#names + 1] = L["Out of combat"] end
 					list[#list + 1] = #names == 0 and { L["Never"], ns.ROW_CHIP.never }
 						or { table.concat(names, ", "), ns.ROW_CHIP.when }

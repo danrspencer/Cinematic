@@ -35,8 +35,6 @@ local KEY_ADDRESSES = {
 	prdOn = "Profiles/Edit Mode layout", -- (the game's own switch, with the layout centred on it)
 	prdOnFights = "Personal Resources", -- (the same switch, for fights that show it)
 	chatPeekChannelList = "Chat/Other",
-	-- (with the rows as dropdowns, what rows without a Calm Timer of their own go by)
-	combatShowCalm = "Standard Frames/top",
 	-- (the effects' switches, set from their row of the Visual Effects grid, or the Letterbox page's)
 	letterbox = "Letterbox/Show in", vignette = "Effects/Show in", weatherTint = "Effects/Show in",
 }
@@ -161,10 +159,8 @@ ns.PROFILE_MODULES = {
 
 	-- What fades, and when
 	{ key = "recovering", name = "Up while recovering", scope = { "Standard Frames/top", "Personal Resources" },
-		tip = "In combat rows stay for the Calm Timer, and the player frame and personal resource display " ..
-		"stay up until health and power are full.",
+		tip = "The player frame and personal resource display stay up until health and power are full.",
 		apply = function(set)
-			set("combatShowCalm", true)
 			set("portraitWhenNotFull", true)
 			set("prdWhenNotFull", true)
 		end },
@@ -562,16 +558,17 @@ ns.PROFILE_MODULES = {
 	{ key = "no-letterbox", name = "No letterbox", scope = { "Letterbox/Show in" },
 		tip = "No letterbox: the other effects show over the normal UI.",
 		apply = function(set) set("letterbox", false) end },
-	{ key = "letterbox-in-cinemode", name = "Letterbox in CineMode only", scope = { "Letterbox/Show in" },
-		tip = "The bars only in CineMode, not over the normal UI: the row's Cine tick alone.",
-		settings = { quietShow = { ["effect:letterbox"] = false }, cineModeShow = { ["effect:letterbox"] = true } } },
-	{ key = "tint-in-cinemode", name = "Tint in CineMode only", scope = { "Tint/Show in" },
-		tip = "The tint only in CineMode, not over the normal UI: the row's Cine tick alone.",
-		settings = { tintAlways = false, cineModeShow = { ["effect:tint"] = true } } },
-	{ key = "effects-in-cinemode", name = "Vignette and weather in CineMode only", scope = { "Effects/Show in" },
-		tip = "The vignette and weather only in CineMode, not over the normal UI: their rows' Cine ticks alone.",
-		settings = { vignetteAlways = false, weatherAlways = false,
-			cineModeShow = { ["effect:vignette"] = true, ["effect:weather"] = true } } },
+	-- (Keys as they were: the effects only show in CineMode now anyway, and
+	-- these keep them up all through it, fights too.)
+	{ key = "letterbox-in-cinemode", name = "Letterbox all through CineMode", scope = { "Letterbox/Show in" },
+		tip = "The bars all through CineMode, fights too: the row's Always.",
+		settings = { letterboxAlways = true } },
+	{ key = "tint-in-cinemode", name = "Tint all through CineMode", scope = { "Tint/Show in" },
+		tip = "The tint all through CineMode, fights too: the row's Always.",
+		settings = { tintAlways = true } },
+	{ key = "effects-in-cinemode", name = "Vignette and weather all through CineMode", scope = { "Effects/Show in" },
+		tip = "The vignette and weather all through CineMode, fights too: their rows' Always.",
+		settings = { vignetteAlways = true, weatherAlways = true } },
 	{ key = "effects-in-cameras", name = "Effects only in cameras", scope = { "Effects/Show in", "Letterbox/Show in", "Tint/Show in" },
 		tip = "The letterbox, tint, vignette and weather only while a camera mode runs; no soft edges.",
 		apply = function(set)

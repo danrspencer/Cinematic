@@ -201,16 +201,17 @@ local THEMES = {
 	Theme({
 		key = "glade", name = "Moonlit Glade", unitBars = "linen",
 		tip = "Night in an old forest: deep teal, soft silver and vines climbing the edges. Quiet and alive.",
-		swatch = { { 0.05, 0.11, 0.12 }, { 0.72, 0.9, 0.84 }, { 0.3, 0.72, 0.56 }, { 0.46, 0.42, 0.8 } },
-		menu = { accent = { 0.66, 0.92, 0.82 }, edge = { 0.3, 0.47, 0.46 }, field = { 0.05, 0.1, 0.11 },
+		swatch = { { 0.05, 0.11, 0.12 }, { 0.22, 0.6, 0.52 }, { 0.3, 0.72, 0.56 }, { 0.46, 0.42, 0.8 } },
+		menu = { accent = { 0.34, 0.7, 0.62 }, edge = { 0.1, 0.31, 0.29 }, field = { 0.05, 0.1, 0.11 },
 			window = { 0.03, 0.065, 0.075 }, well = { 0.015, 0.035, 0.04 }, knob = { 0.82, 0.96, 0.9 },
-			thumb = { 0.42, 0.62, 0.58 } },
-		grain = "Glade", ornament = { 0.72, 0.9, 0.84 },
+			thumb = { 0.18, 0.43, 0.38 } },
+		-- (Saturated, not silver: pale, its edges read dry and close to Runestone's.)
+		grain = "Glade", ornament = { 0.22, 0.6, 0.52 },
 		health = { 0.3, 0.72, 0.56 }, mana = { 0.46, 0.42, 0.82 }, back = 0.65,
-		xp = { 0.5, 0.36, 0.82 }, -- (the XP bar, XpBarStyle.lua: a violet of its own; its mana turned read washed out)
+		xp = { 0.5, 0.28, 0.98 }, -- (the XP bar, XpBarStyle.lua: a violet of its own; its mana turned read washed out)
 		panel = { 0.055, 0.12, 0.13 }, panelAlpha = 0.93,
 		cast = { 0.68, 0.84, 0.92 }, channel = { 0.62, 0.52, 0.9 }, locked = { 0.4, 0.48, 0.5 }, stop = { 0.8, 0.3, 0.4 },
-		line = { 0.34, 0.52, 0.5 }, lineSize = 1,
+		line = { 0.12, 0.36, 0.33 }, lineSize = 1,
 		cardColor = { 0.82, 0.96, 0.9 }, cardFont = "cinzel",
 		settings = { styleTexture = "lunar", styleFont = "philosopher", styleOutline = 0, styleShadow = "on",
 			stylePanel = "leaf", styleBarShape = "soft",
@@ -254,15 +255,15 @@ local THEMES = {
 	Theme({
 		key = "hearth", name = "Hearthside", unitBars = "linen",
 		tip = "A warm inn at the end of the road: soft round panels, capsule bars and honey light. Nothing has a sharp edge.",
-		swatch = { { 0.17, 0.11, 0.08 }, { 0.95, 0.72, 0.38 }, { 0.56, 0.68, 0.42 }, { 0.84, 0.47, 0.34 } },
-		menu = { accent = { 0.97, 0.76, 0.44 }, edge = { 0.5, 0.36, 0.26 }, field = { 0.16, 0.11, 0.08 },
+		swatch = { { 0.17, 0.11, 0.08 }, { 0.95, 0.72, 0.38 }, { 0.48, 0.72, 0.26 }, { 0.84, 0.47, 0.34 } },
+		menu = { accent = { 0.97, 0.76, 0.44 }, edge = { 0.6, 0.38, 0.2 }, field = { 0.16, 0.11, 0.08 },
 			window = { 0.11, 0.075, 0.055 }, well = { 0.07, 0.045, 0.035 }, knob = { 1, 0.86, 0.62 },
 			thumb = { 0.66, 0.48, 0.32 } },
 		grain = "Glade", ornament = { 0.95, 0.72, 0.38 },
-		health = { 0.56, 0.68, 0.38 }, mana = { 0.44, 0.58, 0.72 }, back = 0.7,
+		health = { 0.48, 0.72, 0.26 }, mana = { 0.3, 0.52, 0.84 }, back = 0.7, -- (rich: muted, they read dry)
 		panel = { 0.17, 0.115, 0.085 }, panelAlpha = 0.95,
-		cast = { 0.95, 0.72, 0.38 }, channel = { 0.56, 0.68, 0.42 }, locked = { 0.5, 0.42, 0.36 }, stop = { 0.84, 0.36, 0.3 },
-		line = { 0.56, 0.4, 0.28 }, lineSize = 1,
+		cast = { 0.95, 0.72, 0.38 }, channel = { 0.48, 0.72, 0.26 }, locked = { 0.5, 0.42, 0.36 }, stop = { 0.84, 0.36, 0.3 },
+		line = { 0.68, 0.42, 0.2 }, lineSize = 1,
 		cardColor = { 0.98, 0.84, 0.6 }, cardFont = "almendra",
 		settings = { styleTexture = "soft", styleFont = "philosopher", styleOutline = 0, styleShadow = "on",
 			stylePanel = "round", styleBarShape = "capsule", ufShape = "circle",
@@ -312,7 +313,7 @@ local THEMES = {
 		grain = "Forge", ornament = { 0.34, 0.68, 0.17 }, veil = { raid = 0.46, plate = 0.26 },
 		nameColor = { 0.74, 0.95, 0.54 },
 		health = { 0.3, 0.66, 0.14 }, mana = { 0.46, 0.24, 0.66 }, back = 0.88,
-		xp = { 0.36, 0.14, 0.56 }, -- (the XP bar, XpBarStyle.lua: a darker purple; its mana turned came out pink)
+		xp = { 0.44, 0.1, 0.78 }, -- (the XP bar, XpBarStyle.lua: a darker purple; its mana turned came out pink)
 		panel = { 0.03, 0.04, 0.028 }, panelAlpha = 0.96,
 		cast = { 0.5, 0.9, 0.24 }, channel = { 0.56, 0.3, 0.8 }, locked = { 0.32, 0.36, 0.3 }, stop = { 0.6, 0.12, 0.1 },
 		line = { 0.28, 0.56, 0.14 }, lineSize = 1,

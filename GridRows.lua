@@ -656,7 +656,8 @@ end
 local LIST_WORD = { combatShow = "combat", enemyShow = "enemy", friendlyShow = "friendly", bgShow = "bg",
 	worldShow = "world", cityShow = "city", groupShow = "group", instanceShow = "instance" }
 -- The words a list row's dropdowns hold, for ns.ReadGridRule.
-local GRID = { calm = true } -- (calm: the Combat dropdown's Calm Timer, calmShow)
+-- (No calm: the Calm Timer is the fight still, In combat's, since 2026-11-10.)
+local GRID = {}
 for _, word in pairs(LIST_WORD) do GRID[word] = true end
 
 -- The dropdowns, by number (a grid has some of them: ns.GRID_COMBAT...),
@@ -677,6 +678,9 @@ local MENU_NAMES = { combatShow = "In combat", enemyShow = "Enemy targeted", fri
 -- Across a row, from the label's end: Always, CineMode (the Show in tables'),
 -- the dropdowns, Edit. (Its icons: Media/make_quill.py, Media/make_grid_icon.py.)
 local ALWAYS_W, CINE_W, MENU_W, RULE_W, GAP = 40, 44, 96, 22, 2
+-- (For rows lined up with the Always column without a grid of their own:
+-- the Addon Frames page's supported addons' switches.)
+ns.GRID_ALWAYS_W, ns.GRID_GAP = ALWAYS_W, GAP
 local EDIT_ICON = "Interface\\AddOns\\" .. ADDON_NAME .. "\\Textures\\Quill"
 local GRID_ICON = "Interface\\AddOns\\" .. ADDON_NAME .. "\\Textures\\GridIcon"
 -- The dot at the end of a row's name (room kept for it in the label).
@@ -1141,9 +1145,9 @@ end
 -- columnTips (nil: the columns' own), setAlways. Gives menus, words, apply
 -- for ns.GridRow. A tick here gives the rows that follow this one
 -- (ns.ROW_FALLBACK: the pet frame the player frame's) its old tick of their
--- own first, so only this row changes. Combat holds three times, each a
--- tick of its own: In combat, Calm Timer (calmShow: after a fight, till it's
--- run out) and Out of combat (quietShow: the rest). opts (nil: none):
+-- own first, so only this row changes. Combat holds two times, each a
+-- tick of its own: In combat (the fight, and the Calm Timer after it) and Out
+-- of combat (quietShow: the rest). opts (nil: none):
 --   quiet, cam: Out of combat (quietShow) and In a camera mode (camShow) in Combat too;
 --   cinemode: the row has the CineMode column (cineModeShow), its word in the row's rule;
 --   anyFight: its In combat in any fight (not greyed while CineMode doesn't stay on in them);
@@ -1165,9 +1169,8 @@ function ns.ListRowParts(Key, columns, columnTips, setAlways, opts)
 		KeepFollowers(columns[c][3], columns[c][2])
 		ns.GetDB()[columns[c][3]][Key()] = value
 	end
-	-- (The lists that aren't columns: Calm Timer, Out of combat, In a camera mode.)
-	local EXTRA_ON = { calmShow = ns.IsCalmShowOn, quietShow = ns.IsQuietShowOn, camShow = ns.IsCamShowOn,
-		cineModeShow = ns.IsCineModeShowOn }
+	-- (The lists that aren't columns: Out of combat, In a camera mode.)
+	local EXTRA_ON = { quietShow = ns.IsQuietShowOn, camShow = ns.IsCamShowOn, cineModeShow = ns.IsCineModeShowOn }
 	local function ExtraOn(list) return EXTRA_ON[list](Key()) and true or false end
 	local function SetExtra(list, value)
 		KeepFollowers(list, EXTRA_ON[list])
@@ -1195,21 +1198,15 @@ function ns.ListRowParts(Key, columns, columnTips, setAlways, opts)
 			local group = menus[LIST_GROUP[list] or 3]
 			group[#group + 1] = { name, function() return Ticked(c) end, function() SetTick(c, not Ticked(c)) end,
 				needsStay and stays or nil, tip }
-			-- (Combat's Calm Timer: the time after a fight, till it's run out.)
+			-- (Combat's other items: a camera's wait, Out of combat, In a camera mode.)
 			if c == combatColumn then
 				if opts.calmItem then
 					group[#group + 1] = opts.calmItem
-				else
-					group[#group + 1] = { L["Calm Timer"], function() return ExtraOn("calmShow") end,
-						function() SetExtra("calmShow", not ExtraOn("calmShow")) end, nil,
-						L["On after a fight, until the Calm Timer (CineMode page) has run out. With In combat too: " ..
-						"the fight, then that."] }
 				end
 				if opts.quiet then
 					group[#group + 1] = { L["Out of combat"], function() return ExtraOn("quietShow") end,
 						function() SetExtra("quietShow", not ExtraOn("quietShow")) end, nil,
-						L["On out of fights, once the Calm Timer after one has run out. With Calm Timer too: as soon " ..
-						"as a fight ends."] }
+						L["On out of fights, once the Calm Timer after one has run out."] }
 				end
 				if opts.cam then
 					group[#group + 1] = { L["In a camera mode"], function() return ExtraOn("camShow") end,
@@ -1226,8 +1223,7 @@ function ns.ListRowParts(Key, columns, columnTips, setAlways, opts)
 		if opts.quiet then
 			group[#group + 1] = { L["Out of combat"], function() return ExtraOn("quietShow") end,
 				function() SetExtra("quietShow", not ExtraOn("quietShow")) end, nil,
-				L["On out of fights, once the Calm Timer after one has run out. With Calm Timer too: as soon " ..
-				"as a fight ends."] }
+				L["On out of fights, once the Calm Timer after one has run out."] }
 		end
 		if opts.cam then
 			group[#group + 1] = { L["In a camera mode"], function() return ExtraOn("camShow") end,
@@ -1246,7 +1242,6 @@ function ns.ListRowParts(Key, columns, columnTips, setAlways, opts)
 		if opts.cinemode and ExtraOn("cineModeShow") then words[1] = "cinemode" end
 		for c = 2, #columns do
 			if not omit[columns[c][3]] and Ticked(c) then words[#words + 1] = LIST_WORD[columns[c][3]] end
-			if c == combatColumn and not opts.calmItem and ExtraOn("calmShow") then words[#words + 1] = "calm" end
 		end
 		if opts.quiet and ExtraOn("quietShow") then words[#words + 1] = "nocombat" end
 		if opts.cam and ExtraOn("camShow") then words[#words + 1] = "camera" end
@@ -1257,7 +1252,6 @@ function ns.ListRowParts(Key, columns, columnTips, setAlways, opts)
 		for c = 2, #columns do
 			if not omit[columns[c][3]] then SetTick(c, ticked[LIST_WORD[columns[c][3]]] and true or false) end
 		end
-		if combatColumn and not opts.calmItem then SetExtra("calmShow", ticked.calm and true or false) end
 		if opts.quiet then SetExtra("quietShow", ticked.nocombat and true or false) end
 		if opts.cam then SetExtra("camShow", ticked.camera and true or false) end
 		if opts.cinemode then SetExtra("cineModeShow", ticked.cinemode and true or false) end
@@ -1265,7 +1259,6 @@ function ns.ListRowParts(Key, columns, columnTips, setAlways, opts)
 	-- (The words this row's dropdowns hold, for reading a rule back into them.)
 	local grid = {}
 	for word in pairs(GRID) do grid[word] = true end
-	if omit.combatShow or opts.calmItem then grid.calm = nil end
 	for list in pairs(omit) do
 		if LIST_WORD[list] then grid[LIST_WORD[list]] = nil end
 	end

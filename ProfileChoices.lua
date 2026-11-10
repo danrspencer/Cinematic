@@ -123,7 +123,7 @@ ns.SLOT_CHOICES = {
 			modules = { "effects-in-cameras" } },
 		-- (Only Subtle's: not offered.)
 		{ part = "cinebars", hidden = true, label = "In CineMode",
-			line = "The letterbox, tint, vignette and weather only in CineMode",
+			line = "The letterbox, tint, vignette and weather all through CineMode",
 			modules = { "letterbox-in-cinemode", "tint-in-cinemode", "effects-in-cinemode" } },
 		{ part = "pure", label = "Through fights", line = "Fights don't bring the letterbox down",
 			modules = { "letterbox-in-fights" } },

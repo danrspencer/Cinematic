@@ -26,6 +26,10 @@ table.insert(ns.ADDON_NOTES, {
 -- Whether DialogueUI's window is up with its camera on (its saved settings:
 -- CameraMovement 0 is off, nil its default, on).
 function ns.DialogueUICameraOn()
+	-- (Its support switched off, Addon Frames page: ours play as if it weren't here.)
+	if not ns.AddonSupportOn("DialogueUI") then
+		return false
+	end
 	local frame = _G.DUIQuestFrame
 	if not (frame and ns.Flag(frame:IsShown())) then
 		return false

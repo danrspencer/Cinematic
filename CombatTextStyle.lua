@@ -30,7 +30,7 @@ DEFAULTS.combatTextNumbers = true     -- our numbers over nameplates
 DEFAULTS.combatTextHideGame = true    -- the game's damage and healing numbers off (its CVars) while the page is on
 DEFAULTS.combatTextCritPop = true     -- a crit pops big and settles, as the game's
 DEFAULTS.combatTextFont = "game"      -- "game": the game's floating text font; else a Style font
-DEFAULTS.combatTextOutline = 1        -- 0 none, 1 thin (the game's), 2 thick
+DEFAULTS.combatTextOutline = 2        -- 0 none, 1 thin, 2 thick (closest to the game's at our size), 3 soft shadow
 DEFAULTS.combatTextSize = 1           -- times the game's size
 DEFAULTS.combatTextHeight = 0         -- extra pixels above the plate
 DEFAULTS.combatTextSchoolColors = false -- spell damage in its school's color (else the game's yellow)
@@ -141,26 +141,46 @@ local function PlateSpot(plate)
 	end
 end
 
-local OUTLINES = { [0] = "", "OUTLINE", "THICKOUTLINE" }
+-- Outline: 0 none, 1 thin, 2 thick, 3 a soft shadow down and right, no line.
+local OUTLINES = { [0] = "", "OUTLINE", "THICKOUTLINE", "" }
 local function SetSize(text, size)
 	local db = ns.db
 	local file = db and db.combatTextFont ~= "game" and ns.StyleFontFile(db.combatTextFont) or GAME_FONT
-	local outline = OUTLINES[db and tonumber(db.combatTextOutline) or 1] or "OUTLINE"
+	local level = db and tonumber(db.combatTextOutline) or 1
+	local outline = OUTLINES[level] or "OUTLINE"
 	if not text:SetFont(file, size, outline) then
 		text:SetFont("Fonts\\FRIZQT__.TTF", size, outline)
 	end
+	-- (The shadow's color stays solid black: a see-through one took the
+	-- outline with it, Forever 2026-11-10. Only its offset says shadow or not.)
+	local drop = level == 3 and math.max(1, size / 16) or 0
+	text:SetShadowColor(0, 0, 0, 1)
+	text:SetShadowOffset(drop, -drop)
 end
 
 -- Hits landing together spread sideways, as the game's do (its "Resist
--- Resist", "10 12" side by side): the nth number on a plate while others
--- there are still young goes in slot n: middle, right, left, further right...
-local SLOTS = { 0, 1, -1, 2, -2, 3, -3 }
-local function Slot(plate, now)
-	local young = 0
+-- Resist", "10 12" side by side): a number landing while others on its plate
+-- are still young goes past the outermost of them, right then left in turn,
+-- by their widths (an amount that can't be measured, being secret: about two
+-- digits).
+local GAP = 4
+local function Width(number, size)
+	return number.width or size * SPREAD
+end
+local function SlotX(plate, now, width)
+	local right, left, count = nil, nil, 0
 	for _, other in ipairs(live) do
-		if other.plate == plate and now - other.start < TOGETHER then young = young + 1 end
+		if other.plate == plate and now - other.start < TOGETHER then
+			count = count + 1
+			local half = Width(other, other.size) / 2
+			local r, l = other.baseX + half, other.baseX - half
+			right = right and math.max(right, r) or r
+			left = left and math.min(left, l) or l
+		end
 	end
-	return SLOTS[young % #SLOTS + 1]
+	if count == 0 then return 0 end
+	if count % 2 == 1 then return right + GAP + width / 2 end
+	return left - GAP - width / 2
 end
 
 -- One number over a plate. color: an {r, g, b}; crit: pops big and settles
@@ -171,7 +191,6 @@ local function Spawn(plate, unit, amount, color, crit)
 	local now = GetTime()
 	local number = NewNumber()
 	local size = BASE_SIZE * CVarNumber("WorldTextScale_v2", 1) * (db.combatTextSize or 1)
-	local x = Slot(plate, now) * size * SPREAD
 	-- (its middle where a hit's bottom starts, half a hit above; a crit's lower)
 	local y = START_Y + (db.combatTextHeight or 0) + size / 2 + (crit and CRIT_DROP or 0)
 	if crit then size = size * CRIT_SIZE end
@@ -179,6 +198,9 @@ local function Spawn(plate, unit, amount, color, crit)
 	SetSize(text, size)
 	text:SetTextColor(color[1], color[2], color[3])
 	text:SetText(amount) -- (a secret amount goes on as it is)
+	local ok, width = pcall(text.GetStringWidth, text)
+	number.width = ok and type(width) == "number" and Plain(width) and width > 0 and width or nil
+	local x = SlotX(plate, now, Width(number, size))
 	number:SetFrameStrata(plate:GetFrameStrata())
 	number:SetFrameLevel(math.min(plate:GetFrameLevel() + 20, 9000))
 	number.plate, number.unit, number.crit, number.size = plate, unit, crit, size
@@ -356,6 +378,8 @@ local GAME_NUMBERS = ns.CVarSet("Game's damage numbers off", "Combat Text Style 
 		floatingCombatTextPetSpellDamage_v2 = "0",
 	},
 })
+
+ns.COMBAT_TEXT_GAME_NUMBERS = GAME_NUMBERS -- (Core.lua lets go at logout)
 
 -- After a setting changes (the page), and every two seconds.
 function ns.RefreshCombatTextStyle()
@@ -580,9 +604,9 @@ function ns.CreateCombatTextStylePanel(kit)
 
 	stack:Header(content, L["Look"])
 	rows.Font("combatTextFont", L["The numbers' font. The game's: the one it draws its own floating text in."],
-		Ours, { "game", L["The game's"] })
-	rows.Outline("combatTextOutline", L["Outline"], 2, { [0] = L["None"], L["Thin"], L["Thick"] },
-		L["A black border around the numbers. Thin: as the game's."], Ours)
+		Ours) -- (its list starts with The game's: "game")
+	rows.Outline("combatTextOutline", L["Outline"], 3, { [0] = L["None"], L["Thin"], L["Thick"], L["Soft shadow"] },
+		L["A black border around the numbers (Thick: closest to the game's), or none with a soft shadow below them."], Ours)
 	rows.Slider("combatTextSize", L["Size"], 50, 200, 5, "%d%%", 100,
 		L["How big the numbers are, next to the game's."], Ours)
 	rows.Slider("combatTextHeight", L["Height"], -40, 80, 2, "%d px", nil,
@@ -591,11 +615,14 @@ function ns.CreateCombatTextStylePanel(kit)
 	stack:Header(content, L["The game's floating text"])
 	rows.Check("combatTextHideGame", L["Turn off the game's damage and healing numbers"],
 		L["The game's own numbers over what you hit and heal, off at once while this page is on, and back as " ..
-		"they were when it's off. Its XP gains stay: for those, the next one."])
+		"they were when it's off, or when you log out (so turning Cinematic off brings them back). Its XP " ..
+		"gains stay: for those, the next one."])
 	local all = rows.Check("hideWorldText", L["Hide all the game's floating text, XP too (restart required)"],
 		L["The game has no way to hide just the XP you gain: it draws that, its damage and healing numbers, " ..
 		"misses and the like all in one font. This blanks that font, so they all go, always. Takes effect " ..
-		"after you fully restart the game; /reload isn't enough."])
+		"after you fully restart the game; /reload isn't enough.\n\nTo get the game's text back, untick this " ..
+		"(or turn this page or Cinematic off) and fully restart the game again: until then it stays hidden, " ..
+		"even with Cinematic turned off."])
 	all:HookScript("OnClick", function() StaticPopup_Show("CINEMATIC_WORLD_TEXT_RESTART") end)
 
 	canvas:SetScript("OnShow", kit.PageShown(kit.Refresh, content))

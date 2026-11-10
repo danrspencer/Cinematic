@@ -136,11 +136,13 @@ function ns.CreateEffectPanel(kit, effect)
 	local header = stack:Header(content, L["Show in"])
 	local key, alwaysKey = "effect:" .. effect, effect .. "Always"
 	local lastRow = ns.ShowTable(content, header, {
-		opts = { quiet = true, cam = true, anyFight = true }, underHeader = true,
+		-- (No CineMode column: the effects only show in CineMode, so Always says it all.)
+		opts = { quiet = true, cam = true, anyFight = true }, underHeader = true, noCine = true,
 		{ key = key, label = L[info.name], alwaysKey = alwaysKey,
 			alwaysOn = function() return ns.GetDB()[alwaysKey] end,
 			setAlways = function(value) ns.GetDB()[alwaysKey] = value end,
-			alwaysTip = L["Shows all through CineMode. (The other columns then have nothing to add.)"],
+			alwaysTip = L["Shows all through CineMode, fights and the Calm Timer after them too. " ..
+				"(The other columns then have nothing to add.)"],
 			apply = function()
 				local switch = ns.EFFECT_SWITCHES and ns.EFFECT_SWITCHES[effect]
 				if switch then ns.GetDB()[switch] = ns.RowOnAnywhere(key, ns.GetDB()[alwaysKey]) end

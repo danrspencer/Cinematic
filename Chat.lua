@@ -442,6 +442,14 @@ ns.chatPeekHolders = {} -- [frame] = true: holds a peeking chat window (Frames.l
 -- that panel up too, or nothing shows. Filled by the Addon Frame Links
 -- (FrameLinks.lua), as the window part's pick says.
 ns.chatPeekPanels = {}
+-- Whether a chat window's lines show: the window, or its linked panel (Glass
+-- keeps the game's windows hidden and draws the selected tab's lines on its
+-- own frame: Support/Glass.lua).
+function ns.ChatWindowShown(chatFrame)
+	if ns.Flag(chatFrame:IsShown()) then return true end
+	local panel = ns.chatPeekPanels[chatFrame]
+	return panel ~= nil and ns.Flag(panel:IsShown())
+end
 function ns.MarkChatHolders(frame)
 	local panel = ns.chatPeekPanels[frame]
 	if panel then
@@ -459,7 +467,7 @@ ns.chatTypingUntil = 0 -- typing shows the whole chat group without leaving cine
 -- Only a window you'd see peeks: a docked tab that isn't the selected one is
 -- hidden, and peeking it would bring up just the dock's tabs.
 local function PeekWindow(chatFrame)
-	if chatFrame.IsShown and ns.Flag(chatFrame:IsShown()) then
+	if chatFrame.IsShown and ns.ChatWindowShown(chatFrame) then
 		ns.chatPeekUntil[chatFrame] = GetTime() + ns.HoldTime("chatPeekTime")
 		ns.framesWake = true -- (the frames' pass at once: Core.lua)
 	end
@@ -468,7 +476,7 @@ end
 -- Shows a chat window for at least seconds, whatever the Chat page's peek
 -- settings (our own lines worth reading: the update notice).
 function ns.PeekChat(chatFrame, seconds)
-	if chatFrame and ns.Flag(chatFrame:IsShown()) then
+	if chatFrame and ns.ChatWindowShown(chatFrame) then
 		local untilTime = GetTime() + math.max(seconds, ns.HoldTime("chatPeekTime"))
 		ns.chatPeekUntil[chatFrame] = math.max(ns.chatPeekUntil[chatFrame] or 0, untilTime)
 		ns.framesWake = true -- (the frames' pass at once: Core.lua)
@@ -550,7 +558,12 @@ local bubbleWatch = CreateFrame("Frame")
 -- with the UI.
 local function ChatUnseen(chatFrame)
 	if not ns.Flag(chatFrame:IsVisible()) then
-		return true
+		-- (Its lines on a linked panel instead, Glass's: that one's seen or not.)
+		local panel = ns.chatPeekPanels[chatFrame]
+		if not (panel and ns.Flag(panel:IsVisible())) then
+			return true
+		end
+		chatFrame = panel
 	end
 	local alpha = chatFrame:GetEffectiveAlpha()
 	return type(alpha) == "number" and not (issecretvalue and issecretvalue(alpha)) and alpha < 0.95
@@ -571,7 +584,7 @@ local function SpeakOrPeek(line)
 			tostring(chatFrame:GetEffectiveAlpha()), tostring(ns.db.chatSpeechBehind)))
 	end
 	if not (ns.db.handleBubbles and ns.db.chatSpeechBehind and ns.ShowSpeechBehind
-			and ns.Flag(chatFrame:IsShown())) then
+			and ns.ChatWindowShown(chatFrame)) then
 		PeekWindow(chatFrame)
 	elseif ChatUnseen(chatFrame) then
 		ns.ShowSpeechBehind(line[4], line[5], line[2], line[6])

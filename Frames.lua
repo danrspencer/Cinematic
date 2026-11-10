@@ -2751,24 +2751,12 @@ function ns.IsCineShowOn(key)
 	return on
 end
 function ns.IsEnemyShowOn(key) return IsListOn("enemyShow", key, ENEMY_SHOW_DEFAULT) end
--- Whether a row's on for the Calm Timer after a fight, the cool-down (the
--- Combat dropdown's Calm Timer: a time of its own, beside In combat and Out of
--- combat): its own tick, else what it follows, else its default, else, for a
--- row ticked In combat, combatShowCalm (the page's one switch, before: those
--- rows stayed for it).
+-- Whether a row's on for the Calm Timer after a fight. The Calm Timer is the
+-- fight still (2026-11-10): CineMode comes back only once it runs out, so a
+-- row shows then just as its In combat tick says. (The old Calm Timer ticks,
+-- calmShow, are read no more.)
 function ns.IsCalmShowOn(key)
-	key = ns.FollowKey(key)
-	local on = ns.db.calmShow and ns.db.calmShow[key]
-	if on == nil and ROW_FALLBACK[key] then
-		return ns.IsCalmShowOn(ROW_FALLBACK[key])
-	end
-	if on == nil and ns.LIST_DEFAULTS.calmShow[key] ~= nil then
-		return ns.LIST_DEFAULTS.calmShow[key]
-	end
-	if on == nil then
-		return ns.db.combatShowCalm and ns.IsCombatShowOn(key) and true or false
-	end
-	return on
+	return ns.IsCombatShowOn(key) and true or false
 end
 function ns.IsFriendlyShowOn(key) return IsListOn("friendlyShow", key, TARGET_SHOW_DEFAULT) end
 
@@ -3743,14 +3731,13 @@ end
 -- The facts a row's rule is read with where it's used, for the rule
 -- editor's "Right now" and dots: the nameplates', names', plate parts' (<kind>When)
 -- and Heal Vision's in a fight only while really in one (ns.RuleFactsNow); the
--- rest (frames, ns.RowOnNow) with the Calm Timer as combat while combatShowCalm is on.
+-- rest (frames, ns.RowOnNow) with the Calm Timer as combat: the fight still.
 function ns.RuleFactsFor(key)
 	if type(key) == "string" and (key:find("^plate:") or key:find("^name:") or key == "healVision"
 		or key:find("When$")) then
 		return ns.RuleFactsNow()
 	end
-	return ns.RuleFacts(InCombatLockdown() or ns.Flag(UnitAffectingCombat("player"))
-		or (ns.InCalm() and ns.db.combatShowCalm))
+	return ns.RuleFacts(InCombatLockdown() or ns.Flag(UnitAffectingCombat("player")) or ns.InCalm())
 end
 
 -- Casting at an enemy out of combat (Standard Frames page, "Cast fade into
@@ -3875,18 +3862,13 @@ do
 end
 
 -- Frame names to show right now, from the Standard Frames page's column that
--- applies: In combat (while staying cinematic, and with combatShowCalm on
--- until the Calm Timer has run out after the fight), Tar enemy (out of combat
+-- applies: In combat (while staying cinematic, and until the Calm Timer has run
+-- out after the fight: the fight still), Tar enemy (out of combat
 -- with a living enemy targeted) or Tar friendly (anything else targeted:
 -- friends, NPCs, dead enemies).
 -- Rows with Always ticked are always in it: they don't fade in CineMode at all.
--- Rows with a Calm Timer option of their own on their page: their In combat
--- tick lasts until the Calm Timer runs out even with combatShowCalm off. And
--- each row's own Calm Timer tick (ns.IsCalmShowOn): its In combat tick lasts
--- till then, the target columns counting meanwhile.
 local GetCombatShownFrames
 do
-	local CALM_ROW_SETTING = { quests = "questCombatCalm" }
 	-- Whether a row is ticked in one of the place columns that apply here.
 	-- (Kept out of GetCombatShownFrames: a closure made each tick was garbage.)
 	local function KeptHere(placeLists, key)
@@ -3904,11 +3886,10 @@ do
 		return ns.IsCombatShowOn(key) or (targetIsOn and targetIsOn(key))
 	end
 	function GetCombatShownFrames()
-		local fighting = InCombatLockdown() or ns.Flag(UnitAffectingCombat("player"))
-		local calm = not fighting and GetTime() - lastCombatAt < (ns.db.calmTime or 0)
-		-- (The rules' combat as it always was; the ticks' just the fight, each
-		-- row's Calm Timer tick keeping it after.)
-		local inCombat = fighting or (calm and ns.db.combatShowCalm)
+		local fight = InCombatLockdown() or ns.Flag(UnitAffectingCombat("player"))
+		-- (The Calm Timer after a fight is the fight still, for the ticks and the rules.)
+		local fighting = fight or GetTime() - lastCombatAt < (ns.db.calmTime or 0)
+		local inCombat = fighting
 		local isOn
 		if fighting then
 			if ns.db.stayInCombat then
@@ -3936,17 +3917,15 @@ do
 		local facts = ns.RuleFacts(inCombat)
 		for _, item in ipairs(ns.COMBAT_SHOW) do
 			local applies = not (gamepad and item.notGamepad) and not (item.gamepadOnly and not gamepad)
-			local calmRow = calm and ns.db.stayInCombat and (ns.IsCalmShowOn(item.key)
-				or ns.IsCombatShowOn(item.key) and ns.db[CALM_ROW_SETTING[item.key] or ""] and ns.PageOn("handleQuests"))
 			-- (A row's rule, when it has one that reads, decides instead of its ticks.)
 			local ticked = ns.RuleShows(item.key, facts)
 			if ticked == nil then
 				ticked = ns.IsCineShowOn(item.key) or KeptHere(placeLists, item.key) or (isOn and isOn(item.key))
-					or calmRow
 			end
 			-- (Your bars held back at a fight's start, Personal Resources page:
-			-- up only where Always or a place keeps them.)
-			if ticked and (fighting or isOn == CastIsOn) and ns.FightHold(item.key)
+			-- up only where Always or a place keeps them. The fight itself, not the
+			-- Calm Timer after it.)
+			if ticked and (fight or isOn == CastIsOn) and ns.FightHold(item.key)
 				and not (ns.IsCineShowOn(item.key) or ns.IsCineModeShowOn(item.key) or KeptHere(placeLists, item.key)) then
 				ticked = false
 			end
@@ -3965,7 +3944,6 @@ do
 			local ticked = ns.RuleShows(key, facts)
 			if ticked == nil then
 				ticked = KeptHere(placeLists, key) or (isOn and isOn(key))
-					or (calm and ns.db.stayInCombat and ns.IsCalmShowOn(key))
 			end
 			if ticked then
 				shown[GROUP_KEY[key]] = true
@@ -4024,10 +4002,10 @@ do
 	-- Enemy / Tar friendly. anyFight: In combat counts in any fight (else only while
 	-- CineMode stays on in them).
 	function ns.RowOnNow(key, always, anyFight)
+		-- (The Calm Timer after a fight is the fight still.)
 		local fighting = InCombatLockdown() or ns.Flag(UnitAffectingCombat("player"))
-		local calm = not fighting and GetTime() - lastCombatAt < (ns.db.calmTime or 0)
-		local inCombat = fighting or (calm and ns.db.combatShowCalm)
-		local facts = ns.RuleFacts(inCombat)
+			or GetTime() - lastCombatAt < (ns.db.calmTime or 0)
+		local facts = ns.RuleFacts(fighting)
 		local ticked = ns.RuleShows(key, facts)
 		if ticked ~= nil then
 			return ticked
@@ -4044,14 +4022,12 @@ do
 		-- (In combat counts while CineMode stays on in fights, for the rows of
 		-- the UI; anyFight: any fight, for the rest.)
 		local stays = anyFight or ns.db.stayInCombat
-		-- (Three times, each its own tick: the fight, the Calm Timer after it,
-		-- and the rest, Out of combat.)
+		-- (Two times: the fight with the Calm Timer after it, In combat; and the
+		-- rest, Out of combat.)
 		if fighting then
 			return stays and ns.IsCombatShowOn(key) and true or false
 		end
-		if calm then
-			if ns.IsCalmShowOn(key) then return true end
-		elseif ns.IsQuietShowOn(key) then
+		if ns.IsQuietShowOn(key) then
 			return true
 		end
 		if HasAnyTarget() then

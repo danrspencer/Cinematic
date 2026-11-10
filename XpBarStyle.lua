@@ -137,7 +137,7 @@ local barHooked, restedHooked = {}, {}
 -- (Rich, not pale: most themes' mana is a soft grey-blue, and pushed to full
 -- brightness it read light and washed out, the game's art greyed under it. So a
 -- strength of at least VIVID and a brightness of BRIGHT, its hue kept.)
-local VIVID, BRIGHT = 0.62, 1
+local VIVID, BRIGHT = 0.78, 1
 local function Bright(color)
 	local r, g, b = color[1], color[2], color[3]
 	local top, low = math.max(r, g, b, 0.01), math.min(r, g, b)

@@ -362,9 +362,10 @@ local function Columns(key, out, always, anyFight, page)
 end
 function ColumnsOf(key, out, always, anyFight, page)
 	page = page or FramePage(key)
-	local fighting = Fighting()
+	-- (The Calm Timer after a fight counts as the fight still.)
 	local calm = ns.InCalm()
-	local facts = ns.RuleFacts(fighting or (calm and ns.db.combatShowCalm))
+	local fighting = Fighting() or calm
+	local facts = ns.RuleFacts(fighting)
 	local text = ns.db.frameRules and ns.db.frameRules[key]
 	if ns.RuleTest(key) then
 		local on = ns.RuleShows(key, facts)
@@ -399,15 +400,10 @@ function ColumnsOf(key, out, always, anyFight, page)
 	local enemy = hasTarget and ns.IsEnemyUnit("target") and not ns.Flag(UnitIsDeadOrGhost("target"))
 	if ns.IsCombatShowOn(key) then
 		local now = fighting and stays
-		Add(out, now and "on" or "off", now and L["In combat is ticked, and you're fighting"]
+		Add(out, now and "on" or "off", (now and calm and L["In combat is ticked, and the Calm Timer after the fight is running"])
+			or (now and L["In combat is ticked, and you're fighting"])
 			or (fighting and L["In combat is ticked, but CineMode doesn't stay on in fights"])
-			or L["In combat is ticked: it shows when a fight starts"], page)
-		found = true
-	end
-	if ns.IsCalmShowOn(key) and (calm or not ns.IsCombatShowOn(key)) then
-		local now = calm and stays
-		Add(out, now and "on" or "off", now and L["Calm Timer is ticked, and a fight just ended"]
-			or L["Calm Timer is ticked: it stays a while after a fight"], page)
+			or L["In combat is ticked: it shows when a fight starts, until the Calm Timer after it runs out"], page)
 		found = true
 	end
 	if ns.IsEnemyShowOn(key) then
@@ -422,7 +418,7 @@ function ColumnsOf(key, out, always, anyFight, page)
 			or L["Tar friendly is ticked: it shows when you target a friend"], page)
 		found = true
 	end
-	if fighting and ns.FightHold(key) and not always then
+	if fighting and not calm and ns.FightHold(key) and not always then
 		local wait = { player = "fightWaitPortrait", prd = "fightWaitHealth", prdpower = "fightWaitPower",
 			prdmana = "fightWaitPower" }
 		Add(out, "block", L["Held back at the fight's start while you're at rest (Personal Resource Display page)"],

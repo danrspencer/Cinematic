@@ -2131,8 +2131,21 @@ function ns.UnitStyleState()
 		tostring(ns.StyleTexturePath(view.ufTexture)), tostring(view.ufHealthColor), tostring(view.ufShape))
 end
 
-function ns.RefreshUnitStyle()
+-- (Every refresh is done again a moment later, once: after a profile or theme
+-- switch, as after a reload, parts of the player frame are placed again after
+-- our pass, and the name strip, bars and portrait came out off until something
+-- else dressed them again.)
+local settling = false
+local function Settle()
+	settling = false
+	if ns.RefreshUnitStyle then ns.RefreshUnitStyle(true) end
+end
+function ns.RefreshUnitStyle(again)
 	if not ns.db then return end
+	if not again and not settling then
+		settling = true
+		C_Timer.After(0.4, Settle)
+	end
 	wipe(frameInfo)
 	-- (Each on its own, so one's trouble leaves the others dressed, with where it was.)
 	for _, info in ipairs(FRAMES) do
@@ -2149,10 +2162,18 @@ for _, event in ipairs({ "PLAYER_LOGIN", "PLAYER_TARGET_CHANGED", "PLAYER_FOCUS_
 	"PLAYER_REGEN_ENABLED" }) do -- (a fight's end: what couldn't move during it, moved)
 	pcall(watcher.RegisterEvent, watcher, event)
 end
+pcall(watcher.RegisterEvent, watcher, "PLAYER_ENTERING_WORLD")
 watcher:SetScript("OnEvent", function(_, event, name)
 	-- (Of the game's settings, only the classic clients' raid-style party one.)
 	if event == "CVAR_UPDATE" and name ~= "useCompactPartyFrames" then return end
 	ns.RefreshUnitStyle()
+	-- (After a reload the game places the player frame's parts again after our first
+	-- pass: the portrait and name came out off until something (a target) dressed
+	-- them again. So twice more, once it's settled.)
+	if event == "PLAYER_LOGIN" or event == "PLAYER_ENTERING_WORLD" then
+		C_Timer.After(0.5, ns.RefreshUnitStyle)
+		C_Timer.After(2, ns.RefreshUnitStyle)
+	end
 end)
 if hooksecurefunc and type(_G.UnitFramePortrait_Update) == "function" then
 	hooksecurefunc("UnitFramePortrait_Update", function(frame)

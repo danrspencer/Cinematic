@@ -1004,10 +1004,32 @@ if arg[1] and not update then
 				print("problem	Subtle: " .. event .. " doesn't bring CineMode on")
 			end
 		end
+		-- (The effects only show in CineMode now: Subtle's are on all through it,
+		-- their rows' Always, with no CineMode tick left over.)
 		for _, effect in ipairs(ns.EFFECT_GRID) do
 			local row = "effect:" .. effect
-			if subtle.quietShow[row] or subtle[effect .. "Always"] or not subtle.cineModeShow[row] then
-				print("problem	Subtle's " .. effect .. " shows outside CineMode, or not in it")
+			if not subtle[effect .. "Always"] or (subtle.cineModeShow and subtle.cineModeShow[row]) then
+				print("problem	Subtle's " .. effect .. " isn't on all through CineMode")
+			end
+		end
+		-- The effects' old CineMode ticks go onto Always, once.
+		local old = { cineModeShow = { ["effect:letterbox"] = true, ["effect:tint"] = false }, tintAlways = false }
+		ns.EffectCineTicksToAlways(old)
+		if not old.letterboxAlways or old.tintAlways ~= false or next(old.cineModeShow) ~= nil then
+			print("problem	Effects' CineMode ticks weren't moved onto Always as they should be")
+		end
+		-- The Calm Timer after a fight is the fight still: a row shows then as
+		-- its In combat tick says.
+		do
+			local calmDb = ns.GetDB()
+			local was = calmDb.combatShow["effect:letterbox"]
+			calmDb.combatShow["effect:letterbox"] = true
+			local on = ns.IsCalmShowOn("effect:letterbox")
+			calmDb.combatShow["effect:letterbox"] = false
+			local off = ns.IsCalmShowOn("effect:letterbox")
+			calmDb.combatShow["effect:letterbox"] = was
+			if not on or off then
+				print("problem	Calm Timer: a row doesn't go by its In combat tick after a fight")
 			end
 		end
 	end

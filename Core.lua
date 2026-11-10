@@ -145,7 +145,6 @@ local DEFAULTS = {
 	questScenarioCalm = false,  -- ...and stays up for the Calm Timer (if longer than the mouseover time)
 	questRevealOnlyThat = true, -- those two reveals show just that quest, the rest of the tracker faded
 	questRevealCollapse = true, -- ...drawn at the top of the tracker, not in its own place under the faded ones
-	questCombatCalm = false,  -- ticked In combat (Standard Frames), it stays up until the Calm Timer runs out
 	minimapRevealOnPing = true, -- a group member pinging the minimap shows it as a mouseover would
 	minimapPingTime = 30,       -- ...for this many seconds (once faded in), then it fades
 	cooldownWhileRecharging = false, -- the Cooldown Manager stays up while a cooldown recharges (Mouseover groups
@@ -200,7 +199,6 @@ local DEFAULTS = {
 	trackingOffInRaids = true,
 	trackingOffInPvP = true,
 	stayInCombat = true,  -- stay cinematic in combat and when targeting enemies
-	combatShowCalm = false, -- Standard Frames' In combat rows stay up until the Calm Timer runs out after a fight (a row's own calmShow tick wins)
 	fadeInOnHostileCast = true, -- ...and fade in over a cast at an enemy, out of combat (the pull)
 	revealOnCast = false,   -- casting or channeling brings the UI back
 	revealAtNPCs = false,     -- vendor/bank/mail/trainer/trade/auction windows bring the UI back
@@ -2146,7 +2144,9 @@ local offForMoving = false -- this tick, Moving (and nothing else) kept CineMode
 
 local function IsBusy()
 	local inCombat = InCombatLockdown() or Flag(UnitAffectingCombat("player"))
-	if inCombat and not ns.db.stayInCombat then
+	-- (Off for fights: the Calm Timer after one is the fight still, CineMode
+	-- comes back once it runs out.)
+	if (inCombat or (ns.InCalm and ns.InCalm())) and not ns.db.stayInCombat then
 		return true
 	end
 	-- Targeting never brings the whole UI back; it shows the Standard Frames page's
@@ -2550,7 +2550,9 @@ local function ShouldBeCinematic(now)
 		-- busy as it ends waits the full fade delay.
 		local fight = InCombatLockdown() or Flag(UnitAffectingCombat("player"))
 		if fight then switchedProfile = false end
-		quickStart = switchedProfile or (not ns.db.stayInCombat and fight) and true or false
+		-- (The Calm Timer after it too: it was the wait already.)
+		quickStart = switchedProfile
+			or (not ns.db.stayInCombat and (fight or (ns.InCalm and ns.InCalm()))) and true or false
 		ns.cineOffWhy = "busy (combat, cast, window or cursor)"
 		ns.cineOffCode = "busy"
 		return false
@@ -2628,6 +2630,8 @@ function ns.CineOffReason()
 	elseif code == "busy" then
 		if (InCombatLockdown() or Flag(UnitAffectingCombat("player"))) and not ns.db.stayInCombat then
 			return L["You're in combat."] .. " " .. exit:format(L["In combat"])
+		elseif ns.InCalm and ns.InCalm() and not ns.db.stayInCombat then
+			return L["A fight just ended: CineMode comes back once the Calm Timer runs out."], "CineMode"
 		elseif Flag(UnitIsDead("player")) and not Flag(UnitIsGhost("player")) then
 			return L["You're dead: the UI comes back until you release or get up."]
 		elseif ns.db.revealOnCast and (Flag(UnitCastingInfo("player")) or Flag(UnitChannelInfo("player"))) then
@@ -3357,10 +3361,9 @@ local function OnUpdate(_, elapsed)
 			ns.Log("calm", ("%.1f sec after the calm timer ended, still up: %s"):format(now - calmTrace.endedAt,
 				ns.NotFadedList and Step(ns.NotFadedList) or "?"))
 		end
-		-- In CineMode; with Start in CineMode (fadeUI) off, over the normal UI (the Subtle profile);
-		-- and while just moving about takes you out of it, with Keep VFX on.
-		local effectsOn = cinematic or (not ns.db.fadeUI and ns.db.enabled and ns.ProfileChosen())
-			or (offForMoving and ns.db.movingKeepVFX) or false
+		-- In CineMode only (never over the normal UI, since 2026-11-10: the effects
+		-- mean CineMode); and while just moving about takes you out of it, with Keep VFX on.
+		local effectsOn = cinematic or (offForMoving and ns.db.movingKeepVFX) or false
 		-- (Each on while its Show in row, effect:<effect>, is: Visual Effects page;
 		-- the letterbox and tint while their own page's Enable Page is on too.)
 		-- (Show me's effects demo, ShowMe.lua: just its effects, for its few seconds.)
@@ -3868,6 +3871,7 @@ function ns.EnsureTables()
 	ns.db.extraFrames = ns.db.extraFrames or {}
 	ns.db.ignoredFrames = ns.db.ignoredFrames or {}
 	ns.db.addonFrames = ns.db.addonFrames or {} -- Advanced Frames page: key -> false when switched off
+	ns.db.addonSupportOff = ns.db.addonSupportOff or {} -- the same, a supported addon's support: addon -> true (the account's)
 	-- Advanced Frames page: an addon's group (its name, or its suite's) ->
 	-- true when closed (they start open).
 	ns.db.addonGroupsClosed = ns.db.addonGroupsClosed or {}
@@ -3895,9 +3899,9 @@ function ns.EnsureTables()
 	ns.db.timePhaseColors = ns.db.timePhaseColors or {} -- "Night", "Dawn"... -> { r, g, b } of your own
 	ns.db.timePhaseStrength = ns.db.timePhaseStrength or {} -- "Night", "Dawn"... -> strength (0-1) of your own
 	ns.db.combatShow = ns.db.combatShow or {}
-	-- Standard Frames' rows whose In combat tick stays for the Calm Timer (the
-	-- Combat dropdown's Calm Timer): row -> true/false; not set, as
-	-- combatShowCalm says (the page's one switch for all the rows, before).
+	-- (The Combat dropdown's old Calm Timer ticks: row -> true/false. Read no
+	-- more since 2026-11-10, the Calm Timer being the fight still; kept so
+	-- older versions and copies of rows find their table.)
 	ns.db.calmShow = ns.db.calmShow or {}
 	-- The Combat dropdown's Out of combat and In a camera mode, for the grids
 	-- that offer them (Visual Effects, music, tooltips...): row -> true/false.
@@ -4167,6 +4171,18 @@ function ns.CineTicksToAlways(t)
 	end
 	Move("tooltip:All", function() t.tooltipAlways = true end)
 	Move("cursor:hide", function() t.cursorHideAlways = true end)
+end
+-- The effects (letterbox, tint, vignette, weather) only show in CineMode now
+-- (2026-11-10), so their rows lost the CineMode column too: its tick goes
+-- onto the row's Always the same way.
+function ns.EffectCineTicksToAlways(t)
+	local ticks = type(t) == "table" and t.cineModeShow
+	if type(ticks) ~= "table" then return end
+	for _, effect in ipairs(ns.EFFECT_GRID or {}) do
+		local key = "effect:" .. effect
+		if ticks[key] == true then t[effect .. "Always"] = true end
+		ticks[key] = nil
+	end
 end
 ns.GetStillSince = function() return ns.stillSince end
 ns.Flag = Flag
@@ -6065,6 +6081,13 @@ ticker:SetScript("OnEvent", ns.Profiled("Core events", function(self, event, arg
 			for _, saved in pairs(ns.db.profileResetPoints or {}) do ns.CineTicksToAlways(saved) end
 			ns.db.cineTicksToAlwaysV1 = true
 		end
+		-- The effects' rows too (ns.EffectCineTicksToAlways). Once, in every profile.
+		if not ns.db.effectCineTicksToAlwaysV1 then
+			ns.EffectCineTicksToAlways(ns.db)
+			for _, saved in pairs(ns.db.profiles or {}) do ns.EffectCineTicksToAlways(saved) end
+			for _, saved in pairs(ns.db.profileResetPoints or {}) do ns.EffectCineTicksToAlways(saved) end
+			ns.db.effectCineTicksToAlwaysV1 = true
+		end
 		-- Tanks and pets have an opacity of their own now: each starts as the
 		-- one opacity was. Once, in every profile.
 		if not ns.db.healVisionKindAlphaV1 then
@@ -7649,6 +7672,9 @@ ticker:SetScript("OnEvent", ns.Profiled("Core events", function(self, event, arg
 		Guard(ns.StopOrbitNow)
 		Guard(ns.ApplyCVarSet, ns.FLIGHT_CVARS, false)
 		Guard(ns.ApplyCVarSet, ns.RECENTER_CVARS, false)
+		-- (The game's damage numbers back as yours were, saved so: with Cinematic
+		-- turned off before the next login they stay; on, it turns them off again.)
+		Guard(ns.ApplyCVarSet, ns.COMBAT_TEXT_GAME_NUMBERS, false)
 		Guard(ns.ReleaseAllSpeeds, "logging out")
 		Guard(function()
 			ns.MusicTrace(("LOGOUT done volume %s music %s"):format(GetCVar("Sound_MusicVolume"), GetCVar("Sound_EnableMusic")))
