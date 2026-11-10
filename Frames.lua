@@ -11508,6 +11508,44 @@ do
 		wipe(want)
 	end
 
+	-- For the Why window (WhyPanel.lua): the parts a unit frame has on this
+	-- client, in the pages' order, each with its row's key and what decides it
+	-- now, as ns.ApplyUnitFrameParts works it out. nil: not a unit frame here.
+	-- (over: the Style hub's Overrides tab, "hide" or "show"; pageOff: the Unit
+	-- Frame Parts page's switch; held: kept hidden while its frame's up only for
+	-- the mouse or a Hover group; same: it goes by the target's rows.)
+	function ns.UnitPartsWhy(name)
+		local frame = _G[name]
+		for _, entry in ipairs(frame and FRAMES or NO_DEFAULTS) do
+			if entry[1] == name then
+				local out = {}
+				local held = FRAMES.held[name]
+				local pageOff = ns.db.handleUnitFrames == false
+				for _, part in ipairs(ns.UNIT_PARTS) do
+					local paths = entry[2][part]
+					local has = false
+					if type(paths) == "function" then
+						local ok, regions = pcall(paths, frame)
+						has = ok and type(regions) == "table" and regions[1] ~= nil
+					else
+						for _, path in ipairs(paths or NO_DEFAULTS) do
+							if Field(frame, path) then has = true break end
+						end
+					end
+					if has then
+						local key = FRAMES.Key(entry, part)
+						local over = ns.StyleOverride(key)
+						out[#out + 1] = { part = part, key = key, over = over, pageOff = pageOff,
+							hidden = over == "hide" or (not over and not pageOff and FRAMES.Hidden(key)) or false,
+							held = not over and held and held[part] or false,
+							same = entry[5] and ns.db[entry[5]] ~= false or false }
+					end
+				end
+				return out
+			end
+		end
+	end
+
 	-- A frame's regions for a part (UnitStyle.lua: the level, lifted over a shape's ring).
 	function ns.UnitPartRegions(frame, part)
 		local list = {}

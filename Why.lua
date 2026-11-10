@@ -137,8 +137,11 @@ end
 
 -- A row's columns: on (doing it now), off (ticked, would show it elsewhere
 -- or later) and block (keeping it hidden).
-local function Columns(key, out)
-	local page = FramePage(key)
+-- (always, anyFight, page: for a row that isn't a frame's, as ns.RowOnNow
+-- takes them: a unit frame's part, whose Always is its own setting and whose
+-- In combat counts in any fight, on the Unit Frame Parts page.)
+local function Columns(key, out, always, anyFight, page)
+	page = page or FramePage(key)
 	local fighting = Fighting()
 	local calm = ns.InCalm()
 	local facts = ns.RuleFacts(fighting or (calm and ns.db.combatShowCalm))
@@ -148,9 +151,10 @@ local function Columns(key, out)
 		Add(out, on and "on" or "block", L["Rule: %s (the rule decides, not the ticks)"]:format(ColorRule(text, facts)), page)
 		return
 	end
-	local stays = ns.db.stayInCombat
+	local stays = anyFight or ns.db.stayInCombat
 	local found = false
-	if ns.IsCineShowOn(key) then
+	if always == nil then always = ns.IsCineShowOn(key) end
+	if always then
 		Add(out, "on", L["Always is ticked"], page)
 		found = true
 	end
@@ -198,7 +202,7 @@ local function Columns(key, out)
 			or L["Tar friendly is ticked: it shows when you target a friend"], page)
 		found = true
 	end
-	if fighting and ns.FightHold(key) and not ns.IsCineShowOn(key) then
+	if fighting and ns.FightHold(key) and not always then
 		Add(out, "block", L["Held back at the fight's start while you're at rest (Personal Resource Display page)"],
 			"Personal Resources")
 	end
@@ -1033,7 +1037,7 @@ end
 ns.why = {
 	Explain = Explain, RowEntries = RowEntries, LookAtRows = LookAtRows, LookAway = LookAway,
 	RowItem = RowItem, FramePage = FramePage, EntryRect = EntryRect, StatusText = StatusText,
-	MakeBox = MakeBox, PlaceOver = PlaceOver, ICON = ICON,
+	MakeBox = MakeBox, PlaceOver = PlaceOver, ICON = ICON, Columns = Columns,
 }
 
 -- The UI Manager's "Why Is It Showing?" page: every row of frames Cinematic

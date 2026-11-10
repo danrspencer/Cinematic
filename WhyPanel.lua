@@ -3,7 +3,11 @@
 -- showing and why, by section as the Game Frames page has them. At its top,
 -- whether CineMode is on (and when it isn't, what's keeping it off) and what
 -- you're doing right now. A row opens to all its reasons, a button to its
--- settings and one that points it out on the screen. Pick a frame on screen
+-- settings and one that points it out on the screen, and to its parts, each
+-- a row of its own under it: a unit frame's (portrait, name, bars...: the
+-- Unit Frame Parts page's rows, ns.UnitPartsWhy), the raid and party frames'
+-- and the minimap's (rows of their own, listed under their frame here). The
+-- search box and the filters find parts too. Pick a frame on screen
 -- starts Inspect (Why.lua), which comes back here when stopped; Copy report
 -- gives the whole list as text to send us.
 -- The reasons are Inspect's (ns.why.Explain); the list is filled twice a
@@ -14,7 +18,7 @@ local L = ns.L
 local why = ns.why
 
 local GREEN, GREY, GOLD = "|cff8fe39a", "|cff9d9585", "|cffffd100"
-local WIDTH, HEIGHT = 480, 580
+local WIDTH, HEIGHT = 480, 620
 local LIST_WIDTH = WIDTH - 16 - 34 -- (the list's rows: the window less its edges and scroll bar)
 local ROW_HEIGHT, HEADER_HEIGHT = 38, 24
 local STATUS_COLOR = {
@@ -32,20 +36,31 @@ local SECTION_ORDER, SECTION_LABEL = {}, {}
 for i, section in ipairs(SECTIONS) do
 	SECTION_ORDER[section[1]], SECTION_LABEL[section[1]] = i, section[2]
 end
-local FILTERS = { { "all", "All" }, { "shown", "Showing" }, { "hidden", "Hidden" } }
+-- (Addons: the rows of other addons' frames, whatever they're doing.)
+local FILTERS = { { "all", "All" }, { "shown", "Showing" }, { "hidden", "Hidden" }, { "addons", "Addons" } }
+local INDENT = 18 -- (a part's row, under its frame's)
+-- The Game Frames rows that are unit frames, whose parts the Unit Frame Parts page has.
+local UNIT_FRAME = { player = "PlayerFrame", petframe = "PetFrame", target = "TargetFrame", tot = "TargetFrameToT",
+	focus = "FocusFrame", focustot = "FocusFrameToT" }
+-- The rows that are parts of another row's frames, listed under it: by section, and the minimap's.
+local PART_PARENT = { raid = "raidplayers", party = "party", rsparty = "rspartyplayers" }
 
 local window, list, detail, flash
-local filter, search, openKey = "all", "", nil
-local items = {} -- (the rows as last filled: Copy report's too)
+local filter, search, openKey, openParent = "all", "", nil, nil
+local revealAll = false -- (every part listed, opened or not: Copy report's)
+local items = {} -- (the rows as last filled, parts after their frames)
 local Fill -- (below)
 
--- A row's place in the list: its section, and where it comes on the Game Frames page.
+-- A row's place in the list: its section, and where it comes on the Game
+-- Frames page; then the row it's a part of, if it's one.
 local rowPlace
 local function RowPlace(key)
 	if not rowPlace then
 		rowPlace = {}
 		for i, item in ipairs(ns.COMBAT_SHOW) do
-			rowPlace[item.key] = { section = SECTION_ORDER[item.page] and item.page or nil, at = i }
+			local parent = (item.part and PART_PARENT[item.page])
+				or (type(item.key) == "string" and item.key:find("^minimap.") and "minimap") or nil
+			rowPlace[item.key] = { section = SECTION_ORDER[item.page] and item.page or nil, at = i, parent = parent }
 		end
 	end
 	local place = rowPlace[key]
@@ -53,7 +68,7 @@ local function RowPlace(key)
 	if not section then
 		section = type(key) == "string" and (key:find("^addon:") or key:find("^extra:")) and "addons" or "other"
 	end
-	return section, place and place.at or 1000
+	return section, place and place.at or 1000, place and place.parent or nil
 end
 
 local function StatusText(status)
@@ -89,19 +104,96 @@ local function NowWords()
 	return table.concat(words, ", ")
 end
 
--- The rows, each with its status and reasons, in the list's order; and how
--- many are showing, hidden and in all (before the filter and the search).
+-- The line under a row's name: the first reason doing it now, else the first.
+local function MainReason(reasons)
+	for _, reason in ipairs(reasons) do
+		if reason.state ~= "off" then return reason end
+	end
+	return reasons[1]
+end
+
+local function Kind(status)
+	return ((status == "shown" or status == "partly") and "shown") or (status == "hidden" and "hidden") or nil
+end
+
+-- A unit frame's part as a row under its frame's: what the Unit Frame Parts
+-- page's row for it says now (info: one of ns.UnitPartsWhy's).
+local partLabels
+local function UnitPartItem(parent, info, at)
+	if not partLabels then
+		partLabels = {}
+		for _, each in ipairs(ns.UnitPartLabels and ns.UnitPartLabels() or {}) do partLabels[each[1]] = each[2] end
+	end
+	local page = "Unit Frames"
+	local reasons, status = {}, "shown"
+	local function Add(state, text, where)
+		reasons[#reasons + 1] = { state = state, text = text, page = where }
+	end
+	if info.over == "hide" then
+		status = "hidden"
+		Add("block", L["The Style hub's Overrides tab hides it, whatever its row says"], "Style Overrides")
+	elseif info.over then
+		Add("on", L["The Style hub's Overrides tab keeps it shown, whatever its row says"], "Style Overrides")
+	elseif info.pageOff then
+		Add("on", L["The Unit Frame Parts page is switched off, so every part shows as the game has it"], page)
+	else
+		status = (info.hidden or info.held) and "hidden" or "shown"
+		if info.held then
+			Add("block", L["Its frame is up only for the mouse or a Hover group, and this part is left out of that"],
+				"Mouseover groups")
+		end
+		-- (Its row's ticks or rule: Always is the part's own setting, and In combat counts in any fight.)
+		local columns = {}
+		why.Columns(info.key, columns, ns.db[info.key] ~= false, true, page)
+		for _, reason in ipairs(columns) do
+			if reason.state ~= "off" then reasons[#reasons + 1] = reason end
+		end
+		if status == "hidden" and #reasons == 0 then
+			Add("block", L["Always is unticked on its row, and nothing else ticked there applies right now"], page)
+		end
+		for _, reason in ipairs(columns) do
+			if reason.state == "off" then reasons[#reasons + 1] = reason end
+		end
+		if info.same then
+			Add("off", L["It goes by the Target's rows (Same as target is ticked)"], page)
+		end
+	end
+	-- (With its frame hidden or away, so is it, whatever its own row says.)
+	if parent.status == "hidden" then
+		status = "hidden"
+		table.insert(reasons, 1, { state = "block", text = L["Its frame is hidden, so all of it is"] })
+	elseif parent.status == "idle" then
+		status = "idle"
+		table.insert(reasons, 1, { state = "on", text = L["Its frame isn't on screen right now"] })
+	end
+	return { key = "part:" .. tostring(parent.key) .. ":" .. info.part, parent = parent, entry = parent.entry,
+		title = partLabels[info.part] or info.part, status = status, kind = Kind(status), reasons = reasons,
+		main = MainReason(reasons), section = parent.section, sectionLabel = parent.sectionLabel, at = at,
+		settingsPage = page }
+end
+
+-- Whether a row is in the list as filtered and searched (a part: by its own name).
+local function Matches(item, words)
+	if not (filter == "all" or (filter == "addons" and item.section == "addons") or filter == item.kind) then
+		return false
+	end
+	return words == "" or item.title:lower():find(words, 1, true) ~= nil
+		or (not item.parent and item.sectionLabel:lower():find(words, 1, true) ~= nil)
+end
+
+-- The rows, each with its status and reasons, in the list's order, a frame's
+-- parts after it (those to list: all of them while it's open, else the ones
+-- the filter or the search asks for); and how many rows, parts too, are
+-- showing, hidden, addons' and in all (before the filter and the search).
 local function Gather()
 	local order, first = why.RowEntries()
 	why.LookAtRows(order, first)
-	local counts = { all = 0, shown = 0, hidden = 0 }
-	local found = wipe(items)
-	local words = search:lower()
+	local counts = { all = 0, shown = 0, hidden = 0, addons = 0 }
+	local byKey, tops = {}, {}
 	for _, key in ipairs(order) do
 		local info = first[key]
 		local ok, title, status, reasons = pcall(why.Explain, info.entry)
 		if ok then
-			title = tostring(title)
 			-- (Not hidden by Cinematic, and not drawn by the game either: no
 			-- target, no group, a bar switched off.)
 			if (status == "shown" or status == "partly") and not info.onScreen then
@@ -111,29 +203,70 @@ local function Gather()
 				table.insert(reasons, 2, { state = "on", text = L["For example: no target, no group, or it's switched " ..
 					"off in the game's own options or by another addon"] })
 			end
-			local kind = (status == "shown" or status == "partly") and "shown" or (status == "hidden" and "hidden") or nil
-			counts.all = counts.all + 1
-			if kind then counts[kind] = counts[kind] + 1 end
-			local section, at = RowPlace(key)
-			local sectionLabel = L[SECTION_LABEL[section]]
-			if (filter == "all" or filter == kind) and (words == ""
-				or title:lower():find(words, 1, true) or sectionLabel:lower():find(words, 1, true)) then
-				-- (The line under its name: the first reason doing it now, else the first.)
-				local main = reasons[1]
-				for _, reason in ipairs(reasons) do
-					if reason.state ~= "off" then main = reason break end
-				end
-				found[#found + 1] = { key = key, entry = info.entry, title = title, status = status, reasons = reasons,
-					main = main, section = section, sectionLabel = sectionLabel, at = at }
-			end
+			local section, at, parent = RowPlace(key)
+			byKey[key] = { key = key, entry = info.entry, title = tostring(title), status = status, kind = Kind(status),
+				reasons = reasons, main = MainReason(reasons), section = section, sectionLabel = L[SECTION_LABEL[section]],
+				at = at, parentKey = parent }
 		end
 	end
-	table.sort(found, function(a, b)
+	-- The rows that are parts go under their frame's row, when it's listed.
+	for _, key in ipairs(order) do
+		local item = byKey[key]
+		local parent = item and item.parentKey and item.parentKey ~= key and byKey[item.parentKey]
+		if parent then
+			item.parent = parent
+			parent.parts = parent.parts or {}
+			parent.parts[#parent.parts + 1] = item
+		elseif item then
+			tops[#tops + 1] = item
+		end
+	end
+	for _, item in ipairs(tops) do
+		local name = UNIT_FRAME[item.key]
+		local ok, parts = pcall(ns.UnitPartsWhy or tostring, name)
+		if name and ok and type(parts) == "table" then
+			item.parts = item.parts or {}
+			for i, info in ipairs(parts) do
+				local okPart, part = pcall(UnitPartItem, item, info, i)
+				if okPart then item.parts[#item.parts + 1] = part end
+			end
+		end
+		if item.parts then
+			table.sort(item.parts, function(a, b) return a.at < b.at end)
+		end
+	end
+	table.sort(tops, function(a, b)
 		if a.section ~= b.section then return SECTION_ORDER[a.section] < SECTION_ORDER[b.section] end
 		if a.at ~= b.at then return a.at < b.at end
 		if a.title ~= b.title then return a.title < b.title end
 		return tostring(a.key) < tostring(b.key)
 	end)
+	local found = wipe(items)
+	local words = search:lower()
+	local narrowed = filter ~= "all" or words ~= ""
+	local function Count(item)
+		counts.all = counts.all + 1
+		if item.kind then counts[item.kind] = counts[item.kind] + 1 end
+		if item.section == "addons" then counts.addons = counts.addons + 1 end
+	end
+	for _, item in ipairs(tops) do
+		Count(item)
+		local open = revealAll or openKey == item.key or openParent == item.key
+		local own = Matches(item, words)
+		local listed, any = {}, false
+		for _, part in ipairs(item.parts or {}) do
+			Count(part)
+			local match = Matches(part, words)
+			any = any or match
+			if (open and (own or not narrowed)) or (narrowed and match) or revealAll then
+				listed[#listed + 1] = part
+			end
+		end
+		if own or any or revealAll then
+			found[#found + 1] = item
+			for _, part in ipairs(listed) do found[#found + 1] = part end
+		end
+	end
 	return found, counts
 end
 
@@ -171,9 +304,9 @@ end
 local function CopyReport()
 	-- (Every row, whatever the list is showing; the next fill puts the list back.)
 	local keptFilter, keptSearch = filter, search
-	filter, search = "all", ""
+	filter, search, revealAll = "all", "", true
 	local found = Gather()
-	filter, search = keptFilter, keptSearch
+	filter, search, revealAll = keptFilter, keptSearch, false
 	local out = {}
 	out[#out + 1] = ("Cinematic %s, %s"):format(ns.Version and ns.Version() or "?",
 		ns.isRetail and "retail" or ("game " .. tostring(select(4, GetBuildInfo()))))
@@ -190,14 +323,15 @@ local function CopyReport()
 			out[#out + 1] = ""
 			out[#out + 1] = "== " .. item.sectionLabel .. " =="
 		end
-		out[#out + 1] = ("[%s] %s"):format(Bare(StatusText(item.status)), item.title)
+		local pad = item.parent and "    " or ""
+		out[#out + 1] = ("%s[%s] %s"):format(pad, Bare(StatusText(item.status)), item.title)
 		for _, reason in ipairs(item.reasons) do
-			out[#out + 1] = ("    %s %s%s"):format(reason.state == "on" and "+" or (reason.state == "block" and "x") or "-",
+			out[#out + 1] = ("%s    %s %s%s"):format(pad, reason.state == "on" and "+" or (reason.state == "block" and "x") or "-",
 				Bare(reason.text), reason.page and (" (" .. ns.PageLabel(reason.page) .. ")") or "")
 		end
 	end
 	ns.ShowReportText(L["Why is it showing? report"], L["Press Ctrl+C to copy this, then paste it to us on Discord " ..
-		"or in a bug report. It lists each row of frames, whether it's showing, and why."], table.concat(out, "\n"))
+		"or in a bug report. It lists each row of frames and its parts, whether it's showing, and why."], table.concat(out, "\n"))
 end
 
 -- A row's reasons, under it while it's open: one frame, moved to the open row.
@@ -238,6 +372,7 @@ end
 -- Fills it for a row; gives its height.
 local function FillDetail(item)
 	detail.item = item
+	local width = LIST_WIDTH - 14 - (item.parent and INDENT or 0)
 	local y, lines, headings, lastKind = 2, 0, 0, nil
 	for _, reason in ipairs(item.reasons) do
 		local kind = reason.state == "off" and "off" or "now"
@@ -260,10 +395,11 @@ local function FillDetail(item)
 		line.text:SetTextColor(off and 0.62 or 1, off and 0.58 or 1, off and 0.52 or 1)
 		line.page = reason.page
 		line.where:SetText(reason.page and L["Settings: %s"]:format(ns.PageLabel(reason.page)) or "")
+		line.text:SetWidth(width - 32)
 		local height = line.text:GetStringHeight() + (reason.page and line.where:GetStringHeight() + 2 or 0) + 2
 		line:ClearAllPoints()
 		line:SetPoint("TOPLEFT", detail, "TOPLEFT", 0, -y)
-		line:SetSize(LIST_WIDTH - 24, height)
+		line:SetSize(width - 10, height)
 		line:Show()
 		y = y + height + 5
 	end
@@ -272,7 +408,8 @@ local function FillDetail(item)
 	detail.open:ClearAllPoints()
 	detail.open:SetPoint("TOPLEFT", detail, "TOPLEFT", 0, -(y + 4))
 	-- (The page of what's doing it now, else the row's own.)
-	detail.open.page = (item.main and item.main.page) or why.FramePage(item.key)
+	detail.open.page = (item.main and item.main.page) or item.settingsPage or why.FramePage(item.key)
+	detail:SetWidth(width)
 	y = y + 4 + 22 + 10
 	detail:SetHeight(y)
 	return y
@@ -322,8 +459,17 @@ local function Row(index)
 	row.reason:SetJustifyH("LEFT")
 	row.reason:SetWordWrap(false)
 	row.reason:SetTextColor(0.78, 0.76, 0.7)
+	-- (A frame with parts: how many, listed under it while it's open.)
+	row.parts = row:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+	row.parts:SetPoint("BOTTOMRIGHT", -6, 7)
+	row.parts:SetJustifyH("RIGHT")
 	row:SetScript("OnClick", function(self)
-		openKey = openKey ~= self.key and self.key or nil
+		if openKey ~= self.key then
+			openKey, openParent = self.key, self.parentKey
+		else
+			-- (A part closed: back to its frame, its parts still listed.)
+			openKey, openParent = self.parentKey, nil
+		end
 		Fill()
 	end)
 	list.rows[index] = row
@@ -392,12 +538,20 @@ function Fill()
 		end
 		rows = rows + 1
 		local row = Row(rows)
-		row.key = item.key
+		local indent = item.parent and INDENT or 0
+		local count = item.parts and #item.parts or 0
+		row.key, row.parentKey = item.key, item.parent and item.parent.key or nil
 		local color = STATUS_COLOR[item.status] or STATUS_COLOR.unknown
 		row.stripe:SetColorTexture(color[1], color[2], color[3])
+		row.stripe:SetPoint("TOPLEFT", indent, -3)
+		row.name:SetPoint("TOPLEFT", 12 + indent, -4)
+		row.name:SetWidth(LIST_WIDTH - 12 - 120 - indent)
 		row.name:SetText(item.title)
+		if item.parent then row.name:SetTextColor(0.9, 0.86, 0.74) else row.name:SetTextColor(1, 0.82, 0) end
 		row.status:SetText(StatusText(item.status))
+		row.reason:SetWidth(LIST_WIDTH - 12 - 8 - indent - (count > 0 and 70 or 0))
 		row.reason:SetText(item.main and item.main.text or "")
+		row.parts:SetText(count > 0 and L["%d parts"]:format(count) or "")
 		row:ClearAllPoints()
 		row:SetPoint("TOPLEFT", list, "TOPLEFT", 0, -y)
 		row:Show()
@@ -406,8 +560,8 @@ function Fill()
 			opened = true
 			local height = FillDetail(item)
 			detail:ClearAllPoints()
-			detail:SetPoint("TOPLEFT", list, "TOPLEFT", 14, -y)
-			detail:SetWidth(LIST_WIDTH - 14)
+			detail:SetPoint("TOPLEFT", list, "TOPLEFT", 14 + indent, -y)
+			detail.point:SetShown(item.entry ~= nil)
 			detail:Show()
 			y = y + height
 		end
@@ -422,7 +576,18 @@ function Fill()
 	if rows == 0 then
 		window.empty:SetText((counts.all == 0 and L["Cinematic isn't fading any frames right now: its frame pages " ..
 			"are off, or it has only just started. Give it a moment."])
-			or (search ~= "" and L["Nothing here is called \"%s\"."]:format(search)) or L["Nothing in this list right now."])
+			or (search ~= "" and L["Nothing here is called \"%s\"."]:format(search))
+			or (filter == "addons" and L["No other addon's frames are being faded. Cinematic fades the addons it " ..
+				"knows and the frames you add on the Addon Frames page. For any other frame, use Pick a frame on screen."])
+			or L["Nothing in this list right now."])
+	end
+	-- (Addons: only those Cinematic fades have a row.)
+	local note = window.note
+	note:SetShown(filter == "addons" and rows > 0)
+	if filter == "addons" and rows > 0 then
+		note:ClearAllPoints()
+		note:SetPoint("TOPLEFT", list, "TOPLEFT", 2, -(y + 12))
+		y = y + 12 + note:GetStringHeight()
 	end
 	list:SetHeight(math.max(1, y + 8))
 end
@@ -488,7 +653,8 @@ local function MakeWindow()
 	-- Find a row by name, and the filters with their counts.
 	local okBox, box = pcall(CreateFrame, "EditBox", nil, window, "SearchBoxTemplate")
 	if not okBox then box = CreateFrame("EditBox", nil, window, "InputBoxTemplate") end
-	box:SetSize(130, 20)
+	-- (Across the top of the list, the filters under it.)
+	box:SetSize(WIDTH - 32 - 8, 20)
 	box:SetAutoFocus(false)
 	box:SetPoint("TOPLEFT", banner, "BOTTOMLEFT", 6, -10)
 	box:HookScript("OnTextChanged", function(self)
@@ -501,10 +667,10 @@ local function MakeWindow()
 	window.filters = {}
 	for i, info in ipairs(FILTERS) do
 		local button = ns.PanelButton(window)
-		button:SetSize(90, 22)
+		button:SetSize(106, 22)
 		button.key, button.label = info[1], info[2]
 		if i == 1 then
-			button:SetPoint("LEFT", box, "RIGHT", 10, 0)
+			button:SetPoint("TOPLEFT", box, "BOTTOMLEFT", -6, -8)
 		else
 			button:SetPoint("LEFT", window.filters[i - 1], "RIGHT", 4, 0)
 		end
@@ -537,11 +703,11 @@ local function MakeWindow()
 	hint:SetJustifyH("LEFT")
 	hint:SetJustifyV("BOTTOM")
 	hint:SetText(L["Click a row for all its reasons and its settings. It keeps itself up to date: start a fight " ..
-		"or target something and watch it change. Not in the list? Pick it on screen."])
+		"or target something and watch it change. A frame with parts lists them under it. Not in the list? Pick it on screen."])
 
 	local scroll = CreateFrame("ScrollFrame", nil, window, "UIPanelScrollFrameTemplate")
 	if ns.SkinScroll then ns.SkinScroll(scroll) end
-	scroll:SetPoint("TOPLEFT", box, "BOTTOMLEFT", -6, -10)
+	scroll:SetPoint("TOPLEFT", window.filters[1], "BOTTOMLEFT", 0, -8)
 	scroll:SetPoint("BOTTOMRIGHT", window, "BOTTOMRIGHT", -34, 14 + 24 + 8 + 36 + 8) -- (over the hint and buttons)
 	list = CreateFrame("Frame", nil, scroll)
 	list:SetSize(LIST_WIDTH, 1)
@@ -551,6 +717,11 @@ local function MakeWindow()
 	window.empty:SetPoint("TOPLEFT", scroll, "TOPLEFT", 4, -16)
 	window.empty:SetWidth(LIST_WIDTH - 8)
 	window.empty:SetJustifyH("LEFT")
+	window.note = list:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+	window.note:SetWidth(LIST_WIDTH - 8)
+	window.note:SetJustifyH("LEFT")
+	window.note:SetText(L["Only frames Cinematic fades are listed: the addons it knows, and the frames you add on the " ..
+		"Addon Frames page. For any other addon's frame, use Pick a frame on screen."])
 	MakeDetail()
 
 	local elapsedSince = 0
