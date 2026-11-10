@@ -367,6 +367,9 @@ function ColumnsOf(key, out, always, anyFight, page)
 	local fighting = Fighting() or calm
 	local facts = ns.RuleFacts(fighting)
 	local text = ns.db.frameRules and ns.db.frameRules[key]
+	if ns.SpellbookBarsUp and ns.SpellbookBarsUp(key) then
+		Add(out, "on", L["The spellbook or macros window is open (Show while the spellbook is open)"], page)
+	end
 	if ns.RuleTest(key) then
 		local on = ns.RuleShows(key, facts)
 		Add(out, on and "on" or "block", L["Rule: %s (the rule decides, not the ticks)"]:format(ColorRule(text, facts)), page)

@@ -7178,7 +7178,12 @@ local function CreateCombatPanel()
 				end)
 			macros:SetParent(section.body)
 			macros:SetPoint("TOPLEFT", keys, "BOTTOMLEFT", 0, 0)
-			section.last = macros
+			local book = Check(content, "barsWithSpellbook", L["Show while the spellbook is open"],
+				L["Your action bars stay up in CineMode while the spellbook or macros window is open, " ..
+				"so you can drag spells onto them. They fade again when you close it."])
+			book:SetParent(section.body)
+			book:SetPoint("TOPLEFT", macros, "BOTTOMLEFT", 0, 0)
+			section.last = book
 		end
 		-- (Under the trackers' rows: the breath bar's look, and hiding it
 		-- always. MirrorTimerStyle.lua.)
@@ -11664,11 +11669,21 @@ local function CreateMinimapPanel()
 	if questsOnly then
 		SWEEP_NOTE = L["Cinematic checks every second or two how far that place is from you on the map."]
 	end
+	-- (Nodes there by the cursor sweep instead, NodeSweep.lua: its own key,
+	-- off to start with, and no marks, which need where each node is.)
+	local byCursor = questsOnly and ns.CanCursorSweepMinimap and ns.CanCursorSweepMinimap()
+	local CURSOR_NOTE = L["The game no longer lets addons point at the minimap, so while the minimap is " ..
+		"faded Cinematic moves it, invisible, under your mouse pointer for about a second every few " ..
+		"seconds (not in combat, nor while you turn the camera or point at a window) to look. It stays up " ..
+		"while you're still near what it found. A workaround: other minimap addons may not like it."]
 	local function RevealKinds(list)
 		if not questsOnly then return list end
 		local kept = {}
 		for _, kind in ipairs(list) do
-			if kind[1] == "minimapRevealTurnIns" or kind[1] == "minimapRevealAreas" then kept[#kept + 1] = kind end
+			if kind[1] == "minimapRevealTurnIns" or kind[1] == "minimapRevealAreas"
+				or (byCursor and kind[1] == "minimapRevealNodes") then
+				kept[#kept + 1] = kind
+			end
 		end
 		return kept
 	end
@@ -11688,16 +11703,28 @@ local function CreateMinimapPanel()
 			"quest for you, flight masters and innkeepers you track and the like. Your group and pets " ..
 			"don't count."] },
 	})) do
-		local check = Check(content, kind[1], kind[2], kind[3] .. " " .. SWEEP_NOTE,
+		local cursorNodes = byCursor and kind[1] == "minimapRevealNodes"
+		local key = cursorNodes and "minimapNodesByCursor" or kind[1]
+		local check = Check(content, key, kind[2], kind[3] .. " " .. (cursorNodes and CURSOR_NOTE or SWEEP_NOTE),
 			kind[1] == "minimapRevealNodes" and function(value)
-				ns.GetDB().minimapRevealNodes = value
+				ns.GetDB()[key] = value
 				Refresh()
 			end or nil)
 		check:SetPoint("TOPLEFT", previousReveal, "BOTTOMLEFT", -(previousReveal.revealIndent or 0),
 			previousReveal.revealIndent and -6 or -2)
 		previousReveal = check
 		-- (Under it: how each node is marked, minimapNodeMark.)
-		if kind[1] == "minimapRevealNodes" then
+		-- (The cursor sweep: a ping where it heard its find, just a box.)
+		if cursorNodes then
+			local ping = Check(content, "minimapNodePing", L["Ping where it is"],
+				L["Pings the minimap where a vein, herb or chest shows up, the same ping as clicking the minimap, " ..
+				"with its sound; in a group, everyone sees it. It lands within a few yards of the node."])
+			ping:SetPoint("TOPLEFT", check, "BOTTOMLEFT", 20, -2)
+			GreyUnless(ping, function(db) return db.minimapNodesByCursor end)
+			ping.revealIndent = 20
+			previousReveal = ping
+		end
+		if kind[1] == "minimapRevealNodes" and not cursorNodes then
 			local function IfNodes(db) return db.minimapRevealNodes end
 			local MARK_TIP = L["How a vein, herb or chest is marked where it shows up on the minimap. " ..
 				"Our mark: a ring of Cinematic's that pulses on it a few seconds, no sound, only you see it. " ..
@@ -11773,6 +11800,26 @@ local function CreateMinimapPanel()
 				end
 				previousReveal.revealIndent = 16
 			end
+		end
+		-- (Under the cursor sweep's box: whether it goes on in fights.)
+		if cursorNodes then
+			local fights = Check(content, "minimapNodesInCombat", L["In combat too"],
+				L["Keeps looking during fights. While it looks, the minimap and its buttons don't take clicks for " ..
+				"about a second; buttons the game protects in fights are left alone."])
+			fights:SetPoint("TOPLEFT", previousReveal, "BOTTOMLEFT", 20 - (previousReveal.revealIndent or 0),
+				previousReveal.revealIndent and -6 or -2)
+			GreyUnless(fights, function(db) return db.minimapNodesByCursor end)
+			-- (What the workaround costs, said where it's ticked.)
+			local warning = Label(content, "GameFontRedSmall",
+				L["A workaround: every few seconds the hidden minimap is moved under your mouse pointer for about " ..
+				"a second. Meanwhile the minimap and its buttons don't take clicks. It doesn't look while you hold " ..
+				"the left or right mouse button (or both), turn the camera or point at a window, so if you steer " ..
+				"with the mouse a lot it only looks in the gaps. Other minimap addons may not like it."])
+			warning:SetPoint("TOPLEFT", fights, "BOTTOMLEFT", 4, -4)
+			warning:SetWidth(440)
+			warning:SetJustifyH("LEFT")
+			warning.revealIndent = 24
+			previousReveal = warning
 		end
 	end
 	-- Quest givers nearby (QuestGlow.lua): NPC nameplates the game would show

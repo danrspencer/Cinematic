@@ -155,7 +155,7 @@ local DEFAULTS = {
 	cooldownUtilityAfterCombat = true,
 	cooldownSmartDefaults = true, -- Cooldown Manager page: spells with no cooldown default to Smart set's pick
 	minimapIndoors = false,    -- keep the minimap up indoors (hidden there, its map goes stale)
-	minimapKeepQuest = true,   -- keep the minimap up while a quest is tracked
+	minimapKeepQuest = false,  -- keep the minimap up while a quest is tracked (off to start with since 2026-11-10)
 	minimapKeepQuestFor = 1,   -- ...only this many minutes after picking one up or progress on one (0 = off)
 	minimapKeepZones = "",     -- ...and in these zones: map IDs, comma-separated (ns.IsMinimapKeptInZone)
 	minimapKeepPrey = true,    -- ...and while hunting your prey (retail; ns.IsHuntingPrey)
@@ -169,22 +169,28 @@ local DEFAULTS = {
 	-- ...and which kinds get their icon on the node, kept there while it's on
 	-- the minimap (NodeSweep.lua): kinds comma-separated (ore, herb), "" none.
 	minimapNodeIcons = "",
+	-- ...the same box where the game stopped answering the pretend mouse (WoW
+	-- Forever game 70862 on): the cursor sweep, the faded minimap moved under
+	-- your real mouse (NodeSweep.lua). Off to start with: it's a workaround.
+	minimapNodesByCursor = true, -- (on to start with since 2026-11-10: tested, the user wants it)
+	minimapNodePing = true,       -- ...and pings where it heard what it found (NodeSweep.lua cursor.Mark)
+	minimapNodesInCombat = true, -- ...and it goes on in fights (tested 2026-11-10: nothing blocked)
 	minimapRevealTurnIns = true, -- quests of yours that are done
-	minimapRevealAreas = true,   -- the areas of quests of yours that aren't
+	minimapRevealAreas = false,  -- the areas of quests of yours that aren't (off to start with since 2026-11-10)
 	minimapRevealIcons = true,   -- anything else (quest givers, flight masters...)
 	minimapQuestGivers = true,   -- NPC nameplates with a quest cursor (QuestGlow.lua)
 	minimapQuestie = true,       -- Questie's own minimap icons too: quests on offer near you (Support/QuestieMinimap.lua)
 	minimapHideOnTaxi = true,    -- none of these, pings or Keep open's tracking bring it up on a flight path
 	-- The header parts (row keys, comma-separated) that come up with the map when one of those or a
 	-- ping brings it up; "" = just the map (hovering shows all). Default: all of them.
-	minimapRevealParts = "minimapzone,minimapheader,minimaptracking,minimapcalendar,minimapclock,minimapdial,"
-		.. "minimapaddons,minimapcompartment,minimapcoords",
+	-- (Just the map to start with since 2026-11-10, every profile.)
+	minimapRevealParts = "",
 	-- Keep open (Minimap page's Tracking dropdown): the minimap stays up the whole time this tracking
-	-- is on (Tracking.lua). (Ore, herbs, treasure on since 2026-11-07: Reveal can't find ore and herbs
-	-- on WoW Forever any more, NodeSweep.lua.)
-	minimapKeepOre = true,       -- gathering: ore, herbs, treasure...
-	minimapKeepHerbs = true,
-	minimapKeepTreasure = true,
+	-- is on (Tracking.lua). (Ore, herbs, treasure on since 2026-11-07 where Reveal can't find them; on
+	-- WoW Forever the cursor sweep does again since 2026-11-10, NodeSweep.lua: None there.)
+	minimapKeepOre = ns.isRetail or ns.isClassicEra,  -- gathering: ore, herbs, treasure...
+	minimapKeepHerbs = ns.isRetail or ns.isClassicEra,
+	minimapKeepTreasure = ns.isRetail or ns.isClassicEra,
 	minimapKeepHumanoids = false, -- creatures (hunter, druid, warlock, paladin) and fish
 	minimapKeepFish = false,
 	minimapKeepBeasts = false,
@@ -205,6 +211,7 @@ local DEFAULTS = {
 	revealOnDrag = false,     -- bring the UI back while something's held on the cursor (dragging)
 	returnDelay = 15,         -- seconds things must stay calm (no cast, window...) before CineMode returns
 	stayWithWindows = true, -- stay cinematic when opening the spellbook, options and similar
+	barsWithSpellbook = true, -- action bars show in CineMode while the spellbook or macros are open (Action bars tab)
 	pauseCamsInWindows = true, -- an open window pauses a playing scene and holds new ones (Scenes page)
 	portraitWhenNotFull = true, -- keep the player portrait up while health or power isn't full, within
 	                            -- the Calm Timer (calmTime) of combat or after coming back to life
@@ -3736,6 +3743,16 @@ end
 function ns.IsCineModeOn()
 	if not (ns.db and ns.db.enabled) or ns.GetSnoozeLeft() then return false end
 	return (ns.db.fadeUI or ns.TriggerStartsCine() or ns.cineKeyOn) and true or false
+end
+
+-- On, but out of it for now as Exit CineMode's In combat has it: in a fight,
+-- or its Calm Timer after. (The minimap menu's tick shows it off then.)
+function ns.CineOutForFight()
+	if ns.lastCinematic or ns.cineOffCode ~= "busy" or ns.db.stayInCombat or not ns.IsCineModeOn() then
+		return false
+	end
+	return (InCombatLockdown() or Flag(UnitAffectingCombat("player")) or (ns.InCalm and ns.InCalm())) and true
+		or false
 end
 
 function Cinematic_ToggleCineMode()

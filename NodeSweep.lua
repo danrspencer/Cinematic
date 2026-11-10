@@ -30,13 +30,14 @@ end
 -- them: their mark's name is just the NPC's, tested). A herb's dot has the name of
 -- the herb it gives, so the client names them (item IDs, Classic's herbs); a
 -- vein's or chest's name has a word for vein, deposit or chest in the client's
--- language.
+-- language. (Forever's new ore in the night elf starting zone is "Large
+-- chunks of Amber": "chunk" too, in English.)
 local HERB_ITEMS = {
 	2447, 765, 2449, 785, 2450, 3820, 2453, 3355, 3369, 3356, 3357, 3818, 3821, 3358,
 	3819, 4625, 8831, 8836, 8838, 8839, 8845, 8846, 13464, 13463, 13465, 13466, 13467, 13468,
 }
 local WORDS = {
-	enUS = { ore = { "Vein", "Deposit" }, treasure = { "Chest", "Trunk", "Strongbox" } },
+	enUS = { ore = { "Vein", "Deposit", "Chunk", "chunk" }, treasure = { "Chest", "Trunk", "Strongbox" } },
 	esES = { ore = { "Filón", "Depósito", "filón" }, treasure = { "Cofre", "cofre", "Baúl", "baúl" } },
 	deDE = { ore = { "ader", "vorkommen", "Ader", "Vorkommen" }, treasure = { "truhe", "Truhe", "kiste", "Kiste" } },
 	frFR = { ore = { "Filon", "Gisement", "filon" }, treasure = { "Coffre", "coffre", "Malle", "malle" } },
@@ -274,6 +275,11 @@ function ns.CanSweepMinimap()
 	return HasSweepApi() and answer.state ~= "no"
 end
 
+-- The cursor sweep, for nearby ore, herbs and treasure once the game doesn't
+-- answer the pretend mouse: the minimap moved under the REAL mouse instead
+-- (filled in further down, after the Reveal sweep).
+local cursor = {}
+
 -- The pretend mouse's turn on the minimap (OnMinimap): the faded minimap
 -- grown or back on the screen for it (Grow) and the soft cursor on, then
 -- both put back. The Reveal sweep runs as a job over several frames
@@ -342,6 +348,7 @@ local function MouseoverAt(x, y)
 	return C_TooltipInfo.GetMinimapMouseover()
 end
 local function Listen(px, py)
+	if cursor.s then return cursor.Look(px, py) end
 	local left, bottom = Minimap:GetLeft(), Minimap:GetBottom()
 	local scale, width = Minimap:GetEffectiveScale(), Minimap:GetWidth()
 	if not (left and bottom and scale and width) or width <= 0 then return nil, "the minimap has no place" end
@@ -593,6 +600,7 @@ local function Wanted(name, entry)
 end
 
 local function AnyReveal()
+	if cursor.On and cursor.On() then return true end
 	local db = ns.db
 	return db and db.handleMinimap ~= false and ns.CanSweepMinimap() and (db.minimapRevealNodes
 		or db.minimapRevealTurnIns or db.minimapRevealAreas or db.minimapRevealIcons) or false
@@ -1404,6 +1412,7 @@ local function RunSweep()
 	local ok, err = coroutine.resume(sweepJob)
 	if coroutine.status(sweepJob) == "dead" then
 		sweepJob = nil
+		if cursor.s then cursor.End() end
 		if session then
 			Leave(session)
 			session = nil
@@ -1425,6 +1434,570 @@ ns.SetOnUpdate(sweepDriver, function(self)
 	RunSweep()
 	if not sweepJob then self:Hide() end
 end)
+
+-- The cursor sweep (cursor, declared at the top). From game 70862 on the
+-- game answers only for where the real mouse is, so the minimap goes to the
+-- mouse: faded (alpha 0), it's moved each frame so the point to hear sits
+-- under your pointer, and on the next frame the game says what's there. One
+-- point a frame: the grid is about a second, and it stops at the first herb,
+-- vein or chest. (Moving the minimap under the pointer is NodeSight's and
+-- Lueur's idea; this code is ours.) Meanwhile the minimap and what's on it
+-- take no clicks (a click would land on it instead of the world), its
+-- tooltip is hidden, and it stops as soon as a fight starts, you turn the
+-- camera with the mouse, the mouse goes onto a window, or the minimap starts
+-- to come up. Then it's put back where it was.
+-- (/cine debug offers on 2026-11-07 moved it under the mouse and heard
+-- nothing, with the soft cursor on: here it stays off, and the game hears it,
+-- tested 2026-11-10 with /cine debug cursorsweep test.)
+-- A node found keeps the minimap up while you're within its view of that spot
+-- (its place in the world: a minimap that's up can't be swept), at most FOR.
+cursor.EVERY = 4    -- seconds between two cursor sweeps
+cursor.MISS = 1.5   -- minimap units: a point the pointer missed by more is tried again
+cursor.TRIES = 3
+-- The game's icon scale while it runs: 0, nothing of them shows under the
+-- pointer, and they're heard just the same (tested 2026-11-10: 0, 0.05 and 1
+-- hear the same; at 1 the dots fly about around the pointer, seen).
+cursor.ICONS = 0
+-- Minimap units between grid points: a dot answers about 12 units around it
+-- (measured: 24 across, both ways, on a 198-wide minimap), so 16 can't miss one.
+cursor.STEP = 16
+cursor.FOR = 120    -- seconds a node keeps the minimap up at most
+cursor.DEPTH = 4    -- generations of the minimap's children whose mouse is turned off
+cursor.LOOTED = 12  -- yards: looting this near a node's spot drops it
+cursor.SETTLE = 5   -- seconds after a login or /reload before the first one (10 was a guess; 5 on trial 2026-11-10)
+cursor.KEEP = 0.85  -- of the minimap's view radius: a node further than this from you lets it go
+
+function cursor.Can()
+	return Minimap.AdjustPointsOffset ~= nil and Minimap.SetIconScale ~= nil and GetCursorPosition ~= nil
+end
+
+-- Whether this client needs (and has) the cursor sweep: the Minimap page's
+-- Nearby ore, herbs and treasure box then sets minimapNodesByCursor.
+function ns.CanCursorSweepMinimap()
+	return HasSweepApi() and answer.state == "no" and cursor.Can()
+end
+
+function cursor.On()
+	local db = ns.db
+	return db ~= nil and db.handleMinimap ~= false and db.minimapNodesByCursor == true
+		and ns.CanCursorSweepMinimap()
+end
+
+local function MouseFocus()
+	if GetMouseFoci then
+		local foci = GetMouseFoci()
+		local focus = type(foci) == "table" and foci[1] or nil
+		if Secret(focus) then return nil end
+		return focus
+	end
+	return GetMouseFocus and GetMouseFocus() or nil
+end
+
+local function InMinimap(frame)
+	for _ = 1, 20 do
+		if frame == nil then return false end
+		if frame == Minimap then return true end
+		local ok, parent = pcall(frame.GetParent, frame)
+		if not ok then return false end
+		frame = parent
+	end
+	return false
+end
+
+-- Why the cursor sweep can't run (or go on, started) now, or nil.
+function cursor.NotReady(started)
+	-- (In fights with In combat too ticked, or /cine debug cursorsweep combat
+	-- for this session; never with the minimap itself protected. Tested
+	-- 2026-11-10: sweeps in fights, nothing blocked.)
+	local fights = cursor.combat or (ns.db and ns.db.minimapNodesInCombat == true)
+	if (InCombatLockdown() or ns.Flag(UnitAffectingCombat("player")))
+		and not (fights and not (Minimap.IsProtected and Minimap:IsProtected())) then
+		return "in combat"
+	end
+	if not ns.Flag(Minimap:IsVisible()) then return "the minimap is hidden" end
+	if Minimap:GetEffectiveAlpha() > 0.01 then return "the minimap is up" end
+	-- (Not in the first seconds after a login or /reload: the game is still
+	-- laying the minimap out and puts its icons' size back, and they flashed
+	-- around the pointer, seen 2026-11-10. Nor before our fade has it.)
+	if GetTime() < (cursor.loadedAt or 0) + cursor.SETTLE then return "the game is still loading in" end
+	local entry = MinimapEntry()
+	if not entry or (entry.alpha or 1) > 0 then return "Cinematic hasn't faded the minimap" end
+	if entry.shrunk or entry.parkedFullSize then return "the minimap is shrunk or moved away" end
+	if (IsMouselooking and IsMouselooking())
+		or (IsMouseButtonDown and (IsMouseButtonDown("LeftButton") or IsMouseButtonDown("RightButton"))) then
+		return "you're turning the camera"
+	end
+	if not started and ns.Flag(Minimap:IsMouseOver()) then return "your mouse is over the minimap" end
+	local focus = MouseFocus()
+	if focus and focus ~= WorldFrame and not InMinimap(focus) then return "your mouse is on a window" end
+end
+
+-- The minimap ready to go under the mouse: where it is, its mouse off (and
+-- its children's), the game's icons at ICONS.
+function cursor.Begin()
+	local s = { points = {}, muted = {}, ox = 0, oy = 0, frames = 0, again = 0, heard = 0 }
+	for i = 1, Minimap:GetNumPoints() do s.points[i] = { Minimap:GetPoint(i) } end
+	s.left, s.bottom = Minimap:GetLeft(), Minimap:GetBottom()
+	s.scale, s.width = Minimap:GetEffectiveScale(), Minimap:GetWidth()
+	if not (s.left and s.bottom and s.scale and s.width and s.width > 0 and #s.points > 0) then
+		return nil, "the minimap has no place"
+	end
+	local function Mute(frame, depth)
+		if Secret(frame) or (frame.IsForbidden and frame:IsForbidden()) then return end
+		-- (A protected frame can't be changed in a fight: left as it is.)
+		local locked = InCombatLockdown() and frame.IsProtected and frame:IsProtected()
+		if locked then s.skipped = (s.skipped or 0) + 1 end
+		if not locked and frame.IsMouseClickEnabled and frame.SetMouseClickEnabled and frame.IsMouseMotionEnabled then
+			local click, motion = frame:IsMouseClickEnabled(), frame:IsMouseMotionEnabled()
+			if not (Secret(click) or Secret(motion)) then
+				-- (The minimap keeps its own motion: its tooltip needs the mouse on it.)
+				motion = motion and frame ~= Minimap
+				s.muted[#s.muted + 1] = { frame, click, motion }
+				if click then pcall(frame.SetMouseClickEnabled, frame, false) end
+				if motion then pcall(frame.SetMouseMotionEnabled, frame, false) end
+			end
+		end
+		if depth < cursor.DEPTH then
+			for _, child in ipairs({ frame:GetChildren() }) do Mute(child, depth + 1) end
+		end
+	end
+	Mute(Minimap, 0)
+	if Minimap.IsMouseWheelEnabled then
+		s.wheel = Minimap:IsMouseWheelEnabled()
+		pcall(Minimap.EnableMouseWheel, Minimap, false)
+	end
+	settingIcons = true
+	pcall(Minimap.SetIconScale, Minimap, cursor.iconsFor or cursor.ICONS)
+	settingIcons = false
+	-- (Frames.lua: the minimap under your mouse isn't you hovering it, which
+	-- would bring it up and stop the sweep after a frame, tested.)
+	s.underTestBefore = ns.minimapUnderTest
+	ns.minimapUnderTest = true
+	cursor.s = s
+	return s
+end
+
+-- Put back as it was. (Its anchors only if nothing else set them meanwhile:
+-- its first one where ours left it.)
+function cursor.End()
+	local s = cursor.s
+	if not s then return end
+	cursor.s = nil
+	cursor.quietUntil = GetTime() + 0.3
+	-- (Hover ignored a moment longer: the game may still see the mouse on it
+	-- for the frame it's put back in.)
+	C_Timer.After(0.2, function()
+		if not cursor.s then ns.minimapUnderTest = s.underTestBefore end
+	end)
+	last.frames, last.again, last.heard = s.frames, s.again, s.heard
+	local ok, _, _, _, x, y = pcall(Minimap.GetPoint, Minimap, 1)
+	local first = s.points[1]
+	if ok and type(x) == "number" and not Secret(x) and math.abs(x - (first[4] or 0) - s.ox) < 0.5
+		and math.abs(y - (first[5] or 0) - s.oy) < 0.5 then
+		pcall(Minimap.AdjustPointsOffset, Minimap, -s.ox, -s.oy)
+	end
+	for _, muted in ipairs(s.muted) do
+		local frame, click, motion = muted[1], muted[2], muted[3]
+		if InCombatLockdown() and frame.IsProtected and frame:IsProtected() then
+			-- (Muted before a fight began, protected: given back after it.)
+			cursor.later = cursor.later or {}
+			cursor.later[#cursor.later + 1] = muted
+		else
+			if click then pcall(frame.SetMouseClickEnabled, frame, true) end
+			if motion then pcall(frame.SetMouseMotionEnabled, frame, true) end
+		end
+	end
+	if InCombatLockdown() then cursor.fightSweeps = (cursor.fightSweeps or 0) + 1 end
+	if s.wheel ~= nil then pcall(Minimap.EnableMouseWheel, Minimap, s.wheel) end
+	settingIcons = true
+	pcall(Minimap.SetIconScale, Minimap, iconsHidden and (tinyUsed or 0) or iconScale)
+	settingIcons = false
+end
+-- (Frames.lua, as the faded minimap starts to come up: put back at once.)
+function ns.EndCursorSweep(alpha)
+	if not cursor.s then return end
+	cursor.endedBy = ("the minimap came up (alpha %.2f)"):format(tonumber(alpha) or -1)
+	cursor.End()
+end
+
+-- What the game hears at px, py (minimap units from its middle): the minimap
+-- moved so that point is where the pointer will be on the next frame (it
+-- moves as much again as it just did), and read then. A point the pointer
+-- missed is tried again, TRIES times. Only from the sweep's job.
+function cursor.Look(px, py)
+	for _ = 1, cursor.TRIES do
+		local s = cursor.s
+		if not (s and sweepJob and coroutine.running() == sweepJob) then error({ stopped = "the minimap came up" }) end
+		local cx, cy = GetCursorPosition()
+		local ex, ey = 2 * cx - (s.cx or cx), 2 * cy - (s.cy or cy)
+		s.cx, s.cy = cx, cy
+		local half = s.width / 2
+		local ox = ex / s.scale - s.left - half - px
+		local oy = ey / s.scale - s.bottom - half - py
+		Minimap:AdjustPointsOffset(ox - s.ox, oy - s.oy)
+		-- (Each frame: something else may have put the icons' size back.)
+		settingIcons = true
+		pcall(Minimap.SetIconScale, Minimap, cursor.iconsFor or cursor.ICONS)
+		settingIcons = false
+		s.ox, s.oy, s.frames = ox, oy, s.frames + 1
+		if ns.profiling then ns.ProfileCount("minimap points") end
+		coroutine.yield()
+		if cursor.s ~= s then error({ stopped = cursor.endedBy or "the minimap came up" }) end
+		local why = cursor.NotReady(true)
+		local diag = cursor.diag
+		-- (/cine debug cursorsweep test: turning the camera is counted, not a stop.)
+		if why and not (diag and why == "you're turning the camera") then error({ stopped = why }) end
+		local nx, ny = GetCursorPosition()
+		if diag then
+			diag.reads = diag.reads + 1
+			if why then diag.camera = diag.camera + 1 end
+			if ns.Flag(Minimap:IsMouseOver()) then diag.over = diag.over + 1 end
+			local focus = MouseFocus()
+			local name = focus == nil and "nothing" or focus == Minimap and "Minimap" or focus == WorldFrame and "WorldFrame"
+				or (focus.GetDebugName and focus:GetDebugName()) or (focus.GetName and focus:GetName()) or "a frame with no name"
+			diag.focus[name] = (diag.focus[name] or 0) + 1
+			-- (How far the point landed from the pointer, minimap units.)
+			local left, bottom = Minimap:GetLeft(), Minimap:GetBottom()
+			if left and bottom then
+				local off = math.sqrt((left + half + px - nx / s.scale) ^ 2 + (bottom + half + py - ny / s.scale) ^ 2)
+				diag.offSum, diag.offMax = diag.offSum + off, math.max(diag.offMax, off)
+			end
+			local ok, data = pcall(C_TooltipInfo.GetMinimapMouseover)
+			local lines = ok and not Secret(data) and type(data) == "table" and data.lines
+			if type(lines) == "table" and not Secret(lines) and #lines > 0 then diag.anyLines = diag.anyLines + 1 end
+			if GameTooltip and ns.Flag(GameTooltip:IsShown()) then diag.tooltip = diag.tooltip + 1 end
+		end
+		if math.abs(nx - ex) <= cursor.MISS * s.scale and math.abs(ny - ey) <= cursor.MISS * s.scale then
+			local ok, data = pcall(C_TooltipInfo.GetMinimapMouseover)
+			local lines = ok and not Secret(data) and type(data) == "table" and data.lines
+			if type(lines) == "table" and not Secret(lines) then
+				if #lines > 0 then s.heard = s.heard + 1 end
+				return lines
+			end
+			return NO_LINES
+		end
+		s.again = s.again + 1
+	end
+	return NO_LINES
+end
+
+-- Where a node heard at x, y (minimap units from the middle) is in the
+-- world: yards north and west (ToMinimap the other way round), or nil.
+function cursor.Keep(name, list)
+	local x, y, count = 0, 0, #list / 2
+	for i = 1, #list, 2 do x, y = x + list[i], y + list[i + 1] end
+	x, y = x / count, y / count -- (the middle of the points that heard it)
+	local perUnit, facing = View()
+	local n, w = Here()
+	if not (perUnit and n) then
+		cursor.spot = nil
+		ns.Log("nodes", ("cursor sweep found %s (where you are isn't known: held %d s)"):format(name, HOLD))
+		return
+	end
+	local cos, sin = math.cos(facing), math.sin(facing)
+	cursor.spot = { name = name, n = n + (sin * x + cos * y) * perUnit, w = w + (-cos * x + sin * y) * perUnit,
+		at = GetTime(), x = x, y = y, yards = perUnit }
+	ns.Log("nodes", ("cursor sweep found %s, %.0f yd away"):format(name,
+		math.sqrt(x * x + y * y) * perUnit))
+end
+
+-- Ping where it is (minimapNodePing) on a find: the game's ping where it was
+-- heard, the middle of the grid points that heard it (a few yards off the dot
+-- at most). (Our ring was tried too; the user wanted just the ping.)
+function cursor.Mark()
+	local spot = cursor.spot
+	if not spot then return end
+	if ns.db and ns.db.minimapNodePing and Minimap.PingLocation then
+		ns.nodePingAt = GetTime() -- (not a ping of yours for Pings, Minimap page)
+		pcall(Minimap.PingLocation, Minimap, spot.x, spot.y)
+	end
+end
+
+-- Whether the last node found is still on the minimap: you within its view
+-- of the spot, for FOR at most. (Where you are isn't known: HOLD after it.)
+function cursor.Held(now)
+	local spot = cursor.spot
+	if not spot then return false end
+	if now - spot.at > cursor.FOR then
+		cursor.spot = nil
+		return false
+	end
+	local n, w = Here()
+	local ok, radius = pcall(C_Minimap.GetViewRadius)
+	if not (n and ok and type(radius) == "number" and not Secret(radius)) then return now - spot.at < HOLD end
+	-- (The spot is only as good as the grid: a dot answers some 12 units
+	-- around it, so a node near the rim may already be off it. KEEP of the
+	-- radius: it's let go a little early rather than held up after it's gone,
+	-- seen 2026-11-10.)
+	local yards = math.sqrt((n - spot.n) ^ 2 + (w - spot.w) ^ 2)
+	if yards <= radius * cursor.KEEP then return true end
+	ns.Log("nodes", ("cursor sweep: %s is %.0f yd away, the minimap shows %.0f: let go"):format(
+		tostring(spot.name), yards, radius))
+	cursor.spot = nil
+	return false
+end
+
+-- Looted near it (gathered): it's gone. (And when the game last loaded in.)
+cursor.loadedAt = GetTime()
+do
+	local loot = CreateFrame("Frame")
+	loot:RegisterEvent("LOOT_CLOSED")
+	loot:RegisterEvent("PLAYER_ENTERING_WORLD")
+	loot:RegisterEvent("PLAYER_REGEN_ENABLED")
+	loot:RegisterEvent("ADDON_ACTION_BLOCKED")
+	loot:RegisterEvent("ADDON_ACTION_FORBIDDEN")
+	loot:SetScript("OnEvent", function(_, event, addon, fn)
+		if event == "PLAYER_ENTERING_WORLD" then
+			cursor.loadedAt = GetTime()
+			return
+		end
+		if event == "PLAYER_REGEN_ENABLED" then
+			for _, muted in ipairs(cursor.later or {}) do
+				if muted[2] then pcall(muted[1].SetMouseClickEnabled, muted[1], true) end
+				if muted[3] then pcall(muted[1].SetMouseMotionEnabled, muted[1], true) end
+			end
+			cursor.later = nil
+			return
+		end
+		if event == "ADDON_ACTION_BLOCKED" or event == "ADDON_ACTION_FORBIDDEN" then
+			-- (For the combat test: anything the game refused while a sweep ran.)
+			if cursor.s or GetTime() < (cursor.quietUntil or 0) then
+				local text = ("cursor sweep: %s %s by %s, in combat %s"):format(event, tostring(fn), tostring(addon),
+					tostring(InCombatLockdown()))
+				ns.Log("nodes", text)
+				if cursor.combat then ns.Print(text) end
+			end
+			return
+		end
+		local spot, n, w = cursor.spot, Here()
+		if spot and n and (n - spot.n) ^ 2 + (w - spot.w) ^ 2 <= cursor.LOOTED ^ 2 then cursor.spot = nil end
+	end)
+end
+
+-- One cursor sweep, run as sweepJob. (all: the whole grid, every name, for
+-- /cine debug cursorsweep; else it stops at the first node.)
+local function CursorSweep(all)
+	STEP = cursor.STEP
+	cursor.endedBy = nil
+	local s, why = cursor.Begin()
+	last.at, last.why, last.names, last.cursor = GetTime(), nil, nil, true
+	if not s then
+		last.why = why
+		return
+	end
+	local function IsNode(name) return NODE_KINDS[ns.NodeKind(name)] == true end
+	local found, probes = Probe(STEP, {}, not all and IsNode or nil, s.width / 2)
+	-- (The test: how far from where each name was heard it still answers,
+	-- out along the four ways, a unit at a time: the size of a dot's answer.)
+	if all and type(found) == "table" then
+		cursor.reach = {}
+		local done = 0
+		for name, entry in pairs(found) do
+			if done >= 4 or not entry.list then break end
+			done = done + 1
+			local x0, y0, ways = entry.list[1], entry.list[2], {}
+			for _, way in ipairs({ { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } }) do
+				local far = 0
+				for d = 1, 30 do
+					local heard = false
+					for _, line in ipairs(cursor.Look(x0 + way[1] * d, y0 + way[2] * d)) do
+						local text = line.leftText
+						if type(text) == "string" and not Secret(text) and text:find(name, 1, true) then heard = true end
+					end
+					if not heard then break end
+					far = d
+				end
+				ways[#ways + 1] = far
+			end
+			cursor.reach[name] = ("right %d, left %d, up %d, down %d"):format(ways[1], ways[2], ways[3], ways[4])
+		end
+	end
+	cursor.End()
+	last.probes, last.step, last.found = probes, STEP, type(found) == "table" and found or nil
+	if not found then
+		last.why = probes
+		return
+	end
+	local names = {}
+	for name, entry in pairs(found) do
+		names[#names + 1] = ("%s (%s)"):format(name, ns.NodeKind(name))
+		if IsNode(name) and not all then
+			seenAt = GetTime()
+			revealedBy = name
+			cursor.Keep(name, entry.list)
+			cursor.Mark()
+		end
+	end
+	table.sort(names)
+	last.names = table.concat(names, ", ")
+end
+
+local function StartCursorSweep(all)
+	sweepJob = coroutine.create(function() CursorSweep(all) end)
+	RunSweep()
+	if sweepJob then sweepDriver:Show() end
+end
+
+-- From ns.IsMinimapRevealed while cursor.On(): up while a node found is
+-- still on it, else swept every EVERY seconds while it's faded.
+function cursor.Reveal(now)
+	if cursor.Held(now) then
+		seenAt = now
+		return true
+	end
+	if not sweepJob and now - sweptAt >= cursor.EVERY and not cursor.NotReady() then
+		sweptAt = now
+		StartCursorSweep(false)
+	end
+	return now - seenAt < HOLD
+end
+
+-- /cine debug cursorsweep [test]: one whole cursor sweep now (the minimap
+-- has to be faded), and everything it heard, to the chat tab named
+-- Cinematic (the main chat window when there's none).
+local function CinematicTab()
+	for i = 1, NUM_CHAT_WINDOWS or 10 do
+		local name = GetChatWindowInfo and GetChatWindowInfo(i)
+		local frame = _G["ChatFrame" .. i]
+		if type(name) == "string" and not Secret(name) and name:lower() == "cinematic" and frame then return frame end
+	end
+	return DEFAULT_CHAT_FRAME
+end
+
+local COMPASS = { "north", "northeast", "east", "southeast", "south", "southwest", "west", "northwest" }
+-- Where one name was heard: its points' middle, as yards and a compass way
+-- from you, or minimap units where yards can't be known.
+local function Where(entry)
+	local list, x, y = entry.list or {}, 0, 0
+	local count = #list / 2
+	if count == 0 then return "?" end
+	for i = 1, #list, 2 do x, y = x + list[i], y + list[i + 1] end
+	x, y = x / count, y / count
+	local perUnit, facing = View()
+	if not perUnit then return ("%.0f, %.0f minimap units from the middle"):format(x, y) end
+	local cos, sin = math.cos(facing), math.sin(facing)
+	local north, west = (sin * x + cos * y) * perUnit, (-cos * x + sin * y) * perUnit
+	local yards = math.sqrt(north * north + west * west)
+	if yards < 5 then return ("%.0f yd (on you)"):format(yards) end
+	local angle = math.deg(math.atan2(-west, north)) % 360
+	return ("%.0f yd %s"):format(yards, COMPASS[math.floor((angle + 22.5) / 45) % 8 + 1])
+end
+
+-- /cine debug cursorsweep combat: sweeps in fights too, this session (a test).
+function ns.CursorSweepCombat()
+	cursor.combat = not cursor.combat
+	ns.Print(("cursorsweep: in fights %s for this session (%d swept in fights so far)"):format(
+		cursor.combat and "ON" or "off", cursor.fightSweeps or 0))
+end
+
+function ns.CursorSweepTest(arg)
+	-- (test <size>: the game's icon scale during this sweep, to see if
+	-- bigger icons are heard from further away.)
+	local size = tonumber((arg or ""):match("test%s+([%d%.]+)"))
+	local tab = CinematicTab()
+	local function Say(text)
+		tab:AddMessage("|cffe0b050Cinematic cursorsweep:|r " .. text)
+		ns.Log("nodes", "cursorsweep: " .. text)
+	end
+	if not ns.CanCursorSweepMinimap() then
+		return Say("this client doesn't need it, or can't (no AdjustPointsOffset)")
+	end
+	if sweepJob then return Say("a sweep is running, try again in a second") end
+	if Minimap:GetEffectiveAlpha() > 0.01 then
+		return Say("the minimap has to be faded first (CineMode), then run it again")
+	end
+	-- (The faded minimap is shrunk away unless the ore box is ticked: kept full
+	-- size in its place for the test, /cine debug nodes stay's flag, and given
+	-- a moment for the game to put its dots back on.)
+	local stayBefore = ns.minimapStayFullSize
+	ns.minimapStayFullSize = true
+	Say("getting ready, keep the mouse over the world (not on a window) for a few seconds")
+	local waiter, startedAt, readyAt, swept = CreateFrame("Frame"), GetTime(), nil, false
+	local function Done(self)
+		self:Hide()
+		ns.minimapStayFullSize = stayBefore
+		cursor.iconsFor = nil
+	end
+	ns.SetOnUpdate(waiter, function(self)
+		if not swept then
+			local entry = MinimapEntry()
+			local shrunk = entry and (entry.shrunk or entry.parkedFullSize)
+			if shrunk then
+				if GetTime() - startedAt > 3 then
+					Done(self)
+					return Say("the minimap stayed shrunk, couldn't sweep")
+				end
+				return
+			end
+			readyAt = readyAt or GetTime()
+			if GetTime() - readyAt < 0.5 then return end
+			local why = cursor.NotReady()
+			if why then
+				Done(self)
+				return Say("can't now: " .. why)
+			end
+			swept = true
+			last.found, cursor.reach = nil, nil
+			cursor.iconsFor = size
+			cursor.diag = { reads = 0, over = 0, camera = 0, focus = {}, offSum = 0, offMax = 0, anyLines = 0, tooltip = 0 }
+			StartCursorSweep(true)
+			return
+		end
+		if sweepJob then return end
+		Done(self)
+		local diag = cursor.diag
+		cursor.diag = nil
+		Say(("icon scale during the sweep: %s"):format(tostring(size or cursor.ICONS)))
+		if diag then
+			local foci = {}
+			for name, count in pairs(diag.focus) do foci[#foci + 1] = ("%s x%d"):format(name, count) end
+			table.sort(foci)
+			Say(("reads %d: game saw the mouse over the minimap %d, any tooltip lines %d, GameTooltip shown %d, " ..
+				"camera turning %d; point off the pointer by %.1f on average, %.1f at most (minimap units); " ..
+				"mouse on: %s"):format(diag.reads, diag.over, diag.anyLines, diag.tooltip, diag.camera,
+				diag.reads > 0 and diag.offSum / diag.reads or 0, diag.offMax,
+				#foci > 0 and table.concat(foci, ", ") or "nothing read"))
+			Say(("CineMode %s, HardwareCursor %s, minimap scale %.2f, width %.0f, icon scale now %s"):format(
+				tostring(ns.IsCineModeOn and ns.IsCineModeOn() or false), tostring(GetCVar("HardwareCursor")),
+				Minimap:GetEffectiveScale(), Minimap:GetWidth() or 0, tostring(iconsHidden and tinyUsed or iconScale)))
+		end
+		Say(("%s: %s points, %s frames, %s tried again, %s heard something, step %s"):format(
+			last.why and ("stopped (" .. tostring(last.why) .. ")") or "done", tostring(last.probes),
+			tostring(last.frames), tostring(last.again), tostring(last.heard), tostring(last.step)))
+		local found, names = last.found or {}, {}
+		for name in pairs(found) do names[#names + 1] = name end
+		table.sort(names)
+		if #names == 0 then return Say("heard NOTHING on the minimap") end
+		for _, name in ipairs(names) do
+			local entry = found[name]
+			Say(("%s - %s, heard at %d points, %s%s; still heard (minimap units) %s"):format(name, ns.NodeKind(name),
+				entry.points, Where(entry), entry.gray and ", gray (other side of a cave)" or "",
+				cursor.reach and cursor.reach[name] or "?"))
+		end
+	end)
+end
+
+-- No minimap tooltip while it's under the mouse for the sweep (Blizzard's
+-- shows the names there), nor just after.
+do
+	local function Quiet()
+		return cursor.s ~= nil or GetTime() < (cursor.quietUntil or 0)
+	end
+	if GameTooltip and GameTooltip.SetMinimapMouseover then
+		hooksecurefunc(GameTooltip, "SetMinimapMouseover", function(tip)
+			if Quiet() then tip:Hide() end
+		end)
+	end
+	if GameTooltip then
+		GameTooltip:HookScript("OnShow", function(tip)
+			if not Quiet() then return end
+			local owner = tip:GetOwner()
+			if owner ~= nil and (InMinimap(owner) or (owner == UIParent and ns.Flag(Minimap:IsMouseOver()))) then
+				tip:Hide()
+			end
+		end)
+	end
+end
 
 -- Does the game answer the pretend mouse (answer, at the top)? Every few
 -- seconds after login until it's known: with the minimap shown, its icons at
@@ -1569,6 +2142,11 @@ local function GiversFound(now)
 end
 function ns.IsMinimapRevealed(now)
 	local questie = GiversFound(now)
+	-- (Nodes by the cursor sweep, quests from the quest log: both can be on.)
+	if cursor.On() then
+		local nodesUp = cursor.Reveal(now)
+		return (QuestReveal() and QuestReveals(now)) or nodesUp or questie
+	end
 	if QuestReveal() then return QuestReveals(now) or questie end
 	if not AnyReveal() then
 		nodes = {}

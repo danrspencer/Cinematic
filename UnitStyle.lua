@@ -1225,6 +1225,32 @@ local function StripMasks(state, bar)
 		end
 	end
 	state.masks[fill] = list
+	-- (The heal on its way, absorbs and the rest share the fill's mask: left on, they're
+	-- cut to the old bar's height, shorter than the fill beside them.)
+	if #list == 0 then return end
+	local shared = {}
+	for _, mask in ipairs(list) do shared[mask] = true end
+	local function Unmask(region)
+		if region == fill or state.masks[region] or not (region.GetObjectType and region:GetObjectType() == "Texture"
+			and region.GetNumMaskTextures) then return end
+		local own = {}
+		local n = region:GetNumMaskTextures()
+		for i = (Readable(n) and n or 0), 1, -1 do
+			local mask = region:GetMaskTexture(i)
+			if mask and shared[mask] then
+				own[#own + 1] = mask
+				region:RemoveMaskTexture(mask)
+			end
+		end
+		if #own > 0 then state.masks[region] = own end
+	end
+	for _, region in ipairs({ bar:GetRegions() }) do Unmask(region) end
+	for _, child in ipairs({ bar:GetChildren() }) do
+		if not (child.IsForbidden and child:IsForbidden()) then
+			for _, region in ipairs({ child:GetRegions() }) do Unmask(region) end
+			if child.GetStatusBarTexture and child:GetStatusBarTexture() then Unmask(child:GetStatusBarTexture()) end
+		end
+	end
 end
 
 local function SizeSlab(frame, state, bars, portrait, bare)
@@ -2827,4 +2853,60 @@ function ns.ReportPartyPortrait()
 			N(state.round:GetHeight())))
 	end
 	ns.Print("Party portrait written to the log.")
+end
+
+-- /cine debug heal: the player's health fill beside each piece of the heal on its way,
+-- measured (top, bottom, height, masks, anchors), to see why they don't line up.
+function ns.ReportHealForecast()
+	local function Say(text) ns.Log("style", "heal: " .. text) end
+	-- (Secret values, as the fill's are while health is secret, are said so: never written.)
+	local function N(value)
+		if not Readable(value) then return "secret" end
+		return type(value) == "number" and ("%.1f"):format(value) or tostring(value)
+	end
+	local function Name(region)
+		local ok, name = pcall(function() return region:GetDebugName() end)
+		return ok and Readable(name) and tostring(name) or "?"
+	end
+	local frame = _G.PlayerFrame
+	local health = frame and Parts(frame)
+	if not health then return ns.Print("No player health bar.") end
+	Say(("client %s, combat %s, ufStyle %s, layout %s, fit %s, health %s/%s"):format(tostring(select(4, GetBuildInfo())),
+		tostring(InCombatLockdown()), tostring(ns.StyleOn("ufStyle")), tostring(ns.ThemeLayout and ns.ThemeLayout()),
+		tostring(fits[frame] ~= nil), N(UnitHealth("player")), N(UnitHealthMax("player"))))
+	local function MeasureOne(tag, region)
+		local masks = {}
+		local n = region.GetNumMaskTextures and region:GetNumMaskTextures()
+		for i = 1, (Readable(n) and n or 0) do masks[#masks + 1] = Name(region:GetMaskTexture(i)) end
+		local points = {}
+		for i = 1, (region.GetNumPoints and region:GetNumPoints() or 0) do
+			local point, to, toPoint, x, y = region:GetPoint(i)
+			points[#points + 1] = ("%s>%s.%s(%s,%s)"):format(N(point), to and Name(to) or "nil", N(toPoint), N(x), N(y))
+		end
+		Say(("%s [%s] %s shown %s, top %s bottom %s height %s, left %s right %s, layer %s, masks {%s}, points %s"):format(
+			tag, region.GetObjectType and region:GetObjectType() or "?", Name(region), N(region:IsShown()),
+			N(region:GetTop()), N(region:GetBottom()), N(region:GetHeight()), N(region:GetLeft()), N(region:GetRight()),
+			N(region.GetDrawLayer and region:GetDrawLayer()), table.concat(masks, ", "), table.concat(points, " ")))
+	end
+	local function Measure(tag, region)
+		if not region then return end
+		local ok, err = pcall(MeasureOne, tag, region)
+		if not ok then Say(tag .. " " .. Name(region) .. " failed: " .. (Readable(err) and tostring(err) or "secret")) end
+	end
+	Measure("bar", health)
+	local fill = health:GetStatusBarTexture()
+	Measure("fill", fill)
+	for _, region in ipairs({ health:GetRegions() }) do
+		if region ~= fill then Measure("region", region) end
+	end
+	for _, child in ipairs({ health:GetChildren() }) do
+		Measure("child", child)
+		for _, region in ipairs({ child:GetRegions() }) do Measure("  in child", region) end
+	end
+	for _, key in ipairs({ "myHealPrediction", "otherHealPrediction", "totalAbsorb", "totalAbsorbOverlay",
+		"healAbsorb", "myHealAbsorb", "overAbsorbGlow", "overHealAbsorbGlow", "myHealPredictionBar",
+		"otherHealPredictionBar", "myManaCostPredictionBar" }) do
+		if frame[key] then Measure("frame." .. key, frame[key]) end
+	end
+	ns.Print("Heal measurements written to the log.")
 end

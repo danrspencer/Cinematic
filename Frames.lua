@@ -653,13 +653,21 @@ do
 		if info.on ~= on and not (region.IsForbidden and region:IsForbidden()) then
 			info.on = on
 			region:SetIgnoreParentAlpha(on)
+			return true
 		end
 	end
 	function ns.RefreshDetached()
 		local fading = belowCount > 0
+		local changed = false
 		for region, info in pairs(parts) do
-			Set(region, info, fading and GroupHandled(info.group))
+			if Set(region, info, fading and GroupHandled(info.group)) then changed = true end
 		end
+		-- A part that now ignores its parent's alpha (or follows it again) no
+		-- longer fades with it (or does again): its nesting worked out again at
+		-- once, or till the next scan it'd be drawn at its own full alpha while
+		-- detached. (The pet frame and the minimap's header showed for a moment
+		-- after a /reload: snapped to 0 with the rest, they were still nested.)
+		if changed and ns.RecomputeNesting then ns.RecomputeNesting() end
 	end
 	function ns.DetachWhileFading(region, group)
 		if type(region) ~= "table" or not region.SetIgnoreParentAlpha or parts[region] then return end
@@ -794,6 +802,7 @@ local function RecomputeNesting()
 		end
 	end
 end
+ns.RecomputeNesting = RecomputeNesting -- (for ns.RefreshDetached, above it)
 -- A chat window docked or pulled out moves its tab in or out of the dock bar.
 for _, fname in ipairs({ "FCF_DockFrame", "FCF_UnDockFrame" }) do
 	if type(_G[fname]) == "function" then
@@ -1726,6 +1735,9 @@ end)
 end
 
 function ns.SetEntryAlpha(entry, alpha)
+	-- (The cursor sweep has the faded minimap under your mouse: put back
+	-- before it shows, NodeSweep.lua.)
+	if alpha > 0 and entry.frame == Minimap and ns.EndCursorSweep then ns.EndCursorSweep(alpha) end
 	entry.alpha = alpha
 	ns.NoteEntryAlpha(entry, alpha)
 	ns.UpdateEntryClicks(entry, alpha)
@@ -2240,6 +2252,24 @@ ns.COMBAT_SHOW = {
 		"StatusTrackingBarManager",
 	} },
 }
+-- The Action bars tab's Show while the spellbook is open (barsWithSpellbook):
+-- these rows come up in CineMode while one of these windows is open, so new
+-- spells can be dragged onto the bars. (Not the bar art: buttons only.)
+ns.SPELLBOOK_BARS = { mainbar = true, bottomleft = true, bottomright = true, right1 = true, right2 = true,
+	bar6 = true, bar7 = true, bar8 = true, pet = true, stance = true, totems = true }
+ns.SPELLBOOK_WINDOWS = { "SpellBookFrame", "PlayerSpellsFrame", "MacroFrame" }
+function ns.SpellbookOpen()
+	if not ns.db.barsWithSpellbook then return false end
+	for _, name in ipairs(ns.SPELLBOOK_WINDOWS) do
+		local frame = _G[name]
+		if frame and frame.IsShown and frame:IsShown() then return true end
+	end
+	return false
+end
+-- Whether a row is up now for that (false with the setting off or no window open).
+function ns.SpellbookBarsUp(key)
+	return ns.SPELLBOOK_BARS[key] and ns.SpellbookOpen() or false
+end
 -- The Standard Frames page's sections (page) for the rows not given one
 -- above. (Kept in the order above within each.)
 local ROW_SECTIONS = {
@@ -3938,6 +3968,17 @@ do
 				end
 			end
 		end
+		-- (The action bars while the spellbook or macros are open: Action bars
+		-- tab's Show while the spellbook is open, barsWithSpellbook.)
+		if ns.SpellbookOpen() then
+			for _, item in ipairs(ns.COMBAT_SHOW) do
+				if ns.SpellbookBarsUp(item.key) then
+					for _, name in ipairs(item.frames or NO_DEFAULTS) do
+						shown[name] = true
+					end
+				end
+			end
+		end
 		-- Added frames, by their rows on the Advanced Frames page.
 		for name in pairs(ns.db.extraFrames) do
 			local key = tickTables.extraKey[name]
@@ -3964,7 +4005,7 @@ do
 	local SHOWN_HOLD, SHOWN_GRACE = 0.2, 0.1
 	local Compute = GetCombatShownFrames
 	local keptAt, keptShown, askedAt = -1, nil, -math.huge
-	local wasFighting, wasCalm, wasTarget, wasEnemy, wasCast, wasRuleCast
+	local wasFighting, wasCalm, wasTarget, wasEnemy, wasCast, wasRuleCast, wasBook
 	local function Kept(now, hold)
 		local fighting = InCombatLockdown() or ns.Flag(UnitAffectingCombat("player"))
 		local calm = not fighting and now - lastCombatAt < (ns.db.calmTime or 0)
@@ -3972,12 +4013,14 @@ do
 		local enemy = target and ns.IsEnemyUnit("target") and not ns.Flag(UnitIsDeadOrGhost("target")) or false
 		local cast = ns.HostileCastLeft(now) ~= nil
 		local ruleCast = ns.CastingRuleOn()
+		local book = ns.SpellbookOpen()
 		if keptShown and now >= keptAt and now - keptAt < hold and fighting == wasFighting
 			and calm == wasCalm and target == wasTarget and enemy == wasEnemy and cast == wasCast
-			and ruleCast == wasRuleCast then
+			and ruleCast == wasRuleCast and book == wasBook then
 			return keptShown
 		end
-		wasFighting, wasCalm, wasTarget, wasEnemy, wasCast, wasRuleCast = fighting, calm, target, enemy, cast, ruleCast
+		wasFighting, wasCalm, wasTarget, wasEnemy, wasCast, wasRuleCast, wasBook = fighting, calm, target, enemy, cast,
+			ruleCast, book
 		keptAt, keptShown = now, Compute()
 		return keptShown
 	end

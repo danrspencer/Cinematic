@@ -5,7 +5,8 @@
 -- bar fills, highlights and glows keep the game's colors. Groups: chat, buffs,
 -- XP and reputation bars, the menu and bag buttons, your cast bar, small windows
 -- (popups, loot, ready check, the game menu) and big windows (bags, character,
--- spellbook, quest log, map, merchant...). Only with a theme picked on General.
+-- spellbook, quest log, map, merchant...): a window's own frame only, never what's
+-- inside it (talent trees, spell buttons, bag slots). Only with a theme picked on General.
 --
 -- A frame's chrome is told by its art's name (an atlas, a file, or the texture's
 -- own name or parentKey): there's no list of every texture. Windows that load
@@ -108,9 +109,10 @@ local GROUPS = {
 	-- (The swing timer's frames; its fill and words: SwingTimerStyle.lua.)
 	{ key = "swFrame", names = { "SwingTimerMainHandFrame", "SwingTimerOffHandFrame", "SwingTimerRangedFrame" } },
 	{ key = "irRaidFrame", get = RaidChrome },
-	{ key = "irSmall", names = Join(Numbered("StaticPopup", 1, 4), { "LootFrame", "ReadyCheckFrame", "GameMenuFrame",
+	-- (shell: the windows' own frames only, not what's inside them: EachShell.)
+	{ key = "irSmall", shell = true, names = Join(Numbered("StaticPopup", 1, 4), { "LootFrame", "ReadyCheckFrame", "GameMenuFrame",
 		"QueueStatusButton", "QueueStatusFrame", "LFGDungeonReadyDialog", "RolePollPopup", "GroupLootContainer" }) },
-	{ key = "irBig", names = Join(Numbered("ContainerFrame", 1, 13), { "ContainerFrameCombinedBags", "BankFrame",
+	{ key = "irBig", shell = true, names = Join(Numbered("ContainerFrame", 1, 13), { "ContainerFrameCombinedBags", "BankFrame",
 		"CharacterFrame", "PlayerSpellsFrame", "SpellBookFrame", "PlayerTalentFrame", "TalentFrame", "QuestLogFrame",
 		"QuestMapFrame", "WorldMapFrame", "MerchantFrame", "FriendsFrame", "GossipFrame", "QuestFrame", "MailFrame",
 		"TradeFrame", "AuctionHouseFrame", "AuctionFrame", "CollectionsJournal", "EncounterJournal", "PVEFrame",
@@ -259,6 +261,36 @@ local function Each(frame, depth, visit, seen)
 	for _, kid in ipairs(okKids and kids or {}) do Each(kid, depth + 1, visit, seen) end
 end
 
+-- A game window's own frame only, never what's inside it (the talent tree's nodes,
+-- spell buttons, bag slots came out in the theme's color): its own art, and the
+-- parts that make its frame (border, title bar, close button, portrait, tabs), and
+-- theirs in turn. Told by a part's own name or parentKey.
+local SHELL = { "nineslice", "border", "title", "tab", "close", "portrait" }
+local function ShellPart(kid)
+	local okName, name = pcall(function() return kid.GetDebugName and kid:GetDebugName() end)
+	name = okName and Plain(name)
+	if type(name) ~= "string" then return false end
+	local own = (name:match("([^%.]+)$") or name):lower()
+	local okParent, parent = pcall(function() return kid:GetParent():GetName() end)
+	parent = okParent and Plain(parent)
+	if type(parent) == "string" and own:sub(1, #parent) == parent:lower() then own = own:sub(#parent + 1) end
+	return Has(own, SHELL)
+end
+local function EachShell(frame, depth, visit, seen)
+	if type(frame) ~= "table" or seen[frame] or not frame.GetObjectType then return end
+	seen[frame] = true
+	if not Kind(frame) then return end
+	local okRegions, regions = pcall(function() return { frame:GetRegions() } end)
+	for _, region in ipairs(okRegions and regions or {}) do
+		if Kind(region) == "Texture" then visit(region) end
+	end
+	if depth >= DEPTH or not frame.GetChildren then return end
+	local okKids, kids = pcall(function() return { frame:GetChildren() } end)
+	for _, kid in ipairs(okKids and kids or {}) do
+		if Kind(kid) and ShellPart(kid) then EachShell(kid, depth + 1, visit, seen) end
+	end
+end
+
 -- A group's color now, or nil: the game's.
 local function ColorOf(group)
 	local ring = ns.StyleOn("irStyle") and ns.ThemeRing()
@@ -347,7 +379,8 @@ local function DressFrame(frame, group, color, walk)
 	local list = found[frame]
 	if walk or not list then
 		list = {}
-		Each(frame, 0, function(texture)
+		local walker = group.shell and EachShell or Each
+		walker(frame, 0, function(texture)
 			if not isGlint[texture] and IsChrome(texture, group.all) then list[#list + 1] = texture end
 		end, {})
 		found[frame] = list

@@ -191,7 +191,7 @@ ns.BUILTIN_PROFILES = {
 		picks = { layout = { forever = "preset" }, frames = "nofade", camera = "travel", vfx = "cinebars",
 			sound = "nomusic" },
 		modules = With("zone-card", "travel-cards", "no-visions", "no-custom-bubbles", "tint-light",
-			"advanced-pages-off"),
+			"advanced-pages-off", "exit-in-combat"),
 	},
 	{
 		name = "Balanced",

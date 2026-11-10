@@ -30,7 +30,7 @@ DEFAULTS.combatTextNumbers = true     -- our numbers over nameplates
 DEFAULTS.combatTextHideGame = true    -- the game's damage and healing numbers off (its CVars) while the page is on
 DEFAULTS.combatTextCritPop = true     -- a crit pops big and settles, as the game's
 DEFAULTS.combatTextFont = "game"      -- "game": the game's floating text font; else a Style font
-DEFAULTS.combatTextOutline = 2        -- 0 none, 1 thin, 2 thick (closest to the game's at our size), 3 soft shadow
+DEFAULTS.combatTextEdge = "game"      -- "game" (a drop shadow, as the game's), "both" (an edge too), "edge", "none"
 DEFAULTS.combatTextSize = 1           -- times the game's size
 DEFAULTS.combatTextHeight = 0         -- extra pixels above the plate
 DEFAULTS.combatTextSchoolColors = false -- spell damage in its school's color (else the game's yellow)
@@ -52,10 +52,11 @@ ns.gameDamageTextFont = GAME_FONT
 -- 2.5 times in ~0.13 s, shrinks back by ~0.25 s to ~1.3 times a hit, sits
 -- over the plate's bar (lower than a hit) and barely climbs, still full a
 -- second on. Hits landing together sit side by side, not stacked.
-local BASE_SIZE = 33        -- the game's number at WorldTextScale_v2 1
+local BASE_SIZE = 36        -- the game's number at WorldTextScale_v2 1 (two shots: theirs ~1.1 times our first 33)
 local CRIT_SIZE = 1.3       -- a crit once settled, times a hit
 local START_Y = -36         -- from the plate's top down to its name (a hit's bottom)
-local RISE = 64             -- pixels a number climbs over its life
+local RISE = 40             -- pixels a number drifts up over its life, after its jump
+local JUMP, JUMP_TIME = 40, 0.2 -- and the quick jump up it starts with (the game's, at mid range: it leaps, then drifts)
 local CRIT_RISE = 0.2       -- a crit barely climbs
 local CRIT_DROP = -36       -- a crit's middle, below a hit's
 local CRIT_LIFE = 1.5       -- a crit stays longer, times a hit's life
@@ -68,9 +69,9 @@ local FADE_FROM = 0.6       -- of its life, when it starts fading
 local MAX_LIVE = 40         -- numbers showing at once; the oldest goes first
 
 -- Colors as the game's: a melee or physical hit white, a spell's yellow, a
--- heal green, a miss white. School colors (optional): its own.
+-- heal green, a miss yellow (seen in a recording, 2026-11-10). School colors (optional): its own.
 local WHITE = { 1, 1, 1 }
-local SPELL = { 1, 0.95, 0.2 }
+local SPELL = { 1, 0.867, 0 } -- (the game's, read off a screenshot: 255, 221, 0)
 local HEAL = { 0.1, 1, 0.1 }
 local SCHOOL = {
 	[1] = { 1, 1, 1 },          -- physical
@@ -118,6 +119,16 @@ local function NewNumber()
 		number:SetSize(1, 1)
 		number.text = number:CreateFontString(nil, "OVERLAY")
 		number.text:SetPoint("CENTER")
+		-- (Behind it: its edge, the words again eight times nudged each way in
+		-- black; and its drop shadow, once more up and to the right. Each in a
+		-- layer of its own, shadow under edge under words: in one layer their
+		-- order was anyone's, the black over the yellow, seen 2026-11-10.)
+		number.copies = {}
+		for i = 1, 9 do
+			local copy = number:CreateFontString(nil, i == 9 and "BORDER" or "ARTWORK")
+			copy.angle = i <= 8 and (i - 1) * math.pi / 4 or nil
+			number.copies[i] = copy
+		end
 	end
 	return number
 end
@@ -141,21 +152,67 @@ local function PlateSpot(plate)
 	end
 end
 
--- Outline: 0 none, 1 thin, 2 thick, 3 a soft shadow down and right, no line.
-local OUTLINES = { [0] = "", "OUTLINE", "THICKOUTLINE", "" }
-local function SetSize(text, size)
+-- The game's look, read off a screenshot (2026-11-10): a dark edge all round
+-- (~2 px on a 49 px digit) and a drop shadow ~4-5 px down and to the right.
+-- The font's own OUTLINE drew nothing on ours there, so both are drawn as
+-- copies of the words: the edge's nudge and the shadow's drop by the size.
+-- (Second look, same day: ours came out 4-5 times darker round the digits
+-- than the game's in one screenshot: its edge is about a pixel and see-
+-- through, its shadow longer but faint.)
+-- (Third look: the game's edge is a band about a pixel wide, ~75% dark,
+-- hardly spreading; ours stacked to near black and several pixels wide, as
+-- eight overlapping copies add up. So each copy is faint (about three
+-- overlap at an edge: 1 - 0.65^3, ~0.75) and the shadow sits close.)
+-- (Fourth look, a recording: the edges now match all round, but down and to
+-- the right ours were still darker; the game's is about as dark there as
+-- elsewhere. So its shadow is barely one.)
+-- (Fifth look, two crops the player sent: theirs has a strong drop shadow,
+-- and it falls up and to the right, ~3 px each way on 64 px digits; an earlier
+-- look had mixed up which numbers were whose and thinned ours wrongly.)
+local EDGE, EDGE_ALPHA, DROP, SHADOW_ALPHA = 1 / 40, 0.35, 1 / 28, 0.8
+local function SetSize(number, size)
 	local db = ns.db
 	local file = db and db.combatTextFont ~= "game" and ns.StyleFontFile(db.combatTextFont) or GAME_FONT
-	local level = db and tonumber(db.combatTextOutline) or 1
-	local outline = OUTLINES[level] or "OUTLINE"
-	if not text:SetFont(file, size, outline) then
-		text:SetFont("Fonts\\FRIZQT__.TTF", size, outline)
+	local text = number.text
+	if not text:SetFont(file, size, "") then
+		file = "Fonts\\FRIZQT__.TTF"
+		text:SetFont(file, size, "")
 	end
-	-- (The shadow's color stays solid black: a see-through one took the
-	-- outline with it, Forever 2026-11-10. Only its offset says shadow or not.)
-	local drop = level == 3 and math.max(1, size / 16) or 0
-	text:SetShadowColor(0, 0, 0, 1)
-	text:SetShadowOffset(drop, -drop)
+	text:SetShadowOffset(0, 0)
+	local look = db and db.combatTextEdge or "game"
+	-- (The game's: the shadow alone, no edge, the player saw side by side;
+	-- "shadow", an older name for it.)
+	local edge = look == "both" or look == "edge"
+	local shadow = look == "game" or look == "both" or look == "shadow"
+	local nudge, drop = math.max(1, size * EDGE), math.max(1, size * DROP)
+	for _, copy in ipairs(number.copies) do
+		copy:SetFont(file, size, "")
+		copy:SetShadowOffset(0, 0)
+		copy:ClearAllPoints()
+		if copy.angle then
+			copy:SetPoint("CENTER", math.cos(copy.angle) * nudge, math.sin(copy.angle) * nudge)
+			copy:SetTextColor(0, 0, 0, EDGE_ALPHA)
+			copy:SetShown(edge)
+		else
+			copy:SetPoint("CENTER", drop, drop)
+			copy:SetTextColor(0, 0, 0, SHADOW_ALPHA)
+			copy:SetShown(shadow)
+		end
+	end
+end
+
+-- The words on the number and its copies.
+local function SetWords(number, amount)
+	number.text:SetText(amount) -- (a secret amount goes on as it is)
+	for _, copy in ipairs(number.copies) do copy:SetText(amount) end
+end
+
+-- All of it scaled for a moment (a crit's pop), without laying it out again.
+local function SetHeight(number, height)
+	pcall(number.text.SetTextHeight, number.text, height)
+	for _, copy in ipairs(number.copies) do
+		if copy:IsShown() then pcall(copy.SetTextHeight, copy, height) end
+	end
 end
 
 -- Hits landing together spread sideways, as the game's do (its "Resist
@@ -195,9 +252,9 @@ local function Spawn(plate, unit, amount, color, crit)
 	local y = START_Y + (db.combatTextHeight or 0) + size / 2 + (crit and CRIT_DROP or 0)
 	if crit then size = size * CRIT_SIZE end
 	local text = number.text
-	SetSize(text, size)
+	SetSize(number, size)
 	text:SetTextColor(color[1], color[2], color[3])
-	text:SetText(amount) -- (a secret amount goes on as it is)
+	SetWords(number, amount)
 	local ok, width = pcall(text.GetStringWidth, text)
 	number.width = ok and type(width) == "number" and Plain(width) and width > 0 and width or nil
 	local x = SlotX(plate, now, Width(number, size))
@@ -248,8 +305,11 @@ local function Step()
 		if t >= 1 then
 			Retire(index)
 		else
+			-- (A quick jump, easing out over JUMP_TIME, then the drift: the game's
+			-- leap up from behind the plate, seen at 5 fps on 2026-11-10.)
+			local leap = math.min(1, (now - number.start) / JUMP_TIME)
 			local eased = 1 - (1 - t) ^ EASE
-			local rise = RISE * (number.crit and CRIT_RISE or 1) * eased
+			local rise = (JUMP * (1 - (1 - leap) ^ 2) + RISE * eased) * (number.crit and CRIT_RISE or 1)
 			-- (anchor and start height set at Spawn, or LetGo; the rise on top)
 			number:SetPoint("CENTER", number.anchor, number.anchorPoint, number.baseX, number.baseY + rise)
 			-- A crit's pop: up to POP_PEAK times its size by POP_UP seconds, back
@@ -257,13 +317,12 @@ local function Step()
 			-- font size again, sharp.
 			if number.popping then
 				local age = now - number.start
-				local text = number.text
 				if age >= POP_DOWN then
 					number.popping = nil
-					SetSize(text, number.size)
+					SetSize(number, number.size)
 				else
 					local k = age < POP_UP and age / POP_UP or 1 - (age - POP_UP) / (POP_DOWN - POP_UP)
-					pcall(text.SetTextHeight, text, number.size * (1 + (POP_PEAK - 1) * k))
+					SetHeight(number, number.size * (1 + (POP_PEAK - 1) * k))
 				end
 			end
 			number:SetAlpha(t > FADE_FROM and (1 - t) / (1 - FADE_FROM) or 1)
@@ -434,7 +493,7 @@ local function OnHit(unit, action, flag, amount, school)
 		if not enemy then return end
 		-- (A plain 0: all of it absorbed, as the game's word.)
 		if Plain(amount) and (amount == 0 or amount == "0") then
-			if db.combatTextMisses then Claim(plate, unit, _G.ABSORB or "Absorb", WHITE, false) end
+			if db.combatTextMisses then Claim(plate, unit, _G.ABSORB or "Absorb", SPELL, false) end
 			return
 		end
 		local color = SPELL
@@ -451,7 +510,7 @@ local function OnHit(unit, action, flag, amount, school)
 	elseif MISSES[action] and enemy and db.combatTextMisses then
 		local word = _G[action]
 		if not (type(word) == "string" and Plain(word)) then word = action:sub(1, 1) .. action:sub(2):lower() end
-		Claim(plate, unit, word, WHITE, false)
+		Claim(plate, unit, word, SPELL, false)
 	end
 end
 
@@ -525,7 +584,7 @@ end
 -- (a swing's), "crit", "heal" or "miss".
 function ns.CombatTextSample(frame, kind)
 	local db = ns.db
-	if kind == "miss" then return Spawn(frame, nil, _G.MISS or "Miss", WHITE, false) end
+	if kind == "miss" then return Spawn(frame, nil, _G.MISS or "Miss", SPELL, false) end
 	if kind == "heal" then return Spawn(frame, nil, "18", HEAL, false) end
 	local color = kind == "white" and WHITE or (db.combatTextSchoolColors and SCHOOL[8] or SPELL)
 	Spawn(frame, nil, kind == "crit" and "46" or kind == "white" and "11" or "23", color, kind == "crit")
@@ -605,8 +664,15 @@ function ns.CreateCombatTextStylePanel(kit)
 	stack:Header(content, L["Look"])
 	rows.Font("combatTextFont", L["The numbers' font. The game's: the one it draws its own floating text in."],
 		Ours) -- (its list starts with The game's: "game")
-	rows.Outline("combatTextOutline", L["Outline"], 3, { [0] = L["None"], L["Thin"], L["Thick"], L["Soft shadow"] },
-		L["A black border around the numbers (Thick: closest to the game's), or none with a soft shadow below them."], Ours)
+	rows.Dropdown(L["Edge:"], "combatTextEdge", function()
+		return {
+			{ value = "game", text = L["The game's (a drop shadow)"] },
+			{ value = "both", text = L["Dark edge and drop shadow"] },
+			{ value = "edge", text = L["Dark edge"] },
+			{ value = "none", text = L["None"] },
+		}
+	end, L["What's behind the numbers so they read against the world. The game's: a dark shadow up and " ..
+		"to the right, no edge."], Ours)
 	rows.Slider("combatTextSize", L["Size"], 50, 200, 5, "%d%%", 100,
 		L["How big the numbers are, next to the game's."], Ours)
 	rows.Slider("combatTextHeight", L["Height"], -40, 80, 2, "%d px", nil,

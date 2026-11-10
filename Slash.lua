@@ -684,6 +684,10 @@ local function HandleSlash(msg)
 		else
 			ns.Print("/cine debug screenfx is in the dev copy only.")
 		end
+	elseif cmd == "debug" and arg == "heal" and ns.ReportHealForecast then
+		-- (In 3 seconds: time to start casting a heal on yourself.)
+		ns.Print("Measuring the heal bar in 3 seconds: start casting a heal on yourself.")
+		C_Timer.After(3, function() ns.ReportHealForecast() end)
 	elseif cmd == "debug" and arg == "bargap" then
 		-- Gaps between action bar buttons and bars (Layouts.lua's bar 3 offset),
 		-- in UI units: each frame's left and right edges.
@@ -1559,6 +1563,11 @@ local function HandleSlash(msg)
 	elseif cmd == "debug" and arg:find("^offers") then
 		-- (Quests on offer near you, the minimap's "!": NodeSweep.lua.)
 		ns.OffersTest()
+	elseif cmd == "debug" and arg:find("^cursorsweep%s+combat") then
+		ns.CursorSweepCombat()
+	elseif cmd == "debug" and arg:find("^cursorsweep") then
+		-- (One cursor sweep, the faded minimap under your mouse: NodeSweep.lua.)
+		ns.CursorSweepTest(arg:match("^cursorsweep%s*(.*)$"))
 	elseif cmd == "debug" and arg:find("^nodes") then
 		ns.NodesDebug(arg:match("^nodes%s*(.*)$"))
 	elseif cmd == "facing" then
