@@ -1850,6 +1850,10 @@ local function HandleSlash(msg)
 		ns.ReportQuestTrackerStyle()
 	elseif cmd == "debug" and arg == "recolor" then
 		ns.ReportInterfaceRecolor()
+	elseif cmd == "debug" and arg == "micro" then
+		ns.ReportMicroButtons()
+	elseif cmd == "debug" and arg == "meterstyle" then
+		ns.ReportDamageMeterStyle()
 	elseif cmd == "debug" and arg == "fonts" then
 		ns.ReportStyleFonts()
 	elseif cmd == "debug" and arg == "mirror" then

@@ -4597,3 +4597,15 @@ L["Picking a vendor's \"let me browse your goods\", the shop window opens where 
 L["Add all"] = "Добавить все"
 L["Fades every frame on this list that isn't added yet, as Add does for one."] = "Приглушает каждую ещё не добавленную рамку из этого списка, как «Добавить» делает для одной."
 L["Brings the letterbox bars in, or takes them out, in or out of CineMode. Turning CineMode on or off puts them back as the Letterbox page says."] = "Выводит полосы или убирает их, в CineMode и вне его. Включение или выключение CineMode возвращает их, как указано на странице «Полосы»."
+
+-- SwingTimerStyle.lua, DamageMeterStyle.lua (Interface Recolor rows)
+L["Damage meter"] = "Измеритель урона"
+L["Frame color"] = "Цвет рамки"
+L["The game's damage meter's borders, header and buttons in the theme's color. Its bars keep their colors."] = "Края, заголовок и кнопки игрового измерителя урона в цвете темы. Полосы сохраняют свои цвета."
+L["Bar texture"] = "Текстура полос"
+L["Its bars in General's bar texture, each in its own color."] = "Его полосы в текстуре полос из раздела Общие, каждая своего цвета."
+L["Text font"] = "Шрифт текста"
+L["Its names and numbers in General's text font."] = "Его имена и числа шрифтом текста из раздела Общие."
+L["The swing timer bars' frames in the theme's color. What fills them keeps its color."] = "Рамки полос таймера удара в цвете темы. Заполнение сохраняет свой цвет."
+L["The bars' fill in General's bar texture, each weapon's in its own color."] = "Заполнение полос в текстуре полос из раздела Общие, у каждого оружия своего цвета."
+L["The bars' words in General's text font."] = "Надписи на полосах шрифтом текста из раздела Общие."

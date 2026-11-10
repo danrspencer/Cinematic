@@ -83,6 +83,10 @@ local GROUPS = {
 		"MainMenuBarBackpackButton", "CharacterReagentBag0Slot", "MainMenuBarPerformanceBar" },
 		Numbered("CharacterBag", 0, 3, "Slot")) },
 	{ key = "irCast", names = { "PlayerCastingBarFrame", "CastingBarFrame" } },
+	-- (The damage meter's windows; its bars and words: DamageMeterStyle.lua.)
+	{ key = "dmFrame", get = function() return ns.DamageMeterWindows and ns.DamageMeterWindows() or {} end },
+	-- (The swing timer's frames; its fill and words: SwingTimerStyle.lua.)
+	{ key = "swFrame", names = { "SwingTimerMainHandFrame", "SwingTimerOffHandFrame", "SwingTimerRangedFrame" } },
 	{ key = "irSmall", names = Join(Numbered("StaticPopup", 1, 4), { "LootFrame", "ReadyCheckFrame", "GameMenuFrame",
 		"QueueStatusButton", "QueueStatusFrame", "LFGDungeonReadyDialog", "RolePollPopup", "GroupLootContainer" }) },
 	{ key = "irBig", names = Join(Numbered("ContainerFrame", 1, 13), { "ContainerFrameCombinedBags", "BankFrame",
@@ -355,6 +359,110 @@ local function Shown(frame)
 	local ok, shown = pcall(frame.IsVisible, frame)
 	return not ok or Plain(shown) ~= false
 end
+-- The menu buttons' edges (the irMicro row). Newer clients draw each button as
+-- one picture, its gold edge and its icon together (UI-HUD-MicroMenu-*), so the
+-- picture isn't tinted: a copy of it, grey and in the theme's color, goes over
+-- it, cut to its edge by the square frame mask (as MinimapStyle.lua's calendar).
+-- The edge is mostly the button's background (ButtonBG, behind the icon); the
+-- icon art's copy follows the button's state (up, pressed, disabled); one in its
+-- HIGHLIGHT layer covers the mouseover art, which the game shows on hover; the
+-- character button's own edge is its portrait's shadow.
+local MICRO_HOLDERS = { "MicroMenu", "MicroMenuContainer", "MicroButtonAndBagsBar" }
+local micro = {} -- [button] = { state, hover, extra = { [texture] = copy } }
+local microColor
+local function MicroButtons()
+	local list, seen = {}, {}
+	for _, holder in ipairs(MICRO_HOLDERS) do
+		local frame = _G[holder]
+		if type(frame) == "table" and frame.GetChildren then
+			for _, kid in ipairs({ frame:GetChildren() }) do
+				local okName, name = pcall(kid.GetName, kid)
+				if okName and type(name) == "string" and name:find("MicroButton$") and not seen[kid] then
+					seen[kid] = true
+					list[#list + 1] = kid
+				end
+			end
+		end
+	end
+	return list
+end
+local function AtlasOf(texture)
+	if not texture then return nil end
+	local ok, atlas = pcall(function() return texture:GetAtlas() end)
+	atlas = ok and Plain(atlas)
+	if type(atlas) == "string" and atlas:find("^UI%-HUD%-MicroMenu%-") then return atlas end
+end
+local function MicroCopy(button, layer, sub)
+	local copy = button:CreateTexture(nil, layer, nil, sub)
+	copy.mask = button:CreateMaskTexture()
+	copy.mask:SetTexture(ns.THEME_SQUARE_FRAME_MASK, "CLAMPTOBLACKADDITIVE", "CLAMPTOBLACKADDITIVE")
+	copy:AddMaskTexture(copy.mask)
+	isGlint[copy] = true -- (ours: never taken for the game's art)
+	copy:Hide()
+	return copy
+end
+local function Lay(copy, art, atlas)
+	if not (microColor and art and atlas) then return copy:Hide() end
+	copy:ClearAllPoints()
+	copy:SetAllPoints(art)
+	copy.mask:ClearAllPoints()
+	copy.mask:SetAllPoints(art)
+	copy:SetAtlas(atlas)
+	copy:SetDesaturated(true)
+	copy:SetVertexColor(microColor[1], microColor[2], microColor[3], 1)
+	copy:Show()
+end
+-- The art the button shows now: disabled, pressed or up.
+local function SyncMicro(button)
+	local parts = micro[button]
+	if not parts then return end
+	local art
+	local okEnabled, enabled = pcall(button.IsEnabled, button)
+	local okState, state = pcall(button.GetButtonState, button)
+	if okEnabled and Plain(enabled) == false then
+		art = button.GetDisabledTexture and button:GetDisabledTexture()
+	elseif okState and Plain(state) == "PUSHED" then
+		art = button.GetPushedTexture and button:GetPushedTexture()
+	end
+	art = art or (button.GetNormalTexture and button:GetNormalTexture())
+	Lay(parts.state, art, AtlasOf(art))
+	local hover = button.GetHighlightTexture and button:GetHighlightTexture()
+	Lay(parts.hover, hover, AtlasOf(hover))
+	for texture, copy in pairs(parts.extra) do
+		local okShown, shown = pcall(texture.IsShown, texture)
+		Lay(copy, (not okShown or Plain(shown) ~= false) and texture or nil, AtlasOf(texture))
+	end
+end
+local function DressMicro(color)
+	microColor = color -- (ColorOf's: brightened already)
+	for _, button in ipairs(MicroButtons()) do
+		local parts = micro[button]
+		if not parts and color then
+			parts = { state = MicroCopy(button, "ARTWORK", 7), hover = MicroCopy(button, "HIGHLIGHT", 7), extra = {} }
+			micro[button] = parts
+			-- (The gold edge is the button's background, behind its icon (tested on
+			-- Forever: a copy of the icon art changed nothing); the character
+			-- button's portrait shadow too.)
+			for _, key in ipairs({ "Background", "PushedBackground", "Shadow" }) do
+				local texture = button[key]
+				if AtlasOf(texture) then
+					local layer, sub = texture:GetDrawLayer()
+					parts.extra[texture] = MicroCopy(button, layer or "BORDER", math.min(7, (sub or 0) + 1))
+				end
+			end
+			local function Sync() SyncMicro(button) end
+			button:HookScript("OnMouseDown", Sync)
+			button:HookScript("OnMouseUp", Sync)
+			button:HookScript("OnShow", Sync)
+			for _, method in ipairs({ "Enable", "Disable", "SetEnabled", "SetButtonState", "SetNormalAtlas",
+				"SetPushedAtlas", "SetDisabledAtlas", "SetHighlightAtlas" }) do
+				if button[method] then hooksecurefunc(button, method, Sync) end
+			end
+		end
+		if parts then SyncMicro(button) end
+	end
+end
+
 local function Refresh()
 	for _, group in ipairs(GROUPS) do
 		local color = ColorOf(group)
@@ -383,6 +491,7 @@ local function Refresh()
 			end
 		end
 		counts[group.key] = count
+		if group.key == "irMicro" then DressMicro(color) end
 	end
 end
 -- (Many calls in one frame (a profile switch, a theme pick) make one pass.)
@@ -394,6 +503,8 @@ function ns.RefreshInterfaceRecolor()
 		pending = false
 		local started = debugprofilestop()
 		Refresh()
+		if ns.RefreshSwingTimerStyle then ns.RefreshSwingTimerStyle() end
+		if ns.RefreshDamageMeterStyle then ns.RefreshDamageMeterStyle() end
 		local took = debugprofilestop() - started
 		if took > 10 then ns.Log("style", ("recolor pass: %.0f ms"):format(took)) end
 	end)
@@ -454,6 +565,72 @@ function ns.ReportInterfaceRecolor()
 			#present > 0 and table.concat(present, ", ", 1, math.min(#present, 6)) .. (#present > 6 and ", ..." or "")
 			or "none"))
 	end
+	if ns.ReportSwingTimerStyle then ns.ReportSwingTimerStyle() end
+end
+
+-- For debug reports: every texture in a frame (DEPTH deep), to the log: what it is (own name,
+-- atlas or file, layer, size, color), whether it counts as chrome, and whether
+-- we tinted it.
+function ns.LogTextures(tag, frame)
+	Each(frame, 0, function(texture)
+		local okAtlas, atlas = pcall(function() return texture:GetAtlas() end)
+		local okFile, file = pcall(texture.GetTexture, texture)
+		local _, full = OwnName(texture)
+		local layer, sub = texture:GetDrawLayer()
+		local r, g, b, alpha = texture:GetVertexColor()
+		ns.Log("recolor", ("%s:   %s [%s %s] atlas=%s file=%s %.0fx%.0f shown=%s desat=%s " ..
+			"color=%.2f,%.2f,%.2f,%.2f chrome=%s tinted=%s"):format(tag, full ~= "" and full or "?", tostring(layer),
+			tostring(sub), tostring(okAtlas and Plain(atlas)), tostring(okFile and Plain(file)), texture:GetWidth(),
+			texture:GetHeight(), tostring(texture:IsShown()), tostring(texture:IsDesaturated()), Plain(r) or -1,
+			Plain(g) or -1, Plain(b) or -1, Plain(alpha) or -1, tostring(IsChrome(texture)),
+			tostring(tinted[texture] ~= nil)))
+	end, {})
+end
+
+-- For /cine debug micro: each menu button's textures, to the log: what they are
+-- (own name, atlas or file, layer, size), whether they count as chrome, and
+-- whether we tinted them.
+function ns.ReportMicroButtons()
+	Refresh()
+	local function Say(text) ns.Log("recolor", text) end
+	Say(("micro: client %s, combat %s, page %s, irMicro %s, theme ring %s"):format(tostring(select(4, GetBuildInfo())),
+		tostring(InCombatLockdown()), tostring(ns.StyleOn("irStyle")), tostring(ns.StyleLook("irStyle").irMicro),
+		tostring(ns.ThemeRing() ~= nil)))
+	local seen, buttons = {}, {}
+	for _, holder in ipairs({ "MicroMenu", "MicroMenuContainer", "MicroButtonAndBagsBar" }) do
+		local frame = _G[holder]
+		if type(frame) == "table" and frame.GetChildren then
+			for _, kid in ipairs({ frame:GetChildren() }) do
+				local name = kid.GetName and kid:GetName()
+				if name and name:find("MicroButton$") and not seen[kid] then
+					seen[kid] = true
+					buttons[#buttons + 1] = kid
+				end
+			end
+		end
+	end
+	Say(("micro: %d buttons"):format(#buttons))
+	for _, button in ipairs(buttons) do
+		Say(("micro: %s %.0fx%.0f shown %s"):format(button:GetName(), button:GetWidth(), button:GetHeight(),
+			tostring(button:IsShown())))
+		Each(button, 0, function(texture)
+			local okAtlas, atlas = pcall(function() return texture:GetAtlas() end)
+			local okFile, file = pcall(texture.GetTexture, texture)
+			local own = OwnName(texture)
+			local layer, sub = texture:GetDrawLayer()
+			local r, g, b, alpha = texture:GetVertexColor()
+			Say(("micro:   %s [%s %s] atlas=%s file=%s %.0fx%.0f shown=%s desat=%s color=%.2f,%.2f,%.2f,%.2f chrome=%s tinted=%s")
+				:format(own ~= "" and own or "?", tostring(layer), tostring(sub), tostring(okAtlas and Plain(atlas)),
+				tostring(okFile and Plain(file)), texture:GetWidth(), texture:GetHeight(), tostring(texture:IsShown()),
+				tostring(texture:IsDesaturated()), Plain(r) or -1, Plain(g) or -1, Plain(b) or -1, Plain(alpha) or -1,
+				tostring(IsChrome(texture)), tostring(tinted[texture] ~= nil)))
+		end, {})
+	end
+	for button, parts in pairs(micro) do
+		Say(("micro: %s copy %s %s, hover copy %s"):format(button:GetName() or "?", tostring(parts.state:IsShown()),
+			tostring(parts.state:GetAtlas()), tostring(parts.hover:GetAtlas())))
+	end
+	ns.Print("Menu buttons' textures written to the log.")
 end
 
 -- The page itself.
@@ -462,8 +639,8 @@ function ns.CreateInterfaceRecolorPanel(kit)
 	local title = kit.Label(content, "GameFontNormalLarge", L["Interface Recolor"])
 	title:SetPoint("TOPLEFT", 16, -16)
 	local intro = kit.PageIntro(content, title,
-		L["The game's interface in your theme's color: the minimap, the quest tracker, and the game's own " ..
-		"borders, edges and tabs, tinted. Icons, backgrounds and bars keep their colors. Only with a theme " ..
+		L["The game's interface in your theme's color: the minimap, the quest tracker, the damage meter, the " ..
+		"swing timer, and the game's own borders, edges and tabs, tinted. Icons, backgrounds and bars keep their colors. Only with a theme " ..
 		"picked on General."])
 
 	local function Changed()
@@ -494,6 +671,21 @@ function ns.CreateInterfaceRecolorPanel(kit)
 		"their difficulty's color. Objectives keep the game's colors."])
 	rows.Check("qtBars", L["Bars and buttons"], L["Progress bars in General's bar texture, and the fold buttons in " ..
 		"the theme's color."])
+	-- (DamageMeterStyle.lua's.)
+	stack:Header(content, L["Damage meter"])
+	rows.Check("dmFrame", L["Frame color"], L["The game's damage meter's borders, header and buttons in the " ..
+		"theme's color. Its bars keep their colors."])
+	rows.Check("dmBars", L["Bar texture"], L["Its bars in General's bar texture, each in its own color."])
+	rows.Check("dmFont", L["Text font"], L["Its names and numbers in General's text font."])
+	-- (SwingTimerStyle.lua's; Classic clients' own swing timer, none on retail.)
+	if not ns.isRetail then
+		stack:Header(content, L["Swing timer"])
+		rows.Check("swFrame", L["Frame color"], L["The swing timer bars' frames in the theme's color. What fills " ..
+			"them keeps its color."])
+		rows.Check("swBars", L["Bar texture"], L["The bars' fill in General's bar texture, each weapon's in its " ..
+			"own color."])
+		rows.Check("swFont", L["Text font"], L["The bars' words in General's text font."])
+	end
 	stack:Header(content, L["Recolor"])
 	rows.Check("irBarArt", L["Action bar art"], L["The gryphons (or wyverns) at the ends of action bar 1, and " ..
 		"the band its buttons sit on."])

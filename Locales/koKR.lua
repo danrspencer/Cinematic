@@ -4597,3 +4597,15 @@ L["Picking a vendor's \"let me browse your goods\", the shop window opens where 
 L["Add all"] = "모두 추가"
 L["Fades every frame on this list that isn't added yet, as Add does for one."] = "이 목록에서 아직 추가하지 않은 모든 창을 흐리게 합니다. 하나에 대해 추가가 하는 것과 같습니다."
 L["Brings the letterbox bars in, or takes them out, in or out of CineMode. Turning CineMode on or off puts them back as the Letterbox page says."] = "CineMode 안팎에서 레터박스를 들여오거나 내보냅니다. CineMode를 켜거나 끄면 레터박스 페이지 설정대로 돌아갑니다."
+
+-- SwingTimerStyle.lua, DamageMeterStyle.lua (Interface Recolor rows)
+L["Damage meter"] = "피해량 측정기"
+L["Frame color"] = "테두리 색상"
+L["The game's damage meter's borders, header and buttons in the theme's color. Its bars keep their colors."] = "게임 피해량 측정기의 테두리, 머리글, 버튼을 테마 색상으로 바꿉니다. 막대는 원래 색상을 유지합니다."
+L["Bar texture"] = "막대 텍스처"
+L["Its bars in General's bar texture, each in its own color."] = "막대를 일반의 막대 텍스처로 바꾸며, 각 막대는 고유 색상을 유지합니다."
+L["Text font"] = "글꼴"
+L["Its names and numbers in General's text font."] = "이름과 숫자를 일반의 글꼴로 표시합니다."
+L["The swing timer bars' frames in the theme's color. What fills them keeps its color."] = "평타 타이머 막대의 테두리를 테마 색상으로 바꿉니다. 채워지는 부분은 원래 색상을 유지합니다."
+L["The bars' fill in General's bar texture, each weapon's in its own color."] = "막대 채움을 일반의 막대 텍스처로 바꾸며, 무기마다 고유 색상을 유지합니다."
+L["The bars' words in General's text font."] = "막대의 글자를 일반의 글꼴로 표시합니다."

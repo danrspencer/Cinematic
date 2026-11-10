@@ -4597,3 +4597,15 @@ L["Picking a vendor's \"let me browse your goods\", the shop window opens where 
 L["Add all"] = "全部加入"
 L["Fades every frame on this list that isn't added yet, as Add does for one."] = "淡化此清單中尚未加入的每個框架，就像加入對單個框架所做的那樣。"
 L["Brings the letterbox bars in, or takes them out, in or out of CineMode. Turning CineMode on or off puts them back as the Letterbox page says."] = "在 CineMode 內外引入或移出黑邊。開啟或關閉 CineMode 會讓它們恢復為黑邊頁面的設定。"
+
+-- SwingTimerStyle.lua, DamageMeterStyle.lua (Interface Recolor rows)
+L["Damage meter"] = "傷害統計"
+L["Frame color"] = "邊框顏色"
+L["The game's damage meter's borders, header and buttons in the theme's color. Its bars keep their colors."] = "遊戲傷害統計的邊框、標題列和按鈕使用主題顏色。計量條保留原本的顏色。"
+L["Bar texture"] = "計量條材質"
+L["Its bars in General's bar texture, each in its own color."] = "計量條使用一般中的計量條材質，各自保留原本的顏色。"
+L["Text font"] = "文字字型"
+L["Its names and numbers in General's text font."] = "名字和數字使用一般中的文字字型。"
+L["The swing timer bars' frames in the theme's color. What fills them keeps its color."] = "揮擊計時器的邊框使用主題顏色。填充部分保留原本的顏色。"
+L["The bars' fill in General's bar texture, each weapon's in its own color."] = "計時條的填充使用一般中的計量條材質，每把武器保留各自的顏色。"
+L["The bars' words in General's text font."] = "計時條上的文字使用一般中的文字字型。"

@@ -129,6 +129,8 @@ TooltipStyle.lua
 ActionBarStyle.lua
 MinimapStyle.lua
 QuestTrackerStyle.lua
+SwingTimerStyle.lua
+DamageMeterStyle.lua
 InterfaceRecolor.lua
 Support\QuestieTracker.lua
 PersonalStyle.lua

@@ -4596,3 +4596,15 @@ L["Picking a vendor's \"let me browse your goods\", the shop window opens where 
 L["Add all"] = "Tout ajouter"
 L["Fades every frame on this list that isn't added yet, as Add does for one."] = "Estompe chaque cadre de cette liste qui n'est pas encore ajouté, comme Ajouter le fait pour un seul."
 L["Brings the letterbox bars in, or takes them out, in or out of CineMode. Turning CineMode on or off puts them back as the Letterbox page says."] = "Fait entrer ou sortir les bandes, en CineMode ou non. Activer ou désactiver le CineMode les remet comme le dit la page Bandes."
+
+-- SwingTimerStyle.lua, DamageMeterStyle.lua (Interface Recolor rows)
+L["Damage meter"] = "Mètre de dégâts"
+L["Frame color"] = "Couleur du cadre"
+L["The game's damage meter's borders, header and buttons in the theme's color. Its bars keep their colors."] = "Les bordures, l'en-tête et les boutons du mètre de dégâts du jeu à la couleur du thème. Ses barres gardent leurs couleurs."
+L["Bar texture"] = "Texture de barre"
+L["Its bars in General's bar texture, each in its own color."] = "Ses barres avec la texture de barre de Général, chacune dans sa propre couleur."
+L["Text font"] = "Police du texte"
+L["Its names and numbers in General's text font."] = "Ses noms et chiffres dans la police de texte de Général."
+L["The swing timer bars' frames in the theme's color. What fills them keeps its color."] = "Les cadres des barres du minuteur d'attaque à la couleur du thème. Leur remplissage garde sa couleur."
+L["The bars' fill in General's bar texture, each weapon's in its own color."] = "Le remplissage des barres avec la texture de barre de Général, celui de chaque arme dans sa propre couleur."
+L["The bars' words in General's text font."] = "Le texte des barres dans la police de texte de Général."
