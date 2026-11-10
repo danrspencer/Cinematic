@@ -4609,7 +4609,3 @@ L["Its names and numbers in General's text font."] = "Его имена и чи�
 L["The swing timer bars' frames in the theme's color. What fills them keeps its color."] = "Рамки полос таймера удара в цвете темы. Заполнение сохраняет свой цвет."
 L["The bars' fill in General's bar texture, each weapon's in its own color."] = "Заполнение полос в текстуре полос из раздела Общие, у каждого оружия своего цвета."
 L["The bars' words in General's text font."] = "Надписи на полосах шрифтом текста из раздела Общие."
-
--- CombineBags.lua (Options.lua)
-L["Profession bags in the combined backpack"] = "Сумки профессий в общем рюкзаке"
-L["With the game's Combine Bags on (Options > Interface), the bag in your fifth bag slot, such as a skinning or herb bag, opens in the Combined Backpack too, rather than in a window of its own. Its slots go at the bottom, and look like the rest when empty."] = "Когда включена игровая настройка «Объединить сумки» (Настройки > Интерфейс), сумка в пятой ячейке, например сумка снятия шкур или травника, тоже открывается в общем рюкзаке, а не в отдельном окне. Её ячейки идут в самом низу и, пустые, выглядят как остальные."

@@ -4609,7 +4609,3 @@ L["Its names and numbers in General's text font."] = "이름과 숫자를 일반
 L["The swing timer bars' frames in the theme's color. What fills them keeps its color."] = "평타 타이머 막대의 테두리를 테마 색상으로 바꿉니다. 채워지는 부분은 원래 색상을 유지합니다."
 L["The bars' fill in General's bar texture, each weapon's in its own color."] = "막대 채움을 일반의 막대 텍스처로 바꾸며, 무기마다 고유 색상을 유지합니다."
 L["The bars' words in General's text font."] = "막대의 글자를 일반의 글꼴로 표시합니다."
-
--- CombineBags.lua (Options.lua)
-L["Profession bags in the combined backpack"] = "통합 가방에 전문 기술 가방 포함"
-L["With the game's Combine Bags on (Options > Interface), the bag in your fifth bag slot, such as a skinning or herb bag, opens in the Combined Backpack too, rather than in a window of its own. Its slots go at the bottom, and look like the rest when empty."] = "게임의 가방 통합 옵션이 켜져 있으면(설정 > 인터페이스), 다섯 번째 가방 칸의 가방(무두질 가방, 약초 가방 등)도 따로 창을 열지 않고 통합 가방에서 열립니다. 그 칸들은 맨 아래에 놓이며, 비어 있을 때 다른 칸과 똑같아 보입니다."

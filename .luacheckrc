@@ -9,7 +9,7 @@ ignore = { "542", "212/self", "421", "422", "431" }
 -- What the addon defines or changes
 globals = {
 	"CinematicDB", "CinematicCharDB", "SlashCmdList", "StaticPopupDialogs", "ColorPickerFrame", "DAMAGE_TEXT_FONT",
-	"ClickCastFrames", "ENDING_BAG_INDEX", -- (CombineBags.lua widens the combined bag window)
+	"ClickCastFrames",
 	"Cinematic_Toggle", "Cinematic_ToggleCineMode", "Cinematic_ToggleUI", "Cinematic_TakeScreenshot", "Cinematic_Reload", "BINDING_NAME_CINEMATIC_RELOAD", "Cinematic_ToggleSettings", "BINDING_NAME_CINEMATIC_TOGGLESETTINGS", "Cinematic_StartCam", "Cinematic_StopCamera", "Cinematic_CustomTrigger", "Cinematic_FlyBy", "Cinematic_ShowTooltips", "Cinematic_ToggleTooltips", "Cinematic_HideCursor", "BINDING_NAME_CINEMATIC_HIDECURSOR", "Cinematic_ToggleVisualEffects", "Cinematic_ToggleLetterbox",
 	"Cinematic_CameraWheel", "BINDING_NAME_CINEMATIC_CAMWHEEL", "Cinematic_KeyboardMap", "BINDING_NAME_CINEMATIC_KEYMAP", "Cinematic_ToggleVision", "AddonCompartmentFrame",
 	"BINDING_NAME_CINEMATIC_VISION_HEAL", "BINDING_NAME_CINEMATIC_VISION_QUEST", "BINDING_NAME_CINEMATIC_VISION_DUEL",
@@ -140,7 +140,7 @@ read_globals = {
 	"GetCursorInfo",
 	"CharacterFrame", "HideUIPanel", "ToggleCharacter", "ToggleTalentFrame", "UnitLevel", "EnumerateFrames", "TalentMicroButton", "PlayerSpellsUtil", "InspectLevelText", "InspectFrame", "InspectPaperDollFrame", "InspectPaperDollItemsFrame", "PlayerSpellsFrame_LoadUI", "ClassTalentFrame_LoadUI", "PlayerSpellsFrame", "ClassTalentFrame", "LoadAddOn", "InspectUnit", "UnitTokenFromGUID", "CanInspect", "INSPECT", "TALENTS", "GetUIPanel",
 	"C_Traits", "C_ClassTalents", "IsPassiveSpell", "SPELL_PASSIVE", "GetMaxLevelForPlayerExpansion", "GetMaxPlayerLevel", "ButtonFrameTemplate_HidePortrait",
-	"ContainerFrameCombinedBags", "UpdateContainerFrameAnchors", "NUM_BAG_FRAMES", "NUM_TOTAL_BAG_FRAMES", "IsAnyBagOpen", "CloseAllBags", "ContainerFrameItemButtonMixin",
+	"ContainerFrameCombinedBags", "UpdateContainerFrameAnchors",
 	"C_Container", "PickupContainerItem", "GetContainerNumSlots", "GetContainerItemInfo", "NUM_BAG_SLOTS",
 	"C_SpellBook", "GetNumSpellTabs", "BOOKTYPE_SPELL", "GetSpellTabInfo", "GetSpellBookItemName", "GetSpellBookItemTexture",
 	"NUM_TOTAL_EQUIPPED_BAG_SLOTS", "GetInventoryItemTexture", "GetWeaponEnchantInfo", "C_MountJournal",

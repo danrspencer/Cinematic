@@ -7640,13 +7640,6 @@ local function CreateQualityPanel()
 		"so its slots are there to drop it on. Moving it between bags doesn't. Put it back without wearing it " ..
 		"and the window closes again. Not in a fight."]
 		.. (issecretvalue and "\n\n" .. L["Off by default on this client: opened by an addon, the window makes your player frame's health and power numbers show errors in BugSack and other error catchers. They're harmless."] or "")), "check")
-	-- (CombineBags.lua; only where the game's combined bags leave a bag out.)
-	if ns.CanCombineProfessionBags then
-		stack:Add(Check(content, "combineProfessionBags", L["Profession bags in the combined backpack"],
-			L["With the game's Combine Bags on (Options > Interface), the bag in your fifth bag slot, such as a " ..
-			"skinning or herb bag, opens in the Combined Backpack too, rather than in a window of its own. Its slots " ..
-			"go at the bottom, and look like the rest when empty."]), "check")
-	end
 	-- (TalentLink.lua; WoW Forever only.)
 	if not ns.isRetail then
 		stack:Add(Check(content, "talentLink", L["Talents button when inspecting someone"],

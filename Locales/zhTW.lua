@@ -4609,7 +4609,3 @@ L["Its names and numbers in General's text font."] = "名字和數字使用一�
 L["The swing timer bars' frames in the theme's color. What fills them keeps its color."] = "揮擊計時器的邊框使用主題顏色。填充部分保留原本的顏色。"
 L["The bars' fill in General's bar texture, each weapon's in its own color."] = "計時條的填充使用一般中的計量條材質，每把武器保留各自的顏色。"
 L["The bars' words in General's text font."] = "計時條上的文字使用一般中的文字字型。"
-
--- CombineBags.lua (Options.lua)
-L["Profession bags in the combined backpack"] = "專業背包併入組合背包"
-L["With the game's Combine Bags on (Options > Interface), the bag in your fifth bag slot, such as a skinning or herb bag, opens in the Combined Backpack too, rather than in a window of its own. Its slots go at the bottom, and look like the rest when empty."] = "開啟遊戲的「組合背包」選項時（選項 > 介面），第五個背包欄位中的背包（例如剝皮包或草藥包）也會在組合背包中開啟，而不是獨立的視窗。它的格子排在最下方，空著時與其他格子外觀相同。"

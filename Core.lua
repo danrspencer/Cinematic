@@ -352,7 +352,6 @@ local DEFAULTS = {
 	-- Dragging something you can wear out of the bags opens the character window (DragEquip.lua). Off by
 	-- default where unit values are secret: opening it taints the player bars, and BugSack shows their errors.
 	dragEquipCharacter = issecretvalue == nil,
-	combineProfessionBags = false, -- (on in the dev copy: ns.isDev below) Forever: the game's Combine Bags takes the fifth-slot (profession) bag in too (CombineBags.lua)
 	talentLink = true,         -- Forever: inspecting someone, a button to their talents, and one back on the talents window (TalentLink.lua)
 	talentCalc = true,         -- Forever: a Talent calculator button on the talents window (TalentCalc.lua)
 	talentCalcTalented = false, -- ...counting the Legacy Tree's Talented (points from level 5) for the level a build needs
@@ -1181,8 +1180,6 @@ DEFAULTS.handleSwing = true -- Swing timer
 -- The development copy (the CinematicDev folder), for features not ready to
 -- ship: they show only there.
 ns.isDev = ADDON_NAME == "CinematicDev"
--- Shipped off; on to start with in the dev copy only (the developer's pick).
-DEFAULTS.combineProfessionBags = ns.isDev
 -- Whether Forever's Character Models setting is on Standard Definition (its
 -- Settings proxy is true then; not a CVar). nil on clients without it.
 function ns.StandardModels()
@@ -1420,7 +1417,7 @@ DEFAULTS.handleAddonSupport = true -- Quality of life > Addon Support (only buil
 DEFAULTS.handleHealVision = true -- (read by ns.HealVisionHere; Quest Vision's switch is questVision)
 local PAGE_SWITCH = {}
 for page, keys in pairs({
-	handleQuality = { "campfireSitButton", "dragEquipCharacter", "combineProfessionBags", "talentLink", "talentCalc",
+	handleQuality = { "campfireSitButton", "dragEquipCharacter", "talentLink", "talentCalc",
 		"centerPanels", "dragPanels", "chatCopyButton", "chatHistory", "chatHistoryTime", "loginZoom",
 		"reloadButton", "reloadKeepWindows" },
 	handleHunter = { "hunterRightClickShot", "hunterAmmoSort", "hunterQuiverFill", "petUnhappyShow" },

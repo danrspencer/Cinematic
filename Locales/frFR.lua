@@ -4608,7 +4608,3 @@ L["Its names and numbers in General's text font."] = "Ses noms et chiffres dans 
 L["The swing timer bars' frames in the theme's color. What fills them keeps its color."] = "Les cadres des barres du minuteur d'attaque à la couleur du thème. Leur remplissage garde sa couleur."
 L["The bars' fill in General's bar texture, each weapon's in its own color."] = "Le remplissage des barres avec la texture de barre de Général, celui de chaque arme dans sa propre couleur."
 L["The bars' words in General's text font."] = "Le texte des barres dans la police de texte de Général."
-
--- CombineBags.lua (Options.lua)
-L["Profession bags in the combined backpack"] = "Sacs de métier dans le sac à dos combiné"
-L["With the game's Combine Bags on (Options > Interface), the bag in your fifth bag slot, such as a skinning or herb bag, opens in the Combined Backpack too, rather than in a window of its own. Its slots go at the bottom, and look like the rest when empty."] = "Avec l'option Combiner les sacs du jeu activée (Options > Interface), le sac de votre cinquième emplacement, comme un sac de dépeçage ou d'herbes, s'ouvre aussi dans le sac à dos combiné plutôt que dans sa propre fenêtre. Ses emplacements vont tout en bas et, vides, ressemblent aux autres."
