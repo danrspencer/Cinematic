@@ -112,4 +112,17 @@ ns.WhenAddonLoads("Questie", function()
 		buttons[i] = "Questie_ItemButton" .. i
 	end
 	ns.FadeWithRow("quests", "quests", buttons, true, true)
+	-- Its tracker is made seconds after the loading screen, past the login
+	-- window: hidden as it comes up rather than showing till the next scan.
+	local checks = 0
+	local watch
+	watch = C_Timer.NewTicker(0.1, function()
+		checks = checks + 1
+		local base = _G.Questie_BaseFrame
+		local up = type(base) == "table" and base.IsShown and ns.Flag(base:IsShown())
+		if up or checks >= 600 then
+			watch:Cancel()
+			if up and ns.SnapLateFrames then ns.SnapLateFrames() end
+		end
+	end)
 end)

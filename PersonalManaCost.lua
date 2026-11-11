@@ -50,6 +50,20 @@ local function Readable(value)
 	return value ~= nil and not (issecretvalue and issecretvalue(value))
 end
 
+-- Trace (while the log takes detail: always in the dev copy, else /cine
+-- debug record): every cast event and mana change around a cast, in the
+-- order they reach us, with what each read, to see why a cast's paid or not.
+local traceUntil = 0 -- power changes are traced until then (a little past a cast)
+local function Shown(value)
+	if value == nil then return "nil" end
+	return Readable(value) and tostring(value) or "secret"
+end
+local function Trace(text)
+	if ns.LogDetailOn and ns.LogDetailOn() and ns.Log then
+		ns.Log("manacost", ("%.3f %s"):format(GetTime(), text))
+	end
+end
+
 -- The bars your mana is on now, by where: display (under your character)
 -- and portrait (your player frame). Either can be nil. (Power type
 -- secret: maybe mana.)
@@ -193,6 +207,7 @@ end
 local function SetPaid()
 	paid = true
 	if castSpell then AtStart()[castSpell] = true end
+	Trace("PAID (seen paying at its start): " .. Shown(castSpell))
 end
 
 local function CheckPaid()
@@ -225,9 +240,34 @@ local function Start(castGUID, spellID)
 	end
 	lastStart = { cost = Readable(cost) and cost or nil, readable = startMana ~= nil,
 		ago = ago or (changes[#changes] and now - changes[#changes].at) or nil, early = early }
-	if casting and castSpell and AtStart()[castSpell] then paid = true end
+	local learned = casting and castSpell and AtStart()[castSpell] and true or false
+	if learned then paid = true end
 	CheckPaid()
+	traceUntil = now + 2
+	local seen = {}
+	for _, change in ipairs(changes) do
+		seen[#seen + 1] = ("%.3fs ago from %s"):format(now - change.at, Shown(change.before))
+	end
+	Trace(("START %s guid %s: cost %s, mana now %s, last event mana %s, changes [%s], start mana %s%s, learned %s, stopped %s, paid %s")
+		:format(Shown(castSpell), Shown(castGUID), Shown(cost), Shown(UnitPower("player", MANA)), Shown(lastMana),
+			table.concat(seen, "; "), Shown(startMana), early and " (taken before)" or "", tostring(learned),
+			stoppedAt and ("%.3fs ago"):format(now - stoppedAt) or "never", tostring(paid)))
 	Update()
+	-- (What's drawn on each mana bar: ours, and anything else on it, an
+	-- addon's or the game's, by name.)
+	if ns.LogDetailOn and ns.LogDetailOn() then
+		for where, bar in pairs(ManaBars()) do
+			local others = {}
+			for _, child in ipairs({ bar:GetChildren() }) do
+				if child ~= overlays[bar] and ns.Flag(child:IsShown()) then
+					local ok, name = pcall(child.GetDebugName or child.GetName, child)
+					others[#others + 1] = ok and Readable(name) and name or "unnamed"
+				end
+			end
+			Trace(("%s bar %s: ours %s, others shown [%s]"):format(where, ns.DescribeManaBar(bar),
+				overlays[bar] and ns.Flag(overlays[bar]:IsShown()) and "shown" or "hidden", table.concat(others, ", ")))
+		end
+	end
 end
 
 -- (Only for the cast that's on: some spells go off on their own mid-cast.
@@ -278,6 +318,14 @@ watcher:RegisterUnitEvent("UNIT_DISPLAYPOWER", "player")
 watcher:RegisterUnitEvent("UNIT_MAXPOWER", "player")
 watcher:RegisterUnitEvent("UNIT_POWER_FREQUENT", "player")
 watcher:SetScript("OnEvent", function(_, event, _, arg2, spellID)
+	if event:find("^UNIT_SPELLCAST_") and event ~= "UNIT_SPELLCAST_START" then
+		traceUntil = GetTime() + 2
+		Trace(("%s guid %s (ours %s): mana %s, casting info %s, paid %s"):format(event:sub(16), Shown(arg2),
+			Shown(casting), Shown(UnitPower("player", MANA)), Shown((UnitCastingInfo("player"))), tostring(paid)))
+	elseif event == "UNIT_POWER_FREQUENT" and GetTime() < traceUntil then
+		Trace(("power %s: mana %s, last %s, casting %s, start mana %s, paid %s"):format(Shown(arg2),
+			Shown(UnitPower("player", MANA)), Shown(lastMana), casting and "yes" or "no", Shown(startMana), tostring(paid)))
+	end
 	if event == "UNIT_SPELLCAST_START" then
 		Start(arg2, spellID)
 	elseif event == "UNIT_SPELLCAST_FAILED" or event == "UNIT_SPELLCAST_INTERRUPTED" then

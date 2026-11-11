@@ -2082,13 +2082,13 @@ do
 			{ "Cursor Hide", "Interface\\Icons\\INV_Misc_Eye_01", section = "CineMode Autohide" }, -- (CursorHide.lua)
 			-- (Most used first; swing timer, chat bubbles and tooltips last.)
 			{ "Nameplates", "Interface\\Icons\\Ability_Hunter_SniperShot", section = "Autohide Advanced" },
+			{ "Personal Resources", "Interface\\Icons\\Ability_Racial_BloodRage", -- (Bloodrage: health into power)
+				label = "Personal Resource Display", section = "Autohide Advanced" },
+			{ "Buffs/debuffs", "Interface\\Icons\\Spell_Holy_WordFortitude", label = "Buffs/Debuffs", section = "Autohide Advanced" },
 			{ "Minimap", "Interface\\Icons\\INV_Misc_Map_01", section = "Autohide Advanced" },
 			{ "Chat", "Interface\\Icons\\INV_Scroll_03", section = "Autohide Advanced" },
 			{ "Quest tracker", "Interface\\Icons\\INV_Misc_Note_01", label = "Quest Tracker", section = "Autohide Advanced" },
-			{ "Buffs/debuffs", "Interface\\Icons\\Spell_Holy_WordFortitude", label = "Buffs/Debuffs", section = "Autohide Advanced" },
 			{ "Cooldown Manager", "Interface\\Icons\\INV_Misc_PocketWatch_01", section = "Autohide Advanced" },
-			{ "Personal Resources", "Interface\\Icons\\Ability_Racial_BloodRage", -- (Bloodrage: health into power)
-				label = "Personal Resource Display", section = "Autohide Advanced" },
 			{ "Swing timer", "Interface\\Icons\\INV_Sword_04", label = "Swing Timer", section = "Autohide Advanced" },
 			{ "Chat bubbles", "Interface\\Icons\\Ability_Warrior_BattleShout", label = "Chat Bubbles",
 				section = "Autohide Advanced" },
@@ -11571,7 +11571,7 @@ local function CreateMinimapPanel()
 		{ "minimaptracking", L["Tracking button"] }, { "minimapcalendar", L["Calendar"] },
 		{ "minimapclock", L["Clock"] }, { "minimapdial", L["Day/night dial"] },
 		{ "minimapaddons", L["Addon buttons"] }, { "minimapcompartment", L["Addon compartment"] },
-		{ "minimapcoords", L["Coordinates"] },
+		{ "minimapcoords", L["Coordinates"] }, { "minimapmail", L["Mail"] },
 	}
 	local function PartsHere()
 		local here, has = {}, {}

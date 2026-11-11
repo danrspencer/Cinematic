@@ -500,6 +500,8 @@ local function HandleSlash(msg)
 		ns.db.debugCameraMode = not ns.db.debugCameraMode
 		ns.ResetCameraModeReport() -- print the current mode straight away
 		ns.Print("print camera mode changes to chat: " .. OnOff(ns.db.debugCameraMode))
+	elseif cmd == "debug" and arg:find("^alphatrace ") then
+		ns.StartAlphaTrace(arg:match("^alphatrace%s+(.+)$"))
 	elseif cmd == "debug" and arg:find("^frame ") then
 		ns.ReportFrames(arg:match("^frame%s+(.+)$"))
 	elseif cmd == "debug" and arg == "marks" then

@@ -3702,6 +3702,15 @@ function ns.RestartTimers()
 	end
 end
 
+-- A supported addon made a frame after the login window (Questie's tracker
+-- comes seconds after the loading screen): scanned for at once and, in
+-- CineMode, hidden at once as at login, rather than showing until the next
+-- scan finds it and fades it. Frames already snapped stay as they are.
+function ns.SnapLateFrames()
+	startSnapUntil = math.max(startSnapUntil, GetTime() + 1)
+	sinceScan = START_SCAN_INTERVAL
+end
+
 -- Off is all or nothing: our hooks can't be taken out once in, so off is the
 -- game's own AddOns list (for every character, as the dev copy found by name
 -- didn't stick) and a reload, with nothing of ours loaded after. Back on is
@@ -5404,6 +5413,36 @@ ticker:SetScript("OnEvent", ns.Profiled("Core events", function(self, event, arg
 				end
 			end
 			ns.db.minimapCompartmentV1 = true
+		end
+		-- The unread mail icon got a row of its own (it faded with the map):
+		-- into saved groups with the minimap, and into Reveal shows lists that
+		-- name any part, so it still comes up with the map. Once.
+		if not ns.db.minimapMailV1 then
+			local function AddMailRow(groups)
+				for _, group in ipairs(groups or {}) do
+					local has = {}
+					for _, key in ipairs(group.members or {}) do has[key] = true end
+					if has.minimap and not has.minimapmail then
+						table.insert(group.members, "minimapmail")
+					end
+				end
+			end
+			local function AddMailPart(db)
+				local parts = db.minimapRevealParts
+				if type(parts) == "string" and parts ~= ""
+					and not (parts .. ","):find("minimapmail,", 1, true) then
+					db.minimapRevealParts = parts .. ",minimapmail"
+				end
+			end
+			AddMailRow(ns.db.hoverGroups)
+			AddMailPart(ns.db)
+			for _, saved in pairs(ns.db.profiles or {}) do
+				if type(saved) == "table" then
+					AddMailRow(saved.hoverGroups)
+					AddMailPart(saved)
+				end
+			end
+			ns.db.minimapMailV1 = true
 		end
 		-- The objective boxes under the minimap went with the quest tracker
 		-- (always up); now with the minimap: into saved groups with it. Once.

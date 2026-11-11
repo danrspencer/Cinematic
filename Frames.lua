@@ -117,6 +117,9 @@ local FRAME_GROUPS = {
 	-- The game's addon compartment button by the minimap (retail and Forever).
 	minimapcompartment = { "AddonCompartmentFrame" },
 	minimapcoords = {},
+	-- The unread mail icon on the minimap (MiniMapMailFrame, retail's
+	-- MinimapCluster.IndicatorFrame.MailFrame: found by FindMinimapHeader).
+	minimapmail = {},
 	chat = {
 		"GeneralDockManager", "ChatFrameMenuButton", "ChatFrameChannelButton",
 		"QuickJoinToastButton", "ChatFrameToggleVoiceDeafenButton", "ChatFrameToggleVoiceMuteButton",
@@ -390,6 +393,7 @@ local function ApplyAlpha(entry)
 		entry.settingAlpha = true
 		ns.SetFrameAlpha(entry.frame, entry.applied)
 		entry.settingAlpha = false
+		if ns.AlphaTrace then ns.AlphaTrace(entry, "ours", entry.applied) end
 		if ns.profiling then
 			ns.ProfileCount("SetAlpha on faded frames")
 		end
@@ -566,13 +570,25 @@ local OnOwnSetAlpha = ns.Profiled("Own SetAlpha hook", function(frame, alpha)
 	if not entry or entry.settingAlpha then
 		return
 	end
+	if ns.AlphaTrace then ns.AlphaTrace(entry, "SetAlpha", alpha) end
+	-- (An addon fading the frame smoothly (ElvUI's range fade) sets each step
+	-- of it, and starts it again from the alpha it reads back, ours in it:
+	-- while we fade the frame, where its fade ends is its alpha, or each
+	-- restart knocks ours down again. Support files set cinematicFadeEnd.)
+	-- (What it set stays what ApplyAlpha compares with, or it reads that
+	-- back and takes it as the base after all.)
+	local set = alpha
+	local fadeEnd = rawget(frame, "cinematicFadeEnd")
+	if type(fadeEnd) == "number" and VisualAlpha(entry) < 1 then
+		alpha = fadeEnd
+	end
 	if (issecretvalue and issecretvalue(alpha)) or math.abs(alpha - (entry.applied or -1)) > ALPHA_SLACK then
 		ReportOwnAlpha(entry, alpha, "hooked")
 	end
 	if not (issecretvalue and issecretvalue(alpha)) then
 		entry.baseAlpha = alpha
 	end
-	entry.applied = alpha -- (so ApplyAlpha doesn't take it again)
+	entry.applied = set -- (so ApplyAlpha doesn't take it again)
 	ApplyAlpha(entry)
 end)
 
@@ -609,7 +625,7 @@ end
 local GROUP_SWITCH = {
 	minimap = "handleMinimap", minimapheader = "handleMinimap", minimaptracking = "handleMinimap",
 	minimapcalendar = "handleMinimap", minimapzone = "handleMinimap", minimapclock = "handleMinimap",
-	minimapdial = "handleMinimap", minimapaddons = "handleMinimap", minimapcompartment = "handleMinimap", minimapcoords = "handleMinimap", belowminimap = "handleMinimap", quests = "handleQuests", questtimer = "handleQuests", waypoint = "handleQuests",
+	minimapdial = "handleMinimap", minimapaddons = "handleMinimap", minimapcompartment = "handleMinimap", minimapcoords = "handleMinimap", minimapmail = "handleMinimap", belowminimap = "handleMinimap", quests = "handleQuests", questtimer = "handleQuests", waypoint = "handleQuests",
 	buffs = "handleBuffs", cooldowns = "handleCooldowns", chat = "handleChat", swing = "handleSwing",
 	gamepadbars = "handleGamepad", gamepadlegend = "handleGamepad", gamepadreticle = "handleGamepad",
 }
@@ -1310,7 +1326,7 @@ do
 	end
 
 	local HEADER_GROUPS = { "minimapheader", "minimapzone", "minimaptracking", "minimapdial", "minimapaddons",
-		"minimapcoords" }
+		"minimapcoords", "minimapmail" }
 	local coordsFound -- (the coordinates' frame once found: not looked for again while it's faded)
 	function ns.FindMinimapHeader()
 		-- (None of the minimap's parts handled, its page off: nothing to find.)
@@ -1343,6 +1359,15 @@ do
 		-- The zone's name: its button, whose bar art ignores its fade (above).
 		AddFrame(bar, "minimapzone")
 		AddFrame(cluster and cluster.DielFrame, "minimapdial")
+		-- The unread mail icon: retail's sits in the cluster's IndicatorFrame,
+		-- older clients' is MiniMapMailFrame. (Left in the cluster when an
+		-- addon hides it for good, as above.)
+		if not leftAlone.MinimapCluster then
+			local indicators = cluster and cluster.IndicatorFrame
+			AddFrame(type(indicators) == "table" and indicators.MailFrame or nil, "minimapmail")
+			AddFrame(cluster and cluster.MailFrame, "minimapmail")
+			AddFrame(_G.MiniMapMailFrame, "minimapmail")
+		end
 		-- Our button, unless an addon gathering minimap buttons took it: then it
 		-- shows in that addon's popout, so it's not faded with the map.
 		local ours = _G.CinematicMinimapButton
@@ -2136,6 +2161,9 @@ ns.COMBAT_SHOW = {
 	{ key = "minimapcoords", label = L["Coordinates"], default = true, groups = { "minimapcoords" },
 		tip = L["The map coordinates by the minimap. Untick it to hide them in CineMode even while the minimap is up. " ..
 			"Hovering the minimap brings them up with the map."] },
+	{ key = "minimapmail", label = L["Mail"], default = true, groups = { "minimapmail" },
+		tip = L["The unread mail icon on the minimap. Untick it to hide it in CineMode even while the minimap is up. " ..
+			"Hovering the minimap brings it up with the map."] },
 	-- The boxes under the minimap (a capture bar, a scenario's step): go with
 	-- the minimap, following its ticks until set (see ROW_FALLBACK), and in its
 	-- Mouseover group.
@@ -2294,7 +2322,7 @@ local ROW_SECTIONS = {
 	right1 = "bars", right2 = "bars", bar6 = "bars", bar7 = "bars", bar8 = "bars",
 	minimap = "minimap", minimapheader = "minimap", minimaptracking = "minimap", minimapcalendar = "minimap",
 	minimapzone = "minimap", minimapclock = "minimap", minimapdial = "minimap", minimapaddons = "minimap",
-	minimapcompartment = "minimap", minimapcoords = "minimap", belowminimap = "minimap",
+	minimapcompartment = "minimap", minimapcoords = "minimap", minimapmail = "minimap", belowminimap = "minimap",
 	quests = "interface", waypoint = "interface", topcenter = "interface", micro = "interface", bags = "interface", xp = "interface",
 	chat = "interface", voice = "interface",
 }
@@ -2460,7 +2488,7 @@ ns.HOVER_GROUPS_DEFAULT = {
 		members = { "raidmanager" }, triggers = { roster = true }, when = "calm" },
 	{ preset = "minimap", icon = "Interface\\Icons\\INV_Misc_Map_01", name = L["Minimap"],
 		members = { "minimap", "minimapheader", "minimapzone", "minimaptracking", "minimapcalendar", "minimapclock",
-			"minimapdial", "minimapaddons", "minimapcompartment", "minimapcoords", "belowminimap" },
+			"minimapdial", "minimapaddons", "minimapcompartment", "minimapcoords", "minimapmail", "belowminimap" },
 		triggers = { ping = true, tracking = true } },
 	{ preset = "buffs", icon = "Interface\\Icons\\Spell_Holy_WordFortitude", name = L["Buffs"],
 		members = { "buffs", "buffcollapse" }, triggers = { aura = true } },
@@ -2697,7 +2725,7 @@ end
 local ROW_FALLBACK = {
 	art = "mainbar", petframe = "player", prdpower = "prd", focustot = "focus", minimapheader = "minimap", minimaptracking = "minimap", minimapcalendar = "minimap",
 	minimapzone = "minimap", minimapclock = "minimap", minimapdial = "minimap", minimapaddons = "minimap",
-	minimapcompartment = "minimap", minimapcoords = "minimap", bags = "micro",
+	minimapcompartment = "minimap", minimapcoords = "minimap", minimapmail = "minimap", bags = "micro",
 	belowminimap = "minimap", topcenter = "quests",
 	cooldownsutility = "cooldowns", cooldownsbuffs = "cooldowns", cooldownsbars = "cooldowns",
 	["addon:fecmAuras"] = "addon:fecm",
@@ -6217,7 +6245,7 @@ local pingRevealUntil = 0
 do
 	local PARTS = { minimapheader = true, minimapzone = true, minimaptracking = true, minimapcalendar = true,
 		minimapclock = true, minimapdial = true, minimapaddons = true, minimapcompartment = true,
-		minimapcoords = true }
+		minimapcoords = true, minimapmail = true }
 	local parsed, shown = nil, {}
 	function ns.MinimapRevealHides(member)
 		if not PARTS[member] then
@@ -8595,10 +8623,10 @@ function ns.ReportFrames(text)
 			local parent = frame:GetParent()
 			ns.Print(("%s [%s] shown=%s visible=%s nested=%s"):format(name, entry.group,
 				tostring(frame:IsShown()), tostring(frame:IsVisible()), tostring(entry.nested or false)))
-			ns.Print(("  alpha now %s, fade %s, applied %s, base %s, own=%s hooked=%s scale %s"):format(
+			ns.Print(("  alpha now %s, fade %s, applied %s, base %s, own=%s hooked=%s scale %s, addon fade ends %s"):format(
 				Number(frame:GetAlpha()), Number(entry.alpha), Number(entry.applied), Number(entry.baseAlpha),
 				tostring(entry.ownAlpha or false), tostring(alphaHooked[frame] == entry),
-				Number(frame:GetScale())))
+				Number(frame:GetScale()), Number(rawget(frame, "cinematicFadeEnd"))))
 			ns.Print(("  parent %s (shown=%s, alpha %s, on screen %s)"):format(
 				parent and (parent:GetName() or parent:GetDebugName()) or "none",
 				tostring(parent and parent:IsShown()), Number(parent and parent:GetAlpha()),

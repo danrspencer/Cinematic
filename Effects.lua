@@ -3027,6 +3027,39 @@ end
 RefreshAllPlates = ns.Profiled("RefreshAllPlates", RefreshAllPlates)
 ns.RefreshAllPlates = RefreshAllPlates -- (the Names grid's Service NPCs Show and Kinds: Options)
 
+-- The filtered plates' timed refresh (FilteredInputsChanged's every half
+-- second) spread over a few frames, ROLL_STEP plates a frame: all at once
+-- it was a 2-5 ms frame twice a second in a city's worth of plates. A
+-- change that needs them all now still refreshes them all at once.
+-- (On ns.plates, not locals: this file is at Lua's 200 locals cap.)
+ns.plates.ROLL_STEP = 8
+function ns.plates.StartRoll()
+	if C_NamePlate and C_NamePlate.GetNamePlates then
+		ns.plates.roll, ns.plates.rollAt = C_NamePlate.GetNamePlates(), 0
+	end
+end
+-- One frame's share; whether any are left.
+function ns.plates.RollStep()
+	local list = ns.plates.roll
+	if not list then return false end
+	local from = ns.plates.rollAt
+	local to = math.min(#list, from + ns.plates.ROLL_STEP)
+	for i = from + 1, to do
+		local plate = list[i]
+		if not (plate.IsForbidden and plate:IsForbidden()) then
+			local unit = plate.namePlateUnitToken or (plate.UnitFrame and plate.UnitFrame.unit)
+			SetPlateAlphas(plate, PlateAlphas(unit, plate))
+		end
+	end
+	if to >= #list then
+		ns.plates.roll = nil
+		return false
+	end
+	ns.plates.rollAt = to
+	return true
+end
+ns.plates.RollStep = ns.Profiled("Plates refresh step", ns.plates.RollStep)
+
 -- For /cine debug plates: the game's plate settings, the fade, and how each
 -- visible plate (and the target) is sorted.
 function ns.PrintPlatesDebug()
@@ -3844,10 +3877,15 @@ end)
 local function FilteredInputsChanged(now)
 	local key = (platesActive and 1 or 0) + (InCombatLockdown() and 2 or 0) + (ns.InGroup() and 4 or 0)
 		+ (InPvPFight() and 8 or 0)
-	if platesDirty or key ~= filteredKey or placeSuffix ~= filteredPlace or now >= filteredRefreshAt then
+	if platesDirty or key ~= filteredKey or placeSuffix ~= filteredPlace then
 		platesDirty, filteredKey, filteredPlace = false, key, placeSuffix
 		filteredRefreshAt = now + FILTERED_REFRESH
 		return true
+	end
+	-- (Just the timer: spread over frames, ns.plates.StartRoll.)
+	if now >= filteredRefreshAt then
+		filteredRefreshAt = now + FILTERED_REFRESH
+		return "timer"
 	end
 	return false
 end
@@ -4076,9 +4114,14 @@ function ns.UpdatePlates(cinematic, elapsed)
 	-- One more pass after filtering stops, to put every plate back. (Filtered
 	-- with nothing moving: see FilteredInputsChanged.)
 	local filtered = PlatesFiltered()
-	if changed or filtered ~= platesWereFiltered or (filtered and FilteredInputsChanged(GetTime())) then
+	local inputs = filtered and FilteredInputsChanged(GetTime())
+	if changed or filtered ~= platesWereFiltered or inputs == true then
+		ns.plates.roll = nil
 		RefreshAllPlates()
+	elseif inputs == "timer" and not ns.plates.roll then
+		ns.plates.StartRoll()
 	end
+	local rolling = ns.plates.RollStep()
 	platesWereFiltered = filtered
 	if ns.UpdatePlateParts(platesActive, elapsed) then changed = true end
 	UpdatePlateClicks()
@@ -4088,7 +4131,7 @@ function ns.UpdatePlates(cinematic, elapsed)
 		ns.plates.off = true
 	end
 	-- (Nothing moving: the next passes outside CineMode may be skipped.)
-	ns.plates.quiet = not changed and next(combatCap) == nil and next(leavingTargets) == nil
+	ns.plates.quiet = not changed and not rolling and next(combatCap) == nil and next(leavingTargets) == nil
 		and next(pendingPlateRows) == nil
 	ns.plates.settled = ns.plates.quiet and not filtered
 	if not ns.plates.quiet or (not cinematic and not ns.plates.settled) then ns.plates.seen.at = nil end

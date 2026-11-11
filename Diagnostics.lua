@@ -2906,3 +2906,64 @@ do
 		end
 	end
 end
+
+-- /cine debug alphatrace <text>: for 10 seconds, logs every alpha change on
+-- the faded frames with <text> in their name: what the frame's addon set
+-- (SetAlpha, SetAlphaFromBoolean), what we set, and each frame drawn with an
+-- alpha other than the last one (/reload afterwards to save the log).
+do
+	local tracing, hookedBool, lastSeen = {}, {}, {}
+	local watch = CreateFrame("Frame")
+	local untilTime = 0
+	local function Number(value)
+		if issecretvalue and issecretvalue(value) then return "secret" end
+		return type(value) == "number" and ("%.3f"):format(value) or tostring(value)
+	end
+	local function Line(entry, what, value)
+		ns.Log("chat", ("trace %.3f %s %s %s (fade %s, applied %s, base %s, addon fade ends %s)"):format(
+			GetTime(), entry.name or "?", what, Number(value), Number(entry.alpha), Number(entry.applied),
+			Number(entry.baseAlpha), Number(rawget(entry.frame, "cinematicFadeEnd"))))
+	end
+	function ns.AlphaTrace(entry, what, value)
+		if tracing[entry] then Line(entry, what, value) end
+	end
+	watch:SetScript("OnUpdate", function()
+		if GetTime() > untilTime then
+			wipe(tracing)
+			watch:Hide()
+			ns.Print("alpha trace done (/reload to save the log)")
+			return
+		end
+		for entry in pairs(tracing) do
+			local alpha = entry.frame:GetAlpha()
+			local shown = Number(alpha) .. (entry.frame:IsVisible() and "" or " hidden")
+			if shown ~= lastSeen[entry] then
+				lastSeen[entry] = shown
+				Line(entry, "drawn at", shown)
+			end
+		end
+	end)
+	watch:Hide()
+	function ns.StartAlphaTrace(text)
+		text = (text or ""):lower()
+		wipe(tracing)
+		wipe(lastSeen)
+		local count = 0
+		for _, entry in ipairs(ns.managed or {}) do
+			if entry.name and entry.name:lower():find(text, 1, true) then
+				tracing[entry] = true
+				count = count + 1
+				local frame = entry.frame
+				if not hookedBool[frame] and type(frame.SetAlphaFromBoolean) == "function" then
+					hookedBool[frame] = true
+					hooksecurefunc(frame, "SetAlphaFromBoolean", function(_, _, yes, no)
+						if tracing[entry] then Line(entry, "SetAlphaFromBoolean", tostring(Number(yes)) .. "/" .. Number(no)) end
+					end)
+				end
+			end
+		end
+		untilTime = GetTime() + 10
+		watch:Show()
+		ns.Print(("tracing the alpha of %d frames for 10 seconds"):format(count))
+	end
+end

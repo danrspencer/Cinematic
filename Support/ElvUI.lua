@@ -65,11 +65,16 @@ local ROWS = {
 	{ "micro", "bars", "ElvUI_MicroBar" },
 	-- (Classic clients have no Bags row: their bags go with the micro menu.)
 	{ _G.BagsBar and "bags" or "micro", "bars", "ElvUIBagBar" },
-	{ "xp", "bars", "ElvUI_ExperienceBarHolder", "ElvUI_ReputationBarHolder", "ElvUI_PetExperienceBarHolder" },
+	-- Its bar for an encounter's or quest's own power, in place of the game's.
+	{ "encounter", "encounter", "ElvUI_AltPowerBar" },
+	{ "xp", "bars","ElvUI_ExperienceBarHolder", "ElvUI_ReputationBarHolder", "ElvUI_PetExperienceBarHolder" },
 	-- Your cast bars sit inside its player and pet frames: they follow the
 	-- Cast bar row, as the game's do (the castbar group ignores the parent's
 	-- fade), not the frame they're on.
 	{ "castbar", "castbar", "ElvUF_Player_CastBar", "ElvUF_Pet_CastBar" },
+	-- Its player nameplate (on with its Static Position) stands in for the
+	-- personal resource display: your health and power under you.
+	{ "prd", "prd", "ElvNP_Player" },
 	-- Its chat panels hold the game's chat frames, with its data texts and
 	-- toggle buttons (no row: the Chat page's).
 	{ "chat", "chat", "LeftChatPanel", "RightChatPanel", "LeftChatToggleButton", "RightChatToggleButton" },
@@ -92,8 +97,88 @@ local RAID = {
 	raidpets = { "ElvUF_Raidpet" },
 }
 
+-- Its frames standing in for the game's, linked as those parts (Addon Frame
+-- Links: FrameLinks.lua), so the pages' Addon Frame Links sections and the
+-- Support files tab show them as found. Part -> its frame's name; looked up
+-- with each scan till found (most are made after loading, and only with
+-- that module of it on).
+local LINKS = {
+	unitplayer = "ElvUF_Player", unitpet = "ElvUF_Pet", unittarget = "ElvUF_Target",
+	unittot = "ElvUF_TargetTarget", unitfocus = "ElvUF_Focus", unitfocustot = "ElvUF_FocusTarget",
+	aurabuffs = "ElvUIPlayerBuffs", auradebuffs = "ElvUIPlayerDebuffs",
+	prdbars = "ElvNP_Player",
+}
+
+local function IsUsable(frame)
+	return type(frame) == "table" and type(frame.GetObjectType) == "function"
+		and not (frame.IsForbidden and frame:IsForbidden())
+end
+
+-- Its chat panels: the panel a chat window's lines show on (its left and
+-- right chat windows, as its Chat module says), the panel's backdrop (the
+-- Chat page's Background), its tab strip and its data panels and toggle
+-- buttons.
+local function ClaimChat()
+	local E = _G.ElvUI and _G.ElvUI[1]
+	local ok, chat = false, nil
+	if E and type(E.GetModule) == "function" then
+		ok, chat = pcall(E.GetModule, E, "Chat", true)
+	end
+	chat = ok and type(chat) == "table" and chat or nil
+	for _, side in ipairs({ "Left", "Right" }) do
+		local panel = _G[side .. "ChatPanel"]
+		local window = chat and chat[side .. "ChatWindow"]
+		if IsUsable(panel) and IsUsable(window) then
+			local backdrop = IsUsable(panel.backdrop) and { panel.backdrop } or nil
+			ns.ClaimLinkPart("ElvUI", "chatwindow", panel, { window = window, backdrop = backdrop })
+		end
+		local tab = _G[side .. "ChatTab"]
+		if IsUsable(tab) then ns.ClaimLinkPart("ElvUI", "chattabs", tab) end
+		for _, name in ipairs({ side .. "ChatDataPanel", side .. "ChatToggleButton" }) do
+			local frame = _G[name]
+			if IsUsable(frame) then ns.ClaimLinkPart("ElvUI", "chatbuttons", frame) end
+		end
+	end
+end
+
+-- Its smooth fades (its unit frames' range fade): restarted every 0.2 s from
+-- the alpha it reads back, ours in it, so each restart knocked ours down and
+-- its target of target flickered. While one runs the frame is marked with
+-- where it ends, which our hook takes as its alpha (Frames.lua).
+local function FollowFades()
+	local E = _G.ElvUI and _G.ElvUI[1]
+	if type(E) ~= "table" or type(E.UIFrameFade) ~= "function"
+		or type(E.UIFrameFadeRemoveFrame) ~= "function" then
+		return
+	end
+	hooksecurefunc(E, "UIFrameFade", function(_, frame, info)
+		if type(frame) ~= "table" or type(frame.SetAlpha) ~= "function"
+			or (frame.IsForbidden and frame:IsForbidden())
+			or type(info) ~= "table" or type(info.endAlpha) ~= "number"
+			or (issecretvalue and issecretvalue(info.endAlpha)) then
+			return
+		end
+		frame.cinematicFadeEnd = info.endAlpha
+		-- (It set the start alpha before this: taken again, as its end.)
+		if type(info.startAlpha) == "number" and not (issecretvalue and issecretvalue(info.startAlpha)) then
+			frame:SetAlpha(info.startAlpha)
+		end
+	end)
+	hooksecurefunc(E, "UIFrameFadeRemoveFrame", function(_, frame)
+		if type(frame) == "table" then frame.cinematicFadeEnd = nil end
+	end)
+end
+
 ns.WhenAddonLoads("ElvUI", function()
+	FollowFades()
 	ns.FadeWithRows(ROWS)
+	ns.AddScanner(function()
+		for part, name in pairs(LINKS) do
+			local frame = _G[name]
+			if IsUsable(frame) then ns.ClaimLinkPart("ElvUI", part, frame) end
+		end
+		ClaimChat()
+	end)
 	for group, names in pairs(RAID) do
 		ns.FadeFoundByName(group, names)
 	end
