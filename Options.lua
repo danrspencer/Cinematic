@@ -2064,12 +2064,11 @@ do
 	-- Each hub (by English name) and its pages in order, with their icons
 	-- (or a function that gives one).
 	local HUBS = {
-		-- (sections: the grids of what shows (CineMode Autohide), then each frame's own rules:
-		-- the HUD's, then what floats over heads, as on the Style hub. label: the
+		-- (sections: the grids of what shows (CineMode Autohide), then each frame's own rules
+		-- (Autohide Advanced: the HUD's, then what floats over heads). label: the
 		-- hub's name as shown, its pages' ids staying "UI Manager"'s.)
 		{ name = "UI Manager", label = "UI Visibility", colors = {
-			["CineMode Autohide"] = { 0.75, 0.65, 0.45 }, ["HUD Advanced"] = { 0.35, 0.6, 0.9 },
-			["Overhead Advanced"] = { 0.65, 0.45, 0.9 },
+			["CineMode Autohide"] = { 0.75, 0.65, 0.45 }, ["Autohide Advanced"] = { 0.35, 0.6, 0.9 },
 		}, pages = {
 			-- (A standard: your faction's battle banner.)
 			{ "Standard Frames", function()
@@ -2081,18 +2080,19 @@ do
 			{ "Mouseover groups", "Interface\\Icons\\Spell_Holy_MindVision", label = "Hover Groups", section = "CineMode Autohide" },
 			{ "Gamepad", "Interface\\Icons\\INV_Gizmo_01", label = "Gamepad Frames", section = "CineMode Autohide" },
 			{ "Cursor Hide", "Interface\\Icons\\INV_Misc_Eye_01", section = "CineMode Autohide" }, -- (CursorHide.lua)
+			-- (Most used first; swing timer, chat bubbles and tooltips last.)
+			{ "Nameplates", "Interface\\Icons\\Ability_Hunter_SniperShot", section = "Autohide Advanced" },
+			{ "Minimap", "Interface\\Icons\\INV_Misc_Map_01", section = "Autohide Advanced" },
+			{ "Chat", "Interface\\Icons\\INV_Scroll_03", section = "Autohide Advanced" },
+			{ "Quest tracker", "Interface\\Icons\\INV_Misc_Note_01", label = "Quest Tracker", section = "Autohide Advanced" },
+			{ "Buffs/debuffs", "Interface\\Icons\\Spell_Holy_WordFortitude", label = "Buffs/Debuffs", section = "Autohide Advanced" },
+			{ "Cooldown Manager", "Interface\\Icons\\INV_Misc_PocketWatch_01", section = "Autohide Advanced" },
 			{ "Personal Resources", "Interface\\Icons\\Ability_Racial_BloodRage", -- (Bloodrage: health into power)
-				label = "Personal Resource Display", section = "HUD Advanced" },
-			{ "Buffs/debuffs", "Interface\\Icons\\Spell_Holy_WordFortitude", label = "Buffs/Debuffs", section = "HUD Advanced" },
-			{ "Cooldown Manager", "Interface\\Icons\\INV_Misc_PocketWatch_01", section = "HUD Advanced" },
-			{ "Swing timer", "Interface\\Icons\\INV_Sword_04", label = "Swing Timer", section = "HUD Advanced" },
-			{ "Minimap", "Interface\\Icons\\INV_Misc_Map_01", section = "HUD Advanced" },
-			{ "Quest tracker", "Interface\\Icons\\INV_Misc_Note_01", label = "Quest Tracker", section = "HUD Advanced" },
-			{ "Tooltips", "Interface\\Icons\\INV_Misc_Book_09", section = "HUD Advanced" },
-			{ "Chat", "Interface\\Icons\\INV_Scroll_03", section = "HUD Advanced" },
-			{ "Nameplates", "Interface\\Icons\\Ability_Hunter_SniperShot", section = "Overhead Advanced" },
+				label = "Personal Resource Display", section = "Autohide Advanced" },
+			{ "Swing timer", "Interface\\Icons\\INV_Sword_04", label = "Swing Timer", section = "Autohide Advanced" },
 			{ "Chat bubbles", "Interface\\Icons\\Ability_Warrior_BattleShout", label = "Chat Bubbles",
-				section = "Overhead Advanced" },
+				section = "Autohide Advanced" },
+			{ "Tooltips", "Interface\\Icons\\INV_Misc_Book_09", section = "Autohide Advanced" },
 		} },
 		-- (Cameras: what everyone has; Dev: the dev copy's own, to the right)
 		-- (master: Enable Cameras; its pages with no switch of their own show Off with it)
@@ -8774,7 +8774,8 @@ local function CreatePlatesPanel()
 			targetGroup = group
 		else
 			r = r + 1
-			local tip = (group.tip or "") .. (group.plate and (plateNameTip .. nameTip) or nameTip)
+			local tip = group.plateOnly and group.tip
+				or (group.tip or "") .. (group.plate and (plateNameTip .. nameTip) or nameTip)
 			AddNameRow(namesTop, r, group, group.key, group.label, group.indent, tip)
 		end
 	end

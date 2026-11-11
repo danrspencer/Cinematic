@@ -413,12 +413,12 @@ ns.PROFILE_MODULES = {
 			set("chatSpeechBehind", false)
 			set("bubblesOffTop", false)
 		end },
-	-- (The UI Visibility hub's HUD Advanced and Overhead Advanced pages, each
+	-- (The UI Visibility hub's Autohide Advanced pages, each
 	-- frame's own rules: Subtle's UI stays as the game has it.)
 	{ key = "advanced-pages-off", name = "Advanced pages off", scope = { "Personal Resources/top",
 		"Buffs/debuffs/top", "Cooldown Manager/top", "Swing timer/top", "Minimap/top", "Quest tracker/top",
 		"Tooltips/top", "Chat/top", "Nameplates/top", "Chat bubbles/top" },
-		tip = "The UI Visibility hub's HUD Advanced and Overhead Advanced pages off: the personal resources, " ..
+		tip = "The UI Visibility hub's Autohide Advanced pages off: the personal resources, " ..
 			"buffs, Cooldown Manager, swing timer, minimap, quest tracker, tooltips, chat, nameplates and chat " ..
 			"bubbles keep the game's own ways.",
 		apply = function(set)

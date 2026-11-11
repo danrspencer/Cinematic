@@ -18,6 +18,7 @@ DEFAULTS.lowHealthFollowGame = true -- no edges while the game's "Do Not Flash S
 DEFAULTS.lowHealthTheme = "auto"   -- a theme's key (LowHealthThemes.lua), or by class and talents
 DEFAULTS.lowHealthStart = 0.75     -- health (0-1) they start creeping in below
 DEFAULTS.lowHealthFull = 0.15      -- ...and are all the way in at
+DEFAULTS.lowHealthRamp = 0         -- 0: evenly between them; up to 1: little at first, most near Full
 DEFAULTS.lowHealthSound = "auto"   -- played on reaching that: your class and spec's, "off", or a file number
 DEFAULTS.lowHealthSoundVolume = 1  -- ...at this share of your ambient volume (over 1: louder)
 DEFAULTS.lowHealthReach = 0.3      -- share of the screen's height the top and bottom shadow covers at full
@@ -481,9 +482,18 @@ local function Thresholds(prefix)
 	return start, math.min(db[prefix .. "Full"], start - 0.01)
 end
 
+-- The edges' ramp: how far in at a share of the way from Starts to Full
+-- (even at 0; at 1 a quarter of the way in by halfway). Health bars: even.
+local function Ramped(t, prefix)
+	if prefix and prefix ~= "lowHealth" then return t end
+	local ramp = db.lowHealthRamp or 0
+	if ramp <= 0 then return t end
+	return t ^ (1 + 3 * ramp)
+end
+
 local function LevelAt(share, prefix)
 	local start, full = Thresholds(prefix)
-	return math.max(0, math.min(1, (start - share) / (start - full)))
+	return Ramped(math.max(0, math.min(1, (start - share) / (start - full))), prefix)
 end
 
 -- Secret health (in combat on some clients): the game sets the overlay's
@@ -502,6 +512,11 @@ local function SecretCurve(prefix)
 		local start, full = Thresholds(prefix)
 		curve:AddPoint(0, 1)
 		curve:AddPoint(full, 1)
+		-- (the ramp, in steps between: the curve is straight lines)
+		for i = 9, 1, -1 do -- (rising health)
+			local t = i / 10
+			curve:AddPoint(start - t * (start - full), Ramped(t, prefix))
+		end
 		curve:AddPoint(start, 0)
 		curve:AddPoint(1, 0)
 		secretCurves[prefix] = curve
@@ -3610,7 +3625,10 @@ function ns.CreateVitalsVisionPanel(kit)
 		}, "lowHealth")
 	Boxes({ "lowHealthCalm", L["Strength out of combat"], 0, 100, 5, "%d%%", 100,
 		L["How strong the edges are out of a fight (eating and drinking back up, say), next to in one. Some " ..
-		"clients keep your health secret in fights; there the edges only fade in and out with it."], Edges })
+		"clients keep your health secret in fights; there the edges only fade in and out with it."], Edges },
+		{ "lowHealthRamp", L["Ramp up"], 0, 100, 5, "%d%%", 100,
+		L["0%: the edges close in evenly from Starts to Full. Higher: only a little at first, then faster " ..
+		"and faster the nearer your health gets to Full."], Edges })
 	-- The game's "Do Not Flash Screen at Low Health" (Accessibility): followed
 	-- if ticked, with what it's set to now beside it. (Not on a client without it.)
 	if ns.GameLowHealthFlashOff() ~= nil then

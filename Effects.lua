@@ -59,6 +59,20 @@ ns.NAME_GROUPS = {
 			"UnitNameFriendlyMinionName", "UnitNameFriendlyPetName", "UnitNameFriendlyGuardianName",
 			"UnitNameFriendlyTotemName",
 		} },
+	-- The players in your party or raid, and their pets and minions (yours
+	-- left out), their names alone kept on their plates whatever Friendly
+	-- players and its Minions say. The game has no setting of its own for them
+	-- (plateOnly): beyond plate range, the Friendly players rows decide.
+	{ key = "GroupMembers", label = L["Group members"], plate = true, plateOnly = true, unitRow = true, cvars = {},
+		tip = L[" In CineMode, away from dungeons and raids, the names of the players in your party or raid show " ..
+			"on their nameplates, with the rest of the plate hidden, whatever Friendly players says. Beyond " ..
+			"nameplate range the game has no setting for them: Friendly players decides there."] },
+	{ key = "GroupMinions", label = L["Minions"], indent = true, plate = true, plateOnly = true, unitRow = true,
+		cvars = {},
+		tip = L[" In CineMode, away from dungeons and raids, the names of your party or raid members' pets and " ..
+			"minions show on their nameplates, with the rest of the plate hidden, whatever the Friendly players " ..
+			"Minions row says. Your own pet isn't one of them. Beyond nameplate range the game has no setting for " ..
+			"them: the Friendly players Minions row decides there."] },
 	{ key = "Enemies", label = L["Enemy players"], plate = true, cvars = { "UnitNameEnemyPlayerName" } },
 	{ key = "EnemyMinions", label = L["Minions"], indent = true, plate = true,
 		cvars = {
@@ -78,6 +92,9 @@ ns.NAME_GROUPS = {
 	{ key = "Target", label = L["Target"], plate = true, cvars = { "UnitNameFocused" }, rows = ns.NAME_TARGET_ROWS },
 }
 ns.OnLanguage(function() ns.TranslateFields(ns.NAME_GROUPS, "label") end)
+-- (The Names rows for your group's units: see PlateAlphas. On ns: this file's
+-- main chunk is at Lua's 200 locals.)
+ns.GROUP_NAME_ROWS = { "GroupMembers", "GroupMinions" }
 
 local CVAR_SETS = {}
 for _, group in ipairs(ns.NAME_GROUPS) do
@@ -97,7 +114,7 @@ for _, group in ipairs(ns.NAME_GROUPS) do
 			values[cvar] = "0"
 		end
 	end
-	if not group.shared then
+	if not group.shared and not group.plateOnly then
 		CVAR_SETS[#CVAR_SETS + 1] = ns.CVarSet("Names: " .. group.key, "CineMode hides this kind's names over heads",
 			{ key = group.key, values = values, secure = true, playerWins = true })
 	end
@@ -116,6 +133,9 @@ end
 
 -- Whether this client has any of a group's name settings.
 function ns.HasNameSettings(group)
+	if group.plateOnly then
+		return true -- (plates only: every client)
+	end
 	for _, cvar in ipairs(group.cvars) do
 		if GetCVar(cvar) ~= nil then
 			return true
@@ -2849,6 +2869,13 @@ local function PlateAlphas(unit, plate)
 	elseif platesForced and unit and plate ~= PersonalPlate() then
 		local kind = PlateKind(unit)
 		name = kind and nameLevel[KIND_NAME_GROUP[kind]] or 0
+		-- (The Names grid's Group members rows: your party or raid's players, and their minions.)
+		for _, row in ipairs(ns.GROUP_NAME_ROWS) do
+			local group = nameLevel[row] or 0
+			if group > name and InUnitRow(row, unit, kind) then
+				name = group
+			end
+		end
 		-- (Your target's, as the Target section's Names row says. Not while its
 		-- Nameplates row keeps the plate up: the plate wins, fading in whole
 		-- with its own name, rather than a name-only look flashing first.)
@@ -3766,6 +3793,9 @@ local function SideShown(side)
 		return true -- (quest mobs are on either side)
 	end
 	if side == PLATE_SIDES.Friendly then
+		if (nameLevel.GroupMembers or 0) > 0 or (nameLevel.GroupMinions or 0) > 0 then
+			return true
+		end
 		for _, level in pairs(unitRowLevel) do
 			if level > 0 then
 				return true
@@ -4023,7 +4053,8 @@ function ns.UpdatePlates(cinematic, elapsed)
 	for _, group in ipairs(ns.NAME_GROUPS) do
 		if group.plate then
 			for _, key in ipairs(group.keys) do
-				local nameTarget = platesForced and NameKeptHere(key, inCombat) and 1 or 0
+				local nameTarget = platesForced and NameKeptHere(key, inCombat)
+					and (not group.unitRow or ns.InGroup()) and 1 or 0
 				local level = nameLevel[key]
 				if level == nil then
 					nameLevel[key] = nameTarget

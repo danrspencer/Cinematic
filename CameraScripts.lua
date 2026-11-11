@@ -2257,7 +2257,11 @@ local function Suspend(now)
 	if zoomer.pending or zoomer.moving then
 		zoomer.suspended = { goal = zoomer.goal, T = math.max(MOVE_MIN_TIME, zoomer.T - (zoomer.t or 0)), ease = zoomer.ease }
 	end
-	StopZoom(now)
+	-- (Its zoom speed eases back, even as you take the camera: the game still
+	-- had a little zoom to go, asked at the crawl, and your speed put back at
+	-- once ran it many times too far, out to the raised max. Your own zoom
+	-- holds it instead: HoldForYourZoom.)
+	StopZoom()
 end
 
 -- Your own camera input: the running totals of the turn and tilt start

@@ -266,6 +266,8 @@ local DEFAULTS = {
 	nameKeepServiceNPCs = false, -- (friendly and neutral NPCs with a title: <Repair Vendor>, <Innkeeper>...)
 	nameKeepCritters = false,
 	nameKeepFriends = false,
+	nameKeepGroupMembers = false, -- (on plates only: the game has no setting for them)
+	nameKeepGroupMinions = false,
 	nameKeepFriendlyMinions = false,
 	nameKeepEnemies = false,
 	nameKeepEnemyMinions = false,
@@ -1521,7 +1523,7 @@ for _, part in ipairs(ns.PLATE_ICONS_ALWAYS) do
 end
 -- Names likewise (the groups are in Effects): kept up in fights, and in each place.
 for _, key in ipairs({ "Self", "HostileNPCs", "NeutralNPCs", "FriendlyNPCs", "ServiceNPCs", "Critters", "Friends",
-	"FriendlyMinions", "Enemies", "EnemyMinions", "Guild" }) do
+	"GroupMembers", "GroupMinions", "FriendlyMinions", "Enemies", "EnemyMinions", "Guild" }) do
 	DEFAULTS["nameCombat" .. key], DEFAULTS["nameCombatPvP" .. key] = false, false
 	for _, suffix in ipairs(ns.PLATE_PLACES) do
 		DEFAULTS["nameIn" .. suffix .. key] = false
@@ -1563,18 +1565,21 @@ DEFAULTS.nameInBGsEnemies = true
 DEFAULTS.nameInBGsEnemyMinions = true
 -- Both grids' Grouped column: the row stays up in a party or raid, in fights
 -- and out, whatever its other boxes say. Friendly players and their minions by
--- default. Their Always column likewise, everywhere (just Service NPCs' names by default).
+-- default. Their Always column likewise, everywhere (just Service NPCs' and
+-- group members' names by default).
 for _, kind in ipairs(ns.PLATE_KINDS) do
 	DEFAULTS["plateGroup" .. kind] = kind == "Friends" or kind == "FriendlyMinions"
 	DEFAULTS["plateAlways" .. kind] = false
 end
 for _, key in ipairs({ "Self", "HostileNPCs", "NeutralNPCs", "FriendlyNPCs", "ServiceNPCs", "Critters", "Friends",
-	"FriendlyMinions", "Enemies", "EnemyMinions", "Guild" }) do
+	"GroupMembers", "GroupMinions", "FriendlyMinions", "Enemies", "EnemyMinions", "Guild" }) do
 	DEFAULTS["nameGroup" .. key] = false
 	DEFAULTS["nameAlways" .. key] = false
 end
 -- Service NPCs' titles (Repair Vendor, Innkeeper...) up always, in every profile.
 DEFAULTS.nameAlwaysServiceNPCs = true
+-- The players you're grouped with: their names up always, on their plates.
+DEFAULTS.nameAlwaysGroupMembers = true
 -- Both grids' Target dropdown: the row stays up out of fights while you have
 -- an enemy targeted (plateTargetEnemy<row>, nameTargetEnemy<row>), or anything
 -- else (...Friendly), as the Standard Frames page's Target columns. Off for
