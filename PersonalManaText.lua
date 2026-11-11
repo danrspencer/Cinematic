@@ -132,8 +132,20 @@ local function AfterWords(cost)
 			or Readable(amount) and ("%s left (by curve)"):format(tostring(amount))
 			or "worked out by the game's curves (secret)"
 	end
+	-- (A whole number: a cost or a curve's answer can come with a fraction,
+	-- 234.999999999, and the game's shortening leaves a number under 1000
+	-- as it is. A secret one can't be rounded by us: with a max under 1000
+	-- the game's formatting rounds it, above that its shortening does.)
+	local whole
+	if Readable(amount) then
+		amount = math.floor(amount + 0.5)
+	elseif amount ~= nil and Readable(maxMana) and maxMana < 1000 then
+		local ok, words = pcall(string.format, "%.0f", amount)
+		if ok then whole = words end
+	end
 	local abbreviate = _G.AbbreviateNumbers
 	local okAmount, amountWords = pcall(function()
+		if whole then return whole end
 		return amount ~= nil and (abbreviate and abbreviate(amount) or tostring(amount)) or nil
 	end)
 	local okPercent, percentWords = pcall(function()

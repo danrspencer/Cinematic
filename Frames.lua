@@ -4909,6 +4909,34 @@ function ns.CheckNewBuffIcons(peek)
 		local picturesBefore = ns.shownBuffPictures
 		ns.shownBuffIcons, ns.shownBuffTotal, ns.shownBuffEnds = shown, total, ends
 		ns.shownBuffPictures = pictureAt
+		-- WoW Forever lists the buffs you cast yourself first, in the order you
+		-- got them, and other casters' after (seen: Might of Stormwind staying
+		-- the highest while Regrowth and Bear Form came in under it). So a
+		-- fight's new buff, nearly always your own, lands under those: how many
+		-- sit on top is counted whenever the buffs can be read, and kept for
+		-- the fight. (Retail untested with another's buff on: left as it was.)
+		if not ns.isRetail and C_UnitAuras and C_UnitAuras.GetAuraDataByIndex then
+			local okTail, tail = pcall(function()
+				local count = 0
+				for index = total, 1, -1 do
+					local aura = C_UnitAuras.GetAuraDataByIndex("player", index, "HELPFUL")
+					if type(aura) ~= "table" or (issecretvalue and (issecretvalue(aura)
+						or issecretvalue(aura.sourceUnit) or issecretvalue(aura.icon))) then
+						return nil
+					end
+					-- (The game's icons and this list out of step: not counted.)
+					if pictureAt[index] and aura.icon ~= pictureAt[index] then
+						return nil
+					end
+					if IsSelfCast(aura) then break end
+					count = count + 1
+				end
+				return count
+			end)
+			if okTail and tail then
+				ns.buffOthersTail = tail
+			end
+		end
 		-- (Every fight change, the count the same too: one buff ending as
 		-- another comes leaves it unchanged.)
 		-- (/cine debug peeks: every look, out of fights too: what each icon's
@@ -5001,10 +5029,15 @@ function ns.CheckNewBuffIcons(peek)
 		if #found > 0 or added > 0 then
 			local hold = ns.HoldTime("buffPeekTime")
 			ns.StartBuffPeek(hold, found, nil, added > 0)
-			-- (The new ones go on top, older ones' places moving down. A
+			-- (The new ones go on top, older ones' places moving down; on
+			-- Forever under other casters' buffs, which stay on top. A
 			-- readable one is by its picture already.)
+			local tail = math.min(ns.buffOthersTail or 0, totalBefore or 0)
+			for place = #ns.fightNewBuffs + 1, tail do
+				ns.fightNewBuffs[place] = 0
+			end
 			for place = added, 1, -1 do
-				table.insert(ns.fightNewBuffs, 1, secretAt[total - place + 1] and GetTime() + hold or 0)
+				table.insert(ns.fightNewBuffs, tail + 1, secretAt[total - tail - place + 1] and GetTime() + hold or 0)
 			end
 		end
 	end)
@@ -5063,10 +5096,19 @@ do
 		end
 		size.width, size.height = width, height
 	end
+	-- (Always a size: a copy with none draws nothing. The first peek after
+	-- logging in or a /reload can be a fight's, with nothing measured yet and
+	-- the icon's scale unreadable: the usual size then, at the buff frame's
+	-- scale, which the holder has already. Its width is kept as a plain
+	-- number: asked back, it can be secret, anchored to the game's icon.)
 	local function SizeMirror(mirror, button)
-		local scale = button:GetEffectiveScale() / mirror:GetEffectiveScale()
+		local okScale, scale = pcall(ScaleBetween, button, mirror)
+		if not okScale or type(scale) ~= "number" or (issecretvalue and issecretvalue(scale)) then
+			scale = 1
+		end
 		local size = layout.button
-		mirror:SetSize((size and size.width or 30) * scale, (size and size.height or 40) * scale)
+		mirror.plainWidth = (size and size.width or 30) * scale
+		mirror:SetSize(mirror.plainWidth, (size and size.height or 40) * scale)
 	end
 	local function CopyFont(source, copy, scale)
 		local font, size, flags = source:GetFont()
@@ -5124,7 +5166,7 @@ do
 			copy:SetSize(spot.width * scale, spot.height * scale)
 		elseif key == "Icon" then
 			copy:SetPoint("TOP", mirror, "TOP")
-			copy:SetSize(mirror:GetWidth(), mirror:GetWidth())
+			copy:SetSize(mirror.plainWidth or 30, mirror.plainWidth or 30)
 		elseif key == "Duration" then
 			copy:SetPoint("TOP", mirror.Icon, "BOTTOM", 0, -1)
 		else
@@ -5195,7 +5237,7 @@ do
 			mirror:SetPoint("CENTER", slots[i], "CENTER")
 			-- (Its size, or the last measured one in a fight, where it's secret.)
 			pcall(MeasureButton, button)
-			pcall(SizeMirror, mirror, button)
+			SizeMirror(mirror, button)
 			mirror:SetAlpha(entry.level)
 			for _, key in ipairs(MIRROR_PARTS) do
 				local source = Part(button, key)
@@ -5238,8 +5280,9 @@ do
 				local copy = ns.buffMirrors[i] and ns.buffMirrors[i].Duration
 				if copy then
 					local okCopy, state = pcall(function()
-						return ("shown %s, text %s, font %s"):format(Say(copy:IsShown()), Say(copy:GetText()),
-							Say(select(2, copy:GetFont())))
+						return ("shown %s, text %s, font %s, copy width %s, measured %s"):format(Say(copy:IsShown()),
+							Say(copy:GetText()), Say(select(2, copy:GetFont())), Say(ns.buffMirrors[i].plainWidth),
+							layout.Icon and "yes" or "no")
 					end)
 					ns.AuraSay("  its timer copy: " .. (okCopy and state or "errors"))
 				end
@@ -6597,8 +6640,44 @@ end
 local PAD_MOVE = { PADLSTICKUP = true, PADLSTICKDOWN = true, PADLSTICKLEFT = true, PADLSTICKRIGHT = true }
 local PAD_ENDS_AUTORUN = { PADLSTICKUP = true, PADLSTICKDOWN = true }
 local padMoveHeld = false
+-- With the game's gamepad bars hidden on WoW Forever (ConsolePort hides them)
+-- the watch below is off, so the stick is read here instead, once a frame:
+-- walking with it passed for auto-run. (Kept on ns: no locals to spare here.)
 function ns.PadMovementHeld()
-	return padMoveHeld
+	if padWatcher:IsShown() then
+		return padMoveHeld
+	end
+	local now = GetTime()
+	if ns.padStickAt == now then
+		return ns.padStickHeld
+	end
+	ns.padStickAt, ns.padStickHeld = now, false
+	if not (C_GamePad and C_GamePad.GetDeviceMappedState and GetCVarBool("GamePadEnable")) then
+		return false
+	end
+	local ok, state = pcall(C_GamePad.GetDeviceMappedState, C_GamePad.GetActiveDeviceID
+		and C_GamePad.GetActiveDeviceID() or nil)
+	if not ok or type(state) ~= "table" then
+		return false
+	end
+	if type(state.buttons) == "table" then
+		for index, down in ipairs(state.buttons) do
+			if down and PAD_MOVE[ButtonName(index)] then
+				ns.padStickHeld = true
+			end
+		end
+	end
+	-- (The stick itself too, past a dead zone: its directions aren't buttons on every client.)
+	if not ns.padStickHeld and type(state.sticks) == "table" and C_GamePad.StickIndexToConfigName then
+		for index, stick in ipairs(state.sticks) do
+			local okName, name = pcall(C_GamePad.StickIndexToConfigName, index)
+			if okName and (name == "Left" or name == "Movement") and type(stick) == "table"
+				and type(stick.len) == "number" and stick.len > 0.25 then
+				ns.padStickHeld = true
+			end
+		end
+	end
+	return ns.padStickHeld
 end
 ns.SetOnUpdate(padWatcher, ns.Profiled("Gamepad watch", function()
 	CheckPendingPress()

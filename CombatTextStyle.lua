@@ -387,8 +387,18 @@ local function OnLine()
 	lines[#lines + 1] = now
 end
 
--- A hit on you or your pet: its line isn't for a plate's hit.
-local function OnOwnHit()
+-- A hit on you or your pet: its line isn't for a plate's hit. Only hits,
+-- heals and misses: the game also sends power gains here (ENERGIZE: a bear's
+-- or warrior's rage with each swing), and those waited for a line that never
+-- came and took the swing's own, so no number showed in bear form.
+local ownSeen = {}
+local function OnOwnHit(action)
+	if not Plain(action) then return end
+	if not ownSeen[action] then
+		ownSeen[action] = true
+		ns.Log("combattext", "first on you: " .. tostring(action))
+	end
+	if not (action == "WOUND" or action == "HEAL" or MISSES[action]) then return end
 	local now = GetTime()
 	Fresh(lines, now)
 	if lines[1] then table.remove(lines, 1) else owed[#owed + 1] = now end
@@ -543,8 +553,8 @@ driver:SetScript("OnEvent", ns.Profiled("Combat text plates", function(_, event,
 		end))
 		local own = CreateFrame("Frame")
 		pcall(own.RegisterUnitEvent, own, "UNIT_COMBAT", "player", "pet")
-		own:SetScript("OnEvent", ns.Profiled("Combat text own", function()
-			if On() then OnOwnHit() end
+		own:SetScript("OnEvent", ns.Profiled("Combat text own", function(_, _, _, action)
+			if On() then OnOwnHit(action) end
 		end))
 		if C_Timer and C_Timer.NewTicker then C_Timer.NewTicker(2, function() ns.Guard(ns.RefreshCombatTextStyle) end) end
 		ns.RefreshCombatTextStyle()

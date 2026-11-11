@@ -11202,7 +11202,8 @@ do
 
 		local peekTime = Slider(chatPanel, "chatPeekTime", L["Show chat for"], 2, 30, 1, L["%d sec"])
 		peekTime:SetPoint("TOPLEFT", chatPeek, "BOTTOMLEFT", 4, -26)
-		Tooltip(peekTime, L["How long chat stays up after a message arrives or after you finish typing."])
+		Tooltip(peekTime, L["How long chat stays up after a message arrives or after you finish typing. " ..
+			"While a flight, auto-run, auto-walk or standing-still camera plays, 8 seconds at most."])
 		GreyUnless(peekTime, IfPeek)
 
 		local hideOwn = Check(chatPanel, "chatHideOwn", L["Hide your messages"],

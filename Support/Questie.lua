@@ -166,3 +166,19 @@ function ns.QuestieTooltipLines(unit)
 	end)
 	return lines
 end
+
+-- Whether Questie has an unfinished objective for the mob ("4/8 Goretusk
+-- Liver": a count short of its total among its tooltip lines). It knows the
+-- mobs that drop a quest's items, which the game's own tooltip doesn't say.
+-- (The Tooltips page's No wait for list.)
+function ns.QuestieObjectiveMob(unit)
+	for text in pairs(ns.QuestieTooltipLines(unit)) do
+		if type(text) == "string" then
+			local have, need = text:match("(%d+)%s*/%s*(%d+)")
+			if have and tonumber(have) < tonumber(need) then
+				return true
+			end
+		end
+	end
+	return false
+end

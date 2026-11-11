@@ -4114,24 +4114,29 @@ function ns.GetPlayerSpeed()
 end
 ns.GetPlayerSpeed = OncePerFrame(ns.GetPlayerSpeed) -- (asked 2-3 times a frame)
 
--- How long things stay up after a mouseover or a peek. In the camera modes
--- (flying, RP walking, standing still past the standing-still delay) these use
--- their default values instead of the player's, so a long hold set for normal
--- play doesn't keep the quest tracker (or chat, or buffs) up over the view.
+-- How long things stay up after a mouseover or a peek. While a flight, travel
+-- or standing-still camera plays these use their default values instead of
+-- the player's, so a long hold set for normal play doesn't keep the quest
+-- tracker (or chat, or buffs) up over the view.
 local FLIGHT_USES_DEFAULT = { mouseoverHold = true, buffPeekTime = true, debuffPeekTime = true, chatPeekTime = true }
 -- ...except the general hold, which goes at once there (normal play holds it a while).
 local FLIGHT_HOLD = { mouseoverHold = 0 }
 
--- Flying, RP walking, or standing still past the standing-still delay.
+-- The flight, auto-walk or auto-run camera playing, or a standing-still one
+-- past the standing-still delay. By the camera really running (ns.activeCam,
+-- Camera.lua), not by what you're doing: flying, auto-running or standing
+-- still with that camera off (or still waiting out its delay, or out of
+-- CineMode) keeps the player's own times.
 local function InCameraMode()
-	if ns.OnTaxi() then
+	local cam = ns.activeCam
+	if cam == "flight" or cam == "walk" or cam == "run" then
 		return true
 	end
-	if (ns.IsRPWalking and ns.IsRPWalking()) or (ns.IsAutoRunning and ns.IsAutoRunning()) then
-		return true
+	if cam == "idle" or cam == "cozy" or cam == "vista" or cam == "fish" then
+		local still = ns.GetStillSince()
+		return still ~= nil and GetTime() - still >= ns.db.idleOrbitDelay
 	end
-	local still = ns.GetStillSince()
-	return still ~= nil and GetTime() - still >= ns.db.idleOrbitDelay
+	return false
 end
 
 ns.InCameraMode = function() return InCameraMode() end
@@ -7696,11 +7701,19 @@ ticker:SetScript("OnEvent", ns.Profiled("Core events", function(self, event, arg
 		end
 		-- Strafing doesn't end an auto-run (you drift sideways and carry on),
 		-- so once auto-run is on, the strafe keys don't count as moving by hand.
-		local STRAFE = { StrafeLeft = true, StrafeRight = true }
+		-- The turn keys strafe too while the right mouse button steers
+		-- (mouselook): held then, they're movement keys like the strafe ones
+		-- (running sideways with them passed for auto-run after a moment).
+		local STRAFE = { StrafeLeft = true, StrafeRight = true, TurnLeft = true, TurnRight = true }
+		local TURN = { TurnLeft = true, TurnRight = true }
+		local function KeyCounts(key)
+			if ns.autoRunning and STRAFE[key] then return false end
+			return not TURN[key] or (IsMouselooking ~= nil and ns.Flag(IsMouselooking()))
+		end
 		local function AnyMovementKey()
 			if ns.autoFollowing then return true end
 			for key, held in pairs(movementKeys) do
-				if held and not (ns.autoRunning and STRAFE[key]) then return true end
+				if held and KeyCounts(key) then return true end
 			end
 			if ns.PadMovementHeld and ns.PadMovementHeld() then -- (gamepad mode's left stick)
 				return true
@@ -7720,7 +7733,7 @@ ticker:SetScript("OnEvent", ns.Profiled("Core events", function(self, event, arg
 			local held = {}
 			if ns.autoFollowing then held[#held + 1] = "/follow" end
 			for key, down in pairs(movementKeys) do
-				if down and not (ns.autoRunning and STRAFE[key]) then held[#held + 1] = key end
+				if down and KeyCounts(key) then held[#held + 1] = key end
 			end
 			if ns.PadMovementHeld and ns.PadMovementHeld() then held[#held + 1] = "gamepad stick" end
 			if IsMouseButtonDown("LeftButton") and IsMouseButtonDown("RightButton") then
@@ -7746,7 +7759,8 @@ ticker:SetScript("OnEvent", ns.Profiled("Core events", function(self, event, arg
 		local function Hook(name, fn)
 			if _G[name] then Guard(hooksecurefunc, name, fn) end
 		end
-		for _, key in ipairs({ "MoveForward", "MoveBackward", "StrafeLeft", "StrafeRight", "MoveAndSteer" }) do
+		for _, key in ipairs({ "MoveForward", "MoveBackward", "StrafeLeft", "StrafeRight", "MoveAndSteer",
+			"TurnLeft", "TurnRight" }) do
 			Hook(key .. "Start", function() movementKeys[key] = true end)
 			Hook(key .. "Stop", function() movementKeys[key] = false end)
 		end

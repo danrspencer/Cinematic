@@ -876,8 +876,16 @@ local function SkipsWait(tooltip)
 		return false
 	end
 	local unit = TooltipUnit(tooltip)
-	return unit ~= nil and ns.IsQuestMob ~= nil and ns.IsQuestMob(unit) and true or false
+	if not unit then
+		return false
+	end
+	-- (Questie's too: it knows the mobs that drop a quest's items.)
+	return (ns.IsQuestMob ~= nil and ns.IsQuestMob(unit))
+		or (ns.QuestieObjectiveMob ~= nil and ns.QuestieObjectiveMob(unit)) or false
 end
+-- This tooltip's unit skips the wait (set as the unit is, before the tooltip
+-- shows: the show that follows then leaves its After look and starts no countdown).
+local noWait = false
 
 -- A hide followed at once by a show from the same owner is the game setting
 -- the tooltip again, not a new one: a unit frame does it every moment while
@@ -906,7 +914,7 @@ local function StartsAgain(tooltip)
 		fullTimer:Cancel()
 		fullTimer = nil
 	end
-	revealed, linesCut, shownName = false, false, nil
+	revealed, linesCut, shownName, noWait = false, false, nil, false
 	hiddenBars = {}
 	return true
 end
@@ -925,6 +933,7 @@ local function OnUnitTooltip(tooltip)
 		end
 		-- (One on the No wait for list: the After look from the start, no countdown.)
 		local skip = SkipsWait(tooltip)
+		noWait = skip
 		if revealed ~= skip then
 			revealed = skip
 			UpdateBorder(tooltip)
@@ -1096,6 +1105,22 @@ local function ListParts(tooltip)
 			tostring(TooltipUnit(tooltip)), tostring(FrameUnit(tooltip)), okData and kind or "error",
 			tostring(UnitSecret(tooltip)), tostring(Cut("Hint"))))
 	end)
+	-- And the No wait for list: its setting, what it goes by, and where the wait stands.
+	pcall(function()
+		local db = ns.db or {}
+		local unit = TooltipUnit(tooltip)
+		ns.Print(("No wait: quest mobs ticked %s | page on %s | after %s sec | quest mob %s (mouseover %s) | skips %s"
+			.. " | showing After look %s | countdown running %s | in fight %s"):format(
+			tostring(db.tooltipNoWaitQuest), tostring(db.enabled and db.handleTooltips), tostring(db.tooltipFullAfter),
+			tostring(unit and ns.IsQuestMob and ns.IsQuestMob(unit)),
+			tostring(ns.IsQuestMob and ns.IsQuestMob("mouseover")), tostring(SkipsWait(tooltip)),
+			tostring(revealed) .. " (no wait " .. tostring(noWait) .. ")", tostring(fullTimer ~= nil),
+			tostring(InCombatLockdown())))
+		if unit and ns.DescribeQuestMob then
+			ns.Print(("  %s | Questie objective mob=%s"):format(ns.DescribeQuestMob(unit),
+				tostring(ns.QuestieObjectiveMob and ns.QuestieObjectiveMob(unit))))
+		end
+	end)
 end
 
 function ns.HookTooltipParts()
@@ -1146,7 +1171,7 @@ function ns.HookTooltipParts()
 		StartsAgain(tooltip)
 		local again = not carriedOn
 		carriedOn = false
-		if again then
+		if again and not noWait then
 			revealed = false
 			StartCountdown(tooltip)
 		end
