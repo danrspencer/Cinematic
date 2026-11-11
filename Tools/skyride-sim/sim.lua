@@ -41,6 +41,9 @@ C_CVar = C_CVar or {}
 C_CVar.GetCVar, C_CVar.SetCVar = GetCVar, SetCVar
 InCombatLockdown = function() return false end
 UnitAffectingCombat = function() return false end
+-- (Not AFK: as the stub it counted as AFK, and the AFK camera played through the flight's first
+-- seconds, holding the Skyriding Cam off till 3.5 s after the launch.)
+UnitIsAFK = function() return false end
 IsIndoors = function() return false end
 
 -- CAMERA: the game's camera, moved only by the commands sent. A turn or tilt

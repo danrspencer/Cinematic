@@ -76,6 +76,15 @@ local function QuestTitles()
 	return titles
 end
 
+-- A quest title as Questie writes it, down to the bare title: colour codes
+-- and icons off, then its "[15] " level in front and " (123)" ID or "(Complete)" behind.
+-- (Its lines aren't the game's quest lines, so the client gives no kind.)
+local function BareTitle(text)
+	local bare = text:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|cn[^:]*:", ""):gsub("|r", ""):gsub("|T.-|t", "")
+	bare = bare:gsub("^%s*%[[^%]]*%]%s*", ""):gsub("%s*%(%d+%)%s*$", ""):gsub("%s*%([^%(%)]*%)%s*$", "")
+	return bare
+end
+
 -- The texts of the tooltip's lines whose kind the client gives, -> part:
 -- quest lines (titles, objectives, party members on the quest) and threat.
 local function TypedTexts(tooltip)
@@ -260,6 +269,8 @@ local function LinesToCut(tooltip, count, unit, object)
 			and not (issecretvalue and issecretvalue(guild)) and guild or nil
 	end
 	local questTitles, typed = QuestTitles(), TypedTexts(tooltip)
+	-- (Questie's own lines, as it gives them: Support/Questie.lua.)
+	local questie = ns.QuestieTooltipLines and not object and ns.QuestieTooltipLines(unit) or {}
 	local inQuest = false
 	for i = 2, count do
 		local text = Left(i) and Left(i):GetText()
@@ -278,7 +289,10 @@ local function LinesToCut(tooltip, count, unit, object)
 			if typed[text] == "Threat" or text:find(ThreatPattern()) then
 				inQuest = false
 				return "Threat"
-			elseif typed[text] or questTitles[text] then
+			elseif typed[text] or questie[text] or questTitles[text] or questTitles[BareTitle(text)]
+				-- (A quest the mob starts or ends, not in your log: Questie
+				-- puts one of its own icons in front of the title.)
+				or text:lower():find("addons\\questie\\icons", 1, true) then
 				inQuest = true
 				return "Quest"
 			elseif inQuest and text:find("^%s") then
@@ -372,11 +386,25 @@ local function Snapshot(i)
 		-- Its row's layout too (wrap, width, justify, indent): these stay with
 		-- the row, not the text, so text moved into a row laid out for another
 		-- line wrapped or sat indented (Questie's quest lines, several quests).
+		-- (Each read on its own, so one refused read keeps the rest. A row is
+		-- held by two points: under the row above, and LEFT of the tooltip by
+		-- its indent, 10 or 28 for an objective: read in game, WoW Forever
+		-- 2026-11-11. The tooltip's points carry the indent.)
+		local left = Left(i)
+		pcall(function() line.wrap = left:CanWordWrap() end)
+		pcall(function() line.width = left:GetWidth() end)
+		pcall(function() line.justify = left:GetJustifyH() end)
 		pcall(function()
-			local left = Left(i)
-			local _, _, _, x = left:GetPoint(1)
-			line.wrap, line.width, line.justify, line.x = left:GetWordWrap(), left:GetWidth(), left:GetJustifyH(), x
+			local points = {}
+			for p = 1, left:GetNumPoints() do
+				local point, relativeTo, relative, x, y = left:GetPoint(p)
+				if relativeTo == GameTooltip then
+					points[#points + 1] = { point, relative, x, y }
+				end
+			end
+			line.points = points
 		end)
+		pcall(function() line.indent = left:GetLeft() - GameTooltip:GetLeft() end)
 	end
 	return ok and line or nil
 end
@@ -393,14 +421,53 @@ local function ApplyLayout(left, line)
 	if line.justify then
 		pcall(left.SetJustifyH, left, line.justify)
 	end
-	if type(line.x) == "number" then
+	for _, p in ipairs(line.points or {}) do
+		pcall(left.SetPoint, left, p[1], GameTooltip, p[2], p[3], p[4])
+	end
+end
+
+-- Sizes a row to the text moved into it, as the game does for a line it
+-- adds (a row's width and height read the same as its text's there: WoW
+-- Forever, 2026-11-11). A row keeps the size of its last line otherwise: a
+-- title moved into a two-line row left a blank gap under it, and the last
+-- line spilled out of the tooltip.
+local function FitRow(left, line)
+	if not line.wrap then
 		pcall(function()
-			local point, relativeTo, relative, _, y = left:GetPoint(1)
-			if point then
-				left:SetPoint(point, relativeTo, relative, line.x, y)
+			local width = left.GetUnboundedStringWidth and left:GetUnboundedStringWidth() or left:GetStringWidth()
+			if width > 0 then
+				left:SetWidth(width)
 			end
 		end)
 	end
+	pcall(function()
+		local height = left:GetStringHeight()
+		if height > 0 then
+			left:SetHeight(height)
+		end
+	end)
+end
+
+-- A moved row that didn't land at its line's indent: noted in the log (a
+-- few times a session), with how the row is held, to read back later.
+local indentNotes = 0
+local function CheckIndent(n, line)
+	pcall(function()
+		local left = Left(n)
+		local indent = left:GetLeft() - GameTooltip:GetLeft()
+		if not line.indent or math.abs(indent - line.indent) <= 1 or indentNotes >= 5 then
+			return
+		end
+		indentNotes = indentNotes + 1
+		local held = {}
+		for p = 1, left:GetNumPoints() do
+			local point, relativeTo, relative, x, y = left:GetPoint(p)
+			held[#held + 1] = ("%s of %s %s %.1f,%.1f"):format(point,
+				relativeTo and relativeTo:GetDebugName() or "-", relative, x, y)
+		end
+		ns.Log("tooltip", ("row %d indent %.1f, wanted %.1f | %s"):format(n, indent, line.indent,
+			table.concat(held, "; ")))
+	end)
 end
 
 -- The icons beside lines (a quest objective's bullet, or its tick once done):
@@ -434,9 +501,13 @@ local function MoveIcons(cut, count, newIndex)
 	end
 end
 
+-- /cine debug tooltipparts' second reading: no lines are moved meanwhile, so
+-- the rows read as the game (and other addons) laid them out.
+local leaveLines = false
+
 local function CutLines(tooltip, object)
 	local okCount, count = pcall(tooltip.NumLines, tooltip)
-	if not okCount or type(count) ~= "number" or count < 2 then
+	if leaveLines or not okCount or type(count) ~= "number" or count < 2 then
 		return
 	end
 	local unit
@@ -483,6 +554,7 @@ local function CutLines(tooltip, object)
 				left:SetText(line.left)
 				left:SetTextColor(line.lr[1], line.lr[2], line.lr[3])
 				left:Show()
+				FitRow(left, line)
 				if right then
 					if line.right then
 						right:SetText(line.right)
@@ -508,7 +580,44 @@ local function CutLines(tooltip, object)
 	unitLinesCut = not object
 	if ns.Flag(tooltip:IsShown()) then
 		pcall(tooltip.Show, tooltip) -- (sizes itself to the lines again)
+		for n = first, count do
+			if kept[n - 1] then
+				CheckIndent(n, kept[n - 1])
+			end
+		end
 	end
+end
+
+-- Where the client fills tooltips through its data (TooltipDataProcessor),
+-- lines are taken out once the game has shown the tooltip, not as it's filled:
+-- other addons' lines (Questie's) are all in by then and every row is laid
+-- out. Taken out while filling, rows read as their last line left them
+-- (titles indented or over a blank gap when switching between mobs: seen in
+-- a video, WoW Forever 2026-11-11), and Questie, which counts the tooltip's
+-- lines to tell whether its own are still there, counted ours gone and left
+-- its lines out of later fills. pendingCut: the kind waiting for that show
+-- ("unit", true for an object, "item"). cutting: our own Show, as CutLines
+-- resizes the tooltip.
+local deferCuts, pendingCut, cutting = false, nil, false
+local function RunPendingCut(tooltip)
+	local kind = pendingCut
+	if not kind or cutting then
+		return false
+	end
+	pendingCut = nil
+	cutting = true
+	pcall(CutLines, tooltip, kind ~= "unit" and kind or nil)
+	cutting = false
+	return true
+end
+local function CutWhenShown(tooltip, kind)
+	if not deferCuts then
+		CutLines(tooltip, kind ~= "unit" and kind or nil)
+		return
+	end
+	pendingCut = kind
+	-- (Should no show follow: on the next frame.)
+	C_Timer.After(0, function() RunPendingCut(tooltip) end)
 end
 
 local LINE_PARTS = { "Guild", "Level", "LevelEnemy", "Spec", "Type", "Corpse", "Faction", "Rep", "Threat", "Quest",
@@ -683,6 +792,7 @@ local function ShowLater(tooltip)
 			pcall(tooltip.SetUnit, tooltip, unit)
 		end
 		refilling = false
+		RunPendingCut(tooltip)
 	elseif unit or FrameUnit(tooltip) then
 		CutLines(tooltip)
 	elseif IsWorldObject(tooltip) then
@@ -811,7 +921,7 @@ local function OnUnitTooltip(tooltip)
 		HideBar(bar)
 	end
 	if AnyLineCut() then
-		CutLines(tooltip)
+		CutWhenShown(tooltip, "unit")
 	end
 end
 
@@ -819,14 +929,14 @@ end
 -- World tooltips have no unit and are owned by UIParent or the world.
 local function OnObjectTooltip(tooltip)
 	if tooltip == GameTooltip and Cut("ObjQuest") and IsWorldObject(tooltip) then
-		CutLines(tooltip, true)
+		CutWhenShown(tooltip, true)
 	end
 end
 
 -- An item: its green click hints ("<Right Click to Read>"), by the Hint row.
 local function OnItemTooltip(tooltip)
 	if tooltip == GameTooltip and Cut("Hint") and IsItemTooltip(tooltip) then
-		CutLines(tooltip, "item")
+		CutWhenShown(tooltip, "item")
 	end
 end
 
@@ -875,6 +985,49 @@ local function Describe(part)
 		Try(function() return part.GetAtlas and part:GetAtlas() or part.GetTexture and part:GetTexture() end))
 end
 
+-- Each line's text and where its row sits (secret: "?"): its anchor, indent
+-- and wrap stay with the row, not the text, when CutLines moves texts up.
+local function ListLines(tooltip, title)
+	ns.Print(title)
+	pcall(function()
+		for i = 1, tooltip:NumLines() do
+			local fs = Left(i)
+			local text = fs and fs:GetText()
+			local plain = type(text) == "string" and not (issecretvalue and issecretvalue(text))
+			local okColor, color = pcall(function()
+				local r, g, b = fs:GetTextColor()
+				return ("%.2f %.2f %.2f"):format(r, g, b)
+			end)
+			local function Try(f)
+				local ok, value = pcall(f)
+				return ok and tostring(value) or "?"
+			end
+			local right = Right(i)
+			local place = ("%s of %s x %s y %s (%s points) | left %s | shown %s wrap %s justify %s | w %s text w %s"
+				.. " h %s text h %s rows %s | right shown %s"):format(
+				Try(function() return (fs:GetPoint(1)) end),
+				Try(function() return select(2, fs:GetPoint(1)):GetDebugName() end),
+				Try(function() return ("%.1f"):format(select(4, fs:GetPoint(1))) end),
+				Try(function() return ("%.1f"):format(select(5, fs:GetPoint(1))) end),
+				Try(function() return fs:GetNumPoints() end),
+				Try(function() return ("%.1f"):format(fs:GetLeft() - tooltip:GetLeft()) end),
+				Try(function() return ns.Flag(fs:IsShown()) end), Try(function() return fs:CanWordWrap() end),
+				Try(function() return fs:GetJustifyH() end),
+				Try(function() return ("%.1f"):format(fs:GetWidth()) end),
+				Try(function() return ("%.1f"):format(fs:GetStringWidth()) end),
+				Try(function() return ("%.1f"):format(fs:GetHeight()) end),
+				Try(function() return ("%.1f"):format(fs:GetStringHeight()) end),
+				Try(function() return fs:GetNumLines() end),
+				Try(function() return right and ns.Flag(right:IsShown()) end))
+			ns.Print(("Line %d: %s (color %s%s) %s"):format(i,
+				plain and ("%q"):format(text) or (Unreadable(fs) and "secret" or "?"),
+				okColor and color or "secret", IsHintColor(fs) and ", hint green" or "", place))
+		end
+		ns.Print(("Lines cut %s (a unit's %s) | tooltip w %.0f h %.0f"):format(tostring(linesCut),
+			tostring(unitLinesCut), tooltip:GetWidth(), tooltip:GetHeight()))
+	end)
+end
+
 local function ListParts(tooltip)
 	local function Walk(frame, depth)
 		for _, region in ipairs({ frame:GetRegions() }) do
@@ -892,35 +1045,23 @@ local function ListParts(tooltip)
 		end
 	end
 	pcall(Walk, tooltip, 0)
-	-- Then each line's text, for a line the parts grid misses (secret: "?").
-	pcall(function()
-		for i = 1, tooltip:NumLines() do
-			local text = Left(i) and Left(i):GetText()
-			local plain = type(text) == "string" and not (issecretvalue and issecretvalue(text))
-			local okColor, color = pcall(function()
-				local r, g, b = Left(i):GetTextColor()
-				return ("%.2f %.2f %.2f"):format(r, g, b)
-			end)
-			-- (Where it sits: its anchor, indent and wrap stay with the line
-			-- slot, not the text, when CutLines moves texts up.)
-			local fs = Left(i)
-			local function Try(f)
-				local ok, value = pcall(f)
-				return ok and tostring(value) or "?"
-			end
-			local place = ("x %s y %s | shown %s wrap %s justify %s | w %s h %s"):format(
-				Try(function() return select(4, fs:GetPoint(1)) end),
-				Try(function() return select(5, fs:GetPoint(1)) end),
-				Try(function() return ns.Flag(fs:IsShown()) end), Try(function() return fs:GetWordWrap() end),
-				Try(function() return fs:GetJustifyH() end), Try(function() return math.floor(fs:GetWidth()) end),
-				Try(function() return math.floor(fs:GetHeight()) end))
-			ns.Print(("Line %d: %s (color %s%s) %s"):format(i,
-				plain and ("%q"):format(text) or (Unreadable(Left(i)) and "secret" or "?"),
-				okColor and color or "secret", IsHintColor(Left(i)) and ", hint green" or "", place))
-		end
-		ns.Print(("Lines cut %s (a unit's %s) | tooltip h %.0f"):format(tostring(linesCut),
-			tostring(unitLinesCut), tooltip:GetHeight()))
-	end)
+	-- Then each line's text, for a line the parts grid misses.
+	ListLines(tooltip, "Lines as shown:")
+	-- And once more with the tooltip filled again and nothing moved: the rows
+	-- as the game and other addons (Questie) lay them out, to compare. (Not in
+	-- a fight, nor for a secret unit: the game's refill errors then.)
+	if tooltip.RefreshData and not InCombatLockdown() and not UnitSecret(tooltip) then
+		leaveLines, refilling = true, true
+		pcall(tooltip.RefreshData, tooltip)
+		refilling = false
+		C_Timer.After(0.2, function()
+			ListLines(tooltip, "Lines filled again, nothing moved:")
+			leaveLines = false
+			ns.Print("Done.")
+		end)
+	else
+		ns.Print("Done (no second reading: in a fight, or the tooltip can't be filled again).")
+	end
 	-- And what the hint's taking out goes by: the unit, the frame's, the data kind.
 	pcall(function()
 		local okData, kind = pcall(function()
@@ -942,9 +1083,13 @@ function ns.HookTooltipParts()
 	local processor = TooltipDataProcessor and TooltipDataProcessor.AddTooltipPostCall and Enum
 		and Enum.TooltipDataType
 	if processor then
+		deferCuts = true
 		TooltipDataProcessor.AddTooltipPostCall(Enum.TooltipDataType.Unit, OnUnitTooltip)
 		TooltipDataProcessor.AddTooltipPostCall(TooltipDataProcessor.AllTypes or "ALL", function(tooltip, data)
 			if not (data and data.type == Enum.TooltipDataType.Unit) then
+				if tooltip == GameTooltip then
+					pendingCut = nil -- (filled with something else since)
+				end
 				OnObjectTooltip(tooltip)
 				OnItemTooltip(tooltip)
 			end
@@ -958,13 +1103,12 @@ function ns.HookTooltipParts()
 	end
 	-- Lines the game adds after a unit's tooltip is filled (a unit frame's
 	-- right-click hint, a PvP line): taken out as it shows the tooltip again
-	-- to fit them. (cutting: our own Show, as CutLines resizes it.) A tooltip
+	-- to fit them. A tooltip
 	-- already cut counts too, with no readable unit (a mob in a fight on
 	-- Forever): lines added under our emptied last line (Questie's quest
 	-- lines) sat under a blank gap until this pass took it out.
-	local cutting = false
 	hooksecurefunc(GameTooltip, "Show", function(tooltip)
-		if cutting or refilling or not AnyLineCut()
+		if cutting or RunPendingCut(tooltip) or refilling or not AnyLineCut()
 			or not ((linesCut and unitLinesCut) or TooltipUnit(tooltip) or FrameUnit(tooltip)) then
 			return
 		end
@@ -1005,6 +1149,7 @@ function ns.HookTooltipParts()
 		-- (Cleared on the next show, unless that's the game setting it again.
 		-- A countdown that ends while it's hidden reveals nothing.)
 		pendingHide, hiddenOwner = true, Owner(tooltip)
+		pendingCut = nil
 		hiddenAt, hiddenAlpha = GetTime(), Alpha(GameTooltip) or (fade and fade.set) or 1
 		StopFade(true)
 	end)

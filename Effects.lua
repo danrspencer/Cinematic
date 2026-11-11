@@ -1057,6 +1057,31 @@ function ns.UpdateMusic(cinematic, elapsed)
 	end
 end
 
+-- (Asked every tick, 28 times a second: with no volume on its way anywhere and
+-- CineMode, the fight and the camera as last time, it looks only 5 times a
+-- second. A volume it wrote that differs from
+-- the last, a level part way, the death song or /cine debug music keep it at
+-- every tick. On ns: this file's main chunk is at Lua's 200 locals.)
+ns.musicPace = { elapsed = 0, every = 0.2, run = ns.UpdateMusic }
+function ns.UpdateMusic(cinematic, elapsed)
+	local pace = ns.musicPace
+	local fight = (InCombatLockdown() or ns.Flag(UnitAffectingCombat("player"))) and true or false
+	local cam = (ns.CameraMode and ns.CameraMode()) or (ns.QuestCamActive and ns.QuestCamActive() and "quest") or false
+	pace.elapsed = pace.elapsed + elapsed
+	if not pace.busy and pace.cinematic == cinematic and pace.fight == fight and pace.cam == cam
+		and pace.elapsed < pace.every and not deathSong.file and not deathSong.playing and not ns.musicDebug then
+		return
+	end
+	-- (This tick's own time, not the wait's: nothing was fading through it, and
+	-- a fade starting now would jump by it.)
+	pace.elapsed = 0
+	pace.cinematic, pace.fight, pace.cam = cinematic, fight, cam
+	local written = musicWritten
+	pace.run(cinematic, elapsed)
+	pace.busy = musicWritten ~= written or (ns.music.level > 0 and ns.music.level < 1 and ns.music.managing)
+		or (combatMusic.level > 0 and combatMusic.level < 1) or ns.music.ending ~= nil
+end
+
 -- A camera script's End music step: the music a camera started fades out over
 -- secs (0: at once) and ends. Your own music, not started by one, is left alone.
 function ns.EndSceneMusic(secs)

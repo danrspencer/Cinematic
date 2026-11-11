@@ -1897,23 +1897,54 @@ end
 -- not: the gaps between them are the 3D world too. (Retail's bars list their
 -- buttons; Classic's go by name.)
 ns.hoverReach = {} -- (row key -> its reach: its hover groups', set each tick)
+-- (Asked of every bar on each hover check, each button's rect read: 0.3 ms
+-- a check, 2026-11-11. So each bar keeps the box around all its buttons, in
+-- screen pixels, measured again every 2 seconds: the mouse outside it, with
+-- the reach, is on none of them, and no button's asked. ns.slotBoxes.)
+ns.slotBoxes = setmetatable({}, { __mode = "k" })
 function ns.IsOverEmptySlot(frame, pad)
 	pad = pad or 0
 	local buttons, name = frame.actionButtons, frame:GetName()
 	local x, y = ns.CursorPosition()
+	local box, now = ns.slotBoxes[frame], GetTime()
+	if not box then
+		box = { at = -math.huge }
+		ns.slotBoxes[frame] = box
+	end
+	local measure = now - box.at >= 2
+	if not measure then
+		local reach = pad * (box.scale or 1)
+		if not box.left or x < box.left - reach or x > box.right + reach or y < box.bottom - reach
+			or y > box.top + reach then
+			return false
+		end
+	else
+		box.at, box.left, box.right, box.bottom, box.top, box.scale = now, nil, nil, nil, nil, nil
+	end
+	local over = false
 	for i = 1, buttons and #buttons or 12 do
 		local button = buttons and buttons[i]
 			or _G[(name == "MainMenuBar" and "ActionButton" or (name or "") .. "Button") .. i]
-		if button and not IsForbidden(button) and (pad > 0 or not ns.Flag(button:IsShown())) then
+		if button and not IsForbidden(button) and (measure or pad > 0 or not ns.Flag(button:IsShown())) then
 			local left, bottom, width, height = button:GetRect()
 			local scale = button:GetEffectiveScale()
-			if left and scale and scale > 0 and x / scale >= left - pad and x / scale <= left + width + pad
-				and y / scale >= bottom - pad and y / scale <= bottom + height + pad then
-				return true
+			if left and scale and not (issecretvalue and (issecretvalue(left) or issecretvalue(scale))) and scale > 0 then
+				if measure then
+					box.left = math.min(box.left or math.huge, left * scale)
+					box.right = math.max(box.right or -math.huge, (left + width) * scale)
+					box.bottom = math.min(box.bottom or math.huge, bottom * scale)
+					box.top = math.max(box.top or -math.huge, (bottom + height) * scale)
+					box.scale = math.max(box.scale or 0, scale)
+				end
+				if (pad > 0 or not ns.Flag(button:IsShown())) and x / scale >= left - pad and x / scale <= left + width + pad
+					and y / scale >= bottom - pad and y / scale <= bottom + height + pad then
+					if not measure then return true end
+					over = true
+				end
 			end
 		end
 	end
-	return false
+	return over
 end
 
 -- Buff icons are small, so they count as hovered from a little way off, and
@@ -4880,6 +4911,29 @@ function ns.CheckNewBuffIcons(peek)
 		ns.shownBuffPictures = pictureAt
 		-- (Every fight change, the count the same too: one buff ending as
 		-- another comes leaves it unchanged.)
+		-- (/cine debug peeks: every look, out of fights too: what each icon's
+		-- buttonInfo says and which of it is secret, to learn how a client
+		-- numbers its buffs.)
+		if ns.auraDebug then
+			ns.ForEachBuffIcon(function(button)
+				local info = button.buttonInfo
+				local okShown, isShown = pcall(button.IsShown, button)
+				if type(info) ~= "table" or not (okShown and ns.Flag(isShown)) then return end
+				local parts = {}
+				for key, value in pairs(info) do
+					local kind = type(value)
+					if issecretvalue and issecretvalue(value) then
+						parts[#parts + 1] = tostring(key) .. "=secret"
+					elseif kind == "number" or kind == "string" or kind == "boolean" then
+						parts[#parts + 1] = tostring(key) .. "=" .. tostring(value)
+					else
+						parts[#parts + 1] = tostring(key) .. "=" .. kind
+					end
+				end
+				table.sort(parts)
+				ns.AuraSay(("  buff icon (now %.1f): %s"):format(GetTime(), table.concat(parts, " ")))
+			end)
+		end
 		if ns.auraDebug and peek then
 			local places = {}
 			for index = total, 1, -1 do
@@ -8263,6 +8317,19 @@ local function SyncSwitches()
 end
 ns.SyncSwitches = SyncSwitches
 
+-- (The icons' check asked for at once: UpdateReadyOnly below. On ns: this
+-- file is near Lua's 200 locals.)
+ns.readyPace = { due = true }
+ns.Guard(function()
+	local watch = CreateFrame("Frame")
+	for _, event in ipairs({ "SPELL_UPDATE_COOLDOWN", "SPELL_UPDATE_CHARGES", "SPELL_ACTIVATION_OVERLAY_GLOW_SHOW",
+		"SPELL_ACTIVATION_OVERLAY_GLOW_HIDE", "PLAYER_REGEN_DISABLED", "PLAYER_REGEN_ENABLED" }) do
+		pcall(watch.RegisterEvent, watch, event)
+	end
+	pcall(watch.RegisterUnitEvent, watch, "UNIT_AURA", "player")
+	watch:SetScript("OnEvent", function() ns.readyPace.due = true end)
+end)
+
 local UpdateReadyOnly
 do
 -- (Each pass's icons looked at by one function made once, with the pass's
@@ -8309,7 +8376,14 @@ function UpdateReadyOnly(elapsed, now)
 	if not viewersUp and not next(readyAlpha) then
 		return
 	end
-	if now - readyCheckedAt >= 0.1 then
+	-- (Ten times a second in a fight, where When ready icons come up as
+	-- their time nears. Out of one, three: what changes an icon there, a
+	-- cooldown starting, a buff, a proc, a flash, the fight itself, asks at
+	-- once, ns.readyPace.due.)
+	local pace = ns.readyPace
+	local fight = (InCombatLockdown() or ns.Flag(UnitAffectingCombat("player"))) and true or false
+	if pace.due or fight ~= pace.fight or now - readyCheckedAt >= (fight and 0.1 or 0.3) then
+		pace.due, pace.fight = nil, fight
 		readyCheckedAt = now
 		wipe(readyTargets)
 		local db = ns.db
@@ -8449,6 +8523,7 @@ do
 		elseif wasRecharging[icon] then
 			if wasRecharging[icon] == id then
 				flashUntil[icon], flashSpell[icon] = passNow + (ns.db.cooldownFlashTime or 3), id
+				ns.readyPace.due = true -- (its icon shown for it at once: UpdateReadyOnly)
 			end
 			wasRecharging[icon] = nil
 		end
@@ -9561,6 +9636,17 @@ end
 
 -- Where the mouse was when the hover checks last ran (see below).
 tickTables.hoverMouse = { at = -math.huge }
+-- With the mouse over the 3D world (no frame has it), the only faded frames
+-- ns.IsEntryHovered can say yes for: a shrunk or parked one (its saved
+-- spot), the buffs (near an icon), the quest tracker (its lines), an action
+-- bar (its empty slots) and the chat (its rect). The other 180 or so of 208
+-- aren't asked at all then (0.8 ms of a pass, 2026-11-11). Keep in step with
+-- ns.IsEntryHovered. (On tickTables: this file is at Lua's 200 locals.)
+function tickTables.WorldHover(entry)
+	local group = entry.group
+	return entry.shrunk or entry.parkedFullSize or group == "bars" or group == "sidebars" or group == "chat"
+		or group == "buffs" or group == "quests"
+end
 
 -- In CineMode, out of fights, with every frame settled, the frames' pass runs
 -- only a few times a second (Core.lua); these bring it on at once, as what it
@@ -9583,8 +9669,47 @@ do
 		pcall(wake.RegisterUnitEvent, wake, event, "player", "pet")
 	end
 	-- (The event's name: /cine debug framepass says what woke it.)
-	wake:SetScript("OnEvent", function(_, event) ns.framesWake = event end)
+	-- (In a fight these come many times a second, and the pass ran for each:
+	-- 14 a second, a third of all our time in a fight, 2026-11-11. There
+	-- they wait for the fight's own timer, Core.lua's framesPass.fightWait,
+	-- an eighth of a second at most; out of one, at once as ever. The rest,
+	-- your target, a cast starting, the mouse on a unit, always at once.)
+	wake.soft = { UNIT_AURA = true, UNIT_HEALTH = true, UNIT_MAXHEALTH = true, UNIT_POWER_UPDATE = true,
+		SPELL_UPDATE_COOLDOWN = true, UNIT_SPELLCAST_SUCCEEDED = true, BAG_UPDATE_DELAYED = true,
+		QUEST_LOG_UPDATE = true }
+	wake:SetScript("OnEvent", function(self, event)
+		if self.soft[event] and InCombatLockdown() then return end
+		ns.framesWake = event
+	end)
 end
+
+-- The mouse moved and nothing else changed (Core.lua's tick, in CineMode):
+-- is it on or off a faded frame it wasn't a moment ago? Only then does the
+-- whole pass run for it; moving about over the world, it ran every other
+-- tick, 17 times a second, for nothing (2026-11-11 recording). The answers
+-- are kept as the pass's own (entry.hoverWas, tickTables.hoverMouse), so a
+-- pass straight after doesn't ask again. true: something changed.
+function ns.HoverProbe()
+	if not ns.db.mouseover then return false end -- (the mouse brings nothing up)
+	if ns.whyPicking then return true end -- (Inspect picking frames: as before)
+	local changed = false
+	local overWorld, WorldHover = not MouseFocus(), tickTables.WorldHover
+	for _, entry in ipairs(ns.managed) do
+		entry.row = entry.row or ns.HoverRowFor(entry)
+		local over = false
+		if not overWorld or WorldHover(entry) then
+			over = ns.IsEntryHovered(entry) and true or false
+		end
+		if over ~= (entry.hoverWas or false) then changed = true end
+		entry.hoverWas = over
+	end
+	local mouse = tickTables.hoverMouse
+	mouse.x, mouse.y = ns.CursorPosition()
+	mouse.focus, mouse.at = MouseFocus(), GetTime()
+	if ns.framePassTimes then ns.framePassTimes.probes = (ns.framePassTimes.probes or 0) + 1 end
+	return changed
+end
+ns.ProfileName(ns.HoverProbe, "HoverProbe")
 
 function ns.UpdateFrames(cinematic, elapsed)
 	-- (/cine debug framepass: where a pass's time goes, ns.framePassTimes.)
@@ -9737,7 +9862,8 @@ function ns.UpdateFrames(cinematic, elapsed)
 			entry.row = entry.row or ns.HoverRowFor(entry)
 			local over = entry.hoverWas
 			if not still or over == nil then
-				over = ns.IsEntryHovered(entry) and true or false
+				-- (Over the world: only the few that can be, tickTables.WorldHover.)
+				over = (focus ~= nil or tickTables.WorldHover(entry)) and ns.IsEntryHovered(entry) and true or false
 				entry.hoverWas = over
 			end
 			if over then

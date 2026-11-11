@@ -1531,21 +1531,108 @@ function ns.UpdateMouseSteer()
 	end
 end
 
+-- Gamepad: any button down, and the right stick (the camera stick) pushed.
+-- Read once a frame at most, and only with a gamepad on (pad.at: the frame).
+local pad = { at = -1 }
+local function PadState()
+	local now = GetTime()
+	if pad.at == now then
+		return pad.on, pad.stick, pad.down
+	end
+	pad.at, pad.on, pad.stick, pad.down = now, false, false, false
+	if not (C_GamePad and C_GamePad.GetDeviceMappedState and GetCVarBool("GamePadEnable")) then
+		return false, false, false
+	end
+	pad.on = true
+	local ok, state = pcall(C_GamePad.GetDeviceMappedState, C_GamePad.GetActiveDeviceID
+		and C_GamePad.GetActiveDeviceID() or nil)
+	if not ok or type(state) ~= "table" then
+		return true, false, false -- (pad on but unreadable: don't guess a stick)
+	end
+	if type(state.buttons) == "table" then
+		for index, down in ipairs(state.buttons) do
+			if down then
+				pad.down = true
+				local okName, name = pcall(C_GamePad.ButtonIndexToBinding, index)
+				if okName and type(name) == "string" and name:find("^PADRSTICK%u") then
+					pad.stick = true
+				end
+			end
+		end
+	end
+	-- (The stick itself too, where the client lists it: its directions aren't
+	-- buttons on every one. Past a dead zone, so a worn stick's drift isn't you.)
+	if not pad.stick and type(state.sticks) == "table" and C_GamePad.StickIndexToConfigName then
+		for index, stick in ipairs(state.sticks) do
+			local okName, name = pcall(C_GamePad.StickIndexToConfigName, index)
+			if okName and (name == "Right" or name == "Camera" or name == "Look") and type(stick) == "table"
+				and type(stick.len) == "number" and stick.len > 0.25 then
+				pad.stick = true
+			end
+		end
+	end
+	return pad.on, pad.stick, pad.down
+end
+
+local function MouseButtonDown()
+	return IsMouseButtonDown("LeftButton") or IsMouseButtonDown("RightButton")
+end
+
+-- Mouselook counts as you on the camera only with a mouse button down, no
+-- gamepad in use, or the right stick pushed. With a gamepad the game also
+-- reports mouselook for a whole cast with nothing held (ConsolePort sets
+-- GamePadTurnWithCamera 2 on every cast start).
+local function MouselookIsYou()
+	if not (IsMouselooking and IsMouselooking()) then
+		return false
+	end
+	if MouseButtonDown() then
+		return true
+	end
+	local padOn, stick = PadState()
+	return not padOn or stick
+end
+
+function ns.ClearMouseCameraHeld()
+	mouseCameraHeld = false
+end
+
 local function IsMouseOnCamera()
+	-- A press whose release got lost (alt-tab, a loading screen, a binding
+	-- switched while held): after a second with no mouse or pad button down,
+	-- it's let go.
+	if mouseCameraHeld and GetTime() - mouseCameraHeld > 1 and not MouseButtonDown() then
+		local _, _, padDown = PadState()
+		if not padDown then
+			mouseCameraHeld = false
+		end
+	end
 	-- Fishing: a quick click (right-clicking the bobber) isn't moving the camera;
 	-- only holding the button down a moment is. Same in the quest cam (clicking
 	-- the quest giver again for their next quest; not once their window's
 	-- closed: the drift still going fought your turn for that moment).
+	-- And in any scene your camera input ends for good (its rule Stop or Put
+	-- back: the Tele camera, say): a click to target something mid-cast ended
+	-- it and left you zoomed in. (One that only pauses takes the click as it did.)
 	if mouseCameraHeld and ((ns.IsFishingEvent and ns.IsFishingEvent())
-		or (ns.QuestCamWindowOpen and ns.QuestCamWindowOpen())) then
+		or (ns.QuestCamWindowOpen and ns.QuestCamWindowOpen())
+		or (ns.ScriptEndsOnCamera and ns.ScriptEndsOnCamera())) then
 		return GetTime() - mouseCameraHeld >= 0.4
 	end
-	return mouseCameraHeld and true or (IsMouselooking and IsMouselooking()) or false
+	if mouseCameraHeld or MouselookIsYou() then
+		return true
+	end
+	-- (The gamepad's camera stick pushed, mouselook reported or not: turning
+	-- the view with it mid-scene, the scene's own turns carried on against it.)
+	local _, stick = PadState()
+	return stick
 end
 ns.IsMouseOnCamera = IsMouseOnCamera -- (QuestTalk: the bubble while the camera moves)
 -- A button down on the camera at all, even before IsMouseOnCamera counts it
 -- (QuestCam: its turn pauses meanwhile).
 function ns.MouseCameraPressed()
+	if not mouseCameraHeld then return false end
+	IsMouseOnCamera() -- (a press whose release got lost is dropped there)
 	return mouseCameraHeld and true or false
 end
 -- A turn key held (camera scripts' Follow your turns: turns where the facing

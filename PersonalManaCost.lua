@@ -11,6 +11,14 @@
 -- Mana and its max can be secret in fights: the stretch is a status bar of
 -- its own, drawn reversed from the fill's right edge and given them as they
 -- are, clipped to the bar (a cost over what you have runs out at its left).
+-- The stretch ends where your mana ends, not where the game's fill does:
+-- on Forever the personal resource display's power bar lowers its own fill
+-- by the cost as the cast starts, though the mana's only taken at its end
+-- (a warlock's Shadow Bolt, 2026-11-11: no mana change at the start, one at
+-- the end, the fill down from the start). Off the fill's edge the stretch
+-- took the cost a second time; off your mana's (an unseen bar of ours given
+-- your mana: the ruler) it lies over what the game took off, the fill to
+-- its left what's left, on a bar the game lowers and on one it doesn't.
 -- Some casts take their mana as they start (seen on Forever: an arcane
 -- mage's casts): once your mana has dropped by the cost since the cast
 -- began, it's paid and the stretch goes (else it took the cost twice).
@@ -122,6 +130,14 @@ local function Overlay(bar)
 	stretch:SetStatusBarTexture("Interface\\Buttons\\WHITE8X8")
 	stretch:SetStatusBarColor(SHADE[1], SHADE[2], SHADE[3], SHADE[4])
 	overlay.stretch = stretch
+	-- (The ruler: a bar of our own the same size, unseen, given your mana as
+	-- it is. Its fill's right edge is where your mana ends: the stretch hangs
+	-- off it, not off the game's fill, which the game can draw lower.)
+	local ruler = CreateFrame("StatusBar", nil, overlay)
+	ruler:SetAllPoints()
+	ruler:SetStatusBarTexture("Interface\\Buttons\\WHITE8X8")
+	ruler:GetStatusBarTexture():SetAlpha(0)
+	overlay.ruler = ruler
 	overlay:Hide()
 	overlays[bar] = overlay
 	return overlay
@@ -140,16 +156,19 @@ end
 
 -- The stretch on one bar, for the cast going on (false: it can't be).
 local function Draw(bar)
-	local fill = bar.GetStatusBarTexture and bar:GetStatusBarTexture()
-	if not fill then return false end
+	if not (bar.GetStatusBarTexture and bar:GetStatusBarTexture()) then return false end
 	local overlay = Overlay(bar)
-	local stretch = overlay.stretch
+	local stretch, ruler = overlay.stretch, overlay.ruler
 	local ok = pcall(function()
+		local maxMana = UnitPowerMax("player", MANA)
+		ruler:SetMinMaxValues(0, maxMana)
+		ruler:SetValue(UnitPower("player", MANA))
+		local edge = ruler:GetStatusBarTexture()
 		stretch:SetWidth(bar:GetWidth())
 		stretch:ClearAllPoints()
-		stretch:SetPoint("TOPRIGHT", fill, "TOPRIGHT")
-		stretch:SetPoint("BOTTOMRIGHT", fill, "BOTTOMRIGHT")
-		stretch:SetMinMaxValues(0, UnitPowerMax("player", MANA))
+		stretch:SetPoint("TOPRIGHT", edge, "TOPRIGHT")
+		stretch:SetPoint("BOTTOMRIGHT", edge, "BOTTOMRIGHT")
+		stretch:SetMinMaxValues(0, maxMana)
 		stretch:SetValue(cost)
 	end)
 	overlay:SetShown(ok)

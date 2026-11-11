@@ -1226,7 +1226,23 @@ local function FadeLevel(level, wanted, elapsed)
 end
 
 -- cinematic, vignetteOn, weatherOn: whether each is wanted now (see Core).
+-- (Asked every tick, 28 times a second: with nothing of it fading, wanted as
+-- last time and no death screen, it looks only 5 times a second. What it
+-- drew last time, or anything marked to redraw,
+-- keeps it at every tick. On ns: no more locals for this file's main chunk.)
+ns.tintPace = { elapsed = 0, every = 0.2 }
 local function UpdateTint(cinematic, elapsed, vignetteOn, weatherOn)
+	local pace = ns.tintPace
+	pace.elapsed = pace.elapsed + elapsed
+	if not pace.busy and not tintDirty and not daySweep and deathLevel == 0 and deathCreep == 0
+		and pace.tint == cinematic and pace.vignette == vignetteOn and pace.weather == weatherOn
+		and pace.elapsed < pace.every and not Previewing() then
+		return
+	end
+	-- (This tick's own time, not the wait's: nothing was fading through it, and
+	-- a fade starting now would jump by it.)
+	pace.elapsed = 0
+	pace.tint, pace.vignette, pace.weather, pace.busy = cinematic, vignetteOn, weatherOn, false
 	UpdateDeathScreen(elapsed)
 	UpdateDeathBanner()
 	local target = TintWanted(cinematic) and 1 or 0
@@ -1281,6 +1297,7 @@ local function UpdateTint(cinematic, elapsed, vignetteOn, weatherOn)
 		return
 	end
 	tintDirty = false
+	pace.busy = true -- (something moved: every tick till it's still)
 	tintLevel = FadeLevel(tintLevel, target, elapsed)
 	layerLevel.vignette = FadeLevel(layerLevel.vignette, vignetteWant, elapsed)
 	layerLevel.weather = FadeLevel(layerLevel.weather, weatherWant, elapsed)

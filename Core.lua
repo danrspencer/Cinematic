@@ -3347,7 +3347,7 @@ end
 -- cinematic and elapsed, waiting for the second half. (At low frame rates, with a
 -- tick due every frame, both halves still run in one.)
 local tickRest = {}
-local framesPass = { elapsed = 0, sinceFull = 0 } -- (sinceFull: seconds since the last whole pass)
+local framesPass = { elapsed = 0, sinceFull = 0, fightWait = 0.125 } -- (sinceFull: seconds since the last whole pass)
 local IDLE_PASS = 0.5 -- (seconds: the frames pass out of CineMode, all settled)
 local CINE_IDLE_PASS = 0.25 -- (seconds: in CineMode, out of fights, all settled and nothing changed)
 
@@ -3551,20 +3551,39 @@ local function OnUpdate(_, elapsed)
 	-- the quest tracker), or at once when something above changes.
 	local pass = framesPass
 	local immersive = ns.ChatCamImmersive and ns.ChatCamImmersive() or false
+	-- The mouse moved, in CineMode: that alone brings on the whole pass only
+	-- when it's now on or off a faded frame, ns.HoverProbe (Frames.lua), asked
+	-- every 0.06 seconds at most (the pass's old pace for a moving mouse).
+	-- Otherwise it counts as where it was. (An error in it: the pass, as before.)
+	if fadeOn and pass.fadeOn and pass.x and (x ~= pass.x or y ~= pass.y) and ns.HoverProbe then
+		local now = GetTime()
+		if now - (pass.probedAt or 0) < 0.06 then
+			x, y = pass.x, pass.y -- (asked again next tick)
+		else
+			pass.probedAt = now
+			if Step(ns.HoverProbe) == false then
+				pass.x, pass.y = x, y
+			end
+		end
+	end
 	local same = ns.framesSettled and fadeOn == pass.fadeOn and fight == pass.fight and immersive == pass.immersive
 		and x == pass.x and y == pass.y and not IsModifierKeyDown() and not (ns.IsChatActive and ns.IsChatActive())
 	-- In CineMode too, out of fights: every CINE_IDLE_PASS seconds, or at once
 	-- when something the pass goes by changes (ns.framesWake: Frames.lua's
-	-- events, the reveals and peeks). In fights, as often as ever.
-	local wait = not immersive and (not fadeOn and IDLE_PASS or (not fight and CINE_IDLE_PASS)) or nil
+	-- events, the reveals and peeks).
+	-- (In a fight, an eighth of a second, pass.fightWait: it ran every other
+	-- tick whatever happened, 14 passes a second, 2026-11-11. A frame still
+	-- fading, the mouse on or off a frame, your target, a cast or the fight
+	-- itself changing still bring it at once; health, power, auras and
+	-- cooldowns wait for it, Frames.lua's wake.soft.)
+	local wait = not immersive and (not fadeOn and IDLE_PASS or (fight and pass.fightWait or CINE_IDLE_PASS)) or nil
 	-- (Out of CineMode nothing it goes by needs the pass at once: kept to its
 	-- IDLE_PASS whatever comes, as before.)
 	local woken = fadeOn and ns.framesWake
 	local idle = same and wait and not woken and pass.elapsed + elapsed < wait
 	-- (Only frames still fading, every one able to go on alone, and nothing
 	-- else changed: just those, ns.UpdateFadingFrames, till the whole pass is
-	-- due by its timer. Not in fights or immersive, where wait is nil: the
-	-- whole pass as ever.)
+	-- due by its timer. Not immersive, where wait is nil: the whole pass as ever.)
 	local fadeOnly = ns.framesFadeOnly and not ns.framesSettled and wait and not woken and fadeOn == pass.fadeOn
 		and fight == pass.fight and immersive == pass.immersive and x == pass.x and y == pass.y
 		and not IsModifierKeyDown() and not (ns.IsChatActive and ns.IsChatActive())
@@ -4696,6 +4715,15 @@ ticker:SetScript("OnEvent", ns.Profiled("Core events", function(self, event, arg
 		if not ns.db.flyByLookOffV1 then
 			if ns.db.flyByLook == true then ns.db.flyByLook = nil end
 			ns.db.flyByLookOffV1 = true
+		end
+		-- Vitals' screen edges closed in evenly at first (Ramp up 0%); 50% now,
+		-- saved profiles too. Once, unless changed.
+		if not ns.db.lowHealthRampV2 then
+			if ns.db.lowHealthRamp == 0 then ns.db.lowHealthRamp = nil end
+			for _, saved in pairs(type(ns.db.profiles) == "table" and ns.db.profiles or {}) do
+				if type(saved) == "table" and saved.lowHealthRamp == 0 then saved.lowHealthRamp = nil end
+			end
+			ns.db.lowHealthRampV2 = true
 		end
 		-- Service NPCs' titles first kept their < > by default; off now, for
 		-- everyone and every saved profile. Once.
@@ -7761,6 +7789,7 @@ ticker:SetScript("OnEvent", ns.Profiled("Core events", function(self, event, arg
 		end
 	elseif event == "LOADING_SCREEN_DISABLED" then
 		ns.stillSince = nil -- the AFK timer starts once you can see the world
+		if ns.ClearMouseCameraHeld then ns.ClearMouseCameraHeld() end -- (a release lost in the load)
 	elseif event == "PLAYER_ENTERING_WORLD" then
 		-- After a login, /reload or any loading screen, the AFK timer starts
 		-- afresh (the orbit has been running since login, counting the loading

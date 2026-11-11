@@ -2755,6 +2755,15 @@ function zoomer.StartDistance()
 	return zoom
 end
 
+-- A script's start distance: a zoom back out still held from the last one
+-- you took the camera from (QuestCam.lua holds it till you walk off), else
+-- zoomer.StartDistance. Both taken either way: neither is left for later.
+function zoomer.TakeStart()
+	local held = ns.QuestCamTakeHeldZoom and ns.QuestCamTakeHeldZoom()
+	local distance = zoomer.StartDistance()
+	return held or distance
+end
+
 -- Starts a script (trigger: the trigger key it's running for; nil, played
 -- from its page or /cine script play).
 local function Start(script, trigger, camera)
@@ -2767,7 +2776,7 @@ local function Start(script, trigger, camera)
 	run = {
 		script = script, trigger = trigger, camera = camera, t = 0, phase = "steps", paths = paths, active = {},
 		builtinId = builtinId,
-		startZoom = IsQuestTrigger(trigger) and ns.QuestCamTakeHeldZoom() or zoomer.StartDistance(),
+		startZoom = zoomer.TakeStart(),
 		startedAt = GetTime(), inputSeen = ns.GetLastCameraInput and ns.GetLastCameraInput() or 0,
 		triggerOn = trigger ~= nil, onceLeft = math.random() < 0.5, swayCenters = {},
 		-- (Played for Skyriding, or a scene of yours on the move, mounted or flying: walking
@@ -2777,7 +2786,11 @@ local function Start(script, trigger, camera)
 			or (trigger ~= nil and ns.CustomTravelScene ~= nil and ns.CustomTravelScene() == trigger),
 	}
 	ns.zoomWhileSteering[WHO] = run.travel or nil
-	movers.yaw.amount, movers.pitch.amount = 0, 0
+	-- (Handed over from a scene cut off on its way back, zoomer.carry: its turn
+	-- and tilt are this one's to undo, so its Put back goes all the way.)
+	local carry = zoomer.carry
+	zoomer.carry = nil
+	movers.yaw.amount, movers.pitch.amount = carry and carry.yaw or 0, carry and carry.pitch or 0
 	run.co = coroutine.create(function() DoSteps(script.steps) end)
 	ns.ApplyCVarSet(FOLLOW_CVARS, true)
 	ns.Log("state", ("camera script %s started (%s)"):format(script.name, trigger or "played"))
@@ -2818,8 +2831,11 @@ local function Finish(why)
 	-- turn's yours, but the zoom back out still comes as you walk off, or a
 	-- right-drag away from a quest giver left you close in.)
 	-- (Chat Cam's the same, at its own zoom out speed, as ChatCam.lua held it.)
+	-- (And any other scene's whose When it ends zooms back: a drag mid
+	-- Hearthstone cast left you zoomed in for good.)
 	local chat = run.trigger == "Chat" or run.trigger == "ChatNearby"
-	if why == "camera" and (IsQuestTrigger(run.trigger) or chat) and HasKind(run.script.ending, "zoom")
+	-- (A fight stopping it too, its rule Stop: sat down, you were left 3 yards out.)
+	if (why == "camera" or why == "fight") and ns.QuestCamHoldZoomOut and zoomer.GoesBack(run.script.ending)
 		and math.abs(Zoom() - run.startZoom) > 0.5 then
 		local speed = chat and Db("chatCamZoomOutSpeed", 0.5) or Db("questCamZoomOutSpeed", 0.5)
 		if speed > 0 then ns.QuestCamHoldZoomOut(run.startZoom, math.max(0.25, speed)) end
@@ -2832,7 +2848,10 @@ local function Finish(why)
 	ns.Log("state", ("camera script %s ended (%s)"):format(run.script.name, why or "done"))
 	-- (Not the Skyriding Cam's own end with you back in the air: that's a new
 	-- flight, not one to sit out with no camera.)
-	if run.trigger and run.triggerOn and not (why == "ends" and run.trigger == "Skyride") then
+	-- (Nor its trigger come on afresh during its When it ends, run.again: but
+	-- one you took the camera from stays stopped.)
+	if run.trigger and run.triggerOn and not (why == "ends" and run.trigger == "Skyride")
+		and not (run.again and why ~= "camera") then
 		stoppedFor = run.trigger .. run.camera
 	end
 	-- (Stopped before its When it ends ran, or partway through: its End music
@@ -2882,6 +2901,10 @@ local function Act(event)
 	-- (Its When it ends under way: only your camera input or a fight stops
 	-- that; walking on, say, it carries on turning back.)
 	if run.phase == "ending" and event ~= "camera" and event ~= "fight" then return false end
+	-- (Nor the fight its Put back is for: that fight's still on next frame, and
+	-- stopped the way back as it began, the camera left turned and zoomed
+	-- where the scene had it: 7 yards in at a quest giver as a fight started.)
+	if run.phase == "ending" and event == "fight" and run.why == "fight" then return false end
 	if run.phase == "ending" or action == "stop" then
 		Finish(event)
 	elseif action == "putback" then
@@ -3058,7 +3081,10 @@ end
 local function Update(elapsed)
 	local now = GetTime()
 	if not ns.db.enabled then
+		-- (Turned off mid-scene: its zoom goes straight back, at your own speed.)
+		local back = zoomer.GoesBack(run.script.ending) and run.startZoom - Zoom() or 0
 		Finish("Cinematic off")
+		zoomer.SnapBy(back)
 		return
 	end
 	-- Your camera input since the last look: the zoom or the rest.
@@ -3238,6 +3264,16 @@ ns.SetOnUpdate(watcher, function(_, elapsed)
 		elseif not (wait and windowDo == "pause") and run.pausedBy == "window" then
 			run.pausedUntil, run.pausedBy = GetTime(), nil
 		end
+		-- (Its trigger over and on again during its When it ends, a Hearthstone
+		-- cast cancelled and cast again: that's a new time, to start for once
+		-- it's back, not one stopped for this time. See Finish.)
+		if run and run.phase == "ending" then
+			if not (on or wait) then
+				run.wentOff = true
+			elseif run.wentOff then
+				run.again = true
+			end
+		end
 		if run then run.triggerOn = on or wait end
 		-- A quest script, its window just closed as you accepted, handed in
 		-- or picked the next (Its quest window closes rule), once per close.
@@ -3272,6 +3308,18 @@ ns.SetOnUpdate(watcher, function(_, elapsed)
 		and IsScript(camera) and zoomer.FOOT[camera:sub(8)] and not InFight() then
 		ns.Log("state", ("camera script %s hands over to %s"):format(run.script.name, camera))
 		Finish("handover")
+	end
+	-- A Hearthstone or teleport cast's scene taking over: the cast won't wait,
+	-- so the one playing doesn't finish its When it ends first (the AFK
+	-- camera's took 5 of the cast's 10 seconds). It's cut off there, and what
+	-- it had turned, tilted and zoomed is the new one's to put back
+	-- (zoomer.carry, zoomer.StartDistance).
+	if run and run.phase == "ending" and run.why == "ends" and (key == "Hearth" or key == "Teleport")
+		and key ~= run.trigger and IsScript(camera) and stoppedFor ~= key .. camera and not InFight()
+		and not (ns.MouseCameraPressed and ns.MouseCameraPressed()) then
+		ns.Log("state", ("camera script %s hands over to %s (a cast)"):format(run.script.name, camera))
+		Finish("handover")
+		zoomer.carry = { yaw = movers.yaw.amount, pitch = movers.pitch.amount }
 	end
 	-- A scene you stopped (took the camera, say) comes back only once its
 	-- trigger has been off a while (zoomer.OFF_CLEAR), not off for a moment:
@@ -3352,10 +3400,40 @@ function ns.CameraScriptHaze()
 end
 watcher:RegisterEvent("PLAYER_LOGIN")
 watcher:RegisterEvent("PLAYER_LOGOUT")
+-- Zooms by yards at once (out: positive), at your own zoom speed.
+function zoomer.SnapBy(yards)
+	if math.abs(yards) <= 0.5 then return end
+	StopZoom()
+	zoomer.release = nil
+	ns.ReleaseSpeed(ZOOM_WHO, ZOOM_CVAR)
+	ns.CallCameraFunction(yards > 0 and "CameraZoomOut" or "CameraZoomIn", math.abs(yards))
+end
+-- Logging out or /reload mid-scene: zooming then does nothing (tested), so
+-- the distance it was going back to is kept (db.sceneZoomBack) and gone to
+-- as you come back in, if the camera's still where the scene left it and
+-- it's the same character.
+function zoomer.Me()
+	local name, realm = UnitName("player"), _G.GetRealmName and _G.GetRealmName() or ""
+	return type(name) == "string" and (name .. "-" .. tostring(realm)) or nil
+end
 watcher:SetScript("OnEvent", function(_, event)
 	if event == "PLAYER_LOGIN" then
 		ns.SyncScriptCameras()
+		local back = ns.db and ns.db.sceneZoomBack
+		if back then
+			ns.db.sceneZoomBack = nil
+			C_Timer.After(1.5, function()
+				if back.who == zoomer.Me() and not run and math.abs(Zoom() - back.at) < 1.5
+					and not (ns.Setting and ns.Setting("loginZoom")) then
+					ns.Log("zoom", ("a scene was cut off by logging out: back to %.1f yards"):format(back.to))
+					zoomer.SnapBy(back.to - Zoom())
+				end
+			end)
+		end
 	else
+		if run and ns.db and zoomer.GoesBack(run.script.ending) and math.abs(Zoom() - run.startZoom) > 0.5 then
+			ns.db.sceneZoomBack = { to = run.startZoom, at = Zoom(), who = zoomer.Me() }
+		end
 		Finish("logging out")
 	end
 end)
@@ -3379,6 +3457,15 @@ if ns.RegisterCamera then
 			if rules.camera ~= "pause" and rules.cameraOn ~= false then StopAll() end
 		end
 	end)
+end
+
+-- A script playing its steps whose Your camera input rule ends it (Stop or
+-- Put back): a quick click on the world isn't that (Camera.lua's
+-- IsMouseOnCamera).
+function ns.ScriptEndsOnCamera()
+	if not run or run.phase ~= "steps" then return false end
+	local rules = run.script.rules
+	return rules.cameraOn ~= false and (rules.camera == "stop" or rules.camera == "putback")
 end
 
 -- Plays a script now, from its page or a command. False and why if it can't.

@@ -137,3 +137,32 @@ ns.WhenAddonLoads("Questie", function()
 		end
 	end)
 end)
+
+-- The lines Questie adds to a mob's tooltip (quest titles, objectives, the
+-- quests it starts or ends), as Questie itself gives them: text -> true. The
+-- Tooltips page takes them out by its Quest lines row. Asked of Questie, not
+-- guessed from how its lines look: its titles come with a level in front, an
+-- icon, "(Complete)" behind and more, and each guess missed the next one.
+-- Empty without Questie, or for a unit whose ID can't be read (in fights).
+function ns.QuestieTooltipLines(unit)
+	local lines = {}
+	pcall(function()
+		local loader = _G.QuestieLoader
+		if not (loader and unit) then
+			return
+		end
+		local guid = UnitGUID(unit)
+		if type(guid) ~= "string" or (issecretvalue and issecretvalue(guid)) then
+			return
+		end
+		local kind, _, _, _, _, id = strsplit("-", guid)
+		if kind ~= "Creature" and kind ~= "Vehicle" then
+			return
+		end
+		local tooltips = loader:ImportModule("QuestieTooltips")
+		for _, text in pairs(tooltips.GetTooltip("m_" .. id) or {}) do
+			lines[text] = true
+		end
+	end)
+	return lines
+end

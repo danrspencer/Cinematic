@@ -18,7 +18,7 @@ DEFAULTS.lowHealthFollowGame = true -- no edges while the game's "Do Not Flash S
 DEFAULTS.lowHealthTheme = "auto"   -- a theme's key (LowHealthThemes.lua), or by class and talents
 DEFAULTS.lowHealthStart = 0.75     -- health (0-1) they start creeping in below
 DEFAULTS.lowHealthFull = 0.15      -- ...and are all the way in at
-DEFAULTS.lowHealthRamp = 0         -- 0: evenly between them; up to 1: little at first, most near Full
+DEFAULTS.lowHealthRamp = 0.5       -- 0: evenly between them; up to 1: little at first, most near Full
 DEFAULTS.lowHealthSound = "auto"   -- played on reaching that: your class and spec's, "off", or a file number
 DEFAULTS.lowHealthSoundVolume = 1  -- ...at this share of your ambient volume (over 1: louder)
 DEFAULTS.lowHealthReach = 0.3      -- share of the screen's height the top and bottom shadow covers at full
@@ -486,7 +486,7 @@ end
 -- (even at 0; at 1 a quarter of the way in by halfway). Health bars: even.
 local function Ramped(t, prefix)
 	if prefix and prefix ~= "lowHealth" then return t end
-	local ramp = db.lowHealthRamp or 0
+	local ramp = db.lowHealthRamp or 0.5
 	if ramp <= 0 then return t end
 	return t ^ (1 + 3 * ramp)
 end

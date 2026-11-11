@@ -1744,9 +1744,12 @@ end
 -- script starting now: its distance, or nil. (Its start, so When it ends goes
 -- back out there, not to the close-in spot the last quest giver left you at.)
 function ns.QuestCamTakeHeldZoom()
-	local to = zoomer.pending and zoomer.pending.to
+	local pending = zoomer.pending
 	zoomer.pending = nil
-	return to
+	-- (Zoomed yourself since it was held: that's your distance now, as the
+	-- loop above drops it.)
+	if pending and ns.PlayerZoomedSince and ns.PlayerZoomedSince(pending.since) then return nil end
+	return pending and pending.to
 end
 
 -- For /cine debug: whether the quest cam is on now and its moves.

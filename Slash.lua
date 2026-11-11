@@ -1127,6 +1127,11 @@ local function HandleSlash(msg)
 				t.fadeOnly or 0, (t.fadeOnly or 0) / 20)
 			ns.Print(fadeLine)
 			ns.Log("framepass", fadeLine)
+			-- (Mouse moves answered by the hover check alone, ns.HoverProbe: Frames.lua.)
+			local probeLine = ("framepass: hover checks for a moving mouse %d (%.1f a second)"):format(
+				t.probes or 0, (t.probes or 0) / 20)
+			ns.Print(probeLine)
+			ns.Log("framepass", probeLine)
 			-- (The slowest pass, part by part: a spike's cause, which the averages hide.)
 			if t.worstLine then
 				ns.Print("framepass: slowest pass " .. t.worstLine)
