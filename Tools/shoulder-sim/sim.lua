@@ -68,7 +68,8 @@ C_CVar.GetCVarDefault = function() return "0" end
 
 -- You and the world.
 local me = { mounted = false, taxi = false, dead = false, fight = false, editMode = false, camera = nil,
-	row = true, scale = variant == "tall" and GAME.tallScale or 1, indoors = false }
+	row = true, scale = variant == "tall" and GAME.tallScale or 1, indoors = false, selfTarget = false }
+UnitIsUnit = function(a, b) return me.selfTarget and a == "target" and b == "player" end
 InCombatLockdown = function() return me.fight end
 UnitAffectingCombat = function() return me.fight end
 IsMounted = function() return me.mounted end
@@ -97,6 +98,8 @@ local function MoveCamera(dt)
 	cam.zoom = math.abs(d) <= step and cam.goal or cam.zoom + (d > 0 and step or -step)
 	local want = tonumber(cvars[SHOULDER]) or 0
 	if cvars[CENTERED] == "1" or cvars.CameraReduceUnexpectedMovement == "1" then want = 0 end
+	-- (You as your own target: the game puts you in the middle, the setting kept. 2026-11-11, Forever.)
+	if me.selfTarget then want = 0 end
 	want = want * me.scale * (me.mounted and GAME.mountScale or 1)
 	cam.offset = cam.offset + (want - cam.offset) * math.min(1, dt * GAME.ease)
 end
@@ -325,6 +328,14 @@ local function Day()
 	Wait(3)
 	_G.CinematicDevShoulderSwapButton:GetScript("OnClick")()
 	Wait(2)
+	Part("You target yourself")
+	me.selfTarget = true
+	wow.Fire("PLAYER_TARGET_CHANGED")
+	Wait(3)
+	me.selfTarget = false
+	wow.Fire("PLAYER_TARGET_CHANGED")
+	Part("Target cleared")
+	Wait(3)
 	Part("Mounted")
 	me.mounted = true
 	Wait(4)

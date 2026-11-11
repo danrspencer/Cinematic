@@ -393,24 +393,66 @@ local function BuildDemoRow(page, width)
 	for _, demo in ipairs(DEMO_ROW) do
 		if ns.ShowMeAvailable and ns.ShowMeAvailable(demo.key) then list[#list + 1] = demo end
 	end
-	-- Under the buttons, with the Tint demo: the tint's strength (the
+	-- Under the buttons, a line of settings. On the left, Start in CineMode:
+	-- the level's the tags are for (hovered, else picked), a tick to change
+	-- for the one picked (a hovered card has the mouse: its own is only
+	-- shown). None hovered or picked: dim and empty till one is (hidden, the
+	-- strength sat alone on the right).
+	local strengthH = 24
+	local start = CreateFrame("Button", nil, row, BackdropTemplateMixin and "BackdropTemplate")
+	start:SetSize(14, 14)
+	start:SetPoint("BOTTOMLEFT", 12, 10)
+	Flat(start, BG, EDGE)
+	start.tick = start:CreateTexture(nil, "ARTWORK")
+	start.tick:SetColorTexture(unpack(GOLD))
+	start.tick:SetPoint("TOPLEFT", 3, -3)
+	start.tick:SetPoint("BOTTOMRIGHT", -3, 3)
+	start.label = Text(start, "GameFontHighlightSmall", L["Start in CineMode"], SOFT)
+	start.label:SetPoint("LEFT", start, "RIGHT", 8, 0)
+	-- (the words click too)
+	start:SetHitRectInsets(0, -(start.label:GetStringWidth() + 8), -4, -4)
+	local startFor -- (the profile it shows: nil for none)
+	local function StartOn()
+		if not startFor then return false end
+		if startFor == Active() then return ns.db.fadeUI ~= false end
+		return ns.ProfileSettings(startFor).fadeUI ~= false
+	end
+	local function ShowStart()
+		start.tick:SetShown(StartOn())
+		Color(start.label, startFor and SOFT or DIM)
+	end
+	start:SetScript("OnClick", function()
+		if startFor ~= Active() then return end
+		ns.db.fadeUI = not StartOn()
+		if ns.RestartTimers then ns.RestartTimers() end
+		ShowStart()
+	end)
+	start:SetScript("OnEnter", function(self)
+		if startFor then self:SetBackdropBorderColor(unpack(LIT)) end
+		about:SetText("|cffffd100" .. L["Start in CineMode"] .. "|r   " ..
+			L["On: CineMode comes in by itself between fights, fading your UI. Off: your UI stays as it is, " ..
+			"unless a camera brings CineMode on."] .. (startFor and "" or " " .. L["Pick a profile first."]))
+	end)
+	start:SetScript("OnLeave", function(self)
+		self:SetBackdropBorderColor(unpack(EDGE))
+		Describe(levelOf[Active()])
+	end)
+	-- On the right, with the Tint demo: the tint's strength (the
 	-- profile's). Dragging it plays the Tint demo, or keeps
 	-- it playing, so you see the strength you pick.
-	local strengthH = 0
 	if ns.ShowMeAvailable and ns.ShowMeAvailable("tint") and ns.db then
-		strengthH = 24
-		local label = Text(row, "GameFontHighlightSmall", L["Tint strength"], SOFT)
-		label:SetPoint("BOTTOMLEFT", 12, 12)
 		local value = Text(row, "GameFontHighlightSmall", "", SOFT)
 		value:SetJustifyH("LEFT")
 		value:SetWidth(40)
+		value:SetPoint("BOTTOMRIGHT", -12, 12)
 		local slider = CreateFrame("Slider", nil, row)
 		slider:SetOrientation("HORIZONTAL")
 		slider:SetHeight(14)
 		-- (short: a full-width line made small changes look like nothing)
 		slider:SetWidth(200)
-		slider:SetPoint("LEFT", label, "RIGHT", 12, 0)
-		value:SetPoint("LEFT", slider, "RIGHT", 10, 0)
+		slider:SetPoint("RIGHT", value, "LEFT", -10, 0)
+		local label = Text(row, "GameFontHighlightSmall", L["Tint strength"], SOFT)
+		label:SetPoint("RIGHT", slider, "LEFT", -12, 0)
 		local track = slider:CreateTexture(nil, "BACKGROUND")
 		track:SetColorTexture(unpack(EDGE))
 		track:SetHeight(4)
@@ -510,6 +552,8 @@ local function BuildDemoRow(page, width)
 	-- keep: the same level as last time (a demo started or ended, a fight).
 	function row:Update(level, keep)
 		if not keep then show = level end
+		startFor = show and (show.profile or ns.DEFAULT_PROFILE) or nil
+		ShowStart()
 		for _, b in ipairs(buttons) do
 			local key = b.demo.key
 			local running = ns.ShowMeRunning(key)

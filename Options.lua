@@ -3157,6 +3157,11 @@ local function CreateRevealPanel()
 	-- Each slider on one line with its name (an inline stack, as on Graphics+).
 	local stack = Stack(subtitle, "label", true)
 
+	-- Start in CineMode: the main page's box again, the same setting (its
+	-- tip too), so the page has all of CineMode's coming in and going out.
+	local startCine = ns.SettingControl("fadeUI", content, function() end)
+	if startCine then stack:Add(startCine, "check") end
+
 	-- Fading: how fast the UI goes and comes back
 	stack:Header(content, L["Fading"])
 

@@ -179,9 +179,21 @@ local function Hook()
 		end)
 	end
 end
+-- Your target (target changes: "it goes back to the middle when I target myself"),
+-- the game's target focus settings, and our Frames follow you slide.
+local function TargetNow()
+	if not (UnitExists and ns.Flag(UnitExists("target"))) then return "no target" end
+	local follow = ns.GetShoulderCamDebug and ns.GetShoulderCamDebug() or {}
+	return ("target %s (you %s, friend %s, player %s), focus enemy %s interact %s, reduce movement %s, " ..
+		"frames slide %s of %s"):format(Text(UnitName("target")), Text(ns.Flag(UnitIsUnit("target", "player"))),
+		Text(ns.Flag(UnitIsFriend("player", "target"))), Text(ns.Flag(UnitIsPlayer("target"))),
+		Text(GetCVar("test_cameraTargetFocusEnemyEnable")), Text(GetCVar("test_cameraTargetFocusInteractEnable")),
+		Text(GetCVar(REDUCE)), Text(follow.followShift), Text(follow.followTarget))
+end
 local function Values(when)
-	Log(("watch: %s: offset %s, centered %s, switch %s, yours kept %s | %s"):format(when, Text(GetCVar(SHOULDER)),
-		Text(GetCVar(CENTERED)), Text(ns.db and ns.db.shoulderCam), Text(ns.db and ns.db.shoulderCamYours ~= nil), Who()))
+	Log(("watch: %s: offset %s, centered %s, switch %s, yours kept %s | %s | %s"):format(when, Text(GetCVar(SHOULDER)),
+		Text(GetCVar(CENTERED)), Text(ns.db and ns.db.shoulderCam), Text(ns.db and ns.db.shoulderCamYours ~= nil), Who(),
+		TargetNow()))
 end
 watcher:SetScript("OnEvent", function(self, event, name, value)
 	if not self.on then return end
@@ -189,6 +201,10 @@ watcher:SetScript("OnEvent", function(self, event, name, value)
 		if type(name) == "string" and WATCHED[name:lower()] then
 			Log(("watch: CVAR_UPDATE %s = %s (reads %s)"):format(name, Text(value), Text(GetCVar(name))))
 		end
+	elseif event == "PLAYER_TARGET_CHANGED" then
+		Values(event)
+		-- (and once the game's had time to ease the camera over)
+		C_Timer.After(1, function() if self.on then Values("1 s after the target change") end end)
 	else
 		Values(event)
 	end
@@ -206,7 +222,7 @@ local function SetWatch(on)
 	if on then
 		Hook()
 		for _, event in ipairs({ "CVAR_UPDATE", "PLAYER_LOGIN", "PLAYER_ENTERING_WORLD", "PLAYER_LOGOUT",
-			"PLAYER_MOUNT_DISPLAY_CHANGED", "UPDATE_SHAPESHIFT_FORM" }) do
+			"PLAYER_MOUNT_DISPLAY_CHANGED", "UPDATE_SHAPESHIFT_FORM", "PLAYER_TARGET_CHANGED" }) do
 			pcall(watcher.RegisterEvent, watcher, event)
 		end
 		watcher:Show()

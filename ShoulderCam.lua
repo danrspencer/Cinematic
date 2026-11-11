@@ -361,9 +361,17 @@ function ns.ShoulderViewWidth()
 	return math.tan(math.rad(fov / 2)) * aspect / (16 / 9)
 end
 
+-- With you as your own target the game puts you back in the middle by itself,
+-- the offset setting untouched (2026-11-11, Forever: the log kept 2.02 while a
+-- recording showed you ease to the middle over ~0.5 s): the frames go with you.
+local function YouAreTarget()
+	return UnitIsUnit and ns.Flag(UnitIsUnit("target", "player")) or false
+end
+
 local function TargetShift()
 	local db = ns.db
 	if not (db and ns.Setting("shoulderCam") and db.shoulderCamFrames) then return 0 end
+	if YouAreTarget() then return 0 end
 	local yards = tonumber(GetCVar("test_cameraOverShoulder")) or 0
 	if yards == 0 then return 0 end
 	local distance = math.max(FOLLOW_MIN_ZOOM, GetCameraZoom and GetCameraZoom() or 5)
@@ -425,6 +433,7 @@ function ns.GetShoulderCamDebug()
 		side = db and db.shoulderCamSide, spot = db and db.shoulderCamSpot, model = ns.ShoulderModelKey(),
 		scale = (ns.ShoulderModelScale()), scaleFrom = select(2, ns.ShoulderModelScale()),
 		follow = db and db.shoulderCamFrames, followShift = followShift, followTarget = TargetShift(),
+		youTarget = YouAreTarget(),
 		followed = (function()
 			local names = {}
 			for frame in pairs(followed) do names[#names + 1] = frame:GetName() or "?" end
@@ -452,7 +461,15 @@ end
 
 local events = CreateFrame("Frame")
 events:RegisterEvent("PLAYER_ENTERING_WORLD")
-events:SetScript("OnEvent", ns.ApplyShoulderCam)
+events:RegisterEvent("PLAYER_TARGET_CHANGED")
+events:SetScript("OnEvent", function(_, event)
+	if event == "PLAYER_TARGET_CHANGED" then
+		-- (Yourself targeted or not: the frames glide to the middle or back.)
+		if UpdateFollow then UpdateFollow() end
+	else
+		ns.ApplyShoulderCam()
+	end
+end)
 
 function ns.CreateShoulderCamPanel(kit)
 	local canvas, content = kit.CreateScrollPage()
