@@ -1141,15 +1141,22 @@ end
 
 -- Hidden frames are skipped: a hidden reporter gets found by a later scan once
 -- it shows, and addons build pages off-screen in hidden frames (EllesmereUI's
--- search index), which crash the client when read mid-build.
+-- search index), which crash the client when read mid-build. IsShown and
+-- GetText go through pcall: a frame can say it isn't forbidden and still
+-- refuse tainted code (seen in a fight on WoW Forever: "calling 'IsShown' on
+-- bad self (Attempt to access forbidden object from code tainted by an AddOn)").
 local function HasIssueReporterText(frame, depth)
-	if IsForbidden(frame) or not ns.Flag(frame:IsShown()) then
+	if IsForbidden(frame) then
+		return false
+	end
+	local okShown, shown = pcall(frame.IsShown, frame)
+	if not okShown or not ns.Flag(shown) then
 		return false
 	end
 	for _, region in ipairs(ReadParts(frame, "GetRegions") or {}) do
 		if not IsForbidden(region) and region.GetText then
-			local text = region:GetText()
-			if type(text) == "string" and not (issecretvalue and issecretvalue(text))
+			local okText, text = pcall(region.GetText, region)
+			if okText and type(text) == "string" and not (issecretvalue and issecretvalue(text))
 				and text:find("Issue") and text:find("Reporter") then
 				return true
 			end
