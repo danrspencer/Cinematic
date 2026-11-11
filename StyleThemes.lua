@@ -80,7 +80,7 @@ end
 -- these keep their own, as they mean something (red for danger) or are a look
 -- of their own (the Storybook's lettering).
 local CARDS_KEEP = { danger = true, combat = true, respite = true, rare = true, alert = true, death = true,
-	victory = true, film = true, storybook = true, arcade = true }
+	victory = true, triumph = true, film = true, storybook = true, arcade = true }
 local function CardSettings(theme)
 	local list = {}
 	if not theme.cardColor then return list end

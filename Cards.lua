@@ -44,6 +44,7 @@ DEFAULTS.felledText = ""
 DEFAULTS.revivedWords = "restored"
 DEFAULTS.revivedText = ""
 for _, id in ipairs({ "duel", "battleground", "cleared", "streak" }) do DEFAULTS["cardSouls_" .. id] = "usual" end
+DEFAULTS.cardSouls_cleared = "souls" -- (the run's end: the one big banner, its bosses' small in the top bar)
 
 local BOOK = "Interface\\Icons\\INV_Misc_Book_09"
 local MAP = "Interface\\Icons\\INV_Misc_Map_01"
@@ -253,6 +254,11 @@ local STYLES = {
 	-- (Death's gold other side: a win, or coming back.)
 	{ id = "victory", name = "Victory", look = { Style = "banner", Anim = "fade", Size = 60, Hold = 4,
 		R = 0.93, G = 0.76, B = 0.3 } },
+	-- (Victory's small one, for a win on the way to the big one: a boss down
+	-- mid-dungeon, in the top bar's middle, out of the way.)
+	{ id = "triumph", name = "Triumph", look = { Place = "top", BarScale = 0.62, BarFallback = "bar", Style = "title",
+		Anim = "fade", Size = 34, Outline = 1, Hold = 2.5, R = 0.93, G = 0.76, B = 0.3, PulseR = 0.93, PulseG = 0.76,
+		PulseB = 0.3 } },
 	{ id = "film", name = "Film", look = { Place = "screen", Style = "title", Anim = "fade", Font = "morpheus",
 		Size = 40 } },
 	{ id = "reel", name = "Reel", look = { Place = "bottom", Style = "title", Anim = "reveal" } },
@@ -279,7 +285,7 @@ local BASES = { combatIn = "danger", combatOut = "respite", attack = "danger", d
 	zone = "place", subzone = "follow", departure = "follow", arrival = "follow", login = "place", boss = "place", duel = "place",
 	time = "milestone",
 	reputation = "ticker", collect = "ticker", profession = "ticker", rested = "ticker",
-	streak = "ticker", rare = "rare", bossDown = "victory", felled = "victory", revived = "victory" }
+	streak = "ticker", rare = "rare", bossDown = "triumph", felled = "victory", revived = "victory" }
 -- (What each started from before the families, for the update moving
 -- yours onto them: Core.lua's cardsV7.)
 ns.CARD_OLD_BASES = { combatIn = "combat", boss = "boss", zone = "third", login = "journal", time = "title",

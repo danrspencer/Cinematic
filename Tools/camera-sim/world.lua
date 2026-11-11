@@ -434,9 +434,16 @@ return function(client, opts)
 		me.taxi = on
 		W.Fire(on and "PLAYER_CONTROL_LOST" or "PLAYER_CONTROL_GAINED")
 	end
-	function W.Loading() -- a loading screen
+	-- A loading screen. secs: how long it's up, with no frames or timers run
+	-- while the game carries on any turn or tilt left going.
+	function W.Loading(secs)
 		W.Fire("LOADING_SCREEN_ENABLED")
 		W.Fire("PLAYER_LEAVING_WORLD")
+		if secs then
+			W.now = W.now + secs
+			W.MoveCamera(secs)
+			if W.AfterLoading then W.AfterLoading() end
+		end
 		W.Fire("PLAYER_ENTERING_WORLD", false, false)
 		W.Fire("LOADING_SCREEN_DISABLED")
 	end

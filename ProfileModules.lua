@@ -222,7 +222,8 @@ ns.PROFILE_MODULES = {
 		scope = { "Standard Frames", "Personal Resources", "Advanced Frames/Supported addons", "Gamepad/top" },
 		tip = "Fights bring up your portrait, target, target of target, focus and focus's target " ..
 		"of target (these also for an enemy or friend targeted and in dungeons and raids) and the swing timer, but " ..
-		"no buffs or minimap (the personal resource display: as the layout has it); the cast bar shows all " ..
+		"no buffs or minimap (the minimap is up in dungeons and raids; the personal resource display: as " ..
+		"the layout has it); the cast bar shows all " ..
 		"through CineMode. The player frame stays up until health and power are full (not the resource display); " ..
 		"raid frames without names, buffs, threat, target markers, ready checks or titles in CineMode.",
 		apply = function(set)
@@ -240,6 +241,7 @@ ns.PROFILE_MODULES = {
 			local enemy = { player = false, prd = false, prdpower = false, party = false, raidplayers = false,
 				raidpets = false, buffs = false }
 			local instance = EveryRow(false, false)
+			instance.minimap = true -- (the minimap's up in instances in every profile)
 			for _, list in ipairs({ combat, enemy, instance }) do
 				for _, row in ipairs(units) do list[row] = true end
 			end

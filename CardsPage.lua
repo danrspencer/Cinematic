@@ -669,8 +669,8 @@ local TIPS = {
 	streak = "Other players you kill without dying, at 2, 3, 5 and every 5 after.",
 	death = "Shortly after the death camera starts: YOU DIED across the middle of the screen, \"wasted\" or " ..
 		"words of your own. Only with the death camera on (the Die row on the Scenes page).",
-	bossDown = "As a dungeon or raid boss goes down, or a world boss you fought: VICTORY ACHIEVED across the " ..
-		"middle of the screen in gold, its name under it. Its words: the Settings tab.",
+	bossDown = "As a dungeon or raid boss goes down, or a world boss you fought: VICTORY ACHIEVED in the top " ..
+		"bar in gold, its name under it. Its words: the Settings tab.",
 	felled = "As a rare you have targeted dies (yours, not someone else's): ENEMY FELLED across the middle of " ..
 		"the screen in gold, its name under it. Its words: the Settings tab.",
 	revived = "As you come back to life, resurrected or back in your body: VITALITY RESTORED across the middle " ..
@@ -1348,8 +1348,8 @@ function ns.CreateCardSettingsPanel(kit)
 	end
 	-- (The wins that can show as a souls banner, and their Banner's tooltip.)
 	local SOULS_TIPS = {
-		cleared = "How the dungeon's end shows: its card, or a souls banner: its name and CONQUERED across the " ..
-			"middle of the screen, the time and deaths under it.",
+		cleared = "How the dungeon's end shows: its card, or a souls banner: VICTORY ACHIEVED across the " ..
+			"middle of the screen, its name, the time and deaths under it (in place of the last boss's own card).",
 		battleground = "How the result shows: its card in the top bar, or a souls banner: VICTORY ACHIEVED or " ..
 			"DEFEATED across the middle of the screen (where the game's scoreboard may cover it).",
 		streak = "How it shows: its card, or a souls banner: PREY SLAUGHTERED across the middle of the screen, " ..
@@ -1377,8 +1377,9 @@ function ns.CreateCardSettingsPanel(kit)
 		parts.Part(id, function()
 			SoulsWordsRows(id)
 			if ns.CARD_BY_ID[id].inFight then FightRow(id) end
-			stack:Note(content, L["Its look is the Victory card type's (the Style tab), its sound on the Sounds tab."],
-				NOTE_W)
+			stack:Note(content, id == "bossDown"
+				and L["Its look is the Triumph card type's (the Style tab), its sound on the Sounds tab."]
+				or L["Its look is the Victory card type's (the Style tab), its sound on the Sounds tab."], NOTE_W)
 		end)
 	end
 	parts.Part("death", function()

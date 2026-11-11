@@ -2884,12 +2884,13 @@ local NO_DEFAULTS = {}
 -- Ticked to start with: the raid and party frames in battlegrounds and
 -- arenas, where you're always in a group, and in dungeons, scenarios and
 -- raids (nothing else: what you'd want hidden out of fights elsewhere you'd
--- want hidden there too); and the party frames and raid frames' players
--- whenever you're grouped.
+-- want hidden there too), where the minimap's up too, in every profile
+-- (finding your way indoors without it was a nuisance); and the party frames
+-- and raid frames' players whenever you're grouped.
 local PLACE_SHOW_DEFAULTS = {
 	bgShow = { raidplayers = true, raidpets = true, party = true },
 	groupShow = { raidplayers = true, party = true },
-	instanceShow = { raidplayers = true, raidpets = true, party = true },
+	instanceShow = { raidplayers = true, raidpets = true, party = true, minimap = true },
 }
 local function PlaceDefaults(list)
 	return PLACE_SHOW_DEFAULTS[list] or NO_DEFAULTS

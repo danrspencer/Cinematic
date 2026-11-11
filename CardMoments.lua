@@ -580,16 +580,19 @@ samples.quest = function() return QuestCard(L["The Defias Brotherhood"], "Dungeo
 -- Dungeon cleared: its last boss down (the Journal's last), with the time
 -- since you came in and your deaths.
 local run = { at = GetTime(), deaths = 0 }
+local function ClearedBanner() return (ns.GetDB() or DEFAULTS).cardSouls_cleared == "souls" end
 local function ClearedCard(name, seconds, deaths)
 	local under = { Span(seconds) }
 	under[2] = deaths == 0 and L["no deaths"] or deaths == 1 and L["1 death"] or L["%d deaths"]:format(deaths)
+	-- (As a souls banner: VICTORY ACHIEVED, the place's name with them under it.)
+	if ClearedBanner() then table.insert(under, 1, name) end
 	local card = { meta = L["Cleared"], name = name, sub = table.concat(under, SEPARATOR) }
-	return ns.SoulsCard("cleared", card, L["%s CONQUERED"]:format(name:upper()))
+	return ns.SoulsCard("cleared", card, "VICTORY ACHIEVED")
 end
 
 -- Boss defeated: a dungeon or raid boss (its encounter won), or a world boss
--- you fought (Rare felled's watch), as a souls banner: VICTORY ACHIEVED,
--- its name under it.
+-- you fought (Rare felled's watch): VICTORY ACHIEVED in the top bar, its
+-- name under it.
 local function BossDownCard(name, great)
 	local words, named = ns.SoulsWords("bossDown", name, great)
 	return { name = words, sub = not named and name or "" }
@@ -605,15 +608,21 @@ local function EncounterEnd(encounterID, encounterName, success)
 	-- (Its name from the Journal where the event's is secret.)
 	local name = Plain(encounterName)
 	if not name and EJ_GetEncounterInfo then name = Plain((EJ_GetEncounterInfo(encounterID))) end
-	BossDown(name, select(2, IsInInstance()) == "raid")
-	if not (ns.EncounterIndex and ns.CardOn("cleared")) then return end
-	local index, count = ns.EncounterIndex(encounterID)
-	if not (index and index == count) then return end
-	local place = Plain((GetInstanceInfo())) or ""
-	if place == "" then return end
+	-- (The last boss, the Journal's: the run's card too.)
+	local place
+	if ns.EncounterIndex and ns.CardOn("cleared") then
+		local index, count = ns.EncounterIndex(encounterID)
+		if index and index == count then place = Plain((GetInstanceInfo())) end
+		if place == "" then place = nil end
+	end
+	-- (The run's as the big banner: it's the win's one card, the last boss's
+	-- small one left out.)
+	local alone = place and ClearedBanner()
+	if not alone then BossDown(name, select(2, IsInInstance()) == "raid") end
+	if not place then return end
 	local card = ClearedCard(place, GetTime() - run.at, run.deaths)
-	-- (The kill's own moment first: its banner, if it has one, done.)
-	card.delay = ns.CardOn("bossDown") and 6 or 3
+	-- (The kill's own moment first, if it shows.)
+	card.delay = not alone and ns.CardOn("bossDown") and 6 or 3
 	ns.Cards.Fire("cleared", card)
 end
 samples.cleared = function() return ClearedCard(L["The Deadmines"], 34 * 60, 1) end

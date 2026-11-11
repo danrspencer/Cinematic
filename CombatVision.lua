@@ -49,8 +49,9 @@ local CHAT_LIFT_MOST = 0.4         -- ...but lifted no more than this share of t
 local OUTLINES = { [0] = "", "OUTLINE", "THICKOUTLINE" }
 -- Banner: the words across the middle of the screen on a dark band with soft
 -- edges (the death banner's), coming in and going slowly, or a picture on a
--- flat one (card.picture), in quicker. The words look worn: faint copies
--- behind them, nudged each way, bleed their edges. (A grain texture over them
+-- flat one (card.picture), in quicker. A card can ask for worn words
+-- (card.worn; none does now): faint copies behind them, nudged each way,
+-- bleed their edges. (A grain texture over them
 -- wore the band round the letters too, and looked dirty: tested.)
 local BANNER_IN, BANNER_OUT = 3, 1.5
 local PICTURE_IN, PICTURE_OUT = 0.4, 1
@@ -300,9 +301,12 @@ local function Setup(cue, look, enter, width, height, scale, boss)
 	text:SetTextColor(r, g, b, 1)
 	text:SetVertexColor(r, g, b, 1) -- (one and the same on Forever)
 	text:SetShown(style ~= "none")
+	-- (The worn copies only for a card that asks (card.worn): they smear the
+	-- letters' edges, and big gold words looked low-res with them.)
+	local worn = style == "banner" and boss and boss.worn and true or false
 	for i, bleed in ipairs(text.bleed) do
-		bleed:SetShown(style == "banner")
-		if style == "banner" then
+		bleed:SetShown(worn)
+		if worn then
 			local nudge = BANNER_BLEED[i]
 			bleed:ClearAllPoints()
 			bleed:SetPoint("CENTER", text, "CENTER", nudge[1] * size * BLEED_NUDGE, nudge[2] * size * BLEED_NUDGE)

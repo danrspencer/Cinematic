@@ -53,6 +53,8 @@ local function Play(name, opts, body)
 		end
 		lastZoom = cam.zoom
 	end
+	-- (A loading screen's seconds went by in one go: not a zoom snap.)
+	W.AfterLoading = function() lastZoom = cam.zoom end
 	local scroll = W.Scroll
 	W.Scroll = function(yards) stats.yourScrollAt = W.now return scroll(yards) end
 	function T.Count(pattern)
@@ -184,6 +186,30 @@ Scenario("hearth", function(T)
 	T.Expect(T.Count("Tele camera ended") == 0, "the Tele camera ended before the cast did")
 	W.CastEnd("done")
 	W.Loading()
+end)
+
+-- (As in game: the loading screen comes up 0.7 s after the cast, just as the
+-- way back's turn and tilt set off, and stays up 5 s with no frames run.)
+Scenario("hearth, the loading screen comes up as the way back begins", function(T)
+	local W = T.W
+	local yaw, pitch = T.cam.yaw, T.cam.pitch
+	W.Cast(HEARTH, 10)
+	local took = T.WaitFor("Tele camera", 3)
+	T.Expect(took, "the Tele camera never started on a Hearthstone cast")
+	W.Run(10 - (took or 3))
+	W.CastEnd("done")
+	for _ = 1, 40 do -- (up to 2 s: until its way back's tilt is going)
+		if T.cam.pitchRate ~= 0 then break end
+		W.Tick()
+	end
+	T.Expect(T.cam.pitchRate ~= 0, "the way back's tilt never set off")
+	W.Loading(5)
+	T.Expect(T.cam.yawRate == 0 and T.cam.pitchRate == 0,
+		("the camera was left turning through the loading screen (turn %s, tilt %s)"):format(T.cam.yawRate, T.cam.pitchRate))
+	W.Run(5)
+	T.Expect(math.abs(T.cam.pitch - pitch) < 3,
+		("the camera was left tilted %.0f after the loading screen"):format(T.cam.pitch - pitch))
+	T.notes[#T.notes + 1] = ("turn left at %.0f, tilt at %.0f"):format(T.cam.yaw - yaw, T.cam.pitch - pitch)
 end)
 
 Scenario("hearth, gamepad + ConsolePort (mouselook reported for the cast)", { consolePort = true }, function(T)

@@ -2951,8 +2951,38 @@ for _, event in ipairs({ "CHAT_MSG_MONSTER_SAY", "CHAT_MSG_MONSTER_YELL", "CHAT_
 	"QUEST_GREETING", "QUEST_DETAIL", "QUEST_PROGRESS", "QUEST_COMPLETE", "QUEST_FINISHED" }) do
 	heardFrame:RegisterEvent(event)
 end
+-- (A loading screen: see below. Not on every client, so leaving the world too.)
+for _, event in ipairs({ "LOADING_SCREEN_ENABLED", "LOADING_SCREEN_DISABLED", "PLAYER_LEAVING_WORLD" }) do
+	pcall(heardFrame.RegisterEvent, heardFrame, event)
+end
 heardFrame:SetScript("OnEvent", function(_, event, text, name)
 	local now = GetTime()
+	-- A loading screen: no frames run while it's up, so a turn or tilt left
+	-- going is never stopped and the game may carry it on (a Hearthstone's way
+	-- back, begun as the screen came up, held its tilt 8 seconds; the camera
+	-- was seen left right over your head looking down, not proven to be from
+	-- this). Each move is stopped as it comes up, your speeds back at once,
+	-- and what's left of it carries on once you're in.
+	if event == "LOADING_SCREEN_ENABLED" or event == "PLAYER_LEAVING_WORLD" then
+		if run and not zoomer.loading then
+			local yaw, pitch = movers.yaw, movers.pitch
+			ns.Log("state", ("camera script: loading screen, its moves stop (turned %.0f, tilted %.0f; turn going %s, tilt going %s)")
+				:format(yaw.amount, pitch.amount, tostring(yaw.moving or yaw.held ~= nil), tostring(pitch.moving or pitch.held ~= nil)))
+			Suspend(true)
+			zoomer.loading = now
+		end
+		return
+	elseif event == "LOADING_SCREEN_DISABLED" or event == "PLAYER_ENTERING_WORLD" then
+		if zoomer.loading then
+			ns.Log("state", ("camera script: loading screen over after %.1f sec, %s"):format(now - zoomer.loading,
+				run and (run.pausedUntil and "still paused" or "its moves carry on") or "nothing playing"))
+			zoomer.loading = nil
+			zoomer.loadedAt = now
+			-- (Paused meanwhile: its pause carries it on.)
+			if run and not run.pausedUntil then Resume() end
+		end
+		if event == "LOADING_SCREEN_DISABLED" then return end
+	end
 	if event == "PLAYER_STARTED_MOVING" then
 		talk.stillSince = nil
 	elseif event == "PLAYER_STOPPED_MOVING" or event == "PLAYER_ENTERING_WORLD" then
@@ -3170,6 +3200,11 @@ local function Update(elapsed)
 		run.steerHoldUntil = nil
 		ForgetTurns() -- (a sway's middle picked again, behind you)
 		ns.Log("state", "camera script: steering over, it carries on")
+	end
+	-- (Long frames just after a loading screen, a move going: for the log.)
+	if zoomer.loadedAt and elapsed > 0.1 and now - zoomer.loadedAt < 5 then
+		ns.Log("state", ("camera script: a %.2f sec frame %.1f sec after the loading screen (turned %.0f, tilted %.0f)")
+			:format(elapsed, now - zoomer.loadedAt, movers.yaw.amount, movers.pitch.amount))
 	end
 	StepMove(movers.yaw, elapsed)
 	StepMove(movers.pitch, elapsed)

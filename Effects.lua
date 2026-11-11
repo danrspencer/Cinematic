@@ -53,8 +53,15 @@ ns.NAME_GROUPS = {
 			"Beyond nameplate range, and in dungeons and raids, the game shows the names of NPCs with something " ..
 			"for you (vendors, quest givers...), titles included."] },
 	{ key = "Critters", label = L["Critters and companions"], cvars = { "UnitNameNonCombatCreatureName" } },
-	{ key = "Friends", label = L["Friendly players"], plate = true, cvars = { "UnitNameFriendlyPlayerName" } },
-	{ key = "FriendlyMinions", label = L["Minions"], indent = true, plate = true,
+	-- (groupRow: the group's row that keeps these names up too, in dungeons and
+	-- raids: see NameKeptHere.)
+	{ key = "Friends", label = L["Friendly players"], plate = true, cvars = { "UnitNameFriendlyPlayerName" },
+		groupRow = "GroupMembers",
+		tip = L[" In dungeons and raids, the Group members row keeps these names up too, and its boxes keep " ..
+			"them on in the game's options."] },
+	{ key = "FriendlyMinions", label = L["Minions"], indent = true, plate = true, groupRow = "GroupMinions",
+		tip = L[" In dungeons and raids, the Group members Minions row keeps these names up too, and its boxes " ..
+			"keep them on in the game's options."],
 		cvars = {
 			"UnitNameFriendlyMinionName", "UnitNameFriendlyPetName", "UnitNameFriendlyGuardianName",
 			"UnitNameFriendlyTotemName",
@@ -62,17 +69,26 @@ ns.NAME_GROUPS = {
 	-- The players in your party or raid, and their pets and minions (yours
 	-- left out), their names alone kept on their plates whatever Friendly
 	-- players and its Minions say. The game has no setting of its own for them
-	-- (plateOnly): beyond plate range, the Friendly players rows decide.
+	-- (plateOnly): beyond plate range, the Friendly players rows decide. In
+	-- dungeons and raids, where friendly plates are locked, a row kept up keeps
+	-- the game's friendly names (ofKind's) up while you're grouped: the friendly
+	-- players in there are your group.
 	{ key = "GroupMembers", label = L["Group members"], plate = true, plateOnly = true, unitRow = true, cvars = {},
+		ofKind = "Friends",
 		tip = L[" In CineMode, away from dungeons and raids, the names of the players in your party or raid show " ..
 			"on their nameplates, with the rest of the plate hidden, whatever Friendly players says. Beyond " ..
-			"nameplate range the game has no setting for them: Friendly players decides there."] },
+			"nameplate range the game has no setting for them: Friendly players decides there. In dungeons and " ..
+			"raids the game's own friendly player names stay up over their heads (the players in there are your " ..
+			"group); with friendly nameplates on there, the game shows those instead. Ticking any box turns " ..
+			"friendly player names on in the game's options."] },
 	{ key = "GroupMinions", label = L["Minions"], indent = true, plate = true, plateOnly = true, unitRow = true,
-		cvars = {},
+		cvars = {}, ofKind = "FriendlyMinions",
 		tip = L[" In CineMode, away from dungeons and raids, the names of your party or raid members' pets and " ..
 			"minions show on their nameplates, with the rest of the plate hidden, whatever the Friendly players " ..
 			"Minions row says. Your own pet isn't one of them. Beyond nameplate range the game has no setting for " ..
-			"them: the Friendly players Minions row decides there."] },
+			"them: the Friendly players Minions row decides there. In dungeons and raids the game's own friendly " ..
+			"pet and minion names stay up over their heads, your own pet's too. Ticking any box turns friendly " ..
+			"minion names on in the game's options."] },
 	{ key = "Enemies", label = L["Enemy players"], plate = true, cvars = { "UnitNameEnemyPlayerName" } },
 	{ key = "EnemyMinions", label = L["Minions"], indent = true, plate = true,
 		cvars = {
@@ -174,8 +190,12 @@ end
 -- Whether any box in a names row is ticked (or it has a rule: it may show).
 local NAME_ROW_PREFIXES = { "nameAlways", "nameGroup", "nameCombat", "nameCombatPvP", "nameKeep",
 	"nameInInstances", "nameInPvP", "nameInBGs" }
+-- (A kind's group row counts as its own: the game's friendly names stay on
+-- for Group members in dungeons and raids.)
 local function NameRowTicked(group)
-	for _, key in ipairs(group.keys) do
+	local keys, groupRow = group.keys, group.groupRow
+	for i = 1, #keys + (groupRow and 1 or 0) do
+		local key = keys[i] or groupRow
 		if ns.RuleTest(ns.NameRuleKey(key)) then
 			return true
 		end
@@ -217,6 +237,15 @@ end
 -- (A game setting two rows share, Friendly NPCs' and Service NPCs' names of
 -- NPCs with something for you, stays on while either row is ticked.)
 function ns.SyncNameRow(group)
+	-- (A group row has no game setting of its own: its kind's goes by it too.)
+	if group.ofKind then
+		for _, other in ipairs(ns.NAME_GROUPS) do
+			if other.key == group.ofKind then
+				ns.SyncNameRow(other)
+			end
+		end
+		return
+	end
 	ns.SyncNameRowAlone(group)
 	for _, cvar in ipairs(group.cvars) do
 		for _, other in ipairs(ns.NAME_GROUPS) do
@@ -325,6 +354,13 @@ local function NameKeptHere(key, inCombat)
 	end
 	if key == "InteractiveNPCs" then
 		return NameKeptHere("FriendlyNPCs", inCombat) or NameKeptHere("ServiceNPCs", inCombat)
+	end
+	-- In dungeons and raids, where the group's rows have no plates to show
+	-- names on, they keep the game's friendly names up instead: the friendly
+	-- players (and minions) in there are your group's.
+	if (key == "Friends" or key == "FriendlyMinions") and ns.PlateSuffix() == "Instances" and ns.InGroup()
+		and NameKeptHere(key == "Friends" and "GroupMembers" or "GroupMinions", inCombat) then
+		return true
 	end
 	-- (Its rule, edited on its row: name:<row>.)
 	local facts = ns.RuleFactsNow()
@@ -1308,10 +1344,19 @@ local function KeptMarker(frame)
 	return ours
 end
 
-local function KeepRaidMarker(frame, alpha)
+local function KeepRaidMarker(frame, alpha, plate)
 	-- (A plate up for its name alone: its marker goes by the rest of it.)
 	local bodyAlpha = frame.cinematicBodyAlpha
 	alpha = bodyAlpha or alpha
+	-- (Less the Style hub's Nameplates page's Opacity: a see-through plate is
+	-- still up, with the game's marker on it, so ours isn't added to it.)
+	local opacity = plate and ns.PlateStyleOpacity and ns.PlateStyleOpacity(plate) or 1
+	if opacity > 0 and opacity < 1 then
+		alpha = alpha / opacity
+		if alpha > 0.999 then
+			alpha = 1
+		end
+	end
 	local icon, standIn, kept
 	if ns.db and ns.db.handlePlates then
 		local _
@@ -1357,7 +1402,7 @@ local function RefreshKeptMarkers()
 	for _, plate in ipairs(C_NamePlate.GetNamePlates()) do
 		local frame = plate.UnitFrame
 		if frame and not (plate.IsForbidden and plate:IsForbidden()) then
-			KeepRaidMarker(frame, frame.cinematicAlpha or 1)
+			KeepRaidMarker(frame, frame.cinematicAlpha or 1, plate)
 		end
 	end
 end
@@ -1419,7 +1464,7 @@ function ns.SetPlateAlpha(plate, alpha, bodyAlpha)
 			plateKeeper:Show()
 		end
 		frame:SetAlpha(alpha)
-		KeepRaidMarker(frame, alpha)
+		KeepRaidMarker(frame, alpha, plate)
 		if ns.QuestiePlateFaded then ns.QuestiePlateFaded(plate, alpha) end -- (PlateParts: its icon slides with it)
 	end
 end

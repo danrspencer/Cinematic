@@ -7645,6 +7645,27 @@ ticker:SetScript("OnEvent", ns.Profiled("Core events", function(self, event, arg
 			end
 			ns.db.cardsV13 = true
 		end
+		-- Boss defeated went to the top bar (Cards.lua's Triumph: its banner
+		-- was in the way mid-dungeon), and Dungeon cleared became the big
+		-- banner in the middle: yours still as they came, onto them. Saved
+		-- profiles too. Once: pick the old ones again and they stay.
+		if not ns.db.cardsV14 then
+			local function Wins(t)
+				if t.cardBase_bossDown == "victory" then t.cardBase_bossDown = "triumph" end
+				if t.cardSouls_cleared == "usual" then t.cardSouls_cleared = "souls" end
+			end
+			Wins(ns.db)
+			for _, saved in pairs(ns.db.profiles or {}) do
+				if type(saved) == "table" then
+					Wins(saved)
+					if type(saved.settings) == "table" then Wins(saved.settings) end
+				end
+			end
+			for _, point in pairs(ns.db.profileResetPoints or {}) do
+				if type(point) == "table" then Wins(point) end
+			end
+			ns.db.cardsV14 = true
+		end
 		-- New settings start as the active profile has them (a built-in's
 		-- changes to the defaults included). A fresh install (or Reset addon)
 		-- starts with all of them so: the once-only updates above write theirs
