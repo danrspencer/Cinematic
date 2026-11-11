@@ -142,7 +142,7 @@ Add("Recording helpers", { key = "letterbox", name = "Letterbox sweep",
 -- Standard Frames is Game Frames.)
 local TOURS = {
 	{ "tour-main", "Main page and Profiles", { "", "Profiles" } },
-	{ "tour-ui", "Interface", { "Standard Frames", "Advanced Frames", "Mouseover groups", "Gamepad", "Unit Frames",
+	{ "tour-ui", "Interface", { "Standard Frames", "Advanced Frames", "Mouseover groups", "Gamepad",
 		"Personal Resources", "Buffs/debuffs", "Cooldown Manager", "Swing timer", "Minimap", "Quest tracker",
 		"Tooltips", "Chat", "Nameplates", "Chat bubbles" } },
 	{ "tour-style", "Style", { "Style General", "Unit Style", "Raid Style", "Action Style", "Interface Recolor", "Personal Style",

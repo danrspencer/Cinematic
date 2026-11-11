@@ -47,7 +47,6 @@ Blank Slate|handlePlates=false
 Blank Slate|handleQuality=false
 Blank Slate|handleQuests=false
 Blank Slate|handleSwing=false
-Blank Slate|handleUnitFrames=false
 Blank Slate|irStyle=false
 Blank Slate|letterboxPage=false
 Blank Slate|mouseover=false

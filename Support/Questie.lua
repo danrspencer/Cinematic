@@ -113,16 +113,27 @@ ns.WhenAddonLoads("Questie", function()
 	end
 	ns.FadeWithRow("quests", "quests", buttons, true, true)
 	-- Its tracker is made seconds after the loading screen, past the login
-	-- window: hidden as it comes up rather than showing till the next scan.
+	-- window, hidden, and shown about a second later: snapped to hidden as
+	-- soon as it's made, while it's still hidden, so it never shows (waiting
+	-- for it to show let it flash for a moment). Its first show snaps again,
+	-- in case CineMode wasn't on yet as it was made.
 	local checks = 0
 	local watch
 	watch = C_Timer.NewTicker(0.1, function()
 		checks = checks + 1
 		local base = _G.Questie_BaseFrame
-		local up = type(base) == "table" and base.IsShown and ns.Flag(base:IsShown())
-		if up or checks >= 600 then
+		local made = type(base) == "table" and base.HookScript ~= nil
+		if made or checks >= 600 then
 			watch:Cancel()
-			if up and ns.SnapLateFrames then ns.SnapLateFrames() end
+			if made and ns.SnapLateFrames then
+				ns.SnapLateFrames()
+				local shown = false
+				base:HookScript("OnShow", function()
+					if shown then return end
+					shown = true
+					ns.SnapLateFrames()
+				end)
+			end
 		end
 	end)
 end)

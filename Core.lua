@@ -192,9 +192,10 @@ local DEFAULTS = {
 	-- Keep open (Minimap page's Tracking dropdown): the minimap stays up the whole time this tracking
 	-- is on (Tracking.lua). (Ore, herbs, treasure on since 2026-11-07 where Reveal can't find them; on
 	-- WoW Forever the cursor sweep does again since 2026-11-10, NodeSweep.lua: None there.)
-	minimapKeepOre = true,       -- gathering: ore, herbs, treasure... (on everywhere again 2026-11-10)
-	minimapKeepHerbs = true,
-	minimapKeepTreasure = true,
+	-- None to start with, every profile, since 2026-11-11.
+	minimapKeepOre = false,      -- gathering: ore, herbs, treasure...
+	minimapKeepHerbs = false,
+	minimapKeepTreasure = false,
 	minimapKeepHumanoids = false, -- creatures (hunter, druid, warlock, paladin) and fish
 	minimapKeepFish = false,
 	minimapKeepBeasts = false,
@@ -578,6 +579,14 @@ DEFAULTS.deathOrbitSpeed = 5       -- degrees per second
 DEFAULTS.deathOrbitRight = false   -- turn clockwise instead
 DEFAULTS.deathOrbitRandomDir = false -- pick clockwise or not afresh each death
 DEFAULTS.deathLevel = 30           -- degrees it raises the camera to look down on you
+-- Mouse Turn cap (dev copy: MouseTurn.lua): right-click turning no faster than a set speed.
+DEFAULTS.mouseTurnCap = false      -- cap the turn speed while right-click turning
+DEFAULTS.mouseTurnCapSpeed = 180   -- degrees per second, the fastest you turn
+DEFAULTS.mouseTurnCapEase = 0.3    -- seconds to ease back to your own speed after
+DEFAULTS.mouseTurnCapPitch = true  -- slow looking up and down by the same share
+DEFAULTS.mouseTurnRamp = false     -- each right-click turn starts slow and ramps up to your speed
+DEFAULTS.mouseTurnRampStart = 30   -- percent of your speed a turn starts at
+DEFAULTS.mouseTurnRampTime = 0.5   -- seconds to ramp up to all of it
 DEFAULTS.deathSong = true          -- play a song of its own meanwhile
 -- Music file IDs, comma-separated; one is picked at random each death:
 -- GhostMusic03 (the ghost world's music), Gloomy02, Haunted02, Haunted01,
@@ -1418,7 +1427,6 @@ for _, part in ipairs(ns.UNIT_PARTS) do
 		end
 	end
 end
-DEFAULTS.handleUnitFrames = true -- the Unit Frame Parts page's switch
 -- Pages of helpers, each ticked on its own, with an Enable Page switch
 -- (handle<page>): off, none of the page's helpers work. ns.Setting reads one
 -- of them as its page's switch leaves it.
@@ -7314,10 +7322,28 @@ ticker:SetScript("OnEvent", ns.Profiled("Core events", function(self, event, arg
 		for _, saved in pairs(ns.db.profiles or {}) do
 			if type(saved) == "table" then QuestieIconsFrom(saved) end
 		end
+		-- The Unit Frame Parts page's switch is gone (2026-11-11: the parts
+		-- follow the Game Frames page's). Switched off, every part showed as
+		-- the game has it: the parts' Always ticked, so they still do.
+		local function PartsSwitchOff(saved)
+			if rawget(saved, "handleUnitFrames") ~= false then return end
+			local hidden = {}
+			for key, value in pairs(saved) do
+				if value == false and type(key) == "string" and key:find("^unitPart") and not key:find("Same$") then
+					hidden[#hidden + 1] = key
+				end
+			end
+			for _, key in ipairs(hidden) do saved[key] = true end
+		end
+		PartsSwitchOff(ns.db)
+		for _, saved in pairs(ns.db.profiles or {}) do
+			if type(saved) == "table" then PartsSwitchOff(saved) end
+		end
 		-- Settings from removed or renamed features, now that the migrations
 		-- above have read what they need.
 		for _, key in ipairs({
 			"keepRaidMarkers", -- (now the Raid Markers grid)
+			"handleUnitFrames", -- (the parts follow the Game Frames page's switch)
 			"minimapNodePing", -- (now minimapNodeMark)
 			"storyRecapSound", -- (now Last time's sound rules)
 			"questMarkFade", -- (now questieIcons)

@@ -242,7 +242,7 @@ function ns.CreatePersonalResourcesPanel(kit)
 		"see. When they come up at all (always, in fights, in places) is their rows' on the Game Frames page."])
 	-- Their look: the Style hub's Personal Resource Display page (PersonalStyle.lua).
 	local styleLink = ns.StyleLink(content, title, "Personal Style", L["Opens the Personal Resource Style page: how the bars look."], kit.Tooltip)
-	ns.FramesLink(content, title, "units", styleLink)
+	ns.FramesLink(content, title, "prd", styleLink)
 	local switch = kit.PageSwitch(content, "personalResources", L["Enable Page"],
 		L["On: your player frame, pet frame and personal resource display stay up or wait as this page says, " ..
 		"and its mana bar and mana cost show. Off: none of it; they come up only as their Game Frames " ..

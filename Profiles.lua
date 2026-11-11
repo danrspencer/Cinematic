@@ -248,7 +248,7 @@ end
 -- letterbox's, Vitals', a Vision's), which do nothing with their feature off
 -- and give the welcome window's demos (ShowMe.lua) their proper look.
 local OFF_UNTIL_PICKED = {
-	"handleFrames", "handleAddonFrames", "mouseover", "handleGamepad", "handleUnitFrames", "personalResources",
+	"handleFrames", "handleAddonFrames", "mouseover", "handleGamepad", "personalResources",
 	"handleBuffs", "handleCooldowns", "handleSwing", "handleMinimap", "handleQuests", "handleTooltips",
 	"handleChat", "handlePlates", "handleBubbles",
 	"cameraModes", "shoulderCam", "skyrideCam",

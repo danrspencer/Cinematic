@@ -730,6 +730,9 @@ local TABLE_LAYOUT, TABLE_LABEL_TRIM = { cine = true, edit = true }, 12
 -- Tooltips, Cursor Hide), where a CineMode tick would only be Always again:
 -- no such column, its room shared out to the dropdowns.
 local NO_CINE_LAYOUT = { edit = true, menuW = MENU_W + math.floor((CINE_W + GAP) / 3) }
+-- (For rows laid out under a table's, lined up with its columns: the Game
+-- Frames page's unit frame parts.)
+ns.GRID_NO_CINE_LAYOUT, ns.GRID_TABLE_LABEL_TRIM = NO_CINE_LAYOUT, TABLE_LABEL_TRIM
 -- How wide one is, whole, for names labelWidth wide.
 function ns.GridTableWidth(labelWidth, noCine)
 	return labelWidth - TABLE_LABEL_TRIM + ns.GridWidth(noCine and NO_CINE_LAYOUT or TABLE_LAYOUT)
@@ -1276,9 +1279,10 @@ end
 function ns.GridTable(content, columnTop, rows, kit)
 	local LABEL_WIDTH, ROW_HEIGHT, COLUMNS = kit.labelWidth - TABLE_LABEL_TRIM, kit.rowHeight, kit.columns
 	local LAYOUT = rows.noCine and NO_CINE_LAYOUT or TABLE_LAYOUT
-	-- (The rows a row may follow: the table's others.)
+	-- (The rows a row may follow: the table's others, or rows.followRows: a
+	-- table of one row in a list of them, the Unit frames tab's.)
 	local choices = {}
-	for _, item in ipairs(rows) do
+	for _, item in ipairs(rows.followRows or rows) do
 		if not item.alwaysOnly then choices[#choices + 1] = { item.key, item.label } end
 	end
 	local function Choices() return choices end
@@ -1350,7 +1354,7 @@ function ns.GridTable(content, columnTop, rows, kit)
 		end
 		parts = ns.ListRowParts(Key, COLUMNS, rows.columnTips, SetAlways, opts)
 		local spec = {
-			band = r, dot = not item.alwaysOnly,
+			band = r + (rows.bandFrom or 0), dot = not item.alwaysOnly,
 			always = { isOn = function() return alwaysOn(item.key) end, set = SetAlways,
 				tip = item.alwaysTip or item.part
 				and L["Show it whenever its frame shows. This overrides its Hover groups: untick it to " ..

@@ -1652,7 +1652,15 @@ local function Buffed(aura, refresh)
 	if not (guid and guid:find("^Player%-")) then return Skip("not a player") end
 	if DB().emoteVisionGroupBuffs and InGroup(guid) then return Skip("your group's, ignored") end
 	Skip("card")
-	Fire({ kind = "Buff", name = Short(Plain(UnitName(unit))) or "?", unit = unit, guid = guid,
+	-- (With their last name, as FireFor's: "Waffle" alone, on Forever where
+	-- they're "Waffle Hd", and the face click's /targetexact found no one.)
+	local first, last = UnitName(unit)
+	first, last = Plain(first), Plain(last)
+	local full = first
+	if type(first) == "string" and type(last) == "string" and last ~= "" and not first:find("-", 1, true) then
+		full = first .. "-" .. last:gsub(" ", "")
+	end
+	Fire({ kind = "Buff", name = Short(first) or "?", fullName = full, unit = unit, guid = guid,
 		class = ClassOf(guid, unit), icon = Plain(aura.icon), line = L["gave you %s"]:format(name) })
 end
 

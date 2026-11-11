@@ -17,6 +17,9 @@ local _, ns = ...
 local revealed = false
 -- Whether this tooltip's lines were cut (to fill in again for the After column).
 local linesCut = false
+-- Whether that cut was a unit's lines (not an object's or item's): the
+-- Show hook cuts again with no readable unit then (see HookTooltipParts).
+local unitLinesCut = false
 
 -- Whether a part (ns.TOOLTIP_PARTS) is taken out now: unticked in the
 -- column for now (On first hover, or After once revealed). With
@@ -365,7 +368,39 @@ local function Snapshot(i)
 		end
 		return line
 	end)
+	if ok and line then
+		-- Its row's layout too (wrap, width, justify, indent): these stay with
+		-- the row, not the text, so text moved into a row laid out for another
+		-- line wrapped or sat indented (Questie's quest lines, several quests).
+		pcall(function()
+			local left = Left(i)
+			local _, _, _, x = left:GetPoint(1)
+			line.wrap, line.width, line.justify, line.x = left:GetWordWrap(), left:GetWidth(), left:GetJustifyH(), x
+		end)
+	end
 	return ok and line or nil
+end
+
+-- Lays a row out as the moved line's own row was (Snapshot): each piece on
+-- its own, so one refused call keeps the rest.
+local function ApplyLayout(left, line)
+	if line.wrap ~= nil then
+		pcall(left.SetWordWrap, left, line.wrap)
+	end
+	if type(line.width) == "number" then
+		pcall(left.SetWidth, left, line.width)
+	end
+	if line.justify then
+		pcall(left.SetJustifyH, left, line.justify)
+	end
+	if type(line.x) == "number" then
+		pcall(function()
+			local point, relativeTo, relative, _, y = left:GetPoint(1)
+			if point then
+				left:SetPoint(point, relativeTo, relative, line.x, y)
+			end
+		end)
+	end
 end
 
 -- The icons beside lines (a quest objective's bullet, or its tick once done):
@@ -444,6 +479,7 @@ local function CutLines(tooltip, object)
 		for n = first, count do
 			local line, left, right = kept[n - 1], Left(n), Right(n)
 			if line then
+				ApplyLayout(left, line)
 				left:SetText(line.left)
 				left:SetTextColor(line.lr[1], line.lr[2], line.lr[3])
 				left:Show()
@@ -469,6 +505,7 @@ local function CutLines(tooltip, object)
 	end)
 	pcall(MoveIcons, cut, count, newIndex)
 	linesCut = true
+	unitLinesCut = not object
 	if ns.Flag(tooltip:IsShown()) then
 		pcall(tooltip.Show, tooltip) -- (sizes itself to the lines again)
 	end
@@ -864,10 +901,25 @@ local function ListParts(tooltip)
 				local r, g, b = Left(i):GetTextColor()
 				return ("%.2f %.2f %.2f"):format(r, g, b)
 			end)
-			ns.Print(("Line %d: %s (color %s%s)"):format(i,
+			-- (Where it sits: its anchor, indent and wrap stay with the line
+			-- slot, not the text, when CutLines moves texts up.)
+			local fs = Left(i)
+			local function Try(f)
+				local ok, value = pcall(f)
+				return ok and tostring(value) or "?"
+			end
+			local place = ("x %s y %s | shown %s wrap %s justify %s | w %s h %s"):format(
+				Try(function() return select(4, fs:GetPoint(1)) end),
+				Try(function() return select(5, fs:GetPoint(1)) end),
+				Try(function() return ns.Flag(fs:IsShown()) end), Try(function() return fs:GetWordWrap() end),
+				Try(function() return fs:GetJustifyH() end), Try(function() return math.floor(fs:GetWidth()) end),
+				Try(function() return math.floor(fs:GetHeight()) end))
+			ns.Print(("Line %d: %s (color %s%s) %s"):format(i,
 				plain and ("%q"):format(text) or (Unreadable(Left(i)) and "secret" or "?"),
-				okColor and color or "secret", IsHintColor(Left(i)) and ", hint green" or ""))
+				okColor and color or "secret", IsHintColor(Left(i)) and ", hint green" or "", place))
 		end
+		ns.Print(("Lines cut %s (a unit's %s) | tooltip h %.0f"):format(tostring(linesCut),
+			tostring(unitLinesCut), tooltip:GetHeight()))
 	end)
 	-- And what the hint's taking out goes by: the unit, the frame's, the data kind.
 	pcall(function()
@@ -906,10 +958,14 @@ function ns.HookTooltipParts()
 	end
 	-- Lines the game adds after a unit's tooltip is filled (a unit frame's
 	-- right-click hint, a PvP line): taken out as it shows the tooltip again
-	-- to fit them. (cutting: our own Show, as CutLines resizes it.)
+	-- to fit them. (cutting: our own Show, as CutLines resizes it.) A tooltip
+	-- already cut counts too, with no readable unit (a mob in a fight on
+	-- Forever): lines added under our emptied last line (Questie's quest
+	-- lines) sat under a blank gap until this pass took it out.
 	local cutting = false
 	hooksecurefunc(GameTooltip, "Show", function(tooltip)
-		if cutting or refilling or not AnyLineCut() or not (TooltipUnit(tooltip) or FrameUnit(tooltip)) then
+		if cutting or refilling or not AnyLineCut()
+			or not ((linesCut and unitLinesCut) or TooltipUnit(tooltip) or FrameUnit(tooltip)) then
 			return
 		end
 		cutting = true

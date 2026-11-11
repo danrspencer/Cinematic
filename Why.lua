@@ -350,7 +350,7 @@ end
 -- or later) and block (keeping it hidden).
 -- (always, anyFight, page: for a row that isn't a frame's, as ns.RowOnNow
 -- takes them: a unit frame's part, whose Always is its own setting and whose
--- In combat counts in any fight, on the Unit Frame Parts page.)
+-- In combat counts in any fight, on the unit frame parts' rows.)
 local ColumnsOf -- (below: the lines; Columns tags them with the row's id)
 local function Columns(key, out, always, anyFight, page)
 	local first = #out + 1

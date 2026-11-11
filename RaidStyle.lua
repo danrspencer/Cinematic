@@ -536,7 +536,7 @@ function ns.CreateRaidStylePanel(kit)
 	kit.AddControl(ownCheck)
 	-- (Party, while the game draws it as its own frames: the Unit frames page's.)
 	partyNote = kit.Label(content, "GameFontHighlightSmall", L["Your party uses its own frames, not raid-style " ..
-		"ones: they follow the Unit Frame Parts page's Party tab."])
+		"ones: they follow the Game Frames page's Party tab."])
 	partyNote:SetPoint("LEFT", ownCheck.Text or ownCheck.text or ownCheck, "RIGHT", 16, 0)
 	partyNote:SetWidth(300)
 	partyNote:SetJustifyH("LEFT")

@@ -128,7 +128,8 @@ ns.LAYOUT_PRESET = "*preset"
 -- its group replaces the one before.)
 local function Layout(key, name, layout, client, tip, also)
 	return { key = key, name = name, client = client, group = "layout", editMode = layout,
-		scope = { "Profiles/Edit Mode layout", "Standard Frames/Unit frames" }, tip = tip,
+		scope = { "Profiles/Edit Mode layout", "Standard Frames/Unit frames",
+			"Standard Frames/Personal Resource Display" }, tip = tip,
 		apply = function(set)
 			set("editModeLayout", layout)
 			if also then also(set) end
@@ -400,7 +401,7 @@ ns.PROFILE_MODULES = {
 		"Interface Recolor/top", "Mouseover groups/top", "Name Style/top", "Nameplate Style/top", "Nameplates/top", "Personal Resources/top",
 		"Personal Style/top", "Quest Vision/top", "Quest tracker/top", "Raid Style/top", "Roll Vision/top",
 		"Skyriding Cam/top", "Standard Frames/top", "Style General/top", "Swing timer/top", "Tint/top",
-		"Tooltip Style/top", "Unit Frames/top", "Unit Style/top" },
+		"Tooltip Style/top", "Unit Style/top" },
 		tip = "Every page's Enable switch off: Cinematic does nothing until you turn a page on.",
 		apply = function(set)
 			for _, key in ipairs(ns.OFF_UNTIL_PICKED or {}) do

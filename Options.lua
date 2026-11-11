@@ -2086,7 +2086,6 @@ do
 				return UnitFactionGroup("player") == "Horde" and "Interface\\Icons\\INV_BannerPVP_01"
 					or "Interface\\Icons\\INV_BannerPVP_02"
 			end, label = "Game Frames", section = "CineMode Autohide" },
-			{ "Unit Frames", "Interface\\Icons\\INV_Misc_Head_Dwarf_01", label = "Unit Frame Parts", section = "CineMode Autohide" },
 			{ "Advanced Frames", "Interface\\Icons\\INV_Misc_Gear_01", label = "Addon Frames", section = "CineMode Autohide" },
 			{ "Mouseover groups", "Interface\\Icons\\Spell_Holy_MindVision", label = "Hover Groups", section = "CineMode Autohide" },
 			{ "Gamepad", "Interface\\Icons\\INV_Gizmo_01", label = "Gamepad Frames", section = "CineMode Autohide" },
@@ -3240,8 +3239,8 @@ local function CreateRevealPanel()
 
 	local calmFull, calmPet -- (below; hidden while the Calm Timer is Off)
 	local calm = stack:Add(Slider(content, "calmTime", L["Calm Timer"], 0, 120, 5, function(value)
-		return value == 0 and L["CineMode comes back as a fight ends"]
-			or L["CineMode comes back %d sec after a fight"]:format(value)
+		return value == 0 and L["As soon as a fight ends"]
+			or L["%d sec after a fight"]:format(value)
 	end, nil, function()
 		if calmFull then calmFull:Refresh() end
 		if calmPet then calmPet:Refresh() end
@@ -4710,6 +4709,53 @@ local function CreateCameraSettingsPanel()
 	CreateQuestPanel()
 	if ns.ChatCamCommand then -- (ChatCam.lua)
 		CreateChatCamPanel()
+	end
+	-- Mouse Turn (MouseTurn.lua: dev copy only): a cap on right-click turning.
+	if ns.mouseTurnState then
+		local content, top, title = CameraSection(L["Mouse Turn"], "Mouse Turn")
+		local subtitle = PageIntro(content, title, L["Turning with the right mouse button held never goes faster " ..
+			"than a set speed, and can ramp up to your speed instead of starting at full, so the camera turns " ..
+			"smoothly instead of whipping round. The game's Mouse Look Speed is turned down while needed, and " ..
+			"put back to yours after."], top)
+		local function IfOn(db) return db.mouseTurnCap end
+
+		local stack = Stack(subtitle, "label", true)
+		stack:Header(content, L["Cap"])
+		local on = stack:Add(Check(content, "mouseTurnCap", L["Cap right-click turn speed"],
+			L["While you hold the right mouse button and turn, the camera never turns faster than the speed below."]),
+			"check")
+		on:HookScript("OnClick", Refresh)
+		local speed = stack:Add(Slider(content, "mouseTurnCapSpeed", L["Top turn speed"], 30, 720, 10,
+			L["%d° per sec"]), "slider")
+		Tooltip(speed, L["The fastest you turn. Turning slower than this, nothing changes."])
+		GreyUnless(speed, IfOn)
+		local ease = stack:Add(Slider(content, "mouseTurnCapEase", L["Ease back over"], 0.05, 1.5, 0.05,
+			L["%.2f sec"]), "slider")
+		Tooltip(ease, L["Once you slow down, how long your own Mouse Look Speed takes to come back. " ..
+			"Longer is softer, but a turn right after a fast one stays slow a moment."])
+		GreyUnless(ease, IfOn)
+
+		stack:Header(content, L["Ramp up"])
+		local ramp = stack:Add(Check(content, "mouseTurnRamp", L["Ramp up right-click turn speed"],
+			L["Each right-click turn starts slow and builds up to your own speed. Stop turning a moment, or let " ..
+			"go, and the next turn starts slow again."]), "check")
+		ramp:HookScript("OnClick", Refresh)
+		local function IfRamp(db) return db.mouseTurnRamp end
+		local rampStart = stack:Add(Slider(content, "mouseTurnRampStart", L["Start at"], 5, 100, 5,
+			L["%d%% of your speed"]), "slider")
+		Tooltip(rampStart, L["How fast a turn starts, as a share of your own Mouse Look Speed."])
+		GreyUnless(rampStart, IfRamp)
+		local rampTime = stack:Add(Slider(content, "mouseTurnRampTime", L["Up to full speed over"], 0.1, 2, 0.05,
+			L["%.2f sec"]), "slider")
+		Tooltip(rampTime, L["How long a turn takes to build up to your full speed. It creeps at first and " ..
+			"speeds up near the top."])
+		GreyUnless(rampTime, IfRamp)
+
+		stack:Header(content, L["Both"])
+		local pitch = stack:Add(Check(content, "mouseTurnCapPitch", L["Slow looking up and down too"],
+			L["While the turn is slowed, looking up and down slows by the same share, so the mouse feels the " ..
+			"same both ways."]), "check")
+		GreyUnless(pitch, function(db) return db.mouseTurnCap or db.mouseTurnRamp end)
 	end
 
 	-- A folder tab for each camera (those with settings left: see
@@ -6913,6 +6959,82 @@ end
 ns.GRID_KIT.SectionBand, ns.GRID_KIT.SectionState, ns.GRID_KIT.BAND_HEIGHT = SectionBand, SectionState, BAND_HEIGHT
 ns.GRID_KIT.ContentDepth, ns.GRID_KIT.FitContentHeight = ContentDepth, FitContentHeight
 
+-- The unit frame parts' rows (under the Game Frames page's Unit frames rows): the lists a part's row
+-- keeps its dropdowns' ticks in.
+function ns.UnitPartLists()
+	local lists = { "calmShow", "quietShow", "camShow" }
+	for c = 2, #FRAME_COLUMNS do
+		lists[#lists + 1] = FRAME_COLUMNS[c][3]
+	end
+	return lists
+end
+-- One part's row: Always (its unitPart<unit><part> setting, ticked to start
+-- with), the Combat, Target and Location dropdowns and Edit, its label
+-- (part[2]) indent in from the row's labelWidth to its left. title: its
+-- frame's name, for the rule editor; same: its "Same as target" setting
+-- (greyed while that's ticked); band: its number. The caller places the row
+-- (the label goes with it). Gives the row and the label's widgets.
+function ns.UnitPartRow(content, labelWidth, layout, unit, title, part, same, band, indent)
+	local key = "unitPart" .. unit .. part[1]
+	RecordKey(content, key)
+	for _, list in ipairs(ns.UnitPartLists()) do
+		RecordKey(content, list)
+		RecordRow(content, list, key)
+	end
+	local function Key() return key end
+	local function SetAlways(value) ns.GetDB()[key] = value end
+	local parts = ns.ListRowParts(Key, FRAME_COLUMNS, nil, SetAlways, { quiet = true, cam = true, anyFight = true })
+	local row = ns.GridRow(ns.GRID_KIT, content, labelWidth, layout, {
+		band = band, dot = true,
+		always = { isOn = function() return ns.GetDB()[key] ~= false end, set = SetAlways,
+			tip = L["Show it the whole time, CineMode or not. Unticked, it's hidden, except as the other " ..
+			"columns say."] },
+		menus = parts.menus,
+		rule = { key = Key, label = function() return title .. ": " .. part[2] end,
+			grid = parts.grid, words = parts.words, apply = parts.apply, changed = ns.ApplyUnitFrameParts },
+		changed = ns.ApplyUnitFrameParts,
+		-- (Greyed while it goes by the target's.)
+		enabled = same and function() return ns.GetDB()[same] == false end or nil,
+		override = function() return ns.StyleOverrideText(key) end,
+	})
+	row.debugName = title .. ": " .. part[2] -- (for the dev copy's page timing)
+	local label = Label(content, "GameFontHighlight", part[2])
+	label:SetPoint("TOPLEFT", row, "TOPLEFT", indent - labelWidth, -5)
+	label:SetWidth(labelWidth - 4 - ns.GRID_DOT_ROOM - indent)
+	label:SetJustifyH("LEFT")
+	label:SetWordWrap(false)
+	return row, label, ns.LabelHover(content, label) -- (full name while cut short)
+end
+-- A frame set apart from the target (its Same as target unticked): its parts'
+-- rows start as the target's (keys: its parts), unless it has choices of its
+-- own from before (Always unticked, a dropdown or role ticked, a rule).
+function ns.CopyTargetParts(unit, keys)
+	local db, lists = ns.GetDB(), ns.UnitPartLists()
+	for _, key in ipairs(keys) do
+		local own = "unitPart" .. unit .. key
+		if db[own] == false or (db.frameRules and db.frameRules[own]) then
+			return
+		end
+		for _, list in ipairs(lists) do
+			if db[list] and db[list][own] ~= nil then return end
+		end
+	end
+	for _, key in ipairs(keys) do
+		local own, target = "unitPart" .. unit .. key, "unitPartTarget" .. key
+		db[own] = db[target]
+		for _, list in ipairs(lists) do
+			if db[list] then db[list][own] = db[list][target] end
+		end
+		if db.frameRules then db.frameRules[own] = db.frameRules[target] end
+	end
+end
+-- Whether a unit frame has a part: its frame has it (parts: its UNIT_PARTS
+-- list), and it's not one only some frames have (UNIT_PART_ONLY: hit text).
+function ns.UnitHasPart(unit, parts, part)
+	local only = ns.UNIT_PART_ONLY[part]
+	return parts[part] ~= nil and (not only or only[unit] == true)
+end
+
 -- Sub-page for combat: staying cinematic in fights, and what to show then.
 local function CreateCombatPanel()
 	local canvas, content = CreateScrollPage()
@@ -6968,6 +7090,9 @@ local function CreateCombatPanel()
 	local panelTop = CreateFrame("Frame", nil, content)
 	panelTop:SetSize(1, 1)
 	local panel, ShowTab
+	-- (The unit frames' Addon Frame Links section, at the bottom of their tab:
+	-- made once the sections are.)
+	local unitLinks
 	-- (Sections sharing a tab name share its tab, stacked: the party frames,
 	-- raid-style and not. tabs[i] = { label, sections }.)
 	local tabs = {}
@@ -6993,6 +7118,7 @@ local function CreateCombatPanel()
 		end
 		local order = {}
 		for _, section in ipairs(tabs[shown].sections) do
+			if section.relayout then section.relayout() end -- (the Unit frames' blocks, open as saved)
 			local inUse = #tabs[shown].sections > 1 and section.inUse and section.inUse()
 			if section.inUseTag then section.inUseTag:SetShown(inUse == true) end
 			order[#order + 1] = section
@@ -7012,8 +7138,24 @@ local function CreateCombatPanel()
 			section.body:SetShown(not folded)
 			above, bottom = section, folded and section.frame or section.last
 		end
+		-- (Addon Frame Links last on the Unit frames tab, in from the edge for its +/-.)
+		local inset = 0
+		if unitLinks then
+			local here = false
+			for _, section in ipairs(order) do
+				if section.key == "units" then here = true end
+			end
+			unitLinks.frame:ClearAllPoints()
+			unitLinks.frame:SetShown(here)
+			if here then
+				inset = 18
+				unitLinks.frame:SetPoint("TOPLEFT", bottom, "BOTTOMLEFT", inset, -18)
+				unitLinks.frame:SetWidth(above.width - inset)
+				bottom = unitLinks.frame
+			end
+		end
 		ShowTab(shown)
-		panel:SetPoint("BOTTOMRIGHT", bottom, "BOTTOMLEFT", above.width + 6, -12)
+		panel:SetPoint("BOTTOMRIGHT", bottom, "BOTTOMLEFT", above.width + 6 - inset, -12)
 		FitContentHeight(content)
 	end
 	local function Pick(section)
@@ -7062,6 +7204,131 @@ local function CreateCombatPanel()
 
 	local SECTION_WIDTH = ns.GRID_MENUS and ns.GridTableWidth(FRAME_LABEL_WIDTH, true)
 		or FRAME_LABEL_WIDTH + #FRAME_COLUMNS * FRAME_COLUMN_WIDTH
+	-- The Unit frames section where the client has the parts (and menus): a
+	-- block per frame, its row as the other sections' and under it, opened and
+	-- closed with a click on its name (the +/- in the margin), a row per part
+	-- it has (its unitPart<frame><part> settings). The
+	-- focus and target of target ones start with Same as target, their parts
+	-- greyed while it's ticked. Which are open is kept across reloads
+	-- (SectionState, "Standard Frames/unit/<row key>"). Gives the mark under
+	-- the last block, to place what comes below; section.relayout opens and
+	-- closes the blocks as saved, for Layout.
+	local function UnitBlocks(frame, sectionRows, heading, section)
+		local UNITS = {
+			player = { unit = "Player", parts = ns.UNIT_PARTS_PLAYER },
+			petframe = { unit = "Pet", parts = ns.UNIT_PARTS_PET },
+			target = { unit = "Target", parts = ns.UNIT_PARTS_TARGET },
+			tot = _G.TargetFrameToT and { unit = "ToT", same = "unitPartsToTSame", parts = ns.UNIT_PARTS_TOT } or nil,
+			focus = _G.FocusFrame and { unit = "Focus", same = "unitPartsFocusSame", parts = ns.UNIT_PARTS_TARGET }
+				or nil,
+			focustot = _G.FocusFrame and _G.FocusFrameToT
+				and { unit = "FocusToT", same = "unitPartsFocusToTSame", parts = ns.UNIT_PARTS_TOT } or nil,
+		}
+		local PARTS = ns.UnitPartLabels()
+		-- (Every frame's name moved in TOGGLE_W for the +/-, its parts' INDENT.)
+		local ROW_H, TOGGLE_W, INDENT = 24, 18, 30
+		local kit = setmetatable({ labelWidth = FRAME_LABEL_WIDTH, rowHeight = ROW_H, columns = FRAME_COLUMNS },
+			{ __index = ns.GRID_KIT })
+		local labelWidth = FRAME_LABEL_WIDTH - ns.GRID_TABLE_LABEL_TRIM
+		-- (Where ns.GridTable puts a table's row, under its column top.)
+		local rowTop = -FRAME_HEADING_HEIGHT - 4
+		SetSection(content, heading)
+		local blocks, partRows, after = {}, {}, nil
+		local function Relayout()
+			for _, block in ipairs(blocks) do
+				local open = block.height and SectionState.Restore(block.state) and true or false
+				block.box:SetShown(open)
+				block.box:SetHeight(open and block.height or 0.001)
+				if block.icon then
+					block.icon:SetTexture(open and "Interface\\Buttons\\UI-MinusButton-Up"
+						or "Interface\\Buttons\\UI-PlusButton-Up")
+				end
+			end
+		end
+		section.relayout = Relayout
+		for i, item in ipairs(sectionRows) do
+			local unit = UNITS[item.key]
+			local block = { state = { id = "Standard Frames/unit/" .. item.key, open = false } }
+			blocks[i] = block
+			local columnTop = CreateFrame("Frame", nil, content)
+			columnTop:SetSize(1, 1)
+			if after then
+				columnTop:SetPoint("TOPLEFT", after, "BOTTOMLEFT", 0, -rowTop)
+			else
+				columnTop:SetPoint("TOPLEFT", frame, "BOTTOMLEFT", 0, 6) -- (as ShowTable's, under a header)
+			end
+			local label = ns.GridTable(content, columnTop, { item, noCine = true, noHeadings = after ~= nil,
+				followRows = sectionRows, bandFrom = i - 1 }, kit)
+			local point, relativeTo, relativePoint, x, y = label:GetPoint(1)
+			label:SetPoint(point, relativeTo, relativePoint, x + TOGGLE_W, y)
+			label:SetWidth(label:GetWidth() - TOGGLE_W)
+			local box = CreateFrame("Frame", nil, content)
+			box:SetPoint("TOPLEFT", columnTop, "TOPLEFT", 0, rowTop - ROW_H)
+			box:SetSize(section.width, 0.001)
+			box:Hide()
+			block.box, after = box, box
+			if unit then
+				local function Toggle()
+					SectionState.Save(block.state, not block.state.open)
+					Relayout()
+					Layout()
+				end
+				-- (Search finding a part opens its frame's block, and the tab.)
+				box.openSection = function()
+					SectionState.Save(block.state, true)
+					section.body.openSection()
+				end
+				local plus = CreateFrame("Button", nil, content)
+				plus:SetSize(16, 16)
+				plus:SetPoint("LEFT", columnTop, "TOPLEFT", 0, rowTop - ROW_H / 2)
+				block.icon = plus:CreateTexture(nil, "ARTWORK")
+				block.icon:SetAllPoints()
+				plus:SetScript("OnClick", Toggle)
+				Tooltip(plus, L["Shows or hides its parts."])
+				local name = CreateFrame("Button", nil, content)
+				name:SetPoint("TOPLEFT", label, "TOPLEFT", 0, 4)
+				name:SetPoint("BOTTOMRIGHT", label, "BOTTOMRIGHT", 0, -4)
+				name:SetScript("OnClick", Toggle)
+				Tooltip(name, (item.tip and item.tip .. "\n\n" or "") .. L["Click to show or hide its parts."])
+				local before = Widgets()
+				local y, same = 0, unit.same
+				unit.keys = {}
+				if same then
+					local check = Check(content, same, L["Same as target"],
+						L["Ticked: this frame shows the parts the Target rows say. Untick it to give the frame " ..
+						"choices of its own."], function(value)
+						ns.GetDB()[same] = value
+						if not value then
+							ns.CopyTargetParts(unit.unit, unit.keys)
+						end
+						ns.ApplyUnitFrameParts()
+						Refresh()
+					end)
+					check:SetPoint("TOPLEFT", box, "TOPLEFT", INDENT - 4, 0)
+					y = -ROW_H
+				end
+				local k = 0
+				for _, part in ipairs(PARTS) do
+					if ns.UnitHasPart(unit.unit, unit.parts, part[1]) then
+						k = k + 1
+						unit.keys[k] = part[1]
+						local row = ns.UnitPartRow(content, labelWidth, ns.GRID_NO_CINE_LAYOUT, unit.unit, item.label,
+							part, same, k + 1, INDENT)
+						row:SetPoint("TOPLEFT", box, "TOPLEFT", labelWidth, y - (k - 1) * ROW_H)
+						partRows[#partRows + 1] = row
+					end
+				end
+				block.height = -y + k * ROW_H
+				for object in pairs(Widgets()) do
+					if not before[object] then object:SetParent(box) end
+				end
+			end
+		end
+		ns.GridDots(content, partRows)
+		Relayout()
+		return after
+	end
+
 	-- (tab: its tab's name, nil: heading. link: { page, tip, label }, a button
 	-- to the page with the rest of its settings, right of its heading, named
 	-- label or the page.)
@@ -7110,8 +7377,9 @@ local function CreateCombatPanel()
 			end)
 			after = raid
 		end
-		if link then
-			local style = ns.StyleLink(frame, title, link[1], link[2], Tooltip, (link[3] or ns.PageLabel(link[1])) .. " »")
+		-- (link: one such, or a list of them, side by side.)
+		for _, each in ipairs(link and (type(link[1]) == "table" and link or { link }) or {}) do
+			local style = ns.StyleLink(frame, title, each[1], each[2], Tooltip, (each[3] or ns.PageLabel(each[1])) .. " »")
 			style:SetPoint("LEFT", after, "RIGHT", after == title and 12 or 6, 0)
 			after = style
 		end
@@ -7156,7 +7424,11 @@ local function CreateCombatPanel()
 		local before = Widgets()
 		sectionRows.underHeader = true
 		sectionRows.noCine = true -- (frames only fade in CineMode: Always says it all)
-		section.last = ShowTable(content, frame, sectionRows, "Standard Frames", heading)
+		if page == "units" and ns.GRID_MENUS and ns.HasUnitFrameParts and ns.HasUnitFrameParts() then
+			section.last = UnitBlocks(frame, sectionRows, heading, section)
+		else
+			section.last = ShowTable(content, frame, sectionRows, "Standard Frames", heading)
+		end
 		for object in pairs(Widgets()) do
 			if not before[object] then
 				object:SetParent(section.body)
@@ -7256,8 +7528,12 @@ local function CreateCombatPanel()
 	local raidStyle = { "Raid Style", L["Opens the Raid Frame Style page: how the raid and raid-style " ..
 		"party frames look."], L["Style"] }
 	local SECTIONS = {
-		{ "units", L["Unit frames"], nil, { "Unit Frames", L["Opens the Unit Frame Parts page: which parts of your " ..
-			"own, your target's and the other unit frames show, and when."], L["Parts"] } },
+		{ "units", L["Unit frames"], nil, { "Unit Style", L["Opens the Unit Frame Style page: how the frames look."],
+			L["Style"] } },
+		-- (Your health and resource bars under your character: on the Unit frames tab too.)
+		{ "prd", L["Personal Resource Display"], L["Unit frames"], { "Personal Resources", L["Opens the Personal " ..
+			"Resource Display page: the bars under your character, and your frame kept up while you recover."],
+			L["Settings"] } },
 		{ "bars", L["Action bars"] }, { "combat", L["Trackers"] },
 		{ "interface", L["Info and menus"] }, { "minimap", L["Minimap"] },
 		{ "party", L["Party frames (not raid-style)"], L["Party"] },
@@ -7289,282 +7565,27 @@ local function CreateCombatPanel()
 	panel:SetPoint("TOPLEFT", panelTop, "TOPLEFT")
 	-- (On panelTop, not the panel: the panel's bottom hangs on the rows under them.)
 	base:SetPoint("TOPLEFT", panelTop, "TOPLEFT")
+	-- Addon Frame Links (FrameLinks.lua): which addon's frame each unit frame
+	-- is. Opened from elsewhere (search, the Addon Frames page), it picks the
+	-- Unit frames tab too.
+	unitLinks = ns.BuildLinkSection(content, panelTop, "units")
+	local openLinks = unitLinks.body.openSection
+	function unitLinks.body.openSection()
+		for _, section in ipairs(sections) do
+			if section.key == "units" then Pick(section) end
+		end
+		openLinks()
+	end
+	ns.RegisterLinkSection("units", unitLinks.frame, unitLinks.body.openSection)
 	Layout()
 
 	canvas:SetScript("OnShow", PageShown(function()
 		Refresh()
 		Layout() -- (as last left, once the settings have loaded)
+		unitLinks.Show()
 	end, content))
 	canvas:Hide()
 	RegisterSubpage(canvas, L["Standard Frames"], L["Game Frames"])
-end
-
--- Sub-page: the Unit frame parts grid: the pieces of the player, target,
--- focus and pet frames each kind of unit shows. (Keeping your frame up while
--- you recover is on the Standard Frames page.)
-local function CreatePortraitsPanel()
-	local canvas, content = CreateScrollPage()
-
-	local title = Label(content, "GameFontNormalLarge", L["Unit Frame Parts"])
-	title:SetPoint("TOPLEFT", 16, -16)
-	-- Their look: the Style hub's Unit frames page (UnitStyle.lua).
-	local styleLink = ns.StyleLink(content, title, "Unit Style", L["Opens the Unit Frame Style page: how the " ..
-		"frames look."], Tooltip)
-	ns.FramesLink(content, title, "units", styleLink)
-
-	-- (With the grids the page's own ? says what they do: no header of their
-	-- own under the title, which would only say Unit frame parts again.)
-	local hasParts = ns.HasUnitFrameParts and ns.HasUnitFrameParts()
-	local subtitle = PageIntro(content, title, hasParts
-		and L["Which parts of the unit frames show, CineMode or not: your own frame and your pet's, and " ..
-		"the target, focus and target of target frames. Pick a frame's tab to see " ..
-		"its grid: the focus and target of target go as the target's grid says until you untick Same " ..
-		"as target. Untick parts to keep just the bars. The frame art is the portrait ring, the name " ..
-		"box and the bars' borders: the game draws them as one picture. Icons are the rest Zzz, the " ..
-		"group leader's crown, role and quest icons, and the raid marker (skull, moon...) on the target " ..
-		"and focus frames. Auras are the buffs and debuffs on the target and " ..
-		"focus frames. Hit text is the damage and healing numbers on your and your pet's portraits. " ..
-		"Threat is the threat percentage and aggro glow on the target and focus frames, for NPCs you " ..
-		"can fight."] .. " " .. L["Cast bar is the bar under the target and focus frames as they cast."] ..
-		" " .. L["Health bar and Power bar are the bars (Power: mana, rage, energy...). Bar numbers are the " ..
-		"percent and value on them, hidden with their bar too."] ..
-		" " .. L["Name background is the colored strip behind the name on the target and focus frames, " ..
-		"hidden with the name too."] ..
-		" " .. L["Level background is the ring behind the level number, hidden with the level too."] ..
-		" " .. L["Keeping a frame up, always or in fights, is on the Game Frames page; your own while you " ..
-		"recover, on the Personal Resource Display page."]
-		or L["Which parts of the player, target, focus and pet frames show. Keeping a frame up, always or " ..
-		"in fights, is on the Game Frames page; your own while you recover, on the Personal Resource Display page."])
-
-	-- The Unit frame parts (frames laid out as retail's: see
-	-- ns.ApplyUnitFrameParts), a section per frame that opens and closes with
-	-- a click on its name: a row per part the frame has, as the Standard
-	-- Frames page's (GridRows.lua): Always (its unitPart<frame><part>
-	-- setting, ticked to start with), the Combat, Target and Location
-	-- dropdowns, the roles and Edit, keyed by that setting. Unticked Always:
-	-- hidden but as the rest of the row says (ns.RowOnNow), CineMode or not.
-	-- The focus and target of target sections have a "Same as target" tick:
-	-- ticked, the rows grey and the section closes, and the frame goes by the
-	-- target's; unticked, it opens with the target's rows to start from.
-	local OpenSections -- (opens You, your pet and Target, and the frames set apart from the target)
-	local linksAnchor = subtitle -- (what Addon Frame Links goes under: the parts' panel, made below)
-	if hasParts then
-		local note = PageSwitch(content, "handleUnitFrames", L["Enable Page"],
-			L["On: the unit frames show the parts the grids below say. Off: CineMode leaves them alone, " ..
-			"every part showing as the game has it."], subtitle, function() ns.ApplyUnitFrameParts() end)
-
-		local LABEL_WIDTH, ROW_HEIGHT = 150, 24
-		local PARTS = ns.UnitPartLabels()
-		-- Each section: its title, its frame (unit: the settings' unitPart<unit><part>),
-		-- the frame's parts and its "Same as target" setting.
-		local SECTIONS = {
-			{ title = L["You"], unit = "Player", parts = ns.UNIT_PARTS_PLAYER },
-			{ title = L["Your pet"], unit = "Pet", parts = ns.UNIT_PARTS_PET },
-			{ title = L["Target"], unit = "Target", parts = ns.UNIT_PARTS_TARGET },
-		}
-		if _G.TargetFrameToT then
-			SECTIONS[#SECTIONS + 1] = { title = L["Target of target"], unit = "ToT", same = "unitPartsToTSame",
-				parts = ns.UNIT_PARTS_TOT }
-		end
-		if _G.FocusFrame then
-			SECTIONS[#SECTIONS + 1] = { title = L["Focus"], unit = "Focus", same = "unitPartsFocusSame",
-				parts = ns.UNIT_PARTS_TARGET }
-		end
-		if _G.FocusFrame and _G.FocusFrameToT then
-			SECTIONS[#SECTIONS + 1] = { title = L["Focus target of target"], unit = "FocusToT",
-				same = "unitPartsFocusToTSame", parts = ns.UNIT_PARTS_TOT }
-		end
-		-- Whether a section has a part: its frame has it, and it's not one only
-		-- some frames have (UNIT_PART_ONLY: hit text).
-		local function Has(section, part)
-			local only = ns.UNIT_PART_ONLY[part]
-			return section.parts[part] ~= nil and (not only or only[section.unit] == true)
-		end
-
-		local LAYOUT = { edit = true }
-		local OPTS = { quiet = true, cam = true, anyFight = true }
-		-- The lists a row keeps its dropdowns' ticks in.
-		local LISTS = { "calmShow", "quietShow", "camShow" }
-		for c = 2, #FRAME_COLUMNS do
-			LISTS[#LISTS + 1] = FRAME_COLUMNS[c][3]
-		end
-		local ALWAYS_TIP = L["Show it the whole time, CineMode or not. Unticked, it's hidden, except as the other " ..
-			"columns say."]
-		local liveRows = {}
-
-		-- Each frame a tab of its own, in Heal Vision's folder look
-		-- (ns.FolderTabs, made once every section is): the picked one's
-		-- section shows on the panel under them, its name at its top. The tab
-		-- last picked is kept across reloads (SectionState, its id
-		-- "Unit Frames/tab", open the frame's unit).
-		local picked = { id = "Unit Frames/tab", open = "Player" }
-		-- (The panel's top left, under the tabs (placed once they're made, as
-		-- high as their rows); the sections' frames hang on it.)
-		local panelTop = CreateFrame("Frame", nil, content)
-		panelTop:SetSize(1, 1)
-		local panel, ShowTab
-
-		-- Shows the picked section, the panel down to its last row.
-		local function Layout()
-			local shown
-			for i, section in ipairs(SECTIONS) do
-				if section.unit == picked.open then shown = i end
-			end
-			shown = shown or 1
-			for i, section in ipairs(SECTIONS) do
-				section.frame:SetShown(i == shown)
-				section.body:SetShown(i == shown)
-			end
-			ShowTab(shown)
-			panel:SetPoint("BOTTOMRIGHT", SECTIONS[shown].frame, "BOTTOMRIGHT", 12, -12)
-			FitContentHeight(content)
-		end
-		local function Pick(section)
-			SectionState.Save(picked, section.unit)
-			Layout()
-		end
-		function OpenSections()
-			-- (The page is built before the settings load: the first tab then.)
-			SectionState.Restore(picked)
-			Layout()
-		end
-		resetHooks[content] = OpenSections
-
-		-- Set apart from the target: its rows start as the target's, unless it
-		-- has choices of its own from before (Always unticked, a dropdown or
-		-- role ticked, a rule).
-		local function CopyTarget(section)
-			local db = ns.GetDB()
-			for _, key in ipairs(section.keys) do
-				local own = "unitPart" .. section.unit .. key
-				if db[own] == false or (db.frameRules and db.frameRules[own]) then
-					return
-				end
-				for _, list in ipairs(LISTS) do
-					if db[list] and db[list][own] ~= nil then return end
-				end
-			end
-			for _, key in ipairs(section.keys) do
-				local own, target = "unitPart" .. section.unit .. key, "unitPartTarget" .. key
-				db[own] = db[target]
-				for _, list in ipairs(LISTS) do
-					if db[list] then db[list][own] = db[list][target] end
-				end
-				if db.frameRules then db.frameRules[own] = db.frameRules[target] end
-			end
-		end
-
-		for _, section in ipairs(SECTIONS) do
-			section.widgets, section.keys = {}, {}
-			SetSection(content, section.title)
-			local frame = CreateFrame("Frame", nil, content)
-			frame:SetWidth(LABEL_WIDTH + ns.GridWidth(LAYOUT))
-			frame:SetPoint("TOPLEFT", panelTop, "TOPLEFT", 12, -10)
-			frame.searchAlways = true
-			section.frame = frame
-			local heading = Label(frame, "GameFontNormal", section.title)
-			heading:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, -3)
-			-- (Its rows, hidden on other tabs: search still finds them, and picks this one.)
-			section.body = CreateFrame("Frame", nil, content)
-			section.body:SetPoint("TOPLEFT", frame, "TOPLEFT")
-			section.body:SetSize(1, 1)
-			section.body.searchAlways = true
-			section.body.openSection = function() Pick(section) end
-			frame.openSection = section.body.openSection
-
-			-- Same as target, at the right end of its name.
-			local same = section.same
-			if same then
-				local check = Check(content, same, L["Same as target"],
-					L["Ticked: this frame shows the parts the Target grid says. Untick it to give the frame " ..
-					"choices of its own."], function(value)
-					ns.GetDB()[same] = value
-					if not value then
-						CopyTarget(section)
-					end
-					ns.ApplyUnitFrameParts()
-					Refresh()
-				end)
-				check:SetParent(frame) -- (hidden with its tab)
-				-- (The label on the right edge, the box left of it, whatever its width.)
-				local text = check.Text or check.text
-				text:ClearAllPoints()
-				text:SetPoint("RIGHT", frame, "TOPRIGHT", -6, -10)
-				check:SetPoint("RIGHT", text, "LEFT", -2, 0)
-			end
-
-			local gridTop = -30
-			local headings = CreateFrame("Frame", nil, content)
-			headings:SetSize(1, 1)
-			headings:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, gridTop)
-			for _, heading in ipairs(ns.GridHeadings(ns.GRID_KIT, content, headings, LABEL_WIDTH, LAYOUT)) do
-				section.widgets[#section.widgets + 1] = heading
-			end
-			local r = 0
-			for _, part in ipairs(PARTS) do
-				if Has(section, part[1]) then
-					r = r + 1
-					section.keys[#section.keys + 1] = part[1]
-					local key = "unitPart" .. section.unit .. part[1]
-					local y = gridTop - FRAME_HEADING_HEIGHT - 4 - (r - 1) * ROW_HEIGHT
-					RecordKey(content, key)
-					for _, list in ipairs(LISTS) do
-						RecordKey(content, list)
-						RecordRow(content, list, key)
-					end
-					local label = Label(content, "GameFontHighlight", part[2])
-					label:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, y - 5)
-					label:SetWidth(LABEL_WIDTH - 4 - ns.GRID_DOT_ROOM)
-					label:SetJustifyH("LEFT")
-					label:SetWordWrap(false)
-					section.widgets[#section.widgets + 1] = label
-					section.widgets[#section.widgets + 1] = ns.LabelHover(content, label) -- (full name while cut short)
-					local function Key() return key end
-					local function SetAlways(value) ns.GetDB()[key] = value end
-					local parts = ns.ListRowParts(Key, FRAME_COLUMNS, nil, SetAlways, OPTS)
-					local row = ns.GridRow(ns.GRID_KIT, content, LABEL_WIDTH, LAYOUT, {
-						band = r, dot = true,
-						always = { isOn = function() return ns.GetDB()[key] ~= false end, set = SetAlways, tip = ALWAYS_TIP },
-						menus = parts.menus,
-						rule = { key = Key, label = function() return section.title .. ": " .. part[2] end,
-							grid = parts.grid, words = parts.words, apply = parts.apply, changed = ns.ApplyUnitFrameParts },
-						changed = ns.ApplyUnitFrameParts,
-						-- (Greyed while it goes by the target's.)
-						enabled = same and function() return ns.GetDB()[same] == false end or nil,
-						override = function() return ns.StyleOverrideText(key) end,
-					})
-					row.debugName = section.title .. ": " .. part[2] -- (for the dev copy's page timing)
-					row:SetPoint("TOPLEFT", frame, "TOPLEFT", LABEL_WIDTH, y)
-					section.widgets[#section.widgets + 1] = row
-					liveRows[#liveRows + 1] = row
-				end
-			end
-			frame:SetHeight(-gridTop + FRAME_HEADING_HEIGHT + 4 + r * ROW_HEIGHT)
-			for _, widget in ipairs(section.widgets) do widget:SetParent(section.body) end
-		end
-		ns.GridDots(content, liveRows)
-		local list, _, base, height = {}
-		for i, section in ipairs(SECTIONS) do list[i] = { section.title } end
-		panel, _, ShowTab, base, height = ns.FolderTabs(content, list, function(i) Pick(SECTIONS[i]) end, nil,
-			LABEL_WIDTH + ns.GridWidth(LAYOUT) + 8)
-		panelTop:SetPoint("TOPLEFT", note, "BOTTOMLEFT", 2, -14 - height)
-		panel:SetPoint("TOPLEFT", panelTop, "TOPLEFT")
-		-- (On panelTop, not the panel: the panel's bottom hangs on the rows under them.)
-		base:SetPoint("TOPLEFT", panelTop, "TOPLEFT")
-		OpenSections()
-		linksAnchor = panel
-	end
-	-- Addon Frame Links (last): which addon's frame each unit frame is (FrameLinks.lua).
-	local links = ns.BuildLinkSection(content, linksAnchor, "units")
-
-	local pageShown = PageShown(Refresh, content)
-	canvas:SetScript("OnShow", function()
-		if OpenSections then OpenSections() end
-		pageShown()
-		links.Show()
-	end)
-	canvas:Hide()
-	RegisterSubpage(canvas, "Unit Frames", L["Unit Frame Parts"])
 end
 
 -- Sub-page: chat bubbles (where they show; how they look: BubbleStyle.lua).
@@ -17128,9 +17149,6 @@ ns.OnLanguage(function()
 	-- keybinds. (Standard Frames and Advanced Frames come right after CineMode.)
 	CreateRevealPanel()
 	CreateCombatPanel()
-	if ns.HasUnitFrameParts and ns.HasUnitFrameParts() then -- (nothing else on it)
-		CreatePortraitsPanel()
-	end
 	if ns.CreatePersonalResourcesPanel then -- (PersonalResources.lua)
 		ns.CreatePersonalResourcesPanel(ns.lowHealthKit)
 	end

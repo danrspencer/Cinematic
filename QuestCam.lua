@@ -1598,8 +1598,12 @@ function ns.QuestTalkNow()
 	if cam.held then
 		return cam.held.event, cam.clickSide
 	end
+	-- (Its window closed, the close grace still running: on only for a script
+	-- still playing, never starting one. You took the camera from a paused
+	-- one, moved a step and stopped: it started over with the window gone,
+	-- fighting your right-drag.)
 	if cam.since and cam.event and not cam.cancelled and GetTime() >= (cam.scriptsAt or 0)
-		and (ScriptOn(cam.event) or not ns.playerMoving) then
+		and (ScriptOn(cam.event) or (not ns.playerMoving and not cam.closingAt)) then
 		return cam.event, cam.clickSide
 	end
 end

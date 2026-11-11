@@ -82,6 +82,7 @@ PlateParts.lua
 PlateGuild.lua
 Triggers.lua
 Camera.lua
+MouseTurn.lua
 Director.lua
 ZoomGuard.lua
 QuestCam.lua

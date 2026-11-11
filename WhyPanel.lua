@@ -5,7 +5,7 @@
 -- you're doing right now. A row opens to all its reasons, a button to its
 -- settings and one that points it out on the screen, and to its parts, each
 -- a row of its own under it: a unit frame's (portrait, name, bars...: the
--- Unit Frame Parts page's rows, ns.UnitPartsWhy), the raid and party frames'
+-- Game Frames page's part rows, ns.UnitPartsWhy), the raid and party frames'
 -- and the minimap's (rows of their own, listed under their frame here). The
 -- search box and the filters find parts too. Pick a frame on screen
 -- starts Inspect (Why.lua), which comes back here when stopped; Copy report
@@ -28,7 +28,8 @@ local STATUS_COLOR = {
 }
 -- The Game Frames page's sections, in its order, then the rest.
 local SECTIONS = {
-	{ "units", "Unit frames" }, { "bars", "Action bars" }, { "combat", "Trackers" },
+	{ "units", "Unit frames" }, { "prd", "Personal Resource Display" }, { "bars", "Action bars" },
+	{ "combat", "Trackers" },
 	{ "interface", "Info and menus" }, { "minimap", "Minimap" }, { "party", "Party frames (not raid-style)" },
 	{ "raid", "Raid frames" }, { "rsparty", "Party frames (raid-style)" }, { "gamepad", "Gamepad" },
 	{ "overhead", "Nameplates and chat bubbles" },
@@ -41,7 +42,7 @@ end
 -- (Addons: the rows of other addons' frames, whatever they're doing.)
 local FILTERS = { { "all", "All" }, { "shown", "Showing" }, { "hidden", "Hidden" }, { "addons", "Addons" } }
 local INDENT = 18 -- (a part's row, under its frame's)
--- The Game Frames rows that are unit frames, whose parts the Unit Frame Parts page has.
+-- The Game Frames rows that are unit frames, whose parts open under them there.
 local UNIT_FRAME = { player = "PlayerFrame", petframe = "PetFrame", target = "TargetFrame", tot = "TargetFrameToT",
 	focus = "FocusFrame", focustot = "FocusFrameToT" }
 -- The rows that are parts of another row's frames, listed under it: by section, and the minimap's.
@@ -118,7 +119,7 @@ local function Kind(status)
 	return ((status == "shown" or status == "partly") and "shown") or (status == "hidden" and "hidden") or nil
 end
 
--- A unit frame's part as a row under its frame's: what the Unit Frame Parts
+-- A unit frame's part as a row under its frame's: what the Game Frames
 -- page's row for it says now (info: one of ns.UnitPartsWhy's).
 local partLabels
 local function UnitPartItem(parent, info, at)
@@ -126,7 +127,7 @@ local function UnitPartItem(parent, info, at)
 		partLabels = {}
 		for _, each in ipairs(ns.UnitPartLabels and ns.UnitPartLabels() or {}) do partLabels[each[1]] = each[2] end
 	end
-	local page = "Unit Frames"
+	local page = "Standard Frames"
 	local reasons, status = {}, "shown"
 	local function Add(state, text, where)
 		reasons[#reasons + 1] = { state = state, text = text, page = where }
@@ -137,7 +138,7 @@ local function UnitPartItem(parent, info, at)
 	elseif info.over then
 		Add("on", L["The Style hub's Overrides tab keeps it shown, whatever its row says"], "Style Overrides")
 	elseif info.pageOff then
-		Add("on", L["The Unit Frame Parts page is switched off, so every part shows as the game has it"], page)
+		Add("on", L["The Game Frames page is switched off, so every part shows as the game has it"], page)
 	else
 		status = (info.hidden or info.held) and "hidden" or "shown"
 		if info.held then
@@ -356,7 +357,7 @@ end
 
 -- A settings link: its page opened at the setting behind it (setting: its
 -- id, ns.OpenSettingByKey), glowing; else, on the row's own page (Game
--- Frames, Unit Frame Parts...), at its row there by its name; else the page alone.
+-- Frames, Game Frames...), at its row there by its name; else the page alone.
 -- (By name only there: another page can have a label like the row's, the
 -- Personal Resource Display page's "Player frame" heading.)
 local function OpenAtRow(page, setting)

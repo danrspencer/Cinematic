@@ -89,6 +89,20 @@ local function Visible(thing)
 	local ok, shown = pcall(thing.IsVisible, thing)
 	return not ok or shown ~= false
 end
+-- A thing left for later put in the look as soon as it shows: a page's other
+-- tab or a closed section opened, which doesn't open a page (left as it was,
+-- one tab showed HD and the next SD). Hooked once per thing.
+local hooked = setmetatable({}, { __mode = "k" })
+local function WhenShown(thing)
+	if hooked[thing] or type(thing) ~= "table" or type(thing.HookScript) ~= "function" then return end
+	hooked[thing] = true
+	pcall(thing.HookScript, thing, "OnShow", function(self)
+		if pending[self] and skinned[self] then
+			pending[self] = nil
+			Apply(self, skinned[self], applied)
+		end
+	end)
+end
 function ns.ApplyMenuSkin(force)
 	local skin = ns.MenuSkin()
 	local repainted = Repaint()
@@ -109,6 +123,7 @@ function ns.ApplyMenuSkin(force)
 			Apply(thing, apply, skin)
 		else
 			pending[thing] = true
+			WhenShown(thing)
 		end
 	end
 end

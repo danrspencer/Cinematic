@@ -3124,6 +3124,27 @@ local function Update(elapsed)
 		if Act("cast") and (not run or run.pausedUntil) then return end
 	end
 	if run.pausedUntil then return end
+	-- Steering with the right mouse button on the move (ns.mouseSteering):
+	-- mouselook keeps the camera behind you, so its turns and tilts wait
+	-- (turning it would turn you, and a sway carrying on mid-steer fought
+	-- your turn), and its steps wait too, till its input pause after you let
+	-- go; its zoom goes on. Then it carries on from behind you.
+	if run.travel and run.phase == "steps" and ns.mouseSteering then
+		if not run.steerHoldUntil then ns.Log("state", "camera script: you're steering, its turns wait") end
+		run.steerHoldUntil = now + (run.script.rules.cameraSecs or 2)
+	end
+	if run.steerHoldUntil then
+		if now < run.steerHoldUntil and run.phase == "steps" then
+			StopMove(movers.yaw, true)
+			StopMove(movers.pitch, true)
+			movers.yaw.suspended, movers.pitch.suspended = nil, nil
+			StepZoom(elapsed)
+			return
+		end
+		run.steerHoldUntil = nil
+		ForgetTurns() -- (a sway's middle picked again, behind you)
+		ns.Log("state", "camera script: steering over, it carries on")
+	end
 	StepMove(movers.yaw, elapsed)
 	StepMove(movers.pitch, elapsed)
 	StepZoom(elapsed)
@@ -3161,6 +3182,7 @@ end
 -- true fourth when worked out afresh. (On zoomer: this file's main chunk is
 -- at Lua's 200 locals.)
 zoomer.triggerSeen = { gen = -1, at = -1 }
+zoomer.OFF_CLEAR = 2 -- seconds a stopped scene's trigger stays off before it may start again
 -- The foot cameras, for the walk camera's handover (the watcher): travel
 -- ones hand over to any of these.
 zoomer.FOOT = { walk = "travel", run = "travel", afk = "still", cozy = "still", vista = "still", fish = "still" }
@@ -3251,11 +3273,34 @@ ns.SetOnUpdate(watcher, function(_, elapsed)
 		ns.Log("state", ("camera script %s hands over to %s"):format(run.script.name, camera))
 		Finish("handover")
 	end
+	-- A scene you stopped (took the camera, say) comes back only once its
+	-- trigger has been off a while (zoomer.OFF_CLEAR), not off for a moment:
+	-- a quest's trigger dropping for a step as you moved, then on again,
+	-- started it over and fought your right-drag. And none starts while your
+	-- mouse button's down on the camera (but the Skyriding Cam's: you steer
+	-- it by mouse); it waits till you let go.
 	if not key and not held then
-		stoppedFor = nil
+		if stoppedFor then
+			local now = GetTime()
+			zoomer.offSince = zoomer.offSince or now
+			if now - zoomer.offSince >= zoomer.OFF_CLEAR then
+				stoppedFor, zoomer.offSince = nil, nil
+			end
+		end
 	elseif key and not run and stoppedFor ~= key .. camera and not InFight() then
-		local script = ns.FindCameraScript(camera:sub(8))
-		if script then Start(script, key, camera) end
+		zoomer.offSince = nil
+		if key ~= "Skyride" and ns.MouseCameraPressed and ns.MouseCameraPressed() then
+			if zoomer.mouseWaitFor ~= key then
+				zoomer.mouseWaitFor = key
+				ns.Log("state", ("camera script for %s waits: your mouse is on the camera"):format(key))
+			end
+		else
+			zoomer.mouseWaitFor = nil
+			local script = ns.FindCameraScript(camera:sub(8))
+			if script then Start(script, key, camera) end
+		end
+	else
+		zoomer.offSince = nil
 	end
 	-- (You zoomed while ours zooms or its speed eases back: held for yours.)
 	local yourZoom = ns.lastPlayerZoomAt

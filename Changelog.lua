@@ -228,7 +228,7 @@ ns.CHANGELOG_FEATURES = {
 		text = "WeakAuras' auras fade in CineMode; auras anchored to another frame fade with that frame." },
 	{ date = "2026-10-17", page = "Advanced Frames", title = "Questie support",
 		text = "Questie's quest tracker and its quest item buttons fade with the Quest tracker row." },
-	{ date = "2026-10-17", page = "Unit Frames", title = "Unit frame parts",
+	{ date = "2026-10-17", page = "Standard Frames", title = "Unit frame parts",
 		text = "Pick which parts of your frame and the target and focus frames show (portrait, name, " ..
 		"level, frame art) for you and each kind of unit, to keep just the bars." },
 	{ date = "2026-10-17", page = "Chat", title = "Update notices",

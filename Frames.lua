@@ -1656,8 +1656,17 @@ local restoredHandlers = {}
 -- stay up indoors: minimapIndoors, Minimap page.)
 local minimapNeedsRedraw = false
 
+-- (Any time it's hidden or faded indoors counts, not just a shrink: after a
+-- /reload in a city building it came back half drawn, 2026-11-11, faded from
+-- the loading screen on without ever being shrunk.)
 local function RedrawMinimapWhenShown()
-	if not minimapNeedsRedraw or not ns.Flag(Minimap:IsVisible()) or Minimap:GetEffectiveAlpha() < 0.99 then
+	if not ns.Flag(Minimap:IsVisible()) or Minimap:GetEffectiveAlpha() < 0.99 then
+		if not minimapNeedsRedraw and Minimap.GetZoomLevels and IsIndoors and ns.Flag(IsIndoors()) then
+			minimapNeedsRedraw = true
+		end
+		return
+	end
+	if not minimapNeedsRedraw then
 		return
 	end
 	minimapNeedsRedraw = false
@@ -2067,7 +2076,7 @@ ns.COMBAT_SHOW = {
 	{ key = "focustot", label = L["Focus target of target"], default = true, frames = { "FocusFrameToT" },
 		noHoverRow = true, showKey = ns.isClassicEra and "unitPartsFocusToT" or nil,
 		showTip = L["Unticked: the small frame by the focus frame, showing who your focus is targeting, doesn't " ..
-			"show at all, CineMode or not. Which of its parts show is on the Unit Frame Parts page."],
+			"show at all, CineMode or not. Which of its parts show: click its name."],
 		showChanged = function() if ns.ApplyUnitFrameParts then ns.ApplyUnitFrameParts() end end },
 	-- The game's circle on the ground under your target: not a frame but a
 	-- setting (Effects.lua, ns.RowOnNow). Always ticked to start with
@@ -2312,7 +2321,7 @@ end
 -- The Standard Frames page's sections (page) for the rows not given one
 -- above. (Kept in the order above within each.)
 local ROW_SECTIONS = {
-	player = "units", petframe = "units", prd = "units", prdpower = "units", prdmana = "units", target = "units", tot = "units", focus = "units", focustot = "units",
+	player = "units", petframe = "units", prd = "prd", prdpower = "prd", prdmana = "prd", target = "units", tot = "units", focus = "units", focustot = "units",
 	targetcircle = "units",
 	buffs = "combat", buffcollapse = "combat", swing = "combat", castbar = "combat", meters = "combat", cooldowns = "combat",
 	cooldownsutility = "combat", cooldownsbuffs = "combat", cooldownsbars = "combat", encounter = "combat",
@@ -8629,9 +8638,9 @@ end
 -- commands come lowercased).
 function ns.ReportFrames(text)
 	local found = false
-	ns.Print(("addon on %s, CineMode %s, Game Frames switch %s, unit parts switch %s, in combat %s"):format(
+	ns.Print(("addon on %s, CineMode %s, Game Frames switch %s, in combat %s"):format(
 		tostring(ns.db.enabled), ns.lastCinematic and "on" or ("off: " .. tostring(ns.cineOffWhy)),
-		tostring(ns.db.handleFrames), tostring(ns.db.handleUnitFrames), tostring(InCombatLockdown())))
+		tostring(ns.db.handleFrames), tostring(InCombatLockdown())))
 	-- ([group]: only that fade group, exactly: [party] leaves out the raid-style
 	-- party frames' parts and the game's hidden party frames.)
 	local onlyGroup = text:match("^%[(.+)%]$")
@@ -11657,9 +11666,9 @@ do
 				local held = FRAMES.held[entry[1]]
 				for _, part in ipairs(ns.UNIT_PARTS) do
 					local key = FRAMES.Key(entry, part)
-					-- (The Style hub's Overrides tab over the row, with the page on.)
-					local over = ns.db.handleUnitFrames ~= false and ns.StyleOverride(key) or nil
-					local hide = over == "hide" or not over and ns.db.handleUnitFrames ~= false and FRAMES.Hidden(key)
+					-- (The Style hub's Overrides tab over the row, with the Game Frames page on.)
+					local over = ns.db.handleFrames ~= false and ns.StyleOverride(key) or nil
+					local hide = over == "hide" or not over and ns.db.handleFrames ~= false and FRAMES.Hidden(key)
 					local ruled = key and not over and ns.RuleTest(key) ~= nil
 					local keep = not over and held and held[part] or false
 					local paths = entry[2][part]
@@ -11716,8 +11725,8 @@ do
 	-- For the Why window (WhyPanel.lua): the parts a unit frame has on this
 	-- client, in the pages' order, each with its row's key and what decides it
 	-- now, as ns.ApplyUnitFrameParts works it out. nil: not a unit frame here.
-	-- (over: the Style hub's Overrides tab, "hide" or "show"; pageOff: the Unit
-	-- Frame Parts page's switch; held: kept hidden while its frame's up only for
+	-- (over: the Style hub's Overrides tab, "hide" or "show"; pageOff: the Game
+	-- Frames page's switch; held: kept hidden while its frame's up only for
 	-- the mouse or a Hover group; same: it goes by the target's rows.)
 	function ns.UnitPartsWhy(name)
 		local frame = _G[name]
@@ -11725,7 +11734,7 @@ do
 			if entry[1] == name then
 				local out = {}
 				local held = FRAMES.held[name]
-				local pageOff = ns.db.handleUnitFrames == false
+				local pageOff = ns.db.handleFrames == false
 				for _, part in ipairs(ns.UNIT_PARTS) do
 					local paths = entry[2][part]
 					local has = false

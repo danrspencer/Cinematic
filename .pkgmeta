@@ -20,6 +20,8 @@ ignore:
   # (Screen effects: /cine debug screenfx, the game's full-screen effects animated, dev copy only;
   # ScreenEffectsData.lua and ScreenEffects.lua ship: Vitals Vision's game effects)
   - ScreenEffectScout.lua
+  # (Mouse Turn cap: right-click turning speed cap, dev copy only)
+  - MouseTurn.lua
   # (Demo Hub: demo tools and recording scripts, in the dev copy only)
   - DemoHub.lua
   # (Cursor Hide: test pictures for /cine debug cursorsize pic, not shipped)

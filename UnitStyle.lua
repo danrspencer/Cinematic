@@ -2527,7 +2527,7 @@ function ns.CreateUnitStylePanel(kit)
 	local intro = kit.PageIntro(content, title,
 		L["How your player, target, focus, pet, target of target and party frames look. The Default tab's " ..
 		"settings are every frame's until its own tab has Same as the Default tab unticked. Which parts show: " ..
-		"the UI Visibility hub's Unit Frame Parts page."])
+		"the UI Visibility hub's Game Frames page, its Unit frames tab."])
 
 	-- The tab being edited (nil: Default), and each setting as the field it edits:
 	-- the frame's own copy while it has one, else Default's (shown greyed).

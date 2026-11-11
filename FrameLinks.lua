@@ -38,7 +38,7 @@ ns.LINK_GROUPS = {
 	} },
 	-- (These fade as their support files set them up, linked or not: the
 	-- link says which addon's frame each part is.)
-	{ key = "units", label = "Unit frames", page = "Unit Frames", parts = {
+	{ key = "units", label = "Unit frames", page = "Standard Frames", parts = {
 		{ key = "unitplayer", label = "Player", tip = "Your own frame." },
 		{ key = "unitpet", label = "Pet", tip = "Your pet's frame." },
 		{ key = "unittarget", label = "Target", tip = "Your target's frame." },

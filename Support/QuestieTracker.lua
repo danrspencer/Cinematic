@@ -221,11 +221,53 @@ local function Under(line, above, gap)
 	line:SetPoint("TOPLEFT", above, "BOTTOMLEFT", 0, -gap)
 end
 
-local function PutBack(line)
+local function ToOwnPlace(line)
 	local own = moved[line]
 	line:ClearAllPoints()
 	line:SetPoint(own[1], own[2], own[3], own[4], own[5])
+end
+
+local function PutBack(line)
+	ToOwnPlace(line)
 	moved[line], placedAt[line] = nil, nil
+end
+
+-- A line moved up: under that line (false: where the top line's own place is).
+local function Place(line, above)
+	if above then
+		Under(line, above, QUEST_GAP)
+	else
+		local top = Line(1)
+		local own = moved[top] or { top:GetPoint(1) }
+		line:ClearAllPoints()
+		line:SetPoint(own[1], own[2], own[3], own[4], own[5])
+	end
+end
+
+-- Questie works out the tracker's height from its first line's top to its
+-- last line's bottom: measured with lines moved up (a quest taken while
+-- they're moved), it came out short by the gaps closed and the last quest was
+-- cut off. So right after it measures, its lines go back to their own places,
+-- it measures again, and they go back up (same frame: nothing shows).
+local measuring = false
+local backNow = {}
+local function MeasureOwnLayout(tracker)
+	if measuring or not next(moved) then return end
+	wipe(backNow)
+	for line in pairs(moved) do
+		if CanMove(line) then
+			backNow[#backNow + 1] = line
+			ToOwnPlace(line)
+		end
+	end
+	if #backNow == 0 then return end
+	measuring = true
+	pcall(tracker.UpdateHeight, tracker)
+	measuring = false
+	for i = 1, #backNow do
+		local line = backNow[i]
+		Place(line, placedAt[line])
+	end
 end
 
 -- Its backdrop (on the tracker itself, so not a part to fade): its colors'
@@ -257,7 +299,9 @@ end
 
 -- (Kept and reused, not made each pass.)
 local wanted, runs, firstOf, wantUnder, parts = {}, {}, {}, {}, {}
+local last = {} -- the last pass's othersAlpha, quests, timers, active (for AfterRebuild)
 local function Apply(othersAlpha, quests, timers, active)
+	last[1], last[2], last[3], last[4] = othersAlpha, quests, timers, active
 	local base = _G.Questie_BaseFrame
 	if type(base) ~= "table" or not base.GetChildren then return false end
 	local questFrame = _G.TrackedQuests
@@ -311,7 +355,6 @@ local function Apply(othersAlpha, quests, timers, active)
 			if wanted[line] then lastWanted = line end
 		end
 	end
-	local top = Line(1)
 	for line in pairs(moved) do
 		if want[line] == nil and CanMove(line) then PutBack(line) end
 	end
@@ -320,13 +363,7 @@ local function Apply(othersAlpha, quests, timers, active)
 			if not moved[line] then
 				moved[line] = { line:GetPoint(1) }
 			end
-			if above then
-				Under(line, above, QUEST_GAP)
-			else
-				local own = moved[top] or { top:GetPoint(1) }
-				line:ClearAllPoints()
-				line:SetPoint(own[1], own[2], own[3], own[4], own[5])
-			end
+			Place(line, above)
 			placedAt[line] = above
 		end
 	end
@@ -348,6 +385,24 @@ local function Apply(othersAlpha, quests, timers, active)
 	return found
 end
 
+-- Questie rebuilding its tracker (a quest taken or done) refills its pooled
+-- lines with other quests and ends by setting every line back to full alpha
+-- (its hover highlight's reset): until our next pass, one frame showed the
+-- whole tracker, faded lines at full and moved lines over the others (video
+-- 2026-11-11). So the last pass runs again straight after, in the same frame.
+local function AfterRebuild()
+	if last[2] and (last[1] < 1 or next(moved)) then
+		Apply(last[1], last[2], last[3], last[4])
+	end
+end
+
 ns.WhenAddonLoads("Questie", function()
 	ns.AddQuestFocusTracker(Apply, "Questie")
+	local ok, tracker = pcall(function() return _G.QuestieLoader:ImportModule("QuestieTracker") end)
+	if ok and type(tracker) == "table" and type(tracker.UpdateHeight) == "function" then
+		hooksecurefunc(tracker, "UpdateHeight", MeasureOwnLayout)
+	end
+	if ok and type(tracker) == "table" and type(tracker.Update) == "function" then
+		hooksecurefunc(tracker, "Update", AfterRebuild)
+	end
 end)
