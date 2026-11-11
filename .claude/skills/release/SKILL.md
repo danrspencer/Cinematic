@@ -39,8 +39,9 @@ between them: nothing is committed, pushed or tagged until the user says go.
      syntax). luacheck misses these.
    - Lines starting with `(`: check the line before isn't an expression
      statement (WoW's Lua 5.1 "ambiguous syntax").
-   - Offline checks: the **full run**, exactly what GitHub's Checks runs,
-     stdin from /dev/null (a few minutes; run it in the background):
+   - Offline checks: the **full run**. This is the only place it runs:
+     GitHub's Checks workflow is manual-only since 2026-11-11 (its package
+     downloads failed too often). Stdin from /dev/null (a few minutes; run it in the background):
      `python -I Tools/offline/run.py Tools/offline/check.lua < /dev/null`
      It must end `profile modules: 0 problems`. Never the per-client runs
      (`check.lua forever Cinematic.toc`) instead: they skip the comparison
@@ -184,7 +185,7 @@ offline check still runs (step 2a): GitHub runs it on every push.
    "built-in profiles' settings changed": run it with `--update`, include
    the two snapshot files in the commit, name the changed settings in the
    report. Any other problem: show it and ask whether to fix it or ship
-   anyway (GitHub's Checks will go red).
+   anyway (nothing on GitHub re-checks it).
 3. Untracked files: include `.lua`/`.tga`/locale/docs files that belong to
    the addon (a new `.lua` must be in a `.toc`); leave out anything that
    looks like scratch (`*.md` notes in the root, logs) and name it in the

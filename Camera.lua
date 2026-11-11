@@ -1553,8 +1553,8 @@ local function PadState()
 		for index, down in ipairs(state.buttons) do
 			if down then
 				pad.down = true
-				local okName, name = pcall(C_GamePad.ButtonIndexToBinding, index)
-				if okName and type(name) == "string" and name:find("^PADRSTICK%u") then
+				local name = ns.PadButtonName and ns.PadButtonName(index)
+				if name and name:find("^PADRSTICK%u") then
 					pad.stick = true
 				end
 			end
@@ -1562,16 +1562,24 @@ local function PadState()
 	end
 	-- (The stick itself too, where the client lists it: its directions aren't
 	-- buttons on every one. Past a dead zone, so a worn stick's drift isn't you.)
-	if not pad.stick and type(state.sticks) == "table" and C_GamePad.StickIndexToConfigName then
+	-- (By ns.PadStickName, Frames.lua: the names count from 0, so the left
+	-- stick passed for this one and walking held the cameras off.)
+	if not pad.stick and type(state.sticks) == "table" and ns.PadStickName then
 		for index, stick in ipairs(state.sticks) do
-			local okName, name = pcall(C_GamePad.StickIndexToConfigName, index)
-			if okName and (name == "Right" or name == "Camera" or name == "Look") and type(stick) == "table"
+			local name = ns.PadStickName(index)
+			if (name == "Right" or name == "Camera" or name == "Look") and type(stick) == "table"
 				and type(stick.len) == "number" and stick.len > 0.25 then
 				pad.stick = true
 			end
 		end
 	end
 	return pad.on, pad.stick, pad.down
+end
+
+-- (For /cine debug padtest, Frames.lua: the camera stick pushed.)
+function ns.PadCameraStick()
+	local _, stick = PadState()
+	return stick
 end
 
 local function MouseButtonDown()
@@ -3772,6 +3780,7 @@ function ns.ReportCameraGates()
 		Check("not on a flight", not ns.OnTaxi())
 		local held = ns.HeldMovementWhat and ns.HeldMovementWhat()
 		Check("not moving by hand", not held, held and ("held: " .. held))
+		if ns.PadDebugLine then print("  " .. ns.PadDebugLine()) end
 		if cam == "run" then
 			Check("auto-run seen (its key, or moving a moment hands-free)", ns.autoRunning)
 			Check("auto-running", ns.IsAutoRunning())

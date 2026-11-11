@@ -4558,6 +4558,16 @@ do
 			end
 			return
 		end
+		-- (Your latest cast's picture and when: a buff refreshed in a fight is
+		-- told by it, ns.CheckNewBuffIcons.)
+		ns.ownCastIcon, ns.ownCastAt, ns.ownCastSpell = nil, GetTime(), nil
+		if spellID and not (issecretvalue and issecretvalue(spellID)) then
+			ns.ownCastSpell = spellID
+			local ok, texture = pcall(C_Spell and C_Spell.GetSpellTexture or GetSpellTexture, spellID)
+			if ok and texture and not (issecretvalue and issecretvalue(texture)) then
+				ns.ownCastIcon = texture
+			end
+		end
 		if ns.auraDebug ~= "log" or not (InCombatLockdown() or ns.Flag(UnitAffectingCombat("player"))) then
 			return
 		end
@@ -4714,7 +4724,29 @@ do
 			and not ns.db.buffPeekAfterCombat and not ns.OnTaxi()
 			and not (ns.db.buffPeekNotSkyriding and ns.OnSkyridingMount())
 			and (InCombatLockdown() or ns.Flag(UnitAffectingCombat("player")))
-		ns.CheckNewBuffIcons(fightBuffPeeks)
+		-- (A cast of yours in the same moment: its picture, and whether this
+		-- change updated an aura, which is what a refresh does. In a fight the
+		-- list of updated ones is secret: there at all is all that's asked.)
+		local castIcon = ns.ownCastIcon and GetTime() - (ns.ownCastAt or 0) < 0.3 and ns.ownCastIcon or nil -- (seconds)
+		local function Has(list)
+			return (issecretvalue and issecretvalue(list)) or (type(list) == "table" and next(list) ~= nil) or false
+		end
+		local info = type(updateInfo) == "table" and updateInfo or nil
+		local updated = info and Has(info.updatedAuraInstanceIDs) or false
+		-- (Auras both added and removed in one change, as one form for another.)
+		local swapped = info and Has(info.addedAuras) and Has(info.removedAuraInstanceIDs) or false
+		ns.CheckNewBuffIcons(fightBuffPeeks, castIcon, updated, swapped)
+		-- (/cine debug peeks: all that can be asked about this change, and
+		-- half a second on what the copies drew: ns.BuffProbe.)
+		if ns.auraDebug then
+			local okProbe, problem = pcall(ns.BuffProbe, "aura change", updateInfo)
+			if not okProbe then
+				ns.AuraSay("probe stopped: " .. ((issecretvalue and issecretvalue(problem)) and "secret error" or tostring(problem)))
+			end
+			if InCombatLockdown() or ns.Flag(UnitAffectingCombat("player")) then
+				C_Timer.After(0.5, ns.BuffProbeLater)
+			end
+		end
 		if inFight then
 			if gainedDebuff and fightPeeks then
 				ns.StartDebuffPeek()
@@ -4881,9 +4913,55 @@ ns.shownBuffEnds = {} -- readable picture -> its latest end time then
 ns.shownBuffTotal = nil -- how many buffs then (the highest aura index)
 ns.shownBuffPictures = nil -- aura index -> its picture then (nil: secret or none)
 ns.fightNewBuffs = {} -- place from the top -> when its time is up (0: not one of these)
-function ns.CheckNewBuffIcons(peek)
+-- A refresh in a fight on WoW Forever, where every picture and end time is
+-- secret then: the aura change says an aura was updated (updated) in the
+-- moment of a cast of yours (castIcon, the spell's picture), and the buff
+-- with that picture is found by its place, kept from the last look that could
+-- read them (ns.buffPlaceIcons: places move up as a fight's new buffs come in
+-- under other casters'). Every way of asking the game about your auras
+-- errors in a fight (tested, 2026-11-11: by index, instance ID, spell, slot),
+-- so a buff that ends in one is told apart by what stays readable: whether
+-- each icon shows a timer (a form's doesn't), and when each was due to end
+-- (ns.WhichBuffEnded). One that can't be told empties the places, and
+-- refreshes go unseen until the buffs can be read again.
+ns.buffPlaceIcons = {} -- aura index -> its picture, as last known
+ns.buffPlaceEnds = {} -- aura index -> when it's due to end (0: no timer; nil: not known)
+ns.buffTimerFlags = {} -- aura index -> its icon showed a timer at the last look
+ns.buffDurations = {} -- picture -> how long that buff lasts, as last read
+-- Which of count buffs ended, by the timers shown before and after: the one
+-- place whose leaving gives the new row. More than one fits: the one due
+-- to end now, else the only one whose end isn't known (gained in the fight).
+function ns.WhichBuffEnded(before, after, count, ends)
+	local now, fits, only, due, dueCount, unknown, unknownCount = GetTime(), 0, nil, nil, 0, nil, 0
+	for place = 1, count do
+		local fit = true
+		for index = 1, count do
+			if before[index] == nil then return nil end
+			if index < place then
+				fit = fit and before[index] == after[index]
+			elseif index > place then
+				fit = fit and before[index] == after[index - 1]
+			end
+		end
+		if fit then
+			fits, only = fits + 1, place
+			local ending = ends[place]
+			if ending == nil then
+				unknown, unknownCount = place, unknownCount + 1
+			elseif ending > 0 and math.abs(ending - now) < 2 then -- (seconds)
+				due, dueCount = place, dueCount + 1
+			end
+		end
+	end
+	if fits == 1 then return only end
+	if dueCount == 1 then return due end
+	if dueCount == 0 and unknownCount == 1 then return unknown end
+	return nil
+end
+function ns.CheckNewBuffIcons(peek, castIcon, updated, swapped)
 	C_Timer.After(0, function()
 		local shown, total, secretAt, ends, pictureAt = {}, 0, {}, {}, {}
+		local flagAt, endAt = {}, {}
 		ns.ForEachBuffIcon(function(button)
 			local okShown, isShown = pcall(button.IsShown, button)
 			if okShown and ns.Flag(isShown) then
@@ -4902,6 +4980,22 @@ function ns.CheckNewBuffIcons(peek)
 					total = math.max(total, index)
 					secretAt[index] = secret
 					pictureAt[index] = not secret and icon or nil
+					local timer = button.Duration
+					if timer then
+						local okTimer, timerShown = pcall(timer.IsShown, timer)
+						if okTimer and not (issecretvalue and issecretvalue(timerShown)) then
+							flagAt[index] = timerShown and true or false
+						end
+					end
+					if not secret and icon then
+						local ending, lasts = info.expirationTime, info.duration
+						if type(ending) == "number" and not (issecretvalue and issecretvalue(ending)) then
+							endAt[index] = ending
+						end
+						if type(lasts) == "number" and not (issecretvalue and issecretvalue(lasts)) and lasts > 0 then
+							ns.buffDurations[icon] = lasts
+						end
+					end
 				end
 			end
 		end)
@@ -4936,6 +5030,59 @@ function ns.CheckNewBuffIcons(peek)
 			if okTail and tail then
 				ns.buffOthersTail = tail
 			end
+		end
+		-- Each place's picture, kept while they're secret.
+		local known, knownEnds = ns.buffPlaceIcons, ns.buffPlaceEnds
+		local flagsBefore = ns.buffTimerFlags
+		ns.buffTimerFlags = flagAt
+		local allPlain = true
+		for index = 1, total do
+			if secretAt[index] ~= false then allPlain = false end
+		end
+		local endedIndex
+		if allPlain or not totalBefore then
+			wipe(known)
+			wipe(knownEnds)
+		elseif total < totalBefore then
+			endedIndex = totalBefore - total == 1 and ns.WhichBuffEnded(flagsBefore, flagAt, totalBefore, knownEnds) or nil
+			if endedIndex then
+				for index = endedIndex, totalBefore do
+					known[index], knownEnds[index] = known[index + 1], knownEnds[index + 1]
+				end
+			else
+				wipe(known)
+				wipe(knownEnds)
+			end
+			if ns.auraDebug then
+				ns.AuraSay(("fight buff ended: index %s"):format(tostring(endedIndex or "can't tell")))
+			end
+		elseif total > totalBefore then
+			local grew = total - totalBefore
+			local tail = math.min(ns.buffOthersTail or 0, totalBefore)
+			for index = totalBefore, totalBefore - tail + 1, -1 do
+				known[index + grew], knownEnds[index + grew] = known[index], knownEnds[index]
+			end
+			for index = totalBefore - tail + 1, total - tail do
+				known[index], knownEnds[index] = nil, nil
+			end
+			-- (One new buff in the moment of a cast: taken as that spell's.)
+			if grew == 1 and castIcon then
+				local already = false
+				for _, icon in pairs(known) do
+					if icon == castIcon then already = true end
+				end
+				if not already then
+					known[total - tail] = castIcon
+					knownEnds[total - tail] = ns.buffDurations[castIcon] and GetTime() + ns.buffDurations[castIcon] or nil
+				end
+			end
+		elseif swapped then
+			-- (One gone and one come in the same change: which went can't be told.)
+			wipe(known)
+			wipe(knownEnds)
+		end
+		for index, icon in pairs(pictureAt) do
+			known[index], knownEnds[index] = icon, endAt[index]
 		end
 		-- (Every fight change, the count the same too: one buff ending as
 		-- another comes leaves it unchanged.)
@@ -4996,6 +5143,12 @@ function ns.CheckNewBuffIcons(peek)
 						table.remove(ns.fightNewBuffs, place)
 					end
 				end
+			elseif endedIndex then
+				-- (Told by the timers shown: ns.WhichBuffEnded.)
+				local place = totalBefore - endedIndex + 1
+				if place <= #ns.fightNewBuffs then
+					table.remove(ns.fightNewBuffs, place)
+				end
 			else
 				if ns.auraDebug then
 					ns.AuraSay("fight buff ended, can't tell which: new ones' places dropped")
@@ -5026,9 +5179,27 @@ function ns.CheckNewBuffIcons(peek)
 			ns.AuraSay(("fight buff new: pictures %s, from the top %d"):format(
 				#found > 0 and table.concat(found, " ") or "none", added))
 		end
-		if #found > 0 or added > 0 then
+		-- (A refresh by a cast of yours: the place of the buff with its picture.
+		-- Not with "Not ones you cast on yourself".)
+		local refreshedPlace
+		if updated and castIcon and added == 0 and not ignored[castIcon] and not ns.db.buffPeekIgnoreSelf then
+			for index, icon in pairs(known) do
+				if icon == castIcon then
+					refreshedPlace = total - index + 1
+					-- (Due to end its full time from now.)
+					if ns.buffDurations[castIcon] then
+						knownEnds[index] = GetTime() + ns.buffDurations[castIcon]
+					end
+				end
+			end
+			if ns.auraDebug then
+				ns.AuraSay(("fight buff refreshed: cast picture %s, place from the top %s"):format(
+					tostring(castIcon), tostring(refreshedPlace or "not known")))
+			end
+		end
+		if #found > 0 or added > 0 or refreshedPlace then
 			local hold = ns.HoldTime("buffPeekTime")
-			ns.StartBuffPeek(hold, found, nil, added > 0)
+			ns.StartBuffPeek(hold, found, nil, added > 0 or refreshedPlace ~= nil)
 			-- (The new ones go on top, older ones' places moving down; on
 			-- Forever under other casters' buffs, which stay on top. A
 			-- readable one is by its picture already.)
@@ -5038,6 +5209,12 @@ function ns.CheckNewBuffIcons(peek)
 			end
 			for place = added, 1, -1 do
 				table.insert(ns.fightNewBuffs, tail + 1, secretAt[total - tail - place + 1] and GetTime() + hold or 0)
+			end
+			if refreshedPlace then
+				for place = #ns.fightNewBuffs + 1, refreshedPlace - 1 do
+					ns.fightNewBuffs[place] = 0
+				end
+				ns.fightNewBuffs[refreshedPlace] = GetTime() + hold
 			end
 		end
 	end)
@@ -5286,6 +5463,200 @@ do
 					end)
 					ns.AuraSay("  its timer copy: " .. (okCopy and state or "errors"))
 				end
+			end
+		end
+	end
+end
+
+-- /cine debug peeks: one fight's worth of answers in the log. On every aura
+-- change in a fight: what the change says and which of it is secret, what
+-- each way of asking about your buffs gives back then (by index, by the
+-- instance IDs and spells noted before the fight, by slot, by the spell just
+-- cast), what the game's icons say, and what the copies are drawing. Out of
+-- fights it only notes the buffs' instance IDs, spells and pictures, to ask
+-- by in the next one. The functions the client has are listed once.
+ns.probeBuffs = {} -- before the fight: { id, spell, icon, index } each
+do
+	local function S(value)
+		if issecretvalue and issecretvalue(value) then return "SECRET" end
+		return tostring(value)
+	end
+	local function Each(get)
+		local ok, text = pcall(get)
+		return ok and text or ("ERR(" .. S(text) .. ")")
+	end
+	local FIELDS = { "name", "spellId", "icon", "auraInstanceID", "duration", "expirationTime", "sourceUnit",
+		"isFromPlayerOrPlayerPet", "applications" }
+	local function Aura(ok, aura)
+		if not ok then return "ERR(" .. S(aura) .. ")" end
+		if issecretvalue and issecretvalue(aura) then return "SECRET" end
+		if type(aura) ~= "table" then return tostring(aura) end
+		local parts = {}
+		for _, field in ipairs(FIELDS) do
+			parts[#parts + 1] = field .. "=" .. Each(function() return S(aura[field]) end)
+		end
+		return table.concat(parts, " ")
+	end
+	local function Ask(name, ...)
+		local fn = C_UnitAuras and C_UnitAuras[name]
+		if type(fn) ~= "function" then return false, "no " .. name end
+		return pcall(fn, ...)
+	end
+	local function List(label, list)
+		if issecretvalue and issecretvalue(list) then
+			ns.AuraSay(("  probe %s: SECRET (the list itself)"):format(label))
+			return
+		end
+		if type(list) ~= "table" then
+			ns.AuraSay(("  probe %s: %s"):format(label, tostring(list)))
+			return
+		end
+		local parts = {}
+		local ok, problem = pcall(function()
+			for key, value in pairs(list) do
+				local text = S(key) .. "=" .. (type(value) == "table" and "{" .. Aura(true, value) .. "}" or S(value))
+				-- (An instance ID: can it be asked by, and used as a table's key?)
+				if type(value) ~= "table" then
+					text = text .. " byID{" .. Aura(Ask("GetAuraDataByAuraInstanceID", "player", value)) .. "}"
+						.. " asKey " .. Each(function() local t = {} t[value] = true return t[value] and "ok" end)
+				end
+				parts[#parts + 1] = text
+			end
+		end)
+		ns.AuraSay(("  probe %s: %d entries%s: %s"):format(label, #parts, ok and "" or " (walking it errors: " .. S(problem) .. ")",
+			table.concat(parts, "; ")))
+	end
+	local function Names(label, api)
+		if type(api) ~= "table" then
+			ns.AuraSay(("  probe %s: none"):format(label))
+			return
+		end
+		local names = {}
+		for name in pairs(api) do names[#names + 1] = tostring(name) end
+		table.sort(names)
+		ns.AuraSay(("  probe %s: %s"):format(label, table.concat(names, " ")))
+	end
+	local listed
+	function ns.BuffProbe(reason, updateInfo)
+		local fighting = InCombatLockdown() or ns.Flag(UnitAffectingCombat("player"))
+		if not fighting then
+			-- (Noted only when every icon can be read.)
+			local noted, plain = {}, true
+			ns.ForEachBuffIcon(function(button)
+				local okShown, isShown = pcall(button.IsShown, button)
+				local info = button.buttonInfo
+				if okShown and ns.Flag(isShown) and type(info) == "table" and info.auraType == "Buff" then
+					local id, icon, index = info.auraInstanceID, info.texture, info.index
+					if issecretvalue and (issecretvalue(id) or issecretvalue(icon) or issecretvalue(index)) then
+						plain = false
+					elseif id then
+						local ok, aura = Ask("GetAuraDataByAuraInstanceID", "player", id)
+						local spell = ok and type(aura) == "table" and aura.spellId or nil
+						if issecretvalue and issecretvalue(spell) then spell = nil end
+						noted[#noted + 1] = { id = id, spell = spell, icon = icon, index = index }
+					end
+				end
+			end)
+			if plain then ns.probeBuffs = noted end
+			return
+		end
+		if not listed then
+			listed = true
+			Names("C_UnitAuras has", C_UnitAuras)
+			Names("C_Secrets has", _G.C_Secrets)
+			Names("C_RestrictedActions has", _G.C_RestrictedActions)
+		end
+		local known, marks = {}, {}
+		for index, icon in pairs(ns.buffPlaceIcons) do known[#known + 1] = index .. ":" .. tostring(icon) end
+		table.sort(known)
+		for place, untilAt in ipairs(ns.fightNewBuffs) do
+			marks[#marks + 1] = place .. ":" .. (untilAt > 0 and ("%.1f"):format(untilAt - GetTime()) or "0")
+		end
+		ns.AuraSay(("probe (%s, now %.2f): cast spell %s picture %s %.2f s ago; buffs %s, others on top %s; " ..
+			"places known [%s]; marks from the top [%s]"):format(reason, GetTime(), tostring(ns.ownCastSpell),
+			tostring(ns.ownCastIcon), GetTime() - (ns.ownCastAt or 0), tostring(ns.shownBuffTotal),
+			tostring(ns.buffOthersTail), table.concat(known, " "), table.concat(marks, " ")))
+		if updateInfo ~= nil then
+			if type(updateInfo) == "table" then
+				List("added", updateInfo.addedAuras)
+				List("updated", updateInfo.updatedAuraInstanceIDs)
+				List("removed", updateInfo.removedAuraInstanceIDs)
+			end
+			-- By index, one past the last.
+			for index = 1, 40 do
+				local ok, aura = Ask("GetAuraDataByIndex", "player", index, "HELPFUL")
+				ns.AuraSay(("  probe by index %d: %s"):format(index, Aura(ok, aura)))
+				local secret = issecretvalue and issecretvalue(aura)
+				if not ok or (not secret and aura == nil) or (secret and index > (ns.shownBuffTotal or 0)) then break end
+			end
+			-- By what was noted before the fight: its instance ID, its spell.
+			for _, buff in ipairs(ns.probeBuffs) do
+				ns.AuraSay(("  probe noted before (index %s, id %s, spell %s, picture %s): by id {%s}; by spell {%s}"):format(
+					tostring(buff.index), tostring(buff.id), tostring(buff.spell), tostring(buff.icon),
+					Aura(Ask("GetAuraDataByAuraInstanceID", "player", buff.id)),
+					buff.spell and Aura(Ask("GetPlayerAuraBySpellID", buff.spell)) or "no spell noted"))
+			end
+			if ns.ownCastSpell then
+				ns.AuraSay(("  probe by the cast's spell %s: {%s}"):format(tostring(ns.ownCastSpell),
+					Aura(Ask("GetPlayerAuraBySpellID", ns.ownCastSpell))))
+			end
+			-- The lists of IDs and slots.
+			local ids = { Ask("GetUnitAuraInstanceIDs", "player", "HELPFUL") }
+			if ids[1] then List("GetUnitAuraInstanceIDs", ids[2]) else ns.AuraSay("  probe GetUnitAuraInstanceIDs: " .. S(ids[2])) end
+			local slots = { Ask("GetAuraSlots", "player", "HELPFUL") }
+			if slots[1] then
+				local parts = {}
+				for i = 3, #slots do
+					parts[#parts + 1] = S(slots[i]) .. " {" .. Aura(Ask("GetAuraDataBySlot", "player", slots[i])) .. "}"
+				end
+				ns.AuraSay(("  probe slots (%d): %s"):format(#slots - 2, table.concat(parts, "; ")))
+			else
+				ns.AuraSay("  probe slots: " .. S(slots[2]))
+			end
+		end
+		-- The game's icons.
+		ns.ForEachBuffIcon(function(button)
+			local okShown, isShown = pcall(button.IsShown, button)
+			if not (okShown and ns.Flag(isShown)) then return end
+			local info = type(button.buttonInfo) == "table" and button.buttonInfo or {}
+			local timer = button.Duration
+			ns.AuraSay(("  probe icon index %s: id field %s, button.auraInstanceID %s, alpha %s, scale %s, size %s, " ..
+				"timer shown %s text %s, faded level %s"):format(S(info.index), S(info.auraInstanceID),
+				S(button.auraInstanceID), Each(function() return S(button:GetAlpha()) end),
+				Each(function() return S(button:GetEffectiveScale()) end),
+				Each(function() local w, h = button:GetSize() return S(w) .. "x" .. S(h) end),
+				Each(function() return S(timer and timer:IsShown()) end),
+				Each(function() return S(timer and timer:GetText()) end), tostring(ns.newBuffFadeLevel[button])))
+		end)
+		-- What the copies draw.
+		local holder, frame = ns.buffMirrorHolder, _G.BuffFrame
+		ns.AuraSay(("  probe buff frame: visible %s, alpha %s, effective %s; holder: %s"):format(
+			Each(function() return S(frame:IsVisible()) end), Each(function() return S(frame:GetAlpha()) end),
+			Each(function() return S(frame:GetEffectiveAlpha()) end),
+			holder and Each(function()
+				return ("shown %s, alpha %s, effective %s, scale %s"):format(S(holder:IsShown()), S(holder:GetAlpha()),
+					S(holder:GetEffectiveAlpha()), S(holder:GetScale()))
+			end) or "not made"))
+		for i, mirror in ipairs(ns.buffMirrors) do
+			if mirror:IsShown() then
+				ns.AuraSay(("  probe copy %d: visible %s, width set %s, size %s, effective alpha %s, inside alpha %s, " ..
+					"picture visible %s file %s size %s, timer shown %s"):format(i,
+					Each(function() return S(mirror:IsVisible()) end), tostring(mirror.plainWidth),
+					Each(function() local w, h = mirror:GetSize() return S(w) .. "x" .. S(h) end),
+					Each(function() return S(mirror:GetEffectiveAlpha()) end),
+					Each(function() return S(mirror.Inner:GetAlpha()) end),
+					Each(function() return S(mirror.Icon:IsVisible()) end),
+					Each(function() return S(mirror.Icon:GetTexture()) end),
+					Each(function() local w, h = mirror.Icon:GetSize() return S(w) .. "x" .. S(h) end),
+					Each(function() return S(mirror.Duration:IsShown()) end)))
+			end
+		end
+	end
+	function ns.BuffProbeLater()
+		if ns.auraDebug then
+			local ok, problem = pcall(ns.BuffProbe, "half a second on")
+			if not ok then
+				ns.AuraSay("probe stopped: " .. ((issecretvalue and issecretvalue(problem)) and "secret error" or tostring(problem)))
 			end
 		end
 	end
@@ -6628,9 +6999,23 @@ padWatcher:SetScript("OnEvent", function(_, _, button)
 end)
 -- Buttons held last frame (index -> true), to see new presses.
 local padHeld = {}
+-- A button's name by its place in the mapped state's buttons. Like the
+-- sticks' (ns.PadStickName), the game counts the names from 0 and the list
+-- from 1 (seen on WoW Forever: the bottom button came as PAD2, a left stick
+-- click as PADRSTICK); worked out from whether there's a name at 0.
+function ns.PadButtonName(index)
+	if not (C_GamePad and C_GamePad.ButtonIndexToBinding) then
+		return nil
+	end
+	if ns.padButtonBase == nil then
+		local okZero, zero = pcall(C_GamePad.ButtonIndexToBinding, 0)
+		ns.padButtonBase = (okZero and type(zero) == "string") and 1 or 0
+	end
+	local ok, name = pcall(C_GamePad.ButtonIndexToBinding, index - ns.padButtonBase)
+	return ok and type(name) == "string" and name or nil
+end
 local function ButtonName(index)
-	local ok, name = pcall(C_GamePad.ButtonIndexToBinding, index)
-	return ok and name or ("button" .. index)
+	return ns.PadButtonName(index) or ("button" .. index)
 end
 -- Moving and auto-run in gamepad mode: the left stick walks you and clicking
 -- it toggles auto-run, all handled by the gamepad UI itself (no bindings, so
@@ -6643,9 +7028,26 @@ local padMoveHeld = false
 -- With the game's gamepad bars hidden on WoW Forever (ConsolePort hides them)
 -- the watch below is off, so the stick is read here instead, once a frame:
 -- walking with it passed for auto-run. (Kept on ns: no locals to spare here.)
+-- A stick's name by its place in the mapped state's sticks. The game counts
+-- the names from 0 and the list from 1 (seen on WoW Forever: the left
+-- stick's push came under "Right"), so the name is the one before; worked
+-- out from whether there's a name at 0, in case a client counts both alike.
+function ns.PadStickName(index)
+	if not (C_GamePad and C_GamePad.StickIndexToConfigName) then
+		return nil
+	end
+	if ns.padStickBase == nil then
+		local okZero, zero = pcall(C_GamePad.StickIndexToConfigName, 0)
+		ns.padStickBase = (okZero and type(zero) == "string") and 1 or 0
+	end
+	local ok, name = pcall(C_GamePad.StickIndexToConfigName, index - ns.padStickBase)
+	return ok and type(name) == "string" and name or nil
+end
+-- (The stick's directions aren't buttons on WoW Forever, so the watch's own
+-- answer isn't enough there either: the stick itself is read too.)
 function ns.PadMovementHeld()
-	if padWatcher:IsShown() then
-		return padMoveHeld
+	if padWatcher:IsShown() and padMoveHeld then
+		return true
 	end
 	local now = GetTime()
 	if ns.padStickAt == now then
@@ -6668,16 +7070,265 @@ function ns.PadMovementHeld()
 		end
 	end
 	-- (The stick itself too, past a dead zone: its directions aren't buttons on every client.)
-	if not ns.padStickHeld and type(state.sticks) == "table" and C_GamePad.StickIndexToConfigName then
+	if not ns.padStickHeld and type(state.sticks) == "table" then
 		for index, stick in ipairs(state.sticks) do
-			local okName, name = pcall(C_GamePad.StickIndexToConfigName, index)
-			if okName and (name == "Left" or name == "Movement") and type(stick) == "table"
+			local name = ns.PadStickName(index)
+			if (name == "Left" or name == "Movement") and type(stick) == "table"
 				and type(stick.len) == "number" and stick.len > 0.25 then
 				ns.padStickHeld = true
 			end
 		end
 	end
 	return ns.padStickHeld
+end
+-- For /cine debug mode: what the gamepad reads now (mode, the watch, every
+-- button down by name, each stick by name and push).
+function ns.PadDebugLine()
+	local parts = { ("gamepad: mode %s, watch %s, GamePadEnable %s, stick held %s"):format(
+		tostring(ns.IsGamePadOn()), tostring(padWatcher:IsShown()), tostring(GetCVar("GamePadEnable")),
+		tostring(ns.PadMovementHeld())) }
+	if not (C_GamePad and C_GamePad.GetDeviceMappedState) then
+		return parts[1] .. ", no reading"
+	end
+	local device = C_GamePad.GetActiveDeviceID and C_GamePad.GetActiveDeviceID() or nil
+	local ok, state = pcall(C_GamePad.GetDeviceMappedState, device)
+	parts[#parts + 1] = ("device %s, state %s"):format(tostring(device), ok and type(state) or "error")
+	if ok and type(state) == "table" then
+		local down = {}
+		for index, held in ipairs(type(state.buttons) == "table" and state.buttons or {}) do
+			if held then down[#down + 1] = tostring(ButtonName(index)) end
+		end
+		parts[#parts + 1] = "down: " .. (#down > 0 and table.concat(down, " ") or "none")
+		local sticks = {}
+		for index, stick in ipairs(type(state.sticks) == "table" and state.sticks or {}) do
+			sticks[#sticks + 1] = ("%s=%.2f"):format(tostring(ns.PadStickName(index) or index),
+				type(stick) == "table" and type(stick.len) == "number" and stick.len or -1)
+		end
+		parts[#parts + 1] = "sticks: " .. (#sticks > 0 and table.concat(sticks, " ") or "none")
+	end
+	return table.concat(parts, "; ")
+end
+-- /cine debug padtest: one run that settles how the gamepad, the turn keys
+-- and the chat time are read. Five timed steps, each sampled ten times a
+-- second after a moment to get going (presses the whole step through), then
+-- a line of what was read per step, a verdict for each and one overall.
+-- Show chat for is set to 15 for the run (put back after), so a camera's
+-- shorter time shows. Typed again while running: stops.
+-- (On ns, not locals: this file is at Lua's cap of 200.)
+-- The test's box: what to do, in large type on a dark panel near the top of
+-- the screen, up the whole step with a countdown under it (the error-text
+-- line it used faded in seconds and was lost against the world). Not a
+-- child of UIParent, so CineMode hiding the interface can't take it.
+function ns.PadTestBox(text, sub, r, g, b)
+	local box = ns.padTestBox
+	if not box then
+		box = CreateFrame("Frame")
+		box:SetFrameStrata("FULLSCREEN_DIALOG")
+		box:SetPoint("TOP", UIParent, "TOP", 0, -120)
+		local edge = box:CreateTexture(nil, "BACKGROUND", nil, -1)
+		edge:SetPoint("TOPLEFT", -3, 3)
+		edge:SetPoint("BOTTOMRIGHT", 3, -3)
+		edge:SetColorTexture(1, 0.82, 0, 1)
+		local fill = box:CreateTexture(nil, "BACKGROUND", nil, 0)
+		fill:SetAllPoints()
+		fill:SetColorTexture(0, 0, 0, 0.92)
+		box.text = box:CreateFontString(nil, "OVERLAY")
+		box.text:SetFont((GameFontNormalLarge:GetFont()), 22, "")
+		box.text:SetWidth(660)
+		box.text:SetPoint("TOP", 0, -18)
+		box.text:SetTextColor(1, 1, 1)
+		box.sub = box:CreateFontString(nil, "OVERLAY")
+		box.sub:SetFont((GameFontNormalLarge:GetFont()), 18, "")
+		box.sub:SetWidth(660)
+		box.sub:SetPoint("TOP", box.text, "BOTTOM", 0, -12)
+		ns.padTestBox = box
+	end
+	box:SetScale(UIParent:GetEffectiveScale())
+	box.text:SetText(text)
+	box.sub:SetText(sub or "")
+	box.sub:SetTextColor(r or 1, g or 1, b or 1)
+	box:SetSize(700, box.text:GetStringHeight() + box.sub:GetStringHeight() + 48)
+	box:Show()
+end
+function ns.PadTestBoxHide(run)
+	if ns.padTestBox and (run == nil or run == ns.padTestRun) then ns.padTestBox:Hide() end
+end
+function ns.PadTestEnd(keptChat)
+	if ns.padTestTicker then ns.padTestTicker:Cancel() end
+	ns.padTestTicker = nil
+	if ns.db and keptChat ~= nil then ns.db.chatPeekTime = keptChat end
+	ns.padTestChat = nil
+end
+function ns.PadTest(only)
+	local PAD_TEST_CHAT, PadTestEnd = 15, ns.PadTestEnd
+	if ns.padTestTicker then
+		PadTestEnd(ns.padTestChat)
+		ns.PadTestBoxHide()
+		ns.Print("gamepad test stopped")
+		return
+	end
+	local PHASES = {
+		{ key = "walk", say = "1/5: WALK with the LEFT stick, don't touch the camera" },
+		{ key = "look", say = "2/5: STAND STILL and turn the camera with the RIGHT stick" },
+		{ key = "button", say = "3/5: STAND STILL and press A (Xbox) or Cross (PlayStation) a few times, slowly: "
+			.. "the LOWEST of the 4 buttons on the RIGHT, not the d-pad" },
+		{ key = "auto", say = "4/5: CLICK the LEFT stick to auto-run, then let go of everything" },
+		{ key = "keys", say = "5/5: LET GO of the pad. On the KEYBOARD hold the RIGHT mouse button and hold A or D (strafe)" },
+	}
+	-- (Step numbers given, "3 5": only those steps.)
+	if type(only) == "string" and only:find("%d") then
+		local kept = {}
+		for number in only:gmatch("%d") do
+			if PHASES[tonumber(number)] then kept[#kept + 1] = PHASES[tonumber(number)] end
+		end
+		if #kept > 0 then PHASES = kept end
+	end
+	local LEAD, LENGTH = 4, 12
+	local started, results, at = GetTime(), {}, 0
+	ns.padTestRun = (ns.padTestRun or 0) + 1
+	local downBefore = {}
+	ns.padTestChat = ns.db.chatPeekTime
+	ns.db.chatPeekTime = PAD_TEST_CHAT
+	local CHAT_CAMS = { flight = true, walk = true, run = true, idle = true, cozy = true, vista = true, fish = true }
+	local function Say(text)
+		ns.Print(text)
+		ns.Log("padtest", text)
+	end
+	local function Has(list, name)
+		for _, each in ipairs(list) do
+			if each == name then return true end
+		end
+		return false
+	end
+	local function Report()
+		local failed = {}
+		for index, phase in ipairs(PHASES) do
+			local r = results[index]
+			local sticks, buttons, cams = {}, {}, {}
+			for name, push in pairs(r.sticks) do sticks[#sticks + 1] = ("%s=%.2f"):format(name, push) end
+			for name in pairs(r.buttons) do buttons[#buttons + 1] = name end
+			for name, count in pairs(r.cams) do cams[#cams + 1] = ("%s=%d"):format(name, count) end
+			table.sort(sticks)
+			table.sort(buttons)
+			table.sort(cams)
+			Say(("%s: %d samples, moving %d, stick held %d, by hand %d, auto-run %d (flag %d), camera stick %d; "
+				.. "top push %s; held %s; presses %s (game's raw name %s); camera now %s; chat time wrong %d of %d"):format(
+				phase.key, r.n, r.moving, r.held, r.manual, r.auto, r.flag, r.cam,
+				#sticks > 0 and table.concat(sticks, " ") or "none", #buttons > 0 and table.concat(buttons, " ") or "none",
+				#r.presses > 0 and table.concat(r.presses, " ") or "none",
+				#r.raw > 0 and table.concat(r.raw, " ") or "none",
+				#cams > 0 and table.concat(cams, " ") or "none", r.chatWrong, r.n))
+			local ok
+			if phase.key == "walk" then
+				ok = r.moving > 0 and r.held >= r.moving * 0.8 and r.auto == 0 and r.cam == 0
+			elseif phase.key == "look" then
+				ok = r.cam >= r.n * 0.5 and r.held == 0
+			elseif phase.key == "button" then
+				ok = Has(r.presses, "PAD1") and not Has(r.presses, "PAD2")
+			elseif phase.key == "auto" then
+				ok = r.auto >= r.n * 0.5 and r.held == 0 and Has(r.presses, "PADLSTICK")
+			else
+				-- (By the keys alone: the pad's stick held passed it last time.)
+				ok = r.moving > 0 and r.manual >= r.moving * 0.8 and r.auto == 0 and r.held == 0 and #r.presses == 0
+			end
+			if r.chatWrong > 0 then ok = false end
+			if not ok then failed[#failed + 1] = phase.key end
+		end
+		ns.PadStickName(1) -- (each works out where its names start on first use: a run with no press hadn't yet)
+		ns.PadButtonName(1)
+		Say(("setup: gamepad mode %s, watch %s, GamePadEnable %s, stick names start at %s, button names start at %s, "
+			.. "button event %s, client %s, chat default %s"):format(
+			tostring(ns.IsGamePadOn()), tostring(padWatcher:IsShown()), tostring(GetCVar("GamePadEnable")),
+			tostring(ns.padStickBase == 1 and 0 or 1), tostring(ns.padButtonBase == 1 and 0 or 1),
+			tostring(ns.padEventOK), ns.isRetail and "retail" or "forever", tostring(ns.DEFAULTS.chatPeekTime)))
+		local result = #failed == 0 and ("RESULT: all %d passed"):format(#PHASES)
+			or ("RESULT: FAILED " .. table.concat(failed, ", "))
+		Say(result)
+		return result, #failed == 0
+	end
+	local function Tick()
+		local elapsed = GetTime() - started
+		local index = math.floor(elapsed / LENGTH) + 1
+		if index > #PHASES then
+			PadTestEnd(ns.padTestChat)
+			local result, passed = Report()
+			ns.PadTestBox("Test done. You can let go.", result .. "  (details in chat; say \"check log\")",
+				passed and 0.3 or 1, passed and 1 or 0.35, passed and 0.3 or 0.35)
+			local run = ns.padTestRun
+			C_Timer.After(12, function() ns.PadTestBoxHide(run) end)
+			return
+		end
+		if index ~= at then
+			at = index
+			results[index] = { n = 0, moving = 0, held = 0, manual = 0, auto = 0, flag = 0, cam = 0, sticks = {},
+				buttons = {}, presses = {}, raw = {}, cams = {}, chatWrong = 0 }
+			Say(PHASES[index].say)
+		end
+		local r = results[index]
+		-- (What the game itself reads, the whole step through: new presses by
+		-- our name and the game's own for the same place, unshifted.)
+		if C_GamePad and C_GamePad.GetDeviceMappedState then
+			local ok, state = pcall(C_GamePad.GetDeviceMappedState, C_GamePad.GetActiveDeviceID
+				and C_GamePad.GetActiveDeviceID() or nil)
+			if ok and type(state) == "table" then
+				for i, down in ipairs(type(state.buttons) == "table" and state.buttons or {}) do
+					if down then
+						r.buttons[tostring(ButtonName(i))] = true
+						if not downBefore[i] and #r.presses < 12 then
+							r.presses[#r.presses + 1] = tostring(ButtonName(i))
+							local okRaw, raw = pcall(C_GamePad.ButtonIndexToBinding, i)
+							r.raw[#r.raw + 1] = okRaw and tostring(raw) or "?"
+						end
+					end
+					downBefore[i] = down or nil
+				end
+				for i, stick in ipairs(type(state.sticks) == "table" and state.sticks or {}) do
+					local name = tostring(ns.PadStickName(i) or i)
+					local push = type(stick) == "table" and type(stick.len) == "number" and stick.len or 0
+					if push > 0.25 and push > (r.sticks[name] or 0) then r.sticks[name] = push end
+				end
+			end
+		end
+		-- (The box: the step the whole time, a get-ready count, then the time left.)
+		local into = elapsed - (index - 1) * LENGTH
+		if into < LEAD then
+			ns.PadTestBox(PHASES[index].say, ("GET READY: recording starts in %d"):format(math.ceil(LEAD - into)), 1, 0.82, 0)
+		else
+			ns.PadTestBox(PHASES[index].say, ("RECORDING: keep going, %d sec left"):format(math.ceil(LENGTH - into)),
+				0.3, 1, 0.3)
+		end
+		if into < LEAD then
+			return
+		end
+		r.n = r.n + 1
+		if ns.playerMoving then r.moving = r.moving + 1 end
+		if ns.PadMovementHeld() then r.held = r.held + 1 end
+		if ns.MovingManually and ns.MovingManually() then r.manual = r.manual + 1 end
+		if ns.IsAutoRunning and ns.IsAutoRunning() then r.auto = r.auto + 1 end
+		if ns.autoRunning then r.flag = r.flag + 1 end
+		if ns.PadCameraStick and ns.PadCameraStick() then r.cam = r.cam + 1 end
+		-- The chat time: the player's own with no camera playing, at most the
+		-- default while one of the cameras that shorten it plays.
+		local cam = ns.activeCam
+		r.cams[tostring(cam)] = (r.cams[tostring(cam)] or 0) + 1
+		local expected = PAD_TEST_CHAT
+		if cam == "flight" or cam == "walk" or cam == "run" then
+			expected = math.min(ns.DEFAULTS.chatPeekTime, PAD_TEST_CHAT)
+		elseif cam and CHAT_CAMS[cam] then
+			expected = nil -- (a standing-still one: short only past the standing-still delay, not tested here)
+		end
+		if expected and ns.HoldTime("chatPeekTime") ~= expected then r.chatWrong = r.chatWrong + 1 end
+	end
+	ns.padTestTicker = C_Timer.NewTicker(0.1, function()
+		local ok, err = pcall(Tick)
+		if not ok then
+			PadTestEnd(ns.padTestChat)
+			Say("gamepad test error: " .. tostring(err))
+			pcall(ns.PadTestBox, "Test stopped by an error", "say \"check log\"", 1, 0.35, 0.35)
+			local run = ns.padTestRun
+			C_Timer.After(12, function() ns.PadTestBoxHide(run) end)
+		end
+	end)
 end
 ns.SetOnUpdate(padWatcher, ns.Profiled("Gamepad watch", function()
 	CheckPendingPress()

@@ -881,20 +881,32 @@ do
 	end
 end
 
--- /cine debug combattext: for 30 seconds, every UNIT_COMBAT the game sends
--- (for the Combat Text Style page, Tools/combat-text-plan.md): from one
--- listener for all units and one per nameplate, each value plain or secret,
--- whether a secret amount still goes on a text (SetText), and whether its
--- plate is locked (forbidden). Also the first COMBAT_LOG_MESSAGEs, for
--- telling whose hit it was later. Run it again to stop early.
+-- /cine debug combattext: records everything about our combat numbers until
+-- run again (or 3 minutes), into its own saved list (ns.db.combatTextLog, not
+-- the log: that one's short and fills with other lines). Every UNIT_COMBAT on
+-- any unit, every combat log line, your casts, form and target changes,
+-- plates coming and going, and from CombatTextStyle.lua each step it takes
+-- with a hit (skipped and why, waiting for a line, left out, drawn) and how
+-- each number it drew stands a moment later (visible, where, how big). One
+-- run, then /reload, is all a look at a problem needs.
 do
-	local SECONDS, MAX_LINES, MAX_LOG_LINES = 30, 150, 8
-	local probe, plateFrames, stats, lines, logLines, stopAt
-	local scratch -- (a hidden text: does a secret amount go on it?)
+	local SECONDS, MAX_LINES = 180, 4000
+	local probe, stopAt, log, counts
 
 	local function State(value)
 		if issecretvalue and issecretvalue(value) then return "<secret>" end
 		return tostring(value)
+	end
+
+	local function Rec(text)
+		if not log or #log >= MAX_LINES then return end
+		log[#log + 1] = ("%.3f %s"):format(GetTime(), text)
+	end
+
+	local function Call(fn, ...)
+		if type(fn) ~= "function" then return "none" end
+		local ok, value = pcall(fn, ...)
+		return ok and State(value) or "error"
 	end
 
 	local function PlateInfo(unit)
@@ -907,110 +919,121 @@ do
 		return forbidden and "plate LOCKED" or "plate open"
 	end
 
-	local function TryText(amount)
-		if not scratch then
-			scratch = UIParent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-			scratch:Hide()
-		end
-		local ok = pcall(scratch.SetText, scratch, amount)
-		if not ok then stats.textFail = stats.textFail + 1 end
-		return ok and "text ok" or "TEXT FAILED"
+	local function Who(unit)
+		if type(unit) ~= "string" or issecretvalue and issecretvalue(unit) then return "unit=" .. State(unit) end
+		return ("unit=%s name=%s guid=%s target=%s attackable=%s tapped by others=%s %s"):format(unit,
+			Call(UnitName, unit), Call(UnitGUID, unit), Call(UnitIsUnit, unit, "target"),
+			Call(UnitCanAttack, "player", unit), Call(UnitIsTapDenied, unit), PlateInfo(unit))
 	end
 
-	local function Line(tag, text)
-		lines = lines + 1
-		if lines <= MAX_LINES then ns.Log("combattext", tag .. " " .. text) end
+	local function Form()
+		return ("form %s (id %s), power type %s"):format(Call(_G.GetShapeshiftForm), Call(_G.GetShapeshiftFormID),
+			Call(UnitPowerType, "player"))
 	end
 
-	local function OnCombat(tag, unit, action, flag, amount, school)
-		stats.events = stats.events + 1
-		local secret = issecretvalue and issecretvalue(amount)
-		if secret then stats.secretAmounts = stats.secretAmounts + 1 end
-		local isTarget = "?"
-		if type(unit) == "string" and not (issecretvalue and issecretvalue(unit)) then
-			local ok, same = pcall(UnitIsUnit, unit, "target")
-			isTarget = ok and State(same) or "error"
-		end
-		Line(tag, ("unit=%s action=%s flag=%s amount=%s school=%s target=%s %s %s combat=%s"):format(
-			State(unit), State(action), State(flag), State(amount), State(school), isTarget,
-			PlateInfo(unit), TryText(amount), tostring(InCombatLockdown())))
+	local function Buffs()
+		local names = {}
+		pcall(function()
+			local get = C_UnitAuras and C_UnitAuras.GetAuraDataByIndex
+			for i = 1, 40 do
+				local aura = get("player", i, "HELPFUL")
+				if not aura then break end
+				names[#names + 1] = State(aura.name) .. " (" .. State(aura.spellId) .. ")"
+			end
+		end)
+		return "buffs: " .. (names[1] and table.concat(names, ", ") or "none read")
 	end
 
-	local function WatchPlate(unit)
-		if plateFrames[unit] then return end
-		local frame = CreateFrame("Frame")
-		frame:SetScript("OnEvent", function(_, _, ...) OnCombat("plate", ...) end)
-		local ok = pcall(frame.RegisterUnitEvent, frame, "UNIT_COMBAT", unit)
-		plateFrames[unit] = frame
-		if not ok then Line("plate", unit .. ": RegisterUnitEvent UNIT_COMBAT refused") end
+	local function StateLine()
+		local ok, line = pcall(ns.CombatTextStateLine)
+		return "state: " .. tostring(line) .. (ok and "" or " (error)")
 	end
 
 	local function Stop(why)
 		if not probe then return end
 		probe:UnregisterAllEvents()
 		ns.SetOnUpdate(probe, nil)
-		for _, frame in pairs(plateFrames) do frame:UnregisterAllEvents() end
-		ns.Log("combattext", ("stopped (%s): %d UNIT_COMBAT, %d with a secret amount, %d SetText failures,"
-			.. " %d combat log lines%s"):format(why, stats.events, stats.secretAmounts, stats.textFail,
-			stats.logLines, lines > MAX_LINES and (", " .. (lines - MAX_LINES) .. " lines not logged") or ""))
-		ns.Print(("combattext: stopped, %d events (in /cine log)"):format(stats.events))
+		ns.combatTextRecord = nil
+		Rec(StateLine())
+		Rec(("stopped (%s): %d UNIT_COMBAT, %d combat log lines, %d lines kept%s"):format(why, counts.combat,
+			counts.log, #log, #log >= MAX_LINES and " (FULL: the rest was dropped)" or ""))
+		ns.Print(("combattext: stopped, %d lines recorded. Now /reload"):format(#log))
 		probe = nil
 	end
 
 	function ns.CombatTextProbe()
 		if probe then Stop("run again") return end
-		probe, plateFrames, lines, logLines = CreateFrame("Frame"), {}, 0, 0
-		stats = { events = 0, secretAmounts = 0, textFail = 0, logLines = 0 }
+		probe, counts = CreateFrame("Frame"), { combat = 0, log = 0 }
+		ns.db.combatTextLog = {}
+		log = ns.db.combatTextLog
 		stopAt = GetTime() + SECONDS
 		local get = (C_CVar and C_CVar.GetCVar) or GetCVar
-		local function CVar(name) local ok, v = pcall(get, name) return ok and tostring(v) or "error" end
+		local function CVar(name) return name .. "=" .. Call(get, name) end
 		local loaded = C_AddOns and C_AddOns.IsAddOnLoaded or IsAddOnLoaded
-		local function Loaded(name) local ok, v = pcall(loaded or error, name) return ok and tostring(v) or "?" end
 		local plates = C_NamePlate and C_NamePlate.GetNamePlates and C_NamePlate.GetNamePlates() or {}
-		ns.Log("combattext", ("client %s, combat=%s, target=%s (%s), plates=%d, damage_v2=%s healing_v2=%s,"
-			.. " hideWorldText=%s, DAMAGE_TEXT_FONT=%s, ForeverCombatText=%s MSBT=%s"):format(
-			tostring((select(4, GetBuildInfo()))), tostring(InCombatLockdown()), State(UnitName("target")),
-			State(UnitClassification and UnitClassification("target")), #plates,
-			CVar("floatingCombatTextCombatDamage_v2"), CVar("floatingCombatTextCombatHealing_v2"),
-			tostring(ns.db and ns.db.hideWorldText), tostring(DAMAGE_TEXT_FONT),
-			Loaded("ForeverCombatText"), Loaded("MikScrollingBattleText")))
-		local logOn = "no C_CombatLog"
-		if C_CombatLog and C_CombatLog.AreFilteredEventsEnabled then
-			local ok, on = pcall(C_CombatLog.AreFilteredEventsEnabled)
-			logOn = ok and State(on) or "error"
-		end
-		local globalOK = pcall(probe.RegisterEvent, probe, "UNIT_COMBAT")
-		local logOK = pcall(probe.RegisterEvent, probe, "COMBAT_LOG_MESSAGE")
-		probe:RegisterEvent("NAME_PLATE_UNIT_ADDED")
-		ns.Log("combattext", ("listeners: all units %s, COMBAT_LOG_MESSAGE %s (combat log filtered events on: %s)")
-			:format(globalOK and "on" or "REFUSED", logOK and "on" or "REFUSED", logOn))
+		Rec(("start %s: client %s, class %s, level %s, %s, combat=%s, group=%s, pet=%s, plates=%d"):format(
+			date("%Y-%m-%d %H:%M:%S"), tostring((select(4, GetBuildInfo()))), Call(_G.UnitClassBase or UnitClass, "player"),
+			Call(UnitLevel, "player"), Form(), tostring(InCombatLockdown()), Call(IsInGroup), Call(UnitExists, "pet"),
+			#plates))
+		Rec(Buffs())
+		Rec(StateLine())
+		Rec(("cvars: %s %s %s %s %s %s; DAMAGE_TEXT_FONT=%s; ForeverCombatText=%s MSBT=%s; combat log filtered events on=%s")
+			:format(CVar("floatingCombatTextCombatDamage_v2"), CVar("floatingCombatTextCombatHealing_v2"),
+			CVar("floatingCombatTextCombatDamage"), CVar("WorldTextScale_v2"), CVar("WorldTextRampDuration_v2"),
+			CVar("nameplateShowEnemies"), State(DAMAGE_TEXT_FONT), Call(loaded, "ForeverCombatText"),
+			Call(loaded, "MikScrollingBattleText"), Call(C_CombatLog and C_CombatLog.AreFilteredEventsEnabled)))
+		Rec("target: " .. Who("target"))
 		for i = 1, 40 do
 			local unit = "nameplate" .. i
-			if UnitExists(unit) then WatchPlate(unit) end
+			if UnitExists(unit) then Rec("plate here: " .. Who(unit)) end
 		end
+		local refused = {}
+		for _, event in ipairs({ "UNIT_COMBAT", "COMBAT_LOG_MESSAGE", "NAME_PLATE_UNIT_ADDED", "NAME_PLATE_UNIT_REMOVED",
+			"UPDATE_SHAPESHIFT_FORM", "PLAYER_TARGET_CHANGED", "PLAYER_REGEN_DISABLED", "PLAYER_REGEN_ENABLED",
+			"GROUP_ROSTER_UPDATE" }) do
+			if not pcall(probe.RegisterEvent, probe, event) then refused[#refused + 1] = event end
+		end
+		if not pcall(probe.RegisterUnitEvent, probe, "UNIT_SPELLCAST_SUCCEEDED", "player", "pet") then
+			refused[#refused + 1] = "UNIT_SPELLCAST_SUCCEEDED"
+		end
+		Rec("events refused: " .. (refused[1] and table.concat(refused, ", ") or "none"))
 		probe:SetScript("OnEvent", function(_, event, ...)
 			if event == "UNIT_COMBAT" then
-				OnCombat("all", ...)
-			elseif event == "NAME_PLATE_UNIT_ADDED" then
-				local unit = ...
-				if type(unit) == "string" and not (issecretvalue and issecretvalue(unit)) then WatchPlate(unit) end
+				counts.combat = counts.combat + 1
+				local unit, action, flag, amount, school = ...
+				Rec(("UNIT_COMBAT %s | action=%s flag=%s amount=%s school=%s"):format(Who(unit), State(action),
+					State(flag), State(amount), State(school)))
 			elseif event == "COMBAT_LOG_MESSAGE" then
-				stats.logLines = stats.logLines + 1
-				logLines = logLines + 1
-				if logLines <= MAX_LOG_LINES then
-					local parts = {}
-					for i = 1, math.min(select("#", ...), 8) do
-						local value = select(i, ...)
-						parts[#parts + 1] = type(value) .. ":" .. State(value)
-					end
-					ns.Log("combattext", "log " .. table.concat(parts, " | "))
+				counts.log = counts.log + 1
+				local parts = {}
+				for i = 1, math.min(select("#", ...), 10) do
+					local value = select(i, ...)
+					parts[#parts + 1] = type(value) .. ":" .. State(value)
 				end
+				Rec(("LOG LINE (%d values) %s"):format(select("#", ...), table.concat(parts, " | ")))
+			elseif event == "UNIT_SPELLCAST_SUCCEEDED" then
+				local unit, _, spell = ...
+				local name = C_Spell and C_Spell.GetSpellName or GetSpellInfo
+				Rec(("CAST by %s: %s (%s)"):format(State(unit), Call(name, spell), State(spell)))
+			elseif event == "UPDATE_SHAPESHIFT_FORM" then
+				Rec("FORM: " .. Form() .. "; " .. Buffs())
+			elseif event == "PLAYER_TARGET_CHANGED" then
+				Rec("TARGET: " .. Who("target"))
+			elseif event == "PLAYER_REGEN_DISABLED" then
+				Rec("FIGHT STARTS; " .. Form() .. "; " .. StateLine())
+			elseif event == "PLAYER_REGEN_ENABLED" then
+				Rec("FIGHT ENDS; " .. StateLine())
+			elseif event == "GROUP_ROSTER_UPDATE" then
+				Rec("GROUP: in a group " .. Call(IsInGroup))
+			else
+				Rec((event == "NAME_PLATE_UNIT_ADDED" and "PLATE COMES: " or "PLATE GOES: ") .. Who((...)))
 			end
 		end)
+		ns.combatTextRecord = Rec
 		ns.SetOnUpdate(probe, function()
-			if GetTime() >= stopAt then Stop("30 seconds") end
+			if GetTime() >= stopAt then Stop("3 minutes") end
 		end)
-		ns.Print(("combattext: listening %d seconds, hit something (run again to stop)"):format(SECONDS))
+		ns.Print("combattext: recording for 3 minutes. Fight as you do, then /reload (no need to stop it first)")
 	end
 end
 

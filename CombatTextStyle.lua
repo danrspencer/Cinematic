@@ -36,7 +36,6 @@ DEFAULTS.combatTextHeight = 0         -- extra pixels above the plate
 DEFAULTS.combatTextSchoolColors = false -- spell damage in its school's color (else the game's yellow)
 DEFAULTS.combatTextHeals = true       -- heals on friendly plates, in green
 DEFAULTS.combatTextMisses = true      -- Miss, Dodge, Parry, Immune...
-DEFAULTS.combatTextScope = "auto"     -- "auto" (yours, by the combat log; no log: your target's in a group), "all", "target"
 
 -- The game's floating text font, read as this file loads: before Core's
 -- ADDON_LOADED blanks it (hideWorldText).
@@ -117,7 +116,11 @@ local function NewNumber()
 	if not number then
 		number = CreateFrame("Frame", nil, holder)
 		number:SetSize(1, 1)
-		number.text = number:CreateFontString(nil, "OVERLAY")
+		-- (The words sit in a frame of their own: its alpha is the amount, so a
+		-- hit of 0 draws nothing. See Spawn.)
+		number.body = CreateFrame("Frame", nil, number)
+		number.body:SetAllPoints()
+		number.text = number.body:CreateFontString(nil, "OVERLAY")
 		number.text:SetPoint("CENTER")
 		-- (Behind it: its edge, the words again eight times nudged each way in
 		-- black; and its drop shadow, once more up and to the right. Each in a
@@ -125,7 +128,7 @@ local function NewNumber()
 		-- order was anyone's, the black over the yellow, seen 2026-11-10.)
 		number.copies = {}
 		for i = 1, 9 do
-			local copy = number:CreateFontString(nil, i == 9 and "BORDER" or "ARTWORK")
+			local copy = number.body:CreateFontString(nil, i == 9 and "BORDER" or "ARTWORK")
 			copy.angle = i <= 8 and (i - 1) * math.pi / 4 or nil
 			number.copies[i] = copy
 		end
@@ -240,6 +243,44 @@ local function SlotX(plate, now, width)
 	return left - GAP - width / 2
 end
 
+-- /cine debug combattext running: a number as it's made, and how it stands a
+-- moment later (drawn? where? how see-through?).
+local function Seen(value)
+	if issecretvalue and issecretvalue(value) then return "<secret>" end
+	return type(value) == "number" and ("%.1f"):format(value) or tostring(value)
+end
+local function RecordSpawn(number, plate, unit, amount, color, crit, size)
+	local record = ns.combatTextRecord
+	if not record then return end
+	local function Stand(tag)
+		local okC, cx, cy = pcall(number.GetCenter, number)
+		local okP, px, py = pcall(plate.GetCenter, plate)
+		local okW, width = pcall(number.text.GetStringWidth, number.text)
+		local okA, alpha = pcall(number.GetEffectiveAlpha, number)
+		local okS, scale = pcall(number.GetEffectiveScale, number)
+		local okPA, plateAlpha = pcall(plate.GetEffectiveAlpha, plate)
+		record(("%s unit=%s words=%s color=%.2f,%.2f,%.2f crit=%s size=%s visible=%s shown=%s alpha=%s scale=%s"
+			.. " center=%s,%s width=%s strata=%s level=%s | plate visible=%s alpha=%s center=%s,%s strata=%s"
+			.. " level=%s | holder visible=%s live=%d | alpha from amount took=%s, words alpha=%s"):format(
+			tag, tostring(unit), Seen(amount), color[1], color[2], color[3], tostring(crit), Seen(size),
+			tostring(number:IsVisible()), tostring(number:IsShown()), okA and Seen(alpha) or "error",
+			okS and Seen(scale) or "error", okC and Seen(cx) or "error", okC and Seen(cy) or "error",
+			okW and Seen(width) or "error", tostring(number:GetFrameStrata()), tostring(number:GetFrameLevel()),
+			tostring(plate:IsVisible()), okPA and Seen(plateAlpha) or "error", okP and Seen(px) or "error",
+			okP and Seen(py) or "error", tostring(plate:GetFrameStrata()), tostring(plate:GetFrameLevel()),
+			tostring(holder:IsVisible()), #live, tostring(number.zeroHide),
+			Seen(select(2, pcall(number.body.GetAlpha, number.body)))))
+	end
+	local ok, err = pcall(Stand, "DRAWN")
+	if not ok then record("DRAWN: could not read it: " .. tostring(err)) end
+	local start = number.start
+	C_Timer.After(0.3, function()
+		if number.start ~= start or number.plate ~= plate then return record("0.3 s on: number already gone") end
+		local okLater, errLater = pcall(Stand, "0.3 s on")
+		if not okLater then record("0.3 s on: could not read it: " .. tostring(errLater)) end
+	end)
+end
+
 -- One number over a plate. color: an {r, g, b}; crit: pops big and settles
 -- bigger, lower (over the plate's bar), barely climbing, staying longer.
 local function Spawn(plate, unit, amount, color, crit)
@@ -255,6 +296,13 @@ local function Spawn(plate, unit, amount, color, crit)
 	SetSize(number, size)
 	text:SetTextColor(color[1], color[2], color[3])
 	SetWords(number, amount)
+	-- A hit of 0 (Maul comes as two hits in one instant: the swing it took the
+	-- place of, for 0, and its own) showed as a white "0". The amount is secret
+	-- in a fight, so it can't be checked; but it can be the words' alpha: 0
+	-- draws nothing, 1 and up draws in full.
+	number.body:SetAlpha(1)
+	number.zeroHide = nil
+	if not Plain(amount) then number.zeroHide = pcall(number.body.SetAlpha, number.body, amount) end
 	local ok, width = pcall(text.GetStringWidth, text)
 	number.width = ok and type(width) == "number" and Plain(width) and width > 0 and width or nil
 	local x = SlotX(plate, now, Width(number, size))
@@ -272,6 +320,7 @@ local function Spawn(plate, unit, amount, color, crit)
 	number:Show()
 	live[#live + 1] = number
 	ns.WakeFeatureLoop(holder)
+	RecordSpawn(number, plate, unit, amount, color, crit, size)
 end
 
 -- A plate gone (its unit died or went out of range): its numbers stay where
@@ -337,13 +386,27 @@ end
 -- yet they come, and with Blizzard's filter as it stands (yours: you and your
 -- pet) a line comes with each hit of yours and none with a teammate's. So a
 -- hit is yours when a line comes within HOLD of it, one line per hit (a hit
--- waits up to HOLD for one; a line waits as long for its hit). Hits on you
--- and your pet take their own lines, so a mob's swing at you can't lend its
--- line to a teammate's hit. Lines come only while the log's filtered events
--- are on, which Blizzard turns on and off with its combat log tab: while our
--- numbers are on we keep them on, and turn them back off if we did. No log
--- (a client without it): every hit counts, and in a group only your target's.
+-- waits up to HOLD for one; a line waits as long for its hit). Lines come
+-- only while the log's filtered events are on, which Blizzard turns on and
+-- off with its combat log tab: while our numbers are on we keep them on, and
+-- turn them back off if we did. No log (a client without it): every hit
+-- counts, and in a group only your target's.
+--
+-- From a recording of two fights (/cine debug combattext, Forever, a druid
+-- as caster then bear, 2026-11-11):
+-- - A spell's hit and its line come in the same instant, either first.
+-- - A swing's line (a hit, a miss, a parry) comes 0.3 to 0.75 s BEFORE its
+--   hit on the plate (the plate's hit waits for the swing to land on
+--   screen). With HOLD alone every swing was left out: no numbers in bear
+--   form. So a line is kept MELEE_HOLD, and a swing takes the oldest kept;
+--   anything else only one HOLD fresh.
+-- - A hit on you (or a miss) comes with no line at all; held one back for it
+--   before, which took the line of a hit of yours landing just after. Your
+--   heals on yourself do come with one, so those alone still take theirs.
+-- - Maul comes as two hits in one instant with one line: one number, as the
+--   game shows.
 local HOLD = 0.15
+local MELEE_HOLD = 1
 local lines, owed, pending = {}, {}, {} -- times of lines; of hits on you; hits waiting
 local logListening, logTurnedOn
 ns.combatTextWhose = { mine = 0, others = 0 }
@@ -354,25 +417,73 @@ local function LogRunning()
 	return ok and Plain(on) and on == true
 end
 
-local function Fresh(list, now)
-	while list[1] and now - list[1] > HOLD do table.remove(list, 1) end
+-- A hit left out as someone else's: what came around it (hits, lines, hits
+-- on you, with their times) goes to /cine log a second later, a few times a
+-- session, to see why a hit of yours found no line.
+local trace, traceDue, traceDumps = {}, nil, 0
+local function Trace(what)
+	if ns.combatTextRecord then ns.combatTextRecord(what) end -- (/cine debug combattext: all of it)
+	if traceDumps >= 12 then return end
+	trace[#trace + 1] = ("%.3f %s"):format(GetTime(), what)
+	if #trace > 40 then table.remove(trace, 1) end
+end
+local function TraceFlush()
+	if not traceDue or GetTime() < traceDue then return end
+	traceDue, traceDumps = nil, traceDumps + 1
+	ns.Log("combattext", ("left out a hit (group %s, log %s): %s"):format(
+		tostring(IsInGroup and IsInGroup() or false), tostring(logListening), table.concat(trace, "; ")))
+	wipe(trace)
 end
 
+-- (Which plate, whether it's your target, a swing (white) or not, a crit.)
+local function TraceUnit(unit, color, crit)
+	local ok, same = pcall(UnitIsUnit, unit, "target")
+	return ("%s%s%s%s"):format(tostring(unit), (ok and Plain(same) and same) and "(target)" or "",
+		color[1] == 1 and color[2] == 1 and color[3] == 1 and " white" or "", crit and " crit" or "")
+end
+
+local function Fresh(list, now, keep)
+	while list[1] and now - list[1] > (keep or HOLD) do table.remove(list, 1) end
+end
+
+-- A line waiting for this hit, taken: a swing's is the oldest kept, any
+-- other's the newest if it came within HOLD.
+local function TakeLine(now, melee)
+	Fresh(lines, now, MELEE_HOLD)
+	if melee then
+		if lines[1] then table.remove(lines, 1) return true end
+	elseif lines[1] and now - lines[#lines] <= HOLD then
+		table.remove(lines)
+		return true
+	end
+	return false
+end
+
+-- Two swings on one plate in one instant are one swing of yours (Maul: the
+-- swing for 0 and its own hit, with one line between them): the second goes
+-- with the first.
+local swingAt, swingPlate
 local function Mine(hit)
+	if hit.melee then swingAt, swingPlate = hit.at or GetTime(), hit[1] end
 	ns.combatTextWhose.mine = ns.combatTextWhose.mine + 1
 	Spawn(hit[1], hit[2], hit[3], hit[4], hit[5])
 end
 
 -- A hit on a plate: shown now if a line came for it, else held for one.
-local function Claim(plate, unit, amount, color, crit)
-	local hit = { plate, unit, amount, color, crit }
+-- melee: a swing (a physical hit, or a miss, dodge, parry...).
+local function Claim(plate, unit, amount, color, crit, melee)
+	local hit = { plate, unit, amount, color, crit, melee = melee }
 	if not LogRunning() then return Spawn(plate, unit, amount, color, crit) end
 	local now = GetTime()
-	Fresh(lines, now)
-	if lines[1] then
-		table.remove(lines, 1)
+	if melee and swingAt == now and swingPlate == plate then
+		Trace(("hit %s (swing) goes with the swing before it"):format(TraceUnit(unit, color, crit)))
 		return Mine(hit)
 	end
+	if TakeLine(now, melee) then
+		Trace(("hit %s%s took a waiting line"):format(TraceUnit(unit, color, crit), melee and " (swing)" or ""))
+		return Mine(hit)
+	end
+	Trace(("hit %s%s waits"):format(TraceUnit(unit, color, crit), melee and " (swing)" or ""))
 	hit.at = now
 	pending[#pending + 1] = hit
 	ns.WakeFeatureLoop(holder)
@@ -381,16 +492,25 @@ end
 local function OnLine()
 	local now = GetTime()
 	Fresh(owed, now)
-	if owed[1] then table.remove(owed, 1) return end -- (a hit on you, already here)
+	if owed[1] then Trace("line for a heal on you") table.remove(owed, 1) return end -- (a heal on you, already here)
 	while pending[1] and now - pending[1].at > HOLD do table.remove(pending, 1) end
-	if pending[1] then return Mine(table.remove(pending, 1)) end
+	if pending[1] then
+		Trace("line for a waiting hit")
+		local first = table.remove(pending, 1)
+		Mine(first)
+		while first.melee and pending[1] and pending[1].melee and pending[1].at == first.at
+			and pending[1][1] == first[1] do
+			Trace("and the swing with it")
+			Mine(table.remove(pending, 1))
+		end
+		return
+	end
+	Trace("line waits")
 	lines[#lines + 1] = now
 end
 
--- A hit on you or your pet: its line isn't for a plate's hit. Only hits,
--- heals and misses: the game also sends power gains here (ENERGIZE: a bear's
--- or warrior's rage with each swing), and those waited for a line that never
--- came and took the swing's own, so no number showed in bear form.
+-- A heal on you or your pet: its line isn't for a plate's hit. Heals alone:
+-- hits and misses on you come with no line (above).
 local ownSeen = {}
 local function OnOwnHit(action)
 	if not Plain(action) then return end
@@ -398,10 +518,11 @@ local function OnOwnHit(action)
 		ownSeen[action] = true
 		ns.Log("combattext", "first on you: " .. tostring(action))
 	end
-	if not (action == "WOUND" or action == "HEAL" or MISSES[action]) then return end
+	if action ~= "HEAL" then return end
 	local now = GetTime()
-	Fresh(lines, now)
-	if lines[1] then table.remove(lines, 1) else owed[#owed + 1] = now end
+	local took = TakeLine(now, false)
+	Trace("heal on you" .. (took and " took a waiting line" or " waits"))
+	if not took then owed[#owed + 1] = now end
 end
 
 -- Hits held past HOLD with no line: someone else's.
@@ -409,6 +530,8 @@ local function DropUnclaimed(now)
 	while pending[1] and now - pending[1].at > HOLD do
 		table.remove(pending, 1)
 		ns.combatTextWhose.others = ns.combatTextWhose.others + 1
+		Trace("LEFT OUT")
+		traceDue = traceDue or now + 1
 	end
 end
 
@@ -454,6 +577,7 @@ ns.COMBAT_TEXT_GAME_NUMBERS = GAME_NUMBERS -- (Core.lua lets go at logout)
 function ns.RefreshCombatTextStyle()
 	ns.ApplyCVarSet(GAME_NUMBERS, (PageOn() and ns.db.combatTextHideGame) and true or false)
 	KeepLog()
+	TraceFlush()
 	if not On() then
 		for index = #live, 1, -1 do Retire(index) end
 		wipe(pending)
@@ -470,10 +594,11 @@ local function InGroup()
 	return (IsInGroup and IsInGroup()) or (IsInRaid and IsInRaid())
 end
 
+-- Only your own hits, always (the player's call, 2026-11-11: no choice of
+-- whose). Picked by the combat log (Whose hit, above). A client with no log:
+-- solo, every hit is yours; in a group, only your target's.
 local function Wanted(unit, enemy)
-	local scope = ns.db.combatTextScope or "auto"
-	if scope == "auto" then scope = (InGroup() and not LogRunning()) and "target" or "all" end
-	if scope == "target" and enemy then
+	if enemy and InGroup() and not LogRunning() then
 		local ok, same = pcall(UnitIsUnit, unit, "target")
 		return ok and Plain(same) and same
 	end
@@ -482,13 +607,27 @@ end
 
 local flagsSeen = {}
 local function OnHit(unit, action, flag, amount, school)
-	if not On() or not Plain(unit) or not Plain(action) then return end
+	local record = ns.combatTextRecord
+	if not On() or not Plain(unit) or not Plain(action) then
+		if record then record("plate hit skipped: numbers off, or a secret unit or kind") end
+		return
+	end
 	local get = C_NamePlate and C_NamePlate.GetNamePlateForUnit
 	local ok, plate = pcall(get or error, unit)
-	if not ok or not plate or (plate.IsForbidden and plate:IsForbidden()) then return end
+	if not ok or not plate or (plate.IsForbidden and plate:IsForbidden()) then
+		if record then record(("plate hit %s %s skipped: no plate, or locked"):format(unit, action)) end
+		return
+	end
 	local okEnemy, enemy = pcall(UnitCanAttack, "player", unit)
 	enemy = okEnemy and Plain(enemy) and enemy
-	if not Wanted(unit, enemy) then return end
+	if not Wanted(unit, enemy) then
+		if record then record(("plate hit %s %s skipped: no combat log, in a group, not your target"):format(unit, action)) end
+		return
+	end
+	if record then
+		record(("plate hit %s %s enemy=%s: goes on (a WOUND on a friend, a heal on an enemy, or a kind turned"
+			.. " off still stops here)"):format(unit, action, tostring(enemy)))
+	end
 	local db = ns.db
 	local crit = Plain(flag) and flag == "CRITICAL"
 	-- (Each kind of hit and flag once in /cine log: is a crit "CRITICAL" here?)
@@ -513,14 +652,14 @@ local function OnHit(unit, action, flag, amount, school)
 		elseif db.combatTextSchoolColors then
 			color = SCHOOL[school] or SPELL
 		end
-		Claim(plate, unit, amount, color, crit)
+		Claim(plate, unit, amount, color, crit, school == 1)
 	elseif action == "HEAL" then
 		if enemy or not db.combatTextHeals then return end
 		Claim(plate, unit, amount, HEAL, crit)
 	elseif MISSES[action] and enemy and db.combatTextMisses then
 		local word = _G[action]
 		if not (type(word) == "string" and Plain(word)) then word = action:sub(1, 1) .. action:sub(2):lower() end
-		Claim(plate, unit, word, SPELL, false)
+		Claim(plate, unit, word, SPELL, false, true)
 	end
 end
 
@@ -569,6 +708,23 @@ driver:SetScript("OnEvent", ns.Profiled("Combat text plates", function(_, event,
 		if ok and plate then LetGo(plate) end
 	end
 end))
+
+-- /cine debug combattext: how the page stands, in one line.
+function ns.CombatTextStateLine()
+	local db = ns.db
+	local parts = {}
+	for _, key in ipairs({ "styleGeneral", "combatTextStyle", "combatTextNumbers", "combatTextHeals",
+		"combatTextMisses", "combatTextCritPop", "combatTextSchoolColors", "combatTextFont", "combatTextEdge",
+		"combatTextSize", "combatTextHeight", "combatTextHideGame", "hideWorldText" }) do
+		parts[#parts + 1] = key .. "=" .. tostring(db[key])
+	end
+	return ("numbers on=%s page on=%s blocked=%s | log listening=%s running=%s turned on by us=%s | shown as yours"
+		.. " %d, left out %d, showing now %d, waiting %d | game numbers off=%s | scale=%s ramp=%s | font=%s | %s")
+		:format(tostring(On()), tostring(PageOn()), tostring(ns.combatTextBlocked), tostring(logListening),
+		tostring(LogRunning()), tostring(logTurnedOn), ns.combatTextWhose.mine, ns.combatTextWhose.others, #live,
+		#pending, tostring(GAME_NUMBERS.active), tostring(CVarNumber("WorldTextScale_v2", 1)),
+		tostring(CVarNumber("WorldTextRampDuration_v2", 1)), tostring(GAME_FONT), table.concat(parts, " "))
+end
 
 -- /cine debug combatnumbers: the page on or off, with what it needs and how
 -- many hits it took as yours and left out as others'.
@@ -655,13 +811,6 @@ function ns.CreateCombatTextStylePanel(kit)
 	rows.Check("combatTextNumbers", L["Show your damage and healing over nameplates"],
 		L["Our own numbers: your hits on the nameplate of what you hit, your heals on a friend's. They take " ..
 		"the game's place when its text is off below."])
-	rows.Choices(L["Whose hits:"], "combatTextScope", {
-		{ "auto", L["Yours"], L["Only your own hits and your pet's, as the game shows. The game doesn't say who " ..
-			"hit, so this goes by its combat log: leave its filter as it comes (your actions). With no log, " ..
-			"in a group only your target's."] },
-		{ "target", L["Your target's"], L["Every hit on your target only, anyone's."] },
-		{ "all", L["Everyone's"], L["Every hit on every nameplate, yours or not."] },
-	}, Ours)
 	rows.Check("combatTextHeals", L["Your heals on friends"], L["Heals on friendly nameplates, in green."], Ours)
 	rows.Check("combatTextMisses", L["Misses"], L["Miss, Dodge, Parry, Immune and the like, in the game's words."],
 		Ours)

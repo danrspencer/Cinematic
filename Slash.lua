@@ -632,6 +632,8 @@ local function HandleSlash(msg)
 	elseif cmd == "debug" and arg == "cast" then
 		ns.castDebug = not ns.castDebug
 		ns.Print("print casts at enemies: " .. OnOff(ns.castDebug) .. " (until you /reload)")
+	elseif cmd == "debug" and arg:find("^padtest") then
+		ns.PadTest(arg:match("^padtest%s*(.*)")) -- (step numbers after it: only those)
 	elseif cmd == "debug" and arg == "pad" then
 		ns.padDebug = not ns.padDebug
 		local hasState = C_GamePad and C_GamePad.GetDeviceMappedState and true or false

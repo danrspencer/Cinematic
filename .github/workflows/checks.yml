@@ -1,10 +1,11 @@
 name: Checks
 
 # Lint, and the profile modules' checks on both clients (Tools/offline/check.lua:
-# the addon loaded outside the game), on every push and pull request.
+# the addon loaded outside the game). Run by hand only (Actions > Checks > Run
+# workflow): the same checks run on the PC before every release (/release), and
+# the runner's package downloads failed too often to trust on every push.
 on:
-  push:
-  pull_request:
+  workflow_dispatch:
 
 jobs:
   checks:
