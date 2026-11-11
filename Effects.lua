@@ -507,6 +507,9 @@ end
 local traceFrame = CreateFrame("Frame")
 traceFrame:RegisterEvent("CVAR_UPDATE")
 traceFrame:SetScript("OnEvent", function(_, _, name, value)
+	-- (Not our own fade's steps, as TraceMusicWrite leaves them out: a line
+	-- each frame of a fade, in the dev copy's log, 26 KB/s, 2026-11-11.)
+	if fadeWriting then return end
 	if name == "Sound_MusicVolume" or name == "Sound_EnableMusic" or name == "MUSIC_VOLUME"
 		or name == "ENABLE_MUSIC" then
 		MusicTrace(("CVAR_UPDATE %s = %s (now %s)"):format(tostring(name), tostring(value),

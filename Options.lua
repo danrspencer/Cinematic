@@ -1398,6 +1398,16 @@ end
 -- tooltip or note, and opens its page with it highlighted. (The game's own
 -- search box can't see inside pages drawn like these.)
 local searchPages = {} -- { name = page name (nil: the main page), canvas = its canvas }, as listed
+-- Our settings pages on the screen now, kept as they show and hide (a hidden
+-- settings window hides them too), for ns.OurSettingsShown: asking every
+-- page each time cost 0.1 ms a call, a profile showed, 2026-11-11.
+ns.shownSettingsCanvases = {}
+function ns.WatchSettingsCanvas(canvas)
+	local shown = ns.shownSettingsCanvases
+	canvas:HookScript("OnShow", function(self) shown[self] = true end)
+	canvas:HookScript("OnHide", function(self) shown[self] = nil end)
+	if canvas:IsVisible() then shown[canvas] = true end
+end
 
 -- Text as shown, without colour codes; nil if it has no words.
 local function SearchText(text)
@@ -2040,6 +2050,7 @@ local function CreatePanel()
 	mainCanvas:SetScript("OnShow", PageShown(Refresh, panel))
 	mainCanvas:Hide() -- so OnShow fires on the first visit too
 	searchPages[1] = { canvas = mainCanvas }
+	ns.WatchSettingsCanvas(mainCanvas)
 	-- (Back on the main page: the key opens there next. Cinematic_ToggleSettings)
 	CreateFrame("Frame", nil, mainCanvas):SetScript("OnShow", function() ns.lastOptionsPage = nil end)
 
@@ -2991,6 +3002,7 @@ local function RegisterSubpage(subpanel, name, shown)
 	subpages[name] = subpanel
 	local page = { name = shown or L[name], key = name, canvas = subpanel }
 	searchPages[#searchPages + 1] = page
+	ns.WatchSettingsCanvas(subpanel)
 	-- (a hub's page: shown in its place there, not listed on its own; the hub
 	-- has the search box and Reset page)
 	if HubAdd(subpanel, name, page) then
@@ -15449,11 +15461,7 @@ ns.RefreshOptions = function() Refresh() end
 -- Whether one of our settings pages is on the screen (our own canvases: the
 -- game's settings window says nothing on Forever, its shown state secret).
 function ns.OurSettingsShown()
-	for _, page in ipairs(searchPages) do
-		local canvas = page.canvas
-		if canvas and canvas.IsVisible and canvas:IsVisible() then return true end
-	end
-	return false
+	return next(ns.shownSettingsCanvases) ~= nil
 end
 
 -- Settings asked for in a fight that couldn't open: opened once it ends.
