@@ -2279,12 +2279,11 @@ ns.COMBAT_SHOW = {
 		frames = { "MultiBarRight" } },
 	{ key = "right2", label = ns.isRetail and L["Action bar 5"] or L["Action bar 5 (right 2)"], default = false,
 		frames = { "MultiBarLeft" } },
-	-- Retail only (the frames don't exist on Classic, so the rows are skipped).
-	-- groupOnly: the mouse on one brings it up only through a mouseover group
-	-- that's on (they sit mid-screen, where the mouse often rests).
-	{ key = "bar6", label = L["Action bar 6"], default = false, groupOnly = true, frames = { "MultiBar5" } },
-	{ key = "bar7", label = L["Action bar 7"], default = false, groupOnly = true, frames = { "MultiBar6" } },
-	{ key = "bar8", label = L["Action bar 8"], default = false, groupOnly = true, frames = { "MultiBar7" } },
+	-- Retail and WoW Forever only (the frames don't exist on Classic Era, so
+	-- the rows are skipped).
+	{ key = "bar6", label = L["Action bar 6"], default = false, frames = { "MultiBar5" } },
+	{ key = "bar7", label = L["Action bar 7"], default = false, frames = { "MultiBar6" } },
+	{ key = "bar8", label = L["Action bar 8"], default = false, frames = { "MultiBar7" } },
 	{ key = "pet", label = L["Pet bar"], default = true, frames = { "PetActionBarFrame", "PetActionBar" } },
 	{ key = "stance", label = L["Stance bar"], default = true, frames = { "StanceBarFrame", "StanceBar" } },
 	{ key = "totems", label = L["Totem bar"], default = true, frames = {
@@ -2437,13 +2436,11 @@ local HOVER_EXTRA_ROWS = {
 	{ key = "chatmenu", label = L["Chat menu button"], frames = { "ChatFrameMenuButton" } },
 }
 ns.HOVER_ROWS = {}
-ns.HOVER_GROUP_ONLY = {} -- row key -> true: rows marked groupOnly (above)
 local HOVER_ROW_BY_NAME = {} -- frame name -> row key (the first row listing it)
 for _, list in ipairs({ HOVER_EXTRA_ROWS, ns.COMBAT_SHOW }) do
 	for _, item in ipairs(list) do
 		if item.key ~= "gamepadxp" and not item.noHoverRow then
 			ns.HOVER_ROWS[#ns.HOVER_ROWS + 1] = item
-			ns.HOVER_GROUP_ONLY[item.key] = item.groupOnly
 			for _, name in ipairs(item.frames or {}) do
 				HOVER_ROW_BY_NAME[name] = HOVER_ROW_BY_NAME[name] or item.key
 			end
@@ -2505,9 +2502,8 @@ ns.HOVER_GROUPS_DEFAULT = {
 		members = { "mainbar", "bottomleft", "bottomright", "pet", "stance", "totems", "micro", "bags", "xp" } },
 	{ preset = "side", icon = "Interface\\Icons\\Ability_Warrior_DefensiveStance", name = L["Side bars"], reach = 8,
 		members = { "right1", "right2" } },
-	-- (Off: with it off, the mouse on bars 6-8 brings up nothing: groupOnly.)
 	{ preset = "bars68", icon = "Interface\\Icons\\Ability_DualWield", name = L["Action bars 6-8"], reach = 8,
-		members = { "bar6", "bar7", "bar8" }, off = true },
+		members = { "bar6", "bar7", "bar8" } },
 	{ preset = "player", icon = "Interface\\Icons\\INV_Misc_Head_Human_01", name = L["Player"],
 		members = { "player", "petframe", "totemtimers", "castbar" } },
 	{ preset = "prd", icon = "Interface\\Icons\\Spell_Nature_Rejuvenation", name = L["Personal resource bars"],
@@ -10598,18 +10594,6 @@ function ns.UpdateFrames(cinematic, elapsed)
 			end
 			if over then
 				mouseRows[ownPartyRows and entry.rspGroup or entry.row] = true
-			end
-		end
-		-- (A groupOnly row counts only while a group it's in is on.)
-		for row in pairs(mouseRows) do
-			if ns.HOVER_GROUP_ONLY[row] then
-				local inGroup = false
-				for _, group in ipairs(hoverGroups) do
-					for _, key in ipairs(not group.off and group.when ~= offWhen and group.members or NO_DEFAULTS) do
-						if key == row then inGroup = true end
-					end
-				end
-				if not inGroup then mouseRows[row] = nil end
 			end
 		end
 		-- Rows linger after the mouse leaves. The hold time counts the fade

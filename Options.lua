@@ -1422,8 +1422,10 @@ end
 -- pages: just those pages' (a sub-page's or hub's own search box).
 -- Also the controls by their setting's key (frame.settingKey, set by
 -- Remember): keyed[key] = the first such entry found.
+ns.searchPrepare = {} -- pages that fill their rows only when shown: called to fill them before a search
 local function BuildSearchIndex(pages)
 	Refresh() -- (slider titles and some rows are only filled in on refresh)
+	for _, prepare in ipairs(ns.searchPrepare) do prepare() end
 	local entries, keyed = {}, {}
 	local named = not pages or #pages > 1 -- (pages to pick among: their names count too)
 	for _, page in ipairs(pages or searchPages) do
@@ -16918,6 +16920,10 @@ local function CreateMouseoverPanel()
 			At(nameBox, LEFT + 40)
 			Raise(nameBox)
 			nameBox:SetText(group.name or "")
+			-- (Search and /cine find: a box's text isn't read, so the group's
+			-- name is given, found with its whole heading glowing.)
+			nameBox.searchLabel = group.name
+			nameBox.searchEdges = { top = band, bottom = band, left = band, right = band }
 			nameBox:SetScript("OnEditFocusLost", function(self)
 				local text = self:GetText()
 				if text ~= "" and text ~= group.name then
@@ -17092,6 +17098,11 @@ local function CreateMouseoverPanel()
 	controls[#controls + 1] = { debugName = "Hover Groups layout", owner = canvas, Refresh = function()
 		if canvas:IsVisible() then Layout() end -- (IsShown stays true with its hub hidden: ~20 ms on every page switch)
 	end }
+	-- (The search looks at pages that aren't open: the groups laid out for it,
+	-- or it would find none of them until the page had been opened.)
+	ns.searchPrepare[#ns.searchPrepare + 1] = function()
+		if not canvas:IsVisible() then Layout() end
+	end
 
 	canvas:SetScript("OnShow", function()
 		Refresh()
