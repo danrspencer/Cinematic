@@ -5,10 +5,12 @@
 -- amount, the percent where it shows a percent (both, with both), each in
 -- that word's place while it's faded; with none, the amount in the middle.
 -- On your mana under your character and on your player frame's (the bars
--- and the cast: PersonalManaCost.lua, which calls ns.UpdateManaAfter), each
--- with its cost indicator on. Off to start with: the UI Manager's Personal
--- Resources page turns each on, under its indicator (manaAfterDisplay,
--- manaAfterPortrait).
+-- and the cast: PersonalManaCost.lua, which calls ns.UpdateManaAfter). Off
+-- to start with: the UI Manager's Personal Resources page turns each on
+-- (manaAfterDisplay, manaAfterPortrait).
+-- (The game's own bars lower their fill by the cost as a cast starts, and
+-- their words with it, so there ours say what the game's do while those
+-- show; on our mana bar, and with the game's words off, ours are all there is.)
 -- Your mana can be secret (retail, even out of fights): then the game
 -- works the sums out, through curves over your mana's share of its max
 -- (0 up to the cost's share, then up to what's left at full), and its
@@ -23,9 +25,7 @@ DEFAULTS.manaAfterPortrait = false  -- ...on your player frame
 
 local MANA = Enum and Enum.PowerType and Enum.PowerType.Mana or 0
 local TINT = { 0.7, 0.85, 1 } -- paler than the game's white: a guess
--- Each bar's setting, and its cost indicator's (shown under it: on with it).
-local KEYS = { display = { "manaAfterDisplay", "manaCostDisplay" },
-	portrait = { "manaAfterPortrait", "manaCostPortrait" } }
+local KEYS = { display = "manaAfterDisplay", portrait = "manaAfterPortrait" } -- each bar's setting
 
 local texts = setmetatable({}, { __mode = "k" }) -- bar -> our words on it: { amount, percent }
 local muted = setmetatable({}, { __mode = "k" }) -- the game's words -> true, while faded for ours
@@ -62,7 +62,7 @@ local function Texts(bar)
 	if made then return made end
 	local overlay = CreateFrame("Frame", nil, bar)
 	overlay:SetAllPoints()
-	overlay:SetFrameLevel(bar:GetFrameLevel() + 3) -- (over the cost's stretch)
+	overlay:SetFrameLevel(bar:GetFrameLevel() + 3)
 	local theirs = bar.TextString or bar.RightText
 	local object = type(theirs) == "table" and theirs.GetFontObject and theirs:GetFontObject()
 	made = {}
@@ -147,11 +147,11 @@ end
 -- your mana is on now (by where).
 function ns.UpdateManaAfter(cost, bars)
 	local db = ns.GetDB()
-	-- (The bars it's on for: its own and its indicator's settings on.)
+	-- (The bars it's on for.)
 	local wanted = {}
-	for where, keys in pairs(KEYS) do
+	for where, key in pairs(KEYS) do
 		local bar = bars and bars[where]
-		if bar and cost and db and db[keys[1]] and db[keys[2]] and ns.PersonalResourcesOn(db) then wanted[#wanted + 1] = bar end
+		if bar and cost and db and db[key] and ns.PersonalResourcesOn(db) then wanted[#wanted + 1] = bar end
 	end
 	local on = #wanted > 0
 	local amountWords, percentWords
@@ -205,7 +205,7 @@ function ns.DescribeManaText()
 	local mana = UnitPower("player", MANA)
 	local db = ns.GetDB()
 	local ok, mode = pcall(GetCVar, "statusTextDisplay")
-	local function On(keys) return db and db[keys[1]] and (db[keys[2]] and "on" or "on, indicator off") or "off" end
+	local function On(key) return db and db[key] and "on" or "off" end
 	return ("mana after cast: resource bar %s, player frame %s; Status Text %s; last cast: %s, shown on %s; "
 		.. "mana now %s"):format(On(KEYS.display), On(KEYS.portrait), ok and tostring(mode) or "?", last, lastPlaced,
 		Readable(mana) and tostring(mana) or "secret")

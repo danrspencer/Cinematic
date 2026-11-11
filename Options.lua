@@ -16095,8 +16095,16 @@ local function CreateProfilesPanel()
 		ns.ShowImport()
 	end)
 	import:SetPoint("LEFT", backups, "RIGHT", 8, 0)
-	local rename, note, delete, reset, export, savePoint
+	-- (Export is on a card's right-click menu too, for that card's profile; this
+	-- one is the active profile, where players look for it: beside Import.)
+	local export = Button(buttons, L["Export"], 84, L["The active profile as a line of text to copy and paste " ..
+		"wherever your friends will see it, so they can import it (a built-in one too, with your changes)."], function()
+		ns.ShowExport()
+	end)
+	export:SetPoint("LEFT", import, "RIGHT", 8, 0)
+	local rename, note, delete, reset, savePoint
 	if not PROFILE_MENUS then
+		export:ClearAllPoints()
 		rename = Button(buttons, L["Rename"], 90, L["Rename the active profile (your own ones only)."], function()
 			local name = ns.ActiveProfile()
 			StaticPopup_Show("CINEMATIC_PROFILE_RENAME", nil, nil, name)
@@ -16117,10 +16125,6 @@ local function CreateProfilesPanel()
 		reset = Button(buttons, L["Reset"], 100, L["Put the active profile back to how you last saved it, or a " ..
 			"built-in one back to its own values (your own profiles keep your changes as you go)."], AskResetProfile)
 		reset:SetPoint("TOPLEFT", backups, "BOTTOMLEFT", 0, -8)
-		export = Button(buttons, L["Export"], 84, L["The active profile as a line of text to copy and paste " ..
-			"wherever your friends will see it, so they can import it (a built-in one too, with your changes)."], function()
-			ns.ShowExport()
-		end)
 		export:SetPoint("LEFT", reset, "RIGHT", 8, 0)
 		savePoint = Button(buttons, L["Save"], 84, L["Keep the active profile as it is now: Reset and each " ..
 			"page's Reset put it back to this instead of Cinematic's own settings."], function()

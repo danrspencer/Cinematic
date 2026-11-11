@@ -245,7 +245,7 @@ function ns.CreatePersonalResourcesPanel(kit)
 	ns.FramesLink(content, title, "prd", styleLink)
 	local switch = kit.PageSwitch(content, "personalResources", L["Enable Page"],
 		L["On: your player frame, pet frame and personal resource display stay up or wait as this page says, " ..
-		"and its mana bar and mana cost show. Off: none of it; they come up only as their Game Frames " ..
+		"and its mana bar and remaining mana text show. Off: none of it; they come up only as their Game Frames " ..
 		"rows say."], intro, function()
 		if ns.UpdatePersonalMana then ns.UpdatePersonalMana() end
 		if ns.RefreshPersonalStyle then ns.RefreshPersonalStyle() end
@@ -337,34 +337,24 @@ function ns.CreatePersonalResourcesPanel(kit)
 		kit.AddControl(updater)
 	end
 
-	-- Mana on its bars: a cast's cost and your mana after it, under your
-	-- character and on your player frame (PersonalManaCost.lua, PersonalManaText.lua).
+	-- Mana on its bars: your mana after the cast going on, under your character
+	-- and on your player frame (PersonalManaText.lua; the cast: PersonalManaCost.lua).
 	stack:Header(content, L["Mana"])
 	local function Redraw()
-		if ns.UpdateManaCost then ns.UpdateManaCost() end -- (the mana after the cast too)
+		if ns.UpdateManaCost then ns.UpdateManaCost() end
 	end
-	local function CostTick(key, label, tip, indent, enabledBy)
-		local check = stack:Add(kit.Check(content, key, label, tip, function(value)
-			ns.GetDB()[key] = value
-			Redraw()
-			kit.Refresh()
-		end), "check", indent)
-		if enabledBy then kit.GreyUnless(check, enabledBy) end
-	end
-	local costTip = L["While you cast a spell that costs mana, the mana it will take shows as a pale stretch at " ..
-		"the end of your mana: what's left after the cast is the fill to its left."]
-	local afterTip = L["Under the indicator, while you cast: your mana's numbers on the bar show what you'll have " ..
-		"once the cast is done, paler. The amount and the percent, whichever the game shows there (its Status " ..
-		"Text setting); with the game's numbers off, the amount in the middle of the bar."]
-	-- Each bar: its indicator, and under it the mana left after the cast.
-	for _, info in ipairs({ { L["Resource bar"], "manaCostDisplay", "manaAfterDisplay", hasDisplay },
-		{ L["Player frame"], "manaCostPortrait", "manaAfterPortrait", true } }) do
-		if info[4] then
+	local afterTip = L["While you cast a spell that costs mana, your mana's numbers on the bar show what you'll " ..
+		"have once the cast is done, paler. The amount and the percent, whichever the game shows there (its " ..
+		"Status Text setting); with the game's numbers off, the amount in the middle of the bar."]
+	for _, info in ipairs({ { L["Resource bar"], "manaAfterDisplay", hasDisplay },
+		{ L["Player frame"], "manaAfterPortrait", true } }) do
+		if info[3] then
+			local key = info[2]
 			stack:Add(kit.Label(content, "GameFontNormal", info[1]), "label")
-			CostTick(info[2], L["Show mana cost indicator"], costTip)
-			local costKey = info[2]
-			CostTick(info[3], L["Show remaining mana text"], afterTip, 20,
-				function(db) return db[costKey] end)
+			stack:Add(kit.Check(content, key, L["Show remaining mana text"], afterTip, function(value)
+				ns.GetDB()[key] = value
+				Redraw()
+			end), "check")
 		end
 	end
 	-- (And after the page's Reset, or a profile loaded: drawn as the settings are now.)

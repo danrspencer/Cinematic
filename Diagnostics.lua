@@ -542,8 +542,9 @@ watcher:SetScript("OnEvent", function(_, event, addon, action)
 	elseif addon == ADDON_NAME then
 		ns.Log("BLOCKED", ("%s: %s"):format(event, tostring(action)))
 		-- (The event comes during the blocked call, so the stack says whose it
-		-- was; each different one logged once.)
-		local stack = debugstack(2, 12, 0)
+		-- was; each different one logged once. Both ends: the top is the
+		-- blocked call, the bottom what started it, a click or code of ours.)
+		local stack = debugstack(2, 8, 8)
 		if type(stack) == "string" and not blockedStacks[stack] then
 			blockedStacks[stack] = true
 			ns.Log("BLOCKED", "by " .. stack:gsub("Interface[/\\]AddOns[/\\]", ""):gsub("\n", " < "))

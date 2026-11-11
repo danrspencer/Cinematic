@@ -1,48 +1,32 @@
--- Mana cost: while you cast a spell that costs mana, the mana it will take
--- shows as a pale stretch at the end of your mana, from the fill's right
--- edge leftwards: what's left after the cast is the fill to its left.
--- On your mana under your character (the personal resource display's power
--- bar while mana is your power, else our own mana bar under it while that's
--- in use: PersonalMana.lua), and on your player frame's (its mana bar, else
--- the game's mana bar under it). Each on to start with: the UI Manager's
--- Personal Resources page turns them off (manaCostDisplay, manaCostPortrait).
--- The game's own cost on the player frame (retail's) is faded while ours
--- is on there.
--- Mana and its max can be secret in fights: the stretch is a status bar of
--- its own, drawn reversed from the fill's right edge and given them as they
--- are, clipped to the bar (a cost over what you have runs out at its left).
--- The stretch ends where your mana ends, not where the game's fill does:
--- on Forever the personal resource display's power bar lowers its own fill
--- by the cost as the cast starts, though the mana's only taken at its end
--- (a warlock's Shadow Bolt, 2026-11-11: no mana change at the start, one at
--- the end, the fill down from the start). Off the fill's edge the stretch
--- took the cost a second time; off your mana's (an unseen bar of ours given
--- your mana: the ruler) it lies over what the game took off, the fill to
--- its left what's left, on a bar the game lowers and on one it doesn't.
+-- Mana cost: the cast going on, while it costs mana, and its cost: for
+-- your mana's numbers to say what you'll have after it (PersonalManaText.lua,
+-- through ns.UpdateManaAfter), on your mana under your character (the
+-- personal resource display's power bar while mana is your power, else our
+-- own mana bar under it while that's in use: PersonalMana.lua) and on your
+-- player frame's (its mana bar, else the game's mana bar under it).
+-- No stretch of ours on the bars for the cost (till 2026-11-11: a pale one
+-- at the end of your mana). The game shows it itself: as a cast starts, its
+-- mana bars lower their own fill by the cost and draw the cost past it,
+-- though the mana's only taken at the cast's end (its UnitFrame.lua:
+-- predictedPowerCost; Forever's personal resource display too, a warlock's
+-- Shadow Bolt, 2026-11-11: no mana change at the start, one at the end, the
+-- fill down from the start). Ours, off the fill's edge, took the cost a
+-- second time.
 -- Some casts take their mana as they start (seen on Forever: an arcane
 -- mage's casts): once your mana has dropped by the cost since the cast
--- began, it's paid and the stretch goes (else it took the cost twice).
--- The drop can reach us a little before the cast's start (a Discipline
--- priest's Smite, 2026-11-09), and your mana can't always be read: a spell
--- seen paying at its start is remembered (by character and by name, so
--- every rank of it: chardb.manaAtStart) and its casts show no stretch from
--- then on. (A cost a buff takes away: the game's cost for it reads 0 if the
--- game counts it, and no stretch; a spell paying at its start shows none
--- either way.)
+-- began, it's paid and the numbers are the game's again (else they took the
+-- cost twice). The drop can reach us a little before the cast's start (a
+-- Discipline priest's Smite, 2026-11-09), and your mana can't always be
+-- read: a spell seen paying at its start is remembered (by character and by
+-- name, so every rank of it: chardb.manaAtStart) and its casts leave the
+-- numbers alone from then on. (A cost a buff takes away: the game's cost
+-- for it reads 0 if the game counts it, and nothing changes.)
 
 local _, ns = ...
 
-local DEFAULTS = ns.DEFAULTS
-DEFAULTS.manaCostDisplay = true     -- a cast's mana cost on your mana under your character
-DEFAULTS.manaCostPortrait = true    -- ...and on your player frame's
-
 local display = _G.PersonalResourceDisplayFrame
 local MANA = Enum and Enum.PowerType and Enum.PowerType.Mana or 0
-local SHADE = { 1, 1, 1, 0.5 } -- the stretch: white over the fill, half seen
-local KEYS = { display = "manaCostDisplay", portrait = "manaCostPortrait" }
 
-local overlays = setmetatable({}, { __mode = "k" }) -- bar -> its overlay
-local gameCost = setmetatable({}, { __mode = "k" }) -- the game's own cost pieces -> true, while faded for ours
 local casting -- the cast going on, while it costs mana (its guid, or true)
 local cost -- ...its mana cost
 local paid -- ...true once its mana was taken (some take it as they start)
@@ -116,94 +100,10 @@ local function ManaCost(spellID)
 	if ok and found ~= nil and (not Readable(found) or found > 0) then return found end
 end
 
-local function Overlay(bar)
-	local overlay = overlays[bar]
-	if overlay then return overlay end
-	-- (A clipping frame the bar's size, and in it the stretch: as wide as the
-	-- bar, its right edge on the fill's.)
-	overlay = CreateFrame("Frame", nil, bar)
-	overlay:SetAllPoints()
-	overlay:SetClipsChildren(true)
-	overlay:SetFrameLevel(bar:GetFrameLevel() + 1)
-	local stretch = CreateFrame("StatusBar", nil, overlay)
-	stretch:SetReverseFill(true)
-	stretch:SetStatusBarTexture("Interface\\Buttons\\WHITE8X8")
-	stretch:SetStatusBarColor(SHADE[1], SHADE[2], SHADE[3], SHADE[4])
-	overlay.stretch = stretch
-	-- (The ruler: a bar of our own the same size, unseen, given your mana as
-	-- it is. Its fill's right edge is where your mana ends: the stretch hangs
-	-- off it, not off the game's fill, which the game can draw lower.)
-	local ruler = CreateFrame("StatusBar", nil, overlay)
-	ruler:SetAllPoints()
-	ruler:SetStatusBarTexture("Interface\\Buttons\\WHITE8X8")
-	ruler:GetStatusBarTexture():SetAlpha(0)
-	overlay.ruler = ruler
-	overlay:Hide()
-	overlays[bar] = overlay
-	return overlay
-end
-
--- The game's own cost on a bar (retail's player frame): its pieces.
-local function GameCost(bar)
-	local frame = _G.PlayerFrame
-	local pieces = {}
-	for _, piece in ipairs({ bar.ManaCostPredictionBar or false,
-		frame and bar == (frame.manabar or frame.ManaBar) and frame.myManaCostPredictionBar or false }) do
-		if type(piece) == "table" and piece.SetAlpha then pieces[#pieces + 1] = piece end
-	end
-	return pieces
-end
-
--- The stretch on one bar, for the cast going on (false: it can't be).
-local function Draw(bar)
-	if not (bar.GetStatusBarTexture and bar:GetStatusBarTexture()) then return false end
-	local overlay = Overlay(bar)
-	local stretch, ruler = overlay.stretch, overlay.ruler
-	local ok = pcall(function()
-		local maxMana = UnitPowerMax("player", MANA)
-		ruler:SetMinMaxValues(0, maxMana)
-		ruler:SetValue(UnitPower("player", MANA))
-		local edge = ruler:GetStatusBarTexture()
-		stretch:SetWidth(bar:GetWidth())
-		stretch:ClearAllPoints()
-		stretch:SetPoint("TOPRIGHT", edge, "TOPRIGHT")
-		stretch:SetPoint("BOTTOMRIGHT", edge, "BOTTOMRIGHT")
-		stretch:SetMinMaxValues(0, maxMana)
-		stretch:SetValue(cost)
-	end)
-	overlay:SetShown(ok)
-	return ok
-end
-
--- Drawn again: the cast starting or ending, your mana or its bars changing,
--- the page's settings.
+-- Shown again: the cast starting or ending, your mana or its bars changing,
+-- the page's settings. (The mana after the cast: PersonalManaText.lua.)
 local function Update()
-	local db = ns.GetDB()
-	local bars = ManaBars()
-	local drawn, mute = {}, {}
-	for where, key in pairs(KEYS) do
-		local bar = bars[where]
-		if bar and db and db[key] and ns.PersonalResourcesOn(db) then
-			if casting and not paid and Draw(bar) then drawn[bar] = true end
-			for _, piece in ipairs(GameCost(bar)) do mute[piece] = true end
-		end
-	end
-	for bar, overlay in pairs(overlays) do
-		if not drawn[bar] then overlay:Hide() end
-	end
-	-- (The game's own faded where ours is on, back elsewhere.)
-	for piece in pairs(mute) do
-		gameCost[piece] = true
-		piece:SetAlpha(0)
-	end
-	for piece in pairs(gameCost) do
-		if not mute[piece] then
-			gameCost[piece] = nil
-			piece:SetAlpha(1)
-		end
-	end
-	-- (And the mana after the cast, by the same cast: PersonalManaText.lua.)
-	if ns.UpdateManaAfter then ns.UpdateManaAfter(casting and not paid and cost or nil, bars) end
+	if ns.UpdateManaAfter then ns.UpdateManaAfter(casting and not paid and cost or nil, ManaBars()) end
 end
 ns.UpdateManaCost = Update
 
@@ -272,19 +172,17 @@ local function Start(castGUID, spellID)
 			table.concat(seen, "; "), Shown(startMana), early and " (taken before)" or "", tostring(learned),
 			stoppedAt and ("%.3fs ago"):format(now - stoppedAt) or "never", tostring(paid)))
 	Update()
-	-- (What's drawn on each mana bar: ours, and anything else on it, an
-	-- addon's or the game's, by name.)
+	-- (What's on each mana bar besides its fill, an addon's or the game's, by name.)
 	if ns.LogDetailOn and ns.LogDetailOn() then
 		for where, bar in pairs(ManaBars()) do
 			local others = {}
 			for _, child in ipairs({ bar:GetChildren() }) do
-				if child ~= overlays[bar] and ns.Flag(child:IsShown()) then
+				if ns.Flag(child:IsShown()) then
 					local ok, name = pcall(child.GetDebugName or child.GetName, child)
 					others[#others + 1] = ok and Readable(name) and name or "unnamed"
 				end
 			end
-			Trace(("%s bar %s: ours %s, others shown [%s]"):format(where, ns.DescribeManaBar(bar),
-				overlays[bar] and ns.Flag(overlays[bar]:IsShown()) and "shown" or "hidden", table.concat(others, ", ")))
+			Trace(("%s bar %s: shown on it [%s]"):format(where, ns.DescribeManaBar(bar), table.concat(others, ", ")))
 		end
 	end
 end
@@ -311,7 +209,6 @@ function ns.DescribeManaBar(bar)
 end
 
 function ns.DescribeManaCost()
-	local db = ns.GetDB() or {}
 	local bars = ManaBars()
 	local learned = 0
 	for _ in pairs(AtStart()) do learned = learned + 1 end
@@ -319,9 +216,8 @@ function ns.DescribeManaCost()
 		tostring(lastStart.cost or "unread"), lastStart.readable and "read" or "secret",
 		lastStart.ago and ("%.2fs"):format(lastStart.ago) or "never",
 		lastStart.early and "taken just before" or "not taken before") or ""
-	return ("mana cost: resource bar %s (%s), player frame %s (%s), casting %s, cost %s, %d spells pay at start%s"):format(
-		db.manaCostDisplay and "on" or "off", ns.DescribeManaBar(bars.display),
-		db.manaCostPortrait and "on" or "off", ns.DescribeManaBar(bars.portrait),
+	return ("mana cost: resource bar %s, player frame %s, casting %s, cost %s, %d spells pay at start%s"):format(
+		ns.DescribeManaBar(bars.display), ns.DescribeManaBar(bars.portrait),
 		casting and (paid and "a spell (paid at its start)" or "a spell") or "nothing", Readable(cost) and tostring(cost) or cost and "secret" or "none",
 		learned, last)
 end

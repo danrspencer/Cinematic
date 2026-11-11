@@ -113,8 +113,7 @@ ns.CHANGELOG_FEATURES = {
 		"out once they're done. On in the Cinema profile; turn it on for NPCs you talk to or those chatting " ..
 		"nearby on the Cameras page." },
 	{ date = "2026-10-29", page = "Personal Resources", title = "Mana cost",
-		text = "While you cast, the mana a spell will take shows as a pale stretch on your mana bar, and its " ..
-		"numbers can show what you'll have left." },
+		text = "While you cast, your mana bar's numbers can show what you'll have left after the spell." },
 	{ date = "2026-10-29", page = "General", title = "Reload button",
 		text = "A Reload button on the screen and a key to reload the UI in one go, and after any reload the " ..
 		"windows you had open (these settings at your page, bags, map, the game's windows) open again." },
