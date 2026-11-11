@@ -867,6 +867,18 @@ local function StartCountdown(tooltip)
 	end
 end
 
+-- The slider's No wait for list (Tooltips page): whether this unit's tooltip
+-- skips the wait and takes the After column's look as it appears. Quest
+-- objective mobs (tooltipNoWaitQuest): a unit you still need for a quest.
+local function SkipsWait(tooltip)
+	local db = ns.db
+	if not (db and db.enabled and db.handleTooltips and db.tooltipNoWaitQuest) or (db.tooltipFullAfter or 0) <= 0 then
+		return false
+	end
+	local unit = TooltipUnit(tooltip)
+	return unit ~= nil and ns.IsQuestMob ~= nil and ns.IsQuestMob(unit) and true or false
+end
+
 -- A hide followed at once by a show from the same owner is the game setting
 -- the tooltip again, not a new one: a unit frame does it every moment while
 -- hovered (SetOwner hides it, SetUnit fills it again). That keeps its look
@@ -911,11 +923,20 @@ local function OnUnitTooltip(tooltip)
 		if fade and fade.kind == "reveal" then
 			StopFade(true) -- (a new unit: its own first look)
 		end
-		if revealed then
-			revealed = false
+		-- (One on the No wait for list: the After look from the start, no countdown.)
+		local skip = SkipsWait(tooltip)
+		if revealed ~= skip then
+			revealed = skip
 			UpdateBorder(tooltip)
 		end
-		StartCountdown(tooltip)
+		if skip then
+			if fullTimer then
+				fullTimer:Cancel()
+				fullTimer = nil
+			end
+		else
+			StartCountdown(tooltip)
+		end
 	end
 	for _, bar in ipairs(bars) do
 		HideBar(bar)

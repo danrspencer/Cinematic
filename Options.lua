@@ -14147,8 +14147,65 @@ local function CreateTooltipPanel()
 	end
 	-- (Off: the whole grid greys, and tooltips show as the game has them.)
 	local function LaterOn(db) return (db.tooltipFullAfter or 0) > 0 end
+
+	-- No wait for: kinds of tooltip that skip the slider's wait and show the
+	-- After column's parts as they appear; tick any (each its own setting).
+	local NO_WAITS = {
+		{ key = "tooltipNoWaitQuest", text = L["Quest objective mobs"] },
+	}
+	local NO_WAIT_TIP = L["Tooltips that skip the wait and show the After column's parts as soon as they appear; " ..
+		"tick any. Quest objective mobs: mobs and NPCs you still need for a quest objective."]
+	local noWaitRow = CreateFrame("Frame", nil, content)
+	noWaitRow:SetSize(400, 26)
+	noWaitRow:SetPoint("TOPLEFT", fullAfter, "BOTTOMLEFT", 0, -10)
+	local noWaitLabel = Label(noWaitRow, "GameFontHighlight", L["No wait for"])
+	noWaitLabel:SetPoint("LEFT", noWaitRow, "LEFT", 0, 0)
+	local okNoWait, noWait = ns.MenuDropdown(content)
+	if okNoWait and noWait and noWait.SetupMenu then
+		noWait:SetWidth(200)
+		noWait.searchSkip = true -- (it shows the current ticks, not a label)
+		noWait:SetupMenu(function(_, root)
+			for _, choice in ipairs(NO_WAITS) do
+				root:CreateCheckbox(choice.text,
+					function()
+						local db = ns.GetDB()
+						return db ~= nil and db[choice.key] and true or false
+					end,
+					function()
+						local db = ns.GetDB()
+						db[choice.key] = not db[choice.key]
+						Refresh()
+						return MenuResponse and MenuResponse.Refresh
+					end)
+			end
+		end)
+		if noWait.SetSelectionText then
+			noWait:SetSelectionText(function()
+				local db, ticked = ns.GetDB(), {}
+				for _, choice in ipairs(NO_WAITS) do
+					if db and db[choice.key] then ticked[#ticked + 1] = choice.text end
+				end
+				return #ticked > 0 and table.concat(ticked, ", ") or L["None"]
+			end)
+		end
+		noWait.Refresh = function(self) self:GenerateMenu() end
+		controls[#controls + 1] = noWait
+		for _, choice in ipairs(NO_WAITS) do RecordKey(content, choice.key) end
+		noWait:SetPoint("LEFT", noWaitLabel, "RIGHT", 10, 0)
+		Tooltip(noWait, NO_WAIT_TIP)
+		GreyUnless(noWait, LaterOn)
+	else
+		local lastCheck = noWaitLabel
+		for _, choice in ipairs(NO_WAITS) do
+			local check = Check(content, choice.key, choice.text, NO_WAIT_TIP)
+			check:SetPoint("LEFT", lastCheck, "RIGHT", lastCheck == noWaitLabel and 10 or 140, 0)
+			GreyUnless(check, LaterOn)
+			lastCheck = check
+		end
+	end
+
 	local headings
-	previous, headings = Grid(fullAfter, partRows, {
+	previous, headings = Grid(noWaitRow, partRows, {
 		{ key = "First", heading = L["On first hover"], enabled = LaterOn },
 		{ key = "Later", heading = "", enabled = LaterOn },
 	})

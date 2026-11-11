@@ -284,6 +284,7 @@ local DEFAULTS = {
 	tooltipCursorMode = "corner", -- tooltips the game puts in the bottom-right corner: "corner", "cursor" or "combat" (cursor in fights; with the page on)
 	tooltipFadeTime = 0.2,    -- seconds tooltips take to fade in, and out when the mouse is still too long (0: no fading; only with the page switched on)
 	tooltipFullAfter = 2,     -- seconds hovering before the parts grid's After column takes over (0: never)
+	tooltipNoWaitQuest = true, -- quest objective mobs' tooltips skip that wait: the After column's look at once (the slider's No wait for list)
 	tooltipNeverShow = "Fishing Bobber", -- comma-separated tooltip names (first line) CineMode always hides; each matches its translation too (Effects.lua)
 	musicFadeTime = 3,        -- seconds for music to fade in or out
 	musicFatigue = 0,         -- minutes: don't start music again within this long of the last start
