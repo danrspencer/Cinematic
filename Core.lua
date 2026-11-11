@@ -172,7 +172,7 @@ local DEFAULTS = {
 	-- ...the same box where the game stopped answering the pretend mouse (WoW
 	-- Forever game 70862 on): the cursor sweep, the faded minimap moved under
 	-- your real mouse (NodeSweep.lua). Off to start with: it's a workaround.
-	minimapNodesByCursor = false, -- (off again 2026-11-10: on Forever a quest area's outline showed through the faded minimap while it looked)
+	minimapNodesByCursor = true, -- (on again 2026-11-10: the quest area outline is hidden while faded now, NodeSweep.lua)
 	minimapNodePing = true,       -- ...and pings where it heard what it found (NodeSweep.lua cursor.Mark)
 	minimapNodesInCombat = false, -- ...and in fights (works, tested 2026-11-10; off to start with, user's ask)
 	nodesOffInCities = true,     -- ...but not in these places (cities have no nodes; instances and BGs
@@ -180,7 +180,7 @@ local DEFAULTS = {
 	nodesOffInRaids = true,
 	nodesOffInPvP = true,
 	minimapRevealTurnIns = true, -- quests of yours that are done
-	minimapRevealAreas = false,  -- the areas of quests of yours that aren't (off to start with since 2026-11-10)
+	minimapRevealAreas = true,   -- the areas of quests of yours that aren't (on again 2026-11-10, user's ask)
 	minimapRevealIcons = true,   -- anything else (quest givers, flight masters...)
 	minimapQuestGivers = true,   -- NPC nameplates with a quest cursor (QuestGlow.lua)
 	minimapQuestie = true,       -- Questie's own minimap icons too: quests on offer near you (Support/QuestieMinimap.lua)

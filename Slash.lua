@@ -1,5 +1,5 @@
 -- Cinematic: the /cine slash commands.
-local _, ns = ...
+local ADDON_NAME, ns = ...
 local L = ns.L
 
 -- What the commands print goes in the log too (/cine log), so troubleshooting
@@ -1563,6 +1563,33 @@ local function HandleSlash(msg)
 	elseif cmd == "debug" and arg:find("^offers") then
 		-- (Quests on offer near you, the minimap's "!": NodeSweep.lua.)
 		ns.OffersTest()
+	elseif cmd == "debug" and arg:find("^minimapmask") then
+		-- (Test, 2026-11-10: does a blank minimap mask hide a quest area's
+		-- outline, which nothing else does on Forever? blank, or off for the
+		-- game's round one. Until a /reload.)
+		local which = arg:match("^minimapmask%s*(%S*)")
+		local path = which == "blank" and "Interface\\AddOns\\" .. ADDON_NAME .. "\\Textures\\BlipBlank"
+			or which == "square" and "Interface\\ChatFrame\\ChatFrameBackground"
+			or which == "classic" and "Textures\\MinimapMask" or "ui-hud-minimap-frame-generic-mask"
+		if which == "all" then
+			path = "Interface\\AddOns\\" .. ADDON_NAME .. "\\Textures\\BlipBlank"
+		end
+		-- (all: the blank mask plus every blob ring scalar and alpha at 0;
+		-- off puts those back to 1.)
+		local blobs = 0
+		if which == "all" or which == "" or which == "off" then
+			for _, kind in ipairs({ "Quest", "Task", "Arch" }) do
+				for _, part in ipairs({ "RingScalar", "InsideAlpha", "OutsideAlpha", "RingAlpha" }) do
+					local method = Minimap["Set" .. kind .. "Blob" .. part]
+					if method and pcall(method, Minimap, which == "all" and 0 or 1) then blobs = blobs + 1 end
+				end
+			end
+		end
+		if blobs > 0 then ns.Print(("blob setters: %d set to %d"):format(blobs, which == "all" and 0 or 1)) end
+		local ok, err = pcall(Minimap.SetMaskTexture, Minimap, path)
+		ns.Print(("minimap mask %s: %s; minimap alpha %.2f, shown %s, in combat %s"):format(which ~= "" and which or "off",
+			ok and "set" or ("failed: " .. tostring(err)), Minimap:GetEffectiveAlpha(), tostring(Minimap:IsVisible()),
+			tostring(InCombatLockdown())))
 	elseif cmd == "debug" and arg:find("^cursorsweep%s+combat") then
 		ns.CursorSweepCombat()
 	elseif cmd == "debug" and arg:find("^cursorsweep") then

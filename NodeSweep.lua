@@ -663,14 +663,19 @@ function ns.MinimapIconState()
 end
 
 -- The quest, task and dig site areas (the blue shapes) ignore the minimap's
--- alpha as well: their own alphas go to 0 while it's faded full size. The
--- game can't say what they were, and Blizzard's UI never sets them (so 1),
--- unless another addon did: its value is what's put back.
+-- alpha as well: their own alphas and ring sizes go to 0 while it's faded
+-- full size. The game can't say what they were, and Blizzard's UI never sets
+-- them (so 1), unless another addon did: its value is what's put back.
+-- On WoW Forever none of that hides the outline alone, nor a blank mask
+-- alone, but all of them together do (tested 2026-11-10), and the cursor
+-- sweep still hears the minimap so (it found ore with them on, tested): so
+-- its mask goes blank too meanwhile (the map's ground goes with it, unseen
+-- at alpha 0). The mask another addon set (a square minimap) is put back.
 local BLOB_ALPHAS = {}
 ns.BLOB_ALPHAS = BLOB_ALPHAS -- (for /cine debug minimap)
 for _, kind in ipairs({ "Quest", "Task", "Arch" }) do
-	for _, part in ipairs({ "Inside", "Outside", "Ring" }) do
-		local method = "Set" .. kind .. "Blob" .. part .. "Alpha"
+	for _, part in ipairs({ "InsideAlpha", "OutsideAlpha", "RingAlpha", "RingScalar" }) do
+		local method = "Set" .. kind .. "Blob" .. part
 		if Minimap[method] then BLOB_ALPHAS[method] = 1 end
 	end
 end
@@ -687,6 +692,31 @@ for method in pairs(BLOB_ALPHAS) do
 		end
 	end)
 end
+local BLANK_MASK = "Interface\\AddOns\\" .. ADDON_NAME .. "\\Textures\\BlipBlank"
+local maskSet -- (the mask another addon set, once one did)
+local FOREVER_MASK = "ui-hud-minimap-frame-generic-mask"
+if Minimap.SetMaskTexture then
+	hooksecurefunc(Minimap, "SetMaskTexture", function(_, texture)
+		if settingBlobs or Secret(texture) then return end
+		maskSet = texture
+		if blobsHidden then
+			settingBlobs = true
+			pcall(Minimap.SetMaskTexture, Minimap, BLANK_MASK)
+			settingBlobs = false
+		end
+	end)
+end
+-- (No mask set by an addon since we loaded: the game's round one, or the
+-- usual square one where an addon says the minimap is square.)
+local function MaskBack()
+	if maskSet ~= nil then return maskSet end
+	local ok, shape = pcall(GetMinimapShape or error)
+	if ok and shape == "SQUARE" then return "Interface\\ChatFrame\\ChatFrameBackground" end
+	-- (WoW Forever's own round minimap is this atlas, set before we load;
+	-- "Textures\\MinimapMask" there left the map blank, seen 2026-11-10.)
+	if C_Texture and C_Texture.GetAtlasInfo and C_Texture.GetAtlasInfo(FOREVER_MASK) then return FOREVER_MASK end
+	return "Textures\\MinimapMask"
+end
 
 function ns.SetMinimapBlobsHidden(hidden)
 	if hidden == blobsHidden then return end
@@ -695,6 +725,9 @@ function ns.SetMinimapBlobsHidden(hidden)
 	settingBlobs = true
 	for method, alpha in pairs(BLOB_ALPHAS) do
 		pcall(Minimap[method], Minimap, hidden and 0 or alpha)
+	end
+	if Minimap.SetMaskTexture and not ns.isRetail then
+		pcall(Minimap.SetMaskTexture, Minimap, hidden and BLANK_MASK or MaskBack())
 	end
 	settingBlobs = false
 end
@@ -712,7 +745,7 @@ local last = {} -- the last sweep, for /cine debug tracking
 -- stays in its place: off the screen the game adds no new dots, tested.
 local areaShown = false
 function ns.MinimapAreaShown()
-	return areaShown or (cursor.On() and cursor.AreaNear()) or false
+	return areaShown
 end
 
 -- Nearby ore, herbs and treasure's Mark where it is (minimapNodeMark): our
@@ -1512,10 +1545,35 @@ end
 
 -- Whether the mouse is on a unit or a thing in the world (a chest, a herb:
 -- the game's world tooltip), as a reason, or nil.
+-- (Only units whose cursor isn't the arrow: anything you can attack, or an
+-- NPC. You, your pet and other players keep the arrow, and in CineMode the
+-- pointer often rests on you: counting every unit kept the sweep waiting for
+-- good, seen in the log 2026-11-10.)
+-- (And only while the game's unit tooltip is up for it: "mouseover" alone
+-- said an enemy for 25 s on end with the pointer over open ground, the log
+-- 2026-11-10, and the sweep never ran.)
+local function CursorUnit()
+	if not ns.Flag(UnitExists("mouseover")) then return nil end
+	local shown = GameTooltip and ns.Flag(GameTooltip:IsShown())
+	local ok, _, tipUnit = false, nil, nil
+	if shown then ok, _, tipUnit = pcall(GameTooltip.GetUnit, GameTooltip) end
+	if not (ok and tipUnit ~= nil) then return nil end
+	if ns.Flag(UnitIsUnit("mouseover", "player")) then return nil end
+	local name = UnitName("mouseover")
+	name = (name ~= nil and not Secret(name)) and (" (" .. name .. ")") or ""
+	if ns.Flag(UnitCanAttack("player", "mouseover")) then return "an enemy" .. name end
+	if ns.Flag(UnitPlayerControlled("mouseover")) then return nil end
+	return "an NPC" .. name
+end
+
 function cursor.OnWorldThing()
-	if ns.Flag(UnitExists("mouseover")) then return "your mouse is on someone" end
+	local unit = CursorUnit()
+	if unit then return "your mouse is on " .. unit end
 	local owner = GameTooltip and ns.Flag(GameTooltip:IsShown()) and GameTooltip:GetOwner()
 	if owner ~= nil and (owner == UIParent or owner == WorldFrame) then
+		-- (A unit's tooltip: decided above. Else a chest, herb or the like.)
+		local ok, _, tipUnit = pcall(GameTooltip.GetUnit, GameTooltip)
+		if ok and tipUnit ~= nil then return nil end
 		return "your mouse is on something in the world"
 	end
 end
@@ -1763,45 +1821,6 @@ function cursor.Keep(name, list)
 		math.sqrt(x * x + y * y) * perUnit))
 end
 
--- A quest's area heard by the cursor sweep (Forever): its outline shows
--- through the faded minimap, at its corner and under the pointer while it
--- sweeps, seen 2026-11-10. The quest log only gives an area's middle, not its
--- size, so where it was heard is kept: the faded minimap waits off the screen
--- (Frames.lua, ns.MinimapAreaShown) and no sweep runs while you're within the
--- minimap's view of that spot and AREA_REACH yards more (an area reaches past
--- where it was heard), or AREA_HOLD seconds where you are isn't known.
-cursor.AREA_REACH = 60
-cursor.AREA_HOLD = 60
-function cursor.AreaAt(x, y)
-	local perUnit, facing = View()
-	local n, w = Here()
-	if not (perUnit and n) then
-		cursor.area = { at = GetTime() }
-		return
-	end
-	local cos, sin = math.cos(facing), math.sin(facing)
-	cursor.area = { n = n + (sin * x + cos * y) * perUnit, w = w + (-cos * x + sin * y) * perUnit, at = GetTime() }
-	ns.Log("nodes", ("cursor sweep heard a quest area %.0f yd away: waits off the screen"):format(
-		math.sqrt(x * x + y * y) * perUnit))
-end
-
-function cursor.AreaNear()
-	local area = cursor.area
-	if not area then return false end
-	local now = GetTime()
-	local n, w = Here()
-	local ok, radius = pcall(C_Minimap.GetViewRadius)
-	if not (area.n and n and ok and type(radius) == "number" and not Secret(radius)) then
-		if now - area.at < cursor.AREA_HOLD then return true end
-		cursor.area = nil
-		return false
-	end
-	if (n - area.n) ^ 2 + (w - area.w) ^ 2 <= (radius + cursor.AREA_REACH) ^ 2 then return true end
-	ns.Log("nodes", "cursor sweep: walked away from the quest area heard: back in place")
-	cursor.area = nil
-	return false
-end
-
 -- Ping where it is (minimapNodePing) on a find: the game's ping where it was
 -- heard, the middle of the grid points that heard it (a few yards off the dot
 -- at most). (Our ring was tried too; the user wanted just the ping.)
@@ -1887,37 +1906,7 @@ local function CursorSweep(all)
 		return
 	end
 	local function IsNode(name) return NODE_KINDS[ns.NodeKind(name)] == true end
-	-- (A quest's area heard inside the rim (its name: a rim arrow is only at
-	-- the rim) stops it too: the outline is on the minimap, which waits off
-	-- the screen meanwhile, cursor.AreaNear.)
-	local inner = (s.width / 2 - RIM_BAND) ^ 2
-	local area
-	local function Stop(name, entry)
-		if IsNode(name) then return true end
-		local kind = ns.NodeKind(name)
-		if kind == "objective" or kind == "line" then
-			local list = entry.list
-			local x, y = list[#list - 1], list[#list]
-			if x * x + y * y < inner then
-				area = { x, y }
-				return true
-			end
-		end
-	end
-	local found, probes = Probe(STEP, {}, not all and Stop or nil, s.width / 2)
-	-- (Only at the rim: an area just reaching over it, heard along more of the
-	-- rim than one arrow can be (OnlyAtRim), counts too: its edge peeked in at
-	-- the minimap's corner, seen.)
-	if not area and not all and type(found) == "table" then
-		for name, entry in pairs(found) do
-			local kind = ns.NodeKind(name)
-			if (kind == "objective" or kind == "line") and entry.list and #entry.list >= 2 and not OnlyAtRim(entry) then
-				area = { entry.list[1], entry.list[2] }
-				break
-			end
-		end
-	end
-	if area and not all then cursor.AreaAt(area[1], area[2]) end
+	local found, probes = Probe(STEP, {}, not all and IsNode or nil, s.width / 2)
 	-- (The test: how far from where each name was heard it still answers,
 	-- out along the four ways, a unit at a time: the size of a dot's answer.)
 	if all and type(found) == "table" then
@@ -1947,7 +1936,15 @@ local function CursorSweep(all)
 	last.probes, last.step, last.found = probes, STEP, type(found) == "table" and found or nil
 	if not found then
 		last.why = probes
+		if not all then cursor.Note("sweep stopped: " .. tostring(probes)) end
 		return
+	end
+	if not all then
+		local any = false
+		for name in pairs(found) do
+			if NODE_KINDS[ns.NodeKind(name)] then any = true end
+		end
+		if not any then cursor.Note("swept, no node on the minimap") end
 	end
 	local names = {}
 	for name, entry in pairs(found) do
@@ -1971,14 +1968,27 @@ end
 
 -- From ns.IsMinimapRevealed while cursor.On(): up while a node found is
 -- still on it, else swept every EVERY seconds while it's faded.
+-- (Why it isn't sweeping, logged each time the reason changes: a sweep that
+-- never starts leaves no other trace, 2026-11-10.)
+function cursor.Note(why)
+	if why == cursor.noted then return end
+	cursor.noted = why
+	ns.Log("nodes", "cursor sweep: " .. (why or "ready"))
+end
+
 function cursor.Reveal(now)
 	if cursor.Held(now) then
 		seenAt = now
+		cursor.Note("holding the minimap up for " .. tostring(cursor.spot and cursor.spot.name))
 		return true
 	end
-	if not sweepJob and now - sweptAt >= cursor.EVERY and not cursor.NotReady() then
-		sweptAt = now
-		StartCursorSweep(false)
+	if not sweepJob and now - sweptAt >= cursor.EVERY then
+		local why = cursor.NotReady()
+		cursor.Note(why and ("waits: " .. why) or nil)
+		if not why then
+			sweptAt = now
+			StartCursorSweep(false)
+		end
 	end
 	return now - seenAt < HOLD
 end
@@ -2207,7 +2217,7 @@ local function QuestsOnMinimap()
 	if not (here and Known(here.x) and ok and type(radius) == "number") then return nil, "no world position" end
 	local quests = C_QuestLog.GetQuestsOnMap(mapID)
 	if type(quests) ~= "table" then return nil, "no quests on the map" end
-	local wanted, parts, area = {}, {}, false
+	local wanted, parts = {}, {}
 	for _, quest in ipairs(quests) do
 		local id, x, y = quest.questID, quest.x, quest.y
 		if Known(id) and Known(x) and Known(y) then
@@ -2218,7 +2228,6 @@ local function QuestsOnMinimap()
 				local reach = done and radius or radius + QUEST_AREA_REACH
 				local title = C_QuestLog.GetTitleForQuestID and C_QuestLog.GetTitleForQuestID(id) or tostring(id)
 				local on = yards <= reach
-				if on and not done then area = true end
 				local reveals = on and (done and db.minimapRevealTurnIns or not done and db.minimapRevealAreas)
 				if reveals then wanted[#wanted + 1] = title end
 				parts[#parts + 1] = ("%s (%s, %.0f yd%s)"):format(title, done and "done" or "area", yards,
@@ -2226,8 +2235,7 @@ local function QuestsOnMinimap()
 			end
 		end
 	end
-	return wanted, ("view radius %.0f yd: %s"):format(radius, #parts > 0 and table.concat(parts, "; ") or "no quests"),
-		area
+	return wanted, ("view radius %.0f yd: %s"):format(radius, #parts > 0 and table.concat(parts, "; ") or "no quests")
 end
 
 -- (reveal false: only to know whether a quest's area is on the minimap, for
@@ -2237,9 +2245,8 @@ end
 local function QuestReveals(now, reveal)
 	if now - questLook.at >= SWEEP_EVERY then
 		questLook.at = now
-		local ok, wanted, report, area = pcall(QuestsOnMinimap)
+		local ok, wanted, report = pcall(QuestsOnMinimap)
 		questLook.report = ok and report or ("failed: " .. tostring(wanted))
-		if ok then areaShown = area == true end
 		if reveal and ok and wanted and #wanted > 0 then
 			table.sort(wanted)
 			seenAt = now
@@ -2281,6 +2288,10 @@ end
 function ns.IsMinimapRevealed(now)
 	local questie = GiversFound(now)
 	-- (Nodes by the cursor sweep, quests from the quest log: both can be on.)
+	if not cursor.On() and ns.db and ns.db.minimapNodesByCursor then
+		cursor.Note(("off: Minimap page %s, game answers %s, client can %s"):format(tostring(ns.db.handleMinimap),
+			tostring(answer.state), tostring(cursor.Can())))
+	end
 	if cursor.On() then
 		local quests = QuestReveals(now, QuestReveal())
 		local nodesUp = cursor.Reveal(now)
