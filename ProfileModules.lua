@@ -169,10 +169,10 @@ ns.PROFILE_MODULES = {
 		tip = "The normal UI: nothing fades.",
 		apply = function(set) set("fadeUI", false) end },
 	-- (Stored the other way round: Exit CineMode's In combat ticked = stayInCombat off.)
-	{ key = "exit-in-combat", name = "Exit CineMode in combat", scope = { "Cinematic/General" },
+	{ key = "exit-in-combat", name = "Exit CineMode in combat", scope = { "CineMode/Exit CineMode" },
 		tip = "A fight brings the whole UI back (Exit CineMode: In combat ticked).",
 		apply = function(set) set("stayInCombat", false) end },
-	{ key = "solo-only", name = "Solo in the world only", scope = { "Cinematic/General" },
+	{ key = "solo-only", name = "Solo in the world only", scope = { "CineMode/Exit CineMode" },
 		tip = "On only while you're out in the world on your own: off in dungeons, raids, PvP and groups.",
 		apply = function(set)
 			for _, where in ipairs({ "Dungeons", "Raids", "PvP", "Party", "RaidGroup" }) do

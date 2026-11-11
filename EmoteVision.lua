@@ -522,6 +522,54 @@ local function UnitFor(guid, name)
 	end
 end
 
+-- Whether the one a card is about is still there. The game only says for
+-- someone it has a unit for (your group, your target, focus or mouseover, a
+-- nameplate): out of its sight, gone. With no unit: gone if they had a
+-- nameplate since the moment and have none now (a nameplate also goes when
+-- they're out of the camera's view, unless Show Offscreen Nameplates is on);
+-- never seen on one, no telling: still there. Not asked in a fight (the game
+-- hides who's who then), nor for a group's card or a test's.
+local away = {}
+local GONE_AFTER = 1.5 -- gone this long before a card's dropped (a nameplate can blink)
+-- (true: they have a nameplate; false: none; nil: no telling, a plate's owner hidden.)
+function away.Plate(guid)
+	if not guid then return nil end
+	local unknown
+	for i = 1, 40 do
+		local unit = "nameplate" .. i
+		local raw = UnitGUID(unit)
+		if raw ~= nil then
+			local each = Plain(raw)
+			if each == guid then return true end
+			if each == nil then unknown = true end
+		end
+	end
+	if unknown then return nil end
+	return false
+end
+function away.Gone(moment)
+	if not moment or moment.group or moment.test then return false end
+	local guid = moment.guid
+	local plate = away.Plate(guid)
+	if plate then moment.plated = true end
+	local unit = UnitFor(guid, moment.fullName or moment.name)
+	if unit then
+		local seen = UnitIsVisible(unit)
+		if issecretvalue and issecretvalue(seen) then return false end
+		return not seen
+	end
+	return moment.plated == true and plate == false
+end
+-- (Gone for GONE_AFTER now: the card's dropped. moment.goneSince: since when.)
+function away.Left(moment)
+	if not moment or Fighting() or not away.Gone(moment) then
+		if moment then moment.goneSince = nil end
+		return false
+	end
+	moment.goneSince = moment.goneSince or GetTime()
+	return GetTime() - moment.goneSince >= GONE_AFTER
+end
+
 -- The emotes a moment's buttons play, as its list says (same: the one done
 -- at you, for Same back; none of them twice). own: a list to use instead.
 -- Whether this client has the emote (one picked on another client, or a
@@ -1175,7 +1223,16 @@ local function Create()
 		end
 		self:SetAlpha(math.min(1, age / FADE_IN))
 		self.bar:SetWidth(math.max(1, (self.barWidth or 100) * (1 - math.min(1, age / hold))))
-		if age >= hold then self.leaving = 0 end
+		if age >= hold then self.leaving = 0 return end
+		-- (Twice a second: are they still there? Gone: the card goes too.)
+		self.sinceThere = (self.sinceThere or 0) + elapsed
+		if self.sinceThere >= 0.5 then
+			self.sinceThere = 0
+			if showing and away.Left(showing) then
+				ns.Log("emote", showing.kind .. " card closed: they left")
+				self.leaving = 0
+			end
+		end
 	end)
 	card:SetScript("OnHide", function()
 		showing = nil
@@ -1511,9 +1568,13 @@ function Next()
 			ns.Log("emote", ("%s card dropped unseen: waited too long (%s)"):format(queue[i].kind,
 				WhyWaiting(queue[i]) or "nothing now"))
 			table.remove(queue, i)
+		elseif away.Left(queue[i]) then
+			ns.Log("emote", queue[i].kind .. " card dropped unseen: they left")
+			table.remove(queue, i)
 		end
 	end
-	while queue[1] and Allowed(queue[1]) do
+	-- (One who may have just left, goneSince: held back till that's sure.)
+	while queue[1] and not queue[1].goneSince and Allowed(queue[1]) do
 		local moment = table.remove(queue, 1)
 		if Show(moment) then
 			ns.Log("emote", moment.kind .. " card shown")

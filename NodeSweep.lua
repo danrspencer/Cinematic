@@ -1579,7 +1579,7 @@ function cursor.OnWorldThing()
 end
 
 -- Why the cursor sweep can't run (or go on, started) now, or nil.
-function cursor.NotReady(started)
+function cursor.NotReady(started, test)
 	-- (In fights with In combat too ticked, or /cine debug cursorsweep combat
 	-- for this session; never with the minimap itself protected. Tested
 	-- 2026-11-10: sweeps in fights, nothing blocked.)
@@ -1591,8 +1591,10 @@ function cursor.NotReady(started)
 	if not ns.Flag(Minimap:IsVisible()) then return "the minimap is hidden" end
 	-- (Nothing to find without ore, herb or treasure tracking on, and not in
 	-- the places ticked under its Except in, Minimap page. Only before a
-	-- sweep starts: one going on finishes.)
-	if not started and not cursor.diag then
+	-- sweep starts: one going on finishes. Nor for /cine debug cursorsweep
+	-- test, which hears every name anywhere: it was refused in Darnassus,
+	-- 2026-11-11.)
+	if not started and not test and not cursor.diag then
 		if ns.IsGatheringTrackingOn and not ns.IsGatheringTrackingOn() then
 			return "no ore, herb or treasure tracking is on"
 		end
@@ -1619,7 +1621,15 @@ function cursor.NotReady(started)
 		if why then return why end
 	end
 	local focus = MouseFocus()
-	if focus and focus ~= WorldFrame and not InMinimap(focus) then return "your mouse is on a window" end
+	if focus and focus ~= WorldFrame and not InMinimap(focus) then
+		-- (Which one, for the log: a gamepad test stopped here with no way to
+		-- tell what the pointer had come onto, 2026-11-11.)
+		local ok, name = pcall(function()
+			return (focus.GetDebugName and focus:GetDebugName()) or (focus.GetName and focus:GetName())
+		end)
+		name = ok and type(name) == "string" and not Secret(name) and name or "no name"
+		return "your mouse is on a window (" .. name .. ")"
+	end
 end
 
 -- The minimap ready to go under the mouse: where it is, its mouse off (and
@@ -2075,7 +2085,10 @@ function ns.CursorSweepTest(arg)
 			end
 			readyAt = readyAt or GetTime()
 			if GetTime() - readyAt < 0.5 then return end
-			local why = cursor.NotReady()
+			local why = cursor.NotReady(false, true)
+			-- (Typed right after a /reload: it waits those seconds out, where it
+			-- used to refuse, 2026-11-11.)
+			if why == "the game is still loading in" then return end
 			if why then
 				Done(self)
 				return Say("can't now: " .. why)
@@ -2084,6 +2097,11 @@ function ns.CursorSweepTest(arg)
 			last.found, cursor.reach = nil, nil
 			cursor.iconsFor = size
 			cursor.diag = { reads = 0, over = 0, camera = 0, focus = {}, offSum = 0, offMax = 0, anyLines = 0, tooltip = 0 }
+			-- (What the pointer is under a gamepad: asked 2026-11-11.)
+			local cx, cy = GetCursorPosition()
+			Say(("gamepad on %s, mouselook %s, pointer at %.0f, %.0f of %.0f x %.0f"):format(
+				tostring(ns.IsGamePadOn and ns.IsGamePadOn() or false), tostring(IsMouselooking and IsMouselooking() or false),
+				cx or -1, cy or -1, UIParent:GetWidth() * UIParent:GetEffectiveScale(), UIParent:GetHeight() * UIParent:GetEffectiveScale()))
 			StartCursorSweep(true)
 			return
 		end
@@ -2111,6 +2129,11 @@ function ns.CursorSweepTest(arg)
 		local found, names = last.found or {}, {}
 		for name in pairs(found) do names[#names + 1] = name end
 		table.sort(names)
+		-- (Stopped part way: the names it had are lost with it, but not that it
+		-- heard some. It said NOTHING after hearing 17, 2026-11-11.)
+		if #names == 0 and last.why and (last.heard or 0) > 0 then
+			return Say(("stopped before the end, names lost: it had heard something at %d points"):format(last.heard))
+		end
 		if #names == 0 then return Say("heard NOTHING on the minimap") end
 		for _, name in ipairs(names) do
 			local entry = found[name]

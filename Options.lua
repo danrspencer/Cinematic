@@ -1960,71 +1960,7 @@ local function CreatePanel()
 		"runs: standing still or going AFK, say, for a screensaver."])
 	fadeUI:SetPoint("TOPLEFT", cineHeader, "BOTTOMLEFT", -2, -6)
 
-	local placesHeader = Label(panel, "GameFontNormal", L["Exit CineMode"])
-	placesHeader:SetPoint("TOPLEFT", fadeUI, "BOTTOMLEFT", 2, -14)
-
-	-- Stored the other way round (stayInCombat), as the Standard Frames page's lists apply while staying.
-	local combat = Check(panel, "stayInCombat", L["In combat"],
-		L["Being in combat brings the UI back. Unticked, CineMode stays on in fights: only the frames " ..
-		"ticked under In combat on the Game Frames page show. (Targeting an enemy only ever shows " ..
-		"the frames chosen for it there.)"], function(value)
-			ns.GetDB().stayInCombat = not value
-			Refresh()
-		end)
-	combat.Refresh = function(self) self:SetChecked(not ns.GetDB().stayInCombat) end
-	combat:SetPoint("TOPLEFT", placesHeader, "BOTTOMLEFT", -2, -6)
-
-	-- Places in the same order as every other place list (PlaceList).
-	local world = Check(panel, "offInWorld", L["In the open world"],
-		L["Anywhere outside cities, dungeons and raids (inns too), while you're not PvP flagged. " ..
-		"Flights still go cinematic."])
-	world:SetPoint("TOPLEFT", combat, "BOTTOMLEFT", 0, -2)
-
-	local cities = Check(panel, "offInCities", L["In cities"],
-		L["Capital cities, including Dalaran. Flights leaving a city still go cinematic."])
-	cities:SetPoint("TOPLEFT", world, "BOTTOMLEFT", 0, -2)
-
-	local dungeons = Check(panel, "offInDungeons", L["In dungeons"],
-		L["Keep the normal UI in dungeons and scenarios."])
-	dungeons:SetPoint("TOPLEFT", cities, "BOTTOMLEFT", 0, -2)
-
-	local raids = Check(panel, "offInRaids", L["In raids"])
-	raids:SetPoint("TOPLEFT", dungeons, "BOTTOMLEFT", 0, -2)
-
-	local pvp = Check(panel, "offInPvP", L["In PvP"], PVP_TIP)
-	pvp:SetPoint("TOPLEFT", raids, "BOTTOMLEFT", 0, -2)
-
-	local party = Check(panel, "offInParty", L["In a party"],
-		L["Keep the normal UI while you're in a party (but not a raid group)."])
-	party:SetPoint("TOPLEFT", pvp, "BOTTOMLEFT", 0, -2)
-
-	local raidGroup = Check(panel, "offInRaidGroup", L["In a raid group"],
-		L["Keep the normal UI while you're in a raid group, wherever you are."])
-	raidGroup:SetPoint("TOPLEFT", party, "BOTTOMLEFT", 0, -2)
-
-	local moving = Check(panel, "offWhileMoving", L["When moving"],
-		L["Walking or riding about yourself brings the UI back (names too), say to look for an NPC " ..
-		"in a city. CineMode comes back once you've stood still, or kept moving, for the time " ..
-		"below. Auto-run, RP walking and flights stay in CineMode."],
-		function(value)
-			ns.GetDB().offWhileMoving = value
-			Refresh()
-		end)
-	moving:SetPoint("TOPLEFT", raidGroup, "BOTTOMLEFT", 0, -2)
-
-	-- (Indented under Moving, as its sub-options.)
-	local movingVFX = Check(panel, "movingKeepVFX", L["Keep VFX on"],
-		L["The visual effects (letterbox, tint and the rest on the Visual Effects page) stay on " ..
-		"while moving brings the UI back."])
-	movingVFX:SetPoint("TOPLEFT", moving, "BOTTOMLEFT", 24, -2)
-	GreyUnless(movingVFX, function(db) return db.offWhileMoving end)
-
-	local movingBack = Slider(panel, "movingBackAfter", L["Back after"], 1, 60, 1, L["%d sec"])
-	movingBack:SetPoint("TOPLEFT", movingVFX, "BOTTOMLEFT", 4, -26)
-	movingBack:SetWidth(176)
-	Tooltip(movingBack, L["CineMode comes back once you've stood still this long, or kept moving " ..
-		"this long without stopping (a long walk or ride)."])
-	GreyUnless(movingBack, function(db) return db.offWhileMoving end)
+	-- (What takes you out of it, Exit CineMode: on the CineMode page.)
 
 	local defaults = ns.PanelButton(panel)
 	defaults:SetSize(140, 22)
@@ -3356,8 +3292,73 @@ local function CreateRevealPanel()
 	stack:Add(hostileCast, "check")
 	GreyUnless(hostileCast, function(db) return db.stayInCombat end)
 
-	-- What brings the whole UI back (the rest of the Exit CineMode section, set aside above).
+	-- What takes you out of CineMode: fights, places, groups and moving (from
+	-- the main page, 2026-11-11), then windows (the rest of the section set
+	-- aside above).
 	stack:Header(content, L["Exit CineMode"])
+
+	-- Stored the other way round (stayInCombat), as the Standard Frames page's lists apply while staying.
+	local combat = Check(content, "stayInCombat", L["In combat"],
+		L["Being in combat brings the UI back. Unticked, CineMode stays on in fights: only the frames " ..
+		"ticked under In combat on the Game Frames page show. (Targeting an enemy only ever shows " ..
+		"the frames chosen for it there.)"], function(value)
+			ns.GetDB().stayInCombat = not value
+			Refresh()
+		end)
+	combat.Refresh = function(self) self:SetChecked(not ns.GetDB().stayInCombat) end
+	stack:Add(combat, "check")
+
+	-- Places in the same order as every other place list (PlaceList).
+	local world = Check(content, "offInWorld", L["In the open world"],
+		L["Anywhere outside cities, dungeons and raids (inns too), while you're not PvP flagged. " ..
+		"Flights still go cinematic."])
+	stack:Add(world, "check")
+
+	local cities = Check(content, "offInCities", L["In cities"],
+		L["Capital cities, including Dalaran. Flights leaving a city still go cinematic."])
+	stack:Add(cities, "check")
+
+	local dungeons = Check(content, "offInDungeons", L["In dungeons"],
+		L["Keep the normal UI in dungeons and scenarios."])
+	stack:Add(dungeons, "check")
+
+	local raids = Check(content, "offInRaids", L["In raids"])
+	stack:Add(raids, "check")
+
+	local pvp = Check(content, "offInPvP", L["In PvP"], PVP_TIP)
+	stack:Add(pvp, "check")
+
+	local party = Check(content, "offInParty", L["In a party"],
+		L["Keep the normal UI while you're in a party (but not a raid group)."])
+	stack:Add(party, "check")
+
+	local raidGroup = Check(content, "offInRaidGroup", L["In a raid group"],
+		L["Keep the normal UI while you're in a raid group, wherever you are."])
+	stack:Add(raidGroup, "check")
+
+	local moving = Check(content, "offWhileMoving", L["When moving"],
+		L["Walking or riding about yourself brings the UI back (names too), say to look for an NPC " ..
+		"in a city. CineMode comes back once you've stood still, or kept moving, for the time " ..
+		"below. Auto-run, RP walking and flights stay in CineMode."],
+		function(value)
+			ns.GetDB().offWhileMoving = value
+			Refresh()
+		end)
+	stack:Add(moving, "check")
+
+	-- (Indented under Moving, as its sub-options.)
+	local movingVFX = Check(content, "movingKeepVFX", L["Keep VFX on"],
+		L["The visual effects (letterbox, tint and the rest on the Visual Effects page) stay on " ..
+		"while moving brings the UI back."])
+	GreyUnless(movingVFX, function(db) return db.offWhileMoving end)
+	stack:Add(movingVFX, "check", 16)
+
+	local movingBack = Slider(content, "movingBackAfter", L["Back after"], 1, 60, 1, L["%d sec"])
+	Tooltip(movingBack, L["CineMode comes back once you've stood still this long, or kept moving " ..
+		"this long without stopping (a long walk or ride)."])
+	GreyUnless(movingBack, function(db) return db.offWhileMoving end)
+	stack:Add(movingBack, "slider", 16)
+
 	stack:Add(windows, "check")
 	stack:Add(npcs, "check")
 

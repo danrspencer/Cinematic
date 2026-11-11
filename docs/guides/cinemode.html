@@ -139,7 +139,7 @@ dl.faq dd { margin: 2px 0 0; color: var(--muted) }
   <section>
     <div class="eyebrow">Try it</div>
     <h2>What shows right now</h2>
-    <p class="muted">Pick a moment to see what CineMode does with your screen. The switch on top is the <b>Combat</b> box under <b>Turn off in</b> on the main page; the profiles leave it unticked.</p>
+    <p class="muted">Pick a moment to see what CineMode does with your screen. The switch on top is the <b>In combat</b> box under <b>Exit CineMode</b> on the CineMode page's Settings tab; the profiles leave it unticked.</p>
 
     <div class="win" id="sim">
       <div class="win-top">
@@ -198,7 +198,7 @@ dl.faq dd { margin: 2px 0 0; color: var(--muted) }
       <div class="card"><h3>Friend targeted</h3><p>Shows while you have a friendly player or NPC targeted.</p></div>
     </div>
     <p><b>Cast fade into combat</b> (under Fading on the CineMode page) brings up your In combat frames as you cast at an enemy out of combat, as if the fight had already started: they fade in over the cast and are fully up as it lands.</p>
-    <p>To switch CineMode off for every fight instead, tick <b>Combat</b> under <b>Turn off in</b> on the main page: being in combat then brings the whole UI back.</p>
+    <p>To switch CineMode off for every fight instead, tick <b>In combat</b> under <b>Exit CineMode</b> on the CineMode page's Settings tab: being in combat then brings the whole UI back.</p>
     <p class="muted">The letterbox, tint, vignette and weather can each stay up or step aside during fights, from the <b>Show in</b> grid on the Visual Effects page. Party and raid frames fade part by part (role icons, names, the threat glow), and the cast bar can stay hidden outside fights.</p>
   </section>
 
@@ -218,7 +218,7 @@ dl.faq dd { margin: 2px 0 0; color: var(--muted) }
   <section>
     <div class="eyebrow">Places</div>
     <h2>Turning itself off where you'd rather have the full UI</h2>
-    <p>The <b>Turn off in</b> boxes on Cinematic's main page keep the normal UI in the places you tick:</p>
+    <p>The <b>Exit CineMode</b> boxes on the CineMode page's Settings tab keep the normal UI in the places you tick:</p>
     <div class="cards">
       <div class="card"><h3>Open world</h3><p>Anywhere outside cities, dungeons and raids (inns too), while you're not PvP flagged. Flights still go cinematic.</p></div>
       <div class="card"><h3>Cities</h3><p>Capital cities, including Dalaran. Flights leaving a city still go cinematic.</p></div>
@@ -289,7 +289,7 @@ dl.faq dd { margin: 2px 0 0; color: var(--muted) }
 <script>
 (function () {
   // Moments and what CineMode does in each. ui: which mock frames show; lb: letterbox up.
-  // stay: the same moment with "Combat" unticked under Turn off in (CineMode stays in fights).
+  // stay: the same moment with "In combat" unticked under Exit CineMode (CineMode stays in fights).
   var MOMENTS = [
     { name: "Exploring", q: "Out in the world, nothing going on",
       lines: [["The UI is faded", "Just the world, the letterbox and the tint"], ["Always rows", "Anything you ticked Always on the Game Frames page stays up"]],
@@ -311,7 +311,7 @@ dl.faq dd { margin: 2px 0 0; color: var(--muted) }
       lines: [["CineMode comes back", "Your UI fades away again"]],
       ui: ["bars", "unit", "map"], lb: false,
       stay: { lines: [["The Calm Timer starts", "60 seconds to start with, or less once you're healthy"], ["Rows ticked Calm Timer stay", "Until it runs out, then fade at the Fade out time"], ["The cameras wait", "RP walk, auto-run and cozy wait for it too"]], ui: ["unit"], lb: true } },
-    { name: "In a city", q: "With Cities ticked under Turn off in",
+    { name: "In a city", q: "With In cities ticked under Exit CineMode",
       lines: [["Normal UI", "CineMode stays off while you're there"], ["Flights still go cinematic", "Taking off from a city still goes cinematic"]],
       ui: ["bars", "unit", "map", "chat"], lb: false }
   ];

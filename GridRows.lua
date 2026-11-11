@@ -1195,8 +1195,8 @@ function ns.ListRowParts(Key, columns, columnTips, setAlways, opts)
 			-- (In combat only counts while CineMode stays on in fights, for the UI's rows.)
 			local needsStay = column[4] and not opts.anyFight
 			if needsStay then
-				tip = (tip and tip .. " " or "") .. L["(Only while Combat is unticked under Turn off in, " ..
-					"on the main page: CineMode stays on in fights.)"]
+				tip = (tip and tip .. " " or "") .. L["(Only while In combat is unticked under Exit CineMode, " ..
+					"on the CineMode page: CineMode stays on in fights.)"]
 			end
 			local group = menus[LIST_GROUP[list] or 3]
 			group[#group + 1] = { name, function() return Ticked(c) end, function() SetTick(c, not Ticked(c)) end,

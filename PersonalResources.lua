@@ -295,7 +295,7 @@ function ns.CreatePersonalResourcesPanel(kit)
 			function(db) return (db.lowManaShare or 0) > 0 end)
 	end
 
-	-- (Only while fights bring up frames: the Combat switch on the main page.)
+	-- (Only while fights bring up frames: Exit CineMode's In combat on the CineMode page.)
 	local function Fights(db) return db.stayInCombat end
 	stack:Header(content, L["At the start of a fight"])
 	if hasDisplay then

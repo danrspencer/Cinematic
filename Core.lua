@@ -539,8 +539,12 @@ DEFAULTS.gamepadPressHold = 3       -- ...for this long after the last press (co
 DEFAULTS.gamepadBarsFadeIn = 0.2    -- gamepad mode's action bars fade quicker than the rest of the UI
 DEFAULTS.gamepadBarsFadeOut = 0.5
 DEFAULTS.showInteractPrompt = true -- the interact prompt on a plate (gamepad's X) stays as plates fade
-DEFAULTS.forceReloadOnSettingsExit = true -- WoW Forever: closing Settings reloads (gets past its gamepad freeze)
-DEFAULTS.hideMinimapButtonGamepad = true -- no minimap button in gamepad mode (clicking it there tends to freeze)
+-- WoW Forever: closing Settings reloads (gets past its gamepad freeze). Off to
+-- start with since 2026-11-11: the game looks to have fixed the freeze (user).
+DEFAULTS.forceReloadOnSettingsExit = false
+-- No minimap button in gamepad mode (clicking it there tended to freeze). Off
+-- to start with since 2026-11-11, like the reload above.
+DEFAULTS.hideMinimapButtonGamepad = false
 for _, key in ipairs({ "Mode", "Right", "Step", "Speed", "MinChange", "PitchUp", "PitchDown", "BackArc",
 	"MoveTime", "Ease", "Pause", "Drift", "DriftSpeed" }) do
 	DEFAULTS["fishOrbit" .. key] = DEFAULTS["vistaOrbit" .. key]
@@ -5838,6 +5842,32 @@ ticker:SetScript("OnEvent", ns.Profiled("Core events", function(self, event, arg
 				end
 			end
 			ns.db.questGlowOffV1 = true
+		end
+		-- Force reload on Settings exit (Gamepad Frames page) off to start with
+		-- now (2026-11-11): the game's freeze closing Settings in gamepad mode
+		-- looks fixed (user). Off in every profile. Once: tick it again and it
+		-- stays.
+		if not ns.db.forceReloadOffV1 then
+			ns.db.forceReloadOnSettingsExit = false
+			for _, saved in pairs(ns.db.profiles or {}) do
+				if type(saved) == "table" then
+					saved.forceReloadOnSettingsExit = nil
+					if type(saved.settings) == "table" then saved.settings.forceReloadOnSettingsExit = nil end
+				end
+			end
+			ns.db.forceReloadOffV1 = true
+		end
+		-- Hide the minimap button in gamepad mode, the same page's other guard
+		-- against that freeze: off to start with too (2026-11-11). Once.
+		if not ns.db.hideMinimapButtonGamepadOffV1 then
+			ns.db.hideMinimapButtonGamepad = false
+			for _, saved in pairs(ns.db.profiles or {}) do
+				if type(saved) == "table" then
+					saved.hideMinimapButtonGamepad = nil
+					if type(saved.settings) == "table" then saved.settings.hideMinimapButtonGamepad = nil end
+				end
+			end
+			ns.db.hideMinimapButtonGamepadOffV1 = true
 		end
 		-- Interface Recolor's raid Health bars on to start with now (2026-11-10):
 		-- it began off, which saved off without anyone choosing it. Once: untick
