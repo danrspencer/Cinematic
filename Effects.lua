@@ -3976,6 +3976,16 @@ function ns.UpdatePlates(cinematic, elapsed)
 		and ns.plates.SameAsBefore(cinematic, GetTime()) then
 		return
 	end
+	-- (Nothing moving but the timed refresh rolling over the plates: just its
+	-- next step. The whole pass ran each frame of the roll for it, about a
+	-- quarter of a ms a frame with names kept on plates, 2026-11-11.)
+	if cinematic and ns.plates.rollOnly and not platesDirty and not platesReleased
+		and ns.plates.SameAsBefore(cinematic, GetTime()) then
+		if not ns.plates.RollStep() then
+			ns.plates.rollOnly, ns.plates.quiet = false, true
+		end
+		return
+	end
 	platesReleased = false
 	platesActive = cinematic and true or false
 	-- (The one let go first, so yours is what the other saves.)
@@ -4131,10 +4141,14 @@ function ns.UpdatePlates(cinematic, elapsed)
 		ns.plates.off = true
 	end
 	-- (Nothing moving: the next passes outside CineMode may be skipped.)
-	ns.plates.quiet = not changed and not rolling and next(combatCap) == nil and next(leavingTargets) == nil
+	local still = not changed and next(combatCap) == nil and next(leavingTargets) == nil
 		and next(pendingPlateRows) == nil
+	ns.plates.quiet = still and not rolling
+	ns.plates.rollOnly = still and rolling and cinematic
 	ns.plates.settled = ns.plates.quiet and not filtered
-	if not ns.plates.quiet or (not cinematic and not ns.plates.settled) then ns.plates.seen.at = nil end
+	if not (ns.plates.quiet or ns.plates.rollOnly) or (not cinematic and not ns.plates.settled) then
+		ns.plates.seen.at = nil
+	end
 end
 
 -- World tooltips (units and objects under the cursor) use the default anchor,

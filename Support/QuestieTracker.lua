@@ -255,14 +255,15 @@ local function FadeBackdrop(base, alpha)
 	base:SetBackdropBorderColor(unpack(backdrop[4]))
 end
 
-local wanted, runs, firstOf = {}, {}, {}
+-- (Kept and reused, not made each pass.)
+local wanted, runs, firstOf, wantUnder, parts = {}, {}, {}, {}, {}
 local function Apply(othersAlpha, quests, timers, active)
 	local base = _G.Questie_BaseFrame
 	if type(base) ~= "table" or not base.GetChildren then return false end
 	local questFrame = _G.TrackedQuests
 	-- (Its header, its icon, the sizer: everything but the quests.)
-	for _, part in ipairs({ base:GetChildren() }) do
-		if part ~= questFrame then ns.FadeRelative(part, othersAlpha) end
+	for i = 1, ns.FillChildren(parts, base:GetChildren()) do
+		if parts[i] ~= questFrame then ns.FadeRelative(parts[i], othersAlpha) end
 	end
 	FadeBackdrop(base, othersAlpha)
 	local scrollBar = _G.TrackedQuestsScrollFrame and _G.TrackedQuestsScrollFrame.ScrollBar
@@ -295,7 +296,7 @@ local function Apply(othersAlpha, quests, timers, active)
 	-- line goes under the last wanted line before it (the first run to the
 	-- top); the lines after it follow it, as they're anchored under it.
 	local collapse = active and ns.db.questRevealOnlyThat and ns.db.questRevealCollapse and #runs > 0
-	local want = {} -- [line] = the line to go under (false: the top)
+	local want = wipe(wantUnder) -- [line] = the line to go under (false: the top)
 	if collapse then
 		local lastWanted
 		for i = 1, LINES do
@@ -332,16 +333,21 @@ local function Apply(othersAlpha, quests, timers, active)
 	-- (All back: Questie's tracker height was worked out with them moved.)
 	local restored = anyMoved and not next(moved)
 	anyMoved = next(moved) ~= nil
+	-- (Next frame, not in the frames' pass: Questie building its whole tracker
+	-- again took 5 ms, stacked on the pass, /cine debug framepass 2026-11-11.)
 	if restored and not InCombatLockdown() then
-		local ok, tracker = pcall(function() return _G.QuestieLoader:ImportModule("QuestieTracker") end)
-		if ok and type(tracker) == "table" and type(tracker.Update) == "function" then
-			pcall(tracker.Update, tracker)
-		end
+		C_Timer.After(0, function()
+			if anyMoved or InCombatLockdown() then return end -- (moved again meanwhile)
+			local ok, tracker = pcall(function() return _G.QuestieLoader:ImportModule("QuestieTracker") end)
+			if ok and type(tracker) == "table" and type(tracker.Update) == "function" then
+				pcall(tracker.Update, tracker)
+			end
+		end)
 	end
 	ns.questFocusOthersUp = othersAlpha < 1 or next(moved) ~= nil
 	return found
 end
 
 ns.WhenAddonLoads("Questie", function()
-	ns.AddQuestFocusTracker(Apply)
+	ns.AddQuestFocusTracker(Apply, "Questie")
 end)

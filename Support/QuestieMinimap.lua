@@ -147,13 +147,38 @@ local function Within(spot, px, py, instance, reach)
 	return (x - px) ^ 2 + (y - py) ^ 2 <= reach * reach
 end
 
+-- A route's box: { minX, maxX, minY, maxY } of its points, made once per
+-- route (Questie's tables, weak keys: gone with them). Every point was gone
+-- over for every giver out of reach, every look: 1.2 ms looks, /cine debug
+-- framepass 2026-11-11. Now a route whose box is out of reach is skipped.
+local routeBoxes = setmetatable({}, { __mode = "k" })
+local function RouteBox(world)
+	local box = routeBoxes[world]
+	if box == nil then
+		local minX, maxX, minY, maxY
+		for _, point in ipairs(world) do
+			local x = type(point) == "table" and Plain(point.x, "number")
+			local y = type(point) == "table" and Plain(point.y, "number")
+			if x and y then
+				minX, maxX = math.min(minX or x, x), math.max(maxX or x, x)
+				minY, maxY = math.min(minY or y, y), math.max(maxY or y, y)
+			end
+		end
+		box = minX and { minX, maxX, minY, maxY } or false
+		routeBoxes[world] = box
+	end
+	return box
+end
+
 -- A walking giver's route: any point of it in reach.
 local function RouteWithin(data, px, py, instance, reach)
 	local paths = Plain(data.waypointPaths, "table")
 	if not paths then return false end
 	for _, path in ipairs(paths) do
 		local world = type(path) == "table" and Plain(path.world, "table")
-		if world and (path.instanceId == nil or path.instanceId == instance) then
+		local box = world and RouteBox(world)
+		if box and (path.instanceId == nil or path.instanceId == instance)
+			and px >= box[1] - reach and px <= box[2] + reach and py >= box[3] - reach and py <= box[4] + reach then
 			for _, point in ipairs(world) do
 				if type(point) == "table" and Within(point, px, py, nil, reach) then return true end
 			end
@@ -265,9 +290,27 @@ end
 
 -- For NodeSweep.lua's ns.IsMinimapRevealed: whether Questie's icons hold the
 -- minimap up now, and what (names joined), looking every LOOK_EVERY seconds.
+-- (Standing still, the look is done again only every STILL_EVERY seconds:
+-- going over every one of Questie's icons cost about 1 ms a look, /cine
+-- debug framepass 2026-11-11, and CineMode is mostly up while you stand.
+-- Still: within STILL_YARDS of the last look's spot, same instance. The
+-- longer wait still catches a quest taken or a giver walking up.)
+local STILL_EVERY, STILL_YARDS = 5, 2
+local function StandingStill(now)
+	local y, x, _, instance = UnitPosition("player")
+	x, y = Plain(x, "number"), Plain(y, "number")
+	local still = x and y and look.stillX and instance == look.stillInstance
+		and (x - look.stillX) ^ 2 + (y - look.stillY) ^ 2 <= STILL_YARDS * STILL_YARDS
+		and now - look.at < STILL_EVERY
+	if not still then
+		look.stillX, look.stillY, look.stillInstance = x, y, instance
+	end
+	return still
+end
+
 function ns.QuestieMinimapRevealed(now)
 	if not ns.QuestieMinimapOn() then return false end
-	if now - look.at >= LOOK_EVERY then
+	if now - look.at >= LOOK_EVERY and not StandingStill(now) then
 		look.at = now
 		local ok, names, why = pcall(Look)
 		if ok then

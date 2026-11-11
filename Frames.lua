@@ -2872,6 +2872,9 @@ function ns.IsCineModeShowOn(key) return IsListOn("cineModeShow", key, NO_DEFAUL
 -- Tables UpdateFrames (and what it calls) fills afresh each tick, kept rather
 -- than made anew: making them 33 times a second was a lot of garbage.
 local tickTables = {
+	-- (fading: the frames still fading after a pass, for ns.UpdateFadingFrames;
+	-- fadeOnly: whether every one of them can be faded on by that alone.)
+	fading = {}, fadeOnly = false,
 	hovered = {}, triggered = {}, pinged = {}, mouseRows = {}, mouseGroups = {}, events = {},
 	combatShown = {}, placeLists = {}, auraOnly = {}, cooldownBarUp = {},
 	partsHovered = {}, partsHeldUntil = {}, deathKept = {}, groupsUp = {},
@@ -4044,7 +4047,13 @@ do
 	local SHOWN_HOLD, SHOWN_GRACE = 0.2, 0.1
 	local Compute = GetCombatShownFrames
 	local keptAt, keptShown, askedAt = -1, nil, -math.huge
-	local wasFighting, wasCalm, wasTarget, wasEnemy, wasCast, wasRuleCast, wasBook
+	-- (Past its hold it's still kept while nothing it goes by changed: the
+	-- rules' facts (their stamp: where you are, a group, mounted...), gamepad
+	-- mode, and with the settings closed (a tick changed there counts at
+	-- once), for up to SHOWN_STEADY seconds. Worked out every 0.2 s anyway,
+	-- it was a tenth of a ms every frame, standing still. 2026-11-11.)
+	local SHOWN_STEADY = 2
+	local wasFighting, wasCalm, wasTarget, wasEnemy, wasCast, wasRuleCast, wasBook, wasStamp, wasPad
 	local function Kept(now, hold)
 		local fighting = InCombatLockdown() or ns.Flag(UnitAffectingCombat("player"))
 		local calm = not fighting and now - lastCombatAt < (ns.db.calmTime or 0)
@@ -4053,13 +4062,18 @@ do
 		local cast = ns.HostileCastLeft(now) ~= nil
 		local ruleCast = ns.CastingRuleOn()
 		local book = ns.SpellbookOpen()
-		if keptShown and now >= keptAt and now - keptAt < hold and fighting == wasFighting
+		ns.RuleFacts(fighting or calm) -- (its stamp brought up to date)
+		local stamp, pad = ns.factsStamp, ns.IsGamePadOn() and true or false
+		if keptShown and now >= keptAt and fighting == wasFighting
 			and calm == wasCalm and target == wasTarget and enemy == wasEnemy and cast == wasCast
-			and ruleCast == wasRuleCast and book == wasBook then
+			and ruleCast == wasRuleCast and book == wasBook
+			and (now - keptAt < hold or (now - keptAt < SHOWN_STEADY and stamp == wasStamp and pad == wasPad
+				and not ns.SettingsPanelShown())) then
 			return keptShown
 		end
 		wasFighting, wasCalm, wasTarget, wasEnemy, wasCast, wasRuleCast, wasBook = fighting, calm, target, enemy, cast,
 			ruleCast, book
+		wasStamp, wasPad = stamp, pad
 		keptAt, keptShown = now, Compute()
 		return keptShown
 	end
@@ -4067,6 +4081,10 @@ do
 		local now = GetTime()
 		askedAt = now
 		return Kept(now, SHOWN_HOLD + SHOWN_GRACE)
+	end
+	-- (A profile picked, Profiles.lua: worked out afresh next time.)
+	function ns.ForgetCombatShown()
+		keptShown = nil
 	end
 	-- (Only while the frames' pass is asking: in CineMode.)
 	function ns.WarmCombatShown()
@@ -5939,7 +5957,9 @@ do
 	function ns.QuestFocusTick(entry, showAll, elapsed, timerOnly)
 		local now = GetTime()
 		focus.entry = entry
+		local started = ns.framePassTimes and debugprofilestop() -- (/cine debug framepass)
 		local timers = timerOnly and TrackerTimers(entry.frame) or nil
+		ns.NoteSlowCall("quest tracker timers", started)
 		if timers and not focus.timers and not focus.on then
 			wipe(focus.quests) -- (a reveal's quests gone: just the timer's)
 		end
@@ -5954,10 +5974,17 @@ do
 		-- (Hidden with the tracker: no fade to see.)
 		focus.othersAlpha = entry.alpha == 0 and want
 			or ns.Approach(focus.othersAlpha, want, elapsed, want > 0 and ns.FadeInTime() or ns.FadeOutTime())
+		started = ns.framePassTimes and debugprofilestop()
 		local found = ApplyFocus(entry.frame, focus.othersAlpha, timers, want == 0)
+		ns.NoteSlowCall("quest tracker focus (game's tracker)", started)
 		-- (Other addons' trackers in its place: AddonSupport.lua.)
 		for _, apply in ipairs(ns.QUEST_FOCUS_TRACKERS) do
+			started = ns.framePassTimes and debugprofilestop()
 			if apply(focus.othersAlpha, focus.quests, timers, want == 0) then found = true end
+			if started then
+				ns.NoteSlowCall("quest tracker focus (" .. (ns.questFocusTrackerNames[apply] or "an addon's tracker") .. ")",
+					started)
+			end
 		end
 		if not found and focus.on and now - focus.since > FOCUS_FIND_TIME then
 			focus.on = false
@@ -9554,15 +9581,21 @@ function ns.UpdateFrames(cinematic, elapsed)
 	-- (/cine debug framepass: where a pass's time goes, ns.framePassTimes.)
 	local clock = ns.framePassTimes and debugprofilestop
 	local tick0 = clock and clock()
+	-- (And the slowest pass's own parts: the memory before, for a garbage
+	-- collection step landing in it; the switches and the combat list apart.
+	-- Kept on the timing table: this function is near Lua's local limit.)
+	if clock then ns.framePassTimes.kb0 = collectgarbage("count") end
 	local now = GetTime()
 	SyncSwitches() -- (UpdateReadyOnly: the tick's second half, Core.lua)
 	if not ns.isRetail then
 		ns.UpdateSwingOrder()
 	end
+	if clock then ns.framePassTimes.syncAt = clock() end
 	local combatShown
 	if cinematic then
 		combatShown = GetCombatShownFrames()
 	end
+	if clock then ns.framePassTimes.combatAt = clock() end
 	local fighting = InCombatLockdown() or ns.Flag(UnitAffectingCombat("player"))
 	-- (Casting at an enemy: the rows it brings up fade in over what's left of
 	-- the cast, at the Combat fade in time just after it.)
@@ -9781,6 +9814,7 @@ function ns.UpdateFrames(cinematic, elapsed)
 		or ns.IsMinimapRevealed(now))
 	events.quest, events.roster = ns.PageOn("handleQuests") and questReveal, rosterReveal
 	events.gamepad = ns.PageOn("handleGamepad") and padReveal
+	if clock then ns.framePassTimes.ev0 = clock() end
 	-- (Each bar's own Stay up while recharging: Essential's, with Enhanced
 	-- Cooldown Manager's bars, and Utility's. A bar comes up only for its own
 	-- cooldowns; anything else in the group, for either.)
@@ -9794,6 +9828,7 @@ function ns.UpdateFrames(cinematic, elapsed)
 	events.cooldown = barUp.essential or barUp.utility
 	-- (The page's Flash Test: the Essential and Utility bars up while it plays.)
 	local flashTestUp = ns.CooldownFlashTesting(now)
+	if clock then ns.framePassTimes.ev1 = clock() end
 	-- (auraOnly: rows brought up by a buff or debuff peek and nothing else.)
 	local auraOnly = wipe(tickTables.auraOnly)
 	for _, group in ipairs(hoverGroups) do
@@ -9822,6 +9857,7 @@ function ns.UpdateFrames(cinematic, elapsed)
 	-- (All but the parts unticked in its groups. After the events: they're
 	-- groups up too. Out of CineMode no group's up: any group it's in counts.)
 	local partsBusy = false
+	if clock then ns.framePassTimes.ev2 = clock() end
 	if ns.SetUnitPartsHovered then
 		ns.SetUnitPartsOff(hoverGroups, cinematic and tickTables.groupsUp or nil, offWhen)
 		local partsHovered, partsHeldUntil = wipe(tickTables.partsHovered), tickTables.partsHeldUntil
@@ -9843,6 +9879,7 @@ function ns.UpdateFrames(cinematic, elapsed)
 		end
 		if ns.SetUnitPartsHovered(partsHovered, elapsed) then partsBusy = true end
 	end
+	if clock then ns.framePassTimes.ev3 = clock() end
 
 	-- Dead, with the death camera watching: everything goes, quickly, whatever
 	-- would normally keep it up (the release button is a popup: it stays).
@@ -9882,6 +9919,11 @@ function ns.UpdateFrames(cinematic, elapsed)
 		unsettled["unit frame parts held after the mouse"] = (unsettled["unit frame parts held after the mouse"] or 0) + 1
 	end
 	local tick3, targetTime = clock and clock(), 0
+	-- (The frames left fading after this pass, which the passes in between
+	-- fade on alone, ns.UpdateFadingFrames. Not with a fade whose pace
+	-- changes as it goes: a cast at an enemy's, the death fade's.)
+	wipe(tickTables.fading)
+	tickTables.fadeOnly = not castLeft and not deathFade and not immersive and settled
 	-- (The personal resource display switched off in the game: its rows
 	-- have nothing to fade, so they're left out, as they are, till it's back.)
 	local displayOff = not personalPower.displayOn
@@ -10049,9 +10091,31 @@ function ns.UpdateFrames(cinematic, elapsed)
 			ns.QuestFocusTick(entry, shownAnyway or not ns.db.questRevealOnlyThat, elapsed,
 				trackerTimerUp and not shownAnyway and (not triggered[row] or (questReveal and ns.db.questRevealOnlyThat)))
 		end
+		-- (/cine debug framepass: a frame whose target keeps flipping between
+		-- passes, which keeps the pass from settling.)
+		if clock then
+			if entry.passTarget ~= nil and entry.passTarget ~= target then
+				local flips = ns.framePassTimes.flips
+				local name = tostring(entry.name or entry.group)
+				flips[name] = (flips[name] or 0) + 1
+			end
+			entry.passTarget = target
+		end
 		if entry.alpha ~= target or (entry.backgroundAlpha and entry.backgroundAlpha > 0
 			and entry.backgroundAlpha < 1) then
 			settled = false
+			-- (Only frames whose fade is their alpha and nothing else can fade on
+			-- in the passes in between: not the chat (its background, the button
+			-- column), what shrinks, the minimap, unit frames' parts, the personal
+			-- resource rows, the quest tracker, the stand-ins, secret health.)
+			local group = entry.group
+			if group == "chat" or entry.shrinkWhenFaded or entry.shrunk or entry.parkedFullSize
+				or entry.frame == Minimap or entry.frame == artStandIn or entry.frame == personalPower.healthStandIn
+				or LOOSE_PART_GROUPS[group] or personalPower.GROUPS[group] or group == "prd"
+				or ns.UNIT_PART_FRAME_NAMES[entry.name] or NEVER_NESTED[entry.name] or entry.vitalsSecret
+				or entry.frame == _G.ObjectiveTrackerFrame or ns.chatLinkBackdrop[entry.frame] then
+				tickTables.fadeOnly = false
+			end
 			-- (/cine debug framepass: which frames keep the pass from settling.)
 			if clock then
 				local name = ("%s (%s)"):format(tostring(entry.name or entry.group), tostring(entry.group))
@@ -10090,6 +10154,11 @@ function ns.UpdateFrames(cinematic, elapsed)
 				duration = deathFade and DEATH_FADE_TIME or GroupFadeTime(entry.group, false)
 			end
 			ns.SetEntryAlpha(entry, ns.Approach(entry.alpha, target, elapsed, duration))
+			if entry.alpha ~= target then
+				local fading = tickTables.fading
+				fading[#fading + 1] = entry
+				entry.fadeTarget, entry.fadeDuration = target, duration
+			end
 		end
 		-- (Secret health: the game sets a faded-out health bar's alpha from it.)
 		if entry.vitalsSecret and target == 0 and entry.alpha == 0 and not ns.layoutFadeUntil and not ns.previewRows then
@@ -10163,6 +10232,9 @@ function ns.UpdateFrames(cinematic, elapsed)
 		end
 	end
 	ns.framesSettled = settled
+	-- (Not settled, and every frame left fading can go on alone: the tick
+	-- may run ns.UpdateFadingFrames instead of the whole pass, Core.lua.)
+	ns.framesFadeOnly = not settled and tickTables.fadeOnly and #tickTables.fading > 0
 	if clock then
 		local t = ns.framePassTimes
 		local tick5 = clock()
@@ -10170,7 +10242,48 @@ function ns.UpdateFrames(cinematic, elapsed)
 		t.setup, t.hover, t.events = t.setup + tick1 - tick0, t.hover + tick2 - tick1, t.events + tick3 - tick2
 		t.target, t.apply, t.after = t.target + targetTime, t.apply + (tick4 - tick3 - targetTime), t.after + tick5 - tick4
 		t.mouseMoved = t.mouseMoved + ((tickTables.hoverMouse.at == GetTime()) and 1 or 0)
+		local passMs = tick5 - tick0
+		if passMs > (t.worstMs or 0) then
+			local kb = collectgarbage("count") - t.kb0
+			t.worstMs = passMs
+			t.worstLine = ("%.2f ms (%s, %s): switches %.2f, combat list %.2f, rest of setup %.2f, mouse hover %.2f, "
+				.. "events %.2f (peeks and minimap reveal %.2f, cooldown bars %.2f, groups %.2f, unit frame parts %.2f, "
+				.. "death and minimap %.2f), "
+				.. "targets %.2f, applying %.2f, after %.2f; memory %+.0f KB%s"):format(passMs,
+				t.lastWhy or "?", cinematic and "CineMode" or "not CineMode", t.syncAt - tick0, t.combatAt - t.syncAt,
+				tick1 - t.combatAt, tick2 - tick1, tick3 - tick2, t.ev0 - tick2, t.ev1 - t.ev0, t.ev2 - t.ev1, t.ev3 - t.ev2,
+				tick3 - t.ev3, targetTime, tick4 - tick3 - targetTime, tick5 - tick4,
+				kb, kb < 0 and " (a garbage collection step ran in it)" or "")
+		end
 	end
+end
+
+-- The passes in between, while only a few frames are still fading and
+-- nothing else changed (Core.lua decides): those frames go on toward the
+-- alpha and at the pace the last whole pass gave them, and the other 200
+-- or so are left as they are. (A whole pass ran every tick while any frame
+-- faded: a buff peek fading out was 80 passes of every frame, /cine debug
+-- framepass 2026-11-11.) Whatever changes meanwhile counts at the next
+-- whole pass, still every quarter second at most.
+function ns.UpdateFadingFrames(elapsed)
+	local fading = tickTables.fading
+	local left = 0
+	for i = 1, #fading do
+		local entry = fading[i]
+		fading[i] = nil
+		if not entry.removed and entry.alpha ~= entry.fadeTarget then
+			ns.SetEntryAlpha(entry, ns.Approach(entry.alpha, entry.fadeTarget, elapsed, entry.fadeDuration))
+			if entry.alpha ~= entry.fadeTarget then
+				left = left + 1
+				fading[left] = entry
+			end
+		end
+	end
+	if left == 0 then
+		ns.framesSettled = true
+		ns.framesFadeOnly = false
+	end
+	if ns.framePassTimes then ns.framePassTimes.fadeOnly = (ns.framePassTimes.fadeOnly or 0) + 1 end
 end
 
 -- Frames beyond the built-in list (and built-in ones kept up): added ones (including auto-matched) and

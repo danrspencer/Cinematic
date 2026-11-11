@@ -138,8 +138,10 @@ end)
 -- any of them, and sets ns.questFocusOthersUp while it has anything faded or
 -- moved, so it's called again till it's all back (Frames.lua).
 ns.QUEST_FOCUS_TRACKERS = {}
-function ns.AddQuestFocusTracker(fn)
+ns.questFocusTrackerNames = {} -- (fn -> the addon's name, for /cine debug framepass)
+function ns.AddQuestFocusTracker(fn, name)
 	table.insert(ns.QUEST_FOCUS_TRACKERS, fn)
+	ns.questFocusTrackerNames[fn] = name
 end
 
 -- Its frames standing in for the game's, by Standard Frames row: each row is

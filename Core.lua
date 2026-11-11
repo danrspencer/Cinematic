@@ -3211,6 +3211,28 @@ function ns.Approach(current, target, elapsed, duration)
 	return math.max(target, current - step)
 end
 
+-- Whether the game's settings window (ours are in it) is open: one of our
+-- pages up (Options.lua), else the window itself, when the game says
+-- (secret on Forever).
+function ns.SettingsPanelShown()
+	if ns.OurSettingsShown and ns.OurSettingsShown() then return true end
+	local panel = SettingsPanel or InterfaceOptionsFrame
+	if not panel then return false end
+	local ok, shown = pcall(panel.IsShown, panel)
+	return ok and type(shown) == "boolean" and shown or false
+end
+
+-- /cine debug framepass: a part's slowest call while it times (started: a
+-- debugprofilestop() from before the call, or nil when not timing). Listed
+-- in its report, Slash.lua.
+function ns.NoteSlowCall(name, started)
+	local t = ns.framePassTimes
+	if not (t and started) then return end
+	local ms = debugprofilestop() - started
+	t.jobs = t.jobs or {}
+	if ms > (t.jobs[name] or 0) then t.jobs[name] = ms end
+end
+
 function ns.SaveCVar(cvar)
 	if ns.db.savedCVars[cvar] == nil then
 		ns.db.savedCVars[cvar] = GetCVar(cvar)
@@ -3317,7 +3339,7 @@ end
 -- cinematic and elapsed, waiting for the second half. (At low frame rates, with a
 -- tick due every frame, both halves still run in one.)
 local tickRest = {}
-local framesPass = { elapsed = 0 }
+local framesPass = { elapsed = 0, sinceFull = 0 } -- (sinceFull: seconds since the last whole pass)
 local IDLE_PASS = 0.5 -- (seconds: the frames pass out of CineMode, all settled)
 local CINE_IDLE_PASS = 0.25 -- (seconds: in CineMode, out of fights, all settled and nothing changed)
 
@@ -3531,7 +3553,19 @@ local function OnUpdate(_, elapsed)
 	-- IDLE_PASS whatever comes, as before.)
 	local woken = fadeOn and ns.framesWake
 	local idle = same and wait and not woken and pass.elapsed + elapsed < wait
-	if (pass.skip and same and not woken) or idle then
+	-- (Only frames still fading, every one able to go on alone, and nothing
+	-- else changed: just those, ns.UpdateFadingFrames, till the whole pass is
+	-- due by its timer. Not in fights or immersive, where wait is nil: the
+	-- whole pass as ever.)
+	local fadeOnly = ns.framesFadeOnly and not ns.framesSettled and wait and not woken and fadeOn == pass.fadeOn
+		and fight == pass.fight and immersive == pass.immersive and x == pass.x and y == pass.y
+		and not IsModifierKeyDown() and not (ns.IsChatActive and ns.IsChatActive())
+		and pass.sinceFull + pass.elapsed + elapsed < wait
+	if fadeOnly then
+		pass.sinceFull = pass.sinceFull + pass.elapsed + elapsed
+		Step(ns.UpdateFadingFrames, pass.elapsed + elapsed)
+		pass.elapsed = 0
+	elseif (pass.skip and same and not woken) or idle then
 		pass.skip = false
 		pass.elapsed = pass.elapsed + elapsed
 	else
@@ -3548,12 +3582,13 @@ local function OnUpdate(_, elapsed)
 			elseif not wait then why = "fight or immersive (every other tick)"
 			else why = "its timer" end
 			times.why[why] = (times.why[why] or 0) + 1
+			times.lastWhy = why -- (for the slowest pass's line)
 		end
 		ns.framesWake = nil
 		pass.skip = true
 		pass.fadeOn, pass.fight, pass.immersive, pass.x, pass.y = fadeOn, fight, immersive, x, y
 		Step(ns.UpdateFrames, fadeOn, elapsed + pass.elapsed)
-		pass.elapsed = 0
+		pass.elapsed, pass.sinceFull = 0, 0
 	end
 	-- (The rest next frame, see tickRest.)
 	tickRest.cinematic, tickRest.elapsed = cinematic, elapsed

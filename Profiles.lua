@@ -443,6 +443,7 @@ local function SettingsChanged()
 	if ns.RestartTimers then ns.RestartTimers() end
 	if ns.RefreshTint then ns.RefreshTint() end
 	if ns.BuildManagedList then ns.BuildManagedList() end
+	if ns.ForgetCombatShown then ns.ForgetCombatShown() end -- (the kept Show in list: Frames.lua)
 	if ns.ApplyBubbles then ns.ApplyBubbles() end
 	if ns.ApplyUnitFrameParts then ns.ApplyUnitFrameParts() end
 	if ns.RefreshActionBarStyle then ns.RefreshActionBarStyle() end

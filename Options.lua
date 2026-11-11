@@ -15446,6 +15446,15 @@ local function CreateKeybindsPanel()
 end
 
 ns.RefreshOptions = function() Refresh() end
+-- Whether one of our settings pages is on the screen (our own canvases: the
+-- game's settings window says nothing on Forever, its shown state secret).
+function ns.OurSettingsShown()
+	for _, page in ipairs(searchPages) do
+		local canvas = page.canvas
+		if canvas and canvas.IsVisible and canvas:IsVisible() then return true end
+	end
+	return false
+end
 
 -- Settings asked for in a fight that couldn't open: opened once it ends.
 local openAfterFight = CreateFrame("Frame")

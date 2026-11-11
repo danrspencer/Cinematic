@@ -1960,10 +1960,13 @@ local function CursorSweep(all)
 	last.names = table.concat(names, ", ")
 end
 
+-- (Its first step next frame, from its own driver: run here, inside the
+-- frames' pass (ns.IsMinimapRevealed), cursor.Begin going over every minimap
+-- child (Questie's pins too) stacked with the pass into 4 ms frames, /cine
+-- debug framepass 2026-11-11. The debug test's sweep likewise.)
 local function StartCursorSweep(all)
 	sweepJob = coroutine.create(function() CursorSweep(all) end)
-	RunSweep()
-	if sweepJob then sweepDriver:Show() end
+	sweepDriver:Show()
 end
 
 -- From ns.IsMinimapRevealed while cursor.On(): up while a node found is
@@ -2205,8 +2208,11 @@ local function Known(value)
 	return value ~= nil and not Secret(value)
 end
 
--- The quests on the minimap now: names that reveal it, and a report line.
-local function QuestsOnMinimap()
+-- The quests on the minimap now: names that reveal it, and (report: for
+-- /cine debug tracking only) a report line. (Each quest's title and line
+-- were made every look: 0.5 ms looks, /cine debug framepass 2026-11-11.)
+local spotVector -- (one, reused: a new vector per quest each look was garbage)
+local function QuestsOnMinimap(report)
 	local db = ns.db
 	local mapID = C_Map.GetBestMapForUnit("player")
 	if not Known(mapID) or not mapID then return nil, "no map here" end
@@ -2217,24 +2223,30 @@ local function QuestsOnMinimap()
 	if not (here and Known(here.x) and ok and type(radius) == "number") then return nil, "no world position" end
 	local quests = C_QuestLog.GetQuestsOnMap(mapID)
 	if type(quests) ~= "table" then return nil, "no quests on the map" end
-	local wanted, parts = {}, {}
+	local wanted, parts = {}, report and {}
 	for _, quest in ipairs(quests) do
 		local id, x, y = quest.questID, quest.x, quest.y
 		if Known(id) and Known(x) and Known(y) then
-			local _, there = C_Map.GetWorldPosFromMapPos(mapID, CreateVector2D(x, y))
+			if spotVector then spotVector:SetXY(x, y) else spotVector = CreateVector2D(x, y) end
+			local _, there = C_Map.GetWorldPosFromMapPos(mapID, spotVector)
 			if there and Known(there.x) then
 				local yards = math.sqrt((here.x - there.x) ^ 2 + (here.y - there.y) ^ 2)
 				local done = C_QuestLog.IsComplete and C_QuestLog.IsComplete(id) == true
 				local reach = done and radius or radius + QUEST_AREA_REACH
-				local title = C_QuestLog.GetTitleForQuestID and C_QuestLog.GetTitleForQuestID(id) or tostring(id)
 				local on = yards <= reach
 				local reveals = on and (done and db.minimapRevealTurnIns or not done and db.minimapRevealAreas)
-				if reveals then wanted[#wanted + 1] = title end
-				parts[#parts + 1] = ("%s (%s, %.0f yd%s)"):format(title, done and "done" or "area", yards,
-					reveals and ", reveals" or on and ", on it" or "")
+				if reveals or parts then
+					local title = C_QuestLog.GetTitleForQuestID and C_QuestLog.GetTitleForQuestID(id) or tostring(id)
+					if reveals then wanted[#wanted + 1] = title end
+					if parts then
+						parts[#parts + 1] = ("%s (%s, %.0f yd%s)"):format(title, done and "done" or "area", yards,
+							reveals and ", reveals" or on and ", on it" or "")
+					end
+				end
 			end
 		end
 	end
+	if not parts then return wanted end
 	return wanted, ("view radius %.0f yd: %s"):format(radius, #parts > 0 and table.concat(parts, "; ") or "no quests")
 end
 
@@ -2242,12 +2254,14 @@ end
 -- the cursor sweep: its outline shows through alpha 0 on Forever, so the
 -- faded minimap waits off the screen meanwhile (Frames.lua), and the sweep,
 -- which needs it in its place, waits too. Seen at the pointer 2026-11-10.)
+-- (Not looked at all with reveal false: only the debug report read it then,
+-- and that looks for itself.)
 local function QuestReveals(now, reveal)
-	if now - questLook.at >= SWEEP_EVERY then
+	if reveal and now - questLook.at >= SWEEP_EVERY then
 		questLook.at = now
-		local ok, wanted, report = pcall(QuestsOnMinimap)
-		questLook.report = ok and report or ("failed: " .. tostring(wanted))
-		if reveal and ok and wanted and #wanted > 0 then
+		local ok, wanted, why = pcall(QuestsOnMinimap)
+		questLook.failed = not ok and ("failed: " .. tostring(wanted)) or (ok and not wanted and why) or nil
+		if ok and wanted and #wanted > 0 then
 			table.sort(wanted)
 			seenAt = now
 			revealedBy = table.concat(wanted, ", ")
@@ -2256,11 +2270,15 @@ local function QuestReveals(now, reveal)
 	return reveal and now - seenAt < HOLD or false
 end
 
--- For /cine debug tracking: what the quest log look last saw.
+-- For /cine debug tracking: what a quest log look sees now (made here, not
+-- every look), when the last one ran, and why it failed if it did.
 function ns.QuestRevealReport()
 	if not ns.CanRevealQuestsOnly() then return nil end
-	return ("minimap quests (no sweep): %s, %.1fs ago; last reveal %s"):format(questLook.report,
-		GetTime() - (questLook.at > -math.huge and questLook.at or GetTime()),
+	local ok, wanted, report = pcall(QuestsOnMinimap, true)
+	report = ok and (report or tostring(wanted)) or ("failed: " .. tostring(wanted))
+	return ("minimap quests (no sweep): now %s; last look %s%s; last reveal %s"):format(report,
+		questLook.at > -math.huge and ("%.1fs ago"):format(GetTime() - questLook.at) or "never",
+		questLook.failed and (" (" .. questLook.failed .. ")") or "",
 		seenAt > -math.huge and ("%.1fs ago"):format(GetTime() - seenAt) or "never")
 end
 
@@ -2272,11 +2290,18 @@ local heldIntoFight
 -- Use Questie DB, Support/QuestieMinimap.lua: Questie's own "!" and "?"
 -- icons near you. Each counts as found, on top of the rest; guarded there too.)
 local GIVER_CHECKS = { "QuestGiversRevealed", "QuestieMinimapRevealed" }
+-- (/cine debug framepass: each minimap job's slowest call, Slash.lua.
+-- A field of cursor's: this file is near Lua's local limit.)
+function cursor.TimeNote(name, started)
+	ns.NoteSlowCall("minimap " .. name, started)
+end
 local function GiversFound(now)
 	local any = false
 	for _, key in ipairs(GIVER_CHECKS) do
 		local ok, shown, names = false, nil, nil
+		local started = ns.framePassTimes and debugprofilestop()
 		if ns[key] then ok, shown, names = pcall(ns[key], now) end
+		cursor.TimeNote(key, started)
 		if ok and shown then
 			seenAt = now
 			revealedBy = names
@@ -2293,11 +2318,20 @@ function ns.IsMinimapRevealed(now)
 			tostring(answer.state), tostring(cursor.Can())))
 	end
 	if cursor.On() then
+		local started = ns.framePassTimes and debugprofilestop()
 		local quests = QuestReveals(now, QuestReveal())
+		cursor.TimeNote("quest areas", started)
+		started = ns.framePassTimes and debugprofilestop()
 		local nodesUp = cursor.Reveal(now)
+		cursor.TimeNote("cursor sweep", started)
 		return quests or nodesUp or questie
 	end
-	if QuestReveal() then return QuestReveals(now, true) or questie end
+	if QuestReveal() then
+		local started = ns.framePassTimes and debugprofilestop()
+		local quests = QuestReveals(now, true)
+		cursor.TimeNote("quest areas", started)
+		return quests or questie
+	end
 	if not AnyReveal() then
 		nodes = {}
 		heldIntoFight = nil
@@ -2312,13 +2346,13 @@ function ns.IsMinimapRevealed(now)
 	else
 		heldIntoFight = nil
 	end
-	-- (A sweep due: started as a job, its first points now, the rest over the
-	-- next frames; what it finds counts once it's done.)
+	-- (A sweep due: started as a job, its first points next frame from its own
+	-- driver, not inside the frames' pass, the rest over the frames after;
+	-- what it finds counts once it's done.)
 	if not sweepJob and now - sweptAt >= SWEEP_EVERY and (Minimap:GetEffectiveAlpha() < 0.99 or now - seenAt < HOLD) then
 		sweptAt = now
 		sweepJob = coroutine.create(Sweep)
-		RunSweep()
-		if sweepJob then sweepDriver:Show() end
+		sweepDriver:Show()
 	end
 	return now - seenAt < HOLD
 end

@@ -413,7 +413,7 @@ do
 		return found
 	end
 	ns.WhenAddonLoads("EllesmereUIQuestTracker", function()
-		ns.AddQuestFocusTracker(Apply)
+		ns.AddQuestFocusTracker(Apply, "EllesmereUI")
 	end)
 end
 

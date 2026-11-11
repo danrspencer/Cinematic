@@ -499,6 +499,12 @@ end
 -- Secret health (in combat on some clients): the game sets the overlay's
 -- alpha from your health through this curve, and the edges stay at full
 -- reach (no creep: only the fade). nil where there's no curve API.
+-- A region's alpha from your health through a curve, the game's own number,
+-- secret, straight into SetAlpha. (Called in a pcall, not made as a closure
+-- each frame: two were, every frame while health is secret, 2026-11-11.)
+local function SecretAlpha(region, curve)
+	region:SetAlpha(UnitHealthPercent("player", true, curve))
+end
 local function SecretCurve(prefix)
 	prefix = prefix or "lowHealth"
 	if secretCurves[prefix] ~= nil then return secretCurves[prefix] end
@@ -590,6 +596,7 @@ local autoNoTree = false
 local AUTO_AGAIN = 5
 local TALENT_LEVEL = 10 -- (the first talent point's level)
 local autoAgainAt
+local autoZeroTries = 0 -- (looks in a row that found talents with no points: see AutoTheme)
 -- (byClass, bySpec: our themes' lists, or Game art's.)
 local function AutoTheme(byClass, bySpec, fallback)
 	local _, class = UnitClass("player")
@@ -622,7 +629,16 @@ local function AutoTheme(byClass, bySpec, fallback)
 	-- not one that hasn't loaded. A point spent anyway, or a level gained,
 	-- picks again by the talent events.)
 	local noTalentsYet = (UnitLevel("player") or 0) < TALENT_LEVEL
-	autoAgainAt = (points == false or autoNoTree) and not noTalentsYet and GetTime() + AUTO_AGAIN or nil
+	-- (Talents there but none of them counted (no point spent, or the nodes
+	-- not filled in yet): looked at again less and less often, then left to
+	-- the talent events. Every 5 s forever, each look walking every talent
+	-- node, was 29 KB/s of garbage, 2026-11-11.)
+	local wait = AUTO_AGAIN
+	if points and autoNoTree then
+		autoZeroTries = autoZeroTries + 1
+		wait = autoZeroTries <= 5 and AUTO_AGAIN * 2 ^ (autoZeroTries - 1) or nil
+	end
+	autoAgainAt = wait and (points == false or autoNoTree) and not noTalentsYet and GetTime() + wait or nil
 	return tree and list[tree] or list.none or list[1]
 end
 local function AutoExpired()
@@ -1195,6 +1211,14 @@ end
 -- An art's color as Brightness (lowHealthBrightness) says: at half as set,
 -- down toward black at 0, up toward white at full (not all the way: it'd be
 -- a white wash).
+-- An art's size (screens) for its reach, c as far in as the edges are:
+-- from past the edges in to as far as the reach says. (Not a closure in
+-- Apply: one was made every frame, 2026-11-11.)
+local function ArtScale(reach, c, over)
+	local deep = ART_SHALLOWEST + (ART_DEEPEST - ART_SHALLOWEST) * reach
+	return math.max(1, ART_OUT + (deep - ART_OUT) * c - over * 0.05)
+end
+
 local function Lit(color, bright)
 	local t = bright * 2 - 1
 	if t >= 0 then
@@ -1253,15 +1277,11 @@ local function Apply(d, look, k, fade, heart, secret)
 	-- (a little bigger while it rocks, so its edges never come on screen)
 	local pad = sway and 4 * SWAY * sway or 0
 	if (ours or blizz) and c > 0 then
-		-- (Each art's size: from past the edges in to as far as its reach says.)
-		local function Scale(reach)
-			local deep = ART_SHALLOWEST + (ART_DEEPEST - ART_SHALLOWEST) * reach
-			return math.max(1, ART_OUT + (deep - ART_OUT) * c - over * 0.05)
-		end
 		-- (Down by the top and bottom's reach, across by the sides'.)
-		artScale, artSides = Scale(look.lowHealthBloodReach), Scale(look.lowHealthBloodReachSides)
+		artScale, artSides = ArtScale(look.lowHealthBloodReach, c, over), ArtScale(look.lowHealthBloodReachSides, c, over)
 		d.artScale, d.artScaleSides = artScale, artSides
-		local theirsScale, theirsSides = Scale(look.lowHealthGameReach), Scale(look.lowHealthGameReachSides)
+		local theirsScale = ArtScale(look.lowHealthGameReach, c, over)
+		local theirsSides = ArtScale(look.lowHealthGameReachSides, c, over)
 		-- Sloshing (liquid themes): the art rocks slowly side to side and up and down.
 		if sway then
 			local now = GetTime()
@@ -1288,9 +1308,8 @@ local function Apply(d, look, k, fade, heart, secret)
 				local down = pick[3] * UIParent:GetHeight() / UIParent:GetWidth()
 				drifted[1] = (drifted[1] + pick.drift[1] * spent) % 1
 				drifted[2] = (drifted[2] + pick.drift[2] * spent) % 1
-				for _, tex in ipairs({ theirs, theirsWave }) do
-					tex:SetTexCoord(drifted[1], drifted[1] + pick[3], drifted[2], drifted[2] + down)
-				end
+				theirs:SetTexCoord(drifted[1], drifted[1] + pick[3], drifted[2], drifted[2] + down)
+				theirsWave:SetTexCoord(drifted[1], drifted[1] + pick[3], drifted[2], drifted[2] + down)
 			end
 			theirs:SetSize(width * (theirsSides + pad), height * (theirsScale + pad))
 			theirs:SetVertexColor(r, g, b, math.min(1, a))
@@ -1459,7 +1478,7 @@ local function Apply(d, look, k, fade, heart, secret)
 		local a = info and (look.lowHealthPortalAlpha or 0) * (info.alpha or 1) * math.min(1, c * 2) * fade or 0
 		local curve = secret and a > 0 and SecretCurve()
 		if secret then
-			local ok = curve and pcall(function() portal:SetAlpha(UnitHealthPercent("player", true, curve)) end)
+			local ok = curve and pcall(SecretAlpha, portal, curve)
 			a = ok and 1 or 0
 		end
 		if a > 0 then
@@ -1573,6 +1592,19 @@ local function SoundAtFull(share)
 	end
 end
 
+-- When your health or a fight last changed (the events below), and how long
+-- after that Update keeps running with secret health.
+local healthEventAt = 0
+local SECRET_STILL = 3
+local secretAwakeLogAt, secretEvents = nil, {} -- (dev copy's log of why it's awake: Update)
+-- (Timed for the Profiler: it runs every frame while your health is secret,
+-- WoW Forever all the time, 0.14 ms a frame by /cine debug loops,
+-- 2026-11-11. Its parts too, to see which one.)
+Apply = ns.Profiled("Vitals: apply", Apply)
+Beat = ns.Profiled("Vitals: heartbeat", Beat)
+Sparking = ns.Profiled("Vitals: sparks", Sparking)
+WantedTheme = ns.Profiled("Vitals: theme", WantedTheme)
+Wanted = ns.Profiled("Vitals: health", Wanted)
 local function Update(_, elapsed)
 	local now = GetTime()
 	local look = Look()
@@ -1642,7 +1674,7 @@ local function Update(_, elapsed)
 		local curve = SecretCurve()
 		if curve then
 			-- (The game's own number, secret: straight into SetAlpha.)
-			pcall(function() frame:SetAlpha(UnitHealthPercent("player", true, curve)) end)
+			pcall(SecretAlpha, frame, curve)
 		else
 			fade = 0
 		end
@@ -1672,6 +1704,30 @@ local function Update(_, elapsed)
 	if not shown and not secret and not test and level == 0 and flash == 0 then
 		glimpse = nil
 		driver:Hide()
+	end
+	-- Secret health (WoW Forever, always): it can't tell full health from low,
+	-- so it ran every frame for good, 0.15 ms a frame at full health. Now it
+	-- sleeps once your health hasn't changed for SECRET_STILL seconds out of
+	-- a fight: the game's alpha it set last still fits the health you have,
+	-- and the next change (a hit, a heal, regen, a fight) wakes it. Low and
+	-- not regenerating out of a fight, the beat holds still till then.
+	local fighting = InCombatLockdown() or ns.Flag(UnitAffectingCombat("player"))
+	if secret and not test and not glimpse and not dead and flash == 0 and level == target
+		and now - healthEventAt >= SECRET_STILL and not fighting then
+		if ns.isDev then ns.Log("vitals", "asleep (secret health, still for " .. SECRET_STILL .. " s)") end
+		driver:Hide()
+	elseif secret and ns.isDev and now - (secretAwakeLogAt or 0) >= 10 then
+		-- (Dev copy: why it's still awake with secret health, every 10 s, and
+		-- the events that came meanwhile.)
+		secretAwakeLogAt = now
+		local why = test and "a test" or glimpse and "a quick look" or dead and "dead" or flash ~= 0 and "a flash"
+			or level ~= target and ("level %.3f, target %.3f"):format(level, target)
+			or fighting and "a fight" or ("health event %.1f s ago"):format(now - healthEventAt)
+		local counts = {}
+		for event, count in pairs(secretEvents) do counts[#counts + 1] = event .. " " .. count end
+		wipe(secretEvents)
+		ns.Log("vitals", "awake (secret health): " .. why .. "; events in 10 s: "
+			.. (#counts > 0 and table.concat(counts, ", ") or "none"))
 	end
 end
 
@@ -2012,6 +2068,12 @@ for _, event in ipairs(TALENT_EVENTS) do isTalentEvent[event] = true end
 local events = CreateFrame("Frame")
 events:RegisterEvent("PLAYER_LOGIN")
 events:SetScript("OnEvent", function(_, event, _, action, _, amount)
+	-- (Your health or a fight changing: with secret health, Update runs on
+	-- for a while after the last one, then sleeps: see SECRET_STILL.)
+	if event ~= "PLAYER_LOGIN" and not isTalentEvent[event] then
+		healthEventAt = GetTime()
+		if ns.isDev then secretEvents[event] = (secretEvents[event] or 0) + 1 end
+	end
 	if event == "UNIT_COMBAT" then
 		-- A hit while your health is secret (retail fights): the amount still
 		-- comes plain, so it's counted by that. (Plain health: Update's.) Heals
@@ -2037,7 +2099,7 @@ events:SetScript("OnEvent", function(_, event, _, action, _, amount)
 			for key in pairs(CinematicDB.vitalsThemeEdits) do ThemeEdited(key) end
 		end
 		Create()
-		ns.SetOnUpdate(driver, Update)
+		ns.SetOnUpdate(driver, ns.Profiled("Vitals", Update))
 		events:RegisterUnitEvent("UNIT_HEALTH", "player")
 		events:RegisterUnitEvent("UNIT_MAXHEALTH", "player")
 		events:RegisterUnitEvent("UNIT_COMBAT", "player")
@@ -2050,6 +2112,7 @@ events:SetScript("OnEvent", function(_, event, _, action, _, amount)
 		end
 	elseif isTalentEvent[event] then
 		autoTheme, autoGameTheme = nil, nil -- (picked again)
+		autoZeroTries = 0
 	end
 	Wake()
 end)
@@ -2455,7 +2518,7 @@ end
 function ns.SetVitalsSecretAlpha(frame, which)
 	local curve = SecretCurve(BAR_PREFIX[which])
 	if curve then
-		pcall(function() frame:SetAlpha(UnitHealthPercent("player", true, curve)) end)
+		pcall(SecretAlpha, frame, curve)
 	end
 end
 

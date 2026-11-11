@@ -1108,7 +1108,8 @@ local function HandleSlash(msg)
 		ns.Print("framepass: timing the frames' pass for 20 seconds from 5 seconds now (hands off)")
 		C_Timer.After(5, function()
 			ns.framePassTimes = { passes = 0, entries = 0, setup = 0, hover = 0, events = 0, target = 0, apply = 0,
-				after = 0, mouseMoved = 0, why = {}, unsettled = {}, unsettledLast = {} }
+				after = 0, mouseMoved = 0, why = {}, unsettled = {}, unsettledLast = {}, flips = {} }
+			for _, entry in ipairs(ns.managed) do entry.passTarget = nil end
 		end)
 		C_Timer.After(25, function()
 			local t = ns.framePassTimes
@@ -1121,6 +1122,35 @@ local function HandleSlash(msg)
 				t.target / n, t.apply / n, 1000 * (t.target + t.apply) / math.max(1, t.entries), t.after / n)
 			ns.Print(line)
 			ns.Log("framepass", line)
+			-- (The passes in between that faded only the frames still fading: Core.lua.)
+			local fadeLine = ("framepass: fade-only passes (just the frames still fading) %d (%.1f a second)"):format(
+				t.fadeOnly or 0, (t.fadeOnly or 0) / 20)
+			ns.Print(fadeLine)
+			ns.Log("framepass", fadeLine)
+			-- (The slowest pass, part by part: a spike's cause, which the averages hide.)
+			if t.worstLine then
+				ns.Print("framepass: slowest pass " .. t.worstLine)
+				ns.Log("framepass", "slowest pass " .. t.worstLine)
+			end
+			-- (Frames whose target flipped between passes, most first: Frames.lua.)
+			local flipped = {}
+			for name, count in pairs(t.flips) do flipped[#flipped + 1] = { name, count } end
+			table.sort(flipped, function(a, b) return a[2] > b[2] end)
+			local flipParts = {}
+			for i = 1, math.min(#flipped, 8) do flipParts[i] = ("%s %d"):format(flipped[i][1], flipped[i][2]) end
+			local flipLine = "framepass: target flipped (shown/hidden changed between passes): "
+				.. (#flipParts > 0 and table.concat(flipParts, ", ") or "none")
+			ns.Print(flipLine)
+			ns.Log("framepass", flipLine)
+			-- (Parts timed on their own, each one's slowest call: ns.NoteSlowCall.)
+			if t.jobs then
+				local jobs = {}
+				for name, ms in pairs(t.jobs) do jobs[#jobs + 1] = ("%s %.2f"):format(name, ms) end
+				table.sort(jobs)
+				local jobsLine = "framepass: slowest call of each part (ms): " .. table.concat(jobs, ", ")
+				ns.Print(jobsLine)
+				ns.Log("framepass", jobsLine)
+			end
 			-- (Why each pass ran, most first: Core.lua.)
 			local reasons = {}
 			for why, count in pairs(t.why) do reasons[#reasons + 1] = { why, count } end
