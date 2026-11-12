@@ -3528,6 +3528,16 @@ function ns.PlatesWhy()
 		end
 	end
 	if MarkersKeptUp() then Add("on", L["Plates with a raid marker stay up (Raid markers row)"]) end
+	-- (Names kept on plates, the rest of the plate hidden: the Names grid's rows.)
+	local named = {}
+	for key, label in pairs(ns.plates.NAME_ROW_LABELS) do
+		if (nameLevel[key] or 0) > 0.5 then named[#named + 1] = L[label] end
+	end
+	if #named > 0 then
+		table.sort(named)
+		Add("on", L["Names stay on their plates, the rest of the plate hidden (Names rows): %s"]:format(
+			table.concat(named, ", ")))
+	end
 	if placeSuffix == "Instances" then
 		Add("off", L["In dungeons and raids the game doesn't let addons fade friendly plates: Friendly plates in " ..
 			"dungeons and raids decides them"])
@@ -3536,6 +3546,171 @@ function ns.PlatesWhy()
 		Add("off", L["Tick a kind's row for where you are, or for fights, to show it"])
 	end
 	return (#hidden == 0 and "shown") or ((#shown == 0 and not target) and "hidden") or "partly", out
+end
+
+-- The Names grid's rows that keep names on plates, as the Why window calls them.
+ns.plates.NAME_ROW_LABELS = { Friends = "Friendly players", FriendlyMinions = "Friendly players' minions",
+	GroupMembers = "Group members", GroupMinions = "Group members' minions", Enemies = "Enemy players",
+	EnemyMinions = "Enemy players' minions", HostileNPCs = "Hostile NPCs", NeutralNPCs = "Neutral NPCs",
+	FriendlyNPCs = "Friendly NPCs", ServiceNPCs = "Service NPCs", YourTarget = "Target" }
+
+-- The Why window's rows under Nameplates: each nameplate showing now (and
+-- your target's, hidden or not), with what holds it up, as PlateAlphas works
+-- it out: its kind's row (which ticks), a unit row (your pet, your group),
+-- your target's row, a duel, Quest Vision, or a name kept on it by a Names
+-- row. Gives { key, title, status, reasons = { state, text, page } } each,
+-- showing ones first. Empty while the game's own options decide.
+-- (No new locals here: this file's main chunk is at Lua's 200.)
+function ns.PlateItemsWhy()
+	local items = {}
+	if not (ns.db.handlePlates and platesActive and C_NamePlate and C_NamePlate.GetNamePlates)
+		or (ns.ChatCamImmersive and ns.ChatCamImmersive()) then
+		return items
+	end
+	local page = "Nameplates"
+	local kindLabels = { Enemies = "Enemy players", EnemyMinions = "Enemy minions", EnemyNPCs = "Hostile NPCs",
+		EnemyMinor = "Minor hostile NPCs", NeutralNPCs = "Neutral NPCs", NeutralMinor = "Minor neutral NPCs",
+		Friends = "Friendly players", FriendlyMinions = "Friendly minions", FriendlyNPCs = "Friendly NPCs" }
+	local unitRowLabels = { MyPet = "Your pet", GroupMembers = "Group members", GroupMinions = "Group members' minions" }
+	local placeLabels = { Cities = "Cities", Instances = "Dungeons and raids", PvP = "PvP", BGs = "Battlegrounds" }
+	local nameLabels = ns.plates.NAME_ROW_LABELS
+	local fighting, lingering = InCombatLockdown(), FightLingering()
+	-- A row's boxes that apply right now, in words (a rule: just that).
+	local function Ticks(row, fight)
+		if ns.RuleTest(PLATE_RULE_KEY[row]) then
+			return L["its rule"]
+		end
+		local words = {}
+		if ns.db["plateAlways" .. row] then words[#words + 1] = L["Always"] end
+		if ns.db["plateGroup" .. row] and ns.InGroup() then words[#words + 1] = L["Grouped"] end
+		if fight then
+			if ns.db["plateCombat" .. row] then words[#words + 1] = L["In combat"] end
+			if ns.db["plateCombatPvP" .. row] and InPvPFight() then words[#words + 1] = L["In PvP combat"] end
+		else
+			if ns.db[placeSuffix and ("plateIn" .. placeSuffix .. row) or ("plateCinematic" .. row)] then
+				words[#words + 1] = L[placeSuffix and placeLabels[placeSuffix] or "Open world"]
+			end
+			local facts = ns.RuleFactsNow()
+			if (ns.db["plateTargetEnemy" .. row] and facts.enemy) or (ns.db["plateTargetFriendly" .. row] and facts.friendly) then
+				words[#words + 1] = L["Target"]
+			end
+		end
+		return #words > 0 and table.concat(words, ", ") or L["a box on its row"]
+	end
+	for _, plate in ipairs(C_NamePlate.GetNamePlates()) do
+		local unit = not (plate.IsForbidden and plate:IsForbidden()) and plate ~= PersonalPlate()
+			and (plate.namePlateUnitToken or (plate.UnitFrame and plate.UnitFrame.unit))
+		if type(unit) == "string" then
+			local kind = PlateKind(unit)
+			local alpha, bodyShare, nameShare, markShare = PlateAlphas(unit, plate)
+			local body, name, mark = alpha * bodyShare, alpha * nameShare, alpha * markShare
+			local target = IsTarget(unit)
+			local status = (alpha <= 0.05 and "hidden") or (body > 0.05 and "shown") or "partly"
+			if status ~= "hidden" or target then
+				local reasons = {}
+				local function Add(state, text, where)
+					reasons[#reasons + 1] = { state = state, text = text, page = where or page }
+				end
+				local kindLabel = L[kind and kindLabels[kind] or "Unknown kind"]
+				-- The whole plate: its kind's row, then what adds to it.
+				if ns.SoftPlateHidden(unit) then
+					Add("block", L["Quest Vision's look for things to interact with gave it this plate, kept hidden"], "Quest Vision")
+				elseif not kind then
+					Add(body > 0.05 and "on" or "block", L["The game won't say what kind of unit this is right now, so it " ..
+						"goes by the fade every plate shares"])
+				else
+					local fight = fighting and ShownInFights(kind)
+					local here = not fighting and KeptHere(kind)
+					local after = not fighting and lingering and ShownInFights(kind)
+					if fight or here then
+						Add("on", L["Its row, %s, shows it: %s"]:format(kindLabel, Ticks(kind, fighting)))
+					elseif after then
+						Add("on", L["Its row, %s, shows it in fights (%s), and the Calm Timer after the fight is still running"]
+							:format(kindLabel, Ticks(kind, true)))
+					else
+						Add(body > 0.05 and "off" or "block", L["Its row, %s, has nothing ticked that applies right now"]
+							:format(kindLabel))
+					end
+					for _, row in ipairs({ "MyPet", "GroupMembers", "GroupMinions" }) do
+						if unitRowLevel[row] > 0.05 and InUnitRow(row, unit, kind) then
+							Add("on", L["The %s row keeps it up, whatever its kind's row says: %s"]:format(L[unitRowLabels[row]],
+								Ticks(row, fighting)))
+						end
+					end
+					if unitRowLevel.QuestMobs > 0.05 and ns.QuestMobsShow("plate") and InUnitRow("QuestMobs", unit, kind) then
+						Add("on", L["Quest Vision keeps the plates of mobs you need for a quest"], "Quest Vision")
+					end
+				end
+				if target and ns.HasTarget() and AlwaysShownTarget(unit) then
+					Add("on", L["It's your target, and the Your target row keeps your target's plate up: %s"]
+						:format(Ticks("YourTarget", fighting)))
+				elseif plate == targetHidden.plate and targetHidden.level < 0.95 then
+					Add("block", L["It's your target, and the Your target row leaves its plate out here"])
+				end
+				if leavingTargets[plate] and TargetPlateLevel(plate) > 0.05 then
+					Add("on", L["It was your target a moment ago, and is fading back out"])
+				end
+				if duels.Level(plate) > 0.05 then
+					Add("on", L["Duel Vision shows the two players of a duel near you"], "Duel Vision")
+				end
+				-- Its name alone, kept by a Names row.
+				if name > 0.05 and platesForced then
+					local group = kind and KIND_NAME_GROUP[kind]
+					if group and (nameLevel[group] or 0) > 0.05 then
+						Add("on", L["Names: the %s row keeps its name on its plate"]:format(L[nameLabels[group] or group]))
+					end
+					for _, row in ipairs(ns.GROUP_NAME_ROWS) do
+						if (nameLevel[row] or 0) > 0.05 and kind and InUnitRow(row, unit, kind) then
+							Add("on", L["Names: the %s row keeps its name on its plate"]:format(L[nameLabels[row]]))
+						end
+					end
+					if target and ns.TargetNameRow(unit) and (nameLevel.YourTarget or 0) > 0.05
+						and not (ns.HasTarget() and AlwaysShownTarget(unit)) then
+						Add("on", L["Names: the Target row keeps your target's name on its plate"])
+					end
+					if (kind == "FriendlyNPCs" or kind == "NeutralNPCs") and (nameLevel.ServiceNPCs or 0) > 0.05
+						and ns.PlateServiceMatch(plate, unit) then
+						Add("on", L["Names: the Service NPCs row keeps its name or title on its plate"])
+					end
+					if unitRowLevel.QuestMobs > 0.05 and ns.QuestMobsShow("name") and kind and InUnitRow("QuestMobs", unit, kind) then
+						Add("on", L["Quest Vision keeps the names of mobs you need for a quest"], "Quest Vision")
+					end
+				end
+				if mark > 0.05 then
+					Add("on", L["Quest Vision's quest mark shows over it"], "Quest Vision")
+				end
+				if status == "partly" then
+					table.insert(reasons, 1, { state = "on", page = page,
+						text = L["Only its name shows: the rest of the plate is hidden"] })
+				end
+				local doing = false
+				for _, reason in ipairs(reasons) do doing = doing or reason.state == "on" end
+				if status ~= "hidden" and not doing then
+					table.insert(reasons, 1, { state = "on", page = page, text = L["It's fading in or out right now"] })
+				end
+				if not plate.UnitFrame then
+					Add("off", L["Another addon draws this plate, so Cinematic can only fade it if that addon is supported"],
+						"Addon Support")
+				end
+				local okName, who = pcall(UnitName, unit)
+				local okGuid, guid = pcall(UnitGUID, unit)
+				local known = okName and Known(who) and type(who) == "string" and who ~= ""
+				items[#items + 1] = {
+					key = okGuid and Known(guid) and type(guid) == "string" and guid or tostring(plate),
+					title = known and ("%s (%s)"):format(who, kindLabel) or kindLabel,
+					status = status, reasons = reasons,
+				}
+			end
+		end
+	end
+	local order = { shown = 1, partly = 2, hidden = 3 }
+	table.sort(items, function(a, b)
+		if a.status ~= b.status then return order[a.status] < order[b.status] end
+		if a.title ~= b.title then return a.title < b.title end
+		return a.key < b.key
+	end)
+	for i = #items, 41, -1 do items[i] = nil end -- (a city's worth: the first 40)
+	return items
 end
 
 -- One line of a unit's debuffs for /cine debug duels: name, spell id,
@@ -3623,6 +3798,20 @@ function ns.PrintDuelsDebug()
 	ns.Print(("duel events (now %.1f), system lines only while dueling:"):format(GetTime()))
 	for _, line in ipairs(duels.log) do ns.Print("  " .. line) end
 	if #duels.log == 0 then ns.Print("  none yet") end
+end
+
+-- As a fight starts that CineMode leaves for (Exit CineMode's In combat),
+-- just before lockdown: the hold that keeps every plate on is let go, your own
+-- plate settings back. Left for the next pass it couldn't be (plate settings
+-- can't change in a fight), and kinds you have switched off in the game,
+-- friendly players' say, stayed up in full all through the fight.
+-- (On ns.plates: this file's main chunk is at Lua's 200 locals.)
+function ns.plates.LetGoForFight()
+	if FORCED_PLATE_CVARS.active and not InCombatLockdown() then
+		platesForced = false
+		ns.ApplyCVarSet(FORCED_PLATE_CVARS, false)
+		ns.plates.seen.at = nil -- (the next pass runs in full)
+	end
 end
 
 function ns.ShowPlatesNow()

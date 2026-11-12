@@ -15,8 +15,10 @@
 -- quiet: (stays on over a reload; again and /reload to stop) stops the game
 --   hearing the event that brings up the experimental warning, as DynamicCam
 --   and DialogueUI do, to see if that keeps it away here. For testing so far.
--- try pitch|head|enemy|interact|off: one of the game's other experimental
+-- try pitch|head|enemy|interact|walls|off: one of the game's other experimental
 --   camera settings on (again: off), for a look. "try off" puts all back.
+-- walls: two timed doorway walks (as is, then the wall setting), every frame's
+--   distance and offset, then verdicts: "check log".
 local _, ns = ...
 
 local SETTLE = 0.6     -- seconds a step waits at least (the game eases over in about 0.3: Run 3)
@@ -51,6 +53,9 @@ local FOLLOW_FRAMES = { "PlayerCastingBarFrame", "CastingBarFrame", "GamepadPlay
 local TRIES = {
 	pitch = { test_cameraDynamicPitch = "1" }, head = { test_cameraHeadMovementStrength = "1" },
 	enemy = { test_cameraTargetFocusEnemyEnable = "1" }, interact = { test_cameraTargetFocusInteractEnable = "1" },
+	-- (Walls: the camera may sit this far into what's between you and it before
+	-- it's pushed in, so a wall beside you no longer jerks it in and out.)
+	walls = { cameraIndirectVisibility = "1", cameraIndirectOffset = "10" },
 }
 
 local function Log(text) ns.Log("shoulder", text) end
@@ -329,8 +334,9 @@ local function EndSweep()
 	end
 	Say(("sweep %s done: %d steps, real/worked-out mean %s | %s (/reload to save it)"):format(sweep.name,
 		sweep.at - 1, count > 0 and ("%.2f"):format(total / count) or "none", Who()))
-	-- (offsets, on foot: the mean's your model's size factor, ShoulderCam.lua.)
-	local onFoot = not (IsMounted and ns.Flag(IsMounted())) and not (GetShapeshiftFormID and GetShapeshiftFormID())
+	-- (offsets, off a mount: the mean's the size factor of your model, or of
+	-- the form you're in, ShoulderCam.lua.)
+	local onFoot = not (IsMounted and ns.Flag(IsMounted()))
 	if sweep.name == "offsets" and count >= 3 and onFoot and ns.ShoulderModelKey then
 		local key, factor = ns.ShoulderModelKey(), tonumber(("%.2f"):format(total / count))
 		ns.db.shoulderCamScales = ns.db.shoulderCamScales or {}
@@ -338,7 +344,7 @@ local function EndSweep()
 		if ns.ApplyShoulderCam then ns.ApplyShoulderCam() end
 		Say(("size factor for %s saved: %.2f"):format(key, factor))
 	elseif sweep.name == "offsets" then
-		Say("size factor not saved: on foot and out of forms only, for now")
+		Say("size factor not saved: off a mount only, for now")
 	end
 	sweep = nil
 end
@@ -480,7 +486,7 @@ local function Try(what)
 	end
 	local set = TRIES[what or ""]
 	if not set then
-		ns.Print("shoulder try: pitch, head, enemy, interact or off")
+		ns.Print("shoulder try: pitch, head, enemy, interact, walls or off")
 		return
 	end
 	for cvar, value in pairs(set) do
@@ -496,6 +502,108 @@ local function Try(what)
 			Say(("try %s: on (%s %s, was %s)"):format(what, cvar, Text(GetCVar(cvar)), Text(tried[cvar])))
 		end
 	end
+end
+
+-- walls: one run for "the camera jerks near walls". Two timed walks through a
+-- doorway (as it is, then with "try walls" on), every frame's camera distance
+-- (GetCameraZoom), offset, indoors and the frames' slide logged when they
+-- change, then per walk: the pull-ins (the distance dropping a yard or more in
+-- a frame, not by your wheel), offset writes, indoors flips, and verdicts.
+-- Puts the wall settings back after. Typed again while running: stops.
+local WALL_STEP = 20
+local wallRun
+local function WallsEnd(why)
+	if not wallRun then return end
+	wallRun.frame:Hide()
+	for cvar, value in pairs(wallRun.kept) do SetCVar(cvar, value) end
+	ns.PadTestBoxHide()
+	Log(("walls: %s; wall settings back (%s)"):format(why, Text(GetCVar("cameraIndirectVisibility"))))
+	wallRun = nil
+end
+local function WallsVerdict()
+	local a, b = wallRun.walks[1], wallRun.walks[2]
+	for i, w in ipairs(wallRun.walks) do
+		Log(("walls: walk %d (%s): %d pull-ins (biggest %.1f yd), %d push-outs, distance %.1f-%.1f yd, " ..
+			"%d offset changes, indoors flips %d"):format(i, w.label, w.pullIns, w.biggest, w.pushOuts, w.low,
+			w.high, w.offsets, w.flips))
+	end
+	local sees = (a.pullIns + b.pullIns) > 0
+	Log(("walls: VERDICT distance read sees the wall pull-in: %s (%s)"):format(sees and "YES" or "NO",
+		sees and "the offset follows every pull-in: smoothing it is ours to do"
+		or "the game pulls in out of our sight: only its own settings can help"))
+	if a.flips + b.flips == 0 then
+		Log("walls: VERDICT indoors never flipped: that doorway counts as outdoors")
+	end
+	Log(("walls: VERDICT wall setting: pull-ins %d -> %d (%s)"):format(a.pullIns, b.pullIns,
+		b.pullIns < a.pullIns * 0.6 and "FEWER" or "no real change"))
+	ns.Print("shoulder walls: done, check log (/reload to save it)")
+end
+local function WallsBegin(index)
+	local labels = { "as it is", "with the wall setting" }
+	if index == 2 then
+		for cvar, value in pairs(TRIES.walls) do
+			if GetCVar(cvar) ~= nil then
+				wallRun.kept[cvar] = wallRun.kept[cvar] or GetCVar(cvar)
+				SetCVar(cvar, value)
+			end
+		end
+	end
+	wallRun.walk = { label = labels[index], pullIns = 0, pushOuts = 0, biggest = 0, low = math.huge, high = 0,
+		offsets = 0, flips = 0, ends = GetTime() + WALL_STEP }
+	wallRun.walks[index] = wallRun.walk
+	Log(("walls: walk %d (%s) starts | %s | offset %s, zoom %.2f, cameraIndirectVisibility %s, cameraIndirectOffset %s")
+		:format(index, labels[index], Who(), Text(GetCVar(SHOULDER)), Zoom(), Text(GetCVar("cameraIndirectVisibility")),
+		Text(GetCVar("cameraIndirectOffset"))))
+end
+local function Walls()
+	if wallRun then WallsEnd("stopped") return end
+	wallRun = { kept = {}, walks = {}, frame = wallRun and wallRun.frame or CreateFrame("Frame") }
+	local run = wallRun
+	WallsBegin(1)
+	local last = {}
+	ns.SetOnUpdate(run.frame, function(_, elapsed)
+		if wallRun ~= run then return end
+		local walk, now = run.walk, GetTime()
+		local left = walk.ends - now
+		ns.PadTestBox(("%d/2: WALK in and out of that doorway, past the wall, a few times"):format(#run.walks),
+			("%s - %d s left"):format(walk.label, math.max(0, math.ceil(left))))
+		local zoom, offset = Zoom(), Text(GetCVar(SHOULDER))
+		local indoors = IsIndoors and ns.Flag(IsIndoors()) or false
+		local debug = ns.GetShoulderCamDebug and ns.GetShoulderCamDebug() or {}
+		local shift = type(debug.followShift) == "number" and debug.followShift or 0
+		local wheel = now - (ns.lastPlayerZoomAt or -math.huge) < 1
+		if last.zoom then
+			local dz = zoom - last.zoom
+			if math.abs(dz) >= 1 and not wheel then
+				if dz < 0 then
+					walk.pullIns = walk.pullIns + 1
+					walk.biggest = math.max(walk.biggest, -dz)
+				else
+					walk.pushOuts = walk.pushOuts + 1
+				end
+			end
+			if offset ~= last.offset then walk.offsets = walk.offsets + 1 end
+			if indoors ~= last.indoors then walk.flips = walk.flips + 1 end
+		end
+		walk.low, walk.high = math.min(walk.low, zoom), math.max(walk.high, zoom)
+		if not last.zoom or math.abs(zoom - last.zoom) >= 0.05 or offset ~= last.offset or indoors ~= last.indoors
+			or math.abs(shift - (last.shift or 0)) >= 2 then
+			Log(("walls: %5.2f zoom %.2f offset %s indoors %s slide %.0f%s%s"):format(WALL_STEP - left, zoom, offset,
+				Text(indoors), shift, wheel and " wheel" or "", elapsed > 0.05 and (" frame %.0f ms"):format(elapsed * 1000) or ""))
+			last.zoom, last.offset, last.indoors, last.shift = zoom, offset, indoors, shift
+		end
+		if left <= 0 then
+			last.zoom = nil
+			if #run.walks == 1 then
+				WallsBegin(2)
+			else
+				WallsVerdict()
+				WallsEnd("done")
+			end
+		end
+	end)
+	run.frame:Show()
+	ns.Print("shoulder walls: 2 walks of 20 s; type it again to stop")
 end
 
 local function Set(key, value)
@@ -522,6 +630,7 @@ function ns.ShoulderTest(arg)
 		ns.Print(("shoulder quiet %s (stays over a reload; off takes a /reload)"):format(ns.db.shoulderTestQuiet and "on" or "off"))
 	elseif what == "sweep" then Sweep(rest)
 	elseif what == "try" then Try(rest)
+	elseif what == "walls" then Walls()
 	elseif what == "on" then Set("shoulderCam", true)
 	elseif what == "off" then Set("shoulderCam", false)
 	elseif what == "left" or what == "right" then Set("shoulderCamSide", what)
@@ -530,7 +639,7 @@ function ns.ShoulderTest(arg)
 	-- (The Shoulder Cam layout, Layouts.lua: made, or made again from the code, and switched to; offers the reload.)
 	elseif what == "layout" then ns.RegenerateLayout("Shoulder Cam")
 	else
-		ns.Print("shoulder: scan, frames, watch, quiet, sweep offsets|zoom|ease|next|stop, try pitch|head|enemy|interact|off, " ..
+		ns.Print("shoulder: scan, frames, watch, quiet, sweep offsets|zoom|ease|next|stop, try pitch|head|enemy|interact|walls|off, walls, " ..
 			"on, off, left, right, spot <percent>, strength <percent>, layout")
 	end
 end

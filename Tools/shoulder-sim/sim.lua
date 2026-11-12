@@ -31,7 +31,7 @@ local now = 100
 local SHOULDER, CENTERED = "test_cameraOverShoulder", "CameraKeepCharacterCentered"
 
 -- (ease: measured in Run 3, over in about 0.3 s; the sizes are still guesses.)
-local GAME = { ease = 12, mountScale = 1.6, tallScale = 1.4 }
+local GAME = { ease = 12, mountScale = 1.6, tallScale = 1.4, bearScale = 1.70, swapLag = 0.16, swapLagIn = 0.08 } -- (bear: a 2026-11-11 recording)
 local UI_WIDTH, UI_HEIGHT = 1707, 960
 
 -- The game: time, settings. A write to a test_ setting brings up the warning
@@ -78,7 +78,7 @@ UnitIsDead = function() return me.dead end
 IsIndoors = function() return me.indoors end
 UnitRace = function() return "Human", "Human" end
 UnitSex = function() return 2 end
-GetShapeshiftFormID = function() return nil end
+GetShapeshiftFormID = function() return me.form end -- (me.model: the form on screen)
 _G.EditModeManagerFrame = { IsEditModeActive = function() return me.editMode end }
 StaticPopup_Visible = function() return nil end
 GetBindingKey = function() return nil end
@@ -100,7 +100,8 @@ local function MoveCamera(dt)
 	if cvars[CENTERED] == "1" or cvars.CameraReduceUnexpectedMovement == "1" then want = 0 end
 	-- (You as your own target: the game puts you in the middle, the setting kept. 2026-11-11, Forever.)
 	if me.selfTarget then want = 0 end
-	want = want * me.scale * (me.mounted and GAME.mountScale or 1)
+	-- (A form is its own model: its factor in place of yours.)
+	want = want * (me.model and GAME.bearScale or me.scale) * (me.mounted and GAME.mountScale or 1)
 	cam.offset = cam.offset + (want - cam.offset) * math.min(1, dt * GAME.ease)
 end
 -- Where you really are on screen: -1 left edge, 1 right edge.
@@ -235,6 +236,7 @@ StaticPopup_Show = function(name)
 	if variant == "decline" then dialog.OnCancel() else dialog.OnAccept() end
 end
 if variant == "mounted" then ns.db.shoulderCamNotMounted = false end
+if variant == "indoors" then ns.db.shoulderCamNotIndoors = false end
 local noticedAtStart = ns.db.shoulderCamNoticed
 -- (tall: its size factor measured, as a sweep on it would have saved.)
 if variant == "tall" then ns.db.shoulderCamScales = { ["Human-2"] = GAME.tallScale } end
@@ -310,6 +312,10 @@ local function Switch(on)
 end
 
 -- DAY: what the player does.
+local bearDip -- (the nearest the middle you got between the form and its model coming)
+local bearSwing -- (the furthest off the middle the bear got between "no form" and its model going)
+local bearEnd -- (how far off the middle you sat after 3 s in bear form)
+local indoorsEnd -- (where the camera and frames were after 3 s indoors)
 local function Day()
 	Part("Shoulder Cam off")
 	Wait(1.5)
@@ -335,6 +341,40 @@ local function Day()
 	me.selfTarget = false
 	wow.Fire("PLAYER_TARGET_CHANGED")
 	Part("Target cleared")
+	Wait(3)
+	Part("Bear form")
+	-- (In: the model's 0.06 to 0.1 s behind the form. 2026-11-11 log.)
+	me.form = 5
+	wow.Fire("UPDATE_SHAPESHIFT_FORM")
+	bearDip = 1
+	for _ = 1, math.floor(GAME.swapLagIn / TICK + 0.5) do
+		Tick()
+		bearDip = math.min(bearDip, math.abs(YouOnScreen()))
+	end
+	me.model = 5
+	wow.Fire("UNIT_MODEL_CHANGED", "player")
+	Wait(3)
+	bearEnd = math.abs(YouOnScreen())
+	-- (Out: the game says "no form" a moment before the bear's gone. 2026-11-11 recording.)
+	me.form = nil
+	wow.Fire("UPDATE_SHAPESHIFT_FORM")
+	Part("Out of bear form")
+	bearSwing = 0
+	for _ = 1, math.floor(GAME.swapLag / TICK + 0.5) do
+		Tick()
+		bearSwing = math.max(bearSwing, math.abs(YouOnScreen()))
+	end
+	me.model = nil
+	wow.Fire("UNIT_MODEL_CHANGED", "player")
+	Wait(3)
+	Part("You go indoors")
+	me.indoors = true
+	wow.Fire("ZONE_CHANGED_INDOORS")
+	Wait(3)
+	indoorsEnd = { offset = cam.offset, bar = Share(bar, home.bar), prd = Share(prd, home.prd) }
+	me.indoors = false
+	wow.Fire("ZONE_CHANGED_INDOORS")
+	Part("Back outdoors")
 	Wait(3)
 	Part("Mounted")
 	me.mounted = true
@@ -465,6 +505,26 @@ end
 if variant ~= "decline" and variant ~= "sweep" then
 	Check("Your spot held as you zoom", spotCount > 0 and spotMiss / spotCount < 0.01,
 		spotCount > 0 and ("%.2f%% off it on average"):format(spotMiss / spotCount * 100) or "never on")
+end
+if bearEnd and variant ~= "decline" then
+	local spot = ns.db.shoulderCamSpot or 0.2
+	Check("Bear form: still on your spot", math.abs(bearEnd - spot) < 0.01,
+		("%.1f%% off the middle, your spot %.0f%%"):format(bearEnd * 100, spot * 100))
+	Check("Into bear form: no dip in first", bearDip > spot - 0.01,
+		("%.1f%% off the middle at least, your spot %.0f%%"):format(bearDip * 100, spot * 100))
+	Check("Out of bear form: no swing out first", bearSwing < spot + 0.01,
+		("%.1f%% off the middle at most, your spot %.0f%%"):format(bearSwing * 100, spot * 100))
+end
+if indoorsEnd then
+	local middle = math.abs(indoorsEnd.offset) < 0.05
+		and math.abs(indoorsEnd.bar) < 0.001 and math.abs(indoorsEnd.prd) < 0.001
+	local detail = ("offset %.2f, cast bar %.1f, PRD %.1f UI units off"):format(indoorsEnd.offset,
+		indoorsEnd.bar * UI_WIDTH / 2, indoorsEnd.prd * UI_WIDTH / 2)
+	if variant == "indoors" then
+		Check("Indoors kept the shoulder (Not indoors off)", not middle, detail)
+	else
+		Check("Indoors: camera and frames back in the middle", middle, detail)
+	end
 end
 if variant == "hud" then
 	Check("The HUD slid with you (the PRD, its root)", hud.most > 20, ("%.0f UI units at most"):format(hud.most))

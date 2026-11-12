@@ -430,6 +430,7 @@ local DEFAULTS = {
 	shoulderCamSpot = 0.2,     -- ...how far off the middle you sit (share of the way to the edge), held as you zoom
 	shoulderCamSide = "right", -- ..."right" or "left" (the swap key flips it)
 	shoulderCamNotMounted = true, -- ...back behind you while mounted
+	shoulderCamNotIndoors = true, -- ...and indoors (walls push the camera in: the offset jerks)
 	shoulderCamPause = true,   -- ...and while one of our cameras that frame you runs
 	shoulderCamFrames = true,  -- ...the cast bar and PRD slide over with you
 	shoulderCamFramesStrength = 1, -- ...how far (1 = the worked-out place)
@@ -7952,6 +7953,7 @@ ticker:SetScript("OnEvent", ns.Profiled("Core events", function(self, event, arg
 			ns.UpdateCVarsForFight()
 		else
 			lastBusy = GetTime()
+			ns.plates.LetGoForFight()
 			ns.UpdateCVars(false)
 			for _, entry in ipairs(ns.managed) do
 				ns.SetEntryAlpha(entry, 1)

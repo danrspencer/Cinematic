@@ -24,7 +24,7 @@
 --
 -- It's a held setting, not a camera: it doesn't move the view, so it doesn't
 -- claim the camera lock. It goes to 0 (paused) while mounted
--- (shoulderCamNotMounted) and while one of Cinematic's cameras that frame you
+-- (shoulderCamNotMounted), indoors (shoulderCamNotIndoors) and while one of Cinematic's cameras that frame you
 -- runs (shoulderCamPause): the standing-still ones (cozy, vista, fish, AFK,
 -- teleport), the flight camera and its fly-bys, and the death camera, whose
 -- shots are built around you in the middle, and wherever its Show in row
@@ -57,6 +57,11 @@ local function PauseReason()
 	if db.shoulderCamNotMounted and IsMounted and ns.Flag(IsMounted()) then
 		return "mounted"
 	end
+	-- (Indoors the game pushes the camera in off the walls, and the offset jerks
+	-- with each push: DynamicCam's help says so too. Back in the middle there.)
+	if db.shoulderCamNotIndoors and IsIndoors and ns.Flag(IsIndoors()) then
+		return "indoors"
+	end
 	if db.shoulderCamPause then
 		if UnitOnTaxi and ns.Flag(UnitOnTaxi("player")) then
 			return "flight"
@@ -84,17 +89,83 @@ local paused -- (PauseReason at the last check, every POLL)
 -- (never another addon's tables): each `/cine debug shoulder sweep offsets`
 -- on foot saves the one for your race and sex (db.shoulderCamScales, not part
 -- of a profile), over the ones measured so far here. 1 until measured.
--- (Mounts and forms change it too: not measured yet.)
-local MEASURED_SCALES = { ["Dwarf-2"] = 1, ["Skyborne-2"] = 0.86 }
+-- A shapeshift form is another model with its own factor: a Night Elf's bear
+-- sat about twice as far out as the elf for the same offset (a 2026-11-11
+-- recording: ~18% of the way to the edge, then ~35% each time bear form went
+-- on, back each time it came off). So a form has its own key (race-sex-formN),
+-- measured by the same sweep in that form; until then a bear goes by
+-- FORM_SCALES, read off recordings, and other forms by the on-foot factor.
+-- (A second recording, 18:46 that day, with 1.75 for the bear and 1 for the
+-- elf and the spot at 20%: the bear rested at 21%, the elf at 16.5%.)
+-- The model changes later than the form does on the way out: the game says
+-- "no form" about 0.15 s before the bear's gone (that recording: with the
+-- elf's offset written at once the bear swung out to ~40%, then the elf
+-- snapped back to 16%). Into a form it's 0.06 to 0.1 s later (the log), and
+-- an offset written at the form's change, ahead of it, jumped the whole view
+-- sideways in one frame and crept back (a third recording, 18:51: a stump
+-- beside you jumped 6% of the screen's width). Written in the model's own
+-- frame (UNIT_MODEL_CHANGED) the game's change of factor and its ease to the
+-- new offset cancel: out of bear form that way the view hardly moved. So at
+-- any change of form the old factor's kept till the model's changed, or
+-- SWAP_WAIT at most.
+-- (That third recording, standing still: the elf rested on 20.1% with 0.82,
+-- the bear on 18.4% with 1.85, so 1.70.)
+-- (Mounts change it too: not measured yet.)
+local MEASURED_SCALES = { ["Dwarf-2"] = 1, ["Skyborne-2"] = 0.86, ["NightElf-3"] = 0.82 }
+local FORM_SCALES = { [5] = 1.70, [8] = 1.70 } -- bear, dire bear: off the recordings till the sweep's run in it
+local SWAP_WAIT = 0.4 -- seconds: the longest the old form's factor is kept without the model's event
+local lastForm -- (the form at the last plain read: kept if a read comes back secret)
+local function FormNow()
+	if not GetShapeshiftFormID then return nil end
+	local ok, form = pcall(function()
+		local id = GetShapeshiftFormID()
+		if id == nil then return false end
+		return id + 0 == id and id -- (a secret one errors here: the last one's kept)
+	end)
+	if ok then lastForm = form or nil end
+	return lastForm
+end
+-- The form whose model is on screen.
+local shownKnown, shownForm, swapBy
+local function ModelForm()
+	local form = FormNow()
+	if not shownKnown then shownKnown, shownForm = true, form end
+	if form == shownForm then
+		swapBy = nil
+	else
+		if not swapBy then
+			swapBy = GetTime() + SWAP_WAIT
+			ns.Log("shoulder", ("form: %s -> %s, waiting for the model"):format(tostring(shownForm), tostring(form)))
+		elseif GetTime() >= swapBy then
+			ns.Log("shoulder", ("form: no model event in %.1f s, going by form %s"):format(SWAP_WAIT, tostring(form)))
+			shownForm, swapBy = form, nil
+		end
+	end
+	return shownForm
+end
+local function ModelSwapped()
+	local was = shownForm
+	shownKnown, shownForm, swapBy = true, FormNow(), nil
+	ns.Log("shoulder", ("model changed: form %s (was %s)"):format(tostring(shownForm), tostring(was)))
+end
 function ns.ShoulderModelKey()
 	local _, race = UnitRace("player")
-	return ("%s-%s"):format(tostring(race), tostring(UnitSex("player")))
+	local foot = ("%s-%s"):format(tostring(race), tostring(UnitSex("player")))
+	local form = ModelForm()
+	return form and ("%s-form%d"):format(foot, form) or foot, form, foot
 end
 function ns.ShoulderModelScale()
-	local key = ns.ShoulderModelKey()
-	local saved = ns.db and ns.db.shoulderCamScales and ns.db.shoulderCamScales[key]
+	local key, form, foot = ns.ShoulderModelKey()
+	local scales = ns.db and ns.db.shoulderCamScales
+	local saved = scales and scales[key]
 	if type(saved) == "number" and saved > 0.2 then return saved, "measured here" end
 	if MEASURED_SCALES[key] then return MEASURED_SCALES[key], "built in" end
+	if form then
+		if FORM_SCALES[form] then return FORM_SCALES[form], "estimated for this form" end
+		saved = scales and scales[foot]
+		if type(saved) == "number" and saved > 0.2 then return saved, "on-foot one: form not measured" end
+		if MEASURED_SCALES[foot] then return MEASURED_SCALES[foot], "on-foot one: form not measured" end
+	end
 	return 1, "not measured"
 end
 
@@ -462,8 +533,18 @@ end
 local events = CreateFrame("Frame")
 events:RegisterEvent("PLAYER_ENTERING_WORLD")
 events:RegisterEvent("PLAYER_TARGET_CHANGED")
+-- (Going in or out: at once, not at the next poll.)
+pcall(events.RegisterEvent, events, "ZONE_CHANGED_INDOORS")
+pcall(events.RegisterEvent, events, "ZONE_CHANGED")
+-- (Into or out of a form: the game moves you at once, so the new offset goes
+-- in at once too, not at the next poll.)
+pcall(events.RegisterEvent, events, "UPDATE_SHAPESHIFT_FORM")
+pcall(events.RegisterUnitEvent, events, "UNIT_MODEL_CHANGED", "player")
 events:SetScript("OnEvent", function(_, event)
-	if event == "PLAYER_TARGET_CHANGED" then
+	if event == "UNIT_MODEL_CHANGED" then
+		ModelSwapped()
+		ns.ApplyShoulderCam()
+	elseif event == "PLAYER_TARGET_CHANGED" then
 		-- (Yourself targeted or not: the frames glide to the middle or back.)
 		if UpdateFollow then UpdateFollow() end
 	else
@@ -527,6 +608,10 @@ function ns.CreateShoulderCamPanel(kit)
 	kit.GreyUnless(stack:Add(kit.Check(content, "shoulderCamNotMounted", L["Not while mounted"],
 		L["On a mount the camera stays straight behind you: a big mount's head fills the shot from " ..
 		"the side."]), "check"), IfOn)
+	kit.GreyUnless(stack:Add(kit.Check(content, "shoulderCamNotIndoors", L["Not indoors"],
+		L["Inside buildings and caves the camera goes back behind you, and comes back out over your " ..
+		"shoulder as you step outside. Near walls the game pushes the camera in, and with it off to " ..
+		"the side it jerks."]), "check"), IfOn)
 	kit.GreyUnless(stack:Add(kit.Check(content, "shoulderCamPause", L["Not during Cinematic's cameras that frame you"],
 		L["While the standing-still, AFK, flight, fly-by or death camera runs, the camera goes back " ..
 		"behind you, as their shots are built around you in the middle. It comes back as they end. " ..

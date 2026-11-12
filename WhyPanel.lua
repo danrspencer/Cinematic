@@ -244,10 +244,23 @@ local function Gather()
 		{ "overhead:bubbles", "Chat Bubbles", why.BubblesWhy } }) do
 		local ok, status, reasons = pcall(overhead[3] or error)
 		if ok and type(reasons) == "table" then
-			tops[#tops + 1] = { key = overhead[1], title = L[overhead[2]], status = status, kind = Kind(status),
+			local item = { key = overhead[1], title = L[overhead[2]], status = status, kind = Kind(status),
 				reasons = reasons, main = MainReason(reasons), section = "overhead",
 				sectionLabel = L[SECTION_LABEL.overhead], at = i, wholePage = true, settingsPage = overhead[2] == "Nameplates"
 					and "Nameplates" or "Chat bubbles" }
+			tops[#tops + 1] = item
+			-- The nameplates showing now, each a row under it with what holds
+			-- it up (ns.PlateItemsWhy, Effects): listed while it's open.
+			local okPlates, plates = pcall(overhead[2] == "Nameplates" and ns.PlateItemsWhy or tostring)
+			if okPlates and type(plates) == "table" and #plates > 0 then
+				item.parts, item.partsLabel = {}, L["%d plates"]
+				for at, plate in ipairs(plates) do
+					item.parts[at] = { key = "plate:" .. plate.key, parent = item, title = plate.title, status = plate.status,
+						kind = Kind(plate.status), reasons = plate.reasons, main = MainReason(plate.reasons),
+						section = item.section, sectionLabel = item.sectionLabel, at = at, wholePage = true,
+						settingsPage = "Nameplates" }
+				end
+			end
 		end
 	end
 	table.sort(tops, function(a, b)
@@ -602,7 +615,7 @@ function Fill()
 		row.status:SetText(StatusText(item.status))
 		row.reason:SetWidth(LIST_WIDTH - 12 - 8 - indent - (count > 0 and 70 or 0))
 		row.reason:SetText(item.main and item.main.text or "")
-		row.parts:SetText(count > 0 and L["%d parts"]:format(count) or "")
+		row.parts:SetText(count > 0 and (item.partsLabel or L["%d parts"]):format(count) or "")
 		row:ClearAllPoints()
 		row:SetPoint("TOPLEFT", list, "TOPLEFT", 0, -y)
 		row:Show()
