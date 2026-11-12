@@ -86,6 +86,7 @@ local function PrintHelp()
 	Command("/cine profiler", L["record what the addon costs, results on the Profiler page (deep: in detail, stop: end it early)"])
 	Command("/cine debug help", L["troubleshooting commands"])
 	Command("/cine log", L["copy the log and your setup for a bug report (/cine log clear empties it)"])
+	Command("/cine error", L["has the addon hit any errors? Lists them, newest last"])
 	Command("/cine panic", L["stop for this session and put your UI and settings back (/cine resume to restart)"])
 	if not collecting then
 		print("  " .. L["Keybinds (toggle CineMode, hide the UI, start a camera) are on the Keybinds settings page."])
@@ -288,6 +289,27 @@ local function HandleSlash(msg)
 			ns.Print(L["log cleared"])
 		else
 			ns.ShowLog()
+		end
+	elseif cmd == "error" or cmd == "errors" then
+		-- (The newest few, one line each: the stacks are in /cine log.)
+		local SHOWN = 8
+		local list, blockedCount = ns.ErrorList()
+		if #list == 0 and blockedCount == 0 then
+			ns.Print(L["no errors in the log"])
+		else
+			ns.Print(L["%d errors and %d blocked actions in the log (/cine log has the details)"]:format(#list, blockedCount))
+			if #list > SHOWN then
+				print("  " .. L["...and %d older"]:format(#list - SHOWN))
+			end
+			for i = math.max(1, #list - SHOWN + 1), #list do
+				local e = list[i]
+				local message = #e.message > 200 and e.message:sub(1, 200) .. "..." or e.message
+				print(("  |cffff4040%s|r %s%s"):format(e.at or "--:--:--", message,
+					e.count and (" |cff909090(" .. L["%dx this session"]:format(e.count) .. ")|r") or ""))
+			end
+		end
+		if ns.IsSuspended() then
+			ns.Print(L["(still stopped after an error: /cine resume starts it again)"])
 		end
 	elseif cmd == "panic" then
 		if ns.IsSuspended() then

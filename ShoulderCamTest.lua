@@ -59,6 +59,7 @@ local TRIES = {
 }
 
 local function Log(text) ns.Log("shoulder", text) end
+local Forms -- (below)
 local function Say(text)
 	Log(text)
 	ns.Print("shoulder: " .. text)
@@ -555,6 +556,100 @@ local function WallsBegin(index)
 		:format(index, labels[index], Who(), Text(GetCVar(SHOULDER)), Zoom(), Text(GetCVar("cameraIndirectVisibility")),
 		Text(GetCVar("cameraIndirectOffset"))))
 end
+-- forms: one run for "the view bumps as you shift form". You shift in and out
+-- once per timing (FORM_TIMINGS: the game alone with the offset at 0, as
+-- built, the offset a little after the form's change, and pushed past for a
+-- moment), told when by the box, while recording the screen; each timing and
+-- every form and model change is logged, and the bump's read off the
+-- recording after. Typed again while running: stops.
+local FORM_TIMINGS = {
+	-- (Second run: small pushes past, into a form only. The first run's
+	-- timings and what they did: ShoulderCam.lua, by ns.shoulderSwap.)
+	{ "the game alone (offset 0)", off = true },
+	{ "as built: 35% past for 0.035 s" },
+	{ "no push", boost = 0, boostFor = 0 },
+	{ "50% past for 0.02 s", boost = 0.5, boostFor = 0.02 },
+	{ "as built again", again = true },
+}
+local FORM_SETTLE = 2.5 -- seconds between a timing going on (or a shift back) and "shift now"
+local formRun
+local function FormsEnd(why)
+	if not formRun then return end
+	formRun.frame:UnregisterAllEvents()
+	formRun = nil
+	ns.shoulderSwap, ns.shoulderTestHold = nil, nil
+	if ns.ApplyShoulderCam then ns.ApplyShoulderCam() end
+	ns.PadTestBoxHide()
+	Log(("forms: %s"):format(why))
+end
+local function FormsBox()
+	local run = formRun
+	local timing = FORM_TIMINGS[run.at]
+	local head = ("%d/%d  %s"):format(run.at, #FORM_TIMINGS, timing[1])
+	if run.phase == "wait" then
+		ns.PadTestBox(head, "wait...", 0.7, 0.7, 0.7)
+	elseif run.phase == "in" then
+		ns.PadTestBox(head, "SHIFT INTO BEAR FORM now (stand still, hands off the camera)", 0.3, 1, 0.3)
+	else
+		ns.PadTestBox(head, "count to 2, then SHIFT BACK OUT", 1, 0.82, 0)
+	end
+end
+local function FormsStart(at)
+	local run = formRun
+	if at > #FORM_TIMINGS then
+		FormsEnd("done")
+		ns.PadTestBox("Forms run done", "stop the recording, then /reload", 0.3, 1, 0.3)
+		C_Timer.After(8, function() if not formRun then ns.PadTestBoxHide() end end)
+		return
+	end
+	local timing = FORM_TIMINGS[at]
+	run.at, run.phase = at, "wait"
+	ns.shoulderSwap = (timing.lead or timing.boost) and timing or nil
+	ns.shoulderTestHold = timing.off or nil
+	if timing.off then SetCVar(SHOULDER, "0") elseif ns.ApplyShoulderCam then ns.ApplyShoulderCam() end
+	Log(("forms: timing %d (%s) on | %s | offset %s, zoom %.2f"):format(at, timing[1], Who(), Text(GetCVar(SHOULDER)), Zoom()))
+	FormsBox()
+	C_Timer.After(FORM_SETTLE, function()
+		if formRun ~= run or run.at ~= at then return end
+		run.phase = "in"
+		FormsBox()
+	end)
+end
+function Forms()
+	if formRun then
+		FormsEnd("stopped")
+		ns.Print("shoulder forms: stopped")
+		return
+	end
+	if GetShapeshiftFormID and GetShapeshiftFormID() then
+		ns.Print("shoulder forms: start out of your forms")
+		return
+	end
+	local run = { frame = CreateFrame("Frame") }
+	formRun = run
+	run.frame:RegisterEvent("UPDATE_SHAPESHIFT_FORM")
+	run.frame:RegisterUnitEvent("UNIT_MODEL_CHANGED", "player")
+	run.frame:SetScript("OnEvent", function(_, event)
+		if formRun ~= run then return end
+		local form = GetShapeshiftFormID and GetShapeshiftFormID()
+		Log(("forms: timing %d %s, form %s, offset %s"):format(run.at, event, Text(form), Text(GetCVar(SHOULDER))))
+		if event ~= "UPDATE_SHAPESHIFT_FORM" then return end
+		if form and run.phase == "in" then
+			run.phase = "out"
+			FormsBox()
+		elseif not form and run.phase == "out" then
+			local at = run.at
+			run.phase = "wait"
+			FormsBox()
+			C_Timer.After(FORM_SETTLE, function()
+				if formRun == run and run.at == at then FormsStart(at + 1) end
+			end)
+		end
+	end)
+	ns.Print("shoulder forms: record your screen; type it again to stop")
+	FormsStart(1)
+end
+
 local function Walls()
 	if wallRun then WallsEnd("stopped") return end
 	wallRun = { kept = {}, walks = {}, frame = wallRun and wallRun.frame or CreateFrame("Frame") }
@@ -606,6 +701,497 @@ local function Walls()
 	ns.Print("shoulder walls: 2 walks of 20 s; type it again to stop")
 end
 
+-- cams: one run for "what cameras does the game have, and what does its
+-- ActionCam command set". Logs every console setting and command with "cam"
+-- in its name (value, default, the game's own help line), then types each
+-- ActionCam word (CAM_WORDS) from "off" and logs what changed, and puts every
+-- setting back as it was. Nothing to do but wait for the box to say done.
+-- (Not "default": on Forever it left unreadable text in five settings, run of
+-- 2026-11-11, till the next "off".)
+local CAM_WORDS = { "on", "basic", "full", "focusOn", "focusOff", "headMove", "heavyHeadMove", "lowHeadMove",
+	"noHeadMove" }
+local CAM_WAIT = 0.4 -- seconds for a word's settings to land
+local camRun
+local function CamNames()
+	local names, seen, others = {}, {}, {}
+	local list = C_Console and C_Console.GetAllCommands and select(2, pcall(C_Console.GetAllCommands))
+		or (_G.ConsoleGetAllCommands and select(2, pcall(_G.ConsoleGetAllCommands)))
+	for _, info in ipairs(type(list) == "table" and list or {}) do
+		local name = type(info) == "table" and info.command
+		if type(name) == "string" and name:lower():find("cam", 1, true) then
+			local ok, value = pcall(GetCVar, name)
+			if ok and value ~= nil then
+				if not seen[name] then seen[name], names[#names + 1] = info, name end
+			else
+				others[#others + 1] = info
+			end
+		end
+	end
+	for _, name in ipairs(CAMERA_CVARS) do
+		if not seen[name] and GetCVar(name) ~= nil then seen[name], names[#names + 1] = {}, name end
+	end
+	table.sort(names)
+	return names, seen, others, type(list) == "table" and #list or nil
+end
+local function CamRead(names)
+	local values = {}
+	for _, name in ipairs(names) do values[name] = Text(GetCVar(name)) end
+	return values
+end
+local function CamExec(word)
+	if not ConsoleExec then return "no ConsoleExec" end
+	local ok, err = pcall(ConsoleExec, "ActionCam " .. word)
+	return ok and "ran" or ("failed: " .. Text(err))
+end
+local function CamEnd()
+	local run = camRun
+	camRun = nil
+	local back = 0
+	for _, name in ipairs(run.names) do
+		if Text(GetCVar(name)) ~= run.start[name] then
+			pcall(SetCVar, name, run.start[name])
+			back = back + 1
+		end
+	end
+	ns.shoulderTestHold = nil
+	if ns.ApplyShoulderCam then ns.ApplyShoulderCam() end
+	Log(("cams: done, %d settings put back"):format(back))
+	ns.PadTestBox("Cams run done", "check log: /reload", 0.3, 1, 0.3)
+	C_Timer.After(8, function() if not camRun then ns.PadTestBoxHide() end end)
+end
+local function CamStep(at)
+	local run = camRun
+	local word = CAM_WORDS[at]
+	if not word then return CamEnd() end
+	ns.PadTestBox(("Cams %d/%d"):format(at, #CAM_WORDS), "ActionCam " .. word .. " (just wait)", 0.7, 0.7, 0.7)
+	local off = CamExec("off")
+	C_Timer.After(CAM_WAIT, function()
+		if camRun ~= run then return end
+		local before = CamRead(run.names)
+		local result = CamExec(word)
+		C_Timer.After(CAM_WAIT, function()
+			if camRun ~= run then return end
+			local after, changed = CamRead(run.names), {}
+			for _, name in ipairs(run.names) do
+				if after[name] ~= before[name] then
+					changed[#changed + 1] = ("%s %s -> %s"):format(name, before[name], after[name])
+				end
+			end
+			Log(("cams: ActionCam %s (off %s, it %s): %d changed from off"):format(word, off, result, #changed))
+			for _, line in ipairs(changed) do Log("cams:   " .. line) end
+			CamStep(at + 1)
+		end)
+	end)
+end
+local function Cams()
+	if camRun then return ns.Print("shoulder cams: already running") end
+	local names, seen, others, total = CamNames()
+	Log(("cams: %s | console list %s entries, %d settings and %d commands with 'cam'"):format(Who(), Text(total), #names, #others))
+	for _, name in ipairs(names) do
+		local default = C_CVar and C_CVar.GetCVarDefault and C_CVar.GetCVarDefault(name)
+		Log(("cams: setting %s = %s (default %s) | %s"):format(name, Text(GetCVar(name)), Text(default), Text(seen[name].help)))
+	end
+	for _, info in ipairs(others) do
+		Log(("cams: command %s (type %s) | %s"):format(Text(info.command), Text(info.commandType), Text(info.help)))
+	end
+	camRun = { names = names, start = CamRead(names) }
+	ns.shoulderTestHold = true
+	-- (What "off" itself changes from how things are now.)
+	local result = CamExec("off")
+	C_Timer.After(CAM_WAIT, function()
+		local run = camRun
+		if not run then return end
+		local after, count = CamRead(run.names), 0
+		for _, name in ipairs(run.names) do
+			if after[name] ~= run.start[name] then
+				count = count + 1
+				Log(("cams:   off: %s %s -> %s"):format(name, run.start[name], after[name]))
+			end
+		end
+		Log(("cams: ActionCam off (%s): %d changed from how it was"):format(result, count))
+		CamStep(1)
+	end)
+	ns.Print("shoulder cams: running, about 10 s; the warning popup may come up, leave it")
+end
+
+-- map: mapping what each of the game's camera settings does. Run 1, "still":
+-- you stand still and touch nothing while recording the screen. Per trial
+-- (MAP_STILL) the settings named go on over a plain camera (ActionCam off),
+-- then the same moves each time: wait, zoom in 3 and back out; then the
+-- settings go back. Each
+-- trial's start and its zoom every 0.05 s are logged; the view's moves are
+-- read off the recording. Typed again while running: stops. What was changed
+-- is kept in the saved settings till it's back, so a reload mid-run can't
+-- leave it on.
+-- (The first run, 2026-11-11: 2 minutes in, at trial 22, the standing-still
+-- camera took the view and turned and zoomed through the rest. So while a run
+-- is on it holds the view as a camera of its own ("maptest"), and keeps
+-- "stood still since" at now. "map still 22" starts at trial 22.
+-- And from its first trials the view's tilt wandered off, to the sky by trial
+-- 10: the turn and tilt moves went at your full speed (MoveView's number
+-- does nothing), 72 and 36 degrees each way, and didn't come back to where
+-- they began. The second run held the turn and tilt speed settings at 10 and
+-- set the saved view at each trial's start: the turns were as big as before
+-- (a speed setting written low is put back as yours by Core.lua's watch,
+-- unless held with ns.SetHeldSpeed), and SetView blends over about a second,
+-- into the trial. So this run makes no turn or tilt at all, only the zoom
+-- (turning's for the walking run, with held speeds), and the saved view
+-- (view VIEW_SLOT) is set as each trial's settings go back, with
+-- TRIAL_LENGTH - TRIAL_BACK seconds for its blend before the next.)
+do
+	local VIEW_SLOT = 4
+	local P, H, F = "test_cameraDynamicPitch", "test_cameraHeadMovementStrength", "test_cameraTargetFocus"
+	local PLAIN = { [SHOULDER] = "0", [P] = "0", [H] = "0", [F .. "EnemyEnable"] = "0", [F .. "InteractEnable"] = "0" }
+	local MAP_STILL = {
+		{ "plain camera" },
+		{ "shoulder 2", { [SHOULDER] = "2" } },
+		{ "shoulder 2 + keep character centered", { [SHOULDER] = "2", [CENTERED] = "1" } },
+		{ "shoulder 2 + reduce unexpected movement", { [SHOULDER] = "2", [REDUCE] = "1" } },
+		{ "tilt", { [P] = "1" } },
+		{ "tilt + feet pad 0.2", { [P] = "1", [P .. "BaseFovPad"] = "0.2" } },
+		{ "tilt + feet pad 0.7", { [P] = "1", [P .. "BaseFovPad"] = "0.7" } },
+		{ "tilt + down scale 1", { [P] = "1", [P .. "BaseFovPadDownScale"] = "1" } },
+		{ "tilt + flying pad 0.2", { [P] = "1", [P .. "BaseFovPadFlying"] = "0.2" } },
+		{ "tilt + smart pivot cutoff 30", { [P] = "1", [P .. "SmartPivotCutoffDist"] = "30" } },
+		{ "tilt + keep character centered", { [P] = "1", [CENTERED] = "1" } },
+		{ "head movement 2", { [H] = "2" } },
+		{ "head 2 + standing strength 1", { [H] = "2", test_cameraHeadMovementStandingStrength = "1" } },
+		{ "head 2 + standing damp rate 1", { [H] = "2", test_cameraHeadMovementStandingDampRate = "1" } },
+		{ "head 2 + range scale 20", { [H] = "2", test_cameraHeadMovementRangeScale = "20" } },
+		{ "head 2 + dead zone 0.2", { [H] = "2", test_cameraHeadMovementDeadZone = "0.2" } },
+		{ "bobbing", { cameraBobbing = "1" } },
+		{ "bobbing + smooth speed 0.1", { cameraBobbing = "1", cameraBobbingSmoothSpeed = "0.1" } },
+		{ "custom view smoothing", { cameraCustomViewSmoothing = "1" } },
+		{ "distance rate x3", { cameraDistanceRateMult = "3" } },
+		{ "zoom speed 5", { cameraZoomSpeed = "5" } },
+		{ "zoom speed 50", { cameraZoomSpeed = "50" } },
+		{ "field of view 60", { cameraFov = "60" } },
+		{ "field of view 60, smooth speed 0.05", { cameraFov = "60", cameraFoVSmoothSpeed = "0.05" } },
+		{ "ground smooth speed 1", { cameraGroundSmoothSpeed = "1" } },
+		{ "yaw smooth speed 20", { cameraYawSmoothSpeed = "20" } },
+		{ "yaw smooth min/max 10/30", { cameraYawSmoothMin = "10", cameraYawSmoothMax = "30" } },
+		{ "pitch smooth speed 5", { cameraPitchSmoothSpeed = "5" } },
+		{ "pitch smooth min/max 10/60", { cameraPitchSmoothMin = "10", cameraPitchSmoothMax = "60" } },
+		{ "pivot off", { cameraPivot = "0" } },
+		{ "pivot DX max 0.5", { cameraPivotDXMax = "0.5" } },
+		{ "pivot DY min 0.5", { cameraPivotDYMin = "0.5" } },
+		{ "smooth off", { cameraSmooth = "0" } },
+		{ "smooth pitch off", { cameraSmoothPitch = "0" } },
+		{ "smooth yaw off", { cameraSmoothYaw = "0" } },
+		{ "follow style 1", { cameraSmoothStyle = "1" } },
+		{ "follow style 2", { cameraSmoothStyle = "2" } },
+		{ "follow style 4", { cameraSmoothStyle = "4" } },
+		{ "smooth time min/max 2/2", { cameraSmoothTimeMin = "2", cameraSmoothTimeMax = "2" } },
+		{ "tracking style 1", { cameraSmoothTrackingStyle = "1" } },
+		{ "target smooth speed 10", { cameraTargetSmoothSpeed = "10" } },
+		{ "terrain tilt", { cameraTerrainTilt = "1" } },
+		{ "Z smooth 2", { cameraZSmooth = "2" } },
+		{ "Z smooth 0", { cameraZSmooth = "0" } },
+		{ "action combat camera", { ActionCombatCameraEnable = "1" } },
+		{ "follow on stick", { CameraFollowOnStick = "1" } },
+		{ "max zoom factor 2.6", { cameraDistanceMaxZoomFactor = "2.6" } },
+		{ "plain camera again" },
+	}
+	-- (Seconds into a trial; each move's the same in every trial.)
+	local MOVES = {
+		{ 1.0, "CameraZoomIn", 3 }, { 2.0, "CameraZoomOut", 3 },
+	}
+	local TRIAL_BACK, TRIAL_LENGTH = 3.0, 4.5
+	local run
+	local function Put(values)
+		for name, value in pairs(values) do
+			if GetCVar(name) ~= nil then pcall(SetCVar, name, value) end
+		end
+	end
+	-- Sets these, remembering (in the saved settings too) what each was.
+	local function Change(values)
+		local keep = ns.db.shoulderMapKeep or {}
+		ns.db.shoulderMapKeep = keep
+		for name, value in pairs(values) do
+			local now = GetCVar(name)
+			if now ~= nil then
+				if keep[name] == nil then keep[name] = Text(now) end
+				pcall(SetCVar, name, value)
+			end
+		end
+	end
+	local function AllBack()
+		local keep = ns.db and ns.db.shoulderMapKeep
+		if not keep then return 0 end
+		local count = 0
+		for name, value in pairs(keep) do
+			pcall(SetCVar, name, value)
+			count = count + 1
+		end
+		ns.db.shoulderMapKeep = nil
+		return count
+	end
+	local function End(why)
+		if not run then return end
+		run.ticker:Cancel()
+		if run.events then run.events:UnregisterAllEvents() end
+		if run.view then ns.CallCameraFunction("SetView", VIEW_SLOT) end
+		run = nil
+		local count = AllBack()
+		ns.shoulderTestHold = nil
+		if ns.ApplyShoulderCam then ns.ApplyShoulderCam() end
+		Log(("map: %s, %d settings back"):format(why, count))
+	end
+	local function Begin(at)
+		local trial = MAP_STILL[at]
+		if not trial then
+			End("done")
+			ns.PadTestBox("Map run done", "stop the recording, then /reload", 0.3, 1, 0.3)
+			C_Timer.After(8, function() if not run then ns.PadTestBoxHide() end end)
+			return
+		end
+		local missing = {}
+		for name in pairs(trial[2] or {}) do
+			if GetCVar(name) == nil then missing[#missing + 1] = name end
+		end
+		run.at, run.began, run.move, run.back, run.zooms = at, GetTime(), 1, false, {}
+		Change(trial[2] or {})
+		Log(("map: trial %d (%s) starts, zoom %.2f%s"):format(at, trial[1], Zoom(),
+			#missing > 0 and (", not on this client: " .. table.concat(missing, ", ")) or ""))
+		ns.PadTestBox(("Map %d/%d  %s"):format(at, #MAP_STILL, trial[1]), "stand still, hands off", 0.7, 0.7, 0.7)
+	end
+	local function Tick()
+		if not run then return end
+		ns.stillSince = GetTime()
+		if not run.at then return end
+		local into = GetTime() - run.began
+		while MOVES[run.move] and into >= MOVES[run.move][1] do
+			local move = MOVES[run.move]
+			ns.CallCameraFunction(move[2], move[3])
+			run.move = run.move + 1
+		end
+		if into >= 1.0 and into < TRIAL_BACK then run.zooms[#run.zooms + 1] = ("%.2f"):format(Zoom()) end
+		if not run.back and into >= TRIAL_BACK then
+			run.back = true
+			Log(("map: trial %d zoom from 1.0 s, every 0.05 s: %s"):format(run.at, table.concat(run.zooms, " ")))
+			-- (This trial's settings back to how they were; the plain camera stays.)
+			local keep, back = ns.db.shoulderMapKeep or {}, {}
+			for name in pairs(MAP_STILL[run.at][2] or {}) do
+				back[name] = PLAIN[name] or keep[name]
+			end
+			Put(back)
+			if run.view then ns.CallCameraFunction("SetView", VIEW_SLOT) end
+		end
+		if into >= TRIAL_LENGTH then Begin(run.at + 1) end
+	end
+	-- Run 2, "talk": the camera's turn to whoever you talk to
+	-- (test_cameraTargetFocusInteract...). You stand near an NPC that opens a
+	-- window (a vendor, a quest giver), it well off to one side of the screen,
+	-- and right-click it once per trial when the box says; the window's closed
+	-- for you TALK_HOLD later, and the view's given TALK_RETURN to come back.
+	-- Logged per trial: when the window opened and closed, and the NPC's
+	-- nameplate's spot every 0.05 s where the game lets it be read; the turn's
+	-- read off the recording.
+	local I = F .. "Interact"
+	local MAP_TALK = {
+		{ "focus off" },
+		{ "focus on", { [I .. "Enable"] = "1" } },
+		{ "turn strength 0.3", { [I .. "Enable"] = "1", [I .. "StrengthYaw"] = "0.3" } },
+		{ "turn strength 2", { [I .. "Enable"] = "1", [I .. "StrengthYaw"] = "2" } },
+		{ "tilt strength 0", { [I .. "Enable"] = "1", [I .. "StrengthPitch"] = "0" } },
+		{ "tilt strength 2", { [I .. "Enable"] = "1", [I .. "StrengthPitch"] = "2" } },
+		{ "target smooth speed 10", { [I .. "Enable"] = "1", cameraTargetSmoothSpeed = "10" } },
+		{ "target smooth speed 400", { [I .. "Enable"] = "1", cameraTargetSmoothSpeed = "400" } },
+		{ "yaw smooth speed 20", { [I .. "Enable"] = "1", cameraYawSmoothSpeed = "20" } },
+		{ "pitch smooth speed 5", { [I .. "Enable"] = "1", cameraPitchSmoothSpeed = "5" } },
+		{ "smooth off", { [I .. "Enable"] = "1", cameraSmooth = "0" } },
+		{ "follow style 4", { [I .. "Enable"] = "1", cameraSmoothStyle = "4" } },
+		{ "with shoulder 2", { [I .. "Enable"] = "1", [SHOULDER] = "2" } },
+		{ "focus on again", { [I .. "Enable"] = "1" } },
+	}
+	-- Run 3, "ramp": whether the turn follows its strength while the window's
+	-- already open, so a slow turn can be made by stepping it (the talk run,
+	-- 2026-11-11: no speed setting, the turn's always about 0.2 s; strength is
+	-- a straight share). step = the strengths jump from 0 to full this long
+	-- after the window opens; ramp = they go from 0 to full over this long
+	-- (eased); yawOnly = the tilt strength stays 0; enableAt = focus itself
+	-- switched on this long after. Each write is logged.
+	local MAP_RAMP = {
+		{ "focus on, as before", { [I .. "Enable"] = "1" }, hold = 4 },
+		{ "0, then full at once after 1.5 s", { [I .. "Enable"] = "1", [I .. "StrengthYaw"] = "0",
+			[I .. "StrengthPitch"] = "0" }, step = 1.5, hold = 4 },
+		{ "0 to full over 2 s", { [I .. "Enable"] = "1", [I .. "StrengthYaw"] = "0", [I .. "StrengthPitch"] = "0" },
+			ramp = 2, hold = 4 },
+		{ "0 to full over 2 s, turn only", { [I .. "Enable"] = "1", [I .. "StrengthYaw"] = "0",
+			[I .. "StrengthPitch"] = "0" }, ramp = 2, yawOnly = true, hold = 4 },
+		{ "focus switched on 1.5 s in", { [I .. "Enable"] = "0" }, enableAt = 1.5, hold = 4 },
+	}
+	-- Run 4, "back": the way back as the window closes is the game's 0.2 s snap
+	-- (2026-11-12: "when you stop talking it's really fast"); once closed the
+	-- focus has no one to turn to, so slowing it means the camera itself being
+	-- where the focus points before the close. swing = { at, for, degrees a
+	-- second, ramp }: camera follow swings it round behind you (ns.CenterCamera,
+	-- as the quest cam does: you face whoever you talk to); down = { at, over }:
+	-- the strengths eased back to 0 (what a slow way back looks like, if the
+	-- close were known ahead). The run closes each window at hold; your facing
+	-- is logged at the open, the close and 2.5 s after.
+	local SWING = 45 -- degrees a second at most (the quest cam's)
+	local MAP_BACK = {
+		{ "as built", { [I .. "Enable"] = "1", [I .. "StrengthYaw"] = "0", [I .. "StrengthPitch"] = "0" },
+			ramp = 1.5, hold = 4.5 },
+		{ "swing behind you, focus kept", { [I .. "Enable"] = "1", [I .. "StrengthYaw"] = "0",
+			[I .. "StrengthPitch"] = "0" }, ramp = 1.5, swing = { 1.6, 2.6, SWING, 1 }, hold = 4.5 },
+		{ "swing behind you, focus eased off", { [I .. "Enable"] = "1", [I .. "StrengthYaw"] = "0",
+			[I .. "StrengthPitch"] = "0" }, ramp = 1.5, swing = { 1.6, 2.6, SWING, 1 }, down = { 1.6, 2.4 }, hold = 4.5 },
+		{ "eased back before the close", { [I .. "Enable"] = "1", [I .. "StrengthYaw"] = "0",
+			[I .. "StrengthPitch"] = "0" }, ramp = 1.5, down = { 2.5, 1.5 }, hold = 4.5 },
+		{ "as built again", { [I .. "Enable"] = "1", [I .. "StrengthYaw"] = "0", [I .. "StrengthPitch"] = "0" },
+			ramp = 1.5, hold = 4.5 },
+	}
+	local function Facing()
+		local ok, facing = pcall(GetPlayerFacing)
+		local made, text = pcall(string.format, "%.1f", ok and facing and math.deg(facing) or -1)
+		return made and text or "secret"
+	end
+	local PITCH_FULL = "0.75" -- (the game's default tilt strength)
+	local TALK_SETTLE, TALK_HOLD, TALK_RETURN = 1.5, 2.5, 2.5
+	local TALK_EVENTS = { "GOSSIP_SHOW", "MERCHANT_SHOW", "QUEST_GREETING", "QUEST_DETAIL", "QUEST_PROGRESS",
+		"QUEST_COMPLETE", "TRAINER_SHOW" }
+	-- (The NPC's nameplate can't be measured on Forever: GetCenter refused, the
+	-- talk run. So the turn's read off the recording only.)
+	local function TalkClose()
+		if C_GossipInfo and C_GossipInfo.CloseGossip then pcall(C_GossipInfo.CloseGossip) end
+		for _, name in ipairs({ "CloseMerchant", "CloseQuest", "CloseTrainer" }) do
+			if _G[name] then pcall(_G[name]) end
+		end
+	end
+	local function TalkBox(line, r, g, b)
+		ns.PadTestBox(("Talk %d/%d  %s"):format(run.at, #run.list, run.list[run.at][1]), line, r, g, b)
+	end
+	local function TalkBegin(at)
+		local trial = run.list[at]
+		if not trial then
+			End("done")
+			ns.PadTestBox("Talk run done", "stop the recording, then /reload", 0.3, 1, 0.3)
+			C_Timer.After(8, function() if not run then ns.PadTestBoxHide() end end)
+			return
+		end
+		run.at, run.phase, run.began, run.writes = at, "settle", GetTime(), {}
+		run.lastYaw, run.lastPitch, run.enabled, run.swung = nil, nil, nil, nil
+		Change(trial[2] or {})
+		Log(("map: talk %d (%s) on, zoom %.2f"):format(at, trial[1], Zoom()))
+		TalkBox("wait...", 0.7, 0.7, 0.7)
+	end
+	local function TalkTick()
+		if not run then return end
+		ns.stillSince = GetTime()
+		if not run.at then return end
+		local into = GetTime() - run.began
+		if run.phase == "settle" and into >= TALK_SETTLE then
+			run.phase, run.clickFacing = "click", Facing()
+			TalkBox("RIGHT-CLICK THE NPC now (then hands off)", 0.3, 1, 0.3)
+		elseif run.phase == "open" then
+			local trial = run.list[run.at]
+			if trial.ramp or trial.step then
+				local k
+				if trial.ramp then
+					k = math.min(1, into / trial.ramp)
+					k = k * k * (3 - 2 * k)
+				else
+					k = into >= trial.step and 1 or 0
+				end
+				if trial.down and into >= trial.down[1] then
+					local d = math.min(1, (into - trial.down[1]) / trial.down[2])
+					k = k * (1 - d * d * (3 - 2 * d))
+				end
+				local yaw = ("%.3f"):format(k)
+				local pitch = ("%.3f"):format(trial.yawOnly and 0 or k * tonumber(PITCH_FULL))
+				if yaw ~= run.lastYaw or pitch ~= run.lastPitch then
+					pcall(SetCVar, I .. "StrengthYaw", yaw)
+					pcall(SetCVar, I .. "StrengthPitch", pitch)
+					run.lastYaw, run.lastPitch = yaw, pitch
+					run.writes[#run.writes + 1] = ("%.2f:%s/%s"):format(into, yaw, pitch)
+				end
+			end
+			if trial.swing and not run.swung and into >= trial.swing[1] then
+				run.swung = true
+				ns.CenterCamera(trial.swing[2], trial.swing[3], 0, trial.swing[4])
+				run.writes[#run.writes + 1] = ("%.2f:swing"):format(into)
+			end
+			if trial.enableAt and not run.enabled and into >= trial.enableAt then
+				run.enabled = true
+				pcall(SetCVar, I .. "Enable", "1")
+				run.writes[#run.writes + 1] = ("%.2f:on"):format(into)
+			end
+			if into >= (trial.hold or TALK_HOLD) then
+				run.phase, run.began = "return", GetTime()
+				TalkClose()
+				Log(("map: talk %d closed, facing %s; written (s in: turn/tilt strength): %s"):format(run.at, Facing(),
+					#run.writes > 0 and table.concat(run.writes, " ") or "nothing"))
+				TalkBox("wait...", 0.7, 0.7, 0.7)
+			end
+		elseif run.phase == "return" then
+			if into >= TALK_RETURN then
+				Log(("map: talk %d back, facing %s"):format(run.at, Facing()))
+				local keep, back = ns.db.shoulderMapKeep or {}, {}
+				for name in pairs(run.list[run.at][2] or {}) do
+					back[name] = PLAIN[name] or keep[name]
+				end
+				Put(back)
+				if run.view then ns.CallCameraFunction("SetView", VIEW_SLOT) end
+				TalkBegin(run.at + 1)
+			end
+		end
+	end
+	local function TalkStart(list, label)
+		ns.shoulderTestHold = true
+		Change(PLAIN)
+		-- (Ramps: the strengths go back too, whichever trial ends the run.)
+		Change({ [I .. "StrengthYaw"] = GetCVar(I .. "StrengthYaw"), [I .. "StrengthPitch"] = GetCVar(I .. "StrengthPitch") })
+		run = { ticker = C_Timer.NewTicker(0.05, TalkTick), view = _G.SaveView and pcall(_G.SaveView, VIEW_SLOT) or false,
+			events = CreateFrame("Frame"), list = list }
+		for _, event in ipairs(TALK_EVENTS) do pcall(run.events.RegisterEvent, run.events, event) end
+		local this = run
+		run.events:SetScript("OnEvent", function(_, event)
+			if run ~= this or run.phase ~= "click" then return end
+			run.phase, run.began = "open", GetTime()
+			Log(("map: talk %d opened (%s) by %s, facing %s (at the click %s)"):format(run.at, event,
+				Text(UnitName("npc")), Facing(), run.clickFacing or "?"))
+			TalkBox("hands off...", 1, 0.82, 0)
+		end)
+		Log(("map: %s run, %d trials | %s | screen %.0f x %.0f, view saved %s, zoom %.2f"):format(label, #list, Who(),
+			WorldFrame:GetWidth(), WorldFrame:GetHeight(), Text(run.view), Zoom()))
+		ns.Print(("shoulder map: record your screen; %d right-clicks on the NPC, told when; type it again to stop"):format(
+			#list))
+		C_Timer.After(1, function() if run == this and not run.at then TalkBegin(1) end end)
+	end
+	function ns.ShoulderMap(which)
+		if run then
+			End("stopped")
+			ns.PadTestBoxHide()
+			return ns.Print("shoulder map: stopped")
+		end
+		local kind, from = (which or ""):match("^(%S+)%s*(%d*)$")
+		if kind == "talk" then return TalkStart(MAP_TALK, "talk") end
+		if kind == "ramp" then return TalkStart(MAP_RAMP, "ramp") end
+		if kind == "back" then return TalkStart(MAP_BACK, "back") end
+		if kind ~= "still" then return ns.Print("shoulder map: still [first trial], talk, ramp, back") end
+		from = math.max(1, math.min(#MAP_STILL, tonumber(from) or 1))
+		ns.shoulderTestHold = true
+		Change(PLAIN)
+		run = { ticker = C_Timer.NewTicker(0.05, Tick), view = _G.SaveView and pcall(_G.SaveView, VIEW_SLOT) or false }
+		Log(("map: still run, trials %d-%d of %.1f s | %s | screen %.0f x %.0f, view saved %s, zoom %.2f"):format(from,
+			#MAP_STILL, TRIAL_LENGTH, Who(), WorldFrame:GetWidth(), WorldFrame:GetHeight(), Text(run.view), Zoom()))
+		ns.Print(("shoulder map: record your screen; about %d minutes; type it again to stop"):format(
+			math.ceil((#MAP_STILL - from + 1) * TRIAL_LENGTH / 60)))
+		local this = run
+		C_Timer.After(1, function() if run == this and not run.at then Begin(from) end end)
+	end
+	if ns.RegisterCamera then ns.RegisterCamera("maptest", function() return run ~= nil end) end
+	-- (A reload or logout mid-run: what it changed goes back at the next login.)
+	local frame = CreateFrame("Frame")
+	frame:RegisterEvent("PLAYER_ENTERING_WORLD")
+	frame:SetScript("OnEvent", function()
+		local count = AllBack()
+		if count > 0 then Log(("map: %d settings from a cut-short run put back"):format(count)) end
+	end)
+end
+
 local function Set(key, value)
 	ns.db[key] = value
 	if ns.ApplyShoulderCam then ns.ApplyShoulderCam() end
@@ -631,6 +1217,9 @@ function ns.ShoulderTest(arg)
 	elseif what == "sweep" then Sweep(rest)
 	elseif what == "try" then Try(rest)
 	elseif what == "walls" then Walls()
+	elseif what == "forms" then Forms()
+	elseif what == "cams" then Cams()
+	elseif what == "map" then ns.ShoulderMap(rest)
 	elseif what == "on" then Set("shoulderCam", true)
 	elseif what == "off" then Set("shoulderCam", false)
 	elseif what == "left" or what == "right" then Set("shoulderCamSide", what)
@@ -639,7 +1228,7 @@ function ns.ShoulderTest(arg)
 	-- (The Shoulder Cam layout, Layouts.lua: made, or made again from the code, and switched to; offers the reload.)
 	elseif what == "layout" then ns.RegenerateLayout("Shoulder Cam")
 	else
-		ns.Print("shoulder: scan, frames, watch, quiet, sweep offsets|zoom|ease|next|stop, try pitch|head|enemy|interact|walls|off, walls, " ..
+		ns.Print("shoulder: scan, frames, watch, quiet, sweep offsets|zoom|ease|next|stop, try pitch|head|enemy|interact|walls|off, walls, forms, cams, map still|talk|ramp|back, " ..
 			"on, off, left, right, spot <percent>, strength <percent>, layout")
 	end
 end

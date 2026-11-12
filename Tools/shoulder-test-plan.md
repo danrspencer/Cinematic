@@ -149,6 +149,60 @@ Answers: where does it feel wrong, which experimental settings are worth keeping
 | 4 | Forever | 2026-11-07 | Skyborne (sex 2: male), on foot, 15 yd: **0.86** of the Dwarf's (0.84-0.87 over 0.5 to 2 yards, both sides): a straight scale, so one number per model. Dwarf is 1.00. Still to do: other races, mounts, forms |
 | 4 | | | |
 | 5 | | | |
+| Forms | Forever | 2026-11-11 | `forms`, twice. Bear form 1.70 against the night elf's 0.82. The game alone has no sideways bump. Offset written at the model's change: 8-11 (of 945 wide) for 9 frames going in, 4-5 for 6 coming out. Written 1-2 frames earlier: 15 the other way. Pushed 35% past for 0.035 s going in: 7 for 2 frames, then level: built in (SWAP_PUSH). |
+| Cams | Forever | 2026-11-11 | `cams`. An addon can run `ActionCam`. From off: `basic` = tilt 1; `on` = tilt 1, head movement 1, shoulder 1, interact focus 1; `full` = `on` + enemy focus 1; `headMove`/`heavyHeadMove`/`lowHeadMove` = head movement 1/2/0.5; `focusOn`, `focusOff`, `noHeadMove` nothing; `default` leaves unreadable text in five settings (never run it). 353 console settings have "cam" in the name; most have no help line. |
+| Map: still | Forever | 2026-11-11 | `map still`, third try (see below). |
+
+#### Map: still (night elf, standing, zoom 6.85, hair tracked off the recording)
+
+Each setting on over a plain camera, then zoom in 3 yards and back. Where your hair sat: % of the screen's width off the middle, % of its height from the top.
+
+| Setting | What it did |
+| --- | --- |
+| Plain | Middle (-0.3), 49.6 down. Zoom in 3 yards: 0.5 s to get 90% there, back out 0.35 s |
+| `test_cameraOverShoulder` 2 | 13.9% left at 6.85 yards, 24.8% at 3.85: there in 0.1 s |
+| + `CameraKeepCharacterCentered` 1 | **Cancels the offset entirely** (and the tilt, below) |
+| + `CameraReduceUnexpectedMovement` 1 | **Cancels the offset entirely** |
+| `test_cameraDynamicPitch` 1 | You sit 1.7% lower at 6.85 yards, 6.6% higher at 3.85: it grows as you zoom in; 0.5 s |
+| + `BaseFovPad` 0.2 (default 0.4) | 8.8% lower at 6.85 (3.3% higher at 3.85) |
+| + `BaseFovPad` 0.7 | 6.6% higher at 6.85, the same zoomed in |
+| + `BaseFovPadDownScale` 1, `BaseFovPadFlying` 0.2, `SmartPivotCutoffDist` 30 | As the tilt alone (standing, on the ground, this camera angle) |
+| `cameraDistanceRateMult` 3 | Zoom 3 times as fast (0.17 s in, 0.13 s out) |
+| `cameraZoomSpeed` 5 / 50 (yours 20) | No real change over 3 yards (0.58 / 0.48 s in) |
+| `cameraFov` 60 | You look 1.6 times as big |
+| Head movement 2 and its standing strength, damp rate, range scale, dead zone | Nothing standing still |
+| Bobbing, custom view smoothing, ground smooth speed, yaw and pitch smooth speed and min/max, pivot off and its DX/DY, smooth off, smooth pitch/yaw off, follow styles 1/2/4, smooth time, tracking style 1, target smooth speed, terrain tilt, Z smooth 0/2, action combat camera, follow on stick, max zoom factor | Nothing standing still: for the walking and target runs |
+
+#### Map: talk (a vendor 9.1% right of the middle, zoom 6.66, its target ring tracked off the recording)
+
+`map talk`, 2026-11-11, first try. One right-click per trial; the window closed for you after 2.5 s.
+
+| Setting | What it did |
+| --- | --- |
+| Focus off | No turn |
+| `test_cameraTargetFocusInteractEnable` 1 | The NPC brought to the middle (9.1% right to 1.3% left) and 7.7% up the screen. Half way in 0.07 s, 90% in 0.17 s; back in 0.23 s once the window closes |
+| `...InteractStrengthYaw` 0.3 / 2 (default 1) | 0.3: 31% of the turn (straight share). 2: the same as 1 (capped) |
+| `...InteractStrengthPitch` 0 / 2 (default 0.75) | 0: no tilt. 2: 10.1% up, what 1 would give (capped) |
+| `cameraTargetSmoothSpeed` 10 / 400, `cameraYawSmoothSpeed` 20, `cameraPitchSmoothSpeed` 5, `cameraSmooth` 0, `cameraSmoothStyle` 4 | **No change to the turn or its speed** |
+| With `test_cameraOverShoulder` 2 | The NPC ends in the same place (1.7% left): the focus wins over the offset's sideways shift |
+
+So there's no speed setting: the turn's always about 0.2 s. The strengths are straight shares, so a slower turn would be ours to make by stepping the strength up from 0 (not yet tried: whether a strength changed mid-talk moves the view at once). The NPC's nameplate can't be measured on Forever either (GetCenter refused).
+
+#### Map: ramp (the same vendor, 2026-11-11)
+
+`map ramp`: the strengths changed while the window's open. **The turn follows them**:
+
+| Trial | What it did |
+| --- | --- |
+| Focus on | The usual snap, 0.2 s |
+| Strengths 0, full at 1.5 s | Still till 1.5 s, then the usual snap |
+| 0 to full over 2 s (eased) | **A smooth glide** over the 2 s, about 0.1-0.2 s behind the strength written, then holds |
+| The same, turn only | The same glide sideways, no tilt (0.6% of height) |
+| Focus switched on 1.5 s in | Works mid-talk: the snap at 1.5 s |
+
+So a slow turn to whoever you talk to is ours to make: focus on with strength 0, then step the strengths up per frame. The way back as the window closes is still the game's 0.2 s snap (not yet tried: easing it back down before the window closes, or whether the focus holds a moment after).
+
+What the first two tries taught: a turn or tilt speed setting written low is put back by Core.lua's speed watch unless held with `ns.SetHeldSpeed`; `SetView` blends over about a second; the standing-still and chat cameras start mid-run unless the run holds the view (`ns.RegisterCamera`); the recording's clock ran 1.0 s ahead of the log; block matching fails on dark grass, tracking the hair's colour works.
 
 ## Build phases
 

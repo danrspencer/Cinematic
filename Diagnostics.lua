@@ -459,6 +459,35 @@ local function ErrorCounts()
 	return lines
 end
 
+-- /cine error: this addon's errors, oldest first, each different one once, as
+-- { message (its first line), at (the log's time, nil if it has left the log),
+-- count (times this session, nil for one from before) }, and how many of its
+-- actions the game blocked. From the saved log, so ones from before a /reload
+-- count too, and this session's that the log has dropped since.
+function ns.ErrorList()
+	local list, byMessage, blockedCount = {}, {}, 0
+	for _, line in ipairs(ns.db and ns.db.log or pending) do
+		local at, message = line:match("^(%S+) ERROR: ([^\n]*)")
+		if message then
+			if not byMessage[message] then
+				byMessage[message] = { message = message, at = at }
+				list[#list + 1] = byMessage[message]
+			end
+		elseif line:find("^%S+ BLOCKED: ADDON_ACTION") then
+			blockedCount = blockedCount + 1
+		end
+	end
+	for _, full in ipairs(errorOrder) do
+		local message = Plain(full):match("^[^\n]*")
+		if not byMessage[message] then
+			byMessage[message] = { message = message }
+			list[#list + 1] = byMessage[message]
+		end
+		byMessage[message].count = (byMessage[message].count or 0) + errors[full].count
+	end
+	return list, blockedCount
+end
+
 -- The game's error handler, wrapped to notice this addon's errors. With
 -- BugGrabber installed it usually owns the handler, so its callback is used.
 local usingBugGrabber = false

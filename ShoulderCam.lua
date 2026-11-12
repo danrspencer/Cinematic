@@ -126,7 +126,34 @@ local function FormNow()
 	return lastForm
 end
 -- The form whose model is on screen.
-local shownKnown, shownForm, swapBy
+-- (ns.shoulderSwap: knobs for ShoulderCamTest.lua's "forms" run, which tries
+-- other timings to find the one with the least bump: lead = the offset goes
+-- in this long after the form's change on the way INTO a form, not at the
+-- model's; boost = into a form it's pushed this share past the new offset for
+-- boostFor seconds, to hurry the game's ease.
+-- The first run (19:11 that day, the view's sideways move read off a fence
+-- post, in 945ths of the screen's width): the game alone 1 either way; at
+-- the model's change 11 one way for 8 frames going in, 4 coming out; 0.03 s
+-- after the form's change (a frame or two ahead of the model) 15 the other
+-- way; 50% past for 0.06 s cut the 11 short after 2 frames, then threw it 19
+-- the other way, and coming out made 4 into 11. The up and down move, 12 of
+-- 397, is the game's own: the same with the offset at 0.)
+-- The second run (21:04, six small pushes): as built 8-9 for some 9 frames;
+-- 35% past for 0.035 s and 50% past for 0.02 s both 7 for 2 frames, then
+-- level, with nothing past the other way; 25% for 0.05 s and 50% for 0.035 s
+-- went 5 and 7 past. Out of a form the pushes changed nothing (4-5 for 6
+-- frames, as before). So SWAP_PUSH: into a form the offset's pushed that
+-- share past for SWAP_PUSH_FOR. Those first 2 frames are the model already
+-- changed with our offset not yet in, and no earlier write helps (above).
+local SWAP_PUSH, SWAP_PUSH_FOR = 0.35, 0.035
+local shownKnown, shownForm, swapBy, swapLed
+local lastYards, boostFrom, boostUntil, boostBy = 0, nil, nil, nil -- (yards at the last frame; a push's start, end and share)
+local function Swapped()
+	if shownForm == nil then return end
+	local knobs = ns.shoulderSwap
+	boostBy = knobs and knobs.boost or SWAP_PUSH
+	boostFrom, boostUntil = lastYards, GetTime() + (knobs and knobs.boostFor or SWAP_PUSH_FOR)
+end
 local function ModelForm()
 	local form = FormNow()
 	if not shownKnown then shownKnown, shownForm = true, form end
@@ -134,18 +161,24 @@ local function ModelForm()
 		swapBy = nil
 	else
 		if not swapBy then
-			swapBy = GetTime() + SWAP_WAIT
-			ns.Log("shoulder", ("form: %s -> %s, waiting for the model"):format(tostring(shownForm), tostring(form)))
+			local knobs = ns.shoulderSwap
+			local lead = knobs and shownForm == nil and knobs.lead or nil
+			swapBy, swapLed = GetTime() + (lead or SWAP_WAIT), lead ~= nil
+			ns.Log("shoulder", ("form: %s -> %s, waiting for %s"):format(tostring(shownForm), tostring(form),
+				lead and ("%.2f s"):format(lead) or "the model"))
 		elseif GetTime() >= swapBy then
-			ns.Log("shoulder", ("form: no model event in %.1f s, going by form %s"):format(SWAP_WAIT, tostring(form)))
+			ns.Log("shoulder", swapLed and ("form: going by form %s now"):format(tostring(form))
+				or ("form: no model event in %.1f s, going by form %s"):format(SWAP_WAIT, tostring(form)))
 			shownForm, swapBy = form, nil
+			Swapped()
 		end
 	end
 	return shownForm
 end
 local function ModelSwapped()
-	local was = shownForm
-	shownKnown, shownForm, swapBy = true, FormNow(), nil
+	local was, now = shownForm, FormNow()
+	shownKnown, shownForm, swapBy = true, now, nil
+	if was ~= now then Swapped() end
 	ns.Log("shoulder", ("model changed: form %s (was %s)"):format(tostring(shownForm), tostring(was)))
 end
 function ns.ShoulderModelKey()
@@ -173,7 +206,16 @@ local function SpotYards()
 	local distance = GetCameraZoom and GetCameraZoom() or 8
 	local yards = (ns.db.shoulderCamSpot or 0.2) * distance * ns.ShoulderViewWidth() / ns.ShoulderModelScale()
 	local k = math.min(1, math.max(0, (distance - SPOT_EASE_FROM) / (SPOT_EASE_TO - SPOT_EASE_FROM)))
-	return math.min(OFFSET_MOST, yards * k * k * (3 - 2 * k))
+	yards = math.min(OFFSET_MOST, yards * k * k * (3 - 2 * k))
+	-- (Just into a form: past the new offset for a moment, SWAP_PUSH.)
+	if boostUntil then
+		if GetTime() < boostUntil then
+			return math.max(0, math.min(OFFSET_MOST, yards + boostBy * (yards - boostFrom)))
+		end
+		boostUntil = nil
+	end
+	lastYards = yards
+	return yards
 end
 
 local function ShoulderValue(again)
@@ -185,15 +227,16 @@ local function ShoulderValue(again)
 	return ("%.2f"):format(ns.db.shoulderCamSide == "left" and -yards or yards)
 end
 
--- (The offset's following your zoom: logged in full only to the detail log.)
-local function Write(yours, cvar, value)
+-- (The offset's following your zoom, and quiet ones (the talk turn's steps):
+-- logged in full only to the detail log.)
+local function Write(yours, cvar, value, quiet)
 	local now = GetCVar(cvar)
 	if now ~= nil and not Same(now, value) then
 		if yours[cvar] == nil then
 			yours[cvar] = now
 		end
 		local text = ("Shoulder Cam: %s %s -> %s"):format(cvar, now, value)
-		if cvar == "test_cameraOverShoulder" and tonumber(now) ~= 0 and tonumber(value) ~= 0 then
+		if quiet or cvar == "test_cameraOverShoulder" and tonumber(now) ~= 0 and tonumber(value) ~= 0 then
 			ns.LogDetail("cvar", text)
 		else
 			ns.Log("cvar", text)
@@ -250,6 +293,82 @@ local function AskNotice()
 	StaticPopup_Show("CINEMATIC_SHOULDER_NOTICE")
 end
 
+-- Turn to who you talk to (shoulderCamTalkTurn). The game's own interact
+-- focus (test_cameraTargetFocusInteract...) turns the camera to whoever you
+-- talk to, but in about 0.2 s, a snap, and nothing sets its speed (the "talk"
+-- map run, 2026-11-11, Tools/shoulder-test-plan.md). Its strengths are a
+-- straight share of the turn, and it follows them while the window's open
+-- (the "ramp" run): so the focus stays on with them at 0, and as a window
+-- opens they're stepped up to the game's own (talk.yaw, talk.pitch) over
+-- shoulderCamTalkTime seconds, eased. While one of Cinematic's cameras holds
+-- the view (the quest or chat camera) they're stepped back down over the same
+-- time, and up again once it's done. The way back as the window closes is
+-- still the game's 0.2 s: closed, the focus has no one to turn to. They go
+-- back to 0 talk.grace after the last window closes (from gossip to a quest's
+-- text, one window closes before the next opens). Its own Show in row off
+-- (shoulder:cam) turns it off too; mounted, indoors and the rest don't.
+local talk = {
+	enable = "test_cameraTargetFocusInteractEnable",
+	yawCVar = "test_cameraTargetFocusInteractStrengthYaw",
+	pitchCVar = "test_cameraTargetFocusInteractStrengthPitch",
+	yaw = 1, pitch = 0.75, -- (the game's defaults)
+	grace = 0.6,
+	open = { "GOSSIP_SHOW", "QUEST_GREETING", "QUEST_DETAIL", "QUEST_PROGRESS", "QUEST_COMPLETE", "MERCHANT_SHOW",
+		"TRAINER_SHOW", "BANKFRAME_OPENED", "TAXIMAP_OPENED", "AUCTION_HOUSE_SHOW", "MAIL_SHOW",
+		"GUILDBANKFRAME_OPENED", "PLAYER_INTERACTION_MANAGER_FRAME_SHOW" },
+	close = { "GOSSIP_CLOSED", "QUEST_FINISHED", "MERCHANT_CLOSED", "TRAINER_CLOSED", "BANKFRAME_CLOSED",
+		"TAXIMAP_CLOSED", "AUCTION_HOUSE_CLOSED", "MAIL_CLOSED", "GUILDBANKFRAME_CLOSED",
+		"PLAYER_INTERACTION_MANAGER_FRAME_HIDE" },
+	on = false, closedAt = nil, share = 0, -- (a window open; when the last closed; how far the turn is, 0-1)
+}
+
+local function TalkOn()
+	return ns.Setting("shoulderCam") and ns.db.shoulderCamTalkTurn and paused ~= "show in"
+end
+
+local function SetTalkShare(yours, share)
+	local k = share * share * (3 - 2 * share)
+	Write(yours, talk.yawCVar, ("%.3f"):format(k * talk.yaw), true)
+	Write(yours, talk.pitchCVar, ("%.3f"):format(k * talk.pitch), true)
+end
+
+-- Yours back for these (the rest of the Shoulder Cam staying on).
+local function GiveBack(yours, ...)
+	for i = 1, select("#", ...) do
+		local cvar = select(i, ...)
+		if yours[cvar] ~= nil then
+			if not Same(GetCVar(cvar), yours[cvar]) then
+				ns.Log("cvar", ("Shoulder Cam: %s back to %s"):format(cvar, yours[cvar]))
+				SetCVar(cvar, yours[cvar])
+			end
+			yours[cvar] = nil
+		end
+	end
+end
+
+-- Every frame while the Shoulder Cam's on.
+local function TalkTick(elapsed)
+	local yours = ns.db and ns.db.shoulderCamYours
+	if not (yours and TalkOn()) or ns.shoulderTestHold or (ns.DialogueUICameraOn and ns.DialogueUICameraOn()) then
+		return
+	end
+	if talk.on and talk.closedAt and GetTime() - talk.closedAt >= talk.grace then
+		talk.on, talk.closedAt = false, nil
+	end
+	if not talk.on then
+		talk.share = 0
+	else
+		local step = elapsed / math.max(0.1, ns.db.shoulderCamTalkTime or 1.5)
+		local holder = ns.CameraHolder and ns.CameraHolder("talk")
+		if holder and holder ~= "you" then
+			talk.share = math.max(0, talk.share - step)
+		else
+			talk.share = math.min(1, talk.share + step)
+		end
+	end
+	SetTalkShare(yours, talk.share)
+end
+
 local poller = CreateFrame("Frame")
 poller:Hide()
 
@@ -270,6 +389,14 @@ function ns.ApplyShoulderCam()
 			Write(yours, "CameraKeepCharacterCentered", "0")
 			Write(yours, "CameraReduceUnexpectedMovement", "0")
 			Write(yours, "test_cameraOverShoulder", ShoulderValue())
+			-- (The strengths at 0 before the focus goes on, so it can't snap.)
+			if TalkOn() then
+				SetTalkShare(yours, talk.share)
+				Write(yours, talk.enable, "1")
+			else
+				talk.share = 0
+				GiveBack(yours, talk.enable, talk.yawCVar, talk.pitchCVar)
+			end
 		end
 		poller:Show()
 	else
@@ -291,6 +418,7 @@ end
 -- offset follows your zoom every frame in between.)
 local waited = 0
 ns.SetOnUpdate(poller, function(_, elapsed)
+	TalkTick(elapsed)
 	waited = waited + elapsed
 	if waited >= POLL then
 		waited = 0
@@ -511,6 +639,8 @@ function ns.GetShoulderCamDebug()
 			return #names > 0 and table.concat(names, ", ") or "none"
 		end)(),
 		paused = db and PauseReason() or "no", always = db and db.shoulderCamAlways, key = GetBindingKey(SWAP_ACTION) or "none",
+		talkTurn = db and db.shoulderCamTalkTurn, talking = talk.on, talkShare = talk.share,
+		focus = GetCVar(talk.enable), focusYaw = GetCVar(talk.yawCVar), focusPitch = GetCVar(talk.pitchCVar),
 	}
 end
 
@@ -540,14 +670,28 @@ pcall(events.RegisterEvent, events, "ZONE_CHANGED")
 -- in at once too, not at the next poll.)
 pcall(events.RegisterEvent, events, "UPDATE_SHAPESHIFT_FORM")
 pcall(events.RegisterUnitEvent, events, "UNIT_MODEL_CHANGED", "player")
+-- (A window open with an NPC, or something to use: the talk turn.)
+local TALK_EVENT = {}
+for _, event in ipairs(talk.open) do
+	if pcall(events.RegisterEvent, events, event) then TALK_EVENT[event] = "open" end
+end
+for _, event in ipairs(talk.close) do
+	if pcall(events.RegisterEvent, events, event) then TALK_EVENT[event] = "close" end
+end
 events:SetScript("OnEvent", function(_, event)
-	if event == "UNIT_MODEL_CHANGED" then
+	if TALK_EVENT[event] == "open" then
+		if not talk.on then ns.LogDetail("cvar", ("Shoulder Cam: talk turn starts (%s)"):format(event)) end
+		talk.on, talk.closedAt = true, nil
+	elseif TALK_EVENT[event] == "close" then
+		if talk.on and not talk.closedAt then talk.closedAt = GetTime() end
+	elseif event == "UNIT_MODEL_CHANGED" then
 		ModelSwapped()
 		ns.ApplyShoulderCam()
 	elseif event == "PLAYER_TARGET_CHANGED" then
 		-- (Yourself targeted or not: the frames glide to the middle or back.)
 		if UpdateFollow then UpdateFollow() end
 	else
+		if event == "PLAYER_ENTERING_WORLD" then talk.on, talk.closedAt = false, nil end
 		ns.ApplyShoulderCam()
 	end
 end)
@@ -603,6 +747,17 @@ function ns.CreateShoulderCamPanel(kit)
 	kit.Tooltip(strength, L["How far they slide. Where you are on the screen is worked out from the camera, " ..
 		"not read: if they land short of you or past you, turn this up or down."])
 	kit.GreyUnless(strength, function() return ns.Setting("shoulderCam") and ns.GetDB().shoulderCamFrames end)
+
+	stack:Header(content, L["Talking"])
+	kit.GreyUnless(stack:Add(kit.Check(content, "shoulderCamTalkTurn", L["Turn to who you talk to"],
+		L["As you talk to an NPC (or open a vendor, bank, flight master or mailbox), the camera turns " ..
+		"slowly to bring them toward the middle of the screen, and goes back as the window closes. It " ..
+		"steps aside while Cinematic's quest or chat camera moves the view."], ns.ApplyShoulderCam), "check"), IfOn)
+	local talkTime = stack:Add(kit.Slider(content, "shoulderCamTalkTime", L["Turn takes"], 0.5, 4, 0.5,
+		L["%.1f sec"]), "slider")
+	kit.Tooltip(talkTime, L["How long the turn toward them takes. The way back, as the window closes, is " ..
+		"the game's own and always quick."])
+	kit.GreyUnless(talkTime, function() return ns.Setting("shoulderCam") and ns.GetDB().shoulderCamTalkTurn end)
 
 	stack:Header(content, L["Pause"])
 	kit.GreyUnless(stack:Add(kit.Check(content, "shoulderCamNotMounted", L["Not while mounted"],
