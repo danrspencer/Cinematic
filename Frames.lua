@@ -2345,9 +2345,11 @@ ns.COMBAT_SHOW = {
 -- The Action bars tab's Show while the spellbook is open (barsWithSpellbook):
 -- these rows come up in CineMode while one of these windows is open, so new
 -- spells can be dragged onto the bars. (Not the bar art: buttons only.)
+-- The totem bar's flyout counts too, so the bars are up while picking a
+-- totem from it (with the mouse or an addon's keybind).
 ns.SPELLBOOK_BARS = { mainbar = true, bottomleft = true, bottomright = true, right1 = true, right2 = true,
 	bar6 = true, bar7 = true, bar8 = true, pet = true, stance = true, totems = true }
-ns.SPELLBOOK_WINDOWS = { "SpellBookFrame", "PlayerSpellsFrame", "MacroFrame" }
+ns.SPELLBOOK_WINDOWS = { "SpellBookFrame", "PlayerSpellsFrame", "MacroFrame", "MultiCastFlyoutFrame" }
 function ns.SpellbookOpen()
 	if not ns.db.barsWithSpellbook then return false end
 	for _, name in ipairs(ns.SPELLBOOK_WINDOWS) do
