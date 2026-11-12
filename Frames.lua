@@ -4214,6 +4214,9 @@ local lastCastAt = -math.huge
 
 -- Fall damage brings the portrait up like a fight does. Health changing while
 -- falling or just after landing (the damage arrives a moment later) counts.
+-- So does any other health loss outside a fight: a spell that costs health
+-- (Life Tap), and where health can be read, any drop. lastFallDamageAt holds
+-- the last of all of these.
 local FALL_LANDING_GRACE = 1
 local lastFallingAt = -math.huge
 local lastFallDamageAt = -math.huge
@@ -5775,17 +5778,65 @@ do
 	vitalsWatcher:RegisterUnitEvent("UNIT_HEALTH", "player")
 	vitalsWatcher:RegisterUnitEvent("UNIT_POWER_UPDATE", "player")
 	vitalsWatcher:RegisterUnitEvent("UNIT_SPELLCAST_SUCCEEDED", "player")
-	vitalsWatcher:SetScript("OnEvent", ns.Profiled("Health/power events", function(_, event)
+	-- Spells of yours that cost health (any rank, by name): Life Tap, Health
+	-- Funnel. Casting one counts like fall damage, as where health is secret
+	-- the loss itself can't be seen. (In ns: Frames.lua is at the 200-local cap.)
+	ns.HEALTH_COST_SPELLS = { 1454, 755 }
+	function ns.CostsHealth(spellID)
+		if spellID == nil or IsSecretValue(spellID) then
+			return false
+		end
+		local ok, costs = pcall(function()
+			local function Name(id)
+				if C_Spell and C_Spell.GetSpellName then
+					return C_Spell.GetSpellName(id)
+				end
+				return GetSpellInfo and (GetSpellInfo(id))
+			end
+			local name = Name(spellID)
+			for _, id in ipairs(ns.HEALTH_COST_SPELLS) do
+				if spellID == id or name ~= nil and name == Name(id) then
+					return true
+				end
+			end
+			return false
+		end)
+		return ok and costs or false
+	end
+	vitalsWatcher:SetScript("OnEvent", ns.Profiled("Health/power events", function(_, event, _, _, spellID)
 		local now = GetTime()
 		if event == "UNIT_SPELLCAST_SUCCEEDED" then
 			lastCastAt = now
+			if ns.CostsHealth(spellID) then
+				lastFallDamageAt = now
+			end
 			return
 		end
 		if event == "UNIT_POWER_UPDATE" and not PowerCounts() then
 			return
 		end
-		if event == "UNIT_HEALTH" and (ns.Flag(IsFalling()) or now - lastFallingAt <= FALL_LANDING_GRACE) then
-			lastFallDamageAt = now
+		if event == "UNIT_HEALTH" then
+			if ns.Flag(IsFalling()) or now - lastFallingAt <= FALL_LANDING_GRACE then
+				lastFallDamageAt = now
+			end
+			-- Where health can be read, any loss outside a fight counts too
+			-- (lava, drowning, a spell that costs health). Not dying. Goes
+			-- by health dropping AND more of it missing, so a change of max
+			-- (a Stamina buff fading or landing, a gear swap) isn't a loss.
+			-- (ns.lastOwnVitals: { health, missing }.)
+			local health, most = UnitHealth("player"), UnitHealthMax("player")
+			if IsSecretValue(health) or IsSecretValue(most) then
+				ns.lastOwnVitals = nil
+			else
+				local missing, last = most - health, ns.lastOwnVitals
+				if last and health < last[1] and missing > last[2] and health > 0
+					and not ns.Flag(UnitIsDeadOrGhost("player")) then
+					lastFallDamageAt = now
+				end
+				last = last or {}
+				last[1], last[2] = health, missing
+				ns.lastOwnVitals = last
+			end
 		end
 		lastVitalsChange = now
 	end))
@@ -9912,6 +9963,9 @@ local PORTRAIT_FRAMES = {
 	CinematicPersonalPower = "prdWhenNotFull", CinematicPersonalMana = "prdWhenNotFull",
 }
 ns.PORTRAIT_FRAMES = PORTRAIT_FRAMES -- (Why.lua: which "until full" setting each goes by)
+-- The pet frame kept up until your pet's health is full (addons' too: see
+-- ns.AddPetFrame). (In ns: this file is at the 200-local cap.)
+ns.PET_FRAMES = { PetFrame = true }
 
 -- Swing timer page (Classic clients' own swing timer): a bar fades out once
 -- its weapon hasn't been used for a while, and the off-hand's can go for
@@ -10485,8 +10539,8 @@ function ns.UpdateFrames(cinematic, elapsed)
 	if resurrectRecovering and not IsPlayerRecovering() then
 		resurrectRecovering = false
 	end
-	-- (Only after a fight or fall damage, within the Calm Timer, or after
-	-- resurrecting: not for a buff cast in town.)
+	-- (Only after a fight, fall damage or other health loss (Life Tap), within
+	-- the Calm Timer, or after resurrecting: not for a buff cast in town.)
 	local portraitAllowed = now - math.max(lastCombatAt, lastFallDamageAt) < ns.db.calmTime
 		or resurrectRecovering
 	if ns.IsChatActive() then
@@ -10836,7 +10890,7 @@ function ns.UpdateFrames(cinematic, elapsed)
 			and (entry.name and combatShown[entry.name] or combatShown[GROUP_KEY[ownRow or entry.group]])
 		local fightingShown = listShown
 		-- (Your frames kept up while you recover, or on low mana: PersonalResources.lua.)
-		if not fightingShown and cinematic and (PORTRAIT_FRAMES[entry.name] or entry.name == "PetFrame")
+		if not fightingShown and cinematic and (PORTRAIT_FRAMES[entry.name] or ns.PET_FRAMES[entry.name])
 			and ns.KeepYourFrameUp(PORTRAIT_FRAMES[entry.name], entry, portraitAllowed, fighting) then
 			fightingShown = true -- shown like a combat frame, at the normal fade speeds
 		end
@@ -11712,8 +11766,14 @@ function ns.OnMinimapRestored(fn)
 end
 
 -- Its player frame, shown like the game's while health or power recovers.
-function ns.AddPortraitFrame(name)
-	PORTRAIT_FRAMES[name] = "portraitWhenNotFull"
+-- display: its personal resource display instead, shown like the game's.
+function ns.AddPortraitFrame(name, display)
+	PORTRAIT_FRAMES[name] = display and "prdWhenNotFull" or "portraitWhenNotFull"
+end
+
+-- Its pet frame, kept up like the game's until your pet's health is full.
+function ns.AddPetFrame(name)
+	ns.PET_FRAMES[name] = true
 end
 
 -- A raid frame's ready check icon: retail's readyCheckIcon texture, WoW

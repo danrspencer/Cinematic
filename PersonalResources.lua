@@ -137,13 +137,14 @@ end
 -- Whether your player frame, personal resource display or pet frame stays up
 -- now in CineMode, shown like a fight's frames. setting: the frame's "until
 -- full" one (Frames.lua's PORTRAIT_FRAMES; nil for the pet frame); afterFight:
--- within the Calm Timer of a fight or fall, or coming back to life.
+-- within the Calm Timer of a fight, fall or other health loss (Life Tap), or
+-- coming back to life.
 function ns.KeepYourFrameUp(setting, entry, afterFight, fighting)
 	local db = ns.db
 	if not ns.PersonalResourcesOn(db) then
 		return false
 	end
-	if entry.name == "PetFrame" then
+	if ns.PET_FRAMES[entry.name] then
 		return db.petWhenNotFull and afterFight and ns.IsPetRecovering() or false
 	end
 	if not setting then
@@ -174,7 +175,7 @@ end
 function ns.YourFrameWhy(setting, entry, afterFight, fighting, add)
 	local db = ns.db
 	local page = L["Personal Resource Display"]
-	local pet = entry.name == "PetFrame"
+	local pet = ns.PET_FRAMES[entry.name] or false
 	local row = pet and "petframe" or (setting == "prdWhenNotFull" and entry.group or "player")
 	local manaBar = ns.PersonalManaShown and ns.PersonalManaShown()
 	local lowManaRow = not pet and setting and (row == (manaBar and "prdmana" or "prdpower")
@@ -226,7 +227,7 @@ function ns.YourFrameWhy(setting, entry, afterFight, fighting, add)
 	if not any then
 		add("off", pet and L["After a fight, it stays up until your pet's health is full"]
 			or (afterFight and not held and L["After a fight it stays up until your health and power are full: they are"])
-			or L["After a fight, a fall or resurrecting, it stays up until your health and power are full"], untilKey)
+			or L["After a fight, a fall, Life Tap or resurrecting, it stays up until your health and power are full"], untilKey)
 	end
 end
 
@@ -260,8 +261,8 @@ function ns.CreatePersonalResourcesPanel(kit)
 
 	stack:Header(content, L["After a fight"])
 	Tick("portraitWhenNotFull", L["Show your player frame until health and power are full"],
-		L["Keeps your player frame up after a fight, a fall or resurrecting, until your health and " ..
-		"power are full. Rage and runic power don't count."])
+		L["Keeps your player frame up after a fight, a fall, a spell that costs you health (Life Tap) " ..
+		"or resurrecting, until your health and power are full. Rage and runic power don't count."])
 	if hasDisplay then
 		Tick("prdWhenNotFull", L["Show your personal resource display until health and power are full"],
 			L["The same for your personal resource display."])

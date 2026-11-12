@@ -698,7 +698,7 @@ local function Explain(entry)
 	-- low mana; what it has ticked that isn't keeping them up now, below.)
 	local yours = {}
 	local setting = ns.PORTRAIT_FRAMES and ns.PORTRAIT_FRAMES[entry.name]
-	if (setting or entry.name == "PetFrame") and ns.YourFrameWhy then
+	if (setting or ns.PET_FRAMES and ns.PET_FRAMES[entry.name]) and ns.YourFrameWhy then
 		ns.YourFrameWhy(setting, entry, n.tick.portraitAllowed, n.tick.fighting, function(state, text, settingKey)
 			yours[#yours + 1] = { state = state, text = text, page = "Personal Resources", setting = settingKey }
 		end)
