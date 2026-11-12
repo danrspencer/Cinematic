@@ -109,6 +109,7 @@ VitalsSound.lua
 TeleportVision.lua
 PortalScout.lua
 ScreenEffectScout.lua
+TintLayerTest.lua
 PersonalResources.lua
 StylePages.lua
 MirrorTimerStyle.lua

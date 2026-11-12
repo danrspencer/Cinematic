@@ -619,17 +619,27 @@ local function CreateTint()
 	tintFrame:EnableMouse(false)
 	ns.AddOverlay(tintFrame)
 
-	tintTexture = tintFrame:CreateTexture(nil, "BACKGROUND")
+	-- The washes (tint, inn glow, weather) are WorldFrame's own textures on
+	-- Forever: the nameplates are in WorldFrame, under all of UIParent, so a
+	-- wash on a frame of ours colours their names too (a warrior's name read
+	-- as a druid's). Tested there with /cine debug tintlayer: a frame of ours
+	-- lands over the names wherever it's put (child of WorldFrame or not, any
+	-- strata); only WorldFrame's own textures draw under them. They show with
+	-- the UI hidden too, and each is hidden when it has nothing to draw.
+	-- (Retail and Classic Era: untested, as before.)
+	local host = (ns.isRetail or ns.isClassicEra) and tintFrame or WorldFrame
+	tintTexture = host:CreateTexture(nil, "BACKGROUND")
 	tintTexture:SetAllPoints()
 	tintTexture:SetColorTexture(1, 1, 1, 1)
+	tintTexture:Hide()
 
-	innGlowTexture = tintFrame:CreateTexture(nil, "BORDER")
+	innGlowTexture = host:CreateTexture(nil, "BORDER")
 	innGlowTexture:SetAllPoints()
 	innGlowTexture:SetColorTexture(1, 1, 1, 1)
 	innGlowTexture:SetBlendMode("ADD")
 	innGlowTexture:Hide()
 
-	weatherTexture = tintFrame:CreateTexture(nil, "BACKGROUND", nil, 1)
+	weatherTexture = host:CreateTexture(nil, "BACKGROUND", nil, 1)
 	weatherTexture:SetAllPoints()
 	weatherTexture:SetColorTexture(1, 1, 1, 1)
 	weatherTexture:SetBlendMode("MOD")
@@ -725,6 +735,15 @@ local function ApplyTint(level, vignetteLevel, weatherLevel)
 	SetVignette(vignetteEdges, VIGNETTE_SIZE, db.vignette and db.vignetteStrength * vignetteLevel or 0)
 
 	tintFrame:SetShown(level > 0 or vignetteLevel > 0 or weatherLevel > 0)
+end
+
+-- The washes off, whatever else went wrong (they aren't the tint frame's own
+-- on Forever: hiding it doesn't hide them).
+function ns.HideTintWash()
+	for _, texture in ipairs({ tintTexture or false, innGlowTexture or false, weatherTexture or false }) do
+		if texture then texture:Hide() end
+	end
+	if tintFrame then tintFrame:Hide() end
 end
 
 -- cinematic: already false outside the situations ticked for the tint (see Core).

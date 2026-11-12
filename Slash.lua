@@ -155,6 +155,7 @@ local function PrintDebugHelp()
 	print("  /cine debug mirror - the breath, fatigue and Feign Death bars: their parts and settings")
 	print("  /cine debug themecheck - every theme after every other: the frames' parts must come back where the game had them")
 	print("  /cine debug bubbleshot | off - a real chat bubble in each style theme: run it four times, outdoors, it says a line each go")
+	print("  /cine debug tintlayer | off - dev copy: a red wash in each place a frame can sit, a screenshot of each, to find one under the nameplates")
 	print("  /cine debug themeshots [unitframes] [theme] | off - screenshots of every style theme's frames; your settings come back after")
 	print("  /cine debug cardchat - plays a zone card and prints how it's kept clear of the chat windows")
 	print("  /cine debug platetextures - the textures your target's nameplate is drawn with (for the game's plate Styles)")
@@ -687,6 +688,12 @@ local function HandleSlash(msg)
 			ns.ScoutScreenEffects(arg:match("^screenfx%s*(.-)$"))
 		else
 			ns.Print("/cine debug screenfx is in the dev copy only.")
+		end
+	elseif cmd == "debug" and (arg == "tintlayer" or arg:match("^tintlayer ")) then
+		if ns.TintLayerTest then
+			ns.TintLayerTest(arg:match("^tintlayer%s*(.-)$"))
+		else
+			ns.Print("/cine debug tintlayer is in the dev copy only.")
 		end
 	elseif cmd == "debug" and arg == "heal" and ns.ReportHealForecast then
 		-- (In 3 seconds: time to start casting a heal on yourself.)

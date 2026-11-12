@@ -3677,7 +3677,7 @@ local function RestoreEverything()
 		ns.letterbox:Hide()
 	end
 	if not pcall(ns.UpdateTint, false, 1e6) and _G.CinematicTint then
-		_G.CinematicTint:Hide()
+		ns.HideTintWash()
 	end
 	if _G.CinematicFocus then
 		_G.CinematicFocus:Hide()
