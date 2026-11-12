@@ -8641,7 +8641,9 @@ local function CreatePlatesPanel()
 		"either all on or all off there, in CineMode. The grids' friendly rows (your target's included) have no " ..
 		"Instances box: these take its place.\n\nWith a friendly target: on while you have one of that kind " ..
 		"targeted, out of fights. Every plate of that kind shows then, not just your target's.\n\nThe game won't " ..
-		"switch nameplates on or off during a fight: they stay as the fight found them.\n\nFriendly players' " ..
+		"switch nameplates on or off during a fight: they stay as the fight found them.\n\nA friendly row's " ..
+		"Grouped (in its Location list) counts here too: while you're in a group that kind shows, whatever its " ..
+		"choice below.\n\nFriendly players' " ..
 		"setting covers their pets too, so with pets shown, friendly players' plates show as well."])
 	local INSTANCE_CHOICES = {
 		{ "Friends", L["Friendly players"], target = true },

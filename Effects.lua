@@ -3541,6 +3541,14 @@ function ns.PlatesWhy()
 	if placeSuffix == "Instances" then
 		Add("off", L["In dungeons and raids the game doesn't let addons fade friendly plates: Friendly plates in " ..
 			"dungeons and raids decides them"])
+		if ns.InGroup() then
+			for _, kind in ipairs(ns.PLATE_INSTANCE_KINDS) do
+				if ns.db["plateGroup" .. kind] then
+					Add("on", L["%s: Grouped is ticked, so they show here while you're in a group"]:format(
+						L[labels[kind] or kind]))
+				end
+			end
+		end
 	end
 	if #hidden > 0 then
 		Add("off", L["Tick a kind's row for where you are, or for fights, to show it"])
@@ -3982,9 +3990,12 @@ local function UpdateLockedPlates()
 	local locked = platesActive and placeSuffix == "Instances"
 	local targetKind = locked and Ask(UnitExists, "target") and TARGET_ROW_KIND[TargetRow("target") or ""]
 	local hidden = lockedHidden
+	-- (A kind's Grouped tick counts here too: grouped is grouped, wherever.)
+	local grouped = locked and ns.InGroup()
 	for _, kind in ipairs(LOCKED_PLATE_KINDS) do
 		local mode = ns.db["plateInstance" .. kind]
-		hidden[kind] = locked and (mode == "hide" or (mode == "target" and targetKind ~= kind)) or false
+		hidden[kind] = locked and not (grouped and ns.db["plateGroup" .. kind])
+			and (mode == "hide" or (mode == "target" and targetKind ~= kind)) or false
 	end
 	hidden.Friends = hidden.Friends and hidden.FriendlyMinions
 	local changed = false

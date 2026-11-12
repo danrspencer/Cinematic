@@ -1578,11 +1578,12 @@ DEFAULTS.nameInPvPEnemyMinions = true
 DEFAULTS.nameInBGsEnemies = true
 DEFAULTS.nameInBGsEnemyMinions = true
 -- Both grids' Grouped column: the row stays up in a party or raid, in fights
--- and out, whatever its other boxes say. Friendly players and their minions by
--- default. Their Always column likewise, everywhere (just Service NPCs' and
--- group members' names by default).
+-- and out, whatever its other boxes say. None by default since 2026-11-12
+-- (friendly players and their minions had it: every stranger's plate up in a
+-- party; the Group members rows cover your own group). Their Always column
+-- likewise, everywhere (just Service NPCs' and group members' names by default).
 for _, kind in ipairs(ns.PLATE_KINDS) do
-	DEFAULTS["plateGroup" .. kind] = kind == "Friends" or kind == "FriendlyMinions"
+	DEFAULTS["plateGroup" .. kind] = false
 	DEFAULTS["plateAlways" .. kind] = false
 end
 for _, key in ipairs({ "Self", "HostileNPCs", "NeutralNPCs", "FriendlyNPCs", "ServiceNPCs", "Critters", "Friends",
@@ -5869,6 +5870,23 @@ ticker:SetScript("OnEvent", ns.Profiled("Core events", function(self, event, arg
 				end
 			end
 			ns.db.hideMinimapButtonGamepadOffV1 = true
+		end
+		-- Nameplates: Friendly players' and Friendly minions' Grouped (in the
+		-- Location dropdown) off to start with now (2026-11-12): it showed every
+		-- friendly player's plate in a party, and Ctrl+V couldn't hide them
+		-- (CurseForge report). Off in every profile. Once: tick it again and it
+		-- stays.
+		if not ns.db.plateGroupFriendsOffV1 then
+			for _, key in ipairs({ "plateGroupFriends", "plateGroupFriendlyMinions" }) do
+				ns.db[key] = false
+				for _, saved in pairs(ns.db.profiles or {}) do
+					if type(saved) == "table" then
+						saved[key] = nil
+						if type(saved.settings) == "table" then saved.settings[key] = nil end
+					end
+				end
+			end
+			ns.db.plateGroupFriendsOffV1 = true
 		end
 		-- Interface Recolor's raid Health bars on to start with now (2026-11-10):
 		-- it began off, which saved off without anyone choosing it. Once: untick
