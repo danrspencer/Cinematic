@@ -1653,6 +1653,14 @@ end
 local function Short(name)
 	return name and (name:match("^([^%-]+)") or name)
 end
+-- The name a card shows, from "Name-Second": on Forever (one big realm) the
+-- second part is their last name, shown too ("Ah Noyd"); elsewhere it's
+-- another realm's, left off.
+-- (On nameLink, not a local of its own: this file is at Lua's cap of 200.)
+function nameLink.Shown(name)
+	if ns.isRetail or ns.isClassicEra or type(name) ~= "string" then return Short(name) end
+	return (name:gsub("%-", " ", 1))
+end
 
 -- Someone by name (and GUID, if known) as a moment of kind: their unit,
 -- class and line.
@@ -1672,7 +1680,7 @@ local function FireFor(kind, name, guid, line, extra)
 		if type(realm) == "string" and realm ~= "" then name = name .. "-" .. realm:gsub(" ", "") end
 	end
 	local moment = extra or {}
-	moment.kind, moment.name, moment.unit, moment.guid = kind, Short(name), unit, guid
+	moment.kind, moment.name, moment.unit, moment.guid = kind, nameLink.Shown(name), unit, guid
 	moment.fullName = name -- (with its realm, if from another: who the emote goes to)
 	moment.class = moment.class or ClassOf(guid, unit)
 	moment.line = line
@@ -1721,7 +1729,7 @@ local function Buffed(aura, refresh)
 	if type(first) == "string" and type(last) == "string" and last ~= "" and not first:find("-", 1, true) then
 		full = first .. "-" .. last:gsub(" ", "")
 	end
-	Fire({ kind = "Buff", name = Short(first) or "?", fullName = full, unit = unit, guid = guid,
+	Fire({ kind = "Buff", name = nameLink.Shown(full) or "?", fullName = full, unit = unit, guid = guid,
 		class = ClassOf(guid, unit), icon = Plain(aura.icon), line = L["gave you %s"]:format(name) })
 end
 
@@ -1851,9 +1859,15 @@ local function Emoted(text, author, guid)
 			break
 		end
 	end
-	local name = Short(author)
+	-- (Their name off the front of the line: with its last name where the
+	-- line has it, else the first alone.)
 	local line = text
-	if line:sub(1, #name) == name then line = line:sub(#name + 1):gsub("^%s+", "") end
+	for _, name in ipairs({ nameLink.Shown(author), Short(author) }) do
+		if line:sub(1, #name) == name then
+			line = line:sub(#name + 1):gsub("^%s+", "")
+			break
+		end
+	end
 	-- (Their whole name for who the emote goes to: the card shows it short.)
 	-- (Its answers: the buttons while the list is its start; Same back plays
 	-- the first.)
@@ -2285,7 +2299,10 @@ function ns.TestEmoteVision()
 		-- (With their last name, as a real card has it: see FireFor.)
 		local _, last = UnitName("target")
 		last = Plain(last)
-		if type(last) == "string" and last ~= "" then moment.fullName = name .. "-" .. last:gsub(" ", "") end
+		if type(last) == "string" and last ~= "" then
+			moment.fullName = name .. "-" .. last:gsub(" ", "")
+			moment.name = nameLink.Shown(moment.fullName)
+		end
 		moment.class = guid and guid:find("^Player%-") and ClassOf(guid, "target") or nil
 	end
 	if not Show(moment) then
