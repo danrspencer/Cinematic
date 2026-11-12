@@ -431,7 +431,11 @@ end
 -- Forever, 2026-11-11). A row keeps the size of its last line otherwise: a
 -- title moved into a two-line row left a blank gap under it, and the last
 -- line spilled out of the tooltip.
+-- The rows given a size of our own (row -> true), until the tooltip is cleared
+-- or hides (FreeRows).
+local fitted = {}
 local function FitRow(left, line)
+	fitted[left] = true
 	if not line.wrap then
 		pcall(function()
 			local width = left.GetUnboundedStringWidth and left:GetUnboundedStringWidth() or left:GetStringWidth()
@@ -446,6 +450,19 @@ local function FitRow(left, line)
 			left:SetHeight(height)
 		end
 	end)
+end
+
+-- The rows we sized go back to sizing themselves, as the tooltip is cleared
+-- or hides. The game never sets a row's height, so one of ours stayed on the
+-- row for good: every later tooltip's wrapped line in that row (an item's
+-- Use line, a buff's or talent's words) was held to one line and ended in
+-- "..." (reported with screenshots, WoW Forever 2026-11-12).
+local function FreeRows()
+	for left in pairs(fitted) do
+		pcall(left.SetHeight, left, 0)
+		pcall(left.SetWidth, left, 0)
+	end
+	wipe(fitted)
 end
 
 -- A moved row that didn't land at its line's indent: noted in the log (a
@@ -1198,7 +1215,12 @@ function ns.HookTooltipParts()
 		pendingCut = nil
 		hiddenAt, hiddenAlpha = GetTime(), Alpha(GameTooltip) or (fade and fade.set) or 1
 		StopFade(true)
+		FreeRows()
 	end)
+	-- (And as it's emptied for its next lines, without hiding in between.)
+	if GameTooltip:HasScript("OnTooltipCleared") then
+		GameTooltip:HookScript("OnTooltipCleared", FreeRows)
+	end
 	-- The health bar hides each time it shows.
 	for _, bar in ipairs({ GameTooltipStatusBar or false, GameTooltip.StatusBar or false }) do
 		if bar and bar ~= bars[1] then
