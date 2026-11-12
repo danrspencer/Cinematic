@@ -355,6 +355,7 @@ local function Load(name)
 	end
 	ns.EnsureTables()
 	ns.MigrateRoleHides()
+	ns.SplitAddonRows(db) -- (an imported profile's old rows: AddonSupport.lua)
 	if ns.ResyncVitalsLook then ns.ResyncVitalsLook() end -- (its theme's own look onto settings at their defaults)
 end
 

@@ -67,11 +67,10 @@ end
 -- The Standard Frames columns' rows that are action bars (and the other
 -- bars: the Cooldown Manager, micro menu, bags, XP bars, gamepad bars and
 -- other addons' bars), as against the rest.
-local BAR_ROWS = { cooldowns = true, cooldownsutility = true, cooldownsbuffs = true, cooldownsbars = true, micro = true, bags = true, xp = true, gamepadbars = true, gamepadxp = true,
-	["addon:bt4Bars"] = true, ["addon:euiBars"] = true, ["addon:euiCooldowns"] = true,
-	["addon:euiEssentials"] = true, ["addon:euiDataBars"] = true }
+-- (Other addons' bar rows say so themselves: bar in their Support/ row.)
+local BAR_ROWS = { cooldowns = true, cooldownsutility = true, cooldownsbuffs = true, cooldownsbars = true, micro = true, bags = true, xp = true, gamepadbars = true, gamepadxp = true }
 local function IsBarRow(item)
-	return item.page == "bars" or BAR_ROWS[item.key] == true
+	return item.page == "bars" or item.bar == true or BAR_ROWS[item.key] == true
 end
 -- Every row of the columns, the bars' (bars true) or the rest, given value.
 local function EveryRow(bars, value)

@@ -6,9 +6,28 @@
 local _, ns = ...
 local L = ns.L
 
-table.insert(ns.ADDON_FRAMES, {
-	key = "weakauras", addon = "WeakAuras", label = "WeakAuras",
-	about = L["its auras"],
-	note = L["Auras anchored to another frame fade with that frame."],
-	names = { "WeakAurasFrame", "WeakAurasAttachToMouseFrame", "WeakAurasAttachToPRD" },
-})
+-- One frame a row. (from: the row that held all three till 2026-11-12, whose
+-- settings each starts with: ns.SplitAddonRows.)
+for _, known in ipairs({
+	{
+		key = "weakauras", label = "WeakAuras auras", short = "WeakAuras",
+		about = L["its auras"],
+		note = L["Auras anchored to another frame fade with that frame."],
+		names = { "WeakAurasFrame" },
+	},
+	{
+		key = "weakaurasMouse", from = "weakauras",
+		label = "WeakAuras on the mouse", short = "WeakAuras on mouse",
+		about = L["its auras attached to the mouse"],
+		names = { "WeakAurasAttachToMouseFrame" },
+	},
+	{
+		key = "weakaurasPRD", from = "weakauras",
+		label = "WeakAuras on the personal resource display", short = "WeakAuras on PRD",
+		about = L["its auras attached to the personal resource display"],
+		names = { "WeakAurasAttachToPRD" },
+	},
+}) do
+	known.addon, known.suite = "WeakAuras", "WeakAuras"
+	table.insert(ns.ADDON_FRAMES, known)
+end

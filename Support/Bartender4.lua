@@ -9,16 +9,20 @@
 local _, ns = ...
 local L = ns.L
 
--- Advanced Frames row.
-table.insert(ns.ADDON_FRAMES, {
-	key = "bt4Bars", addon = "Bartender4",
-	label = "Bartender4 other bars", short = "Bartender4 bars",
-	about = L["its bar 2, class bars and bonus bar"],
-	note = L["Its other bars, pet, stance, bag, micro menu, status and art bars are rows on the Standard " ..
-		"Frames page."],
-	names = { "BT4Bar2", "BT4Bar7", "BT4Bar8", "BT4Bar9", "BT4Bar10", "BT4Bar11", "BT4Bar12" },
-	hookAlpha = true,
-})
+-- Advanced Frames rows: one bar each. (from: the row that held them all till
+-- 2026-11-12, whose settings each starts with: ns.SplitAddonRows. bar: a bar
+-- row for the built-in profiles' modules.)
+for i, bar in ipairs({ 2, 7, 8, 9, 10, 11, 12 }) do
+	table.insert(ns.ADDON_FRAMES, {
+		key = "bt4Bar" .. bar, from = "bt4Bars", addon = "Bartender4", suite = "Bartender4",
+		label = "Bartender4 bar " .. bar, short = "Bartender4 bar " .. bar,
+		about = L["its bar %d"]:format(bar),
+		note = i == 1 and L["Its other bars, pet, stance, bag, micro menu, status and art bars are rows on the " ..
+			"Standard Frames page."] or nil,
+		names = { "BT4Bar" .. bar },
+		hookAlpha = true, bar = true,
+	})
+end
 
 -- Its frames standing in for the game's, by Standard Frames row: the row,
 -- the fade group, and the frames. (Its bars 1 and 3-6 show the game's action

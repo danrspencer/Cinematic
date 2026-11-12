@@ -42,29 +42,84 @@ local function MatchUnlockFrames(keys)
 	end
 end
 
--- Advanced Frames rows.
+-- Advanced Frames rows: one frame (or one kind of numbered frame) each.
+-- (from: the row that held it with others till 2026-11-12, whose settings it
+-- starts with: ns.SplitAddonRows. bar: a bar row for the built-in profiles'
+-- modules.)
+local rows = {}
+for i, bar in ipairs({ 6, 7, 8, 9, 10 }) do
+	rows[#rows + 1] = {
+		key = "euiBar" .. bar, from = "euiBars", addon = "EllesmereUIActionBars", bar = true,
+		label = "EllesmereUI Action Bar " .. bar, short = "EllesmereUI bar " .. bar,
+		about = L["its action bar %d"]:format(bar),
+		note = i == 1 and L["Its bars 1-5, pet, stance and XP bars are rows on the Game Frames page, " ..
+			"with its unit frames and quest tracker."] or nil,
+		names = { "EABBar_Bar" .. bar },
+	}
+end
+-- (Its QoL displays, a row each: name, label.)
+local QOL = {
+	{ "EUI_SecondaryStats", "Secondary Stats", "its secondary stats display" },
+	{ "EUI_FPSCounter", "FPS Counter", "its FPS counter" },
+	{ "EllesmereUIBattleResIcon", "Battle Res", "its battle res display" },
+	{ "EllesmereUIBloodlustIcon", "Bloodlust", "its Bloodlust display" },
+	{ "EUI_MovementAlertFrame", "Movement Alert", "its movement alert" },
+	{ "EUI_TimeSpiralFrame", "Time Spiral", "its Time Spiral display" },
+	{ "EUI_GatewayShardFrame", "Gateway Shard", "its Gateway Shard display" },
+	{ "EUI_CharacterCrosshair", "Crosshair", "its crosshair" },
+}
+for _, entry in ipairs(QOL) do
+	rows[#rows + 1] = {
+		key = "eui" .. entry[2]:gsub("%s", ""), from = "euiQoL", addon = "EllesmereUIQoL",
+		label = "EllesmereUI " .. entry[2], short = "EllesmereUI " .. entry[2]:lower(),
+		about = L[entry[3]],
+		names = { entry[1] },
+	}
+end
+-- (Its buff reminders' anchors, a row each: name, label.)
+for _, entry in ipairs({
+	{ "EABR_Anchor", "Buff Reminders" }, { "EABR_CombatAnchor", "Combat Reminders" },
+	{ "EABR_TalentAnchor", "Talent Reminders" }, { "EABR_BeaconAnchor", "Beacon Reminders" },
+	{ "EABR_CursorAnchor", "Cursor Reminders" },
+}) do
+	rows[#rows + 1] = {
+		key = "eui" .. entry[2]:gsub("%s", ""), from = "euiReminders", addon = "EllesmereUIAuraBuffReminders",
+		label = "EllesmereUI " .. entry[2], short = "EllesmereUI " .. entry[2]:lower(),
+		about = L["its missing-buff reminders"],
+		names = { entry[1] },
+	}
+end
+for _, known in ipairs(rows) do
+	known.suite, known.hookAlpha = "EllesmereUI", true
+	table.insert(ns.ADDON_FRAMES, known)
+end
+
 for _, known in ipairs({
 	{
-		key = "euiBars", addon = "EllesmereUIActionBars",
-		label = "EllesmereUI Action Bars 6-10", short = "EllesmereUI bars 6-10",
-		about = L["its action bars 6 to 10"],
-		note = L["Its bars 1-5, pet, stance and XP bars are rows on the Game Frames page, " ..
-			"with its unit frames and quest tracker."],
-		names = { "EABBar_Bar6", "EABBar_Bar7", "EABBar_Bar8", "EABBar_Bar9", "EABBar_Bar10" },
-	},
-	{
-		key = "euiCooldowns", addon = "EllesmereUICooldownManager",
+		key = "euiCooldowns", addon = "EllesmereUICooldownManager", bar = true,
 		label = "EllesmereUI Cooldown Manager", short = "EllesmereUI cooldowns",
 		about = L["its cooldown bars"],
 		patterns = { "^ECME_CDMBar_" },
 	},
 	{
-		key = "euiResource", addon = "EllesmereUIResourceBars",
+		key = "euiResourceBars", from = "euiResource", addon = "EllesmereUIResourceBars",
 		label = "EllesmereUI Resource Bars", short = "EllesmereUI resource bars",
-		about = L["its health, power and totem bars"],
+		about = L["its health and power bars"],
 		note = L["Its cast bar isn't faded, like the game's. Its swing timer is the Swing timer row on " ..
 			"the Game Frames page."],
-		names = { "EllesmereUIResourceBarsFrame", "ERB_TotemBarFrame", "ERB_CallTotemBarFrame" },
+		names = { "EllesmereUIResourceBarsFrame" },
+	},
+	{
+		key = "euiTotemBar", from = "euiResource", addon = "EllesmereUIResourceBars",
+		label = "EllesmereUI Totem Bar", short = "EllesmereUI totem bar",
+		about = L["its totem bar"],
+		names = { "ERB_TotemBarFrame" },
+	},
+	{
+		key = "euiCallTotemBar", from = "euiResource", addon = "EllesmereUIResourceBars",
+		label = "EllesmereUI Call Totem Bar", short = "EllesmereUI call totem bar",
+		about = L["its call totem bar"],
+		names = { "ERB_CallTotemBarFrame" },
 	},
 	{
 		key = "euiMeters", addon = "EllesmereUIDamageMeters",
@@ -73,25 +128,10 @@ for _, known in ipairs({
 		patterns = { "^EllesmereUIDMFrame%d+$" },
 	},
 	{
-		key = "euiDataBars", addon = "EllesmereUIDataBars",
+		key = "euiDataBars", addon = "EllesmereUIDataBars", bar = true,
 		label = "EllesmereUI Data Bars", short = "EllesmereUI data bars",
 		about = L["its data bars"],
 		patterns = { "^EllesmereUIDataBarsBar%d+$" },
-	},
-	{
-		key = "euiReminders", addon = "EllesmereUIAuraBuffReminders",
-		label = "EllesmereUI Buff Reminders", short = "EllesmereUI reminders",
-		about = L["its missing-buff reminders"],
-		names = { "EABR_Anchor", "EABR_CombatAnchor", "EABR_TalentAnchor", "EABR_BeaconAnchor", "EABR_CursorAnchor" },
-	},
-	{
-		key = "euiQoL", addon = "EllesmereUIQoL",
-		label = "EllesmereUI QoL Displays", short = "EllesmereUI QoL",
-		about = L["its stats, FPS, battle res, Bloodlust and movement displays and its crosshair"],
-		names = {
-			"EUI_SecondaryStats", "EUI_FPSCounter", "EllesmereUIBattleResIcon", "EllesmereUIBloodlustIcon",
-			"EUI_MovementAlertFrame", "EUI_TimeSpiralFrame", "EUI_GatewayShardFrame", "EUI_CharacterCrosshair",
-		},
 	},
 	{
 		-- (Unnamed and not taking the mouse, so /cine add can't find it.)
@@ -106,12 +146,32 @@ for _, known in ipairs({
 		about = L["its combat text over your character"],
 		match = MatchUnlockFrames({ "EUI_SelfCombatText" }),
 	},
+	-- Forever Essentials' parts, a row each. (bar: rows the built-in profiles'
+	-- modules count as bars, as the row they come from was.)
 	{
-		key = "euiEssentials", addon = "EllesmereUIForeverEssentials",
-		label = "EllesmereUI Forever Essentials", short = "EllesmereUI essentials",
-		about = L["its flight timer, loot feed, threat meter and junk list"],
-		names = { "EllesmereUIThreatMeterFrame", "EllesmereUIJunkList" },
-		match = MatchUnlockFrames({ "EUI_FlightTimer", "EUI_LootFeed" }),
+		key = "euiThreatMeter", from = "euiEssentials", addon = "EllesmereUIForeverEssentials", bar = true,
+		label = "EllesmereUI Threat Meter", short = "EllesmereUI threat meter",
+		about = L["its threat meter"],
+		names = { "EllesmereUIThreatMeterFrame" },
+	},
+	{
+		key = "euiJunkList", from = "euiEssentials", addon = "EllesmereUIForeverEssentials", bar = true,
+		label = "EllesmereUI Junk List", short = "EllesmereUI junk list",
+		about = L["its junk list"],
+		names = { "EllesmereUIJunkList" },
+	},
+	{
+		-- (Unnamed: found by its Unlock Mode entry.)
+		key = "euiFlightTimer", from = "euiEssentials", addon = "EllesmereUIForeverEssentials", bar = true,
+		label = "EllesmereUI Flight Timer", short = "EllesmereUI flight timer",
+		about = L["its flight timer"],
+		match = MatchUnlockFrames({ "EUI_FlightTimer" }),
+	},
+	{
+		key = "euiLootFeed", from = "euiEssentials", addon = "EllesmereUIForeverEssentials", bar = true,
+		label = "EllesmereUI Loot Feed", short = "EllesmereUI loot feed",
+		about = L["its loot feed"],
+		match = MatchUnlockFrames({ "EUI_LootFeed" }),
 	},
 }) do
 	known.suite, known.hookAlpha = "EllesmereUI", true

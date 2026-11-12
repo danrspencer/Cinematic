@@ -13,15 +13,22 @@
 local _, ns = ...
 local L = ns.L
 
--- Advanced Frames rows.
+-- Advanced Frames rows: one frame each. (from: the row that held it with
+-- others till 2026-11-12, whose settings it starts with: ns.SplitAddonRows.)
 for _, known in ipairs({
 	{
-		key = "dlMeters", addon = "DaylightUI_InfoPanel",
-		label = "DaylightUI damage meters", short = "DaylightUI meters",
-		about = L["its damage meter windows"],
+		key = "dlMeter1", from = "dlMeters", addon = "DaylightUI_InfoPanel",
+		label = "DaylightUI damage meter 1", short = "DaylightUI meter 1",
+		about = L["its first damage meter window"],
 		note = L["Its info panel (XP bar and minimap) follows the Minimap row on the Game Frames page; " ..
 			"its unit frames, bars, buffs, chat and quest tracker follow the rows of the frames they replace."],
-		names = { "DaylightUIDamageMeter", "DaylightUIDamageMeter2" },
+		names = { "DaylightUIDamageMeter" },
+	},
+	{
+		key = "dlMeter2", from = "dlMeters", addon = "DaylightUI_InfoPanel",
+		label = "DaylightUI damage meter 2", short = "DaylightUI meter 2",
+		about = L["its second damage meter window"],
+		names = { "DaylightUIDamageMeter2" },
 	},
 	{
 		key = "dlThreat", addon = "DaylightUI_InfoPanel",
@@ -30,10 +37,16 @@ for _, known in ipairs({
 		names = { "DaylightUIThreatMeterFrame" },
 	},
 	{
-		key = "dlQoL", addon = "DaylightUI_QoL",
-		label = "DaylightUI QoL displays", short = "DaylightUI QoL",
-		about = L["its flight timer and loot feed"],
-		names = { "DaylightUIFlightTimer", "DaylightUILootFeed" },
+		key = "dlFlightTimer", from = "dlQoL", addon = "DaylightUI_QoL",
+		label = "DaylightUI flight timer", short = "DaylightUI flight timer",
+		about = L["its flight timer"],
+		names = { "DaylightUIFlightTimer" },
+	},
+	{
+		key = "dlLootFeed", from = "dlQoL", addon = "DaylightUI_QoL",
+		label = "DaylightUI loot feed", short = "DaylightUI loot feed",
+		about = L["its loot feed"],
+		names = { "DaylightUILootFeed" },
 	},
 	{
 		key = "dlReminder", addon = "DaylightUI_Buffs",
@@ -49,10 +62,16 @@ for _, known in ipairs({
 		names = { "DaylightUIPullTimer" },
 	},
 	{
-		key = "dlQuestNav", addon = "DaylightUI_Quests",
+		key = "dlQuestArrow", from = "dlQuestNav", addon = "DaylightUI_Quests",
 		label = "DaylightUI quest arrow", short = "DaylightUI arrow",
-		about = L["its quest arrow and marker"],
-		names = { "DaylightUIQuestArrow", "DaylightUIQuestMarker" },
+		about = L["its quest arrow"],
+		names = { "DaylightUIQuestArrow" },
+	},
+	{
+		key = "dlQuestMarker", from = "dlQuestNav", addon = "DaylightUI_Quests",
+		label = "DaylightUI quest marker", short = "DaylightUI marker",
+		about = L["its quest marker"],
+		names = { "DaylightUIQuestMarker" },
 	},
 }) do
 	known.suite, known.hookAlpha = "DaylightUI", true

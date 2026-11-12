@@ -1007,6 +1007,18 @@ end
 
 -- The built-in group a frame name belongs to by pattern, if any.
 local function AutoPatternGroup(name)
+	-- (Not a frame a supported addon's row names: Naowh Forever's swing timer,
+	-- NaowhForeverSwingTimer, has its own row, loaded and switched on or not.
+	-- On ns: this file is near Lua's 200 locals.)
+	local claimed = ns.addonRowNames
+	if not claimed then
+		claimed = {}
+		for _, known in ipairs(ns.ADDON_FRAMES) do
+			for _, rowName in ipairs(known.names or {}) do claimed[rowName] = true end
+		end
+		ns.addonRowNames = claimed
+	end
+	if claimed[name] then return nil end
 	for pattern, group in pairs(AUTO_PATTERNS) do
 		if name:find(pattern) then
 			return group
@@ -2412,7 +2424,7 @@ end
 for _, known in ipairs(ns.ADDON_FRAMES) do
 	ns.COMBAT_SHOW[#ns.COMBAT_SHOW + 1] = {
 		key = "addon:" .. known.key, label = known.short or known.label, default = true, addon = known.addon,
-		groups = { "addon:" .. known.key },
+		groups = { "addon:" .. known.key }, bar = known.bar,
 	}
 end
 

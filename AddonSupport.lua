@@ -27,6 +27,69 @@ ns.OnLanguage(function()
 	ns.TranslateFields(ns.ADDON_NOTES, "about", "works")
 end)
 
+-- Rows that held several frames were split into a row per frame (2026-11-12):
+-- each new row names the old one (from), and starts with its settings. In
+-- settings (the live ones, or a saved profile's), every row list's entry for
+-- the old row ("addon:<key>"; addonFrames and addonsSeen by the bare key),
+-- copied to each new row without one, the old entry dropped (unless a row
+-- still has that key); in Mouseover groups the old row's place taken by the
+-- new ones, and a row following it (rowFollow) follows the first. Safe to run
+-- again: nothing's left to carry.
+function ns.SplitAddonRows(settings)
+	if type(settings) ~= "table" then return end
+	local split, live = {}, {}
+	for _, known in ipairs(ns.ADDON_FRAMES) do
+		live[known.key] = true
+		if known.from then
+			split[known.from] = split[known.from] or {}
+			table.insert(split[known.from], known.key)
+		end
+	end
+	for old, keys in pairs(split) do
+		local keep = live[old]
+		local oldItem = "addon:" .. old
+		for listName, list in pairs(settings) do
+			if type(list) == "table" and listName ~= "hoverGroups" and listName ~= "profiles" then
+				local bare = listName == "addonFrames" or listName == "addonsSeen"
+				local from = bare and old or oldItem
+				local value = list[from]
+				if value ~= nil then
+					for _, key in ipairs(keys) do
+						local to = bare and key or "addon:" .. key
+						if to ~= from and list[to] == nil then list[to] = value end
+					end
+					if not keep then list[from] = nil end
+				end
+				if listName == "rowFollow" and not keep then
+					for row, followed in pairs(list) do
+						if followed == oldItem then list[row] = "addon:" .. keys[1] end
+					end
+				end
+			end
+		end
+		for _, group in ipairs(type(settings.hoverGroups) == "table" and settings.hoverGroups or {}) do
+			local members = type(group) == "table" and group.members
+			if type(members) == "table" then
+				local at
+				for i, member in ipairs(members) do
+					if member == oldItem then at = i break end
+				end
+				if at then
+					local has = {}
+					for _, member in ipairs(members) do has[member] = true end
+					if not keep then table.remove(members, at) else at = at + 1 end
+					for _, key in ipairs(keys) do
+						if not has["addon:" .. key] then
+							table.insert(members, at, "addon:" .. key)
+							at = at + 1
+						end
+					end
+				end
+			end
+		end
+	end
+end
+
 local setups = {} -- addon name -> setup functions still to run
 local supported = {} -- addon name -> true: has a setup (loaded or not)
 local started = false -- (Cinematic itself loaded: the setups can run)

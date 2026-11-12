@@ -7679,6 +7679,15 @@ ticker:SetScript("OnEvent", ns.Profiled("Core events", function(self, event, arg
 		end
 		ns.EnsureTables()
 		ns.MigrateRoleHides() -- (the grids' old Roles column, as rules: Frames.lua)
+		-- (Other addons' rows split a frame a row: theirs, the live settings'
+		-- and each saved profile's, so none shows as changed for it.)
+		ns.SplitAddonRows(ns.db)
+		for _, saved in pairs(ns.db.profiles or {}) do
+			if type(saved) == "table" then
+				ns.SplitAddonRows(saved)
+				ns.SplitAddonRows(saved.settings)
+			end
+		end
 		ns.InitProfiles()
 		ns.InitLog()
 		SLASH_CINEMATIC1 = "/cine"

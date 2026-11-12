@@ -10,30 +10,39 @@
 local _, ns = ...
 local L = ns.L
 
--- Advanced Frames rows.
-for _, known in ipairs({
-	{
-		key = "elvBars", addon = "ElvUI",
-		label = "ElvUI other bars", short = "ElvUI bars",
-		about = L["its action bars 2 and 7 to 10"],
-		note = L["Its other bars, pet, stance, totem, micro, bag and data bars are rows on the Standard " ..
-			"Frames page, with its unit frames, buffs and chat panels."],
-		names = { "ElvUI_Bar2", "ElvUI_Bar7", "ElvUI_Bar8", "ElvUI_Bar9", "ElvUI_Bar10" },
-	},
-	{
-		key = "elvPanels", addon = "ElvUI",
-		label = "ElvUI top and bottom panels", short = "ElvUI panels",
-		about = L["its panels along the top and bottom of the screen"],
-		names = { "ElvUI_TopPanel", "ElvUI_BottomPanel" },
-	},
-	{
-		key = "elvThreat", addon = "ElvUI",
-		label = "ElvUI threat bar", short = "ElvUI threat",
-		about = L["its threat bar"],
-		names = { "ElvUI_ThreatBarHolder" },
-	},
-}) do
-	known.hookAlpha = true
+-- Advanced Frames rows: one frame each. (from: the row that held it with
+-- others till 2026-11-12, whose settings it starts with: ns.SplitAddonRows.)
+local rows = {}
+for i, bar in ipairs({ 2, 7, 8, 9, 10 }) do
+	rows[#rows + 1] = {
+		key = "elvBar" .. bar, from = "elvBars",
+		label = "ElvUI action bar " .. bar, short = "ElvUI bar " .. bar,
+		about = L["its action bar %d"]:format(bar),
+		note = i == 1 and L["Its other bars, pet, stance, totem, micro, bag and data bars are rows on the Standard " ..
+			"Frames page, with its unit frames, buffs and chat panels."] or nil,
+		names = { "ElvUI_Bar" .. bar },
+	}
+end
+rows[#rows + 1] = {
+	key = "elvTopPanel", from = "elvPanels",
+	label = "ElvUI top panel", short = "ElvUI top panel",
+	about = L["its panel along the top of the screen"],
+	names = { "ElvUI_TopPanel" },
+}
+rows[#rows + 1] = {
+	key = "elvBottomPanel", from = "elvPanels",
+	label = "ElvUI bottom panel", short = "ElvUI bottom panel",
+	about = L["its panel along the bottom of the screen"],
+	names = { "ElvUI_BottomPanel" },
+}
+rows[#rows + 1] = {
+	key = "elvThreat",
+	label = "ElvUI threat bar", short = "ElvUI threat",
+	about = L["its threat bar"],
+	names = { "ElvUI_ThreatBarHolder" },
+}
+for _, known in ipairs(rows) do
+	known.addon, known.suite, known.hookAlpha = "ElvUI", "ElvUI", true
 	table.insert(ns.ADDON_FRAMES, known)
 end
 
@@ -67,7 +76,11 @@ local ROWS = {
 	{ _G.BagsBar and "bags" or "micro", "bars", "ElvUIBagBar" },
 	-- Its bar for an encounter's or quest's own power, in place of the game's.
 	{ "encounter", "encounter", "ElvUI_AltPowerBar" },
-	{ "xp", "bars","ElvUI_ExperienceBarHolder", "ElvUI_ReputationBarHolder", "ElvUI_PetExperienceBarHolder" },
+	-- (Honor and Azerite: retail only.)
+	{ "xp", "bars","ElvUI_ExperienceBarHolder", "ElvUI_ReputationBarHolder", "ElvUI_PetExperienceBarHolder",
+		"ElvUI_HonorBarHolder", "ElvUI_AzeriteBarHolder" },
+	-- Its arena enemy frames, in place of the game's (the Flag carriers row).
+	{ "flags", "flags", "ElvUF_Arena1", "ElvUF_Arena2", "ElvUF_Arena3", "ElvUF_Arena4", "ElvUF_Arena5" },
 	-- Your cast bars sit inside its player and pet frames: they follow the
 	-- Cast bar row, as the game's do (the castbar group ignores the parent's
 	-- fade), not the frame they're on.
@@ -76,8 +89,10 @@ local ROWS = {
 	-- personal resource display: your health and power under you.
 	{ "prd", "prd", "ElvNP_Player" },
 	-- Its chat panels hold the game's chat frames, with its data texts and
-	-- toggle buttons (no row: the Chat page's).
-	{ "chat", "chat", "LeftChatPanel", "RightChatPanel", "LeftChatToggleButton", "RightChatToggleButton" },
+	-- toggle buttons (no row: the Chat page's), and its voice chat panel over
+	-- the left one.
+	{ "chat", "chat", "LeftChatPanel", "RightChatPanel", "LeftChatToggleButton", "RightChatToggleButton",
+		"ElvUIChatVoicePanel" },
 }
 
 -- Its nameplates are its own frames on the game's plates (plate.unitFrame),
@@ -172,6 +187,12 @@ end
 ns.WhenAddonLoads("ElvUI", function()
 	FollowFades()
 	ns.FadeWithRows(ROWS)
+	-- Its player frame, player nameplate and pet frame stay up while you or
+	-- your pet recover, as the game's player frame, personal resource display
+	-- and pet frame do (Personal Resource Display page).
+	ns.AddPortraitFrame("ElvUF_Player")
+	ns.AddPortraitFrame("ElvNP_Player", true)
+	ns.AddPetFrame("ElvUF_Pet")
 	ns.AddScanner(function()
 		for part, name in pairs(LINKS) do
 			local frame = _G[name]
