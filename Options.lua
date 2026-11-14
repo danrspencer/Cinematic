@@ -17038,8 +17038,14 @@ local function CreateKeybindsPanel()
 			return row
 		end
 		add:SetScript("OnClick", function()
-			ns.AddKeyGroup(L["Key group %d"]:format(#ns.KeyGroups() + 1))
+			-- (At the top, right under the button, its name picked to type over.)
+			ns.AddKeyGroup(L["Key group %d"]:format(#ns.KeyGroups() + 1), nil, nil, true)
 			LayoutGroups()
+			local first = rows[1]
+			if first then
+				first.name:SetFocus()
+				first.name:HighlightText()
+			end
 		end)
 		function LayoutGroups()
 			StopListening()

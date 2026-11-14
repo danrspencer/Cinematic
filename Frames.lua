@@ -3151,7 +3151,8 @@ do
 	end
 	-- A new key group (the Frames tab's New key group): its id one past the
 	-- highest yet, so a deleted group's key never lands on another.
-	function ns.AddKeyGroup(name, members, icon)
+	-- (atTop: first in the list, as New key group puts it, under the button.)
+	function ns.AddKeyGroup(name, members, icon, atTop)
 		ns.db.keyGroups = ns.db.keyGroups or {}
 		local top = ns.db.keyGroupTop or 0
 		for _, group in ipairs(ns.db.keyGroups) do
@@ -3159,7 +3160,7 @@ do
 		end
 		ns.db.keyGroupTop = top + 1
 		local group = { id = top + 1, name = name, members = members or {}, icon = icon }
-		ns.db.keyGroups[#ns.db.keyGroups + 1] = group
+		table.insert(ns.db.keyGroups, atTop and 1 or #ns.db.keyGroups + 1, group)
 		ns.NameKeyGroupBinding(group)
 		return group
 	end
