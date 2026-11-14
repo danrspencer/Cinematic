@@ -6598,6 +6598,48 @@ ticker:SetScript("OnEvent", ns.Profiled("Core events", function(self, event, arg
 			end
 			ns.db.prThresholdsV1 = true
 		end
+		-- Show below's 95% (saved by the carry above in v2.0.97, the default
+		-- then) to Not full (99%), the default since: every share of exactly
+		-- 95% in every profile. Once.
+		if not ns.db.prNotFullV1 then
+			local function Lift(t)
+				if type(t) ~= "table" then return end
+				for key, value in pairs(t) do
+					if type(key) == "string" and (key:find("^prHealth") or key:find("^prPower"))
+						and type(value) == "number" and math.abs(value - 0.95) < 1e-6 then
+						t[key] = 0.99
+					end
+				end
+			end
+			Lift(ns.db)
+			for _, saved in pairs(ns.db.profiles or {}) do
+				if type(saved) == "table" then
+					Lift(type(saved.settings) == "table" and saved.settings or saved)
+				end
+			end
+			ns.db.prNotFullV1 = true
+		end
+		-- Heal Vision's Show below health at 99% ("any damage") to 99.9%: its
+		-- box shows that step as < 100% now, so 99.5% health counts too. Every
+		-- role's and every profile's. Once.
+		if not ns.db.healVisionNotFullV1 then
+			local function Lift(t)
+				if type(t) ~= "table" then return end
+				for key, value in pairs(t) do
+					if type(key) == "string" and key:find("^healVision%a*Below") and type(value) == "number"
+						and math.abs(value - 0.99) < 1e-6 then
+						t[key] = 0.999
+					end
+				end
+			end
+			Lift(ns.db)
+			for _, saved in pairs(ns.db.profiles or {}) do
+				if type(saved) == "table" then
+					Lift(type(saved.settings) == "table" and saved.settings or saved)
+				end
+			end
+			ns.db.healVisionNotFullV1 = true
+		end
 		-- Off-screen plates in CineMode off to start with now (the game's head
 		-- names flashed at the screen's edge): off in every profile. Once.
 		if not ns.db.plateOffscreenOffV1 then

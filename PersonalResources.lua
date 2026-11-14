@@ -254,6 +254,19 @@ local function PowerNotFull(db, row, manaBar)
 	return not RestedNow("power", GetTime())
 end
 
+-- Whether a frame's Not full health the game won't say goes by the game's
+-- curve (ThresholdSecret) rather than the guess from health's change events:
+-- the guess comes and goes between them (up 3 seconds after each change),
+-- so a frame not full but not regenerating (a ghost, slow ticks) flickered
+-- up and down. Not the PRD's stand-in nor frames an addon's alpha hook
+-- breaks on (NO_SECRET_ALPHA), nor with Not full: only during Calm Timer
+-- (the curve can't tell a fight's aftermath).
+local function HealthNotFullByCurve(db, entry)
+	return not db.notFullAfterFight and UnitHealthPercent ~= nil and not HealthShare("player")
+		and entry.name ~= "CinematicPersonalResource" and not ns.NO_SECRET_ALPHA[entry.name]
+		and ns.HealthCurveReady() or false
+end
+
 -- Whether a row's power goes by Not full now though its share is under 99%:
 -- rage and the like (they rest at 0, so "under" means nothing for them).
 local function PowerRestsAtZero(row)
@@ -323,7 +336,9 @@ function ns.KeepYourFrameUp(setting, entry, afterFight, fighting)
 	if pet then
 		return nfHealth and ns.IsPetRecovering() or false
 	end
-	return nfHealth and HealthNotFull() or nfPower and PowerNotFull(db, row, manaBar) or false
+	-- (Secret health: the game's curve sets the alpha instead, ThresholdSecret.)
+	return nfHealth and not HealthNotFullByCurve(db, entry) and HealthNotFull()
+		or nfPower and PowerNotFull(db, row, manaBar) or false
 end
 
 -- In a fight and held back at its start (Wait at pull), for the passes that
@@ -417,6 +432,11 @@ end
 function ns.ManaCurveReady()
 	return CurveAt(0.5) ~= nil and UnitPowerPercent ~= nil
 end
+-- Not full's share on the game's health curve: just short of full.
+local NOT_FULL_CURVE = 0.999
+function ns.HealthCurveReady()
+	return CurveAt(NOT_FULL_CURVE) ~= nil and UnitHealthPercent ~= nil
+end
 local function SecretHealthAlpha(frame, curve)
 	frame:SetAlpha(UnitHealthPercent("player", true, curve))
 end
@@ -439,7 +459,7 @@ function ns.ThresholdSecret(setting, entry)
 	if HeldAtPull(row) then return false end
 	local healthKey, powerKey = RowKeys(row, entry)
 	local manaBar = ns.PersonalManaShown and ns.PersonalManaShown()
-	local health, power, _, nfPower = RowRules(db, row, healthKey, powerKey)
+	local health, power, nfHealth, nfPower = RowRules(db, row, healthKey, powerKey)
 	local spec = secretSpecs[row]
 	if not spec then
 		spec = {}
@@ -452,6 +472,13 @@ function ns.ThresholdSecret(setting, entry)
 	-- health first always left the player frame deaf to low mana.)
 	local healthSecret = health == "below" and UnitHealthPercent and not HealthShare("player")
 		and CurveAt(db[healthKey], spec.range, spec.floor) and true or false
+	-- (Not full the same way, at just short of full: KeepYourFrameUp leaves it
+	-- to the curve, HealthNotFullByCurve.)
+	local healthShare, healthRange = db[healthKey], spec.range
+	if not healthSecret and nfHealth and HealthNotFullByCurve(db, entry)
+		and CurveAt(NOT_FULL_CURVE, 0, spec.floor) then
+		healthSecret, healthShare, healthRange = true, NOT_FULL_CURVE, 0
+	end
 	local powerType
 	if power == "below" and not nfPower and UnitPowerPercent then
 		local below, unknown = PowerBelow(row, db[powerKey], manaBar)
@@ -459,9 +486,15 @@ function ns.ThresholdSecret(setting, entry)
 			powerType = unknown
 		end
 	end
+	-- (Health's curve while it changes, or changed after power last did:
+	-- power's only once power is the one changing. Health resting between
+	-- regen ticks swapped to a full mana's curve and back, so the frame went
+	-- up and down (shares under 99% for both, 2026-11-14). A ghost's health
+	-- doesn't regenerate and isn't full: health's.)
 	local now = GetTime()
-	if healthSecret and (powerType == nil or not RestedNow("health", now)) then
-		spec.health, spec.powerType, spec.share = true, nil, db[healthKey]
+	if healthSecret and (powerType == nil or not RestedNow("health", now)
+		or lastChange.health >= lastChange.power or ns.Flag(UnitIsDeadOrGhost("player"))) then
+		spec.health, spec.powerType, spec.share, spec.range = true, nil, healthShare, healthRange
 		return spec
 	end
 	if powerType ~= nil then
@@ -513,10 +546,10 @@ function ns.YourFrameWhy(setting, entry, afterFight, fighting, add)
 	end
 	local function Percent(key) return ("%d%%"):format(math.floor(db[key] * 100 + 0.5)) end
 	if health == "always" then
-		add("on", L["Kept up always (Show below health: 100%)"], healthKey)
+		add("on", L["Kept up always (Show below health: Always)"], healthKey)
 	end
 	if power == "always" then
-		add("on", L["Kept up always (Show below power: 100%)"], powerKey)
+		add("on", L["Kept up always (Show below power: Always)"], powerKey)
 	end
 	if health == "always" or power == "always" then return end
 	if fighting and not pet and ns.FightHold(row) then
@@ -564,21 +597,25 @@ function ns.YourFrameWhy(setting, entry, afterFight, fighting, add)
 	local shown = false
 	if nfHealth then
 		if pet and ns.IsPetRecovering() then
-			add("on", L["Your pet's health isn't full yet (Show below: 99%)"], healthKey)
+			add("on", L["Your pet's health isn't full yet (Show below: < 100%)"], healthKey)
+			shown = true
+		elseif not pet and HealthNotFullByCurve(db, entry) then
+			add("off", L["Shows while your health isn't full (Show below: < 100%): the game won't say your health, so it " ..
+				"sets the opacity itself"], healthKey)
 			shown = true
 		elseif not pet and HealthNotFull() then
-			add("on", L["Your health isn't full yet (Show below: 99%)"], healthKey)
+			add("on", L["Your health isn't full yet (Show below: < 100%)"], healthKey)
 			shown = true
 		end
 	end
 	if nfPower and PowerNotFull(db, row, manaBar) then
-		add("on", row == "prdmana" and L["Your mana isn't full yet (Show below: 99%)"]
-			or L["Your power isn't full yet, or your rage or the like isn't drained (Show below: 99%)"], powerKey)
+		add("on", row == "prdmana" and L["Your mana isn't full yet (Show below: < 100%)"]
+			or L["Your power isn't full yet, or your rage or the like isn't drained (Show below: < 100%)"], powerKey)
 		shown = true
 	end
 	if not shown then
-		add("off", pet and L["Stays up while your pet's health isn't full (Show below: 99%): it is"]
-			or L["Stays up while its health or power isn't full (Show below: 99%): it is"], key)
+		add("off", pet and L["Stays up while your pet's health isn't full (Show below: < 100%): it is"]
+			or L["Stays up while its health or power isn't full (Show below: < 100%): it is"], key)
 	end
 end
 
@@ -622,10 +659,11 @@ function ns.CreatePersonalResourcesPanel(kit)
 	stack:Header(content, L["Keep up"])
 	local function Fights(db) return db.stayInCombat end
 	local COLUMNS = {
-		{ L["Show below"], L["It stays up while what it shows (health, or your power) is under this. 100%: always " ..
-			"up. 99%: while it isn't full at all (rage and the like: until they're back to 0, Rage counts until 0); " ..
+		{ L["Show below"], L["It stays up while what it shows (health, or your power) is under this. < 100%: " ..
+			"while it isn't full at all, even by a hair (rage and the like: until they're back to 0, Rage counts until 0); " ..
 			"only after fights with the tick under this table. Lower: only while it's under this, any time: drinking, " ..
-			"or saving mana for the pull. 0%: never kept up by it. Wait at pull holds either back at a fight's start."] },
+			"or saving mana for the pull. Always: always up. Off: never kept up by it. Wait at pull holds either back " ..
+			"at a fight's start."] },
 		{ L["Opacity while hidden"], L["How much of it still shows while CineMode hides it. 0%: hidden completely."] },
 		{ L["Wait at pull"], L["At a fight's start, it comes up only once your health or power changes: your " ..
 			"first cast, your first hit. Only while fights bring frames up (In combat on the CineMode page)."] },
@@ -702,6 +740,14 @@ function ns.CreatePersonalResourcesPanel(kit)
 		box.searchLabel = label
 		return box
 	end
+	-- A Show below box (< 50%, < 100%: not full, Off, Always): Options.lua's ShareBox.
+	local function ShareBox(c, y, key, label, tip)
+		local line = kit.BoxLine(grid)
+		local box = line:ShareBox(key, tip, nil, NOT_FULL)
+		line:SetPoint("CENTER", grid, "TOPLEFT", CenterX(c), y - ROW_H / 2)
+		box.searchLabel = label
+		return box
+	end
 	local named = {} -- { [label] = function } (the power rows: named again as the page shows)
 	for r, row in ipairs(rows) do
 		local y = -HEAD_H - (r - 1) * ROW_H
@@ -714,7 +760,7 @@ function ns.CreatePersonalResourcesPanel(kit)
 		text.searchSkip = true
 		if type(row[1]) == "function" then named[text] = row[1] end
 		if row[2] then kit.Tooltip(name, row[2]) end
-		Box(1, y, row[3], ("%s: %s"):format(label, COLUMNS[1][1]),
+		ShareBox(1, y, row[3], ("%s: %s"):format(label, COLUMNS[1][1]),
 			("%s: %s. %s"):format(label, COLUMNS[1][1], COLUMNS[1][2]))
 		if row[6] then
 			Box(2, y, row[6], ("%s: %s"):format(label, COLUMNS[2][1]),
@@ -744,15 +790,15 @@ function ns.CreatePersonalResourcesPanel(kit)
 		local text = kit.Label(name, "GameFontHighlight", L["Fade range"])
 		text:SetPoint("LEFT")
 		text.searchSkip = true
-		local tip = L["Each row under 99% fades in gradually as what it shows nears its share, instead of " ..
-			"popping in all at once. With Show below 30% and 5% here, it starts showing at 35% and is fully up " ..
+		local tip = L["Each row set to a share (not < 100%, Always or Off) fades in gradually as what it shows nears its share, instead of " ..
+			"popping in all at once. With Show below < 30% and 5% here, it starts showing at 35% and is fully up " ..
 			"at 30%. 0%: at the share, all at once."]
 		kit.Tooltip(name, tip)
 		Box(1, y, "prFadeRange", L["Fade range"], tip)
 	end
 	stack:Add(grid, "label")
 	Tick("notFullAfterFight", L["Not full: only during Calm Timer"],
-		L["Ticked, a row at 99% (while it isn't full) comes up only after a fight, a fall, a spell that costs you " ..
+		L["Ticked, a row at < 100% (while it isn't full) comes up only after a fight, a fall, a spell that costs you " ..
 		"health (Life Tap) or resurrecting, until the Calm Timer runs out: casting or drinking in town brings " ..
 		"nothing up. Unticked, it works any time. Lower shares always work any time."])
 	Tick("drainWhenNotEmpty", L["Rage counts until 0"],

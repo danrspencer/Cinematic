@@ -666,6 +666,119 @@ local function BoxLine(parent)
 		Tooltip(box, (tip and tip .. " " or "") .. L["Scroll the mouse wheel over it, or type a number and press Enter."])
 		return box, name
 	end
+	-- A "show below" box (Health & Resources, Heal Vision): each share as "up
+	-- while under it" (< 50%), not full as < 100%, 0 Off and the top step
+	-- Always. Its steps (wheel): 0 Off, 1-98 a share, 99 not full (saved as
+	-- notFull: 0.99 or 0.999, as its page reads it), 100 Always (saved 1).
+	-- Typed: 100 (or 99) not full, "a..." Always, "o..." or 0 Off. field: a
+	-- setting's name or { get, set } as Box's; onChange(step).
+	local NOT_FULL_STEP, ALWAYS_STEP = 99, 100
+	local function Trim(step)
+		return (("%.2f"):format(step):gsub("0+$", ""):gsub("%.$", ""))
+	end
+	function line.ShareBox(_, field, tip, onChange, notFull, width)
+		local get = type(field) == "table" and field.get or function() return ns.GetDB()[field] end
+		local set = type(field) == "table" and field.set or function(value) ns.GetDB()[field] = value end
+		local function StepOf(share)
+			share = tonumber(share) or 0
+			if share >= 1 then return ALWAYS_STEP end
+			if share >= 0.99 - 1e-6 then return NOT_FULL_STEP end
+			return share * 100
+		end
+		local function ShareOf(step)
+			if step >= ALWAYS_STEP then return 1 end
+			if step >= NOT_FULL_STEP then return notFull end
+			return math.max(0, step) / 100
+		end
+		local function Text(step)
+			if step <= 0 then return L["Off"] end
+			if step >= ALWAYS_STEP then return L["Always"] end
+			if step >= NOT_FULL_STEP then return "< 100%" end
+			return ("< %s%%"):format(Trim(step))
+		end
+		local box = line:Box("", {
+			get = function() return StepOf(get()) / 100 end,
+			set = function(value) set(ShareOf(value * 100)) end,
+		}, 0, ALWAYS_STEP, 1, Text, 100, tip, onChange, width or 56)
+		box:SetMaxLetters(12) -- (< 3.25%, and the words in other languages)
+		if type(field) == "string" then
+			RecordKey(parent, field)
+			box.settingKey = field
+		end
+		-- (Typing starts from the number or word the box shows; typed words too.)
+		box:SetScript("OnEditFocusGained", function(self)
+			local step = StepOf(get())
+			self:SetText(step <= 0 and "0" or step >= ALWAYS_STEP and L["Always"]
+				or step >= NOT_FULL_STEP and "100" or Trim(step))
+			self:HighlightText()
+			self.edited = nil
+		end)
+		box:SetScript("OnEditFocusLost", function(self)
+			local step
+			if self.edited and not self.cancelled then
+				local text = self:GetText():lower()
+				local always, off = L["Always"]:lower():sub(1, 2), L["Off"]:lower():sub(1, 2)
+				local number = tonumber((text:match("[%d%.]+")))
+				if text:find("^%s*a") or text:find("^%s*" .. always, 1) then
+					step = ALWAYS_STEP
+				elseif text:find("^%s*o") or text:find("^%s*" .. off, 1) then
+					step = 0
+				elseif number then
+					step = number >= NOT_FULL_STEP and NOT_FULL_STEP or math.max(0, math.min(98, number))
+				end
+			end
+			if step then
+				set(ShareOf(step))
+				if onChange then onChange(step) end
+			end
+			self.cancelled, self.edited = nil, nil
+			self:SetText(Text(StepOf(get())))
+		end)
+		-- An arrow on its right: Always, < 100% and Off one click away (the
+		-- wheel and typing hid them). No menus on the client: each click
+		-- moves to the next of the three.
+		local arrow = CreateFrame("Button", nil, line)
+		arrow:SetSize(18, 18)
+		arrow:SetPoint("LEFT", box, "RIGHT", 2, 0)
+		arrow:SetNormalTexture("Interface\\Buttons\\UI-ScrollBar-ScrollDownButton-Up")
+		arrow:SetPushedTexture("Interface\\Buttons\\UI-ScrollBar-ScrollDownButton-Down")
+		arrow:SetDisabledTexture("Interface\\Buttons\\UI-ScrollBar-ScrollDownButton-Disabled")
+		arrow:SetHighlightTexture("Interface\\Buttons\\UI-ScrollBar-ScrollDownButton-Highlight", "ADD")
+		line:SetWidth(line:GetWidth() + 20)
+		local function Pick(step)
+			set(ShareOf(step))
+			box:Refresh()
+			if onChange then onChange(step) end
+		end
+		local PICKS = { { ALWAYS_STEP, L["Always"] }, { NOT_FULL_STEP, L["< 100% (not full)"] }, { 0, L["Off"] } }
+		arrow:SetScript("OnClick", function(self)
+			if box:HasFocus() then box:ClearFocus() end
+			if MenuUtil and MenuUtil.CreateContextMenu then
+				ns.ContextMenu(self, function(_, root)
+					for _, pick in ipairs(PICKS) do
+						root:CreateRadio(pick[2], function() return StepOf(get()) == pick[1] end,
+							function() Pick(pick[1]) end)
+					end
+				end)
+				return
+			end
+			local now, next = StepOf(get()), 1
+			for i, pick in ipairs(PICKS) do
+				if pick[1] == now then next = i % #PICKS + 1 end
+			end
+			Pick(PICKS[next][1])
+		end)
+		Tooltip(arrow, L["Pick Always, < 100% (not full) or Off. Other shares: scroll over the box, or type one."])
+		-- (Greyed with its box.)
+		local setEnabled = box.SetEnabled
+		function box.SetEnabled(self, enabled)
+			setEnabled(self, enabled)
+			arrow:SetEnabled(enabled and true or false)
+			arrow:SetAlpha(enabled and 1 or 0.5)
+		end
+		box.arrow = arrow
+		return box
+	end
 	-- A round pick before the next box (its name first, if any): ticked
 	-- while setting key is value, a click sets it (onPick(value) after: the
 	-- box's number filled in, say). Two on a line: one or the other.
@@ -14938,7 +15051,7 @@ local function CreateVisionPanel()
 		end
 
 		-- A table, a line each: tanks, healers and damage, then pets, with the
-		-- health they show below (100%: always, every line; 99%: any damage) and how
+		-- health they show below (Always: every line; < 100%: any damage, saved 99.9%) and how
 		-- faded they are while hidden (0: gone); neither goes past the other: one
 		-- set past pushes the other along. Then your target, hidden no fainter
 		-- than its box (100%: always shown), and the dead, offline and far away:
@@ -14989,14 +15102,19 @@ local function CreateVisionPanel()
 			local row = Row(icon, heading)
 			local belowField, alphaField = Field(belowKey), Field(alphaKey)
 			local below, alpha
-			below = Cell(row, 1, belowField, heading .. ": " .. L["Show below health"], belowTip, function(value)
+			-- (< 50%, < 100%: any damage at all, saved as 99.9%; Off; Always: BoxLine's ShareBox.)
+			local belowLine = BoxLine(row)
+			belowLine:SetPoint("LEFT", row, "LEFT", NAME_W, 0)
+			below = belowLine:ShareBox(belowField, belowTip, function(value)
 				-- (Below the opacity: takes it down too.)
 				if value < Percent(alphaField.get(), 0.25) then
 					alphaField.set(value / 100)
 					alpha:Refresh()
 				end
 				ApplyFrames()
-			end)
+			end, 0.999)
+			below.searchLabel = heading .. ": " .. L["Show below health"]
+			GreyUnless(below, Editable)
 			alpha = Cell(row, 2, alphaField, heading .. ": " .. L["Opacity while hidden"], alphaTip, function(value)
 				-- (Above the health: takes it up too.)
 				if value > Percent(belowField.get(), 0.95) then
@@ -15008,26 +15126,26 @@ local function CreateVisionPanel()
 		end
 		Kind(ROLE_ICON:format("0:19:22:41"), L["Tanks"], "healVisionTankBelow",
 			L["A tank (by role, or main tank in a raid) shows once their health drops below this. " ..
-			"100% shows tanks always, at full health too."],
+			"Always: shown always, at full health too; < 100%: at any damage."],
 			"healVisionTankAlpha", L["How much of a hidden tank still shows. 0% hides them completely."])
 		Kind(ROLE_ICON:format("20:39:1:20"), L["Healers"], "healVisionHealerBelow",
-			L["A healer shows once their health drops below this. 100% shows them always, at full health " ..
-			"too; 99% at any damage; lower keeps them hidden through small hits."],
+			L["A healer shows once their health drops below this. Always: shown always, at full health " ..
+			"too; < 100%: at any damage; lower keeps them hidden through small hits."],
 			"healVisionHealerAlpha", L["How much of a hidden healer still shows. 0% hides them completely."])
 		-- (Anyone without a tank's or healer's role goes by these, and the group titles' opacity.)
 		Kind(ROLE_ICON:format("20:39:22:41"), L["Damage"], "healVisionShowBelow",
-			L["A damage dealer (or anyone without a role) shows once their health drops below this. 100% " ..
-			"shows them always, at full health too; 99% at any damage; lower keeps them hidden through small hits."],
+			L["A damage dealer (or anyone without a role) shows once their health drops below this. Always: " ..
+			"shown always, at full health too; < 100%: at any damage; lower keeps them hidden through small hits."],
 			"healVisionMinAlpha", L["How much of a hidden damage dealer still shows, and of the group titles. " ..
 			"0% hides them completely."])
 		Kind(PET_ICON, L["Pets"], "healVisionPetBelow",
-			L["A pet shows once its health drops below this. 100% shows it always, at full health too; 99% at " ..
+			L["A pet shows once its health drops below this. Always: shown always, at full health too; < 100%: at " ..
 				"any damage."],
 			"healVisionPetAlpha", L["How much of a hidden pet still shows. 0% hides them completely."])
 		-- (One for every kind above: how much health over its line they fade in over.)
 		Cell(Row("", L["Fade range"], 12), 1, Field("healVisionFadeRange"), L["Fade range"],
 			L["Members fade in gradually as their health drops toward the Show below health line, instead of " ..
-			"popping in all at once. With Show below 80% and 5% here, they start showing at 85% health and are " ..
+			"popping in all at once. With Show below < 80% and 5% here, they start showing at 85% health and are " ..
 			"fully shown at 80%. 0% switches them at the line, all at once."])
 
 		Cell(Row(TARGET_ICON, L["Your target, at least"], 12), 2, Field("healVisionTargetAlpha"),

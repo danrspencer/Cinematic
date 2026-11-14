@@ -1721,6 +1721,10 @@ local function HandleSlash(msg)
 		-- (Dev copy: one run checking Health & Resources' shares, opacity and fade range, ThresholdTest.lua.)
 		if ns.ThresholdTest then ns.ThresholdTest(arg:match("^hrtest%s*(.*)$"))
 		else ns.Print("/cine debug hrtest is in the dev copy only.") end
+	elseif cmd == "debug" and arg:find("^flickertest") then
+		-- (Dev copy: one run recording whether your player frame flickers while not full, FlickerTest.lua.)
+		if ns.FlickerTest then ns.FlickerTest(arg:match("^flickertest%s*(.*)$"))
+		else ns.Print("/cine debug flickertest is in the dev copy only.") end
 	elseif cmd == "debug" and arg == "bartest" then
 		-- (Dev copy: one run recording an action bar addon's fade, hover and clicks, BarHoverTest.lua.)
 		if ns.BarHoverTest then ns.BarHoverTest() else ns.Print("/cine debug bartest is in the dev copy only.") end

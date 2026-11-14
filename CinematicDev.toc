@@ -206,6 +206,7 @@ MinimapCopy.lua
 BarHoverTest.lua
 LowManaTest.lua
 ThresholdTest.lua
+FlickerTest.lua
 PlateWidthTest.lua
 DamageVisionMeterTest.lua
 HealthRedTest.lua

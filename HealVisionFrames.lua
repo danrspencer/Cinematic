@@ -123,7 +123,7 @@ end
 
 -- Health percent to alpha: 1 below the kind's health setting; at or above
 -- it (and past the fade range), Shown(step). 100% there means always (full
--- health too), on every line, as tanks' always did; 99% is any damage. 0% never.
+-- health too), on every line, as tanks' always did; 99.9% (shown < 100%) is any damage. 0% never.
 local function Curve(step, kind)
 	local floor = Floor(kind)
 	local below = Setting(kind.below)
