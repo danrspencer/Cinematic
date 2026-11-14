@@ -2942,8 +2942,13 @@ do
 		end
 		return nil
 	end
+	-- (A row: the Standard Frames rows, or the Mouseover groups' few more,
+	-- as a key group can hold any row a Mouseover group can.)
 	local function ItemOf(key)
 		for _, each in ipairs(ns.COMBAT_SHOW) do
+			if each.key == key then return each end
+		end
+		for _, each in ipairs(ns.HOVER_ROWS) do
 			if each.key == key then return each end
 		end
 	end
@@ -3146,18 +3151,66 @@ do
 	end
 	-- A new key group (the Frames tab's New key group): its id one past the
 	-- highest yet, so a deleted group's key never lands on another.
-	function ns.AddKeyGroup(name)
+	function ns.AddKeyGroup(name, members, icon)
 		ns.db.keyGroups = ns.db.keyGroups or {}
 		local top = ns.db.keyGroupTop or 0
 		for _, group in ipairs(ns.db.keyGroups) do
 			if (group.id or 0) > top then top = group.id end
 		end
 		ns.db.keyGroupTop = top + 1
-		local group = { id = top + 1, name = name, members = {} }
+		local group = { id = top + 1, name = name, members = members or {}, icon = icon }
 		ns.db.keyGroups[#ns.db.keyGroups + 1] = group
 		ns.NameKeyGroupBinding(group)
 		return group
 	end
+	-- The key groups to start with: a copy of the Mouseover groups (the
+	-- player's, else the defaults), once (db.keyGroupsSeeded), each with its
+	-- icon. Groups made before this stay, with these after them. (Core.lua's
+	-- EnsureTables.)
+	function ns.SeedKeyGroups()
+		local db = ns.db
+		if db.keyGroupsSeeded then return end
+		db.keyGroupsSeeded = true
+		for _, hover in ipairs(ns.GetHoverGroups()) do
+			local members = {}
+			for _, key in ipairs(hover.members or NONE) do
+				if ItemOf(key) then members[#members + 1] = key end
+			end
+			if #members > 0 then
+				ns.AddKeyGroup(hover.name or "", members, ns.HoverGroupIcon(hover))
+			end
+		end
+	end
+	-- Keys set on a single frame (the Frames tab before key groups, v2.0.106):
+	-- each moves to a key group of that frame alone, once, at login (the
+	-- bindings are read by then), out of combat. The single frame's key still
+	-- works till then.
+	local function MoveRowKeys()
+		local db = ns.db
+		if not db or db.keyGroupsRowKeysMoved or InCombatLockdown() then return end
+		db.keyGroupsRowKeysMoved = true
+		local moved = false
+		for _, item in ipairs(ns.COMBAT_SHOW) do
+			local action = "CLICK " .. ns.FRAME_KEY_BUTTON .. ":" .. item.key
+			local keys = {}
+			for _, key in ipairs({ GetBindingKey(action) }) do
+				if type(key) == "string" and key ~= "" then keys[#keys + 1] = key end
+			end
+			if #keys > 0 then
+				local group = ns.AddKeyGroup(item.label, { item.key })
+				local into = "CLICK " .. ns.FRAME_KEY_BUTTON .. ":g" .. tostring(group.id)
+				for _, key in ipairs(keys) do
+					SetBinding(key)
+					SetBinding(key, into)
+				end
+				moved = true
+			end
+		end
+		if moved then SaveBindings(GetCurrentBindingSet()) end
+	end
+	local login = CreateFrame("Frame")
+	login:RegisterEvent("PLAYER_LOGIN")
+	login:SetScript("OnEvent", function() ns.Guard(MoveRowKeys) end)
 	-- Deleting one: its keys unbound (out of combat), its frames back to their rows.
 	function ns.DeleteKeyGroup(index)
 		local groups = ns.db.keyGroups

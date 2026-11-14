@@ -4262,6 +4262,7 @@ function ns.EnsureTables()
 	ns.db.frameForce = ns.db.frameForce or {}
 	-- (Key groups on that tab: id, name and rows, keys "CLICK CinematicFrameKey:g<id>"; Frames.lua.)
 	ns.db.keyGroups = ns.db.keyGroups or {}
+	if ns.SeedKeyGroups then ns.SeedKeyGroups() end -- (a copy of the Mouseover groups, once)
 	if ns.NameKeyGroupBinding then
 		for _, group in ipairs(ns.db.keyGroups) do ns.NameKeyGroupBinding(group) end
 	end

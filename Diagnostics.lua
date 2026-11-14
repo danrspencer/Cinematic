@@ -3387,9 +3387,16 @@ function ns.FrameKeyTest()
 	local function MinimapState()
 		local parts = {}
 		for _, entry in ipairs(ns.managed) do
-			if entry.frame == Minimap or entry.group == "minimap" then
-				parts[#parts + 1] = ("%s alpha %.2f forced %s"):format(tostring(entry.name or entry.group), entry.alpha or -1,
-					tostring(ns.FrameForced(entry)))
+			-- (The minimap's rows too, its header and zone name: a key group of the
+			-- Minimap alone must leave them be. Seen: the alpha on screen.)
+			local group = tostring(entry.group)
+			if entry.frame == Minimap or group:find("minimap") then
+				local frame = entry.frame
+				local seen = frame and frame.GetEffectiveAlpha and frame:GetEffectiveAlpha()
+				local by = ns.FrameForcedBy and ns.FrameForcedBy(entry)
+				parts[#parts + 1] = ("%s[%s] alpha %.2f seen %s forced %s%s"):format(tostring(entry.name or "?"), group,
+					entry.alpha or -1, seen and ("%.2f"):format(seen) or "-", tostring(ns.FrameForced(entry)),
+					by and " by " .. by or "")
 			end
 		end
 		return ("Minimap alpha %.2f, visible %s, handled %s, managed: %s"):format(Minimap:GetAlpha(),
@@ -3470,7 +3477,7 @@ function ns.FrameKeyTest()
 				rec.Finish("done")
 				return
 			end
-			local step = "Press your Minimap key ONCE. Wait 3 seconds.\nThen press it ONCE more."
+			local step = "Press the key you're testing ONCE. Wait 3 seconds.\nThen press it ONCE more."
 			if into < LEAD then
 				ns.PadTestBox(step, ("GET READY: recording starts in %d"):format(math.ceil(LEAD - into)), 1, 0.82, 0)
 			else

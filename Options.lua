@@ -16677,11 +16677,13 @@ for n = 1, 5 do
 		tip = L["Plays your scenes that use this key: on the Triggers page make a Key binding trigger for it, " ..
 			"then pick that trigger for a scene on the Scenes page. Press again to stop it."] }
 end
--- The Frames tab: a key for each Standard Frames row (the frames it hides,
--- in CineMode and out, Frames.lua's ns.ToggleFrameKey), under the headings
--- of that page's tabs. Whole frames only: no parts (role icons...), addons'
--- or added frames' rows (their keys hold a colon, which the binding can't),
--- nor the Highlight rows (game settings, no frame).
+-- The Frames tab: key groups (built in CreateKeybindsPanel, Frames.lua's
+-- db.keyGroups) and then the tooltip keys. The rows a group can hold, by
+-- the Standard Frames page's tabs, for its frame picker: ns.FRAME_KEY_ROWS,
+-- the rows a Mouseover group can hold (not the Highlight rows: game
+-- settings, no frame). (Single frames had keys of their own before key
+-- groups: those still work, and move into a group of their own at login,
+-- Frames.lua; their names here for the "was bound to" line.)
 do
 	local HEADINGS = {
 		{ "units", L["Unit frames"] }, { "prd", L["Personal Resource Display"] }, { "bars", L["Action bars"] },
@@ -16691,41 +16693,28 @@ do
 	}
 	local known = { highlight = true }
 	for _, heading in ipairs(HEADINGS) do if heading[1] then known[heading[1]] = true end end
-	local tip = L["Shows or hides it, in CineMode and out: up, it hides (hovering doesn't bring it back); " ..
-		"hidden, it shows. Its Show in row is overruled till you press the button above, or reload with Reset " ..
-		"frame keys after a reload ticked. The rows that go with it go too, like the minimap's clock and " ..
-		"buttons with the Minimap."]
-	local first = true
-	-- (The same rows by heading, for the key groups' frame picker: ns.FRAME_KEY_ROWS.)
 	ns.FRAME_KEY_ROWS = {}
 	for _, heading in ipairs(HEADINGS) do
-		local page, text = heading[1], heading[2]
-		local headed = false
-		local picks = { heading = text }
+		local page = heading[1]
+		local picks = { heading = heading[2] }
 		ns.FRAME_KEY_ROWS[#ns.FRAME_KEY_ROWS + 1] = picks
-		for _, item in ipairs(ns.COMBAT_SHOW) do
+		for _, item in ipairs(ns.HOVER_ROWS) do
 			local itemPage = item.page
 			if not (itemPage and known[itemPage]) then itemPage = false end
-			if itemPage == page and itemPage ~= "highlight" and not item.part and not item.key:find(":")
-				and (item.frames or item.groups) then
-				KEYBINDS[#KEYBINDS + 1] = { action = "CLICK " .. ns.FRAME_KEY_BUTTON .. ":" .. item.key,
-					label = item.label, frameKey = item.key, tip = tip,
-					section = first and L["Frames"] or nil, clearAll = first or nil,
-					heading = not headed and text or nil,
-					show = function() return ns.OptionAvailable(item)
-						and not (item.auraFrames and not _G.CompactUnitFrame_UtilSetBuff) end }
-				_G["BINDING_NAME_CLICK " .. ns.FRAME_KEY_BUTTON .. ":" .. item.key] =
-					(L["Hide/show: %s"]):format(item.label)
-				first, headed = false, true
+			if itemPage == page and itemPage ~= "highlight" then
 				picks[#picks + 1] = item
 			end
 		end
 	end
+	for _, item in ipairs(ns.COMBAT_SHOW) do
+		_G["BINDING_NAME_CLICK " .. ns.FRAME_KEY_BUTTON .. ":" .. item.key] = (L["Hide/show: %s"]):format(item.label)
+	end
 end
 
--- (The tooltip keys at the end of the Frames tab, under a heading of their own.)
+-- (The tooltip keys under the key groups, on the Frames tab, under a heading of their own.)
 for _, each in ipairs({
 	{ action = "CINEMATIC_SHOWTOOLTIPS", label = L["Show hidden tooltips"], heading = L["Tooltips"],
+		section = L["Frames"], clearAll = true,
 		tip = L["Hold to see the tooltips the Tooltips page hides, in combat and in CineMode. Pressing it " ..
 			"while you're on a unit or something in the world brings its tooltip up; anything else, " ..
 			"hover it again with the key held."] },
@@ -16896,9 +16885,10 @@ local function CreateKeybindsPanel()
 		local WIDTH, ROW_HEIGHT = SECTION_WIDTH - 12, 58
 		local heading = Label(body, "GameFontNormal", L["Key groups"])
 		heading:SetPoint("TOPLEFT", above, "BOTTOMLEFT", 0, -18)
-		local intro = Label(body, "GameFontHighlightSmall", L["A key for the frames you pick: it shows or hides " ..
-			"just those, not the ones that go with them. A group of the Minimap alone leaves its zone name, clock " ..
-			"and buttons to their rows. A frame in a group and with a key of its own goes with the key pressed last."])
+		local intro = Label(body, "GameFontHighlightSmall", L["A key for each group of frames: it shows or hides " ..
+			"just those, in CineMode and out. They start as your Hover Groups; change their frames, add your own " ..
+			"(a group of the Minimap alone leaves its zone name and clock to their rows). A frame in two groups goes " ..
+			"with the key pressed last."])
 		intro:SetPoint("TOPLEFT", heading, "BOTTOMLEFT", 0, -4)
 		intro:SetWidth(WIDTH)
 		intro:SetJustifyH("LEFT")
@@ -16913,7 +16903,7 @@ local function CreateKeybindsPanel()
 			for _, picks in ipairs(ns.FRAME_KEY_ROWS or {}) do
 				for _, item in ipairs(picks) do
 					for _, member in ipairs(group.members or {}) do
-						if member == item.key then names[#names + 1] = item.label break end
+						if member == item.key then names[#names + 1] = item.hoverLabel or item.label break end
 					end
 				end
 			end
@@ -16927,9 +16917,14 @@ local function CreateKeybindsPanel()
 		local function MakeRow()
 			local row = CreateFrame("Frame", nil, box)
 			row:SetSize(WIDTH, ROW_HEIGHT)
+			-- (Its icon: the Mouseover group's it was copied from, else none.)
+			row.icon = row:CreateTexture(nil, "ARTWORK")
+			row.icon:SetSize(20, 20)
+			row.icon:SetPoint("TOPLEFT", 0, 0)
+			row.icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
 			row.name = ns.SkinEditBox(CreateFrame("EditBox", nil, row, "InputBoxTemplate"))
-			row.name:SetSize(192, 20)
-			row.name:SetPoint("TOPLEFT", 6, -1)
+			row.name:SetSize(168, 20)
+			row.name:SetPoint("TOPLEFT", 30, -1)
 			row.name:SetAutoFocus(false)
 			row.name:SetMaxLetters(40)
 			row.name:SetScript("OnEnterPressed", function(self) self:ClearFocus() end)
@@ -16972,7 +16967,7 @@ local function CreateKeybindsPanel()
 						if #shown > 0 then
 							local sub = root:CreateButton(picks.heading)
 							for _, item in ipairs(shown) do
-								sub:CreateCheckbox(item.label, function() return HasMember(group, item.key) ~= nil end,
+								sub:CreateCheckbox(item.hoverLabel or item.label, function() return HasMember(group, item.key) ~= nil end,
 									function()
 										group.members = group.members or {}
 										local at = HasMember(group, item.key)
@@ -17027,6 +17022,7 @@ local function CreateKeybindsPanel()
 				row:SetPoint("TOPLEFT", box, "TOPLEFT", 0, -y)
 				row:Show()
 				row.name:SetText(group.name or "")
+				row.icon:SetTexture(group.icon or "Interface\\Icons\\INV_Misc_Key_03")
 				local action = "CLICK " .. ns.FRAME_KEY_BUTTON .. ":g" .. tostring(group.id)
 				row.first.action, row.second.action = action, action
 				row.stateEntry.key = "g" .. tostring(group.id)
