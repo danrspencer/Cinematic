@@ -13,7 +13,8 @@ local _, ns = ...
 ns.CHANGELOG_FEATURES = {
 	{ date = "2026-11-14", page = "Keybinds", title = "Frame keys",
 		text = "A key for any frame on the Keybinds page's new Frames tab: press it to hide that frame (the minimap, " ..
-		"a bar...), press again to bring it back, in CineMode or out." },
+		"a bar...), press again to bring it back, in CineMode or out. Key groups give one key to just the frames " ..
+		"you pick, like the minimap without its zone name." },
 	{ date = "2026-11-14", page = "Advanced Frames", title = "Frames Forever and ShamanPower support", client = "forever",
 		text = "Frames Forever's unit frames follow the Game Frames rows of the frames they replace. ShamanPower's " ..
 		"totem bar fades with the Totem bar row, and its cooldown bar gets a row of its own." },

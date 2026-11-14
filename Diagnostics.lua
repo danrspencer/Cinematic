@@ -3374,6 +3374,14 @@ function ns.FrameKeyTest()
 			Line(("binding: %s: %s"):format(item.key, table.concat(says, "; ")))
 		end
 	end
+	for _, group in ipairs(ns.KeyGroups and ns.KeyGroups() or {}) do
+		local action = "CLICK " .. (ns.FRAME_KEY_BUTTON or "CinematicFrameKey") .. ":g" .. tostring(group.id)
+		local keys = { GetBindingKey(action) }
+		Line(("key group g%s %q: rows %s; keys %s; state %s"):format(tostring(group.id), tostring(group.name),
+			table.concat(group.members or {}, ","), #keys > 0 and table.concat(keys, ",") or "none",
+			tostring(ns.FrameKeyState("g" .. tostring(group.id)))))
+		if #keys > 0 then bound = bound + 1 end
+	end
 	Line(("start: %d frame keys bound"):format(bound))
 	-- The Minimap's managed entries.
 	local function MinimapState()

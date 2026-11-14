@@ -2917,17 +2917,27 @@ end
 -- set to follow it). The Frames tab's button hands them all back to their rows.
 -- One key button for them all: each row's binding clicks it with the row's
 -- key as the mouse button ("CLICK CinematicFrameKey:minimap").
+--
+-- Key groups (the same tab, db.keyGroups, the account's): a name and a list
+-- of rows, a key of their own ("CLICK CinematicFrameKey:g3", g and the
+-- group's id). Its key shows or hides exactly those rows, not the ones that
+-- go with them: a group of the Minimap alone leaves its zone name and clock
+-- to their rows. Its state is db.frameForce["g3"]. A row both in a group and
+-- with a key of its own, or in two groups, goes with the key pressed last
+-- (db.frameForceAt, key -> press number, cleared with db.frameForce).
 ns.FRAME_KEY_BUTTON = "CinematicFrameKey"
 do
 	-- (row/frame name/group -> "hide" or "show"; handledGroups: groups with a
-	-- frame hidden, faded with their page off too)
+	-- frame hidden, faded with their page off too; rowsBy, namesBy, groupsBy:
+	-- the same keys -> the key group's name doing it, for Inspect)
 	local forcedRows, forcedNames, forcedGroups, handledGroups, NONE = {}, {}, {}, {}, {}
-	-- (key's state, or that of a row it goes with)
+	local rowsBy, namesBy, groupsBy = {}, {}, {}
+	-- (key's state, or that of a row it goes with; and the key that has it)
 	local function Forced(key)
 		local force, follow = ns.db.frameForce, ns.db.rowFollow
 		for _ = 1, 10 do
 			if not key then return nil end
-			if force[key] then return force[key] end
+			if force[key] then return force[key], key end
 			key = follow and follow[key] or ROW_FALLBACK[key]
 		end
 		return nil
@@ -2937,36 +2947,87 @@ do
 			if each.key == key then return each end
 		end
 	end
+	-- The key groups (db.keyGroups), and the one with id.
+	function ns.KeyGroups()
+		return ns.db and ns.db.keyGroups or NONE
+	end
+	local function GroupOf(id)
+		for _, group in ipairs(ns.KeyGroups()) do
+			if group.id == id then return group end
+		end
+	end
+	-- A group key's id ("g3" -> 3), or nil for a row's key.
+	local function GroupId(key)
+		local id = type(key) == "string" and key:match("^g(%d+)$")
+		return id and tonumber(id)
+	end
+	ns.KeyGroupId = GroupId
+	-- Sets a row's frames and groups to state (by: a key group's name, or nil).
+	local function Apply(item, state, by)
+		ns.frameForceOn = true
+		forcedRows[item.key], rowsBy[item.key] = state, by
+		for _, name in ipairs(item.frames or NONE) do
+			forcedNames[name], namesBy[name] = state, by
+			-- (and its fade group, so it's handled with its page off: GroupHandled)
+			if state == "hide" then
+				for group, names in pairs(FRAME_GROUPS) do
+					for _, each in ipairs(names) do
+						if each == name then handledGroups[group] = true end
+					end
+				end
+			end
+		end
+		for _, group in ipairs(item.groups or NONE) do
+			forcedGroups[group], groupsBy[group] = state, by
+			if state == "hide" then handledGroups[group] = true end
+		end
+	end
 	-- The frames and groups of the rows forced now, worked out when a key is
 	-- pressed (or the settings load): the frame pass only looks them up.
 	function ns.RefreshFrameForce()
 		wipe(forcedRows) wipe(forcedNames) wipe(forcedGroups) wipe(handledGroups)
+		wipe(rowsBy) wipe(namesBy) wipe(groupsBy)
 		ns.frameForceOn = nil
 		ns.frameForceStamp = (ns.frameForceStamp or 0) + 1 -- (SyncSwitches: frames picked up or let go)
 		local force = ns.db and ns.db.frameForce
 		if not force or not next(force) then return end
+		local at = ns.db.frameForceAt or NONE
+		-- Rows' own keys (and the rows that go with them)...
+		local rowAt = {}
 		for _, item in ipairs(ns.COMBAT_SHOW) do
-			local state = Forced(item.key)
+			local state, from = Forced(item.key)
 			if state then
-				ns.frameForceOn = true
-				forcedRows[item.key] = state
-				for _, name in ipairs(item.frames or NONE) do
-					forcedNames[name] = state
-					-- (and its fade group, so it's handled with its page off: GroupHandled)
-					if state == "hide" then
-						for group, names in pairs(FRAME_GROUPS) do
-							for _, each in ipairs(names) do
-								if each == name then handledGroups[group] = true end
-							end
-						end
-					end
-				end
-				for _, group in ipairs(item.groups or NONE) do
-					forcedGroups[group] = state
-					if state == "hide" then handledGroups[group] = true end
+				Apply(item, state)
+				rowAt[item.key] = at[from] or 0
+			end
+		end
+		-- ...then the key groups, oldest press first: each over the rows
+		-- pressed before it.
+		local pressed = {}
+		for _, group in ipairs(ns.KeyGroups()) do
+			local key = "g" .. tostring(group.id)
+			if force[key] then pressed[#pressed + 1] = { group = group, state = force[key], at = at[key] or 0 } end
+		end
+		table.sort(pressed, function(a, b) return a.at < b.at end)
+		for _, each in ipairs(pressed) do
+			for _, member in ipairs(each.group.members or NONE) do
+				local item = ItemOf(member)
+				if item and not (rowAt[member] and rowAt[member] > each.at) then
+					Apply(item, each.state, each.group.name or "")
+					rowAt[member] = each.at
 				end
 			end
 		end
+	end
+	-- The key group's name when a managed frame is shown or hidden by one,
+	-- else nil (Inspect's Why.lua).
+	function ns.FrameForcedBy(entry)
+		if not ns.frameForceOn then return nil end
+		if entry.name and forcedNames[entry.name] then return namesBy[entry.name] end
+		if forcedGroups[entry.group] then return groupsBy[entry.group] end
+		if entry.rspGroup and forcedGroups[entry.rspGroup] then return groupsBy[entry.rspGroup] end
+		local row = followsRow[entry.frame]
+		return row and rowsBy[row] or nil
 	end
 	-- "hide" or "show" when a managed frame is forced by a row's key, else
 	-- false (Inspect's Why.lua, the recorder).
@@ -3011,9 +3072,50 @@ do
 		end
 		return not any
 	end
+	-- The next press number (db.frameForceAt: the key pressed last wins).
+	local function Stamp(key)
+		local at = ns.db.frameForceAt or {}
+		ns.db.frameForceAt = at
+		local top = 0
+		for other, n in pairs(at) do
+			if ns.db.frameForce[other] and n > top then top = n end
+		end
+		at[key] = top + 1
+	end
+	local function Changed()
+		ns.RefreshFrameForce()
+		ns.framesSettled = false -- (the frame pass runs next tick, in CineMode or out)
+		ns.framesWake = "frame key"
+		if ns.RefreshKeybindsPage then ns.RefreshKeybindsPage() end
+	end
+	-- A key group's key pressed: any of its rows up now, they all hide; all
+	-- hidden, they all show. (Pressed before: the other way from last time.)
+	local function ToggleGroup(id)
+		local group = GroupOf(id)
+		if not group or not ns.db then return end
+		local key = "g" .. tostring(id)
+		ns.db.frameForce = ns.db.frameForce or {}
+		local state = ns.db.frameForce[key]
+		local hide
+		if state then
+			hide = state == "show"
+		else
+			hide = false
+			for _, member in ipairs(group.members or NONE) do
+				local item = ItemOf(member)
+				if item and RowUp(item) then hide = true break end
+			end
+		end
+		ns.db.frameForce[key] = hide and "hide" or "show"
+		Stamp(key)
+		Changed()
+		ns.Print((hide and L["%s hidden by its key"] or L["%s shown by its key"]):format(group.name or key))
+	end
 	-- A row's key pressed: up now, hidden; hidden now (by its key or its
-	-- row), shown.
+	-- row), shown. (A key group's: ToggleGroup.)
 	function ns.ToggleFrameKey(key)
+		local id = GroupId(key)
+		if id then return ToggleGroup(id) end
 		local item = ItemOf(key)
 		if not item or not ns.db then return end
 		ns.db.frameForce = ns.db.frameForce or {}
@@ -3025,22 +3127,58 @@ do
 			hide = RowUp(item)
 		end
 		ns.db.frameForce[key] = hide and "hide" or "show"
-		ns.RefreshFrameForce()
-		ns.framesSettled = false -- (the frame pass runs next tick, in CineMode or out)
-		ns.framesWake = "frame key"
+		Stamp(key)
+		Changed()
 		ns.Print((hide and L["%s hidden by its key"] or L["%s shown by its key"]):format(item.label))
-		if ns.RefreshKeybindsPage then ns.RefreshKeybindsPage() end
 	end
 	-- The Frames tab's button: every row back to its Show in row.
 	function ns.ShowAllFrameKeys()
 		if not (ns.db and ns.db.frameForce and next(ns.db.frameForce)) then return end
 		wipe(ns.db.frameForce)
-		ns.RefreshFrameForce()
-		ns.framesSettled = false
-		ns.framesWake = "frame key"
+		if ns.db.frameForceAt then wipe(ns.db.frameForceAt) end
+		Changed()
 		ns.Print(L["every frame shown or hidden by its key is back to its Show in row"])
-		if ns.RefreshKeybindsPage then ns.RefreshKeybindsPage() end
 	end
+	-- The name the game's binding list and our "was bound to" line give a group's key.
+	function ns.NameKeyGroupBinding(group)
+		_G["BINDING_NAME_CLICK " .. ns.FRAME_KEY_BUTTON .. ":g" .. tostring(group.id)] =
+			(L["Hide/show: %s"]):format(group.name or "")
+	end
+	-- A new key group (the Frames tab's New key group): its id one past the
+	-- highest yet, so a deleted group's key never lands on another.
+	function ns.AddKeyGroup(name)
+		ns.db.keyGroups = ns.db.keyGroups or {}
+		local top = ns.db.keyGroupTop or 0
+		for _, group in ipairs(ns.db.keyGroups) do
+			if (group.id or 0) > top then top = group.id end
+		end
+		ns.db.keyGroupTop = top + 1
+		local group = { id = top + 1, name = name, members = {} }
+		ns.db.keyGroups[#ns.db.keyGroups + 1] = group
+		ns.NameKeyGroupBinding(group)
+		return group
+	end
+	-- Deleting one: its keys unbound (out of combat), its frames back to their rows.
+	function ns.DeleteKeyGroup(index)
+		local groups = ns.db.keyGroups
+		local group = groups and groups[index]
+		if not group then return end
+		if InCombatLockdown() then
+			ns.Print(L["keybinds can't be changed in combat"])
+			return
+		end
+		local keys = { GetBindingKey("CLICK " .. ns.FRAME_KEY_BUTTON .. ":g" .. tostring(group.id)) }
+		for _, key in ipairs(keys) do SetBinding(key) end
+		if #keys > 0 then SaveBindings(GetCurrentBindingSet()) end
+		table.remove(groups, index)
+		local key = "g" .. tostring(group.id)
+		if ns.db.frameForce then ns.db.frameForce[key] = nil end
+		if ns.db.frameForceAt then ns.db.frameForceAt[key] = nil end
+		Changed()
+	end
+	-- A group's rows changed (the Frames tab): pressed already, it takes
+	-- the new ones at once.
+	ns.KeyGroupsChanged = Changed
 	-- (No parent, like the wheels' key buttons: never drawn, clicked by its bindings only.)
 	local button = CreateFrame("Button", ns.FRAME_KEY_BUTTON)
 	button:RegisterForClicks("AnyDown")

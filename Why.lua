@@ -617,7 +617,13 @@ local function Explain(entry)
 	local status = n.target >= 1 and "shown" or n.target > 0 and "partly" or "hidden"
 	-- (Shown or hidden by its row's key, in CineMode or out: Frames.lua's ns.FrameForced.)
 	local forced = ns.FrameForced and ns.FrameForced(entry)
-	if forced == "hide" then
+	local forcedBy = forced and ns.FrameForcedBy and ns.FrameForcedBy(entry)
+	if forced and forcedBy then
+		Add(out, forced == "hide" and "block" or "on", (forced == "hide"
+			and L["Hidden by the key group %s (Keybinds page, Frames tab): press its key again to bring it back"]
+			or L["Shown by the key group %s (Keybinds page, Frames tab): press its key again to hide it"]):format(forcedBy),
+			"Keybinds")
+	elseif forced == "hide" then
 		Add(out, "block", L["Hidden by its key (Keybinds page, Frames tab): press the key again to bring it back"],
 			"Keybinds")
 	elseif forced == "show" then

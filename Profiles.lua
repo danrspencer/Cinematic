@@ -29,7 +29,7 @@ local GLOBAL_KEYS = {
 	peeksLog = true, -- (/cine debug peeks log)
 	addonSupportOff = true, -- (Addons page: supported addons switched off, AddonSupport.lua)
 	conflictPicks = true, -- (Addon Conflicts: whose version plays, AddonSupport.lua)
-	frameForce = true, frameKeysReset = true, -- (Keybinds page, Frames tab: rows hidden by their key, Frames.lua)
+	frameForce = true, frameKeysReset = true, frameForceAt = true, keyGroups = true, keyGroupTop = true, -- (Keybinds page, Frames tab: rows hidden by their key, Frames.lua)
 }
 -- Lists kept as tables that belong to a profile (their defaults are in code;
 -- see EnsureTables in Core.lua). Missing from a profile: emptied, which means defaults.

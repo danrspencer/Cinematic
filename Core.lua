@@ -4260,6 +4260,11 @@ function ns.EnsureTables()
 	ns.db.conflictPicks = ns.db.conflictPicks or {} -- Addon Conflicts: row id -> "theirs", "ours" or "both" (the account's)
 	-- Keybinds page, Frames tab: rows hidden by their key, row key -> "hide" (the account's; Frames.lua)
 	ns.db.frameForce = ns.db.frameForce or {}
+	-- (Key groups on that tab: id, name and rows, keys "CLICK CinematicFrameKey:g<id>"; Frames.lua.)
+	ns.db.keyGroups = ns.db.keyGroups or {}
+	if ns.NameKeyGroupBinding then
+		for _, group in ipairs(ns.db.keyGroups) do ns.NameKeyGroupBinding(group) end
+	end
 	if ns.RefreshFrameForce then ns.RefreshFrameForce() end
 	-- Advanced Frames page: an addon's group (its name, or its suite's) ->
 	-- true when closed (they start open).
@@ -8314,6 +8319,7 @@ ticker:SetScript("OnEvent", ns.Profiled("Core events", function(self, event, arg
 		-- Reset frame keys after a reload is unticked.)
 		if ns.db.frameKeysReset ~= false and type(ns.db.frameForce) == "table" then
 			wipe(ns.db.frameForce)
+			if type(ns.db.frameForceAt) == "table" then wipe(ns.db.frameForceAt) end
 		end
 		ns.EnsureTables()
 		ns.MigrateRoleHides() -- (the grids' old Roles column, as rules: Frames.lua)
