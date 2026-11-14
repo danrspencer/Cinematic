@@ -213,6 +213,7 @@ ThresholdTest.lua
 FlickerTest.lua
 PlateWidthTest.lua
 StyleRevampTest.lua
+PlateFlickerTest.lua
 DamageVisionMeterTest.lua
 HealthRedTest.lua
 SpokenTest.lua

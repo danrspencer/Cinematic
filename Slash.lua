@@ -1739,6 +1739,9 @@ local function HandleSlash(msg)
 		-- (Dev copy: one run trying three ways to make your target's nameplate narrower, PlateWidthTest.lua.)
 		if ns.PlateWidthTest then ns.PlateWidthTest(arg:match("^platewidth%s*(.*)$"))
 		else ns.Print("/cine debug platewidth is in the dev copy only.") end
+	elseif cmd == "debug" and arg == "plateflicker" then
+		-- (Dev copy: one run recording the plates frame by frame, a white flicker, PlateFlickerTest.lua.)
+		if ns.PlateFlickerTest then ns.PlateFlickerTest() else ns.Print("/cine debug plateflicker is in the dev copy only.") end
 	elseif cmd == "debug" and arg:find("^stylerevamp") then
 		-- (Dev copy: one run checking the style revamp in the game, StyleRevampTest.lua.)
 		if ns.StyleRevampTest then ns.StyleRevampTest(arg:match("^stylerevamp%s*(.*)$"))

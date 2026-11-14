@@ -34,6 +34,7 @@ ignore:
   # (Nameplate width test: /cine debug platewidth, dev copy only)
   - PlateWidthTest.lua
   - StyleRevampTest.lua
+  - PlateFlickerTest.lua
   # (Damage Vision meter crossfade test: /cine debug dvmeter, dev copy only)
   - DamageVisionMeterTest.lua
   # (Spoken support test: /cine debug spokentest, dev copy only)
