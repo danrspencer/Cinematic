@@ -878,6 +878,7 @@ local RESET_KEEPS = {
 	"profileResetPoints", -- (your profiles' reset points)
 	"cameraScripts", "customWheels", -- (your scripts, your own wheels)
 	"zoneTints", "zonePresets", "zoneTintStrength", "timePhaseColors", "timePhaseStrength", -- (tints you picked)
+	"myTints", "myTintNext", -- (tints you made)
 	"extraFrames", -- (frames you added)
 	"cvarsLeftAlone", -- (game settings you kept as yours: the Game Settings page)
 	"devEdits", -- (the dev copy's Module Editor)

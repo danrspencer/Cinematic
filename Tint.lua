@@ -585,6 +585,32 @@ end
 local TINT_BY_KEY = {}
 for _, preset in ipairs(TINT_PRESETS) do TINT_BY_KEY[preset.key] = preset end
 
+-- My tints: looks you made on the Tint Style page (db.myTints, each { key =
+-- "mine<n>", name, color = { r, g, b }, color2 = { r, g, b } or nil (the
+-- bottom of the screen), glow = true: added light, not a color over it}).
+-- Picked like a preset, by its key.
+local GLOW_SCALE = 0.35 -- a glow's color as added light: Dreamy's is about this bright
+local function MyTint(key)
+	local list = db and db.myTints
+	if type(key) ~= "string" or not list then return nil end
+	for _, tint in ipairs(list) do
+		if tint.key == key then return tint end
+	end
+end
+local function MyTintPreset(key)
+	local tint = MyTint(key)
+	if not tint or type(tint.color) ~= "table" then return nil end
+	local function shade(color)
+		if not tint.glow then return color end
+		return { color[1] * GLOW_SCALE, color[2] * GLOW_SCALE, color[3] * GLOW_SCALE }
+	end
+	return { key = key, label = tint.name or "?", mode = tint.glow and "ADD" or "MOD",
+		top = shade(tint.color), bottom = shade(type(tint.color2) == "table" and tint.color2 or tint.color) }
+end
+local function PresetOf(key)
+	return TINT_BY_KEY[key] or MyTintPreset(key) or TINT_BY_KEY.none
+end
+
 -- Gradient across a texture, coping with both the colour-object API of newer
 -- clients and the older number-based one. Colours are { r, g, b, a }; for
 -- VERTICAL "from" is the bottom, for HORIZONTAL the left.
@@ -658,7 +684,7 @@ end
 local CLASSIC_BOOST = 1.4 -- the tint's strength with Classic boost on (classic clients)
 
 local function ApplyTint(level, vignetteLevel, weatherLevel)
-	local preset = TINT_BY_KEY[shownPreset] or TINT_BY_KEY.none
+	local preset = PresetOf(shownPreset)
 	local isZone = preset.key == "zone" or preset.key == "zonetime"
 	local strength = math.min(1, (isZone and zoneStrength or db.tintStrength) * DriftFactor())
 		* level * presetFade * (1 - innLevel * INN_SOFTEN)
@@ -1329,8 +1355,25 @@ function ns.TestDeathBanner()
 end
 
 -- Entry points for Core.lua and the options page
+-- The old single Custom color, where it was picked (the main look or a
+-- place's), becomes a My tint of that color, picked there instead.
+local function MoveCustomToMyTints()
+	local used = db.tintPreset == "custom"
+	for _, preset in pairs(db.zonePresets or {}) do
+		if preset == "custom" then used = true end
+	end
+	if not used then return end
+	local key = ns.AddMyTint({ name = L["My color"],
+		color = { db.tintCustomR or 1, db.tintCustomG or 0.8, db.tintCustomB or 0.6 } })
+	if db.tintPreset == "custom" then db.tintPreset = key end
+	for name, preset in pairs(db.zonePresets or {}) do
+		if preset == "custom" then db.zonePresets[name] = key end
+	end
+end
+
 function ns.CreateTint()
 	db = ns.GetDB()
+	MoveCustomToMyTints()
 	CreateTint()
 	CreateDeathScreen()
 end
@@ -1446,6 +1489,7 @@ ns.GetTimeOfDayPhaseAt = function(hour)
 	return TIME_OF_DAY[1][3]
 end
 ns.TINT_PRESETS = TINT_PRESETS
+ns.TintSetGradient = SetGradient -- (the Tint Style page's pictures)
 ns.OnLanguage(function()
 	ns.TranslateFields(TINT_PRESETS, "label", "tip")
 	ns.TranslateFields(ZONE_MOODS, 2)
@@ -1644,6 +1688,15 @@ ns.GetZoneTintInfo = function(zoneName)
 	return zoneName, label, isOverride, color
 end
 -- Built-in moods for the override menu: { key, label, color } in order.
+-- Every zone with a built-in mood, by name (this client's language), sorted:
+-- { name, mood } each, mood its key. (For the Tint Style page's zone list.)
+ns.GetMoodZones = function()
+	CurrentZoneMood() -- (builds the name lookup)
+	local list = {}
+	for name, mood in pairs(zoneMoodByName) do list[#list + 1] = { name = name, mood = mood } end
+	table.sort(list, function(a, b) return a.name < b.name end)
+	return list
+end
 ns.GetZoneMoods = function()
 	local list = {}
 	for _, key in ipairs(ZONE_MOOD_ORDER) do
@@ -1701,7 +1754,101 @@ ns.GetZonePreset = function(name)
 	return db and db.zonePresets and db.zonePresets[name]
 end
 ns.GetTintPresetLabel = function(key)
-	return TINT_BY_KEY[key] and TINT_BY_KEY[key].label or key
+	if TINT_BY_KEY[key] then return TINT_BY_KEY[key].label end
+	db = db or ns.GetDB()
+	local mine = MyTint(key)
+	return mine and mine.name or key
+end
+-- My tints (see MyTint): the list, in order, and changing it.
+ns.GetMyTints = function()
+	db = db or ns.GetDB()
+	return db and db.myTints or {}
+end
+ns.GetMyTint = function(key)
+	db = db or ns.GetDB()
+	return MyTint(key)
+end
+-- Adds one ({ name, color, color2, glow }); returns its key.
+ns.AddMyTint = function(tint)
+	db = db or ns.GetDB()
+	db.myTints = db.myTints or {}
+	local n = (db.myTintNext or 0) + 1
+	for _, each in ipairs(db.myTints) do -- (never a key that's taken)
+		local used = tonumber(tostring(each.key):match("^mine(%d+)$"))
+		if used and used >= n then n = used + 1 end
+	end
+	db.myTintNext = n
+	tint.key = "mine" .. n
+	db.myTints[#db.myTints + 1] = tint
+	tintDirty = true
+	return tint.key
+end
+ns.UpdateMyTint = function(key, fields)
+	db = db or ns.GetDB()
+	local tint = MyTint(key)
+	if not tint then return end
+	for field, value in pairs(fields) do tint[field] = value end
+	if fields.color2 == false then tint.color2 = nil end
+	tintDirty = true
+end
+-- Removes one; wherever it was picked goes back to the usual look.
+ns.DeleteMyTint = function(key)
+	db = db or ns.GetDB()
+	local list = db and db.myTints
+	if not list then return end
+	for i = #list, 1, -1 do
+		if list[i].key == key then table.remove(list, i) end
+	end
+	if db.tintPreset == key then db.tintPreset = ns.DEFAULTS and ns.DEFAULTS.tintPreset or "zonetime" end
+	for name, preset in pairs(db.zonePresets or {}) do
+		if preset == key then db.zonePresets[name] = nil end
+	end
+	tintDirty = true
+end
+-- For the Tint Style page's pictures: a look's colors as they'd be here and
+-- now, before its strength: top, bottom (r, g, b each) and its mode ("MOD",
+-- "ADD"), or nil for no tint.
+ns.GetTintPictureColors = function(key)
+	db = db or ns.GetDB()
+	if not db then return nil end
+	local preset = PresetOf(key)
+	if not preset.mode then return nil end
+	local top, bottom
+	if key == "custom" then
+		top = { db.tintCustomR, db.tintCustomG, db.tintCustomB }
+	elseif key == "timeofday" then
+		top = TimeOfDayColor()
+	elseif key == "zone" then
+		top = HereTint()
+	elseif key == "zonetime" then
+		local zone, time = HereTint(), TimeOfDayColor()
+		top = { zone[1] * time[1], zone[2] * time[2], zone[3] * time[3] }
+	else
+		top, bottom = preset.top or preset.color, preset.bottom or preset.color
+	end
+	return top, bottom or top, preset.mode
+end
+-- The strength a look shows with here: a zone look's is the zone's (or the
+-- area's) own, else the main one.
+ns.GetTintStrengthFor = function(key)
+	db = db or ns.GetDB()
+	if key == "zone" or key == "zonetime" then return (HereStrength()) end
+	return db.tintStrength
+end
+-- A phase's color as the day cycle blends it at hour:30 (with each phase's
+-- own strength, before the Time of day strength), for the day bar.
+ns.GetTimeOfDayColorAt = function(hour)
+	db = db or ns.GetDB()
+	local now = hour * 60 + 30
+	for i = 1, #TIME_OF_DAY - 1 do
+		local from, to = TIME_OF_DAY[i], TIME_OF_DAY[i + 1]
+		if now >= from[1] and now < to[1] then
+			local t = (now - from[1]) / (to[1] - from[1])
+			local a, b = AppliedPhaseColor(from[3]), AppliedPhaseColor(to[3])
+			return { a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t, a[3] + (b[3] - a[3]) * t }
+		end
+	end
+	return AppliedPhaseColor(TIME_OF_DAY[1][3])
 end
 -- For the options page: the current time-of-day phase name and clock time.
 ns.GetTimeOfDayInfo = function()

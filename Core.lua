@@ -4303,6 +4303,7 @@ function ns.EnsureTables()
 	ns.db.zonePresets = ns.db.zonePresets or {} -- zone or area name -> tint preset key used there instead of tintPreset
 	ns.db.timePhaseColors = ns.db.timePhaseColors or {} -- "Night", "Dawn"... -> { r, g, b } of your own
 	ns.db.timePhaseStrength = ns.db.timePhaseStrength or {} -- "Night", "Dawn"... -> strength (0-1) of your own
+	ns.db.myTints = ns.db.myTints or {} -- tints you made on the Tint Style page (Tint.lua's MyTint)
 	ns.db.combatShow = ns.db.combatShow or {}
 	-- (The Combat dropdown's old Calm Timer ticks: row -> true/false. Read no
 	-- more since 2026-11-10, the Calm Timer being the fight still; kept so

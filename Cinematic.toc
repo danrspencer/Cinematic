@@ -141,6 +141,7 @@ StyleThemes.lua
 PlateThemes.lua
 NameThemes.lua
 LetterboxStyle.lua
+TintStyle.lua
 QuestItemStyle.lua
 RollStyle.lua
 CombatSounds.lua
