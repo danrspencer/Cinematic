@@ -2114,7 +2114,7 @@ do
 	-- bar's color as white, so it never matched and every tinted plate was
 	-- painted again each frame, 0.85 ms and 7 MB of garbage a second with 40,
 	-- 2026-11-14.) Cleared when the game paints it (the hooks), and every
-	-- 0.2 s for anything the hooks miss.
+	-- 0.5 s for anything the hooks miss.
 	local done = setmetatable({}, { __mode = "k" })
 	local doneAt = 0
 
@@ -2156,8 +2156,18 @@ do
 		if not (region[getter] and region[setter]) then
 			return
 		end
-		local r, g, b, a = ReadColour(region, getter)
 		local first = saved[region]
+		-- (Still the color we last gave it: left alone, before even reading it
+		-- back. See done.)
+		local last = done[region]
+		if first and last then
+			local tint = tints[unitFrame]
+			if tint and tint[part] then
+				local br, bg, bb = Blend(first[1], first[2], first[3], tint, part)
+				if last[1] == br and last[2] == bg and last[3] == bb then return end
+			end
+		end
+		local r, g, b, a = ReadColour(region, getter)
 		if not r then
 			-- (Read back secret, as retail's name is after the game paints it on
 			-- mouseover: ours goes over it all the same, at its last alpha known;
@@ -2178,11 +2188,6 @@ do
 			return
 		end
 		local br, bg, bb = Blend(first[1], first[2], first[3], tint, part)
-		-- (Still the color we last gave it: left alone. See done.)
-		local last = done[region]
-		if last and last[1] == br and last[2] == bg and last[3] == bb then
-			return
-		end
 		painting = true
 		SetColour(region, setter, br, bg, bb, a)
 		painting = false
@@ -2223,7 +2228,7 @@ do
 	ns.SetOnUpdate(painter, ns.Profiled("Target colors", function()
 		-- (Everything painted again now and then, for changes no hook sees.)
 		local now = GetTime()
-		if now - doneAt > 0.2 then
+		if now - doneAt > 0.5 then
 			doneAt = now
 			wipe(done)
 		end
