@@ -2423,13 +2423,15 @@ function ns.StyleRows(kit, content, stack, changed, switchKey, fieldOf, panel)
 			kit.GreyUnless(paste, function(db) return On(db) and lookClip ~= nil and lookClip.kind == copyKind end)
 			-- Start from a theme: a theme's look in just this panel (spec.tabs.
 			-- themeLook(theme's key): its { key = value }), to change from there.
+			-- The themes: spec.tabs.themeList() ({ key, name } each), else the
+			-- main ones.
 			if tabbed.themeLook then
 				local start = Tool(ns.L["Start from a theme"], 130,
 					ns.L["This row's look as a theme has it, to change from there. Only this row: the theme in use stays."])
 				start:SetPoint("RIGHT", tools, "RIGHT", 0, 0)
 				start:SetScript("OnClick", function(self)
 					ns.ContextMenu(self, function(_, root)
-						for _, theme in ipairs(ns.StyleThemeList()) do
+						for _, theme in ipairs((tabbed.themeList or ns.StyleThemeList)()) do
 							root:CreateButton(theme.name, function()
 								local values = tabbed.themeLook(theme.key)
 								if values then Load(values) end

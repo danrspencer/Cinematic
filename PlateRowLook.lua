@@ -544,8 +544,6 @@ function ns.MakePlateRowLookPreview(parent, width, kind)
 			level = UnitLevel("player")
 		end
 		local look = ns.PlateRowLookFor(kind, over) or {}
-		local on = db.styleGeneral
-		local general = on and db or ns.DEFAULTS
 		-- (The row's color, where it paints the bar or the name.)
 		local paint = ns.TargetMarkOwn and ns.TargetMarkOwn("PlateColor", kind) == "custom"
 		local color = paint and { ns.TargetMarkOwn("PlateR", kind) or 1, ns.TargetMarkOwn("PlateG", kind) or 1,
@@ -553,9 +551,11 @@ function ns.MakePlateRowLookPreview(parent, width, kind)
 		if color and ns.TargetMarkOwn("ColorBar", kind) then barColor = color end
 		if color and ns.TargetMarkOwn("ColorName", kind) then nameColor = color end
 
-		-- Its fill: the row's texture, else General's, else the game's.
+		-- Its fill: the row's texture, else the plate theme's (General's while
+		-- it follows it), else the game's.
+		local themeTexture, themeEdge, themeSize, themeR, themeG, themeB = ns.PlateThemeBar()
 		local texture = look.texture
-		if texture == nil then texture = on and general.styleTexture or "game" end
+		if texture == nil then texture = themeTexture or "game" end
 		if texture == "game" or not ns.SetBarTexture(health, texture) then
 			health:SetStatusBarTexture(HasAtlas(PLATE_FILL) and PLATE_FILL or "Interface\\TargetingFrame\\UI-StatusBar")
 			local fill = health:GetStatusBarTexture()
@@ -573,12 +573,12 @@ function ns.MakePlateRowLookPreview(parent, width, kind)
 			fill:SetVertexColor(barColor[1], barColor[2], barColor[3], 1)
 		end
 		if ns.DressThemeVeil then ns.DressThemeVeil(health, "plate") end
-		-- Its border: the row's, else General's (the game's: its ground).
+		-- Its border: the row's, else the plate theme's (the game's: its ground).
 		local edgeKind, size, r, g, b
 		if look.border then
 			edgeKind, size, r, g, b = unpack(look.border)
 		else
-			edgeKind, size, r, g, b = ns.StyleBorder(general, "styleBorder")
+			edgeKind, size, r, g, b = themeEdge, themeSize, themeR, themeG, themeB
 		end
 		local game = edgeKind == "game"
 		-- (The game's: its art copied off a real plate, as it sits round the bar;
@@ -637,8 +637,10 @@ function ns.PlateRowUsual(kind, key)
 	local db = ns.db or {}
 	local on = db.styleGeneral
 	local value = kind ~= "others" and Own(key, "others") or nil
+	-- (Under the rows: the plate theme's bar, General's while it follows it.)
+	local plateTheme = on and ns.PlateThemeNow and ns.PlateThemeNow()
 	if key == "LookTexture" then
-		if value == nil then value = on and db.styleTexture or "game" end
+		if value == nil then value = plateTheme and plateTheme.texture or on and db.styleTexture or "game" end
 		return value == "game" and L["The game's"] or (ns.StyleTextureName and ns.StyleTextureName(value) or value),
 			value
 	elseif key == "LookFont" then
@@ -646,7 +648,7 @@ function ns.PlateRowUsual(kind, key)
 		if value == nil then value = "game" end
 		return value == "game" and L["The game's"] or ns.StyleFontName(value), value
 	elseif key == "LookBorder" then
-		if value == nil then value = on and db.styleBorder or "game" end
+		if value == nil then value = plateTheme and plateTheme.border or on and db.styleBorder or "game" end
 		return L[BORDER_WORDS[value] or "The game's"], value
 	elseif key == "LookOutline" then
 		if value == nil then value = AllNames(key) end
@@ -672,6 +674,9 @@ local function Below(key)
 	local L = ns.L
 	local db = ns.db or {}
 	if key == "LookTexture" or key == "LookBorder" then
+		-- (A plate theme picked on the page: its own. PlateThemes.lua.)
+		local plateTheme = db.styleGeneral and ns.PlateThemeNow and ns.PlateThemeNow()
+		if plateTheme then return L["Plate theme: %s"]:format(L[plateTheme.name]), L["theme"] end
 		local general = key == "LookTexture" and "styleTexture" or "styleBorder"
 		local value = db.styleGeneral and db[general]
 		if value ~= nil and value ~= false and value ~= "game" then
@@ -695,20 +700,4 @@ function ns.PlateRowSource(kind, key)
 	end
 	local own = Own(key, kind) ~= nil
 	return { text = own and L["This row"] or parent, own = own, parent = parent, short = short }
-end
-
--- A theme's bar as a row's Look (its panel's Start from a theme): its
--- texture and its line round the bar. (The name stays Name Style's.) The
--- game's theme: the game's bar and border.
-function ns.PlateRowThemeLook(themeKey)
-	local theme = ns.StyleThemeByKey and ns.StyleThemeByKey(themeKey)
-	if not theme then return nil end
-	local settings = theme.settings or {}
-	local look = { LookTexture = settings.styleTexture or "game", LookBorder = settings.styleBorder or "game" }
-	if look.LookBorder == "custom" then
-		look.LookBorderSize = settings.styleBorderSize or 1
-		look.LookBorderR, look.LookBorderG, look.LookBorderB = settings.styleBorderR or 0, settings.styleBorderG or 0,
-			settings.styleBorderB or 0
-	end
-	return look
 end

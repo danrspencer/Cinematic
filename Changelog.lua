@@ -11,6 +11,10 @@
 local _, ns = ...
 
 ns.CHANGELOG_FEATURES = {
+	{ date = "2026-11-14", page = "Name Style", title = "Plate and name themes",
+		text = "Nameplate Style and Name Style each have a strip of themes: one made from each main theme, plus " ..
+		"Clean, Minimal, Bold, Subtle, Storybook, Subtitle and Lantern. Pick one there and it stays when you change " ..
+		"the main theme." },
 	{ date = "2026-11-14", page = "Name Style", title = "Names by kind",
 		text = "Name Style has a row for each kind of name (your target, group members, players, service NPCs...). " ..
 		"Give each its own font, colors, outline color, a glow or a band behind it, and the look of the line under it." },

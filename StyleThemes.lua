@@ -948,7 +948,10 @@ end
 -- Everything a pick changes, as it is now, and that put back.
 function ns.StyleSnapshot()
 	local db = ns.GetDB()
-	local kept = { styleTheme = db.styleTheme or "game", styleGeneral = db.styleGeneral }
+	local kept = { styleTheme = db.styleTheme or "game", styleGeneral = db.styleGeneral,
+		-- (The plate and name themes: never written by a pick, but put back by
+		-- Undo with the rest. PlateThemes.lua, NameThemes.lua.)
+		plateTheme = db.plateTheme or "main", nameTheme = db.nameTheme or "main" }
 	for _, each in ipairs(ThemeKeys()) do
 		kept[each] = db[each]
 		if kept[each] == nil then kept[each] = "default" end

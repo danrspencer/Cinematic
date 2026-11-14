@@ -1,8 +1,8 @@
 -- Name Style's rows: All names (the page's own plateName<setting> keys),
 -- then a row per kind of unit whose names plates draw (ns.NAME_GROUPS'
 -- plate rows), each with settings of its own (nameLook<row><setting>).
--- A setting goes row -> All names -> the game's: a row's or All names'
--- "inherit" hands it on. Colors (<setting>R, G, B) come from the same
+-- A setting goes row -> All names -> the name theme (NameThemes.lua) -> the
+-- game's: a row's or All names' "inherit" hands it on. Colors (<setting>R, G, B) come from the same
 -- place as the setting that picks them (Outline color's Custom, say).
 -- PlateParts draws names by it (ns.NameLookValue), PlateGuild the line
 -- under them; the Name Style page edits it (Options.lua).
@@ -97,8 +97,9 @@ local function Raw(row, setting)
 	return value
 end
 
--- A setting as a row has it: row -> All names -> the game's. Gives the value
--- and where it's from: the row's key, "all" or "game". row nil: All names'.
+-- A setting as a row has it: row -> All names -> the name theme -> the
+-- game's. Gives the value and where it's from: the row's key, "all",
+-- "theme" or "game". row nil: All names'.
 -- over: { setting = value } on top of the row's own (the Look panel's
 -- preview: never saved; "inherit" there hands on as saved).
 function ns.NameLookValue(row, setting, over)
@@ -110,6 +111,8 @@ function ns.NameLookValue(row, setting, over)
 	local value = row == "all" and over and over[setting]
 	if value == nil then value = Raw("all", setting) end
 	if value ~= "inherit" then return value, "all" end
+	local themed = ns.NameThemeLook and ns.NameThemeLook()
+	if themed and themed[setting] ~= nil then return themed[setting], "theme" end
 	return GAME[setting], "game"
 end
 
@@ -120,6 +123,11 @@ function ns.NameLookColor(row, setting, over)
 	local color = COLORS[setting]
 	if from == "game" then return color[1], color[2], color[3] end
 	local base = ColorBase(setting)
+	if from == "theme" then
+		local themed = ns.NameThemeLook()
+		return tonumber(themed[base .. "R"]) or color[1], tonumber(themed[base .. "G"]) or color[2],
+			tonumber(themed[base .. "B"]) or color[3]
+	end
 	local function Part(i, part)
 		local value = over and from == (row or "all") and over[base .. part]
 		if value == nil then value = ns.db and ns.db[ns.NameLookKey(from, base .. part)] end

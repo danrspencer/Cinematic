@@ -4858,6 +4858,10 @@ ticker:SetScript("OnEvent", ns.Profiled("Core events", function(self, event, arg
 			if ns.db.idleOrbitDelay == 60 then ns.db.idleOrbitDelay = nil end
 			ns.db.stillDelayV3 = true
 		end
+		-- (Profiles on the game's own look keep the game's names when a main
+		-- theme comes: NameThemes.lua. Not a fresh install's, marked done: the
+		-- flag below isn't set yet then.)
+		if ns.MigrateNameTheme then ns.MigrateNameTheme(not ns.db.plateNameFriendsV2) end
 		-- Friendly players' names on faded plates were first in class colours by
 		-- default; blue now, as the game's names over heads, so switch them once.
 		if not ns.db.plateNameFriendsV2 then

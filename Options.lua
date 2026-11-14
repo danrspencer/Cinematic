@@ -9660,6 +9660,29 @@ local function CreateNameStylePanel()
 		end
 	end
 
+	-- Name theme: a whole look in one pick, under All names (NameThemes.lua).
+	-- Follow main theme first: the main theme's own names. The old presets are
+	-- among them (Bold, Subtle; Like the game's names is The game's).
+	stack:Header(content, L["Name theme"])
+	RecordKey(content, "nameTheme")
+	local nameStrip = stack:Add(ns.MakePartThemeStrip(ns.lowHealthKit, content, "name", function() Changed() end), "label")
+	local themeNow = stack:Note(content, "", 460)
+	themeNow.searchSkip = true
+	themeNow.Refresh = function(self)
+		local db = ns.GetDB()
+		local theme = ns.NameThemeNow()
+		local picked = db and db.nameTheme or "main"
+		if picked == "main" then
+			self:SetText(theme and (L["Following the main theme: %s's names."]):format(L[theme.name])
+				or L["Following the main theme: the game's names."])
+		else
+			self:SetText((L["%s, picked here: it stays when the main theme changes."]):format(theme and L[theme.name] or ""))
+		end
+		self:SetTextColor(0.6, 0.6, 0.6)
+	end
+	controls[#controls + 1] = themeNow
+	controls[#controls + 1] = nameStrip
+
 	-- The scene: a name of each kind, spread over the lake, each in its row's
 	-- look (your target bigger, in front).
 	local SCENE_W, SCENE_H = 480, 150
@@ -9737,83 +9760,6 @@ local function CreateNameStylePanel()
 	-- switch, as General's doesn't reach these names.)
 	local rows = ns.StyleRows(ns.lowHealthKit, content, stack, Changed, "plateNameStyle")
 
-	-- Presets: a few looks to start from, on All names.
-	local PRESETS = {
-		{ L["Like the game's names"], L["Colored, no outline or shadow (the defaults)."], {} },
-		{ L["Bold"], L["Colored, with a thin black outline, a little bigger."],
-			{ plateNameOutline = 1, plateNameShadow = false, plateNameSize = 1.1 } },
-		{ L["Subtle"], L["Colored, a little smaller and see-through."],
-			{ plateNameSize = 0.9, plateNameAlpha = 0.75 } },
-	}
-	local PRESET_KEYS = { "plateNameColour", "plateNameFriends", "plateNameOutline", "plateNameSize",
-		"plateNameAlpha", "plateNameY", "plateNameFixedSize", "plateNameShadow", "plateNameShadowX",
-		"plateNameShadowY", "plateNameShadowAlpha", "plateNameCloseSize", "plateNameCloseY", "plateNameFarSize",
-		"plateNameFarY" }
-	-- (The Style pages' Preset: row, greyed by this page's switch alone;
-	-- Custom while none matches, and picking it puts back your own settings
-	-- from before a preset, as rows.PresetMenu's.)
-	local function PresetValue(preset, key)
-		local value = preset[3][key]
-		if value == nil then value = ns.DEFAULTS[key] end
-		return value
-	end
-	local function Saved(key)
-		local value = ns.GetDB()[key]
-		if value == nil then value = ns.DEFAULTS[key] end
-		return value
-	end
-	local KEPT_ID = "plateNameStyle:" .. PRESET_KEYS[1]
-	local function Kept()
-		local db = ns.GetDB()
-		return db and db.presetCustom and db.presetCustom[KEPT_ID]
-	end
-	local presetField
-	presetField = {
-		get = function()
-			local db = ns.GetDB()
-			if not (db and db.plateNameStyle) then return "custom" end
-			for i, preset in ipairs(PRESETS) do
-				local match = true
-				for _, key in ipairs(PRESET_KEYS) do
-					if Saved(key) ~= PresetValue(preset, key) then match = false break end
-				end
-				if match then return i end
-			end
-			return "custom"
-		end,
-		set = function(i)
-			local db = ns.GetDB()
-			if i == "custom" then
-				local kept = Kept()
-				if not kept then return end
-				db.plateNameStyle = true
-				for _, key in ipairs(PRESET_KEYS) do
-					if kept[key] ~= nil then db[key] = kept[key] end
-				end
-				return
-			end
-			local preset = PRESETS[i]
-			if not preset then return end
-			if presetField.get() == "custom" then
-				local kept = {}
-				for _, key in ipairs(PRESET_KEYS) do kept[key] = db[key] end
-				db.presetCustom = db.presetCustom or {}
-				db.presetCustom[KEPT_ID] = kept
-			end
-			db.plateNameStyle = true
-			for _, key in ipairs(PRESET_KEYS) do db[key] = PresetValue(preset, key) end
-		end,
-	}
-	rows.Dropdown(L["Preset:"], presetField, function()
-		local list = {}
-		for i, preset in ipairs(PRESETS) do list[i] = { value = i, text = preset[1], tip = preset[2] } end
-		list[#list + 1] = { value = "custom", text = L["Custom"],
-			tip = L["Your own settings, as they were before you picked a preset."],
-			enabled = function() return Kept() ~= nil end }
-		return list
-	end, L["A whole look in one pick. Changing a setting after it shows Custom; picking Custom puts back " ..
-		"your own settings from before the preset."], On)
-
 	-- The rows: All names (the page's own settings), then a row per kind of
 	-- unit, each a Look panel (made the first time it's opened): Text, Color,
 	-- Glow, Background and Second line. A row's setting left on Inherit takes
@@ -9849,16 +9795,24 @@ local function CreateNameStylePanel()
 		local own = db[ns.NameLookKey(row, setting)]
 		own = own ~= nil and own ~= "inherit"
 		local parent, short
-		if row ~= "all" then
-			local _, from = ns.NameLookValue("all", setting)
-			if from ~= "game" then parent, short = L["All names'"], L["All names"] end
+		local _, from = ns.NameLookValue("all", setting)
+		if from == "all" and row ~= "all" then
+			parent, short = L["All names'"], L["All names"]
+		elseif from == "theme" or (from == "all" and row == "all" and ns.NameThemeLook()
+			and ns.NameThemeLook()[setting] ~= nil) then
+			local theme = ns.NameThemeNow()
+			parent, short = (L["Name theme: %s"]):format(theme and L[theme.name] or ""), L["theme"]
 		end
 		if not parent then parent = L["The game's"] end
 		return { text = own and (row == "all" and L["Set here"] or L["This row"]) or parent, own = own,
 			parent = parent, short = short }
 	end
 	local function ParentValue(row, setting)
-		if row == "all" then return ns.NAME_LOOK_GAME[setting] end
+		if row == "all" then
+			local themed = ns.NameThemeLook()
+			if themed and themed[setting] ~= nil then return themed[setting] end
+			return ns.NAME_LOOK_GAME[setting]
+		end
 		return (ns.NameLookValue("all", setting))
 	end
 
@@ -9896,7 +9850,7 @@ local function CreateNameStylePanel()
 			local value = ns.GetDB()[ns.NameLookKey(row, setting)]
 			return value ~= nil and value ~= "inherit" and value or nil
 		end
-		local INHERIT = { "inherit", L["Inherit"], row == "all" and L["The game's look."] or
+		local INHERIT = { "inherit", L["Inherit"], row == "all" and L["The name theme's look, else the game's."] or
 			L["As All names has it, else the game's. Follows it: changes when that changes."] }
 		local hidden = { Add = function(_, control)
 			control:Hide()
@@ -9917,6 +9871,19 @@ local function CreateNameStylePanel()
 				end,
 				resolved = function(key) return ParentValue(row, key) end,
 				copyKind = "nameRow", copyName = label,
+				-- (Start from a theme: a name theme's look in just this row.)
+				themeList = function()
+					local list = {}
+					for _, theme in ipairs(ns.NameThemeList()) do list[#list + 1] = { key = theme.key, name = L[theme.name] } end
+					return list
+				end,
+				themeLook = function(key)
+					local theme = ns.NameThemeByKey(key)
+					if not theme then return nil end
+					local look = {}
+					for setting, value in pairs(theme.look) do look[setting] = value end
+					return look
+				end,
 				resetLabel = function() return row == "all" and L["Reset all"] or L["Clear this row"] end,
 			},
 			preview = function(parent, width)
@@ -10063,7 +10030,8 @@ local function CreateNameStylePanel()
 			if #tabs > 0 then
 				self:SetText(L["Its own:"] .. " " .. table.concat(tabs, " · "))
 			else
-				self:SetText(row == "all" and L["The game's"] or L["Inherits All names"])
+				self:SetText(row == "all" and (ns.NameThemeNow() and L["The name theme's"] or L["The game's"])
+					or L["Inherits All names"])
 			end
 			self:SetWidth(math.max(140, self:GetFontString():GetStringWidth() + 30))
 			self:SetEnabled(db and db.plateNameStyle and true or false)
@@ -10254,6 +10222,26 @@ do
 		local showRow = ShowTable(content, showHeader, { opts = { anyFight = true }, underHeader = true,
 			ns.TargetMarksShowRow(Changed) }, L["Nameplate Style"])
 		stack:Continue(showRow, "label")
+
+		-- Plate theme: the bars' look under the rows, in one pick (texture and
+		-- border; names are Name Style's). Follow General first: as plates
+		-- have always been. PlateThemes.lua.
+		stack:Header(content, L["Plate theme"])
+		RecordKey(content, "plateTheme")
+		local plateStrip = stack:Add(ns.MakePartThemeStrip(ns.lowHealthKit, content, "plate", function()
+			if ns.RefreshPlateHealthStyle then ns.RefreshPlateHealthStyle() end
+			Changed()
+		end), "label")
+		local plateThemeNow = stack:Note(content, "", 460)
+		plateThemeNow.searchSkip = true
+		plateThemeNow.Refresh = function(self)
+			local theme = ns.PlateThemeNow()
+			self:SetText(theme and (L["%s, picked here: it stays when the main theme changes."]):format(L[theme.name])
+				or L["Following General: the bar's texture and border as the Style hub's General page has them."])
+			self:SetTextColor(0.6, 0.6, 0.6)
+		end
+		controls[#controls + 1] = plateThemeNow
+		controls[#controls + 1] = plateStrip
 
 		-- The preview, as the Unit Frame Style page's: a scene of plates, one
 		-- for each row of the grid (the first few, Default at the back), each
@@ -11416,7 +11404,12 @@ do
 					source = function(key) return ns.PlateRowSource(kind, key) end,
 					-- (Copy look / Paste between the rows; Start from a theme: its bar.)
 					copyKind = "plateRow", copyName = info.full,
-					themeLook = function(key) return ns.PlateRowThemeLook(key) end,
+					themeLook = function(key) return ns.PlateThemeRowLook(key) end,
+					themeList = function()
+						local list = {}
+						for _, theme in ipairs(ns.PlateThemeList()) do list[#list + 1] = { key = theme.key, name = L[theme.name] } end
+						return list
+					end,
 					resetLabel = function() return kind == "others" and L["Reset all"] or L["Clear this row"] end },
 				-- (A plate as this row's Look draws it: PlateRowLook.lua.)
 				preview = function(parent, width) return ns.MakePlateRowLookPreview(parent, width, kind) end,

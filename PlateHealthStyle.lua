@@ -59,16 +59,11 @@ end
 -- [bar] = { texture ("game": the game's fill), border = { kind, size, r, g, b } }.
 local overrides = setmetatable({}, { __mode = "k" })
 
--- General's texture (nil: the game's) and its border's kind, size and color;
--- a bar's row Look over them (bar: the one asked about).
+-- The plate theme's texture (nil: the game's) and its border's kind, size
+-- and color: General's while it follows General (PlateThemes.lua); a bar's
+-- row Look over them (bar: the one asked about).
 local function Look(bar)
-	local db = ns.db
-	local texture, kind, size, r, g, b = nil, "game", 0, 0, 0, 0
-	if db and db.styleGeneral then
-		texture = db.styleTexture
-		if texture == "game" then texture = nil end
-		kind, size, r, g, b = ns.StyleBorder(db, "styleBorder")
-	end
+	local texture, kind, size, r, g, b = ns.PlateThemeBar()
 	local own = bar and overrides[bar]
 	if own then
 		if own.texture ~= nil then texture = own.texture ~= "game" and own.texture or nil end
