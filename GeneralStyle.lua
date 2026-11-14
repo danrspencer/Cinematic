@@ -9,29 +9,30 @@ local L = ns.L
 -- The list on the Pages tab, in the hubs' order: name, the page to open
 -- (ns.OpenOptions), its shared settings. fixed: what it says instead, for a
 -- page with no shared settings of its own. group: a heading over it. visions:
--- it follows the Visions hub's Style page first.
+-- it follows the Visions hub's Style page first. part: the part of a theme
+-- it's in (StyleThemes.lua's THEME_PARTS), for its Theme switch.
 local PAGES = {
-	{ "Unit Frames", "Unit Style", { "ufTexture", "ufFont", "ufOutline", "ufShadow", "ufBorder" }, group = "Interface" },
-	{ "Raid Frames", "Raid Style", { "rfTexture", "rfFont", "rfOutline", "rfShadow", "rfBorder" } },
-	{ "Action Bars", "Action Style", {}, fixed = "Its own settings" },
+	{ "Unit Frames", part = "Frames", "Unit Style", { "ufTexture", "ufFont", "ufOutline", "ufShadow", "ufBorder" }, group = "Interface" },
+	{ "Raid Frames", part = "Frames", "Raid Style", { "rfTexture", "rfFont", "rfOutline", "rfShadow", "rfBorder" } },
+	{ "Action Bars", part = "Bars", "Action Style", {}, fixed = "Its own settings" },
 	{ "Interface Recolor", "Interface Recolor", {}, fixed = "Follows General" },
-	{ "Personal Resource Display", "Personal Style", { "prdTexture", "prdBorder" } },
-	{ "Tooltips", "Tooltip Style", { "tooltipBarTexture", "tooltipFont", "tooltipOutline", "tooltipShadow", "tooltipEdge" } },
-	-- (These two read General directly: PlateHealthStyle.lua, PlateParts.lua.)
-	{ "Nameplates", "Nameplate Style", {}, fixed = "Follows General" },
-	{ "Names", "Name Style", {}, fixed = "Follows General" },
-	{ "Cast Bars", "Cast Bar Style", { "plateCastFill", "plateCastFont", "plateCastOutline", "plateCastShadow", "plateCastBorder" } },
-	{ "Chat Bubbles", "Bubble Style", { "bubblesFont", "bubblesOutline", "bubblesEdge" } },
-	{ "Visions Style", "Visions Style", { "visionStyleTexture", "visionStyleFont", "visionStyleOutline", "visionStyleShadow",
+	{ "Personal Resource Display", part = "Frames", "Personal Style", { "prdTexture", "prdBorder" } },
+	{ "Tooltips", part = "Panels", "Tooltip Style", { "tooltipBarTexture", "tooltipFont", "tooltipOutline", "tooltipShadow", "tooltipEdge" } },
+	-- (These two go by their plate and name themes: PlateThemes.lua, NameThemes.lua.)
+	{ "Nameplates", part = "Plates", "Nameplate Style", {}, fixed = "Its plate theme" },
+	{ "Names", part = "Names", "Name Style", {}, fixed = "Its name theme" },
+	{ "Cast Bars", part = "Casts", "Cast Bar Style", { "plateCastFill", "plateCastFont", "plateCastOutline", "plateCastShadow", "plateCastBorder" } },
+	{ "Chat Bubbles", part = "Panels", "Bubble Style", { "bubblesFont", "bubblesOutline", "bubblesEdge" } },
+	{ "Visions Style", part = "Visions", "Visions Style", { "visionStyleTexture", "visionStyleFont", "visionStyleOutline", "visionStyleShadow",
 		"visionStyleBorder" }, group = "Visions" },
-	{ "Damage Vision", "Damage Vision Look", { "damageVisionTexture", "damageVisionFont", "damageVisionOutline",
+	{ "Damage Vision", part = "Visions", "Damage Vision Look", { "damageVisionTexture", "damageVisionFont", "damageVisionOutline",
 		"damageVisionShadow" }, visions = true },
-	{ "Dialogue", "Quest Talk Style", { "questTalkFont", "questTalkOutline", "questTalkShadow" }, visions = true },
-	{ "Quest Item Button", "Quest Item Style", { "questItemFont", "questItemOutline", "questItemShadow", "questItemFrame" },
+	{ "Dialogue", part = "Visions", "Quest Talk Style", { "questTalkFont", "questTalkOutline", "questTalkShadow" }, visions = true },
+	{ "Quest Item Button", part = "Visions", "Quest Item Style", { "questItemFont", "questItemOutline", "questItemShadow", "questItemFrame" },
 		visions = true },
-	{ "Roll Vision", "Roll Style", { "rollBarTexture", "rollFont", "rollOutline", "rollShadow" }, visions = true },
-	{ "Card Vision", "Card Styles", { "cardFont", "cardOutline", "cardShadow" }, visions = true },
-	{ "Emote Vision", "Emote Vision Style", { "emoteFont", "emoteOutline", "emoteShadow", "emoteBorder" }, visions = true },
+	{ "Roll Vision", part = "Visions", "Roll Style", { "rollBarTexture", "rollFont", "rollOutline", "rollShadow" }, visions = true },
+	{ "Card Vision", part = "Visions", "Card Styles", { "cardFont", "cardOutline", "cardShadow" }, visions = true },
+	{ "Emote Vision", part = "Visions", "Emote Vision Style", { "emoteFont", "emoteOutline", "emoteShadow", "emoteBorder" }, visions = true },
 }
 local KIND_NAMES = { texture = "Texture", font = "Font", outline = "Outline", shadow = "Shadow", border = "Border" }
 
@@ -463,6 +464,10 @@ function ns.CreateStylePagesPanel(kit)
 		L["Which pages follow General, or the Visions' Style page. From the theme: as the theme you picked set " ..
 		"it. A page with a setting of your own shows which; Use General puts them back. The page's name opens it."])
 	local stack = kit.Stack(intro, "label")
+	-- (Over the Theme column: what its switches do.)
+	local reachHead = kit.Label(content, "GameFontNormalSmall", L["Theme"])
+	kit.Tooltip(reachHead, L["Ticked, picking a theme on General changes this part. Unticked, a pick leaves it " ..
+		"as it is (plates and names keep the theme they have)."])
 	local pageRows = {}
 	local function Changed()
 		RefreshAll()
@@ -478,7 +483,7 @@ function ns.CreateStylePagesPanel(kit)
 	for _, page in ipairs(pages) do
 		if page.group then stack:Header(content, L[page.group]) end
 		local row = CreateFrame("Frame", nil, content)
-		row:SetSize(480, 22)
+		row:SetSize(520, 22)
 		stack:Add(row, "label")
 		local open = CreateFrame("Button", nil, row)
 		open:SetSize(160, 22)
@@ -492,6 +497,19 @@ function ns.CreateStylePagesPanel(kit)
 		local status = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
 		status:SetPoint("LEFT", open, "RIGHT", 4, 0)
 		status.searchSkip = true
+		-- (Its part's Theme switch, at the right: the same for each page of a part.)
+		if page.part then
+			local reachKey = "styleThemeReach" .. page.part
+			local reach = kit.Check(row, reachKey, "", L["Ticked, picking a theme on General changes this part. " ..
+				"Unticked, a pick leaves it as it is (plates and names keep the theme they have)."], function(value)
+				ns.GetDB()[reachKey] = value
+				Changed()
+				kit.Refresh()
+			end)
+			reach:ClearAllPoints()
+			reach:SetPoint("LEFT", row, "LEFT", 494, 0)
+			reach.searchLabel = L[page[1]] .. " - " .. L["Theme"]
+		end
 		local back = ns.PanelButton(row)
 		back:SetSize(100, 20)
 		back:SetPoint("LEFT", status, "RIGHT", 10, 0)
@@ -520,6 +538,10 @@ function ns.CreateStylePagesPanel(kit)
 			end
 		end
 		pageRows[#pageRows + 1] = row
+	end
+	if pageRows[1] then
+		reachHead:ClearAllPoints()
+		reachHead:SetPoint("BOTTOMRIGHT", pageRows[1], "TOPRIGHT", 4, 2)
 	end
 
 	-- (Reset page: the pages listed back on General, as the profile has them.)

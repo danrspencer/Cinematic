@@ -103,6 +103,9 @@ local SWITCHES = { "ufStyle", "rfStyle", "prdStyle", "tooltipStyle", "bubblesSty
 	"questTalkStyled", "questItemStyle", "rollStyle" }
 
 local function Theme(info)
+	-- (Its plate and name themes: its own, made from it. PlateThemes.lua,
+	-- NameThemes.lua.)
+	info.plates, info.names = info.plates or info.key, info.names or info.key
 	local s = info.settings
 	for _, key in ipairs(SWITCHES) do s[key] = true end
 	-- (A shape of ours: the game's strip behind the target's name was drawn for its
@@ -883,6 +886,41 @@ function ns.ThemeSetting(key)
 	return SettingsOf(theme)[key]
 end
 
+-- The parts a theme reaches (General's Pages tab: a switch each,
+-- styleThemeReach<part>, on to start). A part switched off is left alone
+-- by a pick: its settings aren't written, Reapply and the "with your
+-- changes" line ignore them, and plates and names keep the theme they had.
+ns.THEME_PARTS = { "Frames", "Panels", "Bars", "Plates", "Names", "Casts", "Visions" }
+for _, part in ipairs(ns.THEME_PARTS) do ns.DEFAULTS["styleThemeReach" .. part] = true end
+-- (A setting's part by its key; nil: General's own, always reached.)
+local PART_PATTERNS = {
+	{ "^uf", "Frames" }, { "^rf", "Frames" }, { "^prd", "Frames" }, { "^styleOver_unitPart", "Frames" },
+	{ "^tooltip", "Panels" }, { "^bubbles", "Panels" },
+	{ "^ab", "Bars" }, { "^styleOver_barArt", "Bars" },
+	{ "^plateCast", "Casts" },
+	{ "^card", "Visions" }, { "^questTalk", "Visions" }, { "^questItem", "Visions" }, { "^roll", "Visions" },
+	{ "^emote", "Visions" }, { "^damageVision", "Visions" }, { "^visionStyle", "Visions" },
+}
+local partOf = {}
+function ns.ThemePartOf(key)
+	local part = partOf[key]
+	if part == nil then
+		part = false
+		for _, each in ipairs(PART_PATTERNS) do
+			if key:find(each[1]) then
+				part = each[2]
+				break
+			end
+		end
+		partOf[key] = part
+	end
+	return part or nil
+end
+local function Reached(key, db)
+	local part = ns.ThemePartOf(key)
+	return not part or (db or ns.GetDB())["styleThemeReach" .. part] ~= false
+end
+
 -- Every setting any theme writes, and every page's shared setting (back on
 -- General, so the theme reaches them), each frame's own switched off.
 local function ThemeKeys()
@@ -981,10 +1019,21 @@ function ns.ApplyStyleTheme(key, noUndo)
 	if not (db and theme) then return end
 	local keys = ThemeKeys()
 	if not noUndo then db.styleThemeKept = ns.StyleSnapshot() end
+	-- (Plates and names switched off on the Pages tab while they follow the
+	-- main theme: kept on the theme they had, picked for them.)
+	local before = BY_KEY[db.styleTheme or "game"] or BY_KEY.game
+	if db.styleThemeReachNames == false and (db.nameTheme or "main") == "main" then
+		db.nameTheme = before.key == "game" and "game" or before.names
+	end
+	if db.styleThemeReachPlates == false and (db.plateTheme or "main") == "main" then
+		db.plateTheme = before.key == "game" and "game" or before.plates
+	end
 	db.styleGeneral = true
 	db.styleTheme = key
 	local settings, base = SettingsOf(theme), Base()
-	for _, each in ipairs(keys) do db[each] = ThemeValue(each, settings, base) end
+	for _, each in ipairs(keys) do
+		if Reached(each, db) then db[each] = ThemeValue(each, settings, base) end
+	end
 	ShowTheme()
 	return true
 end
@@ -1006,10 +1055,13 @@ function ns.StyleThemeEdited()
 	if not theme then return false end
 	local settings, base = SettingsOf(theme), Base()
 	for _, key in ipairs(ThemeKeys()) do
-		local value, own = ThemeValue(key, settings, base), db[key]
-		if own == nil then own = "default" end
-		if value == nil then value = "default" end
-		if own ~= value then return true end
+		-- (A part switched off on the Pages tab: not the theme's to judge.)
+		if Reached(key, db) then
+			local value, own = ThemeValue(key, settings, base), db[key]
+			if own == nil then own = "default" end
+			if value == nil then value = "default" end
+			if own ~= value then return true end
+		end
 	end
 	return false
 end
@@ -1076,7 +1128,7 @@ end
 
 -- The picker, for the General page: a card for each theme drawn in that
 -- theme's own panel, corners, lettering and colors, the one in use outlined.
-local CARD_H, CARD_GAP, PER_ROW = 66, 8, 3
+local CARD_H, CARD_GAP, PER_ROW = 86, 8, 3
 -- (Russian, Korean and Chinese names keep the game's font: ours have no such letters.)
 local ROMAN = not ({ ruRU = true, koKR = true, zhCN = true, zhTW = true })[GetLocale and GetLocale() or ""]
 local function FontOf(theme)
@@ -1117,7 +1169,7 @@ local function MakeCard(parent, theme, width, onPick, Tooltip)
 		end
 	end
 	local name = card:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-	name:SetPoint("CENTER", 0, 7)
+	name:SetPoint("CENTER", 0, 24)
 	name:SetWidth(width - 16)
 	if ROMAN then name:SetFont(FontOf(theme), 14, "") end
 	name:SetTextColor(color[1], color[2], color[3])
@@ -1127,9 +1179,46 @@ local function MakeCard(parent, theme, width, onPick, Tooltip)
 	for i = 2, #theme.swatch do
 		local chip = card:CreateTexture(nil, "ARTWORK", nil, 1)
 		chip:SetSize(16, 5)
-		chip:SetPoint("CENTER", card, "CENTER", (i - 2 - (chips - 1) / 2) * 19, -13)
+		chip:SetPoint("CENTER", card, "CENTER", (i - 2 - (chips - 1) / 2) * 19, -30)
 		local c = theme.swatch[i]
 		chip:SetColorTexture(c[1], c[2], c[3], 1)
+	end
+	-- What it gives plates and names: a name in its name theme (its font and
+	-- hostile color) over a little bar in its plate theme (texture and line).
+	local nameTheme = ns.NameThemeByKey and ns.NameThemeByKey(theme.names or theme.key)
+	local look = nameTheme and nameTheme.look or {}
+	local sample = card:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+	sample:SetPoint("CENTER", 0, 3)
+	local sampleFile, sampleSize = _G.GameFontNormalSmall:GetFont()
+	if ROMAN and look.Font and look.Font ~= "game" and ns.StyleFontFile(look.Font) then
+		sampleFile = ns.StyleFontFile(look.Font)
+	end
+	if sampleFile then sample:SetFont(sampleFile, (sampleSize or 10) * (tonumber(look.Size) or 1), "") end
+	if look.Hostile == "custom" then
+		sample:SetTextColor(look.HostileR, look.HostileG, look.HostileB)
+	elseif look.Colour == "one" then
+		sample:SetTextColor(look.ColourR or 1, look.ColourG or 1, look.ColourB or 1)
+	else
+		sample:SetTextColor(1, 0.25, 0.2)
+	end
+	sample:SetText(L["Gnoll Brute"])
+	sample.searchSkip = true
+	local plateTheme = ns.PlateThemeByKey and ns.PlateThemeByKey(theme.key == "game" and "game" or theme.plates)
+	local bar = CreateFrame("StatusBar", nil, card)
+	bar:SetSize(math.min(90, width - 40), 6)
+	bar:SetPoint("CENTER", 0, -11)
+	bar:SetMinMaxValues(0, 1)
+	bar:SetValue(0.7)
+	if not (plateTheme and plateTheme.texture ~= "game" and ns.SetBarTexture(bar, plateTheme.texture)) then
+		bar:SetStatusBarTexture("Interface\\TargetingFrame\\UI-StatusBar")
+	end
+	bar:SetStatusBarColor(0.85, 0.15, 0.1)
+	local barGround = bar:CreateTexture(nil, "BACKGROUND")
+	barGround:SetAllPoints()
+	barGround:SetColorTexture(0, 0, 0, 0.6)
+	if plateTheme and plateTheme.border == "custom" then
+		local edges = ns.MakeStyleEdges(bar)
+		ns.DressStyleEdges(edges, plateTheme.size or 1, plateTheme.color[1], plateTheme.color[2], plateTheme.color[3], 1, true)
 	end
 	local hover = card:CreateTexture(nil, "HIGHLIGHT")
 	hover:SetAllPoints()

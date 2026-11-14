@@ -766,6 +766,55 @@ if arg[1] and not update then
 			end
 		end
 	end
+	-- Plate and name themes: each one's settings are real (NameRowLook's, a
+	-- font and bar texture we have, a border kind), a main theme pick and its
+	-- Undo leave a plate or name theme picked by hand alone, and a part
+	-- switched off on the Pages tab keeps the theme it had.
+	do
+		local themeDb = ns.GetDB()
+		local before = {}
+		for key, value in pairs(themeDb) do before[key] = value end
+		local settings = {}
+		for _, key in ipairs(ns.NameRowKeys("all")) do settings[key:sub(#"plateName" + 1)] = true end
+		for _, theme in ipairs(ns.NameThemeList()) do
+			for setting in pairs(theme.look) do
+				if not settings[setting] then print("problem\tName theme " .. theme.key .. ": no such setting " .. setting) end
+			end
+			local font = theme.look.Font
+			if font and font ~= "game" and not ns.StyleFontFile(font) then
+				print("problem\tName theme " .. theme.key .. ": no such font " .. tostring(font))
+			end
+		end
+		local textures = {}
+		for _, choice in ipairs(ns.StyleTextureChoices(nil, "styleTexture")) do textures[choice.value] = true end
+		local borders = { game = true, none = true, thin = true, thick = true, custom = true }
+		for _, theme in ipairs(ns.PlateThemeList()) do
+			if theme.texture ~= "game" and not textures[theme.texture] then
+				print("problem\tPlate theme " .. theme.key .. ": no such texture " .. tostring(theme.texture))
+			end
+			if not borders[theme.border] then
+				print("problem\tPlate theme " .. theme.key .. ": no such border " .. tostring(theme.border))
+			end
+		end
+		themeDb.plateTheme, themeDb.nameTheme = "clean", "storybook"
+		ns.ApplyStyleTheme("codex")
+		ns.UndoStyleTheme()
+		if themeDb.plateTheme ~= "clean" or themeDb.nameTheme ~= "storybook" then
+			print("problem\tPlate and name themes: a main theme pick and Undo changed one picked by hand")
+		end
+		themeDb.plateTheme, themeDb.nameTheme = "main", "main"
+		ns.ApplyStyleTheme("codex")
+		themeDb.styleThemeReachNames = false
+		ns.ApplyStyleTheme("forge", true)
+		if themeDb.nameTheme ~= "codex" then
+			print("problem\tName themes: Names switched off, a pick changed the names (" .. tostring(themeDb.nameTheme) .. ")")
+		end
+		for key in pairs(themeDb) do
+			if before[key] == nil then themeDb[key] = nil end
+		end
+		for key, value in pairs(before) do themeDb[key] = value end
+		if ns.RestoreStyleSnapshot then ns.RestoreStyleSnapshot(ns.StyleSnapshot()) end
+	end
 	-- Our own fonts: each path is one the game can read, to a file that's here.
 	for _, font in ipairs(ns.QUEST_ITEM_FONTS) do
 		if font.own then
