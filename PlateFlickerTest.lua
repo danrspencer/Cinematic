@@ -32,25 +32,42 @@ local function Get(region, method)
 	return table.concat(out, ",")
 end
 
--- (Counts while running: the fill set again, its color set.)
+-- (Counts while running: the fill set again, its color set. And who set
+-- them: the caller's file and line, with the color, each different one
+-- logged once a bar - ours or the game's.)
 local hooked = setmetatable({}, { __mode = "k" })
+local function Caller()
+	local stack = debugstack and debugstack(3, 3, 0) or ""
+	-- (The first line that isn't this file: who called.)
+	for line in stack:gmatch("[^\n]+") do
+		if not line:find("PlateFlickerTest") then return (line:gsub("^%s+", ""):sub(1, 140)) end
+	end
+	return "?"
+end
+local function Count(bar, what, ...)
+	if not run then return end
+	local count = run.counts[bar] or { tex = 0, color = 0, vertex = 0, seen = {} }
+	run.counts[bar] = count
+	count[what] = count[what] + 1
+	local args = {}
+	for i = 1, select("#", ...) do args[#args + 1] = Plain((select(i, ...))) end
+	local who = what .. " " .. table.concat(args, ",") .. " from " .. Caller()
+	if not count.seen[who] and run.callers < 400 then
+		count.seen[who] = true
+		run.callers = run.callers + 1
+		Say(("  bar %s: %s"):format(tostring(bar):sub(-6), who))
+	end
+end
 local function Hook(bar)
 	if hooked[bar] then return end
 	hooked[bar] = true
-	pcall(hooksecurefunc, bar, "SetStatusBarTexture", function(self)
-		if run then
-			local count = run.counts[self] or { tex = 0, color = 0 }
-			run.counts[self] = count
-			count.tex = count.tex + 1
-		end
-	end)
-	pcall(hooksecurefunc, bar, "SetStatusBarColor", function(self)
-		if run then
-			local count = run.counts[self] or { tex = 0, color = 0 }
-			run.counts[self] = count
-			count.color = count.color + 1
-		end
-	end)
+	pcall(hooksecurefunc, bar, "SetStatusBarTexture", function(self, ...) Count(self, "tex", ...) end)
+	pcall(hooksecurefunc, bar, "SetStatusBarColor", function(self, ...) Count(self, "color", ...) end)
+	local fill = bar.GetStatusBarTexture and bar:GetStatusBarTexture()
+	if fill and not hooked[fill] then
+		hooked[fill] = true
+		pcall(hooksecurefunc, fill, "SetVertexColor", function(_, ...) Count(bar, "vertex", ...) end)
+	end
 end
 
 local function Signature(plate)
@@ -64,9 +81,10 @@ local function Signature(plate)
 	local dress = text and text.cineDress
 	local rim = text and text.cineRim
 	local look = ns.PlateLookNow and ns.PlateLookNow(plate)
-	return ("plate a %s | bar a %s shown %s | fill %s atlas %s color %s a %s desat %s | name a %s color %s font %s | " ..
+	return ("plate a %s | container a %s eff %s | bar a %s shown %s color %s | fill %s atlas %s color %s a %s desat %s | name a %s color %s font %s | " ..
 		"ours %s a %s color %s | glow %s band %s rim %s | row look %s"):format(Get(plate, "GetAlpha"),
-		Get(bar, "GetAlpha"), Get(bar, "IsShown"), Get(fill, "GetTexture"), Get(fill, "GetAtlas"),
+		Get(container, "GetAlpha"), Get(bar, "GetEffectiveAlpha"), Get(bar, "GetAlpha"), Get(bar, "IsShown"),
+		Get(bar, "GetStatusBarColor"), Get(fill, "GetTexture"), Get(fill, "GetAtlas"),
 		Get(fill, "GetVertexColor"), Get(fill, "GetAlpha"), Get(fill, "IsDesaturated"), Get(unitFrame.name, "GetAlpha"),
 		Get(unitFrame.name, "GetTextColor"), Get(unitFrame.name, "GetFont"), text and "shown" or "no",
 		Get(text, "GetAlpha"), Get(text, "GetTextColor"), tostring(dress and dress.glow:IsShown()),
@@ -85,8 +103,8 @@ watcher:SetScript("OnUpdate", function()
 	if not run then return end
 	local now = GetTime() - run.at
 	if now < READY then
-		ns.PadTestBox("Stand where the WHITE FLICKER happens, with nameplates on screen. Then just watch: the box " ..
-			"goes away while it records.", ("Recording starts in %d"):format(math.ceil(READY - now)), 1, 0.82, 0)
+		ns.PadTestBox("Stand where the WHITE BARS flash (CineMode on, a busy street, as in your video). Then just " ..
+			"watch: the box goes away while it records.", ("Recording starts in %d"):format(math.ceil(READY - now)), 1, 0.82, 0)
 		return
 	end
 	if not run.started then
@@ -113,8 +131,8 @@ watcher:SetScript("OnUpdate", function()
 	if into >= RECORD then
 		watcher:Hide()
 		for bar, count in pairs(run.counts) do
-			Say(("bar %s: fill set %d times, color set %d times in %d frames"):format(tostring(bar), count.tex,
-				count.color, run.frame))
+			Say(("bar %s: fill set %d times, color set %d, fill color set %d in %d frames"):format(
+				tostring(bar):sub(-6), count.tex, count.color, count.vertex, run.frame))
 		end
 		Say(("done: %d frames, %.0f fps"):format(run.frame, run.frame / RECORD))
 		run = nil
@@ -126,7 +144,7 @@ end)
 function ns.PlateFlickerTest()
 	if run then return end
 	CinematicDB.plateFlickerLog = {}
-	run = { at = GetTime(), frame = 0, last = setmetatable({}, { __mode = "k" }), counts = {}, shots = 0 }
+	run = { at = GetTime(), frame = 0, last = setmetatable({}, { __mode = "k" }), counts = {}, shots = 0, callers = 0 }
 	local db = ns.GetDB()
 	local texture, kind, size
 	if ns.PlateThemeBar then texture, kind, size = ns.PlateThemeBar() end
