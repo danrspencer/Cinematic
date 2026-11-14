@@ -368,6 +368,14 @@ local HANDLE_RIGHT = 64
 
 local handles = {} -- frame -> its title bar strip
 
+-- Not with a controller: the gamepad cursor stops on every frame that takes the
+-- mouse, and the strip is an invisible one along the window's top (in the bags,
+-- a stop at their top left before the first slot). The window itself can still
+-- be dragged where its contents leave room.
+local function StripShown(drag)
+	return drag and not (ns.IsGamePadOn and ns.IsGamePadOn()) or false
+end
+
 local function MakeDraggable(frame, left)
 	if hooked[frame] or Locked(frame) then
 		return
@@ -560,7 +568,7 @@ local function Arrange()
 	end
 	HookOpen()
 	for frame, handle in pairs(handles) do
-		handle:SetShown(CanDrag(frame))
+		handle:SetShown(StripShown(CanDrag(frame)))
 	end
 	if not OpenPanels() then
 		return
@@ -648,7 +656,7 @@ local function PlaceOther(frame, left)
 		MakeDraggable(frame, left)
 	end
 	if handles[frame] then
-		handles[frame]:SetShown(ns.Setting("dragPanels") and true or false)
+		handles[frame]:SetShown(StripShown(ns.Setting("dragPanels")))
 	end
 	local spot = Spot(frame)
 	if spot and not Held(frame) and ns.Flag(frame:IsShown()) and not Locked(frame) then
