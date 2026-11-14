@@ -211,6 +211,7 @@ LowManaTest.lua
 ThresholdTest.lua
 FlickerTest.lua
 PlateWidthTest.lua
+StyleRevampTest.lua
 DamageVisionMeterTest.lua
 HealthRedTest.lua
 SpokenTest.lua
