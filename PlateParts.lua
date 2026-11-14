@@ -2109,6 +2109,14 @@ do
 	local painting = false
 	local hooked = {}
 	local Paint
+	-- [region] = the color we last gave it, { r, g, b }: the pass below skips
+	-- a region still that color. (Not read back: WoW Forever reads a plate
+	-- bar's color as white, so it never matched and every tinted plate was
+	-- painted again each frame, 0.85 ms and 7 MB of garbage a second with 40,
+	-- 2026-11-14.) Cleared when the game paints it (the hooks), and every
+	-- 0.2 s for anything the hooks miss.
+	local done = setmetatable({}, { __mode = "k" })
+	local doneAt = 0
 
 	local function Hook(region, setter)
 		if hooked[region] then
@@ -2120,6 +2128,7 @@ do
 			if painting or not first or not tints[first[6]] then
 				return
 			end
+			done[self] = nil
 			if type(r) == "number" and Known(r) and Known(g) and Known(b) then
 				first[1], first[2], first[3] = r, g, b
 			end
@@ -2134,6 +2143,7 @@ do
 					hooksecurefunc(region, other, function(self)
 						local first = saved[self]
 						if not painting and first and tints[first[6]] then
+							done[self] = nil
 							Paint(self, first[4], first[5], first[6], first[7])
 						end
 					end)
@@ -2168,16 +2178,19 @@ do
 			return
 		end
 		local br, bg, bb = Blend(first[1], first[2], first[3], tint, part)
-		-- (Already that color: left alone. The pass below runs every frame over
-		-- every tinted plate, and each set ran the game's own code behind it:
-		-- 0.85 ms a frame and 7 MB of garbage a second with 40 plates tinted,
-		-- 2026-11-14. The game's own repaints come through the hook above.)
-		if r and math.abs(r - br) < 0.004 and math.abs(g - bg) < 0.004 and math.abs(b - bb) < 0.004 then
+		-- (Still the color we last gave it: left alone. See done.)
+		local last = done[region]
+		if last and last[1] == br and last[2] == bg and last[3] == bb then
 			return
 		end
 		painting = true
 		SetColour(region, setter, br, bg, bb, a)
 		painting = false
+		if last then
+			last[1], last[2], last[3] = br, bg, bb
+		else
+			done[region] = { br, bg, bb }
+		end
 	end
 
 	-- A frame's textures, from its GetRegions (no table: this runs each frame).
@@ -2208,6 +2221,12 @@ do
 	local painter = CreateFrame("Frame")
 	painter:Hide()
 	ns.SetOnUpdate(painter, ns.Profiled("Target colors", function()
+		-- (Everything painted again now and then, for changes no hook sees.)
+		local now = GetTime()
+		if now - doneAt > 0.2 then
+			doneAt = now
+			wipe(done)
+		end
 		for unitFrame, tint in pairs(tints) do
 			if Usable(unitFrame) then
 				if tint.name then
@@ -2239,6 +2258,7 @@ do
 				local _, _, _, a = ReadColour(region, first[4])
 				SetColour(region, first[5], first[1], first[2], first[3], a)
 				saved[region] = nil
+				done[region] = nil
 			end
 		end
 		painting = false
