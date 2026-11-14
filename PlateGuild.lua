@@ -489,8 +489,10 @@ local function Refresh(plate)
 	-- (Its size next to the name's and its color: the name's Name Style row,
 	-- Second line tab. NameRowLook.lua.)
 	local row = ns.NameRowOf and ns.NameRowOf(unitFrame, unit)
-	local lineSize = ns.NameLookValue and tonumber(ns.NameLookValue(row, "Line2Size")) or 1
-	local lineColor = ns.NameLookValue and ns.NameLookValue(row, "Line2Color") or "name"
+	-- (Each value alone: NameLookValue's second, where it's from, would go into
+	-- tonumber() as a number base.)
+	local lineSize = ns.NameLookValue and tonumber((ns.NameLookValue(row, "Line2Size"))) or 1
+	local lineColor = ns.NameLookValue and (ns.NameLookValue(row, "Line2Color")) or "name"
 	local file, size, flags = name:GetFont()
 	if lineSize ~= 1 and file and size and ns.SetPlateNameFont then
 		ns.SetPlateNameFont(line, object or _G.SystemFont_NamePlate or _G.GameFontNormal, file, size, lineSize, flags)

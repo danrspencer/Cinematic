@@ -218,8 +218,10 @@ end
 
 -- A Name Style setting as a name's row has it (row -> All names -> the
 -- game's: NameRowLook.lua). row nil: All names'.
+-- (The value alone, in parentheses: its second value, where it's from, went
+-- into tonumber() as a number base and errored on every name, 2026-11-14.)
 local function NameStyle(row, setting)
-	return ns.NameLookValue(row, setting)
+	return (ns.NameLookValue(row, setting))
 end
 
 -- Whether a unit's name takes a colour of ours: true for the game's colour
