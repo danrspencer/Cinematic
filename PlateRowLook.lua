@@ -4,7 +4,9 @@
 -- that row goes by. Each setting (keys as the row's others: MarkKey's
 -- <kind>Mark<Look...>, targetArrow<Look...> for your target) starts as
 -- "default": the Default row's, and the Default row's own default is the
--- plate's usual look (the Style hub's General page, else the game's).
+-- plate's usual look: for the bar, the Style hub's General page, else the
+-- game's; for the name, Name Style's All names (what it has changed from
+-- how it starts), else the game's.
 -- PlateParts asks for a plate's row (ns.ApplyPlateRowLook, from its marks'
 -- pass); PlateHealthStyle draws the bar and border (ns.PlateBarOverride);
 -- PlateParts' own names and ApplyPlate read the name and level here.
@@ -36,6 +38,43 @@ local function Own(key, kind)
 	return value
 end
 
+-- The name on a full plate under the rows: Name Style's All names (its
+-- outline and shadow, what it has changed from how they start: as they
+-- start, the game's), with that page on. nil: the game's.
+local function AllNames(key)
+	local db = ns.db
+	if not (db and db.plateNameStyle) then return nil end
+	if key == "LookOutline" then
+		local value = tonumber(db.plateNameOutline)
+		if value and value ~= ns.DEFAULTS.plateNameOutline then return value end
+	elseif key == "LookShadow" then
+		local value = db.plateNameShadow
+		if value ~= nil and value ~= ns.DEFAULTS.plateNameShadow then return value and "on" or "none" end
+	end
+	return nil
+end
+
+-- (The name's outline and shadow from All names, where the rows have none.)
+local function NamesLayer(look)
+	local any = false
+	if look.outline == nil then
+		local outline = AllNames("LookOutline")
+		if outline ~= nil then look.outline, any = outline, true end
+	end
+	if look.shadow == nil then
+		local shadow = AllNames("LookShadow")
+		if shadow ~= nil then
+			look.shadow, any = shadow, true
+			local db = ns.db
+			if shadow == "on" then
+				look.shadowAt = { tonumber(db.plateNameShadowX) or 1, tonumber(db.plateNameShadowY) or -1,
+					tonumber(db.plateNameShadowAlpha) or 1 }
+			end
+		end
+	end
+	return any
+end
+
 -- Whether a row has a look of its own (any of the main settings set).
 function ns.PlateRowHasLook(kind)
 	for _, key in ipairs({ "LookTexture", "LookBorder", "LookFont", "LookTextSize", "LookOutline", "LookShadow",
@@ -52,7 +91,13 @@ end
 -- over: { key = value } in place of the row's own (the Look panel's preview,
 -- for a choice pointed at: never saved).
 function ns.PlateRowLookFor(kind, over)
-	if not kind then return nil end
+	-- (nil: none at all, the page off. false: a plate no row fits, All
+	-- names' alone.)
+	if kind == nil then return nil end
+	if not kind then
+		local look = {}
+		return NamesLayer(look) and look or nil
+	end
 	local function Mine(key)
 		if over and over[key] ~= nil then
 			if IsDefault(key, over[key]) then return nil end
@@ -109,6 +154,7 @@ function ns.PlateRowLookFor(kind, over)
 		end
 		any = true
 	end
+	if NamesLayer(look) then any = true end
 	return any and look or nil
 end
 
@@ -123,6 +169,8 @@ function ns.PlateLooksOn()
 			if ns.PlateRowHasLook(kind) then anyNow = true break end
 		end
 		anyNow = anyNow or ns.PlateRowHasLook("others")
+		-- (All names' outline or shadow reach every plate's name.)
+		anyNow = anyNow or AllNames("LookOutline") ~= nil or AllNames("LookShadow") ~= nil
 	end
 	return anyNow
 end
@@ -136,8 +184,9 @@ local function Signature(look)
 	if not look then return "" end
 	local border = look.border and table.concat(look.border, ",") or ""
 	local gradient = look.gradient and table.concat(look.gradient, ",") or tostring(look.gradient)
+	local shadowAt = look.shadowAt and table.concat(look.shadowAt, ",") or ""
 	return table.concat({ tostring(look.texture), border, tostring(look.fontValue), tostring(look.size),
-		tostring(look.outline), tostring(look.shadow), tostring(look.level), gradient }, "|")
+		tostring(look.outline), tostring(look.shadow), tostring(look.level), gradient, shadowAt }, "|")
 end
 
 -- The game's name on the plate: its own font back.
@@ -154,6 +203,9 @@ local function NameBack(name)
 	pcall(function() name:SetText(name:GetText()) end)
 end
 
+-- (Russian, Korean and Chinese letters: only the game's fonts have them.)
+local ROMAN = not ({ ruRU = true, koKR = true, zhCN = true, zhTW = true })[GetLocale and GetLocale() or ""]
+
 -- The game's name on the plate in the look's font, size, outline and shadow.
 local function NameLook(name, look)
 	if not (name and name.GetFont) then return end
@@ -168,7 +220,9 @@ local function NameLook(name, look)
 			flags = flags, sx = sx, sy = sy }
 	end
 	local before = nameBefore[name]
-	local file = look.font or before.file
+	-- (Our font only where its letters show: a font family keeps the game's
+	-- for other alphabets; without one, other alphabets keep the game's file.)
+	local file = (ROMAN or CreateFontFamily) and look.font or before.file
 	local size = before.size or 10
 	local flags = before.flags
 	if look.outline and look.outline >= 0 and ns.OutlinedFlags then flags = ns.OutlinedFlags(flags, look.outline) end
@@ -177,8 +231,10 @@ local function NameLook(name, look)
 			look.size or 1, flags)
 	end
 	if look.shadow == "on" then
-		name:SetShadowOffset(1, -1)
-		name:SetShadowColor(0, 0, 0, 1)
+		-- (All names' own place and depth, from that page.)
+		local at = look.shadowAt
+		name:SetShadowOffset(at and at[1] or 1, at and at[2] or -1)
+		name:SetShadowColor(0, 0, 0, at and at[3] or 1)
 	elseif look.shadow == "none" then
 		name:SetShadowOffset(0, 0)
 	elseif look.shadow == "game" then
@@ -193,8 +249,9 @@ function ns.PlateLookNow(plate)
 	return entry and entry.look or nil
 end
 
--- A plate's row (kind, nil: none) as the marks' pass found it: its look on
--- the plate, drawn again only if it changed.
+-- A plate's row (kind; false: none fits; nil: none at all, the page off) as
+-- the marks' pass found it: its look on the plate, drawn again only if it
+-- changed.
 function ns.ApplyPlateRowLook(plate, kind)
 	local look = ns.PlateRowLookFor(kind)
 	local sig = Signature(look)
@@ -237,7 +294,6 @@ end)
 -- sample unit to pick, the lake or plain dark behind, and a closer look. (The
 -- picks are kept for the next panel opened.)
 local PLATE_FILL, PLATE_GROUND = "UI-HUD-CoolDownManager-Bar", "UI-HUD-CoolDownManager-Bar-BG"
-local ROMAN = not ({ ruRU = true, koKR = true, zhCN = true, zhTW = true })[GetLocale and GetLocale() or ""]
 -- { pick's name, unit's name, bar color, name color, level } (the Player: you).
 local SAMPLES = {
 	{ "Hostile", "Gnoll Brute", { 0.85, 0.12, 0.1 }, { 1, 0.25, 0.2 }, 17 },
@@ -456,11 +512,13 @@ function ns.MakePlateRowLookPreview(parent, width, kind)
 	tag:SetText(L["Preview: not saved"])
 	tag.searchSkip = true
 
-	-- over: a choice pointed at in the panel ({ key = value }), shown, not saved.
-	function holder.Refresh(self, over)
+	-- over: a choice pointed at in the panel ({ key = value }), shown, not saved;
+	-- note: the words over the scene for it (Preview: not saved).
+	function holder.Refresh(self, over, note)
 		local db = ns.db
 		if not db then return end
 		tag:SetShown(over ~= nil)
+		tag:SetText(note or L["Preview: not saved"])
 		for i, pill in ipairs(picks) do pill:SetOn(i == sampleNow) end
 		sceneButton:SetOn(sceneNow)
 		closeButton:SetOn(closeNow)
@@ -534,30 +592,23 @@ function ns.MakePlateRowLookPreview(parent, width, kind)
 		border:SetShown(edgeKind == "line")
 		if edgeKind == "line" then ns.DressStyleEdges(border, size, r, g, b, 1, true) end
 
-		-- Its name: the row's font, size, outline and shadow, else the Name
-		-- Style page's and General's. (The font set before the text: else
+		-- Its name, as the plates draw it: the row's font, size, outline and
+		-- shadow, else the Default row's, else Name Style's All names (outline
+		-- and shadow), else the game's. (The font set before the text: else
 		-- other alphabets show boxes.)
 		local file, height, flags = own[1], own[2], own[3]
 		if file and height then
-			if ROMAN and on then file = ns.StyleFontFile(general.styleFont) or file end
-			file = look.font or file
+			if ROMAN and look.font then file = look.font end
 			local outline = look.outline
-			if not (outline and outline >= 0) then
-				outline = tonumber(db.plateNameOutline) or tonumber(ns.DEFAULTS.plateNameOutline) or 0
-			end
-			if outline > 0 and ns.OutlinedFlags then flags = ns.OutlinedFlags(flags, outline) end
+			if outline and outline >= 0 and ns.OutlinedFlags then flags = ns.OutlinedFlags(flags, outline) end
 			name:SetFont(file, height * (look.size or 1), flags or "")
 		end
 		name:SetText(unitName)
 		local shadow = look.shadow
-		if shadow == nil or shadow == "default" then
-			local nameShadow = db.plateNameShadow
-			if nameShadow == nil then nameShadow = ns.DEFAULTS.plateNameShadow end
-			shadow = nameShadow and "on" or "game"
-		end
 		if shadow == "on" then
-			name:SetShadowOffset(1, -1)
-			name:SetShadowColor(0, 0, 0, 1)
+			local at = look.shadowAt
+			name:SetShadowOffset(at and at[1] or 1, at and at[2] or -1)
+			name:SetShadowColor(0, 0, 0, at and at[3] or 1)
 		elseif shadow == "none" then
 			name:SetShadowOffset(0, 0)
 		else
@@ -573,9 +624,10 @@ function ns.MakePlateRowLookPreview(parent, width, kind)
 	return holder
 end
 
--- What a row's usual gives for one Look setting (the Look panel's Usual
+-- What a row's usual gives for one Look setting (the Look panel's Inherit
 -- tiles and buttons): its name and value. A row's usual is the Default row's;
--- the Default row's, General's and the Name Style page's, else the game's.
+-- the Default row's: for the bar, General's; for the name's outline and
+-- shadow, Name Style's All names; else the game's.
 local BORDER_WORDS = { game = "The game's", none = "None", thin = "Thin", thick = "Thick", custom = "Custom" }
 local OUTLINE_WORDS = { [0] = "None", "Thin", "Thick" }
 local SHADOW_WORDS = { game = "The game's", on = "Shadow", none = "None" }
@@ -589,22 +641,18 @@ function ns.PlateRowUsual(kind, key)
 		return value == "game" and L["The game's"] or (ns.StyleTextureName and ns.StyleTextureName(value) or value),
 			value
 	elseif key == "LookFont" then
-		if value == nil then value = on and db.styleFont or "game" end
+		-- (General's font doesn't reach full plates' names: the game's.)
+		if value == nil then value = "game" end
 		return value == "game" and L["The game's"] or ns.StyleFontName(value), value
 	elseif key == "LookBorder" then
 		if value == nil then value = on and db.styleBorder or "game" end
 		return L[BORDER_WORDS[value] or "The game's"], value
 	elseif key == "LookOutline" then
-		if value == nil then
-			value = tonumber(db.plateNameOutline) or tonumber(ns.DEFAULTS.plateNameOutline) or 0
-		end
+		if value == nil then value = AllNames(key) end
+		if value == nil then return L["The game's"], -1 end
 		return L[OUTLINE_WORDS[value] or "None"], value
 	elseif key == "LookShadow" then
-		if value == nil then
-			local shadow = db.plateNameShadow
-			if shadow == nil then shadow = ns.DEFAULTS.plateNameShadow end
-			value = shadow and "on" or "game"
-		end
+		if value == nil then value = AllNames(key) or "game" end
 		return L[SHADOW_WORDS[value] or "The game's"], value
 	elseif key == "LookGradient" then
 		if value == nil then value = "off" end
@@ -613,4 +661,53 @@ function ns.PlateRowUsual(kind, key)
 		if value == nil then value = "show" end
 		return value == "hide" and L["Hidden"] or L["Shown"], value
 	end
+end
+
+-- Where a row's Look setting comes from (the Look panel's tags): { text =
+-- This row, Default row's, General's (Set by theme: <name> while it's what
+-- the theme wrote), Name Style's or The game's; own = the row's own; parent =
+-- what it'd inherit, short = that in a word, for the Inherit tile }.
+local function Below(key)
+	local L = ns.L
+	local db = ns.db or {}
+	if key == "LookTexture" or key == "LookBorder" then
+		local general = key == "LookTexture" and "styleTexture" or "styleBorder"
+		local value = db.styleGeneral and db[general]
+		if value ~= nil and value ~= false and value ~= "game" then
+			local theme = ns.ActiveStyleTheme and ns.ActiveStyleTheme()
+			local themed = theme and theme.key ~= "game" and ns.ThemeSetting and ns.ThemeSetting(general)
+			if themed ~= nil and themed == value then return L["Set by theme: %s"]:format(L[theme.name]), L["theme"] end
+			return L["General's"], L["General"]
+		end
+	elseif AllNames(key) ~= nil then
+		return L["Name Style's"], L["Name Style"]
+	end
+	return L["The game's"], nil
+end
+function ns.PlateRowSource(kind, key)
+	local L = ns.L
+	local parent, short
+	if kind ~= "others" and Own(key, "others") ~= nil then
+		parent, short = L["Default row's"], L["Default row"]
+	else
+		parent, short = Below(key)
+	end
+	local own = Own(key, kind) ~= nil
+	return { text = own and L["This row"] or parent, own = own, parent = parent, short = short }
+end
+
+-- A theme's bar as a row's Look (its panel's Start from a theme): its
+-- texture and its line round the bar. (The name stays Name Style's.) The
+-- game's theme: the game's bar and border.
+function ns.PlateRowThemeLook(themeKey)
+	local theme = ns.StyleThemeByKey and ns.StyleThemeByKey(themeKey)
+	if not theme then return nil end
+	local settings = theme.settings or {}
+	local look = { LookTexture = settings.styleTexture or "game", LookBorder = settings.styleBorder or "game" }
+	if look.LookBorder == "custom" then
+		look.LookBorderSize = settings.styleBorderSize or 1
+		look.LookBorderR, look.LookBorderG, look.LookBorderB = settings.styleBorderR or 0, settings.styleBorderG or 0,
+			settings.styleBorderB or 0
+	end
+	return look
 end

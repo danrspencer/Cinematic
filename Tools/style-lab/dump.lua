@@ -112,7 +112,14 @@ local PAGES = {
 	{ id = "page-overrides", name = "Style: Overrides tab", group = "Menu", page = "Style > General > Overrides", pageName = "Style Overrides" },
 	{ id = "page-tooltip", name = "Style: Tooltips page", group = "Menu", page = "Style > Tooltips", pageName = "Tooltip Style" },
 	{ id = "page-cast", name = "Style: Cast Bars page", group = "Menu", page = "Style > Cast Bars", pageName = "Cast Bar Style" },
+	{ id = "page-names", name = "Style: Name Style page", group = "Menu", page = "Style > Nameplates > Name Style", pageName = "Name Style" },
+	{ id = "page-plates", name = "Style: Nameplate Style page", group = "Menu", page = "Style > Nameplates > Nameplate Style", pageName = "Nameplate Style" },
 	{ id = "page-damage", name = "Damage Vision: Style page", group = "Menu", page = "Damage Vision > Style", pageName = "Damage Vision Look" },
+}
+-- Look panels, open: the page they're on, and words in the panel's title.
+local LOOKS = {
+	{ id = "look-plate", name = "Nameplate Style: a row's Look panel", group = "Menu",
+		page = "Style > Nameplates > Nameplate Style > Look", pageName = "Nameplate Style", look = " - " },
 }
 
 local holders = {}
@@ -199,6 +206,42 @@ local function PageShot(info)
 	return { w = w, h = h, items = items }
 end
 
+-- A Look panel, open (StylePages.lua's rows.Look): the first made whose
+-- title has info.look in it, its page opened first so its rows are made.
+local function LookShot(info)
+	local page = PageCanvas(info.pageName)
+	if page and not rawget(page, "cineLabShown") then
+		page.cineLabShown = true
+		PageShot({ pageName = info.pageName })
+	end
+	local found
+	for _, each in ipairs(ns.LOOK_PANELS or {}) do
+		if not found and tostring(each.title):find(info.look, 1, true) then found = each.pop end
+	end
+	if not found then
+		wow.Warn("no Look panel " .. info.look)
+		return nil
+	end
+	found:SetParent(UIParent)
+	found:ClearAllPoints()
+	found:SetPoint("TOPLEFT", UIParent, "TOPLEFT", 0, 0)
+	found:Show()
+	local function Shown(frame)
+		local fn = frame._scripts and frame._scripts.OnShow
+		if fn and frame:IsVisible() then pcall(fn, frame) end
+		local refresh = rawget(frame, "Refresh")
+		if type(refresh) == "function" and frame:IsVisible() then pcall(refresh, frame) end
+		for _, child in ipairs(frame._children or {}) do
+			if child._scripts then Shown(child) end
+		end
+	end
+	Shown(found)
+	if ns.lowHealthKit and ns.lowHealthKit.Refresh then pcall(ns.lowHealthKit.Refresh) end
+	local items, w, h = F.Dump(found)
+	found:Hide()
+	return { w = w, h = h, items = items }
+end
+
 local function ThemeList()
 	if ns.StyleThemeList then return ns.StyleThemeList() end
 	return { { key = "game", name = "The game's" } }
@@ -211,6 +254,9 @@ end
 for _, info in ipairs(PAGES) do
 	result.frames[#result.frames + 1] = { id = info.id, name = info.name, group = info.group, page = info.page }
 end
+for _, info in ipairs(LOOKS) do
+	result.frames[#result.frames + 1] = { id = info.id, name = info.name, group = info.group, page = info.page }
+end
 _G.CinematicDB = _G.CinematicDB or {}
 _G.CinematicDB.menuSkin = "HD"
 for _, theme in ipairs(ThemeList()) do
@@ -220,6 +266,7 @@ for _, theme in ipairs(ThemeList()) do
 	local shots = {}
 	for _, info in ipairs(FRAMES) do shots[info.id] = Shot(info) end
 	for _, info in ipairs(PAGES) do shots[info.id] = PageShot(info) end
+	for _, info in ipairs(LOOKS) do shots[info.id] = LookShot(info) end
 	result.shots[theme.key] = shots
 end
 result.warnings = wow.warnings

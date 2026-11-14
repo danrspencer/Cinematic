@@ -1160,6 +1160,9 @@ ns.LOOK_DIM = LookFont("CinematicLookDim", 0.6, 0.6, 0.6, _G.GameFontDisableSmal
 -- The Look panel shown now (one at a time), and where it was popped out to
 -- (nil: docked beside the settings).
 local openLook
+-- A look copied (Copy look, in a tabbed Look panel): { kind (the panels it
+-- pastes into: spec.tabs.copyKind), from (its row's name), values }.
+local lookClip
 local function LookSpot()
 	local db = ns.GetDB()
 	local spot = db and db.lookPanel
@@ -1563,6 +1566,13 @@ function ns.StyleRows(kit, content, stack, changed, switchKey, fieldOf, panel)
 	local function Hover(key, value)
 		if panel and panel.hover then panel.hover(key, value) end
 	end
+	-- (Where a setting's value comes from: { text = its tag (This row, Default
+	-- row's, General's, The game's...), own = the row's own, parent = the tag
+	-- of what it'd inherit, short = that in a word (nil: the game's) }, or nil
+	-- where the page gives none.)
+	local function Source(key)
+		if key and panel and panel.source then return panel.source(key) end
+	end
 	local function TipOn(frame, text)
 		if not text then return end
 		GameTooltip:SetOwner(frame, "ANCHOR_RIGHT")
@@ -1581,23 +1591,30 @@ function ns.StyleRows(kit, content, stack, changed, switchKey, fieldOf, panel)
 	local ROW_W = TILE_W * TILES_ACROSS + TILE_GAP * (TILES_ACROSS - 1)
 
 	-- A tabbed Look panel's row heading: its name in gold, what it's set to
-	-- after it (head:Set, from the row's control), and Reset at the right
-	-- while it isn't its usual (key nil: none).
-	local function Heading(label, key, tip)
+	-- after it (head:Set, from the row's control), where that comes from (the
+	-- page's source: This row, Default row's, The game's...; Off while the
+	-- setting can't apply), and Reset at the right while it isn't its usual
+	-- (key nil: none).
+	local function Heading(label, key, tip, test)
 		local head = CreateFrame("Frame", nil, content)
 		head:SetSize(ROW_W, 16)
 		stack:Add(head, "label")
 		local name = kit.Label(head, "GameFontNormal", (tostring(label):gsub(":%s*$", "")))
 		name:SetPoint("LEFT", 0, 0)
 		name.searchTip = tip
-		local value = head:CreateFontString(nil, "OVERLAY", ns.LOOK_DIM)
-		value:SetPoint("LEFT", name, "RIGHT", 8, 0)
-		value:SetPoint("RIGHT", head, "RIGHT", -64, 0)
-		value:SetJustifyH("LEFT")
-		value:SetWordWrap(false)
 		local reset = CreateFrame("Button", nil, head)
 		reset:SetSize(58, 16)
 		reset:SetPoint("RIGHT", 0, 0)
+		local source = head:CreateFontString(nil, "OVERLAY", ns.LOOK_DIM)
+		source:SetPoint("RIGHT", reset, "LEFT", -6, 0)
+		source:SetJustifyH("RIGHT")
+		source:SetWordWrap(false)
+		source.searchSkip = true
+		local value = head:CreateFontString(nil, "OVERLAY", ns.LOOK_DIM)
+		value:SetPoint("LEFT", name, "RIGHT", 8, 0)
+		value:SetPoint("RIGHT", source, "LEFT", -8, 0)
+		value:SetJustifyH("LEFT")
+		value:SetWordWrap(false)
 		local icon = reset:CreateTexture(nil, "ARTWORK")
 		icon:SetTexture("Interface\\Buttons\\UI-RefreshButton")
 		icon:SetSize(12, 12)
@@ -1628,13 +1645,19 @@ function ns.StyleRows(kit, content, stack, changed, switchKey, fieldOf, panel)
 			local default = Default()
 			local db = ns.GetDB()
 			reset:SetShown(db and default ~= nil and Get(key) ~= default and On(db) or false)
+			-- (Where it comes from: the row's own in gold, else dim; Off while it
+			-- can't apply and isn't the row's own.)
+			local from = db and Source(key)
+			if from and test and not test(db) and not from.own then from = { text = ns.L["Off"] } end
+			source:SetText(from and from.text or "")
+			if from and from.own then source:SetTextColor(1, 0.82, 0) else source:SetTextColor(0.6, 0.6, 0.6) end
 		end
 		kit.AddControl(head)
 		return head
 	end
 
 	function rows.Tiles(label, key, list, tip, test, tint)
-		local head = Heading(label, key, tip)
+		local head = Heading(label, key, tip, test)
 		local grid = CreateFrame("Frame", nil, content)
 		grid:SetSize(TILE_W * TILES_ACROSS + TILE_GAP * (TILES_ACROSS - 1), 1)
 		stack:Add(grid, "label")
@@ -1725,6 +1748,10 @@ function ns.StyleRows(kit, content, stack, changed, switchKey, fieldOf, panel)
 				tile.words:SetFontObject(ns.LOOK_TEXT)
 			end
 			tile.words:SetText(item.text or tostring(item.value))
+			-- (The inherited one: what it gives and where from, in a word:
+			-- Default row, General, theme. Nothing more for the game's own.)
+			local from = usualText and Source(key)
+			if from and from.short then usualText = usualText .. " · " .. from.short end
 			tile.sub:SetText(usualText or "")
 			local top = (kind == "texture" or kind == "border") and -22 or -9
 			tile.words:ClearAllPoints()
@@ -1822,7 +1849,7 @@ function ns.StyleRows(kit, content, stack, changed, switchKey, fieldOf, panel)
 	-- gold. sample: "outline" (each word in its outline) or "shadow" (in its
 	-- shadow). Gives the last, to put a swatch after.
 	function rows.Segments(label, key, list, tip, test, sample)
-		local head = Heading(label, key, tip)
+		local head = Heading(label, key, tip, test)
 		local last
 		for _, info in ipairs(list) do
 			local button = CreateFrame("Button", nil, content)
@@ -1899,7 +1926,7 @@ function ns.StyleRows(kit, content, stack, changed, switchKey, fieldOf, panel)
 	-- way. Values as rows.Slider's (shown = saved * scale, fmt "%d%%").
 	function rows.Slide(key, label, minV, maxV, step, fmt, scale, tip, test)
 		scale = scale or 1
-		local head = Heading(label, key, tip)
+		local head = Heading(label, key, tip, test)
 		local holder = CreateFrame("Frame", nil, content)
 		holder:SetSize(ROW_W, 30)
 		stack:Add(holder, "label")
@@ -2192,6 +2219,9 @@ function ns.StyleRows(kit, content, stack, changed, switchKey, fieldOf, panel)
 			ns.GetDB().lookPanel = { x = self:GetLeft(), y = self:GetTop() }
 		end)
 		pop.recordAs = content -- (its settings are the page's: its Reset puts them back)
+		-- (Every Look panel made, by its title: Tools/style-lab draws one open.)
+		ns.LOOK_PANELS = ns.LOOK_PANELS or {}
+		ns.LOOK_PANELS[#ns.LOOK_PANELS + 1] = { title = title, pop = pop }
 		local bg = pop:CreateTexture(nil, "BACKGROUND")
 		bg:SetAllPoints()
 		bg:SetColorTexture(0.05, 0.05, 0.05, 0.97)
@@ -2250,8 +2280,10 @@ function ns.StyleRows(kit, content, stack, changed, switchKey, fieldOf, panel)
 				if moved then names[#names + 1] = tab.name end
 				pages[i]:SetShown(on)
 			end
-			summary:SetText(#names > 0 and ns.L["Changed: %s"]:format(table.concat(names, " · "))
-				or ns.L["Nothing changed"])
+			-- (A page whose settings inherit: said so.)
+			local inherits = type(tabbed) == "table" and tabbed.source
+			summary:SetText(#names > 0 and ns.L[inherits and "Changed here: %s" or "Changed: %s"]:format(
+				table.concat(names, " · ")) or ns.L[inherits and "Nothing changed here: all inherited" or "Nothing changed"])
 			if preview and preview:IsVisible() then preview:Refresh() end
 		end
 		-- (Its pages' rows as tiles and buttons: one pointed at shows on the
@@ -2272,7 +2304,20 @@ function ns.StyleRows(kit, content, stack, changed, switchKey, fieldOf, panel)
 					return tabbed.usual(key)
 				end
 			end,
+			-- (Where each setting's value comes from: spec.tabs.source(key).)
+			source = type(tabbed) == "table" and tabbed.source or nil,
 		}
+		-- (Every setting the panel counts: those with a default, its row's color
+		-- and paint ticks left out. Known once its pages are made.)
+		local function LookKeys()
+			local list = {}
+			for _, page in ipairs(pages) do
+				for _, key in ipairs(page.keys) do
+					if DefaultOf(key) ~= nil then list[#list + 1] = key end
+				end
+			end
+			return list
+		end
 		-- (A change on a tab's page: its dot and the footer too.)
 		local function TabChanged(...)
 			changed(...)
@@ -2285,7 +2330,104 @@ function ns.StyleRows(kit, content, stack, changed, switchKey, fieldOf, panel)
 				preview:SetPoint("TOPLEFT", pop, "TOPLEFT", 12, -36)
 				preview:SetPoint("RIGHT", pop, "RIGHT", -12, 0)
 			end
-			strip:SetPoint("TOPLEFT", pop, "TOPLEFT", 0, preview and -(36 + preview:GetHeight() + 10) or -36)
+			-- (A line of tools under the sample: Hold to compare, Copy look,
+			-- Paste, Start from a theme. Then the tabs.)
+			local toolsTop = preview and (36 + preview:GetHeight() + 8) or 36
+			local tools = CreateFrame("Frame", nil, pop)
+			tools:SetHeight(22)
+			tools:SetPoint("TOPLEFT", pop, "TOPLEFT", 12, -toolsTop)
+			tools:SetPoint("RIGHT", pop, "RIGHT", -12, 0)
+			strip:SetPoint("TOPLEFT", pop, "TOPLEFT", 0, -(toolsTop + 22 + 8))
+			local function Tool(text, width, tip)
+				local tool = ns.PanelButton(tools)
+				tool:SetSize(width, 20)
+				tool:SetText(text)
+				tool:SetScript("OnEnter", function(self) TipOn(self, type(tip) == "function" and tip() or tip) end)
+				tool:SetScript("OnLeave", function() GameTooltip:Hide() end)
+				tool.Refresh = function() end
+				kit.AddControl(tool)
+				return tool
+			end
+			-- (Every counted setting as it starts, then values over it: changed.)
+			local function Load(values)
+				for _, key in ipairs(LookKeys()) do ns.StyleKeyPut(Field(key), DefaultOf(key)) end
+				for key, value in pairs(values) do ns.StyleKeyPut(Field(key), value) end
+				changed()
+				kit.Refresh()
+				PaintTabs()
+			end
+			local last
+			-- Hold to compare: held down, the sample without this row's own
+			-- changes (every counted setting as it starts); let go, as it is.
+			if preview then
+				local compare = Tool(ns.L["Hold to compare"], 124,
+					ns.L["Hold it down to see the sample without this row's own changes: before, then after."])
+				compare:SetPoint("LEFT", tools, "LEFT", 0, 0)
+				local holding = false
+				local function Hold(on)
+					if holding == on then return end
+					holding = on
+					compare:SetText(on and ns.L["Showing: before"] or ns.L["Hold to compare"])
+					if on then
+						local over = {}
+						for _, key in ipairs(LookKeys()) do over[key] = DefaultOf(key) end
+						preview:Refresh(over, ns.L["Before this row's changes"])
+					else
+						preview:Refresh()
+					end
+				end
+				compare:SetScript("OnMouseDown", function(self)
+					if self:IsEnabled() then Hold(true) end
+				end)
+				compare:SetScript("OnMouseUp", function() Hold(false) end)
+				compare:HookScript("OnLeave", function() Hold(false) end)
+				compare:HookScript("OnHide", function() Hold(false) end)
+				kit.GreyUnless(compare, On)
+				last = compare
+			end
+			-- Copy look / Paste: this panel's settings, into another panel of
+			-- the same kind (Target's into Focus', say).
+			local copyKind = tabbed.copyKind or title
+			local copy = Tool(ns.L["Copy look"], 86, ns.L["Keep this look, to paste into another row."])
+			if last then copy:SetPoint("LEFT", last, "RIGHT", 6, 0) else copy:SetPoint("LEFT", tools, "LEFT", 0, 0) end
+			local paste = Tool(ns.L["Paste"], 64, function()
+				if lookClip and lookClip.kind == copyKind then
+					return ns.L["This row's look as %s's, copied."]:format(lookClip.from)
+				end
+				return ns.L["Copy a look first (Copy look, in another row's panel)."]
+			end)
+			paste:SetPoint("LEFT", copy, "RIGHT", 6, 0)
+			copy:SetScript("OnClick", function(self)
+				local values = {}
+				for _, key in ipairs(LookKeys()) do values[key] = ns.StyleKeyGet(Field(key)) end
+				lookClip = { kind = copyKind, from = tabbed.copyName or title, values = values }
+				self:SetText(ns.L["Copied"])
+				C_Timer.After(0.9, function() self:SetText(ns.L["Copy look"]) end)
+				kit.Refresh()
+			end)
+			paste:SetScript("OnClick", function()
+				if lookClip and lookClip.kind == copyKind then Load(lookClip.values) end
+			end)
+			kit.GreyUnless(copy, On)
+			kit.GreyUnless(paste, function(db) return On(db) and lookClip ~= nil and lookClip.kind == copyKind end)
+			-- Start from a theme: a theme's look in just this panel (spec.tabs.
+			-- themeLook(theme's key): its { key = value }), to change from there.
+			if tabbed.themeLook then
+				local start = Tool(ns.L["Start from a theme"], 130,
+					ns.L["This row's look as a theme has it, to change from there. Only this row: the theme in use stays."])
+				start:SetPoint("RIGHT", tools, "RIGHT", 0, 0)
+				start:SetScript("OnClick", function(self)
+					ns.ContextMenu(self, function(_, root)
+						for _, theme in ipairs(ns.StyleThemeList()) do
+							root:CreateButton(theme.name, function()
+								local values = tabbed.themeLook(theme.key)
+								if values then Load(values) end
+							end)
+						end
+					end)
+				end)
+				kit.GreyUnless(start, On)
+			end
 			strip:SetPoint("RIGHT", pop, "RIGHT")
 			local band = strip:CreateTexture(nil, "BACKGROUND")
 			band:SetAllPoints()
@@ -2306,10 +2448,21 @@ function ns.StyleRows(kit, content, stack, changed, switchKey, fieldOf, panel)
 			line:SetHeight(1)
 			line:SetColorTexture(1, 1, 1, 0.12)
 			resetAll = ns.PanelButton(footer)
-			resetAll:SetSize(90, 20)
+			resetAll:SetSize(100, 20)
 			resetAll:SetPoint("RIGHT", -10, 0)
 			resetAll:SetText(ns.L["Reset all"])
-			kit.Tooltip(resetAll, ns.L["Every setting in this panel back to how it starts."])
+			-- (Its name: spec.tabs.resetLabel, a word or a function giving one:
+			-- Clear this row on a row that inherits.)
+			local function ResetLabel()
+				local word = type(tabbed) == "table" and tabbed.resetLabel
+				if type(word) == "function" then word = word() end
+				return word or ns.L["Reset all"]
+			end
+			resetAll:SetScript("OnEnter", function(self)
+				TipOn(self, ResetLabel() == ns.L["Reset all"] and ns.L["Every setting in this panel back to how it starts."]
+					or ns.L["Every setting in this panel back to inherited: the row takes its look from above again."])
+			end)
+			resetAll:SetScript("OnLeave", function() GameTooltip:Hide() end)
 			resetAll:SetScript("OnClick", function()
 				for _, page in ipairs(pages) do
 					for _, key in ipairs(page.keys) do
@@ -2321,7 +2474,10 @@ function ns.StyleRows(kit, content, stack, changed, switchKey, fieldOf, panel)
 				kit.Refresh()
 				PaintTabs()
 			end)
-			resetAll.Refresh = function() PaintTabs() end
+			resetAll.Refresh = function(self)
+				self:SetText(ResetLabel())
+				PaintTabs()
+			end
 			kit.GreyUnless(resetAll, function(db) return On(db) and AnyChanged() end)
 			kit.AddControl(resetAll)
 			summary = kit.Label(footer, ns.LOOK_DIM, "")

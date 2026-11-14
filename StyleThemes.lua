@@ -425,6 +425,10 @@ local THEMES = {
 local BY_KEY = {}
 for _, theme in ipairs(THEMES) do BY_KEY[theme.key] = theme end
 
+-- A theme's own data by its key (nil: none such), read only: the Look
+-- panels' Start from a theme.
+function ns.StyleThemeByKey(key) return BY_KEY[key] end
+
 -- The list as the page shows it: each theme's key, name and tip in the
 -- player's language, and its colors.
 function ns.StyleThemeList()

@@ -9517,6 +9517,8 @@ local function CreateNameStylePanel()
 	local preview -- (below: drawn again as each setting changes)
 	local function Changed()
 		if ns.RefreshPlateNameStyle then ns.RefreshPlateNameStyle() end
+		-- (Its outline and shadow reach full plates' names too: PlateRowLook.lua.)
+		if ns.RefreshTargetArrows then ns.RefreshTargetArrows() end
 		if preview then preview:Refresh() end
 	end
 	local function On(db) return db.plateNameStyle end
@@ -11091,10 +11093,12 @@ do
 				chips.Refresh()
 				Changed()
 			end
-			local defaultName = kind == "others" and L["Usual"] or L["Default row's"]
+			-- (Each setting's first choice: Inherit, what's above the row.)
+			local defaultName = L["Inherit"]
 			local defaultTip = kind == "others"
-				and L["Usual: the plate's own look, as the Style hub's General and Name Style pages have it."]
-				or L["Default row's: as the Default row's Look has it."]
+				and L["Inherit: the plate's usual look: the bar as the Style hub's General page has it, the name's " ..
+				"outline and shadow as Name Style's, else the game's."]
+				or L["Inherit: as the Default row's Look has it."]
 			-- (Its rows placed on the drawer's Look line: the panel's own are in it.)
 			local onLine = { Add = function(_, control)
 				control:SetParent(drawer)
@@ -11106,7 +11110,13 @@ do
 				-- (Tabbed, the Look settings counted and reset; the row's color and
 				-- the parts it paints are its own, left alone.)
 				tabs = { default = function(key) return LOOK_DEFAULT[key] end,
-					usual = function(key) return ns.PlateRowUsual(kind, key) end },
+					usual = function(key) return ns.PlateRowUsual(kind, key) end,
+					-- (Where each comes from: This row, Default row's, General's...)
+					source = function(key) return ns.PlateRowSource(kind, key) end,
+					-- (Copy look / Paste between the rows; Start from a theme: its bar.)
+					copyKind = "plateRow", copyName = info.full,
+					themeLook = function(key) return ns.PlateRowThemeLook(key) end,
+					resetLabel = function() return kind == "others" and L["Reset all"] or L["Clear this row"] end },
 				-- (A plate as this row's Look draws it: PlateRowLook.lua.)
 				preview = function(parent, width) return ns.MakePlateRowLookPreview(parent, width, kind) end,
 				texture = function(look)

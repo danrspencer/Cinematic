@@ -315,11 +315,18 @@ ns.PlateNameFamily = NameFamily
 
 -- Sets a text's font, every alphabet's letters drawn (a family where the
 -- client has them), its words set again so they take it.
+-- (Without families, a client whose letters aren't roman keeps the game's
+-- file: ours would show its names as boxes.)
+local ROMAN = not ({ ruRU = true, koKR = true, zhCN = true, zhTW = true })[GetLocale and GetLocale() or ""]
 local function SetNameFont(text, object, file, size, scale, flags)
 	local family = NameFamily(object, file, size, scale, flags)
 	if family then
 		text:SetFontObject(family)
 	else
+		if not ROMAN and object and object.GetFont then
+			local own = object:GetFont()
+			if own then file = own end
+		end
 		pcall(text.SetFont, text, file, size * scale, flags)
 	end
 	pcall(function() text:SetText(text:GetText()) end)
@@ -2706,7 +2713,8 @@ local function RefreshTargetArrow(plate)
 	end
 	-- (Its row's Look: bar, border, name and level box. PlateRowLook.lua.)
 	if ns.ApplyPlateRowLook and ((level > 0 and ns.PlateLooksOn()) or ns.PlateLookNow(plate)) then
-		ns.ApplyPlateRowLook(plate, level > 0 and unit and FittingRow(plate, unit) or nil)
+		-- (false: no row fits, the name still Name Style's All names'.)
+		ns.ApplyPlateRowLook(plate, level > 0 and unit and (FittingRow(plate, unit) or false) or nil)
 	end
 	local jump = not settled[plate]
 	settled[plate] = true
