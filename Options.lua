@@ -2201,17 +2201,17 @@ do
 			{ "Mouseover groups", "Interface\\Icons\\Spell_Holy_MindVision", label = "Hover Groups", section = "CineMode Autohide" },
 			{ "Gamepad", "Interface\\Icons\\INV_Gizmo_01", label = "Gamepad Frames", section = "CineMode Autohide" },
 			{ "Cursor Hide", "Interface\\Icons\\INV_Misc_Eye_01", section = "CineMode Autohide" }, -- (CursorHide.lua)
-			-- (Most used first; swing timer, chat bubbles and tooltips last.)
+			-- (Most used first, chat bubbles next to chat; swing timer and tooltips last.)
 			{ "Personal Resources", "Interface\\Icons\\Ability_Racial_BloodRage", -- (Bloodrage: health into power)
 				label = "Health & Resources", section = "Autohide Advanced" },
 			{ "Buffs/debuffs", "Interface\\Icons\\Spell_Holy_WordFortitude", label = "Buffs/Debuffs", section = "Autohide Advanced" },
 			{ "Minimap", "Interface\\Icons\\INV_Misc_Map_01", section = "Autohide Advanced" },
 			{ "Chat", "Interface\\Icons\\INV_Scroll_03", section = "Autohide Advanced" },
+			{ "Chat bubbles", "Interface\\Icons\\Ability_Warrior_BattleShout", label = "Chat Bubbles",
+				section = "Autohide Advanced" },
 			{ "Quest tracker", "Interface\\Icons\\INV_Misc_Note_01", label = "Quest Tracker", section = "Autohide Advanced" },
 			{ "Cooldown Manager", "Interface\\Icons\\INV_Misc_PocketWatch_01", section = "Autohide Advanced" },
 			{ "Swing timer", "Interface\\Icons\\INV_Sword_04", label = "Swing Timer", section = "Autohide Advanced" },
-			{ "Chat bubbles", "Interface\\Icons\\Ability_Warrior_BattleShout", label = "Chat Bubbles",
-				section = "Autohide Advanced" },
 			{ "Tooltips", "Interface\\Icons\\INV_Misc_Book_09", section = "Autohide Advanced" },
 		} },
 		-- (Cameras: what everyone has; Dev: the dev copy's own, to the right)
