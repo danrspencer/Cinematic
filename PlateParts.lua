@@ -2168,6 +2168,13 @@ do
 			return
 		end
 		local br, bg, bb = Blend(first[1], first[2], first[3], tint, part)
+		-- (Already that color: left alone. The pass below runs every frame over
+		-- every tinted plate, and each set ran the game's own code behind it:
+		-- 0.85 ms a frame and 7 MB of garbage a second with 40 plates tinted,
+		-- 2026-11-14. The game's own repaints come through the hook above.)
+		if r and math.abs(r - br) < 0.004 and math.abs(g - bg) < 0.004 and math.abs(b - bb) < 0.004 then
+			return
+		end
 		painting = true
 		SetColour(region, setter, br, bg, bb, a)
 		painting = false
