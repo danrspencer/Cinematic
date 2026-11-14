@@ -120,6 +120,9 @@ local function Shade(bar, r, g, b)
 	local state = states[bar]
 	local fade = state and state.gradient
 	if not fade then return end
+	-- (Not given: the color the game last set, else read. WoW Forever reads
+	-- a plate bar's color back as white.)
+	if r == nil and state.color then r, g, b = unpack(state.color) end
 	if r == nil then r, g, b = bar:GetStatusBarColor() end
 	if not (Known(r) and Known(g) and Known(b) and r) then return end
 	local fill = bar:GetStatusBarTexture()
@@ -129,6 +132,9 @@ end
 local colorHooked = setmetatable({}, { __mode = "k" })
 local function ColorSet(bar, r, g, b)
 	if busy then return end
+	-- (Kept: the bar's color as the game set it, for going flat again.)
+	local state = states[bar]
+	if state and Known(r) and Known(g) and Known(b) and type(r) == "number" then state.color = { r, g, b } end
 	Shade(bar, r, g, b)
 end
 
@@ -144,13 +150,14 @@ local function Gradient(bar, state)
 		Shade(bar)
 	elseif state.gradient then
 		-- (Flat again: its color set on the fill itself, as the bar's color set
-		-- again the same doesn't clear the gradient.)
+		-- again the same doesn't clear the gradient. The color the game last
+		-- set, not the one read back: WoW Forever reads a plate bar's as white,
+		-- and that went on the fill, a white bar flashing until the game
+		-- painted it again, 2026-11-14. None known: left for the game's next.)
 		state.gradient = nil
-		local r, g, b, a = bar:GetStatusBarColor()
+		local color = state.color
 		local fill = bar:GetStatusBarTexture()
-		if fill and Known(r) and Known(g) and Known(b) and r then
-			pcall(fill.SetVertexColor, fill, r, g, b, Known(a) and a or 1)
-		end
+		if color and fill then pcall(fill.SetVertexColor, fill, color[1], color[2], color[3], 1) end
 	end
 end
 
