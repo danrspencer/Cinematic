@@ -17039,7 +17039,12 @@ local function CreateKeybindsPanel()
 		end
 		add:SetScript("OnClick", function()
 			-- (At the top, right under the button, its name picked to type over.)
-			ns.AddKeyGroup(L["Key group %d"]:format(#ns.KeyGroups() + 1), nil, nil, true)
+			-- (Named Key group 1, 2...: the lowest number no group's name has.)
+			local taken = {}
+			for _, group in ipairs(ns.KeyGroups()) do taken[group.name or ""] = true end
+			local number = 1
+			while taken[L["Key group %d"]:format(number)] do number = number + 1 end
+			ns.AddKeyGroup(L["Key group %d"]:format(number), nil, nil, true)
 			LayoutGroups()
 			local first = rows[1]
 			if first then
@@ -17111,6 +17116,8 @@ local function CreateKeybindsPanel()
 			local reset = Check(body, "frameKeysReset", L["Reset frame keys after a reload"],
 				L["Ticked, every frame shown or hidden by its key below goes back to its Show in row after a " ..
 				"reload or logging in. Unticked, they stay as you left them till you press their key again."])
+			-- (This page's opening doesn't refresh the settings' controls: its own tick, as it's saved.)
+			reset:HookScript("OnShow", function(self) self:Refresh() end)
 			reset:SetPoint("TOPLEFT", body, "BOTTOMLEFT", -4, -2)
 			local clear = ns.PanelButton(body)
 			clear:SetSize(200, 22)

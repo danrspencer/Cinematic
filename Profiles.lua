@@ -30,7 +30,7 @@ local GLOBAL_KEYS = {
 	addonSupportOff = true, -- (Addons page: supported addons switched off, AddonSupport.lua)
 	conflictPicks = true, -- (Addon Conflicts: whose version plays, AddonSupport.lua)
 	frameForce = true, frameKeysReset = true, frameForceAt = true, keyGroups = true, keyGroupTop = true,
-	keyGroupsSeeded = true, keyGroupsRowKeysMoved = true, -- (Keybinds page, Frames tab: rows hidden by their key, Frames.lua)
+	keyGroupsSeeded = true, keyGroupsRowKeysMoved = true, frameKeysResetV1 = true, -- (Keybinds page, Frames tab: rows hidden by their key, Frames.lua)
 }
 -- Lists kept as tables that belong to a profile (their defaults are in code;
 -- see EnsureTables in Core.lua). Missing from a profile: emptied, which means defaults.

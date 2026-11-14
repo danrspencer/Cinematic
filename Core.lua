@@ -8359,7 +8359,12 @@ ticker:SetScript("OnEvent", ns.Profiled("Core events", function(self, event, arg
 			end
 		end
 		-- (Keybinds page, Frames tab: frames hidden by their key back, unless
-		-- Reset frame keys after a reload is unticked.)
+		-- Reset frame keys after a reload is unticked. Ticked for everyone once,
+		-- 2026-11-14: the page showed it unticked while it was on.)
+		if not ns.db.frameKeysResetV1 then
+			ns.db.frameKeysReset = true
+			ns.db.frameKeysResetV1 = true
+		end
 		if ns.db.frameKeysReset ~= false and type(ns.db.frameForce) == "table" then
 			wipe(ns.db.frameForce)
 			if type(ns.db.frameForceAt) == "table" then wipe(ns.db.frameForceAt) end
