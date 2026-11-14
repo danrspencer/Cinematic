@@ -486,13 +486,18 @@ local function Refresh(plate)
 	-- (Its font object, not its file: a file has one alphabet, and a guild in
 	-- another, Cyrillic say, would show as boxes. The name's is a family.)
 	local object = name.GetFontObject and name:GetFontObject()
-	if object then
+	-- (Its size next to the name's and its color: the name's Name Style row,
+	-- Second line tab. NameRowLook.lua.)
+	local row = ns.NameRowOf and ns.NameRowOf(unitFrame, unit)
+	local lineSize = ns.NameLookValue and tonumber(ns.NameLookValue(row, "Line2Size")) or 1
+	local lineColor = ns.NameLookValue and ns.NameLookValue(row, "Line2Color") or "name"
+	local file, size, flags = name:GetFont()
+	if lineSize ~= 1 and file and size and ns.SetPlateNameFont then
+		ns.SetPlateNameFont(line, object or _G.SystemFont_NamePlate or _G.GameFontNormal, file, size, lineSize, flags)
+	elseif object then
 		line:SetFontObject(object)
-	else
-		local file, size, flags = name:GetFont()
-		if file then
-			pcall(line.SetFont, line, file, size, flags)
-		end
+	elseif file then
+		pcall(line.SetFont, line, file, size, flags)
 	end
 	pcall(function()
 		line:SetShadowOffset(name:GetShadowOffset())
@@ -501,7 +506,12 @@ local function Refresh(plate)
 		-- colored copy's color instead.)
 		local source = ns.PlateNameLit and ns.PlateNameLit(name) or name
 		local r, g, b = source:GetTextColor()
-		-- (An icon in its own colors.)
+		-- (A color of the row's own: grey or gold. An icon in its own colors.)
+		if lineColor == "grey" then
+			r, g, b = 0.72, 0.72, 0.72
+		elseif lineColor == "gold" then
+			r, g, b = 1, 0.82, 0
+		end
 		if isIcon then r, g, b = 1, 1, 1 end
 		line:SetTextColor(r, g, b)
 		if line.SetVertexColor then line:SetVertexColor(r, g, b) end

@@ -39,17 +39,18 @@ local function Own(key, kind)
 end
 
 -- The name on a full plate under the rows: Name Style's All names (its
--- outline and shadow, what it has changed from how they start: as they
--- start, the game's), with that page on. nil: the game's.
+-- outline and shadow, where it doesn't hand them on to the game's), with
+-- that page on. nil: the game's.
 local function AllNames(key)
 	local db = ns.db
 	if not (db and db.plateNameStyle) then return nil end
+	-- (Set on All names, not handed on to the game's: NameRowLook.lua.)
 	if key == "LookOutline" then
-		local value = tonumber(db.plateNameOutline)
-		if value and value ~= ns.DEFAULTS.plateNameOutline then return value end
+		local value, from = ns.NameLookValue("all", "Outline")
+		if from ~= "game" then return tonumber(value) end
 	elseif key == "LookShadow" then
-		local value = db.plateNameShadow
-		if value ~= nil and value ~= ns.DEFAULTS.plateNameShadow then return value and "on" or "none" end
+		local value, from = ns.NameLookValue("all", "Shadow")
+		if from ~= "game" then return value and "on" or "none" end
 	end
 	return nil
 end
@@ -68,7 +69,7 @@ local function NamesLayer(look)
 			local db = ns.db
 			if shadow == "on" then
 				look.shadowAt = { tonumber(db.plateNameShadowX) or 1, tonumber(db.plateNameShadowY) or -1,
-					tonumber(db.plateNameShadowAlpha) or 1 }
+					tonumber((ns.NameLookValue("all", "ShadowAlpha"))) or 1 }
 			end
 		end
 	end

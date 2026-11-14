@@ -94,6 +94,7 @@ QuestMobs.lua
 QuestGlow.lua
 QuestItemButton.lua
 Effects.lua
+NameRowLook.lua
 TooltipParts.lua
 PlateParts.lua
 PlateIcons.lua

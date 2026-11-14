@@ -11,6 +11,9 @@
 local _, ns = ...
 
 ns.CHANGELOG_FEATURES = {
+	{ date = "2026-11-14", page = "Name Style", title = "Names by kind",
+		text = "Name Style has a row for each kind of name (your target, group members, players, service NPCs...). " ..
+		"Give each its own font, colors, outline color, a glow or a band behind it, and the look of the line under it." },
 	{ date = "2026-11-14", page = "Keybinds", title = "Key groups",
 		text = "Keys for groups of frames on the Keybinds page's Frames tab: press one to hide its frames (the minimap, " ..
 		"your action bars...), press again to bring them back, in CineMode or out. They start as your Hover Groups; " ..

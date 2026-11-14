@@ -216,14 +216,25 @@ local function Style(key)
 	return value
 end
 
+-- A Name Style setting as a name's row has it (row -> All names -> the
+-- game's: NameRowLook.lua). row nil: All names'.
+local function NameStyle(row, setting)
+	return ns.NameLookValue(row, setting)
+end
+
 -- Whether a unit's name takes a colour of ours: true for the game's colour
 -- for it over heads, a friendly player's colour of our own ("blue",
--- "white"), or false for the plate's own (class colours).
-local function TintUnit(unit)
+-- "white"), or false for the plate's own (class colours). An enemy player's:
+-- false where its row has them in class colours.
+local function TintUnit(unit, row)
 	local okGuid, guid = pcall(UnitGUID, unit)
-	if okGuid and Known(guid) and type(guid) == "string" and guid:find("^Player%-")
-		and not Ask(UnitCanAttack, "player", unit) then
-		local friends = Style("plateNameFriends")
+	if okGuid and Known(guid) and type(guid) == "string" and guid:find("^Player%-") then
+		local mode = NameStyle(row, "Colour")
+		if mode == "class" then return false end
+		if Ask(UnitCanAttack, "player", unit) then
+			return NameStyle(row, "Enemies") ~= "class"
+		end
+		local friends = NameStyle(row, "Friends")
 		return friends ~= "class" and friends
 	end
 	return true
@@ -236,10 +247,23 @@ end
 local FRIEND_COLOURS = { blue = { 0.4, 0.4, 1 }, white = { 1, 1, 1 } }
 ns.PLATE_FRIEND_COLOURS = FRIEND_COLOURS -- (the Name Style page's preview)
 
-local function PaintName(text, unit, own)
+-- (An NPC's reaction in a color of the row's own, where it has one: Hostile,
+-- Neutral, Friendly. Gives whether it painted.)
+local function PaintReaction(text, unit, row)
+	local okReaction, reaction = pcall(UnitReaction, unit, "player")
+	if not (okReaction and Known(reaction) and type(reaction) == "number") then return false end
+	local setting = reaction <= 3 and "Hostile" or reaction == 4 and "Neutral" or "Friendly"
+	if NameStyle(row, setting) ~= "custom" then return false end
+	text:SetTextColor(ns.NameLookColor(row, setting))
+	return true
+end
+
+local function PaintName(text, unit, own, row)
 	local colour = FRIEND_COLOURS[own or ""]
 	if colour and not (own == "blue" and Ask(UnitIsPVP, unit)) then
 		text:SetTextColor(colour[1], colour[2], colour[3])
+	elseif not Ask(UnitIsPlayer, unit) and PaintReaction(text, unit, row) then
+		return
 	elseif UnitSelectionColor then
 		pcall(function() text:SetTextColor(UnitSelectionColor(unit)) end)
 	else
@@ -379,7 +403,7 @@ local SIGHT_CLEAR = 0.2 -- seconds (the fade itself: the page's Fade time)
 -- now; retail's, as the page says. (band: unused, see above.)
 local function Look(band) -- luacheck: no unused args
 	if not FAR_USED then
-		return Style("plateNameSize"), Style("plateNameY")
+		return 1, Style("plateNameY") -- (the size: the row's, in DrawName)
 	end
 	local yards = math.max(1, zoom + UNIT_YARDS)
 	-- (No bigger or higher than the close point: with the camera pushed in by
@@ -495,9 +519,75 @@ end
 
 -- Draws our text over the game's name: its look when that changed (dirty),
 -- then its words and colour, which the game may change at any time.
+-- A name's glow and the band behind it (Name Style's Glow and Background
+-- tabs): made once per text, hidden while unused. Sized to the name where
+-- its width can be read; one width for every name where it can't (secret).
+ns.NAME_GLOW = "Interface\\AddOns\\" .. ADDON_NAME .. "\\Textures\\SoftGlow"
+local function DressName(text, row)
+	local glow, back = NameStyle(row, "Glow"), NameStyle(row, "Back")
+	local dress = text.cineDress
+	if glow == "none" and back == "none" then
+		if dress then
+			dress.on = false
+			dress.glow:Hide()
+			dress.back:Hide()
+		end
+		return
+	end
+	local owner = text:GetParent()
+	if not dress then
+		dress = { glow = owner:CreateTexture(nil, "BACKGROUND", nil, 1), back = owner:CreateTexture(nil, "BACKGROUND", nil, 2) }
+		dress.glow:SetTexture(ns.NAME_GLOW)
+		dress.glow:SetBlendMode("ADD")
+		text.cineDress = dress
+	end
+	dress.on = true
+	local ok, width = pcall(text.GetStringWidth, text)
+	if not (ok and type(width) == "number" and Known(width) and width > 0) then width = 90 end
+	local _, height = text:GetFont()
+	height = tonumber(height) or 12
+	local scale = text.GetScale and text:GetScale() or 1
+	if not (Known(scale) and type(scale) == "number") then scale = 1 end
+	width, height = width * scale, height * scale
+	dress.glow:SetShown(glow ~= "none")
+	if glow ~= "none" then
+		local r, g, b = ns.NameLookColor(row, "Glow")
+		dress.glow:SetVertexColor(r, g, b, 0.7)
+		dress.glow:ClearAllPoints()
+		dress.glow:SetPoint("CENTER", text, "CENTER", 0, 0)
+		dress.glow:SetSize(width + height * 3, height * 3)
+	end
+	dress.back:SetShown(back ~= "none")
+	if back ~= "none" then
+		local r, g, b = ns.NameLookColor(row, "Back")
+		local alpha = tonumber(NameStyle(row, "BackAlpha")) or 0.6
+		dress.back:SetColorTexture(r, g, b, alpha)
+		dress.back:ClearAllPoints()
+		dress.back:SetPoint("CENTER", text, "CENTER", 0, 0)
+		dress.back:SetSize(width + 14, height + 6)
+	end
+end
+-- (The dress follows its name: shown and faded with it.)
+local function DressShown(text, alpha)
+	local dress = text and text.cineDress
+	if not (dress and dress.on) then return end
+	for _, piece in ipairs({ dress.glow, dress.back }) do
+		if alpha then piece:SetAlpha(alpha) end
+	end
+	if not alpha then
+		dress.glow:Hide()
+		dress.back:Hide()
+	end
+end
+
 local function DrawName(text, name, unit)
 	-- (Only the main text gets a fill, not a swap's ghost copy.)
 	local filled = Fill.On() and texts[text:GetParent()] == text
+	-- (The name's row on Name Style: your target's, a group member's...)
+	local row = ns.NameRowOf(text:GetParent(), unit)
+	if text.nameRow ~= row then
+		text.nameRow, text.dirty = row, true
+	end
 	local fill = filled and Fill.Of(text) or Fill.texts[text]
 	if fill then
 		fill.bar:SetShown(filled) -- (hidden with the text: OwnName)
@@ -511,22 +601,38 @@ local function DrawName(text, name, unit)
 			object = _G.SystemFont_NamePlate or _G.GameFontNormal
 			file, size, flags = object:GetFont()
 		end
-		-- (The Style hub's General font, a style theme's: the family keeps the
-		-- game's for other alphabets.)
+		-- (Its font: its row's, else All names', else the usual: the Style
+		-- hub's General font, a style theme's. The family keeps the game's for
+		-- other alphabets.)
 		local db = ns.db
-		file = db and db.styleGeneral and ns.StyleFontFile(db.styleFont) or file
+		local font = NameStyle(row, "Font")
+		if font == "usual" then
+			file = db and db.styleGeneral and ns.StyleFontFile(db.styleFont) or file
+		elseif font ~= "game" then
+			file = ns.StyleFontFile(font) or file
+		end
 		-- (Its Nameplate Style row's Look over the Name Style page's: font,
 		-- size, outline and shadow. PlateRowLook.lua.)
 		local owner = text:GetParent()
 		local look = ns.PlateLookNow and owner and owner.GetParent and ns.PlateLookNow(owner:GetParent())
 		file = look and look.font or file
-		local outline = look and look.outline and look.outline >= 0 and look.outline or Style("plateNameOutline")
-		SetNameFont(text, object, file, size, text.size * (look and look.size or 1), Outlined(flags, outline))
-		local shadow = Style("plateNameShadow")
+		local outline = look and look.outline and look.outline >= 0 and look.outline or tonumber(NameStyle(row, "Outline"))
+			or 0
+		-- (An outline in a color of its own: copies of the name round it, the
+		-- name itself unoutlined. ns.SetTextRim.)
+		local rim = outline > 0 and NameStyle(row, "OutlineColor") == "custom"
+		local scale = text.size * (tonumber(NameStyle(row, "Size")) or 1) * (look and look.size or 1)
+		SetNameFont(text, object, file, size, scale, Outlined(flags, rim and 0 or outline))
+		if rim then
+			ns.SetTextRim(text, outline, ns.NameLookColor(row, "OutlineColor"))
+		elseif text.cineRim then
+			ns.SetTextRim(text, nil)
+		end
+		local shadow = NameStyle(row, "Shadow")
 		if look and look.shadow then shadow = look.shadow == "on" end
 		if shadow then
 			text:SetShadowOffset(Style("plateNameShadowX"), Style("plateNameShadowY"))
-			text:SetShadowColor(0, 0, 0, Style("plateNameShadowAlpha"))
+			text:SetShadowColor(0, 0, 0, tonumber(NameStyle(row, "ShadowAlpha")) or 1)
 		else
 			text:SetShadowOffset(0, 0)
 		end
@@ -534,7 +640,7 @@ local function DrawName(text, name, unit)
 		-- exactly on the grey ones. Its shadow is left off: the grey text's
 		-- shows under both.)
 		if fill then
-			SetNameFont(fill.lit, object, file, size, text.size * (look and look.size or 1), Outlined(flags, outline))
+			SetNameFont(fill.lit, object, file, size, scale, Outlined(flags, rim and 0 or outline))
 			fill.lit:SetShadowOffset(0, 0)
 		end
 		-- (Further off, lower: a plate's name sits a fixed height over the unit's
@@ -556,9 +662,13 @@ local function DrawName(text, name, unit)
 	-- (Colour only: on WoW Forever a FontString's colour carries its alpha, and
 	-- the game's name is faded out under ours, so its alpha is 0, tested.)
 	local alpha = text:GetAlpha()
-	local tint = Style("plateNameColour") and TintUnit(unit)
-	if tint then
-		PaintName(text, unit, tint ~= true and tint or nil)
+	local mode = NameStyle(row, "Colour")
+	local tint = mode and TintUnit(unit, row)
+	if mode == "one" then
+		-- (One color for every name of the row.)
+		text:SetTextColor(ns.NameLookColor(row, "Colour"))
+	elseif tint then
+		PaintName(text, unit, tint ~= true and tint or nil, row)
 	else
 		-- (A player's class colour from their class, not the game's name, which
 		-- it can turn white.)
@@ -595,6 +705,8 @@ local function DrawName(text, name, unit)
 		Fill.Health(fill, unit)
 	end
 	text:SetAlpha(alpha)
+	-- (Its glow and band: the main text's only, not a swap's ghost copy.)
+	if filled or texts[text:GetParent()] == text then DressName(text, row) end
 	-- Retail's plates grow as their units come nearer: undone, for one size.
 	if ns.isRetail and text.SetScale then
 		local scale = 1
@@ -631,6 +743,7 @@ local function OwnName(plate, alpha)
 	if not (alpha and alpha >= 0 and unit and Usable(name)) then
 		if text then
 			text:Hide()
+			DressShown(text, nil)
 			if Fill.texts[text] then
 				Fill.texts[text].bar:Hide()
 			end
@@ -652,6 +765,7 @@ local function OwnName(plate, alpha)
 	DrawName(text, name, unit)
 	text:SetAlpha(alpha * into)
 	text:Show()
+	DressShown(text, alpha * into)
 	local fill = Fill.texts[text]
 	if fill and fill.bar:IsShown() then
 		fill.bar:SetAlpha(alpha * into) -- (the colored copy fades with the text)
@@ -722,7 +836,13 @@ local function ApplyPlate(plate, personal)
 		and not (ns.GameOwnsObjectPlate and ns.GameOwnsObjectPlate(plate.namePlateUnitToken
 			or unitFrame.unit))
 	CentreName(unitFrame, nameOnly and not ours)
-	OwnName(plate, ours and nameAlpha > 0 and textAlpha * Style("plateNameAlpha") or nil)
+	-- (Its Name Style row's opacity: NameRowLook.lua.)
+	local nameOpacity = 1
+	if ours and nameAlpha > 0 then
+		nameOpacity = tonumber(NameStyle(ns.NameRowOf(unitFrame, plate.namePlateUnitToken or unitFrame.unit),
+			"Alpha")) or 1
+	end
+	OwnName(plate, ours and nameAlpha > 0 and textAlpha * nameOpacity or nil)
 	-- (A kind with parts of its own: its levels in place of the default ones.)
 	local mine
 	if plate ~= personal and next(kindParts.levels) then
@@ -803,8 +923,8 @@ do
 			known = ok and value ~= nil
 		end
 		if not known then return end
-		local want = ns.StyleOn() and Style("plateNameStyle") and Style("plateNameColour")
-			and Style("plateNameFriends") == "class" and true or false
+		local want = ns.StyleOn() and Style("plateNameStyle") and NameStyle(nil, "Colour") == true
+			and NameStyle(nil, "Friends") == "class" and true or false
 		ns.ApplyCVarSet(CLASS_NAMES_SET, want)
 	end
 	local holder = CreateFrame("Frame")

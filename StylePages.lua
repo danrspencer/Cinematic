@@ -1175,8 +1175,14 @@ local LOOK_GROUPS = {
 	{ "Bar", { { "texture", "Texture" }, { "barColor", "Color" }, { "ground", "Dark ground" } } },
 	{ "Text", { { "font", "Font" }, { "textSize", "Size" }, { "textColor", "Color" }, { "outline", "Outline" },
 		{ "outlineColor", "Outline color" }, { "shadow", "Shadow" } } },
+	-- (Name Style's rows: the name's colors, a glow behind it. Left out where
+	-- no part has them.)
+	{ "Color", { { "nameColor", "Color by" } } },
+	{ "Glow", { { "glow", "Glow" } } },
 	{ "Border", { { "border", "Border" } } },
 	{ "Background", { { "backColor", "Color" }, { "backAlpha", "Opacity" } } },
+	-- (Name Style's rows: the guild or title under the name.)
+	{ "Second line", { { "line2", "Second line" } } },
 	-- (A Nameplate Style row's: Forever's level box. Left out where no part has it.)
 	{ "Level", { { "level", "Level box" } } },
 }
@@ -1972,7 +1978,10 @@ function ns.StyleRows(kit, content, stack, changed, switchKey, fieldOf, panel)
 		slider:SetScript("OnEnter", function(self) TipOn(self, tip) end)
 		slider:SetScript("OnLeave", function() GameTooltip:Hide() end)
 		slider.Refresh = function(self)
-			local value = (tonumber(ns.GetDB() and Get(key)) or (minV / scale)) * scale
+			-- (A value handed on, "inherit": the one it gives, from panel.resolved.)
+			local own = tonumber(ns.GetDB() and Get(key))
+			if own == nil and panel and panel.resolved then own = tonumber(panel.resolved(key)) end
+			local value = (own or (minV / scale)) * scale
 			setting = true
 			self:SetValue(value)
 			setting = false
@@ -2306,6 +2315,8 @@ function ns.StyleRows(kit, content, stack, changed, switchKey, fieldOf, panel)
 			end,
 			-- (Where each setting's value comes from: spec.tabs.source(key).)
 			source = type(tabbed) == "table" and tabbed.source or nil,
+			-- (What a setting handed on gives, for a slider: spec.tabs.resolved(key).)
+			resolved = type(tabbed) == "table" and tabbed.resolved or nil,
 		}
 		-- (Every setting the panel counts: those with a default, its row's color
 		-- and paint ticks left out. Known once its pages are made.)

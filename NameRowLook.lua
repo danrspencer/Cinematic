@@ -1,0 +1,232 @@
+-- Name Style's rows: All names (the page's own plateName<setting> keys),
+-- then a row per kind of unit whose names plates draw (ns.NAME_GROUPS'
+-- plate rows), each with settings of its own (nameLook<row><setting>).
+-- A setting goes row -> All names -> the game's: a row's or All names'
+-- "inherit" hands it on. Colors (<setting>R, G, B) come from the same
+-- place as the setting that picks them (Outline color's Custom, say).
+-- PlateParts draws names by it (ns.NameLookValue), PlateGuild the line
+-- under them; the Name Style page edits it (Options.lua).
+
+local _, ns = ...
+local L = ns.L
+
+-- The rows, in the page's order: key (NAME_GROUPS' key; "all": All names),
+-- label. Your target second, so it wins over the rest.
+ns.NAME_ROWS = {
+	{ key = "all", label = L["All names"] },
+	{ key = "Target", label = L["Your target"] },
+	{ key = "GroupMembers", label = L["Group members"] },
+	{ key = "Friends", label = L["Friendly players"] },
+	{ key = "Enemies", label = L["Enemy players"] },
+	{ key = "ServiceNPCs", label = L["Service NPCs"] },
+	{ key = "FriendlyNPCs", label = L["Friendly NPCs"] },
+	{ key = "NeutralNPCs", label = L["Neutral NPCs"] },
+	{ key = "HostileNPCs", label = L["Hostile NPCs"] },
+	{ key = "FriendlyMinions", label = L["Friendly players' minions"] },
+	{ key = "GroupMinions", label = L["Group members' minions"] },
+	{ key = "EnemyMinions", label = L["Enemy players' minions"] },
+}
+ns.OnLanguage(function() ns.TranslateFields(ns.NAME_ROWS, "label") end)
+
+-- The settings a row can hand on, and what the game's look gives each (the
+-- last step). Font "usual": General's font while the Style hub is on (as
+-- these names have always had), else the plate's own.
+local GAME = {
+	Font = "usual", Size = 1, Alpha = 1, Outline = 0, OutlineColor = "black", Shadow = false, ShadowAlpha = 1,
+	Colour = true, Friends = "blue", Enemies = "react", Hostile = "game", Neutral = "game", Friendly = "game",
+	Glow = "none", Back = "none", BackAlpha = 0.6, Line2Size = 1, Line2Color = "name",
+}
+ns.NAME_LOOK_GAME = GAME
+-- The colors, by the setting that picks them, as they start.
+local COLORS = {
+	OutlineColor = { 0, 0, 0 }, Colour = { 1, 1, 1 }, Hostile = { 1, 0.25, 0.2 }, Neutral = { 1, 0.9, 0.3 },
+	Friendly = { 0.4, 1, 0.4 }, Glow = { 1, 0.82, 0 }, Back = { 0, 0, 0 },
+}
+ns.NAME_LOOK_COLORS = COLORS
+-- (A color's keys: Outline color's are <prefix>OutlineR..., the rest
+-- <prefix><setting>R...)
+local function ColorBase(setting) return setting == "OutlineColor" and "Outline" or setting end
+
+-- All names' keys: today's settings (plateNameColour...) and the new ones,
+-- every one "inherit" to start (D12: the game's shows through); their
+-- colors as COLORS has them.
+for setting in pairs(GAME) do ns.DEFAULTS["plateName" .. setting] = "inherit" end
+for setting, color in pairs(COLORS) do
+	local base = ColorBase(setting)
+	ns.DEFAULTS["plateName" .. base .. "R"], ns.DEFAULTS["plateName" .. base .. "G"],
+		ns.DEFAULTS["plateName" .. base .. "B"] = color[1], color[2], color[3]
+end
+-- (Every kind's own settings as they start: "inherit", the colors as All
+-- names'. Profiles and the modules ask this for keys with no default:
+-- Core's MarkRowDefault.)
+local ROW_DEFAULTS = {}
+for _, row in ipairs(ns.NAME_ROWS) do
+	if row.key ~= "all" then
+		for setting in pairs(GAME) do ROW_DEFAULTS["nameLook" .. row.key .. setting] = "inherit" end
+		for setting, color in pairs(COLORS) do
+			local base = ColorBase(setting)
+			for i, part in ipairs({ "R", "G", "B" }) do ROW_DEFAULTS["nameLook" .. row.key .. base .. part] = color[i] end
+		end
+	end
+end
+function ns.NameRowDefault(key) return ROW_DEFAULTS[key] end
+-- (A row's settings' keys, for its page's RecordKey.)
+function ns.NameRowKeys(row)
+	local list = {}
+	local prefix = row == "all" and "plateName" or "nameLook" .. row
+	for setting in pairs(GAME) do list[#list + 1] = prefix .. setting end
+	for setting in pairs(COLORS) do
+		local base = ColorBase(setting)
+		for _, part in ipairs({ "R", "G", "B" }) do list[#list + 1] = prefix .. base .. part end
+	end
+	table.sort(list)
+	return list
+end
+
+-- A setting's key on a row.
+function ns.NameLookKey(row, setting)
+	return (row == "all" and "plateName" or "nameLook" .. row) .. setting
+end
+
+local function Raw(row, setting)
+	local key = ns.NameLookKey(row, setting)
+	local value = ns.db and ns.db[key]
+	if value == nil then
+		if row == "all" then value = ns.DEFAULTS[key] else value = ROW_DEFAULTS[key] end
+	end
+	return value
+end
+
+-- A setting as a row has it: row -> All names -> the game's. Gives the value
+-- and where it's from: the row's key, "all" or "game". row nil: All names'.
+-- over: { setting = value } on top of the row's own (the Look panel's
+-- preview: never saved; "inherit" there hands on as saved).
+function ns.NameLookValue(row, setting, over)
+	if row and row ~= "all" then
+		local value = over and over[setting]
+		if value == nil then value = Raw(row, setting) end
+		if value ~= "inherit" then return value, row end
+	end
+	local value = row == "all" and over and over[setting]
+	if value == nil then value = Raw("all", setting) end
+	if value ~= "inherit" then return value, "all" end
+	return GAME[setting], "game"
+end
+
+-- A color as the row has it: from the same place as the setting that picks
+-- it (a row's Custom outline: that row's color). over as NameLookValue's.
+function ns.NameLookColor(row, setting, over)
+	local _, from = ns.NameLookValue(row, setting, over)
+	local color = COLORS[setting]
+	if from == "game" then return color[1], color[2], color[3] end
+	local base = ColorBase(setting)
+	local function Part(i, part)
+		local value = over and from == (row or "all") and over[base .. part]
+		if value == nil then value = ns.db and ns.db[ns.NameLookKey(from, base .. part)] end
+		return tonumber(value) or color[i]
+	end
+	return Part(1, "R"), Part(2, "G"), Part(3, "B")
+end
+
+-- Whether any kind's row has a setting of its own (none: every name goes by
+-- All names, no unit sorted). Worked out again after a change.
+local anyOwn
+function ns.NameRowsChanged()
+	anyOwn = nil
+	if ns.ResetNameRows then ns.ResetNameRows() end
+end
+function ns.NameRowsOwn()
+	if anyOwn == nil then
+		anyOwn = false
+		local db = ns.db or {}
+		for key, default in pairs(ROW_DEFAULTS) do
+			if default == "inherit" and db[key] ~= nil and db[key] ~= "inherit" then
+				anyOwn = true
+				break
+			end
+		end
+	end
+	return anyOwn
+end
+
+-- Whether a row has any setting of its own (its Look button's words).
+function ns.NameRowHasOwn(row)
+	local db = ns.db or {}
+	for setting in pairs(GAME) do
+		local value = db[ns.NameLookKey(row, setting)]
+		if value ~= nil and value ~= "inherit" then return true end
+	end
+	return false
+end
+
+-- Which row a unit's name goes by: your target, a group member or their
+-- minion, a Service NPC, else its kind's row; "all" when the game won't say
+-- (secret values). Kept per unit frame until the target, the group or the
+-- plate's unit changes.
+local function Known(value) return not (issecretvalue and issecretvalue(value)) end
+local function Ask(fn, ...)
+	local ok, value = pcall(fn, ...)
+	return ok and Known(value) and value and true or false
+end
+local KIND_ROW = {
+	Friends = "Friends", FriendlyMinions = "FriendlyMinions", Enemies = "Enemies", EnemyMinions = "EnemyMinions",
+	EnemyNPCs = "HostileNPCs", NeutralNPCs = "NeutralNPCs", EnemyMinor = "HostileNPCs", NeutralMinor = "NeutralNPCs",
+	FriendlyNPCs = "FriendlyNPCs",
+}
+local rowOf = setmetatable({}, { __mode = "k" }) -- [unit frame] = { unit, row }
+local function Sort(plate, unit)
+	if Ask(UnitIsUnit, unit, "target") then return "Target" end
+	local kind = ns.PlateKind and ns.PlateKind(unit)
+	if not kind then return "all" end
+	if (kind == "Friends" or kind == "FriendlyMinions") and not Ask(UnitIsUnit, unit, "pet")
+		and (Ask(UnitPlayerOrPetInParty, unit) or Ask(UnitPlayerOrPetInRaid, unit)) then
+		return kind == "Friends" and "GroupMembers" or "GroupMinions"
+	end
+	if (kind == "FriendlyNPCs" or kind == "NeutralNPCs" or kind == "NeutralMinor") and ns.PlateServiceMatch then
+		local ok, match = pcall(ns.PlateServiceMatch, plate, unit)
+		if ok and match then return "ServiceNPCs" end
+	end
+	return KIND_ROW[kind] or "all"
+end
+function ns.NameRowOf(unitFrame, unit)
+	if not ns.NameRowsOwn() or not unit then return "all" end
+	local kept = rowOf[unitFrame]
+	if kept and kept.unit == unit then return kept.row end
+	local row = Sort(unitFrame and unitFrame:GetParent(), unit)
+	-- (Not kept while the game won't say: asked again next time.)
+	if row ~= "all" then rowOf[unitFrame] = { unit = unit, row = row } end
+	return row
+end
+local watcher = CreateFrame("Frame")
+for _, event in ipairs({ "PLAYER_TARGET_CHANGED", "GROUP_ROSTER_UPDATE", "NAME_PLATE_UNIT_ADDED",
+	"NAME_PLATE_UNIT_REMOVED" }) do
+	watcher:RegisterEvent(event)
+end
+watcher:SetScript("OnEvent", function()
+	if not next(rowOf) then return end
+	wipe(rowOf)
+	-- (Our names drawn again, in their new rows' looks.)
+	if ns.RefreshPlateNameStyle then ns.RefreshPlateNameStyle() end
+end)
+function ns.ResetNameRows() wipe(rowOf) end
+
+-- D12: today's settings with an "inherit" value of their own now: a value
+-- still at the old default goes to it (nothing seen changes: the game's
+-- look gives the same), in every profile. Once.
+local OLD = { plateNameColour = true, plateNameFriends = "blue", plateNameOutline = 0, plateNameSize = 1,
+	plateNameAlpha = 1, plateNameShadow = false, plateNameShadowAlpha = 1 }
+function ns.MigrateNameInherit()
+	local db = ns.db
+	if not db or db.nameInheritV1 then return end
+	local function Move(t)
+		if type(t) ~= "table" then return end
+		for key, old in pairs(OLD) do
+			if t[key] == old then t[key] = nil end
+		end
+	end
+	Move(db)
+	for _, saved in pairs(db.profiles or {}) do
+		if type(saved) == "table" then Move(type(saved.settings) == "table" and saved.settings or saved) end
+	end
+	db.nameInheritV1 = true
+end

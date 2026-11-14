@@ -9335,53 +9335,16 @@ local function CreatePlatesPanel()
 		serviceShow:SetPoint("LEFT", serviceShowLabel, "LEFT", GRID_LABEL + 30, 0)
 		Tooltip(serviceShow, serviceShowTip)
 	end
-	-- The < > round NPC titles (<Baker>); guild names keep theirs.
-	local serviceBracketsLabel = Label(content, "GameFontHighlight", L["Brackets"])
-	serviceBracketsLabel:SetPoint("TOPLEFT", serviceShowLabel, "BOTTOMLEFT", 0, -22)
-	local serviceBrackets = Check(content, "nameServiceBrackets", L["Around titles (<Baker>)"],
-		L["Ticked, NPC titles under or in place of names show as the game writes them (<Baker>). " ..
-			"Unticked, without the < > (Baker). Players' guild names keep theirs."], function(value)
-		ns.GetDB().nameServiceBrackets = value
-		-- (The title lines drawn again: a plate's layout skips itself when its
-		-- shares haven't changed, so RefreshAllPlates alone leaves the old text.)
-		if ns.RefreshPlateGuilds then ns.RefreshPlateGuilds() end
-		Refresh()
-	end)
-	serviceBrackets:SetPoint("TOPLEFT", serviceBracketsLabel, "TOPLEFT", GRID_LABEL + 26, 6)
-	GreyUnless(serviceBrackets, function(db) return not db.nameServiceIcons end)
-	-- Beside it: brackets kept while the name shows over the title (greyed
-	-- while Brackets is ticked: they're always there then).
-	local serviceBracketsName = Check(content, "nameServiceBracketsWithName", L["When the name shows too"],
-		L["Ticked, a title under its NPC's name keeps its < > (Uualla Suncrest, <General Goods>), " ..
-			"and only a title shown alone drops them."], function(value)
-		ns.GetDB().nameServiceBracketsWithName = value
-		if ns.RefreshPlateGuilds then ns.RefreshPlateGuilds() end
-	end)
-	serviceBracketsName:SetPoint("LEFT", serviceBrackets, "LEFT", 220, 0)
-	GreyUnless(serviceBracketsName, function(db) return not db.nameServiceIcons and not db.nameServiceBrackets end)
-	-- Icons: each kind's icon in place of its title (PlateGuild's SERVICE_ICONS).
-	local serviceIconsLabel = Label(content, "GameFontHighlight", L["Icons"])
-	serviceIconsLabel:SetPoint("TOPLEFT", serviceBracketsLabel, "BOTTOMLEFT", 0, -22)
-	local serviceIcons = Check(content, "nameServiceIcons", L["In place of titles"],
-		L["Ticked, a service NPC shows its kind's icon (an anvil for repair, a book for trainers...) instead of " ..
-			"its title, in the middle where its name or title would be. Other titles have no icon: their names " ..
-			"show instead."], function(value)
-		ns.GetDB().nameServiceIcons = value
-		if ns.ServiceKindsChanged then ns.ServiceKindsChanged() end
-		if ns.RefreshAllPlates then ns.RefreshAllPlates() end
-		if ns.RefreshPlateGuilds then ns.RefreshPlateGuilds() end
-		Refresh()
-	end)
-	serviceIcons:SetPoint("TOPLEFT", serviceIconsLabel, "TOPLEFT", GRID_LABEL + 26, 6)
-	-- Their size, beside it (greyed while unticked).
-	local serviceIconScale = Slider(content, "nameServiceIconScale", L["Size"], 50, 200, 5, "%d%%", 100, function()
-		if ns.ServiceKindsChanged then ns.ServiceKindsChanged() end
-		if ns.RefreshPlateGuilds then ns.RefreshPlateGuilds() end
-	end)
-	serviceIconScale:SetWidth(160)
-	serviceIconScale:SetPoint("LEFT", serviceIcons, "LEFT", 220, -4)
-	Tooltip(serviceIconScale, L["How big the icons are."])
-	GreyUnless(serviceIconScale, function(db) return db.nameServiceIcons end)
+	-- How their titles look (brackets, icons in place of titles): Name
+	-- Style's Service NPCs row, Second line tab. Its link here.
+	local serviceLookLabel = Label(content, "GameFontHighlight", L["Their look"])
+	serviceLookLabel:SetPoint("TOPLEFT", serviceShowLabel, "BOTTOMLEFT", 0, -22)
+	local serviceLook = ns.StyleLink(content, serviceLookLabel, "Name Style",
+		L["Brackets round titles and icons in place of them: Name Style, the Service NPCs row's Second line tab."],
+		Tooltip, L["Name Style"], serviceLookLabel)
+	serviceLook:ClearAllPoints()
+	serviceLook:SetPoint("LEFT", serviceLookLabel, "LEFT", GRID_LABEL + 30, 0)
+	local serviceIconsLabel = serviceLookLabel -- (the next row goes under it)
 	local serviceKindsLabel = Label(content, "GameFontHighlight", L["Kinds"])
 	serviceKindsLabel:SetPoint("TOPLEFT", serviceIconsLabel, "BOTTOMLEFT", 0, -22)
 	-- (Quest givers: by the game's quest cursor, or Questie's icons. Hidden on
@@ -9514,12 +9477,20 @@ local function CreateNameStylePanel()
 		"a name kept up over a faded plate is drawn by the plate. Changes show at once, here and on the " ..
 		"plates around you."])
 
-	local preview -- (below: drawn again as each setting changes)
+	local scene -- (below: drawn again as each setting changes)
+	local panels = {} -- [row] = its Look panel's preview, once made
+	local rowButtons = {}
 	local function Changed()
+		if ns.NameRowsChanged then ns.NameRowsChanged() end
 		if ns.RefreshPlateNameStyle then ns.RefreshPlateNameStyle() end
-		-- (Its outline and shadow reach full plates' names too: PlateRowLook.lua.)
+		-- (All names' outline and shadow reach full plates' names too: PlateRowLook.lua.)
 		if ns.RefreshTargetArrows then ns.RefreshTargetArrows() end
-		if preview then preview:Refresh() end
+		-- (The lines under names: titles' brackets and icons, the line's size and color.)
+		if ns.ServiceKindsChanged then ns.ServiceKindsChanged() end
+		if ns.RefreshAllPlates then ns.RefreshAllPlates() end
+		if ns.RefreshPlateGuilds then ns.RefreshPlateGuilds() end
+		if scene then scene:Refresh() end
+		for _, button in pairs(rowButtons) do button:Refresh() end
 	end
 	local function On(db) return db.plateNameStyle end
 
@@ -9530,39 +9501,28 @@ local function CreateNameStylePanel()
 		"that too). Each setting keeps its value for when you turn this back on."], subtitle, Changed)
 	local stack = Stack(switch, "check")
 
-	-- The preview: a strip of names on a dark ground, one of each colour and
-	-- your own name for a friendly player, drawn as the plates would draw them.
+	-- A sample name of each kind, drawn as its row says (NameRowLook.lua):
+	-- its font, size, outline (in its color), shadow, opacity, color, glow,
+	-- band and the line under it. sample: { name, kind: "player"/"npc",
+	-- reaction (1-8), class, title }. over: a row's choice pointed at
+	-- ({ setting = value }), shown, not saved. off: as the plates draw names.
 	local SAMPLES = {
-		{ text = L["Hostile"], color = { 1, 0, 0 } },
-		{ text = L["Neutral"], color = { 1, 1, 0 } },
-		{ text = L["Friendly NPC"], color = { 0, 1, 0 } },
-		{ player = true },
+		all = { name = L["Kodo Bull"], kind = "npc", reaction = 4 },
+		Target = { name = L["Gnoll Brute"], kind = "npc", reaction = 2 },
+		GroupMembers = { name = "Elandra", kind = "player", reaction = 5, class = "PRIEST" },
+		Friends = { name = "Thandril", kind = "player", reaction = 5, class = "MAGE" },
+		Enemies = { name = "Varek", kind = "player", reaction = 2, class = "ROGUE" },
+		ServiceNPCs = { name = L["Innkeeper Allison"], kind = "npc", reaction = 5, title = L["Innkeeper"] },
+		FriendlyNPCs = { name = L["Stormwind Guard"], kind = "npc", reaction = 5 },
+		NeutralNPCs = { name = L["Kodo Bull"], kind = "npc", reaction = 4 },
+		HostileNPCs = { name = L["Gnoll Brute"], kind = "npc", reaction = 2 },
+		FriendlyMinions = { name = L["Wolf"], kind = "npc", reaction = 5 },
+		GroupMinions = { name = L["Felhunter"], kind = "npc", reaction = 5 },
+		EnemyMinions = { name = L["Water Elemental"], kind = "npc", reaction = 2 },
 	}
-	local PREVIEW_W, PREVIEW_H = 480, 84
-	preview = CreateFrame("Frame", nil, content)
-	preview:SetSize(PREVIEW_W, PREVIEW_H)
-	stack:Add(preview, "label")
-	ns.StylePopout(preview, Tooltip) -- (StylePages.lua)
-	ns.StyleScene(preview, 0.55, 0.8) -- (the Style pages' scene, darker under the names: StylePages.lua)
-	local caption = Label(preview, "GameFontDisableSmall", L["Preview"])
-	caption:SetPoint("TOPLEFT", 6, -5)
-	caption.searchSkip = true
-	local texts = {}
-	for i in ipairs(SAMPLES) do
-		local text = preview:CreateFontString(nil, "ARTWORK")
-		text:SetFontObject("GameFontNormal")
-		text.searchSkip = true
-		texts[i] = text
-	end
-	-- (Spread evenly, however wide the page makes it: StylePopout.)
-	local function PlaceTexts(_, width)
-		for i, text in ipairs(texts) do
-			text:ClearAllPoints()
-			text:SetPoint("CENTER", preview, "LEFT", width * (i - 0.5) / #SAMPLES, -4)
-		end
-	end
-	PlaceTexts(nil, PREVIEW_W)
-	preview:HookScript("OnSizeChanged", PlaceTexts)
+	local REACTION = { { 1, 0, 0 }, { 1, 0, 0 }, { 1, 0, 0 }, { 1, 1, 0 }, { 0, 1, 0 }, { 0, 1, 0 }, { 0, 1, 0 },
+		{ 0, 1, 0 } }
+	local ROMAN = not ({ ruRU = true, koKR = true, zhCN = true, zhTW = true })[GetLocale and GetLocale() or ""]
 	-- The plates' own font, as the game sets it up (or the usual one).
 	local function PlateFont()
 		local object = _G.SystemFont_NamePlate or _G.SystemFont_NamePlateFixed or _G.GameFontNormal
@@ -9573,49 +9533,169 @@ local function CreateNameStylePanel()
 		end
 		return object, file, size, flags
 	end
-	function preview:Refresh()
+	-- A sample: its text, the line under it, and its glow and band behind.
+	local function MakeSample(parent)
+		local sample = {}
+		sample.glow = parent:CreateTexture(nil, "ARTWORK", nil, 1)
+		sample.glow:SetTexture(ns.NAME_GLOW) -- (PlateParts.lua)
+		sample.glow:SetBlendMode("ADD")
+		sample.back = parent:CreateTexture(nil, "ARTWORK", nil, 2)
+		sample.text = parent:CreateFontString(nil, "OVERLAY")
+		sample.text:SetFontObject("GameFontNormal")
+		sample.text.searchSkip = true
+		sample.line = parent:CreateFontString(nil, "OVERLAY")
+		sample.line:SetFontObject("GameFontNormalSmall")
+		sample.line:SetPoint("TOP", sample.text, "BOTTOM", 0, -1)
+		sample.line.searchSkip = true
+		return sample
+	end
+	local function DrawSample(sample, row, over, scale)
 		local db = ns.GetDB()
-		local styledNames = db.plateNameStyle
+		local info = SAMPLES[row] or SAMPLES.all
+		local text = sample.text
+		local function S(setting) return (ns.NameLookValue(row, setting, over)) end
 		local object, file, size, flags = PlateFont()
-		local _, class = UnitClass("player")
-		local classColor = class and RAID_CLASS_COLORS and RAID_CLASS_COLORS[class]
-		for i, sample in ipairs(SAMPLES) do
-			local text = texts[i]
-			-- (The plates' own colours: white, players in their class colours.)
-			local r, g, b = 1, 1, 1
-			local ours = styledNames and db.plateNameColour
-			if sample.player then
-				if ours and db.plateNameFriends == "blue" then
-					r, g, b = unpack(ns.PLATE_FRIEND_COLOURS.blue)
-				elseif classColor and not (ours and db.plateNameFriends == "white") then
-					r, g, b = classColor.r, classColor.g, classColor.b
-				end
-			elseif ours then
-				r, g, b = unpack(sample.color)
+		local styled = db.plateNameStyle
+		scale = scale or 1
+		if not styled then
+			text:SetFontObject(object)
+			text:SetShadowOffset(0, 0)
+			text:SetAlpha(1)
+			text:SetTextColor(1, 1, 1)
+			text:SetText(info.name)
+			ns.SetTextRim(text, nil)
+			sample.glow:Hide()
+			sample.back:Hide()
+			sample.line:SetText(info.title and ("<" .. info.title .. ">") or "")
+			return
+		end
+		-- Its font: the row's, All names', else the usual (General's while on).
+		local font = S("Font")
+		if ROMAN then
+			if font == "usual" then
+				file = db.styleGeneral and ns.StyleFontFile(db.styleFont) or file
+			elseif font ~= "game" then
+				file = ns.StyleFontFile(font) or file
 			end
-			if styledNames then
-				ns.SetPlateNameFont(text, object, file, size, db.plateNameSize,
-					ns.OutlinedFlags(flags, db.plateNameOutline))
-				if db.plateNameShadow then
-					text:SetShadowOffset(db.plateNameShadowX, db.plateNameShadowY)
-					text:SetShadowColor(0, 0, 0, db.plateNameShadowAlpha)
-				else
-					text:SetShadowOffset(0, 0)
-				end
-				text:SetAlpha(db.plateNameAlpha)
+		end
+		local outline = tonumber(S("Outline")) or 0
+		local rim = outline > 0 and S("OutlineColor") == "custom"
+		ns.SetPlateNameFont(text, object, file, size, (tonumber(S("Size")) or 1) * scale,
+			ns.OutlinedFlags(flags, rim and 0 or outline))
+		if S("Shadow") then
+			text:SetShadowOffset(db.plateNameShadowX or 1, db.plateNameShadowY or -1)
+			text:SetShadowColor(0, 0, 0, tonumber(S("ShadowAlpha")) or 1)
+		else
+			text:SetShadowOffset(0, 0)
+		end
+		text:SetAlpha(tonumber(S("Alpha")) or 1)
+		-- Its color: as the row's Color tab says.
+		local mode = S("Colour")
+		local r, g, b = 1, 1, 1
+		local classColor = info.class and RAID_CLASS_COLORS and RAID_CLASS_COLORS[info.class]
+		local function Reaction()
+			local setting = info.reaction <= 3 and "Hostile" or info.reaction == 4 and "Neutral" or "Friendly"
+			if info.kind == "npc" and S(setting) == "custom" then return ns.NameLookColor(row, setting, over) end
+			return unpack(REACTION[info.reaction])
+		end
+		if mode == "one" then
+			r, g, b = ns.NameLookColor(row, "Colour", over)
+		elseif mode == "class" and classColor then
+			r, g, b = classColor.r, classColor.g, classColor.b
+		elseif mode and info.kind == "player" and info.reaction >= 5 then
+			local friends = S("Friends")
+			if friends == "class" and classColor then
+				r, g, b = classColor.r, classColor.g, classColor.b
 			else
-				text:SetFontObject(object)
-				text:SetShadowOffset(0, 0)
-				text:SetAlpha(1)
+				local color = ns.PLATE_FRIEND_COLOURS[friends] or ns.PLATE_FRIEND_COLOURS.blue
+				r, g, b = color[1], color[2], color[3]
 			end
-			text:SetTextColor(r, g, b)
-			-- (Set after the font, so it takes the font's alphabet for its letters.)
-			text:SetText(sample.player and (UnitName("player") or L["Friendly player"]) or sample.text)
-			text:SetPoint("CENTER", preview, "LEFT", PREVIEW_W * (i - 0.5) / #SAMPLES,
-				-4 + (styledNames and db.plateNameY or 0))
+		elseif mode and info.kind == "player" and S("Enemies") == "class" and classColor then
+			r, g, b = classColor.r, classColor.g, classColor.b
+		elseif mode then
+			r, g, b = Reaction()
+		elseif classColor then
+			r, g, b = classColor.r, classColor.g, classColor.b
+		end
+		text:SetTextColor(r, g, b)
+		text:SetText(info.name)
+		if rim then ns.SetTextRim(text, outline, ns.NameLookColor(row, "OutlineColor", over)) else ns.SetTextRim(text, nil) end
+		-- Its glow and band, sized to it.
+		local width, height = text:GetStringWidth(), (select(2, text:GetFont())) or 12
+		local glow, back = S("Glow"), S("Back")
+		sample.glow:SetShown(glow ~= "none")
+		if glow ~= "none" then
+			local gr, gg, gb = ns.NameLookColor(row, "Glow", over)
+			sample.glow:SetVertexColor(gr, gg, gb, 0.7)
+			sample.glow:ClearAllPoints()
+			sample.glow:SetPoint("CENTER", text, "CENTER", 0, 0)
+			sample.glow:SetSize(width + height * 3, height * 3)
+		end
+		sample.back:SetShown(back ~= "none")
+		if back ~= "none" then
+			local br, bg, bb = ns.NameLookColor(row, "Back", over)
+			sample.back:SetColorTexture(br, bg, bb, tonumber(S("BackAlpha")) or 0.6)
+			sample.back:ClearAllPoints()
+			sample.back:SetPoint("CENTER", text, "CENTER", 0, 0)
+			sample.back:SetSize(width + 14, height + 6)
+		end
+		-- The line under it: a title (Service NPCs) or a guild (players).
+		local under = info.title or (info.kind == "player" and info.reaction >= 5 and L["Guild"]) or nil
+		if under then
+			local lineSize = tonumber(S("Line2Size")) or 1
+			ns.SetPlateNameFont(sample.line, object, file, size, 0.85 * lineSize * scale, flags)
+			local lineColor = S("Line2Color")
+			if lineColor == "grey" then
+				sample.line:SetTextColor(0.72, 0.72, 0.72)
+			elseif lineColor == "gold" then
+				sample.line:SetTextColor(1, 0.82, 0)
+			else
+				sample.line:SetTextColor(r, g, b)
+			end
+			local brackets = not info.title or db.nameServiceBrackets
+			sample.line:SetText(brackets and ("<" .. under .. ">") or under)
+			sample.line:SetAlpha(tonumber(S("Alpha")) or 1)
+		else
+			sample.line:SetText("")
 		end
 	end
-	controls[#controls + 1] = preview
+
+	-- The scene: a name of each kind, spread over the lake, each in its row's
+	-- look (your target bigger, in front).
+	local SCENE_W, SCENE_H = 480, 150
+	local SPOTS = {
+		{ "Target", 0.5, 0.5 }, { "GroupMembers", 0.16, 0.2 }, { "Friends", 0.5, 0.17 }, { "Enemies", 0.84, 0.2 },
+		{ "ServiceNPCs", 0.2, 0.52 }, { "FriendlyNPCs", 0.82, 0.5 }, { "NeutralNPCs", 0.3, 0.82 },
+		{ "HostileNPCs", 0.7, 0.82 },
+	}
+	scene = CreateFrame("Frame", nil, content)
+	scene:SetSize(SCENE_W, SCENE_H)
+	stack:Add(scene, "label")
+	ns.StylePopout(scene, Tooltip) -- (StylePages.lua)
+	ns.StyleScene(scene, 0.55, 0.8)
+	local caption = Label(scene, "GameFontDisableSmall", L["Preview"])
+	caption:SetPoint("TOPLEFT", 6, -5)
+	caption.searchSkip = true
+	local spots = {}
+	for i in ipairs(SPOTS) do spots[i] = MakeSample(scene) end
+	local function PlaceSpots(_, width, height)
+		for i, spot in ipairs(SPOTS) do
+			spots[i].text:ClearAllPoints()
+			spots[i].text:SetPoint("CENTER", scene, "TOPLEFT", (width or SCENE_W) * spot[2],
+				-(height or SCENE_H) * spot[3])
+		end
+	end
+	PlaceSpots(nil, SCENE_W, SCENE_H)
+	scene:HookScript("OnSizeChanged", PlaceSpots)
+	function scene:Refresh()
+		for i, spot in ipairs(SPOTS) do
+			DrawSample(spots[i], spot[1], nil, spot[1] == "Target" and 1.25 or 1)
+		end
+		for _, preview in pairs(panels) do
+			if preview:IsVisible() then preview:Refresh() end
+		end
+	end
+	controls[#controls + 1] = scene
 
 	-- Where these names are right now: a warning while they aren't drawn (out
 	-- of CineMode, or in it where plates aren't kept on), a calm line while
@@ -9657,7 +9737,7 @@ local function CreateNameStylePanel()
 	-- switch, as General's doesn't reach these names.)
 	local rows = ns.StyleRows(ns.lowHealthKit, content, stack, Changed, "plateNameStyle")
 
-	-- Presets: a few looks to start from.
+	-- Presets: a few looks to start from, on All names.
 	local PRESETS = {
 		{ L["Like the game's names"], L["Colored, no outline or shadow (the defaults)."], {} },
 		{ L["Bold"], L["Colored, with a thin black outline, a little bigger."],
@@ -9677,6 +9757,11 @@ local function CreateNameStylePanel()
 		if value == nil then value = ns.DEFAULTS[key] end
 		return value
 	end
+	local function Saved(key)
+		local value = ns.GetDB()[key]
+		if value == nil then value = ns.DEFAULTS[key] end
+		return value
+	end
 	local KEPT_ID = "plateNameStyle:" .. PRESET_KEYS[1]
 	local function Kept()
 		local db = ns.GetDB()
@@ -9690,7 +9775,7 @@ local function CreateNameStylePanel()
 			for i, preset in ipairs(PRESETS) do
 				local match = true
 				for _, key in ipairs(PRESET_KEYS) do
-					if db[key] ~= PresetValue(preset, key) then match = false break end
+					if Saved(key) ~= PresetValue(preset, key) then match = false break end
 				end
 				if match then return i end
 			end
@@ -9729,49 +9814,271 @@ local function CreateNameStylePanel()
 	end, L["A whole look in one pick. Changing a setting after it shows Custom; picking Custom puts back " ..
 		"your own settings from before the preset."], On)
 
-	stack:Header(content, L["Text"])
-	rows.Look(L["Look:"], L["Names"], {
-		textColor = function(look)
-			look.Check("plateNameColour", L["Color by how the unit sees you"],
-				L["Red for hostile units, yellow for neutral ones and green for friendly ones, as over their heads. " ..
-				"Unticked: the plate's own color, white or gray."], On)
-			look.Choices(L["Friendly players:"], "plateNameFriends", {
-				{ "blue", L["Blue"], L["Blue, as the game's names over their heads (green while they're PvP flagged, " ..
-					"as there too)."] },
-				{ "class", L["Class colors"], L["Their class's color, as the plates draw them. Turns on Use Class " ..
-					"Color for Names in the game's Options > Nameplates too, so every friendly plate shows it; " ..
-					"yours is put back when you pick another color."] },
-				{ "white", L["White"], nil },
-			}, function(db) return db.plateNameStyle and db.plateNameColour end)
-		end,
-		outline = function(look)
-			look.Choices(L["Outline:"], "plateNameOutline", {
-				{ 0, L["None"], L["No border around the letters, like the game's names over heads."] },
-				{ 1, L["Thin"], L["A thin black border around the letters."] },
-				{ 2, L["Thick"], L["A thick black border around the letters."] },
-			}, On)
-		end,
-		shadow = function(look)
-			local shadow = look.Check("plateNameShadow", L["Shadow"], L["A dark copy of the letters just behind " ..
-				"them, to lift them off the world."], On)
-			local function Shadowed(db) return On(db) and db.plateNameShadow end
-			local boxes = look.Boxes(shadow)
-			boxes:Box(L["X"], "plateNameShadowX", -4, 4, 1, "%d", 1, L["How far right of the letters it falls " ..
-				"(left, below 0)."], Shadowed)
-			boxes:Box(L["Y"], "plateNameShadowY", -4, 4, 1, "%d", 1, L["How far above the letters it falls " ..
-				"(below, below 0)."], Shadowed)
-			boxes:Box(L["Opacity"], "plateNameShadowAlpha", 0, 100, 5, "%d", 100, L["How dark the shadow is."],
-				Shadowed, "%")
-		end,
-		outlineColor = false, -- (the game's outline is always black)
-	})
+	-- The rows: All names (the page's own settings), then a row per kind of
+	-- unit, each a Look panel (made the first time it's opened): Text, Color,
+	-- Glow, Background and Second line. A row's setting left on Inherit takes
+	-- All names', and All names' the game's.
+	stack:Header(content, L["Names"])
+	local TAB_NAMES = { Font = "Text", Size = "Text", Alpha = "Text", Outline = "Text", OutlineColor = "Text",
+		Shadow = "Text", ShadowAlpha = "Text", Colour = "Color", Friends = "Color", Enemies = "Color",
+		Hostile = "Color", Neutral = "Color", Friendly = "Color", Glow = "Glow", Back = "Background",
+		BackAlpha = "Background", Line2Size = "Second line", Line2Color = "Second line" }
+	local OUTLINE_NAMES = { [0] = L["None"], L["Thin"], L["Thick"] }
+	local function Words(setting, value)
+		if setting == "Font" then
+			if value == "usual" then return L["General's or the game's"] end
+			return value == "game" and L["The game's"] or ns.StyleFontName(value)
+		elseif setting == "Outline" then
+			return OUTLINE_NAMES[tonumber(value) or 0] or tostring(value)
+		elseif setting == "Size" or setting == "Alpha" or setting == "ShadowAlpha" or setting == "BackAlpha"
+			or setting == "Line2Size" then
+			return ("%d%%"):format(math.floor((tonumber(value) or 1) * 100 + 0.5))
+		elseif setting == "Shadow" then
+			return value and L["Shadow"] or L["None"]
+		elseif setting == "Colour" then
+			return ({ [true] = L["How they see you"], [false] = L["The plate's"], class = L["Class colors"],
+				one = L["One color"] })[value] or tostring(value)
+		end
+		local WORDS = { blue = L["Blue"], class = L["Class colors"], white = L["White"], react = L["Hostile's color"],
+			game = L["The game's"], custom = L["Custom"], black = L["Black"], none = L["None"], soft = L["Soft glow"],
+			band = L["Band"], name = L["Name's"], grey = L["Grey"], gold = L["Gold"] }
+		return WORDS[value] or tostring(value)
+	end
+	local function RowSource(row, setting)
+		local db = ns.GetDB() or {}
+		local own = db[ns.NameLookKey(row, setting)]
+		own = own ~= nil and own ~= "inherit"
+		local parent, short
+		if row ~= "all" then
+			local _, from = ns.NameLookValue("all", setting)
+			if from ~= "game" then parent, short = L["All names'"], L["All names"] end
+		end
+		if not parent then parent = L["The game's"] end
+		return { text = own and (row == "all" and L["Set here"] or L["This row"]) or parent, own = own,
+			parent = parent, short = short }
+	end
+	local function ParentValue(row, setting)
+		if row == "all" then return ns.NAME_LOOK_GAME[setting] end
+		return (ns.NameLookValue("all", setting))
+	end
 
-	-- Size and height by distance. Retail's plates scale themselves: one of
-	-- each. WoW Forever's don't, so names are sized and placed by the camera's
-	-- zoom (PlateParts' Look): set at two points, close and far, following
-	-- perspective between them and on past far. The camera's distance
-	-- now shows under them, to set each with the camera there. (Sizes and
-	-- the like as small boxes on a line, as the other Style pages'.)
+	-- A row's Look panel: its keys through a field each (nameLook<row><setting>,
+	-- All names' plateName<setting>), "inherit" saved as no value.
+	local function OpenRow(row, label)
+		if rowButtons[row].pop then
+			rowButtons[row].pop:SetShown(not rowButtons[row].pop:IsShown())
+			return
+		end
+		local function FieldOf(key)
+			-- (The service titles' own settings, the same for every row.)
+			if key:find("^nameService") then return key end
+			local dbKey = ns.NameLookKey(row, key)
+			RecordKey(content, dbKey)
+			return { get = function()
+				local value = ns.GetDB()[dbKey]
+				if value == nil then
+					if row == "all" then value = ns.DEFAULTS[dbKey] else value = ns.NameRowDefault(dbKey) end
+				end
+				return value
+			end, set = function(value)
+				local default = row == "all" and ns.DEFAULTS[dbKey] or ns.NameRowDefault(dbKey)
+				if value == default then value = nil end
+				ns.GetDB()[dbKey] = value
+			end }
+		end
+		local function DefaultOf(key)
+			if key:find("^nameService") then return nil end -- (not this row's: never reset with it)
+			local dbKey = ns.NameLookKey(row, key)
+			if row == "all" then return ns.DEFAULTS[dbKey] end
+			return ns.NameRowDefault(dbKey)
+		end
+		local function Own(setting)
+			local value = ns.GetDB()[ns.NameLookKey(row, setting)]
+			return value ~= nil and value ~= "inherit" and value or nil
+		end
+		local INHERIT = { "inherit", L["Inherit"], row == "all" and L["The game's look."] or
+			L["As All names has it, else the game's. Follows it: changes when that changes."] }
+		local hidden = { Add = function(_, control)
+			control:Hide()
+			return control
+		end }
+		local styleRows = ns.StyleRows(ns.lowHealthKit, content, hidden, Changed, "plateNameStyle", FieldOf)
+		local service = row == "all" or row == "ServiceNPCs"
+		local button, pop = styleRows.Look("", label, {
+			tabs = {
+				default = DefaultOf,
+				usual = function(key)
+					if key:find("^nameService") then return nil end
+					return Words(key, ParentValue(row, key)), ParentValue(row, key)
+				end,
+				source = function(key)
+					if key:find("^nameService") then return nil end
+					return RowSource(row, key)
+				end,
+				resolved = function(key) return ParentValue(row, key) end,
+				copyKind = "nameRow", copyName = label,
+				resetLabel = function() return row == "all" and L["Reset all"] or L["Clear this row"] end,
+			},
+			preview = function(parent, width)
+				local holder = CreateFrame("Frame", nil, parent)
+				holder:SetSize(width, 96)
+				ns.StyleScene(holder, 0.55, 0.85)
+				local sample = MakeSample(holder)
+				sample.text:SetPoint("CENTER", holder, "CENTER", 0, 8)
+				local tag = holder:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+				tag:SetPoint("TOPRIGHT", -8, -6)
+				tag.searchSkip = true
+				function holder.Refresh(_, over, note)
+					tag:SetShown(over ~= nil)
+					tag:SetText(note or L["Preview: not saved"])
+					DrawSample(sample, row, over, 1.6)
+				end
+				holder:SetScript("OnShow", function(self) self:Refresh() end)
+				panels[row] = holder
+				return holder
+			end,
+			font = function(look)
+				look.Font("Font", L["The names' font."], nil, INHERIT)
+			end,
+			textSize = function(look)
+				look.Slider("Size", L["Size"], 50, 200, 5, "%d%%", 100, L["How big the names are, next to the plates' own."])
+				look.Slider("Alpha", L["Opacity"], 20, 100, 5, "%d%%", 100,
+					L["How see-through the names are, on top of their fades."])
+			end,
+			textColor = false,
+			outline = function(look)
+				look.Segments(L["Outline"], "Outline", { INHERIT, { 0, L["None"] }, { 1, L["Thin"] }, { 2, L["Thick"] } },
+					L["A border around the letters."], nil, "outline")
+			end,
+			outlineColor = function(look)
+				local function Custom(db) return look.On(db) and Own("OutlineColor") == "custom" end
+				local function Outlined(db)
+					return look.On(db) and (tonumber((ns.NameLookValue(row, "Outline"))) or 0) > 0
+				end
+				look.Segments(L["Outline color"], "OutlineColor", { INHERIT, { "black", L["Black"] },
+					{ "custom", L["Custom"], L["An outline in a color of your own: copies of the name drawn round it. " ..
+					"Costs more than a black one with many names up."] } }, nil, Outlined)
+				look.Chips(L["Its color"], { "OutlineR", "OutlineG", "OutlineB" }, nil, Custom)
+			end,
+			shadow = function(look)
+				look.Segments(L["Shadow"], "Shadow", { INHERIT, { true, L["Shadow"],
+					L["A dark copy of the letters just behind them, to lift them off the world."] }, { false, L["None"] } })
+				look.Slider("ShadowAlpha", L["Shadow opacity"], 0, 100, 5, "%d%%", 100, L["How dark the shadow is."],
+					function(db) return look.On(db) and ns.NameLookValue(row, "Shadow") == true end)
+			end,
+			nameColor = function(look)
+				look.Segments(L["Color by"], "Colour", { INHERIT,
+					{ true, L["How they see you"], L["Red for hostile units, yellow for neutral ones and green for " ..
+						"friendly ones, as over their heads."] },
+					{ "class", L["Class"], L["Players in their class's color, the rest as how they see you."] },
+					{ "one", L["One color"] }, { false, L["The plate's"], L["The plate's own color, white or gray."] } })
+				look.Chips(L["Color"], { "ColourR", "ColourG", "ColourB" }, nil,
+					function(db) return look.On(db) and Own("Colour") == "one" end)
+				local function Reacting(db)
+					local mode = ns.NameLookValue(row, "Colour")
+					return look.On(db) and mode ~= "one" and mode ~= false
+				end
+				look.Segments(L["Friendly players"], "Friends", { INHERIT,
+					{ "blue", L["Blue"], L["Blue, as the game's names over their heads (green while they're PvP " ..
+						"flagged, as there too)."] },
+					{ "class", L["Class colors"], L["Their class's color, as the plates draw them. Turns on Use Class " ..
+						"Color for Names in the game's Options > Nameplates too, so every friendly plate shows it; " ..
+						"yours is put back when you pick another color."] },
+					{ "white", L["White"] } }, nil, Reacting)
+				look.Segments(L["Enemy players"], "Enemies", { INHERIT, { "react", L["Hostile's color"] },
+					{ "class", L["Class colors"] } }, nil, Reacting)
+				for _, each in ipairs({ { "Hostile", L["Hostile"] }, { "Neutral", L["Neutral"] },
+					{ "Friendly", L["Friendly"] } }) do
+					look.Segments(each[2], each[1], { INHERIT, { "game", L["The game's"] }, { "custom", L["Custom"] } },
+						L["NPCs of this reaction in a color of your own."], nil)
+					look.Chips(each[2] .. " " .. L["color"], { each[1] .. "R", each[1] .. "G", each[1] .. "B" }, nil,
+						function(db) return look.On(db) and Own(each[1]) == "custom" end)
+				end
+			end,
+			glow = function(look)
+				look.Segments(L["Glow"], "Glow", { INHERIT, { "none", L["None"] },
+					{ "soft", L["Soft glow"], L["A soft light behind the name."] } })
+				look.Chips(L["Glow color"], { "GlowR", "GlowG", "GlowB" }, nil,
+					function(db) return look.On(db) and Own("Glow") == "soft" end)
+			end,
+			backColor = function(look)
+				look.Segments(L["Behind the name"], "Back", { INHERIT, { "none", L["Nothing"] },
+					{ "band", L["Band"], L["A band of color behind the name, as wide as it where its width can be " ..
+						"read (one width for every name where it can't)."] } })
+				local function Banded(db) return look.On(db) and ns.NameLookValue(row, "Back") ~= "none" end
+				look.Chips(L["Color"], { "BackR", "BackG", "BackB" }, nil,
+					function(db) return look.On(db) and Own("Back") == "band" end)
+				look.Slider("BackAlpha", L["Opacity"], 10, 100, 5, "%d%%", 100, L["How see-through the band is."], Banded)
+			end,
+			backAlpha = false,
+			line2 = function(look)
+				look.Slider("Line2Size", L["Size"], 50, 120, 5, "%d%%", 100,
+					L["The guild or title under the name, next to the name's size."])
+				look.Segments(L["Color"], "Line2Color", { INHERIT, { "name", L["Name's"] }, { "grey", L["Grey"] },
+					{ "gold", L["Gold"] } })
+				-- (Service NPCs' titles: the same for every row that shows them.)
+				if service then
+					look.Toggle("nameServiceBrackets", L["Brackets round titles"],
+						L["Ticked, NPC titles under or in place of names show as the game writes them (<Baker>). " ..
+						"Unticked, without the < > (Baker). Players' guild names keep theirs."])
+					look.Toggle("nameServiceBracketsWithName", L["When the name shows too"],
+						L["Ticked, a title under its NPC's name keeps its < > (Uualla Suncrest, <General Goods>), " ..
+						"and only a title shown alone drops them."])
+					look.Toggle("nameServiceIcons", L["Icons for titles"],
+						L["An icon in place of a service NPC's title (an anvil for repairs...)."])
+					look.Slider("nameServiceIconScale", L["Icon size"], 50, 200, 5, "%d%%", 100,
+						L["How big the title icons are."], function(db) return look.On(db) and db.nameServiceIcons end)
+				end
+			end,
+		})
+		if button then button:Hide() end
+		rowButtons[row].pop = pop
+		pop:Show()
+	end
+	for _, info in ipairs(ns.NAME_ROWS) do
+		local row = info.key
+		for _, key in ipairs(ns.NameRowKeys(row)) do RecordKey(content, key) end
+		local name = stack:Add(Label(content, "GameFontHighlight", info.label), "label")
+		name:SetSize(170, 26)
+		name:SetJustifyV("MIDDLE")
+		local button = ns.PanelButton(content)
+		button:SetHeight(22)
+		button:SetPoint("LEFT", name, "RIGHT", 4, 0)
+		button.searchLabel = info.label
+		Tooltip(button, row == "all" and L["Every name's look: the font, colors, glow and the line under it. " ..
+			"Each row below starts on these and can change any of them."]
+			or L["This kind's names: anything set here goes over All names'."])
+		button:SetScript("OnClick", function() OpenRow(row, info.label) end)
+		function button.Refresh(self)
+			local db = ns.GetDB()
+			local tabs, seen = {}, {}
+			for setting, tab in pairs(TAB_NAMES) do
+				local value = db and db[ns.NameLookKey(row, setting)]
+				if value ~= nil and value ~= "inherit" and not seen[tab] then
+					seen[tab] = true
+					tabs[#tabs + 1] = L[tab]
+				end
+			end
+			table.sort(tabs)
+			if #tabs > 0 then
+				self:SetText(L["Its own:"] .. " " .. table.concat(tabs, " · "))
+			else
+				self:SetText(row == "all" and L["The game's"] or L["Inherits All names"])
+			end
+			self:SetWidth(math.max(140, self:GetFontString():GetStringWidth() + 30))
+			self:SetEnabled(db and db.plateNameStyle and true or false)
+		end
+		rowButtons[row] = button
+		controls[#controls + 1] = button
+	end
+
+	-- Distance and timing. Retail's plates scale themselves: one size, and
+	-- names raised as a whole. WoW Forever's don't, so names are sized and
+	-- placed by the camera's zoom (PlateParts' Look): set at two points,
+	-- close and far, following perspective between them and on past far. The
+	-- camera's distance now shows under them, to set each with the camera
+	-- there. (Each name's own size and opacity: its row's Text tab.)
+	stack:Header(content, L["Distance and timing"])
 	local function HideDelayBox(boxes)
 		boxes:Box(L["Hide delay"], "plateNameHideDelay", 0, 10, 0.1, "%.1f", 1,
 			L["How long a unit has to stay out of sight before its name hides, so a short gap like the edge " ..
@@ -9782,20 +10089,14 @@ local function CreateNameStylePanel()
 	end
 	if ns.isRetail then
 		local sizes = rows.Boxes()
-		sizes:Box(L["Size"], "plateNameSize", 50, 200, 5, "%d", 100,
-			L["How big the names are, next to the plates' own."], On, "%")
 		sizes:Box(L["Raise"], "plateNameY", -30, 30, 1, "%d", 1,
 			L["Moves the names up (or down, below 0) from where the plates put them."], On)
-		sizes:Box(L["Opacity"], "plateNameAlpha", 20, 100, 5, "%d", 100,
-			L["How see-through the names are, on top of their fades."], On, "%")
 		HideDelayBox(sizes)
 		rows.Check("plateNameFixedSize", L["Same size at any distance"],
 			L["One size at any distance. Unticked, a name grows and shrinks with its plate as its unit comes " ..
 			"nearer or goes."], On)
 	else
 		local fades = rows.Boxes()
-		fades:Box(L["Opacity"], "plateNameAlpha", 20, 100, 5, "%d", 100,
-			L["How see-through the names are, on top of their fades."], On, "%")
 		HideDelayBox(fades)
 		stack:Header(content, L["Close (camera zoomed all the way in)"])
 		local close = rows.Boxes()

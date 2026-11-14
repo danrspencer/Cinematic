@@ -1025,6 +1025,9 @@ function ns.MarkRowDefault(key)
 	if type(key) ~= "string" or DEFAULTS[key] ~= nil then
 		return nil
 	end
+	-- (Name Style's rows' settings too: NameRowLook.lua.)
+	local nameDefault = ns.NameRowDefault and ns.NameRowDefault(key)
+	if nameDefault ~= nil then return nameDefault end
 	local split = markRowSplit[key]
 	if split == nil then
 		local id, rest = key:match("^(%l[%a%d]-)(Mark%u%a*)$")
@@ -1151,11 +1154,13 @@ ns.MARK_ROW_RULES = { npcEnemy = "elite28" }
 -- Names on plates showing just their name (CineMode), drawn like the game's
 -- names over heads (Nameplates page's tick, the Style hub's Names page; see PlateParts).
 DEFAULTS.plateNameStyle = true
-DEFAULTS.plateNameColour = true -- red hostile, yellow neutral, green friendly
-DEFAULTS.plateNameFriends = "blue" -- friendly players: "blue" (as over their heads), "class" (as their plates' bars) or "white"
-DEFAULTS.plateNameOutline = 0 -- 0 none, 1 thin, 2 thick
-DEFAULTS.plateNameSize = 1 -- times the game's (retail)
-DEFAULTS.plateNameAlpha = 1
+-- (Name Style's All names: each "inherit" to start, the game's look then:
+-- NameRowLook.lua, where the rest of them are.)
+DEFAULTS.plateNameColour = "inherit" -- true: by reaction; "class"; "one": one color; false: the plate's own
+DEFAULTS.plateNameFriends = "inherit" -- friendly players: "blue" (as over heads), "class" or "white"
+DEFAULTS.plateNameOutline = "inherit" -- 0 none, 1 thin, 2 thick
+DEFAULTS.plateNameSize = "inherit" -- times the game's (retail)
+DEFAULTS.plateNameAlpha = "inherit"
 DEFAULTS.plateNameY = 0 -- up from where the game puts it (retail)
 DEFAULTS.plateNameFixedSize = true -- one size at any distance (retail: Forever's plates don't scale)
 DEFAULTS.plateNameHideDelay = 1.5 -- seconds a plate stays dimmed (out of sight) before its name hides
@@ -1166,10 +1171,10 @@ DEFAULTS.plateNameCloseSize = 1.6
 DEFAULTS.plateNameCloseY = -9
 DEFAULTS.plateNameFarSize = 0.3
 DEFAULTS.plateNameFarY = -35
-DEFAULTS.plateNameShadow = false -- (barely shows: off)
+DEFAULTS.plateNameShadow = "inherit" -- (the game's: off, it barely shows)
 DEFAULTS.plateNameShadowX = 1
 DEFAULTS.plateNameShadowY = -1
-DEFAULTS.plateNameShadowAlpha = 1
+DEFAULTS.plateNameShadowAlpha = "inherit"
 DEFAULTS.plateNameHealthFill = false -- name-only names: the colored part shows the unit's health, the rest grey
 DEFAULTS.questVision = false -- (off in every profile) the Quest Vision page's switch: off, none of the four below works
 -- What of units for a quest objective you haven't finished shows in CineMode
@@ -4859,6 +4864,9 @@ ticker:SetScript("OnEvent", ns.Profiled("Core events", function(self, event, arg
 			if ns.db.plateNameFriends == "class" then ns.db.plateNameFriends = nil end
 			ns.db.plateNameFriendsV2 = true
 		end
+		-- Name Style's settings still at their old defaults to "inherit" (the
+		-- same look, from the game's), every profile. Once. NameRowLook.lua.
+		if ns.MigrateNameInherit then ns.MigrateNameInherit() end
 		-- Enemy nameplates were first hidden in fights by default; show them once.
 		if not ns.db.plateCombatV2 then
 			ns.db.plateCombatMobs = true
