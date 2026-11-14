@@ -16992,47 +16992,46 @@ local function CreateKeybindsPanel()
 				GameTooltip:Show()
 			end)
 			row.framesHit:SetScript("OnLeave", function() GameTooltip:Hide() end)
-			local ok, menu = ns.MenuDropdown(row)
-			if ok and menu and menu.SetupMenu then
+			-- The frame picker: a button with the count, its menu of ticks (by
+			-- heading) made only when it's clicked: a dropdown per group built
+			-- every group's 200-odd ticks each time the page was laid out.
+			if MenuUtil and ns.ContextMenu then
+				local menu = ns.PanelButton(row)
 				row.menu = menu
 				menu:SetSize(KEY_W * 2 + 6, 20)
 				menu:SetPoint("TOPLEFT", row.first, "BOTTOMLEFT", 0, -4)
 				menu.searchSkip = true -- (it shows a count, not a label)
-				menu:SetupMenu(function(_, root)
+				menu:SetScript("OnClick", function(self)
 					local group = row.group
 					if not group then return end
-					for _, picks in ipairs(ns.FRAME_KEY_ROWS or {}) do
-						local shown = {}
-						for _, item in ipairs(picks) do
-							if ns.OptionAvailable(item) then shown[#shown + 1] = item end
-						end
-						if #shown > 0 then
-							local sub = root:CreateButton(picks.heading)
-							for _, item in ipairs(shown) do
-								sub:CreateCheckbox(item.hoverLabel or item.label,
-									function() return HasMember(group, item.key) ~= nil end,
-									function()
-										group.members = group.members or {}
-										local at = HasMember(group, item.key)
-										if at then
-											table.remove(group.members, at)
-										else
-											group.members[#group.members + 1] = item.key
-										end
-										ns.KeyGroupsChanged()
-										LayoutGroups()
-										return MenuResponse and MenuResponse.Refresh
-									end)
+					ns.ContextMenu(self, function(_, root)
+						for _, picks in ipairs(ns.FRAME_KEY_ROWS or {}) do
+							local shown = {}
+							for _, item in ipairs(picks) do
+								if ns.OptionAvailable(item) then shown[#shown + 1] = item end
+							end
+							if #shown > 0 then
+								local sub = root:CreateButton(picks.heading)
+								for _, item in ipairs(shown) do
+									sub:CreateCheckbox(item.hoverLabel or item.label,
+										function() return HasMember(group, item.key) ~= nil end,
+										function()
+											group.members = group.members or {}
+											local at = HasMember(group, item.key)
+											if at then
+												table.remove(group.members, at)
+											else
+												group.members[#group.members + 1] = item.key
+											end
+											ns.KeyGroupsChanged()
+											LayoutGroups()
+											return MenuResponse and MenuResponse.Refresh
+										end)
+								end
 							end
 						end
-					end
-				end)
-				if menu.SetSelectionText then
-					menu:SetSelectionText(function()
-						local count = row.group and #MembersText(row.group) or 0
-						return count == 1 and L["1 frame"] or L["%d frames"]:format(count)
 					end)
-				end
+				end)
 				Tooltip(menu, L["Pick the frames this group's key shows and hides. Only these: the frames that " ..
 					"usually go with one (the minimap's clock with the Minimap) stay with their own rows."])
 			end
@@ -17066,7 +17065,9 @@ local function CreateKeybindsPanel()
 					ns.DeleteKeyGroup(index)
 					LayoutGroups()
 				end)
-				if row.menu then row.menu:GenerateMenu() end
+				if row.menu then
+					row.menu:SetText(L["Pick frames (%d)"]:format(#names))
+				end
 				y = y + CARD + GAP
 			end
 			for i = #groups + 1, #rows do
