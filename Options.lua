@@ -16882,14 +16882,19 @@ local function CreateKeybindsPanel()
 	-- frames in a menu of ticks by heading. Laid out again on every change;
 	-- the rows below hang on its box, so they move with it.
 	local function BuildKeyGroups(body, above)
-		local WIDTH, ROW_HEIGHT = SECTION_WIDTH - 12, 58
+		local WIDTH, CARD, GAP = SECTION_WIDTH - 12, 54, 6
+		local KEY_W = 130
+		-- Heading, with New key group at its right; a line on what they do under it.
 		local heading = Label(body, "GameFontNormal", L["Key groups"])
-		heading:SetPoint("TOPLEFT", above, "BOTTOMLEFT", 0, -18)
-		local intro = Label(body, "GameFontHighlightSmall", L["A key for each group of frames: it shows or hides " ..
-			"just those, in CineMode and out. They start as your Hover Groups; change their frames, add your own " ..
-			"(a group of the Minimap alone leaves its zone name and clock to their rows). A frame in two groups goes " ..
-			"with the key pressed last."])
-		intro:SetPoint("TOPLEFT", heading, "BOTTOMLEFT", 0, -4)
+		heading:SetPoint("TOPLEFT", above, "BOTTOMLEFT", 4, -20) -- (above: the Reset tick, 4 left)
+		local add = ns.PanelButton(body)
+		add:SetSize(KEY_W * 2 + 6, 22)
+		add:SetText(L["New key group"])
+		add:SetPoint("LEFT", heading, "LEFT", WIDTH - 2 - 22 - 4 - (KEY_W * 2 + 6), 0)
+		Tooltip(add, L["A key group of your own: name it, set its key and pick its frames."])
+		local intro = Label(body, "GameFontDisableSmall", L["Press a group's key to hide its frames, again to bring " ..
+			"them back, in CineMode or out. They start as your Hover Groups."])
+		intro:SetPoint("TOPLEFT", heading, "BOTTOMLEFT", 0, -8)
 		intro:SetWidth(WIDTH)
 		intro:SetJustifyH("LEFT")
 		local box = CreateFrame("Frame", nil, body)
@@ -16897,7 +16902,8 @@ local function CreateKeybindsPanel()
 		box:SetSize(WIDTH, 30)
 		local rows = {}
 		local LayoutGroups -- (below)
-		-- A group's frames as one line: the picked rows' names.
+		-- A group's frames: the picked rows' names (all of them: the card's
+		-- line cuts it short, its tooltip shows the rest).
 		local function MembersText(group)
 			local names = {}
 			for _, picks in ipairs(ns.FRAME_KEY_ROWS or {}) do
@@ -16907,26 +16913,38 @@ local function CreateKeybindsPanel()
 					end
 				end
 			end
-			return #names > 0 and table.concat(names, ", ") or L["No frames yet: pick them here"]
+			return names
 		end
 		local function HasMember(group, key)
 			for i, member in ipairs(group.members or {}) do
 				if member == key then return i end
 			end
 		end
+		-- A card per group: its icon down the left; its name and keys on the
+		-- top line, delete at the end; its frames under the name, and the
+		-- menu that picks them under the keys.
 		local function MakeRow()
 			local row = CreateFrame("Frame", nil, box)
-			row:SetSize(WIDTH, ROW_HEIGHT)
-			-- (Its icon: the Mouseover group's it was copied from, else none.)
+			row:SetSize(WIDTH, CARD)
+			row.bg = row:CreateTexture(nil, "BACKGROUND")
+			row.bg:SetAllPoints()
+			row.bg:SetColorTexture(1, 1, 1, 0.04)
+			row.edge = row:CreateTexture(nil, "BORDER")
+			row.edge:SetPoint("TOPLEFT")
+			row.edge:SetPoint("BOTTOMLEFT")
+			row.edge:SetWidth(2)
+			row.edge:SetColorTexture(0.8, 0.65, 0.2, 0.6)
+			-- (Its icon: the Hover Group's it was copied from, else a key.)
 			row.icon = row:CreateTexture(nil, "ARTWORK")
-			row.icon:SetSize(20, 20)
-			row.icon:SetPoint("TOPLEFT", 0, 0)
+			row.icon:SetSize(36, 36)
+			row.icon:SetPoint("LEFT", 9, 0)
 			row.icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
 			row.name = ns.SkinEditBox(CreateFrame("EditBox", nil, row, "InputBoxTemplate"))
-			row.name:SetSize(168, 20)
-			row.name:SetPoint("TOPLEFT", 30, -1)
+			row.name:SetSize(WIDTH - 22 - KEY_W * 2 - 6 - 80, 20)
+			row.name:SetPoint("TOPLEFT", 58, -5)
 			row.name:SetAutoFocus(false)
 			row.name:SetMaxLetters(40)
+			row.name:SetFontObject("GameFontNormal")
 			row.name:SetScript("OnEnterPressed", function(self) self:ClearFocus() end)
 			row.name:SetScript("OnEscapePressed", function(self)
 				self:SetText(row.group and row.group.name or "")
@@ -16942,20 +16960,44 @@ local function CreateKeybindsPanel()
 				self:SetText(group and group.name or "")
 			end)
 			Tooltip(row.name, L["The group's name: click to change it."])
-			row.first = CreateKeybindButton(row, "", 1)
-			row.first:SetPoint("TOPLEFT", 210, 0)
-			row.second = CreateKeybindButton(row, "", 2)
-			row.second:SetPoint("LEFT", row.first, "RIGHT", 8, 0)
 			row.delete = ns.SkinClose(CreateFrame("Button", nil, row, "UIPanelCloseButton"))
 			row.delete:SetSize(22, 22)
-			row.delete:SetPoint("LEFT", row.second, "RIGHT", 6, 0)
+			row.delete:SetPoint("TOPRIGHT", -2, -4)
 			Tooltip(row.delete, L["Delete this group, and its keys. Its frames go back to their rows."])
+			row.second = CreateKeybindButton(row, "", 2)
+			row.second:SetWidth(KEY_W)
+			row.second:SetPoint("RIGHT", row.delete, "LEFT", -4, 0)
+			row.first = CreateKeybindButton(row, "", 1)
+			row.first:SetWidth(KEY_W)
+			row.first:SetPoint("RIGHT", row.second, "LEFT", -6, 0)
+			-- ("hidden" or "shown" while its key has them, on the frames' line: RefreshKeybinds.)
+			row.state = Label(row, "GameFontHighlightSmall", "")
+			row.state:SetPoint("TOPRIGHT", row.first, "BOTTOMLEFT", -10, -8)
+			row.stateEntry = { label = row.state, text = "" }
+			frameKeyLabels[#frameKeyLabels + 1] = row.stateEntry
+			-- Its frames, one line (cut short; the tooltip has them all).
+			row.frames = Label(row, "GameFontHighlightSmall", "")
+			row.frames:SetPoint("TOPLEFT", 64, -32)
+			row.frames:SetPoint("RIGHT", row.state, "LEFT", -6, 0)
+			row.frames:SetJustifyH("LEFT")
+			row.frames:SetWordWrap(false)
+			row.framesHit = CreateFrame("Frame", nil, row)
+			row.framesHit:SetAllPoints(row.frames)
+			row.framesHit:SetScript("OnEnter", function(self)
+				local names = row.group and MembersText(row.group) or {}
+				if #names == 0 then return end
+				GameTooltip:SetOwner(self, "ANCHOR_TOP")
+				GameTooltip:SetText(row.group.name or "", 1, 0.82, 0)
+				GameTooltip:AddLine(table.concat(names, ", "), 1, 1, 1, true)
+				GameTooltip:Show()
+			end)
+			row.framesHit:SetScript("OnLeave", function() GameTooltip:Hide() end)
 			local ok, menu = ns.MenuDropdown(row)
 			if ok and menu and menu.SetupMenu then
 				row.menu = menu
-				menu:SetSize(WIDTH - 90, 22)
-				menu:SetPoint("TOPLEFT", 8, -28)
-				menu.searchSkip = true -- (it shows the current ticks, not a label)
+				menu:SetSize(KEY_W * 2 + 6, 20)
+				menu:SetPoint("TOPLEFT", row.first, "BOTTOMLEFT", 0, -4)
+				menu.searchSkip = true -- (it shows a count, not a label)
 				menu:SetupMenu(function(_, root)
 					local group = row.group
 					if not group then return end
@@ -16967,7 +17009,8 @@ local function CreateKeybindsPanel()
 						if #shown > 0 then
 							local sub = root:CreateButton(picks.heading)
 							for _, item in ipairs(shown) do
-								sub:CreateCheckbox(item.hoverLabel or item.label, function() return HasMember(group, item.key) ~= nil end,
+								sub:CreateCheckbox(item.hoverLabel or item.label,
+									function() return HasMember(group, item.key) ~= nil end,
 									function()
 										group.members = group.members or {}
 										local at = HasMember(group, item.key)
@@ -16977,6 +17020,7 @@ local function CreateKeybindsPanel()
 											group.members[#group.members + 1] = item.key
 										end
 										ns.KeyGroupsChanged()
+										LayoutGroups()
 										return MenuResponse and MenuResponse.Refresh
 									end)
 							end
@@ -16985,27 +17029,15 @@ local function CreateKeybindsPanel()
 				end)
 				if menu.SetSelectionText then
 					menu:SetSelectionText(function()
-						return row.group and MembersText(row.group) or ""
+						local count = row.group and #MembersText(row.group) or 0
+						return count == 1 and L["1 frame"] or L["%d frames"]:format(count)
 					end)
 				end
-				Tooltip(menu, L["The frames this group's key shows and hides. Only these: the rows that usually " ..
-					"go with one (the minimap's clock with the Minimap) stay with their own rows."])
+				Tooltip(menu, L["Pick the frames this group's key shows and hides. Only these: the frames that " ..
+					"usually go with one (the minimap's clock with the Minimap) stay with their own rows."])
 			end
-			-- ("hidden" or "shown" while its key has them: RefreshKeybinds.)
-			row.state = Label(row, "GameFontHighlightSmall", "")
-			if row.menu then
-				row.state:SetPoint("LEFT", row.menu, "RIGHT", 8, 0)
-			else
-				row.state:SetPoint("TOPLEFT", 8, -34)
-			end
-			row.stateEntry = { label = row.state, text = "" }
-			frameKeyLabels[#frameKeyLabels + 1] = row.stateEntry
 			return row
 		end
-		local add = ns.PanelButton(box)
-		add:SetSize(160, 22)
-		add:SetText(L["New key group"])
-		Tooltip(add, L["A key group of your own: name it, set its key and pick its frames."])
 		add:SetScript("OnClick", function()
 			ns.AddKeyGroup(L["Key group %d"]:format(#ns.KeyGroups() + 1))
 			LayoutGroups()
@@ -17022,7 +17054,11 @@ local function CreateKeybindsPanel()
 				row:SetPoint("TOPLEFT", box, "TOPLEFT", 0, -y)
 				row:Show()
 				row.name:SetText(group.name or "")
+				row.name:SetCursorPosition(0)
 				row.icon:SetTexture(group.icon or "Interface\\Icons\\INV_Misc_Key_03")
+				local names = MembersText(group)
+				row.frames:SetText(#names > 0 and table.concat(names, ", ")
+					or "|cff808080" .. L["No frames yet: pick them on the right"] .. "|r")
 				local action = "CLICK " .. ns.FRAME_KEY_BUTTON .. ":g" .. tostring(group.id)
 				row.first.action, row.second.action = action, action
 				row.stateEntry.key = "g" .. tostring(group.id)
@@ -17031,16 +17067,14 @@ local function CreateKeybindsPanel()
 					LayoutGroups()
 				end)
 				if row.menu then row.menu:GenerateMenu() end
-				y = y + ROW_HEIGHT
+				y = y + CARD + GAP
 			end
 			for i = #groups + 1, #rows do
 				rows[i]:Hide()
 				rows[i].group = nil
 				rows[i].stateEntry.key = nil
 			end
-			add:ClearAllPoints()
-			add:SetPoint("TOPLEFT", box, "TOPLEFT", 6, -y - 2)
-			box:SetHeight(y + 26)
+			box:SetHeight(math.max(1, y - GAP))
 			RefreshKeybinds()
 			if panel then Layout() end -- (the page, once its tabs are made)
 		end
@@ -17074,12 +17108,13 @@ local function CreateKeybindsPanel()
 			local clear = ns.PanelButton(body)
 			clear:SetSize(200, 22)
 			clear:SetText(L["Back to their Show in rows"])
-			clear:SetPoint("TOPLEFT", reset, "BOTTOMLEFT", 4, -6)
+			-- (Beside the tick, over the key columns.)
+			clear:SetWidth(266)
+			clear:SetPoint("LEFT", reset, "LEFT", SECTION_WIDTH - 12 - 2 - 22 - 4 - 266 + 4, 0)
 			clear:SetScript("OnClick", function() ns.ShowAllFrameKeys() end)
 			Tooltip(clear, L["Every frame shown or hidden by its key below goes back to showing as its Show in " ..
 				"row says."])
-			section.last = clear
-			section.last = BuildKeyGroups(body, clear)
+			section.last = BuildKeyGroups(body, reset)
 		end
 		-- (A heading over a group of rows: the Frames tab's, by the Standard Frames page's tabs.)
 		if bind.heading and (not bind.show or bind.show()) then
