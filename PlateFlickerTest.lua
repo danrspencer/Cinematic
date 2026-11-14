@@ -10,7 +10,7 @@
 -- look go at the top. Into CinematicDB.plateFlickerLog. Dev copy only.
 local _, ns = ...
 
-local READY, RECORD = 5, 8 -- seconds
+local READY, RECORD = 5, 20 -- seconds
 local run -- { at, frame, last = { [plate] = signature }, counts = { [bar] = { tex, color } }, shots }
 
 local function Say(text)
@@ -37,12 +37,15 @@ end
 -- logged once a bar - ours or the game's.)
 local hooked = setmetatable({}, { __mode = "k" })
 local function Caller()
-	local stack = debugstack and debugstack(3, 3, 0) or ""
-	-- (The first line that isn't this file: who called.)
+	local stack = debugstack and debugstack(2, 8, 0) or ""
+	-- (The first line that isn't this file or the game's own C layer: who
+	-- called. None: the game's engine itself.)
 	for line in stack:gmatch("[^\n]+") do
-		if not line:find("PlateFlickerTest") then return (line:gsub("^%s+", ""):sub(1, 140)) end
+		if not line:find("PlateFlickerTest") and not line:find("^%s*%[C%]") then
+			return (line:gsub("^%s+", ""):sub(1, 140))
+		end
 	end
-	return "?"
+	return "the game's engine (no Lua caller)"
 end
 local function Count(bar, what, ...)
 	if not run then return end
@@ -81,9 +84,12 @@ local function Signature(plate)
 	local dress = text and text.cineDress
 	local rim = text and text.cineRim
 	local look = ns.PlateLookNow and ns.PlateLookNow(plate)
-	return ("plate a %s | container a %s eff %s | bar a %s shown %s color %s | fill %s atlas %s color %s a %s desat %s | name a %s color %s font %s | " ..
+	-- (A health bar on the screen at all: flagged, the flash we're after.)
+	local eff = bar and select(2, pcall(bar.GetEffectiveAlpha, bar))
+	local visible = type(eff) == "number" and not (issecretvalue and issecretvalue(eff)) and eff > 0.05
+	return ((visible and "VISIBLE BAR " or "") .. "plate a %s | frame a %s | container a %s eff %s | bar a %s shown %s color %s | fill %s atlas %s color %s a %s desat %s | name a %s color %s font %s | " ..
 		"ours %s a %s color %s | glow %s band %s rim %s | row look %s"):format(Get(plate, "GetAlpha"),
-		Get(container, "GetAlpha"), Get(bar, "GetEffectiveAlpha"), Get(bar, "GetAlpha"), Get(bar, "IsShown"),
+		Get(unitFrame, "GetAlpha"), Get(container, "GetAlpha"), Get(bar, "GetEffectiveAlpha"), Get(bar, "GetAlpha"), Get(bar, "IsShown"),
 		Get(bar, "GetStatusBarColor"), Get(fill, "GetTexture"), Get(fill, "GetAtlas"),
 		Get(fill, "GetVertexColor"), Get(fill, "GetAlpha"), Get(fill, "IsDesaturated"), Get(unitFrame.name, "GetAlpha"),
 		Get(unitFrame.name, "GetTextColor"), Get(unitFrame.name, "GetFont"), text and "shown" or "no",
@@ -104,7 +110,7 @@ watcher:SetScript("OnUpdate", function()
 	local now = GetTime() - run.at
 	if now < READY then
 		ns.PadTestBox("Stand where the WHITE BARS flash (CineMode on, a busy street, as in your video). Then just " ..
-			"watch: the box goes away while it records.", ("Recording starts in %d"):format(math.ceil(READY - now)), 1, 0.82, 0)
+			"watch for 20 sec: the box goes away while it records.", ("Recording starts in %d"):format(math.ceil(READY - now)), 1, 0.82, 0)
 		return
 	end
 	if not run.started then
@@ -121,6 +127,15 @@ watcher:SetScript("OnUpdate", function()
 	for _, plate in ipairs(C_NamePlate and C_NamePlate.GetNamePlates() or {}) do
 		local ok, sig = pcall(Signature, plate)
 		sig = ok and sig or ("error " .. tostring(sig))
+		if sig:find("^VISIBLE BAR") and run.visibleAt ~= run.frame then
+			run.visibleAt = run.frame
+			run.visibleFrames = (run.visibleFrames or 0) + 1
+			-- (A picture of it, the first few times: the flash itself.)
+			if (run.flashShots or 0) < 4 and run.frame - (run.flashShotAt or -100) > 20 then
+				run.flashShots, run.flashShotAt = (run.flashShots or 0) + 1, run.frame
+				Shot("FLASH " .. run.flashShots)
+			end
+		end
 		if run.last[plate] ~= sig then
 			run.last[plate] = sig
 			local unit = plate.namePlateUnitToken
@@ -134,7 +149,8 @@ watcher:SetScript("OnUpdate", function()
 			Say(("bar %s: fill set %d times, color set %d, fill color set %d in %d frames"):format(
 				tostring(bar):sub(-6), count.tex, count.color, count.vertex, run.frame))
 		end
-		Say(("done: %d frames, %.0f fps"):format(run.frame, run.frame / RECORD))
+		Say(("done: %d frames, %.0f fps, health bars seen on the screen in %d frames"):format(run.frame,
+			run.frame / RECORD, run.visibleFrames or 0))
 		run = nil
 		ns.PadTestBox("Done. /reload, then say \"check log\".", "", 0.3, 1, 0.3)
 		C_Timer.After(10, function() if not run then ns.PadTestBoxHide() end end)
