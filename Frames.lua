@@ -13054,8 +13054,10 @@ end
 -- /cine debug readycheck: each raid frame's ready check icon, whether it's
 -- faded as the Ready check row (and how far), and whether CineMode is on.
 function ns.ReportRaidReadyCheck()
-	ns.Print(("CineMode=%s, Ready check row Always=%s"):format(tostring(ns.lastCinematic),
-		tostring(ns.IsCineShowOn("raidready"))))
+	ns.Print(("CineMode=%s, Ready check row Always=%s, Heal Vision on=%s, its Ready check Show while hidden=%s"):format(
+		tostring(ns.lastCinematic), tostring(ns.IsCineShowOn("raidready")),
+		tostring(ns.HealVisionActive and ns.HealVisionActive()),
+		tostring(ns.HealVisionSetting and ns.HealVisionSetting("healVisionReadyCheck"))))
 	local count = 0
 	for _, holderName in ipairs({ "CompactRaidFrameContainer", "CompactPartyFrame" }) do
 		local holder = _G[holderName]

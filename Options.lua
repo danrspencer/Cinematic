@@ -15168,6 +15168,23 @@ local function CreateVisionPanel()
 			"in it with you. In battlegrounds, where WoW Forever won't say how far anyone is, members out of " ..
 			"range of your heals (about 40 yards) fade to this instead of the game's own dimming, on top of the " ..
 			"rest of the page. 100% leaves them be; 0% hides them completely."])
+		-- Ready check marks (HealVisionFrames.lua's ReadyMark): ticked, they
+		-- show on hidden members too; unticked, they fade with their member.
+		do
+			local field = Field("healVisionReadyCheck")
+			local row = Row("|TInterface\\RaidFrame\\ReadyCheck-Ready:16:16|t", L["Ready check"], 12)
+			local check = Check(content, "healVisionReadyCheck", L["Show while hidden"],
+				L["Ticked: a ready check's marks show on every member's frame, hidden ones too. Unticked: a mark " ..
+				"fades with its member, so only the members shown have theirs."], function(value)
+					field.set(value)
+					ApplyFrames()
+				end)
+			check.Refresh = function(self) self:SetChecked(field.get() and true or false) end
+			check.searchLabel = L["Ready check"] .. ": " .. L["Show while hidden"]
+			check:SetPoint("LEFT", row, "LEFT", NAME_W + COLUMN_W - 4, 0)
+			GreyUnless(check, Editable)
+			roleWidgets[#roleWidgets + 1] = check
+		end
 		-- The Nameplates tab, in the same panel: first Nameplates (friendly
 		-- players' and minions' plates by the role tabs' table:
 		-- HealVisionFrames.lua's plates), then Names (names drawn by their

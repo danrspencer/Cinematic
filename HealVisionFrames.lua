@@ -341,7 +341,10 @@ local function AddMember(frame, kind, found, whole)
 	local unit, beside = Unit(frame)
 	if not unit then return end
 	-- (Found afresh each time: the game adds parts as it needs them.)
-	found[frame] = { unit = unit, parts = Parts(frame), whole = whole, beside = beside }
+	-- (mark: its ready check mark, raid-style frames: see ReadyMark.)
+	local mark = whole and ns.RaidReadyCheckIcon and ns.RaidReadyCheckIcon(frame)
+	if mark and (Forbidden(mark) or not mark.SetAlpha) then mark = nil end
+	found[frame] = { unit = unit, parts = Parts(frame), whole = whole, beside = beside, mark = mark or nil }
 	if whole then Hook(frame) end
 	HookEnter(frame)
 end
@@ -421,6 +424,7 @@ local function Scan()
 	for frame, member in pairs(found) do
 		if member.whole then still[frame] = true end
 		for _, part in ipairs(member.parts) do still[part] = true end
+		if member.mark then still[member.mark] = true end
 	end
 	for _, title in ipairs(foundTitles) do still[title] = true end
 	settingPart = true -- (not put back by ReassertPart)
@@ -649,6 +653,22 @@ local function HoverStep(frame, kind)
 	return math.max(revealStep, math.floor(hover * top + 0.5))
 end
 
+-- A raid-style member's ready check mark: the game's shows through the
+-- member's fade (seen on WoW Forever), so with the page's Ready check
+-- unticked it gets the member's alpha itself; ticked (the default), it's
+-- left to the game, put back to full if it was faded here.
+local function ReadyMark(member, alpha)
+	local mark = member.mark
+	if not mark or not Free(mark) then return end
+	if Setting("healVisionReadyCheck") == false then
+		if not pcall(mark.SetAlpha, mark, alpha) then pcall(mark.SetAlpha, mark, 1) end
+		touched[mark] = true
+	elseif touched[mark] then
+		pcall(mark.SetAlpha, mark, 1)
+		touched[mark] = nil
+	end
+end
+
 local function Update(frame)
 	local member = members[frame]
 	if not member then return end
@@ -692,6 +712,7 @@ local function Update(frame)
 				touched[part] = true
 			end
 		end
+		ReadyMark(member, alpha) -- (after the parts: it may be one of them)
 	else
 		settingPart = true
 		for _, part in ipairs(member.parts) do

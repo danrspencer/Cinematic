@@ -1330,6 +1330,9 @@ DEFAULTS.healVisionOfflineAlpha = 0.25 -- and the offline
 DEFAULTS.healVisionFarAlpha = 0.25 -- those more than 100 yards away (another zone...), whatever else: 1, off
 DEFAULTS.healVisionTargetAlpha = 1 -- your target while hidden, if more than their kind's (1: always shown)
 DEFAULTS.healVisionMouseoverAlpha = 0 -- the member under the mouse fades in to this, in fights too (0: off)
+-- Ready check marks on the raid frames: shown on hidden members too (the
+-- game's mark ignores the frame's fade), or off: faded with their member.
+DEFAULTS.healVisionReadyCheck = true
 DEFAULTS.healVisionDispel = true -- so do members with a debuff you can dispel
 DEFAULTS.healVisionAnyDebuff = false -- or with any debuff
 -- The page's Tank, Healer and Damage tabs: while you're that role, with
@@ -1340,7 +1343,7 @@ ns.HEAL_VISION_ROLE_KEYS = { "healVisionTankBelow", "healVisionTankAlpha", "heal
 	"healVisionHealerAlpha", "healVisionShowBelow", "healVisionMinAlpha", "healVisionPetBelow",
 	"healVisionPetAlpha", "healVisionTargetAlpha", "healVisionMouseoverAlpha", "healVisionDeadAlpha",
 	"healVisionOfflineAlpha",
-	"healVisionFarAlpha", "healVisionDispel", "healVisionAnyDebuff", "healVisionFadeRange" }
+	"healVisionFarAlpha", "healVisionDispel", "healVisionAnyDebuff", "healVisionFadeRange", "healVisionReadyCheck" }
 ns.HEAL_VISION_ROLES = { "TANK", "HEALER", "DAMAGER" }
 local HEAL_VISION_ROLE_STARTS = {
 	TANK = { healVisionTankBelow = 1, healVisionHealerBelow = 0.95, healVisionShowBelow = 0.95 },
