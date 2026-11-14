@@ -24,6 +24,10 @@ ns.CHAT_PEEK_TYPES = {
 	{ key = "party", label = L["Party"], events = { "CHAT_MSG_PARTY", "CHAT_MSG_PARTY_LEADER" } },
 	{ key = "raid", label = L["Raid"], events = { "CHAT_MSG_RAID", "CHAT_MSG_RAID_LEADER" } },
 	{ key = "raidwarning", label = L["Raid warnings"], events = { "CHAT_MSG_RAID_WARNING" } },
+	-- The ping system's chat line ("Attack" on a target...). Clients without pings
+	-- never send the event, so the row just never fires there.
+	{ key = "pings", label = L["Pings"], tip = L["Someone in your group pings (attack, assist, warning...)."],
+		events = { "CHAT_MSG_PING" } },
 	{ key = "instance", label = L["Instance"],
 		events = { "CHAT_MSG_INSTANCE_CHAT", "CHAT_MSG_INSTANCE_CHAT_LEADER" } },
 	{ key = "guild", label = L["Guild"], events = { "CHAT_MSG_GUILD" } },
