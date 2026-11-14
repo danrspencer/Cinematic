@@ -694,16 +694,36 @@ local function DressCdmIcon(item, icon, plan)
 		part.mask:SetTexture(ROUND_MASK, "CLAMPTOBLACKADDITIONAL", "CLAMPTOBLACKADDITIONAL")
 		cdmParts[item] = part
 	end
-	-- (Every texture of the icon's: its picture and any square border or overlay.)
-	for _, region in ipairs({ item:GetRegions() }) do
-		if region:GetObjectType() == "Texture" and region.AddMaskTexture then
-			if plan.round and not part.on[region] then
-				part.on[region] = true
-				region:AddMaskTexture(part.mask)
-			elseif not plan.round and part.on[region] then
-				part.on[region] = nil
-				region:RemoveMaskTexture(part.mask)
+	-- (Every texture of the icon's: its picture and any square border or overlay.
+	-- Its child frames' too, each cut by a mask of its own on the icon's spot:
+	-- uncut, a tracked buff's square backdrop showed round the ring, Forever.)
+	local function Cut(holder, mask)
+		for _, region in ipairs({ holder:GetRegions() }) do
+			if region:GetObjectType() == "Texture" and region.AddMaskTexture then
+				if plan.round and not part.on[region] then
+					part.on[region] = mask
+					region:AddMaskTexture(mask)
+				elseif not plan.round and part.on[region] then
+					region:RemoveMaskTexture(part.on[region])
+					part.on[region] = nil
+				end
 			end
+		end
+	end
+	Cut(item, part.mask)
+	part.kids = part.kids or {}
+	for _, kid in ipairs({ item:GetChildren() }) do
+		-- (Not its sweep (round by its own swipe) nor the Flash when ready, which
+		-- cuts its own: Frames.lua.)
+		if kid:GetObjectType() ~= "Cooldown" and not kid.edges and kid.CreateMaskTexture then
+			local mask = part.kids[kid]
+			if not mask and plan.round then
+				mask = kid:CreateMaskTexture()
+				mask:SetAllPoints(icon)
+				mask:SetTexture(ROUND_MASK, "CLAMPTOBLACKADDITIONAL", "CLAMPTOBLACKADDITIONAL")
+				part.kids[kid] = mask
+			end
+			if mask then Cut(kid, mask) end
 		end
 	end
 	local cooldown = item.Cooldown
