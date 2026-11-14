@@ -1,0 +1,370 @@
+<meta charset="utf-8">
+<title>Cinematic Style Revamp</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;600&family=Archivo+Narrow:wght@400;600&family=Marcellus&family=Metamorphous&family=Federo&display=swap" rel="stylesheet">
+<style>
+/*__FONTFACES__*/
+/*__CSS__*/
+</style>
+
+<div class="wrap">
+<header class="top">
+	<span class="eyebrow">Cinematic &middot; design plan &middot; not built yet</span>
+	<h1>Style revamp: one way to style everything</h1>
+	<p class="lede">The Nameplate Style row's Look panel becomes the pattern for every Style page. Names get a full page of their own, with rows per kind of unit. Nameplates and names get themes, and the main themes pick one of each.</p>
+	<div class="meta"><span>Branch <code>claude/exciting-gauss-uizjl4</code></span><span>Based on <code>main</code> at 00381a4 (14 Nov 2026)</span><span>The mock-ups below can be clicked</span></div>
+</header>
+
+<nav class="toc" aria-label="Sections" style="position:static"><ol>
+	<li><a href="#summary">Summary</a></li><li><a href="#decisions">Decisions</a></li><li><a href="#template">The template</a></li>
+	<li><a href="#layers">How it fits</a></li><li><a href="#general">General</a></li><li><a href="#plates">Nameplate Style</a></li>
+	<li><a href="#names">Name Style</a></li><li><a href="#library">Themes</a></li><li><a href="#rollout">Other pages</a></li>
+	<li><a href="#build">Build plan</a></li><li><a href="#risks">Risks and tests</a></li><li><a href="#revisions">Revisions</a></li>
+</ol></nav>
+
+<section class="part" id="summary">
+	<header><span class="eyebrow">Summary</span><h2>What changes</h2></header>
+	<div class="cols">
+		<div class="card"><h3>One template</h3><p>Every way to style a part lives in a Look panel like the Nameplate Style row's: a live sample, tabs, pick by picture, Reset on each setting. Each setting now also says where its value comes from: this row, the Default row, the theme or the game.</p></div>
+		<div class="card"><h3>Name Style, scaled up</h3><p>Names get rows like Nameplate Style's: All names, then Your target, Group members, Friendly players, Enemy players, Service NPCs and the rest. Each row has its own Look with six tabs: Text, Color, Edge, Backdrop, Second line and Extras.</p></div>
+		<div class="card"><h3>Plate and name themes</h3><p>There are 19 plate themes and 21 name themes. Each main theme gets its own matching pair, made from its colors and art, and a few stand alone (Clean, Raider, Storybook, Subtitle…). Plate themes cover only the bar; names come from name themes. The three old name presets become name themes.</p></div>
+		<div class="card"><h3>Main themes use them</h3><p>Picking Gilded Codex on General brings Gilded Codex names, and plates follow General as they do today. A plate or name theme picked on its own page stays when the main theme changes. A new column on General's Pages tab lets a theme leave whole parts alone.</p></div>
+	</div>
+	<p class="note">I read the code on <code>main</code> at commit 00381a4. The mock-ups use the addon's real data: the 16 themes from <code>StyleThemes.lua</code>, the bar textures, bar shapes and target marks from <code>Textures/</code>, the preview lake, and the eight bundled fonts. The game's own font and art are stand-ins, as in <code>Tools/style-lab</code>. Nothing in the addon has changed. The only repo change is two Name Style and Nameplate Style frames added to style-lab, so the "before" pages could be drawn.</p>
+</section>
+
+<section class="part" id="decisions">
+	<header><span class="eyebrow">While you were away</span><h2>Decisions I made, each easy to reverse</h2>
+	<p class="dim">You said to approve suggestions, so I picked a default wherever there was a fork. Each one is listed here so you can overrule it.</p></header>
+	<div class="card">
+		<div class="decision"><b class="id">D1</b><div><b>"This page" means the Nameplate Style row's Look panel</b> (the tabbed panel with the sample plate, from today's commits 3419f26 and 80bc293). It's the newest and most complete styling UI in the addon, so it's the template.<div class="why">If you meant the whole Nameplate Style page (rows grid plus panel), the plan still fits: Name Style and Cast Bar Style copy that page's shape too.</div></div></div>
+		<div class="decision"><b class="id">D2</b><div><b>Plate and name themes are a live layer under your settings, not settings written over them.</b> A row's setting falls back to the Default row, then the part's theme, then the game. Switching themes never wipes a row's own changes. The two picks, <code>plateTheme</code> and <code>nameTheme</code>, stay out of the main theme's <code>ThemeKeys()</code>, so a main theme never writes them. They're only saved with its Undo snapshot.<div class="why">Changed in round 3. In round 2 these keys joined the theme's written settings. That would have reset a plate theme you picked by hand on every main theme pick (StyleThemes.lua 975-980), which broke D3.</div></div></div>
+		<div class="decision"><b class="id">D3</b><div><b>A plate or name theme picked by hand sticks.</b> Changing the main theme leaves it alone. "Follow main theme" is always the first card, to go back.</div></div>
+		<div class="decision"><b class="id">D4</b><div><b>Name themes made from a main theme use its Small names font.</b> That's Friz for most themes and the theme's own font for Slate, Obsidian and Carbon, the same rule the themes use for unit frame names (<code>StyleThemes.lua</code>: "the themes' thin fonts go faint there"). The fancy fonts go to the themes that stand alone (Storybook uses Almendra).</div></div>
+		<div class="decision"><b class="id">D5</b><div><b>Reaction colors keep their meaning, tuned to the palette.</b> Hostile stays red, neutral yellow, friendly green, each pulled a little toward the theme's colors (Gilded Codex's hostile is a warmer red). The tuning rule is in the theme library section.</div></div>
+		<div class="decision"><b class="id">D6</b><div><b>The Name Style Preset menu is removed.</b> Its three presets become name themes with the same values: Like the game's names (now "The game's"), Bold and Subtle. Anyone on one of them lands on the same look.</div></div>
+		<div class="decision"><b class="id">D7</b><div><b>The look of service NPC titles moves to Name Style's Second line tab:</b> brackets, icons in place of titles, and icon size. Which kinds of service NPCs show stays on the Nameplates page, with a link to the new tab. The keys don't change, so nobody loses a setting.</div></div>
+		<div class="decision"><b class="id">D8</b><div><b>The build order is Names first, then plate themes, then main themes, then the other pages.</b> Every step ships on its own.</div></div>
+		<div class="decision"><b class="id">D9</b><div><b>Anything that depends on reading a unit's name, health or level is marked "needs a test".</b> These values can be secret on retail in fights and on Forever, and the addon already works around that in <code>PlateParts.lua</code> and the Heal Vision plan. Each such feature has a fallback.</div></div>
+		<div class="decision"><b class="id">D10</b><div><b>Name Style's All names row sets names everywhere.</b> Plate themes hold only bar settings: texture, border, shape and background. So the name on a full plate goes row, Default row, Name Style's All names, the game. Set a font once and it shows on name-only plates and on full plates. Change it on one plate row only when that row needs to stand out.<div class="why">Round 1 found two unrelated fonts for one name. Round 2's fix still let a plate theme sit above All names. Round 3 takes text out of plate themes altogether.</div></div></div>
+		<div class="decision"><b class="id">D11</b><div><b>"Follow General" is today's plate look.</b> Plates already take General's texture and border, and the theme's veil (PlateHealthStyle.lua). The first plate theme card follows General's live values, so a texture you set on General by hand still reaches plates. Pick a named plate theme and it takes General's place for plates only.</div></div>
+		<div class="decision"><b class="id">D12</b><div><b>A real "inherit" value, and a one-time move to it.</b> Today's <code>plateName*</code> settings always hold a value, so a theme could never show through them. They get an "inherit" value, and a one-time migration turns values still at their defaults into it. Values someone changed stay theirs. Profiles whose main theme is "The game's" also get <code>nameTheme = "game"</code>, so nobody's names change on update without a theme behind it.</div></div>
+	</div>
+	<div class="card"><h3>Open questions, with my default</h3>
+		<ul class="tight">
+			<li>Should the template reach every Style page, or stop at the nameplate pages for now? <span class="dim">Default: every page, one release at a time (see <a href="#rollout">Other pages</a>).</span></li>
+			<li>Should the main theme cards on General show a nameplate and a name, as in the mock-up? <span class="dim">Default: yes. It's the clearest way to show that a theme reaches plates now.</span></li>
+			<li>Is a colored name outline worth its cost? It draws each name eight extra times. <span class="dim">Default: offer it, and measure with 40 names on screen before shipping.</span></li>
+		</ul>
+	</div>
+</section>
+
+<section class="part" id="template">
+	<header><span class="eyebrow">The template</span><h2>What the Look panel already does, and what it gains</h2>
+	<p class="dim">This is today's Nameplate Style row Look panel, redrawn with the four additions. Click the tabs, point at tiles (the sample shows them before you pick), and hold "Hold to compare".</p></header>
+	<div class="cols tpl">
+		<div class="stage"><div class="stage-row" id="np-panel-demo"></div><p class="caption" style="margin-top:8px">The live panel is under <a href="#plates">Nameplate Style</a>. This spot shows where each part sits.</p></div>
+		<div style="display:grid;gap:14px;align-content:start">
+			<h3>Already there (kept as is)</h3>
+			<ol class="callouts">
+				<li>The title shows where you are (<i>Nameplates &gt; Nameplate Style &gt;</i>), with Pop out, Dock and X.</li>
+				<li>A live sample with Hostile, Neutral, Friendly and Player picks, the lake or plain dark, and Closer.</li>
+				<li>Pointing at a choice shows it on the sample with "Preview: not saved".</li>
+				<li>One tab per group, with a gold dot on any tab holding a change.</li>
+				<li>Each setting has a gold name, its value, and a Reset that shows only once it's changed.</li>
+				<li>Pick by picture: tiles for textures, fonts and borders; buttons for small choices; color chips; sliders. After 12 tiles, a More tile.</li>
+				<li>A footer saying what's changed, with Reset all.</li>
+			</ol>
+			<h3>Added</h3>
+			<ol class="callouts">
+				<li class="add"><b>Where it comes from.</b> A tag on each setting: <i>This row</i>, <i>Default row's</i>, <i>Plate theme: Gilded Codex</i> or <i>The game's</i>. It replaces today's mix of "Usual", "Default row's" and "Use General" with one idea. The first tile in each grid, Inherit, says what it gives and from where.</li>
+				<li class="add"><b>Hold to compare.</b> Hold the button and the sample drops this row's own changes, so you can see before and after.</li>
+				<li class="add"><b>Copy look / Paste.</b> Move a look from one row to another (Target to Focus) without redoing it by hand.</li>
+				<li class="add"><b>Start from a theme.</b> Load a theme's look into just this row, then change it from there.</li>
+			</ol>
+		</div>
+	</div>
+</section>
+
+<section class="part" id="layers">
+	<header><span class="eyebrow">How it fits</span><h2>Where a setting's value comes from</h2>
+	<p class="dim">Every setting resolves the same way on every page. The first layer that has a value wins.</p></header>
+	<div class="chain card">
+		<svg viewBox="0 0 980 230" role="img" aria-label="A row's own setting falls back to the Default row's, then the part's theme, then the game's look. The part's theme is the main theme's choice unless one was picked by hand.">
+			<defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="currentColor"/></marker></defs>
+			<g style="color:var(--muted)" fill="none" stroke="currentColor" stroke-width="1.5">
+				<path d="M210 60 H262" marker-end="url(#ar)"/><path d="M462 60 H514" marker-end="url(#ar)"/><path d="M714 60 H766" marker-end="url(#ar)"/>
+				<path d="M614 176 V100" marker-end="url(#ar)" stroke-dasharray="4 4"/>
+			</g>
+			<g font-size="14">
+				<rect x="10" y="22" width="200" height="76" rx="6" fill="var(--surface)" stroke="var(--look)" stroke-width="2"/>
+				<text x="24" y="48" fill="var(--ink)" font-weight="600">1. The row's own</text><text x="24" y="70" fill="var(--muted)">Your target: Size 120%</text><text x="24" y="88" fill="var(--muted)" font-size="12">tag: This row</text>
+				<rect x="262" y="22" width="200" height="76" rx="6" fill="var(--surface)" stroke="var(--rule)" stroke-width="1.5"/>
+				<text x="276" y="48" fill="var(--ink)" font-weight="600">2. The Default row's</text><text x="276" y="70" fill="var(--muted)">(All names, on Name Style)</text><text x="276" y="88" fill="var(--muted)" font-size="12">tag: Default row's</text>
+				<rect x="514" y="22" width="200" height="76" rx="6" fill="var(--surface)" stroke="var(--rule)" stroke-width="1.5"/>
+				<text x="528" y="48" fill="var(--ink)" font-weight="600">3. The part's theme</text><text x="528" y="70" fill="var(--muted)">Gilded Codex names</text><text x="528" y="88" fill="var(--muted)" font-size="12">tag: Name theme: Gilded Codex</text>
+				<rect x="766" y="22" width="200" height="76" rx="6" fill="var(--surface)" stroke="var(--rule)" stroke-width="1.5"/>
+				<text x="780" y="48" fill="var(--ink)" font-weight="600">4. The game's</text><text x="780" y="70" fill="var(--muted)">as with the page off</text><text x="780" y="88" fill="var(--muted)" font-size="12">tag: The game's</text>
+				<rect x="464" y="176" width="300" height="46" rx="6" fill="var(--surface)" stroke="var(--accent)" stroke-width="1.5"/>
+				<text x="478" y="196" fill="var(--ink)" font-weight="600">Which theme? plateTheme / nameTheme</text><text x="478" y="214" fill="var(--muted)" font-size="12.5">"main" follows General. Else the one picked here.</text>
+				<text x="10" y="140" fill="var(--muted)" font-size="13">Example: the Service NPCs row's Font isn't set, and neither is All names'.</text>
+				<text x="10" y="160" fill="var(--muted)" font-size="13">The main theme is Gilded Codex, so its name theme gives Friz (its Small names font).</text>
+			</g>
+		</svg>
+		<ul class="tight dim" style="font-size:14px">
+			<li><b>Nameplate Style</b> uses the same four steps for the bar. Its step 3 is General's live texture, border and shape while the plate theme is "Follow General" (D11), so nothing changes for plates on update.</li>
+			<li><b>The name on a full plate</b> skips step 3: Default row, then Name Style's All names, then the game (D10).</li>
+			<li><b>Values a main theme wrote</b> (cast colors, General's texture) are this row's own, but their tag says <i>Set by theme: Gilded Codex</i> while they still match what the theme wrote. <code>StyleThemeEdited</code> already makes that comparison.</li>
+			<li>This is how <code>PlateRowLook.lua</code> already resolves a row, with step 3 and a real "inherit" value added (D12).</li>
+		</ul>
+	</div>
+</section>
+
+<section class="part" id="general">
+	<header><span class="eyebrow">Mock-up 1 &middot; Style &gt; General</span><h2>Theme cards that show plates and names</h2>
+	<p class="dim">The same 16 themes, in their own fonts, colors and corners. Each card now carries a nameplate and a name in that theme's plate and name themes. The switches on the right are a new column on General's Pages tab, which already lists every page (drawn beside the gallery here): switch a part off and picking a theme leaves it alone. Click a card: the Nameplate Style and Name Style mock-ups below follow it.</p></header>
+	<div class="stage"><div class="stage-row">
+		<div class="win wow" style="width:560px">
+			<div style="display:flex;gap:2px;margin:-4px 0 12px;border-bottom:1px solid #3a3a3a"><span class="btn" style="border-bottom:0;color:#fff">General</span><span class="btn grey" style="border-bottom:0">Pages</span><span class="btn grey" style="border-bottom:0">Overrides</span></div>
+			<div class="ttl">General <span class="help">?</span> <span class="switch"><b>On</b><i></i></span></div>
+			<div class="hdr">Theme <span class="help">?</span></div>
+			<div class="tgal" id="gal"></div>
+			<div style="display:flex;justify-content:space-between;margin-top:10px"><span class="look-dim">A theme sets every page it reaches. Each setting stays yours to change.</span><span class="btn">Undo</span></div>
+		</div>
+		<div class="win wow reach" id="reach"></div>
+	</div></div>
+</section>
+
+<section class="part" id="plates">
+	<header><span class="eyebrow">Mock-up 2 &middot; Nameplates &gt; Nameplate Style</span><h2>Plate themes on top, the rows and their Look panel as now</h2>
+	<p class="dim">New: the Plate theme strip, and the Look panel's Shape tab, background and name placement. The rows grid stays as it is. Its Look column now says what a row inherits from. Click a row to load its Look panel, and pick a theme to watch every inherited setting follow.</p></header>
+	<div class="stage"><div class="stage-row" id="np-page">
+		<div class="win wow" style="width:620px">
+			<div class="ttl">Nameplate Style <span class="help">?</span> <span class="switch"><b>On</b><i></i></span></div>
+			<div class="hdr">Plate theme <span class="flag new">new</span></div>
+			<div class="tstrip" id="np-themes"></div>
+			<div class="look-dim" id="np-theme-now" style="margin:6px 0 12px"></div>
+			<div class="scene" id="np-scene"></div>
+			<div class="hdr">Rows <span class="help">?</span></div>
+			<div class="grid-rows" id="np-grid"></div>
+			<div style="margin-top:10px"><span class="btn">Add row</span></div>
+			<label class="chk" style="margin-top:12px"><input type="checkbox" id="forever"> Show as WoW Forever draws plates (the level box)</label>
+		</div>
+		<div id="np-panel"></div>
+	</div></div>
+	<div class="cols">
+		<div class="card"><h3>New in the plate Look panel</h3>
+			<table class="plain"><thead><tr><th>Setting</th><th>Tab</th><th>Status</th></tr></thead><tbody>
+				<tr><td>Background color and opacity behind the fill</td><td>Bar</td><td><span class="pill new">new, known API</span></td></tr>
+				<tr><td>Bar shape (Soft, Capsule, Bevel, Chisel)</td><td>Shape</td><td><span class="pill new">reuses DressBarShape</span></td></tr>
+				<tr><td>This row's width and height</td><td>Shape</td><td><span class="pill test">needs a test</span> plate size is global; the bar only</td></tr>
+				<tr><td>Name above, on or under the bar</td><td>Text</td><td><span class="pill test">needs a test</span> the game lays it out again</td></tr>
+				<tr><td>Health text (percent, number)</td><td>Text</td><td><span class="pill test">needs a test</span></td></tr>
+				<tr><td>Texture, gradient, font, size, outline, shadow, border, level box</td><td>as now</td><td><span class="pill have">exists</span> (text now inherits from Name Style, D10)</td></tr>
+			</tbody></table>
+		</div>
+		<div class="card"><h3>What the page itself gains</h3>
+			<ul class="tight">
+				<li>The Plate theme strip, with <i>Follow General</i> first (today's look, D11).</li>
+				<li>A line under the strip saying what's in use and whether it follows the main theme.</li>
+				<li>Look cells in the grid that say "Default row's" or name the theme when a row has nothing of its own.</li>
+				<li>Each row keeps its color and the parts it paints (Name, Bar, Border) as now. Themes never touch those: they're what tells your target from the rest.</li>
+			</ul>
+		</div>
+	</div>
+</section>
+
+<section class="part" id="names">
+	<header><span class="eyebrow">Mock-up 3 &middot; Nameplates &gt; Name Style</span><h2>Name Style, from one strip of settings to a full page</h2>
+	<p class="dim">Today the page has a preview, a Preset menu, one Look button and a line of boxes. The new page has a theme strip, a scene with every kind of name in it (drag Near to Far), and a row per kind, each with a Look panel of six tabs. "All names" is the Default row: it keeps today's settings.</p></header>
+	<div class="stage"><div class="stage-row" id="nm-page">
+		<div class="win wow" style="width:620px">
+			<div class="ttl">Name Style <span class="help">?</span> <span class="switch"><b>On</b><i></i></span></div>
+			<p class="intro">How names look on nameplates that show just the name: in CineMode, away from dungeons and raids. Changes show at once, here and on the plates around you.</p>
+			<div class="look-dim" style="color:#9be59b;margin-bottom:6px">&#10003; In CineMode: names near you are drawn by their nameplates and look as this page says.</div>
+			<div class="hdr">Name theme <span class="flag new">new</span></div>
+			<div class="tstrip" id="nm-themes"></div>
+			<div class="look-dim" id="nm-theme-now" style="margin:6px 0 12px"></div>
+			<div class="scene" id="nm-scene"></div>
+			<div class="hdr">Names <span class="flag new">new</span></div>
+			<div class="grid-rows" id="nm-grid"></div>
+			<div class="hdr">Distance and timing</div>
+			<div class="look-dim" style="display:flex;gap:16px;flex-wrap:wrap;color:#cfcfcf"><span>Raise 0</span><span>Hide delay 1.5 sec</span><span>Fade time 0.4 sec</span><span>Far opacity 100% <span class="flag new">new</span></span></div>
+			<label class="chk" style="margin-top:8px"><input type="checkbox" checked> Same size at any distance</label>
+			<div class="look-dim" style="margin-top:6px">On WoW Forever: Close and Far sizes, as now.</div>
+		</div>
+		<div id="nm-panel"></div>
+	</div></div>
+	<div class="cols">
+		<div class="card"><h3>The six tabs</h3>
+			<p style="font-size:14px">Named and ordered as the shared Look groups in <code>StylePages.lua</code> (<code>LOOK_GROUPS</code>: Bar, Text, Border, Background, Level), with three new groups added to that list (Color, Glow, Second line) so every page uses them the same way.</p>
+			<table class="plain"><thead><tr><th>Tab</th><th>Settings</th></tr></thead><tbody>
+				<tr><td>Text</td><td>Font <span class="pill new">new</span>, size, opacity, outline, outline color <span class="pill test">test</span>, shadow and its opacity, capitals <span class="pill test">test</span></td></tr>
+				<tr><td>Color</td><td>Color by: how they see you, class or one color. Hostile, neutral and friendly colors of your own <span class="pill new">new</span>. Friendly players, enemy players <span class="pill new">new</span>.</td></tr>
+				<tr><td>Glow</td><td>A soft glow behind the name in any color <span class="pill new">new</span></td></tr>
+				<tr><td>Background</td><td>Nothing, band, pill or banner behind the name, with color and opacity <span class="pill test">test</span></td></tr>
+				<tr><td>Second line</td><td>Guilds and titles, size and color <span class="pill new">new</span>; brackets and service icons <span class="pill have">moved here</span></td></tr>
+				<tr><td>Level</td><td>Level <span class="pill test">test</span>, elite and rare mark <span class="pill test">test</span>, raid marker place <span class="pill new">new</span></td></tr>
+			</tbody></table>
+		</div>
+		<div class="card"><h3>The rows</h3>
+			<p style="font-size:14px">One row per <code>ns.NAME_GROUPS</code> entry whose names plates draw (Effects.lua 23-108): Hostile, Neutral, Friendly and Service NPCs, Friendly players, Group members, Enemy players, the three Minions groups and Target. "Service NPCs" means the same units on both pages. My name and Critters stay the game's own names over heads, which addons can't style. Guild names are the Second line tab.</p>
+			<p style="font-size:14px;margin-top:8px">Rows only show settings that make sense for them: service icons on All names and Service NPCs, class colors on player rows. "Your target" sits second so it wins over the rest, as on Nameplate Style. Per-kind keys come from a <code>NameRowDefault</code>, built like Core's <code>MarkRowDefault</code>, so profiles and sharing carry them.</p>
+			<p style="font-size:14px;margin-top:8px">All names keeps today's <code>plateName*</code> keys, with a real "inherit" value and a one-time move to it (D12).</p>
+		</div>
+	</div>
+</section>
+
+<section class="part" id="library">
+	<header><span class="eyebrow">Themes</span><h2>The plate and name theme library</h2>
+	<p class="dim">Every main theme brings a plate theme and a name theme made from its own data: the bar texture, line color and thickness, bar shape and veil for plates (bar only: no text); the Small names font, palette-tuned reaction colors and a second-line color from its ornament for names. Some themes add a glow (Fel Pact, Void Whisper, Moonlit Glade, Emberforge) or a dark band (Slate, Obsidian, Carbon). Then the themes that stand alone.</p></header>
+	<div class="lib" id="lib"></div>
+	<div class="cols">
+		<div class="card"><h3>How a family theme is made</h3>
+			<table class="plain"><tbody>
+				<tr><td>Plate texture</td><td>The theme's <code>styleTexture</code></td></tr>
+				<tr><td>Plate border</td><td>The theme's <code>line</code> and <code>lineSize</code></td></tr>
+				<tr><td>Bar shape</td><td>The theme's <code>styleBarShape</code></td></tr>
+				<tr><td>Bar color</td><td>The game's, darkened by the theme's plate <code>veil</code> where it has one (as now)</td></tr>
+				<tr><td>Name font</td><td>The Small names font (Friz, or the theme's own for slab themes), for name themes only</td></tr>
+				<tr><td>Hostile</td><td>Red, 35% of the way to the theme's <code>stop</code> color</td></tr>
+				<tr><td>Neutral</td><td>Yellow, 35% of the way to its <code>cast</code> color</td></tr>
+				<tr><td>Friendly</td><td>Green, 45% of the way to its <code>health</code> color</td></tr>
+				<tr><td>Second line</td><td>Grey, 60% of the way to its <code>ornament</code></td></tr>
+			</tbody></table>
+		</div>
+		<div class="card"><h3>As data</h3><p style="font-size:14px">The tables the plan adds, as the mock-up builds them (two families shown):</p><pre class="lua" id="lua"></pre></div>
+	</div>
+</section>
+
+<section class="part" id="rollout">
+	<header><span class="eyebrow">Mock-up 4 &middot; Nameplates &gt; Cast Bar Style</span><h2>The same template on the other Style pages</h2>
+	<p class="dim">Cast Bar Style already has tabs per kind of cast bar (Default, Nameplates, You, Target &amp; focus, Boss &amp; arena). In the new shape, each tab becomes a row with a Look panel. Here is the Nameplates row's panel. The main theme already writes its cast colors into the Default row (<code>Casts()</code>), so they show as the Default row's own, tagged <i>Set by theme</i>. As today, Nameplates starts on the Default row's look, and You, Target &amp; focus and Boss &amp; arena start on the game's.</p></header>
+	<div class="stage"><div class="stage-row">
+		<div class="win wow" style="width:360px">
+			<div class="ttl">Cast Bar Style <span class="help">?</span> <span class="switch"><b>On</b><i></i></span></div>
+			<p class="intro">Today: a Preset menu and a folder tab per kind of bar. New: the kinds as rows, each opening its Look panel.</p>
+			<div class="hdr">Cast bars</div>
+			<div class="grid-rows" style="width:100%">
+				<div class="grow" style="grid-template-columns:1fr auto;padding:0 8px"><span>Default</span><span class="lookchip">Set by theme</span></div>
+				<div class="grow on" style="grid-template-columns:1fr auto;padding:0 8px"><span>Nameplates</span><span class="lookchip inh">Default row's</span></div>
+				<div class="grow" style="grid-template-columns:1fr auto;padding:0 8px"><span>You</span><span class="lookchip inh">The game's</span></div>
+				<div class="grow" style="grid-template-columns:1fr auto;padding:0 8px"><span>Target &amp; focus</span><span class="lookchip inh">The game's</span></div>
+				<div class="grow" style="grid-template-columns:1fr auto;padding:0 8px"><span>Boss &amp; arena</span><span class="lookchip inh">The game's</span></div>
+			</div>
+		</div>
+		<div id="cb-panel"></div>
+	</div></div>
+	<div class="card scroll"><h3>Every Style page, in the new shape</h3>
+		<table class="plain"><thead><tr><th>Page</th><th>Rows (Default first)</th><th>Look tabs</th><th>Release</th></tr></thead><tbody>
+			<tr><td>Name Style</td><td>All names, Your target, Group members, Friendly and Enemy players, Service, Friendly, Neutral and Hostile NPCs, three Minions rows</td><td>Text, Color, Glow, Background, Second line, Level</td><td>1</td></tr>
+			<tr><td>Nameplate Style</td><td>As now (Default, Target, Focus, Mouseover, Aggro, added rows)</td><td>Bar, Shape, Text, Border, Level</td><td>2</td></tr>
+			<tr><td>Cast Bar Style</td><td>Default, Nameplates, You, Target &amp; focus, Boss &amp; arena (each row: own, Default row's or the game's, as its "These bars" pick today)</td><td>Bar, Icon, Text, Border</td><td>3</td></tr>
+			<tr><td>Unit Frame Style</td><td>Default, Player, Target, Focus, Party, Pet…</td><td>Bars, Name, Portrait, Border, Background</td><td>4</td></tr>
+			<tr><td>Raid Frame Style</td><td>One row</td><td>Bar, Name, Border</td><td>4</td></tr>
+			<tr><td>Personal Resource Style</td><td>Health, Power</td><td>Bar, Shape, Text, Border</td><td>5</td></tr>
+			<tr><td>Tooltip Style, Chat Bubble Style</td><td>One row</td><td>Panel, Text, Border</td><td>5</td></tr>
+			<tr><td>Action Bar Style, Combat Text Style</td><td>One row</td><td>As their parts need</td><td>6</td></tr>
+		</tbody></table>
+		<p class="dim" style="font-size:14px;margin-top:8px">Pages with just one row skip the grid: the Look panel's tabs sit on the page itself, with the sample at the top.</p>
+	</div>
+</section>
+
+<section class="part" id="build">
+	<header><span class="eyebrow">Build plan</span><h2>Six releases, each one whole</h2></header>
+	<div class="cols">
+		<div class="card"><h3>1 &middot; Template upgrades</h3><ul class="tight">
+			<li><code>StylePages.lua</code> <code>rows.Look</code>: a source tag on each Heading, an inherited first tile, Hold to compare, Copy and Paste, and Start from a theme.</li>
+			<li>A <code>panel.source(key)</code> hook giving <code>{ value, from }</code>, so each page tells the panel its chain.</li>
+			<li>Nameplate Style's panel switches over first: <code>PlateRowUsual</code> becomes its source hook.</li>
+			<li>The Text tab's chain reads Name Style's All names (D10). Today <code>PlateRowUsual</code> reports <code>plateNameOutline</code> as the usual outline while <code>NameLook</code> keeps the game's: that existing mismatch gets fixed here.</li>
+			<li>Style-lab draws the panel open (the frames added on this branch).</li></ul></div>
+		<div class="card"><h3>2 &middot; Name Style rows</h3><ul class="tight">
+			<li>New <code>NameRowLook.lua</code>, built like <code>PlateRowLook.lua</code>: the rows, keys and resolution. <code>PlateParts.lua</code> and <code>PlateGuild.lua</code> read through it.</li>
+			<li>Rewrite <code>CreateNameStylePanel</code>: theme strip, scene, rows grid, Distance and timing.</li>
+			<li>The six tabs. The new drawing (glow, backdrop, outline color) goes in a small <code>NameDress</code> helper. Its textures are made once per pooled plate and hidden when unused.</li>
+			<li><code>NameRowDefault</code> (like <code>MarkRowDefault</code>) and <code>RecordKey</code> on the page, so profiles and modules carry the rows.</li>
+			<li>The "inherit" value and the one-time move (D12).</li>
+			<li>A <code>ROMAN</code> guard on plate names' plain <code>SetFont</code> fallback and on <code>NameLook</code>. Today only the preview has one; the rest relies on <code>CreateFontFamily</code>.</li>
+			<li>Service title settings get a link on the Nameplates page (D7).</li></ul></div>
+		<div class="card"><h3>3 &middot; Plate and name themes</h3><ul class="tight">
+			<li>New <code>PlateThemes.lua</code> and <code>NameThemes.lua</code>, made from <code>THEMES</code> at load time (the rules above), plus the themes that stand alone.</li>
+			<li>Keys <code>plateTheme</code> and <code>nameTheme</code>, both <code>"main"</code> by default, kept out of <code>ThemeKeys()</code> (D2).</li>
+			<li>Step 3 of the chain in <code>PlateRowLookFor</code> and the name resolver. For plates, "main" reads General's live values, as <code>PlateHealthStyle</code> does today (D11).</li>
+			<li>The theme strips on both pages.</li></ul></div>
+		<div class="card"><h3>4 &middot; Main themes</h3><ul class="tight">
+			<li><code>THEMES</code> entries name their <code>plates</code> and <code>names</code> (their own key by default).</li>
+			<li>The cards on General draw a plate and a name.</li>
+			<li>The reaches switches, as a column on the Pages tab (GeneralStyle.lua's <code>PAGES</code>): <code>styleThemeReach&lt;part&gt;</code>, all on by default. <code>ApplyStyleTheme</code> skips keys of a part that's off, and <code>StyleThemeEdited</code> ignores them.</li>
+			<li><code>Tools/offline/check.lua</code>: every plate and name theme key is real, and Undo still works with a plate theme picked by hand.</li></ul></div>
+		<div class="card"><h3>5 &middot; Cast Bar Style</h3><ul class="tight">
+			<li>Its tabs become rows. Its existing keys become each row's own, and each row keeps its "These bars" pick (own, Default's or the game's).</li>
+			<li>No theme layer: <code>Casts()</code> keeps writing the Default row. The template's <i>Set by theme</i> tag shows where.</li></ul></div>
+		<div class="card"><h3>6 &middot; The rest</h3><ul class="tight">
+			<li>One page per release, in the order in the table above.</li>
+			<li>Each gets a style-lab frame of its Look panel and a What's new entry.</li></ul></div>
+	</div>
+	<div class="card"><h3>New settings</h3>
+		<div class="scroll"><table class="plain"><thead><tr><th>Key</th><th>Default</th><th>What it holds</th></tr></thead><tbody>
+			<tr><td><code>plateTheme</code></td><td>"main"</td><td>The plate theme, or "main" to follow the main theme</td></tr>
+			<tr><td><code>nameTheme</code></td><td>"main"</td><td>The same for names</td></tr>
+			<tr><td><code>&lt;kind&gt;MarkLook…</code> (<code>targetArrowLook…</code> for your target): <code>Back</code>, <code>BackAlpha</code>, <code>Shape</code>, <code>Width</code>, <code>Height</code>, <code>NamePos</code>, <code>HealthText</code></td><td>"default"</td><td>New Nameplate Style row settings, added to <code>PLATE_LOOK_KEYS</code></td></tr>
+			<tr><td><code>nameLook&lt;Kind&gt;&lt;Setting&gt;</code></td><td>"inherit"</td><td>A Name Style row's own setting, given a default by <code>NameRowDefault</code></td></tr>
+			<tr><td><code>plateNameFont</code>, <code>plateNameGlow…</code>, <code>plateNameBackdrop…</code>, <code>plateNameLine2…</code></td><td>"inherit"</td><td>New All names settings, next to today's <code>plateName*</code> (which also get "inherit", D12)</td></tr>
+			<tr><td><code>styleThemeReach&lt;Part&gt;</code></td><td>true</td><td>Whether picking a main theme changes that part</td></tr>
+		</tbody></table></div>
+		<p class="dim" style="font-size:14px;margin-top:8px">Profiles carry every key in <code>ns.DEFAULTS</code> plus row keys through <code>MarkRowDefault</code> (Profiles.lua 214-239), and the modules map keys by page with <code>RecordKey</code> (ProfileModules.lua <code>BuildMap</code>). So each new key needs a default or a row-default function, and a <code>RecordKey</code> on its page. <code>Tools/offline/check.lua</code>'s profile snapshots change once, with <code>--update</code>.</p>
+	</div>
+</section>
+
+<section class="part" id="risks">
+	<header><span class="eyebrow">Risks and tests</span><h2>What could go wrong, and how to check it</h2></header>
+	<div class="card scroll"><table class="plain"><thead><tr><th>Feature</th><th>Risk</th><th>Fallback</th><th>Check</th></tr></thead><tbody>
+		<tr><td>Capitals, level before the name, backdrop sized to the name</td><td><span class="pill test">secret values</span> The name, its width or the level can be secret on Forever and on retail in fights.</td><td>Show the name as written; one backdrop width for every name.</td><td>In game: Forever open world, a retail fight, a retail city.</td></tr>
+		<tr><td>Health text on plates</td><td><span class="pill test">secret values</span> Health is secret in the same places.</td><td>Pass it straight to <code>SetText</code> where the game allows, as the Heal Vision plan does for bars; hide it otherwise.</td><td>In game, both clients.</td></tr>
+		<tr><td>Colored name outline</td><td><span class="pill risk">cost</span> Eight copies of each name (<code>ns.SetTextRim</code>), and its sync reads the name's text (StylePages.lua 1110), which can be secret.</td><td>Cap it to the target and group rows if it costs too much.</td><td><code>/cine profiler</code> with 40 names up.</td></tr>
+		<tr><td>Bar shape on plates</td><td><span class="pill new">new place</span> Masks on the plate fill. The game strips its own masks first, as the personal display already handles.</td><td>Square.</td><td>In game: Forever and retail plates, target and not.</td></tr>
+		<tr><td>Friendly plates in dungeons and raids</td><td><span class="pill have">known</span> The game won't let addons change them.</td><td>As now: the page's warning triangle.</td><td>Unchanged.</td></tr>
+		<tr><td>Name themes' fonts in other alphabets</td><td><span class="pill risk">gap today</span> The themes' fonts lack Cyrillic and Asian letters. Plate names rely on <code>CreateFontFamily</code>; the plain <code>SetFont</code> fallback and <code>NameLook</code> have no <code>ROMAN</code> guard.</td><td>Add the guard (release 2).</td><td>ruRU, koKR and zhCN clients, with and without <code>CreateFontFamily</code>.</td></tr>
+		<tr><td>Per-row plate width, height and name place</td><td><span class="pill test">needs a test</span> Plate size is set for all plates (<code>C_NamePlate.SetNamePlate…Size</code>), and the game lays out a plate's parts again on each refresh.</td><td>Resize the bar inside the plate only; leave the click area and name to the game where it fights back.</td><td>In game: retail and Forever, while targeting and in a fight.</td></tr>
+		<tr><td>Glow and background on names</td><td><span class="pill risk">cost</span> One or two more textures on every pooled plate.</td><td>Made once per plate, hidden when unused.</td><td>40 plates up, the profiler page.</td></tr>
+		<tr><td>Upgrading players</td><td><span class="pill new">migration</span> The move to "inherit" (D12).</td><td>Only values still at their defaults move; "The game's" main theme gets <code>nameTheme = "game"</code>.</td><td><code>check.lua</code>: an old profile loads to the same look.</td></tr>
+		<tr><td>Main theme pick time</td><td><span class="pill risk">cost</span> One more refresh per part.</td><td>Plates and names refresh lazily, on their next pass.</td><td>The "refresh all" log line stays under 20 ms.</td></tr>
+	</tbody></table></div>
+	<div class="cols">
+		<div class="card"><h3>Offline checks</h3><ul class="tight"><li><code>check.lua</code>: theme keys are real, Undo works, profiles hold the new keys.</li><li>Style-lab: Name Style and Nameplate Style frames with their Look panels open, in all 16 themes.</li><li>A plate and a name frame per plate and name theme.</li></ul></div>
+		<div class="card"><h3>In the game</h3><ul class="tight"><li>Each "needs a test" row above, on both clients.</li><li>Change a main theme with a plate theme picked by hand: it stays.</li><li>Turn off Names in the reaches list, change themes: names stay.</li><li>An old profile on Bold or Subtle lands on the matching name theme.</li></ul></div>
+	</div>
+</section>
+
+<section class="part" id="revisions">
+	<header><span class="eyebrow">Revisions</span><h2>What I changed after looking at each round</h2>
+	<p class="dim">I drew each round, screenshotted it, read it back as a player would, and fixed what didn't make sense. An independent review was the last round.</p></header>
+	<div class="card revlog" id="revlog">
+		<div class="rev"><span class="rv">Round 1</span><div>First full draft: plan, four mock-ups, theme library. Reading the screenshots back I found:
+			<ul class="tight"><li>Name and plate samples in the theme cards overlapped.</li><li>The inherited tile read "Theme'sGilded Codex".</li><li>Numbered callouts broke their text into a column of single words.</li><li>Far names were unreadable.</li><li><b>A design gap:</b> the name on a full plate (Nameplate Style's Text tab) and on a name-only plate (Name Style) had no link, so one name could get two fonts.</li></ul></div></div>
+		<div class="rev"><span class="rv">Round 2</span><div>Fixed the layout bugs.
+			<ul class="tight"><li>Theme cards stack the name over the plate.</li><li>The inherited tile is called Inherit and says what it gives.</li><li>The callouts sit beside the panel, not inside it.</li><li>The Cast Bar mock-up got its rows.</li><li>The page fits a phone.</li><li>Added D10, Name Style feeding plate names.</li></ul></div></div>
+		<div class="rev"><span class="rv">Round 3</span><div>An independent review checked every claim against the code. What changed because of it:
+			<ul class="tight">
+				<li>The theme picks stay out of the main theme's written keys (D2). Before, a main theme pick would have reset a hand-picked plate or name theme.</li>
+				<li>Plate themes hold only bar settings, so All names really reaches full plates (D10).</li>
+				<li>"Follow General" keeps today's plate look and anything set on General by hand (D11).</li>
+				<li>A real "inherit" value with a safe one-time move (D12). Before, the theme could never show through the existing name settings.</li>
+				<li>Cast bars keep the colors the theme writes, now tagged <i>Set by theme</i>. Their rows start as they do today: Nameplates on the Default row, the rest on the game's.</li>
+				<li>Profile and module claims corrected to how <code>Profiles.lua</code> and <code>ProfileModules.lua</code> really work.</li>
+				<li>Name tabs renamed to match the shared Look groups (Glow, Background, Level). Rows now match <code>ns.NAME_GROUPS</code>, with three Minions rows.</li>
+				<li>Per-row plate size and name place are now "needs a test". New risk rows for <code>ROMAN</code>, pooled textures and migration.</li>
+				<li>The reaches switches moved into the Pages tab.</li>
+				<li>One reset button per scope. Settings that are switched off say "Off" instead of "The game's".</li>
+				<li>The sticky nav is gone, and some samples were redrawn so they read.</li>
+			</ul></div></div>
+	</div>
+</section>
+</div>
+
+<script>
+/*__JS__*/
+</script>
