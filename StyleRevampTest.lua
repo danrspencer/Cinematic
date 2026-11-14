@@ -49,10 +49,18 @@ local function Shot(what)
 	return ok and ("screenshot %s at %s"):format(what, date("%m%d%y_%H%M%S")) or ("screenshot failed: " .. tostring(err))
 end
 
--- A setting for the run, its old value kept to put back.
+-- A setting for the run, its old value kept to put back. Kept in the saved
+-- settings too (CinematicDB.styleRevampPending): a run cut short by a
+-- /reload (2026-11-14: left the Subtitle name theme on, every name white)
+-- gets them back at the next login.
 local function Set(key, value)
 	local db = ns.GetDB()
-	if run.saved[key] == nil then run.saved[key] = { db[key] } end
+	if run.saved[key] == nil then
+		run.saved[key] = { db[key] }
+		CinematicDB.styleRevampPending = CinematicDB.styleRevampPending or {}
+		local pending = CinematicDB.styleRevampPending
+		if pending[key] == nil then pending[key] = { value = db[key] } end
+	end
 	db[key] = value
 end
 local function Redraw()
@@ -66,8 +74,31 @@ local function PutBack()
 	local db = ns.GetDB()
 	for key, old in pairs(run.saved) do db[key] = old[1] end
 	run.saved = {}
+	CinematicDB.styleRevampPending = nil
 	Redraw()
 end
+
+-- A run cut short (a /reload, a disconnect): its settings back at login.
+local restorer = CreateFrame("Frame")
+restorer:RegisterEvent("PLAYER_LOGIN")
+restorer:SetScript("OnEvent", function()
+	local pending = CinematicDB and CinematicDB.styleRevampPending
+	if type(pending) ~= "table" then return end
+	local db = ns.GetDB()
+	local names = {}
+	for key, old in pairs(pending) do
+		if type(old) == "table" then
+			db[key] = old.value
+			names[#names + 1] = key
+		end
+	end
+	CinematicDB.styleRevampPending = nil
+	if #names > 0 then
+		table.sort(names)
+		Redraw()
+		ns.Print("style revamp test was cut short: put back " .. table.concat(names, ", "))
+	end
+end)
 
 -- CineMode on or off for a step (names on faded plates need it on); put
 -- back as it was at the end.
