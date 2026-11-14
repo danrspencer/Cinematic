@@ -147,7 +147,9 @@ function ns.PlateRowLookFor(kind, over)
 		if gradient == "on" then
 			local from = Mine("LookGradient") ~= nil and kind or "others"
 			local function Part(key)
-				local value = from == kind and over and over[key]
+				-- (Not "a and b and c": false, not nil, when from isn't kind.)
+				local value
+				if from == kind and over then value = over[key] end
 				if value == nil then value = ns.TargetMarkOwn(key, from) end
 				return tonumber(value) or DEFAULT_VALUE[key]
 			end

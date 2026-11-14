@@ -18,6 +18,7 @@
 --   7 panel:    Nameplate Style with a row's Look panel open;
 --   8 names:    Name Style;
 --   9 pages:    General's Pages tab (the Theme column).
+-- (Step 5 waits 8 seconds: you target an NPC first.)
 -- Steps as arguments (stylerevamp 2 3) redo just those. Into its own saved
 -- list, CinematicDB.styleRevampLog. Dev copy only (CinematicDev.toc).
 local _, ns = ...
@@ -144,8 +145,8 @@ local STEPS = {
 			note.verdict = ("plates %d, our names shown %d (secret widths %d), rows: %s"):format(total, shown, secret, rows)
 			run.fps = FPS()
 		end },
-	{ key = "dress", say = "%d/%d: In %d sec EVERY NAME gets a RED OUTLINE, and your TARGET'S name gets BIGGER " ..
-		"with a GOLD GLOW and a DARK BAND behind it.",
+	{ key = "dress", say = "%d/%d: In %d sec EVERY NAME gets a RED OUTLINE, and NPC names get BIGGER with a GOLD " ..
+		"GLOW and a DARK BAND behind them.",
 		apply = function()
 			CineMode(true)
 			Set("nameLookHostileNPCsAlpha", 1)
@@ -154,9 +155,11 @@ local STEPS = {
 			Set("plateNameOutlineR", 1)
 			Set("plateNameOutlineG", 0)
 			Set("plateNameOutlineB", 0)
-			Set("nameLookTargetSize", 1.3)
-			Set("nameLookTargetGlow", "soft")
-			Set("nameLookTargetBack", "band")
+			for _, row in ipairs({ "Target", "FriendlyNPCs", "NeutralNPCs", "HostileNPCs", "ServiceNPCs" }) do
+				Set("nameLook" .. row .. "Size", 1.3)
+				Set("nameLook" .. row .. "Glow", "soft")
+				Set("nameLook" .. row .. "Back", "band")
+			end
 			local before = debugprofilestop()
 			Redraw()
 			run.redrawMs = debugprofilestop() - before
@@ -207,17 +210,25 @@ local STEPS = {
 				"then Emberforge picked: name theme %s (want codex); undone, theme now %s"):format(theme and theme.key
 				or "none", tostring(texture), shown, tostring(pinned), tostring(db.styleTheme))
 		end },
-	{ key = "full", say = "%d/%d: CineMode turns OFF. In %d sec the names on the FULL NAMEPLATES get a THICK " ..
-		"black OUTLINE and a shadow.",
+	{ key = "full", wait = 8, say = "%d/%d: CLICK an NPC to TARGET it now. CineMode turns OFF. In %d sec the names " ..
+		"on the FULL NAMEPLATES get a THICK black OUTLINE and a shadow.",
 		apply = function()
 			CineMode(false)
+			Say("  before: " .. TargetName())
 			Set("handlePlateStyle", true)
 			Set("plateNameOutline", 2)
 			Set("plateNameShadow", true)
 			Redraw()
+			-- (Ours set? Then whether the game puts its own back: read again later.)
+			local plate = C_NamePlate.GetNamePlateForUnit and C_NamePlate.GetNamePlateForUnit("target")
+			local look = plate and ns.PlateLookNow and ns.PlateLookNow(plate)
+			Say(("  just after: looks on %s, target's look outline %s shadow %s, %s"):format(
+				tostring(ns.PlateLooksOn and ns.PlateLooksOn()), tostring(look and look.outline),
+				tostring(look and look.shadow), TargetName()))
 		end,
 		after = function(note)
-			note.verdict = TargetName() .. " (want THICKOUTLINE in its flags)"
+			note.verdict = TargetName() .. " (want THICKOUTLINE in its flags; see 'just after' above: set then put back " ..
+				"by the game, or never set)"
 		end },
 	{ key = "plate", say = "%d/%d: In %d sec the HEALTH BARS on the plates turn FLAT with a THIN BLACK LINE round them.",
 		apply = function()
@@ -244,7 +255,16 @@ local STEPS = {
 		after = function(note) note.verdict = "see the AFTER screenshot (tags, Hold to compare, Copy look, Paste, Start from a theme)" end },
 	{ key = "names", say = "%d/%d: The settings show NAME STYLE. Just watch.",
 		apply = function() Say("  " .. OpenPage("Name Style")) end,
-		after = function(note) note.verdict = "see the AFTER screenshot (theme strip, scene, rows)" end },
+		after = function(note)
+			-- (A kind's row with nothing of its own: All names' and the game's, never false.)
+			local values = {}
+			for _, setting in ipairs({ "Colour", "Friends", "Glow", "Back", "Outline" }) do
+				local value, from = ns.NameLookValue("GroupMembers", setting)
+				values[#values + 1] = ("%s=%s (%s)"):format(setting, tostring(value), tostring(from))
+			end
+			note.verdict = "Group members row: " .. table.concat(values, ", ") ..
+				" (want true, blue, none, none, 0); see the AFTER screenshot (theme strip, scene, rows)"
+		end },
 	{ key = "pages", say = "%d/%d: The settings show the Style hub's PAGES tab. Just watch.",
 		apply = function() Say("  " .. OpenPage("Style Pages")) end,
 		after = function(note) note.verdict = "see the AFTER screenshot (the Theme column at the right)" end },
@@ -273,10 +293,10 @@ local function Tick()
 	local now = GetTime() - run.at
 	if now < SETUP then
 		local plates = C_NamePlate and #C_NamePlate.GetNamePlates() or 0
-		ns.PadTestBox("Go where SEVERAL NPCs and players are near you (a town), OUT OF A FIGHT, and TARGET an NPC. " ..
-			"The test turns CineMode on and off by itself.",
-			("%d nameplates on screen%s. Starts in %d"):format(plates, UnitExists("target") and ", target set" or
-				", NO TARGET", math.ceil(SETUP - now)), plates > 2 and 0.3 or 1, plates > 2 and 1 or 0.6, 0.3)
+		ns.PadTestBox("Go where AT LEAST 4 NPCs or players stand near you, their names over their heads (a busy " ..
+			"street), OUT OF A FIGHT. Don't target anyone. The test turns CineMode on and off by itself.",
+			("%d nameplates on screen (want 4 or more). Starts in %d"):format(plates, math.ceil(SETUP - now)),
+			plates >= 4 and 0.3 or 1, plates >= 4 and 1 or 0.6, 0.3)
 		return
 	end
 	local index = math.floor((now - SETUP) / STEP) + 1
@@ -295,25 +315,26 @@ local function Tick()
 			tostring(InCombatLockdown()), tostring(ns.lastCinematic)))
 	end
 	local note = run.notes[step.key]
-	if into < WAIT then
-		ns.PadTestBox(step.say:format(index, #run.steps, math.ceil(WAIT - into)), "GET READY: keep watching",
+	local wait = step.wait or WAIT -- (a step with something to do first waits longer)
+	if into < wait then
+		ns.PadTestBox(step.say:format(index, #run.steps, math.ceil(wait - into)), "GET READY: keep watching",
 			1, 0.82, 0)
 	else
 		ns.PadTestBox(step.say:format(index, #run.steps, 0), ("RECORDING: %d sec left"):format(math.ceil(STEP - into)),
 			0.3, 1, 0.3)
 	end
-	if not note.shotBefore and into >= WAIT - 0.6 and into < WAIT then
+	if not note.shotBefore and into >= wait - 0.6 and into < wait then
 		note.shotBefore = true
 		Say("  " .. Shot(("step %d %s BEFORE"):format(run.steps[index], step.key)))
-	elseif into >= WAIT and not note.applied then
+	elseif into >= wait and not note.applied then
 		note.applied = true
 		local ok, why = pcall(step.apply)
 		if not ok then note.skipped = "error: " .. tostring(why) elseif why then note.skipped = why end
 		if note.skipped then Say("  couldn't: " .. note.skipped) end
-	elseif not note.shotAfter and note.applied and into >= WAIT + 2.5 then
+	elseif not note.shotAfter and note.applied and into >= wait + 2.5 then
 		note.shotAfter = true
 		Say("  " .. Shot(("step %d %s AFTER"):format(run.steps[index], step.key)))
-	elseif not note.logged and note.shotAfter and into >= WAIT + 3.5 then
+	elseif not note.logged and note.shotAfter and into >= wait + 3.5 then
 		note.logged = true
 		if not note.skipped then
 			local ok, err = pcall(step.after, note)

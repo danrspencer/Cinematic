@@ -108,7 +108,10 @@ function ns.NameLookValue(row, setting, over)
 		if value == nil then value = Raw(row, setting) end
 		if value ~= "inherit" then return value, row end
 	end
-	local value = row == "all" and over and over[setting]
+	-- (over only for All names' own panel. Not "row == 'all' and over and ...":
+	-- for a kind's row that's false, not nil, and every setting came out false.)
+	local value
+	if row == "all" and over then value = over[setting] end
 	if value == nil then value = Raw("all", setting) end
 	if value ~= "inherit" then return value, "all" end
 	local themed = ns.NameThemeLook and ns.NameThemeLook()
@@ -129,7 +132,8 @@ function ns.NameLookColor(row, setting, over)
 			tonumber(themed[base .. "B"]) or color[3]
 	end
 	local function Part(i, part)
-		local value = over and from == (row or "all") and over[base .. part]
+		local value
+		if over and from == (row or "all") then value = over[base .. part] end
 		if value == nil then value = ns.db and ns.db[ns.NameLookKey(from, base .. part)] end
 		return tonumber(value) or color[i]
 	end
