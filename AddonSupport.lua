@@ -283,28 +283,32 @@ function ns.ConflictStandsAside(key)
 end
 
 -- A Style page's switch standing aside: an addon's own look is on and its
--- row's pick is theirs. (Each switch's answer kept for the frame: asked
--- about 400 times a frame through ns.StyleOn while plates came and went
--- turning the camera fast, each going over every conflict row, 2026-11-15.)
-local yieldFrame, yieldKept = nil, {}
+-- row's pick is theirs. (Only the rows for that switch are gone over, listed
+-- by switch as rows are added: asked about 400 times a frame through
+-- ns.StyleOn while plates came and went turning the camera fast, each going
+-- over every conflict row, 2026-11-15. Picks and the addons' own switches
+-- are still asked each time: they can change at any moment.)
+local rowsBySwitch, rowsListed = {}, 0
 function ns.StyleSwitchYielded(switchKey)
-	local now = GetTime()
-	if now ~= yieldFrame then
-		yieldFrame = now
-		wipe(yieldKept)
-	end
-	local kept = yieldKept[switchKey]
-	if kept == nil then
-		kept = false
-		for _, row in ipairs(ns.CONFLICTS) do
-			if row.styleSwitch == switchKey and ns.ConflictPick(row) == "theirs" and ns.ConflictTheirsOn(row) then
-				kept = row
-				break
+	local rows = ns.CONFLICTS
+	if rowsListed ~= #rows then
+		wipe(rowsBySwitch)
+		for _, row in ipairs(rows) do
+			if row.styleSwitch then
+				rowsBySwitch[row.styleSwitch] = rowsBySwitch[row.styleSwitch] or {}
+				table.insert(rowsBySwitch[row.styleSwitch], row)
 			end
 		end
-		yieldKept[switchKey] = kept
+		rowsListed = #rows
 	end
-	return kept or nil
+	local list = rowsBySwitch[switchKey]
+	if not list then return nil end
+	for _, row in ipairs(list) do
+		if ns.ConflictPick(row) == "theirs" and ns.ConflictTheirsOn(row) then
+			return row
+		end
+	end
+	return nil
 end
 
 -- Features gated by a pick (ns.FeatureYieldedTo): "card:<event id>"
