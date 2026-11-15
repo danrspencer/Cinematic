@@ -6,7 +6,8 @@
 -- "Name says: ..." in the chat's own colour, looking like the chat bubbles
 -- do: in a bubble of its own, or just the text (outlined, if ticked) with the
 -- Chat bubbles page's Text only, and at its text size. Newer lines push older
--- ones up; each fades out after a while, longer for longer lines.
+-- ones up (with Sink as lines come in: newer on top, pushing older ones down);
+-- each fades out after a while, longer for longer lines.
 -- Emotes (db.chatSpeechEmotes: a /point, an NPC's "laughs.") never have a
 -- bubble: they show here too, as the sentence chat shows, in a bubble with
 -- no tail, so they don't read as speech.
@@ -23,7 +24,7 @@ local SLIDE_RATE = 10 -- how fast a line slides up into its place (higher: quick
 -- (The lines sink a little as they come in, so they don't sit still: quick
 -- enough that its 1-pixel steps read as a slide, as words only sit on whole
 -- pixels; a slow crawl looked like move, stop, move.)
-local SINK_SPEED, SINK_DROP = 16, 48 -- pixels a second, pixels in all (3 seconds)
+local SINK_SPEED, SINK_DROP = 16, 36 -- pixels a second, pixels in all (2.25 seconds)
 local SINK_FLOOR = 10 -- the lowest they drift: this far above the screen's bottom edge
 local BASE_TIME, PER_LETTER, MOST_TIME = 3, 0.06, 12 -- seconds a line stays up
 local SAME_LINE = 1 -- seconds: the same line again (another chat window's copy) is skipped
@@ -290,26 +291,47 @@ local function OnUpdate(_, elapsed)
 			end
 		end
 	end
-	-- (All the lines sink together, from when the newest came in; a new one
-	-- starts them again from their place, never off the screen.)
-	if lines[1] and Styled().speechBehindSink then
-		y = -math.min((now - lines[1].born) * SINK_SPEED, SINK_DROP, math.max(0, spotBottom - SINK_FLOOR))
+	-- (Sinking, the lines all flow down: the newest comes in on top at the Move
+	-- box and sinks a little, pushing the older ones down under it, never up,
+	-- so lower always reads as older. Without it, newer lines come in at the
+	-- bottom and push the older ones up.)
+	local sink = Styled().speechBehindSink
+	local floor = SINK_FLOOR - spotBottom -- (the lowest a line's bottom goes)
+	if lines[1] and sink then
+		y = -math.min((now - lines[1].born) * SINK_SPEED, SINK_DROP, math.max(0, -floor))
 	end
 	-- (Placed on whole screen pixels: the words snap to them as they move, the
 	-- bubble's art doesn't, so between pixels the words lagged behind the box.)
 	local pixel = ns.PixelsToUnits and ns.PixelsToUnits(holder, 1)
-	for _, line in ipairs(lines) do
+	for i, line in ipairs(lines) do
 		if not line.fading then
 			line.frame:SetAlpha(math.min(1, (now - line.born) / FADE_IN) * line.most)
 		end
-		-- (Slides up into its place as newer lines come in under it: quick at
-		-- first, settling into place.)
-		line.y = math.abs(y - line.y) < 0.5 and y or line.y + (y - line.y) * math.min(1, elapsed * SLIDE_RATE)
+		local tall = line.text:GetStringHeight() + (line.boxed and PAD_Y * 2 or 0)
+			+ (line.tailed and TAIL_SPACE or 0)
+		local target = y
+		if sink then
+			if i > 1 then
+				-- (Under the newer one, or lower still where it already is.)
+				target = math.min(y - tall - GAP, line.sunk or y - tall - GAP)
+			end
+			line.sunk = target
+			-- (Carried down to the screen's bottom: fades out there.)
+			if target < floor and not line.fading then
+				line.fading = now
+			end
+			y = target
+		end
+		-- (Slides into its place as newer lines come in: quick at first,
+		-- settling into place.)
+		line.y = math.abs(target - line.y) < 0.5 and target
+			or line.y + (target - line.y) * math.min(1, elapsed * SLIDE_RATE)
 		line.frame:ClearAllPoints()
 		line.frame:SetPoint(line.point, spot, line.point, 0,
 			pixel and math.floor(line.y / pixel + 0.5) * pixel or line.y)
-		y = y + line.text:GetStringHeight() + (line.boxed and PAD_Y * 2 or 0)
-			+ (line.tailed and TAIL_SPACE or 0) + GAP
+		if not sink then
+			y = y + tall + GAP
+		end
 	end
 	if #lines == 0 then
 		ns.SetOnUpdate(holder, nil)
@@ -564,8 +586,11 @@ function ns.ShowSpeechBehind(event, author, text, guid)
 	local rise, _, most = Behind()
 	line.born, line.life, line.fading = now, ns.SpeechLife(text), nil
 	line.most, line.said, line.bubbled, line.emote = most, text, nil, emote
-	-- (Rising: it starts below the screen's bottom edge and slides up into place.)
-	line.y = rise and -(spotBottom + RISE_FROM) or 0
+	-- (Rising: it starts below the screen's bottom edge and slides up into place.
+	-- Not while sinking: it comes in on top then, and would rise through the
+	-- older lines; it fades in at its place.)
+	line.y = rise and not Styled().speechBehindSink and -(spotBottom + RISE_FROM) or 0
+	line.sunk = nil
 	local info = _G.ChatTypeInfo and _G.ChatTypeInfo[chatType]
 	local r, g, b = 1, 1, 1
 	if info then r, g, b = info.r or 1, info.g or 1, info.b or 1 end

@@ -131,7 +131,8 @@ function ns.CreateBubbleStylePanel(kit)
 		L["Each line slides up from below the bottom of the screen, as if from behind the camera, " ..
 		"instead of just fading in."], Behind)
 	rows.Check("speechBehindSink", L["Sink as lines come in"],
-		L["The lines slide down a little each time a new one comes in, so they don't sit still."], Behind)
+		L["The lines slide down a little each time a new one comes in, so they don't sit still: " ..
+		"the newest comes in on top and pushes the older ones down."], Behind)
 	rows.Slider("speechBehindScale", L["Size"], 50, 100, 5, "%d%%", 100,
 		L["How big speech from behind you is, next to a bubble overhead: smaller sounds further away."], Behind)
 	rows.Slider("speechBehindAlpha", L["Opacity"], 30, 100, 5, "%d%%", 100,
