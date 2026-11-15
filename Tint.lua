@@ -766,6 +766,7 @@ local function ApplyTint(level, vignetteLevel, weatherLevel)
 	for c = 1, 3 do
 		ns.mapDim.color[c] = ns.mapDim.color[c] * weather[c]
 	end
+	ns.mapDim.level = level
 	ns.UpdateMapDim()
 
 	SetVignette(vignetteEdges, VIGNETTE_SIZE, db.vignette and db.vignetteStrength * vignetteLevel or 0)
@@ -781,27 +782,28 @@ function ns.HideTintWash()
 	end
 	if tintFrame then tintFrame:Hide() end
 	ns.mapDim.color[1], ns.mapDim.color[2], ns.mapDim.color[3] = 1, 1, 1
+	ns.mapDim.level = 0
 	ns.UpdateMapDim()
 end
 
--- The world map dims with the world: in CineMode a dark tint (Duskwood at
--- night) made a maximized map flash bright. The tint's and weather's darkening
--- colour (color, from ApplyTint), as strong as Dim the world map says, laid
--- over the map's scroll area (its pins too, not the side panel or border).
+-- The world map dims with the world: in CineMode a dark scene (Duskwood at
+-- night) made a maximized map flash bright. Laid over the map's scroll area
+-- (its pins too, not the side panel or border): the tint's and weather's
+-- darkening colour (color, from ApplyTint), times a flat dim (Dim the world
+-- map), which comes and goes with the tint (level). The tint alone was too
+-- light: most of a dark zone's dark is the game's own lighting.
 -- The map loads on demand: hooked once it's there (UpdateTint looks), and
 -- redrawn as it opens. (Fields on ns: no more locals for this main chunk.)
-ns.mapDim = { color = { 1, 1, 1 } }
+ns.mapDim = { color = { 1, 1, 1 }, level = 0 }
 function ns.UpdateMapDim()
 	local state = ns.mapDim
 	local area = _G.WorldMapFrame and _G.WorldMapFrame.ScrollContainer
 	if not area then return end
-	local amount = db and db.mapDimStrength or 0
+	local amount = db and db.mapDim or 0
 	local r, g, b = 1, 1, 1
 	if amount > 0 then
-		local color = state.color
-		r = 1 - (1 - color[1]) * amount
-		g = 1 - (1 - color[2]) * amount
-		b = 1 - (1 - color[3]) * amount
+		local color, keep = state.color, 1 - amount * (state.level or 0)
+		r, g, b = color[1] * keep, color[2] * keep, color[3] * keep
 	end
 	if r > 0.995 and g > 0.995 and b > 0.995 then
 		if state.frame then state.frame:Hide() end
