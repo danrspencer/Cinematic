@@ -981,8 +981,20 @@ ns.MARK_DISTANCES = { "In11", "In28", "In40", "Past28", "Past40", "OutOfRange" }
 -- order: "EnemyNeutral"), number (nil: the first) and Distance (nil: any):
 -- "npcEnemyPast403": "npc", "Enemy", 3, "Past40".
 -- (An id that won't read: itself, no kind.)
+-- (Each id's answer kept: it's asked ~30 times a frame with plates up, and
+-- the split made new strings each time, 2026-11-14. Ids are few.)
+local markRowBases = {}
+local MarkRowSplit
 function ns.MarkRowBase(id)
 	id = tostring(id)
+	local kept = markRowBases[id]
+	if not kept then
+		kept = { MarkRowSplit(id) }
+		markRowBases[id] = kept
+	end
+	return kept[1], kept[2], kept[3], kept[4]
+end
+function MarkRowSplit(id)
 	local base, rest = id:match("^(%l+)(.*)$")
 	if not base then
 		return id, nil, nil, nil
