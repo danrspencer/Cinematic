@@ -1615,17 +1615,57 @@ for page, keys in pairs({
 	for _, key in ipairs(keys) do PAGE_SWITCH[key] = page end
 end
 -- Allow outside CineMode (CineMode page): a vision's switch -> its tick there.
--- Unticked, the vision works only while CineMode is on (2026-11-13).
+-- Unticked, the vision works only while CineMode is on (2026-11-13). The
+-- Camera and Audio groups too (2026-11-15): Shoulder Cam, Skyriding Cam, and
+-- the Audio page's music.
 local OUTSIDE_CINE = {
 	handleHealVision = "outsideCineHeal", damageVision = "outsideCineDamage", lowHealth = "outsideCineVitals",
 	questVision = "outsideCineQuest", rollWindow = "outsideCineRoll", teleportVision = "outsideCineTeleport",
 	duelPlates = "outsideCineDuel", emoteVision = "outsideCineEmote", cards = "outsideCineCards",
+	shoulderCam = "outsideCineShoulder", skyrideCam = "outsideCineSkyride", musicInCinematic = "outsideCineMusic",
 }
 for _, tick in pairs(OUTSIDE_CINE) do DEFAULTS[tick] = true end
 ns.OUTSIDE_CINE = OUTSIDE_CINE
+-- And the Camera group's master tick (2026-11-15, on to start with): off, none
+-- of Cinematic's cameras move the view while CineMode is off. A scene whose
+-- CineMode tick is on still plays, bringing CineMode on with it.
+DEFAULTS.outsideCineCameras = true
+local CAMERA_SWITCHES = { shoulderCam = true, skyrideCam = true }
 local function OutsideBlocked(db, key)
+	if ns.lastCinematic then return false end
+	if CAMERA_SWITCHES[key] and db.outsideCineCameras == false then return true end
 	local tick = OUTSIDE_CINE[key]
-	return tick ~= nil and db[tick] == false and not ns.lastCinematic
+	return tick ~= nil and db[tick] == false
+end
+-- Whether the master tick holds a scene (its key on the Scenes page) back now:
+-- off, CineMode off, and the scene doesn't bring CineMode on itself. (Started
+-- by hand, from the wheel or a key: it plays anyway.)
+function ns.SceneHeldToCine(key)
+	local db = ns.db
+	if not db or db.outsideCineCameras ~= false or ns.lastCinematic or key == nil or key == "Manual" then
+		return false
+	end
+	if key == "Skyride" then return db.skyrideCine ~= true end
+	return not (ns.TriggerSetting and ns.TriggerSetting(key, "cine") == true)
+end
+-- The cameras whose own code can run with CineMode off, and the scene each
+-- goes by (ns.CameraOffBesidesRows holds them back by it).
+local OUTSIDE_CAM_SCENES = {
+	flight = function() return { "Flight" } end, walk = function() return { "Walk" } end,
+	run = function() return { "Run" } end, death = function() return { "Death" } end,
+	quest = function() return { ns.QuestCamEvent and ns.QuestCamEvent() or "Quest" } end,
+	chatcam = function()
+		local scene = ns.ChatCamScene and ns.ChatCamScene()
+		return scene and { scene } or { "Chat", "ChatNearby" }
+	end,
+}
+local function CamHeldToCine(cam)
+	local scenes = OUTSIDE_CAM_SCENES[cam]
+	if not scenes or ns.lastCinematic or ns.db.outsideCineCameras ~= false then return false end
+	for _, key in ipairs(scenes()) do
+		if not ns.SceneHeldToCine(key) then return false end
+	end
+	return true
 end
 -- (A page's switch can be under another's: Duel Vision's ticks under its page's
 -- switch, under Enable Visions.)
@@ -2547,6 +2587,10 @@ function ns.CameraOffBesidesRows(cam)
 		or (cam == "death" and GetTime() < (ns.deathTestUntil or 0)) then
 		return false
 	end
+	-- Cameras held to CineMode (CineMode page, Outside CineMode's Cameras).
+	if CamHeldToCine(cam) then
+		return true
+	end
 	-- Not auto-walking or auto-running long enough yet (the delay sliders).
 	if SWITCHED_CAMS[cam] and (db[cam .. "CameraDelay"] or 0) > 0 then
 		local since = ns.travelSince[cam] or GetTime()
@@ -2582,6 +2626,7 @@ function ns.CameraOffWhy(cam)
 	if stopped and (stopped == cam or (stopped == "still" and ns.STILL_CAMS[cam])) then
 		return "stopped with Stop camera, until what started it is over"
 	end
+	if CamHeldToCine(cam) then return "Cameras unticked under Outside CineMode (CineMode page)" end
 	local delay = SWITCHED_CAMS[cam] and db[cam .. "CameraDelay"] or 0
 	if delay > 0 and GetTime() - (ns.travelSince[cam] or GetTime()) < delay then
 		return ("its Wait (%s sec) hasn't run out"):format(delay)

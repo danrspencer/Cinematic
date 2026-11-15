@@ -154,8 +154,9 @@ ns.DEFAULTS.deathCine = false
 -- stays on as you move.
 function ns.TravelSceneCine()
 	if ns.SkyridingNow and not ns.OnTaxi() and ns.SkyridingNow() then
-		-- (Skyriding Cam's own tick, SkyrideCam.lua: only with its page on.)
-		return ns.db.skyrideCine == true and ns.Setting("skyrideCam") and true or false
+		-- (Skyriding Cam's own tick, SkyrideCam.lua: only with its page on. Not
+		-- ns.Setting: held to CineMode, the camera's the one bringing it on.)
+		return ns.db.skyrideCine == true and ns.PageSetting("skyrideCam") and true or false
 	end
 	local scene = ns.CustomTravelScene and ns.CustomTravelScene()
 	return scene ~= nil and ns.IsScriptCamera ~= nil and ns.IsScriptCamera(ns.TriggerSetting(scene, "camera"))

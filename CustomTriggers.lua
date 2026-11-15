@@ -422,6 +422,10 @@ local function TryStart(unit, now)
 		Skip(unit, (L["Only if is false: %s"]):format(unit.condText))
 		return
 	end
+	if ns.SceneHeldToCine and ns.SceneHeldToCine(unit.scene) then
+		Skip(unit, L["Cameras are held to CineMode (CineMode page, Outside CineMode)"])
+		return
+	end
 	if unit.chance < 100 and math.random(100) > unit.chance then
 		Skip(unit, (L["Chance: not this time (%d%%)"]):format(unit.chance))
 		unit.done = true -- (a held one: not again until its thing stops)

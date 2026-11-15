@@ -3103,6 +3103,17 @@ local function TriggerNow()
 		end
 	end
 end
+-- (Not one held to CineMode while it's off: Outside CineMode's Cameras
+-- unticked, its scene not bringing CineMode on. Core.lua's ns.SceneHeldToCine.
+-- In a do block: this file's main chunk is at Lua's 200 locals.)
+do
+	local Any = TriggerNow
+	TriggerNow = function()
+		local key, camera = Any()
+		if key ~= nil and ns.SceneHeldToCine and ns.SceneHeldToCine(key) then return nil end
+		return key, camera
+	end
+end
 
 local function InFight()
 	return InCombatLockdown() or ns.Flag(UnitAffectingCombat("player"))

@@ -473,7 +473,7 @@ function ns.CreateSkyrideCamPanel(kit)
 		"cast it, and landing brings it back to your own distance. Steering with the mouse stops a turn or tilt " ..
 		"but not a zoom; scrolling the zoom yourself stops that. It plays the Skyriding zoom camera script, made " ..
 		"from the settings below."], intro)
-	local function IfOn() return ns.Setting("skyrideCam") end
+	local function IfOn() return ns.PageSetting("skyrideCam") end
 	local stack = kit.Stack(switch, "check")
 
 	local header = stack:Header(content, L["Show in"])

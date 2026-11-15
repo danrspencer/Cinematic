@@ -3686,18 +3686,20 @@ local function CreateRevealPanel()
 	local function OutsideChanged()
 		if ns.RefreshOutsideCine then ns.RefreshOutsideCine(true) end
 	end
+	-- (rows: { tick, label, tip (nil: the usual), greyUnless(db) or nil }.)
 	local function Group(title, rows)
-		stack:Add(Label(content, "GameFontNormal", title), "label")
+		if title then stack:Add(Label(content, "GameFontNormal", title), "label") end
 		local leftCheck
 		for i, row in ipairs(rows) do
 			local tick, label = row[1], row[2]
 			local check = Check(content, tick, label,
-				L["%s works while CineMode is off too. Unticked, only while CineMode is on."]:format(label),
+				row[3] or L["%s works while CineMode is off too. Unticked, only while CineMode is on."]:format(label),
 				function(value)
 					ns.GetDB()[tick] = value
 					OutsideChanged()
 					Refresh()
 				end)
+			if row[4] then GreyUnless(check, row[4]) end
 			if i % 2 == 1 then
 				stack:Add(check, "check")
 				leftCheck = check
@@ -3715,6 +3717,24 @@ local function CreateRevealPanel()
 	-- (Interface: the Nameplates hub's rules, off to start with: Core's outsideCinePlates.)
 	Group(L["Interface"], { { "outsideCinePlates", L["Nameplates"] } })
 	Group(L["Visual effects"], effectRows)
+	-- (Camera: Cameras, every camera of Cinematic's at once (Core.lua's
+	-- outsideCineCameras), then each camera that runs with no scene to start it,
+	-- greyed while Cameras is off: only the cameras this client has, Shoulder
+	-- Cam once unlocked.)
+	local function CamerasOn(db) return db.outsideCineCameras ~= false end
+	Group(L["Camera"], { { "outsideCineCameras", L["Cameras"],
+		L["Cinematic's cameras (scenes, Shoulder Cam, Skyriding Cam, the quest and chat cameras, the death " ..
+		"camera) work while CineMode is off too. Unticked, only while CineMode is on: a scene whose CineMode " ..
+		"tick is on (Scenes page) still plays, bringing CineMode on with it."] } })
+	local cameraRows = {}
+	if ns.ShoulderCamUnlocked and ns.ShoulderCamUnlocked() then
+		cameraRows[#cameraRows + 1] = { ns.OUTSIDE_CINE.shoulderCam, L["Shoulder Cam"], nil, CamerasOn }
+	end
+	if ns.SkyrideCamOn then
+		cameraRows[#cameraRows + 1] = { ns.OUTSIDE_CINE.skyrideCam, L["Skyriding Cam"], nil, CamerasOn }
+	end
+	if #cameraRows > 0 then Group(nil, cameraRows) end
+	Group(L["Audio"], { { ns.OUTSIDE_CINE.musicInCinematic, L["Music"] } })
 	local visionRows = {}
 	for _, item in ipairs({
 		{ "handleHealVision", "Heal Vision" }, { "damageVision", "Damage Vision" },
@@ -6563,8 +6583,10 @@ local function CreateCamerasPanel()
 				Changed()
 			end)
 			music.Refresh = function(self) self:SetChecked(ns.CameraRowValue(id, "music") and true or false) end
+			-- (The trigger's own row: its id for /cine find, as musicCamRun.)
+			if not copy and type(trigger.music) == "string" then music.settingKey = trigger.music end
 			GreyUnless(music, function()
-				return (key == "Death" or ns.Setting("musicInCinematic")) and (key == "AFK" or HasCamera(id))
+				return (key == "Death" or ns.PageSetting("musicInCinematic")) and (key == "AFK" or HasCamera(id))
 			end)
 			At("Camera", music, x)
 			x = x + 90
