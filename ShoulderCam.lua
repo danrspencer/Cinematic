@@ -37,18 +37,14 @@
 -- across the camera's own view, so only their zooms move you, and the
 -- offset follows those. A flight's mount scales the offset as a mount does,
 -- not measured yet: the "cams" sim session.)
-local ADDON_NAME, ns = ...
+local _, ns = ...
 local L = ns.L
 
--- Soft release: in the player copy it's there but locked, page and all,
--- till a tester types /cine testshoulder (db.shoulderCamTester) and reloads.
--- The dev copy always has it.
--- (Read from CinematicDB itself: the pages are built at ADDON_LOADED by the
--- language step, Locales.lua, before Core sets ns.db, so ns.db was nil then
--- and a tester got no page.)
+-- Soft release 2026-11-13 to 2026-11-15: locked in the player copy, page and
+-- all, till a tester typed /cine testshoulder. Everyone's since; kept as a
+-- function for the places that asked.
 function ns.ShoulderCamUnlocked()
-	local db = ns.db or CinematicDB
-	return ns.isDev or (type(db) == "table" and db.shoulderCamTester) and true or false
+	return true
 end
 
 -- On, and not standing aside for another addon that owns the shoulder offset
@@ -1217,10 +1213,14 @@ ns.SetOnUpdate(poller, function(_, elapsed)
 	end
 end)
 
--- The swap shoulders key: a button its key binding clicks (bound on the
--- Shoulder Cam page; no entry in Bindings.xml while the Shoulder Cam's
--- locked for testers, so the game's Key Bindings don't list it for everyone).
-local swap = CreateFrame("Button", ADDON_NAME .. "ShoulderSwapButton", UIParent)
+-- The swap shoulders key: a button its key binding clicks, bound on the
+-- Shoulder Cam page or in the game's Key Bindings (Bindings.xml, since
+-- 2026-11-15). Its name's fixed, as Bindings.xml names it (the dev copy's
+-- was CinematicDevShoulderSwapButton before: bound again once there).
+ns.OnLanguage(function()
+	_G["BINDING_NAME_CLICK CinematicShoulderSwapButton:LeftButton"] = L["Swap shoulders (Shoulder Cam)"]
+end)
+local swap = CreateFrame("Button", "CinematicShoulderSwapButton", UIParent)
 swap:RegisterForClicks("AnyDown")
 swap:SetScript("OnClick", function()
 	if not ns.db then

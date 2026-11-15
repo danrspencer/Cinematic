@@ -8034,15 +8034,29 @@ ticker:SetScript("OnEvent", ns.Profiled("Core events", function(self, event, arg
 		-- camera's tick on its Cameras tab instead (2026-11-13).
 		local function MigrateShoulderPause(saved)
 			if saved.shoulderCamPause ~= false then return end
-			for _, cam in ipairs({ "Vista", "Fish", "Cozy", "AFK", "Tele", "Flight", "Death", "Yours" }) do
+			for _, cam in ipairs({ "Vista", "Fish", "Cozy", "AFK", "Tele", "Flight", "Death", "Yours", "Walk", "Run",
+				"Quest", "Chat" }) do
 				saved["shoulderCamAllow" .. cam] = true
 			end
 		end
+		-- Turn to enemy's Always: on to start with till 2026-11-15, off since
+		-- (its rule "not combat" instead). Left on, it kept turning in fights:
+		-- off once for those who had the old default.
+		local function MigrateTurnAlways(saved)
+			if rawget(saved, "shoulderTurnAlwaysMoved") then return end
+			saved.shoulderTurnAlwaysMoved = true
+			if rawget(saved, "shoulderCamTargetTurnAlways") == true then saved.shoulderCamTargetTurnAlways = false end
+		end
 		MigrateShoulderPause(ns.db)
+		MigrateTurnAlways(ns.db)
 		for _, saved in pairs(ns.db.profiles or {}) do
 			if type(saved) == "table" then
 				MigrateShoulderPause(saved)
-				if type(saved.settings) == "table" then MigrateShoulderPause(saved.settings) end
+				MigrateTurnAlways(saved)
+				if type(saved.settings) == "table" then
+					MigrateShoulderPause(saved.settings)
+					MigrateTurnAlways(saved.settings)
+				end
 			end
 		end
 		-- Settings from removed or renamed features, now that the migrations
@@ -8050,6 +8064,7 @@ ticker:SetScript("OnEvent", ns.Profiled("Core events", function(self, event, arg
 		for _, key in ipairs({
 			"keepRaidMarkers", -- (now the Raid Markers grid)
 			"shoulderCamPause", -- (now shoulderCamAllow<Cam>)
+			"shoulderCamTester", -- (the Shoulder Cam's soft release, /cine testshoulder: everyone's since 2026-11-15)
 			"movingKeepVFX", "damageVisionOnlyCine", -- (now Allow outside CineMode's ticks)
 			"handleUnitFrames", -- (the parts follow the HUD page's switch)
 			"rollMinQuality", "rollUsableOnly", "rollTopPick", -- (now roll<Rule><Group><Q>)

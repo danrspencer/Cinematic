@@ -58,7 +58,7 @@ ns.SLOT_CHOICES = {
 			line = "Action bars centered along the bottom, menus in the corner", modules = { "layout-retail" } },
 		{ part = "pure", label = "Personal Resource Centered", made = true,
 			line = "Your resources in the middle, the Cooldown Manager above", modules = { "layout-pure" } },
-		-- (The Shoulder Cam profile's, testers' for now: in no list.)
+		-- (The Shoulder Cam profile's: in no list.)
 		{ part = "shoulder", client = "forever", hidden = true, label = "Shoulder Cam", made = true,
 			line = "Your resources at the bottom middle, everything hung on them",
 			modules = { "layout-shoulder", "follow-prd-on", "follow-fights" } },
@@ -78,7 +78,7 @@ ns.SLOT_CHOICES = {
 		-- (From the most fading to the least.)
 		{ part = "pure", label = "Almost always", line = "As little UI as possible, even in fights",
 			modules = { "pure-frames", "pure-minimap", "minimal-target", "pure-plates", "ultra-plates", "pure-tooltips" } },
-		-- (The Shoulder Cam profile's, testers' for now: "Almost always" with
+		-- (The Shoulder Cam profile's: "Almost always" with
 		-- the Follow HUD's pieces, the personal resource display in fights in
 		-- place of the player frame.)
 		{ part = "shoulder", client = "forever", hidden = true, label = "Almost always, over your shoulder",
@@ -257,7 +257,7 @@ ns.BUILTIN_PROFILES = {
 			"combat-vision", "cursor-hide", "music-calm", "weather-view-distance",
 			"node-icons", "effects-outside-cinemode"),
 	},
-	-- Cinema over your shoulder (Forever, testers': tester = listed only with
+	-- Cinema over your shoulder (Forever; testers' only till 2026-11-15: tester = listed only with
 	-- the Shoulder Cam unlocked, ns.ShoulderCamUnlocked). Its HUD centered on
 	-- the personal resource display, which fights bring up in place of the
 	-- player frame, and slides with you.

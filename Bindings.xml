@@ -59,6 +59,8 @@
 	<Binding name="CINEMATIC_STOPCAM" category="Cinematic">
 		Cinematic_StopCamera()
 	</Binding>
+	<Binding name="CLICK CinematicShoulderSwapButton:LeftButton" category="Cinematic">
+	</Binding>
 	<Binding name="CINEMATIC_CUSTOMTRIGGER1" category="Cinematic">
 		Cinematic_CustomTrigger(1)
 	</Binding>

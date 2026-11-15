@@ -28,6 +28,8 @@
       line: "Every camera, what starts it, the Cameras page and depth of field." },
     { section: "guides", path: "guides/flight-cam.html", title: "Flight Cam",
       line: "Takeoff, sway, fly-bys and landing, and how each route is timed." },
+    { section: "guides", path: "guides/shoulder-cam.html", title: "Shoulder Cam",
+      line: "The camera over your shoulder: your spot, swapping sides, turning and frames that follow." },
     { section: "guides", path: "guides/look.html", title: "Look and mood",
       line: "Tints, time of day, zone moods, inn glow, weather, letterbox and vignette." },
     { section: "guides", path: "guides/music.html", title: "Music and sound",

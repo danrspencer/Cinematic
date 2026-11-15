@@ -352,14 +352,6 @@ local function HandleSlash(msg)
 			ns.Print("verbose logging (everything logged, errors and blocked actions shown in chat): "
 				.. OnOff(ns.db.verboseLog) .. (ns.db.verboseLog and ". Reproduce the problem, then /cine log." or ""))
 		end
-	elseif cmd == "testshoulder" then
-		-- (Shoulder Cam's soft release: unlocks it for a tester, ShoulderCam.lua.)
-		if ns.isDev then return ns.Print("Shoulder Cam: always there in the dev copy") end
-		ns.db.shoulderCamTester = not ns.db.shoulderCamTester or nil
-		if not ns.db.shoulderCamTester and ns.ApplyShoulderCam then ns.ApplyShoulderCam() end
-		ns.Print(ns.db.shoulderCamTester
-			and "Shoulder Cam test: unlocked. /reload, then it's on the Cameras page (Dev section). Type it again to lock it."
-			or "Shoulder Cam test: locked, your camera settings are back. /reload to hide its page.")
 	elseif cmd == "selftest" or (cmd == "debug" and arg == "selftest") then
 		ns.SelfTest() -- (SelfTest.lua)
 	elseif cmd == "debug" and arg == "record" then

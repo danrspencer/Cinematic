@@ -11,6 +11,10 @@
 local _, ns = ...
 
 ns.CHANGELOG_FEATURES = {
+	{ date = "2026-11-15", page = "Shoulder Cam", title = "Shoulder Cam",
+		text = "An over-the-shoulder camera: you sit to one side of the screen and stay there as you zoom. Swap " ..
+		"shoulders with a key, turn toward the NPCs you talk to and the enemies you target, and let your cast bar " ..
+		"and resources slide along with you." },
 	{ date = "2026-11-14", page = "Name Style", title = "Plate and name themes",
 		text = "Nameplate Style and Name Style each have a strip of themes: one made from each main theme, plus " ..
 		"Clean, Minimal, Bold, Subtle, Storybook, Subtitle and Lantern. Pick one there and it stays when you change " ..

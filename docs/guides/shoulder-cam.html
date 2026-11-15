@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Cinematic Shoulder Cam</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="../assets/site.css">
+<script src="../assets/site.js" defer></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Marcellus+SC&family=Barlow:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a letterboxed opening frame, then one reading column; the camera to try sits in it as a small game window. */
+:root {
+  --bg: #eef1f4; --surface: #ffffff; --fg: #1b2129; --muted: #58626e; --line: #d2d8df;
+  --accent: #8a6400; --accent-soft: #f2e6c2;
+  --bar: #0b0d10; --bar-fg: #e9e4d8; --gold: #e2b53f;
+  --win-bg: #121418; --win-panel: #1b1e23; --win-edge: #3b3f46; --win-fg: #ece9e2; --win-dim: #9a9ca2;
+  --font-display: "Marcellus SC", Georgia, serif;
+  --font-body: "Barlow", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #13171c; --surface: #1b2026; --fg: #e3e6ea; --muted: #9aa3ad; --line: #2e353d;
+  --accent: #e2b53f; --accent-soft: #3a3120; --bar: #050607; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #13171c; --surface: #1b2026; --fg: #e3e6ea; --muted: #9aa3ad; --line: #2e353d;
+  --accent: #e2b53f; --accent-soft: #3a3120; --bar: #050607; color-scheme: dark }
+* { box-sizing: border-box }
+html { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px) }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 17px/1.6 var(--font-body); padding-block: 0 }
+.gutter { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)) }
+.col { max-width: 760px; margin: 0 auto; display: grid; gap: 56px }
+.col > *, section > * { min-width: 0 }
+h1, h2 { font-family: var(--font-display); font-weight: 400; text-wrap: balance; margin: 0 }
+h1 { font-size: clamp(34px, 7vw, 58px); line-height: 1.05; letter-spacing: .01em }
+h2 { font-size: 28px; line-height: 1.2 }
+p { margin: 0 }
+.muted { color: var(--muted) }
+code { font-family: var(--font-mono); font-size: .86em; background: var(--accent-soft); padding: 1px 5px; border-radius: 3px }
+section { display: grid; gap: 14px }
+.eyebrow { font: 600 13px/1 var(--font-body); letter-spacing: .14em; text-transform: uppercase; color: var(--accent) }
+
+.hero { background: var(--bar); color: var(--bar-fg) }
+.hero .band { height: clamp(28px, 6vw, 56px); background: #000 }
+.hero .frame { padding-block: clamp(36px, 7vw, 72px); background:
+  radial-gradient(120% 90% at 50% 40%, #2b3240 0%, #151a22 55%, #0b0d10 100%) }
+.hero .inner { max-width: 760px; margin: 0 auto; display: grid; gap: 14px }
+.hero .eyebrow { color: var(--gold) }
+.hero p { font-size: 19px; max-width: 58ch; color: #cfcabe }
+
+.where { display: flex; flex-wrap: wrap; gap: 6px }
+.client { font: 600 12px/1 var(--font-body); letter-spacing: .04em; color: var(--accent); border: 1px solid currentColor; border-radius: 4px; padding: 4px 7px }
+
+.opts { display: grid; gap: 0; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); overflow: hidden }
+.opt { padding: 11px 16px; border-top: 1px solid var(--line); display: grid; gap: 2px }
+.opt:first-child { border-top: 0 }
+.opt .l { font-weight: 600 }
+.opt .d { color: var(--muted); font-size: 15.5px }
+.note { border-left: 3px solid var(--accent); padding: 4px 0 4px 14px; color: var(--muted) }
+
+/* The camera to try: a game window */
+.win { background: var(--win-bg); color: var(--win-fg); border: 1px solid var(--win-edge); border-radius: 6px; overflow: hidden; font-size: 15.5px }
+.win-top { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 14px;
+  border-bottom: 1px solid var(--win-edge); background: var(--win-panel) }
+.win-title { font: 400 20px var(--font-display); color: var(--gold) }
+.scene { position: relative; height: 210px; overflow: hidden; background: linear-gradient(#5b6f84 0%, #8f8a6c 52%, #3d4a33 53%, #26301f 100%) }
+.scene .mid { position: absolute; left: 50%; top: 0; bottom: 0; border-left: 1px dashed rgba(255,255,255,.35) }
+.scene .you { position: absolute; bottom: 26px; width: 26px; height: 70px; margin-left: -13px; border-radius: 13px 13px 4px 4px;
+  background: linear-gradient(#d8c39a, #6d5532); box-shadow: 0 0 0 2px rgba(0,0,0,.45) }
+.scene .prd { position: absolute; bottom: 8px; width: 70px; height: 8px; margin-left: -35px; border-radius: 2px;
+  background: linear-gradient(90deg, #3fae53 70%, #1f3a24 70%); box-shadow: 0 0 0 1px #000 }
+.controls { display: grid; gap: 12px; padding: 14px 16px }
+.row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px }
+.row label { color: var(--win-dim) }
+.row input[type=range] { flex: 1 1 160px; accent-color: var(--gold) }
+.row output { min-width: 3.5em; color: var(--win-fg); font-weight: 600 }
+.btn { font: 600 15px var(--font-body); color: var(--win-fg); background: #2a2e35; border: 1px solid var(--win-edge); border-radius: 5px; padding: 6px 12px; cursor: pointer }
+.btn:hover { background: #34383f }
+.btn:focus-visible, input:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px }
+.state { color: var(--win-dim); font-size: 14.5px }
+
+dl.faq { display: grid; gap: 16px; margin: 0 }
+dl.faq dt { font-weight: 600 }
+dl.faq dd { margin: 2px 0 0; color: var(--muted) }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="band"></div>
+  <div class="frame gutter">
+    <div class="inner">
+      <div class="eyebrow">Cinematic · Shoulder Cam</div>
+      <h1>Over your shoulder</h1>
+      <p>The camera sits over your shoulder, with you off to one side of the screen, like a third-person adventure. Cinematic keeps you on your spot as you zoom, eases out of the way when it should, and lets your cast bar and resources slide along with you.</p>
+    </div>
+  </div>
+  <div class="band"></div>
+</header>
+
+<main class="gutter" style="padding-block:48px 40px">
+<div class="col">
+
+  <section>
+    <div class="eyebrow">Getting started</div>
+    <h2>Turning it on</h2>
+    <div class="where"><span class="client">WoW Forever</span><span class="client">Retail</span></div>
+    <p>It's the <b>Shoulder Cam</b> page in the Camera hub. Switch it on and Cinematic asks once: it uses one of Blizzard's experimental camera settings, and the game would otherwise warn about that every time you log in. While it's on, the game's <b>Keep Character Centered</b> and motion sickness options are turned off, because they stop it. Turn the Shoulder Cam off and all your own camera settings come back.</p>
+    <p>On WoW Forever, the <b>Shoulder Cam</b> profile turns it on for you, with a layout made for it: your resources, cast bar and Cooldown Manager at the bottom middle, sliding along with you.</p>
+  </section>
+
+  <section>
+    <div class="eyebrow">Try it</div>
+    <h2>Your spot on the screen</h2>
+    <div class="win">
+      <div class="win-top"><span class="win-title">Shoulder Cam</span><span class="state" id="state">Over your right shoulder</span></div>
+      <div class="scene" aria-hidden="true">
+        <div class="mid"></div>
+        <div class="you" id="you"></div>
+        <div class="prd" id="prd"></div>
+      </div>
+      <div class="controls">
+        <div class="row"><label for="spot">Spot on screen</label><input id="spot" type="range" min="5" max="40" step="1" value="20"><output id="spotOut">20%</output></div>
+        <div class="row">
+          <button class="btn" type="button" id="swap">Swap shoulders</button>
+          <button class="btn" type="button" id="self">Target yourself</button>
+          <button class="btn" type="button" id="indoor">Go indoors</button>
+        </div>
+      </div>
+    </div>
+    <p class="muted">The dashed line is the middle of the screen. Swap shoulders glides across over 1.5 seconds; targeting yourself puts you in the middle at once (the game does that) and clearing it glides you back over 1 second; going indoors eases you behind over 0.9 seconds.</p>
+  </section>
+
+  <section>
+    <div class="eyebrow">The Shoulder Cam page</div>
+    <h2>Shoulder</h2>
+    <div class="opts">
+      <div class="opt"><span class="l">Show in</span><span class="d">Where it's on. To start with: not indoors, not in a dungeon, raid or other instance, and not mounted. Everywhere else it puts the camera over your shoulder; tick <b>Always</b> to have it everywhere.</span></div>
+      <div class="opt"><span class="l">Left shoulder, and the swap key beside it</span><span class="d">Unticked, the camera looks over your right shoulder and you sit left of the middle. The key flips sides; bind it here or in the game's Key Bindings (Cinematic, <b>Swap shoulders (Shoulder Cam)</b>).</span></div>
+      <div class="opt"><span class="l">Spot on screen</span><span class="d">How far off the middle you sit, as a share of the way to the edge: 20% to start with, 5% to 40%. The camera moves as you zoom to keep you there, and eases you back to the middle when you zoom right in. Zoomed far out it stops moving further, so a wall pulling the camera in can't throw you off screen.</span></div>
+      <div class="opt"><span class="l">Swap takes</span><span class="d">How long the camera takes to cross to the other shoulder: 1.5 seconds to start with. At 0 it's the game's own quick swap.</span></div>
+      <div class="opt"><span class="l">Back from targeting yourself</span><span class="d">With yourself targeted the game puts you in the middle, and nothing can change that. This is how long the way back over your shoulder takes as you clear the target: 1 second to start with.</span></div>
+      <div class="opt"><span class="l">Off and on again takes</span><span class="d">How long the camera takes to go behind you as you go indoors, mount or leave where Show in has it, and to come back after: 0.9 seconds to start with.</span></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="eyebrow">Turning</div>
+    <h2>Looking at who matters</h2>
+    <div class="opts">
+      <div class="opt"><span class="l">Turn to NPCs you talk to</span><span class="d">As you talk to an NPC (a quest giver, vendor, banker, trainer or flight master), the camera turns slowly to bring them toward the middle, and back as you close the window. <b>NPC turn takes</b>, <b>NPC turn back takes</b> and <b>Look at them for</b> set its pace.</span></div>
+      <div class="opt"><span class="l">Turn to enemy</span><span class="d">As you target an enemy, the camera turns slowly toward it, and glides back once you clear it. It has a Show in row of its own: out of fights to start with (the rule <code>not combat</code>). <b>Enemy turn takes</b> sets its pace.</span></div>
+    </div>
+    <p class="note">It only turns to enemies. Targeting a friendly guard or another player doesn't turn the camera; talking to an NPC does.</p>
+  </section>
+
+  <section>
+    <div class="eyebrow">Frames</div>
+    <h2>Frames that follow you</h2>
+    <p>With you off to the side, your cast bar and Personal Resource Display would sit in the middle of the screen, away from you. <b>Frames follow you</b>, on the page's Frames tab, slides them over to where you are, and back as the camera goes behind you. Edit Mode still places them; this moves them from there.</p>
+    <div class="opts">
+      <div class="opt"><span class="l">Frames follow the turn</span><span class="d">Adds to Frames follow you: as Turn to enemy turns the camera, the frames slide along too. Worked out from where you clicked, so it's a little experimental.</span></div>
+      <div class="opt"><span class="l">Which frames</span><span class="d">A tick each: cast bar, Personal Resource Display, swing timers, the Cooldown Manager's rows, tracked buffs and spell alerts. A frame placed on a ticked one in Edit Mode slides with it.</span></div>
+      <div class="opt"><span class="l">Height (all), Follow strength</span><span class="d">Raise the frames while the camera's over your shoulder (each also has its own height on its row), and slide them further or less far if they land short of you or past you.</span></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="eyebrow">Cameras</div>
+    <h2>When Cinematic's own cameras play</h2>
+    <p>The <b>Cameras</b> tab has a tick for each of Cinematic's cameras. Unticked, the camera goes back behind you while that one plays and comes back after; ticked, you keep your spot as the camera turns round you. Beside each, the seconds the move takes.</p>
+    <div class="opts">
+      <div class="opt"><span class="l">Ticked to start with</span><span class="d">The walk and auto-run cameras.</span></div>
+      <div class="opt"><span class="l">Unticked to start with</span><span class="d">Vista, fish, cozy, AFK, tele (Hearthstone and teleports), flight, death, quest and chat cameras, and your own cameras.</span></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="eyebrow">Calibrate</div>
+    <h2>Sitting in the right place</h2>
+    <p>How far the offset moves you depends on your character's size. Cinematic knows the races, but if you sit too far to the side or too close to the middle (in a form, say), the <b>Calibrate</b> tab measures you: stand still on open, flat ground and it says a line in <code>/say</code> a few times while it reads where you are. <b>Share</b> sends us the numbers so everyone gets them.</p>
+  </section>
+
+  <section>
+    <div class="eyebrow">Questions</div>
+    <h2>Good to know</h2>
+    <dl class="faq">
+      <div><dt>Why does the camera jump to the middle when I target myself?</dt><dd>The game does that, and while you're your own target it ignores the shoulder offset completely. When you clear the target, the camera glides back over <b>Back from targeting yourself</b>.</dd></div>
+      <div><dt>It doesn't work with the gamepad UI.</dt><dd>Not yet: in gamepad mode the game holds your character in the middle. The Shoulder Cam waits behind you and comes back when the gamepad UI is off.</dd></div>
+      <div><dt>I use DynamicCam.</dt><dd>DynamicCam sets the same shoulder offset, so the Shoulder Cam stands aside for it.</dd></div>
+      <div><dt>How do I go back to my old camera?</dt><dd>Turn the Shoulder Cam off. Every camera setting it changed is put back as you had it.</dd></div>
+    </dl>
+  </section>
+
+</div>
+</main>
+
+<script>
+(function () {
+  var you = document.getElementById("you"), prd = document.getElementById("prd"), state = document.getElementById("state");
+  var spot = document.getElementById("spot"), spotOut = document.getElementById("spotOut");
+  var side = 1, sideNow = 1, blend = 1, blendWant = 1, selfTarget = false, indoors = false;
+  var times = { swap: 1.5, blend: 0.9 }, blendTime = 0.9, last = null;
+  var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  function ease(p) { return p * p * (3 - 2 * p) }
+  function frame(now) {
+    var dt = last === null ? 0 : Math.min(0.25, (now - last) / 1000); last = now;
+    var step = reduce ? 2 : dt * 2 / times.swap;
+    sideNow = side > sideNow ? Math.min(side, sideNow + step) : Math.max(side, sideNow - step);
+    var bstep = reduce ? 1 : dt / Math.max(0.01, blendTime);
+    blend = blendWant > blend ? Math.min(blendWant, blend + bstep) : Math.max(blendWant, blend - bstep);
+    var factor = 2 * ease((sideNow + 1) / 2) - 1;
+    // (Right shoulder: you sit left of the middle.)
+    var x = selfTarget ? 0 : -factor * ease(blend) * spot.value / 100;
+    var pct = 50 + x * 50;
+    you.style.left = pct + "%"; prd.style.left = pct + "%";
+    requestAnimationFrame(frame);
+  }
+  function say() {
+    state.textContent = selfTarget ? "Yourself targeted: the game centers you"
+      : indoors ? "Indoors: behind you"
+      : "Over your " + (side > 0 ? "right" : "left") + " shoulder";
+  }
+  spot.addEventListener("input", function () { spotOut.textContent = spot.value + "%" });
+  document.getElementById("swap").addEventListener("click", function () { side = -side; say() });
+  var selfBtn = document.getElementById("self");
+  selfBtn.addEventListener("click", function () {
+    selfTarget = !selfTarget;
+    selfBtn.textContent = selfTarget ? "Clear target" : "Target yourself";
+    // (While targeted, the offset eases out unseen; clearing it eases back in over 1 s.)
+    blendTime = 1; blendWant = selfTarget || indoors ? 0 : 1;
+    if (selfTarget) blend = 0;
+    say();
+  });
+  var indoorBtn = document.getElementById("indoor");
+  indoorBtn.addEventListener("click", function () {
+    indoors = !indoors;
+    indoorBtn.textContent = indoors ? "Go outside" : "Go indoors";
+    blendTime = times.blend; blendWant = indoors || selfTarget ? 0 : 1;
+    say();
+  });
+  say();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
