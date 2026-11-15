@@ -9179,18 +9179,23 @@ local function CreateNameStylePanel()
 	caption.searchSkip = true
 	local spots = {}
 	for i in ipairs(SPOTS) do spots[i] = MakeSample(scene) end
+	-- (The names grow with the scene, however big the page makes it: at the
+	-- game's size they were specks in a screen-shaped scene.)
+	local sceneScale = 1
 	local function PlaceSpots(_, width, height)
+		width, height = width or SCENE_W, height or SCENE_H
+		sceneScale = math.max(1, math.min(1.8, width / 340))
 		for i, spot in ipairs(SPOTS) do
 			spots[i].text:ClearAllPoints()
-			spots[i].text:SetPoint("CENTER", scene, "TOPLEFT", (width or SCENE_W) * spot[2],
-				-(height or SCENE_H) * spot[3])
+			spots[i].text:SetPoint("CENTER", scene, "TOPLEFT", width * spot[2], -height * spot[3])
 		end
+		if scene.Refresh and ns.db then scene:Refresh() end
 	end
 	PlaceSpots(nil, SCENE_W, SCENE_H)
 	scene:HookScript("OnSizeChanged", PlaceSpots)
 	function scene:Refresh()
 		for i, spot in ipairs(SPOTS) do
-			DrawSample(spots[i], spot[1], nil, spot[1] == "Target" and 1.25 or 1)
+			DrawSample(spots[i], spot[1], nil, (spot[1] == "Target" and 1.25 or 1) * sceneScale)
 		end
 		for _, preview in pairs(panels) do
 			if preview:IsVisible() then preview:Refresh() end
