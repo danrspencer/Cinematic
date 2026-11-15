@@ -8533,6 +8533,17 @@ ticker:SetScript("OnEvent", ns.Profiled("Core events", function(self, event, arg
 			if not ns.playerMoving or ns.OnTaxi() or AnyMovementKey() then
 				return false
 			end
+			-- Moving by our flag but the game says you're standing (a speed read
+			-- wrong while loading set the flag, and no stop event ever comes for a
+			-- move that never started): not moving at all. (Not mid-glide, where
+			-- the game can say you've stopped, see stopWhileGliding.)
+			if IsPlayerMoving and not ns.GlidingSpeed() then
+				local okMoving, moving = pcall(IsPlayerMoving)
+				if okMoving and not (issecretvalue and issecretvalue(moving)) and moving == false then
+					ns.playerMoving, ns.autoRunning = false, false
+					return false
+				end
+			end
 			-- (Not while flying on retail: a skyriding glide carries you on with
 			-- no key held, so it would pass for auto-run.)
 			if not ns.autoRunning and GetTime() - (ns.movingSince or GetTime()) > AUTORUN_INFER_AFTER
