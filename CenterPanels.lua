@@ -647,7 +647,13 @@ local BAG_LEFT = 48
 
 -- The loot window isn't one of them either: the game puts it in its own spot
 -- (or under the mouse, with that option on) each time it opens. It's put back
--- where it was dropped after that.
+-- where it was dropped after that. Not with "Open loot window at mouse" on:
+-- the game's option wins (a drop once, even by accident, kept it from ever
+-- opening at the mouse again). It can still be dragged while it's open.
+local function UnderMouse(frame)
+	return frame == LootFrame and GetCVarBool and GetCVarBool("lootUnderMouse") and true or false
+end
+
 local function PlaceOther(frame, left)
 	if not (ns.db and frame and frame.GetPoint) then
 		return
@@ -659,7 +665,7 @@ local function PlaceOther(frame, left)
 		handles[frame]:SetShown(StripShown(ns.Setting("dragPanels")))
 	end
 	local spot = Spot(frame)
-	if spot and not Held(frame) and ns.Flag(frame:IsShown()) and not Locked(frame) then
+	if spot and not Held(frame) and ns.Flag(frame:IsShown()) and not Locked(frame) and not UnderMouse(frame) then
 		frame:ClearAllPoints()
 		frame:SetPoint(spot[1], UIParent, spot[2], spot[3], spot[4])
 	end
