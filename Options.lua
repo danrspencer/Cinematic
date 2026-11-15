@@ -3155,6 +3155,9 @@ local function RegisterSubpage(subpanel, name, shown)
 	end)
 	subpanel.pageWatch = watch
 	subpages[name] = subpanel
+	-- (Kept by name for good, hub pages too: ns.SettingsPageCanvas.)
+	ns.settingsCanvases = ns.settingsCanvases or {}
+	ns.settingsCanvases[name] = subpanel
 	local page = { name = shown or L[name], key = name, canvas = subpanel }
 	searchPages[#searchPages + 1] = page
 	ns.WatchSettingsCanvas(subpanel)
@@ -17038,7 +17041,7 @@ local MOVED_PAGES = { ["Combat Vision"] = "Card Vision", ["Story Vision"] = "Car
 	["Story Style"] = "Card Style" }
 -- A settings page's canvas by its name (RegisterSubpage's), for the test
 -- commands that open and read pages (StyleSixTest.lua).
-function ns.SettingsPageCanvas(name) return subpages[name] end
+function ns.SettingsPageCanvas(name) return subpages[name] or (ns.settingsCanvases and ns.settingsCanvases[name]) end
 
 function ns.OpenOptions(page)
 	page = MOVED_PAGES[page] or page

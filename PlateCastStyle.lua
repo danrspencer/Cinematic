@@ -1592,7 +1592,7 @@ function ns.CreatePlateCastStylePanel(kit)
 					list[#list + 1] = { value = "game", text = L["The game's look"],
 						tip = L["Cinematic leaves them alone. Their size stays the game's either way (yours is sized in Edit Mode)."] }
 				end
-				list[#list + 1] = { value = "default", text = L["Same as the Default row"],
+				list[#list + 1] = { value = "default", text = L["Default row's"],
 					tip = L["They look as the Default row says."] }
 				list[#list + 1] = { value = "own", text = L["Their own look"],
 					tip = L["They look as their Look panel says. Its settings start as the Default row's, and are kept " ..
@@ -1626,10 +1626,8 @@ function ns.CreatePlateCastStylePanel(kit)
 		end)
 		function button.Refresh(self)
 			local db = ns.GetDB()
-			local look = LookPick(id)
-			local words = look == "game" and L["The game's"] or look == "default" and L["Default row's"]
-				or (id and db and db["plateCastOwn_" .. id]) and L["Its own"] or L["Look"]
-			self:SetText(words)
+			-- (Just Look: the pick beside it says whose look it is.)
+			self:SetText(L["Look"])
 			self:SetWidth(math.max(110, self:GetFontString():GetStringWidth() + 30))
 			self:SetEnabled(rows.On(db) and true or false)
 		end

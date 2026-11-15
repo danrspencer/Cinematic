@@ -611,7 +611,7 @@ function ns.CreateRaidStylePanel(kit)
 				return db and db["rfOwn_" .. id] and "own" or "default"
 			end, set = function(value) SetOwn(id, value == "own") end }, function()
 				return {
-					{ value = "default", text = L["Same as the Default row"], tip = L["This group looks as the Default row says."] },
+					{ value = "default", text = L["Default row's"], tip = L["This group looks as the Default row says."] },
 					{ value = "own", text = L["Its own look"], tip = L["This group looks as its Look panel says. Its " ..
 						"settings start as the Default row's, and are kept while you pick the Default row's again."] },
 				}
@@ -642,11 +642,10 @@ function ns.CreateRaidStylePanel(kit)
 		end)
 		function button.Refresh(self)
 			local db = ns.GetDB()
-			local own = id and db and db["rfOwn_" .. id]
 			-- (Party in its own frames, not raid-style: the Unit frames page's.)
 			local unitParty = id == "PARTY" and not (ns.RaidStyleParty and ns.RaidStyleParty())
-			self:SetText(unitParty and L["Unit Frames page's"] or id and not own and L["Default row's"]
-				or own and L["Its own"] or L["Look"])
+			-- (Just Look: the pick beside it says whose look it is.)
+			self:SetText(unitParty and L["Unit Frames page's"] or L["Look"])
 			self:SetWidth(math.max(110, self:GetFontString():GetStringWidth() + 30))
 			self:SetEnabled(rows.On(db) and true or false)
 		end
