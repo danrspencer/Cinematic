@@ -1244,12 +1244,27 @@ function ns.CreatePlateCastStylePanel(kit)
 	-- Three small plates side by side, as the game lays one out: the health
 	-- bar with the unit's name in it (here what the sample shows), the cast
 	-- bar under it.
-	local GAP = 14
-	local left = -(3 * SAMPLE_W + 2 * GAP) / 2 -- (from the middle, however wide the page makes it)
+	-- (Spread over the scene as plates over units, each scaled with however
+	-- big the page makes the preview: in one row at one size they sat close
+	-- together at its top, the rest of it empty.)
+	local SPOTS = { { 0.24, 0.3 }, { 0.5, 0.58 }, { 0.76, 0.3 } }
+	local plates = {}
+	local function PlaceSamples(_, width, height)
+		width, height = width or PREVIEW_W, height or PREVIEW_H
+		local scale = math.max(1, math.min(1.6, width / 340))
+		for i, plate in ipairs(plates) do
+			plate:SetScale(scale)
+			plate:ClearAllPoints()
+			plate:SetPoint("CENTER", preview, "TOPLEFT", width * SPOTS[i][1] / scale, -height * SPOTS[i][2] / scale)
+		end
+	end
 	for i, info in ipairs(SAMPLES) do
-		local health = CreateFrame("StatusBar", nil, preview)
+		local plate = CreateFrame("Frame", nil, preview)
+		plate:SetSize(SAMPLE_W, 26)
+		plates[i] = plate
+		local health = CreateFrame("StatusBar", nil, plate)
 		health:SetSize(SAMPLE_W, 13)
-		health:SetPoint("TOPLEFT", preview, "TOP", left + (i - 1) * (SAMPLE_W + GAP), -42)
+		health:SetPoint("TOP", plate, "TOP", 0, 0)
 		health:SetStatusBarTexture(FILLS.flat)
 		health:SetStatusBarColor(0.8, 0.1, 0.1)
 		health:SetMinMaxValues(0, 1)
@@ -1265,11 +1280,13 @@ function ns.CreatePlateCastStylePanel(kit)
 		name:SetWordWrap(false)
 		name:SetText(L[info[1]])
 		name.searchSkip = true
-		local bar = MakeSample(preview, info)
+		local bar = MakeSample(plate, info)
 		bar:SetPoint("TOP", health, "BOTTOM", 0, -2)
 		bar.offset = (i - 1) * 0.3
 		samples[i] = bar
 	end
+	PlaceSamples(nil, PREVIEW_W, PREVIEW_H)
+	preview:HookScript("OnSizeChanged", PlaceSamples)
 	-- (A look with some settings in place of its own: a choice pointed at in a
 	-- Look panel, never saved. General's picked: as the row's own resolves it.)
 	local function LookOver(id, over)
