@@ -861,6 +861,9 @@ function ns.PrintQuestMobDebug()
 	if ns.DescribeEQoLMarker then
 		for _, line in ipairs(ns.DescribeEQoLMarker(unit)) do ns.Print("  " .. line) end
 	end
+	if ns.LowLevelGiverReport then
+		for _, line in ipairs(ns.LowLevelGiverReport(unit)) do ns.Print("  " .. line) end
+	end
 	ns.Print("  " .. ns.DescribeQuestSpent(unit))
 	ns.Print("  " .. ns.DescribeQuestKills(unit))
 	local info, lineTypes = C_TooltipInfo, Enum and Enum.TooltipDataLineType
@@ -1061,6 +1064,135 @@ do
 		return giverFiles
 	end
 
+	-- Low-level quest givers: the cursor is the same for a low-level ("trivial",
+	-- grey) quest as for any other (tested 2026-11-15, Renato Gallina,
+	-- Stormwind), and nothing else says what an NPC offers before you talk to
+	-- them. So it's learned as you talk: an NPC whose quests on offer are all
+	-- low level is kept (ns.db.lowLevelGivers, npc id -> name) and doesn't count
+	-- for a quest on offer, until it offers one that isn't (then it's dropped).
+	-- With the game's own low-level quests showing (minimap tracking), they
+	-- all count as before.
+	local low = {}
+
+	function low.NpcID(unit)
+		local ok, guid = pcall(UnitGUID, unit)
+		if not (ok and Known(guid) and type(guid) == "string") then return nil end
+		local kind, _, _, _, _, id = strsplit("-", guid)
+		if kind ~= "Creature" and kind ~= "Vehicle" then return nil end
+		return tonumber(id)
+	end
+
+	-- Every quest on offer in the open talk: a list of true (low level) or
+	-- false, or nil when the game doesn't say.
+	function low.OffersNow(event)
+		local offers = {}
+		if event == "GOSSIP_SHOW" then
+			local info = C_GossipInfo
+			if not (info and info.GetAvailableQuests) then return nil end
+			for _, quest in ipairs(info.GetAvailableQuests() or {}) do
+				offers[#offers + 1] = quest.isTrivial == true
+			end
+		elseif event == "QUEST_GREETING" then
+			if not (GetNumAvailableQuests and GetAvailableQuestInfo) then return nil end
+			for i = 1, GetNumAvailableQuests() or 0 do
+				local isTrivial = GetAvailableQuestInfo(i)
+				offers[#offers + 1] = isTrivial == true
+			end
+		end
+		return offers
+	end
+
+	function low.Learn(event)
+		local db = ns.db
+		if not db then return end
+		local id = low.NpcID("npc")
+		local offers = id and low.OffersNow(event)
+		-- (Nothing on offer: only quests to hand in, or none; left as it was.)
+		if not (offers and #offers > 0) then return end
+		local onlyLow = true
+		for _, isLow in ipairs(offers) do
+			if not isLow then onlyLow = false break end
+		end
+		if onlyLow then
+			local name = UnitName("npc")
+			db.lowLevelGivers = db.lowLevelGivers or {}
+			db.lowLevelGivers[id] = Known(name) and type(name) == "string" and name or true
+			ns.Log("questgivers", ("low level only, not counted from now: %s (%d)"):format(tostring(name), id))
+		elseif db.lowLevelGivers and db.lowLevelGivers[id] then
+			db.lowLevelGivers[id] = nil
+			ns.Log("questgivers", ("offers a quest that isn't low level, counted again: npc %d"):format(id))
+		end
+	end
+
+	low.events = CreateFrame("Frame")
+	low.events:RegisterEvent("GOSSIP_SHOW")
+	low.events:RegisterEvent("QUEST_GREETING")
+	low.events:SetScript("OnEvent", function(_, event)
+		local ok, err = pcall(low.Learn, event)
+		if not ok then ns.Log("questgivers", "learning low-level givers failed: " .. tostring(err)) end
+	end)
+
+	-- Whether the game shows low-level quests now (its minimap tracking menu),
+	-- and how that was read, for /cine debug questmob. (Each client names the
+	-- entry; the game's own label for it first, then the English one.)
+	function low.Shown()
+		local label = _G.MINIMAP_TRACKING_TRIVIAL_QUESTS
+		local function Matches(name)
+			if type(name) ~= "string" or not Known(name) then return false end
+			if label and name == label then return true end
+			local lower = name:lower()
+			return lower:find("low level", 1, true) ~= nil or lower:find("low-level", 1, true) ~= nil
+				or lower:find("trivial", 1, true) ~= nil
+		end
+		local api = C_Minimap and C_Minimap.GetNumTrackingTypes and C_Minimap
+			or (_G.GetNumTrackingTypes and { GetNumTrackingTypes = _G.GetNumTrackingTypes,
+				GetTrackingInfo = _G.GetTrackingInfo })
+		if not (api and api.GetTrackingInfo) then return false, "no tracking menu" end
+		for i = 1, api.GetNumTrackingTypes() or 0 do
+			local first, _, active = api.GetTrackingInfo(i)
+			local name = first
+			if type(first) == "table" then name, active = first.name, first.active end
+			if Matches(name) then
+				return active == true, ("tracking menu: %s %s"):format(tostring(name), active and "on" or "off")
+			end
+		end
+		return false, "no low-level entry in the tracking menu"
+	end
+
+	-- For /cine debug questmob: the tracking menu's entries, the low-level
+	-- read, and whether unit is kept as a low-level giver.
+	function ns.LowLevelGiverReport(unit)
+		local shown, how = false, nil
+		local ok = pcall(function() shown, how = low.Shown() end)
+		local entries = {}
+		pcall(function()
+			local api = C_Minimap and C_Minimap.GetNumTrackingTypes and C_Minimap
+				or { GetNumTrackingTypes = _G.GetNumTrackingTypes, GetTrackingInfo = _G.GetTrackingInfo }
+			for i = 1, api.GetNumTrackingTypes() or 0 do
+				local first, _, active = api.GetTrackingInfo(i)
+				local name = first
+				if type(first) == "table" then name, active = first.name, first.active end
+				entries[#entries + 1] = ("%s=%s"):format(tostring(name), active and "on" or "off")
+			end
+		end)
+		local id = low.NpcID(unit)
+		local kept = id and ns.db and ns.db.lowLevelGivers and ns.db.lowLevelGivers[id]
+		local count = 0
+		for _ in pairs(ns.db and ns.db.lowLevelGivers or {}) do count = count + 1 end
+		local questie = ns.QuestieGiverNames and ns.QuestieGiverNames() or nil
+		local okName, name = pcall(UnitName, unit)
+		local questieSays = not (ns.db and ns.db.minimapQuestie == true) and "not used (Use Questie DB off)"
+			or not questie and "not used (Questie not loaded or unreadable)"
+			or (okName and Known(name) and questie[name]) and "shows a ! or ? for it" or "no ! or ? for it: not counted"
+		return {
+			"questie filter: " .. questieSays,
+			("low level: game shows them=%s (%s), this npc %s kept as low level only=%s, %d kept in all"):format(
+				tostring(shown), ok and tostring(how) or "read failed", tostring(id), tostring(kept ~= nil and kept ~= false),
+				count),
+			"  tracking menu: " .. (#entries > 0 and table.concat(entries, ", ") or "none"),
+		}
+	end
+
 	-- What the cursor over unit says: "offer", "turnin" or nil.
 	local function GiverKind(unit)
 		local cursor = CursorOf(unit)
@@ -1095,10 +1227,25 @@ do
 			look.at = now
 			local ok, names = pcall(function()
 				local found = {}
+				local kept = db.lowLevelGivers
+				local lowShown = kept and next(kept) ~= nil and select(2, pcall(low.Shown)) == true
+				-- (Use Questie DB ticked and Questie readable: only NPCs it shows a
+				-- "!" or "?" for count, so its own low-level setting decides, no
+				-- talking first. nil: not used, the learned list alone.)
+				local questie = db.minimapQuestie == true and ns.QuestieGiverNames and ns.QuestieGiverNames() or nil
 				for i = 1, 40 do
 					local unit = "nameplate" .. i
 					if UnitExists(unit) and not ns.Flag(UnitIsPlayer(unit)) then
 						local kind = GiverKind(unit)
+						-- (Only low-level quests on offer, by talking to them: not one.)
+						if kind == "offer" and kept and not lowShown then
+							local id = low.NpcID(unit)
+							if id and kept[id] then kind = nil end
+						end
+						if kind == "offer" and questie then
+							local name = UnitName(unit)
+							if Known(name) and type(name) == "string" and not questie[name] then kind = nil end
+						end
 						if kind == "offer" or (kind == "turnin" and db.minimapRevealTurnIns == true) then
 							local name = UnitName(unit)
 							found[#found + 1] = Known(name) and type(name) == "string" and name or "a quest giver"

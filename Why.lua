@@ -129,11 +129,23 @@ local function MinimapTrackingWhy(out)
 	if creatures then
 		Add(out, "on", L["Keep open: creature or fish tracking is on"], "Minimap", "minimapKeepOre")
 	end
-	local revealed, names, held = false, nil, false
-	if ns.MinimapRevealWhy then revealed, names, held = ns.MinimapRevealWhy(now) end
+	local revealed, names, held, kind = false, nil, false, nil
+	if ns.MinimapRevealWhy then revealed, names, held, kind = ns.MinimapRevealWhy(now) end
 	if revealed then
-		Add(out, "on", names and L["Reveal: the minimap shows %s"]:format(names)
-			or L["Reveal: something you ticked is on the minimap"], "Minimap")
+		-- (Said by what found it: a quest giver near you isn't on the minimap.)
+		if names and kind == "giver" then
+			Add(out, "on", L["Quest givers nearby: %s, close to you, has a quest for you"]:format(names),
+				"Minimap", "minimapQuestGivers")
+		elseif names and kind == "questie" then
+			Add(out, "on", L["Use Questie DB: Questie shows a quest near you (%s)"]:format(names),
+				"Minimap", "minimapQuestie")
+		elseif names and kind == "quest" then
+			Add(out, "on", L["Quest areas or turn-ins: %s is on the minimap"]:format(names),
+				"Minimap", "minimapRevealAreas")
+		else
+			Add(out, "on", names and L["Reveal: the minimap shows %s"]:format(names)
+				or L["Reveal: something you ticked is on the minimap"], "Minimap")
+		end
 		if held then
 			Add(out, "on", L["It was up as this fight started, so it stays up through it"], "Minimap")
 		end
@@ -166,6 +178,13 @@ end
 local function TriggerNow(key, n)
 	if key == "aura" then
 		return n.tick.buffPeekUp and L["You just gained or refreshed a buff"] or L["You just gained or refreshed a debuff"]
+	end
+	-- (Tracking or a Reveal box: only the one that's true now, not both.)
+	if key == "tracking" and ns.IsKeepingMinimapForTracking then
+		local gathering, creatures = ns.IsKeepingMinimapForTracking(GetTime())
+		local tracking = creatures or gathering and not ns.IsTrackingOffHere()
+		return tracking and L["The minimap is up for tracking (Keep open)"]
+			or L["The minimap is up: something a Reveal box looks for is near you"]
 	end
 	return L[({ chat = "A chat message is peeking", whisper = "A whisper is waiting to be read",
 		typing = "You're typing in chat", ping = "Someone pinged the minimap",

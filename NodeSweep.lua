@@ -1460,7 +1460,7 @@ local function Sweep()
 	end
 	if #wantedNames > 0 then
 		table.sort(wantedNames)
-		revealedBy = table.concat(wantedNames, ", ")
+		revealedBy, cursor.revealKind = table.concat(wantedNames, ", "), "map"
 	end
 	last.names, last.probes, last.step = table.concat(names, ", "), probes, STEP
 	PingNodes(found)
@@ -2090,7 +2090,7 @@ local function CursorSweep(all)
 		names[#names + 1] = ("%s (%s)"):format(name, ns.NodeKind(name))
 		if IsNode(name) and not all then
 			seenAt = GetTime()
-			revealedBy = name
+			revealedBy, cursor.revealKind = name, "map"
 			cursor.Keep(name, entry.list)
 			cursor.Mark()
 		end
@@ -2499,7 +2499,7 @@ local function QuestReveals(now, reveal)
 		if ok and wanted and #wanted > 0 then
 			table.sort(wanted)
 			seenAt = now
-			revealedBy = table.concat(wanted, ", ")
+			revealedBy, cursor.revealKind = table.concat(wanted, ", "), "quest"
 		end
 	end
 	return reveal and now - seenAt < HOLD or false
@@ -2525,6 +2525,8 @@ local heldIntoFight
 -- Use Questie DB, Support/QuestieMinimap.lua: Questie's own "!" and "?"
 -- icons near you. Each counts as found, on top of the rest; guarded there too.)
 local GIVER_CHECKS = { "QuestGiversRevealed", "QuestieMinimapRevealed" }
+-- (Which kind of reveal each is, for /cine why's line: cursor.revealKind.)
+cursor.GIVER_KIND = { QuestGiversRevealed = "giver", QuestieMinimapRevealed = "questie" }
 -- (/cine debug framepass: each minimap job's slowest call, Slash.lua.
 -- A field of cursor's: this file is near Lua's local limit.)
 function cursor.TimeNote(name, started)
@@ -2539,7 +2541,7 @@ local function GiversFound(now)
 		cursor.TimeNote(key, started)
 		if ok and shown then
 			seenAt = now
-			revealedBy = names
+			revealedBy, cursor.revealKind = names, cursor.GIVER_KIND[key]
 			any = true
 		end
 	end
@@ -2599,12 +2601,14 @@ end
 
 -- For /cine why: whether a reveal holds the minimap up now, what the sweep
 -- last found that revealed it (names, or nil), and whether it's held up
--- through a fight it was up at the start of.
+-- through a fight it was up at the start of; last, which kind of reveal
+-- found them ("map" a sweep, "quest" the quest log, "giver" a nameplate's
+-- quest cursor, "questie" Questie's icons).
 function ns.MinimapRevealWhy(now)
 	local givers = ns.QuestieMinimapOn and ns.QuestieMinimapOn()
 		or ns.db and ns.db.minimapQuestGivers == true and ns.QuestGiversPossible and ns.QuestGiversPossible()
 	if not (AnyReveal() or QuestReveal() or givers) or now - seenAt >= HOLD then return false end
-	return true, revealedBy, heldIntoFight == true
+	return true, revealedBy, heldIntoFight == true, cursor.revealKind
 end
 
 -- /cine debug nodeoffset: how far what the pretend mouse hears sits from
