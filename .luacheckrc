@@ -1,7 +1,7 @@
 -- luacheck config: WoW runs Lua 5.1. Run: luacheck .
 std = "lua51"
 max_line_length = false
-exclude_files = { "Release/" }
+exclude_files = { "Release/", ".claude/" } -- (.claude/worktrees: other sessions' copies)
 -- Style only, used on purpose here: empty if branches holding a comment, an
 -- unused self, reusing a name in an inner scope.
 ignore = { "542", "212/self", "421", "422", "431" }

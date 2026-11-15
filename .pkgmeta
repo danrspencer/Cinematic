@@ -9,6 +9,7 @@ ignore:
   - Tools
   - docs
   - .claude
+  - ARCHITECTURE.md
   # (Wind Guide: a demo, in the dev copy only, CinematicDev.toc)
   - WindGuide.lua
   - WindGuideStyles.lua

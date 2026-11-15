@@ -1,0 +1,48 @@
+#!/bin/sh
+# Cinematic's checks before every commit: luacheck, the TOC check and the
+# offline check (the addon loaded outside the game on both clients, which also
+# catches a file over Lua's 200-local cap). They run on what is being
+# committed (the index, a temporary one too), copied to a scratch folder, so
+# another session's unfinished edits in the working tree don't block a commit.
+#
+# On once per clone: git config core.hooksPath Tools/hooks
+# Skipped only when the user asks: CINE_SKIP_CHECKS=1 git commit ...
+
+[ -n "$CINE_SKIP_CHECKS" ] && { echo "pre-commit: checks skipped (CINE_SKIP_CHECKS)"; exit 0; }
+
+root=$(git rev-parse --show-toplevel) || exit 1
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/cine-precommit.XXXXXX") || exit 1
+trap 'rm -rf "$tmp"' EXIT
+
+# (What's staged, not the working tree. GIT_INDEX_FILE, when a commit uses a
+# temporary index, is honoured by both commands.)
+git ls-files -z -- '*.lua' '*.toc' '*.xml' .luacheckrc .pkgmeta 'Tools/*.py' 'Tools/offline/*' 'Fonts/*' \
+	| (cd "$root" && xargs -0 git checkout-index --prefix="$tmp/" --) || { echo "pre-commit: couldn't copy the staged files"; exit 1; }
+
+luacheck=$(command -v luacheck 2>/dev/null || command -v luacheck.exe 2>/dev/null)
+[ -z "$luacheck" ] && [ -x "$HOME/bin/luacheck.exe" ] && luacheck="$HOME/bin/luacheck.exe"
+[ -z "$luacheck" ] && [ -x "$HOME/bin/luacheck" ] && luacheck="$HOME/bin/luacheck"
+python=$(command -v python 2>/dev/null || command -v python3 2>/dev/null)
+
+failed=0
+cd "$tmp" || exit 1
+if [ -n "$luacheck" ]; then
+	"$luacheck" . -q --no-color || failed=1
+else
+	echo "pre-commit: luacheck not found, skipped"
+fi
+if [ -n "$python" ]; then
+	if [ -f Tools/check-toc.py ]; then "$python" -I Tools/check-toc.py || failed=1; fi
+	if command -v lua5.1 >/dev/null 2>&1; then
+		lua5.1 Tools/offline/check.lua || failed=1
+	else
+		"$python" -I Tools/offline/run.py Tools/offline/check.lua || failed=1
+	fi
+else
+	echo "pre-commit: python not found, TOC and offline checks skipped"
+fi
+
+if [ "$failed" != 0 ]; then
+	echo "pre-commit: checks failed, nothing committed. Fix the above and commit again."
+	exit 1
+fi

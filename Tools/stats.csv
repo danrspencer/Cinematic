@@ -1,0 +1,2 @@
+date,commit,commits,lua_files,code_lines,locale_lines,functions,funcs_over_300,longest_func,files_near_local_cap,migrations,saved_kb
+2026-11-15,06c1947,954,226,197536,44269,12849,43,4225,8,184,749

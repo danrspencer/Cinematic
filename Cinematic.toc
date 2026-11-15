@@ -114,8 +114,8 @@ Director.lua
 ZoomGuard.lua
 QuestCam.lua
 ShoulderCam.lua
-MultiQuestFix.lua
 ShoulderCalibrate.lua
+MultiQuestFix.lua
 SkyrideCam.lua
 CameraRows.lua
 TriggerLibrary.lua
@@ -151,8 +151,6 @@ CombatVision.lua
 Cards.lua
 CardsPage.lua
 Recap.lua
-DamageVision.lua
-DamageReport.lua
 ZoneCard.lua
 CardMoments.lua
 FlightLine.lua
@@ -184,6 +182,8 @@ ThemeShots.lua
 PageShots.lua
 VisionsStyle.lua
 EmoteVision.lua
+DamageVision.lua
+DamageReport.lua
 Focus.lua
 Tracking.lua
 NodeSweep.lua
