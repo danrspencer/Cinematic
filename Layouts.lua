@@ -497,8 +497,7 @@ ns.EDIT_MODE_LAYOUTS = {
 		or { design = FOREVER_PURE, client = "forever" },
 }
 -- (Not made on logging in, so it never takes one of the player's account
--- layout slots unasked: made when the Shoulder Cam profile's picked, when
--- turning the Shoulder Cam on offers it (ShoulderCam.lua), or by
+-- layout slots unasked: made when the Shoulder Cam profile's picked, or by
 -- /cine debug shoulder layout. The Shoulder Cam's for testers for now.)
 ns.EDIT_MODE_LAYOUTS["Shoulder Cam"] = { design = SHOULDER_HUD, bars = { 2, 3 }, client = "forever",
 	onDemand = true }
@@ -1195,13 +1194,21 @@ end
 -- it (a profile that leaves the layout alone stays so; one on the game's
 -- own stays so while it's a preset), so logging in, or switching back to the
 -- profile, puts the player's own pick back.
+-- On "Your own" (""): a layout of the player's stays theirs, nothing to save;
+-- one of ours picked there is the profile's from then on. (Not taken, the
+-- next login saw one of ours with nothing to go back to and switched to
+-- Modern: "Edit Mode keeps resetting to Modern", a player's report 2026-11-14.)
 local function AdoptLayout()
 	if not ns.db or not ns.chardb or not ns.ProfileChosen() or KeptBy() then return end
 	local want = ns.db.editModeLayout or ""
-	if want == "" then return end
 	local info = C_EditMode.GetLayouts()
 	local active = ActiveName(info)
-	if not active or active == Target(info, want) then return end
+	if not active then return end
+	if want == "" then
+		if not ns.EDIT_MODE_LAYOUTS[active] then return end
+	elseif active == Target(info, want) then
+		return
+	end
 	if want == ns.LAYOUT_PRESET and info.activeLayout <= #Presets() then return end
 	ns.db.editModeLayout = active
 	ns.chardb.layoutOwn = nil -- (the player's pick now: nothing to go back to)

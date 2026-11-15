@@ -285,7 +285,6 @@ Cinema|instanceShow.addon:euiJunkList=false
 Cinema|instanceShow.addon:euiLootFeed=false
 Cinema|instanceShow.addon:euiMeters=false
 Cinema|instanceShow.addon:euiMovementAlert=false
-Cinema|instanceShow.addon:euiResourceBars=false
 Cinema|instanceShow.addon:euiSecondaryStats=false
 Cinema|instanceShow.addon:euiTalentReminders=false
 Cinema|instanceShow.addon:euiThreatMeter=false
