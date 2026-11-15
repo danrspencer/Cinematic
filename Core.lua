@@ -309,6 +309,7 @@ local DEFAULTS = {
 	chatPeekTime = 8,         -- seconds the chat window stays up
 	chatUntilWhisperRead = true, -- keep chat up while a whisper tab is flashing (until it's clicked)
 	chatHideTabHint = false, -- chat tabs' tooltips drop their green "<Right click for Tab Settings>" line (Chat.lua)
+	plateHideTipHint = true, -- hidden: nameplates' tooltips (locked friendly plates in dungeons) drop "<Right click for Frame Settings>" (Chat.lua)
 	chatShowWhileTyping = false, -- typing brings up the chat windows, not just the input box
 	chatHideOwn = true, -- your own messages (emotes, say, party...) don't show chat
 	chatOwnNoBubble = true, -- ...except lines you type that have no bubble (whispers, guild...)

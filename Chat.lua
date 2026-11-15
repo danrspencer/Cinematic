@@ -904,13 +904,54 @@ do
 		return math.abs(r - gr) < 0.03 and math.abs(g - gg) < 0.03 and math.abs(b - gb) < 0.03
 	end
 
+	-- A nameplate's tooltip: the game's locked friendly plates in dungeons
+	-- (forbidden, so GetName can't be asked) and open plates' frames.
+	-- (plateHideTipHint, hidden setting, on by default.)
+	local function NameOf(frame)
+		local ok, name = pcall(frame.GetName, frame)
+		return ok and type(name) == "string" and not (issecretvalue and issecretvalue(name)) and name or nil
+	end
+
+	local function PlateOwner(owner)
+		if type(owner) ~= "table" then return false, "no owner" end
+		local okF, forbidden = pcall(function() return owner.IsForbidden and owner:IsForbidden() end)
+		if okF and forbidden == true then return true, "forbidden" end
+		local frame = owner
+		for _ = 1, 3 do
+			local name = NameOf(frame)
+			if name and name:find("^NamePlate") then return true, name end
+			local ok, parent = pcall(frame.GetParent, frame)
+			if not ok or type(parent) ~= "table" then break end
+			frame = parent
+		end
+		return false, NameOf(owner) or "unnamed"
+	end
+
+	-- What the last tooltip with a hint line was (/cine debug tiphint).
+	local last
+
 	local function DropTabHint(tooltip)
 		local owner = tooltip:GetOwner()
-		local name = owner and owner.GetName and owner:GetName()
-		if type(name) ~= "string" or not name:find("^ChatFrame%d+Tab$") then
-			return
+		local name = owner and NameOf(owner)
+		local isTab = type(name) == "string" and name:find("^ChatFrame%d+Tab$")
+			and ns.db.chatHideTabHint and ns.db.handleChat ~= false
+		local isPlate, why = false, "no"
+		if not isTab and ns.db.plateHideTipHint ~= false then
+			isPlate, why = PlateOwner(owner)
 		end
 		local count = tooltip:NumLines()
+		local hinted = false
+		for i = 1, count do
+			if IsTabHint(_G["GameTooltipTextLeft" .. i]) then hinted = true break end
+		end
+		if hinted then
+			last = { owner = why, plate = isPlate, tab = isTab and true or false, lines = count,
+				mouseover = ns.Flag(UnitExists("mouseover")), result = "not ours" }
+		end
+		if not (isTab or isPlate) then
+			return
+		end
+		if last and hinted then last.result = "kept (a line couldn't be copied)" end
 		local keep, dropped = {}, false
 		for i = 1, count do
 			local fs = _G["GameTooltipTextLeft" .. i]
@@ -937,16 +978,32 @@ do
 			tooltip:AddLine(line[1], line[2], line[3], line[4], true)
 		end
 		tooltip:Show()
+		if last and hinted then last.result = "dropped" end
 	end
 
 	hooksecurefunc(GameTooltip, "Show", function(tooltip)
-		if rebuilding or not (ns.db and ns.db.chatHideTabHint and ns.db.handleChat ~= false) then
+		if rebuilding or not ns.db then
 			return
 		end
 		rebuilding = true
-		pcall(DropTabHint, tooltip)
+		local ok, err = pcall(DropTabHint, tooltip)
+		if not ok and last then last.result = "error: " .. tostring(err) end
 		rebuilding = false
 	end)
+
+	-- /cine debug tiphint: the last tooltip that had a green "<...>" line.
+	function ns.TipHintDebug()
+		ns.Print(("tiphint: setting plateHideTipHint %s, chatHideTabHint %s, in combat %s, client %s"):format(
+			tostring(ns.db.plateHideTipHint ~= false), tostring(ns.db.chatHideTabHint),
+			tostring(InCombatLockdown()), ns.isRetail and "retail" or "classic/Forever"))
+		if not last then
+			ns.Print("tiphint: no tooltip with a hint line seen since /reload (hover the NPC's plate first)")
+			return
+		end
+		ns.Print(("tiphint: owner %s, plate %s, chat tab %s, %d lines, mouseover unit %s -> %s"):format(
+			tostring(last.owner), tostring(last.plate), tostring(last.tab), last.lines,
+			tostring(last.mouseover), tostring(last.result)))
+	end
 end
 
 function ns.RegisterChatPeek()

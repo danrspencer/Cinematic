@@ -189,6 +189,7 @@ local function PrintDebugHelp()
 	print("  /cine debug talents - the character window's Talents button and the talents window's Character button: made, shown, where")
 	print("  /cine debug panels - the game's open windows: where they're anchored and whether they can be dragged")
 	print("  /cine debug tooltipparts - print the shown parts (bars, borders, textures) of the next tooltip")
+	print("  /cine debug tiphint - the last tooltip with a green <...> hint line: its owner, plate or not, dropped or kept")
 	print("  /cine debug raidparts - log every part of the party and raid frames and how each is faded, print shown icons that aren't")
 	print("  /cine debug auras - whether your group's debuffs can be seen, and how (run in and out of combat, in different places)")
 	print("  /cine debug combatlog - log the Combat Log tab's lines, readable or not; stays on across reloads (again to stop)")
@@ -1616,6 +1617,8 @@ local function HandleSlash(msg)
 		ns.TooltipPartsDebug()
 	elseif cmd == "debug" and arg == "raidparts" then
 		ns.LogRaidFrames()
+	elseif cmd == "debug" and arg == "tiphint" then
+		ns.TipHintDebug()
 	elseif cmd == "debug" and arg == "healplates" then
 		ns.HealVisionPlatesDebug()
 	elseif cmd == "debug" and arg == "platefont" then
