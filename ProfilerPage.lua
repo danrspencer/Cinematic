@@ -1,4 +1,4 @@
--- The Profiler page (Community hub, off to start with): what the addon costs.
+-- The Profiler page (Help hub, off to start with): what the addon costs.
 -- On top, a graph of the game's own figure for this addon (its share of each
 -- frame's time, sampled once a second, the last five minutes, kept over a reload),
 -- each bar colored by what was going on then, with averages for each. Below,

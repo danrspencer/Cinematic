@@ -155,7 +155,7 @@ local TOURS = {
 		"Card Styles", "Card Style", "Card Sounds" } },
 	{ "tour-wheels", "Wheels", { "Master wheel", "Your wheels", "Camera wheel", "Menu wheel", "Marker wheel",
 		"Ground marker wheel", "Vision wheel" } },
-	{ "tour-more", "Quality of life, Keybinds, Community", { "General", "Fishing", "Hunter", "Keybinds",
+	{ "tour-more", "Quality of life, Keybinds, Help, Community", { "General", "Fishing", "Hunter", "Keybinds",
 		"New features", "All changes", "Socials", "Help", "Why showing" } },
 }
 local function TourPages(pages)

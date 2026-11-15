@@ -1,27 +1,30 @@
--- The Why window (/cine why): every row of frames Cinematic fades in one
--- window you can keep up while you play, each saying in a line whether it's
--- showing and why, by section as the HUD page has them. At its top,
--- whether CineMode is on (and when it isn't, what's keeping it off) and what
--- you're doing right now. A row opens to all its reasons, a button to its
--- settings and one that points it out on the screen, and to its parts, each
--- a row of its own under it: a unit frame's (portrait, name, bars...: the
--- HUD page's part rows, ns.UnitPartsWhy), the raid and party frames'
--- and the minimap's (rows of their own, listed under their frame here). The
--- search box and the filters find parts too. Pick a frame on screen
--- starts Inspect (Why.lua), which comes back here when stopped; Copy report
--- gives the whole list as text to send us.
--- The reasons are Inspect's (ns.why.Explain); the list is filled twice a
--- second while the window is up, and nothing runs while it's closed.
+-- Why is it showing? Every row of frames Cinematic fades in one list, each
+-- saying in a line whether it's showing and why, by section as the HUD page
+-- has them. At its top, whether CineMode is on (and when it isn't, what's
+-- keeping it off) and what you're doing right now. A row opens to all its
+-- reasons, a button to its settings and one that points it out on the
+-- screen, and to its parts, each a row of its own under it: a unit frame's
+-- (portrait, name, bars...: the HUD page's part rows, ns.UnitPartsWhy), the
+-- raid and party frames' and the minimap's (rows of their own, listed under
+-- their frame here). The search box and the filters find parts too. Pick a
+-- frame on screen starts Inspect (Why.lua); Copy report gives the whole list
+-- as text to send us.
+-- The same list twice, each a view of its own (its search, filter and open
+-- row): the Why window (/cine why), to keep up while you play, and the Help
+-- hub's Why Is It Showing? page. The reasons are Inspect's (ns.why.Explain);
+-- a view is filled twice a second while it's up, and nothing runs while it's
+-- out of sight.
 
 local _, ns = ...
 local L = ns.L
 local why = ns.why
 
 local GREEN, GREY, RED = "|cff8fe39a", "|cff9d9585", "|cffff4040"
-local WIDTH, HEIGHT = 480, 620
+local WIDTH, HEIGHT = 480, 620 -- (the window)
 local TOGGLE_WIDTH = 140 -- (the big CineMode button in the top box)
-local LIST_WIDTH = WIDTH - 16 - 34 -- (the list's rows: the window less its edges and scroll bar)
+local SCROLL_ROOM = 18 -- (the list's scroll bar, right of its rows)
 local ROW_HEIGHT, HEADER_HEIGHT = 38, 24
+local HINT_HEIGHT = 36 -- (three lines' room, so the list's bottom edge stays put)
 local STATUS_COLOR = {
 	shown = { 0.56, 0.89, 0.60 }, partly = { 1, 0.82, 0 }, hidden = { 0.95, 0.64, 0.64 },
 	idle = { 0.5, 0.5, 0.5 }, unknown = { 0.5, 0.5, 0.5 },
@@ -48,11 +51,19 @@ local UNIT_FRAME = { player = "PlayerFrame", petframe = "PetFrame", target = "Ta
 -- The rows that are parts of another row's frames, listed under it: by section, and the minimap's.
 local PART_PARENT = { raid = "raidplayers", party = "party", rsparty = "rspartyplayers" }
 
-local window, list, detail, flash
-local filter, search, openKey, openParent = "all", "", nil, nil
-local revealAll = false -- (every part listed, opened or not: Copy report's)
-local items = {} -- (the rows as last filled, parts after their frames)
+local window, windowView, flash
 local Fill -- (below)
+
+-- The page's switch, on everywhere to start with. Off: the page, the window
+-- and Inspect are put away, and nothing of theirs runs.
+ns.DEFAULTS.whyPage = true
+local function PageOn()
+	return not (ns.db and ns.db.whyPage == false)
+end
+ns.WhyPageOn = PageOn
+local function SayOff()
+	ns.Print(L["Why Is It Showing? is off. Turn it on in the settings, under Help > Why Is It Showing?"])
+end
 
 -- A row's place in the list: its section, and where it comes on the Game
 -- Frames page; then the row it's a part of, if it's one.
@@ -176,7 +187,7 @@ local function UnitPartItem(parent, info, at)
 end
 
 -- Whether a row is in the list as filtered and searched (a part: by its own name).
-local function Matches(item, words)
+local function Matches(item, words, filter)
 	if not (filter == "all" or (filter == "addons" and item.section == "addons") or filter == item.kind) then
 		return false
 	end
@@ -184,11 +195,12 @@ local function Matches(item, words)
 		or (not item.parent and item.sectionLabel:lower():find(words, 1, true) ~= nil)
 end
 
--- The rows, each with its status and reasons, in the list's order, a frame's
--- parts after it (those to list: all of them while it's open, else the ones
--- the filter or the search asks for); and how many rows, parts too, are
--- showing, hidden, addons' and in all (before the filter and the search).
-local function Gather()
+-- A view's rows, each with its status and reasons, in the list's order, a
+-- frame's parts after it (those to list: all of them while it's open, else
+-- the ones the filter or the search asks for); and how many rows, parts too,
+-- are showing, hidden, addons' and in all (before the filter and the search).
+-- revealAll: every row and every part, whatever the view's filter (Copy report's).
+local function Gather(view, revealAll)
 	local order, first = why.RowEntries()
 	why.LookAtRows(order, first)
 	local counts = { all = 0, shown = 0, hidden = 0, addons = 0 }
@@ -269,8 +281,9 @@ local function Gather()
 		if a.title ~= b.title then return a.title < b.title end
 		return tostring(a.key) < tostring(b.key)
 	end)
-	local found = wipe(items)
-	local words = search:lower()
+	local found = {}
+	local filter = revealAll and "all" or view.filter
+	local words = revealAll and "" or view.search:lower()
 	local narrowed = filter ~= "all" or words ~= ""
 	local function Count(item)
 		counts.all = counts.all + 1
@@ -279,12 +292,12 @@ local function Gather()
 	end
 	for _, item in ipairs(tops) do
 		Count(item)
-		local open = revealAll or openKey == item.key or openParent == item.key
-		local own = Matches(item, words)
+		local open = revealAll or view.openKey == item.key or view.openParent == item.key
+		local own = Matches(item, words, filter)
 		local listed, any = {}, false
 		for _, part in ipairs(item.parts or {}) do
 			Count(part)
-			local match = Matches(part, words)
+			local match = Matches(part, words, filter)
 			any = any or match
 			if (open and (own or not narrowed)) or (narrowed and match) or revealAll then
 				listed[#listed + 1] = part
@@ -329,12 +342,9 @@ local function PointOut(item)
 	end)
 end
 
-local function CopyReport()
-	-- (Every row, whatever the list is showing; the next fill puts the list back.)
-	local keptFilter, keptSearch = filter, search
-	filter, search, revealAll = "all", "", true
-	local found = Gather()
-	filter, search, revealAll = keptFilter, keptSearch, false
+local function CopyReport(view)
+	-- (Every row, whatever the list is showing.)
+	local found = Gather(view, true)
 	local out = {}
 	out[#out + 1] = ("Cinematic %s, %s"):format(ns.Version and ns.Version() or "?",
 		ns.isRetail and "retail" or ("game " .. tostring(select(4, GetBuildInfo()))))
@@ -373,8 +383,8 @@ end
 -- Frames, HUD...), at its row there by its name; else the page alone.
 -- (By name only there: another page can have a label like the row's, the
 -- Health & Resources page's "Player frame" heading.)
-local function OpenAtRow(page, setting)
-	local item = detail and detail.item
+local function OpenAtRow(view, page, setting)
+	local item = view.detail.item
 	local ownPage = item and (item.settingsPage or why.FramePage(item.key))
 	local title = item and not item.wholePage and page == ownPage and item.title
 	if ns.OpenOptionsAt and (setting or type(title) == "string") then
@@ -385,7 +395,8 @@ local function OpenAtRow(page, setting)
 end
 
 -- A row's reasons, under it while it's open: one frame, moved to the open row.
-local function DetailLine(index)
+local function DetailLine(view, index)
+	local detail = view.detail
 	local line = detail.lines[index]
 	if line then return line end
 	line = CreateFrame("Button", nil, detail)
@@ -394,7 +405,6 @@ local function DetailLine(index)
 	line.icon:SetPoint("TOPLEFT", 0, -1)
 	line.text = line:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
 	line.text:SetPoint("TOPLEFT", line.icon, "TOPRIGHT", 6, 0)
-	line.text:SetWidth(LIST_WIDTH - 46)
 	line.text:SetJustifyH("LEFT")
 	line.where = line:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
 	line.where:SetPoint("TOPLEFT", line.text, "BOTTOMLEFT", 0, -2)
@@ -403,13 +413,14 @@ local function DetailLine(index)
 	glow:SetAllPoints()
 	glow:SetColorTexture(1, 0.82, 0, 0.08)
 	line:SetScript("OnClick", function(self)
-		if self.page then OpenAtRow(self.page, self.setting) end
+		if self.page then OpenAtRow(view, self.page, self.setting) end
 	end)
 	detail.lines[index] = line
 	return line
 end
 
-local function DetailHeading(index)
+local function DetailHeading(view, index)
+	local detail = view.detail
 	local heading = detail.headings[index]
 	if not heading then
 		heading = detail:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
@@ -420,15 +431,16 @@ local function DetailHeading(index)
 end
 
 -- Fills it for a row; gives its height.
-local function FillDetail(item)
+local function FillDetail(view, item)
+	local detail = view.detail
 	detail.item = item
-	local width = LIST_WIDTH - 14 - (item.parent and INDENT or 0)
+	local width = view.listWidth - 14 - (item.parent and INDENT or 0)
 	local y, lines, headings, lastKind = 2, 0, 0, nil
 	for _, reason in ipairs(item.reasons) do
 		local kind = reason.state == "off" and "off" or "now"
 		if kind ~= lastKind then
 			headings = headings + 1
-			local heading = DetailHeading(headings)
+			local heading = DetailHeading(view, headings)
 			heading:ClearAllPoints()
 			heading:SetPoint("TOPLEFT", detail, "TOPLEFT", 0, -(y + 4))
 			heading:SetText(HeadingText(item.status, kind))
@@ -437,7 +449,7 @@ local function FillDetail(item)
 			lastKind = kind
 		end
 		lines = lines + 1
-		local line = DetailLine(lines)
+		local line = DetailLine(view, lines)
 		local off = reason.state == "off"
 		line.icon:SetTexture(why.ICON[reason.state])
 		line.icon:SetDesaturated(off)
@@ -466,14 +478,15 @@ local function FillDetail(item)
 	return y
 end
 
-local function MakeDetail()
-	detail = CreateFrame("Frame", nil, list)
+local function MakeDetail(view)
+	local detail = CreateFrame("Frame", nil, view.list)
+	view.detail = detail
 	detail.lines, detail.headings = {}, {}
 	detail.open = ns.PanelButton(detail)
 	detail.open:SetSize(120, 22)
 	detail.open:SetText(L["Open settings"])
 	detail.open:SetScript("OnClick", function(self)
-		if self.page then OpenAtRow(self.page, self.setting) end
+		if self.page then OpenAtRow(view, self.page, self.setting) end
 	end)
 	detail.point = ns.PanelButton(detail)
 	detail.point:SetSize(150, 22)
@@ -484,11 +497,12 @@ local function MakeDetail()
 	end)
 end
 
-local function Row(index)
+local function Row(view, index)
+	local list = view.list
 	local row = list.rows[index]
 	if row then return row end
 	row = CreateFrame("Button", nil, list)
-	row:SetSize(LIST_WIDTH, ROW_HEIGHT)
+	row:SetHeight(ROW_HEIGHT)
 	local glow = row:CreateTexture(nil, "HIGHLIGHT")
 	glow:SetAllPoints()
 	glow:SetColorTexture(1, 0.82, 0, 0.08)
@@ -498,7 +512,6 @@ local function Row(index)
 	row.stripe:SetSize(3, ROW_HEIGHT - 6)
 	row.name = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
 	row.name:SetPoint("TOPLEFT", 12, -4)
-	row.name:SetWidth(LIST_WIDTH - 12 - 120)
 	row.name:SetJustifyH("LEFT")
 	row.name:SetWordWrap(false)
 	row.status = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
@@ -506,7 +519,6 @@ local function Row(index)
 	row.status:SetJustifyH("RIGHT")
 	row.reason = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
 	row.reason:SetPoint("TOPLEFT", row.name, "BOTTOMLEFT", 0, -3)
-	row.reason:SetWidth(LIST_WIDTH - 12 - 8)
 	row.reason:SetJustifyH("LEFT")
 	row.reason:SetWordWrap(false)
 	row.reason:SetTextColor(0.78, 0.76, 0.7)
@@ -515,19 +527,20 @@ local function Row(index)
 	row.parts:SetPoint("BOTTOMRIGHT", -6, 7)
 	row.parts:SetJustifyH("RIGHT")
 	row:SetScript("OnClick", function(self)
-		if openKey ~= self.key then
-			openKey, openParent = self.key, self.parentKey
+		if view.openKey ~= self.key then
+			view.openKey, view.openParent = self.key, self.parentKey
 		else
 			-- (A part closed: back to its frame, its parts still listed.)
-			openKey, openParent = self.parentKey, nil
+			view.openKey, view.openParent = self.parentKey, nil
 		end
-		Fill()
+		Fill(view)
 	end)
 	list.rows[index] = row
 	return row
 end
 
-local function Header(index)
+local function Header(view, index)
+	local list = view.list
 	local header = list.headers[index]
 	if header then return header end
 	header = list:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
@@ -537,15 +550,15 @@ local function Header(index)
 	header.line:SetColorTexture(1, 1, 1, 0.12)
 	header.line:SetHeight(1)
 	header.line:SetPoint("BOTTOMLEFT", header, "BOTTOMLEFT", 0, -3)
-	header.line:SetWidth(LIST_WIDTH)
 	list.headers[index] = header
 	return header
 end
 
-function Fill()
-	if not (window and list and detail and ns.Flag(window:IsShown())) then return end
+function Fill(view)
+	if not (view and PageOn() and ns.Flag(view.host:IsVisible())) then return end
+	local list, detail, width = view.list, view.detail, view.listWidth
 	-- The top: CineMode on or off, and what's keeping it off.
-	local banner = window.banner
+	local banner = view.banner
 	if ns.lastCinematic then
 		banner.stripe:SetColorTexture(0.56, 0.89, 0.60)
 		banner.back:SetColorTexture(1, 1, 1, 0.05)
@@ -567,9 +580,9 @@ function Fill()
 	banner:SetHeight(math.max(34 + 20, 10 + banner.title:GetStringHeight() + 4 + banner.text:GetStringHeight() + 6
 		+ banner.now:GetStringHeight() + 10))
 
-	local found, counts = Gather()
-	for _, button in ipairs(window.filters) do
-		local chosen = button.key == filter
+	local found, counts = Gather(view)
+	for _, button in ipairs(view.filters) do
+		local chosen = button.key == view.filter
 		button:SetText(("%s (%d)"):format(L[button.label], counts[button.key]))
 		if chosen then button:LockHighlight() else button:UnlockHighlight() end
 		local text = button:GetFontString()
@@ -580,7 +593,7 @@ function Fill()
 
 	local y, rows, headers, section, opened = 0, 0, 0, nil, false
 	-- The Calm Timer, while it runs: a bar of the time left, over the first section.
-	local calmBar = window.calmBar
+	local calmBar = view.calmBar
 	local calmLeft = ns.CalmLeft()
 	calmBar:SetShown(calmLeft ~= nil)
 	if calmLeft then
@@ -592,37 +605,39 @@ function Fill()
 		if item.section ~= section then
 			section = item.section
 			headers = headers + 1
-			local header = Header(headers)
+			local header = Header(view, headers)
 			header:ClearAllPoints()
 			header:SetPoint("TOPLEFT", list, "TOPLEFT", 2, -(y + 8))
 			header:SetText(item.sectionLabel:upper())
 			header:Show()
+			header.line:SetWidth(width)
 			header.line:Show()
 			y = y + HEADER_HEIGHT
 		end
 		rows = rows + 1
-		local row = Row(rows)
+		local row = Row(view, rows)
 		local indent = item.parent and INDENT or 0
 		local count = item.parts and #item.parts or 0
 		row.key, row.parentKey = item.key, item.parent and item.parent.key or nil
 		local color = STATUS_COLOR[item.status] or STATUS_COLOR.unknown
+		row:SetWidth(width)
 		row.stripe:SetColorTexture(color[1], color[2], color[3])
 		row.stripe:SetPoint("TOPLEFT", indent, -3)
 		row.name:SetPoint("TOPLEFT", 12 + indent, -4)
-		row.name:SetWidth(LIST_WIDTH - 12 - 120 - indent)
+		row.name:SetWidth(width - 12 - 120 - indent)
 		row.name:SetText(item.title)
 		if item.parent then row.name:SetTextColor(0.9, 0.86, 0.74) else row.name:SetTextColor(1, 0.82, 0) end
 		row.status:SetText(StatusText(item.status))
-		row.reason:SetWidth(LIST_WIDTH - 12 - 8 - indent - (count > 0 and 70 or 0))
+		row.reason:SetWidth(width - 12 - 8 - indent - (count > 0 and 70 or 0))
 		row.reason:SetText(item.main and item.main.text or "")
 		row.parts:SetText(count > 0 and (item.partsLabel or L["%d parts"]):format(count) or "")
 		row:ClearAllPoints()
 		row:SetPoint("TOPLEFT", list, "TOPLEFT", 0, -y)
 		row:Show()
 		y = y + ROW_HEIGHT
-		if item.key == openKey then
+		if item.key == view.openKey then
 			opened = true
-			local height = FillDetail(item)
+			local height = FillDetail(view, item)
 			detail:ClearAllPoints()
 			detail:SetPoint("TOPLEFT", list, "TOPLEFT", 14 + indent, -y)
 			detail.point:SetShown(item.entry ~= nil)
@@ -636,24 +651,236 @@ function Fill()
 		list.headers[i].line:Hide()
 	end
 	if not opened then detail:Hide() end
-	window.empty:SetShown(rows == 0)
+	view.empty:SetShown(rows == 0)
 	if rows == 0 then
-		window.empty:SetText((counts.all == 0 and L["Cinematic isn't fading any frames right now: its frame pages " ..
+		view.empty:SetText((counts.all == 0 and L["Cinematic isn't fading any frames right now: its frame pages " ..
 			"are off, or it has only just started. Give it a moment."])
-			or (search ~= "" and L["Nothing here is called \"%s\"."]:format(search))
-			or (filter == "addons" and L["No other addon's frames are being faded. Cinematic fades the addons it " ..
+			or (view.search ~= "" and L["Nothing here is called \"%s\"."]:format(view.search))
+			or (view.filter == "addons" and L["No other addon's frames are being faded. Cinematic fades the addons it " ..
 				"knows and the frames you add on Addons > Frames. For any other frame, use Pick a frame on screen."])
 			or L["Nothing in this list right now."])
 	end
 	-- (Addons: only those Cinematic fades have a row.)
-	local note = window.note
-	note:SetShown(filter == "addons" and rows > 0)
-	if filter == "addons" and rows > 0 then
+	local note = view.note
+	note:SetShown(view.filter == "addons" and rows > 0)
+	if view.filter == "addons" and rows > 0 then
 		note:ClearAllPoints()
 		note:SetPoint("TOPLEFT", list, "TOPLEFT", 2, -(y + 12))
 		y = y + 12 + note:GetStringHeight()
 	end
 	list:SetHeight(math.max(1, y + 8))
+end
+
+-- The list and all around it, filling host (the window's inside, under its
+-- title; or the page's, under its intro). onPick: hides what's in the way
+-- before Inspect starts; extra: a button of the view's own, after Copy report
+-- ({ text, width, onClick }).
+local function MakeView(host, onPick, extra)
+	local view = { host = host, filter = "all", search = "", width = 1, listWidth = 1 }
+
+	-- CineMode on or off, why, and what you're doing: click it for the setting.
+	local banner = CreateFrame("Button", nil, host)
+	banner:SetPoint("TOPLEFT")
+	banner:SetPoint("TOPRIGHT")
+	banner:SetHeight(70)
+	banner.back = banner:CreateTexture(nil, "BACKGROUND")
+	banner.back:SetAllPoints()
+	banner.back:SetColorTexture(1, 1, 1, 0.05)
+	local glow = banner:CreateTexture(nil, "HIGHLIGHT")
+	glow:SetAllPoints()
+	glow:SetColorTexture(1, 0.82, 0, 0.06)
+	banner.stripe = banner:CreateTexture(nil, "ARTWORK")
+	banner.stripe:SetPoint("TOPLEFT")
+	banner.stripe:SetPoint("BOTTOMLEFT")
+	banner.stripe:SetWidth(3)
+	banner.title = banner:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+	banner.title:SetPoint("TOPLEFT", 12, -10)
+	-- (The text leaves room on the right for the CineMode button: sized by Resize.)
+	banner.text = banner:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+	banner.text:SetPoint("TOPLEFT", banner.title, "BOTTOMLEFT", 0, -4)
+	banner.text:SetJustifyH("LEFT")
+	banner.now = banner:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+	banner.now:SetPoint("TOPLEFT", banner.text, "BOTTOMLEFT", 0, -6)
+	banner.now:SetJustifyH("LEFT")
+	banner:SetScript("OnClick", function(self) ns.OpenOptions(self.page) end)
+	-- A big button that turns CineMode on or off (the Toggle CineMode key).
+	local toggle = ns.PanelButton(banner)
+	toggle:SetSize(TOGGLE_WIDTH, 34)
+	toggle:SetPoint("RIGHT", banner, "RIGHT", -10, 0)
+	toggle:SetScript("OnClick", function()
+		Cinematic_ToggleCineMode()
+		Fill(view)
+	end)
+	banner.toggle = toggle
+	view.banner = banner
+
+	-- Find a row by name, and the filters with their counts.
+	local okBox, box = pcall(CreateFrame, "EditBox", nil, host, "SearchBoxTemplate")
+	if not okBox then box = CreateFrame("EditBox", nil, host, "InputBoxTemplate") end
+	-- (Across the top of the list, the filters under it.)
+	box:SetHeight(20)
+	box:SetAutoFocus(false)
+	box:SetPoint("TOPLEFT", banner, "BOTTOMLEFT", 6, -10)
+	box:SetPoint("RIGHT", host, "RIGHT", -8, 0)
+	box:HookScript("OnTextChanged", function(self)
+		local text = self:GetText()
+		view.search = type(text) == "string" and text:match("^%s*(.-)%s*$") or ""
+		Fill(view)
+	end)
+	box:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
+	box:SetScript("OnEnterPressed", function(self) self:ClearFocus() end)
+	box.searchSkip = true
+	view.filters = {}
+	for i, info in ipairs(FILTERS) do
+		local button = ns.PanelButton(host)
+		button:SetSize(106, 22)
+		button.key, button.label = info[1], info[2]
+		if i == 1 then
+			button:SetPoint("TOPLEFT", box, "BOTTOMLEFT", -6, -8)
+		else
+			button:SetPoint("LEFT", view.filters[i - 1], "RIGHT", 4, 0)
+		end
+		button:SetScript("OnClick", function(self)
+			view.filter = self.key
+			Fill(view)
+		end)
+		view.filters[i] = button
+	end
+
+	-- At the bottom: Inspect, the report, and how to read the list.
+	local pick = ns.PanelButton(host)
+	pick:SetSize(180, 24)
+	pick:SetText(L["Pick a frame on screen"])
+	pick:SetPoint("BOTTOMLEFT")
+	pick:SetScript("OnClick", function()
+		onPick()
+		if not ns.whyPicking then ns.ToggleInspect() end
+	end)
+	local report = ns.PanelButton(host)
+	report:SetSize(120, 24)
+	report:SetText(L["Copy report"])
+	report:SetPoint("LEFT", pick, "RIGHT", 8, 0)
+	report:SetScript("OnClick", function() CopyReport(view) end)
+	if extra then
+		local button = ns.PanelButton(host)
+		button:SetSize(extra[2], 24)
+		button:SetText(extra[1])
+		button:SetPoint("LEFT", report, "RIGHT", 8, 0)
+		button:SetScript("OnClick", extra[3])
+	end
+	local hint = host:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+	hint:SetPoint("BOTTOMLEFT", pick, "TOPLEFT", 0, 8)
+	hint:SetPoint("RIGHT", host, "RIGHT")
+	hint:SetHeight(HINT_HEIGHT)
+	hint:SetJustifyH("LEFT")
+	hint:SetJustifyV("BOTTOM")
+	hint:SetText(L["Click a row for all its reasons and its settings. It keeps itself up to date: start a fight " ..
+		"or target something and watch it change. A frame with parts lists them under it. Not in the list? Pick it on screen."])
+
+	local scroll = CreateFrame("ScrollFrame", nil, host, "UIPanelScrollFrameTemplate")
+	if ns.SkinScroll then ns.SkinScroll(scroll) end
+	scroll:SetPoint("TOPLEFT", view.filters[1], "BOTTOMLEFT", 0, -8)
+	scroll:SetPoint("BOTTOMRIGHT", host, "BOTTOMRIGHT", -SCROLL_ROOM, 24 + 8 + HINT_HEIGHT + 8) -- (over the hint and buttons)
+	local list = CreateFrame("Frame", nil, scroll)
+	list:SetSize(1, 1)
+	list.rows, list.headers = {}, {}
+	scroll:SetScrollChild(list)
+	view.list = list
+	view.empty = host:CreateFontString(nil, "OVERLAY", "GameFontDisable")
+	view.empty:SetPoint("TOPLEFT", scroll, "TOPLEFT", 4, -16)
+	view.empty:SetPoint("RIGHT", scroll, "RIGHT", -4, 0)
+	view.empty:SetJustifyH("LEFT")
+	view.note = list:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+	view.note:SetJustifyH("LEFT")
+	view.note:SetText(L["Only frames Cinematic fades are listed: the addons it knows, and the frames you add on the " ..
+		"Addons > Frames. For any other addon's frame, use Pick a frame on screen."])
+	MakeDetail(view)
+
+	-- The Calm Timer bar (placed by Fill, at the list's top while it runs):
+	-- its time left, draining every frame; click it for its setting.
+	local calmBar = CreateFrame("Button", nil, list)
+	calmBar:SetHeight(34)
+	calmBar.back = calmBar:CreateTexture(nil, "BACKGROUND")
+	calmBar.back:SetAllPoints()
+	calmBar.back:SetColorTexture(1, 1, 1, 0.05)
+	local calmGlow = calmBar:CreateTexture(nil, "HIGHLIGHT")
+	calmGlow:SetAllPoints()
+	calmGlow:SetColorTexture(1, 0.82, 0, 0.08)
+	calmBar.label = calmBar:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+	calmBar.label:SetPoint("TOPLEFT", 10, -4)
+	calmBar.label:SetText(L["Calm Timer"])
+	calmBar.left = calmBar:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+	calmBar.left:SetPoint("TOPRIGHT", -8, -4)
+	calmBar.left:SetJustifyH("RIGHT")
+	calmBar.track = calmBar:CreateTexture(nil, "ARTWORK")
+	calmBar.track:SetPoint("BOTTOMLEFT", 10, 6)
+	calmBar.track:SetHeight(6)
+	calmBar.track:SetColorTexture(0, 0, 0, 0.5)
+	calmBar.fill = calmBar:CreateTexture(nil, "OVERLAY")
+	calmBar.fill:SetPoint("LEFT", calmBar.track, "LEFT")
+	calmBar.fill:SetHeight(6)
+	calmBar.fill:SetColorTexture(1, 0.82, 0, 0.85)
+	calmBar:SetScript("OnClick", function()
+		if not (ns.OpenSettingByKey and ns.OpenSettingByKey("calmTime")) then ns.OpenOptions("CineMode") end
+	end)
+	calmBar:Hide()
+	view.calmBar = calmBar
+	local function DrawCalm()
+		local left, total = ns.CalmLeft()
+		if not left then return end
+		local full = ns.CalmFullLeft and ns.CalmFullLeft()
+		if full and full < left then
+			calmBar.left:SetText(L["%.0f sec (health and power full: ends in %.0f)"]:format(left, full))
+		else
+			calmBar.left:SetText(L["%.0f sec left"]:format(left))
+		end
+		local track = view.listWidth - 18
+		local fill = track * (total > 0 and math.min(1, left / total) or 0)
+		calmBar.fill:SetWidth(math.max(0.01, fill))
+		calmBar.fill:SetShown(fill > 0.5)
+	end
+
+	-- Its widths, as wide as host is (the page's grows with the settings window).
+	local function Resize()
+		local width = host:GetWidth()
+		if not width or width <= 1 then return end
+		view.width, view.listWidth = width, width - SCROLL_ROOM
+		local textWidth = width - 24 - TOGGLE_WIDTH - 10
+		banner.text:SetWidth(textWidth)
+		banner.now:SetWidth(textWidth)
+		list:SetWidth(view.listWidth)
+		view.note:SetWidth(view.listWidth - 8)
+		calmBar:SetWidth(view.listWidth)
+		calmBar.track:SetWidth(view.listWidth - 18)
+	end
+	host:HookScript("OnSizeChanged", function()
+		Resize()
+		Fill(view)
+	end)
+
+	local elapsedSince = 0
+	ns.SetOnUpdate(host, function(_, elapsed)
+		if not PageOn() then return end -- (the page off, under its off card)
+		if ns.Flag(calmBar:IsShown()) then DrawCalm() end
+		elapsedSince = elapsedSince + elapsed
+		if elapsedSince > 0.5 then
+			elapsedSince = 0
+			Fill(view)
+		end
+	end)
+	host:HookScript("OnShow", function()
+		-- (Filled at once, and again as soon as UpdateFrames has noted the rows.)
+		elapsedSince = 0.3
+		Resize()
+		Fill(view)
+	end)
+	host:HookScript("OnHide", function()
+		if flash then flash:Hide() end
+		-- (The other view, still open, looks at them again on its next fill.)
+		why.LookAway()
+	end)
+	Resize()
+	return view
 end
 
 local function MakeWindow()
@@ -686,183 +913,19 @@ local function MakeWindow()
 	local close = CreateFrame("Button", nil, window, "UIPanelCloseButton")
 	if ns.SkinClose then ns.SkinClose(close) end
 	close:SetPoint("TOPRIGHT", -2, -2)
+	window:SetScript("OnHide", function() window:StopMovingOrSizing() end)
 
-	-- CineMode on or off, why, and what you're doing: click it for the setting.
-	local banner = CreateFrame("Button", nil, window)
-	banner:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -10)
-	banner:SetSize(WIDTH - 32, 70)
-	banner.back = banner:CreateTexture(nil, "BACKGROUND")
-	banner.back:SetAllPoints()
-	banner.back:SetColorTexture(1, 1, 1, 0.05)
-	local glow = banner:CreateTexture(nil, "HIGHLIGHT")
-	glow:SetAllPoints()
-	glow:SetColorTexture(1, 0.82, 0, 0.06)
-	banner.stripe = banner:CreateTexture(nil, "ARTWORK")
-	banner.stripe:SetPoint("TOPLEFT")
-	banner.stripe:SetPoint("BOTTOMLEFT")
-	banner.stripe:SetWidth(3)
-	banner.title = banner:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-	banner.title:SetPoint("TOPLEFT", 12, -10)
-	banner.text = banner:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-	banner.text:SetPoint("TOPLEFT", banner.title, "BOTTOMLEFT", 0, -4)
-	-- (The text leaves room on the right for the CineMode button.)
-	banner.text:SetWidth(WIDTH - 32 - 24 - TOGGLE_WIDTH - 10)
-	banner.text:SetJustifyH("LEFT")
-	banner.now = banner:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-	banner.now:SetPoint("TOPLEFT", banner.text, "BOTTOMLEFT", 0, -6)
-	banner.now:SetWidth(WIDTH - 32 - 24 - TOGGLE_WIDTH - 10)
-	banner.now:SetJustifyH("LEFT")
-	banner:SetScript("OnClick", function(self) ns.OpenOptions(self.page) end)
-	-- A big button that turns CineMode on or off (the Toggle CineMode key).
-	local toggle = ns.PanelButton(banner)
-	toggle:SetSize(TOGGLE_WIDTH, 34)
-	toggle:SetPoint("RIGHT", banner, "RIGHT", -10, 0)
-	toggle:SetScript("OnClick", function()
-		Cinematic_ToggleCineMode()
-		Fill()
-	end)
-	banner.toggle = toggle
-	window.banner = banner
-
-	-- Find a row by name, and the filters with their counts.
-	local okBox, box = pcall(CreateFrame, "EditBox", nil, window, "SearchBoxTemplate")
-	if not okBox then box = CreateFrame("EditBox", nil, window, "InputBoxTemplate") end
-	-- (Across the top of the list, the filters under it.)
-	box:SetSize(WIDTH - 32 - 8, 20)
-	box:SetAutoFocus(false)
-	box:SetPoint("TOPLEFT", banner, "BOTTOMLEFT", 6, -10)
-	box:HookScript("OnTextChanged", function(self)
-		local text = self:GetText()
-		search = type(text) == "string" and text:match("^%s*(.-)%s*$") or ""
-		Fill()
-	end)
-	box:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
-	box:SetScript("OnEnterPressed", function(self) self:ClearFocus() end)
-	window.filters = {}
-	for i, info in ipairs(FILTERS) do
-		local button = ns.PanelButton(window)
-		button:SetSize(106, 22)
-		button.key, button.label = info[1], info[2]
-		if i == 1 then
-			button:SetPoint("TOPLEFT", box, "BOTTOMLEFT", -6, -8)
-		else
-			button:SetPoint("LEFT", window.filters[i - 1], "RIGHT", 4, 0)
-		end
-		button:SetScript("OnClick", function(self)
-			filter = self.key
-			Fill()
-		end)
-		window.filters[i] = button
-	end
-
-	-- At the bottom: Inspect, the report, and how to read the list.
-	local pick = ns.PanelButton(window)
-	pick:SetSize(180, 24)
-	pick:SetText(L["Pick a frame on screen"])
-	pick:SetPoint("BOTTOMLEFT", 16, 14)
-	pick:SetScript("OnClick", function()
+	local host = CreateFrame("Frame", nil, window)
+	host:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -10)
+	host:SetPoint("BOTTOMRIGHT", window, "BOTTOMRIGHT", -16, 14)
+	windowView = MakeView(host, function()
 		window:Hide()
-		if not ns.whyPicking then ns.ToggleInspect() end
 		ns.whyBackToWindow = true -- (stopped by hand, it comes back here: Why.lua)
-	end)
-	local report = ns.PanelButton(window)
-	report:SetSize(120, 24)
-	report:SetText(L["Copy report"])
-	report:SetPoint("LEFT", pick, "RIGHT", 8, 0)
-	report:SetScript("OnClick", CopyReport)
-	local hint = window:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-	hint:SetPoint("BOTTOMLEFT", pick, "TOPLEFT", 0, 8)
-	hint:SetWidth(WIDTH - 32)
-	hint:SetHeight(36) -- (three lines' room, so the list's bottom edge stays put)
-	hint:SetJustifyH("LEFT")
-	hint:SetJustifyV("BOTTOM")
-	hint:SetText(L["Click a row for all its reasons and its settings. It keeps itself up to date: start a fight " ..
-		"or target something and watch it change. A frame with parts lists them under it. Not in the list? Pick it on screen."])
-
-	local scroll = CreateFrame("ScrollFrame", nil, window, "UIPanelScrollFrameTemplate")
-	if ns.SkinScroll then ns.SkinScroll(scroll) end
-	scroll:SetPoint("TOPLEFT", window.filters[1], "BOTTOMLEFT", 0, -8)
-	scroll:SetPoint("BOTTOMRIGHT", window, "BOTTOMRIGHT", -34, 14 + 24 + 8 + 36 + 8) -- (over the hint and buttons)
-	list = CreateFrame("Frame", nil, scroll)
-	list:SetSize(LIST_WIDTH, 1)
-	list.rows, list.headers = {}, {}
-	scroll:SetScrollChild(list)
-	window.empty = window:CreateFontString(nil, "OVERLAY", "GameFontDisable")
-	window.empty:SetPoint("TOPLEFT", scroll, "TOPLEFT", 4, -16)
-	window.empty:SetWidth(LIST_WIDTH - 8)
-	window.empty:SetJustifyH("LEFT")
-	window.note = list:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-	window.note:SetWidth(LIST_WIDTH - 8)
-	window.note:SetJustifyH("LEFT")
-	window.note:SetText(L["Only frames Cinematic fades are listed: the addons it knows, and the frames you add on the " ..
-		"Addons > Frames. For any other addon's frame, use Pick a frame on screen."])
-	MakeDetail()
-
-	-- The Calm Timer bar (placed by Fill, at the list's top while it runs):
-	-- its time left, draining every frame; click it for its setting.
-	local calmBar = CreateFrame("Button", nil, list)
-	calmBar:SetSize(LIST_WIDTH, 34)
-	calmBar.back = calmBar:CreateTexture(nil, "BACKGROUND")
-	calmBar.back:SetAllPoints()
-	calmBar.back:SetColorTexture(1, 1, 1, 0.05)
-	local calmGlow = calmBar:CreateTexture(nil, "HIGHLIGHT")
-	calmGlow:SetAllPoints()
-	calmGlow:SetColorTexture(1, 0.82, 0, 0.08)
-	calmBar.label = calmBar:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-	calmBar.label:SetPoint("TOPLEFT", 10, -4)
-	calmBar.label:SetText(L["Calm Timer"])
-	calmBar.left = calmBar:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-	calmBar.left:SetPoint("TOPRIGHT", -8, -4)
-	calmBar.left:SetJustifyH("RIGHT")
-	calmBar.track = calmBar:CreateTexture(nil, "ARTWORK")
-	calmBar.track:SetPoint("BOTTOMLEFT", 10, 6)
-	calmBar.track:SetSize(LIST_WIDTH - 18, 6)
-	calmBar.track:SetColorTexture(0, 0, 0, 0.5)
-	calmBar.fill = calmBar:CreateTexture(nil, "OVERLAY")
-	calmBar.fill:SetPoint("LEFT", calmBar.track, "LEFT")
-	calmBar.fill:SetHeight(6)
-	calmBar.fill:SetColorTexture(1, 0.82, 0, 0.85)
-	calmBar:SetScript("OnClick", function()
-		if not (ns.OpenSettingByKey and ns.OpenSettingByKey("calmTime")) then ns.OpenOptions("CineMode") end
-	end)
-	calmBar:Hide()
-	window.calmBar = calmBar
-	local function DrawCalm()
-		local left, total = ns.CalmLeft()
-		if not left then return end
-		local full = ns.CalmFullLeft and ns.CalmFullLeft()
-		if full and full < left then
-			calmBar.left:SetText(L["%.0f sec (health and power full: ends in %.0f)"]:format(left, full))
-		else
-			calmBar.left:SetText(L["%.0f sec left"]:format(left))
-		end
-		local width = (LIST_WIDTH - 18) * (total > 0 and math.min(1, left / total) or 0)
-		calmBar.fill:SetWidth(math.max(0.01, width))
-		calmBar.fill:SetShown(width > 0.5)
-	end
-
-	local elapsedSince = 0
-	ns.SetOnUpdate(window, function(_, elapsed)
-		if ns.Flag(calmBar:IsShown()) then DrawCalm() end
-		elapsedSince = elapsedSince + elapsed
-		if elapsedSince > 0.5 then
-			elapsedSince = 0
-			Fill()
-		end
-	end)
-	window:SetScript("OnShow", function()
-		-- (Filled at once, and again as soon as UpdateFrames has noted the rows.)
-		elapsedSince = 0.3
-		Fill()
-	end)
-	window:SetScript("OnHide", function()
-		window:StopMovingOrSizing()
-		if flash then flash:Hide() end
-		why.LookAway()
 	end)
 end
 
 function ns.ShowWhyWindow()
+	if not PageOn() then return SayOff() end
 	if not window then
 		MakeWindow()
 		window:Hide()
@@ -881,7 +944,58 @@ function ns.ToggleWhyWindow()
 	end
 end
 
+-- /cine why pick: pointing at a frame on screen, or away with it.
+function ns.WhyPick()
+	if not (PageOn() or ns.whyPicking) then return SayOff() end
+	ns.ToggleInspect()
+end
+
+-- The page turned off: the window and Inspect put away with it.
+local function SwitchedOff()
+	if PageOn() then return end
+	if window then window:Hide() end
+	if ns.whyPicking then ns.ToggleInspect() end
+	why.LookAway()
+end
+
 -- What the window lists now (its rows and counts), for checks outside the game.
 function ns.WhyWindowRows()
-	return Gather()
+	return Gather(windowView or { filter = "all", search = "" })
+end
+
+-- The Help hub's "Why Is It Showing?" page: the window's list, as wide as
+-- the settings window, under a line on what it is.
+function ns.CreateWhyPanel(kit)
+	local canvas = kit.CreateScrollPage(true)
+	-- (The list scrolls in its own box: the page's own scroll put away, and a
+	-- frame that doesn't scroll in its place, for the title, its "?" and the
+	-- page's switch: the hub's icon dot, off card and header switch.)
+	canvas.scroll:Hide()
+	local content = CreateFrame("Frame", nil, canvas)
+	content:SetAllPoints()
+	canvas.content = content
+	local title = kit.Label(content, "GameFontNormalLarge", L["Why Is It Showing?"])
+	title:SetPoint("TOPLEFT", 16, -16)
+	local intro = kit.PageIntro(content, title, L["Every row of frames Cinematic fades, whether it's showing right " ..
+		"now and why. /cine why opens this list as a window you can keep up while you play."])
+	local switch = kit.PageSwitch(content, "whyPage", L["Enable Page"],
+		L["On (to start with): this page, the /cine why window and Pick a frame on screen. Off: all three are " ..
+		"put away. They cost nothing while they're closed either way."], intro, SwitchedOff)
+	local host = CreateFrame("Frame", nil, content)
+	host:SetPoint("TOPLEFT", switch, "BOTTOMLEFT", 2, -12)
+	host:SetPoint("BOTTOMRIGHT", content, "BOTTOMRIGHT", -16, 12)
+	-- (The settings window would be in the way of the game.)
+	local function AwayWithSettings()
+		local panel = _G.SettingsPanel or _G.InterfaceOptionsFrame
+		if panel and not InCombatLockdown() then pcall(HideUIPanel, panel) end
+	end
+	MakeView(host, function()
+		AwayWithSettings()
+		ns.whyBackToWindow = nil -- (stopped by hand: nothing to come back to)
+	end, { L["Open as a window"], 150, function()
+		AwayWithSettings()
+		ns.ShowWhyWindow()
+	end })
+	canvas:Hide()
+	kit.RegisterSubpage(canvas, "Why showing", L["Why Is It Showing?"])
 end

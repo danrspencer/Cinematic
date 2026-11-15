@@ -226,8 +226,8 @@ local function ShowMenu(owner)
 				-- callback's answer is the menu's response to the click.)
 				if ns.IsCineModeOn() and MenuResponse then return MenuResponse.Close end
 			end)
-		-- (The /cine why window: what's showing or hidden, and why.)
-		if ns.ToggleWhyWindow then
+		-- (The /cine why window: what's showing or hidden, and why. Not with its page off.)
+		if ns.ToggleWhyWindow and ns.WhyPageOn() then
 			root:CreateButton(L["Why Is It Showing/Hiding?"], function() ns.ToggleWhyWindow() end)
 		end
 	end)

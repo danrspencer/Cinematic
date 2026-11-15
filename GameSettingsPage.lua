@@ -1,4 +1,4 @@
--- The Community hub's Game Settings page: every game setting Cinematic
+-- The Help hub's Game Settings page: every game setting Cinematic
 -- changes for a while where your own change wins (sets marked playerWins,
 -- ns.ApplyCVarSet; and the profiles' Cooldown Manager and personal resource
 -- display switches, Profiles.lua), one row each: what it's for, ours, yours

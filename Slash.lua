@@ -410,7 +410,7 @@ local function HandleSlash(msg)
 		ns.RemoveUnderMouse()
 	elseif cmd == "why" then
 		-- (The window of every row; /cine why pick: straight to pointing at a frame.)
-		if arg == "pick" then ns.ToggleInspect() else ns.ToggleWhyWindow() end
+		if arg == "pick" then ns.WhyPick() else ns.ToggleWhyWindow() end
 	elseif cmd == "plates" then
 		ns.PlatesReport()
 	elseif cmd == "report" then

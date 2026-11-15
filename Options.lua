@@ -2136,7 +2136,7 @@ local subpages = {}
 -- (menu.Flush), so the order of the Create calls doesn't matter. One not named
 -- here goes last; a hub under another (hub.under) right under that one.
 local menu = { order = { "Profiles", "CineMode", "UI Manager", "Plates", "Addons", "Visions", "Style", "Atmosphere", "Camera",
-	"Keybinds", "Quality of life", "Community", "Dev" }, queue = {} }
+	"Keybinds", "Quality of life", "Help", "Community", "Dev" }, queue = {} }
 do
 	local function Register(entry)
 		if category and Settings and Settings.RegisterCanvasLayoutSubcategory then
@@ -2339,19 +2339,22 @@ do
 				section = "Wheels" },
 			{ "Vision wheel", "Interface\\Icons\\Ability_EyeOfTheOwl", label = "Vision Wheel", section = "Wheels" },
 		} },
-		-- (WhatsNew.lua's pages, after Keybinds)
-		-- (Help: where to read up and report a problem, and the Profiler; Dev:
-		-- the dev copy's own tools)
+		-- Help, above Community: where to read up and report a problem, and the
+		-- tools for when something looks wrong. (The hub has its first page's
+		-- name: OpenOptions("Help") opens the hub, at that page.)
+		{ name = "Help", pages = {
+			{ "Help", "Interface\\Icons\\INV_Misc_QuestionMark" }, -- (WhatsNew.lua)
+			{ "Why showing", "Interface\\Icons\\Ability_Hunter_EagleEye", label = "Why Is It Showing?" }, -- (Why.lua)
+			{ "Profiler", "Interface\\Icons\\INV_Misc_PocketWatch_02" }, -- (ProfilerPage.lua)
+			{ "Game settings", "Interface\\Icons\\INV_Gizmo_02", label = "Game Settings" }, -- (GameSettingsPage.lua)
+		} },
+		-- (WhatsNew.lua's pages, after Help. Dev: the dev copy's own tools)
 		{ name = "Community", colors = { Updates = { 0.35, 0.6, 0.9 }, People = { 0.3, 0.7, 0.5 },
-			Help = { 0.85, 0.6, 0.3 }, Dev = { 0.85, 0.3, 0.25 } }, pages = {
+			Dev = { 0.85, 0.3, 0.25 } }, pages = {
 			{ "New features", "Interface\\Icons\\INV_Misc_Gift_01", label = "New Features", section = "Updates" },
 			{ "All changes", "Interface\\Icons\\INV_Misc_Book_11", label = "All Changes", section = "Updates" },
 			{ "Socials", "Interface\\Icons\\INV_Letter_15", section = "People" },
 			{ "Thanks", "Interface\\Icons\\INV_ValentinesCard02", section = "People" },
-			{ "Help", "Interface\\Icons\\INV_Misc_QuestionMark", section = "Help" }, -- (WhatsNew.lua)
-			{ "Profiler", "Interface\\Icons\\INV_Misc_PocketWatch_02", section = "Help" }, -- (ProfilerPage.lua)
-			{ "Why showing", "Interface\\Icons\\Ability_Hunter_EagleEye", label = "Why Is It Showing?", section = "Help" }, -- (Why.lua)
-			{ "Game settings", "Interface\\Icons\\INV_Gizmo_02", label = "Game Settings", section = "Help" }, -- (GameSettingsPage.lua)
 			{ "Module Editor", "Interface\\Icons\\INV_Misc_Wrench_01", section = "Dev", dev = true }, -- (ModuleEditor.lua)
 		} },
 		-- (The dev copy's own hub: none of its pages are in the release, so neither is it.)
@@ -18895,13 +18898,13 @@ ns.OnLanguage(function()
 		ns.CreateWhatsNewPanels({ CreateScrollPage = CreateScrollPage, Label = Label, PageShown = PageShown,
 			RegisterSubpage = RegisterSubpage, Tooltip = Tooltip })
 	end
-	if ns.CreateProfilerPanel then -- (ProfilerPage.lua: Community's last page)
+	if ns.CreateProfilerPanel then -- (ProfilerPage.lua: the Help hub)
 		ns.CreateProfilerPanel(ns.lowHealthKit)
 	end
-	if ns.CreateWhyPanel then -- (Why.lua: after the Profiler, in Community's Help)
+	if ns.CreateWhyPanel then -- (Why.lua: the Help hub)
 		ns.CreateWhyPanel(ns.lowHealthKit)
 	end
-	if ns.CreateGameSettingsPage then -- (GameSettingsPage.lua: after Why, in Community's Help)
+	if ns.CreateGameSettingsPage then -- (GameSettingsPage.lua: the Help hub)
 		ns.CreateGameSettingsPage(ns.lowHealthKit)
 	end
 	-- The dev build's Module Editor, Community's last page (ModuleEditor.lua).
