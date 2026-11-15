@@ -470,10 +470,13 @@ ns.chatTypingUntil = 0 -- typing shows the whole chat group without leaving cine
 
 -- Only a window you'd see peeks: a docked tab that isn't the selected one is
 -- hidden, and peeking it would bring up just the dock's tabs.
+-- (The frames' pass at once, Core.lua, only for a window not already up: a
+-- busy city's channels kept waking it for windows already peeking.)
 local function PeekWindow(chatFrame)
 	if chatFrame.IsShown and ns.ChatWindowShown(chatFrame) then
-		ns.chatPeekUntil[chatFrame] = GetTime() + ns.HoldTime("chatPeekTime")
-		ns.framesWake = true -- (the frames' pass at once: Core.lua)
+		local now = GetTime()
+		if (ns.chatPeekUntil[chatFrame] or 0) <= now then ns.framesWake = "chat message" end
+		ns.chatPeekUntil[chatFrame] = now + ns.HoldTime("chatPeekTime")
 	end
 end
 
@@ -483,12 +486,15 @@ function ns.PeekChat(chatFrame, seconds)
 	if chatFrame and ns.ChatWindowShown(chatFrame) then
 		local untilTime = GetTime() + math.max(seconds, ns.HoldTime("chatPeekTime"))
 		ns.chatPeekUntil[chatFrame] = math.max(ns.chatPeekUntil[chatFrame] or 0, untilTime)
-		ns.framesWake = true -- (the frames' pass at once: Core.lua)
+		ns.framesWake = "chat notice" -- (the frames' pass at once: Core.lua)
 	end
 end
 
 -- A chat window scrolled up to read older lines stays up, and fades after the
--- peek time once it's back at the bottom.
+-- peek time once it's back at the bottom. (Run by the frames' pass itself,
+-- which reads the hold straight after: it wakes the next pass only as the
+-- hold starts. Woken every time, a window left scrolled up could run the
+-- whole pass every other frame. 2026-11-15.)
 function ns.HoldScrolledChat(now)
 	for i = 1, NUM_CHAT_WINDOWS or 10 do
 		local chatFrame = _G["ChatFrame" .. i]
@@ -496,8 +502,8 @@ function ns.HoldScrolledChat(now)
 			-- (Only a plain false: a secret answer mustn't keep chat up for good.)
 			local atBottom = chatFrame:AtBottom()
 			if not (issecretvalue and issecretvalue(atBottom)) and atBottom == false then
+				if (ns.chatPeekUntil[chatFrame] or 0) <= now then ns.framesWake = "chat scrolled up" end
 				ns.chatPeekUntil[chatFrame] = now + ns.HoldTime("chatPeekTime")
-				ns.framesWake = true -- (the frames' pass at once: Core.lua)
 			end
 		end
 	end

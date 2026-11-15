@@ -199,7 +199,7 @@ function ns.ApplyFrameLinks()
 			for _, region in ipairs(regions) do ns.FadeRelative(region, 1) end
 		end
 	end
-	ns.framesWake = true -- (the frames' pass at once: Core.lua)
+	ns.framesWake = "frame links" -- (the frames' pass at once: Core.lua)
 	for _, watcher in ipairs(ns.frameLinkWatchers) do watcher() end
 end
 

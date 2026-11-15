@@ -4974,7 +4974,7 @@ end
 -- your debuffs are gone with debuffPeekUntilGone.
 function ns.StartDebuffPeek(hold)
 	ns.debuffPeekUntil = math.max(ns.debuffPeekUntil, GetTime() + (hold or ns.HoldTime("debuffPeekTime")))
-	ns.framesWake = true -- (the frames' pass at once: Core.lua)
+	ns.framesWake = "debuff peek" -- (the frames' pass at once: Core.lua)
 	if ns.db.debuffPeekUntilGone then
 		debuffHeld = true
 	end
@@ -5386,7 +5386,7 @@ function ns.StartBuffPeek(hold, found, enchant, byPlace, holds)
 	ns.newBuffEnchant = ns.newBuffEnchant or enchant or false
 	-- (a short buff peek doesn't cut a longer debuff one short)
 	buffPeekUntil = math.max(buffPeekUntil, GetTime() + hold)
-	ns.framesWake = true -- (the frames' pass at once: Core.lua)
+	ns.framesWake = "buff peek" -- (the frames' pass at once: Core.lua)
 	ns.buffPeekStartedAt = GetTime()
 end
 
@@ -7319,7 +7319,7 @@ do
 				hold = math.max(hold, ns.db.calmTime or 0)
 			end
 			questRevealUntil = GetTime() + ns.FadeInTime() + math.max(0, hold)
-			ns.framesWake = true -- (the frames' pass at once: Core.lua)
+			ns.framesWake = "quest reveal" -- (the frames' pass at once: Core.lua)
 		end
 	end
 	-- When a quest was last picked up, or a tracked one moved on (Keep open's
@@ -7631,7 +7631,7 @@ do
 			pingTime = math.max(0, (ns.db.mouseoverHold or 0) - ns.FadeOutTime())
 		end
 		pingRevealUntil = GetTime() + ns.FadeInTime() + pingTime
-		ns.framesWake = true -- (the frames' pass at once: Core.lua)
+		ns.framesWake = "minimap ping" -- (the frames' pass at once: Core.lua)
 		if ns.pingDebug then
 			ns.Print(("%s: minimap up for %.1f sec"):format(how, pingRevealUntil - GetTime()))
 		end
@@ -7688,7 +7688,7 @@ do
 		groupSize = size
 		local hold = ns.HoldTime("mouseoverHold") - ns.FadeOutTime()
 		rosterRevealUntil = GetTime() + ns.FadeInTime() + math.max(0, hold)
-		ns.framesWake = true -- (the frames' pass at once: Core.lua)
+		ns.framesWake = "group changed" -- (the frames' pass at once: Core.lua)
 	end)
 end
 
@@ -7838,7 +7838,7 @@ local function CheckPendingPress()
 		pendingPress = nil
 		DebugPress(press.button, "reveals")
 		padRevealUntil = ns.PadRevealEnd()
-		ns.framesWake = true -- (the frames' pass at once: Core.lua)
+		ns.framesWake = "gamepad press" -- (the frames' pass at once: Core.lua)
 	end
 end
 local padWatcher = CreateFrame("Frame")
@@ -8216,7 +8216,7 @@ ns.SetOnUpdate(padWatcher, ns.Profiled("Gamepad watch", function()
 	end
 	if keepUp and not Fishing() then
 		padRevealUntil = ns.PadRevealEnd()
-		ns.framesWake = true -- (the frames' pass at once: Core.lua)
+		ns.framesWake = "gamepad held" -- (the frames' pass at once: Core.lua)
 	end
 	padMoveHeld = moving
 end))
