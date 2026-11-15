@@ -45,6 +45,8 @@ ignore:
   - StyleSixTest.lua
   # (Keyboard Map + Action Bars + themecheck test: /cine debug keysbars, dev copy only)
   - KeysBarsTest.lua
+  # (Camera turning lag test: /cine debug turnlag, dev copy only)
+  - TurnLagTest.lua
   # (Cooldown Manager When ready > Out of fights test: /cine debug anytime, dev copy only)
   - ReadyAnyTimeTest.lua
   # (Round action button crop test: /cine debug iconcrop, dev copy only)

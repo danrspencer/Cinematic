@@ -1754,6 +1754,9 @@ local function HandleSlash(msg)
 		-- (Dev copy: one run checking the Keyboard Map, Action Bars style and themecheck, KeysBarsTest.lua.)
 		if ns.KeysBarsTest then ns.KeysBarsTest(arg:match("^keysbars%s*(.*)$"))
 		else ns.Print("/cine debug keysbars is in the dev copy only.") end
+	elseif cmd == "debug" and arg == "turnlag" then
+		-- (Dev copy: what makes turning the camera in a crowd laggy, CineMode on and off, TurnLagTest.lua.)
+		if ns.TurnLagTest then ns.TurnLagTest() else ns.Print("/cine debug turnlag is in the dev copy only.") end
 	elseif cmd == "debug" and arg:find("^iconcrop") then
 		-- (Dev copy: bar and spellbook icons round at three crops side by side, or "all" the game's, IconCropTest.lua.)
 		if ns.IconCropTest then ns.IconCropTest(arg:match("^iconcrop%s*(.*)$")) else ns.Print("/cine debug iconcrop is in the dev copy only.") end

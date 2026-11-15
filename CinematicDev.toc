@@ -217,6 +217,7 @@ StyleRevampTest.lua
 PlateFlickerTest.lua
 StyleSixTest.lua
 KeysBarsTest.lua
+TurnLagTest.lua
 ReadyAnyTimeTest.lua
 IconCropTest.lua
 DamageVisionMeterTest.lua
