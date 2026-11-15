@@ -455,8 +455,9 @@ function ns.UpdateCVars(cinematic, fightStarting)
 	for _, set in ipairs(CVAR_SETS) do
 		-- (Nameplates page's master switch off: names are left to the game.)
 		-- (Allow outside CineMode's Nameplates: the names too, CineMode on or off.)
-		local want = (ns.PlatesCinematic(cinematic) and ns.db.handlePlates and not NameKeptHere(set.key, inCombat))
-			or immersive
+		-- (Nor while its kind's plates are up: see ns.plates.NamesOnPlates.)
+		local want = (ns.PlatesCinematic(cinematic) and ns.db.handlePlates and not NameKeptHere(set.key, inCombat)
+			and not ns.plates.NamesOnPlates(set.key, inCombat)) or immersive
 		ns.ApplyCVarSet(set, want or false)
 	end
 	-- (Kept through the Calm Timer after a fight, like the plates.)
@@ -1617,6 +1618,33 @@ do
 		end
 	end
 	KeptHere, ShownInFights = PerFrame(KeptHere), PerFrame(ShownInFights)
+end
+
+-- Whether a names row's units show their names on plates now: CineMode
+-- keeping its kind's plates up (in a fight, those shown in fights). Then the
+-- game's own names for that kind stay on too (ns.UpdateCVars): a unit with a
+-- plate shows only the plate's name, but one without (past plate range, or
+-- past the 40 plates seen up at once in a city crowd, Forever 2026-11-14)
+-- had no name at all, close by too.
+do
+	local NAME_PLATE_KINDS = {
+		HostileNPCs = { "EnemyNPCs", "EnemyMinor" }, FriendlyNPCs = { "FriendlyNPCs" },
+		InteractiveNPCs = { "FriendlyNPCs" }, Friends = { "Friends" }, FriendlyMinions = { "FriendlyMinions" },
+		Enemies = { "Enemies" }, EnemyMinions = { "EnemyMinions" },
+	}
+	local function KindShown(kind, inCombat)
+		return (inCombat and ShownInFights(kind)) or KeptHere(kind)
+	end
+	function ns.plates.NamesOnPlates(key, inCombat)
+		if key == "AllNPCs" then
+			return KindShown("EnemyNPCs", inCombat) and KindShown("NeutralNPCs", inCombat)
+				and KindShown("FriendlyNPCs", inCombat)
+		end
+		for _, kind in ipairs(NAME_PLATE_KINDS[key] or {}) do
+			if KindShown(kind, inCombat) then return true end
+		end
+		return false
+	end
 end
 
 -- How far each kind is held up by KeptHere, faded so moving between places
@@ -4451,6 +4479,9 @@ local function ReleasePlates()
 		and not ns.OFFSCREEN_PLATE_CVARS.active and not ns.NO_OFFSCREEN_PLATE_CVARS.active
 		and not (ns.db.savedPlateClicks and next(ns.db.savedPlateClicks))
 end
+-- (Cinematic stopped, ns.Suspend: the plate settings let go too. The names
+-- test found All plates on still held while paused, 2026-11-14.)
+ns.plates.Release = ReleasePlates
 
 -- Outside CineMode, once the last pass changed nothing: the pass runs again
 -- only as something it goes by changes (CineMode, a fight, your target, the

@@ -33,6 +33,8 @@ ignore:
   - ThresholdTest.lua
   # (Nameplate width test: /cine debug platewidth, dev copy only)
   - PlateWidthTest.lua
+  # (Names over heads test: /cine debug namestest, dev copy only)
+  - NamesTest.lua
   - StyleRevampTest.lua
   - PlateFlickerTest.lua
   - StyleSixTest.lua

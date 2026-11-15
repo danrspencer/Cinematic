@@ -3961,6 +3961,7 @@ local function RestoreEverything()
 	Try(ns.StopMusicNow)
 	Try(ns.StopCombatMusicNow)
 	Try(ns.ShowPlatesNow)
+	Try(ns.plates and ns.plates.Release)
 	Try(ns.ApplyCVarSet, ns.FLIGHT_CVARS, false)
 	Try(ns.ApplyCVarSet, ns.RECENTER_CVARS, false)
 	-- The UI: every faded frame back, the bars and tint off (hidden outright
