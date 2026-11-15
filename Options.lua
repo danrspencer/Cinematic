@@ -17036,6 +17036,10 @@ end)
 -- (Pages that went into others: their old names, for links and saved ones.)
 local MOVED_PAGES = { ["Combat Vision"] = "Card Vision", ["Story Vision"] = "Card Vision", ["Cards"] = "Card Vision", ["Combat Style"] = "Card Style",
 	["Story Style"] = "Card Style" }
+-- A settings page's canvas by its name (RegisterSubpage's), for the test
+-- commands that open and read pages (StyleSixTest.lua).
+function ns.SettingsPageCanvas(name) return subpages[name] end
+
 function ns.OpenOptions(page)
 	page = MOVED_PAGES[page] or page
 	-- (a UI Manager page: that page, then UI Manager open at it)
