@@ -20,6 +20,11 @@ local TAIL_SPACE = 12 -- under a bubble, for its tail
 local RISE_FROM = 80 -- how far below the screen a rising line starts
 local FADE_IN, FADE_OUT = 0.2, 0.6 -- seconds
 local SLIDE_RATE = 10 -- how fast a line slides up into its place (higher: quicker)
+-- (The lines sink a little as they come in, so they don't sit still: quick
+-- enough that its 1-pixel steps read as a slide, as words only sit on whole
+-- pixels; a slow crawl looked like move, stop, move.)
+local SINK_SPEED, SINK_DROP = 16, 48 -- pixels a second, pixels in all (3 seconds)
+local SINK_FLOOR = 10 -- the lowest they drift: this far above the screen's bottom edge
 local BASE_TIME, PER_LETTER, MOST_TIME = 3, 0.06, 12 -- seconds a line stays up
 local SAME_LINE = 1 -- seconds: the same line again (another chat window's copy) is skipped
 local BOX_W, BOX_H = 360, 48 -- the Move box
@@ -123,8 +128,10 @@ local function SetLook(line, words)
 	local file, size = font:GetFont()
 	if file and ns.BubbleFont then file = ns.BubbleFont(look, file, "") end
 	local most = MaxWidth()
-	line.frame:SetWidth(most)
+	local pixel = ns.PixelsToUnits and ns.PixelsToUnits(line.frame, 1)
+	line.frame:SetWidth(pixel and math.ceil(most / pixel / 2) * 2 * pixel or most) -- (see below)
 	text:SetWidth(most)
+	text:SetHeight(0) -- (as tall as its words again: set below for the last line)
 	text:SetText(words)
 	if ns.SetPlateNameFont and file then
 		-- (A font family, so every alphabet's letters show; it sets the words again.)
@@ -145,6 +152,13 @@ local function SetLook(line, words)
 	local wide = text.GetUnboundedStringWidth and text:GetUnboundedStringWidth() or text:GetStringWidth()
 	if type(wide) == "number" and wide < most then
 		text:SetWidth(math.ceil(wide) + 2)
+	end
+	-- (Its size on whole screen pixels, an even number wide so it centers on
+	-- one too: else the words, which snap to pixels, sat a pixel nearer one
+	-- edge of the bubble or the other, as where it was changed.)
+	if pixel then
+		text:SetWidth(math.ceil(text:GetWidth() / pixel / 2) * 2 * pixel)
+		text:SetHeight(math.ceil(text:GetStringHeight() / pixel) * pixel)
 	end
 	-- (The game's bubble, or a back of our own: Dark, Custom.)
 	local own = ns.BubbleBackColor and ns.BubbleBackColor(look)
@@ -276,6 +290,14 @@ local function OnUpdate(_, elapsed)
 			end
 		end
 	end
+	-- (All the lines sink together, from when the newest came in; a new one
+	-- starts them again from their place, never off the screen.)
+	if lines[1] and Styled().speechBehindSink then
+		y = -math.min((now - lines[1].born) * SINK_SPEED, SINK_DROP, math.max(0, spotBottom - SINK_FLOOR))
+	end
+	-- (Placed on whole screen pixels: the words snap to them as they move, the
+	-- bubble's art doesn't, so between pixels the words lagged behind the box.)
+	local pixel = ns.PixelsToUnits and ns.PixelsToUnits(holder, 1)
 	for _, line in ipairs(lines) do
 		if not line.fading then
 			line.frame:SetAlpha(math.min(1, (now - line.born) / FADE_IN) * line.most)
@@ -284,7 +306,8 @@ local function OnUpdate(_, elapsed)
 		-- first, settling into place.)
 		line.y = math.abs(y - line.y) < 0.5 and y or line.y + (y - line.y) * math.min(1, elapsed * SLIDE_RATE)
 		line.frame:ClearAllPoints()
-		line.frame:SetPoint(line.point, spot, line.point, 0, line.y)
+		line.frame:SetPoint(line.point, spot, line.point, 0,
+			pixel and math.floor(line.y / pixel + 0.5) * pixel or line.y)
 		y = y + line.text:GetStringHeight() + (line.boxed and PAD_Y * 2 or 0)
 			+ (line.tailed and TAIL_SPACE or 0) + GAP
 	end
@@ -342,6 +365,11 @@ local function PlaceSpot()
 	end
 	local middle = left + BOX_W / 2
 	side = middle < width / 3 and "LEFT" or middle > width * 2 / 3 and "RIGHT" or "CENTER"
+	-- (On whole screen pixels, so the lines over it are too: see OnUpdate.)
+	local pixel = ns.PixelsToUnits and ns.PixelsToUnits(holder, 1)
+	if pixel then
+		left, bottom = math.floor(left / pixel + 0.5) * pixel, math.floor(bottom / pixel + 0.5) * pixel
+	end
 	spotBottom, spotLeft = bottom, left
 	spot:ClearAllPoints()
 	spot:SetSize(BOX_W, 1)

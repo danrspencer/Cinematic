@@ -321,6 +321,7 @@ local DEFAULTS = {
 	speechBehindWidth = 480, -- ...wrapping past this wide
 	speechBehindAlign = "CENTER", -- ...lined up "LEFT", "CENTER", "RIGHT", or by where it's moved to
 	speechBehindRise = true, -- ...rising up from below the screen (Chat bubbles page)
+	speechBehindSink = true, -- ...sinking a little as each line comes in (Chat bubbles page)
 	speechBehindScale = 1, -- ...its size next to a bubble overhead (smaller: further away)
 	speechBehindAlpha = 1, -- ...its opacity (fainter: muffled)
 	speechBehindTailTop = true, -- ...its bubble's tail on top, pointing up
