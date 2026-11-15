@@ -242,8 +242,9 @@ local DEFAULTS = {
 	buffPeekTime = 3,           -- seconds they stay up for a buff
 	debuffPeekTime = 3,         -- ...and for a debuff
 	-- Buffs or debuffs that never bring them up (spell IDs or names; 8326/20584:
-	-- Ghost; 1953: Blink; the rest ns.LUST_DEBUFFS).
-	buffPeekIgnore = "2479, Plainsrunning, 8326, 20584, 57724, 57723, 80354, 95809, 264689, 390435, 1953",
+	-- Ghost; 1953: Blink; Campfire Nearby: smoke of a nearby fire; the rest
+	-- ns.LUST_DEBUFFS).
+	buffPeekIgnore = "2479, Plainsrunning, 8326, 20584, 57724, 57723, 80354, 95809, 264689, 390435, 1953, Campfire Nearby",
 	buffHoverPadX = 40,         -- how far beside the buff icons hovering reveals them (UI units)
 	buffHoverPadY = 40,         -- ...and above and below
 	mouseover = true,      -- hovering a faded element reveals it
@@ -6335,6 +6336,15 @@ ticker:SetScript("OnEvent", ns.Profiled("Core events", function(self, event, arg
 				ns.db.buffPeekIgnore = list
 			end
 			ns.db.buffPeekLustV1 = true
+		end
+		-- Campfire Nearby (the smoke of a fire somewhere close) added to the
+		-- ignore list, where it's set, unless there already. Once.
+		if not ns.db.buffPeekCampfireV1 then
+			local list = ns.db.buffPeekIgnore
+			if type(list) == "string" and not (", " .. list:lower() .. ","):find(",%s*campfire nearby%s*,") then
+				ns.db.buffPeekIgnore = (list:match("^%s*$") and "" or list .. ", ") .. "Campfire Nearby"
+			end
+			ns.db.buffPeekCampfireV1 = true
 		end
 		-- Heal Vision (Vision page) as its defaults in every profile: its grid
 		-- unticked, the options as the defaults say. Once. (Saved profiles drop
