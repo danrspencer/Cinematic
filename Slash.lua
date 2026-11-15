@@ -1750,6 +1750,9 @@ local function HandleSlash(msg)
 		-- (Dev copy: one run checking the style revamp's release 6 and plate theme shapes, StyleSixTest.lua.)
 		if ns.StyleSixTest then ns.StyleSixTest(arg:match("^release6%s*(.*)$"))
 		else ns.Print("/cine debug release6 is in the dev copy only.") end
+	elseif cmd == "debug" and arg:find("^iconcrop") then
+		-- (Dev copy: bar and spellbook icons round at three crops side by side, or "all" the game's, IconCropTest.lua.)
+		if ns.IconCropTest then ns.IconCropTest(arg:match("^iconcrop%s*(.*)$")) else ns.Print("/cine debug iconcrop is in the dev copy only.") end
 	elseif cmd == "debug" and arg:find("^anytime") then
 		-- (Dev copy: one run checking the Cooldown Manager's When ready > Out of fights, ReadyAnyTimeTest.lua.)
 		if ns.ReadyAnyTimeTest then ns.ReadyAnyTimeTest(arg:match("^anytime%s*(.*)$"))

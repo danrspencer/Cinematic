@@ -123,6 +123,22 @@ local function Inset(region, button, inset)
 	region:SetPoint("TOPLEFT", button, "TOPLEFT", inset, -inset)
 	region:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", -inset, inset)
 end
+-- The same, on the icon: where it fills its button (the game's own layouts)
+-- the very spot Inset gives; where a layout draws it smaller than its button,
+-- on the icon, so a round cut stays a circle. (On the button there, the circle
+-- was bigger than the icon: only its corners went, a rounded square with the
+-- icon's dark edge showing along its sides, a player's Evocation, Forever.)
+-- (Anchored, not sized: sizes read at login can be 0, the layout not run yet.)
+local function OnIcon(region, button, part, inset)
+	local icon = part.icon
+	if not (icon and icon.GetPoint and icon:GetNumPoints() > 0) then
+		Inset(region, button, inset)
+		return
+	end
+	region:ClearAllPoints()
+	region:SetPoint("TOPLEFT", icon, "TOPLEFT", inset, -inset)
+	region:SetPoint("BOTTOMRIGHT", icon, "BOTTOMRIGHT", -inset, inset)
+end
 local function Parts(button)
 	local part = parts[button]
 	if part then return part end
@@ -413,8 +429,8 @@ local function RoundGlow(button, part, round)
 	end
 	if not part.glow then return end
 	part.glowOn = round
-	Inset(part.glow, button, part.inset)
-	Inset(part.hover, button, part.inset)
+	OnIcon(part.glow, button, part, part.inset)
+	OnIcon(part.hover, button, part, part.inset)
 	-- (Its art reaches PROC_SPREAD past the round edge, outside the button: sized so
 	-- its edge sits on the button's, Media/make_action_rings.py's EDGE_R and SPREAD.)
 	local wide = button:GetWidth()
@@ -422,7 +438,7 @@ local function RoundGlow(button, part, round)
 	part.proc:ClearAllPoints()
 	part.proc:SetPoint("CENTER", button, "CENTER")
 	part.proc:SetSize(edge * PROC_SCALE * 2, edge * PROC_SCALE * 2)
-	Inset(part.press, button, part.inset)
+	OnIcon(part.press, button, part, part.inset)
 	SetHidden(button.GetPushedTexture and button:GetPushedTexture(), round)
 	part.hover:SetShown(round)
 	SetHidden(button.SpellHighlightTexture, round)
@@ -437,10 +453,7 @@ local function SetRound(button, part, round, own)
 	if own and not part.mask and button.CreateMaskTexture then
 		part.mask = button:CreateMaskTexture()
 	end
-	if part.mask and part.maskInset ~= part.inset then
-		part.maskInset = part.inset
-		Inset(part.mask, button, part.inset)
-	end
+	if part.mask then OnIcon(part.mask, button, part, part.inset) end
 	if part.mask then
 		-- (A cut-corner square (part.bevel): BEVEL_MASK. Round: ours, just
 		-- inside the ring; the game's circle let the icon's pale edge show past it.)
@@ -480,10 +493,7 @@ local function SetOutline(button, part, plan)
 		part.shade = part.edges:CreateTexture(nil, "OVERLAY", nil, -1)
 	end
 	if not part.edges then return end
-	if part.edgesInset ~= part.inset then
-		part.edgesInset = part.inset
-		Inset(part.edges, button, part.inset)
-	end
+	OnIcon(part.edges, button, part, part.inset)
 	-- (Round, or the cut-corner square: a ring of art. A plain square: lines.)
 	local bevel = plan.line and part.bevel
 	local round = plan.line and (plan.round or bevel)
@@ -498,7 +508,7 @@ local function SetOutline(button, part, plan)
 	local inner = plan.line and plan.size or 0
 	-- (Only on the cut-corner square, retail's own look copied (Forever's square
 	-- takes it too): round buttons and Classic Era's squares go without.)
-	Inset(part.shade, button, part.inset + inner)
+	OnIcon(part.shade, button, part, part.inset + inner)
 	if bevel then
 		part.shade:SetTexture(BEVEL_RING .. 1)
 		part.shade:SetVertexColor(0, 0, 0, SHADE)

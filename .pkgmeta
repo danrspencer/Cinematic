@@ -38,6 +38,10 @@ ignore:
   - StyleRevampTest.lua
   - PlateFlickerTest.lua
   - StyleSixTest.lua
+  # (Cooldown Manager When ready > Out of fights test: /cine debug anytime, dev copy only)
+  - ReadyAnyTimeTest.lua
+  # (Round action button crop test: /cine debug iconcrop, dev copy only)
+  - IconCropTest.lua
   # (Damage Vision meter crossfade test: /cine debug dvmeter, dev copy only)
   - DamageVisionMeterTest.lua
   # (Spoken support test: /cine debug spokentest, dev copy only)
