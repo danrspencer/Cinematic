@@ -225,8 +225,8 @@ WorldFrame.GetWidth = function() return UI_WIDTH end
 WorldFrame.GetHeight = function() return UI_HEIGHT end
 WorldFrame.GetEffectiveScale = function() return 1 end
 ns.ActiveEvent = function() return me.camera and "Sim", me.camera end
--- (The Shoulder Cam row's rule to start with, not mounted and not indoors,
--- unless a variant takes one out.)
+-- (The Shoulder Cam row's rule to start with, not indoors and not instance and not
+-- mounted (the sim never enters an instance), unless a variant takes one out.)
 local pauseMounted, pauseIndoors = variant ~= "mounted", variant ~= "indoors"
 ns.RowOnNow = function()
 	return me.row and not (me.mounted and pauseMounted) and not (me.indoors and pauseIndoors)
@@ -602,10 +602,10 @@ Check("Cast bar back on its place", math.abs(Share(bar, home.bar)) < 0.001, ("%.
 Check("PRD back on its place", math.abs(Share(prd, home.prd)) < 0.001, ("%.1f UI units off"):format(Share(prd, home.prd) * UI_WIDTH / 2))
 -- Your spot held (Phase 3): how far you sat from it while it was on and the
 -- game had caught up, 4 to 30 yards away, on a standard model on foot. With
--- the offset at its cap (OFFSET_SAFE / the size factor in ShoulderCam.lua, near walls, since
--- 2026-11-12) you're meant to sit nearer the middle: those only must not go
+-- the offset held (past SPOT_HOLD yards away in ShoulderCam.lua, near walls, since
+-- 2026-11-12; a distance since 2026-11-15) you're meant to sit nearer the middle: those only must not go
 -- past your spot (once the offset's glide after a zoom is done: 0.6 s).
-local OFFSET_SAFE = 1.5
+local SPOT_HOLD = ns.SHOULDER_SPOT_HOLD or 7.5
 local spotMiss, spotCount, pastSpot = 0, 0, 0
 local zoomWas, zoomedAt = nil, -math.huge
 -- (Within BLEND of a pause, the offset's easing in or out (BLEND_TIME in
@@ -628,11 +628,11 @@ for _, row in ipairs(samples) do
 	local caught = math.abs(row[3] - row[2] * me.scale) < 0.05
 	if row[2] ~= 0 and not NearPause(row[1]) and row[9] >= 1 and caught and row[4] >= 4 and row[4] <= 30 and row[8] == 0 then
 		local spot = ns.db.shoulderCamSpot or 0.2
-		if math.abs(row[2]) >= OFFSET_SAFE / me.scale - 0.01 then
+		if row[4] > SPOT_HOLD then
 			if row[1] - zoomedAt < 0.6 then row = nil end
 		end
-		if not row then -- (just zoomed, at the cap: skipped)
-		elseif math.abs(row[2]) >= OFFSET_SAFE / me.scale - 0.01 then
+		if not row then -- (just zoomed, held: skipped)
+		elseif row[4] > SPOT_HOLD then
 			pastSpot = math.max(pastSpot, math.abs(row[5]) - spot)
 		else
 			spotMiss, spotCount = spotMiss + math.abs(math.abs(row[5]) - spot), spotCount + 1

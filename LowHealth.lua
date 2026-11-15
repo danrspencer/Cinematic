@@ -3110,7 +3110,8 @@ function ns.CreateVitalsStylePanel(kit)
 			Changed()
 			kit.Refresh()
 		end)
-		check:SetPoint("LEFT", slider, "RIGHT", 30, 0)
+		-- (Inline, the value sits right of the bar: past it.)
+		check:SetPoint("LEFT", slider, "RIGHT", slider.rowName and 70 or 30, 0)
 		kit.GreyUnless(check, test or On)
 		return check
 	end

@@ -323,7 +323,9 @@ local function Remember(control, key, make)
 end
 
 local function Stack(anchor, kind, inline)
-	local stack = { last = anchor, kind = kind or "header", indent = 0, inline = inline, rows = {} }
+	-- (Inline on every page since 2026-11-15, user: "all sliders same line like
+	-- in Graphics+". false keeps a stack's sliders with their names above.)
+	local stack = { last = anchor, kind = kind or "header", indent = 0, inline = inline ~= false, rows = {} }
 	stack.moved = anchor and anchor.GetParent and movedFrom[anchor:GetParent()] or nil
 	local parent = anchor and anchor.GetParent and anchor:GetParent()
 	if stack.moved and not stack.moved.noted then
@@ -3533,7 +3535,7 @@ local function CreateRevealPanel()
 	-- One column of sections, each below the last: what brings the UI back,
 	-- combat text, your portrait.
 	local revealHeader = Header(content, L["Exit CineMode"], calm, -24)
-	revealHeader:SetPoint("TOPLEFT", calm, "BOTTOMLEFT", -2, -24)
+	revealHeader:SetPoint("TOPLEFT", calm.rowName or calm, "BOTTOMLEFT", -2, -24)
 
 	local cast = Check(content, "revealOnCast", L["While casting"],
 		L["Includes mounting and hearthstone casts."])

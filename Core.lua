@@ -470,14 +470,21 @@ local DEFAULTS = {
 	shoulderCam = false,
 	shoulderCamSpot = 0.2,     -- ...how far off the middle you sit (share of the way to the edge), held as you zoom
 	shoulderCamSide = "right", -- ..."right" or "left" (the swap key flips it)
+	shoulderCamSwapTime = 1.5, --...seconds the camera takes to cross to the other shoulder (0: the game's own quick ease)
+	shoulderCamSelfTime = 1,   -- ...seconds back over your shoulder after targeting yourself (the game centers you then)
+	shoulderCamPauseTime = 0.9, -- ...seconds out and back in going indoors, mounting, Show in and the gamepad UI
 	-- ...and while one of our cameras that frame you runs, unless allowed (the Cameras tab)
 	shoulderCamAllowVista = false, shoulderCamAllowFish = false, shoulderCamAllowCozy = false,
 	shoulderCamAllowAFK = false, shoulderCamAllowTele = false, shoulderCamAllowFlight = false,
 	shoulderCamAllowDeath = false, shoulderCamAllowYours = false,
+	-- (Walk, run, quest and chat: always kept till 2026-11-15, a tick each since; walk and run on.)
+	shoulderCamAllowWalk = true, shoulderCamAllowRun = true, shoulderCamAllowQuest = false,
+	shoulderCamAllowChat = false,
 	-- ...and the seconds it takes to go back behind you as each starts, and back as it ends (false: 0.9)
 	shoulderCamTimeVista = 10, shoulderCamTimeFish = 10, shoulderCamTimeCozy = 5,
 	shoulderCamTimeAFK = 10, shoulderCamTimeTele = 5, shoulderCamTimeFlight = 5,
 	shoulderCamTimeDeath = 5, shoulderCamTimeYours = 5,
+	shoulderCamTimeWalk = 5, shoulderCamTimeRun = 5, shoulderCamTimeQuest = 2, shoulderCamTimeChat = 2,
 	shoulderCamFrames = true,  -- ...the frames picked below slide over with you
 	shoulderCamFollowCast = true,       -- ...the cast bar
 	shoulderCamFollowPRD = true,        -- ...the Personal Resource Display (ours too)
@@ -502,10 +509,10 @@ local DEFAULTS = {
 	shoulderCamTalkIn = 1.5, -- ...seconds the turn to who you talk to takes
 	shoulderCamTalkOut = 1.5, -- ...seconds its glide back takes as the window closes
 	shoulderCamTalkHold = 0, -- ...seconds it stays on them before gliding back (0: till the window closes)
-	shoulderCamTargetTurn = false, -- ...the camera turns slowly toward an enemy you target (the game's enemy focus, eased in)
-	shoulderCamTargetTurnAlways = true, -- ...everywhere, in fights too: its Show in row's Always (off: the row's Combat and Location ticks or rule)
+	shoulderCamTargetTurn = true,  -- (on to start with since 2026-11-15) ...the camera turns slowly toward an enemy you target (the game's enemy focus, eased in)
+	shoulderCamTargetTurnAlways = false, -- (off since 2026-11-15: the rule "not combat" instead) ...everywhere, in fights too: its Show in row's Always (off: the row's Combat and Location ticks or rule)
 	shoulderCamTargetFollow = false, -- ...and the cast bar and PRD slide along with that turn (guessed from where you clicked; experimental; off till the PRD-too-far-left bug is found)
-	shoulderCamAlways = false, -- ...everywhere: its Show in row's Always (the rest: the row's ticks and rule; its rule to start with: not mounted and not indoors)
+	shoulderCamAlways = false, -- ...everywhere: its Show in row's Always (the rest: the row's ticks and rule; its rule to start with: not indoors and not instance and not mounted)
 	indoorLimits = true,      -- indoors, keep the camera modes from pushing into walls:
 	indoorZoomOut = 1,        -- ...zoom out at most this many yards past your own distance
 	indoorSwing = 10,         -- ...swing at most this far either side of behind

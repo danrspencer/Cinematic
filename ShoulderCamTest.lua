@@ -2878,6 +2878,493 @@ function ns.ShoulderSwingSize()
 	ns.Print("shoulder sizes: logged; /reload and say check log")
 end
 
+-- selftarget: why the camera goes back to the middle with yourself targeted
+-- (user, 2026-11-15, Forever: the offset kept, you centered). One run: no
+-- target, then yourself targeted with the Shoulder Cam as it plays, then our
+-- writes held (shoulderTestHold) and one setting after another tried, each
+-- kept on top of the last, HOLD seconds and a screenshot each. The step
+-- where you go back aside is the cause. Every camera setting is listed with
+-- nothing targeted and with yourself, and any change between them logged;
+-- the offset sampled every 0.2 s. Into db.shoulderSelfRun. Typed again: stops.
+do
+	local HOLD = 3
+	local STEPS = {
+		{ "rewrite: the offset written again", function(v) return { [SHOULDER] = ("%.2f"):format(v + 0.01) } end },
+		{ "enemy focus off", function() return { test_cameraTargetFocusEnemyEnable = "0" } end },
+		{ "interact focus off", function() return { test_cameraTargetFocusInteractEnable = "0" } end },
+		{ "centering off again", function() return { [CENTERED] = "0", [REDUCE] = "0" } end },
+		{ "dynamic pitch off", function() return { test_cameraDynamicPitch = "0" } end },
+		{ "head movement off", function() return { test_cameraHeadMovementStrength = "0" } end },
+		{ "offset doubled", function(v) return { [SHOULDER] = ("%.2f"):format(v * 2) } end },
+	}
+	local run
+	local function Write(text)
+		local lines = ns.db.shoulderSelfRun
+		if #lines < 4000 then lines[#lines + 1] = ("%.2f %s"):format(GetTime() - run.began, text) end
+	end
+	local function Self() return UnitExists("target") and ns.Flag(UnitIsUnit("target", "player")) end
+	-- (Every console setting with "camera" or "focus" in its name.)
+	local function Snapshot()
+		local all = {}
+		local list = C_Console and C_Console.GetAllCommands and select(2, pcall(C_Console.GetAllCommands))
+		for _, info in ipairs(type(list) == "table" and list or {}) do
+			local name = type(info) == "table" and info.command
+			local lower = type(name) == "string" and name:lower() or ""
+			if lower:find("camera", 1, true) or lower:find("focus", 1, true) then
+				local ok, value = pcall(GetCVar, name)
+				if ok and value ~= nil then all[name] = Text(value) end
+			end
+		end
+		for _, name in ipairs(CAMERA_CVARS) do all[name] = Text(GetCVar(name)) end
+		return all
+	end
+	local function Shot(what)
+		ns.PadTestBoxHide()
+		C_Timer.After(0.1, function()
+			local ok = pcall(function() Screenshot() end)
+			Write(("screenshot %s at %s: %s"):format(what, date("%m%d%y_%H%M%S"), ok and "taken" or "failed"))
+		end)
+	end
+	local function End(why)
+		if not run then return end
+		run.frame:SetScript("OnUpdate", nil)
+		run.frame:UnregisterAllEvents()
+		for name, value in pairs(run.kept or {}) do SetCVar(name, value) end
+		ns.shoulderTestHold = nil
+		Write("end: " .. why)
+		Log(("selftarget: %s, %d lines in db.shoulderSelfRun"):format(why, #ns.db.shoulderSelfRun))
+		run = nil
+		if ns.ApplyShoulderCam then ns.ApplyShoulderCam() end
+	end
+	local function Box(head, line, r, g, b) ns.PadTestBox(head, line, r or 1, g or 0.82, b or 0) end
+	local function Try(i)
+		local step = STEPS[i]
+		local sets = step[2](tonumber(GetCVar(SHOULDER)) or 0)
+		local said = {}
+		for name, value in pairs(sets) do
+			if run.kept[name] == nil then run.kept[name] = GetCVar(name) end
+			SetCVar(name, value)
+			said[#said + 1] = ("%s %s -> %s (reads %s)"):format(name, Text(run.kept[name]), value, Text(GetCVar(name)))
+		end
+		Write(("step %d %s: %s"):format(i, step[1], table.concat(said, ", ")))
+		Box(("Self target %d/%d: %s"):format(i, #STEPS, step[1]), "hands off, keep yourself targeted", 0.7, 0.7, 0.7)
+	end
+	local function Tick(_, elapsed)
+		run.clock, run.sampleClock = run.clock + elapsed, run.sampleClock + elapsed
+		if run.sampleClock >= 0.2 then
+			run.sampleClock = 0
+			Write(("s %s | offset %s centered %s | zoom %.2f | self %s"):format(run.phase, Text(GetCVar(SHOULDER)),
+				Text(GetCVar(CENTERED)), Zoom(), Text(Self())))
+		end
+		-- (Nothing targeted: read at once, half a second in, so targeting
+		-- yourself straight after can't leave it waiting: the first run, 2026-11-15.)
+		if run.phase == "none" then
+			if UnitExists("target") then run.clock = 0 return end
+			if run.clock < 0.5 then return end
+			run.none = Snapshot()
+			Shot("1 nothing targeted")
+			run.phase, run.clock = "wantSelf", 0
+			C_Timer.After(0.5, function() if run then Box("Self target", "TARGET YOURSELF (F1), then hands off") end end)
+		elseif run.phase == "wantSelf" then
+			if not Self() then run.clock = 0 return end
+			if run.clock < HOLD then return end
+			local now = Snapshot()
+			local changed = 0
+			for name, value in pairs(now) do
+				if run.none[name] ~= value then
+					changed = changed + 1
+					Write(("changed with yourself targeted: %s %s -> %s"):format(name, Text(run.none[name]), value))
+				end
+			end
+			Write(("%d camera settings changed with yourself targeted"):format(changed))
+			Shot("2 yourself, as it plays")
+			run.phase, run.clock, run.at = "steps", 0, 1
+			ns.shoulderTestHold = true
+			C_Timer.After(0.5, function() if run then Try(1) end end)
+			run.clock = -0.5
+		elseif run.phase == "steps" then
+			if not Self() then
+				Box("Self target", "TARGET YOURSELF again (F1)", 1, 0.3, 0.3)
+				run.clock = 0
+				return
+			end
+			if run.clock < HOLD then return end
+			Shot(("%d %s"):format(run.at + 2, STEPS[run.at][1]))
+			run.at, run.clock = run.at + 1, -0.5
+			if not STEPS[run.at] then
+				run.phase, run.clock = "clear", 0
+				for name, value in pairs(run.kept) do SetCVar(name, value) end
+				run.kept = {}
+				ns.shoulderTestHold = nil
+				if ns.ApplyShoulderCam then ns.ApplyShoulderCam() end
+				C_Timer.After(0.5, function() if run then Box("Self target", "CLEAR YOUR TARGET (Esc)") end end)
+				return
+			end
+			local at = run.at
+			C_Timer.After(0.5, function() if run and run.at == at then Try(at) end end)
+		elseif run.phase == "clear" then
+			if UnitExists("target") then run.clock = 0 return end
+			if run.clock < HOLD then return end
+			Shot(("%d cleared again"):format(#STEPS + 3))
+			End("done")
+			C_Timer.After(0.5, function()
+				ns.PadTestBox("Self target run done", "/reload, then say check log", 0.3, 1, 0.3)
+				C_Timer.After(15, function() if not run then ns.PadTestBoxHide() end end)
+			end)
+		end
+	end
+	function ns.ShoulderSelfTarget()
+		if run then
+			End("stopped")
+			ns.PadTestBoxHide()
+			return ns.Print("shoulder selftarget: stopped")
+		end
+		if not ns.Setting("shoulderCam") then
+			return ns.Print("shoulder selftarget: turn on the Shoulder Cam first")
+		end
+		ns.db.shoulderSelfRun = {}
+		run = { frame = CreateFrame("Frame"), phase = "none", clock = 0, sampleClock = 0, began = GetTime(), kept = {} }
+		Write(("start | %s | zoom %.2f | side %s | talk turn %s, target turn %s, frames %s | paused %s"):format(Who(),
+			Zoom(), Text(ns.db.shoulderCamSide), Text(ns.db.shoulderCamTalkTurn), Text(ns.db.shoulderCamTargetTurn),
+			Text(ns.db.shoulderCamFrames), Text(ns.GetShoulderCamDebug and ns.GetShoulderCamDebug().paused)))
+		run.frame:RegisterEvent("PLAYER_TARGET_CHANGED")
+		run.frame:SetScript("OnEvent", function()
+			if run then Write("target changed: " .. (Self() and "yourself" or UnitExists("target") and "other" or "none")) end
+		end)
+		run.frame:SetScript("OnUpdate", Tick)
+		Box("Self target", "CLEAR YOUR TARGET (Esc), stand still, WAIT for the next box")
+		ns.Print("shoulder selftarget: follow the box, about 40 seconds; type it again to stop")
+	end
+end
+
+-- today: one run over the Shoulder Cam changes of 2026-11-15, each with its
+-- own verdict and screenshots, into db.shoulderTodayRun:
+--   swap:   the swap key pressed for you: the offset glides across over
+--           Swap takes (not the game's 0.3 s snap), the frames' height kept up
+--           all the way (at the middle the offset's 0); then back;
+--   self:   yourself targeted, then cleared: the offset starts near 0 and
+--           glides back out over Back from targeting yourself;
+--   spot:   Spot on screen at 35% then 20% at zoom 8: the offset is what the
+--           spot asks for (it stopped at 1.5 yards before, so past ~14% did nothing);
+--   indoor: in and out of a building: out and back in over Off and on again takes;
+--   quest:  talking to a quest giver: with Quest camera unticked, the camera
+--           goes behind you over its 2 s and comes back as it ends.
+-- A step waiting on you gives up after 60 s (CAN'T TELL) and the run goes on.
+-- Your spot, side and zoom are put back. Typed again: stops.
+do
+	local WAIT = 60
+	local run
+	local function Write(text)
+		local lines = ns.db.shoulderTodayRun
+		if #lines < 8000 then lines[#lines + 1] = ("%.2f %s"):format(GetTime() - run.began, text) end
+	end
+	local function Verdict(name, ok, detail)
+		Write(("VERDICT %s: %s%s"):format(name, ok == nil and "CAN'T TELL" or (ok and "PASS" or "FAIL"),
+			detail and (" (" .. detail .. ")") or ""))
+		run.verdicts[#run.verdicts + 1] = ok == nil and "?" or (ok and "ok" or "X")
+	end
+	local function Box(head, line, r, g, b)
+		run.boxShown = { head, line, r or 1, g or 0.82, b or 0 }
+		ns.PadTestBox(head, line, r or 1, g or 0.82, b or 0)
+	end
+	local function Shot(what)
+		ns.PadTestBoxHide()
+		C_Timer.After(0.05, function()
+			if not run then return end
+			local ok = pcall(function() Screenshot() end)
+			Write(("screenshot %s at %s: %s"):format(what, date("%m%d%y_%H%M%S"), ok and "taken" or "failed"))
+			C_Timer.After(0.3, function()
+				if run and run.boxShown then ns.PadTestBox(unpack(run.boxShown)) end
+			end)
+		end)
+	end
+	local function Offset() return tonumber(GetCVar(SHOULDER)) or 0 end
+	local function Self() return UnitExists("target") and ns.Flag(UnitIsUnit("target", "player")) end
+	local function Debug() return ns.GetShoulderCamDebug and ns.GetShoulderCamDebug() or {} end
+	local function ZoomTo(yards)
+		local delta = yards - Zoom()
+		if math.abs(delta) > 0.1 then
+			ns.CallCameraFunction(delta > 0 and "CameraZoomOut" or "CameraZoomIn", math.abs(delta))
+		end
+	end
+	-- A watch over the offset from a moment on: the last time it moved (by
+	-- 0.02 or more, a write's step) and its smallest and largest size.
+	local function Watch()
+		local value = Offset()
+		return { from = GetTime(), first = value, last = value, movedAt = nil, least = math.abs(value),
+			most = math.abs(value), samples = 0, between = 0 }
+	end
+	local function Follow(w, low, high)
+		local value = Offset()
+		if math.abs(value - w.last) >= 0.02 then w.movedAt = GetTime() end
+		w.last = value
+		w.least, w.most = math.min(w.least, math.abs(value)), math.max(w.most, math.abs(value))
+		w.samples = w.samples + 1
+		if low and high and math.abs(value) > low and math.abs(value) < high then w.between = w.between + 1 end
+	end
+	local function Took(w) return w.movedAt and (w.movedAt - w.from) or 0 end
+	local function Near(a, b, by) return math.abs(a - b) <= by end
+
+	-- The steps, in turn. Each: start(s), tick(s, elapsed) returning true when done.
+	local STEPS = {}
+	STEPS[1] = { name = "swap",
+		start = function(s)
+			Box("Today 1/5: swap", "hands off, stand still, nothing targeted", 0.7, 0.7, 0.7)
+			s.phase = "ready"
+		end,
+		tick = function(s)
+			if s.phase == "ready" then
+				local d = Debug()
+				if UnitExists("target") or d.paused ~= "no" or math.abs(Offset()) < 0.3 then
+					if s.clock > WAIT then
+						Verdict("swap glides", nil, ("never ready: paused %s, offset %.2f"):format(Text(d.paused), Offset()))
+						return true
+					end
+					if s.clock > 2 then Box("Today 1/5: swap", "CLEAR YOUR TARGET, outdoors, on foot, Shoulder Cam on") end
+					return
+				end
+				s.want = tonumber(ns.db.shoulderCamSwapTime) or 0
+				s.size, s.side = math.abs(Offset()), ns.db.shoulderCamSide
+				Write(("swap: offset %.2f, side %s, Swap takes %.1f, lift %.2f"):format(Offset(), Text(s.side), s.want,
+					d.followLift or 0))
+				s.w, s.lowLift = Watch(), d.followLift or 0
+				s.liftWas = s.lowLift
+				ns.ShoulderSwapButton:Click()
+				s.phase, s.at, s.shot = "going", 0, false
+			elseif s.phase == "going" or s.phase == "back" then
+				s.at = s.at + s.dt
+				Follow(s.w, 0.05, s.size * 0.9)
+				local lift = Debug().followLift or 0
+				s.lowLift = math.min(s.lowLift, lift)
+				if s.sample <= 0 then
+					s.sample = 0.05
+					Write(("swap %s: %.2f s offset %.2f lift %.2f"):format(s.phase, s.at, Offset(), lift))
+				end
+				if s.phase == "going" and not s.shot and s.at >= s.want / 2 then
+					s.shot = true
+					Shot("1 mid swap")
+				end
+				if s.at < s.want + 1.5 then return end
+				if s.phase == "going" then
+					-- (s.side: the side before: flipped, the offset's on the other one.)
+					local took, flipped = Took(s.w), Offset() * (s.side == "left" and 1 or -1) > 0
+					local okTime = s.want > 0 and Near(took, s.want, 0.45)
+					Verdict("swap glides", flipped and okTime and s.w.between >= 5,
+						("took %.2f s for %.1f, %d samples between, flipped %s, size %.2f -> %.2f"):format(took, s.want,
+						s.w.between, Text(flipped), s.size, math.abs(Offset())))
+					-- (No lift to keep with Frames follow you off: can't tell.)
+					local kept
+					if s.liftWas >= 0.95 then kept = s.lowLift >= 0.95 end
+					Verdict("swap keeps the height", kept, ("lift %.2f before, lowest %.2f"):format(s.liftWas, s.lowLift))
+					Shot("2 swapped")
+					s.w = Watch()
+					ns.ShoulderSwapButton:Click()
+					s.phase, s.at = "back", 0
+					return
+				end
+				Write(("swap back: took %.2f s, side %s"):format(Took(s.w), Text(ns.db.shoulderCamSide)))
+				return true
+			end
+		end }
+	STEPS[2] = { name = "self",
+		start = function(s)
+			s.want = tonumber(ns.db.shoulderCamSelfTime) or 1
+			s.steady = math.abs(Offset())
+			Box("Today 2/5: yourself", "TARGET YOURSELF (F1), then wait for the next box")
+			s.phase = "target"
+		end,
+		tick = function(s)
+			if s.phase == "target" then
+				if not Self() then
+					if s.clock > WAIT then Verdict("self glides back", nil, "never targeted yourself") return true end
+					return
+				end
+				s.phase, s.at = "held", 0
+				Write(("self: targeted, offset %.2f, paused %s"):format(Offset(), Text(Debug().paused)))
+			elseif s.phase == "held" then
+				s.at = s.at + s.dt
+				if s.at < 2.5 then return end
+				Write(("self: after 2.5 s offset %.2f, paused %s"):format(Offset(), Text(Debug().paused)))
+				Box("Today 2/5: yourself", "CLEAR YOUR TARGET (Esc)")
+				s.phase = "clear"
+			elseif s.phase == "clear" then
+				if UnitExists("target") then
+					if s.clock > WAIT * 2 then Verdict("self glides back", nil, "target never cleared") return true end
+					return
+				end
+				s.start, s.w, s.at, s.phase = math.abs(Offset()), Watch(), 0, "back"
+				Box("Today 2/5: yourself", "hands off", 0.7, 0.7, 0.7)
+			elseif s.phase == "back" then
+				s.at = s.at + s.dt
+				Follow(s.w)
+				if s.sample <= 0 then
+					s.sample = 0.05
+					Write(("self back: %.2f s offset %.2f"):format(s.at, Offset()))
+				end
+				if not s.shot and s.at >= 0.3 then s.shot = true Shot("3 self, 0.3 s after clearing") end
+				if s.at < s.want + 1.5 then return end
+				local took = Took(s.w)
+				Verdict("self glides back", s.start < s.steady * 0.3 and Near(took, s.want, 0.4),
+					("started at %.2f of %.2f, took %.2f s for %.1f"):format(s.start, s.steady, took, s.want))
+				Shot("4 self, back")
+				return true
+			end
+		end }
+	STEPS[3] = { name = "spot",
+		start = function(s)
+			s.keptSpot, s.keptZoom = ns.db.shoulderCamSpot, Zoom()
+			Box("Today 3/5: spot", "hands off, nothing targeted (the zoom moves by itself)", 0.7, 0.7, 0.7)
+			ZoomTo(8)
+			s.phase, s.at, s.i = "spot", 0, 1
+			s.spots = { 0.35, 0.20 }
+			ns.db.shoulderCamSpot = s.spots[1]
+		end,
+		tick = function(s)
+			s.at = s.at + s.dt
+			if s.at < 2.5 then return end
+			local spot = s.spots[s.i]
+			local d = Debug()
+			local view = ns.ShoulderViewWidth and ns.ShoulderViewWidth() or 1
+			local want = spot * math.min(Zoom(), ns.SHOULDER_SPOT_HOLD or 7.5) * view / (d.scale or 1)
+			local fits
+			if d.paused == "no" then fits = Near(math.abs(Offset()), want, want * 0.06) end
+			Verdict(("spot %d%%"):format(spot * 100), fits,
+				("offset %.2f, wanted %.2f (zoom %.2f, view width %.3f, size %.2f, paused %s)"):format(math.abs(Offset()),
+				want, Zoom(), view, d.scale or 0, Text(d.paused)))
+			Shot(("%d spot %d%%"):format(4 + s.i, spot * 100))
+			s.i, s.at = s.i + 1, 0
+			if s.spots[s.i] then
+				ns.db.shoulderCamSpot = s.spots[s.i]
+				return
+			end
+			ns.db.shoulderCamSpot = s.keptSpot
+			ZoomTo(s.keptZoom)
+			return true
+		end }
+	-- (Indoors and the quest camera: a pause starting, then ending. kind:
+	-- PauseReason's word; want: the seconds it should take.)
+	local function PauseStep(index, name, kind, want, go, back)
+		return { name = name,
+			start = function(s)
+				s.want = want()
+				Box(("Today %d/5: %s"):format(index, name), go .. "  (or wait 60 s to skip)")
+				s.phase = "wait"
+			end,
+			tick = function(s)
+				local paused = Debug().paused
+				-- (Our cameras play as their scripts: "script:quest" is the quest camera too.)
+				if paused == "script:" .. kind then paused = kind end
+				if s.phase == "wait" then
+					if paused ~= kind then
+						if s.clock > WAIT then Verdict(name .. " out", nil, "never paused for " .. kind) return true end
+						return
+					end
+					s.w, s.at, s.phase = Watch(), 0, "out"
+					s.size = math.abs(s.w.first)
+					Write(("%s: paused, offset %.2f, wants %.1f s"):format(name, Offset(), s.want))
+				elseif s.phase == "out" or s.phase == "in" then
+					s.at = s.at + s.dt
+					Follow(s.w)
+					if s.sample <= 0 then
+						s.sample = 0.05
+						Write(("%s %s: %.2f s offset %.2f paused %s"):format(name, s.phase, s.at, Offset(), Text(paused)))
+					end
+					if not s.shot and s.at >= s.want / 2 then
+						s.shot = true
+						Shot(("%s %s, halfway"):format(name, s.phase))
+					end
+					if s.phase == "out" then
+						if paused ~= kind and s.at < s.want then
+							Write(name .. ": pause ended early")
+						end
+						if s.at < s.want + 1 then return end
+						local took = Took(s.w)
+						Verdict(name .. " out", s.size > 0.3 and Near(took, s.want, math.max(0.4, s.want * 0.25))
+							and math.abs(Offset()) < 0.05,
+							("took %.2f s for %.1f, from %.2f to %.2f"):format(took, s.want, s.size, math.abs(Offset())))
+						Box(("Today %d/5: %s"):format(index, name), back)
+						s.phase = "end"
+					end
+				end
+				if s.phase == "end" then
+					if paused == kind then
+						if s.clock > WAIT * 3 then Verdict(name .. " back in", nil, "never ended") return true end
+						return
+					end
+					Box(("Today %d/5: %s"):format(index, name), "hands off", 0.7, 0.7, 0.7)
+					s.w, s.at, s.phase, s.shot = Watch(), 0, "in", false
+				elseif s.phase == "in" and s.at >= s.want + 1 then
+					local took = Took(s.w)
+					Verdict(name .. " back in", math.abs(Offset()) > 0.3 and Near(took, s.want, math.max(0.4, s.want * 0.25)),
+						("took %.2f s for %.1f, now %.2f"):format(took, s.want, math.abs(Offset())))
+					return true
+				end
+			end }
+	end
+	STEPS[4] = PauseStep(4, "indoors", "indoors", function() return tonumber(ns.db.shoulderCamPauseTime) or 0.9 end,
+		"WALK INTO A BUILDING (an inn), then stand still", "WALK BACK OUTSIDE, then stand still")
+	STEPS[5] = PauseStep(5, "quest", "quest", function() return tonumber(ns.db.shoulderCamTimeQuest) or 2 end,
+		"TALK TO A QUEST GIVER (open a quest)", "CLOSE THE QUEST WINDOW")
+
+	local function End(why)
+		if not run then return end
+		run.frame:SetScript("OnUpdate", nil)
+		ns.db.shoulderCamSide = run.kept.side
+		ns.db.shoulderCamSpot = run.kept.spot
+		Write(("end: %s | verdicts %s"):format(why, table.concat(run.verdicts, " ")))
+		Log(("today: %s, %d lines in db.shoulderTodayRun"):format(why, #ns.db.shoulderTodayRun))
+		run = nil
+		if ns.ApplyShoulderCam then ns.ApplyShoulderCam() end
+	end
+	local function Begin(i)
+		local step = STEPS[i]
+		run.step = { clock = 0, sample = 0, dt = 0 }
+		run.at = i
+		Write(("step %d %s"):format(i, step.name))
+		step.start(run.step)
+	end
+	local function Tick(_, elapsed)
+		local s = run.step
+		s.clock, s.dt, s.sample = s.clock + elapsed, elapsed, s.sample - elapsed
+		if STEPS[run.at].tick(s) then
+			if STEPS[run.at + 1] and not run.only then
+				Begin(run.at + 1)
+			else
+				local verdicts = table.concat(run.verdicts, " ")
+				End("done")
+				ns.PadTestBox("Today run done: /reload, then say check log", verdicts, 0.3, 1, 0.3)
+				C_Timer.After(20, function() if not run then ns.PadTestBoxHide() end end)
+			end
+		end
+	end
+	-- (only: a step's name, "quest"..., to run just that one.)
+	function ns.ShoulderToday(only)
+		if run then
+			End("stopped")
+			ns.PadTestBoxHide()
+			return ns.Print("shoulder today: stopped")
+		end
+		if not ns.Setting("shoulderCam") then
+			return ns.Print("shoulder today: turn on the Shoulder Cam first")
+		end
+		ns.db.shoulderTodayRun = {}
+		run = { frame = CreateFrame("Frame"), began = GetTime(), verdicts = {},
+			kept = { side = ns.db.shoulderCamSide, spot = ns.db.shoulderCamSpot } }
+		Write(("start | %s | zoom %.2f | side %s, spot %s | swap %s, self %s, pause %s, quest allowed %s time %s | " ..
+			"frames %s, screen %.0f x %.0f"):format(Who(), Zoom(), Text(ns.db.shoulderCamSide), Text(ns.db.shoulderCamSpot),
+			Text(ns.db.shoulderCamSwapTime), Text(ns.db.shoulderCamSelfTime), Text(ns.db.shoulderCamPauseTime),
+			Text(ns.db.shoulderCamAllowQuest), Text(ns.db.shoulderCamTimeQuest), Text(ns.db.shoulderCamFrames),
+			WorldFrame:GetWidth(), WorldFrame:GetHeight()))
+		local first = 1
+		for i, step in ipairs(STEPS) do
+			if step.name == only then first, run.only = i, true end
+		end
+		run.frame:SetScript("OnUpdate", Tick)
+		Begin(first)
+		ns.Print("shoulder today: outdoors in a town, on foot; follow the box, a few minutes; type it again to stop")
+	end
+end
+
 local function Set(key, value)
 	ns.db[key] = value
 	if ns.ApplyShoulderCam then ns.ApplyShoulderCam() end
@@ -2922,6 +3409,8 @@ function ns.ShoulderTest(arg)
 	elseif what == "prdcheck" then ns.ShoulderPrdCheck()
 	elseif what == "swingsize" or what == "sizes" then ns.ShoulderSwingSize()
 	elseif what == "lock" then ns.ShoulderLock()
+	elseif what == "selftarget" then ns.ShoulderSelfTarget()
+	elseif what == "today" then ns.ShoulderToday(rest)
 	elseif what == "on" then Set("shoulderCam", true)
 	elseif what == "off" then Set("shoulderCam", false)
 	elseif what == "left" or what == "right" then Set("shoulderCamSide", what)
@@ -2930,7 +3419,7 @@ function ns.ShoulderTest(arg)
 	-- (The Shoulder Cam layout, Layouts.lua: made, or made again from the code, and switched to; offers the reload.)
 	elseif what == "layout" then ns.RegenerateLayout("Shoulder Cam")
 	else
-		ns.Print("shoulder: scan, frames, watch, quiet, sweep offsets|zoom|ease|next|stop, try pitch|head|enemy|interact|walls|off, walls, forms, shift [n|move], cams, map still|talk|ramp|back|walk|enemy, zoomcurve, mounts, aimclick, drag, follow [trial], angles, padscan, prdcheck, calibrate, lock, " ..
+		ns.Print("shoulder: scan, frames, watch, quiet, sweep offsets|zoom|ease|next|stop, try pitch|head|enemy|interact|walls|off, walls, forms, shift [n|move], cams, map still|talk|ramp|back|walk|enemy, zoomcurve, mounts, aimclick, drag, follow [trial], angles, padscan, prdcheck, calibrate, lock, selftarget, today, " ..
 			"on, off, left, right, spot <percent>, strength <percent>, layout")
 	end
 end
