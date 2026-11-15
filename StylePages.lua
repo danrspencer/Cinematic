@@ -1175,6 +1175,8 @@ local LOOK_GROUPS = {
 	{ "Bar", { { "texture", "Texture" }, { "barColor", "Color" }, { "ground", "Dark ground" } } },
 	-- (Cast Bar Style's rows: the spell's icon, its size and the marks on it.)
 	{ "Icon", { { "icon", "Icon" } } },
+	-- (Unit Frame Style's rows: the portrait and its shape.)
+	{ "Portrait", { { "portrait", "Portrait" } } },
 	{ "Text", { { "font", "Font" }, { "textSize", "Size" }, { "textColor", "Color" }, { "outline", "Outline" },
 		{ "outlineColor", "Outline color" }, { "shadow", "Shadow" } } },
 	-- (Name Style's rows: the name's colors, a glow behind it. Left out where

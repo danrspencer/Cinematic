@@ -2688,43 +2688,15 @@ function ns.CreateUnitStylePanel(kit)
 	local title = kit.Label(content, "GameFontNormalLarge", L["Unit Frame Style"])
 	title:SetPoint("TOPLEFT", 16, -16)
 	local intro = kit.PageIntro(content, title,
-		L["How your player, target, focus, pet, target of target and party frames look. The Default tab's " ..
-		"settings are every frame's until its own tab has Same as the Default tab unticked. Which parts show: " ..
-		"the UI Visibility hub's HUD page, its Unit frames tab."])
+		L["How your player, target, focus, pet, target of target and party frames look. The Default row's " ..
+		"look is every frame's until its row says Its own look; each row's Look panel sets it. Which parts " ..
+		"show: the UI Visibility hub's HUD page, its Unit frames tab."])
 
-	-- The tab being edited (nil: Default), and each setting as the field it edits:
-	-- the frame's own copy while it has one, else Default's (shown greyed).
+	-- The row shown in the preview (nil: Default): the last one picked or
+	-- whose panel was opened.
 	local editing
-	local function UsesDefault(db) return editing and not db["ufOwn_" .. editing] end
-	local function FieldOf(key)
-		return {
-			get = function()
-				local db = ns.GetDB()
-				if not db then return nil end
-				local own = editing and db["ufOwn_" .. editing]
-				local border = key:match("^ufBorder(%u%l*)$")
-				if own and border and border ~= "" then return db["ufBorder_" .. editing .. border] end
-				return db[own and key .. "_" .. editing or key]
-			end,
-			set = function(value)
-				local db = ns.GetDB()
-				local border = key:match("^ufBorder(%u%l*)$")
-				if editing and border and border ~= "" then
-					db["ufBorder_" .. editing .. border] = value
-				else
-					db[editing and key .. "_" .. editing or key] = value
-				end
-			end,
-		}
-	end
-	local fields = {}
-	local function Field(key)
-		fields[key] = fields[key] or FieldOf(key)
-		return fields[key]
-	end
 
 	local preview -- (below: drawn again as each setting changes)
-	local tabs, ownCheck, partyNote
 	local function Changed()
 		ns.RefreshUnitStyle()
 		if preview then preview:Refresh(editing) end
@@ -2734,8 +2706,7 @@ function ns.CreateUnitStylePanel(kit)
 		L["On: the unit frames look as this page says. Off: the game's own (the preview shows that too). " ..
 		"Each setting keeps its value for when you turn this back on."], intro, Changed)
 	local stack = kit.Stack(switch, "check")
-	local rows = ns.StyleRows(kit, content, stack, Changed, "ufStyle", Field)
-	local function Editable(db) return rows.On(db) and not UsesDefault(db) end
+	local rows = ns.StyleRows(kit, content, stack, Changed, "ufStyle")
 
 	local function Pick(id)
 		editing = id
@@ -2768,38 +2739,11 @@ function ns.CreateUnitStylePanel(kit)
 				ufNameColor = "class" } },
 	}, PRESET_KEYS)
 
-	-- The tabs, in the folder look (ns.FolderTabs): Default, then each frame,
-	-- the settings on the panel under them. On a frame's, Same as the Default
-	-- tab; on Default's, a note in its place.
-	local TAB_H = ns.FOLDER_TAB_HEIGHT
-	local ids, list = { false }, {}
-	for _, info in ipairs(FRAMES) do ids[#ids + 1] = info[1] end
-	for i, id in ipairs(ids) do
-		list[i] = { id and L[TAB_NAMES[id]] or L["Default"],
-			id and L["This frame's settings: Default's until you untick Same as the Default tab."]
-			or L["The settings every frame has while its tab uses the default settings."] }
-	end
-	local tabsRoom = CreateFrame("Frame", nil, content)
-	tabsRoom:SetSize(480, TAB_H + 4)
-	stack:Add(tabsRoom, "label")
-	local panel, ShowTab, base
-	panel, tabs, ShowTab, base = ns.FolderTabs(content, list, function(i) Pick(ids[i] or nil) end)
-	panel:SetPoint("TOPLEFT", tabsRoom, "BOTTOMLEFT", -10, 0)
-	base:SetPoint("TOPLEFT", tabsRoom, "BOTTOMLEFT", -10, 0)
-	local defaultNote
-	local function TabsLook()
-		local db = ns.GetDB()
-		for i, tab in ipairs(tabs) do
-			local id = ids[i] or nil
-			local own = id and db and db["ufOwn_" .. id]
-			tab:SetText((id and L[TAB_NAMES[id]] or L["Default"]) .. (own and " |cffffd100*|r" or ""))
-			tab:SetWidth(math.max(56, math.ceil(tab.label:GetStringWidth()) + 16))
-			if id == editing then ShowTab(i) end
-		end
-		ownCheck:SetShown(editing ~= nil)
-		defaultNote:SetShown(editing == nil)
-		partyNote:SetShown(editing == "PARTY" and ns.RaidStyleParty())
-	end
+	-- The rows: Default first, then each frame, each with its Same as the
+	-- Default row pick and a Look panel (the Style pages' template,
+	-- StylePages.lua's rows.Look): Bars, Name, Portrait and Border. A frame's
+	-- settings are its own copy (<key>_<ID>) while it has its own look, else
+	-- the Default row's (its panel greyed).
 	-- (Every setting the page has, Default's and each frame's, for its Reset.)
 	for key in pairs(KEYS) do kit.RecordKey(content, key) end
 	for _, info in ipairs(FRAMES) do
@@ -2807,111 +2751,223 @@ function ns.CreateUnitStylePanel(kit)
 		for key in pairs(KEYS) do kit.RecordKey(content, key .. "_" .. info[1]) end
 		for _, part in ipairs({ "Size", "R", "G", "B" }) do kit.RecordKey(content, "ufBorder_" .. info[1] .. part) end
 	end
-	ownCheck = kit.Check(content, false, L["Same as the Default tab"],
-		L["Ticked: this frame looks as the Default tab says. Unticked: as the settings below say (they start " ..
-		"as Default's, and are kept while it's ticked)."], function(value)
-			local db = ns.GetDB()
-			-- (A first untick: the frame starts from Default's settings.)
-			if not value and not db["ufStarted_" .. editing] then
-				for key in pairs(KEYS) do db[key .. "_" .. editing] = db[key] end
-				for _, part in ipairs({ "Size", "R", "G", "B" }) do
-					db["ufBorder_" .. editing .. part] = db["ufBorder" .. part]
+	-- (A row's settings: Default's plain keys, a frame's own copy; its border's
+	-- size and color as ufBorder_<ID><part>.)
+	local fieldsOf = {}
+	local function FieldFor(id)
+		local key0 = id or "DEFAULT"
+		if not fieldsOf[key0] then
+			local fields = {}
+			fieldsOf[key0] = function(key)
+				if type(key) ~= "string" or KEYS[key] == nil then return key end
+				if not fields[key] then
+					local border = key:match("^ufBorder(%u%l*)$")
+					local dbKey = id and ((border and border ~= "") and "ufBorder_" .. id .. border or key .. "_" .. id) or key
+					fields[key] = {
+						get = function()
+							local db = ns.GetDB()
+							return db and db[dbKey]
+						end,
+						set = function(value) ns.GetDB()[dbKey] = value end,
+					}
 				end
-				db["ufStarted_" .. editing] = true
+				return fields[key]
 			end
-			db["ufOwn_" .. editing] = not value
-			Changed()
-			kit.Refresh()
-		end)
-	ownCheck.Refresh = function(self)
-		local db = ns.GetDB()
-		self:SetChecked(editing and db and not db["ufOwn_" .. editing] or false)
-		TabsLook()
+		end
+		return fieldsOf[key0]
 	end
-	ownCheck.pageSwitch = false
-	stack:Add(ownCheck, "check")
-	-- (Party, while the game draws it as raid frames: nothing here to dress.)
-	partyNote = kit.Label(content, "GameFontHighlightSmall", L["Your party uses raid-style frames (Edit Mode's " ..
-		"party frames setting): they follow the Raid Frames page, not this tab."])
-	partyNote:SetPoint("LEFT", ownCheck.Text or ownCheck.text or ownCheck, "RIGHT", 16, 0)
-	partyNote:SetWidth(300)
-	partyNote:SetJustifyH("LEFT")
-	partyNote:SetTextColor(1, 0.82, 0)
-	kit.GreyUnless(ownCheck, rows.On)
-	kit.AddControl(ownCheck)
-	defaultNote = kit.Label(content, "GameFontHighlightSmall",
-		L["Every frame looks as this tab says while its own tab has Same as the Default tab ticked."])
-	defaultNote:SetPoint("LEFT", ownCheck, "LEFT", 4, 0)
-	defaultNote.searchSkip = true
+	local function EditableFor(id)
+		return function(db) return rows.On(db) and (not id or db["ufOwn_" .. id]) and true or false end
+	end
+	-- (A frame's own look the first time: it starts from Default's settings.)
+	local function SetOwn(id, own)
+		local db = ns.GetDB()
+		if own and not db["ufStarted_" .. id] then
+			for key in pairs(KEYS) do db[key .. "_" .. id] = db[key] end
+			for _, part in ipairs({ "Size", "R", "G", "B" }) do db["ufBorder_" .. id .. part] = db["ufBorder" .. part] end
+			db["ufStarted_" .. id] = true
+		end
+		db["ufOwn_" .. id] = own and true or false
+	end
+	-- Where a row's setting comes from (the Look panel's tags).
+	local function SourceOf(id)
+		return function(key)
+			local db = ns.GetDB() or {}
+			if id and not db["ufOwn_" .. id] then return { text = L["Default row's"] } end
+			local dbKey = id and key .. "_" .. id or key
+			local value = db[dbKey]
+			if ns.IsGeneralStyle and ns.IsGeneralStyle(value) then return { text = L["General's"] } end
+			if not id and ns.ThemeSetting then
+				local themed = ns.ThemeSetting(key)
+				local theme = ns.ActiveStyleTheme and ns.ActiveStyleTheme()
+				if themed ~= nil and themed == value and theme then
+					return { text = L["Set by theme: %s"]:format(L[theme.name]) }
+				end
+			end
+			if value ~= nil and value ~= KEYS[key] then return { text = L["This row"], own = true } end
+			return nil
+		end
+	end
 
-	stack:Header(content, L["Look"])
-	rows.Look(L["Bars:"], L["Bars"], {
-		texture = { "ufTexture", L["The bars' fill. Below the game's own few: any other addon shares (through " ..
-			"LibSharedMedia)."], test = Editable, tint = { 0.25, 0.75, 0.3 } },
-		barColor = function(look)
-			local last = look.Choices(L["Health:"], "ufHealthColor", {
-				{ "game", L["The game's"] },
-				{ "class", L["Class or reaction"], L["Players in their class color, everyone else red, yellow or " ..
-					"green by how they see you."] },
-				{ "custom", L["Custom"], L["A color of your own (the swatch)."] },
-			}, Editable)
-			look.Swatch(last, "ufHealthColor", { "ufHealthR", "ufHealthG", "ufHealthB" },
-				L["The health bar's color, for Custom."], Editable)
-		end,
-		border = { "ufBorder", L["Round each bar: the game's frame alone, or a border of ours (Custom: its " ..
-			"thickness and color under it)."], opts = { game = true }, test = Editable },
-		ground = function(look)
-			look.Slider("ufBack", L["Background"], 0, 100, 5, "%d%%", 100,
-				L["How dark it is behind the bars, with a border of ours."], Editable)
-		end,
-	})
-	rows.Look(L["Name:"], L["Name"], {
-		font = { "ufFont", L["The name's font. Russian, Korean or Chinese names keep the game's, so their " ..
-			"letters show."], test = Editable },
-		textSize = function(look)
-			look.Slider("ufNameSize", L["Size"], 50, 150, 5, "%d%%", 100, L["The name's size, next to the game's."],
-				Editable)
-		end,
-		textColor = function(look)
-			look.Choices(L["Color:"], "ufNameColor", {
-				{ "game", L["The game's"] },
-				{ "class", L["Class or reaction"] },
-				{ "white", L["White"] },
-				{ "theme", L["The theme's"] },
-			}, Editable)
-		end,
-		outline = { "ufOutline", nil, names = { [0] = L["None"], L["Thin"], L["Thick"] }, test = Editable },
-		outlineColor = false, -- (the game's text: its outline is always black)
-		shadow = { "ufShadow", test = Editable },
-	})
+	-- A row's Look panel, made the first time it's opened.
+	local function MakePanel(id, label)
+		local Editable = EditableFor(id)
+		local hidden = { Add = function(_, control)
+			control:Hide()
+			return control
+		end }
+		local looks = ns.StyleRows(kit, content, hidden, Changed, "ufStyle", FieldFor(id))
+		local button, pop = looks.Look("", L["Unit frames"] .. ": " .. label, {
+			tabs = {
+				default = function(key) return KEYS[key] end,
+				source = SourceOf(id),
+				copyKind = "unitRow", copyName = label,
+			},
+			-- (Its sample: the frames, this row's drawn as it says.)
+			preview = function(parent, width)
+				local holder = ns.MakeUnitStylePreview(parent, width)
+				local refresh = holder.Refresh
+				local tag = holder:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+				tag:SetPoint("TOPRIGHT", -8, -6)
+				tag.searchSkip = true
+				-- (A choice pointed at isn't drawn here: the frames read their saved settings.)
+				function holder.Refresh(self, _, note)
+					tag:SetShown(note ~= nil)
+					tag:SetText(note or "")
+					refresh(self, id)
+				end
+				holder:HookScript("OnShow", function(self) self:Refresh() end)
+				return holder
+			end,
+			texture = { "ufTexture", L["The bars' fill. Below the game's own few: any other addon shares (through " ..
+				"LibSharedMedia)."], test = Editable, tint = { 0.25, 0.75, 0.3 } },
+			barColor = function(look)
+				look.Choices(L["Health:"], "ufHealthColor", {
+					{ "game", L["The game's"] },
+					{ "class", L["Class or reaction"], L["Players in their class color, everyone else red, yellow or " ..
+						"green by how they see you."] },
+					{ "custom", L["Custom"], L["A color of your own (below)."] },
+				}, Editable)
+				look.Chips(L["Its color"], { "ufHealthR", "ufHealthG", "ufHealthB" },
+					L["The health bar's color, for Custom."],
+					function(db) return Editable(db) and ns.StyleKeyGet(FieldFor(id)("ufHealthColor")) == "custom" end)
+			end,
+			ground = function(look)
+				look.Slider("ufBack", L["Background"], 0, 100, 5, "%d%%", 100,
+					L["How dark it is behind the bars, with a border of ours."], Editable)
+			end,
+			font = { "ufFont", L["The name's font. Russian, Korean or Chinese names keep the game's, so their " ..
+				"letters show."], test = Editable },
+			textSize = function(look)
+				look.Slider("ufNameSize", L["Size"], 50, 150, 5, "%d%%", 100, L["The name's size, next to the game's."],
+					Editable)
+			end,
+			textColor = function(look)
+				look.Choices(L["Color:"], "ufNameColor", {
+					{ "game", L["The game's"] },
+					{ "class", L["Class or reaction"] },
+					{ "white", L["White"] },
+					{ "theme", L["The theme's"] },
+				}, Editable)
+				look.Choices(L["Long names:"], "ufNameCut", {
+					{ "game", L["The game's"], L["A name too long for its frame ends in \"...\"."] },
+					{ "first", L["First name"], L["A name too long for its frame loses its last words, with no \"...\": " ..
+						"Benediction Cumberbatch shows as Benediction. A single long word loses its last letters."] },
+				}, Editable)
+			end,
+			outline = { "ufOutline", nil, names = { [0] = L["None"], L["Thin"], L["Thick"] }, test = Editable },
+			outlineColor = false, -- (the game's text: its outline is always black)
+			shadow = { "ufShadow", test = Editable },
+			portrait = function(look)
+				look.Choices(L["Portrait:"], "ufPortrait", {
+					{ "game", L["The game's"], L["Their face."] },
+					{ "class", L["Class icon"], L["A player's class icon in place of their face (NPCs keep theirs)."] },
+				}, Editable)
+				look.Dropdown(L["Shape:"], "ufShape", function()
+					local list = {}
+					for _, each in ipairs({
+						{ "game", L["The game's"], L["The game's round frame."] },
+						{ "circle", L["Circle"], L["A thin ring in place of the game's frame art."] },
+						{ "square", L["Square"], L["A square portrait with a thin edge, in place of the game's frame art."] },
+						{ "hex", L["Hexagon"], L["A six-sided portrait, in place of the game's frame art."] },
+						{ "diamond", L["Diamond"], L["A diamond portrait, in place of the game's frame art."] },
+						{ "arch", L["Arch"], L["A portrait in a pointed window, in place of the game's frame art."] },
+						{ "cut", L["Cut square"], L["A square portrait with small cut corners, in place of the game's frame art."] },
+						{ "eye", L["Eye"], L["A tall, narrow portrait with a point at each end, in place of the game's frame art."] },
+						{ "octagon", L["Octagon"], L["An eight-sided portrait, in place of the game's frame art."] },
+						{ "shield", L["Shield"], L["A portrait on a shield, in place of the game's frame art."] },
+						{ "petal", L["Leaf"], L["A rounded portrait with two sharp corners, in place of the game's frame art."] },
+						{ "crystal", L["Crystal"], L["A wide cut crystal, in place of the game's frame art."] },
+						{ "none", L["None"], L["No portrait and no frame art: just the name and bars."] },
+					}) do list[#list + 1] = { value = each[1], text = each[2], tip = each[3] } end
+					return list
+				end, L["The portrait's shape, in place of the game's frame art."], Editable)
+			end,
+			border = { "ufBorder", L["Round each bar: the game's frame alone, or a border of ours (Custom: its " ..
+				"thickness and color under it)."], opts = { game = true }, test = Editable },
+		})
+		if button then button:Hide() end
+		return pop
+	end
 
-	rows.Choices(L["Long names:"], "ufNameCut", {
-		{ "game", L["The game's"], L["A name too long for its frame ends in \"...\"."] },
-		{ "first", L["First name"], L["A name too long for its frame loses its last words, with no \"...\": " ..
-			"Benediction Cumberbatch shows as Benediction. A single long word loses its last letters."] },
-	}, Editable)
-	local portrait = rows.Choices(L["Portrait:"], "ufPortrait", {
-		{ "game", L["The game's"], L["Their face."] },
-		{ "class", L["Class icon"], L["A player's class icon in place of their face (NPCs keep theirs)."] },
-	}, Editable)
-	local shape = rows.Choices(L["Shape:"], "ufShape", {
-		{ "game", L["The game's"], L["The game's round frame."] },
-		{ "circle", L["Circle"], L["A thin ring in place of the game's frame art."] },
-		{ "square", L["Square"], L["A square portrait with a thin edge, in place of the game's frame art."] },
-		{ "hex", L["Hexagon"], L["A six-sided portrait, in place of the game's frame art."] },
-		{ "diamond", L["Diamond"], L["A diamond portrait, in place of the game's frame art."] },
-		{ "arch", L["Arch"], L["A portrait in a pointed window, in place of the game's frame art."] },
-		{ "cut", L["Cut square"], L["A square portrait with small cut corners, in place of the game's frame art."] },
-		{ "eye", L["Eye"], L["A tall, narrow portrait with a point at each end, in place of the game's frame art."] },
-		{ "octagon", L["Octagon"], L["An eight-sided portrait, in place of the game's frame art."] },
-		{ "shield", L["Shield"], L["A portrait on a shield, in place of the game's frame art."] },
-		{ "petal", L["Leaf"], L["A rounded portrait with two sharp corners, in place of the game's frame art."] },
-		{ "crystal", L["Crystal"], L["A wide cut crystal, in place of the game's frame art."] },
-		{ "none", L["None"], L["No portrait and no frame art: just the name and bars."] },
-	}, Editable)
-	-- (The panel's bottom under the last row, its right at the page's.)
-	panel:SetPoint("BOTTOM", shape or portrait, "BOTTOM", 0, -12)
-	panel:SetPoint("RIGHT", content, "RIGHT", -16, 0)
+	stack:Header(content, L["Frames"])
+	local ids = { false }
+	for _, info in ipairs(FRAMES) do ids[#ids + 1] = info[1] end
+	local pops = {}
+	for _, id in ipairs(ids) do
+		id = id or nil
+		local label = id and L[TAB_NAMES[id]] or L["Default"]
+		local name = stack:Add(kit.Label(content, "GameFontHighlight", label), "label")
+		name:SetSize(130, 26)
+		name:SetJustifyV("MIDDLE")
+		local pick
+		if id then
+			pick = kit.Dropdown(content, { get = function()
+				local db = ns.GetDB()
+				return db and db["ufOwn_" .. id] and "own" or "default"
+			end, set = function(value) SetOwn(id, value == "own") end }, function()
+				return {
+					{ value = "default", text = L["Same as the Default row"], tip = L["This frame looks as the Default row says."] },
+					{ value = "own", text = L["Its own look"], tip = L["This frame looks as its Look panel says. Its " ..
+						"settings start as the Default row's, and are kept while you pick the Default row's again."] },
+				}
+			end, 170, function()
+				editing = id
+				Changed()
+				kit.Refresh()
+			end)
+			if pick then
+				pick:SetPoint("LEFT", name, "RIGHT", 4, 0)
+				pick.pageSwitch = false
+				kit.GreyUnless(pick, rows.On)
+				kit.Tooltip(pick, L["This frame's look: the Default row's, or its own."])
+			end
+		end
+		local button = ns.PanelButton(content)
+		button:SetHeight(22)
+		button:SetPoint("LEFT", pick or name, "RIGHT", pick and 8 or 178, 0)
+		button.searchLabel = label
+		kit.Tooltip(button, id and L["This frame's own look: bars, name, portrait and border. Only while it has its " ..
+			"own look."] or L["Every frame's look while its row says Same as the Default row."])
+		button:SetScript("OnClick", function()
+			editing = id
+			if preview then preview:Refresh() end
+			local key = id or "DEFAULT"
+			if not pops[key] then pops[key] = MakePanel(id, label) end
+			pops[key]:SetShown(not pops[key]:IsShown())
+		end)
+		function button.Refresh(self)
+			local db = ns.GetDB()
+			local own = id and db and db["ufOwn_" .. id]
+			-- (Party drawn as raid frames: nothing here to dress.)
+			local raid = id == "PARTY" and ns.RaidStyleParty and ns.RaidStyleParty()
+			self:SetText(raid and L["Raid Frames page's"] or id and not own and L["Default row's"] or own and L["Its own"]
+				or L["Look"])
+			self:SetWidth(math.max(110, self:GetFontString():GetStringWidth() + 30))
+			self:SetEnabled(rows.On(db) and true or false)
+		end
+		kit.AddControl(button)
+	end
 
 	canvas:SetScript("OnShow", kit.PageShown(kit.Refresh, content))
 	canvas:Hide()

@@ -111,6 +111,7 @@ local PAGES = {
 	{ id = "page-pages", name = "Style: Pages tab", group = "Menu", page = "Style > General > Pages", pageName = "Style Pages" },
 	{ id = "page-overrides", name = "Style: Overrides tab", group = "Menu", page = "Style > General > Overrides", pageName = "Style Overrides" },
 	{ id = "page-tooltip", name = "Style: Tooltips page", group = "Menu", page = "Style > Tooltips", pageName = "Tooltip Style" },
+	{ id = "page-unit", name = "Style: Unit Frames page", group = "Menu", page = "Style > Unit Frames", pageName = "Unit Style" },
 	{ id = "page-cast", name = "Style: Cast Bars page", group = "Menu", page = "Style > Cast Bars", pageName = "Cast Bar Style" },
 	{ id = "page-names", name = "Style: Name Style page", group = "Menu", page = "Style > Nameplates > Name Style", pageName = "Name Style" },
 	{ id = "page-plates", name = "Style: Nameplate Style page", group = "Menu", page = "Style > Nameplates > Nameplate Style", pageName = "Nameplate Style" },
@@ -185,7 +186,7 @@ local function PageShot(info)
 	canvas:SetParent(UIParent)
 	canvas:ClearAllPoints()
 	canvas:SetPoint("TOPLEFT", UIParent, "TOPLEFT", 0, 0)
-	canvas:SetSize(660, 1060)
+	canvas:SetSize(660, 1500)
 	if canvas.content then canvas.content:SetWidth(640) end
 	-- (Shown, as the game would: everything under it hears OnShow.)
 	local function Shown(frame)
