@@ -20,7 +20,9 @@
 -- again, so after turning off it's back from the next /reload.
 -- Your own settings (db.shoulderCamYours) come back as it's turned off.
 -- Disable (ResetTestCvars) turns it off here too.
--- (Not ns.ApplyCVarSet: Keep Character Centered would be put back on logout.)
+-- Keep Character Centered and the motion sickness option go back to yours at
+-- every logout and reload, and off again as the next session starts
+-- (GiveBackForLogout), so Cinematic not loading again never leaves them off.
 --
 -- It's a held setting, not a camera: it doesn't move the view, so it doesn't
 -- claim the camera lock. It goes to 0 (paused) where its Show in row's off
@@ -587,7 +589,7 @@ local talk = {
 	-- and the game's focus snaps back then, the next quest's window snapping
 	-- it in again 0.25 s on (the log and the user, 2026-11-14). A drift back
 	-- while you read (8 s) didn't help: Accept came 0.45-0.8 s in, the turn
-	-- still 0.8-0.9 there. So those calls are held too (closing.calls with
+	-- still 0.8-0.9 there. So those calls are held too (ns.ShoulderTalkClose with
 	-- quick), the turn gliding back over quickTime, then they go.
 	quickTime = 0.5, quick = false, -- (the glide back's for a held Accept or Complete)
 }
@@ -642,21 +644,24 @@ end
 
 -- Closing slowly. Closing the panel before the glide back's done still
 -- snapped the rest (user, 2026-11-12: "it glides back in .5 seconds"; the
--- game's 0.2 s). So the call that ends the conversation (whichever of
--- closing.calls the panel makes) is held back: the panel's gone at once, the
--- conversation stays open unseen while the turn glides back at its own pace,
--- then the held call goes. Walking off ends it on the game's side: that still
+-- game's 0.2 s). So the call that ends the conversation is held back: the
+-- conversation stays open while the turn glides back at its own pace, then
+-- the held call goes. Walking off ends it on the game's side: that still
 -- snaps. A new window meanwhile (another NPC, the vendor after the gossip)
 -- drops the held calls (the game's moved on to it; ending it would close the
 -- new one). Never in a fight; a timer ends it if the glide can't finish.
--- Wrapped only once the talk turn's first on. Each is logged ("shoulder").
+-- Each is logged ("shoulder").
+-- Only through Cinematic's own quest bubble (QuestTalk.lua calls
+-- ns.ShoulderTalkClose for its Goodbye, Accept and Complete). Till
+-- 2026-11-14 the game's own CloseGossip, CloseQuest, AcceptQuest and
+-- GetQuestReward were replaced to hold them from the game's windows too,
+-- which taints every bit of the game's code that calls them (the user
+-- chose this over it). The game's windows close at once and snap back.
 -- Only gossip and quest text: a vendor, bank, mailbox, trainer or flight
 -- master held open unseen would still take a bag click (an item sold or
 -- banked), so those close at once and snap back as the game's do.
 local closing = {
-	calls = { { "C_GossipInfo", "CloseGossip" }, { nil, "CloseQuest" },
-		{ nil, "AcceptQuest", quick = true }, { nil, "GetQuestReward", quick = true } },
-	wrapped = false, held = {}, since = nil,
+	held = {}, since = nil,
 	-- (Which hold a safety timer's for: an old one, its calls dropped as the
 	-- next window opened, ended a later hold 0.36 s in, a snap (the log,
 	-- 2026-11-14).)
@@ -677,47 +682,37 @@ local function CloseNow(why)
 	closing.passing = nil
 end
 
-local function WrapCloses()
-	if closing.wrapped then return end
-	closing.wrapped = true
-	local names = {}
-	for _, entry in ipairs(closing.calls) do
-		local owner = entry[1] and _G[entry[1]] or (not entry[1] and _G or nil)
-		local fn = owner and owner[entry[2]]
-		local label = (entry[1] and entry[1] .. "." or "") .. entry[2]
-		if type(fn) == "function" then
-			names[#names + 1] = label
-			owner[entry[2]] = function(...)
-				if closing.passing or ns.shoulderTestHold or not (TalkOn() and talk.on and talk.share > 0.02)
-					or InCombatLockdown() then
-					return fn(...)
-				end
-				local held = closing.held
-				-- (Accept clicked twice while held: once is enough.)
-				for _, call in ipairs(held) do
-					if call.label == label then return end
-				end
-				held[#held + 1] = { fn = fn, args = { ... }, n = select("#", ...), label = label }
-				-- (Accept or Complete: the quick glide back, at once.)
-				if entry.quick then talk.quick, talk.back, talk.backAt = true, true, nil end
-				if #held == 1 then
-					closing.since = GetTime()
-					if not entry.quick then talk.backAt = GetTime() + talk.swapWait end
-					closing.token = closing.token + 1
-					local token = closing.token
-					ns.Log("shoulder", ("talk close: %s held while the camera glides back (turn at %.2f)"):format(
-						label, talk.share))
-					local wait = entry.quick and talk.quickTime + 1 or talk.swapWait + TalkOutTime() + 1
-					C_Timer.After(wait, function()
-						if closing.token == token then CloseNow("timer") end
-					end)
-				else
-					ns.Log("shoulder", ("talk close: %s held too"):format(label))
-				end
-			end
-		end
+-- The quest bubble's end of a talk (QuestTalk.lua): fn(...) now, or held
+-- while the turn glides back. label: what it is, for the log; quick: Accept
+-- or Complete, the quick glide back.
+function ns.ShoulderTalkClose(label, fn, quick, ...)
+	if type(fn) ~= "function" then return end
+	if closing.passing or ns.shoulderTestHold or not (TalkOn() and talk.on and talk.share > 0.02)
+		or InCombatLockdown() then
+		return fn(...)
 	end
-	ns.Log("shoulder", "talk close: watching " .. (#names > 0 and table.concat(names, ", ") or "nothing"))
+	local held = closing.held
+	-- (Accept clicked twice while held: once is enough.)
+	for _, call in ipairs(held) do
+		if call.label == label then return end
+	end
+	held[#held + 1] = { fn = fn, args = { ... }, n = select("#", ...), label = label }
+	-- (Accept or Complete: the quick glide back, at once.)
+	if quick then talk.quick, talk.back, talk.backAt = true, true, nil end
+	if #held == 1 then
+		closing.since = GetTime()
+		if not quick then talk.backAt = GetTime() + talk.swapWait end
+		closing.token = closing.token + 1
+		local token = closing.token
+		ns.Log("shoulder", ("talk close: %s held while the camera glides back (turn at %.2f)"):format(
+			label, talk.share))
+		local wait = quick and talk.quickTime + 1 or talk.swapWait + TalkOutTime() + 1
+		C_Timer.After(wait, function()
+			if closing.token == token then CloseNow("timer") end
+		end)
+	else
+		ns.Log("shoulder", ("talk close: %s held too"):format(label))
+	end
 end
 
 -- Turn to your target (shoulderCamTargetTurn, off by default). The game's
@@ -1103,7 +1098,6 @@ function ns.ApplyShoulderCam()
 			if TalkOn() then
 				SetTalkShare(yours, talk.share)
 				Write(yours, talk.enable, "1")
-				WrapCloses()
 			else
 				talk.share = 0
 				GiveBack(yours, talk.enable, talk.yawCVar, talk.pitchCVar)
@@ -1159,7 +1153,8 @@ ns.SetOnUpdate(poller, function(_, elapsed)
 end)
 
 -- The swap shoulders key: a button its key binding clicks (bound on the
--- Shoulder Cam page; no entry in Bindings.xml, as the page is the dev copy's).
+-- Shoulder Cam page; no entry in Bindings.xml while the Shoulder Cam's
+-- locked for testers, so the game's Key Bindings don't list it for everyone).
 local swap = CreateFrame("Button", ADDON_NAME .. "ShoulderSwapButton", UIParent)
 swap:RegisterForClicks("AnyDown")
 swap:SetScript("OnClick", function()
@@ -1469,8 +1464,25 @@ if ResetTestCvars then
 	end)
 end
 
+-- Logging out or reloading: Keep Character Centered and the motion sickness
+-- option go back to yours as the game saves them, and come off again as the
+-- next session starts (the offset's written fresh each session anyway). So
+-- they're never left off by Cinematic not loading again (disabled,
+-- uninstalled, a crash before then aside). yours keeps them meanwhile.
+local ACCESSIBILITY = { "CameraKeepCharacterCentered", "CameraReduceUnexpectedMovement" }
+local function GiveBackForLogout()
+	local yours = ns.db and ns.db.shoulderCamYours
+	if not yours then return end
+	for _, cvar in ipairs(ACCESSIBILITY) do
+		if yours[cvar] ~= nil and not Same(GetCVar(cvar), yours[cvar]) then
+			SetCVar(cvar, yours[cvar])
+		end
+	end
+end
+
 local events = CreateFrame("Frame")
 events:RegisterEvent("PLAYER_ENTERING_WORLD")
+events:RegisterEvent("PLAYER_LOGOUT")
 events:RegisterEvent("PLAYER_TARGET_CHANGED")
 -- (Going in or out: at once, not at the next poll.)
 pcall(events.RegisterEvent, events, "ZONE_CHANGED_INDOORS")
@@ -1488,6 +1500,10 @@ for _, event in ipairs(talk.close) do
 	if pcall(events.RegisterEvent, events, event) then TALK_EVENT[event] = "close" end
 end
 events:SetScript("OnEvent", function(_, event)
+	if event == "PLAYER_LOGOUT" then
+		GiveBackForLogout()
+		return
+	end
 	if TALK_EVENT[event] == "open" then
 		local living, why = TalkingToLiving()
 		if not living then
@@ -1535,9 +1551,9 @@ function ns.CreateShoulderCamPanel(kit)
 		L["The camera sits over your shoulder, with you to one side of the screen."])
 	local switch = kit.PageSwitch(content, "shoulderCam", L["Enable Page"],
 		L["On: the camera moves over your shoulder. This uses one of Blizzard's experimental " ..
-		"camera settings: the game shows its experimental camera warning (Accept keeps it working). " ..
-		"The game's Keep Character Centered and motion sickness options stop it, so those are turned " ..
-		"off meanwhile. Off: your own settings come back."], intro, function()
+		"camera settings: Cinematic asks once, then keeps the game's experimental camera warning away " ..
+		"while it's on. The game's Keep Character Centered and motion sickness options stop it, so those " ..
+		"are turned off meanwhile. Off: your own settings come back."], intro, function()
 			ns.ApplyShoulderCam()
 			-- (No profile offered any more: the camera works on any profile, and
 			-- the Follow HUD tab puts the frames that follow you on yours.)
@@ -1590,9 +1606,9 @@ function ns.CreateShoulderCamPanel(kit)
 
 	stack:Header(content, L["Turning"])
 	local talkCheck = stack:Add(kit.Check(content, "shoulderCamTalkTurn", L["Turn to who you talk to"],
-		L["As you talk to an NPC (or open a vendor, bank, flight master or mailbox), the camera turns " ..
-		"slowly to bring them toward the middle of the screen, and glides back as you " ..
-		"close the window. " ..
+		L["As you talk to an NPC (or a vendor, banker, trainer or flight master), the camera turns " ..
+		"slowly to bring them toward the middle of the screen, and goes back as you close the window: " ..
+		"a slow glide in Cinematic's quest bubble, at the game's own pace in the game's windows. " ..
 		"It steps aside while Cinematic's quest or chat camera moves the view."], SaveThen("shoulderCamTalkTurn", ns.ApplyShoulderCam)), "check")
 	kit.GreyUnless(talkCheck, IfOn)
 	local function IfTalk() return ns.Setting("shoulderCam") and ns.GetDB().shoulderCamTalkTurn end

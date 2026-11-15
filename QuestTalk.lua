@@ -175,6 +175,15 @@ local function Call(fn, ...)
 	return unpack(results, 2)
 end
 
+-- The end of a talk (Goodbye, Accept, Complete): through the Shoulder Cam's
+-- talk turn, which holds it while the camera glides back off the NPC
+-- (ShoulderCam.lua, ns.ShoulderTalkClose), else at once. quick: Accept or
+-- Complete, a quicker glide.
+local function EndTalk(label, fn, quick, ...)
+	if ns.ShoulderTalkClose then return ns.ShoulderTalkClose(label, fn, quick, ...) end
+	if type(fn) == "function" then return fn(...) end
+end
+
 -- Money with its coin icons (retail moved it into C_CurrencyInfo).
 -- Money as the game's quest window shows it: the numbers with coin icons.
 local function CoinIcons(money)
@@ -2095,7 +2104,7 @@ local function GossipScreen()
 			end,
 		})
 	end
-	Goodbye(function() Call(G_.CloseGossip) end)
+	Goodbye(function() EndTalk("CloseGossip", Call, false, G_.CloseGossip) end)
 end
 
 local function GreetingScreen()
@@ -2113,7 +2122,7 @@ local function GreetingScreen()
 			questID = Call(_G.GetActiveQuestID, i) }, function() SelectActiveQuest(i) end)
 	end
 	QuestRows(available, active)
-	Goodbye(CloseQuest)
+	Goodbye(function() EndTalk("CloseQuest", CloseQuest) end)
 end
 
 local function Accept()
@@ -2122,7 +2131,7 @@ local function Accept()
 	elseif Call(_G.QuestGetAutoAccept) and _G.AcknowledgeAutoAcceptQuest then
 		_G.AcknowledgeAutoAcceptQuest()
 	else
-		AcceptQuest()
+		EndTalk("AcceptQuest", AcceptQuest, true)
 	end
 end
 
@@ -2179,7 +2188,7 @@ local function ProgressScreen()
 	end
 	local ready = Call(IsQuestCompletable) and true or false
 	SetButtons({ text = G("CONTINUE", "Continue"), onClick = CompleteQuest, off = not ready },
-		{ text = G("GOODBYE", "Goodbye"), onClick = CloseQuest })
+		{ text = G("GOODBYE", "Goodbye"), onClick = function() EndTalk("CloseQuest", CloseQuest) end })
 end
 
 local function CompleteScreen()
@@ -2195,10 +2204,10 @@ local function CompleteScreen()
 			UIErrorsFrame:AddMessage(G("ERR_QUEST_MUST_CHOOSE", "You must choose a reward."), 1, 0.1, 0.1)
 			return
 		end
-		GetQuestReward(choices > 1 and talk.choice or (choices == 1 and 1 or 0))
+		EndTalk("GetQuestReward", GetQuestReward, true, choices > 1 and talk.choice or (choices == 1 and 1 or 0))
 	end
 	SetButtons({ text = G("COMPLETE_QUEST", "Complete Quest"), onClick = Complete, off = choices > 1 and not talk.choice },
-		{ text = G("CANCEL", "Cancel"), onClick = CloseQuest })
+		{ text = G("CANCEL", "Cancel"), onClick = function() EndTalk("CloseQuest", CloseQuest) end })
 end
 
 local SCREENS = {

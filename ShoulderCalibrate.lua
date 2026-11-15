@@ -123,14 +123,23 @@ local function Changed()
 	if ns.ShoulderCalibrateChanged then ns.ShoulderCalibrateChanged() end
 end
 
+-- What a run changed, put back. (Also saved, db.shoulderCalibrateHeld, so a
+-- reload or logout mid-run puts it back at the next login: chat bubbles,
+-- Keep Character Centered and the motion sickness option would otherwise
+-- stay as the run had them.)
+local function PutBackHeld(held)
+	if held.offset then SetCVar(SHOULDER, held.offset) end
+	if held.centered then SetCVar(CENTERED, held.centered) end
+	if held.bubbles then SetCVar("chatBubbles", held.bubbles) end
+	if held.reduce then SetCVar(REDUCE, held.reduce) end
+end
+
 local function Finish(why)
 	stepper:Hide()
 	if not run then return end
 	local held = run.held
-	SetCVar(SHOULDER, held.offset)
-	SetCVar(CENTERED, held.centered)
-	if held.bubbles then SetCVar("chatBubbles", held.bubbles) end
-	if held.reduce then SetCVar(REDUCE, held.reduce) end
+	PutBackHeld(held)
+	if ns.db then ns.db.shoulderCalibrateHeld = nil end
 	if ns.shoulderCalibrateGoOn then ns.shoulderCalibrateGoOn:Hide() end
 	local delta = held.zoom - Zoom()
 	if math.abs(delta) > 0.1 and ns.CallCameraFunction then
@@ -276,6 +285,8 @@ local function CantStart()
 	if IsMounted and ns.Flag(IsMounted()) then return L["Get off your mount first."] end
 	if UnitExists("target") then return L["Clear your target first (Esc)."] end
 	if not (C_ChatBubbles and C_ChatBubbles.GetAllChatBubbles) then return L["This client can't read chat bubbles."] end
+	-- (Chat bubbles in dungeons, raids and battlegrounds are locked to addons.)
+	if IsInInstance and ns.Flag(IsInInstance()) then return L["Not in a dungeon, raid or battleground."] end
 end
 ns.ShoulderCalibrateCantStart = CantStart
 
@@ -296,6 +307,9 @@ local function Start()
 	run = { key = key, steps = steps, at = 1, readings = {},
 		held = { offset = GetCVar(SHOULDER), centered = GetCVar(CENTERED), zoom = Zoom(),
 			bubbles = GetCVar("chatBubbles"), reduce = GetCVar(REDUCE) } }
+	local saved = {}
+	for k, v in pairs(run.held) do saved[k] = v end
+	ns.db.shoulderCalibrateHeld = saved
 	SetCVar("chatBubbles", "1")
 	SetCVar(REDUCE, "0")
 	SetCVar(CENTERED, "0")
@@ -308,6 +322,20 @@ local function Start()
 	stepper:Show()
 	Changed()
 end
+
+-- A run cut off by a reload or logout: what it changed back at the next
+-- login, then the Shoulder Cam's own settings over it again.
+local leftover = CreateFrame("Frame")
+leftover:RegisterEvent("PLAYER_ENTERING_WORLD")
+leftover:SetScript("OnEvent", function(self)
+	self:UnregisterAllEvents()
+	local held = ns.db and ns.db.shoulderCalibrateHeld
+	if type(held) ~= "table" then return end
+	ns.db.shoulderCalibrateHeld = nil
+	PutBackHeld(held)
+	Log("a run was cut off: chat bubbles, Keep Character Centered and the motion sickness option put back")
+	if ns.ApplyShoulderCam then ns.ApplyShoulderCam() end
+end)
 
 function ns.ShoulderCalibrateRunning() return run ~= nil end
 function ns.ShoulderCalibrateStop()
