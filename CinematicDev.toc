@@ -216,6 +216,7 @@ NamesTest.lua
 StyleRevampTest.lua
 PlateFlickerTest.lua
 StyleSixTest.lua
+KeysBarsTest.lua
 ReadyAnyTimeTest.lua
 IconCropTest.lua
 DamageVisionMeterTest.lua

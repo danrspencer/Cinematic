@@ -1459,6 +1459,43 @@ function ns.KeyboardMapDebug()
 	for _, line in ipairs(lines) do print(line) end
 end
 
+-- For the dev copy's test (KeysBarsTest.lua): every binding token the map
+-- draws, with each layer's prefix (to put back what a test bound).
+function ns.KeyboardMapCombos()
+	local combos = {}
+	for _, def in ipairs(BuildKeys()) do
+		if def.token then
+			for _, prefix in ipairs(PREFIXES) do combos[#combos + 1] = prefix .. def.token end
+		end
+	end
+	return combos
+end
+-- ...and what the map shows now: its layout, size, strata, each kind's count
+-- and the names that don't fit their key (cut off).
+function ns.KeyboardMapTestInfo()
+	if not (board and board:IsShown()) then return "map not shown" end
+	local counts, cut, fit = {}, {}, 0
+	for i in ipairs(defs) do
+		local f = keyFrames[i]
+		if f and f:IsShown() then
+			counts[f.kind or "?"] = (counts[f.kind or "?"] or 0) + 1
+			if f.shownText then
+				if f.name.IsTruncated and f.name:IsTruncated() then
+					cut[#cut + 1] = ("%s '%s'"):format(tostring(f.combo), f.shownText)
+				else
+					fit = fit + 1
+				end
+			end
+		end
+	end
+	return ("layout %s, %dx%d, strata %s level %d, text scale %s, SetTextScale %s; action %d empty %d command %d " ..
+		"unbound %d modifier %d; names fit %d, cut %d%s"):format(LayoutId(), board:GetWidth(), board:GetHeight(),
+		board:GetFrameStrata(), board:GetFrameLevel(), tostring(ns.db.kbTextScale),
+		tostring(board.title.SetTextScale ~= nil), counts.action or 0, counts.empty or 0, counts.command or 0,
+		counts.unbound or 0, counts.modifier or 0, fit, #cut, #cut > 0 and (": " .. table.concat(cut, ", ", 1,
+		math.min(#cut, 8))) or "")
+end
+
 -- The key binding (CINEMATIC_KEYMAP, run on down and up): held, it's up till
 -- you let go; tapped, it stays up till you press it again (or Escape).
 function Cinematic_KeyboardMap(keystate)
