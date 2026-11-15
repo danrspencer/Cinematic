@@ -13,6 +13,11 @@ ignore:
   - WindGuide.lua
   - WindGuideStyles.lua
   - Textures/WindGuide
+  # (Dev copy only, CinematicDev.toc: the Module Editor, the held settings page
+  # and /cine debug flickertest)
+  - ModuleEditor.lua
+  - HeldSettingsPage.lua
+  - FlickerTest.lua
   # (Portal scout: /cine debug portal, trying the game's portal models, dev copy only)
   - PortalScout.lua
   # (Shoulder Cam test: /cine debug shoulder, dev copy only)

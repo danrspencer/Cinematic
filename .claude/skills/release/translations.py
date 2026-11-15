@@ -2,6 +2,7 @@
 
     python -I .claude/skills/release/translations.py          keys new in the uncommitted changes
     python -I .claude/skills/release/translations.py --all    every code key missing anywhere
+    python -I .claude/skills/release/translations.py --langs  keys one language has and another lacks
 
 Only literal L["..."] keys are seen. Text translated another way (page names
 via RegisterSubpage, tables run through ns.TranslateFields, keys built with ..)
@@ -11,6 +12,11 @@ has to be checked by reading the diff.
 missing from a locale. "Gone" keys: in a removed line and no longer anywhere in
 the code (usually English that was reworded): their locale entries are stale and
 should be moved onto the new wording.
+
+--langs compares the languages with each other instead of with the code: every
+key any locale file has, missing from another. It also catches text the code
+scan can't see (RegisterSubpage names, ns.TranslateFields tables), as long as
+one language has it. Just the counts with --langs --count.
 """
 import os
 import re
@@ -50,6 +56,16 @@ def main():
         if f.endswith(".lua") and f != "Locales.lua":
             src = read(os.path.join("Locales", f))
             locales[f[:-4]] = set(re.findall(r'^\s*L\["((?:[^"\\]|\\.)*)"\]\s*=', src, re.M))
+
+    if "--langs" in sys.argv:
+        every = set().union(*locales.values())
+        for lang, keys in locales.items():
+            missing = sorted(every - keys)
+            print("== %s: %d of %d missing" % (lang, len(missing), len(every)))
+            if "--count" not in sys.argv:
+                for k in missing:
+                    print('  + L["%s"]' % k)
+        return
 
     if "--all" in sys.argv:
         wanted, gone = code, set()

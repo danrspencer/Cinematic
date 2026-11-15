@@ -72,7 +72,8 @@ Three modes, picked by the first word after /release:
 5. **Translations** (`full` only). `python -I .claude/skills/release/translations.py`
    lists, per language (all nine in `Locales/`, esES included), the new
    `L["..."]` keys each one lacks, and stale keys whose English was reworded
-   or removed. It only sees literal `L["..."]`: also look in the diff for
+   or removed (`--langs`: what each language lacks that another has). It only
+   sees literal `L["..."]`: also look in the diff for
    new or renamed page names (`RegisterSubpage`), and tables run through
    `ns.TranslateFields`. Count what's missing; it's written in phase 2.
 

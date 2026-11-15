@@ -15,3 +15,10 @@ ChangelogCommits.dev.lua
 __pycache__/
 ~$*
 !.claude/skills/release/
+
+# Notes kept beside the repo, never committed or packaged: reply drafts,
+# players' profile exports, scratch pages, crash dumps
+*-reply.md
+*-profile.txt
+out.html
+*.stackdump
