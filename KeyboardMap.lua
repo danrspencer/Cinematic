@@ -276,6 +276,7 @@ local SHORT = {
 	CINEMATIC_TOGGLE = "CineMode", CINEMATIC_HIDEUI = "Hide UI", CINEMATIC_SCREENSHOT = "CineShot",
 	CINEMATIC_TOGGLEEFFECTS = "Effects", CINEMATIC_TOGGLELETTERBOX = "Letterbox", CINEMATIC_RELOAD = "Reload",
 	CINEMATIC_TOGGLESETTINGS = "Cinematic", CINEMATIC_KEYMAP = "Key map", CINEMATIC_CAMWHEEL = "Cam wheel",
+	CINEMATIC_HIDECURSOR = "Hide cursor",
 	["CLICK CinematicMasterWheelButton:LeftButton"] = "Wheels",
 	["CLICK CinematicMenuWheelButton:LeftButton"] = "Menu wheel",
 	["CLICK CinematicMarkerWheelButton:LeftButton"] = "Markers",
@@ -330,8 +331,9 @@ local function ShortName(command)
 	if short then return L[short] end
 	local name = FullName(command)
 	if not name then return nil end
-	-- (Display only: the English word Toggle goes, and Cinematic's "Cinematic: ".)
-	name = name:gsub("^Cinematic: ", ""):gsub("%f[%a][Tt]oggle%f[%A]%s*", "")
+	-- (Display only: the English word Toggle goes, so does WoW Forever's
+	-- "Hide/show: ", and Cinematic's "Cinematic: ".)
+	name = name:gsub("^Cinematic: ", ""):gsub("%f[%a][Tt]oggle%f[%A]%s*", ""):gsub("^Hide/show:%s*", "")
 	-- (A note in brackets at the end goes: "Master wheel (hold)", "Keyboard
 	-- map (hold, or tap to keep it up)".)
 	name = name:gsub("%s*%b()$", "")
@@ -965,7 +967,9 @@ local function Layout()
 		f.name:SetPoint("TOPLEFT", 1, -(f.keyLabel:GetStringHeight() + 2))
 		f.name:SetPoint("BOTTOMRIGHT", -1, 2)
 		f.nameWidth = w - 4
-		f.shownText = nil
+		-- (false, not nil: a key with no name now, like a modifier, gets its old
+		-- one cleared too. nil matched it, and a name from another layout stayed.)
+		f.shownText = false
 		local arm = def.arm and not round
 		f.armRim:SetShown(arm)
 		f.armFace:SetShown(arm)
@@ -1364,7 +1368,7 @@ local function CreateBoard()
 	grip:SetScript("OnLeave", function() GameTooltip:Hide() end)
 	board:SetScript("OnEvent", function(_, event)
 		if event == "UPDATE_BINDINGS" then
-			for _, f in ipairs(keyFrames) do f.shownText = nil end
+			for _, f in ipairs(keyFrames) do f.shownText = false end
 			sections = nil
 		end
 		-- (Other layers' matches: found again, unless only a modifier changed.)
