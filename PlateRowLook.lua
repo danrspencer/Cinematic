@@ -77,9 +77,12 @@ local function NamesLayer(look)
 end
 
 -- Whether a row has a look of its own (any of the main settings set).
+-- (The list made once: built at each call, it was the top garbage maker in a
+-- 40-plate city, 20 KB a second, 2026-11-15.)
+local MAIN_KEYS = { "LookTexture", "LookBorder", "LookFont", "LookTextSize", "LookOutline", "LookShadow",
+	"LookLevel", "LookGradient" }
 function ns.PlateRowHasLook(kind)
-	for _, key in ipairs({ "LookTexture", "LookBorder", "LookFont", "LookTextSize", "LookOutline", "LookShadow",
-		"LookLevel", "LookGradient" }) do
+	for _, key in ipairs(MAIN_KEYS) do
 		if Own(key, kind) ~= nil then return true end
 	end
 	return false
