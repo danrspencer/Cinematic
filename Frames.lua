@@ -8533,8 +8533,9 @@ local function AnyCooldownRecharging(now, group)
 end
 
 -- The Cooldown Manager page's "Only when ready in combat" spells
--- (db.cooldownReadyOnly: spell ID -> true): out of fights, and in fights
--- while it's recharging, a spell's icon fades out, the rest of its bar as
+-- (db.cooldownReadyOnly: spell ID -> true): out of fights (unless its Out of
+-- fights is ticked, db.cooldownReadyAnyTime), and in fights while it's
+-- recharging, a spell's icon fades out, the rest of its bar as
 -- usual (the icon's place stays: it leaves a gap). It comes back once it's
 -- ready, or with Show early (db.cooldownEarlyOn[spell ID]) a little before:
 -- db.cooldownReadyEarly[spell ID] seconds, or by default READY_EARLY of its
@@ -8710,22 +8711,23 @@ end
 function ns.CooldownGroupSettings(group, sit)
 	if sit == nil then sit = ns.cooldownSitNow end
 	if sit then
-		local mode, power, early = ns.CooldownSitGroup(sit, group)
-		if mode then return mode, power, early end
+		local mode, power, early, anyTime = ns.CooldownSitGroup(sit, group)
+		if mode then return mode, power, early, anyTime end
 	end
 	local set = ns.db.cooldownGroupDefaults[group] or NO_DEFAULTS
-	return set.mode or ns.COOLDOWN_GROUP_MODES[group] or "always", set.power, set.early
+	return set.mode or ns.COOLDOWN_GROUP_MODES[group] or "always", set.power, set.early, set.anyTime
 end
 
 -- A spell's mode ("always", "ready", "recharge", "proc"), whether it's its
--- own (else its group's), and for "ready" its Resources, Show early on, and
--- seconds (nil: the default share). Set under what it's turned into (from
+-- own (else its group's), and for "ready" its Resources, Show early on,
+-- seconds (nil: the default share) and Out of fights (shown when ready out of
+-- fights too, not faded). Set under what it's turned into (from
 -- before settings went by the base) or its base.
 function ns.CooldownSpellMode(id, group, sit)
 	if sit == nil then sit = ns.cooldownSitNow end
 	if sit then
-		local mode, from, power, earlyOn, seconds = ns.CooldownSitSpellMode(sit, id, group)
-		if mode then return mode, from == "spell", power, earlyOn, seconds end
+		local mode, from, power, earlyOn, seconds, anyTime = ns.CooldownSitSpellMode(sit, id, group)
+		if mode then return mode, from == "spell", power, earlyOn, seconds, anyTime end
 	end
 	local db = ns.db
 	if not (db.cooldownReadyOnly[id] or db.cooldownRechargeOnly[id] or db.cooldownProcOnly[id]
@@ -8733,7 +8735,8 @@ function ns.CooldownSpellMode(id, group, sit)
 		id = ns.BaseSpell(id)
 	end
 	if db.cooldownReadyOnly[id] then
-		return "ready", true, db.cooldownNeedsPower[id], db.cooldownEarlyOn[id], db.cooldownReadyEarly[id]
+		return "ready", true, db.cooldownNeedsPower[id], db.cooldownEarlyOn[id], db.cooldownReadyEarly[id],
+			db.cooldownReadyAnyTime[id]
 	elseif db.cooldownRechargeOnly[id] then
 		return "recharge", true
 	elseif db.cooldownProcOnly[id] then
@@ -8746,13 +8749,13 @@ function ns.CooldownSpellMode(id, group, sit)
 	if db.cooldownSmartDefaults and not (set and set.mode) and ns.COOLDOWN_SMART_GROUPS[group] then
 		local pick = ns.SmartCooldownMode(id)
 		if pick == "power" then
-			return "ready", false, true, true, set and set.early
+			return "ready", false, true, true, set and set.early, set and set.anyTime
 		elseif pick == "proc" then
 			return "proc", false
 		end
 	end
-	local mode, power, early = ns.CooldownGroupSettings(group or "other", false)
-	return mode, false, power, true, early
+	local mode, power, early, anyTime = ns.CooldownGroupSettings(group or "other", false)
+	return mode, false, power, true, early, anyTime
 end
 
 -- A tracked buff's or bar's mode ("always", "combat": in fights, "quiet":
@@ -10128,9 +10131,11 @@ local function ReadyTarget(icon, id, bar)
 		return
 	end
 	ns.CooldownNoBuff(icon, id)
-	local mode, _, power, earlyOn, seconds = ns.CooldownSpellMode(id, ns.COOLDOWN_BAR_GROUPS[bar])
+	local mode, _, power, earlyOn, seconds, anyTime = ns.CooldownSpellMode(id, ns.COOLDOWN_BAR_GROUPS[bar])
 	if mode == "ready" then
-		readyTargets[icon] = (passInCombat and IconShows(icon, id, passNow, power, earlyOn, seconds)) and 1 or 0
+		-- (Out of fights faded, unless its Out of fights is ticked: then as in one.)
+		readyTargets[icon] = ((passInCombat or anyTime) and IconShows(icon, id, passNow, power, earlyOn, seconds))
+			and 1 or 0
 	elseif mode == "recharge" then
 		local left = IconTimeLeft(icon, id, passNow) -- (not knowing: faded)
 		readyTargets[icon] = (left and left > 0) and 1 or 0
@@ -10458,6 +10463,21 @@ function ns.ReportCooldownIconLook(icon, id)
 end
 
 -- /cine debug cooldowns: what the Cooldown Manager check sees.
+-- For tests (ReadyAnyTimeTest.lua): a spell's first icon in the Essential or
+-- Utility bar now: { alpha, target (the ready pass's 0 or 1, nil: left
+-- alone), left (sec, nil: can't tell), mode, anyTime }, or nil if not in them.
+function ns.ReadyIconProbe(id)
+	local found
+	EachCooldownIcon(function(icon, spell, bar)
+		if found or not COOLDOWN_VIEWERS[bar] or ns.BaseSpell(spell) ~= id then return end
+		local mode, _, _, _, _, anyTime = ns.CooldownSpellMode(spell, ns.COOLDOWN_BAR_GROUPS[bar])
+		local alpha = icon:GetAlpha()
+		found = { alpha = Secret(alpha) and -1 or alpha, target = readyTargets[icon],
+			left = (IconTimeLeft(icon, spell, GetTime())), mode = mode, anyTime = anyTime and true or false }
+	end)
+	return found
+end
+
 function ns.ReportCooldowns()
 	local now = GetTime()
 	local any = false
@@ -10482,13 +10502,14 @@ function ns.ReportCooldowns()
 					and ("%.1fs left of %.1fs"):format(math.max(0, start + duration - now), duration)
 					or "unreadable"))
 				ns.ReportCooldownIconLook(part, id)
-				local mode, own, power, earlyOn, seconds
+				local mode, own, power, earlyOn, seconds, anyTime
 				if id then
 					ns.NoteCooldownIcon(part, id)
 					local base = ns.BaseSpell(id)
 					if base ~= id then print(("    turned into from %d (its settings go under it)"):format(base)) end
 					ns.ReportSmartPick(base)
-					mode, own, power, earlyOn, seconds = ns.CooldownSpellMode(id, ns.COOLDOWN_BAR_GROUPS[entry.name])
+					mode, own, power, earlyOn, seconds, anyTime =
+						ns.CooldownSpellMode(id, ns.COOLDOWN_BAR_GROUPS[entry.name])
 				end
 				local from = own and "" or " (its group's)"
 				if mode == "ready" then
@@ -10500,6 +10521,7 @@ function ns.ReportCooldowns()
 						early and ("%.0fs"):format(early) or "?",
 						cast and ("%.0fs ago"):format(now - cast) or "not seen",
 						length and ("%.0fs"):format(length) or "unknown"))
+					print(("    out of fights: %s"):format(anyTime and "shown when ready" or "faded"))
 					if power then
 						print(("    resources: %s"):format(ns.SpellHasPower(id) and "enough" or "not enough"))
 					end

@@ -4334,9 +4334,10 @@ function ns.EnsureTables()
 	ns.db.cooldownEarlyOn = ns.db.cooldownEarlyOn or {} -- ...spell ID -> true: Show early ticked
 	ns.db.cooldownRechargeOnly = ns.db.cooldownRechargeOnly or {} -- ...spell ID -> true: only while recharging
 	ns.db.cooldownNeedsPower = ns.db.cooldownNeedsPower or {} -- ...spell ID -> true: ready needs its resources
+	ns.db.cooldownReadyAnyTime = ns.db.cooldownReadyAnyTime or {} -- ...spell ID -> true: When ready out of fights too
 	ns.db.cooldownProcOnly = ns.db.cooldownProcOnly or {} -- ...spell ID -> true: only while it glows (a proc)
 	ns.db.cooldownAlwaysShow = ns.db.cooldownAlwaysShow or {} -- ...spell ID -> true: Always, whatever its group's
-	ns.db.cooldownGroupDefaults = ns.db.cooldownGroupDefaults or {} -- ...group -> { mode, power, early }
+	ns.db.cooldownGroupDefaults = ns.db.cooldownGroupDefaults or {} -- ...group -> { mode, power, early, anyTime }
 	ns.db.cooldownBuffMode = ns.db.cooldownBuffMode or {} -- ...tracked buff's spell ID -> its own mode
 	ns.db.cooldownFlashReady = ns.db.cooldownFlashReady or {} -- ...spell ID -> true/false: Flash, its own
 	ns.db.cooldownSituations = ns.db.cooldownSituations or {} -- ...its situations, in order (CooldownSituations.lua)

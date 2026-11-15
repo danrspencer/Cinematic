@@ -38,6 +38,7 @@ local PROFILE_TABLES = {
 	"chatPeekTypes", "chatPeekChannelList", "combatShow", "calmShow", "quietShow", "camShow", "cineModeShow", "cineShow", "targetShow", "enemyShow",
 	"friendlyShow", "bgShow", "worldShow", "cityShow", "groupShow", "instanceShow", "addonFrames", "gamepadPressButtons",
 	"hoverGroups", "cooldownReadyOnly", "cooldownReadyEarly", "cooldownEarlyOn", "cooldownRechargeOnly", "cooldownNeedsPower",
+	"cooldownReadyAnyTime",
 	"cooldownGroupDefaults", "cooldownProcOnly", "cooldownAlwaysShow", "cooldownBuffMode", "cooldownFlashReady",
 	"cooldownSituations", -- (the Cooldown Manager page's situations: CooldownSituations.lua)
 	"frameRules", -- (none in any built-in profile: each starts with no Custom Visibility Rules)

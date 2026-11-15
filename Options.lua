@@ -13212,6 +13212,7 @@ local function CreateCooldownPanel()
 		"glow (a proc, like an instant Lightning Bolt). A faded icon keeps its place in the bar. In " ..
 		"fights the game may not say how long is left, so then it goes by when you last cast it. The " ..
 		"settings beside each group's name set every spell in it at once."]:format(ns.READY_EARLY * 100) .. " " ..
+		L["Out of fights (When ready): ticked, out of fights it shows once it's ready too, instead of fading."] .. " " ..
 		L["Flash: the icon flashes for a few seconds as its cooldown ends, shown then even if its setting has it faded."] .. " " ..
 		L["Tracked buffs and bars: Always, In combat, Out of combat or Hidden (the game keeps your buffs " ..
 		"secret in fights, so they go by that alone). Each group has a tab of its own."] .. " " ..
@@ -13222,6 +13223,7 @@ local function CreateCooldownPanel()
 	RecordKey(icons, "cooldownEarlyOn")
 	RecordKey(icons, "cooldownRechargeOnly")
 	RecordKey(icons, "cooldownNeedsPower")
+	RecordKey(icons, "cooldownReadyAnyTime")
 	RecordKey(icons, "cooldownGroupDefaults")
 	RecordKey(icons, "cooldownProcOnly")
 	RecordKey(icons, "cooldownAlwaysShow")
@@ -13229,10 +13231,11 @@ local function CreateCooldownPanel()
 	RecordKey(icons, "cooldownSmartDefaults")
 	RecordKey(icons, "cooldownFlashReady")
 	RecordKey(icons, "cooldownSituations")
-	-- Columns: the spell, when it shows, (When ready only) its Resources and
-	-- how early it's back, and Flash.
-	local MODE_X, POWER_X, EARLY_X, FLASH_X, ROW_HEIGHT = 200, 360, 440, 556, 26
-	local GROUP_HEIGHT, GROUP_WIDTH = 36, 610
+	-- Columns: the spell, when it shows, (When ready only) its Resources, how
+	-- early it's back and Out of fights, and Flash.
+	-- (Narrower than before Out of fights came: all of it fits the page's width.)
+	local MODE_X, POWER_X, EARLY_X, ANY_X, FLASH_X, ROW_HEIGHT = 180, 324, 384, 480, 556, 26
+	local MODE_WIDTH, GROUP_HEIGHT, GROUP_WIDTH = 135, 36, 610
 	-- Each group a tab of its own, in Heal Vision's folder look (ns.FolderTabs,
 	-- made below), only those with spells now: the picked one's spells on the
 	-- panel under them, the column headings at its top. The tab last picked
@@ -13252,6 +13255,8 @@ local function CreateCooldownPanel()
 	powerHeading:SetPoint("TOPLEFT", panelTop, "TOPLEFT", 12 + POWER_X - 4, -10)
 	local earlyHeading = Label(icons, "GameFontNormalSmall", L["Show early"] .. " (" .. L["sec"] .. ")")
 	earlyHeading:SetPoint("TOPLEFT", panelTop, "TOPLEFT", 12 + EARLY_X, -10)
+	local anyHeading = Label(icons, "GameFontNormalSmall", L["Out of fights"])
+	anyHeading:SetPoint("TOPLEFT", panelTop, "TOPLEFT", 12 + ANY_X - 4, -10)
 	local flashHeading = Label(icons, "GameFontNormalSmall", L["Flash"])
 	flashHeading:SetPoint("TOPLEFT", panelTop, "TOPLEFT", 12 + FLASH_X - 4, -10)
 	local noSpells = Label(icons, "GameFontDisable", L["Nothing in the Cooldown Manager right now."])
@@ -13334,16 +13339,17 @@ local function CreateCooldownPanel()
 		if mode == "inherit" then mode = nil end
 		if mode == "ready" and not store.cooldownReadyOnly[spell] then
 			-- (Newly When ready: as it was if it was When ready, else its
-			-- group's Resources and Show early; the seconds box empty, the
+			-- group's Resources, Show early and Out of fights; the seconds box empty, the
 			-- default share, unless the group says.)
 			local group = groupOf[spell] or "other"
-			local was, _, power, earlyOn, early = ns.CooldownSpellMode(spell, group, View())
+			local was, _, power, earlyOn, early, anyTime = ns.CooldownSpellMode(spell, group, View())
 			if was ~= "ready" then
 				earlyOn = true
-				power, early = select(2, ns.CooldownGroupSettings(group, View()))
+				power, early, anyTime = select(2, ns.CooldownGroupSettings(group, View()))
 			end
 			store.cooldownEarlyOn[spell], store.cooldownReadyEarly[spell] = earlyOn and true or nil, early
 			store.cooldownNeedsPower[spell] = power or nil
+			store.cooldownReadyAnyTime[spell] = anyTime or nil
 		end
 		for value, key in pairs(OWN_MODES) do
 			store[key][spell] = value == mode or nil
@@ -13376,6 +13382,11 @@ local function CreateCooldownPanel()
 			OwnReady(spell)
 			local store = Store()
 			store.cooldownEarlyOn[spell], store.cooldownReadyEarly[spell] = true, seconds
+		end,
+		AnyTime = function(spell) return select(6, ns.CooldownSpellMode(spell, groupOf[spell], View())) end,
+		SetAnyTime = function(spell, value)
+			OwnReady(spell)
+			Store().cooldownReadyAnyTime[spell] = value or nil
 		end,
 		Length = function(spell) return ns.CooldownLength(spell) end,
 		Flash = function(spell) return ns.CooldownSpellFlash(spell, groupOf[spell], View()) end,
@@ -13416,6 +13427,13 @@ local function CreateCooldownPanel()
 				if Store().cooldownReadyOnly[spell] then SPELL.SetEarly(spell, seconds) end
 			end
 		end,
+		AnyTime = function(group) return GroupDefaults(group).anyTime end,
+		SetAnyTime = function(group, value)
+			GroupDefaults(group).anyTime = value or nil
+			for _, spell in ipairs(groupSpells[group] or {}) do
+				if Store().cooldownReadyOnly[spell] then SPELL.SetAnyTime(spell, value) end
+			end
+		end,
 		Length = function() return nil end,
 		Flash = function(group) return ns.CooldownGroupFlash(group, View()) end,
 		SetFlash = function(group, value)
@@ -13428,7 +13446,7 @@ local function CreateCooldownPanel()
 		Inherit = GroupInherit,
 		modes = MODES,
 		tip = L["Sets every spell in this group to this. Spells you haven't set on their own follow it, " ..
-			"and a spell here made When ready on its own starts with its Resources and Show early."],
+			"and a spell here made When ready on its own starts with its Resources, Show early and Out of fights."],
 	}
 	-- A tracked buff or bar (db.cooldownBuffMode), and their groups' settings.
 	-- (No Resources, Show early or Flash: those are for spells.)
@@ -13444,6 +13462,7 @@ local function CreateCooldownPanel()
 		end,
 		SetMode = function(spell, mode) Store().cooldownBuffMode[spell] = mode ~= "inherit" and mode or nil end,
 		Power = NoValue, SetPower = NoValue, Early = NoValue, SetEarly = NoValue, Length = NoValue,
+		AnyTime = NoValue, SetAnyTime = NoValue,
 		Inherit = function(spell)
 			local sit, group = View(), buffGroupOf[spell]
 			local _, from = ns.CooldownSitBuffMode(sit, spell, group)
@@ -13462,6 +13481,7 @@ local function CreateCooldownPanel()
 			end
 		end,
 		Power = NoValue, SetPower = NoValue, Early = NoValue, SetEarly = NoValue, Length = NoValue,
+		AnyTime = NoValue, SetAnyTime = NoValue,
 		Inherit = GroupInherit,
 		modes = BUFF_MODES,
 		tip = L["Sets every buff in this group to this. Buffs you haven't set on their own follow it."],
@@ -13495,7 +13515,7 @@ local function CreateCooldownPanel()
 		end
 		local ok, dropdown = ns.MenuDropdown(icons)
 		if ok and dropdown and dropdown.SetupMenu then
-			dropdown:SetWidth(150)
+			dropdown:SetWidth(MODE_WIDTH)
 			dropdown.searchSkip = true
 			dropdown:SetupMenu(function(_, rootDescription)
 				for _, choice in ipairs(ModesFor(access, row.key)) do
@@ -13507,7 +13527,7 @@ local function CreateCooldownPanel()
 			row.mode = dropdown
 		else
 			local button = ns.PanelButton(icons)
-			button:SetSize(150, 22)
+			button:SetSize(MODE_WIDTH, 22)
 			button:SetScript("OnClick", function()
 				local now = row.key ~= nil and access.Mode(row.key)
 				local modes = ModesFor(access, row.key)
@@ -13574,6 +13594,19 @@ local function CreateCooldownPanel()
 			row.earlyText:SetShown(self:GetText() == "")
 		end)
 
+		-- Out of fights (When ready only): ticked, out of fights it shows once
+		-- it's ready too, as in one, instead of fading.
+		local anyTime = Check(icons, nil, "", L["Out of fights, the icon shows once it's ready too, instead of " ..
+			"fading. Unticked, When ready shows it only in fights."], function(value)
+			if row.key ~= nil then
+				access.SetAnyTime(row.key, value)
+				Refresh()
+			end
+		end)
+		anyTime.Refresh = function() end -- (set by its row's)
+		anyTime:SetPoint("LEFT", row.mode, "LEFT", ANY_X - MODE_X, 0)
+		row.anyTime = anyTime
+
 		-- Flash (any mode): its icon flashes for a few seconds as its cooldown
 		-- ends, shown for it even if its mode has it faded.
 		if access.SetFlash then
@@ -13612,9 +13645,12 @@ local function CreateCooldownPanel()
 			end
 			row.early:SetShown(ready)
 			row.power:SetShown(ready)
+			row.anyTime:SetShown(ready)
 			if not ready then return end
 			row.power:SetChecked(access.Power(key) and true or false)
 			row.power:SetEnabled(handled)
+			row.anyTime:SetChecked(access.AnyTime(key) and true or false)
+			row.anyTime:SetEnabled(handled)
 			local text = access.Early(key)
 			if not row.early:HasFocus() then
 				row.early:SetText(text)
@@ -13649,6 +13685,7 @@ local function CreateCooldownPanel()
 		row.early:Hide()
 		row.earlyText:Hide()
 		row.power:Hide()
+		row.anyTime:Hide()
 		if row.flash then row.flash:Hide() end
 		if row.line then row.line:Hide() end
 		if row.center then row.center:Hide() end
@@ -13771,6 +13808,7 @@ local function CreateCooldownPanel()
 		modeHeading:SetShown(group ~= nil)
 		earlyHeading:SetShown(group ~= nil)
 		powerHeading:SetShown(group ~= nil)
+		anyHeading:SetShown(group ~= nil)
 		flashHeading:SetShown(group ~= nil and not BUFF_GROUP[group])
 	end
 	-- The tabs (their full names their tips).
@@ -13807,7 +13845,7 @@ local function CreateCooldownPanel()
 	smartSet:SetPoint("TOPLEFT", readyNote, "BOTTOMLEFT", -2, -6)
 	-- Reset: just the spell icons' settings (the page's Reset does the rest too).
 	local SPELL_ICON_KEYS = { cooldownReadyOnly = true, cooldownReadyEarly = true, cooldownEarlyOn = true,
-		cooldownRechargeOnly = true, cooldownNeedsPower = true, cooldownGroupDefaults = true,
+		cooldownRechargeOnly = true, cooldownNeedsPower = true, cooldownReadyAnyTime = true, cooldownGroupDefaults = true,
 		cooldownProcOnly = true, cooldownAlwaysShow = true, cooldownBuffMode = true, cooldownSmartDefaults = true,
 		cooldownFlashReady = true, cooldownSituations = true }
 	local iconsReset = ns.PanelButton(icons)

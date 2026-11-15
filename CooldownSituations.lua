@@ -15,7 +15,7 @@ local L = ns.L
 -- The settings a situation keeps, as Default keeps them (Core's EnsureTables).
 -- (No Close the gaps: where the icons sit is the bar's, the same in each.)
 local SET_KEYS = { "cooldownReadyOnly", "cooldownReadyEarly", "cooldownEarlyOn", "cooldownRechargeOnly",
-	"cooldownNeedsPower", "cooldownProcOnly", "cooldownAlwaysShow", "cooldownGroupDefaults", "cooldownBuffMode",
+	"cooldownNeedsPower", "cooldownReadyAnyTime", "cooldownProcOnly", "cooldownAlwaysShow", "cooldownGroupDefaults", "cooldownBuffMode",
 	"cooldownFlashReady" }
 ns.COOLDOWN_SIT_KEYS = SET_KEYS
 
@@ -143,12 +143,13 @@ local function OwnKey(set, id)
 	return ns.BaseSpell(id)
 end
 
--- A spell's mode, and for "ready" its Resources, Show early on and seconds.
+-- A spell's mode, and for "ready" its Resources, Show early on, seconds and Out of fights.
 function ns.CooldownSitSpellMode(sit, id, group)
 	local set = sit.set
 	local key = OwnKey(set, id)
 	if set.cooldownReadyOnly[key] then
-		return "ready", "spell", set.cooldownNeedsPower[key], set.cooldownEarlyOn[key], set.cooldownReadyEarly[key]
+		return "ready", "spell", set.cooldownNeedsPower[key], set.cooldownEarlyOn[key], set.cooldownReadyEarly[key],
+			set.cooldownReadyAnyTime[key]
 	elseif set.cooldownRechargeOnly[key] then
 		return "recharge", "spell"
 	elseif set.cooldownProcOnly[key] then
@@ -158,14 +159,14 @@ function ns.CooldownSitSpellMode(sit, id, group)
 	end
 	local own = set.cooldownGroupDefaults[group or "other"]
 	if own and own.mode then
-		return own.mode, "group", own.power, true, own.early
+		return own.mode, "group", own.power, true, own.early, own.anyTime
 	end
 end
 
--- A group's mode, Resources and Show early seconds set here (mode nil: not set).
+-- A group's mode, Resources, Show early seconds and Out of fights set here (mode nil: not set).
 function ns.CooldownSitGroup(sit, group)
 	local own = sit.set.cooldownGroupDefaults[group or "other"]
-	if own then return own.mode, own.power, own.early end
+	if own then return own.mode, own.power, own.early, own.anyTime end
 end
 
 -- A tracked buff's or bar's mode.
