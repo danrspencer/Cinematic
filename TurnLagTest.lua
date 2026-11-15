@@ -1,14 +1,15 @@
 -- /cine debug turnlag: one run finding what makes turning the camera in a
 -- crowd laggy, Cinematic or the game. Hands off: the test turns the camera
--- itself (MoveViewLeftStart at a steady pace), so every turning step is the
+-- itself (MoveViewLeftStart at a set pace), so every turning step is the
 -- same. Timed steps in the big test box (Frames.lua's ns.PadTestBox):
 --   1 CineMode on, camera still        (the calm baseline)
---   2 CineMode on, camera turning
---   3 CineMode off, camera turning     (the game's own cost, near enough)
---   4 CineMode off, camera still
---   5 CineMode on, turning, with the detailed CPU recording (which parts of
---     Cinematic cost what while turning; it adds its own cost, so this
---     step's frame times aren't compared with the others)
+--   2 CineMode on, turning slowly      (a turn in about 8 s)
+--   3 CineMode on, turning FAST        (about a turn a second: where it lags)
+--   4 CineMode off, turning fast       (the game's own cost, near enough)
+--   5 CineMode on, turning fast, with the detailed CPU recording (which
+--     parts of Cinematic cost what; it adds its own cost, so this step's
+--     frame times aren't compared with the others)
+-- (Slow turning alone didn't lag, 2026-11-15: fast is what the user feels.)
 -- Each step logs: frames, average and worst frame time, frames over 33 and
 -- 50 ms, Cinematic's ms a frame and all addons' (the game's profiler),
 -- memory made a second, nameplates added and taken away a second, and a
@@ -18,7 +19,7 @@
 local _, ns = ...
 
 local SETUP, WAIT = 10, 3 -- seconds: before the first step, settling at each step's start before measuring
-local TURN_SPEED = 0.25    -- of the camera's yaw speed: a full turn in about 8 seconds
+local SLOW, FAST = 0.25, 2  -- of the camera's yaw speed (180 a second): a turn in about 8 s, or 1 s
 
 local run -- { at, step, starts, notes, cine, turning }
 
@@ -27,12 +28,13 @@ local function Say(text)
 	if log then log[#log + 1] = ("%.1f %s"):format(run and GetTime() - run.at or 0, text) end
 end
 
-local function Turn(on)
-	if on and not run.turning then
-		run.turning = true
+local function Turn(speed)
+	if speed and run.turning ~= speed then
+		if run.turning then pcall(MoveViewLeftStop) end
+		run.turning = speed
 		CinematicDB.turnLagTurning = true
-		pcall(MoveViewLeftStart, TURN_SPEED)
-	elseif not on and run.turning then
+		pcall(MoveViewLeftStart, speed)
+	elseif not speed and run.turning then
 		run.turning = false
 		CinematicDB.turnLagTurning = nil
 		pcall(MoveViewLeftStop)
@@ -123,23 +125,23 @@ end
 
 local STEPS = {
 	{ key = "still-cine", seconds = 12, say = "%d/%d: CineMode ON, camera STILL. Hands off.",
-		act = function() CineMode(true) Turn(false) end },
-	{ key = "turn-cine", seconds = 16, say = "%d/%d: CineMode ON, the test TURNS the camera. Hands off.",
-		act = function() CineMode(true) Turn(true) end },
-	{ key = "turn-off", seconds = 16, say = "%d/%d: CineMode OFF, the test TURNS the camera. Hands off.",
-		act = function() CineMode(false) Turn(true) end },
-	{ key = "still-off", seconds = 12, say = "%d/%d: CineMode OFF, camera STILL. Hands off.",
-		act = function() CineMode(false) Turn(false) end },
-	{ key = "turn-cine-detail", seconds = 19, detail = true,
-		say = "%d/%d: CineMode ON, TURNING, with the detailed CPU recording. Hands off.",
-		act = function() CineMode(true) Turn(true) end },
+		act = function() CineMode(true) Turn(nil) end },
+	{ key = "slow-cine", seconds = 14, say = "%d/%d: CineMode ON, the test turns the camera SLOWLY. Hands off.",
+		act = function() CineMode(true) Turn(SLOW) end },
+	{ key = "fast-cine", seconds = 14, say = "%d/%d: CineMode ON, the test turns the camera FAST. Hands off.",
+		act = function() CineMode(true) Turn(FAST) end },
+	{ key = "fast-off", seconds = 14, say = "%d/%d: CineMode OFF, the test turns the camera FAST. Hands off.",
+		act = function() CineMode(false) Turn(FAST) end },
+	{ key = "fast-cine-detail", seconds = 19, detail = true,
+		say = "%d/%d: CineMode ON, turning FAST, with the detailed CPU recording. Hands off.",
+		act = function() CineMode(true) Turn(FAST) end },
 }
 
 local function Finish(done)
 	if run.ticker then run.ticker:Cancel() end
 	meter:Hide()
 	m = nil
-	Turn(false)
+	Turn(nil)
 	if run.cine ~= nil then CineMode(run.cine) end
 	CinematicDB.turnLagCine = nil
 	if ns.IsProfiling and ns.IsProfiling() and run.profiling then ns.StopProfile() end
