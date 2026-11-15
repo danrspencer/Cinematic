@@ -4052,6 +4052,38 @@ function ns.PrintDuelsDebug()
 		tostring(GetCVar("nameplateShowFriends")), tostring(GetCVar("nameplateShowFriendlyPlayers")),
 		tostring(C_NamePlate and C_NamePlate.GetNamePlateFriendlyClickThrough
 			and C_NamePlate.GetNamePlateFriendlyClickThrough())))
+	-- A duelist's health bar, for one that looks empty (0 hp).
+	local function BarState(plate, unit)
+		local frame = plate and plate.UnitFrame
+		if frame and not (frame.IsForbidden and frame:IsForbidden()) then
+			local bar, box = frame.healthBar, frame.HealthBarsContainer
+			local function Show(fn)
+				local ok, x, y = pcall(fn)
+				if not ok then return "?" end
+				local out = {}
+				for _, v in ipairs({ x, y }) do
+					out[#out + 1] = (issecretvalue and issecretvalue(v)) and "secret"
+						or (type(v) == "number" and ("%.2f"):format(v) or tostring(v))
+				end
+				return table.concat(out, "/")
+			end
+			local fill = bar and bar.GetStatusBarTexture and bar:GetStatusBarTexture()
+			ns.Print(("    frame alpha=%s body=%s | bar value=%s range=%s shown=%s alpha=%s size=%s"
+				.. " | fill tex=%s shown=%s alpha=%s size=%s color=%s | box shown=%s alpha=%s | unit hp=%s"):format(
+				Show(function() return frame:GetAlpha() end), tostring(frame.cinematicBodyAlpha),
+				Show(function() return bar:GetValue() end), Show(function() return bar:GetMinMaxValues() end),
+				Show(function() return bar:IsShown() end), Show(function() return bar:GetAlpha() end),
+				Show(function() return bar:GetSize() end), Show(function() return fill:GetTexture() end),
+				Show(function() return fill:IsShown() end), Show(function() return fill:GetAlpha() end),
+				Show(function() return fill:GetSize() end),
+				Show(function() local r, g = fill:GetVertexColor() return r, g end),
+				Show(function() return box:IsShown() end), Show(function() return box:GetAlpha() end),
+				Show(function() return UnitHealth(unit), UnitHealthMax(unit) end)))
+			if ns.DescribePlateParts then
+				ns.Print("    parts: " .. tostring((ns.DescribePlateParts(frame))))
+			end
+		end
+	end
 	local found, fighters = duels.Scan()
 	ns.Print(("%d friendly players in combat with a plate"):format(#fighters))
 	for i, a in ipairs(fighters) do
@@ -4068,7 +4100,19 @@ function ns.PrintDuelsDebug()
 		ns.Print(("  %s (%s)%s, can attack: %s, shown %.2f"):format(Known(a.name) and tostring(a.name) or "?",
 			a.unit, info and (" DUELING (color " .. info.pair.color .. ")") or "",
 			#canAttack > 0 and table.concat(canAttack, ", ") or "-", duels.Level(a.plate)))
+		BarState(a.plate, a.unit)
 		PrintDebuffs(a.unit)
+	end
+	-- Plates shown as duelists but not in combat (pretend duels), health only.
+	local listed = {}
+	for _, a in ipairs(fighters) do listed[a.plate] = true end
+	for plate, info in pairs(duels.shown) do
+		if not listed[plate] then
+			local unit = plate.namePlateUnitToken or (plate.UnitFrame and plate.UnitFrame.unit)
+			ns.Print(("  %s (%s) DUELING, out of combat, shown %.2f"):format(tostring(info.name), tostring(unit),
+				duels.Level(plate)))
+			if unit then BarState(plate, unit) end
+		end
 	end
 	-- (Your target too, so other players' debuffs can be checked without a duel.)
 	if Ask(UnitExists, "target") and not Ask(UnitIsUnit, "target", "player") then

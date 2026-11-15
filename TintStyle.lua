@@ -766,6 +766,7 @@ function ns.CreateTintStylePanel(kit)
 		end)
 	end)
 	local phaseSlider = kit.Slider(phaseRow, {
+		noSettingId = true, -- (a time of day's: no one setting for /cine find)
 		get = function() local p = PhaseOf(pickedPhase); return p and p.strength or 1 end,
 		set = function(value) ns.SetTimePhaseStrength(pickedPhase, value) end,
 	}, L["Strength"], 0, 100, 5, "%d%%", 100, function()
@@ -974,6 +975,7 @@ function ns.CreateTintStylePanel(kit)
 		return ns.GetZoneTintStrength(GetRealZoneText() or "")
 	end
 	local hereSlider = kit.Slider(card, {
+		noSettingId = true, -- (a zone's: no one setting for /cine find)
 		get = function() return (TargetStrength()) end,
 		set = function(value)
 			local name = TargetName()

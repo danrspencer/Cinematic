@@ -39,6 +39,23 @@ if arg[1] and not update then
 		-- (The minimap button compares the stand-in's numbers: not the addon's.)
 		if not warning:find("^PLAYER_LOGIN: MinimapButton") then print("problem\t" .. warning) end
 	end
+	-- Every setting's control has an id for /cine find (players are sent to
+	-- settings with it): a checkbox, slider or number box made with its
+	-- setting's key, a { key = ..., get, set } field, or settingKey set by
+	-- hand. A control with no one setting of its own (a theme's, a row's or a
+	-- wheel's value) is marked noSettingId. (Options.lua's ns.SettingIds, as
+	-- /cine debug ids lists them.)
+	do
+		local ok, withOrError, _, missing = pcall(ns.SettingIds)
+		if not ok then
+			print("problem\tsetting ids: " .. tostring(withOrError))
+		else
+			for _, each in ipairs(missing) do
+				print(("problem\tsetting ids: %s | %s has no id for /cine find (give it its setting's key, or " ..
+					"noSettingId = true if it has none)"):format(each.page, each.label))
+			end
+		end
+	end
 	-- Your own lines and Hide your messages' exception (Chat.lua): lines you type
 	-- with no bubble show chat, emotes and loot don't, and it's all off without it.
 	do

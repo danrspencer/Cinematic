@@ -317,6 +317,15 @@ local STACK_GAP = { -- [kind being added][kind above it]
 -- search, so what's done with it after still works).
 local settingMakers, movedFrom, movedSink = {}, {}, nil
 local function Remember(control, key, make)
+	-- (A { get, set } field naming its setting, key = "...": that's its id
+	-- for /cine find, as a combined Off-or-amount slider's amount.)
+	if type(key) == "table" and type(key.key) == "string" then
+		control.settingKey = key.key
+		return
+	end
+	-- (Or noSettingId = true: a theme's, a row's or a wheel's value, no one
+	-- setting to find; the offline check leaves it out, ns.SettingIds.)
+	if type(key) == "table" and key.noSettingId then control.noSettingId = true end
 	if type(key) ~= "string" then return end
 	control.settingKey = key
 	if not settingMakers[key] then settingMakers[key] = { make = make, control = control } end
@@ -571,7 +580,10 @@ local function BoxLine(parent)
 		box:SetMaxLetters(6)
 		box:EnableMouseWheel(true)
 		box.searchLabel = label
-		box.settingKey = key -- (its id, as Remember gives a checkbox: the Why window's links, /cine find <key>)
+		-- (its id, as Remember gives a checkbox: the Why window's links, /cine find <key>; a { get, set }
+		-- field's key = "...")
+		box.settingKey = type(key) == "table" and key.key or key
+		box.noSettingId = type(key) == "table" and key.noSettingId or nil
 		right = right + (label ~= "" and name:GetStringWidth() + 8 or 0) + (width or 36) + 18
 		if unit then
 			local after = Label(line, "GameFontHighlight", unit)
@@ -1726,7 +1738,9 @@ function ns.FindSetting(query)
 	-- A setting's id (/cine find nfHealthPlayer), or a Show in row's
 	-- (/cine find row:player): straight to its control.
 	local id = type(query) == "string" and (query:match("^%s*([%w_]+)%s*$") or query:match("^%s*(row:%S+)%s*$"))
-	if id and (ns.DEFAULTS[id] ~= nil or id:find("^row:")) and ns.OpenSettingByKey then
+	-- (A Nameplates row's setting too, as customMark1Size: ns.MarkRowDefault.)
+	if id and (ns.DEFAULTS[id] ~= nil or id:find("^row:") or (ns.MarkRowDefault and ns.MarkRowDefault(id) ~= nil))
+		and ns.OpenSettingByKey then
 		local text, pageName = ns.OpenSettingByKey(id)
 		if text then return text, pageName end
 	end
@@ -3501,6 +3515,7 @@ local function CreateRevealPanel()
 	RecordKey(content, "calmEndsAtFull")
 	RecordKey(content, "calmFullAfter")
 	calmFull = Slider(content, {
+		key = "calmFullAfter",
 		get = function()
 			local db = ns.GetDB()
 			return db.calmEndsAtFull and (db.calmFullAfter or 0) or -1
@@ -5358,6 +5373,7 @@ local function CreateEffectsPanel()
 
 	-- Inns: Off is the inn glow switched off (its amount kept for next time).
 	local innGlowStrength = InlineSlider(vignetteStrength.rowName, 18, {
+		key = "innGlowAmount",
 		get = function()
 			local db = ns.GetDB()
 			return db.innGlow and db.innGlowAmount or 0
@@ -5399,6 +5415,7 @@ local function CreateEffectsPanel()
 	-- strength, this scales them all. Off is the haze switched off (the
 	-- scale kept for next time).
 	local cameraHaze = InlineSlider(lastRow.rowName, 18, {
+		key = "dofScale",
 		get = function()
 			local db = ns.GetDB()
 			return db.depthOfField and (db.dofScale or 1) or 0
@@ -6599,6 +6616,8 @@ local function CreateCamerasPanel()
 				Changed()
 			end)
 			cine.Refresh = function(self) self:SetChecked(ns.CameraRowValue(id, "cine") and true or false) end
+			-- (The trigger's own row: its id for /cine find, as runCine.)
+			if not copy and type(trigger.cine) == "string" then cine.settingKey = trigger.cine end
 			GreyUnless(cine, function() return HasCamera(id) end)
 			At("Camera", cine, x)
 			x = x + 100
@@ -6990,7 +7009,7 @@ local function CreateCombatPanel()
 	-- as their rows); the sections' frames hang on it.)
 	local panelTop = CreateFrame("Frame", nil, content)
 	panelTop:SetSize(1, 1)
-	local panel, ShowTab
+	local panel, ShowTab, PlaceTop
 	-- (The unit frames' Addon Frame Links section, at the bottom of their tab:
 	-- made once the sections are.)
 	local unitLinks
@@ -7056,6 +7075,7 @@ local function CreateCombatPanel()
 			end
 		end
 		ShowTab(shown)
+		if PlaceTop then PlaceTop() end -- (the tabs' rows, measured again as they're shown)
 		panel:SetPoint("BOTTOMRIGHT", bottom, "BOTTOMLEFT", above.width + 6 - inset, -12)
 		FitContentHeight(content)
 	end
@@ -7449,7 +7469,7 @@ local function CreateCombatPanel()
 	for _, section in ipairs(SECTIONS) do
 		Section(section[1] or nil, section[2], section[3], section[4])
 	end
-	local list, _, base, height = {}
+	local list, tabFrames, base = {}
 	for _, section in ipairs(sections) do
 		local tab
 		for _, each in ipairs(tabs) do
@@ -7462,9 +7482,13 @@ local function CreateCombatPanel()
 		end
 		tab.sections[#tab.sections + 1] = section
 	end
-	panel, _, ShowTab, base, height = ns.FolderTabs(content, list, function(i) Pick(tabs[i].sections[1]) end, nil,
+	panel, tabFrames, ShowTab, base = ns.FolderTabs(content, list, function(i) Pick(tabs[i].sections[1]) end, nil,
 		SECTION_WIDTH + 8)
-	panelTop:SetPoint("TOPLEFT", lastCheck, "BOTTOMLEFT", 2 - lastIndent, -16 - height) -- (back to the column edge)
+	function PlaceTop()
+		panelTop:ClearAllPoints()
+		panelTop:SetPoint("TOPLEFT", lastCheck, "BOTTOMLEFT", 2 - lastIndent, -16 - tabFrames.height) -- (back to the column edge)
+	end
+	PlaceTop()
 	panel:SetPoint("TOPLEFT", panelTop, "TOPLEFT")
 	-- (On panelTop, not the panel: the panel's bottom hangs on the rows under them.)
 	base:SetPoint("TOPLEFT", panelTop, "TOPLEFT")
@@ -8193,6 +8217,28 @@ function ns.FolderTabs(parent, list, onClick, width, maxWidth, onRightClick)
 	-- fit (tab.row: its row's number).
 	local rows
 	local function Rows()
+		-- (Fitted to their text: measured again each time, and when they'd
+		-- run past maxWidth their padding shrinks first, so they keep to one
+		-- row while the words fit.)
+		if not width then
+			local shown, textWidth = 0, 0
+			for _, tab in ipairs(tabs) do
+				if tab:IsShown() then
+					tab.textWidth = math.ceil(tab.label:GetStringWidth())
+					shown, textWidth = shown + 1, textWidth + tab.textWidth
+				end
+			end
+			local pad = 12
+			if maxWidth and shown > 0 then
+				local room = maxWidth - 8 - (shown - 1) * TAB_GAP - textWidth
+				pad = math.max(4, math.min(12, math.floor(room / shown)))
+			end
+			for _, tab in ipairs(tabs) do
+				if tab:IsShown() then
+					tab:SetWidth(pad < 12 and tab.textWidth + pad or math.max(40, tab.textWidth + pad))
+				end
+			end
+		end
 		local x = 0
 		rows = { {} }
 		for _, tab in ipairs(tabs) do
@@ -8214,6 +8260,7 @@ function ns.FolderTabs(parent, list, onClick, width, maxWidth, onRightClick)
 	local function Show(picked)
 		tabs.picked = picked
 		Rows()
+		tabs.height = #rows * (TAB_H + 4) -- (how high they reach now: their rows can change as they're measured again)
 		-- (The picked one's row at the bottom, the rest above it in order.
 		-- Each row up clears the picked tab's extra height.)
 		local order = { tabs[picked].row }
@@ -11396,6 +11443,7 @@ do
 				box:SetMaxLetters(4)
 				box:EnableMouseWheel(true)
 				box.searchLabel = info.full .. " " .. name
+				box.settingKey = dbKey -- (its id for /cine find)
 				local function Now()
 					return math.floor((ns.TargetMarkSetting(key, kind) or 1) * 100 + 0.5)
 				end
@@ -12896,7 +12944,9 @@ local function CreateQuestTrackerPanel()
 	-- On top: how long a reveal keeps the tracker up, in place of the mouseover time (all the way left: off).
 	local revealTime = Slider(content, "questRevealTime", L["Override Default Reveal Time"], 0, 60, 1,
 		function(value) return value == 0 and L["Off"] or L["%d sec"]:format(value) end)
-	revealTime:SetPoint("TOPLEFT", switch, "BOTTOMLEFT", 4, -26)
+	-- (On the tab's top, down by its label, which sits above the slider: not under
+	-- the switch, which AdoptTab would move to the tab's very top, the label on the tabs.)
+	revealTime:SetPoint("TOPLEFT", tabHosts[1], "TOPLEFT", 4, -16)
 	Tooltip(revealTime, L["A reveal (a new quest, quest or scenario progress) keeps the quest tracker up this " ..
 		"long, in place of the mouseover time (Hover groups page). \"Keep up for the Calm Timer\" still keeps it " ..
 		"up for the Calm Timer if that's longer. While a camera mode plays, it goes as the mouseover time does. " ..
@@ -14852,7 +14902,7 @@ local function CreateVisionPanel()
 		local function Field(key)
 			for _, role in ipairs(ns.HEAL_VISION_ROLES) do RecordKey(content, key .. "_" .. role) end
 			RecordKey(content, key)
-			return { get = function() local db = ns.GetDB() return db[KeyOf(db, key)] end,
+			return { key = key, get = function() local db = ns.GetDB() return db[KeyOf(db, key)] end,
 				set = function(value) ns.GetDB()[editing and key .. "_" .. editing or key] = value end }
 		end
 		local ROLE_NAMES = { TANK = L["Tank"], HEALER = L["Healer"], DAMAGER = L["Damage"] }
@@ -14911,6 +14961,7 @@ local function CreateVisionPanel()
 				ns.GetDB()["healVisionOwn_" .. editing] = not value
 				Apply()
 			end)
+		ownCheck.noSettingId = true -- (each role tab's own: no one setting for /cine find)
 		ownCheck.Refresh = function(self)
 			self:SetChecked(editing and not ns.GetDB()["healVisionOwn_" .. editing] or false)
 			ShowTabs()
@@ -17195,10 +17246,16 @@ end
 -- and those without one yet (a checkbox, slider, box or button you could
 -- click, made without a setting's key or a grid row), as text to copy.
 -- (Hidden ones too: a closed section's, another tab's.)
-function ns.SettingIdsReport()
+-- ns.SettingIds(): the lines for both lists ("id | page | label" and "page |
+-- label"), and the settings without one (the offline check's, before a
+-- release): { page, label } each for a checkbox, slider or number box that
+-- isn't marked noSettingId (a control with no one setting of its own: a
+-- row's, a theme's or a wheel's value, a tab's switch).
+local SETTING_CONTROLS = { CheckButton = true, Slider = true, EditBox = true }
+function ns.SettingIds()
 	Refresh()
 	local CONTROLS = { CheckButton = true, Slider = true, EditBox = true, Button = true }
-	local with, without, seen = {}, {}, {}
+	local with, without, missing, seen = {}, {}, {}, {}
 	for _, page in ipairs(searchPages) do
 		local pageName = page.name or "Cinematic"
 		local function walk(frame)
@@ -17209,16 +17266,24 @@ function ns.SettingIdsReport()
 				id = ok and type(rowId) == "string" and ("row:" .. rowId) or nil
 			end
 			local label = SearchText(frame.searchLabel)
+			local kind = frame:GetObjectType()
 			if id and not seen[id] then
 				seen[id] = true
 				with[#with + 1] = ("%s | %s | %s"):format(id, pageName, label or "")
-			elseif not id and label and CONTROLS[frame:GetObjectType()] then
+			elseif not id and label and CONTROLS[kind] then
 				without[#without + 1] = ("%s | %s"):format(pageName, label)
+				if SETTING_CONTROLS[kind] and not frame.noSettingId then
+					missing[#missing + 1] = { page = pageName, label = label }
+				end
 			end
 			for _, child in ipairs({ frame:GetChildren() }) do walk(child) end
 		end
 		walk(page.canvas.content)
 	end
+	return with, without, missing
+end
+function ns.SettingIdsReport()
+	local with, without = ns.SettingIds()
 	table.sort(with)
 	local out = { ("Cinematic %s: %d ids, %d controls without one"):format(ns.Version and ns.Version() or "?",
 		#with, #without), "", "== Without an id (page | label) ==" }
@@ -17510,6 +17575,7 @@ local function CreateProfilesPanel()
 			ns.SetCharacterProfile(value)
 			Refresh()
 		end)
+	perChar.noSettingId = true -- (the character's, not a profile setting: no id for /cine find)
 	-- (With the profile your other characters use: the account's.)
 	perChar.Refresh = function(self)
 		self:SetChecked(ns.IsCharacterProfile())

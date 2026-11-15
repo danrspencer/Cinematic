@@ -2955,7 +2955,7 @@ function ns.CreateVitalsStylePanel(kit)
 		return theme and theme[name]
 	end
 	local function Field(name, default)
-		return {
+		return { noSettingId = true, -- (a theme's value: no one setting for /cine find)
 			get = function()
 				local value = ThemeValue(name)
 				if value == nil then value = default end
@@ -3193,7 +3193,7 @@ function ns.CreateVitalsStylePanel(kit)
 		return n
 	end
 	local function SparkField(i, get, set)
-		return {
+		return { noSettingId = true, -- (a theme's sparks: no one setting for /cine find)
 			get = function()
 				local info = Spark(i)
 				return info and get(info)
@@ -3286,7 +3286,7 @@ function ns.CreateVitalsStylePanel(kit)
 		ns.SetVitalsThemeField("swirl", list)
 	end
 	local function SwirlField(i, get, set)
-		return {
+		return { noSettingId = true, -- (a theme's swirl: no one setting for /cine find)
 			get = function()
 				local info = Swirls()[i]
 				return info and get(info)
@@ -3351,7 +3351,7 @@ function ns.CreateVitalsStylePanel(kit)
 		-- (Where it sits, to try out: the theme's own portal changed in place, until /reload;
 		-- the numbers to write into LowHealthThemes.lua.)
 		local function PortalField(name, default)
-			return {
+			return { noSettingId = true, -- (a theme's portal: no one setting for /cine find)
 				get = function()
 					local theme = ns.GetDB() and ns.VitalsEditedTheme()
 					local portal = theme and theme.portal
@@ -3488,7 +3488,7 @@ function ns.CreateVitalsStylePanel(kit)
 		past:SetPoint("LEFT", kind, "RIGHT", 0, 0)
 		-- (Each box changes its part of the theme's effect, the rest kept.)
 		local function EffectPart(name, default)
-			return {
+			return { noSettingId = true, -- (a theme's effect: no one setting for /cine find)
 				get = function()
 					local effect = Effect()
 					return effect and effect[name] or default

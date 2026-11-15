@@ -76,6 +76,7 @@ EFFECT_PAGES.tint.More = function(kit, content, stack)
 	kit.RecordKey(content, "tintDrift")
 	kit.RecordKey(content, "tintDriftAmount")
 	local driftAmount = stack:Add(kit.Slider(content, {
+		key = "tintDriftAmount", -- (its id for /cine find)
 		get = function()
 			local db = ns.GetDB()
 			return db.tintDrift and db.tintDriftAmount or 0

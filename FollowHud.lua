@@ -341,6 +341,7 @@ function ns.BuildFollowHudSetup(parent, stack, kit)
 		for r, piece in ipairs(column) do
 			local text = PIECE_TEXT[piece]
 			local check = kit.Check(pieces, {
+				noSettingId = true, -- (a pick for Set Up, not saved: no setting for /cine find)
 				get = function() return Wanted()[piece] and true or false end,
 				set = function(value) Wanted()[piece] = value end,
 			}, L[text[1]], L[text[2]])

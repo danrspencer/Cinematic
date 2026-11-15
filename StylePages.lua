@@ -2128,6 +2128,9 @@ function ns.StyleRows(kit, content, stack, changed, switchKey, fieldOf, panel)
 		end
 		lastToggle = toggle
 		toggle.searchLabel = label
+		-- (Its id for /cine find, as a checkbox's: its setting's key.)
+		local id = K(key)
+		if type(id) == "string" then toggle.settingKey = id end
 		toggle:SetScript("OnClick", function()
 			Put(key, not Get(key))
 			changed()

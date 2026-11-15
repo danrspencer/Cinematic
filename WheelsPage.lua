@@ -862,6 +862,7 @@ local function WheelPage(kit, info)
 			SetOnMaster(info.key, value)
 			if refreshMaster then refreshMaster() end
 		end)
+	onMaster.noSettingId = true -- (each wheel's own: no one setting for /cine find)
 	onMaster:SetPoint("TOPLEFT", keyLabel, "BOTTOMLEFT", -2, -12)
 	onMaster.Refresh = function(self) self:SetChecked(IsOnMaster(info.key)) end
 	local preview = Preview(content, L[info.label])
@@ -1081,6 +1082,7 @@ local function YourWheelsPage(kit, info)
 			SetOnMaster("custom" .. selected.pool, value)
 			if refreshMaster then refreshMaster() end
 		end)
+	onMaster.noSettingId = true -- (each wheel's own: no one setting for /cine find)
 	onMaster:SetPoint("TOPLEFT", keyLabel, "BOTTOMLEFT", -2, -12)
 	onMaster.Refresh = function(self)
 		self:SetChecked(selected and IsOnMaster("custom" .. selected.pool) or false)

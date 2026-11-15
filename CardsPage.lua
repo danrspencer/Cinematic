@@ -409,6 +409,7 @@ local function LookGrid(kit, content, stack, fieldOf, changed, own, icon)
 	Dot({ "Icon", "Icon picture" })
 	local iconCheck = Tick("cardIconShow", L["Icon"], L["An icon before the words: each event's own (a map " ..
 		"for a zone, a skull for a boss...), unless it's given another with the button beside this."])
+	iconCheck.noSettingId = true -- (the picked style's: no one setting for /cine find)
 	if icon then icon(iconCheck) end
 	local timingEnd = at.y - 4
 	local timingPanel = Panel(at.x, top, timingEnd)

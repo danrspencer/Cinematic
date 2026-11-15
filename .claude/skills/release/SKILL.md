@@ -59,6 +59,11 @@ Three modes, picked by the first word after /release:
      Show the was/now lines in the review and say which change in the diff
      caused each. If they're meant, phase 2 saves them (step 9a); if one
      isn't, it's a finding.
+   - "setting ids: <page> | <label> has no id": a checkbox, slider or number
+     box players can't be sent to with `/cine find`. A finding: the fix is
+     its setting's key (a `{ key = "...", get, set }` field, or
+     `settingKey`), or `noSettingId = true` where it has no one setting (a
+     theme's, a row's or a wheel's value).
    Fix nothing yet; failures go in the review.
 
 4. **Review the diff.** Read the whole `git diff` plus the new files, topic by
