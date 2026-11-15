@@ -118,6 +118,7 @@ local DEFAULTS = {
 	tintDrift = true,      -- tint strength slowly wanders up and down over a few minutes
 	tintDriftAmount = 0.08, -- how far it wanders, as a fraction of the strength (0.08 = +/-8%)
 	mapDim = 0,            -- in CineMode the world map takes the tint's colour and goes this much darker (0 = off; Tint.lua)
+	mapDimFollowTint = false, -- Match the tint: mapDim is the most, scaled by how dark the tint is now (Tint.lua)
 	vignette = true,      -- darkened screen edges
 	vignetteStrength = 0.1,
 	innGlow = true,        -- indoors in an inn: lift the outdoor tint and add a warm glow

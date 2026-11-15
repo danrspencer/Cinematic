@@ -802,7 +802,15 @@ function ns.UpdateMapDim()
 	local amount = db and db.mapDim or 0
 	local r, g, b = 1, 1, 1
 	if amount > 0 then
-		local color, keep = state.color, 1 - amount * (state.level or 0)
+		local color = state.color
+		if db.mapDimFollowTint then
+			-- Match the tint: the slider is the most; a dark tint (night,
+			-- a storm) gets all of it, a light one little, a clear day none.
+			-- (The darkening colour's brightness: a full night tint is ~0.6.)
+			local light = color[1] * 0.299 + color[2] * 0.587 + color[3] * 0.114
+			amount = amount * math.min(1, math.max(0, 1 - light) / 0.4)
+		end
+		local keep = 1 - amount * (state.level or 0)
 		r, g, b = color[1] * keep, color[2] * keep, color[3] * keep
 	end
 	if r > 0.995 and g > 0.995 and b > 0.995 then

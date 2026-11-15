@@ -96,6 +96,12 @@ EFFECT_PAGES.tint.More = function(kit, content, stack)
 	kit.Tooltip(mapDim, L["In CineMode the world map takes the tint's color and goes this much darker, so " ..
 		"opening it in a dark zone or at night doesn't flash bright. It fades with the tint as CineMode comes " ..
 		"and goes. Off: the map at the game's own brightness."])
+	stack:Add(kit.Check(content, "mapDimFollowTint", L["Match the tint"],
+		L["Dims the world map by how dark the tint is right now: the Dim the world map amount at night or " ..
+			"in a storm, less in a light tint, none on a clear day. Off: always the full amount."], function(value)
+			ns.GetDB().mapDimFollowTint = value
+			ns.RefreshTint()
+		end), "check")
 
 	-- Crossing a zone border: how the old zone's tint gives way to the new one.
 	stack:Header(content, L["At zone borders"])
