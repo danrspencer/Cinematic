@@ -5,9 +5,9 @@
 -- fill and its colors by what's cast (a cast, a channel, one that can't be
 -- interrupted, one that was), a dark ground behind, a border, the spell's
 -- icon, shield and spark, and the spell's name in a font of your own, with
--- the seconds left at the end. A Default tab, and a tab for each kind of bar
+-- the seconds left at the end. A Default row, and a row for each kind of bar
 -- whose "These bars" dropdown picks its look: the game's (plateCastOn_<BAR>
--- off; not the nameplates'), the Default tab's, or its own copy of each
+-- off; not the nameplates'), the Default row's, or its own copy of each
 -- setting (plateCastOwn_<BAR>, <key>_<BAR>). The bars past the nameplates'
 -- start with the game's look, and keep
 -- the game's size (yours is sized in Edit Mode). Whether the nameplates'
@@ -1195,57 +1195,39 @@ end
 local TAB_NAMES = {}
 for _, info in ipairs(BARS) do TAB_NAMES[info[1]] = info[2] end
 
+-- The page: a preview, the Default row's presets, then a row per kind of bar
+-- (Default first), each with its These bars pick and a Look panel (the Style
+-- pages' template, StylePages.lua's rows.Look): Bar, Icon, Text and Border.
+-- A kind's settings are its own copy (<key>_<ID>) while These bars says Their
+-- own look, else the Default row's (its panel greyed) or the game's.
 function ns.CreatePlateCastStylePanel(kit)
 	local canvas, content = kit.CreateScrollPage()
 	local title = kit.Label(content, "GameFontNormalLarge", L["Cast Bar Style"])
 	title:SetPoint("TOPLEFT", 16, -16)
 	local intro = kit.PageIntro(content, title,
 		L["How the cast bars look: on nameplates, yours, your target's and focus's, and the bosses' and arena " ..
-		"enemies'. Each tab's These bars picks its look: the game's (all but the nameplates' start so), the " ..
-		"Default tab's, or its own. Whether the nameplates' show in CineMode: the Nameplates page's Plate parts grid. Changes " ..
-		"show at once, here and on bars casting now."])
+		"enemies'. Each row's These bars picks its look: the game's (all but the nameplates' start so), the " ..
+		"Default row's, or its own, set in its Look panel. Whether the nameplates' show in CineMode: the " ..
+		"Nameplates page's Plate parts grid. Changes show at once, here and on bars casting now."])
 
-	-- The tab being edited (nil: Default), and each setting as the field it
-	-- edits: the bar's own copy while it has one, else Default's (shown greyed).
+	-- The row shown in the preview (nil: Default): the last one whose panel
+	-- was opened.
 	local editing
-	local function UsesDefault(db) return editing and not db["plateCastOwn_" .. editing] end
-	local function Restyled(db) return not editing or Active(editing, db) end
-	local fields = {}
-	local function Field(key)
-		if not fields[key] then
-			fields[key] = {
-				get = function()
-					local db = ns.GetDB()
-					if not db then return nil end
-					return db[(editing and db["plateCastOwn_" .. editing]) and key .. "_" .. editing or key]
-				end,
-				set = function(value)
-					ns.GetDB()[editing and key .. "_" .. editing or key] = value
-				end,
-			}
-		end
-		return fields[key]
-	end
-
 	local preview -- (below: drawn again as each setting changes)
-	local tabs, lookPick, sizes, playerSizes
+	local panels = {} -- [id or "DEFAULT"] = its panel's sample, once made
 	local function Changed()
 		ns.RefreshPlateCastStyle()
 		if preview then preview:Refresh() end
+		for _, sample in pairs(panels) do
+			if sample:IsVisible() then sample:Refresh() end
+		end
 	end
 
 	local switch = kit.PageSwitch(content, "plateCastStyle", L["Enable Page"],
 		L["On: the cast bars look as this page says. Off: the game's own (the preview shows that too). Each " ..
 		"setting keeps its value for when you turn this back on."], intro, Changed)
 	local stack = kit.Stack(switch, "check")
-	local rows = ns.StyleRows(kit, content, stack, Changed, "plateCastStyle", Field)
-	local function Editable(db) return rows.On(db) and Restyled(db) and not UsesDefault(db) end
-
-	local function Pick(id)
-		editing = id
-		kit.Refresh()
-		Changed()
-	end
+	local rows = ns.StyleRows(kit, content, stack, Changed, "plateCastStyle")
 
 	-- The preview: a cast, a channel and one that can't be interrupted, filling
 	-- again and again, over the Style pages' scene.
@@ -1288,45 +1270,55 @@ function ns.CreatePlateCastStylePanel(kit)
 		bar.offset = (i - 1) * 0.3
 		samples[i] = bar
 	end
-	-- (The tab being edited's look: the game's for a kind not restyled.)
+	-- (A look with some settings in place of its own: a choice pointed at in a
+	-- Look panel, never saved. General's picked: as the row's own resolves it.)
+	local function LookOver(id, over)
+		local look = Look(id)
+		if not over then return look end
+		return setmetatable({}, { __index = function(_, key)
+			local value = over[key]
+			if value == nil or ns.IsGeneralStyle(value) then return look[key] end
+			return value
+		end })
+	end
+	-- (A sample bar as a look says: the game's fill and colors where it has none.)
+	local function Dress(bar, info, look, sized)
+		if not FILLS[look.plateCastFill] then
+			local kind = info.locked and "locked" or (info.channel and "channel" or "cast")
+			local atlas = ns.isRetail and C_Texture and C_Texture.GetAtlasInfo
+				and C_Texture.GetAtlasInfo(GAME_ATLAS[kind]) and GAME_ATLAS[kind]
+			if atlas and bar.SetStatusBarTexture then
+				bar:SetStatusBarTexture(atlas)
+				bar:SetStatusBarColor(1, 1, 1)
+			else
+				bar:SetStatusBarTexture(FILLS.smooth)
+				bar:SetStatusBarColor(unpack(GAME_COLORS[kind]))
+			end
+		end
+		Apply(bar, look, true, sized)
+	end
+	-- (The row being looked at: the game's look for a kind not restyled.)
 	function preview:Refresh()
 		local look = Look(editing)
 		for i, bar in ipairs(samples) do
-			-- (The game's look for a sample: its classic fill and colors.)
-			if not FILLS[look.plateCastFill] then
-				local info = SAMPLES[i]
-				local kind = info.locked and "locked" or (info.channel and "channel" or "cast")
-				local atlas = ns.isRetail and C_Texture and C_Texture.GetAtlasInfo
-					and C_Texture.GetAtlasInfo(GAME_ATLAS[kind]) and GAME_ATLAS[kind]
-				if atlas and bar.SetStatusBarTexture then
-					bar:SetStatusBarTexture(atlas)
-					bar:SetStatusBarColor(1, 1, 1)
-				else
-					bar:SetStatusBarTexture(FILLS.smooth)
-					bar:SetStatusBarColor(unpack(GAME_COLORS[kind]))
-				end
-			end
-			Apply(bar, look, true, not editing or SizedAs(editing, ns.GetDB()))
+			Dress(bar, SAMPLES[i], look, not editing or SizedAs(editing, ns.GetDB()))
 		end
 	end
 	local started = GetTime()
-	ns.SetOnUpdate(preview, function()
-		local look = Look(editing)
-		for _, bar in ipairs(samples) do
-			local done = ((GetTime() - started) / SAMPLE_TIME + bar.offset) % 1
+	local function Fill(bars, look)
+		for _, bar in ipairs(bars) do
+			local done = ((GetTime() - started) / SAMPLE_TIME + (bar.offset or 0)) % 1
 			local value = bar.channeling and (1 - done) or done
 			bar:SetValue(value)
 			bar.value, bar.maxValue = value * SAMPLE_TIME, SAMPLE_TIME
-			local width = bar:GetWidth()
-			bar.Spark:SetPoint("CENTER", bar, "LEFT", width * value, 0)
-			if look.plateCastTimer and states[bar] then
-				UpdateTimer(bar, states[bar])
-			end
+			bar.Spark:SetPoint("CENTER", bar, "LEFT", bar:GetWidth() * value, 0)
+			if look.plateCastTimer and states[bar] then UpdateTimer(bar, states[bar]) end
 		end
-	end)
+	end
+	ns.SetOnUpdate(preview, function() Fill(samples, Look(editing)) end)
 	kit.AddControl(preview)
 
-	-- (Default's: the presets set the Default tab's settings.)
+	-- (Default's: the presets set the Default row's settings.)
 	rows.PresetMenu({
 		{ L["Like the game's"], L["The game's own cast bars (the defaults)."], {} },
 		{ L["Flat"], L["A flat fill in your colors on a dark ground, a thin black edge, Arial Narrow, the " ..
@@ -1340,49 +1332,6 @@ function ns.CreatePlateCastStylePanel(kit)
 			plateCastSpark = false, plateCastTextSize = 0.9, plateCastOutline = "thin" } },
 	}, PRESET_KEYS)
 
-	-- The tabs, in Heal Vision's folder look (ns.FolderTabs): Default, then
-	-- each kind of bar, the settings on the panel under them. On a kind's,
-	-- Use default settings, and (all but the nameplates') Restyle these bars
-	-- beside it; on Default's, a note in their place.
-	local TAB_H = ns.FOLDER_TAB_HEIGHT
-	local ids, list = { false }, {}
-	for _, info in ipairs(BARS) do ids[#ids + 1] = info[1] end
-	for i, id in ipairs(ids) do
-		list[i] = { id and L[TAB_NAMES[id]] or L["Default"],
-			id and L["These cast bars: the game's look, the Default tab's, or their own, as These bars says."]
-			or L["The settings every kind of cast bar has while its tab uses the default settings."] }
-	end
-	-- (Room for the tabs; the panel's top left under it.)
-	local tabsRoom = CreateFrame("Frame", nil, content)
-	tabsRoom:SetSize(PREVIEW_W, TAB_H + 4)
-	stack:Add(tabsRoom, "label")
-	local panel, ShowTab, base
-	panel, tabs, ShowTab, base = ns.FolderTabs(content, list, function(i) Pick(ids[i] or nil) end)
-	panel:SetPoint("TOPLEFT", tabsRoom, "BOTTOMLEFT", -10, 0)
-	-- (Tabs sit 8 right of base: the first one 2 left of tabsRoom, as before.)
-	base:SetPoint("TOPLEFT", tabsRoom, "BOTTOMLEFT", -10, 0)
-	local defaultNote, lookName
-	local function TabsLook()
-		local db = ns.GetDB()
-		for i, tab in ipairs(tabs) do
-			local id = ids[i] or nil
-			local own = id and db and db["plateCastOwn_" .. id]
-			tab:SetText((id and L[TAB_NAMES[id]] or L["Default"]) .. (own and " |cffffd100*|r" or ""))
-			tab:SetWidth(math.max(56, math.ceil(tab.label:GetStringWidth()) + 16))
-			if id == editing then ShowTab(i) end
-		end
-		lookName:SetShown(editing ~= nil)
-		if lookPick then lookPick:SetShown(editing ~= nil) end
-		defaultNote:SetShown(editing == nil)
-		-- (The bar's size: the nameplates' alone; elsewhere its line takes no
-		-- room, so Look comes right under the header.)
-		local sized = not editing or editing == "PLATE"
-		sizes:SetShown(sized)
-		sizes:SetHeight(sized and 22 or 0.01)
-		local yours = editing == "PLAYER"
-		playerSizes:SetShown(yours)
-		playerSizes:SetHeight(yours and 22 or 0.01)
-	end
 	-- (Every setting the page has, Default's and each kind's, for its Reset.)
 	for _, key in ipairs(BAR_KEYS) do kit.RecordKey(content, key) end
 	for _, info in ipairs(BARS) do
@@ -1391,168 +1340,284 @@ function ns.CreatePlateCastStylePanel(kit)
 		if id ~= "PLATE" then kit.RecordKey(content, "plateCastOn_" .. id) end
 		for _, key in ipairs(BAR_KEYS) do kit.RecordKey(content, key .. "_" .. id) end
 	end
-	-- These bars: the game's look (all but the nameplates'), the Default
-	-- tab's, or their own; one choice over plateCastOn_ and plateCastOwn_.
-	local lookField = {
-		get = function()
-			local db = ns.GetDB()
-			if not (db and editing) then return nil end
-			if editing ~= "PLATE" and not db["plateCastOn_" .. editing] then return "game" end
-			return db["plateCastOwn_" .. editing] and "own" or "default"
-		end,
-		set = function(value)
-			local db = ns.GetDB()
-			if not editing then return end
-			if editing ~= "PLATE" then db["plateCastOn_" .. editing] = value ~= "game" end
-			if value == "game" then return end
-			-- (Their own the first time: they start from Default's settings.)
-			if value == "own" and not db["plateCastStarted_" .. editing] then
-				for _, key in ipairs(BAR_KEYS) do db[key .. "_" .. editing] = db[key] end
-				db["plateCastStarted_" .. editing] = true
-			end
-			db["plateCastOwn_" .. editing] = value == "own"
-		end,
-	}
-	lookName = stack:Add(kit.Label(content, "GameFontHighlight", L["These bars:"]), "label")
-	lookName:SetSize(150, 30)
-	lookName:SetJustifyV("MIDDLE")
-	lookPick = kit.Dropdown(content, lookField, function()
-		local list = {}
-		if editing ~= "PLATE" then
-			list[#list + 1] = { value = "game", text = L["The game's look"],
-				tip = L["Cinematic leaves them alone. Their size stays the game's either way (yours is sized in Edit Mode)."] }
-		end
-		list[#list + 1] = { value = "default", text = L["Same as the Default tab"],
-			tip = L["They look as the Default tab says."] }
-		list[#list + 1] = { value = "own", text = L["Their own look"],
-			tip = L["They look as the settings below say. These start as the Default tab's, and are kept while you pick another choice."] }
-		return list
-	end, 200, function()
-		Changed()
-		kit.Refresh()
-	end)
-	if lookPick then
-		lookPick:SetPoint("LEFT", lookName, "RIGHT", 4, 0)
-		lookPick.pageSwitch = false
-		local generate = lookPick.Refresh
-		lookPick.Refresh = function(self)
-			generate(self)
-			TabsLook()
-		end
-		kit.GreyUnless(lookPick, rows.On)
-		kit.Tooltip(lookPick, L["How these cast bars look: the game's own, the Default tab's, or this tab's own settings."])
-	else
-		-- (No dropdown on this client: the tabs still need their look.)
-		lookName.Refresh = TabsLook
-		kit.AddControl(lookName)
-	end
-	defaultNote = kit.Label(content, "GameFontHighlightSmall",
-		L["Every kind of cast bar looks as this tab says while its own tab picks Same as the Default tab."])
-	defaultNote:SetPoint("LEFT", lookName, "LEFT", 4, 0)
-	defaultNote.searchSkip = true
 
-	-- (Sizes and the like as small boxes on a line, colors on one line, each
-	-- part's check with its size beside it.)
-	stack:Header(content, L["Bar"])
-	sizes = rows.Boxes()
-	-- (Retail's plates won't say where the bar is: its width there goes with
-	-- the health bar's, the Nameplate Style page's Width.)
-	if not ns.isRetail then
-		sizes:Box(L["Width"], Field("plateCastWidth"), 50, 150, 5, "%d", 100,
-			L["Its width, next to the game's, about its middle (nameplates only)."], Editable, "%")
+	-- A row's These bars: the game's look (all but the nameplates'), the
+	-- Default row's, or its own; one choice over plateCastOn_ and plateCastOwn_.
+	local function LookPick(id)
+		local db = ns.GetDB()
+		if not (db and id) then return nil end
+		if id ~= "PLATE" and not db["plateCastOn_" .. id] then return "game" end
+		return db["plateCastOwn_" .. id] and "own" or "default"
 	end
-	sizes:Box(L["Height"], Field("plateCastHeight"), 50, 300, 10, "%d", 100,
-		L["Its height, next to the game's (nameplates only). The health bar and name ride up on it."],
-		Editable, "%")
-	-- (Yours: its width alone, the rest of its size Edit Mode's.)
-	-- (A percent of the game's, or pixels on screen: the round pick before
-	-- each says which; px picked empty, it's filled with the bar's width now.)
-	playerSizes = rows.Boxes()
-	local widthTip = L["Your cast bar's width, about the point it hangs from (its height and place: Edit Mode's)."]
-	playerSizes:Pick(L["Width"], "plateCastPlayerWidthUnit", "pct", L["Its width as a percent of the game's."],
-		Editable)
-	playerSizes:Box("", "plateCastPlayerWidth", 20, 200, 5, "%d", 100, widthTip,
-		function(db) return Editable(db) and db.plateCastPlayerWidthUnit ~= "px" end, "%")
-	playerSizes:Pick("", "plateCastPlayerWidthUnit", "px",
-		L["Its width in pixels on screen: the same number on two bars, the same width."], Editable, function()
-			local db = ns.GetDB()
-			if (tonumber(db.plateCastPlayerWidthPx) or 0) <= 0 then
-				db.plateCastPlayerWidthPx = PlayerBarPixels() or 200
+	local function PickLook(id, value)
+		local db = ns.GetDB()
+		if id ~= "PLATE" then db["plateCastOn_" .. id] = value ~= "game" end
+		if value == "game" then return end
+		-- (Their own the first time: they start from Default's settings.)
+		if value == "own" and not db["plateCastStarted_" .. id] then
+			for _, key in ipairs(BAR_KEYS) do db[key .. "_" .. id] = db[key] end
+			db["plateCastStarted_" .. id] = true
+		end
+		db["plateCastOwn_" .. id] = value == "own"
+	end
+
+	-- A row's settings: Default's plain keys, a kind's own copy (<key>_<ID>).
+	local fieldsOf = {}
+	local function FieldOf(id)
+		if not fieldsOf[id or "DEFAULT"] then
+			local fields = {}
+			fieldsOf[id or "DEFAULT"] = function(key)
+				if type(key) ~= "string" or not OWN_KEY[key] then return key end
+				if not fields[key] then
+					local dbKey = id and key .. "_" .. id or key
+					fields[key] = {
+						get = function()
+							local db = ns.GetDB()
+							return db and db[dbKey]
+						end,
+						set = function(value) ns.GetDB()[dbKey] = value end,
+					}
+				end
+				return fields[key]
 			end
+		end
+		return fieldsOf[id or "DEFAULT"]
+	end
+	-- (A row's settings can change: Default's always, a kind's while it has its
+	-- own look and is restyled.)
+	local function EditableFor(id)
+		return function(db)
+			return ns.StyleOn("plateCastStyle", db) and (not id or (Active(id, db) and db["plateCastOwn_" .. id]))
+				and true or false
+		end
+	end
+
+	-- Where a row's setting comes from (the Look panel's tags).
+	local function SourceOf(id)
+		return function(key)
+			local db = ns.GetDB() or {}
+			local pick = LookPick(id)
+			if pick == "game" then return { text = L["The game's"] } end
+			if pick == "default" then return { text = L["Default row's"] } end
+			local value = db[id and key .. "_" .. id or key]
+			if ns.IsGeneralStyle and ns.IsGeneralStyle(value) then return { text = L["General's"] } end
+			-- (What the main theme wrote, still as it wrote it: StyleThemes.lua's Casts().)
+			if not id and ns.ThemeSetting then
+				local themed = ns.ThemeSetting(key)
+				local theme = ns.ActiveStyleTheme and ns.ActiveStyleTheme()
+				if themed ~= nil and themed == value and theme then
+					return { text = L["Set by theme: %s"]:format(L[theme.name]) }
+				end
+			end
+			if value ~= nil and value ~= ns.DEFAULTS[key] then return { text = L["This row"], own = true } end
+			return nil
+		end
+	end
+
+	-- A row's Look panel, made the first time it's opened.
+	local function MakePanel(id, label)
+		local Editable = EditableFor(id)
+		local Field = FieldOf(id)
+		local function Filled(db)
+			local fill = ns.StyleKeyGet(Field("plateCastFill"))
+			if ns.IsGeneralStyle(fill) then fill = ns.GeneralStyleValue("plateCastFill") end
+			return Editable(db) and FILLS[fill] ~= nil
+		end
+		local hidden = { Add = function(_, control)
+			control:Hide()
+			return control
+		end }
+		local looks = ns.StyleRows(kit, content, hidden, Changed, "plateCastStyle", Field)
+		local button, pop = looks.Look("", L["Cast bars"] .. ": " .. label, {
+			tabs = {
+				default = function(key) return OWN_KEY[key] and ns.DEFAULTS[key] or nil end,
+				source = SourceOf(id),
+				copyKind = "castRow", copyName = label,
+			},
+			-- (Its sample: a cast as this row draws it.)
+			preview = function(parent, width)
+				local holder = CreateFrame("Frame", nil, parent)
+				holder:SetSize(width, 70)
+				ns.StyleScene(holder, 0.6, 0.85)
+				local bar = MakeSample(holder, SAMPLES[1])
+				bar:SetScale(1.6)
+				bar:SetPoint("CENTER", holder, "CENTER", 0, 4)
+				local tag = holder:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+				tag:SetPoint("TOPRIGHT", -8, -6)
+				tag.searchSkip = true
+				local lookNow = Look(id)
+				function holder.Refresh(_, over, note)
+					tag:SetShown(over ~= nil)
+					tag:SetText(note or L["Preview: not saved"])
+					lookNow = LookOver(id, over)
+					Dress(bar, SAMPLES[1], lookNow, not id or SizedAs(id, ns.GetDB()))
+				end
+				ns.SetOnUpdate(holder, function() Fill({ bar }, lookNow) end)
+				holder:HookScript("OnShow", function(self) self:Refresh() end)
+				panels[id or "DEFAULT"] = holder
+				return holder
+			end,
+			texture = { "plateCastFill", L["The game's: its own fill, in its own colors. Below the game's own few: " ..
+				"any other addon shares (through LibSharedMedia)."], label = L["Fill:"], test = Editable,
+				tint = { 1, 0.7, 0 } },
+			barColor = function(look)
+				look.Colors(L["Colors:"], {
+					{ L["Casting"], COLOR_KEYS.cast, L["Pick the color of a cast."] },
+					{ L["Channeling"], COLOR_KEYS.channel, L["Pick the color of a channel."] },
+					{ L["Can't be interrupted"], COLOR_KEYS.locked,
+						L["Pick the color of a cast or channel that can't be interrupted."] },
+					{ L["Interrupted"], COLOR_KEYS.stop,
+						L["Pick the color of a cast that was interrupted (when the game says: not in every fight)."] },
+				}, Filled)
+			end,
+			ground = function(look)
+				look.Slider("plateCastBack", L["Dark ground"], 0, 100, 5, "%d%%", 100,
+					L["How dark it is behind the fill (with a fill of your own; the game's keeps its own)."], Filled)
+				-- (Its size: the nameplates' (and Default's, for them), and yours its width.)
+				if not id or id == "PLATE" then
+					if not ns.isRetail then
+						look.Slider("plateCastWidth", L["Width"], 50, 150, 5, "%d%%", 100,
+							L["Its width, next to the game's, about its middle (nameplates only)."], Editable)
+					end
+					look.Slider("plateCastHeight", L["Height"], 50, 300, 10, "%d%%", 100,
+						L["Its height, next to the game's (nameplates only). The health bar and name ride up on it."],
+						Editable)
+				elseif id == "PLAYER" then
+					local playerSizes = look.Boxes()
+					local widthTip = L["Your cast bar's width, about the point it hangs from (its height and place: " ..
+						"Edit Mode's)."]
+					playerSizes:Pick(L["Width"], "plateCastPlayerWidthUnit", "pct", L["Its width as a percent of the game's."],
+						Editable)
+					playerSizes:Box("", "plateCastPlayerWidth", 20, 200, 5, "%d", 100, widthTip,
+						function(db) return Editable(db) and db.plateCastPlayerWidthUnit ~= "px" end, "%")
+					playerSizes:Pick("", "plateCastPlayerWidthUnit", "px",
+						L["Its width in pixels on screen: the same number on two bars, the same width."], Editable, function()
+							local db = ns.GetDB()
+							if (tonumber(db.plateCastPlayerWidthPx) or 0) <= 0 then
+								db.plateCastPlayerWidthPx = PlayerBarPixels() or 200
+							end
+						end)
+					playerSizes:Box("", "plateCastPlayerWidthPx", 10, 2000, 5, "%d", 1, widthTip,
+						function(db) return Editable(db) and db.plateCastPlayerWidthUnit == "px" end, "px")
+				end
+				look.Check("plateCastSpark", L["The spark at the fill's end"], nil, Editable)
+			end,
+			icon = function(look)
+				look.Check("plateCastIcon", L["The spell's icon"], nil, Editable)
+				look.Slider("plateCastIconSize", L["Size"], 50, 300, 10, "%d%%", 100,
+					L["The icon's size, next to the game's. On nameplates, the health bar and name ride up on it."],
+					function(db) return Editable(db) and ns.StyleKeyGet(Field("plateCastIcon")) end)
+				look.Check("plateCastShield", L["The shield on casts that can't be interrupted"],
+					L["The game's shield over the icon while the cast can't be interrupted."], Editable)
+				-- (Seen on retail's plates and game 11509's alike.)
+				look.Check("plateCastImportant", L["The mark on important casts"],
+					L["The game's mark on casts it counts as important, ones worth interrupting or getting out of."],
+					Editable)
+				look.Check("plateCastTarget", L["Who it's cast at"],
+					L["The game's mark and name for who the spell is cast at."], Editable)
+			end,
+			font = function(look)
+				look.Check("plateCastText", L["The spell's name"], nil, Editable)
+				look.Font("plateCastFont", nil, Editable)
+			end,
+			textSize = function(look)
+				look.Slider("plateCastTextSize", L["Size"], 50, 300, 10, "%d%%", 100, L["Its size, next to the game's."],
+					Editable)
+			end,
+			outline = function(look)
+				look.Choices(L["Outline:"], "plateCastOutline", {
+					{ "general", L["General"], L["As the Style hub's General page says."] },
+					{ "game", L["The game's"] },
+					{ "none", L["None"] },
+					{ "thin", L["Thin"] },
+					{ "thick", L["Thick"] },
+				}, Editable)
+			end,
+			outlineColor = false, -- (the game's text: its outline is always black)
+			shadow = function(look)
+				look.Choices(L["Shadow:"], "plateCastShadow", {
+					{ "general", ns.SharedStyleSource("plateCastShadow"), L["As the Style hub's General page says."] },
+					{ "game", L["The game's"] },
+					{ "on", L["Shadow"], L["A dark copy of the letters just behind them, down and to the right."] },
+					{ "none", L["None"] },
+				}, Editable)
+				look.Check("plateCastTimer", L["Seconds left at its right end"],
+					L["The seconds left on the cast, at the bar's right end (in the same font). Hidden while the " ..
+					"game keeps them secret, in some fights."], Editable)
+			end,
+			textColor = { "plateCastTextColor", L["The spell's name and seconds left in a color of your own."],
+				keys = { "plateCastTextR", "plateCastTextG", "plateCastTextB" }, test = Editable },
+			border = { "plateCastBorder", L["The cast bar's border: the game's, or one of ours (Custom: its thickness " ..
+				"and color under it)."], opts = { game = true }, test = Editable },
+		})
+		if button then button:Hide() end
+		return pop
+	end
+
+	-- The rows: Default first, then each kind of bar.
+	stack:Header(content, L["Cast bars"])
+	local ids = { false }
+	for _, info in ipairs(BARS) do ids[#ids + 1] = info[1] end
+	local pops = {}
+	for _, id in ipairs(ids) do
+		id = id or nil
+		local label = id and L[TAB_NAMES[id]] or L["Default"]
+		local name = stack:Add(kit.Label(content, "GameFontHighlight", label), "label")
+		name:SetSize(130, 26)
+		name:SetJustifyV("MIDDLE")
+		-- Its look: the game's (all but the nameplates'), the Default row's, or its own.
+		local pick
+		if id then
+			pick = kit.Dropdown(content, { get = function() return LookPick(id) end,
+				set = function(value) PickLook(id, value) end }, function()
+				local list = {}
+				if id ~= "PLATE" then
+					list[#list + 1] = { value = "game", text = L["The game's look"],
+						tip = L["Cinematic leaves them alone. Their size stays the game's either way (yours is sized in Edit Mode)."] }
+				end
+				list[#list + 1] = { value = "default", text = L["Same as the Default row"],
+					tip = L["They look as the Default row says."] }
+				list[#list + 1] = { value = "own", text = L["Their own look"],
+					tip = L["They look as their Look panel says. Its settings start as the Default row's, and are kept " ..
+					"while you pick another choice."] }
+				return list
+			end, 170, function()
+				editing = id
+				Changed()
+				kit.Refresh()
+			end)
+			if pick then
+				pick:SetPoint("LEFT", name, "RIGHT", 4, 0)
+				pick.pageSwitch = false
+				kit.GreyUnless(pick, rows.On)
+				kit.Tooltip(pick, L["How these cast bars look: the game's own, the Default row's, or their own."])
+			end
+		end
+		-- Its Look panel's button, naming what it has.
+		local button = ns.PanelButton(content)
+		button:SetHeight(22)
+		button:SetPoint("LEFT", pick or name, "RIGHT", pick and 8 or 178, 0)
+		button.searchLabel = label
+		kit.Tooltip(button, id and L["These cast bars' own look: bar, icon, text and border. Only while These bars " ..
+			"says Their own look."] or L["Every kind of cast bar's look while its row says Same as the Default row."])
+		button:SetScript("OnClick", function()
+			editing = id
+			if preview then preview:Refresh() end
+			local key = id or "DEFAULT"
+			if not pops[key] then pops[key] = MakePanel(id, label) end
+			pops[key]:SetShown(not pops[key]:IsShown())
 		end)
-	playerSizes:Box("", "plateCastPlayerWidthPx", 10, 2000, 5, "%d", 1, widthTip,
-		function(db) return Editable(db) and db.plateCastPlayerWidthUnit == "px" end, "px")
-	local function Filled(db)
-		local fill = rows.Get("plateCastFill")
-		if ns.IsGeneralStyle(fill) then fill = ns.GeneralStyleValue("plateCastFill") end
-		return Editable(db) and FILLS[fill] ~= nil
+		function button.Refresh(self)
+			local db = ns.GetDB()
+			local look = LookPick(id)
+			local words = look == "game" and L["The game's"] or look == "default" and L["Default row's"]
+				or (id and db and db["plateCastOwn_" .. id]) and L["Its own"] or L["Look"]
+			self:SetText(words)
+			self:SetWidth(math.max(110, self:GetFontString():GetStringWidth() + 30))
+			self:SetEnabled(rows.On(db) and true or false)
+		end
+		kit.AddControl(button)
 	end
-	rows.Look(L["Look:"], L["Bar"], {
-		texture = { "plateCastFill", L["The game's: its own fill, in its own colors. Below the game's own few: " ..
-			"any other addon shares (through LibSharedMedia)."], label = L["Fill:"], test = Editable,
-			tint = { 1, 0.7, 0 } },
-		barColor = function(look)
-			look.Colors(L["Colors:"], {
-				{ L["Casting"], COLOR_KEYS.cast, L["Pick the color of a cast."] },
-				{ L["Channeling"], COLOR_KEYS.channel, L["Pick the color of a channel."] },
-				{ L["Can't be interrupted"], COLOR_KEYS.locked,
-					L["Pick the color of a cast or channel that can't be interrupted."] },
-				{ L["Interrupted"], COLOR_KEYS.stop,
-					L["Pick the color of a cast that was interrupted (when the game says: not in every fight)."] },
-			}, Filled)
-		end,
-		ground = function(look)
-			look.Boxes():Box(L["Dark ground"], Field("plateCastBack"), 0, 100, 5, "%d", 100,
-				L["How dark it is behind the fill (with a fill of your own; the game's keeps its own)."], Filled, "%")
-		end,
-		border = { "plateCastBorder", L["The cast bar's border: the game's, or one of ours (Custom: its thickness " ..
-			"and color under it)."], opts = { game = true }, test = Editable },
-	})
-	rows.Check("plateCastSpark", L["The spark at the fill's end"], nil, Editable)
-
-	stack:Header(content, L["Icon"])
-	local icon = rows.Check("plateCastIcon", L["The spell's icon"], nil, Editable)
-	rows.Boxes(icon):Box(L["Size"], Field("plateCastIconSize"), 50, 300, 10, "%d", 100,
-		L["The icon's size, next to the game's. On nameplates, the health bar and name ride up on it."],
-		Editable, "%")
-	rows.Check("plateCastShield", L["The shield on casts that can't be interrupted"],
-		L["The game's shield over the icon while the cast can't be interrupted."], Editable)
-	-- (Seen on retail's plates and game 11509's alike.)
-	rows.Check("plateCastImportant", L["The mark on important casts"],
-		L["The game's mark on casts it counts as important, ones worth interrupting or getting out of."],
-		Editable)
-	rows.Check("plateCastTarget", L["Who it's cast at"],
-		L["The game's mark and name for who the spell is cast at."], Editable)
-
-	stack:Header(content, L["Text"])
-	rows.Check("plateCastText", L["The spell's name"], nil, Editable)
-	rows.Look(L["Look:"], L["Text"], {
-		font = { "plateCastFont", nil, test = Editable },
-		textSize = function(look)
-			look.Boxes():Box(L["Size"], Field("plateCastTextSize"), 50, 300, 10, "%d", 100,
-				L["Its size, next to the game's."], Editable, "%")
-		end,
-		outline = function(look)
-			look.Choices(L["Outline:"], "plateCastOutline", {
-				{ "general", L["General"], L["As the Style hub's General page says."] },
-				{ "game", L["The game's"] },
-				{ "none", L["None"] },
-				{ "thin", L["Thin"] },
-				{ "thick", L["Thick"] },
-			}, Editable)
-		end,
-		outlineColor = false, -- (the game's text: its outline is always black)
-		shadow = { "plateCastShadow", test = Editable },
-		textColor = { "plateCastTextColor", L["The spell's name and seconds left in a color of your own."],
-			keys = { "plateCastTextR", "plateCastTextG", "plateCastTextB" }, test = Editable },
-	})
-	local timer = rows.Check("plateCastTimer", L["Seconds left at its right end"],
-		L["The seconds left on the cast, at the bar's right end (in the same font). Hidden while the game " ..
-		"keeps them secret, in some fights."], Editable)
-	-- (The panel's bottom under the last row, its right at the page's, as the
-	-- other folder tabs' panels.)
-	panel:SetPoint("BOTTOM", timer, "BOTTOM", 0, -12)
-	panel:SetPoint("RIGHT", content, "RIGHT", -16, 0)
 
 	canvas:SetScript("OnShow", kit.PageShown(kit.Refresh, content))
 	canvas:Hide()
