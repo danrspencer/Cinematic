@@ -6,8 +6,11 @@
 -- the log gets every name and plate setting (yours, the game's default,
 -- saved by us, which of our sets holds it) and each plate up now (kind,
 -- distance, plate and name shown/alpha).
---   1 as is:       Cinematic running as it is now;
---   2 no sight:    Cinematic running, its sight check off (PlateParts.lua's
+--   1 as is:       Cinematic running as it is now, friendly names kept up
+--                  (ns.namesTestKeepFriends, steps 1 and 2: the player's
+--                  setup; the Cinema profile hides them, so the first run,
+--                  2026-11-15, had no names to lose);
+--   2 no sight:    likewise, Cinematic's sight check off (PlateParts.lua's
 --                  sight: a name-only plate's name hides while the game dims
 --                  its plate, and a new plate's starts hidden till it's
 --                  clear). If the game also dims plates by distance, the
@@ -40,7 +43,7 @@ local FALLBACK = { "UnitNameOwn", "UnitNameNPC", "UnitNameHostleNPC", "UnitNameI
 	"nameplateShowOffscreen", "nameplateOccludedAlphaMult" }
 
 local STEPS = {
-	{ key = "as is", say = "%d/%d: AS IS. Don't move. Screenshot in %d sec." },
+	{ key = "as is", say = "%d/%d: AS IS, friendly names kept. Don't move. Screenshot in %d sec." },
 	{ key = "no sight", say = "%d/%d: Cinematic's SIGHT CHECK OFF for this step. Don't move. Screenshot in %d sec." },
 	{ key = "paused", say = "%d/%d: Cinematic PAUSED (a red chat line says so, it starts again after). " ..
 		"Don't move. Screenshot in %d sec." },
@@ -222,10 +225,13 @@ local function Pause(why)
 	end
 end
 local APPLY = {
-	["as is"] = function() return nil end,
+	["as is"] = function()
+		ns.namesTestKeepFriends = true
+		return function() ns.namesTestKeepFriends = nil end
+	end,
 	["no sight"] = function()
-		ns.namesTestNoSight = true
-		return function() ns.namesTestNoSight = nil end
+		ns.namesTestKeepFriends, ns.namesTestNoSight = true, true
+		return function() ns.namesTestKeepFriends, ns.namesTestNoSight = nil, nil end
 	end,
 	["paused"] = function() Pause("names test, step 3") end,
 	["plates off"] = function()

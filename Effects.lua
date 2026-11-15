@@ -370,6 +370,11 @@ local function NameKeptHere(key, inCombat)
 		and NameKeptHere(key == "Friends" and "GroupMembers" or "GroupMinions", inCombat) then
 		return true
 	end
+	-- (The names test keeps friendly names up, as a player with them ticked
+	-- has it, whatever the profile's rows say: NamesTest.lua.)
+	if ns.namesTestKeepFriends and (key == "Friends" or key == "FriendlyMinions" or key == "FriendlyNPCs") then
+		return true
+	end
 	-- (Its rule, edited on its row: name:<row>.)
 	local facts = ns.RuleFactsNow()
 	local ruleKey = ns.NameRuleKey(key)

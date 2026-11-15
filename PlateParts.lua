@@ -400,6 +400,14 @@ local sight = {}
 local dimSince = {} -- [plate] = when its plate was first seen dimmed
 local clearSince = {} -- [plate] = when its plate was last seen go clear
 local SIGHT_CLEAR = 0.2 -- seconds (the fade itself: the page's Fade time)
+-- Only within 28 yards (CheckInteractDistance 4, out of fights): further
+-- out WoW Forever dims plates of units in plain view down the street to 0.40
+-- (the names test, Stormwind 2026-11-15: 25 of 40, nearly all past 28
+-- yards, while the game's own names over their heads showed). Hidden, they
+-- had no name at all: a plate takes the game's away. Further out, and in
+-- fights, a name stays up dimmed or not. [plate] = near, and when to ask again.
+-- (On ns: this file's main chunk is near Lua's 200 locals.)
+ns.plateSightNear = { is = {}, at = {} }
 
 -- A name's size (times the plate's) and height at the camera's distance
 -- now; retail's, as the page says. (band: unused, see above.)
@@ -3140,6 +3148,7 @@ watcher:SetScript("OnEvent", function(_, event, unit)
 	-- (A new plate's name starts hidden: see sight.)
 	if event == "NAME_PLATE_UNIT_ADDED" then
 		sight[plate] = not ns.namesTestNoSight and 0 or nil -- (the names test's no sight check step: shown)
+		ns.plateSightNear.is[plate], ns.plateSightNear.at[plate] = nil, nil -- (a new unit: asked again)
 		if _G.QuestieLoader then
 			ns.FindQuestieIconSoon(plate)
 		end
@@ -3156,6 +3165,7 @@ watcher:SetScript("OnEvent", function(_, event, unit)
 		bodyShare[plate], nameShare[plate], markShare[plate], textShare[plate] = nil, nil, nil, nil
 		bandOf[plate], swaps[plate] = nil, nil
 		sight[plate], dimSince[plate], clearSince[plate] = nil, nil, nil
+		ns.plateSightNear.is[plate], ns.plateSightNear.at[plate] = nil, nil
 		if Usable(plate.UnitFrame) then
 			CentreName(plate.UnitFrame, false)
 			OwnName(plate, nil)
@@ -3243,12 +3253,23 @@ ns.SetOnUpdate(farWatch, ns.Profiled("Plate names", function(self, elapsed)
 		end
 	end
 	-- (In sight or not: see sight. Plates showing just a name.)
+	local near = ns.plateSightNear
+	local fighting = InCombatLockdown()
 	for plate in pairs(nameShare) do
 		local level = sight[plate] or 1
 		local okAlpha, alpha = pcall(plate.GetAlpha, plate)
+		-- (Within 28 yards, asked every FAR_CHECK: see plateSightNear.)
+		if (near.at[plate] or 0) <= now then
+			local unit, close = UnitOf(plate), false
+			if unit and not fighting then
+				local okNear, answer = pcall(CheckInteractDistance, unit, 4)
+				close = okNear and Known(answer) and answer == true or false
+			end
+			near.is[plate], near.at[plate] = close, now + FAR_CHECK
+		end
 		-- (The names test's no sight check step: never dimmed. NamesTest.lua.)
-		local dimmed = not ns.namesTestNoSight and (bodyShare[plate] or 1) < 0.5 and okAlpha and Known(alpha)
-			and alpha < 0.99
+		local dimmed = not ns.namesTestNoSight and near.is[plate] and (bodyShare[plate] or 1) < 0.5 and okAlpha
+			and Known(alpha) and alpha < 0.99
 		if dimmed then
 			dimSince[plate], clearSince[plate] = dimSince[plate] or now, nil
 		else
@@ -3298,11 +3319,13 @@ function ns.DescribePlateSight(plate)
 	local okAlpha, alpha = pcall(plate.GetAlpha, plate)
 	local text = plate.UnitFrame and texts[plate.UnitFrame]
 	local since = dimSince[plate]
-	return ("plateAlpha %s, sight %s, dimmed for %s, name share %s, body share %s, our text %s"):format(
+	return ("plateAlpha %s, sight %s, near %s, dimmed for %s, name share %s, body share %s, our text %s"):format(
 		okAlpha and Known(alpha) and ("%.2f"):format(alpha) or "?", tostring(sight[plate] or "clear"),
-		since and ("%.1fs"):format(GetTime() - since) or "no", tostring(nameShare[plate]), tostring(bodyShare[plate]),
+		tostring(ns.plateSightNear.is[plate]), since and ("%.1fs"):format(GetTime() - since) or "no",
+		tostring(nameShare[plate]), tostring(bodyShare[plate]),
 		text and (text:IsShown() and ("a%.2f"):format(text:GetAlpha()) or "hidden") or "none"),
-		text and text:IsVisible() and text:GetEffectiveAlpha() > 0.05 or false
+		-- (Not GetEffectiveAlpha: it errored on our text, 2026-11-15 run.)
+		text and text:IsVisible() and text:GetAlpha() > 0.05 or false
 end
 
 -- Health fill: a plate's fill follows its unit's health as it changes.
