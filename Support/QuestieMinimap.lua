@@ -239,9 +239,20 @@ local function Consider(frame, spot)
 	if giver and not givers[giver] then givers[giver] = data end
 end
 
--- One look: the names that reveal the minimap now (nil if none; a list kept
--- for the next look, so read it straight away), and a report.
-local function Look()
+-- One look, spread over frames: StartLook takes the icons down (just the
+-- frames, into a kept list), StepLook goes over CHUNK of them a frame, and
+-- FinishLook gives the names that reveal the minimap now (nil if none; a
+-- list kept for the next look, so read it straight away). In one go, walking
+-- in a city, a look cost up to 3.9 ms in the frames' pass once a second: the
+-- spike, /cine debug framepass 2026-11-15.
+local CHUNK = 120
+local scan = { frames = {}, spots = {}, n = 0, i = 0 }
+local function Collect(frame, spot)
+	local n = scan.n + 1
+	scan.n = n
+	scan.frames[n], scan.spots[n] = frame, spot or false
+end
+local function StartLook()
 	local db = ns.db
 	local _, hbd = Libs()
 	local px, py, instance
@@ -259,9 +270,26 @@ local function Look()
 	for kind in pairs(counts) do counts[kind] = 0 end
 	lookX, lookY, lookInstance, lookRadius = px, py, instance, radius
 	lookTurnIns = db.minimapRevealTurnIns == true
-	local iconCount, source = ForEachIcon(Consider)
+	scan.n, scan.i = 0, 0
+	local iconCount, source = ForEachIcon(Collect)
 	lookIcons, lookSource = iconCount, source
-	if not iconCount then return nil, source end
+	if not iconCount then return false, source end
+	return true
+end
+-- true once every icon's been gone over.
+local function StepLook()
+	local last = math.min(scan.i + CHUNK, scan.n)
+	local frames, spots = scan.frames, scan.spots
+	for i = scan.i + 1, last do
+		Consider(frames[i], spots[i] or nil)
+	end
+	scan.i = last
+	if last < scan.n then return false end
+	for i = 1, scan.n do frames[i], spots[i] = nil, nil end -- (no frames held between looks)
+	scan.n, scan.i = 0, 0
+	return true
+end
+local function FinishLook()
 	-- (A giver with a "!" up, near you by their nameplate: wherever they walked to.)
 	if next(givers) then
 		for i = 1, NAMEPLATES do
@@ -318,37 +346,67 @@ local function StandingStill(now)
 	return still
 end
 
+local function LookFailed(err)
+	look.errors = look.errors + 1
+	look.lastError = tostring(err)
+	look.why = "failed: " .. look.lastError
+	if look.errors >= MAX_ERRORS then
+		look.broken = look.lastError
+		ns.Log("questie", "Questie's minimap icons can't be read (a Questie update?), off this login: " .. look.lastError)
+	end
+end
+local stepper = CreateFrame("Frame")
+stepper:Hide()
+ns.SetOnUpdate(stepper, function(self)
+	local ok, done = pcall(StepLook)
+	if not ok then
+		self:Hide()
+		scan.n, scan.i = 0, 0
+		LookFailed(done)
+		return
+	end
+	if not done then return end
+	self:Hide()
+	local okFinish, names = pcall(FinishLook)
+	if not okFinish then
+		LookFailed(names)
+		return
+	end
+	look.errors = 0
+	look.why = nil -- (it looked at the icons; LookReport tells what it saw)
+	if names then
+		local now = GetTime()
+		local up = now - look.seenAt < HOLD
+		look.seenAt = now
+		-- (A new string only when what's in view changed.)
+		local joined = look.joined
+		local same = joined ~= nil and #joined == #names
+		if same then
+			for i = 1, #names do
+				if joined[i] ~= names[i] then same = false break end
+			end
+		end
+		if not same then
+			look.joined = { unpack(names) }
+			look.names = table.concat(names, ", ")
+		end
+		-- (Newly found: the frames' pass at once, to bring the minimap up.)
+		if not up then ns.framesWake = "questie giver" end
+	end
+end)
+
 function ns.QuestieMinimapRevealed(now)
 	if not ns.QuestieMinimapOn() then return false end
-	if now - look.at >= LOOK_EVERY and not StandingStill(now) then
+	if now - look.at >= LOOK_EVERY and not stepper:IsShown() and not StandingStill(now) then
 		look.at = now
-		local ok, names, why = pcall(Look)
-		if ok then
-			look.errors = 0
-			look.why = why -- (nil: it looked at the icons; LookReport tells what it saw)
-			if names then
-				look.seenAt = now
-				-- (A new string only when what's in view changed.)
-				local joined = look.joined
-				local same = joined ~= nil and #joined == #names
-				if same then
-					for i = 1, #names do
-						if joined[i] ~= names[i] then same = false break end
-					end
-				end
-				if not same then
-					look.joined = { unpack(names) }
-					look.names = table.concat(names, ", ")
-				end
-			end
+		local ok, started, why = pcall(StartLook)
+		if not ok then
+			LookFailed(started)
+		elseif started then
+			stepper:Show()
 		else
-			look.errors = look.errors + 1
-			look.lastError = tostring(names)
-			look.why = "failed: " .. look.lastError
-			if look.errors >= MAX_ERRORS then
-				look.broken = look.lastError
-				ns.Log("questie", "Questie's minimap icons can't be read (a Questie update?), off this login: " .. look.lastError)
-			end
+			look.errors = 0
+			look.why = why
 		end
 	end
 	if now - look.seenAt < HOLD then return true, look.names end
@@ -454,7 +512,14 @@ function ns.QuestieMinimapReport()
 	local pins, hbd = Libs()
 	lines[#lines + 1] = ("HereBeDragonsQuestie pins %s, core %s, QuestieLoader %s"):format(tostring(pins ~= nil),
 		tostring(hbd ~= nil), tostring(_G.QuestieLoader ~= nil))
-	local ok, names, why = pcall(Look)
+	-- (In one go here: any look the frames were stepping through is dropped.)
+	stepper:Hide()
+	local ok, names, why = pcall(function()
+		local started, reason = StartLook()
+		if not started then return nil, reason end
+		while not StepLook() do end
+		return FinishLook()
+	end)
 	if ok then
 		lines[#lines + 1] = "look now: " .. (why or LookReport())
 		lines[#lines + 1] = "reveals: " .. (names and table.concat(names, ", ") or "nothing")
