@@ -91,6 +91,11 @@ EFFECT_PAGES.tint.More = function(kit, content, stack)
 	kit.Tooltip(driftAmount, L["The tint's strength slowly wanders up and down over a few minutes, so a still " ..
 		"scene feels a little more alive: how far either way, as a share of the strength. Paused while the " ..
 		"Style tab is open. Off: it stays put."])
+	local mapDim = stack:Add(kit.Slider(content, "mapDimStrength", L["Dim the world map"], 0, 100, 5,
+		function(value) return value == 0 and L["Off"] or ("%d%%"):format(value) end, 100, ns.RefreshTint), "slider")
+	kit.Tooltip(mapDim, L["The world map darkens with the tint, so opening it in a dark zone or at night " ..
+		"doesn't flash bright: how much of the tint's darkening it takes. A brightening tint leaves it as it is. " ..
+		"Off: the map at the game's own brightness."])
 
 	-- Crossing a zone border: how the old zone's tint gives way to the new one.
 	stack:Header(content, L["At zone borders"])

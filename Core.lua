@@ -117,6 +117,7 @@ local DEFAULTS = {
 	tintCustomR = 1, tintCustomG = 0.8, tintCustomB = 0.6,
 	tintDrift = true,      -- tint strength slowly wanders up and down over a few minutes
 	tintDriftAmount = 0.08, -- how far it wanders, as a fraction of the strength (0.08 = +/-8%)
+	mapDimStrength = 1,    -- the world map darkens with the tint, this much of it (0 = off; Tint.lua)
 	vignette = true,      -- darkened screen edges
 	vignetteStrength = 0.1,
 	innGlow = true,        -- indoors in an inn: lift the outdoor tint and add a warm glow

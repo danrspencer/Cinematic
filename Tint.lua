@@ -724,10 +724,16 @@ local function ApplyTint(level, vignetteLevel, weatherLevel)
 			bottom = preset.bottom or preset.color
 		end
 		tintTexture:SetBlendMode(preset.mode)
-		SetGradient(tintTexture, "VERTICAL", grade(bottom), grade(top))
+		local low, high = grade(bottom), grade(top)
+		SetGradient(tintTexture, "VERTICAL", low, high)
 		tintTexture:Show()
+		-- (The world map's dim: a darkening tint's middle colour. A glow, none.)
+		for c = 1, 3 do
+			ns.mapDim.color[c] = preset.mode == "MOD" and (low[c] + high[c]) / 2 or 1
+		end
 	else
 		tintTexture:Hide()
+		ns.mapDim.color[1], ns.mapDim.color[2], ns.mapDim.color[3] = 1, 1, 1
 	end
 
 	local glow = innLevel * level * (db.innGlowAmount or 0)
@@ -757,6 +763,10 @@ local function ApplyTint(level, vignetteLevel, weatherLevel)
 	else
 		weatherTexture:Hide()
 	end
+	for c = 1, 3 do
+		ns.mapDim.color[c] = ns.mapDim.color[c] * weather[c]
+	end
+	ns.UpdateMapDim()
 
 	SetVignette(vignetteEdges, VIGNETTE_SIZE, db.vignette and db.vignetteStrength * vignetteLevel or 0)
 
@@ -770,6 +780,54 @@ function ns.HideTintWash()
 		if texture then texture:Hide() end
 	end
 	if tintFrame then tintFrame:Hide() end
+	ns.mapDim.color[1], ns.mapDim.color[2], ns.mapDim.color[3] = 1, 1, 1
+	ns.UpdateMapDim()
+end
+
+-- The world map dims with the world: in CineMode a dark tint (Duskwood at
+-- night) made a maximized map flash bright. The tint's and weather's darkening
+-- colour (color, from ApplyTint), as strong as Dim the world map says, laid
+-- over the map's scroll area (its pins too, not the side panel or border).
+-- The map loads on demand: hooked once it's there (UpdateTint looks), and
+-- redrawn as it opens. (Fields on ns: no more locals for this main chunk.)
+ns.mapDim = { color = { 1, 1, 1 } }
+function ns.UpdateMapDim()
+	local state = ns.mapDim
+	local area = _G.WorldMapFrame and _G.WorldMapFrame.ScrollContainer
+	if not area then return end
+	local amount = db and db.mapDimStrength or 0
+	local r, g, b = 1, 1, 1
+	if amount > 0 then
+		local color = state.color
+		r = 1 - (1 - color[1]) * amount
+		g = 1 - (1 - color[2]) * amount
+		b = 1 - (1 - color[3]) * amount
+	end
+	if r > 0.995 and g > 0.995 and b > 0.995 then
+		if state.frame then state.frame:Hide() end
+		return
+	end
+	if not state.frame then
+		local frame = CreateFrame("Frame", nil, area)
+		frame:SetAllPoints(area)
+		-- (Over the pins, which stack up from the map canvas's level.)
+		frame:SetFrameLevel(math.min(area:GetFrameLevel() + 1500, 9000))
+		frame:EnableMouse(false)
+		local texture = frame:CreateTexture(nil, "OVERLAY")
+		texture:SetAllPoints()
+		texture:SetColorTexture(1, 1, 1, 1)
+		texture:SetBlendMode("MOD")
+		state.frame, state.texture = frame, texture
+	end
+	state.texture:SetVertexColor(r, g, b, 1)
+	state.frame:Show()
+end
+function ns.HookMapDim()
+	local map = _G.WorldMapFrame
+	if ns.mapDim.hooked or not map then return end
+	ns.mapDim.hooked = true
+	map:HookScript("OnShow", function() ns.Guard(ns.UpdateMapDim) end)
+	ns.UpdateMapDim()
 end
 
 -- cinematic: already false outside the situations ticked for the tint (see Core).
@@ -1288,6 +1346,7 @@ local function UpdateTint(cinematic, elapsed, vignetteOn, weatherOn)
 	-- a fade starting now would jump by it.)
 	pace.elapsed = 0
 	pace.tint, pace.vignette, pace.weather, pace.busy = cinematic, vignetteOn, weatherOn, false
+	if not ns.mapDim.hooked then ns.HookMapDim() end
 	UpdateDeathScreen(elapsed)
 	UpdateDeathBanner()
 	local target = TintWanted(cinematic) and 1 or 0
