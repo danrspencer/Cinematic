@@ -1218,47 +1218,83 @@ do
 		return SetUnitCursorTexture ~= nil
 	end
 
+	-- One look goes over the nameplates a few a frame (PLATES_A_FRAME), on its
+	-- own frame, not in the frames' pass: all 40 at once, with Questie's list
+	-- read first, it cost up to 2.8 ms in that pass once a second walking in a
+	-- city (/cine debug framepass 2026-11-15). The pass reads the last look.
+	local PLATES_A_FRAME = 8
+	local PLATE_UNITS = {}
+	for i = 1, 40 do PLATE_UNITS[i] = "nameplate" .. i end
+	local scan = { found = {}, i = 0, kept = nil, lowShown = false, questie = nil }
+	local function ScanPlate(unit)
+		local db = ns.db
+		if not (UnitExists(unit) and not ns.Flag(UnitIsPlayer(unit))) then return end
+		local kind = GiverKind(unit)
+		local kept = scan.kept
+		-- (Only low-level quests on offer, by talking to them: not one.)
+		if kind == "offer" and kept and not scan.lowShown then
+			local id = low.NpcID(unit)
+			if id and kept[id] then kind = nil end
+		end
+		local questie = scan.questie
+		if kind == "offer" and questie then
+			local name = UnitName(unit)
+			if Known(name) and type(name) == "string" and not questie[name] then kind = nil end
+		end
+		if kind == "offer" or (kind == "turnin" and db.minimapRevealTurnIns == true) then
+			local name = UnitName(unit)
+			local found = scan.found
+			found[#found + 1] = Known(name) and type(name) == "string" and name or "a quest giver"
+		end
+	end
+	-- (Its first frame reads the lists; then the plates, a few a frame. true: done.)
+	local function ScanStep()
+		local db = ns.db
+		if scan.i == 0 then
+			wipe(scan.found)
+			local kept = db.lowLevelGivers
+			scan.kept = kept
+			scan.lowShown = kept and next(kept) ~= nil and select(2, pcall(low.Shown)) == true
+			-- (Use Questie DB ticked and Questie readable: only NPCs it shows a
+			-- "!" or "?" for count, so its own low-level setting decides, no
+			-- talking first. nil: not used, the learned list alone.)
+			scan.questie = db.minimapQuestie == true and ns.QuestieGiverNames and ns.QuestieGiverNames() or nil
+			scan.i = 1
+			return false
+		end
+		local last = math.min(scan.i + PLATES_A_FRAME - 1, 40)
+		for i = scan.i, last do ScanPlate(PLATE_UNITS[i]) end
+		scan.i = last + 1
+		return last >= 40
+	end
+	local stepper = CreateFrame("Frame")
+	stepper:Hide()
+	ns.SetOnUpdate(stepper, function(self)
+		local ok, done = pcall(ScanStep)
+		if ok and not done then return end
+		self:Hide()
+		scan.i, scan.kept, scan.questie = 0, nil, nil
+		local names = scan.found
+		if ok and #names > 0 then
+			table.sort(names)
+			local now = GetTime()
+			local up = now - look.seenAt < HOLD
+			look.seenAt = now
+			look.names = table.concat(names, ", ")
+			-- (Newly found: the frames' pass at once, to bring the minimap up.)
+			if not up then ns.framesWake = "quest giver plate" end
+		end
+	end)
+
 	function ns.QuestGiversRevealed(now)
 		local db = ns.db
 		if not (db and db.handleMinimap ~= false and db.minimapQuestGivers == true and SetUnitCursorTexture) then
 			return false
 		end
-		if now - look.at >= LOOK_EVERY then
+		if now - look.at >= LOOK_EVERY and not stepper:IsShown() then
 			look.at = now
-			local ok, names = pcall(function()
-				local found = {}
-				local kept = db.lowLevelGivers
-				local lowShown = kept and next(kept) ~= nil and select(2, pcall(low.Shown)) == true
-				-- (Use Questie DB ticked and Questie readable: only NPCs it shows a
-				-- "!" or "?" for count, so its own low-level setting decides, no
-				-- talking first. nil: not used, the learned list alone.)
-				local questie = db.minimapQuestie == true and ns.QuestieGiverNames and ns.QuestieGiverNames() or nil
-				for i = 1, 40 do
-					local unit = "nameplate" .. i
-					if UnitExists(unit) and not ns.Flag(UnitIsPlayer(unit)) then
-						local kind = GiverKind(unit)
-						-- (Only low-level quests on offer, by talking to them: not one.)
-						if kind == "offer" and kept and not lowShown then
-							local id = low.NpcID(unit)
-							if id and kept[id] then kind = nil end
-						end
-						if kind == "offer" and questie then
-							local name = UnitName(unit)
-							if Known(name) and type(name) == "string" and not questie[name] then kind = nil end
-						end
-						if kind == "offer" or (kind == "turnin" and db.minimapRevealTurnIns == true) then
-							local name = UnitName(unit)
-							found[#found + 1] = Known(name) and type(name) == "string" and name or "a quest giver"
-						end
-					end
-				end
-				return found
-			end)
-			if ok and #names > 0 then
-				table.sort(names)
-				look.seenAt = now
-				look.names = table.concat(names, ", ")
-			end
+			scan.i = 0
+			stepper:Show()
 		end
 		if now - look.seenAt < HOLD then return true, look.names end
 		return false
