@@ -107,14 +107,33 @@ local function Migrate(t)
 		t[WHEN_KEY[part]] = nil
 	end
 end
-function ns.MigratePlateIconWhen(db)
-	if db.plateIconShowInV1 then return end
-	Migrate(db)
-	for _, saved in pairs(type(db.profiles) == "table" and db.profiles or {}) do
-		Migrate(saved)
+-- Nameplate Style's Show in row has no Cine column now (the CineMode page's
+-- Outside CineMode > Nameplates says whether plates work outside it): a Cine
+-- tick, "all through CineMode", is Always, the same there. Once, every profile.
+local function CineToAlways(t)
+	if type(t) ~= "table" then return end
+	local list = t.cineModeShow
+	if type(list) == "table" and list[ROW_KEY.TargetArrow] then
+		list[ROW_KEY.TargetArrow] = nil
+		t[ALWAYS_KEY.TargetArrow] = true
 	end
-	db.plateIconWhenV1 = nil
-	db.plateIconShowInV1 = true
+end
+function ns.MigratePlateIconWhen(db)
+	if not db.plateIconShowInV1 then
+		Migrate(db)
+		for _, saved in pairs(type(db.profiles) == "table" and db.profiles or {}) do
+			Migrate(saved)
+		end
+		db.plateIconWhenV1 = nil
+		db.plateIconShowInV1 = true
+	end
+	if not db.markCineAlwaysV1 then
+		CineToAlways(db)
+		for _, saved in pairs(type(db.profiles) == "table" and db.profiles or {}) do
+			CineToAlways(type(saved.settings) == "table" and saved.settings or saved)
+		end
+		db.markCineAlwaysV1 = true
+	end
 end
 
 -- Each row's icon, before its name: the same art PlateParts draws (role

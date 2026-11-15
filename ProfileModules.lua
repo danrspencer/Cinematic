@@ -420,7 +420,7 @@ ns.PROFILE_MODULES = {
 			set("nameAlwaysYourTarget", true)
 			-- An arrow over your target's plate all through CineMode, with no
 			-- target frame to show what you've targeted.
-			set("cineModeShow", { ["platemark:show"] = true }) -- (the Nameplate Style page's Show in row)
+			set("targetArrowAlways", true) -- (the Nameplate Style page's Show in row: Always, as it has no Cine column)
 			set("plateInstanceFriends", "hide")
 			set("plateInstanceFriendlyNPCs", "hide")
 		end },

@@ -9720,7 +9720,10 @@ do
 		local stack = Stack(switch, "check")
 		-- Where they show: a Show in row (PlateIcons.lua, as the Icons page's).
 		local showHeader = stack:Header(content, L["Show in"])
-		local showRow = ShowTable(content, showHeader, { opts = { anyFight = true }, underHeader = true,
+		-- (No Cine column: whether plates work outside CineMode is the CineMode
+		-- page's Outside CineMode > Nameplates; a Cine tick moved to Always,
+		-- PlateIcons.lua's MigratePlateIconWhen.)
+		local showRow = ShowTable(content, showHeader, { opts = { anyFight = true }, underHeader = true, noCine = true,
 			ns.TargetMarksShowRow(Changed) }, L["Nameplate Style"])
 		stack:Continue(showRow, "label")
 
