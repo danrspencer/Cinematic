@@ -283,14 +283,28 @@ function ns.ConflictStandsAside(key)
 end
 
 -- A Style page's switch standing aside: an addon's own look is on and its
--- row's pick is theirs.
+-- row's pick is theirs. (Each switch's answer kept for the frame: asked
+-- about 400 times a frame through ns.StyleOn while plates came and went
+-- turning the camera fast, each going over every conflict row, 2026-11-15.)
+local yieldFrame, yieldKept = nil, {}
 function ns.StyleSwitchYielded(switchKey)
-	for _, row in ipairs(ns.CONFLICTS) do
-		if row.styleSwitch == switchKey and ns.ConflictPick(row) == "theirs" and ns.ConflictTheirsOn(row) then
-			return row
-		end
+	local now = GetTime()
+	if now ~= yieldFrame then
+		yieldFrame = now
+		wipe(yieldKept)
 	end
-	return nil
+	local kept = yieldKept[switchKey]
+	if kept == nil then
+		kept = false
+		for _, row in ipairs(ns.CONFLICTS) do
+			if row.styleSwitch == switchKey and ns.ConflictPick(row) == "theirs" and ns.ConflictTheirsOn(row) then
+				kept = row
+				break
+			end
+		end
+		yieldKept[switchKey] = kept
+	end
+	return kept or nil
 end
 
 -- Features gated by a pick (ns.FeatureYieldedTo): "card:<event id>"

@@ -116,17 +116,28 @@ end
 
 -- A plate's NPC's title (<Innkeeper>), read once per unit it's given (again
 -- in a while if the game wouldn't say). nil for none, or not known yet.
+-- (Each unit's title kept by its GUID too, false for none: units coming back
+-- into view, turning the camera fast in a crowd, had their tooltip read again
+-- each time, about 9 KB of memory a read, 2026-11-15. Let go past TITLES_KEPT.)
+local titleByGuid, titleCount, TITLES_KEPT = {}, 0, 400
 local function PlateTitle(plate, unit)
 	-- (Asked before the plate's new-unit event reaches us: its last unit's forgotten here.)
 	local ok, guid = pcall(UnitGUID, unit)
 	guid = ok and Known(guid) and guid or nil
 	if guid and titleUnit[plate] ~= guid then
-		titles[plate], titleTried[plate], serviceMatch[plate] = nil, nil, nil
+		titles[plate], titleTried[plate], serviceMatch[plate] = titleByGuid[guid], nil, nil
 		titleUnit[plate] = guid
 	end
 	if titles[plate] == nil and GetTime() - (titleTried[plate] or -TITLE_RETRY) >= TITLE_RETRY then
 		titles[plate] = NPCTitle(unit)
 		titleTried[plate] = titles[plate] == nil and GetTime() or nil
+		if guid and titles[plate] ~= nil then
+			if titleCount >= TITLES_KEPT then
+				wipe(titleByGuid)
+				titleCount = 0
+			end
+			titleByGuid[guid], titleCount = titles[plate], titleCount + 1
+		end
 	end
 	return titles[plate] or nil
 end
