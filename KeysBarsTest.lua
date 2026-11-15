@@ -151,21 +151,25 @@ local function Against(region, icon)
 	if not (l and il) then return "no spot" end
 	return ("in by left %s right %s top %s bottom %s"):format(Plain(l - il), Plain(ir - r), Plain(it - t), Plain(b - ib))
 end
--- Bar 1's buttons with a cooldown sweep showing: the sweep against the icon.
+-- The action buttons (bars 1 to 8) with a cooldown sweep showing: the sweep
+-- against the icon, the first six.
+local SWEEP_BARS = { "ActionButton", "MultiBarBottomLeftButton", "MultiBarBottomRightButton", "MultiBarRightButton",
+	"MultiBarLeftButton", "MultiBar5Button", "MultiBar6Button", "MultiBar7Button" }
 local function Sweeps()
 	local lines = {}
-	for i = 1, 12 do
-		local button = _G["ActionButton" .. i]
+	for n = 1, #SWEEP_BARS * 12 do
+		local i = (n - 1) % 12 + 1
+		local button = #lines < 6 and _G[SWEEP_BARS[math.floor((n - 1) / 12) + 1] .. i]
 		local cd = button and button.cooldown
 		local shown = cd and cd:IsShown()
 		if shown and issecretvalue and issecretvalue(shown) then shown = true end
 		if shown and button.icon then
 			local okMask, masks = pcall(function() return cd.GetNumMaskTextures and cd:GetNumMaskTextures() end)
-			lines[#lines + 1] = ("button %d sweep %s, masks %s"):format(i, Against(cd, button.icon),
+			lines[#lines + 1] = ("%s sweep %s, masks %s"):format(button:GetName(), Against(cd, button.icon),
 				okMask and Plain(masks) or "?")
 		end
 	end
-	return #lines > 0 and table.concat(lines, "; ") or "no sweep showing on bar 1"
+	return #lines > 0 and table.concat(lines, "; ") or "no sweep showing on bars 1 to 8"
 end
 local function BarState()
 	local state = ns.ActionBarState and ns.ActionBarState() or "no ActionBarState"
