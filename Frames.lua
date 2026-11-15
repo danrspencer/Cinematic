@@ -981,6 +981,13 @@ local function RemoveFrame(frame)
 			ns.SetFrameAlpha(frame, frame.cinematicFishingHidden and 0 or entry.baseAlpha or 1)
 			if entry.looseParts then FadeLooseParts(entry, 1) end
 			ns.EntryClicksBack(entry)
+			-- (Let go while faded full size, in a fight or kept up for the dots
+			-- sweep: its icons and mask back too, or the map stays blank with
+			-- only the arrow on it. Only SetEntryAlpha put them back before.)
+			if frame == Minimap then
+				ns.SetMinimapIconsHidden(false)
+				ns.SetMinimapBlobsHidden(false)
+			end
 			if entry.shrunk and ns.ScaleBlocked(frame) then
 				local scale = entry.savedScale or 1
 				local waiter = CreateFrame("Frame")
@@ -1717,12 +1724,21 @@ local restoredHandlers = {}
 -- stay up indoors: minimapIndoors, Minimap page.)
 local minimapNeedsRedraw = false
 
+-- Where the map can come back stale. On WoW Forever that's cities too, not just
+-- IsIndoors(): in Stormwind's Trade District (outdoors to the game) it came back
+-- blank with only the arrow, and a zoom step brought it back (2026-11-15). So
+-- there it's redrawn everywhere (unseen, one frame). Elsewhere indoors only.
+function ns.MinimapMayGoStale()
+	if not ns.isRetail and not ns.isClassicEra then return true end
+	return IsIndoors and ns.Flag(IsIndoors()) or false
+end
+
 -- (Any time it's hidden or faded indoors counts, not just a shrink: after a
 -- /reload in a city building it came back half drawn, 2026-11-11, faded from
 -- the loading screen on without ever being shrunk.)
 local function RedrawMinimapWhenShown()
 	if not ns.Flag(Minimap:IsVisible()) or Minimap:GetEffectiveAlpha() < 0.99 then
-		if not minimapNeedsRedraw and Minimap.GetZoomLevels and IsIndoors and ns.Flag(IsIndoors()) then
+		if not minimapNeedsRedraw and Minimap.GetZoomLevels and ns.MinimapMayGoStale() then
 			minimapNeedsRedraw = true
 		end
 		return
@@ -1748,7 +1764,7 @@ local function UnshrinkEntry(entry)
 	ns.FrameCall(entry.frame, "SetScale", entry.savedScale or 1)
 	ns.UnparkShrunk(entry)
 	entry.shrunk = false
-	if entry.frame == Minimap and Minimap.GetZoomLevels and IsIndoors and ns.Flag(IsIndoors()) then
+	if entry.frame == Minimap and Minimap.GetZoomLevels and ns.MinimapMayGoStale() then
 		minimapNeedsRedraw = true
 	end
 	for _, handler in ipairs(restoredHandlers) do
@@ -1863,8 +1879,8 @@ function ns.SetEntryAlpha(entry, alpha)
 			if entry.shrunk and not ns.ScaleBlocked(entry.frame) then
 				UnshrinkEntry(entry)
 			end
-			if not entry.shrunk and entry.frame == Minimap and Minimap.GetZoomLevels and IsIndoors
-				and ns.Flag(IsIndoors()) then
+			if not entry.shrunk and entry.frame == Minimap and Minimap.GetZoomLevels
+				and ns.MinimapMayGoStale() then
 				minimapNeedsRedraw = true
 			end
 			-- (Kept full size for the sweep: in its place, where the game adds
