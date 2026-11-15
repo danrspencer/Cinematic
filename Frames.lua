@@ -3386,6 +3386,9 @@ local tickTables = {
 	-- (fading: the frames still fading after a pass, for ns.UpdateFadingFrames;
 	-- fadeOnly: whether every one of them can be faded on by that alone.)
 	fading = {}, fadeOnly = false,
+	-- (chatButtons: the chat buttons' frames this pass, for their columns'
+	-- alpha in the passes in between too.)
+	chatButtons = {},
 	hovered = {}, triggered = {}, pinged = {}, mouseRows = {}, mouseGroups = {}, events = {},
 	combatShown = {}, placeLists = {}, auraOnly = {}, cooldownBarUp = {},
 	partsHovered = {}, partsHeldUntil = {}, deathKept = {}, groupsUp = {},
@@ -12072,6 +12075,7 @@ function ns.UpdateFrames(cinematic, elapsed)
 	-- fade on alone, ns.UpdateFadingFrames. Not with a fade whose pace
 	-- changes as it goes: a cast at an enemy's, the death fade's.)
 	wipe(tickTables.fading)
+	wipe(tickTables.chatButtons)
 	tickTables.fadeOnly = not castLeft and not deathFade and not immersive and settled
 	-- (The personal resource display switched off in the game: its rows
 	-- have nothing to fade, so they're left out, as they are, till it's back.)
@@ -12287,14 +12291,20 @@ function ns.UpdateFrames(cinematic, elapsed)
 			and entry.backgroundAlpha < 1) then
 			settled = false
 			-- (Only frames whose fade is their alpha and nothing else can fade on
-			-- in the passes in between: not the chat (its background, the button
-			-- column), what shrinks, the minimap, unit frames' parts, the personal
-			-- resource rows, the quest tracker, the stand-ins, secret health.)
+			-- in the passes in between: not a chat window while its background
+			-- fades on its own, what shrinks, the minimap, unit frames' parts,
+			-- the personal resource rows, the quest tracker, the stand-ins,
+			-- secret health. The chat otherwise yes, its buttons' columns kept
+			-- with them there: all chat was left out, and each peek for a
+			-- message ran the whole pass every other frame for its fade, 93
+			-- passes in 20 s in a busy city, /cine debug framepass 2026-11-15.)
 			local group = entry.group
-			if group == "chat" or entry.shrinkWhenFaded or entry.shrunk or entry.parkedFullSize
+			if group == "chat" and entry.backgroundAlpha and entry.backgroundAlpha > 0 and entry.backgroundAlpha < 1
+				or entry.shrinkWhenFaded or entry.shrunk or entry.parkedFullSize
 				or entry.frame == Minimap or entry.frame == artStandIn or entry.frame == personalPower.healthStandIn
 				or LOOSE_PART_GROUPS[group] or personalPower.GROUPS[group] or group == "prd"
-				or ns.UNIT_PART_FRAME_NAMES[entry.name] or NEVER_NESTED[entry.name] or entry.vitalsSecret or entry.manaSecret
+				or ns.UNIT_PART_FRAME_NAMES[entry.name] or NEVER_NESTED[entry.name] and group ~= "chat"
+				or entry.vitalsSecret or entry.manaSecret
 				or entry.frame == _G.ObjectiveTrackerFrame or ns.chatLinkBackdrop[entry.frame] then
 				tickTables.fadeOnly = false
 			end
@@ -12356,6 +12366,7 @@ function ns.UpdateFrames(cinematic, elapsed)
 		end
 		if NEVER_NESTED[entry.name] and entry.group == "chat" then
 			chatButtonsAlpha = math.max(chatButtonsAlpha or 0, entry.alpha)
+			tickTables.chatButtons[#tickTables.chatButtons + 1] = entry
 		end
 		-- A chat window up just for a message: its background only where the
 		-- Chat page's "Background" is ticked. (Held while the window fades out,
@@ -12460,16 +12471,26 @@ end
 -- whole pass, still every quarter second at most.
 function ns.UpdateFadingFrames(elapsed)
 	local fading = tickTables.fading
-	local left = 0
+	local left, buttons = 0, false
 	for i = 1, #fading do
 		local entry = fading[i]
 		fading[i] = nil
 		if not entry.removed and entry.alpha ~= entry.fadeTarget then
+			if entry.group == "chat" and NEVER_NESTED[entry.name] then buttons = true end
 			ns.SetEntryAlpha(entry, ns.Approach(entry.alpha, entry.fadeTarget, elapsed, entry.fadeDuration))
 			if entry.alpha ~= entry.fadeTarget then
 				left = left + 1
 				fading[left] = entry
 			end
+		end
+	end
+	-- (A chat button fading: its column's strip with it, as the whole pass does.)
+	if buttons then
+		local alpha
+		for _, entry in ipairs(tickTables.chatButtons) do alpha = math.max(alpha or 0, entry.alpha) end
+		for _, name in ipairs(ns.CHAT_BUTTON_COLUMNS) do
+			local column = _G[name]
+			if column and not IsForbidden(column) then ns.FadeRelative(column, alpha or 1) end
 		end
 	end
 	if left == 0 then
