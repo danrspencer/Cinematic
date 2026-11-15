@@ -1173,6 +1173,8 @@ end
 -- them: { group's name, { { option, its name (the dev copy's red rows) } } }.
 local LOOK_GROUPS = {
 	{ "Bar", { { "texture", "Texture" }, { "barColor", "Color" }, { "ground", "Dark ground" } } },
+	-- (Personal Resource Style: each bar's width and height.)
+	{ "Size", { { "size", "Size" } } },
 	-- (Cast Bar Style's rows: the spell's icon, its size and the marks on it.)
 	{ "Icon", { { "icon", "Icon" } } },
 	-- (Unit Frame Style's rows: the portrait and its shape.)
@@ -2202,13 +2204,20 @@ function ns.StyleRows(kit, content, stack, changed, switchKey, fieldOf, panel)
 	-- making its rows with look (the box's own rows), or false: one that
 	-- can't apply to the part. A group shows if the part has any of its
 	-- options; the dev copy lists, in red, the ones of it the part lacks.
+	-- spec.inline: on the page itself, in its stack (a page with one look:
+	-- Personal Resources, Tooltips...), always open, with no button, X or
+	-- Pop out.
 	function rows.Look(label, title, spec)
-		local name = stack:Add(kit.Label(content, "GameFontHighlight", label), "label")
-		name:SetSize(150, 30)
-		name:SetJustifyV("MIDDLE")
+		local inline = spec.inline
+		local name
+		if not inline then
+			name = stack:Add(kit.Label(content, "GameFontHighlight", label), "label")
+			name:SetSize(150, 30)
+			name:SetJustifyV("MIDDLE")
+		end
 		local button = ns.PanelButton(content)
 		button:SetHeight(22)
-		button:SetPoint("LEFT", name, "RIGHT", 4, 0)
+		if inline then button:Hide() else button:SetPoint("LEFT", name, "RIGHT", 4, 0) end
 		button.searchLabel = label
 		kit.Tooltip(button, ns.L["Every way to style this part, in a panel beside the settings. Pop out to drag " ..
 			"it anywhere; Escape or its X closes it."])
@@ -2216,21 +2225,25 @@ function ns.StyleRows(kit, content, stack, changed, switchKey, fieldOf, panel)
 		-- (Docked to the settings window's right, as the camera previewer is;
 		-- popped out, where it was dragged: one place for every Look panel.)
 		local canvas = content:GetParent() and content:GetParent():GetParent() or content
-		local pop = CreateFrame("Frame", nil, UIParent)
-		pop:SetFrameStrata("DIALOG")
+		local pop = CreateFrame("Frame", nil, inline and content or UIParent)
 		pop:EnableMouse(true)
 		pop:SetSize(470, 400)
-		pop:Hide()
-		pop:SetMovable(true)
-		pop:SetClampedToScreen(true)
-		pop:RegisterForDrag("LeftButton")
-		pop:SetScript("OnDragStart", function(self)
-			if LookSpot() then self:StartMoving() end
-		end)
-		pop:SetScript("OnDragStop", function(self)
-			self:StopMovingOrSizing()
-			ns.GetDB().lookPanel = { x = self:GetLeft(), y = self:GetTop() }
-		end)
+		if inline then
+			stack:Add(pop, "label")
+		else
+			pop:SetFrameStrata("DIALOG")
+			pop:Hide()
+			pop:SetMovable(true)
+			pop:SetClampedToScreen(true)
+			pop:RegisterForDrag("LeftButton")
+			pop:SetScript("OnDragStart", function(self)
+				if LookSpot() then self:StartMoving() end
+			end)
+			pop:SetScript("OnDragStop", function(self)
+				self:StopMovingOrSizing()
+				ns.GetDB().lookPanel = { x = self:GetLeft(), y = self:GetTop() }
+			end)
+		end
 		pop.recordAs = content -- (its settings are the page's: its Reset puts them back)
 		-- (Every Look panel made, by its title: Tools/style-lab draws one open.)
 		ns.LOOK_PANELS = ns.LOOK_PANELS or {}
@@ -2250,6 +2263,10 @@ function ns.StyleRows(kit, content, stack, changed, switchKey, fieldOf, panel)
 		dock:SetSize(70, 20)
 		dock:SetPoint("TOPRIGHT", -28, -6)
 		kit.Tooltip(dock, ns.L["Pop out: drag the window anywhere (by its edge). Dock: back beside the settings."])
+		if inline then
+			close:Hide()
+			dock:Hide()
+		end
 		local popStack = kit.Stack(heading, "label") -- (a header's room under the title)
 
 		-- Tabbed (spec.tabs): a tab per group under the title, each group's rows
@@ -2683,10 +2700,12 @@ function ns.StyleRows(kit, content, stack, changed, switchKey, fieldOf, panel)
 			Place()
 		end)
 		pop:SetScript("OnShow", function(self)
-			-- (One panel at a time.)
-			if openLook and openLook ~= self then openLook:Hide() end
-			openLook = self
-			Place()
+			-- (One panel at a time; one on the page stays where it is.)
+			if not inline then
+				if openLook and openLook ~= self then openLook:Hide() end
+				openLook = self
+				Place()
+			end
 			-- (Titled with where the part is, the page's place dimmed before it:
 			-- known once the page is in its hub, after it's built.)
 			local path = canvas.hubPath or (canvas.name and { canvas.name })
@@ -2702,11 +2721,11 @@ function ns.StyleRows(kit, content, stack, changed, switchKey, fieldOf, panel)
 			if manager and manager.GetOpenMenu and manager:GetOpenMenu() then return true end
 			return ColorPickerFrame and ColorPickerFrame:IsShown()
 		end
-		canvas:HookScript("OnHide", function() pop:Hide() end)
+		if not inline then canvas:HookScript("OnHide", function() pop:Hide() end) end
 		-- Escape closes it before the settings window (not in a fight, where
 		-- keys can't be held back; not while its menu or the color picker is
 		-- open: theirs first).
-		if pop.SetPropagateKeyboardInput then
+		if pop.SetPropagateKeyboardInput and not inline then
 			pop:HookScript("OnShow", function(self)
 				if InCombatLockdown() then return end
 				self:EnableKeyboard(true)

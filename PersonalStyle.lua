@@ -737,80 +737,98 @@ function ns.CreatePersonalStylePanel(kit)
 				prdHealthHeight = 0.7, prdPowerHeight = 0.6, prdManaHeight = 0.6 } },
 	}, PRESET_KEYS)
 
-	-- The bars' look: their fill, their border (the game's, a line of ours
-	-- or none: its thickness and color), the dark behind ours.
+	-- The bars' look, on the page itself (the Style pages' template,
+	-- StylePages.lua's rows.Look, inline: one look for both bars): Bar (fill,
+	-- colors, the dark behind ours), Size (each bar's width and height) and
+	-- Border (the game's, a line of ours or none).
 	-- (Mana under the power bar, when it isn't your power: PersonalMana.lua;
 	-- turned on on the UI Manager's Personal Resources page.)
 	local function ManaOn(db) return rows.On(db) and db.prdMana end
 	local function Ours(db) return rows.On(db) and Look().prdBorder ~= "game" end
+	-- (Where a setting comes from: set here, General's, or the theme's.)
+	local function Source(key)
+		local db = ns.GetDB() or {}
+		local value = db[key]
+		if ns.IsGeneralStyle and ns.IsGeneralStyle(value) then return { text = L["General's"] } end
+		if ns.ThemeSetting then
+			local themed = ns.ThemeSetting(key)
+			local theme = ns.ActiveStyleTheme and ns.ActiveStyleTheme()
+			if themed ~= nil and themed == value and theme then
+				return { text = L["Set by theme: %s"]:format(L[theme.name]) }
+			end
+		end
+		if value ~= nil and value ~= ns.DEFAULTS[key] then return { text = L["Set here"], own = true } end
+		return nil
+	end
 	stack:Header(content, L["Look"])
-	rows.Look(L["Bars:"], L["Bars"], {
+	rows.Look("", L["Personal resource bars"], {
+		inline = true,
+		tabs = { default = function(key) return ns.DEFAULTS[key] end, source = Source,
+			copyKind = "prdLook", copyName = L["Personal resource bars"] },
 		texture = { "prdTexture", L["The bars' fill. Below the game's own few: any other addon shares (through " ..
 			"LibSharedMedia)."], tint = { 0.25, 0.75, 0.3 } },
 		barColor = function(look)
-			local last = look.Choices(L["Health:"], "prdHealthColor", {
+			look.Choices(L["Health:"], "prdHealthColor", {
 				{ "game", L["The game's"] },
 				{ "class", L["Class"], L["Your class's color."] },
-				{ "custom", L["Custom"], L["A color of your own (the swatch)."] },
+				{ "custom", L["Custom"], L["A color of your own (below)."] },
 			})
-			look.Swatch(last, "prdHealthColor", { "prdHealthR", "prdHealthG", "prdHealthB" },
-				L["The health bar's color, for Custom."])
+			look.Chips(L["Health color"], { "prdHealthR", "prdHealthG", "prdHealthB" },
+				L["The health bar's color, for Custom."], function(db) return rows.On(db) and db.prdHealthColor == "custom" end)
 			if ns.PERSONAL_MANA then
-				local manaLast = look.Choices(L["Cine Mana Bar:"], "prdManaColor", {
+				look.Choices(L["Cine Mana Bar:"], "prdManaColor", {
 					{ "game", L["The game's"] },
-					{ "custom", L["Custom"], L["A color of your own (the swatch)."] },
+					{ "custom", L["Custom"], L["A color of your own (below)."] },
 				}, ManaOn)
-				look.Swatch(manaLast, "prdManaColor", { "prdManaR", "prdManaG", "prdManaB" },
-					L["The mana bar's color, for Custom."], ManaOn)
+				look.Chips(L["Mana color"], { "prdManaR", "prdManaG", "prdManaB" },
+					L["The mana bar's color, for Custom."], function(db) return ManaOn(db) and db.prdManaColor == "custom" end)
 			end
 		end,
 		ground = function(look)
 			look.Slider("prdBack", L["Background"], 0, 100, 5, "%d%%", 100,
 				L["How dark it is behind the bars, with a border of ours."], Ours)
 		end,
+		-- Each bar's size, next to the game's. (A width: a percent of the game's,
+		-- or pixels on screen, the round pick before each saying which; px picked
+		-- empty, it's filled with the bar's width now.)
+		size = function(look)
+			local function WidthLine(label, key, which, tip, test)
+				test = test or rows.On
+				local unit = key .. "Unit"
+				local line = look.Boxes()
+				line.nameWidth = 90
+				line:Pick(label, unit, "pct", L["Its width as a percent of the game's."], test)
+				line:Box("", key, 20, 200, 5, "%d", 100, tip, function(db) return test(db) and db[unit] ~= "px" end, "%")
+				line:Pick("", unit, "px", L["Its width in pixels on screen: the same number on two bars, the same width."],
+					test, function()
+						local db = ns.GetDB()
+						if (tonumber(db[key .. "Px"]) or 0) <= 0 then
+							db[key .. "Px"] = ns.PersonalBarPixels(which) or math.floor(PREVIEW_WIDTH + 0.5)
+						end
+					end)
+				line:Box("", key .. "Px", 10, 2000, 5, "%d", 1, tip, function(db) return test(db) and db[unit] == "px" end,
+					"px")
+			end
+			WidthLine(L["Health width"], "prdHealthWidth", "health", L["The health bar's width, about its middle."])
+			WidthLine(L["Power width"], "prdPowerWidth", "power", L["The power bar's width, about its middle."])
+			if ns.PERSONAL_MANA then
+				WidthLine(L["Mana width"], "prdManaWidth", "mana",
+					L["The mana bar's width, about its middle (a percent of the game's power bar's)."], ManaOn)
+			end
+			look.Slider("prdHealthHeight", L["Health height"], 0, 100, 5, "%d%%", 100,
+				L["The health bar's height, next to the game's."])
+			look.Slider("prdPowerHeight", L["Power height"], 0, 100, 5, "%d%%", 100,
+				L["The power bar's height, next to the game's."])
+			look.Slider("prdPiecesScale", L["Class resource"], 0, 100, 5, "%d%%", 100,
+				L["How big your class resource is (combo points, holy power, runes and the like), next to the game's."])
+			if ns.PERSONAL_MANA then
+				look.Slider("prdManaHeight", L["Mana height"], 0, 100, 5, "%d%%", 100,
+					L["The mana bar's height, next to the power bar's."], ManaOn)
+			end
+		end,
 		border = { "prdBorder", L["The bars' border: the game's, or one of ours (Custom: its thickness and color " ..
 			"under it)."], opts = { game = true } },
 	})
-
-	-- Each bar's size, next to the game's: widths on a line, heights under.
-	stack:Header(content, L["Sizes"])
-	-- (Each width a line: a percent of the game's, or pixels on screen, the
-	-- round pick before each saying which; px picked empty, it's filled
-	-- with the bar's width now.)
-	local function WidthLine(label, key, which, tip, test)
-		test = test or rows.On
-		local unit = key .. "Unit"
-		local line = rows.Boxes()
-		line.nameWidth = 90
-		line:Pick(label, unit, "pct", L["Its width as a percent of the game's."], test)
-		line:Box("", key, 20, 200, 5, "%d", 100, tip, function(db) return test(db) and db[unit] ~= "px" end, "%")
-		line:Pick("", unit, "px", L["Its width in pixels on screen: the same number on two bars, the same width."],
-			test, function()
-				local db = ns.GetDB()
-				if (tonumber(db[key .. "Px"]) or 0) <= 0 then
-					db[key .. "Px"] = ns.PersonalBarPixels(which) or math.floor(PREVIEW_WIDTH + 0.5)
-				end
-			end)
-		line:Box("", key .. "Px", 10, 2000, 5, "%d", 1, tip, function(db) return test(db) and db[unit] == "px" end,
-			"px")
-	end
-	WidthLine(L["Health width"], "prdHealthWidth", "health", L["The health bar's width, about its middle."])
-	WidthLine(L["Power width"], "prdPowerWidth", "power", L["The power bar's width, about its middle."])
-	if ns.PERSONAL_MANA then
-		WidthLine(L["Mana width"], "prdManaWidth", "mana",
-			L["The mana bar's width, about its middle (a percent of the game's power bar's)."], ManaOn)
-	end
-	local sizes = rows.Boxes()
-	sizes:Box(L["Health"], "prdHealthHeight", 0, 100, 5, "%d", 100, L["The health bar's height, next to the game's."],
-		nil, "%")
-	sizes:Box(L["Power"], "prdPowerHeight", 0, 100, 5, "%d", 100, L["The power bar's height, next to the game's."],
-		nil, "%")
-	sizes:Box(L["Class resource"], "prdPiecesScale", 0, 100, 5, "%d", 100,
-		L["How big your class resource is (combo points, holy power, runes and the like), next to the game's."], nil, "%")
-	if ns.PERSONAL_MANA then
-		sizes:Box(L["Mana"], "prdManaHeight", 0, 100, 5, "%d", 100,
-			L["The mana bar's height, next to the power bar's."], ManaOn, "%")
-	end
 
 	canvas:SetScript("OnShow", kit.PageShown(kit.Refresh, content))
 	canvas:Hide()
