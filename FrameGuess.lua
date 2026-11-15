@@ -496,7 +496,9 @@ function ns.GuessFrames()
 	end
 	local build = GetBuildInfo and select(4, GetBuildInfo()) or "?"
 	Line(("client %s (%s), %s, %s, %s"):format(tostring(build),
-		ns.isRetail and (ns.isClassicEra and "Classic Era" or "retail/Forever") or "classic",
+		-- (isClassicEra is only ever true off retail: asked first. The build
+		-- number before it tells Forever from the other Classic clients.)
+		ns.isRetail and "retail" or ns.isClassicEra and "Classic Era" or "Forever/Classic",
 		ns.lastCinematic and "in CineMode (rows' game frames faded by us aren't spots)" or "not in CineMode",
 		InCombatLockdown() and "in combat" or "out of combat", IsInRaid() and "in a raid"
 			or IsInGroup() and "in a group" or "solo"))

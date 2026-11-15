@@ -18809,6 +18809,9 @@ ns.lowHealthKit = { CreateScrollPage = CreateScrollPage, Label = Label, PageShow
 -- The pages are built once the language is known (Locales.lua): first the
 -- text this file made as it ran is translated again.
 ns.OnLanguage(function()
+	-- (How long making every page takes at login, in the log: for deciding
+	-- whether pages should be made as they first open. Tools/growth-plan.md.)
+	local buildStarted = type(debugprofilestop) == "function" and debugprofilestop()
 	PVP_TIP, ZOOM_TIP, INPUT_PAUSE_TIP = L[PVP_TIP], L[ZOOM_TIP], L[INPUT_PAUSE_TIP]
 	ns.TranslateFields(PLACES, 2)
 	ns.TranslateFields(QUEST_SIDES, "text")
@@ -19028,4 +19031,8 @@ ns.OnLanguage(function()
 	end
 	menu.Flush() -- (the left list, in menu.order)
 	GuardGamepadClose()
+	local buildEnded = type(buildStarted) == "number" and debugprofilestop()
+	if type(buildEnded) == "number" and ns.Log then
+		ns.Log("load", ("settings pages made in %d ms"):format(buildEnded - buildStarted))
+	end
 end)

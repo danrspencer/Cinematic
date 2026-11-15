@@ -4516,7 +4516,6 @@ local function InCameraMode()
 	return false
 end
 
-ns.InCameraMode = function() return InCameraMode() end
 
 -- Which camera mode you're in: "flight", "walk", "run", "vista", "fish", "cozy", "idle", or nil.
 -- (Not one turned off where you are; see ns.IsCameraOffHere.)

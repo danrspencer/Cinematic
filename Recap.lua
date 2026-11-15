@@ -163,11 +163,6 @@ local function RecapText(parts, look)
 	return heading and heading .. ": " .. body or body
 end
 
--- (The line under the zone name for parts.)
-function ns.RecapLineFor(parts)
-	return RecapText(parts, ns.db)
-end
-
 -- A card: the zone big, the heading over it, the rest under it (the heading
 -- big if the zone isn't shown); nil if nothing to say.
 function ns.RecapCardText(parts, look)

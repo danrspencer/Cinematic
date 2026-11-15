@@ -1798,8 +1798,6 @@ local function CheckIdleBuffs()
 end
 campfireWatcher:SetScript("OnEvent", ns.Profiled("UNIT_AURA (campfire)", CheckIdleBuffs))
 ns.CheckIdleBuffs = CheckIdleBuffs -- after the list changes
-function ns.IsAtCampfire() return atCampfire end
-
 -- Weapon drawn (melee or ranged), or false if the game won't say.
 local function WeaponDrawn()
 	if not GetSheathState then

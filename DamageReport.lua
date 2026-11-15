@@ -491,10 +491,6 @@ function ns.ShowDamageReport(made)
 	window:Show()
 end
 
-function ns.HideDamageReport()
-	if window then window:Hide() end
-end
-
 function ns.ToggleDamageReport(made)
 	if window and window:IsShown() then window:Hide() else ns.ShowDamageReport(made) end
 end

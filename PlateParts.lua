@@ -2461,8 +2461,6 @@ local function UpdateWhen()
 	Look("others")
 	return changed
 end
-ns.TargetMarkFits = function(kind) return whenNow[kind] ~= false end
-
 -- Which plate sizes each client takes: retail both; WoW Forever the width
 -- (its cast bar container held in, as retail's: tested 2026-11-13 with
 -- /cine debug platewidth, the whole bar narrowed, the name cut to fit),

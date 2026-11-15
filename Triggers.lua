@@ -203,8 +203,3 @@ function ns.ApplyBuiltInOrders()
 		end
 	end
 end
-function ns.SetBuiltInSourceOrder(id, order)
-	if not ns.BUILT_IN_SOURCE_ORDER[id] then return end
-	ns.GetDB().cameraRows["prio." .. id] = order ~= ns.BUILT_IN_SOURCE_ORDER[id] and order or nil
-	ns.ApplyBuiltInOrders()
-end

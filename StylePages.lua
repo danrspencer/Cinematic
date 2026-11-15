@@ -298,12 +298,6 @@ function ns.StyleScene(frame, focus, shade)
 	return scene
 end
 
--- A toggle button's look: its text gold while it's on, grey while it's off
--- (its normal font: the mouse over it still lights it, as any button).
-function ns.StyleToggle(button, on)
-	button:SetNormalFontObject(on and "GameFontNormal" or "GameFontDisable")
-end
-
 -- A Visions hub page's link to its Style hub page: a small Style button right
 -- of the page's title, past its "?" (PageIntro). page: the Style page's name,
 -- as ns.OpenOptions takes it. Tooltip: the page's (Options.lua's). label: its

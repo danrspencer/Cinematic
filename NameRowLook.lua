@@ -161,16 +161,6 @@ function ns.NameRowsOwn()
 	return anyOwn
 end
 
--- Whether a row has any setting of its own (its Look button's words).
-function ns.NameRowHasOwn(row)
-	local db = ns.db or {}
-	for setting in pairs(GAME) do
-		local value = db[ns.NameLookKey(row, setting)]
-		if value ~= nil and value ~= "inherit" then return true end
-	end
-	return false
-end
-
 -- Which row a unit's name goes by: your target, a group member or their
 -- minion, a Service NPC, else its kind's row; "all" when the game won't say
 -- (secret values). Kept per unit frame until the target, the group or the

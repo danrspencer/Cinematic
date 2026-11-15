@@ -1418,11 +1418,6 @@ local function UpdateTint(cinematic, elapsed, vignetteOn, weatherOn)
 	ApplyTint(tintLevel, layerLevel.vignette, layerLevel.weather)
 end
 
--- The Cards page's Death Test: its card now, alive or not.
-function ns.TestDeathBanner()
-	ns.CardTest("death")
-end
-
 -- Entry points for Core.lua and the options page
 -- The old single Custom color, where it was picked (the main look or a
 -- place's), becomes a My tint of that color, picked there instead.

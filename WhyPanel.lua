@@ -51,7 +51,7 @@ local UNIT_FRAME = { player = "PlayerFrame", petframe = "PetFrame", target = "Ta
 -- The rows that are parts of another row's frames, listed under it: by section, and the minimap's.
 local PART_PARENT = { raid = "raidplayers", party = "party", rsparty = "rspartyplayers" }
 
-local window, windowView, flash
+local window, flash
 local Fill -- (below)
 
 -- The page's switch, on everywhere to start with. Off: the page, the window
@@ -918,7 +918,7 @@ local function MakeWindow()
 	local host = CreateFrame("Frame", nil, window)
 	host:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -10)
 	host:SetPoint("BOTTOMRIGHT", window, "BOTTOMRIGHT", -16, 14)
-	windowView = MakeView(host, function()
+	MakeView(host, function()
 		window:Hide()
 		ns.whyBackToWindow = true -- (stopped by hand, it comes back here: Why.lua)
 	end)
@@ -956,11 +956,6 @@ local function SwitchedOff()
 	if window then window:Hide() end
 	if ns.whyPicking then ns.ToggleInspect() end
 	why.LookAway()
-end
-
--- What the window lists now (its rows and counts), for checks outside the game.
-function ns.WhyWindowRows()
-	return Gather(windowView or { filter = "all", search = "" })
 end
 
 -- The Help hub's "Why Is It Showing?" page: the window's list, as wide as

@@ -929,18 +929,6 @@ local function WithRuleEdits(made, id)
 	end
 	return made
 end
--- Sets one (key: a rule, or rule.."Secs"); back to the built-in's own drops it.
-function ns.SetBuiltinCameraRule(id, key, value)
-	for _, each in ipairs(BUILT_IN) do
-		if each.id == id then
-			local edits = RuleEdits(id)
-			if not edits then return end
-			local own = ns.CleanCameraScript(each.make(), id, true).rules[key]
-			if value == own then edits[key] = nil else edits[key] = value end
-			return
-		end
-	end
-end
 
 -- A built-in camera's script you changed ({ [id] = script }): plain numbers
 -- from then on, not its settings, until Reset (ns.ResetBuiltinCameraScript).
@@ -1151,10 +1139,6 @@ local function TakesScripts(list)
 	end
 	return false
 end
-function ns.TriggerTakesScripts(trigger)
-	return type(trigger.cameras) == "table" and TakesScripts(trigger.cameras)
-end
-
 -- Puts every script in those triggers' camera lists (before "none") and
 -- its name in ns.CAMERA_NAMES. (The lists are shared between triggers: each
 -- done once.)

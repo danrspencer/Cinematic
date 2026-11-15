@@ -337,7 +337,6 @@ leftover:SetScript("OnEvent", function(self)
 	if ns.ApplyShoulderCam then ns.ApplyShoulderCam() end
 end)
 
-function ns.ShoulderCalibrateRunning() return run ~= nil end
 function ns.ShoulderCalibrateStop()
 	if run then Finish(L["Stopped."]) end
 end
