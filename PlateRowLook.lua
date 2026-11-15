@@ -163,10 +163,20 @@ end
 
 -- Whether any row (or Default) has a look: none, and the marks' pass skips
 -- all of this. (Worked out once a frame at most.)
-local anyAt, anyNow = -1, false
+-- (Kept until a Style setting changes, ns.PlateLooksChanged, or 2 seconds
+-- pass: worked out each frame a plate came, it cost 0.55 ms a time with
+-- 40 plates up, 2026-11-14. Rows' looks below kept the same way.)
+local KEEP = 2
+local anyAt, anyNow = -100, false
+local looks = {} -- [kind] = { look (false: none), sig }
+local looksAt = -100
+function ns.PlateLooksChanged()
+	anyAt, looksAt = -100, -100
+	wipe(looks)
+end
 function ns.PlateLooksOn()
 	local now = GetTime()
-	if now ~= anyAt then
+	if now - anyAt > KEEP then
 		anyAt, anyNow = now, false
 		for _, kind in ipairs(ns.TargetMarkOrder and ns.TargetMarkOrder() or {}) do
 			if ns.PlateRowHasLook(kind) then anyNow = true break end
@@ -256,8 +266,20 @@ end
 -- the marks' pass found it: its look on the plate, drawn again only if it
 -- changed.
 function ns.ApplyPlateRowLook(plate, kind)
-	local look = ns.PlateRowLookFor(kind)
-	local sig = Signature(look)
+	-- (The same for every plate on a row: kept, see KEEP.)
+	local now = GetTime()
+	if now - looksAt > KEEP then
+		looksAt = now
+		wipe(looks)
+	end
+	local key = kind == nil and "-" or kind == false and "+" or kind
+	local kept = looks[key]
+	if not kept then
+		local made = ns.PlateRowLookFor(kind)
+		kept = { made or false, Signature(made) }
+		looks[key] = kept
+	end
+	local look, sig = kept[1] or nil, kept[2]
 	local entry = applied[plate]
 	if (entry and entry.sig or "") == sig then return end
 	if look then applied[plate] = { sig = sig, look = look } else applied[plate] = nil end

@@ -3044,6 +3044,8 @@ end)
 
 -- After a change on the Target Indicator page: the arrows styled anew.
 function ns.RefreshTargetArrows()
+	-- (Rows' looks worked out again: a setting changed. PlateRowLook.lua.)
+	if ns.PlateLooksChanged then ns.PlateLooksChanged() end
 	UpdateWhen()
 	for _, arrow in pairs(arrows) do
 		arrow.styled = false
