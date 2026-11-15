@@ -496,11 +496,11 @@ ns.EDIT_MODE_LAYOUTS = {
 	["Personal Resource Centered"] = ns.isRetail and { systems = PURE_CINEMA_SYSTEMS, client = "retail" }
 		or { design = FOREVER_PURE, client = "forever" },
 }
--- (Not made on logging in, so it never takes one of the player's account
--- layout slots unasked: made when the Shoulder Cam profile's picked, or by
--- /cine debug shoulder layout. The Shoulder Cam's for testers for now.)
-ns.EDIT_MODE_LAYOUTS["Shoulder Cam"] = { design = SHOULDER_HUD, bars = { 2, 3 }, client = "forever",
-	onDemand = true }
+-- (Made on logging in with the others since 2026-11-15, the Shoulder Cam
+-- profile a welcome level: trying it there then needs no reload, and it's
+-- made from the player's own layout, not one of ours a level tried before
+-- left on. Till then made only when its profile was picked, testers' only.)
+ns.EDIT_MODE_LAYOUTS["Shoulder Cam"] = { design = SHOULDER_HUD, bars = { 2, 3 }, client = "forever" }
 -- The Follow HUD (dev only for now, FollowHud.lua): the layout the player was
 -- on as it was set up (chardb.followHudBase: theirs, or one of ours like
 -- Retail Inspired), with just the Follow HUD's pieces picked (the profile's

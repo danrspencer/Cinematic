@@ -2234,7 +2234,8 @@ do
 		} },
 		-- (Cameras: what everyone has; Dev: the dev copy's own, to the right)
 		-- (master: Enable Cameras; its pages with no switch of their own show Off with it)
-		{ name = "Camera", master = "cameraModes", colors = { Cameras = { 0.35, 0.6, 0.9 }, Dev = { 0.85, 0.3, 0.25 } },
+		{ name = "Camera", master = "cameraModes", colors = { Cameras = { 0.35, 0.6, 0.9 }, ["Special Cams"] = { 0.55, 0.45, 0.9 },
+			Dev = { 0.85, 0.3, 0.25 } },
 			pages = {
 			{ "Cameras", "Interface\\Icons\\INV_Misc_Spyglass_03", label = "General", section = "Cameras" },
 			{ "Scenes", "Interface\\Icons\\Spell_Holy_MindVision", section = "Cameras" }, -- (built with Cameras: CreateCamerasPanel)
@@ -2250,8 +2251,9 @@ do
 				local get = C_Spell and C_Spell.GetSpellTexture
 				local ok, icon = pcall(get or error, 372608)
 				return ok and icon or "Interface\\Icons\\INV_Misc_Spyglass_02"
-			end, section = "Cameras" },
-			{ "Shoulder Cam", "Interface\\Icons\\INV_Shoulder_02", section = "Cameras" }, -- (ShoulderCam.lua)
+			end, section = "Special Cams" },
+			-- (Special Cams, 2026-11-15: the two that change how the camera follows you as you play.)
+			{ "Shoulder Cam", "Interface\\Icons\\INV_Shoulder_02", section = "Special Cams" }, -- (ShoulderCam.lua)
 			{ "Camera Settings", "Interface\\Icons\\Trade_Engineering", dev = true, section = "Dev" }, -- (settings no script step uses)
 		} },
 		-- (label: the name on its icon, when the page is registered under another)

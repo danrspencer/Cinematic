@@ -175,12 +175,26 @@ local function Call(fn, ...)
 	return unpack(results, 2)
 end
 
+-- Coming and going: ours fade in as a talk opens and out as it ends, not
+-- popping in and out (user, 2026-11-15), on top of the camera-move fade
+-- (the follower loop, below). closing: fading out, then hidden. openTime,
+-- closeTime: seconds, all the way. (One table: the file's at Lua's 200
+-- locals, as the 2026-11-15 build found out.)
+local fade = { alpha = 1, closing = false, openTime = 0.15, closeTime = 0.2 }
+
 -- The end of a talk (Goodbye, Accept, Complete): through the Shoulder Cam's
 -- talk turn, which holds it while the camera glides back off the NPC
 -- (ShoulderCam.lua, ns.ShoulderTalkClose), else at once. quick: Accept or
 -- Complete, a quicker glide.
 local function EndTalk(label, fn, quick, ...)
-	if ns.ShoulderTalkClose then return ns.ShoulderTalkClose(label, fn, quick, ...) end
+	if ns.ShoulderTalkClose then
+		local results = { ns.ShoulderTalkClose(label, fn, quick, ...) }
+		-- (Goodbye or Escape held while the camera glides back: ours fade out
+		-- now, not when the talk ends. Accept and Complete stay up: the next
+		-- quest's window can follow at once.)
+		if not quick and ns.ShoulderTalkHeld and ns.ShoulderTalkHeld() then fade.closing = true end
+		return unpack(results)
+	end
 	if type(fn) == "function" then return fn(...) end
 end
 
@@ -221,6 +235,42 @@ local SAME_NPC_TIME = 120 -- seconds
 local gameWindow = false -- "Show the game's window" for this conversation
 local bubble, panel
 local closeTimer
+
+-- Escape with a target while ours are up: the target cleared and the
+-- window closed in the one press (user, 2026-11-15). Clearing a target is
+-- protected, so it's a secure button's /cleartarget, Escape bound to it
+-- (an override, out of fights) only while ours show and you've a target
+-- (ns.QuestTalkEscapeSync, every frame from the follower loop). (On talk
+-- and ns, no new locals: the file's at Lua's 200.)
+talk.escapeButton = CreateFrame("Button", "CinematicQuestTalkClearTarget", UIParent, "SecureActionButtonTemplate")
+talk.escapeButton:SetAttribute("type", "macro")
+talk.escapeButton:SetAttribute("macrotext", "/cleartarget")
+talk.escapeButton:RegisterEvent("PLAYER_LOGIN")
+talk.escapeButton:SetScript("OnEvent", function(self)
+	-- (On key down or up as the game's action buttons are, not both: it'd go twice.)
+	self:RegisterForClicks(GetCVarBool("ActionButtonUseKeyDown") and "AnyDown" or "AnyUp")
+end)
+-- (After the secure /cleartarget: the window closed by the same press.)
+talk.escapeButton:SetScript("PostClick", function()
+	if ns.QuestTalkEscapeClose then ns.QuestTalkEscapeClose("target cleared") end
+end)
+-- (Ours up for this talk: Escape's ours, not the Shoulder Cam's binding for
+-- the game's windows, which are parked off screen meanwhile.)
+function ns.QuestTalkActive() return talk.kind ~= nil and not gameWindow end
+function ns.QuestTalkEscapeSync()
+	if InCombatLockdown() then return end
+	-- (The Shoulder Cam's setting, shoulderCamEscTarget: its page.)
+	local want = ns.Setting("shoulderCamEscTarget") and talk.kind ~= nil and not gameWindow and bubble ~= nil and bubble:IsShown()
+		and UnitExists("target") and true or false
+	if want == (talk.escapeBound or false) then return end
+	talk.escapeBound = want
+	ns.Log("questtalk", want and "escape: clears your target first (bound)" or "escape: back to closing (unbound)")
+	if want then
+		SetOverrideBindingClick(talk.escapeButton, true, "ESCAPE", talk.escapeButton:GetName())
+	else
+		ClearOverrideBindings(talk.escapeButton)
+	end
+end
 local Place -- (below)
 
 ---------------------------------------------------------------------------
@@ -2310,8 +2360,8 @@ local function Hide(why)
 	ns.LogDetail("questtalk", ("ours gone, the game's windows back (%s)"):format(why or "?"))
 	NoteBubble() -- (a shop window opening from it goes there: ns.ShopSpot)
 	if bubble then
-		bubble:Hide()
-		panel:Hide()
+		-- (Faded out, then hidden: the follower loop.)
+		if bubble:IsShown() or panel:IsShown() then fade.closing = true end
 		RoomAtTop(false)
 	end
 	ParkWindows(false)
@@ -2336,15 +2386,45 @@ local function Reshow(why)
 	end
 end
 
+-- (The Shoulder Cam's held close called off, ns.ShoulderTalkKeep: ours,
+-- faded out for it, back in.)
+function ns.QuestTalkKeep()
+	if not talk.kind or gameWindow then return end
+	fade.closing = false
+	if bubble and not bubble:IsShown() then Reshow("talk kept") end
+end
+
 ---------------------------------------------------------------------------
 -- Keys.
 ---------------------------------------------------------------------------
+-- Escape's close: Goodbye, through the Shoulder Cam's slow glide back
+-- (EndTalk). From OnKeyDown with no target, and from the clear-target
+-- button's PostClick with one: both in one press (user, 2026-11-15).
+function ns.QuestTalkEscapeClose(why)
+	if not talk.kind or gameWindow then return end
+	ns.Log("questtalk", ("escape: closing, %s (%s)"):format(tostring(talk.kind), why))
+	if talk.kind == "gossip" then
+		local close = C_GossipInfo and C_GossipInfo.CloseGossip or _G.CloseGossip
+		EndTalk("CloseGossip", Call, false, close)
+	else
+		EndTalk("CloseQuest", CloseQuest)
+	end
+end
+
 local function OnKeyDown(self, key)
 	if InCombatLockdown() then
 		return
 	end
 	local handled = false
-	if Setting("questTalkKeys") and not IsModifierKeyDown() then
+	-- (Escape: Goodbye, through the Shoulder Cam's slow glide back (EndTalk).
+	-- Left to the game, its own close came first and the camera snapped
+	-- back in 0.2 s: user, 2026-11-15.)
+	-- (With a target, Escape goes on to its binding: the target cleared,
+	-- ns.QuestTalkEscapeSync, and the close in its PostClick.)
+	if key == "ESCAPE" and talk.kind and not gameWindow and not IsModifierKeyDown() and not talk.escapeBound then
+		ns.QuestTalkEscapeClose("no target")
+		handled = true
+	elseif Setting("questTalkKeys") and not IsModifierKeyDown() then
 		local number = tonumber(key)
 		if number and keyed[number == 0 and 10 or number] then
 			keyed[number == 0 and 10 or number]()
@@ -2514,6 +2594,15 @@ local function Open(kind)
 		talk.clickX = ns.TalkClickX()
 	end
 	talk.choice, talk.cardPage = nil, nil
+	-- (Faded in from nothing when not up; fading out as this opens: back in
+	-- from where it is.)
+	fade.closing = false
+	if not (bubble and bubble:IsShown()) then
+		fade.alpha = 0
+		-- (Not a frame at full before the loop's first step.)
+		if bubble then bubble:SetAlpha(0) end
+		if panel then panel:SetAlpha(0) end
+	end
 	talk.kind = kind
 	-- (Whether "npc" is there to go: some talks never have it, see Ending.)
 	talk.hadNpc = ns.Flag(UnitExists("npc"))
@@ -2568,14 +2657,17 @@ local unseen, hiddenFor, stray = 0, 0, 0
 -- (This and the follower below run only while Quest talk is on, or ours
 -- still show: no loop at all otherwise.)
 local function QuestTalkLoopWanted()
-	return (ns.db and ns.db.questTalk) or talk.kind ~= nil
+	return (ns.db and ns.db.questTalk) or talk.kind ~= nil or fade.closing
 end
 ns.FeatureLoop(watcher, function(_, elapsed)
 	local step = elapsed -- (every WATCH_EVERY, on a game timer)
 	if talk.kind and not closeTimer and not TalkWindowOpen() then
 		ScheduleClose()
 	end
-	if talk.kind and not closeTimer and not gameWindow and TalkWindowOpen() and not Answerable() then
+	-- (Not while its end's held for the camera's glide back: faded out on
+	-- purpose then, EndTalk.)
+	if talk.kind and not closeTimer and not gameWindow and TalkWindowOpen() and not Answerable()
+		and not (ns.ShoulderTalkHeld and ns.ShoulderTalkHeld()) then
 		unseen = CameraMoving() and 0 or unseen + step
 		hiddenFor = hiddenFor + step
 		if unseen >= LOCKOUT_WAIT or hiddenFor >= LOCKOUT_MOVING then
@@ -2659,8 +2751,20 @@ ns.FeatureLoop(follower, function(_, elapsed)
 		Place()
 		PlacePanel()
 	end
-	bubble:SetAlpha(camMove.alpha)
-	panel:SetAlpha((panel.following or mode == "wait") and camMove.alpha or 1)
+	ns.QuestTalkEscapeSync()
+	-- (Coming and going: the open and close fade on top.)
+	local fadeTo = fade.closing and 0 or 1
+	if fade.alpha ~= fadeTo then
+		local fadeStep = elapsed / (fade.closing and fade.closeTime or fade.openTime)
+		fade.alpha = fade.closing and math.max(0, fade.alpha - fadeStep) or math.min(1, fade.alpha + fadeStep)
+	end
+	if fade.closing and fade.alpha <= 0 then
+		fade.closing = false
+		bubble:Hide()
+		panel:Hide()
+	end
+	bubble:SetAlpha(camMove.alpha * fade.alpha)
+	panel:SetAlpha(((panel.following or mode == "wait") and camMove.alpha or 1) * fade.alpha)
 end, QuestTalkLoopWanted)
 
 -- A plate came or went while ours show. A quest accepted refreshes the

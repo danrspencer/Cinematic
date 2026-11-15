@@ -205,17 +205,17 @@ ns.PROFILE_MODULES = {
 		"Your own Edit Mode layout, with the personal resource display at the bottom middle and the cast bar, " ..
 		"Cooldown Manager and swing timers hung on it, so Frames follow you slides them as one. Everything " ..
 		"else stays where you had it."),
-	{ key = "follow-prd-on", name = "Follow HUD: personal resource display on", client = "forever",
+	{ key = "follow-prd-on", name = "Follow HUD: personal resource display on",
 		scope = { "Profiles/Edit Mode layout" },
 		tip = "Turns the game's personal resource display on, the Follow HUD's root.",
 		apply = function(set) set("prdOn", true) end },
 	-- (In fights: the layout's to say, as every layout does. With an enemy
 	-- targeted: the frames'.)
-	{ key = "follow-fights", name = "Follow HUD: up in fights", client = "forever",
+	{ key = "follow-fights", name = "Follow HUD: up in fights",
 		scope = { "Standard Frames/Personal Resource Display" },
 		tip = "The personal resource display and its power come up in fights.",
 		apply = function(set) set("combatShow", { prd = true, prdpower = true }) end },
-	{ key = "follow-enemy", name = "Follow HUD: up with an enemy targeted", client = "forever",
+	{ key = "follow-enemy", name = "Follow HUD: up with an enemy targeted",
 		scope = { "Standard Frames/Personal Resource Display" },
 		tip = "The personal resource display and its power come up with an enemy targeted.",
 		apply = function(set) set("enemyShow", { prd = true, prdpower = true }) end },
@@ -352,11 +352,12 @@ ns.PROFILE_MODULES = {
 	-- Made from pure-frames as it's written, so the two stay alike; the
 	-- profile's frames choice puts the Follow HUD's pieces on after it, the
 	-- personal resource display up in place of your portrait.)
-	{ key = "shoulder-frames", name = "Shoulder Cam: frames", client = "forever",
+	{ key = "shoulder-frames", name = "Shoulder Cam: frames",
 		scope = { "Standard Frames", "Personal Resources", "Advanced Frames/Supported addons", "Gamepad/top",
 			"Shoulder Cam" },
 		tip = "Cinema's frames, and the Shoulder Cam on.",
-		apply = function(set)
+		-- (Both clients since 2026-11-15, the Shoulder Cam profile on retail too.)
+		apply = function(set, client)
 			-- (What the Follow HUD's pieces after it set, left to them.)
 			local theirs = {}
 			for _, key in ipairs({ "follow-enemy", "follow-no-portrait", "follow-frames" }) do
@@ -367,19 +368,19 @@ ns.PROFILE_MODULES = {
 					else
 						theirs[setting] = true
 					end
-				end)
+				end, client)
 			end
 			ns.PROFILE_MODULE_BY_KEY["pure-frames"].apply(function(key, value)
 				if theirs[key] == true then return end
 				if type(value) == "table" and theirs[key] then
 					for row in pairs(theirs[key]) do value[row] = nil end
 				end
-				-- (Rows retail alone has: this module's Forever's, so not written.)
-				if key == "instanceShow" and type(value) == "table" then
+				-- (Rows retail alone has: not written on Forever.)
+				if key == "instanceShow" and type(value) == "table" and client ~= "retail" then
 					value.buffcollapse, value.waypoint = nil, nil
 				end
 				set(key, value)
-			end)
+			end, client)
 			set("shoulderCam", true)
 		end },
 	{ key = "pure-minimap", name = "Cinema: minimap", scope = { "Minimap" },
@@ -913,7 +914,11 @@ function ns.SlotChoices(slot)
 	local list = {}
 	local info = ns.SLOT_CHOICES and ns.SLOT_CHOICES[slot]
 	for _, choice in ipairs(info and info.choices or {}) do
-		if not ns.ChoiceHidden(choice, ns.CLIENT) and (not choice.client or choice.client == ns.CLIENT)
+		-- (showWhenOn: a hidden one listed while your settings have it, the
+		-- Shoulder Cam profile's in its Customize, else it read Custom.)
+		local hidden = ns.ChoiceHidden(choice, ns.CLIENT)
+			and not (choice.showWhenOn and ns.db and ns.SlotPartMatches and ns.SlotPartMatches(slot, choice.part))
+		if not hidden and (not choice.client or choice.client == ns.CLIENT)
 			and not (choice.noCDM and not ns.HasCooldownManager()) then
 			list[#list + 1] = ns.GetChoice(slot, choice.part)
 		end

@@ -59,7 +59,7 @@ ns.SLOT_CHOICES = {
 		{ part = "pure", label = "Personal Resource Centered", made = true,
 			line = "Your resources in the middle, the Cooldown Manager above", modules = { "layout-pure" } },
 		-- (The Shoulder Cam profile's: in no list.)
-		{ part = "shoulder", client = "forever", hidden = true, label = "Shoulder Cam", made = true,
+		{ part = "shoulder", client = "forever", hidden = true, showWhenOn = true, label = "Shoulder Cam", made = true,
 			line = "Your resources at the bottom middle, everything hung on them",
 			modules = { "layout-shoulder", "follow-prd-on", "follow-fights" } },
 		-- (The Follow HUD's pieces, dev only for now: in no list. Set up from
@@ -69,6 +69,12 @@ ns.SLOT_CHOICES = {
 			modules = { "layout-follow", "follow-prd-on", "follow-fights" } },
 		{ part = "own", label = "Your own", line = "Cinematic leaves your Edit Mode layout as it is",
 			modules = {} },
+		-- (The Shoulder Cam profile's on retail, with no layout of ours: yours,
+		-- with the personal resource display on and up in fights, as Forever's
+		-- Shoulder Cam layout adds them. In no list.)
+		{ part = "ownprd", client = "retail", hidden = true, showWhenOn = true, label = "Your own",
+			line = "Cinematic leaves your Edit Mode layout as it is; your personal resource display on, up in fights",
+			modules = { "follow-prd-on", "follow-fights" } },
 		{ part = "preset", client = "forever", label = ns.isClassicEra and "Classic's" or "WoW Forever's",
 			line = "The game's own layout", modules = { "layout-preset" } },
 	} },
@@ -81,7 +87,10 @@ ns.SLOT_CHOICES = {
 		-- (The Shoulder Cam profile's: "Almost always" with
 		-- the Follow HUD's pieces, the personal resource display in fights in
 		-- place of the player frame.)
-		{ part = "shoulder", client = "forever", hidden = true, label = "Almost always, over your shoulder",
+		-- (Both clients since 2026-11-15. The personal resource display on and
+		-- up in fights: the layout choice's, Forever's Shoulder Cam or
+		-- retail's ownprd.)
+		{ part = "shoulder", hidden = true, showWhenOn = true, label = "Almost always, over your shoulder",
 			line = "As little UI as possible; your resources, not your portrait, in fights",
 			modules = { "shoulder-frames", "follow-enemy", "follow-no-portrait", "follow-frames", "pure-minimap",
 				"minimal-target", "pure-plates", "ultra-plates", "pure-tooltips" } },
@@ -257,24 +266,25 @@ ns.BUILTIN_PROFILES = {
 			"combat-vision", "cursor-hide", "music-calm", "weather-view-distance",
 			"node-icons", "effects-outside-cinemode"),
 	},
-	-- Cinema over your shoulder (Forever; testers' only till 2026-11-15: tester = listed only with
-	-- the Shoulder Cam unlocked, ns.ShoulderCamUnlocked). Its HUD centered on
-	-- the personal resource display, which fights bring up in place of the
-	-- player frame, and slides with you.
+	-- Cinema over your shoulder (testers' and Forever's only till 2026-11-15;
+	-- a welcome level since, on both clients). Its HUD centered on the
+	-- personal resource display, which fights bring up in place of the player
+	-- frame, and slides with you. On retail your own Edit Mode layout stays.
 	{
 		name = "Shoulder Cam",
 		label = "Shoulder Cam", -- (shown in your language)
-		client = "forever",
-		tester = true,
 		icon = "Interface\\Icons\\INV_Shoulder_02",
 		tip = L["Cinema, over your shoulder. The camera sits over your shoulder with you to one side of the " ..
 			"screen, and your resources, cast bar and Cooldown Manager sit under you and slide along with you. " ..
 			"Fights bring up your personal resource display instead of your portrait. Everything else is " ..
 			"Cinema's: as little UI as possible, every camera, Vision and all the atmosphere."],
-		picks = { layout = "shoulder", frames = "shoulder", bars = "split", camera = "pure", vfx = "pure", chat = "pure" },
+		picks = { layout = { forever = "shoulder", retail = "ownprd" }, frames = "shoulder",
+			bars = { forever = "split", retail = "pure" }, camera = "pure", vfx = "pure", chat = "pure" },
 		modules = With("zone-card", "travel-cards", "story-cards", "damage-vision", "vitals-vision",
 			"combat-vision", "cursor-hide", "music-calm", "weather-view-distance",
 			"node-icons", "effects-outside-cinemode"),
+		-- (No Quest Vision, as in every profile: Escape and walking off glide
+		-- back in the game's own talk windows too, since 2026-11-15.)
 	},
 	-- Nothing on: for players who want just a few parts (Roll, Emote Vision,
 	-- cards...) and turn on only those pages. The welcome window's last
@@ -316,6 +326,13 @@ ns.WELCOME_LEVELS = {
 	-- (flash: something shown for a moment when it's picked, besides the
 	-- profile's preview: "vitals", Vitals Vision's screen edges.)
 	{ label = "Cinema", profile = "Cinema", flash = "vitals", line = "Full immersion: just you and the world." },
+	-- (Cinema over your shoulder, since 2026-11-15. shoulderCam: picking it
+	-- answers the Shoulder Cam's one-time question; note, after its tip in
+	-- the description, says why.)
+	{ label = "Shoulder Cam", profile = "Shoulder Cam", shoulderCam = true,
+		line = "Cinema, with the camera over your shoulder.",
+		note = "It uses one of Blizzard's experimental camera settings: picking it or its test agrees to that. " ..
+			"Turn the Shoulder Cam off and your own camera settings come back." },
 	-- (noCustomize: no Next to Customize, whose parts it has all off.)
 	{ label = "Blank Slate", profile = "Blank Slate", noCustomize = true,
 		line = "Everything off. Turn on only the parts you want." },
@@ -331,7 +348,7 @@ end
 -- In your language once it's set (Locales.lua): the levels' text, and each
 -- slot's name, question and choices.
 ns.OnLanguage(function()
-	ns.TranslateFields(ns.WELCOME_LEVELS, "label", "line", "tip")
+	ns.TranslateFields(ns.WELCOME_LEVELS, "label", "line", "tip", "note")
 	for _, info in pairs(ns.SLOT_CHOICES) do
 		ns.TranslateFields({ info }, "label", "question", "about")
 		ns.TranslateFields(info.choices, "label", "line")

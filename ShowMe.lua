@@ -53,10 +53,19 @@ local DEMOS = {
 	damage = { seconds = 30, setting = "damageVision", start = function() ns.TestDamageVision(true) end,
 		running = function() return ns.DamageVisionTesting() end,
 		stop = function() ns.StopDamageVisionTest() end },
+	-- (The Shoulder Cam: ShoulderCam.lua's test, in and out by itself, your
+	-- settings untouched; starting it is the one-time question's yes. fade:
+	-- the window faded while it runs, as for a camera demo. blocked: why it
+	-- can't run now.)
+	shoulder = { seconds = 10, fade = true,
+		start = function() if not ns.ShoulderCamDemo() then error("can't start now") end end,
+		running = function() return ns.ShoulderCamDemoRunning() end,
+		stop = function() ns.StopShoulderCamDemo() end,
+		blocked = function() return ns.ShoulderCamDemoBlocked() end },
 }
 -- Each test's function, which a client without that Vision lacks.
 local NEEDS = { vitals = "FlashVitals", tele = "TestTeleportVision", emote = "TestEmoteVision",
-	roll = "TestRollWindow", damage = "TestDamageVision" }
+	roll = "TestRollWindow", damage = "TestDamageVision", shoulder = "ShoulderCamDemo" }
 function ns.ShowMeAvailable(key)
 	return DEMOS[key] ~= nil and not (NEEDS[key] and not ns[NEEDS[key]])
 end
@@ -124,6 +133,10 @@ end
 function ns.ShowMeBlocked(key, force)
 	local def = DEMOS[key]
 	if not def then return L["Nothing to show here."] end
+	if def.blocked then
+		local why = def.blocked()
+		if why then return why end
+	end
 	if def.camera and InCombatLockdown() then return L["Not in a fight: try it once the fight ends."] end
 	if def.setting and not force and not ns.Setting(def.setting) then
 		return L["Click the row to turn it on first."]
@@ -134,7 +147,7 @@ end
 -- its settings, under their pages' switches. Camera: the Cameras page's
 -- Enable switch (off on Blank Slate, which leaves the camera as the game has it).
 local IN_PROFILE = { bars = { "letterboxPage", "letterbox" }, tint = { "tintPage" }, camera = { "cameraModes" },
-	vitals = { "lowHealth" }, tele = { "teleportVision" } }
+	vitals = { "lowHealth" }, tele = { "teleportVision" }, shoulder = { "shoulderCam" } }
 local function On(base, key)
 	local page = ns.PageSwitchOf(key)
 	while page do
@@ -236,6 +249,9 @@ function ns.ShowMeWhen(key, name)
 	end
 	if key == "vitals" then return L["Low health"], true, L["As your health drops."] end
 	if key == "tele" then return L["On hearth"], true, L["As you hearth or teleport."] end
+	if key == "shoulder" then
+		return L["On"], true, L["Over your shoulder outdoors, off your mount and out of dungeons and raids."]
+	end
 	return L["On"], true, nil
 end
 
@@ -379,7 +395,7 @@ function ns.ShowMe(key, hideFrame, force)
 		if ns.RefreshTint then ns.RefreshTint() end
 	end
 	current = { key = key, def = def, untilAt = GetTime() + def.seconds }
-	if def.camera and hideFrame then
+	if (def.camera or def.fade) and hideFrame then
 		-- (Faded, the world showing through, and the mouse passing through
 		-- it to the world: Escape still closes it.)
 		current.hidden, current.alpha, current.mice = hideFrame, hideFrame:GetAlpha(), {}

@@ -276,7 +276,7 @@ end
 local function Describe(level)
 	if demoRow then demoRow:Update(level) end
 	if level then
-		about:SetText("|cffffd100" .. level.label .. "|r   " .. level.tip)
+		about:SetText("|cffffd100" .. level.label .. "|r   " .. level.tip .. (level.note and ("  " .. level.note) or ""))
 	else
 		about:SetText(L["Pick a level to try it now. You can change it any time, here or on the Profiles page."])
 	end
@@ -316,7 +316,12 @@ end
 local function Pick(name, level)
 	if InCombatLockdown() then ns.ProfileSwitchBlocked() return end -- (says so)
 	if not ns.db.enabled then ns.SetEnabled(true) end
+	-- (The Shoulder Cam's card: picking it is the yes to its one-time
+	-- question, the card's line saying why. Before and after the switch: the
+	-- profile's settings are loaded over db.)
+	if level and level.shoulderCam and ns.ShoulderCamAgree then ns.ShoulderCamAgree() end
 	ns.SetProfile(name)
+	if level and level.shoulderCam and ns.ShoulderCamAgree then ns.ShoulderCamAgree() end
 	-- (the profile's tint strength on the slider)
 	if demoRow and demoRow.ShowStrength then demoRow.ShowStrength() end
 	if ns.RestartTimers then ns.RestartTimers() end
@@ -343,7 +348,10 @@ local function Card(parent, profile, level)
 	title:SetPoint("TOP", icon, "BOTTOM", 0, -8)
 	local sub = Text(card, "GameFontHighlightSmall", level.line, SOFT, CARD_W - 20)
 	sub:SetJustifyH("CENTER")
+	sub:SetSpacing(2)
 	sub:SetPoint("TOP", title, "BOTTOM", 0, -4)
+	-- (how tall the card needs to be for its line, with room under it)
+	card.need = 16 + 44 + 8 + title:GetStringHeight() + 4 + sub:GetStringHeight() + 14
 	card:SetScript("OnEnter", function(self)
 		if not self.active then self:SetBackdropBorderColor(unpack(LIT)) end
 		Describe(level)
@@ -375,6 +383,13 @@ local DEMO_ROW = {
 	{ key = "vitals", label = "Vitals", icon = "Interface\\Icons\\Spell_Shadow_LifeDrain02",
 		tip = "As your health drops, the screen's edges close in, so you feel a fight without watching " ..
 			"your health bar." },
+	-- (Its test turns it on for a few seconds, whatever the level: ShowMe.lua's
+	-- "shoulder". Running it is the Shoulder Cam's one-time question's yes,
+	-- its tip says why.)
+	{ key = "shoulder", label = "Shoulder Cam", icon = "Interface\\Icons\\INV_Shoulder_02",
+		tip = "The camera moves over your shoulder, with you to one side of the screen. This glides in, swaps " ..
+			"shoulders once and glides back. It uses one of Blizzard's experimental camera settings: trying it " ..
+			"agrees to that, and your own camera settings come back after." },
 	{ key = "tele", label = "Teleport", icon = "Interface\\Icons\\Spell_Arcane_TeleportStormWind",
 		tip = "As you cast your Hearthstone or a teleport, a portal opens around you and the world fades " ..
 			"out as you leave." },
@@ -594,24 +609,29 @@ local function BuildLevels(page)
 
 	local byName = {}
 	for _, profile in ipairs(ns.BUILTIN_PROFILES) do byName[profile.name] = profile end
+	-- (All cards as tall as the one with the longest line, in this language,
+	-- so no line runs into a card's bottom edge.)
+	local cardH = 124
 	for i, level in ipairs(LEVELS) do
 		local profile = byName[level.profile or ns.DEFAULT_PROFILE]
 		if profile then
 			local card = Card(page, profile, level)
 			card:SetPoint("TOPLEFT", sub, "BOTTOMLEFT", (i - 1) * (CARD_W + GAP), -18)
 			cards[profile.name], levelOf[profile.name] = card, level
+			cardH = math.max(cardH, math.ceil(card.need))
 		end
 	end
+	for _, card in pairs(cards) do card:SetHeight(cardH) end
 
 	-- See it first, then the description box, under the cards.
 	local rowH = 0
 	if ns.ShowMe then
 		demoRow = BuildDemoRow(page, WIDTH - 2 * PAD)
-		demoRow:SetPoint("TOPLEFT", sub, "BOTTOMLEFT", 0, -18 - 124 - 12)
+		demoRow:SetPoint("TOPLEFT", sub, "BOTTOMLEFT", 0, -18 - cardH - 12)
 		rowH = demoRow:GetHeight() + 12
 	end
 	local box = CreateFrame("Frame", nil, page, BackdropTemplateMixin and "BackdropTemplate")
-	box:SetPoint("TOPLEFT", sub, "BOTTOMLEFT", 0, -18 - 124 - 12 - rowH)
+	box:SetPoint("TOPLEFT", sub, "BOTTOMLEFT", 0, -18 - cardH - 12 - rowH)
 	box:SetSize(WIDTH - 2 * PAD, 56)
 	Flat(box, BG)
 	about = Text(box, "GameFontHighlightSmall", "", SOFT, WIDTH - 2 * PAD - 24)
@@ -631,7 +651,7 @@ local function BuildLevels(page)
 
 	status = Text(page, "GameFontHighlightSmall", "", SOFT)
 	status:SetPoint("TOPLEFT", box, "BOTTOMLEFT", 0, -10)
-	page.height = 380 + boxH - 56 + rowH
+	page.height = 380 + boxH - 56 + rowH + cardH - 124
 end
 
 -- The Customize panel: a list of parts on the left and the one shown on the

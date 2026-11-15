@@ -4710,3 +4710,23 @@ L["You now: |cffffffff%s|r, size |cffffffff%.2f|r |cff9d9d9d(%s)|r"] = "Du jetzt
 L["Good"] = "Gut"
 L["Not used"] = "Nicht genutzt"
 L["Cinema, over your shoulder. The camera sits over your shoulder with you to one side of the screen, and your resources, cast bar and Cooldown Manager sit under you and slide along with you. Fights bring up your personal resource display instead of your portrait. Everything else is Cinema's: as little UI as possible, every camera, Vision and all the atmosphere."] = "Cinema, über deiner Schulter. Die Kamera sitzt über deiner Schulter, du an einer Seite des Bildschirms, und deine Ressourcen, Zauberleiste und dein Abklingzeitenmanager sitzen unter dir und gleiten mit. Kämpfe zeigen deine persönliche Ressourcenanzeige statt deines Porträts. Alles andere ist wie bei Cinema: so wenig UI wie möglich, jede Kamera, Vision und die ganze Atmosphäre."
+
+-- Shoulder Cam: the welcome level, its test and Customize choices (ProfileChoices.lua, Welcome.lua, ShowMe.lua)
+L["Almost always, over your shoulder"] = "Fast immer, über deiner Schulter"
+L["As little UI as possible; your resources, not your portrait, in fights"] = "So wenig UI wie möglich; im Kampf deine Ressourcen, nicht dein Porträt"
+L["Your resources at the bottom middle, everything hung on them"] = "Deine Ressourcen unten in der Mitte, alles daran gehängt"
+L["Cinema, with the camera over your shoulder."] = "Cinema, mit der Kamera über deiner Schulter."
+L["It uses one of Blizzard's experimental camera settings: picking it or its test agrees to that. Turn the Shoulder Cam off and your own camera settings come back."] = "Sie nutzt eine der experimentellen Kameraeinstellungen von Blizzard: Wer sie wählt oder testet, stimmt dem zu. Schalte die Schulterkamera aus und deine eigenen Kameraeinstellungen kommen zurück."
+L["The camera moves over your shoulder, with you to one side of the screen. This glides in, swaps shoulders once and glides back. It uses one of Blizzard's experimental camera settings: trying it agrees to that, and your own camera settings come back after."] = "Die Kamera geht über deine Schulter, du an einer Seite des Bildschirms. Sie gleitet hinein, wechselt einmal die Schulter und gleitet zurück. Sie nutzt eine der experimentellen Kameraeinstellungen von Blizzard: Wer es testet, stimmt dem zu, und deine eigenen Kameraeinstellungen kommen danach zurück."
+L["Another addon has the shoulder camera (DynamicCam): the Shoulder Cam stands aside for it."] = "Ein anderes Addon hat die Schulterkamera (DynamicCam): Die Schulterkamera tritt dafür zur Seite."
+L["Over your shoulder outdoors, off your mount and out of dungeons and raids."] = "Über deiner Schulter im Freien, ohne Reittier und außerhalb von Dungeons und Schlachtzügen."
+
+-- Shoulder Cam: the welcome level, its test and Customize choices (ProfileChoices.lua, Welcome.lua, ShowMe.lua)
+L["Cinematic leaves your Edit Mode layout as it is; your personal resource display on, up in fights"] = "Cinematic lässt dein Layout im Bearbeitungsmodus, wie es ist; deine persönliche Ressourcenanzeige an, im Kampf sichtbar"
+
+-- Camera hub: the Special Cams section (Options.lua HUBS)
+L["Special Cams"] = "Spezialkameras"
+
+-- Shoulder Cam page: Clear target on Esc while interacting with an NPC
+L["Clear target on Esc while interacting with an NPC"] = "Ziel mit Esc aufheben beim Gespräch mit einem NPC"
+L["With a talk window open, Escape clears your target and closes the window in the same press, the camera gliding back off them. Off: Escape only closes it, and your target stays."] = "Ist ein Gesprächsfenster offen, hebt Escape dein Ziel auf und schließt das Fenster mit demselben Tastendruck, während die Kamera von ihnen zurückgleitet. Aus: Escape schließt es nur, und dein Ziel bleibt."

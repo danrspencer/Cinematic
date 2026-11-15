@@ -130,6 +130,13 @@ local function Frames()
 	for _, name in ipairs(NEIGHBOURS) do list[#list + 1] = name end
 	Log(("frames: screen %.0f x %.0f UI units, in combat %s"):format(UIParent:GetWidth(), UIParent:GetHeight(),
 		Text(InCombatLockdown())))
+	-- (What the follow does with them: the PRD on retail, 2026-11-15.)
+	local d = ns.GetShoulderCamDebug and ns.GetShoulderCamDebug() or {}
+	Log(("frames: client %s, profile %s, layout %s | offset %s, side %s, zoom %.2f, size %s, view width %.3f | " ..
+		"follow %s, slide now %s, wants %s, lift %s | picked %s | moving %s"):format(ns.isRetail and "retail" or "forever",
+		Text(ns.ActiveProfile and ns.ActiveProfile()), Text(ns.ActiveLayoutName and ns.ActiveLayoutName()),
+		Text(d.shoulder), Text(d.side), Zoom(), Text(d.scale), ns.ShoulderViewWidth and ns.ShoulderViewWidth() or 0,
+		Text(d.follow), Text(d.followShift), Text(d.followTarget), Text(d.followLift), Text(d.picked), Text(d.followed)))
 	for _, name in ipairs(list) do
 		local frame = _G[name]
 		if not frame then
@@ -3365,6 +3372,298 @@ do
 	end
 end
 
+-- profiletest: one run over the Shoulder Cam welcome level (2026-11-15),
+-- verdicts and screenshots into db.shoulderProfileRun:
+--   cinema: the welcome window opened and its Cinema card clicked, what it
+--           leaves noted (layout, camera settings) for the end;
+--   demo:   See it first's Shoulder Cam test (as its button runs it): in over
+--           your shoulder, a swap, back out; the setting never on, no question;
+--   pick:   the Shoulder Cam card clicked: the Shoulder Cam and Frames follow
+--           you on, no question, the personal resource display on and up in
+--           fights and with an enemy, your portrait not; Forever: its layout;
+--   fight:  you fight something: the personal resource display up, your
+--           portrait down;
+--   back:   Cinema again: the Shoulder Cam off, the camera settings and
+--           layout as Cinema had them. Then the profile you started on.
+-- A step waiting on you gives up after 2 minutes (CAN'T TELL). Typed again: stops.
+do
+	local WAIT = 120
+	local run
+	local function Write(text)
+		local lines = ns.db.shoulderProfileRun
+		if #lines < 6000 then lines[#lines + 1] = ("%.2f %s"):format(GetTime() - run.began, text) end
+	end
+	local function Verdict(name, ok, detail)
+		Write(("VERDICT %s: %s%s"):format(name, ok == nil and "CAN'T TELL" or (ok and "PASS" or "FAIL"),
+			detail and (" (" .. detail .. ")") or ""))
+		run.verdicts[#run.verdicts + 1] = ok == nil and "?" or (ok and "ok" or "X")
+	end
+	local function Box(head, line, r, g, b)
+		run.boxShown = { head, line, r or 1, g or 0.82, b or 0 }
+		ns.PadTestBox(head, line, r or 1, g or 0.82, b or 0)
+	end
+	local function Shot(what)
+		ns.PadTestBoxHide()
+		C_Timer.After(0.05, function()
+			if not run then return end
+			local ok = pcall(function() Screenshot() end)
+			Write(("screenshot %s at %s: %s"):format(what, date("%m%d%y_%H%M%S"), ok and "taken" or "failed"))
+			C_Timer.After(0.3, function() if run and run.boxShown then ns.PadTestBox(unpack(run.boxShown)) end end)
+		end)
+	end
+	local function Offset() return tonumber(GetCVar(SHOULDER)) or 0 end
+	local function Alpha(name)
+		local frame = _G[name]
+		if not frame then return "none" end
+		local okShown, shown = pcall(frame.IsVisible, frame)
+		local okAlpha, alpha = pcall(frame.GetEffectiveAlpha, frame)
+		if not (okShown and okAlpha) then return "?" end
+		if shown ~= true then return "hidden" end
+		if issecretvalue and issecretvalue(alpha) then return "secret" end
+		-- (Nothing given back, the PRD in a fight on Forever: the first run, 2026-11-15.)
+		return type(alpha) == "number" and ("%.2f"):format(alpha) or "?"
+	end
+	local function Seen(name)
+		local value = Alpha(name)
+		return tonumber(value) and tonumber(value) > 0.5
+	end
+	local function Popup()
+		return StaticPopup_Visible and StaticPopup_Visible("CINEMATIC_SHOULDER_NOTICE") and true or false
+	end
+	local CAMERA_SETTINGS = { SHOULDER, CENTERED, REDUCE, "test_cameraTargetFocusInteractEnable",
+		"test_cameraTargetFocusEnemyEnable" }
+	local function Camera()
+		local values = {}
+		for _, name in ipairs(CAMERA_SETTINGS) do values[name] = Text(GetCVar(name)) end
+		return values
+	end
+	local function CameraText(values)
+		local parts = {}
+		for _, name in ipairs(CAMERA_SETTINGS) do parts[#parts + 1] = name .. " " .. Text(values[name]) end
+		return table.concat(parts, ", ")
+	end
+	local function State(label)
+		local db = ns.db
+		local d = ns.GetShoulderCamDebug and ns.GetShoulderCamDebug() or {}
+		Write(("%s: profile %s, layout %s (own %s), shoulderCam %s, noticed %s, popup %s, paused %s | prdOn %s, " ..
+			"combat prd %s player %s, enemy prd %s player %s, frames %s | %s"):format(label, Text(ns.ActiveProfile()),
+			Text(ns.ActiveLayoutName and ns.ActiveLayoutName()), Text(ns.chardb and ns.chardb.layoutOwn),
+			Text(db.shoulderCam), Text(db.shoulderCamNoticed), Text(Popup()), Text(d.paused), Text(db.prdOn),
+			Text(db.combatShow and db.combatShow.prd), Text(db.combatShow and db.combatShow.player),
+			Text(db.enemyShow and db.enemyShow.prd), Text(db.enemyShow and db.enemyShow.player),
+			Text(db.shoulderCamFrames), CameraText(Camera())))
+	end
+	local function Card(profile)
+		for i, level in ipairs(ns.WELCOME_LEVELS) do
+			if level.profile == profile then return ns.WelcomeCards()[i] end
+		end
+	end
+	local function Click(profile)
+		local card = Card(profile)
+		if not card then return false end
+		card:Click()
+		Write("clicked the " .. profile .. " card")
+		return true
+	end
+
+	local STEPS = {}
+	STEPS[1] = { name = "cinema",
+		start = function(s)
+			ns.ShowWelcome()
+			s.clicked = Click("Cinema")
+			Box("Profile 1/5: Cinema", "hands off: the welcome window tries Cinema", 0.7, 0.7, 0.7)
+		end,
+		tick = function(s)
+			if not s.clicked then Verdict("cinema card", false, "no Cinema card") return true end
+			if s.clock < 4 then return end
+			State("cinema")
+			run.cinema = { layout = ns.ActiveLayoutName and ns.ActiveLayoutName(), camera = Camera(),
+				shoulderCam = ns.db.shoulderCam }
+			Verdict("cinema picked", ns.ActiveProfile() == "Cinema", Text(ns.ActiveProfile()))
+			Shot("1 cinema")
+			return true
+		end }
+	STEPS[2] = { name = "demo",
+		start = function(s)
+			s.wasOn, s.most, s.signs, s.samples = ns.db.shoulderCam, 0, {}, 0
+			ns.ShowMe("shoulder", nil, true)
+			s.started = ns.ShowMeRunning and ns.ShowMeRunning("shoulder")
+			Write(("demo: started %s, blocked %s"):format(Text(s.started), Text(ns.ShowMeBlocked("shoulder", true))))
+			Box("Profile 2/5: the test", "hands off: See it first's Shoulder Cam test plays", 0.7, 0.7, 0.7)
+		end,
+		tick = function(s)
+			if not s.started then Verdict("demo runs", nil, "didn't start") return true end
+			local value = Offset()
+			s.most = math.max(s.most, math.abs(value))
+			if math.abs(value) > 0.3 then s.signs[value > 0 and "right" or "left"] = true end
+			s.popup = s.popup or Popup()
+			s.settingOn = s.settingOn or ns.db.shoulderCam ~= s.wasOn
+			if s.sample <= 0 then
+				s.sample = 0.1
+				Write(("demo: %.1f s offset %s"):format(s.clock, Text(GetCVar(SHOULDER))))
+			end
+			if not s.shot and s.clock >= 1.5 then s.shot = true Shot("2 demo, over the shoulder") end
+			if (ns.ShowMeRunning and ns.ShowMeRunning("shoulder")) and s.clock < 14 then
+				s.endedAt = nil
+				return
+			end
+			if s.clock < 2 then return end
+			-- (Settled: with the Shoulder Cam on there, it glides back to your side.)
+			s.endedAt = s.endedAt or s.clock
+			if s.clock - s.endedAt < 2.5 then return end
+			Verdict("demo over the shoulder and swapped", s.most > 0.3 and s.signs.left and s.signs.right and true or false,
+				("largest %.2f, sides %s%s"):format(s.most, s.signs.left and "left " or "", s.signs.right and "right" or ""))
+			local before = tonumber(run.cinema.camera[SHOULDER]) or 0
+			Verdict("demo back as before, nothing saved", math.abs(Offset() - before) < 0.05 and not s.settingOn
+				and not s.popup, ("offset now %s (before %.2f), setting changed %s, question shown %s"):format(
+				Text(GetCVar(SHOULDER)), before, Text(s.settingOn), Text(s.popup)))
+			local now, same = Camera(), true
+			for _, name in ipairs(CAMERA_SETTINGS) do
+				if now[name] ~= run.cinema.camera[name] then same = false end
+			end
+			Verdict("demo gives the camera back", same, CameraText(now))
+			return true
+		end }
+	STEPS[3] = { name = "pick",
+		start = function(s)
+			s.clicked = Click("Shoulder Cam")
+			Box("Profile 3/5: Shoulder Cam", "hands off: the welcome window tries Shoulder Cam (a reload offer? say no)",
+				0.7, 0.7, 0.7)
+		end,
+		tick = function(s)
+			if not s.clicked then Verdict("shoulder card", false, "no Shoulder Cam card") return true end
+			s.popup = s.popup or Popup()
+			if s.clock < 5 then return end
+			State("shoulder")
+			local db = ns.db
+			Verdict("shoulder picked, no question", ns.ActiveProfile() == "Shoulder Cam" and db.shoulderCam == true
+				and db.shoulderCamNoticed == true and not s.popup,
+				("profile %s, shoulderCam %s, noticed %s, question %s"):format(Text(ns.ActiveProfile()),
+				Text(db.shoulderCam), Text(db.shoulderCamNoticed), Text(s.popup)))
+			Verdict("PRD in fights, portrait not", db.prdOn == true and db.combatShow.prd == true
+				and db.combatShow.player == false and db.enemyShow.prd == true and db.enemyShow.player == false
+				and db.shoulderCamFrames == true)
+			local layout = ns.ActiveLayoutName and ns.ActiveLayoutName()
+			if ns.isRetail then
+				Verdict("retail keeps your layout", layout == run.cinema.layout or layout == (ns.chardb and ns.chardb.layoutOwn),
+					("now %s, Cinema's %s"):format(Text(layout), Text(run.cinema.layout)))
+			else
+				Verdict("Forever: the Shoulder Cam layout", layout == "Shoulder Cam", Text(layout))
+			end
+			local d = ns.GetShoulderCamDebug and ns.GetShoulderCamDebug() or {}
+			if d.paused == "no" then
+				Verdict("over your shoulder now", math.abs(Offset()) > 0.3, Text(GetCVar(SHOULDER)))
+			else
+				Verdict("over your shoulder now", nil, "paused: " .. Text(d.paused))
+			end
+			Shot("3 shoulder cam picked")
+			return true
+		end }
+	STEPS[4] = { name = "fight",
+		start = function()
+			Box("Profile 4/5: a fight", "CLOSE the welcome window (X), then ATTACK something and keep fighting")
+		end,
+		tick = function(s)
+			if not InCombatLockdown() then
+				if s.clock > WAIT then Verdict("fight", nil, "no fight in 2 minutes") return true end
+				s.fightAt = nil
+				return
+			end
+			s.fightAt = s.fightAt or s.clock
+			if s.clock - s.fightAt < 3 then return end
+			local prd = Alpha("PersonalResourceDisplayFrame")
+			local player = Alpha("PlayerFrame")
+			Write(("fight: PRD %s, our health bar %s, player frame %s, CineMode %s"):format(prd,
+				Alpha("CinematicPersonalResource"), player, Text(ns.cinematic)))
+			local prdUp = Seen("PersonalResourceDisplayFrame") or Seen("CinematicPersonalResource")
+			Verdict("fight: PRD up, portrait down", prdUp and not Seen("PlayerFrame"),
+				("PRD %s, player frame %s"):format(prd, player))
+			Shot("4 in a fight")
+			return true
+		end }
+	STEPS[5] = { name = "back",
+		start = function()
+			Box("Profile 5/5: back to Cinema", "STOP fighting and wait for the fight to end")
+		end,
+		tick = function(s)
+			if not s.switched then
+				if InCombatLockdown() then
+					if s.clock > WAIT then Verdict("back to Cinema", nil, "the fight never ended") return true end
+					s.calmAt = nil
+					return
+				end
+				s.calmAt = s.calmAt or s.clock
+				if s.clock - s.calmAt < 2 then return end
+				ns.SetProfile("Cinema")
+				s.switched, s.at = true, s.clock
+				Box("Profile 5/5: back to Cinema", "hands off (a reload offer? say no)", 0.7, 0.7, 0.7)
+				return
+			end
+			if s.clock - s.at < 5 then return end
+			State("back")
+			local now, same = Camera(), true
+			for _, name in ipairs(CAMERA_SETTINGS) do
+				if now[name] ~= run.cinema.camera[name] then same = false end
+			end
+			-- (Your Cinema may have the Shoulder Cam on too: as it had it.)
+			Verdict("back: Shoulder Cam and camera as Cinema had them", ns.db.shoulderCam == run.cinema.shoulderCam and same,
+				("shoulderCam %s | now %s | Cinema %s"):format(Text(ns.db.shoulderCam), CameraText(now),
+				CameraText(run.cinema.camera)))
+			local layout = ns.ActiveLayoutName and ns.ActiveLayoutName()
+			Verdict("back: Cinema's layout", layout == run.cinema.layout,
+				("now %s, Cinema's %s"):format(Text(layout), Text(run.cinema.layout)))
+			Shot("5 back on cinema")
+			return true
+		end }
+
+	local function End(why)
+		if not run then return end
+		run.frame:SetScript("OnUpdate", nil)
+		Write(("end: %s | verdicts %s"):format(why, table.concat(run.verdicts, " ")))
+		Log(("profiletest: %s, %d lines in db.shoulderProfileRun"):format(why, #ns.db.shoulderProfileRun))
+		local startedOn = run.startedOn
+		run = nil
+		-- (The profile you were on, back.)
+		if startedOn and ns.ActiveProfile() ~= startedOn and not InCombatLockdown() then ns.SetProfile(startedOn) end
+	end
+	local function Begin(i)
+		run.step, run.at = { clock = 0, sample = 0 }, i
+		Write(("step %d %s"):format(i, STEPS[i].name))
+		STEPS[i].start(run.step)
+	end
+	local function Tick(_, elapsed)
+		local s = run.step
+		s.clock, s.sample = s.clock + elapsed, s.sample - elapsed
+		if STEPS[run.at].tick(s) then
+			if STEPS[run.at + 1] then
+				Begin(run.at + 1)
+			else
+				local verdicts = table.concat(run.verdicts, " ")
+				End("done")
+				ns.PadTestBox("Profile run done: /reload, then say check log", verdicts, 0.3, 1, 0.3)
+				C_Timer.After(20, function() if not run then ns.PadTestBoxHide() end end)
+			end
+		end
+	end
+	function ns.ShoulderProfileTest()
+		if run then
+			End("stopped")
+			ns.PadTestBoxHide()
+			return ns.Print("shoulder profiletest: stopped")
+		end
+		if InCombatLockdown() then return ns.Print("shoulder profiletest: not in a fight") end
+		ns.db.shoulderProfileRun = {}
+		run = { frame = CreateFrame("Frame"), began = GetTime(), verdicts = {}, startedOn = ns.ActiveProfile() }
+		Write(("start | %s | client %s | profile %s, layout %s (own %s), noticed %s | %s"):format(Who(),
+			ns.isRetail and "retail" or "forever", Text(ns.ActiveProfile()),
+			Text(ns.ActiveLayoutName and ns.ActiveLayoutName()), Text(ns.chardb and ns.chardb.layoutOwn),
+			Text(ns.db.shoulderCamNoticed), CameraText(Camera())))
+		run.frame:SetScript("OnUpdate", Tick)
+		Begin(1)
+		ns.Print("shoulder profiletest: outdoors, on foot, near something to fight; follow the box; type it again to stop")
+	end
+end
+
 local function Set(key, value)
 	ns.db[key] = value
 	if ns.ApplyShoulderCam then ns.ApplyShoulderCam() end
@@ -3411,6 +3710,7 @@ function ns.ShoulderTest(arg)
 	elseif what == "lock" then ns.ShoulderLock()
 	elseif what == "selftarget" then ns.ShoulderSelfTarget()
 	elseif what == "today" then ns.ShoulderToday(rest)
+	elseif what == "profiletest" then ns.ShoulderProfileTest()
 	elseif what == "on" then Set("shoulderCam", true)
 	elseif what == "off" then Set("shoulderCam", false)
 	elseif what == "left" or what == "right" then Set("shoulderCamSide", what)
@@ -3419,7 +3719,7 @@ function ns.ShoulderTest(arg)
 	-- (The Shoulder Cam layout, Layouts.lua: made, or made again from the code, and switched to; offers the reload.)
 	elseif what == "layout" then ns.RegenerateLayout("Shoulder Cam")
 	else
-		ns.Print("shoulder: scan, frames, watch, quiet, sweep offsets|zoom|ease|next|stop, try pitch|head|enemy|interact|walls|off, walls, forms, shift [n|move], cams, map still|talk|ramp|back|walk|enemy, zoomcurve, mounts, aimclick, drag, follow [trial], angles, padscan, prdcheck, calibrate, lock, selftarget, today, " ..
+		ns.Print("shoulder: scan, frames, watch, quiet, sweep offsets|zoom|ease|next|stop, try pitch|head|enemy|interact|walls|off, walls, forms, shift [n|move], cams, map still|talk|ramp|back|walk|enemy, zoomcurve, mounts, aimclick, drag, follow [trial], angles, padscan, prdcheck, calibrate, lock, selftarget, today, profiletest, " ..
 			"on, off, left, right, spot <percent>, strength <percent>, layout")
 	end
 end

@@ -4710,3 +4710,23 @@ L["You now: |cffffffff%s|r, size |cffffffff%.2f|r |cff9d9d9d(%s)|r"] = "你現�
 L["Good"] = "良好"
 L["Not used"] = "未使用"
 L["Cinema, over your shoulder. The camera sits over your shoulder with you to one side of the screen, and your resources, cast bar and Cooldown Manager sit under you and slide along with you. Fights bring up your personal resource display instead of your portrait. Everything else is Cinema's: as little UI as possible, every camera, Vision and all the atmosphere."] = "Cinema，越過你的肩膀。鏡頭位於你的肩膀上方，你在畫面一側，你的資源、施法條和冷卻管理器在你下方隨你滑動。戰鬥時顯示個人資源顯示而不是你的頭像。其餘都和 Cinema 一樣：盡可能少的介面、所有鏡頭、視覺效果和全部氛圍。"
+
+-- Shoulder Cam: the welcome level, its test and Customize choices (ProfileChoices.lua, Welcome.lua, ShowMe.lua)
+L["Almost always, over your shoulder"] = "幾乎一直，越過你的肩膀"
+L["As little UI as possible; your resources, not your portrait, in fights"] = "盡可能少的介面；戰鬥時顯示你的資源而不是頭像"
+L["Your resources at the bottom middle, everything hung on them"] = "你的資源在底部中央，其他一切都掛在它上面"
+L["Cinema, with the camera over your shoulder."] = "Cinema，鏡頭在你的肩膀上方。"
+L["It uses one of Blizzard's experimental camera settings: picking it or its test agrees to that. Turn the Shoulder Cam off and your own camera settings come back."] = "它使用了暴雪的一項實驗性鏡頭設定：選擇或試用它即表示同意。關閉肩膀鏡頭，你自己的鏡頭設定就會恢復。"
+L["The camera moves over your shoulder, with you to one side of the screen. This glides in, swaps shoulders once and glides back. It uses one of Blizzard's experimental camera settings: trying it agrees to that, and your own camera settings come back after."] = "鏡頭移到你的肩膀上方，你在畫面一側。它會滑入、換一次肩膀，然後滑回。它使用了暴雪的一項實驗性鏡頭設定：試用即表示同意，之後你自己的鏡頭設定會恢復。"
+L["Another addon has the shoulder camera (DynamicCam): the Shoulder Cam stands aside for it."] = "另一個插件正在控制肩膀鏡頭（DynamicCam）：肩膀鏡頭會讓開。"
+L["Over your shoulder outdoors, off your mount and out of dungeons and raids."] = "在戶外、不騎坐騎、不在地城和團隊副本中時位於你的肩膀上方。"
+
+-- Shoulder Cam: the welcome level, its test and Customize choices (ProfileChoices.lua, Welcome.lua, ShowMe.lua)
+L["Cinematic leaves your Edit Mode layout as it is; your personal resource display on, up in fights"] = "Cinematic 保留你的編輯模式版面配置不變；開啟個人資源顯示，戰鬥時顯示"
+
+-- Camera hub: the Special Cams section (Options.lua HUBS)
+L["Special Cams"] = "特殊鏡頭"
+
+-- Shoulder Cam page: Clear target on Esc while interacting with an NPC
+L["Clear target on Esc while interacting with an NPC"] = "與 NPC 互動時按 Esc 清除目標"
+L["With a talk window open, Escape clears your target and closes the window in the same press, the camera gliding back off them. Off: Escape only closes it, and your target stays."] = "對話視窗開啟時，按一次 Esc 清除你的目標並關閉視窗，鏡頭同時從對方身上滑回。關閉：Esc 只關閉視窗，目標保留。"

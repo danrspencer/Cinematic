@@ -49,10 +49,13 @@ end
 
 -- On, and not standing aside for another addon that owns the shoulder offset
 -- (DynamicCam writes it with every situation change: Support/DynamicCam.lua).
+-- (demo: the welcome window's See it first test running, ns.ShoulderCamDemo
+-- below: on for it with the setting off, nothing of yours changed.)
+local demo
 local function ShoulderOn()
 	if not ns.ShoulderCamUnlocked() then return false end
 	if ns.FeatureYieldedTo and ns.FeatureYieldedTo("shoulderCam") then return false end
-	return ns.Setting("shoulderCam")
+	return demo ~= nil or ns.Setting("shoulderCam")
 end
 
 local POLL = 0.2 -- seconds between checks for a pause (mounting, a camera starting)
@@ -136,6 +139,10 @@ local function PauseReason()
 	-- that (padscan, 2026-11-13). With it on, the offset does nothing.)
 	if not ns.isRetail and ns.IsGamePadOn and ns.IsGamePadOn() then
 		return "gamepad"
+	end
+	-- (The test: wherever you are, till it eases back out at its end.)
+	if demo then
+		return demo.ending and "demo" or nil
 	end
 	MovePauseBoxes(db)
 	if not db.shoulderCamAlways then
@@ -471,7 +478,7 @@ local blend, blendAt = 0, nil
 local blendTime = BLEND_TIME
 -- (Pauses that aren't one of our cameras: PauseReason's own words.)
 local NOT_A_CAMERA = { gamepad = true, mounted = true, indoors = true, ["show in"] = true, mounting = true,
-	yourself = true }
+	yourself = true, demo = true }
 local function TimeKey(key)
 	return ALLOW_OF[key] and (ALLOW_OF[key]:gsub("Allow", "Time"))
 end
@@ -510,7 +517,7 @@ function ns.ShoulderBlendShare() return blend end
 -- at once.
 local sideNow, sideAt
 local function SideFactor()
-	local want = ns.db.shoulderCamSide == "left" and -1 or 1
+	local want = ((demo and demo.side) or ns.db.shoulderCamSide) == "left" and -1 or 1
 	local now = GetTime()
 	local time = tonumber(ns.db.shoulderCamSwapTime) or 1.5
 	if not sideNow or time <= 0 or not sideAt or now - sideAt > 0.5 then
@@ -524,6 +531,19 @@ local function SideFactor()
 	return 2 * p * p * (3 - 2 * p) - 1
 end
 
+-- You're moving the camera: a mouse button held on it, or camera input under
+-- YOURS_QUIET ago (Core.lua's PLAYER_HOLD).
+-- (Your camera always wins: the way back in after the quest cam slid the view
+-- sideways under a drag, "my mouse and the addon moving the camera were
+-- competing", user 2026-11-15. So it waits where it got to till you let go.)
+local YOURS_QUIET = 0.5
+local heldForYou -- (the way back in waiting for you, for the log)
+local function YouMoveCamera()
+	if ns.IsMouseOnCamera and ns.IsMouseOnCamera() then return true end
+	local last = ns.GetLastCameraInput and ns.GetLastCameraInput() or -math.huge
+	return GetTime() - last < YOURS_QUIET
+end
+
 local function ShoulderValue(again)
 	if not again then paused = PauseReason() end
 	-- (A pause's time is kept as it ends, for the way back in.)
@@ -532,7 +552,17 @@ local function ShoulderValue(again)
 	elseif blend >= 1 then
 		blendTime = BLEND_TIME
 	end
-	local k = Blend(paused and 0 or 1)
+	local toward = paused and 0 or 1
+	-- (Only the way back in waits: easing out for a pause goes on.)
+	local wait = toward > blend and YouMoveCamera()
+	if wait ~= (heldForYou or false) then
+		heldForYou = wait or nil
+		ns.Log("shoulder", wait and ("coming back in waits: you're moving the camera (%d%% in)"):format(blend * 100)
+			or (paused and "coming back in stopped: paused again (%d%% in)"
+				or "you've let go of the camera: coming back in from %d%%"):format(blend * 100))
+	end
+	if wait then toward = blend end
+	local k = Blend(toward)
 	if k <= 0 then
 		return "0"
 	end
@@ -586,6 +616,17 @@ local function Answered(yes)
 	end
 	ns.ApplyShoulderCam()
 	if ns.RefreshOptions then ns.RefreshOptions() end
+end
+-- The question answered yes without it: the welcome window's Shoulder Cam
+-- card and its See it first test say why on themselves (Welcome.lua).
+function ns.ShoulderCamAgree()
+	if ns.db then ns.db.shoulderCamNoticed = true end
+	if asking then
+		if _G.StaticPopup_Hide then _G.StaticPopup_Hide("CINEMATIC_SHOULDER_NOTICE") end
+		asking = nil
+		-- (Held back for the question: on now.)
+		ns.ApplyShoulderCam()
+	end
 end
 local function AskNotice()
 	if asking then return end
@@ -741,6 +782,10 @@ local function CloseNow(why)
 	closing.passing = nil
 end
 
+-- (A talk's end held now, for the camera's glide back: QuestTalk.lua fades
+-- its bubble out at once then.)
+function ns.ShoulderTalkHeld() return #closing.held > 0 end
+
 -- The quest bubble's end of a talk (QuestTalk.lua): fn(...) now, or held
 -- while the turn glides back. label: what it is, for the log; quick: Accept
 -- or Complete, the quick glide back.
@@ -773,6 +818,114 @@ function ns.ShoulderTalkClose(label, fn, quick, ...)
 		ns.Log("shoulder", ("talk close: %s held too"):format(label))
 	end
 end
+
+-- Escape in the game's own gossip and quest windows (2026-11-15, no Quest
+-- Vision needed): bound to a secure button while one's open and the talk
+-- turn is on. Its /cleartarget clears your target (shoulderCamEscTarget; the
+-- game's Escape would close the window first), and its PostClick closes
+-- the window through the slow glide back (ns.ShoulderTalkClose), fading it
+-- out meanwhile. The game's close is only called, as Goodbye would, never
+-- replaced (what tainted, till 2026-11-14). The X and Goodbye buttons still
+-- close at once. With Cinematic's own dialogue up, Escape's left to it.
+local GAME_TALK = { GossipFrame = "gossip", QuestFrame = "quest" }
+local gameEsc = CreateFrame("Button", "CinematicShoulderEscapeButton", UIParent, "SecureActionButtonTemplate")
+gameEsc:SetAttribute("type", "macro")
+gameEsc:SetAttribute("macrotext", "")
+gameEsc:RegisterEvent("PLAYER_LOGIN")
+gameEsc:RegisterEvent("PLAYER_REGEN_ENABLED")
+-- (Right-clicking them again while the close is held: the talk goes on,
+-- ns.ShoulderTalkKeep. The window's still open, faded out, so the game
+-- opens nothing new, and the close came after: user, 2026-11-15.)
+pcall(gameEsc.RegisterEvent, gameEsc, "GLOBAL_MOUSE_UP")
+gameEsc:SetScript("OnEvent", function(self, event, button)
+	if event == "PLAYER_LOGIN" then
+		-- (On key down or up as the game's action buttons are, not both: it'd go twice.)
+		self:RegisterForClicks(GetCVarBool("ActionButtonUseKeyDown") and "AnyDown" or "AnyUp")
+	elseif event == "PLAYER_REGEN_ENABLED" then
+		-- (Out of a fight: a binding the fight kept, with the poller stopped
+		-- (the Shoulder Cam turned off in it), given back now.)
+		if self.Sync then self.Sync() end
+	elseif button == "RightButton" and #closing.held > 0 then
+		local ok, again = pcall(function()
+			return UnitExists("mouseover") and UnitIsUnit("mouseover", "npc")
+		end)
+		if ok and ns.Flag(again) and ns.ShoulderTalkKeep then ns.ShoulderTalkKeep("right-clicked them again") end
+	end
+end)
+gameEsc.bound = false
+local function GameTalkWindow()
+	for name, kind in pairs(GAME_TALK) do
+		local frame = _G[name]
+		if frame and ns.Flag(frame:IsShown()) then return frame, kind end
+	end
+end
+-- The window faded out over gameEsc.fadeTime while the camera glides back;
+-- its alpha back as it hides. (Our own steps: the game's UIFrameFade on its
+-- frames can spread taint.)
+gameEsc.fadeTime = 0.2
+local function FadeGameWindow(frame)
+	if not frame.cinematicEscHooked then
+		frame.cinematicEscHooked = true
+		frame:HookScript("OnHide", function(self)
+			gameEsc.fading = nil
+			self:SetAlpha(1)
+		end)
+	end
+	gameEsc.fading = frame
+	ns.SetOnUpdate(gameEsc, function(_, elapsed)
+		local fading = gameEsc.fading
+		if not fading then
+			ns.SetOnUpdate(gameEsc, nil)
+			return
+		end
+		local alpha = math.max(0, (fading:GetAlpha() or 1) - elapsed / gameEsc.fadeTime)
+		fading:SetAlpha(alpha)
+		if alpha <= 0 then ns.SetOnUpdate(gameEsc, nil) end
+	end)
+end
+gameEsc:SetScript("PostClick", function()
+	local frame, kind = GameTalkWindow()
+	if not frame then return end
+	ns.Log("shoulder", ("escape: the game's %s window, closing after the glide back"):format(kind))
+	if kind == "gossip" then
+		ns.ShoulderTalkClose("CloseGossip", C_GossipInfo and C_GossipInfo.CloseGossip or _G.CloseGossip)
+	else
+		ns.ShoulderTalkClose("CloseQuest", CloseQuest)
+	end
+	if #closing.held > 0 then FadeGameWindow(frame) end
+end)
+-- The held close called off: the window (faded out) back, the turn back
+-- toward them, and the talk goes on as if Escape hadn't been pressed.
+function ns.ShoulderTalkKeep(why)
+	if #closing.held == 0 then return end
+	closing.held = {}
+	closing.token = closing.token + 1 -- (its safety timer ends nothing now)
+	talk.back, talk.quick, talk.backAt, talk.fullAt = false, false, nil, nil
+	local frame = gameEsc.fading
+	if frame then
+		gameEsc.fading = nil
+		frame:SetAlpha(1)
+	end
+	if ns.QuestTalkKeep then ns.QuestTalkKeep() end
+	ns.Log("shoulder", ("talk close: called off (%s), the talk goes on"):format(why))
+end
+
+-- (Every frame from the poller, and as the Shoulder Cam's applied: out of fights only.)
+local function SyncGameEscape()
+	if InCombatLockdown() then return end
+	local want = ShoulderOn() and TalkOn() and talk.on and GameTalkWindow() ~= nil
+		and not (ns.QuestTalkActive and ns.QuestTalkActive()) and true or false
+	if want == gameEsc.bound then return end
+	gameEsc.bound = want
+	if want then
+		gameEsc:SetAttribute("macrotext", ns.Setting("shoulderCamEscTarget") and "/cleartarget" or "")
+		SetOverrideBindingClick(gameEsc, true, "ESCAPE", gameEsc:GetName())
+	else
+		ClearOverrideBindings(gameEsc)
+	end
+	ns.Log("shoulder", want and "escape: bound for the game's talk window" or "escape: back to the game's")
+end
+gameEsc.Sync = SyncGameEscape -- (its PLAYER_REGEN_ENABLED, above)
 
 -- Turn to your target (shoulderCamTargetTurn, off by default). The game's
 -- enemy focus (test_cameraTargetFocusEnemy...) turns the camera toward an
@@ -1104,8 +1257,20 @@ local function TalkTick(elapsed)
 			talk.back, talk.backAt = true, nil
 		end
 		local holder = ns.CameraHolder and ns.CameraHolder("talk")
-		if talk.back or holder and holder ~= "you" then
-			local time = talk.quick and talk.back and talk.quickTime or TalkOutTime()
+		-- (Walking off with the window open: glide back now, at the quick
+		-- pace. The game ends the talk once you're out of reach, and its
+		-- 0.2 s snap then has nothing left to undo (user, 2026-11-15: "it
+		-- will just instantly snap back"). Stopped with it still open: back
+		-- toward them.)
+		local ok, away = pcall(function() return GetUnitSpeed("player") > 0 end)
+		away = ok and away == true
+		if away ~= (talk.walkingOff or false) then
+			talk.walkingOff = away
+			ns.LogDetail("cvar", away and "Shoulder Cam: talk turn glides back, walking off"
+				or "Shoulder Cam: stopped, talk turn back toward them")
+		end
+		if talk.back or away or holder and holder ~= "you" then
+			local time = (talk.quick and talk.back or away) and talk.quickTime or TalkOutTime()
 			talk.share = math.max(0, talk.share - elapsed / time)
 		else
 			talk.share = math.min(1, talk.share + elapsed / TalkInTime())
@@ -1175,6 +1340,7 @@ function ns.ApplyShoulderCam()
 		poller:Show()
 	else
 		CloseNow("Shoulder Cam off")
+		SyncGameEscape() -- (off: Escape the game's again)
 		poller:Hide()
 		if yours then
 			for cvar, value in pairs(yours) do
@@ -1192,7 +1358,71 @@ end
 -- (Picks up pauses, and the page's sliders and ticks, a moment later; the
 -- offset follows your zoom every frame in between.)
 local waited = 0
+-- The welcome window's See it first test (ShowMe.lua's "shoulder"): the
+-- Shoulder Cam on for a few seconds whatever its setting, wherever you are:
+-- it eases in over your shoulder, swaps sides once (at Swap takes' pace),
+-- then eases back out ("demo", a pause) and stops. Nothing saved changes:
+-- the side swaps on the demo's own, and with the setting off your camera
+-- settings come back after as they do whenever it goes off (a reload in the
+-- middle too: shoulderCamYours). Picking it is the one-time question's yes.
+local DEMO_IN, DEMO_SWAP_AT, DEMO_OUT_AT = 0.9, 2.2, 5.2 -- seconds from the start
+function ns.ShoulderCamDemoBlocked()
+	if InCombatLockdown() then return L["Not in a fight: try it once the fight ends."] end
+	if not ns.isRetail and ns.IsGamePadOn and ns.IsGamePadOn() then
+		return L["Shoulder Cam is paused while the gamepad UI is on: the game keeps your character centered in it."]
+	end
+	if ns.FeatureYieldedTo and ns.FeatureYieldedTo("shoulderCam") then
+		return L["Another addon has the shoulder camera (DynamicCam): the Shoulder Cam stands aside for it."]
+	end
+end
+function ns.ShoulderCamDemo()
+	if demo or ns.ShoulderCamDemoBlocked() or not ns.db then return false end
+	if ns.ShoulderCamAgree then ns.ShoulderCamAgree() end
+	-- (Always the right shoulder first, the default, then the left: user,
+	-- 2026-11-15. Your own side's untouched, and back after if it's on.)
+	demo = { side = "right", swapTo = "left", began = GetTime() }
+	ns.Log("shoulder", "demo: starts (the welcome window's test)")
+	ns.ApplyShoulderCam()
+	return true
+end
+function ns.ShoulderCamDemoRunning() return demo ~= nil end
+-- (Ended early, Stop: eased out as at its end.)
+function ns.StopShoulderCamDemo()
+	-- (With the Shoulder Cam on anyway: no glide out and back in, just back
+	-- to your side at Swap takes' pace: the first run, 2026-11-15.)
+	if demo and ns.Setting("shoulderCam") then
+		demo = nil
+		ns.Log("shoulder", "demo: done, back to your side")
+		ns.ApplyShoulderCam()
+		return
+	end
+	if demo and not demo.ending then
+		demo.ending = true
+		ns.ApplyShoulderCam()
+	end
+end
+local function DemoTick()
+	if not demo then return end
+	local at = GetTime() - demo.began
+	if not demo.swapped and at >= DEMO_SWAP_AT then
+		demo.swapped, demo.side = true, demo.swapTo
+	end
+	if not demo.ending and at >= DEMO_OUT_AT then
+		ns.StopShoulderCamDemo()
+		if not demo then return end
+	end
+	-- (All the way back out, or stuck past its time: done.)
+	if demo.ending and (blend <= 0 or at >= DEMO_OUT_AT + 4) then
+		demo = nil
+		ns.Log("shoulder", "demo: done")
+		ns.ApplyShoulderCam()
+	end
+end
+ns.SHOULDER_DEMO_SECONDS = DEMO_OUT_AT + DEMO_IN + 1
+
 ns.SetOnUpdate(poller, function(_, elapsed)
+	SyncGameEscape()
+	DemoTick()
 	TalkTick(elapsed)
 	AimTick(elapsed)
 	waited = waited + elapsed
@@ -1278,7 +1508,9 @@ local followShift = 0      -- the slide now (UIParent units, + right), easing to
 -- together, each with its own on top (<key>Height), while the camera's over
 -- your shoulder; share eases 0 to 1 and back with it. A frame riding along on
 -- another gets only its own (the one it rides on brings the rest).
-local followLift = { share = 0 }
+-- (align: the PRD lined up with the cast bar, 0-1, eased: on while Frames
+-- follow you is, paused too: user, 2026-11-15, "it's switching back" on a mount.)
+local followLift = { share = 0, align = 0 }
 
 local function EditModeOpen()
 	local editMode = _G.EditModeManagerFrame
@@ -1365,6 +1597,14 @@ end
 
 local function Home(entry) return entry.shift == 0 and (entry.lift or 0) == 0 end
 
+-- A frame's middle across the screen, in UI units from the screen's middle
+-- (nil: can't be read). Taken as the game places it (an entry's homeX).
+local function CenterX(frame)
+	local ok, x = pcall(frame.GetCenter, frame)
+	if not ok or type(x) ~= "number" or (issecretvalue and issecretvalue(x)) then return nil end
+	return x * frame:GetEffectiveScale() / UIParent:GetEffectiveScale() - UIParent:GetWidth() / 2
+end
+
 -- Every followed frame back where the game had it, and forgotten; with keep
 -- (a set of names), all but those. One that can't move yet (protected, in a
 -- fight) is kept, to go back once it can.
@@ -1375,7 +1615,7 @@ local function PutBack(keep)
 			followed[frame] = nil
 		end
 	end
-	if not keep then followShift, followLift.share = 0, 0 end
+	if not keep then followShift, followLift.share, followLift.align = 0, 0, 0 end
 end
 
 -- How wide the view is: the tangent of half the field of view across the
@@ -1441,13 +1681,32 @@ ns.SetOnUpdate(follower, function(self, elapsed)
 	PickFollows()
 	-- (No longer picked: back on its place.)
 	PutBack(FOLLOWS)
+	-- The cast bar's own place across (moved by itself, not riding on the
+	-- PRD): the PRD lines up under it, wherever the layout has the PRD
+	-- across (retail's own layout: 410 UI units to the left, 2026-11-15:
+	-- "it should be in line with the cast bar"). Kept while Frames follow
+	-- you is on, the camera behind you too (followLift.align).
+	local alignTo = db and ShoulderOn() and db.shoulderCamFrames and 1 or 0
+	followLift.align = followLift.align + (alignTo - followLift.align) * math.min(1, elapsed * FOLLOW_EASE)
+	if math.abs(alignTo - followLift.align) < 0.01 then followLift.align = alignTo end
+	local castX
+	if FOLLOWS.PlayerCastingBarFrame or FOLLOWS.CastingBarFrame then
+		for _, name in ipairs({ "PlayerCastingBarFrame", "CastingBarFrame", "GamepadPlayerCastingBarFrame" }) do
+			local bar = _G[name]
+			local barEntry = type(bar) == "table" and followed[bar]
+			if barEntry and barEntry.homeX and Mover(bar) then
+				castX = barEntry.homeX
+				break
+			end
+		end
+	end
 	for name, key in pairs(FOLLOWS) do
 		local frame = _G[name]
 		if type(frame) == "table" and frame.GetPoint then
 			local entry, now = followed[frame], ReadPoints(frame)
 			-- (Moved by the game since: its new place.)
 			if now and (not entry or not SamePoints(now, entry.ours)) then
-				entry = { points = now, ours = now, shift = 0, lift = 0 }
+				entry = { points = now, ours = now, shift = 0, lift = 0, homeX = CenterX(frame) }
 				followed[frame] = entry
 			end
 			-- (Riding along with another, or on a plate: only its own height;
@@ -1455,6 +1714,9 @@ ns.SetOnUpdate(follower, function(self, elapsed)
 			local mover = Mover(frame)
 			local own = db and db[key .. "Height"] or 0
 			local shift = mover and followShift or 0
+			if mover and castX and key == "shoulderCamFollowPRD" and entry and entry.homeX then
+				shift = shift + (castX - entry.homeX) * followLift.align
+			end
 			local lift = ((mover and master or 0) + own) * followLift.share
 			if entry and not mover and math.abs(lift) < 0.5 then
 				if Home(entry) or Place(frame, entry, 0, 0) then followed[frame] = nil end
@@ -1466,7 +1728,7 @@ ns.SetOnUpdate(follower, function(self, elapsed)
 		end
 	end
 	-- (Back home and nothing more wanted: stop; not while one is still out.)
-	if target == 0 and followShift == 0 and followLift.share == 0 then
+	if target == 0 and followShift == 0 and followLift.share == 0 and followLift.align == 0 then
 		PutBack()
 		if not next(followed) then self:Hide() end
 	end
@@ -1620,7 +1882,7 @@ function ns.CreateShoulderCamPanel(kit)
 			-- (No profile offered any more: the camera works on any profile, and
 			-- the Follow HUD tab puts the frames that follow you on yours.)
 		end)
-	local function IfOn() return ns.Setting("shoulderCam") end
+	local function IfOn() return ns.PageSetting("shoulderCam") end
 	-- (Three folder tabs: the camera's settings, built on content as before and
 	-- moved onto the first tab (Adopt, below), the frames that follow you, and
 	-- which of our cameras it stays on through.)
@@ -1693,12 +1955,18 @@ function ns.CreateShoulderCamPanel(kit)
 		"a slow glide in Cinematic's quest bubble, at the game's own pace in the game's windows. " ..
 		"It steps aside while Cinematic's quest or chat camera moves the view."], SaveThen("shoulderCamTalkTurn", ns.ApplyShoulderCam)), "check")
 	kit.GreyUnless(talkCheck, IfOn)
-	local function IfTalk() return ns.Setting("shoulderCam") and ns.GetDB().shoulderCamTalkTurn end
+	local function IfTalk() return ns.PageSetting("shoulderCam") and ns.GetDB().shoulderCamTalkTurn end
+	-- (Under it: Escape in a talk window, the game's or Cinematic's own, 2026-11-15.)
+	local escTarget = stack:Add(kit.Check(content, "shoulderCamEscTarget", L["Clear target on Esc while interacting with an NPC"],
+		L["With a talk window open, Escape clears your target and closes the window in the same press, the " ..
+		"camera gliding back off them. Off: Escape only closes it, and your target stays."]), "check", 16)
+	kit.GreyUnless(escTarget, IfTalk)
 	-- Turn to your target: a Show in row, its box before the name (on at all),
 	-- Combat and the places after (where it turns).
 	local turnTop = CreateFrame("Frame", nil, content)
 	turnTop:SetSize(1, 1)
-	turnTop:SetPoint("TOPLEFT", talkCheck, "BOTTOMLEFT", 4, 4)
+	-- (Under the Escape tick, indented 16 under Turn to NPCs: back out to the column.)
+	turnTop:SetPoint("TOPLEFT", escTarget, "BOTTOMLEFT", 4 - 16, 4)
 	local turnRow = ns.ShowTable(content, turnTop, {
 		opts = { anyFight = true }, underHeader = true, layout = ns.GRID_PLACE_COMBAT_EDIT_LAYOUT,
 		{ key = ns.SHOULDER_TURN_ROW, label = L["Turn to enemy"], showKey = "shoulderCamTargetTurn",
@@ -1718,7 +1986,7 @@ function ns.CreateShoulderCamPanel(kit)
 		L["%.1f sec"]), "slider")
 	kit.Tooltip(talkTime, L["How long the turn toward your target takes, and the glide back."])
 	kit.GreyUnless(talkTime, function()
-		return ns.Setting("shoulderCam") and ns.GetDB().shoulderCamTargetTurn
+		return ns.PageSetting("shoulderCam") and ns.GetDB().shoulderCamTargetTurn
 	end)
 	local talkIn = stack:Add(kit.Slider(content, "shoulderCamTalkIn", L["NPC turn takes"], 0.5, 4, 0.5,
 		L["%.1f sec"]), "slider")
@@ -1750,7 +2018,7 @@ function ns.CreateShoulderCamPanel(kit)
 		"glide back as the camera goes behind you. Edit Mode still places them: this moves them from " ..
 		"there."], SaveThen("shoulderCamFrames", UpdateFollow)), "check")
 	kit.GreyUnless(followCheck, IfOn)
-	local function IfFollow() return ns.Setting("shoulderCam") and ns.GetDB().shoulderCamFrames end
+	local function IfFollow() return ns.PageSetting("shoulderCam") and ns.GetDB().shoulderCamFrames end
 	-- (Under it, indented: it adds to it, with Turn to enemy on the first tab. Beside it till
 	-- 2026-11-15, it read as a choice between the two: user.)
 	local turnFollow = kit.Check(frames, "shoulderCamTargetFollow", L["Frames follow the turn"],
@@ -1761,7 +2029,7 @@ function ns.CreateShoulderCamPanel(kit)
 	fstack:Add(turnFollow, "check", 16)
 	kit.GreyUnless(turnFollow, function()
 		local db = ns.GetDB()
-		return ns.Setting("shoulderCam") and db.shoulderCamTargetTurn and db.shoulderCamFrames
+		return ns.PageSetting("shoulderCam") and db.shoulderCamTargetTurn and db.shoulderCamFrames
 	end)
 	local FRAME_TIP = L["Slides with you. A frame placed on it in Edit Mode slides along with it, ticked or not."]
 	local labels = {

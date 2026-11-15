@@ -4710,3 +4710,23 @@ L["You now: |cffffffff%s|r, size |cffffffff%.2f|r |cff9d9d9d(%s)|r"] = "지금: 
 L["Good"] = "좋음"
 L["Not used"] = "사용 안 함"
 L["Cinema, over your shoulder. The camera sits over your shoulder with you to one side of the screen, and your resources, cast bar and Cooldown Manager sit under you and slide along with you. Fights bring up your personal resource display instead of your portrait. Everything else is Cinema's: as little UI as possible, every camera, Vision and all the atmosphere."] = "Cinema를 어깨 너머로. 카메라가 어깨 너머에 있고 나는 화면 한쪽에 있으며, 자원, 시전 바, 재사용 대기시간 관리자가 내 아래에서 함께 미끄러집니다. 전투에서는 초상화 대신 개인 자원 표시가 나옵니다. 나머지는 모두 Cinema와 같습니다: 최소한의 UI, 모든 카메라, 비전, 그리고 모든 분위기."
+
+-- Shoulder Cam: the welcome level, its test and Customize choices (ProfileChoices.lua, Welcome.lua, ShowMe.lua)
+L["Almost always, over your shoulder"] = "거의 항상, 어깨 너머로"
+L["As little UI as possible; your resources, not your portrait, in fights"] = "최소한의 UI; 전투 중에는 초상화 대신 자원"
+L["Your resources at the bottom middle, everything hung on them"] = "자원을 화면 아래 가운데에, 모든 것을 그 위에 연결"
+L["Cinema, with the camera over your shoulder."] = "어깨 너머 카메라를 곁들인 Cinema."
+L["It uses one of Blizzard's experimental camera settings: picking it or its test agrees to that. Turn the Shoulder Cam off and your own camera settings come back."] = "Blizzard의 실험적 카메라 설정 중 하나를 사용합니다: 이것을 고르거나 테스트하면 동의한 것으로 봅니다. 어깨 카메라를 끄면 원래 카메라 설정이 돌아옵니다."
+L["The camera moves over your shoulder, with you to one side of the screen. This glides in, swaps shoulders once and glides back. It uses one of Blizzard's experimental camera settings: trying it agrees to that, and your own camera settings come back after."] = "카메라가 어깨 너머로 이동하고 나는 화면 한쪽에 있습니다. 부드럽게 들어와 어깨를 한 번 바꾸고 돌아갑니다. Blizzard의 실험적 카메라 설정 중 하나를 사용합니다: 테스트하면 동의한 것으로 보며, 끝나면 원래 카메라 설정이 돌아옵니다."
+L["Another addon has the shoulder camera (DynamicCam): the Shoulder Cam stands aside for it."] = "다른 애드온이 어깨 카메라를 사용 중입니다 (DynamicCam): 어깨 카메라가 물러납니다."
+L["Over your shoulder outdoors, off your mount and out of dungeons and raids."] = "야외에서, 탈것에 타지 않고, 던전과 공격대 밖에서 어깨 너머로."
+
+-- Shoulder Cam: the welcome level, its test and Customize choices (ProfileChoices.lua, Welcome.lua, ShowMe.lua)
+L["Cinematic leaves your Edit Mode layout as it is; your personal resource display on, up in fights"] = "Cinematic이 편집 모드 레이아웃을 그대로 둡니다; 개인 자원 표시는 켜지고 전투 중에 표시됩니다"
+
+-- Camera hub: the Special Cams section (Options.lua HUBS)
+L["Special Cams"] = "특수 카메라"
+
+-- Shoulder Cam page: Clear target on Esc while interacting with an NPC
+L["Clear target on Esc while interacting with an NPC"] = "NPC와 상호작용 중 Esc로 대상 해제"
+L["With a talk window open, Escape clears your target and closes the window in the same press, the camera gliding back off them. Off: Escape only closes it, and your target stays."] = "대화 창이 열려 있을 때 Esc 한 번으로 대상을 해제하고 창을 닫으며, 카메라는 그들에게서 부드럽게 돌아옵니다. 꺼짐: Esc는 창만 닫고 대상은 그대로입니다."
