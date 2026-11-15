@@ -9161,29 +9161,6 @@ local function CreateNameStylePanel()
 		end
 	end
 
-	-- Name theme: a whole look in one pick, under All names (NameThemes.lua).
-	-- Follow main theme first: the main theme's own names. The old presets are
-	-- among them (Bold, Subtle; Like the game's names is The game's).
-	stack:Header(content, L["Name theme"])
-	RecordKey(content, "nameTheme")
-	local nameStrip = stack:Add(ns.MakePartThemeStrip(ns.lowHealthKit, content, "name", function() Changed() end), "label")
-	local themeNow = stack:Note(content, "", 460)
-	themeNow.searchSkip = true
-	themeNow.Refresh = function(self)
-		local db = ns.GetDB()
-		local theme = ns.NameThemeNow()
-		local picked = db and db.nameTheme or "main"
-		if picked == "main" then
-			self:SetText(theme and (L["Following the main theme: %s's names."]):format(L[theme.name])
-				or L["Following the main theme: the game's names."])
-		else
-			self:SetText((L["%s, picked here: it stays when the main theme changes."]):format(theme and L[theme.name] or ""))
-		end
-		self:SetTextColor(0.6, 0.6, 0.6)
-	end
-	controls[#controls + 1] = themeNow
-	controls[#controls + 1] = nameStrip
-
 	-- The scene: a name of each kind, spread over the lake, each in its row's
 	-- look (your target bigger, in front).
 	local SCENE_W, SCENE_H = 480, 150
@@ -9220,6 +9197,29 @@ local function CreateNameStylePanel()
 		end
 	end
 	controls[#controls + 1] = scene
+
+	-- Name theme (under the scene): a whole look in one pick, under All names (NameThemes.lua).
+	-- Follow main theme first: the main theme's own names. The old presets are
+	-- among them (Bold, Subtle; Like the game's names is The game's).
+	stack:Header(content, L["Name theme"])
+	RecordKey(content, "nameTheme")
+	local nameStrip = stack:Add(ns.MakePartThemeStrip(ns.lowHealthKit, content, "name", function() Changed() end), "label")
+	local themeNow = stack:Note(content, "", 460)
+	themeNow.searchSkip = true
+	themeNow.Refresh = function(self)
+		local db = ns.GetDB()
+		local theme = ns.NameThemeNow()
+		local picked = db and db.nameTheme or "main"
+		if picked == "main" then
+			self:SetText(theme and (L["Following the main theme: %s's names."]):format(L[theme.name])
+				or L["Following the main theme: the game's names."])
+		else
+			self:SetText((L["%s, picked here: it stays when the main theme changes."]):format(theme and L[theme.name] or ""))
+		end
+		self:SetTextColor(0.6, 0.6, 0.6)
+	end
+	controls[#controls + 1] = themeNow
+	controls[#controls + 1] = nameStrip
 
 	-- Where these names are right now: a warning while they aren't drawn (out
 	-- of CineMode, or in it where plates aren't kept on), a calm line while
@@ -9727,26 +9727,6 @@ do
 			ns.TargetMarksShowRow(Changed) }, L["Nameplate Style"])
 		stack:Continue(showRow, "label")
 
-		-- Plate theme: the bars' look under the rows, in one pick (texture and
-		-- border; names are Name Style's). Follow General first: as plates
-		-- have always been. PlateThemes.lua.
-		stack:Header(content, L["Plate theme"])
-		RecordKey(content, "plateTheme")
-		local plateStrip = stack:Add(ns.MakePartThemeStrip(ns.lowHealthKit, content, "plate", function()
-			if ns.RefreshPlateHealthStyle then ns.RefreshPlateHealthStyle() end
-			Changed()
-		end), "label")
-		local plateThemeNow = stack:Note(content, "", 460)
-		plateThemeNow.searchSkip = true
-		plateThemeNow.Refresh = function(self)
-			local theme = ns.PlateThemeNow()
-			self:SetText(theme and (L["%s, picked here: it stays when the main theme changes."]):format(L[theme.name])
-				or L["Following General: the bar's texture and border as the Style hub's General page has them."])
-			self:SetTextColor(0.6, 0.6, 0.6)
-		end
-		controls[#controls + 1] = plateThemeNow
-		controls[#controls + 1] = plateStrip
-
 		-- The preview, as the Unit Frame Style page's: a scene of plates, one
 		-- for each row of the grid (the first few, Default at the back), each
 		-- drawn as this client's own plates are (its name over the bar,
@@ -10081,6 +10061,26 @@ do
 			RecordKey(content, key)
 			return pick
 		end
+
+		-- Plate theme (under the preview): the bars' look under the rows, in one pick (texture and
+		-- border; names are Name Style's). Follow General first: as plates
+		-- have always been. PlateThemes.lua.
+		stack:Header(content, L["Plate theme"])
+		RecordKey(content, "plateTheme")
+		local plateStrip = stack:Add(ns.MakePartThemeStrip(ns.lowHealthKit, content, "plate", function()
+			if ns.RefreshPlateHealthStyle then ns.RefreshPlateHealthStyle() end
+			Changed()
+		end), "label")
+		local plateThemeNow = stack:Note(content, "", 460)
+		plateThemeNow.searchSkip = true
+		plateThemeNow.Refresh = function(self)
+			local theme = ns.PlateThemeNow()
+			self:SetText(theme and (L["%s, picked here: it stays when the main theme changes."]):format(L[theme.name])
+				or L["Following General: the bar's texture and border as the Style hub's General page has them."])
+			self:SetTextColor(0.6, 0.6, 0.6)
+		end
+		controls[#controls + 1] = plateThemeNow
+		controls[#controls + 1] = plateStrip
 
 		-- The grid: a line for each row in the order a plate tries them, its
 		-- mark's preview, name and what's set apart from the usual (chips);
