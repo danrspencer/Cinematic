@@ -851,6 +851,9 @@ function ns.CreateTintStylePanel(kit)
 	end
 	local function ChangedPlaces()
 		local db, list, listed = ns.GetDB(), {}, {}
+		-- (The menu is first built with the page, before the saved settings
+		-- are loaded: nothing changed yet then. It errored each login.)
+		if not db then return list end
 		for _, source in ipairs({ db.zoneTints or {}, db.zoneTintStrength or {}, db.zonePresets or {} }) do
 			for zone in pairs(source) do
 				if not listed[zone] then
