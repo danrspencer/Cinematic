@@ -9651,6 +9651,9 @@ do
 		for _, group in pairs(ns.COOLDOWN_CENTER_BARS) do
 			on = on or ns.CooldownGroupCentered(group)
 		end
+		-- (An addon laying the bars' icons out itself, EllesmereUI's cooldown
+		-- manager: ours moved them off its spots, spread out and to the right.)
+		if on and ns.FeatureYieldedTo("cooldownCenter") then on = false end
 		if not on and not next(putAt) then return end
 		if on then HookBars() end
 		wipe(wanted)
@@ -9706,9 +9709,9 @@ do
 			return type(value) == "number" and ("%.1f"):format(value) or tostring(value)
 		end
 		local editMode = _G.EditModeManagerFrame
-		ns.Print(("close the gaps: edit mode %s, in combat %s"):format(
+		ns.Print(("close the gaps: edit mode %s, in combat %s, left to %s"):format(
 			tostring(editMode and editMode.IsEditModeActive and ns.Flag(editMode:IsEditModeActive()) or false),
-			tostring(InCombatLockdown())))
+			tostring(InCombatLockdown()), tostring(ns.FeatureYieldedTo("cooldownCenter") or "nobody")))
 		for bar, group in pairs(ns.COOLDOWN_CENTER_BARS) do
 			local viewer = _G[bar]
 			local geometry = "?"

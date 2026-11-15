@@ -102,14 +102,6 @@ for _, known in ipairs({
 		patterns = { "^ECME_CDMBar_" },
 	},
 	{
-		key = "euiResourceBars", from = "euiResource", addon = "EllesmereUIResourceBars",
-		label = "EllesmereUI Resource Bars", short = "EllesmereUI resource bars",
-		about = L["its health and power bars"],
-		note = L["Its cast bar isn't faded, like the game's. Its swing timer is the Swing timer row on " ..
-			"the HUD page."],
-		names = { "EllesmereUIResourceBarsFrame" },
-	},
-	{
 		key = "euiTotemBar", from = "euiResource", addon = "EllesmereUIResourceBars",
 		label = "EllesmereUI Totem Bar", short = "EllesmereUI totem bar",
 		about = L["its totem bar"],
@@ -502,8 +494,36 @@ ns.WhenAddonLoads("EllesmereUIQuestTracker", function()
 	end)
 end)
 
+-- Its cooldown manager pins the game's Essential and Utility bars onto its own
+-- and places their icons itself, with its own spacing: the Cooldown Manager
+-- page's Close the gaps stands aside (moving them spread them out and off
+-- to the right).
+ns.AddFeatureYield("cooldownCenter", function()
+	local isLoaded = C_AddOns and C_AddOns.IsAddOnLoaded or IsAddOnLoaded
+	return isLoaded("EllesmereUICooldownManager") and "EllesmereUI" or nil
+end)
+
+-- Its resource bars ("Main Resources" on WoW Forever) stand in for the
+-- personal bars, so they follow those rows on the HUD page, as its unit
+-- frames do theirs: its health bar the personal health bar, its power bar
+-- and class resource the personal resource bar. (Till 2026-11-14 they were
+-- one row of their own here, which started on Always when it was installed
+-- after Cinematic: they never faded, and taking no mouse, /cine add couldn't
+-- find them.) The bars sit in its 1x1 holder, never faded itself.
+table.insert(ns.ADDON_NOTES, {
+	addon = "EllesmereUIResourceBars", label = "Resource Bars",
+	works = L["Follow the HUD page's rows"],
+	about = L["Its health bar fades with the Personal health bar row on the HUD page, its power bar and " ..
+		"class resource with Personal resource bar, and its swing timer with Swing timer. Its cast bar " ..
+		"isn't faded, like the game's."],
+})
+
 ns.WhenAddonLoads("EllesmereUIResourceBars", function()
-	ns.FadeWithRows({ { "swing", "swing", "ERB_SwingTimerFrame" } })
+	ns.FadeWithRows({
+		{ "prd", "prd", "ERB_HealthBar" },
+		{ "prdpower", "prdpower", "ERB_PrimaryBar", "ERB_SecondaryFrame" },
+		{ "swing", "swing", "ERB_SwingTimerFrame" },
+	})
 end)
 
 -- It moves the map out of the cluster and keeps the cluster at alpha 0, and
