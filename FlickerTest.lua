@@ -15,7 +15,7 @@ local SHOT_EVERY = 5    -- seconds between screenshots
 local KEYS = { "personalResources", "prHealthPlayer", "prPowerPlayer", "prFadeRange", "prAlphaPlayer",
 	"notFullAfterFight", "fightWaitPortrait" }
 local PLAYER_FRAMES = { PlayerFrame = true, ElvUF_Player = true, DaylightUIFrame_player = true,
-	EllesmereUIUnitFrames_Player = true }
+	EllesmereUIUnitFrames_Player = true, FlareUI_UF_Player = true }
 
 local run
 local function Log(text) ns.Log("flickertest", text) end

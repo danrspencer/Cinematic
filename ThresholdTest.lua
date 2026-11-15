@@ -15,6 +15,7 @@ local TOLERANCE = 0.08
 local WATCH = {
 	PlayerFrame = "portraitWhenNotFull", ElvUF_Player = "portraitWhenNotFull",
 	DaylightUIFrame_player = "portraitWhenNotFull", EllesmereUIUnitFrames_Player = "portraitWhenNotFull",
+	FlareUI_UF_Player = "portraitWhenNotFull",
 	PetFrame = false,
 	PersonalResourceDisplayFrame = "prdWhenNotFull", CinematicPersonalResource = "prdWhenNotFull",
 	CinematicPersonalPower = "prdWhenNotFull", CinematicPersonalMana = "prdWhenNotFull",
@@ -25,7 +26,8 @@ local KEYS = { "personalResources", "prHealthPlayer", "prPowerPlayer", "prPetHea
 
 local run
 -- The player frames: the game's and other addons' (whichever is drawn is checked).
-local PLAYER_FRAMES = { "PlayerFrame", "ElvUF_Player", "DaylightUIFrame_player", "EllesmereUIUnitFrames_Player" }
+local PLAYER_FRAMES = { "PlayerFrame", "ElvUF_Player", "DaylightUIFrame_player", "EllesmereUIUnitFrames_Player",
+	"FlareUI_UF_Player" }
 local function PlayerWants(alpha)
 	local want = {}
 	for _, name in ipairs(PLAYER_FRAMES) do want[name] = alpha end

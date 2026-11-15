@@ -54,6 +54,14 @@ local FOLLOWED = {
 
 ns.WhenAddonLoads("FlareUI", function()
 	ns.FadeWithRows(ROWS)
+	-- Kept up by the Health & Resources page like the game's frames (Show
+	-- below, Opacity while hidden...): before, its player frame stayed faded
+	-- after a fall or a fight, as only its HUD row's ticks counted.
+	ns.AddPortraitFrame("FlareUI_UF_Player")
+	ns.AddPetFrame("FlareUI_UF_Pet")
+	ns.AddPortraitFrame("FlareUI_Resource_health", true)
+	ns.AddPortraitFrame("FlareUI_Resource_power", true)
+	ns.AddPortraitFrame("FlareUI_Resource_mana", true)
 	-- Its XP bar stops taking the mouse when faded below 5% (its own SetAlpha
 	-- hook), so the mouse never lands on it: hovered by its rect instead.
 	ns.HOVER_BY_RECT.FlareUI_XPBar = true

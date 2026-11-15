@@ -3139,7 +3139,7 @@ watcher:SetScript("OnEvent", function(_, event, unit)
 	end
 	-- (A new plate's name starts hidden: see sight.)
 	if event == "NAME_PLATE_UNIT_ADDED" then
-		sight[plate] = 0
+		sight[plate] = not ns.namesTestNoSight and 0 or nil -- (the names test's no sight check step: shown)
 		if _G.QuestieLoader then
 			ns.FindQuestieIconSoon(plate)
 		end
@@ -3246,7 +3246,9 @@ ns.SetOnUpdate(farWatch, ns.Profiled("Plate names", function(self, elapsed)
 	for plate in pairs(nameShare) do
 		local level = sight[plate] or 1
 		local okAlpha, alpha = pcall(plate.GetAlpha, plate)
-		local dimmed = (bodyShare[plate] or 1) < 0.5 and okAlpha and Known(alpha) and alpha < 0.99
+		-- (The names test's no sight check step: never dimmed. NamesTest.lua.)
+		local dimmed = not ns.namesTestNoSight and (bodyShare[plate] or 1) < 0.5 and okAlpha and Known(alpha)
+			and alpha < 0.99
 		if dimmed then
 			dimSince[plate], clearSince[plate] = dimSince[plate] or now, nil
 		else
@@ -3286,6 +3288,21 @@ end))
 
 function ns.WatchFarNames()
 	farWatch:Show()
+end
+
+-- For the names test (NamesTest.lua): a plate's own alpha as the game has it
+-- (dimmed: out of sight, or so the sight check takes it), how far its name
+-- shows by that check, how long it's been dimmed, and our own name text;
+-- and whether that text shows.
+function ns.DescribePlateSight(plate)
+	local okAlpha, alpha = pcall(plate.GetAlpha, plate)
+	local text = plate.UnitFrame and texts[plate.UnitFrame]
+	local since = dimSince[plate]
+	return ("plateAlpha %s, sight %s, dimmed for %s, name share %s, body share %s, our text %s"):format(
+		okAlpha and Known(alpha) and ("%.2f"):format(alpha) or "?", tostring(sight[plate] or "clear"),
+		since and ("%.1fs"):format(GetTime() - since) or "no", tostring(nameShare[plate]), tostring(bodyShare[plate]),
+		text and (text:IsShown() and ("a%.2f"):format(text:GetAlpha()) or "hidden") or "none"),
+		text and text:IsVisible() and text:GetEffectiveAlpha() > 0.05 or false
 end
 
 -- Health fill: a plate's fill follows its unit's health as it changes.

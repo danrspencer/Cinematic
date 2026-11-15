@@ -7,12 +7,20 @@
 -- saved by us, which of our sets holds it) and each plate up now (kind,
 -- distance, plate and name shown/alpha).
 --   1 as is:       Cinematic running as it is now;
---   2 paused:      Cinematic stopped (ns.Suspend, every setting of ours put
---                  back), through step 4, started again as the test ends:
+--   2 no sight:    Cinematic running, its sight check off (PlateParts.lua's
+--                  sight: a name-only plate's name hides while the game dims
+--                  its plate, and a new plate's starts hidden till it's
+--                  clear). If the game also dims plates by distance, the
+--                  band past ~28 yards has plates (so no game names) and no
+--                  names of ours: do they come up in this step?
+--   3 paused:      Cinematic stopped (ns.Suspend, every setting of ours put
+--                  back), through step 5, started again as the test ends:
 --                  do the far names come back?
---   3 plates off:  friendly nameplates switched off for the step;
---   4 plates on:   friendly nameplates switched on for the step.
--- 3 and 4 show the game's own rule: a unit with a plate loses its name over
+--   4 plates off:  friendly nameplates switched off for the step;
+--   5 plates on:   friendly nameplates switched on for the step.
+-- Each plate's line has its own alpha, sight and our text (2nd report,
+-- Ironforge 2026-11-14: near names ours, far ones the game's, a band of
+-- none between, 9 friendly plates up showing only names). 4 and 5 show the game's own rule: a unit with a plate loses its name over
 -- its head. The settings are put back after each. Into its own saved list,
 -- CinematicDB.namesTestLog. Dev copy only (CinematicDev.toc).
 local _, ns = ...
@@ -33,6 +41,7 @@ local FALLBACK = { "UnitNameOwn", "UnitNameNPC", "UnitNameHostleNPC", "UnitNameI
 
 local STEPS = {
 	{ key = "as is", say = "%d/%d: AS IS. Don't move. Screenshot in %d sec." },
+	{ key = "no sight", say = "%d/%d: Cinematic's SIGHT CHECK OFF for this step. Don't move. Screenshot in %d sec." },
 	{ key = "paused", say = "%d/%d: Cinematic PAUSED (a red chat line says so, it starts again after). " ..
 		"Don't move. Screenshot in %d sec." },
 	{ key = "plates off", say = "%d/%d: Friendly NAMEPLATES OFF for this step. Don't move. Screenshot in %d sec." },
@@ -174,11 +183,15 @@ local function LogPlates()
 			local name = frame and frame.name
 			local alpha = name and Call(name.GetEffectiveAlpha, name)
 			alpha = type(alpha) == "number" and not (issecretvalue and issecretvalue(alpha)) and alpha or 1
-			local nameShown = name and Call(name.IsVisible, name) == true and alpha > 0.05
+			-- (Ours counts too: the game's own sits at 0 under it, PlateParts.lua.)
+			local okSight, sightInfo, ours = false, nil, false
+			if ns.DescribePlateSight then okSight, sightInfo, ours = pcall(ns.DescribePlateSight, plate) end
+			local nameShown = name and Call(name.IsVisible, name) == true and alpha > 0.05 or (okSight and ours)
 			if nameShown then named = named + 1 end
-			Say(("    %d: %s, %s, plate %s, name %s, bar %s"):format(i,
+			Say(("    %d: %s, %s, plate %s, name %s, bar %s | %s"):format(i,
 				unit and Kind(unit) or "no unit", unit and Distance(unit) or "?", Visible(plate), Visible(name),
-				Visible(frame and (frame.healthBar or (frame.HealthBarsContainer and frame.HealthBarsContainer.healthBar)))))
+				Visible(frame and (frame.healthBar or (frame.HealthBarsContainer and frame.HealthBarsContainer.healthBar))),
+				okSight and tostring(sightInfo) or "no sight info"))
 		end
 	end
 	return named, total
@@ -199,8 +212,8 @@ local function SetCVars(names, value)
 	end
 end
 
--- Steps 2 to 4 run with Cinematic stopped, started again as the test ends:
--- 3 and 4 only ask the game, and with CineMode holding the plate settings
+-- Steps 3 to 5 run with Cinematic stopped, started again as the test ends:
+-- 4 and 5 only ask the game, and with CineMode holding the plate settings
 -- it saved the test's 0 as yours (2026-11-14 run: friendly plates saved 0).
 local function Pause(why)
 	if ns.Suspend and not (ns.IsSuspended and ns.IsSuspended()) then
@@ -210,13 +223,17 @@ local function Pause(why)
 end
 local APPLY = {
 	["as is"] = function() return nil end,
-	["paused"] = function() Pause("names test, step 2") end,
+	["no sight"] = function()
+		ns.namesTestNoSight = true
+		return function() ns.namesTestNoSight = nil end
+	end,
+	["paused"] = function() Pause("names test, step 3") end,
 	["plates off"] = function()
-		Pause("names test, step 3")
+		Pause("names test, step 4")
 		return SetCVars(FRIEND_PLATES, "0")
 	end,
 	["plates on"] = function()
-		Pause("names test, step 4")
+		Pause("names test, step 5")
 		return SetCVars(FRIEND_PLATES, "1")
 	end,
 }

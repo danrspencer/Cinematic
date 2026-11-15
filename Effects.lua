@@ -3740,8 +3740,11 @@ function ns.PlatesReport()
 		local unit = plate.namePlateUnitToken or (plate.UnitFrame and plate.UnitFrame.unit)
 		local kind = type(unit) == "string" and PlateKind(unit)
 		if (kind == "Friends" or kind == "FriendlyMinions") and plate ~= PersonalPlate() then
-			local body, name = PlateAlphas(unit, plate)
-			if (body or 0) > 0.05 or (name or 0) > 0.05 then
+			-- (PlateAlphas gives the whole plate's alpha, then the body's and
+			-- the name's shares of it: a hidden plate's body share is 1.)
+			local alpha, bodyShare, nameShare = PlateAlphas(unit, plate)
+			local body, name = (alpha or 0) * (bodyShare or 0), (alpha or 0) * (nameShare or 0)
+			if body > 0.05 or name > 0.05 then
 				shown = shown + 1
 				if shown <= 12 then
 					local rows = {}
