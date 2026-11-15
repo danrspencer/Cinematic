@@ -406,7 +406,7 @@ read_globals = {
 	"FACTION_STANDING_INCREASED",
 	"FACTION_STANDING_LABEL8", "FACTION_STANDING_LABEL8_FEMALE",
 	-- QuestTalk.lua
-	"AcceptQuest", "DeclineQuest", "CloseQuest", "CompleteQuest", "GetQuestReward", "GetQuestID", "GetActiveQuestID", "QuestIsDaily", "QuestIsWeekly",
+	"AcceptQuest", "DeclineQuest", "CloseQuest", "CloseMerchant", "CloseTrainer", "CloseBankFrame", "CloseGuildBankFrame", "CloseTaxiMap", "CloseMail", "C_AuctionHouse", "CloseAuctionHouse", "ClosePetStables", "CompleteQuest", "GetQuestReward", "GetQuestID", "GetActiveQuestID", "QuestIsDaily", "QuestIsWeekly",
 	"GetTitleText", "GetQuestText", "GetObjectiveText", "GetProgressText", "GetRewardText", "GetGreetingText",
 	"GetNumQuestChoices", "GetNumQuestItems", "GetNumQuestRewards", "GetQuestItemInfo", "GetQuestMoneyToGet",
 	"GetRewardMoney", "GetRewardXP", "IsQuestCompletable", "GetNumActiveQuests", "GetNumAvailableQuests",

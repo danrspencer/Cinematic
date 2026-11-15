@@ -883,9 +883,49 @@ local function FadeGameWindow(frame)
 		if alpha <= 0 then ns.SetOnUpdate(gameEsc, nil) end
 	end)
 end
+-- The other NPC windows (user, 2026-11-15: "vendor NPCs and any others"):
+-- Escape with a target clears it and closes the window at once, through the
+-- game's own close call (as its X does; never HideUIPanel, which taints).
+-- No hold for the glide back: a vendor or bank held open unseen would still
+-- take a bag click (see closing, above). The frame's name, then its close.
+gameEsc.OTHER = {
+	{ "MerchantFrame", function() CloseMerchant() end },
+	{ "ClassTrainerFrame", function() CloseTrainer() end },
+	{ "BankFrame", function() CloseBankFrame() end },
+	{ "GuildBankFrame", function() CloseGuildBankFrame() end },
+	{ "TaxiFrame", function() CloseTaxiMap() end },
+	{ "FlightMapFrame", function() CloseTaxiMap() end },
+	{ "MailFrame", function() CloseMail() end },
+	{ "AuctionHouseFrame", function() C_AuctionHouse.CloseAuctionHouse() end },
+	{ "AuctionFrame", function() CloseAuctionHouse() end },
+	{ "PetStableFrame", function() ClosePetStables() end },
+	{ "StableFrame", function() ClosePetStables() end },
+}
+function gameEsc.OtherWindow()
+	for _, entry in ipairs(gameEsc.OTHER) do
+		local frame = _G[entry[1]]
+		if frame and ns.Flag(frame:IsShown()) then return frame, entry[1], entry[2] end
+	end
+end
+-- (A popup up over it, "Sell this?" and the like: Escape's the game's, for the popup.)
+function gameEsc.PopupUp()
+	for i = 1, 4 do
+		local popup = _G["StaticPopup" .. i]
+		if popup and ns.Flag(popup:IsShown()) then return true end
+	end
+	return false
+end
 gameEsc:SetScript("PostClick", function()
 	local frame, kind = GameTalkWindow()
-	if not frame then return end
+	if not frame then
+		local other, name, close = gameEsc.OtherWindow()
+		if other then
+			ns.Log("shoulder", ("escape: target cleared, closing the game's %s"):format(name))
+			local ok, err = pcall(close)
+			if not ok then ns.Log("shoulder", ("escape: closing %s failed: %s"):format(name, tostring(err))) end
+		end
+		return
+	end
 	ns.Log("shoulder", ("escape: the game's %s window, closing after the glide back"):format(kind))
 	if kind == "gossip" then
 		ns.ShoulderTalkClose("CloseGossip", C_GossipInfo and C_GossipInfo.CloseGossip or _G.CloseGossip)
@@ -913,17 +953,29 @@ end
 -- (Every frame from the poller, and as the Shoulder Cam's applied: out of fights only.)
 local function SyncGameEscape()
 	if InCombatLockdown() then return end
-	local want = ShoulderOn() and TalkOn() and talk.on and GameTalkWindow() ~= nil
-		and not (ns.QuestTalkActive and ns.QuestTalkActive()) and true or false
+	-- want: "talk" (gossip or quest text: the glide back), "other" (a vendor,
+	-- trainer, bank...: only with the tick on and a target to clear), or false.
+	local want = false
+	if ShoulderOn() and TalkOn() and talk.on and not (ns.QuestTalkActive and ns.QuestTalkActive()) then
+		if GameTalkWindow() ~= nil then
+			want = "talk"
+		elseif ns.Setting("shoulderCamEscTarget") and gameEsc.OtherWindow() ~= nil and not gameEsc.PopupUp()
+			and ns.Flag(UnitExists("target")) then
+			want = "other"
+		end
+	end
 	if want == gameEsc.bound then return end
 	gameEsc.bound = want
 	if want then
-		gameEsc:SetAttribute("macrotext", ns.Setting("shoulderCamEscTarget") and "/cleartarget" or "")
+		gameEsc:SetAttribute("macrotext",
+			(want == "other" or ns.Setting("shoulderCamEscTarget")) and "/cleartarget" or "")
 		SetOverrideBindingClick(gameEsc, true, "ESCAPE", gameEsc:GetName())
 	else
 		ClearOverrideBindings(gameEsc)
 	end
-	ns.Log("shoulder", want and "escape: bound for the game's talk window" or "escape: back to the game's")
+	ns.Log("shoulder", want == "talk" and "escape: bound for the game's talk window"
+		or want == "other" and "escape: bound for the game's NPC window (clears your target)"
+		or "escape: back to the game's")
 end
 gameEsc.Sync = SyncGameEscape -- (its PLAYER_REGEN_ENABLED, above)
 
@@ -1958,8 +2010,9 @@ function ns.CreateShoulderCamPanel(kit)
 	local function IfTalk() return ns.PageSetting("shoulderCam") and ns.GetDB().shoulderCamTalkTurn end
 	-- (Under it: Escape in a talk window, the game's or Cinematic's own, 2026-11-15.)
 	local escTarget = stack:Add(kit.Check(content, "shoulderCamEscTarget", L["Clear target on Esc while interacting with an NPC"],
-		L["With a talk window open, Escape clears your target and closes the window in the same press, the " ..
-		"camera gliding back off them. Off: Escape only closes it, and your target stays."]), "check", 16)
+		L["With an NPC's window open (talk, vendor, trainer, banker, flight master, auctioneer, stable master)," ..
+		"Escape clears your target and closes the window in the same press. Off: Escape only closes it, and " ..
+		"your target stays."]), "check", 16)
 	kit.GreyUnless(escTarget, IfTalk)
 	-- Turn to your target: a Show in row, its box before the name (on at all),
 	-- Combat and the places after (where it turns).
