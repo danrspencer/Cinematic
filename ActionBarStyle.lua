@@ -978,17 +978,27 @@ function ns.CreateActionBarStylePanel(kit)
 			{ abEdge = "colored", abShape = "square" } },
 	}, PRESET_KEYS)
 
+	-- The look, on the page itself (the Style pages' template, StylePages.lua's
+	-- rows.Look, inline): Icon (the buttons' shape, empty slots) and Border
+	-- (the outline round each button).
 	stack:Header(content, L["Look"])
-	rows.Border(L["Outline:"], "abEdge", { game = true, colored = L["Class color"] },
-		L["The line around each button. Thin and Thick are black. With the game's shape only the game's outline " ..
-		"fits, so any other outline makes the buttons square."])
-	rows.Choices(L["Shape:"], "abShape", {
-		{ "game", L["The game's"] },
-		{ "square", L["Square"], L["Square icons with their edges trimmed."] },
-		{ "round", L["Round"], L["Round icons, with the cooldown sweep and the highlights round too."] },
+	rows.Look("", L["Action buttons"], {
+		inline = true,
+		tabs = { default = function(key) return ns.DEFAULTS[key] end, source = ns.PageLookSource,
+			copyKind = "actionLook", copyName = L["Action buttons"] },
+		icon = function(look)
+			look.Choices(L["Shape:"], "abShape", {
+				{ "game", L["The game's"] },
+				{ "square", L["Square"], L["Square icons with their edges trimmed."] },
+				{ "round", L["Round"], L["Round icons, with the cooldown sweep and the highlights round too."] },
+			})
+			look.Check("abSlots", L["Empty slot background"], L["The game's background on empty action slots. Off: " ..
+				"only empty space shows there. Classic clients draw part of it on the bar's art, which stays."])
+		end,
+		border = { "abEdge", L["The line around each button. Thin and Thick are black. With the game's shape only " ..
+			"the game's outline fits, so any other outline makes the buttons square."], label = L["Outline:"],
+			opts = { game = true, colored = L["Class color"] } },
 	})
-	rows.Check("abSlots", L["Empty slot background"], L["The game's background on empty action slots. Off: only " ..
-		"empty space shows there. Classic clients draw part of it on the bar's art, which stays."])
 
 	canvas:SetScript("OnShow", kit.PageShown(kit.Refresh, content))
 	canvas:Hide()

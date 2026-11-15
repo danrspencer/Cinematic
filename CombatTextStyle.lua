@@ -836,22 +836,31 @@ function ns.CreateCombatTextStylePanel(kit)
 		L["Fire orange, frost blue, nature green and so on. Off: spells in the game's yellow, swings in white."],
 		Ours)
 
+	-- The numbers' look, on the page itself (the Style pages' template,
+	-- StylePages.lua's rows.Look, inline): their font, size, edge and height.
 	stack:Header(content, L["Look"])
-	rows.Font("combatTextFont", L["The numbers' font. The game's: the one it draws its own floating text in."],
-		Ours) -- (its list starts with The game's: "game")
-	rows.Dropdown(L["Edge:"], "combatTextEdge", function()
-		return {
-			{ value = "game", text = L["The game's (a drop shadow)"] },
-			{ value = "both", text = L["Dark edge and drop shadow"] },
-			{ value = "edge", text = L["Dark edge"] },
-			{ value = "none", text = L["None"] },
-		}
-	end, L["What's behind the numbers so they read against the world. The game's: a dark shadow up and " ..
-		"to the right, no edge."], Ours)
-	rows.Slider("combatTextSize", L["Size"], 50, 200, 5, "%d%%", 100,
-		L["How big the numbers are, next to the game's."], Ours)
-	rows.Slider("combatTextHeight", L["Height"], -40, 80, 2, "%d px", nil,
-		L["Moves the numbers up (or down) from where the game's start: level with the nameplate's name."], Ours)
+	rows.Look("", L["Our numbers"], {
+		inline = true,
+		tabs = { default = function(key) return ns.DEFAULTS[key] end, source = ns.PageLookSource,
+			copyKind = "combatTextLook", copyName = L["Our numbers"] },
+		font = { "combatTextFont", L["The numbers' font. The game's: the one it draws its own floating text in."],
+			test = Ours }, -- (its list starts with The game's: "game")
+		textSize = function(look)
+			look.Slider("combatTextSize", L["Size"], 50, 200, 5, "%d%%", 100,
+				L["How big the numbers are, next to the game's."], Ours)
+			look.Slider("combatTextHeight", L["Height"], -40, 80, 2, "%d px", nil,
+				L["Moves the numbers up (or down) from where the game's start: level with the nameplate's name."], Ours)
+		end,
+		shadow = function(look)
+			look.Choices(L["Edge:"], "combatTextEdge", {
+				{ "game", L["The game's"], L["A dark shadow up and to the right, no edge."] },
+				{ "both", L["Edge and shadow"], L["A dark edge and the drop shadow."] },
+				{ "edge", L["Dark edge"] },
+				{ "none", L["None"] },
+			}, Ours)
+		end,
+		textColor = false, outline = false, outlineColor = false, -- (their colors: by school; the edge, above)
+	})
 
 	stack:Header(content, L["The game's floating text"])
 	rows.Check("combatTextHideGame", L["Turn off the game's damage and healing numbers"],
