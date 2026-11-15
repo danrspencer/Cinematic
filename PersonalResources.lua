@@ -9,33 +9,52 @@
 -- goes by their change events: they keep firing while either regenerates or
 -- drains, and stop once it's back at rest.
 
-local _, ns = ...
+local ADDON_NAME, ns = ...
 local L = ns.L
 
 local DEFAULTS = ns.DEFAULTS
 DEFAULTS.personalResources = true   -- the page's switch: off, none of the below works
-DEFAULTS.fightWaitPower = true      -- the resource bar waits for your power to change at a fight's start
-DEFAULTS.fightWaitHealth = false    -- ...the health bar for your health
-DEFAULTS.fightWaitPortrait = false  -- ...the player frame for either
-DEFAULTS.fightWaitMana = true       -- ...our mana bar for your mana
+DEFAULTS.fightWaitPull = true       -- Wait at pull: each bar waits for what it shows to change at a fight's start
 DEFAULTS.drainWhenNotEmpty = true   -- "not full" also waits for rage, runic power and the like to drain to 0
-DEFAULTS.notFullAfterFight = false  -- "not full" counts only within the Calm Timer of a fight (or a fall, resurrecting)
--- Show below, by row: kept up while its health or power is under this share
--- (0: never; 0.99: while it isn't full; 1: always). (An addon's power bar:
--- by addon, its support file.)
-DEFAULTS.prHealthPlayer = 0.99      -- the player frame, health
-DEFAULTS.prPowerPlayer = 0.99       -- ...power
-DEFAULTS.prPetHealth = 0            -- the pet frame, its health
-DEFAULTS.prHealthPrd = 0.99         -- the personal health bar
-DEFAULTS.prPowerPrd = 0.99          -- the personal power bar
-DEFAULTS.prPowerMana = 0.99         -- the Cine Mana Bar, your mana
-DEFAULTS.prFadeRange = 0            -- ...fading in over this much above a share under 99% (0: all at once)
--- How much of each still shows while CineMode hides it (0: none).
-DEFAULTS.prAlphaPlayer = 0          -- the player frame
-DEFAULTS.prAlphaPet = 0             -- the pet frame
-DEFAULTS.prAlphaPrd = 0             -- the personal health bar
-DEFAULTS.prAlphaPrdPower = 0        -- the personal power bar
-DEFAULTS.prAlphaMana = 0            -- the Cine Mana Bar
+-- Keep up, by row: kept up while its health or power is under a share, one
+-- per column: In combat (the key itself), After combat (key .. "Calm": the
+-- Calm Timer after a fight, a fall, Life Tap or resurrecting) and Out of
+-- combat (key .. "Always": neither; named so before 2026-11-15, when it
+-- counted any time). One column at a time. 0: never; 0.99: while it isn't
+-- full; 1: always. A column linked (key .. "LinkCalm", key .. "LinkAlways"; nil:
+-- linked) goes by the one to its left. (An addon's power bar: by addon, its
+-- support file.)
+-- (A row's three columns, and their links: linked where they match.)
+function ns.KeepUpDefaults(key, combat, calm, always)
+	if calm == nil then calm = combat end
+	if always == nil then always = calm end
+	DEFAULTS[key], DEFAULTS[key .. "Calm"], DEFAULTS[key .. "Always"] = combat, calm, always
+	DEFAULTS[key .. "LinkCalm"], DEFAULTS[key .. "LinkAlways"] = calm == combat, always == calm
+end
+-- (A profile's: a row's three columns through its set, linked where they match.)
+function ns.SetKeepUp(set, key, combat, calm, always)
+	if calm == nil then calm = combat end
+	if always == nil then always = calm end
+	set(key, combat)
+	set(key .. "Calm", calm)
+	set(key .. "Always", always)
+	set(key .. "LinkCalm", calm == combat)
+	set(key .. "LinkAlways", always == calm)
+end
+-- Every profile's rows (user's pick, 2026-11-15): always in fights, while not
+-- full after combat, and out of combat under 95% (health) or 50% (power).
+ns.KEEP_UP_HEALTH = { 1, 0.99, 0.95 }
+ns.KEEP_UP_POWER = { 1, 0.99, 0.5 }
+ns.KeepUpDefaults("prHealthPlayer", unpack(ns.KEEP_UP_HEALTH)) -- the player frame, health
+ns.KeepUpDefaults("prPowerPlayer", unpack(ns.KEEP_UP_POWER))   -- ...power
+ns.KeepUpDefaults("prPetHealth", unpack(ns.KEEP_UP_POWER))     -- the pet frame, its health (50% out of combat)
+ns.KeepUpDefaults("prHealthPrd", unpack(ns.KEEP_UP_HEALTH))    -- the personal health bar (as the player frame's)
+ns.KeepUpDefaults("prPowerPrd", unpack(ns.KEEP_UP_POWER))      -- the personal power bar
+ns.KeepUpDefaults("prPowerMana", unpack(ns.KEEP_UP_POWER))     -- the Cine Mana Bar, your mana
+-- (Other addons' power bars, their support files' rows, loaded before this: as ours.)
+for _, bar in ipairs(ns.ADDON_POWER_ROWS or {}) do
+	ns.KeepUpDefaults("prPower" .. bar.addon, unpack(ns.KEEP_UP_POWER))
+end
 DEFAULTS.prdMana = true             -- a mana bar of ours under them, when mana isn't your power (PersonalMana.lua)
 DEFAULTS.prdManaRecent = 3          -- ...only for this many seconds after you use mana (0: always)
 
@@ -83,13 +102,14 @@ local function RestedNow(kind, now)
 end
 
 -- A row (Standard Frames' player, prd, prdpower) to hold back from the fight
--- now: its setting is on and what it shows has been at rest since the fight
--- started. Out of a fight (casting at an enemy, the pull), while it's at rest now.
+-- now: Wait at pull is on (one for every row since 2026-11-15) and what it
+-- shows has been at rest since the fight started. Out of a fight (casting at
+-- an enemy, the pull), while it's at rest now.
 local ROW_WAIT = {
-	player = { "fightWaitPortrait", "health", "power" },
-	prd = { "fightWaitHealth", "health" },
-	prdpower = { "fightWaitPower", "power" },
-	prdmana = { "fightWaitMana", "mana" },
+	player = { "fightWaitPull", "health", "power" },
+	prd = { "fightWaitPull", "health" },
+	prdpower = { "fightWaitPull", "power" },
+	prdmana = { "fightWaitPull", "mana" },
 }
 function ns.FightHold(row)
 	local wait = ROW_WAIT[row]
@@ -111,11 +131,10 @@ local function Readable(value)
 	return type(value) == "number" and not (issecretvalue and issecretvalue(value))
 end
 
--- Show below, by row: a share of health or power (0-1). 0: never kept up by
+-- Keep up, by row: a share of health or power (0-1). 0: never kept up by
 -- it; 100%: always; 99% (NOT_FULL) and up: while it isn't full at all (rage
--- and the like: until drained, Rage counts until 0), only after fights with
--- Not full: only during Calm Timer, held back at the pull by Wait at pull;
--- under that: while it's under the share, any time.
+-- and the like: until drained, Rage counts until 0); under that: while it's
+-- under the share. Held back at the pull by Wait at pull.
 local NOT_FULL = 0.99
 local function Rule(value)
 	value = tonumber(value) or 0
@@ -125,6 +144,35 @@ local function Rule(value)
 	return "below"
 end
 ns.PR_NOT_FULL = NOT_FULL
+
+-- A row's columns: 1 In combat, 2 After combat, 3 Out of combat. The setting a
+-- column goes by: its own, or (linked) the one to its left's.
+local COLUMN_SUFFIX = { "", "Calm", "Always" }
+local LINK_SUFFIX = { nil, "LinkCalm", "LinkAlways" }
+local function ColumnKey(db, key, col)
+	if col == 3 and db[key .. "LinkAlways"] ~= false then col = 2 end
+	if col == 2 and db[key .. "LinkCalm"] ~= false then col = 1 end
+	return key .. COLUMN_SUFFIX[col]
+end
+local function ColumnShare(db, key, col)
+	return tonumber(db[ColumnKey(db, key, col)]) or 0
+end
+ns.PrColumnKey, ns.PrColumnShare = ColumnKey, ColumnShare
+ns.PR_COLUMN_SUFFIX, ns.PR_LINK_SUFFIX = COLUMN_SUFFIX, LINK_SUFFIX
+-- In a fight now, and in the after-combat window (Frames.lua's
+-- ns.AfterFightCause), for the passes that aren't told.
+local function PhaseNow()
+	local fighting = InCombatLockdown() or ns.Flag(UnitAffectingCombat("player"))
+	return fighting, not fighting and ns.AfterFightCause ~= nil and ns.AfterFightCause() ~= nil
+end
+-- A row's share now (nil: no such key): its column for now's, In combat
+-- in a fight, After combat after one, else Out of combat. Also which
+-- column.
+local function ShareNow(db, key, fighting, afterFight)
+	if not key then return nil end
+	local col = fighting and 1 or afterFight and 2 or 3
+	return ColumnShare(db, key, col), col
+end
 
 -- A share of a number and its max. nil: secret (or no max).
 local function Share(value, max)
@@ -259,10 +307,10 @@ end
 -- the guess comes and goes between them (up 3 seconds after each change),
 -- so a frame not full but not regenerating (a ghost, slow ticks) flickered
 -- up and down. Not the PRD's stand-in nor frames an addon's alpha hook
--- breaks on (NO_SECRET_ALPHA), nor with Not full: only during Calm Timer
--- (the curve can't tell a fight's aftermath).
-local function HealthNotFullByCurve(db, entry)
-	return not db.notFullAfterFight and UnitHealthPercent ~= nil and not HealthShare("player")
+-- breaks on (NO_SECRET_ALPHA). (Only while its column for now says so:
+-- each pass asks again.)
+local function HealthNotFullByCurve(entry)
+	return UnitHealthPercent ~= nil and not HealthShare("player")
 		and entry.name ~= "CinematicPersonalResource" and not ns.NO_SECRET_ALPHA[entry.name]
 		and ns.HealthCurveReady() or false
 end
@@ -275,18 +323,11 @@ local function PowerRestsAtZero(row)
 	return RestsAtZero(token)
 end
 
--- Whether Not full may count now: not held to after a fight (Not full: only
--- during Calm Timer), nor back at a fight's start (Wait at pull).
-local function NotFullAllowed(db, row, afterFight, fighting)
-	if db.notFullAfterFight and not afterFight then return false end
-	return not (fighting and ns.FightHold(row))
-end
-
--- A row's rules now: health's and power's (Rule), and whether each goes by
--- Not full.
-local function RowRules(db, row, healthKey, powerKey)
-	local health = Rule(healthKey and db[healthKey])
-	local power = Rule(powerKey and db[powerKey])
+-- A row's rules now, by its shares now (ShareNow): health's and power's
+-- (Rule), and whether each goes by Not full.
+local function RowRules(row, healthShare, powerShare)
+	local health = Rule(healthShare)
+	local power = Rule(powerShare)
 	local nfHealth = health == "notfull"
 	local nfPower = power == "notfull" or power == "below" and PowerRestsAtZero(row)
 	return health, power, nfHealth, nfPower
@@ -309,7 +350,8 @@ function ns.KeepYourFrameUp(setting, entry, afterFight, fighting)
 	local row = pet and "petframe" or RowOf(setting, entry)
 	local healthKey, powerKey = RowKeys(row, entry)
 	local manaBar = ns.PersonalManaShown and ns.PersonalManaShown()
-	local health, power, nfHealth, nfPower = RowRules(db, row, healthKey, powerKey)
+	local hShare, pShare = ShareNow(db, healthKey, fighting, afterFight), ShareNow(db, powerKey, fighting, afterFight)
+	local health, power, nfHealth, nfPower = RowRules(row, hShare, pShare)
 	if health == "always" or power == "always" then
 		return true
 	end
@@ -319,9 +361,9 @@ function ns.KeepYourFrameUp(setting, entry, afterFight, fighting)
 	end
 	if health == "below" then
 		local share = HealthShare(pet and "pet" or "player")
-		if share and share < db[healthKey] then return true end
+		if share and share < hShare then return true end
 	end
-	if power == "below" and not nfPower and PowerBelow(row, db[powerKey], manaBar) then
+	if power == "below" and not nfPower and PowerBelow(row, pShare, manaBar) then
 		return true
 	end
 	-- (WoW Forever's personal health bar is your nameplate, faded through a
@@ -330,14 +372,14 @@ function ns.KeepYourFrameUp(setting, entry, afterFight, fighting)
 	if health == "below" and entry.name == "CinematicPersonalResource" and not HealthShare("player") then
 		nfHealth = true
 	end
-	if not (nfHealth or nfPower) or not NotFullAllowed(db, row, afterFight, fighting) then
+	if not (nfHealth or nfPower) then
 		return false
 	end
 	if pet then
 		return nfHealth and ns.IsPetRecovering() or false
 	end
 	-- (Secret health: the game's curve sets the alpha instead, ThresholdSecret.)
-	return nfHealth and not HealthNotFullByCurve(db, entry) and HealthNotFull()
+	return nfHealth and not HealthNotFullByCurve(entry) and HealthNotFull()
 		or nfPower and PowerNotFull(db, row, manaBar) or false
 end
 
@@ -347,48 +389,11 @@ local function HeldAtPull(row)
 	return (InCombatLockdown() or ns.Flag(UnitAffectingCombat("player"))) and ns.FightHold(row)
 end
 
--- Each frame's Opacity while hidden (the player frame's two rows: one frame).
-local ALPHA_KEYS = { player = "prAlphaPlayer", prd = "prAlphaPrd", prdpower = "prAlphaPrdPower",
-	prdmana = "prAlphaMana", petframe = "prAlphaPet" }
-local function AlphaKey(row, entry)
-	if row == "addon" then return "prAlpha" .. ns.ADDON_POWER_BARS[entry.name] end
-	return ALPHA_KEYS[row]
-end
--- How far into a share's Fade range a value is: 0 above it, 1 at the share.
-local function Ramp(now, line, range)
-	if not now or now >= line + range then return 0 end
-	if range <= 0 or now <= line then return 1 end
-	return (line + range - now) / range
-end
-local function FadeRange(db)
-	return math.max(0, tonumber(db.prFadeRange) or 0)
-end
-
 -- How much of a frame shows while CineMode would hide it (KeepYourFrameUp
--- said no): its Opacity while hidden, or more as what it shows nears a
--- share under 99% (Fade range). 0: hidden. Readable values only: the
--- game's own secret ones go through the curve (ns.ThresholdSecret).
-function ns.YourFrameLevel(setting, entry)
-	local db = ns.db
-	if not ns.PersonalResourcesOn(db) then return 0 end
-	local pet = ns.PET_FRAMES[entry.name]
-	if not pet and not setting then return 0 end
-	local row = pet and "petframe" or RowOf(setting, entry)
-	local floor = tonumber(db[AlphaKey(row, entry)]) or 0
-	local range = FadeRange(db)
-	if range <= 0 or not pet and HeldAtPull(row) then return floor end
-	local healthKey, powerKey = RowKeys(row, entry)
-	local health, power, _, nfPower = RowRules(db, row, healthKey, powerKey)
-	local ramp = 0
-	if health == "below" then
-		ramp = math.max(ramp, Ramp(HealthShare(pet and "pet" or "player"), db[healthKey], range))
-	end
-	if power == "below" and not nfPower then
-		local low = PowerShareNow(row, ns.PersonalManaShown and ns.PersonalManaShown())
-		ramp = math.max(ramp, Ramp(low, db[powerKey], range))
-	end
-	-- (From the opacity up to full, as the game's curve does.)
-	return floor + ramp * (1 - floor)
+-- said no): none. (Opacity while hidden and Fade range: gone 2026-11-15,
+-- for the In combat / After combat / Out of combat columns.)
+function ns.YourFrameLevel()
+	return 0
 end
 
 -- Health or power the game won't say (WoW Forever: health in fights, mana
@@ -459,30 +464,32 @@ function ns.ThresholdSecret(setting, entry)
 	if HeldAtPull(row) then return false end
 	local healthKey, powerKey = RowKeys(row, entry)
 	local manaBar = ns.PersonalManaShown and ns.PersonalManaShown()
-	local health, power, nfHealth, nfPower = RowRules(db, row, healthKey, powerKey)
+	local fighting, afterFight = PhaseNow()
+	local hShare, pShare = ShareNow(db, healthKey, fighting, afterFight), ShareNow(db, powerKey, fighting, afterFight)
+	local health, power, nfHealth, nfPower = RowRules(row, hShare, pShare)
 	local spec = secretSpecs[row]
 	if not spec then
 		spec = {}
 		secretSpecs[row] = spec
 	end
-	spec.range, spec.floor = FadeRange(db), tonumber(db[AlphaKey(row, entry)]) or 0
+	spec.range, spec.floor = 0, 0
 	-- (Health and power both secret: one curve per frame, so the one that's
 	-- changing now. Health at rest out of a fight is full (it regenerates
 	-- till it is), so its curve would show nothing: power's then. 2026-11-13:
 	-- health first always left the player frame deaf to low mana.)
 	local healthSecret = health == "below" and UnitHealthPercent and not HealthShare("player")
-		and CurveAt(db[healthKey], spec.range, spec.floor) and true or false
+		and CurveAt(hShare, spec.range, spec.floor) and true or false
 	-- (Not full the same way, at just short of full: KeepYourFrameUp leaves it
 	-- to the curve, HealthNotFullByCurve.)
-	local healthShare, healthRange = db[healthKey], spec.range
-	if not healthSecret and nfHealth and HealthNotFullByCurve(db, entry)
+	local healthShare, healthRange = hShare, spec.range
+	if not healthSecret and nfHealth and HealthNotFullByCurve(entry)
 		and CurveAt(NOT_FULL_CURVE, 0, spec.floor) then
 		healthSecret, healthShare, healthRange = true, NOT_FULL_CURVE, 0
 	end
 	local powerType
 	if power == "below" and not nfPower and UnitPowerPercent then
-		local below, unknown = PowerBelow(row, db[powerKey], manaBar)
-		if below == nil and CurveAt(db[powerKey], spec.range, spec.floor) then
+		local below, unknown = PowerBelow(row, pShare, manaBar)
+		if below == nil and CurveAt(pShare, spec.range, spec.floor) then
 			powerType = unknown
 		end
 	end
@@ -498,7 +505,7 @@ function ns.ThresholdSecret(setting, entry)
 		return spec
 	end
 	if powerType ~= nil then
-		spec.health, spec.powerType, spec.share = nil, powerType, db[powerKey]
+		spec.health, spec.powerType, spec.share = nil, powerType, pShare
 		return spec
 	end
 	return false
@@ -517,14 +524,52 @@ end
 
 -- (The low mana test's: /cine debug lowmana, LowManaTest.lua. Your mana
 -- under the player frame's share now; the game's answer on a frame.)
+local function PlayerPowerShareNow()
+	local fighting, afterFight = PhaseNow()
+	return ShareNow(ns.db, "prPowerPlayer", fighting, afterFight) or 0
+end
 function ns.LowManaNow()
-	local share = ns.db.prPowerPlayer or 0
+	local share = PlayerPowerShareNow()
 	if Rule(share) ~= "below" then return false end
 	return (Share(UnitPower("player", 0), UnitPowerMax("player", 0)) or 1) < share
 end
 function ns.SetLowManaSecretAlpha(frame)
-	ns.SetThresholdSecretAlpha(frame, { powerType = 0, share = ns.db.prPowerPlayer or 0 })
+	ns.SetThresholdSecretAlpha(frame, { powerType = 0, share = PlayerPowerShareNow() })
 end
+
+-- The Why line for a row going by its After combat column now: what opened
+-- the window (Frames.lua's ns.AfterFightCause).
+local function CalmCauseText()
+	local cause, ago = nil, nil
+	if ns.AfterFightCause then cause, ago = ns.AfterFightCause() end
+	local text
+	if cause == "resurrect" then
+		return L["In Calm Timer now: you came back to life, until your health and power are full"]
+	elseif cause == "fall" then
+		text = L["In Calm Timer now: you fell, %d sec ago (till the Calm Timer runs out)"]
+	elseif cause == "lifetap" then
+		text = L["In Calm Timer now: you cast a spell that costs health, %d sec ago (till the Calm Timer runs out)"]
+	elseif cause == "health" then
+		text = L["In Calm Timer now: you lost health out of a fight, %d sec ago (till the Calm Timer runs out)"]
+	elseif cause == "fight" then
+		text = L["In Calm Timer now: your last fight, %d sec ago (till the Calm Timer runs out)"]
+	else
+		return L["In Calm Timer now: after a fight, a fall, Life Tap or resurrecting"]
+	end
+	return text:format(math.floor((ago or 0) + 0.5))
+end
+
+-- A share in words, as the page's boxes show it: Off, < 30%, < 100%, Always.
+local function ShareText(share)
+	share = tonumber(share) or 0
+	if share <= 0 then return L["Off"] end
+	if share >= 1 then return L["Always"] end
+	if share >= NOT_FULL - 1e-6 then return "< 100%" end
+	return ("< %d%%"):format(math.floor(share * 100 + 0.5))
+end
+local COLUMN_NAMES = { L["In combat"], L["In Calm Timer"], L["Out of combat"] }
+local COLUMN_WHEN = { L["In a fight it goes by %s for %s"], L["In the Calm Timer it goes by %s for %s"],
+	L["Out of combat it goes by %s for %s"] }
 
 -- The same, in words, for the Why window (Why.lua): each of this page's
 -- settings that can keep this frame up, and whether it is now, every one
@@ -538,84 +583,107 @@ function ns.YourFrameWhy(setting, entry, afterFight, fighting, add)
 	local row = pet and "petframe" or RowOf(setting, entry)
 	local healthKey, powerKey = RowKeys(row, entry)
 	local manaBar = ns.PersonalManaShown and ns.PersonalManaShown()
-	local health, power, nfHealth, nfPower = RowRules(db, row, healthKey, powerKey)
-	if health == "off" and power == "off" then return end
+	local hShare, hCol = ShareNow(db, healthKey, fighting, afterFight)
+	local pShare, pCol = ShareNow(db, powerKey, fighting, afterFight)
+	local health, power, nfHealth, nfPower = RowRules(row, hShare, pShare)
 	if not ns.PersonalResourcesOn(db) then
-		add("off", L["The %s page is off, so its settings don't keep this up"]:format(page), "personalResources")
+		if health ~= "off" or power ~= "off" then
+			add("off", L["The %s page is off, so its settings don't keep this up"]:format(page), "personalResources")
+		end
 		return
 	end
-	local function Percent(key) return ("%d%%"):format(math.floor(db[key] * 100 + 0.5)) end
+	-- (Each line links to the column it goes by: its own setting, or the one
+	-- it's linked to.)
+	local hKey = healthKey and ColumnKey(db, healthKey, hCol)
+	local pKey = powerKey and ColumnKey(db, powerKey, pCol)
+	local function Tag(col, share) return ("%s: %s"):format(COLUMN_NAMES[col], ShareText(share)) end
+	-- (A column not in play now that would keep it up more: when it would.)
+	local nowCol = fighting and 1 or afterFight and 2 or 3
+	for _, key in ipairs({ healthKey or false, powerKey or false }) do
+		if key then
+			local shareNow = key == healthKey and hShare or pShare
+			for col = 1, 3 do
+				local share = ColumnShare(db, key, col)
+				if col ~= nowCol and share > shareNow then
+					local what = key == healthKey and (pet and L["your pet's health"] or L["your health"]) or L["your power"]
+					add("off", COLUMN_WHEN[col]:format(Tag(col, share), what), ColumnKey(db, key, col))
+				end
+			end
+		end
+	end
+	if health == "off" and power == "off" then return end
+	local hTag, pTag = Tag(hCol, hShare), Tag(pCol, pShare)
 	if health == "always" then
-		add("on", L["Kept up always (Show below health: Always)"], healthKey)
+		add("on", L["Kept up always (%s)"]:format(hTag), hKey)
 	end
 	if power == "always" then
-		add("on", L["Kept up always (Show below power: Always)"], powerKey)
+		add("on", L["Kept up always (%s)"]:format(pTag), pKey)
 	end
 	if health == "always" or power == "always" then return end
 	if fighting and not pet and ns.FightHold(row) then
 		add("off", L["Held back at the fight's start while you're at rest (Wait at pull)"],
-			health ~= "off" and healthKey or powerKey)
+			health ~= "off" and hKey or pKey)
 		return
 	end
+	local calmKey -- (a line shown by the After combat column: what opened it, after)
 	if health == "below" then
 		local share = HealthShare(pet and "pet" or "player")
 		local text
-		if share and share < db[healthKey] then
-			text = pet and L["Your pet's health is under %s (Show below)"] or L["Your health is under %s (Show below)"]
-			add("on", text:format(Percent(healthKey)), healthKey)
+		if share and share < hShare then
+			text = pet and L["Your pet's health is under %s (%s)"] or L["Your health is under %s (%s)"]
+			add("on", text:format(ShareText(hShare):gsub("^< ", ""), hTag), hKey)
+			if hCol == 2 then calmKey = hKey end
 		elseif share or pet then
-			text = pet and L["Shows while your pet's health is under %s (Show below)"]
-				or L["Shows while your health is under %s (Show below)"]
-			add("off", text:format(Percent(healthKey)), healthKey)
+			text = pet and L["Shows while your pet's health is under %s (%s)"]
+				or L["Shows while your health is under %s (%s)"]
+			add("off", text:format(ShareText(hShare):gsub("^< ", ""), hTag), hKey)
 		else
-			add("off", L["Shows while your health is under %s (Show below): the game won't say your health, so it " ..
-				"sets the opacity itself"]:format(Percent(healthKey)), healthKey)
+			add("off", L["Shows while your health is under %s (%s): the game won't say your health, so it " ..
+				"sets the opacity itself"]:format(ShareText(hShare):gsub("^< ", ""), hTag), hKey)
 		end
 	end
 	if power == "below" and not nfPower then
-		local below = PowerBelow(row, db[powerKey], manaBar)
+		local below = PowerBelow(row, pShare, manaBar)
 		if below then
-			add("on", L["Your power is under %s (Show below)"]:format(Percent(powerKey)), powerKey)
+			add("on", L["Your power is under %s (%s)"]:format(ShareText(pShare):gsub("^< ", ""), pTag), pKey)
+			if pCol == 2 then calmKey = calmKey or pKey end
 		elseif below == false then
-			add("off", L["Shows while your power is under %s (Show below)"]:format(Percent(powerKey)), powerKey)
+			add("off", L["Shows while your power is under %s (%s)"]:format(ShareText(pShare):gsub("^< ", ""), pTag), pKey)
 		else
-			add("off", L["Shows while your power is under %s (Show below): the game won't say your power, so it " ..
-				"sets the opacity itself"]:format(Percent(powerKey)), powerKey)
+			add("off", L["Shows while your power is under %s (%s): the game won't say your power, so it " ..
+				"sets the opacity itself"]:format(ShareText(pShare):gsub("^< ", ""), pTag), pKey)
 		end
 	end
-	if not (nfHealth or nfPower) then return end
-	local key = nfHealth and healthKey or powerKey
-	if db.notFullAfterFight and not afterFight then
-		add("off", L["Not full counts only after a fight, a fall, Life Tap or resurrecting (Not full: only during Calm Timer)"],
-			"notFullAfterFight")
-		return
-	end
-	if fighting and not pet and ns.FightHold(row) then
-		add("off", L["Held back at the fight's start while you're at rest (Wait at pull)"], key)
-		return
-	end
-	local shown = false
-	if nfHealth then
-		if pet and ns.IsPetRecovering() then
-			add("on", L["Your pet's health isn't full yet (Show below: < 100%)"], healthKey)
+	if nfHealth or nfPower then
+		local key = nfHealth and hKey or pKey
+		local shown = false
+		if nfHealth then
+			if pet and ns.IsPetRecovering() then
+				add("on", L["Your pet's health isn't full yet (%s)"]:format(hTag), hKey)
+				shown = true
+			elseif not pet and HealthNotFullByCurve(entry) then
+				add("off", L["Shows while your health isn't full (%s): the game won't say your health, so it " ..
+					"sets the opacity itself"]:format(hTag), hKey)
+				shown = true
+			elseif not pet and HealthNotFull() then
+				add("on", L["Your health isn't full yet (%s)"]:format(hTag), hKey)
+				shown = true
+			end
+			if shown and hCol == 2 then calmKey = calmKey or hKey end
+		end
+		if nfPower and PowerNotFull(db, row, manaBar) then
+			add("on", (row == "prdmana" and L["Your mana isn't full yet (%s)"]
+				or L["Your power isn't full yet, or your rage or the like isn't drained (%s)"]):format(pTag), pKey)
 			shown = true
-		elseif not pet and HealthNotFullByCurve(db, entry) then
-			add("off", L["Shows while your health isn't full (Show below: < 100%): the game won't say your health, so it " ..
-				"sets the opacity itself"], healthKey)
-			shown = true
-		elseif not pet and HealthNotFull() then
-			add("on", L["Your health isn't full yet (Show below: < 100%)"], healthKey)
-			shown = true
+			if pCol == 2 then calmKey = calmKey or pKey end
+		end
+		if not shown then
+			add("off", pet and L["Stays up while your pet's health isn't full (%s): it is"]:format(hTag)
+				or L["Stays up while its health or power isn't full (%s): it is"]:format(nfHealth and hTag or pTag), key)
 		end
 	end
-	if nfPower and PowerNotFull(db, row, manaBar) then
-		add("on", row == "prdmana" and L["Your mana isn't full yet (Show below: < 100%)"]
-			or L["Your power isn't full yet, or your rage or the like isn't drained (Show below: < 100%)"], powerKey)
-		shown = true
-	end
-	if not shown then
-		add("off", pet and L["Stays up while your pet's health isn't full (Show below: < 100%): it is"]
-			or L["Stays up while its health or power isn't full (Show below: < 100%): it is"], key)
+	if calmKey then
+		add("on", CalmCauseText(), calmKey)
 	end
 end
 
@@ -652,24 +720,21 @@ function ns.CreatePersonalResourcesPanel(kit)
 		if enabledBy then kit.GreyUnless(check, enabledBy) end
 		return check
 	end
-
 	-- Keep up: a row per bar, kept up while what it shows is under its share
-	-- (as Heal Vision's roles are). A cell a row can't have is left empty; a
-	-- frame this client hasn't, no row.
+	-- (as Heal Vision's roles are), a share per column, one at a time: In
+	-- combat, After combat, Out of combat. A link between two columns: the right one goes by the
+	-- left one's. A frame this client hasn't, no row.
 	stack:Header(content, L["Keep up"])
 	local function Fights(db) return db.stayInCombat end
+	local SHARES = L["It stays up while what it shows (health, or your power) is under this. < 100%: while it " ..
+		"isn't full at all, even by a hair (rage and the like: until they're back to 0, Rage counts until 0). " ..
+		"Always: always up. Off: never kept up by it."]
 	local COLUMNS = {
-		{ L["Show below"], L["It stays up while what it shows (health, or your power) is under this. < 100%: " ..
-			"while it isn't full at all, even by a hair (rage and the like: until they're back to 0, Rage counts until 0); " ..
-			"only after fights with the tick under this table. Lower: only while it's under this, any time: drinking, " ..
-			"or saving mana for the pull. Always: always up. Off: never kept up by it. Wait at pull holds either back " ..
-			"at a fight's start."] },
-		{ L["Opacity while hidden"], L["How much of it still shows while CineMode hides it. 0%: hidden completely."] },
-		{ L["Wait at pull"], L["At a fight's start, it comes up only once your health or power changes: your " ..
-			"first cast, your first hit. Only while fights bring frames up (In combat on the CineMode page)."] },
-		{ L["Mana text"], L["While you cast a spell that costs mana, your mana's numbers on the bar show what " ..
-			"you'll have once the cast is done, paler. The amount and the percent, whichever the game shows there " ..
-			"(its Status Text setting); with the game's numbers off, the amount in the middle of the bar."] },
+		{ L["In combat"], L["While you're in a fight."] .. " " .. SHARES .. " " ..
+			L["Wait at pull holds it back at a fight's start."] },
+		{ L["In Calm Timer"], L["After a fight, a fall, a spell that costs you health (Life Tap) or coming back to " ..
+			"life, until the Calm Timer runs out: casting or drinking in town brings nothing up."] .. " " .. SHARES },
+		{ L["Out of combat"], L["Neither in a fight nor after one: drinking in town, say."] .. " " .. SHARES },
 	}
 	-- (The mana text's: redrawn as it's ticked, PersonalManaCost.lua.)
 	local function Redraw()
@@ -682,125 +747,156 @@ function ns.CreatePersonalResourcesPanel(kit)
 		local name = type(token) == "string" and not (issecretvalue and issecretvalue(token)) and _G[token]
 		return type(name) == "string" and name ~= "" and name or L["Power"]
 	end
-	-- { label (a function: named by your power), tip, share key, Wait at pull key, Mana text key,
-	-- Opacity while hidden key (a frame's first row) }
+	-- { label (a function: named by your power), tip, share key (In combat's;
+	-- the others' are named after it, KeepUpDefaults) }. Each frame its own
+	-- rows (one set for the player frame and PRD till 2026-11-15: profiles
+	-- now pick which is kept up).
 	local rows = {
-		{ L["Player Frame: Health"], L["Your player frame, by your health."], "prHealthPlayer", "fightWaitPortrait", nil, "prAlphaPlayer" },
+		{ L["Player Frame: Health"], L["Your player frame, by your health."], "prHealthPlayer" },
 		{ function() return L["Player Frame: %s"]:format(PowerName()) end,
 			L["Your player frame, by your power (mana, rage, energy...). One frame with the row above: up when " ..
-			"either says so."], "prPowerPlayer", nil, "manaAfterPortrait" },
+			"either says so."], "prPowerPlayer" },
 	}
+	local function AddRow(row)
+		rows[#rows + 1] = row
+	end
 	if _G.PetFrame then
-		rows[#rows + 1] = { L["Pet Frame: Health"], L["Your pet frame, by your pet's health."], "prPetHealth", nil, nil,
-			"prAlphaPet" }
+		AddRow({ L["Pet Frame: Health"], L["Your pet frame, by your pet's health."], "prPetHealth" })
 	end
 	if hasDisplay then
-		rows[#rows + 1] = { L["PRD: Health"], L["The game's personal resource display (PRD): its health bar."],
-			"prHealthPrd", "fightWaitHealth", nil, "prAlphaPrd" }
-		rows[#rows + 1] = { function() return L["PRD: %s"]:format(PowerName()) end,
+		AddRow({ L["PRD: Health"], L["The game's personal resource display (PRD): its health bar."],
+			"prHealthPrd" })
+		AddRow({ function() return L["PRD: %s"]:format(PowerName()) end,
 			L["The game's personal resource display (PRD): its power bar (mana, rage, energy...)."],
-			"prPowerPrd", "fightWaitPower", "manaAfterDisplay", "prAlphaPrdPower" }
+			"prPowerPrd" })
 	end
 	if ns.PERSONAL_MANA then
-		rows[#rows + 1] = { L["Cine Mana Bar"], L["Ours, under the PRD's power bar, while mana isn't your power " ..
-			"(forms, Shadow, Elemental): by your mana."], "prPowerMana", "fightWaitMana", nil, "prAlphaMana" }
+		AddRow({ L["Cine Mana Bar"], L["Ours, under the PRD's power bar, while mana isn't your power " ..
+			"(forms, Shadow, Elemental): by your mana."], "prPowerMana" })
 	end
 	-- (Other addons' power bars standing in for these: their own rows, by addon.)
 	for _, bar in ipairs(ns.ADDON_POWER_ROWS or {}) do
 		if C_AddOns and C_AddOns.IsAddOnLoaded and C_AddOns.IsAddOnLoaded(bar.addon) then
-			rows[#rows + 1] = { L["Power bar (%s)"]:format(bar.addon), bar.tip, "prPower" .. bar.addon, nil, nil,
-				"prAlpha" .. bar.addon }
+			AddRow({ L["Power bar (%s)"]:format(bar.addon), bar.tip, "prPower" .. bar.addon })
 		end
 	end
-	-- (Columns: Show below, Opacity while hidden, Wait at pull, Mana text.)
-	local LABEL_W, ROW_H, HEAD_H = 170, 26, 22
-	local WIDTHS = { 90, 130, 90, 90 }
+	-- (Columns: In combat, After combat, Out of combat, a link button between each.)
+	local LABEL_W, ROW_H, HEAD_H, COL_W, LINK_W = 170, 26, 22, 104, 28
 	local left, total = {}, LABEL_W
-	for c, width in ipairs(WIDTHS) do
+	for c = 1, #COLUMNS do
+		if c > 1 then total = total + LINK_W end
 		left[c] = total
-		total = total + width
+		total = total + COL_W
 	end
-	local function CenterX(c) return left[c] + WIDTHS[c] / 2 end
-	local grid = CreateFrame("Frame", nil, content)
-	grid:SetSize(total, HEAD_H + (#rows + 1) * ROW_H + 8)
-	for c, column in ipairs(COLUMNS) do
-		local head = CreateFrame("Frame", nil, grid)
-		head:SetSize(WIDTHS[c], 20)
-		head:SetPoint("BOTTOMLEFT", grid, "TOPLEFT", left[c], -HEAD_H)
-		local text = kit.Label(head, "GameFontNormalSmall", column[1])
-		text:SetPoint("CENTER")
-		text.searchSkip = true
-		kit.Tooltip(head, column[2])
-	end
-	-- A % box in a column (as Heal Vision's).
-	local function Box(c, y, key, label, tip)
-		local line = kit.BoxLine(grid)
-		local box = line:Box("", key, 0, 100, 1, "%d%%", 100, tip, nil, 40)
-		line:SetPoint("CENTER", grid, "TOPLEFT", CenterX(c), y - ROW_H / 2)
-		box.searchLabel = label
-		return box
-	end
-	-- A Show below box (< 50%, < 100%: not full, Off, Always): Options.lua's ShareBox.
-	local function ShareBox(c, y, key, label, tip)
-		local line = kit.BoxLine(grid)
-		local box = line:ShareBox(key, tip, nil, NOT_FULL)
-		line:SetPoint("CENTER", grid, "TOPLEFT", CenterX(c), y - ROW_H / 2)
-		box.searchLabel = label
-		return box
-	end
+	local function CenterX(c) return left[c] + COL_W / 2 end
+	local holder = CreateFrame("Frame", nil, content)
+	holder:SetSize(total, 1)
 	local named = {} -- { [label] = function } (the power rows: named again as the page shows)
-	for r, row in ipairs(rows) do
-		local y = -HEAD_H - (r - 1) * ROW_H
-		local name = CreateFrame("Frame", nil, grid)
-		name:SetSize(LABEL_W, ROW_H)
-		name:SetPoint("TOPLEFT", 0, y)
-		local label = type(row[1]) == "function" and row[1]() or row[1]
-		local text = kit.Label(name, "GameFontHighlight", label)
-		text:SetPoint("LEFT")
-		text.searchSkip = true
-		if type(row[1]) == "function" then named[text] = row[1] end
-		if row[2] then kit.Tooltip(name, row[2]) end
-		ShareBox(1, y, row[3], ("%s: %s"):format(label, COLUMNS[1][1]),
-			("%s: %s. %s"):format(label, COLUMNS[1][1], COLUMNS[1][2]))
-		if row[6] then
-			Box(2, y, row[6], ("%s: %s"):format(label, COLUMNS[2][1]),
-				("%s: %s. %s"):format(label, COLUMNS[2][1], COLUMNS[2][2]))
+	local LINK_TEX = "Interface\\AddOns\\" .. ADDON_NAME .. "\\Textures\\Link" -- (Media/make_link.py)
+	local function BuildGrid(rows)
+		local grid = CreateFrame("Frame", nil, holder)
+		grid:SetPoint("TOPLEFT")
+		grid:SetSize(total, HEAD_H + #rows * ROW_H + 8)
+		for c, column in ipairs(COLUMNS) do
+			local head = CreateFrame("Frame", nil, grid)
+			head:SetSize(COL_W, 20)
+			head:SetPoint("BOTTOMLEFT", grid, "TOPLEFT", left[c], -HEAD_H)
+			local text = kit.Label(head, "GameFontNormalSmall", column[1])
+			text:SetPoint("CENTER")
+			text.searchSkip = true
+			kit.Tooltip(head, column[2])
 		end
-		for c = 3, 4 do
-			local key = row[c + 1]
-			if key then
-				local column = COLUMNS[c]
-				local cell = kit.Check(grid, key, "", ("%s: %s. %s"):format(label, column[1], column[2]),
-					c == 4 and function(value)
-						ns.GetDB()[key] = value
-						Redraw()
-					end or nil)
-				cell:SetPoint("CENTER", grid, "TOPLEFT", CenterX(c), y - ROW_H / 2)
-				cell.searchLabel = ("%s: %s"):format(label, column[1])
-				if c == 3 then kit.GreyUnless(cell, Fights) end
+		for r, row in ipairs(rows) do
+			local y = -HEAD_H - (r - 1) * ROW_H
+			local name = CreateFrame("Frame", nil, grid)
+			name:SetSize(LABEL_W, ROW_H)
+			name:SetPoint("TOPLEFT", 0, y)
+			local label = type(row[1]) == "function" and row[1]() or row[1]
+			local text = kit.Label(name, "GameFontHighlight", label)
+			text:SetPoint("LEFT")
+			text.searchSkip = true
+			if type(row[1]) == "function" then named[text] = row[1] end
+			if row[2] then kit.Tooltip(name, row[2]) end
+			local key = row[3]
+			local boxes, links = {}, {}
+			-- (The row drawn as it is now: each box's value, the links lit or
+			-- not, a linked box's text paler.)
+			local function Draw()
+				local db = ns.GetDB() or ns.db
+				if not db then return end
+				for c, box in ipairs(boxes) do
+					box:Refresh()
+					local linked = c > 1 and db[key .. LINK_SUFFIX[c]] ~= false
+					box:SetTextColor(linked and 0.6 or 1, linked and 0.6 or 1, linked and 0.6 or 1)
+					if links[c] then
+						links[c].icon:SetVertexColor(linked and 1 or 0.4, linked and 0.82 or 0.4, linked and 0 or 0.4)
+					end
+				end
 			end
+			for c, column in ipairs(COLUMNS) do
+				-- (A Show below box, Options.lua's ShareBox: a linked column shows
+				-- and sets the one it goes by.)
+				local line = kit.BoxLine(grid)
+				local own = key .. COLUMN_SUFFIX[c]
+				local tip = ("%s: %s. %s"):format(label, column[1], column[2])
+				local box = line:ShareBox({
+					get = function() return ColumnShare(ns.GetDB(), key, c) end,
+					set = function(value) local db = ns.GetDB(); db[ColumnKey(db, key, c)] = value end,
+				}, tip, function() Draw() end, NOT_FULL, 70)
+				line:SetPoint("CENTER", grid, "TOPLEFT", CenterX(c), y - ROW_H / 2)
+				box.searchLabel = ("%s: %s"):format(label, column[1])
+				box.settingKey = own -- (/cine find, the Why window's links)
+				kit.RecordKey(grid, own) -- (the page's Reset, profiles)
+				boxes[c] = box
+				if c > 1 then
+					local link = CreateFrame("Button", nil, grid)
+					link:SetSize(18, 18)
+					link:SetPoint("CENTER", grid, "TOPLEFT", left[c] - LINK_W / 2, y - ROW_H / 2)
+					link.icon = link:CreateTexture(nil, "ARTWORK")
+					link.icon:SetAllPoints()
+					link.icon:SetTexture(LINK_TEX)
+					link:SetHighlightTexture(LINK_TEX, "ADD")
+					local linkKey = key .. LINK_SUFFIX[c]
+					kit.RecordKey(grid, linkKey)
+					link:SetScript("OnClick", function()
+						local db = ns.GetDB()
+						if db[linkKey] ~= false then
+							-- (Unlinked: it keeps the share it showed, its own now.)
+							db[own] = ColumnShare(db, key, c)
+							db[linkKey] = false
+						else
+							db[linkKey] = true
+						end
+						Draw()
+					end)
+					kit.Tooltip(link, L["Linked: the column on its right goes by the one on its left, so there's one " ..
+						"box to change. Click to link or unlink them. Unlinked, it keeps the share it had, its own " ..
+						"to change."])
+					links[c] = link
+				end
+			end
+			-- (And after the page's Reset, or a profile loaded.)
+			local drawer = CreateFrame("Frame", nil, grid)
+			drawer.Refresh = Draw
+			kit.AddControl(drawer)
 		end
+		return grid
 	end
-	-- Fade range: one for every row, under Show below.
-	do
-		local y = -HEAD_H - #rows * ROW_H - 8
-		local name = CreateFrame("Frame", nil, grid)
-		name:SetSize(LABEL_W, ROW_H)
-		name:SetPoint("TOPLEFT", 0, y)
-		local text = kit.Label(name, "GameFontHighlight", L["Fade range"])
-		text:SetPoint("LEFT")
-		text.searchSkip = true
-		local tip = L["Each row set to a share (not < 100%, Always or Off) fades in gradually as what it shows nears its share, instead of " ..
-			"popping in all at once. With Show below < 30% and 5% here, it starts showing at 35% and is fully up " ..
-			"at 30%. 0%: at the share, all at once."]
-		kit.Tooltip(name, tip)
-		Box(1, y, "prFadeRange", L["Fade range"], tip)
-	end
-	stack:Add(grid, "label")
-	Tick("notFullAfterFight", L["Not full: only during Calm Timer"],
-		L["Ticked, a row at < 100% (while it isn't full) comes up only after a fight, a fall, a spell that costs you " ..
-		"health (Life Tap) or resurrecting, until the Calm Timer runs out: casting or drinking in town brings " ..
-		"nothing up. Unticked, it works any time. Lower shares always work any time."])
+	holder:SetHeight(BuildGrid(rows):GetHeight())
+	stack:Add(holder, "label")
+	-- (One for every row: each bar waits for what it shows.)
+	Tick("fightWaitPull", L["Wait at pull"],
+		L["At a fight's start, each bar comes up only once what it shows changes: your health or power, on " ..
+		"your first cast or first hit. Only while fights bring frames up (In combat on the CineMode page)."], Fights)
+	-- (Both bars' mana numbers, the PRD's and the player frame's: PersonalManaText.lua.)
+	stack:Add(kit.Check(content, "manaAfterCast", L["Mana text"],
+		L["While you cast a spell that costs mana, your mana's numbers on the PRD and your player frame show what " ..
+		"you'll have once the cast is done, paler. The amount and the percent, whichever the game shows there " ..
+		"(its Status Text setting); with the game's numbers off, the amount in the middle of the bar."],
+		function(value)
+			ns.GetDB().manaAfterCast = value
+			Redraw()
+		end), "check")
 	Tick("drainWhenNotEmpty", L["Rage counts until 0"],
 		L["Rage, runic power and the other resources that drain away out of combat: a power row keeps its " ..
 		"frame up until they're back to 0. Unticked, they never keep it up."])

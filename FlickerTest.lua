@@ -13,7 +13,7 @@ local READ = 5          -- seconds to read the step
 local SAMPLE = 0.1      -- seconds between samples
 local SHOT_EVERY = 5    -- seconds between screenshots
 local KEYS = { "personalResources", "prHealthPlayer", "prPowerPlayer", "prFadeRange", "prAlphaPlayer",
-	"notFullAfterFight", "fightWaitPortrait" }
+	"fightWaitPull" }
 local PLAYER_FRAMES = { PlayerFrame = true, ElvUF_Player = true, DaylightUIFrame_player = true,
 	EllesmereUIUnitFrames_Player = true, FlareUI_UF_Player = true }
 
@@ -37,7 +37,7 @@ local function NotFullRules(db, share95)
 	db.personalResources = true
 	db.prHealthPlayer, db.prPowerPlayer = share95 and 0.95 or 0.99, share95 and 0.95 or 0.99
 	db.prFadeRange, db.prAlphaPlayer = share95 and 0.05 or 0, 0
-	db.notFullAfterFight, db.fightWaitPortrait = false, false
+	db.fightWaitPull = false
 end
 
 local STEPS = {

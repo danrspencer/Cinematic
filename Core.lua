@@ -6660,6 +6660,133 @@ ticker:SetScript("OnEvent", ns.Profiled("Core events", function(self, event, arg
 			end
 			ns.db.prNotFullV1 = true
 		end
+		-- Health & Resources' Keep up grid (2026-11-15): Not full: only during
+		-- Calm Timer per row (Show below < 100% Calm, saved 0.995) instead of
+		-- one tick for the page: ticked, every row at < 100% (99%, or the
+		-- default) becomes < 100% Calm. Wait at pull one tick for every row
+		-- (fightWaitPull): on if any row's was (a row left alone: its default,
+		-- on for the power and mana bars). Mana text one tick for both bars
+		-- (manaAfterCast): on if either was. Every profile. Once.
+		-- (A Keep up row's own share, its In combat column's key: not one of its
+		-- columns' or links' named after it, prHealthPlayerCalm... The two
+		-- updates below would take those for rows of their own.)
+		function ns.IsPrRowKey(key)
+			return type(key) == "string" and (key:find("^prHealth") or key:find("^prPower") or key:find("^prPet"))
+				and not (key:find("Calm$") or key:find("Always$") or key:find("Link")) and true or false
+		end
+		if not ns.db.prCalmRowsV1 then
+			local WAITS = { fightWaitPower = true, fightWaitMana = true, fightWaitHealth = false, fightWaitPortrait = false }
+			local function Shares(t, Each)
+				local seen = {}
+				for key, value in pairs(t) do
+					if ns.IsPrRowKey(key) then
+						seen[key] = true
+						Each(key, value)
+					end
+				end
+				for key in pairs(DEFAULTS) do
+					if not seen[key] and ns.IsPrRowKey(key) then
+						Each(key, nil)
+					end
+				end
+			end
+			local function Carry(t)
+				if type(t) ~= "table" then return end
+				if t.notFullAfterFight == true then
+					Shares(t, function(key, value)
+						local share = value
+						if share == nil then share = DEFAULTS[key] end
+						if type(share) == "number" and math.abs(share - 0.99) < 1e-6 then t[key] = 0.995 end
+					end)
+				end
+				t.notFullAfterFight = nil
+				local saved, on = false, false
+				for key, default in pairs(WAITS) do
+					if t[key] ~= nil then saved = true end
+					local value = t[key]
+					if value == nil then value = default end
+					if value then on = true end
+				end
+				if saved then
+					if t.fightWaitPull == nil then t.fightWaitPull = on end
+					for key in pairs(WAITS) do t[key] = nil end
+				end
+				if t.manaAfterDisplay ~= nil or t.manaAfterPortrait ~= nil then
+					if t.manaAfterCast == nil then t.manaAfterCast = t.manaAfterDisplay == true or t.manaAfterPortrait == true end
+					t.manaAfterDisplay, t.manaAfterPortrait = nil, nil
+				end
+			end
+			Carry(ns.db)
+			for _, saved in pairs(ns.db.profiles or {}) do
+				if type(saved) == "table" then
+					Carry(type(saved.settings) == "table" and saved.settings or saved)
+				end
+			end
+			ns.db.prCalmRowsV1 = true
+		end
+		-- Health & Resources' Keep up columns (2026-11-15): In combat, After
+		-- combat and Always in place of one Show below. A saved share fills
+		-- all three, linked (as it worked: any time); < 100% Calm (0.995)
+		-- becomes After combat < 100%, the others Off, unlinked. Opacity while
+		-- hidden (prAlpha...) and Fade range gone. Every profile. Once.
+		if not ns.db.prColumnsV1 then
+			local function Carry(t)
+				if type(t) ~= "table" then return end
+				local shares, gone = {}, {}
+				for key, value in pairs(t) do
+					if type(key) == "string" then
+						if ns.IsPrRowKey(key) and type(value) == "number" and t[key .. "Calm"] == nil then
+							shares[key] = value
+						elseif key:find("^prAlpha") or key == "prFadeRange" then
+							gone[#gone + 1] = key
+						end
+					end
+				end
+				for key, value in pairs(shares) do
+					if math.abs(value - 0.995) < 1e-6 then
+						t[key], t[key .. "Calm"], t[key .. "Always"] = 0, 0.99, 0
+						t[key .. "LinkCalm"], t[key .. "LinkAlways"] = false, false
+					else
+						t[key .. "Calm"], t[key .. "Always"] = value, value
+						t[key .. "LinkCalm"], t[key .. "LinkAlways"] = true, true
+					end
+				end
+				for _, key in ipairs(gone) do t[key] = nil end
+			end
+			Carry(ns.db)
+			for _, saved in pairs(ns.db.profiles or {}) do
+				if type(saved) == "table" then
+					Carry(type(saved.settings) == "table" and saved.settings or saved)
+				end
+			end
+			ns.db.prColumnsV1 = true
+		end
+		-- Treat Player Frame and PRD the same gone (2026-11-15): each frame
+		-- its own Keep up rows, profiles pick which is kept up. Where it was
+		-- on (or never set: on), the PRD's rows take the player frame's, so
+		-- nothing changes. Every profile. Once.
+		if not ns.db.prUnlinkedV1 then
+			local PAIRS = { { "prHealthPrd", "prHealthPlayer" }, { "prPowerPrd", "prPowerPlayer" } }
+			local SUFFIXES = { "", "Calm", "Always", "LinkCalm", "LinkAlways" }
+			local function Carry(t)
+				if type(t) ~= "table" then return end
+				if t.prLinked ~= false then
+					for _, pair in ipairs(PAIRS) do
+						for _, suffix in ipairs(SUFFIXES) do
+							t[pair[1] .. suffix] = t[pair[2] .. suffix]
+						end
+					end
+				end
+				t.prLinked = nil
+			end
+			Carry(ns.db)
+			for _, saved in pairs(ns.db.profiles or {}) do
+				if type(saved) == "table" then
+					Carry(type(saved.settings) == "table" and saved.settings or saved)
+				end
+			end
+			ns.db.prUnlinkedV1 = true
+		end
 		-- Heal Vision's Show below health at 99% ("any damage") to 99.9%: its
 		-- box shows that step as < 100% now, so 99.5% health counts too. Every
 		-- role's and every profile's. Once.

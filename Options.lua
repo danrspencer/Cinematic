@@ -673,28 +673,35 @@ local function BoxLine(parent)
 	-- Always. Its steps (wheel): 0 Off, 1-98 a share, 99 not full (saved as
 	-- notFull: 0.99 or 0.999, as its page reads it), 100 Always (saved 1).
 	-- Typed: 100 (or 99) not full, "a..." Always, "o..." or 0 Off. field: a
-	-- setting's name or { get, set } as Box's; onChange(step).
-	local NOT_FULL_STEP, ALWAYS_STEP = 99, 100
+	-- setting's name or { get, set } as Box's; onChange(step). calm (Health &
+	-- Resources): the saved share for "not full, only during Calm Timer", a
+	-- step of its own after not full (< 100% Calm; Always moves to 101).
+	local NOT_FULL_STEP = 99
 	local function Trim(step)
 		return (("%.2f"):format(step):gsub("0+$", ""):gsub("%.$", ""))
 	end
-	function line.ShareBox(_, field, tip, onChange, notFull, width)
+	function line.ShareBox(_, field, tip, onChange, notFull, width, calm)
 		local get = type(field) == "table" and field.get or function() return ns.GetDB()[field] end
 		local set = type(field) == "table" and field.set or function(value) ns.GetDB()[field] = value end
+		local CALM_STEP = calm and NOT_FULL_STEP + 1 or nil
+		local ALWAYS_STEP = calm and NOT_FULL_STEP + 2 or NOT_FULL_STEP + 1
 		local function StepOf(share)
 			share = tonumber(share) or 0
 			if share >= 1 then return ALWAYS_STEP end
+			if calm and math.abs(share - calm) < 1e-6 then return CALM_STEP end
 			if share >= 0.99 - 1e-6 then return NOT_FULL_STEP end
 			return share * 100
 		end
 		local function ShareOf(step)
 			if step >= ALWAYS_STEP then return 1 end
+			if calm and step >= CALM_STEP then return calm end
 			if step >= NOT_FULL_STEP then return notFull end
 			return math.max(0, step) / 100
 		end
 		local function Text(step)
 			if step <= 0 then return L["Off"] end
 			if step >= ALWAYS_STEP then return L["Always"] end
+			if calm and step >= CALM_STEP then return L["< 100% Calm"] end
 			if step >= NOT_FULL_STEP then return "< 100%" end
 			return ("< %s%%"):format(Trim(step))
 		end
@@ -706,12 +713,14 @@ local function BoxLine(parent)
 		if type(field) == "string" then
 			RecordKey(parent, field)
 			box.settingKey = field
+		elseif type(field.key) == "string" then
+			box.settingKey = field.key
 		end
 		-- (Typing starts from the number or word the box shows; typed words too.)
 		box:SetScript("OnEditFocusGained", function(self)
 			local step = StepOf(get())
 			self:SetText(step <= 0 and "0" or step >= ALWAYS_STEP and L["Always"]
-				or step >= NOT_FULL_STEP and "100" or Trim(step))
+				or calm and step >= CALM_STEP and L["< 100% Calm"] or step >= NOT_FULL_STEP and "100" or Trim(step))
 			self:HighlightText()
 			self.edited = nil
 		end)
@@ -720,11 +729,14 @@ local function BoxLine(parent)
 			if self.edited and not self.cancelled then
 				local text = self:GetText():lower()
 				local always, off = L["Always"]:lower():sub(1, 2), L["Off"]:lower():sub(1, 2)
+				local calmWord = L["Calm"]:lower():sub(1, 2)
 				local number = tonumber((text:match("[%d%.]+")))
 				if text:find("^%s*a") or text:find("^%s*" .. always, 1) then
 					step = ALWAYS_STEP
 				elseif text:find("^%s*o") or text:find("^%s*" .. off, 1) then
 					step = 0
+				elseif calm and (text:find("^%s*c") or text:find(calmWord, 1, true)) then
+					step = CALM_STEP
 				elseif number then
 					step = number >= NOT_FULL_STEP and NOT_FULL_STEP or math.max(0, math.min(98, number))
 				end
@@ -736,9 +748,9 @@ local function BoxLine(parent)
 			self.cancelled, self.edited = nil, nil
 			self:SetText(Text(StepOf(get())))
 		end)
-		-- An arrow on its right: Always, < 100% and Off one click away (the
-		-- wheel and typing hid them). No menus on the client: each click
-		-- moves to the next of the three.
+		-- An arrow on its right: Always, < 100% (and < 100% Calm) and Off one
+		-- click away (the wheel and typing hid them). No menus on the client:
+		-- each click moves to the next.
 		local arrow = CreateFrame("Button", nil, line)
 		arrow:SetSize(18, 18)
 		arrow:SetPoint("LEFT", box, "RIGHT", 2, 0)
@@ -752,7 +764,9 @@ local function BoxLine(parent)
 			box:Refresh()
 			if onChange then onChange(step) end
 		end
-		local PICKS = { { ALWAYS_STEP, L["Always"] }, { NOT_FULL_STEP, L["< 100% (not full)"] }, { 0, L["Off"] } }
+		local PICKS = { { ALWAYS_STEP, L["Always"] }, { NOT_FULL_STEP, L["< 100% (not full)"] } }
+		if calm then PICKS[#PICKS + 1] = { CALM_STEP, L["< 100% Calm (not full, only during Calm Timer)"] } end
+		PICKS[#PICKS + 1] = { 0, L["Off"] }
 		arrow:SetScript("OnClick", function(self)
 			if box:HasFocus() then box:ClearFocus() end
 			if MenuUtil and MenuUtil.CreateContextMenu then
@@ -770,7 +784,9 @@ local function BoxLine(parent)
 			end
 			Pick(PICKS[next][1])
 		end)
-		Tooltip(arrow, L["Pick Always, < 100% (not full) or Off. Other shares: scroll over the box, or type one."])
+		Tooltip(arrow, calm and L["Pick Always, < 100% (not full), < 100% Calm (not full, only during Calm Timer) or " ..
+			"Off. Other shares: scroll over the box, or type one."]
+			or L["Pick Always, < 100% (not full) or Off. Other shares: scroll over the box, or type one."])
 		-- (Greyed with its box.)
 		local setEnabled = box.SetEnabled
 		function box.SetEnabled(self, enabled)

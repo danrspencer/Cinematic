@@ -6,8 +6,8 @@
 -- that word's place while it's faded; with none, the amount in the middle.
 -- On your mana under your character and on your player frame's (the bars
 -- and the cast: PersonalManaCost.lua, which calls ns.UpdateManaAfter). Off
--- to start with: the UI Manager's Personal Resources page turns each on
--- (manaAfterDisplay, manaAfterPortrait).
+-- to start with: the Health & Resources page's Mana text turns it on for
+-- both (manaAfterCast; one per bar till 2026-11-15).
 -- (The game's own bars lower their fill by the cost as a cast starts, and
 -- their words with it, so there ours say what the game's do while those
 -- show; on our mana bar, and with the game's words off, ours are all there is.)
@@ -20,12 +20,11 @@
 local _, ns = ...
 
 local DEFAULTS = ns.DEFAULTS
-DEFAULTS.manaAfterDisplay = false   -- your mana's numbers under your character show what's left after the cast
-DEFAULTS.manaAfterPortrait = false  -- ...on your player frame
+DEFAULTS.manaAfterCast = false      -- your mana's numbers (under your character, on your player frame) show what's left after the cast
 
 local MANA = Enum and Enum.PowerType and Enum.PowerType.Mana or 0
 local TINT = { 0.7, 0.85, 1 } -- paler than the game's white: a guess
-local KEYS = { display = "manaAfterDisplay", portrait = "manaAfterPortrait" } -- each bar's setting
+local KEYS = { display = "manaAfterCast", portrait = "manaAfterCast" } -- each bar's setting (one for both)
 
 local texts = setmetatable({}, { __mode = "k" }) -- bar -> our words on it: { amount, percent }
 local muted = setmetatable({}, { __mode = "k" }) -- the game's words -> true, while faded for ours
@@ -218,7 +217,7 @@ function ns.DescribeManaText()
 	local db = ns.GetDB()
 	local ok, mode = pcall(GetCVar, "statusTextDisplay")
 	local function On(key) return db and db[key] and "on" or "off" end
-	return ("mana after cast: resource bar %s, player frame %s; Status Text %s; last cast: %s, shown on %s; "
-		.. "mana now %s"):format(On(KEYS.display), On(KEYS.portrait), ok and tostring(mode) or "?", last, lastPlaced,
+	return ("mana after cast (Mana text) %s; Status Text %s; last cast: %s, shown on %s; "
+		.. "mana now %s"):format(On(KEYS.display), ok and tostring(mode) or "?", last, lastPlaced,
 		Readable(mana) and tostring(mana) or "secret")
 end

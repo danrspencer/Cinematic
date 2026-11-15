@@ -441,10 +441,8 @@ function ColumnsOf(key, out, always, anyFight, page)
 		found = true
 	end
 	if fighting and not calm and ns.FightHold(key) and not always then
-		local wait = { player = "fightWaitPortrait", prd = "fightWaitHealth", prdpower = "fightWaitPower",
-			prdmana = "fightWaitMana" }
 		Add(out, "block", L["Held back at the fight's start while you're at rest (Health & Resources page)"],
-			"Personal Resources", wait[key])
+			"Personal Resources", "fightWaitPull")
 	end
 	if not found then
 		Add(out, "off", L["Nothing is ticked on its row: tick Always to keep it up"], page)

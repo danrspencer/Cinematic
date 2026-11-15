@@ -117,6 +117,31 @@ local function SplitBarGroups(set)
 	set("hoverGroups", groups)
 end
 
+-- Keep up (Health & Resources): the player frame's rows, or the PRD's (its
+-- health, power and the Cine Mana Bar under it), at the page's start values
+-- or never. The layout says whether the PRD's kept up, the frames choice the
+-- player frame (one set for both till 2026-11-15). The Cine Mana Bar: retail's.
+local function KeepUpPlayer(set, on)
+	if on then
+		ns.SetKeepUp(set, "prHealthPlayer", unpack(ns.KEEP_UP_HEALTH))
+		ns.SetKeepUp(set, "prPowerPlayer", unpack(ns.KEEP_UP_POWER))
+	else
+		ns.SetKeepUp(set, "prHealthPlayer", 0)
+		ns.SetKeepUp(set, "prPowerPlayer", 0)
+	end
+end
+local function KeepUpPrd(set, on, client)
+	if on then
+		ns.SetKeepUp(set, "prHealthPrd", unpack(ns.KEEP_UP_HEALTH))
+		ns.SetKeepUp(set, "prPowerPrd", unpack(ns.KEEP_UP_POWER))
+		if client == "retail" then ns.SetKeepUp(set, "prPowerMana", unpack(ns.KEEP_UP_POWER)) end
+	else
+		ns.SetKeepUp(set, "prHealthPrd", 0)
+		ns.SetKeepUp(set, "prPowerPrd", 0)
+		if client == "retail" then ns.SetKeepUp(set, "prPowerMana", 0) end
+	end
+end
+
 -- A layout module: Edit Mode switches to the layout called layout when the
 -- profile's picked (Layouts.lua: one of Cinematic's own is made first if it
 -- isn't there). No layout module: the player's own layout. ns.LAYOUT_PRESET:
@@ -128,10 +153,10 @@ ns.LAYOUT_PRESET = "*preset"
 local function Layout(key, name, layout, client, tip, also)
 	return { key = key, name = name, client = client, group = "layout", editMode = layout,
 		scope = { "Profiles/Edit Mode layout", "Standard Frames/Unit frames",
-			"Standard Frames/Personal Resource Display" }, tip = tip,
-		apply = function(set)
+			"Standard Frames/Personal Resource Display", "Personal Resources/Keep up" }, tip = tip,
+		apply = function(set, onClient)
 			set("editModeLayout", layout)
-			if also then also(set) end
+			if also then also(set, onClient) end
 		end }
 end
 
@@ -147,14 +172,19 @@ ns.PROFILE_MODULES = {
 		"not one the player's moved things in."),
 	Layout("layout-retail", "Retail Inspired layout", "Retail Inspired", "forever",
 		"Action bars centred along the bottom, the micro menu and bags in the corner, the XP bars under them, " ..
-		"as on retail. Fights bring up the player frame, not the personal resource display.",
-		function(set) set("combatShow", { prd = false, prdpower = false }) end),
+		"as on retail. Fights bring up the player frame, not the personal resource display, which isn't kept " ..
+		"up while you recover either.",
+		function(set, client)
+			set("combatShow", { prd = false, prdpower = false })
+			KeepUpPrd(set, false, client)
+		end),
 	Layout("layout-pure", "Personal Resource Centered layout", "Personal Resource Centered", nil,
 		"The personal resource display in the middle, the Cooldown Manager above it; fights bring it up. Turns " ..
 		"the game's personal resource display on if it's off.",
-		function(set)
+		function(set, client)
 			set("prdOn", true)
 			set("combatShow", { prd = true, prdpower = true })
+			KeepUpPrd(set, true, client)
 		end),
 
 	-- (The Shoulder Cam profile's, testers' for now: its HUD centered on the
@@ -193,29 +223,26 @@ ns.PROFILE_MODULES = {
 	-- display: it's the one that comes up, and stays up while recovering.)
 	{ key = "follow-fights-player", name = "Follow HUD: player frame up in fights", client = "forever",
 		scope = { "Standard Frames/Unit frames", "Standard Frames/top", "Personal Resources" },
-		tip = "Your player frame comes up in fights, and stays up while your health or power isn't full.",
+		tip = "Your player frame comes up in fights, stays up after them while your health or power isn't full, " ..
+			"and out of combat while your health is under 95% or your power under 50%.",
 		apply = function(set)
 			set("combatShow", { player = true })
-			set("prHealthPlayer", 0.99)
-			set("prPowerPlayer", 0.99)
+			KeepUpPlayer(set, true)
 		end },
 	{ key = "follow-enemy-player", name = "Follow HUD: player frame up with an enemy targeted", client = "forever",
 		scope = { "Standard Frames/Unit frames" },
 		tip = "Your player frame comes up with an enemy targeted.",
 		apply = function(set) set("enemyShow", { player = true }) end },
-	{ key = "follow-no-portrait", name = "Follow HUD: in place of your portrait", client = "forever",
+	{ key = "follow-no-portrait", name = "Follow HUD: in place of your portrait",
 		scope = { "Standard Frames/Unit frames", "Standard Frames/top", "Personal Resources" },
 		tip = "Your portrait stays down in fights and with an enemy targeted, and the personal resource display, " ..
 		"not your portrait, stays up while your health or power isn't full.",
 		apply = function(set)
 			set("combatShow", { player = false })
 			set("enemyShow", { player = false })
-			set("prHealthPlayer", 0)
-			set("prPowerPlayer", 0)
-			set("prHealthPrd", 0.99)
-			set("prPowerPrd", 0.99)
+			KeepUpPlayer(set, false) -- (the PRD's: the layout's, kept up to start with)
 		end },
-	{ key = "follow-frames", name = "Follow HUD: frames follow you", client = "forever",
+	{ key = "follow-frames", name = "Follow HUD: frames follow you",
 		scope = { "Shoulder Cam" },
 		tip = "The Shoulder Cam's Frames follow you on, with each of its frames ticked.",
 		apply = function(set)
@@ -228,12 +255,11 @@ ns.PROFILE_MODULES = {
 
 	-- What fades, and when
 	{ key = "recovering", name = "Up while recovering", scope = { "Standard Frames/top", "Personal Resources" },
-		tip = "The player frame and personal resource display stay up while health or power isn't full (rage and " ..
-		"the like: until back to 0).",
+		tip = "The player frame stays up in fights, after them while health or " ..
+		"power isn't full (rage and the like: until back to 0), and out of combat while health is under 95% or " ..
+		"power under 50%.",
 		apply = function(set)
-			for _, key in ipairs({ "prHealthPlayer", "prPowerPlayer", "prHealthPrd", "prPowerPrd", "prPowerMana" }) do
-				set(key, 0.99)
-			end
+			KeepUpPlayer(set, true) -- (the PRD's: the layout's)
 		end },
 	{ key = "no-fading", name = "Nothing fades", scope = { "Cinematic/General" },
 		tip = "The normal UI: nothing fades.",
@@ -294,13 +320,12 @@ ns.PROFILE_MODULES = {
 		"of target (these also for an enemy or friend targeted and in dungeons and raids) and the swing timer, but " ..
 		"no buffs or minimap (the minimap is up in dungeons and raids; the personal resource display: as " ..
 		"the layout has it); the cast bar shows all " ..
-		"through CineMode. The player frame and personal resource display stay up while health or power isn't full; " ..
+		"through CineMode. The player frame stays up in fights, after them while " ..
+		"health or power isn't full, and out of combat under 95% health or 50% power; " ..
 		"raid frames without names, buffs, threat, target markers, ready checks or titles in CineMode.",
 		apply = function(set)
 			-- (The personal resource display in fights: the layout module's.)
-			for _, key in ipairs({ "prHealthPlayer", "prPowerPlayer", "prHealthPrd", "prPowerPrd", "prPowerMana" }) do
-				set(key, 0.99)
-			end
+			KeepUpPlayer(set, true) -- (the PRD's: the layout's)
 			set("unitPartsFocusToT", true)
 			set("cineShow", { castbar = true, raidnames = false, raidbuffs = false, raidthreat = false,
 				raidtarget = false, raidready = false, raidtitles = false })
@@ -726,7 +751,6 @@ ns.PROFILE_MODULES = {
 			-- (Its Show in row's rule is everyone's default: CursorHide.lua's RULE_DEFAULTS.)
 			set("cursorHide", true)
 		end },
-
 	-- Sound and chat
 	{ key = "music-fatigue", name = "Music fatigue", scope = { "Audio/Music" },
 		tip = "No camera starts music again within half a minute of the last start.",

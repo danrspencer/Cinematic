@@ -2003,11 +2003,17 @@ local function HandleSlash(msg)
 		ns.Print(("power %s / %s, type %s (%s)"):format(show(UnitPower("player")),
 			show(UnitPowerMax("player")), show(powerToken), show(powerType)))
 		ns.Print(("last health/power change: %.1f sec ago"):format(ns.GetSecondsSinceVitalsChange()))
-		ns.Print(("Show below: player health %s, power %s; PRD health %s, power %s; Cine Mana Bar %s; " ..
-			"after fights only %s; recovering: %s, in combat: %s"):format(tostring(ns.db.prHealthPlayer),
-			tostring(ns.db.prPowerPlayer), tostring(ns.db.prHealthPrd), tostring(ns.db.prPowerPrd),
-			tostring(ns.db.prPowerMana),
-			tostring(ns.db.notFullAfterFight), tostring(ns.IsPlayerRecovering()), tostring(InCombatLockdown())))
+		-- (Keep up: In combat / After combat / Always, as each column goes by now.)
+		local function Columns(key)
+			if not ns.PrColumnShare then return tostring(ns.db[key]) end
+			return ("%s/%s/%s"):format(tostring(ns.PrColumnShare(ns.db, key, 1)), tostring(ns.PrColumnShare(ns.db, key, 2)),
+				tostring(ns.PrColumnShare(ns.db, key, 3)))
+		end
+		ns.Print(("Keep up (combat/after/always): player health %s, power %s; PRD health %s, power %s; " ..
+			"Cine Mana Bar %s; after combat: %s; Wait at pull %s; recovering: %s, in combat: %s"):format(
+			Columns("prHealthPlayer"), Columns("prPowerPlayer"), Columns("prHealthPrd"), Columns("prPowerPrd"),
+			Columns("prPowerMana"), tostring(ns.AfterFightCause and ns.AfterFightCause()),
+			tostring(ns.db.fightWaitPull), tostring(ns.IsPlayerRecovering()), tostring(InCombatLockdown())))
 		for _, entry in ipairs(ns.managed) do
 			if entry.name == "PlayerFrame" then
 				ns.Print(("PlayerFrame alpha %.2f, group %s, nested %s"):format(

@@ -15,7 +15,8 @@ local L = ns.L
 ns.ADDON_POWER_ROWS = ns.ADDON_POWER_ROWS or {}
 table.insert(ns.ADDON_POWER_ROWS, { addon = "ElvUI",
 	tip = L["ElvUI's player power bar, while it's detached from its player frame."] })
-ns.DEFAULTS.prPowerElvUI = 0.99 -- (Show below: not full)
+-- (Its Keep up columns, as the other power rows': PersonalResources.lua,
+-- loaded after this, sets them for every row here.)
 
 -- Advanced Frames rows: one frame each. (from: the row that held it with
 -- others till 2026-11-12, whose settings it starts with: ns.SplitAddonRows.)

@@ -4723,6 +4723,8 @@ local lastCastAt = -math.huge
 local FALL_LANDING_GRACE = 1
 local lastFallingAt = -math.huge
 local lastFallDamageAt = -math.huge
+-- (Which of them it was, for the Why window: ns.lastFallDamageCause, "fall",
+-- "lifetap" or "health". Not a local: the file is near Lua's local cap.)
 
 -- Coming back to life does too, until health and power are full (however
 -- long that takes).
@@ -6602,7 +6604,7 @@ do
 		if event == "UNIT_SPELLCAST_SUCCEEDED" then
 			lastCastAt = now
 			if ns.CostsHealth(spellID) then
-				lastFallDamageAt = now
+				lastFallDamageAt, ns.lastFallDamageCause = now, "lifetap"
 			end
 			return
 		end
@@ -6611,7 +6613,7 @@ do
 		end
 		if event == "UNIT_HEALTH" then
 			if ns.Flag(IsFalling()) or now - lastFallingAt <= FALL_LANDING_GRACE then
-				lastFallDamageAt = now
+				lastFallDamageAt, ns.lastFallDamageCause = now, "fall"
 			end
 			-- Where health can be read, any loss outside a fight counts too
 			-- (lava, drowning, a spell that costs health). Not dying. Goes
@@ -6625,7 +6627,7 @@ do
 				local missing, last = most - health, ns.lastOwnVitals
 				if last and health < last[1] and missing > last[2] and health > 0
 					and not ns.Flag(UnitIsDeadOrGhost("player")) then
-					lastFallDamageAt = now
+					lastFallDamageAt, ns.lastFallDamageCause = now, "health"
 				end
 				last = last or {}
 				last[1], last[2] = health, missing
@@ -6634,6 +6636,21 @@ do
 		end
 		lastVitalsChange = now
 	end))
+end
+
+-- What has the after-fight window open now (the Frames pass's
+-- portraitAllowed), for the Why window: "resurrect" (till health and power
+-- are full), or "fight", "fall", "lifetap" or "health" and the seconds since.
+-- nil: it's shut.
+function ns.AfterFightCause()
+	if resurrectRecovering then return "resurrect" end
+	local now, calmTime = GetTime(), ns.db.calmTime or 0
+	if lastFallDamageAt > lastCombatAt and ns.lastFallDamageCause then
+		if now - lastFallDamageAt < calmTime then return ns.lastFallDamageCause, now - lastFallDamageAt end
+	elseif now - lastCombatAt < calmTime then
+		return "fight", now - lastCombatAt
+	end
+	return nil
 end
 
 local function IsPlayerRecovering()
@@ -12178,15 +12195,6 @@ function ns.UpdateFrames(cinematic, elapsed)
 		entry.standInSecret = nil
 		if entry.frame == personalPower.standIn and target == 0 and cinematic and not deathFade and not immersive then
 			entry.standInSecret = ns.ThresholdSecret(PORTRAIT_FRAMES[entry.name], entry) or nil
-		end
-		-- (Health & Resources: Opacity while hidden, and fading in as health or
-		-- power nears a row's share (Fade range). Not while the game sets the
-		-- alpha itself from a secret value: its curve has both.)
-		if target < 1 and cinematic and not deathFade and not immersive and not entry.vitalsSecret
-			and not entry.manaSecret and not entry.standInSecret
-			and (PORTRAIT_FRAMES[entry.name] or ns.PET_FRAMES[entry.name]) then
-			local level = ns.YourFrameLevel(PORTRAIT_FRAMES[entry.name], entry)
-			if level > target then target = level end
 		end
 		-- (Swing timer page: in CineMode and out, hovering included.)
 		if entry.group == "swing" and ns.IsSwingBarUnused(entry.name) then
