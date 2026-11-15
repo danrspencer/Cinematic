@@ -356,9 +356,9 @@ local GIVEN_RULES = { ["not combat"] = true, ["not combat and world"] = true,
 	["not combat and (world or city)"] = true }
 -- Any of these on it is a choice of yours. (Not quietShow: Out of combat is
 -- its start.)
-local CHOICE_LISTS = { "combatShow", "calmShow", "camShow", "cineModeShow", "enemyShow", "friendlyShow", "bgShow",
+local CHOICE_LISTS = { "combatShow", "calmShow", "camShow", "enemyShow", "friendlyShow", "bgShow",
 	"worldShow", "cityShow", "groupShow", "instanceShow", "rowFollow" }
-local ROW_LISTS = { "combatShow", "calmShow", "quietShow", "camShow", "cineModeShow", "enemyShow", "friendlyShow",
+local ROW_LISTS = { "combatShow", "calmShow", "quietShow", "camShow", "enemyShow", "friendlyShow",
 	"bgShow", "worldShow", "cityShow", "groupShow", "instanceShow", "rowFollow" }
 -- The old row onto each moment's, then gone. t: the live settings or a saved
 -- profile. Left as it came (Always, no rule or ticks of yours): each moment's

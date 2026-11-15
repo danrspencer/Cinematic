@@ -92,7 +92,7 @@ function ns.RulePieces()
 			{ "elite28", L["Elite near (28 yards)"] }, { "elite40", L["Elite near (40 yards)"] } } },
 		{ L["Location"], { 0.45, 0.75, 1 }, location },
 		{ L["You"], { 0.8, 0.6, 1 }, { { "mounted", L["Mounted"] }, { "indoors", L["Indoors"] }, { "taxi", L["On a flight path"] }, { "dead", L["Dead"] }, { "casting", L["Casting"] }, { "flagged", L["PvP flagged"] },
-			{ "group", L["Grouped"] }, { "cinemode", L["In CineMode"] } } },
+			{ "group", L["Grouped"] } } },
 		{ L["Role"], { 0.4, 0.85, 0.5 }, { { "tank", L["Tank"] }, { "healer", L["Healer"] }, { "damage", L["Damage"] } } },
 		{ L["Class"], { 0.85, 0.75, 0.6 }, classes },
 		-- (Last: the editor shows it only for the Tooltips row, tooltip:All.)
@@ -675,9 +675,9 @@ local FOLLOW_COLOR = { 0.79, 0.73, 1 }
 -- The targets' names in a menu (the rest are their columns').
 local MENU_NAMES = { combatShow = "In combat", enemyShow = "Enemy targeted", friendlyShow = "Friend targeted" }
 
--- Across a row, from the label's end: Always, CineMode (the Show in tables'),
--- the dropdowns, Edit. (Its icons: Media/make_quill.py, Media/make_grid_icon.py.)
-local ALWAYS_W, CINE_W, MENU_W, RULE_W, GAP = 40, 44, 96, 22, 2
+-- Across a row, from the label's end: Always, the dropdowns, Edit. (Its
+-- icons: Media/make_quill.py, Media/make_grid_icon.py.)
+local ALWAYS_W, MENU_W, RULE_W, GAP = 40, 96, 22, 2
 -- (For rows lined up with the Always column without a grid of their own:
 -- the Addons page's supported addons' switches.)
 ns.GRID_ALWAYS_W, ns.GRID_GAP = ALWAYS_W, GAP
@@ -696,18 +696,13 @@ end
 
 -- Where a grid's columns go across a row, labelWidth in. layout: { groups,
 -- the dropdowns it has ({ 1, 2, 3 } when nil); always = false: no Always
--- column; cine: the CineMode column; edit: that column; menuW: the dropdowns'
--- width (nil: MENU_W) }.
+-- column; edit: that column; menuW: the dropdowns' width (nil: MENU_W) }.
 local function Columns(layout)
 	local menuW = layout.menuW or MENU_W
 	local x, cols = 0, { menus = {}, menuW = menuW }
 	if layout.always ~= false then
 		cols.always = x
 		x = x + ALWAYS_W + GAP
-	end
-	if layout.cine then
-		cols.cine = x
-		x = x + CINE_W + GAP
 	end
 	for _, g in ipairs(layout.groups or { 1, 2, 3 }) do
 		cols.menus[g] = x
@@ -723,16 +718,13 @@ local function Columns(layout)
 end
 -- How wide a grid's columns are (the label's not counted).
 function ns.GridWidth(layout) return Columns(layout).width end
--- The Show in tables (ns.GridTable): their columns, and what the CineMode
--- column takes off the names, so they still fit beside the scrollbar.
-local TABLE_LAYOUT, TABLE_LABEL_TRIM = { cine = true, edit = true }, 12
--- A table whose rows only act in CineMode (rows.noCine: HUD, Gamepad,
--- Tooltips, Cursor Hide), where a CineMode tick would only be Always again:
--- no such column, its room shared out to the dropdowns.
-local NO_CINE_LAYOUT = { edit = true, menuW = MENU_W + math.floor((CINE_W + GAP) / 3) }
+-- The Show in tables (ns.GridTable): their columns, and what's taken off the
+-- names, so they still fit beside the scrollbar. (The CineMode column is gone,
+-- 2026-11-15: its 46 shared out to the dropdowns, 15 each.)
+local TABLE_LAYOUT, TABLE_LABEL_TRIM = { edit = true, menuW = MENU_W + 15 }, 12
 -- (For rows laid out under a table's, lined up with its columns: the Game
 -- Frames page's unit frame parts.)
-ns.GRID_NO_CINE_LAYOUT, ns.GRID_TABLE_LABEL_TRIM = NO_CINE_LAYOUT, TABLE_LABEL_TRIM
+ns.GRID_TABLE_LAYOUT, ns.GRID_TABLE_LABEL_TRIM = TABLE_LAYOUT, TABLE_LABEL_TRIM
 -- Combat and Location columns only (no Always, Target or rule): a row that
 -- only says where and whether in fights, the Minimap page's Nearby Dots and Tracking.
 ns.GRID_PLACE_COMBAT_LAYOUT = { always = false, groups = { 1, 3 } }
@@ -741,8 +733,8 @@ ns.GRID_PLACE_COMBAT_LAYOUT = { always = false, groups = { 1, 3 } }
 -- e.g. targetdead.)
 ns.GRID_PLACE_COMBAT_EDIT_LAYOUT = { groups = { 1, 3 }, edit = true }
 -- How wide one is, whole, for names labelWidth wide.
-function ns.GridTableWidth(labelWidth, noCine)
-	return labelWidth - TABLE_LABEL_TRIM + ns.GridWidth(noCine and NO_CINE_LAYOUT or TABLE_LAYOUT)
+function ns.GridTableWidth(labelWidth)
+	return labelWidth - TABLE_LABEL_TRIM + ns.GridWidth(TABLE_LAYOUT)
 end
 
 -- The headings over a grid's columns: at top's top left, labelWidth in
@@ -757,8 +749,6 @@ function ns.GridHeadings(kit, parent, top, labelWidth, layout)
 		made[#made + 1] = heading
 	end
 	if cols.always then Heading(layout.alwaysHeading or L["Always"], cols.always, ALWAYS_W) end
-	-- (Short: CineMode in full ran into Always and was cut off. Its tip says it in full.)
-	if cols.cine then Heading(L["Cine"], cols.cine, CINE_W) end
 	for g, group in ipairs(MENU_GROUPS) do
 		if cols.menus[g] then Heading(L[group.heading], cols.menus[g], cols.menuW, group.color) end
 	end
@@ -859,17 +849,6 @@ function ns.GridRow(kit, parent, labelWidth, layout, spec)
 			Changed()
 		end)
 		Tooltip(always, spec.always.tip)
-	end
-	local cine
-	if spec.cine and cols.cine then
-		cine = ns.SkinCheck(CreateFrame("CheckButton", nil, row, "UICheckButtonTemplate"))
-		cine:SetSize(26, 26)
-		cine:SetPoint("LEFT", cols.cine + (CINE_W - 26) / 2, 0)
-		cine:SetScript("OnClick", function(self)
-			spec.cine.set(self:GetChecked() and true or false)
-			Changed()
-		end)
-		Tooltip(cine, spec.cine.tip)
 	end
 
 	-- The dropdowns, each its items' ticks.
@@ -1068,12 +1047,6 @@ function ns.GridRow(kit, parent, labelWidth, layout, spec)
 			always:SetChecked(on)
 			always:SetEnabled(enabled)
 		end
-		if cine then
-			cine:SetShown(full and not text and not leader)
-			cine:SetChecked(spec.cine.isOn())
-			cine:SetEnabled(enabled and not on)
-			cine:SetAlpha((enabled and not on) and 1 or 0.35)
-		end
 		for _, menu in ipairs(menus) do
 			menu:SetShown(full and not text and not leader)
 			menu:Refresh()
@@ -1159,7 +1132,6 @@ end
 -- tick of its own: In combat (the fight, and the Calm Timer after it) and Out
 -- of combat (quietShow: the rest). opts (nil: none):
 --   quiet, cam: Out of combat (quietShow) and In a camera mode (camShow) in Combat too;
---   cinemode: the row has the CineMode column (cineModeShow), its word in the row's rule;
 --   anyFight: its In combat in any fight (not greyed while CineMode doesn't stay on in them);
 --   omit: lists left out (list -> true: In combat, the targets, a place);
 --   calmItem: in place of the Calm Timer, a menu entry of its own (cameras' wait).
@@ -1180,7 +1152,7 @@ function ns.ListRowParts(Key, columns, columnTips, setAlways, opts)
 		ns.GetDB()[columns[c][3]][Key()] = value
 	end
 	-- (The lists that aren't columns: Out of combat, In a camera mode.)
-	local EXTRA_ON = { quietShow = ns.IsQuietShowOn, camShow = ns.IsCamShowOn, cineModeShow = ns.IsCineModeShowOn }
+	local EXTRA_ON = { quietShow = ns.IsQuietShowOn, camShow = ns.IsCamShowOn }
 	local function ExtraOn(list) return EXTRA_ON[list](Key()) and true or false end
 	local function SetExtra(list, value)
 		KeepFollowers(list, EXTRA_ON[list])
@@ -1249,7 +1221,6 @@ function ns.ListRowParts(Key, columns, columnTips, setAlways, opts)
 	end
 	local function Words()
 		local words = {}
-		if opts.cinemode and ExtraOn("cineModeShow") then words[1] = "cinemode" end
 		for c = 2, #columns do
 			if not omit[columns[c][3]] and Ticked(c) then words[#words + 1] = LIST_WORD[columns[c][3]] end
 		end
@@ -1264,7 +1235,6 @@ function ns.ListRowParts(Key, columns, columnTips, setAlways, opts)
 		end
 		if opts.quiet then SetExtra("quietShow", ticked.nocombat and true or false) end
 		if opts.cam then SetExtra("camShow", ticked.camera and true or false) end
-		if opts.cinemode then SetExtra("cineModeShow", ticked.cinemode and true or false) end
 	end
 	-- (The words this row's dropdowns hold, for reading a rule back into them.)
 	local grid = {}
@@ -1274,10 +1244,7 @@ function ns.ListRowParts(Key, columns, columnTips, setAlways, opts)
 	end
 	grid.nocombat = opts.quiet or nil
 	grid.camera = opts.cam or nil
-	grid.cinemode = opts.cinemode or nil
-	return { menus = menus, words = Words, apply = Apply, grid = grid, keepFollowers = KeepFollowers,
-		cine = { isOn = function() return ExtraOn("cineModeShow") end,
-			set = function(value) SetExtra("cineModeShow", value) end } }
+	return { menus = menus, words = Words, apply = Apply, grid = grid, keepFollowers = KeepFollowers }
 end
 
 -- The Standard Frames table, a row per item, as dropdowns (ShowTable does
@@ -1287,7 +1254,7 @@ function ns.GridTable(content, columnTop, rows, kit)
 	local LABEL_WIDTH, ROW_HEIGHT, COLUMNS = kit.labelWidth - TABLE_LABEL_TRIM, kit.rowHeight, kit.columns
 	-- (rows.layout: a table of its own columns, ns.GRID_PLACE_COMBAT_LAYOUT's
 	-- Combat and Location only, for the Minimap page's rows, 2026-11-13.)
-	local LAYOUT = rows.layout or (rows.noCine and NO_CINE_LAYOUT or TABLE_LAYOUT)
+	local LAYOUT = rows.layout or TABLE_LAYOUT
 	-- (The rows a row may follow: the table's others, or rows.followRows: a
 	-- table of one row in a list of them, the Unit frames tab's.)
 	local choices = {}
@@ -1338,10 +1305,9 @@ function ns.GridTable(content, columnTop, rows, kit)
 		local opts = {}
 		for k, v in pairs(rows.opts or {}) do opts[k] = v end
 		for k, v in pairs(item.opts or {}) do opts[k] = v end
-		opts.cinemode = not item.alwaysOnly and not rows.noCine
 		if not item.alwaysOnly then
 			-- (frameRules too: its rule. Left out, Reset page kept a row's rule.)
-			for _, list in ipairs({ "calmShow", "quietShow", "camShow", "cineModeShow", "rowFollow", "frameRules" }) do
+			for _, list in ipairs({ "calmShow", "quietShow", "camShow", "rowFollow", "frameRules" }) do
 				kit.RecordKey(content, list)
 				kit.RecordRow(content, list, item.key)
 			end
@@ -1373,9 +1339,6 @@ function ns.GridTable(content, columnTop, rows, kit)
 			enabled = item.showKey and function() return kit.RowShown(item) end or nil,
 		}
 		if not item.alwaysOnly then
-			spec.cine = not rows.noCine and { isOn = parts.cine.isOn, set = parts.cine.set,
-				tip = L["Shows it while CineMode is on, whatever the other columns say. Outside CineMode this " ..
-				"tick does nothing."] }
 			spec.menus = parts.menus
 			spec.follow = { key = Key, choices = Choices }
 			spec.rule = { key = Key, label = function() return item.label end, grid = parts.grid,

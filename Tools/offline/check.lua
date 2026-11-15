@@ -1012,23 +1012,32 @@ if arg[1] and not update then
 		if not ran then print("problem\tCard clear of chat: /cine debug cardchat: " .. tostring(why)) end
 		chatDb.cardClearChat = wasClear
 	end
-	-- The Show in tables' CineMode column: its tick shows the row in CineMode
-	-- only, and reads as the rule word both ways. And the Toggle CineMode key
-	-- with Start in CineMode off: it starts CineMode, then stops it, no snooze.
+	-- The CineMode column and its CQL word are gone (2026-11-15): the word no
+	-- longer reads, and saved rules lose it with its NOT and join. And the
+	-- Toggle CineMode key with Start in CineMode off: it starts CineMode, then
+	-- stops it, no snooze.
 	do
 		local cineDb, key = ns.GetDB(), "effect:letterbox"
-		local wasTick = cineDb.cineModeShow[key]
-		cineDb.cineModeShow[key] = true
-		if ns.RuleShows(key, { cinemode = true }) ~= true or ns.RuleShows(key, { cinemode = false }) ~= nil then
-			print("problem\tCineMode column: its tick doesn't show the row in CineMode only")
+		if ns.CompileRule("cinemode") or ns.CompileRule("cine or combat") then
+			print("problem\tCineMode word: CQL still reads cinemode or cine")
 		end
-		if not ns.RowTicksRule(key):find("cinemode") then
-			print("problem\tCineMode column: its tick isn't in the row's ticks as a rule")
+		for text, want in pairs({ ["cinemode"] = "", ["combat and cinemode"] = "combat",
+			["not cinemode and city"] = "city", ["(cinemode) or boss"] = "boss", ["!Cine && raid"] = "raid",
+			["world and (cine or city)"] = "world and (city)", ["mounted or not (cinemode)"] = "mounted",
+			["city or raid"] = "city or raid" }) do
+			local got = ns.StripCineWord(text) or ""
+			if got ~= want then
+				print(('problem\tCineMode word: "%s" stripped is "%s", not "%s"'):format(text, got, want))
+			end
 		end
-		cineDb.cineModeShow[key] = wasTick
-		local always, ticked = ns.ReadGridRule("cinemode or combat", { cinemode = true, combat = true })
-		if always ~= false or not ticked.cinemode then
-			print("problem\tCineMode column: a rule of its word doesn't go back into the column")
+		local saved = { cineModeShow = { ["music"] = true }, frameRules = { a = "cinemode", b = "combat or cinemode" },
+			combatSounds = "in#cinemode and boss#1@100;out##2@100", cardSounds_zone = "show#cine#",
+			cameraRows = { ["t1.cond"] = "not cinemode", ["t1.name"] = "cinemode" } }
+		ns.DropCineModeWord(saved)
+		if saved.cineModeShow or saved.frameRules.a or saved.frameRules.b ~= "combat"
+			or saved.combatSounds ~= "in#boss#1@100;out##2@100" or saved.cardSounds_zone ~= "show##"
+			or saved.cameraRows["t1.cond"] or saved.cameraRows["t1.name"] ~= "cinemode" then
+			print("problem\tCineMode word: a saved profile kept its ticks or the word in a rule")
 		end
 		local wasFade, wasEnabled, wasChosen, wasPrint = cineDb.fadeUI, cineDb.enabled, ns.ProfileChosen, ns.Print
 		cineDb.fadeUI, cineDb.enabled = false, true

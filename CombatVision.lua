@@ -981,14 +981,14 @@ function ns.CutCard(frame)
 end
 
 -- Going into a fight and coming out of it: Entering and Leaving combat's
--- cards (their Show in rows read with the rules' entering or leaving true,
--- and CineMode as the fight began: cine), and the fight's sound with it.
-local fightStart, cineAtStart = 0, false
-local function FightCard(enter, cine)
+-- cards (their Show in rows read with the rules' entering or leaving true),
+-- and the fight's sound with it.
+local fightStart = 0
+local function FightCard(enter)
 	local edge = enter and "enter" or "leave"
 	ns.Cards.Fire(enter and "combatIn" or "combatOut", {
-		name = ns.CardWords(enter and "combatTextIn" or "combatTextOut"), edge = edge, cine = cine,
-		sound = function() ns.PlayCombatCueSound(edge, cine) end, -- (CombatSoundRules.lua)
+		name = ns.CardWords(enter and "combatTextIn" or "combatTextOut"), edge = edge,
+		sound = function() ns.PlayCombatCueSound(edge) end, -- (CombatSoundRules.lua)
 	})
 end
 
@@ -1091,15 +1091,15 @@ end
 -- row and its Show in row (Cards.lua), and why not.
 local function BossAllowed(db, tick)
 	if not db[tick] then return false, tick .. " off" end
-	return ns.CardAllowed("boss", "enter", ns.lastCinematic and true or false)
+	return ns.CardAllowed("boss", "enter")
 end
 
 -- A boss's card on the screen (already allowed: BossAllowed), the pull's
 -- sound with it unless quiet (a card before the pull: no fight yet).
-local function BossCard(card, cine, quiet)
-	card.edge, card.cine = "enter", cine
+local function BossCard(card, quiet)
+	card.edge = "enter"
 	if not quiet then
-		card.sound = function() ns.PlayCombatCueSound("enter", cine) end
+		card.sound = function() ns.PlayCombatCueSound("enter") end
 	end
 	ns.Cards.Fire("boss", card, true)
 end
@@ -1133,7 +1133,7 @@ local function CardBeforePull(unit, tick)
 	end
 	BossLog(("card before the pull for %s: %s"):format(who, how))
 	bossRun.preAt = GetTime()
-	BossCard({ name = (UnitName(unit)), sub = InstanceLine(), meta = "" }, ns.lastCinematic and true or false, true)
+	BossCard({ name = (UnitName(unit)), sub = InstanceLine(), meta = "" }, true)
 end
 
 -- Near: the plates looked at twice a second, only out of a fight in an instance.
@@ -1201,7 +1201,7 @@ local function EncounterStart(db, encounterID, name)
 		-- (Already fighting, a pull from range: over the card playing.)
 		BossLog(("card at the pull of %s, already in combat: plays now (%s)"):format(who, card.meta))
 		bossRun.cardAt = GetTime()
-		BossCard(card, ns.lastCinematic and true or false)
+		BossCard(card)
 	else
 		BossLog(("card at the pull of %s: waits for combat to start (%s)"):format(who, card.meta))
 		bossRun.pending = card
@@ -1223,7 +1223,7 @@ watcher:SetScript("OnEvent", function(_, event, ...)
 	end
 	if event == "PLAYER_REGEN_DISABLED" then
 		ns.Cards.Cut("combatOut") -- (a respite still showing)
-		fightStart, cineAtStart = GetTime(), ns.lastCinematic and true or false
+		fightStart = GetTime()
 		local card = bossRun.pending
 		bossRun.pending = nil
 		if card then
@@ -1232,9 +1232,9 @@ watcher:SetScript("OnEvent", function(_, event, ...)
 		end
 		if card and GetTime() - card.at < PULL_GAP then
 			bossRun.cardAt = GetTime()
-			BossCard(card, cineAtStart)
+			BossCard(card)
 		elseif GetTime() - bossRun.cardAt >= PULL_GAP then
-			FightCard(true, cineAtStart)
+			FightCard(true)
 		else
 			BossLog("combat started: no Entering combat card, a boss card just played")
 		end
@@ -1243,7 +1243,7 @@ watcher:SetScript("OnEvent", function(_, event, ...)
 		ns.Cards.Cut("combatIn")
 		ns.Cards.Cut("boss")
 		if GetTime() - fightStart >= db.combatMinFight then
-			FightCard(false, cineAtStart)
+			FightCard(false)
 		end
 	elseif event == "ENCOUNTER_START" then
 		EncounterStart(db, ...)
@@ -1256,7 +1256,7 @@ watcher:SetScript("OnEvent", function(_, event, ...)
 		-- (The Boss event's sounds for a kill or a wipe.)
 		local result = Plain(tostring, success)
 		if ns.CardOn("boss") and result then
-			ns.PlayCombatCueSound(result == "1" and "kill" or "wipe", ns.lastCinematic and true or false)
+			ns.PlayCombatCueSound(result == "1" and "kill" or "wipe")
 		end
 	elseif event == "PLAYER_TARGET_CHANGED" then
 		if db.combatBossTarget and ns.CardOn("boss") and UnitExists("target") then

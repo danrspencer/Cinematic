@@ -3375,9 +3375,6 @@ function ns.IsPlaceShowOn(list, key) return IsListOn(list, key, PlaceDefaults(li
 -- that offer them (Visual Effects, music, tooltips...).
 function ns.IsQuietShowOn(key) return IsListOn("quietShow", key, NO_DEFAULTS) end
 function ns.IsCamShowOn(key) return IsListOn("camShow", key, NO_DEFAULTS) end
--- The Show in tables' CineMode column (not cineShow, their Always): on while
--- CineMode is, for every kind of row (ns.RuleShows reads it).
-function ns.IsCineModeShowOn(key) return IsListOn("cineModeShow", key, NO_DEFAULTS) end
 
 -- The place columns that apply where you are now.
 -- Tables UpdateFrames (and what it calls) fills afresh each tick, kept rather
@@ -3448,8 +3445,6 @@ ns.RULE_WORDS = {
 	flagged = "flagged", mounted = "mounted", taxi = "taxi", flightpath = "taxi", ontaxi = "taxi",
 	indoors = "indoors", inside = "indoors", -- (inside a building or cave: IsIndoors)
 	dead = "dead", ghost = "dead", casting = "casting", cast = "casting", channeling = "casting",
-	-- (CineMode on: always so for the rows read in it, the frames'; the Cards page's are read any time.)
-	cinemode = "cinemode", cine = "cinemode",
 	-- (A fight starting or ending: only the Cards page's fight rows are read then.)
 	entering = "entering", enter = "entering", leaving = "leaving", leave = "leaving",
 	boss = "boss",
@@ -3589,7 +3584,6 @@ do
 		if ns.IsCineShowOn(key) then return "always" end
 		local words = {}
 		local function Add(on, word) if on then words[#words + 1] = word end end
-		Add(ns.IsCineModeShowOn(key), "cinemode")
 		Add(ns.IsCombatShowOn(key), "combat")
 		Add(ns.IsCalmShowOn(key), "calm")
 		Add(ns.IsQuietShowOn(key), "nocombat")
@@ -3652,10 +3646,6 @@ do
 		local test = ns.RuleTest(key)
 		if test then
 			return test(facts) and true or false
-		end
-		-- (No rule: the CineMode column's tick shows it now; else the row's other ticks say.)
-		if facts.cinemode and ns.IsCineModeShowOn(key) then
-			return true
 		end
 	end
 	function ns.RuleShows(key, facts)
@@ -4164,7 +4154,7 @@ do
 		-- whose fields are walked for changes): the last full working out, and
 		-- the words each call sets. ns.RuleShows keeps each row's answer till
 		-- it changes. (ns.sharedFacts: the one table it holds for.)
-		local sig = (facts.combat and 1 or 0) + (facts.nocombat and 2 or 0) + (facts.cinemode and 4 or 0)
+		local sig = (facts.combat and 1 or 0) + (facts.nocombat and 2 or 0)
 			+ (facts.entering and 8 or 0) + (facts.leaving and 16 or 0) + (facts.tipenemy and 32 or 0)
 			+ (facts.tipfriendly and 64 or 0) + (facts.tipgather and 128 or 0) + (facts.tipquest and 256 or 0)
 			+ (facts.tipother and 512 or 0) + (facts.target and 1024 or 0) + (facts.enemy and 2048 or 0)
@@ -4176,14 +4166,9 @@ do
 		local now = GetTime()
 		inCombat = inCombat and true or false
 		-- (A fight starting or ending: only while the Cards page reads a fight
-		-- row then, ns.combatEdge "enter" or "leave"; CineMode as the fight began.)
+		-- row then, ns.combatEdge "enter" or "leave".)
 		local edge = ns.combatEdge
 		facts.entering, facts.leaving = edge == "enter", edge == "leave"
-		if edge then
-			facts.cinemode = ns.combatEdgeCine and true or false
-		else
-			facts.cinemode = ns.lastCinematic and true or false
-		end
 		-- (The tooltip's kinds, while Effects asks about one: ns.tooltipKinds.)
 		local tip = ns.tooltipKinds
 		facts.tipenemy, facts.tipfriendly = tip and tip.tipenemy or false, tip and tip.tipfriendly or false
@@ -4538,7 +4523,7 @@ do
 			-- up only where Always or a place keeps them. The fight itself, not the
 			-- Calm Timer after it.)
 			if ticked and (fight or isOn == CastIsOn) and ns.FightHold(item.key)
-				and not (ns.IsCineShowOn(item.key) or ns.IsCineModeShowOn(item.key) or KeptHere(placeLists, item.key)) then
+				and not (ns.IsCineShowOn(item.key) or KeptHere(placeLists, item.key)) then
 				ticked = false
 			end
 			if applies and ticked then

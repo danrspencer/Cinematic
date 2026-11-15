@@ -1457,7 +1457,6 @@ function ns.CreateDamageVisionPanel(kit)
 	local header = stack:Header(content, L["Show in"])
 	local lastRow = ns.ShowTable(content, header, {
 		opts = { anyFight = true }, underHeader = true,
-		noCine = true, -- (held to CineMode on the CineMode page: Allow outside CineMode)
 		{ key = ROW_KEY, label = L["Damage Vision"], alwaysKey = "damageVisionAlways",
 			alwaysOn = function() return ns.GetDB().damageVisionAlways end,
 			setAlways = function(value) ns.GetDB().damageVisionAlways = value Changed() end,

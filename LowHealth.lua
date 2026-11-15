@@ -3638,7 +3638,6 @@ function ns.CreateVitalsVisionPanel(kit)
 	local header = stack:Header(content, L["Show in"])
 	local lastRow = ns.ShowTable(content, header, {
 		opts = { anyFight = true }, underHeader = true,
-		noCine = true, -- (held to CineMode on the CineMode page: Allow outside CineMode)
 		{ key = ROW_KEY, label = L["Vitals Vision"], alwaysKey = "lowHealthAlways",
 			alwaysOn = function() return ns.GetDB().lowHealthAlways end,
 			setAlways = function(value) ns.GetDB().lowHealthAlways = value Changed() end,

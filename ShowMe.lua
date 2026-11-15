@@ -219,19 +219,10 @@ function ns.ShowMeWhen(key, name)
 				if list == "quietShow" then quiet = true else others = true end
 			end
 		end
-		local cine = Ticked(base, "cineModeShow", row)
-		if not others and cine and not quiet then
-			local _, cineScenes = Scenes(base)
-			if #cineScenes > 0 then
-				return L["In CineMode"], true,
-					(L["Only in CineMode, which comes on when you %s."]):format(Names(cineScenes, 5))
-			end
-			return L["In CineMode"], true, L["Only while CineMode is on."]
-		end
-		if quiet and not others and not cine then
+		if quiet and not others then
 			return L["Out of fights"], true, L["Whenever you're out of a fight."]
 		end
-		if not (others or quiet or cine) then return L["Off"], false, L["Not in this profile."] end
+		if not (others or quiet) then return L["Off"], false, L["Not in this profile."] end
 		return L["Sometimes"], true, L["At the moments its Show in row ticks."]
 	end
 	if key == "camera" then

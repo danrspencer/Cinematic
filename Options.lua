@@ -5279,7 +5279,7 @@ local function CreateEffectsPanel()
 		"cozy and the rest). Location: the places. Nothing ticked: it's off."])
 	local EFFECT_LABELS = { vignette = L["Vignette"], weather = L["Weather"] }
 	-- (No CineMode column: the effects only show in CineMode, so Always says it all.)
-	local effectRows = { opts = { quiet = true, cam = true, anyFight = true }, underHeader = true, noCine = true }
+	local effectRows = { opts = { quiet = true, cam = true, anyFight = true }, underHeader = true }
 	for _, effect in ipairs(ns.EFFECT_GRID) do
 		if EFFECT_LABELS[effect] then
 			local key, alwaysKey = "effect:" .. effect, effect .. "Always"
@@ -6787,7 +6787,7 @@ function ns.RowOnAnywhere(key, always)
 	for c = 2, #FRAME_COLUMNS do
 		if FRAME_COLUMNS[c][2](key) then return true end
 	end
-	if ns.IsQuietShowOn(key) or ns.IsCamShowOn(key) or ns.IsCineModeShowOn(key) then return true end
+	if ns.IsQuietShowOn(key) or ns.IsCamShowOn(key) then return true end
 	local rules = ns.GetDB().frameRules
 	return type(rules) == "table" and type(rules[key]) == "string" and rules[key]:find("%S") ~= nil
 end
@@ -7079,7 +7079,7 @@ local function CreateCombatPanel()
 		return set
 	end
 
-	local SECTION_WIDTH = ns.GRID_MENUS and ns.GridTableWidth(FRAME_LABEL_WIDTH, true)
+	local SECTION_WIDTH = ns.GRID_MENUS and ns.GridTableWidth(FRAME_LABEL_WIDTH)
 		or FRAME_LABEL_WIDTH + #FRAME_COLUMNS * FRAME_COLUMN_WIDTH
 	-- The Unit frames section where the client has the parts (and menus): a
 	-- block per frame, its row as the other sections' and under it, opened and
@@ -7134,7 +7134,7 @@ local function CreateCombatPanel()
 			else
 				columnTop:SetPoint("TOPLEFT", frame, "BOTTOMLEFT", 0, 6) -- (as ShowTable's, under a header)
 			end
-			local label = ns.GridTable(content, columnTop, { item, noCine = true, noHeadings = after ~= nil,
+			local label = ns.GridTable(content, columnTop, { item, noHeadings = after ~= nil,
 				followRows = sectionRows, bandFrom = i - 1 }, kit)
 			local point, relativeTo, relativePoint, x, y = label:GetPoint(1)
 			label:SetPoint(point, relativeTo, relativePoint, x + TOGGLE_W, y)
@@ -7189,7 +7189,7 @@ local function CreateCombatPanel()
 					if ns.UnitHasPart(unit.unit, unit.parts, part[1]) then
 						k = k + 1
 						unit.keys[k] = part[1]
-						local row = ns.UnitPartRow(content, labelWidth, ns.GRID_NO_CINE_LAYOUT, unit.unit, item.label,
+						local row = ns.UnitPartRow(content, labelWidth, ns.GRID_TABLE_LAYOUT, unit.unit, item.label,
 							part, same, k + 1, INDENT)
 						row:SetPoint("TOPLEFT", box, "TOPLEFT", labelWidth, y - (k - 1) * ROW_H)
 						partRows[#partRows + 1] = row
@@ -7300,7 +7300,6 @@ local function CreateCombatPanel()
 		end
 		local before = Widgets()
 		sectionRows.underHeader = true
-		sectionRows.noCine = true -- (frames only fade in CineMode: Always says it all)
 		if page == "units" and ns.GRID_MENUS and ns.HasUnitFrameParts and ns.HasUnitFrameParts() then
 			section.last = UnitBlocks(frame, sectionRows, heading, section)
 		else
@@ -7958,7 +7957,6 @@ local function CreateGamepadPanel()
 		if ns.UpdateMinimapButton then ns.UpdateMinimapButton() end
 	end)
 	rows.underHeader = true
-	rows.noCine = true -- (CineMode only: Always says it all)
 	local lastRow = ShowTable(content, switch, rows, "Gamepad")
 
 	-- The prompt sits on a nameplate, not a frame of its own: a setting for
@@ -9752,7 +9750,7 @@ do
 		-- (No Cine column: whether plates work outside CineMode is the CineMode
 		-- page's Outside CineMode > Nameplates; a Cine tick moved to Always,
 		-- PlateIcons.lua's MigratePlateIconWhen.)
-		local showRow = ShowTable(content, showHeader, { opts = { anyFight = true }, underHeader = true, noCine = true,
+		local showRow = ShowTable(content, showHeader, { opts = { anyFight = true }, underHeader = true,
 			ns.TargetMarksShowRow(Changed) }, L["Nameplate Style"])
 		stack:Continue(showRow, "label")
 
@@ -12601,7 +12599,6 @@ local function CreateMinimapPanel()
 				-- (Just Combat and Location: where it looks and whether in fights,
 				-- the user 2026-11-13. No Always: Location's every place is it.)
 				layout = ns.GRID_PLACE_COMBAT_LAYOUT,
-				noCine = true, -- (it only looks while CineMode has the minimap faded: Always says it all)
 				{ key = ns.MINIMAP_DOTS_ROW, label = L["Nearby Dots"] },
 			})
 			-- (What comes next goes under the row's whole height, back at the
@@ -15283,7 +15280,7 @@ local function CreateTooltipPanel()
 		L["In CineMode, where and when tooltips show; the rest of the time they're hidden. For some kinds " ..
 		"only (enemies, friendlies, gatherables, quest objectives, anything else), Edit its rule: the " ..
 		"Tooltip line has a word for each."])
-	local tooltipRows = { opts = { quiet = true, cam = true, anyFight = true }, underHeader = true, noCine = true,
+	local tooltipRows = { opts = { quiet = true, cam = true, anyFight = true }, underHeader = true,
 		{ key = "tooltip:All", label = L["Tooltips"],
 			tip = L["Every tooltip: units, things in the world and the UI's (action bars, bags, menus and the rest)."],
 			alwaysKey = "tooltipAlways",

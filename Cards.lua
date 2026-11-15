@@ -521,8 +521,8 @@ end
 
 -- Whether an event's card may show now, and why not: its row ticked, and its
 -- Show in row (read with the rules' entering or leaving true for a fight's
--- edge, and cine: CineMode as the fight began).
-function ns.CardAllowed(id, edge, cine)
+-- edge).
+function ns.CardAllowed(id, edge)
 	local event = BY_ID[id]
 	if not event then return false, "no such card" end
 	if not ns.Setting("cards") then return false, "Card Vision is off" end
@@ -530,8 +530,7 @@ function ns.CardAllowed(id, edge, cine)
 	local other = ns.FeatureYieldReason("card:" .. id)
 	if other then return false, other end
 	if event.needs and not ns.CardOn(event.needs) then return false, BY_ID[event.needs].name .. " is unticked" end
-	if cine == nil then cine = ns.lastCinematic and true or false end
-	ns.combatEdge, ns.combatEdgeCine = edge, cine
+	ns.combatEdge = edge
 	local ok, shows = pcall(ns.RowOnNow, ROW .. id, nil, true)
 	ns.combatEdge = nil
 	if not ok then return false, "its Show in row errored" end
@@ -633,7 +632,7 @@ function ns.Cards.Fire(id, card, force)
 		C_Timer.After(delay, function() ns.Cards.Fire(id, card, force) end)
 		return true
 	end
-	if not force and not ns.CardAllowed(id, card.edge, card.cine) then return false end
+	if not force and not ns.CardAllowed(id, card.edge) then return false end
 	-- (In a bar, No letterbox: Don't show, and no letterbox up: none.)
 	if not force then
 		local look = card.look or ns.CardLook(id)
@@ -700,15 +699,15 @@ ns.CardSamples = ns.CardSamples or {}
 local samples = ns.CardSamples
 samples.combatIn = function()
 	return { name = ns.CardWords("combatTextIn"),
-		sound = function() ns.PlayCombatCueSound("enter", ns.lastCinematic and true or false) end }
+		sound = function() ns.PlayCombatCueSound("enter") end }
 end
 samples.combatOut = function()
 	return { name = ns.CardWords("combatTextOut"),
-		sound = function() ns.PlayCombatCueSound("leave", ns.lastCinematic and true or false) end }
+		sound = function() ns.PlayCombatCueSound("leave") end }
 end
 samples.boss = function()
 	local card = ns.BossSampleCard()
-	card.sound = function() ns.PlayCombatCueSound("enter", ns.lastCinematic and true or false) end
+	card.sound = function() ns.PlayCombatCueSound("enter") end
 	return card
 end
 

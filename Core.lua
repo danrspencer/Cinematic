@@ -1828,7 +1828,7 @@ end
 -- combat alone; without, Out of combat and Calm Timer). music: its places
 -- were its own (Cities, Dungeons, Raids, PvP).
 ns.LIST_DEFAULTS = {}
-for _, list in ipairs({ "combatShow", "calmShow", "quietShow", "camShow", "cineModeShow", "worldShow", "cityShow",
+for _, list in ipairs({ "combatShow", "calmShow", "quietShow", "camShow", "worldShow", "cityShow",
 	"bgShow", "instanceShow", "groupShow", "enemyShow", "friendlyShow" }) do
 	ns.LIST_DEFAULTS[list] = {}
 end
@@ -4336,8 +4336,6 @@ function ns.EnsureTables()
 	-- that offer them (Visual Effects, music, tooltips...): row -> true/false.
 	ns.db.quietShow = ns.db.quietShow or {}
 	ns.db.camShow = ns.db.camShow or {}
-	-- The Show in tables' CineMode column: row -> true/false.
-	ns.db.cineModeShow = ns.db.cineModeShow or {}
 	ns.db.cooldownReadyOnly = ns.db.cooldownReadyOnly or {} -- Cooldown Manager page: spell ID -> true
 	ns.db.cooldownReadyEarly = ns.db.cooldownReadyEarly or {} -- ...spell ID -> seconds early it comes back
 	ns.db.cooldownEarlyOn = ns.db.cooldownEarlyOn or {} -- ...spell ID -> true: Show early ticked
@@ -4626,6 +4624,86 @@ function ns.EffectCineTicksToAlways(t)
 		local key = "effect:" .. effect
 		if ticks[key] == true then t[effect .. "Always"] = true end
 		ticks[key] = nil
+	end
+end
+-- The CineMode column left every Show in table, and its word (cinemode, cine)
+-- left CQL (2026-11-15, the user). Its ticks are dropped, not put on Always
+-- (there Always shows a row outside CineMode too), and the word comes out of
+-- saved rules: with any NOT before it and the AND or OR joining it, and an
+-- emptied ( ) after it. Gives the text (nil: nothing left), as it came if it
+-- hasn't the word or doesn't read.
+local CINE_WORDS = { cinemode = true, cine = true }
+local RULE_JOINS = { ["and"] = true, ["or"] = true, ["&&"] = true, ["||"] = true, ["&"] = true, ["|"] = true }
+function ns.StripCineWord(text)
+	if type(text) ~= "string" then return text end
+	local tokens, found, i = {}, false, 1
+	while i <= #text do
+		local c = text:sub(i, i)
+		if c:find("%s") then
+			i = i + 1
+		elseif c == "(" or c == ")" or c == "!" then
+			tokens[#tokens + 1] = c
+			i = i + 1
+		else
+			local token = text:match("^[&|]+", i) or text:match("^[%w_]+", i)
+			if not token then return text end
+			tokens[#tokens + 1] = token
+			found = found or CINE_WORDS[token:lower()] or false
+			i = i + #token
+		end
+	end
+	if not found then return text end
+	local function Lower(at) return tokens[at] and tokens[at]:lower() end
+	local removed = true
+	while removed do
+		removed = false
+		for at = 1, #tokens do
+			local width = CINE_WORDS[Lower(at)] and 1 or (tokens[at] == "(" and tokens[at + 1] == ")") and 2 or nil
+			if width then
+				local first, last = at, at + width - 1
+				while first > 1 and (Lower(first - 1) == "not" or tokens[first - 1] == "!") do first = first - 1 end
+				if RULE_JOINS[Lower(last + 1)] then
+					last = last + 1
+				elseif first > 1 and RULE_JOINS[Lower(first - 1)] then
+					first = first - 1
+				end
+				for _ = first, last do table.remove(tokens, first) end
+				removed = true
+				break
+			end
+		end
+	end
+	if #tokens == 0 then return nil end
+	return (table.concat(tokens, " "):gsub("%( ", "("):gsub(" %)", ")"):gsub("! ", "!"))
+end
+-- Once, in t (the live settings, a saved profile or a reset point): the
+-- CineMode ticks gone, the word out of the rows' rules, the fight and card
+-- sounds' rules (edge#rule#sounds;...) and the triggers' conditions.
+function ns.DropCineModeWord(t)
+	if type(t) ~= "table" then return end
+	t.cineModeShow = nil
+	if type(t.frameRules) == "table" then
+		for key, text in pairs(t.frameRules) do
+			if type(text) == "string" then t.frameRules[key] = ns.StripCineWord(text) end
+		end
+	end
+	for key, value in pairs(t) do
+		if type(value) == "string" and (key == "combatSounds" or key == "cardTimeSounds" or key:find("^cardSounds_")) then
+			local chunks = {}
+			for chunk in value:gmatch("[^;]+") do
+				local edge, rule, list = chunk:match("^(%a+)#([^#]*)#(.*)$")
+				if edge then chunk = edge .. "#" .. (ns.StripCineWord(rule) or "") .. "#" .. list end
+				chunks[#chunks + 1] = chunk
+			end
+			t[key] = table.concat(chunks, ";")
+		end
+	end
+	if type(t.cameraRows) == "table" then
+		for key, text in pairs(t.cameraRows) do
+			if type(key) == "string" and key:find("%.cond$") and type(text) == "string" then
+				t.cameraRows[key] = ns.StripCineWord(text)
+			end
+		end
 	end
 end
 ns.GetStillSince = function() return ns.stillSince end
@@ -8529,6 +8607,19 @@ ticker:SetScript("OnEvent", ns.Profiled("Core events", function(self, event, arg
 				if type(point) == "table" then Move(point) end
 			end
 			ns.db.outsideCineV1 = true
+		end
+		-- No CineMode column or CQL word now (ns.DropCineModeWord): last, after
+		-- the updates above that read the column's ticks. Once, everywhere.
+		if not ns.db.cineModeWordGoneV1 then
+			ns.DropCineModeWord(ns.db)
+			for _, saved in pairs(ns.db.profiles or {}) do
+				if type(saved) == "table" then
+					ns.DropCineModeWord(saved)
+					ns.DropCineModeWord(saved.settings)
+				end
+			end
+			for _, point in pairs(ns.db.profileResetPoints or {}) do ns.DropCineModeWord(point) end
+			ns.db.cineModeWordGoneV1 = true
 		end
 		-- New settings start as the active profile has them (a built-in's
 		-- changes to the defaults included). A fresh install (or Reset addon)

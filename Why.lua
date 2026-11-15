@@ -401,11 +401,6 @@ function ColumnsOf(key, out, always, anyFight, page)
 		Add(out, "on", L["Always is ticked"], page)
 		found = true
 	end
-	if ns.IsCineModeShowOn(key) then
-		Add(out, facts.cinemode and "on" or "off", facts.cinemode and L["CineMode is ticked, and CineMode is on"]
-			or L["CineMode is ticked: it shows once CineMode is on"], page)
-		found = true
-	end
 	local place = ns.GetPlaceType()
 	local here = (place == "pvp" and "bgShow") or ((place == "dungeon" or place == "raid") and "instanceShow")
 		or (place == "city" and "cityShow") or "worldShow"

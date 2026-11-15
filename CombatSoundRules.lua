@@ -1,6 +1,6 @@
 -- The Cards page's fight sounds: rules, each for entering or leaving combat
 -- (or, on the Boss event, a boss pulled, killed or a wipe: ENCOUNTER_END), with a
--- condition in the rules' words (boss, raid, cinemode...; none: any fight)
+-- condition in the rules' words (boss, raid, city...; none: any fight)
 -- and a list of sounds. As a fight starts or ends, the first rule that fits
 -- plays one of its sounds at random (not the one it played last), at its own
 -- volume times the cue volume. The sounds: CombatSounds.lua. The other
@@ -236,7 +236,7 @@ end
 
 -- The first rule for edge ("enter", "leave", or a boss fight's end: "kill",
 -- "wipe") that fits now (its condition read with the rules' entering or
--- leaving true, and cinemode as cine says): the boss fights' rules first,
+-- leaving true): the boss fights' rules first,
 -- then the rest. A boss fight's end is read as leaving, with boss true (the
 -- encounter's over by then). Leaving combat just after one: no sound, so it
 -- doesn't cut the kill's or wipe's.
@@ -244,11 +244,11 @@ local SIDE = { enter = "in", leave = "out", kill = "kill", wipe = "wipe" }
 local END_QUIET = 8 -- seconds after a kill's or wipe's sound with none for leaving combat
 local lastPlayed = {} -- rule's place -> the id it played last
 local endSoundAt = -math.huge
-local function Pick(edge, cine)
+local function Pick(edge)
 	if edge == "leave" and GetTime() - endSoundAt < END_QUIET then return nil end
 	local rules = ns.ParseCombatSounds(ns.db.combatSounds)
 	local side = SIDE[edge]
-	ns.combatEdge, ns.combatEdgeCine = edge == "enter" and "enter" or "leave", cine
+	ns.combatEdge = edge == "enter" and "enter" or "leave"
 	local ok, facts = pcall(ns.RuleFactsNow)
 	ns.combatEdge = nil
 	if ok and (side == "kill" or side == "wipe") then
@@ -284,9 +284,9 @@ end
 
 -- The sound for a fight starting or ending (or a boss's: "kill", "wipe"), a moment later (so a boss's
 -- frames are up to tell it's a boss fight).
-function ns.PlayCombatCueSound(edge, cine)
+function ns.PlayCombatCueSound(edge)
 	C_Timer.After(0.25, function()
-		local sound = Pick(edge, cine)
+		local sound = Pick(edge)
 		if sound then ns.PlayCombatSound(sound[1], sound[2]) end
 	end)
 end
@@ -412,12 +412,12 @@ function ns.CombatSoundRulesSection(kit, content, stack, boss)
 	stack:Header(content, L["Sounds"])
 	stack:Help(content, card
 		and L["Rules for the card's sound, read top to bottom as it shows: the first that fits plays one of its " ..
-		"sounds at random. A rule's condition uses the rules' words (Cities, Raids, In CineMode...); none: any " ..
+		"sounds at random. A rule's condition uses the rules' words (Cities, Raids, Mounted...); none: any " ..
 		"time. A rule with no sounds: silent. Each sound's slider sets it next to the others, the cue volume sets " ..
 		"them all (every card's sounds share it)."]
 		or time and L["Rules for the sounds, read top to bottom as the time of day changes: the first for the new time " ..
-		"that fits plays one of its sounds at random. A rule's condition uses the rules' words (Cities, In " ..
-		"CineMode...); none: any time. A rule with no sounds: silent. Each sound's slider sets it next to the " ..
+		"that fits plays one of its sounds at random. A rule's condition uses the rules' words (Cities, " ..
+		"Mounted...); none: any time. A rule with no sounds: silent. Each sound's slider sets it next to the " ..
 		"others, the cue volume sets them all (the fights' sounds share it)."]
 		or boss and L["Sounds for boss fights, read before the fights' (Entering and Leaving combat's): as a boss is " ..
 		"pulled, killed or your group " ..
@@ -425,7 +425,7 @@ function ns.CombatSoundRulesSection(kit, content, stack, boss)
 		"its condition (taken out, it moves to the fights'). Each sound's slider sets it next to the others, the " ..
 		"cue volume sets them all."]
 		or L["Rules for the sounds, read top to bottom as a fight starts or ends: the first that fits plays one " ..
-		"of its sounds at random. A rule's condition uses the rules' words (Boss fight, Raids, In CineMode...); " ..
+		"of its sounds at random. A rule's condition uses the rules' words (Boss fight, Raids, Mounted...); " ..
 		"none: any fight. Each sound's slider sets it next to the others, the cue volume sets them all. They " ..
 		"play on the Ambience channel, its volume set for them and put back after."])
 	local cueVolume = stack:Add(kit.Slider(content, "combatCueVolume", L["Cue volume"], 0, 100, 5, "%d%%", 100),

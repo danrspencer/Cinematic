@@ -35,7 +35,7 @@ local GLOBAL_KEYS = {
 -- Lists kept as tables that belong to a profile (their defaults are in code;
 -- see EnsureTables in Core.lua). Missing from a profile: emptied, which means defaults.
 local PROFILE_TABLES = {
-	"chatPeekTypes", "chatPeekChannelList", "combatShow", "calmShow", "quietShow", "camShow", "cineModeShow", "cineShow", "targetShow", "enemyShow",
+	"chatPeekTypes", "chatPeekChannelList", "combatShow", "calmShow", "quietShow", "camShow", "cineShow", "targetShow", "enemyShow",
 	"friendlyShow", "bgShow", "worldShow", "cityShow", "groupShow", "instanceShow", "addonFrames", "gamepadPressButtons",
 	"hoverGroups", "cooldownReadyOnly", "cooldownReadyEarly", "cooldownEarlyOn", "cooldownRechargeOnly", "cooldownNeedsPower",
 	"cooldownReadyAnyTime",
@@ -361,6 +361,7 @@ local function Load(name)
 	end
 	ns.EnsureTables()
 	ns.MigrateRoleHides()
+	if ns.DropCineModeWord then ns.DropCineModeWord(db) end -- (an imported profile's old CineMode word: Core.lua)
 	ns.SplitAddonRows(db) -- (an imported profile's old rows: AddonSupport.lua)
 	if ns.ResyncVitalsLook then ns.ResyncVitalsLook() end -- (its theme's own look onto settings at their defaults)
 end
