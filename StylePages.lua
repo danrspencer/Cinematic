@@ -1231,6 +1231,25 @@ local LOOK_BUILD = {
 	end,
 }
 
+-- Where a one-look page's setting comes from (its on-page Look panel's tags,
+-- spec.tabs.source): Set here, General's, or Set by theme: <name> while it's
+-- what the main theme wrote; nil as it starts.
+function ns.PageLookSource(key)
+	local L = ns.L
+	local db = ns.GetDB() or {}
+	local value = db[key]
+	if ns.IsGeneralStyle and ns.IsGeneralStyle(value) then return { text = L["General's"] } end
+	if ns.ThemeSetting then
+		local themed = ns.ThemeSetting(key)
+		local theme = ns.ActiveStyleTheme and ns.ActiveStyleTheme()
+		if themed ~= nil and themed == value and theme then
+			return { text = L["Set by theme: %s"]:format(L[theme.name]) }
+		end
+	end
+	if value ~= nil and value ~= ns.DEFAULTS[key] then return { text = L["Set here"], own = true } end
+	return nil
+end
+
 -- The rows for a page: kit (Options.lua's ns.lowHealthKit), its content and
 -- stack, changed() after each change, and its switch's key. fieldOf: for a
 -- page with tabs (the Unit frames page), a setting's key -> the field its
@@ -2709,7 +2728,8 @@ function ns.StyleRows(kit, content, stack, changed, switchKey, fieldOf, panel)
 			-- (Titled with where the part is, the page's place dimmed before it:
 			-- known once the page is in its hub, after it's built.)
 			local path = canvas.hubPath or (canvas.name and { canvas.name })
-			if path then
+			-- (On the page itself: its name alone, the page's place is all round it.)
+			if path and not inline then
 				heading:SetText("|cff9a9a9a" .. table.concat(path, " > ") .. " >|r " .. title)
 			end
 			Fit()

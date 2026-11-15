@@ -114,6 +114,7 @@ local PAGES = {
 	{ id = "page-unit", name = "Style: Unit Frames page", group = "Menu", page = "Style > Unit Frames", pageName = "Unit Style" },
 	{ id = "page-raid", name = "Style: Raid Frames page", group = "Menu", page = "Style > Raid Frames", pageName = "Raid Style" },
 	{ id = "page-prd", name = "Style: Personal Resources page", group = "Menu", page = "Style > Personal Resource Display", pageName = "Personal Style" },
+	{ id = "page-bubble", name = "Style: Chat Bubbles page", group = "Menu", page = "Style > Chat Bubbles", pageName = "Bubble Style" },
 	{ id = "page-cast", name = "Style: Cast Bars page", group = "Menu", page = "Style > Cast Bars", pageName = "Cast Bar Style" },
 	{ id = "page-names", name = "Style: Name Style page", group = "Menu", page = "Style > Nameplates > Name Style", pageName = "Name Style" },
 	{ id = "page-plates", name = "Style: Nameplate Style page", group = "Menu", page = "Style > Nameplates > Nameplate Style", pageName = "Nameplate Style" },

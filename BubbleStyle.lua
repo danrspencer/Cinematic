@@ -49,27 +49,15 @@ function ns.CreateBubbleStylePanel(kit)
 	local function Boxed(db) return rows.On(db) and db.bubblesBack ~= "none" end
 	local function Own(db) return rows.On(db) and (db.bubblesBack == "dark" or db.bubblesBack == "custom") end
 
-	stack:Header(content, L["Look"])
-	rows.Look(L["Bubble:"], L["Bubble"], {
-		border = { "bubblesEdge", L["The line round a Dark or Custom bubble. Custom: its thickness and color under " ..
-			"it."], label = L["Edge:"], test = Own },
-		backColor = function(look)
-			local last = look.Choices(L["Behind the words:"], "bubblesBack", {
-				{ "game", L["The game's"], L["The game's own bubble."] },
-				{ "dark", L["Dark"], L["A flat dark bubble."] },
-				{ "custom", L["Custom"], L["A flat bubble in a color of your own (the swatch)."] },
-				{ "none", L["None"], L["Just the words, over the world: an outline helps them read."] },
-			})
-			look.Swatch(last, "bubblesBack", { "bubblesBackR", "bubblesBackG", "bubblesBackB" },
-				L["The bubble's color, for Custom."])
-		end,
-		backAlpha = function(look)
-			look.Slider("bubblesAlpha", L["Opacity"], 20, 100, 5, "%d%%", 100, L["How see-through the bubble is."],
-				Boxed)
-		end,
-	})
+	-- The look, on the page itself (the Style pages' template, StylePages.lua's
+	-- rows.Look, inline): Text (the words), Border (the edge) and Background
+	-- (the bubble, its tail).
 	local OUTLINES = { [0] = L["None"], L["Thin"], L["Thick"], L["Thick + shadow"] }
-	rows.Look(L["Words:"], L["Words"], {
+	stack:Header(content, L["Look"])
+	rows.Look("", L["Chat bubbles"], {
+		inline = true,
+		tabs = { default = function(key) return ns.DEFAULTS[key] end, source = ns.PageLookSource,
+			copyKind = "bubbleLook", copyName = L["Chat bubbles"] },
 		font = { "bubblesFont", L["The words' font. Russian, Korean or Chinese text keeps the game's, so its " ..
 			"letters show."] },
 		textSize = function(look)
@@ -81,9 +69,25 @@ function ns.CreateBubbleStylePanel(kit)
 		outlineColor = false, -- (the game's text: its outline is always black)
 		shadow = false, -- (Outline's Thick + shadow)
 		textColor = false, -- (each kind of chat in its own: say, yell...)
+		border = { "bubblesEdge", L["The line round a Dark or Custom bubble. Custom: its thickness and color under " ..
+			"it."], label = L["Edge:"], test = Own },
+		backColor = function(look)
+			look.Choices(L["Behind the words:"], "bubblesBack", {
+				{ "game", L["The game's"], L["The game's own bubble."] },
+				{ "dark", L["Dark"], L["A flat dark bubble."] },
+				{ "custom", L["Custom"], L["A flat bubble in a color of your own (below)."] },
+				{ "none", L["None"], L["Just the words, over the world: an outline helps them read."] },
+			})
+			look.Chips(L["Its color"], { "bubblesBackR", "bubblesBackG", "bubblesBackB" },
+				L["The bubble's color, for Custom."], function(db) return rows.On(db) and db.bubblesBack == "custom" end)
+			look.Check("bubblesTail", L["The tail pointing at who's talking"],
+				L["The little point under the bubble. Unticked, just the bubble."], Boxed)
+		end,
+		backAlpha = function(look)
+			look.Slider("bubblesAlpha", L["Opacity"], 20, 100, 5, "%d%%", 100, L["How see-through the bubble is."],
+				Boxed)
+		end,
 	})
-	rows.Check("bubblesTail", L["The tail pointing at who's talking"],
-		L["The little point under the bubble. Unticked, just the bubble."], Boxed)
 
 	-- Speech from behind you's own look (Speech.lua): turned on, moved and
 	-- shown with chat up on the UI Manager's Chat bubbles page; greyed out
