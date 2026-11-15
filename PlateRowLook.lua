@@ -616,6 +616,15 @@ function ns.MakePlateRowLookPreview(parent, width, kind)
 		back:SetShown(not game)
 		border:SetShown(edgeKind == "line")
 		if edgeKind == "line" then ns.DressStyleEdges(border, size, r, g, b, 1, true) end
+		-- (A plate theme's ground and bar shape, as the plates have them.)
+		local shape, themeGround
+		if ns.PlateThemeExtras then shape, themeGround = ns.PlateThemeExtras() end
+		if themeGround and not game then
+			back:SetColorTexture(themeGround[1], themeGround[2], themeGround[3], themeGround[4] or 0.7)
+		else
+			back:SetColorTexture(0, 0, 0, 0.6)
+		end
+		if ns.DressBarShape then ns.DressBarShape(health, back, not shape, nil, nil, shape) end
 
 		-- Its name, as the plates draw it: the row's font, size, outline and
 		-- shadow, else the Default row's, else Name Style's All names (outline

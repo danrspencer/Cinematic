@@ -16,8 +16,9 @@ ns.DEFAULTS.plateTheme = "main"
 -- The themes that stand alone, after the main themes' own.
 local OWN = {
 	{ key = "clean", name = "Clean", tip = "A flat bar with a thin black line round it. Nothing else.",
-		texture = "flat", border = "custom", size = 1, color = { 0, 0, 0 } },
-	{ key = "minimal", name = "Minimal", tip = "A flat bar with no line round it.", texture = "flat", border = "none" },
+		texture = "flat", border = "custom", size = 1, color = { 0, 0, 0 }, ground = { 0, 0, 0, 0.6 } },
+	{ key = "minimal", name = "Minimal", tip = "A flat bar with no line round it.", texture = "flat", border = "none",
+		ground = { 0, 0, 0, 0.35 } },
 	{ key = "game", name = "The game's", tip = "The game's own bars. Nothing changed.", texture = "game", border = "game" },
 }
 
@@ -34,7 +35,11 @@ local function List()
 			list[#list + 1] = { key = theme.key, name = theme.name, family = theme.key,
 				tip = nil,
 				texture = s.styleTexture or "game", border = s.styleBorder or "game", size = s.styleBorderSize or 1,
-				color = { s.styleBorderR or 0, s.styleBorderG or 0, s.styleBorderB or 0 } }
+				color = { s.styleBorderR or 0, s.styleBorderG or 0, s.styleBorderB or 0 },
+				-- (Its bar shape, and the ground behind the fill in its panel's
+				-- color, as its own bars have them.)
+				shape = s.styleBarShape, ground = theme.panel and { theme.panel[1], theme.panel[2], theme.panel[3],
+					theme.back or 0.7 } or nil }
 		end
 	end
 	for _, theme in ipairs(OWN) do list[#list + 1] = theme end
@@ -70,6 +75,17 @@ function ns.PlateThemeBar()
 	local texture = theme.texture ~= "game" and theme.texture or nil
 	return texture, ns.StyleBorder({ b = theme.border, bSize = theme.size, bR = theme.color and theme.color[1],
 		bG = theme.color and theme.color[2], bB = theme.color and theme.color[3] }, "b")
+end
+
+-- A plate bar's shape ("bevel"..., nil: square) and the ground behind its
+-- fill ({ r, g, b, a }, nil: the game's), from a plate theme picked on the
+-- page: none while it follows General, as plates always have.
+function ns.PlateThemeExtras()
+	local db = ns.db
+	if not (db and db.styleGeneral) then return nil, nil end
+	local theme = ns.PlateThemeNow()
+	if not theme then return nil, nil end
+	return theme.shape, theme.ground
 end
 
 -- A plate theme as a Nameplate Style row's Look (its panel's Start from a
@@ -124,14 +140,14 @@ function ns.MakePartThemeStrip(kit, parent, kind, changed)
 		tile.searchLabel = theme.key == "main" and theme.name or L[theme.name]
 		-- (What it gives: a little bar for plates, a name for names.)
 		if kind == "plate" then
+			-- (Tall enough to see its texture, its shape and ground on it.)
 			tile.bar = CreateFrame("StatusBar", nil, tile)
-			tile.bar:SetSize(TILE_W - 24, 7)
-			tile.bar:SetPoint("BOTTOMLEFT", 9, 8)
+			tile.bar:SetSize(TILE_W - 18, 12)
+			tile.bar:SetPoint("BOTTOMLEFT", 9, 6)
 			tile.bar:SetMinMaxValues(0, 1)
 			tile.bar:SetValue(0.7)
-			local ground = tile.bar:CreateTexture(nil, "BACKGROUND")
-			ground:SetAllPoints()
-			ground:SetColorTexture(0, 0, 0, 0.6)
+			tile.ground = tile.bar:CreateTexture(nil, "BACKGROUND")
+			tile.ground:SetAllPoints()
 			tile.barEdges = ns.MakeStyleEdges(tile.bar)
 		else
 			tile.sample = tile:CreateFontString(nil, "OVERLAY", "GameFontNormal")
@@ -186,6 +202,9 @@ function ns.MakePartThemeStrip(kit, parent, kind, changed)
 					tile.bar:SetStatusBarTexture("Interface\\TargetingFrame\\UI-StatusBar")
 				end
 				tile.bar:SetStatusBarColor(0.85, 0.15, 0.1)
+				local ground = theme.key ~= "main" and theme.ground or { 0, 0, 0, 0.6 }
+				tile.ground:SetColorTexture(ground[1], ground[2], ground[3], ground[4] or 0.6)
+				ns.DressBarShape(tile.bar, tile.ground, theme.key == "main" or not theme.shape, nil, nil, theme.shape)
 				tile.barEdges:SetShown(edge == "line")
 				if edge == "line" then ns.DressStyleEdges(tile.barEdges, size, r, g, b, 1, true) end
 			else

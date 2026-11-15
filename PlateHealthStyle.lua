@@ -104,6 +104,22 @@ local function Dress(bar)
 	end
 	busy = false
 	ns.DressThemeVeil(bar, texture and "plate" or nil)
+	-- (A plate theme's ground behind the fill and its bar shape, PlateThemes.lua.
+	-- The shape masks the fill and the ground: the game's own rounding off
+	-- the fill first, ns.DressBarShape. Square again once it's left.)
+	local shape, ground = ns.PlateThemeExtras()
+	if ground then
+		state.ground = state.ground or bar:CreateTexture(nil, "BACKGROUND", nil, -1)
+		state.ground:SetAllPoints()
+		state.ground:SetColorTexture(ground[1], ground[2], ground[3], ground[4] or 0.7)
+		state.ground:Show()
+	elseif state.ground then
+		state.ground:Hide()
+	end
+	local back = state.ground or bar.bgTexture
+	if back and back.GetParent and (shape or state.shaped) then
+		state.shaped = ns.DressBarShape(bar, back, not shape, nil, nil, shape) or nil
+	end
 	if kind == "line" then
 		state.edges = state.edges or ns.MakeStyleEdges(bar)
 		ns.DressStyleEdges(state.edges, size, r, g, b, 1, true)

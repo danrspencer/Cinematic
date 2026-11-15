@@ -751,9 +751,18 @@ end
 
 -- (rect: the frame the shape's cut to, if not the bar: see UnitStyle's DressSkin.
 -- gap: that much off its top, so a bar right under another stands apart from it.)
-function ns.DressBarShape(bar, back, skip, rect, gap)
+-- shape: a shape of its own ("bevel"...; a plate theme's) in place of
+-- General's.
+function ns.DressBarShape(bar, back, skip, rect, gap, shape)
 	local db = ns.db
-	local art = not skip and db and db.styleGeneral and BAR_ART[db.styleBarShape] or nil
+	local art
+	if not skip then
+		if shape ~= nil then
+			art = BAR_ART[shape]
+		else
+			art = db and db.styleGeneral and BAR_ART[db.styleBarShape] or nil
+		end
+	end
 	local state = barShapes[bar]
 	if not (art or state) then return false end
 	if not state then
