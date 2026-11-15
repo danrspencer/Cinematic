@@ -14,7 +14,7 @@
 --     icon;
 --   7 back to the game's look, no /reload: the game's art back;
 --   8 /cine debug themecheck: every theme pair, then the game's.
--- What it changes (map layout, action bar look, keys bound on the map) is put
+-- What it changes (map layout, action bar look, CineMode, keys bound on the map) is put
 -- back at the end, and at the next login if a /reload cuts it short. Into
 -- CinematicDB.keysBarsLog. Dev copy only (CinematicDev.toc).
 local _, ns = ...
@@ -48,7 +48,14 @@ local function Set(key, value)
 	if pending[key] == nil then pending[key] = { value = db[key] } end
 	db[key] = value
 end
+-- (CineMode fades the action bars: off for the bar steps, back at the end.)
+local function CineMode(on)
+	if (ns.lastCinematic and true or false) == on then return end
+	if run.cine == nil then run.cine = ns.lastCinematic and true or false end
+	if Cinematic_ToggleCineMode then pcall(Cinematic_ToggleCineMode) end
+end
 local function Bars(shape, edge)
+	CineMode(false)
 	Set("abStyle", true)
 	Set("abShape", shape)
 	Set("abEdge", edge)
@@ -97,8 +104,15 @@ local function Bindings()
 	end
 	return out
 end
+-- Each action slot's icon (a drop on a gold key puts the spell on its button).
+local function Slots()
+	local out = {}
+	for slot = 1, 180 do out[slot] = GetActionTexture(slot) or false end
+	return out
+end
 -- (Kept before the first step that can bind a key, here and for the next login.)
 local function KeepKeys()
+	run.slots = run.slots or Slots()
 	run.keys = run.keys or Bindings()
 	CinematicDB.keysBarsKeys = CinematicDB.keysBarsKeys or run.keys
 end
@@ -214,8 +228,13 @@ local STEPS = {
 				lines[#lines + 1] = ("%s: %s > %s"):format(each.combo, tostring(each.was), tostring(each.now))
 				if not each.was and each.now and not run.boundCombo then run.boundCombo = each.combo end
 			end
-			return ("%d keys changed%s; %s"):format(#list, #lines > 0 and (" (" .. table.concat(lines, ", ") .. ")") or "",
-				MapOverBook())
+			local slots, now = {}, Slots()
+			for slot, was in pairs(run.slots or {}) do
+				if now[slot] ~= was then slots[#slots + 1] = ("slot %d %s > %s"):format(slot, tostring(was), tostring(now[slot])) end
+			end
+			return ("%d keys changed%s; %d action slots changed%s; %s"):format(#list,
+				#lines > 0 and (" (" .. table.concat(lines, ", ") .. ")") or "", #slots,
+				#slots > 0 and (" (" .. table.concat(slots, ", ") .. ")") or "", MapOverBook())
 		end },
 	{ key = "clear", seconds = 20, say = "%d/%d: RIGHT-CLICK the key you just dropped the spell on, then click YES " ..
 		"in the box that asks.",
@@ -229,8 +248,8 @@ local STEPS = {
 			return ("%s now %s (cleared %s), clear box still up %s"):format(run.boundCombo, tostring(now),
 				tostring(not now or now == ""), tostring(popup and true or false))
 		end },
-	{ key = "square", say = "%d/%d: CLOSE the spellbook. The map closes, and your action buttons go SQUARE with a " ..
-		"dark line round them. Just watch.",
+	{ key = "square", say = "%d/%d: CLOSE the spellbook. The map closes, CineMode turns off, and your action " ..
+		"buttons go SQUARE with a dark line round them. Just watch.",
 		act = function()
 			ns.KeyboardMapClose()
 			Bars("square", "thin")
@@ -268,6 +287,7 @@ local function Finish(done)
 	CatchPrints(false)
 	if ns.KeyboardMapClose then ns.KeyboardMapClose() end
 	local keys = PutBack()
+	if run.cine ~= nil then CineMode(run.cine) end
 	Say(("put back: settings, %d keys"):format(keys))
 	for _, index in ipairs(run.steps) do
 		local step = STEPS[index]
