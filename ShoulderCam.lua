@@ -915,6 +915,8 @@ function gameEsc.PopupUp()
 	end
 	return false
 end
+-- (MultiQuestFix.lua: the game's Accept held for the glide back, its window faded the same way.)
+ns.ShoulderFadeGameWindow = FadeGameWindow
 gameEsc:SetScript("PostClick", function()
 	local frame, kind = GameTalkWindow()
 	if not frame then
@@ -2014,6 +2016,13 @@ function ns.CreateShoulderCamPanel(kit)
 		"Escape clears your target and closes the window in the same press. Off: Escape only closes it, and " ..
 		"your target stays."]), "check", 16)
 	kit.GreyUnless(escTarget, IfTalk)
+	-- (Dev copy only, a test: MultiQuestFix.lua, user 2026-11-15.)
+	if ns.isDev then
+		escTarget = stack:Add(kit.Check(content, "shoulderCamMultiQuestFix", L["Multi Quest fix"],
+			L["Test (dev copy only). In the game's quest window, at a quest giver with more quests: Accept " ..
+			"clears your target first, then press your Interact key to talk to them again. Each step goes " ..
+			"in the log."]), "check", 16)
+	end
 	-- Turn to your target: a Show in row, its box before the name (on at all),
 	-- Combat and the places after (where it turns).
 	local turnTop = CreateFrame("Frame", nil, content)

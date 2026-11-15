@@ -114,6 +114,7 @@ Director.lua
 ZoomGuard.lua
 QuestCam.lua
 ShoulderCam.lua
+MultiQuestFix.lua
 ShoulderCalibrate.lua
 SkyrideCam.lua
 CameraRows.lua

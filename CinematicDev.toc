@@ -108,6 +108,7 @@ QuestCam.lua
 ShoulderCam.lua
 ShoulderCalibrate.lua
 ShoulderCamTest.lua
+MultiQuestFix.lua
 SkyrideCam.lua
 CameraRows.lua
 TriggerLibrary.lua
