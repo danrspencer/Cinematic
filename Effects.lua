@@ -189,7 +189,7 @@ end
 
 -- Whether any box in a names row is ticked (or it has a rule: it may show).
 local NAME_ROW_PREFIXES = { "nameAlways", "nameGroup", "nameCombat", "nameCombatPvP", "nameKeep",
-	"nameInInstances", "nameInPvP", "nameInBGs" }
+	"nameInCities", "nameInInstances", "nameInPvP", "nameInBGs", "nameTargetEnemy", "nameTargetFriendly" }
 -- (A kind's group row counts as its own: the game's friendly names stay on
 -- for Group members in dungeons and raids.)
 local function NameRowTicked(group)
