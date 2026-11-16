@@ -18812,6 +18812,14 @@ ns.OnLanguage(function()
 	-- (How long making every page takes at login, in the log: for deciding
 	-- whether pages should be made as they first open. Tools/growth-plan.md.)
 	local buildStarted = type(debugprofilestop) == "function" and debugprofilestop()
+	-- (Each page's own time, between laps: the slowest go in the log too.)
+	local laps, lastLap = {}, buildStarted
+	local function Lap(name)
+		if type(lastLap) ~= "number" then return end
+		local now = debugprofilestop()
+		laps[#laps + 1] = { name = name, ms = now - lastLap }
+		lastLap = now
+	end
 	PVP_TIP, ZOOM_TIP, INPUT_PAUSE_TIP = L[PVP_TIP], L[ZOOM_TIP], L[INPUT_PAUSE_TIP]
 	ns.TranslateFields(PLACES, 2)
 	ns.TranslateFields(QUEST_SIDES, "text")
@@ -18847,192 +18855,278 @@ ns.OnLanguage(function()
 		timeout = 0, whileDead = true, hideOnEscape = true,
 	}
 
+	Lap("(texts and popups)")
 	CreatePanel()
+	Lap("CreatePanel")
 	CreateProfilesPanel()
+	Lap("CreateProfilesPanel")
 	-- Sub-pages in the order they're listed: what fades and shows, then the look
 	-- and sound, then the camera modes (their shared page and events first),
 	-- keybinds. (Their place in the left list: menu.order.)
 	CreateRevealPanel()
+	Lap("CreateRevealPanel")
 	CreateCombatPanel()
+	Lap("CreateCombatPanel")
 	if ns.CreatePersonalResourcesPanel then -- (PersonalResources.lua)
 		ns.CreatePersonalResourcesPanel(ns.lowHealthKit)
+		Lap("CreatePersonalResourcesPanel")
 	end
 	if ns.CreateCursorHidePage then -- (CursorHide.lua)
 		ns.CreateCursorHidePage(ns.lowHealthKit)
+		Lap("CreateCursorHidePage")
 	end
 	-- WoW Forever's gamepad mode (retail's has no frames of its own).
 	if C_GamePad and not ns.isRetail then
 		CreateGamepadPanel()
+		Lap("CreateGamepadPanel")
 	end
 	CreateExtrasPanel()
+	Lap("CreateExtrasPanel")
 	CreateMouseoverPanel()
+	Lap("CreateMouseoverPanel")
 	CreateMinimapPanel()
+	Lap("CreateMinimapPanel")
 	CreateQuestTrackerPanel()
+	Lap("CreateQuestTrackerPanel")
 	-- (Classic clients' own swing timer.)
 	if not ns.isRetail then
 		CreateSwingPanel()
+		Lap("CreateSwingPanel")
 	end
 	-- (Only with a Cooldown Manager: the game's, on clients that have it, or the addon.
 	-- ProfileModules.lua.)
 	if ns.HasCooldownManager() then
 		CreateCooldownPanel()
+		Lap("CreateCooldownPanel")
 	end
 	CreateTooltipPanel()
+	Lap("CreateTooltipPanel")
 	-- (its hub listed after UI Manager's)
 	CreateVisionPanel()
+	Lap("CreateVisionPanel")
 	if ns.CreateVitalsVisionPanel then -- (LowHealth.lua)
 		ns.CreateVitalsVisionPanel(ns.lowHealthKit)
+		Lap("CreateVitalsVisionPanel")
 	end
 	if ns.CreateCardsPanel then -- (CardsPage.lua)
 		ns.CreateCardsPanel(ns.lowHealthKit)
+		Lap("CreateCardsPanel")
 		ns.CreateCardStylesPanel(ns.lowHealthKit)
+		Lap("CreateCardStylesPanel")
 		ns.CreateCardSettingsPanel(ns.lowHealthKit)
+		Lap("CreateCardSettingsPanel")
 		ns.CreateCardStylePanel(ns.lowHealthKit)
+		Lap("CreateCardStylePanel")
 		ns.CreateCardSoundsPanel(ns.lowHealthKit)
+		Lap("CreateCardSoundsPanel")
 	end
 	if ns.CreateWindGuidePanel then -- (WindGuide.lua: the dev copy only, CinematicDev.toc)
 		ns.CreateWindGuidePanel(ns.lowHealthKit)
+		Lap("CreateWindGuidePanel")
 	end
 	if ns.CreateDamageVisionPanel then -- (DamageVision.lua)
 		ns.CreateDamageVisionPanel(ns.lowHealthKit)
+		Lap("CreateDamageVisionPanel")
 		ns.CreateDamageVisionLookPanel(ns.lowHealthKit)
+		Lap("CreateDamageVisionLookPanel")
 	end
 	if ns.CreateTeleportVisionPanel then -- (TeleportVision.lua)
 		ns.CreateTeleportVisionPanel(ns.lowHealthKit)
+		Lap("CreateTeleportVisionPanel")
 	end
 	if ns.CreateEmoteVisionPanel then -- (EmoteVision.lua)
 		ns.CreateEmoteVisionPanel(ns.lowHealthKit)
+		Lap("CreateEmoteVisionPanel")
 		ns.CreateEmoteVisionSettingsPanel(ns.lowHealthKit)
+		Lap("CreateEmoteVisionSettingsPanel")
 		ns.CreateEmoteVisionStylePanel(ns.lowHealthKit)
+		Lap("CreateEmoteVisionStylePanel")
 	end
 	CreateBuffsPanel()
+	Lap("CreateBuffsPanel")
 	CreatePlatesPanel()
+	Lap("CreatePlatesPanel")
 	if ns.CreatePlateIconsPage then -- (PlateIcons.lua: the Nameplates hub's Icons page)
 		ns.CreatePlateIconsPage(ns.lowHealthKit)
+		Lap("CreatePlateIconsPage")
 	end
 	CreateChatPanel()
+	Lap("CreateChatPanel")
 	CreateBubblesPanel()
+	Lap("CreateBubblesPanel")
 	-- (their hub, Style, listed after Visions)
 	CreateNameStylePanel()
+	Lap("CreateNameStylePanel")
 	CreateTargetArrowPanel()
+	Lap("CreateTargetArrowPanel")
 	if ns.CreateLetterboxStylePanel then -- (LetterboxStyle.lua)
 		ns.CreateEffectPanel(ns.lowHealthKit, "letterbox")
+		Lap("CreateEffectPanel")
 		ns.CreateLetterboxStylePanel(ns.lowHealthKit)
+		Lap("CreateLetterboxStylePanel")
 	end
 	if ns.CreateQuestItemStylePanel then -- (QuestItemStyle.lua)
 		ns.CreateQuestItemStylePanel(ns.lowHealthKit)
+		Lap("CreateQuestItemStylePanel")
 	end
 	if ns.CreateRollStylePanel then -- (RollStyle.lua)
 		ns.CreateRollStylePanel(ns.lowHealthKit)
+		Lap("CreateRollStylePanel")
 	end
 	if ns.CreateVitalsStylePanel then -- (LowHealth.lua)
 		ns.CreateVitalsStylePanel(ns.lowHealthKit)
+		Lap("CreateVitalsStylePanel")
 	end
 	if ns.CreateQuestTalkStylePanel then -- (QuestTalkStyle.lua)
 		ns.CreateQuestTalkStylePanel(ns.lowHealthKit)
+		Lap("CreateQuestTalkStylePanel")
 	end
 	if ns.CreateBubbleStylePanel then -- (BubbleStyle.lua)
 		ns.CreateBubbleStylePanel(ns.lowHealthKit)
+		Lap("CreateBubbleStylePanel")
 	end
 	if ns.CreateConflictsPanel then -- (Conflicts.lua)
 		ns.CreateConflictsPanel(ns.lowHealthKit)
+		Lap("CreateConflictsPanel")
 	end
 	if ns.CreateCombatTextStylePanel then -- (CombatTextStyle.lua)
 		ns.CreateCombatTextStylePanel(ns.lowHealthKit)
+		Lap("CreateCombatTextStylePanel")
 	end
 	if ns.CreateTooltipStylePanel then -- (TooltipStyle.lua)
 		ns.CreateTooltipStylePanel(ns.lowHealthKit)
+		Lap("CreateTooltipStylePanel")
 	end
 	if ns.CreateActionBarStylePanel then -- (ActionBarStyle.lua)
 		ns.CreateActionBarStylePanel(ns.lowHealthKit)
+		Lap("CreateActionBarStylePanel")
 	end
 	if ns.CreateInterfaceRecolorPanel then -- (InterfaceRecolor.lua)
 		ns.CreateInterfaceRecolorPanel(ns.lowHealthKit)
+		Lap("CreateInterfaceRecolorPanel")
 	end
 	if ns.CreatePersonalStylePanel then -- (PersonalStyle.lua)
 		ns.CreatePersonalStylePanel(ns.lowHealthKit)
+		Lap("CreatePersonalStylePanel")
 	end
 	if ns.CreateUnitStylePanel then -- (UnitStyle.lua)
 		ns.CreateUnitStylePanel(ns.lowHealthKit)
+		Lap("CreateUnitStylePanel")
 	end
 	if ns.CreateRaidStylePanel then -- (RaidStyle.lua)
 		ns.CreateRaidStylePanel(ns.lowHealthKit)
+		Lap("CreateRaidStylePanel")
 	end
 	if ns.CreateGeneralStylePanel then -- (GeneralStyle.lua)
 		ns.CreateGeneralStylePanel(ns.lowHealthKit)
+		Lap("CreateGeneralStylePanel")
 		ns.CreateStylePagesPanel(ns.lowHealthKit)
+		Lap("CreateStylePagesPanel")
 		ns.CreateStyleOverridesPanel(ns.lowHealthKit)
+		Lap("CreateStyleOverridesPanel")
 	end
 	if ns.CreateVisionsStylePanel then -- (VisionsStyle.lua)
 		ns.CreateVisionsStylePanel(ns.lowHealthKit)
+		Lap("CreateVisionsStylePanel")
 	end
 	if ns.CreatePlateCastStylePanel then -- (PlateCastStyle.lua)
 		ns.CreatePlateCastStylePanel(ns.lowHealthKit)
+		Lap("CreatePlateCastStylePanel")
 	end
 	CreateEffectsPanel()
+	Lap("CreateEffectsPanel")
 	ns.CreateEffectPanel(ns.lowHealthKit, "tint") -- (LetterboxStyle.lua: its Show in row)
+	Lap("CreateEffectPanel")
 	ns.CreateTintStylePanel(ns.lowHealthKit) -- (TintStyle.lua)
+	Lap("CreateTintStylePanel")
 	CreateGraphicsPanel()
+	Lap("CreateGraphicsPanel")
 	CreateAudioPanel()
+	Lap("CreateAudioPanel")
 	CreateCamerasPanel()
+	Lap("CreateCamerasPanel")
 	if ns.CreateTriggersPanels then -- (TriggersPage.lua)
 		ns.CreateTriggersPanels(ns.lowHealthKit)
+		Lap("CreateTriggersPanels")
 	end
 	-- Each camera's own settings, in a section apiece.
 	CreateCameraSettingsPanel()
+	Lap("CreateCameraSettingsPanel")
 	if ns.CreateMyShotsPanel and not ns.SHOTS_RETIRED then -- (ShotsPage.lua; retired in the dev copy)
 		ns.CreateMyShotsPanel(ns.lowHealthKit)
+		Lap("CreateMyShotsPanel")
 	end
 	if ns.CreateShoulderCamPanel then -- (ShoulderCam.lua)
 		ns.CreateShoulderCamPanel(ns.lowHealthKit)
+		Lap("CreateShoulderCamPanel")
 	end
 	if ns.CreateSkyrideCamPanel then -- (SkyrideCam.lua: retail)
 		ns.CreateSkyrideCamPanel(ns.lowHealthKit)
+		Lap("CreateSkyrideCamPanel")
 	end
 	if ns.CreateCameraScriptsPanel then -- (CameraScriptsPage.lua)
 		ns.CreateCameraScriptsPanel(ns.lowHealthKit)
+		Lap("CreateCameraScriptsPanel")
 	end
 	if ns.CreateWheelsPanels then -- (WheelsPage.lua; its hub listed after Camera)
 		ns.CreateWheelsPanels(ns.lowHealthKit)
+		Lap("CreateWheelsPanels")
 	end
 	CreateFishingPanel()
+	Lap("CreateFishingPanel")
 	CreateQualityPanel()
+	Lap("CreateQualityPanel")
 	if ns.CreateKeyboardMapPage then -- (KeyboardMap.lua)
 		ns.CreateKeyboardMapPage(ns.lowHealthKit)
+		Lap("CreateKeyboardMapPage")
 	end
 	CreateKeybindsPanel()
+	Lap("CreateKeybindsPanel")
 	-- Community, last (WhatsNew.lua, with the helpers it shares from here).
 	if ns.CreateWhatsNewPanels then
 		ns.CreateWhatsNewPanels({ CreateScrollPage = CreateScrollPage, Label = Label, PageShown = PageShown,
 			RegisterSubpage = RegisterSubpage, Tooltip = Tooltip })
+		Lap("CreateWhatsNewPanels")
 	end
 	if ns.CreateProfilerPanel then -- (ProfilerPage.lua: the Help hub)
 		ns.CreateProfilerPanel(ns.lowHealthKit)
+		Lap("CreateProfilerPanel")
 	end
 	if ns.CreateWhyPanel then -- (Why.lua: the Help hub)
 		ns.CreateWhyPanel(ns.lowHealthKit)
+		Lap("CreateWhyPanel")
 	end
 	if ns.CreateGameSettingsPage then -- (GameSettingsPage.lua: the Help hub)
 		ns.CreateGameSettingsPage(ns.lowHealthKit)
+		Lap("CreateGameSettingsPage")
 	end
 	-- The dev build's Module Editor, Community's last page (ModuleEditor.lua).
 	if ns.isDev and ns.CreateModuleEditor then
 		ns.CreateModuleEditor({ CreateScrollPage = CreateScrollPage, Label = Label, PageShown = PageShown,
 			RegisterSubpage = RegisterSubpage, Tooltip = Tooltip, PageIntro = PageIntro, Header = Header })
+		Lap("CreateModuleEditor")
 	end
 	if ns.isDev and ns.CreateHeldSettingsPage then -- (HeldSettingsPage.lua: the Dev hub)
 		ns.CreateHeldSettingsPage(ns.lowHealthKit)
+		Lap("CreateHeldSettingsPage")
 	end
 	if ns.isDev and ns.CreateDemoHubPage then -- (DemoHub.lua: the Dev hub)
 		ns.CreateDemoHubPage(ns.lowHealthKit)
+		Lap("CreateDemoHubPage")
 	end
 	if ns.isDev and ns.CreateMinimapCopyPage then -- (MinimapCopy.lua: the Dev hub)
 		ns.CreateMinimapCopyPage(ns.lowHealthKit)
+		Lap("CreateMinimapCopyPage")
 	end
 	menu.Flush() -- (the left list, in menu.order)
 	GuardGamepadClose()
+	Lap("(the left list)")
 	local buildEnded = type(buildStarted) == "number" and debugprofilestop()
 	if type(buildEnded) == "number" and ns.Log then
 		ns.Log("load", ("settings pages made in %d ms"):format(buildEnded - buildStarted))
+		table.sort(laps, function(a, b) return a.ms > b.ms end)
+		for index = 1, math.min(12, #laps) do
+			ns.Log("load", ("  %d ms  %s"):format(laps[index].ms, laps[index].name))
+		end
 	end
 end)
