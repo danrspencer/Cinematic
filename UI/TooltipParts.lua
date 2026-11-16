@@ -1009,18 +1009,55 @@ end
 
 -- /cine debug tooltipparts: the next tooltip's shown parts (name, kind,
 -- size, where) and its lines' text, printed a moment after it shows.
+-- (Armed a moment after the command, so the tooltip already under the mouse,
+-- a mob's in the world, isn't the one read: there's time to move onto the
+-- frame wanted. A player's reading caught the wrong one, WoW Forever 2026-11-16.)
 local listParts = false
 function ns.TooltipPartsDebug()
-	listParts = true
-	ns.Print("Mouse over something: its tooltip's parts print in a moment.")
+	listParts = false
+	ns.Print("In 2 seconds, mouse over the thing to check: the next tooltip after that prints its parts.")
+	C_Timer.After(2, function()
+		listParts = true
+		ns.Print("Now mouse over it.")
+	end)
+end
+
+-- A value as text for the log: a secret one as "secret". (One secret piece
+-- made the whole printed line secret, and the log keeps only "secret" for
+-- it: a player's reading had none of its lines, WoW Forever 2026-11-16.)
+local function Shown(value)
+	if issecretvalue and issecretvalue(value) then
+		return "secret"
+	end
+	return tostring(value)
 end
 
 -- Each piece read on its own, so one restricted call doesn't lose the rest.
-local function Describe(part)
-	local function Try(f)
-		local ok, text = pcall(f)
-		return ok and text or "?"
+local function Try(f)
+	local ok, value = pcall(f)
+	return ok and Shown(value) or "?"
+end
+
+-- A whole number read on its own (a secret one: "secret").
+local function Num0(f)
+	return Try(function()
+		local value = f()
+		if issecretvalue and issecretvalue(value) then
+			return value
+		end
+		return ("%.0f"):format(value)
+	end)
+end
+
+-- The frame under the mouse.
+local function MouseFocus()
+	if GetMouseFoci then
+		return GetMouseFoci()[1]
 	end
+	return GetMouseFocus and GetMouseFocus()
+end
+
+local function Describe(part)
 	return ("%s (%s) %s at %s, %s"):format(
 		Try(function() return part:GetDebugName() end),
 		Try(function() return part:GetObjectType() end),
@@ -1043,35 +1080,53 @@ local function ListLines(tooltip, title)
 			local plain = type(text) == "string" and not (issecretvalue and issecretvalue(text))
 			local okColor, color = pcall(function()
 				local r, g, b = fs:GetTextColor()
-				return ("%.2f %.2f %.2f"):format(r, g, b)
+				local parts = {}
+				for _, c in ipairs({ r, g, b }) do
+					parts[#parts + 1] = (issecretvalue and issecretvalue(c)) and "secret" or ("%.2f"):format(c)
+				end
+				return table.concat(parts, " ")
 			end)
-			local function Try(f)
-				local ok, value = pcall(f)
-				return ok and tostring(value) or "?"
+			-- (A number read and formatted at once: a secret one stays "secret".)
+			local function Num(f)
+				return Try(function()
+					local value = f()
+					if issecretvalue and issecretvalue(value) then
+						return value
+					end
+					return ("%.1f"):format(value)
+				end)
 			end
 			local right = Right(i)
 			local place = ("%s of %s x %s y %s (%s points) | left %s | shown %s wrap %s justify %s | w %s text w %s"
 				.. " h %s text h %s rows %s | right shown %s"):format(
 				Try(function() return (fs:GetPoint(1)) end),
 				Try(function() return select(2, fs:GetPoint(1)):GetDebugName() end),
-				Try(function() return ("%.1f"):format(select(4, fs:GetPoint(1))) end),
-				Try(function() return ("%.1f"):format(select(5, fs:GetPoint(1))) end),
+				Num(function() return (select(4, fs:GetPoint(1))) end),
+				Num(function() return (select(5, fs:GetPoint(1))) end),
 				Try(function() return fs:GetNumPoints() end),
-				Try(function() return ("%.1f"):format(fs:GetLeft() - tooltip:GetLeft()) end),
+				Num(function() return fs:GetLeft() - tooltip:GetLeft() end),
 				Try(function() return ns.Flag(fs:IsShown()) end), Try(function() return fs:CanWordWrap() end),
 				Try(function() return fs:GetJustifyH() end),
-				Try(function() return ("%.1f"):format(fs:GetWidth()) end),
-				Try(function() return ("%.1f"):format(fs:GetStringWidth()) end),
-				Try(function() return ("%.1f"):format(fs:GetHeight()) end),
-				Try(function() return ("%.1f"):format(fs:GetStringHeight()) end),
+				Num(function() return fs:GetWidth() end),
+				Num(function() return fs:GetStringWidth() end),
+				Num(function() return fs:GetHeight() end),
+				Num(function() return fs:GetStringHeight() end),
 				Try(function() return fs:GetNumLines() end),
 				Try(function() return right and ns.Flag(right:IsShown()) end))
 			ns.Print(("Line %d: %s (color %s%s) %s"):format(i,
 				plain and ("%q"):format(text) or (Unreadable(fs) and "secret" or "?"),
-				okColor and color or "secret", IsHintColor(fs) and ", hint green" or "", place))
+				okColor and color or "?", IsHintColor(fs) and ", hint green" or "", place))
 		end
-		ns.Print(("Lines cut %s (a unit's %s) | tooltip w %.0f h %.0f"):format(tostring(linesCut),
-			tostring(unitLinesCut), tooltip:GetWidth(), tooltip:GetHeight()))
+		ns.Print(("Lines cut %s (a unit's %s) | tooltip w %s h %s"):format(tostring(linesCut),
+			tostring(unitLinesCut), Num0(function() return tooltip:GetWidth() end),
+			Num0(function() return tooltip:GetHeight() end)))
+		-- Who the tooltip belongs to: a unit frame (TargetFrame, unit target)
+		-- or something else (another addon moving tooltips may own it instead).
+		ns.Print(("Owner %s (its unit %s) | under the mouse %s (its unit %s)"):format(
+			Try(function() return tooltip:GetOwner():GetDebugName() end),
+			Try(function() return tooltip:GetOwner().unit end),
+			Try(function() return MouseFocus():GetDebugName() end),
+			Try(function() return MouseFocus().unit end)))
 	end)
 end
 
