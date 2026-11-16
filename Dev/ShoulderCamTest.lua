@@ -3543,7 +3543,7 @@ do
 			local spot = s.spots[s.i]
 			local d = Debug()
 			local view = ns.ShoulderViewWidth and ns.ShoulderViewWidth() or 1
-			local want = spot * math.min(Zoom(), ns.SHOULDER_SPOT_HOLD or 7.5) * view / (d.scale or 1)
+			local want = spot * math.min(Zoom() * view, ns.SHOULDER_SPOT_HOLD or 7.5) / (d.scale or 1)
 			local fits
 			if d.paused == "no" then fits = Near(math.abs(Offset()), want, want * 0.06) end
 			Verdict(("spot %d%%"):format(spot * 100), fits,

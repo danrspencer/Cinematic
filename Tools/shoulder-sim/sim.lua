@@ -605,7 +605,7 @@ Check("PRD back on its place", math.abs(Share(prd, home.prd)) < 0.001, ("%.1f UI
 -- the offset held (past SPOT_HOLD yards away in ShoulderCam.lua, near walls, since
 -- 2026-11-12; a distance since 2026-11-15) you're meant to sit nearer the middle: those only must not go
 -- past your spot (once the offset's glide after a zoom is done: 0.6 s).
-local SPOT_HOLD = ns.SHOULDER_SPOT_HOLD or 7.5
+local SPOT_HOLD = (ns.SHOULDER_SPOT_HOLD or 7.5) / (ns.ShoulderViewWidth and ns.ShoulderViewWidth() or 1) -- (in zoom: held over the view width since 2026-11-16)
 local spotMiss, spotCount, pastSpot = 0, 0, 0
 local zoomWas, zoomedAt = nil, -math.huge
 -- (Within BLEND of a pause, the offset's easing in or out (BLEND_TIME in

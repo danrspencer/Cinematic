@@ -211,7 +211,14 @@ local OFFSET_MOST = 15 -- yards (DynamicCam's range too)
 -- user). SPOT_HOLD is where 1.5 yards was the cap for 20% on a 16:9 screen,
 -- so that's as before; a wall's pull-in throws you the same share past your
 -- spot whatever it is.
-local SPOT_HOLD = 7.5 -- yards away
+-- Held over the screen's width since 2026-11-16 (distance x view width, not
+-- the distance alone): on an ultrawide (2.39, view width 1.34) the hold at
+-- 7.5 yards let the offset grow a third past the old cap, a cat's 0.92 to
+-- 1.24 yards at zoom 9, and the camera shook against walls ("a bit shaky
+-- with walls now", user). So the cap's 1.5 yards at 20% again on any screen,
+-- still growing with the slider; zoomed out on a wide screen you sit nearer
+-- the middle than your spot (20% shows as ~15% there).
+local SPOT_HOLD = 7.5 -- yards away (on a 16:9 screen: over the view width)
 ns.SHOULDER_SPOT_HOLD = SPOT_HOLD
 local OFFSET_STEP = 0.02 -- yards: a smaller change to the offset isn't written
 local paused -- (PauseReason at the last check, every POLL)
@@ -451,7 +458,7 @@ end
 local function SpotYards()
 	local distance = SeenZoom()
 	local scale = ns.ShoulderModelScale()
-	local yards = (ns.db.shoulderCamSpot or 0.2) * math.min(distance, SPOT_HOLD) * ns.ShoulderViewWidth() / scale
+	local yards = (ns.db.shoulderCamSpot or 0.2) * math.min(distance * ns.ShoulderViewWidth(), SPOT_HOLD) / scale
 	local k = math.min(1, math.max(0, (distance - SPOT_EASE_FROM) / (SPOT_EASE_TO - SPOT_EASE_FROM)))
 	yards = math.min(OFFSET_MOST, yards * k * k * (3 - 2 * k))
 	steadyYards = yards
