@@ -112,18 +112,18 @@ function ns.MakePartThemeStrip(kit, parent, kind, changed)
 	local function Themes()
 		local themes = { { key = "main", name = kind == "plate" and L["Follow General"] or L["Follow main theme"] } }
 		local source = kind == "plate" and ns.PlateThemeList() or ns.NameThemeList()
-		for _, theme in ipairs(source) do themes[#themes + 1] = theme end
+		-- (The game's second, right after Follow, 2026-11-16: the plain one easy to find.)
+		for _, theme in ipairs(source) do
+			if theme.key == "game" then table.insert(themes, 2, theme) else themes[#themes + 1] = theme end
+		end
 		return themes
 	end
-	local count = #Themes()
-	local lines = math.ceil(count / ACROSS)
 	local strip = CreateFrame("Frame", nil, parent)
-	strip:SetSize(ACROSS * TILE_W + (ACROSS - 1) * GAP, lines * TILE_H + (lines - 1) * GAP)
+	strip:SetSize(ACROSS * TILE_W + (ACROSS - 1) * GAP, TILE_H)
 	local tiles = {}
-	for i, theme in ipairs(Themes()) do
+	for _, theme in ipairs(Themes()) do
 		local tile = CreateFrame("Button", nil, strip)
 		tile:SetSize(TILE_W, TILE_H)
-		tile:SetPoint("TOPLEFT", ((i - 1) % ACROSS) * (TILE_W + GAP), -math.floor((i - 1) / ACROSS) * (TILE_H + GAP))
 		local back = tile:CreateTexture(nil, "BACKGROUND")
 		back:SetAllPoints()
 		back:SetColorTexture(0.1, 0.1, 0.12, 0.95)
@@ -171,11 +171,72 @@ function ns.MakePartThemeStrip(kit, parent, kind, changed)
 		end)
 		tile:SetScript("OnLeave", function() GameTooltip:Hide() end)
 		tile.theme = theme
-		tiles[i] = tile
+		tiles[#tiles + 1] = tile
 	end
+	-- One row to start with (2026-11-16): the theme in use first, then the
+	-- next ones, the last cell a More tile that shows them all (and Fewer
+	-- after them, to fold them back). Open or not: kept while the session lasts.
+	local more = CreateFrame("Button", nil, strip)
+	more:SetSize(TILE_W, TILE_H)
+	local moreBack = more:CreateTexture(nil, "BACKGROUND")
+	moreBack:SetAllPoints()
+	moreBack:SetColorTexture(0.1, 0.1, 0.12, 0.95)
+	ns.DressStyleEdges(ns.MakeStyleEdges(more), 1, 0.24, 0.24, 0.28, 1)
+	local moreGlow = more:CreateTexture(nil, "HIGHLIGHT")
+	moreGlow:SetAllPoints()
+	moreGlow:SetColorTexture(1, 1, 1, 0.07)
+	more.words = more:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+	more.words:SetPoint("CENTER")
+	more.words.searchSkip = true
+	-- (The plates' strip all out, no More: its tab has the room, 2026-11-16.)
+	local always = kind == "plate"
+	local open = always
+	local function Arrange(picked)
+		-- (Kept in their places, 2026-11-16: the first (the default) stays
+		-- first. Folded, the one in use comes second if it'd be out of sight.)
+		local shown = open and #tiles or math.min(#tiles, ACROSS - 1)
+		local order = {}
+		for i, tile in ipairs(tiles) do order[i] = tile end
+		if not open then
+			for i = shown + 1, #order do
+				if order[i].theme.key == picked then
+					table.insert(order, 2, table.remove(order, i))
+					break
+				end
+			end
+		end
+		for _, tile in ipairs(tiles) do tile:Hide() end
+		for i = 1, shown do
+			local tile = order[i]
+			tile:ClearAllPoints()
+			tile:SetPoint("TOPLEFT", ((i - 1) % ACROSS) * (TILE_W + GAP), -math.floor((i - 1) / ACROSS) * (TILE_H + GAP))
+			tile:Show()
+		end
+		local cells = always and shown or shown + 1
+		more:SetShown(not always)
+		more:ClearAllPoints()
+		more:SetPoint("TOPLEFT", (shown % ACROSS) * (TILE_W + GAP), -math.floor(shown / ACROSS) * (TILE_H + GAP))
+		more.words:SetText(open and L["Fewer"] or (L["More (%d)"]):format(#order - shown))
+		local lines = math.ceil(cells / ACROSS)
+		strip:SetHeight(lines * TILE_H + (lines - 1) * GAP)
+	end
+	more:SetScript("OnClick", function()
+		open = not open
+		local db = ns.GetDB()
+		Arrange(db and db[key] or "main")
+		if ns.GRID_KIT and ns.GRID_KIT.FitContentHeight then ns.GRID_KIT.FitContentHeight(parent) end
+	end)
+	more:SetScript("OnEnter", function(self)
+		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+		GameTooltip:SetText(open and L["Show just the one in use and a few more."] or L["Show every theme."], 1, 1, 1)
+		GameTooltip:Show()
+	end)
+	more:SetScript("OnLeave", function() GameTooltip:Hide() end)
+	Arrange("main")
 	function strip.Refresh()
 		local db = ns.GetDB()
 		local picked = db and db[key] or "main"
+		Arrange(picked)
 		local on = db and db.styleGeneral and (kind == "plate" or db.plateNameStyle) and true or false
 		for _, tile in ipairs(tiles) do
 			local theme = tile.theme

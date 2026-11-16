@@ -313,7 +313,7 @@ ns.WhenAddonLoads("ElvUI", function()
 
 	ns.AddConflict({ key = "style:tooltip", addon = "ElvUI", label = "Tooltip look", group = "style", noBoth = true,
 		styleSwitch = "tooltipStyle",
-		about = "How tooltips look: the Style hub's Tooltip Style page, or ElvUI's tooltips",
+		about = "How tooltips look: the Interface hub's Tooltip Style page, or ElvUI's tooltips",
 		theirs = function() return Private("tooltip", "enable") == true end,
 		ours = function() return ns.StyleOn("tooltipStyle") end,
 		hide = function()
@@ -327,7 +327,7 @@ ns.WhenAddonLoads("ElvUI", function()
 
 	ns.AddConflict({ key = "style:bubbles", addon = "ElvUI", label = "Chat bubble look", group = "style",
 		noBoth = true, styleSwitch = "bubblesStyle",
-		about = "How chat bubbles look: the Style hub's Chat Bubble Style page, or ElvUI's bubbles",
+		about = "How chat bubbles look: the Interface hub's Chat Bubble Style page, or ElvUI's bubbles",
 		theirs = function()
 			local option = Private("general", "chatBubbles")
 			return option ~= nil and option ~= "disabled"

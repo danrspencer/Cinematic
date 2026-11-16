@@ -1284,6 +1284,7 @@ DEFAULTS.cooldownFlashR, DEFAULTS.cooldownFlashG, DEFAULTS.cooldownFlashB = 1, 0
 -- The other pages' master switches likewise (see ns.HANDLE_SWITCHES): off,
 -- CineMode leaves that part of the UI to the game.
 DEFAULTS.handleFrames = true -- Standard Frames
+DEFAULTS.visionsAll = true -- Visions > General's switch: off turns every Vision page off (ns.CascadeHub)
 DEFAULTS.handleAddonFrames = true -- Advanced Frames
 DEFAULTS.addonDefaultAlways = true -- its Default row's Always: addons installed later start left alone (ns.DefaultNewAddons)
 DEFAULTS.smartFindBackground = true -- its Find frames tab: Smart Find now and then, while an addon is new to it (FrameGuess.lua)
@@ -1628,13 +1629,8 @@ end
 function ns.SetPageMaster(keys, master)
 	for _, key in ipairs(keys) do PAGE_SWITCH[key] = master end
 end
--- The Timers icon's switch (2026-11-16): off, its Cooldown Manager and Swing
--- Timer tabs are off too, each keeping its own switch. Only where the client
--- has both tabs (Options.lua's PAGE_GROUPS takes it off otherwise): retail has
--- no swing timer, so its Cooldown Manager icon is just its own page.
-DEFAULTS.handleTimers = true
-ns.TIMERS_SWITCHES = { "handleCooldowns", "handleSwing" }
-if not ns.isRetail then ns.SetPageMaster(ns.TIMERS_SWITCHES, "handleTimers") end
+-- (No Timers master switch, 2026-11-16: Cooldown Manager and Swing Timer are
+-- tabs of the Timers icon, each with its own; Migrations.lua's step 16.)
 -- Allow outside CineMode (CineMode page): a vision's switch -> its tick there.
 -- Unticked, the vision works only while CineMode is on (2026-11-13). The
 -- Camera and Audio groups too (2026-11-15): Shoulder Cam, Skyriding Cam, and

@@ -1551,12 +1551,6 @@ local TYPES = {
 		end },
 }
 
--- The look's settings the presets set (the rest as their defaults).
-local PRESET_KEYS = { "damageVisionTexture", "damageVisionBarHeight", "damageVisionWidth", "damageVisionOpacity",
-	"damageVisionTrack", "damageVisionPanel", "damageVisionColors", "damageVisionChaseR", "damageVisionChaseG",
-	"damageVisionChaseB", "damageVisionLeadR", "damageVisionLeadG", "damageVisionLeadB", "damageVisionBorder",
-	"damageVisionBorderR", "damageVisionBorderG", "damageVisionBorderB", "damageVisionSmooth", "damageVisionSpark",
-	"damageVisionTextSize", "damageVisionOutline", "damageVisionTextColor" }
 
 -- The type as picture tiles (a click picks it), under a Type header: the
 -- Look tab's first row. (Not page controls: the Look switch leaves them be.)
@@ -1697,7 +1691,7 @@ TypeSettings = function(kit, content, stack, b)
 	kit.AddControl(holder)
 end
 
--- Look: a switch of its own (off: the plain look), presets, then the bar,
+-- Look: a switch of its own (off: the plain look), then the bar,
 -- what's behind it, its words, and where it sits.
 function ns.CreateDamageVisionLookPanel(kit)
 	local canvas, content = kit.CreateScrollPage()
@@ -1720,23 +1714,6 @@ function ns.CreateDamageVisionLookPanel(kit)
 	TypeTiles(kit, content, stack, Changed)
 	TestButtons(stack, content, b)
 	stack:Header(content, L["Look"])
-	rows.PresetMenu({
-		{ L["Cinematic's"], L["As it comes: amber when you're behind, teal when you lead, a thin border."], {} },
-		{ L["Minimal"], L["A thin line, no border or spark."],
-			{ damageVisionBarHeight = 6, damageVisionBorder = "none", damageVisionSpark = false, damageVisionTrack = 0.25,
-				damageVisionTextSize = 0.9 } },
-		{ L["Arcade"], L["A big bar in a gold frame, red when you're behind, gold when you lead, loud words."],
-			{ damageVisionBarHeight = 22, damageVisionWidth = 320, damageVisionBorder = "thick", damageVisionBorderR = 1,
-				damageVisionBorderG = 0.82, damageVisionBorderB = 0, damageVisionColors = "custom",
-				damageVisionChaseR = 0.9, damageVisionChaseG = 0.2, damageVisionChaseB = 0.2, damageVisionLeadR = 1,
-				damageVisionLeadG = 0.82, damageVisionLeadB = 0, damageVisionPanel = 0.4,
-				damageVisionTextSize = 1.2, damageVisionOutline = 2 } },
-		{ L["Your class"], L["The bar in your class's color, whether you lead or chase."],
-			{ damageVisionColors = "class" } },
-		{ L["Ghost"], L["Half see-through, no border or spark: there, but out of the way."],
-			{ damageVisionOpacity = 0.5, damageVisionTrack = 0.2, damageVisionBorder = "none",
-				damageVisionSpark = false } },
-	}, PRESET_KEYS)
 
 	stack:Header(content, L["Bar"])
 	rows.Texture(L["Texture:"], "damageVisionTexture", L["The bars' fill."], nil, { 0.94, 0.62, 0.15 }, L["Cinematic's"])

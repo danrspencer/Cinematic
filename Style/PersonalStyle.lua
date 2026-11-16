@@ -694,18 +694,16 @@ function ns.MakePersonalPreview(parent, width)
 end
 
 -- The page itself.
-local PRESET_KEYS = { "prdTexture", "prdBorder", "prdBorderSize", "prdBorderR", "prdBorderG", "prdBorderB", "prdBack",
-	"prdHealthColor", "prdHealthHeight", "prdPowerHeight", "prdPiecesScale", "prdManaHeight", "prdHealthWidth", "prdPowerWidth",
-	"prdManaWidth", "prdHealthWidthUnit", "prdPowerWidthUnit", "prdManaWidthUnit", "prdHealthWidthPx", "prdPowerWidthPx",
-	"prdManaWidthPx" }
 
 function ns.CreatePersonalStylePanel(kit)
 	local canvas, content = kit.CreateScrollPage()
 	local title = kit.Label(content, "GameFontNormalLarge", L["Personal Resource Style"])
-	title:SetPoint("TOPLEFT", 16, -16)
+	-- (The Unit Frames icon's Resource Style tab, 2026-11-16: its tabs over the title.)
+	local tabs = ns.PageTabs(content, ns.ShowInTabs("units"), ns.ShowInIndex("units", "Personal Style"))
+	title:SetPoint("TOPLEFT", tabs, "BOTTOMLEFT", 8, -14)
 	local intro = kit.PageIntro(content, title,
 		L["How the personal resource display under your character looks: its health and power bars, and " ..
-		"your class resource. When the bars come up: the UI Visibility hub's Health & Resources page."])
+		"your class resource. When the bars come up: the Unit Frames page."])
 
 	local preview -- (below: drawn again as each setting changes)
 	local function Changed()
@@ -724,18 +722,6 @@ function ns.CreatePersonalStylePanel(kit)
 	ns.StylePopout(preview, kit.Tooltip) -- (StylePages.lua)
 	kit.AddControl(preview)
 
-	rows.PresetMenu({
-		{ L["Like the game's"], L["The game's bars, as it draws them (the defaults)."], {} },
-		{ L["Flat"], L["Flat bars, health in your class color, with a thin black edge."],
-			{ prdTexture = "flat", prdBorder = "thin", prdBack = 0.6, prdHealthColor = "class", prdPowerHeight = 0.8,
-				prdManaHeight = 0.8 } },
-		{ L["Slim"], L["Thin, borderless bars that barely show over the world."],
-			{ prdTexture = "flat", prdBorder = "none", prdBack = 0.35, prdHealthColor = "class", prdHealthHeight = 0.5,
-				prdPowerHeight = 0.4, prdManaHeight = 0.4, prdPiecesScale = 0.8 } },
-		{ L["Cinematic"], L["Soft, thin bars with a fine edge, health in your class color."],
-			{ prdTexture = "smooth", prdBorder = "thin", prdBack = 0.4, prdHealthColor = "class",
-				prdHealthHeight = 0.7, prdPowerHeight = 0.6, prdManaHeight = 0.6 } },
-	}, PRESET_KEYS)
 
 	-- The bars' look, on the page itself (the Style pages' template,
 	-- StylePages.lua's rows.Look, inline: one look for both bars): Bar (fill,

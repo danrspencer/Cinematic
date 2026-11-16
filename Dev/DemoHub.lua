@@ -143,10 +143,10 @@ Add("Recording helpers", { key = "letterbox", name = "Letterbox sweep",
 local TOURS = {
 	{ "tour-main", "Main page and Profiles", { "", "Profiles" } },
 	{ "tour-ui", "Interface", { "Standard Frames", "Advanced Frames", "Mouseover groups", "Gamepad",
-		"Personal Resources", "Buffs/debuffs", "Cooldown Manager", "Swing timer", "Minimap", "Quest tracker",
-		"Tooltips", "Chat", "Nameplates", "Chat bubbles" } },
-	{ "tour-style", "Style", { "Style General", "Unit Style", "Raid Style", "Action Style", "Interface Recolor", "Personal Style",
-		"Tooltip Style", "Nameplate Style", "Name Style", "Cast Bar Style", "Bubble Style" } },
+		"Unit Style", "Raid Style", "Action Style", "Personal Resources", "Personal Style", "Buffs/debuffs",
+		"Minimap", "Chat", "Chat bubbles", "Bubble Style", "Quest tracker", "Cooldown Manager", "Swing timer",
+		"Tooltips", "Tooltip Style", "Combat Text Style", "Nameplates" } },
+	{ "tour-style", "Style", { "Style General", "Interface Recolor", "Nameplate Style", "Name Style", "Cast Bar Style" } },
 	{ "tour-camera", "Camera", { "Cameras", "Scenes", "Camera Scripts", "My Shots" } },
 	{ "tour-look", "Atmosphere", { "Effects", "Tint", "Tint Style", "Letterbox", "Letterbox Style", "Graphics+",
 		"Audio" } },
@@ -180,6 +180,48 @@ Add("1. Settings & menus", { key = "tour-all", name = "Settings tour: every page
 	tip = "Opens every settings page in turn, the hub's seconds-per-page each (Pages button above). " ..
 		"Raise WoW's UI Scale first so the text reads well.",
 	script = function(d) Tour(d, everyPage) end })
+-- Every icon of the Interface hub clicked in turn, a screenshot of each page
+-- (the icon row at its top), the list of which shot is which saved
+-- (CinematicDB.debugHubShots: icon, label, band and the shot's time, as its
+-- file name has it) to look over after a /reload.
+Add("1. Settings & menus", { key = "tour-ui-shots", name = "Settings tour: Interface, with screenshots",
+	tip = "Opens every icon of the Interface hub in turn and takes a screenshot of each page. /reload after, " ..
+		"so the list of which shot is which is saved.",
+	needs = function() return Screenshot ~= nil and ns.HubIcons ~= nil, "no Screenshot on this client" end,
+	script = function(d)
+		local list = {}
+		ns.db.debugHubShots = list
+		-- (Each page's time to open as well, CinematicDB.pageTimes: on for the run.)
+		local timesWere = CinematicDB.pageTimesOn
+		CinematicDB.pageTimesOn = true
+		ns.OpenOptions("Standard Frames")
+		d.Wait(1.5)
+		-- (An icon's other tabs that are pages of their own: shot after it.)
+		local MORE = { ["HUD:units"] = { "Personal Resources", "Unit Style", "Personal Style", "Unit Cast Style", "Unit Frame Links" },
+			["HUD:party"] = { "HUD:raid", "Raid Style" }, ["HUD:bars"] = { "Gamepad", "Action Style" },
+			["HUD:chat"] = { "Chat", "Chat bubbles", "Bubble Style", "Chat Links" },
+			["Mouseover groups"] = { "Tooltips", "Tooltip Style", "Cursor Hide" },
+			["HUD:buffs"] = { "Buffs/debuffs", "Buffs Links" }, ["HUD:combat"] = { "Cooldown Manager", "Swing timer", "Breath Bar" },
+			["HUD:minimap"] = { "Minimap", "Minimap Keep Open", "Minimap Links" }, ["HUD:quests"] = { "Quest tracker", "Quest Tracker Links" },
+			["Nameplates"] = { "Plate Icons", "Nameplate Style", "Nameplate Marks", "Cast Bar Style" }, ["Nameplate Names"] = { "Name Style" } }
+		local function Shoot(name, label, band)
+			d.Cue("icon: " .. label)
+			ns.OpenOptions(name)
+			d.Wait(1.5)
+			list[#list + 1] = { icon = name, label = label, band = band, at = date("%m%d%y_%H%M%S") }
+			Screenshot()
+			d.Wait(0.6)
+			if ActionStatus then ActionStatus:Hide() end -- (its "Screen captured" off the next)
+		end
+		-- (The Interface hub's icons, Nameplates and Names among them.)
+		local icons = ns.HubIcons("UI Manager")
+		for _, icon in ipairs(icons) do
+			Shoot(icon.name, icon.label, icon.band)
+			for _, tab in ipairs(MORE[icon.name] or {}) do Shoot(tab, icon.label .. " > " .. tab, icon.band) end
+		end
+		CinematicDB.pageTimesOn = timesWere
+		ns.Print(("Interface shots: %d taken. /reload to save their list."):format(#list))
+	end })
 for _, tour in ipairs(TOURS) do
 	Add("1. Settings & menus", { key = tour[1], name = "Settings tour: " .. tour[2],
 		tip = "Opens each page in turn: " .. table.concat(tour[3], ", "):gsub("^, ", "main page, "),

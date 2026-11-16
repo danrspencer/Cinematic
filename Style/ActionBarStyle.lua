@@ -960,12 +960,13 @@ end
 ns.MakeActionBarPreview = MakePreview
 
 -- The page itself.
-local PRESET_KEYS = { "abEdge", "abEdgeSize", "abEdgeR", "abEdgeG", "abEdgeB", "abShape", "abSlots" }
 
 function ns.CreateActionBarStylePanel(kit)
 	local canvas, content = kit.CreateScrollPage()
 	local title = kit.Label(content, "GameFontNormalLarge", L["Action Bar Style"])
-	title:SetPoint("TOPLEFT", 16, -16)
+	-- (The Action Bars icon's Bar Style tab, 2026-11-16: its tabs over the title.)
+	local tabs = ns.PageTabs(content, ns.ShowInTabs("bars"), ns.ShowInIndex("bars", "Action Style"))
+	title:SetPoint("TOPLEFT", tabs, "BOTTOMLEFT", 8, -14)
 	local intro = kit.PageIntro(content, title,
 		L["How the game's action buttons look: their outline, their shape and the background of empty slots. " ..
 		"Other addons' bars keep their own look, and the game's do too with Dominos or Masque on."])
@@ -987,13 +988,6 @@ function ns.CreateActionBarStylePanel(kit)
 	ns.StylePopout(preview, kit.Tooltip) -- (StylePages.lua)
 	kit.AddControl(preview)
 
-	rows.PresetMenu({
-		{ L["Like the game's"], L["The game's action buttons, as it draws them (the defaults)."], {} },
-		{ L["Dark"], L["Square buttons with a thick dark outline."], { abEdge = "thick", abShape = "square" } },
-		{ L["Round"], L["Round buttons with a thin dark outline."], { abEdge = "thin", abShape = "round" } },
-		{ L["Class color"], L["Square buttons outlined in your class color."],
-			{ abEdge = "colored", abShape = "square" } },
-	}, PRESET_KEYS)
 
 	-- The look, on the page itself (the Style pages' template, StylePages.lua's
 	-- rows.Look, inline): Icon (the buttons' shape, empty slots) and Border

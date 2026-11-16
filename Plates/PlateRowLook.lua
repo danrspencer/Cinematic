@@ -30,8 +30,11 @@ end
 
 -- A row's own setting (nil: the Default row's). Only while its Look is
 -- Custom (its drawer's Look line, PlateColor): the quick colors have none.
+-- The Default row's always (2026-11-16): the Default Plate Style tab's
+-- Customize sets it, the plates' own look under every row.
 local function Own(key, kind)
-	if not ns.TargetMarkOwn or ns.TargetMarkOwn("PlateColor", kind) ~= "custom" then return nil end
+	if not ns.TargetMarkOwn then return nil end
+	if kind ~= "others" and ns.TargetMarkOwn("PlateColor", kind) ~= "custom" then return nil end
 	if ns.MarkRowBase(kind) == "aggro" and ns.TargetMarkOwn("AlsoSame", kind) then return nil end
 	local value = ns.TargetMarkOwn(key, kind)
 	if IsDefault(key, value) then return nil end
@@ -475,7 +478,7 @@ function ns.MakePlateRowLookPreview(parent, width, kind)
 
 	local plate = CreateFrame("Frame", nil, holder)
 	plate:SetSize(160, 34)
-	plate:SetPoint("CENTER", holder, "CENTER", 0, 9)
+	plate:SetPoint("CENTER", holder, "CENTER", 0, 13) -- (up a little: the cast bar under it)
 	local health = CreateFrame("StatusBar", nil, plate)
 	health:SetSize(118, 10)
 	health:SetPoint("BOTTOM", plate, "BOTTOM", 0, 4)
@@ -507,6 +510,15 @@ function ns.MakePlateRowLookPreview(parent, width, kind)
 	local levelText = levelBox:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
 	levelText:SetPoint("CENTER", 0, 0)
 	levelText.searchSkip = true
+	-- (As the page's own preview draws a plate, 2026-11-16: its cast bar under
+	-- the bar, as the nameplates' Cast Style has it (casting again and again),
+	-- and the row's mark over it.)
+	local cast = ns.MakePlateCastSample and ns.MakePlateCastSample(plate)
+	if cast then
+		cast:SetPoint("TOP", health, "BOTTOM", 0, -3)
+		cast:SetScale(0.75)
+	end
+	local mark = ns.MakeTargetArrow and ns.MakeTargetArrow(health, health)
 
 	local picks = {}
 	for i, sample in ipairs(SAMPLES) do
@@ -656,6 +668,13 @@ function ns.MakePlateRowLookPreview(parent, width, kind)
 		-- Its level box (Forever's): shown unless the row hides it.
 		levelBox:SetShown(not ns.isRetail and look.level ~= false)
 		levelText:SetText(level and level > 0 and tostring(level) or "??")
+		-- Its cast bar (the nameplates' look) and the row's mark, as on the plates.
+		if cast and cast.Refresh then cast:Refresh() end
+		if mark and ns.StyleTargetArrow and ns.TargetMarkSetting then
+			ns.StyleTargetArrow(mark, nil, kind)
+			mark:SetShown((ns.TargetMarkSetting("Show", kind) and ns.TargetMarkSetting("Style", kind) ~= "none") and true or false)
+			mark:SetAlpha(ns.TargetMarkSetting("Opacity", kind) or 1)
+		end
 	end
 	holder:SetScript("OnShow", function(self) self:Refresh() end)
 	return holder

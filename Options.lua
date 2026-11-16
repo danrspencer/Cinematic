@@ -198,27 +198,7 @@ function ns.LabelHover(parent, label, tip)
 	return hover
 end
 
--- A row with a page of its own (item.morePage, its English name): a » at the
--- right end of its label, the label that much narrower, that opens the page.
--- (Before ns.LabelHover, which covers the label as it then is.)
-function ns.MoreLink(parent, label, page)
-	label:SetWidth(label:GetWidth() - 16)
-	local button = CreateFrame("Button", nil, parent)
-	button:SetSize(16, 16)
-	button:SetPoint("LEFT", label, "RIGHT", 0, 0)
-	local text = button:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-	text:SetPoint("CENTER")
-	text:SetText("»")
-	text.searchSkip = true
-	button:SetHighlightTexture("Interface\\Buttons\\UI-Common-MouseHilight", "ADD")
-	Tooltip(button, (L["More settings on the %s page. They can keep it up beyond what's ticked here (hovering, " ..
-		"tracking, new auras, cooldowns recharging and the like)."]):format(ns.PageLabel(page)) .. "\n\n" ..
-		L["Click to open it."])
-	button:SetScript("OnClick", function() ns.OpenOptions(page) end)
-	return button
-end
-
--- The way back from such a page: a button right of its title (or after, a
+-- The way back from a frame's own page: a button right of its title (or after, a
 -- button there already) to the HUD page at its rows' tab (section:
 -- its key there, as Frames.lua's ROW_SECTIONS).
 function ns.FramesLink(content, title, section, after)
@@ -370,7 +350,8 @@ local function Stack(anchor, kind, inline)
 			header:Show()
 			self:Add(header, "header")
 		end
-		indent = indent or 0
+		-- (subIndent: a Look panel's sub-settings, set by its rows.Sub.)
+		indent = indent or self.subIndent or 0
 		local placed = control
 		if self.inline and (controlKind == "slider" or control.inlineName) then
 			placed = self:InlineRow(control, controlKind)
@@ -984,8 +965,21 @@ local function Refresh()
 	for _, control in ipairs(controls) do
 		local page = PageOf(control)
 		local parent = not page and (control.GetParent and control:GetParent() or control.owner)
+		-- (On a page shown, but in a part of it that's hidden: the HUD's other
+		-- sections, a tab not picked. Refreshed as that part shows, 2026-11-16:
+		-- each HUD icon refreshed all 147 rows, ~20 ms.)
+		local hiddenPart
+		if page and page:IsVisible() and control.GetParent then
+			local at = control:GetParent()
+			while at and at ~= page and not hiddenPart do
+				if at.IsShown and not at:IsShown() then hiddenPart = at end
+				at = at.GetParent and at:GetParent() or nil
+			end
+		end
 		if page and not page:IsVisible() then
 			page.stale = true
+		elseif hiddenPart then
+			StaleTillShown(control, hiddenPart)
 		elseif parent and not parent:IsVisible() then
 			-- (On no settings page and out of sight (the Customize window's, a
 			-- popup's): refreshed as its parent shows. ~400 of these refreshed on
@@ -1063,6 +1057,11 @@ local function MakeHeaderSwitch(content, switch)
 		link:SetPoint("LEFT", toggle, "RIGHT", 8, 0)
 	end
 	switch.header = toggle
+	content.pageHeaderSwitch = toggle -- (for pages in other files: shown or not as their part says)
+	-- (content.headerSwitchOff: a part of the page with no switch of its own
+	-- picked, a HUD section's banner icon: hidden till its HUD icon is.)
+	toggle:SetShown(not content.headerSwitchOff)
+	if content.tabbedPage then ns.DropPageHeader(content) end -- (a page under tabs: none, StylePages.lua)
 	PaintHeaderSwitch(toggle)
 end
 ns.PaintHeaderSwitches = function()
@@ -1517,7 +1516,7 @@ function ns.EndPageRun(run)
 			run.fit or 0, run.switches or 0, run.update or -1, run.laterFit or -1, frame,
 			1000 / math.max(run.fps, 1), run.controls or "-",
 			run.slowest ~= "" and run.slowest or "-"))
-		list[31] = nil
+		list[61] = nil -- (60 kept: a whole settings tour)
 	end)
 end
 
@@ -1585,12 +1584,14 @@ ns.searchPrepare = {} -- pages that fill their rows only when shown: called to f
 -- ~1.35 s every page took on Forever, 2026-11-16). Opening the page makes it,
 -- and so does anything that reads every page: the search (and /cine find),
 -- ns.PageSettings (the profiles), ns.SettingIds. The log says when each is made.
-local lazyPages = { list = {} }
+local lazyPages = { list = {}, waiting = {} }
 function lazyPages.Add(canvas, name, build)
 	local made = false
+	local entry = {}
 	local function Make(why)
 		if made then return end
 		made = true
+		entry.made = true
 		local started = type(debugprofilestop) == "function" and debugprofilestop()
 		ns.Guard(build)
 		local ended = type(started) == "number" and debugprofilestop()
@@ -1607,7 +1608,36 @@ function lazyPages.Add(canvas, name, build)
 	end
 	canvas:SetScript("OnShow", FirstShow)
 	lazyPages.list[#lazyPages.list + 1] = Make
+	entry.Make, entry.name = Make, name
+	lazyPages.waiting[#lazyPages.waiting + 1] = entry
 	return Make
+end
+-- Made ahead, one at a quiet moment each (2026-11-16: the HUD's alone till
+-- then; Nameplates, Nameplate Style and Hover Groups took 100-200 ms on
+-- their first opening). Checked each second: out of combat, the settings
+-- closed, not casting, on no flight path, standing still these last 5
+-- seconds; then the next page not made yet is, and 3 more quiet seconds
+-- before the one after. All made: the checks stop. (One opened before its
+-- turn: made then, as before.)
+function lazyPages.StartAhead()
+	if lazyPages.ticker then return end
+	local still = 0
+	lazyPages.ticker = C_Timer.NewTicker(1, function()
+		local settings = _G.SettingsPanel or _G.InterfaceOptionsFrame
+		local casting = (UnitCastingInfo and UnitCastingInfo("player")) or (UnitChannelInfo and UnitChannelInfo("player"))
+		local busy = InCombatLockdown() or (settings and settings:IsShown()) or casting
+			or (UnitOnTaxi and UnitOnTaxi("player")) or (GetUnitSpeed and GetUnitSpeed("player") or 0) > 0
+		still = busy and 0 or still + 1
+		if still < 5 then return end
+		for _, entry in ipairs(lazyPages.waiting) do
+			if not entry.made then
+				entry.Make("ahead, standing still")
+				still = 2
+				return
+			end
+		end
+		lazyPages.ticker:Cancel()
+	end)
 end
 -- (For pages made in other files: ns.LazyPageBody(canvas, name, build).)
 ns.LazyPageBody = lazyPages.Add
@@ -2220,7 +2250,7 @@ local subpages = {}
 -- queued as they're made and handed to the game in this order when setup ends
 -- (menu.Flush), so the order of the Create calls doesn't matter. One not named
 -- here goes last; a hub under another (hub.under) right under that one.
-local menu = { order = { "Profiles", "CineMode", "UI Manager", "Plates", "Addons", "Visions", "Style", "Atmosphere", "Camera",
+local menu = { order = { "Profiles", "CineMode", "UI Manager", "Addons", "Visions", "Style", "Atmosphere", "Camera",
 	"Keybinds", "Quality of life", "Help", "Community", "Dev" }, queue = {} }
 do
 	local function Register(entry)
@@ -2237,6 +2267,7 @@ do
 	-- After setup (menu.flushed), straight in at the bottom.
 	function menu.Add(key, frame, shown, parent)
 		subpages[key] = frame
+		menu.parentOf[key] = parent -- (AutoFold: the lines it's under)
 		local entry = { key = key, frame = frame, shown = shown, parent = parent }
 		if menu.flushed then Register(entry) else menu.queue[#menu.queue + 1] = entry end
 	end
@@ -2260,6 +2291,248 @@ do
 		end
 		menu.flushed, menu.queue = true, {}
 	end
+	-- Interface, Visions and Quality of Life open in the left list as one of
+	-- their pages shows, and fold again as you go elsewhere (2026-11-16); so
+	-- do their group lines (Heads-up...) and Wheels under them: a line open
+	-- while the page shown is it or one under it. The game's list: a
+	-- category's SetExpanded, the list made again. (Its names unchecked on
+	-- each client: /cine log says what it found, once.)
+	menu.parentOf, menu.fold = {}, { ["UI Manager"] = true, Visions = true, ["Quality of life"] = true, Wheels = true }
+	local logged
+	local function Fold(current)
+		local list = SettingsPanel and SettingsPanel.GetCategoryList and SettingsPanel:GetCategoryList()
+		-- (The page shown's line and every line it's under, by key.)
+		local open = {}
+		for key, category in pairs(subpages) do
+			if category == current then
+				while key do
+					open[key] = true
+					key = menu.parentOf[key]
+				end
+				break
+			end
+		end
+		local changed = false
+		for key in pairs(menu.fold) do
+			local category = subpages[key]
+			if type(category) == "table" and category.SetExpanded then
+				local inside = open[key] or false
+				local now = category.IsExpanded and category:IsExpanded() or category.expanded or false
+				if (now and true or false) ~= inside then
+					category:SetExpanded(inside)
+					changed = true
+				end
+			end
+		end
+		if changed and list and list.CreateCategories then list:CreateCategories() end
+		if not logged and ns.Log then
+			logged = true
+			local probe = subpages["UI Manager"]
+			ns.Log("ui", ("left list fold: SetExpanded %s, IsExpanded %s, list %s, CreateCategories %s, " ..
+				"SetCurrentCategory %s, found %s"):format(tostring(type(probe) == "table" and probe.SetExpanded ~= nil),
+				tostring(type(probe) == "table" and probe.IsExpanded ~= nil), tostring(list ~= nil),
+				tostring(list ~= nil and list.CreateCategories ~= nil),
+				tostring(list ~= nil and list.SetCurrentCategory ~= nil), tostring(next(open) ~= nil)))
+		end
+	end
+	-- An icon picked in its hub (2026-11-16): its line in the left list lit
+	-- (the list's own highlight; the page the settings show stays the hub's),
+	-- the lines it's under opened. menu.lineOf: AddBandShortcuts' lines; an
+	-- icon with none (a hub's first), the hub's own line.
+	menu.lineOf = {}
+	function menu.MarkLine(hubName, english, tabOf)
+		-- (A tab (Name Style): its icon's line, Nameplate Names'. 2026-11-16.)
+		local key = menu.lineOf[hubName .. "|" .. english] or (tabOf and menu.lineOf[hubName .. "|" .. tabOf])
+			or hubName
+		local category = subpages[key]
+		if type(category) ~= "table" then return end
+		-- (Its groups opened only, 2026-11-16: the list's SetCurrentCategory lit
+		-- the line but left the settings showing the page they had, so a line's
+		-- borrowed hub frame was never handed back: two hubs drawn at once.)
+		local ok, err = pcall(Fold, category)
+		if not ok and ns.Log then ns.Log("error", "left list line: " .. tostring(err)) end
+	end
+	-- Cinematic's lines in the left list fold with gold arrows, not the game's
+	-- +/- (2026-11-16): each line's own toggle kept, just see-through (still
+	-- what's clicked), our arrow over it, right while folded, down while
+	-- open. Only on our lines: the list's buttons are shared with every
+	-- addon's, so a reused one gets its +/- back. Looked over a few times a
+	-- second while the settings are open (their list made again often).
+	-- (The list's parts unchecked on each client: /cine log says what it
+	-- found, once.)
+	local ARROW = ns.HELP_DISC:gsub("HelpDisc$", "ListArrow")
+	local arrowLogged
+	-- (A line's category: on it, or in its element data however deep the list
+	-- keeps it. ours: the categories to find.)
+	local function CategoryOf(button, ours)
+		local tried = { button.category, button.GetCategory and button:GetCategory() or nil }
+		local data = button.GetElementData and button:GetElementData()
+		local function Add(each)
+			if type(each) ~= "table" then return end
+			tried[#tried + 1] = each
+			tried[#tried + 1] = each.category
+			tried[#tried + 1] = each.data
+			if type(each.data) == "table" then tried[#tried + 1] = each.data.category end
+			if each.GetData then
+				local ok, inner = pcall(each.GetData, each)
+				if ok and type(inner) == "table" then
+					tried[#tried + 1] = inner
+					tried[#tried + 1] = inner.category
+				end
+			end
+		end
+		Add(data)
+		for _, each in pairs(tried) do
+			if type(each) == "table" and ours[each] then return each end
+		end
+		return nil, data
+	end
+	local function ToggleOf(button)
+		if button.Toggle then return button.Toggle end
+		-- (Else the small button on the line: the +/-.)
+		for _, child in ipairs({ button:GetChildren() }) do
+			if child.IsObjectType and child:IsObjectType("Button") and (child:GetWidth() or 99) <= 24 then return child end
+		end
+	end
+	function menu.PaintArrows()
+		local list = SettingsPanel and SettingsPanel.GetCategoryList and SettingsPanel:GetCategoryList()
+		local box = list and list.ScrollBox
+		if not (box and box.ForEachFrame) then
+			if not arrowLogged and ns.Log and SettingsPanel and SettingsPanel:IsVisible() then
+				arrowLogged = true
+				local keys = {}
+				for k in pairs(list or {}) do if type(k) == "string" and #keys < 30 then keys[#keys + 1] = k end end
+				ns.Log("ui", ("left list arrows: no ScrollBox.ForEachFrame (list %s; its keys: %s)")
+					:format(tostring(list ~= nil), table.concat(keys, ",")))
+			end
+			return
+		end
+		local ours = {}
+		for _, category in pairs(subpages) do
+			if type(category) == "table" then ours[category] = true end
+		end
+		local seen, mine, toggles = 0, 0, 0
+		-- (While one of ours is open, the folded ones' arrows at half, 2026-11-16.)
+		local anyOpen = false
+		for category in pairs(ours) do
+			if category.IsExpanded and category:IsExpanded() or category.expanded then
+				-- (Only one with lines under it counts: a page's own line can say open.)
+				for key, each in pairs(subpages) do
+					if each == category and menu.fold[key] then anyOpen = true end
+				end
+			end
+		end
+		box:ForEachFrame(function(button)
+			seen = seen + 1
+			local category = CategoryOf(button, ours)
+			local toggle = ToggleOf(button)
+			local isOurs = category ~= nil
+			if toggle then toggles = toggles + 1 end
+			if isOurs and toggle and toggle:IsShown() then
+				mine = mine + 1
+				if not button.cineArrow then
+					button.cineArrow = button:CreateTexture(nil, "OVERLAY")
+					button.cineArrow:SetSize(16, 16)
+					button.cineArrow:SetTexture(ARROW)
+				end
+				button.cineArrow:ClearAllPoints()
+				button.cineArrow:SetPoint("CENTER", toggle, "CENTER", 0, 0)
+				local open = category.IsExpanded and category:IsExpanded() or category.expanded
+				button.cineArrow:SetRotation(open and -math.pi / 2 or 0)
+				button.cineArrow:SetAlpha((anyOpen and not open) and 0.5 or 1)
+				button.cineArrow:Show()
+				toggle:SetAlpha(0)
+				button.cineToggle = toggle
+				-- (Painted again the moment it's clicked: the list made again
+				-- under it, the game's +/- would show till the next look.)
+				if not toggle.cineHooked then
+					toggle.cineHooked = true
+					toggle:HookScript("OnClick", function() menu.PaintSoon() end)
+				end
+			else
+				if button.cineArrow then button.cineArrow:Hide() end
+				if button.cineToggle then
+					button.cineToggle:SetAlpha(1)
+					button.cineToggle = nil
+				end
+			end
+		end)
+		-- (Logged once it's found ours, or what a line holds if it can't.)
+		if (not arrowLogged or (mine > 0 and not menu.arrowFound)) and ns.Log and seen > 0 then
+			arrowLogged = true
+			menu.arrowFound = mine > 0
+			-- (And the parts of the first line with children of its own, to see
+			-- where its +/- is if none was found: each child and region.)
+			local parts = {}
+			box:ForEachFrame(function(button)
+				if #parts > 0 then return end
+				local category, data = CategoryOf(button, ours)
+				-- (Its element data's keys, a level down: where the category is.)
+				if type(data) == "table" then
+					local keys = {}
+					for k, v in pairs(data) do
+						keys[#keys + 1] = tostring(k) .. ":" .. type(v)
+						if type(v) == "table" then
+							for k2, v2 in pairs(v) do
+								if #keys < 40 then keys[#keys + 1] = tostring(k) .. "." .. tostring(k2) .. ":" .. type(v2) end
+							end
+						end
+					end
+					parts[#parts + 1] = "data {" .. table.concat(keys, ",") .. "}"
+				else
+					parts[#parts + 1] = "data " .. type(data)
+				end
+				for k, v in pairs(button) do
+					if type(k) == "string" and type(v) == "table" and v.GetObjectType then
+						local ok, kind = pcall(v.GetObjectType, v)
+						local w = v.GetWidth and v:GetWidth() or 0
+						local tex = v.GetTexture and v:GetTexture()
+						local atlas = v.GetAtlas and v:GetAtlas()
+						parts[#parts + 1] = ("%s=%s %dpx %s"):format(k, ok and kind or "?", w, tostring(atlas or tex))
+					end
+				end
+				parts[#parts + 1] = "category " .. tostring(category and (category.GetName and category:GetName() or category.name))
+			end)
+			ns.Log("ui", ("left list arrows: %d lines, %d with a toggle, %d of ours with one; a line's parts: %s")
+				:format(seen, toggles, mine, table.concat(parts, "; ")))
+		end
+	end
+	-- Painted now and again as the list settles (it lays out its lines as the
+	-- frame ends), so the game's +/- never shows on ours.
+	function menu.PaintSoon()
+		pcall(menu.PaintArrows)
+		C_Timer.After(0, function() pcall(menu.PaintArrows) end)
+	end
+	function menu.AutoFold()
+		-- (The list made again: painted at once, not at the next look.)
+		local list = SettingsPanel and SettingsPanel.GetCategoryList and SettingsPanel:GetCategoryList()
+		if list and list.CreateCategories and not menu.listHooked then
+			menu.listHooked = true
+			hooksecurefunc(list, "CreateCategories", function() menu.PaintSoon() end)
+		end
+		-- (The arrows: painted while the settings show.)
+		if SettingsPanel and not menu.arrowWatch then
+			local watch = CreateFrame("Frame", nil, SettingsPanel)
+			local wait = 0
+			ns.SetOnUpdate(watch, function(_, elapsed)
+				wait = wait - elapsed
+				if wait > 0 then return end
+				wait = 0.15
+				local ok, err = pcall(menu.PaintArrows)
+				if not ok and not menu.arrowError then
+					menu.arrowError = true
+					if ns.Log then ns.Log("error", "left list arrows: " .. tostring(err)) end
+				end
+			end)
+			menu.arrowWatch = watch
+		end
+		local EventRegistry = _G.EventRegistry
+		if not (EventRegistry and EventRegistry.RegisterCallback) then return end
+		EventRegistry:RegisterCallback("Settings.CategoryChanged", function(_, category)
+			local ok, err = pcall(Fold, category)
+			if not ok and ns.Log then ns.Log("error", "left list fold: " .. tostring(err)) end
+		end, menu)
+	end
 end
 
 -- Hubs: a sub-page holding several pages, picked from a row of icons at its
@@ -2271,33 +2544,93 @@ do
 	-- Each hub (by English name) and its pages in order, with their icons
 	-- (or a function that gives one).
 	local HUBS = {
-		-- (sections: the grids of what shows (CineMode Autohide), then each frame's own rules
-		-- (Autohide Advanced: the HUD's, then what floats over heads). label: the
-		-- hub's name as shown, its pages' ids staying "UI Manager"'s.)
-		{ name = "UI Manager", label = "UI Visibility", note = { "Addon frames moved to the Addons hub >",
-			"Advanced Frames" }, colors = {
-			["CineMode Autohide"] = { 0.75, 0.65, 0.45 }, ["Autohide Advanced"] = { 0.35, 0.6, 0.9 },
+		-- (One home per kind of game frame, 2026-11-16: a band per kind of frame
+		-- holding all its pages: when it shows (its section of the HUD page, an
+		-- icon each: CreateCombatPanel's HUD_ICONS, placed by their before),
+		-- its rules, then its looks. What Shows: what's for all of them. label:
+		-- the hub's name as shown, its pages' ids staying "UI Manager"'s and the
+		-- Style pages' theirs.)
+		-- (plain: its icons in one row, no bands or their names: about one icon
+		-- a kind of frame now, its pages its tabs, 2026-11-16.)
+		-- (groups: its icons in three groups in the row, each on its colored band, the
+		-- General (HUD) icon first on its own,
+		-- 2026-11-16: Heads-up (you and the fight), Overhead (over units), Info
+		-- (the screen's edges: any icon not listed). Each a line in the left list.)
+		{ name = "UI Manager", label = "Interface", plain = true, note = { "Addon frames moved to the Addons hub >",
+			"Advanced Frames" }, groups = { order = { "Heads-up", "Overhead", "Info" }, other = "Info",
+				["HUD:hud"] = false, ["HUD:units"] = "Heads-up", ["HUD:party"] = "Heads-up", ["HUD:bars"] = "Heads-up",
+				["HUD:buffs"] = "Heads-up", ["HUD:combat"] = "Heads-up",
+				Nameplates = "Overhead", ["Nameplate Names"] = "Overhead", ["Combat Text Style"] = "Overhead" },
+			colors = {
+			["Heads-up"] = { 0.35, 0.6, 0.9 }, Overhead = { 0.85, 0.55, 0.25 }, Info = { 0.45, 0.75, 0.45 },
+			["What Shows"] = { 0.75, 0.65, 0.45 }, Mouseover = { 0.35, 0.6, 0.9 }, ["Unit Frames"] = { 0.35, 0.6, 0.9 },
+			["Party & Raid"] = { 0.35, 0.6, 0.9 }, ["Action Bars"] = { 0.35, 0.6, 0.9 }, Chat = { 0.35, 0.6, 0.9 },
+			Tooltips = { 0.35, 0.6, 0.9 }, ["Map & Quests"] = { 0.35, 0.6, 0.9 },
+			["Buffs & Debuffs"] = { 0.35, 0.6, 0.9 }, Timers = { 0.35, 0.6, 0.9 }, ["Menus & Info"] = { 0.35, 0.6, 0.9 },
+			["Combat Text"] = { 0.35, 0.6, 0.9 },
 		}, pages = {
 			-- (A standard: your faction's battle banner.)
 			{ "Standard Frames", function()
 				return UnitFactionGroup("player") == "Horde" and "Interface\\Icons\\INV_BannerPVP_01"
 					or "Interface\\Icons\\INV_BannerPVP_02"
-			end, label = "HUD", section = "CineMode Autohide" },
-			{ "Mouseover groups", "Interface\\Icons\\Spell_Holy_MindVision", label = "Hover Groups", section = "CineMode Autohide" },
-			{ "Gamepad", "Interface\\Icons\\INV_Gizmo_01", label = "Gamepad Frames", section = "CineMode Autohide" },
-			{ "Cursor Hide", "Interface\\Icons\\INV_Misc_Eye_01", section = "CineMode Autohide" }, -- (CursorHide.lua)
-			-- (Most used first, chat bubbles next to chat; swing timer and tooltips last.)
+			end, label = "HUD", section = "What Shows" },
+			{ "Gamepad", "Interface\\Icons\\INV_Gizmo_01", label = "Gamepad Frames", section = "What Shows",
+				tabOf = "HUD:bars" }, -- (the Action Bars icon's Gamepad tab, 2026-11-16)
+			-- (Mouse: what the pointer brings up, the pointer itself and what it shows, 2026-11-16.)
+			-- (The frames, the HUD's top down; combat text last, over heads.)
+			-- (Keep up and Frame Links: tabs of the Unit Frames icon, the HUD's
+			-- Show in first, 2026-11-16: PersonalResources.lua.)
 			{ "Personal Resources", "Interface\\Icons\\Ability_Racial_BloodRage", -- (Bloodrage: health into power)
-				label = "Health & Resources", section = "Autohide Advanced" },
-			{ "Buffs/debuffs", "Interface\\Icons\\Spell_Holy_WordFortitude", label = "Buffs/Debuffs", section = "Autohide Advanced" },
-			{ "Minimap", "Interface\\Icons\\INV_Misc_Map_01", section = "Autohide Advanced" },
-			{ "Chat", "Interface\\Icons\\INV_Scroll_03", section = "Autohide Advanced" },
-			{ "Chat bubbles", "Interface\\Icons\\Ability_Warrior_BattleShout", label = "Chat Bubbles",
-				section = "Autohide Advanced" },
-			{ "Quest tracker", "Interface\\Icons\\INV_Misc_Note_01", label = "Quest Tracker", section = "Autohide Advanced" },
-			{ "Cooldown Manager", "Interface\\Icons\\INV_Misc_PocketWatch_01", section = "Autohide Advanced" },
-			{ "Swing timer", "Interface\\Icons\\INV_Sword_04", label = "Swing Timer", section = "Autohide Advanced" },
-			{ "Tooltips", "Interface\\Icons\\INV_Misc_Book_09", section = "Autohide Advanced" },
+				label = "Unit Frames", section = "Unit Frames", tabOf = "HUD:units" },
+			{ "Unit Style", "Interface\\Icons\\INV_Misc_Head_Human_01", label = "Unit Frame Style", section = "Unit Frames",
+				tabOf = "HUD:units" }, -- (the Unit Frames icon's Style tab)
+			{ "Personal Style", "Interface\\Icons\\Spell_Holy_SealOfVengeance", label = "Personal Resource Style",
+				section = "Unit Frames", tabOf = "HUD:units" }, -- (the Unit Frames icon's Resource Style tab)
+			-- (The unit frames' cast bars, PlateCastStyle.lua: the Unit Frames icon's Cast Style tab, 2026-11-16.)
+			{ "Unit Cast Style", "Interface\\Icons\\Spell_Nature_Lightning", label = "Cast Style", section = "Unit Frames",
+				tabOf = "HUD:units" },
+			{ "Raid Style", "Interface\\Icons\\INV_Misc_GroupNeedMore", label = "Raid Frame Style", section = "Party & Raid",
+				tabOf = "HUD:party" }, -- (the Party & Raid icon's Raid Style tab)
+			-- (Nameplates and Names, 2026-11-16: two icons, both the Nameplates page's
+			-- tiles (CreatePlatesPanel), the rest their tabs. Their own hub till then.)
+			{ "Nameplates", "Interface\\Icons\\Ability_Hunter_SniperShot", label = "Nameplates", section = "Nameplates" },
+			{ "Plate Icons", "Interface\\Icons\\INV_Misc_GroupNeedMore", label = "Icons", section = "Nameplates",
+				tabOf = "Nameplates" }, -- (PlateIcons.lua)
+			{ "Nameplate Style", "Interface\\Icons\\Ability_Marksmanship", label = "Nameplate Style", section = "Nameplates",
+				tabOf = "Nameplates" },
+			{ "Cast Bar Style", "Interface\\Icons\\Spell_Nature_Lightning", label = "Cast Bar Style", section = "Nameplates",
+				tabOf = "Nameplates" },
+			{ "Name Style", "Interface\\Icons\\INV_Misc_Note_02", label = "Name Style", section = "Nameplates",
+				tabOf = "Nameplate Names" },
+			{ "Action Style", "Interface\\Icons\\Ability_DualWield", label = "Action Bar Style", section = "Action Bars",
+				tabOf = "HUD:bars" }, -- (the Action Bars icon's Bar Style tab)
+			{ "Chat", "Interface\\Icons\\INV_Scroll_03", section = "Chat" },
+			-- (The Chat icon's Bubbles and Bubble Style tabs, 2026-11-16.)
+			{ "Chat bubbles", "Interface\\Icons\\Ability_Warrior_BattleShout", label = "Chat Bubbles", section = "Chat",
+				tabOf = "HUD:chat" },
+			{ "Bubble Style", "Interface\\Icons\\Ability_Warrior_RallyingCry", label = "Chat Bubble Style", section = "Chat",
+				tabOf = "HUD:chat" },
+			-- (Reveal and Frame Links: tabs of their icons, the HUD's Show in first, 2026-11-16.)
+			{ "Minimap", "Interface\\Icons\\INV_Misc_Map_01", section = "Map & Quests", tabOf = "HUD:minimap" },
+			-- (One Mouse icon, after the Minimap's, 2026-11-16: Hover Groups, its tabs Tooltips, Tooltip Style and Cursor.)
+			-- (Its picture the game's own mouse pointer.)
+			{ "Mouseover groups", "Interface\\Cursor\\Point", label = "Mouseover", section = "Mouseover" },
+			{ "Tooltips", "Interface\\Icons\\INV_Misc_Book_09", section = "Mouseover", tabOf = "Mouseover groups" },
+			{ "Tooltip Style", "Interface\\Icons\\INV_Misc_Note_05", label = "Tooltip Style", section = "Mouseover",
+				tabOf = "Mouseover groups" },
+			{ "Cursor Hide", "Interface\\Icons\\INV_Misc_Eye_01", section = "Mouseover", tabOf = "Mouseover groups" }, -- (CursorHide.lua)
+			{ "Quest tracker", "Interface\\Icons\\INV_Misc_Note_01", label = "Quest Tracker", section = "Map & Quests",
+				tabOf = "HUD:quests" },
+			-- (Buffs & Debuffs: one icon, its Show in the HUD's, Reveal and links this page's, 2026-11-16.)
+			{ "Buffs/debuffs", "Interface\\Icons\\Spell_Holy_WordFortitude", label = "Buffs/Debuffs", section = "Buffs & Debuffs",
+				tabOf = "HUD:buffs" },
+			-- (The Timers icon's tabs, after its Show in, 2026-11-16.)
+			{ "Cooldown Manager", "Interface\\Icons\\INV_Misc_PocketWatch_01", section = "Timers", tabOf = "HUD:combat" },
+			{ "Swing timer", "Interface\\Icons\\INV_Sword_04", label = "Swing Timer", section = "Timers",
+				tabOf = "HUD:combat" },
+			{ "Breath Bar", "Interface\\Icons\\Spell_Shadow_DemonBreath", section = "Timers", tabOf = "HUD:combat" },
+			{ "Combat Text Style", "Interface\\Icons\\Ability_Warrior_Riposte", label = "Combat Text Style",
+				section = "Combat Text" },
 		} },
 		-- (Cameras: what everyone has; Dev: the dev copy's own, to the right)
 		-- (master: Enable Cameras; its pages with no switch of their own show Off with it)
@@ -2335,44 +2668,24 @@ do
 			{ "Graphics+", "Interface\\Icons\\INV_Misc_Gem_Pearl_04", label = "Graphics Boost", section = "Visuals" },
 			{ "Audio", "Interface\\Icons\\INV_Misc_Drum_01", section = "Audio" },
 		} },
-		-- (section: its pages on a band in its color, its name above it; all in
-		-- one row: the HUD's frames, then what floats over heads in the world.
-		-- The picked page's band in gold, the rest faded. Cinematic's own looks
-		-- are Style tabs on their own pages. after: listed right after UI
-		-- Manager, at the same level.)
-		{ name = "Style", colors = {
-			HUD = { 0.35, 0.6, 0.9 }, Overhead = { 0.65, 0.45, 0.9 },
-		}, pages = {
+		-- (The look of the whole interface: Enable Style and the theme, and the
+		-- recolor. Each frame's own look is on its page in the Interface hub,
+		-- nameplates' in theirs, a Vision's on its own: 2026-11-16.)
+		{ name = "Style", pages = {
 			{ "Style General", "Interface\\Icons\\INV_Misc_Gear_08", label = "General" },
 			{ "Style Pages", "Interface\\Icons\\INV_Misc_Gear_08", tabOf = "Style General" }, -- (GeneralStyle.lua)
 			{ "Style Overrides", "Interface\\Icons\\INV_Misc_Gear_08", tabOf = "Style General" }, -- (StyleOverrides.lua)
-			{ "Unit Style", "Interface\\Icons\\INV_Misc_Head_Human_01", label = "Unit Frame Style", section = "HUD" },
-			{ "Raid Style", "Interface\\Icons\\INV_Misc_GroupNeedMore", label = "Raid Frame Style", section = "HUD" },
-			{ "Action Style", "Interface\\Icons\\Ability_DualWield", label = "Action Bar Style", section = "HUD" },
-			{ "Interface Recolor", "Interface\\Icons\\INV_Misc_Gem_01", label = "Interface Recolor", section = "HUD" },
-			{ "Personal Style", "Interface\\Icons\\Spell_Holy_SealOfVengeance", label = "Personal Resource Style",
-				section = "HUD" },
-			{ "Tooltip Style", "Interface\\Icons\\INV_Misc_Note_05", label = "Tooltip Style", section = "HUD" },
-			{ "Bubble Style", "Interface\\Icons\\Ability_Warrior_RallyingCry", label = "Chat Bubble Style",
-				section = "Overhead" },
-			{ "Combat Text Style", "Interface\\Icons\\Ability_Warrior_Riposte", label = "Combat Text Style",
-				section = "Overhead" },
+			{ "Interface Recolor", "Interface\\Icons\\INV_Misc_Gem_01", tabOf = "Style General" }, -- (InterfaceRecolor.lua: General's last tab)
 		} },
-		-- (Everything about nameplates, listed after UI Visibility: which show
+		-- (Everything about nameplates, listed after Interface: which show
 		-- (General: the Nameplates page, its id kept), the icons on them, then
 		-- their looks (Look: still Style > General's Enable Style and theme;
 		-- ids kept). name: not "Nameplates", the General page's id.)
-		{ name = "Plates", label = "Nameplates", note = { "Looks follow Style > General >", "Style General" },
-			colors = { Look = { 0.65, 0.45, 0.9 } }, pages = {
-			{ "Nameplates", "Interface\\Icons\\Ability_Hunter_SniperShot", label = "General" },
-			{ "Plate Icons", "Interface\\Icons\\INV_Misc_GroupNeedMore", label = "Icons" }, -- (PlateIcons.lua)
-			{ "Nameplate Style", "Interface\\Icons\\Ability_Marksmanship", label = "Nameplate Style", section = "Look" },
-			{ "Name Style", "Interface\\Icons\\INV_Misc_Note_02", label = "Name Style", section = "Look" },
-			{ "Cast Bar Style", "Interface\\Icons\\Spell_Nature_Lightning", label = "Cast Bar Style", section = "Look" },
-		} },
 		-- (General and the dev copy's Wind Guide in no section: plain icons)
 		{ name = "Visions", colors = { Combat = { 0.85, 0.3, 0.25 }, World = { 0.35, 0.6, 0.9 } }, pages = {
-			-- (VisionsStyle.lua: the look they share; in no section, a band of its own)
+			-- (General: every Vision as a card, 2026-11-16. VisionsStyle.lua: the
+			-- look they share. Each in no section, a band of its own.)
+			{ "Visions General", "Interface\\Icons\\INV_Misc_Book_11", label = "General" },
 			{ "Visions Style", "Interface\\Icons\\INV_Misc_Gear_08" },
 			{ "Heal Vision", "Interface\\Icons\\Spell_Holy_FlashHeal", section = "Combat" },
 			-- (tabOf: no icon of its own, a folder tab on that page's (ns.PageTabs))
@@ -2406,14 +2719,15 @@ do
 			{ "Hunter", "Interface\\Icons\\INV_Weapon_Bow_07", section = "Helpers" },
 			{ "Keyboard Map", "Interface\\Icons\\INV_Misc_Note_06", section = "Helpers" }, -- (KeyboardMap.lua)
 		} },
-		-- (Everything about other addons, listed after UI Visibility. General:
+		-- (Everything about other addons, listed after Interface. General:
 		-- CreateQualityPanel's end, only with one of its addons loaded;
 		-- Conflicts: Conflicts.lua, only with an addon that has rows loaded;
 		-- Frames: the Advanced Frames page, always, its ids kept.)
 		{ name = "Addons", pages = {
-			{ "Addon Support", "Interface\\Icons\\INV_Misc_Gear_02", label = "General" },
-			{ "Addon Conflicts", "Interface\\Icons\\Ability_Warrior_Disarm", label = "Conflicts" },
+			-- (Custom Support: Addon Frames' second tab since 2026-11-16.)
 			{ "Advanced Frames", "Interface\\Icons\\INV_Misc_Gear_01", label = "Frames" },
+			{ "Addon Support", "Interface\\Icons\\INV_Misc_Gear_02", tabOf = "Advanced Frames" },
+			{ "Addon Conflicts", "Interface\\Icons\\Ability_Warrior_Disarm", label = "Conflicts" },
 		} },
 		-- (WheelsPage.lua's pages; listed under Quality of life. The master wheel first, plain; the wheels it opens on a band.)
 		{ name = "Wheels", under = "Quality of life", colors = { Wheels = { 0.65, 0.45, 0.9 } }, pages = {
@@ -2454,27 +2768,12 @@ do
 	-- Pages sharing one icon, a folder tab each, where this client has more
 	-- than one of them: the first it has gets the icon, named label; the rest
 	-- are its tabs (tabOf). Each page: { English name, tab name, tab tip }.
-	local PAGE_GROUPS = {
-		-- (HUD' icon: the gamepad's frames and the cursor its tabs.)
-		{ label = "HUD", pages = {
-			{ "Standard Frames", "HUD", "The game's own frames: when each shows in CineMode." },
-			{ "Gamepad", "Gamepad", "The frames gamepad mode adds: its action bars, button hints and reticle." },
-			{ "Cursor Hide", "Cursor", "In CineMode, the cursor gets out of the way." },
-		} },
-		-- (master: the icon's switch, its tabs' own switches under it: Core.lua's handleTimers)
-		{ label = "Timers", master = "handleTimers", switches = ns.TIMERS_SWITCHES, pages = {
-			{ "Cooldown Manager", "Cooldown Manager", "When the Cooldown Manager comes up in CineMode." },
-			{ "Swing timer", "Swing Timer", "Which of the game's swing timer bars show." },
-		} },
-	}
+	-- (None now, 2026-11-16: the HUD page's sections are icons in their bands,
+	-- HUD_ICONS, and a frame's own pages tabs of its icon, ns.ShowInTabs. Kept
+	-- for a group to come: { label, master, switches, pages = { { page, tab, tip } } }.)
+	local PAGE_GROUPS = {}
 	-- (Whether this client makes the page: as the calls at the end of this file decide.)
-	local GROUP_HAS = {
-		["Standard Frames"] = function() return true end,
-		["Cursor Hide"] = function() return ns.CreateCursorHidePage ~= nil end,
-		Gamepad = function() return C_GamePad ~= nil and not ns.isRetail end,
-		["Cooldown Manager"] = function() return ns.HasCooldownManager() end,
-		["Swing timer"] = function() return not ns.isRetail end,
-	}
+	local GROUP_HAS = {}
 	local groupsDone
 	-- (Once, as the first page comes into its hub: each group's pages this
 	-- client has, and their icon and tabs set on HUBS' entries.)
@@ -2644,20 +2943,51 @@ do
 		for _, tile in ipairs(hub.tiles) do
 			if tile.section then return SectionLayout(hub, width) end
 		end
+		-- (One icon only, Addons without Conflicts: no row at all, 2026-11-16;
+		-- the page right under the search bar.)
+		if #hub.tiles <= 1 then
+			for _, tile in ipairs(hub.tiles) do tile:Hide() end
+			hub.host:ClearAllPoints()
+			hub.host:SetPoint("TOPLEFT", hub.frame, "TOPLEFT", 0, -BAR - BELOW)
+			hub.host:SetPoint("BOTTOMRIGHT")
+			return
+		end
 		local left = EDGE
 		local perRow = math.max(1, math.floor((width - left - EDGE + TILE_GAP) / (TILE + TILE_GAP)))
 		local column, row = 0, 0
+		-- (hub.groups: a gap between groups, a thin line in it; x past the gaps so far.)
+		local GROUP_GAP = 16
+		local x, lastGroup, lines = 0, nil, 0
+		hub.groupLines = hub.groupLines or {}
 		local function Place(tile)
-			if column >= perRow then
-				column, row = 0, row + 1
+			if column >= perRow or (column > 0 and left + x + TILE > width - EDGE) then
+				column, row, x = 0, row + 1, 0
 			end
 			local y = -BAR - EDGE - row * (TILE + TILE_GAP)
+			if tile.group and lastGroup and tile.group ~= lastGroup and column > 0 then
+				lines = lines + 1
+				local line = hub.groupLines[lines]
+				if not line then
+					line = hub.frame:CreateTexture(nil, "ARTWORK")
+					line:SetColorTexture(0.6, 0.5, 0.3, 0.5)
+					line:SetWidth(1)
+					hub.groupLines[lines] = line
+				end
+				line:ClearAllPoints()
+				line:SetPoint("TOPLEFT", hub.frame, "TOPLEFT", left + x + (GROUP_GAP - TILE_GAP) / 2, y - 4)
+				line:SetHeight(TILE - 8)
+				line:Show()
+				x = x + GROUP_GAP
+			end
+			lastGroup = tile.group
 			tile:ClearAllPoints()
-			tile:SetPoint("TOPLEFT", hub.frame, "TOPLEFT", left + column * (TILE + TILE_GAP), y)
+			tile:SetPoint("TOPLEFT", hub.frame, "TOPLEFT", left + x, y)
 			tile:Show()
 			column = column + 1
+			x = x + TILE + TILE_GAP
 		end
 		for _, tile in ipairs(hub.tiles) do Place(tile) end
+		for i = lines + 1, #hub.groupLines do hub.groupLines[i]:Hide() end
 		local rows = #hub.tiles > 0 and row + 1 or 0
 		hub.host:ClearAllPoints()
 		hub.host:SetPoint("TOPLEFT", hub.frame, "TOPLEFT", 0,
@@ -2694,6 +3024,8 @@ do
 		if ns.PaintPageSwitches then ns.PaintPageSwitches() end -- (its off card)
 		if run then run.switches = debugprofilestop() - painted end
 		ns.EndPageRun(run)
+		-- (Its line in the left list lit, its groups open: menu.MarkLine.)
+		if menu.MarkLine then menu.MarkLine(hub.name, tile.english, tile.tabOf) end
 	end
 
 	-- (made when its first page comes, so it's listed where that page would be)
@@ -2786,6 +3118,7 @@ do
 		end
 	end
 	local function TileSwitch(tile, asIcon)
+		if tile.noSwitch or (asIcon and tile.noDot) then return nil end
 		local group = GroupSwitch(tile)
 		if group and (asIcon or ns.GetDB()[group.key] == false) then return group end
 		local switch = pageSwitches[tile.resetContent or tile.canvas.content or false]
@@ -2921,7 +3254,7 @@ do
 		card = card or CreateOffCard(hub)
 		local box = BoxSwitch(switch)
 		local stuck = not box or select(2, SwitchState(box))
-		local name = L[switch.name or tile.label or tile.english]
+		local name = L[tile.switchLabel or switch.name or tile.label or tile.english]
 		card.icon:SetTexture(tile.icon:GetTexture())
 		card.title:SetText("|cffff5a40" .. L["%s is off"]:format(name) .. "|r")
 		card.text:SetText(stuck and L["Off with the General page's switch."]
@@ -3039,8 +3372,20 @@ do
 					for i, tab in ipairs(tabs) do
 						local tile = CreateTile(hub, canvas, tab.name, tab.icon, tab.label)
 						tile.order = order + i / 100
-						tile.section = tab.section or page.section
+						-- (tab.before: listed right before that page of the hub, in its band:
+						-- the HUD page's sections, each with its frame's pages.)
+						for at, each in ipairs(tab.before and hub.pages or {}) do
+							if each[1] == tab.before then tile.order = at - 0.5 + i / 1000 end
+						end
+						-- (hub.plain: one row, no bands; the band kept for the left list's lines and the tour)
+						tile.band = tab.section or page.section
+						tile.section = not hub.plain and tile.band or nil
 						tile.onSelect, tile.resetContent = tab.onSelect, tab.resetContent
+						-- (noDot: no switch on its icon, its page's under another's;
+						-- switchLabel: the name its off card gives that switch.)
+						tile.noDot, tile.switchLabel = tab.noDot, tab.switchLabel
+						tile.noSwitch = tab.noSwitch -- (none at all, not its page's: no off card)
+						tile.showIn = tab.showIn -- (its Show in list's key: ns.HubOverview's tabs)
 						if page.dev and tile.CreateLine then
 							-- (A red X over the icon: dev copy only.)
 							tile.dev = true
@@ -3055,8 +3400,8 @@ do
 						if tab.setSelect then
 							tab.setSelect(function() Select(tile) end)
 						end
-						if page.tabOf then
-							tile.tabOf = page.tabOf
+						if tab.tabOf or page.tabOf then -- (tab.tabOf: one of a page's icons only)
+							tile.tabOf = tab.tabOf or page.tabOf
 							tile:Hide()
 						else
 							hub.tiles[#hub.tiles + 1] = tile
@@ -3064,8 +3409,28 @@ do
 						if i == 1 then
 							byName[name], byName[english] = tile, tile
 						end
+						-- (tab.own: opened by its own name too, ns.OpenOptions("HUD:raid").)
+						if tab.own then byName[tab.name] = tile end
 					end
-					table.sort(hub.tiles, function(a, b) return a.order < b.order end)
+					-- (hub.groups: each icon in its group, the groups in their order.)
+					local groups = hub.groups
+					if groups then
+						for _, each in ipairs(hub.tiles) do
+							-- (false: in no group, first, a band of its own: the General icon)
+						each.group = groups[each.english]
+						if each.group == nil then each.group = groups.other end
+						each.group = each.group or nil
+							each.band = each.group
+						each.section = each.group -- (its colored band, as other hubs' sections: SectionLayout)
+							for rank, name in ipairs(groups.order) do
+								if name == each.group then each.groupRank = rank end
+							end
+						end
+					end
+					table.sort(hub.tiles, function(a, b)
+						if (a.groupRank or 0) ~= (b.groupRank or 0) then return (a.groupRank or 0) < (b.groupRank or 0) end
+						return a.order < b.order
+					end)
 					-- (its search: the hub's box; its Reset page: the hub's)
 					searchPage.order = order
 					hub.searchPages[#hub.searchPages + 1] = searchPage
@@ -3086,12 +3451,120 @@ do
 		return byName[name] ~= nil
 	end
 
+	-- Lines in the left list under a hub (2026-11-16): one for each of its
+	-- bands (Heads-up..., Combat...), each icon's line under its band's, and
+	-- an icon in no band past the first (the hub's own line opens that) on
+	-- a line of its own. Each folded to start with, opening as you go in
+	-- (menu.AutoFold). Each a page that, as it shows, takes the hub's own
+	-- frame in (the settings put it back on the hub's line as that's picked)
+	-- at its icon (a band's: its first), so its own line stays lit. Before
+	-- menu.Flush, every page in.
+	function ns.AddBandShortcuts(hubName)
+		for _, hub in ipairs(HUBS) do
+			if hub.name == hubName and hub.frame then
+				local function Line(key, label, parentKey, target)
+					local frame = CreateFrame("Frame")
+					frame.name, frame.parent = label, L[hub.label or hub.name]
+					-- (Put back as it was as this one hides, before the next shows:
+					-- where the settings had it, for the hub's own line.)
+					local kept
+					frame:SetScript("OnShow", function(self)
+						local hubFrame = hub.frame
+						-- (Held by another line still: that one hands it back first.)
+						if hub.heldBy and hub.heldBy ~= self then
+							local onHide = hub.heldBy:GetScript("OnHide")
+							if onHide then onHide(hub.heldBy) end
+						end
+						hub.heldBy = self
+						kept = { parent = hubFrame:GetParent(), points = {} }
+						for i = 1, hubFrame:GetNumPoints() do kept.points[i] = { hubFrame:GetPoint(i) } end
+						hubFrame:SetParent(self)
+						hubFrame:ClearAllPoints()
+						hubFrame:SetAllPoints(self)
+						hubFrame:Show()
+						HubTab(target)
+					end)
+					frame:SetScript("OnHide", function(self)
+						local hubFrame = hub.frame
+						if hub.heldBy == self then hub.heldBy = nil end
+						if not kept or hubFrame:GetParent() ~= self then return end
+						hubFrame:SetParent(kept.parent)
+						hubFrame:ClearAllPoints()
+						for _, point in ipairs(kept.points) do hubFrame:SetPoint(unpack(point)) end
+						if not kept.parent then hubFrame:Hide() end -- (never shown on its own line yet)
+						kept = nil
+					end)
+					frame:Hide() -- (made shown, its OnShow would never come as the list shows it)
+					menu.Add(key, frame, label, parentKey)
+				end
+				local bands = {}
+				for i, tile in ipairs(hub.tiles) do
+					local band = tile.band or tile.section
+					local label = L[tile.label or tile.english]
+					if band then
+						local bandKey = hub.name .. "/" .. band
+						if not bands[band] then
+							bands[band] = true
+							Line(bandKey, L[band], hub.name, tile.english)
+							menu.fold[bandKey] = true
+						end
+						Line(bandKey .. "/" .. tile.english, label, bandKey, tile.english)
+					menu.lineOf[hub.name .. "|" .. tile.english] = bandKey .. "/" .. tile.english
+					elseif i > 1 then
+						Line(hub.name .. "/" .. tile.english, label, hub.name, tile.english)
+					menu.lineOf[hub.name .. "|" .. tile.english] = hub.name .. "/" .. tile.english
+					end
+				end
+			end
+		end
+	end
+
+	-- A hub page's own tabs (tabOf it in HUBS), as { label, page } each, in
+	-- order (the Visions hub's General page's chips).
+	function ns.HubTabsOf(hubName, page)
+		local list = {}
+		for _, hub in ipairs(HUBS) do
+			if hub.name == hubName then
+				for _, each in ipairs(hub.pages) do
+					if each.tabOf == page and not each.dev then
+						list[#list + 1] = { L[each.label or each[1]], each[1] }
+					end
+				end
+			end
+		end
+		return list
+	end
+
+	-- A hub's icons in their order, left to right: each one's name (as
+	-- ns.OpenOptions takes it), its label as shown and its band (the Demo
+	-- Hub's screenshot tour).
+	function ns.HubIcons(hubName)
+		local list = {}
+		for _, hub in ipairs(HUBS) do
+			if hub.name == hubName then
+				for _, tile in ipairs(hub.tiles or {}) do
+					-- (on: its page's switch, on or off (held off: off); nil without
+					-- one. A HUD section's is the HUD page's, its icon having no dot.)
+					local switch, on = TileSwitch(tile, true) or TileSwitch(tile), nil
+					if switch then
+						local isOn, held = SwitchState(switch)
+						on = isOn and not held
+					end
+					list[#list + 1] = { name = tile.english, label = L[tile.label or tile.english],
+						band = tile.band and L[tile.band] or "", texture = tile.icon and tile.icon:GetTexture(), on = on }
+				end
+			end
+		end
+		return list
+	end
+
 	function HubTab(name)
 		local tile = byName[name]
 		if not tile then return false end
-		-- (already on that page, at another of its tabs: left there)
+		-- (already on that page, at another of its tabs: left there, unless
+		-- that tab is the one asked for by its own name)
 		local current = tile.hub.current
-		if not (current and current.canvas == tile.canvas) then
+		if not (current and current.canvas == tile.canvas and tile.english ~= name) then
 			Select(tile)
 		end
 		return tile.hub.name
@@ -3246,12 +3719,98 @@ do
 						list[#list + 1] = { name = page[1], label = L[page.label or page[1]],
 							icon = type(page[2]) == "function" and page[2]() or page[2],
 							intro = content and content.introText, hasSwitch = switch ~= nil, dev = page.dev,
+							section = page.section,
 							on = on, held = held, fixed = (switch and switch.follows or held) and true or false }
 					end
 				end
 				return list, L[hub.label or hub.name]
 			end
 		end
+	end
+
+	-- A hub's icons, left to right, each with its tabs (2026-11-16: the
+	-- CineMode Overview, every page and tab with a switch): as HubPageStates
+	-- gives a page, plus band, and tabs: { name, label, hasSwitch, on, held,
+	-- fixed, shared } each. shared: the icon's own switch (or the HUD's for
+	-- its sections), turned on and off there. An icon's tabs: its Show in
+	-- list's (ns.ShowInTabs, Show in itself being the icon), else its pages
+	-- with tabOf it.
+	local ICON_SHOW_IN = { ["Mouseover groups"] = "mouse", ["Nameplates"] = "plates", ["Nameplate Names"] = "names" }
+	local function StateOf(switch)
+		if not switch then return { hasSwitch = false, on = false, held = false, fixed = false } end
+		local on, held = SwitchState(switch)
+		return { hasSwitch = true, on = on, held = held, fixed = (switch.follows or held) and true or false }
+	end
+	function ns.HubOverview(hubName)
+		for _, hub in ipairs(HUBS) do
+			if hub.name == hubName then
+				local list = {}
+				for _, tile in ipairs(hub.tiles or {}) do
+					local own = TileSwitch(tile, true)
+					local switch = own or TileSwitch(tile)
+					local entry = StateOf(switch)
+					-- (No switch of its own, a HUD section: shows the HUD's, flipped there.)
+					if switch and not own then entry.fixed, entry.shared = true, true end
+					local content = tile.resetContent or (tile.canvas and tile.canvas.content)
+					entry.name, entry.label = tile.english, L[tile.label or tile.english]
+					entry.icon = tile.icon and tile.icon:GetTexture()
+					entry.intro, entry.dev, entry.band = content and content.introText, tile.dev, tile.band
+					entry.tabs = {}
+					local key = tile.showIn or ICON_SHOW_IN[tile.english]
+					local tabs = key and ns.ShowInTabs and ns.ShowInTabs(key) or ns.HubTabsOf(hubName, tile.english)
+					for _, tab in ipairs(tabs) do
+						local page = tab[2]
+						if page ~= tile.english and byName[page] then
+							local tabSwitch = TileSwitch(byName[page])
+							local state = StateOf(tabSwitch)
+							state.name, state.label = page, tab[1]
+							if tabSwitch and switch and tabSwitch.key == switch.key then state.shared = true end
+							entry.tabs[#entry.tabs + 1] = state
+						end
+					end
+					list[#list + 1] = entry
+				end
+				return list, L[hub.label or hub.name]
+			end
+		end
+	end
+	-- A hub's General switch (2026-11-16: Interface's, Visions'): off, every
+	-- other page switch of the hub goes off too, the ones that were on kept
+	-- (db.hubKept); on, those come back on. Each through its own box, so its
+	-- page puts itself right. (Lazy pages made first: their switches with them.)
+	function ns.CascadeHub(hubName, generalKey, on)
+		local db = ns.GetDB()
+		if not db then return end
+		if ns.MakeLazyPages then ns.MakeLazyPages("a hub's General switch") end
+		db.hubKept = db.hubKept or {}
+		for _, hub in ipairs(HUBS) do
+			if hub.name == hubName then
+				local kept = on and db.hubKept[hubName] or {}
+				local done = { [generalKey] = true }
+				for _, page in ipairs(hub.pages) do
+					local tile = byName[page[1]]
+					local switch = tile and TileSwitch(tile)
+					if switch and switch.check and not switch.follows and not done[switch.key] then
+						done[switch.key] = true
+						local now = KeyGet(switch.key) and true or false
+						local want = on and kept[switch.key] or false
+						if not on and now then kept[switch.key] = true end
+						if want ~= now then
+							switch.check:SetChecked(want)
+							switch.check:GetScript("OnClick")(switch.check, "LeftButton")
+						end
+					end
+				end
+				db.hubKept[hubName] = not on and kept or nil
+			end
+		end
+		if ns.PaintPageSwitches then ns.PaintPageSwitches() end
+	end
+
+	-- A tab's page switch flipped, as a right-click on its tab does.
+	function ns.FlipTabSwitch(name)
+		local switch = byName[name] and TileSwitch(byName[name])
+		if switch then FlipSwitch(switch) end
 	end
 end
 
@@ -3303,8 +3862,7 @@ local function CreateRevealPanel()
 	-- as they first show; then Settings, this page's own (everything made on it
 	-- below the cards, moved onto host).
 	local OVERVIEW_HUBS = {
-		{ "UI Manager", L["UI Visibility"], L["What fades in CineMode, and what brings it back."] },
-		{ "Plates", L["Nameplates"], L["Which nameplates and names stay up in CineMode, and what's on them."] },
+		{ "UI Manager", L["Interface"], L["What fades in CineMode, and what brings it back."] },
 		{ "Atmosphere", L["Atmosphere"], L["How the world looks and sounds in CineMode."] },
 		{ "Camera", L["Camera"], L["The camera coming alive while CineMode is on."] },
 	}
@@ -3356,6 +3914,27 @@ local function CreateRevealPanel()
 		GameTooltip:Show()
 	end
 	-- (Placed by FillOverview: under its hub's heading, the cards two a row.)
+	-- A switch: a click flips its page's (a tab's: its own page's), as a
+	-- right-click on its icon or tab does. (Over its own share of the card.)
+	local function MakeSwitch(parent, height, flip)
+		local state = CreateFrame("Button", nil, parent)
+		state:SetSize(SWITCH_W + 20, height) -- (more to click than the switch drawn)
+		state.track = state:CreateTexture(nil, "ARTWORK")
+		state.track:SetSize(SWITCH_W, SWITCH_H)
+		state.track:SetPoint("CENTER")
+		state.knob = state:CreateTexture(nil, "OVERLAY")
+		state.knob:SetSize(KNOB, KNOB)
+		state:SetScript("OnEnter", StateTip)
+		state:SetScript("OnLeave", function() GameTooltip:Hide() end)
+		state:SetScript("OnClick", function(self)
+			if self.page.fixed then return end
+			flip(self.page.name)
+			FillOverview()
+			if GameTooltip:IsOwned(self) then StateTip(self) end
+		end)
+		return state
+	end
+	local TAB_H, TAB_INDENT = 22, 46
 	local function MakeCard(page, tab)
 		local card = CreateFrame("Button", nil, overview)
 		card:SetHeight(CARD_H)
@@ -3371,11 +3950,13 @@ local function CreateRevealPanel()
 			if i <= 2 then line:SetHeight(1) else line:SetWidth(1) end
 		end
 		local hover = card:CreateTexture(nil, "HIGHLIGHT")
-		hover:SetAllPoints()
+		hover:SetPoint("TOPLEFT")
+		hover:SetPoint("TOPRIGHT")
+		hover:SetHeight(CARD_H)
 		hover:SetColorTexture(1, 0.82, 0, 0.07)
 		card.icon = card:CreateTexture(nil, "ARTWORK")
 		card.icon:SetSize(28, 28)
-		card.icon:SetPoint("LEFT", 8, 0)
+		card.icon:SetPoint("TOPLEFT", 8, -7)
 		card.icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
 		card.icon:SetTexture(page.icon)
 		if page.dev and card.CreateLine then
@@ -3388,33 +3969,49 @@ local function CreateRevealPanel()
 			end
 		end
 		-- (A hub's General page by its own name: Effects, Cameras)
-		card.label = Label(card, "GameFontHighlight", page.label == L["General"] and L[page.name] or page.label)
+		-- (Not a section's own icon, HUD:hud: General is its name. 2026-11-16.)
+		card.label = Label(card, "GameFontHighlight", page.label == L["General"] and not page.name:find(":")
+			and L[page.name] or page.label)
 		card.label:SetPoint("LEFT", card.icon, "RIGHT", 10, 0)
 		-- (Its page's whole intro on a "?" beside the name, as on the page itself.)
 		if type(page.intro) == "string" then PageIntro(card, card.label, page.intro) end
 		Tooltip(card, L["Go to this page."])
 		card:SetScript("OnClick", function() ns.OpenOptions(page.name) end)
-		-- (The switch: a click flips the page's, as a right-click on its icon does.)
-		local state = CreateFrame("Button", nil, card)
-		state:SetSize(SWITCH_W + 20, CARD_H) -- (more to click than the switch drawn)
-		state:SetPoint("RIGHT", 0, 0)
-		state.track = state:CreateTexture(nil, "ARTWORK")
-		state.track:SetSize(SWITCH_W, SWITCH_H)
-		state.track:SetPoint("CENTER")
-		state.knob = state:CreateTexture(nil, "OVERLAY")
-		state.knob:SetSize(KNOB, KNOB)
-		state:SetScript("OnEnter", StateTip)
-		state:SetScript("OnLeave", function() GameTooltip:Hide() end)
-		state:SetScript("OnClick", function(self)
-			if self.page.fixed then return end
-			ns.FlipPageSwitch(self.page.name)
-			FillOverview()
-			if GameTooltip:IsOwned(self) then StateTip(self) end
-		end)
-		state.title = card.label:GetText()
-		card.state = state
+		card.state = MakeSwitch(card, CARD_H, ns.FlipPageSwitch)
+		card.state:SetPoint("TOPRIGHT", 0, 0)
+		card.state.title = card.label:GetText()
+		-- (Its tabs, a line each under it: the name (a click opens it) and
+		-- its switch; one turned on and off with the icon's says so.)
+		card.tabRows = {}
 		card.tab = tab
 		return card
+	end
+	local function TabRow(card, i)
+		local row = card.tabRows[i]
+		if row then return row end
+		row = CreateFrame("Button", nil, card)
+		row:SetHeight(TAB_H)
+		row:SetPoint("TOPLEFT", card, "TOPLEFT", TAB_INDENT, -CARD_H - (i - 1) * TAB_H + 4)
+		row:SetPoint("RIGHT", card, "RIGHT", 0, 0)
+		local glow = row:CreateTexture(nil, "HIGHLIGHT")
+		glow:SetAllPoints()
+		glow:SetColorTexture(1, 0.82, 0, 0.07)
+		row.label = Label(row, "GameFontHighlightSmall", "")
+		row.label:SetPoint("LEFT", 0, 0)
+		row.note = Label(row, "GameFontDisableSmall", "")
+		row.note:SetPoint("RIGHT", -12, 0)
+		row:SetScript("OnClick", function(self) ns.OpenOptions(self.page.name) end)
+		row:SetScript("OnEnter", function(self)
+			GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+			GameTooltip:SetText(self.page.label, 1, 0.82, 0)
+			GameTooltip:AddLine(L["Go to this page."], 1, 1, 1, true)
+			GameTooltip:Show()
+		end)
+		row:SetScript("OnLeave", function() GameTooltip:Hide() end)
+		row.state = MakeSwitch(row, TAB_H, ns.FlipTabSwitch)
+		row.state:SetPoint("RIGHT", 0, 0)
+		card.tabRows[i] = row
+		return row
 	end
 	local function PaintSwitch(state, page)
 		local dim = page.fixed and 0.6 or 1
@@ -3432,8 +4029,32 @@ local function CreateRevealPanel()
 			state.knob:SetPoint("LEFT", state.track, "LEFT", inset, 0)
 		end
 	end
+	-- (Grey with its page off.)
+	local function Tone(icon, label, off)
+		if icon then
+			icon:SetDesaturated(off)
+			icon:SetAlpha(off and 0.6 or 1)
+		end
+		local tone = off and 0.6 or 1
+		label:SetTextColor(tone, tone, tone)
+		label:SetVertexColor(tone, tone, tone) -- (one on Forever)
+	end
 	-- Each hub's heading on the Overview, its line of what it's for beside it.
 	local HEADING_H, GROUP_GAP = 22, 14
+	-- (A group's name over its cards, a thin line under it: Heads-up...)
+	local subHeads = {}
+	local function MakeSubHead()
+		local sub = CreateFrame("Frame", nil, overview)
+		sub:SetHeight(16)
+		sub.text = Label(sub, "GameFontNormalSmall", "")
+		sub.text:SetPoint("LEFT", 2, 0)
+		local line = sub:CreateTexture(nil, "ARTWORK")
+		line:SetHeight(1)
+		line:SetPoint("BOTTOMLEFT", 0, -2)
+		line:SetPoint("BOTTOMRIGHT", 0, -2)
+		line:SetColorTexture(0.6, 0.5, 0.25, 0.5)
+		return sub
+	end
 	local headings = {}
 	local function Heading(group)
 		local heading = headings[group[1]]
@@ -3444,14 +4065,20 @@ local function CreateRevealPanel()
 		headings[group[1]] = heading
 		return heading
 	end
-	-- Every card as its page is now, under its hub's heading, and how many
-	-- of them are on.
+	-- Every card as its page and its tabs are now, under its hub's heading
+	-- (2026-11-16: from the hub's icons, each with its tabs), and how many
+	-- switches are on.
 	function FillOverview()
 		if not ns.GetDB() then return end
-		local states = {}
+		local shown = {}
+		local count, onCount = 0, 0
+		local function Count(page)
+			count = count + 1
+			if page.on then onCount = onCount + 1 end
+		end
 		local y = 0
 		for tab, group in ipairs(OVERVIEW_HUBS) do
-			local pages = ns.HubPageStates(group[1]) or {}
+			local pages = ns.HubOverview(group[1]) or {}
 			local heading = Heading(group)
 			heading:SetShown(#pages > 0)
 			heading.note:SetShown(#pages > 0)
@@ -3459,45 +4086,79 @@ local function CreateRevealPanel()
 				heading:ClearAllPoints()
 				heading:SetPoint("TOPLEFT", overview, "TOPLEFT", 0, y)
 				y = y - HEADING_H
-				for spot, page in ipairs(pages) do
-					states[page.name] = page
+				-- (In the hub's groups, each under its name and a line (2026-11-16:
+				-- Interface's General, Heads-up, Overhead, Info); each column filled
+				-- on its own, a card under the one above it, so a short one beside a
+				-- tall one leaves no gap.)
+				local cols, band, subs = { y, y }, false, 0
+				local banded = false -- (a hub with groups at all: each named, General first)
+				for _, page in ipairs(pages) do banded = banded or page.band ~= nil end
+				for _, page in ipairs(pages) do
+					local pageBand = page.band or "General"
+					if banded and pageBand ~= band then
+						subs = subs + 1
+						local sub = subHeads[group[1] .. subs] or MakeSubHead()
+						subHeads[group[1] .. subs] = sub
+						shown[sub] = true
+						local top = math.min(cols[1], cols[2]) - (band ~= false and 6 or 0)
+						sub:ClearAllPoints()
+						sub:SetPoint("TOPLEFT", overview, "TOPLEFT", 0, top)
+						sub:SetPoint("RIGHT", overview, "RIGHT", 0, 0)
+						sub.text:SetText(L[pageBand])
+						cols = { top - 22, top - 22 }
+					end
+					band = pageBand
 					local card = cards[page.name] or MakeCard(page, tab)
 					cards[page.name] = card
-					local top = y - math.floor((spot - 1) / 2) * (CARD_H + CARD_GAP)
-					card:ClearAllPoints()
-					if spot % 2 == 1 then
-						card:SetPoint("TOPLEFT", overview, "TOPLEFT", 0, top)
-						card:SetPoint("TOPRIGHT", mid, "TOP", -CARD_GAP / 2, top)
-					else
-						card:SetPoint("TOPLEFT", mid, "TOP", CARD_GAP / 2, top)
-						card:SetPoint("TOPRIGHT", overview, "TOPRIGHT", 0, top)
+					shown[card] = true
+					-- (The icon's own switch; a HUD section's the HUD's, shown greyed.)
+					card.state:SetShown(page.hasSwitch)
+					if page.hasSwitch then
+						card.state.page = page
+						PaintSwitch(card.state, page)
+						if not page.shared then Count(page) end
 					end
+					Tone(card.icon, card.label, page.hasSwitch and not page.on)
+					for i, each in ipairs(page.tabs) do
+						local row = TabRow(card, i)
+						row.page = each
+						row.label:SetText(each.label)
+						local own = each.hasSwitch and not each.shared
+						row.state:SetShown(own)
+						-- (Turned on and off with the icon's switch, or with none.)
+						row.note:SetText("") -- (no switch, or the page's: none drawn, no word, 2026-11-16)
+						if own then
+							row.state.page = each
+							row.state.title = each.label
+							PaintSwitch(row.state, each)
+							Count(each)
+						end
+						Tone(nil, row.label, own and not each.on)
+						row:Show()
+					end
+					for i = #page.tabs + 1, #card.tabRows do card.tabRows[i]:Hide() end
+					local height = CARD_H + (#page.tabs > 0 and #page.tabs * TAB_H + 2 or 0)
+					card:SetHeight(height)
+					card:ClearAllPoints()
+					-- (Into the shorter column; the left on a tie.)
+					local col = cols[2] > cols[1] and 2 or 1
+					if col == 1 then
+						card:SetPoint("TOPLEFT", overview, "TOPLEFT", 0, cols[1])
+						card:SetPoint("TOPRIGHT", mid, "TOP", -CARD_GAP / 2, cols[1])
+					else
+						card:SetPoint("TOPLEFT", mid, "TOP", CARD_GAP / 2, cols[2])
+						card:SetPoint("TOPRIGHT", overview, "TOPRIGHT", 0, cols[2])
+					end
+					cols[col] = cols[col] - height - CARD_GAP
 				end
-				y = y - math.ceil(#pages / 2) * (CARD_H + CARD_GAP) - GROUP_GAP
+				y = math.min(cols[1], cols[2])
+				y = y - GROUP_GAP
 			end
 		end
 		overview:SetHeight(math.max(1, -y))
-		local count, onCount = 0, 0
-		for name, card in pairs(cards) do
-			local page, state = states[name], card.state
-			card:SetShown(page ~= nil)
-			if page and page.hasSwitch then
-				count = count + 1
-				if page.on then onCount = onCount + 1 end
-				state.page = page
-				PaintSwitch(state, page)
-				state:Show()
-			else
-				state:Hide()
-			end
-			local off = page and page.hasSwitch and not page.on or false
-			card.icon:SetDesaturated(off)
-			card.icon:SetAlpha(off and 0.6 or 1)
-			local tone = off and 0.6 or 1
-			card.label:SetTextColor(tone, tone, tone)
-			card.label:SetVertexColor(tone, tone, tone) -- (one on Forever)
-		end
-		summary:SetText(L["%d of %d pages on."]:format(onCount, count))
+		for _, card in pairs(cards) do card:SetShown(shown[card] or false) end
+		for _, sub in pairs(subHeads) do sub:SetShown(shown[sub] or false) end
+		summary:SetText(L["%d of %d switches on."]:format(onCount, count))
 		FitContentHeight(content)
 	end
 
@@ -3889,9 +4550,11 @@ end
 local function CreateBuffsPanel()
 	local canvas, content = CreateScrollPage()
 
-	local title = Label(content, "GameFontNormalLarge", L["Buffs/Debuffs"])
-	title:SetPoint("TOPLEFT", 16, -16)
-	ns.FramesLink(content, title, "combat")
+	-- (The Buffs & Debuffs icon's Reveal and links tabs, its Show in the HUD
+	-- page's: ns.ShowInTabs("buffs"), 2026-11-16.)
+	local title = Label(content, "GameFontNormalLarge", L["Reveal"])
+	local outer, ShowOuter = ns.PageTabs(content, ns.ShowInTabs("buffs"), 2)
+	title:SetPoint("TOPLEFT", outer, "BOTTOMLEFT", 8, -14)
 
 	local note = PageIntro(content, title,
 		L["Your buff and debuff icons. They fade with the UI in CineMode; these bring them back."])
@@ -3901,13 +4564,17 @@ local function CreateBuffsPanel()
 	buffPeek:SetPoint("TOPLEFT", note, "BOTTOMLEFT", -2, -17) -- (as under the other pages' hidden switch)
 	local switch = PageSwitch(content, "handleBuffs", L["Enable Page"],
 		L["On: this page's peeks bring your buffs and debuffs up in CineMode. Off: no peeks; they still " ..
-		"fade as their HUD row says."], note)
+		"fade as their Show in row says."], note)
 
-	-- Two tabs (ns.PageTabsBelow): the page's settings, and Addon Frame Links.
-	local tabHosts, _, TabsShown, AdoptTab = ns.PageTabsBelow(content, switch, {
-		{ L["Settings"], L["When your buffs and debuffs come up in CineMode."] },
-		{ L["Frame Links"], L["Which supported addon's frames stand in for your buffs and debuffs."] },
-	}, "Buffs/page", 2, "buffs", 1)
+	-- Two parts (ns.PageTabsBelow, its tabs not drawn: the icon's pick them):
+	-- Reveal, and Addon Frame Links.
+	local tabHosts, PickPart, TabsShown, AdoptTab = ns.PageTabsBelow(content, switch, {
+		{ L["Reveal"], L["When your buffs and debuffs come up in CineMode."] },
+		{ L["Addon Reveal Link"], L["Which supported addon's frames stand in for your buffs and debuffs."] },
+	}, "Buffs/page", 2, "buffs", 1, nil, true)
+	ns.ShowInParts(canvas, content, title, "buffs", PickPart, ShowOuter, { label = "Buffs & Debuffs",
+		icon = "Interface\\Icons\\Spell_Holy_WordFortitude", titles = { L["Reveal"], L["Addon Reveal Link"] },
+		switchLabel = "Reveal" })
 	-- (Made before the switch, under the page's intro: onto the tab, at its top.)
 	buffPeek:SetParent(tabHosts[1])
 	buffPeek:ClearAllPoints()
@@ -6858,8 +7525,7 @@ local function ShowTable(content, anchor, rows, ...)
 		rowLabel:SetJustifyH("LEFT")
 		rowLabel:SetWordWrap(false)
 		ShowBox(content, item, rowLabel)
-		-- A » to its page on rows that have a page of their own.
-		if item.morePage then ns.MoreLink(content, rowLabel, item.morePage) end
+		-- (No » to a row's own page, 2026-11-16: its frame's pages are tabs of one icon.)
 		ns.LabelHover(content, rowLabel, item.tip)
 		if ns.CINE_SHOW_SETTING[item.key] then
 			RecordKey(content, ns.CINE_SHOW_SETTING[item.key]) -- (for the page's Reset)
@@ -7041,7 +7707,55 @@ local function CreateCombatPanel()
 
 	local title = Label(content, "GameFontNormalLarge", L["HUD"])
 	title:SetPoint("TOPLEFT", 16, -16)
-	ns.GroupTabs(content, title, "Standard Frames")
+
+	-- The page's sections, an icon each in their frame's band on the Interface
+	-- hub (canvas.hubTabs, 2026-11-16), not folder tabs: keys, the sections
+	-- on it (sharing one, as the party frames' two); before, the page in HUBS
+	-- it's listed right before; section, its band. Each the HUD's banner: a
+	-- band's banner is when its frames show. (The first is the page's own,
+	-- ns.OpenOptions("Standard Frames"): HUD, its switch for all of them and
+	-- no rows; hud = true. The others have no switch of their own: no dot on
+	-- their icon, and the HUD's off card while it's off.)
+	local HUD_ICONS = {
+		-- (General since 2026-11-16: the hub's first icon, on its own before the groups; its switch still all the HUD's.)
+		{ keys = { "hud" }, label = "General", section = "What Shows", before = "Gamepad", hud = true },
+		-- (tabs: one page with the frame's own page's parts, its tabs: ns.ShowInTabs.)
+		{ keys = { "units", "prd", "playercast", "highlight" }, label = "Unit Frames", section = "Unit Frames", before = "Personal Resources",
+			icon = "Interface\\Icons\\INV_Misc_Head_Human_01",
+			tabs = "units" },
+		-- (Party & Raid: one icon, its tabs Party, Raid and Raid Style; Raid's
+		-- icon hidden under it, tabOf, picked by its tab: tabIndex.)
+		{ keys = { "party", "rsparty" }, label = "Party & Raid", section = "Party & Raid", before = "Raid Style",
+			icon = "Interface\\Icons\\INV_Misc_GroupNeedMore",
+			tabs = "party" },
+		{ keys = { "raid" }, label = "Party & Raid", section = "Party & Raid", before = "Raid Style",
+			tabs = "party", tabIndex = 2, tabOf = "HUD:party" },
+		{ keys = { "bars" }, label = "Action Bars", section = "Action Bars", before = "Action Style", tabs = "bars",
+			icon = "Interface\\Icons\\Ability_DualWield" },
+		{ keys = { "chat" }, label = "Chat", section = "Chat", before = "Chat", tabs = "chat",
+			icon = "Interface\\Icons\\INV_Scroll_03" },
+		{ keys = { "minimap" }, label = "Minimap", section = "Map & Quests", before = "Minimap", tabs = "minimap",
+			icon = "Interface\\Icons\\INV_Misc_Map_01" },
+		{ keys = { "quests" }, label = "Quest Tracker", section = "Map & Quests", before = "Quest tracker", tabs = "quests",
+			-- (A quest giver's "!", drawn sharp at 128 px: Media/make_quest_icon.py, 2026-11-16.)
+			icon = ns.HELP_DISC:gsub("HelpDisc$", "QuestTracker") },
+		{ keys = { "buffs" }, label = "Buffs & Debuffs", section = "Buffs & Debuffs", before = "Buffs/debuffs", tabs = "buffs",
+			icon = "Interface\\Icons\\Spell_Holy_WordFortitude" },
+		{ keys = { "combat" }, label = "Timers", section = "Timers", before = "Cooldown Manager", tabs = "timers",
+			icon = "Interface\\Icons\\INV_Misc_PocketWatch_01" },
+		{ keys = { "interface" }, label = "Menus & Info", section = "Menus & Info", before = "Combat Text Style",
+			icon = "Interface\\Icons\\INV_Misc_Bag_07" },
+		{ keys = { "other" }, label = "Other Frames in CineMode", section = "What Shows", before = "Gamepad" },
+	}
+	-- (A section's icon's name: "HUD:" and its first key.)
+	local function IconOf(key)
+		for _, icon in ipairs(HUD_ICONS) do
+			for _, each in ipairs(icon.keys) do
+				if each == key then return icon end
+			end
+		end
+	end
+	local function IconName(icon) return "HUD:" .. icon.keys[1] end
 
 	-- (The rows are dropdowns where the client has menus, else a column each: GridRows.lua.)
 	local subtitle = PageIntro(content, title, ns.GRID_MENUS
@@ -7062,7 +7776,9 @@ local function CreateCombatPanel()
 	local switch = PageSwitch(content, "handleFrames", L["Enable Page"],
 		L["On: CineMode fades the frames on this page as their rows say. Off: it leaves them all " ..
 		"alone, the minimap, quest tracker, buffs and Cooldown Manager included (their pages' " ..
-		"switches only count while this is on)."], subtitle, function()
+		"switches only count while this is on)."], subtitle, function(value)
+		-- (The Interface hub's General: every page of the hub with it, 2026-11-16.)
+		ns.CascadeHub("UI Manager", "handleFrames", value and true or false)
 		if ns.ApplyUnitFrameParts then ns.ApplyUnitFrameParts() end
 		if ns.ApplyMirrorTimers then ns.ApplyMirrorTimers() end
 	end)
@@ -7101,9 +7817,10 @@ local function CreateCombatPanel()
 		local panelTop = CreateFrame("Frame", nil, content)
 		panelTop:SetSize(1, 1)
 		local panel, ShowTab, PlaceTop
-		-- (The unit frames' Addon Frame Links section, at the bottom of their tab:
-		-- made once the sections are.)
-		local unitLinks
+		-- (The tabs' frames: shown as sub-tabs where the picked icon has more than
+		-- one tab, Unit Frames' Unit frames, Resources, Cast bar and Highlight;
+		-- hidden otherwise, its icon picking its one. 2026-11-16.)
+		local subTabs, subTabsShown
 		-- (Sections sharing a tab name share its tab, stacked: the party frames,
 		-- raid-style and not. tabs[i] = { label, sections }.)
 		local tabs = {}
@@ -7114,8 +7831,36 @@ local function CreateCombatPanel()
 		end
 		-- Shows the picked section's tab (its sections one under another, the one
 		-- the game uses now tagged In use), the panel down to its last row.
+		local hudNote -- (the HUD icon's page: what the banners are, under its switch)
+		local hudList, MakeHudList -- (and under it, every icon of the hub and its tabs, as links)
 		local function Layout()
 			SectionState.Restore(picked)
+			-- (The HUD icon: its switch and note, no section.)
+			local hud = picked.open == "hud"
+			if hudNote then hudNote:SetShown(hud) end
+			-- (Made again each time, its on/off dots as the switches are now.)
+			if hud and MakeHudList then
+				if hudList then hudList:Hide() end
+				MakeHudList()
+			end
+			if hudList then hudList:SetShown(hud) end
+			panel:SetShown(not hud)
+			if hud then
+				for _, section in ipairs(sections) do
+					section.frame:Hide()
+					section.body:Hide()
+				end
+				-- (No sub-tabs here: the last icon's were left showing over the title.)
+				subTabsShown = false
+				for _, tab in ipairs(subTabs or {}) do tab:Hide() end
+				local help = content.pageHelp -- (back by the title, shown here)
+				if help then
+					help:ClearAllPoints()
+					help:SetPoint("LEFT", title, "RIGHT", 6, 0)
+				end
+				FitContentHeight(content)
+				return
+			end
 			local shown
 			for i, tab in ipairs(tabs) do
 				for _, section in ipairs(tab.sections) do
@@ -7149,20 +7894,24 @@ local function CreateCombatPanel()
 				section.body:SetShown(not folded)
 				above, bottom = section, folded and section.frame or section.last
 			end
-			-- (Addon Frame Links last on the Unit frames tab, in from the edge for its +/-.)
+			-- (The unit frames' Addon Frame Links: the Unit Frames icon's Frame Links tab now.)
 			local inset = 0
-			if unitLinks then
-				local here = false
-				for _, section in ipairs(order) do
-					if section.key == "units" then here = true end
+			-- (The page's "?" by the first section's heading: its title isn't shown here.)
+			local help = content.pageHelp
+			if help and order[1] then
+				help:ClearAllPoints()
+				help:SetPoint("CENTER", order[1].helpSpot)
+				help:SetFrameLevel(order[1].frame:GetFrameLevel() + 5)
+			end
+			-- (Its icon's tabs as sub-tabs, where it has more than one.)
+			if subTabs then
+				local icon, count = IconOf(tabs[shown].sections[1].key), 0
+				for _, tab in ipairs(tabs) do
+					if IconOf(tab.sections[1].key) == icon then count = count + 1 end
 				end
-				unitLinks.frame:ClearAllPoints()
-				unitLinks.frame:SetShown(here)
-				if here then
-					inset = 18
-					unitLinks.frame:SetPoint("TOPLEFT", bottom, "BOTTOMLEFT", inset, -18)
-					unitLinks.frame:SetWidth(above.width - inset)
-					bottom = unitLinks.frame
+				subTabsShown = count > 1
+				for i, tab in ipairs(tabs) do
+					subTabs[i]:SetShown(subTabsShown and IconOf(tab.sections[1].key) == icon)
 				end
 			end
 			ShowTab(shown)
@@ -7170,16 +7919,58 @@ local function CreateCombatPanel()
 			panel:SetPoint("BOTTOMRIGHT", bottom, "BOTTOMLEFT", above.width + 6 - inset, -12)
 			FitContentHeight(content)
 		end
+		-- (A section picked from the page (search, the Raid » button): its icon lit too.)
 		local function Pick(section)
 			SectionState.Save(picked, section.key)
 			Layout()
+			local icon = IconOf(section.key)
+			if icon then ns.ShowHubPage(IconName(icon)) end
 		end
-		-- (ns.FramesLink's: the page opened at a section's tab.)
+		-- (Its icon picked: its first section, unless one of its others shows.
+		-- The Unit Frames icon: its Show in, Keep up and Frame Links tabs over
+		-- the title, made the first time; no tabs on the others.)
+		-- (icon.tabs: its key in ns.ShowInTabs, a set of tabs each, made the
+		-- first time; only the picked icon's shown.)
+		local tabsOf = {}
+		function ns.PickFramesIcon(icon)
+			SectionState.Restore(picked)
+			if IconOf(picked.open) ~= icon then SectionState.Save(picked, icon.keys[1]) end
+			title:SetText(L[icon.label])
+			title:SetShown(icon.hud == true) -- (a section's: its table's heading names it)
+			if icon.tabs and not tabsOf[icon.tabs] then
+				local _, Show = ns.PageTabs(content, ns.ShowInTabs(icon.tabs), icon.tabIndex or 1)
+				tabsOf[icon.tabs] = content.pageTabs
+				content.pageTabs.Show = Show
+				content.tabbedPage = nil -- (its own HUD icon keeps its title and On/Off: its sections show none)
+			end
+			for key, tabs in pairs(tabsOf) do
+				local mine = key == icon.tabs
+				tabs.panel:SetShown(mine)
+				for _, tab in ipairs(tabs.frames) do tab:SetShown(mine) end
+			end
+			local mine = icon.tabs and tabsOf[icon.tabs]
+			-- (icon.tabIndex: its tab in the set, more than one of the HUD's own: Party & Raid's)
+			if mine then mine.Show(icon.tabIndex or 1) end
+			content.pageTabs = mine or nil -- (over the HUD's off card)
+			title:ClearAllPoints()
+			if mine then
+				title:SetPoint("TOPLEFT", mine.panel, "BOTTOMLEFT", 8, -14)
+			else
+				title:SetPoint("TOPLEFT", 16, -16)
+			end
+			-- (The HUD's On/Off by the title on its own icon only: MakeHeaderSwitch.)
+			content.headerSwitchOff = icon.hud ~= true
+			local header = pageSwitches[content] and pageSwitches[content].header
+			if header then header:SetShown(icon.hud == true) end
+			Layout()
+		end
+		-- (ns.FramesLink's: the page opened at a section, its icon lit.)
 		function ns.OpenFramesSection(key)
 			SectionState.Restore(picked)
 			SectionState.Save(picked, key)
 			Layout()
-			ns.OpenOptions("Standard Frames")
+			local icon = IconOf(key)
+			ns.OpenOptions(icon and IconName(icon) or "Standard Frames")
 		end
 		resetHooks[content] = function()
 			Layout()
@@ -7372,40 +8163,19 @@ local function CreateCombatPanel()
 			section.frame = frame
 			local title = Label(frame, "GameFontNormal", heading)
 			title:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, -3)
-			local after = title -- (what the next button or the In use tag goes right of)
-			-- (The raid-style party frames: a button to the Raid tab, whose rows
-			-- they follow while Same as raid frames is ticked.)
-			if page == "rsparty" then
-				local raid = ns.PanelButton(frame)
-				raid:SetSize(70, 20)
-				raid:SetText(L["Raid"] .. " »")
-				raid:SetWidth(math.max(70, raid:GetFontString():GetStringWidth() + 24))
-				raid:SetPoint("LEFT", title, "RIGHT", 12, 0)
-				Tooltip(raid, L["Opens the Raid tab: its rows decide for these frames while Same as raid frames is ticked."])
-				raid:SetScript("OnClick", function()
-					for _, each in ipairs(sections) do
-						if each.key == "raid" then Pick(each) end
-					end
-				end)
-				after = raid
-			end
+			-- (Room for the page's "?" right of the heading: on the first shown
+			-- section's, the page's own title hidden on a banner icon's page: Layout.)
+			section.helpSpot = CreateFrame("Frame", nil, frame)
+			section.helpSpot:SetSize(18, 18)
+			section.helpSpot:SetPoint("LEFT", title, "RIGHT", 6, 0)
+			local after = section.helpSpot -- (what the next button goes right of)
+			-- (No Raid » button or In use tag on the party frames' headings,
+			-- 2026-11-16: Raid is a tab of the Party & Raid icon.)
 			-- (link: one such, or a list of them, side by side.)
 			for _, each in ipairs(link and (type(link[1]) == "table" and link or { link }) or {}) do
 				local style = ns.StyleLink(frame, title, each[1], each[2], Tooltip, (each[3] or ns.PageLabel(each[1])) .. " »")
-				style:SetPoint("LEFT", after, "RIGHT", after == title and 12 or 6, 0)
+				style:SetPoint("LEFT", after, "RIGHT", 6, 0)
 				after = style
-			end
-			-- (The party frames: which of their two kinds the game draws now, the
-			-- Edit Mode setting. Its section is tagged on their tab.)
-			if (page == "party" or page == "rsparty") and ns.RaidStyleParty then
-				local raid = page == "rsparty"
-				section.inUse = function() return ns.RaidStyleParty() == raid end
-				local tag = Label(frame, "GameFontHighlightSmall", L["In use"])
-				tag:SetTextColor(0.3, 0.9, 0.3)
-				tag:SetPoint("LEFT", after, "RIGHT", 12, 0)
-				tag.searchSkip = true
-				tag:Hide()
-				section.inUseTag = tag
 			end
 			section.body = CreateFrame("Frame", nil, content)
 			section.body:SetPoint("TOPLEFT", frame, "TOPLEFT")
@@ -7425,13 +8195,13 @@ local function CreateCombatPanel()
 					Refresh()
 					Layout() -- (its grid folds away while ticked)
 				end)
-				-- (At the right end of its name: the label on the right edge, the
-				-- box left of it, whatever its width. Hidden with its tab.)
+				-- (Right after its heading (past the "?"'s room), its words right
+				-- of the box. Hidden with its tab.)
 				same:SetParent(frame)
 				local text = same.Text or same.text
+				same:SetPoint("LEFT", after, "RIGHT", 8, 0)
 				text:ClearAllPoints()
-				text:SetPoint("RIGHT", frame, "TOPRIGHT", -6, -10)
-				same:SetPoint("RIGHT", text, "LEFT", -2, 0)
+				text:SetPoint("LEFT", same, "RIGHT", 2, 1)
 			end
 			local before = Widgets()
 			sectionRows.underHeader = true
@@ -7481,79 +8251,27 @@ local function CreateCombatPanel()
 				book:SetPoint("TOPLEFT", macros, "BOTTOMLEFT", 0, 0)
 				section.last = book
 			end
-			-- (Under the trackers' rows: the breath bar's look, and hiding it
-			-- always. MirrorTimerStyle.lua.)
-			if page == "combat" then
-				local function Apply()
-					if ns.ApplyMirrorTimers then ns.ApplyMirrorTimers() end
-					Refresh()
-				end
-				local function Shown(db) return not db.mirrorHide end
-				local function Worded(db) return not db.mirrorHide and not db.mirrorHideText end
-				local heading = Label(section.body, "GameFontNormal", L["Breath bar"])
-				heading:SetPoint("TOPLEFT", section.last, "BOTTOMLEFT", 0, -14)
-				local hide = Check(content, "mirrorHide", L["Hide the breath bar"],
-					L["Hides the bar that runs down while you hold your breath underwater, and the game's other bars " ..
-					"like it (fatigue in deep water, Feign Death), CineMode or not."], function(value)
-						ns.GetDB().mirrorHide = value
-						Apply()
-					end)
-				hide:SetParent(section.body)
-				hide:SetPoint("TOPLEFT", heading, "BOTTOMLEFT", -4, -4)
-				local words = Check(content, "mirrorHideText", L["Hide its text"],
-					L["Hides the word on the bar (Breath, Fatigue...), leaving the bar."], function(value)
-						ns.GetDB().mirrorHideText = value
-						Apply()
-					end)
-				words:SetParent(section.body)
-				words:SetPoint("TOPLEFT", hide, "BOTTOMLEFT", 0, 0)
-				GreyUnless(words, Shown)
-				local last = words
-				-- (A dropdown with its name before it; nil where the client has no menus.)
-				local function Pick(label, key, choices, tip, test)
-					local dropdown = Dropdown(content, key, choices, 180, Apply)
-					if not dropdown then return end
-					local name = Label(section.body, "GameFontHighlight", label)
-					name:SetPoint("TOPLEFT", last, "BOTTOMLEFT", last == words and 4 or 0, -10)
-					name:SetSize(90, 30)
-					name:SetJustifyV("MIDDLE")
-					dropdown:SetParent(section.body)
-					dropdown:SetPoint("LEFT", name, "RIGHT", 4, 0)
-					Tooltip(dropdown, tip)
-					GreyUnless(dropdown, test)
-					last = name
-				end
-				Pick(L["Bar texture:"], "mirrorTexture", function() return ns.StyleTextureChoices() end,
-					L["The bar's fill. The game's: as it comes."], Shown)
-				Pick(L["Font:"], "mirrorFont", function() return ns.StyleFontChoices() end,
-					L["The font of the word on the bar. (In Russian, Korean and Chinese it stays the game's.)"], Worded)
-				local size = Slider(content, "mirrorTextScale", L["Text size"], 50, 200, 5, "%d%%", 100,
-					function() if ns.ApplyMirrorTimers then ns.ApplyMirrorTimers() end end)
-				size:SetParent(section.body)
-				size:SetPoint("TOPLEFT", last, "BOTTOMLEFT", last == words and 4 or 0, -22)
-				Tooltip(size, L["The size of the word on the bar, against the game's."])
-				GreyUnless(size, Worded)
-				section.last = size
-			end
+			-- (The breath bar's look and hiding it: the Timers icon's Breath Bar tab, 2026-11-16.)
 			sections[#sections + 1] = section
 		end
-		local raidStyle = { "Raid Style", L["Opens the Raid Frame Style page: how the raid and raid-style " ..
-			"party frames look."], L["Style"] }
 		local SECTIONS = {
-			{ "units", L["Unit frames"], nil, { "Unit Style", L["Opens the Unit Frame Style page: how the frames look."],
-				L["Style"] } },
-			-- (Your health and resource bars under your character: on the Unit frames tab too.)
-			{ "prd", L["Personal Resource Display"], L["Unit frames"], { "Personal Resources", L["Opens the Health & " ..
-				"Resources page: the bars under your character, and your frame kept up while you recover."],
-				L["Settings"] } },
-			{ "bars", L["Action bars"] }, { "combat", L["Trackers"] },
-			{ "interface", L["Info and menus"] }, { "minimap", L["Minimap"] },
+			-- (Their look: the Unit Frames icon's Style tab.)
+			{ "units", L["Unit frames"], L["UF"] }, -- (its sub-tab: UF)
+			-- (Your health and resource bars under your character: on the Unit frames tab too.
+			-- Kept up while you recover: the Unit Frames icon's Keep up tab.)
+			{ "prd", L["Personal Resource Display"], L["PRD"] },
+			-- (Your cast bar: a sub-tab of Unit Frames' Show in too, its look the Cast Style tab's, 2026-11-16.)
+			{ "playercast", L["Your cast bar"], L["Cast bar"] },
+			{ "bars", L["Action bars"] }, { "buffs", L["Buffs and debuffs"] }, { "combat", L["Trackers"] },
+			-- (The chat window's row: the Chat icon's Show in tab.)
+			{ "chat", L["Chat window"] },
+			{ "interface", L["Info and menus"] }, { "minimap", L["Minimap"] }, { "quests", L["Quest tracker"] },
 			{ "party", L["Party frames (not raid-style)"], L["Party"] },
-			-- (Their look: the Style hub's Raid frames page, RaidStyle.lua.)
-			{ "raid", L["Raid frames"], L["Raid"], raidStyle },
+			-- (Their look: the Party & Raid icon's Raid Style tab, RaidStyle.lua.)
+			{ "raid", L["Raid frames"], L["Raid"] },
 			-- (On the Party tab too, under the not raid-style ones.)
-			{ "rsparty", L["Party frames (raid-style)"], L["Party"], raidStyle },
-			-- (Game settings that mark your character: Self Highlight, Effects.lua.)
+			{ "rsparty", L["Party frames (raid-style)"], L["Party"] },
+			-- (Game settings that mark your character: Self Highlight, Effects.lua. On the Unit frames tab too.)
 			{ "highlight", L["Highlight"] },
 			{ false, L["Other"] }, -- (any row not given a section)
 		}
@@ -7575,35 +8293,108 @@ local function CreateCombatPanel()
 		end
 		panel, tabFrames, ShowTab, base = ns.FolderTabs(content, list, function(i) Pick(tabs[i].sections[1]) end, nil,
 			SECTION_WIDTH + 8)
+		-- (Each section is picked by its icon in the hub, HUD_ICONS: the tabs
+		-- shown only as an icon's sub-tabs, Layout.)
+		for _, tab in ipairs(tabFrames) do tab:Hide() end
+		subTabs = tabFrames
+		-- (A section's page has no title shown, nor switch: its table at the
+		-- top, under its icon's tabs if it has them.)
 		function PlaceTop()
 			panelTop:ClearAllPoints()
-			panelTop:SetPoint("TOPLEFT", lastCheck, "BOTTOMLEFT", 2 - lastIndent, -16 - tabFrames.height) -- (back to the column edge)
+			local tabsNow = content.pageTabs
+			-- (Room above for the sub-tabs, where they show.)
+			local below = -12 - (subTabsShown and (tabFrames.height or 0) + 4 or 0)
+			if tabsNow then
+				panelTop:SetPoint("TOPLEFT", tabsNow.panel, "BOTTOMLEFT", 8, below)
+			else
+				panelTop:SetPoint("TOPLEFT", content, "TOPLEFT", 16, below)
+			end
+		end
+		hudNote = Label(content, "GameFontHighlight", L["Each kind of frame has an icon above, and its Show in tab " ..
+			"says when those frames show in CineMode, a row each. This switch turns all of them on or off at once."])
+		hudNote:SetPoint("TOPLEFT", lastCheck, "BOTTOMLEFT", 6 - lastIndent, -16)
+		hudNote:SetWidth(SECTION_WIDTH - 12)
+		hudNote:SetWordWrap(true)
+		hudNote:Hide()
+		-- Every page of the hub, under the note (2026-11-16): each icon (its
+		-- picture and name, a link to it), its other tabs beside it as links,
+		-- wrapping. Made the first time the HUD icon shows, the hub's icons all in.
+		local LIST_TABS = { ["HUD:units"] = "units", ["HUD:party"] = "party", ["HUD:bars"] = "bars",
+			["HUD:chat"] = "chat", ["HUD:minimap"] = "minimap", ["HUD:quests"] = "quests", ["HUD:buffs"] = "buffs",
+			["HUD:combat"] = "timers", ["Mouseover groups"] = "mouse", ["Nameplates"] = "plates",
+			["Nameplate Names"] = "names" }
+		-- (What each icon is for, under its name: its Show in tab's tip, else these.)
+		local LIST_NOTES = { ["HUD:interface"] = L["The XP bar, bags, micro menu and the like: when they show."],
+			["Combat Text Style"] = L["The damage and healing numbers over heads: how they look."] }
+		-- (The cards: StylePages.lua's ns.MakeHubCards, the Visions hub's General page's too.)
+		function MakeHudList()
+			-- (In the hub's groups, each under its name: Heads-up, Overhead, Info.)
+			local groups, entries = {}
+			for _, icon in ipairs(ns.HubIcons("UI Manager")) do
+				if not (groups[#groups] and groups[#groups][1] == icon.band) then
+					entries = {}
+					groups[#groups + 1] = { icon.band, entries }
+				end
+				if icon.name ~= "HUD:hud" then
+					local key = LIST_TABS[icon.name]
+					local tabs, chips = key and ns.ShowInTabs(key) or {}, {}
+					for i, tab in ipairs(tabs) do
+						if i > 1 then chips[#chips + 1] = { tab[1], tab[2] } end
+					end
+					entries[#entries + 1] = { label = icon.label, texture = icon.texture, open = icon.name, tabs = chips,
+						note = LIST_NOTES[icon.name] or (tabs[1] and tabs[1][3]) or "", state = icon.on }
+				end
+			end
+			hudList = ns.MakeHubCardGroups(content, groups, SECTION_WIDTH - 12)
+			hudList:SetPoint("TOPLEFT", hudNote, "BOTTOMLEFT", 0, -18)
+			FitContentHeight(content)
 		end
 		PlaceTop()
 		panel:SetPoint("TOPLEFT", panelTop, "TOPLEFT")
 		-- (On panelTop, not the panel: the panel's bottom hangs on the rows under them.)
 		base:SetPoint("TOPLEFT", panelTop, "TOPLEFT")
-		-- Addon Frame Links (FrameLinks.lua): which addon's frame each unit frame
-		-- is. Opened from elsewhere (search, the Addons page), it picks the
-		-- Unit frames tab too.
-		unitLinks = ns.BuildLinkSection(content, panelTop, "units")
-		local openLinks = unitLinks.body.openSection
-		function unitLinks.body.openSection()
-			for _, section in ipairs(sections) do
-				if section.key == "units" then Pick(section) end
-			end
-			openLinks()
-		end
-		ns.RegisterLinkSection("units", unitLinks.frame, unitLinks.body.openSection)
+		-- (Addon Frame Links for the unit frames: the Unit Frames icon's Frame
+		-- Links tab, PersonalResources.lua, 2026-11-16.)
 		Layout()
 
 		canvas:SetScript("OnShow", PageShown(function()
 			Refresh()
 			Layout() -- (as last left, once the settings have loaded)
-			unitLinks.Show()
 		end, content))
 	end
 	MakeHud = lazyPages.Add(canvas, "HUD", MakeBody)
+	-- (Made ahead at a quiet moment, with the other slow pages: lazyPages.StartAhead.)
+	lazyPages.StartAhead()
+	-- (An icon for each section with rows on this client, as Section finds them.)
+	local function HasRows(key)
+		for _, item in ipairs(ns.COMBAT_SHOW) do
+			if (item.page or "other") == key and ns.OptionAvailable(item) and not item.key:find("^addon:")
+				and not (item.auraFrames and not _G.CompactUnitFrame_UtilSetBuff) then
+				return true
+			end
+		end
+	end
+	canvas.hubTabs = {}
+	for _, icon in ipairs(HUD_ICONS) do
+		local has = icon.hud == true
+		for _, key in ipairs(icon.keys) do has = has or HasRows(key) or false end
+		if has then
+			canvas.hubTabs[#canvas.hubTabs + 1] = {
+				name = IconName(icon), label = icon.label, section = icon.section, before = icon.before, own = true,
+				showIn = icon.tabs,
+				noDot = not icon.hud, switchLabel = "HUD", tabOf = icon.tabOf,
+				-- (its own picture, 2026-11-16; the HUD's and Other's your faction's banner)
+				icon = icon.icon or function()
+					return UnitFactionGroup("player") == "Horde" and "Interface\\Icons\\INV_BannerPVP_01"
+						or "Interface\\Icons\\INV_BannerPVP_02"
+				end,
+				onSelect = function()
+					MakeHud("its icon picked")
+					if ns.PickFramesIcon then ns.PickFramesIcon(icon) end
+				end,
+			}
+		end
+	end
 	canvas:Hide()
 	RegisterSubpage(canvas, L["Standard Frames"], L["HUD"])
 end
@@ -7613,14 +8404,13 @@ local function CreateBubblesPanel()
 	local canvas, content = CreateScrollPage()
 
 	local title = Label(content, "GameFontNormalLarge", L["Chat Bubbles"])
-	title:SetPoint("TOPLEFT", 16, -16)
+	-- (The Chat icon's Bubbles tab, 2026-11-16: its tabs over the title; their
+	-- look the Bubble Style tab beside it.)
+	local tabs = ns.PageTabs(content, ns.ShowInTabs("chat"), ns.ShowInIndex("chat", "Chat bubbles"))
+	title:SetPoint("TOPLEFT", tabs, "BOTTOMLEFT", 8, -14)
 
 	local subtitle = PageIntro(content, title,
-		L["Where chat bubbles show. How they look: the Chat Bubble Style page."])
-	-- Their look: the Style hub's Chat bubbles page (BubbleStyle.lua), a
-	-- button away, right of the page's on/off switch (it sat on the switch).
-	ns.StyleLink(content, title, "Bubble Style", L["Opens the Chat Bubble Style page: how the bubbles and speech " ..
-		"from behind you look."], Tooltip)
+		L["Where chat bubbles show. How they look: the Bubble Style tab."])
 
 	local function Changed() if ns.ApplyBubbles then ns.ApplyBubbles() end end
 
@@ -7651,7 +8441,7 @@ local function CreateBubblesPanel()
 	stack:Help(content, L["The game only shows a bubble over someone on your screen, and puts one from someone " ..
 		"above you at the very top of the screen, under the letterbox bar. So Cinematic draws bubbles of its own, " ..
 		"looking like the game's, for speech whose bubble you can't see. How they look, and where speech from " ..
-		"behind you shows: the Chat Bubble Style page."])
+		"behind you shows: the Bubble Style tab."])
 	local offScreen = stack:Add(Check(content, "chatSpeechBehind", L["Show off-screen bubbles"],
 		L["Says and yells whose bubble isn't on your screen (the speaker is behind you, or out of view) show in " ..
 		"a bubble low on the screen, with the speaker's name, instead of bringing up chat. It needs the Chat " ..
@@ -7955,6 +8745,32 @@ local function CreateQualityPanel()
 				L["On: everything below works as ticked. Off: none of it does, and each keeps its tick for " ..
 				"when you turn this back on."], intro, RefreshPlates)
 			stack = Stack(switch, "check")
+			-- (Addon Frames' tab row, Custom Support its last tab, picked here,
+			-- 2026-11-16: one row for the two pages. The others open Addon Frames
+			-- at theirs. Addon Frames made by now: its Custom Support tab shown.)
+			if extrasPanel and extrasPanel.PickAddonTab then
+				extrasPanel.supportTab:Show()
+				local width = extrasPanel.tabsWidth
+				local row = CreateFrame("Frame", nil, content)
+				local tabsPanel, ShowTab, tabsBase, tabsHeight, _
+				tabsPanel, _, ShowTab, tabsBase, tabsHeight = ns.FolderTabs(content, {
+					{ L["Loaded"], L["The addons loaded now: their frames, and the ones you added."] },
+					{ L["Find frames"], L["Find other addons' frames to fade: search, hover, or Smart Find."] },
+					{ L["Not running"], L["Addons installed but not loaded, and the ones supported but not installed."] },
+					{ L["Support files"], L["Addons that draw their own frames in place of the game's (chat panels, tabs...): " ..
+						"what each replaces, and which addon's to use where two of them do."] },
+					{ L["Custom Support"], L["How Cinematic works with your other addons."] },
+				}, function(i)
+					ShowTab(5)
+					if i ~= 5 then extrasPanel.PickAddonTab(i) end
+				end)
+				row:SetSize(width, tabsHeight + 6)
+				stack:Add(row, "label")
+				tabsBase:SetPoint("TOPLEFT", row, "TOPLEFT", 0, -tabsHeight)
+				tabsPanel:SetPoint("TOPLEFT", tabsBase, "TOPLEFT")
+				tabsPanel:SetSize(width, 1)
+				ShowTab(5)
+			end
 			for _, each in ipairs(have) do
 				stack:Header(content, each.label)
 				each.build(content, stack)
@@ -8086,8 +8902,9 @@ local function CreateGamepadPanel()
 	local canvas, content = CreateScrollPage()
 
 	local title = Label(content, "GameFontNormalLarge", L["Gamepad Frames"])
-	title:SetPoint("TOPLEFT", 16, -16)
-	ns.GroupTabs(content, title, "Gamepad")
+	-- (The Action Bars icon's Gamepad tab, 2026-11-16: its tabs over the title.)
+	local tabs = ns.PageTabs(content, ns.ShowInTabs("bars"), ns.ShowInIndex("bars", "Gamepad"))
+	title:SetPoint("TOPLEFT", tabs, "BOTTOMLEFT", 8, -14)
 
 	local subtitle = PageIntro(content, title,
 		L["The frames gamepad mode adds (Options, Controls, Gamepad): its action bars, the button hints " ..
@@ -8108,7 +8925,11 @@ local function CreateGamepadPanel()
 		if ns.UpdateMinimapButton then ns.UpdateMinimapButton() end
 	end)
 	rows.underHeader = true
-	local lastRow = ShowTable(content, switch, rows, "Gamepad")
+	-- (Everything below on a panel, as the HUD page's sections are, its
+	-- heading at the top: 2026-11-16. The panel itself: at the page's end.)
+	local panelHeading = Label(content, "GameFontNormal", L["Gamepad frames"])
+	panelHeading:SetPoint("TOPLEFT", switch, "BOTTOMLEFT", 14, -14)
+	local lastRow = ShowTable(content, panelHeading, rows, "Gamepad")
 
 	-- The prompt sits on a nameplate, not a frame of its own: a setting for
 	-- the plates' fade rather than a row.
@@ -8200,7 +9021,7 @@ local function CreateGamepadPanel()
 		"you've opened a Cinematic page, closing Settings (X, Close, Escape or the gamepad) reloads " ..
 		"the UI instead, which closes it without the freeze. Your settings are saved first, as they are " ..
 		"on every reload. Turning it off takes effect after a reload."]), "check")
-	stack:Add(Check(content, "hideMinimapButtonGamepad", L["Hide the minimap button in gamepad mode"],
+	local lastSetting = stack:Add(Check(content, "hideMinimapButtonGamepad", L["Hide the minimap button in gamepad mode"],
 		L["Using Cinematic's minimap button in gamepad mode tends to freeze the game, like closing " ..
 		"Settings does. With this on, the button is hidden while gamepad mode is on and comes back " ..
 		"when it's off. Cinematic's settings are still in the game's Settings (AddOns tab), or type /cine."],
@@ -8208,6 +9029,29 @@ local function CreateGamepadPanel()
 			ns.GetDB().hideMinimapButtonGamepad = value
 			if ns.UpdateMinimapButton then ns.UpdateMinimapButton() end
 		end), "check")
+
+	-- The panel behind it all (the HUD page's sections' look: a dark fill, a
+	-- thin grey edge), from its heading to the last setting, under them.
+	local panel = CreateFrame("Frame", nil, content)
+	panel:SetFrameLevel(content:GetFrameLevel())
+	panel:SetPoint("TOPLEFT", panelHeading, "TOPLEFT", -12, 12)
+	panel:SetPoint("RIGHT", content, "RIGHT", -16, 0)
+	panel:SetPoint("BOTTOM", lastSetting, "BOTTOM", 0, -12)
+	local fill = panel:CreateTexture(nil, "BACKGROUND")
+	fill:SetAllPoints()
+	fill:SetColorTexture(0.12, 0.12, 0.13, 0.9)
+	for _, sides in ipairs({ { "TOPLEFT", "TOPRIGHT" }, { "BOTTOMLEFT", "BOTTOMRIGHT" },
+		{ "TOPLEFT", "BOTTOMLEFT" }, { "TOPRIGHT", "BOTTOMRIGHT" } }) do
+		local line = panel:CreateTexture(nil, "BORDER")
+		line:SetColorTexture(0.42, 0.42, 0.42, 1)
+		line:SetPoint(sides[1])
+		line:SetPoint(sides[2])
+		if sides[1] == "TOPLEFT" and sides[2] == "TOPRIGHT" or sides[1] == "BOTTOMLEFT" then
+			line:SetHeight(1)
+		else
+			line:SetWidth(1)
+		end
+	end
 
 	canvas:SetScript("OnShow", PageShown(Refresh, content))
 	canvas:Hide()
@@ -8366,9 +9210,13 @@ function ns.FolderTabs(parent, list, onClick, width, maxWidth, onRightClick)
 		tabs.height = #rows * (TAB_H + 4) -- (how high they reach now: their rows can change as they're measured again)
 		-- (The picked one's row at the bottom, the rest above it in order.
 		-- Each row up clears the picked tab's extra height.)
-		local order = { tabs[picked].row }
+		-- (The picked tab's row as measured now: one hidden keeps an old row
+		-- that may not be there any more, the HUD page's at Party after Raid Style.)
+		local pickedRow = tabs[picked].row
+		if not rows[pickedRow] then pickedRow = 1 end
+		local order = { pickedRow }
 		for r = 1, #rows do
-			if r ~= tabs[picked].row then order[#order + 1] = r end
+			if r ~= pickedRow then order[#order + 1] = r end
 		end
 		for up, r in ipairs(order) do
 			for n, tab in ipairs(rows[r]) do
@@ -8391,6 +9239,15 @@ function ns.FolderTabs(parent, list, onClick, width, maxWidth, onRightClick)
 				topRight:SetPoint("TOPRIGHT", panel, "TOPRIGHT")
 			end
 		end
+		-- (The picked tab hidden, its page picked some other way (the HUD's
+		-- sections, by their hub icons): the top edge whole, no gap for it.)
+		local open = tabs[picked]:IsShown()
+		if not open then
+			topLeft:ClearAllPoints()
+			topLeft:SetPoint("TOPLEFT", panel, "TOPLEFT")
+			topLeft:SetPoint("TOPRIGHT", panel, "TOPRIGHT")
+		end
+		topRight:SetShown(open)
 	end
 	Show(1)
 	return panel, tabs, Show, base, #rows * (TAB_H + 4)
@@ -8402,8 +9259,25 @@ local function CreatePlatesPanel()
 	local canvas, content = CreateScrollPage()
 
 	local title = Label(content, "GameFontNormalLarge", L["Nameplates"])
-	title:SetPoint("TOPLEFT", 16, -16)
-	-- (Their icons and looks: the Nameplates hub's other pages, beside this one.)
+	-- Two icons' tabs over the title (2026-11-16): the Nameplates icon's (this
+	-- page's grids but Names, then Icons and the looks) and the Names icon's
+	-- (this page's Names grid, then Name Style); only the picked icon's shown.
+	local plateTabs, ShowPlateTab = ns.PageTabs(content, ns.ShowInTabs("plates"), 1)
+	local plateSet = content.pageTabs
+	local nameTabs, ShowNameTab = ns.PageTabs(content, ns.ShowInTabs("names"), 1)
+	local nameSet = content.pageTabs
+	title:SetPoint("TOPLEFT", plateTabs, "BOTTOMLEFT", 8, -14)
+	local function ShowSet(names)
+		for _, set in ipairs({ plateSet, nameSet }) do
+			local mine = (set == nameSet) == names
+			set.panel:SetShown(mine)
+			for _, tab in ipairs(set.frames) do tab:SetShown(mine) end
+		end
+		content.pageTabs = names and nameSet or plateSet
+		if names then ShowNameTab(1) else ShowPlateTab(1) end
+	end
+	ShowSet(false)
+	local _ = nameTabs -- (its panel: nameSet.panel)
 
 	local subtitle = PageIntro(content, title,
 		L["Which nameplates and names stay up in CineMode: in groups, in fights and in each kind of place."])
@@ -8502,7 +9376,11 @@ local function CreatePlatesPanel()
 		-- (Under the picked section's last row, at its left: the panel's bottom.)
 		local foot = CreateFrame("Frame", nil, content)
 		foot:SetSize(1, 1)
-		local panel, ShowTab
+		local panel, ShowTab, folderTabs, folderHeight
+		local playersTop, npcTop, serviceTop, extrasTop -- (the Names icon's four grids)
+		-- (The Names icon's sections, 2026-11-16: Players, NPCs ("Names", its old
+		-- id), Service NPCs and Extras.)
+		local function IsNames(key) return type(key) == "string" and key:find("^Names") ~= nil end
 		local function LayoutSections()
 			SectionState.Restore(picked)
 			local shown
@@ -8514,6 +9392,8 @@ local function CreatePlatesPanel()
 				section.frame:SetShown(i == shown)
 				section.body:SetShown(i == shown)
 			end
+			if IsNames(sections[shown].key) then content.lastNamesSection = sections[shown].key
+			else content.lastPlatesSection = sections[shown].key end
 			ShowTab(shown)
 			local last = sections[shown].last
 			foot:ClearAllPoints()
@@ -8522,6 +9402,27 @@ local function CreatePlatesPanel()
 		end
 		local function Pick(section)
 			SectionState.Save(picked, section.key)
+			LayoutSections()
+			-- (Its icon lit: Names', or the Nameplates one for the rest.)
+			ns.ShowHubPage(IsNames(section.key) and "Nameplate Names" or "Nameplates")
+		end
+		-- An icon picked (its tile's onSelect): the Names grid alone, or the rest
+		-- with their folder tabs (Names' left out), the last of them shown.
+		function ns.PickPlatesIcon(names)
+			SectionState.Restore(picked)
+			if names and not IsNames(picked.open) then
+				SectionState.Save(picked, content.lastNamesSection or "NamesPlayers")
+			elseif not names and IsNames(picked.open) then
+				SectionState.Save(picked, content.lastPlatesSection or "Instances")
+			end
+			-- (Each icon's own sections as its sub-tabs.)
+			for i, section in ipairs(sections) do
+				if folderTabs then folderTabs[i]:SetShown(IsNames(section.key) == names) end
+			end
+			if folderTabs then
+				panelTop:ClearAllPoints()
+				panelTop:SetPoint("TOPLEFT", handleCheck, "BOTTOMLEFT", 2, -14 - folderHeight)
+			end
 			LayoutSections()
 		end
 		-- What's on the page, to tell what a section adds.
@@ -8922,10 +9823,13 @@ local function CreatePlatesPanel()
 
 		-- Names, laid out the same way. Outside cinematic mode the game's own
 		-- name options decide.
-		local namesSection = Section(L["Names"], "Names")
-		local namesHeader = namesSection.title
+		-- Names: four sections, the Names icon's sub-tabs (2026-11-16): players,
+		-- Enemy NPCs, Friendly NPCs (with Service NPCs, its row and its settings
+		-- together) and extras.
+		local playersSection = Section(L["Player names"], "NamesPlayers", L["Players"])
+		local namesHeader = playersSection.title
 		-- (A warning beside it: on faded plates the names are ours. See PlateParts.)
-		local namesNote = CreateFrame("Button", nil, namesSection.frame)
+		local namesNote = CreateFrame("Button", nil, playersSection.frame)
 		namesNote:SetSize(16, 16)
 		namesNote:SetPoint("LEFT", namesHeader, "RIGHT", 6, 0)
 		local namesNoteIcon = namesNote:CreateTexture(nil, "ARTWORK")
@@ -8940,8 +9844,8 @@ local function CreatePlatesPanel()
 		Tooltip(namesNote, namesNoteText)
 		namesNote.searchNote = namesNoteText
 		namesNote.searchEdges = { top = namesHeader, bottom = namesHeader, left = namesHeader, right = namesNote }
-		BeginSection(namesSection)
-		local namesTop = TableTop(namesSection.frame, NAME_LAYOUT)
+		BeginSection(playersSection)
+		playersTop = TableTop(playersSection.frame, NAME_LAYOUT)
 		local nameTip = L[" Ticking any box turns these names on in the game's options. Ticking none turns them off."]
 		-- (Units with plates show a kept name on theirs in CineMode: see Effects.)
 		local plateNameTip = L[" In CineMode, away from dungeons and raids, the name shows on the unit's nameplate instead, with the rest of the plate hidden."]
@@ -8996,31 +9900,60 @@ local function CreatePlatesPanel()
 				liveRule = function() return TicksRule(alwaysKey, ticks) end,
 			})
 		end
+		-- Each group's rows in its section (which: players, npcs, service, extras).
+		local GROUP_SECTION = { Self = "players", Friends = "players", FriendlyMinions = "players",
+			GroupMembers = "players", GroupMinions = "players", Enemies = "players", EnemyMinions = "players",
+			HostileNPCs = "npcs", NeutralNPCs = "npcs", Critters = "npcs",
+			-- (Friendly NPCs with Service NPCs on the Friendly NPCs tab, 2026-11-16.)
+			FriendlyNPCs = "service", ServiceNPCs = "service", Guild = "extras" }
 		local targetGroup
-		r = 0
-		for _, group in ipairs(ns.NAME_GROUPS) do
-			if group.rows then
-				targetGroup = group
-			else
-				r = r + 1
-				local tip = group.plateOnly and group.tip
-					or (group.tip or "") .. (group.plate and (plateNameTip .. nameTip) or nameTip)
-				AddNameRow(namesTop, r, group, group.key, group.label, group.indent, tip)
+		local function AddRows(top, which)
+			local count = 0
+			for _, group in ipairs(ns.NAME_GROUPS) do
+				if group.rows then
+					targetGroup = group
+				elseif (GROUP_SECTION[group.key] or "extras") == which then
+					count = count + 1
+					local tip = group.plateOnly and group.tip
+						or (group.tip or "") .. (group.plate and (plateNameTip .. nameTip) or nameTip)
+					-- (Service NPCs under Friendly NPCs, on their tab: indented as before.)
+					AddNameRow(top, count, group, group.key, group.label, group.indent, tip)
+				end
 			end
+			return count
 		end
+		AddRows(playersTop, "players")
+		EndSection(playersSection, lastLabel)
+
+		-- (Enemy NPCs since 2026-11-16: hostile, neutral and critters; ids kept.)
+		local npcSection = Section(L["Enemy NPCs"], "Names", L["Enemy NPCs"])
+		BeginSection(npcSection)
+		npcTop = TableTop(npcSection.frame, NAME_LAYOUT)
+		AddRows(npcTop, "npcs")
+		EndSection(npcSection, lastLabel)
+
+		local extrasSection = Section(L["More over heads"], "NamesExtras", L["Extras"])
+		BeginSection(extrasSection)
+		extrasTop = TableTop(extrasSection.frame, NAME_LAYOUT)
+		local extraRows = AddRows(extrasTop, "extras")
 		-- Raid markers (skull, moon...) kept up over their units as the rest of
 		-- their plates fades or shows their names alone (see KeepRaidMarker).
 		UNIT_ROW_TIPS.PartMarker = L[" Ticked, raid markers (skull, moon...) stay over their units in CineMode as the " ..
 			"rest of their nameplates fades, or shows just their names, so your group can still see what's marked. " ..
 			"Unticked, they fade with the plates (the Plate parts row decides them on the plates that are up)."]
 			.. markerRangeTip
-		AddPlateRow(namesTop, r + 1, { "PartMarker", L["Raid marker"] })
-		-- The Service NPCs row's own settings, under the grid: whether it shows
-		-- names or titles alone, and which titles it keeps (Effects, PlateGuild).
-		local serviceTitle = Label(content, "GameFontNormal", L["Service NPCs"])
-		serviceTitle:SetPoint("TOPLEFT", lastLabel, "BOTTOMLEFT", 0, -24)
+		AddPlateRow(extrasTop, extraRows + 1, { "PartMarker", L["Raid marker"] })
+		EndSection(extrasSection, lastLabel)
+
+		-- Service NPCs: its row, then its own settings right under it: whether it
+		-- shows names or titles alone, and which titles it keeps (Effects, PlateGuild).
+		-- (Friendly NPCs since 2026-11-16: their row first, Service NPCs under it; ids kept.)
+		local serviceSection = Section(L["Friendly NPCs"], "NamesService", L["Friendly NPCs"])
+		BeginSection(serviceSection)
+		serviceTop = TableTop(serviceSection.frame, NAME_LAYOUT)
+		AddRows(serviceTop, "service")
 		local serviceShowLabel = Label(content, "GameFontHighlight", L["Show"])
-		serviceShowLabel:SetPoint("TOPLEFT", serviceTitle, "BOTTOMLEFT", 0, -16)
+		serviceShowLabel:SetPoint("TOPLEFT", lastLabel, "BOTTOMLEFT", 0, -20)
 		local serviceShowTip = L["Names and titles: a service NPC's name shows on its nameplate with its title under it. " ..
 			"Titles only: just its title (<Repair Vendor>) where its name would be, unless its own row (or your target's) " ..
 			"shows its name too. Beyond nameplate range, and in dungeons and raids, the game shows names and titles together."]
@@ -9114,7 +10047,15 @@ local function CreatePlatesPanel()
 			GreyUnless(questie, function() return ns.QuestieLoaded() end)
 			lastServiceKind = questie
 		end
-		EndSection(namesSection, lastServiceKind)
+		EndSection(serviceSection, lastServiceKind)
+		-- (Extras after Service NPCs in the tabs: made before it, its raid marker row's code first.)
+		for i, each in ipairs(sections) do
+			if each == extrasSection then
+				table.remove(sections, i)
+				break
+			end
+		end
+		sections[#sections + 1] = extrasSection
 
 		-- Your target: its plate and its name, whatever its kind's rows say, a
 		-- row each (their rules naming kinds of target where they differ). Made
@@ -9138,17 +10079,18 @@ local function CreatePlatesPanel()
 		AddNameRow(targetTop, 2, targetGroup, "YourTarget", L["Names"], nil, targetNameTip)
 		EndSection(targetSection, lastLabel)
 
-		for _, top in ipairs({ targetTop, columnTop, enemyTop, partsTop, namesTop }) do
+		for _, top in ipairs({ targetTop, columnTop, enemyTop, partsTop, playersTop, npcTop, serviceTop, extrasTop }) do
 			ns.GridDots(content, top.rows or {})
 		end
 
 		-- The tabs, in order: your target's plate and name, enemy nameplates,
 		-- friendly nameplates, friendly plates in dungeons and raids, their parts,
 		-- then names and raid markers.
-		local list, _, base, height = {}
+		local list, base, height = {}
 		for i, section in ipairs(sections) do list[i] = { section.tab } end
-		panel, _, ShowTab, base, height = ns.FolderTabs(content, list, function(i) Pick(sections[i]) end, nil,
+		panel, folderTabs, ShowTab, base, height = ns.FolderTabs(content, list, function(i) Pick(sections[i]) end, nil,
 			SECTION_WIDTH + 8)
+		folderHeight = height
 		panelTop:SetPoint("TOPLEFT", handleCheck, "BOTTOMLEFT", 2, -14 - height)
 		panel:SetPoint("TOPLEFT", panelTop, "TOPLEFT")
 		panel:SetPoint("BOTTOMRIGHT", foot, "TOPLEFT", SECTION_WIDTH + 12, -12)
@@ -9161,7 +10103,20 @@ local function CreatePlatesPanel()
 			LayoutSections() -- (as last left, once the settings have loaded)
 		end, content))
 	end
-	lazyPages.Add(canvas, "Nameplates", MakeBody)
+	local MakePlates = lazyPages.Add(canvas, "Nameplates", MakeBody)
+	-- Two hub tiles: the Nameplates icon and the Names icon, each picking its
+	-- grids and showing its tabs.
+	local function PickIcon(names)
+		ShowSet(names)
+		MakePlates("its icon picked")
+		if ns.PickPlatesIcon then ns.PickPlatesIcon(names) end
+	end
+	canvas.hubTabs = {
+		{ name = "Nameplates", icon = "Interface\\Icons\\Ability_Hunter_SniperShot", label = "Nameplates",
+			onSelect = function() PickIcon(false) end },
+		{ name = "Nameplate Names", icon = "Interface\\Icons\\INV_Misc_Note_02", label = "Names", own = true,
+			onSelect = function() PickIcon(true) end },
+	}
 	canvas:Hide()
 	RegisterSubpage(canvas, "Nameplates", L["Nameplates"])
 end
@@ -9169,10 +10124,27 @@ end
 -- The Style hub's Names page: how names look on nameplates showing just the
 -- name (CineMode), with a preview of them at the top. PlateParts draws them.
 local function CreateNameStylePanel()
+	-- (Each row's Color tab: the colors its names can take, by NAME_ROWS' key;
+	-- a row not here, every one (Default, Your target). Friends / Enemies:
+	-- the players' segments; Hostile, Neutral, Friendly: the NPC reactions';
+	-- class: Color by's Class. Enemy players keep Hostile, for Hostile's color.)
+	local NAME_COLOR_PARTS = {
+		GroupMembers = { class = true, Friends = true }, Friends = { class = true, Friends = true },
+		Enemies = { class = true, Enemies = true, Hostile = true },
+		ServiceNPCs = { Friendly = true }, FriendlyNPCs = { Friendly = true },
+		NeutralNPCs = { Neutral = true }, HostileNPCs = { Hostile = true },
+		FriendlyMinions = { Friendly = true }, GroupMinions = { Friendly = true }, EnemyMinions = { Hostile = true },
+	}
+	-- (Each kind of service NPC's row: as Service NPCs'.)
+	for _, each in ipairs(ns.NAME_ROWS) do
+		if each.service then NAME_COLOR_PARTS[each.key] = { Friendly = true } end
+	end
 	local canvas, content = CreateScrollPage()
 
 	local title = Label(content, "GameFontNormalLarge", L["Name Style"])
-	title:SetPoint("TOPLEFT", 16, -16)
+	-- (The Names icon's Name Style tab, 2026-11-16: its tabs over the title.)
+	local nameTabs = ns.PageTabs(content, ns.ShowInTabs("names"), ns.ShowInIndex("names", "Name Style"))
+	title:SetPoint("TOPLEFT", nameTabs, "BOTTOMLEFT", 8, -14)
 	local subtitle = PageIntro(content, title,
 		L["How names look on nameplates showing just the name: in CineMode, away from dungeons and raids, " ..
 		"a name kept up over a faded plate is drawn by the plate. Changes show at once, here and on the " ..
@@ -9221,6 +10193,15 @@ local function CreateNameStylePanel()
 		GroupMinions = { name = L["Felhunter"], kind = "npc", reaction = 5 },
 		EnemyMinions = { name = L["Water Elemental"], kind = "npc", reaction = 2 },
 	}
+	-- (Each kind of service NPC: a name with a title of that kind.)
+	local SERVICE_SAMPLES = { Vendor = { "Thomas Miller", "Bread Merchant" }, Repair = { "Brother Kristoff", "Repair Vendor" },
+		Trainer = { "Wilken Gilmore", "Mage Trainer" }, Profession = { "Lee Brown", "Fisherman" },
+		Flight = { "Dungar Longdrink", "Gryphon Master" }, Inn = { "Innkeeper Allison", "Innkeeper" },
+		Bank = { "Olivia Burnside", "Banker" }, Stable = { "Jenova Stoneshield", "Stable Master" },
+		Other = { "Brog Hamfist", "General Supplies" }, Quest = { "Marshal Dughan", nil } }
+	for kind, info in pairs(SERVICE_SAMPLES) do
+		SAMPLES["Service" .. kind] = { name = info[1], kind = "npc", reaction = 5, title = info[2] and L[info[2]] or nil }
+	end
 	local REACTION = { { 1, 0, 0 }, { 1, 0, 0 }, { 1, 0, 0 }, { 1, 1, 0 }, { 0, 1, 0 }, { 0, 1, 0 }, { 0, 1, 0 },
 		{ 0, 1, 0 } }
 	local ROMAN = not ({ ruRU = true, koKR = true, zhCN = true, zhTW = true })[GetLocale and GetLocale() or ""]
@@ -9236,7 +10217,7 @@ local function CreateNameStylePanel()
 	end
 	-- A sample: its text, the line under it, and its glow and band behind.
 	local function MakeSample(parent)
-		local sample = {}
+		local sample = { owner = parent }
 		sample.glow = parent:CreateTexture(nil, "ARTWORK", nil, 1)
 		sample.glow:SetTexture(ns.NAME_GLOW) -- (PlateParts.lua)
 		sample.glow:SetBlendMode("ADD")
@@ -9267,6 +10248,7 @@ local function CreateNameStylePanel()
 			ns.SetTextRim(text, nil)
 			sample.glow:Hide()
 			sample.back:Hide()
+			for _, edge in ipairs(sample.edges or {}) do edge:Hide() end
 			sample.line:SetText(info.title and ("<" .. info.title .. ">") or "")
 			return
 		end
@@ -9323,23 +10305,10 @@ local function CreateNameStylePanel()
 		if rim then ns.SetTextRim(text, outline, ns.NameLookColor(row, "OutlineColor", over)) else ns.SetTextRim(text, nil) end
 		-- Its glow and band, sized to it.
 		local width, height = text:GetStringWidth(), (select(2, text:GetFont())) or 12
-		local glow, back = S("Glow"), S("Back")
-		sample.glow:SetShown(glow ~= "none")
-		if glow ~= "none" then
-			local gr, gg, gb = ns.NameLookColor(row, "Glow", over)
-			sample.glow:SetVertexColor(gr, gg, gb, 0.7)
-			sample.glow:ClearAllPoints()
-			sample.glow:SetPoint("CENTER", text, "CENTER", 0, 0)
-			sample.glow:SetSize(width + height * 3, height * 3)
-		end
-		sample.back:SetShown(back ~= "none")
-		if back ~= "none" then
-			local br, bg, bb = ns.NameLookColor(row, "Back", over)
-			sample.back:SetColorTexture(br, bg, bb, tonumber(S("BackAlpha")) or 0.6)
-			sample.back:ClearAllPoints()
-			sample.back:SetPoint("CENTER", text, "CENTER", 0, 0)
-			sample.back:SetSize(width + 14, height + 6)
-		end
+		-- (Glow, band and its border: NameRowLook's, as the plates draw them.)
+		ns.DressNameParts(sample.owner, sample, text, width, height, S, function(setting)
+			return ns.NameLookColor(row, setting, over)
+		end)
 		-- The line under it: a title (Service NPCs) or a guild (players).
 		local under = info.title or (info.kind == "player" and info.reaction >= 5 and L["Guild"]) or nil
 		if under then
@@ -9395,7 +10364,8 @@ local function CreateNameStylePanel()
 	scene:HookScript("OnSizeChanged", PlaceSpots)
 	function scene:Refresh()
 		for i, spot in ipairs(SPOTS) do
-			DrawSample(spots[i], spot[1], nil, (spot[1] == "Target" and 1.25 or 1) * sceneScale)
+			-- (scene.zoom: its - and + (StylePages' AddPreviewZoom); names drawn on it, not frames.)
+			DrawSample(spots[i], spot[1], nil, (spot[1] == "Target" and 1.25 or 1) * sceneScale * (scene.zoom or 1))
 		end
 		for _, preview in pairs(panels) do
 			if preview:IsVisible() then preview:Refresh() end
@@ -9474,7 +10444,8 @@ local function CreateNameStylePanel()
 	local TAB_NAMES = { Font = "Text", Size = "Text", Alpha = "Text", Outline = "Text", OutlineColor = "Text",
 		Shadow = "Text", ShadowAlpha = "Text", Colour = "Color", Friends = "Color", Enemies = "Color",
 		Hostile = "Color", Neutral = "Color", Friendly = "Color", Glow = "Glow", Back = "Background",
-		BackAlpha = "Background", Line2Size = "Second line", Line2Color = "Second line" }
+		BackAlpha = "Background", Line2Size = "Second line", Line2Color = "Second line",
+		GlowAlpha = "Glow", GlowSize = "Glow", BackBorder = "Background", BackBorderSize = "Background" }
 	local OUTLINE_NAMES = { [0] = L["None"], L["Thin"], L["Thick"] }
 	local function Words(setting, value)
 		if setting == "Font" then
@@ -9483,7 +10454,7 @@ local function CreateNameStylePanel()
 		elseif setting == "Outline" then
 			return OUTLINE_NAMES[tonumber(value) or 0] or tostring(value)
 		elseif setting == "Size" or setting == "Alpha" or setting == "ShadowAlpha" or setting == "BackAlpha"
-			or setting == "Line2Size" then
+			or setting == "Line2Size" or setting == "GlowAlpha" or setting == "GlowSize" then
 			return ("%d%%"):format(math.floor((tonumber(value) or 1) * 100 + 0.5))
 		elseif setting == "Shadow" then
 			return value and L["Shadow"] or L["None"]
@@ -9501,9 +10472,17 @@ local function CreateNameStylePanel()
 		local own = db[ns.NameLookKey(row, setting)]
 		own = own ~= nil and own ~= "inherit"
 		local parent, short
-		local _, from = ns.NameLookValue("all", setting)
-		if from == "all" and row ~= "all" then
-			parent, short = L["All names'"], L["All names"]
+		-- (From the nearest row up that sets it (2026-11-16: rows inherit along
+		-- NAME_ROWS' parents), else Default's, the theme's or the game's.)
+		local above = row ~= "all" and (ns.NAME_ROW_PARENT[row] or "all") or nil
+		local from = above and select(2, ns.NameLookValue(above, setting)) or select(2, ns.NameLookValue("all", setting))
+		if from ~= "all" and from ~= "theme" and from ~= "game" and ns.NameRowLabel(from) then
+			parent, short = (L["%s's"]):format(ns.NameRowLabel(from)), ns.NameRowLabel(from)
+		elseif from == "all" and row == "Target" then
+			-- (Your target: its own kind's row first, then Default's. 2026-11-16.)
+			parent, short = L["Its kind's row, else Default's"], L["Its kind's"]
+		elseif from == "all" and row ~= "all" then
+			parent, short = L["Default's"], L["Default"]
 		elseif from == "theme" or (from == "all" and row == "all" and ns.NameThemeLook()
 			and ns.NameThemeLook()[setting] ~= nil) then
 			local theme = ns.NameThemeNow()
@@ -9519,7 +10498,8 @@ local function CreateNameStylePanel()
 			if themed and themed[setting] ~= nil then return themed[setting] end
 			return ns.NAME_LOOK_GAME[setting]
 		end
-		return (ns.NameLookValue("all", setting))
+		local above = ns.NAME_ROW_PARENT[row]
+		return (ns.NameLookValue(above or "all", setting))
 	end
 
 	-- A row's Look panel: its keys through a field each (nameLook<row><setting>,
@@ -9557,13 +10537,13 @@ local function CreateNameStylePanel()
 			return value ~= nil and value ~= "inherit" and value or nil
 		end
 		local INHERIT = { "inherit", L["Inherit"], row == "all" and L["The name theme's look, else the game's."] or
-			L["As All names has it, else the game's. Follows it: changes when that changes."] }
+			L["As the Default row has it, else the game's. Follows it: changes when that changes."] }
 		local hidden = { Add = function(_, control)
 			control:Hide()
 			return control
 		end }
 		local styleRows = ns.StyleRows(ns.lowHealthKit, content, hidden, Changed, "plateNameStyle", FieldOf)
-		local service = row == "all" or row == "ServiceNPCs"
+		local service = row == "all" or row == "ServiceNPCs" or row:find("^Service") ~= nil
 		local button, pop = styleRows.Look("", label, {
 			tabs = {
 				default = DefaultOf,
@@ -9604,8 +10584,10 @@ local function CreateNameStylePanel()
 				function holder.Refresh(_, over, note)
 					tag:SetShown(over ~= nil)
 					tag:SetText(note or L["Preview: not saved"])
-					DrawSample(sample, row, over, 1.6)
+					DrawSample(sample, row, over, 1.6 * (holder.zoom or 1))
 				end
+				-- (Its name drawn on it, not a frame: zoomed by its own size.)
+				function holder.OnZoom() end
 				holder:SetScript("OnShow", function(self) self:Refresh() end)
 				panels[row] = holder
 				return holder
@@ -9614,9 +10596,12 @@ local function CreateNameStylePanel()
 				look.Font("Font", L["The names' font."], nil, INHERIT)
 			end,
 			textSize = function(look)
-				look.Slider("Size", L["Size"], 50, 200, 5, "%d%%", 100, L["How big the names are, next to the plates' own."])
+				-- (Up to 400%, 2026-11-16: a target's name can be made to stand out.)
+				look.Pair(true) -- (Size and Opacity on one line, 2026-11-16)
+				look.Slider("Size", L["Size"], 50, 400, 10, "%d%%", 100, L["How big the names are, next to the plates' own."])
 				look.Slider("Alpha", L["Opacity"], 20, 100, 5, "%d%%", 100,
 					L["How see-through the names are, on top of their fades."])
+				look.Pair(false)
 			end,
 			textColor = false,
 			outline = function(look)
@@ -9628,60 +10613,126 @@ local function CreateNameStylePanel()
 				local function Outlined(db)
 					return look.On(db) and (tonumber((ns.NameLookValue(row, "Outline"))) or 0) > 0
 				end
+				-- (Under Outline, indented: its parts, 2026-11-16.)
+				look.Sub(true)
 				look.Segments(L["Outline color"], "OutlineColor", { INHERIT, { "black", L["Black"] },
 					{ "custom", L["Custom"], L["An outline in a color of your own: copies of the name drawn round it. " ..
 					"Costs more than a black one with many names up."] } }, nil, Outlined)
 				look.Chips(L["Its color"], { "OutlineR", "OutlineG", "OutlineB" }, nil, Custom)
+				look.Sub(false)
 			end,
 			shadow = function(look)
 				look.Segments(L["Shadow"], "Shadow", { INHERIT, { true, L["Shadow"],
 					L["A dark copy of the letters just behind them, to lift them off the world."] }, { false, L["None"] } })
+				look.Sub(true) -- (under Shadow, indented; half as long, 2026-11-16)
+				look.Pair(true)
 				look.Slider("ShadowAlpha", L["Shadow opacity"], 0, 100, 5, "%d%%", 100, L["How dark the shadow is."],
 					function(db) return look.On(db) and ns.NameLookValue(row, "Shadow") == true end)
+				look.Pair(false)
+				look.Sub(false)
 			end,
 			nameColor = function(look)
-				look.Segments(L["Color by"], "Colour", { INHERIT,
-					{ true, L["How they see you"], L["Red for hostile units, yellow for neutral ones and green for " ..
-						"friendly ones, as over their heads."] },
-					{ "class", L["Class"], L["Players in their class's color, the rest as how they see you."] },
-					{ "one", L["One color"] }, { false, L["The plate's"], L["The plate's own color, white or gray."] } })
-				look.Chips(L["Color"], { "ColourR", "ColourG", "ColourB" }, nil,
-					function(db) return look.On(db) and Own("Colour") == "one" end)
+				-- (The Default row: no One color or its picker, 2026-11-16: every kind
+				-- of name in one color undoes the rows' own, as the plates' did.)
+				-- (Only the colors this row's names can take, 2026-11-16: an NPC row
+				-- has no players' or other reactions' colors, nor Class; the
+				-- Default row and Your target, every kind of unit, have them all.)
+				local parts = NAME_COLOR_PARTS[row]
+				-- (How they see you only where names of every reaction share the row,
+				-- 2026-11-16: Default, Your target. A row of one kind of unit has its
+				-- color below; Inherit gives Default's way.)
+				local choices = { INHERIT }
+				if not parts then
+					choices[#choices + 1] = { true, L["How they see you"], L["Red for hostile units, yellow for neutral " ..
+						"ones and green for friendly ones, as over their heads."] }
+				end
+				if not parts or parts.class then
+					choices[#choices + 1] = { "class", L["Class"], L["Players in their class's color, the rest as how they see you."] }
+				end
+				-- (No One color on an NPC row, 2026-11-16: its reaction's Custom below
+				-- is that one color already.)
+				local npcRow = parts and not parts.Friends and not parts.Enemies
+				if row ~= "all" and not npcRow then choices[#choices + 1] = { "one", L["One color"] } end
+				choices[#choices + 1] = { false, L["The plate's"], L["The plate's own color, white or gray."] }
+				look.Segments(L["Color by"], "Colour", choices)
+				if row ~= "all" and not npcRow then
+					look.Chips(L["Color"], { "ColourR", "ColourG", "ColourB" }, nil,
+						function(db) return look.On(db) and Own("Colour") == "one" end)
+				end
+				-- (The Default row: Color by alone, 2026-11-16. Each kind's color is
+				-- on its own row; Your target takes them from its kind's.)
+				if row == "all" then return end
 				local function Reacting(db)
 					local mode = ns.NameLookValue(row, "Colour")
 					return look.On(db) and mode ~= "one" and mode ~= false
 				end
-				look.Segments(L["Friendly players"], "Friends", { INHERIT,
-					{ "blue", L["Blue"], L["Blue, as the game's names over their heads (green while they're PvP " ..
-						"flagged, as there too)."] },
-					{ "class", L["Class colors"], L["Their class's color, as the plates draw them. Turns on Use Class " ..
-						"Color for Names in the game's Options > Nameplates too, so every friendly plate shows it; " ..
-						"yours is put back when you pick another color."] },
-					{ "white", L["White"] } }, nil, Reacting)
-				look.Segments(L["Enemy players"], "Enemies", { INHERIT, { "react", L["Hostile's color"] },
-					{ "class", L["Class colors"] } }, nil, Reacting)
+				if not parts or parts.Friends then
+					look.Segments(L["Friendly players"], "Friends", { INHERIT,
+						{ "blue", L["Blue"], L["Blue, as the game's names over their heads (green while they're PvP " ..
+							"flagged, as there too)."] },
+						{ "class", L["Class colors"], L["Their class's color, as the plates draw them. Turns on Use Class " ..
+							"Color for Names in the game's Options > Nameplates too, so every friendly plate shows it; " ..
+							"yours is put back when you pick another color."] },
+						{ "white", L["White"] } }, nil, Reacting)
+				end
+				if not parts or parts.Enemies then
+					look.Segments(L["Enemy players"], "Enemies", { INHERIT, { "react", L["Hostile's color"] },
+						{ "class", L["Class colors"] } }, nil, Reacting)
+				end
 				for _, each in ipairs({ { "Hostile", L["Hostile"] }, { "Neutral", L["Neutral"] },
 					{ "Friendly", L["Friendly"] } }) do
-					look.Segments(each[2], each[1], { INHERIT, { "game", L["The game's"] }, { "custom", L["Custom"] } },
-						L["NPCs of this reaction in a color of your own."], nil)
-					look.Chips(each[2] .. " " .. L["color"], { each[1] .. "R", each[1] .. "G", each[1] .. "B" }, nil,
-						function(db) return look.On(db) and Own(each[1]) == "custom" end)
+					if not parts or parts[each[1]] then
+						look.Segments(each[2], each[1], { INHERIT, { "game", L["The game's"] }, { "custom", L["Custom"] } },
+							L["NPCs of this reaction in a color of your own."], nil)
+						look.Chips(each[2] .. " " .. L["color"], { each[1] .. "R", each[1] .. "G", each[1] .. "B" }, nil,
+							function(db) return look.On(db) and Own(each[1]) == "custom" end)
+					end
 				end
 			end,
 			glow = function(look)
 				look.Segments(L["Glow"], "Glow", { INHERIT, { "none", L["None"] },
 					{ "soft", L["Soft glow"], L["A soft light behind the name."] } })
-				look.Chips(L["Glow color"], { "GlowR", "GlowG", "GlowB" }, nil,
-					function(db) return look.On(db) and Own("Glow") == "soft" end)
+				-- (No picker on the Default row, 2026-11-16: one color for every
+				-- name's glow, as One color was. The theme's own still comes through.)
+				if row ~= "all" then
+					look.Chips(L["Glow color"], { "GlowR", "GlowG", "GlowB" }, nil,
+						function(db) return look.On(db) and Own("Glow") == "soft" end)
+				end
+				-- (Its opacity and size, 2026-11-16, under it.)
+				local function Glowing(db) return look.On(db) and ns.NameLookValue(row, "Glow") ~= "none" end
+				look.Sub(true)
+				look.Pair(true)
+				look.Slider("GlowAlpha", L["Opacity"], 10, 100, 5, "%d%%", 100, L["How strong the glow is."], Glowing)
+				look.Slider("GlowSize", L["Size"], 50, 300, 10, "%d%%", 100, L["How far the glow spreads round the name."],
+					Glowing)
+				look.Pair(false)
+				look.Sub(false)
 			end,
 			backColor = function(look)
 				look.Segments(L["Behind the name"], "Back", { INHERIT, { "none", L["Nothing"] },
 					{ "band", L["Band"], L["A band of color behind the name, as wide as it where its width can be " ..
 						"read (one width for every name where it can't)."] } })
 				local function Banded(db) return look.On(db) and ns.NameLookValue(row, "Back") ~= "none" end
-				look.Chips(L["Color"], { "BackR", "BackG", "BackB" }, nil,
-					function(db) return look.On(db) and Own("Back") == "band" end)
+				if row ~= "all" then -- (as the glow's: none on the Default row)
+					look.Chips(L["Color"], { "BackR", "BackG", "BackB" }, nil,
+						function(db) return look.On(db) and Own("Back") == "band" end)
+				end
+				look.Sub(true)
+				look.Pair(true)
 				look.Slider("BackAlpha", L["Opacity"], 10, 100, 5, "%d%%", 100, L["How see-through the band is."], Banded)
+				look.Pair(false)
+				-- (A border round the band, 2026-11-16: its color and thickness.)
+				look.Segments(L["Border"], "BackBorder", { INHERIT, { "none", L["None"] },
+					{ "line", L["Line"], L["A line round the band."] } }, nil, Banded)
+				local function Edged(db) return Banded(db) and ns.NameLookValue(row, "BackBorder") == "line" end
+				look.Sub(false)
+				look.Sub(true)
+				look.Chips(L["Border color"], { "BackBorderR", "BackBorderG", "BackBorderB" }, nil, Edged)
+				look.Pair(true)
+				look.Slider("BackBorderSize", L["Thickness"], 1, 4, 1, "%d", 1, L["How thick the band's border is, in pixels."],
+					Edged)
+				look.Pair(false)
+				look.Sub(false)
 			end,
 			backAlpha = false,
 			line2 = function(look)
@@ -9711,16 +10762,30 @@ local function CreateNameStylePanel()
 	for _, info in ipairs(ns.NAME_ROWS) do
 		local row = info.key
 		for _, key in ipairs(ns.NameRowKeys(row)) do RecordKey(content, key) end
-		local name = stack:Add(Label(content, "GameFontHighlight", info.label), "label")
-		name:SetSize(170, 26)
+		-- (Indented under the row it inherits from, a step a level. Default and
+		-- the rows right under it flush left.)
+		local shownLabel = info.label
+		if (info.depth or 0) > 1 then shownLabel = ("     "):rep(info.depth - 1) .. info.label end
+		local name = stack:Add(Label(content, "GameFontHighlight", shownLabel), "label")
+		name.searchLabel = info.label
+		name:SetSize(195, 26) -- (room for the deepest, Group members' minions, indented)
 		name:SetJustifyV("MIDDLE")
 		local button = ns.PanelButton(content)
 		button:SetHeight(22)
 		button:SetPoint("LEFT", name, "RIGHT", 4, 0)
+		-- (A thin line under the Default row: the rows below start on it. 2026-11-16.)
+		if row == "all" then
+			local line = content:CreateTexture(nil, "ARTWORK")
+			line:SetColorTexture(0.45, 0.38, 0.2, 0.8)
+			line:SetHeight(1)
+			line:SetPoint("TOPLEFT", name, "BOTTOMLEFT", 0, -2)
+			line:SetPoint("RIGHT", name, "RIGHT", 4 + 300, 0)
+		end
 		button.searchLabel = info.label
 		Tooltip(button, row == "all" and L["Every name's look: the font, colors, glow and the line under it. " ..
 			"Each row below starts on these and can change any of them."]
-			or L["This kind's names: anything set here goes over All names'."])
+			or L["This kind's names: anything set here goes over the row it's under (or Default's). Grey: nothing of its " ..
+			"own, it goes by the row named."])
 		button:SetScript("OnClick", function() OpenRow(row, info.label) end)
 		function button.Refresh(self)
 			local db = ns.GetDB()
@@ -9733,11 +10798,25 @@ local function CreateNameStylePanel()
 				end
 			end
 			table.sort(tabs)
+			local inherits = false
 			if #tabs > 0 then
-				self:SetText(L["Its own:"] .. " " .. table.concat(tabs, " · "))
+				self:SetText(L["Own:"] .. " " .. table.concat(tabs, " · "))
+			elseif row == "all" then
+				self:SetText(ns.NameThemeNow() and L["The name theme's"] or L["The game's"])
 			else
-				self:SetText(row == "all" and (ns.NameThemeNow() and L["The name theme's"] or L["The game's"])
-					or L["Inherits All names"])
+				-- (The row right above it, which it goes by (2026-11-16); Default
+				-- for the rows right under Default.)
+				local above = ns.NAME_ROW_PARENT[row]
+				local aboveLabel = above and ns.NameRowLabel(above)
+				-- (Your target: whatever its kind's row says, under its own.)
+				if row == "Target" then aboveLabel = L["Its kind's row"] end
+				self:SetText(aboveLabel or L["Default"])
+				inherits = true
+			end
+			-- (Grey while it has nothing of its own: it's all the Default row's.)
+			local words = self:GetFontString()
+			if words then
+				if inherits then words:SetTextColor(0.6, 0.6, 0.6) else words:SetTextColor(1, 0.82, 0) end
 			end
 			self:SetWidth(math.max(140, self:GetFontString():GetStringWidth() + 30))
 			self:SetEnabled(db and db.plateNameStyle and true or false)
@@ -9752,7 +10831,10 @@ local function CreateNameStylePanel()
 	-- close and far, following perspective between them and on past far. The
 	-- camera's distance now shows under them, to set each with the camera
 	-- there. (Each name's own size and opacity: its row's Text tab.)
-	stack:Header(content, L["Distance and timing"])
+	-- (Hidden for now, 2026-11-16: hard for players to read; names' size is on
+	-- their rows' Text tab. The settings still work as they are.)
+	local SHOW_DISTANCE = false
+	if SHOW_DISTANCE then stack:Header(content, L["Distance and timing"]) end
 	local function HideDelayBox(boxes)
 		boxes:Box(L["Hide delay"], "plateNameHideDelay", 0, 10, 0.1, "%.1f", 1,
 			L["How long a unit has to stay out of sight before its name hides, so a short gap like the edge " ..
@@ -9761,7 +10843,8 @@ local function CreateNameStylePanel()
 			L["How long a name takes to fade out as its unit leaves sight, and in as it comes into sight. " ..
 			"0: at once."], On, L["sec"])
 	end
-	if ns.isRetail then
+	if not SHOW_DISTANCE then -- luacheck: ignore 542
+	elseif ns.isRetail then
 		local sizes = rows.Boxes()
 		sizes:Box(L["Raise"], "plateNameY", -30, 30, 1, "%d", 1,
 			L["Moves the names up (or down, below 0) from where the plates put them."], On)
@@ -9899,7 +10982,13 @@ do
 		local canvas, content = CreateScrollPage()
 
 		local title = Label(content, "GameFontNormalLarge", L["Nameplate Style"])
-		title:SetPoint("TOPLEFT", 16, -16)
+		-- (The Nameplates icon's Plate Style tab, 2026-11-16: its tabs over the title.)
+		local plateTabs, ShowPlateTab = ns.PageTabs(content, ns.ShowInTabs("plates"), ns.ShowInIndex("plates", "Nameplate Style"))
+		title:SetPoint("TOPLEFT", plateTabs, "BOTTOMLEFT", 8, -14)
+		-- (Two parts, each the Nameplates icon's tab (2026-11-16): Plate Style
+		-- (Show in, the theme) and Marks (its rows, a page of their own in all
+		-- but name); the preview shown with both. ShowPart: made with the body.)
+		local ShowPart
 		local subtitle = PageIntro(content, title,
 			L["How your target, focus and the unit under the mouse stand out on the nameplates, for when no " ..
 			"target frame shows them: a mark on each one's plate, a row for each in the grid, and its name, " ..
@@ -9924,6 +11013,10 @@ do
 			"of them do. Each setting keeps its value for when you turn this back on."], subtitle, Changed)
 		-- (Everything below is made the first time the page is needed: lazyPages.)
 		local function MakeBody()
+			-- (What's on the page before the body: neither part's.)
+			local before = {}
+			for _, object in ipairs({ content:GetChildren() }) do before[object] = true end
+			for _, object in ipairs({ content:GetRegions() }) do before[object] = true end
 			local stack = Stack(switch, "check")
 			-- Where they show: a Show in row (PlateIcons.lua, as the Icons page's).
 			local showHeader = stack:Header(content, L["Show in"])
@@ -9955,7 +11048,6 @@ do
 			-- ones first and larger; Default's at the back.)
 			local SPOTS = { { 0.27, 0.42, 1 }, { 0.73, 0.40, 1 }, { 0.16, 0.76, 0.9 }, { 0.5, 0.70, 0.95 },
 				{ 0.84, 0.76, 0.9 } }
-			local BACK_SPOT = { 0.5, 0.17, 0.75 }
 			local BAR_W, BAR_H = 120, 10
 			local WHO_COLORS = { Enemy = { 0.75, 0.1, 0.1 }, Neutral = { 0.85, 0.75, 0 }, Friendly = { 0, 0.6, 0.1 } }
 			local GAME_FILL = "Interface\\TargetingFrame\\UI-StatusBar"
@@ -10079,6 +11171,7 @@ do
 			function preview:Pick(id)
 				previewed = id or "others"
 				self:Refresh()
+				if self.OnPicked then self.OnPicked() end -- (the grid: its row lit)
 			end
 			-- A row hovered in the grid (nil: none): its plate lit, when it's on the scene.
 			function preview:Hover(id)
@@ -10088,13 +11181,18 @@ do
 			end
 			-- Dresses a plate as its row says. (Named as its row, so each is
 			-- told apart at a glance.)
-			local function Dress(plate, kind)
+			-- (who: the plate's own kind of unit, its bar's color under the row's,
+			-- 2026-11-16: Hostile, Neutral, Friendly or Player (your class's color),
+			-- the plate named for it.)
+			local WHO_PLATES = { { "Enemy", L["Hostile"] }, { "Neutral", L["Neutral"] }, { "Friendly", L["Friendly"] },
+				{ "Player", L["Player"] } }
+			local function Dress(plate, kind, who)
 				plate.kind = kind
 				local base, reaction = ns.MarkRowBase(kind)
 				local info = preview.RowInfo and preview.RowInfo(kind)
 				plate.full = info and info.full or L["Default"]
-				plate.name:SetText(info and info.label or L["Default"])
-				plate.glow:SetShown(kind == previewed)
+				plate.name:SetText(who and who[2] or info and info.label or L["Default"])
+				plate.glow:Hide() -- (one plate shown now, 2026-11-16: no glow to tell the picked one apart)
 				local shown = ns.TargetMarkSetting("Show", kind) and true or false
 				plate.arrow = plate.arrow or ns.MakeTargetArrow(plate.bar, plate.bar)
 				ns.StyleTargetArrow(plate.arrow, nil, kind)
@@ -10107,7 +11205,12 @@ do
 				else
 					plate.name:SetTextColor(1, 1, 1) -- (the game's names over plates: white)
 				end
-				local colors = WHO_COLORS[(reaction or ""):match("^%u%l+") or ""] or WHO_COLORS.Enemy
+				local colors = WHO_COLORS[(who and who[1]) or (reaction or ""):match("^%u%l+") or ""] or WHO_COLORS.Enemy
+				if who and who[1] == "Player" then
+					local class = select(2, UnitClass("player"))
+					local classColor = class and RAID_CLASS_COLORS and RAID_CLASS_COLORS[class]
+					colors = classColor and { classColor.r, classColor.g, classColor.b } or { 0.25, 0.78, 0.92 }
+				end
 				local fr, fg, fb = colors[1], colors[2], colors[3]
 				if shown and ns.TargetMarkAlso("ColorBar", tintKind) then fr, fg, fb = r, g, b end
 				plate.fill:SetVertexColor(fr, fg, fb)
@@ -10125,12 +11228,20 @@ do
 				-- (Its row's Look: the bar's texture and border, the name's font,
 				-- size, outline and shadow, the level box. PlateRowLook.lua.)
 				local look = ns.PlateRowLookFor and ns.PlateRowLookFor(kind)
-				if look and look.texture and look.texture ~= "game" and ns.SetStyleTexture then
-					ns.SetStyleTexture(plate.fill, look.texture)
+				-- (Where the row sets none: the plate theme's bar and border, as the
+				-- plates have them, and the Look panel's preview; else the game's.
+				-- 2026-11-16: the theme never showed here.)
+				local themeTexture, themeEdge, themeSize, themeR, themeG, themeB
+				if ns.PlateThemeBar then themeTexture, themeEdge, themeSize, themeR, themeG, themeB = ns.PlateThemeBar() end
+				local texture = look and look.texture
+				if texture == nil then texture = themeTexture end
+				if texture and texture ~= "game" and ns.SetStyleTexture then
+					ns.SetStyleTexture(plate.fill, texture)
 				else
 					plate.fill:SetTexture(GAME_FILL)
 				end
 				local border = look and look.border
+				if not border and themeEdge then border = { themeEdge, themeSize, themeR, themeG, themeB } end
 				if border and border[1] == "line" then
 					plate.edges = plate.edges or ns.MakeStyleEdges(plate.bar)
 					ns.DressStyleEdges(plate.edges, border[2], border[3], border[4], border[5], 1, true)
@@ -10179,17 +11290,22 @@ do
 				end
 				local width, height = self:GetWidth(), self:GetHeight()
 				local used = {}
-				local function Place(n, spot, kind)
+				local function Place(n, spot, kind, who)
 					local plate = plates[n] or MakeSample(n)
 					plate:ClearAllPoints()
 					plate:SetScale(spot[3])
 					plate:SetPoint("CENTER", self, "TOPLEFT", width * spot[1] / spot[3], -height * spot[2] / spot[3])
 					plate:Show()
-					Dress(plate, kind)
+					Dress(plate, kind, who)
 					used[n] = true
 				end
-				Place(#SPOTS + 1, BACK_SPOT, others)
-				for n, id in ipairs(list) do Place(n, SPOTS[n], id) end
+				-- (The row picked (Default to start) on four plates, one in each
+				-- quarter of the scene, 2026-11-16: a hostile, a neutral, a friendly
+				-- unit and a player.)
+				for n, who in ipairs(WHO_PLATES) do
+					local column, row = (n - 1) % 2, math.floor((n - 1) / 2)
+					Place(n, { 0.25 + column * 0.5, 0.3 + row * 0.44, 0.95 }, previewed, who)
+				end
 				for n, plate in pairs(plates) do
 					if not used[n] then plate:Hide() end
 				end
@@ -10288,11 +11404,36 @@ do
 			end
 			controls[#controls + 1] = plateThemeNow
 			controls[#controls + 1] = plateStrip
+			-- Customize (2026-11-16): the Default row's Look panel (Smart Style's
+			-- last row): the plates' own look before any row of Smart Style.
+			local customize = ns.PanelButton(content)
+			customize:SetSize(140, 22)
+			customize:SetText(L["Customize"])
+			customize:SetPoint("TOPLEFT", plateThemeNow, "BOTTOMLEFT", 0, -12)
+			Tooltip(customize, L["The plates' own look, before any Smart Style row: the bar's texture and border, " ..
+				"the name's font, size, outline and shadow, and the level box. It's Smart Style's Default row's Look."])
+			customize:SetScript("OnClick", function()
+				local grid = content.markGrid
+				local default
+				for _, id in ipairs(ns.TargetMarkOrder()) do
+					if not default and ns.MarkRowBase(id) == "others" then default = id end
+				end
+				local button = grid and grid.lookButtons and grid.lookButtons[default or "others"]
+				if preview and preview.Pick then preview:Pick(default) end
+				if button and button:GetScript("OnClick") then button:GetScript("OnClick")(button, "LeftButton") end
+			end)
+			customize.Refresh = function() end
+			customize.pageSwitch = false
+			controls[#controls + 1] = customize
 
 			-- The grid: a line for each row in the order a plate tries them, its
 			-- mark's preview, name and what's set apart from the usual (chips);
 			-- its settings in a drawer under it, opened by clicking the line.
-			stack:Header(content, L["Marks"])
+			-- (What's made from here on: the Marks part; before it, Plate Style's.)
+			local styleMade = {}
+			for _, object in ipairs({ content:GetChildren() }) do styleMade[object] = true end
+			for _, object in ipairs({ content:GetRegions() }) do styleMade[object] = true end
+			local marksHeader = stack:Header(content, L["Smart Style"]) -- (Marks until 2026-11-16)
 			stack:Help(content, L["A plate takes its whole look (mark, colors, opacity) from the first row that " ..
 				"fits it, top to bottom; the rows below aren't looked at. Click a row to open its settings: its " ..
 				"mark, the plate's colors and opacity, and When it fits. Beside its name, its Mark column shows its " ..
@@ -10584,6 +11725,19 @@ do
 					row:ClearAllPoints()
 					row:SetPoint("TOPLEFT", grid, "TOPLEFT", 0, -y)
 					row:Show()
+					-- (The row in the preview: a gold band behind it and a bar at its left.)
+					if not row.picked then
+						row.picked = row:CreateTexture(nil, "BACKGROUND", nil, 1)
+						row.picked:SetAllPoints()
+						row.picked:SetColorTexture(1, 0.82, 0, 0.14)
+						row.pickedBar = row:CreateTexture(nil, "ARTWORK")
+						row.pickedBar:SetPoint("TOPLEFT")
+						row.pickedBar:SetPoint("BOTTOMLEFT")
+						row.pickedBar:SetWidth(2)
+						row.pickedBar:SetColorTexture(1, 0.82, 0, 0.9)
+					end
+					row.picked:SetShown(id == previewed)
+					row.pickedBar:SetShown(id == previewed)
 					y = y + ROW_H
 					if moves[id] then
 						moves[id].up:SetShown(i > 1 and Group(list[i - 1]) == Group(id))
@@ -10615,6 +11769,7 @@ do
 				grid:SetHeight(math.max(y, 1))
 			end
 			controls[#controls + 1] = grid
+			content.markGrid = grid -- (the Default Plate Style tab's Customize: its Default row's Look)
 			RecordKey(content, "markOrder")
 			-- (Right-click: folds or opens it, the preview left on its pick.)
 			local function Toggle(id, button)
@@ -10622,6 +11777,8 @@ do
 				grid:Refresh()
 				if button ~= "RightButton" then preview:Pick(id) end
 			end
+			-- (A row picked for the preview: lit here.)
+			preview.OnPicked = function() grid:Refresh() end
 			-- (A plate clicked in the preview: its row opened.)
 			preview.OnPlateClick = function(id)
 				opened[id] = true
@@ -11093,6 +12250,8 @@ do
 					end }
 				end
 				local function IsCustom()
+					-- (The Default row's look always counts: its Customize always there.)
+					if kind == "others" then return true end
 					return ns.TargetMarkOwn("PlateColor", kind) == "custom"
 						and not (ns.MarkRowBase(kind) == "aggro" and ns.TargetMarkOwn("AlsoSame", kind))
 				end
@@ -11142,12 +12301,16 @@ do
 					end,
 					-- (Its color, and the parts that take it.)
 					barColor = function(look)
-						look.Color(L["Color:"], { "PlateR", "PlateG", "PlateB" },
-							L["The plate's color, for the parts ticked below."])
-						for _, part in ipairs(ALSO_PARTS) do
-							if not part.targetOnly or ns.MarkRowBase(kind) == "target" or ns.MarkRowBase(kind) == "aggro" then
-								RecordKey(content, kind .. "Color" .. part[1])
-								look.Check("Color" .. part[1], (L["%s in its color"]):format(part[2]), part[3])
+						-- (Not on the Default row: it paints nothing, each plate keeping its
+						-- own color, hostile, neutral or friendly. Its gradient still fades it.)
+						if kind ~= "others" then
+							look.Color(L["Color:"], { "PlateR", "PlateG", "PlateB" },
+								L["The plate's color, for the parts ticked below."])
+							for _, part in ipairs(ALSO_PARTS) do
+								if not part.targetOnly or ns.MarkRowBase(kind) == "target" or ns.MarkRowBase(kind) == "aggro" then
+									RecordKey(content, kind .. "Color" .. part[1])
+									look.Check("Color" .. part[1], (L["%s in its color"]):format(part[2]), part[3])
+								end
 							end
 						end
 						-- (The fill fading, left to right, to a second color: PlateHealthStyle.lua.)
@@ -11201,6 +12364,8 @@ do
 					end or false,
 				})
 				if button then
+					grid.lookButtons = grid.lookButtons or {}
+					grid.lookButtons[kind] = button
 					button:SetParent(drawer)
 					button:ClearAllPoints()
 					At("Plate", button, LABEL_W + 106)
@@ -11782,6 +12947,12 @@ do
 					"on the parts ticked beside it. Custom: a look of your own, in its Look panel (the button beside " ..
 					"it): its color and parts, the bar's texture and border, the name's font and the level box."])
 				GreyUnless(plateColor, Shown)
+				-- (Not on the Default row: it paints nothing, 2026-11-16 (PlateParts' PlateHow):
+				-- just its Customize, its look.)
+				if kind == "others" then
+					plateColor:Hide()
+					plateColor.Show = plateColor.Hide
+				end
 				local function Colors()
 					local how = PlateHow()
 					return how ~= "-" and how ~= "game" and how ~= "target"
@@ -11828,7 +12999,7 @@ do
 				placer.Refresh = function()
 					partPick:ClearAllPoints()
 					At("Plate", partPick, LABEL_W + 106)
-					partPick:SetShown(Colors() and PlateHow() ~= "custom")
+					partPick:SetShown(kind ~= "others" and Colors() and PlateHow() ~= "custom")
 				end
 				controls[#controls + 1] = placer
 				-- (Width and Height, W and H, the two boxes where one Size was.)
@@ -11967,9 +13138,49 @@ do
 				"middle is, while nothing of the plate shows. As the plate fades in or out, the marks move between " ..
 				"the two heights."], Changed)
 
+			-- The two parts on frames of their own, each at the top where Show in
+			-- was; the preview (and its spot) on the page, shown with both.
+			local point, relative, relPoint, x, y = showHeader:GetPoint(1)
+			local hosts = {}
+			for i = 1, 2 do
+				hosts[i] = CreateFrame("Frame", nil, content)
+				hosts[i]:SetSize(1, 1)
+				hosts[i]:SetPoint(point, relative, relPoint, x, y)
+			end
+			local keep = { [preview] = true, [preview.stackSpot or preview] = true, [preview.popSlot or preview] = true }
+			for _, set in ipairs({ { content:GetChildren() }, { content:GetRegions() } }) do
+				for _, object in ipairs(set) do
+					if not before[object] and not keep[object] and object ~= hosts[1] and object ~= hosts[2] then
+						object:SetParent(styleMade[object] and hosts[1] or hosts[2])
+					end
+				end
+			end
+			showHeader:ClearAllPoints()
+			showHeader:SetPoint("TOPLEFT", hosts[1], "TOPLEFT", 0, 0)
+			marksHeader:ClearAllPoints()
+			marksHeader:SetPoint("TOPLEFT", hosts[2], "TOPLEFT", 0, 0)
+			function ShowPart(i)
+				hosts[1]:SetShown(i == 1)
+				hosts[2]:SetShown(i == 2)
+				ShowPlateTab(ns.ShowInIndex("plates", i == 1 and "Nameplate Style" or "Nameplate Marks"))
+				FitContentHeight(content)
+			end
+			ShowPart(1)
+
 			canvas:SetScript("OnShow", PageShown(Refresh, content))
 		end
-		lazyPages.Add(canvas, "Nameplate Style", MakeBody)
+		local MakeStyle = lazyPages.Add(canvas, "Nameplate Style", MakeBody)
+		-- (A hub tile each: Plate Style, and Marks hidden under the Nameplates icon too.)
+		local function Pick(i)
+			MakeStyle("its tab picked")
+			if ShowPart then ShowPart(i) end
+		end
+		canvas.hubTabs = {
+			{ name = "Nameplate Style", icon = "Interface\\Icons\\Ability_Marksmanship", label = "Nameplate Style",
+				onSelect = function() Pick(1) end },
+			{ name = "Nameplate Marks", icon = "Interface\\Icons\\Ability_Marksmanship", label = "Smart Style", own = true,
+				onSelect = function() Pick(2) end },
+		}
 		canvas:Hide()
 		RegisterSubpage(canvas, "Nameplate Style", L["Nameplate Style"])
 	end
@@ -12076,9 +13287,12 @@ do
 		local chatCanvas
 		chatCanvas, chatPanel = CreateScrollPage()
 
+		-- (The Chat icon's tabs over the title, 2026-11-16: this page's parts,
+		-- the bubbles' pages, then its links: ns.ShowInTabs("chat").)
 		local title = Label(chatPanel, "GameFontNormalLarge", L["Chat"])
-		title:SetPoint("TOPLEFT", 16, -16)
-		ns.FramesLink(chatPanel, title, "interface")
+		local outerTabs, ShowOuter = ns.PageTabs(chatPanel, ns.ShowInTabs("chat"), ns.ShowInIndex("chat", "Chat"))
+		title:SetPoint("TOPLEFT", outerTabs, "BOTTOMLEFT", 8, -14)
+		-- (When the chat window shows: its row is at the top of this page, Show in.)
 
 		local subtitle = PageIntro(chatPanel, title,
 			L["The chat window fades with the rest of the UI in CineMode. Mousing over it or typing " ..
@@ -12087,8 +13301,12 @@ do
 		-- On top: the master switch and the peek's own options.
 		local switch = PageSwitch(chatPanel, "handleChat", L["Enable Page"],
 			L["On: new messages, typing, unread whispers and scrolling back bring up the chat windows as this " ..
-			"page says. Off: none of them do, and the chat windows fade as their HUD row says."],
+			"page says. Off: none of them do, and the chat windows fade as their Show in row says."],
 			subtitle)
+
+		-- (When the chat window shows at all: the Chat icon's Show in tab, the
+		-- HUD page's Chat window section.)
+		local tabsAnchor = switch
 
 		local chatPeek = Check(chatPanel, "chatPeek", L["Show chat when a message arrives"],
 			L["While the UI is faded, a new message briefly shows just the chat window it " ..
@@ -12136,14 +13354,22 @@ do
 		local TAB_SETTINGS, TAB_LINKS = 1, 6
 		local bodies = {}
 		local Layout
-		local tabHosts, PickTab, TabsShown = ns.PageTabsBelow(chatPanel, switch, {
-			{ L["Settings"], L["When a new message shows chat, and what of the chat window comes up with it."] },
+		-- (Reveal's sub-tabs, all but the links: those are the Chat icon's own
+		-- tab over the title, their row hidden there: chatCanvas.hubTabs, below.)
+		local innerNow = 1 -- (the part shown now)
+		local tabHosts, PickTab, TabsShown, _, _, innerPanel, innerTabs = ns.PageTabsBelow(chatPanel, tabsAnchor, {
+			{ L["General"], L["When a new message shows chat, and what of the chat window comes up with it."] },
 			{ L["Conversations"], L["Which people's messages show chat, and where: says, whispers, party, guild..."] },
 			{ L["Game Messages"], L["Which of the game's messages show chat, and where."] },
 			{ L["Channels"], L["Which channels you've joined show chat, and where."] },
 			{ L["Other"], L["Chat lines of Cinematic's own."] },
-			{ L["Frame Links"], L["Which frame each part of the chat is: the game's, or an addon's that draws its own."] },
-		}, "Chat/page", nil, nil, nil, function() Layout() end)
+			{ L["Addon Reveal Link"], L["Which frame each part of the chat is: the game's, or an addon's that draws its own."] },
+		}, "Chat/page", nil, nil, nil, function(i)
+			innerNow = i
+			Layout()
+		end)
+		innerTabs[TAB_LINKS]:Hide()
+		innerTabs[TAB_LINKS].Show = innerTabs[TAB_LINKS].Hide
 		local settings = tabHosts[TAB_SETTINGS]
 		for _, control in ipairs({ chatPeek, peekTime, hideOwn, ownNoBubble, hideBubbled }) do
 			control:SetParent(settings)
@@ -12317,6 +13543,29 @@ do
 			TabsShown()
 		end, chatPanel))
 		chatCanvas:Hide()
+		-- Two hub tiles, hidden under the Chat icon (its Show in tab, the HUD
+		-- page's: tabOf): Reveal (the part last shown, or General; the sub-tabs'
+		-- row shown) and the links (their own tab over the title, the sub-tabs'
+		-- row hidden, no On/Off: no switch of theirs).
+		local function ShowPart(links)
+			local part = links and TAB_LINKS or (innerNow ~= TAB_LINKS and innerNow or 1)
+			PickTab(part)
+			ShowOuter(ns.ShowInIndex("chat", links and "Chat Links" or "Chat"))
+			innerPanel:SetShown(not links)
+			for i, tab in ipairs(innerTabs) do
+				if i ~= TAB_LINKS then tab:SetShown(not links) end
+			end
+			title:SetText(links and L["Addon Reveal Link"] or L["Chat"])
+			chatPanel.headerSwitchOff = links
+			local header = chatPanel.pageHeaderSwitch
+			if header then header:SetShown(not links) end
+		end
+		chatCanvas.hubTabs = {
+			{ name = "Chat", icon = "Interface\\Icons\\INV_Scroll_03", label = "Chat", section = "Chat",
+				tabOf = "HUD:chat", onSelect = function() ShowPart(false) end },
+			{ name = "Chat Links", icon = "Interface\\Icons\\INV_Scroll_03", label = "Chat", section = "Chat",
+				own = true, tabOf = "HUD:chat", noSwitch = true, onSelect = function() ShowPart(true) end },
+		}
 		RegisterSubpage(chatCanvas, "Chat")
 	end
 end
@@ -12469,23 +13718,31 @@ end
 local function CreateMinimapPanel()
 	local canvas, content = CreateScrollPage()
 
-	local title = Label(content, "GameFontNormalLarge", L["Minimap"])
-	title:SetPoint("TOPLEFT", 16, -16)
-	ns.FramesLink(content, title, "minimap")
+	-- (The Minimap icon's Reveal and Frame Links tabs, its Show in the HUD
+	-- page's: ns.ShowInTabs("minimap"), 2026-11-16.)
+	local title = Label(content, "GameFontNormalLarge", L["Reveal"])
+	local outer, ShowOuter = ns.PageTabs(content, ns.ShowInTabs("minimap"), 2)
+	title:SetPoint("TOPLEFT", outer, "BOTTOMLEFT", 8, -14)
 
 	local subtitle = PageIntro(content, title,
 		L["When the minimap (and on retail the quest waypoint) stays up in CineMode. " ..
 		"Hovering the minimap always shows it. To keep it up all the time, or in fights, " ..
-		"see the HUD page."])
+		"see the Show in tab."])
 	local switch = PageSwitch(content, "handleMinimap", L["Enable Page"],
-		L["On: this page's settings can bring the minimap up or keep it up in CineMode. Off: they don't; " ..
-		"it still fades as its HUD rows say."], subtitle)
+		L["On: this tab's settings can bring the minimap up or keep it up in CineMode. Off: they don't; " ..
+		"it still fades as its Show in rows say."], subtitle)
 
-	-- Two tabs (ns.PageTabsBelow): the page's settings, and Addon Frame Links.
-	local _, _, TabsShown, AdoptTab = ns.PageTabsBelow(content, switch, {
-		{ L["Settings"], L["When the minimap comes up or stays up in CineMode."] },
-		{ L["Frame Links"], L["Which supported addon's frames stand in for the minimap's parts."] },
-	}, "Minimap/page", 2, "minimap", 1)
+	-- Three parts (ns.PageTabsBelow, its tabs not drawn: the icon's pick them):
+	-- Reveal, Keep Open (2026-11-16) and Addon Frame Links.
+	local partHosts, PickPart, TabsShown, AdoptTab = ns.PageTabsBelow(content, switch, {
+		{ L["Reveal"], L["When the minimap comes up for a while in CineMode."] },
+		{ L["Keep Open"], L["Where and while what the minimap stays up the whole time."] },
+		{ L["Addon Reveal Link"], L["Which supported addon's frames stand in for the minimap's parts."] },
+	}, "Minimap/page", 3, "minimap", 1, nil, true)
+	local keepHost = partHosts[2]
+	ns.ShowInParts(canvas, content, title, "minimap", PickPart, ShowOuter, { label = "Minimap",
+		icon = "Interface\\Icons\\INV_Misc_Map_01", titles = { L["Reveal"], L["Keep Open"], L["Addon Reveal Link"] },
+		switchLabel = "Reveal" })
 
 	-- Retail's quest waypoint (the marker in the world showing where to go).
 	local aboveTracking
@@ -12836,7 +14093,11 @@ local function CreateMinimapPanel()
 	previousReveal = onTaxi
 
 
-	-- Keep open: the minimap stays up the whole time.
+	-- Keep open: the minimap stays up the whole time. (Its own tab, Keep Open:
+	-- what's made from here on goes onto it, at the end.)
+	local beforeKeep = {}
+	for _, object in ipairs({ content:GetChildren() }) do beforeKeep[object] = true end
+	for _, object in ipairs({ content:GetRegions() }) do beforeKeep[object] = true end
 	local keepLabel = Label(content, "GameFontHighlight", L["Keep open"])
 	keepLabel:SetPoint("TOPLEFT", previousReveal, "BOTTOMLEFT", -12, -10)
 	local indoors = Check(content, "minimapIndoors", L["Indoors"],
@@ -12870,7 +14131,7 @@ local function CreateMinimapPanel()
 	local function ZoneRow(i)
 		local row = zoneRows[i]
 		if not row then
-			row = CreateFrame("Frame", nil, content)
+			row = CreateFrame("Frame", nil, keepHost) -- (on the Keep Open tab, with the rest of Keep open)
 			row:SetSize(200, 22) -- (Remove ends where the Add button does)
 			row.text = Label(row, "GameFontHighlight")
 			row.text:SetPoint("LEFT", 0, 0)
@@ -13022,7 +14283,15 @@ local function CreateMinimapPanel()
 			tip = L["Where herb, mineral or treasure tracking keeps the minimap up, and whether in fights. " ..
 			"Alterac Valley's mines do have ore: tick BGs & arenas if you mine there. Hovering it still shows it."] },
 	})
-	AdoptTab(switch) -- (everything above onto the Settings tab)
+	-- (Keep open onto its tab, its heading at the top; then the rest onto Reveal.)
+	for _, set in ipairs({ { content:GetChildren() }, { content:GetRegions() } }) do
+		for _, object in ipairs(set) do
+			if not beforeKeep[object] then object:SetParent(keepHost) end
+		end
+	end
+	keepLabel:ClearAllPoints()
+	keepLabel:SetPoint("TOPLEFT", keepHost, "TOPLEFT", 4, 0)
+	AdoptTab(switch) -- (everything above onto the Reveal tab)
 	canvas:SetScript("OnShow", PageShown(function()
 		Refresh()
 		TabsShown()
@@ -13036,27 +14305,32 @@ end
 local function CreateQuestTrackerPanel()
 	local canvas, content = CreateScrollPage()
 
-	local title = Label(content, "GameFontNormalLarge", L["Quest Tracker"])
-	title:SetPoint("TOPLEFT", 16, -16)
-	ns.FramesLink(content, title, "interface")
+	-- (The Quest Tracker icon's Reveal and Frame Links tabs, its Show in the
+	-- HUD page's: ns.ShowInTabs("quests"), 2026-11-16.)
+	local title = Label(content, "GameFontNormalLarge", L["Reveal"])
+	local outer, ShowOuter = ns.PageTabs(content, ns.ShowInTabs("quests"), 2)
+	title:SetPoint("TOPLEFT", outer, "BOTTOMLEFT", 8, -14)
 
 	local subtitle = PageIntro(content, title,
 		L["When the quest tracker comes up in CineMode. Hovering it always shows it. To keep it " ..
-		"up all the time, or in fights, see the HUD page."])
+		"up all the time, or in fights, see the Show in tab."])
 
-	local reveal = Check(content, "questRevealOnAccept", L["Reveal on new quest"],
+	local reveal = Check(content, "questRevealOnAccept", L["New quest"],
 		L["Accepting a quest shows the quest tracker as if you'd hovered it (with the rest of the " ..
 		"Hover groups that have Quest progress ticked): it goes after \"Stays after " ..
 		"mouseover\" (Hover groups page)."])
 	local switch = PageSwitch(content, "handleQuests", L["Enable Page"],
 		L["On: this page's settings can bring the quest tracker, quest timer and durability figure up in " ..
-		"CineMode. Off: they don't; they still fade as their HUD rows say."], subtitle)
+		"CineMode. Off: they don't; they still fade as their Show in rows say."], subtitle)
 
-	-- Two tabs (ns.PageTabsBelow): the page's settings, and Addon Frame Links.
-	local tabHosts, _, TabsShown, AdoptTab = ns.PageTabsBelow(content, switch, {
-		{ L["Settings"], L["When the quest tracker, quest timer and durability figure come up in CineMode."] },
-		{ L["Frame Links"], L["Which supported addon's frames stand in for the quest tracker."] },
-	}, "Quest tracker/page", 2, "quests", 1)
+	-- Two parts (ns.PageTabsBelow, its tabs not drawn: the icon's pick them):
+	-- Reveal, and Addon Frame Links.
+	local tabHosts, PickPart, TabsShown, AdoptTab = ns.PageTabsBelow(content, switch, {
+		{ L["Reveal"], L["When the quest tracker, quest timer and durability figure come up in CineMode."] },
+		{ L["Addon Reveal Link"], L["Which supported addon's frames stand in for the quest tracker."] },
+	}, "Quest tracker/page", 2, "quests", 1, nil, true)
+	ns.ShowInParts(canvas, content, title, "quests", PickPart, ShowOuter, { label = "Quest Tracker",
+		icon = "Interface\\Icons\\INV_Misc_Note_01", titles = { L["Reveal"], L["Addon Reveal Link"] }, switchLabel = "Reveal" })
 	reveal:SetParent(tabHosts[1]) -- (made before the switch: onto the tab too)
 
 	-- On top: how long a reveal keeps the tracker up, in place of the mouseover time (all the way left: off).
@@ -13081,7 +14355,7 @@ local function CreateQuestTrackerPanel()
 	acceptCalm:SetPoint("TOPLEFT", reveal, "BOTTOMLEFT", QUEST_INDENT, -2)
 	GreyUnless(acceptCalm, function(db) return db.questRevealOnAccept end)
 
-	local revealProgress = Check(content, "questRevealOnProgress", L["Reveal on receiving quest objective"],
+	local revealProgress = Check(content, "questRevealOnProgress", L["Quest progress"],
 		L["Progress on a quest's objectives (a kill or item counted towards it) shows the quest " ..
 		"tracker the same way."])
 	revealProgress:SetPoint("TOPLEFT", acceptCalm, "BOTTOMLEFT", -QUEST_INDENT, -2)
@@ -13094,7 +14368,7 @@ local function CreateQuestTrackerPanel()
 	-- Scenarios: raid bosses' and dungeons' stages, which aren't quests.
 	local lastReveal = progressCalm
 	if C_ScenarioInfo and C_ScenarioInfo.GetScenarioStepInfo then
-		local revealScenario = Check(content, "questRevealOnScenario", L["Reveal on scenario progress"],
+		local revealScenario = Check(content, "questRevealOnScenario", L["Scenario progress"],
 			L["Progress in a scenario (the stages and objectives the tracker shows for some raid bosses, " ..
 			"dungeons and events) shows the quest tracker the same way."])
 		revealScenario:SetPoint("TOPLEFT", progressCalm, "BOTTOMLEFT", -QUEST_INDENT, -2)
@@ -13106,7 +14380,7 @@ local function CreateQuestTrackerPanel()
 		lastReveal = scenarioCalm
 	end
 
-	local onlyThat = Check(content, "questRevealOnlyThat", L["Show just that quest"],
+	local onlyThat = Check(content, "questRevealOnlyThat", L["Just that quest"],
 		L["When accepting a quest or progress on one brings the quest tracker up, just that quest shows " ..
 		"(and any others accepted or moved on while it's up); the rest of the tracker, headers and all, " ..
 		"stays faded. Scenario progress shows just the scenario. Hovering it shows it all."])
@@ -13127,7 +14401,7 @@ local function CreateQuestTrackerPanel()
 	-- Classic's quest timer box; retail shows timers in the tracker itself.
 	local timer
 	if ns.OptionAvailable({ retail = false }) then
-		timer = Check(content, "questTimerShow", L["Show the quest timer while one is running"],
+		timer = Check(content, "questTimerShow", L["Quest timer"],
 			L["Keeps the quest timer box up in CineMode, and in fights, while a timed quest " ..
 			"counts down. Just the timer: the quest tracker stays faded."])
 	else
@@ -13140,7 +14414,7 @@ local function CreateQuestTrackerPanel()
 	local lastQuest = timer
 
 	-- The durability figure (with the page on, as the rest).
-	local durability = Check(content, "durabilityShow", L["Show the durability figure when gear is damaged"],
+	local durability = Check(content, "durabilityShow", L["Damaged gear"],
 		L["Keeps the armor figure (by the minimap) up in CineMode, and in fights, while the game shows it: " ..
 		"some of your gear is badly damaged (yellow) or broken (red). It goes again once you repair. Off, " ..
 		"it fades with the rest of the UI."])
@@ -13177,16 +14451,27 @@ end
 -- switch, then sits at the tab's top), and again as the page shows (rows a
 -- page makes later).
 -- onPick(i): after a tab's picked, before the page's height is fitted.
--- Gives the hosts, Pick(i), Shown() for the page's OnShow, and Adopt.
+-- hidden: the tabs not drawn, picked by Pick(i) from elsewhere (folder
+-- tabs over the page's title: the Unit Frames page's), the hosts at once
+-- under anchor.
+-- Gives the hosts, Pick(i), Shown() for the page's OnShow, Adopt, the links
+-- section (linksTab's), and the panel and tab frames (to hide the row).
 -- (On ns: this file's main chunk is near Lua's 200 locals.)
-function ns.PageTabsBelow(content, anchor, list, id, linksTab, groupKey, adoptTab, onPick)
+function ns.PageTabsBelow(content, anchor, list, id, linksTab, groupKey, adoptTab, onPick, hidden)
 	local picked = { id = id, open = 1 }
 	local Pick
-	local panel, _, ShowTab, base = ns.FolderTabs(content, list, function(i) Pick(i) end)
-	base:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", 0, -(ns.FOLDER_TAB_HEIGHT + 14))
+	local panel, tabFrames, ShowTab, base = ns.FolderTabs(content, list, function(i) Pick(i) end)
+	base:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", 0, hidden and 0 or -(ns.FOLDER_TAB_HEIGHT + 14))
 	panel:SetPoint("TOPLEFT", base)
 	panel:SetPoint("RIGHT", content, "RIGHT", -8, 0)
 	panel:SetHeight(1) -- (just its top edge, a line under the tabs)
+	if hidden then
+		panel:Hide()
+		for _, tab in ipairs(tabFrames) do
+			tab:Hide()
+			tab.Show = tab.Hide
+		end
+	end
 	local hosts = {}
 	for i = 1, #list do
 		local host = CreateFrame("Frame", nil, content)
@@ -13219,7 +14504,8 @@ function ns.PageTabsBelow(content, anchor, list, id, linksTab, groupKey, adoptTa
 		local host = hosts[adoptTab]
 		for _, set in ipairs({ { content:GetChildren() }, { content:GetRegions() } }) do
 			for _, object in ipairs(set) do
-				if not before[object] then
+				-- (noAdopt: one that stays on the page, a popped preview's slot)
+				if not before[object] and not object.noAdopt then
 					before[object] = true
 					object:SetParent(host)
 					-- (Placed under the switch: at the tab's top instead, its
@@ -13258,7 +14544,128 @@ function ns.PageTabsBelow(content, anchor, list, id, linksTab, groupKey, adoptTa
 		SectionState.Restore(picked)
 		Pick(tonumber(picked.open) or 1)
 	end
-	return hosts, Pick, Shown, Adopt
+	return hosts, Pick, Shown, Adopt, links, panel, tabFrames
+end
+
+-- Sub-page: the Visions hub's General (2026-11-16): every Vision as a card,
+-- on or off, what it does (its page's intro, the first line) and its
+-- pages as chips; the card opens it. Made again as it shows, the switches
+-- as they are now. (On ns: this file's main chunk is near Lua's 200 locals.)
+function ns.CreateVisionsGeneralPanel()
+	-- (Card Vision's event pages open from its rows, not as tabs: no chips.)
+	local VISION_CHIPS_SKIP = { ["Card Settings"] = true, ["Card Style"] = true, ["Card Sounds"] = true }
+	local canvas, content = CreateScrollPage()
+	local title = Label(content, "GameFontNormalLarge", L["Visions"])
+	title:SetPoint("TOPLEFT", 16, -16)
+	local intro = PageIntro(content, title, L["Every Vision at a glance: whether it's on, what it does, and its " ..
+		"pages. Click a card to open it, or one of its pages under it."])
+	-- (Its switch, 2026-11-16: every Vision page off with it, and back on.)
+	PageSwitch(content, "visionsAll", L["Enable Page"], L["On: the Visions work as their pages say. Off: every " ..
+		"Vision page is turned off; turning this back on turns back on the ones that were on."], intro, function(value)
+		ns.CascadeHub("Visions", "visionsAll", value and true or false)
+		if content.RefillCards then content.RefillCards() end -- (its cards' dots as they are now)
+	end)
+	local cards
+	local function Fill()
+		if cards then cards:Hide() end
+		-- (In the hub's sections, each under its name, as its icons are
+		-- banded: Combat, World; any in none last, under Other. 2026-11-16.)
+		local groups, bySection, entries = {}, {}
+		for _, page in ipairs(ns.HubPageStates("Visions") or {}) do
+			local key = page.section or "Other"
+			entries = bySection[key]
+			if not entries then
+				entries = {}
+				bySection[key] = entries
+				groups[#groups + 1] = { L[key], entries, last = not page.section }
+			end
+			if page.name ~= "Visions General" and not page.dev then
+				local chips = {}
+				for _, tab in ipairs(ns.HubTabsOf("Visions", page.name)) do
+					if not VISION_CHIPS_SKIP[tab[2]] then chips[#chips + 1] = tab end
+				end
+				local note = page.intro and page.intro:match("^(.-[%.%!%?])%s") or page.intro or ""
+				entries[#entries + 1] = { label = page.label, texture = page.icon, open = page.name, tabs = chips,
+					note = note }
+				-- (Off too: "a and false or nil" gave nil, no dot, 2026-11-16.)
+				if page.hasSwitch then entries[#entries].state = page.on and not page.held end
+			end
+		end
+		table.sort(groups, function(a, b) return not a.last and b.last end)
+		cards = ns.MakeHubCardGroups(content, groups, 600)
+		cards:SetPoint("TOPLEFT", intro, "BOTTOMLEFT", 0, -14)
+		FitContentHeight(content)
+	end
+	content.RefillCards = Fill
+	canvas:SetScript("OnShow", PageShown(function()
+		Refresh()
+		Fill()
+	end, content))
+	canvas:Hide()
+	RegisterSubpage(canvas, "Visions General", L["General"])
+end
+
+-- Sub-page: the breath bar (the game's mirror timers: breath underwater,
+-- fatigue in deep water, Feign Death): hiding it always, and its look
+-- (MirrorTimerStyle.lua). The Timers icon's Breath Bar tab (2026-11-16: once
+-- under the HUD page's Trackers rows); when it shows: its row on Show in.
+-- (On ns: this file's main chunk is near Lua's 200 locals.)
+function ns.CreateBreathBarPanel()
+	local canvas, content = CreateScrollPage()
+	local title = Label(content, "GameFontNormalLarge", L["Breath Bar"])
+	local tabs = ns.PageTabs(content, ns.ShowInTabs("timers"), ns.ShowInIndex("timers", "Breath Bar"))
+	title:SetPoint("TOPLEFT", tabs, "BOTTOMLEFT", 8, -14)
+	local intro = PageIntro(content, title, L["The bar that runs down while you hold your breath underwater, and " ..
+		"the game's other bars like it (fatigue in deep water, Feign Death). When it shows: its row on the Show " ..
+		"in tab."])
+
+	local function Apply()
+		if ns.ApplyMirrorTimers then ns.ApplyMirrorTimers() end
+		Refresh()
+	end
+	local function Shown(db) return not db.mirrorHide end
+	local function Worded(db) return not db.mirrorHide and not db.mirrorHideText end
+	local hide = Check(content, "mirrorHide", L["Hide the breath bar"],
+		L["Hides the bar that runs down while you hold your breath underwater, and the game's other bars " ..
+		"like it (fatigue in deep water, Feign Death), CineMode or not."], function(value)
+			ns.GetDB().mirrorHide = value
+			Apply()
+		end)
+	hide:SetPoint("TOPLEFT", intro, "BOTTOMLEFT", -2, -14)
+	local words = Check(content, "mirrorHideText", L["Hide its text"],
+		L["Hides the word on the bar (Breath, Fatigue...), leaving the bar."], function(value)
+			ns.GetDB().mirrorHideText = value
+			Apply()
+		end)
+	words:SetPoint("TOPLEFT", hide, "BOTTOMLEFT", 0, 0)
+	GreyUnless(words, Shown)
+	local last = words
+	-- (A dropdown with its name before it; nil where the client has no menus.)
+	local function Pick(label, key, choices, tip, test)
+		local dropdown = Dropdown(content, key, choices, 180, Apply)
+		if not dropdown then return end
+		local name = Label(content, "GameFontHighlight", label)
+		name:SetPoint("TOPLEFT", last, "BOTTOMLEFT", last == words and 4 or 0, -10)
+		name:SetSize(90, 30)
+		name:SetJustifyV("MIDDLE")
+		dropdown:SetPoint("LEFT", name, "RIGHT", 4, 0)
+		Tooltip(dropdown, tip)
+		GreyUnless(dropdown, test)
+		last = name
+	end
+	Pick(L["Bar texture:"], "mirrorTexture", function() return ns.StyleTextureChoices() end,
+		L["The bar's fill. The game's: as it comes."], Shown)
+	Pick(L["Font:"], "mirrorFont", function() return ns.StyleFontChoices() end,
+		L["The font of the word on the bar. (In Russian, Korean and Chinese it stays the game's.)"], Worded)
+	local size = Slider(content, "mirrorTextScale", L["Text size"], 50, 200, 5, "%d%%", 100,
+		function() if ns.ApplyMirrorTimers then ns.ApplyMirrorTimers() end end)
+	size:SetPoint("TOPLEFT", last, "BOTTOMLEFT", last == words and 4 or 0, -22)
+	Tooltip(size, L["The size of the word on the bar, against the game's."])
+	GreyUnless(size, Worded)
+
+	canvas:SetScript("OnShow", PageShown(Refresh, content))
+	canvas:Hide()
+	RegisterSubpage(canvas, "Breath Bar")
 end
 
 -- Sub-page: Classic's swing timer bars: only the weapons in use, and the
@@ -13267,9 +14674,9 @@ local function CreateSwingPanel()
 	local canvas, content = CreateScrollPage()
 
 	local title = Label(content, "GameFontNormalLarge", L["Swing Timer"])
-	title:SetPoint("TOPLEFT", 16, -16)
-	ns.GroupTabs(content, title, "Swing timer")
-	ns.FramesLink(content, title, "combat")
+	-- (The Timers icon's Swing Timer tab, 2026-11-16: its tabs over the title.)
+	local timerTabs = ns.PageTabs(content, ns.ShowInTabs("timers"), ns.ShowInIndex("timers", "Swing timer"))
+	title:SetPoint("TOPLEFT", timerTabs, "BOTTOMLEFT", 8, -14)
 
 	local subtitle = PageIntro(content, title,
 		L["Which of the game's swing timer bars show, in CineMode and out. When they come up in " ..
@@ -13284,7 +14691,7 @@ local function CreateSwingPanel()
 	-- Two tabs: its settings, and Addon Frame Links.
 	local hosts, _, TabsShown = ns.PageTabsBelow(content, handleCheck, {
 		{ L["Settings"], L["Which bars show, and when they fade."] },
-		{ L["Frame Links"], L["Which supported addon's frames stand in for the swing timer."] },
+		{ L["Addon Reveal Link"], L["Which supported addon's frames stand in for the swing timer."] },
 	}, "Swing timer/page", 2, "swing")
 	local settings = hosts[1]
 
@@ -13326,9 +14733,9 @@ local function CreateCooldownPanel()
 	local canvas, content = CreateScrollPage()
 
 	local title = Label(content, "GameFontNormalLarge", L["Cooldown Manager"])
-	title:SetPoint("TOPLEFT", 16, -16)
-	ns.GroupTabs(content, title, "Cooldown Manager")
-	ns.FramesLink(content, title, "combat")
+	-- (The Timers icon's Cooldown Manager tab, 2026-11-16: its tabs over the title.)
+	local timerTabs = ns.PageTabs(content, ns.ShowInTabs("timers"), ns.ShowInIndex("timers", "Cooldown Manager"))
+	title:SetPoint("TOPLEFT", timerTabs, "BOTTOMLEFT", 8, -14)
 
 	local subtitle = PageIntro(content, title,
 		L["When the Cooldown Manager comes up in CineMode (Enhanced Cooldown Manager's bars too). Hovering " ..
@@ -13347,7 +14754,7 @@ local function CreateCooldownPanel()
 	local tabHosts, _, TabsShown = ns.PageTabsBelow(content, handleCheck, {
 		{ L["CDM"], L["Each spell's icon: when it shows, and in which situations."] },
 		{ L["Settings"], L["Staying up while a cooldown recharges, keybinds, numbers and the Flash style."] },
-		{ L["Frame Links"], L["Which supported addon's frames stand in for the Cooldown Manager's bars."] },
+		{ L["Addon Reveal Link"], L["Which supported addon's frames stand in for the Cooldown Manager's bars."] },
 	}, "Cooldown Manager/page", 3, "cooldowns")
 	local icons, settings = tabHosts[1], tabHosts[2]
 
@@ -15357,12 +16764,12 @@ local function CreateTooltipPanel()
 	local canvas, content = CreateScrollPage()
 
 	local title = Label(content, "GameFontNormalLarge", L["Tooltips"])
-	title:SetPoint("TOPLEFT", 16, -16)
+	-- (The Mouse icon's Tooltips tab, 2026-11-16: its tabs over the title.)
+	local mouseTabs = ns.PageTabs(content, ns.ShowInTabs("mouse"), ns.ShowInIndex("mouse", "Tooltips"))
+	title:SetPoint("TOPLEFT", mouseTabs, "BOTTOMLEFT", 8, -14)
 
 	local note = PageIntro(content, title, L["Only in CineMode. Hold your Show hidden tooltips " ..
 		"key (set it on the Keybinds page) to see a hidden one anyway."])
-	-- Their look: the Style hub's Tooltips page (TooltipStyle.lua).
-	ns.StyleLink(content, title, "Tooltip Style", L["Opens the Tooltip Style page: how tooltips look."], Tooltip)
 	local switch = PageSwitch(content, "handleTooltips", L["Enable Page"],
 		L["On: CineMode hides tooltips as this page says. Off: every tooltip shows as normal."], note)
 
@@ -15784,8 +17191,14 @@ local function CreateExtrasPanel()
 	-- (The Find frames tab's parts, made further down.)
 	local smart, foundHead, noneFound
 	local foundRows, foundCount = {}, 0
-	local tabsPanel, ShowTab, tabsBase, tabsHeight, _
+	local tabsPanel, ShowTab, tabsBase, tabsHeight, tabFrames
 	local function PickTab(i)
+		-- (Custom Support: the Addon Support page, in this row as its last tab, 2026-11-16.)
+		if i == 5 then
+			ShowTab(tab)
+			ns.ShowHubPage("Addon Support")
+			return
+		end
 		tab = i
 		ShowTab(i)
 		if i == 2 then
@@ -15796,13 +17209,23 @@ local function CreateExtrasPanel()
 			FitContentHeight(content)
 		end
 	end
-	tabsPanel, _, ShowTab, tabsBase, tabsHeight = ns.FolderTabs(content, {
+	tabsPanel, tabFrames, ShowTab, tabsBase, tabsHeight = ns.FolderTabs(content, {
 		{ L["Loaded"], L["The addons loaded now: their frames, and the ones you added."] },
 		{ L["Find frames"], L["Find other addons' frames to fade: search, hover, or Smart Find."] },
 		{ L["Not running"], L["Addons installed but not loaded, and the ones supported but not installed."] },
 		{ L["Support files"], L["Addons that draw their own frames in place of the game's (chat panels, tabs...): " ..
 			"what each replaces, and which addon's to use where two of them do."] },
+		{ L["Custom Support"], L["How Cinematic works with your other addons."] },
 	}, PickTab)
+	-- (Shown by the Addon Support page as it's made: only with one of its addons.)
+	tabFrames[5]:Hide()
+	content.supportTab = tabFrames[5]
+	content.tabsWidth = PANEL_W
+	-- (A tab picked from the Addon Support page's copy of this row.)
+	function content.PickAddonTab(i)
+		ns.ShowHubPage("Advanced Frames")
+		PickTab(i)
+	end
 	tabsBase:SetPoint("TOPLEFT", holder, "TOPLEFT", 0, -tabsHeight)
 	tabsPanel:SetPoint("TOPLEFT", tabsBase, "TOPLEFT")
 	tabsPanel:SetSize(PANEL_W, 1)
@@ -16663,7 +18086,7 @@ local KEYBINDS = {
 			"or off puts them back as the Letterbox page says."] },
 	{ action = "CINEMATIC_HIDECURSOR", label = L["Hide Cursor till moves"],
 		tip = L["Hides the cursor right away; moving the mouse (or pressing it again) brings it back. Also on " ..
-			"UI Visibility > Cursor."] },
+			"Interface > HUD > Cursor."] },
 	{ action = "CINEMATIC_RELOAD", label = L["Reload the UI"],
 		tip = L["Reloads the UI, like /reload. With Keep windows open across a reload ticked (Quality of " ..
 			"life > General), what you had open opens again after."] },
@@ -16742,6 +18165,8 @@ local KEYBINDS = {
 	{ action = "CINEMATIC_CAM_DEATH", label = L["Death camera test"],
 		tip = L["Pretends you're dead for 30 seconds so the death camera runs. Press again to stop. " ..
 			"Like /cine deathtest."] },
+	{ action = "CINEMATIC_SHOULDERCAM", label = L["Toggle Shoulder Cam"],
+		tip = L["Turns the Shoulder Cam on or off (its Enable Page switch)."] },
 	{ action = "CINEMATIC_STOPCAM", label = L["Stop the camera"],
 		tip = L["Stops whichever of Cinematic's cameras is running now, however it started."] },
 }
@@ -18068,7 +19493,9 @@ local function CreateMouseoverPanel()
 	local RESULTS_SHOWN = 8
 
 	local title = Label(content, "GameFontNormalLarge", L["Hover Groups"])
-	title:SetPoint("TOPLEFT", LEFT, -16)
+	-- (The Mouse icon's Mouseover groups tab, 2026-11-16: its tabs over the title.)
+	local mouseTabs = ns.PageTabs(content, ns.ShowInTabs("mouse"), ns.ShowInIndex("mouse", "Mouseover groups"))
+	title:SetPoint("TOPLEFT", mouseTabs, "BOTTOMLEFT", 8, -14)
 	local subtitle = PageIntro(content, title,
 		L["Frames in the same group come up together when you mouse over any of them. A frame can " ..
 		"be in more than one group; one in no group comes up on its own."] .. " " ..
@@ -19019,6 +20446,8 @@ ns.OnLanguage(function()
 		CreateSwingPanel()
 		Lap("CreateSwingPanel")
 	end
+	ns.CreateBreathBarPanel() -- (the Timers icon's Breath Bar tab)
+	Lap("CreateBreathBarPanel")
 	-- (Only with a Cooldown Manager: the game's, on clients that have it, or the addon.
 	-- ProfileModules.lua.)
 	if ns.HasCooldownManager() then
@@ -19151,6 +20580,8 @@ ns.OnLanguage(function()
 		ns.CreateStyleOverridesPanel(ns.lowHealthKit)
 		Lap("CreateStyleOverridesPanel")
 	end
+	ns.CreateVisionsGeneralPanel() -- (the Visions hub's General: its cards)
+	Lap("CreateVisionsGeneralPanel")
 	if ns.CreateVisionsStylePanel then -- (VisionsStyle.lua)
 		ns.CreateVisionsStylePanel(ns.lowHealthKit)
 		Lap("CreateVisionsStylePanel")
@@ -19158,6 +20589,8 @@ ns.OnLanguage(function()
 	if ns.CreatePlateCastStylePanel then -- (PlateCastStyle.lua)
 		ns.CreatePlateCastStylePanel(ns.lowHealthKit)
 		Lap("CreatePlateCastStylePanel")
+		ns.CreateUnitCastStylePanel(ns.lowHealthKit) -- (the unit frames' cast bars: Unit Frames' Cast Style tab)
+		Lap("CreateUnitCastStylePanel")
 	end
 	CreateEffectsPanel()
 	Lap("CreateEffectsPanel")
@@ -19244,7 +20677,10 @@ ns.OnLanguage(function()
 		ns.CreateMinimapCopyPage(ns.lowHealthKit)
 		Lap("CreateMinimapCopyPage")
 	end
+	ns.AddBandShortcuts("UI Manager") -- (a line for each of the Interface hub's bands, under it)
+	ns.AddBandShortcuts("Visions") -- (and the Visions hub's: Combat, World, each Vision under its band)
 	menu.Flush() -- (the left list, in menu.order)
+	menu.AutoFold()
 	GuardGamepadClose()
 	Lap("(the left list)")
 	local buildEnded = type(buildStarted) == "number" and debugprofilestop()

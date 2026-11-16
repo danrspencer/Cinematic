@@ -22,7 +22,7 @@ local L = ns.L
 -- The game frame groups and their parts. (Labels are English keys, read
 -- through L when shown: the language isn't known yet at load.)
 ns.LINK_GROUPS = {
-	{ key = "chat", label = "Chat window", page = "Chat", parts = {
+	{ key = "chat", label = "Chat window", page = "Chat Links", parts = {
 		{ key = "chatwindow", label = "Window",
 			tip = "The panel the chat window's lines show on. A message peeking that window brings it up." },
 		{ key = "chattabs", label = "Tabs",
@@ -32,13 +32,13 @@ ns.LINK_GROUPS = {
 	} },
 	-- (Its addons' trackers fade with the Quest tracker row as their support
 	-- files add them, linked or not: the link says which addon's it is.)
-	{ key = "quests", label = "Quest tracker", page = "Quest tracker", parts = {
+	{ key = "quests", label = "Quest tracker", page = "Quest Tracker Links", parts = {
 		{ key = "questtracker", label = "Tracker",
 			tip = "The quest list. It comes up as the Quest tracker row and this page say." },
 	} },
 	-- (These fade as their support files set them up, linked or not: the
 	-- link says which addon's frame each part is.)
-	{ key = "units", label = "Unit frames", page = "Standard Frames", parts = {
+	{ key = "units", label = "Unit frames", page = "Unit Frame Links", parts = {
 		{ key = "unitplayer", label = "Player", tip = "Your own frame." },
 		{ key = "unitpet", label = "Pet", tip = "Your pet's frame." },
 		{ key = "unittarget", label = "Target", tip = "Your target's frame." },
@@ -46,11 +46,11 @@ ns.LINK_GROUPS = {
 		{ key = "unitfocus", label = "Focus", tip = "Your focus's frame." },
 		{ key = "unitfocustot", label = "Focus target", tip = "Your focus's target's frame." },
 	} },
-	{ key = "buffs", label = "Buffs and debuffs", page = "Buffs/debuffs", parts = {
+	{ key = "buffs", label = "Buffs and debuffs", page = "Buffs Links", parts = {
 		{ key = "aurabuffs", label = "Buffs", tip = "Your buffs." },
 		{ key = "auradebuffs", label = "Debuffs", tip = "Your debuffs." },
 	} },
-	{ key = "minimap", label = "Minimap", page = "Minimap", parts = {
+	{ key = "minimap", label = "Minimap", page = "Minimap Links", parts = {
 		{ key = "mapzone", label = "Zone name", tip = "The bar with the zone's name." },
 		{ key = "mapclock", label = "Clock", tip = "The clock by the minimap." },
 		{ key = "mapcoords", label = "Coordinates", tip = "Your coordinates by the minimap." },
@@ -60,7 +60,7 @@ ns.LINK_GROUPS = {
 		{ key = "cdutility", label = "Utility", tip = "The Utility Cooldowns bar." },
 		{ key = "cdbuffs", label = "Tracked buffs", tip = "The tracked buffs' icons." },
 	} },
-	{ key = "prd", label = "Personal resource display", page = "Personal Resources", parts = {
+	{ key = "prd", label = "Personal resource display", page = "Unit Frame Links", parts = {
 		{ key = "prdbars", label = "Health and power bars", tip = "Your health and power bars." },
 	} },
 	{ key = "swing", label = "Swing timer", page = "Swing timer", parts = {

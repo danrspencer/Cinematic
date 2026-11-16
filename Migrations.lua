@@ -3999,6 +3999,167 @@ STEPS[#STEPS + 1] = function()
 	end
 end
 
+-- (Step 16.)
+STEPS[#STEPS + 1] = function()
+	-- No Timers master switch now (handleTimers, 2026-11-16: Cooldown Manager
+	-- and Swing Timer are tabs of the Timers icon, each with its own switch).
+	-- Off, it turned both off (WoW Forever only): they're off on their own now.
+	if not ns.db.timersMasterGoneV1 then
+		local function Move(saved)
+			if not ns.isRetail and saved.handleTimers == false then
+				saved.handleCooldowns = false
+				saved.handleSwing = false
+			end
+			saved.handleTimers = nil
+		end
+		Move(ns.db)
+		for _, saved in pairs(ns.db.profiles or {}) do
+			if type(saved) == "table" then
+				Move(saved)
+				if type(saved.settings) == "table" then Move(saved.settings) end
+			end
+		end
+		for _, point in pairs(ns.db.profileResetPoints or {}) do
+			if type(point) == "table" then Move(point) end
+		end
+		ns.db.timersMasterGoneV1 = true
+	end
+end
+
+-- (Step 17.)
+STEPS[#STEPS + 1] = function()
+	-- Name Style's Default row has no One color now (2026-11-16: every kind of
+	-- name in one color undid the rows' own): set there, back to the theme's.
+	-- (A name theme's own one color, Silver Screen's white, still comes through.)
+	if not ns.db.nameDefaultOneGoneV1 then
+		local function Move(saved)
+			if saved.plateNameColour == "one" then saved.plateNameColour = nil end
+		end
+		Move(ns.db)
+		for _, saved in pairs(ns.db.profiles or {}) do
+			if type(saved) == "table" then
+				Move(saved)
+				if type(saved.settings) == "table" then Move(saved.settings) end
+			end
+		end
+		for _, point in pairs(ns.db.profileResetPoints or {}) do
+			if type(point) == "table" then Move(point) end
+		end
+		ns.db.nameDefaultOneGoneV1 = true
+	end
+end
+
+-- (Step 18.)
+STEPS[#STEPS + 1] = function()
+	-- Name Style's Default row has no glow or band color picker now
+	-- (2026-11-16: one color for every name's): set there, back to the theme's.
+	if not ns.db.nameDefaultColorsGoneV1 then
+		local KEYS = { "plateNameGlowR", "plateNameGlowG", "plateNameGlowB", "plateNameBackR", "plateNameBackG",
+			"plateNameBackB" }
+		local function Move(saved)
+			for _, key in ipairs(KEYS) do saved[key] = nil end
+		end
+		Move(ns.db)
+		for _, saved in pairs(ns.db.profiles or {}) do
+			if type(saved) == "table" then
+				Move(saved)
+				if type(saved.settings) == "table" then Move(saved.settings) end
+			end
+		end
+		for _, point in pairs(ns.db.profileResetPoints or {}) do
+			if type(point) == "table" then Move(point) end
+		end
+		ns.db.nameDefaultColorsGoneV1 = true
+	end
+end
+
+-- (Step 19.)
+STEPS[#STEPS + 1] = function()
+	-- Name Style's Default row has Color by alone now (2026-11-16): each
+	-- kind's color moved to the rows it colors (Your target takes them from
+	-- its kind's row now), where those rows set none of their own.
+	if not ns.db.nameKindColorsMovedV1 then
+		local MOVES = {
+			Friends = { "Friends" }, Enemies = { "Enemies" },
+			Hostile = { "HostileNPCs", "Enemies", "EnemyMinions" }, Neutral = { "NeutralNPCs" },
+			Friendly = { "FriendlyNPCs", "FriendlyMinions", "GroupMinions" },
+		}
+		local COLORED = { Hostile = true, Neutral = true, Friendly = true }
+		local function Move(saved)
+			for setting, rows in pairs(MOVES) do
+				local value = saved["plateName" .. setting]
+				if value ~= nil and value ~= "inherit" then
+					for _, row in ipairs(rows) do
+						local key = "nameLook" .. row .. setting
+						if saved[key] == nil or saved[key] == "inherit" then
+							saved[key] = value
+							if COLORED[setting] then
+								for _, part in ipairs({ "R", "G", "B" }) do
+									if saved["plateName" .. setting .. part] ~= nil then
+										saved["nameLook" .. row .. setting .. part] = saved["plateName" .. setting .. part]
+									end
+								end
+							end
+						end
+					end
+				end
+				saved["plateName" .. setting] = nil
+				if COLORED[setting] then
+					for _, part in ipairs({ "R", "G", "B" }) do saved["plateName" .. setting .. part] = nil end
+				end
+			end
+		end
+		Move(ns.db)
+		for _, saved in pairs(ns.db.profiles or {}) do
+			if type(saved) == "table" then
+				Move(saved)
+				if type(saved.settings) == "table" then Move(saved.settings) end
+			end
+		end
+		for _, point in pairs(ns.db.profileResetPoints or {}) do
+			if type(point) == "table" then Move(point) end
+		end
+		ns.db.nameKindColorsMovedV1 = true
+	end
+end
+
+-- (Step 20.)
+STEPS[#STEPS + 1] = function()
+	-- Name Style's NPC rows have no One color now (2026-11-16): their
+	-- reaction's Custom is the same. One set there becomes that Custom.
+	if not ns.db.nameNpcOneColorV1 then
+		local ROWS = { HostileNPCs = "Hostile", NeutralNPCs = "Neutral", FriendlyNPCs = "Friendly",
+			ServiceNPCs = "Friendly", FriendlyMinions = "Friendly", GroupMinions = "Friendly", EnemyMinions = "Hostile" }
+		local function Move(saved)
+			for row, reaction in pairs(ROWS) do
+				local prefix = "nameLook" .. row
+				if saved[prefix .. "Colour"] == "one" then
+					saved[prefix .. "Colour"] = nil
+					if saved[prefix .. reaction] == nil or saved[prefix .. reaction] == "inherit" then
+						saved[prefix .. reaction] = "custom"
+						for _, part in ipairs({ "R", "G", "B" }) do
+							if saved[prefix .. "Colour" .. part] ~= nil then
+								saved[prefix .. reaction .. part] = saved[prefix .. "Colour" .. part]
+							end
+						end
+					end
+				end
+			end
+		end
+		Move(ns.db)
+		for _, saved in pairs(ns.db.profiles or {}) do
+			if type(saved) == "table" then
+				Move(saved)
+				if type(saved.settings) == "table" then Move(saved.settings) end
+			end
+		end
+		for _, point in pairs(ns.db.profileResetPoints or {}) do
+			if type(point) == "table" then Move(point) end
+		end
+		ns.db.nameNpcOneColorV1 = true
+	end
+end
+
 -- Runs them all, each on its own: an error is logged and reported (the
 -- addon's error net, Diagnostics.lua), and the steps after it still run.
 function ns.RunMigrations()

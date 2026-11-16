@@ -390,15 +390,15 @@ function ns.MakeRaidStylePreview(parent, width, onPick)
 end
 
 -- The page itself.
-local PRESET_KEYS = { "rfTexture", "rfBorder", "rfBorderSize", "rfBorderR", "rfBorderG", "rfBorderB", "rfBack",
-	"rfGround", "rfGroundColor", "rfGroundR", "rfGroundG", "rfGroundB", "rfHealthColor", "rfNameColor", "rfFont", "rfOutline", "rfNameSize", "rfShadow" }
 local TAB_NAMES = {}
 for _, group in ipairs(GROUPS) do TAB_NAMES[group[1]] = group[2] end
 
 function ns.CreateRaidStylePanel(kit)
 	local canvas, content = kit.CreateScrollPage()
 	local title = kit.Label(content, "GameFontNormalLarge", L["Raid Frame Style"])
-	title:SetPoint("TOPLEFT", 16, -16)
+	-- (The Party & Raid icon's Raid Style tab, 2026-11-16: its tabs over the title.)
+	local tabs = ns.PageTabs(content, ns.ShowInTabs("party"), ns.ShowInIndex("party", "Raid Style"))
+	title:SetPoint("TOPLEFT", tabs, "BOTTOMLEFT", 8, -14)
 	local intro = kit.PageIntro(content, title,
 		L["How the raid frames look, the party's when the game draws them raid-style, and the arena's. The " ..
 		"Default row's look is each group's until its row says Its own look; each row's Look panel sets it. " ..
@@ -432,15 +432,6 @@ function ns.CreateRaidStylePanel(kit)
 	local refreshPreview = preview.Refresh
 	preview.Refresh = function(self) refreshPreview(self, editing) end
 
-	rows.PresetMenu({
-		{ L["Like the game's"], L["The game's raid frames, as it draws them (the defaults)."], {} },
-		{ L["Flat"], L["Flat bars with a thin black edge, class-colored names, Arial Narrow."],
-			{ rfTexture = "flat", rfBorder = "thin", rfNameColor = "class", rfFont = "arial", rfOutline = 1 } },
-		{ L["Minimal"], L["Borderless flat bars on a faint ground, small names."],
-			{ rfTexture = "flat", rfBorder = "none", rfGround = 0.4, rfNameSize = 0.9, rfOutline = 1 } },
-		{ L["Cinematic"], L["Soft bars with a fine edge, names outlined."],
-			{ rfTexture = "soft", rfBorder = "thin", rfOutline = 1 } },
-	}, PRESET_KEYS)
 
 	-- The rows: Default first, then each group, each with its Same as the
 	-- Default row pick and a Look panel (the Style pages' template,
@@ -596,7 +587,12 @@ function ns.CreateRaidStylePanel(kit)
 
 	stack:Header(content, L["Groups"])
 	local ids = { false }
-	for _, group in ipairs(GROUPS) do ids[#ids + 1] = group[1] end
+	-- (No Arena row on WoW Forever: it has no arena frames to style. Its
+	-- settings stay, unused.)
+	local forever = not ns.isRetail and not ns.isClassicEra
+	for _, group in ipairs(GROUPS) do
+		if not (forever and group[1] == "ARENA") then ids[#ids + 1] = group[1] end
+	end
 	local pops = {}
 	for _, id in ipairs(ids) do
 		id = id or nil
@@ -629,23 +625,30 @@ function ns.CreateRaidStylePanel(kit)
 		end
 		local button = ns.PanelButton(content)
 		button:SetHeight(22)
-		button:SetPoint("LEFT", pick or name, "RIGHT", pick and 8 or 178, 0)
+		-- (Default's, with no pick: where the others' are, past a pick's room: 4 + 170 + 8.)
+		button:SetPoint("LEFT", pick or name, "RIGHT", pick and 8 or 182, 0)
 		button.searchLabel = label
 		kit.Tooltip(button, id and L["This group's own look: bars, name, border and background. Only while it has " ..
 			"its own look."] or L["Every group's look while its row says Same as the Default row."])
+		-- (A row on the Default row's look: its button opens Default's, and says so.)
+		local function FollowsDefault()
+			local db = ns.GetDB()
+			return id ~= nil and not (db and db["rfOwn_" .. id])
+		end
 		button:SetScript("OnClick", function()
-			editing = id
+			local shown = not FollowsDefault() and id or nil
+			editing = shown
 			if preview then preview:Refresh() end
-			local key = id or "DEFAULT"
-			if not pops[key] then pops[key] = MakePanel(id, label) end
+			local key = shown or "DEFAULT"
+			if not pops[key] then pops[key] = MakePanel(shown, shown and label or L["Default"]) end
 			pops[key]:SetShown(not pops[key]:IsShown())
 		end)
 		function button.Refresh(self)
 			local db = ns.GetDB()
 			-- (Party in its own frames, not raid-style: the Unit frames page's.)
 			local unitParty = id == "PARTY" and not (ns.RaidStyleParty and ns.RaidStyleParty())
-			-- (Just Look: the pick beside it says whose look it is.)
-			self:SetText(unitParty and L["Unit Frames page's"] or L["Look"])
+			-- (Look, or Default on a row that follows it.)
+			self:SetText(unitParty and L["Unit Frames page's"] or FollowsDefault() and L["Default"] or L["Look"])
 			self:SetWidth(math.max(110, self:GetFontString():GetStringWidth() + 30))
 			self:SetEnabled(rows.On(db) and true or false)
 		end

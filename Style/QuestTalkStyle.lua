@@ -10,9 +10,6 @@
 local _, ns = ...
 local L = ns.L
 
--- The look's settings a preset sets (the rest as the defaults).
-local PRESET_KEYS = { "questTalkStyle", "questTalkAlpha", "questTalkFont", "questTalkTextSize", "questTalkNumberAlpha", "questTalkOutline", "questTalkShadow", "questTalkTextColor",
-	"questTalkCardSame" }
 
 function ns.CreateQuestTalkStylePanel(kit)
 	local canvas, content = kit.CreateScrollPage()
@@ -40,14 +37,6 @@ function ns.CreateQuestTalkStylePanel(kit)
 	ns.StylePopout(preview, kit.Tooltip) -- (StylePages.lua)
 	kit.AddControl(preview)
 
-	rows.PresetMenu({
-		{ L["Cinematic's"], L["Parchment, as the dialogue has always looked (the defaults)."], {} },
-		{ L["Bubble"], L["The game's own chat bubble."], { questTalkStyle = "bubble" } },
-		{ L["Dark"], L["Light words on dark, see-through panels, in Arial Narrow."],
-			{ questTalkStyle = "dark", questTalkAlpha = 0.8, questTalkFont = "arial" } },
-		{ L["Subtitles"], L["No panels: outlined words, like a film's subtitles."],
-			{ questTalkStyle = "none", questTalkOutline = 1, questTalkTextSize = 1.1 } },
-	}, PRESET_KEYS)
 
 	stack:Header(content, L["Panels"])
 	rows.Look(L["Look:"], L["Panels"], {

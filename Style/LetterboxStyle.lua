@@ -9,11 +9,6 @@
 local _, ns = ...
 local L = ns.L
 
--- The look's settings a preset sets (the rest as the defaults; the custom
--- colors are kept, for a pick of Custom later).
-local PRESET_KEYS = { "letterboxSizeBy", "letterboxSize", "letterboxAspect", "letterboxColor", "letterboxAlpha",
-	"letterboxEdge", "letterboxFeather", "letterboxLine", "letterboxMotion", "letterboxTime" }
-
 -- The Atmosphere hub's effects with a page of their own: a Show in row on
 -- the first tab, the look on the Style tab (English: L at the call, once the
 -- language is set). page: the first tab's page, style: the Style tab's.
@@ -244,18 +239,6 @@ function ns.CreateLetterboxStylePanel(kit)
 			target, comeBack = 0, true
 		end)
 
-	-- Presets: a few looks to start from.
-	local PRESETS = {
-		{ L["Cinematic's"], L["Thin black bars that slide in with the UI's fade (the defaults)."], {} },
-		{ L["Film"], L["A 2.39:1 frame, as at the cinema."],
-			{ letterboxSizeBy = "aspect", letterboxAspect = 2.39, letterboxTime = 1 } },
-		{ L["Soft"], L["Feathered edges that melt into the scene, fading in."],
-			{ letterboxSize = 0.09, letterboxEdge = "soft", letterboxFeather = 40, letterboxAlpha = 0.9,
-			letterboxMotion = "fade", letterboxTime = 1.2 } },
-		{ L["Gilded"], L["Thin bars with a thin gold line along their edge."],
-			{ letterboxSize = 0.06, letterboxLine = "gold" } },
-	}
-	rows.PresetMenu(PRESETS, PRESET_KEYS)
 
 	stack:Header(content, L["Size"])
 	rows.Choices(L["Set by:"], "letterboxSizeBy", {

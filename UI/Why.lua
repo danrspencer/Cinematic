@@ -315,7 +315,7 @@ local function AdvancedNow(entry, n, out)
 	end
 	if name == "ObjectiveTrackerFrame" and db.questRevealOnlyThat and (n.events or NONE).quest and not n.hovered
 		and not n.fightingShown then
-		Add(out, "on", L["Show just that quest: only the quest that moved on shows, the rest stay faded"],
+		Add(out, "on", L["Just that quest: only the quest that moved on shows, the rest stay faded"],
 			"Quest tracker", "questRevealOnlyThat")
 	end
 	if name == "CinematicPersonalMana" and ns.PersonalManaRecent then
@@ -436,7 +436,7 @@ function ColumnsOf(key, out, always, anyFight, page)
 		found = true
 	end
 	if fighting and not calm and ns.FightHold(key) and not always then
-		Add(out, "block", L["Held back at the fight's start while you're at rest (Health & Resources page)"],
+		Add(out, "block", L["Held back at the fight's start while you're at rest (Unit Frames page, Keep up)"],
 			"Personal Resources", "fightWaitPull")
 	end
 	if not found then

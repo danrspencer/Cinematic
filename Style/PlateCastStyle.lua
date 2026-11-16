@@ -46,7 +46,7 @@ DEFAULTS.plateCastTextR, DEFAULTS.plateCastTextG, DEFAULTS.plateCastTextB = 1, 1
 DEFAULTS.plateCastShadow = "general" -- "game", "on" or "none" (ns.SetTextShadow; general: General's)
 DEFAULTS.plateCastTimer = false     -- the seconds left at the bar's right end
 
--- The look's settings a preset sets (the rest as the defaults; the colors are kept).
+-- The look's own settings (each kind of bar has its copy: BAR_KEYS).
 local PRESET_KEYS = { "plateCastWidth", "plateCastHeight", "plateCastFill", "plateCastBack", "plateCastBorder", "plateCastSpark", "plateCastIcon", "plateCastIconSize",
 	"plateCastShield", "plateCastImportant", "plateCastTarget", "plateCastText", "plateCastFont", "plateCastTextSize", "plateCastOutline", "plateCastShadow", "plateCastTextColor", "plateCastTextR", "plateCastTextG", "plateCastTextB",
 	"plateCastTimer" }
@@ -1195,24 +1195,31 @@ end
 local TAB_NAMES = {}
 for _, info in ipairs(BARS) do TAB_NAMES[info[1]] = info[2] end
 
--- The page: a preview, the Default row's presets, then a row per kind of bar
--- (Default first), each with its These bars pick and a Look panel (the Style
--- pages' template, StylePages.lua's rows.Look): Bar, Icon, Text and Border.
--- A kind's settings are its own copy (<key>_<ID>) while These bars says Their
--- own look, else the Default row's (its panel greyed) or the game's.
-function ns.CreatePlateCastStylePanel(kit)
+-- A cast bar page: a preview, then a row per kind of bar spec.ids has
+-- (Default first, spec.default), each with its These bars pick and a Look
+-- panel (the Style pages' template, StylePages.lua's rows.Look): Bar, Icon,
+-- Text and Border. A kind's settings are its own copy (<key>_<ID>) while
+-- These bars says Their own look, else the Default row's (its panel greyed)
+-- or the game's. Two pages (2026-11-16): the unit frames' (Default, yours,
+-- target & focus, boss & arena: the Unit Frames icon's Cast Style tab) and
+-- the nameplates' (Cast Bar Style, the Nameplates hub's), its Default the
+-- unit frames' page's. spec: page, title, intro, ids, default, tabs (the
+-- page's icon's tabs: ns.ShowInTabs' key), defaultName (Default's, where
+-- it isn't on this page).
+local function BuildCastPage(kit, spec)
 	local canvas, content = kit.CreateScrollPage()
-	local title = kit.Label(content, "GameFontNormalLarge", L["Cast Bar Style"])
-	title:SetPoint("TOPLEFT", 16, -16)
-	local intro = kit.PageIntro(content, title,
-		L["How the cast bars look: on nameplates, yours, your target's and focus's, and the bosses' and arena " ..
-		"enemies'. Each row's These bars picks its look: the game's (all but the nameplates' start so), the " ..
-		"Default row's, or its own, set in its Look panel. Whether the nameplates' show in CineMode: the " ..
-		"Nameplates page's Plate parts grid. Changes show at once, here and on bars casting now."])
+	local title = kit.Label(content, "GameFontNormalLarge", L[spec.title])
+	if spec.tabs then
+		local tabs = ns.PageTabs(content, ns.ShowInTabs(spec.tabs), ns.ShowInIndex(spec.tabs, spec.page))
+		title:SetPoint("TOPLEFT", tabs, "BOTTOMLEFT", 8, -14)
+	else
+		title:SetPoint("TOPLEFT", 16, -16)
+	end
+	local intro = kit.PageIntro(content, title, spec.intro)
 
 	-- The row shown in the preview (nil: Default): the last one whose panel
-	-- was opened.
-	local editing
+	-- was opened (to start with: the page's own row, without a Default).
+	local editing = not spec.default and spec.ids[1] or nil
 	local preview -- (below: drawn again as each setting changes)
 	local panels = {} -- [id or "DEFAULT"] = its panel's sample, once made
 	local function Changed()
@@ -1335,24 +1342,11 @@ function ns.CreatePlateCastStylePanel(kit)
 	ns.SetOnUpdate(preview, function() Fill(samples, Look(editing)) end)
 	kit.AddControl(preview)
 
-	-- (Default's: the presets set the Default row's settings.)
-	rows.PresetMenu({
-		{ L["Like the game's"], L["The game's own cast bars (the defaults)."], {} },
-		{ L["Flat"], L["A flat fill in your colors on a dark ground, a thin black edge, Arial Narrow, the " ..
-			"seconds left."], { plateCastHeight = 1.5, plateCastFill = "flat", plateCastBorder = "thin",
-			plateCastFont = "arial",
-			plateCastOutline = "thin", plateCastTimer = true } },
-		{ L["Smooth"], L["The classic smooth fill in your colors, no border."],
-			{ plateCastFill = "smooth", plateCastBorder = "none", plateCastBack = 0.5 } },
-		{ L["Cinematic"], L["A quiet flat bar: no icon, spark or border, a soft ground, small outlined text."],
-			{ plateCastFill = "flat", plateCastBorder = "none", plateCastBack = 0.35, plateCastIcon = false,
-			plateCastSpark = false, plateCastTextSize = 0.9, plateCastOutline = "thin" } },
-	}, PRESET_KEYS)
-
-	-- (Every setting the page has, Default's and each kind's, for its Reset.)
-	for _, key in ipairs(BAR_KEYS) do kit.RecordKey(content, key) end
-	for _, info in ipairs(BARS) do
-		local id = info[1]
+	-- (Every setting the page has, Default's and each of its kinds', for its Reset.)
+	if spec.default then
+		for _, key in ipairs(BAR_KEYS) do kit.RecordKey(content, key) end
+	end
+	for _, id in ipairs(spec.ids) do
 		kit.RecordKey(content, "plateCastOwn_" .. id)
 		if id ~= "PLATE" then kit.RecordKey(content, "plateCastOn_" .. id) end
 		for _, key in ipairs(BAR_KEYS) do kit.RecordKey(content, key .. "_" .. id) end
@@ -1412,6 +1406,7 @@ function ns.CreatePlateCastStylePanel(kit)
 	-- Where a row's setting comes from (the Look panel's tags).
 	local function SourceOf(id)
 		return function(key)
+			if type(key) ~= "string" then return nil end -- (the Look from tab's own field)
 			local db = ns.GetDB() or {}
 			local pick = LookPick(id)
 			if pick == "game" then return { text = L["The game's"] } end
@@ -1474,6 +1469,21 @@ function ns.CreatePlateCastStylePanel(kit)
 				panels[id or "DEFAULT"] = holder
 				return holder
 			end,
+			-- (A row's first tab: what it goes by, 2026-11-16. Not on Default's.)
+			uses = id and function(look)
+				local list = {}
+				if id ~= "PLATE" then
+					list[#list + 1] = { "game", L["The game's"], L["Cinematic leaves them alone. Their size stays the " ..
+						"game's either way (yours is sized in Edit Mode)."] }
+				end
+				list[#list + 1] = { "default", L["Default's"], L["They look as the Default row says."] }
+				list[#list + 1] = { "own", L["Their own"], L["They look as the tabs here say. Their settings start as " ..
+					"the Default row's, and are kept while you pick another choice."] }
+				look.Segments(L["These bars"], { get = function() return LookPick(id) end, set = function(value)
+					PickLook(id, value)
+					editing = id
+				end }, list, L["How these cast bars look: the game's own, the Default row's, or their own."])
+			end or nil,
 			texture = { "plateCastFill", L["The game's: its own fill, in its own colors. Below the game's own few: " ..
 				"any other addon shares (through LibSharedMedia)."], label = L["Fill:"], test = Editable,
 				tint = { 1, 0.7, 0 } },
@@ -1571,10 +1581,10 @@ function ns.CreatePlateCastStylePanel(kit)
 		return pop
 	end
 
-	-- The rows: Default first, then each kind of bar.
+	-- The rows: Default first (where it's this page's), then each kind of bar.
 	stack:Header(content, L["Cast bars"])
-	local ids = { false }
-	for _, info in ipairs(BARS) do ids[#ids + 1] = info[1] end
+	local ids = spec.default and { false } or {}
+	for _, id in ipairs(spec.ids) do ids[#ids + 1] = id end
 	local pops = {}
 	for _, id in ipairs(ids) do
 		id = id or nil
@@ -1582,53 +1592,47 @@ function ns.CreatePlateCastStylePanel(kit)
 		local name = stack:Add(kit.Label(content, "GameFontHighlight", label), "label")
 		name:SetSize(130, 26)
 		name:SetJustifyV("MIDDLE")
-		-- Its look: the game's (all but the nameplates'), the Default row's, or its own.
-		local pick
-		if id then
-			pick = kit.Dropdown(content, { get = function() return LookPick(id) end,
-				set = function(value) PickLook(id, value) end }, function()
-				local list = {}
-				if id ~= "PLATE" then
-					list[#list + 1] = { value = "game", text = L["The game's look"],
-						tip = L["Cinematic leaves them alone. Their size stays the game's either way (yours is sized in Edit Mode)."] }
-				end
-				list[#list + 1] = { value = "default", text = L["Default row's"],
-					tip = L["They look as the Default row says."] }
-				list[#list + 1] = { value = "own", text = L["Their own look"],
-					tip = L["They look as their Look panel says. Its settings start as the Default row's, and are kept " ..
-					"while you pick another choice."] }
-				return list
-			end, 170, function()
-				editing = id
-				Changed()
-				kit.Refresh()
-			end)
-			if pick then
-				pick:SetPoint("LEFT", name, "RIGHT", 4, 0)
-				pick.pageSwitch = false
-				kit.GreyUnless(pick, rows.On)
-				kit.Tooltip(pick, L["How these cast bars look: the game's own, the Default row's, or their own."])
-			end
-		end
-		-- Its Look panel's button, naming what it has.
+		-- One button a row, as Name Style's (2026-11-16): Default's opens its
+		-- look; a row's says what it goes by, The game's or Default (grey) or
+		-- Own (gold), and gives a menu to pick that and to edit its own look.
 		local button = ns.PanelButton(content)
 		button:SetHeight(22)
-		button:SetPoint("LEFT", pick or name, "RIGHT", pick and 8 or 178, 0)
+		button:SetPoint("LEFT", name, "RIGHT", 4, 0)
 		button.searchLabel = label
-		kit.Tooltip(button, id and L["These cast bars' own look: bar, icon, text and border. Only while These bars " ..
-			"says Their own look."] or L["Every kind of cast bar's look while its row says Same as the Default row."])
-		button:SetScript("OnClick", function()
-			editing = id
+		button.pageSwitch = false
+		local function OpenLook(shown)
+			editing = shown
 			if preview then preview:Refresh() end
-			local key = id or "DEFAULT"
-			if not pops[key] then pops[key] = MakePanel(id, label) end
+			local key = shown or "DEFAULT"
+			if not pops[key] then pops[key] = MakePanel(shown, shown and label or L["Default"]) end
 			pops[key]:SetShown(not pops[key]:IsShown())
-		end)
+		end
+		if id then
+			kit.Tooltip(button, L["How these cast bars look: the game's own, the Default row's, or their own. " ..
+				"Click to set it."])
+			-- (Straight to its panel, 2026-11-16: its Look from tab picks the
+			-- game's, Default's or its own.)
+			button:SetScript("OnClick", function() OpenLook(id) end)
+		else
+			kit.Tooltip(button, L["Every kind of cast bar's look while its row says Default."])
+			button:SetScript("OnClick", function() OpenLook(nil) end)
+			-- (A line under it, as Name Style's: the rows below go by it.)
+			local line = content:CreateTexture(nil, "ARTWORK")
+			line:SetHeight(1)
+			line:SetColorTexture(0.6, 0.5, 0.25, 0.6)
+			line:SetPoint("TOPLEFT", name, "BOTTOMLEFT", 0, -2)
+			line:SetPoint("RIGHT", button, "RIGHT", 190, 0)
+		end
 		function button.Refresh(self)
 			local db = ns.GetDB()
-			-- (Just Look: the pick beside it says whose look it is.)
-			self:SetText(L["Look"])
-			self:SetWidth(math.max(110, self:GetFontString():GetStringWidth() + 30))
+			local pickNow = id and LookPick(id)
+			self:SetText(not id and L["Look"] or pickNow == "game" and L["The game's"] or pickNow == "default"
+				and L["Default"] or L["Own"])
+			self:SetWidth(170)
+			local words = self:GetFontString()
+			if words then
+				if id and pickNow ~= "own" then words:SetTextColor(0.6, 0.6, 0.6) else words:SetTextColor(1, 0.82, 0) end
+			end
 			self:SetEnabled(rows.On(db) and true or false)
 		end
 		kit.AddControl(button)
@@ -1636,7 +1640,29 @@ function ns.CreatePlateCastStylePanel(kit)
 
 	canvas:SetScript("OnShow", kit.PageShown(kit.Refresh, content))
 	canvas:Hide()
-	kit.RegisterSubpage(canvas, "Cast Bar Style", L["Cast Bar Style"])
+	kit.RegisterSubpage(canvas, spec.page, L[spec.title])
+end
+
+-- The unit frames' cast bars (yours, your target's and focus's, the bosses'
+-- and arena enemies'), with the Default row every cast bar can follow: the
+-- Unit Frames icon's Cast Style tab.
+function ns.CreateUnitCastStylePanel(kit)
+	BuildCastPage(kit, { page = "Unit Cast Style", title = "Cast Style", tabs = "units",
+		ids = { "PLAYER", "TARGET", "BOSS" }, default = true,
+		intro = L["How the unit frames' cast bars look: yours, your target's and focus's, and the bosses' and arena " ..
+		"enemies'. Each row's These bars picks its look: the game's (they start so), the Default row's, or its own, " ..
+		"set in its Look panel. The Default row is every cast bar's base look, the nameplates' too while theirs " ..
+		"says so. Changes show at once, here and on bars casting now."] })
+end
+
+-- The nameplates' cast bars: the Nameplates hub's Cast Bar Style. Their
+-- Default: the unit frames' page's (above).
+function ns.CreatePlateCastStylePanel(kit)
+	BuildCastPage(kit, { page = "Cast Bar Style", title = "Cast Bar Style", tabs = "plates", ids = { "PLATE" },
+		defaultName = L["Default's (Unit Frames)"],
+		intro = L["How the nameplates' cast bars look: the Default row's (on the Unit Frames icon's Cast Style tab), " ..
+		"or their own, set in their Look panel. Whether they show in CineMode: the Nameplates page's Plate parts " ..
+		"grid. Changes show at once, here and on bars casting now."] })
 end
 
 -- One sample cast bar, for the General page's nameplate preview: dressed as

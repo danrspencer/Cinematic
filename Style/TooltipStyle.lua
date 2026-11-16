@@ -510,16 +510,16 @@ function ns.MakeTooltipPreview(parent, width)
 end
 
 -- The page itself.
-local PRESET_KEYS = { "tooltipBack", "tooltipAlpha", "tooltipEdge", "tooltipFont", "tooltipTextSize", "tooltipOutline",
-	"tooltipShadow", "tooltipNames", "tooltipBar", "tooltipBarTexture", "tooltipBarHeight", "tooltipBarColor", "tooltipBarGround" }
 
 function ns.CreateTooltipStylePanel(kit)
 	local canvas, content = kit.CreateScrollPage()
 	local title = kit.Label(content, "GameFontNormalLarge", L["Tooltip Style"])
-	title:SetPoint("TOPLEFT", 16, -16)
+	-- (The Mouse icon's Tooltip Style tab, 2026-11-16: its tabs over the title.)
+	local mouseTabs = ns.PageTabs(content, ns.ShowInTabs("mouse"), ns.ShowInIndex("mouse", "Tooltip Style"))
+	title:SetPoint("TOPLEFT", mouseTabs, "BOTTOMLEFT", 8, -14)
 	local intro = kit.PageIntro(content, title,
 		L["How the game's tooltips look: their background, edge and words, names in their colors and the " ..
-		"health bar. Which lines show and when: the UI Visibility hub's Tooltips page."])
+		"health bar. Which lines show and when: the Tooltips page."])
 
 	local preview -- (below: drawn again as each setting changes)
 	local function Changed()
@@ -538,18 +538,6 @@ function ns.CreateTooltipStylePanel(kit)
 	ns.StylePopout(preview, kit.Tooltip) -- (StylePages.lua)
 	kit.AddControl(preview)
 
-	rows.PresetMenu({
-		{ L["Like the game's"], L["The game's tooltips, as it draws them (the defaults)."], {} },
-		{ L["Flat"], L["Dark and flat with a thin edge, names in class and reaction colors, in Arial Narrow."],
-			{ tooltipBack = "dark", tooltipAlpha = 0.88, tooltipEdge = "thin", tooltipFont = "arial",
-				tooltipNames = "class", tooltipBarTexture = "flat", tooltipBarHeight = 5 } },
-		{ L["Colored edges"], L["The edge in a unit's class or reaction color, or an item's quality."],
-			{ tooltipBack = "dark", tooltipAlpha = 0.88, tooltipEdge = "colored", tooltipFont = "arial",
-				tooltipNames = "class", tooltipBarTexture = "flat" } },
-		{ L["Cinematic"], L["See-through and borderless, the health bar thin along the top."],
-			{ tooltipBack = "dark", tooltipAlpha = 0.65, tooltipEdge = "none", tooltipOutline = 1,
-				tooltipNames = "class", tooltipBar = "top", tooltipBarTexture = "smooth", tooltipBarHeight = 3 } },
-	}, PRESET_KEYS)
 
 	-- The look, on the page itself (the Style pages' template, StylePages.lua's
 	-- rows.Look, inline): Bar (the health bar), Text (the words), Border (the

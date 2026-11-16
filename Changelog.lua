@@ -11,6 +11,9 @@
 local _, ns = ...
 
 ns.CHANGELOG_FEATURES = {
+	{ date = "2026-11-16", page = "Standard Frames", title = "A new Interface hub",
+		text = "Every kind of frame has one icon, with when it shows, what brings it back and how it looks as its " ..
+		"tabs, grouped into Heads-up, Overhead and Info." },
 	{ date = "2026-11-15", page = "Shoulder Cam", title = "Shoulder Cam",
 		text = "An over-the-shoulder camera: you sit to one side of the screen and stay there as you zoom. Swap " ..
 		"shoulders with a key, turn toward the NPCs you talk to and the enemies you target, and let your cast bar " ..

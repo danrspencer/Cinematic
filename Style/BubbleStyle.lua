@@ -7,17 +7,16 @@
 local _, ns = ...
 local L = ns.L
 
--- The look's settings a preset sets (the rest as the defaults).
-local PRESET_KEYS = { "bubblesBack", "bubblesAlpha", "bubblesEdge", "bubblesTail", "bubblesFont",
-	"bubblesTextScale", "bubblesOutline" }
 
 function ns.CreateBubbleStylePanel(kit)
 	local canvas, content = kit.CreateScrollPage()
 	local title = kit.Label(content, "GameFontNormalLarge", L["Chat Bubble Style"])
-	title:SetPoint("TOPLEFT", 16, -16)
+	-- (The Chat icon's Bubble Style tab, 2026-11-16: its tabs over the title.)
+	local tabs = ns.PageTabs(content, ns.ShowInTabs("chat"), ns.ShowInIndex("chat", "Bubble Style"))
+	title:SetPoint("TOPLEFT", tabs, "BOTTOMLEFT", 8, -14)
 	local intro = kit.PageIntro(content, title,
 		L["How chat bubbles look, and speech from behind you with them. Where bubbles show: the " ..
-		"UI Visibility hub's Chat Bubbles page. Bubbles already showing change with the next thing said."])
+		"Bubbles tab. Bubbles already showing change with the next thing said."])
 
 	local preview -- (below: drawn again as each setting changes)
 	local function Changed()
@@ -37,23 +36,22 @@ function ns.CreateBubbleStylePanel(kit)
 	ns.StylePopout(preview, kit.Tooltip) -- (StylePages.lua)
 	kit.AddControl(preview)
 
-	rows.PresetMenu({
-		{ L["Like the game's"], L["The game's own bubbles (the defaults)."], {} },
-		{ L["Dark"], L["Light words on a dark, see-through bubble with a thin edge, in Arial Narrow."],
-			{ bubblesBack = "dark", bubblesAlpha = 0.8, bubblesFont = "arial" } },
-		{ L["Text only"], L["No bubble: just the words, outlined, like a film's subtitles."],
-			{ bubblesBack = "none", bubblesOutline = 2, bubblesTextScale = 1.1 } },
-		{ L["Big words"], L["The game's bubbles, with bigger words."], { bubblesTextScale = 1.3 } },
-	}, PRESET_KEYS)
 
 	local function Boxed(db) return rows.On(db) and db.bubblesBack ~= "none" end
 	local function Own(db) return rows.On(db) and (db.bubblesBack == "dark" or db.bubblesBack == "custom") end
+
+	-- Two sub-tabs (Options.lua's ns.PageTabsBelow, 2026-11-16): Bubbles (the
+	-- look) and Behind Bubbles (speech from behind you), each at its tab's top.
+	local hosts, _, TabsShown, AdoptTab = ns.PageTabsBelow(content, preview.stackSpot or preview, {
+		{ L["Bubbles"], L["How chat bubbles look."] },
+		{ L["Behind Bubbles"], L["How speech from behind you looks, and where it shows."] },
+	}, "Bubble Style/page", nil, nil, 1)
 
 	-- The look, on the page itself (the Style pages' template, StylePages.lua's
 	-- rows.Look, inline): Text (the words), Border (the edge) and Background
 	-- (the bubble, its tail).
 	local OUTLINES = { [0] = L["None"], L["Thin"], L["Thick"], L["Thick + shadow"] }
-	stack:Header(content, L["Look"])
+	local lookHeader = stack:Header(content, L["Look"])
 	rows.Look("", L["Chat bubbles"], {
 		inline = true,
 		tabs = { default = function(key) return ns.DEFAULTS[key] end, source = ns.PageLookSource,
@@ -89,12 +87,20 @@ function ns.CreateBubbleStylePanel(kit)
 		end,
 	})
 
+	-- (The look onto the Bubbles tab, at its top.)
+	AdoptTab()
+	lookHeader:ClearAllPoints()
+	lookHeader:SetPoint("TOPLEFT", hosts[1], "TOPLEFT", 0, 0)
+	-- (What's made from here on: onto the Behind Bubbles tab, below.)
+	local made = {}
+	for _, object in ipairs({ content:GetChildren() }) do made[object] = true end
+	for _, object in ipairs({ content:GetRegions() }) do made[object] = true end
+
 	-- Speech from behind you's own look (Speech.lua): turned on, moved and
-	-- shown with chat up on the UI Manager's Chat bubbles page; greyed out
-	-- while it's off there.
+	-- shown with chat up on the Bubbles tab; greyed out while it's off there.
 	local speechHeader = stack:Header(content, L["Speech from behind you"])
 	stack:Help(content, L["Says and yells whose bubble isn't on your screen, shown low on the screen instead. " ..
-		"Turn it on on the UI Visibility hub's Chat bubbles page (with that page on)."])
+		"Turn it on on the Bubbles tab (with that page on)."])
 	-- (Test and Move buttons beside its "?": a line from you, where they show;
 	-- the Move box, to drag where they show.)
 	local speechTest = ns.PanelButton(content)
@@ -172,7 +178,19 @@ function ns.CreateBubbleStylePanel(kit)
 			"edges. By where it's moved to: by which side of the screen the Move box is on."])
 	end
 
-	canvas:SetScript("OnShow", kit.PageShown(kit.Refresh, content))
+	-- (Speech from behind you onto the Behind Bubbles tab, its heading at the top.)
+	for _, set in ipairs({ { content:GetChildren() }, { content:GetRegions() } }) do
+		for _, object in ipairs(set) do
+			if not made[object] then object:SetParent(hosts[2]) end
+		end
+	end
+	speechHeader:ClearAllPoints()
+	speechHeader:SetPoint("TOPLEFT", hosts[2], "TOPLEFT", 0, 0)
+
+	canvas:SetScript("OnShow", kit.PageShown(function()
+		kit.Refresh()
+		TabsShown()
+	end, content))
 	canvas:Hide()
 	kit.RegisterSubpage(canvas, "Bubble Style", L["Chat Bubble Style"])
 end

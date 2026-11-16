@@ -541,6 +541,7 @@ local function DressName(text, row)
 			dress.on = false
 			dress.glow:Hide()
 			dress.back:Hide()
+			for _, edge in ipairs(dress.edges or {}) do edge:Hide() end
 		end
 		return
 	end
@@ -559,34 +560,18 @@ local function DressName(text, row)
 	local scale = text.GetScale and text:GetScale() or 1
 	if not (Known(scale) and type(scale) == "number") then scale = 1 end
 	width, height = width * scale, height * scale
-	dress.glow:SetShown(glow ~= "none")
-	if glow ~= "none" then
-		local r, g, b = ns.NameLookColor(row, "Glow")
-		dress.glow:SetVertexColor(r, g, b, 0.7)
-		dress.glow:ClearAllPoints()
-		dress.glow:SetPoint("CENTER", text, "CENTER", 0, 0)
-		dress.glow:SetSize(width + height * 3, height * 3)
-	end
-	dress.back:SetShown(back ~= "none")
-	if back ~= "none" then
-		local r, g, b = ns.NameLookColor(row, "Back")
-		local alpha = tonumber(NameStyle(row, "BackAlpha")) or 0.6
-		dress.back:SetColorTexture(r, g, b, alpha)
-		dress.back:ClearAllPoints()
-		dress.back:SetPoint("CENTER", text, "CENTER", 0, 0)
-		dress.back:SetSize(width + 14, height + 6)
-	end
+	-- (Glow, band and its border: NameRowLook's, as the Name Style preview's.)
+	ns.DressNameParts(owner, dress, text, width, height, function(setting) return NameStyle(row, setting) end,
+		function(setting) return ns.NameLookColor(row, setting) end)
 end
 -- (The dress follows its name: shown and faded with it.)
 local function DressShown(text, alpha)
 	local dress = text and text.cineDress
 	if not (dress and dress.on) then return end
-	for _, piece in ipairs({ dress.glow, dress.back }) do
-		if alpha then piece:SetAlpha(alpha) end
-	end
-	if not alpha then
-		dress.glow:Hide()
-		dress.back:Hide()
+	local pieces = { dress.glow, dress.back }
+	for _, edge in ipairs(dress.edges or {}) do pieces[#pieces + 1] = edge end
+	for _, piece in ipairs(pieces) do
+		if alpha then piece:SetAlpha(alpha) else piece:Hide() end
 	end
 end
 
@@ -1812,6 +1797,9 @@ ns.TargetMarkTintKind = TintKind
 -- (PlateLook); "game" the game's, whatever the rows below say; "same" its
 -- mark's; "gold", "reaction", "class" or "custom" (PlateR, G, B).
 local function PlateHow(kind)
+	-- (The Default row paints nothing, 2026-11-16: under every row, one color
+	-- would take each plate's own away, hostile, neutral or friendly.)
+	if kind == "others" then return "-" end
 	return ArrowSetting("PlateColor", kind) or "-"
 end
 local PLATE_PASS = { ["-"] = true, game = true }

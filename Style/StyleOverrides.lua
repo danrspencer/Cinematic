@@ -84,7 +84,7 @@ end
 function ns.CreateStyleOverridesPanel(kit)
 	local canvas, content = kit.CreateScrollPage()
 	local title = kit.Label(content, "GameFontNormalLarge", L["Overrides"])
-	ns.StyleTabs(content, title, 3)
+	ns.StyleTabs(content, title, 4)
 	local intro = kit.PageIntro(content, title,
 		L["Hide or show parts of the unit frames and nameplates whatever their Show in rows say. Themes use these " ..
 		"too. An overridden row on the Interface pages says so, and goes back to its own ticks when you set it to " ..
@@ -97,12 +97,12 @@ function ns.CreateStyleOverridesPanel(kit)
 		kit.Refresh()
 		for _, row in ipairs(parts) do row:Refresh() end
 	end
-	local stack = kit.Stack(intro, "label")
+	-- (No stack: Clear overrides and the tabs are placed by hand, below.)
 
 	local clear = ns.PanelButton(content)
 	clear:SetSize(130, 22)
 	clear:SetText(L["Clear overrides"])
-	kit.Tooltip(clear, L["Every part back to what its row on the UI Visibility pages says."])
+	kit.Tooltip(clear, L["Every part back to what its row on the Interface hub's pages says."])
 	clear:SetScript("OnClick", function()
 		local db = ns.GetDB()
 		for key, value in pairs(DEFAULTS) do
@@ -110,10 +110,10 @@ function ns.CreateStyleOverridesPanel(kit)
 		end
 		Changed()
 	end)
-	stack:Add(clear, "label")
+	-- (Placed by the inner tabs, at their row's right end, below.)
 
 	-- A row: its name and the three picks side by side, so the whole tab reads at a glance.
-	local CHOICES = { { "row", L["UI Visibility page"], 120 }, { "hide", L["Hide"], 60 }, { "show", L["Show"], 60 } }
+	local CHOICES = { { "row", L["Interface page"], 120 }, { "hide", L["Hide"], 60 }, { "show", L["Show"], 60 } }
 	local ROW_H, NAME_W = 25, 170
 	local function PartRow(holder, index, name, key)
 		local row = CreateFrame("Frame", nil, holder)
@@ -171,7 +171,15 @@ function ns.CreateStyleOverridesPanel(kit)
 	end, nil, NAME_W + 264)
 	local panelTop = CreateFrame("Frame", nil, content)
 	panelTop:SetSize(1, 1)
-	panelTop:SetPoint("TOPLEFT", clear, "BOTTOMLEFT", 0, -14 - height)
+	-- (Under the page's tabs, 2026-11-16: Clear overrides at the inner tabs'
+	-- right end, not on the page tabs' line where the title used to be.)
+	local pageTabs = content.pageTabs and content.pageTabs.panel
+	if pageTabs then
+		panelTop:SetPoint("TOPLEFT", pageTabs, "BOTTOMLEFT", 8, -14 - height)
+	else
+		panelTop:SetPoint("TOPLEFT", intro, "BOTTOMLEFT", 0, -14 - height)
+	end
+	clear:SetPoint("BOTTOMRIGHT", panelTop, "TOPLEFT", NAME_W + 264, 4)
 	panel:SetPoint("TOPLEFT", panelTop, "TOPLEFT")
 	base:SetPoint("TOPLEFT", panelTop, "TOPLEFT")
 	for i, section in ipairs(sections) do
@@ -198,5 +206,6 @@ function ns.CreateStyleOverridesPanel(kit)
 		shown()
 	end)
 	canvas:Hide()
+	ns.SharePreview(canvas, function() return ns.generalStylePreview end) -- (General's preview here too)
 	kit.RegisterSubpage(canvas, "Style Overrides", L["Overrides"])
 end

@@ -690,30 +690,72 @@ end
 -- The page.
 function ns.CreatePersonalResourcesPanel(kit)
 	local canvas, content = kit.CreateScrollPage()
-	local title = kit.Label(content, "GameFontNormalLarge", L["Health & Resources"])
-	title:SetPoint("TOPLEFT", 16, -16)
+	-- (The Unit Frames icon's Keep up and Frame Links tabs, 2026-11-16: its
+	-- Show in tab is the HUD page's; the three tabs over the title on both,
+	-- ns.UnitFrameTabs. Its title is the tab shown, so the On/Off by it reads
+	-- as Keep up's own switch.)
+	local title = kit.Label(content, "GameFontNormalLarge", L["Keep up while low"])
+	local outerPanel, ShowOuter = ns.PageTabs(content, ns.UnitFrameTabs(), 2)
+	title:SetPoint("TOPLEFT", outerPanel, "BOTTOMLEFT", 8, -14)
 	local hasDisplay = _G.CinematicPersonalPower ~= nil
 	local intro = kit.PageIntro(content, title,
 		L["Your player frame, pet frame and personal resource display in CineMode: kept up while your health " ..
 		"or power is under each row's share (as Heal Vision's roles are), and held back at the start of a fight until there's something " ..
-		"to see. Hover a row or column for what it does. When they come up at all (always, in fights, in places) " ..
-		"is their rows' on the HUD page."])
-	-- Their look: the Style hub's Personal Resource Style page (PersonalStyle.lua).
-	local styleLink = ns.StyleLink(content, title, "Personal Style", L["Opens the Personal Resource Style page: how the bars look."], kit.Tooltip)
-	ns.FramesLink(content, title, "prd", styleLink)
+		"to see. Hover a row or column for what it does. When they come up at all (always, in fights, in places): " ..
+		"the Show in tab."])
+	-- (Their look: the Unit Frames icon's Resource Style tab.)
 	local switch = kit.PageSwitch(content, "personalResources", L["Enable Page"],
-		L["On: your player frame, pet frame and personal resource display stay up or wait as this page says, " ..
-		"and its mana bar and remaining mana text show. Off: none of it; they come up only as their HUD " ..
+		L["On: your player frame, pet frame and personal resource display stay up or wait as this tab says, " ..
+		"and its mana bar and remaining mana text show. Off: none of it; they come up only as their Show in " ..
 		"rows say."], intro, function()
 		if ns.UpdatePersonalMana then ns.UpdatePersonalMana() end
 		if ns.RefreshPersonalStyle then ns.RefreshPersonalStyle() end
 		if ns.UpdateManaCost then ns.UpdateManaCost() end
 	end)
-	-- Two tabs (Options.lua's ns.PageTabsBelow): the page's settings, and Addon Frame Links.
-	local _, _, TabsShown, AdoptTab = ns.PageTabsBelow(content, switch, {
-		{ L["Settings"], L["When your player frame, pet frame and personal resource display stay up or wait."] },
-		{ L["Frame Links"], L["Which supported addon's frames stand in for these bars."] },
-	}, "Personal Resources/page", 2, "prd", 1)
+	-- Two parts (Options.lua's ns.PageTabsBelow, its own tabs not drawn: the
+	-- Unit Frames tabs over the title pick them): Keep up, and Frame Links.
+	local unitLinks -- (the unit frames' links, over the bars' on Frame Links: below)
+	local hosts, PickPart, TabsShown, AdoptTab, prdLinks = ns.PageTabsBelow(content, switch, {
+		{ L["Keep up"], L["When your player frame, pet frame and personal resource display stay up or wait."] },
+		{ L["Addon Reveal Link"], L["Which supported addon's frames stand in for these frames and bars."] },
+	}, "Personal Resources/page", 2, "prd", 1, function(i)
+		if i == 2 and unitLinks then unitLinks.Show() end
+	end, true)
+	-- Frame Links: the unit frames' (once on the HUD page's Unit frames tab),
+	-- then the bars', a heading over each. (Made on the tab's frame, not the
+	-- page: AdoptTab takes what's new on the page onto Keep up.)
+	do
+		local linksHost = hosts[2]
+		local unitsHead = kit.Label(linksHost, "GameFontNormal", L["Unit frames"])
+		unitsHead:SetPoint("TOPLEFT", linksHost, "TOPLEFT", 0, 0)
+		unitLinks = ns.BuildLinkSection(content, unitsHead, "units", true)
+		unitLinks.frame:SetParent(linksHost)
+		ns.RegisterLinkSection("units", unitLinks.frame, unitLinks.body.openSection)
+		local prdHead = kit.Label(linksHost, "GameFontNormal", L["Personal Resource Display"])
+		prdHead:SetPoint("TOPLEFT", unitLinks.frame, "BOTTOMLEFT", -2, -18)
+		if prdLinks then
+			prdLinks.frame:ClearAllPoints()
+			prdLinks.frame:SetPoint("TOPLEFT", prdHead, "BOTTOMLEFT", 2, 0)
+			prdLinks.frame:SetPoint("RIGHT", content, "RIGHT", -16, 0)
+		end
+	end
+	-- Each part a hidden hub tile under the Unit Frames icon (its tabOf in
+	-- HUBS), picked by its tab: Keep up's title and switch, or Frame Links'.
+	local function ShowPart(i)
+		PickPart(i)
+		ShowOuter(ns.ShowInIndex("units", i == 1 and "Personal Resources" or "Unit Frame Links"))
+		title:SetText(i == 1 and L["Keep up while low"] or L["Addon Reveal Link"])
+		content.headerSwitchOff = i ~= 1 -- (no On/Off by Frame Links: it isn't Keep up's)
+		local header = content.pageHeaderSwitch
+		if header then header:SetShown(i == 1) end
+	end
+	local ICON = "Interface\\Icons\\Ability_Racial_BloodRage"
+	canvas.hubTabs = {
+		{ name = "Personal Resources", icon = ICON, label = "Unit Frames", switchLabel = "Keep up while low",
+			onSelect = function() ShowPart(1) end },
+		{ name = "Unit Frame Links", icon = ICON, label = "Unit Frames", own = true, noSwitch = true,
+			onSelect = function() ShowPart(2) end },
+	}
 	local stack = kit.Stack(switch, "check")
 	local function Tick(key, label, tip, enabledBy)
 		local check = stack:Add(kit.Check(content, key, label, tip), "check")

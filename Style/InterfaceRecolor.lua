@@ -761,7 +761,7 @@ end
 function ns.CreateInterfaceRecolorPanel(kit)
 	local canvas, content = kit.CreateScrollPage()
 	local title = kit.Label(content, "GameFontNormalLarge", L["Interface Recolor"])
-	title:SetPoint("TOPLEFT", 16, -16)
+	ns.StyleTabs(content, title, 5) -- (Style General's last tab, 2026-11-16)
 	local intro = kit.PageIntro(content, title,
 		L["The game's interface in your theme's color: the minimap, the quest tracker, the damage meter, the " ..
 		"swing timer, and the game's own borders, edges and tabs, tinted. Icons, backgrounds and bars keep their colors. Only with a theme " ..
@@ -840,6 +840,7 @@ function ns.CreateInterfaceRecolorPanel(kit)
 		"and the rest of the game's windows."])
 
 	canvas:SetScript("OnShow", kit.PageShown(kit.Refresh, content))
+	ns.SharePreview(canvas, function() return ns.generalStylePreview end) -- (General's preview here too, a tab of it)
 	canvas:Hide()
 	kit.RegisterSubpage(canvas, "Interface Recolor", L["Interface Recolor"])
 end

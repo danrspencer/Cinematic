@@ -163,7 +163,9 @@ end
 function ns.CreatePlateIconsPage(kit)
 	local canvas, content = kit.CreateScrollPage()
 	local title = kit.Label(content, "GameFontNormalLarge", L["Nameplate Icons"])
-	title:SetPoint("TOPLEFT", 16, -16)
+	-- (The Nameplates icon's Icons tab, 2026-11-16: its tabs over the title.)
+	local tabs = ns.PageTabs(content, ns.ShowInTabs("plates"), ns.ShowInIndex("plates", "Plate Icons"))
+	title:SetPoint("TOPLEFT", tabs, "BOTTOMLEFT", 8, -14)
 	local intro = kit.PageIntro(content, title, L["Icons beside players' health bars on their nameplates: their " ..
 		"class, and the role of the players in your group. They show on the plates that are up, as their Show " ..
 		"in rows say: outside CineMode only with Always ticked, unless Nameplates is ticked under the CineMode " ..

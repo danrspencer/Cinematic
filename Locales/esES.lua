@@ -6336,3 +6336,7 @@ L["Special Cams"] = "Cámaras especiales"
 -- Shoulder Cam page: Clear target on Esc while interacting with an NPC
 L["Clear target on Esc while interacting with an NPC"] = "Quitar objetivo con Esc al hablar con un PNJ"
 L["With a talk window open, Escape clears your target and closes the window in the same press, the camera gliding back off them. Off: Escape only closes it, and your target stays."] = "Con una ventana de diálogo abierta, Escape quita tu objetivo y cierra la ventana con la misma pulsación, mientras la cámara se aparta de ellos. Desactivado: Escape solo la cierra y tu objetivo se queda."
+
+-- What's new: A new Interface hub (Changelog.lua)
+L["A new Interface hub"] = "Un nuevo centro de Interfaz"
+L["Every kind of frame has one icon, with when it shows, what brings it back and how it looks as its tabs, grouped into Heads-up, Overhead and Info."] = "Cada tipo de marco tiene un icono, con cuándo se muestra, qué lo trae de vuelta y cómo se ve en sus pestañas, agrupados en Pantalla, Sobre la cabeza e Información."

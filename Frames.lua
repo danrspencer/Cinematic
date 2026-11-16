@@ -2247,7 +2247,7 @@ ns.COMBAT_SHOW = {
 	{ key = "prdmana", label = L["Cine Mana Bar"], default = false, frames = { "CinematicPersonalMana" },
 		morePage = "Personal Resources",
 		tip = L["Your mana under your character when it isn't your power (Elemental Shaman, Shadow Priest...): " ..
-			"once it's on, on the Health & Resources page."] },
+			"once it's on, on the Unit Frames page's Keep up tab."] },
 	{ key = "target", label = L["Target"], default = true, frames = { "TargetFrame" } },
 	{ key = "tot", label = L["Target of target"], default = true, frames = { "TargetFrameToT" } },
 	{ key = "focus", label = L["Focus"], default = true, frames = { "FocusFrame" } },
@@ -2553,8 +2553,10 @@ end
 -- above. (Kept in the order above within each.)
 local ROW_SECTIONS = {
 	player = "units", petframe = "units", prd = "prd", prdpower = "prd", prdmana = "prd", target = "units", tot = "units", focus = "units", focustot = "units",
-	targetcircle = "units", selfhighlight = "highlight",
-	buffs = "combat", buffcollapse = "combat", swing = "combat", castbar = "combat", meters = "combat", cooldowns = "combat",
+	targetcircle = "highlight", selfhighlight = "highlight", -- (the marks round you and your target, 2026-11-16)
+	buffs = "buffs", buffcollapse = "buffs", -- (their own section: the Buffs & Debuffs icon's Show in, 2026-11-16)
+	swing = "combat", castbar = "playercast", -- (your cast bar: Unit Frames' Show in)
+	meters = "combat", cooldowns = "combat",
 	cooldownsutility = "combat", cooldownsbuffs = "combat", cooldownsbars = "combat", encounter = "combat",
 	mirror = "combat",
 	mainbar = "bars", art = "bars", bottomleft = "bars", bottomright = "bars",
@@ -2563,8 +2565,11 @@ local ROW_SECTIONS = {
 	minimap = "minimap", minimapheader = "minimap", minimaptracking = "minimap", minimapcalendar = "minimap",
 	minimapzone = "minimap", minimapclock = "minimap", minimapdial = "minimap", minimapaddons = "minimap",
 	minimapcompartment = "minimap", minimapcoords = "minimap", minimapmail = "minimap", belowminimap = "minimap",
-	quests = "interface", waypoint = "interface", topcenter = "interface", micro = "interface", bags = "interface", xp = "interface",
-	chat = "interface", voice = "interface",
+	-- (The quest tracker on its own, the waypoint with the minimap: each section is an icon
+	-- in its frame's band on the Interface hub, 2026-11-16. The chat window's
+	-- row, "chat": its own section, the Chat icon's Show in tab.)
+	quests = "quests", waypoint = "minimap", topcenter = "interface", micro = "interface", bags = "interface", xp = "interface",
+	chat = "chat", voice = "interface",
 }
 -- The chat window's parts with frames: its tabs and each button beside it
 -- (and its background, no frame), in the chat window's section.

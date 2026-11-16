@@ -9,13 +9,6 @@
 local _, ns = ...
 local L = ns.L
 
--- The look's settings a preset sets (the rest as the defaults; the custom
--- glow color is kept, for a pick of Custom later).
-local PRESET_KEYS = { "questItemSize", "questItemShape", "questItemFrame", "questItemZoom", "questItemGlow",
-	"questItemGlowColor", "questItemCooldown", "questItemNumbers", "questItemKey", "questItemFont",
-	"questItemOutline", "questItemOutlineR", "questItemOutlineG", "questItemOutlineB",
-	"questItemShadow", "questItemTextColor", "questItemTextR",
-	"questItemTextG", "questItemTextB" }
 local SAMPLE_ICON = "Interface\\Icons\\INV_Misc_Bag_07"
 local SAMPLE_COOLDOWN = 8 -- seconds the cooling sample counts down, over and over
 
@@ -113,19 +106,6 @@ function ns.CreateQuestItemStylePanel(kit)
 	stack:Add(preview, "label")
 	ns.StylePopout(preview, kit.Tooltip) -- (StylePages.lua)
 	kit.AddControl(preview)
-
-	-- Presets: a few looks to start from.
-	rows.PresetMenu({
-		{ L["Like the game's"], L["Framed like the game's extra ability button (the defaults)."], {} },
-		{ L["Flat"], L["A thin black edge, the icon zoomed in to cut its border, an edge glow when ready, " ..
-			"Arial Narrow."], { questItemFrame = "thin", questItemZoom = true, questItemFont = "arial",
-			questItemGlow = "edge" } },
-		{ L["Round"], L["A round button with a soft glow when ready."],
-			{ questItemShape = "round", questItemFrame = "thin", questItemZoom = true, questItemGlow = "soft" } },
-		{ L["Cinematic"], L["Smaller, no frame, a quiet edge glow and a dark cooldown fill, no key."],
-			{ questItemSize = 42, questItemFrame = "none", questItemZoom = true, questItemGlow = "edge",
-			questItemCooldown = "fill", questItemKey = false } },
-	}, PRESET_KEYS)
 
 	stack:Header(content, L["Button"])
 	rows.Slider("questItemSize", L["Size"], 32, 80, 2, "%d", 1, L["The button's width and height."])

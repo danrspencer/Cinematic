@@ -2678,19 +2678,19 @@ function ns.MakeUnitStylePreview(parent, width, onPick)
 end
 
 -- The page itself.
-local PRESET_KEYS = { "ufTexture", "ufBorder", "ufBorderSize", "ufBorderR", "ufBorderG", "ufBorderB", "ufBack",
-	"ufHealthColor", "ufNameColor", "ufFont", "ufOutline", "ufNameSize", "ufShadow", "ufPortrait", "ufShape" }
 local TAB_NAMES = {}
 for _, info in ipairs(FRAMES) do TAB_NAMES[info[1]] = info[2] end
 
 function ns.CreateUnitStylePanel(kit)
 	local canvas, content = kit.CreateScrollPage()
 	local title = kit.Label(content, "GameFontNormalLarge", L["Unit Frame Style"])
-	title:SetPoint("TOPLEFT", 16, -16)
+	-- (The Unit Frames icon's Style tab, 2026-11-16: its tabs over the title.)
+	local tabs = ns.PageTabs(content, ns.ShowInTabs("units"), ns.ShowInIndex("units", "Unit Style"))
+	title:SetPoint("TOPLEFT", tabs, "BOTTOMLEFT", 8, -14)
 	local intro = kit.PageIntro(content, title,
 		L["How your player, target, focus, pet, target of target and party frames look. The Default row's " ..
 		"look is every frame's until its row says Its own look; each row's Look panel sets it. Which parts " ..
-		"show: the UI Visibility hub's HUD page, its Unit frames tab."])
+		"show: the Interface hub's HUD page, its Unit frames tab."])
 
 	-- The row shown in the preview (nil: Default): the last one picked or
 	-- whose panel was opened.
@@ -2721,23 +2721,6 @@ function ns.CreateUnitStylePanel(kit)
 	local refreshPreview = preview.Refresh
 	preview.Refresh = function(self) refreshPreview(self, editing) end
 
-	rows.PresetMenu({
-		{ L["Like the game's"], L["The game's frames, as it draws them (the defaults)."], {} },
-		{ L["Flat"], L["Flat bars with a thin black edge, health and names in class and reaction colors, " ..
-			"Arial Narrow."], { ufTexture = "flat", ufBorder = "thin", ufBack = 0.65, ufHealthColor = "class",
-			ufNameColor = "class", ufFont = "arial", ufOutline = 1 } },
-		{ L["Slim"], L["Borderless flat bars in class colors, small white names."],
-			{ ufTexture = "flat", ufBorder = "none", ufBack = 0.4, ufHealthColor = "class", ufNameColor = "white",
-				ufNameSize = 0.9, ufOutline = 1 } },
-		{ L["Cinematic"], L["Soft bars with a fine edge, class icons for players."],
-			{ ufTexture = "soft", ufBorder = "thin", ufBack = 0.45, ufHealthColor = "class", ufPortrait = "class",
-				ufOutline = 1 } },
-		{ L["Square"], L["Square portraits with no frame art, flat bars with a thin edge."],
-			{ ufShape = "square", ufTexture = "flat", ufBorder = "thin", ufBack = 0.65, ufHealthColor = "class" } },
-		{ L["Bars only"], L["No portrait and no frame art: just the name and bars, in class colors."],
-			{ ufShape = "none", ufTexture = "soft", ufBorder = "thin", ufBack = 0.6, ufHealthColor = "class",
-				ufNameColor = "class" } },
-	}, PRESET_KEYS)
 
 	-- The rows: Default first, then each frame, each with its Same as the
 	-- Default row pick and a Look panel (the Style pages' template,
@@ -2945,23 +2928,30 @@ function ns.CreateUnitStylePanel(kit)
 		end
 		local button = ns.PanelButton(content)
 		button:SetHeight(22)
-		button:SetPoint("LEFT", pick or name, "RIGHT", pick and 8 or 178, 0)
+		-- (Default's, with no pick: where the others' are, past a pick's room: 4 + 170 + 8.)
+		button:SetPoint("LEFT", pick or name, "RIGHT", pick and 8 or 182, 0)
 		button.searchLabel = label
 		kit.Tooltip(button, id and L["This frame's own look: bars, name, portrait and border. Only while it has its " ..
 			"own look."] or L["Every frame's look while its row says Same as the Default row."])
+		-- (A row on the Default row's look: its button opens Default's, and says so.)
+		local function FollowsDefault()
+			local db = ns.GetDB()
+			return id ~= nil and not (db and db["ufOwn_" .. id])
+		end
 		button:SetScript("OnClick", function()
-			editing = id
+			local shown = not FollowsDefault() and id or nil
+			editing = shown
 			if preview then preview:Refresh() end
-			local key = id or "DEFAULT"
-			if not pops[key] then pops[key] = MakePanel(id, label) end
+			local key = shown or "DEFAULT"
+			if not pops[key] then pops[key] = MakePanel(shown, shown and label or L["Default"]) end
 			pops[key]:SetShown(not pops[key]:IsShown())
 		end)
 		function button.Refresh(self)
 			local db = ns.GetDB()
 			-- (Party drawn as raid frames: nothing here to dress.)
 			local raid = id == "PARTY" and ns.RaidStyleParty and ns.RaidStyleParty()
-			-- (Just Look: the pick beside it says whose look it is.)
-			self:SetText(raid and L["Raid Frames page's"] or L["Look"])
+			-- (Look, or Default on a row that follows it.)
+			self:SetText(raid and L["Raid Frames page's"] or FollowsDefault() and L["Default"] or L["Look"])
 			self:SetWidth(math.max(110, self:GetFontString():GetStringWidth() + 30))
 			self:SetEnabled(rows.On(db) and true or false)
 		end

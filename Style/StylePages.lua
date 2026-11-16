@@ -325,13 +325,22 @@ end
 -- and Style, each its own hub page with one icon: tabOf in Options.lua's
 -- HUBS). list: { label, page, tip } each (page: its English name), picked:
 -- this page's. Gives the panel (its line); the page's title goes under it.
+-- Second, Show(i): another tab picked, for a page that's more than one tab
+-- (Unit Frames' Keep up and Frame Links, one page).
 function ns.PageTabs(content, list, picked)
 	local tabs = {}
 	for i, each in ipairs(list) do tabs[i] = { each[1], each[3] } end
-	local panel, tabFrames, Show, base = ns.FolderTabs(content, tabs, function(i)
+	-- (current: the tab shown now, picked or set by Show since: a page that's
+	-- more than one tab, Party & Raid's HUD page at Raid, opens Party from it)
+	local current = picked
+	local panel, tabFrames, ShowTab, base = ns.FolderTabs(content, tabs, function(i)
 		-- (list[i][4]: opens its page even while picked, from a page under it)
-		if i ~= picked or list[i][4] then ns.ShowHubPage(list[i][2]) end
+		if i ~= current or list[i][4] then ns.ShowHubPage(list[i][2]) end
 	end, nil, nil, function(i) ns.FlipPageSwitch(list[i][2]) end)
+	local function Show(i)
+		current = i
+		ShowTab(i)
+	end
 	tabFrames.shotSkip = true -- (each its own page: PageShots.lua shoots those on their own)
 	-- (A right-click flips that tab's page switch: on or off on its tip.)
 	for i, tab in ipairs(tabFrames) do
@@ -345,7 +354,205 @@ function ns.PageTabs(content, list, picked)
 	Show(picked)
 	-- (kept on screen over the page's off card, to reach the other tabs)
 	content.pageTabs = { panel = panel, frames = tabFrames }
-	return panel
+	-- A page under tabs has no title, "?" or On/Off of its own (2026-11-16):
+	-- the tab names it, its tip says what it's for, a right-click on it flips
+	-- its switch. Gone as the page first shows, its parts made by then;
+	-- tabbedPage: the HUD page clears it, its own icon keeping its header.
+	content.tabbedPage = true
+	if not content.tabbedHook then
+		content.tabbedHook = true
+		content:HookScript("OnShow", function(self)
+			if self.tabbedPage then ns.DropPageHeader(self) end
+		end)
+		-- (A page made as it first shows, Hover Groups: it showed already.)
+		if content:IsVisible() then
+			C_Timer.After(0, function()
+				if content.tabbedPage then ns.DropPageHeader(content) end
+			end)
+		end
+	end
+	return panel, Show
+end
+
+-- A tabbed page's title, "?" and On/Off out of sight for good: the title
+-- emptied to a line's height so what's under it moves up (and set no more),
+-- the "?" hidden, the On/Off (MakeHeaderSwitch's) never shown.
+function ns.DropPageHeader(content)
+	local title = content.pageTitle
+	if title and not title.dropped then
+		title.dropped = true
+		title:SetText("")
+		title:SetHeight(1)
+		title.SetText = function() end
+		-- (Up by the room the title and the hidden switch under it kept, so the
+		-- page's settings, or its sub-tabs, start just under the tabs.)
+		local tabs = content.pageTabs
+		if tabs and tabs.panel then
+			title:ClearAllPoints()
+			title:SetPoint("TOPLEFT", tabs.panel, "BOTTOMLEFT", 8, 14)
+		end
+	end
+	-- (The title's "?", and a second one past it, a warning's ⚠: Nameplate Style's.)
+	for _, help in ipairs({ content.pageHelp or false, content.pageHelpLast or false }) do
+		if help then
+			help:Hide()
+			help.Show = help.Hide
+		end
+	end
+	-- (A Style or HUD » button by the title: its own tab now, and it'd sit on the tabs.)
+	local link = content.titleLink
+	if link then
+		link:Hide()
+		link.Show = link.Hide
+	end
+	local header = content.pageHeaderSwitch
+	if header then
+		header:Hide()
+		header.Show = header.Hide
+		header.SetShown = function() end
+	end
+end
+
+-- An Interface hub icon's three tabs, each its own hub page (2026-11-16):
+-- Show in (the HUD page at its section: Options.lua's HUD_ICONS, tabs =
+-- its key), the frame's own page's settings, and that page's Frame Links.
+-- For ns.PageTabs: { label, page, tip } each.
+local SHOW_IN_TABS = {
+	-- (PersonalResources.lua's page)
+	units = {
+		{ "Show in", "HUD:units", "When each unit frame, your resource bars and your highlight show in CineMode." },
+		{ "Keep up", "Personal Resources", "Your frame, pet frame and resource bars kept up while your health " ..
+			"or power is low, beyond what Show in says." },
+		-- (UnitStyle.lua's page, a tab here too: its look by its rows, 2026-11-16)
+		{ "UF Style", "Unit Style", "How the unit frames look." },
+		{ "PRD Style", "Personal Style", "How the personal resource display's bars look." }, -- (PersonalStyle.lua's)
+		-- (PlateCastStyle.lua's unit frames' page: yours, target & focus, boss & arena, and the Default row)
+		{ "Cast Style", "Unit Cast Style", "How your cast bar and the unit frames' cast bars look." },
+		-- (The links last, as on every icon's tabs.)
+		{ "Addon Reveal Link", "Unit Frame Links", "Which supported addon's frames stand in for the unit frames and " ..
+			"your resource bars." },
+	},
+	-- (Two of the HUD page's sections, then RaidStyle.lua's page)
+	party = {
+		{ "Party", "HUD:party", "When the party frames show in CineMode, raid-style or not." },
+		{ "Raid", "HUD:raid", "When the raid frames show in CineMode." },
+		{ "Raid Style", "Raid Style", "How the raid frames and raid-style party frames look." },
+	},
+	minimap = {
+		{ "Show in", "HUD:minimap", "When the minimap and its parts show in CineMode." },
+		{ "Reveal", "Minimap", "What brings the minimap up for a while, beyond what Show in says." },
+		{ "Keep Open", "Minimap Keep Open", "Where and while what the minimap stays up the whole time: zones, " ..
+			"indoors, a tracked quest, tracking." },
+		{ "Addon Reveal Link", "Minimap Links", "Which supported addon's frames stand in for the minimap's parts." },
+	},
+	quests = {
+		{ "Show in", "HUD:quests", "When the quest tracker shows in CineMode." },
+		{ "Reveal", "Quest tracker", "What brings the quest tracker, quest timer and durability figure up for a " ..
+			"while, beyond what Show in says." },
+		{ "Addon Reveal Link", "Quest Tracker Links", "Which supported addon's frames stand in for the quest tracker." },
+	},
+	-- (The Chat page (Options.lua's CreateChatPanel: Reveal, its own sub-tabs
+	-- under it), the bubbles' two pages, then the Chat page's links.)
+	chat = {
+		{ "Show in", "HUD:chat", "When the chat window shows in CineMode." },
+		{ "Reveal", "Chat", "What brings chat up in CineMode: new messages (which ones, by its tabs), typing, " ..
+			"and what of the chat window comes up with them." },
+		{ "Bubbles", "Chat bubbles", "Where chat bubbles show in CineMode." },
+		{ "Bubble Style", "Bubble Style", "How chat bubbles look, and speech from behind you." },
+		{ "Addon Reveal Link", "Chat Links", "Which frame each part of the chat is: the game's, or an addon's " ..
+			"that draws its own." },
+	},
+	-- (The HUD page's Trackers section, then the timers' own pages (Options.lua's),
+	-- each with its own sub-tabs, where the client has them.)
+	timers = {
+		{ "Show in", "HUD:combat", "When the swing timer, cast bar, meters, cooldowns and the like show in CineMode." },
+		{ "Cooldown Manager", "Cooldown Manager", "When the Cooldown Manager comes up in CineMode.",
+			has = function() return ns.HasCooldownManager() end },
+		{ "Swing Timer", "Swing timer", "Which of the game's swing timer bars show.",
+			has = function() return not ns.isRetail end },
+		{ "Breath Bar", "Breath Bar", "Hiding the breath bar, and how it looks." },
+	},
+	-- (The Nameplates hub's two icons, 2026-11-16: Nameplates (the Nameplates
+	-- page's grids but Names, then its icons and looks) and Names (that page's
+	-- Names grid, then Name Style).)
+	plates = {
+		{ "Show in", "Nameplates", "Which nameplates stay up in CineMode: in groups, in fights and in each kind of place." },
+		{ "Icons", "Plate Icons", "Icons beside players' health bars on their nameplates." },
+		{ "Default Plate Style", "Nameplate Style", "How the nameplates look, before Smart Style's rows." },
+		-- (Nameplate Style's rows, its second part: Options.lua's CreateTargetArrowPanel)
+		{ "Smart Style", "Nameplate Marks", "Rows that mark and color plates: your target, focus, aggro, fades and more. "
+			.. "A plate takes its look from the first row that fits it." },
+		{ "Cast Style", "Cast Bar Style", "How the nameplates' cast bars look." },
+	},
+	names = {
+		{ "Show in", "Nameplate Names", "Which names over heads stay up in CineMode." },
+		{ "Name Style", "Name Style", "How names over heads look." },
+	},
+	-- (The HUD page's buffs section, then the Buffs/debuffs page's parts)
+	buffs = {
+		{ "Show in", "HUD:buffs", "When your buff and debuff icons show in CineMode." },
+		{ "Reveal", "Buffs/debuffs", "What brings your buffs and debuffs up for a while, beyond what Show in says." },
+		{ "Addon Reveal Link", "Buffs Links", "Which supported addon's frames stand in for your buffs and debuffs." },
+	},
+	-- (What the pointer brings up, what it shows, then the pointer itself: the
+	-- Hover Groups page (the icon), Tooltips, TooltipStyle.lua's, CursorHide.lua's.)
+	mouse = {
+		{ "Hover Groups", "Mouseover groups", "Frames that come up together when you point at one of them." },
+		{ "Tooltips", "Tooltips", "Which tooltips show in CineMode, and when." },
+		{ "Tooltip Style", "Tooltip Style", "How the game's tooltips look." },
+		{ "Cursor", "Cursor Hide", "In CineMode, the cursor gets out of the way." },
+	},
+	-- (The Gamepad page (Options.lua's) where the client has it, then ActionBarStyle.lua's)
+	bars = {
+		{ "Show in", "HUD:bars", "When each action bar shows in CineMode." },
+		{ "Gamepad", "Gamepad", "The frames gamepad mode adds: its action bars, button hints and reticle.",
+			has = function() return C_GamePad ~= nil and not ns.isRetail end },
+		{ "Bar Style", "Action Style", "How the action buttons look." },
+	},
+}
+-- (has: whether this client has that tab's page; one it hasn't, left out.)
+function ns.ShowInTabs(key)
+	local L, list = ns.L, {}
+	for _, each in ipairs(SHOW_IN_TABS[key]) do
+		if not each.has or each.has() then list[#list + 1] = { L[each[1]], each[2], L[each[3]] } end
+	end
+	return list
+end
+-- A page's place in its icon's tabs (what ns.PageTabs takes as picked).
+function ns.ShowInIndex(key, page)
+	for i, each in ipairs(ns.ShowInTabs(key)) do
+		if each[2] == page then return i end
+	end
+	return 1
+end
+function ns.UnitFrameTabs() return ns.ShowInTabs("units") end
+
+-- A frame's own page as the rest of those tabs, after Show in (its parts:
+-- its settings' tabs, its links last): a hidden hub tile each under the icon
+-- (tabOf in HUBS), each picking its part. PickPart: ns.PageTabsBelow's
+-- (hidden = true); ShowOuter: ns.PageTabs'. spec: label (the icon's), icon,
+-- titles (each part's), switchLabel (the off card's name for its switch:
+-- the links' have none), onPart(i).
+function ns.ShowInParts(canvas, content, title, key, PickPart, ShowOuter, spec)
+	local list = SHOW_IN_TABS[key]
+	local parts = #list - 1
+	local function ShowPart(i)
+		local links = i == parts
+		PickPart(i)
+		ShowOuter(ns.ShowInIndex(key, list[i + 1][2]))
+		title:SetText(spec.titles[i])
+		content.headerSwitchOff = links
+		local header = content.pageHeaderSwitch
+		if header then header:SetShown(not links) end
+		if spec.onPart then spec.onPart(i) end
+	end
+	canvas.hubTabs = {}
+	for i = 1, parts do
+		local links = i == parts
+		canvas.hubTabs[i] = { name = list[i + 1][2], icon = spec.icon, label = spec.label, own = i > 1 or nil,
+			switchLabel = not links and spec.switchLabel or nil, noSwitch = links or nil,
+			onSelect = function() ShowPart(i) end }
+	end
 end
 
 -- A Vision page's two tabs: Vision (vision, its page) and Style (style's),
@@ -412,7 +619,10 @@ end
 -- lets you drag it anywhere (kept for next time, stylePreviewPos), Dock puts
 -- it back beside them (as the camera script preview does).
 -- tooltip: the page's (kit.Tooltip, Options.lua's Tooltip).
-local POPOUT_SCALE = 1.5
+-- (Every preview starts out popped, 2026-11-16: the page keeps no room for
+-- it, the settings from its top. Put back keeps it on the page from then on,
+-- ns.db.stylePreviewInPage; Pop out undoes that.)
+local POPOUT_SCALE = 1
 local POPOUT_MIN_SCALE = 0.75
 local popWindow, popped, popScale, popTooltip
 
@@ -431,19 +641,41 @@ local function Repoint(parent, from, to)
 	for _, region in ipairs({ parent:GetRegions() }) do Swap(region) end
 end
 
-local function PutBack()
+-- soft: its page left: the window kept a moment, for the next page's preview
+-- to take over without it blinking off and on; hidden if none comes.
+local function PutBack(soft)
 	local preview = popped
 	if not preview then return end
 	popped = nil
 	local slot = preview.popSlot
+	-- (Put back with its page still up: the window closed, or Put back:
+	-- not popped again till the page is left.)
+	if slot:IsVisible() then preview.keptIn = true end
 	preview:SetScale(1)
 	preview:SetParent(slot:GetParent())
 	preview:ClearAllPoints()
 	for _, each in ipairs(slot.points) do preview:SetPoint(unpack(each)) end
 	Repoint(slot:GetParent(), slot, preview)
 	slot:Hide()
+	-- (Its spot on the page, what's under it is placed from: its size again.)
+	if preview.stackSpot then preview.stackSpot:SetSize(preview:GetWidth(), preview:GetHeight()) end
 	preview.popButton:SetText(ns.L["Pop out"])
-	popWindow:Hide()
+	-- (Its button back on the preview, where it was: off the window's top row.)
+	local button = preview.popButton
+	if button.homePoints then
+		button:SetParent(preview)
+		button:ClearAllPoints()
+		for _, each in ipairs(button.homePoints) do button:SetPoint(unpack(each)) end
+		button:SetFrameLevel(preview:GetFrameLevel() + 30)
+		button.homePoints = nil
+	end
+	if soft then
+		C_Timer.After(0.1, function()
+			if not popped and popWindow then popWindow:Hide() end
+		end)
+	else
+		popWindow:Hide()
+	end
 	if preview.Refresh then preview:Refresh() end
 end
 
@@ -476,7 +708,7 @@ local function FitWindow()
 	if not popped then return end
 	local scale = popped:GetScale()
 	popWindow:SetSize(popped:GetWidth() * scale + 24, popped:GetHeight() * scale + 42)
-	popped.popSlot:SetHeight(popped:GetHeight())
+	popped.popSlot:SetHeight(1) -- (no room kept on the page: what's under it moves up)
 end
 
 -- The popped preview at scale (kept between the smallest and what the screen
@@ -584,10 +816,26 @@ local function Window()
 			popWindow:StopMovingOrSizing()
 			popWindow.sizing = nil
 		end
+		if popWindow.lookAside then return end -- (out of a Look panel's way: kept popped, back as it closes)
 		PutBack()
 	end)
 	popWindow:Hide()
 	return popWindow
+end
+
+-- The preview window out of a docked Look panel's way while it's open (they
+-- sit in the same spot beside the settings), back as it closes (2026-11-16).
+function ns.PreviewAside(aside)
+	if not popWindow then return end
+	if aside then
+		if popWindow:IsShown() then
+			popWindow.lookAside = true
+			popWindow:Hide()
+		end
+	elseif popWindow.lookAside then
+		popWindow.lookAside = nil
+		if popped then popWindow:Show() end
+	end
 end
 
 local function PopOut(preview)
@@ -597,8 +845,10 @@ local function PopOut(preview)
 	local slot = preview.popSlot
 	if not slot then
 		slot = CreateFrame("Button", nil, parent)
+		slot.noAdopt = true -- (stays on the page: a page's tab taking it would hide it, the preview put back)
 		-- (leaving the page puts it back: the slot hides with the page)
-		slot:SetScript("OnHide", function() if popped == preview then PutBack() end end)
+		-- (Its page left: back on it, unless the page shown next takes it over.)
+		slot:SetScript("OnHide", function() if popped == preview then ns.PutBackUnclaimed(preview) end end)
 		slot:SetScript("OnClick", function() if popped == preview then PutBack() end end)
 		local bg = slot:CreateTexture(nil, "BACKGROUND")
 		bg:SetAllPoints()
@@ -615,19 +865,197 @@ local function PopOut(preview)
 	for i = 1, preview:GetNumPoints() do slot.points[i] = { preview:GetPoint(i) } end
 	slot:ClearAllPoints()
 	for _, each in ipairs(slot.points) do slot:SetPoint(unpack(each)) end
-	slot:SetSize(preview:GetWidth(), preview:GetHeight())
-	slot.label:SetText(ns.L["Showing in its own window. Click here to put it back."])
+	-- (No room kept for it on the page, nor a note: the window shows it.)
+	slot:SetSize(preview:GetWidth(), 1)
+	slot.label:SetText("")
+	slot:EnableMouse(false)
+	slot:SetAlpha(0) -- (its dark fill, a pixel high now, drew a line across the page)
 	slot:Show()
+	-- (And its spot, what's under it on the page is placed from: no height either.)
+	if preview.stackSpot then preview.stackSpot:SetHeight(1) end
 	Repoint(parent, preview, slot)
 	popped = preview
 	window.title:SetText(preview.popTitle or ns.L["Preview"])
 	preview:SetParent(window)
 	ScalePopped(popScale or POPOUT_SCALE)
 	preview.popButton:SetText(ns.L["Put back"])
+	-- (Put back on the window's top row, left of its Pop out: not over the picture.)
+	local button = preview.popButton
+	button.homePoints = {}
+	for i = 1, button:GetNumPoints() do button.homePoints[i] = { button:GetPoint(i) } end
+	button:SetParent(window)
+	button:ClearAllPoints()
+	button:SetPoint("RIGHT", window.dock, "LEFT", -6, 0)
+	button:SetFrameLevel(window.dock:GetFrameLevel())
 	window:Show()
 	FitWindow()
 	PlaceWindow()
 	if preview.Refresh then preview:Refresh() end
+end
+
+-- A hub's pages as cards, two to a row (2026-11-16: the Interface hub's HUD
+-- page, the Visions hub's General page). entries: { label, texture, note,
+-- open (the page a click opens), tabs ({ label, page } each, as chips),
+-- state (true on, false off, nil: no switch) } each. Gives the frame,
+-- sized to them. The card opens its page; each chip its tab.
+function ns.MakeHubCards(parent, entries, width)
+	local function Edge(frame, r, g, b)
+		local edges = ns.MakeStyleEdges(frame)
+		function frame.SetEdge(_, er, eg, eb) ns.DressStyleEdges(edges, 1, er, eg, eb, 1) end
+		frame:SetEdge(r, g, b)
+	end
+	local function Chip(card, text, page)
+		local chip = CreateFrame("Button", nil, card)
+		local back = chip:CreateTexture(nil, "BACKGROUND")
+		back:SetAllPoints()
+		back:SetColorTexture(0.17, 0.16, 0.14, 1)
+		Edge(chip, 0.3, 0.28, 0.24)
+		chip.text = chip:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+		chip.text:SetPoint("CENTER", 0, 0)
+		chip.text:SetText(text)
+		chip.text:SetTextColor(0.85, 0.82, 0.74)
+		chip:SetSize(math.ceil(chip.text:GetStringWidth()) + 16, 18)
+		chip:SetScript("OnEnter", function(self)
+			self.text:SetTextColor(1, 0.82, 0)
+			self:SetEdge(0.85, 0.7, 0.2)
+			card:LockHighlight()
+		end)
+		chip:SetScript("OnLeave", function(self)
+			self.text:SetTextColor(0.85, 0.82, 0.74)
+			self:SetEdge(0.3, 0.28, 0.24)
+			card:UnlockHighlight()
+		end)
+		chip:SetScript("OnClick", function() ns.OpenOptions(page) end)
+		return chip
+	end
+	local function Card(holder, entry, cardW)
+		local card = CreateFrame("Button", nil, holder)
+		card:SetWidth(cardW)
+		local back = card:CreateTexture(nil, "BACKGROUND")
+		back:SetAllPoints()
+		back:SetColorTexture(0.09, 0.09, 0.1, 0.92)
+		Edge(card, 0.28, 0.25, 0.2)
+		local glow = card:CreateTexture(nil, "HIGHLIGHT")
+		glow:SetAllPoints()
+		glow:SetColorTexture(1, 0.82, 0, 0.05)
+		card:SetScript("OnEnter", function(self) self:SetEdge(0.85, 0.7, 0.2) end)
+		card:SetScript("OnLeave", function(self) self:SetEdge(0.28, 0.25, 0.2) end)
+		card:SetScript("OnClick", function() ns.OpenOptions(entry.open) end)
+		local picture = card:CreateTexture(nil, "ARTWORK")
+		picture:SetSize(32, 32)
+		picture:SetPoint("TOPLEFT", 10, -10)
+		picture:SetTexture(entry.texture)
+		picture:SetTexCoord(0.07, 0.93, 0.07, 0.93)
+		local name = card:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+		name:SetPoint("TOPLEFT", picture, "TOPRIGHT", 10, -1)
+		name:SetText(entry.label)
+		-- (On or off: a dot at the top right, green or red.)
+		if entry.state ~= nil then
+			local dot = card:CreateTexture(nil, "OVERLAY")
+			dot:SetSize(12, 12)
+			dot:SetPoint("TOPRIGHT", -8, -8)
+			dot:SetTexture(entry.state and "Interface\\COMMON\\Indicator-Green" or "Interface\\COMMON\\Indicator-Red")
+		end
+		local note = card:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+		note:SetPoint("TOPLEFT", name, "BOTTOMLEFT", 0, -3)
+		note:SetWidth(cardW - 62)
+		note:SetJustifyH("LEFT")
+		note:SetText(entry.note or "")
+		note:SetTextColor(0.62, 0.6, 0.56)
+		local left, x, rows = 52, 52, 0
+		local noteBottom = 10 + 1 + (name:GetStringHeight() or 12) + 3 + (note:GetStringHeight() or 10)
+		local top = math.max(52, noteBottom + 8)
+		for _, tab in ipairs(entry.tabs or {}) do
+			local chip = Chip(card, tab[1], tab[2])
+			if rows == 0 then rows = 1 end
+			if x > left and x + chip:GetWidth() > cardW - 10 then x, rows = left, rows + 1 end
+			chip:SetPoint("TOPLEFT", card, "TOPLEFT", x, -top - (rows - 1) * 22)
+			x = x + chip:GetWidth() + 5
+		end
+		card:SetHeight(rows > 0 and top + rows * 22 + 6 or math.max(52, noteBottom + 10))
+		return card
+	end
+	local holder = CreateFrame("Frame", nil, parent)
+	local GAP = 8
+	local cardW = math.floor((width - GAP) / 2)
+	local y, column, rowH = 0, 0, 0
+	for _, entry in ipairs(entries) do
+		local card = Card(holder, entry, cardW)
+		card:SetPoint("TOPLEFT", holder, "TOPLEFT", column * (cardW + GAP), -y)
+		rowH = math.max(rowH, card:GetHeight())
+		column = column + 1
+		if column == 2 then y, column, rowH = y + rowH + GAP, 0, 0 end
+	end
+	if column > 0 then y = y + rowH end
+	holder:SetSize(width, math.max(y, 1))
+	return holder
+end
+
+-- The cards in groups, each under its name (2026-11-16: the hub's groups,
+-- Interface's Heads-up, Overhead and Info, Visions' Combat and World).
+-- groups: { title, entries } each, in order, empty ones left out. Gives the
+-- frame, sized to them.
+function ns.MakeHubCardGroups(parent, groups, width)
+	local holder = CreateFrame("Frame", nil, parent)
+	local y = 0
+	for _, group in ipairs(groups) do
+		if #group[2] > 0 then
+			if y > 0 then y = y + 14 end
+			local name = holder:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+			name:SetPoint("TOPLEFT", holder, "TOPLEFT", 0, -y)
+			name:SetText(group[1])
+			y = y + (name:GetStringHeight() or 12) + 8
+			local cards = ns.MakeHubCards(holder, group[2], width)
+			cards:SetPoint("TOPLEFT", holder, "TOPLEFT", 0, -y)
+			y = y + cards:GetHeight()
+		end
+	end
+	holder:SetSize(width, math.max(y, 1))
+	return holder
+end
+
+-- Another page's preview in the window while this one shows (2026-11-16:
+-- Style General's on its Pages and Overrides tabs), back on its own page as
+-- this one hides. getPreview: gives it (made later, maybe). Not while
+-- previews are put back on their pages (stylePreviewInPage).
+function ns.SharePreview(canvas, getPreview)
+	canvas:HookScript("OnShow", function()
+		local preview = getPreview()
+		-- (Still in the window from the tab before: just taken over, no blink.)
+		if preview and popped == preview then
+			preview.borrowedBy = canvas
+			return
+		end
+		C_Timer.After(0, function()
+			local db = ns.db
+			preview = getPreview()
+			if not (preview and preview.popButton and canvas:IsVisible() and db) then return end
+			if db.stylePreviewInPage or popped == preview then return end
+			PopOut(preview)
+			preview.borrowedBy = canvas
+		end)
+	end)
+	canvas:HookScript("OnHide", function()
+		local preview = getPreview()
+		if preview and popped == preview and preview.borrowedBy == canvas then
+			preview.borrowedBy = nil
+			ns.PutBackUnclaimed(preview)
+		end
+	end)
+end
+
+-- A popped preview whose page (or borrowing page) was just left: kept in the
+-- window a frame, for the page shown next to take it over (SharePreview);
+-- back on its own page if none did and its own isn't up.
+function ns.PutBackUnclaimed(preview)
+	C_Timer.After(0, function()
+		if popped ~= preview then return end
+		local by = preview.borrowedBy
+		if by and by:IsVisible() then return end
+		if preview.popSlot and preview.popSlot:IsVisible() then return end
+		preview.borrowedBy = nil
+		PutBack(true)
+	end)
 end
 
 -- Every preview the page's width (from the column's edge to the page's right,
@@ -683,25 +1111,151 @@ local function WidePreview(preview)
 	end)
 end
 
+-- Zoom on a preview (2026-11-16): - and + in its bottom right corner. What's
+-- in it (each sample frame) drawn bigger or smaller round its own anchor,
+-- the scene behind as it is. A preview drawing straight on itself (Name
+-- Style's text) reads preview.zoom in its Refresh: preview.OnZoom says so.
+-- Kept while the game runs. (Its own buttons and two-point children left be.)
+local ZOOMS = { 0.5, 0.75, 1, 1.25, 1.5, 2, 2.5, 3 }
+local function ApplyZoom(preview)
+	local z = preview.zoom or 1
+	for _, child in ipairs({ preview:GetChildren() }) do
+		if not child.zoomSkip and child:GetNumPoints() <= 1 then
+			-- (Its own scale and spot, as its maker last set them.)
+			local scale = child:GetScale()
+			if child.zoomScale == nil or math.abs(scale - child.zoomScale) > 0.0001 then child.zoomBase = scale end
+			if child:GetNumPoints() == 1 then
+				local point, rel, relPoint, x, y = child:GetPoint(1)
+				local applied = child.zoomPoint
+				if not (applied and applied[1] == point and applied[2] == rel and math.abs(applied[4] - x) < 0.01
+					and math.abs(applied[5] - y) < 0.01) then
+					child.zoomAnchor = { point, rel, relPoint, x * (child.zoomBase or 1) / scale, y * (child.zoomBase or 1) / scale }
+				end
+				local a = child.zoomAnchor
+				if a then
+					child:ClearAllPoints()
+					child:SetPoint(a[1], a[2], a[3], a[4] / z, a[5] / z)
+					child.zoomPoint = { a[1], a[2], a[3], a[4] / z, a[5] / z }
+				end
+			end
+			child:SetScale((child.zoomBase or 1) * z)
+			child.zoomScale = (child.zoomBase or 1) * z
+		end
+	end
+	if preview.OnZoom then preview:OnZoom(z) end
+end
+function ns.AddPreviewZoom(preview)
+	if preview.zoomButtons then return end
+	local function Step(by)
+		local now = preview.zoom or 1
+		local at = 3
+		for i, each in ipairs(ZOOMS) do
+			if math.abs(each - now) < 0.01 then at = i end
+		end
+		preview.zoom = ZOOMS[math.max(1, math.min(#ZOOMS, at + by))]
+		-- (Its Refresh zooms again after it draws: wrapped once, here.)
+		if preview.Refresh and not preview.zoomWrapped then
+			preview.zoomWrapped = true
+			local refresh = preview.Refresh
+			preview.Refresh = function(self, ...)
+				local a, b = refresh(self, ...)
+				if (self.zoom or 1) ~= 1 or self.zoomed then ApplyZoom(self) end
+				return a, b
+			end
+		end
+		preview.zoomed = true
+		if preview.Refresh then preview:Refresh() else ApplyZoom(preview) end
+		preview.zoomButtons.label:SetText(("%d%%"):format(math.floor(preview.zoom * 100 + 0.5)))
+	end
+	local holder = CreateFrame("Frame", nil, preview)
+	holder.zoomSkip = true
+	holder:SetSize(76, 18)
+	holder:SetPoint("BOTTOMRIGHT", -6, 6)
+	holder:SetFrameLevel(preview:GetFrameLevel() + 30)
+	local function Button(text, by, tip)
+		local button = CreateFrame("Button", nil, holder)
+		button:SetSize(18, 18)
+		local back = button:CreateTexture(nil, "BACKGROUND")
+		back:SetAllPoints()
+		back:SetColorTexture(0, 0, 0, 0.55)
+		local glow = button:CreateTexture(nil, "HIGHLIGHT")
+		glow:SetAllPoints()
+		glow:SetColorTexture(1, 1, 1, 0.12)
+		local words = button:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+		words:SetPoint("CENTER", 0, 1)
+		words:SetText(text)
+		button:SetScript("OnClick", function() Step(by) end)
+		button:SetScript("OnEnter", function(self)
+			GameTooltip:SetOwner(self, "ANCHOR_TOP")
+			GameTooltip:SetText(tip, 1, 1, 1)
+			GameTooltip:Show()
+		end)
+		button:SetScript("OnLeave", function() GameTooltip:Hide() end)
+		return button
+	end
+	local minus = Button("-", -1, ns.L["Zoom out"])
+	local plus = Button("+", 1, ns.L["Zoom in"])
+	plus:SetPoint("RIGHT", 0, 0)
+	local label = holder:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+	label:SetPoint("RIGHT", plus, "LEFT", -3, 0)
+	label:SetText("100%")
+	minus:SetPoint("RIGHT", label, "LEFT", -3, 0)
+	holder.label = label
+	preview.zoomButtons = holder
+end
+
 function ns.StylePopout(preview, tooltip, title)
 	popTooltip = popTooltip or tooltip
 	WidePreview(preview)
+	ns.AddPreviewZoom(preview) -- (- and + in its corner)
 	local button = ns.PanelButton(preview)
 	button:SetSize(80, 20)
 	button:SetText(ns.L["Pop out"])
 	button:SetFrameLevel(preview:GetFrameLevel() + 30)
+	button.zoomSkip = true
+	if preview.styleTest then preview.styleTest.zoomSkip = true end
 	if preview.styleTest then
 		button:SetPoint("RIGHT", preview.styleTest, "LEFT", -6, 0)
 	else
 		button:SetPoint("TOPRIGHT", -6, -6)
 	end
-	tooltip(button, ns.L["Shows the preview larger, in a window of its own beside the settings (its Pop out lets " ..
-		"you move it anywhere) that you can resize from its corner, so you can watch it while you scroll down the " ..
-		"page. Click again to put it back."])
+	tooltip(button, ns.L["The preview shows in a window of its own beside the settings (its Pop out lets you move " ..
+		"it anywhere) that you can resize from its corner, so the page has room for its settings. Put back: on the " ..
+		"page instead, from now on. Pop out: in its window again."])
 	button:SetScript("OnClick", function()
-		if popped == preview then PutBack() else PopOut(preview) end
+		local db = ns.db
+		if popped == preview then
+			PutBack()
+			if db then db.stylePreviewInPage = true end
+		else
+			if db then db.stylePreviewInPage = nil end
+			PopOut(preview)
+		end
 	end)
 	preview.popButton, preview.popTitle = button, title
+	-- (Popped as its page shows, unless put back before; a frame later, once
+	-- the page is laid out and the preview fitted to it.)
+	-- (Till then unseen, its room on the page already gone: no flash of it there.)
+	local function AutoPop(self)
+		if popped == self then return end
+		local db = ns.db
+		if not db or db.stylePreviewInPage or self.keptIn then return end
+		self:SetAlpha(0)
+		if self.stackSpot then self.stackSpot:SetHeight(1) end
+		C_Timer.After(0, function()
+			if popped ~= self and self:IsVisible() then PopOut(self) end
+			self:SetAlpha(1)
+			-- (Not popped after all: its room back.)
+			if popped ~= self and self.stackSpot then self.stackSpot:SetSize(self:GetWidth(), self:GetHeight()) end
+		end)
+	end
+	preview:HookScript("OnShow", AutoPop)
+	-- (Made on a page that's already up, one built as it first shows (Nameplate
+	-- Style): no OnShow to come, so now.)
+	if preview:IsVisible() then AutoPop(preview) end
+	preview:HookScript("OnHide", function(self)
+		if popped ~= self then self.keptIn = nil end -- (its page left: popped again next time)
+	end)
 	return button
 end
 
@@ -1166,6 +1720,9 @@ end
 -- Every way a part can be styled, in the order a Look box (rows.Look) shows
 -- them: { group's name, { { option, its name (the dev copy's red rows) } } }.
 local LOOK_GROUPS = {
+	-- (Cast Bar Style's rows, 2026-11-16: what the row goes by, the game's,
+	-- Default's or its own, first. Left out where no part has it.)
+	{ "Look from", { { "uses", "Look from" } } },
 	{ "Bar", { { "texture", "Texture" }, { "barColor", "Color" }, { "ground", "Dark ground" } } },
 	-- (Personal Resource Style: each bar's width and height.)
 	{ "Size", { { "size", "Size" } } },
@@ -1265,6 +1822,11 @@ function ns.StyleRows(kit, content, stack, changed, switchKey, fieldOf, panel)
 	local function Get(key) return ns.StyleKeyGet(K(key)) end
 	local function Put(key, value) ns.StyleKeyPut(K(key), value) end
 	rows.Get, rows.Put, rows.K = Get, Put, K -- (K: a key as its page's fieldOf gives it, for a line's :Box)
+	-- Rows after Sub(true) sit indented, a setting's parts under it (Outline
+	-- color under Outline...), till Sub(false). 2026-11-16.
+	function rows.Sub(on) stack.subIndent = on and 16 or nil end
+	-- Sliders after Pair(true) go two to a line, half as wide, till Pair(false).
+	function rows.Pair(on) stack.pairing = on and {} or nil end
 
 	-- A row of choices for key, after its name: { value, text, tip } each.
 	-- Gives the last, to put a color swatch after.
@@ -1620,10 +2182,11 @@ function ns.StyleRows(kit, content, stack, changed, switchKey, fieldOf, panel)
 	-- page's source: This row, Default row's, The game's...; Off while the
 	-- setting can't apply), and Reset at the right while it isn't its usual
 	-- (key nil: none).
-	local function Heading(label, key, tip, test)
+	-- (width, place: a paired slider's, half wide, put beside the first.)
+	local function Heading(label, key, tip, test, width, place)
 		local head = CreateFrame("Frame", nil, content)
-		head:SetSize(ROW_W, 16)
-		stack:Add(head, "label")
+		head:SetSize(width or ROW_W, 16)
+		if place then place(head) else stack:Add(head, "label") end
 		local name = kit.Label(head, "GameFontNormal", (tostring(label):gsub(":%s*$", "")))
 		name:SetPoint("LEFT", 0, 0)
 		name.searchTip = tip
@@ -1687,6 +2250,9 @@ function ns.StyleRows(kit, content, stack, changed, switchKey, fieldOf, panel)
 		grid:SetSize(TILE_W * TILES_ACROSS + TILE_GAP * (TILES_ACROSS - 1), 1)
 		stack:Add(grid, "label")
 		local tiles, open, enabled = {}, false, true
+		-- (A font's: one bar, the font picked, till it's clicked; then every
+		-- font, folded back to the bar as one's picked. 2026-11-16.)
+		local fontOpen = false
 		local function MakeTile()
 			local tile = CreateFrame("Button", nil, grid)
 			local back = tile:CreateTexture(nil, "BACKGROUND")
@@ -1735,6 +2301,12 @@ function ns.StyleRows(kit, content, stack, changed, switchKey, fieldOf, panel)
 					grid:Refresh()
 					return
 				end
+				if self.isBar then
+					fontOpen = true
+					grid:Refresh()
+					return
+				end
+				fontOpen = false
 				Put(key, self.value)
 				changed(self.value)
 				kit.Refresh()
@@ -1743,7 +2315,7 @@ function ns.StyleRows(kit, content, stack, changed, switchKey, fieldOf, panel)
 		end
 		-- (One tile as its choice: what it shows, how high the grid's are.)
 		local function Dress(tile, item, kind, height, picked)
-			tile.value, tile.tip, tile.isMore = item.value, item.tip, item.isMore
+			tile.value, tile.tip, tile.isMore, tile.isBar = item.value, item.tip, item.isMore, item.isBar
 			tile.itemOn = not (item.enabled and not item.enabled())
 			tile:SetSize(TILE_W, height)
 			local usualText, usualValue = Usual(key, item.value)
@@ -1786,6 +2358,19 @@ function ns.StyleRows(kit, content, stack, changed, switchKey, fieldOf, panel)
 			tile.sub:SetPoint("TOPLEFT", tile.words, "BOTTOMLEFT", 0, -2)
 			tile.sub:SetPoint("TOPRIGHT", tile.words, "BOTTOMRIGHT", 0, -2)
 			if item.isMore then tile.words:SetTextColor(1, 0.82, 0) else tile.words:SetTextColor(0.92, 0.92, 0.92) end
+			-- (The font's bar: as wide as the grid, an arrow at its right.)
+			if item.isBar then
+				tile:SetWidth(grid:GetWidth())
+				tile.words:SetPoint("TOPRIGHT", -26, top)
+			end
+			if not tile.drop then
+				tile.drop = tile:CreateTexture(nil, "OVERLAY")
+				tile.drop:SetSize(16, 16)
+				tile.drop:SetPoint("RIGHT", -8, 0)
+				tile.drop:SetTexture((ns.HELP_DISC:gsub("HelpDisc$", "ListArrow"))) -- (the left list's arrow, turned down)
+				tile.drop:SetRotation(-math.pi / 2)
+			end
+			tile.drop:SetShown(item.isBar and true or false)
 			-- The picked one in gold.
 			if picked then
 				ns.DressStyleEdges(tile.edges, 2, 1, 0.82, 0, 1)
@@ -1832,14 +2417,31 @@ function ns.StyleRows(kit, content, stack, changed, switchKey, fieldOf, panel)
 			local height = ((kind == "texture" or kind == "border") and 40 or kind == "font" and 32 or 28) + (subs and 11 or 0)
 			local shown = {}
 			for i = 1, count do shown[i] = items[i] end
-			if #items > TILES_SHOWN then
+			-- (A font folded: just its bar, the one picked.)
+			local asBar = kind == "font" and not fontOpen
+			if asBar then
+				local now = items[1]
+				for _, item in ipairs(items) do
+					if item.value == picked then now = item end
+				end
+				local bar = {}
+				for k, v in pairs(now or {}) do bar[k] = v end
+				bar.isBar = true
+				bar.tip = ns.L["Click to pick a font."]
+				shown = { bar }
+			elseif kind == "font" then
+				-- (Open: every font, no More.)
+				shown = {}
+				for i, item in ipairs(items) do shown[i] = item end
+			end
+			if #items > TILES_SHOWN and kind ~= "font" then
 				shown[#shown + 1] = { isMore = true, text = open and ns.L["Fewer"] or (ns.L["More (%d)"]):format(#items -
 					TILES_SHOWN + 1) }
 			end
 			for i, item in ipairs(shown) do
 				local tile = tiles[i] or MakeTile()
 				tiles[i] = tile
-				Dress(tile, item, kind, height, not item.isMore and item.value == picked)
+				Dress(tile, item, kind, height, not item.isMore and not item.isBar and item.value == picked)
 				tile:ClearAllPoints()
 				tile:SetPoint("TOPLEFT", grid, "TOPLEFT", ((i - 1) % TILES_ACROSS) * (TILE_W + TILE_GAP),
 					-math.floor((i - 1) / TILES_ACROSS) * (height + TILE_GAP))
@@ -1951,10 +2553,23 @@ function ns.StyleRows(kit, content, stack, changed, switchKey, fieldOf, panel)
 	-- way. Values as rows.Slider's (shown = saved * scale, fmt "%d%%").
 	function rows.Slide(key, label, minV, maxV, step, fmt, scale, tip, test)
 		scale = scale or 1
-		local head = Heading(label, key, tip, test)
+		-- (Paired (rows.Pair): two on one line, each half as wide, the second
+		-- beside the first. 2026-11-16: Name Style's Size and Opacity.)
+		local pairing = stack.pairing
+		local first = pairing and pairing.first
+		local ROW_W = pairing and math.floor((ROW_W - 24) / 2) or ROW_W -- luacheck: ignore 421
+		local head = Heading(label, key, tip, test, ROW_W, first and function(h)
+			h:SetPoint("TOPLEFT", first.head, "TOPLEFT", ROW_W + 24, 0)
+		end or nil)
 		local holder = CreateFrame("Frame", nil, content)
 		holder:SetSize(ROW_W, 30)
-		stack:Add(holder, "label")
+		if first then
+			holder:SetPoint("TOPLEFT", first.holder, "TOPLEFT", ROW_W + 24, 0)
+			pairing.first = nil
+		else
+			stack:Add(holder, "label")
+			if pairing then pairing.first = { head = head, holder = holder } end
+		end
 		local slider = CreateFrame("Slider", nil, holder)
 		slider:SetOrientation("HORIZONTAL")
 		slider:SetPoint("TOPLEFT", 0, 0)
@@ -2297,6 +2912,7 @@ function ns.StyleRows(kit, content, stack, changed, switchKey, fieldOf, panel)
 		-- (spec.preview(parent, width): the part as it looks now, a frame with
 		-- :Refresh(), between the title and the tabs; drawn again on each change.)
 		local preview = tabbed and spec.preview and spec.preview(pop, 496)
+		if preview then ns.AddPreviewZoom(preview) end -- (- and + in its corner, 2026-11-16)
 		local function Field(key) return fieldOf and fieldOf(key) or key end
 		local function PageChanged(page)
 			for _, key in ipairs(page.keys) do
@@ -2530,6 +3146,12 @@ function ns.StyleRows(kit, content, stack, changed, switchKey, fieldOf, panel)
 			end
 			kit.GreyUnless(resetAll, function(db) return On(db) and AnyChanged() end)
 			kit.AddControl(resetAll)
+			-- (And up by Paste, 2026-11-16: the same, this panel's settings only.)
+			local reset = Tool(ns.L["Reset"], 64, ns.L["Every setting in this panel back to how it starts (on a row " ..
+				"that inherits: back to inherited). Only this panel."])
+			reset:SetPoint("LEFT", paste, "RIGHT", 6, 0)
+			reset:SetScript("OnClick", function() resetAll:GetScript("OnClick")(resetAll) end)
+			kit.GreyUnless(reset, function(db) return On(db) and AnyChanged() end)
 			summary = kit.Label(footer, ns.LOOK_DIM, "")
 			summary:SetPoint("LEFT", 12, 0)
 			summary:SetPoint("RIGHT", resetAll, "LEFT", -8, 0)
@@ -2721,6 +3343,7 @@ function ns.StyleRows(kit, content, stack, changed, switchKey, fieldOf, panel)
 				if openLook and openLook ~= self then openLook:Hide() end
 				openLook = self
 				Place()
+				ns.PreviewAside(true) -- (the preview window, in the same spot: hidden while this is up)
 			end
 			-- (Titled with where the part is, the page's place dimmed before it:
 			-- known once the page is in its hub, after it's built.)
@@ -2729,6 +3352,10 @@ function ns.StyleRows(kit, content, stack, changed, switchKey, fieldOf, panel)
 			if path and not inline then
 				heading:SetText("|cff9a9a9a" .. table.concat(path, " > ") .. " >|r " .. title)
 			end
+			-- (Its rows as their settings are now, each time it opens, 2026-11-16:
+			-- one made as it's first opened was shown with no refresh, its values
+			-- blank, every Reset up and the font bar missing, till the page changed.)
+			kit.Refresh()
 			Fit()
 			C_Timer.After(0, Fit)
 		end)
@@ -2738,7 +3365,16 @@ function ns.StyleRows(kit, content, stack, changed, switchKey, fieldOf, panel)
 			if manager and manager.GetOpenMenu and manager:GetOpenMenu() then return true end
 			return ColorPickerFrame and ColorPickerFrame:IsShown()
 		end
-		if not inline then canvas:HookScript("OnHide", function() pop:Hide() end) end
+		if not inline then
+			canvas:HookScript("OnHide", function() pop:Hide() end)
+			-- (Closed, and no other Look panel up in its place: the preview window back.)
+			pop:HookScript("OnHide", function(self)
+				if openLook == self then
+					openLook = nil
+					ns.PreviewAside(false)
+				end
+			end)
+		end
 		-- Escape closes it before the settings window (not in a fight, where
 		-- keys can't be held back; not while its menu or the color picker is
 		-- open: theirs first).

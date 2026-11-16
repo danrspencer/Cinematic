@@ -8,11 +8,6 @@
 local _, ns = ...
 local L = ns.L
 
--- The look's settings a preset sets (the rest as the defaults; the custom
--- colors are kept, for a pick of Custom later).
-local PRESET_KEYS = { "rollPanel", "rollAlpha", "rollDensity", "rollFont", "rollTextSize", "rollOutline", "rollShadow",
-	"rollBarTexture", "rollBarColor", "rollBarHeight", "rollBarGround", "rollPicks", "rollNumbers", "rollWinner", "rollWinnerColor" }
-
 -- The two pages' tabs (picked: 1 Vision, 2 Style).
 function ns.RollTabs(content, title, picked)
 	ns.VisionTabs(content, title, "Roll Vision", "Roll Style", picked,
@@ -56,15 +51,6 @@ function ns.CreateRollStylePanel(kit)
 		function() ns.TestRollWindow() end)
 	test.Refresh = function(self) self:SetEnabled(ns.GetDB().rollWindow and true or false) end
 
-	rows.PresetMenu({
-		{ L["Cinematic's"], L["As Roll Vision has always looked (the defaults)."], {} },
-		{ L["Compact"], L["Tighter rows and smaller text, for raids."],
-			{ rollDensity = "compact", rollTextSize = 0.9, rollFont = "arial", rollOutline = 1 } },
-		{ L["Bare"], L["No panels behind the cards: outlined text over the world, the winner just crowned."],
-			{ rollPanel = "none", rollOutline = 1, rollWinner = "crown", rollPicks = "words" } },
-		{ L["Gilded"], L["Flat cards, gold timers and the winner's row in gold."],
-			{ rollPanel = "flat", rollBarColor = "gold", rollBarTexture = "smooth" } },
-	}, PRESET_KEYS)
 
 	stack:Header(content, L["Cards"])
 	rows.Look(L["Look:"], L["Cards"], {

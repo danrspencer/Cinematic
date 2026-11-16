@@ -335,7 +335,7 @@ end
 ns.WhenAddonLoads("DaylightUI_Tooltip", function()
 	ns.AddConflict({ key = "style:tooltip", addon = LABEL, label = "Tooltip look", group = "style", noBoth = true,
 		styleSwitch = "tooltipStyle",
-		about = "How tooltips look: the Style hub's Tooltip Style page, or DaylightUI's tooltips",
+		about = "How tooltips look: the Interface hub's Tooltip Style page, or DaylightUI's tooltips",
 		theirs = function()
 			local dui = DUI()
 			local aside = dui and dui.PrettyAside and dui.PrettyAside.Draws and dui.PrettyAside.Draws()
@@ -355,7 +355,7 @@ end)
 ns.WhenAddonLoads("DaylightUI_Chat", function()
 	ns.AddConflict({ key = "style:bubbles", addon = LABEL, label = "Chat bubble look", group = "style", noBoth = true,
 		styleSwitch = "bubblesStyle",
-		about = "How chat bubbles look: the Style hub's Chat Bubble Style page, or DaylightUI's bubbles",
+		about = "How chat bubbles look: the Interface hub's Chat Bubble Style page, or DaylightUI's bubbles",
 		theirs = function()
 			local dui = DUI()
 			return dui and dui.Get and dui:Get("Chat", "bubbles") == true or false

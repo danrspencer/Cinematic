@@ -339,24 +339,29 @@ local function PageStatus(keys)
 end
 
 
--- General's two folder tabs: General and Pages (picked 1 or 2). title: the
--- page's, put under them.
+-- General's folder tabs: General, Quick Settings (General's page too, its
+-- second part, 2026-11-16), Pages, Overrides and Interface Recolor (picked
+-- 1 to 5; Recolor a tab since 2026-11-16). title: the
+-- page's, put under them. Gives Show(i), another one picked.
 local function StyleTabs(content, title, picked)
-	local panel = ns.PageTabs(content, {
-		{ L["General"], "Style General", L["The theme, quick settings and the switch for every Style page."] },
+	local panel, Show = ns.PageTabs(content, {
+		{ L["General"], "Style General", L["The theme, and the switch for every Style page."] },
+		{ L["Quick Settings"], "Style Quick", L["Make a theme your own: fonts, bars, shapes, outline and border."] },
 		{ L["Pages"], "Style Pages", L["Which Style pages follow General, and which have settings of their own."] },
-		{ L["Overrides"], "Style Overrides", L["Hide or show parts of the unit frames and nameplates, whatever the UI Visibility pages' rows say."] },
+		{ L["Overrides"], "Style Overrides", L["Hide or show parts of the unit frames and nameplates, whatever the Interface hub's rows say."] },
+		{ L["Interface Recolor"], "Interface Recolor", L["The game's minimap, quest tracker, windows and the rest in your theme's color."] },
 	}, picked)
 	title:ClearAllPoints()
 	title:SetPoint("TOPLEFT", panel, "BOTTOMLEFT", 8, -14)
+	return Show
 end
 
-ns.StyleTabs = StyleTabs -- (StyleOverrides.lua)
+ns.StyleTabs = StyleTabs -- (StyleOverrides.lua, InterfaceRecolor.lua)
 
 function ns.CreateGeneralStylePanel(kit)
 	local canvas, content = kit.CreateScrollPage()
 	local title = kit.Label(content, "GameFontNormalLarge", L["General"])
-	StyleTabs(content, title, 1)
+	local ShowStyleTab = StyleTabs(content, title, 1)
 	local intro = kit.PageIntro(content, title,
 		L["Every Style page at once: a switch for them all, and the settings they share. Each page's shared " ..
 		"settings start on General and follow it; change one on its page and it's that page's own."])
@@ -375,15 +380,32 @@ function ns.CreateGeneralStylePanel(kit)
 	local rows = ns.StyleRows(kit, content, stack, Changed, "styleGeneral")
 
 	preview = ns.MakeStyleJumbotron(kit, content, stack, 480)
+	ns.generalStylePreview = preview -- (shown on the Style hub's other tabs too: ns.SharePreview)
+
+	-- Two parts (ns.PageTabsBelow, its tabs not drawn: the Style tabs over the
+	-- title pick them): General (the theme) and Quick Settings, each at its top.
+	local hosts, PickPart, TabsShown, AdoptTab = ns.PageTabsBelow(content, preview.stackSpot or preview, {
+		{ L["General"], L["The theme."] },
+		{ L["Quick Settings"], L["Make a theme your own."] },
+	}, "Style General/page", nil, nil, 1, nil, true)
 
 	-- (The whole look in one pick: StyleThemes.lua.)
-	stack:Header(content, L["Theme"])
+	local themeHeader = stack:Header(content, L["Theme"])
 	stack:Help(content, L["A whole look for the addon: bars, fonts, borders, panels, colors and these menus. Every " ..
 		"setting below stays yours to change after you pick one. Undo puts back what you had."])
 	stack:Add(ns.MakeThemePicker(kit, content, 480, function() Changed() end), "label")
 
+	-- (The theme onto the General part, at its top; what's made from here on
+	-- onto Quick Settings, at the end.)
+	AdoptTab()
+	themeHeader:ClearAllPoints()
+	themeHeader:SetPoint("TOPLEFT", hosts[1], "TOPLEFT", 0, 0)
+	local made = {}
+	for _, object in ipairs({ content:GetChildren() }) do made[object] = true end
+	for _, object in ipairs({ content:GetRegions() }) do made[object] = true end
+
 	-- (On top of whichever theme's picked: each shows as the theme's "with your changes".)
-	stack:Header(content, L["Quick settings"])
+	local quickHeader = stack:Header(content, L["Quick settings"])
 	stack:Help(content, L["Make a theme your own. These stay until you pick a theme or use Reapply theme."])
 	local titleFont = ns.ThemeTitleFontField()
 	rows.Font(ns.ThemeQuickField("styleFont"), L["The words on every page that follows General. Russian, Korean or " ..
@@ -449,7 +471,31 @@ function ns.CreateGeneralStylePanel(kit)
 		Changed()
 	end)
 
-	canvas:SetScript("OnShow", kit.PageShown(kit.Refresh, content))
+	-- (Quick settings onto their part, the heading at its top.)
+	for _, set in ipairs({ { content:GetChildren() }, { content:GetRegions() } }) do
+		for _, object in ipairs(set) do
+			if not made[object] then object:SetParent(hosts[2]) end
+		end
+	end
+	quickHeader:ClearAllPoints()
+	quickHeader:SetPoint("TOPLEFT", hosts[2], "TOPLEFT", 0, 0)
+	-- Each part a hub tile: General the Style hub's icon, Quick Settings hidden
+	-- under it (tabOf), both picked by the Style tabs over the title.
+	local function ShowPart(i)
+		PickPart(i)
+		ShowStyleTab(i)
+	end
+	canvas.hubTabs = {
+		{ name = "Style General", icon = "Interface\\Icons\\INV_Misc_Gear_08", label = "General",
+			onSelect = function() ShowPart(1) end },
+		{ name = "Style Quick", icon = "Interface\\Icons\\INV_Misc_Gear_08", label = "General", own = true,
+			tabOf = "Style General", onSelect = function() ShowPart(2) end },
+	}
+
+	canvas:SetScript("OnShow", kit.PageShown(function()
+		kit.Refresh()
+		TabsShown()
+	end, content))
 	canvas:Hide()
 	kit.RegisterSubpage(canvas, "Style General", L["General"])
 end
@@ -459,7 +505,7 @@ end
 function ns.CreateStylePagesPanel(kit)
 	local canvas, content = kit.CreateScrollPage()
 	local title = kit.Label(content, "GameFontNormalLarge", L["Pages"])
-	StyleTabs(content, title, 2)
+	StyleTabs(content, title, 3)
 	local intro = kit.PageIntro(content, title,
 		L["Which pages follow General, or the Visions' Style page. From the theme: as the theme you picked set " ..
 		"it. A page with a setting of your own shows which; Use General puts them back. The page's name opens it."])
@@ -559,5 +605,6 @@ function ns.CreateStylePagesPanel(kit)
 		shown()
 	end)
 	canvas:Hide()
+	ns.SharePreview(canvas, function() return ns.generalStylePreview end) -- (General's preview here too)
 	kit.RegisterSubpage(canvas, "Style Pages", L["Pages"])
 end

@@ -11,22 +11,58 @@ local _, ns = ...
 local L = ns.L
 
 -- The rows, in the page's order: key (NAME_GROUPS' key; "all": All names),
--- label. Your target second, so it wins over the rest.
+-- label, and the row each goes by where it sets nothing (parent; none:
+-- Default). In order of what they go by (2026-11-16), each under the row it
+-- inherits from; depth: how far down (Default 0). Which row a unit takes is
+-- decided elsewhere (its group), not by this order.
 ns.NAME_ROWS = {
-	{ key = "all", label = L["All names"] },
+	{ key = "all", label = L["Default"] }, -- (All names until 2026-11-16: the Default row, as the other Style pages')
 	{ key = "Target", label = L["Your target"] },
-	{ key = "GroupMembers", label = L["Group members"] },
 	{ key = "Friends", label = L["Friendly players"] },
+	{ key = "GroupMembers", label = L["Group members"], parent = "Friends" },
+	{ key = "GroupMinions", label = L["Group members' minions"], parent = "GroupMembers" },
+	{ key = "FriendlyMinions", label = L["Friendly players' minions"], parent = "Friends" },
 	{ key = "Enemies", label = L["Enemy players"] },
-	{ key = "ServiceNPCs", label = L["Service NPCs"] },
-	{ key = "FriendlyNPCs", label = L["Friendly NPCs"] },
-	{ key = "NeutralNPCs", label = L["Neutral NPCs"] },
+	{ key = "EnemyMinions", label = L["Enemy players' minions"], parent = "Enemies" },
 	{ key = "HostileNPCs", label = L["Hostile NPCs"] },
-	{ key = "FriendlyMinions", label = L["Friendly players' minions"] },
-	{ key = "GroupMinions", label = L["Group members' minions"] },
-	{ key = "EnemyMinions", label = L["Enemy players' minions"] },
+	{ key = "NeutralNPCs", label = L["Neutral NPCs"] },
+	{ key = "FriendlyNPCs", label = L["Friendly NPCs"] },
+	{ key = "ServiceNPCs", label = L["Service NPCs"], parent = "FriendlyNPCs" },
+	-- (Each kind of service NPC by its title, under Service NPCs, 2026-11-16:
+	-- PlateGuild's SERVICE_KINDS, "Service" .. its key.)
+	{ key = "ServiceVendor", label = L["Vendors"], parent = "ServiceNPCs", service = "Vendor" },
+	{ key = "ServiceRepair", label = L["Repair"], parent = "ServiceNPCs", service = "Repair" },
+	{ key = "ServiceTrainer", label = L["Trainers"], parent = "ServiceNPCs", service = "Trainer" },
+	{ key = "ServiceProfession", label = L["Professions"], parent = "ServiceNPCs", service = "Profession" },
+	{ key = "ServiceFlight", label = L["Flight masters"], parent = "ServiceNPCs", service = "Flight" },
+	{ key = "ServiceInn", label = L["Innkeepers"], parent = "ServiceNPCs", service = "Inn" },
+	{ key = "ServiceBank", label = L["Bankers and auctioneers"], parent = "ServiceNPCs", service = "Bank" },
+	{ key = "ServiceStable", label = L["Stable masters"], parent = "ServiceNPCs", service = "Stable" },
+	{ key = "ServiceOther", label = L["Other titles"], parent = "ServiceNPCs", service = "Other" },
+	{ key = "ServiceQuest", label = L["Quest givers"], parent = "ServiceNPCs", service = "Quest" },
 }
-ns.OnLanguage(function() ns.TranslateFields(ns.NAME_ROWS, "label") end)
+local ROW_PARENT, ROW_LABEL = {}, {}
+for _, row in ipairs(ns.NAME_ROWS) do ROW_PARENT[row.key] = row.parent end
+for _, row in ipairs(ns.NAME_ROWS) do
+	local depth, at = 0, row.key
+	while at ~= "all" do
+		depth = depth + 1
+		at = ROW_PARENT[at] or "all"
+	end
+	row.depth = depth
+end
+ns.NAME_ROW_PARENT = ROW_PARENT
+-- A row's label by key (as shown).
+function ns.NameRowLabel(key)
+	if not next(ROW_LABEL) then
+		for _, row in ipairs(ns.NAME_ROWS) do ROW_LABEL[row.key] = row.label end
+	end
+	return ROW_LABEL[key]
+end
+ns.OnLanguage(function()
+	ns.TranslateFields(ns.NAME_ROWS, "label")
+	ROW_LABEL = {}
+end)
 
 -- The settings a row can hand on, and what the game's look gives each (the
 -- last step). Font "usual": General's font while the Style hub is on (as
@@ -35,12 +71,14 @@ local GAME = {
 	Font = "usual", Size = 1, Alpha = 1, Outline = 0, OutlineColor = "black", Shadow = false, ShadowAlpha = 1,
 	Colour = true, Friends = "blue", Enemies = "react", Hostile = "game", Neutral = "game", Friendly = "game",
 	Glow = "none", Back = "none", BackAlpha = 0.6, Line2Size = 1, Line2Color = "name",
+	-- (2026-11-16: the glow's opacity and size; the band's border, its thickness.)
+	GlowAlpha = 0.7, GlowSize = 1, BackBorder = "none", BackBorderSize = 1,
 }
 ns.NAME_LOOK_GAME = GAME
 -- The colors, by the setting that picks them, as they start.
 local COLORS = {
 	OutlineColor = { 0, 0, 0 }, Colour = { 1, 1, 1 }, Hostile = { 1, 0.25, 0.2 }, Neutral = { 1, 0.9, 0.3 },
-	Friendly = { 0.4, 1, 0.4 }, Glow = { 1, 0.82, 0 }, Back = { 0, 0, 0 },
+	Friendly = { 0.4, 1, 0.4 }, Glow = { 1, 0.82, 0 }, Back = { 0, 0, 0 }, BackBorder = { 1, 0.82, 0 },
 }
 ns.NAME_LOOK_COLORS = COLORS
 -- (A color's keys: Outline color's are <prefix>OutlineR..., the rest
@@ -102,11 +140,24 @@ end
 -- "theme" or "game". row nil: All names'.
 -- over: { setting = value } on top of the row's own (the Look panel's
 -- preview: never saved; "inherit" there hands on as saved).
+-- (Up the rows it inherits from before Default (2026-11-16): Service NPCs
+-- by Friendly NPCs', Group members by Friendly players'...: NAME_ROWS' parent.)
+-- (Your target over its own kind's row, 2026-11-16: "Target:HostileNPCs"
+-- is your target that's a hostile NPC: Your target's, then Hostile NPCs' and
+-- the rows above it, then Default's.)
 function ns.NameLookValue(row, setting, over)
-	if row and row ~= "all" then
-		local value = over and over[setting]
-		if value == nil then value = Raw(row, setting) end
-		if value ~= "inherit" then return value, row end
+	local under
+	if type(row) == "string" then
+		local target, kind = row:match("^(Target):(.+)$")
+		if target then row, under = target, kind end
+	end
+	local at = row ~= "all" and row or nil
+	while at do
+		local value
+		if at == row and over then value = over[setting] end
+		if value == nil then value = Raw(at, setting) end
+		if value ~= "inherit" then return value, at end
+		at = ROW_PARENT[at] or (at == row and under) or nil
 	end
 	-- (over only for All names' own panel. Not "row == 'all' and over and ...":
 	-- for a kind's row that's false, not nil, and every setting came out false.)
@@ -176,8 +227,7 @@ local KIND_ROW = {
 	FriendlyNPCs = "FriendlyNPCs",
 }
 local rowOf = setmetatable({}, { __mode = "k" }) -- [unit frame] = { unit, row }
-local function Sort(plate, unit)
-	if Ask(UnitIsUnit, unit, "target") then return "Target" end
+local function KindRow(plate, unit)
 	local kind = ns.PlateKind and ns.PlateKind(unit)
 	if not kind then return "all" end
 	if (kind == "Friends" or kind == "FriendlyMinions") and not Ask(UnitIsUnit, unit, "pet")
@@ -186,9 +236,21 @@ local function Sort(plate, unit)
 	end
 	if (kind == "FriendlyNPCs" or kind == "NeutralNPCs" or kind == "NeutralMinor") and ns.PlateServiceMatch then
 		local ok, match = pcall(ns.PlateServiceMatch, plate, unit)
-		if ok and match then return "ServiceNPCs" end
+		if ok and match then
+			-- (Its kind's row by its title, else Service NPCs': PlateGuild.lua.)
+			local okKind, service = pcall(ns.PlateServiceKind or function() end, plate, unit)
+			return okKind and service and "Service" .. service or "ServiceNPCs"
+		end
 	end
 	return KIND_ROW[kind] or "all"
+end
+-- (Your target: on top of its kind's row, "Target:<row>" (NameLookValue).)
+local function Sort(plate, unit)
+	if Ask(UnitIsUnit, unit, "target") then
+		local under = KindRow(plate, unit)
+		return under ~= "all" and "Target:" .. under or "Target"
+	end
+	return KindRow(plate, unit)
 end
 function ns.NameRowOf(unitFrame, unit)
 	if not ns.NameRowsOwn() or not unit then return "all" end
@@ -231,4 +293,53 @@ function ns.MigrateNameInherit()
 		if type(saved) == "table" then Move(type(saved.settings) == "table" and saved.settings or saved) end
 	end
 	db.nameInheritV1 = true
+end
+
+-- A name's glow, band and the band's border, placed round its text (the
+-- plates' and the Name Style preview's, 2026-11-16). parts: { glow, back,
+-- edges (four textures, made here) } on owner; S(setting): the row's value;
+-- Color(setting): its r, g, b. width, height: the text's, scaled.
+function ns.DressNameParts(owner, parts, text, width, height, S, Color)
+	local glow, back = S("Glow"), S("Back")
+	parts.glow:SetShown(glow ~= "none")
+	if glow ~= "none" then
+		local r, g, b = Color("Glow")
+		local size = tonumber(S("GlowSize")) or 1
+		parts.glow:SetVertexColor(r, g, b, tonumber(S("GlowAlpha")) or 0.7)
+		parts.glow:ClearAllPoints()
+		parts.glow:SetPoint("CENTER", text, "CENTER", 0, 0)
+		parts.glow:SetSize(width + height * 3 * size, height * 3 * size)
+	end
+	parts.back:SetShown(back ~= "none")
+	if back ~= "none" then
+		local r, g, b = Color("Back")
+		parts.back:SetColorTexture(r, g, b, tonumber(S("BackAlpha")) or 0.6)
+		parts.back:ClearAllPoints()
+		parts.back:SetPoint("CENTER", text, "CENTER", 0, 0)
+		parts.back:SetSize(width + 14, height + 6)
+	end
+	-- (The band's border: a line round it, its thickness and color.)
+	local edged = back ~= "none" and S("BackBorder") == "line"
+	if edged and not parts.edges then
+		parts.edges = {}
+		for i = 1, 4 do parts.edges[i] = owner:CreateTexture(nil, "BACKGROUND", nil, 3) end
+	end
+	for i, edge in ipairs(parts.edges or {}) do
+		edge:SetShown(edged)
+		if edged then
+			local r, g, b = Color("BackBorder")
+			local thick = math.max(1, tonumber(S("BackBorderSize")) or 1)
+			edge:SetColorTexture(r, g, b, 1)
+			edge:ClearAllPoints()
+			if i <= 2 then
+				edge:SetPoint(i == 1 and "BOTTOMLEFT" or "TOPLEFT", parts.back, i == 1 and "TOPLEFT" or "BOTTOMLEFT", -thick, 0)
+				edge:SetPoint(i == 1 and "BOTTOMRIGHT" or "TOPRIGHT", parts.back, i == 1 and "TOPRIGHT" or "BOTTOMRIGHT", thick, 0)
+				edge:SetHeight(thick)
+			else
+				edge:SetPoint(i == 3 and "TOPRIGHT" or "TOPLEFT", parts.back, i == 3 and "TOPLEFT" or "TOPRIGHT", 0, 0)
+				edge:SetPoint(i == 3 and "BOTTOMRIGHT" or "BOTTOMLEFT", parts.back, i == 3 and "BOTTOMLEFT" or "BOTTOMRIGHT", 0, 0)
+				edge:SetWidth(thick)
+			end
+		end
+	end
 end

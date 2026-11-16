@@ -459,6 +459,25 @@ function ns.PlateServiceMatch(plate, unit)
 	return false
 end
 
+-- Which kind of service NPC a plate's unit is, for its Name Style row
+-- (2026-11-16): the first of SERVICE_KINDS its title fits and is ticked, or
+-- Quest for a quest giver kept by that; nil if none.
+function ns.PlateServiceKind(plate, unit)
+	if not (plate and unit) then return nil end
+	local title = PlateTitle(plate, unit)
+	if title then
+		local fits = ns.TitleKinds(title)
+		local otherClass = ns.db.nameServiceClassOnly and OtherClassTitle(title)
+		for _, kind in ipairs(ns.SERVICE_KINDS) do
+			if fits[kind.key] and ns.db["nameService" .. kind.key] and not (kind.key == "Trainer" and otherClass) then
+				return kind.key
+			end
+		end
+	end
+	if ns.db.nameServiceQuest and PlateQuestGiver(plate, unit) then return "Quest" end
+	return nil
+end
+
 local function Hide(plate)
 	if lines[plate] then
 		lines[plate]:Hide()

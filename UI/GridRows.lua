@@ -1292,8 +1292,7 @@ function ns.GridTable(content, columnTop, rows, kit)
 		rowLabel:SetJustifyH("LEFT")
 		rowLabel:SetWordWrap(false)
 		kit.ShowBox(content, item, rowLabel) -- (its frame on at all: item.showKey)
-		-- A » to its page on rows that have a page of their own.
-		if item.morePage then ns.MoreLink(content, rowLabel, item.morePage) end
+		-- (No » to a row's own page, 2026-11-16: its frame's pages are tabs of one icon.)
 		ns.LabelHover(content, rowLabel, item.tip)
 		if ns.CINE_SHOW_SETTING[item.key] then
 			kit.RecordKey(content, ns.CINE_SHOW_SETTING[item.key]) -- (for the page's Reset)

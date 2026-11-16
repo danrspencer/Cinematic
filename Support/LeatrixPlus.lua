@@ -101,7 +101,7 @@ ns.WhenAddonLoads("Leatrix_Plus", function()
 
 	ns.AddConflict({ key = "style:tooltip", addon = LABEL, label = "Tooltip look", group = "style", noBoth = true,
 		styleSwitch = "tooltipStyle",
-		about = "How tooltips look: the Style hub's Tooltip Style page, or Leatrix Plus's tooltip backgrounds " ..
+		about = "How tooltips look: the Interface hub's Tooltip Style page, or Leatrix Plus's tooltip backgrounds " ..
 			"tinted blue or red by faction (Enhance tooltip)",
 		theirs = function() return On("TipModEnable") and On("TipBackSimple") end,
 		ours = function() return ns.StyleOn("tooltipStyle") end,
