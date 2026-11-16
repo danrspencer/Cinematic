@@ -498,10 +498,17 @@ end)
 -- and places their icons itself, with its own spacing: the Cooldown Manager
 -- page's Close the gaps stands aside (moving them spread them out and off
 -- to the right).
-ns.AddFeatureYield("cooldownCenter", function()
+local function CooldownsTheirs()
 	local isLoaded = C_AddOns and C_AddOns.IsAddOnLoaded or IsAddOnLoaded
 	return isLoaded("EllesmereUICooldownManager") and "EllesmereUI" or nil
-end)
+end
+ns.AddFeatureYield("cooldownCenter", CooldownsTheirs)
+-- Its icons keep their slots, so an icon our page fades leaves an empty spot
+-- (a player's 3rd cooldown "disappeared", 2026-11-16: Smart set had picked
+-- When ready for it). The fades you didn't pick stand aside: Smart set's
+-- picks and the Utility bar's built-in While recharging. A spell's or a
+-- bar's mode set on the page still fades it.
+ns.AddFeatureYield("cooldownDefaults", CooldownsTheirs)
 
 -- Its resource bars ("Main Resources" on WoW Forever) stand in for the
 -- personal bars, so they follow those rows on the HUD page, as its unit

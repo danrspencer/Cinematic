@@ -8910,7 +8910,10 @@ function ns.CooldownGroupSettings(group, sit)
 		if mode then return mode, power, early, anyTime end
 	end
 	local set = ns.db.cooldownGroupDefaults[group] or NO_DEFAULTS
-	return set.mode or ns.COOLDOWN_GROUP_MODES[group] or "always", set.power, set.early, set.anyTime
+	-- (The built-in mode stands aside for an addon placing the icons itself,
+	-- EllesmereUI: a faded icon left an empty slot in its bar.)
+	local builtIn = not set.mode and not ns.FeatureYieldedTo("cooldownDefaults") and ns.COOLDOWN_GROUP_MODES[group]
+	return set.mode or builtIn or "always", set.power, set.early, set.anyTime
 end
 
 -- A spell's mode ("always", "ready", "recharge", "proc"), whether it's its
@@ -8939,9 +8942,11 @@ function ns.CooldownSpellMode(id, group, sit)
 	elseif db.cooldownAlwaysShow[id] then
 		return "always", true
 	end
-	-- (Its group's mode not set: the Smart set pick, if it has one and Smart set's ticked.)
+	-- (Its group's mode not set: the Smart set pick, if it has one and Smart
+	-- set's ticked, and no addon places the icons itself: see CooldownGroupSettings.)
 	local set = db.cooldownGroupDefaults[group or "other"]
-	if db.cooldownSmartDefaults and not (set and set.mode) and ns.COOLDOWN_SMART_GROUPS[group] then
+	if db.cooldownSmartDefaults and not (set and set.mode) and ns.COOLDOWN_SMART_GROUPS[group]
+		and not ns.FeatureYieldedTo("cooldownDefaults") then
 		local pick = ns.SmartCooldownMode(id)
 		if pick == "power" then
 			return "ready", false, true, true, set and set.early, set and set.anyTime
@@ -9283,6 +9288,11 @@ function EachCooldownIcon(visit, all)
 	end
 	visiting, visitingBar = outerVisit, outerBar
 end
+end
+-- (For the dev copy's tests, Dev/EuiCooldownTest.lua: the walk, and an icon's spell.)
+ns.EachCooldownIcon = EachCooldownIcon
+function ns.CooldownIconSpellOf(icon)
+	return ItemSpell(icon) or iconSpell[icon]
 end
 
 -- The spells in the Cooldown Manager now, for its page, as its settings
@@ -10321,6 +10331,8 @@ do
 -- time and whether you're in a fight.)
 local passNow, passInCombat
 local function ReadyTarget(icon, id, bar)
+	-- (Paused by the dev copy's /cine debug euicd: every icon back to full.)
+	if ns.cooldownFadePaused then return end
 	local buffGroup = ns.COOLDOWN_BUFF_GROUPS[bar]
 	if buffGroup then
 		if not ns.CooldownBuffShows(ns.CooldownBuffMode(id, buffGroup), passInCombat) then
@@ -10419,6 +10431,11 @@ end
 -- name, and both under one name read as two calls a tick.)
 function ns.UpdateReadyOnly(elapsed)
 	UpdateReadyOnly(elapsed, GetTime())
+end
+-- (An icon's per-spell fade, for the dev copy's tests: its target, 0 or 1,
+-- and its alpha while not full.)
+function ns.CooldownReadyState(icon)
+	return readyTargets[icon], readyAlpha[icon]
 end
 
 -- The Cooldown Manager page's Flash (ns.CooldownSpellFlash, any mode): as a
