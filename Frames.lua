@@ -392,6 +392,14 @@ local function ApplyAlpha(entry)
 		end
 		entry.settingAlpha = true
 		ns.SetFrameAlpha(entry.frame, entry.applied)
+		-- (Faded out with the game's health or power curve drawing it (the
+		-- Frames pass, curveDrawn): the curve again, not 0. Its alpha reads
+		-- back secret, so an addon's frame followed every frame (EllesmereUI)
+		-- was put to 0 here each frame and back by the next pass: the player
+		-- frame flickered while hurt with nothing else keeping it up, 2026-11-16.)
+		if entry.curveDrawn and visual == 0 and (entry.baseAlpha or 1) > 0 then
+			ns.DrawSecretCurve(entry)
+		end
 		entry.settingAlpha = false
 		if ns.AlphaTrace then ns.AlphaTrace(entry, "ours", entry.applied) end
 		if ns.profiling then
@@ -1854,6 +1862,17 @@ fightWatch:RegisterEvent("PLAYER_REGEN_DISABLED")
 fightWatch:SetScript("OnEvent", function()
 	for _, entry in ipairs(ns.managed) do ns.EntryClicksBack(entry) end
 end)
+end
+
+-- A faded-out frame's alpha from the game's secret health or power curve
+-- (the Frames pass's vitalsSecret, Vitals Vision; manaSecret, Health &
+-- Resources' shares).
+function ns.DrawSecretCurve(entry)
+	if entry.vitalsSecret then
+		ns.SetVitalsSecretAlpha(entry.frame, entry.vitalsSecret)
+	elseif entry.manaSecret then
+		ns.SetThresholdSecretAlpha(entry.frame, entry.manaSecret)
+	end
 end
 
 function ns.SetEntryAlpha(entry, alpha)
@@ -12346,16 +12365,17 @@ function ns.UpdateFrames(cinematic, elapsed)
 				entry.fadeTarget, entry.fadeDuration = target, duration
 			end
 		end
-		-- (Secret health: the game sets a faded-out health bar's alpha from it.)
-		if entry.vitalsSecret and target == 0 and entry.alpha == 0 and not ns.layoutFadeUntil and not ns.previewRows then
+		-- (Secret health: the game sets a faded-out health bar's alpha from it.
+		-- curveDrawn: so ApplyAlpha between passes draws the curve again.)
+		if (entry.vitalsSecret or entry.manaSecret) and target == 0 and entry.alpha == 0
+			and not ns.layoutFadeUntil and not ns.previewRows then
 			-- (Ours: the own-alpha hook on an addon's frame mustn't put it back.)
 			entry.settingAlpha = true
-			ns.SetVitalsSecretAlpha(entry.frame, entry.vitalsSecret)
+			entry.curveDrawn = true
+			ns.DrawSecretCurve(entry)
 			entry.settingAlpha = nil
-		elseif entry.manaSecret and target == 0 and entry.alpha == 0 and not ns.layoutFadeUntil and not ns.previewRows then
-			entry.settingAlpha = true
-			ns.SetThresholdSecretAlpha(entry.frame, entry.manaSecret)
-			entry.settingAlpha = nil
+		else
+			entry.curveDrawn = nil
 		end
 		if NEVER_NESTED[entry.name] and entry.group == "chat" then
 			chatButtonsAlpha = math.max(chatButtonsAlpha or 0, entry.alpha)
