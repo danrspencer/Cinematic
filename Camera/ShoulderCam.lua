@@ -569,19 +569,58 @@ local function ShoulderValue(again)
 	return ("%.2f"):format(SpotYards() * k * SideFactor())
 end
 
--- (The offset's following your zoom, and quiet ones (the talk turn's steps):
--- logged in full only to the detail log.)
+-- Glides (the offset, and quiet ones: the talk and target turns' strengths)
+-- are logged as one line once they settle, from where to where over how long,
+-- not a line a frame (user, 2026-11-16: they filled 5,000-line logs). Settled
+-- = no step for GLIDE_QUIET seconds; any other Shoulder Cam CVar line, and
+-- the log being saved, write the open ones first so the order stays right.
+local GLIDE_QUIET = 0.3
+local glides, glideTicker = {}, nil
+local function FlushGlides(all)
+	local now, open = GetTime(), false
+	for cvar, g in pairs(glides) do
+		if all or now - g.last >= GLIDE_QUIET then
+			glides[cvar] = nil
+			ns.Log("cvar", ("Shoulder Cam: %s %s -> %s over %.2f s (%d steps)"):format(
+				cvar, g.from, g.to, g.last - g.start, g.steps))
+		else
+			open = true
+		end
+	end
+	if not open and glideTicker then
+		glideTicker:Cancel()
+		glideTicker = nil
+	end
+end
+local function GlideStep(cvar, from, to)
+	local now = GetTime()
+	local g = glides[cvar]
+	if not g then
+		g = { from = from, start = now, steps = 0 }
+		glides[cvar] = g
+	end
+	g.to, g.last, g.steps = to, now, g.steps + 1
+	if not glideTicker then
+		glideTicker = C_Timer.NewTicker(0.1, function() FlushGlides() end)
+	end
+end
+do -- (a glide still going as you log out or /reload)
+	local saver = CreateFrame("Frame")
+	saver:RegisterEvent("PLAYER_LOGOUT")
+	saver:SetScript("OnEvent", function() FlushGlides(true) end)
+end
+
 local function Write(yours, cvar, value, quiet)
 	local now = GetCVar(cvar)
 	if now ~= nil and not Same(now, value) then
 		if yours[cvar] == nil then
 			yours[cvar] = now
 		end
-		local text = ("Shoulder Cam: %s %s -> %s"):format(cvar, now, value)
-		if quiet or cvar == "test_cameraOverShoulder" and tonumber(now) ~= 0 and tonumber(value) ~= 0 then
-			ns.LogDetail("cvar", text)
+		if quiet or cvar == "test_cameraOverShoulder" then
+			GlideStep(cvar, now, value)
 		else
-			ns.Log("cvar", text)
+			FlushGlides(true)
+			ns.Log("cvar", ("Shoulder Cam: %s %s -> %s"):format(cvar, now, value))
 		end
 		SetCVar(cvar, value)
 	end
@@ -734,6 +773,7 @@ local function GiveBack(yours, ...)
 		local cvar = select(i, ...)
 		if yours[cvar] ~= nil then
 			if not Same(GetCVar(cvar), yours[cvar]) then
+				FlushGlides(true)
 				ns.Log("cvar", ("Shoulder Cam: %s back to %s"):format(cvar, yours[cvar]))
 				SetCVar(cvar, yours[cvar])
 			end
