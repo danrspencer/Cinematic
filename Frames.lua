@@ -994,6 +994,10 @@ local function RemoveFrame(frame)
 			end
 			ns.SetFrameAlpha(frame, frame.cinematicFishingHidden and 0 or entry.baseAlpha or 1)
 			if entry.looseParts then FadeLooseParts(entry, 1) end
+			-- (Let go mid-peek, Just the new one's faded buff pictures and its
+			-- copies would stay till a reload: only the tick over a managed
+			-- BuffFrame puts them back. Tested, 2026-11-16, WoW Forever.)
+			if entry.name == "BuffFrame" and ns.ShowOnlyNewBuffs then ns.ShowOnlyNewBuffs(false) end
 			ns.EntryClicksBack(entry)
 			-- (Let go while faded full size, in a fight or kept up for the dots
 			-- sweep: its icons and mask back too, or the map stays blank with

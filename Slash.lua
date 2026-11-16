@@ -1713,6 +1713,10 @@ local function HandleSlash(msg)
 	elseif cmd == "debug" and arg:find("^cursorsweep") then
 		-- (One cursor sweep, the faded minimap under your mouse: NodeSweep.lua.)
 		ns.CursorSweepTest(arg:match("^cursorsweep%s*(.*)$"))
+	elseif cmd == "debug" and arg:find("^bufftest") then
+		-- (Dev copy: one run recording buff pictures left hidden after a "Just the new one" peek, BuffFadeTest.lua.)
+		if ns.BuffFadeTest then ns.BuffFadeTest(arg:match("^bufftest%s*(.*)$")) else
+			ns.Print("/cine debug bufftest is in the dev copy only.") end
 	elseif cmd == "debug" and arg == "lowmana" then
 		-- (Dev copy: one run recording why low mana doesn't bring your frames up, LowManaTest.lua.)
 		if ns.LowManaTest then ns.LowManaTest() else ns.Print("/cine debug lowmana is in the dev copy only.") end
