@@ -3495,3 +3495,54 @@ function ns.FrameKeyTest()
 	end)
 	ns.Print("framekey: recording for 23 seconds, follow the box at the top. Type it again to stop.")
 end
+
+-- Why a cast of yours failed: the game's red error text ("You can't do that
+-- while moving", "Invalid target"...) with the spell that failed, and what was
+-- going on (fight, moving, loot window, a spell waiting for its target...), so
+-- the log names the cause and not only that it failed. (One line per try: the
+-- game sends a failed cast twice, same moment, same spell.)
+do
+	local function Yes(f, ...)
+		local ok, v = pcall(f, ...)
+		if not ok or v == nil or (issecretvalue and issecretvalue(v)) then return "?" end
+		return v and "yes" or "no"
+	end
+	local function State()
+		local speed = "?"
+		local ok, s = pcall(GetUnitSpeed, "player")
+		if ok and s ~= nil and not (issecretvalue and issecretvalue(s)) then speed = s > 0 and "yes" or "no" end
+		local loot = LootFrame and Yes(LootFrame.IsShown, LootFrame) or "?"
+		return ("fight %s (lockdown %s), moving %s, loot window %s, targeting a spell %s, casting %s, mounted %s"):format(
+			Yes(UnitAffectingCombat, "player"), Yes(InCombatLockdown), speed, loot,
+			SpellIsTargeting and Yes(SpellIsTargeting) or "?",
+			UnitCastingInfo and Yes(function() return UnitCastingInfo("player") ~= nil end) or "?",
+			Yes(IsMounted))
+	end
+	local lastError, lastErrorAt = nil, 0
+	local lastFailSpell, lastFailAt = nil, 0
+	local function SpellName(spellID)
+		if spellID == nil or (issecretvalue and issecretvalue(spellID)) then return "a spell" end
+		local get = C_Spell and C_Spell.GetSpellName or GetSpellInfo
+		local ok, name = pcall(get, spellID)
+		return ("%s (%s)"):format(ok and name and Plain(name) or "?", tostring(spellID))
+	end
+	local watcher = CreateFrame("Frame")
+	watcher:RegisterEvent("UI_ERROR_MESSAGE")
+	watcher:RegisterUnitEvent("UNIT_SPELLCAST_FAILED", "player")
+	watcher:SetScript("OnEvent", function(_, event, a, b, c)
+		if event == "UI_ERROR_MESSAGE" then
+			-- (a: the error's id, b: its text)
+			lastError, lastErrorAt = Plain(b) .. " [" .. Plain(a) .. "]", GetTime()
+			return
+		end
+		local spellID, now = c, GetTime()
+		if spellID == lastFailSpell and now - lastFailAt < 0.05 then return end
+		lastFailSpell, lastFailAt = spellID, now
+		local name, state = SpellName(spellID), State()
+		-- (The error can come just before or just after the failed cast.)
+		C_Timer.After(0.2, function()
+			local why = lastError and math.abs(lastErrorAt - now) < 0.4 and lastError or "no error text from the game"
+			ns.Log("cast", ("%s failed: %s | %s"):format(name, why, state))
+		end)
+	end)
+end
