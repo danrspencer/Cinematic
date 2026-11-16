@@ -59,33 +59,42 @@ earlier in the TOC. Inside functions that run later, any `ns.X` works.
 | Text the player reads | `ns.L["English text"]` (American spelling) | Locales/ |
 | Why a frame is up | `/cine why`; a new reason needs a line in Explain | Why.lua |
 
-## Areas
+## Areas (one folder each)
 
-- **UI fading:** Frames, HideUI, GridRows, FrameLinks, Chat, Bubbles, Speech,
-  Tracking, NodeSweep, CursorHide, PersonalResources, Why/WhyPanel.
-- **Other addons:** AddonSupport, Conflicts, `Support/*` (one file per
-  addon, one row per frame).
-- **Camera:** Camera, Director, ZoomGuard, QuestCam, ShoulderCam (and
+- **Top level, the core:** Core, Migrations, Diagnostics, Profiler, Frames
+  (the fading frames and the frame pass), Effects (letterbox, names, music,
+  plates and CVars in CineMode), Options (the settings window), Skin,
+  Graphics, AddonSupport, Conflicts, Slash, SlashComplete, SelfTest,
+  Changelog, WhatsNew, ProfilerPage, GameSettingsPage, MinimapButton,
+  FrameGuess.
+- **`Support/`:** one file per other addon, one row per frame.
+- **`UI/`:** what shows when: HideUI, GridRows (Show in rows), FrameLinks,
+  Chat, Bubbles, Speech, Tracking, NodeSweep, CursorHide, PersonalResources,
+  the Cooldown Manager's stacks and situations, TooltipParts, Why/WhyPanel.
+- **`Camera/`:** Camera, Director, ZoomGuard, QuestCam, ShoulderCam (and
   Calibrate, MultiQuestFix), SkyrideCam, ChatCam, CameraRows, Triggers,
   TriggerLibrary, CustomTriggers, Shots, CameraScripts, CameraTests,
   CameraWheel, and their pages.
-- **Atmosphere and effects:** Effects (letterbox, names, music, plates and
-  CVars in CineMode), Tint, Focus, ScreenEffects, LowHealth, VitalsSound,
-  TeleportVision.
-- **Visions and cards:** Cards, CombatVision, CardMoments, ZoneCard, Recap,
+- **`Atmosphere/`:** Tint, Focus, ScreenEffects, LowHealth (Vitals),
+  VitalsSound, TeleportVision.
+- **`Visions/`:** Cards, CombatVision, CardMoments, ZoneCard, Recap,
   EmoteVision, RollWindow, QuestTalk, TalkingHeads, QuestMobs, QuestGlow,
   QuestItemButton, HealVisionFrames, DamageVision.
-- **Nameplates:** PlateParts, PlateIcons, PlateGuild, NameRowLook,
+- **`Plates/`:** PlateParts, PlateIcons, PlateGuild, NameRowLook,
   PlateRowLook, PlateThemes, NameThemes.
-- **Style hub:** StylePages (shared rows), StyleThemes, GeneralStyle, then one
-  file per page (`*Style.lua`), InterfaceRecolor, StyleOverrides.
-- **Quality of life:** Campfire, Hunter, HunterAmmo, DragEquip, TalentLink,
+- **`Style/`:** StylePages (shared rows), StyleThemes, GeneralStyle, one file
+  per page (`*Style.lua`), InterfaceRecolor, StyleOverrides, the personal
+  mana bar, ThemeShots, PageShots.
+- **`QoL/`:** Campfire, Hunter, HunterAmmo, DragEquip, TalentLink,
   TalentCalc, CenterPanels, XpLeft, KeyboardMap, Reload, the wheels.
-- **Profiles:** ProfileChoices (what players pick), ProfileModules (the
+- **`Profiles/`:** ProfileChoices (what players pick), ProfileModules (the
   settings behind each pick), Profiles, Share, Backups, Welcome, ShowMe,
-  Layouts.
-- **Help and tooling:** Slash, SlashComplete, SelfTest, ProfilerPage,
-  GameSettingsPage, Changelog, WhatsNew, ThemeShots, PageShots.
+  Layouts, FollowHud.
+- **`Dev/`:** everything only the dev copy loads (tests, demos, dev pages).
+  None of it ships (`.pkgmeta` leaves out the folder).
+
+A new file goes in its area's folder, in both TOCs at the same spot (the TOC
+check says if not). A TOC change needs the game restarted, not a `/reload`.
 
 ## Rules every change follows
 

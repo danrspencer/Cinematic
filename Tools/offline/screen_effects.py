@@ -14,7 +14,7 @@ import urllib.request
 
 BASE = "https://wago.tools/db2/%s/csv"
 HERE = os.path.dirname(os.path.abspath(__file__))
-OUT = os.path.join(HERE, "..", "..", "ScreenEffectsData.lua")
+OUT = os.path.join(HERE, "..", "..", "Atmosphere/ScreenEffectsData.lua")
 
 
 def table(name):

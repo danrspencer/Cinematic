@@ -59,10 +59,9 @@ AREAS = {
     # (Every file only the dev TOC loads: .pkgmeta can then leave out Dev/ whole.)
     "Dev": [
         "MouseTurn", "ShoulderCamTest", "PortalScout", "ScreenEffectScout", "TintLayerTest", "WindGuideStyles",
-        "WindGuide", "ModuleEditor", "HeldSettingsPage", "DemoHub", "MinimapTiles", "MinimapCopy", "BarHoverTest",
-        "LowManaTest", "ThresholdTest", "FlickerTest", "PlateWidthTest", "NamesTest", "StyleRevampTest",
-        "PlateFlickerTest", "StyleSixTest", "KeysBarsTest", "TurnLagTest", "ReadyAnyTimeTest", "IconCropTest",
-        "DamageVisionMeterTest", "HealthRedTest", "SpokenTest", "LoreForeverTest", "FollowHudTest",
+        "WindGuide", "ModuleEditor", "HeldSettingsPage", "DemoHub", "MinimapTiles", "MinimapCopy",
+        "LowManaTest", "ThresholdTest", "FlickerTest", "NamesTest", "StyleRevampTest",
+        "StyleSixTest", "KeysBarsTest", "TurnLagTest", "ReadyAnyTimeTest", "FollowHudTest",
     ],
 }
 # Tools that open an addon file by its path ("<name>.lua" in them gets the folder).

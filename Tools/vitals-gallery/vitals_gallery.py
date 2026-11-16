@@ -19,7 +19,7 @@ lua = lupa.LuaRuntime(unpack_returned_tuples=True)
 ns = lua.table()
 ns.isRetail = True  # (retail's menu: the game effects are retail's)
 loader = lua.eval("function(src, ns) local f = assert(load(src)) f('Cinematic', ns) end")
-for name in ("ScreenEffectsData.lua", "LowHealthThemes.lua"):
+for name in ("Atmosphere/ScreenEffectsData.lua", "Atmosphere/LowHealthThemes.lua"):
     loader(open(os.path.join(ADDON, name), encoding="utf-8").read(), ns)
 
 
@@ -248,7 +248,7 @@ OWN_COLORS = {6996936, 2159813, 2395778, 4529965, 5636772, 3522953, 2735672}  # 
 EDGES = {164: 1803988, 258: 1803988, 129: 1803988, 137: 1803988}  # (ScreenEffects.lua's SCREEN_EFFECT_EDGES)
 shot_files, order = [], []
 if SHOTS:
-    lh = open(os.path.join(ADDON, "LowHealth.lua"), encoding="utf-8").read()
+    lh = open(os.path.join(ADDON, "Atmosphere/LowHealth.lua"), encoding="utf-8").read()
     block = lh[lh.index("local EDGE_SCOUT = {"):lh.index("\n}", lh.index("local EDGE_SCOUT = {"))]
     order = [int(x) for x in re.findall(r"\{ (\d+), \"", block)]
     shot_files = sorted(f for f in os.listdir(SHOTS) if f.lower().endswith(".jpg"))

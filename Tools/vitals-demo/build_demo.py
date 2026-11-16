@@ -21,7 +21,7 @@ CROP = 118         # rows of a 1440-high shot under the reel's label box
 lua = lupa.LuaRuntime(unpack_returned_tuples=True)
 ns = lua.table()
 ns.isRetail = True  # (the page shows retail's menu: the game effects are retail's)
-for name in ("ScreenEffectsData.lua", "LowHealthThemes.lua"):
+for name in ("Atmosphere/ScreenEffectsData.lua", "Atmosphere/LowHealthThemes.lua"):
     src = open(os.path.join(ADDON, name), encoding="utf-8").read()
     lua.eval("function(src, ns) local f = assert(load(src)) f('Cinematic', ns) end")(src, ns)
 
@@ -112,7 +112,7 @@ for i in range(1, len(ns.LOW_HEALTH_MENU) + 1):
 # (Those no class has: More themes, as the page's menu has them.)
 menu.append({"name": "More themes", "specs": [{"spec": None, "key": k} for k in py(ns.LOW_HEALTH_MORE)]})
 
-lh = open(os.path.join(ADDON, "LowHealth.lua"), encoding="utf-8").read()
+lh = open(os.path.join(ADDON, "Atmosphere/LowHealth.lua"), encoding="utf-8").read()
 # The settings' defaults (LowHealth.lua's DEFAULTS.lowHealth... lines): numbers, ticks and words.
 defaults = {}
 for key, value in re.findall(r"^DEFAULTS\.(lowHealth\w+) = (\S+)", lh, re.M):

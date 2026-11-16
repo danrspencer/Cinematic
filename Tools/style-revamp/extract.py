@@ -12,7 +12,7 @@ OUT = os.path.join(HERE, "assets")
 os.makedirs(OUT, exist_ok=True)
 
 # --- themes: evaluate the THEMES table with Theme() as a pass-through
-src = open(os.path.join(REPO, "StyleThemes.lua"), encoding="utf-8").read().split("\n")
+src = open(os.path.join(REPO, "Style/StyleThemes.lua"), encoding="utf-8").read().split("\n")
 start = next(i for i, l in enumerate(src) if l.startswith("local THEMES = {"))
 end = next(i for i in range(start, len(src)) if src[i].startswith("}"))
 chunk = "\n".join(src[start:end + 1]).replace("local THEMES", "THEMES")
