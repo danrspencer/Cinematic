@@ -7720,6 +7720,16 @@ local function CreateQualityPanel()
 			GreyUnless(check, function(db) return db.campfireSitButton end)
 			previous = check
 		end
+		local reach = stack:Add(Slider(content, "campfireReach", L["Cursor reach from the middle"], 5, 50, 1,
+			L["%d%%"], 100), "slider", 24)
+		Tooltip(reach, L["How near the middle of the screen the cursor must be on a campfire for the Campfire " ..
+			"button to show, as a share of the screen's height. Higher: a fire further off the middle still counts."])
+		GreyUnless(reach, function(db) return db.campfireSitButton end)
+		local grow = stack:Add(Check(content, "campfireReachGrow", L["Reach widens the longer you hover"],
+			L["The longer the cursor stays on a campfire, you standing still, the further from the middle it may be: " ..
+			"the reach above grows a little each second, up to 30% more. Moving, or the cursor leaving the fire, " ..
+			"starts it again."]), "check", 24)
+		GreyUnless(grow, function(db) return db.campfireSitButton end)
 		local NAMES_TIP = L["Words that mark a campfire when they're in the name its tooltip shows " ..
 			"(\"Campfire\"), separated by commas. Use words in your game language."]
 		local namesLabel = Label(content, "GameFontHighlightSmall", L["Campfire names:"])

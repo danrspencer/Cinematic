@@ -38,7 +38,14 @@ local function CampfireNames()
 	return names
 end
 
-local CENTER_REACH = 0.1 -- how near the middle the cursor must be: this much of the screen's height
+-- How near the middle the cursor must be: campfireReach, a share of the
+-- screen's height. With campfireReachGrow, the reach widens by REACH_GROW a
+-- second while the cursor stays on the fire (you standing still), up to
+-- REACH_GROW_MAX more: a fire off to the side still gets the button after a
+-- moment (a high camera puts fires well off the middle).
+local REACH_GROW = 0.15
+local REACH_GROW_MAX = 0.3
+local onFireSince -- when the cursor came onto the fire (anywhere on the screen), or nil
 local OBJECT_REACH = 40  -- UI units the cursor may wander from where a hidden tooltip's campfire was found
 local LINGER = 1.5       -- seconds a sighting of the fire counts for, to bring it up
 local REST = 2.5         -- seconds after it's gone before it can show again
@@ -79,8 +86,17 @@ local function CenterOffset(x, y)
 	return math.sqrt((x - width / 2) ^ 2 + (y - height / 2) ^ 2) / height
 end
 
+local function Reach()
+	local db = ns.db
+	local reach = tonumber(db and db.campfireReach) or 0.1
+	if db and db.campfireReachGrow and onFireSince then
+		reach = reach + math.min(REACH_GROW_MAX, (GetTime() - onFireSince) * REACH_GROW)
+	end
+	return reach
+end
+
 local function NearCenter(x, y)
-	return CenterOffset(x, y) <= CENTER_REACH
+	return CenterOffset(x, y) <= Reach()
 end
 
 -- What counts as a tent: things the camera goes through that sit beside a
@@ -446,6 +462,13 @@ local function OnUpdate(_, elapsed)
 		ForgetTentIfAway()
 		-- (The fire's watched for Emote Vision's campfire card too, the button off.)
 		local onFire = CanSit(true) and OnCampfire()
+		-- (The reach's growth counts from when the cursor came onto the fire,
+		-- wherever on the screen; moving or leaving the fire starts it again.)
+		if onFire and not ns.playerMoving then
+			onFireSince = onFireSince or now
+		else
+			onFireSince = nil
+		end
 		if not CanSit(true) then
 			if alpha == 0 and not blockedLogged and ns.Setting("campfireSitButton") and TooltipIsCampfire() then
 				blockedLogged = true
@@ -483,8 +506,9 @@ local function OnUpdate(_, elapsed)
 			hoverSince = nil
 			if onFire and alpha == 0 and not blockedLogged then
 				blockedLogged = true
-				ns.Log("campfire", ("on a campfire, but no button: moving %s, cursor near the middle %s (%.2f of the screen's height off it, %.2f allowed)"):format(
-					tostring(ns.playerMoving), tostring(NearCenter(CursorPosition())), CenterOffset(CursorPosition()), CENTER_REACH))
+				ns.Log("campfire", ("on a campfire, but no button: moving %s, cursor near the middle %s (%.2f of the screen's height off it, %.2f allowed, widening %s)"):format(
+					tostring(ns.playerMoving), tostring(NearCenter(CursorPosition())), CenterOffset(CursorPosition()), Reach(),
+					tostring(ns.db.campfireReachGrow and true or false)))
 			end
 			if not onFire then
 				dismissed = false
