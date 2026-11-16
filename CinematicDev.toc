@@ -219,6 +219,7 @@ Dev\KeysBarsTest.lua
 Dev\TurnLagTest.lua
 Dev\ReadyAnyTimeTest.lua
 Dev\FollowHudTest.lua
+Dev\EuiSwingTest.lua
 Camera\CameraScriptsPage.lua
 Camera\CameraManager.lua
 Options.lua

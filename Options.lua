@@ -1671,6 +1671,13 @@ local function BuildSearchIndex(pages)
 			end
 		end
 		walk(page.canvas.content)
+		-- (The page's Enable switch: its checkbox is hidden, the switch drawn
+		-- in the page's header (RegisterPageSwitch), so the walk above never
+		-- reaches it and /cine find handleSwing found nothing, 2026-11-16.)
+		local switch = pageSwitches[page.canvas.content]
+		if switch and not keyed[switch.key] then
+			keyed[switch.key] = { page = page, text = L["Enable Page"], pageSwitch = switch }
+		end
 	end
 	return entries, keyed
 end
@@ -1750,8 +1757,18 @@ local function ShowMatch(entry, onPage)
 		object = object:GetParent()
 	end
 	if not onPage then ns.OpenOptions(entry.page.key) end
-	if not entry.edges then return end
 	local canvas = entry.page.canvas
+	-- (A page's Enable switch, in its header: made as the page shows, so
+	-- looked up once it has.)
+	if entry.pageSwitch then
+		C_Timer.After(0.1, function()
+			local header = entry.pageSwitch.header
+			canvas.scroll:SetVerticalScroll(0)
+			if header then Highlight(canvas, { top = header, bottom = header, left = header, right = header }) end
+		end)
+		return
+	end
+	if not entry.edges then return end
 	-- (once the page has shown and sized itself)
 	C_Timer.After(0.1, function()
 		local content, scroll = canvas.content, canvas.scroll
@@ -17323,6 +17340,9 @@ function ns.SettingIds()
 				id = ok and type(rowId) == "string" and ("row:" .. rowId) or nil
 			end
 			local label = SearchText(frame.searchLabel)
+			-- (A page's Enable switch: its checkbox hidden, its label taken off,
+			-- the switch in the page's header: named so, not left blank.)
+			if frame.hiddenSwitch then label = "Enable Page (page header switch)" end
 			local kind = frame:GetObjectType()
 			if id and not seen[id] then
 				seen[id] = true

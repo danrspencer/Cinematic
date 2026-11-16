@@ -2385,7 +2385,12 @@ ns.COMBAT_SHOW = {
 			"hovering your buffs brings it up."] },
 	{ key = "swing", label = L["Swing timer"], default = true, retail = false, morePage = "Swing timer",
 		tip = L["The Swing timer page can fade out the bars of weapons you aren't using, and the off-hand's."],
-		frames ={ "SwingTimerMainHandFrame", "SwingTimerOffHandFrame", "SwingTimerRangedFrame" } },
+		frames ={ "SwingTimerMainHandFrame", "SwingTimerOffHandFrame", "SwingTimerRangedFrame" },
+		-- (And every other frame in its group: one found by its name having
+		-- SwingTimer in it (AUTO_PATTERNS), like EllesmereUI's ERB_SwingTimerFrame
+		-- with its support switched off, was faded with the group but in no
+		-- row's list, so Always on this row never brought it up, 2026-11-16.)
+		groups = { "swing" } },
 	-- Always ticked to start with (CINE_SHOW_DEFAULT), as before it had a row,
 	-- and nothing else: untick it and tick In combat to hide your cast bar
 	-- in CineMode but for fights.

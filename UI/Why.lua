@@ -1205,8 +1205,9 @@ end
 -- /cine debug why: what Inspect finds under the cursor, and why not.
 -- Inspect's reasons for one faded frame, printed to chat (for debug reports).
 -- (UpdateFrames notes only the frames in ns.whyLook: watch it a moment first.)
-function ns.PrintWhyLater(entry, indent)
-	indent = indent or ""
+-- Inspect's reasons for one faded frame, half a second on, to fn(ok, status,
+-- reasons) (ok false: status is the error). For the debug recorders' logs.
+function ns.WhyLater(entry, fn)
 	local look = ns.whyLook
 	local added = not look
 	if added then
@@ -1219,6 +1220,13 @@ function ns.PrintWhyLater(entry, indent)
 		local ok, _, status, out = pcall(Explain, entry)
 		if not had and ns.whyLook == look then look[entry] = nil end
 		if added and ns.whyLook == look and not ns.whyPicking then ns.whyLook = nil end
+		fn(ok, status, out or NONE)
+	end)
+end
+
+function ns.PrintWhyLater(entry, indent)
+	indent = indent or ""
+	ns.WhyLater(entry, function(ok, status, out)
 		if not ok then
 			ns.Print(indent .. "why: error " .. tostring(status))
 			return
