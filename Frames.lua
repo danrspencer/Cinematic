@@ -4069,6 +4069,9 @@ do
 		return answer
 	end
 	function ns.UnitInBand(unit, band)
+		if band == "NearAggro" then
+			return ns.UnitNearAggro(unit)
+		end
 		if band == "OutOfRange" then
 			-- (Out of reach of every attack on your bars, or every helpful
 			-- spell for a friend: the longest that can say answers. A friend
@@ -4135,6 +4138,96 @@ do
 			return nil
 		end
 		return ns.NPCRank(unit)
+	end
+
+	-- Near aggro range (the Nameplates rows' NearAggro Distance): a living
+	-- hostile (red) NPC not in a fight yet, about near enough to attack you.
+	-- No game call gives a mob's aggro radius (looked for 2026-11-16), so it's
+	-- the known rule of thumb: about 20 yards at your level, a yard more for
+	-- each level it's above you and a yard less for each below, 5 to 45 (a
+	-- skull: 45); plus AGGRO_WARN yards so it shows before the pull. Neutral
+	-- (yellow) NPCs never attack on sight. Measured with the nearest check
+	-- that reaches that far (the interact distances, 11 and 28, out of a fight
+	-- only; or a harmful spell on your bars); with none that far, the
+	-- furthest there is. A start to tune: it'll be off for some mobs.
+	local AGGRO_BASE, AGGRO_MIN, AGGRO_MAX, AGGRO_WARN = 20, 5, 45, 5
+	-- (A unit's guessed aggro radius in yards; nil for one that won't attack
+	-- on sight, or when the game won't say.)
+	function ns.AggroRadius(unit)
+		if not unit or ns.EnemyNPCRank(unit) == nil then return nil end
+		local reaction = Plain(UnitReaction, unit, "player")
+		if type(reaction) ~= "number" or reaction > 3 then return nil end
+		if Plain(UnitAffectingCombat, unit) ~= false then return nil end
+		local level = Plain(UnitLevel, unit)
+		local mine = Plain(UnitEffectiveLevel or UnitLevel, "player")
+		if type(level) ~= "number" or type(mine) ~= "number" then return nil end
+		if level <= 0 then return AGGRO_MAX end
+		return math.max(AGGRO_MIN, math.min(AGGRO_MAX, AGGRO_BASE + level - mine))
+	end
+	-- (True or false; how it measured and how far, for /cine debug aggro.)
+	function ns.UnitNearAggro(unit)
+		local radius = ns.AggroRadius(unit)
+		if not radius then return false, "no aggro" end
+		local want = radius + AGGRO_WARN
+		LookForRangeSpells()
+		-- (The shortest attack on your bars that reaches want: the list is
+		-- longest first.)
+		local spellId, spellYards
+		for i = #farSpells.harmful, 1, -1 do
+			local id = farSpells.harmful[i]
+			if farYards[id] >= want then
+				spellId, spellYards = id, farYards[id]
+				break
+			end
+		end
+		local index = want <= 11 and 2 or want <= 28 and 4 or nil
+		local indexYards = index == 2 and 11 or 28
+		if index and (not spellYards or indexYards <= spellYards) then
+			local near = InteractDistance(unit, index)
+			if near ~= nil then return near, "interact", indexYards end
+		end
+		if spellId then
+			local reaches = SpellReaches(spellId, unit)
+			if reaches ~= nil then return reaches, "spell " .. spellId, spellYards end
+		end
+		if index then
+			local near = InteractDistance(unit, index)
+			if near ~= nil then return near, "interact", indexYards end
+		end
+		-- (Nothing that far: the furthest there is, so a mob further than it
+		-- can say shows late, not wrongly.)
+		local longest = farSpells.harmful[1]
+		if longest and farYards[longest] > 28 then
+			local reaches = SpellReaches(longest, unit)
+			if reaches ~= nil then return reaches, "spell " .. longest .. " (short)", farYards[longest] end
+		end
+		local near = InteractDistance(unit, 4)
+		if near ~= nil then return near, "interact (short)", 28 end
+		return false, "nothing can say"
+	end
+	-- /cine debug aggro: your target's guess, and every enemy plate's.
+	function ns.ReportAggroRange()
+		local function Line(unit)
+			local name = Plain(UnitName, unit)
+			local near, how, yards = ns.UnitNearAggro(unit)
+			return ("%s: level %s, reaction %s, in combat %s, radius %s, near %s (%s%s)"):format(
+				type(name) == "string" and name or "?", tostring(Plain(UnitLevel, unit)),
+				tostring(Plain(UnitReaction, unit, "player")), tostring(Plain(UnitAffectingCombat, unit)),
+				tostring(ns.AggroRadius(unit)), tostring(near), tostring(how), yards and ", " .. yards .. " yd" or "")
+		end
+		ns.Print(("aggro: game %s, you level %s (effective %s), in combat %s, harmful spells %d"):format(
+			tostring((select(4, GetBuildInfo()))), tostring(Plain(UnitLevel, "player")),
+			tostring(UnitEffectiveLevel and Plain(UnitEffectiveLevel, "player")), tostring(InCombatLockdown()),
+			#farSpells.harmful))
+		ns.Print("  target " .. (Plain(UnitExists, "target") and Line("target") or "none"))
+		local shown = 0
+		for i = 1, 40 do
+			local unit = "nameplate" .. i
+			if shown < 15 and Plain(UnitExists, unit) and Plain(UnitCanAttack, "player", unit) then
+				shown = shown + 1
+				ns.Print("  " .. unit .. " " .. Line(unit))
+			end
+		end
 	end
 
 	-- elite11, elite28, elite40: a living elite enemy within about 11, 28 or

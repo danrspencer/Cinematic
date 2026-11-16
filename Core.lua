@@ -993,8 +993,10 @@ for kind in pairs(ns.MARK_ROW_KINDS) do
 end
 -- A row's Distance, any kind's: its unit within about 11, 28 or 40 yards of
 -- you, past 28 or 40, or out of range of your spells (ns.UnitInBand). 40
--- asks a 40-yard spell on your bars; out of range, every one on them.
-ns.MARK_DISTANCES = { "In11", "In28", "In40", "Past28", "Past40", "OutOfRange" }
+-- asks a 40-yard spell on your bars; out of range, every one on them. Near
+-- aggro range: a hostile NPC about close enough to attack you (a guess from
+-- the levels: ns.UnitNearAggro).
+ns.MARK_DISTANCES = { "In11", "In28", "In40", "Past28", "Past40", "OutOfRange", "NearAggro" }
 -- A row's kind, Who (nil: all its units; one or more, in MARK_REACTIONS'
 -- order: "EnemyNeutral"), number (nil: the first) and Distance (nil: any):
 -- "npcEnemyPast403": "npc", "Enemy", 3, "Past40".

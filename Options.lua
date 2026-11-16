@@ -10398,9 +10398,16 @@ do
 			-- name, and its tip.)
 			local DISTANCE_NAMES = { In11 = L["Within 11 yards"], In28 = L["Within 28 yards"],
 				In40 = L["Within 40 yards"], Past28 = L["Past 28 yards"], Past40 = L["Past 40 yards"],
-				OutOfRange = L["Out of range"] }
+				OutOfRange = L["Out of range"], NearAggro = L["Near aggro range"] }
 			local DISTANCE_SHORT = { In11 = L["in 11 yd"], In28 = L["in 28 yd"], In40 = L["in 40 yd"],
-				Past28 = L["past 28 yd"], Past40 = L["past 40 yd"], OutOfRange = L["out of range"] }
+				Past28 = L["past 28 yd"], Past40 = L["past 40 yd"], OutOfRange = L["out of range"],
+				NearAggro = L["near aggro"] }
+			-- (Near aggro range, its own tip: Frames' ns.UnitNearAggro.)
+			local NEAR_AGGRO_TIP = L["This row: just hostile (red) NPCs not yet in a fight that are about " ..
+				"close enough to attack you, a few yards early. The game doesn't say how far a mob attacks from, " ..
+				"so it's a guess: about 20 yards at your level, a yard more for each level it's above you and a " ..
+				"yard less for each below (5 to 45). Measured with the game's 28-yard interact distance or a " ..
+				"spell on your action bars, so it can be a few yards off."]
 			local DISTANCE_TIP = L["This row: just those about that far from you. 11 and 28 yards are the " ..
 				"game's interact distances; 40 asks a 40-yard spell on your action bars (harmful for enemies, " ..
 				"helpful for friends), and with none there the row fits no unit past 28 yards. Out of range: " ..
@@ -10444,7 +10451,7 @@ do
 					full = kind[2] .. (fullScope ~= "" and " - " .. fullScope or "") .. (number and " " .. number or ""),
 					tip = kind[3] .. (reaction and " " .. (REACTION_TIPS[reaction]
 						or (L["This row: just these among them: %s."]):format(WhoName(reaction))) or "")
-						.. (distance and " " .. DISTANCE_TIP or "") }
+						.. (distance and " " .. (distance == "NearAggro" and NEAR_AGGRO_TIP or DISTANCE_TIP) or "") }
 			end
 			preview.RowInfo = RowInfo
 

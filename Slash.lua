@@ -2057,6 +2057,8 @@ local function HandleSlash(msg)
 		ns.ReportCooldowns()
 	elseif cmd == "debug" and arg == "spellrange" then
 		ns.ReportSpellRange()
+	elseif cmd == "debug" and arg == "aggro" then
+		ns.ReportAggroRange()
 	elseif cmd == "debug" and arg == "textures" then
 		ns.ShowStyleTextures()
 	elseif cmd == "debug" and arg == "xpbar" then
