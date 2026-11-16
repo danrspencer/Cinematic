@@ -15,8 +15,10 @@ Both TOCs load the same files in the same order. The dev copy
    (`ns.Profiled`), `Graphics`.
 2. **`Core.lua`:** client flags (`ns.isRetail`, `ns.isClassicEra`),
    `DEFAULTS` (most of them), CineMode itself and the main tick, then the
-   ADDON_LOADED/PLAYER_LOGIN handler (settings updates, defaults filled in,
-   profiles, slash command).
+   ADDON_LOADED/PLAYER_LOGIN handler (settings updates via
+   `ns.RunMigrations`, defaults filled in, profiles, slash command).
+   `Migrations.lua` right after it holds the once-only settings updates, in
+   steps.
 3. **Features**, roughly by area (below). Each one builds its frames at load
    and hooks into the tick, events or signals.
 4. **Last:** `Options.lua` and the page files (the settings window), then
@@ -101,8 +103,10 @@ earlier in the TOC. Inside functions that run later, any `ns.X` works.
   table or inside a `do ... end` block. The offline check catches going over.
 - **Settings:** a new setting goes in `DEFAULTS`, its page's Reset uses it,
   and a page switched off turns off everything on it. Changing an existing
-  default for players already playing needs a one-time update in Core's load
-  handler, with a `...V1` flag.
+  default for players already playing needs a once-only update at the end of
+  `Migrations.lua`, with a `...V1` flag. Check it with
+  `Tools/offline/migrate-test.lua`: it runs every update on a real saved
+  settings file, with each flag off, so two versions can be compared.
 - **Before committing:** `luacheck .` and the offline check
   (`python -I Tools/offline/run.py Tools/offline/check.lua`). The pre-commit
   hook runs both (`Tools/hooks/`, see below). Then the whats-new skill.

@@ -25,6 +25,7 @@ Diagnostics.lua
 Profiler.lua
 Graphics.lua
 Core.lua
+Migrations.lua
 Skin.lua
 GridRows.lua
 HideUI.lua

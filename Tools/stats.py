@@ -96,8 +96,13 @@ def main():
             near_cap.append((count, f))
     funcs.sort(reverse=True)
     near_cap.sort(reverse=True)
-    with open(os.path.join(ROOT, "Core.lua"), encoding="utf-8", errors="replace") as h:
-        migrations = len(set(re.findall(r"ns\.db\.(\w+V\d+) = true", h.read())))
+    flags = set()
+    for name in ("Core.lua", "Migrations.lua"):
+        path = os.path.join(ROOT, name)
+        if os.path.exists(path):
+            with open(path, encoding="utf-8", errors="replace") as h:
+                flags |= set(re.findall(r"ns\.db\.(\w+V\d+) = true", h.read()))
+    migrations = len(flags)
     commits = subprocess.run(["git", "rev-list", "--count", "HEAD"], cwd=ROOT, capture_output=True,
                              text=True).stdout.strip()
     row = {
