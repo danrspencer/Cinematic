@@ -1,5 +1,14 @@
 # Managing the addon's growth (2026-11-15)
 
+> **Status, later on 2026-11-15:** A (the hook) is on. From B, the 4 unhooked
+> functions are sorted (the rule editor now closes with the settings; the menu's
+> tint preview and camera tab link are removed; the camera shake is kept as an
+> idea for big hits). 8 finished test files are deleted, and the parked
+> features are kept (each has a note to come back to). The 184 updates are in
+> `Migrations.lua` (15 steps, checked equal on 4 real saved files). C is done:
+> the files are in area folders. D waits for the log's build time from the
+> game. Below is the plan as first written.
+
 The seven steps from the review, what was done for each, and what's waiting
 for your decision. **Nothing is committed.** All checks pass on the working
 tree: luacheck, `Tools/check-toc.py` and the offline check. None of it has been
