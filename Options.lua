@@ -70,6 +70,7 @@ end
 -- it's under, as shown, or false above the first; sections: in the order
 -- they're on the page). For the profile modules. Unnamed: under "?".
 function ns.PageSettings()
+	if ns.MakeLazyPages then ns.MakeLazyPages("the page list") end
 	local pages = {}
 	local function Page(content)
 		local frame = content
@@ -1579,6 +1580,39 @@ end
 -- Also the controls by their setting's key (frame.settingKey, set by
 -- Remember): keyed[key] = the first such entry found.
 ns.searchPrepare = {} -- pages that fill their rows only when shown: called to fill them before a search
+-- Pages whose body is made the first time they're needed, not at login: the
+-- two that cost the most to make (HUD ~300 ms and Hover Groups ~190 ms of the
+-- ~1.35 s every page took on Forever, 2026-11-16). Opening the page makes it,
+-- and so does anything that reads every page: the search (and /cine find),
+-- ns.PageSettings (the profiles), ns.SettingIds. The log says when each is made.
+local lazyPages = { list = {} }
+function lazyPages.Add(canvas, name, build)
+	local made = false
+	local function Make(why)
+		if made then return end
+		made = true
+		local started = type(debugprofilestop) == "function" and debugprofilestop()
+		ns.Guard(build)
+		local ended = type(started) == "number" and debugprofilestop()
+		if type(ended) == "number" and ns.Log then
+			ns.Log("load", ("settings page %s made when first needed (%s) in %d ms"):format(name, why or "?",
+				ended - started))
+		end
+	end
+	-- (The page's own OnShow, set as it's made, runs straight after.)
+	local function FirstShow(self, ...)
+		Make("opened")
+		local onShow = self:GetScript("OnShow")
+		if onShow and onShow ~= FirstShow then onShow(self, ...) end
+	end
+	canvas:SetScript("OnShow", FirstShow)
+	lazyPages.list[#lazyPages.list + 1] = Make
+	return Make
+end
+function ns.MakeLazyPages(why)
+	for _, Make in ipairs(lazyPages.list) do Make(why) end
+end
+ns.searchPrepare[#ns.searchPrepare + 1] = function() ns.MakeLazyPages("search") end
 local function BuildSearchIndex(pages)
 	Refresh() -- (slider titles and some rows are only filled in on refresh)
 	for _, prepare in ipairs(ns.searchPrepare) do prepare() end
@@ -6991,526 +7025,538 @@ local function CreateCombatPanel()
 	-- (Pet happiness: the Quality of life > Hunter page.)
 	-- The lowest option so far, and how far in from the column edge it sits.
 	local lastCheck, lastIndent = switch, 0
-
-	-- Each section a tab of its own, in Heal Vision's folder look
-	-- (ns.FolderTabs, made once every section is): the picked one's table
-	-- shows on the panel under them, its full name at its top. (The party
-	-- frames' two sections share the Party tab, raid-style second.) The raid-style
-	-- party frames' (page = "rsparty") rows are greyed while its "Same as raid
-	-- frames" is ticked, when the raid frames' rows decide for them; unticked,
-	-- they're rows of their own, starting from the raid frames' choices.
-	-- (section.body: what its table made, hidden on other tabs: search still
-	-- finds it, and picks its tab; section.last: its last row's label, the
-	-- panel's bottom under it.) The tab last picked is kept across reloads
-	-- (SectionState, its id "Standard Frames/tab", open the section's key).
-	local sections = {}
-	local picked = { id = "Standard Frames/tab", open = "units" }
-	-- (The panel's top left, under the tabs (placed once they're made, as high
-	-- as their rows); the sections' frames hang on it.)
-	local panelTop = CreateFrame("Frame", nil, content)
-	panelTop:SetSize(1, 1)
-	local panel, ShowTab, PlaceTop
-	-- (The unit frames' Addon Frame Links section, at the bottom of their tab:
-	-- made once the sections are.)
-	local unitLinks
-	-- (Sections sharing a tab name share its tab, stacked: the party frames,
-	-- raid-style and not. tabs[i] = { label, sections }.)
-	local tabs = {}
-	local function OwnPartyRows()
-		-- (The page is built before the settings load: the default then.)
-		local db = ns.GetDB()
-		return db ~= nil and db.raidStylePartySame == false
+	-- (Everything below is made the first time the page is needed, not at
+	-- login: lazyPages. Opened from elsewhere before then, a section's tab
+	-- makes it first.)
+	local MakeHud
+	local function OpenSectionFirst(key)
+		MakeHud("a section opened")
+		if ns.OpenFramesSection ~= OpenSectionFirst then return ns.OpenFramesSection(key) end
 	end
-	-- Shows the picked section's tab (its sections one under another, the one
-	-- the game uses now tagged In use), the panel down to its last row.
-	local function Layout()
-		SectionState.Restore(picked)
-		local shown
-		for i, tab in ipairs(tabs) do
-			for _, section in ipairs(tab.sections) do
-				if section.key == picked.open then shown = i end
+	ns.OpenFramesSection = OpenSectionFirst
+	local function MakeBody()
+
+		-- Each section a tab of its own, in Heal Vision's folder look
+		-- (ns.FolderTabs, made once every section is): the picked one's table
+		-- shows on the panel under them, its full name at its top. (The party
+		-- frames' two sections share the Party tab, raid-style second.) The raid-style
+		-- party frames' (page = "rsparty") rows are greyed while its "Same as raid
+		-- frames" is ticked, when the raid frames' rows decide for them; unticked,
+		-- they're rows of their own, starting from the raid frames' choices.
+		-- (section.body: what its table made, hidden on other tabs: search still
+		-- finds it, and picks its tab; section.last: its last row's label, the
+		-- panel's bottom under it.) The tab last picked is kept across reloads
+		-- (SectionState, its id "Standard Frames/tab", open the section's key).
+		local sections = {}
+		local picked = { id = "Standard Frames/tab", open = "units" }
+		-- (The panel's top left, under the tabs (placed once they're made, as high
+		-- as their rows); the sections' frames hang on it.)
+		local panelTop = CreateFrame("Frame", nil, content)
+		panelTop:SetSize(1, 1)
+		local panel, ShowTab, PlaceTop
+		-- (The unit frames' Addon Frame Links section, at the bottom of their tab:
+		-- made once the sections are.)
+		local unitLinks
+		-- (Sections sharing a tab name share its tab, stacked: the party frames,
+		-- raid-style and not. tabs[i] = { label, sections }.)
+		local tabs = {}
+		local function OwnPartyRows()
+			-- (The page is built before the settings load: the default then.)
+			local db = ns.GetDB()
+			return db ~= nil and db.raidStylePartySame == false
+		end
+		-- Shows the picked section's tab (its sections one under another, the one
+		-- the game uses now tagged In use), the panel down to its last row.
+		local function Layout()
+			SectionState.Restore(picked)
+			local shown
+			for i, tab in ipairs(tabs) do
+				for _, section in ipairs(tab.sections) do
+					if section.key == picked.open then shown = i end
+				end
 			end
-		end
-		shown = shown or 1
-		for _, section in ipairs(sections) do
-			section.frame:Hide()
-			section.body:Hide()
-		end
-		local order = {}
-		for _, section in ipairs(tabs[shown].sections) do
-			if section.relayout then section.relayout() end -- (the Unit frames' blocks, open as saved)
-			local inUse = #tabs[shown].sections > 1 and section.inUse and section.inUse()
-			if section.inUseTag then section.inUseTag:SetShown(inUse == true) end
-			order[#order + 1] = section
-		end
-		-- (The raid-style party frames' grid folded away while Same as raid
-		-- frames is ticked: just their heading, the raid frames' rows decide.)
-		local above, bottom
-		for _, section in ipairs(order) do
-			section.frame:ClearAllPoints()
-			if bottom then
-				section.frame:SetPoint("TOPLEFT", bottom, "BOTTOMLEFT", 0, -28)
-			else
-				section.frame:SetPoint("TOPLEFT", panelTop, "TOPLEFT", 12, -10)
+			shown = shown or 1
+			for _, section in ipairs(sections) do
+				section.frame:Hide()
+				section.body:Hide()
 			end
-			local folded = section.key == "rsparty" and not OwnPartyRows()
-			section.frame:Show()
-			section.body:SetShown(not folded)
-			above, bottom = section, folded and section.frame or section.last
-		end
-		-- (Addon Frame Links last on the Unit frames tab, in from the edge for its +/-.)
-		local inset = 0
-		if unitLinks then
-			local here = false
+			local order = {}
+			for _, section in ipairs(tabs[shown].sections) do
+				if section.relayout then section.relayout() end -- (the Unit frames' blocks, open as saved)
+				local inUse = #tabs[shown].sections > 1 and section.inUse and section.inUse()
+				if section.inUseTag then section.inUseTag:SetShown(inUse == true) end
+				order[#order + 1] = section
+			end
+			-- (The raid-style party frames' grid folded away while Same as raid
+			-- frames is ticked: just their heading, the raid frames' rows decide.)
+			local above, bottom
 			for _, section in ipairs(order) do
-				if section.key == "units" then here = true end
+				section.frame:ClearAllPoints()
+				if bottom then
+					section.frame:SetPoint("TOPLEFT", bottom, "BOTTOMLEFT", 0, -28)
+				else
+					section.frame:SetPoint("TOPLEFT", panelTop, "TOPLEFT", 12, -10)
+				end
+				local folded = section.key == "rsparty" and not OwnPartyRows()
+				section.frame:Show()
+				section.body:SetShown(not folded)
+				above, bottom = section, folded and section.frame or section.last
 			end
-			unitLinks.frame:ClearAllPoints()
-			unitLinks.frame:SetShown(here)
-			if here then
-				inset = 18
-				unitLinks.frame:SetPoint("TOPLEFT", bottom, "BOTTOMLEFT", inset, -18)
-				unitLinks.frame:SetWidth(above.width - inset)
-				bottom = unitLinks.frame
+			-- (Addon Frame Links last on the Unit frames tab, in from the edge for its +/-.)
+			local inset = 0
+			if unitLinks then
+				local here = false
+				for _, section in ipairs(order) do
+					if section.key == "units" then here = true end
+				end
+				unitLinks.frame:ClearAllPoints()
+				unitLinks.frame:SetShown(here)
+				if here then
+					inset = 18
+					unitLinks.frame:SetPoint("TOPLEFT", bottom, "BOTTOMLEFT", inset, -18)
+					unitLinks.frame:SetWidth(above.width - inset)
+					bottom = unitLinks.frame
+				end
 			end
+			ShowTab(shown)
+			if PlaceTop then PlaceTop() end -- (the tabs' rows, measured again as they're shown)
+			panel:SetPoint("BOTTOMRIGHT", bottom, "BOTTOMLEFT", above.width + 6 - inset, -12)
+			FitContentHeight(content)
 		end
-		ShowTab(shown)
-		if PlaceTop then PlaceTop() end -- (the tabs' rows, measured again as they're shown)
-		panel:SetPoint("BOTTOMRIGHT", bottom, "BOTTOMLEFT", above.width + 6 - inset, -12)
-		FitContentHeight(content)
-	end
-	local function Pick(section)
-		SectionState.Save(picked, section.key)
-		Layout()
-	end
-	-- (ns.FramesLink's: the page opened at a section's tab.)
-	function ns.OpenFramesSection(key)
-		SectionState.Restore(picked)
-		SectionState.Save(picked, key)
-		Layout()
-		ns.OpenOptions("Standard Frames")
-	end
-	resetHooks[content] = function()
-		Layout()
-		ns.ApplyHideKeybinds()
-		if ns.ApplyMirrorTimers then ns.ApplyMirrorTimers() end
-	end
-	-- Set apart: its rows start as the raid frames' (ticks and rules),
-	-- unless they have choices of their own from before.
-	local function CopyRaidRows()
-		local db = ns.GetDB()
-		for _, key in pairs(ns.RAID_STYLE_PARTY) do
-			for _, column in ipairs(FRAME_COLUMNS) do
-				if db[column[3]][key] ~= nil then
-					return
+		local function Pick(section)
+			SectionState.Save(picked, section.key)
+			Layout()
+		end
+		-- (ns.FramesLink's: the page opened at a section's tab.)
+		function ns.OpenFramesSection(key)
+			SectionState.Restore(picked)
+			SectionState.Save(picked, key)
+			Layout()
+			ns.OpenOptions("Standard Frames")
+		end
+		resetHooks[content] = function()
+			Layout()
+			ns.ApplyHideKeybinds()
+			if ns.ApplyMirrorTimers then ns.ApplyMirrorTimers() end
+		end
+		-- Set apart: its rows start as the raid frames' (ticks and rules),
+		-- unless they have choices of their own from before.
+		local function CopyRaidRows()
+			local db = ns.GetDB()
+			for _, key in pairs(ns.RAID_STYLE_PARTY) do
+				for _, column in ipairs(FRAME_COLUMNS) do
+					if db[column[3]][key] ~= nil then
+						return
+					end
+				end
+			end
+			for raidKey, key in pairs(ns.RAID_STYLE_PARTY) do
+				for _, column in ipairs(FRAME_COLUMNS) do
+					db[column[3]][key] = column[2](raidKey)
+				end
+				if type(db.frameRules) == "table" then
+					db.frameRules[key] = db.frameRules[raidKey]
 				end
 			end
 		end
-		for raidKey, key in pairs(ns.RAID_STYLE_PARTY) do
-			for _, column in ipairs(FRAME_COLUMNS) do
-				db[column[3]][key] = column[2](raidKey)
-			end
-			if type(db.frameRules) == "table" then
-				db.frameRules[key] = db.frameRules[raidKey]
-			end
+		-- What's on the page, to tell what a table adds.
+		local function Widgets()
+			local set = {}
+			for _, object in ipairs({ content:GetChildren() }) do set[object] = true end
+			for _, object in ipairs({ content:GetRegions() }) do set[object] = true end
+			return set
 		end
-	end
-	-- What's on the page, to tell what a table adds.
-	local function Widgets()
-		local set = {}
-		for _, object in ipairs({ content:GetChildren() }) do set[object] = true end
-		for _, object in ipairs({ content:GetRegions() }) do set[object] = true end
-		return set
-	end
 
-	local SECTION_WIDTH = ns.GRID_MENUS and ns.GridTableWidth(FRAME_LABEL_WIDTH)
-		or FRAME_LABEL_WIDTH + #FRAME_COLUMNS * FRAME_COLUMN_WIDTH
-	-- The Unit frames section where the client has the parts (and menus): a
-	-- block per frame, its row as the other sections' and under it, opened and
-	-- closed with a click on its name (the +/- in the margin), a row per part
-	-- it has (its unitPart<frame><part> settings). The
-	-- focus and target of target ones start with Same as target, their parts
-	-- greyed while it's ticked. Which are open is kept across reloads
-	-- (SectionState, "Standard Frames/unit/<row key>"). Gives the mark under
-	-- the last block, to place what comes below; section.relayout opens and
-	-- closes the blocks as saved, for Layout.
-	local function UnitBlocks(frame, sectionRows, heading, section)
-		local UNITS = {
-			player = { unit = "Player", parts = ns.UNIT_PARTS_PLAYER },
-			petframe = { unit = "Pet", parts = ns.UNIT_PARTS_PET },
-			target = { unit = "Target", parts = ns.UNIT_PARTS_TARGET },
-			tot = _G.TargetFrameToT and { unit = "ToT", same = "unitPartsToTSame", parts = ns.UNIT_PARTS_TOT } or nil,
-			focus = _G.FocusFrame and { unit = "Focus", same = "unitPartsFocusSame", parts = ns.UNIT_PARTS_TARGET }
-				or nil,
-			focustot = _G.FocusFrame and _G.FocusFrameToT
-				and { unit = "FocusToT", same = "unitPartsFocusToTSame", parts = ns.UNIT_PARTS_TOT } or nil,
-		}
-		local PARTS = ns.UnitPartLabels()
-		-- (Every frame's name moved in TOGGLE_W for the +/-, its parts' INDENT.)
-		local ROW_H, TOGGLE_W, INDENT = 24, 18, 30
-		local kit = setmetatable({ labelWidth = FRAME_LABEL_WIDTH, rowHeight = ROW_H, columns = FRAME_COLUMNS },
-			{ __index = ns.GRID_KIT })
-		local labelWidth = FRAME_LABEL_WIDTH - ns.GRID_TABLE_LABEL_TRIM
-		-- (Where ns.GridTable puts a table's row, under its column top.)
-		local rowTop = -FRAME_HEADING_HEIGHT - 4
-		SetSection(content, heading)
-		local blocks, partRows, after = {}, {}, nil
-		local function Relayout()
-			for _, block in ipairs(blocks) do
-				local open = block.height and SectionState.Restore(block.state) and true or false
-				block.box:SetShown(open)
-				block.box:SetHeight(open and block.height or 0.001)
-				if block.icon then
-					block.icon:SetTexture(open and "Interface\\Buttons\\UI-MinusButton-Up"
-						or "Interface\\Buttons\\UI-PlusButton-Up")
+		local SECTION_WIDTH = ns.GRID_MENUS and ns.GridTableWidth(FRAME_LABEL_WIDTH)
+			or FRAME_LABEL_WIDTH + #FRAME_COLUMNS * FRAME_COLUMN_WIDTH
+		-- The Unit frames section where the client has the parts (and menus): a
+		-- block per frame, its row as the other sections' and under it, opened and
+		-- closed with a click on its name (the +/- in the margin), a row per part
+		-- it has (its unitPart<frame><part> settings). The
+		-- focus and target of target ones start with Same as target, their parts
+		-- greyed while it's ticked. Which are open is kept across reloads
+		-- (SectionState, "Standard Frames/unit/<row key>"). Gives the mark under
+		-- the last block, to place what comes below; section.relayout opens and
+		-- closes the blocks as saved, for Layout.
+		local function UnitBlocks(frame, sectionRows, heading, section)
+			local UNITS = {
+				player = { unit = "Player", parts = ns.UNIT_PARTS_PLAYER },
+				petframe = { unit = "Pet", parts = ns.UNIT_PARTS_PET },
+				target = { unit = "Target", parts = ns.UNIT_PARTS_TARGET },
+				tot = _G.TargetFrameToT and { unit = "ToT", same = "unitPartsToTSame", parts = ns.UNIT_PARTS_TOT } or nil,
+				focus = _G.FocusFrame and { unit = "Focus", same = "unitPartsFocusSame", parts = ns.UNIT_PARTS_TARGET }
+					or nil,
+				focustot = _G.FocusFrame and _G.FocusFrameToT
+					and { unit = "FocusToT", same = "unitPartsFocusToTSame", parts = ns.UNIT_PARTS_TOT } or nil,
+			}
+			local PARTS = ns.UnitPartLabels()
+			-- (Every frame's name moved in TOGGLE_W for the +/-, its parts' INDENT.)
+			local ROW_H, TOGGLE_W, INDENT = 24, 18, 30
+			local kit = setmetatable({ labelWidth = FRAME_LABEL_WIDTH, rowHeight = ROW_H, columns = FRAME_COLUMNS },
+				{ __index = ns.GRID_KIT })
+			local labelWidth = FRAME_LABEL_WIDTH - ns.GRID_TABLE_LABEL_TRIM
+			-- (Where ns.GridTable puts a table's row, under its column top.)
+			local rowTop = -FRAME_HEADING_HEIGHT - 4
+			SetSection(content, heading)
+			local blocks, partRows, after = {}, {}, nil
+			local function Relayout()
+				for _, block in ipairs(blocks) do
+					local open = block.height and SectionState.Restore(block.state) and true or false
+					block.box:SetShown(open)
+					block.box:SetHeight(open and block.height or 0.001)
+					if block.icon then
+						block.icon:SetTexture(open and "Interface\\Buttons\\UI-MinusButton-Up"
+							or "Interface\\Buttons\\UI-PlusButton-Up")
+					end
 				end
 			end
+			section.relayout = Relayout
+			for i, item in ipairs(sectionRows) do
+				local unit = UNITS[item.key]
+				local block = { state = { id = "Standard Frames/unit/" .. item.key, open = false } }
+				blocks[i] = block
+				local columnTop = CreateFrame("Frame", nil, content)
+				columnTop:SetSize(1, 1)
+				if after then
+					columnTop:SetPoint("TOPLEFT", after, "BOTTOMLEFT", 0, -rowTop)
+				else
+					columnTop:SetPoint("TOPLEFT", frame, "BOTTOMLEFT", 0, 6) -- (as ShowTable's, under a header)
+				end
+				local label = ns.GridTable(content, columnTop, { item, noHeadings = after ~= nil,
+					followRows = sectionRows, bandFrom = i - 1 }, kit)
+				local point, relativeTo, relativePoint, x, y = label:GetPoint(1)
+				label:SetPoint(point, relativeTo, relativePoint, x + TOGGLE_W, y)
+				label:SetWidth(label:GetWidth() - TOGGLE_W)
+				local box = CreateFrame("Frame", nil, content)
+				box:SetPoint("TOPLEFT", columnTop, "TOPLEFT", 0, rowTop - ROW_H)
+				box:SetSize(section.width, 0.001)
+				box:Hide()
+				block.box, after = box, box
+				if unit then
+					local function Toggle()
+						SectionState.Save(block.state, not block.state.open)
+						Relayout()
+						Layout()
+					end
+					-- (Search finding a part opens its frame's block, and the tab.)
+					box.openSection = function()
+						SectionState.Save(block.state, true)
+						section.body.openSection()
+					end
+					local plus = CreateFrame("Button", nil, content)
+					plus:SetSize(16, 16)
+					plus:SetPoint("LEFT", columnTop, "TOPLEFT", 0, rowTop - ROW_H / 2)
+					block.icon = plus:CreateTexture(nil, "ARTWORK")
+					block.icon:SetAllPoints()
+					plus:SetScript("OnClick", Toggle)
+					Tooltip(plus, L["Shows or hides its parts."])
+					local name = CreateFrame("Button", nil, content)
+					name:SetPoint("TOPLEFT", label, "TOPLEFT", 0, 4)
+					name:SetPoint("BOTTOMRIGHT", label, "BOTTOMRIGHT", 0, -4)
+					name:SetScript("OnClick", Toggle)
+					Tooltip(name, (item.tip and item.tip .. "\n\n" or "") .. L["Click to show or hide its parts."])
+					local before = Widgets()
+					local y, same = 0, unit.same
+					unit.keys = {}
+					if same then
+						local check = Check(content, same, L["Same as target"],
+							L["Ticked: this frame shows the parts the Target rows say. Untick it to give the frame " ..
+							"choices of its own."], function(value)
+							ns.GetDB()[same] = value
+							if not value then
+								ns.CopyTargetParts(unit.unit, unit.keys)
+							end
+							ns.ApplyUnitFrameParts()
+							Refresh()
+						end)
+						check:SetPoint("TOPLEFT", box, "TOPLEFT", INDENT - 4, 0)
+						y = -ROW_H
+					end
+					local k = 0
+					for _, part in ipairs(PARTS) do
+						if ns.UnitHasPart(unit.unit, unit.parts, part[1]) then
+							k = k + 1
+							unit.keys[k] = part[1]
+							local row = ns.UnitPartRow(content, labelWidth, ns.GRID_TABLE_LAYOUT, unit.unit, item.label,
+								part, same, k + 1, INDENT)
+							row:SetPoint("TOPLEFT", box, "TOPLEFT", labelWidth, y - (k - 1) * ROW_H)
+							partRows[#partRows + 1] = row
+						end
+					end
+					block.height = -y + k * ROW_H
+					for object in pairs(Widgets()) do
+						if not before[object] then object:SetParent(box) end
+					end
+				end
+			end
+			ns.GridDots(content, partRows)
+			Relayout()
+			return after
 		end
-		section.relayout = Relayout
-		for i, item in ipairs(sectionRows) do
-			local unit = UNITS[item.key]
-			local block = { state = { id = "Standard Frames/unit/" .. item.key, open = false } }
-			blocks[i] = block
-			local columnTop = CreateFrame("Frame", nil, content)
-			columnTop:SetSize(1, 1)
-			if after then
-				columnTop:SetPoint("TOPLEFT", after, "BOTTOMLEFT", 0, -rowTop)
+
+		-- (tab: its tab's name, nil: heading. link: { page, tip, label }, a button
+		-- to the page with the rest of its settings, right of its heading, named
+		-- label or the page.)
+		local function Section(page, heading, tab, link)
+			local sectionRows = {}
+			for _, item in ipairs(ns.COMBAT_SHOW) do
+				if item.page == page and ns.OptionAvailable(item) and not item.key:find("^addon:")
+					and not (item.auraFrames and not _G.CompactUnitFrame_UtilSetBuff) then
+					sectionRows[#sectionRows + 1] = item
+				end
+			end
+			if #sectionRows == 0 then
+				return
+			end
+			-- (Whole frames first, then the parts drawn inside them, each kind under
+			-- a heading of its own: the raid tab's Raid Frame Manager up with Players.)
+			local whole, inside = {}, {}
+			for _, item in ipairs(sectionRows) do table.insert(item.part and inside or whole, item) end
+			if #whole > 0 and #inside > 0 then
+				sectionRows = whole
+				for _, item in ipairs(inside) do sectionRows[#sectionRows + 1] = item end
+				sectionRows.kindHeadings = { L["Frames"], L["Parts"] }
+			end
+			local section = { key = page or "other", tab = tab or heading, width = SECTION_WIDTH }
+			local frame = CreateFrame("Frame", nil, content)
+			frame:SetSize(SECTION_WIDTH, 20)
+			frame:SetPoint("TOPLEFT", panelTop, "TOPLEFT", 12, -10)
+			frame.searchAlways = true
+			section.frame = frame
+			local title = Label(frame, "GameFontNormal", heading)
+			title:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, -3)
+			local after = title -- (what the next button or the In use tag goes right of)
+			-- (The raid-style party frames: a button to the Raid tab, whose rows
+			-- they follow while Same as raid frames is ticked.)
+			if page == "rsparty" then
+				local raid = ns.PanelButton(frame)
+				raid:SetSize(70, 20)
+				raid:SetText(L["Raid"] .. " »")
+				raid:SetWidth(math.max(70, raid:GetFontString():GetStringWidth() + 24))
+				raid:SetPoint("LEFT", title, "RIGHT", 12, 0)
+				Tooltip(raid, L["Opens the Raid tab: its rows decide for these frames while Same as raid frames is ticked."])
+				raid:SetScript("OnClick", function()
+					for _, each in ipairs(sections) do
+						if each.key == "raid" then Pick(each) end
+					end
+				end)
+				after = raid
+			end
+			-- (link: one such, or a list of them, side by side.)
+			for _, each in ipairs(link and (type(link[1]) == "table" and link or { link }) or {}) do
+				local style = ns.StyleLink(frame, title, each[1], each[2], Tooltip, (each[3] or ns.PageLabel(each[1])) .. " »")
+				style:SetPoint("LEFT", after, "RIGHT", after == title and 12 or 6, 0)
+				after = style
+			end
+			-- (The party frames: which of their two kinds the game draws now, the
+			-- Edit Mode setting. Its section is tagged on their tab.)
+			if (page == "party" or page == "rsparty") and ns.RaidStyleParty then
+				local raid = page == "rsparty"
+				section.inUse = function() return ns.RaidStyleParty() == raid end
+				local tag = Label(frame, "GameFontHighlightSmall", L["In use"])
+				tag:SetTextColor(0.3, 0.9, 0.3)
+				tag:SetPoint("LEFT", after, "RIGHT", 12, 0)
+				tag.searchSkip = true
+				tag:Hide()
+				section.inUseTag = tag
+			end
+			section.body = CreateFrame("Frame", nil, content)
+			section.body:SetPoint("TOPLEFT", frame, "TOPLEFT")
+			section.body:SetSize(1, 1)
+			section.body.searchAlways = true
+			section.body.openSection = function() Pick(section) end
+			frame.openSection = section.body.openSection
+			local same
+			if page == "rsparty" then
+				same = Check(content, "raidStylePartySame", L["Same as raid frames"],
+					L["Ticked: party frames shown raid-style (the game's Use Raid-Style Party Frames, in Edit Mode) " ..
+					"fade as the Raid tab's rows say. Untick it to give them rows of their own."], function(value)
+					ns.GetDB().raidStylePartySame = value
+					if not value then
+						CopyRaidRows()
+					end
+					Refresh()
+					Layout() -- (its grid folds away while ticked)
+				end)
+				-- (At the right end of its name: the label on the right edge, the
+				-- box left of it, whatever its width. Hidden with its tab.)
+				same:SetParent(frame)
+				local text = same.Text or same.text
+				text:ClearAllPoints()
+				text:SetPoint("RIGHT", frame, "TOPRIGHT", -6, -10)
+				same:SetPoint("RIGHT", text, "LEFT", -2, 0)
+			end
+			local before = Widgets()
+			sectionRows.underHeader = true
+			if page == "units" and ns.GRID_MENUS and ns.HasUnitFrameParts and ns.HasUnitFrameParts() then
+				section.last = UnitBlocks(frame, sectionRows, heading, section)
 			else
-				columnTop:SetPoint("TOPLEFT", frame, "BOTTOMLEFT", 0, 6) -- (as ShowTable's, under a header)
+				section.last = ShowTable(content, frame, sectionRows, "Standard Frames", heading)
 			end
-			local label = ns.GridTable(content, columnTop, { item, noHeadings = after ~= nil,
-				followRows = sectionRows, bandFrom = i - 1 }, kit)
-			local point, relativeTo, relativePoint, x, y = label:GetPoint(1)
-			label:SetPoint(point, relativeTo, relativePoint, x + TOGGLE_W, y)
-			label:SetWidth(label:GetWidth() - TOGGLE_W)
-			local box = CreateFrame("Frame", nil, content)
-			box:SetPoint("TOPLEFT", columnTop, "TOPLEFT", 0, rowTop - ROW_H)
-			box:SetSize(section.width, 0.001)
-			box:Hide()
-			block.box, after = box, box
-			if unit then
-				local function Toggle()
-					SectionState.Save(block.state, not block.state.open)
-					Relayout()
-					Layout()
-				end
-				-- (Search finding a part opens its frame's block, and the tab.)
-				box.openSection = function()
-					SectionState.Save(block.state, true)
-					section.body.openSection()
-				end
-				local plus = CreateFrame("Button", nil, content)
-				plus:SetSize(16, 16)
-				plus:SetPoint("LEFT", columnTop, "TOPLEFT", 0, rowTop - ROW_H / 2)
-				block.icon = plus:CreateTexture(nil, "ARTWORK")
-				block.icon:SetAllPoints()
-				plus:SetScript("OnClick", Toggle)
-				Tooltip(plus, L["Shows or hides its parts."])
-				local name = CreateFrame("Button", nil, content)
-				name:SetPoint("TOPLEFT", label, "TOPLEFT", 0, 4)
-				name:SetPoint("BOTTOMRIGHT", label, "BOTTOMRIGHT", 0, -4)
-				name:SetScript("OnClick", Toggle)
-				Tooltip(name, (item.tip and item.tip .. "\n\n" or "") .. L["Click to show or hide its parts."])
-				local before = Widgets()
-				local y, same = 0, unit.same
-				unit.keys = {}
-				if same then
-					local check = Check(content, same, L["Same as target"],
-						L["Ticked: this frame shows the parts the Target rows say. Untick it to give the frame " ..
-						"choices of its own."], function(value)
-						ns.GetDB()[same] = value
-						if not value then
-							ns.CopyTargetParts(unit.unit, unit.keys)
+			for object in pairs(Widgets()) do
+				if not before[object] then
+					object:SetParent(section.body)
+					-- (Greyed while the raid frames' rows decide for them.)
+					if same and object.Refresh and object.SetEnabled then
+						local refresh = object.Refresh
+						object.Refresh = function(self)
+							refresh(self)
+							if not OwnPartyRows() then
+								self:SetEnabled(false)
+							end
 						end
-						ns.ApplyUnitFrameParts()
-						Refresh()
+					end
+				end
+			end
+			-- (Under the action bars' rows: their key names hidden.)
+			if page == "bars" then
+				local keys = Check(content, "hideKeybinds", L["Hide keybinds"],
+					L["Hides the key names on the action bar buttons (1, a-Q, s-2...), CineMode or not."],
+					function(value)
+						ns.GetDB().hideKeybinds = value
+						ns.ApplyHideKeybinds()
 					end)
-					check:SetPoint("TOPLEFT", box, "TOPLEFT", INDENT - 4, 0)
-					y = -ROW_H
-				end
-				local k = 0
-				for _, part in ipairs(PARTS) do
-					if ns.UnitHasPart(unit.unit, unit.parts, part[1]) then
-						k = k + 1
-						unit.keys[k] = part[1]
-						local row = ns.UnitPartRow(content, labelWidth, ns.GRID_TABLE_LAYOUT, unit.unit, item.label,
-							part, same, k + 1, INDENT)
-						row:SetPoint("TOPLEFT", box, "TOPLEFT", labelWidth, y - (k - 1) * ROW_H)
-						partRows[#partRows + 1] = row
-					end
-				end
-				block.height = -y + k * ROW_H
-				for object in pairs(Widgets()) do
-					if not before[object] then object:SetParent(box) end
-				end
+				keys:SetParent(section.body)
+				keys:SetPoint("TOPLEFT", section.last, "BOTTOMLEFT", -4, -8)
+				local macros = Check(content, "hideMacroText", L["Hide macro names"],
+					L["Hides the macro names on the action bar buttons, CineMode or not."],
+					function(value)
+						ns.GetDB().hideMacroText = value
+						ns.ApplyHideKeybinds()
+					end)
+				macros:SetParent(section.body)
+				macros:SetPoint("TOPLEFT", keys, "BOTTOMLEFT", 0, 0)
+				local book = Check(content, "barsWithSpellbook", L["Show while the spellbook is open"],
+					L["Your action bars stay up in CineMode while the spellbook or macros window is open, " ..
+					"so you can drag spells onto them, and while the totem bar's flyout is open, " ..
+					"so you can see them while picking a totem. They fade again when you close it."])
+				book:SetParent(section.body)
+				book:SetPoint("TOPLEFT", macros, "BOTTOMLEFT", 0, 0)
+				section.last = book
 			end
-		end
-		ns.GridDots(content, partRows)
-		Relayout()
-		return after
-	end
-
-	-- (tab: its tab's name, nil: heading. link: { page, tip, label }, a button
-	-- to the page with the rest of its settings, right of its heading, named
-	-- label or the page.)
-	local function Section(page, heading, tab, link)
-		local sectionRows = {}
-		for _, item in ipairs(ns.COMBAT_SHOW) do
-			if item.page == page and ns.OptionAvailable(item) and not item.key:find("^addon:")
-				and not (item.auraFrames and not _G.CompactUnitFrame_UtilSetBuff) then
-				sectionRows[#sectionRows + 1] = item
-			end
-		end
-		if #sectionRows == 0 then
-			return
-		end
-		-- (Whole frames first, then the parts drawn inside them, each kind under
-		-- a heading of its own: the raid tab's Raid Frame Manager up with Players.)
-		local whole, inside = {}, {}
-		for _, item in ipairs(sectionRows) do table.insert(item.part and inside or whole, item) end
-		if #whole > 0 and #inside > 0 then
-			sectionRows = whole
-			for _, item in ipairs(inside) do sectionRows[#sectionRows + 1] = item end
-			sectionRows.kindHeadings = { L["Frames"], L["Parts"] }
-		end
-		local section = { key = page or "other", tab = tab or heading, width = SECTION_WIDTH }
-		local frame = CreateFrame("Frame", nil, content)
-		frame:SetSize(SECTION_WIDTH, 20)
-		frame:SetPoint("TOPLEFT", panelTop, "TOPLEFT", 12, -10)
-		frame.searchAlways = true
-		section.frame = frame
-		local title = Label(frame, "GameFontNormal", heading)
-		title:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, -3)
-		local after = title -- (what the next button or the In use tag goes right of)
-		-- (The raid-style party frames: a button to the Raid tab, whose rows
-		-- they follow while Same as raid frames is ticked.)
-		if page == "rsparty" then
-			local raid = ns.PanelButton(frame)
-			raid:SetSize(70, 20)
-			raid:SetText(L["Raid"] .. " »")
-			raid:SetWidth(math.max(70, raid:GetFontString():GetStringWidth() + 24))
-			raid:SetPoint("LEFT", title, "RIGHT", 12, 0)
-			Tooltip(raid, L["Opens the Raid tab: its rows decide for these frames while Same as raid frames is ticked."])
-			raid:SetScript("OnClick", function()
-				for _, each in ipairs(sections) do
-					if each.key == "raid" then Pick(each) end
+			-- (Under the trackers' rows: the breath bar's look, and hiding it
+			-- always. MirrorTimerStyle.lua.)
+			if page == "combat" then
+				local function Apply()
+					if ns.ApplyMirrorTimers then ns.ApplyMirrorTimers() end
+					Refresh()
 				end
-			end)
-			after = raid
-		end
-		-- (link: one such, or a list of them, side by side.)
-		for _, each in ipairs(link and (type(link[1]) == "table" and link or { link }) or {}) do
-			local style = ns.StyleLink(frame, title, each[1], each[2], Tooltip, (each[3] or ns.PageLabel(each[1])) .. " »")
-			style:SetPoint("LEFT", after, "RIGHT", after == title and 12 or 6, 0)
-			after = style
-		end
-		-- (The party frames: which of their two kinds the game draws now, the
-		-- Edit Mode setting. Its section is tagged on their tab.)
-		if (page == "party" or page == "rsparty") and ns.RaidStyleParty then
-			local raid = page == "rsparty"
-			section.inUse = function() return ns.RaidStyleParty() == raid end
-			local tag = Label(frame, "GameFontHighlightSmall", L["In use"])
-			tag:SetTextColor(0.3, 0.9, 0.3)
-			tag:SetPoint("LEFT", after, "RIGHT", 12, 0)
-			tag.searchSkip = true
-			tag:Hide()
-			section.inUseTag = tag
-		end
-		section.body = CreateFrame("Frame", nil, content)
-		section.body:SetPoint("TOPLEFT", frame, "TOPLEFT")
-		section.body:SetSize(1, 1)
-		section.body.searchAlways = true
-		section.body.openSection = function() Pick(section) end
-		frame.openSection = section.body.openSection
-		local same
-		if page == "rsparty" then
-			same = Check(content, "raidStylePartySame", L["Same as raid frames"],
-				L["Ticked: party frames shown raid-style (the game's Use Raid-Style Party Frames, in Edit Mode) " ..
-				"fade as the Raid tab's rows say. Untick it to give them rows of their own."], function(value)
-				ns.GetDB().raidStylePartySame = value
-				if not value then
-					CopyRaidRows()
+				local function Shown(db) return not db.mirrorHide end
+				local function Worded(db) return not db.mirrorHide and not db.mirrorHideText end
+				local heading = Label(section.body, "GameFontNormal", L["Breath bar"])
+				heading:SetPoint("TOPLEFT", section.last, "BOTTOMLEFT", 0, -14)
+				local hide = Check(content, "mirrorHide", L["Hide the breath bar"],
+					L["Hides the bar that runs down while you hold your breath underwater, and the game's other bars " ..
+					"like it (fatigue in deep water, Feign Death), CineMode or not."], function(value)
+						ns.GetDB().mirrorHide = value
+						Apply()
+					end)
+				hide:SetParent(section.body)
+				hide:SetPoint("TOPLEFT", heading, "BOTTOMLEFT", -4, -4)
+				local words = Check(content, "mirrorHideText", L["Hide its text"],
+					L["Hides the word on the bar (Breath, Fatigue...), leaving the bar."], function(value)
+						ns.GetDB().mirrorHideText = value
+						Apply()
+					end)
+				words:SetParent(section.body)
+				words:SetPoint("TOPLEFT", hide, "BOTTOMLEFT", 0, 0)
+				GreyUnless(words, Shown)
+				local last = words
+				-- (A dropdown with its name before it; nil where the client has no menus.)
+				local function Pick(label, key, choices, tip, test)
+					local dropdown = Dropdown(content, key, choices, 180, Apply)
+					if not dropdown then return end
+					local name = Label(section.body, "GameFontHighlight", label)
+					name:SetPoint("TOPLEFT", last, "BOTTOMLEFT", last == words and 4 or 0, -10)
+					name:SetSize(90, 30)
+					name:SetJustifyV("MIDDLE")
+					dropdown:SetParent(section.body)
+					dropdown:SetPoint("LEFT", name, "RIGHT", 4, 0)
+					Tooltip(dropdown, tip)
+					GreyUnless(dropdown, test)
+					last = name
 				end
-				Refresh()
-				Layout() -- (its grid folds away while ticked)
-			end)
-			-- (At the right end of its name: the label on the right edge, the
-			-- box left of it, whatever its width. Hidden with its tab.)
-			same:SetParent(frame)
-			local text = same.Text or same.text
-			text:ClearAllPoints()
-			text:SetPoint("RIGHT", frame, "TOPRIGHT", -6, -10)
-			same:SetPoint("RIGHT", text, "LEFT", -2, 0)
-		end
-		local before = Widgets()
-		sectionRows.underHeader = true
-		if page == "units" and ns.GRID_MENUS and ns.HasUnitFrameParts and ns.HasUnitFrameParts() then
-			section.last = UnitBlocks(frame, sectionRows, heading, section)
-		else
-			section.last = ShowTable(content, frame, sectionRows, "Standard Frames", heading)
-		end
-		for object in pairs(Widgets()) do
-			if not before[object] then
-				object:SetParent(section.body)
-				-- (Greyed while the raid frames' rows decide for them.)
-				if same and object.Refresh and object.SetEnabled then
-					local refresh = object.Refresh
-					object.Refresh = function(self)
-						refresh(self)
-						if not OwnPartyRows() then
-							self:SetEnabled(false)
-						end
-					end
-				end
+				Pick(L["Bar texture:"], "mirrorTexture", function() return ns.StyleTextureChoices() end,
+					L["The bar's fill. The game's: as it comes."], Shown)
+				Pick(L["Font:"], "mirrorFont", function() return ns.StyleFontChoices() end,
+					L["The font of the word on the bar. (In Russian, Korean and Chinese it stays the game's.)"], Worded)
+				local size = Slider(content, "mirrorTextScale", L["Text size"], 50, 200, 5, "%d%%", 100,
+					function() if ns.ApplyMirrorTimers then ns.ApplyMirrorTimers() end end)
+				size:SetParent(section.body)
+				size:SetPoint("TOPLEFT", last, "BOTTOMLEFT", last == words and 4 or 0, -22)
+				Tooltip(size, L["The size of the word on the bar, against the game's."])
+				GreyUnless(size, Worded)
+				section.last = size
 			end
+			sections[#sections + 1] = section
 		end
-		-- (Under the action bars' rows: their key names hidden.)
-		if page == "bars" then
-			local keys = Check(content, "hideKeybinds", L["Hide keybinds"],
-				L["Hides the key names on the action bar buttons (1, a-Q, s-2...), CineMode or not."],
-				function(value)
-					ns.GetDB().hideKeybinds = value
-					ns.ApplyHideKeybinds()
-				end)
-			keys:SetParent(section.body)
-			keys:SetPoint("TOPLEFT", section.last, "BOTTOMLEFT", -4, -8)
-			local macros = Check(content, "hideMacroText", L["Hide macro names"],
-				L["Hides the macro names on the action bar buttons, CineMode or not."],
-				function(value)
-					ns.GetDB().hideMacroText = value
-					ns.ApplyHideKeybinds()
-				end)
-			macros:SetParent(section.body)
-			macros:SetPoint("TOPLEFT", keys, "BOTTOMLEFT", 0, 0)
-			local book = Check(content, "barsWithSpellbook", L["Show while the spellbook is open"],
-				L["Your action bars stay up in CineMode while the spellbook or macros window is open, " ..
-				"so you can drag spells onto them, and while the totem bar's flyout is open, " ..
-				"so you can see them while picking a totem. They fade again when you close it."])
-			book:SetParent(section.body)
-			book:SetPoint("TOPLEFT", macros, "BOTTOMLEFT", 0, 0)
-			section.last = book
+		local raidStyle = { "Raid Style", L["Opens the Raid Frame Style page: how the raid and raid-style " ..
+			"party frames look."], L["Style"] }
+		local SECTIONS = {
+			{ "units", L["Unit frames"], nil, { "Unit Style", L["Opens the Unit Frame Style page: how the frames look."],
+				L["Style"] } },
+			-- (Your health and resource bars under your character: on the Unit frames tab too.)
+			{ "prd", L["Personal Resource Display"], L["Unit frames"], { "Personal Resources", L["Opens the Health & " ..
+				"Resources page: the bars under your character, and your frame kept up while you recover."],
+				L["Settings"] } },
+			{ "bars", L["Action bars"] }, { "combat", L["Trackers"] },
+			{ "interface", L["Info and menus"] }, { "minimap", L["Minimap"] },
+			{ "party", L["Party frames (not raid-style)"], L["Party"] },
+			-- (Their look: the Style hub's Raid frames page, RaidStyle.lua.)
+			{ "raid", L["Raid frames"], L["Raid"], raidStyle },
+			-- (On the Party tab too, under the not raid-style ones.)
+			{ "rsparty", L["Party frames (raid-style)"], L["Party"], raidStyle },
+			-- (Game settings that mark your character: Self Highlight, Effects.lua.)
+			{ "highlight", L["Highlight"] },
+			{ false, L["Other"] }, -- (any row not given a section)
+		}
+		for _, section in ipairs(SECTIONS) do
+			Section(section[1] or nil, section[2], section[3], section[4])
 		end
-		-- (Under the trackers' rows: the breath bar's look, and hiding it
-		-- always. MirrorTimerStyle.lua.)
-		if page == "combat" then
-			local function Apply()
-				if ns.ApplyMirrorTimers then ns.ApplyMirrorTimers() end
-				Refresh()
-			end
-			local function Shown(db) return not db.mirrorHide end
-			local function Worded(db) return not db.mirrorHide and not db.mirrorHideText end
-			local heading = Label(section.body, "GameFontNormal", L["Breath bar"])
-			heading:SetPoint("TOPLEFT", section.last, "BOTTOMLEFT", 0, -14)
-			local hide = Check(content, "mirrorHide", L["Hide the breath bar"],
-				L["Hides the bar that runs down while you hold your breath underwater, and the game's other bars " ..
-				"like it (fatigue in deep water, Feign Death), CineMode or not."], function(value)
-					ns.GetDB().mirrorHide = value
-					Apply()
-				end)
-			hide:SetParent(section.body)
-			hide:SetPoint("TOPLEFT", heading, "BOTTOMLEFT", -4, -4)
-			local words = Check(content, "mirrorHideText", L["Hide its text"],
-				L["Hides the word on the bar (Breath, Fatigue...), leaving the bar."], function(value)
-					ns.GetDB().mirrorHideText = value
-					Apply()
-				end)
-			words:SetParent(section.body)
-			words:SetPoint("TOPLEFT", hide, "BOTTOMLEFT", 0, 0)
-			GreyUnless(words, Shown)
-			local last = words
-			-- (A dropdown with its name before it; nil where the client has no menus.)
-			local function Pick(label, key, choices, tip, test)
-				local dropdown = Dropdown(content, key, choices, 180, Apply)
-				if not dropdown then return end
-				local name = Label(section.body, "GameFontHighlight", label)
-				name:SetPoint("TOPLEFT", last, "BOTTOMLEFT", last == words and 4 or 0, -10)
-				name:SetSize(90, 30)
-				name:SetJustifyV("MIDDLE")
-				dropdown:SetParent(section.body)
-				dropdown:SetPoint("LEFT", name, "RIGHT", 4, 0)
-				Tooltip(dropdown, tip)
-				GreyUnless(dropdown, test)
-				last = name
-			end
-			Pick(L["Bar texture:"], "mirrorTexture", function() return ns.StyleTextureChoices() end,
-				L["The bar's fill. The game's: as it comes."], Shown)
-			Pick(L["Font:"], "mirrorFont", function() return ns.StyleFontChoices() end,
-				L["The font of the word on the bar. (In Russian, Korean and Chinese it stays the game's.)"], Worded)
-			local size = Slider(content, "mirrorTextScale", L["Text size"], 50, 200, 5, "%d%%", 100,
-				function() if ns.ApplyMirrorTimers then ns.ApplyMirrorTimers() end end)
-			size:SetParent(section.body)
-			size:SetPoint("TOPLEFT", last, "BOTTOMLEFT", last == words and 4 or 0, -22)
-			Tooltip(size, L["The size of the word on the bar, against the game's."])
-			GreyUnless(size, Worded)
-			section.last = size
-		end
-		sections[#sections + 1] = section
-	end
-	local raidStyle = { "Raid Style", L["Opens the Raid Frame Style page: how the raid and raid-style " ..
-		"party frames look."], L["Style"] }
-	local SECTIONS = {
-		{ "units", L["Unit frames"], nil, { "Unit Style", L["Opens the Unit Frame Style page: how the frames look."],
-			L["Style"] } },
-		-- (Your health and resource bars under your character: on the Unit frames tab too.)
-		{ "prd", L["Personal Resource Display"], L["Unit frames"], { "Personal Resources", L["Opens the Health & " ..
-			"Resources page: the bars under your character, and your frame kept up while you recover."],
-			L["Settings"] } },
-		{ "bars", L["Action bars"] }, { "combat", L["Trackers"] },
-		{ "interface", L["Info and menus"] }, { "minimap", L["Minimap"] },
-		{ "party", L["Party frames (not raid-style)"], L["Party"] },
-		-- (Their look: the Style hub's Raid frames page, RaidStyle.lua.)
-		{ "raid", L["Raid frames"], L["Raid"], raidStyle },
-		-- (On the Party tab too, under the not raid-style ones.)
-		{ "rsparty", L["Party frames (raid-style)"], L["Party"], raidStyle },
-		-- (Game settings that mark your character: Self Highlight, Effects.lua.)
-		{ "highlight", L["Highlight"] },
-		{ false, L["Other"] }, -- (any row not given a section)
-	}
-	for _, section in ipairs(SECTIONS) do
-		Section(section[1] or nil, section[2], section[3], section[4])
-	end
-	local list, tabFrames, base = {}
-	for _, section in ipairs(sections) do
-		local tab
-		for _, each in ipairs(tabs) do
-			if each.label == section.tab then tab = each end
-		end
-		if not tab then
-			tab = { label = section.tab, sections = {} }
-			tabs[#tabs + 1] = tab
-			list[#list + 1] = { section.tab }
-		end
-		tab.sections[#tab.sections + 1] = section
-	end
-	panel, tabFrames, ShowTab, base = ns.FolderTabs(content, list, function(i) Pick(tabs[i].sections[1]) end, nil,
-		SECTION_WIDTH + 8)
-	function PlaceTop()
-		panelTop:ClearAllPoints()
-		panelTop:SetPoint("TOPLEFT", lastCheck, "BOTTOMLEFT", 2 - lastIndent, -16 - tabFrames.height) -- (back to the column edge)
-	end
-	PlaceTop()
-	panel:SetPoint("TOPLEFT", panelTop, "TOPLEFT")
-	-- (On panelTop, not the panel: the panel's bottom hangs on the rows under them.)
-	base:SetPoint("TOPLEFT", panelTop, "TOPLEFT")
-	-- Addon Frame Links (FrameLinks.lua): which addon's frame each unit frame
-	-- is. Opened from elsewhere (search, the Addons page), it picks the
-	-- Unit frames tab too.
-	unitLinks = ns.BuildLinkSection(content, panelTop, "units")
-	local openLinks = unitLinks.body.openSection
-	function unitLinks.body.openSection()
+		local list, tabFrames, base = {}
 		for _, section in ipairs(sections) do
-			if section.key == "units" then Pick(section) end
+			local tab
+			for _, each in ipairs(tabs) do
+				if each.label == section.tab then tab = each end
+			end
+			if not tab then
+				tab = { label = section.tab, sections = {} }
+				tabs[#tabs + 1] = tab
+				list[#list + 1] = { section.tab }
+			end
+			tab.sections[#tab.sections + 1] = section
 		end
-		openLinks()
-	end
-	ns.RegisterLinkSection("units", unitLinks.frame, unitLinks.body.openSection)
-	Layout()
+		panel, tabFrames, ShowTab, base = ns.FolderTabs(content, list, function(i) Pick(tabs[i].sections[1]) end, nil,
+			SECTION_WIDTH + 8)
+		function PlaceTop()
+			panelTop:ClearAllPoints()
+			panelTop:SetPoint("TOPLEFT", lastCheck, "BOTTOMLEFT", 2 - lastIndent, -16 - tabFrames.height) -- (back to the column edge)
+		end
+		PlaceTop()
+		panel:SetPoint("TOPLEFT", panelTop, "TOPLEFT")
+		-- (On panelTop, not the panel: the panel's bottom hangs on the rows under them.)
+		base:SetPoint("TOPLEFT", panelTop, "TOPLEFT")
+		-- Addon Frame Links (FrameLinks.lua): which addon's frame each unit frame
+		-- is. Opened from elsewhere (search, the Addons page), it picks the
+		-- Unit frames tab too.
+		unitLinks = ns.BuildLinkSection(content, panelTop, "units")
+		local openLinks = unitLinks.body.openSection
+		function unitLinks.body.openSection()
+			for _, section in ipairs(sections) do
+				if section.key == "units" then Pick(section) end
+			end
+			openLinks()
+		end
+		ns.RegisterLinkSection("units", unitLinks.frame, unitLinks.body.openSection)
+		Layout()
 
-	canvas:SetScript("OnShow", PageShown(function()
-		Refresh()
-		Layout() -- (as last left, once the settings have loaded)
-		unitLinks.Show()
-	end, content))
+		canvas:SetScript("OnShow", PageShown(function()
+			Refresh()
+			Layout() -- (as last left, once the settings have loaded)
+			unitLinks.Show()
+		end, content))
+	end
+	MakeHud = lazyPages.Add(canvas, "HUD", MakeBody)
 	canvas:Hide()
 	RegisterSubpage(canvas, L["Standard Frames"], L["HUD"])
 end
@@ -17253,6 +17299,7 @@ end
 -- row's, a theme's or a wheel's value, a tab's switch).
 local SETTING_CONTROLS = { CheckButton = true, Slider = true, EditBox = true }
 function ns.SettingIds()
+	ns.MakeLazyPages("the setting ids")
 	Refresh()
 	local CONTROLS = { CheckButton = true, Slider = true, EditBox = true, Button = true }
 	local with, without, missing, seen = {}, {}, {}, {}
@@ -17967,781 +18014,785 @@ local function CreateMouseoverPanel()
 	GreyUnless(hold, function(db) return db.mouseover end)
 	-- (The groups go back to the defaults with the rest of the page.)
 	RecordKey(content, "hoverGroups")
+	-- (Everything below is made the first time the page is needed: lazyPages.)
+	local function MakeBody()
 
-	-- The frames you can add: the rows (Standard Frames, the supported
-	-- addons, a few more), your Advanced Frames additions, and any other
-	-- named frame on screen (adding one of those fades it too).
-	local catalog, byKey = {}, {}
-	local function AddToCatalog(key, label, tag)
-		if not byKey[key] then
-			local item = { key = key, label = label, tag = tag }
-			catalog[#catalog + 1], byKey[key] = item, item
-		end
-	end
-	for _, item in ipairs(ns.HOVER_ROWS) do
-		if ns.OptionAvailable(item) then
-			AddToCatalog(item.key, item.hoverLabel or item.label, item.key:find("^addon:") and L["addon"])
-		end
-	end
-	local function ScanCatalog()
-		for name in pairs(ns.GetDB().extraFrames or {}) do
-			AddToCatalog("extra:" .. name, name, L["custom"])
-		end
-		local faded = {}
-		for _, entry in ipairs(ns.managed) do
-			if entry.name then faded[entry.name] = true end
-		end
-		for _, frame in ipairs({ UIParent:GetChildren() }) do
-			local name = not (frame.IsForbidden and frame:IsForbidden()) and frame:GetName()
-			if name and frame:IsShown() and not faded[name] and not name:find("^Cinematic") then
-				AddToCatalog("frame:" .. name, name, L["not faded yet"])
+		-- The frames you can add: the rows (Standard Frames, the supported
+		-- addons, a few more), your Advanced Frames additions, and any other
+		-- named frame on screen (adding one of those fades it too).
+		local catalog, byKey = {}, {}
+		local function AddToCatalog(key, label, tag)
+			if not byKey[key] then
+				local item = { key = key, label = label, tag = tag }
+				catalog[#catalog + 1], byKey[key] = item, item
 			end
 		end
-	end
-
-	-- The groups shown are the ones in use; the first change makes them the
-	-- player's own copy (until then they're the defaults, and follow them).
-	local function Groups()
-		return ns.GetHoverGroups()
-	end
-	local function Writable()
-		local db = ns.GetDB()
-		if not db.hoverGroups then
-			db.hoverGroups = ns.CopyHoverGroups()
-		end
-		return db.hoverGroups
-	end
-
-	-- Whether a group has an action bar in it (the rows of the faded bars:
-	-- its hover reach works only on those).
-	local function HasBarMember(group)
-		local barRows = {}
-		for _, entry in ipairs(ns.managed) do
-			if entry.group == "bars" or entry.group == "sidebars" then
-				barRows[entry.row or ns.HoverRowFor(entry)] = true
+		for _, item in ipairs(ns.HOVER_ROWS) do
+			if ns.OptionAvailable(item) then
+				AddToCatalog(item.key, item.hoverLabel or item.label, item.key:find("^addon:") and L["addon"])
 			end
 		end
-		for _, key in ipairs(group.members) do
-			if barRows[key] then return true end
-		end
-		return false
-	end
-
-	local function GroupsWith(key, exceptIndex)
-		local names = {}
-		for i, group in ipairs(Groups()) do
-			if i ~= exceptIndex then
-				for _, member in ipairs(group.members) do
-					if member == key then names[#names + 1] = group.name break end
+		local function ScanCatalog()
+			for name in pairs(ns.GetDB().extraFrames or {}) do
+				AddToCatalog("extra:" .. name, name, L["custom"])
+			end
+			local faded = {}
+			for _, entry in ipairs(ns.managed) do
+				if entry.name then faded[entry.name] = true end
+			end
+			for _, frame in ipairs({ UIParent:GetChildren() }) do
+				local name = not (frame.IsForbidden and frame:IsForbidden()) and frame:GetName()
+				if name and frame:IsShown() and not faded[name] and not name:find("^Cinematic") then
+					AddToCatalog("frame:" .. name, name, L["not faded yet"])
 				end
 			end
 		end
-		return names
-	end
 
-	-- The unit frames' rows: each one's section (as the Unit Frames page's) and parts.
-	local UNIT_ROWS = {
-		player = { "Player", ns.UNIT_PARTS_PLAYER }, petframe = { "Pet", ns.UNIT_PARTS_PET },
-		target = { "Target", ns.UNIT_PARTS_TARGET }, tot = { "ToT", ns.UNIT_PARTS_TOT },
-		focus = { "Focus", ns.UNIT_PARTS_TARGET },
-	}
-	-- The parts a row's frame has here, or nil for a frame that hasn't any.
-	local function RowParts(key)
-		local info = UNIT_ROWS[key]
-		if not (info and MenuUtil and ns.HasUnitFrameParts and ns.HasUnitFrameParts()) then return nil end
-		local list = {}
-		for _, part in ipairs(ns.UnitPartLabels()) do
-			local only = ns.UNIT_PART_ONLY[part[1]]
-			if info[2][part[1]] ~= nil and (not only or only[info[1]] == true) then
-				list[#list + 1] = part
+		-- The groups shown are the ones in use; the first change makes them the
+		-- player's own copy (until then they're the defaults, and follow them).
+		local function Groups()
+			return ns.GetHoverGroups()
+		end
+		local function Writable()
+			local db = ns.GetDB()
+			if not db.hoverGroups then
+				db.hoverGroups = ns.CopyHoverGroups()
 			end
+			return db.hoverGroups
 		end
-		return list
-	end
-	local function PartOff(index, key, part)
-		local group = Groups()[index]
-		local off = group and group.parts and group.parts[key]
-		return off and off[part] or false
-	end
-	-- (Only what's unticked is kept: none, and the group has every part, as
-	-- groups made before there were parts have.)
-	local function SetRowOff(index, key, off)
-		local group = Writable()[index]
-		local parts = group.parts or {}
-		parts[key] = off and next(off) and off or nil
-		group.parts = next(parts) and parts or nil
-	end
-	local function TogglePart(index, key, part)
-		local group = Writable()[index]
-		local off = group.parts and group.parts[key] or {}
-		off[part] = not off[part] or nil
-		SetRowOff(index, key, off)
-	end
 
-	local triggers = {}
-	for _, trigger in ipairs(ns.HOVER_TRIGGERS) do
-		if not trigger.gamepad or (C_GamePad and not ns.isRetail) then
-			triggers[#triggers + 1] = trigger
-		end
-	end
-
-	-- Widgets are pooled and laid out top to bottom again on every change.
-	local pools = {}
-	local function Take(kind, make)
-		local pool = pools[kind] or { list = {}, used = 0 }
-		pools[kind] = pool
-		pool.used = pool.used + 1
-		local widget = pool.list[pool.used]
-		if not widget then
-			widget = make()
-			pool.list[pool.used] = widget
-		end
-		widget:ClearAllPoints()
-		widget:Show()
-		return widget
-	end
-	local Layout -- (below)
-
-	-- The search results list, shared by every group's add boxes (frames and events).
-	-- (On the canvas, not the scrolling content, so the scroll frame doesn't clip it.)
-	local results = CreateFrame("Frame", nil, canvas)
-	results:SetFrameStrata("DIALOG")
-	results:SetSize(320, RESULTS_SHOWN * 20 + 8)
-	local resultsBg = results:CreateTexture(nil, "BACKGROUND")
-	resultsBg:SetAllPoints()
-	resultsBg:SetColorTexture(0.05, 0.05, 0.05, 0.95)
-	local resultsEdge = results:CreateTexture(nil, "BORDER")
-	resultsEdge:SetPoint("TOPLEFT", -1, 1)
-	resultsEdge:SetPoint("BOTTOMRIGHT", 1, -1)
-	resultsEdge:SetColorTexture(0.4, 0.4, 0.4, 1)
-	resultsEdge:SetDrawLayer("BACKGROUND", -1)
-	results:Hide()
-	local resultButtons = {}
-	for i = 1, RESULTS_SHOWN do
-		local button = CreateFrame("Button", nil, results)
-		button:SetSize(298, 20)
-		button:SetPoint("TOPLEFT", 4, -4 - (i - 1) * 20)
-		button:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight", "ADD")
-		button.text = Label(button, "GameFontHighlight")
-		button.text:SetPoint("LEFT", 4, 0)
-		button.tag = Label(button, "GameFontDisableSmall")
-		button.tag:SetPoint("RIGHT", -4, 0)
-		-- (An event's tip says what it is.)
-		button:SetScript("OnEnter", function(self)
-			if self.tip then
-				GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-				GameTooltip:SetText(self.tip, 1, 1, 1, 1, true)
-				GameTooltip:Show()
-			end
-		end)
-		button:SetScript("OnLeave", function() GameTooltip:Hide() end)
-		resultButtons[i] = button
-	end
-	local noMatch = Label(results, "GameFontDisable", L["No frames match"])
-	noMatch:SetPoint("TOPLEFT", 8, -8)
-
-	-- The scroll bar down the right edge: drag it, or scroll the wheel over the list.
-	local scrollBar = CreateFrame("Slider", nil, results)
-	scrollBar:SetOrientation("VERTICAL")
-	scrollBar:SetWidth(10)
-	scrollBar:SetPoint("TOPRIGHT", -3, -4)
-	scrollBar:SetPoint("BOTTOMRIGHT", -3, 4)
-	local track = scrollBar:CreateTexture(nil, "BACKGROUND")
-	track:SetAllPoints()
-	track:SetColorTexture(1, 1, 1, 0.08)
-	local thumb = scrollBar:CreateTexture(nil, "OVERLAY")
-	thumb:SetColorTexture(0.8, 0.7, 0.3, 0.8)
-	thumb:SetSize(10, 30)
-	scrollBar:SetThumbTexture(thumb)
-	scrollBar:SetValueStep(1)
-	if scrollBar.SetObeyStepOnDrag then scrollBar:SetObeyStepOnDrag(true) end
-
-	-- Adding a frame to group number index. A frame on screen that isn't
-	-- faded yet is added to the Advanced Frames list first (as /cine add
-	-- does; windows are turned down there).
-	local function AddMember(index, item)
-		local key = item.key
-		local name = key:match("^frame:(.+)$")
-		if name then
-			ns.AddUnderMouse(name)
-			if not ns.GetDB().extraFrames[name] then
-				return
-			end
-			key = "extra:" .. name
-			AddToCatalog(key, name, L["custom"])
-		end
-		local members = Writable()[index].members
-		for _, member in ipairs(members) do
-			if member == key then return end
-		end
-		members[#members + 1] = key
-	end
-
-	local list = { matches = {}, offset = 0 }
-	local function RenderResults()
-		local matches, index, box = list.matches, list.index, list.box
-		local maxOffset = math.max(0, #matches - RESULTS_SHOWN)
-		list.offset = math.max(0, math.min(list.offset, maxOffset))
-		local shown = math.min(#matches, RESULTS_SHOWN)
-		results:SetHeight(math.max(1, shown) * 20 + 8)
-		noMatch:SetText(list.events and L["No events match"] or L["No frames match"])
-		noMatch:SetShown(shown == 0)
-		scrollBar:SetShown(maxOffset > 0)
-		if maxOffset > 0 then
-			list.syncing = true
-			scrollBar:SetMinMaxValues(0, maxOffset)
-			scrollBar:SetValue(list.offset)
-			list.syncing = false
-			-- (The thumb's length shows how much of the list fits.)
-			thumb:SetHeight(math.max(16, (shown * 20) * RESULTS_SHOWN / #matches))
-		end
-		for i, button in ipairs(resultButtons) do
-			local item = matches[i + list.offset]
-			button:SetShown(item ~= nil)
-			if item then
-				local here, tag
-				if list.events then
-					local group = Groups()[index]
-					here = group and group.triggers and group.triggers[item.key] and true or false
-					tag = ""
-				else
-					local others = GroupsWith(item.key, index)
-					here = #GroupsWith(item.key) > #others
-					tag = #others > 0 and L["in %s"]:format(table.concat(others, ", ")) or item.tag or ""
+		-- Whether a group has an action bar in it (the rows of the faded bars:
+		-- its hover reach works only on those).
+		local function HasBarMember(group)
+			local barRows = {}
+			for _, entry in ipairs(ns.managed) do
+				if entry.group == "bars" or entry.group == "sidebars" then
+					barRows[entry.row or ns.HoverRowFor(entry)] = true
 				end
-				button.text:SetText(item.label)
-				SetLabelFont(button.text, here and "GameFontDisable" or "GameFontHighlight")
-				button.tag:SetText(here and L["already here"] or tag)
-				button.tip = list.events and item.tip or nil
-				button:SetEnabled(not here)
-				button:SetScript("OnClick", function()
-					if list.events then
-						local editable = Writable()[index]
-						editable.triggers = editable.triggers or {}
-						editable.triggers[item.key] = true
-					else
-						AddMember(index, item)
+			end
+			for _, key in ipairs(group.members) do
+				if barRows[key] then return true end
+			end
+			return false
+		end
+
+		local function GroupsWith(key, exceptIndex)
+			local names = {}
+			for i, group in ipairs(Groups()) do
+				if i ~= exceptIndex then
+					for _, member in ipairs(group.members) do
+						if member == key then names[#names + 1] = group.name break end
 					end
-					box:SetText("")
-					box:ClearFocus()
-					results:Hide()
-					Layout()
-				end)
+				end
+			end
+			return names
+		end
+
+		-- The unit frames' rows: each one's section (as the Unit Frames page's) and parts.
+		local UNIT_ROWS = {
+			player = { "Player", ns.UNIT_PARTS_PLAYER }, petframe = { "Pet", ns.UNIT_PARTS_PET },
+			target = { "Target", ns.UNIT_PARTS_TARGET }, tot = { "ToT", ns.UNIT_PARTS_TOT },
+			focus = { "Focus", ns.UNIT_PARTS_TARGET },
+		}
+		-- The parts a row's frame has here, or nil for a frame that hasn't any.
+		local function RowParts(key)
+			local info = UNIT_ROWS[key]
+			if not (info and MenuUtil and ns.HasUnitFrameParts and ns.HasUnitFrameParts()) then return nil end
+			local list = {}
+			for _, part in ipairs(ns.UnitPartLabels()) do
+				local only = ns.UNIT_PART_ONLY[part[1]]
+				if info[2][part[1]] ~= nil and (not only or only[info[1]] == true) then
+					list[#list + 1] = part
+				end
+			end
+			return list
+		end
+		local function PartOff(index, key, part)
+			local group = Groups()[index]
+			local off = group and group.parts and group.parts[key]
+			return off and off[part] or false
+		end
+		-- (Only what's unticked is kept: none, and the group has every part, as
+		-- groups made before there were parts have.)
+		local function SetRowOff(index, key, off)
+			local group = Writable()[index]
+			local parts = group.parts or {}
+			parts[key] = off and next(off) and off or nil
+			group.parts = next(parts) and parts or nil
+		end
+		local function TogglePart(index, key, part)
+			local group = Writable()[index]
+			local off = group.parts and group.parts[key] or {}
+			off[part] = not off[part] or nil
+			SetRowOff(index, key, off)
+		end
+
+		local triggers = {}
+		for _, trigger in ipairs(ns.HOVER_TRIGGERS) do
+			if not trigger.gamepad or (C_GamePad and not ns.isRetail) then
+				triggers[#triggers + 1] = trigger
 			end
 		end
-	end
-	scrollBar:SetScript("OnValueChanged", function(_, value)
-		if list.syncing then return end
-		list.offset = math.floor(value + 0.5)
-		RenderResults()
-	end)
-	results:EnableMouseWheel(true)
-	results:SetScript("OnMouseWheel", function(_, delta)
-		list.offset = list.offset - delta * 3
-		RenderResults()
-	end)
-	-- Clicking the scroll bar takes the focus from the search box, so the list
-	-- stays open while the mouse is on it and closes on a click anywhere else.
-	ns.SetOnUpdate(results, function(self)
-		if not (list.box and list.box:HasFocus()) and not self:IsMouseOver()
-			and (IsMouseButtonDown("LeftButton") or IsMouseButtonDown("RightButton")) then
-			self:Hide()
-		end
-	end)
 
-	-- events: search the events that bring a group up instead of the frames.
-	local function ShowResults(box, index, events)
-		local query = box:GetText():lower()
-		local matches = {}
-		for _, item in ipairs(events and triggers or catalog) do
-			if query == "" or item.label:lower():find(query, 1, true) then
-				matches[#matches + 1] = item
+		-- Widgets are pooled and laid out top to bottom again on every change.
+		local pools = {}
+		local function Take(kind, make)
+			local pool = pools[kind] or { list = {}, used = 0 }
+			pools[kind] = pool
+			pool.used = pool.used + 1
+			local widget = pool.list[pool.used]
+			if not widget then
+				widget = make()
+				pool.list[pool.used] = widget
 			end
+			widget:ClearAllPoints()
+			widget:Show()
+			return widget
 		end
-		list.matches, list.index, list.box, list.offset = matches, index, box, 0
-		list.events = events
-		results:ClearAllPoints()
-		results:SetPoint("TOPLEFT", box, "BOTTOMLEFT", -6, -2)
-		RenderResults()
-		results:Show()
-	end
+		local Layout -- (below)
 
-	-- Each group's heading is a band that opens and closes it, as on the
-	-- Standard Frames page: closed until clicked open (remembered by its
-	-- default's key, or its name). A new group opens, to add its frames.
-	local function GroupSection(group)
-		local preset = ns.HoverGroupPreset(group)
-		return { id = "Mouseover groups/" .. (preset and "preset:" .. preset.preset or "name:" .. (group.name or "")) }
-	end
-	local function IsOpen(group)
-		return SectionState.Saved(GroupSection(group).id, false)
-	end
-
-	local newGroup = ns.PanelButton(content)
-	newGroup:SetSize(120, 22)
-	newGroup:SetText(L["New group"])
-	newGroup:SetScript("OnClick", function()
-		local groups = Writable()
-		groups[#groups + 1] = { name = L["Group %d"]:format(#groups + 1), members = {}, triggers = {},
-			icon = ns.UnusedHoverGroupIcon() }
-		SectionState.Save(GroupSection(groups[#groups]), true)
-		Layout()
-	end)
-
-	-- The icon picker for a group you made, under the icon clicked: any icon
-	-- the game has (IconBrowser.lua).
-	local picker = ns.IconBrowser(canvas, function(index, file)
-		local group = Writable()[index]
-		if group then group.icon = file end
-		Layout()
-	end)
-	local function ShowPicker(owner, index)
+		-- The search results list, shared by every group's add boxes (frames and events).
+		-- (On the canvas, not the scrolling content, so the scroll frame doesn't clip it.)
+		local results = CreateFrame("Frame", nil, canvas)
+		results:SetFrameStrata("DIALOG")
+		results:SetSize(320, RESULTS_SHOWN * 20 + 8)
+		local resultsBg = results:CreateTexture(nil, "BACKGROUND")
+		resultsBg:SetAllPoints()
+		resultsBg:SetColorTexture(0.05, 0.05, 0.05, 0.95)
+		local resultsEdge = results:CreateTexture(nil, "BORDER")
+		resultsEdge:SetPoint("TOPLEFT", -1, 1)
+		resultsEdge:SetPoint("BOTTOMRIGHT", 1, -1)
+		resultsEdge:SetColorTexture(0.4, 0.4, 0.4, 1)
+		resultsEdge:SetDrawLayer("BACKGROUND", -1)
 		results:Hide()
-		picker:Open(owner, index, ns.HoverGroupIcon(Groups()[index]))
-	end
-
-	-- A square icon: gold edge, a darker one when dim. (The row of groups at
-	-- the top, and each group's heading.)
-	local function IconTile(size)
-		local tile = CreateFrame("Button", nil, content)
-		tile:SetSize(size, size)
-		tile.border = tile:CreateTexture(nil, "BACKGROUND")
-		tile.border:SetAllPoints()
-		tile.border:SetColorTexture(0.45, 0.38, 0.2, 1)
-		local bg = tile:CreateTexture(nil, "BORDER")
-		bg:SetPoint("TOPLEFT", 1, -1)
-		bg:SetPoint("BOTTOMRIGHT", -1, 1)
-		bg:SetColorTexture(0.06, 0.05, 0.04, 0.95)
-		tile.icon = tile:CreateTexture(nil, "ARTWORK")
-		tile.icon:SetPoint("TOPLEFT", 2, -2)
-		tile.icon:SetPoint("BOTTOMRIGHT", -2, 2)
-		tile.icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
-		local hl = tile:CreateTexture(nil, "HIGHLIGHT")
-		hl:SetAllPoints(tile.icon)
-		hl:SetColorTexture(1, 1, 1, 0.15)
-		tile:SetScript("OnEnter", function(self)
-			if not self.tipTitle then return end
-			GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
-			GameTooltip:SetText(self.tipTitle, 1, 0.82, 0)
-			for _, line in ipairs(self.tipLines or {}) do
-				GameTooltip:AddLine(line, 1, 1, 1, true)
-			end
-			GameTooltip:Show()
-		end)
-		tile:SetScript("OnLeave", function() GameTooltip:Hide() end)
-		return tile
-	end
-
-	-- Scrolls the page to a group's heading.
-	local headingY = {}
-	local function JumpTo(index)
-		local scroll = canvas.scroll
-		local y = headingY[index]
-		if not (scroll and y) then return end
-		local range = scroll:GetVerticalScrollRange() or 0
-		scroll:SetVerticalScroll(math.max(0, math.min(range, y - 8)))
-	end
-
-	-- A row in a group: remove button, label, a note after it.
-	local function MemberRow()
-		local frame = CreateFrame("Frame", nil, content)
-		frame:SetSize(WIDTH - 10, ROW)
-		frame.remove = ns.SkinClose(CreateFrame("Button", nil, frame, "UIPanelCloseButton"))
-		frame.remove:SetSize(22, 22)
-		frame.remove:SetPoint("LEFT", 0, 0)
-		Tooltip(frame.remove, L["Take it out of this group."])
-		frame.text = Label(frame, "GameFontHighlight")
-		frame.text:SetPoint("LEFT", frame.remove, "RIGHT", 4, 0)
-		frame.also = Label(frame, "GameFontDisableSmall")
-		frame.also:SetPoint("LEFT", frame.text, "RIGHT", 10, 0)
-		return frame
-	end
-
-	-- In a unit frame's row, for its label: its name and how many parts come up
-	-- with the group, a click ticking them. (index, key, label: the row it's on now.)
-	local function PartsMenu()
-		local _, menu = ns.MenuDropdown(content)
-		menu:SetSize(250, 22)
-		menu.searchSkip = true -- (it shows the current ticks, not a label)
-		menu:SetupMenu(function(_, root)
-			root:CreateButton(L["All parts"], function()
-				SetRowOff(menu.index, menu.key, nil)
-				return MenuResponse and MenuResponse.Refresh
+		local resultButtons = {}
+		for i = 1, RESULTS_SHOWN do
+			local button = CreateFrame("Button", nil, results)
+			button:SetSize(298, 20)
+			button:SetPoint("TOPLEFT", 4, -4 - (i - 1) * 20)
+			button:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight", "ADD")
+			button.text = Label(button, "GameFontHighlight")
+			button.text:SetPoint("LEFT", 4, 0)
+			button.tag = Label(button, "GameFontDisableSmall")
+			button.tag:SetPoint("RIGHT", -4, 0)
+			-- (An event's tip says what it is.)
+			button:SetScript("OnEnter", function(self)
+				if self.tip then
+					GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+					GameTooltip:SetText(self.tip, 1, 1, 1, 1, true)
+					GameTooltip:Show()
+				end
 			end)
-			if root.CreateDivider then root:CreateDivider() end
-			for _, part in ipairs(RowParts(menu.key) or {}) do
-				root:CreateCheckbox(part[2], function() return not PartOff(menu.index, menu.key, part[1]) end, function()
-					TogglePart(menu.index, menu.key, part[1])
+			button:SetScript("OnLeave", function() GameTooltip:Hide() end)
+			resultButtons[i] = button
+		end
+		local noMatch = Label(results, "GameFontDisable", L["No frames match"])
+		noMatch:SetPoint("TOPLEFT", 8, -8)
+
+		-- The scroll bar down the right edge: drag it, or scroll the wheel over the list.
+		local scrollBar = CreateFrame("Slider", nil, results)
+		scrollBar:SetOrientation("VERTICAL")
+		scrollBar:SetWidth(10)
+		scrollBar:SetPoint("TOPRIGHT", -3, -4)
+		scrollBar:SetPoint("BOTTOMRIGHT", -3, 4)
+		local track = scrollBar:CreateTexture(nil, "BACKGROUND")
+		track:SetAllPoints()
+		track:SetColorTexture(1, 1, 1, 0.08)
+		local thumb = scrollBar:CreateTexture(nil, "OVERLAY")
+		thumb:SetColorTexture(0.8, 0.7, 0.3, 0.8)
+		thumb:SetSize(10, 30)
+		scrollBar:SetThumbTexture(thumb)
+		scrollBar:SetValueStep(1)
+		if scrollBar.SetObeyStepOnDrag then scrollBar:SetObeyStepOnDrag(true) end
+
+		-- Adding a frame to group number index. A frame on screen that isn't
+		-- faded yet is added to the Advanced Frames list first (as /cine add
+		-- does; windows are turned down there).
+		local function AddMember(index, item)
+			local key = item.key
+			local name = key:match("^frame:(.+)$")
+			if name then
+				ns.AddUnderMouse(name)
+				if not ns.GetDB().extraFrames[name] then
+					return
+				end
+				key = "extra:" .. name
+				AddToCatalog(key, name, L["custom"])
+			end
+			local members = Writable()[index].members
+			for _, member in ipairs(members) do
+				if member == key then return end
+			end
+			members[#members + 1] = key
+		end
+
+		local list = { matches = {}, offset = 0 }
+		local function RenderResults()
+			local matches, index, box = list.matches, list.index, list.box
+			local maxOffset = math.max(0, #matches - RESULTS_SHOWN)
+			list.offset = math.max(0, math.min(list.offset, maxOffset))
+			local shown = math.min(#matches, RESULTS_SHOWN)
+			results:SetHeight(math.max(1, shown) * 20 + 8)
+			noMatch:SetText(list.events and L["No events match"] or L["No frames match"])
+			noMatch:SetShown(shown == 0)
+			scrollBar:SetShown(maxOffset > 0)
+			if maxOffset > 0 then
+				list.syncing = true
+				scrollBar:SetMinMaxValues(0, maxOffset)
+				scrollBar:SetValue(list.offset)
+				list.syncing = false
+				-- (The thumb's length shows how much of the list fits.)
+				thumb:SetHeight(math.max(16, (shown * 20) * RESULTS_SHOWN / #matches))
+			end
+			for i, button in ipairs(resultButtons) do
+				local item = matches[i + list.offset]
+				button:SetShown(item ~= nil)
+				if item then
+					local here, tag
+					if list.events then
+						local group = Groups()[index]
+						here = group and group.triggers and group.triggers[item.key] and true or false
+						tag = ""
+					else
+						local others = GroupsWith(item.key, index)
+						here = #GroupsWith(item.key) > #others
+						tag = #others > 0 and L["in %s"]:format(table.concat(others, ", ")) or item.tag or ""
+					end
+					button.text:SetText(item.label)
+					SetLabelFont(button.text, here and "GameFontDisable" or "GameFontHighlight")
+					button.tag:SetText(here and L["already here"] or tag)
+					button.tip = list.events and item.tip or nil
+					button:SetEnabled(not here)
+					button:SetScript("OnClick", function()
+						if list.events then
+							local editable = Writable()[index]
+							editable.triggers = editable.triggers or {}
+							editable.triggers[item.key] = true
+						else
+							AddMember(index, item)
+						end
+						box:SetText("")
+						box:ClearFocus()
+						results:Hide()
+						Layout()
+					end)
+				end
+			end
+		end
+		scrollBar:SetScript("OnValueChanged", function(_, value)
+			if list.syncing then return end
+			list.offset = math.floor(value + 0.5)
+			RenderResults()
+		end)
+		results:EnableMouseWheel(true)
+		results:SetScript("OnMouseWheel", function(_, delta)
+			list.offset = list.offset - delta * 3
+			RenderResults()
+		end)
+		-- Clicking the scroll bar takes the focus from the search box, so the list
+		-- stays open while the mouse is on it and closes on a click anywhere else.
+		ns.SetOnUpdate(results, function(self)
+			if not (list.box and list.box:HasFocus()) and not self:IsMouseOver()
+				and (IsMouseButtonDown("LeftButton") or IsMouseButtonDown("RightButton")) then
+				self:Hide()
+			end
+		end)
+
+		-- events: search the events that bring a group up instead of the frames.
+		local function ShowResults(box, index, events)
+			local query = box:GetText():lower()
+			local matches = {}
+			for _, item in ipairs(events and triggers or catalog) do
+				if query == "" or item.label:lower():find(query, 1, true) then
+					matches[#matches + 1] = item
+				end
+			end
+			list.matches, list.index, list.box, list.offset = matches, index, box, 0
+			list.events = events
+			results:ClearAllPoints()
+			results:SetPoint("TOPLEFT", box, "BOTTOMLEFT", -6, -2)
+			RenderResults()
+			results:Show()
+		end
+
+		-- Each group's heading is a band that opens and closes it, as on the
+		-- Standard Frames page: closed until clicked open (remembered by its
+		-- default's key, or its name). A new group opens, to add its frames.
+		local function GroupSection(group)
+			local preset = ns.HoverGroupPreset(group)
+			return { id = "Mouseover groups/" .. (preset and "preset:" .. preset.preset or "name:" .. (group.name or "")) }
+		end
+		local function IsOpen(group)
+			return SectionState.Saved(GroupSection(group).id, false)
+		end
+
+		local newGroup = ns.PanelButton(content)
+		newGroup:SetSize(120, 22)
+		newGroup:SetText(L["New group"])
+		newGroup:SetScript("OnClick", function()
+			local groups = Writable()
+			groups[#groups + 1] = { name = L["Group %d"]:format(#groups + 1), members = {}, triggers = {},
+				icon = ns.UnusedHoverGroupIcon() }
+			SectionState.Save(GroupSection(groups[#groups]), true)
+			Layout()
+		end)
+
+		-- The icon picker for a group you made, under the icon clicked: any icon
+		-- the game has (IconBrowser.lua).
+		local picker = ns.IconBrowser(canvas, function(index, file)
+			local group = Writable()[index]
+			if group then group.icon = file end
+			Layout()
+		end)
+		local function ShowPicker(owner, index)
+			results:Hide()
+			picker:Open(owner, index, ns.HoverGroupIcon(Groups()[index]))
+		end
+
+		-- A square icon: gold edge, a darker one when dim. (The row of groups at
+		-- the top, and each group's heading.)
+		local function IconTile(size)
+			local tile = CreateFrame("Button", nil, content)
+			tile:SetSize(size, size)
+			tile.border = tile:CreateTexture(nil, "BACKGROUND")
+			tile.border:SetAllPoints()
+			tile.border:SetColorTexture(0.45, 0.38, 0.2, 1)
+			local bg = tile:CreateTexture(nil, "BORDER")
+			bg:SetPoint("TOPLEFT", 1, -1)
+			bg:SetPoint("BOTTOMRIGHT", -1, 1)
+			bg:SetColorTexture(0.06, 0.05, 0.04, 0.95)
+			tile.icon = tile:CreateTexture(nil, "ARTWORK")
+			tile.icon:SetPoint("TOPLEFT", 2, -2)
+			tile.icon:SetPoint("BOTTOMRIGHT", -2, 2)
+			tile.icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
+			local hl = tile:CreateTexture(nil, "HIGHLIGHT")
+			hl:SetAllPoints(tile.icon)
+			hl:SetColorTexture(1, 1, 1, 0.15)
+			tile:SetScript("OnEnter", function(self)
+				if not self.tipTitle then return end
+				GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
+				GameTooltip:SetText(self.tipTitle, 1, 0.82, 0)
+				for _, line in ipairs(self.tipLines or {}) do
+					GameTooltip:AddLine(line, 1, 1, 1, true)
+				end
+				GameTooltip:Show()
+			end)
+			tile:SetScript("OnLeave", function() GameTooltip:Hide() end)
+			return tile
+		end
+
+		-- Scrolls the page to a group's heading.
+		local headingY = {}
+		local function JumpTo(index)
+			local scroll = canvas.scroll
+			local y = headingY[index]
+			if not (scroll and y) then return end
+			local range = scroll:GetVerticalScrollRange() or 0
+			scroll:SetVerticalScroll(math.max(0, math.min(range, y - 8)))
+		end
+
+		-- A row in a group: remove button, label, a note after it.
+		local function MemberRow()
+			local frame = CreateFrame("Frame", nil, content)
+			frame:SetSize(WIDTH - 10, ROW)
+			frame.remove = ns.SkinClose(CreateFrame("Button", nil, frame, "UIPanelCloseButton"))
+			frame.remove:SetSize(22, 22)
+			frame.remove:SetPoint("LEFT", 0, 0)
+			Tooltip(frame.remove, L["Take it out of this group."])
+			frame.text = Label(frame, "GameFontHighlight")
+			frame.text:SetPoint("LEFT", frame.remove, "RIGHT", 4, 0)
+			frame.also = Label(frame, "GameFontDisableSmall")
+			frame.also:SetPoint("LEFT", frame.text, "RIGHT", 10, 0)
+			return frame
+		end
+
+		-- In a unit frame's row, for its label: its name and how many parts come up
+		-- with the group, a click ticking them. (index, key, label: the row it's on now.)
+		local function PartsMenu()
+			local _, menu = ns.MenuDropdown(content)
+			menu:SetSize(250, 22)
+			menu.searchSkip = true -- (it shows the current ticks, not a label)
+			menu:SetupMenu(function(_, root)
+				root:CreateButton(L["All parts"], function()
+					SetRowOff(menu.index, menu.key, nil)
 					return MenuResponse and MenuResponse.Refresh
 				end)
-			end
-		end)
-		if menu.SetSelectionText then
-			menu:SetSelectionText(function()
-				local parts, ticked = RowParts(menu.key) or {}, 0
-				for _, part in ipairs(parts) do
-					if not PartOff(menu.index, menu.key, part[1]) then ticked = ticked + 1 end
+				if root.CreateDivider then root:CreateDivider() end
+				for _, part in ipairs(RowParts(menu.key) or {}) do
+					root:CreateCheckbox(part[2], function() return not PartOff(menu.index, menu.key, part[1]) end, function()
+						TogglePart(menu.index, menu.key, part[1])
+						return MenuResponse and MenuResponse.Refresh
+					end)
 				end
-				if ticked == #parts then return L["%s (all parts)"]:format(menu.label) end
-				return L["%s (%d of %d parts)"]:format(menu.label, ticked, #parts)
 			end)
-		end
-		Tooltip(menu, L["Which parts of this frame come up with this group. An unticked part stays hidden while " ..
-			"this group is what's bringing the frame up. Up for anything else, like a fight, it shows as usual."])
-		return menu
-	end
-
-	-- A type-to-search box adding to group number index: frames, or with
-	-- events set, the events that bring the group up.
-	local function AddBox(kind, hint, index, events)
-		local add = Take(kind, function()
-			local box = ns.SkinEditBox(CreateFrame("EditBox", nil, content, "InputBoxTemplate"))
-			box:SetSize(260, 20)
-			box:SetAutoFocus(false)
-			box.hint = Label(box, "GameFontDisable", hint)
-			box.hint:SetPoint("LEFT", 2, 0)
-			box:SetScript("OnEscapePressed", function(self) self:SetText("") self:ClearFocus() end)
-			box:SetScript("OnEditFocusLost", function(self)
-				self.hint:SetShown(self:GetText() == "")
-				C_Timer.After(0.2, function()
-					if not self:HasFocus() and not results:IsMouseOver() then results:Hide() end
+			if menu.SetSelectionText then
+				menu:SetSelectionText(function()
+					local parts, ticked = RowParts(menu.key) or {}, 0
+					for _, part in ipairs(parts) do
+						if not PartOff(menu.index, menu.key, part[1]) then ticked = ticked + 1 end
+					end
+					if ticked == #parts then return L["%s (all parts)"]:format(menu.label) end
+					return L["%s (%d of %d parts)"]:format(menu.label, ticked, #parts)
 				end)
-			end)
-			return box
-		end)
-		add:SetText("")
-		add.hint:Show()
-		add:SetScript("OnEditFocusGained", function(self)
-			if not events then ScanCatalog() end
-			self.hint:Hide()
-			ShowResults(self, index, events)
-		end)
-		add:SetScript("OnTextChanged", function(self)
-			if self:HasFocus() then ShowResults(self, index, events) end
-		end)
-		add:SetScript("OnEnterPressed", function(self)
-			local first = resultButtons[1]
-			if results:IsShown() and first:IsShown() and first:IsEnabled() then first:Click() end
-			self:ClearFocus()
-		end)
-		return add
-	end
-
-	function Layout()
-		for _, pool in pairs(pools) do
-			for _, widget in ipairs(pool.list) do widget:Hide() end
-			pool.used = 0
-		end
-		-- (Below the main switch and slider.)
-		local top, bottom = content:GetTop(), hold:GetBottom()
-		local y = (top and bottom) and (top - bottom + 22) or 180
-		-- (dim: the alpha for what's placed, lower for a group that's off.)
-		local dim = 1
-		local function At(widget, x, extraY)
-			widget:SetPoint("TOPLEFT", content, "TOPLEFT", x, -(y + (extraY or 0)))
-			widget:SetAlpha(dim)
-		end
-
-		-- A row of every group's icon: click one to go to it. The + at the
-		-- end makes a new group.
-		local TILE, GAP = 32, 6
-		local perRow = math.max(1, math.floor((WIDTH + GAP) / (TILE + GAP)))
-		local groups = Groups()
-		local function TileAt(tile, i)
-			tile:SetPoint("TOPLEFT", content, "TOPLEFT", LEFT + ((i - 1) % perRow) * (TILE + GAP),
-				-(y + math.floor((i - 1) / perRow) * (TILE + GAP)))
-		end
-		for index, group in ipairs(groups) do
-			local tile = Take("tile", function() return IconTile(TILE) end)
-			TileAt(tile, index)
-			tile.icon:SetTexture(ns.HoverGroupIcon(group))
-			tile.icon:SetDesaturated(group.off and true or false)
-			tile.tipTitle = group.off and group.name .. " |cff808080(" .. L["Off"] .. ")|r" or group.name
-			local names = {}
-			for _, key in ipairs(group.members) do
-				local item = byKey[key]
-				if item or key:find("^extra:") then
-					names[#names + 1] = item and item.label or key:gsub("^extra:", "")
-				end
 			end
-			tile.tipLines = { #names > 0 and table.concat(names, ", ") or L["No frames yet."],
-				"|cff808080" .. L["Click to go to it."] .. "|r" }
-			tile:SetScript("OnClick", function()
-				if IsOpen(group) then
-					JumpTo(index)
-				else
-					SectionState.Save(GroupSection(group), true)
-					Layout()
-					-- (Once the page has grown to fit it.)
-					C_Timer.After(0, function() JumpTo(index) end)
-				end
-			end)
+			Tooltip(menu, L["Which parts of this frame come up with this group. An unticked part stays hidden while " ..
+				"this group is what's bringing the frame up. Up for anything else, like a fight, it shows as usual."])
+			return menu
 		end
-		local add = Take("tile", function() return IconTile(TILE) end)
-		TileAt(add, #groups + 1)
-		add.icon:SetTexture("Interface\\Icons\\Spell_ChargePositive")
-		add.icon:SetDesaturated(false)
-		add.tipTitle, add.tipLines = L["New group"], { L["A group of your own, to pick its frames and icon."] }
-		add:SetScript("OnClick", function()
-			newGroup:Click()
-			-- (Once the page has grown to fit it.)
-			C_Timer.After(0, function() JumpTo(#Groups()) end)
-		end)
-		y = y + math.ceil((#groups + 1) / perRow) * (TILE + GAP) + 14
 
-		wipe(headingY)
-		for index, group in ipairs(groups) do
-			-- Heading, on its band: icon, name box, when, on/off, delete.
-			dim = 1
-			headingY[index] = y
-			y = y + 4
-			local open = IsOpen(group)
-			local band = Take("band", function()
-				local holder = CreateFrame("Frame", nil, content)
-				holder:SetSize(WIDTH - 2, BAND_HEIGHT)
-				holder.nameRow = SectionBand(holder, "")
-				return holder
-			end)
-			At(band, LEFT + 2, -3)
-			band.nameRow:SetOpen(open)
-			band.nameRow:SetScript("OnClick", function()
-				SectionState.Save(GroupSection(group), not open)
-				Layout()
-			end)
-			-- (The heading's buttons above the band, to take their own clicks.)
-			local function Raise(widget)
-				widget:SetFrameLevel(band.nameRow:GetFrameLevel() + 2)
-			end
-			-- (An off group is greyed out, all but its On/Off and Delete buttons.)
-			dim = group.off and 0.4 or 1
-
-			-- Its icon: one you pick. Right-click: a default group's own back.
-			local preset = ns.HoverGroupPreset(group)
-			local icon = Take("headIcon", function() return IconTile(26) end)
-			At(icon, LEFT + 4, -3)
-			Raise(icon)
-			icon.icon:SetTexture(ns.HoverGroupIcon(group))
-			icon:RegisterForClicks("LeftButtonUp", "RightButtonUp")
-			icon.tipTitle, icon.tipLines = group.name, { L["Click to pick its icon."] }
-			if preset then
-				icon.tipLines[2] = L["Right-click: back to its own icon."]
-			end
-			icon:SetScript("OnClick", function(self, button)
-				if button ~= "RightButton" then
-					ShowPicker(self, index)
-				elseif preset and group.icon then
-					picker:Hide()
-					Writable()[index].icon = nil
-					Layout()
-				end
-			end)
-
-			local nameBox = Take("name", function()
+		-- A type-to-search box adding to group number index: frames, or with
+		-- events set, the events that bring the group up.
+		local function AddBox(kind, hint, index, events)
+			local add = Take(kind, function()
 				local box = ns.SkinEditBox(CreateFrame("EditBox", nil, content, "InputBoxTemplate"))
-				box:SetSize(170, 20)
+				box:SetSize(260, 20)
 				box:SetAutoFocus(false)
-				box:SetFontObject("GameFontNormal")
-				box:SetScript("OnEnterPressed", function(self) self:ClearFocus() end)
-				box:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
-				Tooltip(box, L["The group's name: click to change it."])
+				box.hint = Label(box, "GameFontDisable", hint)
+				box.hint:SetPoint("LEFT", 2, 0)
+				box:SetScript("OnEscapePressed", function(self) self:SetText("") self:ClearFocus() end)
+				box:SetScript("OnEditFocusLost", function(self)
+					self.hint:SetShown(self:GetText() == "")
+					C_Timer.After(0.2, function()
+						if not self:HasFocus() and not results:IsMouseOver() then results:Hide() end
+					end)
+				end)
 				return box
 			end)
-			At(nameBox, LEFT + 40)
-			Raise(nameBox)
-			nameBox:SetText(group.name or "")
-			-- (Search and /cine find: a box's text isn't read, so the group's
-			-- name is given, found with its whole heading glowing.)
-			nameBox.searchLabel = group.name
-			nameBox.searchEdges = { top = band, bottom = band, left = band, right = band }
-			nameBox:SetScript("OnEditFocusLost", function(self)
-				local text = self:GetText()
-				if text ~= "" and text ~= group.name then
-					local editable = Writable()[index]
-					-- (A default group stays one, with its icon, under a new name.)
-					editable.preset = preset and preset.preset or editable.preset
-					editable.name = text
-					Layout()
-				end
+			add:SetText("")
+			add.hint:Show()
+			add:SetScript("OnEditFocusGained", function(self)
+				if not events then ScanCatalog() end
+				self.hint:Hide()
+				ShowResults(self, index, events)
 			end)
+			add:SetScript("OnTextChanged", function(self)
+				if self:HasFocus() then ShowResults(self, index, events) end
+			end)
+			add:SetScript("OnEnterPressed", function(self)
+				local first = resultButtons[1]
+				if results:IsShown() and first:IsShown() and first:IsEnabled() then first:Click() end
+				self:ClearFocus()
+			end)
+			return add
+		end
 
-			-- When it works: any time, or only out of fights or in them (click
-			-- for the next). (when: nil, "calm" or "combat".)
-			local when = Take("when", function()
-				local button = ns.PanelButton(content)
-				button:SetSize(140, 22)
-				Tooltip(button, L["When this group works: any time, only out of combat or only in combat. " ..
-					"Click to change. The rest of the time its frames come up on their own (or with their other " ..
-					"groups), and its events don't bring it up."])
-				return button
-			end)
-			At(when, LEFT + 224, -1)
-			Raise(when)
-			when:SetText(group.when == "calm" and L["Only out of combat"]
-				or group.when == "combat" and L["Only in combat"] or L["Any time"])
-			when:SetScript("OnClick", function()
-				local editable = Writable()[index]
-				editable.when = (editable.when == nil and "calm") or (editable.when == "calm" and "combat") or nil
-				Layout()
-			end)
+		function Layout()
+			for _, pool in pairs(pools) do
+				for _, widget in ipairs(pool.list) do widget:Hide() end
+				pool.used = 0
+			end
+			-- (Below the main switch and slider.)
+			local top, bottom = content:GetTop(), hold:GetBottom()
+			local y = (top and bottom) and (top - bottom + 22) or 180
+			-- (dim: the alpha for what's placed, lower for a group that's off.)
+			local dim = 1
+			local function At(widget, x, extraY)
+				widget:SetPoint("TOPLEFT", content, "TOPLEFT", x, -(y + (extraY or 0)))
+				widget:SetAlpha(dim)
+			end
 
-			-- On or off: an off group is kept, but does nothing. (off: nil or true.)
-			local onOff = Take("onOff", function()
-				local button = ns.PanelButton(content)
-				button:SetSize(80, 22)
-				Tooltip(button, L["Turns this group on or off. While it's off it's kept as it is, but its frames " ..
-					"come up on their own (or with their other groups), and its events don't bring it up."])
-				return button
-			end)
-			At(onOff, LEFT + 372, -1)
-			Raise(onOff)
-			onOff:SetAlpha(1)
-			onOff:SetText(group.off and L["Off"] or L["On"])
-			onOff:SetScript("OnClick", function()
-				local editable = Writable()[index]
-				editable.off = not editable.off or nil
-				Layout()
-			end)
-			icon.icon:SetDesaturated(group.off and true or false)
-
-			local delete = Take("delete", function()
-				local button = ns.PanelButton(content)
-				button:SetSize(100, 22)
-				button:SetText(L["Delete group"])
-				Tooltip(button, L["Its frames come up on their own again (or with their other groups)."])
-				return button
-			end)
-			At(delete, LEFT + WIDTH - 100, -1)
-			Raise(delete)
-			delete:SetAlpha(1)
-			delete:SetScript("OnClick", function()
-				SectionState.Save(GroupSection(group), nil)
-				table.remove(Writable(), index)
-				Layout()
-			end)
-			y = y + 28
-			if open then
-				-- Members: label, other groups it's in, remove. (Frames this client
-				-- doesn't have stay in the group, unlisted.)
-				local listed = 0
+			-- A row of every group's icon: click one to go to it. The + at the
+			-- end makes a new group.
+			local TILE, GAP = 32, 6
+			local perRow = math.max(1, math.floor((WIDTH + GAP) / (TILE + GAP)))
+			local groups = Groups()
+			local function TileAt(tile, i)
+				tile:SetPoint("TOPLEFT", content, "TOPLEFT", LEFT + ((i - 1) % perRow) * (TILE + GAP),
+					-(y + math.floor((i - 1) / perRow) * (TILE + GAP)))
+			end
+			for index, group in ipairs(groups) do
+				local tile = Take("tile", function() return IconTile(TILE) end)
+				TileAt(tile, index)
+				tile.icon:SetTexture(ns.HoverGroupIcon(group))
+				tile.icon:SetDesaturated(group.off and true or false)
+				tile.tipTitle = group.off and group.name .. " |cff808080(" .. L["Off"] .. ")|r" or group.name
+				local names = {}
 				for _, key in ipairs(group.members) do
 					local item = byKey[key]
 					if item or key:find("^extra:") then
-						listed = listed + 1
-						local row = Take("member", MemberRow)
-						At(row, LEFT + 4)
-						local label = item and item.label or key:gsub("^extra:", "")
-						row.text:SetText(label)
-						row.also:ClearAllPoints()
-						row.also:SetPoint("LEFT", row.text, "RIGHT", 10, 0)
-						-- (A unit frame's label is its menu of parts.)
-						if RowParts(key) then
-							local menu = Take("partsMenu", PartsMenu)
-							menu.index, menu.key, menu.label = index, key, label
-							At(menu, LEFT + 30, 1)
-							menu:GenerateMenu()
-							row.text:SetText("")
-							row.also:ClearAllPoints()
-							row.also:SetPoint("LEFT", menu, "RIGHT", 10, 0)
-							y = y + 8 -- (a menu fills its row: a gap, or they touch)
-						end
-						local others = GroupsWith(key, index)
-						row.also:SetText(#others > 0 and L["also in %s"]:format(table.concat(others, ", "))
-							or (item and item.tag) or (item and "" or L["custom"]))
-						row.remove:SetScript("OnClick", function()
-							local members = Writable()[index].members
-							for i, member in ipairs(members) do
-								if member == key then table.remove(members, i) break end
-							end
-							SetRowOff(index, key, nil)
-							Layout()
-						end)
-						y = y + ROW
+						names[#names + 1] = item and item.label or key:gsub("^extra:", "")
 					end
 				end
-				if listed == 0 then
-					local empty = Take("empty", function() return Label(content, "GameFontDisable", L["No frames yet."]) end)
-					At(empty, LEFT + 10, 4)
-					y = y + ROW
-				end
-
-				-- Add a frame: type to search the list.
-				At(AddBox("add", L["Add a frame: type to search..."], index), LEFT + 34, 4)
-				y = y + 30
-
-				-- Hover reach: only for a group with an action bar in it (the
-				-- one kind it works on).
-				if HasBarMember(group) then
-					local reach = Take("reach", function()
-						local slider
-						slider = Slider(content, {
-							get = function()
-								local current = slider.index and Groups()[slider.index]
-								return current and ns.HoverGroupReach(current) or 0
-							end,
-							set = function(value)
-								if slider.index then Writable()[slider.index].reach = value end
-							end,
-						}, L["Hover reach"], 0, 40, 1, L["%d px"])
-						Tooltip(slider, L["How close the mouse must come to this group's action bar buttons to " ..
-							"bring it up, so the gaps between the buttons count too. 0: only on the buttons themselves."])
-						return slider
-					end)
-					reach.index = index
-					At(reach, LEFT + 14, 20)
-					reach:Refresh()
-					y = y + 52
-				end
-
-				-- The events that bring the group up besides the mouse: one row
-				-- each, then a box to add more.
-				local alsoLabel = Take("alsoLabel", function()
-					return Label(content, "GameFontNormalSmall", L["Also bring this group up for:"])
+				tile.tipLines = { #names > 0 and table.concat(names, ", ") or L["No frames yet."],
+					"|cff808080" .. L["Click to go to it."] .. "|r" }
+				tile:SetScript("OnClick", function()
+					if IsOpen(group) then
+						JumpTo(index)
+					else
+						SectionState.Save(GroupSection(group), true)
+						Layout()
+						-- (Once the page has grown to fit it.)
+						C_Timer.After(0, function() JumpTo(index) end)
+					end
 				end)
-				At(alsoLabel, LEFT + 10, 2)
-				y = y + 18
-				for _, trigger in ipairs(triggers) do
-					if group.triggers and group.triggers[trigger.key] then
-						local row = Take("member", MemberRow)
-						At(row, LEFT + 4)
-						row.text:SetText(trigger.label)
-						row.also:SetText("")
-						row.remove:SetScript("OnClick", function()
-							local editable = Writable()[index]
-							if editable.triggers then editable.triggers[trigger.key] = nil end
-							Layout()
-						end)
+			end
+			local add = Take("tile", function() return IconTile(TILE) end)
+			TileAt(add, #groups + 1)
+			add.icon:SetTexture("Interface\\Icons\\Spell_ChargePositive")
+			add.icon:SetDesaturated(false)
+			add.tipTitle, add.tipLines = L["New group"], { L["A group of your own, to pick its frames and icon."] }
+			add:SetScript("OnClick", function()
+				newGroup:Click()
+				-- (Once the page has grown to fit it.)
+				C_Timer.After(0, function() JumpTo(#Groups()) end)
+			end)
+			y = y + math.ceil((#groups + 1) / perRow) * (TILE + GAP) + 14
+
+			wipe(headingY)
+			for index, group in ipairs(groups) do
+				-- Heading, on its band: icon, name box, when, on/off, delete.
+				dim = 1
+				headingY[index] = y
+				y = y + 4
+				local open = IsOpen(group)
+				local band = Take("band", function()
+					local holder = CreateFrame("Frame", nil, content)
+					holder:SetSize(WIDTH - 2, BAND_HEIGHT)
+					holder.nameRow = SectionBand(holder, "")
+					return holder
+				end)
+				At(band, LEFT + 2, -3)
+				band.nameRow:SetOpen(open)
+				band.nameRow:SetScript("OnClick", function()
+					SectionState.Save(GroupSection(group), not open)
+					Layout()
+				end)
+				-- (The heading's buttons above the band, to take their own clicks.)
+				local function Raise(widget)
+					widget:SetFrameLevel(band.nameRow:GetFrameLevel() + 2)
+				end
+				-- (An off group is greyed out, all but its On/Off and Delete buttons.)
+				dim = group.off and 0.4 or 1
+
+				-- Its icon: one you pick. Right-click: a default group's own back.
+				local preset = ns.HoverGroupPreset(group)
+				local icon = Take("headIcon", function() return IconTile(26) end)
+				At(icon, LEFT + 4, -3)
+				Raise(icon)
+				icon.icon:SetTexture(ns.HoverGroupIcon(group))
+				icon:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+				icon.tipTitle, icon.tipLines = group.name, { L["Click to pick its icon."] }
+				if preset then
+					icon.tipLines[2] = L["Right-click: back to its own icon."]
+				end
+				icon:SetScript("OnClick", function(self, button)
+					if button ~= "RightButton" then
+						ShowPicker(self, index)
+					elseif preset and group.icon then
+						picker:Hide()
+						Writable()[index].icon = nil
+						Layout()
+					end
+				end)
+
+				local nameBox = Take("name", function()
+					local box = ns.SkinEditBox(CreateFrame("EditBox", nil, content, "InputBoxTemplate"))
+					box:SetSize(170, 20)
+					box:SetAutoFocus(false)
+					box:SetFontObject("GameFontNormal")
+					box:SetScript("OnEnterPressed", function(self) self:ClearFocus() end)
+					box:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
+					Tooltip(box, L["The group's name: click to change it."])
+					return box
+				end)
+				At(nameBox, LEFT + 40)
+				Raise(nameBox)
+				nameBox:SetText(group.name or "")
+				-- (Search and /cine find: a box's text isn't read, so the group's
+				-- name is given, found with its whole heading glowing.)
+				nameBox.searchLabel = group.name
+				nameBox.searchEdges = { top = band, bottom = band, left = band, right = band }
+				nameBox:SetScript("OnEditFocusLost", function(self)
+					local text = self:GetText()
+					if text ~= "" and text ~= group.name then
+						local editable = Writable()[index]
+						-- (A default group stays one, with its icon, under a new name.)
+						editable.preset = preset and preset.preset or editable.preset
+						editable.name = text
+						Layout()
+					end
+				end)
+
+				-- When it works: any time, or only out of fights or in them (click
+				-- for the next). (when: nil, "calm" or "combat".)
+				local when = Take("when", function()
+					local button = ns.PanelButton(content)
+					button:SetSize(140, 22)
+					Tooltip(button, L["When this group works: any time, only out of combat or only in combat. " ..
+						"Click to change. The rest of the time its frames come up on their own (or with their other " ..
+						"groups), and its events don't bring it up."])
+					return button
+				end)
+				At(when, LEFT + 224, -1)
+				Raise(when)
+				when:SetText(group.when == "calm" and L["Only out of combat"]
+					or group.when == "combat" and L["Only in combat"] or L["Any time"])
+				when:SetScript("OnClick", function()
+					local editable = Writable()[index]
+					editable.when = (editable.when == nil and "calm") or (editable.when == "calm" and "combat") or nil
+					Layout()
+				end)
+
+				-- On or off: an off group is kept, but does nothing. (off: nil or true.)
+				local onOff = Take("onOff", function()
+					local button = ns.PanelButton(content)
+					button:SetSize(80, 22)
+					Tooltip(button, L["Turns this group on or off. While it's off it's kept as it is, but its frames " ..
+						"come up on their own (or with their other groups), and its events don't bring it up."])
+					return button
+				end)
+				At(onOff, LEFT + 372, -1)
+				Raise(onOff)
+				onOff:SetAlpha(1)
+				onOff:SetText(group.off and L["Off"] or L["On"])
+				onOff:SetScript("OnClick", function()
+					local editable = Writable()[index]
+					editable.off = not editable.off or nil
+					Layout()
+				end)
+				icon.icon:SetDesaturated(group.off and true or false)
+
+				local delete = Take("delete", function()
+					local button = ns.PanelButton(content)
+					button:SetSize(100, 22)
+					button:SetText(L["Delete group"])
+					Tooltip(button, L["Its frames come up on their own again (or with their other groups)."])
+					return button
+				end)
+				At(delete, LEFT + WIDTH - 100, -1)
+				Raise(delete)
+				delete:SetAlpha(1)
+				delete:SetScript("OnClick", function()
+					SectionState.Save(GroupSection(group), nil)
+					table.remove(Writable(), index)
+					Layout()
+				end)
+				y = y + 28
+				if open then
+					-- Members: label, other groups it's in, remove. (Frames this client
+					-- doesn't have stay in the group, unlisted.)
+					local listed = 0
+					for _, key in ipairs(group.members) do
+						local item = byKey[key]
+						if item or key:find("^extra:") then
+							listed = listed + 1
+							local row = Take("member", MemberRow)
+							At(row, LEFT + 4)
+							local label = item and item.label or key:gsub("^extra:", "")
+							row.text:SetText(label)
+							row.also:ClearAllPoints()
+							row.also:SetPoint("LEFT", row.text, "RIGHT", 10, 0)
+							-- (A unit frame's label is its menu of parts.)
+							if RowParts(key) then
+								local menu = Take("partsMenu", PartsMenu)
+								menu.index, menu.key, menu.label = index, key, label
+								At(menu, LEFT + 30, 1)
+								menu:GenerateMenu()
+								row.text:SetText("")
+								row.also:ClearAllPoints()
+								row.also:SetPoint("LEFT", menu, "RIGHT", 10, 0)
+								y = y + 8 -- (a menu fills its row: a gap, or they touch)
+							end
+							local others = GroupsWith(key, index)
+							row.also:SetText(#others > 0 and L["also in %s"]:format(table.concat(others, ", "))
+								or (item and item.tag) or (item and "" or L["custom"]))
+							row.remove:SetScript("OnClick", function()
+								local members = Writable()[index].members
+								for i, member in ipairs(members) do
+									if member == key then table.remove(members, i) break end
+								end
+								SetRowOff(index, key, nil)
+								Layout()
+							end)
+							y = y + ROW
+						end
+					end
+					if listed == 0 then
+						local empty = Take("empty", function() return Label(content, "GameFontDisable", L["No frames yet."]) end)
+						At(empty, LEFT + 10, 4)
 						y = y + ROW
 					end
+
+					-- Add a frame: type to search the list.
+					At(AddBox("add", L["Add a frame: type to search..."], index), LEFT + 34, 4)
+					y = y + 30
+
+					-- Hover reach: only for a group with an action bar in it (the
+					-- one kind it works on).
+					if HasBarMember(group) then
+						local reach = Take("reach", function()
+							local slider
+							slider = Slider(content, {
+								get = function()
+									local current = slider.index and Groups()[slider.index]
+									return current and ns.HoverGroupReach(current) or 0
+								end,
+								set = function(value)
+									if slider.index then Writable()[slider.index].reach = value end
+								end,
+							}, L["Hover reach"], 0, 40, 1, L["%d px"])
+							Tooltip(slider, L["How close the mouse must come to this group's action bar buttons to " ..
+								"bring it up, so the gaps between the buttons count too. 0: only on the buttons themselves."])
+							return slider
+						end)
+						reach.index = index
+						At(reach, LEFT + 14, 20)
+						reach:Refresh()
+						y = y + 52
+					end
+
+					-- The events that bring the group up besides the mouse: one row
+					-- each, then a box to add more.
+					local alsoLabel = Take("alsoLabel", function()
+						return Label(content, "GameFontNormalSmall", L["Also bring this group up for:"])
+					end)
+					At(alsoLabel, LEFT + 10, 2)
+					y = y + 18
+					for _, trigger in ipairs(triggers) do
+						if group.triggers and group.triggers[trigger.key] then
+							local row = Take("member", MemberRow)
+							At(row, LEFT + 4)
+							row.text:SetText(trigger.label)
+							row.also:SetText("")
+							row.remove:SetScript("OnClick", function()
+								local editable = Writable()[index]
+								if editable.triggers then editable.triggers[trigger.key] = nil end
+								Layout()
+							end)
+							y = y + ROW
+						end
+					end
+					At(AddBox("addEvent", L["Add an event: type to search..."], index, true), LEFT + 34, 4)
+					y = y + 48
 				end
-				At(AddBox("addEvent", L["Add an event: type to search..."], index, true), LEFT + 34, 4)
-				y = y + 48
 			end
+			dim = 1
+
+			newGroup:ClearAllPoints()
+			newGroup:SetPoint("TOPLEFT", content, "TOPLEFT", LEFT, -(y + 4))
+			FitContentHeight(content)
 		end
-		dim = 1
+		-- (Laid out again whenever the page refreshes, a Reset page included.)
+		controls[#controls + 1] = { debugName = "Hover Groups layout", owner = canvas, Refresh = function()
+			if canvas:IsVisible() then Layout() end -- (IsShown stays true with its hub hidden: ~20 ms on every page switch)
+		end }
+		-- (The search looks at pages that aren't open: the groups laid out for it,
+		-- or it would find none of them until the page had been opened.)
+		ns.searchPrepare[#ns.searchPrepare + 1] = function()
+			if not canvas:IsVisible() then Layout() end
+		end
 
-		newGroup:ClearAllPoints()
-		newGroup:SetPoint("TOPLEFT", content, "TOPLEFT", LEFT, -(y + 4))
-		FitContentHeight(content)
+		canvas:SetScript("OnShow", function()
+			Refresh()
+			Layout()
+			C_Timer.After(0, function() FitContentHeight(content) end)
+		end)
+		canvas:SetScript("OnHide", function()
+			results:Hide()
+			picker:Hide()
+		end)
 	end
-	-- (Laid out again whenever the page refreshes, a Reset page included.)
-	controls[#controls + 1] = { debugName = "Hover Groups layout", owner = canvas, Refresh = function()
-		if canvas:IsVisible() then Layout() end -- (IsShown stays true with its hub hidden: ~20 ms on every page switch)
-	end }
-	-- (The search looks at pages that aren't open: the groups laid out for it,
-	-- or it would find none of them until the page had been opened.)
-	ns.searchPrepare[#ns.searchPrepare + 1] = function()
-		if not canvas:IsVisible() then Layout() end
-	end
-
-	canvas:SetScript("OnShow", function()
-		Refresh()
-		Layout()
-		C_Timer.After(0, function() FitContentHeight(content) end)
-	end)
-	canvas:SetScript("OnHide", function()
-		results:Hide()
-		picker:Hide()
-	end)
+	lazyPages.Add(canvas, "Hover Groups", MakeBody)
 	canvas:Hide()
 	RegisterSubpage(canvas, "Mouseover groups", L["Hover Groups"])
 end
