@@ -199,7 +199,6 @@ local TIME_PHASES = {
 }
 local DEFAULT_PHASE_COLOR = {}
 for _, key in ipairs(TIME_OF_DAY) do DEFAULT_PHASE_COLOR[key[3]] = key[2] end
-local MENU_PREVIEW_TIME = 8 -- seconds a preview from the minimap menu lasts
 -- Strength drift: two slow waves with unrelated periods, so it wanders rather
 -- than pulses. Refreshed a few times a second; the steps are far too small to see.
 local DRIFT_PERIOD_A, DRIFT_PERIOD_B = 170, 410 -- seconds
@@ -271,7 +270,6 @@ local tintLevel = 0
 local layerLevel = { vignette = 0, weather = 0 }
 local tintDirty = false
 local tintPreview = false
-local menuPreviewHour, menuPreviewUntil = -1, 0
 -- /cine tinttest: each time of day in turn, its tint and its title.
 local daySweep -- { started, each, shown } while it runs
 local DAY_SWEEP_STOPS = { -- title, and the clock time (minutes) whose tint it shows
@@ -507,11 +505,9 @@ local function GetClockTime()
 end
 
 -- Showing a preview: an hour picked in the Atmosphere hub's Tint tab's Preview time
--- (just opening the page shows nothing), or a quick preview from the minimap
--- menu is running.
+-- (just opening the page shows nothing), or /cine tinttest is running.
 local function Previewing()
-	return (tintPreview and (db.tintPreviewHour or -1) >= 0) or GetTime() < menuPreviewUntil
-		or daySweep ~= nil
+	return (tintPreview and (db.tintPreviewHour or -1) >= 0) or daySweep ~= nil
 end
 
 -- A phase's colour: your own if you picked one, else the built-in.
@@ -536,15 +532,13 @@ local function AppliedPhaseColor(name)
 end
 
 -- The tint colour for the current time, the phase's name, and the time.
--- A previewed hour (menu preview, or the Tint tab), else the clock.
+-- A previewed hour (/cine tinttest, or the Tint tab), else the clock.
 -- Time-of-day strength blends the colour toward no change.
 local function TimeOfDayColor()
 	local hour, minute
 	if daySweep then
 		local _, minutes = DaySweepNow()
 		hour, minute = math.floor(minutes / 60), minutes % 60
-	elseif GetTime() < menuPreviewUntil then
-		hour, minute = menuPreviewHour, 0
 	elseif tintPreview and (db.tintPreviewHour or -1) >= 0 then
 		hour, minute = db.tintPreviewHour, 0
 	else
@@ -1514,13 +1508,6 @@ ns.SetTimePhaseStrength = function(name, strength)
 	end
 	db.timePhaseStrength[name] = strength
 	tintDirty = true
-end
--- Quick preview from the minimap menu: the tint at this hour for a few
--- seconds, shown even outside cinematic mode.
-ns.PreviewTintHour = function(hour)
-	menuPreviewHour, menuPreviewUntil = hour, GetTime() + MENU_PREVIEW_TIME
-	tintDirty = true
-	C_Timer.After(MENU_PREVIEW_TIME + 0.1, function() tintDirty = true end)
 end
 -- /cine tinttest: each time of day in turn (Dawn to Night), this many seconds
 -- each: the tint glides to it, whatever your preset, and its title shows (with

@@ -32,17 +32,12 @@ ignore:
   - MouseTurn.lua
   # (Demo Hub: demo tools and recording scripts, in the dev copy only)
   - DemoHub.lua
-  # (Bar hover test: /cine debug bartest, action bar addons' fade, hover and clicks, dev copy only)
-  - BarHoverTest.lua
   - LowManaTest.lua
   # (Health & Resources test: /cine debug hrtest, dev copy only)
   - ThresholdTest.lua
-  # (Nameplate width test: /cine debug platewidth, dev copy only)
-  - PlateWidthTest.lua
   # (Names over heads test: /cine debug namestest, dev copy only)
   - NamesTest.lua
   - StyleRevampTest.lua
-  - PlateFlickerTest.lua
   - StyleSixTest.lua
   # (Keyboard Map + Action Bars + themecheck test: /cine debug keysbars, dev copy only)
   - KeysBarsTest.lua
@@ -50,16 +45,6 @@ ignore:
   - TurnLagTest.lua
   # (Cooldown Manager When ready > Out of fights test: /cine debug anytime, dev copy only)
   - ReadyAnyTimeTest.lua
-  # (Round action button crop test: /cine debug iconcrop, dev copy only)
-  - IconCropTest.lua
-  # (Damage Vision meter crossfade test: /cine debug dvmeter, dev copy only)
-  - DamageVisionMeterTest.lua
-  # (Spoken support test: /cine debug spokentest, dev copy only)
-  - SpokenTest.lua
-  # (Lore Forever support test: /cine debug loretest, dev copy only)
-  - LoreForeverTest.lua
-  # (Health bar colors test: /cine debug redbar, dev copy only)
-  - HealthRedTest.lua
   # (Follow HUD test: /cine debug followtest, dev copy only)
   - FollowHudTest.lua
   # (Minimap Copy: the Dev hub page drawing the minimap from the game's own tiles, dev copy only)

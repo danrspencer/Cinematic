@@ -66,7 +66,6 @@ ns.WhenAddonLoads("Spoken_Quests", function()
 		make = function(bubble)
 			button = Spoken:CreateRoundButton(bubble, "play")
 			if not button then return end
-			ns.spokenTalkButton = button -- (for /cine debug spokentest)
 			button:SetSize(CORNER, CORNER)
 			button:SetPoint("CENTER", bubble, "TOPRIGHT", -4, -4)
 			button:SetFrameLevel(bubble:GetFrameLevel() + 6)

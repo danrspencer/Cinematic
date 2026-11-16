@@ -490,9 +490,4 @@ function ns.CameraManager(kit, canvas, content, title, intro, switch, helper)
 		if openId then Pick(1) end
 	end)
 
-	-- The settings open at a camera's tab (the minimap button's Cameras in use).
-	function ns.ShowCameraTab(id)
-		ns.OpenOptions("Cameras")
-		if id then Pick(2, id) end
-	end
 end

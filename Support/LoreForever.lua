@@ -85,7 +85,6 @@ ns.WhenAddonLoads("LoreForever", function()
 		local p = FindPill()
 		return p and p.playing and true or false
 	end
-	ns.LoreForeverPill = FindPill -- (for /cine debug loretest)
 
 	local button
 	function Refresh()
@@ -95,7 +94,6 @@ ns.WhenAddonLoads("LoreForever", function()
 	ns.AddQuestTalkPart({
 		make = function(bubble)
 			button = CreateFrame("Button", nil, bubble)
-			ns.loreTalkButton = button -- (for /cine debug loretest)
 			button:SetSize(CORNER, CORNER)
 			-- (Spoken's Play button has the corner itself: ours goes beside it.)
 			local spoken = C_AddOns and C_AddOns.IsAddOnLoaded and C_AddOns.IsAddOnLoaded("Spoken_Quests")

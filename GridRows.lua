@@ -291,6 +291,14 @@ local function BuildEditor()
 	editor:EnableMouse(true)
 	ns.DockBeside(editor, "ruleEditor")
 	tinsert(UISpecialFrames, "CinematicRuleEditor") -- (Escape closes it)
+	-- (The settings going close it too: it's only opened from their pages,
+	-- and parented to UIParent it stayed up on its own after them.)
+	local settings = _G.SettingsPanel or _G.InterfaceOptionsFrame
+	if settings then
+		settings:HookScript("OnHide", function()
+			if editor:IsShown() then editor:Hide() end
+		end)
+	end
 	local close = ns.SkinClose(CreateFrame("Button", nil, editor, "UIPanelCloseButton"))
 	close:SetPoint("TOPRIGHT", -2, -2)
 	close:SetScript("OnClick", function() editor:Hide() end)
@@ -637,10 +645,6 @@ function ns.OpenRuleEditor(newTarget)
 	if not editor then BuildEditor() end
 	if editor:IsShown() then editor:Hide() end
 	editor.Open(newTarget)
-end
--- Closes it (the settings going).
-function ns.CloseRuleEditor()
-	if editor then editor:Hide() end
 end
 
 -- Whether key's a raid-style party frames' row, which follows the raid

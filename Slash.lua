@@ -1720,20 +1720,6 @@ local function HandleSlash(msg)
 		-- (Dev copy: one run recording whether your player frame flickers while not full, FlickerTest.lua.)
 		if ns.FlickerTest then ns.FlickerTest(arg:match("^flickertest%s*(.*)$"))
 		else ns.Print("/cine debug flickertest is in the dev copy only.") end
-	elseif cmd == "debug" and arg == "bartest" then
-		-- (Dev copy: one run recording an action bar addon's fade, hover and clicks, BarHoverTest.lua.)
-		if ns.BarHoverTest then ns.BarHoverTest() else ns.Print("/cine debug bartest is in the dev copy only.") end
-	elseif cmd == "debug" and arg:find("^dvmeter") then
-		-- (Dev copy: one run checking Damage Vision's crossfade with the damage meter, DamageVisionMeterTest.lua.)
-		if ns.DamageVisionMeterTest then ns.DamageVisionMeterTest(arg:match("^dvmeter%s*(.*)$"))
-		else ns.Print("/cine debug dvmeter is in the dev copy only.") end
-	elseif cmd == "debug" and arg == "redbar" then
-		-- (Dev copy: one run recording the health bars' colors as you take damage, HealthRedTest.lua.)
-		if ns.HealthRedTest then ns.HealthRedTest() else ns.Print("/cine debug redbar is in the dev copy only.") end
-	elseif cmd == "debug" and arg:find("^platewidth") then
-		-- (Dev copy: one run trying three ways to make your target's nameplate narrower, PlateWidthTest.lua.)
-		if ns.PlateWidthTest then ns.PlateWidthTest(arg:match("^platewidth%s*(.*)$"))
-		else ns.Print("/cine debug platewidth is in the dev copy only.") end
 	elseif cmd == "debug" and arg:find("^namestest") then
 		-- (Dev copy: one run on names over heads missing far off, NamesTest.lua.)
 		if ns.NamesTest then ns.NamesTest(arg:match("^namestest%s*(.*)$"))
@@ -1749,28 +1735,14 @@ local function HandleSlash(msg)
 	elseif cmd == "debug" and arg == "turnlag" then
 		-- (Dev copy: what makes turning the camera in a crowd laggy, CineMode on and off, TurnLagTest.lua.)
 		if ns.TurnLagTest then ns.TurnLagTest() else ns.Print("/cine debug turnlag is in the dev copy only.") end
-	elseif cmd == "debug" and arg:find("^iconcrop") then
-		-- (Dev copy: bar and spellbook icons round at three crops side by side, or "all" the game's, IconCropTest.lua.)
-		if ns.IconCropTest then ns.IconCropTest(arg:match("^iconcrop%s*(.*)$")) else ns.Print("/cine debug iconcrop is in the dev copy only.") end
 	elseif cmd == "debug" and arg:find("^anytime") then
 		-- (Dev copy: one run checking the Cooldown Manager's When ready > Out of fights, ReadyAnyTimeTest.lua.)
 		if ns.ReadyAnyTimeTest then ns.ReadyAnyTimeTest(arg:match("^anytime%s*(.*)$"))
 		else ns.Print("/cine debug anytime is in the dev copy only.") end
-	elseif cmd == "debug" and arg == "plateflicker" then
-		-- (Dev copy: one run recording the plates frame by frame, a white flicker, PlateFlickerTest.lua.)
-		if ns.PlateFlickerTest then ns.PlateFlickerTest() else ns.Print("/cine debug plateflicker is in the dev copy only.") end
 	elseif cmd == "debug" and arg:find("^stylerevamp") then
 		-- (Dev copy: one run checking the style revamp in the game, StyleRevampTest.lua.)
 		if ns.StyleRevampTest then ns.StyleRevampTest(arg:match("^stylerevamp%s*(.*)$"))
 		else ns.Print("/cine debug stylerevamp is in the dev copy only.") end
-	elseif cmd == "debug" and arg:find("^spokentest") then
-		-- (Dev copy: one run checking Spoken support, its Play button on Quest talk and its fades, SpokenTest.lua.)
-		if ns.SpokenTest then ns.SpokenTest(arg:match("^spokentest%s*(.*)$"))
-		else ns.Print("/cine debug spokentest is in the dev copy only.") end
-	elseif cmd == "debug" and arg:find("^loretest") then
-		-- (Dev copy: one run checking Lore Forever support, its book button on Quest talk and its fades, LoreForeverTest.lua.)
-		if ns.LoreForeverTest then ns.LoreForeverTest(arg:match("^loretest%s*(.*)$"))
-		else ns.Print("/cine debug loretest is in the dev copy only.") end
 	elseif cmd == "debug" and arg:find("^minimapcopy") and ns.MinimapCopyCommand then
 		-- (Dev copy: minimap tile test and live copy, MinimapCopy.lua.)
 		ns.MinimapCopyCommand(arg:match("^minimapcopy%s*(%a*)"))
