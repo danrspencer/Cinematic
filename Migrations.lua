@@ -1354,6 +1354,34 @@ STEPS[#STEPS + 1] = function()
 		end
 		ns.db.chatMenuHoverV1 = true
 	end
+	-- The chat's tabs and each button beside it got rows of their own (they
+	-- were the chat window's): into saved groups with chat, so hovering it
+	-- still brings them. (Not the chat menu: groups have had it since
+	-- chatMenuHoverV1, and one taken out stays out. chatbuttons: one row for
+	-- all the buttons for a while, uncommitted, dropped.) Once.
+	if not ns.db.chatPartsHoverV2 then
+		local function AddChatPartRows(groups)
+			for _, group in ipairs(type(groups) == "table" and groups or {}) do
+				local has = {}
+				for i = #(group.members or {}), 1, -1 do
+					if group.members[i] == "chatbuttons" then table.remove(group.members, i) end
+				end
+				for _, key in ipairs(group.members or {}) do has[key] = true end
+				if has.chat then
+					for _, key in ipairs({ "chattabs", "chatchannels", "chatquickjoin", "chatfriends", "chatdeafen",
+						"chatmute" }) do
+						if not has[key] then table.insert(group.members, key) end
+					end
+				end
+			end
+		end
+		AddChatPartRows(ns.db.hoverGroups)
+		for _, saved in pairs(type(ns.db.profiles) == "table" and ns.db.profiles or {}) do
+			if type(saved) == "table" then AddChatPartRows(saved.hoverGroups) end
+		end
+		ns.db.chatPartsHoverV1 = nil
+		ns.db.chatPartsHoverV2 = true
+	end
 	-- Roll Vision was first off by default; on once. Saved profiles too.
 	if not ns.db.rollWindowV1 then
 		ns.db.rollWindow = true

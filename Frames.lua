@@ -2461,12 +2461,48 @@ ns.COMBAT_SHOW = {
 	{ key = "micro", label = _G.BagsBar and L["Micro menu"] or L["Micro menu and bags"], default = true,
 		frames = { "MicroButtonAndBagsBar", "MicroMenuContainer" } },
 	{ key = "bags", label = L["Bags"], default = true, frames = { "BagsBar" } },
-	-- The chat windows with their tabs and buttons. A new message, typing or
-	-- a whisper to read brings them up too (Chat page).
-	{ key = "chat", label = L["Chat window"], default = false, groups = { "chat" }, frames = FRAME_GROUPS.chat,
+	-- The chat windows. A new message, typing or a whisper to read brings them
+	-- up too (Chat page). Their tabs, buttons and background are parts with
+	-- rows of their own, following this one's ticks until set (ROW_FALLBACK),
+	-- and up only while a window is (ns.CHAT_PART_ROW, UpdateFrames).
+	{ key = "chat", label = L["Chat window"], default = false, groups = { "chat" },
 		morePage = "Chat",
-		tip = L["The chat windows, with their tabs and buttons. Tick where they stay up while the rest fades; " ..
+		tip = L["The chat windows. Tick where they stay up while the rest fades; " ..
 			"which messages bring them up for a moment is on the Chat page."] },
+	{ key = "chattabs", label = L["Chat tabs"], default = false, part = true, frames = { "GeneralDockManager" },
+		tip = L["The chat window's tabs (General, Combat Log...). Untick it to hide them in CineMode even while " ..
+			"the chat window is up. They never stay up without it. Hovering the chat brings them up with it."] },
+	-- The buttons beside it, a row each (one a client lacks has none:
+	-- ns.OptionAvailable). chatmenu was a Mouseover row before it had a row
+	-- here, so saved groups already name it.
+	{ key = "chatmenu", label = L["Chat menu button"], default = false, part = true, frames = { "ChatFrameMenuButton" },
+		tip = L["The chat menu button beside the chat window (languages, emotes...). Untick it to hide it in " ..
+			"CineMode even while the chat window is up. It never stays up without it. Hovering the chat brings " ..
+			"it up with it."] },
+	{ key = "chatchannels", label = L["Channels button"], default = false, part = true,
+		frames = { "ChatFrameChannelButton" },
+		tip = L["The channels button beside the chat window. Untick it to hide it in CineMode even while the chat " ..
+			"window is up. It never stays up without it. Hovering the chat brings it up with it."] },
+	{ key = "chatquickjoin", label = L["Quick Join button"], default = false, part = true,
+		frames = { "QuickJoinToastButton" },
+		tip = L["The Quick Join (social) button beside the chat window. Untick it to hide it in CineMode even " ..
+			"while the chat window is up. It never stays up without it. Hovering the chat brings it up with it."] },
+	{ key = "chatfriends", label = L["Friends button"], default = false, part = true, frames = { "FriendsMicroButton" },
+		tip = L["The friends button beside the chat window. Untick it to hide it in CineMode even while the chat " ..
+			"window is up. It never stays up without it. Hovering the chat brings it up with it."] },
+	{ key = "chatdeafen", label = L["Voice deafen button"], default = false, part = true,
+		frames = { "ChatFrameToggleVoiceDeafenButton" },
+		tip = L["The voice chat deafen button beside the chat window. Untick it to hide it in CineMode even while " ..
+			"the chat window is up. It never stays up without it. Hovering the chat brings it up with it."] },
+	{ key = "chatmute", label = L["Voice mute button"], default = false, part = true,
+		frames = { "ChatFrameToggleVoiceMuteButton" },
+		tip = L["The voice chat mute button beside the chat window. Untick it to hide it in CineMode even while " ..
+			"the chat window is up. It never stays up without it. Hovering the chat brings it up with it."] },
+	-- (Not a frame: the windows' own background textures, UpdateFrames.)
+	{ key = "chatbackground", label = L["Chat background"], default = false, part = true,
+		groups = { "chatbackground" }, noHoverRow = true,
+		tip = L["The chat window's dark background. Untick it for just the lines of text while the chat window " ..
+			"is up. Hovering the chat or typing brings it up; a new message does where the Chat page ticks Background."] },
 	-- Always ticked to start with (CINE_SHOW_DEFAULT), as before it had a row.
 	{ key = "voice", label = L["Voice chat speakers"], default = false, frames = FRAME_GROUPS.voice,
 		tip = L["The names and portraits above the chat of who's talking in voice chat. Untick Always to hide them in CineMode."] },
@@ -2530,6 +2566,21 @@ local ROW_SECTIONS = {
 	quests = "interface", waypoint = "interface", topcenter = "interface", micro = "interface", bags = "interface", xp = "interface",
 	chat = "interface", voice = "interface",
 }
+-- The chat window's parts with frames: its tabs and each button beside it
+-- (and its background, no frame), in the chat window's section.
+ns.CHAT_PART_ROWS = { "chattabs", "chatmenu", "chatchannels", "chatquickjoin", "chatfriends", "chatdeafen", "chatmute" }
+-- Their frames -> their rows: only those rows count for them, not the chat
+-- window's (its fade group's), and only while a chat window is up (UpdateFrames).
+ns.CHAT_PART_ROW = {}
+for _, key in ipairs(ns.CHAT_PART_ROWS) do
+	ROW_SECTIONS[key] = ROW_SECTIONS.chat
+	for _, item in ipairs(ns.COMBAT_SHOW) do
+		if item.key == key then
+			for _, name in ipairs(item.frames) do ns.CHAT_PART_ROW[name] = key end
+		end
+	end
+end
+ROW_SECTIONS.chatbackground = ROW_SECTIONS.chat
 for _, item in ipairs(ns.COMBAT_SHOW) do
 	item.page = item.page or ROW_SECTIONS[item.key]
 end
@@ -2594,11 +2645,7 @@ local HOVER_EXTRA_ROWS = {
 	{ key = "durability", label = L["Durability figure"], frames = { "DurabilityFrame" } },
 	{ key = "questtimer", label = L["Quest timer"], frames = { "QuestTimerFrame" } },
 	{ key = "waypoint", label = L["Quest waypoint"], frames = { "SuperTrackedFrame" } },
-	-- The chat menu button (languages, emotes) apart from the chat windows: in
-	-- the Chat group by default, so it comes and goes with chat; taken out of
-	-- it, only the mouse on the button brings it up. (Still faded with the
-	-- chat row's ticks and peeks: its fade group stays chat.)
-	{ key = "chatmenu", label = L["Chat menu button"], frames = { "ChatFrameMenuButton" } },
+	-- (The chat menu button: a Show in row of its own now, chatmenu, on the Chat page.)
 }
 ns.HOVER_ROWS = {}
 local HOVER_ROW_BY_NAME = {} -- frame name -> row key (the first row listing it)
@@ -2698,7 +2745,8 @@ ns.HOVER_GROUPS_DEFAULT = {
 	{ preset = "gamepad", icon = "Interface\\Icons\\INV_Gizmo_01", name = L["Gamepad action bars"],
 		members = { "gamepadbars" }, triggers = { gamepad = true } },
 	{ preset = "chat", icon = "Interface\\Icons\\INV_Scroll_03", name = L["Chat"],
-		members = { "chat", "chatmenu" }, triggers = { whisper = true, typing = true } },
+		members = { "chat", "chattabs", "chatmenu", "chatchannels", "chatquickjoin", "chatfriends", "chatdeafen",
+			"chatmute" }, triggers = { whisper = true, typing = true } },
 	{ preset = "cooldowns", icon = "Interface\\Icons\\INV_Misc_PocketWatch_01", name = L["Cooldowns"],
 		members = { "cooldowns", "cooldownsutility", "cooldownsbuffs", "cooldownsbars", "addon:fecm", "addon:fecmAuras" },
 		triggers = { cooldown = true } },
@@ -2928,6 +2976,8 @@ local ROW_FALLBACK = {
 	minimapzone = "minimap", minimapclock = "minimap", minimapdial = "minimap", minimapaddons = "minimap",
 	minimapcompartment = "minimap", minimapcoords = "minimap", minimapmail = "minimap", bags = "micro",
 	belowminimap = "minimap", topcenter = "quests",
+	chattabs = "chat", chatmenu = "chat", chatchannels = "chat", chatquickjoin = "chat", chatfriends = "chat",
+	chatdeafen = "chat", chatmute = "chat", chatbackground = "chat",
 	cooldownsutility = "cooldowns", cooldownsbuffs = "cooldowns", cooldownsbars = "cooldowns",
 	["addon:fecmAuras"] = "addon:fecm",
 }
@@ -12168,8 +12218,10 @@ function ns.UpdateFrames(cinematic, elapsed)
 			or (flashTestUp and ns.COOLDOWN_BAR_GROUPS[entry.name])
 			or (triggered[row] and not (debuffsOnly and auraOnly[row]
 				and (entry.name == "BuffFrame" or entry.name == "TemporaryEnchantFrame")))
+		-- (The chat's tabs and buttons: by their own rows, not the chat window's.)
 		local listShown = combatShown
-			and (entry.name and combatShown[entry.name] or combatShown[GROUP_KEY[ownRow or entry.group]])
+			and (entry.name and combatShown[entry.name]
+				or not ns.CHAT_PART_ROW[entry.name or ""] and combatShown[GROUP_KEY[ownRow or entry.group]])
 		local fightingShown = listShown
 		-- (Your frames kept up while you recover, or on low mana: PersonalResources.lua.)
 		if not fightingShown and cinematic and (PORTRAIT_FRAMES[entry.name] or ns.PET_FRAMES[entry.name])
@@ -12222,6 +12274,12 @@ function ns.UpdateFrames(cinematic, elapsed)
 		end
 		if follows and cinematic and not hovered[follows] and not triggered[follows]
 			and not (combatShown and combatShown[GROUP_KEY[follows]]) then
+			target = 0
+		end
+		-- (The chat's tabs and buttons: never up in CineMode without a chat
+		-- window, Chat page's Show in. Typing and docked peeks are chatShowing.)
+		if cinematic and entry.group == "chat" and ns.CHAT_PART_ROW[entry.name or ""] and not chatShowing
+			and not hovered.chat and not triggered.chat and not (combatShown and combatShown[GROUP_KEY.chat]) then
 			target = 0
 		end
 		-- (/cine debug pad: why the gamepad bars come up, as they start to.)
@@ -12404,11 +12462,16 @@ function ns.UpdateFrames(cinematic, elapsed)
 		-- the same way, by the window it draws: FrameLinks.lua.)
 		if entry.isChatWindow or ns.chatLinkBackdrop[entry.frame] then
 			if target > 0 then
-				local peekOnly = cinematic
-					and (ns.chatPeekUntil[ns.chatPanelOwner[entry.frame] or entry.frame] or 0) > now
-					and not hovered[row] and not typingShown and not tracking and not fightingShown
+				-- (Up for a message: as Background says. Kept up by its row's
+				-- ticks: as the Chat background row's say. Hovered, typed in,
+				-- brought up by its group: always.)
+				local peeking = (ns.chatPeekUntil[ns.chatPanelOwner[entry.frame] or entry.frame] or 0) > now
 				entry.backgroundAlpha = ns.Approach(entry.backgroundAlpha or 1,
-					(peekOnly and not ns.db.chatPeekBackground) and 0 or 1, elapsed, GroupFadeTime(entry.group, false))
+					(cinematic and not hovered[row] and not typingShown and not tracking
+						and (peeking or fightingShown)
+						and not (peeking and ns.db.chatPeekBackground)
+						and not (fightingShown and combatShown and combatShown[GROUP_KEY.chatbackground])) and 0 or 1,
+					elapsed, GroupFadeTime(entry.group, false))
 			end
 			if (entry.backgroundAlpha or 1) < 1 or entry.backgroundFaded then
 				entry.backgroundFaded = entry.backgroundAlpha < 1
