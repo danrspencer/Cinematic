@@ -57,6 +57,9 @@ DEFAULTS.lowHealthFollow = 0.1     -- seconds to close all the way in after a dr
 DEFAULTS.lowHealthLiftSpeed = 0.4  -- the most it lifts a second after healing (share of all the way);
                                    -- it eases up to that speed and slows as it settles
 DEFAULTS.lowHealthFlash = true     -- a flash at the edges on a big hit
+DEFAULTS.lowHealthFlashDark = 0.35 -- how much darker the shadow gets in a flash
+DEFAULTS.lowHealthFlashTint = 0.6  -- how far a flash turns the shadow to the theme's flash colour
+DEFAULTS.lowHealthFlashTime = 0.6  -- seconds a hit's flash takes to fade
 DEFAULTS.lowHealthFlashHit = 0.08  -- share of your health lost at once that counts
 DEFAULTS.lowHealthFlashAdded = 0.2 -- ...or lost in smaller hits adding up (since the last, in a fight)
 DEFAULTS.lowHealthCalm = 0.6       -- strength out of combat (eating up, say)
@@ -82,8 +85,6 @@ local EDGE_START = 0.05      -- share of the screen the shadow covers as it star
 local ART_OUT = 1.35         -- the art's size (screens) as it starts: about all past the edges
 local ART_DEEPEST = 1        -- ...and at full with Reach 100% (no smaller: it must cover the screen)
 local ART_SHALLOWEST = 1.2   -- ...and at full with Reach 0%
-local FLASH_TIME = 0.6       -- seconds a hit's flash takes to fade
-local FLASH_TINT = 0.6       -- how far a flash turns the shadow to the theme's flash colour
 local DEATH_FADE = 0.5       -- seconds to clear as you die (the death screen takes over)
 local LIFT_EASE = 0.8        -- how quickly the lift speeds up and slows down (a second, each second)
 local TEST_HOLD = 2          -- seconds the test stays at its last share before handing back
@@ -1241,13 +1242,14 @@ local function Apply(d, look, k, fade, heart, secret)
 	local width, height = d.frame:GetWidth(), d.frame:GetHeight()
 	local size = EDGE_START + (look.lowHealthReach - EDGE_START) * c + over * 0.1
 	local sides = EDGE_START + (look.lowHealthReachSides - EDGE_START) * c + over * 0.1
-	local alpha = math.min(1, look.lowHealthDark * c + flash * 0.35) * fade
+	local alpha = math.min(1, look.lowHealthDark * c + flash * (look.lowHealthFlashDark or 0.35)) * fade
 	-- The shadow: the theme's colour (as far as Shadow tint says), toward its
-	-- flash colour in a flash.
+	-- flash colour in a flash (as far as Flash color says).
 	local shadow, flashColor = shown.shadow, shown.flash
+	local flashTint = flash * (look.lowHealthFlashTint or 0.6)
 	for i = 1, 3 do
 		local v = shadow[i] * look.lowHealthRed
-		shadowColor[i] = v + (flashColor[i] - v) * flash * FLASH_TINT
+		shadowColor[i] = v + (flashColor[i] - v) * flashTint
 	end
 	ns.SetVignette(d.edges, size, alpha, shadowColor[1], shadowColor[2], shadowColor[3], width, height, sides)
 	-- The grade: by how far in the edges are, not their throb (the world
@@ -1641,7 +1643,7 @@ local function Update(_, elapsed)
 	Sparking(screen, look, elapsed, hit)
 	lastHealth = share
 	belowStart = on and share ~= nil and share < db.lowHealthStart
-	flash = Approach(flash, 0, elapsed, FLASH_TIME)
+	flash = Approach(flash, 0, elapsed, look.lowHealthFlashTime or 0.6)
 	local secret = on and share == nil
 	local target = on and (share and LevelAt(share) or 1) or 0
 	if on and not testing and not secret and not ns.Flag(UnitAffectingCombat("player")) then
@@ -2604,7 +2606,7 @@ function ns.CreateVitalsStylePanel(kit)
 			if look.lowHealthFlash then d.flash = 1 end
 		end
 		Sparking(d, look, elapsed, hit)
-		d.flash = Approach(d.flash, 0, elapsed, FLASH_TIME)
+		d.flash = Approach(d.flash, 0, elapsed, look.lowHealthFlashTime or 0.6)
 		local target = LevelAt(share)
 		if target >= d.level then
 			d.level = Approach(d.level, target, elapsed, db.lowHealthFollow)
@@ -3090,6 +3092,14 @@ function ns.CreateVitalsStylePanel(kit)
 	rows.Check("lowHealthFlash", L["Flash on big hits"],
 		L["The edges flash in the theme's color when a hit takes a lot at once. (What counts as big: the " ..
 		"Vision tab.)"])
+	local function Flashing(d) return On(d) and d.lowHealthFlash end
+	local flashBoxes = rows.Boxes()
+	flashBoxes:Box(L["Flash darkness"], "lowHealthFlashDark", 0, 100, 5, "%d", 100,
+		L["How much darker the edges get in a flash, on top of Darkness."], Flashing, "%")
+	flashBoxes:Box(L["Flash color"], "lowHealthFlashTint", 0, 100, 5, "%d", 100,
+		L["How far a flash turns the edges toward the theme's Flash color. 0%: no color change."], Flashing, "%")
+	flashBoxes:Box(L["Flash fade"], "lowHealthFlashTime", 0.1, 3, 0.1, "%.1fs", 1,
+		L["Seconds a flash takes to fade."], Flashing)
 	tabbed.Finish(general)
 
 	-- The art, in two layers: ours, and Blizzard's (the game's own screen

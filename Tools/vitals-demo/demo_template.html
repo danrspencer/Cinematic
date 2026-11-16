@@ -121,7 +121,7 @@ const W = cv.width, H = cv.height;
 const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 // LowHealth.lua's numbers.
-const EDGE_START = 0.05, ART_OUT = 1.35, ART_DEEPEST = 1, ART_SHALLOWEST = 1.2, FLASH_TIME = 0.6, FLASH_TINT = 0.6;
+const EDGE_START = 0.05, ART_OUT = 1.35, ART_DEEPEST = 1, ART_SHALLOWEST = 1.2;
 const LIFT_EASE = 0.8, RIPPLE_SPAN = 0.25, RIPPLE_ALPHA = 0.7, SWAY = 0.012, GAS_REACH = 0.2, GAS_DRIFT = 0.03;
 const FADE_IN = 0.3, FADE_END = 1.2, GRADE_GREY = [0.6, 0.63, 0.68], GRADE_TINT = 0.3, MAX_SPARKS = 24;
 const SPIRAL_TURN = 0.45, SPIRAL_IN = 0.65, ORBIT_SPEED = 0.35;
@@ -398,7 +398,7 @@ function frame(nowMs) {
   }
   if (sparking) for (const info of sparking) if (info.rate && Math.random() < info.rate / 60 * elapsed * level) spark(info, now);
   lastHealth = share;
-  flash = Math.max(0, flash - elapsed / FLASH_TIME);
+  flash = Math.max(0, flash - elapsed / db.lowHealthFlashTime);
   const start = db.lowHealthStart, full = Math.min(db.lowHealthFull, start - 0.01);
   const target = ramped(Math.max(0, Math.min(1, (start - share) / (start - full))));
   if (target >= level) { level = Math.min(target, level + elapsed / db.lowHealthFollow); liftSpeed = 0; }
@@ -429,8 +429,8 @@ function apply(theme, k, heart, now) {
   const sides = EDGE_START + (look("lowHealthReachSides") - EDGE_START) * c + over * 0.1;
   reachNow = size; reachSidesNow = sides;
   if (S.shadow) {
-    const alpha = Math.min(1, look("lowHealthDark") * c + flash * 0.35);
-    const col = theme.shadow.map((v, i) => { const s = v * db.lowHealthRed; return s + (theme.flash[i] - s) * flash * FLASH_TINT; });
+    const alpha = Math.min(1, look("lowHealthDark") * c + flash * db.lowHealthFlashDark);
+    const col = theme.shadow.map((v, i) => { const s = v * db.lowHealthRed; return s + (theme.flash[i] - s) * flash * db.lowHealthFlashTint; });
     vignette(size, sides, alpha, col);
   }
   // The grade: as strong as Strength, by how far in the edges are (not their throb).
@@ -579,7 +579,8 @@ const SLIDERS = {
     ["lowHealthBrightness", "Brightness", 0, 100, 5]],
   shadowRows: [["lowHealthDark", "Darkness", 0, 100, 5], ["lowHealthRed", "Shadow tint", 0, 100, 5],
     ["lowHealthReach", "Reach, top and bottom", 10, 50, 1], ["lowHealthReachSides", "Reach, sides", 10, 50, 1]],
-  beatRows: [["lowHealthPulseAmount", "Throb", 0, 60, 5]],
+  beatRows: [["lowHealthPulseAmount", "Throb", 0, 60, 5], ["lowHealthFlashDark", "Flash darkness", 0, 100, 5],
+    ["lowHealthFlashTint", "Flash color", 0, 100, 5], ["lowHealthFlashTime", "Flash fade", 10, 300, 10, "s"]],
   oursRows: [["lowHealthBloodAlpha", "Opacity", 0, 100, 1], ["lowHealthBloodReach", "Reach, top and bottom", 0, 100, 5],
     ["lowHealthBloodReachSides", "Reach, sides", 0, 100, 5]],
   swirlRows: [["lowHealthSwirlAlpha", "Opacity", 0, 100, 1]],
@@ -633,8 +634,8 @@ function note() {
 }
 // The controls from the settings.
 function sync() {
-  for (const list of Object.values(SLIDERS)) for (const [key] of list) {
-    $(key).value = Math.round(db[key] * 100); $(key + "V").textContent = Math.round(db[key] * 100) + "%";
+  for (const list of Object.values(SLIDERS)) for (const [key, , , , , unit] of list) {
+    $(key).value = Math.round(db[key] * 100); $(key + "V").textContent = unit === "s" ? db[key].toFixed(1) + "s" : Math.round(db[key] * 100) + "%";
   }
   $("health").value = Math.round(S.health * 100); $("healthV").textContent = Math.round(S.health * 100) + "%";
   for (const box of document.querySelectorAll("[data-key]")) box.checked = !!db[box.dataset.key];
