@@ -171,6 +171,14 @@ local function ShowIcon(icon)
 			text.time:Show()
 			-- (Set again only when the end moves: an aura read out of a
 			-- fight can put it right.)
+			-- (Round with round icons, as the icon's own sweep: the Style
+			-- pass skips this one, and it may be made after that pass ran.
+			-- Square, it drew a square over a round icon, Forever.)
+			local round = ns.CooldownSwipeTexture and ns.CooldownSwipeTexture()
+			if text.swipe and text.swipeShape ~= round and (round or text.swipeShape) then
+				text.swipe:SetSwipeTexture(round or ns.SQUARE_SWIPE)
+			end
+			if text.swipe then text.swipeShape = round end
 			if text.swipe and text.swipeEnds ~= entry.endsAt then
 				text.swipeEnds = entry.endsAt
 				text.swipe:SetCooldown(entry.endsAt - entry.lasts, entry.lasts)

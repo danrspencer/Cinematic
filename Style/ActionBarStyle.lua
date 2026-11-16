@@ -763,6 +763,13 @@ function ns.CooldownRoundArt(thick)
 	if not cdmRound then return nil end
 	return ROUND_MASK, RING .. math.max(1, math.min(MAX_RING, thick or 1))
 end
+-- The swipe texture for a sweep of our own on a Cooldown Manager icon
+-- (CooldownStacks.lua's Arcane Blast timer): round with the icons, else nil
+-- (the template's square). The icon's own sweep is set in DressCdmIcon.
+function ns.CooldownSwipeTexture()
+	return cdmRound and CIRCLE or nil
+end
+ns.SQUARE_SWIPE = SQUARE_SWIPE
 function ns.RefreshCooldownShape()
 	local plan = Plan()
 	cdmRound = plan.round and true or false
