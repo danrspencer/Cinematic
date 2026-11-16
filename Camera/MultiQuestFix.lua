@@ -20,7 +20,7 @@
 -- One quest (test 3, user 2026-11-15: "accepting a quest from a quest giver
 -- with just 1 causes the snap back"): the game's Accept ends the talk at once,
 -- so the game's turn snaps back. With the cover over it, Accept is held while
--- the camera glides back (ns.ShoulderTalkClose, quick, as the quest bubble's
+-- the camera glides back (ns.ShoulderTalkClose, quick: at once, as the quest bubble's
 -- Accept is) and the window fades, then the game's AcceptQuest is called:
 -- only called, never replaced. A PvP quest (the game asks first) isn't covered.
 local _, ns = ...

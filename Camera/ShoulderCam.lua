@@ -693,13 +693,14 @@ end
 -- (the "ramp" run): so the focus stays on with them at 0, and as a window
 -- opens they're stepped up to the game's own (talk.yaw, talk.pitch) over
 -- shoulderCamTalkIn seconds, eased (back down: shoulderCamTalkOut). While one of Cinematic's cameras holds
--- the view (the quest or chat camera) they're stepped back down over the same
--- time, and up again once it's done. The way back as the window closes is
+-- the view (the quest or chat camera) they're held where they are, and glide
+-- back as the window closes (stepped down under it till 2026-11-16, so the
+-- close had nothing left to turn back: user). The way back as the window closes is
 -- the game's 0.2 s, a snap: closed, the focus has no one to turn to, and
 -- nothing turns the camera beforehand (the "back" run, 2026-11-12: camera
--- follow didn't move it). So after shoulderCamTalkHold seconds on them the
--- strengths glide back down at the same pace, the window still open, and the
--- close has nothing left to snap (0: they stay up till it closes). A new
+-- follow didn't move it), so the close is held while they glide back down
+-- (ns.ShoulderTalkClose). (A time on them before gliding back with the window
+-- still open, shoulderCamTalkHold, removed 2026-11-16: user.) A new
 -- window (the quest's text after the gossip) turns to them again. They go
 -- back to 0 talk.grace after the last window closes (from gossip to a quest's
 -- text, one window closes before the next opens). Its own Show in row off
@@ -729,17 +730,40 @@ local talk = {
 	-- it in again 0.25 s on (the log and the user, 2026-11-14). A drift back
 	-- while you read (8 s) didn't help: Accept came 0.45-0.8 s in, the turn
 	-- still 0.8-0.9 there. So those calls are held too (ns.ShoulderTalkClose with
-	-- quick), the turn gliding back over quickTime, then they go.
-	quickTime = 0.5, quick = false, -- (the glide back's for a held Accept or Complete)
+	-- quick: the glide back at once, no swapWait), then they go. Over
+	-- NPC turn back takes, as every close (user, 2026-11-16: "when i close the
+	-- window i expect it to turn back over 3 seconds"); quickTime (0.5 s)
+	-- till then. quickTime's only for walking off now.
+	quickTime = 0.5, quick = false, -- (quick: a held Accept, Complete or Decline)
 }
 
 -- Seconds the turn toward them takes (shoulderCamTalkIn), and the glide back
 -- (shoulderCamTalkOut), each its own slider since 2026-11-14.
-local function TalkInTime() return math.max(0.1, ns.db.shoulderCamTalkIn or 1.5) end
-local function TalkOutTime() return math.max(0.1, ns.db.shoulderCamTalkOut or 1.5) end
+local function TalkInTime() return math.max(0.1, ns.db.shoulderCamTalkIn or 3) end
+local function TalkOutTime() return math.max(0.1, ns.db.shoulderCamTalkOut or 3) end
+
+-- Turn to NPCs' Show in row (user, 2026-11-16: "turning inside can be a bit
+-- much"): where it turns, not indoors or in fights to start with. Read 4 times a second,
+-- as Turn to enemy's (rules aren't cheap). Its Always: shoulderCamTalkTurnAlways.
+ns.SHOULDER_TALK_ROW = "shoulder:talkturn"
+ns.CINE_SHOW_SETTING[ns.SHOULDER_TALK_ROW] = "shoulderCamTalkTurnAlways"
+ns.RULE_DEFAULTS[ns.SHOULDER_TALK_ROW] = "not indoors and not combat"
+for _, list in ipairs({ "combatShow", "worldShow", "cityShow", "bgShow", "instanceShow", "groupShow" }) do
+	ns.LIST_DEFAULTS[list][ns.SHOULDER_TALK_ROW] = true
+end
+local talkRead = { at = -1, on = true }
+local function TalkHere()
+	local now = GetTime()
+	if now - talkRead.at >= 0.25 then
+		talkRead.at = now
+		local ok, on = pcall(ns.RowOnNow, ns.SHOULDER_TALK_ROW, ns.db.shoulderCamTalkTurnAlways, true)
+		talkRead.on = not ok or on and true or false
+	end
+	return talkRead.on
+end
 
 local function TalkOn()
-	return ShoulderOn() and ns.db.shoulderCamTalkTurn and paused ~= "show in"
+	return ShoulderOn() and ns.db.shoulderCamTalkTurn and paused ~= "show in" and TalkHere()
 end
 
 -- Who the window's with, only a living creature: a mailbox, a wanted poster,
@@ -797,9 +821,9 @@ end
 -- GetQuestReward were replaced to hold them from the game's windows too,
 -- which taints every bit of the game's code that calls them (the user
 -- chose this over it). The game's windows close at once and snap back.
--- Only gossip and quest text: a vendor, bank, mailbox, trainer or flight
--- master held open unseen would still take a bag click (an item sold or
--- banked), so those close at once and snap back as the game's do.
+-- Every NPC window since 2026-11-16 (user: no snap anywhere): held open
+-- unseen it'd still take a click (an item sold or banked, a spell bought),
+-- so gameEsc.Guard covers it and keeps your bags closed till it goes.
 local closing = {
 	held = {}, since = nil,
 	-- (Which hold a safety timer's for: an old one, its calls dropped as the
@@ -850,7 +874,7 @@ function ns.ShoulderTalkClose(label, fn, quick, ...)
 		local token = closing.token
 		ns.Log("shoulder", ("talk close: %s held while the camera glides back (turn at %.2f)"):format(
 			label, talk.share))
-		local wait = quick and talk.quickTime + 1 or talk.swapWait + TalkOutTime() + 1
+		local wait = (quick and 0 or talk.swapWait) + TalkOutTime() + 1
 		C_Timer.After(wait, function()
 			if closing.token == token then CloseNow("timer") end
 		end)
@@ -859,15 +883,35 @@ function ns.ShoulderTalkClose(label, fn, quick, ...)
 	end
 end
 
--- Escape in the game's own gossip and quest windows (2026-11-15, no Quest
--- Vision needed): bound to a secure button while one's open and the talk
--- turn is on. Its /cleartarget clears your target (shoulderCamEscTarget; the
--- game's Escape would close the window first), and its PostClick closes
--- the window through the slow glide back (ns.ShoulderTalkClose), fading it
--- out meanwhile. The game's close is only called, as Goodbye would, never
--- replaced (what tainted, till 2026-11-14). The X and Goodbye buttons still
--- close at once. With Cinematic's own dialogue up, Escape's left to it.
-local GAME_TALK = { GossipFrame = "gossip", QuestFrame = "quest" }
+-- Escape in the game's own NPC windows (2026-11-15, no Quest Vision
+-- needed): bound to a secure button while one's open and the talk turn is
+-- on. Its /cleartarget clears your target (shoulderCamEscTarget; the game's
+-- Escape would close the window first), and its PostClick closes the window
+-- through the slow glide back (ns.ShoulderTalkClose), fading it out
+-- meanwhile. The game's close is only called, never replaced (what tainted,
+-- till 2026-11-14). With Cinematic's own dialogue up, Escape's left to it.
+-- Every NPC window since 2026-11-16 (user: no snap anywhere), gossip and
+-- quest text before (then a vendor too). A held window is kept from clicks
+-- (gameEsc.Guard: a cover over it, your bags closed and kept closed), so
+-- nothing's bought, sold, banked, sent or flown to while it fades. The
+-- game's X, Goodbye and Decline buttons have covers of ours over them
+-- (gameEsc.Covers) that do the same, as MultiQuestFix.lua's over Accept.
+-- The frame's name, the game's close call (for the log, and the call).
+local GAME_TALK = {
+	{ "GossipFrame", "CloseGossip", function() (C_GossipInfo and C_GossipInfo.CloseGossip or _G.CloseGossip)() end },
+	{ "QuestFrame", "CloseQuest", function() CloseQuest() end },
+	{ "MerchantFrame", "CloseMerchant", function() CloseMerchant() end },
+	{ "ClassTrainerFrame", "CloseTrainer", function() CloseTrainer() end },
+	{ "BankFrame", "CloseBankFrame", function() CloseBankFrame() end },
+	{ "GuildBankFrame", "CloseGuildBankFrame", function() CloseGuildBankFrame() end },
+	{ "TaxiFrame", "CloseTaxiMap", function() CloseTaxiMap() end },
+	{ "FlightMapFrame", "CloseTaxiMap", function() CloseTaxiMap() end },
+	{ "MailFrame", "CloseMail", function() CloseMail() end },
+	{ "AuctionHouseFrame", "CloseAuctionHouse", function() C_AuctionHouse.CloseAuctionHouse() end },
+	{ "AuctionFrame", "CloseAuctionHouse", function() CloseAuctionHouse() end },
+	{ "PetStableFrame", "ClosePetStables", function() ClosePetStables() end },
+	{ "StableFrame", "ClosePetStables", function() ClosePetStables() end },
+}
 local gameEsc = CreateFrame("Button", "CinematicShoulderEscapeButton", UIParent, "SecureActionButtonTemplate")
 gameEsc:SetAttribute("type", "macro")
 gameEsc:SetAttribute("macrotext", "")
@@ -893,11 +937,52 @@ gameEsc:SetScript("OnEvent", function(self, event, button)
 	end
 end)
 gameEsc.bound = false
+-- The open NPC window: its frame, name, close call's label and the call.
 local function GameTalkWindow()
-	for name, kind in pairs(GAME_TALK) do
-		local frame = _G[name]
-		if frame and ns.Flag(frame:IsShown()) then return frame, kind end
+	for _, entry in ipairs(GAME_TALK) do
+		local frame = _G[entry[1]]
+		if frame and ns.Flag(frame:IsShown()) then return frame, entry[1], entry[2], entry[3] end
 	end
+end
+-- Your bags closed while a close is held, and closed again if one opens
+-- before it goes (a bag key). (Post-hooks only: nothing of the game's replaced.)
+function gameEsc.HoldBags()
+	gameEsc.bagsHeld = true
+	if CloseAllBags then pcall(CloseAllBags) end
+	if gameEsc.bagHooks then return end
+	gameEsc.bagHooks = true
+	local function Shut()
+		if not gameEsc.bagsHeld then return end
+		if #closing.held == 0 then
+			gameEsc.bagsHeld = nil
+			return
+		end
+		ns.Log("shoulder", "talk close: a bag opened while the close is held, closed again")
+		if CloseAllBags then pcall(CloseAllBags) end
+	end
+	for _, name in ipairs({ "OpenAllBags", "ToggleAllBags", "OpenBag", "ToggleBag", "ToggleBackpack", "OpenBackpack" }) do
+		if type(_G[name]) == "function" then hooksecurefunc(name, Shut) end
+	end
+end
+-- A cover over the held (faded) window that takes its clicks, gone once
+-- nothing's held. (Ours, over it: nothing of the game's window is changed.)
+local guard = CreateFrame("Frame", "CinematicShoulderTalkGuard", UIParent)
+guard:EnableMouse(true)
+pcall(guard.EnableMouseWheel, guard, true)
+guard:SetFrameStrata("FULLSCREEN")
+guard:Hide()
+guard:SetScript("OnUpdate", function(self)
+	if #closing.held == 0 or not (self.window and self.window:IsVisible()) then
+		self:Hide()
+		self.window = nil
+	end
+end)
+function gameEsc.Guard(frame)
+	guard:ClearAllPoints()
+	guard:SetAllPoints(frame)
+	guard.window = frame
+	guard:Show()
+	gameEsc.HoldBags()
 end
 -- The window faded out over gameEsc.fadeTime while the camera glides back;
 -- its alpha back as it hides. (Our own steps: the game's UIFrameFade on its
@@ -923,28 +1008,13 @@ local function FadeGameWindow(frame)
 		if alpha <= 0 then ns.SetOnUpdate(gameEsc, nil) end
 	end)
 end
--- The other NPC windows (user, 2026-11-15: "vendor NPCs and any others"):
--- Escape with a target clears it and closes the window at once, through the
--- game's own close call (as its X does; never HideUIPanel, which taints).
--- No hold for the glide back: a vendor or bank held open unseen would still
--- take a bag click (see closing, above). The frame's name, then its close.
-gameEsc.OTHER = {
-	{ "MerchantFrame", function() CloseMerchant() end },
-	{ "ClassTrainerFrame", function() CloseTrainer() end },
-	{ "BankFrame", function() CloseBankFrame() end },
-	{ "GuildBankFrame", function() CloseGuildBankFrame() end },
-	{ "TaxiFrame", function() CloseTaxiMap() end },
-	{ "FlightMapFrame", function() CloseTaxiMap() end },
-	{ "MailFrame", function() CloseMail() end },
-	{ "AuctionHouseFrame", function() C_AuctionHouse.CloseAuctionHouse() end },
-	{ "AuctionFrame", function() CloseAuctionHouse() end },
-	{ "PetStableFrame", function() ClosePetStables() end },
-	{ "StableFrame", function() ClosePetStables() end },
-}
-function gameEsc.OtherWindow()
-	for _, entry in ipairs(gameEsc.OTHER) do
-		local frame = _G[entry[1]]
-		if frame and ns.Flag(frame:IsShown()) then return frame, entry[1], entry[2] end
+-- A close through the glide back: held (ns.ShoulderTalkClose), the window
+-- faded and kept from clicks; or at once if nothing holds it (no turn, a fight).
+function gameEsc.HeldClose(frame, label, close, quick)
+	ns.ShoulderTalkClose(label, close, quick)
+	if #closing.held > 0 then
+		FadeGameWindow(frame)
+		gameEsc.Guard(frame)
 	end
 end
 -- (A popup up over it, "Sell this?" and the like: Escape's the game's, for the popup.)
@@ -955,27 +1025,105 @@ function gameEsc.PopupUp()
 	end
 	return false
 end
--- (MultiQuestFix.lua: the game's Accept held for the glide back, its window faded the same way.)
-ns.ShoulderFadeGameWindow = FadeGameWindow
+-- (MultiQuestFix.lua: the game's Accept held for the glide back, its window
+-- faded and guarded the same way.)
+ns.ShoulderFadeGameWindow = function(frame)
+	FadeGameWindow(frame)
+	if #closing.held > 0 then gameEsc.Guard(frame) end
+end
 gameEsc:SetScript("PostClick", function()
-	local frame, kind = GameTalkWindow()
-	if not frame then
-		local other, name, close = gameEsc.OtherWindow()
-		if other then
-			ns.Log("shoulder", ("escape: target cleared, closing the game's %s"):format(name))
-			local ok, err = pcall(close)
-			if not ok then ns.Log("shoulder", ("escape: closing %s failed: %s"):format(name, tostring(err))) end
-		end
-		return
-	end
-	ns.Log("shoulder", ("escape: the game's %s window, closing after the glide back"):format(kind))
-	if kind == "gossip" then
-		ns.ShoulderTalkClose("CloseGossip", C_GossipInfo and C_GossipInfo.CloseGossip or _G.CloseGossip)
-	else
-		ns.ShoulderTalkClose("CloseQuest", CloseQuest)
-	end
-	if #closing.held > 0 then FadeGameWindow(frame) end
+	local frame, name, label, close = GameTalkWindow()
+	if not frame then return end
+	ns.Log("shoulder", ("escape: the game's %s, closing after the glide back"):format(name))
+	gameEsc.HeldClose(frame, label, close)
 end)
+
+-- Covers over the game's own close buttons (X, Goodbye, Decline): plain
+-- buttons of ours on top that close through the glide back. The game's button
+-- under it is lit and pressed as ours is, so it looks the same. Each found by
+-- its name on either client; the ones found are logged as the window opens.
+-- { path from _G (dots for keys), the call's label, the call, quick } (no
+-- call: the window's own close).
+local COVER_BUTTONS = {
+	all = { ".CloseButton", "CloseButton", ".BorderFrame.CloseButton" },
+	GossipFrame = { { "GossipFrame.GreetingPanel.GoodbyeButton" }, { "GossipFrameGreetingGoodbyeButton" } },
+	QuestFrame = { { "QuestFrameGoodbyeButton" }, { "QuestFrameGreetingGoodbyeButton" }, { "QuestFrameCancelButton" },
+		-- (Decline: its glide back at once, as Accept's.)
+		{ "QuestFrameDeclineButton", "DeclineQuest", function() DeclineQuest() end, true } },
+	ClassTrainerFrame = { { "ClassTrainerCancelButton" } },
+	TaxiFrame = { { "TaxiCloseButton" } },
+	MailFrame = { { "InboxCloseButton" } },
+}
+local function Resolve(path)
+	local node = _G
+	for key in path:gmatch("[^%.]+") do
+		if type(node) ~= "table" then return nil end
+		node = node[key]
+	end
+	if type(node) ~= "table" or not node.IsObjectType then return nil end
+	local ok, button = pcall(node.IsObjectType, node, "Button")
+	return ok and button and node or nil
+end
+gameEsc.covers = {} -- [the game's button] = our cover
+gameEsc.coveredFor = nil -- (the window and buttons covers were laid for, logged once)
+local function Cover(target, frame, label, close, quick)
+	local cover = gameEsc.covers[target]
+	if not cover then
+		cover = CreateFrame("Button", nil, UIParent)
+		cover:RegisterForClicks("LeftButtonUp")
+		cover:SetScript("OnEnter", function(self) pcall(self.target.LockHighlight, self.target) end)
+		cover:SetScript("OnLeave", function(self)
+			pcall(self.target.UnlockHighlight, self.target)
+			pcall(self.target.SetButtonState, self.target, "NORMAL")
+		end)
+		cover:SetScript("OnMouseDown", function(self) pcall(self.target.SetButtonState, self.target, "PUSHED") end)
+		cover:SetScript("OnMouseUp", function(self) pcall(self.target.SetButtonState, self.target, "NORMAL") end)
+		cover:SetScript("OnClick", function(self)
+			pcall(self.target.UnlockHighlight, self.target)
+			ns.Log("shoulder", ("talk close: the game's %s, closing after the glide back"):format(self.which))
+			gameEsc.HeldClose(self.frame, self.label, self.close, self.quick)
+		end)
+		-- (Gone with the button: never left over a closed window, taking clicks.)
+		cover:SetScript("OnUpdate", function(self)
+			if not self.target:IsVisible() then self:Hide() end
+		end)
+		cover.target = target
+		gameEsc.covers[target] = cover
+	end
+	-- (Already over it for this window: nothing to do, every frame.)
+	if cover:IsShown() and cover.frame == frame and cover.label == (label or cover.label) then return end
+	cover.frame, cover.label, cover.close, cover.quick = frame, label, close, quick
+	cover.which = target:GetName() or label
+	cover:ClearAllPoints()
+	cover:SetAllPoints(target)
+	cover:SetFrameStrata(target:GetFrameStrata() or "HIGH")
+	cover:SetFrameLevel((target:GetFrameLevel() or 1) + 20)
+	cover:Show()
+end
+function gameEsc.Covers(frame, name, label, close)
+	local seen, laid = {}, {}
+	local function Try(path, coverLabel, coverClose, quick)
+		local target = Resolve(path)
+		if target and not seen[target] and ns.Flag(target:IsVisible()) then
+			seen[target] = true
+			Cover(target, frame, coverLabel or label, coverClose or close, quick)
+			laid[#laid + 1] = path
+		end
+	end
+	for _, suffix in ipairs(COVER_BUTTONS.all) do Try(name .. suffix) end
+	for _, entry in ipairs(COVER_BUTTONS[name] or {}) do Try(entry[1], entry[2], entry[3], entry[4]) end
+	local key = name .. ":" .. table.concat(laid, ",")
+	if gameEsc.coveredFor ~= key then
+		gameEsc.coveredFor = key
+		ns.Log("shoulder", ("covers over the game's %s buttons: %s"):format(name,
+			#laid > 0 and table.concat(laid, ", ") or "none found"))
+	end
+end
+function gameEsc.Uncover()
+	for _, cover in pairs(gameEsc.covers) do cover:Hide() end
+	gameEsc.coveredFor = nil
+end
+
 -- The held close called off: the window (faded out) back, the turn back
 -- toward them, and the talk goes on as if Escape hadn't been pressed.
 function ns.ShoulderTalkKeep(why)
@@ -995,28 +1143,30 @@ end
 -- (Every frame from the poller, and as the Shoulder Cam's applied: out of fights only.)
 local function SyncGameEscape()
 	if InCombatLockdown() then return end
-	-- want: "talk" (gossip or quest text: the glide back), "other" (a vendor,
-	-- trainer, bank...: only with the tick on and a target to clear), or false.
-	local want = false
+	-- want: "talk" (an NPC window: the glide back), or false.
+	local want, window, name, label, close = false, nil, nil, nil, nil
 	if ShoulderOn() and TalkOn() and talk.on and not (ns.QuestTalkActive and ns.QuestTalkActive()) then
-		if GameTalkWindow() ~= nil then
-			want = "talk"
-		elseif ns.Setting("shoulderCamEscTarget") and gameEsc.OtherWindow() ~= nil and not gameEsc.PopupUp()
-			and ns.Flag(UnitExists("target")) then
-			want = "other"
-		end
+		window, name, label, close = GameTalkWindow()
+		if window ~= nil then want = "talk" end
 	end
+	-- (The game's buttons covered while it's open; a button that shows later,
+	-- the next quest panel's Goodbye, covered as it does. Not while held.)
+	if want and #closing.held == 0 then
+		gameEsc.Covers(window, name, label, close)
+	elseif not want and gameEsc.coveredFor then
+		gameEsc.Uncover()
+	end
+	-- (A popup up, "Sell this?" and the like: Escape's the game's, for it.)
+	if want and gameEsc.PopupUp() then want = false end
 	if want == gameEsc.bound then return end
 	gameEsc.bound = want
 	if want then
-		gameEsc:SetAttribute("macrotext",
-			(want == "other" or ns.Setting("shoulderCamEscTarget")) and "/cleartarget" or "")
+		gameEsc:SetAttribute("macrotext", ns.Setting("shoulderCamEscTarget") and "/cleartarget" or "")
 		SetOverrideBindingClick(gameEsc, true, "ESCAPE", gameEsc:GetName())
 	else
 		ClearOverrideBindings(gameEsc)
 	end
-	ns.Log("shoulder", want == "talk" and "escape: bound for the game's talk window"
-		or want == "other" and "escape: bound for the game's NPC window (clears your target)"
+	ns.Log("shoulder", want and ("escape: bound for the game's %s"):format(tostring(name))
 		or "escape: back to the game's")
 end
 gameEsc.Sync = SyncGameEscape -- (its PLAYER_REGEN_ENABLED, above)
@@ -1028,8 +1178,8 @@ gameEsc.Sync = SyncGameEscape -- (its PLAYER_REGEN_ENABLED, above)
 -- target's gone till they come back down (the "enemy" map run, retail dummy,
 -- 2026-11-12, Tools/shoulder-test-plan.md). So, as with the talk turn, it's on
 -- with them at 0, eased up to the game's own (aim.yaw, aim.pitch) over
--- shoulderCamTalkTime while an enemy's targeted, and down again over the same
--- time once it isn't: a slow turn there and a glide back. In a fight it's
+-- shoulderCamTalkTime while an enemy's targeted, and down again over
+-- a time of its own (shoulderCamTargetBack) once it isn't: a slow turn there and a glide back. In a fight it's
 -- untested. A target the game won't say is an enemy (secret) counts as none.
 local aim = {
 	enable = "test_cameraTargetFocusEnemyEnable",
@@ -1054,6 +1204,61 @@ local function HasEnemy()
 	return UnitExists("target") and ns.Flag(UnitCanAttack("player", "target"))
 		and not ns.Flag(UnitIsDeadOrGhost("target")) or false
 end
+
+-- The game's soft enemy target, held on while the camera's turned (user,
+-- 2026-11-16: "yes"). Esc clears your target and the game drops its turn at
+-- once, a snap, whatever the strengths (the "soft" run, Forever trial 2:
+-- kept full, gone by 0.2 s). With the soft target on that enemy, the turn
+-- stays on it after the clear (Forever trial 2: still turned 1.2 s on), and
+-- eases back with the strengths (retail tank dummy, same day). Clearing a
+-- target can't be held (protected), so this is the only way to a glide.
+-- Raised to these only where yours are lower, given back once the glide's
+-- done (or a fight turns it back with the target kept: no glide to hold).
+-- In those 1.5 s, attacks with no target can go to the soft one.
+aim.soft = { SoftTargetEnemy = 3, SoftTargetEnemyArc = 2, SoftTargetEnemyRange = 45 }
+local function SoftHold(yours, on)
+	-- SoftTarget CVars are protected in fights: a SetCVar there isn't an
+	-- error pcall catches but an ADDON_ACTION_BLOCKED, once a frame (680 in
+	-- 8 s, Forever 2026-11-16). Not touched in fights; given back after.
+	if InCombatLockdown() then
+		if not on and not aim.softSaid then
+			for cvar in pairs(aim.soft) do
+				if yours[cvar] ~= nil then
+					aim.softSaid = true
+					ns.Log("cvar", "Shoulder Cam: soft target given back once the fight ends")
+					break
+				end
+			end
+		end
+		return
+	end
+	for cvar, want in pairs(aim.soft) do
+		local now = GetCVar(cvar)
+		if now == nil then
+			-- (Not on this client.)
+		elseif on then
+			if (tonumber(now) or 0) < want then
+				if yours[cvar] == nil then yours[cvar] = now end
+				local ok = pcall(SetCVar, cvar, tostring(want))
+				ns.Log("cvar", ("Shoulder Cam: %s %s -> %s, the soft target for the glide back%s"):format(cvar, now,
+					want, ok and "" or " (refused)"))
+			end
+		elseif yours[cvar] ~= nil then
+			-- (Refused: it's tried again each frame, out of fights.)
+			local back = yours[cvar]
+			local ok = pcall(SetCVar, cvar, back)
+			if ok and Same(GetCVar(cvar), back) then
+				yours[cvar] = nil
+				ns.Log("cvar", ("Shoulder Cam: %s back to %s"):format(cvar, back))
+			elseif not aim.softSaid then
+				aim.softSaid = true
+				ns.Log("cvar", ("Shoulder Cam: %s back to %s refused (in a fight %s): tried again"):format(cvar, back,
+					tostring(InCombatLockdown())))
+			end
+		end
+	end
+	if on then aim.softSaid = nil end
+end
 -- Turn to your target's Show in row (Frames.lua's rows): where it turns, and
 -- whether in fights. Every place and fights ticked to start with (it turned
 -- everywhere before); Not in fights, a box till 2026-11-13, is its Combat
@@ -1063,8 +1268,8 @@ end
 -- rule (cineShow) wasn't seen, its ticks all off: it never turned.
 ns.SHOULDER_TURN_ROW = "shoulder:targetturn"
 ns.CINE_SHOW_SETTING[ns.SHOULDER_TURN_ROW] = "shoulderCamTargetTurnAlways"
--- (Out of fights to start with, its Always off: user, 2026-11-15.)
-ns.RULE_DEFAULTS[ns.SHOULDER_TURN_ROW] = "not combat"
+-- (Out of fights to start with, its Always off: user, 2026-11-15; and not indoors, 2026-11-16.)
+ns.RULE_DEFAULTS[ns.SHOULDER_TURN_ROW] = "not indoors and not combat"
 for _, list in ipairs({ "combatShow", "worldShow", "cityShow", "bgShow", "instanceShow", "groupShow" }) do
 	ns.LIST_DEFAULTS[list][ns.SHOULDER_TURN_ROW] = true
 end
@@ -1245,14 +1450,20 @@ local function AimTick(elapsed)
 	if not (yours and AimOn()) or ns.shoulderTestHold or (ns.DialogueUICameraOn and ns.DialogueUICameraOn()) then
 		return
 	end
-	local step = elapsed / math.max(0.1, ns.db.shoulderCamTalkTime or 1.5)
 	-- (Its Show in row off here, e.g. Combat unticked in a fight: as if none
 	-- were targeted, so it glides back, and turns again after.)
 	local enemy = HasEnemy() and TurnHere()
+	-- (The turn in and the glide back each their own time since 2026-11-16,
+	-- as the NPC turn's: one time for both before.)
+	local step = elapsed / math.max(0.1, (enemy and ns.db.shoulderCamTalkTime or ns.db.shoulderCamTargetBack) or 3)
 	if enemy ~= aim.had then
 		aim.had = enemy
 		ns.Log("shoulder", ("target turn: %s (target %s, attackable %s; enemy focus %s, turn %s, tilt %s, share %.2f)"):format(
-			enemy and "an enemy targeted, turning to it" or "no enemy, gliding back",
+			enemy and "an enemy targeted, turning to it"
+				or HasEnemy() and ("an enemy targeted but its Show in row is off here (%s), gliding back"):format(
+					InCombatLockdown() and "in a fight" or "not here")
+				or ("no enemy, gliding back (soft target %s)"):format(
+					select(2, pcall(function() return tostring(ns.Flag(UnitExists("softenemy"))) end)) or "?"),
 			UnitExists("target") and "yes" or "none", select(2, pcall(tostring, UnitCanAttack("player", "target"))) or "secret",
 			tostring(GetCVar(aim.enable)), tostring(GetCVar(aim.yawCVar)), tostring(GetCVar(aim.pitchCVar)), aim.share))
 	end
@@ -1320,6 +1531,16 @@ local function AimTick(elapsed)
 			nowX and ("%.3f"):format(nowX) or "-", aim.clickX, aim.share, facing and ("%.3f"):format(facing) or "-",
 			spot and ("%.1f, %.1f"):format(spot[1], spot[2]) or "-"))
 	end
+	-- (The soft target: on while turned to an enemy; kept through the glide
+	-- after a clear; off once it's all the way back, or with the target kept
+	-- but the turn going back (a fight, its row off): nothing to hold then.)
+	-- (Its own box, shoulderCamSoftGlide: off, the soft target's never touched.)
+	if enemy and ns.db.shoulderCamSoftGlide then
+		aim.softHeld = true
+	elseif HasEnemy() or aim.share <= 0 or not ns.db.shoulderCamSoftGlide then
+		aim.softHeld = nil
+	end
+	SoftHold(yours, aim.softHeld)
 	SetAimShare(yours, aim.share)
 end
 
@@ -1344,7 +1565,7 @@ local function TalkTick(elapsed)
 	end
 	if not talk.on then
 		talk.share, talk.back, talk.fullAt, talk.backAt = 0, false, nil, nil
-		talk.quick = false
+		talk.quick, talk.heldByCam = false, nil
 	else
 		-- (A held close with no new window after talk.swapWait: the glide back.)
 		if talk.backAt and GetTime() >= talk.backAt then
@@ -1363,19 +1584,22 @@ local function TalkTick(elapsed)
 			ns.LogDetail("cvar", away and "Shoulder Cam: talk turn glides back, walking off"
 				or "Shoulder Cam: stopped, talk turn back toward them")
 		end
-		if talk.back or away or holder and holder ~= "you" then
-			local time = (talk.quick and talk.back or away) and talk.quickTime or TalkOutTime()
+		-- (One of our cameras holding the view (the quest or chat camera): the
+		-- turn's held where it is till the window closes, then glides back at
+		-- NPC turn back takes. Stepped down under it before, so the window
+		-- closed with nothing left to turn back (user, 2026-11-16: "Hold till
+		-- close").)
+		local held = holder ~= nil and holder ~= "you" -- (a plain true/false: nil ~= false logged every frame)
+		if held ~= (talk.heldByCam or false) then
+			talk.heldByCam = held
+			ns.LogDetail("cvar", held and ("Shoulder Cam: talk turn held at %.2f, the %s camera has the view"):format(
+				talk.share, tostring(holder)) or "Shoulder Cam: talk turn free again")
+		end
+		if talk.back or away then
+			local time = away and talk.quickTime or TalkOutTime()
 			talk.share = math.max(0, talk.share - elapsed / time)
-		else
+		elseif not held then
 			talk.share = math.min(1, talk.share + elapsed / TalkInTime())
-			local hold = ns.db.shoulderCamTalkHold or 0
-			if talk.share >= 1 and hold > 0 then
-				talk.fullAt = talk.fullAt or GetTime()
-				if GetTime() - talk.fullAt >= hold then
-					talk.back = true
-					ns.LogDetail("cvar", "Shoulder Cam: talk turn glides back")
-				end
-			end
 		end
 	end
 	SetTalkShare(yours, talk.share)
@@ -1427,8 +1651,9 @@ function ns.ApplyShoulderCam()
 				SetAimShare(yours, aim.share)
 				Write(yours, aim.enable, "1")
 			else
-				aim.share = 0
+				aim.share, aim.softHeld = 0, nil
 				GiveBack(yours, aim.enable, aim.yawCVar, aim.pitchCVar)
+				SoftHold(yours, false)
 			end
 		end
 		poller:Show()
@@ -1895,6 +2120,13 @@ local function GiveBackForLogout()
 			SetCVar(cvar, yours[cvar])
 		end
 	end
+	-- (The soft target too: a logout mid-glide mustn't keep it on.)
+	for cvar in pairs(aim.soft) do
+		if yours[cvar] ~= nil then
+			pcall(SetCVar, cvar, yours[cvar])
+			yours[cvar] = nil
+		end
+	end
 end
 
 local events = CreateFrame("Frame")
@@ -2042,15 +2274,29 @@ function ns.CreateShoulderCamPanel(kit)
 		"times on the Cameras tab."])
 	kit.GreyUnless(pauseTime, IfOn)
 
-	stack:Header(content, L["Turning"])
-	local talkCheck = stack:Add(kit.Check(content, "shoulderCamTalkTurn", L["Turn to NPCs you talk to"],
-		L["As you talk to an NPC (or a vendor, banker, trainer or flight master), the camera turns " ..
-		"slowly to bring them toward the middle of the screen, and goes back as you close the window: " ..
-		"a slow glide in Cinematic's quest bubble, at the game's own pace in the game's windows. " ..
-		"It steps aside while Cinematic's quest or chat camera moves the view."], SaveThen("shoulderCamTalkTurn", ns.ApplyShoulderCam)), "check")
-	kit.GreyUnless(talkCheck, IfOn)
+	-- Turn to NPCs and Turn to your target: Show in rows, each one's box before
+	-- the name (on at all), Combat and the places after (where it turns). (Turn
+	-- to NPCs a plain tick till 2026-11-16: user, "turning inside can be a bit much".)
+	local turningHeader = stack:Header(content, L["Turning"])
 	local function IfTalk() return ns.PageSetting("shoulderCam") and ns.GetDB().shoulderCamTalkTurn end
-	-- (Under it: Escape in a talk window, the game's or Cinematic's own, 2026-11-15.)
+	local talkRow = ns.ShowTable(content, turningHeader, {
+		opts = { anyFight = true }, underHeader = true, layout = ns.GRID_PLACE_COMBAT_EDIT_LAYOUT,
+		{ key = ns.SHOULDER_TALK_ROW, label = L["Turn to NPCs you talk to"], showKey = "shoulderCamTalkTurn",
+			alwaysKey = "shoulderCamTalkTurnAlways",
+			alwaysOn = function() return ns.GetDB().shoulderCamTalkTurnAlways end,
+			setAlways = function(value) ns.GetDB().shoulderCamTalkTurnAlways = value talkRead.at = -1 end,
+			alwaysTip = L["Turns to who you talk to wherever you are. (The other columns then have nothing to add.)"],
+			showTip = L["As you talk to an NPC (or a vendor, banker, trainer or flight master), the camera turns " ..
+			"slowly to bring them toward the middle of the screen, and stays there while the window's open. " ..
+			"Close it (Escape, its X or Goodbye, Accept, Complete or Decline) and the window fades while the " ..
+			"camera glides back, then it closes. Walking away turns back quickly."],
+			showChanged = function() if ns.ApplyShoulderCam then ns.ApplyShoulderCam() end end,
+			apply = function() talkRead.at = -1 end,
+			tip = L["Where the camera turns to who you talk to. Unticked here (indoors and in fights, to start with), " ..
+			"it stays over your shoulder as you talk."] },
+	}, "Shoulder Cam")
+	stack:Continue(talkRow, "label")
+	-- (Under it, indented: Escape in a talk window, the game's or Cinematic's own, 2026-11-15.)
 	local escTarget = stack:Add(kit.Check(content, "shoulderCamEscTarget", L["Clear target on Esc while interacting with an NPC"],
 		L["With an NPC's window open (talk, vendor, trainer, banker, flight master, auctioneer, stable master)," ..
 		"Escape clears your target and closes the window in the same press. Off: Escape only closes it, and " ..
@@ -2058,19 +2304,30 @@ function ns.CreateShoulderCamPanel(kit)
 	kit.GreyUnless(escTarget, IfTalk)
 	-- (Dev copy only, a test: MultiQuestFix.lua, user 2026-11-15.)
 	if ns.isDev then
-		escTarget = stack:Add(kit.Check(content, "shoulderCamMultiQuestFix", L["Multi Quest fix"],
+		stack:Add(kit.Check(content, "shoulderCamMultiQuestFix", L["Multi Quest fix"],
 			L["Test (dev copy only). In the game's quest window, at a quest giver with more quests: Accept " ..
 			"clears your target first, then press your Interact key to talk to them again. Each step goes " ..
 			"in the log."]), "check", 16)
 	end
-	-- Turn to your target: a Show in row, its box before the name (on at all),
-	-- Combat and the places after (where it turns).
+	-- (The NPC turn's times with it, under its ticks: under Turn to enemy till
+	-- 2026-11-16, they read as its own.)
+	local talkIn = stack:Add(kit.Slider(content, "shoulderCamTalkIn", L["NPC turn takes"], 0.5, 4, 0.5,
+		L["%.1f sec"]), "slider")
+	kit.Tooltip(talkIn, L["How long the turn toward who you talk to takes as the window opens."])
+	kit.GreyUnless(talkIn, IfTalk)
+	local talkOut = stack:Add(kit.Slider(content, "shoulderCamTalkOut", L["NPC turn back takes"], 0.5, 4, 0.5,
+		L["%.1f sec"]), "slider")
+	kit.Tooltip(talkOut, L["How long the glide back over your shoulder takes as you close the window. " ..
+		"Going from one window to the next with them (a quest's text, the next quest) it stays on them."])
+	kit.GreyUnless(talkOut, IfTalk)
+	-- Turn to enemy, under them: its own table, back out at the header's
+	-- edge, with no column headings of its own (the NPC row's above say them).
 	local turnTop = CreateFrame("Frame", nil, content)
 	turnTop:SetSize(1, 1)
-	-- (Under the Escape tick, indented 16 under Turn to NPCs: back out to the column.)
-	turnTop:SetPoint("TOPLEFT", escTarget, "BOTTOMLEFT", 4 - 16, 4)
+	turnTop:SetPoint("LEFT", turningHeader, "LEFT")
+	turnTop:SetPoint("TOP", stack.last.stackSpot or stack.last, "BOTTOM", 0, (ns.GRID_KIT.headingHeight or 24) - 4)
 	local turnRow = ns.ShowTable(content, turnTop, {
-		opts = { anyFight = true }, underHeader = true, layout = ns.GRID_PLACE_COMBAT_EDIT_LAYOUT,
+		opts = { anyFight = true }, underHeader = true, noHeadings = true, layout = ns.GRID_PLACE_COMBAT_EDIT_LAYOUT,
 		{ key = ns.SHOULDER_TURN_ROW, label = L["Turn to enemy"], showKey = "shoulderCamTargetTurn",
 			alwaysKey = "shoulderCamTargetTurnAlways",
 			alwaysOn = function() return ns.GetDB().shoulderCamTargetTurnAlways end,
@@ -2086,24 +2343,22 @@ function ns.CreateShoulderCamPanel(kit)
 	stack:Continue(turnRow, "label")
 	local talkTime = stack:Add(kit.Slider(content, "shoulderCamTalkTime", L["Enemy turn takes"], 0.5, 4, 0.5,
 		L["%.1f sec"]), "slider")
-	kit.Tooltip(talkTime, L["How long the turn toward your target takes, and the glide back."])
-	kit.GreyUnless(talkTime, function()
-		return ns.PageSetting("shoulderCam") and ns.GetDB().shoulderCamTargetTurn
-	end)
-	local talkIn = stack:Add(kit.Slider(content, "shoulderCamTalkIn", L["NPC turn takes"], 0.5, 4, 0.5,
+	kit.Tooltip(talkTime, L["How long the turn toward your target takes."])
+	local function IfTurn() return ns.PageSetting("shoulderCam") and ns.GetDB().shoulderCamTargetTurn end
+	kit.GreyUnless(talkTime, IfTurn)
+	local turnBack = stack:Add(kit.Slider(content, "shoulderCamTargetBack", L["Enemy turn back takes"], 0.5, 4, 0.5,
 		L["%.1f sec"]), "slider")
-	kit.Tooltip(talkIn, L["How long the turn toward who you talk to takes as the window opens."])
-	kit.GreyUnless(talkIn, IfTalk)
-	local talkOut = stack:Add(kit.Slider(content, "shoulderCamTalkOut", L["NPC turn back takes"], 0.5, 4, 0.5,
-		L["%.1f sec"]), "slider")
-	kit.Tooltip(talkOut, L["How long the glide back over your shoulder takes as you close the window. " ..
-		"Going from one window to the next with them (a quest's text, the next quest) it stays on them."])
-	kit.GreyUnless(talkOut, IfTalk)
-	local talkHold = stack:Add(kit.Slider(content, "shoulderCamTalkHold", L["Look at them for"], 0, 10, 0.5,
-		L["%.1f sec"]), "slider")
-	kit.Tooltip(talkHold, L["At 0 the camera stays on them till you close the window. Set a time and it " ..
-		"glides back on its own after that long, the window still open."])
-	kit.GreyUnless(talkHold, IfTalk)
+	kit.Tooltip(turnBack, L["How long the glide back over your shoulder takes as you clear your target, pick a " ..
+		"friendly one or it dies."])
+	kit.GreyUnless(turnBack, IfTurn)
+	-- (The soft target trick, SoftHold: its own box so it can be turned off. User, 2026-11-16.)
+	local softGlide = stack:Add(kit.Check(content, "shoulderCamSoftGlide", L["Glide back when you clear your target"],
+		L["Clearing your target (Esc) makes the game drop its turn at once, a snap. With this on, the game's " ..
+		"soft enemy target is kept on while the camera's turned, which holds the turn so it can glide back. " ..
+		"For that moment, an attack with no target can go to the enemy in front of you; if a fight starts " ..
+		"while you're turned, it stays on till the fight ends. Off: it snaps back, and soft targeting is " ..
+		"left alone."]), "check", 16)
+	kit.GreyUnless(softGlide, IfTurn)
 
 	Adopt(switch) -- (all of the above onto the first tab)
 

@@ -3572,15 +3572,34 @@ STEPS[#STEPS + 1] = function()
 		saved.shoulderTurnAlwaysMoved = true
 		if rawget(saved, "shoulderCamTargetTurnAlways") == true then saved.shoulderCamTargetTurnAlways = false end
 	end
+	-- Both turns' rules (Turn to enemy, Turn to NPCs): "not indoors and not
+	-- combat" since 2026-11-16. Turn to enemy's was "not combat" to start with,
+	-- Turn to NPCs' "not indoors" for a dev build that day: moved once for
+	-- those who still had an old default (one of their own stays). (Its flag
+	-- was shoulderTurnRuleMoved, the enemy's row alone, for that build.)
+	local OLD_TURN_RULES = { ["shoulder:targetturn"] = "not combat", ["shoulder:talkturn"] = "not indoors" }
+	local function MigrateTurnRule(saved)
+		saved.shoulderTurnRuleMoved = nil
+		if rawget(saved, "shoulderTurnRulesMoved") then return end
+		saved.shoulderTurnRulesMoved = true
+		local rules = rawget(saved, "frameRules")
+		if type(rules) ~= "table" then return end
+		for key, old in pairs(OLD_TURN_RULES) do
+			if rules[key] == old then rules[key] = "not indoors and not combat" end
+		end
+	end
 	MigrateShoulderPause(ns.db)
 	MigrateTurnAlways(ns.db)
+	MigrateTurnRule(ns.db)
 	for _, saved in pairs(ns.db.profiles or {}) do
 		if type(saved) == "table" then
 			MigrateShoulderPause(saved)
 			MigrateTurnAlways(saved)
+			MigrateTurnRule(saved)
 			if type(saved.settings) == "table" then
 				MigrateShoulderPause(saved.settings)
 				MigrateTurnAlways(saved.settings)
+				MigrateTurnRule(saved.settings)
 			end
 		end
 	end
@@ -3589,6 +3608,7 @@ STEPS[#STEPS + 1] = function()
 	for _, key in ipairs({
 		"keepRaidMarkers", -- (now the Raid Markers grid)
 		"shoulderCamPause", -- (now shoulderCamAllow<Cam>)
+		"shoulderCamTalkHold", -- (Look at them for, removed 2026-11-16: the turn stays till the window closes)
 		"shoulderCamTester", -- (the Shoulder Cam's soft release, /cine testshoulder: everyone's since 2026-11-15)
 		"movingKeepVFX", "damageVisionOnlyCine", -- (now Allow outside CineMode's ticks)
 		"handleUnitFrames", -- (the parts follow the HUD page's switch)

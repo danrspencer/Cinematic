@@ -475,7 +475,7 @@ local DEFAULTS = {
 	shoulderCamSide = "right", -- ..."right" or "left" (the swap key flips it)
 	shoulderCamSwapTime = 1.5, --...seconds the camera takes to cross to the other shoulder (0: the game's own quick ease)
 	shoulderCamSelfTime = 1,   -- ...seconds back over your shoulder after targeting yourself (the game centers you then)
-	shoulderCamPauseTime = 0.9, -- ...seconds out and back in going indoors, mounting, Show in and the gamepad UI
+	shoulderCamPauseTime = 1.5, -- (1.5 since 2026-11-16, user) ...seconds out and back in going indoors, mounting, Show in and the gamepad UI
 	-- ...and while one of our cameras that frame you runs, unless allowed (the Cameras tab)
 	shoulderCamAllowVista = false, shoulderCamAllowFish = false, shoulderCamAllowCozy = false,
 	shoulderCamAllowAFK = false, shoulderCamAllowTele = false, shoulderCamAllowFlight = false,
@@ -508,13 +508,15 @@ local DEFAULTS = {
 	shoulderCamFollowSwingHeight = 0,
 	shoulderCamFollowSpellAlertsHeight = 0,
 	shoulderCamTalkTurn = true, -- ...the camera turns slowly to whoever you talk to (the game's interact focus, eased in)
-	shoulderCamTalkTime = 1.5, -- ...seconds the turn to your target takes (and its glide back)
-	shoulderCamTalkIn = 1.5, -- ...seconds the turn to who you talk to takes
-	shoulderCamTalkOut = 1.5, -- ...seconds its glide back takes as the window closes
-	shoulderCamTalkHold = 0, -- ...seconds it stays on them before gliding back (0: till the window closes)
+	shoulderCamTalkTurnAlways = false, -- (since 2026-11-16) ...everywhere: its Show in row's Always (off: the row's ticks or rule, "not indoors and not combat" to start with)
+	shoulderCamTalkTime = 3, -- (3 since 2026-11-16, user) ...seconds the turn to your target takes
+	shoulderCamTargetBack = 3, -- (since 2026-11-16, 3: user; shoulderCamTalkTime did both before) ...seconds its glide back takes
+	shoulderCamTalkIn = 3, -- (3 since 2026-11-16, user) ...seconds the turn to who you talk to takes
+	shoulderCamTalkOut = 3, -- (3 since 2026-11-16, user) ...seconds its glide back takes as the window closes
 	shoulderCamEscTarget = true, -- ...Escape in a talk window clears your target too, in the same press as it closes it
 	shoulderCamMultiQuestFix = true, -- (on since 2026-11-15, MultiQuestFix.lua) the game's Accept waits for the Shoulder Cam's glide back (dev copy: a two-quest test too)
 	shoulderCamTargetTurn = true,  -- (on to start with since 2026-11-15) ...the camera turns slowly toward an enemy you target (the game's enemy focus, eased in)
+	shoulderCamSoftGlide = true, -- (since 2026-11-16, user: an option, on) ...Turn to enemy holds the game's soft enemy target on while turned, so clearing the target glides back (off: it snaps, soft targeting untouched)
 	shoulderCamTargetTurnAlways = false, -- (off since 2026-11-15: the rule "not combat" instead) ...everywhere, in fights too: its Show in row's Always (off: the row's Combat and Location ticks or rule)
 	shoulderCamTargetFollow = false, -- ...and the cast bar and PRD slide along with that turn (guessed from where you clicked; experimental; off till the PRD-too-far-left bug is found)
 	shoulderCamAlways = false, -- ...everywhere: its Show in row's Always (the rest: the row's ticks and rule; its rule to start with: not indoors and not instance and not mounted)

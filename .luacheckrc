@@ -414,5 +414,5 @@ read_globals = {
 	"C_CampaignInfo", "C_MajorFactions", "C_QuestInfoSystem", "C_QuestOffer", "BreakUpLargeNumbers", "UnitXP", "UnitXPMax", "IsXPUserDisabled", "AbbreviateLargeNumbers", "AbbreviateNumbers", "Ambiguate", "C_RestrictedActions",
 	"GameFontHighlight", "IsModifierKeyDown", "IsModifiedClick", "GetQuestItemLink",
 	-- Reload.lua
-	"ToggleWorldMap", "ToggleQuestLog", "ToggleSpellBook", "PVEFrame_ToggleFrame", "InterfaceOptionsFrame", "OpenAllBags", "C_UI",
+	"ToggleWorldMap", "ToggleQuestLog", "ToggleSpellBook", "PVEFrame_ToggleFrame", "InterfaceOptionsFrame", "OpenAllBags", "CloseAllBags", "C_UI",
 }

@@ -129,7 +129,7 @@ dl.faq dd { margin: 2px 0 0; color: var(--muted) }
         </div>
       </div>
     </div>
-    <p class="muted">The dashed line is the middle of the screen. Swap shoulders glides across over 1.5 seconds; targeting yourself puts you in the middle at once (the game does that) and clearing it glides you back over 1 second; going indoors eases you behind over 0.9 seconds.</p>
+    <p class="muted">The dashed line is the middle of the screen. Swap shoulders glides across over 1.5 seconds; targeting yourself puts you in the middle at once (the game does that) and clearing it glides you back over 1 second; going indoors eases you behind over 1.5 seconds.</p>
   </section>
 
   <section>
@@ -141,7 +141,7 @@ dl.faq dd { margin: 2px 0 0; color: var(--muted) }
       <div class="opt"><span class="l">Spot on screen</span><span class="d">How far off the middle you sit, as a share of the way to the edge: 20% to start with, 5% to 40%. The camera moves as you zoom to keep you there, and eases you back to the middle when you zoom right in. Zoomed far out it stops moving further, so a wall pulling the camera in can't throw you off screen.</span></div>
       <div class="opt"><span class="l">Swap takes</span><span class="d">How long the camera takes to cross to the other shoulder: 1.5 seconds to start with. At 0 it's the game's own quick swap.</span></div>
       <div class="opt"><span class="l">Back from targeting yourself</span><span class="d">With yourself targeted the game puts you in the middle, and nothing can change that. This is how long the way back over your shoulder takes as you clear the target: 1 second to start with.</span></div>
-      <div class="opt"><span class="l">Off and on again takes</span><span class="d">How long the camera takes to go behind you as you go indoors, mount or leave where Show in has it, and to come back after: 0.9 seconds to start with.</span></div>
+      <div class="opt"><span class="l">Off and on again takes</span><span class="d">How long the camera takes to go behind you as you go indoors, mount or leave where Show in has it, and to come back after: 1.5 seconds to start with.</span></div>
     </div>
   </section>
 
@@ -149,8 +149,8 @@ dl.faq dd { margin: 2px 0 0; color: var(--muted) }
     <div class="eyebrow">Turning</div>
     <h2>Looking at who matters</h2>
     <div class="opts">
-      <div class="opt"><span class="l">Turn to NPCs you talk to</span><span class="d">As you talk to an NPC (a quest giver, vendor, banker, trainer or flight master), the camera turns slowly to bring them toward the middle, and back as you close the window. <b>NPC turn takes</b>, <b>NPC turn back takes</b> and <b>Look at them for</b> set its pace.</span></div>
-      <div class="opt"><span class="l">Turn to enemy</span><span class="d">As you target an enemy, the camera turns slowly toward it, and glides back once you clear it. It has a Show in row of its own: out of fights to start with (the rule <code>not combat</code>). <b>Enemy turn takes</b> sets its pace.</span></div>
+      <div class="opt"><span class="l">Turn to NPCs you talk to</span><span class="d">As you talk to an NPC (a quest giver, vendor, banker, trainer or flight master), the camera turns slowly to bring them toward the middle, and back as you close the window, with Escape or the window's own X, Goodbye or Decline (the window fades out meanwhile, and it and your bags can't be clicked). <b>NPC turn takes</b> and <b>NPC turn back takes</b> set its pace.</span></div>
+      <div class="opt"><span class="l">Turn to enemy</span><span class="d">As you target an enemy, the camera turns slowly toward it, and glides back once you clear it. It has a Show in row of its own: out of fights and not indoors to start with (the rule <code>not indoors and not combat</code>). <b>Enemy turn takes</b> and <b>Enemy turn back takes</b> set its pace. <b>Glide back when you clear your target</b> (on to start with) keeps the game's soft enemy target on while you're turned, so clearing it glides back instead of snapping. For those moments an attack with no target can go to that enemy, and if a fight starts while you're turned it stays on till the fight ends. Turn it off if that gets in your way.</span></div>
     </div>
     <p class="note">It only turns to enemies. Targeting a friendly guard or another player doesn't turn the camera; talking to an NPC does.</p>
   </section>

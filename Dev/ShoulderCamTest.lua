@@ -1714,6 +1714,313 @@ do
 		ns.Print(("shoulder map: record your screen; %d targets, told when; type it again to stop"):format(#MAP_ENEMY))
 		C_Timer.After(1, function() if run == this and not run.at then EnemyBegin(1) end end)
 	end
+	-- Run 7, "soft" (2026-11-16): Esc clears your target and the game's turn
+	-- to it snaps back at once (Forever, user: "it comes back instant"), the
+	-- strengths' 1.5 s glide back too late (they glide with no one to turn
+	-- to). Clearing a target can't be held (protected), so: does the turn keep
+	-- to the soft enemy target (SoftTargetEnemy), the one in front of you the
+	-- game picks itself, once the hard one's gone? 1: as now (soft off), 2:
+	-- soft on, strengths kept full after Esc (does it stay turned at all?),
+	-- 3: soft on, eased back over 1.5 s (does it glide?). The soft target's
+	-- logged every 0.1 s after Esc (the same enemy or not), with screenshots
+	-- at full, then 0.1, 0.5, 1.0, 1.6 and 3 s after; read off those.
+	local SE = "SoftTargetEnemy"
+	local SOFT_ON = { [SE] = "3", [SE .. "Arc"] = "2", [SE .. "Range"] = "45" }
+	local MAP_SOFT = {
+		{ "as now: soft target off, eased back after Esc", { [SE] = "0" }, ease = true },
+		{ "soft target on, the turn kept full after Esc", SOFT_ON },
+		{ "soft target on, eased back after Esc", SOFT_ON, ease = true },
+	}
+	local SOFT_RAMP, SOFT_HOLD, SOFT_EASE, SOFT_AFTER = 1.5, 4, 1.5, 3.5
+	-- (A second apart: the game names them by the second, so two in one second
+	-- were one file, the run of 2026-11-16.)
+	local SOFT_SHOTS = { 0.2, 1.2, 2.2, 3.2 }
+	local function SoftBox(line, r, g, b)
+		ns.PadTestBox(("Soft %d/%d  %s"):format(run.at, #MAP_SOFT, MAP_SOFT[run.at][1]), line, r, g, b)
+	end
+	local function Plain(fn, ...)
+		local ok, value = pcall(fn, ...)
+		if not ok then return nil, "error" end
+		if issecretvalue and issecretvalue(value) then return nil, "secret" end
+		return value
+	end
+	-- Who the soft enemy target is now, and whether it's the one you cleared.
+	local function SoftNow()
+		local exists, why = Plain(UnitExists, "softenemy")
+		if why then return "soft " .. why, nil end
+		if not exists then return "no soft target", false end
+		local guid = Plain(UnitGUID, "softenemy")
+		local same = guid and run.guid and guid == run.guid
+		if same == nil then same = run.name and Plain(UnitName, "softenemy") == run.name or false end
+		return ("soft %s (%s)"):format(Text(Plain(UnitName, "softenemy")), same and "the same one" or "another"), same
+	end
+	local function SoftStrengths(k)
+		k = k * k * (3 - 2 * k)
+		local yaw, pitch = ("%.3f"):format(k * run.fullYaw), ("%.3f"):format(k * run.fullPitch)
+		if yaw ~= run.lastYaw or pitch ~= run.lastPitch then
+			pcall(SetCVar, E .. "StrengthYaw", yaw)
+			pcall(SetCVar, E .. "StrengthPitch", pitch)
+			run.lastYaw, run.lastPitch = yaw, pitch
+		end
+	end
+	local function SoftShot(what, line)
+		ns.PadTestBoxHide()
+		local ok, err = pcall(function() Screenshot() end)
+		Log(ok and ("map: soft %d screenshot %s at %s | %s | strengths %s/%s"):format(run.at, what,
+			date("%m%d%y_%H%M%S"), (SoftNow()), Text(GetCVar(E .. "StrengthYaw")), Text(GetCVar(E .. "StrengthPitch")))
+			or ("map: soft %d screenshot %s failed: %s"):format(run.at, what, tostring(err)))
+		local this = run
+		C_Timer.After(0.2, function() if run == this and run.at then SoftBox(line, 1, 0.82, 0) end end)
+	end
+	local function SoftBegin(at)
+		local trial = MAP_SOFT[at]
+		if not trial then
+			local lines = {}
+			for i, verdict in ipairs(run.verdicts) do lines[#lines + 1] = ("%d: %s"):format(i, verdict) end
+			Log("map: soft verdicts | " .. table.concat(lines, " | "))
+			End("done")
+			ns.PadTestBox("Soft run done", "/reload and say check log", 0.3, 1, 0.3)
+			C_Timer.After(10, function() if not run then ns.PadTestBoxHide() end end)
+			return
+		end
+		run.at, run.phase, run.began, run.lastYaw, run.lastPitch = at, "settle", GetTime(), nil, nil
+		run.guid, run.name, run.shots, run.kept, run.lost, run.seen = nil, nil, {}, nil, nil, {}
+		Put(trial[2])
+		SoftStrengths(0)
+		Log(("map: soft %d (%s) on | %s %s, arc %s, range %s | focus %s"):format(at, trial[1], SE, Text(GetCVar(SE)),
+			Text(GetCVar(SE .. "Arc")), Text(GetCVar(SE .. "Range")), Text(GetCVar(E .. "Enable"))))
+		SoftBox("wait... (no target)", 0.7, 0.7, 0.7)
+	end
+	local function SoftTick()
+		if not run then return end
+		ns.stillSince = GetTime()
+		if not run.at then return end
+		local into = GetTime() - run.began
+		local trial = MAP_SOFT[run.at]
+		if run.phase == "settle" and into >= 2 then
+			if UnitExists("target") then
+				SoftBox("CLEAR YOUR TARGET first (Esc)", 1, 0.3, 0.3)
+			else
+				run.phase = "target"
+				-- (The view with no turn, to read the others against.)
+				SoftShot("before targeting", "TAB to the enemy (well off to one side), then hands off")
+			end
+		elseif run.phase == "on" then
+			SoftStrengths(math.min(1, into / SOFT_RAMP))
+			if into >= SOFT_HOLD - 0.5 and not run.shots.full then
+				run.shots.full = true
+				SoftShot("at full", "hands off...")
+			elseif into >= SOFT_HOLD and not run.told then
+				run.told = true
+				-- (The soft target on it while it's still targeted: without that
+				-- there's nothing to test. A sheep, 2026-11-16: never picked.)
+				local text, same = SoftNow()
+				run.softBefore = same
+				Log(("map: soft %d before Esc: %s"):format(run.at, text))
+				SoftBox(same == false and trial[2] == SOFT_ON
+					and "no soft target on it (try a RED enemy in front of you); PRESS ESC ONCE anyway"
+					or "PRESS ESC ONCE now, then hands off", 1, 0.82, 0)
+			end
+		elseif run.phase == "back" then
+			if trial.ease then SoftStrengths(1 - math.min(1, into / SOFT_EASE)) end
+			for _, at in ipairs(SOFT_SHOTS) do
+				if into >= at and not run.shots[at] then
+					run.shots[at] = true
+					SoftShot(("%.1f s after Esc"):format(at), "hands off...")
+					break
+				end
+			end
+			local slot = math.floor(into * 10)
+			if not run.seen[slot] then
+				run.seen[slot] = true
+				local text, same = SoftNow()
+				if same and not run.lost then run.kept = into elseif not same and not run.lost then run.lost = into end
+				Log(("map: soft %d +%.1f s: %s | strengths %s/%s"):format(run.at, into, text,
+					Text(GetCVar(E .. "StrengthYaw")), Text(GetCVar(E .. "StrengthPitch"))))
+			end
+			if into >= SOFT_AFTER then
+				local verdict = trial[2] == SOFT_ON and not run.softBefore
+					and "the soft target never picked it, even targeted: nothing tested (a critter? try a red enemy)"
+					or run.kept and not run.lost and "the soft target kept the same enemy the whole time"
+					or run.kept and ("the soft target kept the same enemy for %.1f s, then lost it"):format(run.lost)
+					or "no soft target on that enemy after Esc"
+				run.verdicts[#run.verdicts + 1] = trial[1] .. ": " .. verdict
+				Log(("map: soft %d verdict: %s (the camera: read the screenshots)"):format(run.at, verdict))
+				SoftBegin(run.at + 1)
+			end
+		end
+	end
+	-- from: the trial to start at (soft 3: the eased one only).
+	local function SoftStart(from)
+		if InCombatLockdown() then return ns.Print("shoulder map: out of a fight, please") end
+		ns.shoulderTestHold = true -- (ShoulderCam.lua keeps its hands off the strengths meanwhile)
+		-- (All of these go back at the end; full = the game's own strengths, read now.)
+		Change({ [E .. "Enable"] = "1", [E .. "StrengthYaw"] = GetCVar(E .. "StrengthYaw"),
+			[E .. "StrengthPitch"] = GetCVar(E .. "StrengthPitch"), [SE] = GetCVar(SE) or "0",
+			[SE .. "Arc"] = GetCVar(SE .. "Arc") or "0", [SE .. "Range"] = GetCVar(SE .. "Range") or "0" })
+		local yours = ns.db.shoulderCamYours or {}
+		run = { ticker = C_Timer.NewTicker(0.05, SoftTick), events = CreateFrame("Frame"), verdicts = {},
+			fullYaw = tonumber(yours[E .. "StrengthYaw"] or GetCVar(E .. "StrengthYaw")) or 0.5,
+			fullPitch = tonumber(yours[E .. "StrengthPitch"] or GetCVar(E .. "StrengthPitch")) or 0.4 }
+		-- (The Shoulder Cam keeps its own at 0 while nothing's targeted: the game's full is 0.5/0.4.)
+		if run.fullYaw <= 0 then run.fullYaw = 0.5 end
+		if run.fullPitch <= 0 then run.fullPitch = 0.4 end
+		pcall(run.events.RegisterEvent, run.events, "PLAYER_TARGET_CHANGED")
+		local this = run
+		run.events:SetScript("OnEvent", function()
+			if run ~= this or not run.at then return end
+			local has = UnitExists("target") and ns.Flag(UnitCanAttack("player", "target"))
+			if has and run.phase == "target" then
+				run.phase, run.began, run.told = "on", GetTime(), nil
+				run.guid, run.name = Plain(UnitGUID, "target"), Plain(UnitName, "target")
+				Log(("map: soft %d targeted %s (guid %s), facing %s | %s"):format(run.at, Text(run.name),
+					run.guid and "readable" or "unreadable", Facing(), (SoftNow())))
+				SoftBox("hands off...", 1, 0.82, 0)
+			elseif not UnitExists("target") and run.phase == "on" then
+				Log(("map: soft %d cleared %.1f s in, facing %s | %s"):format(run.at, GetTime() - run.began, Facing(),
+					(SoftNow())))
+				run.phase, run.began = "back", GetTime()
+				SoftBox("hands off...", 0.7, 0.7, 0.7)
+			end
+		end)
+		Log(("map: soft run, %d trials | %s | offset %s, zoom %.2f, full strengths %s/%s"):format(#MAP_SOFT, Who(),
+			Text(GetCVar(SHOULDER)), Zoom(), Text(run.fullYaw), Text(run.fullPitch)))
+		ns.Print("shoulder map: soft run, 3 targets; do what the box says. Type it again to stop.")
+		C_Timer.After(1, function() if run == this and not run.at then SoftBegin(from) end end)
+	end
+	-- Run 8, "switch" (2026-11-16): from one enemy to another, the game's
+	-- turn jumps to the new one at once, a snap (user), the strengths full
+	-- through it. A target change can't be held (protected), so: what if the
+	-- strengths are dropped at the switch and eased back up? 1: as now (kept
+	-- full), 2: to 0, eased up over 1.5 s, 3: to 30%, eased up over 1.5 s.
+	-- Two enemies side by side, off to one side (a row of dummies). Screenshots
+	-- on the first at full, then 0.2, 1.2, 2.2 and 3.2 s after the switch
+	-- (a second apart: named by the second).
+	local MAP_SWITCH = {
+		{ "as now: kept full at the switch" },
+		{ "dropped to 0 at the switch, eased up over 1.5 s", from = 0, ease = 1.5 },
+		{ "dropped to 30% at the switch, eased up over 1.5 s", from = 0.3, ease = 1.5 },
+		-- (4-6, the same day: 2 and 3 glided, but with a small turn back toward
+		-- you first, a dip (user). Shallower drops, judged by eye: "switch 4".
+		-- from is the share; the strength's eased from it, so 0.5, 0.6355 and
+		-- 0.7555 are 50%, 70% and 85% of the strength.)
+		{ "dropped to 50% at the switch, eased up over 1.5 s", from = 0.5, ease = 1.5, eye = true },
+		{ "dropped to 70% at the switch, eased up over 1.5 s", from = 0.6355, ease = 1.5, eye = true },
+		{ "dropped to 85% at the switch, eased up over 1.5 s", from = 0.7555, ease = 1.5, eye = true },
+	}
+	local SWITCH_SHOTS = { 0.2, 1.2, 2.2, 3.2 }
+	local function SwitchBox(line, r, g, b)
+		ns.PadTestBox(("Switch %d/%d  %s"):format(run.at, #MAP_SWITCH, MAP_SWITCH[run.at][1]), line, r, g, b)
+	end
+	local function SwitchShot(what, line)
+		ns.PadTestBoxHide()
+		local ok, err = pcall(function() Screenshot() end)
+		Log(ok and ("map: switch %d screenshot %s at %s | target %s | strengths %s/%s"):format(run.at, what,
+			date("%m%d%y_%H%M%S"), Text(Plain(UnitName, "target")), Text(GetCVar(E .. "StrengthYaw")),
+			Text(GetCVar(E .. "StrengthPitch")))
+			or ("map: switch %d screenshot %s failed: %s"):format(run.at, what, tostring(err)))
+		local this = run
+		C_Timer.After(0.2, function() if run == this and run.at then SwitchBox(line, 1, 0.82, 0) end end)
+	end
+	local function SwitchBegin(at)
+		if not MAP_SWITCH[at] then
+			End("done")
+			ns.PadTestBox("Switch run done", "/reload and say check log", 0.3, 1, 0.3)
+			C_Timer.After(10, function() if not run then ns.PadTestBoxHide() end end)
+			return
+		end
+		run.at, run.phase, run.began, run.lastYaw, run.lastPitch = at, "settle", GetTime(), nil, nil
+		run.guid, run.shots, run.told = nil, {}, nil
+		SoftStrengths(0)
+		Log(("map: switch %d (%s) on"):format(at, MAP_SWITCH[at][1]))
+		SwitchBox("wait... (no target)", 0.7, 0.7, 0.7)
+	end
+	local function SwitchTick()
+		if not run then return end
+		ns.stillSince = GetTime()
+		if not run.at then return end
+		local into = GetTime() - run.began
+		local trial = MAP_SWITCH[run.at]
+		if run.phase == "settle" and into >= 2 then
+			if UnitExists("target") then
+				SwitchBox("CLEAR YOUR TARGET first (Esc)", 1, 0.3, 0.3)
+			else
+				run.phase = "first"
+				SwitchBox("TAB to the FIRST enemy (off to one side), then hands off", 0.3, 1, 0.3)
+			end
+		elseif run.phase == "on" then
+			SoftStrengths(math.min(1, into / SOFT_RAMP))
+			if into >= SOFT_HOLD - 0.5 and not run.shots.full then
+				run.shots.full = true
+				SwitchShot("on the first at full", "hands off...")
+			elseif into >= SOFT_HOLD and not run.told then
+				run.told = true
+				SwitchBox("TAB ONCE to the NEXT enemy (the one beside it), then hands off", 1, 0.82, 0)
+			end
+		elseif run.phase == "switched" then
+			if trial.ease then
+				SoftStrengths(trial.from + (1 - trial.from) * math.min(1, into / trial.ease))
+			end
+			for _, at in ipairs(SWITCH_SHOTS) do
+				if into >= at and not run.shots[at] then
+					run.shots[at] = true
+					SwitchShot(("%.1f s after the switch"):format(at), "hands off...")
+					break
+				end
+			end
+			local slot = math.floor(into * 10)
+			if slot % 2 == 0 and not run.shots["s" .. slot] then
+				run.shots["s" .. slot] = true
+				Log(("map: switch %d +%.1f s: strengths %s/%s"):format(run.at, into, Text(GetCVar(E .. "StrengthYaw")),
+					Text(GetCVar(E .. "StrengthPitch"))))
+			end
+			if into >= 3.5 then
+				run.phase, run.began = "clear", GetTime()
+				SwitchBox(trial.eye and ("Trial %d: snap, dip or smooth? Remember it, then PRESS ESC"):format(run.at)
+					or "PRESS ESC to clear it", 1, 0.82, 0)
+			end
+		elseif run.phase == "clear" and not UnitExists("target") then
+			SoftStrengths(0)
+			SwitchBegin(run.at + 1)
+		end
+	end
+	local function SwitchStart(from)
+		if InCombatLockdown() then return ns.Print("shoulder map: out of a fight, please") end
+		ns.shoulderTestHold = true -- (ShoulderCam.lua keeps its hands off the strengths meanwhile)
+		Change({ [E .. "Enable"] = "1", [E .. "StrengthYaw"] = GetCVar(E .. "StrengthYaw"),
+			[E .. "StrengthPitch"] = GetCVar(E .. "StrengthPitch") })
+		local yours = ns.db.shoulderCamYours or {}
+		run = { ticker = C_Timer.NewTicker(0.05, SwitchTick), events = CreateFrame("Frame"),
+			fullYaw = tonumber(yours[E .. "StrengthYaw"] or GetCVar(E .. "StrengthYaw")) or 0.5,
+			fullPitch = tonumber(yours[E .. "StrengthPitch"] or GetCVar(E .. "StrengthPitch")) or 0.4 }
+		if run.fullYaw <= 0 then run.fullYaw = 0.5 end
+		if run.fullPitch <= 0 then run.fullPitch = 0.4 end
+		pcall(run.events.RegisterEvent, run.events, "PLAYER_TARGET_CHANGED")
+		local this = run
+		run.events:SetScript("OnEvent", function()
+			if run ~= this or not run.at then return end
+			local has = UnitExists("target") and ns.Flag(UnitCanAttack("player", "target"))
+			if not has then return end
+			local guid, name = Plain(UnitGUID, "target"), Plain(UnitName, "target")
+			if run.phase == "first" then
+				run.phase, run.began, run.guid = "on", GetTime(), guid or name
+				Log(("map: switch %d first %s, facing %s"):format(run.at, Text(name), Facing()))
+				SwitchBox("hands off...", 1, 0.82, 0)
+			elseif run.phase == "on" and run.told and (guid or name) ~= run.guid then
+				local trial = MAP_SWITCH[run.at]
+				-- (At once, in the same frame as the switch.)
+				if trial.ease then SoftStrengths(trial.from) end
+				Log(("map: switch %d switched to %s, facing %s; strengths now %s/%s"):format(run.at, Text(name), Facing(),
+					Text(GetCVar(E .. "StrengthYaw")), Text(GetCVar(E .. "StrengthPitch"))))
+				run.phase, run.began = "switched", GetTime()
+			end
+		end)
+		Log(("map: switch run, %d trials | %s | offset %s, zoom %.2f, full strengths %s/%s"):format(#MAP_SWITCH, Who(),
+			Text(GetCVar(SHOULDER)), Zoom(), Text(run.fullYaw), Text(run.fullPitch)))
+		ns.Print(("shoulder map: switch run, trials %d-%d; do what the box says. Type it again to stop."):format(from,
+			#MAP_SWITCH))
+		C_Timer.After(1, function() if run == this and not run.at then SwitchBegin(from) end end)
+	end
 	function ns.ShoulderMap(which)
 		if run then
 			End("stopped")
@@ -1731,7 +2038,11 @@ do
 		end
 		if kind == "walk" then return WalkStart() end
 		if kind == "enemy" then return EnemyStart() end
-		if kind ~= "still" then return ns.Print("shoulder map: still [first trial], talk, ramp, back, friend, walk, enemy") end
+		if kind == "soft" then return SoftStart(math.max(1, math.min(3, tonumber(from) or 1))) end
+		if kind == "switch" then return SwitchStart(math.max(1, math.min(#MAP_SWITCH, tonumber(from) or 1))) end
+		if kind ~= "still" then
+			return ns.Print("shoulder map: still [first trial], talk, ramp, back, friend, walk, enemy, soft, switch")
+		end
 		from = math.max(1, math.min(#MAP_STILL, tonumber(from) or 1))
 		ns.shoulderTestHold = true
 		Change(PLAIN)
@@ -3308,7 +3619,7 @@ do
 				end
 			end }
 	end
-	STEPS[4] = PauseStep(4, "indoors", "indoors", function() return tonumber(ns.db.shoulderCamPauseTime) or 0.9 end,
+	STEPS[4] = PauseStep(4, "indoors", "indoors", function() return tonumber(ns.db.shoulderCamPauseTime) or 1.5 end,
 		"WALK INTO A BUILDING (an inn), then stand still", "WALK BACK OUTSIDE, then stand still")
 	STEPS[5] = PauseStep(5, "quest", "quest", function() return tonumber(ns.db.shoulderCamTimeQuest) or 2 end,
 		"TALK TO A QUEST GIVER (open a quest)", "CLOSE THE QUEST WINDOW")
