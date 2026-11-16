@@ -167,11 +167,17 @@ local function ArmEcho(token, test)
 end
 -- (CHAT_MSG_TEXT_EMOTE: your own, while one's awaited.)
 local function EchoOwn(text, author, guid)
-	if not echoUntil or GetTime() > echoUntil then return end
 	local function Clean(value)
 		if issecretvalue and issecretvalue(value) then return nil end
 		return value
 	end
+	-- (The game's line for a card button's emote, in the log: who it went to.)
+	if lastEcho and not lastEcho.test and not lastEcho.logged and GetTime() - lastEcho.at < 2
+		and Clean(guid) == Clean(UnitGUID("player")) then
+		lastEcho.logged = true
+		ns.Log("emote", "the game's line: " .. tostring(Clean(text)))
+	end
+	if not echoUntil or GetTime() > echoUntil then return end
 	text, author, guid = Clean(text), Clean(author), Clean(guid)
 	if type(text) ~= "string" or guid ~= Clean(UnitGUID("player")) then
 		if lastEcho then lastEcho.other = ("%s (guid %s)"):format(tostring(text), tostring(guid)) end
@@ -763,10 +769,19 @@ local function Answer(token)
 		-- (Out of your sight, the game can't find them and plays it at everyone
 		-- around you instead: say so and play nothing. With no unit for them at
 		-- all, e.g. a stranger with no nameplate, there's no telling: by name.)
-		if unit and not ns.Flag(UnitIsVisible(unit)) then
+		local seen = unit and ns.Flag(UnitIsVisible(unit))
+		-- (In the log: a stranger's Thank once went to everyone around, with
+		-- nothing to say what it was played at.)
+		local why = ("%s card %s: for %s (guid %s), unit %s (%s), visible %s, target %s"):format(moment.kind,
+			token, tostring(name), tostring(moment.guid), tostring(unit),
+			tostring(unit and Plain(UnitName(unit))), tostring(seen), tostring(Plain(UnitName("target"))))
+		if unit and not seen then
+			ns.Log("emote", why .. ": too far, nothing played")
 			ns.Print(L["Emote Vision: %s is too far away now."]:format(moment.name))
 		else
-			pcall(DoEmote, token, unit or name)
+			local ok, err = pcall(DoEmote, token, unit or name)
+			ns.Log("emote", ("%s: DoEmote(%s, %s) %s"):format(why, token, tostring(unit or name),
+				ok and "ok" or ("error " .. tostring(err))))
 		end
 	end
 	Hide()
@@ -1796,10 +1811,14 @@ local function Fire(moment)
 	local key = moment.kind .. ":" .. who
 	local now = GetTime()
 	local wait = db.emoteVisionRepeats and (tonumber(db.emoteVisionRepeatMins) or 10) * 60 or AGAIN_SOON
-	if lastFrom[key] and now - lastFrom[key] < wait then return end
+	if lastFrom[key] and now - lastFrom[key] < wait then
+		ns.Log("emote", ("%s card skipped: same one %d sec ago (wait %d)"):format(moment.kind, math.floor(now - lastFrom[key]), math.floor(wait)))
+		return
+	end
 	for _, each in ipairs(queue) do
 		if each.key == key then return end
 	end
+	if #queue >= MAX_QUEUE then ns.Log("emote", moment.kind .. " card skipped: queue full") end
 	moment.key, moment.at = key, now
 	if #queue < MAX_QUEUE then queue[#queue + 1] = moment end
 	Next()
@@ -1892,6 +1911,9 @@ local function Buffed(aura, refresh)
 	local duration = Plain(aura.duration)
 	local function Skip(why)
 		lastBuff = ("%s%s from %s: %s"):format(tostring(name), refresh and " (refreshed)" or "", tostring(unit), why)
+		-- (In the log too, but your own buffs, every cast, are left out: a
+		-- stranger's buff with no card left nothing to go on after a /reload.)
+		if why ~= "yours" then ns.Log("emote", "buff seen: " .. lastBuff) end
 	end
 	if not (unit and name and type(duration) == "number" and duration >= MIN_BUFF) then
 		return Skip(not unit and "no caster unit" or "under a minute or unreadable")
@@ -3180,9 +3202,12 @@ end
 -- the menu's end: the game's own lines stay where it put them, as moving them
 -- from here could taint them (Edit Mode, Report Player). Not for you, enemies
 -- or anyone who isn't around to emote at (a friend list name far away).
+-- Not for your group either: with it on a party member's menu, the game's
+-- Set Role and Trade there failed ("Interface action failed because of an
+-- AddOn") till a /reload (player report, 2026-11-16), so the party and raid
+-- menus aren't hooked and group members are left out of the others.
 do
-	local TAGS = { "MENU_UNIT_PLAYER", "MENU_UNIT_PARTY", "MENU_UNIT_RAID_PLAYER", "MENU_UNIT_RAID",
-		"MENU_UNIT_FRIEND", "MENU_UNIT_TARGET" }
+	local TAGS = { "MENU_UNIT_PLAYER", "MENU_UNIT_FRIEND", "MENU_UNIT_TARGET" }
 	local hooked, last = 0, "none yet"
 
 	-- Who the menu's for: their unit, GUID and name. nil and why not, for no one to emote at.
@@ -3199,6 +3224,7 @@ do
 		if guid and not guid:find("^Player%-") then return nil, "not a player" end
 		if ns.Flag(UnitIsUnit(unit, "player")) then return nil, "you" end
 		if ns.Flag(UnitCanAttack("player", unit)) then return nil, "enemy" end
+		if ns.Flag(UnitInParty(unit)) or ns.Flag(UnitInRaid(unit)) then return nil, "in your group" end
 		return { unit = unit, guid = guid, name = Plain(UnitName(unit)) or name }
 	end
 
