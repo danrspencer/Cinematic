@@ -338,9 +338,14 @@ end
 -- (Frames.lua's PORTRAIT_FRAMES; nil for the pet frame); afterFight: within
 -- the Calm Timer of a fight, fall or other health loss (Life Tap), or coming
 -- back to life. Each row's share: the page's table (ROW_KEYS).
+-- (Dead or a ghost: no personal resource display, whatever its rows say.
+-- Your health isn't full then, so Not full kept it up, empty bars and all.)
+local function PrdWhileDead(setting)
+	return setting == "prdWhenNotFull" and ns.Flag(UnitIsDeadOrGhost("player")) and true or false
+end
 function ns.KeepYourFrameUp(setting, entry, afterFight, fighting)
 	local db = ns.db
-	if not ns.PersonalResourcesOn(db) then
+	if not ns.PersonalResourcesOn(db) or PrdWhileDead(setting) then
 		return false
 	end
 	local pet = ns.PET_FRAMES[entry.name]
@@ -457,7 +462,7 @@ end
 local secretSpecs = {}
 function ns.ThresholdSecret(setting, entry)
 	local db = ns.db
-	if not setting or ns.NO_SECRET_ALPHA[entry.name] or not ns.PersonalResourcesOn(db) then
+	if not setting or ns.NO_SECRET_ALPHA[entry.name] or not ns.PersonalResourcesOn(db) or PrdWhileDead(setting) then
 		return false
 	end
 	local row = RowOf(setting, entry)
