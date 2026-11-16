@@ -720,112 +720,116 @@ function ns.CreateCardsPanel(kit)
 	local switch = kit.PageSwitch(content, "cards", L["Enable Page"],
 		L["On: each card shows as its row says. Off: none of them do, and each row keeps its tick for when you " ..
 		"turn this back on."], intro)
-	local stack = kit.Stack(switch, "check")
-	kit.RecordKey(content, "cardThirdX") -- (the lower third's spot, moved in Edit Mode: Reset puts it back)
-	kit.RecordKey(content, "cardThirdY")
-	local cardScale = stack:Add(kit.Slider(content, "cardScale", L["Card size"], 50, 200, 5, "%d%%", 100),
-		"slider")
-	kit.Tooltip(cardScale, L["Every card's words bigger or smaller, for a big or wide screen (a card in a " ..
-		"letterbox bar goes by the bar's height instead)."])
-	stack:Add(kit.Check(content, "cardClearChat", L["Move cards clear of the chat"],
-		L["Ticked: a lower third card that would land on a chat window you can see moves up just enough to " ..
-		"clear it. Unticked: it stays where its place puts it."]), "check")
-	stack:Header(content, L["Events"])
-	local grid = ns.GRID_KIT
-	local columns = ns.FRAME_COLUMNS
-	local items = {}
-	for i, event in ipairs(ns.CardEventsGrouped()) do
-		local id, key, alwaysKey = event.id, "card:" .. event.id, "cardAlways_" .. event.id
-		local opts = event.fight and FIGHT_OPTS or STORY_OPTS
-		local function Key() return key end
-		local function SetAlways(value) ns.GetDB()[alwaysKey] = value end
-		local parts = ns.ListRowParts(Key, columns, nil, SetAlways, opts)
-		-- (What the page's Reset puts back.)
-		kit.RecordKey(content, alwaysKey)
-		kit.RecordKey(content, "cardBase_" .. id)
-		for _, list in ipairs(ROW_LISTS) do
-			kit.RecordKey(content, list)
-			grid.RecordRow(content, list, key)
+	-- (Everything below is made the first time the page is needed: Options.lua's lazyPages.)
+	local function MakeBody()
+		local stack = kit.Stack(switch, "check")
+		kit.RecordKey(content, "cardThirdX") -- (the lower third's spot, moved in Edit Mode: Reset puts it back)
+		kit.RecordKey(content, "cardThirdY")
+		local cardScale = stack:Add(kit.Slider(content, "cardScale", L["Card size"], 50, 200, 5, "%d%%", 100),
+			"slider")
+		kit.Tooltip(cardScale, L["Every card's words bigger or smaller, for a big or wide screen (a card in a " ..
+			"letterbox bar goes by the bar's height instead)."])
+		stack:Add(kit.Check(content, "cardClearChat", L["Move cards clear of the chat"],
+			L["Ticked: a lower third card that would land on a chat window you can see moves up just enough to " ..
+			"clear it. Unticked: it stays where its place puts it."]), "check")
+		stack:Header(content, L["Events"])
+		local grid = ns.GRID_KIT
+		local columns = ns.FRAME_COLUMNS
+		local items = {}
+		for i, event in ipairs(ns.CardEventsGrouped()) do
+			local id, key, alwaysKey = event.id, "card:" .. event.id, "cardAlways_" .. event.id
+			local opts = event.fight and FIGHT_OPTS or STORY_OPTS
+			local function Key() return key end
+			local function SetAlways(value) ns.GetDB()[alwaysKey] = value end
+			local parts = ns.ListRowParts(Key, columns, nil, SetAlways, opts)
+			-- (What the page's Reset puts back.)
+			kit.RecordKey(content, alwaysKey)
+			kit.RecordKey(content, "cardBase_" .. id)
+			for _, list in ipairs(ROW_LISTS) do
+				kit.RecordKey(content, list)
+				grid.RecordRow(content, list, key)
+			end
+			items[i] = {
+				id = id, label = L[event.name], tip = L[TIPS[id]], on = event.on, group = L[event.group],
+				onTip = L["Ticked: this card shows where its row says. Unticked: never."],
+				dim = function()
+					return not (ns.GetDB()[event.on] and (not event.needs or ns.GetDB()[ns.CARD_BY_ID[event.needs].on]))
+				end,
+				chips = function()
+					local db = ns.GetDB()
+					local own = #OwnNames(id)
+					local list = { { StyleSummary(id), own > 0 and ns.ROW_CHIP.gold or ns.ROW_CHIP.plain } }
+					local rule = db.frameRules and db.frameRules[key]
+					if type(rule) == "string" and rule:find("%S") then
+						list[#list + 1] = { rule, ns.ROW_CHIP.when }
+					elseif not db[alwaysKey] then
+						local names = {}
+						for c = 2, #columns do
+							if not opts.omit[columns[c][3]] and columns[c][2](key) then names[#names + 1] = columns[c][1] end
+						end
+						if opts.quiet and ns.IsQuietShowOn(key) then names[#names + 1] = L["Out of combat"] end
+						list[#list + 1] = #names == 0 and { L["Never"], ns.ROW_CHIP.never }
+							or { table.concat(names, ", "), ns.ROW_CHIP.when }
+					end
+					return list
+				end,
+				lines = {
+					{ name = L["When"], build = function(drawer, At)
+						local layout = { groups = event.fight and { ns.GRID_LOCATION } or { ns.GRID_COMBAT, ns.GRID_LOCATION },
+							edit = true }
+						At(ns.GridRow(grid, drawer, 0, layout, {
+							band = 1,
+							always = { isOn = function() return ns.GetDB()[alwaysKey] and true or false end, set = SetAlways,
+								tip = L["Shows wherever you are. (The other columns then have nothing to add.)"] },
+							menus = parts.menus,
+							rule = { key = Key, label = function() return L[event.name] end, grid = parts.grid,
+								words = parts.words, apply = parts.apply },
+						}))
+					end },
+					{ name = L["Style"], build = function(drawer, At)
+						local base = kit.Dropdown(drawer, BaseField(id), function() return StyleChoices(id) end, 170)
+						if base then
+							At(base)
+							kit.Tooltip(base, L["The card type this card starts from. Settings you give it on the Style tab go " ..
+								"over it."])
+						end
+						-- (Buttons to it on the Settings, Style and Sounds tabs.)
+						for n, link in ipairs({ { L["Settings"], "Card Settings",
+							L["Opens the Settings tab with this event picked."] },
+							{ L["Style"], "Card Style", L["Opens the Style tab with this event picked."] },
+							{ L["Sounds"], "Card Sounds", L["Opens the Sounds tab with this event picked."] } }) do
+							local button = ns.PanelButton(drawer)
+							button:SetSize(70, 22)
+							button:SetText(link[1])
+							At(button, ns.ROW_LIST_LABEL_W + 180 + (n - 1) * 76)
+							kit.Tooltip(button, link[3])
+							button:SetScript("OnClick", function()
+								CARD.now = id
+								ns.ShowHubPage(link[2])
+							end)
+						end
+						local test = ns.PanelButton(drawer)
+						test:SetSize(60, 22)
+						test:SetText(L["Test"])
+						At(test, ns.ROW_LIST_LABEL_W + 408)
+						kit.Tooltip(test, ns.CardSequences[id]
+							and L["Shows each of its cards in turn, to see how they look (close the settings to see them). " ..
+							"Clicking Stop ends it."]
+							or L["Shows its card now, to see how it looks (close the settings to see it)."])
+						test:SetScript("OnClick", function() ns.CardTest(id) end)
+						TestStops(test, function() return id end)
+					end },
+				},
+			}
 		end
-		items[i] = {
-			id = id, label = L[event.name], tip = L[TIPS[id]], on = event.on, group = L[event.group],
-			onTip = L["Ticked: this card shows where its row says. Unticked: never."],
-			dim = function()
-				return not (ns.GetDB()[event.on] and (not event.needs or ns.GetDB()[ns.CARD_BY_ID[event.needs].on]))
-			end,
-			chips = function()
-				local db = ns.GetDB()
-				local own = #OwnNames(id)
-				local list = { { StyleSummary(id), own > 0 and ns.ROW_CHIP.gold or ns.ROW_CHIP.plain } }
-				local rule = db.frameRules and db.frameRules[key]
-				if type(rule) == "string" and rule:find("%S") then
-					list[#list + 1] = { rule, ns.ROW_CHIP.when }
-				elseif not db[alwaysKey] then
-					local names = {}
-					for c = 2, #columns do
-						if not opts.omit[columns[c][3]] and columns[c][2](key) then names[#names + 1] = columns[c][1] end
-					end
-					if opts.quiet and ns.IsQuietShowOn(key) then names[#names + 1] = L["Out of combat"] end
-					list[#list + 1] = #names == 0 and { L["Never"], ns.ROW_CHIP.never }
-						or { table.concat(names, ", "), ns.ROW_CHIP.when }
-				end
-				return list
-			end,
-			lines = {
-				{ name = L["When"], build = function(drawer, At)
-					local layout = { groups = event.fight and { ns.GRID_LOCATION } or { ns.GRID_COMBAT, ns.GRID_LOCATION },
-						edit = true }
-					At(ns.GridRow(grid, drawer, 0, layout, {
-						band = 1,
-						always = { isOn = function() return ns.GetDB()[alwaysKey] and true or false end, set = SetAlways,
-							tip = L["Shows wherever you are. (The other columns then have nothing to add.)"] },
-						menus = parts.menus,
-						rule = { key = Key, label = function() return L[event.name] end, grid = parts.grid,
-							words = parts.words, apply = parts.apply },
-					}))
-				end },
-				{ name = L["Style"], build = function(drawer, At)
-					local base = kit.Dropdown(drawer, BaseField(id), function() return StyleChoices(id) end, 170)
-					if base then
-						At(base)
-						kit.Tooltip(base, L["The card type this card starts from. Settings you give it on the Style tab go " ..
-							"over it."])
-					end
-					-- (Buttons to it on the Settings, Style and Sounds tabs.)
-					for n, link in ipairs({ { L["Settings"], "Card Settings",
-						L["Opens the Settings tab with this event picked."] },
-						{ L["Style"], "Card Style", L["Opens the Style tab with this event picked."] },
-						{ L["Sounds"], "Card Sounds", L["Opens the Sounds tab with this event picked."] } }) do
-						local button = ns.PanelButton(drawer)
-						button:SetSize(70, 22)
-						button:SetText(link[1])
-						At(button, ns.ROW_LIST_LABEL_W + 180 + (n - 1) * 76)
-						kit.Tooltip(button, link[3])
-						button:SetScript("OnClick", function()
-							CARD.now = id
-							ns.ShowHubPage(link[2])
-						end)
-					end
-					local test = ns.PanelButton(drawer)
-					test:SetSize(60, 22)
-					test:SetText(L["Test"])
-					At(test, ns.ROW_LIST_LABEL_W + 408)
-					kit.Tooltip(test, ns.CardSequences[id]
-						and L["Shows each of its cards in turn, to see how they look (close the settings to see them). " ..
-						"Clicking Stop ends it."]
-						or L["Shows its card now, to see how it looks (close the settings to see it)."])
-					test:SetScript("OnClick", function() ns.CardTest(id) end)
-					TestStops(test, function() return id end)
-				end },
-			},
-		}
-	end
-	local list = ns.RowList(kit, content, items)
-	stack:Add(list, "label")
-	stack:Note(content, L["A card type with +2 has two settings of its own over the one it starts from (the Style tab " ..
-		"marks them with gold dots)."], NOTE_W)
+		local list = ns.RowList(kit, content, items)
+		stack:Add(list, "label")
+		stack:Note(content, L["A card type with +2 has two settings of its own over the one it starts from (the Style tab " ..
+			"marks them with gold dots)."], NOTE_W)
 
-	canvas:SetScript("OnShow", kit.PageShown(kit.Refresh, content))
+		canvas:SetScript("OnShow", kit.PageShown(kit.Refresh, content))
+	end
+	ns.LazyPageBody(canvas, "Card Vision", MakeBody)
 	canvas:Hide()
 	kit.RegisterSubpage(canvas, "Card Vision")
 end
@@ -1490,22 +1494,26 @@ function ns.CreateCardSoundsPanel(kit)
 	local switch = kit.PageSwitch(content, "cards", L["Enable Page"],
 		L["On: each card shows as the Events tab says, with its sounds. Off: none of them do. Each setting keeps " ..
 		"its value for when you turn this back on."], intro)
-	local stack = kit.Stack(switch, "check")
+	-- (Everything below is made the first time the page is needed: Options.lua's lazyPages.)
+	local function MakeBody()
+		local stack = kit.Stack(switch, "check")
 
-	-- (Each event's sound rules: CombatSoundRules.lua. Entering and Leaving
-	-- combat's one list, shown on both; Boss's its own; Time of day's a rule for each time; the rest's
-	-- own, read as the card shows.)
-	local parts = Parts(kit, content, stack, function() return CARD.now end)
-	parts.Part("combatIn", function() ns.CombatSoundRulesSection(kit, content, stack) end)
-	parts.Part("combatOut", function() ns.CombatSoundRulesSection(kit, content, stack) end)
-	parts.Part("boss", function() ns.CombatSoundRulesSection(kit, content, stack, true) end)
-	parts.Part("time", function() ns.CombatSoundRulesSection(kit, content, stack, "time") end)
-	for _, id in ipairs(ns.CARD_SOUND_LISTS) do
-		parts.Part(id, function() ns.CombatSoundRulesSection(kit, content, stack, id) end)
+		-- (Each event's sound rules: CombatSoundRules.lua. Entering and Leaving
+		-- combat's one list, shown on both; Boss's its own; Time of day's a rule for each time; the rest's
+		-- own, read as the card shows.)
+		local parts = Parts(kit, content, stack, function() return CARD.now end)
+		parts.Part("combatIn", function() ns.CombatSoundRulesSection(kit, content, stack) end)
+		parts.Part("combatOut", function() ns.CombatSoundRulesSection(kit, content, stack) end)
+		parts.Part("boss", function() ns.CombatSoundRulesSection(kit, content, stack, true) end)
+		parts.Part("time", function() ns.CombatSoundRulesSection(kit, content, stack, "time") end)
+		for _, id in ipairs(ns.CARD_SOUND_LISTS) do
+			parts.Part(id, function() ns.CombatSoundRulesSection(kit, content, stack, id) end)
+		end
+		parts.Finish()
+
+		canvas:SetScript("OnShow", kit.PageShown(kit.Refresh, content))
 	end
-	parts.Finish()
-
-	canvas:SetScript("OnShow", kit.PageShown(kit.Refresh, content))
+	ns.LazyPageBody(canvas, "Card Sounds", MakeBody)
 	canvas:Hide()
 	kit.RegisterSubpage(canvas, "Card Sounds", L["Card Vision"])
 end
