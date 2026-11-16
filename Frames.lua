@@ -722,8 +722,14 @@ do
 end
 
 -- Whether a page's switch is on, for its extras (Keep open, reveals, peeks...).
+-- (Off with the switch it's under too: the Timers icon's, for its tabs.)
 function ns.PageOn(switch)
-	return ns.db[switch] ~= false
+	local db = ns.db
+	while switch do
+		if db[switch] == false then return false end
+		switch = ns.PageSwitchOf(switch)
+	end
+	return true
 end
 
 local function AddFrame(frame, group)
@@ -11396,7 +11402,7 @@ do
 		if not weapon then
 			return false
 		end
-		if not ns.db.handleSwing then
+		if not ns.PageOn("handleSwing") then
 			return false
 		end
 		if name == "SwingTimerOffHandFrame" and ns.db.swingHideOffHand then
@@ -11636,7 +11642,7 @@ do
 	-- Each tick: the bars as the setting (and the page's master switch) say.
 	function ns.UpdateSwingOrder()
 		-- (The Swing timer page off, and nothing of ours swapped: nothing to do.)
-		if not ns.db.handleSwing and not order.swapped and not next(order.game) then return end
+		if not ns.PageOn("handleSwing") and not order.swapped and not next(order.game) then return end
 		-- (The class's setting name made once: a new string each tick was garbage.)
 		order.key = order.key or "swingRangedOnTop" .. select(2, UnitClass("player"))
 		-- In Edit Mode the bars sit in their own places, so the one you drag is
@@ -11659,7 +11665,7 @@ do
 				order.before = nil
 			end
 		end
-		local swap = not editing and ns.db.handleSwing and ns.db[order.key] and true or false
+		local swap = not editing and ns.PageOn("handleSwing") and ns.db[order.key] and true or false
 		order.want = swap -- (the game moving a bar: the swap done again at once)
 		if order.swapped ~= swap and GetTime() >= (order.waitUntil or 0) then
 			-- (Not swapped and the game's anchors not taken yet: nothing to put back.)

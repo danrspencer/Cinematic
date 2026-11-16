@@ -2461,7 +2461,8 @@ do
 			{ "Gamepad", "Gamepad", "The frames gamepad mode adds: its action bars, button hints and reticle." },
 			{ "Cursor Hide", "Cursor", "In CineMode, the cursor gets out of the way." },
 		} },
-		{ label = "Timers", pages = {
+		-- (master: the icon's switch, its tabs' own switches under it: Core.lua's handleTimers)
+		{ label = "Timers", master = "handleTimers", switches = ns.TIMERS_SWITCHES, pages = {
 			{ "Cooldown Manager", "Cooldown Manager", "When the Cooldown Manager comes up in CineMode." },
 			{ "Swing timer", "Swing Timer", "Which of the game's swing timer bars show." },
 		} },
@@ -2486,6 +2487,8 @@ do
 				if GROUP_HAS[each[1]]() then have[#have + 1] = each end
 			end
 			group.have = have
+			-- (One page here: no icon of the group's, so no switch over that page.)
+			if group.master then ns.SetPageMaster(group.switches, #have > 1 and group.master or nil) end
 			if #have > 1 then
 				for _, hub in ipairs(HUBS) do
 					for _, page in ipairs(hub.pages) do
@@ -2759,7 +2762,32 @@ do
 	-- A tile's page switch (its hidden Enable Page: RegisterPageSwitch), or nil.
 	-- A page with none in a hub with a master (hub.master: Enable Cameras)
 	-- follows that: Off on its icon with it, nothing to flip.
-	local function TileSwitch(tile)
+	-- A group's icon (Timers) flips the group's master instead (asIcon: the
+	-- icon itself, its dot, tooltip and right-click); on its tabs' pages the
+	-- master stands in while it's off, so the off card turns it back on.
+	local groupSwitches = {}
+	local function GroupSwitch(tile)
+		local english = tile.tabOf or tile.english
+		for _, group in ipairs(PAGE_GROUPS) do
+			if group.master and group.have and #group.have > 1 and group.have[1][1] == english then
+				local switch = groupSwitches[group.master]
+				if not switch then
+					local check = CreateFrame("CheckButton", nil, tile.hub.frame)
+					check:Hide()
+					check:SetScript("OnClick", function(self)
+						KeyPut(group.master, self:GetChecked() and true or false)
+						Refresh()
+					end)
+					switch = { key = group.master, check = check, name = group.label }
+					groupSwitches[group.master] = switch
+				end
+				return switch
+			end
+		end
+	end
+	local function TileSwitch(tile, asIcon)
+		local group = GroupSwitch(tile)
+		if group and (asIcon or ns.GetDB()[group.key] == false) then return group end
 		local switch = pageSwitches[tile.resetContent or tile.canvas.content or false]
 		if switch and switch.check then return switch end
 		if tile.hub.master then
@@ -2804,7 +2832,7 @@ do
 	-- A page's on/off dot in its icon's corner (green on, red off; none for a
 	-- page without a switch), and the icon darkened while it's off.
 	local function PaintSwitch(tile)
-		local switch = TileSwitch(tile)
+		local switch = TileSwitch(tile, true)
 		if not switch and not tile.switchDot then return end
 		if not tile.switchDot then
 			tile.offMark = tile:CreateTexture(nil, "OVERLAY")
@@ -2893,7 +2921,7 @@ do
 		card = card or CreateOffCard(hub)
 		local box = BoxSwitch(switch)
 		local stuck = not box or select(2, SwitchState(box))
-		local name = L[tile.label or tile.english]
+		local name = L[switch.name or tile.label or tile.english]
 		card.icon:SetTexture(tile.icon:GetTexture())
 		card.title:SetText("|cffff5a40" .. L["%s is off"]:format(name) .. "|r")
 		card.text:SetText(stuck and L["Off with the General page's switch."]
@@ -2966,7 +2994,7 @@ do
 			if self.dev then
 				GameTooltip:AddLine("(dev only)", 1, 0.25, 0.25)
 			end
-			local switch = TileSwitch(self)
+			local switch = TileSwitch(self, true)
 			if switch then SwitchLine(switch) end
 			GameTooltip:Show()
 		end)
@@ -2975,7 +3003,7 @@ do
 		tile:RegisterForClicks("LeftButtonUp", "RightButtonUp")
 		tile:SetScript("OnClick", function(self, button)
 			if button ~= "RightButton" then return Select(self) end
-			local switch = TileSwitch(self)
+			local switch = TileSwitch(self, true)
 			if not switch then return end
 			FlipSwitch(switch)
 			if GameTooltip:IsOwned(self) then self:GetScript("OnEnter")(self) end
@@ -3077,7 +3105,7 @@ do
 	-- A hub page's switch by its English name, flipped (its folder tab's
 	-- right-click), or its line added to owner's tooltip.
 	function ns.FlipPageSwitch(name)
-		local switch = byName[name] and TileSwitch(byName[name])
+		local switch = byName[name] and TileSwitch(byName[name], true)
 		if switch then FlipSwitch(switch) end
 	end
 	function ns.PageSwitchTip(owner, name)
@@ -3211,7 +3239,7 @@ do
 				for _, page in ipairs(hub.pages) do
 					local tile = not page.tabOf and byName[page[1]]
 					if tile then
-						local switch = TileSwitch(tile)
+						local switch = TileSwitch(tile, true)
 						local on, held = false, false
 						if switch then on, held = SwitchState(switch) end
 						local content = tile.resetContent or (tile.canvas and tile.canvas.content)
@@ -13295,7 +13323,7 @@ local function CreateCooldownPanel()
 	local handleCheck = PageSwitch(content, "handleCooldowns", L["Enable Page"],
 		L["On: this page's settings can keep the Cooldown Manager up in CineMode, or show only the icons " ..
 		"you pick. Off: they don't; it still fades as its HUD row says."], subtitle)
-	local function Handled() return ns.GetDB().handleCooldowns end
+	local function Handled() return ns.PageSetting("handleCooldowns") end
 
 	-- The page's tabs (ns.PageTabsBelow): the spell icons and their
 	-- situations (CDM), the Cooldown Manager's other settings, and Addon Frame Links.

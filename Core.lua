@@ -1620,6 +1620,17 @@ for page, keys in pairs({
 }) do
 	for _, key in ipairs(keys) do PAGE_SWITCH[key] = page end
 end
+-- (keys put under master's switch, or taken off it: nil.)
+function ns.SetPageMaster(keys, master)
+	for _, key in ipairs(keys) do PAGE_SWITCH[key] = master end
+end
+-- The Timers icon's switch (2026-11-16): off, its Cooldown Manager and Swing
+-- Timer tabs are off too, each keeping its own switch. Only where the client
+-- has both tabs (Options.lua's PAGE_GROUPS takes it off otherwise): retail has
+-- no swing timer, so its Cooldown Manager icon is just its own page.
+DEFAULTS.handleTimers = true
+ns.TIMERS_SWITCHES = { "handleCooldowns", "handleSwing" }
+if not ns.isRetail then ns.SetPageMaster(ns.TIMERS_SWITCHES, "handleTimers") end
 -- Allow outside CineMode (CineMode page): a vision's switch -> its tick there.
 -- Unticked, the vision works only while CineMode is on (2026-11-13). The
 -- Camera and Audio groups too (2026-11-15): Shoulder Cam, Skyriding Cam, and
