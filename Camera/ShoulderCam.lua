@@ -1782,6 +1782,21 @@ end)
 local SWAP_ACTION = "CLICK " .. swap:GetName() .. ":LeftButton"
 ns.ShoulderSwapButton = swap -- (ShoulderCamTest.lua's "today" run presses it)
 
+-- The on/off key (Bindings.xml CINEMATIC_SHOULDERCAM, 2026-11-16): flips the
+-- page's Enable switch, as clicking it does (the one-time question included).
+local TOGGLE_ACTION = "CINEMATIC_SHOULDERCAM"
+ns.OnLanguage(function()
+	_G.BINDING_NAME_CINEMATIC_SHOULDERCAM = L["Toggle Shoulder Cam"]
+end)
+function Cinematic_ToggleShoulderCam() -- luacheck: ignore 111 (the key binding's global)
+	local db = ns.db
+	if not db or not ns.ShoulderCamUnlocked() then return end
+	db.shoulderCam = not db.shoulderCam
+	ns.ApplyShoulderCam()
+	ns.Print((db.shoulderCam and L["%s on"] or L["%s off"]):format(L["Shoulder Cam"]))
+	if ns.RefreshOptions then ns.RefreshOptions() end
+end
+
 -- Frames follow you (shoulderCamFrames): with you off to one side, the cast
 -- bar and the Personal Resource Display slide over with you. Where you are
 -- on screen can't be read (plates can't be measured), so it's worked out:
@@ -2239,6 +2254,12 @@ function ns.CreateShoulderCamPanel(kit)
 	stack:Continue(lastRow, "label")
 
 	stack:Header(content, L["Shoulder"])
+	-- The on/off key (user 2026-11-16), the same binding as the Keybinds page's
+	-- row: an inline row, its button in the sliders' column. Never greyed: it's
+	-- how the camera comes on.
+	local toggleKey = kit.CreateKeybindButton(content, TOGGLE_ACTION, 1)
+	toggleKey.inlineName = L["Toggle Shoulder Cam"]
+	stack:Add(toggleKey, "dropdown")
 	-- (One tick for the side, user 2026-11-15: ticked over the left shoulder.)
 	local left = kit.Check(content, "shoulderCamSide", L["Left shoulder"],
 		L["Over your left shoulder, you on the right of the screen. Unticked, over your right. " ..
