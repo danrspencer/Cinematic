@@ -225,8 +225,8 @@ WorldFrame.GetWidth = function() return UI_WIDTH end
 WorldFrame.GetHeight = function() return UI_HEIGHT end
 WorldFrame.GetEffectiveScale = function() return 1 end
 ns.ActiveEvent = function() return me.camera and "Sim", me.camera end
--- (The Shoulder Cam row's rule to start with, not indoors and not instance and not
--- mounted (the sim never enters an instance), unless a variant takes one out.)
+-- (The Shoulder Cam row's rule to start with, (not indoors and not mounted) or
+-- instance (the sim never enters an instance), unless a variant takes one out.)
 local pauseMounted, pauseIndoors = variant ~= "mounted", variant ~= "indoors"
 ns.RowOnNow = function()
 	return me.row and not (me.mounted and pauseMounted) and not (me.indoors and pauseIndoors)

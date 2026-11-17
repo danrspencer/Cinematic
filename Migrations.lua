@@ -4210,6 +4210,28 @@ STEPS[#STEPS + 1] = function()
 		for _, point in pairs(ns.db.profileResetPoints or {}) do Move(point) end
 		ns.db.vitalsBarsToKeepUpV1 = true
 	end
+	-- Shoulder Cam's row rule: on in instances too since 2026-11-17 ("(not
+	-- indoors and not mounted) or instance"). The old default was saved into
+	-- every account that loaded it (Core.lua fills a row's default rule in),
+	-- so it's swapped once where it's still exactly the old text; a rule of
+	-- the player's own stays. Every profile's.
+	if not ns.db.shoulderRuleInstanceV1 then
+		local OLD = "not indoors and not instance and not mounted"
+		local NEW = "(not indoors and not mounted) or instance"
+		local function Swap(t)
+			local rules = type(t) == "table" and rawget(t, "frameRules")
+			if type(rules) == "table" and rules["shoulder:cam"] == OLD then rules["shoulder:cam"] = NEW end
+		end
+		Swap(ns.db)
+		for _, saved in pairs(ns.db.profiles or {}) do
+			if type(saved) == "table" then
+				Swap(saved)
+				Swap(saved.settings)
+			end
+		end
+		for _, point in pairs(ns.db.profileResetPoints or {}) do Swap(point) end
+		ns.db.shoulderRuleInstanceV1 = true
+	end
 end
 
 -- Runs them all, each on its own: an error is logged and reported (the

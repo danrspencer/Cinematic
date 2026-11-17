@@ -68,7 +68,7 @@ local POLL = 0.2 -- seconds between checks for a pause (mounting, a camera start
 -- into the rule once (MovePauseBoxes).
 local ROW_KEY = "shoulder:cam"
 ns.CINE_SHOW_SETTING[ROW_KEY] = "shoulderCamAlways"
-ns.RULE_DEFAULTS[ROW_KEY] = "not indoors and not instance and not mounted"
+ns.RULE_DEFAULTS[ROW_KEY] = "(not indoors and not mounted) or instance" -- (since 2026-11-17, user: on in instances too)
 local function MovePauseBoxes(db)
 	if db.shoulderPauseMoved then return end
 	db.shoulderPauseMoved = true
