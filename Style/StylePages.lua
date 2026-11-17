@@ -109,7 +109,7 @@ end })
 local VISION_SIZES = { damageVisionTextSize = true, questTalkTextSize = true, rollTextSize = true }
 function ns.VisionTextScale()
 	local db = ns.db
-	return db and db.styleGeneral and tonumber(db.visionStyleTextSize) or 1
+	return db and db.styleGeneral and db.visionsStyle ~= false and tonumber(db.visionStyleTextSize) or 1
 end
 ns.SHARED_STYLE = shared -- (the General page's list of who follows it)
 
@@ -132,7 +132,7 @@ end
 local function FromGeneral(entry, gameOnly)
 	local db = ns.db
 	if gameOnly or not (db and db.styleGeneral) then return entry.own end
-	local value = entry.visions and db[VISION_KEYS[entry.kind]] or nil
+	local value = entry.visions and db.visionsStyle ~= false and db[VISION_KEYS[entry.kind]] or nil
 	if value == nil or IsGeneral(value) then value = db[GENERAL_KEYS[entry.kind]] end
 	if value == nil or value == "game" or value == -1 then
 		return entry.own
@@ -166,7 +166,7 @@ function ns.StyleLook(switchKey, off)
 					-- General, or Visions Style's while a Vision's is on one of its own.)
 					local db = ns.db
 					if on and db and db.styleGeneral and IsGeneral(source[entry.follows]) then
-						local from = (entry.visions and not IsGeneral(db.visionStyleBorder)) and VISION_KEYS or GENERAL_KEYS
+						local from = (entry.visions and db.visionsStyle ~= false and not IsGeneral(db.visionStyleBorder)) and VISION_KEYS or GENERAL_KEYS
 						if db[from.border] == "custom" then return db[from[entry.kind]] end
 					end
 					return value
@@ -282,8 +282,27 @@ function ns.StyleScene(frame, focus, shade)
 		-- screens, is cut before it has its width.)
 		frame:HookScript("OnSizeChanged", ns.RecutStyleScene)
 	end
-	scene:SetTexture(SCENE)
 	shade = shade or 1
+	-- (The plain dark panel, by default since 2026-11-17: light at its top. The
+	-- painted scene is the preview's own pick, stylePreviewBack, toned down.)
+	if not (ns.db and ns.db.stylePreviewBack == "scene") then
+		scene:SetColorTexture(1, 1, 1, 1)
+		scene:SetTexCoord(0, 1, 0, 1)
+		if scene.SetDesaturation then scene:SetDesaturation(0) end
+		local top, low = 0.2 * shade, 0.085 * shade
+		if not (CreateColor and pcall(scene.SetGradient, scene, "VERTICAL",
+			CreateColor(low, low * 1.05, low * 1.2, 1), CreateColor(top, top * 1.04, top * 1.15, 1))) then
+			if scene.SetGradientAlpha then
+				scene:SetGradientAlpha("VERTICAL", low, low * 1.05, low * 1.2, 1, top, top * 1.04, top * 1.15, 1)
+			else
+				scene:SetVertexColor(low, low, low, 1)
+			end
+		end
+		return scene
+	end
+	scene:SetTexture(SCENE)
+	if scene.SetDesaturation then scene:SetDesaturation(0.4) end
+	shade = shade * 0.8
 	scene:SetVertexColor(shade, shade, shade, 1)
 	local width, height = frame:GetWidth(), frame:GetHeight()
 	local aspect = (width and height and height > 0) and width / height or 2
@@ -352,7 +371,11 @@ function ns.PageTabs(content, list, picked)
 	end
 	picked = at[picked] or 1
 	local tabs = {}
-	for i, each in ipairs(list) do tabs[i] = { each[1], each[3] } end
+	-- (off: its page's switch off, its name greyed; quietOff: the tip's line is ns.PageSwitchTip's.)
+	for i, each in ipairs(list) do
+		tabs[i] = { each[1], each[3], quietOff = true,
+			off = function() return ns.PageSwitchOff and ns.PageSwitchOff(each[2]) or false end }
+	end
 	-- (current: the tab shown now, picked or set by Show since: a page that's
 	-- more than one tab, Party & Raid's HUD page at Raid, opens Party from it)
 	local current = picked
@@ -442,7 +465,8 @@ end
 
 -- An Interface hub icon's three tabs, each its own hub page (2026-11-16):
 -- Show in (the HUD page at its section: Options.lua's HUD_ICONS, tabs =
--- its key), the frame's own page's settings, and that page's Frame Links.
+-- its key), the frame's own page's settings, and its looks. (Its Frame
+-- Links once last: the Addons hub's Links page since 2026-11-17.)
 -- For ns.PageTabs: { label, page, tip } each.
 local SHOW_IN_TABS = {
 	-- (PersonalResources.lua's page)
@@ -456,8 +480,6 @@ local SHOW_IN_TABS = {
 		{ "Unit Frames", "Unit Style", "How the unit frames look." },
 		-- (PlateCastStyle.lua's unit frames' page: yours, target & focus, boss & arena, and the Default row)
 		{ "Cast Bars", "Unit Cast Style", "How your cast bar and the unit frames' cast bars look." },
-		-- (The links last, as on every icon's tabs.)
-		{ "Addon Reveal Link", "Unit Frame Links", "Which supported addon's frames stand in for the unit frames." },
 	},
 	-- (The personal resource display: the HUD's PRD section, PersonalResources.lua's
 	-- page at its PRD parts, PersonalStyle.lua's look.)
@@ -466,8 +488,6 @@ local SHOW_IN_TABS = {
 		{ "Show Advanced", "PRD Keep Up", "Brings your hidden resource bars back while your health or power is low.",
 			has = function() return _G.CinematicPersonalPower ~= nil end },
 		{ "Personal Resources", "Personal Style", "How the personal resource display's bars look." },
-		{ "Addon Reveal Link", "PRD Links", "Which supported addon's frames stand in for your resource bars.",
-			has = function() return _G.CinematicPersonalPower ~= nil end },
 	},
 	-- (Two of the HUD page's sections, then RaidStyle.lua's page)
 	party = {
@@ -480,22 +500,18 @@ local SHOW_IN_TABS = {
 		{ "Show Advanced", "Minimap", "What brings the hidden minimap up for a while." },
 		{ "Keep Open", "Minimap Keep Open", "Where and while what the minimap stays up the whole time: zones, " ..
 			"indoors, a tracked quest, tracking." },
-		{ "Addon Reveal Link", "Minimap Links", "Which supported addon's frames stand in for the minimap's parts." },
 	},
 	quests = {
 		{ "Show", "HUD:quests", "CineMode hides the quest tracker: pick when it shows." },
 		{ "Show Advanced", "Quest tracker", "What brings the hidden quest tracker up for a while." },
-		{ "Addon Reveal Link", "Quest Tracker Links", "Which supported addon's frames stand in for the quest tracker." },
 	},
 	-- (The Chat page (Options.lua's CreateChatPanel: Reveal, its own sub-tabs
-	-- under it), the bubbles' two pages, then the Chat page's links.)
+	-- under it), then the bubbles' two pages.)
 	chat = {
 		{ "Show", "HUD:chat", "CineMode hides the chat window: pick when it shows." },
 		{ "Show Advanced", "Chat", "What brings the hidden chat up, like new messages or typing." },
 		{ "Bubbles", "Chat bubbles", "Where chat bubbles show in CineMode." },
 		{ "Bubble Style", "Bubble Style", "How chat bubbles look, and speech from behind you." },
-		{ "Addon Reveal Link", "Chat Links", "Which frame each part of the chat is: the game's, or an addon's " ..
-			"that draws its own." },
 	},
 	-- (The HUD page's Trackers section, then the timers' own pages (Options.lua's),
 	-- each with its own sub-tabs, where the client has them.)
@@ -526,7 +542,6 @@ local SHOW_IN_TABS = {
 	buffs = {
 		{ "Show", "HUD:buffs", "CineMode hides your buffs and debuffs: pick when they show." },
 		{ "Show Advanced", "Buffs/debuffs", "What brings your hidden buffs and debuffs up for a while." },
-		{ "Addon Reveal Link", "Buffs Links", "Which supported addon's frames stand in for your buffs and debuffs." },
 	},
 	-- (What the pointer brings up, what it shows, then the pointer itself: the
 	-- Hover Groups page (the icon), Tooltips, TooltipStyle.lua's, CursorHide.lua's.)
@@ -562,30 +577,25 @@ end
 function ns.UnitFrameTabs() return ns.ShowInTabs("units") end
 
 -- A frame's own page as the rest of those tabs, after Show in (its parts:
--- its settings' tabs, its links last): a hidden hub tile each under the icon
--- (tabOf in HUBS), each picking its part. PickPart: ns.PageTabsBelow's
--- (hidden = true); ShowOuter: ns.PageTabs'. spec: label (the icon's), icon,
--- titles (each part's), switchLabel (the off card's name for its switch:
--- the links' have none), onPart(i).
-function ns.ShowInParts(canvas, content, title, key, PickPart, ShowOuter, spec)
+-- its settings' tabs): a hidden hub tile each under the icon (tabOf in
+-- HUBS), each picking its part. PickPart: ns.PageTabsBelow's (hidden =
+-- true); ShowOuter: ns.PageTabs'. spec: label (the icon's), icon, titles
+-- (each part's), switchLabel (the off card's name for its switch), onPart(i).
+-- (Its Addon Reveal Link tab, last, gone 2026-11-17: the Addons hub's Links
+-- page, FrameLinks.lua.)
+function ns.ShowInParts(canvas, _, title, key, PickPart, ShowOuter, spec) -- (_: the page's content)
 	local list = SHOW_IN_TABS[key]
 	local parts = #list - 1
 	local function ShowPart(i)
-		local links = i == parts
 		PickPart(i)
 		ShowOuter(ns.ShowInIndex(key, list[i + 1][2]))
 		title:SetText(spec.titles[i])
-		content.headerSwitchOff = links
-		local header = content.pageHeaderSwitch
-		if header then header:SetShown(not links) end
 		if spec.onPart then spec.onPart(i) end
 	end
 	canvas.hubTabs = {}
 	for i = 1, parts do
-		local links = i == parts
 		canvas.hubTabs[i] = { name = list[i + 1][2], icon = spec.icon, label = spec.label, own = i > 1 or nil,
-			switchLabel = not links and spec.switchLabel or nil, noSwitch = links or nil,
-			onSelect = function() ShowPart(i) end }
+			switchLabel = spec.switchLabel, onSelect = function() ShowPart(i) end }
 	end
 end
 
@@ -648,19 +658,71 @@ end
 -- back. While it's out, a dark frame of its size holds its place (click it to
 -- put it back), and what was placed from it is placed from that instead. One
 -- preview out at a time; the size you give the window is kept for the next.
--- The window sits docked beside the settings to start with; its own Pop out
+-- The window sits docked to the settings to start with (above them, else
+-- right, else left: the first side it fits at POPOUT_MIN_SCALE or more,
+-- DockSpot; 2026-11-17); its own Pop out
 -- lets you drag it anywhere (kept for next time, stylePreviewPos), Dock puts
 -- it back beside them (as the camera script preview does).
 -- tooltip: the page's (kit.Tooltip, Options.lua's Tooltip).
--- (Every preview starts out popped, 2026-11-16: the page keeps no room for
--- it, the settings from its top. Put back keeps it on the page from then on,
--- ns.db.stylePreviewInPage; Pop out undoes that.)
+-- (Every preview starts on its page, 2026-11-17. Pop out is remembered for
+-- the account, stylePreviewOut: every Style page's preview opens popped from
+-- then on, after a logout too, till Put back or the window's X. Leaving the
+-- page, Escape or closing the settings keep it.)
 local POPOUT_SCALE = 1
 local POPOUT_MIN_SCALE = 0.75
-local popWindow, popped, popScale, popTooltip
+local popWindow, popped, popScale
+local UpdateSticky -- (below: a preview held at its page's top as you scroll)
 
--- Everything on parent placed from from, placed from to instead.
-local function Repoint(parent, from, to)
+-- The preview's and its window's small icon buttons (2026-11-17): a dark
+-- square, a thin edge, a light line icon (Textures/PreviewIcons.tga,
+-- Media/make_preview_icons.py), gold under the mouse. button.tip: its
+-- tooltip; button:SetIcon(name) changes the icon.
+local ICONS = "Interface\\AddOns\\" .. ADDON_NAME .. "\\Textures\\PreviewIcons"
+local ICON_CELLS = { pop = 0, back = 1, dock = 2, close = 3, fold = 4, unfold = 5, scene = 6, undock = 7 }
+local function SetIconCell(texture, name)
+	local cell = ICON_CELLS[name] or 0
+	local col, row = cell % 4, math.floor(cell / 4)
+	texture:SetTexCoord(col / 4, (col + 1) / 4, row / 2, (row + 1) / 2)
+end
+local function IconButton(parent, icon, tip)
+	local button = CreateFrame("Button", nil, parent)
+	button:SetSize(22, 22)
+	local back = button:CreateTexture(nil, "BACKGROUND")
+	back:SetAllPoints()
+	back:SetColorTexture(0.06, 0.065, 0.08, 0.85)
+	local edges = ns.MakeStyleEdges(button, "BORDER")
+	ns.DressStyleEdges(edges, 1, 1, 1, 1, 0.16)
+	local glyph = button:CreateTexture(nil, "ARTWORK")
+	glyph:SetSize(16, 16)
+	glyph:SetPoint("CENTER")
+	glyph:SetTexture(ICONS)
+	glyph:SetVertexColor(0.9, 0.88, 0.82)
+	button.glyph, button.tip = glyph, tip
+	function button.SetIcon(self, name) SetIconCell(self.glyph, name) end
+	button:SetIcon(icon)
+	button:SetScript("OnEnter", function(self)
+		glyph:SetVertexColor(1, 0.82, 0.3)
+		ns.DressStyleEdges(edges, 1, 1, 0.82, 0.3, 0.6)
+		if self.tip then
+			GameTooltip:SetOwner(self, "ANCHOR_TOP")
+			GameTooltip:SetText(self.tip, 1, 1, 1, 1, true)
+			GameTooltip:Show()
+		end
+	end)
+	button:SetScript("OnLeave", function()
+		glyph:SetVertexColor(0.9, 0.88, 0.82)
+		ns.DressStyleEdges(edges, 1, 1, 1, 1, 0.16)
+		GameTooltip:Hide()
+	end)
+	button:SetScript("OnMouseDown", function() glyph:SetPoint("CENTER", 1, -1) end)
+	button:SetScript("OnMouseUp", function() glyph:SetPoint("CENTER", 0, 0) end)
+	return button
+end
+
+-- Everything on parent placed from from, placed from to instead. Gives what
+-- it moved (to move back: Repoint(parent, to, from, that)).
+local function Repoint(parent, from, to, only)
+	local list = {}
 	local function Swap(object)
 		if object == from or object == to or not object.GetNumPoints then return end
 		local moved = {}
@@ -669,9 +731,44 @@ local function Repoint(parent, from, to)
 			if relative == from then moved[#moved + 1] = { point, relPoint, x, y } end
 		end
 		for _, each in ipairs(moved) do object:SetPoint(each[1], to, each[2], each[3], each[4]) end
+		if #moved > 0 then list[#list + 1] = object end
+	end
+	if only then
+		for _, each in ipairs(only) do Swap(each) end
+		return list
 	end
 	for _, child in ipairs({ parent:GetChildren() }) do Swap(child) end
 	for _, region in ipairs({ parent:GetRegions() }) do Swap(region) end
+	return list
+end
+
+-- The settings window slid down to make room for the preview docked above
+-- it, and back as the preview goes (2026-11-17): { frame, points, top }.
+-- Never in a fight (it may be the game's own window); left where it is if
+-- something else moved it since.
+local slid
+local function SlideBack()
+	if not slid then return end
+	local was = slid
+	slid = nil
+	local settings = was.frame
+	local top = settings:GetTop()
+	if InCombatLockdown() or not top or math.abs(top - was.top) > 1 then return end
+	settings:ClearAllPoints()
+	for _, each in ipairs(was.points) do settings:SetPoint(unpack(each)) end
+end
+local function SlideSettings(settings, by) -- (by: in UIParent's units)
+	if by <= 0 or InCombatLockdown() then return end
+	local left, top = settings:GetLeft(), settings:GetTop()
+	if not (left and top) then return end
+	local points = {}
+	for i = 1, settings:GetNumPoints() do points[i] = { settings:GetPoint(i) } end
+	local k = settings:GetEffectiveScale() / UIParent:GetEffectiveScale()
+	local width, height = settings:GetSize()
+	settings:ClearAllPoints()
+	settings:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", left, top - by / k)
+	settings:SetSize(width, height) -- (one sized by two anchors keeps its size)
+	slid = { frame = settings, points = points, top = top - by / k }
 end
 
 -- soft: its page left: the window kept a moment, for the next page's preview
@@ -680,6 +777,7 @@ local function PutBack(soft)
 	local preview = popped
 	if not preview then return end
 	popped = nil
+	SlideBack()
 	local slot = preview.popSlot
 	-- (Put back with its page still up: the window closed, or Put back:
 	-- not popped again till the page is left.)
@@ -692,9 +790,10 @@ local function PutBack(soft)
 	slot:Hide()
 	-- (Its spot on the page, what's under it is placed from: its size again.)
 	if preview.stackSpot then preview.stackSpot:SetSize(preview:GetWidth(), preview:GetHeight()) end
-	preview.popButton:SetText(ns.L["Pop out"])
 	-- (Its button back on the preview, where it was: off the window's top row.)
 	local button = preview.popButton
+	button:SetIcon("pop")
+	button.tip = ns.L["Pop out: the preview in a window of its own, docked to the settings."]
 	if button.homePoints then
 		button:SetParent(preview)
 		button:ClearAllPoints()
@@ -710,6 +809,7 @@ local function PutBack(soft)
 		popWindow:Hide()
 	end
 	if preview.Refresh then preview:Refresh() end
+	UpdateSticky(preview)
 end
 
 -- The settings window a preview's page is in (to dock beside).
@@ -718,22 +818,70 @@ local function SettingsWindow(frame)
 	return frame
 end
 
--- Docked beside the settings, or where you dragged it (popped out).
+-- Where a preview's window fits docked to its settings window without
+-- covering them: above first (sliding the settings down for room when there
+-- isn't enough over them: SlideSettings), then right, then left. Gives the
+-- side, the settings window and the largest scale it has there; nothing when
+-- no side holds it at POPOUT_MIN_SCALE or more. (In UIParent's units: the
+-- settings window may have its own scale.)
+local DOCK_GAP = 4
+local function DockSpot(preview)
+	local settings = SettingsWindow(preview.popSlot or preview)
+	if not (settings and settings ~= UIParent and settings:IsShown() and settings:GetLeft()) then return end
+	local k = settings:GetEffectiveScale() / UIParent:GetEffectiveScale()
+	local left, right, top = settings:GetLeft() * k, settings:GetRight() * k, settings:GetTop() * k
+	local bottom = settings:GetBottom() * k
+	local screenW, screenH = UIParent:GetWidth(), UIParent:GetHeight()
+	local width, height = math.max(preview:GetWidth(), 1), math.max(preview:GetHeight(), 1)
+	local function Fit(roomW, roomH)
+		return math.min((roomW - 24) / width, (roomH - 42) / height)
+	end
+	local above = Fit(screenW * 0.95, screenH - top - DOCK_GAP * 2)
+	if above < POPOUT_MIN_SCALE and not InCombatLockdown() then
+		-- (The room the settings slid down to the screen's bottom would give.)
+		above = Fit(screenW * 0.95, screenH - top + bottom - DOCK_GAP * 4)
+	end
+	if above >= POPOUT_MIN_SCALE then return "above", settings, above end
+	local beside = Fit(screenW - right - DOCK_GAP * 2, screenH - 60)
+	if beside >= POPOUT_MIN_SCALE then return "right", settings, beside end
+	beside = Fit(left - DOCK_GAP * 2, screenH - 60)
+	if beside >= POPOUT_MIN_SCALE then return "left", settings, beside end
+end
+
+-- Docked to the settings, or where you dragged it (popped out).
 local function PlaceWindow()
+	SlideBack() -- (worked out from where the settings were: slid again below if it needs)
+	popWindow.side = nil
 	local saved = ns.db and ns.db.stylePreviewPos
 	popWindow:ClearAllPoints()
+	local dock = popWindow.dock
 	if type(saved) == "table" and saved.x and saved.y then
 		popWindow:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", saved.x, saved.y)
-		popWindow.dock:SetText(ns.L["Dock"])
+		dock:SetIcon("dock")
+		dock.tip = ns.L["Dock the window to the settings again."]
 		return
 	end
-	local settings = popped and popped.popSlot and SettingsWindow(popped.popSlot)
-	if settings and settings ~= UIParent and settings:IsShown() then
-		popWindow:SetPoint("TOPLEFT", settings, "TOPRIGHT", 4, 0)
+	local side, settings
+	if popped then side, settings = DockSpot(popped) end
+	if side == "above" then
+		local k = settings:GetEffectiveScale() / UIParent:GetEffectiveScale()
+		local need = popped:GetHeight() * popped:GetScale() + 42 + DOCK_GAP * 2
+		local room = UIParent:GetHeight() - settings:GetTop() * k
+		if need > room then
+			SlideSettings(settings, math.min(need - room, settings:GetBottom() * k - DOCK_GAP * 2))
+		end
+		popWindow:SetPoint("BOTTOM", settings, "TOP", 0, DOCK_GAP)
+	elseif side == "right" then
+		popWindow:SetPoint("TOPLEFT", settings, "TOPRIGHT", DOCK_GAP, 0)
+	elseif side == "left" then
+		popWindow:SetPoint("TOPRIGHT", settings, "TOPLEFT", -DOCK_GAP, 0)
 	else
+		-- (Popped by hand where no side holds it: the screen's top.)
 		popWindow:SetPoint("TOP", UIParent, "TOP", 0, -60)
 	end
-	popWindow.dock:SetText(ns.L["Pop out"])
+	popWindow.side = side
+	dock:SetIcon("undock")
+	dock.tip = ns.L["Undock: drag the window anywhere."]
 end
 
 -- The window's size: the preview's, scaled, with room for the title.
@@ -749,6 +897,12 @@ end
 local function ScalePopped(scale)
 	local width, height = math.max(popped:GetWidth(), 1), math.max(popped:GetHeight(), 1)
 	local most = math.min(UIParent:GetWidth() * 0.95 / width, (UIParent:GetHeight() - 60) / height)
+	-- (Docked: no bigger than its side holds, so it never covers the settings.)
+	local saved = ns.db and ns.db.stylePreviewPos
+	if not (type(saved) == "table" and saved.x) then
+		local _, _, fit = DockSpot(popped)
+		if fit then most = math.min(most, fit) end
+	end
 	local least = math.min(POPOUT_MIN_SCALE, most)
 	scale = math.max(least, math.min(scale, most))
 	-- (The window's corner can't go past the preview's own smallest and largest.)
@@ -775,16 +929,19 @@ local function Resizing(window)
 		(height - 42) / math.max(popped:GetHeight(), 1)))
 end
 
+-- The window: flat and dark with a thin edge (2026-11-17, was the old dialog
+-- art), its name top left, icon buttons top right (Put back, Undock or Dock,
+-- Close), a grip in its corner.
 local function Window()
 	if popWindow then return popWindow end
-	popWindow = CreateFrame("Frame", "CinematicPreviewWindow", UIParent, BackdropTemplateMixin and "BackdropTemplate")
+	popWindow = CreateFrame("Frame", "CinematicPreviewWindow", UIParent)
 	popWindow:SetFrameStrata("DIALOG")
 	popWindow:SetToplevel(true)
 	popWindow:SetClampedToScreen(true)
 	popWindow:EnableMouse(true)
 	popWindow:SetMovable(true)
 	popWindow:RegisterForDrag("LeftButton")
-	-- (Docked, it stays beside the settings: Pop out first to drag it.)
+	-- (Docked, it stays by the settings: Undock first to drag it.)
 	popWindow:SetScript("OnDragStart", function(self)
 		local saved = ns.db and ns.db.stylePreviewPos
 		if type(saved) == "table" and saved.x then self:StartMoving() end
@@ -794,23 +951,22 @@ local function Window()
 		if ns.db then ns.db.stylePreviewPos = { x = self:GetLeft(), y = self:GetTop() } end
 		PlaceWindow()
 	end)
-	popWindow:SetBackdrop({
-		bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background-Dark",
-		edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-		tile = true, tileSize = 16, edgeSize = 16,
-		insets = { left = 4, right = 4, top = 4, bottom = 4 },
-	})
-	if ns.SkinWindow then ns.SkinWindow(popWindow) end
+	local back = popWindow:CreateTexture(nil, "BACKGROUND", nil, -8)
+	back:SetAllPoints()
+	back:SetColorTexture(0.05, 0.055, 0.07, 0.97)
+	ns.DressStyleEdges(ns.MakeStyleEdges(popWindow, "BORDER"), 1, 1, 1, 1, 0.12)
 	tinsert(UISpecialFrames, "CinematicPreviewWindow") -- Escape closes it
 	ns.CloseWithSettings(popWindow) -- (and closing the settings)
-	popWindow.title = popWindow:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-	popWindow.title:SetPoint("TOPLEFT", 14, -10)
-	local close = CreateFrame("Button", nil, popWindow, "UIPanelCloseButton")
-	close:SetPoint("TOPRIGHT", 0, 0)
-	popWindow.dock = ns.PanelButton(popWindow)
-	popWindow.dock:SetSize(70, 20)
-	popWindow.dock:SetPoint("TOPRIGHT", -28, -6)
-	popWindow.dock:SetText(ns.L["Pop out"])
+	popWindow.title = popWindow:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+	popWindow.title:SetPoint("TOPLEFT", 12, -9)
+	local close = IconButton(popWindow, "close", ns.L["Close"])
+	close:SetPoint("TOPRIGHT", -6, -4)
+	close:SetScript("OnClick", function()
+		if ns.db then ns.db.stylePreviewOut = nil end -- (as Put back: on the page from now on)
+		popWindow:Hide()
+	end)
+	popWindow.dock = IconButton(popWindow, "undock")
+	popWindow.dock:SetPoint("RIGHT", close, "LEFT", -4, 0)
 	popWindow.dock:SetScript("OnClick", function()
 		if not ns.db then return end
 		local saved = ns.db.stylePreviewPos
@@ -819,17 +975,20 @@ local function Window()
 		else
 			ns.db.stylePreviewPos = { x = popWindow:GetLeft() + 30, y = popWindow:GetTop() - 30 }
 		end
+		-- (Docked again: back to a size its side holds.)
+		if popped then
+			ScalePopped(popScale or POPOUT_SCALE)
+			FitWindow()
+		end
 		PlaceWindow()
 	end)
-	if popTooltip then
-		popTooltip(popWindow.dock, ns.L["Pop out to drag the window anywhere, or dock it beside the settings."])
-	end
-	-- The corner grip (the chat frames' own) resizes it.
+	-- The corner grip (the chat frames' own, quieter) resizes it.
 	popWindow:SetResizable(true) -- (its bounds: ScalePopped)
 	local grip = CreateFrame("Button", nil, popWindow)
-	grip:SetSize(16, 16)
+	grip:SetSize(14, 14)
 	grip:SetPoint("BOTTOMRIGHT", -3, 3)
 	grip:SetFrameLevel(popWindow:GetFrameLevel() + 40)
+	grip:SetAlpha(0.55)
 	grip:SetNormalTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up")
 	grip:SetPushedTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Down")
 	grip:SetHighlightTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Highlight")
@@ -858,10 +1017,11 @@ end
 
 -- The preview window out of a docked Look panel's way while it's open (they
 -- sit in the same spot beside the settings), back as it closes (2026-11-16).
+-- (Docked above the settings it's in no one's way: left up.)
 function ns.PreviewAside(aside)
 	if not popWindow then return end
 	if aside then
-		if popWindow:IsShown() then
+		if popWindow:IsShown() and popWindow.side ~= "above" then
 			popWindow.lookAside = true
 			popWindow:Hide()
 		end
@@ -873,6 +1033,7 @@ end
 
 local function PopOut(preview)
 	PutBack()
+	UpdateSticky(preview, true) -- (held at its page's top: back in its spot first)
 	local window = Window()
 	local parent = preview:GetParent()
 	local slot = preview.popSlot
@@ -911,19 +1072,180 @@ local function PopOut(preview)
 	window.title:SetText(preview.popTitle or ns.L["Preview"])
 	preview:SetParent(window)
 	ScalePopped(popScale or POPOUT_SCALE)
-	preview.popButton:SetText(ns.L["Put back"])
-	-- (Put back on the window's top row, left of its Pop out: not over the picture.)
+	-- (Put back on the window's top row, left of its Undock: not over the picture.)
 	local button = preview.popButton
+	button:SetIcon("back")
+	button.tip = ns.L["Put the preview back on its page."]
 	button.homePoints = {}
 	for i = 1, button:GetNumPoints() do button.homePoints[i] = { button:GetPoint(i) } end
 	button:SetParent(window)
 	button:ClearAllPoints()
-	button:SetPoint("RIGHT", window.dock, "LEFT", -6, 0)
+	button:SetPoint("RIGHT", window.dock, "LEFT", -4, 0)
 	button:SetFrameLevel(window.dock:GetFrameLevel())
+	button:Show()
 	window:Show()
 	FitWindow()
 	PlaceWindow()
 	if preview.Refresh then preview:Refresh() end
+end
+
+-- Sticky (2026-11-17): a preview on its page stays in sight as you scroll
+-- down. Once its spot goes past the top of the page's view, the preview is
+-- held shrunk in the view's top left corner (STICKY_SHARE of its width), over
+-- the settings (which scroll under it), on a dark card with a thin fold bar
+-- under it. Folding it (kept: stylePreviewFolded) leaves just that bar,
+-- "Preview"; a click on it brings the preview back. Not for a popped one.
+local STICKY_BAR, PIN_RAISE, STICKY_SHARE, STICKY_PAD = 14, 200, 0.42, 6
+
+local function ScrollOf(frame)
+	local each = frame:GetParent()
+	while each and each ~= UIParent do
+		if each.GetObjectType and each:GetObjectType() == "ScrollFrame" then return each end
+		each = each:GetParent()
+	end
+end
+
+-- frame and all under it raised (or lowered) by by levels, their order kept:
+-- over the settings it's held above. (Raised deepest first, lowered top
+-- first: none pushed up by its parent on the way.)
+local function ShiftLevels(frame, by)
+	local list = {}
+	local function Walk(each)
+		list[#list + 1] = { each, math.max(0, each:GetFrameLevel() + by) }
+		for _, child in ipairs({ each:GetChildren() }) do Walk(child) end
+	end
+	Walk(frame)
+	if by > 0 then
+		for i = #list, 1, -1 do list[i][1]:SetFrameLevel(list[i][2]) end
+	else
+		for i = 1, #list do list[i][1]:SetFrameLevel(list[i][2]) end
+	end
+end
+
+local function PinParts(preview)
+	if preview.pin then return preview.pin end
+	local spot, scroll = preview.stackSpot, ScrollOf(preview)
+	if not (spot and scroll) then return end
+	local pin = { scroll = scroll }
+	-- The band: from the view's top down past the preview, dark, taking the
+	-- clicks that would reach the settings under it.
+	local band = CreateFrame("Frame", nil, spot:GetParent())
+	band.noAdopt = true
+	band:EnableMouse(true)
+	band:SetPoint("TOPLEFT", scroll, "TOPLEFT")
+	band:Hide()
+	local back = band:CreateTexture(nil, "BACKGROUND")
+	back:SetAllPoints()
+	back:SetColorTexture(0.04, 0.045, 0.055, 0.97)
+	local line = band:CreateTexture(nil, "BORDER")
+	line:SetPoint("BOTTOMLEFT")
+	line:SetPoint("BOTTOMRIGHT")
+	line:SetHeight(1)
+	line:SetColorTexture(1, 1, 1, 0.1)
+	-- Its fold bar, along its bottom.
+	local bar = CreateFrame("Button", nil, band)
+	bar:SetPoint("BOTTOMLEFT")
+	bar:SetPoint("BOTTOMRIGHT")
+	bar:SetHeight(STICKY_BAR)
+	local glow = bar:CreateTexture(nil, "HIGHLIGHT")
+	glow:SetAllPoints()
+	glow:SetColorTexture(1, 1, 1, 0.06)
+	bar.glyph = bar:CreateTexture(nil, "ARTWORK")
+	bar.glyph:SetSize(12, 12)
+	bar.glyph:SetPoint("CENTER")
+	bar.glyph:SetTexture(ICONS)
+	bar.glyph:SetVertexColor(0.8, 0.78, 0.72)
+	bar.label = bar:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+	bar.label:SetPoint("LEFT", 8, 0)
+	bar.label:SetText(ns.L["Preview"])
+	bar:SetScript("OnClick", function()
+		if ns.db then ns.db.stylePreviewFolded = not ns.db.stylePreviewFolded or nil end
+		UpdateSticky(preview)
+	end)
+	bar:SetScript("OnEnter", function(self)
+		GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
+		GameTooltip:SetText(ns.db and ns.db.stylePreviewFolded and ns.L["Show the preview here as you scroll."]
+			or ns.L["Fold the preview away as you scroll."], 1, 1, 1, 1, true)
+		GameTooltip:Show()
+	end)
+	bar:SetScript("OnLeave", function() GameTooltip:Hide() end)
+	pin.band, pin.bar = band, bar
+	preview.pin = pin
+	scroll:HookScript("OnVerticalScroll", function() UpdateSticky(preview) end)
+	return pin
+end
+
+-- off: not held whatever the scroll (popping out, its page left).
+UpdateSticky = function(preview, off)
+	local pin = preview.pin
+	if not pin then return end
+	local spot, scroll, band, bar = preview.stackSpot, pin.scroll, pin.band, pin.bar
+	local spotTop, viewTop = spot:GetTop(), scroll:GetTop()
+	local over = (spotTop and viewTop) and spotTop - viewTop or 0
+	local width, height = preview:GetWidth(), preview:GetHeight()
+	-- (Shrunk to its share of the view's width, and no taller than half of it.)
+	local k = math.min(1, scroll:GetWidth() * STICKY_SHARE / math.max(width, 1),
+		scroll:GetHeight() * 0.5 / math.max(height, 1))
+	local can = not off and popped ~= preview and preview:IsVisible() and over > 0
+	local hold = can and not (ns.db and ns.db.stylePreviewFolded) or false
+	if hold ~= (pin.on or false) then
+		if hold then
+			-- (What hangs from it on the page, from its spot while it's held.)
+			pin.moved = Repoint(spot:GetParent(), preview, spot)
+			ShiftLevels(preview, PIN_RAISE)
+		else
+			ShiftLevels(preview, -PIN_RAISE)
+			preview:SetScale(1)
+			preview:ClearAllPoints()
+			preview:SetPoint("TOPLEFT", spot, "TOPLEFT")
+			Repoint(spot:GetParent(), spot, preview, pin.moved)
+			pin.moved = nil
+		end
+		pin.on = hold
+	end
+	if hold then
+		-- (Its offsets are in its own scale: the corner gap the same on screen.)
+		preview:SetScale(k)
+		preview:ClearAllPoints()
+		preview:SetPoint("TOPLEFT", scroll, "TOPLEFT", STICKY_PAD / k, -STICKY_PAD / k)
+	end
+	band:SetShown(can)
+	if not can then return end
+	band:SetFrameLevel(spot:GetParent():GetFrameLevel() + PIN_RAISE - 10)
+	band:SetWidth(width * k + STICKY_PAD * 2)
+	band:SetHeight(hold and height * k + STICKY_PAD + 4 + STICKY_BAR or STICKY_BAR + 4)
+	bar.label:SetShown(not hold)
+	SetIconCell(bar.glyph, hold and "fold" or "unfold")
+end
+
+-- Shown only while the mouse is over the preview (2026-11-17): its Pop out
+-- (on the page), zoom and backdrop pick. A light check, only while it shows.
+local function HoverControls(preview)
+	local watch = CreateFrame("Frame", nil, preview)
+	watch.zoomSkip = true
+	local shown, wait = nil, 0
+	local function Set(on)
+		shown = on
+		if preview.zoomButtons then preview.zoomButtons:SetShown(on) end
+		if preview.backButton then preview.backButton:SetShown(on) end
+		if preview.popButton and popped ~= preview then preview.popButton:SetShown(on) end
+	end
+	ns.SetOnUpdate(watch, function(_, elapsed)
+		wait = wait - elapsed
+		if wait > 0 then return end
+		wait = 0.08
+		local over = preview:IsMouseOver() and true or false
+		if over ~= shown then Set(over) end
+	end)
+	Set(false)
+end
+
+-- The "Preview" word in a preview's corner, gone (2026-11-17): the page and
+-- the window say what it is.
+local function HideCaption(preview)
+	for _, region in ipairs({ preview:GetRegions() }) do
+		if region.GetText and region:GetText() == ns.L["Preview"] then region:SetAlpha(0) end
+	end
 end
 
 -- A hub's pages as cards, two to a row (2026-11-16: the Interface hub's HUD
@@ -1025,7 +1347,7 @@ function ns.MakeHubCards(parent, entries, width)
 end
 
 -- The cards in groups, each under its name (2026-11-16: the hub's groups,
--- Interface's Heads-up, Overhead and Info, Visions' Combat and World).
+-- Interface's Combat, Nameplates and Info, Visions' Combat and World).
 -- groups: { title, entries } each, in order, empty ones left out. Gives the
 -- frame, sized to them.
 function ns.MakeHubCardGroups(parent, groups, width)
@@ -1050,7 +1372,7 @@ end
 -- Another page's preview in the window while this one shows (2026-11-16:
 -- Style General's on its Pages and Overrides tabs), back on its own page as
 -- this one hides. getPreview: gives it (made later, maybe). Not while
--- previews are put back on their pages (stylePreviewInPage).
+-- previews are on their pages (stylePreviewOut not set).
 function ns.SharePreview(canvas, getPreview)
 	canvas:HookScript("OnShow", function()
 		local preview = getPreview()
@@ -1063,7 +1385,7 @@ function ns.SharePreview(canvas, getPreview)
 			local db = ns.db
 			preview = getPreview()
 			if not (preview and preview.popButton and canvas:IsVisible() and db) then return end
-			if db.stylePreviewInPage or popped == preview then return end
+			if not db.stylePreviewOut or popped == preview then return end
 			PopOut(preview)
 			preview.borrowedBy = canvas
 		end)
@@ -1237,13 +1559,11 @@ function ns.AddPreviewZoom(preview)
 	preview.zoomButtons = holder
 end
 
-function ns.StylePopout(preview, tooltip, title)
-	popTooltip = popTooltip or tooltip
+-- (tooltip: the page's, unused since the buttons are icons with their own.)
+function ns.StylePopout(preview, _, title)
 	WidePreview(preview)
 	ns.AddPreviewZoom(preview) -- (- and + in its corner)
-	local button = ns.PanelButton(preview)
-	button:SetSize(80, 20)
-	button:SetText(ns.L["Pop out"])
+	local button = IconButton(preview, "pop", ns.L["Pop out: the preview in a window of its own, docked to the settings."])
 	button:SetFrameLevel(preview:GetFrameLevel() + 30)
 	button.zoomSkip = true
 	if preview.styleTest then preview.styleTest.zoomSkip = true end
@@ -1252,25 +1572,45 @@ function ns.StylePopout(preview, tooltip, title)
 	else
 		button:SetPoint("TOPRIGHT", -6, -6)
 	end
-	tooltip(button, ns.L["Moves the preview into a resizable window beside the settings, or back onto the page."])
 	button:SetScript("OnClick", function()
 		local db = ns.db
 		if popped == preview then
+			if db then db.stylePreviewOut = nil end
 			PutBack()
-			if db then db.stylePreviewInPage = true end
 		else
-			if db then db.stylePreviewInPage = nil end
+			if db then db.stylePreviewOut = true end -- (every page's, from now on: account-wide)
 			PopOut(preview)
 		end
 	end)
 	preview.popButton, preview.popTitle = button, title
-	-- (Popped as its page shows, unless put back before; a frame later, once
-	-- the page is laid out and the preview fitted to it.)
+	-- Its backdrop: the dark panel or the painted scene (every preview's, kept).
+	local scene = IconButton(preview, "scene", ns.L["Backdrop: a plain dark panel or a world scene."])
+	scene.zoomSkip = true
+	scene:SetPoint("BOTTOMLEFT", 6, 6)
+	scene:SetFrameLevel(preview:GetFrameLevel() + 30)
+	scene:SetScript("OnClick", function()
+		if not ns.db then return end
+		ns.db.stylePreviewBack = ns.db.stylePreviewBack ~= "scene" and "scene" or nil
+		for frame in pairs(scenes) do ns.RecutStyleScene(frame) end
+	end)
+	preview.backButton = scene
+	HoverControls(preview)
+	HideCaption(preview)
+	-- (Held at its page's top as you scroll: once it's on a page in view.)
+	preview:HookScript("OnShow", function(self)
+		HideCaption(self) -- (some pages write theirs after this)
+		C_Timer.After(0, function()
+			if self:IsVisible() and PinParts(self) then UpdateSticky(self) end
+		end)
+	end)
+	preview:HookScript("OnHide", function(self) UpdateSticky(self, true) end)
+	-- (Popped as its page shows once you've popped one out (stylePreviewOut);
+	-- a frame later, once the page is laid out and the preview fitted to it.)
 	-- (Till then unseen, its room on the page already gone: no flash of it there.)
 	local function AutoPop(self)
 		if popped == self then return end
 		local db = ns.db
-		if not db or db.stylePreviewInPage or self.keptIn then return end
+		if not (db and db.stylePreviewOut) or self.keptIn then return end
 		self:SetAlpha(0)
 		if self.stackSpot then self.stackSpot:SetHeight(1) end
 		C_Timer.After(0, function()

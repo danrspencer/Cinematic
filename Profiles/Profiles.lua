@@ -25,6 +25,7 @@ local GLOBAL_KEYS = {
 	masterWheelOrder = true, masterWheelOff = true, customWheels = true, wheelExtras = true, -- (Wheels pages)
 	cameraScripts = true, -- (CameraScripts.lua: your scripts, the same in every profile)
 	stylePreviewPos = true, -- (StylePages.lua: where you dragged the Style preview window)
+	stylePreviewBack = true, stylePreviewFolded = true, stylePreviewOut = true, -- (StylePages.lua: the previews' backdrop pick, their sticky fold)
 	dockSpots = true, -- (Skin.lua's DockBeside: where you dragged popped-out windows)
 	peeksLog = true, -- (/cine debug peeks log)
 	addonSupportOff = true, -- (Addons page: supported addons switched off, AddonSupport.lua)
