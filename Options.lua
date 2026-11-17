@@ -2351,7 +2351,22 @@ do
 		-- borrowed hub frame was never handed back: two hubs drawn at once.)
 		local ok, err = pcall(Fold, category)
 		if not ok and ns.Log then ns.Log("error", "left list line: " .. tostring(err)) end
+		-- The line itself picked too (2026-11-16): the settings' own
+		-- SelectCategory, so the old line hides (handing the hub frame back)
+		-- and this one shows (taking it, its icon already the current one).
+		-- Without it the old line stayed lit, or none did when its group
+		-- just folded away. menu.lineNow: each hub's, for ns.OpenOptions.
+		menu.lineNow[hubName] = category
+		local panel = SettingsPanel
+		if menu.selecting or not (panel and panel.SelectCategory and panel:IsShown()) then return end
+		if InCombatLockdown() and panel:IsProtected() then return end
+		if panel.GetCurrentCategory and panel:GetCurrentCategory() == category then return end
+		menu.selecting = true
+		ok, err = pcall(panel.SelectCategory, panel, category)
+		menu.selecting = nil
+		if not ok and ns.Log then ns.Log("error", "left list pick: " .. tostring(err)) end
 	end
+	menu.lineNow = {}
 	-- Cinematic's lines in the left list fold with gold arrows, not the game's
 	-- +/- (2026-11-16): each line's own toggle kept, just see-through (still
 	-- what's clicked), our arrow over it, right while folded, down while
@@ -3482,7 +3497,12 @@ do
 						hubFrame:ClearAllPoints()
 						hubFrame:SetAllPoints(self)
 						hubFrame:Show()
+						-- (This line picked already: its icon's line not picked over
+						-- it, a band's line staying lit.)
+						local was = menu.selecting
+						menu.selecting = true
 						HubTab(target)
+						menu.selecting = was
 					end)
 					frame:SetScript("OnHide", function(self)
 						local hubFrame = hub.frame
@@ -18723,14 +18743,17 @@ function ns.SettingsPageCanvas(name) return subpages[name] or (ns.settingsCanvas
 function ns.OpenOptions(page)
 	page = MOVED_PAGES[page] or page
 	-- (a UI Manager page: that page, then UI Manager open at it)
-	page = page and HubTab(page) or page
+	local hubName = page and HubTab(page)
+	page = hubName or page
 	-- (some pages are registered by their name as shown)
 	if page and not subpages[page] and subpages[L[page]] then page = L[page] end
+	-- (A hub's icon: opened on its own line in the left list, lit there.)
+	local line = hubName and menu.lineNow[hubName]
 	if InCombatLockdown() then
 		local panel = category and SettingsPanel
 		if panel and panel.SelectCategory and not panel:IsProtected() then
 			panel:Show()
-			panel:SelectCategory(subpages[page] or category)
+			panel:SelectCategory(line or subpages[page] or category)
 		elseif not (panel and panel:IsShown()) then
 			openAfterFight.page = page
 			openAfterFight:RegisterEvent("PLAYER_REGEN_ENABLED")
@@ -18739,7 +18762,7 @@ function ns.OpenOptions(page)
 		return
 	end
 	if category and Settings and Settings.OpenToCategory then
-		local target = subpages[page] or category
+		local target = line or subpages[page] or category
 		Settings.OpenToCategory(target:GetID())
 	elseif InterfaceOptionsFrame_OpenToCategory then
 		-- Called twice: the first call can land on the wrong page in old clients.
