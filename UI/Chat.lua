@@ -601,8 +601,36 @@ local function WatchCopies()
 end
 local OnCopyWatch = ns.Profiled("Chat line copies", WatchCopies)
 
-local function ShowCopy(chatFrame, line, r, g, b)
+-- Whether two frames cover some of the same screen (false if unreadable).
+local function Overlap(a, b)
+	local al, ab, aw, ah = a:GetRect()
+	local bl, bb, bw, bh = b:GetRect()
+	for _, v in ipairs({ al, ab, aw, ah, bl, bb, bw, bh }) do
+		if type(v) ~= "number" or (issecretvalue and issecretvalue(v)) then return false end
+	end
+	return al < bl + bw and bl < al + aw and ab < bb + bh and bb < ab + ah
+end
+
+-- The message filters run once per window the message goes to: a line two
+-- windows both show (System in two tabs, or two windows an addon draws on one
+-- panel) is copied once where they overlap, not once per window.
+local SAME_LINE_TIME = 1 -- seconds a line counts as the same message
+local function CopiedNearby(chatFrame, text)
+	local shown, now = ns.chatPeekPanels[chatFrame] or chatFrame, GetTime()
+	for other, copy in pairs(lineCopies) do
+		if other ~= chatFrame and copy.lastText == text and now - (copy.lastTime or 0) < SAME_LINE_TIME
+				and copy.frame:IsShown() and copy.place and Overlap(copy.place, shown) then
+			return true
+		end
+	end
+	return false
+end
+
+local function ShowCopy(chatFrame, line, r, g, b, text)
+	if CopiedNearby(chatFrame, text or line) then return end
 	local copy = CopyFrame(chatFrame)
+	copy.lastText, copy.lastTime = text or line, GetTime()
+	copy.place = ns.chatPeekPanels[chatFrame] or chatFrame
 	DressCopy(copy, chatFrame)
 	-- (A copy already up keeps its base: the window has only risen since.)
 	if not copy.frame:IsShown() then
@@ -625,13 +653,13 @@ end
 local function PeekLine(chatFrame, text, formatted)
 	if formatted then
 		local line, r, g, b = FindWindowLine(chatFrame, text) -- (for its color)
-		ShowCopy(chatFrame, line or text, r, g, b)
+		ShowCopy(chatFrame, line or text, r, g, b, text)
 		return
 	end
 	C_Timer.After(0, function()
 		local line, r, g, b = FindWindowLine(chatFrame, text)
 		if line then
-			ShowCopy(chatFrame, line, r, g, b)
+			ShowCopy(chatFrame, line, r, g, b, text)
 		else
 			PeekWindow(chatFrame) -- (not found: the whole window, as before)
 		end
