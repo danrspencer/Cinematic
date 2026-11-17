@@ -3877,22 +3877,25 @@ end
 local function CreateRevealPanel()
 	local canvas, content = CreateScrollPage()
 
-	-- Folder tabs at the top: Overview, a group for each hub CineMode works
-	-- through, its pages on cards (on or off, a click away) built from the hubs
-	-- as they first show; then Settings, this page's own (everything made on it
-	-- below the cards, moved onto host).
-	local OVERVIEW_HUBS = {
+	-- Folder tabs at the top (2026-11-17): a tab for each hub CineMode works
+	-- through, a row for each of its pages and their tabs (a click on one
+	-- opens it), each with when it works: Off or On, or, for one with an Allow
+	-- outside CineMode tick, Off, CineMode (only while it's on) or Always
+	-- (while it's off too). Then Settings, this page's own (everything made on
+	-- it below the rows, moved onto host).
+	local SECTIONS = {
 		{ "UI Manager", L["Interface"], L["What fades in CineMode, and what brings it back."] },
+		{ "Visions", L["Visions"], L["Effects that play over the world when something happens."] },
+		{ "Style", L["Style"], L["How the whole interface looks."] },
 		{ "Atmosphere", L["Atmosphere"], L["How the world looks and sounds in CineMode."] },
-		{ "Camera", L["Camera"], L["The camera coming alive while CineMode is on."] },
+		{ "Camera", L["Camera"], L["The camera coming alive."] },
 	}
-	local OVERVIEW_TAB, SETTINGS_TAB = 1, 2
+	local SETTINGS_TAB = #SECTIONS + 1
 	local overview, host, PickTab, FillOverview
 	local picked = 1 -- (the tab shown, kept while the game runs)
-	local tabList = {
-		{ L["Overview"], L["Every page CineMode works through, hub by hub: on or off, a click away."] },
-		{ L["Settings"], L["How fast the UI fades, the Calm Timer, combat text and error messages."] },
-	}
+	local tabList = {}
+	for i, section in ipairs(SECTIONS) do tabList[i] = { section[2], section[3] } end
+	tabList[SETTINGS_TAB] = { L["Settings"], L["How fast the UI fades, the Calm Timer, and what takes you out of CineMode."] }
 	local tabsPanel, _, ShowTab, tabsBase = ns.FolderTabs(content, tabList, function(i) PickTab(i) end)
 	tabsBase:SetPoint("TOPLEFT", content, "TOPLEFT", 8, -(ns.FOLDER_TAB_HEIGHT + 16))
 	tabsPanel:SetPoint("TOPLEFT", tabsBase)
@@ -3901,167 +3904,212 @@ local function CreateRevealPanel()
 
 	local title = Label(content, "GameFontNormalLarge", "CineMode")
 	title:SetPoint("TOPLEFT", tabsPanel, "BOTTOMLEFT", 8, -14)
+	-- (The tab's hub, what it's for, beside the title: hidden on Settings.)
+	local sectionNote = Label(content, "GameFontDisableSmall", "")
+	sectionNote:SetPoint("BOTTOMLEFT", title, "BOTTOMRIGHT", 10, 1)
 
-	-- A hub's tab: a card for each of its pages, in two columns either side of
-	-- mid (icon, name, its intro behind a "?", a switch; a click opens the page).
-	-- Dev-only pages have a red X over the icon, as on their hub's.
 	overview = CreateFrame("Frame", nil, content)
 	overview:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -14)
 	overview:SetPoint("RIGHT", content, "RIGHT", -16, 0)
 	overview:SetHeight(1)
 	overview.searchSkip = true -- (the settings' own pages are what search finds)
-	local mid = CreateFrame("Frame", nil, overview)
-	mid:SetSize(1, 1)
-	mid:SetPoint("TOP", overview, "TOP")
 	local summary = Label(overview, "GameFontHighlightSmall")
 	summary:SetPoint("BOTTOMRIGHT", overview, "TOPRIGHT", 0, 16)
-	local CARD_H, CARD_GAP = 42, 8
-	local SWITCH_W, SWITCH_H, KNOB = 34, 16, 12
-	local cards = {}
-	local function StateTip(self)
-		local page = self.page
-		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-		GameTooltip:SetText(self.title, 1, 0.82, 0)
-		if page.held then
-			GameTooltip:AddLine(L["Off with the General page's switch."], 1, 0.25, 0.25, true)
-		elseif page.fixed then
-			GameTooltip:AddLine(L["On and off with the General page's switch."], 1, 1, 1, true)
-		elseif page.on then
-			GameTooltip:AddLine(L["On. Click to turn this page off."], 0.25, 1, 0.25, true)
+	local whenHead = Label(overview, "GameFontDisableSmall", L["When"])
+	whenHead:SetPoint("TOPRIGHT", overview, "TOPRIGHT", -8, 0)
+	local HEAD_H, PAGE_H, TAB_H, TAB_INDENT, SEG_H = 16, 28, 22, 34, 18
+
+	-- A page's Allow outside CineMode ticks (Core.lua's OUTSIDE_CINE and
+	-- OUTSIDE_EFFECT), by its English name: with them its row's choices are
+	-- Off, CineMode and Always. (Effects: the vignette's and weather's together.)
+	local OUTSIDE = {
+		Nameplates = { "outsideCinePlates" },
+		Effects = { "outsideCineVignette", "outsideCineWeather" },
+		Tint = { "outsideCineTint" }, Letterbox = { "outsideCineLetterbox" },
+		Audio = { "outsideCineMusic" },
+		Cameras = { "outsideCineCameras" },
+		["Shoulder Cam"] = { "outsideCineShoulder" }, ["Skyriding Cam"] = { "outsideCineSkyride" },
+		["Heal Vision"] = { "outsideCineHeal" }, ["Damage Vision"] = { "outsideCineDamage" },
+		["Vitals Vision"] = { "outsideCineVitals" }, ["Quest Vision"] = { "outsideCineQuest" },
+		["Roll Vision"] = { "outsideCineRoll" }, ["Teleport Vision"] = { "outsideCineTeleport" },
+		["Duel Vision"] = { "outsideCineDuel" }, ["Emote Vision"] = { "outsideCineEmote" },
+		["Card Vision"] = { "outsideCineCards" },
+	}
+	-- (Held to CineMode while Cameras is: their Always does nothing then.)
+	local CAMERA_HELD = { ["Shoulder Cam"] = true, ["Skyriding Cam"] = true }
+	local function TicksOf(name)
+		if name == "Shoulder Cam" and not (ns.ShoulderCamUnlocked and ns.ShoulderCamUnlocked()) then return nil end
+		return OUTSIDE[name]
+	end
+	local function TickOn(db, tick)
+		local value = db[tick]
+		if value == nil then value = ns.DEFAULTS and ns.DEFAULTS[tick] end
+		return value == true
+	end
+	local CHOICES_ON = { L["Off"], L["On"] }
+	local CHOICES_CINE = { L["Off"], L["CineMode"], L["Always"] }
+	-- (Which is picked: 1 Off, 2 On or CineMode, 3 Always.)
+	local function Picked(entry, ticks)
+		if not entry.on then return 1 end
+		if not ticks then return 2 end
+		local db = ns.GetDB()
+		for _, tick in ipairs(ticks) do
+			if not TickOn(db, tick) then return 2 end
+		end
+		return 3
+	end
+	-- A choice the row can't take now (its page off or on with another's
+	-- switch; Always on a camera while Cameras is CineMode only), and why.
+	local function Inert(row, i)
+		local entry = row.entry
+		if entry.held then return L["Off with the General page's switch."] end
+		if entry.fixed and (i == 1 or not row.ticks) then return L["On and off with the General page's switch."] end
+		if i == 3 and row.tickHeld then return L["Cameras (Camera tab) is set to CineMode."] end
+	end
+	local function Choose(row, i)
+		local entry, ticks = row.entry, row.ticks
+		if Inert(row, i) then return end
+		if i == 1 then
+			if entry.on then row.flip(entry.name) end
 		else
-			GameTooltip:AddLine(L["Off. Click to turn this page on."], 1, 0.25, 0.25, true)
-		end
-		GameTooltip:Show()
-	end
-	-- (Placed by FillOverview: under its hub's heading, the cards two a row.)
-	-- A switch: a click flips its page's (a tab's: its own page's), as a
-	-- right-click on its icon or tab does. (Over its own share of the card.)
-	local function MakeSwitch(parent, height, flip)
-		local state = CreateFrame("Button", nil, parent)
-		state:SetSize(SWITCH_W + 20, height) -- (more to click than the switch drawn)
-		state.track = state:CreateTexture(nil, "ARTWORK")
-		state.track:SetSize(SWITCH_W, SWITCH_H)
-		state.track:SetPoint("CENTER")
-		state.knob = state:CreateTexture(nil, "OVERLAY")
-		state.knob:SetSize(KNOB, KNOB)
-		state:SetScript("OnEnter", StateTip)
-		state:SetScript("OnLeave", function() GameTooltip:Hide() end)
-		state:SetScript("OnClick", function(self)
-			if self.page.fixed then return end
-			flip(self.page.name)
-			FillOverview()
-			if GameTooltip:IsOwned(self) then StateTip(self) end
-		end)
-		return state
-	end
-	local TAB_H, TAB_INDENT = 22, 46
-	local function MakeCard(page, tab)
-		local card = CreateFrame("Button", nil, overview)
-		card:SetHeight(CARD_H)
-		local bg = card:CreateTexture(nil, "BACKGROUND")
-		bg:SetAllPoints()
-		bg:SetColorTexture(0.05, 0.05, 0.06, 0.75)
-		for i, corners in ipairs({ { "TOPLEFT", "TOPRIGHT" }, { "BOTTOMLEFT", "BOTTOMRIGHT" },
-			{ "TOPLEFT", "BOTTOMLEFT" }, { "TOPRIGHT", "BOTTOMRIGHT" } }) do
-			local line = card:CreateTexture(nil, "BORDER")
-			line:SetColorTexture(0.22, 0.22, 0.22, 1)
-			line:SetPoint(corners[1])
-			line:SetPoint(corners[2])
-			if i <= 2 then line:SetHeight(1) else line:SetWidth(1) end
-		end
-		local hover = card:CreateTexture(nil, "HIGHLIGHT")
-		hover:SetPoint("TOPLEFT")
-		hover:SetPoint("TOPRIGHT")
-		hover:SetHeight(CARD_H)
-		hover:SetColorTexture(1, 0.82, 0, 0.07)
-		card.icon = card:CreateTexture(nil, "ARTWORK")
-		card.icon:SetSize(28, 28)
-		card.icon:SetPoint("TOPLEFT", 8, -7)
-		card.icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
-		card.icon:SetTexture(page.icon)
-		if page.dev and card.CreateLine then
-			for _, corners in ipairs({ { "TOPLEFT", "BOTTOMRIGHT" }, { "TOPRIGHT", "BOTTOMLEFT" } }) do
-				local line = card:CreateLine(nil, "OVERLAY")
-				line:SetThickness(2)
-				line:SetColorTexture(1, 0.15, 0.15, 0.9)
-				line:SetStartPoint(corners[1], card.icon, 0, 0)
-				line:SetEndPoint(corners[2], card.icon, 0, 0)
+			if not entry.on then row.flip(entry.name) end
+			if ticks then
+				local db = ns.GetDB()
+				for _, tick in ipairs(ticks) do db[tick] = i == 3 end
+				if ns.RefreshOutsideCine then ns.RefreshOutsideCine(true) end
+				Refresh()
+				if entry.on and PlaySound and SOUNDKIT then PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON) end
 			end
 		end
-		-- (A hub's General page by its own name: Effects, Cameras)
-		-- (Not a section's own icon, HUD:hud: General is its name. 2026-11-16.)
-		card.label = Label(card, "GameFontHighlight", page.label == L["General"] and not page.name:find(":")
-			and L[page.name] or page.label)
-		card.label:SetPoint("LEFT", card.icon, "RIGHT", 10, 0)
-		-- (Its page's whole intro on a "?" beside the name, as on the page itself.)
-		if type(page.intro) == "string" then PageIntro(card, card.label, page.intro) end
-		Tooltip(card, L["Go to this page."])
-		card:SetScript("OnClick", function() ns.OpenOptions(page.name) end)
-		card.state = MakeSwitch(card, CARD_H, ns.FlipPageSwitch)
-		card.state:SetPoint("TOPRIGHT", 0, 0)
-		card.state.title = card.label:GetText()
-		-- (Its tabs, a line each under it: the name (a click opens it) and
-		-- its switch; one turned on and off with the icon's says so.)
-		card.tabRows = {}
-		card.tab = tab
-		return card
+		FillOverview()
 	end
-	local function TabRow(card, i)
-		local row = card.tabRows[i]
-		if row then return row end
-		row = CreateFrame("Button", nil, card)
-		row:SetHeight(TAB_H)
-		row:SetPoint("TOPLEFT", card, "TOPLEFT", TAB_INDENT, -CARD_H - (i - 1) * TAB_H + 4)
-		row:SetPoint("RIGHT", card, "RIGHT", 0, 0)
+	local function ChoiceTip(self)
+		local row, i = self.row, self.index
+		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+		GameTooltip:SetText(self.label:GetText(), 1, 0.82, 0)
+		local tip
+		if i == 1 then
+			tip = L["This page does nothing."]
+		elseif not row.ticks then
+			tip = L["This page works as its settings say."]
+		elseif i == 2 then
+			tip = L["Works only while CineMode is on."]
+		else
+			tip = L["Works while CineMode is off too."]
+		end
+		GameTooltip:AddLine(tip, 1, 1, 1, true)
+		local why = Inert(row, i)
+		if why then GameTooltip:AddLine(why, 1, 0.25, 0.25, true) end
+		GameTooltip:Show()
+	end
+	-- (Its choices side by side, the last at the row's right.)
+	local function MakeChoices(row)
+		local list = {}
+		for i = 1, 3 do
+			local choice = CreateFrame("Button", nil, row)
+			choice:SetHeight(SEG_H)
+			choice.edge = choice:CreateTexture(nil, "BACKGROUND")
+			choice.edge:SetAllPoints()
+			choice.edge:SetColorTexture(0.35, 0.35, 0.37, 1)
+			choice.bg = choice:CreateTexture(nil, "BORDER")
+			choice.bg:SetPoint("TOPLEFT", 1, -1)
+			choice.bg:SetPoint("BOTTOMRIGHT", -1, 1)
+			local hover = choice:CreateTexture(nil, "HIGHLIGHT")
+			hover:SetAllPoints(choice.bg)
+			hover:SetColorTexture(1, 1, 1, 0.08)
+			choice.label = choice:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+			choice.label:SetPoint("CENTER", 0, 0)
+			choice.row, choice.index = row, i
+			choice:SetScript("OnClick", function(self)
+				Choose(self.row, self.index)
+				if GameTooltip:IsOwned(self) then ChoiceTip(self) end
+			end)
+			choice:SetScript("OnEnter", ChoiceTip)
+			choice:SetScript("OnLeave", function() GameTooltip:Hide() end)
+			list[i] = choice
+		end
+		return list
+	end
+	local function PaintChoices(row, own)
+		local list = row.choices
+		if not own then
+			for _, choice in ipairs(list) do choice:Hide() end
+			return
+		end
+		local names = row.ticks and CHOICES_CINE or CHOICES_ON
+		local pick = Picked(row.entry, row.ticks)
+		for i = #list, 1, -1 do
+			local choice = list[i]
+			if i > #names then
+				choice:Hide()
+			else
+				choice:Show()
+				choice.label:SetText(names[i])
+				choice:SetWidth(math.max(38, math.ceil(choice.label:GetStringWidth()) + 16))
+				choice:ClearAllPoints()
+				if i == #names then
+					choice:SetPoint("RIGHT", row, "RIGHT", -8, 0)
+				else
+					choice:SetPoint("RIGHT", list[i + 1], "LEFT", 1, 0)
+				end
+				local on = i == pick
+				if on and i == 1 then
+					choice.bg:SetColorTexture(0.3, 0.3, 0.32, 1)
+				elseif on then
+					choice.bg:SetColorTexture(0.14, 0.5, 0.2, 1)
+				else
+					choice.bg:SetColorTexture(0.06, 0.06, 0.07, 1)
+				end
+				local tone = on and 1 or 0.7
+				choice.label:SetTextColor(tone, tone, tone)
+				choice.label:SetVertexColor(tone, tone, tone) -- (one on Forever)
+				choice:SetAlpha(Inert(row, i) and (on and 0.7 or 0.35) or 1)
+			end
+		end
+	end
+	local function RowTip(self)
+		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+		GameTooltip:SetText(self.label:GetText(), 1, 0.82, 0)
+		if not self.isTab and type(self.entry.intro) == "string" then
+			GameTooltip:AddLine(self.entry.intro, 1, 1, 1, true)
+		end
+		GameTooltip:AddLine(L["Go to this page."], 0.6, 0.6, 0.6, true)
+		GameTooltip:Show()
+	end
+	local rows = {}
+	local function MakeRow()
+		local row = CreateFrame("Button", nil, overview)
 		local glow = row:CreateTexture(nil, "HIGHLIGHT")
 		glow:SetAllPoints()
 		glow:SetColorTexture(1, 0.82, 0, 0.07)
-		row.label = Label(row, "GameFontHighlightSmall", "")
-		row.label:SetPoint("LEFT", 0, 0)
-		row.note = Label(row, "GameFontDisableSmall", "")
-		row.note:SetPoint("RIGHT", -12, 0)
-		row:SetScript("OnClick", function(self) ns.OpenOptions(self.page.name) end)
-		row:SetScript("OnEnter", function(self)
-			GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-			GameTooltip:SetText(self.page.label, 1, 0.82, 0)
-			GameTooltip:AddLine(L["Go to this page."], 1, 1, 1, true)
-			GameTooltip:Show()
-		end)
+		local line = row:CreateTexture(nil, "BORDER")
+		line:SetHeight(1)
+		line:SetPoint("BOTTOMLEFT")
+		line:SetPoint("BOTTOMRIGHT")
+		line:SetColorTexture(0.22, 0.22, 0.22, 0.8)
+		row.icon = row:CreateTexture(nil, "ARTWORK")
+		row.icon:SetSize(20, 20)
+		row.icon:SetPoint("LEFT", 6, 0)
+		row.icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
+		row.dev = {}
+		if row.CreateLine then
+			for _, corners in ipairs({ { "TOPLEFT", "BOTTOMRIGHT" }, { "TOPRIGHT", "BOTTOMLEFT" } }) do
+				local cross = row:CreateLine(nil, "OVERLAY")
+				cross:SetThickness(2)
+				cross:SetColorTexture(1, 0.15, 0.15, 0.9)
+				cross:SetStartPoint(corners[1], row.icon, 0, 0)
+				cross:SetEndPoint(corners[2], row.icon, 0, 0)
+				row.dev[#row.dev + 1] = cross
+			end
+		end
+		row.label = Label(row, "GameFontHighlight", "")
+		row.choices = MakeChoices(row)
+		row:SetScript("OnClick", function(self) ns.OpenOptions(self.entry.name) end)
+		row:SetScript("OnEnter", RowTip)
 		row:SetScript("OnLeave", function() GameTooltip:Hide() end)
-		row.state = MakeSwitch(row, TAB_H, ns.FlipTabSwitch)
-		row.state:SetPoint("RIGHT", 0, 0)
-		card.tabRows[i] = row
 		return row
 	end
-	local function PaintSwitch(state, page)
-		local dim = page.fixed and 0.6 or 1
-		if page.on then
-			state.track:SetColorTexture(0.16 * dim, 0.62 * dim, 0.24 * dim, 1)
-		else
-			state.track:SetColorTexture(0.2, 0.2, 0.22, 1)
-		end
-		state.knob:SetColorTexture(0.92 * dim, 0.92 * dim, 0.92 * dim, 1)
-		state.knob:ClearAllPoints()
-		local inset = (SWITCH_H - KNOB) / 2
-		if page.on then
-			state.knob:SetPoint("RIGHT", state.track, "RIGHT", -inset, 0)
-		else
-			state.knob:SetPoint("LEFT", state.track, "LEFT", inset, 0)
-		end
-	end
-	-- (Grey with its page off.)
-	local function Tone(icon, label, off)
-		if icon then
-			icon:SetDesaturated(off)
-			icon:SetAlpha(off and 0.6 or 1)
-		end
-		local tone = off and 0.6 or 1
-		label:SetTextColor(tone, tone, tone)
-		label:SetVertexColor(tone, tone, tone) -- (one on Forever)
-	end
-	-- Each hub's heading on the Overview, its line of what it's for beside it.
-	local HEADING_H, GROUP_GAP = 22, 14
-	-- (A group's name over its cards, a thin line under it: Heads-up...)
+	-- (A group's name over its rows, a thin line under it: Heads-up...)
 	local subHeads = {}
 	local function MakeSubHead()
 		local sub = CreateFrame("Frame", nil, overview)
@@ -4075,109 +4123,79 @@ local function CreateRevealPanel()
 		line:SetColorTexture(0.6, 0.5, 0.25, 0.5)
 		return sub
 	end
-	local headings = {}
-	local function Heading(group)
-		local heading = headings[group[1]]
-		if heading then return heading end
-		heading = Label(overview, "GameFontNormal", group[2])
-		heading.note = Label(overview, "GameFontDisableSmall", group[3])
-		heading.note:SetPoint("BOTTOMLEFT", heading, "BOTTOMRIGHT", 10, 1)
-		headings[group[1]] = heading
-		return heading
-	end
-	-- Every card as its page and its tabs are now, under its hub's heading
-	-- (2026-11-16: from the hub's icons, each with its tabs), and how many
-	-- switches are on.
+	-- The tab's hub: each page a row (its group's name over the first of a
+	-- group), its tabs indented under it, and how many switches are on.
 	function FillOverview()
 		if not ns.GetDB() then return end
-		local shown = {}
-		local count, onCount = 0, 0
-		local function Count(page)
-			count = count + 1
-			if page.on then onCount = onCount + 1 end
-		end
-		local y = 0
-		for tab, group in ipairs(OVERVIEW_HUBS) do
-			local pages = ns.HubOverview(group[1]) or {}
-			local heading = Heading(group)
-			heading:SetShown(#pages > 0)
-			heading.note:SetShown(#pages > 0)
-			if #pages > 0 then
-				heading:ClearAllPoints()
-				heading:SetPoint("TOPLEFT", overview, "TOPLEFT", 0, y)
-				y = y - HEADING_H
-				-- (In the hub's groups, each under its name and a line (2026-11-16:
-				-- Interface's General, Heads-up, Overhead, Info); each column filled
-				-- on its own, a card under the one above it, so a short one beside a
-				-- tall one leaves no gap.)
-				local cols, band, subs = { y, y }, false, 0
-				local banded = false -- (a hub with groups at all: each named, General first)
-				for _, page in ipairs(pages) do banded = banded or page.band ~= nil end
-				for _, page in ipairs(pages) do
-					local pageBand = page.band or "General"
-					if banded and pageBand ~= band then
-						subs = subs + 1
-						local sub = subHeads[group[1] .. subs] or MakeSubHead()
-						subHeads[group[1] .. subs] = sub
-						shown[sub] = true
-						local top = math.min(cols[1], cols[2]) - (band ~= false and 6 or 0)
-						sub:ClearAllPoints()
-						sub:SetPoint("TOPLEFT", overview, "TOPLEFT", 0, top)
-						sub:SetPoint("RIGHT", overview, "RIGHT", 0, 0)
-						sub.text:SetText(L[pageBand])
-						cols = { top - 22, top - 22 }
-					end
-					band = pageBand
-					local card = cards[page.name] or MakeCard(page, tab)
-					cards[page.name] = card
-					shown[card] = true
-					-- (The icon's own switch; a HUD section's the HUD's, shown greyed.)
-					card.state:SetShown(page.hasSwitch)
-					if page.hasSwitch then
-						card.state.page = page
-						PaintSwitch(card.state, page)
-						if not page.shared then Count(page) end
-					end
-					Tone(card.icon, card.label, page.hasSwitch and not page.on)
-					for i, each in ipairs(page.tabs) do
-						local row = TabRow(card, i)
-						row.page = each
-						row.label:SetText(each.label)
-						local own = each.hasSwitch and not each.shared
-						row.state:SetShown(own)
-						-- (Turned on and off with the icon's switch, or with none.)
-						row.note:SetText("") -- (no switch, or the page's: none drawn, no word, 2026-11-16)
-						if own then
-							row.state.page = each
-							row.state.title = each.label
-							PaintSwitch(row.state, each)
-							Count(each)
-						end
-						Tone(nil, row.label, own and not each.on)
-						row:Show()
-					end
-					for i = #page.tabs + 1, #card.tabRows do card.tabRows[i]:Hide() end
-					local height = CARD_H + (#page.tabs > 0 and #page.tabs * TAB_H + 2 or 0)
-					card:SetHeight(height)
-					card:ClearAllPoints()
-					-- (Into the shorter column; the left on a tie.)
-					local col = cols[2] > cols[1] and 2 or 1
-					if col == 1 then
-						card:SetPoint("TOPLEFT", overview, "TOPLEFT", 0, cols[1])
-						card:SetPoint("TOPRIGHT", mid, "TOP", -CARD_GAP / 2, cols[1])
-					else
-						card:SetPoint("TOPLEFT", mid, "TOP", CARD_GAP / 2, cols[2])
-						card:SetPoint("TOPRIGHT", overview, "TOPRIGHT", 0, cols[2])
-					end
-					cols[col] = cols[col] - height - CARD_GAP
-				end
-				y = math.min(cols[1], cols[2])
-				y = y - GROUP_GAP
+		local section = SECTIONS[math.min(picked, #SECTIONS)]
+		sectionNote:SetText(section[3])
+		local pages = ns.HubOverview(section[1]) or {}
+		local db = ns.GetDB()
+		local count, onCount, used, heads = 0, 0, 0, 0
+		local y = -HEAD_H
+		local function Place(entry, isTab, flip)
+			used = used + 1
+			local row = rows[used] or MakeRow()
+			rows[used] = row
+			-- (A tab turned on and off with its icon's switch, or with none: no choices.)
+			local own = entry.hasSwitch and not (isTab and entry.shared)
+			row.entry, row.flip, row.isTab = entry, flip, isTab
+			row.ticks = own and TicksOf(entry.name) or nil
+			row.tickHeld = row.ticks and CAMERA_HELD[entry.name] and db.outsideCineCameras == false or false
+			row:SetHeight(isTab and TAB_H or PAGE_H)
+			row.icon:SetShown(not isTab)
+			if not isTab then row.icon:SetTexture(entry.icon) end
+			for _, cross in ipairs(row.dev) do cross:SetShown(not isTab and entry.dev or false) end
+			-- (A hub's General page by its own name: Effects, Cameras; not a
+			-- section's own icon, HUD:hud.)
+			local text = entry.label
+			if not isTab and entry.label == L["General"] and not entry.name:find(":") then text = L[entry.name] end
+			row.label:SetFontObject(isTab and "GameFontHighlightSmall" or "GameFontHighlight")
+			row.label:SetText(text)
+			row.label:ClearAllPoints()
+			row.label:SetPoint("LEFT", row, "LEFT", isTab and TAB_INDENT + 12 or TAB_INDENT, 0)
+			local off = own and not entry.on
+			if not isTab then
+				row.icon:SetDesaturated(entry.hasSwitch and not entry.on)
+				row.icon:SetAlpha(entry.hasSwitch and not entry.on and 0.6 or 1)
 			end
+			local tone = off and 0.6 or (isTab and 0.85 or 1)
+			row.label:SetTextColor(tone, tone, tone)
+			row.label:SetVertexColor(tone, tone, tone) -- (one on Forever)
+			PaintChoices(row, own)
+			if own and not entry.shared then
+				count = count + 1
+				if entry.on then onCount = onCount + 1 end
+			end
+			row:ClearAllPoints()
+			row:SetPoint("TOPLEFT", overview, "TOPLEFT", 0, y)
+			row:SetPoint("RIGHT", overview, "RIGHT", 0, 0)
+			row:Show()
+			y = y - row:GetHeight()
 		end
-		overview:SetHeight(math.max(1, -y))
-		for _, card in pairs(cards) do card:SetShown(shown[card] or false) end
-		for _, sub in pairs(subHeads) do sub:SetShown(shown[sub] or false) end
+		local banded, band = false, false
+		for _, page in ipairs(pages) do banded = banded or page.band ~= nil end
+		for _, page in ipairs(pages) do
+			local pageBand = page.band or "General"
+			if banded and pageBand ~= band then
+				heads = heads + 1
+				local sub = subHeads[heads] or MakeSubHead()
+				subHeads[heads] = sub
+				y = y - (band ~= false and 10 or 4)
+				sub:ClearAllPoints()
+				sub:SetPoint("TOPLEFT", overview, "TOPLEFT", 0, y)
+				sub:SetPoint("RIGHT", overview, "RIGHT", 0, 0)
+				sub.text:SetText(L[pageBand])
+				sub:Show()
+				y = y - 22
+			end
+			band = pageBand
+			Place(page, false, ns.FlipPageSwitch)
+			for _, tab in ipairs(page.tabs) do Place(tab, true, ns.FlipTabSwitch) end
+		end
+		for i = used + 1, #rows do rows[i]:Hide() end
+		for i = heads + 1, #subHeads do subHeads[i]:Hide() end
+		overview:SetHeight(math.max(1, -y + 8))
 		summary:SetText(L["%d of %d switches on."]:format(onCount, count))
 		FitContentHeight(content)
 	end
@@ -4195,14 +4213,13 @@ local function CreateRevealPanel()
 		"Buffs/debuffs page, the minimap on the Minimap page, the quest tracker on the Quest tracker page, " ..
 		"chat on the Chat page."])
 
-	-- Folder tabs of its own (ns.PageTabsBelow): General, Exit CineMode, and
-	-- Outside CineMode. Each section's controls, made on content, go onto its
-	-- tab's frame as the next section starts (TakeInto), each tab's stack
-	-- starting at its top.
+	-- Folder tabs of its own (ns.PageTabsBelow): Settings and Exit. Each
+	-- section's controls, made on content, go onto its tab's frame as the next
+	-- section starts (TakeInto), each tab's stack starting at its top. (What
+	-- works outside CineMode: each page's row on the hubs' tabs, 2026-11-17.)
 	local subHosts, _, SubShown = ns.PageTabsBelow(content, subtitle, {
-		{ L["General"], L["How fast the UI fades, the Calm Timer, and fights coming in."] },
-		{ L["Exit CineMode"], L["What takes you out of CineMode: fights, places, groups, moving and windows."] },
-		{ L["Outside CineMode"], L["What still works while CineMode is off."] },
+		{ L["Settings"], L["How fast the UI fades, the Calm Timer, and fights coming in."] },
+		{ L["Exit"], L["What takes you out of CineMode: fights, places, groups, moving and windows."] },
 	}, "CineMode/settings")
 	-- (Search opens the nearest tab only: Settings first, then this one.)
 	for _, subHost in ipairs(subHosts) do
@@ -4454,78 +4471,15 @@ local function CreateRevealPanel()
 	stack:Add(windows, "check")
 	stack:Add(npcs, "check")
 
-	-- What still works while CineMode is off (2026-11-13): each visual effect
-	-- (Core.lua's OUTSIDE_EFFECT, off to start with) and each vision
-	-- (OUTSIDE_CINE, on to start with). A group each, in two columns.
-	-- (Its own tab: Outside CineMode.)
+	-- Allow outside CineMode's ticks: set from each page's row on the hubs'
+	-- tabs now (2026-11-17), recorded here as this page's, in their section
+	-- still, for Reset page and the profile modules (ProfileModules.lua).
 	TakeInto(2)
-	stack = Stack(TabTop(3), "label", true)
-	SetSection(content, L["Allow outside CineMode"]) -- (no heading: the tab says it; for search and the modules)
-	stack:Note(content, L["Ticked, it works while CineMode is off too. Unticked, only while CineMode is on."], 520)
-	local function OutsideChanged()
-		if ns.RefreshOutsideCine then ns.RefreshOutsideCine(true) end
-	end
-	-- (rows: { tick, label, tip (nil: the usual), greyUnless(db) or nil }.)
-	local function Group(title, rows)
-		if title then stack:Add(Label(content, "GameFontNormal", title), "label") end
-		local leftCheck
-		for i, row in ipairs(rows) do
-			local tick, label = row[1], row[2]
-			local check = Check(content, tick, label,
-				row[3] or L["%s works while CineMode is off too. Unticked, only while CineMode is on."]:format(label),
-				function(value)
-					ns.GetDB()[tick] = value
-					OutsideChanged()
-					Refresh()
-				end)
-			if row[4] then GreyUnless(check, row[4]) end
-			if i % 2 == 1 then
-				stack:Add(check, "check")
-				leftCheck = check
-			else
-				check:SetPoint("LEFT", leftCheck, "LEFT", 200, 0)
-			end
-		end
-	end
-	local effectRows = {}
-	for _, item in ipairs({ { "letterbox", L["Letterbox"] }, { "tint", L["Tint"] },
-		{ "vignette", L["Vignette"] }, { "weather", L["Weather"] } }) do
-		local effect = item[1]
-		effectRows[#effectRows + 1] = { ns.OUTSIDE_EFFECT[effect], item[2] } -- (never greyed by its page)
-	end
-	-- (Interface: the Nameplates hub's rules, off to start with: Core's outsideCinePlates.)
-	Group(L["Interface"], { { "outsideCinePlates", L["Nameplates"] } })
-	Group(L["Visual effects"], effectRows)
-	-- (Camera: Cameras, every camera of Cinematic's at once (Core.lua's
-	-- outsideCineCameras), then each camera that runs with no scene to start it,
-	-- greyed while Cameras is off: only the cameras this client has, Shoulder
-	-- Cam once unlocked.)
-	local function CamerasOn(db) return db.outsideCineCameras ~= false end
-	Group(L["Camera"], { { "outsideCineCameras", L["Cameras"],
-		L["Cinematic's cameras (scenes, Shoulder Cam, Skyriding Cam, the quest and chat cameras, the death " ..
-		"camera) work while CineMode is off too. Unticked, only while CineMode is on: a scene whose CineMode " ..
-		"tick is on (Scenes page) still plays, bringing CineMode on with it."] } })
-	local cameraRows = {}
-	if ns.ShoulderCamUnlocked and ns.ShoulderCamUnlocked() then
-		cameraRows[#cameraRows + 1] = { ns.OUTSIDE_CINE.shoulderCam, L["Shoulder Cam"], nil, CamerasOn }
-	end
-	if ns.SkyrideCamOn then
-		cameraRows[#cameraRows + 1] = { ns.OUTSIDE_CINE.skyrideCam, L["Skyriding Cam"], nil, CamerasOn }
-	end
-	if #cameraRows > 0 then Group(nil, cameraRows) end
-	Group(L["Audio"], { { ns.OUTSIDE_CINE.musicInCinematic, L["Music"] } })
-	local visionRows = {}
-	for _, item in ipairs({
-		{ "handleHealVision", "Heal Vision" }, { "damageVision", "Damage Vision" },
-		{ "lowHealth", "Vitals Vision" }, { "questVision", "Quest Vision" },
-		{ "rollWindow", "Roll Vision" }, { "teleportVision", "Teleport Vision" },
-		{ "duelPlates", "Duel Vision" }, { "emoteVision", "Emote Vision" },
-		{ "cards", "Card Vision" },
-	}) do
-		visionRows[#visionRows + 1] = { ns.OUTSIDE_CINE[item[1]], L[item[2]] } -- (never greyed by its page)
-	end
-	Group(L["Visions"], visionRows)
-	TakeInto(3)
+	SetSection(content, L["Allow outside CineMode"])
+	for _, tick in pairs(ns.OUTSIDE_EFFECT or {}) do RecordKey(content, tick) end
+	for _, tick in pairs(ns.OUTSIDE_CINE or {}) do RecordKey(content, tick) end
+	RecordKey(content, "outsideCinePlates")
+	RecordKey(content, "outsideCineCameras")
 
 	-- The Settings tab: everything made since the overview, on a frame of its
 	-- own to show and hide (1 by 1: one with no height draws none of it).
@@ -4546,7 +4500,8 @@ local function CreateRevealPanel()
 		ShowTab(i)
 		overview:SetShown(i ~= SETTINGS_TAB)
 		host:SetShown(i == SETTINGS_TAB)
-		if i == OVERVIEW_TAB and ns.Flag(canvas:IsVisible()) then FillOverview() end
+		sectionNote:SetShown(i ~= SETTINGS_TAB)
+		if i ~= SETTINGS_TAB and ns.Flag(canvas:IsVisible()) then FillOverview() end
 		if i == SETTINGS_TAB then SubShown() end
 		FitContentHeight(content)
 		C_Timer.After(0, function() FitContentHeight(content) end)

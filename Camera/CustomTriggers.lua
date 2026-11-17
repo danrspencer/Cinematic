@@ -423,7 +423,7 @@ local function TryStart(unit, now)
 		return
 	end
 	if ns.SceneHeldToCine and ns.SceneHeldToCine(unit.scene) then
-		Skip(unit, L["Cameras are held to CineMode (CineMode page, Outside CineMode)"])
+		Skip(unit, L["Cameras are held to CineMode (CineMode page, Camera tab)"])
 		return
 	end
 	if unit.chance < 100 and math.random(100) > unit.chance then
