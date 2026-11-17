@@ -914,6 +914,46 @@ function ns.UnreadableBubbles()
 	return #C_ChatBubbles.GetAllChatBubbles(true) - #C_ChatBubbles.GetAllChatBubbles(false)
 end
 
+-- Whether the game draws a bubble for an NPC's chat line: it only does for a
+-- speaker near you (a yell from across an instance reaches the chat window
+-- with none), so Chat Cam takes only lines with one. Calls back
+-- callback(true) once a bubble saying it shows (or, where the game keeps
+-- bubbles from addons, one more of those than when the line came), or
+-- callback(false, why) after BUBBLE_WAIT seconds without (the bubble comes a
+-- frame or so after its line).
+local BUBBLE_WAIT = 0.5
+local function BubbleFor(text)
+	for _, bubble in ipairs(C_ChatBubbles.GetAllChatBubbles(false)) do
+		if not (bubble.IsForbidden and bubble:IsForbidden()) and ns.Flag(bubble:IsShown()) and SaysText(bubble, text) then
+			return true
+		end
+	end
+	return false
+end
+function ns.WhenBubble(text, callback)
+	if not (C_ChatBubbles and C_ChatBubbles.GetAllChatBubbles) then
+		callback(false, "no bubbles on this client")
+		return
+	end
+	if BubbleFor(text) then
+		callback(true)
+		return
+	end
+	local unreadable, started = ns.UnreadableBubbles(), GetTime()
+	local ticker
+	ticker = C_Timer.NewTicker(0, function()
+		if BubbleFor(text) or ns.UnreadableBubbles() > unreadable then
+			ticker:Cancel()
+			callback(true)
+		elseif GetTime() - started >= BUBBLE_WAIT then
+			ticker:Cancel()
+			local okCVar, bubbles = pcall(GetCVar, "chatBubbles")
+			callback(false, ("no bubble (too far off, or bubbles off: chatBubbles %s)"):format(
+				okCVar and tostring(bubbles) or "?"))
+		end
+	end)
+end
+
 -- A bubble appears a frame or so after its chat message: the bubbles are
 -- looked at for a short while after each one.
 local BUBBLE_EVENTS = {

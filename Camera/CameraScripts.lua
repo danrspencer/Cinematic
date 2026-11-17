@@ -2978,20 +2978,26 @@ heardFrame:SetScript("OnEvent", function(_, event, text, name)
 	else
 		text, name = Plain(text), Plain(name) or "?"
 		if not text or not ns.db or not ns.db.enabled then return end
-		heard.text, heard.name, heard.at = text, name, now
-		if convo and now - convo.lastAt < Db("chatCamQuiet", 20) then
-			convo.lastAt = now -- (any line carries a conversation on)
-			return
-		end
-		if ns.playerMoving then return end
-		local key = "ChatNearby"
-		if event == "CHAT_MSG_MONSTER_PARTY" or talk.open or now - talk.closedAt < TALKED_WINDOW
-			or (name ~= "?" and Plain(UnitName("target")) == name) then
-			key = "Chat"
-		elseif now - (talk.stillSince or now) < Db("chatNearbyDelay", 3) then
-			return
-		end
-		if ScriptRow(key) then convo = { key = key, lastAt = now } end
+		-- (Only lines the game draws a bubble for, a speaker near you: a yell
+		-- from across an instance has none. It comes a frame or so late.)
+		ns.WhenBubble(text, function(bubbled)
+			if not bubbled then return end
+			now = GetTime()
+			heard.text, heard.name, heard.at = text, name, now
+			if convo and now - convo.lastAt < Db("chatCamQuiet", 20) then
+				convo.lastAt = now -- (any line carries a conversation on)
+				return
+			end
+			if ns.playerMoving then return end
+			local key = "ChatNearby"
+			if event == "CHAT_MSG_MONSTER_PARTY" or talk.open or now - talk.closedAt < TALKED_WINDOW
+				or (name ~= "?" and Plain(UnitName("target")) == name) then
+				key = "Chat"
+			elseif now - (talk.stillSince or now) < Db("chatNearbyDelay", 3) then
+				return
+			end
+			if ScriptRow(key) then convo = { key = key, lastAt = now } end
+		end)
 	end
 end)
 local function ChatNow()

@@ -1636,13 +1636,22 @@ watcher:SetScript("OnEvent", function(_, event, text, name, ...)
 	end
 	name = Plain(name) or "?"
 	SetTargetName(name) -- (any line, the camera on or not: the key targets whoever spoke last)
-	local why = NotTaken(text, event, name)
-	DebugLine(event, text, name, (select(10, ...)), why)
-	if not why then
-		Heard(text, name, event)
-	elseif Immersive() and ns.ShowSubtitle and not Secret(text) and ScriptScene() then
-		ns.ShowSubtitle(event, name, text)
+	local guid = (select(10, ...))
+	if type(text) ~= "string" or Secret(text) then
+		DebugLine(event, text, name, guid, "text can't be read")
+		return
 	end
+	-- (Only lines the game draws a bubble for: a speaker near you. A yell from
+	-- across an instance has none, and no one here to look at.)
+	ns.WhenBubble(text, function(bubbled, noBubble)
+		local why = bubbled and NotTaken(text, event, name) or noBubble
+		DebugLine(event, text, name, guid, why)
+		if not why then
+			Heard(text, name, event)
+		elseif bubbled and Immersive() and ns.ShowSubtitle and ScriptScene() then
+			ns.ShowSubtitle(event, name, text)
+		end
+	end)
 end)
 
 ns.CAMERA_TESTS = ns.CAMERA_TESTS or {}
