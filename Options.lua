@@ -2757,9 +2757,11 @@ do
 		-- Conflicts: Conflicts.lua, only with an addon that has rows loaded;
 		-- Frames: the Advanced Frames page, always, its ids kept.)
 		{ name = "Addons", pages = {
-			-- (Custom Support: Addon Frames' second tab since 2026-11-16.)
-			{ "Advanced Frames", "Interface\\Icons\\INV_Misc_Gear_01", label = "Frames" },
-			{ "Addon Support", "Interface\\Icons\\INV_Misc_Gear_02", tabOf = "Advanced Frames" },
+			-- (Addon Frames' tabs an icon each, 2026-11-17: Loaded, Find frames,
+			-- Not running, Support files (the page's canvas.hubTabs), then Custom
+			-- Support (only with one of its addons) and Links. Ids kept.)
+			{ "Advanced Frames", "Interface\\Icons\\INV_Misc_Gear_01", label = "Loaded" },
+			{ "Addon Support", "Interface\\Icons\\INV_Misc_Gear_02", label = "Custom Support" },
 			-- (FrameLinks.lua's: every frame's Addon Reveal Link tab, one page, 2026-11-17)
 			{ "Addon Links", "Interface\\Icons\\INV_Misc_Gear_08", label = "Links" },
 			{ "Addon Conflicts", "Interface\\Icons\\Ability_Warrior_Disarm", label = "Conflicts" },
@@ -9264,31 +9266,7 @@ local function CreateQualityPanel()
 			switch = PageSwitch(content, "handleAddonSupport", L["Enable Page"],
 				L["Turns Cinematic's support for your other addons on or off."], intro, RefreshPlates)
 			stack = Stack(switch, "check")
-			-- (Addon Frames' tab row, Custom Support its last tab, picked here,
-			-- 2026-11-16: one row for the two pages. The others open Addon Frames
-			-- at theirs. Addon Frames made by now: its Custom Support tab shown.)
-			if extrasPanel and extrasPanel.PickAddonTab then
-				extrasPanel.supportTab:Show()
-				local width = extrasPanel.tabsWidth
-				local row = CreateFrame("Frame", nil, content)
-				local tabsPanel, ShowTab, tabsBase, tabsHeight, _
-				tabsPanel, _, ShowTab, tabsBase, tabsHeight = ns.FolderTabs(content, {
-					{ L["Loaded"], L["The addons loaded now: their frames, and the ones you added."] },
-					{ L["Find frames"], L["Find other addons' frames to fade: search, hover, or Smart Find."] },
-					{ L["Not running"], L["Addons installed but not loaded, and the ones supported but not installed."] },
-					{ L["Support files"], L["Addons that replace the game's frames, and which to use where two do."] },
-					{ L["Custom Support"], L["Settings for each supported addon you have installed."] },
-				}, function(i)
-					ShowTab(5)
-					if i ~= 5 then extrasPanel.PickAddonTab(i) end
-				end)
-				row:SetSize(width, tabsHeight + 6)
-				stack:Add(row, "label")
-				tabsBase:SetPoint("TOPLEFT", row, "TOPLEFT", 0, -tabsHeight)
-				tabsPanel:SetPoint("TOPLEFT", tabsBase, "TOPLEFT")
-				tabsPanel:SetSize(width, 1)
-				ShowTab(5)
-			end
+			-- (Its own icon in the Addons hub since 2026-11-17, not Addon Frames' last tab.)
 			for _, each in ipairs(have) do
 				stack:Header(content, each.label)
 				each.build(content, stack)
@@ -17295,21 +17273,17 @@ local function CreateExtrasPanel()
 	box:SetSize(PANEL_W - 16, 1)
 	content.box = box
 	local Layout, RefreshFound
-	local tab = 1 -- (the tab picked: 1 Loaded, 2 Find frames, 3 Not running, 4 Support files)
-	local supportPanel -- (the Support files tab's: FrameLinks.lua)
-	-- (The Find frames tab's parts, made further down.)
+	local tab = 1 -- (the part shown: 1 Loaded, 2 Find frames, 3 Not running, 4 Support files)
+	local supportPanel -- (the Support files part's: FrameLinks.lua)
+	-- (The Find frames part's parts, made further down.)
 	local smart, foundHead, noneFound
 	local foundRows, foundCount = {}, 0
-	local tabsPanel, ShowTab, tabsBase, tabsHeight, tabFrames
-	local function PickTab(i)
-		-- (Custom Support: the Addon Support page, in this row as its last tab, 2026-11-16.)
-		if i == 5 then
-			ShowTab(tab)
-			ns.ShowHubPage("Addon Support")
-			return
-		end
+	-- Each part an icon of its own in the Addons hub (2026-11-17, folder tabs
+	-- till then), all on this one page: its tile's onSelect shows the part.
+	-- (A frame with no height draws nothing: tabsPanel sized by Layout's Fit.)
+	local tabsPanel, tabsHeight = CreateFrame("Frame", nil, content), 0
+	local function ShowPart(i)
 		tab = i
-		ShowTab(i)
 		if i == 2 then
 			ns.FindFoundFrames()
 			RefreshFound()
@@ -17318,26 +17292,26 @@ local function CreateExtrasPanel()
 			FitContentHeight(content)
 		end
 	end
-	tabsPanel, tabFrames, ShowTab, tabsBase, tabsHeight = ns.FolderTabs(content, {
-		{ L["Loaded"], L["The addons loaded now: their frames, and the ones you added."] },
-		{ L["Find frames"], L["Find other addons' frames to fade: search, hover, or Smart Find."] },
-		{ L["Not running"], L["Addons installed but not loaded, and the ones supported but not installed."] },
-		{ L["Support files"], L["Addons that replace the game's frames, and which one to use."] },
-		{ L["Custom Support"], L["Settings for each supported addon you have installed."] },
-	}, PickTab)
-	-- (Shown by the Addon Support page as it's made: only with one of its addons.)
-	tabFrames[5]:Hide()
-	content.supportTab = tabFrames[5]
-	content.tabsWidth = PANEL_W
-	-- (A tab picked from the Addon Support page's copy of this row.)
-	function content.PickAddonTab(i)
-		ns.ShowHubPage("Advanced Frames")
-		PickTab(i)
+	local PARTS = {
+		{ name = "Advanced Frames", icon = "Interface\\Icons\\INV_Misc_Gear_01", label = "Loaded" },
+		{ name = "Addon Find Frames", icon = "Interface\\Icons\\INV_Misc_Spyglass_01", label = "Find frames" },
+		{ name = "Addon Not Running", icon = "Interface\\Icons\\Spell_Nature_Sleep", label = "Not running" },
+		{ name = "Addon Support Files", icon = "Interface\\Icons\\INV_Scroll_04", label = "Support files" },
+	}
+	canvas.hubTabs = {}
+	for i, part in ipairs(PARTS) do
+		canvas.hubTabs[i] = { name = part.name, icon = part.icon, label = part.label, own = i > 1 or nil,
+			onSelect = function() ShowPart(i) end }
 	end
-	tabsBase:SetPoint("TOPLEFT", holder, "TOPLEFT", 0, -tabsHeight)
-	tabsPanel:SetPoint("TOPLEFT", tabsBase, "TOPLEFT")
+	-- (A part picked from inside the page (the settings search, /cine find):
+	-- its icon picked, which shows it.)
+	local function PickTab(i)
+		ns.ShowHubPage(PARTS[i].name)
+		if tab ~= i then ShowPart(i) end
+	end
+	tabsPanel:SetPoint("TOPLEFT", holder, "TOPLEFT")
 	tabsPanel:SetSize(PANEL_W, 1)
-	box:SetPoint("TOPLEFT", tabsPanel, "TOPLEFT", 8, -10)
+	box:SetPoint("TOPLEFT", tabsPanel, "TOPLEFT", 0, -6)
 	supportPanel = ns.BuildSupportFilesPanel(box, PANEL_W - 16)
 	supportPanel.onResize = function()
 		Layout()

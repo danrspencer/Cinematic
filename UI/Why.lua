@@ -598,11 +598,11 @@ local function Explain(entry)
 			end
 		end
 		if ns.db.ignoredFrames[name] then
-			Add(out, "on", L["You set it to always show (Custom frames, Addons > Frames)"], "Advanced Frames")
+			Add(out, "on", L["You set it to always show (Custom frames, Addons > Loaded)"], "Advanced Frames")
 		else
 			Add(out, "on", L["%s isn't a supported addon, so Cinematic leaves its frames as they are"]
 				:format(entry.unmanaged), "Advanced Frames")
-			Add(out, "off", L["/cine add %s fades it in CineMode, or add it on Addons > Frames"]:format(name),
+			Add(out, "off", L["/cine add %s fades it in CineMode, or add it on Addons > Find frames"]:format(name),
 				"Advanced Frames")
 		end
 		return name, "unmanaged", out, "extra:" .. name
