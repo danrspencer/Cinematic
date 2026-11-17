@@ -348,19 +348,19 @@ ns.PROFILE_MODULES = {
 			-- column starts with the party and raid frames ticked. The bars: pure-cdm's.)
 			set("instanceShow", instance)
 		end },
-	-- (Cinema's frames with the Shoulder Cam on: the Shoulder Cam profile's.
-	-- Made from pure-frames as it's written, so the two stay alike; the
-	-- profile's frames choice puts the Follow HUD's pieces on after it, the
-	-- personal resource display up in place of your portrait.)
-	{ key = "shoulder-frames", name = "Shoulder Cam: frames",
-		scope = { "Standard Frames", "Personal Resources", "Advanced Frames/Supported addons", "Gamepad/top",
-			"Shoulder Cam" },
-		tip = "Cinema's frames, and the Shoulder Cam on.",
-		-- (Both clients since 2026-11-15, the Shoulder Cam profile on retail too.)
+	-- (Cinema's frames with the personal resource display in place of your
+	-- portrait: UI Auto Fade's "resources in fights", the Shoulder Cam
+	-- profile's. Made from pure-frames as it's written, so the two stay alike;
+	-- the choice puts the Follow HUD's pieces on after it. Until 2026-11-16
+	-- shoulder-frames, which turned the Shoulder Cam on too: that's the
+	-- profile's own shoulder-cam-on now.)
+	{ key = "prd-frames", name = "Cinema: frames, personal resources",
+		scope = { "Standard Frames", "Personal Resources", "Advanced Frames/Supported addons", "Gamepad/top" },
+		tip = "Cinema's frames, with what the personal resource display does left to the modules after it.",
 		apply = function(set, client)
 			-- (What the Follow HUD's pieces after it set, left to them.)
 			local theirs = {}
-			for _, key in ipairs({ "follow-enemy", "follow-no-portrait", "follow-frames" }) do
+			for _, key in ipairs({ "follow-enemy", "follow-no-portrait" }) do
 				ns.PROFILE_MODULE_BY_KEY[key].apply(function(setting, value)
 					if type(value) == "table" then
 						theirs[setting] = theirs[setting] or {}
@@ -381,8 +381,11 @@ ns.PROFILE_MODULES = {
 				end
 				set(key, value)
 			end, client)
-			set("shoulderCam", true)
 		end },
+	-- (The Shoulder Cam profile's own, apart from the UI Auto Fade choice.)
+	{ key = "shoulder-cam-on", name = "Shoulder Cam on", scope = { "Shoulder Cam" },
+		tip = "The Shoulder Cam on.",
+		apply = function(set) set("shoulderCam", true) end },
 	{ key = "pure-minimap", name = "Cinema: minimap", scope = { "Minimap" },
 		tip = "A reveal, ping or Keep open brings up just the map, none of its header, buttons or coordinates " ..
 		"(hovering shows them).",
@@ -915,7 +918,8 @@ function ns.SlotChoices(slot)
 		local hidden = ns.ChoiceHidden(choice, ns.CLIENT)
 			and not (choice.showWhenOn and ns.db and ns.SlotPartMatches and ns.SlotPartMatches(slot, choice.part))
 		if not hidden and (not choice.client or choice.client == ns.CLIENT)
-			and not (choice.noCDM and not ns.HasCooldownManager()) then
+			and not (choice.noCDM and not ns.HasCooldownManager())
+			and not (choice.prd and not ns.HasPersonalDisplay()) then
 			list[#list + 1] = ns.GetChoice(slot, choice.part)
 		end
 	end

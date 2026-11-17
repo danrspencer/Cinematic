@@ -43,7 +43,8 @@ ns.PROFILE_SLOTS = {
 -- by), label and line (what players read), client (only there),
 -- hidden (only for profiles, not offered; a client's name: not offered
 -- there), noCDM (made for the Cooldown Manager: not offered without one,
--- and a profile's pick of it is this choice there instead), barAddon (a
+-- and a profile's pick of it is this choice there instead), prd (made for
+-- the personal resource display: not offered without one), barAddon (a
 -- profile's pick of it is this choice instead while an addon that swaps the
 -- game's action bars for its own runs, Bartender4 or Dominos: ns.BarAddonRuns), made (a layout Cinematic makes
 -- and adds to Edit Mode for you, tagged so in Customize), and modules (each a module's key,
@@ -84,15 +85,15 @@ ns.SLOT_CHOICES = {
 		-- (From the most fading to the least.)
 		{ part = "pure", label = "Almost always", line = "As little UI as possible, even in fights",
 			modules = { "pure-frames", "pure-minimap", "minimal-target", "pure-plates", "ultra-plates", "pure-tooltips" } },
-		-- (The Shoulder Cam profile's: "Almost always" with
-		-- the Follow HUD's pieces, the personal resource display in fights in
-		-- place of the player frame.)
-		-- (Both clients since 2026-11-15. The personal resource display on and
-		-- up in fights: the layout choice's, Forever's Shoulder Cam or
-		-- retail's ownprd.)
-		{ part = "shoulder", hidden = true, showWhenOn = true, label = "Almost always, over your shoulder",
-			line = "As little UI as possible; your resources, not your portrait, in fights",
-			modules = { "shoulder-frames", "follow-enemy", "follow-no-portrait", "follow-frames", "pure-minimap",
+		-- ("Almost always" with the personal resource display in fights and
+		-- with an enemy targeted in place of the player frame: the Shoulder Cam
+		-- profile's, offered since 2026-11-16, before which it was hidden as
+		-- "shoulder" and turned the Shoulder Cam on too. The personal resource
+		-- display on and up in fights: the layout choice's, Forever's Shoulder
+		-- Cam or retail's ownprd. prd: not offered without one, Classic Era.)
+		{ part = "prd", prd = true, label = "Almost always, resources in fights",
+			line = "As little UI as possible; your personal resource display, not your portrait, in fights",
+			modules = { "prd-frames", "follow-enemy", "follow-no-portrait", "pure-minimap",
 				"minimal-target", "pure-plates", "ultra-plates", "pure-tooltips" } },
 		-- (The Follow HUD's pieces for when your UI's up, dev only for now: in
 		-- no list. Set up from the Shoulder Cam page on top of any profile.)
@@ -278,11 +279,13 @@ ns.BUILTIN_PROFILES = {
 			"screen, and your resources, cast bar and Cooldown Manager sit under you and slide along with you. " ..
 			"Fights bring up your personal resource display instead of your portrait. Everything else is " ..
 			"Cinema's: as little UI as possible, every camera, Vision and all the atmosphere."],
-		picks = { layout = { forever = "shoulder", retail = "ownprd" }, frames = "shoulder",
+		picks = { layout = { forever = "shoulder", retail = "ownprd" }, frames = "prd",
 			bars = { forever = "split", retail = "pure" }, camera = "pure", vfx = "pure", chat = "pure" },
+		-- (The Shoulder Cam and its Frames follow you: its own, apart from UI
+		-- Auto Fade's choice, so picking another there keeps them.)
 		modules = With("zone-card", "travel-cards", "story-cards", "damage-vision", "vitals-vision",
 			"combat-vision", "cursor-hide", "music-calm", "weather-view-distance",
-			"node-icons", "effects-outside-cinemode"),
+			"node-icons", "effects-outside-cinemode", "shoulder-cam-on", "follow-frames"),
 		-- (No Quest Vision, as in every profile: Escape and walking off glide
 		-- back in the game's own talk windows too, since 2026-11-15.)
 	},
