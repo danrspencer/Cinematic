@@ -475,10 +475,13 @@ local DEFAULTS = {
 	-- Shoulder Cam (ShoulderCam.lua): the camera sits over your right shoulder (a Blizzard experimental setting)
 	shoulderCam = false,
 	shoulderCamSpot = 0.2,     -- ...how far off the middle you sit (share of the way to the edge), held as you zoom
+	shoulderCamSpotFar = false, -- ...the spot zoomed out (eased to from 5 yards away; never past the offset's cap); false: Spot on screen's
+	shoulderCamSpotFarAt = 15, -- ...yards away where you sit at shoulderCamSpotFar
 	shoulderCamSide = "right", -- ..."right" or "left" (the swap key flips it)
 	shoulderCamSwapTime = 1.5, --...seconds the camera takes to cross to the other shoulder (0: the game's own quick ease)
 	shoulderCamSelfTime = 1,   -- ...seconds back over your shoulder after targeting yourself (the game centers you then)
 	shoulderCamPauseTime = 1.5, -- (1.5 since 2026-11-16, user) ...seconds out and back in going indoors, mounting, Show in and the gamepad UI
+	shoulderCamBackAfter = 2,  -- ...seconds its Show in row's on again before it comes back in (2026-11-17)
 	-- ...and while one of our cameras that frame you runs, unless allowed (the Cameras tab)
 	shoulderCamAllowVista = false, shoulderCamAllowFish = false, shoulderCamAllowCozy = false,
 	shoulderCamAllowAFK = false, shoulderCamAllowTele = false, shoulderCamAllowFlight = false,

@@ -542,6 +542,7 @@ function ns.CreateSkyrideCamPanel(kit)
 	-- click refreshes the page, as sliders and other ticks grey by it.
 	local function Tick(key, label, tip, unless)
 		local check = Put(kit.Check(content, key, label, tip), "check")
+		section.flip = section.flip or key -- (its tab's right-click flips its first tick)
 		check:HookScript("OnClick", kit.Refresh)
 		kit.GreyUnless(check, function()
 			return IfOn() and not (unless and ns.GetDB()[unless]) and true or false
@@ -616,6 +617,7 @@ function ns.CreateSkyrideCamPanel(kit)
 		L["How long after you stop turning the camera starts gliding back behind you."], "skyrideFollow")
 	Slider("skyrideFollowMost", L["Fall behind at most"], 10, 120, 5, DEGREES,
 		L["The furthest you can turn away before the camera turns with you."], "skyrideFollow")
+	section.flip = "skyrideFollow" -- (not Swing into the turn: Follow your turns stands in for it)
 
 	Section("land", L["Landing"])
 	Tick("skyrideCamZoomBack", L["Zoom back to your distance"], L["Landing brings the camera back to the distance you took off at."])
@@ -635,10 +637,12 @@ function ns.CreateSkyrideCamPanel(kit)
 	Section("cine", L["CineMode"])
 	kit.GreyUnless(Put(kit.Check(content, "skyrideCine", L["CineMode while skyriding"],
 		L["Brings CineMode on while you skyride, if Start in CineMode is off."]), "check"), IfOn)
+	section.flip = "skyrideCine"
 
-	-- The tabs, as high as their rows, under the Show in row.
+	-- The tabs, as high as their rows, under the Show in row (a right-click
+	-- flips a tab's main tick, its name greyed while off).
 	local list = {}
-	for i, each in ipairs(sections) do list[i] = { each.tab } end
+	for i, each in ipairs(sections) do list[i] = { each.tab, flip = each.flip } end
 	local base, height
 	panel, _, ShowTab, base, height = ns.FolderTabs(content, list, function(i) Pick(sections[i]) end, nil, SECTION_WIDTH + 8)
 	panelTop:SetPoint("TOPLEFT", lastRow, "BOTTOMLEFT", 0, -16 - height)

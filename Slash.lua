@@ -1421,6 +1421,9 @@ local function HandleSlash(msg)
 		ns.Print(("  Frames follow you %s: slide %.0f of %.0f (UI units, - left), zoom %.1f, cameraFov %s; moving %s"):format(
 			tostring(d.follow), d.followShift, d.followTarget, GetCameraZoom and GetCameraZoom() or 0, tostring(GetCVar("cameraFov")), d.followed))
 		ns.Print(("  Model %s: size factor %.2f (%s)"):format(tostring(d.model), d.scale or 1, tostring(d.scaleFrom)))
+		ns.Print(("  Spot %s near, %s zoomed out at %s yards, %.0f%% now (zoom %.1f); back after %s sec%s"):format(
+			tostring(d.spot), tostring(d.spotFar), tostring(d.spotFarAt), (d.spotNow or 0) * 100, GetCameraZoom and GetCameraZoom() or 0,
+			tostring(d.backAfter), d.backIn and (", %.1f sec left"):format(d.backIn) or ""))
 	elseif cmd == "debug" and arg:find("^shoulder%s") and ns.ShoulderTest then
 		ns.ShoulderTest((arg:gsub("^shoulder%s+", "")))
 	elseif cmd == "debug" and (arg == "skyride" or arg:find("^skyride%s")) and ns.SkyrideDebug then

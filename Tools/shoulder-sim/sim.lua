@@ -234,6 +234,12 @@ end
 ns.ShoulderPausedMounted = function() return pauseMounted end
 ns.DialogueUICameraOn = function() return false end
 ns.RefreshOptions = function() end
+-- (You never move the camera yourself here: the way back in waits while you
+-- do, YouMoveCamera, and the stand-in game's mouse and stick read as held.)
+ns.IsMouseOnCamera = function() return false end
+ns.GetLastCameraInput = function() return -math.huge end
+-- (The stand-in Edit Mode has no layout list Layouts.lua can name: only the sweep's log line asks.)
+ns.ActiveLayoutName = function() return "Sim" end
 if variant ~= "yours" then
 	ns.db.enabled, ns.db.cameraModes = true, true
 end
@@ -253,6 +259,8 @@ if variant:find("^cams") then
 	ns.db.shoulderCamFrames = true
 end
 local noticedAtStart = ns.db.shoulderCamNoticed
+-- zoomfar: Spot zoomed out at 5%, nearer the middle than the 20% up close.
+if variant == "zoomfar" then ns.db.shoulderCamSpotFar = 0.05 end
 -- (tall: its size factor measured, as a sweep on it would have saved.)
 if variant == "tall" then ns.db.shoulderCamScales = { ["Dwarf-2"] = GAME.tallScale } end
 
@@ -332,6 +340,8 @@ local bearBefore -- (how far off the middle you sat just before: below your spot
 local bearSwing -- (the furthest off the middle the bear got between "no form" and its model going)
 local bearEnd -- (how far off the middle you sat after 3 s in bear form)
 local indoorsEnd -- (where the camera and frames were after 3 s indoors)
+local backAfter = {} -- (from: when you stepped out the last time)
+local zoomedOut -- (how far off the middle you sat, and the offset, settled at zoom 22)
 local function Day()
 	Part("Shoulder Cam off")
 	Wait(1.5)
@@ -341,6 +351,7 @@ local function Day()
 	Part("You zoom out to 22")
 	cam.goal = 22
 	Wait(3)
+	zoomedOut = { you = math.abs(YouOnScreen()), offset = math.abs(tonumber(cvars[SHOULDER]) or 0) }
 	Part("You zoom in to 6")
 	cam.goal = 6
 	Wait(3)
@@ -392,7 +403,15 @@ local function Day()
 	me.indoors = false
 	wow.Fire("ZONE_CHANGED_INDOORS")
 	Part("Back outdoors")
-	Wait(3)
+	-- (Back after: a step back in at the doorway a second out starts the wait over.)
+	Wait(1)
+	me.indoors = true
+	Wait(0.4)
+	me.indoors = false
+	Part("Out again past the doorway")
+	backAfter.from = now
+	local wait = tonumber(ns.db.shoulderCamBackAfter) or 0
+	Wait(wait + 3)
 	Part("Mounted")
 	me.mounted = true
 	Wait(4)
@@ -627,15 +646,19 @@ for _, row in ipairs(samples) do
 	if row[4] ~= zoomWas then zoomWas, zoomedAt = row[4], row[1] end
 	local caught = math.abs(row[3] - row[2] * me.scale) < 0.05
 	if row[2] ~= 0 and not NearPause(row[1]) and row[9] >= 1 and caught and row[4] >= 4 and row[4] <= 30 and row[8] == 0 then
-		local spot = ns.db.shoulderCamSpot or 0.2
-		if row[4] > SPOT_HOLD then
-			if row[1] - zoomedAt < 0.6 then row = nil end
-		end
-		if not row then -- (just zoomed, held: skipped)
-		elseif row[4] > SPOT_HOLD then
-			pastSpot = math.max(pastSpot, math.abs(row[5]) - spot)
+		-- (Your spot at this distance (Spot zoomed out, 2026-11-17), or nearer
+		-- the middle at the offset's cap. Either changing with the distance:
+		-- just zoomed, skipped, the offset still following the camera's glide.)
+		local near = ns.db.shoulderCamSpot or 0.2
+		local spot = ns.ShoulderSpotAt(row[4])
+		local capped = near * SPOT_HOLD / row[4] < spot
+		local want = math.min(spot, near * SPOT_HOLD / row[4])
+		if (capped or math.abs(spot - near) > 1e-6) and row[1] - zoomedAt < 0.6 then
+			-- (just zoomed: skipped)
+		elseif capped then
+			pastSpot = math.max(pastSpot, math.abs(row[5]) - want)
 		else
-			spotMiss, spotCount = spotMiss + math.abs(math.abs(row[5]) - spot), spotCount + 1
+			spotMiss, spotCount = spotMiss + math.abs(math.abs(row[5]) - want), spotCount + 1
 		end
 	end
 end
@@ -661,6 +684,32 @@ if bearEnd and variant ~= "decline" then
 		("%.1f%% off the middle at least, %.1f%% before it"):format(bearDip * 100, level * 100))
 	Check("Out of bear form: no swing out first", bearSwing < spot + 0.01,
 		("%.1f%% off the middle at most, your spot %.0f%%"):format(bearSwing * 100, spot * 100))
+end
+-- Back after: out of doors again, it waited its seconds behind you and then
+-- came back in (slack: the 0.2 s poll seeing you out, another seeing the
+-- wait over, and the ease's first steps under OFFSET_STEP, not written).
+if backAfter.from and variant ~= "indoors" and variant ~= "decline" then
+	local wait = tonumber(ns.db.shoulderCamBackAfter) or 0
+	local early, backAt = nil, nil
+	for _, row in ipairs(samples) do
+		local t = row[1] - (backAfter.from - 100)
+		if t >= 0 and t < wait + 3 then
+			if row[2] ~= 0 and not backAt then backAt = t end
+			if row[2] ~= 0 and t < wait - 0.01 then early = early or t end
+		end
+	end
+	Check("Back after: waited outside before coming back", not early,
+		early and ("back in after %.1f s, the wait's %.1f"):format(early, wait) or ("back in after %.1f s"):format(backAt or -1))
+	Check("Back after: came back in once the wait was over", backAt and backAt <= wait + 0.6,
+		backAt and ("after %.1f s, the wait's %.1f"):format(backAt, wait) or "never")
+end
+-- Spot zoomed out: at 22 yards you sat nearer the middle (zoomfar's 5%), the
+-- offset under the cap; at its default, where you did before (the cap's share).
+if zoomedOut and variant ~= "decline" then
+	local near = ns.db.shoulderCamSpot or 0.2
+	local want = math.min(ns.ShoulderSpotAt(22), near * SPOT_HOLD / 22)
+	Check("Zoomed out to 22: on your zoomed-out spot", math.abs(zoomedOut.you - want) < 0.01,
+		("%.1f%% off the middle, meant %.1f%%; offset %.2f yards"):format(zoomedOut.you * 100, want * 100, zoomedOut.offset))
 end
 if indoorsEnd then
 	local middle = math.abs(indoorsEnd.offset) < 0.05

@@ -131,6 +131,9 @@ local function YouAreTarget()
 	return UnitIsUnit and ns.Flag(UnitIsUnit("target", "player")) or false
 end
 
+-- (Back after: backIn.off, why its row was off at the last check; backIn.from,
+-- when it came on again.)
+local backIn = {}
 local function PauseReason()
 	local db = ns.db
 	-- (Forever's gamepad UI holds Keep Character Centered on inside the game:
@@ -149,10 +152,31 @@ local function PauseReason()
 		local ok, here = pcall(ns.RowOnNow, ROW_KEY, false, true)
 		if not (ok and here) then
 			-- (ns.Flag: either can be secret on Forever. The likely why, for the log.)
-			if IsMounted and ns.Flag(IsMounted()) then return "mounted" end
-			if IsIndoors and ns.Flag(IsIndoors()) then return "indoors" end
-			return "show in"
+			local why = (IsMounted and ns.Flag(IsMounted()) and "mounted")
+				or (IsIndoors and ns.Flag(IsIndoors()) and "indoors") or "show in"
+			backIn.off, backIn.from = why, nil
+			return why
 		end
+		-- (Back after: its row on again, it waits shoulderCamBackAfter
+		-- seconds before coming back in, user 2026-11-17: "going straight
+		-- away to shoulder cam after going outside can be a bit jarring".
+		-- Back off in that time, at a doorway, the wait starts over.)
+		if backIn.off then
+			backIn.from = GetTime()
+			local wait = math.max(0, tonumber(db.shoulderCamBackAfter) or 0)
+			if wait > 0 then
+				ns.Log("shoulder", ("back over your shoulder in %.1f s (%s ended)"):format(wait, backIn.off))
+			end
+			backIn.off = nil
+		end
+		if backIn.from then
+			if GetTime() - backIn.from < math.max(0, tonumber(db.shoulderCamBackAfter) or 0) then
+				return "waiting"
+			end
+			backIn.from = nil
+		end
+	else
+		backIn.off, backIn.from = nil, nil
 	end
 	-- (Casting a mount its row's off on: already easing out, so you're behind
 	-- it by the time the mount's size comes in (it swings the offset out 2-5
@@ -455,10 +479,28 @@ local function SeenZoom()
 	return seenZoom
 end
 
+-- Your spot as you zoom (user 2026-11-17: "as you zoom in increase the
+-- offset, as you zoom out decrease it", to keep the camera off walls, which
+-- only catch it zoomed out). Spot on screen up to SPOT_NEAR yards away,
+-- easing to Spot zoomed out (shoulderCamSpotFar) at Zoomed out at
+-- (shoulderCamSpotFarAt) and beyond. It's a share of the screen as the near
+-- one is, and the cap (SPOT_HOLD) still holds over it, so it only ever takes
+-- the offset in: at its default (false: the near spot), nothing changes.
+function ns.ShoulderSpotAt(distance)
+	local SPOT_NEAR = 5 -- yards away
+	local db = ns.db or {}
+	local near = db.shoulderCamSpot or 0.2
+	local far = db.shoulderCamSpotFar or near
+	local farAt = math.max(SPOT_NEAR + 1, tonumber(db.shoulderCamSpotFarAt) or 15)
+	local k = math.min(1, math.max(0, (distance - SPOT_NEAR) / (farAt - SPOT_NEAR)))
+	return near + (far - near) * k * k * (3 - 2 * k)
+end
+
 local function SpotYards()
 	local distance = SeenZoom()
 	local scale = ns.ShoulderModelScale()
-	local yards = (ns.db.shoulderCamSpot or 0.2) * math.min(distance * ns.ShoulderViewWidth(), SPOT_HOLD) / scale
+	local view = distance * ns.ShoulderViewWidth()
+	local yards = math.min(ns.ShoulderSpotAt(distance) * view, (ns.db.shoulderCamSpot or 0.2) * SPOT_HOLD) / scale
 	local k = math.min(1, math.max(0, (distance - SPOT_EASE_FROM) / (SPOT_EASE_TO - SPOT_EASE_FROM)))
 	yards = math.min(OFFSET_MOST, yards * k * k * (3 - 2 * k))
 	steadyYards = yards
@@ -485,7 +527,7 @@ local blend, blendAt = 0, nil
 local blendTime = BLEND_TIME
 -- (Pauses that aren't one of our cameras: PauseReason's own words.)
 local NOT_A_CAMERA = { gamepad = true, mounted = true, indoors = true, ["show in"] = true, mounting = true,
-	yourself = true, demo = true }
+	yourself = true, demo = true, waiting = true }
 local function TimeKey(key)
 	return ALLOW_OF[key] and (ALLOW_OF[key]:gsub("Allow", "Time"))
 end
@@ -2153,6 +2195,10 @@ function ns.GetShoulderCamDebug()
 		setting = db and db.shoulderCam, applied = db and db.shoulderCamYours ~= nil,
 		shoulder = GetCVar("test_cameraOverShoulder"), centered = GetCVar("CameraKeepCharacterCentered"),
 		side = db and db.shoulderCamSide, spot = db and db.shoulderCamSpot, model = ns.ShoulderModelKey(),
+		spotFar = db and db.shoulderCamSpotFar, spotFarAt = db and db.shoulderCamSpotFarAt,
+		spotNow = db and ns.ShoulderSpotAt(GetCameraZoom and GetCameraZoom() or 8),
+		backAfter = db and db.shoulderCamBackAfter,
+		backIn = backIn.from and math.max(0, (tonumber(db and db.shoulderCamBackAfter) or 0) - (GetTime() - backIn.from)) or nil,
 		scale = (ns.ShoulderModelScale()), scaleFrom = select(2, ns.ShoulderModelScale()),
 		follow = db and db.shoulderCamFrames, followShift = followShift, followTarget = TargetShift(),
 		followLift = followLift.share, followHeight = db and db.shoulderCamFramesHeight,
@@ -2301,7 +2347,8 @@ function ns.CreateShoulderCamPanel(kit)
 	-- (A fourth on Forever, which has a gamepad UI: why it's not for that yet.)
 	local tabList = {
 		{ L["Shoulder Cam"], L["Where the camera sits, when it turns, and when it steps back behind you."] },
-		{ L["Follow HUD"], L["The frames that follow you: which slide with you as the camera sits over your shoulder."] },
+		{ L["Follow HUD"], L["The frames that follow you: which slide with you as the camera sits over your shoulder."],
+			flip = "shoulderCamFrames" }, -- (a right-click: Frames follow you)
 		{ L["Cameras"], L["Which of Cinematic's cameras the Shoulder Cam stays on through."] },
 	}
 	if not ns.isRetail then
@@ -2346,6 +2393,18 @@ function ns.CreateShoulderCamPanel(kit)
 		"slider")
 	kit.Tooltip(spot, L["How far from the middle of the screen you sit."])
 	kit.GreyUnless(spot, IfOn)
+	-- (Scale with zoom, user 2026-11-17: nearer the middle zoomed out, where walls catch the camera.)
+	-- (Unset, false: it follows Spot on screen, so one moved there stays as it was zoomed out too.)
+	local spotFar = stack:Add(kit.Slider(content, { key = "shoulderCamSpotFar",
+		get = function() return ns.db.shoulderCamSpotFar or ns.db.shoulderCamSpot or 0.2 end,
+		set = function(value) ns.db.shoulderCamSpotFar = value end }, L["Spot zoomed out"], 0, 40, 1, "%d%%", 100),
+		"slider")
+	kit.Tooltip(spotFar, L["How far from the middle you sit when zoomed out. Lower than Spot on screen keeps the camera off walls, which only catch it zoomed out."])
+	kit.GreyUnless(spotFar, IfOn)
+	local spotFarAt = stack:Add(kit.Slider(content, "shoulderCamSpotFarAt", L["Zoomed out at"], 8, 30, 1,
+		L["%d yards"]), "slider")
+	kit.Tooltip(spotFarAt, L["How far away the camera is when you sit at Spot zoomed out. From 5 yards out to here your spot moves from Spot on screen to it."])
+	kit.GreyUnless(spotFarAt, IfOn)
 	local swapTime = stack:Add(kit.Slider(content, "shoulderCamSwapTime", L["Swap takes"], 0, 3, 0.1,
 		L["%.1f sec"]), "slider")
 	kit.Tooltip(swapTime, L["How long the camera takes to swap to your other shoulder."])
@@ -2358,6 +2417,11 @@ function ns.CreateShoulderCamPanel(kit)
 		0.1, L["%.1f sec"]), "slider")
 	kit.Tooltip(pauseTime, L["How long the camera takes to move behind you when the Shoulder Cam pauses, and back."])
 	kit.GreyUnless(pauseTime, IfOn)
+	-- (A wait before coming back in, user 2026-11-17: straight back on stepping outside was jarring.)
+	local backAfter = stack:Add(kit.Slider(content, "shoulderCamBackAfter", L["Back after"], 0, 10, 0.5,
+		L["%.1f sec"]), "slider")
+	kit.Tooltip(backAfter, L["How long the Shoulder Cam waits before coming back over your shoulder once it can again: you step outside or get off your mount. Going back in or getting on again in that time starts the wait over."])
+	kit.GreyUnless(backAfter, IfOn)
 
 	-- Turn to NPCs and Turn to your target: Show in rows, each one's box before
 	-- the name (on at all), Combat and the places after (where it turns). (Turn
