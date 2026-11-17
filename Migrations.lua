@@ -4249,6 +4249,33 @@ STEPS[#STEPS + 1] = function()
 	end
 end
 
+-- (Step 23.)
+STEPS[#STEPS + 1] = function()
+	-- The Scripts page's switch: its own key, cameraScriptsPage (2026-11-17).
+	-- It was cameraScripts, the store your scripts are kept in, so switching
+	-- the page off wrote false over them (and on, true): the store's a table
+	-- again, the page's off or on kept on the new key. Once.
+	if not ns.db.scriptsPageKeyV1 then
+		if type(ns.db.cameraScripts) == "boolean" then
+			if ns.db.cameraScripts == false then ns.db.cameraScriptsPage = false end
+			ns.db.cameraScripts = nil -- (made again, empty, as the Scripts page or a script needs it)
+		end
+		ns.db.scriptsPageKeyV1 = true
+	end
+end
+
+-- (Step 24.)
+STEPS[#STEPS + 1] = function()
+	-- The remembered music volume (put back at every login) could go stale at
+	-- 0 while the music code stood aside, setting music to 0 at every /reload
+	-- (2026-11-17, a player's report). A 0 is dropped: the game's own volume
+	-- stands, and it's kept again from the slider. Once.
+	if not ns.db.musicVolumeZeroV1 then
+		if ns.db.musicVolume == 0 then ns.db.musicVolume = nil end
+		ns.db.musicVolumeZeroV1 = true
+	end
+end
+
 -- Runs them all, each on its own: an error is logged and reported (the
 -- addon's error net, Diagnostics.lua), and the steps after it still run.
 function ns.RunMigrations()

@@ -217,9 +217,11 @@ Dev\StyleRevampTest.lua
 Dev\StyleSixTest.lua
 Dev\KeysBarsTest.lua
 Dev\TurnLagTest.lua
+Dev\PlateCostTest.lua
 Dev\ReadyAnyTimeTest.lua
 Dev\FollowHudTest.lua
 Dev\ResetTest.lua
+Dev\Sweep.lua
 Dev\EuiSwingTest.lua
 Dev\EuiCooldownTest.lua
 Dev\BuffFadeTest.lua

@@ -816,6 +816,7 @@ local function BoxLine(parent)
 		line:SetWidth(right)
 		pick.searchLabel = hasName and label or nil
 		pick.settingKey = key
+		pick.sweepValue = value -- (/cine debug sweep: one of a set of picks, Dev/Sweep.lua)
 		pick:SetScript("OnClick", function()
 			ns.GetDB()[key] = value
 			if onPick then onPick(value) end
@@ -13539,7 +13540,30 @@ do
 			showHeader:SetPoint("TOPLEFT", hosts[1], "TOPLEFT", 0, 0)
 			marksHeader:ClearAllPoints()
 			marksHeader:SetPoint("TOPLEFT", hosts[2], "TOPLEFT", 0, 0)
+			-- (On the Smart tab the preview goes to the top, where Show in was, and
+			-- Smart's part under it: left under the hidden Show in, it sat over
+			-- Smart's rows, 2026-11-17. Its column offset from Show in's: the x
+			-- of each anchor from its spot up to the Show in header.)
+			local spot = preview.stackSpot
+			local spotHome = spot and { spot:GetPoint(1) }
+			local spotX, each = 0, spot
+			for _ = 1, 10 do
+				if not each or each == showHeader then break end
+				local _, rel, _, ox = each:GetPoint(1)
+				spotX, each = spotX + (ox or 0), rel
+			end
+			if each ~= showHeader then spotX = 0 end
 			function ShowPart(i)
+				if spot and spotHome[2] then
+					spot:ClearAllPoints()
+					if i == 2 then
+						spot:SetPoint("TOPLEFT", relative, relPoint, x + spotX, y)
+						hosts[2]:ClearAllPoints()
+						hosts[2]:SetPoint("TOPLEFT", spot, "BOTTOMLEFT", -spotX, -12)
+					else
+						spot:SetPoint(unpack(spotHome))
+					end
+				end
 				hosts[1]:SetShown(i == 1)
 				hosts[2]:SetShown(i == 2)
 				ShowPlateTab(ns.ShowInIndex("plates", i == 1 and "Nameplate Style" or "Nameplate Marks"))

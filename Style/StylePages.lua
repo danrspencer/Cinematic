@@ -865,8 +865,8 @@ local function SettingsWindow(frame)
 end
 
 -- Where a preview's window fits docked to its settings window without
--- covering them: above first (sliding the settings down for room when there
--- isn't enough over them: SlideSettings), then right, then left. Gives the
+-- covering them: right first, then above (sliding the settings down for
+-- room when there isn't enough over them: SlideSettings), then left. Gives the
 -- side, the settings window and the largest scale it has there; nothing when
 -- no side holds it at POPOUT_MIN_SCALE or more. (In UIParent's units: the
 -- settings window may have its own scale.)
@@ -887,9 +887,10 @@ local function DockSpot(preview)
 		-- (The room the settings slid down to the screen's bottom would give.)
 		above = Fit(screenW * 0.95, screenH - top + bottom - DOCK_GAP * 4)
 	end
-	if above >= POPOUT_MIN_SCALE then return "above", settings, above end
+	-- (Right first since 2026-11-17: the user's pick; above when it doesn't fit there.)
 	local beside = Fit(screenW - right - DOCK_GAP * 2, screenH - 60)
 	if beside >= POPOUT_MIN_SCALE then return "right", settings, beside end
+	if above >= POPOUT_MIN_SCALE then return "above", settings, above end
 	beside = Fit(left - DOCK_GAP * 2, screenH - 60)
 	if beside >= POPOUT_MIN_SCALE then return "left", settings, beside end
 end

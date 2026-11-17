@@ -703,6 +703,12 @@ end
 -- put back at login and /reload, so a volume the addon left turned down, or one
 -- something else wrote, can't stick.
 function ns.RestoreMusicVolume()
+	-- (The Audio page off: Cinematic doesn't handle music, so it has nothing
+	-- to put back; forgotten, and kept again from the slider as it goes.)
+	if not ns.PageSetting("musicInCinematic") then
+		ns.db.musicVolume = nil
+		return
+	end
 	local volume = ns.db.musicVolume
 	local now = tonumber(GetCVar("Sound_MusicVolume"))
 	if volume and not (now and math.abs(now - volume) <= MUSIC_VOLUME_EPSILON) then
@@ -1126,6 +1132,12 @@ function ns.UpdateMusic(cinematic, elapsed)
 		and not combatMusic.ducking and not combatMusic.musicOff and not combatMusic.managedOff
 		and not combatMusic.override and not combatMusic.rested and not musicWritten
 		and not ns.Setting("musicInCinematic") then
+		-- (Nothing touching the volume: whatever it's set to is yours, kept
+		-- for the login restore. Before, it went stale here, and a 0 kept at
+		-- some point came back at every /reload: a player's report 2026-11-17.)
+		if ns.db.savedCVars.Sound_MusicVolume == nil then
+			ns.db.musicVolume = tonumber(GetCVar("Sound_MusicVolume")) or ns.db.musicVolume
+		end
 		return
 	end
 	-- A camera starting (or the quest cam) may start music; switching from one

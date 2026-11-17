@@ -32,7 +32,7 @@ local L = ns.L
 -- (ns.TriggerRowNow). It and the Triggers, Scripts and My Shots pages'
 -- switches (their own files' defaults) go under Enable Cameras.
 ns.DEFAULTS.cameraScenes = true
-ns.SetPageMaster({ "cameraScenes", "cameraTriggers", "cameraScripts", "cameraShots" }, "cameraModes")
+ns.SetPageMaster({ "cameraScenes", "cameraTriggers", "cameraScriptsPage", "cameraShots" }, "cameraModes")
 
 ns.CAMERA_ROW_COPIES = 5 -- (a trigger's own row and four copies: <key>2 to <key>5)
 

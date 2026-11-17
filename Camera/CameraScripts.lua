@@ -1123,15 +1123,18 @@ end
 -- camera (CameraRows.lua's ns.TriggerSetting asks ns.ScriptBlocked), and our
 -- cameras play their scripts as we ship them, your edits to them aside
 -- (ns.CameraScriptToPlay). The Skyriding Cam's own script goes by its page.
-ns.DEFAULTS.cameraScripts = true
+-- (Its own key: till 2026-11-17 it was cameraScripts, the scripts' store
+-- itself, so switching the page off wrote false over your scripts. The
+-- settings sweep, Dev/Sweep.lua, found it; Migrations.lua step 23 moves it.)
+ns.DEFAULTS.cameraScriptsPage = true
 function ns.ScriptBlocked(value)
-	return type(value) == "string" and ns.db ~= nil and ns.db.cameraScripts == false
+	return type(value) == "string" and ns.db ~= nil and ns.db.cameraScriptsPage == false
 		and value:find("^script:u%d+$") ~= nil
 end
 -- The script a camera plays (by id): as its page has it, or with the page
 -- off, a built-in one as we ship it and none of yours.
 function ns.CameraScriptToPlay(id)
-	if id == "skyride" or not (ns.db and ns.db.cameraScripts == false) then return ns.FindCameraScript(id) end
+	if id == "skyride" or not (ns.db and ns.db.cameraScriptsPage == false) then return ns.FindCameraScript(id) end
 	for _, each in ipairs(BUILT_IN) do
 		if each.id == id then
 			local script = ns.CleanCameraScript(each.make(), each.id, true)

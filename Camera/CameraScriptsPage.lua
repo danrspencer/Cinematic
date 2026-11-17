@@ -1093,7 +1093,7 @@ function ns.CreateCameraScriptsPanel(kit)
 	-- (Its switch, under Enable Cameras: off, scenes set to a script of yours
 	-- play no camera and ours play as we ship them, CameraScripts.lua's
 	-- ns.CameraScriptToPlay. Hidden: the page's places below are fixed.)
-	kit.PageSwitch(content, "cameraScripts", L["Enable Page"],
+	kit.PageSwitch(content, "cameraScriptsPage", L["Enable Page"],
 		L["Lets scenes play your scripts, and our cameras play your changes to theirs."], intro, function()
 			if ns.CameraRowsChanged then ns.CameraRowsChanged() end
 		end)
