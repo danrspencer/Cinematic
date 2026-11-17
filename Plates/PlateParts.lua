@@ -812,6 +812,10 @@ local function ApplyPlate(plate, personal)
 	if not Usable(unitFrame) or (plate.IsForbidden and plate:IsForbidden()) then
 		return
 	end
+	-- (Showing nothing: done as it wakes. PlateSleep.lua.)
+	if ns.PlateAsleep(plate) then
+		return
+	end
 	local body = bodyShare[plate] or 1
 	local kept = nameShare[plate]
 	-- A plate filling in round a name kept up (your target clicked) or
@@ -2490,15 +2494,38 @@ local mouseoverPlate -- (the plate with the mouseover mark: see mouseoverWatch)
 local RANK_LETTERS = { normal = "n", elite = "e" }
 local PLATE_KIND_ROWS = { Enemies = { "p", "Enemy" }, Friends = { "p", "Friendly" },
 	EnemyMinions = { "m", "Enemy" }, FriendlyMinions = { "m", "Friendly" } }
+-- The rows shown and fitting now (When), the same for every plate: worked
+-- out once a frame, not for each plate (a busy city's plates asked every
+-- row's settings ~40 times a frame, 2026-11-17), and again as the marks
+-- refresh (settings changed, target changed: RefreshMarks). (On ns: this
+-- file's main chunk is at Lua's 200 locals.)
+ns.shownMarkRows = { n = 0, kinds = {}, spots = {}, others = false }
+function ns.ShownMarkRows()
+	local shownRows = ns.shownMarkRows
+	local order, now = MarkOrder(), GetTime()
+	if shownRows.at ~= now or shownRows.order ~= order then
+		shownRows.at, shownRows.order = now, order
+		local n, kinds, spots = 0, shownRows.kinds, shownRows.spots
+		for i, kind in ipairs(order) do
+			if whenNow[kind] ~= false and ArrowSetting("Show", kind) then
+				n = n + 1
+				kinds[n], spots[n] = kind, i
+			end
+		end
+		shownRows.n = n
+		shownRows.others = whenNow.others ~= false and OthersOn() and true or false
+	end
+	return shownRows
+end
 -- (From the row at start on, for the rows below one: returns the row and
 -- its place in the order, none for Default's own.)
 local function FittingRow(plate, unit, start)
 	local standing, asked, plateKind, kindAsked, rank, rankAsked
-	local order = MarkOrder()
-	for i = start or 1, #order do
-		local kind = order[i]
+	local rows = ns.ShownMarkRows()
+	for r = 1, rows.n do
+		local kind, i = rows.kinds[r], rows.spots[r]
 		local base, reaction, _, distance = ns.MarkRowBase(kind)
-		if whenNow[kind] ~= false and ArrowSetting("Show", kind) then
+		if i >= (start or 1) then
 			local fits
 			if AGGRO_ROWS[base] then
 				fits = AggroFits(AGGRO_ROWS[base], unit)
@@ -2544,7 +2571,7 @@ local function FittingRow(plate, unit, start)
 			if fits then return kind, i end
 		end
 	end
-	if whenNow.others ~= false and OthersOn() then
+	if rows.others then
 		return "others"
 	end
 end
@@ -3001,6 +3028,7 @@ end
 
 -- Every plate's mark looked at again (a new target, focus or mouseover).
 local function RefreshMarks()
+	ns.shownMarkRows.at = nil -- (settings or When may have changed: rows looked at again)
 	if (levels.TargetArrow or 0) > 0 or next(arrows) or next(tints) or next(opacities) or next(ownSizes) then
 		for _, plate in ipairs(C_NamePlate.GetNamePlates()) do
 			RefreshTargetArrow(plate)
@@ -3047,22 +3075,32 @@ function ns.RefreshTargetArrows()
 	RefreshMarks()
 end
 
--- A plate's icons (the role icon goes by where the class icon is).
-function ns.RefreshClassIcon(plate)
+-- A plate's icons (class, role, quest), its mark and its row's look (the role icon goes by where the class icon is).
+function ns.RefreshPlateLook(plate)
+	-- (Showing nothing: done as it wakes. PlateSleep.lua.)
+	if ns.PlateAsleep(plate) then
+		return
+	end
 	RefreshClass(plate)
 	RefreshRoleIcon(plate)
 	RefreshQuestIcon(plate)
 	RefreshTargetArrow(plate)
 end
+-- (A plate woken: its parts, our name on it and its icons drawn again.)
+ns.plateSleep.OnWake(function(plate)
+	ApplyPlate(plate, PersonalPlate())
+	ns.DirtyPlateName(plate)
+	ns.RefreshPlateLook(plate)
+end)
 
-local function RefreshClassIcons()
+local function RefreshPlateLooks()
 	if C_NamePlate and C_NamePlate.GetNamePlates then
 		for _, plate in ipairs(C_NamePlate.GetNamePlates()) do
-			ns.RefreshClassIcon(plate)
+			ns.RefreshPlateLook(plate)
 		end
 	end
 end
-ns.RefreshPlateIcons = RefreshClassIcons -- (the Icons page's settings: PlateIcons.lua)
+ns.RefreshPlateIcons = RefreshPlateLooks -- (the Icons page's settings: PlateIcons.lua)
 
 local function AnyClassIcons()
 	for _, part in ipairs(ns.PLATE_ICON_PARTS) do
@@ -3099,7 +3137,7 @@ watcher:SetScript("OnEvent", function(_, event, unit)
 			RefreshMarks() -- (Aggro on non-tank: who's the tank)
 		end
 		if AnyClassIcons() or next(roleIcons) then
-			RefreshClassIcons()
+			RefreshPlateLooks()
 		end
 		return
 	end
@@ -3179,7 +3217,7 @@ watcher:SetScript("OnEvent", function(_, event, unit)
 	if AnyClassIcons() or icons[plate] or roleIcons[plate] or questIcons[plate] or arrows[plate]
 		or opacities[plate] or nows.width[plate] or nows.height[plate]
 		or ((levels.TargetArrow or 0) > 0 and (OthersOn() or TypeRowsOn() or MasterSizeOn())) then
-		ns.RefreshClassIcon(plate)
+		ns.RefreshPlateLook(plate)
 	end
 	-- (Looked at or not, a plate's settled now: from here on it moves.)
 	settled[plate] = true
@@ -3209,7 +3247,7 @@ function ns.SetPlateBody(plate, body, name, mark, text)
 	ApplyPlate(plate, PersonalPlate())
 	if AnyClassIcons() or icons[plate] or roleIcons[plate] or questIcons[plate] or mark
 		or (ns.QuestMarkLevel and ns.QuestMarkLevel() > 0) then
-		ns.RefreshClassIcon(plate)
+		ns.RefreshPlateLook(plate)
 	end
 end
 
@@ -3531,7 +3569,7 @@ function ns.UpdatePlateParts(active, elapsed, cinematic)
 		end
 	end
 	if iconsChanged then
-		RefreshClassIcons()
+		RefreshPlateLooks()
 	elseif ((levels.QuestIcon or 0) > 0 or ns.QuestMarkLevel() > 0 or next(markShare)) and GetTime() >= questIconsAt then
 		-- (Quest progress comes and goes without the row changing: looked at again now and then.)
 		questIconsAt = GetTime() + QUEST_ICONS_EVERY

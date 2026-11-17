@@ -266,8 +266,24 @@ for _, event in ipairs({ "PLAYER_TARGET_CHANGED", "GROUP_ROSTER_UPDATE", "NAME_P
 	"NAME_PLATE_UNIT_REMOVED" }) do
 	watcher:RegisterEvent(event)
 end
-watcher:SetScript("OnEvent", function()
+watcher:SetScript("OnEvent", function(_, event, unit)
 	if not next(rowOf) then return end
+	-- (A plate coming or going: only its own row asked again, its name drawn
+	-- anew. Every plate's, each of the ~100 a second turning in a crowd, was
+	-- the top cost there: 2026-11-17.)
+	if event == "NAME_PLATE_UNIT_ADDED" or event == "NAME_PLATE_UNIT_REMOVED" then
+		local get = C_NamePlate and C_NamePlate.GetNamePlateForUnit
+		local plate = get and get(unit)
+		local unitFrame = plate and plate.UnitFrame
+		if unitFrame and rowOf[unitFrame] then
+			rowOf[unitFrame] = nil
+			if event == "NAME_PLATE_UNIT_ADDED" and ns.DirtyPlateName then
+				ns.DirtyPlateName(plate)
+				if ns.ApplyPlateNow then ns.ApplyPlateNow(plate) end
+			end
+		end
+		return
+	end
 	wipe(rowOf)
 	-- (Our names drawn again, in their new rows' looks.)
 	if ns.RefreshPlateNameStyle then ns.RefreshPlateNameStyle() end

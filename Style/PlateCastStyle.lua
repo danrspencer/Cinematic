@@ -1268,6 +1268,8 @@ function ns.RefreshPlateCastStyle()
 	end
 end
 
+ns.plateSleep.OnWake(function(plate) if ns.db then StylePlate(plate) end end)
+
 -- (The bosses' and arena's frames come as they're needed: looked for again
 -- then.)
 local watcher = CreateFrame("Frame")
@@ -1281,7 +1283,9 @@ watcher:SetScript("OnEvent", function(_, event, unit)
 	end
 	if event == "NAME_PLATE_UNIT_ADDED" then
 		if C_NamePlate and C_NamePlate.GetNamePlateForUnit then
-			StylePlate(C_NamePlate.GetNamePlateForUnit(unit))
+			local plate = C_NamePlate.GetNamePlateForUnit(unit)
+			-- (Showing nothing: styled as it wakes. PlateSleep.lua.)
+			if not ns.PlateAsleep(plate) then StylePlate(plate) end
 		end
 	elseif event == "PLAYER_ENTERING_WORLD" then
 		for id in pairs(GAME_BARS) do

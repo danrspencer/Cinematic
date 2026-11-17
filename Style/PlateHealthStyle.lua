@@ -285,5 +285,8 @@ watcher:SetScript("OnEvent", function(_, event, unit)
 		return
 	end
 	if not (ns.db and C_NamePlate and C_NamePlate.GetNamePlateForUnit) then return end
-	TryPlate(C_NamePlate.GetNamePlateForUnit(unit))
+	local plate = C_NamePlate.GetNamePlateForUnit(unit)
+	-- (Showing nothing: dressed as it wakes. PlateSleep.lua.)
+	if not ns.PlateAsleep(plate) then TryPlate(plate) end
 end)
+ns.plateSleep.OnWake(function(plate) if ns.db then TryPlate(plate) end end)

@@ -94,6 +94,7 @@ QoL\WheelsPage.lua
 Visions\QuestMobs.lua
 Visions\QuestGlow.lua
 Visions\QuestItemButton.lua
+Plates\PlateSleep.lua
 Effects.lua
 Plates\NameRowLook.lua
 UI\TooltipParts.lua

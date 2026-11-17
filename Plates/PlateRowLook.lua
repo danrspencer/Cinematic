@@ -314,8 +314,8 @@ watcher:SetScript("OnEvent", function(_, event, unit)
 		pcall(NameBack, unitFrame and unitFrame.name)
 	end
 	-- (Come with a unit: its row's look, as the marks' pass finds it.)
-	if event == "NAME_PLATE_UNIT_ADDED" and ns.RefreshClassIcon and ns.PlateLooksOn() then
-		C_Timer.After(0, function() ns.RefreshClassIcon(plate) end)
+	if event == "NAME_PLATE_UNIT_ADDED" and ns.RefreshPlateLook and ns.PlateLooksOn() then
+		C_Timer.After(0, function() ns.RefreshPlateLook(plate) end)
 	end
 end)
 

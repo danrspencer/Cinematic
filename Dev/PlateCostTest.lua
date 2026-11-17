@@ -1,27 +1,24 @@
 -- /cine debug platecost: one run finding where the cost of plates goes while
--- the camera turns fast in a crowd (plates coming and going), to pick what
--- to build: fewer plates, cheaper plates (names only), or plates stripped of
--- the game's own frame. Hands off: the test turns the camera itself at the
--- turn lag test's fast pace (TurnLagTest.lua), CineMode on unless said.
--- Timed steps in the big test box (Frames.lua's ns.PadTestBox):
---   1 baseline            CineMode on, as it is now
---   2 near plates         nameplateMaxDistance halved (fewer plates)
---   3 names only          nameplateShowOnlyNames 1 (cheaper plates, where the
---                         client has it; skipped if not)
---   4 baseline again      (drift check: crowd moving, warm caches)
---   5 CineMode off        (the game alone, near enough)
---   6 stripped            each plate's game unit frame (plate.UnitFrame) has
---                         its events taken away and is hidden as it comes,
---                         your target's left be: what the game's plate code
---                         costs on top of the plate itself. Last, as only a
---                         /reload gives those frames their events back.
+-- the camera turns fast in a crowd (plates coming and going), and what
+-- sleeping plates (PlateSleep.lua) save. Hands off: the test turns the camera
+-- itself at the turn lag test's fast pace (TurnLagTest.lua), CineMode on
+-- unless said. Timed steps in the big test box (Frames.lua's ns.PadTestBox):
+--   1 baseline          plates never sleep (as before 2026-11-17)
+--   2 sleep, ours       our work skipped on plates showing nothing
+--   3 sleep, hide       and the game's frame on them hidden
+--   4 sleep, strip      and its events taken away too (given back on waking)
+--   5 baseline again    (drift check: crowd moving, warm caches)
+--   6 CineMode off      (the game alone, near enough)
+-- 2026-11-17's first run (fewer plates by distance, names-only plates, the
+-- game's frame stripped by hand): distance didn't cut the count in a city
+-- (the 40-plate cap), Forever has no names-only setting, stripping saved ~4 ms.
 -- Each step logs: frames, average and worst frame time, frames over 33 and
--- 50 ms, Cinematic's ms a frame, the game's plate add-on's
--- (Blizzard_NamePlates, where the game's profiler reports it), all addons',
--- memory made a second, plates added and taken away a second, plates up on
--- average, and a screenshot. At the end, verdicts against the baseline.
--- Settings changed are put back at each step's end, at the end, or after a
--- /reload that cuts it short. Into CinematicDB.plateCostLog. Dev copy only
+-- 50 ms, Cinematic's ms a frame, the game's plate add-on's (always 0 on
+-- Forever: its profiler doesn't time it), all addons', memory made a second,
+-- plates added and taken away a second, plates up on average, plates slept
+-- and woken, and a screenshot. At the end, verdicts against the baseline.
+-- CineMode and the sleep mode are put back at the end, or after a /reload
+-- that cuts it short. Into CinematicDB.plateCostLog. Dev copy only
 -- (CinematicDev.toc).
 local _, ns = ...
 
@@ -31,7 +28,7 @@ local STEP_SECONDS = 14
 -- (Where the game's own plate code is an add-on the profiler may report.)
 local PLATE_ADDONS = { "Blizzard_NamePlates", "Blizzard_Nameplates" }
 
-local run -- { at, step, starts, notes, cine, turning, cvars, stripped }
+local run -- { at, step, starts, notes, cine, turning, mode }
 
 local function Say(text)
 	local log = CinematicDB and CinematicDB.plateCostLog
@@ -59,20 +56,7 @@ local function CineMode(on)
 	if Cinematic_ToggleCineMode then pcall(Cinematic_ToggleCineMode) end
 end
 
--- A game setting for one step, its value before kept (in the saved
--- variables too, for a /reload cutting the run short).
-local function SetFor(name, value)
-	local before = GetCVar(name)
-	if before == nil then return false end
-	CinematicDB.plateCostCVars = CinematicDB.plateCostCVars or {}
-	if CinematicDB.plateCostCVars[name] == nil then
-		CinematicDB.plateCostCVars[name] = before
-	end
-	local ok = pcall(SetCVar, name, tostring(value))
-	Say(("  %s %s -> %s%s (reads %s)"):format(name, tostring(before), tostring(value), ok and "" or " FAILED",
-		tostring(GetCVar(name))))
-	return ok
-end
+-- (Game settings an older run of this test changed, put back.)
 local function PutBackCVars()
 	local saved = CinematicDB and CinematicDB.plateCostCVars
 	if not saved then return end
@@ -84,7 +68,7 @@ local function PutBackCVars()
 end
 
 -- (Cut short by a /reload: the turning stops by itself; settings and
--- CineMode back. Stripped frames came back with the reload.)
+-- CineMode back.)
 local restorer = CreateFrame("Frame")
 restorer:RegisterEvent("PLAYER_ENTERING_WORLD")
 restorer:SetScript("OnEvent", function(self)
@@ -172,40 +156,9 @@ local plateEvents = CreateFrame("Frame")
 plateEvents:RegisterEvent("NAME_PLATE_UNIT_ADDED")
 plateEvents:RegisterEvent("NAME_PLATE_UNIT_REMOVED")
 
--- Step 6: a plate's game unit frame stripped (not your target's).
-local function Strip(plate)
-	if not (run and run.stripping and plate) then return end
-	if plate.IsForbidden and plate:IsForbidden() then
-		run.forbidden = (run.forbidden or 0) + 1
-		return
-	end
-	local frame = plate.UnitFrame
-	if not frame then
-		run.noFrame = (run.noFrame or 0) + 1
-		return
-	end
-	if plate == (C_NamePlate.GetNamePlateForUnit and C_NamePlate.GetNamePlateForUnit("target")) then return end
-	if pcall(frame.UnregisterAllEvents, frame) and pcall(frame.Hide, frame) then
-		run.stripped[frame] = true
-		run.strips = (run.strips or 0) + 1
-	else
-		run.stripFailed = (run.stripFailed or 0) + 1
-	end
-end
-local function StripAll()
-	for _, plate in ipairs(C_NamePlate and C_NamePlate.GetNamePlates and C_NamePlate.GetNamePlates() or {}) do
-		Strip(plate)
-	end
-end
-
-plateEvents:SetScript("OnEvent", function(_, event, unit)
+plateEvents:SetScript("OnEvent", function(_, event)
 	if m then
 		if event == "NAME_PLATE_UNIT_ADDED" then m.added = m.added + 1 else m.removed = m.removed + 1 end
-	end
-	if event == "NAME_PLATE_UNIT_ADDED" and run and run.stripping then
-		-- (After the game's own handler has set the frame up for its unit.)
-		local plate = C_NamePlate.GetNamePlateForUnit(unit)
-		C_Timer.After(0, function() Strip(plate) end)
 	end
 end)
 
@@ -244,41 +197,38 @@ local function Shot(what)
 	return ("screenshot %s at %s%s"):format(what, date("%m%d%y_%H%M%S"), ok and "" or " (failed)")
 end
 
+-- Sleeping plates' modes (PlateSleep.lua), set for a step: every plate
+-- woken first so the step starts clean.
+local function Mode(mode)
+	local sleep = ns.plateSleep
+	if not sleep then return "skipped: no plate sleep here" end
+	if run.mode == nil then run.mode = sleep.mode end
+	sleep.mode = mode
+	sleep.WakeAll()
+	Say("  plate sleep mode " .. mode)
+end
+local function SleepCounts()
+	if ns.plateSleep then Say("  " .. ns.plateSleep.Describe()) end
+	-- (Friendly players' plates: CineMode turns them on only where a row wants them.)
+	local set = ns.plates and ns.plates.FRIEND_PLAYER_CVARS
+	Say(("  friendly player plates: game setting %s, held on by CineMode %s, yours %s"):format(
+		tostring(GetCVar("nameplateShowFriendlyPlayers")), tostring(set and set.active or false),
+		tostring(ns.db.savedCVars and ns.db.savedCVars.nameplateShowFriendlyPlayers)))
+end
+
 local STEPS = {
-	{ key = "baseline", say = "%d/%d: CineMode ON, as it is now. The test turns the camera FAST. Hands off.",
-		act = function() CineMode(true) Turn(FAST) end },
-	{ key = "near-plates", say = "%d/%d: CineMode ON, plates only for NEAR units. Turning FAST. Hands off.",
-		act = function()
-			CineMode(true) Turn(FAST)
-			local now = tonumber(GetCVar("nameplateMaxDistance"))
-			if not now then return "skipped: no nameplateMaxDistance here" end
-			SetFor("nameplateMaxDistance", math.max(10, math.floor(now / 2)))
-		end,
-		undo = PutBackCVars },
-	{ key = "names-only", say = "%d/%d: CineMode ON, NAMES-ONLY plates. Turning FAST. Hands off.",
-		act = function()
-			CineMode(true) Turn(FAST)
-			if GetCVar("nameplateShowOnlyNames") == nil then return "skipped: no nameplateShowOnlyNames here" end
-			SetFor("nameplateShowOnlyNames", 1)
-		end,
-		undo = PutBackCVars },
-	{ key = "baseline-again", say = "%d/%d: CineMode ON, as it is now, again. Turning FAST. Hands off.",
-		act = function() CineMode(true) Turn(FAST) end },
+	{ key = "baseline", say = "%d/%d: CineMode ON, plates NOT sleeping (as before). Turning FAST. Hands off.",
+		act = function() CineMode(true) Turn(FAST) return Mode("off") end, undo = SleepCounts },
+	{ key = "sleep-ours", say = "%d/%d: CineMode ON, plates SLEEP (our work only). Turning FAST. Hands off.",
+		act = function() CineMode(true) Turn(FAST) return Mode("ours") end, undo = SleepCounts },
+	{ key = "sleep-hide", say = "%d/%d: CineMode ON, plates SLEEP (game frame hidden). Turning FAST. Hands off.",
+		act = function() CineMode(true) Turn(FAST) return Mode("hide") end, undo = SleepCounts },
+	{ key = "sleep-strip", say = "%d/%d: CineMode ON, plates SLEEP (game frame hidden, no events). Turning FAST. Hands off.",
+		act = function() CineMode(true) Turn(FAST) return Mode("strip") end, undo = SleepCounts },
+	{ key = "baseline-again", say = "%d/%d: CineMode ON, plates NOT sleeping, again. Turning FAST. Hands off.",
+		act = function() CineMode(true) Turn(FAST) return Mode("off") end, undo = SleepCounts },
 	{ key = "cinemode-off", say = "%d/%d: CineMode OFF, turning FAST. Hands off.",
-		act = function() CineMode(false) Turn(FAST) end },
-	{ key = "stripped", say = "%d/%d: CineMode ON, the game's plate frames STRIPPED. Turning FAST. Hands off.",
-		act = function()
-			CineMode(true) Turn(FAST)
-			run.stripping = true
-			StripAll()
-		end,
-		undo = function()
-			run.stripping = false
-			Say(("  stripped %d frames (%d forbidden plates skipped, %d without a unit frame, %d failed)"):format(
-				run.strips or 0, run.forbidden or 0, run.noFrame or 0, run.stripFailed or 0))
-			-- (Shown again; their events come back only with a /reload.)
-			for frame in pairs(run.stripped) do pcall(frame.Show, frame) end
-		end },
+		act = function() Mode("hide") CineMode(false) Turn(FAST) end, undo = SleepCounts },
 }
 
 -- Each step against the two baselines' average: frame time and fps.
@@ -335,11 +285,13 @@ local function Finish(done)
 	PutBackCVars()
 	if run.cine ~= nil then CineMode(run.cine) end
 	CinematicDB.plateCostCine = nil
+	if ns.plateSleep and run.mode then
+		ns.plateSleep.mode = run.mode
+		ns.plateSleep.WakeAll()
+	end
 	Verdicts()
-	local stripped = next(run.stripped) ~= nil
 	run = nil
-	ns.PadTestBox(done and "Test done. /reload, then say \"check log\"." or
-		(stripped and "Test stopped. /reload now: plate frames were stripped." or "Test stopped."), "", 1, 0.82, 0)
+	ns.PadTestBox(done and "Test done. /reload, then say \"check log\"." or "Test stopped.", "", 1, 0.82, 0)
 	C_Timer.After(12, function() if not run then ns.PadTestBoxHide() end end)
 end
 
@@ -401,7 +353,7 @@ function ns.PlateCostTest()
 		return
 	end
 	CinematicDB.plateCostLog = {}
-	run = { at = GetTime(), step = 0, notes = {}, starts = {}, stripped = {} }
+	run = { at = GetTime(), step = 0, notes = {}, starts = {} }
 	local at = SETUP
 	for i = 1, #STEPS do
 		run.starts[i] = at

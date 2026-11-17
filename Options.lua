@@ -9230,8 +9230,8 @@ local function CreateQualityPanel()
 	-- (Here, not a function of its own: this file's near the 200 locals cap.)
 	do
 		local function RefreshPlates()
-			if ns.RefreshClassIcon and C_NamePlate and C_NamePlate.GetNamePlates then
-				for _, plate in ipairs(C_NamePlate.GetNamePlates()) do ns.RefreshClassIcon(plate) end
+			if ns.RefreshPlateLook and C_NamePlate and C_NamePlate.GetNamePlates then
+				for _, plate in ipairs(C_NamePlate.GetNamePlates()) do ns.RefreshPlateLook(plate) end
 			end
 		end
 		local SUPPORT = {
@@ -15894,8 +15894,8 @@ local function CreateVisionPanel()
 		local QUESTIE_ICONS_TIP = L["Which quest icon shows when both Cinematic and Questie mark the same unit."]
 		local questieIcons = Dropdown(content, "questieIcons", QUESTIE_ICONS, 180, function()
 			if ns.RefreshTargetQuestIcon then ns.RefreshTargetQuestIcon() end
-			if ns.RefreshClassIcon and C_NamePlate and C_NamePlate.GetNamePlates then
-				for _, plate in ipairs(C_NamePlate.GetNamePlates()) do ns.RefreshClassIcon(plate) end
+			if ns.RefreshPlateLook and C_NamePlate and C_NamePlate.GetNamePlates then
+				for _, plate in ipairs(C_NamePlate.GetNamePlates()) do ns.RefreshPlateLook(plate) end
 			end
 		end)
 		if questieIcons then

@@ -1574,6 +1574,7 @@ ns.addonPlateHidden = nil
 
 -- bodyAlpha: for a plate up for its name alone, how far the rest of it shows.
 function ns.SetPlateAlpha(plate, alpha, bodyAlpha)
+	if alpha > 0 and plate then ns.plateSleep.Shown(plate) end -- (PlateSleep.lua)
 	if ns.addonPlateAlpha and plate and not (plate.IsForbidden and plate:IsForbidden()) then
 		ns.addonPlateAlpha(plate, alpha)
 	end
@@ -2623,7 +2624,7 @@ do
 			overlay.instants:Clear()
 		end
 		ShowCC(plate, overlay)
-		ns.RefreshClassIcon(plate) -- (the Plate parts class icon gives way to the badge)
+		ns.RefreshPlateLook(plate) -- (the Plate parts class icon gives way to the badge)
 	end
 
 	-- A duelist's debuffs changing: their crowd control icon at once, not at
@@ -2879,7 +2880,7 @@ do
 			if overlay.instants then
 				overlay.instants:Clear()
 			end
-			ns.RefreshClassIcon(plate)
+			ns.RefreshPlateLook(plate)
 		end
 	end
 
@@ -3410,12 +3411,16 @@ function ns.DescribePlateNameKept(unit, plate)
 end
 
 local function SetPlateAlphas(plate, alpha, body, name, mark, text)
+	-- (Showing nothing: asleep, its parts' work skipped. PlateSleep.lua.)
+	ns.plateSleep.Decide(plate, alpha, name, mark)
 	ns.SetPlateBody(plate, body, name, mark, text)
 	ns.SetPlateAlpha(plate, alpha, alpha * body)
+	ns.plateSleep.After(plate)
 end
 
 -- Leaves a plate's alpha to the game (or its nameplate addon) again.
 local function LetGoOfPlate(plate)
+	ns.plateSleep.Shown(plate)
 	if plate.UnitFrame then
 		FadeBarHighlight(plate.UnitFrame, false)
 		plate.UnitFrame.cinematicAlpha = nil
@@ -4263,6 +4268,7 @@ function ns.plates.LetGoForFight()
 		ns.ApplyCVarSet(FORCED_PLATE_CVARS, false)
 		ns.ApplyCVarSet(ns.plates.FRIEND_BODY_CVARS, false)
 		ns.ApplyCVarSet(ns.plates.FRIEND_MINION_CVARS, false)
+		ns.ApplyCVarSet(ns.plates.FRIEND_PLAYER_CVARS, false)
 		ns.plates.seen.at = nil -- (the next pass runs in full)
 	end
 end
@@ -4472,7 +4478,9 @@ FORCED_PLATE_CVARS = ns.CVarSet("All plates on", "CineMode away from instances: 
 for kind, cvars in pairs(PLATE_KIND_CVARS) do
 	if kind ~= "FriendlyMinions" then
 		for _, cvar in ipairs(cvars) do
-			FORCED_PLATE_CVARS.values[cvar] = "1"
+			if cvar ~= "nameplateShowFriendlyPlayers" then -- (FRIEND_PLAYER_CVARS)
+				FORCED_PLATE_CVARS.values[cvar] = "1"
+			end
 		end
 	end
 end
@@ -4483,6 +4491,15 @@ end
 -- they made turning the camera fast in a crowded city drop from 19 fps to 8,
 -- nearly all of it the game's own work (/cine debug turnlag, 2026-11-15).
 -- (On ns.plates: this file's main chunk is at Lua's 200 locals.)
+-- And friendly players' plates themselves, names only or not: in a city
+-- crowd they were ~35 plates of the 40, rebuilt ~135 times a second turning
+-- fast, all faded to nothing (22 ms a frame: /cine debug platecost,
+-- 2026-11-17). On only where a row can show a friendly player here (their
+-- Nameplates or Names rows, your group's while you're in one) or your target
+-- is one. (Clients without the setting: nothing changes.)
+ns.plates.FRIEND_PLAYER_CVARS = ns.CVarSet("Friendly player plates on",
+	"CineMode away from instances, a row can show friendly players here",
+	{ secure = true, playerWins = true, values = { nameplateShowFriendlyPlayers = "1" } })
 ns.plates.FRIEND_BODY_CVARS = ns.CVarSet("Friendly player bars on",
 	"CineMode away from instances, a row can show friendly players' plates here",
 	{ secure = true, playerWins = true, values = { nameplateShowOnlyNameForFriendlyPlayerUnits = "0" } })
@@ -4499,9 +4516,10 @@ end
 -- Nameplates row counts only while your target is one of them (out of a
 -- fight: with it, as you target a friend, their bars come on).
 ns.plates.FRIEND_ROWS = { body = { "Friends", "GroupMembers" },
-	minions = { "FriendlyMinions", "GroupMinions", "MyPet" }, target = { "YourTarget" } }
+	minions = { "FriendlyMinions", "GroupMinions", "MyPet" }, target = { "YourTarget" },
+	players = { "Friends" }, group = { "GroupMembers" } }
 ns.plates.friendWants = { at = -math.huge, body = true, minions = true, target = true, shownBody = true,
-	shownMinions = true }
+	shownMinions = true, players = true, groupRows = true, shownPlayers = true }
 function ns.plates.FriendRowWanted(rows, names, suffix)
 	local db = ns.db
 	for _, row in ipairs(rows) do
@@ -4532,21 +4550,28 @@ end
 function ns.plates.FriendWants(suffix)
 	local wants = ns.plates.friendWants
 	local now = GetTime()
-	if InCombatLockdown() then return wants.shownBody, wants.shownMinions end
+	if InCombatLockdown() then return wants.shownBody, wants.shownMinions, wants.shownPlayers end
 	if wants.place ~= suffix or now - wants.at >= 10 then
 		wants.place, wants.at = suffix, now
 		local rows = ns.plates.FRIEND_ROWS
 		wants.body = ns.plates.FriendRowWanted(rows.body, false, suffix)
 		wants.minions = ns.plates.FriendRowWanted(rows.minions, true, suffix)
 		wants.target = ns.plates.FriendRowWanted(rows.target, false, suffix)
+		wants.targetNames = ns.plates.FriendRowWanted(rows.target, true, suffix)
+		wants.players = ns.plates.FriendRowWanted(rows.players, true, suffix)
+		wants.groupRows = ns.plates.FriendRowWanted(rows.group, true, suffix)
 	end
 	-- (Your target a friendly player, or a friendly pet, guardian, totem or minion.)
 	local friendTarget = wants.target and Ask(UnitExists, "target") and Ask(UnitIsFriend, "player", "target")
 	local player = friendTarget and Ask(UnitIsPlayer, "target")
+	local playerTarget = wants.targetNames and Ask(UnitExists, "target") and Ask(UnitIsFriend, "player", "target")
+		and Ask(UnitIsPlayer, "target")
 	wants.shownBody = wants.body or (player and true) or false
 	wants.shownMinions = wants.minions or (friendTarget and not player and Ask(UnitPlayerControlled, "target") and true)
 		or false
-	return wants.shownBody, wants.shownMinions
+	-- (Your group's rows only while you're in one; their bars need the plates.)
+	wants.shownPlayers = wants.players or (wants.groupRows and IsInGroup()) or (playerTarget and true) or false
+	return wants.shownBody, wants.shownMinions, wants.shownPlayers
 end
 
 -- The game's Show Offscreen Nameplates in CineMode as the Nameplates page's
@@ -4694,6 +4719,7 @@ local function ReleasePlates()
 	ns.ApplyCVarSet(FORCED_PLATE_CVARS, false)
 	ns.ApplyCVarSet(ns.plates.FRIEND_BODY_CVARS, false)
 	ns.ApplyCVarSet(ns.plates.FRIEND_MINION_CVARS, false)
+	ns.ApplyCVarSet(ns.plates.FRIEND_PLAYER_CVARS, false)
 	UpdatePlateClicks()
 	duels.Sync(false)
 	duels.Clear()
@@ -4715,6 +4741,7 @@ local function ReleasePlates()
 	end
 	platesReleased = not ns.plates.off and not locked and not duels.on and not FORCED_PLATE_CVARS.active
 		and not ns.plates.FRIEND_BODY_CVARS.active and not ns.plates.FRIEND_MINION_CVARS.active
+		and not ns.plates.FRIEND_PLAYER_CVARS.active
 		and not ns.OFFSCREEN_PLATE_CVARS.active and not ns.NO_OFFSCREEN_PLATE_CVARS.active
 		and not (ns.db.savedPlateClicks and next(ns.db.savedPlateClicks))
 end
@@ -4800,6 +4827,7 @@ function ns.UpdatePlates(cinematic, elapsed)
 		ns.ApplyCVarSet(FORCED_PLATE_CVARS, false)
 		ns.ApplyCVarSet(ns.plates.FRIEND_BODY_CVARS, false)
 		ns.ApplyCVarSet(ns.plates.FRIEND_MINION_CVARS, false)
+		ns.ApplyCVarSet(ns.plates.FRIEND_PLAYER_CVARS, false)
 	end
 	duels.Sync(duels.NotWatchingWhy() == nil or MarkersHiddenOverFriends())
 	UpdateLockedPlates()
@@ -4817,7 +4845,7 @@ function ns.UpdatePlates(cinematic, elapsed)
 			end
 		end
 		-- (Friendly players' bars and minions' plates: where a row can show them.)
-		local body, minions = ns.plates.FriendWants(placeSuffix)
+		local body, minions, players = ns.plates.FriendWants(placeSuffix)
 		-- (Not let go under a duel's own hold on the same setting: the first to
 		-- let go would put yours back from under it.)
 		if duels.on and ns.plates.FRIEND_BODY_CVARS.active then body = true end
@@ -4826,6 +4854,13 @@ function ns.UpdatePlates(cinematic, elapsed)
 		ns.ApplyCVarSet(ns.plates.FRIEND_MINION_CVARS, minions)
 		if not minionsWere and ns.plates.FRIEND_MINION_CVARS.active and not OwnKindShown("FriendlyMinions") then
 			combatCap.FriendlyMinions = 0
+		end
+		-- (Friendly players' plates: under a duel's hold too, as above.)
+		if duels.on and ns.plates.FRIEND_PLAYER_CVARS.active then players = true end
+		local playersWere = ns.plates.FRIEND_PLAYER_CVARS.active
+		ns.ApplyCVarSet(ns.plates.FRIEND_PLAYER_CVARS, players)
+		if not playersWere and ns.plates.FRIEND_PLAYER_CVARS.active and not OwnKindShown("Friends") then
+			combatCap.Friends = 0
 		end
 	end
 	-- Plates show for every fight (bar kinds cinematic mode hides in fights)
