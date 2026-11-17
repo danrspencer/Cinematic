@@ -97,11 +97,15 @@ end
 -- size of ours, nothing hidden).
 ns.DEFAULTS.breathBar = true
 ns.SetPageMaster({ "breathBar" }, "handleFrames")
+-- (Parked 2026-11-17, the user still deciding what it's for: no Breath Bar
+-- page (Options.lua doesn't make it), and the game's own look whatever was
+-- saved. Code and settings kept; false brings it back.)
+ns.BREATH_PARKED = true
 local GAME_LOOK = {}
 local function Settings()
 	local db = ns.GetDB()
 	if not db then return nil end
-	if not (db.enabled and ns.PageOn("breathBar")) then return GAME_LOOK end
+	if ns.BREATH_PARKED or not (db.enabled and ns.PageOn("breathBar")) then return GAME_LOOK end
 	return db
 end
 

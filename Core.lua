@@ -631,12 +631,6 @@ DEFAULTS.gamepadPressHold = 3       -- ...for this long after the last press (co
 DEFAULTS.gamepadBarsFadeIn = 0.2    -- gamepad mode's action bars fade quicker than the rest of the UI
 DEFAULTS.gamepadBarsFadeOut = 0.5
 DEFAULTS.showInteractPrompt = true -- the interact prompt on a plate (gamepad's X) stays as plates fade
--- WoW Forever: closing Settings reloads (gets past its gamepad freeze). Off to
--- start with since 2026-11-11: the game looks to have fixed the freeze (user).
-DEFAULTS.forceReloadOnSettingsExit = false
--- No minimap button in gamepad mode (clicking it there tended to freeze). Off
--- to start with since 2026-11-11, like the reload above.
-DEFAULTS.hideMinimapButtonGamepad = false
 for _, key in ipairs({ "Mode", "Right", "Step", "Speed", "MinChange", "PitchUp", "PitchDown", "BackArc",
 	"MoveTime", "Ease", "Pause", "Drift", "DriftSpeed" }) do
 	DEFAULTS["fishOrbit" .. key] = DEFAULTS["vistaOrbit" .. key]

@@ -32,7 +32,7 @@ local STATUS_COLOR = {
 -- The HUD page's sections, in its order, then the rest.
 local SECTIONS = {
 	{ "units", "Unit frames" }, { "prd", "Personal Resource Display" }, { "bars", "Action bars" },
-	{ "combat", "Trackers" },
+	{ "combat", "Trackers" }, { "cdm", "Cooldown Manager" }, { "swingtimer", "Swing timer" },
 	{ "interface", "Info and menus" }, { "minimap", "Minimap" }, { "party", "Party frames (not raid-style)" },
 	{ "raid", "Raid frames" }, { "rsparty", "Party frames (raid-style)" }, { "gamepad", "Gamepad" },
 	{ "overhead", "Nameplates and chat bubbles" },

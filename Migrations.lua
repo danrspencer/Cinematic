@@ -1721,31 +1721,23 @@ STEPS[#STEPS + 1] = function()
 		end
 		ns.db.questGlowOffV1 = true
 	end
-	-- Force reload on Settings exit (Gamepad Frames page) off to start with
-	-- now (2026-11-11): the game's freeze closing Settings in gamepad mode
-	-- looks fixed (user). Off in every profile. Once: tick it again and it
-	-- stays.
-	if not ns.db.forceReloadOffV1 then
-		ns.db.forceReloadOnSettingsExit = false
-		for _, saved in pairs(ns.db.profiles or {}) do
-			if type(saved) == "table" then
-				saved.forceReloadOnSettingsExit = nil
-				if type(saved.settings) == "table" then saved.settings.forceReloadOnSettingsExit = nil end
+	-- Force reload on Settings exit and Hide the minimap button in gamepad
+	-- mode (Gamepad Frames page), guards against the game's freeze closing
+	-- Settings in gamepad mode: gone 2026-11-17, the freeze looks fixed
+	-- (user). Their saved values cleared, in every profile too. (Off to
+	-- start with from 2026-11-11: forceReloadOffV1, hideMinimapButtonGamepadOffV1.)
+	if not ns.db.gamepadFreezeGuardsGoneV1 then
+		for _, key in ipairs({ "forceReloadOnSettingsExit", "hideMinimapButtonGamepad",
+			"forceReloadOffV1", "hideMinimapButtonGamepadOffV1" }) do
+			ns.db[key] = nil
+			for _, saved in pairs(ns.db.profiles or {}) do
+				if type(saved) == "table" then
+					saved[key] = nil
+					if type(saved.settings) == "table" then saved.settings[key] = nil end
+				end
 			end
 		end
-		ns.db.forceReloadOffV1 = true
-	end
-	-- Hide the minimap button in gamepad mode, the same page's other guard
-	-- against that freeze: off to start with too (2026-11-11). Once.
-	if not ns.db.hideMinimapButtonGamepadOffV1 then
-		ns.db.hideMinimapButtonGamepad = false
-		for _, saved in pairs(ns.db.profiles or {}) do
-			if type(saved) == "table" then
-				saved.hideMinimapButtonGamepad = nil
-				if type(saved.settings) == "table" then saved.settings.hideMinimapButtonGamepad = nil end
-			end
-		end
-		ns.db.hideMinimapButtonGamepadOffV1 = true
+		ns.db.gamepadFreezeGuardsGoneV1 = true
 	end
 	-- Nameplates: Friendly players' and Friendly minions' Grouped (in the
 	-- Location dropdown) off to start with now (2026-11-12): it showed every
@@ -4231,6 +4223,29 @@ STEPS[#STEPS + 1] = function()
 		end
 		for _, point in pairs(ns.db.profileResetPoints or {}) do Swap(point) end
 		ns.db.shoulderRuleInstanceV1 = true
+	end
+end
+
+-- (Step 22.)
+STEPS[#STEPS + 1] = function()
+	-- The Cooldown Manager's and swing timer's Show in rows: sections of their
+	-- own (2026-11-17), each with its switch (showInCooldowns, showInSwing),
+	-- out of the Trackers' (showInTimers). Trackers off: those off too. Once.
+	if not ns.db.timersSectionSplitV1 then
+		local function Move(t)
+			if type(t) == "table" and t.showInTimers == false then
+				t.showInCooldowns, t.showInSwing = false, false
+			end
+		end
+		Move(ns.db)
+		for _, saved in pairs(ns.db.profiles or {}) do
+			if type(saved) == "table" then
+				Move(saved)
+				Move(saved.settings)
+			end
+		end
+		for _, point in pairs(ns.db.profileResetPoints or {}) do Move(point) end
+		ns.db.timersSectionSplitV1 = true
 	end
 end
 

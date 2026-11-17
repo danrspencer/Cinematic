@@ -659,7 +659,7 @@ ns.SHOW_IN_SWITCH = {
 	units = "showInUnits", prd = "showInPrd", playercast = "showInPlayerCast", highlight = "showInHighlight",
 	party = "showInParty", rsparty = "showInParty", raid = "showInRaid", bars = "showInBars", chat = "showInChat",
 	minimap = "showInMinimap", quests = "showInQuests", buffs = "showInBuffs", combat = "showInTimers",
-	interface = "showInInterface", other = "showInOther",
+	swingtimer = "showInSwing", cdm = "showInCooldowns", interface = "showInInterface", other = "showInOther",
 }
 ns.SHOW_IN_SWITCHES = {}
 do
@@ -2562,9 +2562,11 @@ local ROW_SECTIONS = {
 	player = "units", petframe = "units", prd = "prd", prdpower = "prd", prdmana = "prd", target = "units", tot = "units", focus = "units", focustot = "units",
 	targetcircle = "highlight", selfhighlight = "highlight", -- (the marks round you and your target, 2026-11-16)
 	buffs = "buffs", buffcollapse = "buffs", -- (their own section: the Buffs & Debuffs icon's Show in, 2026-11-16)
-	swing = "combat", castbar = "playercast", -- (your cast bar: Unit Frames' Show in)
-	meters = "combat", cooldowns = "combat",
-	cooldownsutility = "combat", cooldownsbuffs = "combat", cooldownsbars = "combat", encounter = "combat",
+	-- (The swing timer and the Cooldown Manager: sections of their own, their
+	-- icons' Show in, 2026-11-17; the Trackers' (combat) till then.)
+	swing = "swingtimer", castbar = "playercast", -- (your cast bar: Unit Frames' Show in)
+	meters = "combat", cooldowns = "cdm",
+	cooldownsutility = "cdm", cooldownsbuffs = "cdm", cooldownsbars = "cdm", encounter = "combat",
 	mirror = "combat",
 	mainbar = "bars", art = "bars", bottomleft = "bars", bottomright = "bars",
 	pet = "bars", stance = "bars", totems = "bars", extra = "bars",

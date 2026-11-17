@@ -403,7 +403,7 @@ ns.PROFILE_MODULES = {
 			set("minimapNodeIcons", "")
 		end },
 	{ key = "pure-cdm", name = "Cinema: Cooldown Manager only",
-		scope = { "Cooldown Manager", "Standard Frames/Trackers", "Standard Frames/Action bars",
+		scope = { "Cooldown Manager", "Standard Frames/Cooldown Manager", "Standard Frames/Trackers", "Standard Frames/Action bars",
 			"Standard Frames/Info and menus", "Advanced Frames/Supported addons",
 			"Gamepad/top" },
 		tip = "No action bars, micro menu, bags or XP bar in fights, with an enemy targeted or in instances; " ..

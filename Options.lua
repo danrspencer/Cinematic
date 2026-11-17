@@ -2516,10 +2516,14 @@ do
 		-- General (HUD) icon first on its own,
 		-- 2026-11-16: Combat (you and the fight), Nameplates (over units), Info
 		-- (the screen's edges: any icon not listed). Each a line in the left list.)
-		{ name = "UI Manager", label = "Interface", plain = true, note = { "Addon frames moved to the Addons hub >",
+		-- (collapse: each group just its first icon till one of its pages is
+		-- picked, as the Style hub's, 2026-11-17.)
+		{ name = "UI Manager", label = "Interface", plain = true, collapse = true,
+			note = { "Addon frames moved to the Addons hub >",
 			"Advanced Frames" }, groups = { order = { "Combat", "Nameplates", "Info" }, other = "Info",
 				["HUD:hud"] = false, ["HUD:units"] = "Combat", ["HUD:prd"] = "Combat", ["HUD:party"] = "Combat", ["HUD:bars"] = "Combat",
-				["HUD:buffs"] = "Combat", ["HUD:combat"] = "Combat",
+				["HUD:buffs"] = "Combat", ["HUD:combat"] = "Combat", ["HUD:cdm"] = "Combat",
+				["HUD:swingtimer"] = "Combat", Gamepad = "Combat",
 				Nameplates = "Nameplates", ["Nameplate Names"] = "Nameplates" },
 			colors = {
 			["Combat"] = { 0.35, 0.6, 0.9 }, Nameplates = { 0.85, 0.55, 0.25 }, Info = { 0.45, 0.75, 0.45 },
@@ -2527,21 +2531,23 @@ do
 			["Party & Raid"] = { 0.35, 0.6, 0.9 }, ["Action Bars"] = { 0.35, 0.6, 0.9 }, Chat = { 0.35, 0.6, 0.9 },
 			Tooltips = { 0.35, 0.6, 0.9 }, ["Map & Quests"] = { 0.35, 0.6, 0.9 },
 			["Buffs & Debuffs"] = { 0.35, 0.6, 0.9 }, Timers = { 0.35, 0.6, 0.9 }, ["Menus & Info"] = { 0.35, 0.6, 0.9 },
-			["Combat Text"] = { 0.35, 0.6, 0.9 },
+			["Combat Text"] = { 0.35, 0.6, 0.9 }, ["Cooldown Manager"] = { 0.35, 0.6, 0.9 },
+			["Swing Timer"] = { 0.35, 0.6, 0.9 }, Gamepad = { 0.35, 0.6, 0.9 },
 		}, pages = {
 			-- (A standard: your faction's battle banner.)
 			{ "Standard Frames", function()
 				return UnitFactionGroup("player") == "Horde" and "Interface\\Icons\\INV_BannerPVP_01"
 					or "Interface\\Icons\\INV_BannerPVP_02"
 			end, label = "HUD", section = "What Shows" },
-			{ "Gamepad", "Interface\\Icons\\INV_Gizmo_01", label = "Gamepad Frames", section = "What Shows",
-				tabOf = "HUD:bars" }, -- (the Action Bars icon's Gamepad tab, 2026-11-16)
 			-- (Mouse: what the pointer brings up, the pointer itself and what it shows, 2026-11-16.)
 			-- (The frames, the HUD's top down; combat text last, over heads.)
 			-- (Keep up and Frame Links: tabs of the Unit Frames icon, the HUD's
 			-- Show in first, 2026-11-16: PersonalResources.lua.)
 			{ "Personal Resources", "Interface\\Icons\\Ability_Racial_BloodRage", -- (Bloodrage: health into power)
 				label = "Unit Frames", section = "Unit Frames", tabOf = "HUD:units" },
+			-- (Gamepad: its own icon after Action Bars', its tabs its page's, 2026-11-17;
+			-- the Action Bars icon's Gamepad tab from 2026-11-16.)
+			{ "Gamepad", "Interface\\Icons\\INV_Gizmo_01", label = "Gamepad Frames", section = "Gamepad" },
 			-- (The frames' looks: the Style hub's since 2026-11-17.)
 			-- (Nameplates and Names, 2026-11-16: two icons, both the Nameplates page's
 			-- tiles (CreatePlatesPanel), the rest their tabs. Their own hub till then.)
@@ -2564,18 +2570,23 @@ do
 			-- (Buffs & Debuffs: one icon, its Show in the HUD's, Reveal and links this page's, 2026-11-16.)
 			{ "Buffs/debuffs", "Interface\\Icons\\Spell_Holy_WordFortitude", label = "Buffs/Debuffs", section = "Buffs & Debuffs",
 				tabOf = "HUD:buffs" },
-			-- (The Timers icon's tabs, after its Show in, 2026-11-16.)
-			{ "Cooldown Manager", "Interface\\Icons\\INV_Misc_PocketWatch_01", section = "Timers", tabOf = "HUD:combat" },
-			{ "Swing timer", "Interface\\Icons\\INV_Sword_04", label = "Swing Timer", section = "Timers",
-				tabOf = "HUD:combat" },
-			{ "Breath Bar", "Interface\\Icons\\Spell_Shadow_DemonBreath", section = "Timers", tabOf = "HUD:combat" },
+			-- (Cooldown Manager and Swing Timer: icons of their own after Timers',
+			-- 2026-11-17, each its own Show in then these pages; the Timers icon's
+			-- tabs from 2026-11-16. Breath Bar, its third tab, parked then:
+			-- MirrorTimerStyle.lua's BREATH_PARKED.)
+			{ "Cooldown Manager", "Interface\\Icons\\Spell_Nature_TimeStop", section = "Cooldown Manager",
+				tabOf = "HUD:cdm" },
+			{ "Swing timer", "Interface\\Icons\\INV_Sword_04", label = "Swing Timer", section = "Swing Timer",
+				tabOf = "HUD:swingtimer" },
 		} },
 		-- (Cameras: what everyone has; Dev: the dev copy's own, to the right)
 		-- (master: Enable Cameras; its pages with no switch of their own show Off with it)
 		{ name = "Camera", master = "cameraModes", colors = { Cameras = { 0.35, 0.6, 0.9 }, ["Special Cams"] = { 0.55, 0.45, 0.9 },
 			Dev = { 0.85, 0.3, 0.25 } },
 			pages = {
-			{ "Cameras", "Interface\\Icons\\INV_Misc_Spyglass_03", label = "General", section = "Cameras" },
+			-- (In no section, a band of its own at the top: Enable Cameras is the
+			-- hub's master, Shoulder and Skyriding Cam under it too: Core.lua's PAGE_SWITCH.)
+			{ "Cameras", "Interface\\Icons\\INV_Misc_Spyglass_03", label = "General" },
 			{ "Scenes", "Interface\\Icons\\Spell_Holy_MindVision", section = "Cameras" }, -- (built with Cameras: CreateCamerasPanel)
 			-- (TriggersPage.lua: the list; its other pages tabs on it, or opened from a row)
 			{ "Triggers", "Interface\\Icons\\INV_Misc_PocketWatch_02", section = "Cameras" },
@@ -3312,16 +3323,18 @@ do
 	ns.GAME_OPTION_PAGES = {}
 	local CDM_OPTION = { cvar = "cooldownViewerEnabled", name = "Cooldown Manager" }
 	local PRD_OPTION = { cvar = "nameplateShowSelf", name = "Personal Resource Display" }
-	for _, page in ipairs({ "Cooldown Manager", "HUD:prd", "PRD Keep Up", "Personal Style" }) do
-		ns.GAME_OPTION_PAGES[page] = page == "Cooldown Manager" and CDM_OPTION or PRD_OPTION
-	end
+	-- (HUD:cdm: the Cooldown Manager icon's Show tab, its own since 2026-11-17.)
+	for _, page in ipairs({ "Cooldown Manager", "HUD:cdm" }) do ns.GAME_OPTION_PAGES[page] = CDM_OPTION end
+	for _, page in ipairs({ "HUD:prd", "PRD Keep Up", "Personal Style" }) do ns.GAME_OPTION_PAGES[page] = PRD_OPTION end
+	-- (Damage Vision reads the game's damage meter: off, it counts nothing.)
+	ns.GAME_OPTION_PAGES["Damage Vision"] = { cvar = "damageMeterEnabled", name = "Damage Meter" }
 	-- (Turned on or off in the game's options, or by a profile, while a page shows.)
 	local optionWatch = CreateFrame("Frame")
 	optionWatch:RegisterEvent("CVAR_UPDATE")
 	optionWatch:SetScript("OnEvent", function(_, _, name)
 		if type(name) ~= "string" then return end
 		name = name:lower()
-		if name == "cooldownviewerenabled" or name == "nameplateshowself" then ns.PaintPageSwitches() end
+		if name == "cooldownviewerenabled" or name == "nameplateshowself" or name == "damagemeterenabled" then ns.PaintPageSwitches() end
 	end)
 
 	local function CreateTile(hub, canvas, english, iconFile, label)
@@ -3410,6 +3423,8 @@ do
 						for at, each in ipairs(tab.before and hub.pages or {}) do
 							if each[1] == tab.before then tile.order = at - 0.5 + i / 1000 end
 						end
+						-- (tab.last: after all the hub's pages.)
+						if tab.last then tile.order = #hub.pages + 1 + i / 1000 end
 						-- (hub.plain: one row, no bands; the band kept for the left list's lines and the tour)
 						tile.band = tab.section or page.section
 						tile.section = not hub.plain and tile.band or nil
@@ -8033,7 +8048,8 @@ local function CreateCombatPanel()
 	-- their icon, and the HUD's off card while it's off.)
 	local HUD_ICONS = {
 		-- (General since 2026-11-16: the hub's first icon, on its own before the groups; its switch still all the HUD's.)
-		{ keys = { "hud" }, label = "General", section = "What Shows", before = "Gamepad", hud = true },
+		-- (before = "Standard Frames": first of all; Gamepad's until it moved, 2026-11-17.)
+		{ keys = { "hud" }, label = "General", section = "What Shows", before = "Standard Frames", hud = true },
 		-- (tabs: one page with the frame's own page's parts, its tabs: ns.ShowInTabs.)
 		-- (before: an Interface page; Party & Raid and Action Bars, their looks moved
 		-- to the Style hub 2026-11-17, before Personal Resources too, after Unit Frames.)
@@ -8064,9 +8080,14 @@ local function CreateCombatPanel()
 			icon = "Interface\\Icons\\Spell_Holy_WordFortitude" },
 		{ keys = { "combat" }, label = "Timers", section = "Timers", before = "Cooldown Manager", tabs = "timers",
 			icon = "Interface\\Icons\\INV_Misc_PocketWatch_01" },
-		{ keys = { "interface" }, label = "Menus & Info", section = "Menus & Info", before = "Breath Bar",
+		-- (Their own sections and icons, out of Timers', 2026-11-17.)
+		{ keys = { "cdm" }, label = "Cooldown Manager", section = "Cooldown Manager", before = "Cooldown Manager",
+			tabs = "cdm", icon = "Interface\\Icons\\Spell_Nature_TimeStop" },
+		{ keys = { "swingtimer" }, label = "Swing Timer", section = "Swing Timer", before = "Swing timer",
+			tabs = "swing", icon = "Interface\\Icons\\INV_Sword_04" },
+		{ keys = { "interface" }, label = "Menus & Info", section = "Menus & Info", last = true,
 			icon = "Interface\\Icons\\INV_Misc_Bag_07" },
-		{ keys = { "other" }, label = "Other Frames in CineMode", section = "What Shows", before = "Gamepad" },
+		{ keys = { "other" }, label = "Other Frames in CineMode", section = "What Shows", before = "Standard Frames" },
 	}
 	-- (A section's icon's name: "HUD:" and its first key.)
 	local function IconOf(key)
@@ -8603,6 +8624,7 @@ local function CreateCombatPanel()
 			-- (Your cast bar: a sub-tab of Unit Frames' Show in too, its look the Cast Style tab's, 2026-11-16.)
 			{ "playercast", L["Your cast bar"], L["Cast bar"] },
 			{ "bars", L["Action bars"] }, { "buffs", L["Buffs and debuffs"] }, { "combat", L["Trackers"] },
+			{ "cdm", L["Cooldown Manager"] }, { "swingtimer", L["Swing timer"] },
 			-- (The chat window's row: the Chat icon's Show in tab.)
 			{ "chat", L["Chat window"] },
 			{ "interface", L["Info and menus"] }, { "minimap", L["Minimap"] }, { "quests", L["Quest tracker"] },
@@ -8622,7 +8644,9 @@ local function CreateCombatPanel()
 			playercast = L["CineMode hides your cast bar: pick when it shows."],
 			bars = L["CineMode hides the action bars: pick which show, and when."],
 			buffs = L["CineMode hides your buffs and debuffs: pick when they show."],
-			combat = L["CineMode hides timers, meters and cooldowns: pick which show, and when."],
+			combat = L["CineMode hides timers and meters: pick which show, and when."],
+			cdm = L["CineMode hides the Cooldown Manager: pick which bars show, and when."],
+			swingtimer = L["CineMode hides your swing timer: pick when it shows."],
 			chat = L["CineMode hides the chat window: pick when it shows."],
 			interface = L["CineMode hides info frames and menus: pick which show, and when."],
 			minimap = L["CineMode hides the minimap: pick which parts show, and when."],
@@ -8696,7 +8720,8 @@ local function CreateCombatPanel()
 		-- wrapping. Made the first time the HUD icon shows, the hub's icons all in.
 		local LIST_TABS = { ["HUD:units"] = "units", ["HUD:prd"] = "prd", ["HUD:party"] = "party", ["HUD:bars"] = "bars",
 			["HUD:chat"] = "chat", ["HUD:minimap"] = "minimap", ["HUD:quests"] = "quests", ["HUD:buffs"] = "buffs",
-			["HUD:combat"] = "timers", ["Mouseover groups"] = "mouse", ["Nameplates"] = "plates",
+			["HUD:combat"] = "timers", ["HUD:cdm"] = "cdm", ["HUD:swingtimer"] = "swing",
+			["Mouseover groups"] = "mouse", ["Nameplates"] = "plates",
 			["Nameplate Names"] = "names" }
 		-- (What each icon is for, under its name: its Show in tab's tip, else these.)
 		local LIST_NOTES = { ["HUD:interface"] = L["The XP bar, bags, micro menu and the like: when they show."],
@@ -8765,7 +8790,7 @@ local function CreateCombatPanel()
 		own = own or nil
 		if has then
 			canvas.hubTabs[#canvas.hubTabs + 1] = {
-				name = IconName(icon), label = icon.label, section = icon.section, before = icon.before, own = true,
+				name = IconName(icon), label = icon.label, section = icon.section, before = icon.before, last = icon.last, own = true,
 				showIn = icon.tabs,
 				noDot = not (icon.hud or own), switchLabel = own and (icon.switchLabel or icon.label) or "HUD",
 				switchFrame = own, tabOf = icon.tabOf, groupFrames = not own and #group > 1 and group or nil,
@@ -9196,10 +9221,11 @@ end
 local function CreateGamepadPanel()
 	local canvas, content = CreateScrollPage()
 
+	-- (An icon of its own in the Combat group since 2026-11-17, its parts on
+	-- tabs under the switch: Show, Action Bars, Settings. The Action Bars
+	-- icon's Gamepad tab before.)
 	local title = Label(content, "GameFontNormalLarge", L["Gamepad Frames"])
-	-- (The Action Bars icon's Gamepad tab, 2026-11-16: its tabs over the title.)
-	local tabs = ns.PageTabs(content, ns.ShowInTabs("bars"), ns.ShowInIndex("bars", "Gamepad"))
-	title:SetPoint("TOPLEFT", tabs, "BOTTOMLEFT", 8, -14)
+	title:SetPoint("TOPLEFT", 16, -16)
 
 	local subtitle = PageIntro(content, title,
 		L["CineMode hides the gamepad's bars, button hints and reticle: pick when they show."])
@@ -9211,29 +9237,31 @@ local function CreateGamepadPanel()
 		end
 	end
 	local switch = PageSwitch(content, "handleGamepad", L["Enable Page"],
-		L["CineMode hides the gamepad's frames, and shows them only when their rows say."], subtitle, function()
-		if ns.UpdateMinimapButton then ns.UpdateMinimapButton() end
-	end)
+		L["CineMode hides the gamepad's frames, and shows them only when their rows say."], subtitle)
 	rows.underHeader = true
-	-- (Everything below on a panel, as the HUD page's sections are, its
-	-- heading at the top: 2026-11-16. The panel itself: at the page's end.)
-	local panelHeading = Label(content, "GameFontNormal", L["Gamepad frames"])
-	panelHeading:SetPoint("TOPLEFT", switch, "BOTTOMLEFT", 14, -14)
-	local lastRow = ShowTable(content, panelHeading, rows, "Gamepad")
+	-- Its parts on tabs under the switch (ns.PageTabsBelow, 2026-11-17).
+	local hosts, _, TabsShown = ns.PageTabsBelow(content, switch, {
+		{ L["Show"], L["Which gamepad frames show in CineMode, and when."] },
+		{ L["Settings"], L["What brings the gamepad action bars up, and how they fade."] },
+	}, "Gamepad/tab")
+	local showTab, barsTab = hosts[1], hosts[2]
+	local panelHeading = Label(showTab, "GameFontNormal", L["Gamepad frames"])
+	panelHeading:SetPoint("TOPLEFT", showTab, "TOPLEFT", 6, 0)
+	local lastRow = ShowTable(showTab, panelHeading, rows, "Gamepad")
 
 	-- The prompt sits on a nameplate, not a frame of its own: a setting for
 	-- the plates' fade rather than a row.
-	local prompt = Check(content, "showInteractPrompt", L["Show the interact prompt (X)"],
+	local prompt = Check(showTab, "showInteractPrompt", L["Show the interact prompt (X)"],
 		L["Keeps the gamepad's interact prompt up in CineMode as nameplates fade."])
 	prompt:SetPoint("TOPLEFT", lastRow, "BOTTOMLEFT", -2, -16)
-	local press = Check(content, "gamepadPressReveal", L["Show the action bars when you press a button"],
+	local press = Check(barsTab, "gamepadPressReveal", L["Show the action bars when you press a button"],
 		L["Pressing a gamepad button brings the action bars up."])
-	press:SetPoint("TOPLEFT", prompt, "BOTTOMLEFT", 0, -2)
+	press:SetPoint("TOPLEFT", barsTab, "TOPLEFT", 0, 0)
 	press:HookScript("OnClick", Refresh) -- grey out / enable the options below
 
 	-- Which buttons count: a list that opens and closes (+ / -), closed at first.
 	local IfPress = function(db) return db.gamepadPressReveal end
-	local listToggle = CreateFrame("Button", nil, content)
+	local listToggle = CreateFrame("Button", nil, barsTab)
 	listToggle:SetSize(260, 20)
 	listToggle:SetPoint("TOPLEFT", press, "BOTTOMLEFT", 28, -4)
 	listToggle.icon = listToggle:CreateTexture(nil, "ARTWORK")
@@ -9248,7 +9276,7 @@ local function CreateGamepadPanel()
 	-- The list sits in a box that's empty and flat while closed, so what
 	-- comes below moves up.
 	local BUTTON_COLUMN, BUTTON_ROW = 200, 24
-	local list = CreateFrame("Frame", nil, content)
+	local list = CreateFrame("Frame", nil, barsTab)
 	list:SetPoint("TOPLEFT", listToggle, "BOTTOMLEFT", 0, -2)
 	list:SetSize(BUTTON_COLUMN * 2, 1)
 	local rowsPerColumn = math.ceil(#ns.GAMEPAD_BUTTONS / 2)
@@ -9284,52 +9312,22 @@ local function CreateGamepadPanel()
 	-- check's 2 left and the toggle's 28.)
 	local stack = Stack(list, "label")
 	stack.indent = 26
-	stack:Header(content, L["Action bar fading"])
-	local stay = stack:Add(Slider(content, "gamepadPressHold", L["Stay after a press"], 0, 10, 0.5, L["%.1f sec"]),
+	stack:Header(barsTab, L["Action bar fading"])
+	local stay = stack:Add(Slider(barsTab, "gamepadPressHold", L["Stay after a press"], 0, 10, 0.5, L["%.1f sec"]),
 		"slider")
 	Tooltip(stay, L["How long the action bars stay after your last button press."])
 	GreyUnless(stay, function(db) return db.gamepadPressReveal end)
-	local fadeIn = stack:Add(Slider(content, "gamepadBarsFadeIn", L["Fade in time"], 0, 3, 0.1, L["%.1f sec"]),
+	local fadeIn = stack:Add(Slider(barsTab, "gamepadBarsFadeIn", L["Fade in time"], 0, 3, 0.1, L["%.1f sec"]),
 		"slider")
 	Tooltip(fadeIn, L["How long the gamepad action bars take to fade in."])
-	local fadeOut = stack:Add(Slider(content, "gamepadBarsFadeOut", L["Fade out time"], 0, 3, 0.1, L["%.1f sec"]),
+	local fadeOut = stack:Add(Slider(barsTab, "gamepadBarsFadeOut", L["Fade out time"], 0, 3, 0.1, L["%.1f sec"]),
 		"slider")
 	Tooltip(fadeOut, L["How long the gamepad action bars take to fade out."])
 
-	stack:Header(content, L["Settings window"])
-	stack:Add(Check(content, "forceReloadOnSettingsExit", L["Force reload on Settings exit"],
-		L["Reloads the UI when you close Settings, to avoid a gamepad-mode freeze."]), "check")
-	local lastSetting = stack:Add(Check(content, "hideMinimapButtonGamepad", L["Hide the minimap button in gamepad mode"],
-		L["Hides the minimap button in gamepad mode, where it can freeze the game."],
-		function(value)
-			ns.GetDB().hideMinimapButtonGamepad = value
-			if ns.UpdateMinimapButton then ns.UpdateMinimapButton() end
-		end), "check")
-
-	-- The panel behind it all (the HUD page's sections' look: a dark fill, a
-	-- thin grey edge), from its heading to the last setting, under them.
-	local panel = CreateFrame("Frame", nil, content)
-	panel:SetFrameLevel(content:GetFrameLevel())
-	panel:SetPoint("TOPLEFT", panelHeading, "TOPLEFT", -12, 12)
-	panel:SetPoint("RIGHT", content, "RIGHT", -16, 0)
-	panel:SetPoint("BOTTOM", lastSetting, "BOTTOM", 0, -12)
-	local fill = panel:CreateTexture(nil, "BACKGROUND")
-	fill:SetAllPoints()
-	fill:SetColorTexture(0.12, 0.12, 0.13, 0.9)
-	for _, sides in ipairs({ { "TOPLEFT", "TOPRIGHT" }, { "BOTTOMLEFT", "BOTTOMRIGHT" },
-		{ "TOPLEFT", "BOTTOMLEFT" }, { "TOPRIGHT", "BOTTOMRIGHT" } }) do
-		local line = panel:CreateTexture(nil, "BORDER")
-		line:SetColorTexture(0.42, 0.42, 0.42, 1)
-		line:SetPoint(sides[1])
-		line:SetPoint(sides[2])
-		if sides[1] == "TOPLEFT" and sides[2] == "TOPRIGHT" or sides[1] == "BOTTOMLEFT" then
-			line:SetHeight(1)
-		else
-			line:SetWidth(1)
-		end
-	end
-
-	canvas:SetScript("OnShow", PageShown(Refresh, content))
+	canvas:SetScript("OnShow", PageShown(function()
+		Refresh()
+		TabsShown()
+	end, content))
 	canvas:Hide()
 	RegisterSubpage(canvas, "Gamepad", L["Gamepad Frames"])
 end
@@ -14693,6 +14691,7 @@ end
 
 -- Sub-page: the breath bar (the game's mirror timers: breath underwater,
 -- fatigue in deep water, Feign Death): hiding it always, and its look
+-- (PARKED since 2026-11-17: not made, ns.BREATH_PARKED; its tab gone)
 -- (MirrorTimerStyle.lua). The Timers icon's Breath Bar tab (2026-11-16: once
 -- under the HUD page's Trackers rows); when it shows: its row on Show in.
 -- (On ns: this file's main chunk is near Lua's 200 locals.)
@@ -14762,8 +14761,9 @@ local function CreateSwingPanel()
 	local canvas, content = CreateScrollPage()
 
 	local title = Label(content, "GameFontNormalLarge", L["Swing Timer"])
-	-- (The Timers icon's Swing Timer tab, 2026-11-16: its tabs over the title.)
-	local timerTabs = ns.PageTabs(content, ns.ShowInTabs("timers"), ns.ShowInIndex("timers", "Swing timer"))
+	-- (The Swing Timer icon's Settings tab, its Show in first, 2026-11-17: its
+	-- tabs over the title. The Timers icon's tab before.)
+	local timerTabs = ns.PageTabs(content, ns.ShowInTabs("swing"), ns.ShowInIndex("swing", "Swing timer"))
 	title:SetPoint("TOPLEFT", timerTabs, "BOTTOMLEFT", 8, -14)
 
 	local subtitle = PageIntro(content, title,
@@ -14815,8 +14815,9 @@ local function CreateCooldownPanel()
 	local canvas, content = CreateScrollPage()
 
 	local title = Label(content, "GameFontNormalLarge", L["Cooldown Manager"])
-	-- (The Timers icon's Cooldown Manager tab, 2026-11-16: its tabs over the title.)
-	local timerTabs = ns.PageTabs(content, ns.ShowInTabs("timers"), ns.ShowInIndex("timers", "Cooldown Manager"))
+	-- (The Cooldown Manager icon's Settings tab, its Show in first, 2026-11-17:
+	-- its tabs over the title. The Timers icon's tab before.)
+	local timerTabs = ns.PageTabs(content, ns.ShowInTabs("cdm"), ns.ShowInIndex("cdm", "Cooldown Manager"))
 	title:SetPoint("TOPLEFT", timerTabs, "BOTTOMLEFT", 8, -14)
 
 	local subtitle = PageIntro(content, title,
@@ -18064,7 +18065,8 @@ end
 do
 	local HEADINGS = {
 		{ "units", L["Unit frames"] }, { "prd", L["Personal Resource Display"] }, { "bars", L["Action bars"] },
-		{ "combat", L["Trackers"] }, { "interface", L["Info and menus"] }, { "minimap", L["Minimap"] },
+		{ "combat", L["Trackers"] }, { "cdm", L["Cooldown Manager"] }, { "swingtimer", L["Swing timer"] },
+		{ "interface", L["Info and menus"] }, { "minimap", L["Minimap"] },
 		{ "party", L["Party frames (not raid-style)"] }, { "raid", L["Raid frames"] },
 		{ "rsparty", L["Party frames (raid-style)"] }, { false, L["Other"] },
 	}
@@ -18720,7 +18722,7 @@ function Cinematic_ToggleSettings()
 	elseif InCombatLockdown() then
 		if not panel:IsProtected() then panel:Hide() end
 	elseif panel.Close then
-		panel:Close(true) -- (through GuardGamepadClose's reload, in gamepad mode)
+		panel:Close(true)
 	else
 		HideUIPanel(panel)
 	end
@@ -20151,54 +20153,6 @@ local function CreateMouseoverPanel()
 	RegisterSubpage(canvas, "Mouseover groups", L["Hover Groups"])
 end
 
--- WoW Forever freezes closing Settings in gamepad mode once one of our
--- controls has been used (a Blizzard bug: an empty addon does it too).
--- With forceReloadOnSettingsExit (Gamepad page), closing reloads the UI
--- instead: our settings are saved already, and the reload closes the window
--- without the freeze. The X, Close, Escape and the gamepad's own presses all
--- go through SettingsPanel:Close (the gamepad clicks buttons itself, past
--- anything laid over them), so that's replaced, once one of our pages has
--- shown in gamepad mode. Replacing it taints the close from then on, so every
--- close in gamepad mode reloads after that (until a reload, if the setting
--- is turned off).
-local function GuardGamepadClose()
-	local panel = _G.SettingsPanel
-	local InputUtil = _G.InputUtil
-	if ns.isRetail or not panel or not panel.Close or not InputUtil or not InputUtil.IsGamepadUIEnabled then
-		return
-	end
-	local function Wanted()
-		return ns.db and ns.db.forceReloadOnSettingsExit and ns.db.handleGamepad ~= false
-			and InputUtil.IsGamepadUIEnabled()
-	end
-	local function Install()
-		local Close = panel.Close
-		panel.Close = function(...)
-			if Wanted() then
-				ReloadUI()
-				return
-			end
-			return Close(...)
-		end
-		print("|cffffd100Cinematic:|r " .. L["closing Settings now reloads the UI (Force reload on Settings exit, " ..
-			"Gamepad Frames page)."])
-	end
-	-- Runs only while Settings is open (a child of it).
-	local watcher = CreateFrame("Frame", nil, panel)
-	ns.SetOnUpdate(watcher, function(self)
-		if not Wanted() then
-			return
-		end
-		for _, page in ipairs(searchPages) do
-			if page.canvas:IsVisible() then
-				Install()
-				ns.SetOnUpdate(self, nil)
-				return
-			end
-		end
-	end)
-end
-
 -- The page helpers LowHealth.lua's Vitals Vision page uses. (Out here: the
 -- function below is at Lua's cap of 60 outside locals it can use.)
 ns.lowHealthKit = { CreateScrollPage = CreateScrollPage, Label = Label, PageShown = PageShown,
@@ -20298,8 +20252,12 @@ ns.OnLanguage(function()
 		CreateSwingPanel()
 		Lap("CreateSwingPanel")
 	end
-	ns.CreateBreathBarPanel() -- (the Timers icon's Breath Bar tab)
-	Lap("CreateBreathBarPanel")
+	-- (The Breath Bar page, the Timers icon's tab: parked 2026-11-17, not made
+	-- while MirrorTimerStyle.lua's BREATH_PARKED; its row on Show stays.)
+	if not ns.BREATH_PARKED then
+		ns.CreateBreathBarPanel()
+		Lap("CreateBreathBarPanel")
+	end
 	-- (Only with a Cooldown Manager: the game's, on clients that have it, or the addon.
 	-- ProfileModules.lua.)
 	if ns.HasCooldownManager() then
@@ -20537,7 +20495,6 @@ ns.OnLanguage(function()
 	ns.AddBandShortcuts("Style") -- (and the Style hub's: Interface, Visions, Atmosphere, each look under its band)
 	menu.Flush() -- (the left list, in menu.order)
 	menu.AutoFold()
-	GuardGamepadClose()
 	Lap("(the left list)")
 	local buildEnded = type(buildStarted) == "number" and debugprofilestop()
 	if type(buildEnded) == "number" and ns.Log then

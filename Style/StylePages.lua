@@ -513,15 +513,19 @@ local SHOW_IN_TABS = {
 		{ "Bubbles", "Chat bubbles", "Where chat bubbles show in CineMode." },
 		{ "Bubble Style", "Bubble Style", "How chat bubbles look, and speech from behind you." },
 	},
-	-- (The HUD page's Trackers section, then the timers' own pages (Options.lua's),
-	-- each with its own sub-tabs, where the client has them.)
+	-- (The HUD page's Trackers section. Cooldown Manager and Swing Timer its
+	-- tabs till 2026-11-17, their own icons since; Breath Bar's parked then.)
 	timers = {
-		{ "Show", "HUD:combat", "CineMode hides timers, meters and cooldowns: pick which show, and when." },
-		{ "Cooldown Manager", "Cooldown Manager", "When the Cooldown Manager comes up in CineMode.",
-			has = function() return ns.HasCooldownManager() end },
-		{ "Swing Timer", "Swing timer", "Which of the game's swing timer bars show.",
-			has = function() return not ns.isRetail end },
-		{ "Breath Bar", "Breath Bar", "Hiding the breath bar, and how it looks." },
+		{ "Show", "HUD:combat", "CineMode hides timers and meters: pick which show, and when." },
+	},
+	-- (Out of Timers', 2026-11-17: the HUD page's section, then Options.lua's page.)
+	cdm = {
+		{ "Show", "HUD:cdm", "CineMode hides the Cooldown Manager: pick which bars show, and when." },
+		{ "Settings", "Cooldown Manager", "Each spell's icon, and the Cooldown Manager's other settings." },
+	},
+	swing = {
+		{ "Show", "HUD:swingtimer", "CineMode hides your swing timer: pick when it shows." },
+		{ "Settings", "Swing timer", "Which of the game's swing timer bars show." },
 	},
 	-- (The Nameplates hub's two icons, 2026-11-16: Nameplates (the Nameplates
 	-- page's grids but Names, then its icons and looks) and Names (that page's
@@ -551,11 +555,9 @@ local SHOW_IN_TABS = {
 		{ "Tooltip Style", "Tooltip Style", "How the game's tooltips look." },
 		{ "Cursor", "Cursor Hide", "In CineMode, the cursor gets out of the way." },
 	},
-	-- (The Gamepad page (Options.lua's) where the client has it, then ActionBarStyle.lua's)
+	-- (ActionBarStyle.lua's. Gamepad's page its own icon since 2026-11-17.)
 	bars = {
 		{ "Show", "HUD:bars", "CineMode hides the action bars: pick which show, and when." },
-		{ "Gamepad", "Gamepad", "The frames gamepad mode adds: its action bars, button hints and reticle.",
-			has = function() return C_GamePad ~= nil and not ns.isRetail end },
 		{ "Bar Style", "Action Style", "How the action buttons look." },
 	},
 }

@@ -155,10 +155,7 @@ local function UpdateIcon()
 	local db = ns.GetDB()
 	local active = db.enabled and not ns.GetSnoozeLeft()
 	button.icon:SetDesaturated(not active)
-	-- (Not in gamepad mode with hideMinimapButtonGamepad, Gamepad page on:
-	-- clicking it there tends to freeze WoW Forever.)
-	local shown = db.minimapButton and not (db.hideMinimapButtonGamepad and db.handleGamepad ~= false
-		and ns.IsGamePadOn())
+	local shown = db.minimapButton and true or false
 	if shown ~= button.wanted then
 		-- Only on a change, and with Show/Hide, which addons gathering the
 		-- button follow: they hide it themselves too.
@@ -388,16 +385,9 @@ end
 -- tooltip, for when the button's hidden or gathered away. Added from here, not
 -- the .toc, so "Show in addon compartment" can take it out again: the game has
 -- no call for that, so it's taken off the frame's list, as LibDBIcon does.
--- Not in gamepad mode with hideMinimapButtonGamepad: the button's hidden there
--- as clicking it tends to freeze WoW Forever, and this would open the same.
 local compartmentEntry
 
 local function OnCompartmentClick(_, input)
-	local db = ns.GetDB()
-	if db.hideMinimapButtonGamepad and db.handleGamepad ~= false and ns.IsGamePadOn() then
-		Print(L["not available in gamepad mode: use /cine instead."])
-		return
-	end
 	local mouseButton = type(input) == "table" and input.buttonName or "LeftButton"
 	-- (A frame later: the compartment's own menu is closing. UIParent: that
 	-- menu's button goes with it.)
