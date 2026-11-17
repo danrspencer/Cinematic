@@ -901,7 +901,7 @@ end
 -- quest text before (then a vendor too). A held window is kept from clicks
 -- (gameEsc.Guard: a cover over it, your bags closed and kept closed), so
 -- nothing's bought, sold, banked, sent or flown to while it fades. The
--- game's X, Goodbye and Decline buttons have covers of ours over them
+-- game's X, Goodbye, Decline and Complete Quest buttons have covers of ours over them
 -- (gameEsc.Covers) that do the same, as MultiQuestFix.lua's over Accept.
 -- The frame's name, the game's close call (for the log, and the call).
 local GAME_TALK = {
@@ -1056,7 +1056,15 @@ local COVER_BUTTONS = {
 	GossipFrame = { { "GossipFrame.GreetingPanel.GoodbyeButton" }, { "GossipFrameGreetingGoodbyeButton" } },
 	QuestFrame = { { "QuestFrameGoodbyeButton" }, { "QuestFrameGreetingGoodbyeButton" }, { "QuestFrameCancelButton" },
 		-- (Decline: its glide back at once, as Accept's.)
-		{ "QuestFrameDeclineButton", "DeclineQuest", function() DeclineQuest() end, true } },
+		{ "QuestFrameDeclineButton", "DeclineQuest", function() DeclineQuest() end, true },
+		-- (Complete Quest: the reward taken through the glide back, as the
+		-- quest bubble's Complete is; it snapped till 2026-11-16, user. Only
+		-- when the game's own click would take it straight away: a reward
+		-- still to pick, or gold the quest costs (the game asks first), leaves
+		-- the game's button uncovered.)
+		{ "QuestFrameCompleteQuestButton", "GetQuestReward", function()
+			GetQuestReward(gameEsc.RewardChoice())
+		end, true, function() return gameEsc.RewardReady() end } },
 	ClassTrainerFrame = { { "ClassTrainerCancelButton" } },
 	TaxiFrame = { { "TaxiCloseButton" } },
 	MailFrame = { { "InboxCloseButton" } },
@@ -1107,10 +1115,32 @@ local function Cover(target, frame, label, close, quick)
 	cover:SetFrameLevel((target:GetFrameLevel() or 1) + 20)
 	cover:Show()
 end
+-- The reward the game's Complete would take: the one picked, or the only one.
+function gameEsc.RewardChoice()
+	local choice = _G.QuestInfoFrame and tonumber(_G.QuestInfoFrame.itemChoice) or 0
+	if choice > 0 then return choice end
+	local ok, choices = pcall(GetNumQuestChoices)
+	return (ok and choices == 1) and 1 or 0
+end
+function gameEsc.RewardReady()
+	local ok, ready = pcall(function()
+		local choices = GetNumQuestChoices() or 0
+		if choices > 0 and gameEsc.RewardChoice() == 0 then return false end
+		local money = GetQuestMoneyToGet and GetQuestMoneyToGet() or 0
+		return not (type(money) == "number" and money > 0)
+	end)
+	return ok and ready == true
+end
 function gameEsc.Covers(frame, name, label, close)
 	local seen, laid = {}, {}
-	local function Try(path, coverLabel, coverClose, quick)
+	local function Try(path, coverLabel, coverClose, quick, when)
 		local target = Resolve(path)
+		-- (Not now: the game's own button takes the click, our cover off it.)
+		if target and when and not when() then
+			local cover = gameEsc.covers[target]
+			if cover and cover:IsShown() then cover:Hide() end
+			return
+		end
 		if target and not seen[target] and ns.Flag(target:IsVisible()) then
 			seen[target] = true
 			Cover(target, frame, coverLabel or label, coverClose or close, quick)
@@ -1118,7 +1148,7 @@ function gameEsc.Covers(frame, name, label, close)
 		end
 	end
 	for _, suffix in ipairs(COVER_BUTTONS.all) do Try(name .. suffix) end
-	for _, entry in ipairs(COVER_BUTTONS[name] or {}) do Try(entry[1], entry[2], entry[3], entry[4]) end
+	for _, entry in ipairs(COVER_BUTTONS[name] or {}) do Try(entry[1], entry[2], entry[3], entry[4], entry[5]) end
 	local key = name .. ":" .. table.concat(laid, ",")
 	if gameEsc.coveredFor ~= key then
 		gameEsc.coveredFor = key
@@ -1223,21 +1253,56 @@ end
 -- done (or a fight turns it back with the target kept: no glide to hold).
 -- In those 1.5 s, attacks with no target can go to the soft one.
 aim.soft = { SoftTargetEnemy = 3, SoftTargetEnemyArc = 2, SoftTargetEnemyRange = 45 }
+-- And the game's outlines off meanwhile (user, 2026-11-17: "yes, try it"):
+-- the soft enemy gets an outline on its body, and no setting hides just that
+-- one (Forever's outline CVars: only the fade times are per kind), so it's the
+-- Graphics menu's Outline Mode, every outline (your target's, mouseover's)
+-- gone while held. Set to exactly these, not raised; given back with the rest.
+aim.outline = { OutlineEngineMode = 0, RAIDOutlineEngineMode = 0 }
 local function SoftHold(yours, on)
 	-- SoftTarget CVars are protected in fights: a SetCVar there isn't an
 	-- error pcall catches but an ADDON_ACTION_BLOCKED, once a frame (680 in
 	-- 8 s, Forever 2026-11-16). Not touched in fights; given back after.
 	if InCombatLockdown() then
 		if not on and not aim.softSaid then
-			for cvar in pairs(aim.soft) do
-				if yours[cvar] ~= nil then
-					aim.softSaid = true
-					ns.Log("cvar", "Shoulder Cam: soft target given back once the fight ends")
-					break
+			for _, set in ipairs({ aim.soft, aim.outline }) do
+				for cvar in pairs(set) do
+					if yours[cvar] ~= nil then
+						aim.softSaid = true
+						ns.Log("cvar", "Shoulder Cam: soft target given back once the fight ends")
+						break
+					end
 				end
 			end
 		end
 		return
+	end
+	for cvar, want in pairs(aim.outline) do
+		local now = GetCVar(cvar)
+		if now == nil then
+			-- (Not on this client.)
+		elseif on then
+			if not Same(now, want) then
+				if yours[cvar] == nil then yours[cvar] = now end
+				-- (A graphics setting: timed, for any hitch it costs.)
+				local start = debugprofilestop()
+				local ok = pcall(SetCVar, cvar, tostring(want))
+				ns.Log("cvar", ("Shoulder Cam: %s %s -> %s, no outline on the soft target (%.1f ms)%s"):format(cvar,
+					now, want, debugprofilestop() - start, ok and "" or " (refused)"))
+			end
+		elseif yours[cvar] ~= nil then
+			local back = yours[cvar]
+			local start = debugprofilestop()
+			local ok = pcall(SetCVar, cvar, back)
+			local took = debugprofilestop() - start
+			if ok and Same(GetCVar(cvar), back) then
+				yours[cvar] = nil
+				ns.Log("cvar", ("Shoulder Cam: %s back to %s (%.1f ms)"):format(cvar, back, took))
+			elseif not aim.softSaid then
+				aim.softSaid = true
+				ns.Log("cvar", ("Shoulder Cam: %s back to %s refused: tried again"):format(cvar, back))
+			end
+		end
 	end
 	for cvar, want in pairs(aim.soft) do
 		local now = GetCVar(cvar)
@@ -2143,10 +2208,12 @@ local function GiveBackForLogout()
 		end
 	end
 	-- (The soft target too: a logout mid-glide mustn't keep it on.)
-	for cvar in pairs(aim.soft) do
-		if yours[cvar] ~= nil then
-			pcall(SetCVar, cvar, yours[cvar])
-			yours[cvar] = nil
+	for _, set in ipairs({ aim.soft, aim.outline }) do
+		for cvar in pairs(set) do
+			if yours[cvar] ~= nil then
+				pcall(SetCVar, cvar, yours[cvar])
+				yours[cvar] = nil
+			end
 		end
 	end
 end
@@ -2332,10 +2399,11 @@ function ns.CreateShoulderCamPanel(kit)
 	kit.GreyUnless(escTarget, IfTalk)
 	-- (Dev copy only, a test: MultiQuestFix.lua, user 2026-11-15.)
 	if ns.isDev then
-		stack:Add(kit.Check(content, "shoulderCamMultiQuestFix", L["Multi Quest fix"],
+		local multiQuest = stack:Add(kit.Check(content, "shoulderCamMultiQuestFix", L["Multi Quest fix"],
 			L["Test (dev copy only). In the game's quest window, at a quest giver with more quests: Accept " ..
 			"clears your target first, then press your Interact key to talk to them again. Each step goes " ..
 			"in the log."]), "check", 16)
+		kit.GreyUnless(multiQuest, IfTalk)
 	end
 	-- (The NPC turn's times with it, under its ticks: under Turn to enemy till
 	-- 2026-11-16, they read as its own.)
