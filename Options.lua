@@ -8076,7 +8076,10 @@ local function CreateCombatPanel()
 						Relayout()
 						Layout()
 					end
-					-- (Search finding a part opens its frame's block, and the tab.)
+					-- (Search finding a part opens its frame's block, and the tab.
+					-- searchAlways: closed, its rows still count, or /cine find
+					-- row:unitPartPlayerName found nothing, 2026-11-17.)
+					box.searchAlways = true
 					box.openSection = function()
 						SectionState.Save(block.state, true)
 						section.body.openSection()

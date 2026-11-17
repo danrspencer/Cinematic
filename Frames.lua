@@ -13874,7 +13874,8 @@ do
 					hooksecurefunc(region, "SetShown", KeepHidden)
 				end
 			end
-			-- (A part with a rule fades out; not as first applied, at login.)
+			-- (A part that changes (a rule, or columns over an unticked Always)
+			-- fades out; not as first applied, at login.)
 			if FRAMES.ruled[region] and FRAMES.applied[region] then
 				FRAMES.fade[region] = 1
 			end
@@ -14106,7 +14107,10 @@ do
 					-- (The Style hub's Overrides tab over the row, with the HUD page on.)
 					local over = ns.db.handleFrames ~= false and ns.StyleOverride(key) or nil
 					local hide = over == "hide" or not over and ns.db.handleFrames ~= false and FRAMES.Hidden(key)
-					local ruled = key and not over and ns.RuleTest(key) ~= nil
+					-- (ruled: it fades as it changes. A rule, or Always unticked with
+					-- the other columns bringing it up (a fight, a target): those
+					-- snapped out while the rest of the UI faded, 2026-11-17.)
+					local ruled = key and not over and (ns.RuleTest(key) ~= nil or ns.db[key] == false)
 					local keep = not over and held and held[part] or false
 					local paths = entry[2][part]
 					if type(paths) == "function" then
