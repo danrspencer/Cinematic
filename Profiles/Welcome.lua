@@ -282,8 +282,8 @@ local function Describe(level)
 		-- player's report 2026-11-17 found settings and layouts left after
 		-- removing the addon. Reset addon puts them back.)
 		about:SetText(L["Pick a level to try it now. You can change it any time, here or on the Profiles page."]
-			.. "\n" .. L["A level may change some game settings, like nameplates and names, and add an Edit Mode " ..
-			"layout. Before removing Cinematic, Reset addon on its main settings page puts them back."])
+			.. "\n" .. L["A level may change some game settings, like nameplates and names, which go back when you " ..
+			"log out, and add an Edit Mode layout, which Reset addon on the main settings page deletes."])
 	end
 end
 
@@ -320,6 +320,8 @@ end
 
 local function Pick(name, level)
 	if InCombatLockdown() then ns.ProfileSwitchBlocked() return end -- (says so)
+	-- (The first pick asks about game settings first; Continue picks it again.)
+	if ns.GameSettingsAgreed and not ns.GameSettingsAgreed(function() Pick(name, level) end) then return end
 	if not ns.db.enabled then ns.SetEnabled(true) end
 	-- (The Shoulder Cam's card: picking it is the yes to its one-time
 	-- question, the card's line saying why. Before and after the switch: the

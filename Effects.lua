@@ -147,12 +147,14 @@ local function OwnValue(cvar)
 	return GetCVar(cvar)
 end
 
--- Sets a game setting for good: straight away, or, while cinematic mode has
--- it put away, in the value it comes back to. The player's own value from
--- before the first such write is kept (cvarsBefore, per character as the
--- game keeps these), so a reset puts it back (ns.PutBackOwnCVars): without
--- it, removing the addon left plates and names as the rows had set them (a
--- player's report, 2026-11-17).
+-- Sets a game setting for the rows: straight away, or, while cinematic mode
+-- has it put away, in the value it comes back to. The player's own value
+-- from before the first such write is kept (cvarsBefore, per character as
+-- the game keeps these) and ours too (cvarsOurs): logging out puts theirs
+-- back and logging in ours again (ns.GiveBackOwnCVars), and a reset puts
+-- theirs back for good (ns.PutBackOwnCVars). Till 2026-11-17 they stayed
+-- written for good, and removing the addon left plates and names as the rows
+-- had set them (a player's report).
 local function SetOwnValue(cvar, value)
 	if GetCVar(cvar) == nil then
 		return
@@ -165,6 +167,8 @@ local function SetOwnValue(cvar, value)
 			if yours == nil then yours = GetCVar(cvar) end
 			keep.cvarsBefore[cvar] = yours
 		end
+		keep.cvarsOurs = keep.cvarsOurs or {}
+		keep.cvarsOurs[cvar] = value
 	end
 	if ns.IsCVarHeld(cvar) then
 		ns.db.savedCVars[cvar] = value
@@ -178,8 +182,8 @@ local function SetOwnValue(cvar, value)
 end
 
 -- Reset (Profiles.lua's ns.ResetAddon): the plate and name settings the
--- rows wrote for good back to the player's own, from before the first write.
--- Not in a fight (the reset waits for it to end).
+-- rows wrote back to the player's own, from before the first write, and
+-- forgotten. Not in a fight (the reset waits for it to end).
 function ns.PutBackOwnCVars()
 	for _, keep in ipairs({ ns.chardb or false, ns.db or false }) do
 		local before = keep and keep.cvarsBefore
@@ -191,9 +195,65 @@ function ns.PutBackOwnCVars()
 					SetCVar(cvar, value)
 				end
 			end
-			keep.cvarsBefore = nil
+		end
+		if keep then keep.cvarsBefore, keep.cvarsOurs = nil, nil end
+	end
+end
+
+-- Logging out (Core.lua, after the held settings are let go): each setting
+-- the rows wrote back to the player's own, so they're never left as ours by
+-- Cinematic not loading again (removed, turned off); logging in writes ours
+-- again (below). One changed since we wrote it (the game's options) is the
+-- player's now: left as it is and forgotten. In a fight (a /reload) the
+-- game won't take them: left as they are, the next logout tries again.
+function ns.GiveBackOwnCVars()
+	if InCombatLockdown() then return end
+	local keep = ns.chardb or ns.db
+	local before, ours = keep and keep.cvarsBefore, keep and keep.cvarsOurs
+	if not (before and ours) then return end
+	for cvar, value in pairs(ours) do
+		local now = GetCVar(cvar)
+		if now == nil or before[cvar] == nil then
+			ours[cvar] = nil
+		elseif now ~= value then
+			ns.Log("cvar", ("%s is %s, not ours (%s): yours now, left"):format(cvar, tostring(now), tostring(value)))
+			ours[cvar], before[cvar] = nil, nil
+		elseif now ~= before[cvar] then
+			SetCVar(cvar, before[cvar])
 		end
 	end
+end
+
+-- Logging in: ours written again (after the logout put the player's back),
+-- if the Nameplates page still wants them; else nothing to write, and
+-- forgotten (theirs stays). After a fight if in one.
+do
+	local login = CreateFrame("Frame")
+	login:RegisterEvent("PLAYER_LOGIN")
+	login:SetScript("OnEvent", function(self, event)
+		self:UnregisterEvent(event)
+		if InCombatLockdown() then
+			self:RegisterEvent("PLAYER_REGEN_ENABLED")
+			return
+		end
+		local keep = ns.chardb or ns.db
+		local ours = keep and keep.cvarsOurs
+		if not ours then return end
+		local wanted = ns.db.enabled and ns.db.handlePlates and (not ns.ProfileChosen or ns.ProfileChosen())
+		if not wanted then
+			keep.cvarsBefore, keep.cvarsOurs = nil, nil
+			return
+		end
+		local before = keep.cvarsBefore or {}
+		for cvar, value in pairs(ours) do
+			-- (Changed while we weren't loaded: the player's, left and forgotten.)
+			if before[cvar] ~= nil and GetCVar(cvar) ~= before[cvar] and GetCVar(cvar) ~= value then
+				ours[cvar], before[cvar] = nil, nil
+			else
+				SetOwnValue(cvar, value)
+			end
+		end
+	end)
 end
 
 -- Whether any box in a names row is ticked (or it has a rule: it may show).

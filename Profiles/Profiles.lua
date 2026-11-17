@@ -426,6 +426,21 @@ local function ApplyProfileSwitches()
 	end
 end
 ns.ApplyProfileSwitches = ApplyProfileSwitches
+-- Logging out (Core.lua): each switch a profile turned on, off again as the
+-- game saves it, so it's never left on by Cinematic not loading again
+-- (removed, turned off). Its mark stays, so logging in turns it on again
+-- (ApplyProfileSwitches at PLAYER_LOGIN: ours with it off). Not in a fight
+-- (a /reload): the game won't take it then. (2026-11-17, a player's report.)
+function ns.GiveBackProfileSwitches()
+	if not ns.db or InCombatLockdown() then return end
+	local marks = Marks()
+	for _, switch in ipairs(PROFILE_SWITCHES) do
+		if marks[switch.turnedOn] and GetCVar(switch.cvar) == "1" then
+			switchWritten[switch.cvar] = "0"
+			SetCVar(switch.cvar, "0")
+		end
+	end
+end
 -- The switches for the Game Settings page (GameSettingsPage.lua): each one's
 -- setting, its name, and whether the profile wants it on now.
 function ns.ProfileSwitchRows()
@@ -534,6 +549,33 @@ function ns.ProfileSwitchBlocked()
 	ns.Print(L["can't switch profiles in a fight: try again once it's over"])
 	if ns.PeekChat then ns.PeekChat(DEFAULT_CHAT_FRAME, 8) end -- (up through CineMode, to be seen)
 	return true
+end
+
+-- The first profile ever picked: a box saying Cinematic changes some game
+-- settings for its features, and that Reset addon puts them all back
+-- (ns.ResetAddon), asked before anything's changed. Continue: picked
+-- (then: what to do, the pick again); Cancel: nothing picked, Cinematic stays
+-- off. Asked where a player picks (the welcome window, the Profiles page,
+-- /cine profile), not in ns.SetProfile: code picking one (an import, the
+-- offline checks) goes ahead. After a player's report, 2026-11-17: removing the addon left settings
+-- and layouts they never saw it change. Once per account
+-- (db.gameSettingsNoticeSeen; a reset asks again). True: go ahead now.
+function ns.GameSettingsAgreed(after)
+	if ns.ProfileChosen() or ns.db.gameSettingsNoticeSeen then return true end
+	StaticPopupDialogs.CINEMATIC_GAME_SETTINGS_NOTICE = {
+		text = L["To make its features work, Cinematic changes some of your game settings, like nameplates and " ..
+			"names. They go back when you log out. It may also add an Edit Mode layout, which Reset addon on " ..
+			"Cinematic's main settings page deletes, so do that before removing it."],
+		button1 = _G.CONTINUE or L["Continue"], button2 = _G.CANCEL or L["Cancel"],
+		OnAccept = function(_, data)
+			ns.db.gameSettingsNoticeSeen = true
+			if data then data() end
+		end,
+		OnCancel = function() ns.Print(L["nothing changed: no profile picked yet."]) end,
+		timeout = 0, whileDead = true, hideOnEscape = true,
+	}
+	StaticPopup_Show("CINEMATIC_GAME_SETTINGS_NOTICE", nil, nil, after)
+	return false
 end
 
 -- True once on that profile (false: no such profile, or in a fight).

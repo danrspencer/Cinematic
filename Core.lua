@@ -5108,6 +5108,11 @@ ticker:SetScript("OnEvent", ns.Profiled("Core events", function(self, event, arg
 		-- turned off before the next login they stay; on, it turns them off again.)
 		Guard(ns.ApplyCVarSet, ns.COMBAT_TEXT_GAME_NUMBERS, false)
 		Guard(ns.ReleaseAllSpeeds, "logging out")
+		-- (The Nameplates page's rows' plate and name settings, and the switches a
+		-- profile turned on, back to yours as the game saves them; on again at
+		-- login. So removing Cinematic never leaves them: Effects.lua, Profiles.lua.)
+		Guard(ns.GiveBackOwnCVars)
+		Guard(ns.GiveBackProfileSwitches)
 		Guard(function()
 			ns.MusicTrace(("LOGOUT done volume %s music %s"):format(GetCVar("Sound_MusicVolume"), GetCVar("Sound_EnableMusic")))
 		end)

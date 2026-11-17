@@ -10,6 +10,13 @@
 --            is made again as on picking it (ns.ApplyProfileLayout).
 --   3 login (after the reload): no layout of ours made just for logging
 --            in, only the profile's.
+-- /cine debug resettest logout: the rows' plate settings going back at
+-- logout and on again at login (2026-11-17), across one reload, nothing
+-- deleted:
+--   L1 now:    a plate setting set off as yours, the row's write turns it on;
+--   L2 loaded: as the addon loads after the reload (before login): yours
+--              (off) back, ours still noted;
+--   L3 login:  ours (on) written again; then as it was.
 -- A verdict per check, into CinematicDB.resetTestLog. Dev copy only.
 local _, ns = ...
 
@@ -114,7 +121,59 @@ local function LoginStep()
 	Log("done")
 end
 
-function ns.ResetTest()
+local CVAR, KIND = "nameplateShowFriendlyNPCs", "FriendlyNPCs"
+
+local function LogoutStart()
+	local keep = ns.chardb or ns.db
+	local was = GetCVar(CVAR)
+	if was == nil then return Verdict("L1 now", false, CVAR .. " not on this client") end
+	CinematicDB.resetTest = { stage = "L2", was = was, before = keep.cvarsBefore and keep.cvarsBefore[CVAR],
+		ours = keep.cvarsOurs and keep.cvarsOurs[CVAR] }
+	if keep.cvarsBefore then keep.cvarsBefore[CVAR] = nil end
+	if keep.cvarsOurs then keep.cvarsOurs[CVAR] = nil end
+	SetCVar(CVAR, "0")
+	ns.EnablePlateRow(KIND)
+	local held = ns.IsCVarHeld(CVAR)
+	local before, ours = keep.cvarsBefore or {}, keep.cvarsOurs or {}
+	Verdict("L1 row writes on, off kept as yours", (GetCVar(CVAR) == "1" or held) and before[CVAR] == "0"
+		and ours[CVAR] == "1", ("%s now %s (held %s, saved %s), before %s, ours %s; enabled %s, plates page %s")
+		:format(CVAR, tostring(GetCVar(CVAR)), tostring(held), tostring(ns.db.savedCVars[CVAR]),
+		tostring(before[CVAR]), tostring(ours[CVAR]), tostring(ns.db.enabled), tostring(ns.db.handlePlates)))
+	ns.Print("step L1 done: now /reload")
+end
+
+local function LogoutLoaded()
+	-- (As the addon loads: before PLAYER_LOGIN writes ours again.)
+	local char = CinematicCharDB or {}
+	local now = GetCVar(CVAR)
+	Verdict("L2 logout put yours back", now == "0" and char.cvarsOurs and char.cvarsOurs[CVAR] == "1",
+		("%s at load %s, ours noted %s, before %s"):format(CVAR, tostring(now),
+		tostring(char.cvarsOurs and char.cvarsOurs[CVAR]), tostring(char.cvarsBefore and char.cvarsBefore[CVAR])))
+	CinematicDB.resetTest.stage = "L3"
+end
+
+local function LogoutLogin()
+	local saved = CinematicDB.resetTest
+	CinematicDB.resetTest = nil
+	local keep = ns.chardb or ns.db
+	local now, held = GetCVar(CVAR), ns.IsCVarHeld(CVAR)
+	Verdict("L3 login wrote ours again", now == "1" or (held and ns.db.savedCVars[CVAR] == "1"),
+		("%s now %s (held %s, saved %s)"):format(CVAR, tostring(now), tostring(held), tostring(ns.db.savedCVars[CVAR])))
+	if keep.cvarsBefore then keep.cvarsBefore[CVAR] = saved.before end
+	if keep.cvarsOurs then keep.cvarsOurs[CVAR] = saved.ours end
+	if held then ns.db.savedCVars[CVAR] = saved.was else SetCVar(CVAR, saved.was) end
+	Log(("L3: %s back to %s"):format(CVAR, tostring(saved.was)))
+	ns.Print("reset test done: say \"check log\" (then /reload saves it)")
+	Log("done")
+end
+
+function ns.ResetTest(mode)
+	if mode == "logout" then
+		if InCombatLockdown() then return ns.Print("not in a fight") end
+		CinematicDB.resetTestLog = {}
+		Log(("start logout %s, client %s"):format(date("%Y-%m-%d %H:%M:%S"), tostring(ns.CLIENT)))
+		return ns.Guard(LogoutStart)
+	end
 	if not (C_EditMode and C_EditMode.GetLayouts) then return ns.Print("no Edit Mode on this client") end
 	if InCombatLockdown() then return ns.Print("not in a fight") end
 	local manager = _G.EditModeManagerFrame
@@ -128,10 +187,20 @@ function ns.ResetTest()
 end
 
 local resume = CreateFrame("Frame")
+resume:RegisterEvent("ADDON_LOADED")
 resume:RegisterEvent("PLAYER_ENTERING_WORLD")
-resume:SetScript("OnEvent", function(self)
+resume:SetScript("OnEvent", function(self, event, addon)
+	local saved = CinematicDB and CinematicDB.resetTest
+	if event == "ADDON_LOADED" then
+		if addon ~= "CinematicDev" and addon ~= "Cinematic" then return end
+		self:UnregisterEvent(event)
+		if saved and saved.stage == "L2" then ns.Guard(LogoutLoaded) end
+		return
+	end
 	self:UnregisterAllEvents()
-	if CinematicDB and CinematicDB.resetTest and CinematicDB.resetTest.stage == 3 then
+	if saved and saved.stage == 3 then
 		C_Timer.After(RESUME, function() ns.Guard(LoginStep) end)
+	elseif saved and saved.stage == "L3" then
+		C_Timer.After(RESUME, function() ns.Guard(LogoutLogin) end)
 	end
 end)

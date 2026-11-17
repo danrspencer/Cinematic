@@ -18487,6 +18487,8 @@ local function CreateProfilesPanel()
 				ProfileMenu(self)
 			elseif self.name ~= active then
 				picker:Hide()
+				-- (The first pick asks about game settings first; Continue clicks again.)
+				if not ns.GameSettingsAgreed(function() self:Click("LeftButton") end) then return end
 				if not ns.SetProfile(self.name) then return end -- (in a fight: it said so)
 				ns.PreviewProfile(self.name)
 				-- (Cinema: Vitals Vision's screen edges for a moment, as on the
@@ -18593,8 +18595,12 @@ local function CreateProfilesPanel()
 			-- (A copy of that one: switched to first, as New profile copies the active one.)
 			root:CreateButton(L["Copy profile"], function()
 				picker:Hide()
-				if name ~= ns.ActiveProfile() and not ns.SetProfile(name) then return end
-				NewFromActive()
+				-- (The first pick asks about game settings first; Continue copies.)
+				local function Copy()
+					if name ~= ns.ActiveProfile() and not ns.SetProfile(name) then return end
+					NewFromActive()
+				end
+				if ns.GameSettingsAgreed(Copy) then Copy() end
 			end)
 			if own then
 				root:CreateButton(L["Rename"], function() StaticPopup_Show("CINEMATIC_PROFILE_RENAME", nil, nil, name) end)
