@@ -3759,7 +3759,9 @@ do
 	local function StateOf(switch)
 		if not switch then return { hasSwitch = false, on = false, held = false, fixed = false } end
 		local on, held = SwitchState(switch)
-		return { hasSwitch = true, on = on, held = held, fixed = (switch.follows or held) and true or false }
+		-- (key, follows: whose switch it goes by, for the CineMode page's "with HUD".)
+		return { hasSwitch = true, on = on, held = held, fixed = (switch.follows or held) and true or false,
+			key = switch.key, follows = switch.follows and true or false }
 	end
 	function ns.HubOverview(hubName)
 		for _, hub in ipairs(HUBS) do
@@ -3869,6 +3871,7 @@ local function RegisterSubpage(subpanel, name, shown)
 	if subpanel.content and subpanel.resetButton then
 		local box = CreateSearch(subpanel, subpanel.content, { page })
 		box:SetPoint("RIGHT", subpanel.resetButton, "LEFT", -12, 0)
+		subpanel.searchBox = box -- (the CineMode page narrows it: its tabs run under it)
 	end
 	menu.Add(name, subpanel, L[name])
 end
@@ -3896,7 +3899,14 @@ local function CreateRevealPanel()
 	local tabList = {}
 	for i, section in ipairs(SECTIONS) do tabList[i] = { section[2], section[3] } end
 	tabList[SETTINGS_TAB] = { L["Settings"], L["How fast the UI fades, the Calm Timer, and what takes you out of CineMode."] }
-	local tabsPanel, _, ShowTab, tabsBase = ns.FolderTabs(content, tabList, function(i) PickTab(i) end)
+	local tabsPanel, tabButtons, ShowTabs, tabsBase = ns.FolderTabs(content, tabList, function(i) PickTab(i) end)
+	-- (Settings, this page's own, set a little apart from the hubs' tabs.)
+	local function ShowTab(i)
+		ShowTabs(i)
+		local last = tabButtons[SETTINGS_TAB]
+		last:ClearAllPoints()
+		last:SetPoint("BOTTOMLEFT", tabButtons[SETTINGS_TAB - 1], "BOTTOMRIGHT", 18, 0)
+	end
 	tabsBase:SetPoint("TOPLEFT", content, "TOPLEFT", 8, -(ns.FOLDER_TAB_HEIGHT + 16))
 	tabsPanel:SetPoint("TOPLEFT", tabsBase)
 	tabsPanel:SetPoint("RIGHT", content, "RIGHT", -8, 0)
@@ -4030,17 +4040,24 @@ local function CreateRevealPanel()
 		end
 		return list
 	end
+	-- (The picked choice's color: Off red, On plain, CineMode blue, Always
+	-- green, so what's been changed stands out among the rows.)
+	local PICK_COLOR = { { 0.42, 0.13, 0.11 }, { 0.26, 0.26, 0.28 }, { 0.15, 0.3, 0.52 }, { 0.14, 0.42, 0.2 } }
+	-- (fixed: the page's switch is another's, the HUD's say: no Off and On,
+	-- which could never be clicked here; just CineMode and Always if it has them.)
 	local function PaintChoices(row, own)
 		local list = row.choices
-		if not own then
+		local entry = row.entry
+		local first = entry.fixed and 2 or 1
+		if not own or (entry.fixed and not (row.ticks and entry.on)) then
 			for _, choice in ipairs(list) do choice:Hide() end
 			return
 		end
 		local names = row.ticks and CHOICES_CINE or CHOICES_ON
-		local pick = Picked(row.entry, row.ticks)
+		local pick = Picked(entry, row.ticks)
 		for i = #list, 1, -1 do
 			local choice = list[i]
-			if i > #names then
+			if i > #names or i < first then
 				choice:Hide()
 			else
 				choice:Show()
@@ -4053,10 +4070,9 @@ local function CreateRevealPanel()
 					choice:SetPoint("RIGHT", list[i + 1], "LEFT", 1, 0)
 				end
 				local on = i == pick
-				if on and i == 1 then
-					choice.bg:SetColorTexture(0.3, 0.3, 0.32, 1)
-				elseif on then
-					choice.bg:SetColorTexture(0.14, 0.5, 0.2, 1)
+				if on then
+					local color = PICK_COLOR[row.ticks and (i == 1 and 1 or i + 1) or i]
+					choice.bg:SetColorTexture(color[1], color[2], color[3], 1)
 				else
 					choice.bg:SetColorTexture(0.06, 0.06, 0.07, 1)
 				end
@@ -4103,6 +4119,9 @@ local function CreateRevealPanel()
 			end
 		end
 		row.label = Label(row, "GameFontHighlight", "")
+		-- (Where its Off and On would be, whose switch it goes by: "with HUD".)
+		row.note = Label(row, "GameFontDisableSmall", "")
+		row.note:SetPoint("RIGHT", row, "RIGHT", -10, 0)
 		row.choices = MakeChoices(row)
 		row:SetScript("OnClick", function(self) ns.OpenOptions(self.entry.name) end)
 		row:SetScript("OnEnter", RowTip)
@@ -4133,6 +4152,31 @@ local function CreateRevealPanel()
 		local db = ns.GetDB()
 		local count, onCount, used, heads = 0, 0, 0, 0
 		local y = -HEAD_H
+		-- (A row's name: a hub's General page by its own (Effects, Cameras),
+		-- the HUD's as HUD.)
+		local function NameOf(entry, isTab)
+			if isTab or entry.label ~= L["General"] then return entry.label end
+			if entry.name == "HUD:hud" then return L["HUD"] end
+			if entry.name:find(":") then return entry.label end
+			-- (Style General, Visions General: Style, Visions.)
+			return L[entry.name:match("^(.+) General$") or entry.name]
+		end
+		-- (Each switch's page by its key, over every hub, the first listed
+		-- winning (the HUD's before its sections): whose switch a row goes by.)
+		local keyNames = {}
+		for _, each in ipairs(SECTIONS) do
+			for _, page in ipairs(ns.HubOverview(each[1]) or {}) do
+				if page.key and not page.follows and not keyNames[page.key] then keyNames[page.key] = NameOf(page, false) end
+				for _, tab in ipairs(page.tabs) do
+					if tab.key and not tab.follows and not keyNames[tab.key] then keyNames[tab.key] = NameOf(tab, true) end
+				end
+			end
+		end
+		local function MasterOf(entry)
+			local key = entry.key
+			if entry.held and not entry.follows then key = ns.PageSwitchOf(key) or key end
+			return keyNames[key] or L["General"]
+		end
 		local function Place(entry, isTab, flip)
 			used = used + 1
 			local row = rows[used] or MakeRow()
@@ -4146,10 +4190,11 @@ local function CreateRevealPanel()
 			row.icon:SetShown(not isTab)
 			if not isTab then row.icon:SetTexture(entry.icon) end
 			for _, cross in ipairs(row.dev) do cross:SetShown(not isTab and entry.dev or false) end
-			-- (A hub's General page by its own name: Effects, Cameras; not a
-			-- section's own icon, HUD:hud.)
-			local text = entry.label
-			if not isTab and entry.label == L["General"] and not entry.name:find(":") then text = L[entry.name] end
+			local text = NameOf(entry, isTab)
+			row.note:SetText("")
+			if own and entry.fixed and not (row.ticks and entry.on) then
+				row.note:SetText((entry.held and L["off with %s"] or L["with %s"]):format(MasterOf(entry)))
+			end
 			row.label:SetFontObject(isTab and "GameFontHighlightSmall" or "GameFontHighlight")
 			row.label:SetText(text)
 			row.label:ClearAllPoints()
@@ -4177,7 +4222,8 @@ local function CreateRevealPanel()
 		for _, page in ipairs(pages) do banded = banded or page.band ~= nil end
 		for _, page in ipairs(pages) do
 			local pageBand = page.band or "General"
-			if banded and pageBand ~= band then
+			-- (No General header over the first page: the hub's own, the HUD's, on its own at the top.)
+			if banded and pageBand ~= band and not (band == false and pageBand == "General") then
 				heads = heads + 1
 				local sub = subHeads[heads] or MakeSubHead()
 				subHeads[heads] = sub
@@ -4514,6 +4560,8 @@ local function CreateRevealPanel()
 	end, content))
 	canvas:Hide()
 	RegisterSubpage(canvas, "CineMode")
+	-- (Narrower than other pages': the hubs' tabs run along under its left end.)
+	if canvas.searchBox then canvas.searchBox:SetWidth(130) end
 	-- (The welcome window's See Profile: the CineMode page on its first tab.)
 	function ns.OpenCineModeOverview()
 		PickTab(1)
