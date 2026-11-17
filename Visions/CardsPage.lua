@@ -95,10 +95,43 @@ function ns.CardsLink(content, text, event)
 	return holder
 end
 
+-- Where a played card's parts are on its stage (from its bottom left), left
+-- right bottom top; nil with none. Parts nearly the stage's size (a screen
+-- edge pulse, a full-width bar) aren't counted: they'd hide how small it is.
+local function CardBounds(stage)
+	local sl, sb, ss = stage:GetLeft(), stage:GetBottom(), stage:GetEffectiveScale()
+	if not (sl and sb and ss and ss > 0) then return end
+	local W, H = stage:GetSize()
+	local l, r, b, t
+	local function Take(object, k)
+		if not object:IsVisible() then return end
+		local ol, orr, ob, ot = object:GetLeft(), object:GetRight(), object:GetBottom(), object:GetTop()
+		if not (ol and orr and ob and ot) then return end
+		ol, orr, ob, ot = ol * k - sl, orr * k - sl, ob * k - sb, ot * k - sb
+		local w, h = orr - ol, ot - ob
+		if w <= 0 or h <= 0 or w > W * 0.8 or h > H * 0.8 then return end
+		l, r = math.min(l or ol, ol), math.max(r or orr, orr)
+		b, t = math.min(b or ob, ob), math.max(t or ot, ot)
+	end
+	local function Walk(frame, depth)
+		local k = frame:GetEffectiveScale() / ss
+		for _, region in ipairs({ frame:GetRegions() }) do Take(region, k) end
+		if depth < 4 then
+			for _, child in ipairs({ frame:GetChildren() }) do Walk(child, depth + 1) end
+		end
+	end
+	Walk(stage, 0)
+	return l, r, b, t
+end
+
 -- The preview: the screen's shape (or a height given), the scene behind, a
 -- card played on it, the event which() gives (nil: the Zone's, the zone
 -- you're in), in the look lookOf() gives (nil: the event's). The General
--- page's screen too.
+-- page's screen too. Zoomed in on the card (2026-11-17: it's drawn the size
+-- it is on your screen, a sliver in the preview): up to CARD_ZOOM times, till
+-- it's half the preview's width or height, as near its middle as the stage
+-- still covering the preview allows.
+local CARD_ZOOM, CARD_SHARE = 2, 0.5
 function ns.MakeCardPreview(parent, width, fixedH, which, lookOf)
 	local preview = CreateFrame("Frame", nil, parent)
 	preview:SetSize(width, fixedH or 270)
@@ -124,7 +157,25 @@ function ns.MakeCardPreview(parent, width, fixedH, which, lookOf)
 		if id == "zone" and not card.name then card.name = GetRealZoneText and GetRealZoneText() or "Darkshore" end
 		card.sound = nil
 		local look = lookOf and lookOf() or ns.CardLook(id)
-		ns.PlayCard(stage, look, self:GetWidth(), previewH, previewH / math.max(screenH, 1), card)
+		stage:SetScale(1)
+		stage:ClearAllPoints()
+		stage:SetAllPoints()
+		local W = self:GetWidth()
+		ns.PlayCard(stage, look, W, previewH, previewH / math.max(screenH, 1), card)
+		local l, r, b, t = CardBounds(stage)
+		if not l then return end
+		local f = math.max(1, math.min(CARD_ZOOM, W * CARD_SHARE / math.max(r - l, 1),
+			previewH * CARD_SHARE / math.max(t - b, 1)))
+		if f <= 1.01 then return end
+		-- (Its top left, down from the preview's, so the card's middle comes as
+		-- near the preview's as can be with no edge of the stage showing.)
+		local cx, cd = (l + r) / 2, previewH - (b + t) / 2
+		local ox = math.max(W - W * f, math.min(0, W / 2 - cx * f))
+		local od = math.max(previewH - previewH * f, math.min(0, previewH / 2 - cd * f))
+		stage:ClearAllPoints()
+		stage:SetSize(W, previewH)
+		stage:SetScale(f)
+		stage:SetPoint("TOPLEFT", self, "TOPLEFT", ox / f, -od / f)
 	end
 	return preview
 end

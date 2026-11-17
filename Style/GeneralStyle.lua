@@ -200,6 +200,11 @@ local function MakePreview(parent, width, list)
 					self:SetHeight(height)
 				end
 				ns.RecutStyleScene(self) -- (its shape: the screen's width may have changed too)
+				-- (Its samples grown to fill it when small, at the holder's zoom: StylePages.lua.)
+				if ns.ApplyPreviewZoom then
+					self.zoom = holder.zoom
+					ns.ApplyPreviewZoom(self)
+				end
 			end
 			cell:Hide()
 			cells[#cells + 1] = { frame = cell, name = L[info[1]] }
@@ -244,6 +249,7 @@ local function MakePreview(parent, width, list)
 	-- over the pages fading in.)
 	for _, side in ipairs({ { 30, "Prev", -1 }, { 6, "Next", 1 } }) do
 		local arrow = CreateFrame("Button", nil, holder)
+		arrow.zoomSkip = true -- (not drawn bigger with the screens: StylePages.lua's zoom)
 		arrow:SetSize(24, 24)
 		arrow:SetPoint("TOPRIGHT", holder, "TOPRIGHT", -side[1], -NAME_H - 4)
 		arrow:SetFrameLevel(holder:GetFrameLevel() + 30)
@@ -258,6 +264,7 @@ local function MakePreview(parent, width, list)
 	-- Not saved: a reload or login starts it turning again.)
 	local locked = false
 	local lock = CreateFrame("Button", nil, holder)
+	lock.zoomSkip = true
 	lock:SetSize(22, 22)
 	lock:SetPoint("RIGHT", holder.prevArrow, "LEFT", -2, 0)
 	lock:SetFrameLevel(holder:GetFrameLevel() + 30)

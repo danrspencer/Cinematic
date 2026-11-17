@@ -1137,11 +1137,12 @@ end
 
 -- Sticky (2026-11-17): a preview on its page stays in sight as you scroll
 -- down. Once its spot goes past the top of the page's view, the preview is
--- held shrunk in the view's top left corner (STICKY_SHARE of its width), over
--- the settings (which scroll under it), on a dark card with a thin fold bar
--- under it. Folding it (kept: stylePreviewFolded) leaves just that bar,
--- "Preview"; a click on it brings the preview back. Not for a popped one.
-local STICKY_BAR, PIN_RAISE, STICKY_SHARE, STICKY_PAD = 14, 200, 0.42, 6
+-- held shrunk in the hub's top left corner, over its icons (moved onto the
+-- hub's frame: the page's scroll view would cut it off there), left of the
+-- search box, on a dark card with a thin fold bar under it. Folding it (kept:
+-- stylePreviewFolded) leaves just that bar, "Preview"; a click on it brings
+-- the preview back. Not for a popped one, nor a page outside a hub.
+local STICKY_BAR, PIN_RAISE, STICKY_PAD = 14, 50, 6
 
 local function ScrollOf(frame)
 	local each = frame:GetParent()
@@ -1168,17 +1169,27 @@ local function ShiftLevels(frame, by)
 	end
 end
 
+-- The hub frame a page is in (Options.lua's CreateHub: it has hubSearch).
+local function HubOf(frame)
+	local each = frame:GetParent()
+	while each and each ~= UIParent do
+		if each.hubSearch then return each end
+		each = each:GetParent()
+	end
+end
+
 local function PinParts(preview)
 	if preview.pin then return preview.pin end
 	local spot, scroll = preview.stackSpot, ScrollOf(preview)
-	if not (spot and scroll) then return end
-	local pin = { scroll = scroll }
-	-- The band: from the view's top down past the preview, dark, taking the
-	-- clicks that would reach the settings under it.
-	local band = CreateFrame("Frame", nil, spot:GetParent())
+	local hub = scroll and HubOf(scroll)
+	if not (spot and hub) then return end
+	local pin = { scroll = scroll, hub = hub, home = preview:GetParent() }
+	-- The band: the card in the hub's corner, dark, taking the clicks that
+	-- would reach the icons under it.
+	local band = CreateFrame("Frame", nil, hub)
 	band.noAdopt = true
 	band:EnableMouse(true)
-	band:SetPoint("TOPLEFT", scroll, "TOPLEFT")
+	band:SetPoint("TOPLEFT", hub, "TOPLEFT", 0, -STICKY_PAD)
 	band:Hide()
 	local back = band:CreateTexture(nil, "BACKGROUND")
 	back:SetAllPoints()
@@ -1206,7 +1217,7 @@ local function PinParts(preview)
 	bar.label:SetText(ns.L["Preview"])
 	bar:SetScript("OnClick", function()
 		if ns.db then ns.db.stylePreviewFolded = not ns.db.stylePreviewFolded or nil end
-		UpdateSticky(preview)
+		UpdateSticky(preview, nil, true)
 	end)
 	bar:SetScript("OnEnter", function(self)
 		GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
@@ -1216,52 +1227,136 @@ local function PinParts(preview)
 	end)
 	bar:SetScript("OnLeave", function() GameTooltip:Hide() end)
 	pin.band, pin.bar = band, bar
+	pin.driver = CreateFrame("Frame", nil, pin.hub)
 	preview.pin = pin
 	scroll:HookScript("OnVerticalScroll", function() UpdateSticky(preview) end)
+	-- (Held on the hub, it doesn't hide with its page: put back as that goes.)
+	pin.home:HookScript("OnHide", function() UpdateSticky(preview, true) end)
 	return pin
 end
 
--- off: not held whatever the scroll (popping out, its page left).
-UpdateSticky = function(preview, off)
+-- How small it goes in the hub's corner: what fits over the page's view,
+-- left of the search box.
+local function CornerScale(preview, pin)
+	local hub, viewTop = pin.hub, pin.scroll:GetTop()
+	local hubTop, hubLeft, searchLeft = hub:GetTop(), hub:GetLeft(), hub.hubSearch:GetLeft()
+	local roomH = (hubTop and viewTop) and hubTop - viewTop - STICKY_PAD * 2 - 4 - STICKY_BAR or 0
+	local roomW = (searchLeft and hubLeft) and searchLeft - hubLeft - STICKY_PAD * 4 or 0
+	return math.min(1, roomH / math.max(preview:GetHeight(), 1), roomW / math.max(preview:GetWidth(), 1))
+end
+
+-- Its move between its page and the hub's corner, eased (2026-11-17): it
+-- shrinks into the corner as its room on the page closes, the settings under
+-- it rising with it, and back the same way.
+local STICKY_TIME = 0.22
+
+-- Its spot's room on the page set, the page's scroll length with it (else
+-- the room taken away is left as empty space at the page's bottom).
+local function SetRoom(pin, spot, height)
+	local before = spot:GetHeight()
+	spot:SetHeight(height)
+	local child = pin.scroll:GetScrollChild()
+	if child and math.abs(height - before) > 0.01 then
+		child:SetHeight(math.max(1, child:GetHeight() + height - before))
+	end
+end
+
+-- Onto the hub, over its icons, its own order kept; what hangs from it on
+-- the page, from its spot while it's away.
+local function Lift(preview, pin)
+	local spot = preview.stackSpot
+	pin.moved = Repoint(spot:GetParent(), preview, spot)
+	preview:SetParent(pin.hub)
+	pin.raise = pin.hub:GetFrameLevel() + PIN_RAISE - preview:GetFrameLevel()
+	ShiftLevels(preview, pin.raise)
+	pin.on = true
+end
+
+-- Back in its spot on the page, its room there whole.
+local function Drop(preview, pin)
+	local spot = preview.stackSpot
+	ShiftLevels(preview, -pin.raise)
+	preview:SetParent(pin.home)
+	preview:SetScale(1)
+	preview:ClearAllPoints()
+	preview:SetPoint("TOPLEFT", spot, "TOPLEFT")
+	Repoint(spot:GetParent(), spot, preview, pin.moved)
+	SetRoom(pin, spot, preview:GetHeight())
+	pin.moved, pin.on = nil, false
+end
+
+-- Where it is at e (0: its spot on the page, 1: the hub's corner), its
+-- spot's room on the page closing as it goes, the card fading in under it.
+local function Place(preview, pin, e)
+	local spot, hub, band = preview.stackSpot, pin.hub, pin.band
+	local width, height = preview:GetWidth(), preview:GetHeight()
+	local sx, sy = (spot:GetLeft() or 0) - (hub:GetLeft() or 0), (spot:GetTop() or 0) - (hub:GetTop() or 0)
+	local s = 1 + (CornerScale(preview, pin) - 1) * e
+	local x, y = sx + (STICKY_PAD * 2 - sx) * e, sy + (-STICKY_PAD * 2 - sy) * e
+	-- (Its offsets are in its own scale: where it goes the same on screen.)
+	preview:SetScale(s)
+	preview:ClearAllPoints()
+	preview:SetPoint("TOPLEFT", hub, "TOPLEFT", x / s, y / s)
+	SetRoom(pin, spot, math.max(1, height * (1 - e)))
+	band:SetWidth(width * s + STICKY_PAD * 4)
+	band:SetHeight(height * s + STICKY_PAD + 4 + STICKY_BAR)
+	band:SetAlpha(e)
+end
+
+local function Step(preview, pin, elapsed)
+	local goal = pin.target and 1 or 0
+	local t = pin.t or 0
+	t = goal > t and math.min(goal, t + elapsed / STICKY_TIME) or math.max(goal, t - elapsed / STICKY_TIME)
+	pin.t = t
+	if t == 0 and not pin.target then
+		if pin.on then Drop(preview, pin) end
+	elseif pin.on then
+		Place(preview, pin, t * t * (3 - 2 * t))
+	end
+	if t == goal then ns.SetOnUpdate(pin.driver, nil) end
+end
+
+-- off: not held whatever the scroll (popping out, its page left), at once.
+-- snap: no easing (folded or unfolded: its spot is out of sight).
+UpdateSticky = function(preview, off, snap)
 	local pin = preview.pin
 	if not pin then return end
 	local spot, scroll, band, bar = preview.stackSpot, pin.scroll, pin.band, pin.bar
 	local spotTop, viewTop = spot:GetTop(), scroll:GetTop()
 	local over = (spotTop and viewTop) and spotTop - viewTop or 0
-	local width, height = preview:GetWidth(), preview:GetHeight()
-	-- (Shrunk to its share of the view's width, and no taller than half of it.)
-	local k = math.min(1, scroll:GetWidth() * STICKY_SHARE / math.max(width, 1),
-		scroll:GetHeight() * 0.5 / math.max(height, 1))
-	local can = not off and popped ~= preview and preview:IsVisible() and over > 0
+	local can = not off and popped ~= preview and spot:IsVisible() and over > 0
+		and CornerScale(preview, pin) > 0.1
+	-- (A page too short to scroll past its spot once its room is gone: left
+	-- as it is, not held, or closing the room would pull the scroll back up
+	-- over its spot and put it back. Asked of the page, not of where it's
+	-- scrolled to: one scrolled fast to its bottom is held too, 2026-11-17.)
+	if can and not pin.target
+		and scroll:GetVerticalScrollRange() - preview:GetHeight() <= scroll:GetVerticalScroll() - over + 1 then
+		can = false
+	end
 	local hold = can and not (ns.db and ns.db.stylePreviewFolded) or false
-	if hold ~= (pin.on or false) then
-		if hold then
-			-- (What hangs from it on the page, from its spot while it's held.)
-			pin.moved = Repoint(spot:GetParent(), preview, spot)
-			ShiftLevels(preview, PIN_RAISE)
-		else
-			ShiftLevels(preview, -PIN_RAISE)
-			preview:SetScale(1)
-			preview:ClearAllPoints()
-			preview:SetPoint("TOPLEFT", spot, "TOPLEFT")
-			Repoint(spot:GetParent(), spot, preview, pin.moved)
-			pin.moved = nil
-		end
-		pin.on = hold
+	pin.target = hold
+	if hold and not pin.on then
+		Lift(preview, pin)
+		pin.t = 0
 	end
-	if hold then
-		-- (Its offsets are in its own scale: the corner gap the same on screen.)
-		preview:SetScale(k)
-		preview:ClearAllPoints()
-		preview:SetPoint("TOPLEFT", scroll, "TOPLEFT", STICKY_PAD / k, -STICKY_PAD / k)
+	if off or snap then
+		pin.t = hold and 1 or 0
 	end
-	band:SetShown(can)
-	if not can then return end
-	band:SetFrameLevel(spot:GetParent():GetFrameLevel() + PIN_RAISE - 10)
-	band:SetWidth(width * k + STICKY_PAD * 2)
-	band:SetHeight(hold and height * k + STICKY_PAD + 4 + STICKY_BAR or STICKY_BAR + 4)
-	bar.label:SetShown(not hold)
-	SetIconCell(bar.glyph, hold and "fold" or "unfold")
+	Step(preview, pin, 0)
+	if pin.t ~= (hold and 1 or 0) then
+		ns.SetOnUpdate(pin.driver, function(_, elapsed) Step(preview, pin, elapsed) end)
+	end
+	-- (Folded: just its bar, "Preview", in the corner.)
+	band:SetFrameLevel(pin.hub:GetFrameLevel() + PIN_RAISE - 10)
+	band:SetShown(pin.on or can)
+	bar.label:SetShown(not pin.on)
+	SetIconCell(bar.glyph, pin.on and "fold" or "unfold")
+	if not pin.on and can then
+		band:SetAlpha(1)
+		band:SetWidth(preview:GetWidth() * CornerScale(preview, pin) + STICKY_PAD * 4)
+		band:SetHeight(STICKY_BAR + 4)
+	end
 end
 
 -- Shown only while the mouse is over the preview (2026-11-17): its Pop out
@@ -1288,9 +1383,13 @@ end
 
 -- The "Preview" word in a preview's corner, gone (2026-11-17): the page and
 -- the window say what it is.
-local function HideCaption(preview)
+-- (Its screens' own too: a rotating preview's each have theirs.)
+local function HideCaption(preview, depth)
 	for _, region in ipairs({ preview:GetRegions() }) do
 		if region.GetText and region:GetText() == ns.L["Preview"] then region:SetAlpha(0) end
+	end
+	if (depth or 0) < 1 then
+		for _, child in ipairs({ preview:GetChildren() }) do HideCaption(child, (depth or 0) + 1) end
 	end
 end
 
@@ -1500,7 +1599,10 @@ local function WidePreview(preview)
 	preview:ClearAllPoints()
 	preview:SetPoint("TOPLEFT", spot, "TOPLEFT")
 	preview:HookScript("OnSizeChanged", function(self, width, height)
-		if popped ~= self then spot:SetSize(width, height) end
+		if popped ~= self then
+			local pin = self.pin
+			spot:SetSize(width, pin and pin.on and math.max(1, height * (1 - (pin.t or 0))) or height)
+		end
 	end)
 	FitPreview(preview)
 	preview:HookScript("OnShow", function(self)
@@ -1518,8 +1620,23 @@ end
 -- Style's text) reads preview.zoom in its Refresh: preview.OnZoom says so.
 -- Kept while the game runs. (Its own buttons and two-point children left be.)
 local ZOOMS = { 0.5, 0.75, 1, 1.25, 1.5, 2, 2.5, 3 }
+-- A preview whose samples take up little of it is drawn bigger to start
+-- with (2026-11-17: the Personal Resource Display's bars were a strip in the
+-- middle; then zoomed in more, the action buttons and nameplates too): up to
+-- FIT_W of its width and FIT_H of its screen's height, at most FIT_MAX
+-- times, spread round their middle. Never smaller. Its zoom buttons go on
+-- from there (100% is this fit). Its own buttons are zoomSkip.
+local FIT_W, FIT_H, FIT_MAX = 0.85, 0.8, 2
+-- Where a frame's point is, from its bottom left, in its own units.
+local function PointAt(frame, point)
+	local w, h = frame:GetSize()
+	local x = point:find("LEFT") and 0 or point:find("RIGHT") and w or w / 2
+	local y = point:find("TOP") and h or point:find("BOTTOM") and 0 or h / 2
+	return x, y
+end
 local function ApplyZoom(preview)
 	local z = preview.zoom or 1
+	local list = {}
 	for _, child in ipairs({ preview:GetChildren() }) do
 		if not child.zoomSkip and child:GetNumPoints() <= 1 then
 			-- (Its own scale and spot, as its maker last set them.)
@@ -1532,19 +1649,63 @@ local function ApplyZoom(preview)
 					and math.abs(applied[5] - y) < 0.01) then
 					child.zoomAnchor = { point, rel, relPoint, x * (child.zoomBase or 1) / scale, y * (child.zoomBase or 1) / scale }
 				end
-				local a = child.zoomAnchor
-				if a then
-					child:ClearAllPoints()
-					child:SetPoint(a[1], a[2], a[3], a[4] / z, a[5] / z)
-					child.zoomPoint = { a[1], a[2], a[3], a[4] / z, a[5] / z }
-				end
 			end
-			child:SetScale((child.zoomBase or 1) * z)
-			child.zoomScale = (child.zoomBase or 1) * z
+			list[#list + 1] = child
 		end
+	end
+	-- (As its maker drew them, measured: how much of the preview they take.)
+	for _, child in ipairs(list) do
+		child:SetScale(child.zoomBase or 1)
+		local a = child.zoomAnchor
+		if a then
+			child:ClearAllPoints()
+			child:SetPoint(a[1], a[2], a[3], a[4], a[5])
+		end
+	end
+	local pl, pb, ps = preview:GetLeft(), preview:GetBottom(), preview:GetEffectiveScale()
+	local l, r, b, t
+	if pl and pb and ps and ps > 0 then
+		for _, child in ipairs(list) do
+			local cl, cr, cb, ct = child:GetLeft(), child:GetRight(), child:GetBottom(), child:GetTop()
+			if child:IsShown() and cl and cr and cb and ct and cr > cl and ct > cb then
+				local k = child:GetEffectiveScale() / ps
+				cl, cr, cb, ct = cl * k - pl, cr * k - pl, cb * k - pb, ct * k - pb
+				l, r = math.min(l or cl, cl), math.max(r or cr, cr)
+				b, t = math.min(b or cb, cb), math.max(t or ct, ct)
+			end
+		end
+	end
+	local f = 1
+	if l and not preview.noAutoFit then
+		local roomH = preview:GetHeight() - (preview.headHeight or 0)
+		f = math.max(1, math.min(FIT_MAX, preview:GetWidth() * FIT_W / math.max(r - l, 1),
+			roomH * FIT_H / math.max(t - b, 1)))
+	end
+	local cx, cy = l and (l + r) / 2 or 0, b and (b + t) / 2 or 0
+	for _, child in ipairs(list) do
+		local base = child.zoomBase or 1
+		local s = base * z * f
+		local a = child.zoomAnchor
+		if a then
+			local x, y = a[4] * base / s, a[5] * base / s
+			-- (Hung on the preview: moved out from the samples' middle as they grow.)
+			if f ~= 1 and a[2] == preview then
+				local rx, ry = PointAt(preview, a[3])
+				local px, py = rx + a[4] * base, ry + a[5] * base
+				x = (cx + (px - cx) * f - rx) / s
+				y = (cy + (py - cy) * f - ry) / s
+			end
+			child:ClearAllPoints()
+			child:SetPoint(a[1], a[2], a[3], x, y)
+			child.zoomPoint = { a[1], a[2], a[3], x, y }
+		end
+		child:SetScale(s)
+		child.zoomScale = s
 	end
 	if preview.OnZoom then preview:OnZoom(z) end
 end
+-- (A rotating preview's screens: each fitted and zoomed as it's drawn.)
+ns.ApplyPreviewZoom = ApplyZoom
 function ns.AddPreviewZoom(preview)
 	if preview.zoomButtons then return end
 	local function Step(by)
@@ -1554,19 +1715,18 @@ function ns.AddPreviewZoom(preview)
 			if math.abs(each - now) < 0.01 then at = i end
 		end
 		preview.zoom = ZOOMS[math.max(1, math.min(#ZOOMS, at + by))]
-		-- (Its Refresh zooms again after it draws: wrapped once, here.)
-		if preview.Refresh and not preview.zoomWrapped then
-			preview.zoomWrapped = true
-			local refresh = preview.Refresh
-			preview.Refresh = function(self, ...)
-				local a, b = refresh(self, ...)
-				if (self.zoom or 1) ~= 1 or self.zoomed then ApplyZoom(self) end
-				return a, b
-			end
-		end
-		preview.zoomed = true
 		if preview.Refresh then preview:Refresh() else ApplyZoom(preview) end
 		preview.zoomButtons.label:SetText(("%d%%"):format(math.floor(preview.zoom * 100 + 0.5)))
+	end
+	-- (Its Refresh zooms and fits again after it draws: wrapped once, here.)
+	if preview.Refresh and not preview.zoomWrapped then
+		preview.zoomWrapped = true
+		local refresh = preview.Refresh
+		preview.Refresh = function(self, ...)
+			local a, b = refresh(self, ...)
+			ApplyZoom(self)
+			return a, b
+		end
 	end
 	local holder = CreateFrame("Frame", nil, preview)
 	holder.zoomSkip = true

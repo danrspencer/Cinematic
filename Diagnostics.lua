@@ -1807,6 +1807,10 @@ do
 				ns.Log("unitframes", name .. ": not on this client")
 			end
 		end
+		for _, line in ipairs(ns.UnitCastPinReport and ns.UnitCastPinReport() or {}) do
+			ns.Print(line)
+			ns.Log("unitframes", line)
+		end
 		for _, line in ipairs(ns.UnitPartDebug and ns.UnitPartDebug("CastBar") or {}) do
 			ns.Print(line)
 			ns.Log("unitframes", line)

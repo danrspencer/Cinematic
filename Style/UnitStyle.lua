@@ -449,6 +449,27 @@ local function DressBar(bar, view, r, g, b, tint, under)
 	dressing = false
 end
 
+-- For the cast bars that take a unit frame's look (PlateCastStyle.lua): that
+-- frame's look (id: PLAYER, TARGET...), and its border and background on a
+-- cast bar as on the frame's own bars (id nil: taken off). The fill and its
+-- colors are the cast bar page's.
+function ns.UnitFrameLook(id)
+	return View(id)
+end
+
+function ns.DressCastSkin(bar, id)
+	if not (bar and bar.CreateTexture) then return end
+	local view = id and View(id)
+	if view and ns.StyleOn("ufStyle") and view.ufBorder ~= "game" then
+		local skin = Skin(bar)
+		DressSkin(skin, view)
+		skin:Show()
+	elseif skins[bar] then
+		ns.DressBarShape(bar, skins[bar].back, true)
+		skins[bar]:Hide()
+	end
+end
+
 -- A bar we've colored keeps it: on Forever the mana bar turns green now and then
 -- (full mana, a buff to max mana) by a way none of our setter hooks hear. Checked
 -- as its value changes, cheap: only the fill's color against ours. A bar left in
@@ -677,6 +698,12 @@ local function Parts(frame)
 		frame.portrait or frame.Portrait
 end
 
+-- A frame's health and power bars (PlateCastStyle.lua's cast bar goes under the lower).
+function ns.UnitFrameBars(frame)
+	local health, power = Parts(frame)
+	return health, power
+end
+
 -- The game's frame art, in the style theme's ornament color: one texture draws
 -- the portrait ring and the name box (the names as Frames.lua's Art lists them).
 -- Nothing's touched with no theme, and what was tinted goes back.
@@ -873,7 +900,9 @@ end
 -- piece of the ring's own metal off the health bar's end, running in under the ring.
 -- All textures of its own frame, so the picture covers it: lines on a frame above
 -- crossed the face.
-local function PlaceBridge(bridge, plate, bottom, flip, portrait, under, shape)
+-- gap: the rows' metal (BAR_GAP; the preview's game frame: whole screen pixels).
+local function PlaceBridge(bridge, plate, bottom, flip, portrait, under, shape, gap)
+	gap = gap or BAR_GAP
 	local near, far = flip and "RIGHT" or "LEFT", flip and "LEFT" or "RIGHT"
 	-- (A rectangle out of the rows, exactly their height: its two corners by the rows
 	-- show, its other end's under the portrait. under: the portrait draws over it, so it
@@ -885,8 +914,8 @@ local function PlaceBridge(bridge, plate, bottom, flip, portrait, under, shape)
 	if not (Readable(top) and Readable(low) and Readable(edge) and Readable(middle) and Readable(side)) then return end
 	bridge:ClearAllPoints()
 	-- (Out from the rows' metal, which is just outside their edge.)
-	bridge:SetPoint("TOP" .. far, plate, "TOP" .. near, flip and BAR_GAP or -BAR_GAP, BAR_GAP)
-	bridge:SetSize(math.max(1, math.abs(edge - (under and middle or side)) - BAR_GAP), top - low + BAR_GAP * 2)
+	bridge:SetPoint("TOP" .. far, plate, "TOP" .. near, flip and gap or -gap, gap)
+	bridge:SetSize(math.max(1, math.abs(edge - (under and middle or side)) - gap), top - low + gap * 2)
 	-- (Cut away inside the ring: a picture part faded shows what's under it, and the
 	-- connector's lines came through the face as the frame faded in.)
 	local file = ns.ThemePortraitOut(shape)
@@ -902,13 +931,20 @@ local function PlaceBridge(bridge, plate, bottom, flip, portrait, under, shape)
 		if not file and bridge.holed then texture:RemoveMaskTexture(bridge.hole) end
 	end
 	bridge.holed = file and true or nil
+	-- (Its metal as thick as the rows', the shade just inside it.)
+	bridge.top:SetHeight(gap)
+	bridge.low:SetHeight(gap)
+	bridge.shadeTop:SetPoint("TOPLEFT", 0, -gap)
+	bridge.shadeTop:SetPoint("TOPRIGHT", 0, -gap)
+	bridge.shadeLow:SetPoint("BOTTOMLEFT", 0, gap)
+	bridge.shadeLow:SetPoint("BOTTOMRIGHT", 0, gap)
 	local left, right = flip and 1 or 0, flip and 0 or 1
 	bridge.art:SetTexCoord(left, right, 0, 1) -- (darker toward the portrait)
 	-- (The cell's small 45 degree corners, on the two that show.)
 	for i, brace in ipairs({ bridge.braceTop, bridge.braceLow }) do
 		brace:SetSize(2, 2)
 		brace:ClearAllPoints()
-		brace:SetPoint((i == 1 and "TOP" or "BOTTOM") .. far, bridge, (i == 1 and "TOP" or "BOTTOM") .. far, 0, i == 1 and -BAR_GAP or BAR_GAP)
+		brace:SetPoint((i == 1 and "TOP" or "BOTTOM") .. far, bridge, (i == 1 and "TOP" or "BOTTOM") .. far, 0, i == 1 and -gap or gap)
 		brace:SetTexCoord(right, left, i == 1 and 0 or 1, i == 1 and 1 or 0)
 	end
 end
@@ -925,6 +961,9 @@ local function DressBridge(bridge, on)
 	bridge.low:SetColorTexture(edge[1], edge[2], edge[3], 1)
 	bridge.braceTop:SetVertexColor(edge[1], edge[2], edge[3], 1)
 	bridge.braceLow:SetVertexColor(edge[1], edge[2], edge[3], 1)
+	-- (Shown again: the preview's game frame hides them.)
+	bridge.braceTop:Show()
+	bridge.braceLow:Show()
 end
 
 local function MakeBridge(parent)
@@ -2458,13 +2497,15 @@ function ns.MakeUnitStylePreview(parent, width, onPick)
 				unit.plate.left:SetColorTexture(0, 0, 0, 0)
 				unit.plate.right:SetColorTexture(0, 0, 0, 0)
 				unit.plate.edges:Hide()
-				DressCell(unit.plate.cell, true, metal, BAR_GAP)
+				-- (No small corners or fine lines in it: at the preview's size they
+				-- land between screen pixels and smear. 2026-11-17.)
+				DressCell(unit.plate.cell, false, metal, BAR_GAP)
 			else
 				unit.plate.grit:Show()
 				unit.plate.sheen:SetAlpha(1)
 			end
 			for _, bar in ipairs({ unit.health, unit.power }) do
-				DressCell(bar.gameCell, framed, metal, BAR_GAP)
+				DressCell(bar.gameCell, false, metal, BAR_GAP)
 				-- (Solid, or the metal behind would show through the empty part.)
 				if framed then bar.game:SetColorTexture(0.05, 0.04, 0.03, 1) else bar.game:SetColorTexture(0, 0, 0, 0.5) end
 			end
@@ -2545,7 +2586,24 @@ function ns.MakeUnitStylePreview(parent, width, onPick)
 				unit.value:SetText(("%d%%"):format(sample.health * 100))
 			end
 			PlacePlate(unit.plate, unit.health)
-			if framed then unit.plate:SetHeight(10) end
+			-- (The game's frame: its metal a whole number of screen pixels, so every
+			-- line between and round the rows comes out the same, and sharp. Rows
+			-- whose edges are all that far apart round to the screen alike.)
+			local metalGap = BAR_GAP
+			local factor = PixelUtil and PixelUtil.GetPixelToUIUnitFactor and PixelUtil.GetPixelToUIUnitFactor()
+			local scale = unit.health:GetEffectiveScale()
+			if framed and factor and Readable(scale) and scale > 0 then
+				local px = factor / scale
+				metalGap = math.max(1, math.floor(BAR_GAP / px + 0.5)) * px
+			end
+			unit.power:ClearAllPoints()
+			unit.power:SetPoint("TOP", unit.health, "BOTTOM", 0, framed and -metalGap or -2)
+			if framed then
+				unit.plate:SetHeight(10)
+				unit.plate:ClearAllPoints()
+				unit.plate:SetPoint("BOTTOMLEFT", unit.health, "TOPLEFT", 0, metalGap)
+				unit.plate:SetPoint("BOTTOMRIGHT", unit.health, "TOPRIGHT", 0, metalGap)
+			end
 			PlaceBridge(unit.bridge, unit.plate, unit.power, sample.flip, unit.portrait, true, view.ufShape)
 			PlaceRowShadow(unit.rowShadow, unit.plate, unit.power)
 			unit.rowShadow:SetShown(view.ufShape ~= "game" and view.ufShape ~= "none" and ns.ThemeLayout() ~= "slab"
@@ -2555,19 +2613,19 @@ function ns.MakeUnitStylePreview(parent, width, onPick)
 				and not ns.ThemePortraitBack(view.ufShape))
 			if framed then
 				-- (The game's connector: dark, the rows' metal along its top and bottom.)
-				PlaceBridge(unit.bridge, unit.plate, unit.power, sample.flip, unit.portrait, true, "game")
+				PlaceBridge(unit.bridge, unit.plate, unit.power, sample.flip, unit.portrait, true, "game", metalGap)
 				local bridge = unit.bridge
 				bridge:Show()
 				bridge.back:SetColorTexture(0.09, 0.07, 0.05, 1)
 				bridge.top:SetColorTexture(metal[1], metal[2], metal[3], 1)
 				bridge.low:SetColorTexture(metal[1], metal[2], metal[3], 1)
-				bridge.braceTop:SetVertexColor(metal[1], metal[2], metal[3], 1)
-				bridge.braceLow:SetVertexColor(metal[1], metal[2], metal[3], 1)
-				-- (Its metal block: round corners at the far end only, square where the connector joins.)
-				local box, round = unit.box, 3
+				bridge.braceTop:Hide()
+				bridge.braceLow:Hide()
+				-- (Its metal block, square: small round corners smeared at the preview's size.)
+				local box, round = unit.box, 0
 				box:ClearAllPoints()
-				box:SetPoint("TOPLEFT", unit.plate, "TOPLEFT", -BAR_GAP, BAR_GAP)
-				box:SetPoint("BOTTOMRIGHT", unit.power, "BOTTOMRIGHT", BAR_GAP, -BAR_GAP)
+				box:SetPoint("TOPLEFT", unit.plate, "TOPLEFT", -metalGap, metalGap)
+				box:SetPoint("BOTTOMRIGHT", unit.power, "BOTTOMRIGHT", metalGap, -metalGap)
 				box.wide:ClearAllPoints()
 				box.wide:SetPoint("TOPLEFT", 0, -round)
 				box.wide:SetPoint("BOTTOMRIGHT", 0, round)
@@ -2576,19 +2634,7 @@ function ns.MakeUnitStylePreview(parent, width, onPick)
 				box.tall:SetPoint("BOTTOMRIGHT", -round, 0)
 				box.wide:SetColorTexture(metal[1], metal[2], metal[3], 1)
 				box.tall:SetColorTexture(metal[1], metal[2], metal[3], 1)
-				for i, corner in ipairs(box.corners) do
-					corner:SetSize(round, round)
-					local near = (i % 2 == 1) ~= (sample.flip and true or false)
-					if near then
-						corner:SetColorTexture(metal[1], metal[2], metal[3], 1)
-						corner:SetVertexColor(1, 1, 1, 1)
-						corner:SetTexCoord(0, 1, 0, 1)
-					else
-						corner:SetTexture("Interface\\CharacterFrame\\TempPortraitAlphaMask")
-						corner:SetTexCoord(unpack(corner.coords))
-						corner:SetVertexColor(metal[1], metal[2], metal[3], 1)
-					end
-				end
+				for _, corner in ipairs(box.corners) do corner:Hide() end
 			end
 			-- (The name.)
 			-- (The game's frame: small text in its name box.)

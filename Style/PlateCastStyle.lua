@@ -181,6 +181,7 @@ for _, info in ipairs(BARS) do
 	local id = info[1]
 	DEFAULTS["plateCastOwn_" .. id] = false
 	if id ~= "PLATE" then DEFAULTS["plateCastOn_" .. id] = false end
+	if id == "PLAYER" or id == "TARGET" then DEFAULTS["plateCastFrame_" .. id] = false end -- (the unit frame's look: FrameLooked)
 	for _, key in ipairs(BAR_KEYS) do
 		DEFAULTS[key .. "_" .. id] = DEFAULTS[key]
 		local entry = ns.SHARED_STYLE[key]
@@ -204,12 +205,34 @@ end
 -- its "Use default settings" is unticked, else Default's; each through the
 -- Style pages' look (General's, and the game's with the page or General off).
 local views = {}
+-- (Yours and your target's can take their unit frame's look instead, its
+-- fill, font and border: FRAME_LOOK, the rest Default's. Their border and
+-- background are then the frame's own, drawn by UnitStyle.lua: ours off.)
+local OUTLINE_NAMES = { [0] = "none", [1] = "thin", [2] = "thick" }
+local FRAME_LOOK = {
+	plateCastFill = function(frame) return frame.ufTexture end,
+	plateCastBorder = function(frame) return frame.ufBorder == "game" and "game" or "none" end,
+	plateCastBack = function() return 0 end,
+	plateCastFont = function(frame) return frame.ufFont end,
+	plateCastOutline = function(frame) return OUTLINE_NAMES[tonumber(frame.ufOutline)] or "game" end,
+	plateCastShadow = function(frame) return frame.ufShadow end,
+}
+local FRAME_IDS = { PLAYER = true, TARGET = true }
+local function FrameLooked(id, db)
+	db = db or ns.db
+	return FRAME_IDS[id] and db and db["plateCastFrame_" .. id] and Active(id, db) and ns.UnitFrameLook and true
+		or false
+end
 local function View(id)
 	local view = views[id or "DEFAULT"]
 	if not view then
 		view = setmetatable({}, { __index = function(_, key)
 			local look = ns.StyleLook("plateCastStyle")
 			local db = ns.db
+			if FRAME_LOOK[key] and FrameLooked(id, db) then
+				local value = FRAME_LOOK[key](ns.UnitFrameLook(id))
+				if value ~= nil then return value end
+			end
 			if id and OWN_KEY[key] and db and ns.StyleOn("plateCastStyle") and db["plateCastOwn_" .. id] then
 				return look[key .. "_" .. id]
 			end
@@ -852,6 +875,224 @@ ns.StylePlateCastBar = Apply
 local hooked = setmetatable({}, { __mode = "k" })
 local barIds = setmetatable({}, { __mode = "k" }) -- [bar] = its kind's id
 
+-- With the unit frame's look, the bar is part of the frame: pinned just under
+-- its lowest bar, as wide as it, the spell's icon in the frame's left edge,
+-- and the frame's buffs that hang under it moved down to under the cast bar.
+-- Yours only while Edit Mode has it locked to the player frame (else it's
+-- where you put it). The game places these bars again as buffs come and go:
+-- each time, ours goes back on a frame later. Not in fights where the game
+-- locks the bar. Its own anchors (and the buffs') put back when turned off.
+local PIN_GAP = 3 -- (under the frame's bar: past both borders)
+local placing = false
+local pinned = setmetatable({}, { __mode = "k" }) -- [bar or buff] = { own = its points, ours = ours }
+local pinReport = {} -- [bar] = what the last try did (/cine debug unitframes)
+local pinHooked = setmetatable({}, { __mode = "k" }) -- [region] = its SetPoint heard
+local PlaceOnFrame -- (below)
+
+-- (The game places it again: ours back on a frame later, once.)
+local pinSoon = setmetatable({}, { __mode = "k" })
+local function OnGamePoint(bar)
+	if placing or not pinned[bar] or pinSoon[bar] then return end
+	pinSoon[bar] = true
+	C_Timer.After(0, function()
+		pinSoon[bar] = nil
+		if pinned[bar] and FrameLooked(barIds[bar]) then PlaceOnFrame(bar, true) end
+	end)
+end
+
+local function OwnerOf(bar)
+	if bar == _G.PlayerCastingBarFrame then
+		return bar.attachedToPlayerFrame and _G.PlayerFrame or nil, "PLAYER"
+	end
+	for _, name in ipairs({ "TargetFrame", "FocusFrame" }) do
+		local frame = _G[name]
+		if frame and (frame.spellbar == bar or _G[name .. "SpellBar"] == bar) then
+			return frame, name == "TargetFrame" and "TARGET" or "FOCUS"
+		end
+	end
+end
+
+local function Locked(region)
+	return InCombatLockdown() and region.IsProtected and select(2, region:IsProtected())
+end
+
+-- (A region's points, ours on it, or the game's again: then kept as its own.)
+local function Pin(region, points)
+	local saved = pinned[region]
+	local now = ReadPoints(region)
+	if now and not (saved and SamePoints(now, saved.ours)) then
+		saved = { own = now }
+		pinned[region] = saved
+	end
+	if not saved or Locked(region) then return false end
+	placing = true
+	SetPoints(region, points)
+	placing = false
+	saved.ours = ReadPoints(region)
+	return true
+end
+
+local function Unpin(region)
+	local saved = pinned[region]
+	if not saved then return end
+	pinned[region] = nil
+	local now = ReadPoints(region)
+	if saved.own and now and SamePoints(now, saved.ours) and not Locked(region) then
+		placing = true
+		SetPoints(region, saved.own)
+		placing = false
+	end
+end
+
+local function Bottom(region)
+	local ok, bottom = pcall(region.GetBottom, region)
+	local okScale, scale = pcall(region.GetEffectiveScale, region)
+	if ok and okScale and type(bottom) == "number" and Known(bottom) and Known(scale) then return bottom * scale end
+end
+local function Top(region)
+	local ok, top = pcall(region.GetTop, region)
+	local okScale, scale = pcall(region.GetEffectiveScale, region)
+	if ok and okScale and type(top) == "number" and Known(top) and Known(scale) then return top * scale, scale end
+end
+
+-- The frame's buffs and debuffs that start a row under it: its small square
+-- children held by the frame itself or by their holder (the rest of a row
+-- hangs off those). Retail's and Forever's target and focus: in
+-- TargetFrameContent.TargetFrameContentContextual.Auras (/cine debug
+-- unitframes, 2026-11-17).
+local function AuraHolder(frame)
+	local content = frame.TargetFrameContent
+	local contextual = content and content.TargetFrameContentContextual
+	return contextual and contextual.Auras
+end
+local function BuffStarts(frame, bar)
+	local list = {}
+	local holder = AuraHolder(frame)
+	for _, parent in ipairs({ frame, holder or false }) do
+		local ok, children = pcall(function() return parent and { parent:GetChildren() } or {} end)
+		for _, child in ipairs(ok and children or {}) do
+			if child ~= bar and Usable(child) then
+				local width = Number(pcall(child.GetWidth, child))
+				local height = Number(pcall(child.GetHeight, child))
+				local points = ReadPoints(child)
+				local first = points and points[1]
+				if width and height and width > 8 and width <= 40 and math.abs(width - height) < 3 and first
+					and (first[2] == frame or (holder and first[2] == holder)) and first[1]:find("TOP") then
+					list[#list + 1] = child
+				end
+			end
+		end
+	end
+	return list
+end
+
+local buffsMoved = setmetatable({}, { __mode = "k" }) -- [frame] = { its buffs we moved }
+local function PlaceBuffs(frame, bar, on)
+	local moved = buffsMoved[frame] or {}
+	buffsMoved[frame] = moved
+	if not on then
+		for buff in pairs(moved) do Unpin(buff) end
+		wipe(moved)
+		return 0
+	end
+	local floor = Bottom(bar)
+	local count = 0
+	for _, buff in ipairs(BuffStarts(frame, bar)) do
+		local saved = pinned[buff]
+		local own = saved and saved.own
+		local now = ReadPoints(buff)
+		if now and not (saved and SamePoints(now, saved.ours)) then own = now end
+		local top, scale = Top(buff)
+		if own and top and floor then
+			-- (From where the game holds it: a frame's own place, not ours.)
+			local shift = 0
+			if saved and saved.ours and SamePoints(now, saved.ours) then
+				shift = own[1][5] - now[1][5]
+			end
+			local ownTop = top + shift * scale
+			local want = floor - PIN_GAP * scale
+			if ownTop > want then
+				local points = {}
+				for i, p in ipairs(own) do
+					points[i] = { p[1], p[2], p[3], p[4], p[5] - (ownTop - want) / scale }
+				end
+				if Pin(buff, points) then
+					if not pinHooked[buff] then
+						pinHooked[buff] = true
+						hooksecurefunc(buff, "SetPoint", function() OnGamePoint(bar) end)
+					end
+					moved[buff] = true
+					count = count + 1
+				end
+			elseif moved[buff] then
+				Unpin(buff)
+				moved[buff] = nil
+			end
+		end
+	end
+	return count
+end
+
+function PlaceOnFrame(bar, on)
+	local frame, frameId = OwnerOf(bar)
+	if not pinHooked[bar] then
+		pinHooked[bar] = true
+		hooksecurefunc(bar, "SetPoint", function(self) OnGamePoint(self) end)
+	end
+	local report = { frame = frameId or "none" }
+	pinReport[bar] = report
+	if not (on and frame) then
+		Unpin(bar)
+		if frame then PlaceBuffs(frame, bar, false) end
+		report.why = not frame and "not on a unit frame (yours: not locked to the player frame)" or "off"
+		return
+	end
+	local health, power = ns.UnitFrameBars(frame)
+	local lowest = Usable(power) and power:IsShown() and power or health
+	if not Usable(lowest) then
+		report.why = "no health bar found"
+		return
+	end
+	-- (The icon's at the bar's left, outside it: the bar starts that far in.)
+	local icon = Part(bar, "Icon")
+	local room = 0
+	local iconWidth = Usable(icon) and Number(pcall(icon.GetWidth, icon))
+	local iconAlpha = Usable(icon) and Number(pcall(icon.GetAlpha, icon))
+	if iconWidth and iconAlpha and iconAlpha > 0 then room = iconWidth + 3 end
+	local placed = Pin(bar, {
+		{ "TOPLEFT", lowest, "BOTTOMLEFT", room, -PIN_GAP },
+		{ "TOPRIGHT", lowest, "BOTTOMRIGHT", 0, -PIN_GAP },
+	})
+	report.placed = placed
+	report.why = not placed and (Locked(bar) and "locked in a fight" or "its anchors can't be read") or nil
+	report.buffs = placed and PlaceBuffs(frame, bar, true) or 0
+end
+
+function ns.UnitCastPinReport()
+	local lines = {}
+	for bar, report in pairs(pinReport) do
+		local name = bar.GetName and bar:GetName() or "?"
+		local anchors = {}
+		for _, p in ipairs(ReadPoints(bar) or {}) do
+			local okName, relative = pcall(function() return p[2] and p[2]:GetDebugName() end)
+			anchors[#anchors + 1] = ("%s>%s %s %.1f,%.1f"):format(p[1], okName and Known(relative)
+				and tostring(relative):match("[^.]*$") or "?", p[3], p[4], p[5])
+		end
+		local frame = OwnerOf(bar)
+		local starts = {}
+		for _, buff in ipairs(frame and BuffStarts(frame, bar) or {}) do
+			local okName, buffName = pcall(buff.GetDebugName, buff)
+			starts[#starts + 1] = okName and Known(buffName) and tostring(buffName):match("[^.]*$") or "?"
+		end
+		lines[#lines + 1] = ("cast pin %s: frame %s, placed %s, buffs moved %s%s; width %s; anchors %s; buff rows %s")
+			:format(tostring(name), report.frame, tostring(report.placed or false), tostring(report.buffs or 0),
+				report.why and (" (" .. report.why .. ")") or "", tostring(Number(pcall(bar.GetWidth, bar))),
+				#anchors > 0 and table.concat(anchors, " + ") or "secret", #starts > 0 and table.concat(starts, ", ")
+				or "none found")
+	end
+	return lines
+end
+
 local function Restyle(bar)
 	local id = barIds[bar] or "PLATE"
 	local state = states[bar]
@@ -860,6 +1101,15 @@ local function Restyle(bar)
 		return
 	end
 	Apply(bar, Look(id), nil, SizedAs(id))
+	if FRAME_IDS[id] then
+		local framed = FrameLooked(id)
+		if framed or (state and state.framed) then
+			local _, frameId = OwnerOf(bar)
+			ns.DressCastSkin(bar, framed and (frameId or id) or nil)
+			PlaceOnFrame(bar, framed)
+			states[bar].framed = framed
+		end
+	end
 	if not active then
 		states[bar].on = false
 	end
@@ -1219,7 +1469,7 @@ local function BuildCastPage(kit, spec)
 
 	-- The row shown in the preview (nil: Default): the last one whose panel
 	-- was opened (to start with: the page's own row, without a Default).
-	local editing = not spec.default and spec.ids[1] or nil
+	local editing = (spec.tabs == "units" and "PLAYER") or (not spec.default and spec.ids[1]) or nil
 	local preview -- (below: drawn again as each setting changes)
 	local panels = {} -- [id or "DEFAULT"] = its panel's sample, once made
 	local function Changed()
@@ -1254,6 +1504,13 @@ local function BuildCastPage(kit, spec)
 	-- big the page makes the preview: in one row at one size they sat close
 	-- together at its top, the rest of it empty.)
 	local SPOTS = { { 0.24, 0.3 }, { 0.5, 0.58 }, { 0.76, 0.3 } }
+	-- (The unit frames' page: taller samples, a mana bar too, so the middle one
+	-- goes lower, clear of the other two. 2026-11-17.)
+	if spec.tabs == "units" then
+		SPOTS = { { 0.25, 0.27 }, { 0.5, 0.74 }, { 0.75, 0.27 } }
+		PREVIEW_H = 180
+		preview:SetHeight(PREVIEW_H)
+	end
 	local plates = {}
 	local function PlaceSamples(_, width, height)
 		width, height = width or PREVIEW_W, height or PREVIEW_H
@@ -1290,6 +1547,21 @@ local function BuildCastPage(kit, spec)
 		bar:SetPoint("TOP", health, "BOTTOM", 0, -2)
 		bar.offset = (i - 1) * 0.3
 		samples[i] = bar
+		-- (The unit frames' page: a unit frame's bars, health and mana, dressed as
+		-- the Unit Frames page says, the cast bar under them: preview:Refresh.)
+		if spec.tabs == "units" then
+			local power = CreateFrame("StatusBar", nil, plate)
+			power:SetSize(SAMPLE_W, 5)
+			power:SetPoint("TOP", health, "BOTTOM", 0, -2)
+			power:SetMinMaxValues(0, 1)
+			power:SetValue(0.6 + (i - 1) * 0.1)
+			local powerGround = power:CreateTexture(nil, "BACKGROUND")
+			powerGround:SetAllPoints()
+			powerGround:SetColorTexture(0, 0, 0, 0.6)
+			plate:SetHeight(42)
+			plate.health, plate.power, plate.ground = health, power, ground
+			bar.frameBars = plate
+		end
 	end
 	PlaceSamples(nil, PREVIEW_W, PREVIEW_H)
 	preview:HookScript("OnSizeChanged", PlaceSamples)
@@ -1321,10 +1593,37 @@ local function BuildCastPage(kit, spec)
 		Apply(bar, look, true, sized)
 	end
 	-- (The row being looked at: the game's look for a kind not restyled.)
+	-- (A sample's unit frame bars as that frame looks, and its cast bar under
+	-- them: right under, in the frame's border, with the Unit frame's look.)
+	local function DressFrameBars(bar, framed)
+		local plate = bar.frameBars
+		if not (plate and ns.UnitFrameLook) then return end
+		local frameId = editing == "TARGET" and "TARGET" or "PLAYER"
+		local view = ns.UnitFrameLook(frameId)
+		for _, part in ipairs({ plate.health, plate.power }) do
+			if not ns.SetBarTexture(part, view.ufTexture) then part:SetStatusBarTexture(FILLS.smooth) end
+			ns.DressCastSkin(part, frameId)
+		end
+		plate.health:SetStatusBarColor(0.1, 0.8, 0.1)
+		plate.power:SetStatusBarColor(0, 0.45, 1)
+		plate.ground:SetShown(view.ufBorder == "game" or not ns.StyleOn("ufStyle"))
+		bar:ClearAllPoints()
+		if framed then
+			local room = bar.Icon:IsShown() and bar.Icon:GetAlpha() > 0 and bar.Icon:GetWidth() + 3 or 0
+			bar:SetPoint("TOPLEFT", plate.power, "BOTTOMLEFT", room, -PIN_GAP)
+			bar:SetPoint("TOPRIGHT", plate.power, "BOTTOMRIGHT", 0, -PIN_GAP)
+		else
+			bar:SetWidth(SAMPLE_W)
+			bar:SetPoint("TOP", plate.power, "BOTTOM", 0, -6)
+		end
+		ns.DressCastSkin(bar, framed and frameId or nil)
+	end
 	function preview:Refresh()
 		local look = Look(editing)
+		local framed = FrameLooked(editing, ns.GetDB())
 		for i, bar in ipairs(samples) do
 			Dress(bar, SAMPLES[i], look, not editing or SizedAs(editing, ns.GetDB()))
+			DressFrameBars(bar, framed)
 		end
 	end
 	local started = GetTime()
@@ -1348,6 +1647,7 @@ local function BuildCastPage(kit, spec)
 	for _, id in ipairs(spec.ids) do
 		kit.RecordKey(content, "plateCastOwn_" .. id)
 		if id ~= "PLATE" then kit.RecordKey(content, "plateCastOn_" .. id) end
+		if FRAME_IDS[id] then kit.RecordKey(content, "plateCastFrame_" .. id) end
 		for _, key in ipairs(BAR_KEYS) do kit.RecordKey(content, key .. "_" .. id) end
 	end
 
@@ -1357,12 +1657,18 @@ local function BuildCastPage(kit, spec)
 		local db = ns.GetDB()
 		if not (db and id) then return nil end
 		if id ~= "PLATE" and not db["plateCastOn_" .. id] then return "game" end
+		if FRAME_IDS[id] and db["plateCastFrame_" .. id] then return "frame" end
 		return db["plateCastOwn_" .. id] and "own" or "default"
 	end
 	local function PickLook(id, value)
 		local db = ns.GetDB()
 		if id ~= "PLATE" then db["plateCastOn_" .. id] = value ~= "game" end
+		if FRAME_IDS[id] then db["plateCastFrame_" .. id] = value == "frame" end
 		if value == "game" then return end
+		if value == "frame" then
+			db["plateCastOwn_" .. id] = false
+			return
+		end
 		-- (Their own the first time: they start from Default's settings.)
 		if value == "own" and not db["plateCastStarted_" .. id] then
 			for _, key in ipairs(BAR_KEYS) do db[key .. "_" .. id] = db[key] end
@@ -1409,6 +1715,9 @@ local function BuildCastPage(kit, spec)
 			local db = ns.GetDB() or {}
 			local pick = LookPick(id)
 			if pick == "game" then return { text = L["The game's"] } end
+			if pick == "frame" then
+				return { text = FRAME_LOOK[key] and L["Unit frame's"] or L["Default row's"] }
+			end
 			if pick == "default" then return { text = L["Default row's"] } end
 			local value = db[id and key .. "_" .. id or key]
 			if ns.IsGeneralStyle and ns.IsGeneralStyle(value) then return { text = L["General's"] } end
@@ -1475,11 +1784,17 @@ local function BuildCastPage(kit, spec)
 					list[#list + 1] = { "game", L["The game's"], L["Cinematic leaves these cast bars alone."] }
 				end
 				list[#list + 1] = { "default", L["Default's"], L["They look as the Default row says."] }
+				if FRAME_IDS[id] then
+					list[#list + 1] = { "frame", L["Unit frame's"],
+						L["Part of the unit frame: its fill, border and font, right under its bars."] }
+				end
 				list[#list + 1] = { "own", L["Their own"], L["These bars use their own look from the tabs here."] }
 				look.Segments(L["These bars"], { get = function() return LookPick(id) end, set = function(value)
 					PickLook(id, value)
 					editing = id
-				end }, list, L["How these cast bars look: the game's own, the Default row's, or their own."])
+				end }, list, FRAME_IDS[id]
+					and L["How these cast bars look: the game's own, the Default row's, the unit frame's, or their own."]
+					or L["How these cast bars look: the game's own, the Default row's, or their own."])
 			end or nil,
 			texture = { "plateCastFill", L["The bar's fill, including textures other addons share."], label = L["Fill:"], test = Editable,
 				tint = { 1, 0.7, 0 } },
@@ -1620,7 +1935,7 @@ local function BuildCastPage(kit, spec)
 			local db = ns.GetDB()
 			local pickNow = id and LookPick(id)
 			self:SetText(not id and L["Look"] or pickNow == "game" and L["The game's"] or pickNow == "default"
-				and L["Default"] or L["Own"])
+				and L["Default"] or pickNow == "frame" and L["Unit frame's"] or L["Own"])
 			self:SetWidth(170)
 			local words = self:GetFontString()
 			if words then
