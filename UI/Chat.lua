@@ -100,6 +100,9 @@ local PEEK_ROW = {}
 for _, peekType in ipairs(ns.CHAT_PEEK_TYPES) do
 	PEEK_ROW[peekType.key] = "chat:" .. peekType.key
 end
+-- Players' yells: not in cities, where people yell their trade all day
+-- (user, 2026-11-17). NPCs' yells are the NPC speech row's.
+ns.RULE_DEFAULTS[PEEK_ROW.yell] = "not city"
 local function IsPeekTypeOn(key)
 	return PEEK_ROW[key] ~= nil and ns.RowOnNow(PEEK_ROW[key], ns.IsPeekTypeAlways(key))
 end
@@ -387,6 +390,18 @@ local CHANNEL_ROW = setmetatable({}, { __index = function(keys, name)
 end })
 function ns.ChannelRowKey(name)
 	return CHANNEL_ROW[name]
+end
+-- General: not in cities, like players' yells (user, 2026-11-17). Rows go by
+-- the game's own channel name, so also the client's word for it (zone channel
+-- 1) where that isn't "General".
+ns.RULE_DEFAULTS[CHANNEL_ROW.General] = "not city"
+do
+	local getName = C_ChatInfo and C_ChatInfo.GetChannelShortcutForChannelID
+	local ok, name = false, nil
+	if getName then ok, name = pcall(getName, 1) end
+	if ok and type(name) == "string" and name ~= "" and not (issecretvalue and issecretvalue(name)) then
+		ns.RULE_DEFAULTS[CHANNEL_ROW[name]] = "not city"
+	end
 end
 local function IsChannelPeekNow(name)
 	return ns.RowOnNow(CHANNEL_ROW[name], ns.IsChannelPeekOn(name))
