@@ -363,9 +363,7 @@ function ns.BuildLinkBand(body, groupKey, onResize)
 
 	-- The group's row: Automatic (the support files decide), the game's own,
 	-- or one addon for every part it has.
-	local groupRow = Row(L[group.label], L["Picks one addon for every part below that it has. Parts you " ..
-		"picked yourself keep their pick. Automatic: each part takes the one supported addon that has it; " ..
-		"a part two addons have stays the game's until you pick."],
+	local groupRow = Row(L[group.label], L["Picks one addon for every part below that it has."],
 		{ get = function() local links = DB() return links and links.groups[groupKey] end,
 			set = function(value) ns.SetLinkPick("groups", groupKey, value) end },
 		function()
@@ -381,8 +379,7 @@ function ns.BuildLinkBand(body, groupKey, onResize)
 
 	for _, part in ipairs(group.parts) do
 		local partRow -- (the panel opens beside it)
-		partRow = Row(L[part.label], L[part.tip] .. " " .. L["Find a frame: use another addon's frame for this part, " ..
-			"one Cinematic has no support file for. It fades with this part's HUD row from then on."],
+		partRow = Row(L[part.label], L[part.tip],
 			{ get = function() local links = DB() return links and links.parts[part.key] end,
 				set = function(value)
 					if value == FIND then

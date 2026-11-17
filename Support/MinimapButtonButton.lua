@@ -13,8 +13,7 @@ local L = ns.L
 table.insert(ns.ADDON_NOTES, {
 	addon = "MinimapButtonButton", label = "MinimapButtonButton",
 	works = L["Follows the Addon buttons row"],
-	about = L["MinimapButtonButton's button and the bar of addon buttons it opens fade with the Minimap " ..
-		"page's Addon buttons row: they go with the map and come back when you hover the minimap."],
+	about = L["Its button and addon bar fade with the minimap and come back on hover."],
 })
 
 ns.WhenAddonLoads("MinimapButtonButton", function()

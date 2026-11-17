@@ -776,8 +776,7 @@ function ns.CustomizePanel(parent, width, onChange, skinned)
 		if skinned then Skinnable(option.regenerate) end
 		option.regenerate:HookScript("OnEnter", function(self)
 			GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-			GameTooltip:SetText(L["Make this layout again as Cinematic has it, undoing any changes you " ..
-				"made to it in Edit Mode."], 1, 1, 1, 1, true)
+			GameTooltip:SetText(L["Rebuilds this layout, undoing your Edit Mode changes to it."], 1, 1, 1, 1, true)
 			GameTooltip:Show()
 		end)
 		option.regenerate:HookScript("OnLeave", function() GameTooltip:Hide() end)

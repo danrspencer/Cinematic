@@ -32,19 +32,15 @@ local TINT_PRESETS = {
 	{ key = "sepia", label = L["Sepia-ish"], mode = "MOD", color = { 0.95, 0.8, 0.55 },
 		tip = L["Warm brownish yellow, old-photo warmth. (The world can't be truly desaturated.)"] },
 	{ key = "dreamy", label = L["Dreamy"], mode = "ADD", color = { 0.3, 0.22, 0.12 },
-		tip = L["A faint warm glow added over the scene. Soft and hazy."] },
+		tip = L["A soft, hazy warm glow over the scene."] },
 	{ key = "custom", label = L["Custom"], mode = "MOD",
 		tip = L["Your own color, chosen with the color picker below."] },
 	{ key = "timeofday", label = L["Time of day"], mode = "MOD", dynamic = true,
-		tip = L["Changes through the day: blue at night, pink at dawn, clear in the day, " ..
-			"golden in the evening and purple at dusk."] },
+		tip = L["Changes color through the day, from blue nights to golden evenings."] },
 	{ key = "zone", label = L["Zone"], mode = "MOD", dynamic = true,
-		tip = L["A mood for the zone you're in: pale blue in the snow, sandy in deserts, green " ..
-			"in swamps and jungles, sickly in blighted lands, ember red near volcanoes. " ..
-			"Other zones are left untinted."] },
+		tip = L["A mood color for the zone you're in, like pale blue in snow or sandy in deserts."] },
 	{ key = "zonetime", label = L["Zone + time of day"], mode = "MOD", dynamic = true,
-		tip = L["The zone's mood and the time-of-day color together: a desert at night is warm " ..
-			"sand darkened by moonlight."] },
+		tip = L["The zone's mood and the time-of-day color together."] },
 }
 
 -- Zone moods: subtle colours, multiplied over the scene.

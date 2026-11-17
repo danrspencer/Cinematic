@@ -549,7 +549,7 @@ local function SlotEditor(kit, parent, anchor, picker, hooks)
 		label:SetAutoFocus(false)
 		label:SetMaxLetters(40)
 		label:SetPoint("TOPLEFT", 48, -5)
-		kit.Tooltip(label, L["Its name in the wheel's middle as you point at it. Empty: its command's first line."])
+		kit.Tooltip(label, L["The name shown in the wheel's middle when you point at it."])
 		label:SetScript("OnTextChanged", function(self, userInput)
 			local slot = Slot(i)
 			if userInput and slot then
@@ -562,8 +562,7 @@ local function SlotEditor(kit, parent, anchor, picker, hooks)
 		label:SetScript("OnEditFocusLost", hooks.Commit)
 		local command = CommandBox(row, 250)
 		command:SetPoint("TOPLEFT", 172, 0)
-		kit.Tooltip(command, L["What picking it does: a slash command, such as /rw Pull in 10, or several, a " ..
-			"line each (anything a macro can do). The game cuts a line at 255 letters."])
+		kit.Tooltip(command, L["The slash commands this runs, one per line."])
 		command.box:SetScript("OnTextChanged", function(self, userInput)
 			local slot = Slot(i)
 			if userInput and slot then
@@ -856,8 +855,7 @@ local function WheelPage(kit, info)
 	local text = Top(kit, content, info)
 	local keyLabel = KeyRow(kit, content, text, info.action)
 	local onMaster = kit.Check(content, nil, L["On the master wheel"],
-		L["Its icon is on the master wheel, which opens it. Untick to leave it off: its own key still " ..
-		"brings it up. The master wheel is the same for all your characters."],
+		L["Puts this wheel's icon on the master wheel."],
 		function(value)
 			SetOnMaster(info.key, value)
 			if refreshMaster then refreshMaster() end
@@ -968,8 +966,7 @@ local function YourWheelsPage(kit, info)
 			end
 		end)
 	end
-	TopButton(L["Import a wheel"], L["Add a wheel someone shared with you: paste in its text, and read " ..
-		"what's on it before you add it."], 140, function()
+	TopButton(L["Import a wheel"], L["Add a wheel someone shared with you."], 140, function()
 		Apply()
 		ShowImport(Select)
 	end)
@@ -1012,7 +1009,7 @@ local function YourWheelsPage(kit, info)
 
 	local wheelIcon = IconTile(editorFrame, TILE)
 	wheelIcon:SetPoint("TOPLEFT", 0, 0)
-	kit.Tooltip(wheelIcon, L["The wheel's icon, as it shows on the master wheel. Click to pick another."])
+	kit.Tooltip(wheelIcon, L["The wheel's icon; click to pick another."])
 	wheelIcon:SetScript("OnClick", function(self)
 		picker:Open(self, 0, selected and selected.icon)
 	end)
@@ -1075,8 +1072,7 @@ local function YourWheelsPage(kit, info)
 	local keyLabel, firstKey, secondKey = KeyRow(kit, editorFrame, wheelIcon,
 		"CLICK CinematicCustomWheel1Button:LeftButton", -14)
 	local onMaster = kit.Check(editorFrame, nil, L["On the master wheel"],
-		L["Its icon is on the master wheel, which opens it. Untick to leave it off: its own key still " ..
-		"brings it up. The master wheel is the same for all your characters."],
+		L["Puts this wheel's icon on the master wheel."],
 		function(value)
 			if not selected then return end
 			SetOnMaster("custom" .. selected.pool, value)

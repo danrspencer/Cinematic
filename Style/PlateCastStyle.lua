@@ -1231,8 +1231,7 @@ local function BuildCastPage(kit, spec)
 	end
 
 	local switch = kit.PageSwitch(content, "plateCastStyle", L["Enable Page"],
-		L["On: the cast bars look as this page says. Off: the game's own (the preview shows that too). Each " ..
-		"setting keeps its value for when you turn this back on."], intro, Changed)
+		L["On: the cast bars look as this page says; off: the game's own look."], intro, Changed)
 	local stack = kit.Stack(switch, "check")
 	local rows = ns.StyleRows(kit, content, stack, Changed, "plateCastStyle")
 
@@ -1473,19 +1472,16 @@ local function BuildCastPage(kit, spec)
 			uses = id and function(look)
 				local list = {}
 				if id ~= "PLATE" then
-					list[#list + 1] = { "game", L["The game's"], L["Cinematic leaves them alone. Their size stays the " ..
-						"game's either way (yours is sized in Edit Mode)."] }
+					list[#list + 1] = { "game", L["The game's"], L["Cinematic leaves these cast bars alone."] }
 				end
 				list[#list + 1] = { "default", L["Default's"], L["They look as the Default row says."] }
-				list[#list + 1] = { "own", L["Their own"], L["They look as the tabs here say. Their settings start as " ..
-					"the Default row's, and are kept while you pick another choice."] }
+				list[#list + 1] = { "own", L["Their own"], L["These bars use their own look from the tabs here."] }
 				look.Segments(L["These bars"], { get = function() return LookPick(id) end, set = function(value)
 					PickLook(id, value)
 					editing = id
 				end }, list, L["How these cast bars look: the game's own, the Default row's, or their own."])
 			end or nil,
-			texture = { "plateCastFill", L["The game's: its own fill, in its own colors. Below the game's own few: " ..
-				"any other addon shares (through LibSharedMedia)."], label = L["Fill:"], test = Editable,
+			texture = { "plateCastFill", L["The bar's fill, including textures other addons share."], label = L["Fill:"], test = Editable,
 				tint = { 1, 0.7, 0 } },
 			barColor = function(look)
 				look.Colors(L["Colors:"], {
@@ -1507,7 +1503,7 @@ local function BuildCastPage(kit, spec)
 							L["Its width, next to the game's, about its middle (nameplates only)."], Editable)
 					end
 					look.Slider("plateCastHeight", L["Height"], 50, 300, 10, "%d%%", 100,
-						L["Its height, next to the game's (nameplates only). The health bar and name ride up on it."],
+						L["The cast bar's height, next to the game's."],
 						Editable)
 				elseif id == "PLAYER" then
 					local playerSizes = look.Boxes()
@@ -1532,7 +1528,7 @@ local function BuildCastPage(kit, spec)
 			icon = function(look)
 				look.Check("plateCastIcon", L["The spell's icon"], nil, Editable)
 				look.Slider("plateCastIconSize", L["Size"], 50, 300, 10, "%d%%", 100,
-					L["The icon's size, next to the game's. On nameplates, the health bar and name ride up on it."],
+					L["The icon's size, next to the game's."],
 					function(db) return Editable(db) and ns.StyleKeyGet(Field("plateCastIcon")) end)
 				look.Check("plateCastShield", L["The shield on casts that can't be interrupted"],
 					L["The game's shield over the icon while the cast can't be interrupted."], Editable)
@@ -1569,13 +1565,11 @@ local function BuildCastPage(kit, spec)
 					{ "none", L["None"] },
 				}, Editable)
 				look.Check("plateCastTimer", L["Seconds left at its right end"],
-					L["The seconds left on the cast, at the bar's right end (in the same font). Hidden while the " ..
-					"game keeps them secret, in some fights."], Editable)
+					L["Shows the seconds left at the cast bar's right end."], Editable)
 			end,
 			textColor = { "plateCastTextColor", L["The spell's name and seconds left in a color of your own."],
 				keys = { "plateCastTextR", "plateCastTextG", "plateCastTextB" }, test = Editable },
-			border = { "plateCastBorder", L["The cast bar's border: the game's, or one of ours (Custom: its thickness " ..
-				"and color under it)."], opts = { game = true }, test = Editable },
+			border = { "plateCastBorder", L["The cast bar's border: the game's or one of ours."], opts = { game = true }, test = Editable },
 		})
 		if button then button:Hide() end
 		return pop
@@ -1608,8 +1602,7 @@ local function BuildCastPage(kit, spec)
 			pops[key]:SetShown(not pops[key]:IsShown())
 		end
 		if id then
-			kit.Tooltip(button, L["How these cast bars look: the game's own, the Default row's, or their own. " ..
-				"Click to set it."])
+			kit.Tooltip(button, L["Click to pick how these cast bars look."])
 			-- (Straight to its panel, 2026-11-16: its Look from tab picks the
 			-- game's, Default's or its own.)
 			button:SetScript("OnClick", function() OpenLook(id) end)

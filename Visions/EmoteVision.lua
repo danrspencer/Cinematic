@@ -2894,7 +2894,7 @@ end
 local function Tabs(content, title, picked)
 	local panel = ns.PageTabs(content, {
 		{ L["Vision"], "Emote Vision", L["Turning it on, the moments a card shows for and each one's emotes."] },
-		{ L["Settings"], "Emote Vision Settings", L["When the cards show, and for how long."] },
+		{ L["Settings"], "Emote Vision Settings", L["Which cards to skip, how long they stay, and the player menu."] },
 		{ L["Look"], "Emote Vision Style", L["Its style, words, frame and face, and where it sits."] },
 	}, picked)
 	title:ClearAllPoints()
@@ -3324,8 +3324,7 @@ do
 			return row
 		end
 		local add = SmallButton(box, L["Add an emote"], 120)
-		kit.Tooltip(add, L["Pick an emote for the menu itself: a common one, any of the game's, or a voice " ..
-			"emote (said out loud). Up to six."])
+		kit.Tooltip(add, L["Adds an emote to the menu, up to six."])
 		add:SetScript("OnClick", function(self)
 			ns.OpenEmotePicker(self, PICKER, List, function(token)
 				local list = List()
@@ -3498,8 +3497,7 @@ local function MomentsGrid(kit, content, stack)
 		head:EnableMouse(true)
 		head:SetScript("OnMouseUp", function(self) if self.toggle:IsEnabled() then self.toggle:Click() end end)
 		head.add = SmallButton(box, L["Add an emote"], 120)
-		kit.Tooltip(head.add, L["Pick an emote to add as a button on this card: a common one, any of the " ..
-			"game's, or a voice emote (said out loud). Up to six."])
+		kit.Tooltip(head.add, L["Adds an emote button to this card, up to six."])
 		heads[i] = head
 		return head
 	end
@@ -3677,12 +3675,9 @@ function ns.CreateEmoteVisionPanel(kit)
 	local title = kit.Label(content, "GameFontNormalLarge", L["Emote Vision"])
 	Tabs(content, title, 1)
 	local intro = kit.PageIntro(content, title,
-		L["When someone does something for you or at you, a small card shows who it was, with a few " ..
-		"emotes to answer in one click. It waits out fights and fades away by itself. Pick the moments and " ..
-		"their emotes below. When it shows: the Settings tab. Its style and look: the Look tab."])
+		L["When someone emotes at you, a small card lets you answer with one click."])
 	local switch = kit.PageSwitch(content, "emoteVision", L["Enable Page"],
-		L["On: the cards show as ticked below. Off: none do, and it keeps its settings for when " ..
-		"you turn this back on."], intro, Changed)
+		L["Turns all Emote Vision cards on or off."], intro, Changed)
 	local stack = kit.Stack(switch, "check")
 
 	-- (Where each moment shows: its When line, in its section below.)
@@ -3691,8 +3686,7 @@ function ns.CreateEmoteVisionPanel(kit)
 	-- (After the "?" its help puts beside it, 6 + 18 wide: PageIntro's.)
 	test:SetPoint("LEFT", moments, "RIGHT", 36, 0)
 	kit.Tooltip(test, L[TEST_TIP])
-	stack:Help(content, L["Each moment's card has a button for each emote under it, in that order. Untick a " ..
-		"moment for no card at all. + opens a moment: When, where its card shows, then its emotes."])
+	stack:Help(content, L["Pick the moments that show a card and the emotes on it."])
 	MomentsGrid(kit, content, stack)
 
 	canvas:SetScript("OnShow", kit.PageShown(kit.Refresh, content))
@@ -3706,8 +3700,7 @@ function ns.CreateEmoteVisionSettingsPanel(kit)
 	local title = kit.Label(content, "GameFontNormalLarge", L["Emote Vision"])
 	Tabs(content, title, 2)
 	local intro = kit.PageIntro(content, title,
-		L["When the cards show and for how long. The moments and their emotes: the Vision tab. Its look: " ..
-		"the Look tab."])
+		L["When the cards show and for how long."])
 	local stack = kit.Stack(intro, "label")
 	local b = ns.VisionRows(kit, content, stack, Changed)
 
@@ -3717,9 +3710,7 @@ function ns.CreateEmoteVisionSettingsPanel(kit)
 			"shows once you stop (if that's within 20 seconds)."] },
 	}, On)
 	b.Toggles(L["Repeats:"], {
-		{ "emoteVisionRepeats", L["Ignore repeats from the same person"], L["The same person doing the same " ..
-			"again (buffing you again, another wave) brings up no card for the minutes below. Their other " ..
-			"moments still do."] },
+		{ "emoteVisionRepeats", L["Ignore repeats from the same person"], L["Ignores the same person doing the same thing again for a few minutes."] },
 	}, On)
 	b.Toggles(L["Buffs:"], {
 		{ "emoteVisionGroupBuffs", L["Ignore buffs from your group"], L["Buffs from people in your party or " ..
@@ -3728,7 +3719,7 @@ function ns.CreateEmoteVisionSettingsPanel(kit)
 	b.Number(L["Ignored for:"], "emoteVisionRepeatMins", 1, 60, 1, 1, L["min"], L["How long a repeat is ignored for."],
 		function(db) return db.emoteVision and db.emoteVisionRepeats end)
 	b.Number(L["Stays for:"], "emoteVisionHold", 3, 20, 1, 1, L["sec"],
-		L["How long a card stays before it fades. The mouse over it holds it."], On)
+		L["How long a card stays; hovering holds it."], On)
 	-- (Gamepad: the button that lets the face buttons answer a card.)
 	local grabList = {}
 	for _, choice in ipairs(nameLink.pad.GRABS) do
@@ -3742,17 +3733,12 @@ function ns.CreateEmoteVisionSettingsPanel(kit)
 		grabName:SetJustifyV("MIDDLE")
 		grab:SetPoint("LEFT", grabName, "RIGHT", 10, 0)
 		kit.GreyUnless(grab, On)
-		kit.Tooltip(grab, L["In gamepad mode, pressing this button while a card is up lets the face " ..
-			"buttons answer it: bottom picks the first emote, left the second, top the third, and right " ..
-			"targets them (or closes the card when there's no one to target). " ..
-			"They're yours again once you pick one, move, press it again or wait a few seconds."])
+		kit.Tooltip(grab, L["In gamepad mode, press this to answer a card with the face buttons."])
 	end
 	if ns.EmotePlayerMenuAvailable() then
 		stack:Header(content, L["Player menu"])
 		b.Toggles(L["Menu:"], {
-			{ "emoteVisionPlayerMenu", L["Emotes on the right-click menu"], L["Right-clicking a friendly player " ..
-				"adds an Emote section to the end of the menu: a few emotes, More Emotes, and every emote " ..
-				"under All Emotes."] },
+			{ "emoteVisionPlayerMenu", L["Emotes on the right-click menu"], L["Adds an Emote section to the right-click menu on friendly players."] },
 		}, On)
 		ns.EmoteMenuList(kit, content, stack)
 	end
@@ -3882,8 +3868,7 @@ function ns.CreateEmoteVisionStylePanel(kit)
 	local title = kit.Label(content, "GameFontNormalLarge", L["Emote Vision"])
 	Tabs(content, title, 3)
 	local intro = kit.PageIntro(content, title,
-		L["Pick its style, then how its words and frame look and where it sits. The font, outline, shadow " ..
-		"and border start on Visions Style's. Press Test and close the settings to see it."])
+		L["Pick its style, look and position."])
 	local stack = kit.Stack(intro, "label")
 	local rows = ns.StyleRows(kit, content, stack, Changed, "emoteVision")
 	local b = ns.VisionRows(kit, content, stack, Changed)
@@ -3915,8 +3900,7 @@ function ns.CreateEmoteVisionStylePanel(kit)
 	b.Number(L["Scale:"], "emoteVisionScale", 50, 150, 5, 100, "%", L["The whole card at once."], On)
 	-- Its X and Y (yours, once typed or dragged), Move to drag it, Reset to put
 	-- it back above speech from behind you.
-	local XY_TIP = L["How far right (X) of the middle of the screen, and up (Y) from its bottom, the card sits. " ..
-		"Typing here or dragging it with Move puts it there; Reset puts it back above speech from behind you."]
+	local XY_TIP = L["How far right and up the card sits."]
 	local row, name = b.Row(L["Emote Vision:"])
 	local line = kit.BoxLine(content) -- (the page's: its Reset puts them back)
 	line:SetPoint("LEFT", name, "RIGHT", 4, 0)
@@ -3926,14 +3910,12 @@ function ns.CreateEmoteVisionStylePanel(kit)
 	end
 	line:Box("X", "emoteVisionX", -2000, 2000, 1, "%d", 1, XY_TIP, Own, 52)
 	local yBox = line:Box("Y", "emoteVisionY", 0, 1600, 1, "%d", 1, XY_TIP, Own, 52)
-	local move = b.Button(row, L["Move"], 90, L["Holds the card up so you can drag it where you want it; Done " ..
-		"lets it go. Close the settings to see it."], function()
+	local move = b.Button(row, L["Move"], 90, L["Lets you drag the card; click Done when finished."], function()
 		ns.MoveEmoteVision()
 	end)
 	move:SetPoint("LEFT", yBox, "RIGHT", 16, 0)
 	ns.SetOnUpdate(move, function(self) self:SetText(ns.EmoteVisionMoving() and L["Done"] or L["Move"]) end)
-	local reset = b.Button(row, L["Reset"], 90, L["Puts the card back where it starts: just above where speech " ..
-		"from behind you shows (the Chat Bubbles page's Move), beside the chat window."], function()
+	local reset = b.Button(row, L["Reset"], 90, L["Puts the card back in its starting spot."], function()
 		local db = ns.GetDB()
 		db.emoteVisionX, db.emoteVisionY = DEFAULTS.emoteVisionX, DEFAULTS.emoteVisionY
 		db.emoteVisionSpot = DEFAULTS.emoteVisionSpot

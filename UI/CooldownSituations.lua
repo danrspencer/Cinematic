@@ -367,8 +367,7 @@ function ns.BuildCooldownSituations(parent, opts)
 		button:HookScript("OnEnable", function(self) self:SetAlpha(1) end)
 		button:SetHighlightTexture("Interface\\Buttons\\UI-Common-MouseHilight", "ADD")
 		Tip(button, by < 0 and L["Move this row up: it's looked at sooner, and takes any spot it shares with the " ..
-			"row above."] or L["Move this row down: it's looked at later, and gives up any spot it shares with the " ..
-			"row below."])
+			"row above."] or L["Moves this row down so it's checked later."])
 		button:SetScript("OnClick", function()
 			local list, i = List(), IndexOf(row.sit)
 			local j = i and i + by
@@ -538,8 +537,7 @@ function ns.BuildCooldownSituations(parent, opts)
 			help = {
 				[ns.GRID_COMBAT] = L["Used in a fight (the Calm Timer after one too), out of one, or both ticked: " ..
 					"either."],
-				[ns.GRID_LOCATION] = L["Used while you're in any of these. One a row above has (in the same combat) " ..
-					"is greyed: move this row up to take it."],
+				[ns.GRID_LOCATION] = L["Used while you're in any of these places."],
 			},
 			enabled = function() return not opts.Enabled or opts.Enabled() end,
 			changed = function() Changed() end,
@@ -558,8 +556,7 @@ function ns.BuildCooldownSituations(parent, opts)
 		row.copy:SetPoint("LEFT", row, "LEFT", COPY_X, 0)
 		row.copy:SetText(L["Copy"])
 		row.copy.searchSkip = true
-		Tip(row.copy, L["A new row under this one with its spell settings and Combat. It starts with no places " ..
-			"(they stay this row's): pick where it's used."])
+		Tip(row.copy, L["Adds a copy of this row below it, with no places picked yet."])
 		row.copy:SetScript("OnClick", function()
 			local from = row.sit
 			view = ns.CopyCooldownSituation(from, from and IndexOf(from) or nil)
@@ -603,8 +600,7 @@ function ns.BuildCooldownSituations(parent, opts)
 	add.searchSkip = true
 	add:SetText("+ " .. L["Add row"])
 	add:SetWidth((add:GetFontString() and add:GetFontString():GetStringWidth() or 80) + 24)
-	Tip(add, L["A new row at the bottom that changes nothing yet: every spell follows Default till you set it. " ..
-		"Pick where it's used."])
+	Tip(add, L["Adds an empty row at the bottom; pick where it's used."])
 	add:SetScript("OnClick", function()
 		view = ns.NewCooldownSituation()
 		note = ""

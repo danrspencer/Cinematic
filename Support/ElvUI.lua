@@ -21,13 +21,11 @@ table.insert(ns.ADDON_POWER_ROWS, { addon = "ElvUI",
 -- Advanced Frames rows: one frame each. (from: the row that held it with
 -- others till 2026-11-12, whose settings it starts with: ns.SplitAddonRows.)
 local rows = {}
-for i, bar in ipairs({ 2, 7, 8, 9, 10 }) do
+for _, bar in ipairs({ 2, 7, 8, 9, 10 }) do
 	rows[#rows + 1] = {
 		key = "elvBar" .. bar, from = "elvBars",
 		label = "ElvUI action bar " .. bar, short = "ElvUI bar " .. bar,
 		about = L["its action bar %d"]:format(bar),
-		note = i == 1 and L["Its other bars, pet, stance, totem, micro, bag and data bars are rows on the Standard " ..
-			"Frames page, with its unit frames, buffs and chat panels."] or nil,
 		names = { "ElvUI_Bar" .. bar },
 	}
 end

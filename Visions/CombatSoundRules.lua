@@ -411,10 +411,7 @@ function ns.CombatSoundRulesSection(kit, content, stack, boss)
 	local function Mine(rule) return time or card or IsBossRule(rule) == (boss and true or false) end
 	stack:Header(content, L["Sounds"])
 	stack:Help(content, card
-		and L["Rules for the card's sound, read top to bottom as it shows: the first that fits plays one of its " ..
-		"sounds at random. A rule's condition uses the rules' words (Cities, Raids, Mounted...); none: any " ..
-		"time. A rule with no sounds: silent. Each sound's slider sets it next to the others, the cue volume sets " ..
-		"them all (every card's sounds share it)."]
+		and L["Rules that pick which sound plays when the card shows."]
 		or time and L["Rules for the sounds, read top to bottom as the time of day changes: the first for the new time " ..
 		"that fits plays one of its sounds at random. A rule's condition uses the rules' words (Cities, " ..
 		"Mounted...); none: any time. A rule with no sounds: silent. Each sound's slider sets it next to the " ..
@@ -475,10 +472,10 @@ function ns.CombatSoundRulesSection(kit, content, stack, boss)
 		kit.Tooltip(head.edge, moments and L["The moment this rule is for. Click to switch."]
 			or card and L["As the card shows."]
 			or time and L["The time of day this rule is for. Click to switch."]
-			or boss and L["As the boss is pulled, as it dies or as your group wipes. Click to switch."]
+			or boss and L["As the boss is pulled, dies or wipes your group; click to switch."]
 			or L["As a fight starts or as it ends. Click to switch."])
-		kit.Tooltip(head.rule, (time or card) and L["When this rule fits. Click to write it in the rule editor; empty: any time."]
-			or L["When this rule fits. Click to write it in the rule editor; empty: any fight."])
+		kit.Tooltip(head.rule, (time or card) and L["When this rule plays; click to edit it."]
+			or L["When this rule plays; click to edit it."])
 		kit.Tooltip(head.up, L["Move this rule up: it's read before the ones below it."])
 		kit.Tooltip(head.remove, L["Remove this rule and its sounds."])
 		head.add = SmallButton(box, L["Add a sound"], 110)
@@ -529,9 +526,8 @@ function ns.CombatSoundRulesSection(kit, content, stack, boss)
 		or boss and L["A new rule for boss fights, first on this tab."]
 		or L["A new rule above the last one, for the fights you pick."])
 	kit.Tooltip(defaults, card and L["This card's rules as they come."]
-		or time and L["This tab's rules as they come: one for each time of day, a rooster at dawn, " ..
-		"a horse in the morning, your faction's bell at midday, frogs in the evening, an owl at dusk and a wolf at night."]
-		or boss and L["This tab's rules as they come: a war horn as a boss is pulled; a kill and a wipe, no sound yet."]
+		or time and L["Resets this tab to its default rules."]
+		or boss and L["Resets this tab to its default rules."]
 		or L["This tab's rules as they come: a sound as any other fight starts and one as it ends."])
 	addRule:SetScript("OnClick", function()
 		if time or card then

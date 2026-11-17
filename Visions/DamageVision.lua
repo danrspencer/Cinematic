@@ -1438,15 +1438,12 @@ function ns.CreateDamageVisionPanel(kit)
 	local title = kit.Label(content, "GameFontNormalLarge", L["Damage Vision"])
 	DamageTabs(content, title, 1)
 	local intro = kit.PageIntro(content, title,
-		L["Not the damage meter's numbers: your race with the player ahead of you, or your lead over #2 once " ..
-		"you're #1. It reads the game's own damage meter, so that needs to be on (Options, Gameplay " ..
-		"Enhancements: Enable Damage Meter). Its type and how it looks: the Look tab."])
+		L["Shows your damage race with the player just ahead of you, from the game's damage meter."])
 	local function Changed()
 		ns.RefreshDamageVision()
 	end
 	local switch = kit.PageSwitch(content, "damageVision", L["Enable Page"],
-		L["On: everything below works as ticked. Off: none of it does, and each keeps its tick for " ..
-		"when you turn this back on."], intro, Changed)
+		L["Turns Damage Vision on or off."], intro, Changed)
 	local stack = kit.Stack(switch, "check")
 	local b = Builder(kit, content, stack, Changed)
 	local rows = ns.StyleRows(kit, content, stack, Changed, "damageVision")
@@ -1474,9 +1471,7 @@ function ns.CreateDamageVisionPanel(kit)
 		L["How long it stays up once a fight is over."])
 	b.Toggles(L["Damage meter:"], {
 		{ "damageVisionMeterHidden", L["Only while it's faded out"],
-			L["Ticked, it shows only while Cinematic has the game's damage meter faded out: it fades in as the " ..
-			"meter fades out, and out as the meter comes back. (When the meter fades: its row on the Frames page.) " ..
-			"Goes well with Sits: Over the damage meter on the Look tab."] },
+			L["Shows it only while the game's damage meter is faded out."] },
 	})
 
 	stack:Header(content, L["What it counts"])
@@ -1489,8 +1484,7 @@ function ns.CreateDamageVisionPanel(kit)
 		{ value = "boss", text = L["This boss only"] },
 		{ value = "run", text = L["The whole run"] },
 		{ value = "fight", text = L["Each fight"] },
-	}, L["This boss only: everyone starts at 0 as a boss is pulled, and when it dies it's back to the " ..
-		"whole run. The whole run: the meter's Overall. Each fight: every pull starts at 0."], Any)
+	}, L["Picks when everyone's damage starts back at 0."], Any)
 
 	stack:Header(content, L["Recaps"])
 	b.Toggles(L["Recap after:"], {
@@ -1618,16 +1612,14 @@ local function TestButtons(stack, content, b)
 		return button
 	end
 	local testButton = RunButton(100, L["Test"],
-		L["A made-up fight for 25 seconds, to see how it looks (Stop ends it). It works with the page off " ..
-		"too. Close the settings to see it."], ns.DamageVisionTesting, ns.TestDamageVision, ns.StopDamageVisionTest)
+		L["Plays a made-up 25-second fight; close the settings to see it."], ns.DamageVisionTesting, ns.TestDamageVision, ns.StopDamageVisionTest)
 	testButton:SetPoint("LEFT")
 	local recapButton = RunButton(110, L["Test recap"],
 		L["The recap card, with the meter's whole run if you've one, else made up (Stop hides it)."],
 		ns.DamageRecapShowing, ns.TestDamageRecap, ns.StopDamageRecap)
 	recapButton:SetPoint("LEFT", testButton, "RIGHT", 8, 0)
 	local reportButton = b.Button(tests, L["Full report"], 110,
-		L["The full report: how you did on the run, boss by boss and the rest, with the whole party " ..
-		"(/cine report). Made-up bosses while the meter has none."], function() ns.ToggleDamageReport("test") end)
+		L["Shows your full damage report for the run."], function() ns.ToggleDamageReport("test") end)
 	reportButton:SetPoint("LEFT", recapButton, "RIGHT", 8, 0)
 end
 
@@ -1679,7 +1671,7 @@ TypeSettings = function(kit, content, stack, b)
 	end)
 	Section("ladder", L["Rank ladder"], function()
 		return b.Number(L["Rows:"], "damageVisionLadderRows", 2, LADDER_ROWS, 1, 1, nil,
-			L["At most this many rows: #1 on down, and you in the last row if you're further down than that."]),
+			L["The most rows to show."]),
 			b.Toggles(L["On the rows:"], {
 				{ "damageVisionLadderNames", L["Names"], L["Ticked, each player's name on their row."] },
 			})
@@ -1698,14 +1690,12 @@ function ns.CreateDamageVisionLookPanel(kit)
 	local title = kit.Label(content, "GameFontNormalLarge", L["Damage Vision"])
 	DamageTabs(content, title, 2)
 	local intro = kit.PageIntro(content, title,
-		L["Its type, how it looks and where it sits. Press Test and close the settings " ..
-		"to see it."])
+		L["Pick its type, look and position."])
 	local function Changed()
 		ns.RefreshDamageVision()
 	end
 	local switch = kit.PageSwitch(content, "damageVisionLook", L["Enable Page"],
-		L["On: it looks as this page says. Off: Cinematic's plain look (the defaults). Each setting keeps its " ..
-		"value for when you turn this back on."], intro, Changed)
+		L["Turns this page's look on, or uses the plain look when off."], intro, Changed)
 	local stack = kit.Stack(switch, "check")
 	local rows = ns.StyleRows(kit, content, stack, Changed, "damageVisionLook")
 	local b = Builder(kit, content, stack, Changed)
@@ -1724,9 +1714,9 @@ function ns.CreateDamageVisionLookPanel(kit)
 	}, On)
 	local chase = rows.Swatch(colorsLast, "damageVisionColors",
 		{ "damageVisionChaseR", "damageVisionChaseG", "damageVisionChaseB" },
-		L["The bar's color while you're behind. Picking one turns Colors to Your own."])
+		L["The bar's color while you're behind."])
 	rows.Swatch(chase, "damageVisionColors", { "damageVisionLeadR", "damageVisionLeadG", "damageVisionLeadB" },
-		L["The bar's color once you lead. Picking one turns Colors to Your own."])
+		L["The bar's color once you lead."])
 	local _, borderLast = b.Choices(L["Border:"], "damageVisionBorder", {
 		{ "none", L["None"] }, { "thin", L["Thin"] }, { "thick", L["Thick"] },
 	}, On)
@@ -1745,7 +1735,7 @@ function ns.CreateDamageVisionLookPanel(kit)
 	b.Number(L["Behind the bar:"], "damageVisionTrack", 0, 100, 5, 100, "%",
 		L["How dark the empty part of the bar is."], On)
 	b.Number(L["Panel:"], "damageVisionPanel", 0, 100, 5, 100, "%",
-		L["A dark panel behind it all, this dark. 0: none."], On)
+		L["How dark the panel behind it is; 0 for none."], On)
 
 	stack:Header(content, L["Words"])
 	rows.Font("damageVisionFont")
@@ -1758,17 +1748,15 @@ function ns.CreateDamageVisionLookPanel(kit)
 		{ "gold", L["Gold"] }, { "white", L["White"] }, { "custom", L["Your own"] },
 	}, On)
 	rows.Swatch(textLast, "damageVisionTextColor", { "damageVisionTextR", "damageVisionTextG", "damageVisionTextB" },
-		L["The place's color (and the recap's title). Picking one turns it to Your own."])
+		L["The color of your place."])
 
 	stack:Header(content, L["Position"])
 	b.Number(L["Scale:"], "damageVisionSize", 50, 200, 10, 100, "%", L["Everything at once, bars and words."])
 	-- Its X and Y from the middle of the screen (the recap's too), and its mover.
-	local XY_TIP = L["How far right (X) and up (Y) from the middle of the screen it sits; below 0, left or down. " ..
-		"Dragging it with Move fills these in."]
+	local XY_TIP = L["How far right and up from the screen's middle it sits."]
 	b.Choices(L["Sits:"], "damageVisionSpot", {
 		{ "own", L["Where you put it"], L["At the X and Y below (or where you drag it with Move)."] },
-		{ "meter", L["Over the damage meter"], L["Over the middle of the game's damage meter window, its recap " ..
-			"too. With Only while it's faded out (the Vision tab), one fades in as the other fades out."] },
+		{ "meter", L["Over the damage meter"], L["Sits over the game's damage meter window."] },
 	})
 	local spotMade = {}
 	local function Spot(label, xKey, yKey, buttonText, buttonTip, which)
@@ -1783,8 +1771,7 @@ function ns.CreateDamageVisionLookPanel(kit)
 		spotMade[#spotMade + 1] = line
 	end
 	Spot(L["Damage Vision:"], "damageVisionX", "damageVisionY", L["Move"],
-		L["A box where it and its recap show: drag it where you want it, left-click to set, right-click to put " ..
-		"it back. Close the settings to see it."], "display")
+		L["Drag the box to move it; right-click to reset."], "display")
 	-- (Over the meter: no X, Y or Move to use, so none shown.)
 	local spotHolder = CreateFrame("Frame", nil, content)
 	spotHolder:Hide()

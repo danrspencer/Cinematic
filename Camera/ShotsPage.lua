@@ -8,10 +8,7 @@ function ns.CreateMyShotsPanel(kit)
 	local canvas, content = kit.CreateScrollPage(true)
 	local title = kit.Label(content, "GameFontNormalLarge", L["My Shots"])
 	title:SetPoint("TOPLEFT", 16, -16)
-	local intro = kit.PageIntro(content, title, L["A shot is one of the cameras that run while you stand still " ..
-		"(cozy, vista, fish or AFK) with numbers of your own for how it sways and zooms. Make one here, then pick " ..
-		"it as a scene's camera on the Scenes page. A number you haven't changed follows the camera's own " ..
-		"settings."])
+	local intro = kit.PageIntro(content, title, L["Make your own version of a standing-still camera with your own sway and zoom."])
 
 	local selected -- (the shot shown)
 	local function Shot()
@@ -47,8 +44,7 @@ function ns.CreateMyShotsPanel(kit)
 	pick:SetPoint("TOPLEFT", intro, "BOTTOMLEFT", 0, -14)
 	kit.Tooltip(pick, L["The shot to show and change."])
 	kit.AddControl(pick)
-	local newShot = Button(L["+ New shot"], 100, L["Make a shot, starting from the cozy camera's own numbers. " ..
-		"Pick another camera for it below."], function()
+	local newShot = Button(L["+ New shot"], 100, L["Makes a new shot, starting from the cozy camera's numbers."], function()
 		local id = ns.AddShot("cozy")
 		if id then
 			selected = id
@@ -57,7 +53,7 @@ function ns.CreateMyShotsPanel(kit)
 	end)
 	newShot.Refresh = function(self) self:SetEnabled(#(ns.ShotList()) < ns.SHOT_MAX) end
 	kit.AddControl(newShot)
-	local test = Button(L["Test"], 60, L["Play this shot now (stand still). Press it again, or move, to stop."],
+	local test = Button(L["Test"], 60, L["Plays this shot now; press again or move to stop."],
 		function() if Shot() then ns.TestShot(Shot()) end end)
 	local share = Button(L["Share"], 64, L["Text to send a friend: they add this shot with Import here or on " ..
 		"their Scenes page."], function()
@@ -70,7 +66,7 @@ function ns.CreateMyShotsPanel(kit)
 			Changed()
 		end)
 	end)
-	local delete = Button(L["Delete"], 64, L["Delete this shot. Scenes that played it go back to its camera."],
+	local delete = Button(L["Delete"], 64, L["Deletes this shot; scenes that played it go back to its camera."],
 		function()
 			local id = Shot()
 			if not id then return end
@@ -142,8 +138,7 @@ function ns.CreateMyShotsPanel(kit)
 		Changed()
 	end)
 	base:SetPoint("LEFT", baseLabel, "LEFT", 66, 0)
-	kit.Tooltip(base, L["The camera it moves like: cozy swings round to face you, vista and fish settle behind you " ..
-		"(fish sways less), AFK turns right around you. Its other settings (Camera Settings page) go on as they are."])
+	kit.Tooltip(base, L["The camera this shot moves like."])
 	kit.AddControl(base)
 
 	local sliders = {}

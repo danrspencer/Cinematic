@@ -166,13 +166,9 @@ function ns.CreatePlateIconsPage(kit)
 	-- (The Nameplates icon's Icons tab, 2026-11-16: its tabs over the title.)
 	local tabs = ns.PageTabs(content, ns.ShowInTabs("plates"), ns.ShowInIndex("plates", "Plate Icons"))
 	title:SetPoint("TOPLEFT", tabs, "BOTTOMLEFT", 8, -14)
-	local intro = kit.PageIntro(content, title, L["Icons beside players' health bars on their nameplates: their " ..
-		"class, and the role of the players in your group. They show on the plates that are up, as their Show " ..
-		"in rows say: outside CineMode only with Always ticked, unless Nameplates is ticked under the CineMode " ..
-		"page's Allow outside CineMode."])
+	local intro = kit.PageIntro(content, title, L["Class and role icons beside players' health bars on their nameplates."])
 	local switch = kit.PageSwitch(content, "handlePlateIcons", L["Enable Page"],
-		L["On: the icons below show as their rows say. Off: none of them do. Each setting keeps its value " ..
-		"for when you turn this back on."], intro, Changed)
+		L["Turns this page's icons on or off."], intro, Changed)
 	local stack = kit.Stack(switch, "check")
 	local header = stack:Header(content, L["Show in"])
 	local ROWS = {

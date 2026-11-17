@@ -20,8 +20,6 @@ for _, known in ipairs({
 		key = "dlMeter1", from = "dlMeters", addon = "DaylightUI_InfoPanel",
 		label = "DaylightUI damage meter 1", short = "DaylightUI meter 1",
 		about = L["its first damage meter window"],
-		note = L["Its info panel (XP bar and minimap) follows the Minimap row on the HUD page; " ..
-			"its unit frames, bars, buffs, chat and quest tracker follow the rows of the frames they replace."],
 		names = { "DaylightUIDamageMeter" },
 	},
 	{

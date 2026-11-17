@@ -971,11 +971,9 @@ function ns.CreateWhyPanel(kit)
 	canvas.content = content
 	local title = kit.Label(content, "GameFontNormalLarge", L["Why Is It Showing?"])
 	title:SetPoint("TOPLEFT", 16, -16)
-	local intro = kit.PageIntro(content, title, L["Every row of frames Cinematic fades, whether it's showing right " ..
-		"now and why. /cine why opens this list as a window you can keep up while you play."])
+	local intro = kit.PageIntro(content, title, L["Every row of frames Cinematic fades, and why each is showing or not."])
 	local switch = kit.PageSwitch(content, "whyPage", L["Enable Page"],
-		L["On (to start with): this page, the /cine why window and Pick a frame on screen. Off: all three are " ..
-		"put away. They cost nothing while they're closed either way."], intro, SwitchedOff)
+		L["Turns this page, the /cine why window and Pick a frame on or off."], intro, SwitchedOff)
 	local host = CreateFrame("Frame", nil, content)
 	host:SetPoint("TOPLEFT", switch, "BOTTOMLEFT", 2, -12)
 	host:SetPoint("BOTTOMRIGHT", content, "BOTTOMRIGHT", -16, 12)

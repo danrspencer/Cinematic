@@ -254,9 +254,7 @@ function ns.CreateConflictsPanel(kit)
 	local canvas, content = kit.CreateScrollPage()
 	local title = kit.Label(content, "GameFontNormalLarge", L["Addon Conflicts"])
 	title:SetPoint("TOPLEFT", 16, -16)
-	local intro = kit.PageIntro(content, title, L["Features one of your other addons also has its own version " ..
-		"of. Pick whose plays: Theirs, Ours (Cinematic's, with theirs hidden while ours is on, their settings left " ..
-		"as they are) or Both. Only the addons you have loaded are listed."])
+	local intro = kit.PageIntro(content, title, L["Pick whose version plays for features your other addons also have."])
 
 	local rows, headers = {}, {}
 	local Build

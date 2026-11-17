@@ -15,8 +15,7 @@ function ns.CreateBubbleStylePanel(kit)
 	local tabs = ns.PageTabs(content, ns.ShowInTabs("chat"), ns.ShowInIndex("chat", "Bubble Style"))
 	title:SetPoint("TOPLEFT", tabs, "BOTTOMLEFT", 8, -14)
 	local intro = kit.PageIntro(content, title,
-		L["How chat bubbles look, and speech from behind you with them. Where bubbles show: the " ..
-		"Bubbles tab. Bubbles already showing change with the next thing said."])
+		L["How chat bubbles look."])
 
 	local preview -- (below: drawn again as each setting changes)
 	local function Changed()
@@ -25,9 +24,7 @@ function ns.CreateBubbleStylePanel(kit)
 	end
 
 	local switch = kit.PageSwitch(content, "bubblesStyle", L["Enable Page"],
-		L["On: chat bubbles look as this page says. Off: the game's own bubbles (the preview shows that " ..
-		"too). Each setting keeps its value for when you turn this back on. (Not in instances on retail: " ..
-		"the game doesn't let addons change bubbles there.)"], intro, Changed)
+		L["Turns this page's chat bubble look on or off."], intro, Changed)
 	local stack = kit.Stack(switch, "check")
 	local rows = ns.StyleRows(kit, content, stack, Changed, "bubblesStyle")
 
@@ -56,19 +53,16 @@ function ns.CreateBubbleStylePanel(kit)
 		inline = true,
 		tabs = { default = function(key) return ns.DEFAULTS[key] end, source = ns.PageLookSource,
 			copyKind = "bubbleLook", copyName = L["Chat bubbles"] },
-		font = { "bubblesFont", L["The words' font. Russian, Korean or Chinese text keeps the game's, so its " ..
-			"letters show."] },
+		font = { "bubblesFont", L["The font for bubble text."] },
 		textSize = function(look)
 			look.Slider("bubblesTextScale", L["Text size"], 50, 200, 5, "%d%%", 100,
 				L["How big the words are, next to their usual size."])
 		end,
-		outline = { "bubblesOutline", L["A black border around the letters, so they stand out against the world. " ..
-			"Thick + shadow also drops a shadow below and to the right of them."], names = OUTLINES, max = 3 },
+		outline = { "bubblesOutline", L["A black outline around the letters so they stand out."], names = OUTLINES, max = 3 },
 		outlineColor = false, -- (the game's text: its outline is always black)
 		shadow = false, -- (Outline's Thick + shadow)
 		textColor = false, -- (each kind of chat in its own: say, yell...)
-		border = { "bubblesEdge", L["The line round a Dark or Custom bubble. Custom: its thickness and color under " ..
-			"it."], label = L["Edge:"], test = Own },
+		border = { "bubblesEdge", L["The outline around Dark or Custom bubbles."], label = L["Edge:"], test = Own },
 		backColor = function(look)
 			look.Choices(L["Behind the words:"], "bubblesBack", {
 				{ "game", L["The game's"], L["The game's own bubble."] },
@@ -79,7 +73,7 @@ function ns.CreateBubbleStylePanel(kit)
 			look.Chips(L["Its color"], { "bubblesBackR", "bubblesBackG", "bubblesBackB" },
 				L["The bubble's color, for Custom."], function(db) return rows.On(db) and db.bubblesBack == "custom" end)
 			look.Check("bubblesTail", L["The tail pointing at who's talking"],
-				L["The little point under the bubble. Unticked, just the bubble."], Boxed)
+				L["Shows the little point under the bubble."], Boxed)
 		end,
 		backAlpha = function(look)
 			look.Slider("bubblesAlpha", L["Opacity"], 20, 100, 5, "%d%%", 100, L["How see-through the bubble is."],
@@ -99,8 +93,7 @@ function ns.CreateBubbleStylePanel(kit)
 	-- Speech from behind you's own look (Speech.lua): turned on, moved and
 	-- shown with chat up on the Bubbles tab; greyed out while it's off there.
 	local speechHeader = stack:Header(content, L["Speech from behind you"])
-	stack:Help(content, L["Says and yells whose bubble isn't on your screen, shown low on the screen instead. " ..
-		"Turn it on on the Bubbles tab (with that page on)."])
+	stack:Help(content, L["Shows says and yells low on the screen when their bubble is off your screen."])
 	-- (Test and Move buttons beside its "?": a line from you, where they show;
 	-- the Move box, to drag where they show.)
 	local speechTest = ns.PanelButton(content)
@@ -123,30 +116,27 @@ function ns.CreateBubbleStylePanel(kit)
 		return rows.On(db) and db.handleBubbles and db.chatPeek and db.chatHideBubbled and db.chatSpeechBehind
 	end
 	local speechName = rows.Check("speechBehindName", L["Show who said it"],
-		L["Speech from behind you starts with the speaker's name (\"Name says: ...\"). Unticked, just their words show."],
+		L["Starts each line with the speaker's name."],
 		Behind)
 	-- (On the same line as Show who said it.)
 	local speechClass = kit.Check(content, "speechBehindClassColor", L["In class color"],
-		L["Players' names show in their class color, as in the chat window. NPCs' don't have one."], function(value)
+		L["Shows players' names in their class color."], function(value)
 			ns.GetDB().speechBehindClassColor = value
 			Changed()
 		end)
 	speechClass:SetPoint("LEFT", speechName.Text or speechName.text, "RIGHT", 16, 0)
 	kit.GreyUnless(speechClass, function(db) return Behind(db) and db.speechBehindName end)
 	rows.Check("speechBehindRise", L["Rise up from below the screen"],
-		L["Each line slides up from below the bottom of the screen, as if from behind the camera, " ..
-		"instead of just fading in."], Behind)
+		L["Lines slide up from the bottom of the screen."], Behind)
 	rows.Check("speechBehindSink", L["Sink as lines come in"],
-		L["The lines slide down a little each time a new one comes in, so they don't sit still: " ..
-		"the newest comes in on top and pushes the older ones down."], Behind)
+		L["Older lines slide down as new ones come in."], Behind)
 	rows.Slider("speechBehindScale", L["Size"], 50, 100, 5, "%d%%", 100,
 		L["How big speech from behind you is, next to a bubble overhead: smaller sounds further away."], Behind)
 	rows.Slider("speechBehindAlpha", L["Opacity"], 30, 100, 5, "%d%%", 100,
 		L["How solid speech from behind you is: fainter sounds muffled, out of view."], Behind)
 	local function Tailed(db) return Behind(db) and db.bubblesBack ~= "none" and db.bubblesTail end
 	local tailTop = rows.Check("speechBehindTailTop", L["Tail on top"],
-		L["The bubble's tail sits on top, pointing up, instead of under it pointing down. (In a bubble only: " ..
-		"not with no bubble behind the words.)"], Tailed)
+		L["Puts the bubble's tail on top, pointing up."], Tailed)
 	-- (On the same line as Tail on top.)
 	local tailFlip = kit.Check(content, "speechBehindTailFlip", L["Flip the tail"],
 		L["The tail curls the other way, as if seen in a mirror."], function(value)
@@ -156,10 +146,10 @@ function ns.CreateBubbleStylePanel(kit)
 	tailFlip:SetPoint("LEFT", tailTop.Text or tailTop.text, "RIGHT", 16, 0)
 	kit.GreyUnless(tailFlip, Tailed)
 	rows.Slider("speechBehindTailPos", L["Tail position"], 0, 100, 5, "%d", 100,
-		L["Where the tail sits along the bubble: 0 at its left end, 50 in the middle, 100 at its right end."], Tailed)
+		L["Where the tail sits along the bubble, from left to right."], Tailed)
 	-- How wide a line gets before it wraps, and which way the lines line up.
 	rows.Slider("speechBehindWidth", L["Max width"], 200, 1000, 20, "%d", nil,
-		L["How wide a line of speech from behind you can get before it wraps onto the next row, as a bubble overhead does."],
+		L["How wide a line gets before it wraps."],
 		Behind)
 	local align = kit.Dropdown(content, "speechBehindAlign", {
 		{ value = "auto", text = L["By where it's moved to"] },
@@ -174,8 +164,7 @@ function ns.CreateBubbleStylePanel(kit)
 		alignName:SetJustifyV("MIDDLE")
 		align:SetPoint("LEFT", alignName, "RIGHT", 10, 0)
 		kit.GreyUnless(align, Behind)
-		kit.Tooltip(align, L["Which way the lines line up: their left edges, their middles or their right " ..
-			"edges. By where it's moved to: by which side of the screen the Move box is on."])
+		kit.Tooltip(align, L["How the lines line up: left, center or right."])
 	end
 
 	-- (Speech from behind you onto the Behind Bubbles tab, its heading at the top.)

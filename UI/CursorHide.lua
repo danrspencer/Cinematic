@@ -565,8 +565,7 @@ function ns.CreateCursorHidePage(kit)
 	-- (The Mouse icon's Cursor Hide tab, 2026-11-16: its tabs over the title.)
 	local mouseTabs = ns.PageTabs(content, ns.ShowInTabs("mouse"), ns.ShowInIndex("mouse", "Cursor Hide"))
 	title:SetPoint("TOPLEFT", mouseTabs, "BOTTOMLEFT", 8, -14)
-	local intro = kit.PageIntro(content, title, L["In CineMode, the cursor gets out of the way: tiny, gone once " ..
-		"the mouse has been still a while, or tiny and then gone. Moving the mouse brings it back from gone."])
+	local intro = kit.PageIntro(content, title, L["In CineMode, the cursor shrinks or hides until you move the mouse."])
 	local switch = kit.PageSwitch(content, "cursorHide", L["Enable Page"],
 		L["On: the cursor gets out of the way where its Show in row says."], intro, Apply)
 	local stack = kit.Stack(switch, "check")
@@ -585,13 +584,10 @@ function ns.CreateCursorHidePage(kit)
 	stack:Add(kit.Choice(content, "cursorHideMethod", "tiny", L["Tiny"],
 		L["The cursor stays a tiny corner, as you move and click too."]), "check")
 	stack:Add(kit.Choice(content, "cursorHideMethod", "steer", L["Hide completely"],
-		L["Once the mouse has been still a while, the cursor's gone, and moving the mouse brings it back. " ..
-		"Meanwhile the game draws its cursor itself (its Hardware cursor off), which can feel a little behind " ..
-		"at a low frame rate; yours is back with the cursor."]),
+		L["Hides the cursor completely once the mouse has been still a while."]),
 		"check")
 	stack:Add(kit.Choice(content, "cursorHideMethod", "both", L["Tiny, then gone"],
-		L["The tiny cursor all the time, as you move and click too, and gone once the mouse has been still a " ..
-		"while (as Hide completely). Moving the mouse brings the tiny one back, not yours."]), "check")
+		L["A tiny cursor that disappears once the mouse has been still a while."]), "check")
 	kit.GreyUnless(stack:Add(kit.Slider(content, "cursorHideDelay", L["Gone after the mouse is still for"],
 		DELAY_MIN, DELAY_MAX, 0.5, "%.1f s"), "slider"), function(d) return d.cursorHideMethod ~= "tiny" end)
 
@@ -602,8 +598,7 @@ function ns.CreateCursorHidePage(kit)
 	first:SetPoint("LEFT", keyLabel, "RIGHT", 4, 0)
 	local second = kit.CreateKeybindButton(content, "CINEMATIC_HIDECURSOR", 2)
 	second:SetPoint("LEFT", first, "RIGHT", 8, 0)
-	kit.PageIntro(content, second, L["Hides the cursor right away; moving the mouse (or pressing it again) brings " ..
-		"it back. Also on the Keybinds page."], keyLabel)
+	kit.PageIntro(content, second, L["Hides the cursor right away until you move the mouse."], keyLabel)
 
 	-- The warning, over everything below the title till it's accepted (the
 	-- account's): it's experimental, and /cine reset undoes it all.

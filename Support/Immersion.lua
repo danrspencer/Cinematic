@@ -12,6 +12,5 @@ local L = ns.L
 table.insert(ns.ADDON_NOTES, {
 	addon = "Immersion", label = "Immersion",
 	works = L["Takes over talking to NPCs"],
-	about = L["Immersion's window stands in for the game's gossip and quest windows, so Cinematic's " ..
-		"Custom dialogue frames don't show while it's on. The quest camera plays with it as usual."],
+	about = L["Immersion replaces the game's NPC windows, so Cinematic's dialogue frames don't show."],
 })

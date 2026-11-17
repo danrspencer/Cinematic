@@ -19,9 +19,7 @@ local L = ns.L
 table.insert(ns.ADDON_NOTES, {
 	addon = "Platynator", label = "Platynator",
 	works = L["Follows the Nameplates page"],
-	about = L["Platynator's nameplates fade in CineMode and follow the Nameplates page's rows. Platynator " ..
-		"sets the game's nameplate settings itself (at login and after a fight); Cinematic puts its own " ..
-		"back afterwards."],
+	about = L["Platynator's nameplates fade in CineMode and follow the Nameplates page."],
 })
 
 local LABEL = "Platynator plate alpha"

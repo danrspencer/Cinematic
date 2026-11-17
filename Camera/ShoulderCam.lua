@@ -2289,10 +2289,7 @@ function ns.CreateShoulderCamPanel(kit)
 	local intro = kit.PageIntro(content, title,
 		L["The camera sits over your shoulder, with you to one side of the screen."])
 	local switch = kit.PageSwitch(content, "shoulderCam", L["Enable Page"],
-		L["On: the camera moves over your shoulder. This uses one of Blizzard's experimental " ..
-		"camera settings: Cinematic asks once, then keeps the game's experimental camera warning away " ..
-		"while it's on. The game's Keep Character Centered and motion sickness options stop it, so those " ..
-		"are turned off meanwhile. Off: your own settings come back."], intro, function()
+		L["Moves the camera over your shoulder, using one of Blizzard's experimental camera settings."], intro, function()
 			ns.ApplyShoulderCam()
 			-- (No profile offered any more: the camera works on any profile, and
 			-- the Follow HUD tab puts the frames that follow you on yours.)
@@ -2308,7 +2305,7 @@ function ns.CreateShoulderCamPanel(kit)
 		{ L["Cameras"], L["Which of Cinematic's cameras the Shoulder Cam stays on through."] },
 	}
 	if not ns.isRetail then
-		tabList[4] = { L["Gamepad"], L["Playing with the gamepad UI on."] }
+		tabList[4] = { L["Gamepad"], L["Why the Shoulder Cam pauses while the gamepad UI is on."] }
 	end
 	-- (Last: measuring your race, sex and form, ShoulderCalibrate.lua.)
 	tabList[#tabList + 1] = { L["Calibrate"], L["Measure where you sit for your race, sex and form, and share it."] }
@@ -2336,8 +2333,7 @@ function ns.CreateShoulderCamPanel(kit)
 	stack:Add(toggleKey, "dropdown")
 	-- (One tick for the side, user 2026-11-15: ticked over the left shoulder.)
 	local left = kit.Check(content, "shoulderCamSide", L["Left shoulder"],
-		L["Over your left shoulder, you on the right of the screen. Unticked, over your right. " ..
-		"The swap key beside it flips it."], function(value)
+		L["Puts the camera over your left shoulder instead of your right."], function(value)
 			ns.GetDB().shoulderCamSide = value and "left" or "right"
 			ns.ApplyShoulderCam()
 		end)
@@ -2348,25 +2344,19 @@ function ns.CreateShoulderCamPanel(kit)
 	key:SetPoint("LEFT", left, "LEFT", 200, 0)
 	local spot = stack:Add(kit.Slider(content, "shoulderCamSpot", L["Spot on screen"], 5, 40, 1, "%d%%", 100),
 		"slider")
-	kit.Tooltip(spot, L["How far off the middle of the screen you sit, as a share of the way to its edge. " ..
-		"The camera moves as you zoom to keep you there, and eases you back to the middle when you zoom " ..
-		"right in. 33% puts you on the line a third of the way across."])
+	kit.Tooltip(spot, L["How far from the middle of the screen you sit."])
 	kit.GreyUnless(spot, IfOn)
 	local swapTime = stack:Add(kit.Slider(content, "shoulderCamSwapTime", L["Swap takes"], 0, 3, 0.1,
 		L["%.1f sec"]), "slider")
-	kit.Tooltip(swapTime, L["How long the camera takes to cross to your other shoulder as you swap sides. " ..
-		"At 0 it's the game's own quick swap."])
+	kit.Tooltip(swapTime, L["How long the camera takes to swap to your other shoulder."])
 	kit.GreyUnless(swapTime, IfOn)
 	local selfTime = stack:Add(kit.Slider(content, "shoulderCamSelfTime", L["Back from targeting yourself"], 0, 3,
 		0.1, L["%.1f sec"]), "slider")
-	kit.Tooltip(selfTime, L["With yourself targeted the game puts you in the middle of the screen, at once. " ..
-		"This is how long the camera takes to go back over your shoulder as you clear the target."])
+	kit.Tooltip(selfTime, L["How long the camera takes to go back over your shoulder after you stop targeting yourself."])
 	kit.GreyUnless(selfTime, IfOn)
 	local pauseTime = stack:Add(kit.Slider(content, "shoulderCamPauseTime", L["Off and on again takes"], 0, 3,
 		0.1, L["%.1f sec"]), "slider")
-	kit.Tooltip(pauseTime, L["How long the camera takes to go back behind you as you go indoors, mount, or leave " ..
-		"where Show in has it, and back over your shoulder after. Cinematic's own cameras have their own " ..
-		"times on the Cameras tab."])
+	kit.Tooltip(pauseTime, L["How long the camera takes to move behind you when the Shoulder Cam pauses, and back."])
 	kit.GreyUnless(pauseTime, IfOn)
 
 	-- Turn to NPCs and Turn to your target: Show in rows, each one's box before
@@ -2381,28 +2371,20 @@ function ns.CreateShoulderCamPanel(kit)
 			alwaysOn = function() return ns.GetDB().shoulderCamTalkTurnAlways end,
 			setAlways = function(value) ns.GetDB().shoulderCamTalkTurnAlways = value talkRead.at = -1 end,
 			alwaysTip = L["Turns to who you talk to wherever you are. (The other columns then have nothing to add.)"],
-			showTip = L["As you talk to an NPC (or a vendor, banker, trainer or flight master), the camera turns " ..
-			"slowly to bring them toward the middle of the screen, and stays there while the window's open. " ..
-			"Close it (Escape, its X or Goodbye, Accept, Complete or Decline) and the window fades while the " ..
-			"camera glides back, then it closes. Walking away turns back quickly."],
+			showTip = L["The camera turns toward the NPC you talk to while their window is open."],
 			showChanged = function() if ns.ApplyShoulderCam then ns.ApplyShoulderCam() end end,
 			apply = function() talkRead.at = -1 end,
-			tip = L["Where the camera turns to who you talk to. Unticked here (indoors and in fights, to start with), " ..
-			"it stays over your shoulder as you talk."] },
+			tip = L["Where the camera turns toward who you talk to."] },
 	}, "Shoulder Cam")
 	stack:Continue(talkRow, "label")
 	-- (Under it, indented: Escape in a talk window, the game's or Cinematic's own, 2026-11-15.)
 	local escTarget = stack:Add(kit.Check(content, "shoulderCamEscTarget", L["Clear target on Esc while interacting with an NPC"],
-		L["With an NPC's window open (talk, vendor, trainer, banker, flight master, auctioneer, stable master)," ..
-		"Escape clears your target and closes the window in the same press. Off: Escape only closes it, and " ..
-		"your target stays."]), "check", 16)
+		L["Escape clears your target and closes an NPC's window in one press."]), "check", 16)
 	kit.GreyUnless(escTarget, IfTalk)
 	-- (Dev copy only, a test: MultiQuestFix.lua, user 2026-11-15.)
 	if ns.isDev then
 		local multiQuest = stack:Add(kit.Check(content, "shoulderCamMultiQuestFix", L["Multi Quest fix"],
-			L["Test (dev copy only). In the game's quest window, at a quest giver with more quests: Accept " ..
-			"clears your target first, then press your Interact key to talk to them again. Each step goes " ..
-			"in the log."]), "check", 16)
+			L["Dev test: at a quest giver with more quests, Accept clears your target first."]), "check", 16)
 		kit.GreyUnless(multiQuest, IfTalk)
 	end
 	-- (The NPC turn's times with it, under its ticks: under Turn to enemy till
@@ -2413,8 +2395,7 @@ function ns.CreateShoulderCamPanel(kit)
 	kit.GreyUnless(talkIn, IfTalk)
 	local talkOut = stack:Add(kit.Slider(content, "shoulderCamTalkOut", L["NPC turn back takes"], 0.5, 4, 0.5,
 		L["%.1f sec"]), "slider")
-	kit.Tooltip(talkOut, L["How long the glide back over your shoulder takes as you close the window. " ..
-		"Going from one window to the next with them (a quest's text, the next quest) it stays on them."])
+	kit.Tooltip(talkOut, L["How long the camera takes to glide back over your shoulder after you close the window."])
 	kit.GreyUnless(talkOut, IfTalk)
 	-- Turn to enemy, under them: its own table, back out at the header's
 	-- edge, with no column headings of its own (the NPC row's above say them).
@@ -2428,13 +2409,11 @@ function ns.CreateShoulderCamPanel(kit)
 			alwaysKey = "shoulderCamTargetTurnAlways",
 			alwaysOn = function() return ns.GetDB().shoulderCamTargetTurnAlways end,
 			setAlways = function(value) ns.GetDB().shoulderCamTargetTurnAlways = value turnRead.at = -1 end,
-			alwaysTip = L["Turns to your target wherever you are, in fights too. (The other columns then have nothing to add.)"],
-			showTip = L["As you target an enemy, the camera turns slowly toward it, and glides back at the same " ..
-			"pace once you clear your target, pick a friendly one or it dies."],
+			alwaysTip = L["Turns to your target everywhere, in fights too."],
+			showTip = L["The camera turns slowly toward the enemy you target."],
 			showChanged = function() if ns.ApplyShoulderCam then ns.ApplyShoulderCam() end end,
 			apply = function() turnRead.at = -1 end,
-			tip = L["Where the camera turns to your target, and whether in fights. Unticked here, it glides " ..
-			"back over your shoulder, and turns again once you're somewhere ticked."] },
+			tip = L["Where the camera turns toward your target."] },
 	}, "Shoulder Cam")
 	stack:Continue(turnRow, "label")
 	local talkTime = stack:Add(kit.Slider(content, "shoulderCamTalkTime", L["Enemy turn takes"], 0.5, 4, 0.5,
@@ -2444,16 +2423,11 @@ function ns.CreateShoulderCamPanel(kit)
 	kit.GreyUnless(talkTime, IfTurn)
 	local turnBack = stack:Add(kit.Slider(content, "shoulderCamTargetBack", L["Enemy turn back takes"], 0.5, 4, 0.5,
 		L["%.1f sec"]), "slider")
-	kit.Tooltip(turnBack, L["How long the glide back over your shoulder takes as you clear your target, pick a " ..
-		"friendly one or it dies."])
+	kit.Tooltip(turnBack, L["How long the camera takes to glide back after you clear your target."])
 	kit.GreyUnless(turnBack, IfTurn)
 	-- (The soft target trick, SoftHold: its own box so it can be turned off. User, 2026-11-16.)
 	local softGlide = stack:Add(kit.Check(content, "shoulderCamSoftGlide", L["Glide back when you clear your target"],
-		L["Clearing your target (Esc) makes the game drop its turn at once, a snap. With this on, the game's " ..
-		"soft enemy target is kept on while the camera's turned, which holds the turn so it can glide back. " ..
-		"For that moment, an attack with no target can go to the enemy in front of you; if a fight starts " ..
-		"while you're turned, it stays on till the fight ends. Off: it snaps back, and soft targeting is " ..
-		"left alone."]), "check", 16)
+		L["Glides back instead of snapping when you clear your target, briefly using soft enemy targeting."]), "check", 16)
 	kit.GreyUnless(softGlide, IfTurn)
 
 	Adopt(switch) -- (all of the above onto the first tab)
@@ -2467,24 +2441,19 @@ function ns.CreateShoulderCamPanel(kit)
 	-- (Dev only for now: setting the Follow HUD up on the profile, FollowHud.lua.)
 	if ns.BuildFollowHudSetup then ns.BuildFollowHudSetup(frames, fstack, kit) end
 	local followCheck = fstack:Add(kit.Check(frames, "shoulderCamFrames", L["Frames follow you"],
-		L["The frames ticked below slide over to where you are on the screen, and " ..
-		"glide back as the camera goes behind you. Edit Mode still places them: this moves them from " ..
-		"there."], SaveThen("shoulderCamFrames", UpdateFollow)), "check")
+		L["The ticked frames slide over to where you are on the screen."], SaveThen("shoulderCamFrames", UpdateFollow)), "check")
 	kit.GreyUnless(followCheck, IfOn)
 	local function IfFollow() return ns.PageSetting("shoulderCam") and ns.GetDB().shoulderCamFrames end
 	-- (Under it, indented: it adds to it, with Turn to enemy on the first tab. Beside it till
 	-- 2026-11-15, it read as a choice between the two: user.)
 	local turnFollow = kit.Check(frames, "shoulderCamTargetFollow", L["Frames follow the turn"],
-		L["Your cast bar and Personal Resource Display slide along with you as the camera turns toward " ..
-		"your target. The game doesn't say how far it turned, so this works it out from where you clicked: " ..
-		"picked with Tab, they join in once your mouse passes over it. Experimental: dragging the camera " ..
-		"with the mouse loses it till you pick a target again."], SaveThen("shoulderCamTargetFollow", UpdateFollow))
+		L["Your cast bar and Personal Resource Display slide along as the camera turns to your target."], SaveThen("shoulderCamTargetFollow", UpdateFollow))
 	fstack:Add(turnFollow, "check", 16)
 	kit.GreyUnless(turnFollow, function()
 		local db = ns.GetDB()
 		return ns.PageSetting("shoulderCam") and db.shoulderCamTargetTurn and db.shoulderCamFrames
 	end)
-	local FRAME_TIP = L["Slides with you. A frame placed on it in Edit Mode slides along with it, ticked or not."]
+	local FRAME_TIP = L["Slides with you."]
 	local labels = {
 		shoulderCamFollowCast = L["Cast bar"],
 		shoulderCamFollowPRD = L["Personal Resource Display"],
@@ -2497,17 +2466,14 @@ function ns.CreateShoulderCamPanel(kit)
 	}
 	local height = fstack:Add(kit.Slider(frames, "shoulderCamFramesHeight", L["Height (all)"], -200, 200, 5, "%+d"),
 		"slider")
-	kit.Tooltip(height, L["Raises (or lowers) all the ticked frames together while the camera is over your " ..
-		"shoulder; they glide back down as it goes behind you. Each one's own slider, on its row, adds to this."])
+	kit.Tooltip(height, L["Raises or lowers all the ticked frames while the camera is over your shoulder."])
 	kit.GreyUnless(height, IfFollow)
 	-- (Its own line under Height (all), each with its name: user, 2026-11-15.)
 	local strength = fstack:Add(kit.Slider(frames, "shoulderCamFramesStrength", L["Follow strength"], 0, 200, 5,
 		"%d%%", 100), "slider")
-	kit.Tooltip(strength, L["How far they slide. Where you are on the screen is worked out from the camera, " ..
-		"not read: if they land short of you or past you, turn this up or down."])
+	kit.Tooltip(strength, L["How far the frames slide; adjust it if they land short of you or past you."])
 	kit.GreyUnless(strength, IfFollow)
-	local OWN_TIP = L["This frame's own height, on top of Height (all). A frame placed on it in Edit Mode moves " ..
-		"with it."]
+	local OWN_TIP = L["This frame's own height, added to Height (all)."]
 	for _, group in ipairs(FOLLOW_GROUPS) do
 		local key = group.key
 		local check = fstack:Add(kit.Check(frames, key, labels[key], FRAME_TIP,
@@ -2529,8 +2495,7 @@ function ns.CreateShoulderCamPanel(kit)
 	-- Beside each camera's tick: the seconds it takes to go back behind you as
 	-- that camera starts, and back over your shoulder as it ends. Empty: the
 	-- usual time (shown greyed in it). Greyed while ticked: no pause then.
-	local TIME_TIP = L["How many seconds the camera takes to go back behind you as this camera starts, " ..
-		"and back over your shoulder as it ends. Leave it empty for the usual %s seconds."]:format(BLEND_TIME)
+	local TIME_TIP = L["Seconds the camera takes to move behind you for this camera; empty uses %s."]:format(BLEND_TIME)
 	local function TimeBox(parent, check, timeKey, allowKey)
 		kit.RecordKey(parent, timeKey)
 		local box = ns.SkinEditBox(CreateFrame("EditBox", nil, parent, "InputBoxTemplate"))
@@ -2608,8 +2573,7 @@ function ns.CreateShoulderCamPanel(kit)
 		{ "shoulderCamAllowCozy", L["Cozy camera"] },
 		{ "shoulderCamAllowAFK", L["AFK camera"] },
 		{ "shoulderCamAllowTele", L["Tele camera"], L["Your Hearthstone and teleports."] },
-		{ "shoulderCamAllowFlight", L["Flight camera"], L["Flight paths and their fly-bys. The flight's mount " ..
-			"pushes you further aside than your spot, and the frames that follow you don't know by how much yet."] },
+		{ "shoulderCamAllowFlight", L["Flight camera"], L["Flight paths and their fly-bys."] },
 		{ "shoulderCamAllowDeath", L["Death camera"], L["While you're dead, until you release."] },
 		{ "shoulderCamAllowWalk", L["Walk camera"] },
 		{ "shoulderCamAllowRun", L["Auto-run camera"] },

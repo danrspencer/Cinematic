@@ -18,9 +18,7 @@ local L = ns.L
 table.insert(ns.ADDON_NOTES, {
 	addon = "DialogueUI", label = "Dialogue UI",
 	works = L["Takes over talking to NPCs"],
-	about = L["Dialogue UI's window stands in for the game's gossip and quest windows, so Cinematic's " ..
-		"Custom dialogue frames don't show while it's on. While its camera moves (Camera Movement in its " ..
-		"settings), Cinematic's quest camera and other cameras wait; turn that off there to have ours."],
+	about = L["Dialogue UI replaces the game's NPC windows, so Cinematic's dialogue frames don't show."],
 })
 
 -- Whether DialogueUI's window is up with its camera on (its saved settings:

@@ -33,10 +33,7 @@ local LABEL = "DynamicCam"
 table.insert(ns.ADDON_NOTES, {
 	addon = LABEL, label = LABEL,
 	works = L["Shares the camera with Cinematic's"],
-	about = L["DynamicCam has no frames to fade. Cinematic's cameras zoom past its zoom handling, so they " ..
-		"go the distance they ask for, and Shoulder Cam leaves the shoulder offset to it. Its situations " ..
-		"that move the camera (Taxi, Hearth/Teleport, AFK, Fishing, NPC Interaction) are on the Addon " ..
-		"Conflicts page: pick whose camera plays."],
+	about = L["Cinematic's cameras work alongside DynamicCam, which has no frames to fade."],
 })
 
 -- Its situations that play at the same moments as our scenes: its situation

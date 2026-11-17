@@ -2238,13 +2238,11 @@ ns.COMBAT_SHOW = {
 	-- Follows the health bar's ticks until set (see ROW_FALLBACK).
 	{ key = "prdpower", label = L["Personal resource bar"], default = true, frames = { "CinematicPersonalPower" },
 		morePage = "Personal Resources",
-		tip = L["Mana, rage, energy, focus or runic power under your character, and class resources " ..
-			"such as combo points."] },
+		tip = L["Your power under your character, plus class resources like combo points."] },
 	-- Nothing ticked to start with: its own setting (a few seconds after you use mana) shows it.
 	{ key = "prdmana", label = L["Cine Mana Bar"], default = false, frames = { "CinematicPersonalMana" },
 		morePage = "Personal Resources",
-		tip = L["Your mana under your character when it isn't your power (Elemental Shaman, Shadow Priest...): " ..
-			"once it's on, on the Unit Frames page's Keep up tab."] },
+		tip = L["Your mana under your character when it isn't your main power."] },
 	{ key = "target", label = L["Target"], default = true, frames = { "TargetFrame" } },
 	{ key = "tot", label = L["Target of target"], default = true, frames = { "TargetFrameToT" } },
 	{ key = "focus", label = L["Focus"], default = true, frames = { "FocusFrame" } },
@@ -2255,21 +2253,18 @@ ns.COMBAT_SHOW = {
 	-- since their game has its own focus target setting).
 	{ key = "focustot", label = L["Focus target of target"], default = true, frames = { "FocusFrameToT" },
 		noHoverRow = true, showKey = ns.isClassicEra and "unitPartsFocusToT" or nil,
-		showTip = L["Unticked: the small frame by the focus frame, showing who your focus is targeting, doesn't " ..
-			"show at all, CineMode or not. Which of its parts show: click its name."],
+		showTip = L["Unticked, the focus's target frame never shows."],
 		showChanged = function() if ns.ApplyUnitFrameParts then ns.ApplyUnitFrameParts() end end },
 	-- The game's circle on the ground under your target: not a frame but a
 	-- setting (Effects.lua, ns.RowOnNow). Always ticked to start with
 	-- (CINE_SHOW_DEFAULT), as before it had a row.
 	{ key = "targetcircle", label = L["Target circle"], default = false, noHoverRow = true,
-		tip = L["The selection circle on the ground under your target. Hidden, your own setting is put " ..
-			"back when the UI returns."] },
+		tip = L["The selection circle on the ground under your target."] },
 	-- The game's Self Highlight (circle and/or outline on your own character),
 	-- on the HUD page's Highlight tab: a setting too (Effects.lua). Always
 	-- ticked to start with (CINE_SHOW_DEFAULT): left to the game until changed.
 	{ key = "selfhighlight", label = L["Self highlight"], default = false, noHoverRow = true,
-		tip = L["The game's Self Highlight: the circle or outline on your own character. Hidden, your own " ..
-			"setting is put back when the UI returns."] },
+		tip = L["The circle or outline on your own character."] },
 	-- The Standard Frames page's Party frames section (page = "party"); the
 	-- raid-style ones are the Raid frames section's.
 	{ key = "party", label = L["Party frames"], default = true, page = "party", groups = { "party" } },
@@ -2278,8 +2273,7 @@ ns.COMBAT_SHOW = {
 	{ key = "partyroles", label = L["Role icons"], default = false, page = "party", groups = { "partyroles" }, part = true },
 	{ key = "partynames", label = L["Names"], default = false, page = "party", groups = { "partynames" }, part = true },
 	{ key = "partystatus", label = L["Status icons"], default = false, page = "party", groups = { "partystatus" }, part = true,
-		tip = L["The icon on a member's portrait for a summon on its way, or a member phased, in another " ..
-			"instance or too far away."] },
+		tip = L["The summon or phased icon on a member's portrait."] },
 	-- The raid frames (raid-style party frames too), members and pets apart,
 	-- and the Raid Frame Manager (the tab at the left edge): the Standard
 	-- Frames page's Raid frames section (page = "raid").
@@ -2295,8 +2289,7 @@ ns.COMBAT_SHOW = {
 	-- The glow round a member with threat. (tip: the row name's tooltip.)
 	{ key = "raidthreat", label = L["Threat highlight"], default = false, addon = "Blizzard_CompactRaidFrames",
 		page = "raid", groups = { "raidthreat" }, part = true,
-		tip = L["The glow round a member with threat (aggro). To hide it all the time, CineMode or not, " ..
-			"turn off the game's own Display Aggro Highlight raid frame option."] },
+		tip = L["The glow around a member with threat."] },
 	-- The white outline round your target's frame.
 	{ key = "raidtarget", label = L["Target highlight"], default = false, addon = "Blizzard_CompactRaidFrames",
 		page = "raid", groups = { "raidtarget" }, part = true,
@@ -2328,45 +2321,32 @@ ns.COMBAT_SHOW = {
 	-- The bar behind the zone's name (not the name): follows the minimap's
 	-- ticks until set (see ROW_FALLBACK).
 	{ key = "minimapheader", label = L["Minimap header"], default = true, groups = { "minimapheader" },
-		tip = L["The bar behind the zone's name above the minimap (the name has a row of its own). " ..
-			"Untick it to leave the name floating on its own. Hovering the minimap brings it up with the map: " ..
-			"to keep it hidden then too, take Minimap header out of the Minimap group on the Hover groups page."] },
+		tip = L["The bar behind the zone name above the minimap."] },
 	-- The buttons on the header: follow the minimap's ticks until set, too.
 	{ key = "minimaptracking", label = L["Tracking button"], default = true, groups = { "minimaptracking" },
-		tip = L["The tracking button on the minimap header. Untick it to hide it in CineMode even while the minimap is up. " ..
-			"Hovering the minimap brings it up with the map."] },
+		tip = L["The tracking button on the minimap header."] },
 	{ key = "minimapcalendar", label = L["Calendar"], default = true, groups = { "minimapcalendar" },
-		tip = L["The calendar button on the minimap header. Untick it to hide it in CineMode even while the minimap is up. " ..
-			"Hovering the minimap brings it up with the map."] },
+		tip = L["The calendar button on the minimap header."] },
 	{ key = "minimapzone", label = L["Zone name"], default = true, groups = { "minimapzone" },
-		tip = L["The zone's name on the minimap header. Untick it to hide it in CineMode even while the minimap is up. " ..
-			"Hovering the minimap brings it up with the map."] },
+		tip = L["The zone's name on the minimap header."] },
 	{ key = "minimapclock", label = L["Clock"], default = true, groups = { "minimapclock" },
-		tip = L["The clock on the minimap header. Untick it to hide it in CineMode even while the minimap is up. " ..
-			"Hovering the minimap brings it up with the map."] },
+		tip = L["The clock on the minimap header."] },
 	{ key = "minimapdial", label = L["Day/night dial"], default = true, groups = { "minimapdial" }, retail = false,
-		tip = L["The day and night dial by the minimap. Untick it to hide it in CineMode even while the minimap is up. " ..
-			"Hovering the minimap brings it up with the map."] },
+		tip = L["The day and night dial by the minimap."] },
 	{ key = "minimapaddons", label = L["Addon buttons"], default = true, groups = { "minimapaddons" },
-		tip = L["Addons' buttons around the minimap's edge, Cinematic's own too. Untick it to hide them in CineMode " ..
-			"even while the minimap is up. Hovering the minimap brings them up with the map."] },
+		tip = L["Addon buttons around the minimap's edge."] },
 	{ key = "minimapcompartment", label = L["Addon compartment"], default = true, groups = { "minimapcompartment" },
-		tip = L["The game's addon compartment button by the minimap, which lists your addons' entries. Untick it to hide it " ..
-			"in CineMode even while the minimap is up. Hovering the minimap brings it up with the map."] },
+		tip = L["The button by the minimap that lists your addons."] },
 	{ key = "minimapcoords", label = L["Coordinates"], default = true, groups = { "minimapcoords" },
-		tip = L["The map coordinates by the minimap. Untick it to hide them in CineMode even while the minimap is up. " ..
-			"Hovering the minimap brings them up with the map."] },
+		tip = L["The map coordinates by the minimap."] },
 	{ key = "minimapmail", label = L["Mail"], default = true, groups = { "minimapmail" },
-		tip = L["The unread mail icon on the minimap. Untick it to hide it in CineMode even while the minimap is up. " ..
-			"Hovering the minimap brings it up with the map."] },
+		tip = L["The unread mail icon on the minimap."] },
 	-- The boxes under the minimap (a capture bar, a scenario's step): go with
 	-- the minimap, following its ticks until set (see ROW_FALLBACK), and in its
 	-- Mouseover group.
 	{ key = "belowminimap", label = L["Objective boxes (below the minimap)"], default = true,
 		frames = FRAME_GROUPS.belowminimap,
-		tip = L["The boxes the game puts under the minimap for a scenario's or quest's current step, " ..
-			"such as a capture bar. They come and go with the minimap until you change their ticks, " ..
-			"and hovering the minimap brings them up with the map."] },
+		tip = L["Boxes under the minimap for a quest or scenario step, like a capture bar."] },
 	-- (groups too: an addon's unnamed tracker parts, found by its scanner.)
 	{ key = "quests", label = L["Quest tracker"], default = false, frames = FRAME_GROUPS.quests, groups = { "quests" },
 		morePage = "Quest tracker" },
@@ -2377,18 +2357,16 @@ ns.COMBAT_SHOW = {
 	-- Follows the quest tracker's ticks until set too.
 	{ key = "topcenter", label = L["Event boxes (top of the screen)"], default = false,
 		frames = FRAME_GROUPS.topcenter,
-		tip = L["The bars and boxes the game puts at the top of the screen for a zone event or scenario, " ..
-			"such as a timer to the next event. Until you change its ticks it does what the quest tracker's row does."] },
+		tip = L["Bars and boxes at the top of the screen for zone events and scenarios."] },
 	{ key = "buffs", label = L["Buffs and debuffs"], default = true, morePage = "Buffs/debuffs",
 		frames = { "BuffFrame", "DebuffFrame", "TemporaryEnchantFrame" } },
 	-- Hidden even while the buffs are up: hovering the buffs brings it (it's in
 	-- their Mouseover group), a buff peek doesn't (see the aura trigger).
 	{ key = "buffcollapse", label = L["Collapse buffs button"], default = false, retail = true,
 		groups = { "buffcollapse" },
-		tip = L["The arrow by your buffs that folds them away. Hidden in CineMode even while your buffs show; " ..
-			"hovering your buffs brings it up."] },
+		tip = L["The arrow by your buffs that folds them away."] },
 	{ key = "swing", label = L["Swing timer"], default = true, retail = false, morePage = "Swing timer",
-		tip = L["The Swing timer page can fade out the bars of weapons you aren't using, and the off-hand's."],
+		tip = L["Your weapon swing timer bars."],
 		frames ={ "SwingTimerMainHandFrame", "SwingTimerOffHandFrame", "SwingTimerRangedFrame" },
 		-- (And every other frame in its group: one found by its name having
 		-- SwingTimer in it (AUTO_PATTERNS), like EllesmereUI's ERB_SwingTimerFrame
@@ -2418,7 +2396,7 @@ ns.COMBAT_SHOW = {
 	-- always: under the Trackers tab's table (MirrorTimerStyle.lua).
 	{ key = "mirror", label = L["Breath bar"], default = false,
 		frames = { "MirrorTimerContainer", "MirrorTimer1", "MirrorTimer2", "MirrorTimer3" },
-		tip = L["The bar that runs down while you hold your breath underwater, and the game's other bars like it: fatigue in deep water and Feign Death."] },
+		tip = L["The breath bar underwater and similar bars like fatigue."] },
 	-- Always ticked to start with (CINE_SHOW_DEFAULT): a boss's or quest's bar to watch.
 	{ key = "encounter", label = L["Encounter bar"], default = false, frames = FRAME_GROUPS.encounter,
 		tip = L["The extra bar some bosses, quests and vehicles bring up, such as a boss's own power."] },
@@ -2464,45 +2442,35 @@ ns.COMBAT_SHOW = {
 	-- and up only while a window is (ns.CHAT_PART_ROW, UpdateFrames).
 	{ key = "chat", label = L["Chat window"], default = false, groups = { "chat" },
 		morePage = "Chat",
-		tip = L["The chat windows. Tick where they stay up while the rest fades; " ..
-			"which messages bring them up for a moment is on the Chat page."] },
+		tip = L["The chat windows."] },
 	{ key = "chattabs", label = L["Chat tabs"], default = false, part = true, frames = { "GeneralDockManager" },
-		tip = L["The chat window's tabs (General, Combat Log...). Untick it to hide them in CineMode even while " ..
-			"the chat window is up. They never stay up without it. Hovering the chat brings them up with it."] },
+		tip = L["The chat window's tabs."] },
 	-- The buttons beside it, a row each (one a client lacks has none:
 	-- ns.OptionAvailable). chatmenu was a Mouseover row before it had a row
 	-- here, so saved groups already name it.
 	{ key = "chatmenu", label = L["Chat menu button"], default = false, part = true, frames = { "ChatFrameMenuButton" },
-		tip = L["The chat menu button beside the chat window (languages, emotes...). Untick it to hide it in " ..
-			"CineMode even while the chat window is up. It never stays up without it. Hovering the chat brings " ..
-			"it up with it."] },
+		tip = L["The chat menu button beside the chat window."] },
 	{ key = "chatchannels", label = L["Channels button"], default = false, part = true,
 		frames = { "ChatFrameChannelButton" },
-		tip = L["The channels button beside the chat window. Untick it to hide it in CineMode even while the chat " ..
-			"window is up. It never stays up without it. Hovering the chat brings it up with it."] },
+		tip = L["The channels button beside the chat window."] },
 	{ key = "chatquickjoin", label = L["Quick Join button"], default = false, part = true,
 		frames = { "QuickJoinToastButton" },
-		tip = L["The Quick Join (social) button beside the chat window. Untick it to hide it in CineMode even " ..
-			"while the chat window is up. It never stays up without it. Hovering the chat brings it up with it."] },
+		tip = L["The Quick Join button beside the chat window."] },
 	{ key = "chatfriends", label = L["Friends button"], default = false, part = true, frames = { "FriendsMicroButton" },
-		tip = L["The friends button beside the chat window. Untick it to hide it in CineMode even while the chat " ..
-			"window is up. It never stays up without it. Hovering the chat brings it up with it."] },
+		tip = L["The friends button beside the chat window."] },
 	{ key = "chatdeafen", label = L["Voice deafen button"], default = false, part = true,
 		frames = { "ChatFrameToggleVoiceDeafenButton" },
-		tip = L["The voice chat deafen button beside the chat window. Untick it to hide it in CineMode even while " ..
-			"the chat window is up. It never stays up without it. Hovering the chat brings it up with it."] },
+		tip = L["The voice chat deafen button beside the chat window."] },
 	{ key = "chatmute", label = L["Voice mute button"], default = false, part = true,
 		frames = { "ChatFrameToggleVoiceMuteButton" },
-		tip = L["The voice chat mute button beside the chat window. Untick it to hide it in CineMode even while " ..
-			"the chat window is up. It never stays up without it. Hovering the chat brings it up with it."] },
+		tip = L["The voice chat mute button beside the chat window."] },
 	-- (Not a frame: the windows' own background textures, UpdateFrames.)
 	{ key = "chatbackground", label = L["Chat background"], default = false, part = true,
 		groups = { "chatbackground" }, noHoverRow = true,
-		tip = L["The chat window's dark background. Untick it for just the lines of text while the chat window " ..
-			"is up. Hovering the chat or typing brings it up; a new message does where the Chat page ticks Background."] },
+		tip = L["The chat window's dark background."] },
 	-- Always ticked to start with (CINE_SHOW_DEFAULT), as before it had a row.
 	{ key = "voice", label = L["Voice chat speakers"], default = false, frames = FRAME_GROUPS.voice,
-		tip = L["The names and portraits above the chat of who's talking in voice chat. Untick Always to hide them in CineMode."] },
+		tip = L["Names and portraits of who's talking in voice chat."] },
 	-- (In gamepad mode the Gamepad page's row has them instead: notGamepad.)
 	{ key = "xp", label = L["Experience and reputation bars"], default = true, notGamepad = true, frames = {
 		"MainStatusTrackingBarContainer", "SecondaryStatusTrackingBarContainer",
@@ -2698,9 +2666,7 @@ ns.HOVER_TRIGGERS = {
 	{ key = "gamepad", label = L["Gamepad input"], gamepad = true, tip = L["Pressing a gamepad button (Gamepad Frames page)."] },
 	{ key = "roster", label = L["Group joins or leaves"],
 		tip = L["Someone joining or leaving your party or raid, or you joining or leaving one."] },
-	{ key = "cooldown", label = L["Cooldown recharging"], tip = L["While a spell in the Cooldown Manager (or " ..
-		"Enhanced Cooldown Manager's cooldown bars) is still recharging, until they're all ready. Not " ..
-		"the global cooldown (Cooldown Manager page)."] },
+	{ key = "cooldown", label = L["Cooldown recharging"], tip = L["While a spell in the Cooldown Manager is still recharging."] },
 }
 
 -- What it's like before you change anything: today's groups that do

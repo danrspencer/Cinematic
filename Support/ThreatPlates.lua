@@ -21,9 +21,7 @@ local L = ns.L
 table.insert(ns.ADDON_NOTES, {
 	addon = "TidyPlates_ThreatPlates", label = "Threat Plates",
 	works = L["Follows the Nameplates page"],
-	about = L["Threat Plates' nameplates fade in CineMode and follow the Nameplates page's rows. Threat " ..
-		"Plates can switch friendly nameplates on and off around fights; Cinematic puts its own back " ..
-		"afterwards."],
+	about = L["Threat Plates' nameplates fade in CineMode and follow the Nameplates page."],
 })
 
 local LABEL = "Threat Plates plate alpha"

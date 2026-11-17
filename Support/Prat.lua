@@ -15,8 +15,7 @@ local L = ns.L
 table.insert(ns.ADDON_NOTES, {
 	addon = "Prat-3.0", label = "Prat 3.0",
 	works = L["Follows the Chat page"],
-	about = L["Prat keeps the game's chat windows, so they fade with the Chat page. With its Chat Tabs " ..
-		"module on, it fades the chat tabs itself, so the Chat page leaves those alone."],
+	about = L["Prat's chat windows fade with the Chat page."],
 })
 
 local function ModuleOn(prat, name)

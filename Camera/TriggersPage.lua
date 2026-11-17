@@ -127,10 +127,7 @@ function ns.CreateTriggersPanels(kit)
 		local canvas, content = kit.CreateScrollPage(true)
 		local title = kit.Label(content, "GameFontNormalLarge", L["Triggers"])
 		Tabs(content, title, 1)
-		local intro = kit.PageIntro(content, title, L["Everything that can start a scene, in one list. A trigger " ..
-			"is what starts it, Only if (a CQL rule), what ends it, its timing and its priority. Scenes pick " ..
-			"them on the Scenes page; open one here to change it for every scene using it. Ours show their " ..
-			"place and their scene: the rest of them moves here in a later update."])
+		local intro = kit.PageIntro(content, title, L["Everything that can start a scene, in one list."])
 		local show = ns.ChoiceMenu(content, 130, {
 			{ value = "all", text = L["All"] }, { value = "ours", text = L["Ours"] },
 			{ value = "yours", text = L["Yours"] }, { value = "unused", text = L["Unused"] },
@@ -150,8 +147,7 @@ function ns.CreateTriggersPanels(kit)
 		by:SetPoint("LEFT", show, "RIGHT", 8, 0)
 		kit.Tooltip(by, L["How the list is grouped."])
 		kit.AddControl(by)
-		local new = Button(content, L["+ New trigger"], 120, L["Make a trigger of your own (/cheer to start " ..
-			"with) and open its page. Pick it on a scene's Triggers on the Scenes page."], function()
+		local new = Button(content, L["+ New trigger"], 120, L["Makes a trigger of your own and opens its page."], function()
 			local id = ns.AddLibTrigger("emote:cheer")
 			if id then ns.OpenTriggerPage(id) end
 		end)
@@ -349,17 +345,13 @@ function ns.CreateTriggersPanels(kit)
 		local canvas, content = kit.CreateScrollPage(true)
 		local title = kit.Label(content, "GameFontNormalLarge", L["Priority"])
 		Tabs(content, title, 2)
-		local intro = kit.PageIntro(content, title, L["When two triggers are on at once, the one higher in this " ..
-			"list plays its scene. Move one with its arrows (or type its number on its page). Ours are groups " ..
-			"of our triggers: Emotes and seats is every emote, seat and Fishing. A card or music never competes " ..
-			"with a camera: this is the cameras' order."])
+		local intro = kit.PageIntro(content, title, L["When two triggers fire at once, the higher one in this list wins."])
 		local note = kit.Label(content, "GameFontDisableSmall", L["The flight, quest, chat, RP walk, auto-run and " ..
 			"death cameras take turns by their own rules for now: they join this list in a later update."])
 		note:SetPoint("TOPLEFT", intro, "BOTTOMLEFT", 0, -10)
 		note:SetWidth(WIDTH)
 		note:SetJustifyH("LEFT")
-		local reset = Button(content, L["Put ours back"], 130, L["Our triggers' places as we ship them. " ..
-			"Yours keep theirs."], function()
+		local reset = Button(content, L["Put ours back"], 130, L["Puts our triggers back in their original places."], function()
 			ns.ResetAllOurs()
 			kit.Refresh()
 		end)
@@ -503,9 +495,7 @@ function ns.CreateTriggersPanels(kit)
 		local canvas, content = kit.CreateScrollPage(true)
 		local title = kit.Label(content, "GameFontNormalLarge", L["Log"])
 		Tabs(content, title, 3)
-		local intro = kit.PageIntro(content, title, L["Your triggers firing, held back (Only if, cooldown, " ..
-			"chance), losing to a higher one, and ending, with why; and which of ours started a camera. This " ..
-			"session only, newest first."])
+		local intro = kit.PageIntro(content, title, L["A log of this session's triggers and why each did or didn't play."])
 		local clear = Button(content, L["Clear"], 80, L["Empty the log."], function()
 			ns.ClearTriggerLog()
 			kit.Refresh()
@@ -606,8 +596,7 @@ function ns.CreateTriggerSettingsPanel(kit)
 	end
 
 	-- Fire now (Stop while on), Copy, Delete.
-	local fire = Add(Button(content, L["Fire now"], 90, L["Starts this trigger's scenes now, whatever its Only " ..
-		"if, cooldown and chance say (click again to stop). The Log tab shows it."], function()
+	local fire = Add(Button(content, L["Fire now"], 90, L["Starts this trigger's scenes now, ignoring its rules; click again to stop."], function()
 		local id = Id()
 		if id then ns.FireLibTrigger(id) end
 		kit.Refresh()
@@ -787,8 +776,7 @@ function ns.CreateTriggerSettingsPanel(kit)
 		if kind == "emote" then text = ns.EmoteToken(text) end
 		Set("src", kind .. ":" .. text)
 	end)
-	kit.Tooltip(whatBox, L["Emotes: the command, with or without its slash. Spells and buffs: the name in your " ..
-		"game language, or a spell ID (works in any language). Places: the zone or subzone name as the game shows it."])
+	kit.Tooltip(whatBox, L["An emote command, a spell or buff name or ID, or a zone name."])
 	local here = Add(Button(whatLine, L["Here"], 54, L["Fill in the subzone you're in now (or the zone, where " ..
 		"there's no subzone)."], function()
 		local name = GetSubZoneText and GetSubZoneText()
@@ -802,7 +790,7 @@ function ns.CreateTriggerSettingsPanel(kit)
 	local pickLine = Line(L["Which"], function() return Mine() and FIXED[Kind()] ~= nil end)
 	local pick = Menu(pickLine, 240, function() return FIXED[Kind()] or {} end, function() return select(2, Src(Id())) end,
 		function(value) Set("src", Kind() .. ":" .. value) end)
-	kit.Tooltip(pick, L["Which one. Set its key on Cinematic's Keybinds page or in the game's Key Bindings."])
+	kit.Tooltip(pick, L["Which keybind; set its key on the Keybinds page."])
 	local atLine = Line(L["When"], function() return Mine() and ns.TRIGGER_PHASES[Kind()] ~= nil end)
 	Menu(atLine, 200, function() return ns.TRIGGER_PHASES[Kind()] or {} end, function()
 		local list = ns.TRIGGER_PHASES[Kind()]
@@ -815,9 +803,7 @@ function ns.CreateTriggerSettingsPanel(kit)
 	-- Only if
 	Heading(L["Only if"], Editable)
 	local condLine = Line(L["Rule (CQL)"], Editable)
-	local rule = Add(Button(condLine, "", 300, L["A rule it needs to start, in the words the Show in rules use " ..
-		"(In combat, Cities, Resting, Mounted, In CineMode..., with AND, OR and NOT). Empty: always. Click to " ..
-		"write it in the rule editor."], function()
+	local rule = Add(Button(condLine, "", 300, L["A rule it needs to start; empty means always, click to edit."], function()
 		local id = EditId()
 		if not id then return end
 		ns.OpenRuleEditor({
@@ -929,9 +915,7 @@ function ns.CreateTriggerSettingsPanel(kit)
 		kit.Tooltip(remove, L["Take this ending off."])
 	end
 	local addEndLine = Line("", function() return Mine() and #Ends() < ns.TRIGGER_ENDS_MAX end)
-	local addEnd = Add(Button(addEndLine, L["+ Add ending"], 120, L["Another way for it to end: the first one " ..
-		"that happens ends it. Moving, walking, zooming or a fight are the camera's own stop rules (Scripts " ..
-		"page), not the trigger's."], function()
+	local addEnd = Add(Button(addEndLine, L["+ Add ending"], 120, L["Adds another way for it to end; the first that happens ends it."], function()
 		local list = Ends()
 		list[#list + 1] = { kind = "time", secs = 10 }
 		ns.SetTriggerEnds(Id(), list)
@@ -977,8 +961,7 @@ function ns.CreateTriggerSettingsPanel(kit)
 	rearmText:SetText(L["Don't start again until it has stopped being true"])
 	rearm:SetScript("OnClick", function(self) Set("rearm", not self:GetChecked() and "no" or nil) end)
 	rearm.Refresh = function(self) self:SetChecked(ns.TriggerField(Id(), "rearm") ~= "no") end
-	kit.Tooltip(rearm, L["On: once it has played, it waits for its thing to stop (you dismount, you leave) " ..
-		"before it can start again. Off: it may start again while still true, after its cooldown."])
+	kit.Tooltip(rearm, L["On: it waits until its condition stops before it can start again."])
 
 	-- Priority
 	building = 4
@@ -1001,8 +984,7 @@ function ns.CreateTriggerSettingsPanel(kit)
 			Set("pri", value ~= ns.BuiltInSourceOrder(built.source) and value or nil)
 		end
 	end, nil, true)
-	kit.Tooltip(priBox, L["Lower wins when two triggers are on at once (ours: Hearthstone 100, logging out 200, " ..
-		"AFK 300, campfire 400, emotes 500, weapon 600, campfire buff 700, standing still 800)."])
+	kit.Tooltip(priBox, L["Lower wins when two triggers are on at once."])
 	local order = Add(Button(priLine, L["See the order"], 110, L["Opens the Priority tab."], function()
 		ns.ShowHubPage("Trigger Priority")
 	end))
@@ -1070,8 +1052,7 @@ function ns.CreateTriggerSettingsPanel(kit)
 		local built = BuiltIn()
 		if built then ns.MoveTriggerToScene(built.key, value) end
 	end)
-	kit.Tooltip(move, L["The scene this trigger starts. Moved to another, it plays that scene's camera, music " ..
-		"and When; the scene it left carries on without it."])
+	kit.Tooltip(move, L["The scene this trigger starts."])
 
 	-- The sentence at the top: the trigger in words.
 	local function Sentence()

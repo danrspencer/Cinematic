@@ -466,13 +466,9 @@ function ns.CreateSkyrideCamPanel(kit)
 	local title = kit.Label(content, "GameFontNormalLarge", L["Skyriding Cam"])
 	title:SetPoint("TOPLEFT", 16, -16)
 	local intro = kit.PageIntro(content, title,
-		L["While you skyride through the air, the camera zooms out so you can see where you're going, and each " ..
-		"skyriding ability you cast gets a shot of its own."])
+		L["While you skyride, the camera zooms out and gives each ability its own shot."])
 	local switch = kit.PageSwitch(content, "skyrideCam", L["Enable Page"],
-		L["On: taking to the air on a skyriding mount zooms the camera out, each ability below moves it as you " ..
-		"cast it, and landing brings it back to your own distance. Steering with the mouse stops a turn or tilt " ..
-		"but not a zoom; scrolling the zoom yourself stops that. It plays the Skyriding zoom camera script, made " ..
-		"from the settings below."], intro)
+		L["Zooms the camera out and moves it with your abilities while you skyride."], intro)
 	local function IfOn() return ns.PageSetting("skyrideCam") end
 	local stack = kit.Stack(switch, "check")
 
@@ -555,19 +551,16 @@ function ns.CreateSkyrideCamPanel(kit)
 	local HOLD_TIP = L["How long the camera stays there before going back."]
 
 	Section("takeoff", L["Take off"])
-	Tick("skyrideCamZoomOut", L["Zoom out"], L["Taking to the air zooms the camera out. Off: it stays at your own " ..
-		"distance, and surges go out from there."])
+	Tick("skyrideCamZoomOut", L["Zoom out"], L["Zooms the camera out as you take to the air."])
 	Slider("skyrideCamDistance", L["Zoom out to"], 10, 39, 1, YARDS,
-		L["How far out the camera goes as you take to the air: your cruise distance. Surges go out from here and " ..
-		"come back to it. 39 is as far as the game allows, past your own max camera distance for the flight."],
+		L["How far out the camera goes while you skyride."],
 		"skyrideCamZoomOut")
 	Slider("skyrideCamZoomTime", L["Over"], 1, 10, 0.5, SECS, nil, "skyrideCamZoomOut")
 	Slider("skyrideCamStart", L["Start after"], 0, 3, 0.25, L["%.2f sec"],
 		L["How long you're in the air before the camera zooms out, so a hop doesn't start it."])
 
 	Section("surge", L["Surge Forward"])
-	Tick("skyrideSurge", L["Zoom out"], L["Surge Forward pulls the camera out past your cruise distance, holds " ..
-		"it there, then lets it drift back. Another Surge meanwhile holds it out longer; it doesn't go further."])
+	Tick("skyrideSurge", L["Zoom out"], L["Surge Forward pulls the camera out for a moment, then lets it drift back."])
 	Slider("skyrideSurgeYards", L["By"], 1, 15, 1, YARDS, L["How far past your cruise distance (Take off's)."],
 		"skyrideSurge")
 	Slider("skyrideSurgeTime", L["Over"], 1, 5, 0.5, SECS, nil, "skyrideSurge")
@@ -582,8 +575,7 @@ function ns.CreateSkyrideCamPanel(kit)
 	Slider("skyrideAscentHold", L["Hold"], 0, 5, 0.5, SECS, HOLD_TIP, "skyrideAscent")
 
 	Section("whirl", L["Whirling Surge"])
-	Tick("skyrideWhirl", L["Zoom out"], L["Whirling Surge throws the camera out fast, as if you're going too fast " ..
-		"for it to keep up, holds it there, then lets it catch up slowly."])
+	Tick("skyrideWhirl", L["Zoom out"], L["Whirling Surge throws the camera out fast, then lets it catch up slowly."])
 	Slider("skyrideWhirlYards", L["To"], 10, 39, 1, YARDS, nil, "skyrideWhirl")
 	Slider("skyrideWhirlTime", L["Over"], 0.5, 5, 0.5, SECS, L["0.5: a snap, as quick as the game's zoom goes."],
 		"skyrideWhirl")
@@ -592,11 +584,9 @@ function ns.CreateSkyrideCamPanel(kit)
 		"cruise distance."], "skyrideWhirl")
 
 	Section("halt", L["Aerial Halt"])
-	Tick("skyrideHalt", L["Swing around and zoom in"], L["Aerial Halt swings the camera around you and in close for " ..
-		"a shot of you hovering, holds it, then swings back. A Surge to fly off ends the shot."])
+	Tick("skyrideHalt", L["Swing around and zoom in"], L["Aerial Halt swings the camera around for a close shot of you hovering."])
 	Slider("skyrideHaltDeg", L["By"], 30, 180, 10, DEGREES, nil, "skyrideHalt")
-	Slider("skyrideHaltYards", L["Zoom in to"], 0, 25, 1, YARDS, L["How close the camera comes in meanwhile. " ..
-		"0: it stays at the distance it's at."], "skyrideHalt")
+	Slider("skyrideHaltYards", L["Zoom in to"], 0, 25, 1, YARDS, L["How close the camera comes in; 0 keeps its distance."], "skyrideHalt")
 	Slider("skyrideHaltTime", L["Over"], 1, 5, 0.5, SECS, nil, "skyrideHalt")
 	Slider("skyrideHaltHold", L["Hold"], 0, 5, 0.5, SECS, HOLD_TIP, "skyrideHalt")
 
@@ -606,63 +596,45 @@ function ns.CreateSkyrideCamPanel(kit)
 	Slider("skyrideWindYards", L["By"], 1, 10, 1, YARDS, nil, "skyrideWind")
 	Slider("skyrideWindTime", L["Over"], 1, 5, 0.5, SECS, L["Each way."], "skyrideWind")
 
-	local SHAPE_TIP = L["Worked out from your speed and where you are, so it comes on half a second in and " ..
-		"goes off about a second after. Not in instances: the game doesn't say where you are there."]
 	Section("climb", L["Climbing"])
-	Tick("skyrideClimb", L["Tilt up"], L["While you climb steeply, the camera tilts up with you, as steep as you " ..
-		"go (three quarters of it, up to the setting below), and levels " ..
-		"out again as you do."] .. " " .. SHAPE_TIP)
+	Tick("skyrideClimb", L["Tilt up"], L["The camera tilts up with you as you climb steeply."])
 	Slider("skyrideClimbDeg", L["Up to"], 5, 80, 5, DEGREES, nil, "skyrideClimb")
 	Slider("skyrideClimbTime", L["Over"], 1, 5, 0.5, SECS, nil, "skyrideClimb")
 
 	Section("dive", L["Diving"])
-	Tick("skyrideDive", L["Tilt down"], L["While you dive, the camera tilts down to where you're heading, as " ..
-		"steep as you go (three quarters of it, up to the setting below: a nose-dive looks down after you), and " ..
-		"levels out again as you do."] .. " " .. SHAPE_TIP)
+	Tick("skyrideDive", L["Tilt down"], L["The camera tilts down toward where you dive."])
 	Slider("skyrideDiveDeg", L["Up to"], 5, 80, 5, DEGREES, nil, "skyrideDive")
 	Slider("skyrideDiveTime", L["Over"], 1, 5, 0.5, SECS, nil, "skyrideDive")
 
 	Section("turn", L["Turning"])
-	Tick("skyrideTurn", L["Swing into the turn"], L["While you turn hard, the camera swings around toward where " ..
-		"you're turning, and back behind you as you straighten out. Steering with the mouse moves the camera " ..
-		"yourself, so this only shows when you turn with the keys."], "skyrideFollow")
+	Tick("skyrideTurn", L["Swing into the turn"], L["The camera swings toward your turn when you turn hard with the keys."], "skyrideFollow")
 	Slider("skyrideTurnDeg", L["By"], 5, 60, 5, DEGREES, nil, "skyrideTurn", "skyrideFollow")
 	Slider("skyrideTurnTime", L["Over"], 1, 5, 0.5, SECS, nil, "skyrideTurn", "skyrideFollow")
 	Tick("skyrideFollow", L["Follow your turns"],
-		L["As the auto-run camera does: while you turn, the camera holds its direction, so you bank across the " ..
-		"screen, then glides around behind you once you straighten out. In place of Swing into the turn. Steering " ..
-		"with the mouse keeps the camera behind you, as ever."])
+		L["The camera holds its direction as you turn, then glides back behind you."])
 	Slider("skyrideFollowAfter", L["Glide back after"], 0, 3, 0.25, L["%.2f sec"],
 		L["How long after you stop turning the camera starts gliding back behind you."], "skyrideFollow")
 	Slider("skyrideFollowMost", L["Fall behind at most"], 10, 120, 5, DEGREES,
-		L["The furthest the camera lets you turn away from it. Past it, it turns with you, so a long turn " ..
-		"never ends with it in front of you."], "skyrideFollow")
+		L["The furthest you can turn away before the camera turns with you."], "skyrideFollow")
 
 	Section("land", L["Landing"])
-	Tick("skyrideCamZoomBack", L["Zoom back to your distance"], L["Landing brings the camera back to the distance " ..
-		"you took off at. Off: it stays where the flight left it, for you or a scene of yours to change. Any " ..
-		"turn or tilt still comes back."])
+	Tick("skyrideCamZoomBack", L["Zoom back to your distance"], L["Landing brings the camera back to the distance you took off at."])
 	Slider("skyrideCamBackTime", L["Back to your distance over"], 0.5, 10, 0.5, SECS,
-		L["How long the camera takes to come back to your own distance (and any turn or tilt undone) after " ..
-		"you land, as one smooth move."])
+		L["How long the camera takes to come back to your distance after you land."])
 	Slider("skyrideCamLand", L["Start after landing"], 0, 5, 0.25, L["%.2f sec"],
-		L["How long you're on the ground before the camera starts coming back, so touching down between flaps " ..
-		"doesn't bounce it. Off again before it's back: it goes back out with you."])
+		L["How long you stay landed before the camera starts coming back."])
 
-	local FASTEST_TIP = L["The fastest the camera goes at the height of a move. A moment that would go faster takes " ..
-		"longer instead, so moments firing close together never whip the camera around."]
+	local FASTEST_TIP = L["The fastest the camera moves; quicker moments take longer instead."]
 	Section("blend", L["Blend"])
 	Slider("skyrideMaxTurn", L["Fastest turn"], 30, 360, 10, L["%d degrees a second"], FASTEST_TIP)
 	Slider("skyrideMaxTilt", L["Fastest tilt"], 10, 90, 5, L["%d degrees a second"], FASTEST_TIP)
 	Slider("skyrideMaxZoom", L["Fastest zoom"], 5, 40, 1, L["%d yards a second"], FASTEST_TIP)
 	Slider("skyrideBlend", L["Blend into the next move"], 0, 2, 0.25, L["%.2f sec"],
-		L["When a moment starts while the camera is still moving the same way, the move carries on and slides " ..
-		"into the new one's speed over this long, instead of stopping first. 0: it stops, then starts the new one."])
+		L["Slides one move smoothly into the next; 0 stops first."])
 
 	Section("cine", L["CineMode"])
 	kit.GreyUnless(Put(kit.Check(content, "skyrideCine", L["CineMode while skyriding"],
-		L["With \"Start in CineMode\" off (Cinematic's main page), skyriding brings CineMode on (the UI " ..
-		"fades as your Show in rows say) until you land."]), "check"), IfOn)
+		L["Brings CineMode on while you skyride, if Start in CineMode is off."]), "check"), IfOn)
 
 	-- The tabs, as high as their rows, under the Show in row.
 	local list = {}

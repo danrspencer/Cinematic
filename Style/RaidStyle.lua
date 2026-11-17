@@ -400,9 +400,7 @@ function ns.CreateRaidStylePanel(kit)
 	local tabs = ns.PageTabs(content, ns.ShowInTabs("party"), ns.ShowInIndex("party", "Raid Style"))
 	title:SetPoint("TOPLEFT", tabs, "BOTTOMLEFT", 8, -14)
 	local intro = kit.PageIntro(content, title,
-		L["How the raid frames look, the party's when the game draws them raid-style, and the arena's. The " ..
-		"Default row's look is each group's until its row says Its own look; each row's Look panel sets it. " ..
-		"Which parts show: the HUD page's party and raid rows."])
+		L["How the raid, party and arena frames look."])
 
 	-- The row shown in the preview (nil: Default): the last one picked or
 	-- whose panel was opened.
@@ -414,8 +412,7 @@ function ns.CreateRaidStylePanel(kit)
 	end
 
 	local switch = kit.PageSwitch(content, "rfStyle", L["Enable Page"],
-		L["On: the raid frames look as this page says. Off: the game's own (the preview shows that too). Each " ..
-		"setting keeps its value for when you turn this back on."], intro, Changed)
+		L["On: the raid frames look as this page says; off: the game's own look."], intro, Changed)
 	local stack = kit.Stack(switch, "check")
 	local rows = ns.StyleRows(kit, content, stack, Changed, "rfStyle")
 
@@ -533,8 +530,7 @@ function ns.CreateRaidStylePanel(kit)
 				holder:HookScript("OnShow", function(self) self:Refresh() end)
 				return holder
 			end,
-			texture = { "rfTexture", L["The health bar's fill. Below the game's own few: any other addon shares " ..
-				"(through LibSharedMedia)."], test = Editable, tint = { 0.25, 0.75, 0.3 } },
+			texture = { "rfTexture", L["The health bar's fill, including textures other addons share."], test = Editable, tint = { 0.25, 0.75, 0.3 } },
 			barColor = function(look)
 				look.Choices(L["Health:"], "rfHealthColor", {
 					{ "game", L["The game's"], L["As the game's options say (class colors, or green)."] },
@@ -550,8 +546,7 @@ function ns.CreateRaidStylePanel(kit)
 						return Editable(db) and ns.StyleKeyGet(Field("rfBorder")) ~= "game"
 					end)
 			end,
-			border = { "rfBorder", L["Round each frame: the game's, or a border of ours (Custom: its thickness and " ..
-				"color under it)."], opts = { game = true }, test = Editable },
+			border = { "rfBorder", L["The border around each frame: the game's or one of ours."], opts = { game = true }, test = Editable },
 			backColor = function(look)
 				look.Choices(L["Background:"], "rfGroundColor", {
 					{ "game", L["The game's"] },
@@ -564,8 +559,7 @@ function ns.CreateRaidStylePanel(kit)
 				look.Slider("rfGround", L["Background"], 0, 100, 5, "%d%%", 100, L["How solid the game's " ..
 					"dark background behind each frame is."], Editable)
 			end,
-			font = { "rfFont", L["The name's font. Russian, Korean or Chinese names keep the game's, so their " ..
-				"letters show."], test = Editable },
+			font = { "rfFont", L["The font for names."], test = Editable },
 			textSize = function(look)
 				look.Slider("rfNameSize", L["Size"], 50, 150, 5, "%d%%", 100, L["The name's size, next to the game's."],
 					Editable)
@@ -608,8 +602,7 @@ function ns.CreateRaidStylePanel(kit)
 			end, set = function(value) SetOwn(id, value == "own") end }, function()
 				return {
 					{ value = "default", text = L["Default row's"], tip = L["This group looks as the Default row says."] },
-					{ value = "own", text = L["Its own look"], tip = L["This group looks as its Look panel says. Its " ..
-						"settings start as the Default row's, and are kept while you pick the Default row's again."] },
+					{ value = "own", text = L["Its own look"], tip = L["This group uses its own look from its Look panel."] },
 				}
 			end, 170, function()
 				editing = id
@@ -628,8 +621,7 @@ function ns.CreateRaidStylePanel(kit)
 		-- (Default's, with no pick: where the others' are, past a pick's room: 4 + 170 + 8.)
 		button:SetPoint("LEFT", pick or name, "RIGHT", pick and 8 or 182, 0)
 		button.searchLabel = label
-		kit.Tooltip(button, id and L["This group's own look: bars, name, border and background. Only while it has " ..
-			"its own look."] or L["Every group's look while its row says Same as the Default row."])
+		kit.Tooltip(button, id and L["Sets this group's own look: bars, name, border and background."] or L["Every group's look while its row says Same as the Default row."])
 		-- (A row on the Default row's look: its button opens Default's, and says so.)
 		local function FollowsDefault()
 			local db = ns.GetDB()

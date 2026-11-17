@@ -35,16 +35,13 @@ local EFFECT_PAGES = {
 EFFECT_PAGES.letterbox.More = function(kit, content, stack)
 	stack:Header(content, L["New places"])
 	stack:Add(kit.Check(content, "letterboxOnDiscover", L["Show bars on discovering a new place"],
-		L["The bars come in for a few seconds when you find a place new to you: a zone you're in for the first " ..
-		"time, a subzone the game says you discovered, a dungeon or raid. In or out of CineMode, with " ..
-		"everything else off too. Not in fights, if the bars are off in combat."], function(value)
+		L["Brings the bars in for a few seconds when you find a new place."], function(value)
 			ns.GetDB().letterboxOnDiscover = value
 			kit.Refresh()
 		end), "check")
 	local time = stack:Add(kit.Slider(content, "letterboxDiscoverTime", L["How long"], 2, 10, 1, L["%d sec"]),
 		"slider")
-	kit.Tooltip(time, L["How long the bars stay for a new place, not counting their coming in and going. " ..
-		"Another new place meanwhile starts the count again."])
+	kit.Tooltip(time, L["How long the bars stay when you find a new place."])
 	kit.GreyUnless(time, function(db) return db.letterboxOnDiscover end)
 end
 
@@ -57,16 +54,14 @@ EFFECT_PAGES.tint.More = function(kit, content, stack)
 	kit.Tooltip(strength, L["How strongly the tint colors the world, for every preset."])
 	if not ns.isRetail then -- (retail's world shows the tint as it is)
 		stack:Add(kit.Check(content, "tintClassicBoost", L["Classic boost"],
-			L["Makes the tint stronger on this client, whose brighter, more colorful world shows the same tint " ..
-				"less than retail does. Off: the tint as the Strength slider sets it."], function(value)
+			L["Makes the tint stronger on this client, whose brighter world shows it less."], function(value)
 				ns.GetDB().tintClassicBoost = value
 				ns.RefreshTint()
 			end), "check")
 	end
 	local timeStrength = stack:Add(kit.Slider(content, "timeTintStrength", L["Time of day strength"], 0, 100, 5,
 		"%d%%", 100, ns.RefreshTint), "slider")
-	kit.Tooltip(timeStrength, L["How strongly the time-of-day color applies, in Time of day and " ..
-		"Zone + time of day. Lower it for softer nights; 0 leaves just the zone mood."])
+	kit.Tooltip(timeStrength, L["How strongly the time-of-day color applies."])
 	-- (All the way left is Off: tintDrift off, the amount kept for next time.)
 	kit.RecordKey(content, "tintDrift")
 	kit.RecordKey(content, "tintDriftAmount")
@@ -84,17 +79,12 @@ EFFECT_PAGES.tint.More = function(kit, content, stack)
 	}, L["Drift amount"], 0, 15, 1, function(value)
 		return value == 0 and L["Off"] or ("+/-%d%%"):format(value)
 	end, 100, ns.RefreshTint), "slider")
-	kit.Tooltip(driftAmount, L["The tint's strength slowly wanders up and down over a few minutes, so a still " ..
-		"scene feels a little more alive: how far either way, as a share of the strength. Paused while the " ..
-		"Style tab is open. Off: it stays put."])
+	kit.Tooltip(driftAmount, L["Lets the tint's strength slowly drift up and down by this much."])
 	local mapDim = stack:Add(kit.Slider(content, "mapDim", L["Dim the world map"], 0, 80, 5,
 		function(value) return value == 0 and L["Off"] or ("%d%%"):format(value) end, 100, ns.RefreshTint), "slider")
-	kit.Tooltip(mapDim, L["In CineMode the world map takes the tint's color and goes this much darker, so " ..
-		"opening it in a dark zone or at night doesn't flash bright. It fades with the tint as CineMode comes " ..
-		"and goes. Off: the map at the game's own brightness."])
+	kit.Tooltip(mapDim, L["Darkens and tints the world map in CineMode so it doesn't flash bright."])
 	stack:Add(kit.Check(content, "mapDimFollowTint", L["Match the tint"],
-		L["Dims the world map by how dark the tint is right now: the Dim the world map amount at night or " ..
-			"in a storm, less in a light tint, none on a clear day. Off: always the full amount."], function(value)
+		L["Dims the world map only as much as the tint is dark right now."], function(value)
 			ns.GetDB().mapDimFollowTint = value
 			ns.RefreshTint()
 		end), "check")
@@ -103,13 +93,10 @@ EFFECT_PAGES.tint.More = function(kit, content, stack)
 	stack:Header(content, L["At zone borders"])
 	local zoneFade = stack:Add(kit.Slider(content, "zoneFadeTime", L["Fade time"], 0.5, 10, 0.5, L["%.1f sec"]),
 		"slider")
-	kit.Tooltip(zoneFade, L["With a Zone tint preset, crossing into a zone with a different mood " ..
-		"fades the old mood out over this long, pauses, then fades the new one in over " ..
-		"this long."])
+	kit.Tooltip(zoneFade, L["How long one zone's mood takes to fade out and the next to fade in."])
 	local gapFlying = stack:Add(kit.Slider(content, "zoneGapFlying", L["Pause between tints when flying"], 0, 20, 1,
 		L["%d sec"]), "slider")
-	kit.Tooltip(gapFlying, L["Untinted time between the two zones' moods while you're in the air, " ..
-		"where you see the old zone's ground for longer (snow under an ember tint looks red)."])
+	kit.Tooltip(gapFlying, L["An untinted gap between two zones' moods while you're flying."])
 	local gapGround = stack:Add(kit.Slider(content, "zoneGapTime", L["Pause between tints on the ground"], 0, 10, 0.5,
 		L["%.1f sec"]), "slider")
 	kit.Tooltip(gapGround, L["The same pause when you cross a border on foot or riding."])
@@ -147,8 +134,7 @@ function ns.CreateEffectPanel(kit, effect)
 		{ key = key, label = L[info.name], alwaysKey = alwaysKey,
 			alwaysOn = function() return ns.GetDB()[alwaysKey] end,
 			setAlways = function(value) ns.GetDB()[alwaysKey] = value end,
-			alwaysTip = L["Shows all through CineMode, fights and the Calm Timer after them too. " ..
-				"(The other columns then have nothing to add.)"],
+			alwaysTip = L["Shows all through CineMode, fights and the Calm Timer after them."],
 			apply = function()
 				local switch = ns.EFFECT_SWITCHES and ns.EFFECT_SWITCHES[effect]
 				if switch then ns.GetDB()[switch] = ns.RowOnAnywhere(key, ns.GetDB()[alwaysKey]) end
@@ -170,8 +156,7 @@ function ns.CreateLetterboxStylePanel(kit)
 	local title = kit.Label(content, "GameFontNormalLarge", L["Letterbox"])
 	ns.EffectTabs(content, title, "letterbox", 2)
 	local intro = kit.PageIntro(content, title,
-		L["How the bars at the top and bottom of the screen look and come in. When they show: the Letterbox " ..
-		"tab. Changes show at once, here and on the bars."])
+		L["How the letterbox bars at the top and bottom of the screen look."])
 
 	local preview -- (below: drawn again as each setting changes)
 	local function Changed()
@@ -180,8 +165,7 @@ function ns.CreateLetterboxStylePanel(kit)
 	end
 
 	local switch = kit.PageSwitch(content, "letterboxStyle", L["Enable Page"],
-		L["On: the bars look as this page says. Off: Cinematic's own, thin black bars sliding in with the " ..
-		"UI's fade (the preview shows that too). Each setting keeps its value for when you turn this back on."],
+		L["On: the bars look as this page says; off: Cinematic's plain black bars."],
 		intro, Changed)
 	local stack = kit.Stack(switch, "check")
 	local rows = ns.StyleRows(kit, content, stack, Changed, "letterboxStyle")
@@ -243,8 +227,7 @@ function ns.CreateLetterboxStylePanel(kit)
 	stack:Header(content, L["Size"])
 	rows.Choices(L["Set by:"], "letterboxSizeBy", {
 		{ "height", L["Height"], L["Each bar a share of the screen's height."] },
-		{ "aspect", L["A film's frame"], L["The bars as tall as it takes for what's left between them to have a " ..
-			"film's shape, whatever your screen."] },
+		{ "aspect", L["A film's frame"], L["Makes the space between the bars the shape of a film, on any screen."] },
 	})
 	rows.Slider("letterboxSize", L["Bar height"], 0, 25, 1, "%d%%", 100,
 		L["How tall each bar is, as a share of the screen's height."],
@@ -282,8 +265,7 @@ function ns.CreateLetterboxStylePanel(kit)
 	})
 	rows.Slider("letterboxTime", L["How long"], 0, 30, 1, function(value)
 		return value == 0 and L["With the UI"] or ("%.1f s"):format(value / 10)
-	end, 10, L["How long the bars take to come in or go. 0: as long as the UI's own fades (the main page's " ..
-		"Fade in and Fade out times)."])
+	end, 10, L["How long the bars take to come in or go; 0 matches the UI's fade."])
 
 	canvas:SetScript("OnShow", kit.PageShown(kit.Refresh, content))
 	canvas:Hide()

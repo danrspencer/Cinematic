@@ -86,9 +86,7 @@ function ns.CreateStyleOverridesPanel(kit)
 	local title = kit.Label(content, "GameFontNormalLarge", L["Overrides"])
 	ns.StyleTabs(content, title, 4)
 	local intro = kit.PageIntro(content, title,
-		L["Hide or show parts of the unit frames and nameplates whatever their Show in rows say. Themes use these " ..
-		"too. An overridden row on the Interface pages says so, and goes back to its own ticks when you set it to " ..
-		"Interface page here. The focus and target of target frames go as Target does."])
+		L["Hide or show parts of unit frames and nameplates, whatever their Show rows say."])
 	local parts = {} -- (each row, to show its pick again)
 	local function Changed()
 		if ns.ApplyUnitFrameParts then ns.ApplyUnitFrameParts() end

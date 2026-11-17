@@ -161,7 +161,7 @@ function ns.MakePartThemeStrip(kit, parent, kind, changed)
 		tile:SetScript("OnEnter", function(self)
 			GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
 			local tip = theme.key == "main" and (kind == "plate"
-				and L["The bar as the Style hub's General page has it (its texture and border), as plates have always been."]
+				and L["The bar as set on the Style General page."]
 				or L["The names of the main theme picked on the Style hub's General page."])
 				or (theme.tip and L[theme.tip]) or ""
 			if theme.family then tip = (L["%s's own, made from its colors and art."]):format(L[theme.name]) end

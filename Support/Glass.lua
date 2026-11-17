@@ -20,9 +20,7 @@ local L = ns.L
 table.insert(ns.ADDON_NOTES, {
 	addon = "Glass", label = "Glass Forever",
 	works = L["Follows the Chat page"],
-	about = L["Glass's chat lines and tab bar fade with the Chat page, and a message brings them up where " ..
-		"the Chat page says. Glass fades each chat tab and the input box itself, so the Chat page leaves " ..
-		"those alone while it's on."],
+	about = L["Glass's chat fades and comes up as the Chat page says."],
 })
 
 -- Glass shows and hides the tab bar with alpha animations (0 to 1 to show it

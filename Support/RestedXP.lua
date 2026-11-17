@@ -12,8 +12,7 @@ local L = ns.L
 table.insert(ns.ADDON_NOTES, {
 	addon = "RXPGuides", label = "RestedXP Guides",
 	works = L["Follows the Quest tracker row"],
-	about = L["RestedXP's guide window, waypoint arrow, quest item and target buttons and level splits fade " ..
-		"with the Quest tracker row on the HUD page."],
+	about = L["RestedXP's guide window and buttons fade with the Quest tracker row."],
 })
 
 ns.WhenAddonLoads("RXPGuides", function()

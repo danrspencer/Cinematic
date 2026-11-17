@@ -763,9 +763,7 @@ function ns.CreateInterfaceRecolorPanel(kit)
 	local title = kit.Label(content, "GameFontNormalLarge", L["Interface Recolor"])
 	ns.StyleTabs(content, title, 5) -- (Style General's last tab, 2026-11-16)
 	local intro = kit.PageIntro(content, title,
-		L["The game's interface in your theme's color: the minimap, the quest tracker, the damage meter, the " ..
-		"swing timer, and the game's own borders, edges and tabs, tinted. Icons, backgrounds and bars keep their colors. Only with a theme " ..
-		"picked on General."])
+		L["Tints the game's interface in your theme's color."])
 
 	local function Changed()
 		ns.RefreshInterfaceRecolor()
@@ -774,70 +772,55 @@ function ns.CreateInterfaceRecolorPanel(kit)
 	end
 
 	local switch = kit.PageSwitch(content, "irStyle", L["Enable Page"],
-		L["On: the ticked parts take the theme's color. Off: the game's own."], intro, Changed)
+		L["Turns this page's theme colors on or off."], intro, Changed)
 	local stack = kit.Stack(switch, "check")
 	local rows = ns.StyleRows(kit, content, stack, Changed, "irStyle")
 	-- (MinimapStyle.lua's: its ring always follows the page.)
 	stack:Header(content, L["Minimap"])
 	rows.Check("mmShade", L["Shade inside the edge"], L["A little dark just inside the ring, so the map sits " ..
 		"back in it."])
-	rows.Check("mmButtons", L["Color the buttons' rings"], L["The rings round the buttons on the minimap " ..
-		"(tracking, calendar, the day/night dial, addon buttons...) in the theme's color too."])
-	rows.Check("mmZoneBar", L["Zone bar"], L["The bar with the zone's name above the minimap in the theme's panel " ..
-		"look: its shape, color and line."])
+	rows.Check("mmButtons", L["Color the buttons' rings"], L["Colors the rings around minimap buttons."])
+	rows.Check("mmZoneBar", L["Zone bar"], L["Gives the zone name bar the theme's panel look."])
 	-- (QuestTrackerStyle.lua's.)
 	stack:Header(content, L["Quest tracker"])
-	rows.Check("qtHeaders", L["Header bars"], L["The bars behind All Objectives, Quests, Campaign and the rest " ..
-		"in the theme's panel look: its shape, color and line."])
-	rows.Check("qtFont", L["Text font"], L["The headers (All Objectives, Quests...) in General's text font. Quest " ..
-		"names and objectives keep the game's, which reads best that small."])
-	rows.Check("qtTitles", L["Quest name color"], L["Quest names in the theme's color, with a dot in front in " ..
-		"their difficulty's color. Objectives keep the game's colors."])
+	rows.Check("qtHeaders", L["Header bars"], L["Gives the quest tracker's header bars the theme's panel look."])
+	rows.Check("qtFont", L["Text font"], L["Uses General's text font for the quest tracker headers."])
+	rows.Check("qtTitles", L["Quest name color"], L["Colors quest names in the theme's color."])
 	rows.Check("qtBars", L["Bars and buttons"], L["Progress bars in General's bar texture, and the fold buttons in " ..
 		"the theme's color."])
 	-- (DamageMeterStyle.lua's.)
 	stack:Header(content, L["Damage meter"])
-	rows.Check("dmFrame", L["Frame color"], L["The game's damage meter's borders, header and buttons in the " ..
-		"theme's color. Its bars keep their colors."])
+	rows.Check("dmFrame", L["Frame color"], L["Colors the damage meter's frame in the theme's color."])
 	rows.Check("dmBars", L["Bar texture"], L["Its bars in General's bar texture, each in its own color."])
 	rows.Check("dmFont", L["Text font"], L["Its names and numbers in General's text font."])
 	-- (SwingTimerStyle.lua's; Classic clients' own swing timer, none on retail.)
 	if not ns.isRetail then
 		stack:Header(content, L["Swing timer"])
-		rows.Check("swFrame", L["Frame color"], L["The swing timer bars' frames in the theme's color. What fills " ..
-			"them keeps its color."])
+		rows.Check("swFrame", L["Frame color"], L["Colors the swing timer frames in the theme's color."])
 		rows.Check("swBars", L["Bar texture"], L["The bars' fill in General's bar texture, each weapon's in its " ..
 			"own color."])
 		rows.Check("swFont", L["Text font"], L["The bars' words in General's text font."])
 	end
 	-- (Their frames' chrome here (irStatus); the fill and words: XpBarStyle.lua.)
 	stack:Header(content, L["XP and reputation bars"])
-	rows.Check("irStatus", L["Frame color"], L["The experience, reputation and honor bars' frames in the theme's " ..
-		"color. What fills them keeps its color."])
-	rows.Check("xpBars", L["Bar color"], L["The experience bar's fill in the theme's mana color, the game's own art " ..
-		"kept. Reputation and honor keep their colors."])
+	rows.Check("irStatus", L["Frame color"], L["Colors the XP and reputation bar frames in the theme's color."])
+	rows.Check("xpBars", L["Bar color"], L["Colors the experience bar's fill in the theme's mana color."])
 	rows.Check("xpFont", L["Text font"], L["Their numbers in General's text font."])
 	-- (The raid's chrome here; its health and ground: RaidStyle.lua's Dress.)
 	stack:Header(content, L["Raid frames"])
-	rows.Check("irRaidFrame", L["Frame color"], L["The borders round the raid and party frames (raid-style), " ..
-		"their group titles, and the raid manager's tab at the left of the screen in the theme's color."])
-	rows.Check("irRaidHealth", L["Health bars"], L["The health bars in the theme's color, where the Raid Frame " ..
-		"Style page leaves their color as the game's."])
-	rows.Check("irRaidGround", L["Background"], L["The dark behind each health bar in a dark shade of the theme's " ..
-		"color, where the Raid Frame Style page leaves the background as the game's."])
+	rows.Check("irRaidFrame", L["Frame color"], L["Colors the raid and party frame borders in the theme's color."])
+	rows.Check("irRaidHealth", L["Health bars"], L["Colors the health bars in the theme's color."])
+	rows.Check("irRaidGround", L["Background"], L["Shades the dark behind each health bar in the theme's color."])
 	stack:Header(content, L["Recolor"])
 	rows.Check("irBarArt", L["Action bar art"], L["The gryphons (or wyverns) at the ends of action bar 1, and " ..
 		"the band its buttons sit on."])
 	rows.Check("irChat", L["Chat"], L["The chat windows' tabs, the box you type in and their buttons."])
-	rows.Check("irBuffs", L["Buffs"], L["The buffs' borders by the minimap. Debuffs keep the game's colors: they " ..
-		"say what kind each is."])
-	rows.Check("irMicro", L["Menu and bag buttons"], L["The frames round the small buttons at the bottom right and your bags. " ..
-		"Their pictures keep their colors."])
-	rows.Check("irCast", L["Your cast bar"], L["Its frame. What fills it keeps its color."])
+	rows.Check("irBuffs", L["Buffs"], L["Colors the buff borders by the minimap in the theme's color."])
+	rows.Check("irMicro", L["Menu and bag buttons"], L["Colors the frames around the menu and bag buttons in the theme's color."])
+	rows.Check("irCast", L["Your cast bar"], L["Colors your cast bar's frame in the theme's color."])
 	rows.Check("irSmall", L["Small windows"], L["Popups, the loot window, the ready check, the game menu and the " ..
 		"queue's eye."])
-	rows.Check("irBig", L["Big windows"], L["Bags, character, spellbook, talents, quest log, map, merchant, friends " ..
-		"and the rest of the game's windows."])
+	rows.Check("irBig", L["Big windows"], L["Colors the frames of your bags, the map and the game's other big windows."])
 
 	canvas:SetScript("OnShow", kit.PageShown(kit.Refresh, content))
 	ns.SharePreview(canvas, function() return ns.generalStylePreview end) -- (General's preview here too, a tab of it)

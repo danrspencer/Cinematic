@@ -40,8 +40,7 @@ ns.CHAT_PEEK_TYPES = {
 	-- Anyone's line naming or linking a quest in your log, in any chat or
 	-- channel, even ones that are off above; see MentionsYourQuest below.
 	{ key = "quests", label = L["Your quests"],
-		tip = L["Someone links or names a quest you're on, in any chat or channel (General, Looking for Group, " ..
-		"party, guild...), even ones that don't show chat themselves."], events = {} },
+		tip = L["Someone links or names a quest you're on, in any chat."], events = {} },
 
 	-- Guild members' comings and goings arrive as system messages; see IsGuildLine below.
 	{ key = "guildmembers", label = L["Guild members"], section = "game",

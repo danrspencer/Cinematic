@@ -86,9 +86,7 @@ function ns.CreateQuestItemStylePanel(kit)
 	local title = kit.Label(content, "GameFontNormalLarge", L["Quest Item Button"])
 	ns.QuestTabs(content, title, 3)
 	local intro = kit.PageIntro(content, title,
-		L["How the big button for the nearest quest's item looks. Turning it on: the Vision tab. " ..
-		"Where it sits: the extra ability button's place in Edit Mode. Changes show at once (its size " ..
-		"after a fight, if you're in one)."])
+		L["How the big quest item button looks."])
 
 	local preview -- (below: drawn again as each setting changes)
 	local function Changed()
@@ -97,8 +95,7 @@ function ns.CreateQuestItemStylePanel(kit)
 	end
 
 	local switch = kit.PageSwitch(content, "questItemStyle", L["Enable Page"],
-		L["On: the button looks as this page says. Off: like the game's extra ability button (the preview " ..
-		"shows that too). Each setting keeps its value for when you turn this back on."], intro, Changed)
+		L["On: the button looks as this page says; off: like the game's extra ability button."], intro, Changed)
 	local stack = kit.Stack(switch, "check")
 	local rows = ns.StyleRows(kit, content, stack, Changed, "questItemStyle")
 
@@ -114,8 +111,7 @@ function ns.CreateQuestItemStylePanel(kit)
 		{ "round", L["Round"] },
 	})
 	rows.Look(L["Look:"], L["Button"], {
-		border = { "questItemFrame", L["Round the button: the game's (the extra ability button's frame), or one of " ..
-			"ours (Custom: its thickness and color under it)."], label = L["Frame:"], opts = { game = true } },
+		border = { "questItemFrame", L["The frame around the button: the game's or one of ours."], label = L["Frame:"], opts = { game = true } },
 	})
 	rows.Check("questItemZoom", L["Zoom the icon in to cut its own border"],
 		L["Icons have a dark border of their own: zoomed in a little, it's cut off."])
@@ -144,7 +140,7 @@ function ns.CreateQuestItemStylePanel(kit)
 
 	stack:Header(content, L["Text"])
 	rows.Check("questItemKey", L["Its key binding in the corner"],
-		L["The key you've bound to it (Key Bindings, Cinematic: Use the quest item), in its top corner."])
+		L["Shows the key you've bound to it in its top corner."])
 	rows.Look(L["Look:"], L["Text"], {
 		font = { "questItemFont", nil },
 		outline = { "questItemOutline", L["A black border round its numbers."],

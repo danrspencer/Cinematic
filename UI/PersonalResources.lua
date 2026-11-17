@@ -747,15 +747,10 @@ function ns.CreatePersonalResourcesPanel(kit)
 	title:SetPoint("TOPLEFT", outerPanel, "BOTTOMLEFT", 8, -14)
 	local hasDisplay = _G.CinematicPersonalPower ~= nil
 	local intro = kit.PageIntro(content, title,
-		L["Your player frame, pet frame and personal resource display in CineMode: kept up while your health " ..
-		"or power is under each row's share (as Heal Vision's roles are), and held back at the start of a fight until there's something " ..
-		"to see. Hover a row or column for what it does. When they come up at all (always, in fights, in places): " ..
-		"the Show in tab."])
+		L["Brings your hidden player and pet frames back in CineMode while your health or power runs low."])
 	-- (Their look: the Unit Frames icon's Resource Style tab.)
 	local switch = kit.PageSwitch(content, "personalResources", L["Enable Page"],
-		L["On: your player frame, pet frame and personal resource display stay up or wait as this tab says, " ..
-		"and its mana bar and remaining mana text show. Off: none of it; they come up only as their Show in " ..
-		"rows say."], intro, function()
+		L["Turns this page's player frame, pet frame and resource display settings on or off."], intro, function()
 		if ns.UpdatePersonalMana then ns.UpdatePersonalMana() end
 		if ns.RefreshPersonalStyle then ns.RefreshPersonalStyle() end
 		if ns.UpdateManaCost then ns.UpdateManaCost() end
@@ -764,7 +759,7 @@ function ns.CreatePersonalResourcesPanel(kit)
 	-- Unit Frames tabs over the title pick them): Keep up, and Frame Links.
 	local unitLinks -- (the unit frames' links, over the bars' on Frame Links: below)
 	local hosts, PickPart, TabsShown, AdoptTab, prdLinks = ns.PageTabsBelow(content, switch, {
-		{ L["Keep up"], L["When your player frame, pet frame and personal resource display stay up or wait."] },
+		{ L["Show Advanced"], L["Brings your hidden frame and resource bars back while your health or power is low."] },
 		{ L["Addon Reveal Link"], L["Which supported addon's frames stand in for these frames and bars."] },
 	}, "Personal Resources/page", 2, "prd", 1, function(i)
 		if i == 2 and unitLinks then unitLinks.Show() end
@@ -816,14 +811,11 @@ function ns.CreatePersonalResourcesPanel(kit)
 	-- left one's. A frame this client hasn't, no row.
 	stack:Header(content, L["Keep up"])
 	local function Fights(db) return db.stayInCombat end
-	local SHARES = L["It stays up while what it shows (health, or your power) is under this. < 100%: while it " ..
-		"isn't full at all, even by a hair (rage and the like: until they're back to 0, Rage counts until 0). " ..
-		"Always: always up. Off: never kept up by it."]
+	local SHARES = L["Stays up while it's under this share."]
 	local COLUMNS = {
 		{ L["In combat"], L["While you're in a fight."] .. " " .. SHARES .. " " ..
 			L["Wait at pull holds it back at a fight's start."] },
-		{ L["In Calm Timer"], L["After a fight, a fall, a spell that costs you health (Life Tap) or coming back to " ..
-			"life, until the Calm Timer runs out: casting or drinking in town brings nothing up."] .. " " .. SHARES },
+		{ L["In Calm Timer"], L["After a fight, a fall or coming back to life, until the Calm Timer runs out."] .. " " .. SHARES },
 		{ L["Out of combat"], L["Neither in a fight nor after one: drinking in town, say."] .. " " .. SHARES },
 	}
 	-- (The mana text's: redrawn as it's ticked, PersonalManaCost.lua.)
@@ -844,8 +836,7 @@ function ns.CreatePersonalResourcesPanel(kit)
 	local rows = {
 		{ L["Player Frame: Health"], L["Your player frame, by your health."], "prHealthPlayer", true },
 		{ function() return L["Player Frame: %s"]:format(PowerName()) end,
-			L["Your player frame, by your power (mana, rage, energy...). One frame with the row above: up when " ..
-			"either says so."], "prPowerPlayer" },
+			L["Your player frame, kept up by your power."], "prPowerPlayer" },
 	}
 	local function AddRow(row)
 		rows[#rows + 1] = row
@@ -861,8 +852,7 @@ function ns.CreatePersonalResourcesPanel(kit)
 			"prPowerPrd" })
 	end
 	if ns.PERSONAL_MANA then
-		AddRow({ L["Cine Mana Bar"], L["Ours, under the PRD's power bar, while mana isn't your power " ..
-			"(forms, Shadow, Elemental): by your mana."], "prPowerMana" })
+		AddRow({ L["Cine Mana Bar"], L["Our mana bar under the resource display, kept up by your mana."], "prPowerMana" })
 	end
 	-- (Other addons' power bars standing in for these: their own rows, by addon.)
 	for _, bar in ipairs(ns.ADDON_POWER_ROWS or {}) do
@@ -882,9 +872,7 @@ function ns.CreatePersonalResourcesPanel(kit)
 	local FADE_W = 76
 	local fadeLeft = total + LINK_W / 2
 	total = fadeLeft + FADE_W
-	local FADE_TIP = L["Fade to: under the share in this row's column for now (< 95%, say), it fades in as your " ..
-		"health drops, fully up at this. Off: fully up as soon as your health is under the share. Only with a " ..
-		"share under 100%: Always and < 100% are up all the way."]
+	local FADE_TIP = L["Fades it in as your health drops, fully up at this share."]
 	local function CenterX(c) return left[c] + COL_W / 2 end
 	local holder = CreateFrame("Frame", nil, content)
 	holder:SetSize(total, 1)
@@ -975,9 +963,7 @@ function ns.CreatePersonalResourcesPanel(kit)
 						end
 						Draw()
 					end)
-					kit.Tooltip(link, L["Linked: the column on its right goes by the one on its left, so there's one " ..
-						"box to change. Click to link or unlink them. Unlinked, it keeps the share it had, its own " ..
-						"to change."])
+					kit.Tooltip(link, L["Click to link or unlink these two columns."])
 					links[c] = link
 				end
 			end
@@ -1005,20 +991,16 @@ function ns.CreatePersonalResourcesPanel(kit)
 	stack:Add(holder, "label")
 	-- (One for every row: each bar waits for what it shows.)
 	Tick("fightWaitPull", L["Wait at pull"],
-		L["At a fight's start, each bar comes up only once what it shows changes: your health or power, on " ..
-		"your first cast or first hit. Only while fights bring frames up (In combat on the CineMode page)."], Fights)
+		L["At a fight's start, each bar waits until your health or power changes."], Fights)
 	-- (Both bars' mana numbers, the PRD's and the player frame's: PersonalManaText.lua.)
 	stack:Add(kit.Check(content, "manaAfterCast", L["Mana text"],
-		L["While you cast a spell that costs mana, your mana's numbers on the PRD and your player frame show what " ..
-		"you'll have once the cast is done, paler. The amount and the percent, whichever the game shows there " ..
-		"(its Status Text setting); with the game's numbers off, the amount in the middle of the bar."],
+		L["While casting, your mana numbers show what you'll have left, paler."],
 		function(value)
 			ns.GetDB().manaAfterCast = value
 			Redraw()
 		end), "check")
 	Tick("drainWhenNotEmpty", L["Rage counts until 0"],
-		L["Rage, runic power and the other resources that drain away out of combat: a power row keeps its " ..
-		"frame up until they're back to 0. Unticked, they never keep it up."])
+		L["Rage and similar resources keep the frame up until they drain to 0."])
 
 	-- Mana under the power bar, when it isn't your power (PersonalMana.lua; its
 	-- look: the Style hub's Personal Resource Style page).
@@ -1028,9 +1010,7 @@ function ns.CreatePersonalResourcesPanel(kit)
 			if ns.UpdatePersonalMana then ns.UpdatePersonalMana() end
 		end
 		stack:Add(kit.Check(content, "prdMana", L["Show Cine Mana Bar"],
-			L["The game shows only your main power under your character: Maelstrom, Insanity, Astral Power, " ..
-			"rage or energy in a form. Ticked, your mana gets a bar of its own under it. When it comes up is the " ..
-			"Cine Mana Bar row on the HUD page."], function(value)
+			L["Adds a mana bar under your main power bar."], function(value)
 			ns.GetDB().prdMana = value
 			if ns.RefreshPersonalStyle then ns.RefreshPersonalStyle() end -- (shown and dressed)
 			kit.Refresh()
@@ -1038,8 +1018,7 @@ function ns.CreatePersonalResourcesPanel(kit)
 		local recentLine = kit.BoxLine(content)
 		stack:Add(recentLine, "label", 20)
 		local recentBox = recentLine:Box(L["After using mana for"], "prdManaRecent", 0, 60, 1, "%d", 1,
-			L["The mana bar shows for this many seconds after you spend mana, then fades out until you spend " ..
-			"some again. 0: whenever it's up."], Update, 40, L["sec"])
+			L["Shows the mana bar for this many seconds after you spend mana; 0 means always."], Update, 40, L["sec"])
 		kit.GreyUnless(recentBox, function(db) return db.prdMana end)
 		-- (And after the page's Reset, or a profile loaded: shown as the settings are now.)
 		local updater = CreateFrame("Frame", nil, content)

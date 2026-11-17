@@ -71,8 +71,7 @@ function ns.CreateVisionsStylePanel(kit)
 	local title = kit.Label(content, "GameFontNormalLarge", L["Visions Style"])
 	title:SetPoint("TOPLEFT", 16, -16)
 	local intro = kit.PageIntro(content, title,
-		L["The look every Vision shares. Each setting starts on the Style hub's General page's; a Vision with a " ..
-		"setting of its own on its page keeps it."])
+		L["The look every Vision shares."])
 
 	local visionRows = {}
 	local preview -- (below: drawn again as each setting changes)
@@ -88,8 +87,7 @@ function ns.CreateVisionsStylePanel(kit)
 	preview = ns.MakeStyleJumbotron(kit, content, stack, 480, CELLS)
 
 	stack:Header(content, L["Shared look"])
-	rows.Font("visionStyleFont", L["Every Vision's words that follow this page. Each Vision's own: the game's " ..
-		"font, or the one its page starts with."])
+	rows.Font("visionStyleFont", L["The font for every Vision that follows this page."])
 	rows.Outline("visionStyleOutline", L["Outline"], 2, { [0] = L["None"], L["Thin"], L["Thick"], game = OWN },
 		L["A black border around the letters, on every Vision that follows this page."])
 	rows.Choices(L["Shadow:"], "visionStyleShadow", {
@@ -100,15 +98,11 @@ function ns.CreateVisionsStylePanel(kit)
 	})
 	rows.Slider("visionStyleTextSize", L["Text size"], 70, 150, 5, "%d%%", 100,
 		L["Every Vision's words bigger or smaller, times each one's own size on its page (cards too)."])
-	rows.Texture(L["Bar texture:"], "visionStyleTexture", L["The bars of every Vision that follows this page " ..
-		"(Damage Vision's, Roll Vision's time left). Below the game's own few: any other addon shares (through " ..
-		"LibSharedMedia)."], nil, { 0.25, 0.75, 0.3 }, OWN)
-	rows.Border(L["Border:"], "visionStyleBorder", { game = OWN }, L["The border around the Vision parts that " ..
-		"follow this page (the quest item button's frame). Custom: its thickness and color under it."])
+	rows.Texture(L["Bar texture:"], "visionStyleTexture", L["The bar fill for every Vision that follows this page."], nil, { 0.25, 0.75, 0.3 }, OWN)
+	rows.Border(L["Border:"], "visionStyleBorder", { game = OWN }, L["The border for every Vision part that follows this page."])
 
 	stack:Header(content, L["Visions"])
-	stack:Help(content, L["Which Visions follow this page. One with a setting of its own shows which; Use " ..
-		"Visions Style puts them all back on this page. The name opens its page."])
+	stack:Help(content, L["Pick which Visions follow this page."])
 	local lists = {}
 	for _, vision in ipairs(VISIONS) do
 		local keys = KeysOf(vision[3])

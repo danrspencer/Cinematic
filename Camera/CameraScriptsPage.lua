@@ -486,7 +486,7 @@ local function MakePreview()
 		end
 		PlacePreview()
 	end)
-	ns.lowHealthKit.Tooltip(w.dock, L["Pop out: drag the window anywhere (by its edge). Dock: back beside the settings."])
+	ns.lowHealthKit.Tooltip(w.dock, L["Pop out to drag the window anywhere, or dock it beside the settings."])
 
 	-- The drawing: where the camera is, from above and from the side.
 	w.art = CreateFrame("Frame", nil, w)
@@ -1089,11 +1089,7 @@ function ns.CreateCameraScriptsPanel(kit)
 	page.canvas, page.content = canvas, content
 	local title = kit.Label(content, "GameFontNormalLarge", L["Scripts"])
 	title:SetPoint("TOPLEFT", LEFT, -16)
-	kit.PageIntro(content, title, L["Every camera, made of small steps: rotate, tilt, zoom, sway, wait, and Together " ..
-		"and Repeat for steps at once or again. Stop rules say what happens when you move the camera, walk, zoom, a " ..
-		"fight starts or its trigger ends. The built-in ones are our own cameras' steps, with your settings: set a " ..
-		"row on the Scenes page to one to run it instead of the camera, or Copy it to make it yours. " ..
-		"A hollow dot: that camera isn't a script yet."])
+	kit.PageIntro(content, title, L["Every camera as a script of small steps you can copy and change."])
 
 	-- The camera's name, and the list it drops down: over the page (a dim
 	-- layer under it takes a click outside to close it), every camera in two
@@ -1196,7 +1192,7 @@ function ns.CreateCameraScriptsPanel(kit)
 			page.delete:SetText(L["Sure?"])
 		end
 	end)
-	kit.Tooltip(page.delete, L["Deletes this script (click twice). Rows set to it go back to no camera."])
+	kit.Tooltip(page.delete, L["Deletes this script; click twice to confirm."])
 	-- One of ours you changed: back to ours (in Delete's place).
 	page.reset = Button(content, L["Reset"], 60)
 	page.reset:SetPoint("LEFT", page.copy, "RIGHT", 4, 0)
@@ -1210,7 +1206,7 @@ function ns.CreateCameraScriptsPanel(kit)
 			page.reset:SetText(L["Sure?"])
 		end
 	end)
-	kit.Tooltip(page.reset, L["Puts our script back, made from its camera's settings again, in place of your changes (click twice)."])
+	kit.Tooltip(page.reset, L["Puts our script back in place of your changes; click twice to confirm."])
 	-- (After Delete; after Copy for a built-in one, which has no Delete: see Layout.)
 	page.share = Button(content, L["Share"], 56)
 	page.share:SetScript("OnClick", function() ShowShare(true) end)
@@ -1252,7 +1248,7 @@ function ns.CreateCameraScriptsPanel(kit)
 		end
 		if changed then page.Paint() end
 	end)
-	kit.Tooltip(page.runNow, L["Moves the real camera through this script now, with a drawing of it beside the settings and its steps lit up as it goes (click again to stop it). Its stop rules count, as for a trigger."])
+	kit.Tooltip(page.runNow, L["Runs the camera through this script now; click again to stop."])
 
 	-- The lists and rules, laid out by Layout.
 	page.rows, page.used = {}, 0
@@ -1302,7 +1298,7 @@ function ns.CreateCameraScriptsPanel(kit)
 		row.on:SetScript("OnClick", function(self)
 			if page.script then page.SetRule(rule.key .. "On", self:GetChecked() and true or false) end
 		end)
-		kit.Tooltip(row.on, L["Untick to leave the camera running when this happens. Moving the camera yourself still takes over: it carries on a second after you let go."])
+		kit.Tooltip(row.on, L["Untick to keep the camera running when this happens."])
 		row.label = kit.Label(row, "GameFontHighlightSmall", RULE_NAMES[rule.key])
 		row.label:SetPoint("LEFT", RULE_X, 0)
 		row.label:SetWidth(126)
@@ -1356,7 +1352,7 @@ function ns.CreateCameraScriptsPanel(kit)
 			row.box:SetScript("OnEnterPressed", function(self) Commit(self) self:ClearFocus() end)
 			row.box:SetScript("OnEditFocusLost", Commit)
 			WheelNumber(row.box, function() return 5 end)
-			kit.Tooltip(row.box, L["A soft haze around the edges of the screen while this camera runs, as if it had focused on you. 0 leaves it off. Needs Camera haze on the Visual Effects page, which also turns it up or down."])
+			kit.Tooltip(row.box, L["A soft haze around the screen's edges while this camera runs; 0 turns it off."])
 		else
 			row.pick = Choice(row, 150, function() return { "no", "yes" } end,
 				function() return page.script and (page.script.button and "yes" or "no") end,
@@ -1365,7 +1361,7 @@ function ns.CreateCameraScriptsPanel(kit)
 					page.Changed()
 				end, function(choice) return choice == "yes" and L["Show it"] or L["No button"] end)
 			row.pick:SetPoint("LEFT", RULE_X + 128, 0)
-			kit.Tooltip(row.pick, L["A Stop camera button on screen while its steps run (under the release popup when you're dead): click it for your own view back, until what started it is over."])
+			kit.Tooltip(row.pick, L["Shows a Stop camera button on screen while this camera runs."])
 		end
 		page.optRows[i] = row
 	end
@@ -1557,7 +1553,7 @@ function ns.CreateCameraScriptsPanel(kit)
 	local tabsPanel, tabs, ShowTab, tabsBase
 	tabsPanel, tabs, ShowTab, tabsBase = ns.FolderTabs(content, {
 		{ L["Script"], L["The camera's steps, in order, and what it does when it ends."] },
-		{ L["Stop rules"], L["What happens when you move the camera, a fight starts, you walk, you zoom, its trigger ends, a window opens or closes, or its steps run out; and its edge haze and Stop button while it runs."] },
+		{ L["Stop rules"], L["What stops the camera, plus its edge haze and Stop button."] },
 	}, function(i)
 		page.tab, page.selected = i, nil
 		ShowTab(i)
@@ -1803,7 +1799,7 @@ function ns.CreateCameraScriptsPanel(kit)
 			page.delete:Hide()
 			page.reset:Hide()
 			page.SetCameraButton(page.own.name and L[page.own.name] or ns.CAMERA_NAMES[page.own.own] or "", "own")
-			page.tipStatus = L["Not a script yet: it runs on its own code. Laying it out as steps needs %s, steps the runner doesn't have yet."]:format(
+			page.tipStatus = L["Not a script yet: it needs %s, which the runner doesn't have yet."]:format(
 				L[page.own.needs])
 			page.tipStarts = nil
 			for _, bar in pairs(page.addBars) do bar:Hide() end
@@ -1826,14 +1822,14 @@ function ns.CreateCameraScriptsPanel(kit)
 			page.share:SetPoint("LEFT", not page.builtin and page.delete or script.edited and page.reset or page.copy,
 				"RIGHT", 4, 0)
 			page.tipStatus = not page.builtin and L["Yours: change anything."]
-				or script.edited and L["Built in, changed by you: change anything, and the camera plays your version. Reset puts ours back."]
-				or L["Built in, from your settings: this is what the camera plays. Change anything, and it's kept as yours of it (Reset puts ours back)."]
+				or script.edited and L["Built in and changed by you; Reset puts ours back."]
+				or L["Built in, from your settings; any change keeps it as your own."]
 			y = top + 4
 			local keys = ns.CameraScriptTriggers(script.id)
 			local names = {}
 			for _, key in ipairs(keys) do names[#names + 1] = ns.CameraTriggerName(key) end
 			page.tipStarts = #names > 0 and L["Starts when: %s"]:format(table.concat(names, ", "))
-				or L["Starts when: no trigger yet. Set a row on the Scenes page to it."]
+				or L["Starts when: no trigger yet."]
 			-- The tabs: Script (its steps, When it ends last) and Stop rules.
 			for _, tab in ipairs(tabs) do tab:Show() end
 			tabsPanel:Show()

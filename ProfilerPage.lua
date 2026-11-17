@@ -433,11 +433,7 @@ function ns.CreateProfilerPanel(kit)
 	local title = kit.Label(content, "GameFontNormalLarge", L["Profiler"])
 	title:SetPoint("TOPLEFT", 16, -16)
 	local intro = kit.PageIntro(content, title,
-		L["How much of your computer's time Cinematic takes. The graph is the game's own figure for this addon: " ..
-		"its share of each frame's time, sampled every second (the last five minutes, kept over a reload), each " ..
-		"bar colored by what was going on. A recording times the addon's busy parts: it starts when you close " ..
-		"the settings, and its results show here. If Cinematic seems slow for you, record a while of your usual " ..
-		"play (a fight too), then Copy report and send it to us: it helps us find what to speed up."])
+		L["Shows how much of your computer's time Cinematic uses."])
 
 	local function Text(parent, font, anchor, x, y)
 		local fs = parent:CreateFontString(nil, "ARTWORK", font or "GameFontHighlightSmall")
@@ -573,8 +569,7 @@ function ns.CreateProfilerPanel(kit)
 	-- The switch, and Clear all data beside it.
 	local Refresh -- (below)
 	local switch = kit.PageSwitch(content, "profilerPage", L["Enable Page"],
-		L["On: the graph samples the game's figure every second and keeps it over a reload, and you can " ..
-		"record. Off (to start with): nothing is sampled or saved, and it costs nothing."], intro,
+		L["Turn on to track and record the addon's CPU use."], intro,
 		function() Refresh() end)
 	StaticPopupDialogs.CINEMATIC_PROFILER_CLEAR = {
 		text = L["Clear the Profiler's graph and its last recording, here and in what's saved? (The game's own " ..
@@ -946,9 +941,7 @@ function ns.CreateProfilerPanel(kit)
 		Refresh()
 	end)
 	record:SetPoint("TOPLEFT", recordHeader, "BOTTOMLEFT", 0, -10)
-	kit.Tooltip(record, L["Times the addon's busy parts as you play, for as long as is picked beside it. It starts " ..
-		"when you close the settings (or right away, with Start now), and the results show here. Click it again " ..
-		"to stop."])
+	kit.Tooltip(record, L["Records the addon's CPU use while you play; click again to stop."])
 	local length = kit.Dropdown and kit.Dropdown(content, "profilerSeconds", LENGTHS, 120, function() Refresh() end)
 	if not length then
 		-- (No dropdowns on this client: a button that steps through them.)
@@ -969,17 +962,11 @@ function ns.CreateProfilerPanel(kit)
 	end
 	kit.Tooltip(length, L["How long a recording runs."])
 	length:SetPoint("LEFT", record, "RIGHT", 10, 0)
-	local detailed = kit.Check(content, "profilerDetailed", L["Detailed"], L["Nearly every one of the addon's " ..
-		"functions timed too, not just its busy parts, each listed under the part that called it: it shows " ..
-		"what inside a busy part costs. The timing itself takes time, so everything reads higher than it is."])
+	local detailed = kit.Check(content, "profilerDetailed", L["Detailed"], L["Times nearly every function too, which makes everything read a bit higher."])
 	detailed:SetPoint("LEFT", length, "RIGHT", 12, 0)
-	local startNow = kit.Check(content, "profilerNow", L["Start now"], L["Start right away, with the settings " ..
-		"open, instead of when you close them: to measure the settings pages themselves. Click through the ones " ..
-		"to check while it runs."])
+	local startNow = kit.Check(content, "profilerNow", L["Start now"], L["Starts recording right away instead of when you close the settings."])
 	startNow:SetPoint("LEFT", detailed.Text or detailed, "RIGHT", 16, 0)
-	local copy = Button(L["Copy report"], 120, L["Everything here as text, to copy and send us (on Discord, " ..
-		"or in a bug report): your game version, the graph's figures, every addon's and the last recording. " ..
-		"It's in English, for us to read."], function()
+	local copy = Button(L["Copy report"], 120, L["Copies a text report to send us."], function()
 			ns.ShowText(L["Profiler: press Ctrl+C to copy"], ShareText())
 		end)
 	copy:SetPoint("RIGHT", content, "RIGHT", -16, 0)

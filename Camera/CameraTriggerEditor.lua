@@ -177,8 +177,7 @@ local function BuildLines(parent, store, kit)
 			edit:SetScript("OnClick", function()
 				if ns.OpenTriggerPage then ns.OpenTriggerPage("b:" .. key) end
 			end)
-			Tooltip(edit, L["Opens this trigger's page (Triggers, Camera hub): its Only if, wait, cooldown, chance " ..
-				"and priority."])
+			Tooltip(edit, L["Opens this trigger's page."])
 			own:SetJustifyH("LEFT")
 			own:SetWordWrap(false)
 			local toggle = kit.BlockAt(j, CreateFrame("Button", nil, parent), x + 424)
@@ -237,9 +236,7 @@ local function BuildLines(parent, store, kit)
 			orText:SetShown(shown and line > 1)
 			if shown then pickRefresh(self) end
 		end
-		Tooltip(pick, L["One thing that starts this scene: a trigger from the Triggers page (Camera hub), where " ..
-			"what starts it, what ends it, its Only if and its priority are set. Any one of a scene's triggers " ..
-			"starts it. New trigger... makes one and opens its page."])
+		Tooltip(pick, L["A trigger that starts this scene; any one of them starts it."])
 		AddControl(pick)
 
 		local edit = kit.BlockAt(line, ns.PanelButton(parent), x + 300)
@@ -251,8 +248,7 @@ local function BuildLines(parent, store, kit)
 			if id and ns.OpenTriggerPage then ns.OpenTriggerPage(id) end
 		end)
 		ShownWhile(edit, function() return Shown() and Lib() ~= nil end)
-		Tooltip(edit, L["Opens this trigger's page (Triggers, Camera hub). A change there is a change for every " ..
-			"scene using it."])
+		Tooltip(edit, L["Opens this trigger's page; changes there apply to every scene using it."])
 		AddControl(edit)
 
 		-- (A scene of yours keeps one trigger at least.)
@@ -325,8 +321,7 @@ function ns.BuildCustomTriggerLines(drawer, id, kit)
 	share:SetScript("OnClick", function()
 		ns.ShowCameraShare(ns.ExportCameraTrigger(id), (L["Share %s"]):format(ns.CustomTriggerLabel(id)))
 	end)
-	kit.Tooltip(share, L["Text to send a friend: they add this scene (and the shot it plays) with Import on their " ..
-		"Scenes page. Where it may start (its When) stays with you."])
+	kit.Tooltip(share, L["Text a friend can import to add this scene."])
 end
 
 -- The New scene panel, above the Cameras page's rows: a scene made in it
@@ -396,7 +391,7 @@ function ns.BuildTriggerDraft(parent, kit)
 		nameHint:SetText(ns.DescribeTriggerSource(data.triggers[1]))
 		nameHint:SetShown(not data.name and not self:HasFocus())
 	end
-	kit.Tooltip(name, L["A name of your own for it, shown on the rows. Empty: what starts it."])
+	kit.Tooltip(name, L["Your own name for it; leave empty to show what starts it."])
 	own[#own + 1] = name
 
 	-- (Its camera: the ones that run where you stand, the moving ones (their
@@ -443,15 +438,13 @@ function ns.BuildTriggerDraft(parent, kit)
 		own[#own + 1] = At("Camera", check, x)
 	end
 	Tick(L["Music"], "music", LABEL_W + 170, L["Music starts as its camera starts (Audio page)."])
-	Tick("CineMode", "cine", LABEL_W + 260, L["With \"Start in CineMode\" off (Cinematic's main page), its camera " ..
-		"starting brings CineMode on, and it ends with the camera."])
+	Tick("CineMode", "cine", LABEL_W + 260, L["Brings CineMode on while its camera runs, if Start in CineMode is off."])
 
 	save = ns.PanelButton(panel)
 	save:SetSize(90, 22)
 	save:SetText(L["Save"])
 	save.Refresh = function(self) self:SetEnabled(Ready()) end
-	kit.Tooltip(save, L["Add it to the rows below, with its When set to anywhere but battlegrounds and arenas, " ..
-		"out of fights (open its row to change that)."])
+	kit.Tooltip(save, L["Adds it to the rows below."])
 	local cancel = ns.PanelButton(panel)
 	cancel:SetSize(90, 22)
 	cancel:SetText(CANCEL or L["Cancel"])

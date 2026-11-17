@@ -420,9 +420,8 @@ end
 local SHOW_IN_TABS = {
 	-- (PersonalResources.lua's page)
 	units = {
-		{ "Show in", "HUD:units", "When each unit frame, your resource bars and your highlight show in CineMode." },
-		{ "Keep up", "Personal Resources", "Your frame, pet frame and resource bars kept up while your health " ..
-			"or power is low, beyond what Show in says." },
+		{ "Show", "HUD:units", "CineMode hides your unit frames and resource bars: pick which show, and when." },
+		{ "Show Advanced", "Personal Resources", "Brings your hidden frame and resource bars back while your health or power is low." },
 		-- (UnitStyle.lua's page, a tab here too: its look by its rows, 2026-11-16)
 		{ "UF Style", "Unit Style", "How the unit frames look." },
 		{ "PRD Style", "Personal Style", "How the personal resource display's bars look." }, -- (PersonalStyle.lua's)
@@ -434,29 +433,27 @@ local SHOW_IN_TABS = {
 	},
 	-- (Two of the HUD page's sections, then RaidStyle.lua's page)
 	party = {
-		{ "Party", "HUD:party", "When the party frames show in CineMode, raid-style or not." },
-		{ "Raid", "HUD:raid", "When the raid frames show in CineMode." },
+		{ "Party", "HUD:party", "CineMode hides the party frames: pick when they show." },
+		{ "Raid", "HUD:raid", "CineMode hides the raid frames: pick when they show." },
 		{ "Raid Style", "Raid Style", "How the raid frames and raid-style party frames look." },
 	},
 	minimap = {
-		{ "Show in", "HUD:minimap", "When the minimap and its parts show in CineMode." },
-		{ "Reveal", "Minimap", "What brings the minimap up for a while, beyond what Show in says." },
+		{ "Show", "HUD:minimap", "CineMode hides the minimap: pick which parts show, and when." },
+		{ "Show Advanced", "Minimap", "What brings the hidden minimap up for a while." },
 		{ "Keep Open", "Minimap Keep Open", "Where and while what the minimap stays up the whole time: zones, " ..
 			"indoors, a tracked quest, tracking." },
 		{ "Addon Reveal Link", "Minimap Links", "Which supported addon's frames stand in for the minimap's parts." },
 	},
 	quests = {
-		{ "Show in", "HUD:quests", "When the quest tracker shows in CineMode." },
-		{ "Reveal", "Quest tracker", "What brings the quest tracker, quest timer and durability figure up for a " ..
-			"while, beyond what Show in says." },
+		{ "Show", "HUD:quests", "CineMode hides the quest tracker: pick when it shows." },
+		{ "Show Advanced", "Quest tracker", "What brings the hidden quest tracker up for a while." },
 		{ "Addon Reveal Link", "Quest Tracker Links", "Which supported addon's frames stand in for the quest tracker." },
 	},
 	-- (The Chat page (Options.lua's CreateChatPanel: Reveal, its own sub-tabs
 	-- under it), the bubbles' two pages, then the Chat page's links.)
 	chat = {
-		{ "Show in", "HUD:chat", "When the chat window shows in CineMode." },
-		{ "Reveal", "Chat", "What brings chat up in CineMode: new messages (which ones, by its tabs), typing, " ..
-			"and what of the chat window comes up with them." },
+		{ "Show", "HUD:chat", "CineMode hides the chat window: pick when it shows." },
+		{ "Show Advanced", "Chat", "What brings the hidden chat up, like new messages or typing." },
 		{ "Bubbles", "Chat bubbles", "Where chat bubbles show in CineMode." },
 		{ "Bubble Style", "Bubble Style", "How chat bubbles look, and speech from behind you." },
 		{ "Addon Reveal Link", "Chat Links", "Which frame each part of the chat is: the game's, or an addon's " ..
@@ -465,7 +462,7 @@ local SHOW_IN_TABS = {
 	-- (The HUD page's Trackers section, then the timers' own pages (Options.lua's),
 	-- each with its own sub-tabs, where the client has them.)
 	timers = {
-		{ "Show in", "HUD:combat", "When the swing timer, cast bar, meters, cooldowns and the like show in CineMode." },
+		{ "Show", "HUD:combat", "CineMode hides timers, meters and cooldowns: pick which show, and when." },
 		{ "Cooldown Manager", "Cooldown Manager", "When the Cooldown Manager comes up in CineMode.",
 			has = function() return ns.HasCooldownManager() end },
 		{ "Swing Timer", "Swing timer", "Which of the game's swing timer bars show.",
@@ -476,22 +473,21 @@ local SHOW_IN_TABS = {
 	-- page's grids but Names, then its icons and looks) and Names (that page's
 	-- Names grid, then Name Style).)
 	plates = {
-		{ "Show in", "Nameplates", "Which nameplates stay up in CineMode: in groups, in fights and in each kind of place." },
+		{ "Show", "Nameplates", "CineMode hides nameplates: pick which show, and when." },
 		{ "Icons", "Plate Icons", "Icons beside players' health bars on their nameplates." },
 		{ "Default Plate Style", "Nameplate Style", "How the nameplates look, before Smart Style's rows." },
 		-- (Nameplate Style's rows, its second part: Options.lua's CreateTargetArrowPanel)
-		{ "Smart Style", "Nameplate Marks", "Rows that mark and color plates: your target, focus, aggro, fades and more. "
-			.. "A plate takes its look from the first row that fits it." },
+		{ "Smart Style", "Nameplate Marks", "Rows that mark and color plates, like your target, focus and aggro." },
 		{ "Cast Style", "Cast Bar Style", "How the nameplates' cast bars look." },
 	},
 	names = {
-		{ "Show in", "Nameplate Names", "Which names over heads stay up in CineMode." },
+		{ "Show", "Nameplate Names", "CineMode hides names over heads: pick which show, and when." },
 		{ "Name Style", "Name Style", "How names over heads look." },
 	},
 	-- (The HUD page's buffs section, then the Buffs/debuffs page's parts)
 	buffs = {
-		{ "Show in", "HUD:buffs", "When your buff and debuff icons show in CineMode." },
-		{ "Reveal", "Buffs/debuffs", "What brings your buffs and debuffs up for a while, beyond what Show in says." },
+		{ "Show", "HUD:buffs", "CineMode hides your buffs and debuffs: pick when they show." },
+		{ "Show Advanced", "Buffs/debuffs", "What brings your hidden buffs and debuffs up for a while." },
 		{ "Addon Reveal Link", "Buffs Links", "Which supported addon's frames stand in for your buffs and debuffs." },
 	},
 	-- (What the pointer brings up, what it shows, then the pointer itself: the
@@ -504,7 +500,7 @@ local SHOW_IN_TABS = {
 	},
 	-- (The Gamepad page (Options.lua's) where the client has it, then ActionBarStyle.lua's)
 	bars = {
-		{ "Show in", "HUD:bars", "When each action bar shows in CineMode." },
+		{ "Show", "HUD:bars", "CineMode hides the action bars: pick which show, and when." },
 		{ "Gamepad", "Gamepad", "The frames gamepad mode adds: its action bars, button hints and reticle.",
 			has = function() return C_GamePad ~= nil and not ns.isRetail end },
 		{ "Bar Style", "Action Style", "How the action buttons look." },
@@ -573,8 +569,7 @@ end
 function ns.QuestTabs(content, title, picked)
 	local L = ns.L
 	local panel = ns.PageTabs(content, {
-		{ L["Vision"], "Quest Vision", L["Quest mobs' nameplates and marks, the quest item button, the glow on " ..
-			"quest objects, and where the dialogue sits."] },
+		{ L["Vision"], "Quest Vision", L["Quest mob marks, the quest item button and where dialogue sits."] },
 		{ L["Dialogue"], "Quest Talk Style", L["How the dialogue looks, the \"Show the game's window\" link and " ..
 			"the number keys."] },
 		{ L["Quest Item Button"], "Quest Item Style", L["How the quest item button looks."] },
@@ -789,7 +784,7 @@ local function Window()
 		PlaceWindow()
 	end)
 	if popTooltip then
-		popTooltip(popWindow.dock, ns.L["Pop out: drag the window anywhere (by its edge). Dock: back beside the settings."])
+		popTooltip(popWindow.dock, ns.L["Pop out to drag the window anywhere, or dock it beside the settings."])
 	end
 	-- The corner grip (the chat frames' own) resizes it.
 	popWindow:SetResizable(true) -- (its bounds: ScalePopped)
@@ -1219,9 +1214,7 @@ function ns.StylePopout(preview, tooltip, title)
 	else
 		button:SetPoint("TOPRIGHT", -6, -6)
 	end
-	tooltip(button, ns.L["The preview shows in a window of its own beside the settings (its Pop out lets you move " ..
-		"it anywhere) that you can resize from its corner, so the page has room for its settings. Put back: on the " ..
-		"page instead, from now on. Pop out: in its window again."])
+	tooltip(button, ns.L["Moves the preview into a resizable window beside the settings, or back onto the page."])
 	button:SetScript("OnClick", function()
 		local db = ns.db
 		if popped == preview then
@@ -2059,7 +2052,7 @@ function ns.StyleRows(kit, content, stack, changed, switchKey, fieldOf, panel)
 		local color = kit.Label(content, "GameFontHighlight", ns.L["Color"])
 		color:SetPoint("LEFT", line, "RIGHT", 6, 0)
 		rows.Swatch(color, key, { key .. "R", key .. "G", key .. "B" },
-			ns.L["The border's color. Picking one turns it to Custom."], test)
+			ns.L["The border's color; picking one switches it to Custom."], test)
 		return dropdown
 	end
 
@@ -2824,8 +2817,7 @@ function ns.StyleRows(kit, content, stack, changed, switchKey, fieldOf, panel)
 				tip = ns.L["Your own settings, as they were before you picked a preset."],
 				enabled = function() return Kept() ~= nil end }
 			return list
-		end, ns.L["A whole look in one pick. Changing a setting after it shows Custom; picking Custom puts back " ..
-			"your own settings from before the preset."])
+		end, ns.L["Picks a whole look at once; Custom brings back your own settings."])
 	end
 
 	-- A Look row: a button naming the part's look, and a click opens every
@@ -2850,8 +2842,7 @@ function ns.StyleRows(kit, content, stack, changed, switchKey, fieldOf, panel)
 		button:SetHeight(22)
 		if inline then button:Hide() else button:SetPoint("LEFT", name, "RIGHT", 4, 0) end
 		button.searchLabel = label
-		kit.Tooltip(button, ns.L["Every way to style this part, in a panel beside the settings. Pop out to drag " ..
-			"it anywhere; Escape or its X closes it."])
+		kit.Tooltip(button, ns.L["Opens every style setting for this part in a panel beside the settings."])
 
 		-- (Docked to the settings window's right, as the camera previewer is;
 		-- popped out, where it was dragged: one place for every Look panel.)
@@ -2893,7 +2884,7 @@ function ns.StyleRows(kit, content, stack, changed, switchKey, fieldOf, panel)
 		local dock = ns.PanelButton(pop)
 		dock:SetSize(70, 20)
 		dock:SetPoint("TOPRIGHT", -28, -6)
-		kit.Tooltip(dock, ns.L["Pop out: drag the window anywhere (by its edge). Dock: back beside the settings."])
+		kit.Tooltip(dock, ns.L["Pop out to drag the window anywhere, or dock it beside the settings."])
 		if inline then
 			close:Hide()
 			dock:Hide()
@@ -3080,7 +3071,7 @@ function ns.StyleRows(kit, content, stack, changed, switchKey, fieldOf, panel)
 			-- main ones.
 			if tabbed.themeLook then
 				local start = Tool(ns.L["Start from a theme"], 130,
-					ns.L["This row's look as a theme has it, to change from there. Only this row: the theme in use stays."])
+					ns.L["Starts this row's look from a theme, without changing your theme."])
 				start:SetPoint("RIGHT", tools, "RIGHT", 0, 0)
 				start:SetScript("OnClick", function(self)
 					ns.ContextMenu(self, function(_, root)
@@ -3147,8 +3138,7 @@ function ns.StyleRows(kit, content, stack, changed, switchKey, fieldOf, panel)
 			kit.GreyUnless(resetAll, function(db) return On(db) and AnyChanged() end)
 			kit.AddControl(resetAll)
 			-- (And up by Paste, 2026-11-16: the same, this panel's settings only.)
-			local reset = Tool(ns.L["Reset"], 64, ns.L["Every setting in this panel back to how it starts (on a row " ..
-				"that inherits: back to inherited). Only this panel."])
+			local reset = Tool(ns.L["Reset"], 64, ns.L["Resets every setting in this panel."])
 			reset:SetPoint("LEFT", paste, "RIGHT", 6, 0)
 			reset:SetScript("OnClick", function() resetAll:GetScript("OnClick")(resetAll) end)
 			kit.GreyUnless(reset, function(db) return On(db) and AnyChanged() end)

@@ -245,9 +245,7 @@ function ns.CreateGameSettingsPage(kit)
 	local canvas, content = kit.CreateScrollPage(true)
 	local title = kit.Label(content, "GameFontNormalLarge", L["Game Settings"])
 	title:SetPoint("TOPLEFT", 16, -16)
-	local intro = kit.PageIntro(content, title, L["The game's own settings Cinematic changes while it needs " ..
-		"them, then puts yours back. Change one yourself and yours wins. Keep yours puts yours back and Cinematic " ..
-		"leaves it alone for good; Use ours lets Cinematic change it again. Hover a row for more."])
+	local intro = kit.PageIntro(content, title, L["Game settings Cinematic changes while it needs them, then puts back to yours."])
 
 	local allOurs = ns.PanelButton(content)
 	allOurs:SetSize(170, 24)

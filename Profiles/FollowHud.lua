@@ -252,8 +252,7 @@ function ns.BuildFollowHudSetup(parent, stack, kit)
 	end
 	-- (Its header with a "?" holding what it does, and where it stands beside them.)
 	local header = stack:Header(parent, L["Set Up"])
-	stack:Help(parent, L["Puts the frames that follow you on this profile, piece by piece. Nothing else changes: " ..
-		"not your styles, nor the rest of your Edit Mode layout. Undo takes it all off again."])
+	stack:Help(parent, L["Puts the frames that follow you on this profile; Undo takes them off again."])
 	local status = parent:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
 	status:SetJustifyH("LEFT")
 	status:SetPoint("LEFT", header, "RIGHT", 32, 0)
@@ -281,25 +280,21 @@ function ns.BuildFollowHudSetup(parent, stack, kit)
 		end)
 		return button
 	end
-	local setUp = Button(L["Set Up"], L["Puts the ticked pieces on this profile. Set up already: takes the last " ..
-		"set-up off first, then puts these on. With a layout piece, the game needs a reload to show the layout."],
+	local setUp = Button(L["Set Up"], L["Puts the ticked pieces on this profile; layout pieces need a reload."],
 		function()
 			local picks = Wanted()
 			for key in pairs(AUTO_PIECES) do picks[key] = true end
 			return ns.FollowHudSetUp(picks)
 		end)
 	setUp:SetPoint("LEFT", row, "LEFT", 0, 0)
-	local undo = Button(L["Undo"], L["Takes the Follow HUD off this profile: each setting it changed back as it " ..
-		"was (one you've changed since stays yours), and Edit Mode back on your layout."], ns.FollowHudUndo)
+	local undo = Button(L["Undo"], L["Takes the Follow HUD off this profile and puts your settings back."], ns.FollowHudUndo)
 	undo:SetPoint("LEFT", setUp, "RIGHT", 6, 0)
-	local update = Button(L["Update Layout"], L["Makes the Follow HUD layout again from the layout it was made on, " ..
-		"so changes you've made to that one since come over. Changes made to the Follow HUD layout itself in " ..
-		"Edit Mode are lost."], ns.FollowHudUpdate)
+	local update = Button(L["Update Layout"], L["Rebuilds the Follow HUD layout, losing any Edit Mode changes made to it."], ns.FollowHudUpdate)
 	update:SetPoint("LEFT", undo, "RIGHT", 6, 0)
 	local change = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
 	change:SetSize(122, 22)
 	if ns.SkinButton then ns.SkinButton(change) end
-	kit.Tooltip(change, L["Shows the pieces to pick from, for Set Up Again. Hide puts them away, changing nothing."])
+	kit.Tooltip(change, L["Shows the pieces you can pick from."])
 	change:SetScript("OnClick", function()
 		Wanted()
 		editing = not editing

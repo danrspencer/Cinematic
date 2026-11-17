@@ -313,8 +313,7 @@ local function BuildEditor()
 	local cqlText = cql:CreateFontString(nil, "OVERLAY", "GameFontNormal")
 	cqlText:SetPoint("LEFT")
 	cqlText:SetText("CQL")
-	Tip(cql, L["CQL (Cinematic Query Language): the words a rule is written in. Join them with AND, OR and " ..
-		"NOT, and group them with brackets, to say exactly when this shows."])
+	Tip(cql, L["CQL is the words a rule is written in, joined with AND, OR and NOT."])
 
 	-- The rule, a few lines' room; a click anywhere on it types there.
 	local well = CreateFrame("Frame", nil, editor, BACKDROP)
@@ -473,11 +472,10 @@ local function BuildEditor()
 			if group.tooltipOnly then tipLine[#tipLine + 1] = button end
 			if field and group.tooltipOnly then
 				wordButtons[word] = button
-				Tip(button, (L["Adds \"%s\": true for a tooltip of this kind (one can be more than one: a quest mob " ..
-					"is an enemy too). Anything else: none of the others, and every tooltip of the UI."]):format(word))
+				Tip(button, (L["Adds \"%s\": true for a tooltip of this kind."]):format(word))
 			elseif field then
 				wordButtons[word] = button
-				local tip = (L["Adds \"%s\". A green dot: true where you are now."]):format(word)
+				local tip = (L["Adds \"%s\"; a green dot means it's true where you are now."]):format(word)
 				if field:find("^range") then
 					-- (What it measures with here, as you look.)
 					Tip(button, function()
@@ -485,14 +483,11 @@ local function BuildEditor()
 							.. ns.RangeBandInfo(field)
 					end)
 				elseif field == "near" or field == "near28" then
-					Tip(button, tip .. "\n\n" .. L["In fights the game won't say how far anyone is: it stays as it " ..
-						"was for the same target, and is false for a new one. Spell range is measured in fights too."])
+					Tip(button, tip .. "\n\n" .. "")
 				elseif field == "elite11" or field == "elite28" then
-					Tip(button, tip .. "\n\n" .. L["In fights the game won't say how far anyone is: it stays as it was " ..
-						"as the fight began, while an elite enemy still has a nameplate."])
+					Tip(button, tip .. "\n\n" .. "")
 				elseif field == "enemy" or field == "friendly" or field == "target" then
-					Tip(button, tip .. "\n\n" .. L["Out of fights only, as the dropdowns' target ticks: in a fight, In " ..
-						"combat decides. For your target in a fight, use the kinds (Hostile NPCs, Enemy players...)."])
+					Tip(button, tip .. "\n\n" .. L["Out of fights only."])
 				else
 					Tip(button, tip)
 				end
@@ -528,11 +523,10 @@ local function BuildEditor()
 	if done.SetMotionScriptsWhileDisabled then done:SetMotionScriptsWhileDisabled(true) end -- (its tip says why)
 	Tip(done, function()
 		if not done:IsEnabled() then
-			return L["The rule isn't finished. Finish it, or close with X or Escape to put back the rule it had."]
+			return L["The rule isn't finished; finish it or press Escape to undo."]
 		end
 		return target and not target.grid and L["Closes the editor, keeping the rule."]
-			or L["Closes the editor. A rule that's just the dropdowns' words joined by OR goes back into them; " ..
-			"one that isn't stays the row's rule."]
+			or L["Closes the editor, keeping the rule."]
 	end)
 	local resetGrid = ns.PanelButton(editor)
 	resetGrid:SetSize(130, 22)
@@ -574,9 +568,7 @@ local function BuildEditor()
 			end
 		end)
 	end)
-	Tip(followButton, L["Instead of a rule, this row shows whenever another row of its table does, however that " ..
-		"one is set now or later. All or nothing: none of this row's own settings count while it follows, and " ..
-		"they're kept for when it stops (Grid on the row)."])
+	Tip(followButton, L["Makes this row show whenever another row of its table does, instead of a rule."])
 	editor:SetHeight(34 + 64 + 6 + 32 + 12 + palette:GetHeight() + 50)
 
 	function Refresh()
@@ -840,7 +832,7 @@ function ns.GridRow(kit, parent, labelWidth, layout, spec)
 		hover:SetSize(16, 16)
 		hover:SetPoint("CENTER", live, "CENTER")
 		hover:EnableMouse(true)
-		Tooltip(hover, L["Green: it'd show in CineMode right now. Grey: it'd be hidden. None: its rule isn't finished."])
+		Tooltip(hover, L["Green: it would show in CineMode now; grey: hidden; none: rule not finished."])
 	end
 
 	local always
@@ -946,7 +938,7 @@ function ns.GridRow(kit, parent, labelWidth, layout, spec)
 			if Leader() then
 				GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
 				GameTooltip:SetText(L["Follow"], FOLLOW_COLOR[1], FOLLOW_COLOR[2], FOLLOW_COLOR[3])
-				GameTooltip:AddLine((L["Follows %s: shows when it does. Its own settings are kept for when it stops."])
+				GameTooltip:AddLine((L["Follows %s and shows when it does."])
 					:format(LeaderLabel(Leader())), 1, 1, 1, true)
 				GameTooltip:AddLine(L["Click to open the editor."], 0.8, 0.8, 0.8, true)
 				GameTooltip:Show()
@@ -1000,12 +992,11 @@ function ns.GridRow(kit, parent, labelWidth, layout, spec)
 				elseif spec.liveRule then
 					GameTooltip:AddLine(ns.ColoredRule(spec.liveRule()), 1, 1, 1, true)
 				end
-				GameTooltip:AddLine(L["Opens the rule editor, for AND, NOT and more places and situations " ..
-					"than the dropdowns have."], 0.8, 0.8, 0.8, true)
+				GameTooltip:AddLine(L["Opens the rule editor for more options than the dropdowns have."], 0.8, 0.8, 0.8, true)
 			elseif rule.grid then
 				local _, why = ns.ReadGridRule(text, rule.grid)
 				GameTooltip:SetText(L["Back to the dropdowns"], 1, 1, 1)
-				GameTooltip:AddLine(why and (L["Can't: %s. Open the rule to change it, or Reset to grid there."])
+				GameTooltip:AddLine(why and (L["Can't: %s. Open the rule to change it."])
 					:format(why) or L["Puts the rule's words back in the dropdowns."], 0.8, 0.8, 0.8, true)
 			else
 				GameTooltip:SetText(L["Back to the ticks"], 1, 1, 1)
@@ -1094,7 +1085,7 @@ function ns.GridRow(kit, parent, labelWidth, layout, spec)
 			note.label = note:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
 			note.label:SetPoint("LEFT", 6, 0)
 			note:SetScript("OnClick", function() ns.OpenOptions("Style Overrides") end)
-			Tooltip(note, L["Set on the Style hub's Overrides tab. Click to open it."])
+			Tooltip(note, L["Set on the Style Overrides tab; click to open it."])
 		end
 		for _, child in ipairs({ row:GetChildren() }) do
 			if child ~= note then child:SetShown(not text) end
@@ -1178,8 +1169,7 @@ function ns.ListRowParts(Key, columns, columnTips, setAlways, opts)
 			-- (In combat only counts while CineMode stays on in fights, for the UI's rows.)
 			local needsStay = column[4] and not opts.anyFight
 			if needsStay then
-				tip = (tip and tip .. " " or "") .. L["(Only while In combat is unticked under Exit CineMode, " ..
-					"on the CineMode page: CineMode stays on in fights.)"]
+				tip = tip
 			end
 			local group = menus[LIST_GROUP[list] or 3]
 			group[#group + 1] = { name, function() return Ticked(c) end, function() SetTick(c, not Ticked(c)) end,
@@ -1335,9 +1325,8 @@ function ns.GridTable(content, columnTop, rows, kit)
 			band = r + (rows.bandFrom or 0), dot = not item.alwaysOnly,
 			always = { isOn = function() return alwaysOn(item.key) end, set = SetAlways,
 				tip = item.alwaysTip or item.part
-				and L["Show it whenever its frame shows. This overrides its Hover groups: untick it to " ..
-				"hide it in CineMode except when hovered or brought up by the other columns."]
-				or L["Show it all through CineMode, instead of hiding it. (The other columns then have nothing to add.)"] },
+				and L["Shows it whenever its frame shows, even in CineMode."]
+				or L["Shows it all through CineMode instead of hiding it."] },
 			changed = item.apply,
 			enabled = item.showKey and function() return kit.RowShown(item) end or nil,
 		}

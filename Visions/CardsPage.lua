@@ -386,9 +386,9 @@ local function LookGrid(kit, content, stack, fieldOf, changed, own, icon)
 	at.y = at.y + TILE_H + 6
 	Dot({ "Position" })
 	Number("cardOffsetX", L["Move across"], -50, 50, 0.5, "%.1f%%", 100,
-		L["Moves the card from where its place puts it: right, or left below 0, as a share of the screen's width."])
+		L["Moves the card right, or left below 0."])
 	Number("cardOffsetY", L["Move up"], -50, 50, 0.5, "%.1f%%", 100,
-		L["Moves the card from where its place puts it: up, or down below 0, as a share of the screen's height."],
+		L["Moves the card up, or down below 0."],
 		nil, true)
 	Panel(at.x, top, at.y - 4)
 
@@ -400,15 +400,14 @@ local function LookGrid(kit, content, stack, fieldOf, changed, own, icon)
 	Number("cardHold", L["Stays"], 0.5, 12, 0.5, "%.1f s", 1,
 		L["How long the card stays between fading in and out (Typewriter: once typed)."])
 	local pulse = Number("cardPulse", L["Edge pulse"], 0, 100, 1, "%d%%", 100,
-		L["The edges of the screen flash for a moment as the card shows, this strongly. 0: no pulse."], nil, true)
+		L["How strongly the screen edges flash as the card shows; 0 for none."], nil, true)
 	-- (At the column's end, where the Text column's swatches are at theirs.)
 	local pulseColor = rows.Swatch(pulse, nil, { "cardPulseR", "cardPulseG", "cardPulseB" },
 		L["Pick the pulse's color."], function(db) return On(db) and (tonumber(Get("cardPulse")) or 0) > 0 end)
 	pulseColor:ClearAllPoints()
 	pulseColor:SetPoint("TOPLEFT", grid, "TOPLEFT", at.x + CELL_W - 18, -(at.y - CELL_ROW + 3))
 	Dot({ "Icon", "Icon picture" })
-	local iconCheck = Tick("cardIconShow", L["Icon"], L["An icon before the words: each event's own (a map " ..
-		"for a zone, a skull for a boss...), unless it's given another with the button beside this."])
+	local iconCheck = Tick("cardIconShow", L["Icon"], L["Shows an icon before the words."])
 	iconCheck.noSettingId = true -- (the picked style's: no one setting for /cine find)
 	if icon then icon(iconCheck) end
 	local timingEnd = at.y - 4
@@ -427,8 +426,7 @@ local function LookGrid(kit, content, stack, fieldOf, changed, own, icon)
 	}, InBar)
 	Dot({ "Letterbox scale" }, BarUp)
 	local barScale, barScaleName = Number("cardBarScale", L["Scale"], 20, 100, 1, "%d%%", 100,
-		L["The words' height next to the bar's: they grow and shrink with your letterbox. (With no letterbox " ..
-		"up, a bar as tall as your letterbox's comes in for the card.)"], InBar)
+		L["The words' size compared to the letterbox bar."], InBar)
 	Dot({ "No letterbox" }, BarUp)
 	local barFallback = Narrow(rows.Dropdown(L["No letterbox"], "cardBarFallback", List({
 		{ "bar", L["Its own bar"], L["A bar as tall as your letterbox's comes in for the card."] },
@@ -452,27 +450,21 @@ local function LookGrid(kit, content, stack, fieldOf, changed, own, icon)
 		{ "title", L["Title"], L["Big words in the middle of the screen, the rest under them."] },
 		{ "subtitle", L["Subtitle"], L["A small line low on the screen, where a film's subtitles go."] },
 		{ "chapter", L["Chapter"], L["The words over a line that draws out, as a new scene starts."] },
-		{ "banner", L["Banner"], L["Across the middle of the screen on a dark band with soft edges, coming in " ..
-			"and going slowly, as YOU DIED does."] },
+		{ "banner", L["Banner"], L["Big words across the middle of the screen on a dark band."] },
 	})
 	Dot({ "Animation" })
 	Buttons(Name(L["Animation"]), "cardAnim", {
 		{ "fade", L["Fade"], L["The card fades in and out."] },
-		{ "reveal", L["Reveal"], L["The words open out from their middle (or from their side, in the lower third " ..
-			"or at a bar's side), the line drawing out with them; the other lines rise in after."] },
-		{ "track", L["Tracking"], L["The letters start spread apart and close up, as a film's title comes in; " ..
-			"the other lines rise in after. A name the game keeps secret (a boss's before its fight, on retail) " ..
-			"opens as Reveal instead."] },
-		{ "type", L["Type"], L["The words come in a letter at a time from the left, as if typed; the " ..
-			"other lines rise in after. A secret name opens as Reveal instead."] },
+		{ "reveal", L["Reveal"], L["The words open out from their middle."] },
+		{ "track", L["Tracking"], L["The letters start spread apart and close up, like a film title."] },
+		{ "type", L["Type"], L["The words appear a letter at a time, as if typed."] },
 	})
 	Dot({ "Font" })
 	Narrow(rows.Font("cardFont", L["Words in Russian, Korean or Chinese keep the game's font, so their letters show."],
 		nil, nil, L["Font"]))
 	Dot({ "Size" })
 	Number("cardSize", L["Size"], 14, 80, 1, "%d", 1,
-		L["How tall the words are on the screen; the other lines go by them. (In a letterbox bar: " ..
-		"Letterbox scale.)"], function(db) return On(db) and not BarUp() end)
+		L["How tall the words are."], function(db) return On(db) and not BarUp() end)
 	-- (On its row, its swatch under the row's end, over the Outline's.)
 	local COLOR_NAME = 60
 	at.x, at.y = CELL_RIGHT + CELL_W - 28 - COLOR_NAME, at.y - CELL_ROW
@@ -514,11 +506,10 @@ local function LookGrid(kit, content, stack, fieldOf, changed, own, icon)
 		{ "same", L["Same as the words"] }, L["Font"]))
 	Dot({ "Small lines' size" })
 	Number("cardSmallSize", L["Size"], 50, 250, 5, "%d%%", 100,
-		L["The small lines over and under the words, bigger or smaller than they come (100%: as they come, " ..
-		"by the words' size)."])
+		L["Makes the small lines bigger or smaller."])
 	Dot({ "Small lines' color" })
 	local smallColor = Buttons(Name(L["Color"]), "cardSmallColor", {
-		{ "auto", L["Automatic"], L["Under the words: their color, lighter. Over them: a pale gray."] },
+		{ "auto", L["Automatic"], L["Picks a matching color automatically."] },
 		{ "custom", L["Custom"], L["A color of your own (the swatch), for both lines."] },
 	}, nil, Field() - 28)
 	rows.Swatch(smallColor, "cardSmallColor", { "cardSmallR", "cardSmallG", "cardSmallB" },
@@ -712,14 +703,9 @@ function ns.CreateCardsPanel(kit)
 	local title = kit.Label(content, "GameFontNormalLarge", L["Card Vision"])
 	CardTabs(content, title, 1)
 	local intro = kit.PageIntro(content, title,
-		L["Every moment that puts words on your screen, as a card: going into a fight and coming out of it, a " ..
-		"boss, a new zone, what you did last time, the time of day, a place under attack, a duel, your death. A " ..
-		"row for " ..
-		"each: its tick, the style it uses and where it shows; click it for its settings. How they look: the " ..
-		"Style tab. One card at a time: a more important one cuts in, a less important one waits for it."])
+		L["Cards that put words on your screen for moments like fights, zones and duels."])
 	local switch = kit.PageSwitch(content, "cards", L["Enable Page"],
-		L["On: each card shows as its row says. Off: none of them do, and each row keeps its tick for when you " ..
-		"turn this back on."], intro)
+		L["Turns all cards on or off."], intro)
 	-- (Everything below is made the first time the page is needed: Options.lua's lazyPages.)
 	local function MakeBody()
 		local stack = kit.Stack(switch, "check")
@@ -727,11 +713,9 @@ function ns.CreateCardsPanel(kit)
 		kit.RecordKey(content, "cardThirdY")
 		local cardScale = stack:Add(kit.Slider(content, "cardScale", L["Card size"], 50, 200, 5, "%d%%", 100),
 			"slider")
-		kit.Tooltip(cardScale, L["Every card's words bigger or smaller, for a big or wide screen (a card in a " ..
-			"letterbox bar goes by the bar's height instead)."])
+		kit.Tooltip(cardScale, L["Makes every card bigger or smaller."])
 		stack:Add(kit.Check(content, "cardClearChat", L["Move cards clear of the chat"],
-			L["Ticked: a lower third card that would land on a chat window you can see moves up just enough to " ..
-			"clear it. Unticked: it stays where its place puts it."]), "check")
+			L["Moves lower third cards up so they don't cover the chat."]), "check")
 		stack:Header(content, L["Events"])
 		local grid = ns.GRID_KIT
 		local columns = ns.FRAME_COLUMNS
@@ -751,7 +735,7 @@ function ns.CreateCardsPanel(kit)
 			end
 			items[i] = {
 				id = id, label = L[event.name], tip = L[TIPS[id]], on = event.on, group = L[event.group],
-				onTip = L["Ticked: this card shows where its row says. Unticked: never."],
+				onTip = L["Shows this card."],
 				dim = function()
 					return not (ns.GetDB()[event.on] and (not event.needs or ns.GetDB()[ns.CARD_BY_ID[event.needs].on]))
 				end,
@@ -790,8 +774,7 @@ function ns.CreateCardsPanel(kit)
 						local base = kit.Dropdown(drawer, BaseField(id), function() return StyleChoices(id) end, 170)
 						if base then
 							At(base)
-							kit.Tooltip(base, L["The card type this card starts from. Settings you give it on the Style tab go " ..
-								"over it."])
+							kit.Tooltip(base, L["The card type this card starts from."])
 						end
 						-- (Buttons to it on the Settings, Style and Sounds tabs.)
 						for n, link in ipairs({ { L["Settings"], "Card Settings",
@@ -813,8 +796,7 @@ function ns.CreateCardsPanel(kit)
 						test:SetText(L["Test"])
 						At(test, ns.ROW_LIST_LABEL_W + 408)
 						kit.Tooltip(test, ns.CardSequences[id]
-							and L["Shows each of its cards in turn, to see how they look (close the settings to see them). " ..
-							"Clicking Stop ends it."]
+							and L["Shows each of its cards in turn; close the settings to see them."]
 							or L["Shows its card now, to see how it looks (close the settings to see it)."])
 						test:SetScript("OnClick", function() ns.CardTest(id) end)
 						TestStops(test, function() return id end)
@@ -915,16 +897,13 @@ function ns.CreateCardStylePanel(kit)
 	local title = kit.Label(content, "GameFontNormalLarge", L["Card Vision"])
 	local under = CardTop(kit, content, title, 2)
 	local intro = kit.PageIntro(content, title,
-		L["How this card looks. It starts from a card type (a subzone's, the zone's), each setting following it " ..
-		"until you change it here, then the card's own until you put it back. Change the card type itself on the Card Types " ..
-		"tab, for every card using it. Changes play at once in the preview."], under)
+		L["How this card looks."], under)
 	local preview
 	local function Changed()
 		if preview then preview:Refresh() end
 	end
 	local switch = kit.PageSwitch(content, "cards", L["Enable Page"],
-		L["On: each card shows as the Events tab says, looking as its Style page says. Off: none of them do. " ..
-		"Each setting keeps its value for when you turn this back on."], intro, Changed)
+		L["Turns all cards on or off."], intro, Changed)
 	local stack = kit.Stack(switch, "check")
 
 	-- The look's rows edit the picked event's own settings (showing what
@@ -954,9 +933,7 @@ function ns.CreateCardStylePanel(kit)
 	stack:Add(preview, "label")
 	ns.StylePopout(preview, kit.Tooltip) -- (StylePages.lua)
 	kit.AddControl(preview)
-	local styleTest = ns.StylePreviewTest(preview, kit, L["Plays the card in the preview and on your screen, as it " ..
-		"will look, with its sound (close the settings to see it there). A card with moments (Duel) plays each in " ..
-		"turn; clicking Stop ends it."], function()
+	local styleTest = ns.StylePreviewTest(preview, kit, L["Plays the card in the preview and on your screen."], function()
 			preview:Refresh()
 			ns.CardTest(CARD.now)
 		end)
@@ -967,7 +944,7 @@ function ns.CreateCardStylePanel(kit)
 	local base = rows.Dropdown(L["Starts from"], { get = function() return ns.GetDB()["cardBase_" .. CARD.now] end,
 		set = function(value) ns.GetDB()["cardBase_" .. CARD.now] = value end },
 		function() return StyleChoices(CARD.now) end,
-		L["The card type this card starts from. The settings below that you change go over it, as its own."])
+		L["The card type this card starts from."])
 	if base then
 		stack.last:SetSize(84, 30)
 		base:SetWidth(170)
@@ -1010,7 +987,7 @@ function ns.CreateCardStylePanel(kit)
 		local hl = button:CreateTexture(nil, "HIGHLIGHT")
 		hl:SetAllPoints(icon)
 		hl:SetColorTexture(1, 1, 1, 0.2)
-		kit.Tooltip(button, L["The icon. Click to pick it from all the game's. Right-click: back to the event's own."])
+		kit.Tooltip(button, L["Click to pick an icon; right-click to reset it."])
 		button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
 		button:SetScript("OnClick", function(self, mouse)
 			local key = ns.CardKey("Icon", CARD.now)
@@ -1033,7 +1010,7 @@ function ns.CreateCardStylePanel(kit)
 	LookGrid(kit, content, stack, FieldOf, Changed, {
 		Is = function(group) return OwnGroup(CARD.now, group) end,
 		Put = function(group) Follow(CARD.now, group) end,
-		tip = L["This card's own setting. Click to go back to its card type."],
+		tip = L["This card's own setting; click to reset it."],
 	}, IconButton)
 
 
@@ -1049,16 +1026,13 @@ function ns.CreateCardStylesPanel(kit)
 	local title = kit.Label(content, "GameFontNormalLarge", L["Card Vision"])
 	CardTabs(content, title, 2)
 	local intro = kit.PageIntro(content, title,
-		L["The card types the cards start from. Change one here and every card that starts from it changes too, " ..
-		"except where a card has a setting of its own (its Style page, from its row on the Events tab). Changes " ..
-		"play at once in the preview."])
+		L["The card types that cards start from."])
 	local preview
 	local function Changed()
 		if preview then preview:Refresh() end
 	end
 	local switch = kit.PageSwitch(content, "cards", L["Enable Page"],
-		L["On: each card shows as the Events tab says, in its card type. Off: none of them do. Each setting keeps " ..
-		"its value for when you turn this back on."], intro, Changed)
+		L["Turns all cards on or off."], intro, Changed)
 	local stack = kit.Stack(switch, "check")
 
 	-- The look's rows edit the picked style (showing what shows: your change,
@@ -1141,8 +1115,7 @@ function ns.CreateCardStylesPanel(kit)
 	stack:Add(preview, "label")
 	ns.StylePopout(preview, kit.Tooltip) -- (StylePages.lua)
 	kit.AddControl(preview)
-	ns.StylePreviewTest(preview, kit, L["Plays a card in this style in the preview and on your screen (close the " ..
-		"settings to see it there): the first card using it, else the zone you're in."], function()
+	ns.StylePreviewTest(preview, kit, L["Plays a card in this style in the preview and on your screen."], function()
 			preview:Refresh()
 			local id = Sample()
 			local card = ns.CardSample(id)
@@ -1174,7 +1147,7 @@ function ns.CreateCardStylesPanel(kit)
 			return false
 		end,
 		Put = PutBack,
-		tip = L["Changed from how this card type comes. Click to put it back."],
+		tip = L["Changed from the card type; click to reset it."],
 	})
 
 	canvas:SetScript("OnShow", kit.PageShown(kit.Refresh, content)) -- (its refresh plays the preview)
@@ -1189,11 +1162,9 @@ function ns.CreateCardSettingsPanel(kit)
 	local title = kit.Label(content, "GameFontNormalLarge", L["Card Vision"])
 	local under = CardTop(kit, content, title, 1)
 	local intro = kit.PageIntro(content, title,
-		L["What's this card's alone: when it shows, the lines with its name, its words. How it looks: the Style " ..
-		"tab."], under)
+		L["This card's own settings and words."], under)
 	local switch = kit.PageSwitch(content, "cards", L["Enable Page"],
-		L["On: each card shows as the Events tab says, as this tab sets it. Off: none of them do. Each setting " ..
-		"keeps its value for when you turn this back on."], intro)
+		L["Turns all cards on or off."], intro)
 	local stack = kit.Stack(switch, "check")
 	local function Now() return CARD.now end
 
@@ -1208,8 +1179,7 @@ function ns.CreateCardSettingsPanel(kit)
 	-- Zone's and Subzone's gap: one setting, on both their tabs.
 	local function GapRow()
 		local gap = stack:Add(kit.Slider(content, "storyZoneGap", L["Not again within"], 0, 30, 1, "%d s"), "slider")
-		kit.Tooltip(gap, L["After a Zone or Subzone card, no other comes for this long, so passing through " ..
-			"places quickly doesn't bring one after another. 0: every time."])
+		kit.Tooltip(gap, L["No new Zone or Subzone card for this long after one; 0 for every time."])
 	end
 	-- In a fight (or just out of one): shown now, held till after, or not at
 	-- all. (Not for the fight's own cards.)
@@ -1218,8 +1188,7 @@ function ns.CreateCardSettingsPanel(kit)
 		Header(L["In a fight"])
 		local choice = kit.Dropdown(content, "cardFight_" .. id, List({
 			{ "show", L["Show it now"] },
-			{ "wait", L["Wait till after"], L["Held till you've been out of the fight 5 seconds (back in it, longer: a " ..
-				"feign death or vanish doesn't let it through), then shown. Dropped after 5 minutes."] },
+			{ "wait", L["Wait till after"], L["Waits until you've been out of the fight for 5 seconds."] },
 			{ "skip", L["Skip it"], L["Not shown at all in a fight, or in the 5 seconds after one."] },
 		}), 200)
 		if choice then
@@ -1234,46 +1203,37 @@ function ns.CreateCardSettingsPanel(kit)
 	parts.Part("combatIn", function()
 		Header(L["Words"])
 		WordsRow(kit, content, stack, "combatTextIn", L["Words:"],
-			L["The words going into a fight. Empty: none, just the rest of the card."])
+			L["The words as you go into a fight; leave empty for none."])
 	end)
 	parts.Part("combatOut", function()
 		Header(L["Words"])
 		WordsRow(kit, content, stack, "combatTextOut", L["Words:"],
-			L["The words coming out of a fight. Empty: none, just the rest of the card."])
+			L["The words as you leave a fight; leave empty for none."])
 		Header(L["When"])
 		local minFight = stack:Add(kit.Slider(content, "combatMinFight", L["Not after fights under"], 0, 10, 1,
 			"%d s"), "slider")
-		kit.Tooltip(minFight, L["No card coming out of a fight shorter than this, so a stray hit doesn't bring it " ..
-			"up. 0: after every fight."])
+		kit.Tooltip(minFight, L["No card after fights shorter than this; 0 for every fight."])
 	end)
 	parts.Part("boss", function()
 		Header(L["When"])
-		Check("combatBossPull", L["Boss pulled"], L["The boss's name as its fight starts, in place of Entering " ..
-			"combat's card. Once a run for each boss."])
-		Check("combatBossTarget", L["Boss targeted"], L["The boss's name as you first target it, before the " ..
-			"fight. A dungeon or raid boss is told by its level: a skull, or on retail two over yours."])
-		Check("combatBossNear", L["Boss nearby"], L["The boss's name as you first come within about 28 yards of " ..
-			"it, before the fight. A dungeon or raid boss is told by its level: a skull, or on retail two over yours."])
+		Check("combatBossPull", L["Boss pulled"], L["Shows the boss's name as its fight starts."])
+		Check("combatBossTarget", L["Boss targeted"], L["Shows the boss's name when you first target it."])
+		Check("combatBossNear", L["Boss nearby"], L["Shows the boss's name when you first get near it."])
 		Header(L["Lines"])
 		Check("combatBossSub", L["Dungeon line"],
-			L["The dungeon or raid and its difficulty under the boss's name (beside it in a letterbox bar)."])
+			L["Shows the dungeon or raid and its difficulty under the boss's name."])
 		if EJ_GetInstanceForMap and EJ_GetEncounterInfoByIndex then
 			Check("combatBossCount", L["Boss number"],
-				L["\"Boss 2 of 3\" over the name, from the Adventure Guide, as the fight starts (not in a letterbox bar)."])
+				L["Shows \"Boss 2 of 3\" over the name."])
 		end
 	end)
 	parts.Part("zone", function()
 		Header(L["Lines"])
-		Check("storyZoneTerritory", L["Territory"], L["Under the name, what the game says of the place: " ..
-			"Contested Territory, Sanctuary, Alliance or Horde Territory..."])
-		Check("timeOfDayMessage", L["Time of day at login"], L["Dawn, Morning, Midday, Afternoon, Evening, Dusk or " ..
-			"Night as you log in or reload: over the name on this card, or under the game's zone name with Zone " ..
-			"unticked. Follows the clock picked on the Tint page."])
+		Check("storyZoneTerritory", L["Territory"], L["Shows the zone's type under its name, such as Sanctuary."])
+		Check("timeOfDayMessage", L["Time of day at login"], L["Shows the time of day when you log in."])
 		Header(L["When"])
 		GapRow()
-		Check("storyZoneNotFlying", L["Not on flights"], L["No Zone or Subzone card on a flight path: the " ..
-			"places you fly over don't bring one after another, and the Flight departure and arrival cards say " ..
-			"where you're going."])
+		Check("storyZoneNotFlying", L["Not on flights"], L["No Zone or Subzone cards while on a flight path."])
 		FightRow("zone")
 	end)
 	parts.Part("subzone", function()
@@ -1285,8 +1245,7 @@ function ns.CreateCardSettingsPanel(kit)
 	end)
 	parts.Part("login", function()
 		Header(L["Where"])
-		Check("storyRecapUnder", L["Under the zone name"], L["One line under the game's zone name, as it comes in " ..
-			"at login, in place of a card. (The look above is the card's.)"])
+		Check("storyRecapUnder", L["Under the zone name"], L["Shows one line under the game's zone name instead of a card."])
 		stack:Add(kit.Slider(content, "storyRecapDelay", L["After"], 0, 8, 0.5, "%.1f s"), "slider")
 		Header(L["Details"])
 		local heading = kit.Dropdown(content, "storyRecapHeading", List({
@@ -1339,8 +1298,7 @@ function ns.CreateCardSettingsPanel(kit)
 		Header(L["Banner"])
 		PickRow("cardSouls_" .. id, L["Shows as:"], {
 			{ "usual", L["Its card"], L["As it always has, in its own look (the Style tab)."] },
-			{ "souls", L["Souls banner"], L["Big words across the middle of the screen on a dark band, as YOU DIED " ..
-				"shows: a win in gold, a loss in red (the Victory and Death styles' looks)."] },
+			{ "souls", L["Souls banner"], L["Big words across the middle of the screen, like YOU DIED."] },
 		}, tip)
 	end
 	-- Boss defeated's, Rare felled's and Revived's words (SOULS_WORDS, or your
@@ -1353,9 +1311,9 @@ function ns.CreateCardSettingsPanel(kit)
 		end
 		items[#items + 1] = { "custom", L["Custom"], L["Your own words."] }
 		PickRow(id .. "Words", L["Banner words:"], items,
-			L["The big words across the screen. <NAME>: the name of the one that fell."])
+			L["The big words across the screen."])
 		local box = WordsRow(kit, content, stack, id .. "Text", L["Your words:"],
-			L["The words the banner shows with Custom picked. Left blank: the first ones in the list."])
+			L["Your own words for the banner."])
 		kit.GreyUnless(box, function(db) return db[id .. "Words"] == "custom" end)
 	end
 	-- (The wins that can show as a souls banner, and their Banner's tooltip.)
@@ -1375,15 +1333,14 @@ function ns.CreateCardSettingsPanel(kit)
 		Check("cardDuelResult", L["Result"], L["Whether you won or lost (or someone fled) as the duel ends."])
 		Header(L["Words"])
 		local start = WordsRow(kit, content, stack, "duelTextStart", L["Starts:"],
-			L["The words under both names as the duel starts. Empty: none."])
+			L["The words under both names as the duel starts."])
 		kit.GreyUnless(start, function(db) return db.cardDuelStart end)
 		for _, row in ipairs({ { "duelTextWon", L["Won:"], L["The big words as you win a duel."] },
 			{ "duelTextLost", L["Lost:"], L["The big words as you lose a duel."] } }) do
 			local box = WordsRow(kit, content, stack, row[1], row[2], row[3])
 			kit.GreyUnless(box, function(db) return db.cardDuelResult end)
 		end
-		SoulsRow("duel", L["How the result shows: its card (with the words above), or a souls banner: VICTORY " ..
-			"ACHIEVED or DEFEATED across the middle of the screen, who it was against under it."])
+		SoulsRow("duel", L["Shows the result as its card or as a big banner."])
 	end)
 	for _, id in ipairs({ "bossDown", "felled", "revived" }) do
 		parts.Part(id, function()
@@ -1409,7 +1366,7 @@ function ns.CreateCardSettingsPanel(kit)
 			kit.Tooltip(banner, L["YOU DIED, \"wasted\" (a picture) or words of your own."])
 		end
 		local box = WordsRow(kit, content, stack, "deathBannerText", L["Your words:"],
-			L["The words the banner shows with Custom picked. Left blank: YOU DIED."])
+			L["Your own words for the banner; blank shows YOU DIED."])
 		kit.GreyUnless(box, function(db) return db.deathBannerStyle == "custom" end)
 		stack:Note(content, L["Only with the death camera on (the Die row on the Scenes page)."], NOTE_W)
 	end)
@@ -1421,9 +1378,7 @@ function ns.CreateCardSettingsPanel(kit)
 		FightRow("departure")
 		Header(L["Progress line"])
 		Check("cardDepartureLine", L["Show a line as you fly"],
-			L["On a route you've flown before, a thin line along a letterbox bar (or that edge of the " ..
-			"screen) fills up as you fly, with the time left at its end. It shows while your UI is faded, and " ..
-			"goes a moment before you land. A route's first flight has none: it's timed as you fly it."])
+			L["Shows a line that fills up as you fly a route you've flown before."])
 		local where = kit.Dropdown(content, "cardDepartureLinePlace", List({
 			{ "top", L["Top bar"] },
 			{ "bottom", L["Bottom bar"] },
@@ -1439,8 +1394,7 @@ function ns.CreateCardSettingsPanel(kit)
 		end
 		local edges = stack:Add(kit.Slider(content, "cardDepartureLineEdges", L["Only at the start and end"], 0, 30, 1,
 			"%d s"), "slider")
-		kit.Tooltip(edges, L["The line shows for this long as the flight starts and before it lands, and is " ..
-			"hidden in between: point the mouse at its place to see it. 0: it shows the whole way."])
+		kit.Tooltip(edges, L["Shows the line only this long at the start and end; 0 for the whole way."])
 		kit.GreyUnless(edges, function(db) return db.cardDepartureLine end)
 		local clock = kit.Dropdown(content, "cardDepartureClock", List({
 			{ "minutes", L["Minutes only"], L["\"2 min\", rounded up, then \"under a minute\"."] },
@@ -1492,8 +1446,7 @@ function ns.CreateCardSoundsPanel(kit)
 	local under = CardTop(kit, content, title, 3)
 	local intro = kit.PageIntro(content, title, L["What this card plays as it shows."], under)
 	local switch = kit.PageSwitch(content, "cards", L["Enable Page"],
-		L["On: each card shows as the Events tab says, with its sounds. Off: none of them do. Each setting keeps " ..
-		"its value for when you turn this back on."], intro)
+		L["Turns all cards on or off."], intro)
 	-- (Everything below is made the first time the page is needed: Options.lua's lazyPages.)
 	local function MakeBody()
 		local stack = kit.Stack(switch, "check")

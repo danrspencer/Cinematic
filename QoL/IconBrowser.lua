@@ -276,10 +276,8 @@ function ns.IconBrowser(canvas, onPick, source)
 	result:SetTextColor(1, 0.4, 0.35)
 	box:SetScript("OnEnter", function(self)
 		GameTooltip:SetOwner(self, "ANCHOR_TOP")
-		GameTooltip:SetText(source and L["Type part of an icon's name to see the ones it matches, such as " ..
-			"bang, turnin or speak. Enter picks the first."]
-			or L["Type part of a name to see the icons it matches: any spell, the items you " ..
-			"carry and wear, mounts, or an icon's file name such as INV_Misc_Bag_07. Enter picks the first."],
+		GameTooltip:SetText(source and L["Type part of an icon's name; Enter picks the first match."]
+			or L["Type part of a spell, item, mount or icon name; Enter picks the first match."],
 			1, 1, 1, 1, true)
 		GameTooltip:Show()
 	end)

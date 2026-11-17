@@ -229,7 +229,7 @@ function ns.CameraManager(kit, canvas, content, title, intro, switch, helper)
 	local run = ns.PanelButton(view)
 	run:SetSize(70, 22)
 	run:SetText(L["Run"])
-	kit.Tooltip(run, L["Moves the real camera through this script now (click again to stop it). Its stop rules count, as for a trigger."])
+	kit.Tooltip(run, L["Runs the camera through this script now; click again to stop."])
 	local function Running()
 		local state = ns.CameraScriptState and ns.CameraScriptState()
 		return state and state.script.id == openId

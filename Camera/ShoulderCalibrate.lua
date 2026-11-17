@@ -415,8 +415,7 @@ function ns.BuildShoulderCalibrateTab(host, kit)
 	go:SetScript("OnClick", function()
 		if run then ns.ShoulderCalibrateStop() else ns.ShoulderCalibrateAsk() end
 	end)
-	kit.Tooltip(go, L["Measures the race, sex and form you are now. Stand still on open, flat ground, nothing " ..
-		"targeted, and leave the camera alone for about 10 seconds. It says a line in /say a few times."])
+	kit.Tooltip(go, L["Measures your current form; stand still for 10 seconds while it says a line in /say."])
 	local share = CreateFrame("Button", nil, host, "UIPanelButtonTemplate")
 	share:SetSize(150, 24)
 	share:SetText(L["Share"])

@@ -32,14 +32,9 @@ ns.NAME_GROUPS = {
 	-- (see the AllNPCs set, SyncNameRow).
 	{ key = "HostileNPCs", label = L["Hostile NPCs"], plate = true, npcs = true,
 		cvars = { "UnitNameHostleNPC" } },
-	{ key = "NeutralNPCs", label = L["Neutral NPCs"], plate = true, npcs = true, cvars = {},
-		tip = L[" Beyond nameplate range, and in dungeons and raids, the game has no setting for neutral NPCs' " ..
-			"names alone: they show there while all three NPC rows do."] },
+	{ key = "NeutralNPCs", label = L["Neutral NPCs"], plate = true, npcs = true, cvars = {} },
 	{ key = "FriendlyNPCs", label = L["Friendly NPCs"], plate = true, npcs = true,
-		cvars = { "UnitNameInteractiveNPC", "UnitNameFriendlySpecialNPCName" },
-		tip = L[" Beyond nameplate range, and in dungeons and raids, the game only shows friendly NPCs with " ..
-			"something for you (quest givers, vendors, flight masters...) unless all three NPC rows show: then " ..
-			"all of them, guards too."] },
+		cvars = { "UnitNameInteractiveNPC", "UnitNameFriendlySpecialNPCName" } },
 	-- Friendly and neutral NPCs with a title under their names (<Repair
 	-- Vendor>, <Innkeeper>), of the kinds its Kinds menu ticks (PlateGuild's
 	-- ns.PlateServiceMatch): their names kept on their plates whatever their
@@ -48,20 +43,13 @@ ns.NAME_GROUPS = {
 	-- (UnitNameInteractiveNPC, shared with Friendly NPCs: see cvarKeys).
 	{ key = "ServiceNPCs", label = L["Service NPCs"], indent = true, plate = true, cvars = { "UnitNameInteractiveNPC" },
 		shared = true,
-		tip = L[" Friendly and neutral NPCs with a title under their name (<Repair Vendor>, <Innkeeper>...), " ..
-			"whatever their own row says: Kinds picks which, Show whether their names show or just their titles. " ..
-			"Beyond nameplate range, and in dungeons and raids, the game shows the names of NPCs with something " ..
-			"for you (vendors, quest givers...), titles included."] },
+		tip = L[" NPCs with a title under their name, like vendors and innkeepers."] },
 	{ key = "Critters", label = L["Critters and companions"], cvars = { "UnitNameNonCombatCreatureName" } },
 	-- (groupRow: the group's row that keeps these names up too, in dungeons and
 	-- raids: see NameKeptHere.)
 	{ key = "Friends", label = L["Friendly players"], plate = true, cvars = { "UnitNameFriendlyPlayerName" },
-		groupRow = "GroupMembers",
-		tip = L[" In dungeons and raids, the Group members row keeps these names up too, and its boxes keep " ..
-			"them on in the game's options."] },
+		groupRow = "GroupMembers" },
 	{ key = "FriendlyMinions", label = L["Minions"], indent = true, plate = true, groupRow = "GroupMinions",
-		tip = L[" In dungeons and raids, the Group members Minions row keeps these names up too, and its boxes " ..
-			"keep them on in the game's options."],
 		cvars = {
 			"UnitNameFriendlyMinionName", "UnitNameFriendlyPetName", "UnitNameFriendlyGuardianName",
 			"UnitNameFriendlyTotemName",
@@ -75,20 +63,10 @@ ns.NAME_GROUPS = {
 	-- players in there are your group.
 	{ key = "GroupMembers", label = L["Group members"], plate = true, plateOnly = true, unitRow = true, cvars = {},
 		ofKind = "Friends",
-		tip = L[" In CineMode, away from dungeons and raids, the names of the players in your party or raid show " ..
-			"on their nameplates, with the rest of the plate hidden, whatever Friendly players says. Beyond " ..
-			"nameplate range the game has no setting for them: Friendly players decides there. In dungeons and " ..
-			"raids the game's own friendly player names stay up over their heads (the players in there are your " ..
-			"group); with friendly nameplates on there, the game shows those instead. Ticking any box turns " ..
-			"friendly player names on in the game's options."] },
+		tip = L[" Your party or raid members' names on their nameplates in CineMode."] },
 	{ key = "GroupMinions", label = L["Minions"], indent = true, plate = true, plateOnly = true, unitRow = true,
 		cvars = {}, ofKind = "FriendlyMinions",
-		tip = L[" In CineMode, away from dungeons and raids, the names of your party or raid members' pets and " ..
-			"minions show on their nameplates, with the rest of the plate hidden, whatever the Friendly players " ..
-			"Minions row says. Your own pet isn't one of them. Beyond nameplate range the game has no setting for " ..
-			"them: the Friendly players Minions row decides there. In dungeons and raids the game's own friendly " ..
-			"pet and minion names stay up over their heads, your own pet's too. Ticking any box turns friendly " ..
-			"minion names on in the game's options."] },
+		tip = L[" Your party or raid members' pet and minion names in CineMode."] },
 	{ key = "Enemies", label = L["Enemy players"], plate = true, cvars = { "UnitNameEnemyPlayerName" } },
 	{ key = "EnemyMinions", label = L["Minions"], indent = true, plate = true,
 		cvars = {
@@ -98,8 +76,7 @@ ns.NAME_GROUPS = {
 	-- Players' guilds (<Guild>) under their names, wherever their names show:
 	-- over their heads, and on plates showing just the name (PlateGuild.lua).
 	{ key = "Guild", label = L["Guild names"], cvars = { "UnitNamePlayerGuild" },
-		tip = L[" Players' guilds, under their names wherever their names show: over their heads, and in CineMode " ..
-			"on nameplates showing just the name."] },
+		tip = L[" Players' guild names, shown under their names."] },
 	-- Not in the game's menu: whatever you've targeted shows its name
 	-- even with its kind's names off, unless this is off too. Its boxes are
 	-- the Target section's Names row (ns.NAME_TARGET_ROWS: YourTarget, its rule

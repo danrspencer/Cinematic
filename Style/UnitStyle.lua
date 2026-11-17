@@ -2688,9 +2688,7 @@ function ns.CreateUnitStylePanel(kit)
 	local tabs = ns.PageTabs(content, ns.ShowInTabs("units"), ns.ShowInIndex("units", "Unit Style"))
 	title:SetPoint("TOPLEFT", tabs, "BOTTOMLEFT", 8, -14)
 	local intro = kit.PageIntro(content, title,
-		L["How your player, target, focus, pet, target of target and party frames look. The Default row's " ..
-		"look is every frame's until its row says Its own look; each row's Look panel sets it. Which parts " ..
-		"show: the Interface hub's HUD page, its Unit frames tab."])
+		L["How your player, target, focus, pet and party frames look."])
 
 	-- The row shown in the preview (nil: Default): the last one picked or
 	-- whose panel was opened.
@@ -2703,8 +2701,7 @@ function ns.CreateUnitStylePanel(kit)
 	end
 
 	local switch = kit.PageSwitch(content, "ufStyle", L["Enable Page"],
-		L["On: the unit frames look as this page says. Off: the game's own (the preview shows that too). " ..
-		"Each setting keeps its value for when you turn this back on."], intro, Changed)
+		L["On: the unit frames look as this page says; off: the game's own look."], intro, Changed)
 	local stack = kit.Stack(switch, "check")
 	local rows = ns.StyleRows(kit, content, stack, Changed, "ufStyle")
 
@@ -2822,8 +2819,7 @@ function ns.CreateUnitStylePanel(kit)
 				holder:HookScript("OnShow", function(self) self:Refresh() end)
 				return holder
 			end,
-			texture = { "ufTexture", L["The bars' fill. Below the game's own few: any other addon shares (through " ..
-				"LibSharedMedia)."], test = Editable, tint = { 0.25, 0.75, 0.3 } },
+			texture = { "ufTexture", L["The bars' fill, including textures other addons share."], test = Editable, tint = { 0.25, 0.75, 0.3 } },
 			barColor = function(look)
 				look.Choices(L["Health:"], "ufHealthColor", {
 					{ "game", L["The game's"] },
@@ -2839,8 +2835,7 @@ function ns.CreateUnitStylePanel(kit)
 				look.Slider("ufBack", L["Background"], 0, 100, 5, "%d%%", 100,
 					L["How dark it is behind the bars, with a border of ours."], Editable)
 			end,
-			font = { "ufFont", L["The name's font. Russian, Korean or Chinese names keep the game's, so their " ..
-				"letters show."], test = Editable },
+			font = { "ufFont", L["The font for names."], test = Editable },
 			textSize = function(look)
 				look.Slider("ufNameSize", L["Size"], 50, 150, 5, "%d%%", 100, L["The name's size, next to the game's."],
 					Editable)
@@ -2854,8 +2849,7 @@ function ns.CreateUnitStylePanel(kit)
 				}, Editable)
 				look.Choices(L["Long names:"], "ufNameCut", {
 					{ "game", L["The game's"], L["A name too long for its frame ends in \"...\"."] },
-					{ "first", L["First name"], L["A name too long for its frame loses its last words, with no \"...\": " ..
-						"Benediction Cumberbatch shows as Benediction. A single long word loses its last letters."] },
+					{ "first", L["First name"], L["Long names lose their last words instead of ending in \"...\"."] },
 				}, Editable)
 			end,
 			outline = { "ufOutline", nil, names = { [0] = L["None"], L["Thin"], L["Thick"] }, test = Editable },
@@ -2886,8 +2880,7 @@ function ns.CreateUnitStylePanel(kit)
 					return list
 				end, L["The portrait's shape, in place of the game's frame art."], Editable)
 			end,
-			border = { "ufBorder", L["Round each bar: the game's frame alone, or a border of ours (Custom: its " ..
-				"thickness and color under it)."], opts = { game = true }, test = Editable },
+			border = { "ufBorder", L["The border around each bar: the game's frame or one of ours."], opts = { game = true }, test = Editable },
 		})
 		if button then button:Hide() end
 		return pop
@@ -2911,8 +2904,7 @@ function ns.CreateUnitStylePanel(kit)
 			end, set = function(value) SetOwn(id, value == "own") end }, function()
 				return {
 					{ value = "default", text = L["Default row's"], tip = L["This frame looks as the Default row says."] },
-					{ value = "own", text = L["Its own look"], tip = L["This frame looks as its Look panel says. Its " ..
-						"settings start as the Default row's, and are kept while you pick the Default row's again."] },
+					{ value = "own", text = L["Its own look"], tip = L["This frame uses its own look from its Look panel."] },
 				}
 			end, 170, function()
 				editing = id
@@ -2931,8 +2923,7 @@ function ns.CreateUnitStylePanel(kit)
 		-- (Default's, with no pick: where the others' are, past a pick's room: 4 + 170 + 8.)
 		button:SetPoint("LEFT", pick or name, "RIGHT", pick and 8 or 182, 0)
 		button.searchLabel = label
-		kit.Tooltip(button, id and L["This frame's own look: bars, name, portrait and border. Only while it has its " ..
-			"own look."] or L["Every frame's look while its row says Same as the Default row."])
+		kit.Tooltip(button, id and L["Sets this frame's own look: bars, name, portrait and border."] or L["Every frame's look while its row says Same as the Default row."])
 		-- (A row on the Default row's look: its button opens Default's, and says so.)
 		local function FollowsDefault()
 			local db = ns.GetDB()

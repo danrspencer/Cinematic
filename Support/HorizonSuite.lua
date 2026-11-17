@@ -13,8 +13,7 @@ local L = ns.L
 table.insert(ns.ADDON_NOTES, {
 	addon = "HorizonSuite", label = "Horizon Suite",
 	works = L["Follows the Quest tracker row"],
-	about = L["Horizon Suite's quest tracker (Focus), its dungeon banner and its floating quest " ..
-		"item button fade with the Quest tracker row on the HUD page."],
+	about = L["Its quest tracker, dungeon banner and quest item button fade with the Quest tracker row."],
 })
 
 -- Its dungeon banner (and retail's Mythic+ one) sit on UIParent rather than

@@ -331,7 +331,7 @@ function ns.DockBeside(frame, key)
 		Place()
 	end)
 	if ns.lowHealthKit then
-		ns.lowHealthKit.Tooltip(dock, ns.L["Pop out: drag the window anywhere (by its edge). Dock: back beside the settings."])
+		ns.lowHealthKit.Tooltip(dock, ns.L["Pop out to move the window anywhere, or dock it back by the settings."])
 	end
 	-- (Docked, it stays beside the settings: Pop out first to drag it.)
 	frame:SetMovable(true)

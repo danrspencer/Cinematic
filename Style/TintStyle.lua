@@ -203,9 +203,7 @@ function ns.CreateTintStylePanel(kit)
 	local title = kit.Label(content, "GameFontNormalLarge", L["Tint"])
 	ns.EffectTabs(content, title, "tint", 2)
 	local intro = kit.PageIntro(content, title,
-		L["The color grading over the game world: pick a look, make your own, set how strong it is, " ..
-		"color the day and give the place you're in its own mood. Where and when it shows: the Tint tab. " ..
-		"The UI isn't tinted."])
+		L["The color grading over the game world."])
 	for _, key in ipairs({ "tintPreset", "timeTintStrength", "tintClock" }) do kit.RecordKey(content, key) end
 
 	local presetInfo = {}
@@ -413,8 +411,7 @@ function ns.CreateTintStylePanel(kit)
 	for i, key in ipairs(FIXED) do
 		local tile = LookTile(key, SMALL_W, 50, 24)
 		tile.name:SetText(ShortName(key))
-		TipOn(tile, presetInfo[key].label .. "\n" .. presetInfo[key].tip .. "\n\n" ..
-			L["One color everywhere. Handy as a look for one place too (Night in Duskwood): Zone mood's Look here."])
+		TipOn(tile, presetInfo[key].label .. "\n" .. presetInfo[key].tip)
 		fixedTiles[i] = tile
 	end
 	local mineTiles = {}
@@ -432,8 +429,7 @@ function ns.CreateTintStylePanel(kit)
 	local newGlow = newTile:CreateTexture(nil, "HIGHLIGHT")
 	newGlow:SetAllPoints()
 	newGlow:SetColorTexture(1, 1, 1, 0.08)
-	TipOn(newTile, L["Make a tint of your own: a color (or two, top and bottom), and whether it colors the " ..
-		"world or adds a soft glow. It's then picked like any other look, here or for a place."])
+	TipOn(newTile, L["Make your own tint with your own colors."])
 	newTile:SetScript("OnClick", function()
 		draft = { name = L["My tint"], color = { 0.79, 0.63, 1 } }
 		RefreshAll()
@@ -477,8 +473,7 @@ function ns.CreateTintStylePanel(kit)
 		TipOn(check, tip)
 		return check
 	end
-	local glowCheck = DraftCheck(L["Soft glow"], L["Adds a soft light over the world in place of coloring it " ..
-		"(as Dreamy does). Coloring can only darken; a glow can only brighten."], 300, -34)
+	local glowCheck = DraftCheck(L["Soft glow"], L["Adds a soft light over the world instead of coloring it."], 300, -34)
 	glowCheck:SetScript("OnClick", function(self)
 		if draft then draft.glow = self:GetChecked() or nil end
 		RefreshAll()
@@ -510,8 +505,7 @@ function ns.CreateTintStylePanel(kit)
 		paletteSwatches[i] = swatch
 	end
 
-	local fadeCheck = DraftCheck(L["A second color at the bottom"], L["The tint goes from its color at the top " ..
-		"of the screen to this one at the bottom, as Dusk does (orange sky, purple ground). White: it fades out."],
+	local fadeCheck = DraftCheck(L["A second color at the bottom"], L["Fades the tint to a second color at the bottom of the screen."],
 		10, -98)
 	local bottomSwatch = Swatch(editor, 18)
 	bottomSwatch:SetPoint("LEFT", fadeCheck.words, "RIGHT", 10, 0)
@@ -594,7 +588,7 @@ function ns.CreateTintStylePanel(kit)
 	deleteButton:SetSize(80, 22)
 	deleteButton:SetPoint("BOTTOMLEFT", 12, 10)
 	deleteButton:SetText(DELETE or L["Delete"])
-	TipOn(deleteButton, L["Deletes this tint. Wherever it was picked goes back to the usual look."])
+	TipOn(deleteButton, L["Deletes this tint for good."])
 	deleteButton:SetScript("OnClick", function()
 		if draft and draft.key then ns.DeleteMyTint(draft.key) end
 		draft = nil
@@ -631,8 +625,7 @@ function ns.CreateTintStylePanel(kit)
 	local day = Section(content, 240)
 	sections[#sections + 1] = day
 	day.tab = "time"
-	local dayHead = Heading(kit, day, L["Time of day"], L["The time part of the look. Click the bar to see " ..
-		"any hour, a phase to change it."])
+	local dayHead = Heading(kit, day, L["Time of day"], L["The time-of-day part of the look; click the bar to preview any hour."])
 	local clockGame = Chip(day, L["Game time"], 90)
 	local clockLocal = Chip(day, L["My clock"], 90)
 	clockLocal:SetPoint("TOPRIGHT", day, "TOPRIGHT", 0, 2)
@@ -660,8 +653,7 @@ function ns.CreateTintStylePanel(kit)
 		cell.hour = hour
 		TipOn(cell, function()
 			return ("%02d:00 - %s"):format(hour, L[ns.GetTimeOfDayPhaseAt(hour)]) .. "\n" ..
-				L["Click to see the tint at this hour (only while this page is open). Click it again to go " ..
-					"back to the real time."]
+				L["Click to preview the tint at this hour; click again to go back."]
 		end)
 		-- A click previews the hour; the same hour again goes back to the real time.
 		cell:SetScript("OnClick", function(self)
@@ -722,7 +714,7 @@ function ns.CreateTintStylePanel(kit)
 		card.sub:SetPoint("TOPLEFT", card.label, "BOTTOMLEFT", 0, -2)
 		Edges(card)
 		card.name, card.hour = phase.name, phase.hour
-		TipOn(card, L["Click to change %s and see it. Click it again to go back to the real time."]:format(
+		TipOn(card, L["Click to change %s and see it; click again to go back."]:format(
 			L[phase.name]))
 		-- A click picks the phase and shows it; again (while shown), back to the real time.
 		card:SetScript("OnClick", function(self)
@@ -794,14 +786,13 @@ function ns.CreateTintStylePanel(kit)
 		end)
 	timeSlider:SetWidth(300)
 	timeSlider:SetPoint("TOPLEFT", phaseRow, "BOTTOMLEFT", 2, -26)
-	kit.Tooltip(timeSlider, L["How strongly the time part applies, in Time of day and " ..
-		"Zone + time of day. Lower it for softer nights; 0 leaves just the zone mood."])
+	kit.Tooltip(timeSlider, L["How strongly the time-of-day part applies."])
 
 	-- ── Zone mood: the look's zone part, for where you're standing ────────
 	local place = Section(content, 250)
 	sections[#sections + 1] = place
 	place.tab = "zones"
-	local placeHead = Heading(kit, place, L["Zone mood"], L["The zone part of the look. Kept for every visit."])
+	local placeHead = Heading(kit, place, L["Zone mood"], L["The zone part of the look, kept for every visit."])
 	local card = CreateFrame("Frame", nil, place)
 	card:SetPoint("TOPLEFT", 0, -32)
 	card:SetPoint("BOTTOMRIGHT", 0, 0)
@@ -889,8 +880,7 @@ function ns.CreateTintStylePanel(kit)
 					function() Edit(zone.name) end)
 			end
 		end)
-		TipOn(picker, L["Edit another place without going there: one you've changed, or any zone with a " ..
-			"mood. (Another zone's areas show here once you've changed them.)"])
+		TipOn(picker, L["Edit another place's mood without going there."])
 	end
 	local backHere = Chip(card, L["Back to where you are"], 160)
 	backHere:SetPoint("TOPRIGHT", -12, -14)
@@ -900,8 +890,7 @@ function ns.CreateTintStylePanel(kit)
 	local scopeZone = Chip(card, L["Whole zone"], 100)
 	scopeZone:SetPoint("RIGHT", scopeArea, "LEFT", -4, 0)
 	TipOn(scopeZone, L["The choices below change the whole zone."])
-	TipOn(scopeArea, L["The choices below change just the area you're in (a town, a port): " ..
-		"they win over the zone's."])
+	TipOn(scopeArea, L["The choices below change just the area you're in, over the zone's."])
 	scopeZone:SetScript("OnClick", function() target = "zone"; kit.Refresh() end)
 	scopeArea:SetScript("OnClick", function() target = "area"; kit.Refresh() end)
 
@@ -987,7 +976,7 @@ function ns.CreateTintStylePanel(kit)
 	end)
 	hereSlider:SetWidth(200)
 	hereSlider:SetPoint("TOPLEFT", builtIn, "BOTTOMLEFT", 2, -28)
-	kit.Tooltip(hereSlider, L["How strong the zone looks are in this place. Until you move it: the main Strength."])
+	kit.Tooltip(hereSlider, L["How strong the zone looks are in this place."])
 	local sameStrength = ns.PanelButton(card)
 	sameStrength:SetSize(140, 22)
 	sameStrength:SetPoint("LEFT", hereSlider, "RIGHT", 14, 0)
@@ -1032,8 +1021,7 @@ function ns.CreateTintStylePanel(kit)
 		end)
 		local lookLabel = Text(card, "GameFontHighlightSmall", L["Look here"])
 		lookLabel:SetPoint("BOTTOMLEFT", lookHere, "TOPLEFT", 2, 3)
-		TipOn(lookHere, L["A look of its own for this place, used here in place of your main look " ..
-			"(Night in Duskwood, None in a city)."])
+		TipOn(lookHere, L["A look of its own for this place, used instead of your main look."])
 	end
 	place:SetHeight(32 + 54 + 15 + moodRows * 23 + 10 + 22 + 28 + 16 + 18)
 
@@ -1234,7 +1222,7 @@ function ns.CreateTintStylePanel(kit)
 			if not tile then
 				tile = LookTile(tint.key, SMALL_W, 50, 24)
 				TipOn(tile, function()
-					return (tile.tintName or "") .. "\n" .. L["Your own tint. Click it once it's picked to change it."]
+					return (tile.tintName or "") .. "\n" .. L["Your own tint; click it again once picked to change it."]
 				end)
 				mineTiles[i] = tile
 				tiles[#tiles] = nil -- (painted below, not with the built-in ones)

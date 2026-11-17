@@ -518,8 +518,7 @@ function ns.CreateTooltipStylePanel(kit)
 	local mouseTabs = ns.PageTabs(content, ns.ShowInTabs("mouse"), ns.ShowInIndex("mouse", "Tooltip Style"))
 	title:SetPoint("TOPLEFT", mouseTabs, "BOTTOMLEFT", 8, -14)
 	local intro = kit.PageIntro(content, title,
-		L["How the game's tooltips look: their background, edge and words, names in their colors and the " ..
-		"health bar. Which lines show and when: the Tooltips page."])
+		L["How the game's tooltips look."])
 
 	local preview -- (below: drawn again as each setting changes)
 	local function Changed()
@@ -528,8 +527,7 @@ function ns.CreateTooltipStylePanel(kit)
 	end
 
 	local switch = kit.PageSwitch(content, "tooltipStyle", L["Enable Page"],
-		L["On: tooltips look as this page says. Off: the game's own (the preview shows that too). Each " ..
-		"setting keeps its value for when you turn this back on."], intro, Changed)
+		L["On: tooltips look as this page says; off: the game's own look."], intro, Changed)
 	local stack = kit.Stack(switch, "check")
 	local rows = ns.StyleRows(kit, content, stack, Changed, "tooltipStyle")
 
@@ -549,8 +547,7 @@ function ns.CreateTooltipStylePanel(kit)
 		inline = true,
 		tabs = { default = function(key) return ns.DEFAULTS[key] end, source = ns.PageLookSource,
 			copyKind = "tooltipLook", copyName = L["Tooltips"] },
-		texture = { "tooltipBarTexture", L["The health bar's fill. Below the game's own few: any other addon shares " ..
-			"(through LibSharedMedia)."], label = L["Health bar:"], test = BarOn, tint = { 0, 0.83, 0 } },
+		texture = { "tooltipBarTexture", L["The health bar's fill, including textures other addons share."], label = L["Health bar:"], test = BarOn, tint = { 0, 0.83, 0 } },
 		barColor = function(look)
 			look.Choices(L["Position:"], "tooltipBar", {
 				{ "under", L["Under it"], L["Under the tooltip, where the game puts it."] },
@@ -569,8 +566,7 @@ function ns.CreateTooltipStylePanel(kit)
 				BarOn)
 			look.Slider("tooltipBarHeight", L["Height"], 2, 12, 1, "%d", nil, L["The health bar's height."], BarOn)
 		end,
-		font = { "tooltipFont", L["The words' font. Russian, Korean or Chinese text keeps the game's, so its " ..
-			"letters show."] },
+		font = { "tooltipFont", L["The font for the words."] },
 		textSize = function(look)
 			look.Slider("tooltipTextSize", L["Text size"], 80, 140, 5, "%d%%", 100,
 				L["How big the words are, next to their usual size."])
@@ -578,16 +574,14 @@ function ns.CreateTooltipStylePanel(kit)
 		textColor = function(look)
 			look.Choices(L["Name color:"], "tooltipNames", {
 				{ "game", L["The game's"] },
-				{ "class", L["Class or reaction"], L["Players' names in their class color, NPCs' in their reaction " ..
-					"to you (red, yellow or green)."] },
+				{ "class", L["Class or reaction"], L["Players' names in class colors, NPCs' in red, yellow or green."] },
 			})
 		end,
 		outline = { "tooltipOutline", L["A black border around the letters, for see-through backgrounds."],
 			names = OUTLINES },
 		outlineColor = false, -- (the game's text: its outline is always black)
 		shadow = { "tooltipShadow" },
-		border = { "tooltipEdge", L["The tooltip's edge. In its color: a unit's class or reaction color, an item's " ..
-			"quality. Custom: its thickness and color under it."], label = L["Edge:"],
+		border = { "tooltipEdge", L["The tooltip's edge, plain or in the unit's or item's color."], label = L["Edge:"],
 			opts = { game = true, colored = true } },
 		backColor = function(look)
 			look.Choices(L["Background:"], "tooltipBack", {

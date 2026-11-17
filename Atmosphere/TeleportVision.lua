@@ -480,12 +480,10 @@ function ns.CreateTeleportVisionPanel(kit)
 	local title = kit.Label(content, "GameFontNormalLarge", L["Teleport Vision"])
 	title:SetPoint("TOPLEFT", 16, -16)
 	local intro = kit.PageIntro(content, title,
-		L["As you cast your Hearthstone, Astral Recall or a teleport, a portal's glowing rim closes in around " ..
-		"you, brighter and turning quicker as the cast fills, and flashes as you're whisked away. It shows " ..
-		"whenever the tele camera would play for that cast (Cameras), with or alongside it."])
+		L["A glowing portal rim closes in around you as you cast a Hearthstone or teleport."])
 	local function Changed() end
 	local switch = kit.PageSwitch(content, "teleportVision", L["Enable Page"],
-		L["On: it shows as you cast. Off: it doesn't, and keeps its settings for when you turn this back on."],
+		L["Shows a glowing portal around you as you cast a teleport."],
 		intro, Changed)
 	local stack = kit.Stack(switch, "check")
 	local rows = ns.StyleRows(kit, content, stack, Changed)
@@ -519,8 +517,7 @@ function ns.CreateTeleportVisionPanel(kit)
 		end
 		list[#list + 1] = { value = "custom", text = L["Your own color"] }
 		return list
-	end, L["Its color. Auto: your class and spec's (the glow of the Vitals Vision theme Auto picks for you), " ..
-		"changing with your spec. Or pick any class and spec's, or your own color beside this."], On)
+	end, L["The portal's color: your class and spec's, any class's, or your own."], On)
 	if picker and picker.SetupMenu then
 		picker:SetupMenu(function(_, root)
 			local function Picked(value) return ns.GetDB() and ns.GetDB().teleportVisionColor == value end
@@ -560,28 +557,23 @@ function ns.CreateTeleportVisionPanel(kit)
 		Changed), "slider")
 	kit.Tooltip(darkness, L["How dark the world gets outside the portal's rim, in a deep shade of its color."])
 	kit.GreyUnless(darkness, On)
-	rows.Check("teleportVisionClouds", L["Swirling clouds"], L["Clouds in a deep shade of its color, swirling " ..
-		"round outside the rim, so the portal fills the screen."], On)
-	rows.Check("teleportVisionEdges", L["Black edges"], L["Black edges closing in from the screen's sides as " ..
-		"the cast fills, then over the whole screen at the last moment."], On)
+	rows.Check("teleportVisionClouds", L["Swirling clouds"], L["Clouds in its color swirl outside the rim, filling the screen."], On)
+	rows.Check("teleportVisionEdges", L["Black edges"], L["Black edges close in from the sides as the cast fills."], On)
 	local function Edges() return On() and ns.GetDB().teleportVisionEdges end
 	for _, info in ipairs({
 		{ "teleportVisionEdgeReach", L["Edge reach"], 5, 50, 1, "%d%%", 100,
 			L["How far in the black edges come as the cast fills (a share of the screen from each side)."] },
 		{ "teleportVisionEdgeAlpha", L["Edge darkness"], 0, 100, 5, "%d%%", 100, L["How dark the black edges get."] },
 		{ "teleportVisionEdgeClose", L["Blackout"], 0, 3, 0.1, "%.1f sec", 1,
-			L["How long before the cast ends the black takes over the whole screen. 0: it doesn't."] },
+			L["How long before the cast ends the screen goes fully black; 0 turns it off."] },
 	}) do
 		local slider = stack:Add(kit.Slider(content, info[1], info[2], info[3], info[4], info[5], info[6], info[7],
 			Changed), "slider")
 		kit.Tooltip(slider, info[8])
 		kit.GreyUnless(slider, Edges)
 	end
-	rows.Check("teleportVisionHideCast", L["Fade out your cast bar"], L["Your cast bar fades out over the " ..
-		"first 3 seconds of the cast, so you see it start, then the portal closing in is its progress. Other " ..
-		"casts show it as usual."], On)
-	rows.Check("teleportVisionFadeTooltip", L["Fade out the tooltip"], L["The tooltip fades out over the " ..
-		"first 3 seconds of the cast too, and comes back as the cast ends or is cancelled."], On)
+	rows.Check("teleportVisionHideCast", L["Fade out your cast bar"], L["Fades out your cast bar early in the cast, so the portal shows its progress."], On)
+	rows.Check("teleportVisionFadeTooltip", L["Fade out the tooltip"], L["Fades out the tooltip while you cast."], On)
 	rows.Check("teleportVisionMotes", L["Motes spiraling in"], L["Motes of its color winding in from the rim."],
 		On)
 

@@ -22,9 +22,7 @@ function ns.CreateRollStylePanel(kit)
 	local title = kit.Label(content, "GameFontNormalLarge", L["Roll Vision"])
 	ns.RollTabs(content, title, 2)
 	local intro = kit.PageIntro(content, title,
-		L["How the window of the group's loot rolls looks: its cards, the bar for the time left, and each " ..
-		"player's pick and number. Turning it on: the Vision tab. Changes show at once, " ..
-		"here and on the window."])
+		L["How the group loot roll window looks."])
 
 	local preview -- (below: drawn again as each setting changes)
 	local function Changed()
@@ -33,8 +31,7 @@ function ns.CreateRollStylePanel(kit)
 	end
 
 	local switch = kit.PageSwitch(content, "rollStyle", L["Enable Page"],
-		L["On: the window looks as this page says. Off: as Roll Vision has always looked. Each setting " ..
-		"keeps its value for when you turn this back on."], intro, Changed)
+		L["On: the window looks as this page says; off: Roll Vision's usual look."], intro, Changed)
 	local stack = kit.Stack(switch, "check")
 	local rows = ns.StyleRows(kit, content, stack, Changed, "rollStyle")
 
@@ -46,8 +43,7 @@ function ns.CreateRollStylePanel(kit)
 
 	-- The real window, with made-up drops (the Roll Vision page's test). (Works
 	-- with the page off too: to see the look it goes back to.)
-	local test = ns.StylePreviewTest(preview, kit, L["Brings up the window with three made-up drops, your " ..
-		"group picking and rolling on them over a few seconds. Change things here while it's up to see them."],
+	local test = ns.StylePreviewTest(preview, kit, L["Shows the window with three made-up drops so you can see your changes."],
 		function() ns.TestRollWindow() end)
 	test.Refresh = function(self) self:SetEnabled(ns.GetDB().rollWindow and true or false) end
 
@@ -88,8 +84,7 @@ function ns.CreateRollStylePanel(kit)
 
 	stack:Header(content, L["Time left"])
 	rows.Look(L["Look:"], L["Time left"], {
-		texture = { "rollBarTexture", L["The bar's fill. Below the game's own few: any other addon shares " ..
-			"(through LibSharedMedia)."], label = L["Bar texture:"], tint = { 1, 0.82, 0 }, game = L["Flat"] },
+		texture = { "rollBarTexture", L["The bar's fill, including textures other addons share."], label = L["Bar texture:"], tint = { 1, 0.82, 0 }, game = L["Flat"] },
 		barColor = function(look)
 			look.Swatch(look.Choices(L["Bar color:"], "rollBarColor", {
 				{ "quality", L["The item's quality"] },
@@ -114,8 +109,7 @@ function ns.CreateRollStylePanel(kit)
 	rows.Color(L["Transmog"], { "rollTransmogR", "rollTransmogG", "rollTransmogB" },
 		L["Pick Transmog's color."], Words)
 	rows.Check("rollNumbers", L["Their numbers, once the rolls are shown"],
-		L["Each player's number at the end of their row once the game reveals the rolls. Unticked: just " ..
-		"who won."])
+		L["Shows each player's roll number once the game reveals the rolls."])
 
 	stack:Header(content, L["Winner"])
 	local function Marked(db) return rows.On(db) and db.rollWinner ~= "plain" end

@@ -702,8 +702,7 @@ function ns.CreatePersonalStylePanel(kit)
 	local tabs = ns.PageTabs(content, ns.ShowInTabs("units"), ns.ShowInIndex("units", "Personal Style"))
 	title:SetPoint("TOPLEFT", tabs, "BOTTOMLEFT", 8, -14)
 	local intro = kit.PageIntro(content, title,
-		L["How the personal resource display under your character looks: its health and power bars, and " ..
-		"your class resource. When the bars come up: the Unit Frames page."])
+		L["How the personal resource display under your character looks."])
 
 	local preview -- (below: drawn again as each setting changes)
 	local function Changed()
@@ -712,8 +711,7 @@ function ns.CreatePersonalStylePanel(kit)
 	end
 
 	local switch = kit.PageSwitch(content, "prdStyle", L["Enable Page"],
-		L["On: the bars look as this page says. Off: the game's own (the preview shows that too). Each " ..
-		"setting keeps its value for when you turn this back on."], intro, Changed)
+		L["On: the bars look as this page says; off: the game's own look."], intro, Changed)
 	local stack = kit.Stack(switch, "check")
 	local rows = ns.StyleRows(kit, content, stack, Changed, "prdStyle")
 
@@ -751,8 +749,7 @@ function ns.CreatePersonalStylePanel(kit)
 		inline = true,
 		tabs = { default = function(key) return ns.DEFAULTS[key] end, source = Source,
 			copyKind = "prdLook", copyName = L["Personal resource bars"] },
-		texture = { "prdTexture", L["The bars' fill. Below the game's own few: any other addon shares (through " ..
-			"LibSharedMedia)."], tint = { 0.25, 0.75, 0.3 } },
+		texture = { "prdTexture", L["The bars' fill, including textures other addons share."], tint = { 0.25, 0.75, 0.3 } },
 		barColor = function(look)
 			look.Choices(L["Health:"], "prdHealthColor", {
 				{ "game", L["The game's"] },
@@ -806,7 +803,7 @@ function ns.CreatePersonalStylePanel(kit)
 			look.Slider("prdPowerHeight", L["Power height"], 0, 100, 5, "%d%%", 100,
 				L["The power bar's height, next to the game's."])
 			look.Slider("prdPiecesScale", L["Class resource"], 0, 100, 5, "%d%%", 100,
-				L["How big your class resource is (combo points, holy power, runes and the like), next to the game's."])
+				L["How big your class resource is, next to the game's size."])
 			if ns.PERSONAL_MANA then
 				look.Slider("prdManaHeight", L["Mana height"], 0, 100, 5, "%d%%", 100,
 					L["The mana bar's height, next to the power bar's."], ManaOn)

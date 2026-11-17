@@ -968,8 +968,7 @@ function ns.CreateActionBarStylePanel(kit)
 	local tabs = ns.PageTabs(content, ns.ShowInTabs("bars"), ns.ShowInIndex("bars", "Action Style"))
 	title:SetPoint("TOPLEFT", tabs, "BOTTOMLEFT", 8, -14)
 	local intro = kit.PageIntro(content, title,
-		L["How the game's action buttons look: their outline, their shape and the background of empty slots. " ..
-		"Other addons' bars keep their own look, and the game's do too with Dominos or Masque on."])
+		L["How the game's action buttons look."])
 
 	local preview -- (below: drawn again as each setting changes)
 	local function Changed()
@@ -978,8 +977,7 @@ function ns.CreateActionBarStylePanel(kit)
 	end
 
 	local switch = kit.PageSwitch(content, "abStyle", L["Enable Page"],
-		L["On: action buttons look as this page says. Off: the game's own (the preview shows that too). Each " ..
-		"setting keeps its value for when you turn this back on."], intro, Changed)
+		L["Turns this page's action button look on or off."], intro, Changed)
 	local stack = kit.Stack(switch, "check")
 	local rows = ns.StyleRows(kit, content, stack, Changed, "abStyle")
 
@@ -1003,11 +1001,9 @@ function ns.CreateActionBarStylePanel(kit)
 				{ "square", L["Square"], L["Square icons with their edges trimmed."] },
 				{ "round", L["Round"], L["Round icons, with the cooldown sweep and the highlights round too."] },
 			})
-			look.Check("abSlots", L["Empty slot background"], L["The game's background on empty action slots. Off: " ..
-				"only empty space shows there. Classic clients draw part of it on the bar's art, which stays."])
+			look.Check("abSlots", L["Empty slot background"], L["Shows the game's background on empty action slots."])
 		end,
-		border = { "abEdge", L["The line around each button. Thin and Thick are black. With the game's shape only " ..
-			"the game's outline fits, so any other outline makes the buttons square."], label = L["Outline:"],
+		border = { "abEdge", L["The outline around each action button."], label = L["Outline:"],
 			opts = { game = true, colored = L["Class color"] } },
 	})
 

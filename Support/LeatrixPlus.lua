@@ -41,8 +41,6 @@ table.insert(ns.ADDON_FRAMES, {
 	key = "leatrixFlightBar", addon = "Leatrix_Plus",
 	label = "Leatrix Plus flight bar", short = "Leatrix flight bar",
 	about = L["its flight progress bar (Show flight times)"],
-	note = L["Its square minimap's header bar follows the Minimap header row on the HUD page, " ..
-		"and its minimap button bag the Addon buttons row."],
 	match = function(frame)
 		return type(frame.track) == "table" and type(frame.dest) == "table" and type(frame.time) == "table"
 			and type(frame.edges) == "table" and frame.spark ~= nil

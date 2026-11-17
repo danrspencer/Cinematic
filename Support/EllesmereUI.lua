@@ -47,13 +47,11 @@ end
 -- starts with: ns.SplitAddonRows. bar: a bar row for the built-in profiles'
 -- modules.)
 local rows = {}
-for i, bar in ipairs({ 6, 7, 8, 9, 10 }) do
+for _, bar in ipairs({ 6, 7, 8, 9, 10 }) do
 	rows[#rows + 1] = {
 		key = "euiBar" .. bar, from = "euiBars", addon = "EllesmereUIActionBars", bar = true,
 		label = "EllesmereUI Action Bar " .. bar, short = "EllesmereUI bar " .. bar,
 		about = L["its action bar %d"]:format(bar),
-		note = i == 1 and L["Its bars 1-5, pet, stance and XP bars are rows on the HUD page, " ..
-			"with its unit frames and quest tracker."] or nil,
 		names = { "EABBar_Bar" .. bar },
 	}
 end
@@ -175,10 +173,7 @@ end
 table.insert(ns.ADDON_NOTES, {
 	addon = "EllesmereUIUnitFrames", label = "Unit Frames",
 	works = L["Follow the HUD page's rows"],
-	about = L["Its player, target, target of target and focus frames fade with the Player frame, Target, " ..
-		"Target of target and Focus rows on the HUD page, its party frames with Party frames and its " ..
-		"raid frames with Players. " ..
-		"Set when they come back, or tick Always, there. Hover Find leaves them out and says which row."],
+	about = L["Its unit frames fade with the matching rows on the HUD page."],
 })
 
 -- The core: its visibility pass sets its frames' alpha (and some of the
@@ -520,9 +515,7 @@ ns.AddFeatureYield("cooldownDefaults", CooldownsTheirs)
 table.insert(ns.ADDON_NOTES, {
 	addon = "EllesmereUIResourceBars", label = "Resource Bars",
 	works = L["Follow the HUD page's rows"],
-	about = L["Its health bar fades with the Personal health bar row on the HUD page, its power bar and " ..
-		"class resource with Personal resource bar, and its swing timer with Swing timer. Its cast bar " ..
-		"isn't faded, like the game's."],
+	about = L["Its resource bars fade with the matching personal bar rows on the HUD page."],
 })
 
 ns.WhenAddonLoads("EllesmereUIResourceBars", function()

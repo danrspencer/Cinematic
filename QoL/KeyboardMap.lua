@@ -1271,10 +1271,8 @@ local function CreateBoard()
 		return tick
 	end
 	board.numpad = TopTick("kbNumpad", L["Numpad"], L["Show the numpad, at the right of the keyboard."], search)
-	board.hideUnbound = TopTick("kbHideUnbound", L["Hide unbound"], L["Keys with nothing bound to them " ..
-		"(with the modifiers shown) aren't drawn. The keyboard keeps its shape."], board.numpad)
-	board.hideEmpty = TopTick("kbHideEmpty", L["Hide empty"], L["Keys bound to an action button with nothing " ..
-		"on it aren't drawn. The keyboard keeps its shape."], board.hideUnbound)
+	board.hideUnbound = TopTick("kbHideUnbound", L["Hide unbound"], L["Hides keys with nothing bound to them."], board.numpad)
+	board.hideEmpty = TopTick("kbHideEmpty", L["Hide empty"], L["Hides keys bound to empty action buttons."], board.hideUnbound)
 	board.hint = NoShadow(board:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall"))
 	board.hint:SetPoint("BOTTOMRIGHT", -PAD - 14, 7) -- (clear of the size grip)
 	board.hint:SetText(L["Drag to move. Click Shift, Ctrl or Alt to keep them down. Drop a spell on a key to bind it."])
@@ -1525,10 +1523,7 @@ function ns.CreateKeyboardMapPage(kit)
 	local canvas, content = kit.CreateScrollPage()
 	local title = kit.Label(content, "GameFontNormalLarge", L["Keyboard Map"])
 	title:SetPoint("TOPLEFT", 16, -16)
-	local intro = kit.PageIntro(content, title, L["Your keyboard on screen: what each key does, with your action " ..
-		"buttons' icons and cooldowns. Hold Shift, Ctrl or Alt (or click them on the map) to see those keys' other " ..
-		"bindings. Hold its key to peek, or tap it to keep the map up. It only shows your keys: place spells on " ..
-		"your action bars and set keys in the game's Key Bindings."])
+	local intro = kit.PageIntro(content, title, L["Your keyboard on screen, showing what each key does."])
 	local stack = kit.Stack(intro, "label")
 
 	local function Changed() ns.KeyboardMapChanged() end
@@ -1560,16 +1555,14 @@ function ns.CreateKeyboardMapPage(kit)
 	end, 200, Changed)
 	if layoutMenu then
 		layoutMenu:SetPoint("LEFT", layoutName, "RIGHT", 4, 0)
-		kit.Tooltip(layoutMenu, L["Which keyboard to draw. Auto goes by your game's language: German, UK English, " ..
-			"or US for the rest."])
+		kit.Tooltip(layoutMenu, L["Which keyboard layout to draw."])
 	end
 	local function Tick(key, label, tip)
 		local check = stack:Add(kit.Check(content, key, label, tip), "check")
 		check:HookScript("OnClick", Changed)
 		return check
 	end
-	Tick("kbExtended", L["Show navigation and arrow keys"], L["Insert, Home, Page Up and the rest, the arrow " ..
-		"keys and Print Screen, at the right. The numpad has its own tick on the map's top bar."])
+	Tick("kbExtended", L["Show navigation and arrow keys"], L["Shows the navigation and arrow keys to the right."])
 	Tick("kbMouse", L["Show mouse buttons"], L["The middle button, buttons 4 and 5 and the wheel, at the right."])
 	Tick("kbRound", L["Round keys"], L["Round keys and icons, each at the left of a wide key's space."])
 	-- (Key size: the map as it makes it again, not stretched.)
@@ -1583,14 +1576,10 @@ function ns.CreateKeyboardMapPage(kit)
 	stack:Add(kit.Slider(content, "kbTextScale", L["Text size"], 70, 160, 5, "%d%%", 100, Changed), "slider")
 
 	stack:Header(content, L["Keys"])
-	Tick("kbHideUnbound", L["Hide unbound keys"], L["Keys with nothing bound to them aren't drawn (with the " ..
-		"modifiers shown). The keyboard keeps its shape."])
-	Tick("kbHideEmpty", L["Hide keys bound to empty action buttons"], L["Keys bound to an action button with " ..
-		"nothing on it aren't drawn. The keyboard keeps its shape."])
-	Tick("kbHideCommands", L["Hide keys bound to menus and movement"], L["Only keys bound to action buttons " ..
-		"are drawn: not moving, targeting, windows or other commands. The keyboard keeps its shape."])
-	Tick("kbSplitWords", L["Split long names over two lines"], L["A one-word name too wide for its key " ..
-		"(Screenshot, Professions) goes over two lines instead of being cut off."])
+	Tick("kbHideUnbound", L["Hide unbound keys"], L["Hides keys with nothing bound to them."])
+	Tick("kbHideEmpty", L["Hide keys bound to empty action buttons"], L["Hides keys bound to empty action buttons."])
+	Tick("kbHideCommands", L["Hide keys bound to menus and movement"], L["Shows only keys bound to action buttons."])
+	Tick("kbSplitWords", L["Split long names over two lines"], L["Wraps long one-word key names onto two lines."])
 
 	-- Colors: a dropdown of colors for each kind of key, and a swatch for your own.
 	stack:Header(content, L["Colors"])

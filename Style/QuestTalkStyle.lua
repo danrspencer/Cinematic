@@ -16,9 +16,7 @@ function ns.CreateQuestTalkStylePanel(kit)
 	local title = kit.Label(content, "GameFontNormalLarge", L["Dialogue"])
 	ns.QuestTabs(content, title, 2)
 	local intro = kit.PageIntro(content, title,
-		L["NPC dialogue, and how it looks: the panels behind the NPC's words, your replies and the quest's card, " ..
-		"and the words themselves. Where it sits: the Vision tab. Changes show at once, " ..
-		"here and on a conversation going on."])
+		L["How NPC dialogue looks."])
 
 	local preview -- (below: drawn again as each setting changes)
 	local function Changed()
@@ -27,8 +25,7 @@ function ns.CreateQuestTalkStylePanel(kit)
 	end
 
 	local switch = kit.PageSwitch(content, "questTalkStyled", L["Enable Page"],
-		L["On: the dialogue looks as this page says. Off: parchment, in the game's fonts (the preview shows " ..
-		"that too). Each setting keeps its value for when you turn this back on."], intro, Changed)
+		L["On: the dialogue looks as this page says; off: the game's parchment."], intro, Changed)
 	local stack = kit.Stack(switch, "check")
 	local rows = ns.StyleRows(kit, content, stack, Changed, "questTalk")
 
@@ -54,27 +51,21 @@ function ns.CreateQuestTalkStylePanel(kit)
 		end,
 	})
 	rows.Check("questTalkCardSame", L["Quest card on the bubble's background"],
-		L["The quest card and the list of replies have the bubble's look instead of their own dark one, " ..
-		"their words in colors that suit it."])
+		L["Gives the quest card and reply list the bubble's look."])
 	rows.Check("questTalkPortrait", L["The NPC's portrait"],
-		L["Their portrait, round, on the bubble's top left corner, as on the game's quest window. Not " ..
-		"for a quest from an item, with nobody to show."])
+		L["Shows the NPC's round portrait on the bubble's top left corner."])
 
 	stack:Header(content, L["Size"])
 	rows.Slider("questTalkScale", L["Scale"], 70, 150, 5, "%d%%", 100,
 		L["The size of the bubble and the list as a whole (their words grow with them)."])
 	rows.Slider("questTalkLines", L["Bubble height"], 3, 15, 1, L["%d lines"], 1,
-		L["How many lines of their words the bubble holds. It's always this tall, however little is on the " ..
-		"page; more words go on the next page."])
+		L["How many lines of words the bubble holds."])
 
 	-- Where the quest card and the list sit (where the bubble does: the Quest
 	-- Vision page's Where they go).
 	stack:Header(content, L["Layout"])
-	local SIDE_TIP = L["Where the quest card (the objective, rewards and buttons, or the list of replies) " ..
-		"goes beside the bubble. Below: right under it, as wide as it (over a head, the bubble moves up to make room). Side: " ..
-		"with Opposite clicked, on the bubble's outer side (away from the middle of the screen), else on " ..
-		"the right. Right or Left: always that side. Beside it, it's as tall as the bubble."] .. " " ..
-		L["Separate: the card stays where you drag it (or at the list's height), wherever the bubble goes."]
+	local SIDE_TIP = L["Where the quest card goes next to the bubble."] .. " " ..
+		""
 	local function SideOn(db) return db.questTalk end
 	local side = kit.Dropdown(content, "questTalkCardSide", {
 		{ value = "below", text = L["Below"] },
@@ -97,8 +88,7 @@ function ns.CreateQuestTalkStylePanel(kit)
 	end
 	local listLine = stack:Add(kit.BoxLine(content), "label")
 	local listY = listLine:Box(L["List height on the screen"], "questTalkListY", 20, 80, 1, "%d", 100,
-		L["How far up the screen the list of replies starts: its top edge, from the bottom of the screen. " ..
-		"Changing this also forgets where you dragged the list to."], function()
+		L["How far up the screen the list of replies starts."], function()
 			ns.GetDB().questTalkSpot = nil -- (the box decides again)
 			Changed()
 		end, nil, "%")
@@ -107,8 +97,7 @@ function ns.CreateQuestTalkStylePanel(kit)
 
 	stack:Header(content, L["Words"])
 	rows.Look(L["Look:"], L["Words"], {
-		font = { "questTalkFont", L["The game's: each part in its own (the quest window's for the words). Russian, " ..
-			"Korean or Chinese text keeps the game's, so its letters show."] },
+		font = { "questTalkFont", L["The font for the words."] },
 		textSize = function(look)
 			look.Slider("questTalkTextSize", L["Text size"], 70, 150, 5, "%d%%", 100,
 				L["How big the words are, next to their usual size."])
@@ -133,12 +122,9 @@ function ns.CreateQuestTalkStylePanel(kit)
 		end), "check")
 	end
 	Control("questTalkGameButton", L["\"Show the game's window\" link"],
-		L["A small link at the bottom of the quest card that brings back the game's own quest window for the " ..
-		"rest of that conversation (for a long quest text, or to read it the usual way)."])
+		L["Adds a link on the quest card that brings back the game's quest window."])
 	Control("questTalkKeys", L["Number keys and Space"],
-		L["1 to 9 and 0 pick from the list, as numbered. Space shows the next paragraph, and on the last " ..
-		"one does the card's first button (Accept, Continue, Complete Quest). Only keys that do something " ..
-		"there are held back from your action bars, and none in a fight."])
+		L["Number keys pick a reply and Space moves on, outside fights."])
 
 	canvas:SetScript("OnShow", kit.PageShown(kit.Refresh, content))
 	canvas:Hide()

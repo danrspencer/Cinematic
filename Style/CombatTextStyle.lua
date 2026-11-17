@@ -764,9 +764,7 @@ function ns.CreateCombatTextStylePanel(kit)
 	local title = kit.Label(content, "GameFontNormalLarge", L["Combat Text Style"])
 	title:SetPoint("TOPLEFT", 16, -16)
 	local intro = kit.PageIntro(content, title,
-		L["Damage and healing numbers of our own over nameplates, drawn to look like the game's, and the game's " ..
-		"own floating text turned off. The game draws its XP gains (\"XP: 35\") in the same font as its damage " ..
-		"numbers, so the only way to hide the XP is to hide all of its text and show ours instead."])
+		L["Shows damage and healing numbers of our own in place of the game's."])
 
 	-- An Experimental notice (not a gate: it doesn't stop the page working):
 	-- a skull (the raid marker's: on every client) and a red Experimental.
@@ -786,7 +784,7 @@ function ns.CreateCombatTextStylePanel(kit)
 
 	local function Changed() ns.RefreshCombatTextStyle() end
 	local switch = kit.PageSwitch(content, "combatTextStyle", L["Enable Page"],
-		L["On: this page's settings take hold. Off: the game's own floating text, as it was."], warnText, Changed)
+		L["Turns this page's combat text on or off."], warnText, Changed)
 	local stack = kit.Stack(switch, "check")
 	local rows = ns.StyleRows(kit, content, stack, Changed, "combatTextStyle")
 	local function Ours(db) return rows.On(db) and db.combatTextNumbers end
@@ -820,20 +818,18 @@ function ns.CreateCombatTextStylePanel(kit)
 			end)
 		end
 	end
-	ns.StylePreviewTest(preview, kit, L["Plays a few hits on the nameplate: a spell's, a swing's, a crit, " ..
-		"two landing together and a miss, with this page's look."], Play)
+	ns.StylePreviewTest(preview, kit, L["Plays a few sample hits on the nameplate."], Play)
 
 	stack:Header(content, L["Our numbers"])
 	rows.Check("combatTextNumbers", L["Show your damage and healing over nameplates"],
-		L["Our own numbers: your hits on the nameplate of what you hit, your heals on a friend's. They take " ..
-		"the game's place when its text is off below."])
+		L["Shows your own damage and healing numbers over nameplates."])
 	rows.Check("combatTextHeals", L["Your heals on friends"], L["Heals on friendly nameplates, in green."], Ours)
 	rows.Check("combatTextMisses", L["Misses"], L["Miss, Dodge, Parry, Immune and the like, in the game's words."],
 		Ours)
 	rows.Check("combatTextCritPop", L["Crits pop"],
 		L["A crit grows big for a moment and settles a little bigger than a hit, as the game's do."], Ours)
 	rows.Check("combatTextSchoolColors", L["Spells in their school's color"],
-		L["Fire orange, frost blue, nature green and so on. Off: spells in the game's yellow, swings in white."],
+		L["Colors spell numbers by their school, like fire orange."],
 		Ours)
 
 	-- The numbers' look, on the page itself (the Style pages' template,
@@ -843,13 +839,13 @@ function ns.CreateCombatTextStylePanel(kit)
 		inline = true,
 		tabs = { default = function(key) return ns.DEFAULTS[key] end, source = ns.PageLookSource,
 			copyKind = "combatTextLook", copyName = L["Our numbers"] },
-		font = { "combatTextFont", L["The numbers' font. The game's: the one it draws its own floating text in."],
+		font = { "combatTextFont", L["The font for the numbers."],
 			test = Ours }, -- (its list starts with The game's: "game")
 		textSize = function(look)
 			look.Slider("combatTextSize", L["Size"], 50, 200, 5, "%d%%", 100,
 				L["How big the numbers are, next to the game's."], Ours)
 			look.Slider("combatTextHeight", L["Height"], -40, 80, 2, "%d px", nil,
-				L["Moves the numbers up (or down) from where the game's start: level with the nameplate's name."], Ours)
+				L["Moves the numbers up or down."], Ours)
 		end,
 		shadow = function(look)
 			look.Choices(L["Edge:"], "combatTextEdge", {
@@ -864,15 +860,9 @@ function ns.CreateCombatTextStylePanel(kit)
 
 	stack:Header(content, L["The game's floating text"])
 	rows.Check("combatTextHideGame", L["Turn off the game's damage and healing numbers"],
-		L["The game's own numbers over what you hit and heal, off at once while this page is on, and back as " ..
-		"they were when it's off, or when you log out (so turning Cinematic off brings them back). Its XP " ..
-		"gains stay: for those, the next one."])
+		L["Turns off the game's damage and healing numbers while this page is on."])
 	local all = rows.Check("hideWorldText", L["Hide all the game's floating text, XP too (restart required)"],
-		L["The game has no way to hide just the XP you gain: it draws that, its damage and healing numbers, " ..
-		"misses and the like all in one font. This blanks that font, so they all go, always. Takes effect " ..
-		"after you fully restart the game; /reload isn't enough.\n\nTo get the game's text back, untick this " ..
-		"(or turn this page or Cinematic off) and fully restart the game again: until then it stays hidden, " ..
-		"even with Cinematic turned off."])
+		L["Hides all the game's floating text, XP too; needs a full game restart."])
 	all:HookScript("OnClick", function() StaticPopup_Show("CINEMATIC_WORLD_TEXT_RESTART") end)
 
 	canvas:SetScript("OnShow", kit.PageShown(kit.Refresh, content))

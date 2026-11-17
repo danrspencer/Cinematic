@@ -22,9 +22,7 @@ local L = ns.L
 table.insert(ns.ADDON_NOTES, {
 	addon = "Plater", label = "Plater",
 	works = L["Follows the Nameplates page"],
-	about = L["Plater's nameplates fade in CineMode and follow the Nameplates page's rows. Plater can " ..
-		"change the game's nameplate settings itself (at login, and with its auto toggles); " ..
-		"Cinematic puts its own back afterwards."],
+	about = L["Plater's nameplates fade in CineMode and follow the Nameplates page."],
 })
 
 -- The game's settings that pick which plates show: one of these changed by a
