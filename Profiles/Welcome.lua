@@ -955,6 +955,16 @@ function ns.CustomizePanel(parent, width, onChange, skinned)
 	end
 	function holder:IsLast() return shown.index >= #SECTIONS end
 	function holder:SettingsPage() return shown and shown.page end
+	-- (Taller, to fill the room it has: the Profiles page's Customize tab
+	-- reaches the bottom of the window. Never less than it's made.)
+	function holder:SetPanelHeight(height)
+		height = math.max(360, math.floor(height))
+		if height == PANEL_H then return end
+		PANEL_H = height
+		holder:SetHeight(height)
+		panel:SetHeight(height)
+		if shown then Show(shown.index, true) end
+	end
 	rows = {}
 	for i, section in ipairs(SECTIONS) do
 		section.index = i

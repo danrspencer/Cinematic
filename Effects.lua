@@ -412,6 +412,33 @@ ns.selfHighlightCVars = ns.CVarSet("Self highlight off", "CineMode, unless its H
 	playerWins = true,
 	values = { findYourselfAnywhere = "0", findYourselfInRaid = "0", findYourselfInBG = "0" },
 })
+-- Your Self Highlight choice in the game's options, as its dropdown names it
+-- (nil: the client has none), for the HUD Highlight row. Clients with an Icon
+-- choice keep one on/off setting per part (findYourselfModeCircle, Outline,
+-- Icon); Off turns them all off and findYourselfAnywhere too (Forever, tested
+-- 2026-11-17). Older ones: findYourselfMode 0 circle, 1 outline, 2 both.
+-- Read from the value saved while CineMode holds a setting.
+function ns.SelfHighlightChoice()
+	local saved = ns.db and ns.db.savedCVars or {}
+	local function Yours(cvar)
+		local value = saved[cvar]
+		if value == nil then value = GetCVar(cvar) end
+		return value
+	end
+	if Yours("findYourselfAnywhere") == nil then return nil end
+	local on = Yours("findYourselfAnywhere") ~= "0"
+	local parts = {}
+	if Yours("findYourselfModeCircle") ~= nil then
+		if Yours("findYourselfModeCircle") == "1" then parts[#parts + 1] = L["Circle"] end
+		if Yours("findYourselfModeOutline") == "1" then parts[#parts + 1] = L["Outline"] end
+		if Yours("findYourselfModeIcon") == "1" then parts[#parts + 1] = L["Icon"] end
+	elseif on then
+		local mode = Yours("findYourselfMode")
+		parts = mode == "1" and { L["Outline"] } or mode == "2" and { L["Circle"], L["Outline"] } or { L["Circle"] }
+	end
+	if not on or #parts == 0 then return L["Off"], true end
+	return table.concat(parts, " + ")
+end
 
 -- Whether you were PvP flagged as the fight now under way started: names
 -- can't change mid-fight, so In PvP combat names go by that.

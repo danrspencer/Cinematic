@@ -1017,6 +1017,13 @@ local function PaintHeaderSwitch(toggle)
 	toggle.text:SetTextColor(1, 1, 1, held and 0.4 or 1)
 	toggle:SetEnabled(not held)
 end
+-- A page's frames' Style page, by the page's id: a palette by its switch
+-- (ns.StyleIcon): pages without tabs. Tabbed pages: after their tabs (ns.PageTabs);
+-- the HUD's sections: SECTION_STYLES.
+local PAGE_STYLES = {
+	["Visions General"] = "Visions Style", ["Vitals Vision"] = "Vitals Style",
+	["Quest Vision"] = "Quest Talk Style", ["Roll Vision"] = "Roll Style",
+}
 local function MakeHeaderSwitch(content, switch)
 	-- (switch.at: { parent, anchor }, a part of a page with its own switch, by
 	-- its heading: the HUD's sections, 2026-11-17. switch.tip: its tooltip.)
@@ -1064,6 +1071,15 @@ local function MakeHeaderSwitch(content, switch)
 	if link and link.linkTitle == content.pageTitle then
 		link:ClearAllPoints()
 		link:SetPoint("LEFT", toggle, "RIGHT", 8, 0)
+	else
+		link = nil
+	end
+	-- (A palette past them to the page's Style page, 2026-11-17: on the
+	-- switch, hidden with it.)
+	local canvas = content:GetParent() and content:GetParent():GetParent()
+	local stylePage = PAGE_STYLES[canvas and canvas.pageName or ""]
+	if stylePage then
+		ns.StyleIcon(toggle, link or toggle, stylePage, Tooltip)
 	end
 	switch.header = toggle
 	content.pageHeaderSwitch = toggle -- (for pages in other files: shown or not as their part says)
@@ -1224,6 +1240,15 @@ local function Dropdown(parent, key, choices, width, onChange)
 		end
 	end)
 	dropdown.Refresh = function(self) self:GenerateMenu() end
+	-- (/cine debug sweep, Dev/Sweep.lua: its choices, its setting now, and a
+	-- pick as clicking a choice in its menu does.)
+	dropdown.sweepChoices = choices
+	dropdown.sweepGet = function() return KeyGet(key) end
+	dropdown.sweepPick = function(value)
+		KeyPut(key, value)
+		if onChange then onChange(value) end
+		Refresh()
+	end
 	controls[#controls + 1] = dropdown
 	RecordKey(parent, key)
 	Remember(dropdown, key, function(where, changed)
@@ -1387,6 +1412,35 @@ local function CreateScrollPage(noReset)
 	scroll:SetScript("OnSizeChanged", function(_, width)
 		content:SetWidth(width)
 	end)
+	-- The mouse wheel glides the page (2026-11-17), WHEEL_STEP a notch (the
+	-- game's own, half the view, took a short page top to bottom in one notch,
+	-- 2026-11-17); notches in a row add up. Moved by anything else meanwhile
+	-- (its bar dragged, a page opened at its top): stopped.
+	local WHEEL_STEP = 60
+	do
+		local glide = CreateFrame("Frame", nil, scroll)
+		local goal, last
+		local function Stop()
+			goal = nil
+			ns.SetOnUpdate(glide, nil)
+		end
+		local function Step(_, elapsed)
+			local now = scroll:GetVerticalScroll()
+			if not goal or math.abs(now - last) > 0.5 then return Stop() end
+			local nextY = now + (goal - now) * math.min(1, elapsed * 14)
+			if math.abs(goal - nextY) < 0.5 then nextY = goal end
+			scroll:SetVerticalScroll(nextY)
+			last = nextY
+			if nextY == goal then Stop() end
+		end
+		scroll:SetScript("OnMouseWheel", function(self, delta)
+			local now = self:GetVerticalScroll()
+			local from = (goal and math.abs(now - last) <= 0.5) and goal or now
+			goal = math.max(0, math.min(self:GetVerticalScrollRange(), from - delta * WHEEL_STEP))
+			last = now
+			ns.SetOnUpdate(glide, Step)
+		end)
+	end
 	-- Every page gets a "Reset page" button, top right; it scrolls away with
 	-- the top of the page (left in place, the settings scrolled under it), and
 	-- goes on a page with no settings of its own.
@@ -3011,6 +3065,14 @@ do
 		end
 		hub.current = tile
 		Light(Lit(tile), true)
+		-- (The tab last open under each icon: its icon and left list line open
+		-- that one again, not the first (ns.LastHubTab), after a reload too:
+		-- db.hubLastTab, the account's. 2026-11-17.)
+		local db = ns.db
+		if db then
+			db.hubLastTab = db.hubLastTab or {}
+			db.hubLastTab[Lit(tile).english] = tile ~= Lit(tile) and tile.english or nil
+		end
 		-- (A collapsed hub's bands open and close by the page picked: laid out again.)
 		if hub.collapse then Layout(hub) end
 		PaintBands(hub)
@@ -3027,6 +3089,15 @@ do
 		ns.EndPageRun(run)
 		-- (Its line in the left list lit, its groups open: menu.MarkLine.)
 		if menu.MarkLine then menu.MarkLine(hub.name, tile.english, tile.tabOf) end
+	end
+
+	-- The tab last open under an icon (db.hubLastTab, Select), or the icon's
+	-- own; a saved tab no longer under it (renamed, moved) ignored.
+	function ns.LastHubTab(icon)
+		local saved = ns.db and ns.db.hubLastTab and ns.db.hubLastTab[icon.english]
+		local tab = saved and byName[saved]
+		if tab and tab ~= icon and Lit(tab) == icon then return tab end
+		return icon
 	end
 
 	-- (made when its first page comes, so it's listed where that page would be)
@@ -3080,6 +3151,8 @@ do
 		hub.searchPages = {}
 		local box = CreateSearch(frame, frame, hub.searchPages)
 		box:SetPoint("RIGHT", reset, "LEFT", -12, 0)
+		-- (A Style preview held over the icons as you scroll stops left of it.)
+		frame.hubSearch = box
 		frame:SetScript("OnSizeChanged", function() Layout(hub) end)
 		frame:SetScript("OnShow", function()
 			Layout(hub)
@@ -3210,6 +3283,7 @@ do
 		bg:SetPoint("TOPLEFT", 1, -1)
 		bg:SetPoint("BOTTOMRIGHT", -1, 1)
 		bg:SetColorTexture(0.16, 0.04, 0.03, 0.85)
+		card.edge, card.bg = edge, bg -- (blue for the game's own option off: PaintOffCard)
 		card.icon = box:CreateTexture(nil, "ARTWORK")
 		card.icon:SetSize(32, 32)
 		card.icon:SetPoint("LEFT", 12, 0)
@@ -3268,9 +3342,18 @@ do
 		end
 		card = card or CreateOffCard(hub)
 		card.icon:SetTexture(tile.icon:GetTexture())
+		-- (Red: our page's switch off. Blue: the game's own option off, so the
+		-- two don't look alike. 2026-11-17.)
+		if game then
+			card.edge:SetColorTexture(0.16, 0.38, 0.66, 0.7)
+			card.bg:SetColorTexture(0.03, 0.08, 0.17, 0.85)
+		else
+			card.edge:SetColorTexture(0.55, 0.16, 0.12, 0.7)
+			card.bg:SetColorTexture(0.16, 0.04, 0.03, 0.85)
+		end
 		if game then
 			local name = L[game.name]
-			card.title:SetText("|cffff5a40" .. L["The game's %s is off"]:format(name) .. "|r")
+			card.title:SetText("|cff5ab4ff" .. L["The game's %s is off"]:format(name) .. "|r")
 			card.text:SetText(card.failed == game.cvar and L["Couldn't turn it on right now; try again after the fight."]
 				or L["Turn it on to see and change its settings."])
 			card.button:SetText(L["Turn on %s"]:format(name))
@@ -3381,7 +3464,7 @@ do
 		-- (Right-click: its page's switch flipped, the page left as it is.)
 		tile:RegisterForClicks("LeftButtonUp", "RightButtonUp")
 		tile:SetScript("OnClick", function(self, button)
-			if button ~= "RightButton" then return Select(self) end
+			if button ~= "RightButton" then return Select(ns.LastHubTab(self)) end
 			local switch = TileSwitch(self, true)
 			if not switch then return end
 			FlipSwitch(switch)
@@ -3544,7 +3627,9 @@ do
 						-- it, a band's line staying lit.)
 						local was = menu.selecting
 						menu.selecting = true
-						HubTab(target)
+						-- (At the tab last open under that icon: ns.LastHubTab.)
+						local tile = byName[target]
+						if tile then Select(ns.LastHubTab(tile)) end
 						menu.selecting = was
 					end)
 					frame:SetScript("OnHide", function(self)
@@ -4115,7 +4200,7 @@ local function CreateRevealPanel()
 		GameTooltip:SetOwner(self, "ANCHOR_BOTTOMRIGHT")
 		GameTooltip:SetText(banner.title:GetText(), 1, 0.82, 0)
 		if on then
-			GameTooltip:AddLine(L["Your interface fades as the rows below say."], 1, 1, 1, true)
+			GameTooltip:AddLine(L["Your interface fades away but comes back when you need it to."], 1, 1, 1, true)
 		else
 			GameTooltip:AddLine(L["Nothing fades right now."], 1, 1, 1, true)
 			if banner.reason and banner.reason ~= "" then GameTooltip:AddLine(banner.reason, 1, 0.5, 0.5, true) end
@@ -4138,7 +4223,7 @@ local function CreateRevealPanel()
 			banner.back:SetColorTexture(0.07, 0.15, 0.09, 0.95)
 			banner.title:SetText(L["CineMode is on"])
 			banner.title:SetTextColor(0.56, 0.89, 0.6)
-			banner.line:SetText(L["Your interface fades as the rows below say."])
+			banner.line:SetText(L["Your interface fades away but comes back when you need it to."])
 			banner.line:SetTextColor(0.62, 0.72, 0.63)
 			banner.icon:SetDesaturated(false)
 			banner.reason, banner.page = nil, nil
@@ -4202,8 +4287,10 @@ local function CreateRevealPanel()
 	searchBox:SetWidth(200)
 	searchBox:SetPoint("BOTTOMRIGHT", tabsPanel, "TOPRIGHT", -4, 4)
 
-	-- (Settings' title: the hubs' tabs have none, their tab says it.)
-	local title = Label(content, "GameFontNormalLarge", L["Settings"])
+	-- (No title on the Settings tab, 2026-11-17: its own tabs start the page.
+	-- This empty frame is where they and Reset page hang.)
+	local title = CreateFrame("Frame", nil, content)
+	title:SetSize(1, 1)
 	title:SetPoint("TOPLEFT", tabsPanel, "BOTTOMLEFT", 8, -14)
 
 	overview = CreateFrame("Frame", nil, content)
@@ -4582,10 +4669,10 @@ local function CreateRevealPanel()
 		if not rowWidth or rowWidth < 200 then rowWidth = 640 end
 		rowWidth = rowWidth - 2 * PANEL_PAD
 		-- (A row's name: a hub's General page by its own (Effects, Cameras),
-		-- the HUD's as HUD.)
+		-- the HUD's as Interface.)
 		local function NameOf(entry, isTab)
 			if isTab or entry.label ~= L["General"] then return entry.label end
-			if entry.name == "HUD:hud" then return L["HUD"] end
+			if entry.name == "HUD:hud" then return L["Interface"] end
 			if entry.name:find(":") then return entry.label end
 			-- (Style General, Visions General: Style, Visions.)
 			return L[entry.name:match("^(.+) General$") or entry.name]
@@ -4623,6 +4710,9 @@ local function CreateRevealPanel()
 			if width > 0 then return width + 8 end
 			return math.ceil(row.note:GetStringWidth()) + 10
 		end
+		-- (Rows under a named group set in from its name, so they read as its.)
+		local GROUP_INDENT = 16
+		local rowIndent = 0
 		local function Place(entry, isTab, flip, chipTabs)
 			used = used + 1
 			local row = rows[used] or MakeRow()
@@ -4666,7 +4756,7 @@ local function CreateRevealPanel()
 			if chipTabs and #chipTabs > 0 then
 				local start = math.max(TAB_INDENT + labelCol + 16,
 					TAB_INDENT + math.ceil(row.label:GetStringWidth()) + 16)
-				local limit = rowWidth - RightWidth(row) - 12
+				local limit = rowWidth - rowIndent - RightWidth(row) - 12
 				local x = start
 				for _, tab in ipairs(chipTabs) do
 					chipsUsed = chipsUsed + 1
@@ -4688,7 +4778,7 @@ local function CreateRevealPanel()
 			row:SetHeight((isTab and TAB_H or PAGE_H) + lines * CHIP_LINE)
 			row.stripe:Show()
 			row:ClearAllPoints()
-			row:SetPoint("TOPLEFT", overview, "TOPLEFT", PANEL_PAD, y)
+			row:SetPoint("TOPLEFT", overview, "TOPLEFT", PANEL_PAD + rowIndent, y)
 			row:SetPoint("RIGHT", overview, "RIGHT", -PANEL_PAD, 0)
 			row:Show()
 			y = y - row:GetHeight()
@@ -4701,6 +4791,7 @@ local function CreateRevealPanel()
 			panel.top = y
 			panel.head:SetShown(text ~= nil)
 			panel.text:SetText(text or "")
+			rowIndent = text and GROUP_INDENT or 0
 			y = y - (text and PANEL_HEAD or PANEL_PAD)
 		end
 		local function ClosePanel()
@@ -4746,8 +4837,10 @@ local function CreateRevealPanel()
 	for _, object in ipairs({ content:GetChildren() }) do before[object] = true end
 	for _, object in ipairs({ content:GetRegions() }) do before[object] = true end
 
-	local subtitle = PageIntro(content, title,
-		L["How fast the UI fades and what brings it back while CineMode is on."])
+	-- (The page's intro, for its card's "?"; no "?" here, the title's gone.)
+	content.introText = content.introText
+		or L["How fast the UI fades and what brings it back while CineMode is on."]
+	local subtitle = title
 
 	-- Folder tabs of its own (ns.PageTabsBelow): Settings and Exit. Each
 	-- section's controls, made on content, go onto its tab's frame as the next
@@ -8221,8 +8314,14 @@ local function CreateCombatPanel()
 			local order = {}
 			for _, section in ipairs(tabs[shown].sections) do
 				if section.relayout then section.relayout() end -- (the Unit frames' blocks, open as saved)
-				local inUse = #tabs[shown].sections > 1 and section.inUse and section.inUse()
-				if section.inUseTag then section.inUseTag:SetShown(inUse == true) end
+				-- (In use green, Not in use grey with its rows dimmed: still set-able ahead.)
+				if section.inUseTag then
+					local inUse = section.inUse() == true
+					section.inUseTag:SetText(inUse and L["In use"] or L["Not in use"])
+					section.inUseTag:SetTextColor(inUse and 0.3 or 0.6, inUse and 0.9 or 0.6, inUse and 0.3 or 0.6)
+					section.inUseTag:SetShown(#tabs[shown].sections > 1)
+					section.body:SetAlpha(inUse and 1 or 0.5)
+				end
 				order[#order + 1] = section
 			end
 			-- (The raid-style party frames' grid folded away while Same as raid
@@ -8266,6 +8365,15 @@ local function CreateCombatPanel()
 			panel:SetPoint("BOTTOMRIGHT", bottom, "BOTTOMLEFT", above.width + 6 - inset, -12)
 			FitContentHeight(content)
 		end
+		-- (Edit Mode's raid-style party frames changed with the page up, by a
+		-- profile picked: the party frames' In use tags again.)
+		do
+			local watch = CreateFrame("Frame")
+			pcall(watch.RegisterEvent, watch, "EDIT_MODE_LAYOUTS_UPDATED")
+			watch:SetScript("OnEvent", function()
+				if content:IsVisible() then Layout() end
+			end)
+		end
 		-- (A section picked from the page (search, the Raid » button): its icon lit too.)
 		local function Pick(section)
 			SectionState.Save(picked, section.key)
@@ -8285,6 +8393,7 @@ local function CreateCombatPanel()
 			title:SetText(L[icon.label])
 			title:SetShown(icon.hud == true) -- (a section's: its table's heading names it)
 			if icon.tabs and not tabsOf[icon.tabs] then
+				content.headingStyleIcons = true -- (no palette after its tabs: its sections' headings have one)
 				local _, Show = ns.PageTabs(content, ns.ShowInTabs(icon.tabs), icon.tabIndex or 1)
 				tabsOf[icon.tabs] = content.pageTabs
 				content.pageTabs.Show = Show
@@ -8484,6 +8593,9 @@ local function CreateCombatPanel()
 		-- (tab: its tab's name, nil: heading. link: { page, tip, label }, a button
 		-- to the page with the rest of its settings, right of its heading, named
 		-- label or the page.)
+		-- (Each section's frames' Style page, a palette by its heading: ns.StyleIcon.)
+		local SECTION_STYLES = { units = "Unit Style", prd = "Personal Style", playercast = "Unit Cast Style",
+			bars = "Action Style", raid = "Raid Style" }
 		local function Section(page, heading, tab, link)
 			local sectionRows = {}
 			for _, item in ipairs(ns.COMBAT_SHOW) do
@@ -8542,6 +8654,11 @@ local function CreateCombatPanel()
 					section.firstLink:SetPoint("LEFT", sectionSwitch.header, "RIGHT", 8, 0)
 				end
 			end
+			-- (A palette past its switch to its frames' Style page, 2026-11-17.)
+			local stylePage = SECTION_STYLES[section.key]
+			if stylePage and not section.firstLink then
+				ns.StyleIcon(frame, section.switch and section.switch.header or section.helpSpot, stylePage, Tooltip)
+			end
 			section.body:SetPoint("TOPLEFT", frame, "TOPLEFT")
 			section.body:SetSize(1, 1)
 			section.body.searchAlways = true
@@ -8565,6 +8682,58 @@ local function CreateCombatPanel()
 				same:SetPoint("LEFT", after, "RIGHT", 8, 0)
 				text:ClearAllPoints()
 				text:SetPoint("LEFT", same, "RIGHT", 2, 1)
+				-- ("raid frames" a link to the Raid tab, 2026-11-17: the words split,
+				-- "Same as" still the box's own. Search keeps the whole label.)
+				text:SetText(L["Same as"])
+				local link = CreateFrame("Button", nil, frame)
+				link:SetFrameLevel(same:GetFrameLevel() + 2)
+				local words = link:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+				words:SetText(L["raid frames"])
+				words:SetTextColor(0.45, 0.75, 1)
+				words:SetPoint("LEFT")
+				local underline = link:CreateTexture(nil, "OVERLAY")
+				underline:SetColorTexture(0.45, 0.75, 1, 0.6)
+				underline:SetHeight(1)
+				underline:SetPoint("TOPLEFT", words, "BOTTOMLEFT", 0, -1)
+				underline:SetPoint("TOPRIGHT", words, "BOTTOMRIGHT", 0, -1)
+				link:SetSize(words:GetStringWidth() + 2, 16)
+				link:SetPoint("LEFT", text, "RIGHT", 4, 0)
+				link.searchSkip = true
+				Tooltip(link, L["Opens the Raid tab."])
+				link:HookScript("OnEnter", function() words:SetTextColor(0.7, 0.9, 1) end)
+				link:HookScript("OnLeave", function() words:SetTextColor(0.45, 0.75, 1) end)
+				link:SetScript("OnClick", function()
+					for _, each in ipairs(sections) do
+						if each.key == "raid" then return Pick(each) end
+					end
+				end)
+				same.raidLink = link
+				same.searchEdges.right = link -- (a search's highlight over all its words)
+			end
+			-- (The two kinds of party frames: which one the game draws, from Edit
+			-- Mode's Use Raid-Style Party Frames, tagged In use or Not in use on
+			-- their heading (Layout), the other's rows dimmed. Back 2026-11-17.)
+			if (page == "party" or page == "rsparty") and ns.RaidStyleParty then
+				local raid = page == "rsparty"
+				section.inUse = function() return ns.RaidStyleParty() == raid end
+				local tag = Label(frame, "GameFontHighlightSmall", L["In use"])
+				local spot = same and same.raidLink or (sectionSwitch and sectionSwitch.header) or after
+				tag:SetPoint("LEFT", spot, "RIGHT", 12, 0)
+				tag.searchSkip = true
+				tag:Hide()
+				-- (Its tip: on a frame over it, a FontString takes no mouse.)
+				local hover = CreateFrame("Frame", nil, frame)
+				hover:SetAllPoints(tag)
+				hover:SetScript("OnEnter", function(self)
+					if not tag:IsShown() then return end
+					GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+					local ticked = ns.RaidStyleParty()
+					GameTooltip:SetText(ticked and L["Your Edit Mode layout has Use Raid-Style Party Frames ticked."]
+						or L["Your Edit Mode layout has Use Raid-Style Party Frames unticked."], 1, 1, 1, 1, true)
+					GameTooltip:Show()
+				end)
+				hover:SetScript("OnLeave", GameTooltip_Hide)
+				section.inUseTag = tag
 			end
 			local before = Widgets()
 			sectionRows.underHeader = true
@@ -18980,8 +19149,21 @@ local function CreateProfilesPanel()
 	local subtitle = PageIntro(content, title,
 		L["A profile is a whole set of settings you can switch between."])
 
+	-- Two tabs (2026-11-17), so each fits without scrolling: Profiles (the
+	-- cards, their box, managing and sharing) and Customize (the active
+	-- profile's parts). The tab last picked is kept.
+	local tabHosts, PickTab, TabsShown = ns.PageTabsBelow(content, subtitle, {
+		{ L["Profiles"], L["Pick, add and share profiles."] },
+		{ L["Customize"], L["Change parts of the active profile."] },
+	}, "Profiles/page")
+	local pickHost, customHost = tabHosts[1], tabHosts[2]
+	-- (Its sections as the headers once named them, with no header drawn: the
+	-- profile modules find the page by them, ProfileModules.lua.)
+	SetSection(pickHost, L["Profiles"])
+	SetSection(customHost, L["Customize"])
+
 	-- Ticked, this character keeps the one it's on as its own.
-	local perChar = Check(content, nil, L["Use a profile just for this character"],
+	local perChar = Check(pickHost, nil, L["Use a profile just for this character"],
 		L["This character keeps its own profile."], function(value)
 			ns.SetCharacterProfile(value)
 			Refresh()
@@ -18996,10 +19178,12 @@ local function CreateProfilesPanel()
 				:format(ns.ProfileLabel(ns.GetDB().profile or ns.ActiveProfile())))
 		end
 	end
-	perChar:SetPoint("TOPLEFT", subtitle, "BOTTOMLEFT", -2, -14)
+	perChar:SetPoint("TOPLEFT", pickHost, "TOPLEFT", -2, 0)
 
-	local header = Header(content, L["Profiles"], perChar, -12)
-	header:SetPoint("TOPLEFT", perChar, "BOTTOMLEFT", 2, -12)
+	-- (Where the cards start: no "Profiles" header, the page's title says it.)
+	local header = CreateFrame("Frame", nil, pickHost)
+	header:SetSize(1, 1)
+	header:SetPoint("TOPLEFT", perChar, "BOTTOMLEFT", 2, -2)
 
 	-- Drawn as the welcome window is (Welcome.lua's flat look): a card per
 	-- profile (its icon, name and a line) and one to start a new one, a box
@@ -19022,7 +19206,7 @@ local function CreateProfilesPanel()
 		Layout()
 	end)
 
-	local box = CreateFrame("Frame", nil, content, BackdropTemplateMixin and "BackdropTemplate")
+	local box = CreateFrame("Frame", nil, pickHost, BackdropTemplateMixin and "BackdropTemplate")
 	box:SetSize(WIDTH, 56)
 	S.Flat(box, S.BG)
 	S.Skinnable(box)
@@ -19057,7 +19241,7 @@ local function CreateProfilesPanel()
 	end
 
 	local function Card()
-		local cell = CreateFrame("Button", nil, content, BackdropTemplateMixin and "BackdropTemplate")
+		local cell = CreateFrame("Button", nil, pickHost, BackdropTemplateMixin and "BackdropTemplate")
 		cell:SetSize(CARD_W, CARD_H)
 		S.Flat(cell)
 		S.Skinnable(cell)
@@ -19150,24 +19334,42 @@ local function CreateProfilesPanel()
 		return cell
 	end
 
-	-- The welcome window's Customize panel (Welcome.lua): one part of the
-	-- active profile at a time. A change to a built-in starts My setup.
-	local customizeHeader = Header(content, L["Customize"], box, -18)
-	customizeHeader:SetPoint("TOPLEFT", box, "BOTTOMLEFT", 0, -18)
-	local customize = ns.CustomizePanel(content, WIDTH, function() Refresh() end, true)
-	customize:SetPoint("TOPLEFT", customizeHeader, "BOTTOMLEFT", 0, -10)
-	-- (The part's own settings page, for everything else it has.)
-	local more = S.Button(customize, L["Open its settings page"] .. " >", nil, function()
-		local page = customize:SettingsPage()
-		if page then ns.OpenOptions(page) end
-	end)
-	more:SetPoint("TOPRIGHT", customize, "BOTTOMRIGHT", 0, -4)
+	-- The Customize tab: which profile it changes, then the welcome window's
+	-- Customize panel (Welcome.lua): one part of the active profile at a
+	-- time. A change to a built-in starts My setup.
+	-- (The active profile's icon first, as on its card.)
+	local editingIcon = customHost:CreateTexture(nil, "ARTWORK")
+	editingIcon:SetSize(24, 24)
+	editingIcon:SetPoint("TOPLEFT", customHost, "TOPLEFT", 0, 0)
+	editingIcon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
+	S.Rounded(customHost, editingIcon)
+	local editing = S.Text(customHost, "GameFontHighlight", "", S.SOFT)
+	editing:SetPoint("LEFT", editingIcon, "RIGHT", 8, 0)
+	editing.searchSkip = true -- (it names the active profile)
+	local customize = ns.CustomizePanel(customHost, WIDTH, function() Refresh() end, true)
+	customize:SetPoint("TOPLEFT", editingIcon, "BOTTOMLEFT", 0, -10)
+	-- (As tall as the window leaves under it: down to the page's bottom.)
+	local function FillDown()
+		local top, bottom = customize:GetTop(), canvas:GetBottom()
+		if not (top and bottom and customHost:IsVisible()) then return end
+		local scale = customize:GetEffectiveScale() / canvas:GetEffectiveScale()
+		-- (Where its top is with the page scrolled to the top.)
+		top = top - (canvas.scroll:GetVerticalScroll() or 0)
+		customize:SetPanelHeight(top - bottom / scale - 16)
+		FitContentHeight(content)
+	end
+	customHost:HookScript("OnShow", function() C_Timer.After(0, FillDown) end)
+	canvas:HookScript("OnSizeChanged", function() C_Timer.After(0, FillDown) end)
 
-	local manageHeader = Header(content, L["Manage and share"], more, -14)
-	manageHeader:SetPoint("TOPLEFT", customize, "BOTTOMLEFT", 0, -32)
-	local buttons = CreateFrame("Frame", nil, content)
+	-- (Managing and sharing: a row under the cards' box, no header.)
+	local buttons = CreateFrame("Frame", nil, pickHost)
 	buttons:SetSize(WIDTH, 28)
-	buttons:SetPoint("TOPLEFT", manageHeader, "BOTTOMLEFT", 0, -10)
+	buttons:SetPoint("TOPLEFT", box, "BOTTOMLEFT", 0, -12)
+	-- (At its right: the Customize tab, for the active profile.)
+	local toCustomize = S.Button(buttons, "", nil, function() PickTab(2) end)
+	toCustomize.text:SetFontObject("GameFontNormalSmall")
+	toCustomize:SetPoint("TOPRIGHT", buttons, "TOPRIGHT", 0, -4)
+	toCustomize.searchSkip = true
 	-- (The menu look's own buttons, HD or SD. Its tip goes in the box, not a
 	-- tooltip, as on the welcome window.)
 	local function Button(parent, text, width, tip, onClick)
@@ -19267,12 +19469,6 @@ local function CreateProfilesPanel()
 		end)
 	end
 
-	-- (Managing comes right under the cards and their box, Customize after.)
-	manageHeader:ClearAllPoints()
-	manageHeader:SetPoint("TOPLEFT", box, "BOTTOMLEFT", 0, -18)
-	customizeHeader:ClearAllPoints()
-	customizeHeader:SetPoint("TOPLEFT", reset or backups, "BOTTOMLEFT", 0, -22)
-
 	-- A card's place in the grid.
 	local function Place(cell, i)
 		cell:ClearAllPoints()
@@ -19326,6 +19522,13 @@ local function CreateProfilesPanel()
 		box:ClearAllPoints()
 		box:SetPoint("TOPLEFT", header, "BOTTOMLEFT", 0, -10 - rows * (CARD_H + GAP))
 		customize:Refresh()
+		-- (The Customize tab's line, and the link to it, name the active profile.)
+		local profileName = ns.ProfileLabel(ns.ActiveProfile())
+		editingIcon:SetTexture(ns.ProfileIcon(ns.ActiveProfile()))
+		local changed = active ~= nil and ns.IsBuiltinProfile(active) and ns.ProfileChanged()
+		editing:SetText(L["Customizing %s"]:format("|cffffd100" .. profileName .. "|r")
+			.. (changed and "  |cff808080" .. L["(changed)"] .. "|r" or ""))
+		toCustomize:SetLabel(L["Customize %s"]:format(profileName) .. " >")
 		local own = active ~= nil and not ns.IsBuiltinProfile(active)
 		if rename then
 			rename:SetEnabled(own)
@@ -19343,6 +19546,7 @@ local function CreateProfilesPanel()
 
 	canvas:SetScript("OnShow", function()
 		Refresh() -- (Layout too: its control above, the canvas shown now)
+		TabsShown()
 		C_Timer.After(0, function() FitContentHeight(content) end)
 	end)
 	canvas:Hide()

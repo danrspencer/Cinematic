@@ -844,6 +844,7 @@ function ns.GridRow(kit, parent, labelWidth, layout, spec)
 			spec.always.set(self:GetChecked() and true or false)
 			Changed()
 		end)
+		always.Refresh = function(self) self:SetChecked(AlwaysOn()) end -- (/cine debug sweep, Dev/Sweep.lua)
 		Tooltip(always, spec.always.tip)
 	end
 
@@ -857,6 +858,7 @@ function ns.GridRow(kit, parent, labelWidth, layout, spec)
 			button:SetPoint("LEFT", cols.menus[g], 0)
 			button:SetSkinEdge(color[1], color[2], color[3], 0.45)
 			button:SetScript("OnClick", function(self) ns.TickMenu(self, entries, Changed) end)
+			button.sweepTicks, button.sweepChanged = entries, Changed -- (/cine debug sweep: its ticks, Dev/Sweep.lua)
 			button.Refresh = function(self)
 				local on = {}
 				for _, entry in ipairs(entries) do
@@ -1338,6 +1340,26 @@ function ns.GridTable(content, columnTop, rows, kit)
 		end
 		local row = ns.GridRow(kit, content, LABEL_WIDTH, LAYOUT, spec)
 		row.debugName = item.label -- (for the dev copy's page timing)
+		-- (item.value(): a game setting the row goes with, after its name, kept
+		-- up with the dot: "Self highlight: Off" in red. Its tip says what it is.)
+		if item.value then
+			local Live = row.Live
+			row.Live = function()
+				Live()
+				local value, off = item.value()
+				rowLabel:SetText(value and ("%s: |cff%s%s|r"):format(item.label, off and "ff6060" or "aaaaaa", value)
+					or item.label)
+			end
+			row.Live()
+			local hover = ns.LabelHover(content, rowLabel)
+			hover:SetScript("OnEnter", function(self)
+				GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+				GameTooltip:SetText(rowLabel:GetText(), 1, 1, 1)
+				if item.tip then GameTooltip:AddLine(item.tip, 0.8, 0.8, 0.8, true) end
+				GameTooltip:AddLine(L["Your choice in the game's options; Off shows nothing here."], 0.8, 0.8, 0.8, true)
+				GameTooltip:Show()
+			end)
+		end
 		row:SetPoint("TOPLEFT", columnTop, "TOPLEFT", LABEL_WIDTH, y)
 		made[#made + 1] = row
 		lastLabel = rowLabel

@@ -2306,7 +2306,9 @@ ns.COMBAT_SHOW = {
 	-- on the HUD page's Highlight tab: a setting too (Effects.lua). Always
 	-- ticked to start with (CINE_SHOW_DEFAULT): left to the game until changed.
 	{ key = "selfhighlight", label = L["Self highlight"], default = false, noHoverRow = true,
-		tip = L["The circle or outline on your own character."] },
+		tip = L["The circle or outline on your own character."],
+		-- (Your choice in the game's options shown after its name: Off, Circle...)
+		value = function() if ns.SelfHighlightChoice then return ns.SelfHighlightChoice() end end },
 	-- The Standard Frames page's Party frames section (page = "party"); the
 	-- raid-style ones are the Raid frames section's.
 	{ key = "party", label = L["Party frames"], default = true, page = "party", groups = { "party" } },

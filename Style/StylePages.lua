@@ -340,6 +340,40 @@ function ns.StyleLink(content, title, page, tip, Tooltip, label, after)
 	return button
 end
 
+-- A small palette right of anchor (a page's or HUD section's On/Off
+-- switch) opening that frame's Style page (page: its id, as ns.OpenOptions
+-- takes it, or a function giving it as clicked). Icon: Media/make_style_palette.py.
+-- Hidden on a client without that page. 2026-11-17.
+local PALETTE = "Interface\\AddOns\\" .. ADDON_NAME .. "\\Textures\\StylePalette"
+function ns.StyleIcon(parent, anchor, page, Tooltip)
+	local button = CreateFrame("Button", nil, parent)
+	button:SetSize(20, 20)
+	button:SetPoint("LEFT", anchor, "RIGHT", 6, 0)
+	button:SetFrameLevel(anchor:GetFrameLevel())
+	button.searchSkip = true
+	local icon = button:CreateTexture(nil, "ARTWORK")
+	icon:SetAllPoints()
+	icon:SetTexture(PALETTE)
+	local glow = button:CreateTexture(nil, "HIGHLIGHT")
+	glow:SetAllPoints()
+	glow:SetTexture(PALETTE)
+	glow:SetBlendMode("ADD")
+	glow:SetAlpha(0.5)
+	button:SetScript("OnMouseDown", function() icon:SetPoint("TOPLEFT", 1, -1) end)
+	button:SetScript("OnMouseUp", function() icon:SetAllPoints() end)
+	Tooltip = Tooltip or ns.GRID_KIT.Tooltip
+	Tooltip(button, ns.L["Opens how these look, on the Style page."])
+	button:SetScript("OnClick", function()
+		ns.OpenOptions(type(page) == "function" and page() or page)
+	end)
+	if type(page) == "string" then
+		button:SetScript("OnShow", function(self)
+			if ns.settingsCanvases and not ns.settingsCanvases[page] then self:Hide() end
+		end)
+	end
+	return button
+end
+
 -- Folder tabs at the top of a page split into pages (Vitals Vision's Vision
 -- and Style, each its own hub page with one icon: tabOf in Options.lua's
 -- HUBS). list: { label, page, tip } each (page: its English name), picked:
@@ -352,6 +386,7 @@ function ns.PageTabs(content, list, picked)
 	-- Vision's its Style. at: a list index to its tab here, for Show. Just
 	-- one left: named as its icon is, not "Vision" or "Style".)
 	local at, hub = {}, ns.PageHub and list[picked] and ns.PageHub(list[picked][2])
+	local stylePage -- (the first of them in the Style hub: a palette after the tabs links it)
 	if hub then
 		local kept = {}
 		for i, each in ipairs(list) do
@@ -359,6 +394,8 @@ function ns.PageTabs(content, list, picked)
 			if not other or other == hub then
 				kept[#kept + 1] = each
 				at[i] = #kept
+			elseif other == "Style" and not stylePage then
+				stylePage = each[2]
 			end
 		end
 		if #kept == 1 and #list > 1 then
@@ -402,6 +439,13 @@ function ns.PageTabs(content, list, picked)
 	panel:SetPoint("RIGHT", content, "RIGHT", -8, 0)
 	panel:SetHeight(1)
 	ShowAt(picked)
+	-- (Its frames' Style page, its tab gone to the Style hub: a palette right
+	-- of the last tab, shown and hidden with it. Not on the HUD page, its
+	-- sections' headings have theirs: content.headingStyleIcons. 2026-11-17.)
+	local lastTab = tabFrames[#tabFrames]
+	if stylePage and lastTab and not content.headingStyleIcons then
+		ns.StyleIcon(lastTab, lastTab, stylePage)
+	end
 	-- (kept on screen over the page's off card, to reach the other tabs)
 	content.pageTabs = { panel = panel, frames = tabFrames }
 	-- A page under tabs has no title, "?" or On/Off of its own (2026-11-16):
