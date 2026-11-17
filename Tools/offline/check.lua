@@ -73,9 +73,12 @@ if arg[1] and not update then
 		end
 		local db = ns.db
 		if db.chatOwnNoBubble ~= true then Problem("the exception isn't on by default") end
-		local kept = { db.chatPeek, db.handleChat, db.chatHideOwn, db.chatOwnNoBubble }
+		local kept = { db.chatPeek, db.handleChat, db.chatHideOwn, db.chatOwnNoBubble, db.chatPeekLinesOnly }
 		local keptGuild, keptChannels = db.chatPeekTypes.guild, db.chatPeekChannels
 		db.chatPeek, db.handleChat, db.chatHideOwn, db.chatOwnNoBubble = true, true, true, true
+		-- (Whether a line peeks, told by the whole window's peek: no line copies,
+		-- which read the window's lines a frame later.)
+		db.chatPeekLinesOnly = false
 		for _, event in ipairs({ "CHAT_MSG_GUILD", "CHAT_MSG_PARTY" }) do
 			if not Peeks(event) then Problem(event .. " with no bubble didn't show chat") end
 		end
@@ -110,6 +113,7 @@ if arg[1] and not update then
 		db.chatHideOwn = false
 		if not Peeks("CHAT_MSG_WHISPER_INFORM", "Someone") then Problem("a sent whisper hid with Hide your messages off") end
 		db.chatPeek, db.handleChat, db.chatHideOwn, db.chatOwnNoBubble = kept[1], kept[2], kept[3], kept[4]
+		db.chatPeekLinesOnly = kept[5]
 		_G.ChatFrame_AddMessageEventFilter = keptFilter
 		ns.chatPeekUntil[frame] = nil
 	end

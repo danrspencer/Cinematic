@@ -13339,6 +13339,14 @@ do
 			end)
 		local function IfPeek(db) return db.chatPeek end
 
+		-- (UI/Chat.lua's PeekLine: copies of just those lines over the faded window.)
+		local linesOnly = Check(chatPanel, "chatPeekLinesOnly", L["Show just those messages"],
+			L["The messages that show chat come up on their own where the chat window sits, without the " ..
+			"window, its tabs, its background or its older lines, and fade out after the reveal time. Mousing " ..
+			"over or typing still brings up the whole window."])
+		linesOnly:SetPoint("TOPLEFT", chatPeek, "BOTTOMLEFT", 20, -2)
+		GreyUnless(linesOnly, IfPeek)
+
 		-- On top: how long chat stays up, in place of the mouseover time (all the way left: off).
 		local peekTime = Slider(chatPanel, "chatPeekTime", L["Override Default Reveal Time"], 0, 60, 1,
 			function(value) return value == 0 and L["Off"] or L["%d sec"]:format(value) end)
@@ -13351,7 +13359,7 @@ do
 		local hideOwn = Check(chatPanel, "chatHideOwn", L["Hide your messages"],
 			L["Your own messages don't show chat: your emotes (a /bow, or sitting or kneeling at the " ..
 			"campfire), and what you say in /say, party, guild and so on. Other people's still do."])
-		hideOwn:SetPoint("TOPLEFT", chatPeek, "BOTTOMLEFT", 0, -2)
+		hideOwn:SetPoint("TOPLEFT", linesOnly, "BOTTOMLEFT", -20, -2)
 		GreyUnless(hideOwn, IfPeek)
 		hideOwn:HookScript("OnClick", Refresh) -- (greys out / enables its exception)
 
@@ -13394,7 +13402,7 @@ do
 		innerTabs[TAB_LINKS]:Hide()
 		innerTabs[TAB_LINKS].Show = innerTabs[TAB_LINKS].Hide
 		local settings = tabHosts[TAB_SETTINGS]
-		for _, control in ipairs({ chatPeek, peekTime, hideOwn, ownNoBubble, hideBubbled }) do
+		for _, control in ipairs({ chatPeek, linesOnly, peekTime, hideOwn, ownNoBubble, hideBubbled }) do
 			control:SetParent(settings)
 		end
 		peekTime:ClearAllPoints()

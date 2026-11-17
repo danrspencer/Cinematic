@@ -310,6 +310,7 @@ local DEFAULTS = {
 	chatPeek = true,          -- briefly show a chat window when a message arrives
 	chatPeekChannels = false, -- old "include public channels"; now the default for channels not yet set
 	chatPeekTime = 8,         -- seconds the chat window stays up
+	chatPeekLinesOnly = true, -- a peek shows copies of just the lines that peeked, not the window (Chat.lua)
 	chatUntilWhisperRead = true, -- keep chat up while a whisper tab is flashing (until it's clicked)
 	chatHideTabHint = false, -- chat tabs' tooltips drop their green "<Right click for Tab Settings>" line (Chat.lua)
 	plateHideTipHint = true, -- hidden: nameplates' tooltips (locked friendly plates in dungeons) drop "<Right click for Frame Settings>" (Chat.lua)

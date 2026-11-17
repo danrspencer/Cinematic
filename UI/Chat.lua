@@ -472,8 +472,166 @@ ns.chatTypingUntil = 0 -- typing shows the whole chat group without leaving cine
 -- hidden, and peeking it would bring up just the dock's tabs.
 -- (The frames' pass at once, Core.lua, only for a window not already up: a
 -- busy city's channels kept waking it for windows already peeking.)
-local function PeekWindow(chatFrame)
+-- "Show just those messages" (db.chatPeekLinesOnly): instead of the window,
+-- a copy of the line that peeked shows where the window sits, on a message
+-- frame of ours (one per window, over it), and fades after the reveal time.
+-- The line is read back from the window once the game has added it (filters
+-- run just before), as the window drew it: name, channel, colors, timestamp.
+-- A line that can't be found or read there (another addon rewrote it, a
+-- secret text) peeks the whole window as before. The copies go as soon as
+-- the window itself comes up (hovered, typed in, out of CineMode).
+local LINE_LOOKBACK = 20 -- newest window lines searched for the one that peeked
+local lineCopies = {} -- [chat frame] = { frame = our message frame, untilTime = when its last line is gone }
+local copyWatch = CreateFrame("Frame")
+local PeekWindow
+
+local function Plain(value)
+	return type(value) == "string" and not (issecretvalue and issecretvalue(value))
+end
+
+-- A window's line as it drew it, with its color: the newest of its last
+-- lines with text in it (nil if none, or it can't be read).
+local function FindWindowLine(chatFrame, text)
+	if not (chatFrame.GetNumMessages and chatFrame.GetMessageInfo) then return nil end
+	local count = chatFrame:GetNumMessages()
+	if not (type(count) == "number" and not (issecretvalue and issecretvalue(count))) then return nil end
+	for i = count, math.max(1, count - LINE_LOOKBACK + 1), -1 do
+		local line, r, g, b = chatFrame:GetMessageInfo(i)
+		if Plain(line) and line:find(text, 1, true) then
+			return line, r, g, b
+		end
+	end
+end
+
+local function CopyFrame(chatFrame)
+	local copy = lineCopies[chatFrame]
+	if copy then return copy end
+	local frame = CreateFrame("ScrollingMessageFrame", nil, UIParent)
+	frame:EnableMouse(false)
+	frame:SetInsertMode(_G.SCROLLING_MESSAGE_FRAME_INSERT_MODE_BOTTOM or "BOTTOM")
+	frame:SetMaxLines(LINE_LOOKBACK)
+	frame:SetFading(true)
+	frame:SetFontObject(ChatFontNormal)
+	if ns.WhyRegister then
+		ns.WhyRegister(frame, L["Chat message"], "Chat", {
+			L["Show just those messages is on: a message that shows chat comes up here on its own, " ..
+				"without the chat window"] })
+	end
+	-- (Hidden till its first line: a new frame starts shown, and ShowCopy
+	-- takes the window's alpha as base only for a hidden one.)
+	frame:Hide()
+	copy = { frame = frame, untilTime = 0, base = 0 }
+	lineCopies[chatFrame] = copy
+	return copy
+end
+
+-- Lays our frame over the window (or the panel that draws its lines) with the
+-- window's font and look, before a line goes in. (Font set only when it
+-- changed: set again after lines are in, Russian ones turn to boxes.)
+local function DressCopy(copy, chatFrame)
+	local frame, shown = copy.frame, ns.chatPeekPanels[chatFrame] or chatFrame
+	frame:ClearAllPoints()
+	frame:SetAllPoints(shown)
+	frame:SetFrameStrata(shown:GetFrameStrata())
+	frame:SetFrameLevel(shown:GetFrameLevel() + 5)
+	local file, size, flags = chatFrame:GetFont()
+	if Plain(file) and (copy.file ~= file or copy.size ~= size or copy.flags ~= flags) then
+		frame:SetFont(file, size, flags or "")
+		copy.file, copy.size, copy.flags = file, size, flags
+	end
+	if chatFrame.GetJustifyH then frame:SetJustifyH(chatFrame:GetJustifyH()) end
+	local x, y = chatFrame:GetShadowOffset()
+	if type(x) == "number" then frame:SetShadowOffset(x, y) end
+	local hold = ns.HoldTime("chatPeekTime")
+	frame:SetTimeVisible(hold)
+	-- (Fading out like the window would: the Fade out time.)
+	frame:SetFadeDuration(math.max(0.2, tonumber(ns.FadeOutTime()) or 0.5))
+	copy.untilTime = GetTime() + hold + frame:GetFadeDuration()
+end
+
+-- How far up the window (or the panel drawing its lines) is now: 0 to 1, nil
+-- if it can't be read.
+local function WindowAlpha(chatFrame)
+	local shown = chatFrame
+	if not ns.Flag(chatFrame:IsVisible()) then
+		shown = ns.chatPeekPanels[chatFrame]
+		if not (shown and ns.Flag(shown:IsVisible())) then return 0 end
+	end
+	local alpha = shown:GetEffectiveAlpha()
+	if type(alpha) == "number" and not (issecretvalue and issecretvalue(alpha)) then return alpha end
+end
+
+-- While copies are up: gone once their time is over, or when the window
+-- itself comes up (hovered, typed in): they fade out as it fades in, from how
+-- far up it was when they showed (copy.base), so its lines and theirs never
+-- show over each other.
+local function WatchCopies()
+	local now, any = GetTime(), false
+	for chatFrame, copy in pairs(lineCopies) do
+		if copy.frame:IsShown() then
+			local alpha = WindowAlpha(chatFrame) or 1
+			local base = copy.base or 0
+			local rise = (alpha - base) / math.max(0.05, 1 - base)
+			local seen = not ns.ChatPeekLinesOnly() or now >= copy.untilTime
+				or not ns.ChatWindowShown(chatFrame) or rise >= 0.9
+			if seen then
+				copy.frame:Clear()
+				copy.frame:Hide()
+			else
+				copy.frame:SetAlpha(1 - math.max(0, rise))
+				any = true
+			end
+		end
+	end
+	if not any then ns.SetOnUpdate(copyWatch, nil) end
+end
+local OnCopyWatch = ns.Profiled("Chat line copies", WatchCopies)
+
+local function ShowCopy(chatFrame, line, r, g, b)
+	local copy = CopyFrame(chatFrame)
+	DressCopy(copy, chatFrame)
+	-- (A copy already up keeps its base: the window has only risen since.)
+	if not copy.frame:IsShown() then
+		copy.base = math.min(WindowAlpha(chatFrame) or 0, 0.9)
+		copy.frame:SetAlpha(1)
+	end
+	copy.frame:Show()
+	copy.frame:AddMessage(line, r, g, b)
+	ns.SetOnUpdate(copyWatch, OnCopyWatch)
+end
+
+-- Whether a peek shows just its line (the setting, with the Chat page on).
+function ns.ChatPeekLinesOnly()
+	return ns.db and ns.db.chatPeekLinesOnly and ns.db.handleChat ~= false and true or false
+end
+
+-- A peek in lines-only mode. formatted: text is the window's line already
+-- (server lines); else it's the message's own text, and the window's line
+-- holding it is looked up once the game has added it (the next frame).
+local function PeekLine(chatFrame, text, formatted)
+	if formatted then
+		local line, r, g, b = FindWindowLine(chatFrame, text) -- (for its color)
+		ShowCopy(chatFrame, line or text, r, g, b)
+		return
+	end
+	C_Timer.After(0, function()
+		local line, r, g, b = FindWindowLine(chatFrame, text)
+		if line then
+			ShowCopy(chatFrame, line, r, g, b)
+		else
+			PeekWindow(chatFrame) -- (not found: the whole window, as before)
+		end
+	end)
+end
+
+-- (text, formatted: the line that peeked, for Show just those messages.)
+PeekWindow = function(chatFrame, text, formatted)
 	if chatFrame.IsShown and ns.ChatWindowShown(chatFrame) then
+		if text ~= nil and Plain(text) and text ~= "" and ns.ChatPeekLinesOnly()
+				and not (ns.ChatSeen and ns.ChatSeen(chatFrame)) then
+			PeekLine(chatFrame, text, formatted)
+			return
+		end
 		local now = GetTime()
 		if (ns.chatPeekUntil[chatFrame] or 0) <= now then ns.framesWake = "chat message" end
 		ns.chatPeekUntil[chatFrame] = now + ns.HoldTime("chatPeekTime")
@@ -578,6 +736,10 @@ local function ChatUnseen(chatFrame)
 	local alpha = chatFrame:GetEffectiveAlpha()
 	return type(alpha) == "number" and not (issecretvalue and issecretvalue(alpha)) and alpha < 0.95
 end
+-- (The window up enough to read: its own lines show, no copies needed.)
+function ns.ChatSeen(chatFrame)
+	return not ChatUnseen(chatFrame)
+end
 
 -- /cine debug speech: prints what happens to each say and yell.
 local function SpeechTrace(text)
@@ -595,7 +757,7 @@ local function SpeakOrPeek(line)
 	end
 	if not (ns.db.handleBubbles and ns.db.chatSpeechBehind and ns.ShowSpeechBehind
 			and ns.ChatWindowShown(chatFrame)) then
-		PeekWindow(chatFrame)
+		PeekWindow(chatFrame, line[2])
 	elseif ChatUnseen(chatFrame) then
 		ns.ShowSpeechBehind(line[4], line[5], line[2], line[6])
 		if ns.HideOffScreenBubble then ns.HideOffScreenBubble(line[2]) end
@@ -657,7 +819,7 @@ local function WatchBubbles()
 		elseif now >= line[3] then
 			table.remove(waiting, i)
 			if line[8] then
-				PeekWindow(line[1]) -- (your own line: chat, not speech from behind you)
+				PeekWindow(line[1], line[2]) -- (your own line: chat, not speech from behind you)
 			else
 				SpeakOrPeek(line)
 			end
@@ -685,7 +847,7 @@ local function PeekUnlessBubble(chatFrame, event, text, author, guid)
 			SpeechTrace(("not waiting for a bubble (hide bubbled %s, bubbles CVar %s)"):format(
 				tostring(ns.db.chatHideBubbled), tostring(GetCVar("chatBubbles"))))
 		end
-		PeekWindow(chatFrame)
+		PeekWindow(chatFrame, text)
 		return
 	end
 	waiting[#waiting + 1] = { chatFrame, text, GetTime() + BUBBLE_WAIT, event, author, guid,
@@ -700,7 +862,7 @@ local function PeekOwnLine(chatFrame, event, text, author, guid, bubbleCVar)
 	local kind = ns.BUBBLE_KIND_OF and ns.BUBBLE_KIND_OF[event]
 	if bubbleCVar == true or type(text) ~= "string" or (issecretvalue and issecretvalue(text))
 			or not (GetCVarBool and GetCVarBool(bubbleCVar)) or (kind and ns.BubbleKindOff(kind)) then
-		PeekWindow(chatFrame)
+		PeekWindow(chatFrame, text)
 		return
 	end
 	waiting[#waiting + 1] = { chatFrame, text, GetTime() + BUBBLE_WAIT, event, author, guid,
@@ -782,7 +944,7 @@ local function CheckServerLines(chatFrame, watch, peekOn)
 			local prefix = SERVER_MESSAGE_PREFIX or "[SERVER]"
 			if peekOn and watch.newest ~= nil and text ~= watch.server and text:find(prefix, 1, true) then
 				watch.server = text
-				PeekWindow(chatFrame)
+				PeekWindow(chatFrame, text, true)
 			end
 		end
 	end
