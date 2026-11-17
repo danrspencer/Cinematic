@@ -219,6 +219,7 @@ Dev\KeysBarsTest.lua
 Dev\TurnLagTest.lua
 Dev\ReadyAnyTimeTest.lua
 Dev\FollowHudTest.lua
+Dev\ResetTest.lua
 Dev\EuiSwingTest.lua
 Dev\EuiCooldownTest.lua
 Dev\BuffFadeTest.lua

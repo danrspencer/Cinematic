@@ -278,7 +278,12 @@ local function Describe(level)
 	if level then
 		about:SetText("|cffffd100" .. level.label .. "|r   " .. level.tip .. (level.note and ("  " .. level.note) or ""))
 	else
-		about:SetText(L["Pick a level to try it now. You can change it any time, here or on the Profiles page."])
+		-- (And what it changes in the game, said before anything's picked: a
+		-- player's report 2026-11-17 found settings and layouts left after
+		-- removing the addon. Reset addon puts them back.)
+		about:SetText(L["Pick a level to try it now. You can change it any time, here or on the Profiles page."]
+			.. "\n" .. L["A level may change some game settings, like nameplates and names, and add an Edit Mode " ..
+			"layout. Before removing Cinematic, Reset addon on its main settings page puts them back."])
 	end
 end
 

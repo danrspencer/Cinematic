@@ -148,10 +148,23 @@ local function OwnValue(cvar)
 end
 
 -- Sets a game setting for good: straight away, or, while cinematic mode has
--- it put away, in the value it comes back to.
+-- it put away, in the value it comes back to. The player's own value from
+-- before the first such write is kept (cvarsBefore, per character as the
+-- game keeps these), so a reset puts it back (ns.PutBackOwnCVars): without
+-- it, removing the addon left plates and names as the rows had set them (a
+-- player's report, 2026-11-17).
 local function SetOwnValue(cvar, value)
 	if GetCVar(cvar) == nil then
 		return
+	end
+	local keep = ns.chardb or ns.db
+	if keep then
+		keep.cvarsBefore = keep.cvarsBefore or {}
+		if keep.cvarsBefore[cvar] == nil then
+			local yours = ns.db.savedCVars and ns.db.savedCVars[cvar]
+			if yours == nil then yours = GetCVar(cvar) end
+			keep.cvarsBefore[cvar] = yours
+		end
 	end
 	if ns.IsCVarHeld(cvar) then
 		ns.db.savedCVars[cvar] = value
@@ -161,6 +174,25 @@ local function SetOwnValue(cvar, value)
 	ns.db.savedCVars[cvar] = nil
 	if GetCVar(cvar) ~= value then
 		SetCVar(cvar, value)
+	end
+end
+
+-- Reset (Profiles.lua's ns.ResetAddon): the plate and name settings the
+-- rows wrote for good back to the player's own, from before the first write.
+-- Not in a fight (the reset waits for it to end).
+function ns.PutBackOwnCVars()
+	for _, keep in ipairs({ ns.chardb or false, ns.db or false }) do
+		local before = keep and keep.cvarsBefore
+		if before then
+			for cvar, value in pairs(before) do
+				if ns.db.savedCVars then ns.db.savedCVars[cvar] = nil end -- (a held one's "yours" is this now)
+				if GetCVar(cvar) ~= nil and GetCVar(cvar) ~= value then
+					ns.Log("cvar", ("%s back to %s (reset)"):format(cvar, tostring(value)))
+					SetCVar(cvar, value)
+				end
+			end
+			keep.cvarsBefore = nil
+		end
 	end
 end
 

@@ -925,6 +925,9 @@ function ns.ResetAddon(settingsOnly)
 		for cvar in pairs(ns.db.savedCVars) do held[#held + 1] = cvar end
 		for _, cvar in ipairs(held) do ns.RestoreCVar(cvar) end
 	end
+	-- The plate and name settings the Nameplates page's rows turned on for
+	-- good, back to the player's own (Effects.lua).
+	if ns.PutBackOwnCVars then ns.PutBackOwnCVars() end
 	-- (The dev copy keeps the Vitals Vision theme looks made with DEV SET
 	-- DEFAULT: work for LowHealthThemes.lua, not settings. resetKept: still a
 	-- fresh install to Core.lua.)

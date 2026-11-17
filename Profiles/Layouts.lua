@@ -1,6 +1,7 @@
--- Edit Mode layouts: Cinematic's own (EDIT_MODE_LAYOUTS), all made on logging
--- in if missing (EnsureLayouts), and switching to a profile's
--- (ns.ApplyProfileLayout). A built-in profile whose
+-- Edit Mode layouts: Cinematic's own (EDIT_MODE_LAYOUTS), each made only
+-- once a profile that uses it is picked (never just for installing: a
+-- player's report 2026-11-17 found three new layouts they never asked for),
+-- and switching to a profile's (ns.ApplyProfileLayout). A built-in profile whose
 -- layout module names one (db.editModeLayout) switches Edit Mode to it when
 -- it's picked, making it first if it isn't there; a profile without one
 -- puts back the layout the player was on before. The dev build's Dev page
@@ -496,10 +497,8 @@ ns.EDIT_MODE_LAYOUTS = {
 	["Personal Resource Centered"] = ns.isRetail and { systems = PURE_CINEMA_SYSTEMS, client = "retail" }
 		or { design = FOREVER_PURE, client = "forever" },
 }
--- (Made on logging in with the others since 2026-11-15, the Shoulder Cam
--- profile a welcome level: trying it there then needs no reload, and it's
--- made from the player's own layout, not one of ours a level tried before
--- left on. Till then made only when its profile was picked, testers' only.)
+-- (Made when its profile is picked, like the others, from the layout the
+-- player is on then; a reload offered as it's made.)
 ns.EDIT_MODE_LAYOUTS["Shoulder Cam"] = { design = SHOULDER_HUD, bars = { 2, 3 }, client = "forever" }
 -- The Follow HUD (dev only for now, FollowHud.lua): the layout the player was
 -- on as it was set up (chardb.followHudBase: theirs, or one of ours like
@@ -956,49 +955,8 @@ local function RenameOld()
 	if renamed then C_EditMode.SaveLayouts(info) end
 end
 
--- Ours for this client (def.client) that aren't in Edit Mode yet made, all
--- in one save, without switching to any: so switching profile only changes
--- the active layout. Added after the player's, so the active one's number
--- stays. Any that don't fit (the account's layouts full) are left out: a
--- profile that needs one says so then (ns.ApplyProfileLayout). On logging in
--- and on a reset (ns.ResetLayouts). Switching to one made this session still
--- needs a reload (madeNow): so they're made before they're needed.
-local function EnsureLayouts()
-	if Blocked() then return end
-	local info = C_EditMode.GetLayouts()
-	local max = Constants.EditModeConsts and Constants.EditModeConsts.EditModeMaxLayoutsPerType or 5
-	local count = 0
-	for _, layout in ipairs(info.layouts) do
-		if layout.layoutType == AccountType() then count = count + 1 end
-	end
-	local names = {}
-	for name, def in pairs(ns.EDIT_MODE_LAYOUTS) do
-		if (not def.client or def.client == ns.CLIENT) and not def.onDemand and not select(2, FindLayout(name)) then
-			names[#names + 1] = name
-		end
-	end
-	table.sort(names) -- (the same order every time)
-	local made = {}
-	for _, name in ipairs(names) do
-		if count >= max then
-			ns.Log("state", "edit mode layout not made, account layouts full: " .. name)
-		else
-			local layout = BuildLayout(name)
-			if layout then
-				info.layouts[#info.layouts + 1] = layout
-				count = count + 1
-				made[#made + 1] = name
-				madeNow[name] = true
-			end
-		end
-	end
-	if #made == 0 then return end
-	C_EditMode.SaveLayouts(info)
-	ns.Log("state", "edit mode layouts made: " .. table.concat(made, ", "))
-end
-
 -- On logging in (or a reload), once Edit Mode has its layouts: ours under
--- old names renamed, then the layout just remade, switched to again;
+-- old names renamed (none made here), then the layout just remade, switched to again;
 -- otherwise the profile's, as on switching to it. Edit Mode keeps a layout per character,
 -- so one logged into from a character on another profile can be on the
 -- wrong one (Retail's on a character whose profile isn't Retail).
@@ -1012,7 +970,6 @@ login:SetScript("OnEvent", function(self)
 	ns.chardb.layoutPending = nil
 	C_Timer.After(1, function()
 		RenameOld()
-		EnsureLayouts()
 		if not name then
 			if ns.ProfileChosen() then ns.ApplyProfileLayout() end
 			return
@@ -1095,11 +1052,11 @@ end
 
 -- Resetting Cinematic (ns.ResetAddon): back on the player's own layout (the
 -- one before a profile switched it; on one of ours with none saved, the
--- first preset), and Cinematic's own layouts made again from the code in
--- their places (changes made to them in Edit Mode undone), any missing
--- added: so after the reset's reload Edit Mode has them all, and switching
--- profile needs no reload. Ones for the other client deleted. Not in combat:
--- false then (and done nothing).
+-- first preset), and every one of Cinematic's own layouts deleted, as the
+-- reset's popup says: a profile that uses one makes it again when it's
+-- picked. (Till 2026-11-17 they were remade, so a reset before removing
+-- the addon still left them all.) Not in combat: false then (and done
+-- nothing).
 function ns.ResetLayouts()
 	if not (C_EditMode and C_EditMode.GetLayouts) or not ns.chardb then return true end
 	if InCombatLockdown() then return false end
@@ -1115,31 +1072,24 @@ function ns.ResetLayouts()
 		active = Presets()[1] and Presets()[1].layoutName
 	end
 	ns.chardb.layoutOwn = nil
-	local kept, remade, removed = {}, 0, 0
+	local kept, removed = {}, 0
 	for _, layout in ipairs(info.layouts) do
-		local name = Named(layout)
-		local def = ns.EDIT_MODE_LAYOUTS[name]
-		if not def then
-			kept[#kept + 1] = layout
-		elseif def.client and def.client ~= ns.CLIENT then
+		if ns.EDIT_MODE_LAYOUTS[Named(layout)] then
 			removed = removed + 1
 		else
-			kept[#kept + 1] = BuildLayout(name, active) or layout
-			remade = remade + 1
+			kept[#kept + 1] = layout
 		end
 	end
-	if remade + removed > 0 then
+	if removed > 0 then
 		info.layouts = kept
 		info.activeLayout = (active and IndexOf(info, active)) or 1
 		if ns.UnshrinkForLayout then ns.UnshrinkForLayout() end
 		C_EditMode.SaveLayouts(info)
-		ns.Log("state", ("reset: %d edit mode layout(s) remade, %d deleted, on %s"):format(remade, removed,
-			tostring(active)))
+		ns.Log("state", ("reset: %d edit mode layout(s) deleted, on %s"):format(removed, tostring(active)))
 	end
 	local index = active and IndexOf(C_EditMode.GetLayouts(), active)
 	if index and C_EditMode.GetLayouts().activeLayout ~= index then SetActive(index) end
 	SyncBars(active)
-	EnsureLayouts()
 	return true
 end
 
