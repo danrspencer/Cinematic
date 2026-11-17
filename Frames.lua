@@ -2233,15 +2233,15 @@ ns.COMBAT_SHOW = {
 	{ key = "player", label = L["Player frame"], default = true, frames = { "PlayerFrame" } },
 	-- Follows the player frame's ticks until set (see ROW_FALLBACK).
 	{ key = "petframe", label = L["Pet frame"], default = true, frames = { "PetFrame" } },
-	{ key = "prd", label = L["Personal health bar"], default = true, morePage = "Personal Resources",
+	{ key = "prd", label = L["Personal health bar"], default = true, morePage = "PRD Keep Up",
 		frames = { "PersonalResourceDisplayFrame", "CinematicPersonalResource" } },
 	-- Follows the health bar's ticks until set (see ROW_FALLBACK).
 	{ key = "prdpower", label = L["Personal resource bar"], default = true, frames = { "CinematicPersonalPower" },
-		morePage = "Personal Resources",
+		morePage = "PRD Keep Up",
 		tip = L["Your power under your character, plus class resources like combo points."] },
 	-- Nothing ticked to start with: its own setting (a few seconds after you use mana) shows it.
 	{ key = "prdmana", label = L["Cine Mana Bar"], default = false, frames = { "CinematicPersonalMana" },
-		morePage = "Personal Resources",
+		morePage = "PRD Keep Up",
 		tip = L["Your mana under your character when it isn't your main power."] },
 	{ key = "target", label = L["Target"], default = true, frames = { "TargetFrame" } },
 	{ key = "tot", label = L["Target of target"], default = true, frames = { "TargetFrameToT" } },

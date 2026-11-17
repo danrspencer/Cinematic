@@ -328,6 +328,29 @@ end
 -- Second, Show(i): another tab picked, for a page that's more than one tab
 -- (Unit Frames' Keep up and Frame Links, one page).
 function ns.PageTabs(content, list, picked)
+	-- (Only the tabs in the picked page's hub, 2026-11-17: an Interface icon's
+	-- list has its frame's Style pages too, now in the Style hub, and a
+	-- Vision's its Style. at: a list index to its tab here, for Show. Just
+	-- one left: named as its icon is, not "Vision" or "Style".)
+	local at, hub = {}, ns.PageHub and list[picked] and ns.PageHub(list[picked][2])
+	if hub then
+		local kept = {}
+		for i, each in ipairs(list) do
+			local other = ns.PageHub(each[2])
+			if not other or other == hub then
+				kept[#kept + 1] = each
+				at[i] = #kept
+			end
+		end
+		if #kept == 1 and #list > 1 then
+			local only = kept[1]
+			kept[1] = { ns.PageTileLabel(only[2]), only[2], only[3], only[4] }
+		end
+		list = kept
+	else
+		for i in ipairs(list) do at[i] = i end
+	end
+	picked = at[picked] or 1
 	local tabs = {}
 	for i, each in ipairs(list) do tabs[i] = { each[1], each[3] } end
 	-- (current: the tab shown now, picked or set by Show since: a page that's
@@ -337,9 +360,13 @@ function ns.PageTabs(content, list, picked)
 		-- (list[i][4]: opens its page even while picked, from a page under it)
 		if i ~= current or list[i][4] then ns.ShowHubPage(list[i][2]) end
 	end, nil, nil, function(i) ns.FlipPageSwitch(list[i][2]) end)
-	local function Show(i)
+	local function ShowAt(i)
 		current = i
 		ShowTab(i)
+	end
+	-- (Show: by the list's index as given; a tab in another hub, none here.)
+	local function Show(i)
+		if at[i] then ShowAt(at[i]) end
 	end
 	tabFrames.shotSkip = true -- (each its own page: PageShots.lua shoots those on their own)
 	-- (A right-click flips that tab's page switch: on or off on its tip.)
@@ -351,7 +378,7 @@ function ns.PageTabs(content, list, picked)
 	panel:SetPoint("TOPLEFT", base)
 	panel:SetPoint("RIGHT", content, "RIGHT", -8, 0)
 	panel:SetHeight(1)
-	Show(picked)
+	ShowAt(picked)
 	-- (kept on screen over the page's off card, to reach the other tabs)
 	content.pageTabs = { panel = panel, frames = tabFrames }
 	-- A page under tabs has no title, "?" or On/Off of its own (2026-11-16):
@@ -419,17 +446,28 @@ end
 -- For ns.PageTabs: { label, page, tip } each.
 local SHOW_IN_TABS = {
 	-- (PersonalResources.lua's page)
+	-- (The looks here are the Style hub's since 2026-11-17: ns.PageTabs shows a
+	-- page only its own hub's tabs. The PRD its own icon since then too.)
 	units = {
-		{ "Show", "HUD:units", "CineMode hides your unit frames and resource bars: pick which show, and when." },
-		{ "Show Advanced", "Personal Resources", "Brings your hidden frame and resource bars back while your health or power is low." },
+		{ "Show", "HUD:units", "CineMode hides your unit frames: pick which show, and when." },
+		{ "Show Advanced", "Personal Resources", "Brings your hidden player and pet frames back while your health or " ..
+			"power is low." },
 		-- (UnitStyle.lua's page, a tab here too: its look by its rows, 2026-11-16)
-		{ "UF Style", "Unit Style", "How the unit frames look." },
-		{ "PRD Style", "Personal Style", "How the personal resource display's bars look." }, -- (PersonalStyle.lua's)
+		{ "Unit Frames", "Unit Style", "How the unit frames look." },
 		-- (PlateCastStyle.lua's unit frames' page: yours, target & focus, boss & arena, and the Default row)
-		{ "Cast Style", "Unit Cast Style", "How your cast bar and the unit frames' cast bars look." },
+		{ "Cast Bars", "Unit Cast Style", "How your cast bar and the unit frames' cast bars look." },
 		-- (The links last, as on every icon's tabs.)
-		{ "Addon Reveal Link", "Unit Frame Links", "Which supported addon's frames stand in for the unit frames and " ..
-			"your resource bars." },
+		{ "Addon Reveal Link", "Unit Frame Links", "Which supported addon's frames stand in for the unit frames." },
+	},
+	-- (The personal resource display: the HUD's PRD section, PersonalResources.lua's
+	-- page at its PRD parts, PersonalStyle.lua's look.)
+	prd = {
+		{ "Show", "HUD:prd", "CineMode hides your personal resource display: pick which bars show, and when." },
+		{ "Show Advanced", "PRD Keep Up", "Brings your hidden resource bars back while your health or power is low.",
+			has = function() return _G.CinematicPersonalPower ~= nil end },
+		{ "Personal Resources", "Personal Style", "How the personal resource display's bars look." },
+		{ "Addon Reveal Link", "PRD Links", "Which supported addon's frames stand in for your resource bars.",
+			has = function() return _G.CinematicPersonalPower ~= nil end },
 	},
 	-- (Two of the HUD page's sections, then RaidStyle.lua's page)
 	party = {
@@ -475,10 +513,10 @@ local SHOW_IN_TABS = {
 	plates = {
 		{ "Show", "Nameplates", "CineMode hides nameplates: pick which show, and when." },
 		{ "Icons", "Plate Icons", "Icons beside players' health bars on their nameplates." },
-		{ "Default Plate Style", "Nameplate Style", "How the nameplates look, before Smart Style's rows." },
+		{ "Default", "Nameplate Style", "How the nameplates look, before Smart's rows." },
 		-- (Nameplate Style's rows, its second part: Options.lua's CreateTargetArrowPanel)
-		{ "Smart Style", "Nameplate Marks", "Rows that mark and color plates, like your target, focus and aggro." },
-		{ "Cast Style", "Cast Bar Style", "How the nameplates' cast bars look." },
+		{ "Smart", "Nameplate Marks", "Rows that mark and color plates, like your target, focus and aggro." },
+		{ "Cast Bars", "Cast Bar Style", "How the nameplates' cast bars look." },
 	},
 	names = {
 		{ "Show", "Nameplate Names", "CineMode hides names over heads: pick which show, and when." },

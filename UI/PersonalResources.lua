@@ -739,13 +739,22 @@ end
 function ns.CreatePersonalResourcesPanel(kit)
 	local canvas, content = kit.CreateScrollPage()
 	-- (The Unit Frames icon's Keep up and Frame Links tabs, 2026-11-16: its
-	-- Show in tab is the HUD page's; the three tabs over the title on both,
-	-- ns.UnitFrameTabs. Its title is the tab shown, so the On/Off by it reads
-	-- as Keep up's own switch.)
+	-- Show in tab is the HUD page's. Its title is the tab shown, so the On/Off
+	-- by it reads as Keep up's own switch.)
+	-- (Two icons' tabs over the title since 2026-11-17, as the Nameplates
+	-- page's: Unit Frames' (the player and pet frames' rows and links) and
+	-- Personal Resources' (the PRD's), only the picked icon's shown.)
 	local title = kit.Label(content, "GameFontNormalLarge", L["Keep up while low"])
-	local outerPanel, ShowOuter = ns.PageTabs(content, ns.UnitFrameTabs(), 2)
-	title:SetPoint("TOPLEFT", outerPanel, "BOTTOMLEFT", 8, -14)
 	local hasDisplay = _G.CinematicPersonalPower ~= nil
+	local outerPanel, ShowUnitTab = ns.PageTabs(content, ns.ShowInTabs("units"), ns.ShowInIndex("units", "Personal Resources"))
+	local unitSet = content.pageTabs
+	local ShowPrdTab, prdSet
+	if hasDisplay then
+		ShowPrdTab = select(2, ns.PageTabs(content, ns.ShowInTabs("prd"), ns.ShowInIndex("prd", "PRD Keep Up")))
+		prdSet = content.pageTabs
+	end
+	content.pageTabs = unitSet
+	title:SetPoint("TOPLEFT", outerPanel, "BOTTOMLEFT", 8, -14)
 	local intro = kit.PageIntro(content, title,
 		L["Brings your hidden player and pet frames back in CineMode while your health or power runs low."])
 	-- (Their look: the Unit Frames icon's Resource Style tab.)
@@ -757,7 +766,10 @@ function ns.CreatePersonalResourcesPanel(kit)
 	end)
 	-- Two parts (Options.lua's ns.PageTabsBelow, its own tabs not drawn: the
 	-- Unit Frames tabs over the title pick them): Keep up, and Frame Links.
-	local unitLinks -- (the unit frames' links, over the bars' on Frame Links: below)
+	local unitLinks, unitsHead, prdHead -- (the unit frames' links, over the bars' on Frame Links: below)
+	-- (The PRD's: its grid and Cine Mana Bar's settings, shown on its icon only. Below.)
+	local unitGrid, prdGrid, holder
+	local prdParts = {}
 	local hosts, PickPart, TabsShown, AdoptTab, prdLinks = ns.PageTabsBelow(content, switch, {
 		{ L["Show Advanced"], L["Brings your hidden frame and resource bars back while your health or power is low."] },
 		{ L["Addon Reveal Link"], L["Which supported addon's frames stand in for these frames and bars."] },
@@ -769,12 +781,12 @@ function ns.CreatePersonalResourcesPanel(kit)
 	-- page: AdoptTab takes what's new on the page onto Keep up.)
 	do
 		local linksHost = hosts[2]
-		local unitsHead = kit.Label(linksHost, "GameFontNormal", L["Unit frames"])
+		unitsHead = kit.Label(linksHost, "GameFontNormal", L["Unit frames"])
 		unitsHead:SetPoint("TOPLEFT", linksHost, "TOPLEFT", 0, 0)
 		unitLinks = ns.BuildLinkSection(content, unitsHead, "units", true)
 		unitLinks.frame:SetParent(linksHost)
 		ns.RegisterLinkSection("units", unitLinks.frame, unitLinks.body.openSection)
-		local prdHead = kit.Label(linksHost, "GameFontNormal", L["Personal Resource Display"])
+		prdHead = kit.Label(linksHost, "GameFontNormal", L["Personal Resource Display"])
 		prdHead:SetPoint("TOPLEFT", unitLinks.frame, "BOTTOMLEFT", -2, -18)
 		if prdLinks then
 			prdLinks.frame:ClearAllPoints()
@@ -782,23 +794,65 @@ function ns.CreatePersonalResourcesPanel(kit)
 			prdLinks.frame:SetPoint("RIGHT", content, "RIGHT", -16, 0)
 		end
 	end
-	-- Each part a hidden hub tile under the Unit Frames icon (its tabOf in
-	-- HUBS), picked by its tab: Keep up's title and switch, or Frame Links'.
-	local function ShowPart(i)
+	-- Which icon's this page is now: the Unit Frames icon's (the player and
+	-- pet frames) or the Personal Resources icon's (the PRD), 2026-11-17: its
+	-- tabs, its Keep up rows and its links.
+	local function SetIcon(prd)
+		prd = prd and prdSet ~= nil
+		for _, set in ipairs({ unitSet, prdSet or false }) do
+			if set then
+				local mine = (set == prdSet) == prd
+				set.panel:SetShown(mine)
+				for _, tab in ipairs(set.frames) do tab:SetShown(mine) end
+			end
+		end
+		content.pageTabs = prd and prdSet or unitSet
+		if unitGrid then unitGrid:SetShown(not prd) end
+		if prdGrid then prdGrid:SetShown(prd) end
+		local grid = prd and prdGrid or unitGrid
+		if holder and grid then holder:SetHeight(grid:GetHeight()) end
+		for _, part in ipairs(prdParts) do part:SetShown(prd) end
+		-- (Links: the unit frames', or the bars' at the top in their place.)
+		if unitLinks then unitLinks.frame:SetShown(not prd) end
+		if unitsHead then unitsHead:SetShown(not prd) end
+		if prdHead then
+			prdHead:SetShown(prd)
+			prdHead:ClearAllPoints()
+			prdHead:SetPoint("TOPLEFT", hosts[2], "TOPLEFT", 0, 0)
+		end
+		if prdLinks then prdLinks.frame:SetShown(prd) end
+		return prd
+	end
+	-- Each part a hidden hub tile under its icon (its tabOf: HUBS', or the
+	-- tab's), picked by its tab: Keep up's title and switch, or Frame Links'.
+	local function ShowPart(i, prd)
 		PickPart(i)
-		ShowOuter(ns.ShowInIndex("units", i == 1 and "Personal Resources" or "Unit Frame Links"))
+		prd = SetIcon(prd)
+		if prd then
+			ShowPrdTab(ns.ShowInIndex("prd", i == 1 and "PRD Keep Up" or "PRD Links"))
+		else
+			ShowUnitTab(ns.ShowInIndex("units", i == 1 and "Personal Resources" or "Unit Frame Links"))
+		end
 		title:SetText(i == 1 and L["Keep up while low"] or L["Addon Reveal Link"])
 		content.headerSwitchOff = i ~= 1 -- (no On/Off by Frame Links: it isn't Keep up's)
 		local header = content.pageHeaderSwitch
 		if header then header:SetShown(i == 1) end
 	end
-	local ICON = "Interface\\Icons\\Ability_Racial_BloodRage"
+	local ICON = "Interface\\AddOns\\" .. ADDON_NAME .. "\\Textures\\PersonalResources" -- (Media/make_prd_icon.py)
 	canvas.hubTabs = {
 		{ name = "Personal Resources", icon = ICON, label = "Unit Frames", switchLabel = "Keep up while low",
-			onSelect = function() ShowPart(1) end },
+			onSelect = function() ShowPart(1, false) end },
 		{ name = "Unit Frame Links", icon = ICON, label = "Unit Frames", own = true, noSwitch = true,
-			onSelect = function() ShowPart(2) end },
+			onSelect = function() ShowPart(2, false) end },
 	}
+	-- (The PRD's two, under the HUD's Personal Resources icon: tabOf.)
+	if prdSet then
+		local list = canvas.hubTabs
+		list[#list + 1] = { name = "PRD Keep Up", icon = ICON, label = "Personal Resources", own = true,
+			tabOf = "HUD:prd", switchLabel = "Keep up while low", onSelect = function() ShowPart(1, true) end }
+		list[#list + 1] = { name = "PRD Links", icon = ICON, label = "Personal Resources", own = true,
+			tabOf = "HUD:prd", noSwitch = true, onSelect = function() ShowPart(2, true) end }
+	end
 	local stack = kit.Stack(switch, "check")
 	local function Tick(key, label, tip, enabledBy)
 		local check = stack:Add(kit.Check(content, key, label, tip), "check")
@@ -833,16 +887,18 @@ function ns.CreatePersonalResourcesPanel(kit)
 	-- the others' are named after it, KeepUpDefaults) }. Each frame its own
 	-- rows (one set for the player frame and PRD till 2026-11-15: profiles
 	-- now pick which is kept up).
+	-- (Two sets since 2026-11-17: the Unit Frames icon's rows, the PRD's.)
 	local rows = {
 		{ L["Player Frame: Health"], L["Your player frame, by your health."], "prHealthPlayer", true },
 		{ function() return L["Player Frame: %s"]:format(PowerName()) end,
 			L["Your player frame, kept up by your power."], "prPowerPlayer" },
 	}
-	local function AddRow(row)
-		rows[#rows + 1] = row
-	end
 	if _G.PetFrame then
-		AddRow({ L["Pet Frame: Health"], L["Your pet frame, by your pet's health."], "prPetHealth" })
+		rows[#rows + 1] = { L["Pet Frame: Health"], L["Your pet frame, by your pet's health."], "prPetHealth" }
+	end
+	local prdRows = {}
+	local function AddRow(row)
+		prdRows[#prdRows + 1] = row
 	end
 	if hasDisplay then
 		AddRow({ L["PRD: Health"], L["The game's personal resource display (PRD): its health bar."],
@@ -874,7 +930,7 @@ function ns.CreatePersonalResourcesPanel(kit)
 	total = fadeLeft + FADE_W
 	local FADE_TIP = L["Fades it in as your health drops, fully up at this share."]
 	local function CenterX(c) return left[c] + COL_W / 2 end
-	local holder = CreateFrame("Frame", nil, content)
+	holder = CreateFrame("Frame", nil, content)
 	holder:SetSize(total, 1)
 	local named = {} -- { [label] = function } (the power rows: named again as the page shows)
 	local LINK_TEX = "Interface\\AddOns\\" .. ADDON_NAME .. "\\Textures\\Link" -- (Media/make_link.py)
@@ -987,7 +1043,12 @@ function ns.CreatePersonalResourcesPanel(kit)
 		end
 		return grid
 	end
-	holder:SetHeight(BuildGrid(rows):GetHeight())
+	unitGrid = BuildGrid(rows)
+	if #prdRows > 0 then
+		prdGrid = BuildGrid(prdRows)
+		prdGrid:Hide()
+	end
+	holder:SetHeight(unitGrid:GetHeight())
 	stack:Add(holder, "label")
 	-- (One for every row: each bar waits for what it shows.)
 	Tick("fightWaitPull", L["Wait at pull"],
@@ -1004,6 +1065,11 @@ function ns.CreatePersonalResourcesPanel(kit)
 
 	-- Mana under the power bar, when it isn't your power (PersonalMana.lua; its
 	-- look: the Style hub's Personal Resource Style page).
+	-- (What's made from here to the end of Cine Mana Bar's settings: the PRD
+	-- icon's only, prdParts.)
+	local before = {}
+	for _, object in ipairs({ content:GetChildren() }) do before[object] = true end
+	for _, object in ipairs({ content:GetRegions() }) do before[object] = true end
 	if ns.PERSONAL_MANA then
 		stack:Header(content, L["Cine Mana Bar"])
 		local function Update()
@@ -1025,6 +1091,14 @@ function ns.CreatePersonalResourcesPanel(kit)
 		updater.Refresh = Update
 		kit.AddControl(updater)
 	end
+	for _, set in ipairs({ { content:GetChildren() }, { content:GetRegions() } }) do
+		for _, object in ipairs(set) do
+			if not before[object] then
+				prdParts[#prdParts + 1] = object
+				object:Hide()
+			end
+		end
+	end
 
 	-- (And after the page's Reset, or a profile loaded: drawn as the settings are now.)
 	local redrawer = CreateFrame("Frame", nil, content)
@@ -1032,6 +1106,7 @@ function ns.CreatePersonalResourcesPanel(kit)
 	kit.AddControl(redrawer)
 
 	AdoptTab(switch) -- (everything above onto the Settings tab)
+	SetIcon(false) -- (the Unit Frames icon's to start with: the PRD's parts put away)
 
 	canvas:SetScript("OnShow", kit.PageShown(function()
 		for text, Name in pairs(named) do text:SetText(Name()) end

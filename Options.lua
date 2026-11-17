@@ -2277,13 +2277,14 @@ do
 		end
 		menu.flushed, menu.queue = true, {}
 	end
-	-- Interface, Visions and Quality of Life open in the left list as one of
+	-- Interface, Visions, Style and Quality of Life open in the left list as one of
 	-- their pages shows, and fold again as you go elsewhere (2026-11-16); so
 	-- do their group lines (Heads-up...) and Wheels under them: a line open
 	-- while the page shown is it or one under it. The game's list: a
 	-- category's SetExpanded, the list made again. (Its names unchecked on
 	-- each client: /cine log says what it found, once.)
-	menu.parentOf, menu.fold = {}, { ["UI Manager"] = true, Visions = true, ["Quality of life"] = true, Wheels = true }
+	menu.parentOf, menu.fold = {}, { ["UI Manager"] = true, Visions = true, Style = true, ["Quality of life"] = true,
+		Wheels = true }
 	local logged
 	local function Fold(current)
 		local list = SettingsPanel and SettingsPanel.GetCategoryList and SettingsPanel:GetCategoryList()
@@ -2559,9 +2560,9 @@ do
 		-- (the screen's edges: any icon not listed). Each a line in the left list.)
 		{ name = "UI Manager", label = "Interface", plain = true, note = { "Addon frames moved to the Addons hub >",
 			"Advanced Frames" }, groups = { order = { "Heads-up", "Overhead", "Info" }, other = "Info",
-				["HUD:hud"] = false, ["HUD:units"] = "Heads-up", ["HUD:party"] = "Heads-up", ["HUD:bars"] = "Heads-up",
+				["HUD:hud"] = false, ["HUD:units"] = "Heads-up", ["HUD:prd"] = "Heads-up", ["HUD:party"] = "Heads-up", ["HUD:bars"] = "Heads-up",
 				["HUD:buffs"] = "Heads-up", ["HUD:combat"] = "Heads-up",
-				Nameplates = "Overhead", ["Nameplate Names"] = "Overhead", ["Combat Text Style"] = "Overhead" },
+				Nameplates = "Overhead", ["Nameplate Names"] = "Overhead" },
 			colors = {
 			["Heads-up"] = { 0.35, 0.6, 0.9 }, Overhead = { 0.85, 0.55, 0.25 }, Info = { 0.45, 0.75, 0.45 },
 			["What Shows"] = { 0.75, 0.65, 0.45 }, Mouseover = { 0.35, 0.6, 0.9 }, ["Unit Frames"] = { 0.35, 0.6, 0.9 },
@@ -2583,33 +2584,15 @@ do
 			-- Show in first, 2026-11-16: PersonalResources.lua.)
 			{ "Personal Resources", "Interface\\Icons\\Ability_Racial_BloodRage", -- (Bloodrage: health into power)
 				label = "Unit Frames", section = "Unit Frames", tabOf = "HUD:units" },
-			{ "Unit Style", "Interface\\Icons\\INV_Misc_Head_Human_01", label = "Unit Frame Style", section = "Unit Frames",
-				tabOf = "HUD:units" }, -- (the Unit Frames icon's Style tab)
-			{ "Personal Style", "Interface\\Icons\\Spell_Holy_SealOfVengeance", label = "Personal Resource Style",
-				section = "Unit Frames", tabOf = "HUD:units" }, -- (the Unit Frames icon's Resource Style tab)
-			-- (The unit frames' cast bars, PlateCastStyle.lua: the Unit Frames icon's Cast Style tab, 2026-11-16.)
-			{ "Unit Cast Style", "Interface\\Icons\\Spell_Nature_Lightning", label = "Cast Style", section = "Unit Frames",
-				tabOf = "HUD:units" },
-			{ "Raid Style", "Interface\\Icons\\INV_Misc_GroupNeedMore", label = "Raid Frame Style", section = "Party & Raid",
-				tabOf = "HUD:party" }, -- (the Party & Raid icon's Raid Style tab)
+			-- (The frames' looks: the Style hub's since 2026-11-17.)
 			-- (Nameplates and Names, 2026-11-16: two icons, both the Nameplates page's
 			-- tiles (CreatePlatesPanel), the rest their tabs. Their own hub till then.)
 			{ "Nameplates", "Interface\\Icons\\Ability_Hunter_SniperShot", label = "Nameplates", section = "Nameplates" },
 			{ "Plate Icons", "Interface\\Icons\\INV_Misc_GroupNeedMore", label = "Icons", section = "Nameplates",
 				tabOf = "Nameplates" }, -- (PlateIcons.lua)
-			{ "Nameplate Style", "Interface\\Icons\\Ability_Marksmanship", label = "Nameplate Style", section = "Nameplates",
-				tabOf = "Nameplates" },
-			{ "Cast Bar Style", "Interface\\Icons\\Spell_Nature_Lightning", label = "Cast Bar Style", section = "Nameplates",
-				tabOf = "Nameplates" },
-			{ "Name Style", "Interface\\Icons\\INV_Misc_Note_02", label = "Name Style", section = "Nameplates",
-				tabOf = "Nameplate Names" },
-			{ "Action Style", "Interface\\Icons\\Ability_DualWield", label = "Action Bar Style", section = "Action Bars",
-				tabOf = "HUD:bars" }, -- (the Action Bars icon's Bar Style tab)
 			{ "Chat", "Interface\\Icons\\INV_Scroll_03", section = "Chat" },
 			-- (The Chat icon's Bubbles and Bubble Style tabs, 2026-11-16.)
 			{ "Chat bubbles", "Interface\\Icons\\Ability_Warrior_BattleShout", label = "Chat Bubbles", section = "Chat",
-				tabOf = "HUD:chat" },
-			{ "Bubble Style", "Interface\\Icons\\Ability_Warrior_RallyingCry", label = "Chat Bubble Style", section = "Chat",
 				tabOf = "HUD:chat" },
 			-- (Reveal and Frame Links: tabs of their icons, the HUD's Show in first, 2026-11-16.)
 			{ "Minimap", "Interface\\Icons\\INV_Misc_Map_01", section = "Map & Quests", tabOf = "HUD:minimap" },
@@ -2617,8 +2600,6 @@ do
 			-- (Its picture the game's own mouse pointer.)
 			{ "Mouseover groups", "Interface\\Cursor\\Point", label = "Mouseover", section = "Mouseover" },
 			{ "Tooltips", "Interface\\Icons\\INV_Misc_Book_09", section = "Mouseover", tabOf = "Mouseover groups" },
-			{ "Tooltip Style", "Interface\\Icons\\INV_Misc_Note_05", label = "Tooltip Style", section = "Mouseover",
-				tabOf = "Mouseover groups" },
 			{ "Cursor Hide", "Interface\\Icons\\INV_Misc_Eye_01", section = "Mouseover", tabOf = "Mouseover groups" }, -- (CursorHide.lua)
 			{ "Quest tracker", "Interface\\Icons\\INV_Misc_Note_01", label = "Quest Tracker", section = "Map & Quests",
 				tabOf = "HUD:quests" },
@@ -2630,8 +2611,6 @@ do
 			{ "Swing timer", "Interface\\Icons\\INV_Sword_04", label = "Swing Timer", section = "Timers",
 				tabOf = "HUD:combat" },
 			{ "Breath Bar", "Interface\\Icons\\Spell_Shadow_DemonBreath", section = "Timers", tabOf = "HUD:combat" },
-			{ "Combat Text Style", "Interface\\Icons\\Ability_Warrior_Riposte", label = "Combat Text Style",
-				section = "Combat Text" },
 		} },
 		-- (Cameras: what everyone has; Dev: the dev copy's own, to the right)
 		-- (master: Enable Cameras; its pages with no switch of their own show Off with it)
@@ -2662,21 +2641,58 @@ do
 		{ name = "Atmosphere", colors = { Visuals = { 0.65, 0.45, 0.9 }, Audio = { 0.3, 0.7, 0.5 } }, pages = {
 			{ "Effects", "Interface\\Icons\\Spell_Holy_Restoration", label = "General" }, -- (in no section: a band of its own)
 			{ "Tint", "Interface\\Icons\\INV_Misc_Gem_Variety_02", section = "Visuals" },
-			-- (tabOf: no icon of its own, a folder tab on that page's (ns.PageTabs))
-			{ "Tint Style", "Interface\\Icons\\INV_Misc_Gem_Variety_02", tabOf = "Tint" },
+			-- (Tint Style and Letterbox Style: the Style hub's since 2026-11-17.)
 			{ "Letterbox", "Interface\\Icons\\Spell_Shadow_ShadesOfDarkness", section = "Visuals" },
-			{ "Letterbox Style", "Interface\\Icons\\Spell_Shadow_ShadesOfDarkness", tabOf = "Letterbox" },
 			{ "Graphics+", "Interface\\Icons\\INV_Misc_Gem_Pearl_04", label = "Graphics Boost", section = "Visuals" },
 			{ "Audio", "Interface\\Icons\\INV_Misc_Drum_01", section = "Audio" },
 		} },
-		-- (The look of the whole interface: Enable Style and the theme, and the
-		-- recolor. Each frame's own look is on its page in the Interface hub,
-		-- nameplates' in theirs, a Vision's on its own: 2026-11-16.)
-		{ name = "Style", pages = {
+		-- (Every look in one hub, 2026-11-17: General (Enable Style, the theme,
+		-- the recolor), then a band each for the Interface's frames (as the
+		-- Interface hub's icons: Heads-up, then Overhead, then Info), the
+		-- Visions and Atmosphere. The pages' ids kept; the Interface, Visions
+		-- and Atmosphere hubs keep when each shows, ns.PageTabs splitting their
+		-- shared tab lists by hub.)
+		-- (collapse: each band just its first icon, opening as one of its pages is picked.)
+		{ name = "Style", collapse = true, colors = { Interface = { 0.35, 0.6, 0.9 }, Visions = { 0.85, 0.3, 0.25 },
+			Atmosphere = { 0.65, 0.45, 0.9 } }, pages = {
 			{ "Style General", "Interface\\Icons\\INV_Misc_Gear_08", label = "General" },
 			{ "Style Pages", "Interface\\Icons\\INV_Misc_Gear_08", tabOf = "Style General" }, -- (GeneralStyle.lua)
 			{ "Style Overrides", "Interface\\Icons\\INV_Misc_Gear_08", tabOf = "Style General" }, -- (StyleOverrides.lua)
 			{ "Interface Recolor", "Interface\\Icons\\INV_Misc_Gem_01", tabOf = "Style General" }, -- (InterfaceRecolor.lua: General's last tab)
+			-- (Labels without "Style", 2026-11-17: you're in the Style hub. Ids kept.)
+			-- (Interface: Unit Frames' two looks on one icon, its cast bars a tab.)
+			{ "Unit Style", "Interface\\Icons\\INV_Misc_Head_Human_01", label = "Unit Frames", section = "Interface" },
+			{ "Unit Cast Style", "Interface\\Icons\\Spell_Nature_Lightning", label = "Cast Bars", section = "Interface",
+				tabOf = "Unit Style" }, -- (PlateCastStyle.lua's unit frames' page)
+			-- (The personal resource display its own icon, as in the Interface hub: 2026-11-17.)
+			{ "Personal Style", ns.HELP_DISC:gsub("HelpDisc$", "PersonalResources"), label = "Personal Resources",
+				section = "Interface" },
+			{ "Raid Style", "Interface\\Icons\\INV_Misc_GroupNeedMore", label = "Raid Frames", section = "Interface" },
+			{ "Action Style", "Interface\\Icons\\Ability_DualWield", label = "Action Bars", section = "Interface" },
+			-- (Nameplate Style: its Smart tab a second icon of its page's, hidden under it: canvas.hubTabs.)
+			{ "Nameplate Style", "Interface\\Icons\\Ability_Marksmanship", label = "Nameplates", section = "Interface" },
+			{ "Cast Bar Style", "Interface\\Icons\\Spell_Nature_Lightning", label = "Cast Bars", section = "Interface",
+				tabOf = "Nameplate Style" },
+			{ "Name Style", "Interface\\Icons\\INV_Misc_Note_02", label = "Names", section = "Interface" },
+			{ "Combat Text Style", "Interface\\Icons\\Ability_Warrior_Riposte", label = "Combat Text",
+				section = "Interface" },
+			{ "Bubble Style", "Interface\\Icons\\Ability_Warrior_RallyingCry", label = "Chat Bubbles",
+				section = "Interface" },
+			{ "Tooltip Style", "Interface\\Icons\\INV_Misc_Note_05", label = "Tooltips", section = "Interface" },
+			-- (Visions: the look they share (VisionsStyle.lua), then each Vision's.)
+			{ "Visions Style", "Interface\\Icons\\INV_Misc_Gear_08", label = "All Visions", section = "Visions" },
+			{ "Damage Vision Look", "Interface\\Icons\\Ability_Warrior_Rampage", label = "Damage", section = "Visions" },
+			{ "Vitals Style", "Interface\\Icons\\Spell_Shadow_LifeDrain02", label = "Vitals", section = "Visions" },
+			{ "Quest Talk Style", "Interface\\Icons\\INV_Scroll_02", label = "Quest", section = "Visions" },
+			{ "Quest Item Style", "Interface\\Icons\\INV_Misc_Key_03", section = "Visions", tabOf = "Quest Talk Style" },
+			{ "Roll Style", "Interface\\Icons\\INV_Misc_Dice_02", label = "Roll", section = "Visions" },
+			{ "Emote Vision Style", "Interface\\Icons\\Spell_Holy_PrayerOfFortitude", label = "Emote",
+				section = "Visions" },
+			{ "Card Styles", "Interface\\Icons\\INV_Misc_Book_09", label = "Card Types", section = "Visions" }, -- (CardsPage.lua)
+			-- (Atmosphere: the effects' looks.)
+			{ "Tint Style", "Interface\\Icons\\INV_Misc_Gem_Variety_02", label = "Tint", section = "Atmosphere" },
+			{ "Letterbox Style", "Interface\\Icons\\Spell_Shadow_ShadesOfDarkness", label = "Letterbox",
+				section = "Atmosphere" },
 		} },
 		-- (Everything about nameplates, listed after Interface: which show
 		-- (General: the Nameplates page, its id kept), the icons on them, then
@@ -2687,27 +2703,19 @@ do
 			-- (General: every Vision as a card, 2026-11-16. VisionsStyle.lua: the
 			-- look they share. Each in no section, a band of its own.)
 			{ "Visions General", "Interface\\Icons\\INV_Misc_Book_11", label = "General" },
-			{ "Visions Style", "Interface\\Icons\\INV_Misc_Gear_08" },
 			{ "Heal Vision", "Interface\\Icons\\Spell_Holy_FlashHeal", section = "Combat" },
 			-- (tabOf: no icon of its own, a folder tab on that page's (ns.PageTabs))
 			{ "Damage Vision", "Interface\\Icons\\Ability_Warrior_Rampage", section = "Combat" }, -- (DamageVision.lua)
-			{ "Damage Vision Look", "Interface\\Icons\\Ability_Warrior_Rampage", tabOf = "Damage Vision" },
 			{ "Vitals Vision", "Interface\\Icons\\Spell_Shadow_LifeDrain02", section = "Combat" },
-			{ "Vitals Style", "Interface\\Icons\\Spell_Shadow_LifeDrain02", tabOf = "Vitals Vision" },
 			{ "Quest Vision", "Interface\\Icons\\INV_Misc_Head_Dragon_01", section = "World" },
-			{ "Quest Talk Style", "Interface\\Icons\\INV_Scroll_02", tabOf = "Quest Vision" },
-			{ "Quest Item Style", "Interface\\Icons\\INV_Misc_Key_03", tabOf = "Quest Vision" },
 			{ "Roll Vision", "Interface\\Icons\\INV_Misc_Dice_01", section = "World" },
-			{ "Roll Style", "Interface\\Icons\\INV_Misc_Dice_02", tabOf = "Roll Vision" },
 			{ "Teleport Vision", "Interface\\Icons\\Spell_Arcane_TeleportStormWind",
 				section = "World" }, -- (TeleportVision.lua; its tooltip: ns.TILE_TOOLTIPS)
 			{ "Duel Vision", "Interface\\Icons\\Ability_DualWield", section = "World" },
 			{ "Emote Vision", "Interface\\Icons\\Spell_Holy_PrayerOfFortitude", section = "World" }, -- (EmoteVision.lua)
 			{ "Emote Vision Settings", "Interface\\Icons\\Spell_Holy_PrayerOfFortitude", tabOf = "Emote Vision" },
-			{ "Emote Vision Style", "Interface\\Icons\\Spell_Holy_PrayerOfFortitude", tabOf = "Emote Vision" },
 			-- (CardsPage.lua's: Battle Vision's and Story Vision's moments, one page)
 			{ "Card Vision", "Interface\\Icons\\INV_Misc_Book_09", section = "World" },
-			{ "Card Styles", "Interface\\Icons\\INV_Misc_Book_09", label = "Card Types", tabOf = "Card Vision" },
 			-- (an event's own pages: not tabs on the page's, opened from its row)
 			{ "Card Settings", "Interface\\Icons\\INV_Misc_Book_09", tabOf = "Card Vision" },
 			{ "Card Style", "Interface\\Icons\\INV_Misc_Book_09", tabOf = "Card Vision" },
@@ -2894,10 +2902,29 @@ do
 			end
 			run[#run + 1] = tile
 		end
+		-- (hub.collapse: a band shows just its first icon till one of its pages
+		-- is picked, the rest coming out then; the Style hub's, 2026-11-17.)
+		local count = #hub.tiles
+		if hub.collapse then
+			local lit = hub.current and Lit(hub.current)
+			for _, run in ipairs(runs) do
+				local open = not run.section
+				for _, tile in ipairs(run) do
+					if tile == lit then open = true end
+				end
+				if not open then
+					for i = #run, 2, -1 do
+						run[i]:Hide()
+						run[i] = nil
+						count = count - 1
+					end
+				end
+			end
+		end
 		-- (all but the icons themselves: gaps, band padding, the page's edges)
 		local fixed = EDGE * 2 + (#runs - 1) * SECTION_GAP
 		for _, run in ipairs(runs) do fixed = fixed + (#run - 1) * TILE_GAP + BAND_PAD * 2 end
-		local size = math.max(MIN_TILE, math.min(TILE, math.floor((width - fixed) / math.max(1, #hub.tiles))))
+		local size = math.max(MIN_TILE, math.min(TILE, math.floor((width - fixed) / math.max(1, count))))
 		local high = size + BAND_PAD * 2
 		local x, y = EDGE, -BAR - EDGE
 		local used = {}
@@ -3013,6 +3040,8 @@ do
 		end
 		hub.current = tile
 		Light(Lit(tile), true)
+		-- (A collapsed hub's bands open and close by the page picked: laid out again.)
+		if hub.collapse then Layout(hub) end
 		PaintBands(hub)
 		if tile.onSelect then tile.onSelect() end
 		local shown = run and debugprofilestop()
@@ -3603,6 +3632,35 @@ do
 		return L[name]
 	end
 
+	-- The hub a page is in, by its English name ("UI Manager", "Style"...),
+	-- or nil when it's not known. ns.PageTabs keeps only a page's own hub's
+	-- tabs (2026-11-17: the frames' looks moved to the Style hub, their
+	-- shared tab lists split by hub). ns.PAGE_HUB: pages that are only another
+	-- page's icons (canvas.hubTabs), not in HUBS.
+	-- (A table on ns, not a local: this block's locals are near Lua's cap.)
+	ns.PAGE_HUB = { ["Nameplate Marks"] = "Style", ["Nameplate Names"] = "UI Manager",
+		["Unit Frame Links"] = "UI Manager", ["Chat Links"] = "UI Manager", ["Buffs Links"] = "UI Manager",
+		["Minimap Links"] = "UI Manager", ["Minimap Keep Open"] = "UI Manager", ["Quest Tracker Links"] = "UI Manager",
+		["PRD Keep Up"] = "UI Manager", ["PRD Links"] = "UI Manager" }
+	function ns.PageHub(name)
+		if type(name) ~= "string" then return nil end
+		if ns.PAGE_HUB[name] then return ns.PAGE_HUB[name] end
+		if name:find("^HUD:") then return "UI Manager" end
+		for _, hub in ipairs(HUBS) do
+			for _, page in ipairs(hub.pages) do
+				if page[1] == name then return hub.name end
+			end
+		end
+		local tile = byName[name]
+		return tile and tile.hub and tile.hub.name or nil
+	end
+	-- A page's name as its icon shows it, its hidden icons' too (Names).
+	function ns.PageTileLabel(name)
+		local tile = byName[name]
+		if tile and tile.label then return L[tile.label] end
+		return ns.PageLabel(name)
+	end
+
 	-- Whether a page (its English name; nil: the main page) goes by every
 	-- one of parts (lower case): each found in its name, its label, the page
 	-- it's a tab of, its hub's or the hub that's under, in English or the
@@ -3767,7 +3825,8 @@ do
 					local tabs = key and ns.ShowInTabs and ns.ShowInTabs(key) or ns.HubTabsOf(hubName, tile.english)
 					for _, tab in ipairs(tabs) do
 						local page = tab[2]
-						if page ~= tile.english and byName[page] then
+						-- (only this hub's: an Interface icon's list has its Style pages too)
+						if page ~= tile.english and byName[page] and byName[page].hub == hub then
 							local tabSwitch = TileSwitch(byName[page])
 							local state = StateOf(tabSwitch)
 							state.name, state.label = page, tab[1]
@@ -7436,17 +7495,23 @@ local function CreateCombatPanel()
 		-- (General since 2026-11-16: the hub's first icon, on its own before the groups; its switch still all the HUD's.)
 		{ keys = { "hud" }, label = "General", section = "What Shows", before = "Gamepad", hud = true },
 		-- (tabs: one page with the frame's own page's parts, its tabs: ns.ShowInTabs.)
-		{ keys = { "units", "prd", "playercast", "highlight" }, label = "Unit Frames", section = "Unit Frames", before = "Personal Resources",
+		-- (before: an Interface page; Party & Raid and Action Bars, their looks moved
+		-- to the Style hub 2026-11-17, before Personal Resources too, after Unit Frames.)
+		{ keys = { "units", "playercast", "highlight" }, label = "Unit Frames", section = "Unit Frames", before = "Personal Resources",
 			icon = "Interface\\Icons\\INV_Misc_Head_Human_01",
 			tabs = "units" },
+		-- (The personal resource display its own icon since 2026-11-17: the HUD's
+		-- PRD section, PersonalResources.lua's page at its PRD parts.)
+		{ keys = { "prd" }, label = "Personal Resources", section = "Unit Frames", before = "Personal Resources",
+			icon = ns.HELP_DISC:gsub("HelpDisc$", "PersonalResources"), tabs = "prd" },
 		-- (Party & Raid: one icon, its tabs Party, Raid and Raid Style; Raid's
 		-- icon hidden under it, tabOf, picked by its tab: tabIndex.)
-		{ keys = { "party", "rsparty" }, label = "Party & Raid", section = "Party & Raid", before = "Raid Style",
+		{ keys = { "party", "rsparty" }, label = "Party & Raid", section = "Party & Raid", before = "Personal Resources",
 			icon = "Interface\\Icons\\INV_Misc_GroupNeedMore",
 			tabs = "party" },
-		{ keys = { "raid" }, label = "Party & Raid", section = "Party & Raid", before = "Raid Style",
+		{ keys = { "raid" }, label = "Party & Raid", section = "Party & Raid", before = "Personal Resources",
 			tabs = "party", tabIndex = 2, tabOf = "HUD:party" },
-		{ keys = { "bars" }, label = "Action Bars", section = "Action Bars", before = "Action Style", tabs = "bars",
+		{ keys = { "bars" }, label = "Action Bars", section = "Action Bars", before = "Personal Resources", tabs = "bars",
 			icon = "Interface\\Icons\\Ability_DualWield" },
 		{ keys = { "chat" }, label = "Chat", section = "Chat", before = "Chat", tabs = "chat",
 			icon = "Interface\\Icons\\INV_Scroll_03" },
@@ -7459,7 +7524,7 @@ local function CreateCombatPanel()
 			icon = "Interface\\Icons\\Spell_Holy_WordFortitude" },
 		{ keys = { "combat" }, label = "Timers", section = "Timers", before = "Cooldown Manager", tabs = "timers",
 			icon = "Interface\\Icons\\INV_Misc_PocketWatch_01" },
-		{ keys = { "interface" }, label = "Menus & Info", section = "Menus & Info", before = "Combat Text Style",
+		{ keys = { "interface" }, label = "Menus & Info", section = "Menus & Info", before = "Breath Bar",
 			icon = "Interface\\Icons\\INV_Misc_Bag_07" },
 		{ keys = { "other" }, label = "Other Frames in CineMode", section = "What Shows", before = "Gamepad" },
 	}
@@ -7963,7 +8028,7 @@ local function CreateCombatPanel()
 		end
 		local SECTIONS = {
 			-- (Their look: the Unit Frames icon's Style tab.)
-			{ "units", L["Unit frames"], L["UF"] }, -- (its sub-tab: UF)
+			{ "units", L["Unit frames"] }, -- (its sub-tab: its name, "UF" till 2026-11-17)
 			-- (Your health and resource bars under your character: on the Unit frames tab too.
 			-- Kept up while you recover: the Unit Frames icon's Keep up tab.)
 			{ "prd", L["Personal Resource Display"], L["PRD"] },
@@ -8046,7 +8111,7 @@ local function CreateCombatPanel()
 		-- Every page of the hub, under the note (2026-11-16): each icon (its
 		-- picture and name, a link to it), its other tabs beside it as links,
 		-- wrapping. Made the first time the HUD icon shows, the hub's icons all in.
-		local LIST_TABS = { ["HUD:units"] = "units", ["HUD:party"] = "party", ["HUD:bars"] = "bars",
+		local LIST_TABS = { ["HUD:units"] = "units", ["HUD:prd"] = "prd", ["HUD:party"] = "party", ["HUD:bars"] = "bars",
 			["HUD:chat"] = "chat", ["HUD:minimap"] = "minimap", ["HUD:quests"] = "quests", ["HUD:buffs"] = "buffs",
 			["HUD:combat"] = "timers", ["Mouseover groups"] = "mouse", ["Nameplates"] = "plates",
 			["Nameplate Names"] = "names" }
@@ -12665,16 +12730,17 @@ do
 			canvas:SetScript("OnShow", PageShown(Refresh, content))
 		end
 		local MakeStyle = lazyPages.Add(canvas, "Nameplate Style", MakeBody)
-		-- (A hub tile each: Plate Style, and Marks hidden under the Nameplates icon too.)
+		-- (A hub tile each: Plate Style, and Marks hidden under it (the Style
+		-- hub's since 2026-11-17); showIn: the CineMode page's tabs for it.)
 		local function Pick(i)
 			MakeStyle("its tab picked")
 			if ShowPart then ShowPart(i) end
 		end
 		canvas.hubTabs = {
-			{ name = "Nameplate Style", icon = "Interface\\Icons\\Ability_Marksmanship", label = "Nameplate Style",
-				onSelect = function() Pick(1) end },
-			{ name = "Nameplate Marks", icon = "Interface\\Icons\\Ability_Marksmanship", label = "Smart Style", own = true,
-				onSelect = function() Pick(2) end },
+			{ name = "Nameplate Style", icon = "Interface\\Icons\\Ability_Marksmanship", label = "Nameplates",
+				showIn = "plates", onSelect = function() Pick(1) end },
+			{ name = "Nameplate Marks", icon = "Interface\\Icons\\Ability_Marksmanship", label = "Smart", own = true,
+				tabOf = "Nameplate Style", onSelect = function() Pick(2) end },
 		}
 		canvas:Hide()
 		RegisterSubpage(canvas, "Nameplate Style", L["Nameplate Style"])
@@ -19816,6 +19882,7 @@ ns.OnLanguage(function()
 	end
 	ns.AddBandShortcuts("UI Manager") -- (a line for each of the Interface hub's bands, under it)
 	ns.AddBandShortcuts("Visions") -- (and the Visions hub's: Combat, World, each Vision under its band)
+	ns.AddBandShortcuts("Style") -- (and the Style hub's: Interface, Visions, Atmosphere, each look under its band)
 	menu.Flush() -- (the left list, in menu.order)
 	menu.AutoFold()
 	GuardGamepadClose()

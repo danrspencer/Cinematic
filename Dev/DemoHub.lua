@@ -143,16 +143,17 @@ Add("Recording helpers", { key = "letterbox", name = "Letterbox sweep",
 local TOURS = {
 	{ "tour-main", "Main page and Profiles", { "", "Profiles" } },
 	{ "tour-ui", "Interface", { "Standard Frames", "Advanced Frames", "Mouseover groups", "Gamepad",
-		"Unit Style", "Raid Style", "Action Style", "Personal Resources", "Personal Style", "Buffs/debuffs",
-		"Minimap", "Chat", "Chat bubbles", "Bubble Style", "Quest tracker", "Cooldown Manager", "Swing timer",
-		"Tooltips", "Tooltip Style", "Combat Text Style", "Nameplates" } },
-	{ "tour-style", "Style", { "Style General", "Interface Recolor", "Nameplate Style", "Name Style", "Cast Bar Style" } },
+		"Personal Resources", "Buffs/debuffs", "Minimap", "Chat", "Chat bubbles", "Quest tracker",
+		"Cooldown Manager", "Swing timer", "Tooltips", "Nameplates" } },
+	-- (Every look in the Style hub since 2026-11-17: the Interface's frames', the Visions', Atmosphere's.)
+	{ "tour-style", "Style", { "Style General", "Interface Recolor", "Unit Style", "Personal Style", "Raid Style",
+		"Action Style", "Nameplate Style", "Cast Bar Style", "Name Style", "Combat Text Style", "Bubble Style",
+		"Tooltip Style", "Visions Style", "Vitals Style", "Quest Talk Style", "Quest Item Style", "Roll Style",
+		"Card Styles", "Tint Style", "Letterbox Style" } },
 	{ "tour-camera", "Camera", { "Cameras", "Scenes", "Camera Scripts", "My Shots" } },
-	{ "tour-look", "Atmosphere", { "Effects", "Tint", "Tint Style", "Letterbox", "Letterbox Style", "Graphics+",
-		"Audio" } },
-	{ "tour-visions", "Visions", { "Heal Vision", "Vitals Vision", "Vitals Style", "Quest Vision",
-		"Quest Talk Style", "Quest Item Style", "Roll Vision", "Roll Style", "Duel Vision", "Card Vision",
-		"Card Styles", "Card Style", "Card Sounds" } },
+	{ "tour-look", "Atmosphere", { "Effects", "Tint", "Letterbox", "Graphics+", "Audio" } },
+	{ "tour-visions", "Visions", { "Heal Vision", "Vitals Vision", "Quest Vision", "Roll Vision", "Duel Vision",
+		"Card Vision", "Card Style", "Card Sounds" } },
 	{ "tour-wheels", "Wheels", { "Master wheel", "Your wheels", "Camera wheel", "Menu wheel", "Marker wheel",
 		"Ground marker wheel", "Vision wheel" } },
 	{ "tour-more", "Quality of life, Keybinds, Help, Community", { "General", "Fishing", "Hunter", "Keybinds",
@@ -197,13 +198,14 @@ Add("1. Settings & menus", { key = "tour-ui-shots", name = "Settings tour: Inter
 		ns.OpenOptions("Standard Frames")
 		d.Wait(1.5)
 		-- (An icon's other tabs that are pages of their own: shot after it.)
-		local MORE = { ["HUD:units"] = { "Personal Resources", "Unit Style", "Personal Style", "Unit Cast Style", "Unit Frame Links" },
-			["HUD:party"] = { "HUD:raid", "Raid Style" }, ["HUD:bars"] = { "Gamepad", "Action Style" },
-			["HUD:chat"] = { "Chat", "Chat bubbles", "Bubble Style", "Chat Links" },
-			["Mouseover groups"] = { "Tooltips", "Tooltip Style", "Cursor Hide" },
+		-- (Their looks: the Style hub's since 2026-11-17.)
+		local MORE = { ["HUD:units"] = { "Personal Resources", "Unit Frame Links" }, ["HUD:prd"] = { "PRD Keep Up", "PRD Links" },
+			["HUD:party"] = { "HUD:raid" }, ["HUD:bars"] = { "Gamepad" },
+			["HUD:chat"] = { "Chat", "Chat bubbles", "Chat Links" },
+			["Mouseover groups"] = { "Tooltips", "Cursor Hide" },
 			["HUD:buffs"] = { "Buffs/debuffs", "Buffs Links" }, ["HUD:combat"] = { "Cooldown Manager", "Swing timer", "Breath Bar" },
 			["HUD:minimap"] = { "Minimap", "Minimap Keep Open", "Minimap Links" }, ["HUD:quests"] = { "Quest tracker", "Quest Tracker Links" },
-			["Nameplates"] = { "Plate Icons", "Nameplate Style", "Nameplate Marks", "Cast Bar Style" }, ["Nameplate Names"] = { "Name Style" } }
+			["Nameplates"] = { "Plate Icons" } }
 		local function Shoot(name, label, band)
 			d.Cue("icon: " .. label)
 			ns.OpenOptions(name)

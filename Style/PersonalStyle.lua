@@ -699,7 +699,7 @@ function ns.CreatePersonalStylePanel(kit)
 	local canvas, content = kit.CreateScrollPage()
 	local title = kit.Label(content, "GameFontNormalLarge", L["Personal Resource Style"])
 	-- (The Unit Frames icon's Resource Style tab, 2026-11-16: its tabs over the title.)
-	local tabs = ns.PageTabs(content, ns.ShowInTabs("units"), ns.ShowInIndex("units", "Personal Style"))
+	local tabs = ns.PageTabs(content, ns.ShowInTabs("prd"), ns.ShowInIndex("prd", "Personal Style"))
 	title:SetPoint("TOPLEFT", tabs, "BOTTOMLEFT", 8, -14)
 	local intro = kit.PageIntro(content, title,
 		L["How the personal resource display under your character looks."])
