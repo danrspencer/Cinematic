@@ -736,14 +736,10 @@ ns.PROFILE_MODULES = {
 			"weather at 100%).",
 		apply = function(set) set("rainViewScale", 1) end },
 	{ key = "vitals-vision", name = "Vitals Vision on", scope = { "Vitals Vision" },
-		tip = "Your health at the screen's edges, the picture drained toward grey and the personal resource " ..
-		"display (or, in a game without one, your player frame) fading in as it drops.",
-		apply = function(set, client)
-			set("lowHealth", true)
-			set("lowHealthPrd", true)
-			-- (Classic Era has no personal resource display: the player frame instead.)
-			if client == ns.CLIENT and not ns.HasPersonalDisplay() then set("lowHealthPortrait", true) end
-		end },
+		tip = "Your health at the screen's edges and the picture drained toward grey as it drops.",
+		-- (Its health bars fading in, Keep up's Fade to since 2026-11-17: Off
+		-- in every profile, user's pick.)
+		apply = function(set) set("lowHealth", true) end },
 
 	{ key = "cursor-hide", name = "Cursor out of the way in cameras", scope = { "Cursor Hide" },
 		tip = "On flights, at vistas and while you're AFK, the cursor is gone once the mouse has been still for " ..

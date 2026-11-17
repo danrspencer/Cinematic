@@ -51,6 +51,12 @@ ns.KeepUpDefaults("prPetHealth", unpack(ns.KEEP_UP_POWER))     -- the pet frame,
 ns.KeepUpDefaults("prHealthPrd", unpack(ns.KEEP_UP_HEALTH))    -- the personal health bar (as the player frame's)
 ns.KeepUpDefaults("prPowerPrd", unpack(ns.KEEP_UP_POWER))      -- the personal power bar
 ns.KeepUpDefaults("prPowerMana", unpack(ns.KEEP_UP_POWER))     -- the Cine Mana Bar, your mana
+-- Fade to, the health rows' (player frame, PRD): under the row's share now
+-- the frame fades in as your health drops, fully up at this share. 0: none,
+-- fully up as soon as it's under. (Vitals Vision's Health bars till
+-- 2026-11-17: two settings for one bar, Keep up's always won.)
+DEFAULTS.prHealthPlayerFade = 0
+DEFAULTS.prHealthPrdFade = 0
 -- (Other addons' power bars, their support files' rows, loaded before this: as ours.)
 for _, bar in ipairs(ns.ADDON_POWER_ROWS or {}) do
 	ns.KeepUpDefaults("prPower" .. bar.addon, unpack(ns.KEEP_UP_POWER))
@@ -333,6 +339,16 @@ local function RowRules(row, healthShare, powerShare)
 	return health, power, nfHealth, nfPower
 end
 
+-- A health row's Fade to under its share now: the share it fades in from
+-- and the one it's fully up at, or nil (no fade: not a "below" share, Fade
+-- to Off, or at or over the share).
+local function FadeRange(db, healthKey, hShare)
+	if not healthKey or Rule(hShare) ~= "below" then return nil end
+	local full = tonumber(db[healthKey .. "Fade"]) or 0
+	if full <= 0 or full >= hShare then return nil end
+	return hShare, full
+end
+
 -- Whether your player frame, personal resource display or pet frame stays up
 -- now in CineMode, shown like a fight's frames. setting: the frame's kind
 -- (Frames.lua's PORTRAIT_FRAMES; nil for the pet frame); afterFight: within
@@ -366,7 +382,9 @@ function ns.KeepYourFrameUp(setting, entry, afterFight, fighting)
 	end
 	if health == "below" then
 		local share = HealthShare(pet and "pet" or "player")
-		if share and share < hShare then return true end
+		-- (Fade to: fully up only at it; above, ns.KeepUpFadeLevel's share.)
+		local _, full = FadeRange(db, healthKey, hShare)
+		if share and share < (full or hShare) then return true end
 	end
 	if power == "below" and not nfPower and PowerBelow(row, pShare, manaBar) then
 		return true
@@ -392,6 +410,23 @@ end
 -- aren't told whether you're fighting.
 local function HeldAtPull(row)
 	return (InCombatLockdown() or ns.Flag(UnitAffectingCombat("player"))) and ns.FightHold(row)
+end
+
+-- Fade to (FadeRange): how far up (0-1) your player frame or PRD's health
+-- bar is while CineMode would hide it (KeepYourFrameUp said no), by your
+-- health between its row's share and Fade to. nil: no fade now (or secret
+-- health: ThresholdSecret's curve does it). Frames.lua asks, each tick.
+function ns.KeepUpFadeLevel(setting, entry, afterFight, fighting)
+	local db = ns.db
+	if not setting or not ns.PersonalResourcesOn(db) or ns.Flag(UnitIsDeadOrGhost("player")) then return nil end
+	local row = RowOf(setting, entry)
+	if row ~= "player" and row ~= "prd" then return nil end
+	local healthKey = RowKeys(row, entry)
+	local start, full = FadeRange(db, healthKey, ShareNow(db, healthKey, fighting, afterFight))
+	if not start or (fighting and ns.FightHold(row)) then return nil end
+	local share = HealthShare("player")
+	if not share or share >= start then return nil end
+	return math.min(1, (start - share) / (start - full))
 end
 
 -- How much of a frame shows while CineMode would hide it (KeepYourFrameUp
@@ -482,11 +517,14 @@ function ns.ThresholdSecret(setting, entry)
 	-- changing now. Health at rest out of a fight is full (it regenerates
 	-- till it is), so its curve would show nothing: power's then. 2026-11-13:
 	-- health first always left the player frame deaf to low mana.)
+	-- (Fade to: fully up under it, fading out to none at the share.)
+	local fadeStart, fadeFull = FadeRange(db, healthKey, hShare)
+	local healthShare, healthRange = hShare, spec.range
+	if fadeStart then healthShare, healthRange = fadeFull, fadeStart - fadeFull end
 	local healthSecret = health == "below" and UnitHealthPercent and not HealthShare("player")
-		and CurveAt(hShare, spec.range, spec.floor) and true or false
+		and CurveAt(healthShare, healthRange, spec.floor) and true or false
 	-- (Not full the same way, at just short of full: KeepYourFrameUp leaves it
 	-- to the curve, HealthNotFullByCurve.)
-	local healthShare, healthRange = hShare, spec.range
 	if not healthSecret and nfHealth and HealthNotFullByCurve(entry)
 		and CurveAt(NOT_FULL_CURVE, 0, spec.floor) then
 		healthSecret, healthShare, healthRange = true, NOT_FULL_CURVE, 0
@@ -634,6 +672,11 @@ function ns.YourFrameWhy(setting, entry, afterFight, fighting, add)
 	if health == "below" then
 		local share = HealthShare(pet and "pet" or "player")
 		local text
+		local fadeStart, fadeFull = FadeRange(db, healthKey, hShare)
+		if fadeStart then
+			add("off", L["Fades in as your health drops under %s, fully up at %d%% (Fade to)"]:format(
+				ShareText(hShare):gsub("^< ", ""), math.floor(fadeFull * 100 + 0.5)), healthKey .. "Fade")
+		end
 		if share and share < hShare then
 			text = pet and L["Your pet's health is under %s (%s)"] or L["Your health is under %s (%s)"]
 			add("on", text:format(ShareText(hShare):gsub("^< ", ""), hTag), hKey)
@@ -799,7 +842,7 @@ function ns.CreatePersonalResourcesPanel(kit)
 	-- rows (one set for the player frame and PRD till 2026-11-15: profiles
 	-- now pick which is kept up).
 	local rows = {
-		{ L["Player Frame: Health"], L["Your player frame, by your health."], "prHealthPlayer" },
+		{ L["Player Frame: Health"], L["Your player frame, by your health."], "prHealthPlayer", true },
 		{ function() return L["Player Frame: %s"]:format(PowerName()) end,
 			L["Your player frame, by your power (mana, rage, energy...). One frame with the row above: up when " ..
 			"either says so."], "prPowerPlayer" },
@@ -812,7 +855,7 @@ function ns.CreatePersonalResourcesPanel(kit)
 	end
 	if hasDisplay then
 		AddRow({ L["PRD: Health"], L["The game's personal resource display (PRD): its health bar."],
-			"prHealthPrd" })
+			"prHealthPrd", true })
 		AddRow({ function() return L["PRD: %s"]:format(PowerName()) end,
 			L["The game's personal resource display (PRD): its power bar (mana, rage, energy...)."],
 			"prPowerPrd" })
@@ -835,6 +878,13 @@ function ns.CreatePersonalResourcesPanel(kit)
 		left[c] = total
 		total = total + COL_W
 	end
+	-- (Fade to after them, the health rows': row[4]. Not linked, one per row.)
+	local FADE_W = 76
+	local fadeLeft = total + LINK_W / 2
+	total = fadeLeft + FADE_W
+	local FADE_TIP = L["Fade to: under the share in this row's column for now (< 95%, say), it fades in as your " ..
+		"health drops, fully up at this. Off: fully up as soon as your health is under the share. Only with a " ..
+		"share under 100%: Always and < 100% are up all the way."]
 	local function CenterX(c) return left[c] + COL_W / 2 end
 	local holder = CreateFrame("Frame", nil, content)
 	holder:SetSize(total, 1)
@@ -852,6 +902,15 @@ function ns.CreatePersonalResourcesPanel(kit)
 			text:SetPoint("CENTER")
 			text.searchSkip = true
 			kit.Tooltip(head, column[2])
+		end
+		do
+			local head = CreateFrame("Frame", nil, grid)
+			head:SetSize(FADE_W, 20)
+			head:SetPoint("BOTTOMLEFT", grid, "TOPLEFT", fadeLeft, -HEAD_H)
+			local text = kit.Label(head, "GameFontNormalSmall", L["Fade to"])
+			text:SetPoint("CENTER")
+			text.searchSkip = true
+			kit.Tooltip(head, FADE_TIP)
 		end
 		for r, row in ipairs(rows) do
 			local y = -HEAD_H - (r - 1) * ROW_H
@@ -921,6 +980,19 @@ function ns.CreatePersonalResourcesPanel(kit)
 						"to change."])
 					links[c] = link
 				end
+			end
+			-- (Fade to: Off at 0, else the share it's fully up at.)
+			if row[4] then
+				local fadeKey = key .. "Fade"
+				local line = kit.BoxLine(grid)
+				local box = line:Box("", fadeKey, 0, 95, 5, function(value)
+					if value <= 0 then return L["Off"] end
+					return ("%d%%"):format(math.floor(value + 0.5))
+				end, 100, ("%s: %s. %s"):format(label, L["Fade to"], FADE_TIP), nil, 56)
+				line:SetPoint("CENTER", grid, "TOPLEFT", fadeLeft + FADE_W / 2, y - ROW_H / 2)
+				box.searchLabel = ("%s: %s"):format(label, L["Fade to"])
+				box.settingKey = fadeKey
+				kit.RecordKey(grid, fadeKey)
 			end
 			-- (And after the page's Reset, or a profile loaded.)
 			local drawer = CreateFrame("Frame", nil, grid)

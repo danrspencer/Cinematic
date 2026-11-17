@@ -63,14 +63,6 @@ DEFAULTS.lowHealthFlashTime = 0.6  -- seconds a hit's flash takes to fade
 DEFAULTS.lowHealthFlashHit = 0.08  -- share of your health lost at once that counts
 DEFAULTS.lowHealthFlashAdded = 0.2 -- ...or lost in smaller hits adding up (since the last, in a fight)
 DEFAULTS.lowHealthCalm = 0.6       -- strength out of combat (eating up, say)
--- Health bars: faded out in CineMode, they fade in between their own Starts
--- (hidden above) and Full (fully up below), Frames.lua.
-DEFAULTS.lowHealthPortrait = false -- your player frame (portrait)
-DEFAULTS.lowHealthPortraitStart = 0.95
-DEFAULTS.lowHealthPortraitFull = 0.25
-DEFAULTS.lowHealthPrd = false      -- ...and the personal resource display
-DEFAULTS.lowHealthPrdStart = 0.95
-DEFAULTS.lowHealthPrdFull = 0.25
 -- The page's test: health falling from one share to another over some seconds.
 DEFAULTS.lowHealthTestFrom = 1
 DEFAULTS.lowHealthTestTo = 0.1
@@ -475,8 +467,8 @@ local function HealthShare()
 end
 
 -- How far in the edges want to be (0-1) at a health share. prefix: whose
--- Starts and Full ("lowHealth", the edges', when nil; or
--- a health bar's, "lowHealthPortrait" or "lowHealthPrd").
+-- Starts and Full ("lowHealth", the edges', when nil). (The health bars'
+-- own were here till 2026-11-17: Keep up's Fade to now.)
 local function Thresholds(prefix)
 	prefix = prefix or "lowHealth"
 	local start = db[prefix .. "Start"]
@@ -2125,24 +2117,6 @@ function ns.VitalsVisionActive()
 	return db ~= nil and ns.Setting("lowHealth") and db.lowHealthEdges and belowStart and level > 0
 end
 
--- Your health bar faded out in CineMode (Frames.lua asks, each tick): which
--- is "portrait" or "prd". How far up (0-1) by your health: none above its
--- Starts, fading in to fully up at its Full. nil: not ticked (or
--- dead). "secret": the game won't say, so ns.SetVitalsSecretAlpha sets it.
--- plate: Forever's personal resource bars (your own nameplate), which can't
--- take a secret alpha: fully up then. (Not the page's test's health: those
--- bars show your real health, and you aren't losing any.)
-local BAR_PREFIX = { portrait = "lowHealthPortrait", prd = "lowHealthPrd" }
-function ns.VitalsFrameAlpha(which, plate)
-	local prefix = BAR_PREFIX[which]
-	if not (db and db[prefix]) then return nil end
-	if not ns.Setting("lowHealth") or ns.Flag(UnitIsDeadOrGhost("player")) then return nil end
-	local share = HealthShare()
-	if share then return LevelAt(share, prefix) end
-	if plate or not SecretCurve(prefix) then return 1 end
-	return "secret"
-end
-
 -- /cine debug vitals: what the edges and the theme's art are doing now (run
 -- it in a fight: health can be secret there).
 function ns.ReportVitals()
@@ -2514,14 +2488,6 @@ function ns.TextureReel(arg)
 		:format(#list, each, math.floor(total / 60), total % 60,
 			shots and (", a screenshot of each half (%d)"):format(#list * 2) or ""))
 	ns.Print("  Space: next, Backspace: back. /cine debug texreel pause, or off")
-end
-
--- (which: as ns.VitalsFrameAlpha's.)
-function ns.SetVitalsSecretAlpha(frame, which)
-	local curve = SecretCurve(BAR_PREFIX[which])
-	if curve then
-		pcall(SecretAlpha, frame, curve)
-	end
 end
 
 -- The Style hub's Vitals Vision page: the theme, our art and Blizzard's, the
@@ -3671,23 +3637,8 @@ function ns.CreateVitalsVisionPanel(kit)
 		end
 	end
 
-	-- Health bars kept faded in CineMode, fading in as your health drops,
-	-- each by its own health.
-	stack:Header(content, L["Health bars"])
-	local BARS_TIP = "\n\n" .. L["In CineMode, a health bar faded out comes back as your health drops: hidden " ..
-		"above its Starts, fading in to fully up at its Full."]
-	local BAR_BOXES = {
-		{ "Start", L["Starts"], 10, 100, L["Your health this bar starts fading in below."], 1 },
-		{ "Full", L["Full"], 0, 90, L["Your health this bar is fully up at (under Starts)."], 1 },
-	}
-	TickRow("lowHealthPortrait", L["Player frame"],
-		L["Your player frame (portrait and health bar) fades in as your health drops."] .. BARS_TIP, BAR_BOXES)
-	-- (Only on clients with a personal resource display.)
-	if _G.CinematicPersonalPower then
-		TickRow("lowHealthPrd", L["Personal resource display"],
-			L["Your personal resource display (the health bar under your character) fades in as your health drops."]
-			.. BARS_TIP, BAR_BOXES)
-	end
+	-- (Its Health bars, the player frame's and PRD's fading in as your health
+	-- drops: Keep up's Fade to since 2026-11-17.)
 
 	-- The screen's edges closing in.
 	stack:Header(content, L["Screen edges"])

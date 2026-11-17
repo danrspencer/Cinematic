@@ -4160,6 +4160,58 @@ STEPS[#STEPS + 1] = function()
 	end
 end
 
+-- (Step 21.)
+STEPS[#STEPS + 1] = function()
+	-- Vitals Vision's Health bars gone (2026-11-17): Keep up's Fade to on the
+	-- player frame's and PRD's health rows instead (Keep up always won over
+	-- them). A bar ticked with the page on: each Keep up column Off or under
+	-- its Starts goes to Starts, and Fade to takes its Full. Every profile's.
+	-- Once.
+	if not ns.db.vitalsBarsToKeepUpV1 then
+		local BARS = { { "lowHealthPortrait", "prHealthPlayer" }, { "lowHealthPrd", "prHealthPrd" } }
+		local D = ns.DEFAULTS
+		local function Get(t, key)
+			if t[key] ~= nil then return t[key] end
+			return D[key]
+		end
+		-- (A column's share, through its links: PersonalResources.lua's ColumnShare.)
+		local function Column(t, key, col)
+			if col == 3 and Get(t, key .. "LinkAlways") ~= false then col = 2 end
+			if col == 2 and Get(t, key .. "LinkCalm") ~= false then col = 1 end
+			return tonumber(Get(t, key .. ({ "", "Calm", "Always" })[col])) or 0
+		end
+		local function Move(t)
+			if type(t) ~= "table" then return end
+			for _, bar in ipairs(BARS) do
+				local old, key = bar[1], bar[2]
+				if t[old] == true and t.lowHealth == true then
+					local start = tonumber(t[old .. "Start"]) or 0.95
+					local full = math.min(tonumber(t[old .. "Full"]) or 0.25, start - 0.01)
+					local shares = {}
+					for col = 1, 3 do
+						local share = Column(t, key, col)
+						if share <= 0 or (share < 0.99 - 1e-6 and share < start) then share = start end
+						shares[col] = share
+					end
+					t[key], t[key .. "Calm"], t[key .. "Always"] = shares[1], shares[2], shares[3]
+					t[key .. "LinkCalm"], t[key .. "LinkAlways"] = shares[2] == shares[1], shares[3] == shares[2]
+					t[key .. "Fade"] = full > 0 and full or 0
+				end
+				t[old], t[old .. "Start"], t[old .. "Full"] = nil, nil, nil
+			end
+		end
+		Move(ns.db)
+		for _, saved in pairs(ns.db.profiles or {}) do
+			if type(saved) == "table" then
+				Move(saved)
+				if type(saved.settings) == "table" then Move(saved.settings) end
+			end
+		end
+		for _, point in pairs(ns.db.profileResetPoints or {}) do Move(point) end
+		ns.db.vitalsBarsToKeepUpV1 = true
+	end
+end
+
 -- Runs them all, each on its own: an error is logged and reported (the
 -- addon's error net, Diagnostics.lua), and the steps after it still run.
 function ns.RunMigrations()

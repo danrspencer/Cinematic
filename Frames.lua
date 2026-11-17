@@ -1872,12 +1872,9 @@ end)
 end
 
 -- A faded-out frame's alpha from the game's secret health or power curve
--- (the Frames pass's vitalsSecret, Vitals Vision; manaSecret, Health &
--- Resources' shares).
+-- (the Frames pass's manaSecret: Keep up's shares and Fade to).
 function ns.DrawSecretCurve(entry)
-	if entry.vitalsSecret then
-		ns.SetVitalsSecretAlpha(entry.frame, entry.vitalsSecret)
-	elseif entry.manaSecret then
+	if entry.manaSecret then
 		ns.SetThresholdSecretAlpha(entry.frame, entry.manaSecret)
 	end
 end
@@ -12355,21 +12352,17 @@ function ns.UpdateFrames(cinematic, elapsed)
 		if immersive and not typingShown then
 			target = 0
 		end
-		-- (Vitals Vision's health bars: up as far as your health says, LowHealth.lua.)
-		entry.vitalsSecret, entry.manaSecret = nil, nil
+		-- (Keep up's Fade to, the health rows': up as far as your health says,
+		-- PersonalResources.lua.)
+		entry.manaSecret = nil
 		if target == 0 and cinematic and not deathFade and not immersive and PORTRAIT_FRAMES[entry.name]
 			and entry.name ~= "CinematicPersonalPower" and entry.name ~= "CinematicPersonalMana" then
-			local which = PORTRAIT_FRAMES[entry.name] == "prdWhenNotFull" and "prd" or "portrait"
-			local vitals = ns.VitalsFrameAlpha(which, entry.frame == personalPower.healthStandIn)
-			if vitals == "secret" then
-				entry.vitalsSecret = not ns.NO_SECRET_ALPHA[entry.name] and which or nil
-			elseif vitals then
-				target = vitals
-			end
+			local fade = ns.KeepUpFadeLevel(PORTRAIT_FRAMES[entry.name], entry, portraitAllowed, fighting)
+			if fade then target = fade end
 			-- (Under a Show below share the game won't say: it sets the alpha,
 			-- PersonalResources.lua. Not the stand-ins: their alpha is read and
 			-- worked with, Apply.)
-			if target == 0 and not entry.vitalsSecret and entry.frame ~= personalPower.healthStandIn then
+			if target == 0 and entry.frame ~= personalPower.healthStandIn then
 				entry.manaSecret = ns.ThresholdSecret(PORTRAIT_FRAMES[entry.name], entry) or nil
 			end
 		end
@@ -12501,7 +12494,7 @@ function ns.UpdateFrames(cinematic, elapsed)
 				or entry.frame == Minimap or entry.frame == artStandIn or entry.frame == personalPower.healthStandIn
 				or LOOSE_PART_GROUPS[group] or personalPower.GROUPS[group] or group == "prd"
 				or ns.UNIT_PART_FRAME_NAMES[entry.name] or NEVER_NESTED[entry.name] and group ~= "chat"
-				or entry.vitalsSecret or entry.manaSecret
+				or entry.manaSecret
 				or entry.frame == _G.ObjectiveTrackerFrame or ns.chatLinkBackdrop[entry.frame] then
 				tickTables.fadeOnly = false
 			end
@@ -12552,7 +12545,7 @@ function ns.UpdateFrames(cinematic, elapsed)
 		end
 		-- (Secret health: the game sets a faded-out health bar's alpha from it.
 		-- curveDrawn: so ApplyAlpha between passes draws the curve again.)
-		if (entry.vitalsSecret or entry.manaSecret) and target == 0 and entry.alpha == 0
+		if entry.manaSecret and target == 0 and entry.alpha == 0
 			and not ns.layoutFadeUntil and not ns.previewRows then
 			-- (Ours: the own-alpha hook on an addon's frame mustn't put it back.)
 			entry.settingAlpha = true
