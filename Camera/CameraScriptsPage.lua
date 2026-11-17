@@ -1089,7 +1089,14 @@ function ns.CreateCameraScriptsPanel(kit)
 	page.canvas, page.content = canvas, content
 	local title = kit.Label(content, "GameFontNormalLarge", L["Scripts"])
 	title:SetPoint("TOPLEFT", LEFT, -16)
-	kit.PageIntro(content, title, L["Every camera as a script of small steps you can copy and change."])
+	local intro = kit.PageIntro(content, title, L["Every camera as a script of small steps you can copy and change."])
+	-- (Its switch, under Enable Cameras: off, scenes set to a script of yours
+	-- play no camera and ours play as we ship them, CameraScripts.lua's
+	-- ns.CameraScriptToPlay. Hidden: the page's places below are fixed.)
+	kit.PageSwitch(content, "cameraScripts", L["Enable Page"],
+		L["Lets scenes play your scripts, and our cameras play your changes to theirs."], intro, function()
+			if ns.CameraRowsChanged then ns.CameraRowsChanged() end
+		end)
 
 	-- The camera's name, and the list it drops down: over the page (a dim
 	-- layer under it takes a click outside to close it), every camera in two

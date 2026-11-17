@@ -199,12 +199,12 @@ Add("1. Settings & menus", { key = "tour-ui-shots", name = "Settings tour: Inter
 		d.Wait(1.5)
 		-- (An icon's other tabs that are pages of their own: shot after it.)
 		-- (Their looks: the Style hub's since 2026-11-17.)
-		local MORE = { ["HUD:units"] = { "Personal Resources", "Unit Frame Links" }, ["HUD:prd"] = { "PRD Keep Up", "PRD Links" },
+		local MORE = { ["HUD:units"] = { "Personal Resources" }, ["HUD:prd"] = { "PRD Keep Up" },
 			["HUD:party"] = { "HUD:raid" }, ["HUD:bars"] = { "Gamepad" },
-			["HUD:chat"] = { "Chat", "Chat bubbles", "Chat Links" },
+			["HUD:chat"] = { "Chat", "Chat bubbles" },
 			["Mouseover groups"] = { "Tooltips", "Cursor Hide" },
-			["HUD:buffs"] = { "Buffs/debuffs", "Buffs Links" }, ["HUD:combat"] = { "Cooldown Manager", "Swing timer", "Breath Bar" },
-			["HUD:minimap"] = { "Minimap", "Minimap Keep Open", "Minimap Links" }, ["HUD:quests"] = { "Quest tracker", "Quest Tracker Links" },
+			["HUD:buffs"] = { "Buffs/debuffs" }, ["HUD:combat"] = { "Cooldown Manager", "Swing timer", "Breath Bar" },
+			["HUD:minimap"] = { "Minimap", "Minimap Keep Open" }, ["HUD:quests"] = { "Quest tracker" },
 			["Nameplates"] = { "Plate Icons" } }
 		local function Shoot(name, label, band)
 			d.Cue("icon: " .. label)

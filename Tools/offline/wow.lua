@@ -57,7 +57,28 @@ local function NewObject(kind, name, parent)
 end
 M.NewObject = NewObject
 function Methods:GetParent() return self._parent end
-function Methods:SetParent(parent) self._parent = parent end
+-- (Moved to the new parent's lists too, as in the game: pages that move
+-- what they made onto a tab are walked from there.)
+function Methods:SetParent(parent)
+	local old = self._parent
+	if old == parent then return end
+	local wasRegion = false
+	if type(old) == "table" then
+		for _, list in ipairs({ rawget(old, "_children") or {}, rawget(old, "_regions") or {} }) do
+			for i = #list, 1, -1 do
+				if list[i] == self then
+					table.remove(list, i)
+					if list == rawget(old, "_regions") then wasRegion = true end
+				end
+			end
+		end
+	end
+	self._parent = parent
+	if type(parent) == "table" and rawget(parent, "_children") then
+		table.insert(parent._children, self)
+		if wasRegion then table.insert(parent._regions, self) end
+	end
+end
 function Methods:GetName() return self._name end
 function Methods:SetScript(script, fn) self._scripts[script] = fn end
 function Methods:GetScript(script) return self._scripts[script] end

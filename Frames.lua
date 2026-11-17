@@ -652,6 +652,48 @@ function ns.AnyFramePageOn()
 	end
 	return false
 end
+-- The HUD's Show in sections, a switch each (its heading's On/Off, its icon's
+-- dot), 2026-11-17: off, CineMode leaves that section's frames alone, as the
+-- HUD's own switch (handleFrames, over them all) does for every section.
+ns.SHOW_IN_SWITCH = {
+	units = "showInUnits", prd = "showInPrd", playercast = "showInPlayerCast", highlight = "showInHighlight",
+	party = "showInParty", rsparty = "showInParty", raid = "showInRaid", bars = "showInBars", chat = "showInChat",
+	minimap = "showInMinimap", quests = "showInQuests", buffs = "showInBuffs", combat = "showInTimers",
+	interface = "showInInterface", other = "showInOther",
+}
+ns.SHOW_IN_SWITCHES = {}
+do
+	local listed = {}
+	for _, key in pairs(ns.SHOW_IN_SWITCH) do
+		if not listed[key] then
+			listed[key] = true
+			ns.SHOW_IN_SWITCHES[#ns.SHOW_IN_SWITCHES + 1] = key
+			ns.DEFAULTS[key] = true
+		end
+	end
+	table.sort(ns.SHOW_IN_SWITCHES)
+	ns.SetPageMaster(ns.SHOW_IN_SWITCHES, "handleFrames")
+end
+-- Whether a fade group's section is on (its section: its row's, worked out
+-- the first time it's asked). (In a do: the file's main chunk is at Lua's
+-- 200 locals.)
+do
+	local sectionOfGroup
+	function ns.ShowInSectionOn(group)
+		if not sectionOfGroup then
+			sectionOfGroup = {}
+			for _, item in ipairs(ns.COMBAT_SHOW or {}) do
+				if not item.key:find("^addon:") and item.page ~= "gamepad" then
+					for _, each in ipairs(item.groups or { item.key }) do
+						sectionOfGroup[each] = sectionOfGroup[each] or item.page or "other"
+					end
+				end
+			end
+		end
+		local key = ns.SHOW_IN_SWITCH[sectionOfGroup[group] or false]
+		return not key or ns.db[key] ~= false
+	end
+end
 local function GroupHandled(group)
 	local db = ns.db
 	-- (Hidden by its row's key, Keybinds page: handled with its page off too.)
@@ -665,7 +707,7 @@ local function GroupHandled(group)
 		return false
 	end
 	if not OWN_PAGE_GROUPS[group] then
-		return true
+		return ns.ShowInSectionOn(group)
 	end
 	return db[GROUP_SWITCH[group]] and true or false
 end
@@ -10127,13 +10169,15 @@ end
 local switchesWere = {}
 local function SyncSwitches()
 	local changed, turnedOn = false, false
-	for _, key in ipairs(ns.HANDLE_SWITCHES) do
-		local on = ns.db[key] and true or false
-		if switchesWere[key] ~= nil and switchesWere[key] ~= on then
-			changed = true
-			turnedOn = turnedOn or on
+	for _, list in ipairs({ ns.HANDLE_SWITCHES, ns.SHOW_IN_SWITCHES }) do
+		for _, key in ipairs(list) do
+			local on = ns.db[key] ~= false and (list ~= ns.HANDLE_SWITCHES or ns.db[key]) and true or false
+			if switchesWere[key] ~= nil and switchesWere[key] ~= on then
+				changed = true
+				turnedOn = turnedOn or on
+			end
+			switchesWere[key] = on
 		end
-		switchesWere[key] = on
 	end
 	-- (A frame's key pressed, Keybinds page: its frames handled, page off or not.)
 	local force = ns.frameForceStamp or 0
@@ -14057,6 +14101,8 @@ do
 		local want = FRAMES.want
 		FRAMES.dynamic = false
 		wipe(FRAMES.ruled)
+		-- (The HUD page's switch, and its Unit frames section's.)
+		local unitsOn = ns.PageOn("showInUnits")
 		for _, entry in ipairs(FRAMES) do
 			local frame = _G[entry[1]]
 			if frame then
@@ -14064,8 +14110,8 @@ do
 				for _, part in ipairs(ns.UNIT_PARTS) do
 					local key = FRAMES.Key(entry, part)
 					-- (The Style hub's Overrides tab over the row, with the HUD page on.)
-					local over = ns.db.handleFrames ~= false and ns.StyleOverride(key) or nil
-					local hide = over == "hide" or not over and ns.db.handleFrames ~= false and FRAMES.Hidden(key)
+					local over = unitsOn and ns.StyleOverride(key) or nil
+					local hide = over == "hide" or not over and unitsOn and FRAMES.Hidden(key)
 					-- (ruled: it fades as it changes. A rule, or Always unticked with
 					-- the other columns bringing it up (a fight, a target): those
 					-- snapped out while the rest of the UI faded, 2026-11-17.)
@@ -14101,7 +14147,7 @@ do
 		-- mouse only out of combat: the game guards it in one; set after the fight.)
 		local tot = _G.FocusFrameToT
 		if tot then
-			local hide = ns.isClassicEra and ns.db.handleFrames ~= false and ns.db.unitPartsFocusToT == false
+			local hide = ns.isClassicEra and unitsOn and ns.db.unitPartsFocusToT == false
 			want[tot] = hide
 			-- (Shown again at the alpha its Standard Frames row fades it to now,
 			-- not the one it had when hidden.)
@@ -14134,7 +14180,7 @@ do
 			if entry[1] == name then
 				local out = {}
 				local held = FRAMES.held[name]
-				local pageOff = ns.db.handleFrames == false
+				local pageOff = not ns.PageOn("showInUnits")
 				for _, part in ipairs(ns.UNIT_PARTS) do
 					local paths = entry[2][part]
 					local has = false

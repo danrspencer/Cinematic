@@ -22,6 +22,8 @@ local _, ns = ...
 -- fight (it waits). resetToDefault:
 -- Reset page puts the game's default back, not just its own. decimals: shown
 -- with this many. group: the page's header it goes under (in this order).
+-- console: not in the Graphics menu (menu is then the game's default).
+-- onOff: a 0/1 setting.
 ns.GRAPHICS_PLUS = {
 	-- (How far away nameplates show, in yards. The game caps it at its own limit.)
 	{ key = "graphicsPlusPlateDistance", cvar = "nameplateMaxDistance", min = 10, menu = 60, max = 100, step = 5,
@@ -41,6 +43,9 @@ ns.GRAPHICS_PLUS = {
 	-- (Where the land turns to the flat horizon, and how far anything's drawn: together.)
 	{ key = "graphicsPlusView", cvar = "horizonStart", also = { "farclip" }, alsoMenu = { farclip = 10000 },
 		min = 400, menu = 4000, max = 24000, step = 400, group = "Land and buildings" },
+	-- (The flat far horizon past the land, beyond horizonStart. Console only: menu is its default.)
+	{ key = "graphicsPlusHorizon", cvar = "horizonfarclip", min = 1000, menu = 2112, max = 5000, step = 100,
+		group = "Land and buildings", console = true },
 	{ key = "graphicsPlusTerrain", cvar = "terrainLodDist", min = 200, menu = 650, max = 2000, step = 50,
 		group = "Land and buildings" },
 	{ key = "graphicsPlusBuildings", cvar = "wmoLodDist", min = 250, menu = 400, max = 2000, step = 50,
@@ -54,7 +59,45 @@ ns.GRAPHICS_PLUS = {
 	-- (1536: what the menu's level 5 sets on WoW Forever.)
 	{ key = "graphicsPlusShadows", cvar = "shadowTextureSize", min = 512, menu = 2048, max = 4096,
 		values = { 512, 1024, 1536, 2048, 4096 }, group = "Shadows" },
+	-- The rest are console only, or only partly in the menu: menu is the game's
+	-- default (console: never taken for a leftover). onOff: a 0/1 setting, its
+	-- slider Off and On.
+	{ key = "graphicsPlusSky", cvar = "skyCloudLod", min = 0, menu = 3, max = 3, step = 1,
+		group = "Sky and weather", console = true },
+	{ key = "graphicsPlusVolumeFog", cvar = "volumeFog", menu = 0, onOff = true,
+		group = "Sky and weather", console = true },
+	{ key = "graphicsPlusReflections", cvar = "reflectionMode", min = 0, menu = 0, max = 3, step = 1,
+		group = "Water", console = true },
+	{ key = "graphicsPlusRipples", cvar = "rippleDetail", min = 0, menu = 0, max = 2, step = 1,
+		group = "Water", console = true },
+	{ key = "graphicsPlusParticles", cvar = "particleMTDensity", min = 10, menu = 20, max = 100, step = 5,
+		group = "Effects", console = true },
+	{ key = "graphicsPlusGlow", cvar = "ffxGlow", menu = 1, onOff = true, group = "Effects", console = true },
+	{ key = "graphicsPlusDeathGrey", cvar = "ffxDeath", menu = 1, onOff = true, group = "Effects", console = true },
+	{ key = "graphicsPlusViolence", cvar = "violenceLevel", min = 0, menu = 2, max = 5, step = 1,
+		group = "Effects", console = true },
+	{ key = "graphicsPlusSharpen", cvar = "ResampleAlwaysSharpen", menu = 1, onOff = true,
+		group = "Effects", console = true },
+	-- HDR: needs HDR on in the system and monitor. One of the two brightness
+	-- modes on, or the picture goes dark; HDRFactor works with peak brightness.
+	{ key = "graphicsPlusHDR", cvar = "HDROutput", menu = 0, onOff = true, group = "HDR", console = true },
+	{ key = "graphicsPlusHDRPeakMode", cvar = "useHDRPeakBrightness", menu = 0, onOff = true,
+		group = "HDR", console = true },
+	{ key = "graphicsPlusHDRPeak", cvar = "HDRPeakBrightness", min = 80, menu = 400, max = 2000, step = 10,
+		group = "HDR", console = true },
+	{ key = "graphicsPlusHDRFactor", cvar = "HDRFactor", min = 0, menu = 2, max = 2, step = 0.1, decimals = 1,
+		group = "HDR", console = true },
+	{ key = "graphicsPlusHDRPaperMode", cvar = "useHDRBrightness", menu = 0, onOff = true,
+		group = "HDR", console = true },
+	{ key = "graphicsPlusHDRPaper", cvar = "HDRBrightness", min = 80, menu = 203, max = 1000, step = 1,
+		group = "HDR", console = true },
 }
+-- (A 0/1 setting's slider: two places, Off and On.)
+for _, setting in ipairs(ns.GRAPHICS_PLUS) do
+	if setting.onOff then
+		setting.min, setting.max, setting.values = 0, 1, { 0, 1 }
+	end
+end
 
 local writing = false
 local borrowed = false -- a setting left alone while another feature has it
@@ -137,7 +180,8 @@ function ns.ApplyGraphicsPlus()
 	for _, setting in ipairs(ns.GRAPHICS_PLUS) do
 		if Exists(setting.cvar) and not (setting.secure and InCombatLockdown()) then
 			local wanted = ns.Setting("graphicsPlus") and db[setting.key .. "On"] and db[setting.key] or nil
-			ApplyOne(setting.cvar, wanted, false, saved, written, setting.menu, setting.max)
+			ApplyOne(setting.cvar, wanted, false, saved, written, not setting.console and setting.menu or nil,
+				setting.max)
 			for _, cvar in ipairs(setting.also or {}) do
 				if Exists(cvar) then
 					ApplyOne(cvar, wanted, true, saved, written, setting.alsoMenu and setting.alsoMenu[cvar],

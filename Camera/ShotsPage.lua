@@ -9,6 +9,13 @@ function ns.CreateMyShotsPanel(kit)
 	local title = kit.Label(content, "GameFontNormalLarge", L["My Shots"])
 	title:SetPoint("TOPLEFT", 16, -16)
 	local intro = kit.PageIntro(content, title, L["Make your own version of a standing-still camera with your own sway and zoom."])
+	-- (Its switch, under Enable Cameras: off, scenes set to a shot play its
+	-- camera with that camera's own numbers, Shots.lua's ActiveShot. Hidden:
+	-- nothing below moves for it.)
+	kit.PageSwitch(content, "cameraShots", L["Enable Page"],
+		L["Lets scenes set to a shot play it with its own sway and zoom."], intro, function()
+			if ns.CameraRowsChanged then ns.CameraRowsChanged() end
+		end)
 
 	local selected -- (the shot shown)
 	local function Shot()

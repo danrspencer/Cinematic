@@ -6,6 +6,8 @@
 local _, ns = ...
 local L = ns.L
 
+ns.DEFAULTS.tintStyle = true -- this page at all (its switch; off: the tint's plain look, Tint.lua's Look)
+
 local WHITE = "Interface\\Buttons\\WHITE8X8"
 local PAGE_W = 600
 local GAP = 6
@@ -204,6 +206,11 @@ function ns.CreateTintStylePanel(kit)
 	ns.EffectTabs(content, title, "tint", 2)
 	local intro = kit.PageIntro(content, title,
 		L["The color grading over the game world."])
+	-- (Off: the tint keeps to its plain look, the defaults: Tint.lua's Look.)
+	local switch = kit.PageSwitch(content, "tintStyle", L["Enable Page"],
+		L["On: the tint looks as this page says. Off: its plain look, the default preset with no zone, area or " ..
+			"time of day colors of your own; this page keeps its settings for when you turn it back on."],
+		intro, function() ns.RefreshTint() end)
 	for _, key in ipairs({ "tintPreset", "timeTintStrength", "tintClock" }) do kit.RecordKey(content, key) end
 
 	local presetInfo = {}
@@ -227,7 +234,7 @@ function ns.CreateTintStylePanel(kit)
 				if above then
 					section:SetPoint("TOPLEFT", above, "BOTTOMLEFT", 0, -SECTION_GAP)
 				else
-					section:SetPoint("TOPLEFT", intro, "BOTTOMLEFT", 0, -14)
+					section:SetPoint("TOPLEFT", switch, "BOTTOMLEFT", 2, 0) -- (the hidden switch: 1px under the intro)
 				end
 				above = section
 			end
@@ -1407,6 +1414,23 @@ function ns.CreateTintStylePanel(kit)
 		RefreshPlaces()
 		UpdatePreview()
 		Layout()
+		-- (Page off: its tiles and pickers, not kit controls, dim and take no clicks.)
+		local on = ns.PageOn("tintStyle")
+		for _, section in ipairs(sections) do section:SetAlpha(on and 1 or 0.45) end
+		if not on and not content.offBlock then
+			local block = CreateFrame("Frame", nil, content)
+			block:SetFrameLevel(content:GetFrameLevel() + 100)
+			block:EnableMouse(true)
+			if block.EnableMouseWheel then block:EnableMouseWheel(false) end
+			content.offBlock = block
+		end
+		if content.offBlock then
+			local block = content.offBlock
+			block:ClearAllPoints()
+			block:SetPoint("TOPLEFT", switch, "BOTTOMLEFT", 0, 0)
+			block:SetPoint("BOTTOMRIGHT", content, "BOTTOMRIGHT")
+			block:SetShown(not on)
+		end
 	end
 	-- One control for the whole page: kit.Refresh (a profile switch, Reset page) redraws it.
 	local master = CreateFrame("Frame", nil, content)

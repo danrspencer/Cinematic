@@ -537,9 +537,9 @@ function ns.UpdateCVars(cinematic, fightStarting)
 	-- (Kept through the Calm Timer after a fight, like the plates.)
 	local fighting = inCombat or (ns.FightLingering and ns.FightLingering())
 	ns.ApplyCVarSet(COMBAT_TEXT_CVARS, (cinematic and ns.Setting("hideCombatText") and not fighting) or false)
-	ns.ApplyCVarSet(TARGET_CIRCLE_CVARS, (cinematic and ns.PageOn("handleFrames")
+	ns.ApplyCVarSet(TARGET_CIRCLE_CVARS, (cinematic and ns.PageOn("showInHighlight")
 		and not ns.RowOnNow("targetcircle", nil, true)) or immersive)
-	ns.ApplyCVarSet(ns.selfHighlightCVars, (cinematic and ns.PageOn("handleFrames")
+	ns.ApplyCVarSet(ns.selfHighlightCVars, (cinematic and ns.PageOn("showInHighlight")
 		and not ns.RowOnNow("selfhighlight", nil, true)) or false)
 	-- The red error text ("Target not in line of sight"): its own In combat
 	-- and Out of combat boxes, CineMode or not (the addon off: always shown).

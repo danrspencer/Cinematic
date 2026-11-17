@@ -65,6 +65,7 @@ for n = 1, MAX do
 		title = "Your wheel",
 		binding = "Your wheel",
 		slots = {},
+		switch = "wheelYoursOn", -- (the Your Wheels page's switch: all of them)
 		linger = 0.4, -- (up a moment after a pick, showing which it was)
 		lingerPicks = true,
 		Title = function()
@@ -124,7 +125,8 @@ function ns.CustomWheelChoices()
 	local list = {}
 	for _, data in ipairs(Saved()) do
 		list[#list + 1] = { key = "custom" .. data.pool, icon = data.icon or DEFAULT_ICON, trim = true,
-			color = COLOR, label = data.name, opens = pool[data.pool], offByDefault = true, custom = true }
+			color = COLOR, label = data.name, opens = pool[data.pool], offByDefault = true, custom = true,
+			switch = "wheelYoursOn" }
 	end
 	return list
 end

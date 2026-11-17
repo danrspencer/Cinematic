@@ -1118,6 +1118,29 @@ function ns.BuiltInAsScript(value)
 	local id = BUILT_IN_OF[value]
 	return id and "script:" .. id or value
 end
+-- The Scripts page's switch (CameraScriptsPage.lua, under Enable Cameras).
+-- Off, every setting on it is: scenes set to a script of yours play no
+-- camera (CameraRows.lua's ns.TriggerSetting asks ns.ScriptBlocked), and our
+-- cameras play their scripts as we ship them, your edits to them aside
+-- (ns.CameraScriptToPlay). The Skyriding Cam's own script goes by its page.
+ns.DEFAULTS.cameraScripts = true
+function ns.ScriptBlocked(value)
+	return type(value) == "string" and ns.db ~= nil and ns.db.cameraScripts == false
+		and value:find("^script:u%d+$") ~= nil
+end
+-- The script a camera plays (by id): as its page has it, or with the page
+-- off, a built-in one as we ship it and none of yours.
+function ns.CameraScriptToPlay(id)
+	if id == "skyride" or not (ns.db and ns.db.cameraScripts == false) then return ns.FindCameraScript(id) end
+	for _, each in ipairs(BUILT_IN) do
+		if each.id == id then
+			local script = ns.CleanCameraScript(each.make(), each.id, true)
+			script.name, script.builtin = each.name, true
+			return script
+		end
+	end
+	return nil
+end
 -- The camera a built-in script stands in for, by its key in ns.activeCam
 -- ("idle", "fish", "chatcam"...): from a script id or a "script:<id>" value.
 -- nil for any other script (yours, the fly-by, Skyriding).
@@ -2673,7 +2696,7 @@ function STEP.keepup(step)
 end
 
 function STEP.play(step)
-	local played = (run.plays or 0) < MAX_PLAYS and ns.FindCameraScript(step.script)
+	local played = (run.plays or 0) < MAX_PLAYS and ns.CameraScriptToPlay(step.script)
 	if not played then return end
 	run.plays = (run.plays or 0) + 1
 	DoSteps(ns.CleanCameraScript(played, played.id, played.builtin).steps)
@@ -3385,7 +3408,7 @@ ns.SetOnUpdate(watcher, function(_, elapsed)
 			end
 		else
 			zoomer.mouseWaitFor = nil
-			local script = ns.FindCameraScript(camera:sub(8))
+			local script = ns.CameraScriptToPlay(camera:sub(8)) -- (the Scripts page off: ours as shipped)
 			if script then Start(script, key, camera) end
 		end
 	else

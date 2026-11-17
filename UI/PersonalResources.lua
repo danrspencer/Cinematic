@@ -764,39 +764,19 @@ function ns.CreatePersonalResourcesPanel(kit)
 		if ns.RefreshPersonalStyle then ns.RefreshPersonalStyle() end
 		if ns.UpdateManaCost then ns.UpdateManaCost() end
 	end)
-	-- Two parts (Options.lua's ns.PageTabsBelow, its own tabs not drawn: the
-	-- Unit Frames tabs over the title pick them): Keep up, and Frame Links.
-	local unitLinks, unitsHead, prdHead -- (the unit frames' links, over the bars' on Frame Links: below)
+	-- Its part (Options.lua's ns.PageTabsBelow, its own tabs not drawn: the
+	-- Unit Frames tabs over the title pick it): Keep up. (Its Frame Links,
+	-- the unit frames' and the bars': the Addons hub's Links page, 2026-11-17.)
 	-- (The PRD's: its grid and Cine Mana Bar's settings, shown on its icon only. Below.)
 	local unitGrid, prdGrid, holder
 	local prdParts = {}
-	local hosts, PickPart, TabsShown, AdoptTab, prdLinks = ns.PageTabsBelow(content, switch, {
+	local _, PickPart, TabsShown, AdoptTab = ns.PageTabsBelow(content, switch, {
 		{ L["Show Advanced"], L["Brings your hidden frame and resource bars back while your health or power is low."] },
-		{ L["Addon Reveal Link"], L["Which supported addon's frames stand in for these frames and bars."] },
-	}, "Personal Resources/page", 2, "prd", 1, function(i)
-		if i == 2 and unitLinks then unitLinks.Show() end
-	end, true)
-	-- Frame Links: the unit frames' (once on the HUD page's Unit frames tab),
-	-- then the bars', a heading over each. (Made on the tab's frame, not the
-	-- page: AdoptTab takes what's new on the page onto Keep up.)
-	do
-		local linksHost = hosts[2]
-		unitsHead = kit.Label(linksHost, "GameFontNormal", L["Unit frames"])
-		unitsHead:SetPoint("TOPLEFT", linksHost, "TOPLEFT", 0, 0)
-		unitLinks = ns.BuildLinkSection(content, unitsHead, "units", true)
-		unitLinks.frame:SetParent(linksHost)
-		ns.RegisterLinkSection("units", unitLinks.frame, unitLinks.body.openSection)
-		prdHead = kit.Label(linksHost, "GameFontNormal", L["Personal Resource Display"])
-		prdHead:SetPoint("TOPLEFT", unitLinks.frame, "BOTTOMLEFT", -2, -18)
-		if prdLinks then
-			prdLinks.frame:ClearAllPoints()
-			prdLinks.frame:SetPoint("TOPLEFT", prdHead, "BOTTOMLEFT", 2, 0)
-			prdLinks.frame:SetPoint("RIGHT", content, "RIGHT", -16, 0)
-		end
-	end
+	}, "Personal Resources/page", nil, nil, 1, nil, true)
+	ns.LinkPointer(content, { "units", "prd" })
 	-- Which icon's this page is now: the Unit Frames icon's (the player and
 	-- pet frames) or the Personal Resources icon's (the PRD), 2026-11-17: its
-	-- tabs, its Keep up rows and its links.
+	-- tabs and its Keep up rows.
 	local function SetIcon(prd)
 		prd = prd and prdSet ~= nil
 		for _, set in ipairs({ unitSet, prdSet or false }) do
@@ -812,46 +792,30 @@ function ns.CreatePersonalResourcesPanel(kit)
 		local grid = prd and prdGrid or unitGrid
 		if holder and grid then holder:SetHeight(grid:GetHeight()) end
 		for _, part in ipairs(prdParts) do part:SetShown(prd) end
-		-- (Links: the unit frames', or the bars' at the top in their place.)
-		if unitLinks then unitLinks.frame:SetShown(not prd) end
-		if unitsHead then unitsHead:SetShown(not prd) end
-		if prdHead then
-			prdHead:SetShown(prd)
-			prdHead:ClearAllPoints()
-			prdHead:SetPoint("TOPLEFT", hosts[2], "TOPLEFT", 0, 0)
-		end
-		if prdLinks then prdLinks.frame:SetShown(prd) end
 		return prd
 	end
 	-- Each part a hidden hub tile under its icon (its tabOf: HUBS', or the
-	-- tab's), picked by its tab: Keep up's title and switch, or Frame Links'.
-	local function ShowPart(i, prd)
-		PickPart(i)
+	-- tab's), picked by its tab: Keep up's title and switch.
+	local function ShowPart(prd)
+		PickPart(1)
 		prd = SetIcon(prd)
 		if prd then
-			ShowPrdTab(ns.ShowInIndex("prd", i == 1 and "PRD Keep Up" or "PRD Links"))
+			ShowPrdTab(ns.ShowInIndex("prd", "PRD Keep Up"))
 		else
-			ShowUnitTab(ns.ShowInIndex("units", i == 1 and "Personal Resources" or "Unit Frame Links"))
+			ShowUnitTab(ns.ShowInIndex("units", "Personal Resources"))
 		end
-		title:SetText(i == 1 and L["Keep up while low"] or L["Addon Reveal Link"])
-		content.headerSwitchOff = i ~= 1 -- (no On/Off by Frame Links: it isn't Keep up's)
-		local header = content.pageHeaderSwitch
-		if header then header:SetShown(i == 1) end
+		title:SetText(L["Keep up while low"])
 	end
 	local ICON = "Interface\\AddOns\\" .. ADDON_NAME .. "\\Textures\\PersonalResources" -- (Media/make_prd_icon.py)
 	canvas.hubTabs = {
 		{ name = "Personal Resources", icon = ICON, label = "Unit Frames", switchLabel = "Keep up while low",
-			onSelect = function() ShowPart(1, false) end },
-		{ name = "Unit Frame Links", icon = ICON, label = "Unit Frames", own = true, noSwitch = true,
-			onSelect = function() ShowPart(2, false) end },
+			onSelect = function() ShowPart(false) end },
 	}
-	-- (The PRD's two, under the HUD's Personal Resources icon: tabOf.)
+	-- (The PRD's, under the HUD's Personal Resources icon: tabOf.)
 	if prdSet then
 		local list = canvas.hubTabs
 		list[#list + 1] = { name = "PRD Keep Up", icon = ICON, label = "Personal Resources", own = true,
-			tabOf = "HUD:prd", switchLabel = "Keep up while low", onSelect = function() ShowPart(1, true) end }
-		list[#list + 1] = { name = "PRD Links", icon = ICON, label = "Personal Resources", own = true,
-			tabOf = "HUD:prd", noSwitch = true, onSelect = function() ShowPart(2, true) end }
+			tabOf = "HUD:prd", switchLabel = "Keep up while low", onSelect = function() ShowPart(true) end }
 	end
 	local stack = kit.Stack(switch, "check")
 	local function Tick(key, label, tip, enabledBy)

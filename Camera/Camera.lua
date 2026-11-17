@@ -3771,6 +3771,8 @@ function ns.ReportCameraGates()
 	ns.Print("every camera:")
 	Check("Cinematic on", db.enabled)
 	Check("Enable Cameras (Scenes page)", db.cameraModes ~= false)
+	Check("Scenes page on", db.cameraScenes ~= false, ("Triggers page %s, Scripts page %s"):format(
+		db.cameraTriggers == false and "off" or "on", db.cameraScripts == false and "off" or "on"))
 	Check("CineMode on", ns.lastCinematic, not ns.lastCinematic and tostring(ns.cineOffWhy) or nil)
 	Check("out of combat", not (InCombatLockdown() or ns.Flag(UnitAffectingCombat("player"))))
 	Check("not moving the camera yourself", not g.adjusting, ("last camera input %s sec ago (%s)"):format(

@@ -20,6 +20,8 @@ end
 for _, part in ipairs(ns.PLATE_PARTS) do DEFAULTS[PREFIX .. "platePart" .. part] = "row" end
 DEFAULTS[PREFIX .. "barArt"] = "row" -- (action bar 1's art: InterfaceRecolor.lua's ns.ApplyBarArtOverride)
 DEFAULTS[PREFIX .. "barDividers"] = "row" -- (the dividers between bar 1's buttons: ActionBarStyle.lua)
+DEFAULTS.styleOverrides = true -- this tab at all (its switch, under General's Enable Style; off: no overrides)
+ns.SetPageMaster({ "styleOverrides" }, "styleGeneral")
 
 -- (The frames that go as the target's do so here too, set apart from it or not:
 -- the tab has the one Target section.)
@@ -32,10 +34,11 @@ local function Own(db, key)
 end
 
 -- "hide", "show" or nil (the row says). key: the row's: unitPart<frame><part>,
--- platePart<part>. Only with Style on: off, everything's as the game has it.
+-- platePart<part>. Only with Style and this tab on (styleOverrides, under
+-- styleGeneral: ns.PageOn): off, everything's as the rows say.
 function ns.StyleOverride(key)
 	local db = ns.db
-	if not (db and key and db.styleGeneral ~= false and db.enabled ~= false) then return nil end
+	if not (db and key and db.enabled ~= false and ns.PageOn("styleOverrides")) then return nil end
 	return Own(db, key)
 end
 
@@ -95,7 +98,11 @@ function ns.CreateStyleOverridesPanel(kit)
 		kit.Refresh()
 		for _, row in ipairs(parts) do row:Refresh() end
 	end
-	-- (No stack: Clear overrides and the tabs are placed by hand, below.)
+	-- (No stack: Clear overrides and the tabs are placed by hand, below. The
+	-- switch is hidden on a tabbed page: its tab's right-click and the off card.)
+	kit.PageSwitch(content, "styleOverrides", L["Enable Page"],
+		L["On: the parts picked here are hidden or shown. Off: every part goes by its row on the Interface " ..
+			"hub's pages; this tab keeps its picks for when you turn it back on."], intro, Changed)
 
 	local clear = ns.PanelButton(content)
 	clear:SetSize(130, 22)
@@ -108,6 +115,8 @@ function ns.CreateStyleOverridesPanel(kit)
 		end
 		Changed()
 	end)
+	clear.Refresh = function() end -- (greyed with the tab's switch)
+	kit.AddControl(clear)
 	-- (Placed by the inner tabs, at their row's right end, below.)
 
 	-- A row: its name and the three picks side by side, so the whole tab reads at a glance.
@@ -136,7 +145,11 @@ function ns.CreateStyleOverridesPanel(kit)
 		function row:Refresh()
 			local db = ns.GetDB()
 			local value = db and db[key] or "row"
+			-- (The tab's switch off, or Enable Style: greyed, no clicks.)
+			local on = db ~= nil and ns.PageOn("styleOverrides")
+			row:SetAlpha(on and 1 or 0.5)
 			for i, choice in ipairs(CHOICES) do
+				buttons[i]:SetEnabled(on)
 				local words = buttons[i]:GetFontString()
 				if words then
 					if choice[1] == value then words:SetTextColor(1, 0.82, 0) else words:SetTextColor(0.55, 0.55, 0.55) end
@@ -144,6 +157,8 @@ function ns.CreateStyleOverridesPanel(kit)
 			end
 		end
 		row:Refresh()
+		row.pageSwitch = false -- (greys itself above)
+		kit.AddControl(row)
 		parts[#parts + 1] = row
 	end
 	-- Each section a folder tab, on the panel under them, down to its last row. The

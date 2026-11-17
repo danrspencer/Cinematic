@@ -21,6 +21,8 @@ DEFAULTS.emoteVisionRepeatMins = 1     -- ...for this many minutes
 DEFAULTS.emoteVisionGroupBuffs = false -- buffs from your own party or raid ignored (no card)
 DEFAULTS.emoteVisionHold = 10          -- seconds a card stays (paused while the mouse is over it)
 DEFAULTS.emoteVisionPadGrab = "PADRSTICK" -- gamepad: the button that lets the face buttons pick the card's emotes
+DEFAULTS.emoteSettings = true         -- its Settings tab at all (that tab's switch; off: its settings as they start)
+DEFAULTS.emoteStyle = true            -- its Look tab at all (that tab's switch; off: the starting look and spot)
 DEFAULTS.emoteVisionScale = 1
 DEFAULTS.emoteVisionPortrait = true    -- their face (or class icon) on the card
 DEFAULTS.emoteVisionPlayerMenu = true  -- an Emote section on a player's right-click menu
@@ -484,8 +486,29 @@ end
 
 local function DB() return ns.GetDB() or DEFAULTS end
 
+-- (Look tab's Enable Page off: the words and frame at their defaults.)
 local function Look()
-	return ns.StyleLook("emoteVision")
+	return ns.StyleLook("emoteVision", ns.db ~= nil and not ns.PageOn("emoteStyle"))
+end
+
+-- A setting of the Settings or Look tab as its Enable Page leaves it
+-- (emoteSettings, emoteStyle): off, its default; others as saved. (On ns:
+-- this file's main chunk is at Lua's 200-local cap.)
+do
+	local TAB = {}
+	for _, key in ipairs({ "emoteVisionStill", "emoteVisionRepeats", "emoteVisionRepeatMins", "emoteVisionGroupBuffs",
+		"emoteVisionHold", "emoteVisionPadGrab", "emoteVisionPlayerMenu", "emoteVisionMenuEmotes" }) do
+		TAB[key] = "emoteSettings"
+	end
+	for _, key in ipairs({ "emoteVisionLook", "emoteVisionPortrait", "emoteVisionScale", "emoteVisionSpot",
+		"emoteVisionX", "emoteVisionY" }) do
+		TAB[key] = "emoteStyle"
+	end
+	function ns.EmoteOpt(key)
+		local tab = TAB[key]
+		if tab and ns.db and not ns.PageOn(tab) then return DEFAULTS[key] end
+		return DB()[key]
+	end
 end
 
 local function Fighting()
@@ -669,16 +692,15 @@ end
 local Hide, Next
 
 local function LookNow()
-	return LOOKS[DB().emoteVisionLook] or LOOKS.classic
+	return LOOKS[ns.EmoteOpt("emoteVisionLook")] or LOOKS.classic
 end
 
 local function Place()
-	local db = DB()
-	local scale = tonumber(db.emoteVisionScale) or 1
+	local scale = tonumber(ns.EmoteOpt("emoteVisionScale")) or 1
 	card:SetScale(scale)
 	card:ClearAllPoints()
 	-- (To start with: its left edge on theirs, a little above their box.)
-	if db.emoteVisionSpot ~= "own" and ns.SpeechBehindSpot then
+	if ns.EmoteOpt("emoteVisionSpot") ~= "own" and ns.SpeechBehindSpot then
 		local left, bottom, _, height = ns.SpeechBehindSpot()
 		if type(left) == "number" and type(bottom) == "number" then
 			-- (Whole units: a card between pixels draws its thin edges broken.)
@@ -687,8 +709,8 @@ local function Place()
 			return
 		end
 	end
-	card:SetPoint("BOTTOM", UIParent, "BOTTOM", math.floor((tonumber(db.emoteVisionX) or 0) / scale + 0.5),
-		math.floor((tonumber(db.emoteVisionY) or 260) / scale + 0.5))
+	card:SetPoint("BOTTOM", UIParent, "BOTTOM", math.floor((tonumber(ns.EmoteOpt("emoteVisionX")) or 0) / scale + 0.5),
+		math.floor((tonumber(ns.EmoteOpt("emoteVisionY")) or 260) / scale + 0.5))
 end
 
 -- The panel behind the words, as the style says (classic: Visions Style's
@@ -1030,7 +1052,7 @@ nameLink.pad.GRABS = {
 	{ value = "PADDRIGHT", text = "D-pad right" },
 }
 function nameLink.pad.GrabKey()
-	local key = DB().emoteVisionPadGrab
+	local key = ns.EmoteOpt("emoteVisionPadGrab")
 	for _, choice in ipairs(nameLink.pad.GRABS) do
 		if choice.value == key then return key, choice.text end
 	end
@@ -1141,7 +1163,7 @@ function nameLink.pad.Grab()
 	nameLink.pad.grabbed, nameLink.pad.grabAge = true, 0
 	-- (Its time runs on, its bar still going down; grabbed near its end, it
 	-- gets a few seconds back to pick in.)
-	local hold = tonumber(DB().emoteVisionHold) or 10
+	local hold = tonumber(ns.EmoteOpt("emoteVisionHold")) or 10
 	if card and card.age and card.age > hold - 4 then card.age = math.max(FADE_IN, hold - 4) end
 	ns.Log("emote", ("Pad: grabbed: %s; %s %s"):format(nameLink.pad.Report(), nameLink.pad.targetKey,
 		target and "targets " .. tostring(target.who) or "closes"))
@@ -1402,7 +1424,7 @@ local function Create()
 		-- (The mouse over it: its time stands still.)
 		nameLink.pad.Tick(elapsed)
 		if not ns.Flag(self:IsMouseOver()) then self.age = self.age + elapsed end
-		local hold = tonumber(DB().emoteVisionHold) or 10
+		local hold = tonumber(ns.EmoteOpt("emoteVisionHold")) or 10
 		local age = self.age
 		if self.leaving then
 			self.leaving = self.leaving + elapsed
@@ -1558,7 +1580,7 @@ local function Show(moment)
 	if #emotes == 0 then return false end
 	if not card then Create() end
 	showing = moment
-	local style, look, db = LookNow(), Look(), DB()
+	local style, look = LookNow(), Look()
 	Panel(style)
 	Place()
 
@@ -1586,7 +1608,7 @@ local function Show(moment)
 		card.heading:SetText(L[HEADINGS[moment.kind] or "A KINDNESS"])
 		Color(card.heading, style.lines or GOLD)
 	end
-	local face = db.emoteVisionPortrait and style.layout ~= "center"
+	local face = ns.EmoteOpt("emoteVisionPortrait") and style.layout ~= "center"
 	-- (Its size: the style's, the wheel's bigger in its middle.)
 	local faceSize = style.face or 40
 	card.portrait:SetSize(faceSize, faceSize)
@@ -1740,7 +1762,7 @@ local function WhyWaiting(moment)
 	if Fighting() then return "in a fight" end
 	-- (No emoting while dead or a ghost: a card waits until you're back.)
 	if ns.Flag(UnitIsDeadOrGhost("player")) then return "dead" end
-	if DB().emoteVisionStill and ns.playerMoving then return "moving" end
+	if ns.EmoteOpt("emoteVisionStill") and ns.playerMoving then return "moving" end
 	local kind = moment and MOMENT[moment.kind]
 	if kind and kind.soon then
 		if moment.after and GetTime() < moment.after then return "just killed" end
@@ -1810,7 +1832,7 @@ local function Fire(moment)
 	if not who then return end
 	local key = moment.kind .. ":" .. who
 	local now = GetTime()
-	local wait = db.emoteVisionRepeats and (tonumber(db.emoteVisionRepeatMins) or 10) * 60 or AGAIN_SOON
+	local wait = ns.EmoteOpt("emoteVisionRepeats") and (tonumber(ns.EmoteOpt("emoteVisionRepeatMins")) or 10) * 60 or AGAIN_SOON
 	if lastFrom[key] and now - lastFrom[key] < wait then
 		ns.Log("emote", ("%s card skipped: same one %d sec ago (wait %d)"):format(moment.kind, math.floor(now - lastFrom[key]), math.floor(wait)))
 		return
@@ -1925,7 +1947,7 @@ local function Buffed(aura, refresh)
 	local guid = Plain(UnitGUID(unit))
 	-- (By GUID: UnitIsPlayer can say false for players after a buff on Forever.)
 	if not (guid and guid:find("^Player%-")) then return Skip("not a player") end
-	if DB().emoteVisionGroupBuffs and InGroup(guid) then return Skip("your group's, ignored") end
+	if ns.EmoteOpt("emoteVisionGroupBuffs") and InGroup(guid) then return Skip("your group's, ignored") end
 	Skip("card")
 	-- (With their last name, as FireFor's: "Waffle" alone, on Forever where
 	-- they're "Waffle Hd", and the face click's /targetexact found no one.)
@@ -3255,14 +3277,14 @@ do
 	local function AddSection(tag, root, context)
 		-- (Hooking runs this at once on the last menu built: no context then.)
 		if not root or type(context) ~= "table" then return end
-		if not (ns.Setting("emoteVision") and ns.Setting("emoteVisionPlayerMenu")) then return end
+		if not (ns.Setting("emoteVision") and ns.EmoteOpt("emoteVisionPlayerMenu")) then return end
 		local who, why = MenuPlayer(context)
 		last = tag .. ": " .. (who and ("added for " .. tostring(who.unit)) or tostring(why))
 		if not who then return end
 		root:CreateDivider()
 		root:CreateTitle(L["Emote"])
 		local quick = {}
-		for _, token in ipairs(ParseEmotes(DB().emoteVisionMenuEmotes)) do
+		for _, token in ipairs(ParseEmotes(ns.EmoteOpt("emoteVisionMenuEmotes"))) do
 			quick[token] = true
 			if HasEmote(token) then
 				root:CreateButton(EmoteName(token), function() PlayAt(who, token) end)
@@ -3701,7 +3723,11 @@ function ns.CreateEmoteVisionSettingsPanel(kit)
 	Tabs(content, title, 2)
 	local intro = kit.PageIntro(content, title,
 		L["When the cards show and for how long."])
-	local stack = kit.Stack(intro, "label")
+	-- (Off: every setting here as it starts: Opt.)
+	local switch = kit.PageSwitch(content, "emoteSettings", L["Enable Page"],
+		L["On: the cards show as this page says. Off: as they start, for each setting here; this page keeps " ..
+			"its settings for when you turn it back on."], intro, Changed)
+	local stack = kit.Stack(switch, "check")
 	local b = ns.VisionRows(kit, content, stack, Changed)
 
 	stack:Header(content, L["When"])
@@ -3855,8 +3881,8 @@ function LookTiles(kit, content, stack)
 				picked and 0 or 0.4, 1)
 			lit:SetShown(picked)
 			name:SetTextColor(picked and 1 or 0.8, picked and 0.82 or 0.8, picked and 0 or 0.8)
+			tile:SetAlpha((not ns.db or ns.PageOn("emoteStyle")) and 1 or 0.5) -- (and no clicks: its page's switch)
 		end
-		tile.pageSwitch = false
 		kit.AddControl(tile)
 	end
 end
@@ -3869,7 +3895,11 @@ function ns.CreateEmoteVisionStylePanel(kit)
 	Tabs(content, title, 3)
 	local intro = kit.PageIntro(content, title,
 		L["Pick its style, look and position."])
-	local stack = kit.Stack(intro, "label")
+	-- (Off: the card's style, words, frame and spot as they start: Look and Opt.)
+	local switch = kit.PageSwitch(content, "emoteStyle", L["Enable Page"],
+		L["On: the cards look and sit as this page says. Off: their starting look, size and spot; this page " ..
+			"keeps its settings for when you turn it back on."], intro, Changed)
+	local stack = kit.Stack(switch, "check")
 	local rows = ns.StyleRows(kit, content, stack, Changed, "emoteVision")
 	local b = ns.VisionRows(kit, content, stack, Changed)
 

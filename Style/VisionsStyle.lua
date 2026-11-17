@@ -7,6 +7,9 @@
 local _, ns = ...
 local L = ns.L
 
+ns.DEFAULTS.visionsStyle = true -- this page at all (its switch)
+ns.SetPageMaster({ "visionsStyle" }, "styleGeneral") -- (under Enable Style, as the other Style pages)
+
 -- The Visions that share settings, as the list shows them: name, the page
 -- to open (ns.OpenOptions), how their shared settings' keys start.
 local VISIONS = {
@@ -81,8 +84,15 @@ function ns.CreateVisionsStylePanel(kit)
 		for _, row in ipairs(visionRows) do row:Refresh() end
 	end
 
-	local stack = kit.Stack(intro, "label")
-	local rows = ns.StyleRows(kit, content, stack, Changed) -- (greyed with the Style hub's Enable Style)
+	-- (Off: every Vision on "Visions Style" goes by the Style hub's General
+	-- page instead, and the text size is 100%: StylePages.lua's FromGeneral.)
+	local switch = kit.PageSwitch(content, "visionsStyle", L["Enable Page"],
+		L["On: the Visions that follow this page look as it says. Off: they go by the Style hub's General page, " ..
+			"at their own text size; this page keeps its settings for when you turn it back on."],
+		intro, Changed)
+	local stack = kit.Stack(switch, "check")
+	-- (Greyed with the Style hub's Enable Style too.)
+	local rows = ns.StyleRows(kit, content, stack, Changed, "visionsStyle")
 	local OWN = L["Each Vision's own"]
 	preview = ns.MakeStyleJumbotron(kit, content, stack, 480, CELLS)
 

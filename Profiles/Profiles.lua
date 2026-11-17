@@ -494,6 +494,12 @@ local function SettingsChanged()
 	if ns.RefreshInterfaceRecolor then ns.RefreshInterfaceRecolor() end
 	if ns.SwitchProfileLayout then ns.SwitchProfileLayout() end
 	if ns.ApplyShoulderCam then ns.ApplyShoulderCam() end
+	if ns.ApplyWheelSwitches then ns.ApplyWheelSwitches() end -- (MarkerWheel.lua: the Wheels pages' switches)
+	if ns.ApplyFrameLinks then ns.ApplyFrameLinks() end -- (FrameLinks.lua: the Links page tabs' switches)
+	-- (A profile with the Keyboard Map's page off: an open map closes, as its switch does.)
+	if ns.KeyboardMapClose and ns.KeyboardMapShown and ns.KeyboardMapShown() and not ns.PageOn("keyboardMap") then
+		ns.KeyboardMapClose()
+	end
 	ApplyProfileSwitches()
 	local started = debugprofilestop()
 	if ns.RefreshOptions then ns.RefreshOptions() end

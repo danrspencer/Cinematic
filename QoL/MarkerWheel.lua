@@ -89,7 +89,7 @@ local OPEN_SNIPPET = [[
 		return
 	end
 	self:SetAttribute("cineopen", nil)
-	if (self:GetAttribute("count") or 0) == 0 then
+	if (self:GetAttribute("count") or 0) == 0 or self:GetAttribute("cineoff") then
 		return
 	end
 	for i = 1, self:GetAttribute("others") or 0 do
@@ -447,7 +447,8 @@ local function MakeWheel(spec)
 				owner:Hide()
 				return false
 			end
-			if (owner:GetAttribute("count") or 0) == 0 then
+			-- (cineoff: its Wheels page switched off, ApplyWheelSwitches.)
+			if (owner:GetAttribute("count") or 0) == 0 or owner:GetAttribute("cineoff") then
 				return false
 			end
 			-- (One wheel at a time: the other secure ones are put away.)
@@ -623,6 +624,7 @@ local function MakeWheel(spec)
 	end
 
 	wheel.keyButton, wheel.area, wheel.face = keyButton, area, face
+	wheel.switch = spec.switch -- (its Wheels page's switch: ApplyWheelSwitches)
 	wheels[#wheels + 1] = wheel
 	return wheel
 end
@@ -688,6 +690,7 @@ markerWheel = MakeWheel({
 	title = "Marker wheel",
 	binding = "Marker wheel (hold)",
 	slots = unitSlots,
+	switch = "wheelMarkerOn",
 	linger = 0.6, -- (up a moment after a pick, showing the marker go on)
 	lingerPicks = true,
 	OnOpen = function() SetUnit(MarkUnit()) end,
@@ -740,6 +743,7 @@ if PlaceRaidMarker then
 		title = "Ground marker wheel",
 		binding = "Ground marker wheel (hold)",
 		slots = worldSlots,
+		switch = "wheelWorldOn",
 		linger = 0.6, -- (up a moment after a pick, showing the marker go down)
 		lingerPicks = true,
 		activeText = "down: pick it to move it",
@@ -894,6 +898,7 @@ visionWheel = MakeWheel({
 	title = "Vision wheel",
 	binding = "Vision wheel (hold)",
 	slots = visionSlots,
+	switch = "wheelVisionOn",
 	activeText = "on: pick it to turn it off",
 	inactiveText = "off: pick it to turn it on",
 	dimInactive = true, -- (the ones off greyed, so they stand out from the ones on)
@@ -912,17 +917,18 @@ cameraOpener:SetScript("OnClick", function() ns.OpenCameraWheel() end)
 local MASTER_CHOICES = {
 	{ key = "camera", icon = "Interface\\Icons\\INV_Misc_Spyglass_03", trim = true, color = { 1, 0.82, 0.3 },
 		label = "Camera wheel", attributes = { type = "click", clickbutton = cameraOpener },
-		Cant = function() return ns.CameraWheelCant() end },
+		Cant = function() return ns.CameraWheelCant() end, switch = "wheelCameraOn" },
 	{ key = "menu", icon = "Interface\\Icons\\INV_Misc_Gear_01", trim = true, color = { 1, 0.82, 0.3 },
-		label = "Menu wheel", opens = CinematicMenuWheel },
-	{ key = "marker", icon = ICON .. 8, color = COLORS[8], label = "Marker wheel", opens = markerWheel },
+		label = "Menu wheel", opens = CinematicMenuWheel, switch = "wheelMenuOn" },
+	{ key = "marker", icon = ICON .. 8, color = COLORS[8], label = "Marker wheel", opens = markerWheel,
+		switch = "wheelMarkerOn" },
 	-- (Off it until ticked, in every profile: the wheels list is the account's.)
 	{ key = "vision", icon = "Interface\\Icons\\Ability_EyeOfTheOwl", trim = true, color = { 0.35, 1, 0.45 },
-		label = "Vision wheel", opens = visionWheel, offByDefault = true },
+		label = "Vision wheel", opens = visionWheel, offByDefault = true, switch = "wheelVisionOn" },
 }
 if CinematicWorldMarkerWheel then
 	MASTER_CHOICES[#MASTER_CHOICES + 1] = { key = "world", icon = ICON .. 6, color = COLORS[6],
-		label = "Ground marker wheel", opens = CinematicWorldMarkerWheel }
+		label = "Ground marker wheel", opens = CinematicWorldMarkerWheel, switch = "wheelWorldOn" }
 end
 ns.MASTER_WHEEL_CHOICES = MASTER_CHOICES
 
@@ -988,10 +994,17 @@ function ns.ForgetMasterWheel(key)
 	end
 end
 
+-- Whether a wheel's Wheels page is on (key: its switch; nil: no page of its own).
+local function WheelOn(key)
+	return not key or not ns.db or ns.PageOn(key)
+end
+ns.WheelOn = WheelOn
+
+-- (A wheel whose page is off is left off it.)
 local function MasterSlots()
 	local slots = {}
 	for _, item in ipairs(ns.MasterWheelOrder()) do
-		if item.on then
+		if item.on and WheelOn(item.choice.switch) then
 			slots[#slots + 1] = item.choice
 		end
 	end
@@ -1003,6 +1016,7 @@ local masterWheel = MakeWheel({
 	title = "Master wheel",
 	binding = "Master wheel (hold)",
 	slots = MasterSlots(), -- (the usual ones: settings aren't loaded yet)
+	switch = "wheelMasterOn",
 	-- (Out of a fight: the menu wheel laid out fresh, and who the marker
 	-- wheel marks settled from where the cursor is now.)
 	OnOpen = function()
@@ -1150,6 +1164,43 @@ end
 ns.LinkSecureWheels()
 ns.MakeWheel = MakeWheel -- (CustomWheels.lua: the player's own)
 
+-- Each Wheels page's switch (on to start with): off, its key doesn't open
+-- the wheel and the master wheel leaves it off (Your Wheels: all of yours;
+-- Master Wheel: the master wheel doesn't open).
+for _, key in ipairs({ "wheelMasterOn", "wheelYoursOn", "wheelCameraOn", "wheelMenuOn", "wheelMarkerOn",
+	"wheelWorldOn", "wheelVisionOn" }) do
+	ns.DEFAULTS[key] = true
+end
+-- The secure wheels told (their snippets read "cineoff") and the master
+-- wheel laid out again: now, or in a fight as it ends.
+local switchPending = CreateFrame("Frame")
+function ns.ApplyWheelSwitches()
+	if InCombatLockdown() then
+		switchPending:RegisterEvent("PLAYER_REGEN_ENABLED")
+		return
+	end
+	CinematicMenuWheel:SetAttribute("cineoff", not WheelOn("wheelMenuOn") or nil)
+	for _, wheel in ipairs(wheels) do
+		wheel:Hide()
+		wheel:SetAttribute("cineoff", not WheelOn(wheel.switch) or nil)
+	end
+	ns.RebuildMasterWheel()
+end
+switchPending:SetScript("OnEvent", function(self)
+	self:UnregisterEvent("PLAYER_REGEN_ENABLED")
+	ns.ApplyWheelSwitches()
+end)
+-- (The camera wheel's key, CameraWheel.lua: not opened with its page off;
+-- put away as usual if it's up.)
+local cameraWheelKey = Cinematic_CameraWheel
+function Cinematic_CameraWheel(keystate)
+	local cameraWheel = _G.CinematicCameraWheel
+	if keystate == "down" and not WheelOn("wheelCameraOn") and not (cameraWheel and cameraWheel:IsShown()) then
+		return
+	end
+	return cameraWheelKey(keystate)
+end
+
 -- Scaled like the UI (they aren't in UIParent) out of a fight; and the
 -- marker wheel back to the target as a fight starts (just before the
 -- lockdown), as a mouseover's token could name someone else by the time the
@@ -1161,7 +1212,7 @@ watcher:RegisterEvent("UI_SCALE_CHANGED")
 watcher:SetScript("OnEvent", function(_, event)
 	-- (The master wheel's wheels, as saved: the settings are loaded now.)
 	if event == "PLAYER_ENTERING_WORLD" then
-		ns.RebuildMasterWheel()
+		ns.ApplyWheelSwitches() -- (the master wheel laid out again too)
 	end
 	if InCombatLockdown() then
 		return

@@ -17,6 +17,7 @@ local ADDON_NAME, ns = ...
 local L = ns.L
 
 local DEFAULTS = ns.DEFAULTS
+DEFAULTS.keyboardMap = true    -- at all (its page's switch; off: the map doesn't open)
 DEFAULTS.kbLayout = "auto"     -- "auto" (the game's language), "us", "uk", "de", "no"
 DEFAULTS.kbExtended = false    -- navigation keys, arrows and Print Screen
 DEFAULTS.kbNumpad = false      -- the numpad (its tick on the map's top bar)
@@ -1402,6 +1403,11 @@ end
 -- Opens it (stay: up till closed, rather than while its key's held).
 function ns.KeyboardMapOpen(stay)
 	if not ns.db then return end
+	-- (Its page's Enable Page off: it doesn't open, by its key, /cine keys or anything.)
+	if not ns.PageOn("keyboardMap") then
+		if stay then ns.Print(L["Keyboard Map is off: turn on its page's Enable Page."]) end
+		return
+	end
 	if not board then CreateBoard() end
 	stayOpen = stay or stayOpen
 	if not board:IsShown() then
@@ -1524,9 +1530,17 @@ function ns.CreateKeyboardMapPage(kit)
 	local title = kit.Label(content, "GameFontNormalLarge", L["Keyboard Map"])
 	title:SetPoint("TOPLEFT", 16, -16)
 	local intro = kit.PageIntro(content, title, L["Your keyboard on screen, showing what each key does."])
-	local stack = kit.Stack(intro, "label")
 
 	local function Changed() ns.KeyboardMapChanged() end
+
+	-- (Off: the map doesn't open, and closes if it's up: KeyboardMapOpen.)
+	local switch = kit.PageSwitch(content, "keyboardMap", L["Enable Page"],
+		L["On: the map opens with its key or /cine keys. Off: it doesn't open at all; this page keeps its " ..
+			"settings for when you turn it back on."], intro, function(value)
+			if not value then ns.KeyboardMapClose() end
+			Changed()
+		end)
+	local stack = kit.Stack(switch, "check")
 
 	-- Its key (two slots, as on the Keybinds page) and a button to open it.
 	local keyLabel = stack:Add(kit.Label(content, "GameFontHighlight", L["Key"]), "label")
@@ -1543,6 +1557,8 @@ function ns.CreateKeyboardMapPage(kit)
 	kit.Tooltip(open, L["Opens the map till you close it (also /cine keys)."])
 	ns.KeyboardMapShownChanged = OpenText
 	OpenText()
+	open.Refresh = OpenText -- (greyed with the page's switch)
+	kit.AddControl(open)
 
 	stack:Header(content, L["Keyboard"])
 	local layoutName = stack:Add(kit.Label(content, "GameFontHighlight", L["Layout:"]), "label")

@@ -69,11 +69,16 @@ end
 -- it), its page's name (English), its key binding, and Entries(), its slots
 -- now (each: label, and icon with trim and color, or Paint(icon, under)).
 -- extras: the player can put icons of their own on it (MarkerWheel.lua).
+-- switch: its page's switch (switchTip: what it does, Top).
+local ON_TIP = "On: its key opens this wheel, and it can be on the master wheel."
 local WHEELS = {
 	{ key = "master", label = "Master wheel", title = "Master Wheel", action = "CLICK CinematicMasterWheelButton:LeftButton",
+		switch = "wheelMasterOn", switchTip = "On: its key opens the master wheel.",
 		Entries = function() return SlotsOf("master") end },
-	{ key = "yours", label = "Your wheels", title = "Your Wheels" },
+	{ key = "yours", label = "Your wheels", title = "Your Wheels", switch = "wheelYoursOn",
+		switchTip = "On: your wheels' keys open them, and they can be on the master wheel." },
 	{ key = "camera", label = "Camera wheel", title = "Camera Wheel", action = "CINEMATIC_CAMWHEEL",
+		switch = "wheelCameraOn", switchTip = ON_TIP,
 		Entries = function()
 			local list = {}
 			for _, camera in ipairs(ns.CAMERA_WHEEL_LIST or {}) do
@@ -82,12 +87,15 @@ local WHEELS = {
 			return list
 		end },
 	{ key = "menu", label = "Menu wheel", title = "Menu Wheel", action = "CLICK CinematicMenuWheelButton:LeftButton",
+		switch = "wheelMenuOn", switchTip = ON_TIP,
 		Entries = function() return ns.MenuWheelPreview and ns.MenuWheelPreview() or {} end },
 	{ key = "marker", label = "Marker wheel", title = "Marker Wheel", action = "CLICK CinematicMarkerWheelButton:LeftButton", extras = true,
+		switch = "wheelMarkerOn", switchTip = ON_TIP,
 		Entries = function() return SlotsOf("marker") end },
 	{ key = "world", label = "Ground marker wheel", title = "Ground Marker Wheel", action = "CLICK CinematicWorldMarkerWheelButton:LeftButton",
-		extras = true, Entries = function() return SlotsOf("world") end },
+		extras = true, switch = "wheelWorldOn", switchTip = ON_TIP, Entries = function() return SlotsOf("world") end },
 	{ key = "vision", label = "Vision wheel", title = "Vision Wheel", action = "CLICK CinematicVisionWheelButton:LeftButton", extras = true,
+		switch = "wheelVisionOn", switchTip = ON_TIP,
 		Entries = function() return SlotsOf("vision") end },
 }
 
@@ -247,9 +255,18 @@ local function KeyRow(kit, parent, anchor, action, yOffset)
 end
 
 -- A page's title and what the wheel does, under it.
+-- Its switch (info.switch, MarkerWheel.lua's ns.ApplyWheelSwitches): an
+-- On/Off right of the title (no "?" there: a spot for it to go past).
 local function Top(kit, content, info)
 	local title = kit.Label(content, "GameFontNormalLarge", L[info.title])
 	title:SetPoint("TOPLEFT", 16, -16)
+	local spot = CreateFrame("Frame", nil, content)
+	spot:SetSize(1, 18)
+	spot:SetPoint("LEFT", title, "RIGHT", 1, 0)
+	content.pageHelp, content.pageTitle = spot, title
+	kit.PageSwitch(content, info.switch, L["Enable Page"], L[info.switchTip], title, function()
+		if ns.ApplyWheelSwitches then ns.ApplyWheelSwitches() end
+	end)
 	local text = kit.Label(content, "GameFontHighlight", L[TIPS[info.key]])
 	text:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -10)
 	text:SetWidth(560)

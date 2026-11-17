@@ -410,6 +410,7 @@ end
 -- Something says start: its cooldown, Only if and chance first, then its wait.
 local function TryStart(unit, now)
 	if unit.on or unit.pendingAt then return end
+	if ns.db and ns.db.cameraTriggers == false then return end -- (the Triggers page off: none of yours fire)
 	if unit.cd > 0 and unit.lastStart and now - unit.lastStart < unit.cd then
 		Skip(unit, (L["Cooldown: %d of %d sec left"]):format(math.ceil(unit.cd - (now - unit.lastStart)), unit.cd))
 		return
@@ -616,8 +617,13 @@ local function Tick()
 	local newEmote = emote and emote.at ~= lastEmoteAt and type(emote.token) == "string" and emote.token:lower()
 	lastEmoteAt = emote and emote.at
 	local moving = ns.playerMoving and not (ns.OnTaxi and ns.OnTaxi())
+	local off = ns.db and ns.db.cameraTriggers == false -- (the Triggers page off: those on end, none start)
 	for _, unit in ipairs(units) do
 		Parse(unit)
+		if off then
+			unit.pendingAt = nil
+			if unit.on then Stop(unit) end
+		end
 		local cond = Condition(unit, now)
 		if cond ~= nil then
 			-- (Starting as it stops: not at the first look, only once it has been on.)

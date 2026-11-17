@@ -121,6 +121,17 @@ local function Entries()
 	return list
 end
 
+-- The page's switch, on each of its four pages (one key, cameraTriggers:
+-- TriggerLibrary.lua). Hidden, so nothing below moves for it.
+local function TriggersSwitch(kit, content, anchor)
+	return kit.PageSwitch(content, "cameraTriggers", L["Enable Page"],
+		L["Lets your triggers fire, and ours go by your priorities and settings."], anchor, function()
+			-- (Ours' places and settings, as the switch now says.)
+			if ns.CustomTriggersChanged then ns.CustomTriggersChanged() end
+			if ns.CameraRowsChanged then ns.CameraRowsChanged() end
+		end)
+end
+
 function ns.CreateTriggersPanels(kit)
 	-- ===== Triggers: the list =====
 	do
@@ -128,6 +139,7 @@ function ns.CreateTriggersPanels(kit)
 		local title = kit.Label(content, "GameFontNormalLarge", L["Triggers"])
 		Tabs(content, title, 1)
 		local intro = kit.PageIntro(content, title, L["Everything that can start a scene, in one list."])
+		TriggersSwitch(kit, content, intro)
 		local show = ns.ChoiceMenu(content, 130, {
 			{ value = "all", text = L["All"] }, { value = "ours", text = L["Ours"] },
 			{ value = "yours", text = L["Yours"] }, { value = "unused", text = L["Unused"] },
@@ -346,6 +358,7 @@ function ns.CreateTriggersPanels(kit)
 		local title = kit.Label(content, "GameFontNormalLarge", L["Priority"])
 		Tabs(content, title, 2)
 		local intro = kit.PageIntro(content, title, L["When two triggers fire at once, the higher one in this list wins."])
+		TriggersSwitch(kit, content, intro)
 		local note = kit.Label(content, "GameFontDisableSmall", L["The flight, quest, chat, RP walk, auto-run and " ..
 			"death cameras take turns by their own rules for now: they join this list in a later update."])
 		note:SetPoint("TOPLEFT", intro, "BOTTOMLEFT", 0, -10)
@@ -496,6 +509,7 @@ function ns.CreateTriggersPanels(kit)
 		local title = kit.Label(content, "GameFontNormalLarge", L["Log"])
 		Tabs(content, title, 3)
 		local intro = kit.PageIntro(content, title, L["A log of this session's triggers and why each did or didn't play."])
+		TriggersSwitch(kit, content, intro)
 		local clear = Button(content, L["Clear"], 80, L["Empty the log."], function()
 			ns.ClearTriggerLog()
 			kit.Refresh()
@@ -567,6 +581,7 @@ function ns.CreateTriggerSettingsPanel(kit)
 	title:SetWidth(300)
 	title:SetJustifyH("LEFT")
 	title:SetWordWrap(false)
+	TriggersSwitch(kit, content, icon)
 	local controls = {} -- (this page's, refreshed by its Layout)
 	local function Add(control)
 		controls[#controls + 1] = control

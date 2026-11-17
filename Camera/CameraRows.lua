@@ -28,6 +28,12 @@
 local _, ns = ...
 local L = ns.L
 
+-- The Scenes page's switch (Options.lua): off, no scene plays from a trigger
+-- (ns.TriggerRowNow). It and the Triggers, Scripts and My Shots pages'
+-- switches (their own files' defaults) go under Enable Cameras.
+ns.DEFAULTS.cameraScenes = true
+ns.SetPageMaster({ "cameraScenes", "cameraTriggers", "cameraScripts", "cameraShots" }, "cameraModes")
+
 ns.CAMERA_ROW_COPIES = 5 -- (a trigger's own row and four copies: <key>2 to <key>5)
 
 -- The triggers in the order the page lists them: the order they win in when
@@ -437,6 +443,7 @@ end
 local NOW_HOLD = 0.1
 local nowCache = { at = -1 }
 function ns.TriggerRowNow(key)
+	if ns.db and ns.db.cameraScenes == false then return nil end -- (the Scenes page off: no scene plays)
 	if ns.db and DroppedSet()[key] then return nil end -- (taken off its scene's Triggers)
 	if ns.FeatureYieldedTo and ns.FeatureYieldedTo("scene:" .. key) then return nil end -- (another addon's own)
 	if ns.db and TRIGGER[key] then key = ns.SceneLead(key) end -- (a group's member: its lead's rows)
@@ -479,11 +486,15 @@ function ns.TriggerSetting(key, field)
 	if not id then
 		return field == "camera" and TRIGGER[key] and TRIGGER[key].off or false
 	end
+	local value = ns.CameraRowValue(id, field)
+	if field ~= "camera" then return value end
+	-- (A script of yours, with the Scripts page off: no camera. CameraScripts.lua.)
+	if ns.ScriptBlocked and ns.ScriptBlocked(value) then return TRIGGER[key] and TRIGGER[key].off or false end
 	-- (Dev copy: our cameras run as their scripts, CameraScripts.lua.)
-	if field == "camera" and ns.ScriptBuiltInsOn and ns.ScriptBuiltInsOn() then
-		return ns.BuiltInAsScript(ns.CameraRowValue(id, field))
+	if ns.ScriptBuiltInsOn and ns.ScriptBuiltInsOn() then
+		return ns.BuiltInAsScript(value)
 	end
-	return ns.CameraRowValue(id, field)
+	return value
 end
 -- Whether a trigger's camera now is one (and not none).
 function ns.TriggerHasCamera(key)
@@ -555,6 +566,7 @@ function ns.CameraRowsOffWhy(cam)
 	local keys = OWN_TRIGGER[cam]
 	if cam == "quest" then keys = { ns.QuestCamEvent and ns.QuestCamEvent() or "Quest" } end
 	if not keys then return "its event's row decides (see the event line)" end
+	if ns.db and ns.db.cameraScenes == false then return "the Scenes page is off" end
 	local why = {}
 	for _, key in ipairs(keys) do
 		local lead = TRIGGER[key] and ns.SceneLead(key)

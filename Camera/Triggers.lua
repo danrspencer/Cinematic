@@ -50,10 +50,14 @@ local gateCache = { version = false, list = {} }
 -- One of ours' own parts (read again when the library changes).
 local function Parts(key)
 	local version = ns.triggerLibVersion or 0
-	if gateCache.version ~= version then gateCache.version, gateCache.list = version, {} end
+	-- (The Triggers page off: none of yours for it, TriggerLibrary.lua.)
+	local own = not (ns.db and ns.db.cameraTriggers == false)
+	if gateCache.version ~= version or gateCache.own ~= own then
+		gateCache.version, gateCache.own, gateCache.list = version, own, {}
+	end
 	local parts = gateCache.list[key]
 	if parts then return parts end
-	local id = ns.OursTriggerId and ns.OursTriggerId(key)
+	local id = own and ns.OursTriggerId and ns.OursTriggerId(key) or nil
 	local function Num(field, default, low, high)
 		local value = id and tonumber(ns.TriggerField(id, field)) or default
 		return math.max(low, math.min(high, value))
@@ -195,8 +199,10 @@ function ns.BuiltInSourceOrder(id)
 	return tonumber(rows and rows["prio." .. id]) or ns.BUILT_IN_SOURCE_ORDER[id]
 end
 function ns.ApplyBuiltInOrders()
+	-- (The Triggers page off: their places as we ship them.)
+	local own = not (ns.db and ns.db.cameraTriggers == false)
 	for _, source in ipairs(BUILT_IN) do
-		local order = ns.BuiltInSourceOrder(source.id)
+		local order = own and ns.BuiltInSourceOrder(source.id) or ns.BUILT_IN_SOURCE_ORDER[source.id]
 		if order ~= source.order then
 			source.order = order
 			ns.RegisterTriggerSource(source) -- (taken out and put back in its new place)

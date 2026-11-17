@@ -117,6 +117,7 @@ local function NowWords()
 	if IsMounted and ns.Flag(IsMounted()) then words[#words + 1] = L["mounted"] end
 	return table.concat(words, ", ")
 end
+ns.WhyNowWords = NowWords -- (the settings landing page's CineMode banner too)
 
 -- The line under a row's name: the first reason doing it now, else the first.
 local function MainReason(reasons)

@@ -443,7 +443,8 @@ wheel:WrapScript(keyButton, "OnClick", [[
 			owner:Hide()
 			return false
 		end
-		if (owner:GetAttribute("count") or 0) == 0 then
+		-- (cineoff: its Wheels page switched off, MarkerWheel.lua's ApplyWheelSwitches.)
+		if (owner:GetAttribute("count") or 0) == 0 or owner:GetAttribute("cineoff") then
 			return false
 		end
 		-- (One wheel at a time: the marker wheels are put away. MarkerWheel.lua

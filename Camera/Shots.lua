@@ -14,6 +14,10 @@
 local _, ns = ...
 local L = ns.L
 
+-- The My Shots page's switch (ShotsPage.lua, under Enable Cameras). Off, a
+-- scene set to a shot plays its camera with that camera's own numbers.
+ns.DEFAULTS.cameraShots = true
+
 ns.SHOT_MAX = 10
 ns.SHOT_BASES = { "cozy", "vista", "fish", "afk" }
 -- (Each camera's settings' prefix: the AFK camera's are the standing-still ones.)
@@ -123,8 +127,8 @@ local function ActiveShot()
 	local id
 	local key = ns.ActiveEvent and ns.ActiveEvent()
 	if key == "Manual" then
-		id = ns.testShot
-	elseif key then
+		id = ns.testShot -- (its Test button: as the page's other buttons, with the page off too)
+	elseif key and ns.db and ns.db.cameraShots ~= false then -- (My Shots off: the camera's own numbers)
 		id = ns.ShotOf(ns.TriggerSetting(key, "camera"))
 	end
 	local _, set = ns.ShotList()

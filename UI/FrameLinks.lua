@@ -11,8 +11,8 @@
 --                   for the parts not picked on their own.
 -- Neither picked: the one supported addon that claims the part ("found by
 -- Cinematic"). Two or more claiming it is a clash: the part stays the game's
--- own until the player picks (the Chat page's Addon Frame Links section, or
--- the Addons page's Support files tab).
+-- own until the player picks (the Addons hub's Links page, or the Addons
+-- page's Support files tab).
 --
 -- The claimed frames still fade with their row as their support file adds
 -- them (ns.AddFoundFrame): a link only adds what the part does on the page.
@@ -55,7 +55,7 @@ ns.LINK_GROUPS = {
 		{ key = "mapclock", label = "Clock", tip = "The clock by the minimap." },
 		{ key = "mapcoords", label = "Coordinates", tip = "Your coordinates by the minimap." },
 	} },
-	{ key = "cooldowns", label = "Cooldown Manager", page = "Cooldown Manager", parts = {
+	{ key = "cooldowns", label = "Cooldown Manager", page = "Cooldown Links", parts = {
 		{ key = "cdessential", label = "Essential", tip = "The Essential Cooldowns bar." },
 		{ key = "cdutility", label = "Utility", tip = "The Utility Cooldowns bar." },
 		{ key = "cdbuffs", label = "Tracked buffs", tip = "The tracked buffs' icons." },
@@ -63,10 +63,22 @@ ns.LINK_GROUPS = {
 	{ key = "prd", label = "Personal resource display", page = "Unit Frame Links", parts = {
 		{ key = "prdbars", label = "Health and power bars", tip = "Your health and power bars." },
 	} },
-	{ key = "swing", label = "Swing timer", page = "Swing timer", parts = {
+	{ key = "swing", label = "Swing timer", page = "Swing Links", parts = {
 		{ key = "swingbars", label = "Swing bars", tip = "The swing timer's bars." },
 	} },
 }
+-- Each Links page tab's switch (on to start with), by group: off, its
+-- groups' links are ignored, every part the game's own (the Unit Frames
+-- tab's covers the unit frames' and the resource bars'). (The timers' two
+-- since 2026-11-17, their tabs on the Links page: before, on their own pages,
+-- they had none.)
+local LINK_SWITCH = { chat = "linksChat", quests = "linksQuests", units = "linksUnits", prd = "linksUnits",
+	buffs = "linksBuffs", minimap = "linksMinimap", cooldowns = "linksCooldowns", swing = "linksSwing" }
+for _, key in pairs(LINK_SWITCH) do ns.DEFAULTS[key] = true end
+local function GroupOff(groupKey)
+	local key = LINK_SWITCH[groupKey]
+	return key ~= nil and ns.db ~= nil and not ns.PageOn(key)
+end
 local GROUP_OF, PART_DEF, GROUP_DEF = {}, {}, {}
 for _, group in ipairs(ns.LINK_GROUPS) do
 	GROUP_DEF[group.key] = group
@@ -112,6 +124,7 @@ end
 -- addon claiming it), "clash" (two or more, none picked), "none" (the
 -- group's addon has no such part) or nil (nothing claims it).
 function ns.LinkResolve(part)
+	if GroupOff(GROUP_OF[part]) then return nil, nil end -- (its tab switched off: none of its links)
 	local links, owners = DB(), claims[part] or {}
 	local function Has(addon) return owners[addon] and next(owners[addon]) ~= nil end
 	local pick = links and links.parts[part]
@@ -224,7 +237,8 @@ function ns.FadePickedFrames()
 	if not links or not ns.FadeWithRow then return end
 	for part, pick in pairs(links.parts) do
 		local name, row = ns.LinkPickedName(pick), PART_ROW[part]
-		if name and row and not fadingPicked[name] then
+		-- (Not while its tab's switched off; one fading already goes on till /reload.)
+		if name and row and not fadingPicked[name] and not GroupOff(GROUP_OF[part]) then
 			fadingPicked[name] = true
 			ns.FadeWithRow(row[1], row[2], { name }, true, true)
 		end
@@ -419,7 +433,7 @@ function ns.BuildLinkBand(body, groupKey, onResize)
 				:format(table.concat(addons, L[" and "])) .. "|r")
 		else
 			intro:SetText(L["Which frame each part is: the game's own, or another addon's that draws its own. " ..
-				"This page's settings work on these frames."])
+				"Cinematic hides and shows the frame picked as it would the game's."])
 		end
 		local y = -6 - intro:GetStringHeight() - 6
 		for i, row in ipairs(band.rows) do
@@ -653,6 +667,18 @@ end
 -- it }. ns.OpenLinkSection opens its page scrolled to it (the Addons
 -- page's Support files buttons).
 local linkSections = {}
+
+-- An Addon Reveal Link tab's switch (LINK_SWITCH), made on host, its tab's
+-- own frame: what's on it greys with it, and its hub tab finds it there (the
+-- tab's hubTabs entry: switchFrame = host). The page's own switch stays the
+-- page's other tabs'. Returns host.
+function ns.LinksSwitch(host, groupKey)
+	ns.GRID_KIT.PageSwitch(host, LINK_SWITCH[groupKey], L["Enable Page"],
+		L["Off: the links on this tab are ignored, and the game's own frames are used."], host,
+		function() ns.ApplyFrameLinks() end)
+	return host
+end
+
 function ns.RegisterLinkSection(groupKey, frame, open)
 	linkSections[groupKey] = { frame = frame, open = open }
 end
@@ -688,6 +714,206 @@ function ns.LinkBandOpen(groupKey)
 		if why == "clash" then return true end
 	end
 	return false
+end
+
+-- The Addons hub's Links page (2026-11-17; before, an Addon Reveal Link tab
+-- on each frame's own page): a tab per part of the screen, each its own
+-- hidden hub tile under the Links icon (tabOf), with its own switch, its
+-- groups' sections on it. Its old page names kept (ns.OpenOptions, /cine
+-- find): Options.lua's ns.PAGE_HUB has them. has: whether this client has it.
+-- A tab nothing links (no loaded addon claims its parts, nothing picked) is
+-- hidden; with none linked anywhere, every tab shows (Find a frame in reach).
+local LINK_TABS = {
+	{ page = "Unit Frame Links", label = "Unit Frames", name = "Unit Frame Links", groups = { "units", "prd" },
+		tip = "Which supported addon's frames stand in for the unit frames and your resource bars." },
+	{ page = "Buffs Links", label = "Buffs & Debuffs", name = "Buff Links", groups = { "buffs" },
+		tip = "Which supported addon's frames stand in for your buffs and debuffs." },
+	{ page = "Minimap Links", label = "Minimap", name = "Minimap Links", groups = { "minimap" },
+		tip = "Which supported addon's frames stand in for the minimap's parts." },
+	{ page = "Quest Tracker Links", label = "Quest Tracker", name = "Quest Tracker Links", groups = { "quests" },
+		tip = "Which supported addon's frames stand in for the quest tracker." },
+	{ page = "Chat Links", label = "Chat", name = "Chat Links", groups = { "chat" },
+		tip = "Which frame each part of the chat is: the game's, or an addon's that draws its own." },
+	{ page = "Cooldown Links", label = "Cooldown Manager", name = "Cooldown Manager Links", groups = { "cooldowns" },
+		tip = "Which supported addon's frames stand in for the Cooldown Manager's bars.",
+		has = function() return ns.HasCooldownManager() end },
+	{ page = "Swing Links", label = "Swing Timer", name = "Swing Timer Links", groups = { "swing" },
+		tip = "Which supported addon's frames stand in for the swing timer.",
+		has = function() return not ns.isRetail end },
+}
+-- (A heading over each group where a tab has two.)
+local LINK_HEADS = { units = "Unit frames", prd = "Personal Resource Display" }
+
+-- Whether a group has anything to link: a loaded addon claiming a part, or a pick.
+local function GroupHasLinks(groupKey)
+	if #ns.LinkGroupAddons(groupKey) > 0 then return true end
+	local links = DB()
+	if not links then return false end
+	if links.groups[groupKey] ~= nil then return true end
+	for _, part in ipairs(GROUP_DEF[groupKey].parts) do
+		if links.parts[part.key] ~= nil then return true end
+	end
+	return false
+end
+
+-- kit: Options.lua's page helpers (ns.lowHealthKit).
+function ns.CreateAddonLinksPage(kit)
+	local canvas, content = kit.CreateScrollPage()
+	local tabs, list = {}, {}
+	for _, each in ipairs(LINK_TABS) do
+		if not each.has or each.has() then
+			tabs[#tabs + 1] = each
+			list[#list + 1] = { L[each.label], each.page, L[each.tip] }
+		end
+	end
+	local title = kit.Label(content, "GameFontNormalLarge", L["Links"])
+	local panel, ShowTab = ns.PageTabs(content, list, 1)
+	local tabFrames = content.pageTabs.frames
+	title:SetPoint("TOPLEFT", panel, "BOTTOMLEFT", 8, -14)
+	local intro = kit.PageIntro(content, title, L["Some addons draw their own frames in place of the game's: " ..
+		"pick which frame Cinematic treats as each part."])
+
+	-- A frame for each tab, under the intro, its switch and its groups' sections on it.
+	local hosts, sections = {}, {}
+	for i, each in ipairs(tabs) do
+		local host = CreateFrame("Frame", nil, content)
+		host:SetSize(1, 1)
+		host:SetPoint("TOPLEFT", intro, "BOTTOMLEFT", 0, -14)
+		host.recordAs = content -- (its switch the page's: its Reset puts it back)
+		host.searchAlways = true
+		host:Hide()
+		ns.LinksSwitch(host, each.groups[1])
+		hosts[i], sections[i] = host, {}
+		local below -- (the last group's section: the next heading goes under it)
+		for _, groupKey in ipairs(each.groups) do
+			-- (The resource bars' only where Cinematic has its own.)
+			if groupKey ~= "prd" or _G.CinematicPersonalPower ~= nil then
+				local anchor = host
+				if #each.groups > 1 then
+					anchor = kit.Label(host, "GameFontNormal", L[LINK_HEADS[groupKey]])
+					if below then
+						anchor:SetPoint("TOPLEFT", below.frame, "BOTTOMLEFT", -2, -18)
+					else
+						anchor:SetPoint("TOPLEFT", host, "TOPLEFT", 0, 0)
+					end
+				end
+				local section = ns.BuildLinkSection(content, anchor, groupKey, true)
+				section.frame:SetParent(host)
+				section.frame:SetPoint("RIGHT", content, "RIGHT", -16, 0)
+				sections[i][#sections[i] + 1] = section
+				below = section
+			end
+		end
+	end
+
+	local current = 1
+	-- The tabs shown: those with something to link (and want, the one asked
+	-- for); every one when none has.
+	local function FitTabs(want)
+		local any = false
+		local shown = {}
+		for i, each in ipairs(tabs) do
+			for _, groupKey in ipairs(each.groups) do
+				if GroupHasLinks(groupKey) then shown[i] = true end
+			end
+			any = any or shown[i] or false
+		end
+		for i, tab in ipairs(tabFrames) do tab:SetShown(not any or shown[i] or i == want) end
+	end
+	local function ShowPart(i)
+		FitTabs(i)
+		current = i
+		for n, host in ipairs(hosts) do host:SetShown(n == i) end
+		ShowTab(i)
+		title:SetText(L[tabs[i].label])
+		for _, section in ipairs(sections[i]) do section.Show() end
+		kit.FitContentHeight(content)
+	end
+	-- The first tab shown (the Links icon itself opens there, or where it was).
+	local function FirstShown()
+		FitTabs()
+		if tabFrames[current] and tabFrames[current]:IsShown() then return current end
+		for i, tab in ipairs(tabFrames) do
+			if tab:IsShown() then return i end
+		end
+		return 1
+	end
+	ns.WatchFrameLinks(function()
+		if canvas:IsVisible() then
+			FitTabs(current)
+			ShowTab(current)
+		end
+	end)
+
+	local ICON = "Interface\\Icons\\INV_Misc_Gear_08"
+	canvas.hubTabs = { { name = "Addon Links", icon = ICON, label = "Links", noSwitch = true,
+		onSelect = function() ShowPart(FirstShown()) end } }
+	for i, each in ipairs(tabs) do
+		canvas.hubTabs[#canvas.hubTabs + 1] = { name = each.page, icon = ICON, label = "Links", own = true,
+			tabOf = "Addon Links", switchLabel = each.name, switchFrame = hosts[i],
+			onSelect = function() ShowPart(i) end }
+	end
+	canvas:SetScript("OnShow", kit.PageShown(function()
+		kit.Refresh()
+		ShowPart(current)
+	end, content))
+	canvas:Hide()
+	kit.RegisterSubpage(canvas, "Addon Links", L["Links"])
+end
+
+-- A line at the top right of a frame's own page while an addon's frames
+-- stand in for its parts (groupKeys'): which addon's, and a click to the
+-- Links page's tab. Hidden while nothing is linked.
+function ns.LinkPointer(content, groupKeys)
+	local button = CreateFrame("Button", nil, content)
+	button:SetHeight(18)
+	button:SetPoint("TOPRIGHT", content, "TOPRIGHT", -20, -(ns.FOLDER_TAB_HEIGHT + 26))
+	button.searchSkip = true
+	local text = button:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+	text:SetPoint("RIGHT", button, "RIGHT", 0, 0)
+	text:SetTextColor(0.61, 0.75, 1)
+	button:SetScript("OnEnter", function(self)
+		text:SetTextColor(1, 1, 1)
+		GameTooltip:SetOwner(self, "ANCHOR_BOTTOMRIGHT")
+		GameTooltip:SetText(L["Opens the Links page, where you pick which addon's frames these are."], 1, 1, 1, 1, true)
+		GameTooltip:Show()
+	end)
+	button:SetScript("OnLeave", function()
+		text:SetTextColor(0.61, 0.75, 1)
+		GameTooltip:Hide()
+	end)
+	button:SetScript("OnClick", function()
+		for _, groupKey in ipairs(groupKeys) do
+			if ns.LinkGroupInUse(groupKey) then return ns.OpenOptions(GROUP_DEF[groupKey].page) end
+		end
+	end)
+	local function Update()
+		local seen, names = {}, {}
+		for _, groupKey in ipairs(groupKeys) do
+			for _, part in ipairs(GROUP_DEF[groupKey].parts) do
+				local addon = ns.LinkResolve(part.key)
+				addon = ns.LinkPickedName(addon) or addon
+				if addon and not seen[addon] then
+					seen[addon] = true
+					names[#names + 1] = addon
+				end
+			end
+		end
+		if #names == 0 then
+			button:Hide()
+			return
+		end
+		table.sort(names)
+		text:SetText((L["Using %s's frames: Addons > Links"]):format(table.concat(names, L[" and "])))
+		button:SetWidth(text:GetStringWidth() + 4)
+		button:Show()
+	end
+	content:HookScript("OnShow", Update)
+	ns.WatchFrameLinks(function()
+		if content:IsVisible() then Update() end
+	end)
+	Update()
+	return button
 end
 
 -- The Addons page's Support files tab: the clashes to pick, then what

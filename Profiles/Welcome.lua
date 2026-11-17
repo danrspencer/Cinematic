@@ -1102,8 +1102,7 @@ local function CreateWindow()
 
 	-- Footer: a quiet link on the left (Turn off, or Back); on the right
 	-- Next, the way on: from the levels to Customize, then through its parts,
-	-- Done on the last. Beside it Settings (the options at the page for
-	-- what's shown: the Profiles page, or the part's) and, quietly, Done (or
+	-- Done on the last. Beside it Settings (Cinematic's main page) and, quietly, Done (or
 	-- Decide later): out at any point, keeping what's picked, as the X does.
 	-- See Profile (once one's picked) closes onto the CineMode page's
 	-- Overview: everything the profile turned on, page by page.
@@ -1126,11 +1125,11 @@ local function CreateWindow()
 	end)
 	primary:SetPoint("BOTTOMRIGHT", -PAD, PAD)
 	finish = FlatButton(window, L["See Profile"], nil, Finish)
+	-- (Settings: Cinematic's main page, on its first tab, from any step.)
 	settings = FlatButton(window, L["Settings"], "box", function()
-		local page = window.page == 2 and pages[2].settingsPage() or "Profiles"
 		toSettings = true
 		window:Hide()
-		ns.OpenOptions(page)
+		if ns.OpenCineModeOverview then ns.OpenCineModeOverview() else ns.OpenOptions() end
 	end)
 	settings:SetPoint("RIGHT", primary, "LEFT", -8, 0)
 	finish:SetPoint("RIGHT", settings, "LEFT", -12, 0)

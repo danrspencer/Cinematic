@@ -92,13 +92,16 @@ local function StyleText(entry, font, scale)
 	if type(words) == "string" then text:SetText(words) end
 end
 
--- The settings, as the Standard Frames page's switch leaves them: off, the
--- game's own look (no texture, font or size of ours, nothing hidden).
+-- The settings, as the Breath Bar page's switch (and the Standard Frames
+-- page's, over it) leaves them: off, the game's own look (no texture, font or
+-- size of ours, nothing hidden).
+ns.DEFAULTS.breathBar = true
+ns.SetPageMaster({ "breathBar" }, "handleFrames")
 local GAME_LOOK = {}
 local function Settings()
 	local db = ns.GetDB()
 	if not db then return nil end
-	if not (db.enabled and ns.PageOn("handleFrames")) then return GAME_LOOK end
+	if not (db.enabled and ns.PageOn("breathBar")) then return GAME_LOOK end
 	return db
 end
 

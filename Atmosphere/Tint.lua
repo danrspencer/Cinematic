@@ -342,10 +342,19 @@ local function CurrentZoneMood()
 	return zoneMoodByName[GetRealZoneText() or ""]
 end
 
+-- The Tint Style tab's settings (the preset, zones' tints and presets, the
+-- day's phases, the clock): yours while its Enable Page is on, else the
+-- defaults (no zone or phase of your own).
+local function Look()
+	if db and ns.PageOn("tintStyle") then return db end
+	return ns.DEFAULTS
+end
+
 -- The zone tint for a zone: your override if you set one, else the built-in
 -- mood. Returns the colour, a label and whether it's your override.
 local function ZoneTint(zoneName)
-	local override = db.zoneTints and db.zoneTints[zoneName]
+	local look = Look()
+	local override = look.zoneTints and look.zoneTints[zoneName]
 	if type(override) == "table" then
 		return override, L["Custom color"], true
 	elseif override == "none" then
@@ -363,7 +372,8 @@ end
 
 -- A zone's strength for the Zone presets: its own if set, else the main one.
 local function ZoneStrength(zoneName)
-	local own = db.zoneTintStrength and db.zoneTintStrength[zoneName]
+	local look = Look()
+	local own = look.zoneTintStrength and look.zoneTintStrength[zoneName]
 	return own or db.tintStrength, own ~= nil
 end
 
@@ -388,7 +398,8 @@ end
 -- the zone's. Also returns whether it came from the area.
 local function HereTint()
 	local area = CurrentArea()
-	if area and db.zoneTints and db.zoneTints[area] ~= nil then
+	local look = Look()
+	if area and look.zoneTints and look.zoneTints[area] ~= nil then
 		local color, label = ZoneTint(area)
 		return color, label, true
 	end
@@ -406,7 +417,8 @@ local function HereStrength()
 		return zoneStrength, zoneStrength, false
 	end
 	local default = zoneStrength * (AREA_STRENGTH[area] or 1)
-	local own = db.zoneTintStrength and db.zoneTintStrength[area]
+	local look = Look()
+	local own = look.zoneTintStrength and look.zoneTintStrength[area]
 	return own or default, default, own ~= nil
 end
 
@@ -418,7 +430,8 @@ end
 -- (Night in Duskwood, None in a city). The area's wins over the zone's; with
 -- neither, your main preset. Also returns where it came from: "area", "zone" or nil.
 local function HerePreset()
-	local presets = db.zonePresets
+	local look = Look()
+	local presets = look.zonePresets
 	if presets then
 		local area = CurrentArea()
 		if area and presets[area] then
@@ -429,7 +442,7 @@ local function HerePreset()
 			return zone, "zone"
 		end
 	end
-	return db.tintPreset
+	return look.tintPreset
 end
 
 local function SameColor(a, b)
@@ -493,7 +506,7 @@ local function BlendZoneColor(elapsed, instant)
 end
 
 local function GetClockTime()
-	if db.tintClock == "local" then
+	if Look().tintClock == "local" then
 		local now = date("*t")
 		return now.hour, now.min
 	end
@@ -508,14 +521,16 @@ end
 
 -- A phase's colour: your own if you picked one, else the built-in.
 local function PhaseColor(name)
-	return db and db.timePhaseColors and db.timePhaseColors[name] or DEFAULT_PHASE_COLOR[name]
+	local look = Look()
+	return look.timePhaseColors and look.timePhaseColors[name] or DEFAULT_PHASE_COLOR[name]
 end
 
 -- A phase's own strength (default full), and the colour as applied: blended
 -- toward no change by that strength.
 local DEFAULT_PHASE_STRENGTH = { Night = 0.65 } -- others: full
 local function PhaseStrength(name)
-	return db and db.timePhaseStrength and db.timePhaseStrength[name] or DEFAULT_PHASE_STRENGTH[name] or 1
+	local look = Look()
+	return look.timePhaseStrength and look.timePhaseStrength[name] or DEFAULT_PHASE_STRENGTH[name] or 1
 end
 
 local function AppliedPhaseColor(name)
@@ -697,7 +712,8 @@ local function ApplyTint(level, vignetteLevel, weatherLevel)
 		end
 		local top, bottom
 		if preset.key == "custom" then
-			top = { db.tintCustomR, db.tintCustomG, db.tintCustomB }
+			local look = Look()
+			top = { look.tintCustomR, look.tintCustomG, look.tintCustomB }
 			bottom = top
 		elseif preset.key == "timeofday" then
 			top = TimeOfDayColor()

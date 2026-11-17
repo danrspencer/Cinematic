@@ -24,6 +24,13 @@
 local _, ns = ...
 local L = ns.L
 
+-- The Triggers page's switch (TriggersPage.lua: the same key on its Priority,
+-- Log and Trigger Settings tabs; under Enable Cameras). Off, every setting on
+-- them is: no trigger of yours fires (CustomTriggers.lua's Tick and
+-- TryStart), and ours go by their places as we ship them, with no Only if,
+-- wait, cooldown or chance of yours (Triggers.lua).
+ns.DEFAULTS.cameraTriggers = true
+
 ns.TRIGGER_LIB_MAX = 60
 ns.TRIGGER_DEFAULT_PRI = 510 -- (just after the emotes and seats)
 ns.TRIGGER_ENDS_MAX = 3
