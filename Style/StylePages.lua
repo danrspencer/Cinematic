@@ -1980,6 +1980,30 @@ local function Has(info)
 	return C_Texture and C_Texture.GetAtlasInfo and C_Texture.GetAtlasInfo(info[3]) ~= nil or false
 end
 
+-- What each part's own bar looks like ("The game's" tile's picture,
+-- 2026-11-18): the first of these this client has. Left out: General and
+-- the Visions, where "The game's" is each one's own.
+local GAME_TEXTURES = {
+	{ "ufTexture", { "playerhealth", "smooth" } },
+	{ "rfTexture", { "raid" } },
+	{ "prdTexture", { "platemodern", "smooth" } },
+	{ "tooltipBarTexture", { "smooth" } },
+	{ "plateCastFill", { "castbar", "smooth" } },
+	{ "rollBarTexture", { "flat" } },
+}
+function ns.StyleGameTexture(key)
+	if type(key) ~= "string" then return nil end
+	for _, part in ipairs(GAME_TEXTURES) do
+		if key:find(part[1], 1, true) then
+			for _, value in ipairs(part[2]) do
+				for _, info in ipairs(TEXTURES) do
+					if info[1] == value and Has(info) then return value end
+				end
+			end
+		end
+	end
+end
+
 local function SharedMedia()
 	local stub = _G.LibStub
 	return stub and stub("LibSharedMedia-3.0", true)
@@ -3073,6 +3097,26 @@ function ns.StyleRows(kit, content, stack, changed, switchKey, fieldOf, panel)
 			-- Its picture.
 			local full = kind == "texture" and ns.StyleTextureFull(shows)
 			local strip = kind == "texture" and not item.isMore and ns.SetStyleTexture(tile.strip, shows, full) or false
+			-- (General: the texture General gives, in its own colors if it has them.)
+			if not strip and kind == "texture" and item.value == "general" and ns.GeneralStyleValue then
+				local given = ns.GeneralStyleValue(key)
+				full = ns.StyleTextureFull(given)
+				strip = ns.SetStyleTexture(tile.strip, given, full) or false
+			end
+			-- (The game's: the part's own bar, where we know it.)
+			if not strip and kind == "texture" and item.value == "game" then
+				local own = ns.StyleGameTexture(key)
+				if own then
+					full = false
+					strip = ns.SetStyleTexture(tile.strip, own, false) or false
+				end
+			end
+			-- (Else the picture the list gave it.)
+			if not strip and kind == "texture" and not item.isMore and (item.texture or item.atlas) then
+				if item.atlas then tile.strip:SetAtlas(item.atlas) else tile.strip:SetTexture(item.texture) end
+				tile.strip:SetDesaturated(false)
+				strip = true
+			end
 			tile.strip:SetShown(strip)
 			if strip then
 				local t = full and { 1, 1, 1 } or item.tint or tint or { 0.3, 0.75, 0.35 }
@@ -3144,13 +3188,50 @@ function ns.StyleRows(kit, content, stack, changed, switchKey, fieldOf, panel)
 			else
 				grid.handed = false
 			end
-			local count = #items
-			if count > TILES_SHOWN then
-				for i = TILES_SHOWN, count do
-					if items[i].value == picked then open = true end
+			-- (Folded: the first ones, and the picked one in the last slot
+			-- if it's further on, so Fewer folds even when it's picked.)
+			local view, folds = items, false
+			local textures = false
+			for _, item in ipairs(items) do textures = textures or (item.texture or item.atlas) and true end
+			-- (Shapes too: a portrait's, 2026-11-18.)
+			local oneLine = textures or (type(key) == "string" and key:find("Shape$") ~= nil)
+			if oneLine and #items > TILES_ACROSS then
+				-- (Textures fold to one line, 2026-11-18: the picked one first,
+				-- then the game's, then the ones after the picked one.)
+				folds = true
+				if not open then
+					view = {}
+					local at, game
+					for i, item in ipairs(items) do
+						if item.value == picked then at = i end
+						if item.value == "game" then game = i end
+					end
+					at = at or game or 1
+					local taken = {}
+					local function Take(i)
+						if i and not taken[i] and #view < TILES_ACROSS - 1 then
+							taken[i] = true
+							view[#view + 1] = items[i]
+						end
+					end
+					Take(at)
+					Take(game)
+					for step = 1, #items - 1 do
+						local i = (at - 1 + step) % #items + 1
+						if i ~= game then Take(i) end
+					end
 				end
-				if not open then count = TILES_SHOWN - 1 end
+			elseif #items > TILES_SHOWN then
+				folds = true
+				if not open then
+					view = {}
+					for i = 1, TILES_SHOWN - 1 do view[i] = items[i] end
+					for i = TILES_SHOWN, #items do
+						if items[i].value == picked then view[TILES_SHOWN - 1] = items[i] end
+					end
+				end
 			end
+			local count = #view
 			-- (What it's set to, after its name.)
 			for _, item in ipairs(items) do
 				if item.value == picked then
@@ -3161,7 +3242,7 @@ function ns.StyleRows(kit, content, stack, changed, switchKey, fieldOf, panel)
 			-- (What the grid's tiles show, and so how high they are.)
 			local kind, subs = nil, false
 			for i = 1, count do
-				local item = items[i]
+				local item = view[i]
 				if item.texture or item.atlas then kind = "texture" end
 				if item.font and kind ~= "texture" then kind = "font" end
 				if item.edge then kind = "border" end
@@ -3170,15 +3251,15 @@ function ns.StyleRows(kit, content, stack, changed, switchKey, fieldOf, panel)
 			-- (The usual one in the font it gives.)
 			if kind == "font" then
 				for i = 1, count do
-					local _, usualValue = Usual(key, items[i].value)
+					local _, usualValue = Usual(key, view[i].value)
 					if usualValue ~= nil and usualValue ~= "game" then
-						items[i].fontUsual = ns.StyleFontFile and ns.StyleFontFile(usualValue) or nil
+						view[i].fontUsual = ns.StyleFontFile and ns.StyleFontFile(usualValue) or nil
 					end
 				end
 			end
 			local height = ((kind == "texture" or kind == "border") and 40 or kind == "font" and 32 or 28) + (subs and 11 or 0)
 			local shown = {}
-			for i = 1, count do shown[i] = items[i] end
+			for i = 1, count do shown[i] = view[i] end
 			-- (A font folded: just its bar, the one picked.)
 			local asBar = kind == "font" and not fontOpen
 			if asBar then
@@ -3196,9 +3277,9 @@ function ns.StyleRows(kit, content, stack, changed, switchKey, fieldOf, panel)
 				shown = {}
 				for i, item in ipairs(items) do shown[i] = item end
 			end
-			if #items > TILES_SHOWN and kind ~= "font" then
+			if folds and kind ~= "font" then
 				shown[#shown + 1] = { isMore = true, text = open and ns.L["Fewer"] or (ns.L["More (%d)"]):format(#items -
-					TILES_SHOWN + 1) }
+					#view) }
 			end
 			for i, item in ipairs(shown) do
 				local tile = tiles[i] or MakeTile()
