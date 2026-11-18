@@ -1962,10 +1962,52 @@ function ns.MakeThemePicker(kit, parent, width, changed)
 		changed()
 		kit.Refresh()
 	end
-	local function Pick(key)
+	local function Apply(key)
 		if not ns.ApplyStyleTheme(key) then return end
 		Changed()
 		ns.PlayThemeCard()
+	end
+	-- A pick writes the theme's settings over yours, so with changes over the
+	-- one in use (its card says "(changed)") it asks first: keep them (Save
+	-- changes into yours, or a new theme of yours from ours), switch anyway or
+	-- cancel; Reset, just whether to. (No Undo since 2026-11-18: asked here instead.)
+	-- sure: nothing to lose, as + New theme has taken your changes with it.
+	local function Pick(key, sure)
+		local db = ns.GetDB()
+		local now = db and db.styleGeneral and Find(db.styleTheme)
+		if sure or not now or not ns.StyleThemeEdited() then return Apply(key) end
+		local which = key == now.key and "CINEMATIC_STYLE_THEME_RESET"
+			or now.mine and "CINEMATIC_STYLE_THEME_SWITCH_MINE" or "CINEMATIC_STYLE_THEME_SWITCH"
+		StaticPopup_Show(which, NameOf(now), nil, { from = now.key, to = key, apply = Apply })
+	end
+	if not StaticPopupDialogs.CINEMATIC_STYLE_THEME_SWITCH then
+		-- (Keep them, then the pick.)
+		local function Keep(_, data)
+			if not data then return end
+			local from = Find(data.from)
+			if from and from.mine then
+				ns.SaveMyStyleTheme()
+			else
+				local key, why = ns.AddMyStyleTheme(data.from, nil, true)
+				if not key then
+					if why then ns.Print(why) end
+					return
+				end
+			end
+			data.apply(data.to)
+		end
+		local function Anyway(_, data) if data then data.apply(data.to) end end
+		local function Switch(keep)
+			return { text = L["Your changes to %s will be lost."], button1 = keep, button2 = CANCEL,
+				button3 = L["Switch anyway"], OnAccept = Keep, OnAlt = Anyway,
+				timeout = 0, whileDead = true, hideOnEscape = true }
+		end
+		StaticPopupDialogs.CINEMATIC_STYLE_THEME_SWITCH = Switch(L["Save as a new theme"])
+		StaticPopupDialogs.CINEMATIC_STYLE_THEME_SWITCH_MINE = Switch(L["Save changes"])
+		StaticPopupDialogs.CINEMATIC_STYLE_THEME_RESET = {
+			text = L["Put %s back as it comes? Your changes will be lost."], button1 = L["Reset"], button2 = CANCEL,
+			OnAccept = Anyway, timeout = 0, whileDead = true, hideOnEscape = true,
+		}
 	end
 
 	-- The box under the grids, as on the Profiles page: what the card (or
@@ -2052,29 +2094,22 @@ function ns.MakeThemePicker(kit, parent, width, changed)
 	newWords:SetText(L["+ New theme"])
 	BoxTip(newCard, L["A theme of your own, made from the one you're using now with your changes."])
 
-	-- Under the grid: the theme's name, Save, Reapply and Undo.
+	-- Under the grid: the theme's name and, with changes over one of yours,
+	-- Save changes. (Undo and Reapply theme gone 2026-11-18: a pick asks before
+	-- your changes go, and Reset is on the card's right-click menu. Clients
+	-- without the game's menus, Classic Era, keep Reapply as Reset's way in.)
 	local status = holder:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
 	status.searchSkip = true
-	local undo = ns.PanelButton(holder)
-	undo:SetSize(70, 20)
-	undo:SetText(L["Undo"])
-	BoxTip(undo, L["Your settings as they were before the last theme you picked."])
-	undo:SetScript("OnClick", function()
-		ns.UndoStyleTheme()
-		Changed()
-	end)
 	local again = ns.PanelButton(holder)
 	again:SetSize(110, 20)
-	again:SetPoint("RIGHT", undo, "LEFT", -6, 0)
 	again:SetText(L["Reapply theme"])
-	BoxTip(again, L["Puts every setting back as this theme has it; Undo brings your changes back."])
+	BoxTip(again, L["Puts every setting back as this theme has it."])
 	again:SetScript("OnClick", function()
 		local db = ns.GetDB()
 		Pick(db and db.styleTheme or "game")
 	end)
 	local save = ns.PanelButton(holder)
 	save:SetSize(110, 20)
-	save:SetPoint("RIGHT", again, "LEFT", -6, 0)
 	save:SetText(L["Save changes"])
 	BoxTip(save, L["Saves your changes into this theme of yours."])
 	save:SetScript("OnClick", function()
@@ -2238,7 +2273,7 @@ function ns.MakeThemePicker(kit, parent, width, changed)
 	local function New(fromKey, withEdits)
 		local key, why = ns.AddMyStyleTheme(fromKey, nil, withEdits)
 		if key then
-			Pick(key)
+			Pick(key, withEdits) -- (your changes went into it: nothing to ask)
 		elseif why then
 			ns.Print(why)
 		end
@@ -2402,8 +2437,10 @@ function ns.MakeThemePicker(kit, parent, width, changed)
 		y = y + box:GetHeight() + 8
 		status:ClearAllPoints()
 		status:SetPoint("TOPLEFT", holder, "TOPLEFT", 0, -(y + 4))
-		undo:ClearAllPoints()
-		undo:SetPoint("TOPRIGHT", holder, "TOPRIGHT", 0, -y)
+		save:ClearAllPoints()
+		save:SetPoint("TOPRIGHT", holder, "TOPRIGHT", 0, -y)
+		again:ClearAllPoints()
+		again:SetPoint("TOPRIGHT", holder, "TOPRIGHT", -116, -y)
 		y = y + 30
 		local mine = Editing()
 		editor:SetShown(mine ~= nil)
@@ -2446,9 +2483,8 @@ function ns.MakeThemePicker(kit, parent, width, changed)
 			for _, chip in ipairs(card.chips or {}) do chip:SetShown(not tagged) end
 		end
 		status:SetText(edited and (L["%s, with your changes"]):format(NameOf(current)) or NameOf(current))
-		again:SetShown(edited and true or false)
+		again:SetShown(edited and not MENUS and true or false)
 		save:SetShown(edited and current.mine and true or false)
-		undo:SetShown(on and type(db and db.styleThemeKept) == "table")
 		local mine = Editing()
 		if mine then
 			editTitle:SetText(L["Your theme: %s"]:format(mine.name))

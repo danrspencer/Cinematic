@@ -6,17 +6,18 @@
 --   1 the Themes tab opens: 5 cards a row, every name fits its card;
 --   2 a change over Crimson Vanguard (bar texture): "(changed)" on its card;
 --   3 Silver Screen's card pointed at: the box under the grids describes it;
---   4 + New theme: one of yours with that change in it, nothing "(changed)";
---   5 its Health and Accent colors changed: the bars' and menus' colors follow;
---   6 Started from changed to Fel Pact: its shapes and font, your colors kept;
---   7 a description written: the box shows it for its card;
---   8 another change, then Save changes: a backup of the saved version taken;
---   9 Share: the window with its text, read back with its description;
---  10 Share on one of ours (Crimson Vanguard): read back as that theme;
---  11 Import of the step 9 text: a second theme of yours just like it, used;
---  12 Backups of yours: the window with the step 8 backup;
---  13 both deleted: back on Fel Pact, both under Recently deleted;
---  14 the first restored from Recently deleted: description and colors back.
+--   4 Silver Screen clicked with those changes: a box asks first, nothing lost;
+--   5 + New theme: one of yours with that change in it, nothing "(changed)";
+--   6 its Health and Accent colors changed: the bars' and menus' colors follow;
+--   7 Started from changed to Fel Pact: its shapes and font, your colors kept;
+--   8 a description written: the box shows it for its card;
+--   9 another change, then Save changes: a backup of the saved version taken;
+--  10 Share: the window with its text, read back with its description;
+--  11 Share on one of ours (Crimson Vanguard): read back as that theme;
+--  12 Import of the step 10 text: a second theme of yours just like it, used;
+--  13 Backups of yours: the window with the step 9 backup;
+--  14 both deleted: back on Fel Pact, both under Recently deleted;
+--  15 the first restored from Recently deleted: description and colors back.
 -- Your theme, settings, themes of yours and their backups are put back at the
 -- end, and at the next login if a /reload cuts it short. Into
 -- CinematicDB.myThemesLog. Dev copy only (CinematicDev.toc).
@@ -206,6 +207,22 @@ local STEPS = {
 				and Has(back, ns.StyleThemeName(ns.StyleThemeByKey("vanguard")))
 			return Verdict(ok, ("pointed at '%s'; let go '%s'; box %.0f high"):format(tostring(text), tostring(back),
 				Parts().box:GetHeight()))
+		end },
+	{ key = "ask", say = "%d/%d: SILVER SCREEN's card is clicked: a box asks first, as your changes would be " ..
+		"lost. Nothing changes yet; it closes by itself.",
+		act = function()
+			local card = Parts().cards.reel
+			if not card then return "no Silver Screen card" end
+			card:Click("LeftButton")
+			return "clicked"
+		end,
+		after = function()
+			local shown = StaticPopup_Visible and StaticPopup_Visible("CINEMATIC_STYLE_THEME_SWITCH")
+			local ok = shown and ns.GetDB().styleTheme == "vanguard" and ns.StyleThemeEdited()
+			if StaticPopup_Hide then StaticPopup_Hide("CINEMATIC_STYLE_THEME_SWITCH") end
+			return Verdict(ok, ("box shown %s, theme still %s (want vanguard), changes kept %s"):format(
+				tostring(shown ~= nil and shown ~= false), tostring(ns.GetDB().styleTheme),
+				tostring(ns.StyleThemeEdited())))
 		end },
 	{ key = "new", say = "%d/%d: + New theme is pressed: a theme of yours appears under Yours with your " ..
 		"texture in it, and no card says (changed).",
