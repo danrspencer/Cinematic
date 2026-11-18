@@ -1810,9 +1810,13 @@ local restoredHandlers = {}
 -- stay up indoors: minimapIndoors, Minimap page.)
 local minimapNeedsRedraw = false
 
--- Where the map can come back stale: indoors only, on every client. Outdoors
--- the minimap draws the real world map, which never went stale (user, 2026-11-16).
+-- Where the map can come back stale: wherever the minimap shows a drawn map
+-- (caves, buildings, and on WoW Forever cities like Stormwind, which it draws
+-- like a cave though IsIndoors() says outdoors; user, 2026-11-18). No call
+-- tells a drawn map from the plain world one, so on Forever it's redrawn
+-- everywhere (unseen, one frame). Elsewhere indoors only.
 function ns.MinimapMayGoStale()
+	if not ns.isRetail and not ns.isClassicEra then return true end
 	return IsIndoors and ns.Flag(IsIndoors()) or false
 end
 
