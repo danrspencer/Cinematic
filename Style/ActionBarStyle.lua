@@ -293,7 +293,17 @@ local function SyncGlow(button, part)
 	SyncFill(button, part, part.glowOn and castFx and true or false)
 	local casting = castFx or (okChecked and checked == true)
 	local proc = Shown(button.SpellActivationAlert) or Shown(button.overlay) or Shown(button.SpellHighlightTexture)
-	part.glow:SetShown(part.glowOn and casting and not proc and true or false)
+	local glow = part.glowOn and casting and not proc and true or false
+	-- (Each change logged, with what the game said: a queued swing's glow, Heroic
+	-- Strike's, stayed on past the swing on Forever, 2026-11-18.)
+	if glow ~= (part.glowWas or false) then
+		part.glowWas = glow
+		local okName, name = pcall(button.GetName, button)
+		ns.Log("buttons", ("round glow %s %s: checked %s, cast effect %s, casting %s, proc %s"):format(
+			glow and "on" or "off", okName and tostring(name) or "?", okChecked and tostring(checked) or "error",
+			tostring(Shown(button.SpellCastAnimFrame)), tostring(Casting()), tostring(proc)))
+	end
+	part.glow:SetShown(glow)
 	part.proc:SetShown(part.glowOn and proc and true or false)
 	-- (Held down, by key or mouse: the game's pressed frame, a square, is hidden on
 	-- round buttons; a dark round edge of ours instead.)
@@ -317,6 +327,13 @@ local function SyncAllGlows()
 	for button, part in pairs(parts) do
 		if part.glow then SyncGlow(button, part) end
 	end
+end
+-- (And the game's own word that buttons' states changed: a queued swing, Heroic
+-- Strike, unchecks as it goes off without every client calling the button's
+-- SetChecked, which is all the glow watched.)
+for _, event in ipairs({ "ACTIONBAR_UPDATE_STATE", "PLAYER_ENTER_COMBAT", "PLAYER_LEAVE_COMBAT",
+	"PLAYER_REGEN_ENABLED" }) do
+	pcall(castWatch.RegisterEvent, castWatch, event)
 end
 castWatch:SetScript("OnEvent", function()
 	SyncAllGlows()
@@ -692,6 +709,47 @@ local function EachCdmIcon(visit)
 		if type(viewer) == "table" and viewer.GetChildren then Look(viewer, 0) end
 	end
 end
+-- Round, an icon's picture is cropped in as the round buttons' are: uncropped,
+-- art with its own frame drawn in (Evocation's) showed that frame inside the
+-- circle. Square again, the game's own crop comes back. The game setting its
+-- crop again (an icon refreshed) is cropped in again.
+local CDM_TRIM = 0.07
+local cdmCrop = setmetatable({}, { __mode = "k" }) -- (icon -> { on, game's 8 corners })
+local cropping = false
+local function ApplyCdmCrop(icon)
+	local crop = cdmCrop[icon]
+	if not crop or cropping then return end
+	cropping = true
+	if crop.on then
+		icon:SetTexCoord(CDM_TRIM, 1 - CDM_TRIM, CDM_TRIM, 1 - CDM_TRIM)
+	elseif crop.game then
+		icon:SetTexCoord(unpack(crop.game))
+	end
+	cropping = false
+end
+local function CropCdmIcon(icon, round)
+	local crop = cdmCrop[icon]
+	if not crop then
+		if not round then return end
+		crop = { game = { icon:GetTexCoord() } }
+		if #crop.game ~= 8 then crop.game = nil end
+		cdmCrop[icon] = crop
+		hooksecurefunc(icon, "SetTexCoord", function(self)
+			if cropping then return end
+			local mine = cdmCrop[self]
+			if not mine then return end
+			if mine.on then
+				-- (The game's new crop, kept for going square, then ours again.)
+				local corners = { self:GetTexCoord() }
+				if #corners == 8 then mine.game = corners end
+				ApplyCdmCrop(self)
+			end
+		end)
+	end
+	if crop.on == round then return end
+	crop.on = round
+	ApplyCdmCrop(icon)
+end
 local function DressCdmIcon(item, icon, plan)
 	local part = cdmParts[item]
 	if not part then
@@ -721,6 +779,7 @@ local function DressCdmIcon(item, icon, plan)
 		end
 	end
 	Cut(item, part.mask)
+	CropCdmIcon(icon, plan.round)
 	part.kids = part.kids or {}
 	for _, kid in ipairs({ item:GetChildren() }) do
 		-- (Not its sweep (round by its own swipe) nor the Flash when ready, which
