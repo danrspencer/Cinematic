@@ -563,7 +563,7 @@ local SHOW_IN_TABS = {
 		{ "Bubbles", "Chat bubbles", "Where chat bubbles show in CineMode." },
 		{ "Bubble Style", "Bubble Style", "How chat bubbles look, and speech from behind you." },
 	},
-	-- (The HUD page's Trackers section. Cooldown Manager and Swing Timer its
+	-- (The HUD page's Timers section (Trackers till 2026-11-18). Cooldown Manager and Swing Timer its
 	-- tabs till 2026-11-17, their own icons since; Breath Bar's parked then.)
 	timers = {
 		{ "Show", "HUD:combat", "CineMode hides timers and meters: pick which show, and when." },

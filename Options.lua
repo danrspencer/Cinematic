@@ -2619,7 +2619,8 @@ do
 			note = { "Addon frames moved to the Addons hub >",
 			"Advanced Frames" }, groups = { order = { "Combat", "Nameplates", "Info" }, other = "Info",
 				["HUD:hud"] = false, ["HUD:units"] = "Combat", ["HUD:prd"] = "Combat", ["HUD:party"] = "Combat", ["HUD:bars"] = "Combat",
-				["HUD:buffs"] = "Combat", ["HUD:combat"] = "Combat", ["HUD:cdm"] = "Combat",
+				-- (Timers, the rows once called Trackers: in Info since 2026-11-18, user.)
+				["HUD:buffs"] = "Combat", ["HUD:combat"] = "Info", ["HUD:cdm"] = "Combat",
 				["HUD:swingtimer"] = "Combat", Gamepad = "Combat",
 				Nameplates = "Nameplates", ["Nameplate Names"] = "Nameplates" },
 			colors = {
@@ -8933,7 +8934,7 @@ local function CreateCombatPanel()
 			{ "prd", L["Personal Resource Display"], L["PRD"] },
 			-- (Your cast bar: a sub-tab of Unit Frames' Show in too, its look the Cast Style tab's, 2026-11-16.)
 			{ "playercast", L["Your cast bar"], L["Cast bar"] },
-			{ "bars", L["Action bars"] }, { "buffs", L["Buffs and debuffs"] }, { "combat", L["Trackers"] },
+			{ "bars", L["Action bars"] }, { "buffs", L["Buffs and debuffs"] }, { "combat", L["Timers"] },
 			{ "cdm", L["Cooldown Manager"] }, { "swingtimer", L["Swing timer"] },
 			-- (The chat window's row: the Chat icon's Show in tab.)
 			{ "chat", L["Chat window"] },
@@ -18694,7 +18695,7 @@ end
 do
 	local HEADINGS = {
 		{ "units", L["Unit frames"] }, { "prd", L["Personal Resource Display"] }, { "bars", L["Action bars"] },
-		{ "combat", L["Trackers"] }, { "cdm", L["Cooldown Manager"] }, { "swingtimer", L["Swing timer"] },
+		{ "combat", L["Timers"] }, { "cdm", L["Cooldown Manager"] }, { "swingtimer", L["Swing timer"] },
 		{ "interface", L["Info and menus"] }, { "minimap", L["Minimap"] },
 		{ "party", L["Party frames (not raid-style)"] }, { "raid", L["Raid frames"] },
 		{ "rsparty", L["Party frames (raid-style)"] }, { false, L["Other"] },
