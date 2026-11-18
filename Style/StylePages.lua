@@ -1379,7 +1379,8 @@ UpdateSticky = function(preview, off, snap)
 	-- is, not held; since 2026-11-18 (Card Vision's Events tab, every type
 	-- shut) it's held too, a floor kept at its bottom as it was, so its
 	-- scroll length stays while the preview's away: room left at its bottom
-	-- then, not the page pulled up.)
+	-- then, not the page pulled up. Every page has the floor now (below);
+	-- short is only told to /cine debug previewwatch.)
 	local short = can and not pin.target
 		and scroll:GetVerticalScrollRange() - preview:GetHeight() <= scroll:GetVerticalScroll() - over + 1
 	local hold = can and not (ns.db and ns.db.stylePreviewFolded) or false
@@ -1390,18 +1391,19 @@ UpdateSticky = function(preview, off, snap)
 	pin.target = hold
 	if hold and not pin.on then
 		-- (The floor: a speck on the page where its bottom is now, counted in
-		-- its scroll length, shown while the preview's away.)
-		if short then
-			local child = scroll:GetScrollChild()
-			if child then
-				pin.floor = pin.floor or CreateFrame("Frame", nil, child)
-				pin.floor:SetSize(1, 1)
-				pin.floor:ClearAllPoints()
-				pin.floor:SetPoint("TOPLEFT", child, "TOPLEFT", 0, -math.max(1, child:GetHeight() - 1))
-				pin.floor:Show()
-			end
-		elseif pin.floor then
-			pin.floor:Hide()
+		-- its scroll length, shown while the preview's away. Every page's, not
+		-- only a short one's, since 2026-11-18: a page whose length changed as
+		-- the preview lifted and dropped moved the scroll bar's thumb under a
+		-- drag, the preview let go and was held again, flickering and pulling
+		-- the page back up to it (Card Types, Card Vision's Events). Its
+		-- length kept, the room under it still closes.)
+		local child = scroll:GetScrollChild()
+		if child then
+			pin.floor = pin.floor or CreateFrame("Frame", nil, child)
+			pin.floor:SetSize(1, 1)
+			pin.floor:ClearAllPoints()
+			pin.floor:SetPoint("TOPLEFT", child, "TOPLEFT", 0, -math.max(1, child:GetHeight() - 1))
+			pin.floor:Show()
 		end
 		Lift(preview, pin)
 		pin.t = 0
