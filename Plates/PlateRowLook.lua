@@ -592,7 +592,7 @@ function ns.MakePlateRowLookPreview(parent, width, kind)
 		local themeTexture, themeEdge, themeSize, themeR, themeG, themeB = ns.PlateThemeBar()
 		local texture = look.texture
 		if texture == nil then texture = themeTexture or "game" end
-		if texture == "game" or not ns.SetBarTexture(health, texture) then
+		if texture == "game" or not ns.SetBarTexture(health, texture, true) then
 			-- (Retail's plate fill. Forever has the atlas but not retail's plates:
 			-- the game's plain fill there, 2026-11-17.)
 			health:SetStatusBarTexture(ns.isRetail and HasAtlas(PLATE_FILL) and PLATE_FILL
@@ -610,6 +610,11 @@ function ns.MakePlateRowLookPreview(parent, width, kind)
 				CreateColor(look.gradient[1], look.gradient[2], look.gradient[3], 1))
 		elseif fill then
 			fill:SetVertexColor(barColor[1], barColor[2], barColor[3], 1)
+		end
+		-- (A full-color fill in its own colors, the bar's color on a strip, as real plates.)
+		if ns.DressPlateFullColor then
+			ns.DressPlateFullColor(health, not look.gradient and ns.StyleTextureFull(texture), barColor[1], barColor[2],
+				barColor[3])
 		end
 		if ns.DressThemeVeil then ns.DressThemeVeil(health, "plate") end
 		-- Its border: the row's, else the plate theme's (the game's: its ground).

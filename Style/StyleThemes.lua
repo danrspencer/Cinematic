@@ -79,17 +79,25 @@ end
 -- Card Vision's big words. Most card styles take the theme's color and font;
 -- these keep their own, as they mean something (red for danger) or are a look
 -- of their own (the Storybook's lettering).
-local CARDS_KEEP = { danger = true, combat = true, respite = true, rare = true, alert = true, death = true,
-	victory = true, triumph = true, film = true, storybook = true, arcade = true }
+-- (Since 2026-11-18 the ones with a meaning keep only their color and take the
+-- theme's font, so a theme's cards all match; the looks of their own keep both.)
+local CARDS_KEEP = { film = true, storybook = true, arcade = true }
+local CARDS_KEEP_COLOR = { danger = true, combat = true, respite = true, rare = true, alert = true, death = true,
+	victory = true, triumph = true }
 local function CardSettings(theme)
 	local list = {}
 	if not theme.cardColor then return list end
 	for _, style in ipairs(ns.CARD_STYLES or {}) do
 		if not CARDS_KEEP[style.id] then
-			list[ns.CardStyleKey("R", style.id)] = theme.cardColor[1]
-			list[ns.CardStyleKey("G", style.id)] = theme.cardColor[2]
-			list[ns.CardStyleKey("B", style.id)] = theme.cardColor[3]
-			list[ns.CardStyleKey("Font", style.id)] = theme.cardFont
+			if not CARDS_KEEP_COLOR[style.id] then
+				list[ns.CardStyleKey("R", style.id)] = theme.cardColor[1]
+				list[ns.CardStyleKey("G", style.id)] = theme.cardColor[2]
+				list[ns.CardStyleKey("B", style.id)] = theme.cardColor[3]
+			end
+			-- (cardMeaningFont: a plainer one for the meaning cards, Death, Victory,
+			-- Danger...: Neon Coast's script read wrong on "YOU DIED", 2026-11-18.)
+			list[ns.CardStyleKey("Font", style.id)] = CARDS_KEEP_COLOR[style.id] and theme.cardMeaningFont
+				or theme.cardFont
 			list[ns.CardStyleKey("Outline", style.id)] = 0
 			list[ns.CardStyleKey("Shadow", style.id)] = "on"
 		end
@@ -118,10 +126,11 @@ local function Theme(info)
 	-- bar texture's bands into shapes, and their names are small on bright class
 	-- colors: a smooth fill, dark under the name, in the game's font for small text.)
 	-- (A soft shadow, not an outline: at this size an outline reads heavy and cartoony.)
-	s.rfTexture, s.rfFont, s.rfNameSize, s.rfOutline, s.rfShadow = "tile", "friz", 1.15, 0, "on"
+	-- (smallFont: a theme whose own font holds up small, Neon Coast's Outfit, there too.)
+	s.rfTexture, s.rfFont, s.rfNameSize, s.rfOutline, s.rfShadow = "tile", info.smallFont or "friz", 1.15, 0, "on"
 	s.ufNameColor = "theme"
 	-- (Unit names are small too: the themes' thin fonts go faint there.)
-	s.ufFont, s.ufOutline, s.ufShadow = "friz", 0, info.layout == "slab" and "soft" or "on"
+	s.ufFont, s.ufOutline, s.ufShadow = info.smallFont or "friz", 0, info.layout == "slab" and "soft" or "on"
 	Bars(s, info.health, info.mana, info.back)
 	-- (A slab: the name on the bar in the theme's own font, the bar in class colors.)
 	-- With a thin black line and nothing else. (darkBars: charcoal, not class colors.)
@@ -423,6 +432,47 @@ local THEMES = {
 		settings = { styleTexture = "brushed", styleFont = "rajdhani", styleOutline = 0, styleShadow = "on",
 			stylePanel = "soft", ufShape = "none",
 			questTalkStyle = "dark", rollPanel = "flat", abShape = "square" },
+	}),
+	Theme({
+		-- (Health bars in Sunset's own colors, Media/make_sunset_art.py: white, so
+		-- nothing tints them, and keepColors so white stays white. Plates keep the
+		-- game's color on a strip under the bar, PlateHealthStyle.lua. Sleek, not
+		-- ornate: one thin line, no corner art, Moonlit Glade's petal portraits,
+		-- Outfit on unit frame names.)
+		key = "neon", name = "Neon Coast", unitBars = "sunsettall", keepColors = true,
+		smallFont = "outfit", barDepth = { 0.12, 0.02, 0.18, 0.2 },
+		-- (Names over heads: Outfit Bold in the sunset's colors, each still meaning
+		-- what the game's does: coral hostile, gold neutral, mint friendly, sky cyan
+		-- for friendly players. No band: it read badly there. NameThemes.lua.)
+		-- (Its own damage numbers, Combat Text Style: on with it, in Outfit Bold and
+		-- the sunset's colors. CombatTextStyle.lua's ns.ThemeCombatColor.)
+		turnsOn = { "combatTextStyle" },
+		combatText = { hit = { 1, 0.9, 0.95 }, spell = { 1, 0.76, 0.3 }, heal = { 0.36, 0.94, 0.71 },
+			crit = { 1, 0.31, 0.6 }, miss = { 0.72, 0.65, 1 } },
+		-- (The plates' reaction strip in the same colors: PlateHealthStyle.lua.)
+		reaction = { hostile = { 1, 0.31, 0.43 }, neutral = { 1, 0.76, 0.3 }, friendly = { 0.36, 0.94, 0.71 },
+			friends = { 0.36, 0.84, 1 } },
+		nameLook = { Font = "outfitbold", Hostile = "custom", HostileR = 1, HostileG = 0.31, HostileB = 0.43,
+			Neutral = "custom", NeutralR = 1, NeutralG = 0.76, NeutralB = 0.3,
+			Friendly = "custom", FriendlyR = 0.36, FriendlyG = 0.94, FriendlyB = 0.71,
+			Friends = "custom", FriendsR = 0.36, FriendsG = 0.84, FriendsB = 1, Shadow = true },
+		tip = "A beach city at dusk: a blue, magenta and gold sky behind palm trees, under clean modern lettering.",
+		swatch = { { 0.09, 0.04, 0.14 }, { 0.23, 0.36, 0.82 }, { 1, 0.18, 0.53 }, { 1, 0.6, 0.24 } },
+		menu = { accent = { 1, 0.38, 0.68 }, edge = { 0.44, 0.16, 0.52 }, field = { 0.1, 0.05, 0.14 },
+			window = { 0.06, 0.03, 0.09 }, well = { 0.03, 0.015, 0.05 }, knob = { 1, 0.78, 0.36 },
+			thumb = { 0.62, 0.26, 0.6 } },
+		grain = "Neon", ornament = { 1, 0.5, 0.74 }, veil = { raid = 0.3, plate = 0.2 },
+		nameColor = { 1, 0.94, 0.97 },
+		health = { 1, 1, 1 }, mana = { 0.2, 0.78, 1 }, back = 0.8,
+		xp = { 0.92, 0.22, 0.66 },
+		panel = { 0.07, 0.03, 0.1 }, panelAlpha = 0.88,
+		cast = { 1, 0.38, 0.68 }, channel = { 0.3, 0.8, 1 }, locked = { 0.5, 0.44, 0.56 }, stop = { 0.95, 0.2, 0.25 },
+		line = { 0.46, 0.15, 0.44 }, lineSize = 1, -- (one quiet line: sleek, not a frame)
+		cardColor = { 1, 0.86, 0.94 }, cardFont = "damion", -- (script, as the sign on a beach bar)
+		cardMeaningFont = "archivoblack", -- (Death, Victory, Danger...: serious and heavy, not script)
+		settings = { styleTexture = "sunset", styleFont = "outfit", styleOutline = 0, styleShadow = "on",
+			stylePanel = "soft", ufShape = "petal", bubblesFont = "outfit", combatTextFont = "outfitbold",
+			questTalkStyle = "dark", rollPanel = "flat", abShape = "round" },
 	}),
 }
 local BY_KEY = {}
@@ -1004,6 +1054,13 @@ function ns.StyleSnapshot()
 		kept[each] = db[each]
 		if kept[each] == nil then kept[each] = "default" end
 	end
+	-- (And the pages a theme turns on, for Undo: TurnsOnKeys.)
+	for _, theme in ipairs(THEMES) do
+		for _, each in ipairs(theme.turnsOn or {}) do
+			kept[each] = db[each]
+			if kept[each] == nil then kept[each] = "default" end
+		end
+	end
 	return kept
 end
 function ns.RestoreStyleSnapshot(kept)
@@ -1043,6 +1100,12 @@ function ns.ApplyStyleTheme(key, noUndo)
 	local settings, base = SettingsOf(theme), Base()
 	for _, each in ipairs(keys) do
 		if Reached(each, db) then db[each] = ThemeValue(each, settings, base) end
+	end
+	-- (turnsOn: pages this theme switches on, Neon Coast's Combat Text Style. Kept
+	-- out of its settings, so another theme's pick never switches them off: one
+	-- you'd turned on yourself stays. Undo puts them back, StyleSnapshot.)
+	for _, each in ipairs(theme.turnsOn or {}) do
+		if Reached(each, db) then db[each] = true end
 	end
 	ShowTheme()
 	return true
@@ -1219,10 +1282,13 @@ local function MakeCard(parent, theme, width, onPick, Tooltip)
 	bar:SetPoint("CENTER", 0, -11)
 	bar:SetMinMaxValues(0, 1)
 	bar:SetValue(0.7)
-	if not (plateTheme and plateTheme.texture ~= "game" and ns.SetBarTexture(bar, plateTheme.texture)) then
+	if not (plateTheme and plateTheme.texture ~= "game" and ns.SetBarTexture(bar, plateTheme.texture, true)) then
 		bar:SetStatusBarTexture("Interface\\TargetingFrame\\UI-StatusBar")
 	end
 	bar:SetStatusBarColor(0.85, 0.15, 0.1)
+	-- (This card's theme's hostile color, not the one in use.)
+	local hostile = theme.reaction and theme.reaction.hostile or { 0.85, 0.15, 0.1 }
+	ns.DressPlateFullColor(bar, plateTheme and ns.StyleTextureFull(plateTheme.texture), hostile[1], hostile[2], hostile[3])
 	local barGround = bar:CreateTexture(nil, "BACKGROUND")
 	barGround:SetAllPoints()
 	barGround:SetColorTexture(0, 0, 0, 0.6)

@@ -8,7 +8,10 @@ images = json.load(open(os.path.join(A, "images.json")))
 fonts = json.load(open(os.path.join(A, "fonts.json")))
 FAMILY = {"Marcellus-Regular": "CinMarcellus", "Almendra-Bold": "CinAlmendra", "Philosopher-Regular": "CinPhilosopher",
           "CinzelDecorative-Regular": "CinCinzel", "GermaniaOne-Regular": "CinGermania",
-          "BarlowCondensed-Medium": "CinBarlow", "BebasNeue-Regular": "CinBebas", "Rajdhani-SemiBold": "CinRajdhani"}
+          "BarlowCondensed-Medium": "CinBarlow", "BebasNeue-Regular": "CinBebas", "Rajdhani-SemiBold": "CinRajdhani",
+          "Outfit-Medium": "CinOutfit", "Outfit-Bold": "CinOutfitBold",
+          "LilitaOne-Regular": "CinLilita", "TitanOne-Regular": "CinTitan",
+          "ArchivoBlack-Regular": "CinArchivoBlack", "Damion-Regular": "CinDamion"}
 faces = "\n".join("@font-face{font-family:'%s';src:url(%s) format('truetype');font-display:block}" % (FAMILY[k], v)
                   for k, v in fonts.items())
 page = open(os.path.join(HERE, "src", "page.html"), encoding="utf-8").read()

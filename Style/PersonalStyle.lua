@@ -403,7 +403,9 @@ local function DressBar(bar, holder, look, heightKey, color)
 	-- Its fill.
 	-- (The game's: left alone unless we'd changed it, the power bar's being
 	-- set again by the game as your power changes.)
-	if look and ns.SetBarTexture(bar, look.prdTexture) then
+	-- (A full-color fill, Sunset's, as it is on health only: power and mana take its
+	-- grey twin, tinted their colors. ns.StyleTextureFull.)
+	if look and ns.SetBarTexture(bar, look.prdTexture, heightKey == "prdHealthHeight") then
 		textured[bar] = true
 	elseif textured[bar] then
 		textured[bar] = nil
@@ -656,7 +658,7 @@ function ns.MakePersonalPreview(parent, width)
 			{ power, realPower, "prdPowerHeight", 8, "prdPowerWidth" },
 			{ mana, realPower, "prdManaHeight", 8, "prdManaWidth" } }) do
 			local bar = info[1]
-			if not ns.SetBarTexture(bar, look.prdTexture) then
+			if not ns.SetBarTexture(bar, look.prdTexture, info[3] == "prdHealthHeight") then
 				local atlas, file = GameFill(info[2])
 				bar:SetStatusBarTexture(atlas or file or "Interface\\TargetingFrame\\UI-StatusBar")
 				bar:GetStatusBarTexture():SetDesaturated(false)

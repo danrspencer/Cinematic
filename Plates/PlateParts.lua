@@ -226,7 +226,7 @@ end
 
 -- Whether a unit's name takes a colour of ours: true for the game's colour
 -- for it over heads, a friendly player's colour of our own ("blue",
--- "white"), or false for the plate's own (class colours). An enemy player's:
+-- "white", "custom"), or false for the plate's own (class colours). An enemy player's:
 -- false where its row has them in class colours.
 local function TintUnit(unit, row)
 	local okGuid, guid = pcall(UnitGUID, unit)
@@ -262,7 +262,10 @@ end
 
 local function PaintName(text, unit, own, row)
 	local colour = FRIEND_COLOURS[own or ""]
-	if colour and not (own == "blue" and Ask(UnitIsPVP, unit)) then
+	-- (Custom: a friendly player's color of the row's own, or its name theme's.)
+	if own == "custom" then
+		text:SetTextColor(ns.NameLookColor(row, "Friends"))
+	elseif colour and not (own == "blue" and Ask(UnitIsPVP, unit)) then
 		text:SetTextColor(colour[1], colour[2], colour[3])
 	elseif not Ask(UnitIsPlayer, unit) and PaintReaction(text, unit, row) then
 		return

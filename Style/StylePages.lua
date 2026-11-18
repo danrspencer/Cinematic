@@ -2005,6 +2005,11 @@ local TEXTURES = {
 	{ "linen", "Linen", OURS .. "Linen" },
 	{ "satin", "Satin", OURS .. "Satin" },
 	{ "hammered", "Hammered", OURS .. "Hammered" },
+	-- (Full color, Neon Coast's: Media/make_sunset_art.py. Drawn as they are only
+	-- where a bar asks for it and is white, ns.StyleTextureFull; any other bar takes
+	-- grey (twin), the same palms, so its own color tints it clean.)
+	{ "sunset", "Sunset", OURS .. "Sunset", twin = OURS .. "SunsetGrey" },
+	{ "sunsettall", "Sunset (tall)", OURS .. "SunsetTall", twin = OURS .. "SunsetTallGrey" },
 }
 
 -- Whether this client has a texture (an atlas: the game says; a file: assumed).
@@ -2021,10 +2026,12 @@ end
 -- A texture value's file or atlas, whether it's an atlas, and whether it's
 -- to be turned grey (nil: the game's own, or one this client doesn't have,
 -- or a shared one no longer there).
-function ns.StyleTexturePath(value)
+-- full: a bar that shows a full-color texture as it is (else its grey twin).
+function ns.StyleTexturePath(value, full)
 	if type(value) ~= "string" or value == "game" then return nil end
 	for _, info in ipairs(TEXTURES) do
 		if info[1] == value then
+			if info.twin and not full then return info.twin, false, false end
 			if Has(info) then return info[3], info.atlas or false, info.atlas or false end
 			return nil
 		end
@@ -2039,8 +2046,8 @@ end
 
 -- A status bar's fill as a value says (turned grey where it's to be);
 -- false if the value has no texture (the game's own: left alone).
-function ns.SetBarTexture(bar, value)
-	local path, _, grey = ns.StyleTexturePath(value)
+function ns.SetBarTexture(bar, value, full)
+	local path, _, grey = ns.StyleTexturePath(value, full)
 	if not path then return false end
 	bar:SetStatusBarTexture(path)
 	local fill = bar:GetStatusBarTexture()
@@ -2049,12 +2056,21 @@ function ns.SetBarTexture(bar, value)
 end
 
 -- A texture (a strip, say) showing a value's texture; false if none.
-function ns.SetStyleTexture(texture, value)
-	local path, atlas, grey = ns.StyleTexturePath(value)
+function ns.SetStyleTexture(texture, value, full)
+	local path, atlas, grey = ns.StyleTexturePath(value, full)
 	if not path then return false end
 	if atlas then texture:SetAtlas(path) else texture:SetTexture(path) end
 	texture:SetDesaturated(grey)
 	return true
+end
+
+-- Whether a texture value is full color (its own colors, not a grey to tint):
+-- a bar showing it as it is sets itself white (ns.SetBarTexture's full).
+function ns.StyleTextureFull(value)
+	for _, info in ipairs(TEXTURES) do
+		if info[1] == value then return info.twin ~= nil end
+	end
+	return false
 end
 
 -- A texture value's name, as the lists show it.
@@ -2723,10 +2739,12 @@ function ns.StyleRows(kit, content, stack, changed, switchKey, fieldOf, panel)
 			refresh(self)
 			local value = ns.GetDB() and Get(key)
 			if ns.IsGeneralStyle(value) then value = ns.GeneralStyleValue(key) end
-			local shown = value ~= nil and ns.SetStyleTexture(strip, value) or false
+			-- (A full-color one as it is, in white: Sunset's own colors.)
+			local full = value ~= nil and ns.StyleTextureFull(value)
+			local shown = value ~= nil and ns.SetStyleTexture(strip, value, full) or false
 			strip:SetShown(shown)
 			if shown then
-				local t = tint or { 0.3, 0.75, 0.35 }
+				local t = full and { 1, 1, 1 } or tint or { 0.3, 0.75, 0.35 }
 				strip:SetVertexColor(t[1], t[2], t[3], 1)
 			end
 		end
@@ -3091,10 +3109,11 @@ function ns.StyleRows(kit, content, stack, changed, switchKey, fieldOf, panel)
 			local usualText, usualValue = Usual(key, item.value)
 			local shows = usualValue ~= nil and usualValue or item.value
 			-- Its picture.
-			local strip = kind == "texture" and not item.isMore and ns.SetStyleTexture(tile.strip, shows) or false
+			local full = kind == "texture" and ns.StyleTextureFull(shows)
+			local strip = kind == "texture" and not item.isMore and ns.SetStyleTexture(tile.strip, shows, full) or false
 			tile.strip:SetShown(strip)
 			if strip then
-				local t = item.tint or tint or { 0.3, 0.75, 0.35 }
+				local t = full and { 1, 1, 1 } or item.tint or tint or { 0.3, 0.75, 0.35 }
 				tile.strip:SetVertexColor(t[1], t[2], t[3], 1)
 			end
 			local edgeKind, size, r, g, b = "none", 0, 0, 0, 0

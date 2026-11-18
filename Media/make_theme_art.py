@@ -130,6 +130,8 @@ def grains():
         "Rime": 0.80 + 0.30 * np.abs(field(n, 5, 16) - 0.5) ** 0.6 - 0.1,
         # (Film grain.)
         "Reel": 0.84 + 0.16 * (rng.random((n, n)) - 0.5),
+        # (Soft dusk haze, smooth as glass: Neon Coast.)
+        "Neon": 0.86 + 0.16 * (field(n, 1, 3) - 0.5) + 0.02 * (rng.random((n, n)) - 0.5),
     }
 
 

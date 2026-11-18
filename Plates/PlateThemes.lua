@@ -260,10 +260,12 @@ function ns.MakePartThemeStrip(kit, parent, kind, changed)
 						bR = theme.color and theme.color[1], bG = theme.color and theme.color[2],
 						bB = theme.color and theme.color[3] }, "b")
 				end
-				if not (texture and texture ~= "game" and ns.SetBarTexture(tile.bar, texture)) then
+				if not (texture and texture ~= "game" and ns.SetBarTexture(tile.bar, texture, true)) then
 					tile.bar:SetStatusBarTexture("Interface\\TargetingFrame\\UI-StatusBar")
 				end
 				tile.bar:SetStatusBarColor(0.85, 0.15, 0.1)
+				local hr, hg, hb = ns.ThemeReactionColor("hostile")
+				ns.DressPlateFullColor(tile.bar, ns.StyleTextureFull(texture), hr or 0.85, hg or 0.15, hb or 0.1)
 				local ground = theme.key ~= "main" and theme.ground or { 0, 0, 0, 0.6 }
 				tile.ground:SetColorTexture(ground[1], ground[2], ground[3], ground[4] or 0.6)
 				ns.DressBarShape(tile.bar, tile.ground, theme.key == "main" or not theme.shape, nil, nil, theme.shape)

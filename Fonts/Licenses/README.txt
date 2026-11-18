@@ -10,5 +10,11 @@ GermaniaOne-Regular.ttf        germaniaone-OFL.txt
 BarlowCondensed-Medium.ttf     barlowcondensed-OFL.txt
 BebasNeue-Regular.ttf          bebasneue-OFL.txt
 Rajdhani-SemiBold.ttf          rajdhani-OFL.txt
+Outfit-Medium.ttf              outfit-OFL.txt
+Outfit-Bold.ttf                outfit-OFL.txt
+LilitaOne-Regular.ttf          lilitaone-OFL.txt
+TitanOne-Regular.ttf           titanone-OFL.txt
+ArchivoBlack-Regular.ttf       archivoblack-OFL.txt
+Damion-Regular.ttf             damion-OFL.txt
 
 Blank.ttf is our own (Media/make_blank_font.py).

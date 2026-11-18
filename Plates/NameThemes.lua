@@ -36,6 +36,8 @@ local function FromTheme(theme)
 	SetColor(look, "Hostile", Toward({ 1, 0, 0 }, theme.stop or { 1, 0, 0 }, 0.35))
 	SetColor(look, "Neutral", Toward({ 1, 1, 0 }, theme.cast or { 1, 1, 0 }, 0.35))
 	SetColor(look, "Friendly", Toward({ 0, 1, 0 }, theme.health or { 0, 1, 0 }, 0.45))
+	-- (A theme's own names, over what's made from it: nameLook, as NameRowLook's settings.)
+	for setting, value in pairs(theme.nameLook or {}) do look[setting] = value end
 	if GLOW[theme.key] and theme.ornament then
 		look.Glow = "soft"
 		SetColor(look, "Glow", theme.ornament[1], theme.ornament[2], theme.ornament[3])

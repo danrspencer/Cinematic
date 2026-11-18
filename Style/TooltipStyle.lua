@@ -256,7 +256,7 @@ local function DressBar(bar, tooltip, look)
 	end
 	if Readable(height) then bar:SetHeight(height) end
 	bar:SetAlpha(where == "none" and 0 or 1)
-	if look and ns.SetBarTexture(bar, look.tooltipBarTexture) then
+	if look and ns.SetBarTexture(bar, look.tooltipBarTexture, true) then -- (full: a health bar, as unit frames')
 		return
 	end
 	if barOwn.atlas and bar.SetStatusBarTexture then
@@ -493,7 +493,7 @@ function ns.MakeTooltipPreview(parent, width)
 		end
 		bar:SetHeight(tonumber(look.tooltipBarHeight) or 8)
 		bar:SetShown(look.tooltipBar ~= "none")
-		if not ns.SetBarTexture(bar, look.tooltipBarTexture) then
+		if not ns.SetBarTexture(bar, look.tooltipBarTexture, true) then
 			bar:SetStatusBarTexture("Interface\\TargetingFrame\\UI-StatusBar")
 			bar:GetStatusBarTexture():SetDesaturated(false)
 		end

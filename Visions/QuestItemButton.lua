@@ -84,6 +84,12 @@ for _, font in ipairs({
 	{ "barlow", "Barlow Condensed", "BarlowCondensed-Medium" },
 	{ "bebas", "Bebas Neue", "BebasNeue-Regular" },
 	{ "rajdhani", "Rajdhani", "Rajdhani-SemiBold" },
+	{ "outfit", "Outfit", "Outfit-Medium" },
+	{ "outfitbold", "Outfit Bold", "Outfit-Bold" },
+	{ "lilita", "Lilita One", "LilitaOne-Regular" },
+	{ "titan", "Titan One", "TitanOne-Regular" },
+	{ "archivoblack", "Archivo Black", "ArchivoBlack-Regular" },
+	{ "damion", "Damion", "Damion-Regular" },
 }) do
 	ns.QUEST_ITEM_FONTS[#ns.QUEST_ITEM_FONTS + 1] = { font[1], font[2],
 		"Interface\\AddOns\\" .. ADDON_NAME .. "\\Fonts\\" .. font[3] .. ".ttf", own = true }

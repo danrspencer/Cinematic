@@ -115,12 +115,15 @@ function ns.MakeGeneralPlatePreview(parent, width)
 		local on = db and db.styleGeneral
 		local general = on and db or ns.DEFAULTS
 		-- (Its fill: General's texture, or the game's nameplate fill.)
-		if not ns.SetBarTexture(health, on and general.styleTexture or "game") then
+		if not ns.SetBarTexture(health, on and general.styleTexture or "game", true) then
 			local game = HasAtlas(PLATE_FILL) and PLATE_FILL or "Interface\\TargetingFrame\\UI-StatusBar"
 			health:SetStatusBarTexture(game)
 			health:GetStatusBarTexture():SetDesaturated(false)
 		end
 		health:SetStatusBarColor(0.85, 0.12, 0.1)
+		-- (A full-color fill in its own colors, red on a strip under it, as real plates.)
+		local hr, hg, hb = ns.ThemeReactionColor("hostile")
+		ns.DressPlateFullColor(health, on and ns.StyleTextureFull(general.styleTexture), hr or 0.85, hg or 0.12, hb or 0.1)
 		ns.DressThemeVeil(health, "plate")
 		-- (Its border: General's, or the game's ground with its outline.)
 		local kind, size, r, g, b = ns.StyleBorder(general, "styleBorder")

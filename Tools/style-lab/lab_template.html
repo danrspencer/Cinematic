@@ -1,7 +1,7 @@
 <title>Cinematic Style Lab</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Marcellus&family=Archivo+Narrow:wght@400;600&family=Metamorphous&family=Federo&family=Almendra:wght@700&family=Philosopher&family=Cinzel+Decorative&family=Germania+One&family=Barlow+Condensed:wght@500&family=Bebas+Neue&family=Rajdhani:wght@600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Marcellus&family=Archivo+Narrow:wght@400;600&family=Metamorphous&family=Federo&family=Almendra:wght@700&family=Philosopher&family=Cinzel+Decorative&family=Germania+One&family=Barlow+Condensed:wght@500&family=Bebas+Neue&family=Rajdhani:wght@600&family=Outfit:wght@500;700&family=Lilita+One&family=Titan+One&family=Archivo+Black&family=Damion&display=swap" rel="stylesheet">
 <style>
 :root {
 	--bg: #101114; --panel: #181a1f; --line: #2b2e36; --text: #e8e6e1; --dim: #9a9ca5; --accent: #e0b84c; color-scheme: dark;
@@ -43,7 +43,7 @@ const DATA = /*DATA*/null;
 // The fonts we bundle are the real thing here; the game's four are near matches.
 const FONT_MAP = [[/friz/i, "Marcellus"], [/arialn/i, "'Archivo Narrow'"], [/morpheus/i, "Metamorphous"], [/skurri/i, "Federo"],
 	[/Marcellus-/, "Marcellus"], [/Almendra-Bold/, "700 @Almendra"], [/Philosopher-/, "Philosopher"], [/CinzelDecorative-/, "'Cinzel Decorative'"],
-	[/GermaniaOne-/, "'Germania One'"], [/BarlowCondensed-/, "500 @'Barlow Condensed'"], [/BebasNeue-/, "'Bebas Neue'"], [/Rajdhani-/, "600 @Rajdhani"]];
+	[/GermaniaOne-/, "'Germania One'"], [/BarlowCondensed-/, "500 @'Barlow Condensed'"], [/BebasNeue-/, "'Bebas Neue'"], [/Rajdhani-/, "600 @Rajdhani"], [/Outfit-Bold/, "700 @Outfit"], [/Outfit-/, "500 @Outfit"], [/LilitaOne-/, "'Lilita One'"], [/TitanOne-/, "'Titan One'"], [/ArchivoBlack-/, "'Archivo Black'"], [/Damion-/, "Damion"]];
 const fontOf = f => { for (const [re, name] of FONT_MAP) if (re.test(f || "")) return name; return "Marcellus"; };
 const images = {};
 function loadAssets() {
@@ -280,6 +280,6 @@ function render() {
 	}
 }
 const families = ['16px "Marcellus"', '16px "Archivo Narrow"', '16px "Metamorphous"', '16px "Federo"', '700 16px "Almendra"', '16px "Philosopher"',
-	'16px "Cinzel Decorative"', '16px "Germania One"', '500 16px "Barlow Condensed"', '16px "Bebas Neue"', '600 16px "Rajdhani"'];
+	'16px "Cinzel Decorative"', '16px "Germania One"', '500 16px "Barlow Condensed"', '16px "Bebas Neue"', '600 16px "Rajdhani"', '500 16px "Outfit"', '700 16px "Outfit"', '16px "Lilita One"', '16px "Titan One"', '16px "Archivo Black"', '16px "Damion"'];
 Promise.all([loadAssets(), ...families.map(f => document.fonts.load(f).catch(() => {}))]).then(render);
 </script>

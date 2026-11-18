@@ -83,7 +83,7 @@ ns.NAME_LOOK_GAME = GAME
 -- The colors, by the setting that picks them, as they start.
 local COLORS = {
 	OutlineColor = { 0, 0, 0 }, Colour = { 1, 1, 1 }, Hostile = { 1, 0.25, 0.2 }, Neutral = { 1, 0.9, 0.3 },
-	Friendly = { 0.4, 1, 0.4 }, Glow = { 1, 0.82, 0 }, Back = { 0, 0, 0 }, BackBorder = { 1, 0.82, 0 },
+	Friendly = { 0.4, 1, 0.4 }, Friends = { 0.4, 0.4, 1 }, Glow = { 1, 0.82, 0 }, Back = { 0, 0, 0 }, BackBorder = { 1, 0.82, 0 },
 	Line2OutlineColor = { 0, 0, 0 }, Line2Color = { 0.72, 0.72, 0.72 },
 }
 ns.NAME_LOOK_COLORS = COLORS

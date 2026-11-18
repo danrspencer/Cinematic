@@ -409,7 +409,10 @@ local function DressBar(bar, view, r, g, b, tint, under)
 	if not (bar and bar.SetStatusBarTexture) or (bar.IsForbidden and bar:IsForbidden()) then return end
 	local saved = OwnOf(bar)
 	dressing = true
-	if view and ns.SetBarTexture(bar, view.ufTexture) then
+	-- (A full-color fill, Sunset's, as it is on health only: the bar under it takes
+	-- its grey twin, tinted its power's color. ns.StyleTextureFull.)
+	local full = view and not under and ns.StyleTextureFull(view.ufTexture)
+	if view and ns.SetBarTexture(bar, view.ufTexture, full) then
 		saved.ours = true
 		local c = saved.color
 		if not r and tint and (not c or (c[1] > 0.95 and c[2] > 0.95 and c[3] > 0.95)) then
@@ -424,7 +427,8 @@ local function DressBar(bar, view, r, g, b, tint, under)
 	end
 	if r then
 		local fill = bar:GetStatusBarTexture()
-		if fill and fill.SetDesaturated then fill:SetDesaturated(true) end -- (a colored fill of the game's tints clean)
+		-- (A colored fill of the game's tints clean; a full-color one of ours keeps its colors.)
+		if fill and fill.SetDesaturated then fill:SetDesaturated(not (saved.ours and full)) end
 		bar:SetStatusBarColor(r, g, b)
 		saved.colored = true
 		saved.want = { r, g, b }
@@ -2458,7 +2462,7 @@ function ns.MakeUnitStylePreview(parent, width, onPick)
 			unit.mark:SetShown(editing == unit.id)
 			-- (The bars: the look's fill, else the game's look.)
 			for i, bar in ipairs({ unit.health, unit.power }) do
-				if not ns.SetBarTexture(bar, view.ufTexture) then
+				if not ns.SetBarTexture(bar, view.ufTexture, i == 1 and ns.StyleTextureFull(view.ufTexture)) then
 					bar:SetStatusBarTexture(GAME_FILL)
 					bar:GetStatusBarTexture():SetDesaturated(false)
 				end

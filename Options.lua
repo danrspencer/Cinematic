@@ -10931,6 +10931,7 @@ local function CreateNameStylePanel()
 			else
 				local color = ns.PLATE_FRIEND_COLOURS[friends] or ns.PLATE_FRIEND_COLOURS.blue
 				r, g, b = color[1], color[2], color[3]
+				if friends == "custom" then r, g, b = ns.NameLookColor(row, "Friends", over) end
 			end
 		elseif mode and info.kind == "player" and S("Enemies") == "class" and classColor then
 			r, g, b = classColor.r, classColor.g, classColor.b
@@ -11417,7 +11418,9 @@ local function CreateNameStylePanel()
 					reacting.Segments(L["Friendly players"], "Friends", {
 						{ "blue", L["Blue"], L["Blue, as the game's names over their heads."] },
 						{ "class", L["Class colors"], L["Their class's color; also turns on the game's class colors for nameplates."] },
-						{ "white", L["White"] } })
+						{ "white", L["White"] }, { "custom", L["Custom"] } })
+					reacting.Fold(function() return ns.NameLookValue(row, "Friends") == "custom" end)
+						.Chips(L["Friendly players"] .. " " .. L["color"], { "FriendsR", "FriendsG", "FriendsB" })
 				end
 				if not parts or parts.Enemies then
 					reacting.Segments(L["Enemy players"], "Enemies", { { "react", L["Hostile's color"] },
