@@ -10055,8 +10055,12 @@ local function CreatePlatesPanel()
 			else content.lastPlatesSection = sections[shown].key end
 			ShowTab(shown)
 			local last = sections[shown].last
+			-- (Its height the last control's, its left the tabs': the panel's
+			-- right edge hangs on it, and a last control set in (Friendly NPCs'
+			-- Kinds or Questie tick) took it 143 past the page. 2026-11-17.)
 			foot:ClearAllPoints()
-			foot:SetPoint("TOPLEFT", last, "BOTTOMLEFT", -(last.indentX or 0), 0)
+			foot:SetPoint("TOP", last, "BOTTOM", 0, 0)
+			foot:SetPoint("LEFT", panelTop, "LEFT", 12, 0)
 			FitContentHeight(content)
 		end
 		local function Pick(section)

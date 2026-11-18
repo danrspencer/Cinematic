@@ -38,7 +38,11 @@ local BOX_STEPS = 5 -- wheel steps a number box moves in a visual run
 local QUIET = { log = true, sweepLog = true, sweepPending = true, pageTimes = true, pageTimesOn = true,
 	sectionsOpen = true, selfTest = true, profiles = true, hubLastTab = true, hubKept = true,
 	-- (Counters and debug lists that grow as you play: 2026-11-17's first run.)
-	slashUsage = true, chatCamDebug = true, smartFindLooks = true }
+	slashUsage = true, chatCamDebug = true, smartFindLooks = true,
+	-- (The game settings Cinematic holds now and what they were: its own
+	-- record as it holds and lets go (a fight lets go of some), never a
+	-- setting. Put back, it said one still held that wasn't. 2026-11-17.)
+	savedCVars = true }
 -- Settings that change others on purpose: setting -> a pattern of the
 -- others' names it may change (a theme writes its values, a unit
 -- converts its width, a dragged spot becomes your own spot).
@@ -670,6 +674,12 @@ local function LookAt(page, entry, path)
 		if n > 1 then
 			scroll:SetVerticalScroll(at)
 			coroutine.yield(TAB_WAIT)
+			-- (A sticky preview still easing into its corner (slow frames in
+			-- the settings): measured once it's there, 2 seconds at most.)
+			for _ = 1, 20 do
+				if not (ns.StickyPreviewMoving and ns.StickyPreviewMoving()) then break end
+				coroutine.yield(0.1)
+			end
 		end
 		local where = n == 1 and "" or (n == 2 and " (scrolled halfway)" or " (scrolled to the bottom)")
 		local found = ns.PageLayoutFindings and { ns.PageLayoutFindings(page.canvas) } or {}
@@ -961,20 +971,7 @@ local function PutAllBack()
 	if run.panel and run.alpha then run.panel:SetAlpha(run.alpha) end
 	local db = ns.GetDB()
 	local leaks = {}
-	-- (The live CVars' held copies: kept as they are now, LIVE_CVARS.)
-	local function KeepLive(k, v)
-		if k ~= "savedCVars" or type(v) ~= "table" or type(db[k]) ~= "table" then return v end
-		local merged = Copy(v)
-		for name in pairs(v) do
-			if LIVE_CVARS[tostring(name):lower()] then merged[name] = nil end
-		end
-		for name, value in pairs(db[k]) do
-			if LIVE_CVARS[tostring(name):lower()] then merged[name] = value end
-		end
-		return merged
-	end
 	for k, v in pairs(run.before) do
-		v = KeepLive(k, v)
 		if not Same(db[k], v) then
 			if not Alike(db[k], v) then leaks[#leaks + 1] = Diff(v, db[k], k) end
 			db[k] = Copy(v)

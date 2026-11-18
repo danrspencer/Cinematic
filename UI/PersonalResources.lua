@@ -917,7 +917,7 @@ function ns.CreatePersonalResourcesPanel(kit)
 		total = total + COL_W
 	end
 	-- (Fade to after them, the health rows': row[4]. Not linked, one per row.)
-	local FADE_W = 76
+	local FADE_W = 68 -- (its 56 box with a little room: at 76 the grid ran 4 past the page, 2026-11-17)
 	local fadeLeft = total + LINK_W / 2
 	total = fadeLeft + FADE_W
 	local FADE_TIP = L["Fades it in as your health drops, fully up at this share."]

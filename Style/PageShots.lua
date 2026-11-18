@@ -71,13 +71,16 @@ end
 -- another tab's not). Also ns.PageLayoutFindings, for /cine debug sweep.
 local function Measure(canvas)
 	local root = canvas.content or canvas
-	local right = (canvas.scroll or canvas):GetRight()
+	-- (A page that puts its own scroll away (Why Is It Showing?, its list in
+	-- a box of its own): its edge the page's, not the hidden scroll's.)
+	local pageScroll = canvas.scroll and ns.Flag(canvas.scroll:IsShown()) and canvas.scroll or nil
+	local right = (pageScroll or root or canvas):GetRight()
 	local cut, over, past, under, covered, texts, bars = {}, {}, {}, {}, {}, {}, {}
 	local pastSeen = {}
-	local clip -- (the nearest clipping frame's left and right, walk)
+	local clip -- (the box the nearest clipping frame (a scroll box, a preview) shows: walk)
 	-- (Only text in the page's view counts for overlaps: rows scrolled out of
 	-- it are cut off by it, whatever's drawn there.)
-	local view = canvas.scroll
+	local view = pageScroll
 	local viewBottom, viewTop = view and view:GetBottom(), view and view:GetTop()
 	-- (A style preview (StylePages.lua marks it stackSpot): its own labels on
 	-- its own bars are how it's drawn, not an overlap.)
@@ -96,8 +99,22 @@ local function Measure(canvas)
 		if region and region.GetAlpha then alpha = alpha * (tonumber(region:GetAlpha()) or 1) end
 		return alpha > 0.05
 	end
+	-- (A card over the page (layoutCover: Cursor Hide's Experimental one):
+	-- what's under it isn't seen.)
+	local covers = {}
+	local function CoverOf(frame)
+		local depth = 0
+		while frame and depth < 30 do
+			if frame.layoutCover then return frame end
+			frame, depth = frame:GetParent(), depth + 1
+		end
+	end
 	local function walk(frame, depth)
 		if depth > 30 or not ns.Flag(frame:IsVisible()) then return end
+		if frame.layoutCover then
+			local l, b, w, h = frame:GetRect()
+			if l and w then covers[#covers + 1] = { frame = frame, l = l, b = b, r = l + w, t = b + h } end
+		end
 		local isButton = frame.GetObjectType and frame:GetObjectType() == "Button"
 		if frame.GetObjectType and frame:GetObjectType() == "StatusBar" and Seen(frame) then
 			local l, b, w, h = frame:GetRect()
@@ -114,8 +131,21 @@ local function Measure(canvas)
 					local l, b, w, h = region:GetRect()
 					local inView = not (viewBottom and viewTop) or (l and b + h > viewBottom + 2 and b < viewTop - 2)
 					if l and w and w > 0 and h > 0 and inView and Seen(frame, region) then
-						texts[#texts + 1] = { words = words, l = l, b = b, r = l + math.min(w, region:GetStringWidth()), t = b + h,
+						local text = { words = words, l = l, b = b, r = l + math.min(w, region:GetStringWidth()), t = b + h,
 							frame = frame, preview = PreviewOf(frame) }
+						-- (In a clipping box (a list scrolling in its own box): only
+						-- the part it shows; one wholly outside it isn't drawn.)
+						if clip then
+							text.l, text.r = math.max(text.l, clip.l), math.min(text.r, clip.r)
+							text.b, text.t = math.max(text.b, clip.b), math.min(text.t, clip.t)
+						end
+						-- (And to the page's view: a line half scrolled out of it
+						-- is drawn only inside. 2026-11-18: Name Style's, 4 px over
+						-- the top, "under" the preview held above it.)
+						if viewBottom and viewTop then
+							text.b, text.t = math.max(text.b, viewBottom), math.min(text.t, viewTop)
+						end
+						if text.r - text.l > 1 and text.t - text.b > 1 then texts[#texts + 1] = text end
 					end
 				end
 			end
@@ -123,7 +153,8 @@ local function Measure(canvas)
 		-- (Inside a frame that clips (a preview): only what shows in it counts;
 		-- one wholly outside it is drawn nowhere.)
 		local l, r = frame:GetLeft(), frame:GetRight()
-		local hidden = clip and l and r and (l >= clip.r or r <= clip.l)
+		local b, t = frame:GetBottom(), frame:GetTop()
+		local hidden = clip and l and r and b and t and (l >= clip.r or r <= clip.l or b >= clip.t or t <= clip.b)
 		if right and r and r > right + 2 and frame ~= root and not hidden then
 			-- (Shown past its clip's edge: only as far as the clip shows it.)
 			local shownRight = clip and math.min(r, clip.r) or r
@@ -142,8 +173,11 @@ local function Measure(canvas)
 			end
 		end
 		local was = clip
-		if frame.DoesClipChildren and ns.Flag(frame:DoesClipChildren()) and l and r then
-			clip = { l = was and math.max(l, was.l) or l, r = was and math.min(r, was.r) or r }
+		local clips = frame:GetObjectType() == "ScrollFrame"
+			or (frame.DoesClipChildren and ns.Flag(frame:DoesClipChildren()))
+		if clips and l and r and b and t then
+			clip = { l = was and math.max(l, was.l) or l, r = was and math.min(r, was.r) or r,
+				b = was and math.max(b, was.b) or b, t = was and math.min(t, was.t) or t }
 		end
 		if not hidden then
 			for _, child in ipairs({ frame:GetChildren() }) do walk(child, depth + 1) end
@@ -151,6 +185,19 @@ local function Measure(canvas)
 		clip = was
 	end
 	pcall(walk, root, 0)
+	-- (Text under a cover, not on it: dropped.)
+	if #covers > 0 then
+		local kept = {}
+		for _, text in ipairs(texts) do
+			local own, hid = CoverOf(text.frame), false
+			for _, cover in ipairs(covers) do
+				if cover.frame ~= own and text.l >= cover.l - 1 and text.r <= cover.r + 1
+					and text.b >= cover.b - 1 and text.t <= cover.t + 1 then hid = true end
+			end
+			if not hid then kept[#kept + 1] = text end
+		end
+		texts = kept
+	end
 	-- (Text over text: two lines' boxes crossing by more than 3 px each way.)
 	for i = 1, #texts do
 		local a = texts[i]
@@ -210,7 +257,15 @@ local function Measure(canvas)
 			local x = math.min(text.r, preview.r) - math.max(text.l, preview.l)
 			local y = math.min(text.t, preview.t) - math.max(text.b, preview.b)
 			if x > 3 and y > 3 and text.preview ~= preview.frame then
-				Add(covered, text.words)
+				-- (Its state with it, so a run says why: held in the hub's corner
+				-- or on its page, how far along, its size, and where it sits
+				-- against the page's view top. 2026-11-18.)
+				local frame, pin = preview.frame, preview.frame.pin
+				local state = ("%s t %.2f, scale %.2f, %dx%d, bottom %+d from view top, crossing %dx%d"):format(
+					pin and pin.on and "held" or "on page", pin and pin.t or 0, frame:GetScale() or 1,
+					preview.r - preview.l, preview.t - preview.b,
+					viewTop and (preview.b - viewTop) or 0, x, y)
+				Add(covered, ("%s [%s]"):format(text.words, state))
 				break
 			end
 		end

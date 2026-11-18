@@ -1167,6 +1167,14 @@ end
 
 -- (Dev: /cine debug previewwatch, Dev/PreviewWatch.lua, reads these.)
 function ns.StylePreviewDebug() return popped, popWindow, slid end
+-- Whether a sticky preview is still on its way to or from the hub's corner
+-- (/cine debug sweep waits for it before measuring a page).
+function ns.StickyPreviewMoving()
+	for _, pin in ipairs(ns.stickyPins or {}) do
+		if (pin.t or 0) ~= (pin.target and 1 or 0) then return true end
+	end
+	return false
+end
 
 -- Sticky (2026-11-17): a preview on its page stays in sight as you scroll
 -- down. Once its spot goes past the top of the page's view, the preview is
@@ -1262,6 +1270,8 @@ local function PinParts(preview)
 	pin.band, pin.bar = band, bar
 	pin.driver = CreateFrame("Frame", nil, pin.hub)
 	preview.pin = pin
+	ns.stickyPins = ns.stickyPins or {}
+	ns.stickyPins[#ns.stickyPins + 1] = pin
 	scroll:HookScript("OnVerticalScroll", function() UpdateSticky(preview) end)
 	-- (Held on the hub, it doesn't hide with its page: put back as that goes.)
 	pin.home:HookScript("OnHide", function() UpdateSticky(preview, true) end)
