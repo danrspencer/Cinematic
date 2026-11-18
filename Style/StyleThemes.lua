@@ -1453,6 +1453,25 @@ function ns.AddSharedStyleTheme(info)
 	return key
 end
 
+-- A shared profile's theme of theirs (Share.lua): one of yours just like it
+-- (name, start, colors, settings), else added. Its key, or nil and why.
+local function SameValue(a, b)
+	if type(a) ~= "table" or type(b) ~= "table" then return a == b end
+	for k, v in pairs(a) do if not SameValue(v, b[k]) then return false end end
+	for k in pairs(b) do if a[k] == nil then return false end end
+	return true
+end
+function ns.AddProfileStyleTheme(info)
+	local store = MineStore()
+	for _, entry in ipairs(store and store.list or {}) do
+		if type(entry) == "table" and entry.name == info.name and BaseOf(entry.base).key == info.base
+			and SameValue(entry.colors or {}, info.colors) and SameValue(entry.settings or {}, info.settings) then
+			return "u:" .. entry.id
+		end
+	end
+	return ns.AddSharedStyleTheme(info)
+end
+
 -- The General page's quick settings. A change turns the Style pages on: with
 -- them off, as on the game's theme, General's settings reach nothing and the
 -- pick would seem to do nothing.

@@ -1125,6 +1125,14 @@ function ns.ProfileForSharing(name)
 	return AgainstDefaults(ns.db.profiles[name] or {}, ns.ProfileBase(name))
 end
 
+-- Settings that are a word or a number: "auto"/"game" or a file number,
+-- the nameplate style's number. (Same-kind only, a picked one was skipped
+-- on import and backup restores, 2026-11-18.)
+local WORD_OR_NUMBER = {
+	stylePlate = true, -- (PlateHealthStyle.lua: "game" or the style's number)
+	lowHealthSound = true, lowHealthGamePattern = true, lowHealthGamePattern2 = true, lowHealthGameMask = true, -- (LowHealth.lua)
+}
+
 -- Whether a shared setting is one this version has: a list, or a setting
 -- of the same kind as its default. (The rest are skipped on import.)
 function ns.KnownProfileSetting(key, value)
@@ -1137,7 +1145,9 @@ function ns.KnownProfileSetting(key, value)
 	if default == nil then default = ns.OldGridDefault(key) end
 	-- (A row added on the Style hub's Nameplates page: as its kind's.)
 	if default == nil then default = ns.MarkRowDefault(key) end
-	return default ~= nil and IsProfileKey(key) and type(value) == type(default)
+	if default == nil or not IsProfileKey(key) then return false end
+	if WORD_OR_NUMBER[key] then return type(value) == "string" or type(value) == "number" end
+	return type(value) == type(default)
 end
 
 -- A new profile of your own from shared settings (stored against the
@@ -1145,8 +1155,10 @@ end
 function ns.AddSharedProfile(name, settings, note, icon)
 	if ns.ProfileExists(name) then return false end
 	if ns.ProfileSwitchBlocked() then return false end -- (switched to below)
-	-- (One shared from before the old grids went over: theirs go over now.)
-	ns.ConvertOffGrids(settings, ns.OldGridDefault, { switches = true })
+	-- (One shared from before the old grids went over: theirs go over now. Not
+	-- an effect's switch being off: that's a setting of today's too, and taking
+	-- it as an old one cleared its Show in row, 2026-11-18.)
+	ns.ConvertOffGrids(settings, ns.OldGridDefault)
 	ns.db.profileIcons[name] = icon or ns.UnusedProfileIcon()
 	ns.db.profiles[name] = settings
 	ns.db.profileNotes[name] = note

@@ -11,8 +11,10 @@
 -- a later format number asks for an update instead.
 --
 -- What's in it: the profile's name, its description, who shared it, the
--- version, and its settings that differ from the defaults (ns.ProfileForSharing).
--- Like a profile, not the frames you added or the zone and time tints.
+-- version, and its settings that differ from the defaults (ns.ProfileForSharing),
+-- and the theme of yours it's on, if it is (StyleThemes.lua's share text: your
+-- themes are the account's, not a profile's). Like a profile, not the frames
+-- you added or the zone and time tints.
 
 local _, ns = ...
 local L = ns.L
@@ -183,6 +185,12 @@ function ns.ExportProfile(name)
 		from = UnitName("player"),
 		settings = ns.ProfileForSharing(name),
 	}
+	-- (A theme of yours is the account's, not the profile's: it goes along as
+	-- a theme's own share text, added to theirs on import. Older versions skip it.)
+	local theme = data.settings.styleTheme
+	if type(theme) == "string" and theme:find("^u:") and ns.ExportMyStyleTheme then
+		data.theme = ns.ExportMyStyleTheme(theme)
+	end
 	local out = {}
 	Write(data, out)
 	local body = table.concat(out)
@@ -216,7 +224,16 @@ function ns.ReadSharedProfile(text)
 	end
 	-- (One from before the Cards page lost its Default style: that onto its cards.)
 	if ns.SpreadCardBase then ns.SpreadCardBase(settings) end
+	-- Their own theme, if it came along (added to yours on Import). Without it
+	-- (an older version's export), a theme of theirs is one you haven't, or
+	-- worse a different one of yours by the same number: the game's look instead.
+	local theme
+	if type(settings.styleTheme) == "string" and settings.styleTheme:find("^u:") then
+		theme = type(data.theme) == "string" and ns.ReadSharedStyleTheme and ns.ReadSharedStyleTheme(data.theme) or nil
+		if not theme then settings.styleTheme = nil end
+	end
 	return {
+		theme = theme,
 		name = Clean(data.name, MAX_NAME) or L["Shared profile"],
 		note = Clean(data.note, MAX_NOTE),
 		icon = icon,
@@ -272,6 +289,9 @@ local function UpdateImport()
 		"|cffffd100" .. info.name .. "|r", info.from, info.count)
 		or L["%s: %d settings changed from the defaults."]:format("|cffffd100" .. info.name .. "|r", info.count))
 	if info.note then lines[#lines + 1] = "|cffbbbbbb" .. info.note .. "|r" end
+	if info.theme then
+		lines[#lines + 1] = L["Their theme %s comes with it, added to your themes."]:format("|cffffd100" .. info.theme.name .. "|r")
+	end
 	if info.skipped > 0 then
 		lines[#lines + 1] = "|cffff8000" .. L["%d settings from a newer Cinematic (%s) will be skipped. " ..
 			"Update Cinematic to get them all."]:format(info.skipped, info.version or "?") .. "|r"
@@ -290,6 +310,13 @@ local function Accept()
 	local info, name = window.info, Trimmed(window.nameBox)
 	if not info or name == "" or ns.FindProfile(name) then return end
 	local note = info.note or (info.from and L["Shared by %s."]:format(info.from))
+	if ns.ProfileSwitchBlocked() then return end -- (not a theme added for a profile a fight then refuses)
+	if info.theme then
+		-- (Yours already, or added; none free: the one it started from.)
+		local key, why = ns.AddProfileStyleTheme(info.theme)
+		if not key and why then ns.Print(why) end
+		info.settings.styleTheme = key or info.theme.base
+	end
 	if ns.AddSharedProfile(name, info.settings, note, info.icon) then
 		ns.Print(L["profile imported: %s"]:format(name))
 		window:Hide()
