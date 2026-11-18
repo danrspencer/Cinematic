@@ -91,6 +91,10 @@ local EVENTS = {
 		icon = "Interface\\Icons\\Ability_Mount_Gryphon_01", parent = "zone", inFight = "show" },
 	{ id = "rested", name = "Rested", on = "cardRestedOn", priority = 25,
 		icon = "Interface\\Icons\\Spell_Nature_Sleep", inFight = "show" },
+	-- (Not a card that comes and goes: a line in the top bar while you lie in a
+	-- Cozy Sleeping Bag, its Well-Rested stacks and their time: SleepingBag.lua.)
+	{ id = "sleepBag", name = "Sleeping bag", on = "cardSleepBagOn", priority = 25,
+		icon = "Interface\\Icons\\INV_Misc_Bag_EnchantedRunecloth", has = not ns.isRetail },
 	{ id = "login", name = "Last time", on = "storyRecap", priority = 35, icon = BOOK, inFight = "show" },
 	{ id = "time", name = "Time of day", on = "timeOfDayChange", priority = 20,
 		icon = "Interface\\Icons\\INV_Misc_PocketWatch_01", inFight = "wait" },
@@ -147,7 +151,7 @@ ns.CARD_BY_ID = BY_ID
 ns.CARD_GROUPS = {
 	{ name = "Combat", "combatIn", "combatOut", "attack", "streak", "death", "revived" },
 	{ name = "Bosses and rares", "boss", "bossDown", "cleared", "rare", "felled" },
-	{ name = "Places and travel", "zone", "subzone", "discover", "newZone", "departure", "arrival", "rested" },
+	{ name = "Places and travel", "zone", "subzone", "discover", "newZone", "departure", "arrival", "rested", "sleepBag" },
 	{ name = "Your story", "login", "time", "quest" },
 	{ name = "Progress", "levelUp", "achievement", "explore", "almost", "step", "reputation", "collect", "profession" },
 	{ name = "Player vs. player", "duel", "battleground" },
@@ -303,7 +307,7 @@ local BASES = { combatIn = "danger", combatOut = "respite", attack = "danger", d
 	newZone = "headline", quest = "milestone", battleground = "place",
 	zone = "place", subzone = "follow", departure = "follow", arrival = "follow", login = "place", boss = "place", duel = "place",
 	time = "milestone",
-	reputation = "ticker", collect = "ticker", explore = "ticker", almost = "ticker", step = "ticker", profession = "ticker", rested = "ticker",
+	reputation = "ticker", collect = "ticker", explore = "ticker", almost = "ticker", step = "ticker", profession = "ticker", rested = "ticker", sleepBag = "ticker",
 	streak = "ticker", rare = "rare", bossDown = "triumph", felled = "victory", revived = "victory" }
 -- (What each started from before the families, for the update moving
 -- yours onto them: Core.lua's cardsV7.)
@@ -834,9 +838,15 @@ end
 -- Test again meanwhile stops it (ns.CardTestRunning: its button says Stop).
 local testRun
 function ns.CardTestRunning(id)
+	if id == "sleepBag" then return ns.SleepBagTestRunning ~= nil and ns.SleepBagTestRunning() end
 	return testRun ~= nil and testRun.id == id
 end
 function ns.CardTest(id)
+	-- (Sleeping bag's: a made-up stay in the bag on its own line, SleepingBag.lua.)
+	if id == "sleepBag" then
+		if ns.SleepBagTest then ns.SleepBagTest() end
+		return
+	end
 	local sequence = ns.CardSequences[id]
 	if testRun then
 		local was = testRun.id

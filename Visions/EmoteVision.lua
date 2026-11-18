@@ -34,6 +34,9 @@ DEFAULTS.emoteVisionX = 0              -- ...own: from the bottom middle of the 
 DEFAULTS.emoteVisionY = 260
 -- (The campfire card's: its fire button at the cursor too, Campfire.lua's.)
 DEFAULTS.emoteVisionCampfireButton = true
+-- (The Camp Benefits card's: a timer in the top bar while you rest by the
+-- fire for it, SleepingBag.lua's line.)
+DEFAULTS.emoteVisionCampTimer = true
 -- (Its look: on Visions Style to start with, StylePages.lua's "emote" prefix.)
 DEFAULTS.emoteFont = "general"
 DEFAULTS.emoteTextSize = 1
@@ -2616,6 +2619,10 @@ do
 			icon = "Interface\\Icons\\Spell_Fire_Fire" })
 	end, CampOn)
 	ns.Listen("CAMP_BENEFITS_DONE", function() CampfireCardDone("CampBenefits", "up again") end, CampOn)
+	-- (Its timer as you rest by the fire: SleepingBag.lua's line.)
+	function ns.CampTimerOn()
+		return CampOn() and DB().emoteVisionCampTimer and true or false
+	end
 end
 
 -- Your duel's end (Effects.lua's duel line): moment "won" or "lost", other
@@ -3760,6 +3767,22 @@ local function MomentsGrid(kit, content, stack, plates)
 		return fire
 	end
 
+	-- The Camp Benefits moment's own setting, in its open section under When.
+	kit.RecordKey(content, "emoteVisionCampTimer")
+	local camp
+	local function CampSettings()
+		if camp then return camp end
+		camp = CreateFrame("Frame", nil, box)
+		camp.recordAs = content
+		camp:SetSize(GRID_W - 26, 30)
+		local function Live() return On() and DB()[MOMENT.CampBenefits.on] and true or false end
+		local timer = kit.Check(camp, "emoteVisionCampTimer", L["Show a timer while you rest"],
+			L["A bar in the top bar fills up over the minute Camp Benefits takes."])
+		timer:SetPoint("TOPLEFT", camp, "TOPLEFT", 0, 0)
+		kit.GreyUnless(timer, Live)
+		return camp
+	end
+
 	local heads, rows, groupTitles = {}, {}, {}
 	-- (Each moment closed to start, its emotes summed up on its band; open:
 	-- its rows and Add an emote under it. Kept while the settings stay open.)
@@ -3840,6 +3863,7 @@ local function MomentsGrid(kit, content, stack, plates)
 		for _, title in ipairs(groupTitles) do title:Hide() end
 		for _, when in pairs(whens) do when.label:Hide() when.row:Hide() end
 		if fire then fire:Hide() end
+		if camp then camp:Hide() end
 		-- (Camp Benefits' only where the game has it.)
 		local listed = {}
 		for _, moment in ipairs(MOMENTS) do
@@ -3907,6 +3931,14 @@ local function MomentsGrid(kit, content, stack, plates)
 			-- (The campfire's: its reach and names, then its emotes.)
 			if expanded and moment.campfire then
 				local settings = FireSettings()
+				settings:ClearAllPoints()
+				settings:SetPoint("TOPLEFT", box, "TOPLEFT", 26, -y)
+				settings:Show()
+				y = y + settings:GetHeight()
+			end
+			-- (Camp Benefits': its timer tick.)
+			if expanded and moment.id == "CampBenefits" then
+				local settings = CampSettings()
 				settings:ClearAllPoints()
 				settings:SetPoint("TOPLEFT", box, "TOPLEFT", 26, -y)
 				settings:Show()

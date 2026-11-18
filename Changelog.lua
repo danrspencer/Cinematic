@@ -11,6 +11,9 @@
 local _, ns = ...
 
 ns.CHANGELOG_FEATURES = {
+	{ date = "2026-11-18", page = "Card Vision", title = "Rest timers", client = "forever",
+		text = "Lying in a sleeping bag shows your Well-Rested stacks in the top bar, with a bar filling up to 3/3. " ..
+		"Resting by a Welcoming Campfire shows a bar filling up until Camp Benefits arrives." },
 	{ date = "2026-11-18", page = "Style Themes", title = "Make your own themes",
 		text = "Turn any style theme into one of your own on Style > Themes: give it your colors, save your " ..
 		"changes into it, and share it with friends." },

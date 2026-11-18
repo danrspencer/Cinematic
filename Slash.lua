@@ -244,6 +244,7 @@ local function PrintDebugHelp()
 	print("  /cine debug portal [number|file|back|near|far|up|down|turn|tilt|scale N|alpha N|reset|reel [seconds]|off] - (dev copy) show the game's portal and swirl models over the screen, one each time, to see which load and how they sit, for Vitals Vision")
 	print("  /cine debug bargap - the left and right edges of action bars 1-3 and their end buttons, to line up the gaps between bars")
 	print("  /cine debug explore - where you are in the game's Exploration achievements: discovered or not, and the zone's areas")
+	print("  /cine debug sleepbag - the Sleeping bag card: the Resting and Well-Rested auras as read, the stacks and times shown, and why it shows or not; test: a made-up stay in the bag (a third every 4 seconds), test camp: a made-up rest by a campfire for Camp Benefits, again: stop")
 	print("  /cine debug stacks - the Cooldown Manager's stack numbers: each stacking spell's count now, which tracked buff icons are for it, and the last casts")
 	print("  /cine debug stacktest - a guided 3-step Arcane Blast test (about 80 sec) with results to copy; again: stop")
 	print("  /cine debug screenfx [number | id N | find words | speed N | tile N | shots [from] | back | off] - dev copy: the game's full-screen effects (all of them, from its data) animated over the screen, one at a time; Space: next, Backspace: back; shots: a screenshot of each")
@@ -755,6 +756,10 @@ local function HandleSlash(msg)
 		if ns.CooldownStacksTest then ns.CooldownStacksTest() end
 	elseif cmd == "debug" and arg == "explore" then
 		if ns.DebugExplore then ns.DebugExplore() end
+	elseif cmd == "debug" and arg == "sleepbag" then
+		if ns.SleepBagReport then ns.SleepBagReport() end
+	elseif cmd == "debug" and (arg == "sleepbag test" or arg == "sleepbag test camp") then
+		if ns.SleepBagTest then ns.SleepBagTest(arg:match("camp$")) end
 	elseif cmd == "debug" and (arg == "screenfx" or arg:match("^screenfx ")) then
 		if ns.ScoutScreenEffects then
 			ns.ScoutScreenEffects(arg:match("^screenfx%s*(.-)$"))

@@ -889,6 +889,7 @@ local TIPS = {
 	arrival = "As a flight lands: where it took you, and how long the flight took.",
 	rested = "As you come into an inn or a city (not at login, not in a fight): the place's name. The same " ..
 		"place at most once every 10 minutes.",
+	sleepBag = "While you lie in a sleeping bag: your Well-Rested stacks in the top bar, a bar filling up to 3/3.",
 	levelUp = "As you reach a new level (after the fight, if you're in one): the level, the zone and how long " ..
 		"it took this session. Max level at the cap.",
 	achievement = "An achievement you earn: its name and points.",
@@ -1092,15 +1093,18 @@ function ns.CreateCardsPanel(kit)
 							L["Opens the Settings tab with this event picked."] },
 							{ L["Style"], "Card Style", L["Opens the Style tab with this event picked."] },
 							{ L["Sounds"], "Card Sounds", L["Opens the Sounds tab with this event picked."] } }) do
-							local button = ns.PanelButton(drawer)
-							button:SetSize(70, 22)
-							button:SetText(link[1])
-							At(button, ns.ROW_LIST_LABEL_W + 180 + (n - 1) * 76)
-							kit.Tooltip(button, link[3])
-							button:SetScript("OnClick", function()
-								CARD.now = id
-								ns.ShowHubPage(link[2])
-							end)
+							-- (Sleeping bag plays no sound: no Sounds button, its place left empty.)
+							if not (id == "sleepBag" and link[2] == "Card Sounds") then
+								local button = ns.PanelButton(drawer)
+								button:SetSize(70, 22)
+								button:SetText(link[1])
+								At(button, ns.ROW_LIST_LABEL_W + 180 + (n - 1) * 76)
+								kit.Tooltip(button, link[3])
+								button:SetScript("OnClick", function()
+									CARD.now = id
+									ns.ShowHubPage(link[2])
+								end)
+							end
 						end
 						local test = ns.PanelButton(drawer)
 						test:SetSize(60, 22)
@@ -1845,6 +1849,10 @@ function ns.CreateCardSettingsPanel(kit)
 			kit.GreyUnless(clock, function(db) return db.cardDepartureLine end)
 		end
 		stack:Note(content, L["Its look is on the Style tab, its sound on the Sounds tab."], NOTE_W)
+	end)
+	parts.Part("sleepBag", function()
+		stack:Note(content, L["Shows in the top bar while you're in a sleeping bag, and fades at 3/3 or as you " ..
+			"get up. Its font and color are on the Style tab; it plays no sound."], NOTE_W)
 	end)
 	for _, id in ipairs({ "cleared", "discover", "newZone", "arrival", "rested", "levelUp", "achievement", "explore", "almost", "step",
 		"reputation", "collect",

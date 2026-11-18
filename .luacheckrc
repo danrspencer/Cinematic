@@ -48,6 +48,8 @@ read_globals = {
 	"time",
 	"C_Texture",
 	"GetItemIcon",
+	"GetItemSpell",
+	"SecondsToTimeAbbrev",
 	"GetInventoryItemLink",
 	"GetInventoryItemQuality",
 	"HandleModifiedItemClick",

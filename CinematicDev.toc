@@ -153,6 +153,7 @@ Visions\Recap.lua
 Visions\ZoneCard.lua
 Visions\CardMoments.lua
 Visions\FlightLine.lua
+Visions\SleepingBag.lua
 Style\QuestTalkStyle.lua
 Style\BubbleStyle.lua
 Style\TooltipStyle.lua
