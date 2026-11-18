@@ -365,14 +365,10 @@ local DEFAULTS = {
 	cozyZoom = true,          -- with a close, gentle zoom
 	cozyBuffs = "Welcoming Campfire", -- the campfire event's buffs: names or spell IDs, comma-separated
 	cozyChairWords = "chair, bench, stool, seat, throne, pew", -- the chair event: words in a seat's name
-	campfireSitButton = true, -- the Campfire button on hovering a campfire near the middle of the screen (Campfire.lua)
-	campfireReach = 0.1,      -- (since 2026-11-16) ...how near the middle the cursor must be: this share of the screen's height
+	-- (The campfire card, Emote Vision's: hovering a campfire near the middle of the screen. Campfire.lua.)
+	campfireReach = 0.1,      -- (since 2026-11-16) how near the middle the cursor must be: this share of the screen's height
 	campfireReachGrow = true, -- (since 2026-11-16) ...that reach widens the longer the cursor stays on the fire (up to campfireReach + 0.3)
 	campfireNames = "campfire", -- ...what counts as one: words in its name, comma-separated (your game language's by default)
-	campfireSit = true,       -- ...its emotes: sit, kneel, lie down (one of those ticked, at random)
-	campfireKneel = true,
-	campfireLie = true,
-	campfireStandUp = true,   -- ...and stand up again once Camp Benefits arrives (not while eating, casting or crafting)
 	hunterRightClickShot = true, -- hunters on Classic Era: right-click on an enemy starts Auto Shot, in combat too (Hunter.lua)
 	hunterAmmoSort = true,    -- hunters: after Clean Up Bags, the smallest ammo stack goes first, to be shot first (HunterAmmo.lua)
 	hunterQuiverFill = true,  -- hunters: a Fill button on arrows and bullets at vendors fills the quiver (HunterAmmo.lua)
@@ -1618,7 +1614,7 @@ DEFAULTS.handleAddonSupport = true -- Addons > General (only built with one of i
 DEFAULTS.handleHealVision = true -- (read by ns.HealVisionHere; Quest Vision's switch is questVision)
 local PAGE_SWITCH = {}
 for page, keys in pairs({
-	handleQuality = { "campfireSitButton", "dragEquipCharacter", "talentLink", "talentCalc",
+	handleQuality = { "dragEquipCharacter", "talentLink", "talentCalc",
 		"centerPanels", "dragPanels", "chatCopyButton", "chatHistory", "chatHistoryTime", "loginZoom",
 		"reloadButton", "reloadKeepWindows", "xpLeft", "hideCombatText", "hideErrorsInCombat", "hideErrorsOutOfCombat" },
 	handleHunter = { "hunterRightClickShot", "hunterAmmoSort", "hunterQuiverFill", "petUnhappyShow" },
@@ -1660,10 +1656,6 @@ local OUTSIDE_CINE = {
 	shoulderCam = "outsideCineShoulder", skyrideCam = "outsideCineSkyride", musicInCinematic = "outsideCineMusic",
 }
 for _, tick in pairs(OUTSIDE_CINE) do DEFAULTS[tick] = true end
--- (Emote Vision: CineMode only to start with, 2026-11-17. Outside it, cards
--- come up in everyday play, and a buff's caster with no plate is missed:
--- CineMode keeps friendly plates for its Buff card. Always asks first.)
-DEFAULTS.outsideCineEmote = false
 ns.OUTSIDE_CINE = OUTSIDE_CINE
 -- And the Camera group's master tick (2026-11-15, on to start with): off, none
 -- of Cinematic's cameras move the view while CineMode is off. A scene whose
@@ -2313,7 +2305,9 @@ end
 -- wanted, a function, says whether it needs the signal now (nil: always),
 -- so a watch costing something runs only while a listener wants it
 -- (ns.SignalWanted). A listener's error is logged, the others still hear it.
--- Names: CAMPFIRE_REST (name) Campfire.lua, the cursor stayed on a fire.
+-- Names (Campfire.lua): CAMPFIRE_REST (name), the cursor stayed on a fire;
+-- CAMPFIRE_LEFT, you moved away after; CAMP_BENEFITS, it arrived or renewed;
+-- CAMP_BENEFITS_DONE, you're up or moving after.
 ns.listeners = {}
 function ns.Listen(name, fn, wanted)
 	local list = ns.listeners[name] or {}

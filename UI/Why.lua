@@ -532,8 +532,8 @@ local NAMED = {
 		"The letterbox: black bars at the top and bottom of the screen while CineMode is on" },
 	{ { "CinematicMinimapButton" }, "Minimap button", "Cinematic",
 		"Cinematic's minimap button: click it for its menu. Show minimap button turns it off" },
-	{ { "CinematicSitButton" }, "Campfire button", "General",
-		"The Campfire button: you're pointing at a campfire and standing still. Click it to sit down" },
+	{ { "CinematicSitButton" }, "Campfire fire button", "Emote Vision",
+		"The campfire card's fire button: you're pointing at a campfire and standing still. Click it to sit down" },
 	{ { "CinematicQuestItemButton" }, "Quest item button", "Quest Vision",
 		"The quest item button: the item your nearest tracked quest gives you to use" },
 }

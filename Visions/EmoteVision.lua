@@ -21,6 +21,8 @@ DEFAULTS.emoteVisionRepeatMins = 1     -- ...for this many minutes
 DEFAULTS.emoteVisionGroupBuffs = false -- buffs from your own party or raid ignored (no card)
 DEFAULTS.emoteVisionHold = 10          -- seconds a card stays (paused while the mouse is over it)
 DEFAULTS.emoteVisionPadGrab = "PADRSTICK" -- gamepad: the button that lets the face buttons pick the card's emotes
+DEFAULTS.emoteVisionPlates = true     -- its Nameplates tab (the cards that need a plate: plates = true) at all
+ns.SetPageMaster({ "emoteVisionPlates" }, "emoteVision") -- (Emote Vision off: that tab off too)
 DEFAULTS.emoteSettings = true         -- its Settings tab at all (that tab's switch; off: its settings as they start)
 DEFAULTS.emoteStyle = true            -- its Look tab at all (that tab's switch; off: the starting look and spot)
 DEFAULTS.emoteVisionScale = 1
@@ -30,6 +32,8 @@ DEFAULTS.emoteVisionMenuEmotes = "HELLO,THANK,CHEER,LAUGH" -- ...the ones on it 
 DEFAULTS.emoteVisionSpot = "speech"   -- "speech": just above the lines from behind you (Speech.lua's spot); "own": X, Y
 DEFAULTS.emoteVisionX = 0              -- ...own: from the bottom middle of the screen (dragging it with Move)
 DEFAULTS.emoteVisionY = 260
+-- (The campfire card's: its fire button at the cursor too, Campfire.lua's.)
+DEFAULTS.emoteVisionCampfireButton = true
 -- (Its look: on Visions Style to start with, StylePages.lua's "emote" prefix.)
 DEFAULTS.emoteFont = "general"
 DEFAULTS.emoteTextSize = 1
@@ -213,6 +217,7 @@ end
 local MOMENTS = {
 	{ id = "Buff", on = "emoteVisionBuffs", name = "Someone buffs you", emotes = { "THANK", "BOW", "SALUTE" },
 		outside = true, -- (its Show in row: World and City to start with, not dungeons, raids or battlegrounds)
+		plates = true, -- (the game names the caster only through a unit: a plate for strangers)
 		tip = "A buff of a minute or more someone else puts on you (Fortitude, Arcane Intellect, a blessing...). " ..
 			"Not heals over time.",
 		sample = { name = "Aelwyn", class = "PRIEST", line = "gave you %s", spell = "Power Word: Fortitude",
@@ -252,7 +257,7 @@ local MOMENTS = {
 			"to them if it's just the two of you.",
 		sample = { name = "Your group", line = "you joined a group", group = true,
 			icon = "Interface\\Icons\\INV_Misc_GroupNeedMore" } },
-	{ id = "Achievement", on = "emoteVisionAchievement", name = "Someone earns an achievement",
+	{ id = "Achievement", on = "emoteVisionAchievement", name = "Someone earns an achievement", plates = true,
 		emotes = { "CONGRATULATE", "CHEER", "APPLAUD" },
 		near = true, tip = "Someone near you earns an achievement (a stranger, someone in your group or in " ..
 			"your guild).",
@@ -263,10 +268,12 @@ local MOMENTS = {
 		sample = { name = "Edwin VanCleef", line = "defeated with your group", group = true,
 			icon = "Interface\\Icons\\INV_Misc_Bone_HumanSkull_01" } },
 	{ id = "Guild", on = "emoteVisionGuild", name = "You run into a guild member", emotes = { "WAVE", "HELLO", "HUG" },
+		plates = true,
 		tip = "Someone from your guild (not in your group) comes into view: with friendly nameplates on, as " ..
 			"soon as you see them; otherwise when you mouse over or target them. Once an hour per person.",
 		sample = { name = "Brakka", class = "WARRIOR", line = "is in your guild" } },
 	{ id = "Ally", on = "emoteVisionAlly", name = "You run into a recent ally", emotes = { "WAVE", "HELLO", "SALUTE" },
+		plates = true,
 		ally = true,
 		tip = "Someone you grouped with lately (the game's Recent Allies, not in your group now) comes into " ..
 			"view: with friendly nameplates on, as soon as you see them; otherwise when you mouse over or " ..
@@ -276,15 +283,26 @@ local MOMENTS = {
 		tip = "You and a stranger (not in your group or guild) target each other for 10 seconds straight. " ..
 			"Once you've looked away, it can happen again.",
 		sample = { name = "Velmora", class = "WARLOCK", line = "is looking back at you" } },
+	{ id = "Stalked", on = "emoteVisionStalked", name = "An enemy stalks you", emotes = { "THREATEN", "RUDE", "LAUGH" },
+		rule = "not combat and not bg", -- (its When to start with: no Always, not in battlegrounds or arenas)
+		tip = "An enemy player keeps you targeted for 5 seconds while you're out of a fight, not in " ..
+			"battlegrounds (needs enemy nameplates on). Once they've looked away, it can happen again.",
+		sample = { name = "Kargash", class = "ROGUE", line = "is stalking you" } },
 	{ id = "YouLevel", on = "emoteVisionYouLevel", name = "You level up", emotes = { "CHEER", "DANCE", "FLEX" },
 		tip = "You reach a new level: the emotes go to everyone, to celebrate.",
 		sample = { name = "You", line = "reached level %d", level = 42, group = true,
 			icon = "Interface\\Icons\\Spell_Holy_SurgeOfLight" } },
 	{ id = "Campfire", on = "emoteVisionCampfire", name = "You hover a campfire", emotes = { "SIT", "KNEEL", "LAYDOWN" },
-		tip = "The cursor rests on a campfire near the middle of the screen, you standing still and not sitting " ..
-			"yet: sit, kneel or lie down by it in one click (the Campfire button's names for a fire, its " ..
-			"camera too).",
+		campfire = true, -- (its open section: the fire's reach and names, CampfireSettings)
+		anyMode = true, -- (outside CineMode too, whatever Allow outside CineMode says: ns.EmoteVisionOnFor)
+		tip = "Hover a campfire near the middle of the screen, standing still: sit by it in one click (CineMode or not).",
 		sample = { name = "Campfire", line = "rest a while by the fire", group = true,
+			icon = "Interface\\Icons\\Spell_Fire_Fire" } },
+	{ id = "CampBenefits", on = "emoteVisionCampBenefits", name = "You get Camp Benefits", emotes = { "STAND" },
+		camp = true, -- (only where the game has Camp Benefits: ns.HasCampBenefits)
+		anyMode = true,
+		tip = "Camp Benefits arrives while you rest by a Welcoming Campfire: stand up when you're ready (CineMode or not).",
+		sample = { name = "Camp Benefits", line = "rested and ready", group = true,
 			icon = "Interface\\Icons\\Spell_Fire_Fire" } },
 }
 -- (No Encounter Journal, as on Classic Era: no telling a dungeon's last boss,
@@ -304,9 +322,9 @@ end
 -- (One not listed goes at the end, in the last group.)
 local MOMENT_GROUPS = {
 	{ name = "Help from others", "Buff", "Res", "Summon", "Trade" },
-	{ name = "Meeting people", "Emote", "Eyes", "Guild", "Ally", "Achievement", "Duel" },
+	{ name = "Meeting people", "Emote", "Eyes", "Stalked", "Guild", "Ally", "Achievement", "Duel" },
 	{ name = "Your group", "Join", "Leave", "Joined", "Level", "Boss", "Dungeon" },
-	{ name = "Yourself", "YouLevel", "Campfire" },
+	{ name = "Yourself", "YouLevel", "Campfire", "CampBenefits" },
 }
 do
 	local byId, ordered = {}, {}
@@ -337,6 +355,29 @@ for _, moment in ipairs(MOMENTS) do
 	DEFAULTS[moment.key] = table.concat(moment.emotes, ",")
 end
 
+-- Whether a moment of kind (its id) can come now: the page on, and CineMode
+-- on unless Allow outside CineMode is ticked. The campfire cards (anyMode)
+-- come outside CineMode too, as the Campfire button they took over from did.
+function ns.EmoteVisionOnFor(kind)
+	if ns.Setting("emoteVision") then return true end
+	local moment = kind and MOMENT[kind]
+	return moment and moment.anyMode and ns.PageSetting("emoteVision") and true or false
+end
+
+-- The campfire card's fire button at the cursor (Campfire.lua): with the
+-- card on, its own tick on. And the emotes it picks from (the card's).
+function ns.CampfireButtonOn()
+	local db = ns.db
+	return db and db.emoteVisionCampfireButton and db[MOMENT.Campfire.on] and ns.EmoteVisionOnFor("Campfire") or false
+end
+function ns.EmoteVisionEmotes(kind)
+	local list = {}
+	for token in tostring(ns.db and ns.db[MOMENT[kind].key] or ""):gmatch("[%w_]+") do
+		if token:upper() ~= "SAME" then list[#list + 1] = token:upper() end
+	end
+	return list
+end
+
 -- Where: a Show in row for each moment ("emote:<id>", its Always
 -- emoteVisionAlways<Id>), Always ticked to start with (a fight still holds a
 -- card back: WhyWaiting); unticked, Out of combat is. An outside moment's
@@ -347,9 +388,11 @@ local function AlwaysKey(id) return "emoteVisionAlways" .. id end
 for _, moment in ipairs(MOMENTS) do
 	if not moment.soon then
 		local key = RowKey(moment.id)
-		DEFAULTS[AlwaysKey(moment.id)] = not moment.outside
+		DEFAULTS[AlwaysKey(moment.id)] = not (moment.outside or moment.rule)
 		ns.CINE_SHOW_SETTING[key] = AlwaysKey(moment.id)
-		if moment.outside then
+		if moment.rule then
+			ns.RULE_DEFAULTS[key] = moment.rule
+		elseif moment.outside then
 			ns.LIST_DEFAULTS.worldShow[key] = true
 			ns.LIST_DEFAULTS.cityShow[key] = true
 		else
@@ -667,7 +710,7 @@ DEFAULTS.emoteVisionLook = "classic"
 local HEADINGS = { Buff = "A KINDNESS", Res = "SAVED", Emote = "A GREETING", Summon = "SUMMONED",
 	Trade = "A FAIR TRADE", Level = "LEVEL UP", Dungeon = "VICTORY", Duel = "THE DUEL", Join = "WELCOME",
 	Leave = "FAREWELL", Joined = "WELL MET", Achievement = "WELL DONE", Boss = "VICTORY",
-	YouLevel = "LEVEL UP", Guild = "WELL MET", Ally = "WELL MET", Eyes = "EYES MEET", Campfire = "A WARM FIRE" }
+	YouLevel = "LEVEL UP", Guild = "WELL MET", Ally = "WELL MET", Eyes = "EYES MEET", Stalked = "STALKED", Campfire = "A WARM FIRE" }
 local BUTTON_W, BUTTON_H, BUTTON_GAP, ROW_GAP = 84, 24, 8, 6
 -- The face's glow: circles this far out past the face, and how strong each.
 local GLOW_STEPS = { { 4, 0.35 }, { 6, 0.25 }, { 8, 0.17 }, { 10, 0.1 }, { 12, 0.06 } }
@@ -783,11 +826,28 @@ local function Answer(token)
 		ns.Print(L["Emote Vision test: you'd %s %s."]:format(Command(token), moment.name))
 	elseif moment.group then
 		pcall(DoEmote, token, "none")
-		-- (By a fire: the Campfire button's own camera, not the emote's.)
+		-- (By a fire: the campfire card's own camera, not the emote's.)
 		if moment.kind == "Campfire" and ns.SatByButton then ns.SatByButton() end
 	else
 		local name = moment.fullName or moment.name
-		local unit = UnitFor(moment.guid, name)
+		-- (moment.noUnit: /cine debug fakebuff, as if their plate had gone.)
+		local unit = not moment.noUnit and UnitFor(moment.guid, name) or nil
+		-- (No unit for them, e.g. a stranger's plate gone behind the camera: a
+		-- line of your own, "/e thanks Rinthar Darichheals.", which can't go to
+		-- everyone around. No gesture: an emote with no one plays its own line
+		-- too, "thanks everyone". For now only from /cine debug fakebuff e, while
+		-- the game's emote by name is tried first: it has the gesture.)
+		local own = not unit and moment.ownLine and ns.EmoteOwnLine(token, moment.name)
+		if own then
+			local send = C_ChatInfo and C_ChatInfo.SendChatMessage or SendChatMessage
+			ns.EmoteOwnWatch()
+			local ok, err = pcall(send, own, "EMOTE")
+			ns.Log("emote", ("%s card %s: for %s (guid %s), no unit: /e %s %s (by %s)"):format(moment.kind, token,
+				tostring(name), tostring(moment.guid), own, ok and "ok" or ("error " .. tostring(err)),
+				send == SendChatMessage and "SendChatMessage" or "C_ChatInfo.SendChatMessage"))
+			Hide()
+			return
+		end
 		-- (Out of your sight, the game can't find them and plays it at everyone
 		-- around you instead: say so and play nothing. With no unit for them at
 		-- all, e.g. a stranger with no nameplate, there's no telling: by name.)
@@ -801,8 +861,15 @@ local function Answer(token)
 			ns.Log("emote", why .. ": too far, nothing played")
 			ns.Print(L["Emote Vision: %s is too far away now."]:format(moment.name))
 		else
-			local ok, err = pcall(DoEmote, token, unit or name)
-			ns.Log("emote", ("%s: DoEmote(%s, %s) %s"):format(why, token, tostring(unit or name),
+			-- (By name on Forever: the game's "Rinthar Darichheals", not our
+			-- "Rinthar-Darichheals", which it knew no one by and thanked everyone
+			-- around: a plate gone behind the camera, 2 s after the buff.)
+			local byName = name
+			if not unit and not ns.isRetail and not ns.isClassicEra and type(name) == "string" then
+				byName = (name:gsub("%-", " ", 1))
+			end
+			local ok, err = pcall(DoEmote, token, unit or byName)
+			ns.Log("emote", ("%s: DoEmote(%s, %s) %s"):format(why, token, tostring(unit or byName),
 				ok and "ok" or ("error " .. tostring(err))))
 		end
 	end
@@ -1758,7 +1825,7 @@ end
 -- out of the fight and its "after" time come, no calm or Show in row to wait
 -- for.)
 local function WhyWaiting(moment)
-	if not ns.Setting("emoteVision") then return "page off" end
+	if not ns.EmoteVisionOnFor(moment and moment.kind) then return "page off (or CineMode off)" end
 	if Fighting() then return "in a fight" end
 	-- (No emoting while dead or a ghost: a card waits until you're back.)
 	if ns.Flag(UnitIsDeadOrGhost("player")) then return "dead" end
@@ -1824,10 +1891,11 @@ end
 -- showing is ignored (with that off, only a doubled event's), and so is one
 -- already waiting in the queue.
 local function Fire(moment)
-	if not ns.Setting("emoteVision") then return end
+	if not ns.EmoteVisionOnFor(moment.kind) then return end
 	local db = DB()
 	local kind = MOMENT[moment.kind]
 	if not (kind and db[kind.on]) then return end
+	if kind.plates and not ns.PageOn("emoteVisionPlates") then return end
 	local who = moment.guid or moment.name
 	if not who then return end
 	local key = moment.kind .. ":" .. who
@@ -1885,6 +1953,49 @@ end
 function nameLink.Shown(name)
 	if ns.isRetail or ns.isClassicEra or type(name) ~= "string" then return Short(name) end
 	return (name:gsub("%-", " ", 1))
+end
+-- A card emote as your own /e line at them ("thanks Rinthar Darichheals."),
+-- for when the game has no unit for them; nil for an emote with none here
+-- (that one goes by name, as before). (On ns: the card's Answer comes before
+-- nameLink in this file.)
+nameLink.OWN_LINES = {
+	THANK = "thanks %s.", BOW = "bows before %s.", SALUTE = "salutes %s with respect.",
+	KNEEL = "kneels before %s.", CHEER = "cheers at %s.", WAVE = "waves at %s.", BYE = "waves goodbye to %s.",
+	HELLO = "greets %s with a hearty hello!", GREET = "greets %s warmly.", WELCOME = "welcomes %s.",
+	CONGRATULATE = "congratulates %s.", APPLAUD = "applauds at %s. Bravo!", SMILE = "smiles at %s.",
+	BLUSH = "blushes at %s.", HUG = "hugs %s.", HIGHFIVE = "gives %s a high five!", CURTSEY = "curtsies before %s.",
+	YW = "tells %s they're welcome.", ROAR = "roars with bestial vigor at %s.", LAUGH = "laughs with %s.",
+}
+function ns.EmoteOwnLine(token, name)
+	local line = nameLink.OWN_LINES[token]
+	if not line or type(name) ~= "string" or name == "" or name == "?" then return nil end
+	return L[line]:format(name)
+end
+-- What the game made of that /e line, in the log for 3 s: your own line back
+-- (CHAT_MSG_EMOTE), or a block or error instead. (A send once came back "ok"
+-- and nothing showed.)
+function ns.EmoteOwnWatch()
+	local watch = nameLink.ownWatch
+	if not watch then
+		watch = CreateFrame("Frame")
+		watch:SetScript("OnEvent", function(self, event, ...)
+			if GetTime() > (self.untilAt or 0) then return end
+			local a, b = ...
+			if event == "CHAT_MSG_EMOTE" then
+				local guid = select(12, ...)
+				if Plain(guid) ~= Plain(UnitGUID("player")) then return end
+				a, b = Plain(a), Plain(b)
+			end
+			ns.Log("emote", ("/e watch: %s %s %s"):format(event, tostring(Plain(a)), tostring(Plain(b))))
+		end)
+		for _, event in ipairs({ "CHAT_MSG_EMOTE", "ADDON_ACTION_BLOCKED", "ADDON_ACTION_FORBIDDEN",
+			"CHAT_MSG_SYSTEM", "UI_ERROR_MESSAGE", "CHAT_MSG_RESTRICTED" }) do
+			pcall(watch.RegisterEvent, watch, event)
+		end
+		nameLink.ownWatch = watch
+	end
+	watch.untilAt = GetTime() + 3
+	C_Timer.After(3.1, function() ns.Log("emote", "/e watch: done") end)
 end
 
 -- Someone by name (and GUID, if known) as a moment of kind: their unit,
@@ -1961,13 +2072,20 @@ local function Buffed(aura, refresh)
 		class = ClassOf(guid, unit), icon = Plain(aura.icon), line = L["gave you %s"]:format(name) })
 end
 
--- Whether the Buff card could show here now. The game names a buff's caster
--- only when they're a unit of yours (target, mouseover, group, a plate), so
--- CineMode keeps friendly players' plates on for it (FriendWants).
-function ns.EmoteBuffWantsPlates()
-	if not (ns.db and ns.Setting("emoteVision") and DB().emoteVisionBuffs) then return false end
-	local ok, here = pcall(ns.RowOnNow, RowKey("Buff"), nil, true)
-	return ok and here and true or false
+-- Whether one of the Nameplates tab's cards could show here now. They need
+-- the other player as a unit (a buff's caster, a guildie or ally coming into
+-- view, an achiever near you), for strangers a plate, so CineMode keeps
+-- friendly players' plates on for them (FriendWants).
+function ns.EmoteWantsPlates()
+	if not (ns.db and ns.Setting("emoteVision") and ns.PageOn("emoteVisionPlates")) then return false end
+	local db = DB()
+	for _, moment in ipairs(MOMENTS) do
+		if moment.plates and db[moment.on] then
+			local ok, here = pcall(ns.RowOnNow, RowKey(moment.id), nil, true)
+			if ok and here then return true end
+		end
+	end
+	return false
 end
 
 -- Old clients' auras with no list of the new ones: what's new since last time.
@@ -2388,6 +2506,45 @@ local function GazeTargetChanged()
 	end
 end
 
+-- An enemy stalks you: an enemy player's nameplate (nameplateN) with you as
+-- its target for 5 seconds straight, while you're out of a fight. Their
+-- looking away (UNIT_TARGET) or plate going starts it over; one card per
+-- look. (On nameLink, not locals: this file is at Lua's cap of 200.)
+nameLink.stalk = {} -- (enemies with you targeted, by GUID: { since, done })
+function nameLink.Stalking(unit, event)
+	if type(unit) ~= "string" or not unit:find("^nameplate%d+$") or not MOMENT.Stalked then return end
+	local stalk = nameLink.stalk
+	local guid = Plain(UnitGUID(unit))
+	if not guid then return end
+	if event == "NAME_PLATE_UNIT_REMOVED" then stalk[guid] = nil return end
+	-- (Its When row asked here too, not just as the card waits: one from a
+	-- battleground would otherwise wait and show once you're out.)
+	local function Here()
+		local ok, here = pcall(ns.RowOnNow, RowKey("Stalked"), nil, true)
+		return ok and here
+	end
+	local on = ns.Setting("emoteVision") and DB()[MOMENT.Stalked.on] and ns.EmoteVisionOnFor("Stalked")
+	local looking = on and guid:find("^Player%-") and not loading and not Fighting() and Here()
+		and ns.Flag(UnitCanAttack("player", unit)) and ns.Flag(UnitIsUnit(unit .. "target", "player"))
+	if not looking then stalk[guid] = nil return end
+	if stalk[guid] then return end -- (already timing them, or carded for this look)
+	local STALK_TIME = 5
+	local look = { since = GetTime() }
+	stalk[guid] = look
+	C_Timer.After(STALK_TIME, function()
+		if stalk[guid] ~= look then return end
+		-- (Their plate's number can change: found again by GUID.)
+		local now = UnitFor(guid)
+		if not now or loading or Fighting() or not Here() or not ns.Flag(UnitIsUnit(now .. "target", "player")) then
+			stalk[guid] = nil
+			return
+		end
+		look.done = true
+		ns.Log("emote", ("Stalked: %s had you targeted %d s"):format(tostring(Plain(UnitName(now))), STALK_TIME))
+		FireFor("Stalked", Plain((UnitName(now))), guid, L["is stalking you"])
+	end)
+end
+
 -- Your own level up: a card for everyone around, to celebrate.
 local function LeveledUp(level)
 	level = Plain(level)
@@ -2403,7 +2560,7 @@ end
 local CAMPFIRE_AGAIN = 60
 local campfireAt = -math.huge
 function ns.EmoteVisionCampfireOn()
-	return ns.Setting("emoteVision") and DB()[MOMENT.Campfire.on] and true or false
+	return ns.EmoteVisionOnFor("Campfire") and DB()[MOMENT.Campfire.on] and true or false
 end
 local campfireSkip -- (the last reason one wasn't fired, logged once)
 function ns.EmoteVisionCampfire(name)
@@ -2423,24 +2580,43 @@ function ns.EmoteVisionCampfire(name)
 		line = L["rest a while by the fire"], group = true, icon = "Interface\\Icons\\Spell_Fire_Fire" })
 end
 ns.Listen("CAMPFIRE_REST", ns.EmoteVisionCampfire, ns.EmoteVisionCampfireOn)
--- Moved away from the fire (Campfire.lua's CAMPFIRE_LEFT, as its button goes)
--- or sat down by its button (CAMPFIRE_SAT): its card fades too, and one still
+-- Moved away from the fire (Campfire.lua's CAMPFIRE_LEFT), or up again after
+-- Camp Benefits (CAMP_BENEFITS_DONE): the card of kind fades, and one still
 -- waiting is dropped.
-local function CampfireCardDone(why)
+local function CampfireCardDone(kind, why)
 	for i = #queue, 1, -1 do
-		if queue[i].kind == "Campfire" then
+		if queue[i].kind == kind then
 			table.remove(queue, i)
-			ns.Log("emote", "Campfire card dropped unseen: " .. why)
+			ns.Log("emote", kind .. " card dropped unseen: " .. why)
 		end
 	end
-	if showing and showing.kind == "Campfire" and not showing.test and card and card:IsShown() and not card.leaving then
-		ns.Log("emote", "Campfire card going: " .. why)
+	if showing and showing.kind == kind and not showing.test and card and card:IsShown() and not card.leaving then
+		ns.Log("emote", kind .. " card going: " .. why)
 		Hide()
 	end
 end
-ns.Listen("CAMPFIRE_LEFT", function() CampfireCardDone("moved away from the fire") end, ns.EmoteVisionCampfireOn)
-ns.Listen("CAMPFIRE_SAT", function() CampfireCardDone("sat down by the campfire button") end,
+ns.Listen("CAMPFIRE_LEFT", function() CampfireCardDone("Campfire", "moved away from the fire") end,
 	ns.EmoteVisionCampfireOn)
+ns.Listen("CAMPFIRE_SAT", function() CampfireCardDone("Campfire", "sat down by the fire button") end,
+	ns.EmoteVisionCampfireOn)
+-- Camp Benefits arrived or renewed as you rest by a Welcoming Campfire
+-- (Campfire.lua's CAMP_BENEFITS): a card to stand up when you choose, in
+-- place of standing you up. Gone once you're up or moving.
+do
+	local function CampOn()
+		return ns.EmoteVisionOnFor("CampBenefits") and DB()[MOMENT.CampBenefits.on] and ns.HasCampBenefits() and true or false
+	end
+	ns.Listen("CAMP_BENEFITS", function()
+		if loading or Fighting() then
+			ns.Log("emote", "Camp Benefits card skipped: " .. (loading and "loading screen" or "in a fight"))
+			return
+		end
+		ns.Log("emote", "Camp Benefits card fired")
+		Fire({ kind = "CampBenefits", name = L["Camp Benefits"], line = L["rested and ready"], group = true,
+			icon = "Interface\\Icons\\Spell_Fire_Fire" })
+	end, CampOn)
+	ns.Listen("CAMP_BENEFITS_DONE", function() CampfireCardDone("CampBenefits", "up again") end, CampOn)
+end
 
 -- Your duel's end (Effects.lua's duel line): moment "won" or "lost", other
 -- the one you fought.
@@ -2454,13 +2630,16 @@ for _, event in ipairs({ "PLAYER_ENTERING_WORLD", "PLAYER_REGEN_ENABLED", "RESUR
 	"PLAYER_ALIVE", "PLAYER_UNGHOST", "CHAT_MSG_TEXT_EMOTE", "PLAYER_STOPPED_MOVING", "CONFIRM_SUMMON",
 	"TRADE_SHOW", "UI_INFO_MESSAGE", "GROUP_ROSTER_UPDATE", "UNIT_LEVEL", "ENCOUNTER_END", "LOADING_SCREEN_ENABLED",
 	"LOADING_SCREEN_DISABLED", "CHAT_MSG_ACHIEVEMENT", "CHAT_MSG_GUILD_ACHIEVEMENT", "PLAYER_LEVEL_UP",
-	"NAME_PLATE_UNIT_ADDED", "UPDATE_MOUSEOVER_UNIT", "PLAYER_TARGET_CHANGED" }) do
+	"NAME_PLATE_UNIT_ADDED", "UPDATE_MOUSEOVER_UNIT", "PLAYER_TARGET_CHANGED", "UNIT_TARGET",
+	"NAME_PLATE_UNIT_REMOVED" }) do
 	pcall(watcher.RegisterEvent, watcher, event)
 end
 pcall(watcher.RegisterUnitEvent, watcher, "UNIT_AURA", "player")
 watcher:SetScript("OnEvent", function(_, event, ...)
 	if event == "UNIT_AURA" then
 		AurasChanged(select(2, ...))
+	elseif event == "UNIT_TARGET" or event == "NAME_PLATE_UNIT_REMOVED" then
+		nameLink.Stalking(Plain((...)), event)
 	elseif event == "CHAT_MSG_TEXT_EMOTE" then
 		local text, author = ...
 		EchoOwn(text, author, (select(12, ...)))
@@ -2502,6 +2681,8 @@ watcher:SetScript("OnEvent", function(_, event, ...)
 				or (event == "UPDATE_MOUSEOVER_UNIT" and "mouseover" or "target")
 			if unit then Spotted(unit) end
 		end
+		-- (A new plate may already have you targeted.)
+		if event == "NAME_PLATE_UNIT_ADDED" then nameLink.Stalking(Plain((...)), event) end
 		if event == "PLAYER_TARGET_CHANGED" then GazeTargetChanged() end
 	elseif event == "LOADING_SCREEN_ENABLED" then
 		loading = true
@@ -2531,15 +2712,16 @@ end)
 ---------------------------------------------------------------------------
 -- The page's test and mover.
 
--- Test: each moment's pretend card in turn (the next moment ticked on).
+-- Test: each moment's pretend card in turn (the next moment ticked on), or
+-- the one whose id is given (a moment's own Test button, ticked on or not).
 local nextSample = 1
-function ns.TestEmoteVision()
+function ns.TestEmoteVision(id)
 	local db = DB()
-	local kind
-	for _ = 1, #MOMENTS do
+	local kind = id and MOMENT[id]
+	for _ = 1, kind and 0 or #MOMENTS do
 		local each = MOMENTS[nextSample]
 		nextSample = nextSample % #MOMENTS + 1
-		if db[each.on] and #EmotesFor(each.id, each.sample.same) > 0 then
+		if db[each.on] and #EmotesFor(each.id, each.sample.same) > 0 and not (each.camp and not ns.HasCampBenefits()) then
 			kind = each
 			break
 		end
@@ -2570,8 +2752,8 @@ function ns.TestEmoteVision()
 	end
 	if not Show(moment) then
 		-- (No moment with emotes on: the first one's as they come, so Test
-		-- still shows one.)
-		local first = MOMENTS[1]
+		-- still shows one; a moment's own Test, its own as they come.)
+		local first = id and MOMENT[id] or MOMENTS[1]
 		moment.kind, moment.emotes = first.id, ParseEmotes(DEFAULTS[first.key])
 		Show(moment)
 	end
@@ -2616,10 +2798,15 @@ end
 function ns.RefreshEmoteVision()
 	if not card then return end
 	if not ns.Setting("emoteVision") then
-		moving = nil
-		wipe(queue)
-		card:Hide()
-		return
+		-- (Out of CineMode, the campfire cards (anyMode) stay; the rest go.)
+		for i = #queue, 1, -1 do
+			if not ns.EmoteVisionOnFor(queue[i].kind) then table.remove(queue, i) end
+		end
+		if not (showing and not showing.test and ns.EmoteVisionOnFor(showing.kind)) then
+			moving = nil
+			card:Hide()
+			return
+		end
 	end
 	-- (Up: drawn again in the look now, its time and fade kept.)
 	if card:IsShown() and showing and not card.leaving then
@@ -2850,10 +3037,10 @@ function ns.EmoteVisionDebug()
 	ns.Print(("  aura events %d, last: %s; buffs' end times known %d"):format(auraSeen.events,
 		auraSeen.last or "none", known))
 	ns.Print("  last buff: " .. (lastBuff or "none yet") ..
-		(" (refreshes tracked: %s; friendly player plates %s, held for buffs %s)"):format(
+		(" (refreshes tracked: %s; friendly player plates %s, held for the Nameplates tab's cards %s)"):format(
 			C_UnitAuras and C_UnitAuras.GetAuraDataByAuraInstanceID and "yes" or "no, old client",
 			tostring(GetCVar("nameplateShowFriendlyPlayers")),
-			tostring(ns.plates and ns.plates.friendWants and ns.plates.friendWants.buffCard)))
+			tostring(ns.plates and ns.plates.friendWants and ns.plates.friendWants.plateCards)))
 	if lastEcho then
 		ns.Print(("  last button: %s %d s ago; test %s; words only %s; %s; own line caught: %s%s"):format(
 			lastEcho.token, GetTime() - lastEcho.at, tostring(lastEcho.test), tostring(lastEcho.words),
@@ -2921,13 +3108,47 @@ function ns.EmoteVisionFake(word)
 	C_Timer.After(1, function() nameLink.Report("fakeemote: ") end)
 end
 
+-- /cine debug fakebuff [e]: a player near you "buffs" you: their Buff card,
+-- its buttons acting as if their plate had gone (no unit): the game's emote
+-- at them by name, or with e your own /e line. A click plays it for real.
+function ns.EmoteVisionFakeBuff(mode)
+	local units = { "target", "mouseover" }
+	for i = 1, 40 do units[#units + 1] = "nameplate" .. i end
+	local found
+	for _, unit in ipairs(units) do
+		if ns.Flag(UnitExists(unit)) and ns.Flag(UnitIsPlayer(unit)) and not ns.Flag(UnitIsUnit(unit, "player")) then
+			local first, last = UnitName(unit)
+			first, last = Plain(first), Plain(last)
+			local guid = Plain(UnitGUID(unit))
+			if type(first) == "string" and guid then
+				local full = first
+				if type(last) == "string" and last ~= "" then full = first .. "-" .. last:gsub(" ", "") end
+				found = { unit = unit, guid = guid, full = full }
+				break
+			end
+		end
+	end
+	if not found then
+		ns.Print("fakebuff: no player near you (target one, or stand where their nameplate shows)")
+		return
+	end
+	ns.Print(("fakebuff: %s (%s), Emote Vision %s, Buff row %s, waiting: %s; click Thank on the card"):format(
+		found.full, found.unit, ns.Setting("emoteVision") and "on" or "off", DB().emoteVisionBuffs and "on" or "off",
+		tostring(WhyWaiting({ kind = "Buff" }) or "no")))
+	lastFrom["Buff:" .. found.guid] = nil
+	Fire({ kind = "Buff", name = nameLink.Shown(found.full) or "?", fullName = found.full, guid = found.guid,
+		class = ClassOf(found.guid, found.unit), noUnit = true, ownLine = mode == "e",
+		line = L["gave you %s"]:format("Fake Blessing") })
+end
+
 ---------------------------------------------------------------------------
 -- The pages (Visions, World): Vision (when it shows) and Style (how it
 -- looks), two folder tabs.
 
 local function Tabs(content, title, picked)
 	local panel = ns.PageTabs(content, {
-		{ L["Vision"], "Emote Vision", L["Turning it on, the moments a card shows for and each one's emotes."] },
+		{ L["Works Everywhere"], "Emote Vision", L["Turning it on, the moments a card shows for and each one's emotes."] },
+		{ L["Nameplates Required"], "Emote Vision Nameplates", L["The cards that need the other player's nameplate: CineMode keeps it for them."] },
 		{ L["Settings"], "Emote Vision Settings", L["Which cards to skip, how long they stay, and the player menu."] },
 		{ L["Look"], "Emote Vision Style", L["Its style, words, frame and face, and where it sits."] },
 	}, picked)
@@ -3435,7 +3656,11 @@ do
 		end
 	end
 end
-local function MomentsGrid(kit, content, stack)
+local function MomentsGrid(kit, content, stack, plates)
+	-- (plates: the Nameplates tab's, the moments with plates = true; else the rest.)
+	local function Here(moment) return (moment.plates or false) == (plates or false) end
+	-- (Its page on: Emote Vision's switch, and the Nameplates tab's for its own.)
+	local function Live() return On() and (not plates or ns.PageOn("emoteVisionPlates")) end
 	local box = CreateFrame("Frame", nil, content)
 	box:SetSize(GRID_W, 40)
 	stack:Add(box, "label")
@@ -3469,7 +3694,7 @@ local function MomentsGrid(kit, content, stack)
 	local WHEN_LABEL_W = 60
 	local whens = {}
 	for _, moment in ipairs(MOMENTS) do
-		if not moment.soon then
+		if not moment.soon and Here(moment) then
 			local key = RowKey(moment.id)
 			kit.RecordKey(content, AlwaysKey(moment.id))
 			for _, list in ipairs({ "combatShow", "calmShow", "quietShow", "camShow", "enemyShow", "friendlyShow",
@@ -3493,11 +3718,46 @@ local function MomentsGrid(kit, content, stack)
 			menus = parts.menus,
 			rule = { key = Key, label = function() return L[moment.name] end, grid = parts.grid,
 				words = parts.words, apply = parts.apply },
-			enabled = function() return On() and DB()[moment.on] and true or false end,
+			enabled = function() return Live() and DB()[moment.on] and true or false end,
 			changed = Changed,
 		})
 		whens[moment.id] = { label = label, row = row }
 		return whens[moment.id]
+	end
+
+	-- The campfire moment's own settings, in its open section under When (once
+	-- the Campfire button's, on the Quality of Life page). Built once.
+	-- (Its keys the page's from the start, for its Reset: the frame's made
+	-- only when first opened.)
+	for _, key in ipairs({ "emoteVisionCampfireButton", "campfireReach", "campfireReachGrow", "campfireNames" }) do
+		kit.RecordKey(content, key)
+	end
+	local fire
+	local function FireSettings()
+		if fire then return fire end
+		fire = CreateFrame("Frame", nil, box)
+		fire.recordAs = content
+		fire:SetSize(GRID_W - 26, 142)
+		local function Live() return On() and DB()[MOMENT.Campfire.on] and true or false end
+		local button = kit.Check(fire, "emoteVisionCampfireButton", L["Fire button at the cursor"],
+			L["A fire icon under the cursor too: click it to do one of this card's emotes."])
+		button:SetPoint("TOPLEFT", fire, "TOPLEFT", 0, 0)
+		kit.GreyUnless(button, Live)
+		local reach = kit.Slider(fire, "campfireReach", L["Cursor reach from the middle"], 5, 50, 1, "%d%%", 100)
+		reach:SetPoint("TOPLEFT", button, "BOTTOMLEFT", 4, -20)
+		kit.Tooltip(reach, L["How close to the middle of the screen the cursor must be on a campfire."])
+		kit.GreyUnless(reach, Live)
+		local grow = kit.Check(fire, "campfireReachGrow", L["Reach widens the longer you hover"],
+			L["The longer you hover a campfire, the further from the middle it may be."])
+		grow:SetPoint("TOPLEFT", reach, "BOTTOMLEFT", -4, -8)
+		kit.GreyUnless(grow, Live)
+		local label = kit.Label(fire, "GameFontHighlightSmall", L["Campfire names:"])
+		label:SetPoint("TOPLEFT", grow, "BOTTOMLEFT", 4, -6)
+		local names = kit.ListBox(fire, "campfireNames", 300,
+			L["Words in a name that mark it as a campfire, separated by commas."])
+		names:SetPoint("TOPLEFT", label, "BOTTOMLEFT", 2, -4)
+		kit.GreyUnless(names, Live)
+		return fire
 	end
 
 	local heads, rows, groupTitles = {}, {}, {}
@@ -3522,9 +3782,13 @@ local function MomentsGrid(kit, content, stack)
 		head.name:SetPoint("LEFT", head.check, "RIGHT", 2, 0)
 		head.count = kit.Label(head, "GameFontDisableSmall", "")
 		head.count:SetPoint("RIGHT", -8, 0)
+		-- (Its Test: this moment's pretend card. Works with the page off too.)
+		head.test = SmallButton(head, L["Test"], 44)
+		head.test:SetPoint("RIGHT", head.count, "LEFT", -8, 0)
+		kit.Tooltip(head.test, L["Shows this moment's card; with someone targeted, its buttons emote at them."])
 		head.summary = kit.Label(head, "GameFontDisableSmall", "")
 		head.summary:SetPoint("LEFT", head.name, "RIGHT", 10, 0)
-		head.summary:SetPoint("RIGHT", head.count, "LEFT", -8, 0)
+		head.summary:SetPoint("RIGHT", head.test, "LEFT", -8, 0)
 		head.summary:SetJustifyH("LEFT")
 		head.summary:SetWordWrap(false)
 		-- (A click on the band itself opens or closes it too.)
@@ -3561,20 +3825,28 @@ local function MomentsGrid(kit, content, stack)
 	kit.Tooltip(defaults, L["Every moment's emotes as they come."])
 	defaults:SetScript("OnClick", function()
 		local db = ns.GetDB()
-		for _, moment in ipairs(MOMENTS) do db[moment.key] = DEFAULTS[moment.key] end
+		for _, moment in ipairs(MOMENTS) do
+			if Here(moment) then db[moment.key] = DEFAULTS[moment.key] end
+		end
 		Changed()
 		Rebuild()
 	end)
 
 	function Rebuild()
 		local db = DB()
-		local pageOn = On() and true or false
+		local pageOn = Live() and true or false
 		for _, head in ipairs(heads) do head:Hide() head.add:Hide() end
 		for _, row in ipairs(rows) do row:Hide() end
 		for _, title in ipairs(groupTitles) do title:Hide() end
 		for _, when in pairs(whens) do when.label:Hide() when.row:Hide() end
+		if fire then fire:Hide() end
+		-- (Camp Benefits' only where the game has it.)
+		local listed = {}
+		for _, moment in ipairs(MOMENTS) do
+			if Here(moment) and not (moment.camp and not ns.HasCampBenefits()) then listed[#listed + 1] = moment end
+		end
 		local y, n, lastGroup, g = 0, 0, nil, 0
-		for i, moment in ipairs(MOMENTS) do
+		for i, moment in ipairs(listed) do
 			-- (A header over each group's moments.)
 			if moment.group ~= lastGroup then
 				lastGroup, g = moment.group, g + 1
@@ -3607,6 +3879,7 @@ local function MomentsGrid(kit, content, stack)
 			kit.Tooltip(head.check, L[moment.tip])
 			local list = List(moment)
 			head.count:SetText(("%d/%d"):format(#list, MAX_EMOTES))
+			head.test:SetScript("OnClick", function() ns.TestEmoteVision(moment.id) end)
 			local open = pageOn and momentOn
 			local expanded = opened[moment.id] and true or false
 			head.toggle:SetText(expanded and "-" or "+")
@@ -3630,6 +3903,14 @@ local function MomentsGrid(kit, content, stack)
 				when.row:Show()
 				when.row:Refresh()
 				y = y + 28
+			end
+			-- (The campfire's: its reach and names, then its emotes.)
+			if expanded and moment.campfire then
+				local settings = FireSettings()
+				settings:ClearAllPoints()
+				settings:SetPoint("TOPLEFT", box, "TOPLEFT", 26, -y)
+				settings:Show()
+				y = y + settings:GetHeight()
 			end
 			for k, token in ipairs(expanded and list or {}) do
 				n = n + 1
@@ -3715,11 +3996,8 @@ function ns.CreateEmoteVisionPanel(kit)
 	local stack = kit.Stack(switch, "check")
 
 	-- (Where each moment shows: its When line, in its section below.)
-	local moments = stack:Header(content, L["Moments"])
-	local test = TestButton(content)
-	-- (After the "?" its help puts beside it, 6 + 18 wide: PageIntro's.)
-	test:SetPoint("LEFT", moments, "RIGHT", 36, 0)
-	kit.Tooltip(test, L[TEST_TIP])
+	-- (Each moment's own Test is on its band.)
+	stack:Header(content, L["Moments"])
 	stack:Help(content, L["Pick the moments that show a card and the emotes on it."])
 	MomentsGrid(kit, content, stack)
 
@@ -3728,11 +4006,31 @@ function ns.CreateEmoteVisionPanel(kit)
 	kit.RegisterSubpage(canvas, "Emote Vision")
 end
 
+-- Nameplates: the cards that need the other player's plate (plates = true).
+-- No Always on its row in the hub: CineMode keeps friendly players' plates
+-- for them; outside it they come only while your own plates show.
+function ns.CreateEmoteVisionPlatesPanel(kit)
+	local canvas, content = kit.CreateScrollPage()
+	local title = kit.Label(content, "GameFontNormalLarge", L["Emote Vision"])
+	Tabs(content, title, 2)
+	local intro = kit.PageIntro(content, title,
+		L["These cards need the other player's nameplate. CineMode keeps friendly players' nameplates for them, hidden; outside it they show only while your friendly nameplates are on."])
+	local switch = kit.PageSwitch(content, "emoteVisionPlates", L["Enable Page"],
+		L["Turns these cards on or off."], intro, Changed)
+	local stack = kit.Stack(switch, "check")
+	stack:Header(content, L["Moments"])
+	MomentsGrid(kit, content, stack, true)
+
+	canvas:SetScript("OnShow", kit.PageShown(kit.Refresh, content))
+	canvas:Hide()
+	kit.RegisterSubpage(canvas, "Emote Vision Nameplates")
+end
+
 -- Settings: when the cards show, and for how long.
 function ns.CreateEmoteVisionSettingsPanel(kit)
 	local canvas, content = kit.CreateScrollPage()
 	local title = kit.Label(content, "GameFontNormalLarge", L["Emote Vision"])
-	Tabs(content, title, 2)
+	Tabs(content, title, 3)
 	local intro = kit.PageIntro(content, title,
 		L["When the cards show and for how long."])
 	-- (Off: every setting here as it starts: Opt.)
@@ -3904,7 +4202,7 @@ end
 function ns.CreateEmoteVisionStylePanel(kit)
 	local canvas, content = kit.CreateScrollPage()
 	local title = kit.Label(content, "GameFontNormalLarge", L["Emote Vision"])
-	Tabs(content, title, 3)
+	Tabs(content, title, 4)
 	local intro = kit.PageIntro(content, title,
 		L["Pick its style, look and position."])
 	-- (Off: the card's style, words, frame and spot as they start: Look and Opt.)

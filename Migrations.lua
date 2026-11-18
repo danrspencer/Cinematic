@@ -1807,19 +1807,9 @@ STEPS[#STEPS + 1] = function()
 	-- on to start with again since 2026-11-12, with eating, casting and
 	-- crafting left alone; the old turn-off no longer runs, so new players
 	-- keep it on.)
-	-- Back on once for everyone it was turned off for (2026-11-12): eating,
-	-- casting and crafting no longer get cut short. Once: untick it and it
-	-- stays off.
-	if not ns.db.campfireStandUpOnV2 then
-		ns.db.campfireStandUp = true
-		for _, saved in pairs(type(ns.db.profiles) == "table" and ns.db.profiles or {}) do
-			if type(saved) == "table" then
-				saved.campfireStandUp = nil
-				if type(saved.settings) == "table" then saved.settings.campfireStandUp = nil end
-			end
-		end
-		ns.db.campfireStandUpOnV2 = true
-	end
+	-- (campfireStandUpOnV2, 2026-11-12, turned it back on once for everyone.
+	-- Gone since 2026-11-17: the stand-up is Emote Vision's Camp Benefits
+	-- card now, campfireStandUp cleared in step 29.)
 	-- Boss defeated's card waits till after the fight now (it showed in the
 	-- middle of it, with adds still up). Once: pick Show again and it stays.
 	if not ns.db.bossDownWaitV1 then

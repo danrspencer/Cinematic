@@ -326,7 +326,7 @@ local BUILT_IN = {
 	{ "AFK", "Go AFK", "You're flagged AFK", "Spell_Nature_Sleep", "Resting", "state", "afk" },
 	{ "Campfire", "Campfire", "Resting with a campfire buff", "Spell_Fire_Fire", "Resting", "aura", "campfire" },
 	{ "Sit", "/sit", "You sit (or press the sit key)", "Spell_Holy_PrayerOfFortitude", "Resting", "emote", "emote" },
-	{ "SitButton", "Campfire button", "You press Cinematic's campfire button", "Spell_Fire_Fire", "Resting", "key",
+	{ "SitButton", "Campfire card", "You sit by a fire from its card or fire button", "Spell_Fire_Fire", "Resting", "key",
 		"emote" },
 	{ "Sleep", "/sleep", "You /sleep or /lie down", "Spell_Nature_Sleep", "Resting", "emote", "emote" },
 	{ "Chair", "Chair", "You sit in a chair or on a bench", "INV_Misc_Bag_07", "Resting", "state", "emote" },

@@ -95,8 +95,8 @@ local turnKeys = { left = false, right = false }
 ns.EVENTS = {
 	{ key = "Campfire", label = L["Resting with a listed buff (campfire)"], camera = "cozy", stopsOnMove = true },
 	{ key = "Sit", label = L["/sit (or press the sit key)"], camera = "vista" },
-	-- Sitting down with Campfire.lua's Sit button.
-	{ key = "SitButton", label = L["Campfire button"], camera = "cozy" },
+	-- Sitting down from Emote Vision's campfire card (key kept from its old Campfire button).
+	{ key = "SitButton", label = L["Campfire card"], camera = "cozy" },
 	{ key = "Sleep", label = L["/sleep or /lie down"], camera = "cozy" },
 	{ key = "Dance", label = L["/dance"], camera = "cozy" },
 	{ key = "Kneel", label = L["/kneel"], camera = "cozy" },
@@ -221,11 +221,11 @@ local EMOTE_EVENTS = {
 }
 local emoteEvent -- the event for the emote (or seat) you're doing, or nil
 -- Whether you're sitting or lying down (an emote, the sit key or a seat), as
--- far as the emotes followed here can tell (Campfire.lua's Sit button).
+-- far as the emotes followed here can tell (the campfire card's too).
 function ns.IsSitting()
 	return emoteEvent == "Sit" or emoteEvent == "SitButton" or emoteEvent == "Sleep" or emoteEvent == "Chair"
 end
--- The emote just done (sit, kneel or lie down) was the Campfire button's: its
+-- The emote just done (sit, kneel or lie down) was the campfire card's: its
 -- own event, not the emote's.
 function ns.SatByButton()
 	if emoteEvent == "Sit" or emoteEvent == "Kneel" or emoteEvent == "Sleep" then
@@ -2114,7 +2114,7 @@ do
 			local e = ns.lastEmote
 			local detail = e and ("%s via %s, %.0f sec ago"):format(tostring(e.token), tostring(e.via), now - e.at)
 				or "no emote seen"
-			return key == "SitButton" and ("Campfire button, " .. detail) or detail
+			return key == "SitButton" and ("campfire card, " .. detail) or detail
 		end
 		return ns.CustomTriggerDetail and ns.CustomTriggerDetail(key) or "-"
 	end

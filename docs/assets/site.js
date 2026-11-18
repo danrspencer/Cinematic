@@ -45,7 +45,7 @@
     { section: "guides", path: "guides/chat-and-quests.html", title: "Chat and quests",
       line: "Chat that peeks in, chat bubbles, and quest dialogue as bubbles and cards." },
     { section: "guides", path: "guides/quality-of-life.html", title: "Quality of life",
-      line: "The campfire button, fishing casts, hunter ammo, the talent calculator and more." },
+      line: "Fishing casts, hunter ammo, the talent calculator and more." },
     { section: "guides", path: "guides/other-addons.html", title: "Other addons",
       line: "Addons handled out of the box, and Add mode for the rest." },
     { section: "guides", path: "guides/gamepad.html", title: "Gamepad",

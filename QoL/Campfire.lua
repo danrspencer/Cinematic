@@ -1,9 +1,20 @@
--- Cinematic: the Campfire button. Hovering a campfire with the cursor near
--- the middle of the screen, standing still, brings up a campfire icon right
--- under the cursor; clicking it sits, kneels or lies down (as ticked), so you
--- needn't type the emote. Moving the cursor off it, or moving, puts it away.
--- (campfireSitButton, on the Quality of life page.)
+-- Cinematic: campfires. Hovering one with the cursor near the middle of the
+-- screen, standing still, signals CAMPFIRE_REST (Emote Vision's campfire
+-- card; triggers) and, with the card's Fire button at the cursor on, brings
+-- up a campfire icon right under the cursor: clicking it plays one of the
+-- card's emotes (sit, kneel, lie down...), so you needn't type it. Moving the
+-- cursor off it, or moving, puts it away; moving away signals CAMPFIRE_LEFT.
+-- Camp Benefits arriving signals CAMP_BENEFITS (its card: a Stand button),
+-- and CAMP_BENEFITS_DONE once you're up or moving. Also the Camp Tent beside
+-- a fire, for the cozy camera. (The settings: the campfire card's, on the
+-- Emote Vision page.)
 local ADDON_NAME, ns = ...
+
+-- Whether the fire button shows: the campfire card on (CineMode or not) and
+-- its Fire button at the cursor ticked (EmoteVision.lua, loaded after this).
+local function ButtonOn()
+	return ns.CampfireButtonOn ~= nil and ns.CampfireButtonOn()
+end
 
 -- A campfire's name in each game language (the game's own, whatever language
 -- Cinematic shows): campfireNames' default. Any world tooltip with one of its
@@ -166,7 +177,7 @@ end
 -- with any = true, nothing listening for CAMPFIRE_REST either), or you're
 -- sitting, fighting, casting, mounted...
 local function CanSit(any)
-	if not (ns.Setting("campfireSitButton") or (any and ns.SignalWanted("CAMPFIRE_REST"))) then
+	if not (ButtonOn() or (any and ns.SignalWanted("CAMPFIRE_REST"))) then
 		return false
 	end
 	if (ns.IsSitting and ns.IsSitting()) or Casting() or InCombatLockdown() or ns.Flag(UnitAffectingCombat("player")) or ns.Flag(UnitIsDeadOrGhost("player"))
@@ -177,18 +188,10 @@ local function CanSit(any)
 	return true
 end
 
--- The emotes the button can do (campfireSit, campfireKneel, campfireLie): one
--- of those ticked, at random; sitting if none is.
-local EMOTES = { { key = "campfireSit", token = "SIT" }, { key = "campfireKneel", token = "KNEEL" },
-	{ key = "campfireLie", token = "LAYDOWN" } }
-local picks = {}
+-- What the button does: one of the campfire card's emotes, at random;
+-- sitting if it has none.
 local function Sit()
-	wipe(picks)
-	for _, emote in ipairs(EMOTES) do
-		if ns.db[emote.key] then
-			picks[#picks + 1] = emote.token
-		end
-	end
+	local picks = ns.EmoteVisionEmotes and ns.EmoteVisionEmotes("Campfire") or {}
 	local token = picks[1] and picks[math.random(#picks)] or "SIT"
 	if C_ChatInfo and C_ChatInfo.PerformEmote then
 		pcall(C_ChatInfo.PerformEmote, token)
@@ -470,7 +473,7 @@ local function OnUpdate(_, elapsed)
 			onFireSince = nil
 		end
 		if not CanSit(true) then
-			if alpha == 0 and not blockedLogged and ns.Setting("campfireSitButton") and TooltipIsCampfire() then
+			if alpha == 0 and not blockedLogged and ButtonOn() and TooltipIsCampfire() then
 				blockedLogged = true
 				ns.Log("campfire", ("on a campfire, but no button: sitting %s, casting %s, combat %s, mounted %s, dead %s, " ..
 					"taxi %s, vehicle %s"):format(tostring(ns.IsSitting and ns.IsSitting()), tostring(Casting()),
@@ -634,31 +637,40 @@ local driver = CreateFrame("Frame")
 ns.FeatureLoop(driver, ns.Profiled("Campfire sit button", OnUpdate), function()
 	if alpha > 0 or cozy.on then return true end
 	if not ns.db then return false end
-	return ns.Setting("campfireSitButton") or not ns.db.sceneOffCampfire or ns.SignalWanted("CAMPFIRE_REST")
+	return ButtonOn() or not ns.db.sceneOffCampfire or ns.SignalWanted("CAMPFIRE_REST")
 end)
 
 GameTooltip:HookScript("OnShow", OnTooltipShow)
 
--- Standing up once the camp is done (campfireStandUp): sitting by a Welcoming
--- Campfire for its minute gives Camp Benefits, or renews it if you have it
--- already. As it arrives, or its end moves later, you stand. Not as you log
--- in or reload with it already on you.
+-- Camp Benefits: sitting by a Welcoming Campfire for its minute gives it, or
+-- renews it if you have it already. As it arrives, or its end moves later,
+-- CAMP_BENEFITS (Emote Vision's card: a Stand button, so you get up when you
+-- choose). Not as you log in or reload with it already on you. Then
+-- CAMP_BENEFITS_DONE once you're up (sitting as it came, not now) or moving.
 local CAMP_BENEFITS = 1229741 -- Camp Benefits' spell ID
 local RENEWED = 5 -- seconds its end must move later by to count as renewed
 local campBenefitsName -- (by name where the game can't look up an aura by ID)
 
+-- Camp Benefits' name in the game's language, or nil where this client has
+-- none.
+local function CampBenefitsName()
+	local ok, name = pcall(function()
+		if C_Spell and C_Spell.GetSpellName then
+			return C_Spell.GetSpellName(CAMP_BENEFITS)
+		end
+		return (GetSpellInfo(CAMP_BENEFITS))
+	end)
+	if ok and type(name) == "string" and not (issecretvalue and issecretvalue(name)) then
+		return name
+	end
+end
+
 -- Whether this client has Camp Benefits at all (WoW Forever's Welcoming
--- Campfire): the stand-up option shows only then.
-local hasCampBenefits -- (looked up once)
+-- Campfire): its card shows only then.
+local hasCampBenefits -- (looked up until found)
 function ns.HasCampBenefits()
-	if hasCampBenefits == nil then
-		local ok, name = pcall(function()
-			if C_Spell and C_Spell.GetSpellName then
-				return C_Spell.GetSpellName(CAMP_BENEFITS)
-			end
-			return (GetSpellInfo(CAMP_BENEFITS))
-		end)
-		hasCampBenefits = ok and type(name) == "string" and not (issecretvalue and issecretvalue(name))
+	if not hasCampBenefits then
+		hasCampBenefits = CampBenefitsName() ~= nil
 	end
 	return hasCampBenefits
 end
@@ -679,15 +691,7 @@ local function CampBenefits()
 		end
 		return false
 	end
-	if not campBenefitsName then
-		local ok, name = pcall(function()
-			if C_Spell and C_Spell.GetSpellName then
-				return C_Spell.GetSpellName(CAMP_BENEFITS)
-			end
-			return (GetSpellInfo(CAMP_BENEFITS))
-		end)
-		campBenefitsName = ok and type(name) == "string" and name or "Camp Benefits"
-	end
+	campBenefitsName = campBenefitsName or CampBenefitsName() or "Camp Benefits"
 	if AuraUtil and AuraUtil.FindAuraByName then
 		local ok, found, _, _, _, _, ends = pcall(AuraUtil.FindAuraByName, campBenefitsName, "player", "HELPFUL")
 		if ok and found ~= nil then
@@ -697,94 +701,31 @@ local function CampBenefits()
 	return false
 end
 
-local function StandUp()
-	local ok, err
-	if C_ChatInfo and C_ChatInfo.PerformEmote then
-		ok, err = pcall(C_ChatInfo.PerformEmote, "STAND")
-	elseif DoEmote then
-		ok, err = pcall(DoEmote, "STAND")
-	end
-	ns.Log("campfire", ("stand up: %s %s"):format(tostring(ok), ok and "" or tostring(err)))
+-- After CAMP_BENEFITS: watched every half second till you're up or moving.
+local campWatch -- { ticker, sat = sitting as it came }
+local function StopCampWatch(why)
+	if not campWatch then return end
+	campWatch.ticker:Cancel()
+	campWatch = nil
+	ns.Log("campfire", "CAMP_BENEFITS_DONE: " .. why)
+	ns.Signal("CAMP_BENEFITS_DONE")
 end
-
--- Eating or drinking: sitting down to eat by a campfire can bring Camp
--- Benefits too, and standing then stops the food (a player had to click it
--- twice). Food and drink are spells you cast whose buff of the same ID lasts
--- while you sit, half a minute or less: one of your last few casts still on
--- you that short means you're eating. (By spell ID: no food names to match
--- in every game language.)
-local EAT_LONGEST = 35 -- seconds: food and drink buffs are this long or shorter
-local recentCasts = {} -- the last few spell IDs you cast, newest first
-local BUSY_FOR = 10 -- seconds after your last cast you still count as busy
-local lastCast, lastCastID -- when you last started or finished a cast, and what
-local function NoteCast(spellID)
-	if type(spellID) ~= "number" or (issecretvalue and issecretvalue(spellID)) then
-		spellID = nil
+local function WatchStandUp()
+	if ns.playerMoving then
+		StopCampWatch("moving")
+	elseif campWatch.sat and not (ns.IsSitting and ns.IsSitting()) then
+		StopCampWatch("stood up")
+	elseif GetTime() - campWatch.at > 120 then
+		StopCampWatch("two minutes on")
 	end
-	-- (Camp Benefits itself, should the game cast it on you, isn't you busy.)
-	if spellID == CAMP_BENEFITS then
-		return
-	end
-	lastCast, lastCastID = GetTime(), spellID
-	if spellID and spellID ~= recentCasts[1] then
-		table.insert(recentCasts, 1, spellID)
-		recentCasts[5] = nil
-	end
-end
-
--- Doing something else as Camp Benefits arrives: casting or channeling
--- (crafting), a cast in the last few seconds (between crafts, a hearth, a
--- mount), or a profession window open. Standing then would cut it short or
--- get in the way. Returns the reason for the log.
-local CRAFT_WINDOWS = { "ProfessionsFrame", "TradeSkillFrame", "CraftFrame" }
-local function Busy()
-	local ok, casting = pcall(function()
-		return (UnitCastingInfo and UnitCastingInfo("player")) or (UnitChannelInfo and UnitChannelInfo("player"))
-	end)
-	if ok and casting ~= nil then
-		return "casting"
-	end
-	if lastCast and GetTime() - lastCast < BUSY_FOR then
-		return ("cast spell %s %.1f sec ago"):format(tostring(lastCastID), GetTime() - lastCast)
-	end
-	for _, name in ipairs(CRAFT_WINDOWS) do
-		local frame = _G[name]
-		if frame and frame.IsShown and frame:IsShown() then
-			return name .. " open"
-		end
-	end
-end
-local function Eating()
-	if not (C_UnitAuras and C_UnitAuras.GetPlayerAuraBySpellID) then
-		return false
-	end
-	for _, spellID in ipairs(recentCasts) do
-		local ok, aura = pcall(C_UnitAuras.GetPlayerAuraBySpellID, spellID)
-		if ok and type(aura) == "table" then
-			local okLong, long = pcall(function() return aura.duration end)
-			long = okLong and Number(long) or nil
-			-- (How long unknown: taken as food, better to stay sat.)
-			if not long or (long > 0 and long <= EAT_LONGEST) then
-				return true, spellID
-			end
-		end
-	end
-	return false
 end
 
 local had, hadEnds -- nil until the first look after loading in
 local campWatcher = CreateFrame("Frame")
 campWatcher:RegisterUnitEvent("UNIT_AURA", "player")
-campWatcher:RegisterUnitEvent("UNIT_SPELLCAST_SUCCEEDED", "player")
-campWatcher:RegisterUnitEvent("UNIT_SPELLCAST_START", "player")
-campWatcher:RegisterUnitEvent("UNIT_SPELLCAST_CHANNEL_START", "player")
 campWatcher:RegisterEvent("PLAYER_ENTERING_WORLD")
-campWatcher:SetScript("OnEvent", ns.Profiled("UNIT_AURA (camp benefits)", function(_, event, _, _, spellID)
+campWatcher:SetScript("OnEvent", ns.Profiled("UNIT_AURA (camp benefits)", function(_, event)
 	if not ns.HasCampBenefits() then
-		return
-	end
-	if event ~= "UNIT_AURA" and event ~= "PLAYER_ENTERING_WORLD" then
-		NoteCast(spellID)
 		return
 	end
 	local has, ends = CampBenefits()
@@ -795,17 +736,10 @@ campWatcher:SetScript("OnEvent", ns.Profiled("UNIT_AURA (camp benefits)", functi
 			tostring(had), tostring(hadEnds), gained and ": gained" or ""))
 	end
 	had, hadEnds = has, ends
-	local db = ns.db
-	-- (It only comes while you sit, so no need to ask whether you are.)
-	if gained and ns.Setting("campfireSitButton") and db.campfireStandUp then
-		local eating, food = Eating()
-		local busy = not eating and Busy()
-		if eating then
-			ns.Log("campfire", ("stand up skipped: eating or drinking (spell %s)"):format(tostring(food)))
-		elseif busy then
-			ns.Log("campfire", "stand up skipped: " .. busy)
-		else
-			StandUp()
-		end
+	if gained and ns.SignalWanted("CAMP_BENEFITS") then
+		if campWatch then campWatch.ticker:Cancel() end
+		campWatch = { at = GetTime(), sat = ns.IsSitting and ns.IsSitting() or false }
+		campWatch.ticker = C_Timer.NewTicker(0.5, WatchStandUp)
+		ns.Signal("CAMP_BENEFITS")
 	end
 end))

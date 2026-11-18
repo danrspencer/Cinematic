@@ -60,8 +60,8 @@ Each situation has its own camera, and they hand over seamlessly:
 
 ## Quality of life (WoW Forever)
 
-* **Campfire button:** hover a campfire and click the icon at your cursor to sit, kneel or lie down by the fire (your pick, or at random between the ones you tick), no emote to type. It has its own camera trigger.
-* **Stand up with Camp Benefits:** once the buff arrives, you stand up again, ready to go.
+* **Campfire card:** hover a campfire and an Emote Vision card, and a fire button at your cursor, offer to sit, kneel or lie down by the fire, no emote to type. It has its own camera trigger.
+* **Camp Benefits card:** once the buff arrives, a card with a Stand button, so you get up when you're ready.
 * **Fishing:** cast with right-click or a gamepad button, in CineMode or not.
 * **Hunters** (Classic clients): the smallest ammo stack goes first after Clean Up Bags, and a Fill quiver button at vendors buys enough ammo to fill your quiver.
 

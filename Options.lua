@@ -2781,8 +2781,13 @@ do
 				section = "RP" }, -- (TeleportVision.lua; its tooltip: ns.TILE_TOOLTIPS)
 			{ "Emote Vision", "Interface\\Icons\\Spell_Holy_PrayerOfFortitude", section = "RP" }, -- (EmoteVision.lua)
 			{ "Emote Vision Settings", "Interface\\Icons\\Spell_Holy_PrayerOfFortitude", tabOf = "Emote Vision" },
+			-- (Its cards that need the other player's plate: EmoteVision.lua's moments with plates = true)
+			{ "Emote Vision Nameplates", "Interface\\Icons\\Spell_Holy_PrayerOfFortitude", tabOf = "Emote Vision",
+				label = "Requires CineMode or Visible Nameplates" },
 			-- (CardsPage.lua's: Battle Vision's and Story Vision's moments, one page)
 			{ "Card Vision", "Interface\\Icons\\INV_Misc_Book_09", section = "RP" },
+			-- (its Settings tab: what's for every card)
+			{ "Card General", "Interface\\Icons\\INV_Misc_Book_09", tabOf = "Card Vision", label = "Settings" },
 			-- (an event's own pages: not tabs on the page's, opened from its row)
 			{ "Card Settings", "Interface\\Icons\\INV_Misc_Book_09", tabOf = "Card Vision" },
 			{ "Card Style", "Interface\\Icons\\INV_Misc_Book_09", tabOf = "Card Vision" },
@@ -4448,6 +4453,9 @@ local function CreateRevealPanel()
 		["Roll Vision"] = { "outsideCineRoll" }, ["Teleport Vision"] = { "outsideCineTeleport" },
 		["Duel Vision"] = { "outsideCineDuel" }, ["Emote Vision"] = { "outsideCineEmote" },
 		["Card Vision"] = { "outsideCineCards" },
+		-- (No Always: its cards need a plate, which only CineMode keeps for
+		-- them; outside it they come only while your own plates show.)
+		["Emote Vision Nameplates"] = { cineOnly = true },
 	}
 	-- (Held to CineMode while Cameras is: their Always does nothing then.)
 	local CAMERA_HELD = { ["Shoulder Cam"] = true, ["Skyriding Cam"] = true }
@@ -4464,7 +4472,7 @@ local function CreateRevealPanel()
 	-- (Which is picked: 1 Off, 2 On or CineMode, 3 Always.)
 	local function Picked(entry, ticks)
 		if not entry.on then return 1 end
-		if not ticks then return 2 end
+		if not ticks or ticks.cineOnly then return 2 end
 		local db = ns.GetDB()
 		for _, tick in ipairs(ticks) do
 			if not TickOn(db, tick) then return 2 end
@@ -4480,24 +4488,9 @@ local function CreateRevealPanel()
 		if entry.fixed and (i == 1 or not row.ticks) then return L["On and off with the General page's switch."] end
 		if i == 3 and row.tickHeld then return L["Cameras (Camera tab) is set to CineMode."] end
 	end
-	-- (Always on these asks first: [its first tick] = the question.)
-	ns.ALWAYS_ASK = {
-		outsideCineEmote = L["Emote Vision is made for CineMode. Outside it, cards pop up during everyday play, and buffs from players with no nameplate showing make no card. Use it outside CineMode too?"],
-	}
-	StaticPopupDialogs["CINEMATIC_ALWAYS_ASK"] = {
-		text = "%s",
-		button1 = YES, button2 = NO,
-		OnAccept = function(_, data) data.Go() end,
-		timeout = 0, whileDead = true, hideOnEscape = true, preferredIndex = 3,
-	}
-	local function Choose(row, i, sure)
+	local function Choose(row, i)
 		local entry, ticks = row.entry, row.ticks
 		if Inert(row, i) then return end
-		if i == 3 and not sure and ticks and ns.ALWAYS_ASK[ticks[1]] and Picked(entry, ticks) ~= 3 then
-			StaticPopup_Show("CINEMATIC_ALWAYS_ASK", ns.ALWAYS_ASK[ticks[1]], nil,
-				{ Go = function() Choose(row, i, true) end })
-			return
-		end
 		if i == 1 then
 			if entry.on then row.flip(entry.name) end
 		else
@@ -4519,6 +4512,8 @@ local function CreateRevealPanel()
 		local tip
 		if i == 1 then
 			tip = L["This page does nothing."]
+		elseif i == 2 and row.ticks and row.ticks.cineOnly then
+			tip = L["Works while CineMode is on, and outside it while friendly nameplates show."]
 		elseif i == 2 then
 			tip = L["Works only while CineMode is on."]
 		else
@@ -4571,16 +4566,17 @@ local function CreateRevealPanel()
 			return
 		end
 		local pick = Picked(entry, row.ticks)
+		local last = row.ticks and row.ticks.cineOnly and 2 or #list
 		for i = #list, 1, -1 do
 			local choice = list[i]
-			if i < first then
+			if i < first or i > last then
 				choice:Hide()
 			else
 				choice:Show()
 				choice.label:SetText(CHOICES_CINE[i])
 				choice:SetWidth(math.max(38, math.ceil(choice.label:GetStringWidth()) + 16))
 				choice:ClearAllPoints()
-				if i == #list then
+				if i == last then
 					choice:SetPoint("RIGHT", row, "TOPRIGHT", -8, -row.mid)
 				else
 					choice:SetPoint("RIGHT", list[i + 1], "LEFT", 1, 0)
@@ -5993,7 +5989,7 @@ end
 local EVENT_TIPS = {
 	Campfire = L["Standing or sitting still with any of the buffs listed below (like Welcoming Campfire)."],
 	Sit = L["Doing the emote or pressing the sit key."],
-	SitButton = L["Clicking the Campfire button on the Quality of Life page."],
+	SitButton = L["Clicking Sit, Kneel or Lie down on the campfire card, or its fire button (Emote Vision)."],
 	Sleep = L["Doing the emote, until you move or jump."],
 	Dance = L["Doing the emote, until you move or jump."],
 	Kneel = L["Doing the emote, until you move or jump."],
@@ -9206,44 +9202,6 @@ local function CreateQualityPanel()
 	end)
 
 	local stack = Stack(switch, "check")
-	-- (Campfire.lua.)
-	do
-		local sit = stack:Add(Check(content, "campfireSitButton", L["Campfire button"],
-			L["Hover a campfire to show a button that sits you down by it."]), "check")
-		sit:HookScript("OnClick", Refresh) -- grey out / enable the options below
-		local EMOTE_TIP = L["What the Campfire button does; with several ticked, one is picked at random."]
-		-- (on one row, each right of the one before)
-		local previous
-		for _, emote in ipairs({ { "campfireSit", L["Sit"] }, { "campfireKneel", L["Kneel"] },
-			{ "campfireLie", L["Lie down"] } }) do
-			local check = Check(content, emote[1], emote[2], EMOTE_TIP)
-			if previous then
-				check:SetPoint("LEFT", previous.Text or previous.text, "RIGHT", 16, 0)
-			else
-				stack:Add(check, "check", 24)
-			end
-			GreyUnless(check, function(db) return db.campfireSitButton end)
-			previous = check
-		end
-		local reach = stack:Add(Slider(content, "campfireReach", L["Cursor reach from the middle"], 5, 50, 1,
-			L["%d%%"], 100), "slider", 24)
-		Tooltip(reach, L["How close to the middle of the screen the cursor must be on a campfire."])
-		GreyUnless(reach, function(db) return db.campfireSitButton end)
-		local grow = stack:Add(Check(content, "campfireReachGrow", L["Reach widens the longer you hover"],
-			L["The longer you hover a campfire, the further from the middle it may be."]), "check", 24)
-		GreyUnless(grow, function(db) return db.campfireSitButton end)
-		local NAMES_TIP = L["Words in a name that mark it as a campfire, separated by commas."]
-		local namesLabel = Label(content, "GameFontHighlightSmall", L["Campfire names:"])
-		stack:Add(namesLabel, "label", 24)
-		local names = stack:Add(ListBox(content, "campfireNames", 300, NAMES_TIP), "box", 24)
-		GreyUnless(names, function(db) return db.campfireSitButton end)
-		-- (Only where the game has Camp Benefits: WoW Forever.)
-		if ns.HasCampBenefits and ns.HasCampBenefits() then
-			local stand = stack:Add(Check(content, "campfireStandUp", L["Stand up once you get Camp Benefits"],
-				L["Stands you up once you get Camp Benefits."]), "check", 24)
-			GreyUnless(stand, function(db) return db.campfireSitButton end)
-		end
-	end
 	-- (DragEquip.lua.)
 	stack:Add(Check(content, "dragEquipCharacter", L["Open the character window when dragging gear out of your bags"],
 		L["Opens the character window when you drag gear out of your bags."]
@@ -20892,7 +20850,7 @@ ns.lowHealthKit = { CreateScrollPage = CreateScrollPage, Label = Label, PageShow
 	PageSwitch = PageSwitch, AddControl = function(control) controls[#controls + 1] = control end,
 	Header = Header, CreateKeybindButton = CreateKeybindButton, RefreshKeybinds = RefreshKeybinds,
 	StopListening = StopListening, FitContentHeight = FitContentHeight, SectionState = SectionState,
-	Choice = Choice, OpenColorPicker = OpenColorPicker, BoxLine = BoxLine, RecordKey = RecordKey,
+	Choice = Choice, OpenColorPicker = OpenColorPicker, BoxLine = BoxLine, RecordKey = RecordKey, ListBox = ListBox,
 	-- (fn after the page's Reset page has put its settings back)
 	OnReset = function(content, fn) resetHooks[content] = fn end }
 
@@ -21038,6 +20996,8 @@ ns.OnLanguage(function()
 		Lap("CreateEmoteVisionPanel")
 		ns.CreateEmoteVisionSettingsPanel(ns.lowHealthKit)
 		Lap("CreateEmoteVisionSettingsPanel")
+		ns.CreateEmoteVisionPlatesPanel(ns.lowHealthKit)
+		Lap("CreateEmoteVisionPlatesPanel")
 		ns.CreateEmoteVisionStylePanel(ns.lowHealthKit)
 		Lap("CreateEmoteVisionStylePanel")
 	end
