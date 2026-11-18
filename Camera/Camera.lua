@@ -225,6 +225,10 @@ local emoteEvent -- the event for the emote (or seat) you're doing, or nil
 function ns.IsSitting()
 	return emoteEvent == "Sit" or emoteEvent == "SitButton" or emoteEvent == "Sleep" or emoteEvent == "Chair"
 end
+-- Sitting, kneeling or lying down, and not moved since (Camp Benefits' card).
+function ns.IsResting()
+	return ns.IsSitting() or emoteEvent == "Kneel"
+end
 -- The emote just done (sit, kneel or lie down) was the campfire card's: its
 -- own event, not the emote's.
 function ns.SatByButton()

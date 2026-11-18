@@ -645,8 +645,8 @@ GameTooltip:HookScript("OnShow", OnTooltipShow)
 -- Camp Benefits: sitting by a Welcoming Campfire for its minute gives it, or
 -- renews it if you have it already. As it arrives, or its end moves later,
 -- CAMP_BENEFITS (Emote Vision's card: a Stand button, so you get up when you
--- choose). Not as you log in or reload with it already on you. Then
--- CAMP_BENEFITS_DONE once you're up (sitting as it came, not now) or moving.
+-- choose), only while you still sit, kneel or lie there. Not as you log in or
+-- reload with it already on you. Then CAMP_BENEFITS_DONE once you're up or moving.
 local CAMP_BENEFITS = 1229741 -- Camp Benefits' spell ID
 local RENEWED = 5 -- seconds its end must move later by to count as renewed
 local campBenefitsName -- (by name where the game can't look up an aura by ID)
@@ -713,7 +713,7 @@ end
 local function WatchStandUp()
 	if ns.playerMoving then
 		StopCampWatch("moving")
-	elseif campWatch.sat and not (ns.IsSitting and ns.IsSitting()) then
+	elseif not (ns.IsResting and ns.IsResting()) then
 		StopCampWatch("stood up")
 	elseif GetTime() - campWatch.at > 120 then
 		StopCampWatch("two minutes on")
@@ -736,9 +736,15 @@ campWatcher:SetScript("OnEvent", ns.Profiled("UNIT_AURA (camp benefits)", functi
 			tostring(had), tostring(hadEnds), gained and ": gained" or ""))
 	end
 	had, hadEnds = has, ends
-	if gained and ns.SignalWanted("CAMP_BENEFITS") then
+	-- (Only while you still sit, kneel or lie by the fire, not moved since: the
+	-- aura showing up late after logging in or a loading screen isn't arriving.)
+	local resting = ns.IsResting and ns.IsResting()
+	if gained and not resting then
+		ns.Log("campfire", "Camp Benefits gained but not resting (sat, knelt or lay, not moved since): no card")
+	end
+	if gained and resting and ns.SignalWanted("CAMP_BENEFITS") then
 		if campWatch then campWatch.ticker:Cancel() end
-		campWatch = { at = GetTime(), sat = ns.IsSitting and ns.IsSitting() or false }
+		campWatch = { at = GetTime() }
 		campWatch.ticker = C_Timer.NewTicker(0.5, WatchStandUp)
 		ns.Signal("CAMP_BENEFITS")
 	end
