@@ -126,6 +126,19 @@ local PAGES = {
 local LOOKS = {
 	{ id = "look-plate", name = "Nameplate Style: a row's Look panel", group = "Menu",
 		page = "Style > Nameplates > Nameplate Style > Look", pageName = "Nameplate Style", look = " - " },
+	-- (Name Style's row panels, made on a click: click names the row's button,
+	-- tab the panel's tab to show. 2026-11-17.)
+	{ id = "look-names-name", name = "Name Style: Your target, Name tab", group = "Menu",
+		page = "Style > Interface > Names > Your target", pageName = "Name Style", look = "Your target",
+		click = "Your target", tab = "Name", set = { nameLookTargetOutline = 2,
+			nameLookTargetOutlineColor = "custom", nameLookTargetShadow = true } },
+	{ id = "look-names-line2", name = "Name Style: Default, Second line tab", group = "Menu",
+		page = "Style > Interface > Names > Default", pageName = "Name Style", look = "Default", click = "Default",
+		tab = "Second line", set = { plateNameLine2Match = false, plateNameLine2Outline = 1 } },
+	{ id = "look-names-behind", name = "Name Style: Default, Behind tab", group = "Menu",
+		page = "Style > Interface > Names > Default", pageName = "Name Style", look = "Default", click = "Default",
+		tab = "Behind", set = { plateNameGlow = "soft", plateNameGlowAlpha = 1.2,
+			plateNameBack = "band", plateNameBackBorder = "line" } },
 }
 
 local holders = {}
@@ -220,9 +233,38 @@ local function LookShot(info)
 		page.cineLabShown = true
 		PageShot({ pageName = info.pageName })
 	end
+	-- (Settings it's shown with: info.set, put on the saved settings, and
+	-- put back once it's drawn. Before the panel's made.)
+	local kept = {}
+	for key, value in pairs(info.set or {}) do
+		kept[key] = { ns.db[key] }
+		ns.db[key] = value
+	end
+	-- (A panel made on a click: its row's button clicked once, the newest
+	-- panel of that title taken.)
+	local function Descendants(frame, fn)
+		fn(frame)
+		for _, child in ipairs(frame._children or {}) do Descendants(child, fn) end
+	end
+	if info.click and page and not rawget(page, "cineLabClicked" .. info.click) then
+		page["cineLabClicked" .. info.click] = true
+		local button
+		Descendants(page, function(f)
+			if not button and rawget(f, "searchLabel") == info.click and f._scripts and f._scripts.OnClick then button = f end
+		end)
+		if button then pcall(button._scripts.OnClick, button, "LeftButton") end
+	end
 	local found
-	for _, each in ipairs(ns.LOOK_PANELS or {}) do
+	local list = ns.LOOK_PANELS or {}
+	for i = info.click and #list or 1, info.click and 1 or #list, info.click and -1 or 1 do
+		local each = list[i]
 		if not found and tostring(each.title):find(info.look, 1, true) then found = each.pop end
+	end
+	-- (Its tab, by name.)
+	if found and info.tab then
+		Descendants(found, function(f)
+			if rawget(f, "name") == info.tab and f._scripts and f._scripts.OnClick then pcall(f._scripts.OnClick, f) end
+		end)
 	end
 	if not found then
 		wow.Warn("no Look panel " .. info.look)
@@ -245,6 +287,7 @@ local function LookShot(info)
 	if ns.lowHealthKit and ns.lowHealthKit.Refresh then pcall(ns.lowHealthKit.Refresh) end
 	local items, w, h = F.Dump(found)
 	found:Hide()
+	for key, old in pairs(kept) do ns.db[key] = old[1] end
 	return { w = w, h = h, items = items }
 end
 

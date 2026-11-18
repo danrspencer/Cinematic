@@ -478,10 +478,37 @@ function ns.PlateServiceKind(plate, unit)
 	return nil
 end
 
+-- (The name's glow and band drawn again once its line comes, goes or changes
+-- size: round both lines, NameRowLook's GlowAround / BackAround.)
+local function Redress(plate, line, key)
+	if line.cineDressKey == key then return end
+	line.cineDressKey = key
+	if ns.RedressPlateName then ns.RedressPlateName(plate.UnitFrame) end
+end
+
 local function Hide(plate)
 	if lines[plate] then
 		lines[plate]:Hide()
+		Redress(plate, lines[plate], nil)
 	end
+end
+
+-- The second line under a plate's name while it shows, { width, height }
+-- as drawn (scaled), for the name's glow and band (PlateParts' DressName);
+-- nil while none. Its width where the game hides it (secret): 90.
+function ns.PlateLine2Box(unitFrame)
+	local plate = unitFrame and unitFrame.GetParent and unitFrame:GetParent()
+	local line = plate and lines[plate]
+	if not (line and line:IsShown()) then return nil end
+	local ok, width = pcall(line.GetStringWidth, line)
+	if not (ok and type(width) == "number" and Known(width) and width > 0) then width = 90 end
+	local _, height = line:GetFont()
+	height = tonumber(height) or 10
+	local okScale, scale = pcall(line.GetScale, line)
+	if not (okScale and type(scale) == "number" and Known(scale)) then scale = 1 end
+	-- (Its name hidden, a title shown alone: the glow and band round the line
+	-- alone, What shows. As the line's own nameShown.)
+	return { width = width * scale, height = height * scale, nameHidden = (textShares[plate] or 1) < 0.5 }
 end
 
 local function Refresh(plate)
@@ -521,28 +548,62 @@ local function Refresh(plate)
 	local row = ns.NameRowOf and ns.NameRowOf(unitFrame, unit)
 	-- (Each value alone: NameLookValue's second, where it's from, would go into
 	-- tonumber() as a number base.)
-	local lineSize = ns.NameLookValue and tonumber((ns.NameLookValue(row, "Line2Size"))) or 1
-	local lineColor = ns.NameLookValue and (ns.NameLookValue(row, "Line2Color")) or "name"
+	local function S(setting) return ns.NameLookValue and (ns.NameLookValue(row, setting)) end
+	local lineSize = tonumber(S("Line2Size")) or 1
+	local lineColor = S("Line2Color") or "name"
+	-- (Its letters: the name's while it matches the name, else its own font,
+	-- outline and shadow. NameRowLook's NameLine2Look, 2026-11-17.)
+	local look = ns.NameLine2Look and ns.NameLine2Look(S)
 	local file, size, flags = name:GetFont()
-	if lineSize ~= 1 and file and size and ns.SetPlateNameFont then
+	if look and look.own and file and size and ns.SetPlateNameFont then
+		local base = object or _G.SystemFont_NamePlate or _G.GameFontNormal
+		local baseFile = base.GetFont and base:GetFont() or file
+		local font = look.font
+		local db = ns.db
+		if font == "usual" then
+			baseFile = db and db.styleGeneral and ns.StyleFontFile(db.styleFont) or baseFile
+		elseif font ~= "game" and ns.StyleFontFile then
+			baseFile = ns.StyleFontFile(font) or baseFile
+		end
+		ns.SetPlateNameFont(line, base, baseFile, size, lineSize,
+			ns.OutlinedFlags(flags, look.rim and 0 or look.outline))
+	elseif lineSize ~= 1 and file and size and ns.SetPlateNameFont then
 		ns.SetPlateNameFont(line, object or _G.SystemFont_NamePlate or _G.GameFontNormal, file, size, lineSize, flags)
 	elseif object then
 		line:SetFontObject(object)
 	elseif file then
 		pcall(line.SetFont, line, file, size, flags)
 	end
+	if ns.SetTextRim then
+		if look and look.rim then
+			ns.SetTextRim(line, look.outline, ns.NameLookColor(row, look.colorSetting))
+		elseif line.cineRim then
+			ns.SetTextRim(line, nil)
+		end
+	end
 	pcall(function()
-		line:SetShadowOffset(name:GetShadowOffset())
-		line:SetShadowColor(name:GetShadowColor())
+		if look and look.own then
+			if look.shadow then
+				line:SetShadowOffset(1, -1)
+				line:SetShadowColor(0, 0, 0, look.shadowAlpha)
+			else
+				line:SetShadowOffset(0, 0)
+			end
+		else
+			line:SetShadowOffset(name:GetShadowOffset())
+			line:SetShadowColor(name:GetShadowColor())
+		end
 		-- (With the name's health fill on, its own text is the grey part: the
 		-- colored copy's color instead.)
 		local source = ns.PlateNameLit and ns.PlateNameLit(name) or name
 		local r, g, b = source:GetTextColor()
-		-- (A color of the row's own: grey or gold. An icon in its own colors.)
+		-- (A color of the row's own: grey, gold or its own. An icon in its own colors.)
 		if lineColor == "grey" then
 			r, g, b = 0.72, 0.72, 0.72
 		elseif lineColor == "gold" then
 			r, g, b = 1, 0.82, 0
+		elseif lineColor == "custom" then
+			r, g, b = ns.NameLookColor(row, "Line2Color")
 		end
 		if isIcon then r, g, b = 1, 1, 1 end
 		line:SetTextColor(r, g, b)
@@ -550,8 +611,12 @@ local function Refresh(plate)
 		if name.GetScale then line:SetScale(name:GetScale()) end
 	end)
 	line:SetText(text)
-	line:SetAlpha(share)
+	line:SetAlpha(share * (look and look.alpha or 1))
 	line:Show()
+	-- (Keyed by what changes its box: its words, size and row.)
+	-- (And whether its name shows: your target's comes in over its title.)
+	Redress(plate, line, tostring(row) .. "|" .. lineSize .. "|" .. (Known(text) and text or "?") .. "|"
+		.. tostring((textShares[plate] or 1) < 0.5))
 end
 
 -- From PlateParts, each time it lays out a plate: how far its name shows

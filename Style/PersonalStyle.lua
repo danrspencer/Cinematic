@@ -645,7 +645,7 @@ function ns.MakePersonalPreview(parent, width)
 		local _, _, realHealth, realPower = Parts()
 		-- (The mana bar while it's ticked: a third bar, under the power bar, in
 		-- the power bar's game fill.)
-		local withMana = ns.PERSONAL_MANA and ns.db.prdMana and ns.PersonalResourcesOn() and true or false
+		local withMana = ns.PERSONAL_MANA and ns.db.prdMana and ns.PersonalResourcesOn(nil, "prdmana") and true or false
 		mana:SetShown(withMana)
 		-- (Spaced for the border: ns.PersonalBarGap.)
 		local gap, reach = ns.PersonalBarGap(look)

@@ -332,7 +332,7 @@ local SAMPLES = {
 	{ "Friendly", "Stormwind Guard", { 0.2, 0.75, 0.2 }, { 0.4, 1, 0.4 }, 55 },
 	{ "Player" },
 }
-local sampleNow, sceneNow, closeNow = 1, true, false
+local sampleNow = 1
 
 local function HasAtlas(name)
 	return C_Texture and C_Texture.GetAtlasInfo and C_Texture.GetAtlasInfo(name) ~= nil
@@ -445,6 +445,7 @@ end
 local function Pill(parent, text, onClick)
 	local pill = CreateFrame("Button", nil, parent)
 	pill:SetFrameLevel(parent:GetFrameLevel() + 10)
+	pill.zoomSkip = true -- (the preview's zoom leaves its buttons be)
 	local back = pill:CreateTexture(nil, "BACKGROUND")
 	back:SetAllPoints()
 	local words = pill:CreateFontString(nil, "OVERLAY", ns.LOOK_TEXT)
@@ -472,6 +473,8 @@ function ns.MakePlateRowLookPreview(parent, width, kind)
 	local holder = CreateFrame("Frame", nil, parent)
 	holder:SetSize(width, 112)
 	if holder.SetClipsChildren then holder:SetClipsChildren(true) end
+	-- (Its plate sized here (1.6): not grown to fill the preview, only its zoom's - and +.)
+	holder.noAutoFit = true
 	local dark = holder:CreateTexture(nil, "BACKGROUND", nil, -7)
 	dark:SetAllPoints()
 	dark:SetColorTexture(0.04, 0.04, 0.05, 1)
@@ -533,18 +536,17 @@ function ns.MakePlateRowLookPreview(parent, width, kind)
 		end
 		picks[i] = pill
 	end
-	local closeButton = Pill(holder, L["Closer"], function()
-		closeNow = not closeNow
-		holder:Refresh()
-	end)
-	closeButton:SetPoint("BOTTOMRIGHT", -6, 6)
+	-- (Scene: the backdrop every preview shares, stylePreviewBack, the painted
+	-- scene or the dark panel; left of the zoom's - and +. Its own Closer gone,
+	-- 2026-11-17: the zoom does it.)
 	local sceneButton = Pill(holder, L["Scene"], function()
-		sceneNow = not sceneNow
+		if not ns.db then return end
+		ns.db.stylePreviewBack = ns.db.stylePreviewBack ~= "scene" and "scene" or nil
+		if ns.RecutStyleScene then ns.RecutStyleScene(holder) end
 		holder:Refresh()
 	end)
-	sceneButton:SetPoint("BOTTOMRIGHT", closeButton, "BOTTOMLEFT", -4, 0)
+	sceneButton:SetPoint("BOTTOMRIGHT", -90, 6)
 	ns.lowHealthKit.Tooltip(sceneButton, L["The lake behind the plate, or plain dark."])
-	ns.lowHealthKit.Tooltip(closeButton, L["The plate bigger, for a closer look."])
 
 	-- (Over the scene's top right while a choice is only pointed at.)
 	local tag = holder:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
@@ -560,17 +562,12 @@ function ns.MakePlateRowLookPreview(parent, width, kind)
 		tag:SetShown(over ~= nil)
 		tag:SetText(note or L["Preview: not saved"])
 		for i, pill in ipairs(picks) do pill:SetOn(i == sampleNow) end
-		sceneButton:SetOn(sceneNow)
-		closeButton:SetOn(closeNow)
-		-- (The lake, or the plain dark: that one over it, so hidden for the lake.)
-		if sceneNow then
-			ns.StyleScene(self, 0.55, 0.85)
-			self.styleScene:Show()
-		elseif self.styleScene then
-			self.styleScene:Hide()
-		end
-		dark:SetShown(not sceneNow)
-		plate:SetScale(closeNow and 2.4 or 1.6)
+		sceneButton:SetOn(db.stylePreviewBack == "scene")
+		-- (The shared backdrop, the lake or the dark panel: StyleScene draws either.)
+		ns.StyleScene(self, 0.55, 0.85)
+		self.styleScene:Show()
+		dark:Hide()
+		plate:SetScale(1.6)
 
 		local sample = SAMPLES[sampleNow]
 		local unitName, barColor, nameColor, level = sample[2] and L[sample[2]], sample[3], sample[4], sample[5]
@@ -596,7 +593,10 @@ function ns.MakePlateRowLookPreview(parent, width, kind)
 		local texture = look.texture
 		if texture == nil then texture = themeTexture or "game" end
 		if texture == "game" or not ns.SetBarTexture(health, texture) then
-			health:SetStatusBarTexture(HasAtlas(PLATE_FILL) and PLATE_FILL or "Interface\\TargetingFrame\\UI-StatusBar")
+			-- (Retail's plate fill. Forever has the atlas but not retail's plates:
+			-- the game's plain fill there, 2026-11-17.)
+			health:SetStatusBarTexture(ns.isRetail and HasAtlas(PLATE_FILL) and PLATE_FILL
+				or "Interface\\TargetingFrame\\UI-StatusBar")
 			local fill = health:GetStatusBarTexture()
 			if fill and fill.SetDesaturated then fill:SetDesaturated(false) end
 		end
@@ -626,7 +626,13 @@ function ns.MakePlateRowLookPreview(parent, width, kind)
 		for _, piece in ipairs(health.cineGameTrim or {}) do piece:SetShown(game) end
 		ground:SetShown(game and not trim)
 		if game and not trim then
-			if HasAtlas(PLATE_GROUND) then ground:SetAtlas(PLATE_GROUND) else ground:SetColorTexture(0, 0, 0, 0.7) end
+			-- (Retail's ground. On Forever its rounded silver frame and pale middle
+			-- showed round a square fill, 2026-11-17: a dark ground there.)
+			if ns.isRetail and HasAtlas(PLATE_GROUND) then
+				ground:SetAtlas(PLATE_GROUND)
+			else
+				ground:SetColorTexture(0, 0, 0, 0.7)
+			end
 		end
 		back:SetShown(not game)
 		border:SetShown(edgeKind == "line")

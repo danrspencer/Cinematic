@@ -50,9 +50,30 @@ local function CardTop(kit, content, title, picked)
 	title:SetPoint("LEFT", icon, "RIGHT", 8, 0)
 	local list = {}
 	for i, page in ipairs(PAGES) do list[i] = { L[page[1]], L[page[3]] } end
-	local sub, _, ShowSub, subBase, subH = ns.FolderTabs(content, list, function(i)
+	local sub, subTabs, ShowSub, subBase, subH = ns.FolderTabs(content, list, function(i)
 		if i ~= picked then ns.ShowHubPage(PAGES[i][2]) end
 	end)
+	-- (Each tab a container for the event shown, 2026-11-17: its own switch
+	-- per event, "tabOn:Card:<id>:<part>": off, no card, its card type's
+	-- look, or no sound (Cards.lua's ns.CardPartOff); this page greyed with it.)
+	local PARTS = { "settings", "style", "sounds" }
+	local checks = {}
+	local function PartKey(id, i) return ("tabOn:Card:%s:%s"):format(id, PARTS[i]) end
+	local function PartSwitches(id)
+		for i, tab in ipairs(subTabs) do
+			local key = PartKey(id, i)
+			if not checks[key] then
+				local frame = CreateFrame("Frame", nil, content)
+				frame:SetSize(1, 1)
+				checks[key] = kit.PageSwitch(frame, key, L["Enable Page"], L["Turns this tab of the card on or off."], frame)
+				ns.SetPageMaster({ key }, "cards")
+				ns.DEFAULTS[key] = true -- (on to start; /cine debug sweep: not a leak)
+				if ns.db and ns.db[key] == nil then ns.db[key] = true end
+			end
+			tab:SetFlip(key)
+		end
+		ns.SetPageGate(content, PartKey(id, picked))
+	end
 	subBase:SetPoint("TOPLEFT", panel, "BOTTOMLEFT", 0, -(44 + subH))
 	sub:SetPoint("TOPLEFT", subBase, "TOPLEFT")
 	sub:SetPoint("RIGHT", content, "RIGHT", -8, 0)
@@ -69,6 +90,7 @@ local function CardTop(kit, content, title, picked)
 		local event = ns.CARD_BY_ID[CARD.now] or ns.CARD_EVENTS[1]
 		icon:SetTexture(event.icon)
 		title:SetText(L[event.name])
+		PartSwitches(event.id)
 	end
 	kit.AddControl(holder)
 	return under

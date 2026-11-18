@@ -66,15 +66,45 @@ local function Add(list, line)
 end
 
 -- A page's layout by the game's measure: cut words, text over text, parts past
--- its right edge. Only what's shown (a closed section's or another tab's not).
+-- its right edge, and text under a bar of another part (a preview's plates
+-- over the rows, 2026-11-17). Only what's shown (a closed section's or
+-- another tab's not). Also ns.PageLayoutFindings, for /cine debug sweep.
 local function Measure(canvas)
 	local root = canvas.content or canvas
 	local right = (canvas.scroll or canvas):GetRight()
-	local cut, over, past, texts = {}, {}, {}, {}
+	local cut, over, past, under, covered, texts, bars = {}, {}, {}, {}, {}, {}, {}
 	local pastSeen = {}
+	local clip -- (the nearest clipping frame's left and right, walk)
+	-- (Only text in the page's view counts for overlaps: rows scrolled out of
+	-- it are cut off by it, whatever's drawn there.)
+	local view = canvas.scroll
+	local viewBottom, viewTop = view and view:GetBottom(), view and view:GetTop()
+	-- (A style preview (StylePages.lua marks it stackSpot): its own labels on
+	-- its own bars are how it's drawn, not an overlap.)
+	local function PreviewOf(frame)
+		local depth = 0
+		while frame and depth < 12 do
+			if frame.stackSpot then return frame end
+			frame, depth = frame:GetParent(), depth + 1
+		end
+	end
+	-- (Faded to nothing (a hidden label kept at alpha 0, a card over the
+	-- page): seen as nothing, so no overlap. 2026-11-17's false ones.)
+	local function Seen(frame, region)
+		local ok, alpha = pcall(frame.GetEffectiveAlpha, frame)
+		alpha = ok and tonumber(alpha) or 1
+		if region and region.GetAlpha then alpha = alpha * (tonumber(region:GetAlpha()) or 1) end
+		return alpha > 0.05
+	end
 	local function walk(frame, depth)
 		if depth > 30 or not ns.Flag(frame:IsVisible()) then return end
 		local isButton = frame.GetObjectType and frame:GetObjectType() == "Button"
+		if frame.GetObjectType and frame:GetObjectType() == "StatusBar" and Seen(frame) then
+			local l, b, w, h = frame:GetRect()
+			if l and w and w > 0 and h > 0 then
+				bars[#bars + 1] = { frame = frame, l = l, b = b, r = l + w, t = b + h, preview = PreviewOf(frame) }
+			end
+		end
 		for _, region in ipairs({ frame:GetRegions() }) do
 			if region.IsTruncated and ns.Flag(region:IsVisible()) then
 				local words = Text(region)
@@ -82,21 +112,43 @@ local function Measure(canvas)
 					local wide = isButton and region:GetStringWidth() > frame:GetWidth() + 1
 					if wide or ns.Flag(region:IsTruncated()) then Add(cut, words) end
 					local l, b, w, h = region:GetRect()
-					if l and w and w > 0 and h > 0 then
-						texts[#texts + 1] = { words = words, l = l, b = b, r = l + math.min(w, region:GetStringWidth()), t = b + h }
+					local inView = not (viewBottom and viewTop) or (l and b + h > viewBottom + 2 and b < viewTop - 2)
+					if l and w and w > 0 and h > 0 and inView and Seen(frame, region) then
+						texts[#texts + 1] = { words = words, l = l, b = b, r = l + math.min(w, region:GetStringWidth()), t = b + h,
+							frame = frame, preview = PreviewOf(frame) }
 					end
 				end
 			end
 		end
-		local r = frame:GetRight()
-		if right and r and r > right + 2 and frame ~= root then
-			local name = FirstText(frame) or frame:GetObjectType()
-			if not pastSeen[name] then
+		-- (Inside a frame that clips (a preview): only what shows in it counts;
+		-- one wholly outside it is drawn nowhere.)
+		local l, r = frame:GetLeft(), frame:GetRight()
+		local hidden = clip and l and r and (l >= clip.r or r <= clip.l)
+		if right and r and r > right + 2 and frame ~= root and not hidden then
+			-- (Shown past its clip's edge: only as far as the clip shows it.)
+			local shownRight = clip and math.min(r, clip.r) or r
+			-- (Named by its words, else its kind, size and the words of what
+			-- it's in: "Frame (+2023)" told nothing.)
+			local name = FirstText(frame)
+			if not name then
+				local parent = frame:GetParent()
+				local w, h = frame:GetSize()
+				name = ("%s %dx%d in %s"):format(frame:GetObjectType(), tonumber(w) or 0, tonumber(h) or 0,
+					parent and (FirstText(parent) or parent:GetObjectType()) or "?")
+			end
+			if shownRight > right + 2 and not pastSeen[name] then
 				pastSeen[name] = true
-				Add(past, ("%s (+%d)"):format(name, r - right))
+				Add(past, ("%s (+%d)"):format(name, shownRight - right))
 			end
 		end
-		for _, child in ipairs({ frame:GetChildren() }) do walk(child, depth + 1) end
+		local was = clip
+		if frame.DoesClipChildren and ns.Flag(frame:DoesClipChildren()) and l and r then
+			clip = { l = was and math.max(l, was.l) or l, r = was and math.min(r, was.r) or r }
+		end
+		if not hidden then
+			for _, child in ipairs({ frame:GetChildren() }) do walk(child, depth + 1) end
+		end
+		clip = was
 	end
 	pcall(walk, root, 0)
 	-- (Text over text: two lines' boxes crossing by more than 3 px each way.)
@@ -106,13 +158,66 @@ local function Measure(canvas)
 			local b = texts[j]
 			local x = math.min(a.r, b.r) - math.max(a.l, b.l)
 			local y = math.min(a.t, b.t) - math.max(a.b, b.b)
-			if x > 3 and y > 3 and a.words ~= b.words then
+			if x > 3 and y > 3 and a.words ~= b.words and not (a.preview and a.preview == b.preview) then
 				Add(over, ("%s / %s"):format(a.words, b.words))
 			end
 		end
 	end
-	return cut, over, past
+	-- (Text under a bar: crossing by more than 3 px each way, the bar not the
+	-- text's own (its own number, its own name on it).)
+	local function Within(frame, bar)
+		local depth = 0
+		while frame and depth < 8 do
+			if frame == bar or frame == bar:GetParent() then return true end
+			frame, depth = frame:GetParent(), depth + 1
+		end
+	end
+	for _, text in ipairs(texts) do
+		for _, bar in ipairs(bars) do
+			local x = math.min(text.r, bar.r) - math.max(text.l, bar.l)
+			local y = math.min(text.t, bar.t) - math.max(text.b, bar.b)
+			if x > 3 and y > 3 and not Within(text.frame, bar.frame)
+				and not (text.preview and text.preview == bar.preview) then
+				Add(under, text.words)
+				break
+			end
+		end
+	end
+	-- (Text under a style preview: the preview found wherever it's hung (a
+	-- sticky one's lifted onto the hub, 2026-11-17: one left full size there
+	-- covers the rows scrolling under it), the page's text in view under it.)
+	local top = canvas
+	while top:GetParent() and top:GetParent() ~= UIParent do top = top:GetParent() end
+	local previews = {}
+	local function find(frame, depth)
+		if depth > 25 or not ns.Flag(frame:IsVisible()) then return end
+		if frame.stackSpot then
+			local l, b, w, h = frame:GetRect()
+			local scale = frame:GetEffectiveScale() / math.max(root:GetEffectiveScale(), 0.01)
+			if l and w and w > 0 and h > 0 then
+				previews[#previews + 1] = { frame = frame, l = l * scale, b = b * scale, r = (l + w) * scale, t = (b + h) * scale }
+			end
+			return
+		end
+		for _, child in ipairs({ frame:GetChildren() }) do find(child, depth + 1) end
+	end
+	pcall(find, top, 0)
+	-- (And one popped out into its own window: on the screen, not the settings.)
+	local window = _G.CinematicPreviewWindow
+	if window and ns.Flag(window:IsVisible()) then pcall(find, window, 0) end
+	for _, text in ipairs(texts) do
+		for _, preview in ipairs(previews) do
+			local x = math.min(text.r, preview.r) - math.max(text.l, preview.l)
+			local y = math.min(text.t, preview.t) - math.max(text.b, preview.b)
+			if x > 3 and y > 3 and text.preview ~= preview.frame then
+				Add(covered, text.words)
+				break
+			end
+		end
+	end
+	return cut, over, past, under, covered
 end
+ns.PageLayoutFindings = Measure
 
 local function Finish(text)
 	run = nil
@@ -139,6 +244,7 @@ local function TabSets(root)
 	pcall(walk, root, 0)
 	return sets
 end
+ns.PageTabSets = TabSets -- (/cine debug sweep, Dev/Sweep.lua: clicks through them too)
 
 -- One look at the page as it is now (its tabs picked: path): measured, then
 -- shot a screenful at a time, top down. Then done().
@@ -146,7 +252,7 @@ local function ShootState(ctx, path, done)
 	local canvas, entry, token = ctx.page.canvas, ctx.entry, ctx.token
 	local state = { tabs = path ~= "" and path or nil, shots = {} }
 	entry.states[#entry.states + 1] = state
-	state.cut, state.over, state.past = Measure(canvas)
+	state.cut, state.over, state.past, state.under, state.covered = Measure(canvas)
 	local scroll = canvas.scroll
 	local range, view = 0, canvas:GetHeight() or 0
 	if scroll and scroll.GetVerticalScrollRange then
@@ -264,7 +370,28 @@ local function Shots(pages, index, last, token, out)
 			return
 		end
 		local ctx = { page = page, entry = entry, token = token, out = out, index = index, last = last }
-		Explore(ctx, {}, "", function() Shots(pages, index + 1, last, token, out) end)
+		-- (Then the page's other parts, each an icon of its own on its canvas
+		-- (canvas.hubTabs: Nameplate Style's Smart, the HUD's sections): its
+		-- tab row's left out as pages of their own, so these were never shot.)
+		local parts = {}
+		for _, part in ipairs(page.canvas.hubTabs or {}) do
+			if part.name and part.name ~= page.key then parts[#parts + 1] = part end
+		end
+		local function Part(n)
+			if run ~= token then return end
+			local part = parts[n]
+			if not part or not ns.ShowHubPage then
+				Shots(pages, index + 1, last, token, out)
+				return
+			end
+			pcall(ns.ShowHubPage, part.name)
+			C_Timer.After(OPEN_WAIT, function()
+				if run ~= token then return end
+				if not ns.Flag(page.canvas:IsVisible()) then return Part(n + 1) end
+				Explore(ctx, {}, part.label or part.name, function() Part(n + 1) end)
+			end)
+		end
+		Explore(ctx, {}, "", function() Part(1) end)
 	end)
 end
 

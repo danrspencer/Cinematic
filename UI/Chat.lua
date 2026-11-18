@@ -644,7 +644,7 @@ end
 
 -- Whether a peek shows just its line (the setting, with the Chat page on).
 function ns.ChatPeekLinesOnly()
-	return ns.db and ns.db.chatPeekLinesOnly and ns.db.handleChat ~= false and true or false
+	return ns.db and ns.db.chatPeekLinesOnly and ns.PageOn("handleChat") and true or false
 end
 
 -- A peek in lines-only mode. formatted: text is the window's line already
@@ -918,7 +918,7 @@ local function ChatPeekFilter(chatFrame, event, text, author, _, channelString, 
 		_, _, guid)
 	-- (WIM runs the filters with its own table, not a chat window: nothing to peek.)
 	if type(chatFrame) ~= "table" or not chatFrame.IsShown then return false end
-	if not ns.db.chatPeek or ns.db.handleChat == false then
+	if not ns.db.chatPeek or not ns.PageOn("handleChat") then
 		if BUBBLE_SPEECH[event] then SpeechTrace("\"Show chat when a message arrives\" or the Chat page is off") end
 		return false
 	end
@@ -1008,12 +1008,12 @@ local function WatchServerMessages()
 	-- (Runs only while server messages peek: no loop at all otherwise. Off,
 	-- where chat's up to is forgotten, so turning it on peeks at nothing old.)
 	ns.FeatureLoop(watcher, ns.Profiled("Server message watch", function()
-		local peekOn = ns.db.chatPeek and ns.db.handleChat ~= false and IsPeekTypeOn("server")
+		local peekOn = ns.db.chatPeek and ns.PageOn("handleChat") and IsPeekTypeOn("server")
 		for chatFrame, watch in pairs(serverWatch) do
 			CheckServerLines(chatFrame, watch, peekOn)
 		end
 	end), function()
-		local on = ns.db and ns.db.chatPeek and ns.db.handleChat ~= false and IsPeekTypeOn("server") and true or false
+		local on = ns.db and ns.db.chatPeek and ns.PageOn("handleChat") and IsPeekTypeOn("server") and true or false
 		if not on then
 			for _, watch in pairs(serverWatch) do watch.newest, watch.server = nil, nil end
 		end
@@ -1144,7 +1144,7 @@ do
 		local owner = tooltip:GetOwner()
 		local name = owner and NameOf(owner)
 		local isTab = type(name) == "string" and name:find("^ChatFrame%d+Tab$")
-			and ns.db.chatHideTabHint and ns.db.handleChat ~= false
+			and ns.db.chatHideTabHint and ns.PageOn("handleChat")
 		local isPlate, why = false, "no"
 		if not isTab and ns.db.plateHideTipHint ~= false then
 			isPlate, why = PlateOwner(owner)

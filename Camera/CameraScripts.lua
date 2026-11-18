@@ -400,6 +400,13 @@ local function CleanDesc(text)
 	return text ~= "" and text or nil
 end
 
+-- Whether a script's tab (part: "script" or "stops") is off on the Scripts
+-- page: each tab a container per script, "tabOn:Script:<id>:<part>" (2026-11-17).
+function ns.CameraScriptPartOff(id, part)
+	local db = ns.db
+	return id ~= nil and db ~= nil and db[("tabOn:Script:%s:%s"):format(tostring(id), part)] == false
+end
+
 function ns.CleanCameraScript(script, id, keepSet, paths)
 	if type(script) ~= "table" then return nil end
 	local budget = { left = MAX_STEPS }
@@ -2777,12 +2784,20 @@ end
 -- Starts a script (trigger: the trigger key it's running for; nil, played
 -- from its page or /cine script play).
 local function Start(script, trigger, camera)
+	-- (Its Script tab off on the Scripts page: it doesn't play.)
+	if ns.CameraScriptPartOff(script.id, "script") then return end
 	if run then StopAll() end
 	-- (A copy: editing it on its page meanwhile can't trip it up. A built-in
 	-- one's switched-off steps kept, to be passed by.)
 	local paths = {}
 	local builtinId = script.builtin and script.id or nil -- (the copy below doesn't keep builtin: PlayingCameraKey)
 	script = ns.CleanCameraScript(script, script.id, script.builtin, paths)
+	-- (Its Stop rules tab off: the rules as a new script has them, no haze,
+	-- no Stop button.)
+	if ns.CameraScriptPartOff(script.id, "stops") then
+		script.rules = ns.CleanCameraScript({}, script.id).rules
+		script.haze, script.button = 0, nil
+	end
 	run = {
 		script = script, trigger = trigger, camera = camera, t = 0, phase = "steps", paths = paths, active = {},
 		builtinId = builtinId,

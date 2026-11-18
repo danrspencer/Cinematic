@@ -33,12 +33,29 @@ local function Own(db, key)
 	if value == "hide" or value == "show" then return value end
 end
 
+-- Each tab a container (2026-11-17): its own switch over its rows, under
+-- styleOverrides. A key's tab by its frame: You, Target (focus and target of
+-- target go as the target's), Your pet, Nameplates, Action bars.
+local TAB_KEYS = { "tabOn:Style Overrides:1", "tabOn:Style Overrides:2", "tabOn:Style Overrides:3",
+	"tabOn:Style Overrides:4", "tabOn:Style Overrides:5" }
+for _, key in ipairs(TAB_KEYS) do DEFAULTS[key] = true end
+ns.SetPageMaster(TAB_KEYS, "styleOverrides")
+local function TabOf(key)
+	if key:find("^unitPartPlayer") then return TAB_KEYS[1] end
+	if key:find("^unitPartPet") then return TAB_KEYS[3] end
+	if key:find("^unitPart") then return TAB_KEYS[2] end
+	if key:find("^platePart") then return TAB_KEYS[4] end
+	if key:find("^bar") then return TAB_KEYS[5] end
+end
+
 -- "hide", "show" or nil (the row says). key: the row's: unitPart<frame><part>,
 -- platePart<part>. Only with Style and this tab on (styleOverrides, under
 -- styleGeneral: ns.PageOn): off, everything's as the rows say.
 function ns.StyleOverride(key)
 	local db = ns.db
 	if not (db and key and db.enabled ~= false and ns.PageOn("styleOverrides")) then return nil end
+	local tab = TabOf(key)
+	if tab and not ns.PageOn(tab) then return nil end -- (its tab off)
 	return Own(db, key)
 end
 
@@ -122,7 +139,7 @@ function ns.CreateStyleOverridesPanel(kit)
 	-- A row: its name and the three picks side by side, so the whole tab reads at a glance.
 	local CHOICES = { { "row", L["Interface page"], 120 }, { "hide", L["Hide"], 60 }, { "show", L["Show"], 60 } }
 	local ROW_H, NAME_W = 25, 170
-	local function PartRow(holder, index, name, key)
+	local function PartRow(holder, index, name, key, tabKey)
 		local row = CreateFrame("Frame", nil, holder)
 		row:SetSize(NAME_W + 240, ROW_H)
 		row:SetPoint("TOPLEFT", 0, -(index - 1) * ROW_H)
@@ -146,7 +163,7 @@ function ns.CreateStyleOverridesPanel(kit)
 			local db = ns.GetDB()
 			local value = db and db[key] or "row"
 			-- (The tab's switch off, or Enable Style: greyed, no clicks.)
-			local on = db ~= nil and ns.PageOn("styleOverrides")
+			local on = db ~= nil and ns.PageOn(tabKey or "styleOverrides")
 			row:SetAlpha(on and 1 or 0.5)
 			for i, choice in ipairs(CHOICES) do
 				buttons[i]:SetEnabled(on)
@@ -177,8 +194,8 @@ function ns.CreateStyleOverridesPanel(kit)
 		kit.FitContentHeight(content)
 	end
 	for i, section in ipairs(sections) do tabs[i] = { section[1] } end
-	local _, base, height
-	panel, _, ShowTab, base, height = ns.FolderTabs(content, tabs, function(i)
+	local tabFrames, base, height
+	panel, tabFrames, ShowTab, base, height = ns.FolderTabs(content, tabs, function(i)
 		kit.SectionState.Save(picked, sections[i][1])
 		Layout()
 	end, nil, NAME_W + 264)
@@ -207,7 +224,9 @@ function ns.CreateStyleOverridesPanel(kit)
 			kit.SectionState.Save(picked, section[1])
 			Layout()
 		end
-		for r, row in ipairs(section[2]) do PartRow(holder, r, row[2], PREFIX .. row[1]) end
+		for r, row in ipairs(section[2]) do PartRow(holder, r, row[2], PREFIX .. row[1], TAB_KEYS[i]) end
+		-- (Its tab a container: right-click turns its rows off, 2026-11-17.)
+		ns.TabContainer(tabFrames[i], holder, TAB_KEYS[i], "styleOverrides")
 	end
 	kit.SectionState.Restore(picked)
 	Layout()

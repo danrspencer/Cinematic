@@ -424,7 +424,8 @@ function ns.CreateGeneralStylePanel(kit)
 			{ value = "notch", text = L["Notched"] }, { value = "sigil", text = L["Sigil"] },
 			{ value = "veil", text = L["Veil"] }, { value = "deco", text = L["Stepped"] },
 			{ value = "plate", text = L["Plate"] }, { value = "leaf", text = L["Leaf"] },
-			{ value = "facet", text = L["Faceted"] }, { value = "soft", text = L["Soft"] } }
+			{ value = "facet", text = L["Faceted"] }, { value = "soft", text = L["Soft"] },
+			{ value = "frame", text = L["Slightly rounded"] } }
 	end, L["The outline of tooltips, chat bubbles, dialogue and roll panels."])
 	rows.Dropdown(L["Bar shape:"], ns.ThemeQuickField("styleBarShape"), function()
 		return { { value = "square", text = L["Square"] }, { value = "capsule", text = L["Capsule"] },

@@ -862,6 +862,23 @@ end
 -- { key, check }. While one is off, every other control on its page greys
 -- out, keeping its value; switched on, each is back as its own settings say.
 local pageSwitches = {}
+-- Whether a switch, or one on a frame around its own (a tab's inside its
+-- page, 2026-11-17), is off: each with every switch it's under.
+local function SwitchHeldOff(switch)
+	local db = ns.GetDB()
+	local each = switch
+	for _ = 1, 6 do
+		if not each then return false end
+		if not db[each.key] or ns.MasterOff(each.key) or (each.gate and not ns.PageOn(each.gate)) then return true end
+		if each.outer == nil then
+			local frame = each.frame and each.frame:GetParent()
+			while frame and not pageSwitches[frame] do frame = frame:GetParent() end
+			each.outer = frame and pageSwitches[frame] or false
+		end
+		each = each.outer or nil
+	end
+	return false
+end
 local function SwitchOf(control)
 	if control.pageSwitch == nil then
 		local frame = control:GetParent()
@@ -893,8 +910,9 @@ local function RefreshControl(control, timing)
 		end
 		control:SetEnabled(true)
 		control:Refresh()
-		local master = ns.PageSwitchOf(switch.key)
-		if not ns.GetDB()[switch.key] or (master and ns.GetDB()[master] == false) then
+		-- (Off with any switch it's under, every level up: ns.MasterOff; and
+		-- with the picked tab's, a page whose tabs share its controls.)
+		if SwitchHeldOff(switch) then
 			control:SetEnabled(false)
 			if label then SetLabelFont(label, "GameFontDisable") end
 		end
@@ -902,13 +920,14 @@ local function RefreshControl(control, timing)
 		-- (A page's switch greys with the one it's under: a vision's with Enable Visions.)
 		local master = switch and ns.PageSwitchOf(switch.key)
 		local label = master and (control.Text or control.text)
+		local held = switch and ns.MasterOff(switch.key)
 		if label then
 			control.baseFont = control.baseFont or label:GetFontObject() or "GameFontHighlight"
 			SetLabelFont(label, control.baseFont)
 			control:SetEnabled(true)
 		end
 		control:Refresh()
-		if master and ns.GetDB()[master] == false then
+		if held then
 			control:SetEnabled(false)
 			if label then SetLabelFont(label, "GameFontDisable") end
 		end
@@ -1096,7 +1115,7 @@ ns.PaintHeaderSwitches = function()
 	end
 end
 local function RegisterPageSwitch(content, key, check)
-	local switch = { key = key, check = check }
+	local switch = { key = key, check = check, frame = content }
 	pageSwitches[content] = switch
 	if check then
 		check:Hide()
@@ -1106,6 +1125,29 @@ local function RegisterPageSwitch(content, key, check)
 		content:HookScript("OnShow", function() MakeHeaderSwitch(content, switch) end)
 		if content:IsVisible() then MakeHeaderSwitch(content, switch) end
 	end
+end
+-- A page shown under two icons, each with its switch (Health & Resources:
+-- the Unit Frames icon's and the PRD's, 2026-11-17): its header switch and
+-- its greying go by key (check: that switch's box) while that icon's is up.
+-- (The same switch table changed, not a new one: controls keep theirs.)
+function ns.SetPageSwitchKey(content, key, check)
+	local switch = pageSwitches[content]
+	if not switch or switch.key == key then return end
+	switch.key, switch.check = key, check
+	if switch.header then
+		switch.header.key, switch.header.check = key, check
+		PaintHeaderSwitch(switch.header)
+	end
+	Refresh()
+end
+-- A page whose tabs all edit one set of controls (Heal Vision's roles,
+-- Vitals' parts): its controls greyed while the picked tab's switch (key,
+-- nil: none) is off too, its own header switch as it is. 2026-11-17.
+function ns.SetPageGate(content, key)
+	local switch = pageSwitches[content]
+	if not switch or switch.gate == key then return end
+	switch.gate = key
+	Refresh()
 end
 local function PageSwitch(content, key, label, tip, anchor, onChange)
 	local check = Check(content, key, label, tip, function(value)
@@ -2723,7 +2765,7 @@ do
 		-- their looks (Look: still Style > General's Enable Style and theme;
 		-- ids kept). name: not "Nameplates", the General page's id.)
 		-- (General and the dev copy's Wind Guide in no section: plain icons)
-		{ name = "Visions", colors = { Combat = { 0.85, 0.3, 0.25 }, World = { 0.35, 0.6, 0.9 } }, pages = {
+		{ name = "Visions", colors = { Combat = { 0.85, 0.3, 0.25 }, World = { 0.35, 0.6, 0.9 }, RP = { 0.7, 0.45, 0.85 } }, pages = {
 			-- (General: every Vision as a card, 2026-11-16. VisionsStyle.lua: the
 			-- look they share. Each in no section, a band of its own.)
 			{ "Visions General", "Interface\\Icons\\INV_Misc_Book_11", label = "General" },
@@ -2733,13 +2775,14 @@ do
 			{ "Vitals Vision", "Interface\\Icons\\Spell_Shadow_LifeDrain02", section = "Combat" },
 			{ "Quest Vision", "Interface\\Icons\\INV_Misc_Head_Dragon_01", section = "World" },
 			{ "Roll Vision", "Interface\\Icons\\INV_Misc_Dice_01", section = "World" },
-			{ "Teleport Vision", "Interface\\Icons\\Spell_Arcane_TeleportStormWind",
-				section = "World" }, -- (TeleportVision.lua; its tooltip: ns.TILE_TOOLTIPS)
 			{ "Duel Vision", "Interface\\Icons\\Ability_DualWield", section = "World" },
-			{ "Emote Vision", "Interface\\Icons\\Spell_Holy_PrayerOfFortitude", section = "World" }, -- (EmoteVision.lua)
+			-- (RP: the role-play ones, 2026-11-17)
+			{ "Teleport Vision", "Interface\\Icons\\Spell_Arcane_TeleportStormWind",
+				section = "RP" }, -- (TeleportVision.lua; its tooltip: ns.TILE_TOOLTIPS)
+			{ "Emote Vision", "Interface\\Icons\\Spell_Holy_PrayerOfFortitude", section = "RP" }, -- (EmoteVision.lua)
 			{ "Emote Vision Settings", "Interface\\Icons\\Spell_Holy_PrayerOfFortitude", tabOf = "Emote Vision" },
 			-- (CardsPage.lua's: Battle Vision's and Story Vision's moments, one page)
-			{ "Card Vision", "Interface\\Icons\\INV_Misc_Book_09", section = "World" },
+			{ "Card Vision", "Interface\\Icons\\INV_Misc_Book_09", section = "RP" },
 			-- (an event's own pages: not tabs on the page's, opened from its row)
 			{ "Card Settings", "Interface\\Icons\\INV_Misc_Book_09", tabOf = "Card Vision" },
 			{ "Card Style", "Interface\\Icons\\INV_Misc_Book_09", tabOf = "Card Vision" },
@@ -3212,8 +3255,7 @@ do
 			local on = ns.GetDB()[switch.key] ~= false
 			return on, not on
 		end
-		local master = ns.PageSwitchOf(switch.key)
-		if master and ns.GetDB()[master] == false then return false, true end
+		if ns.MasterOff(switch.key) then return false, true end
 		return KeyGet(switch.key) and true or false
 	end
 	-- Flips a page's switch as a click on its box would.
@@ -3243,6 +3285,11 @@ do
 	-- page without a switch), and the icon darkened while it's off.
 	local function PaintSwitch(tile)
 		local switch = TileSwitch(tile, true)
+		-- (An icon whose sub-tabs each have a switch (Unit Frames'): its dot
+		-- on while any of them is, as its Show tab's right-click has it.
+		-- 2026-11-17: it had no dot and no right-click, the only one.)
+		local group = tile.groupSwitches and #tile.groupSwitches > 0
+		if group then switch = tile.groupSwitches[1] end
 		if not switch and not tile.switchDot then return end
 		if not tile.switchDot then
 			tile.offMark = tile:CreateTexture(nil, "OVERLAY")
@@ -3253,6 +3300,7 @@ do
 			tile.switchDot:SetPoint("BOTTOMRIGHT", tile.icon, "BOTTOMRIGHT", 1, -1)
 		end
 		local off = switch and not SwitchState(switch) or false
+		if group then off = ns.PageSwitchOff(tile.english) and true or false end
 		tile.offMark:SetShown(off)
 		tile.switchDot:SetShown(switch ~= nil)
 		tile.switchDot:SetTexture(off and "Interface\\COMMON\\Indicator-Red" or "Interface\\COMMON\\Indicator-Green")
@@ -3460,7 +3508,11 @@ do
 				GameTooltip:AddLine("(dev only)", 1, 0.25, 0.25)
 			end
 			local switch = TileSwitch(self, true)
-			if switch then SwitchLine(switch) end
+			if self.groupSwitches and #self.groupSwitches > 0 then
+				ns.PageSwitchTip(self, self.english)
+			elseif switch then
+				SwitchLine(switch)
+			end
 			GameTooltip:Show()
 		end)
 		tile:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -3468,6 +3520,13 @@ do
 		tile:RegisterForClicks("LeftButtonUp", "RightButtonUp")
 		tile:SetScript("OnClick", function(self, button)
 			if button ~= "RightButton" then return Select(ns.LastHubTab(self)) end
+			-- (Unit Frames': all its tabs' switches off, or all on: ns.FlipPageSwitch.)
+			if self.groupSwitches and #self.groupSwitches > 0 then
+				ns.FlipPageSwitch(self.english)
+				PaintSwitch(self)
+				if GameTooltip:IsOwned(self) then self:GetScript("OnEnter")(self) end
+				return
+			end
 			local switch = TileSwitch(self, true)
 			if not switch then return end
 			FlipSwitch(switch)
@@ -3697,7 +3756,9 @@ do
 					-- (on: its page's switch, on or off (held off: off); nil without
 					-- one. A HUD section's is the HUD page's, its icon having no dot.)
 					local switch, on = TileSwitch(tile, true) or TileSwitch(tile), nil
-					if switch then
+					if tile.groupSwitches and #tile.groupSwitches > 0 then
+						on = not ns.PageSwitchOff(tile.english)
+					elseif switch then
 						local isOn, held = SwitchState(switch)
 						on = isOn and not held
 					end
@@ -3760,6 +3821,31 @@ do
 		if tile and tile.groupSwitches then return not GroupOn(tile) end
 		local switch = tile and TileSwitch(tile, true)
 		return switch ~= nil and not switch.follows and not SwitchState(switch)
+	end
+	-- The key of a page's switch (its icon's), or nil: none.
+	function ns.PageSwitchKey(name)
+		local tile = byName[name]
+		local switch = tile and TileSwitch(tile, true)
+		return switch and not switch.follows and switch.key or nil
+	end
+	-- Whether a page has a switch a right-click on its icon or tab flips.
+	function ns.HasPageSwitch(name)
+		local tile = byName[name]
+		if not tile then return false end
+		return (tile.groupSwitches and #tile.groupSwitches > 0) or TileSwitch(tile, true) ~= nil
+	end
+	-- (/cine debug sweep: every hub icon a right-click can't turn on and off,
+	-- as { hub, label }: the user's rule is that every one can, 2026-11-17.)
+	function ns.HubTilesWithoutSwitch()
+		local list = {}
+		for _, hub in ipairs(HUBS) do
+			for _, tile in ipairs(hub.tiles or {}) do
+				if not tile.tabOf and not ((tile.groupSwitches and #tile.groupSwitches > 0) or TileSwitch(tile, true)) then
+					list[#list + 1] = { hub = L[hub.label or hub.name], label = L[tile.label or tile.english] }
+				end
+			end
+		end
+		return list
 	end
 	function ns.PageSwitchTip(owner, name)
 		local tile = byName[name]
@@ -4137,9 +4223,41 @@ local function CreateRevealPanel()
 	local overview, host, PickTab, FillOverview
 	local picked = 1 -- (the tab shown, kept while the game runs)
 	local tabList = {}
-	for i, section in ipairs(SECTIONS) do tabList[i] = { section[2], section[3] } end
+	-- (Each hub's tab a container, 2026-11-17: a right-click turns off every
+	-- page of the hub with a switch, or on again when all are off, as the
+	-- HUD's group tabs do; greyed while all are off.)
+	local function HubSwitched(hubName)
+		local any, on = false, false
+		for _, entry in ipairs(ns.HubOverview(hubName) or {}) do
+			if entry.name and ns.HasPageSwitch(entry.name) then
+				any = true
+				on = on or not ns.PageSwitchOff(entry.name)
+			end
+		end
+		return any, on
+	end
+	for i, section in ipairs(SECTIONS) do
+		tabList[i] = { section[2], section[3], off = function()
+			local any, on = HubSwitched(section[1])
+			return any and not on
+		end }
+	end
 	tabList[SETTINGS_TAB] = { L["Settings"], L["How fast the UI fades, the Calm Timer, and what takes you out of CineMode."] }
-	local tabsPanel, tabButtons, ShowTabs, tabsBase = ns.FolderTabs(content, tabList, function(i) PickTab(i) end)
+	local function FlipHub(i)
+		local section = SECTIONS[i]
+		if not section then return end
+		local any, on = HubSwitched(section[1])
+		if not any then return end
+		for _, entry in ipairs(ns.HubOverview(section[1]) or {}) do
+			if entry.name and ns.HasPageSwitch(entry.name) and (not ns.PageSwitchOff(entry.name)) == on then
+				ns.FlipPageSwitch(entry.name)
+			end
+		end
+		Refresh()
+		if picked ~= SETTINGS_TAB and FillOverview then FillOverview() end
+	end
+	local tabsPanel, tabButtons, ShowTabs, tabsBase = ns.FolderTabs(content, tabList, function(i) PickTab(i) end,
+		nil, nil, FlipHub)
 	-- (Settings, this page's own, set a little apart from the hubs' tabs.)
 	local function ShowTab(i)
 		ShowTabs(i)
@@ -4361,9 +4479,24 @@ local function CreateRevealPanel()
 		if entry.fixed and (i == 1 or not row.ticks) then return L["On and off with the General page's switch."] end
 		if i == 3 and row.tickHeld then return L["Cameras (Camera tab) is set to CineMode."] end
 	end
-	local function Choose(row, i)
+	-- (Always on these asks first: [its first tick] = the question.)
+	ns.ALWAYS_ASK = {
+		outsideCineEmote = L["Emote Vision is made for CineMode. Outside it, cards pop up during everyday play, and buffs from players with no nameplate showing make no card. Use it outside CineMode too?"],
+	}
+	StaticPopupDialogs["CINEMATIC_ALWAYS_ASK"] = {
+		text = "%s",
+		button1 = YES, button2 = NO,
+		OnAccept = function(_, data) data.Go() end,
+		timeout = 0, whileDead = true, hideOnEscape = true, preferredIndex = 3,
+	}
+	local function Choose(row, i, sure)
 		local entry, ticks = row.entry, row.ticks
 		if Inert(row, i) then return end
+		if i == 3 and not sure and ticks and ns.ALWAYS_ASK[ticks[1]] and Picked(entry, ticks) ~= 3 then
+			StaticPopup_Show("CINEMATIC_ALWAYS_ASK", ns.ALWAYS_ASK[ticks[1]], nil,
+				{ Go = function() Choose(row, i, true) end })
+			return
+		end
 		if i == 1 then
 			if entry.on then row.flip(entry.name) end
 		else
@@ -5112,6 +5245,9 @@ local function CreateRevealPanel()
 			if not before[object] and object ~= host then object:SetParent(host) end
 		end
 	end
+	-- (Settings a container of its own: the hubs' right-click isn't its.)
+	tabButtons[SETTINGS_TAB].canFlip = nil
+	ns.TabContainer(tabButtons[SETTINGS_TAB], host, "tabOn:CineMode:settings")
 	function PickTab(i)
 		picked = i
 		ShowTab(i)
@@ -6384,6 +6520,10 @@ local function CreateCameraSettingsPanel()
 	local empty = Label(content, "GameFontHighlight", L["Every camera's settings are on the Scripts page now."])
 	empty:SetPoint("TOPLEFT", subtitle, "BOTTOMLEFT", 0, -16)
 	cameraSections.tabs = { panel = panel, buttons = buttons, Show = Show, empty = empty }
+	-- (Each camera's tab a container over its section, 2026-11-17.)
+	for i, section in ipairs(cameraSections) do
+		ns.TabContainer(buttons[i], section.frame, "tabOn:Camera Settings:" .. tostring(section.key))
+	end
 
 	canvas:SetScript("OnShow", function()
 		Refresh()
@@ -8272,8 +8412,9 @@ local function CreateCombatPanel()
 		end
 		-- Shows the picked section's tab (its sections one under another, the one
 		-- the game uses now tagged In use), the panel down to its last row.
-		local hudNote -- (the HUD icon's page: what the banners are, under its switch)
+		local hudNote -- (the HUD icon's page: where its cards go, under its switch)
 		local hudList, MakeHudList -- (and under it, every icon of the hub and its tabs, as links)
+		local hudListTab = 1 -- (its tab picked: Combat, Nameplates, Info)
 		local function Layout()
 			SectionState.Restore(picked)
 			-- (The HUD icon: its switch and note, no section.)
@@ -8881,11 +9022,11 @@ local function CreateCombatPanel()
 				panelTop:SetPoint("TOPLEFT", content, "TOPLEFT", 16, below)
 			end
 		end
-		hudNote = Label(content, "GameFontHighlight", L["Each kind of frame has an icon above, and its Show in tab " ..
-			"says when those frames show in CineMode, a row each. This switch turns all of them on or off at once."])
+		-- (Just a spot under the switch for the cards now: its note, what the
+		-- icons and Show in tabs are, dropped 2026-11-17.)
+		hudNote = CreateFrame("Frame", nil, content)
+		hudNote:SetSize(SECTION_WIDTH - 12, 1)
 		hudNote:SetPoint("TOPLEFT", lastCheck, "BOTTOMLEFT", 6 - lastIndent, -16)
-		hudNote:SetWidth(SECTION_WIDTH - 12)
-		hudNote:SetWordWrap(true)
 		hudNote:Hide()
 		-- Every page of the hub, under the note (2026-11-16): each icon (its
 		-- picture and name, a link to it), its other tabs beside it as links,
@@ -8917,8 +9058,13 @@ local function CreateCombatPanel()
 						note = LIST_NOTES[icon.name] or (tabs[1] and tabs[1][3]) or "", state = icon.on }
 				end
 			end
-			hudList = ns.MakeHubCardGroups(content, groups, SECTION_WIDTH - 12)
-			hudList:SetPoint("TOPLEFT", hudNote, "BOTTOMLEFT", 0, -18)
+			-- (A tab per group, 2026-11-17: the one last picked kept as it's made again.)
+			hudList = ns.MakeHubCardGroups(content, groups, SECTION_WIDTH - 12, { tabs = true, picked = hudListTab,
+				onPick = function(i)
+					hudListTab = i
+					FitContentHeight(content)
+				end })
+			hudList:SetPoint("TOPLEFT", hudNote, "BOTTOMLEFT", 0, 0)
 			FitContentHeight(content)
 		end
 		PlaceTop()
@@ -9599,6 +9745,15 @@ function ns.FolderTabs(parent, list, onClick, width, maxWidth, onRightClick)
 		elseif each.off then
 			tab.IsOff = each.off
 		end
+		-- (A tab's container switch given later, its frame made after the tabs:
+		-- ns.TabContainer, 2026-11-17. Right-click flips it, off greys its name.)
+		function tab.SetFlip(self, key)
+			self.flipKey = key
+			self.canFlip = true
+			self.IsOff = function() return not KeyGet(key) end
+			self:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+			PaintTab(self, tabs.picked == self.shotIndex)
+		end
 		if tab.IsOff and not each.quietOff then
 			local function OffLine(self)
 				if not GameTooltip:IsOwned(self) then
@@ -9621,9 +9776,11 @@ function ns.FolderTabs(parent, list, onClick, width, maxWidth, onRightClick)
 		end
 		-- (onRightClick(i): a right-click on a tab, its tip shown again after)
 		if onRightClick or flip then tab:RegisterForClicks("LeftButtonUp", "RightButtonUp") end
+		tab.canFlip = (onRightClick or flip) and true or nil -- (/cine debug sweep: every tab must, user rule)
 		tab:SetScript("OnClick", function(self, button)
 			if button ~= "RightButton" then return onClick(i) end
-			if onRightClick then onRightClick(i) else ns.FlipSettingKey(flip) end
+			if self.flipKey then ns.FlipSettingKey(self.flipKey)
+			elseif onRightClick then onRightClick(i) else ns.FlipSettingKey(flip) end
 			PaintTab(self, tabs.picked == i)
 			if GameTooltip:IsOwned(self) and self:GetScript("OnEnter") then self:GetScript("OnEnter")(self) end
 		end)
@@ -9748,6 +9905,7 @@ local function CreatePlatesPanel()
 	local nameTabs, ShowNameTab = ns.PageTabs(content, ns.ShowInTabs("names"), 1)
 	local nameSet = content.pageTabs
 	title:SetPoint("TOPLEFT", plateTabs, "BOTTOMLEFT", 8, -14)
+	local plateCheck, namesCheck -- (the two icons' switches, made below: ShowSet picks the shown one's)
 	local function ShowSet(names)
 		for _, set in ipairs({ plateSet, nameSet }) do
 			local mine = (set == nameSet) == names
@@ -9756,6 +9914,9 @@ local function CreatePlatesPanel()
 		end
 		content.pageTabs = names and nameSet or plateSet
 		if names then ShowNameTab(1) else ShowPlateTab(1) end
+		if plateCheck then
+			ns.SetPageSwitchKey(content, names and "handleNames" or "handlePlates", names and namesCheck or plateCheck)
+		end
 	end
 	ShowSet(false)
 	local _ = nameTabs -- (its panel: nameSet.panel)
@@ -9777,6 +9938,24 @@ local function CreatePlatesPanel()
 		end)
 	handleCheck:SetPoint("TOPLEFT", subtitle, "BOTTOMLEFT", -2, -12)
 	RegisterPageSwitch(content, "handlePlates", handleCheck)
+	-- (Two icons, two switches, 2026-11-17: the Nameplates icon's (the plates)
+	-- and the Names icon's, handleNames (names over heads: the game's name
+	-- settings in CineMode, Effects.lua). Each on a frame of its own too, for
+	-- its tile's dot and right-click; the page's header switch and greying
+	-- are the shown icon's: ShowSet.)
+	local platesSwitchFrame, namesSwitchFrame = CreateFrame("Frame", nil, content), CreateFrame("Frame", nil, content)
+	for _, each in ipairs({ platesSwitchFrame, namesSwitchFrame }) do
+		each:SetSize(1, 1)
+		each:SetPoint("TOPLEFT")
+	end
+	PageSwitch(platesSwitchFrame, "handlePlates", L["Enable Page"],
+		L["Lets CineMode fade nameplates as this page says."], platesSwitchFrame, function(value)
+			if value and ns.EnsurePlateRows then ns.EnsurePlateRows() end
+			ns.WarnPlatesInCombat()
+		end)
+	plateCheck = handleCheck
+	namesCheck = PageSwitch(namesSwitchFrame, "handleNames", L["Enable Page"],
+		L["Lets CineMode hide names over heads as this page says."], namesSwitchFrame)
 	-- (Everything below is made the first time the page is needed: lazyPages.)
 	local function MakeBody()
 
@@ -10540,6 +10719,13 @@ local function CreatePlatesPanel()
 		panel, folderTabs, ShowTab, base, height = ns.FolderTabs(content, list, function(i) Pick(sections[i]) end, nil,
 			SECTION_WIDTH + 8)
 		folderHeight = height
+		-- (Each tab a container over its section's rows, 2026-11-17.)
+		for i, section in ipairs(sections) do
+			-- (The Names icon's sections under its switch, the rest under the plates'.)
+			local names = tostring(section.key):find("^Names") ~= nil
+			ns.TabContainer(folderTabs[i], section.body, "tabOn:Nameplates:" .. tostring(section.key),
+				names and "handleNames" or "handlePlates")
+		end
 		panelTop:SetPoint("TOPLEFT", handleCheck, "BOTTOMLEFT", 2, -14 - height)
 		panel:SetPoint("TOPLEFT", panelTop, "TOPLEFT")
 		panel:SetPoint("BOTTOMRIGHT", foot, "TOPLEFT", SECTION_WIDTH + 12, -12)
@@ -10562,9 +10748,9 @@ local function CreatePlatesPanel()
 	end
 	canvas.hubTabs = {
 		{ name = "Nameplates", icon = "Interface\\Icons\\Ability_Hunter_SniperShot", label = "Nameplates",
-			onSelect = function() PickIcon(false) end },
+			switchFrame = platesSwitchFrame, onSelect = function() PickIcon(false) end },
 		{ name = "Nameplate Names", icon = "Interface\\Icons\\INV_Misc_Note_02", label = "Names", own = true,
-			onSelect = function() PickIcon(true) end },
+			switchFrame = namesSwitchFrame, switchLabel = "Names", onSelect = function() PickIcon(true) end },
 	}
 	canvas:Hide()
 	RegisterSubpage(canvas, "Nameplates", L["Nameplates"])
@@ -10676,7 +10862,7 @@ local function CreateNameStylePanel()
 		sample.line.searchSkip = true
 		return sample
 	end
-	local function DrawSample(sample, row, over, scale)
+	local function DrawSample(sample, row, over, scale, always)
 		local db = ns.GetDB()
 		local info = SAMPLES[row] or SAMPLES.all
 		local text = sample.text
@@ -10692,9 +10878,13 @@ local function CreateNameStylePanel()
 			text:SetText(info.name)
 			ns.SetTextRim(text, nil)
 			sample.glow:Hide()
+			if sample.glow2 then sample.glow2:Hide() end
 			sample.back:Hide()
 			for _, edge in ipairs(sample.edges or {}) do edge:Hide() end
-			sample.line:SetText(info.title and ("<" .. info.title .. ">") or "")
+			ns.SetTextRim(sample.line, nil)
+			local title = info.title or (always and (info.kind == "player" and L["Guild"] or L["Stable Master"]))
+			sample.line:SetText(title and ("<" .. title .. ">") or "")
+			sample.line:SetAlpha(1)
 			return
 		end
 		-- Its font: the row's, All names', else the usual (General's while on).
@@ -10748,31 +10938,70 @@ local function CreateNameStylePanel()
 		text:SetTextColor(r, g, b)
 		text:SetText(info.name)
 		if rim then ns.SetTextRim(text, outline, ns.NameLookColor(row, "OutlineColor", over)) else ns.SetTextRim(text, nil) end
-		-- Its glow and band, sized to it.
+		-- The line under it: a title (Service NPCs) or a guild (players); always
+		-- one in a row's own panel (always), to see its look. Its letters the
+		-- name's while it matches it, else its own (NameRowLook's NameLine2Look).
+		local under = info.title or (info.kind == "player" and info.reaction >= 5 and L["Guild"])
+			or (always and (info.kind == "player" and L["Guild"] or L["Stable Master"])) or nil
+		local line = sample.line
+		local below
+		if under then
+			local look = ns.NameLine2Look(S)
+			local lineFile, lineOutline, lineRim = file, outline, rim
+			if look.own then
+				lineFile = PlateFont and select(2, PlateFont()) or file
+				if ROMAN then
+					if look.font == "usual" then
+						lineFile = db.styleGeneral and ns.StyleFontFile(db.styleFont) or lineFile
+					elseif look.font ~= "game" then
+						lineFile = ns.StyleFontFile(look.font) or lineFile
+					end
+				end
+				lineOutline, lineRim = look.outline, look.rim
+			end
+			local lineSize = tonumber(S("Line2Size")) or 1
+			ns.SetPlateNameFont(line, object, lineFile, size, 0.85 * lineSize * scale,
+				ns.OutlinedFlags(flags, lineRim and 0 or lineOutline))
+			local shadow, shadowAlpha = S("Shadow"), tonumber(S("ShadowAlpha")) or 1
+			if look.own then shadow, shadowAlpha = look.shadow, look.shadowAlpha end
+			if shadow then
+				line:SetShadowOffset(db.plateNameShadowX or 1, db.plateNameShadowY or -1)
+				line:SetShadowColor(0, 0, 0, shadowAlpha)
+			else
+				line:SetShadowOffset(0, 0)
+			end
+			local lineColor = S("Line2Color")
+			if lineColor == "grey" then
+				line:SetTextColor(0.72, 0.72, 0.72)
+			elseif lineColor == "gold" then
+				line:SetTextColor(1, 0.82, 0)
+			elseif lineColor == "custom" then
+				line:SetTextColor(ns.NameLookColor(row, "Line2Color", over))
+			else
+				line:SetTextColor(r, g, b)
+			end
+			-- (Brackets as Service NPCs' Brackets pick: round a title alone
+			-- (Title alone), or under its name too (Always). Under a name here.)
+			local brackets = not info.title or (db.nameServiceBrackets and db.nameServiceBracketsWithName)
+			line:SetText(brackets and ("<" .. under .. ">") or under)
+			line:SetAlpha(look.alpha)
+			if lineRim then
+				ns.SetTextRim(line, lineOutline, ns.NameLookColor(row, look.colorSetting, over))
+			else
+				ns.SetTextRim(line, nil)
+			end
+			local lineHeight = select(2, line:GetFont()) or 10
+			below = { width = line:GetStringWidth(), height = lineHeight }
+		else
+			line:SetText("")
+			ns.SetTextRim(line, nil)
+		end
+		-- Its glow and band, sized to it (and the line under it: Around).
 		local width, height = text:GetStringWidth(), (select(2, text:GetFont())) or 12
 		-- (Glow, band and its border: NameRowLook's, as the plates draw them.)
 		ns.DressNameParts(sample.owner, sample, text, width, height, S, function(setting)
 			return ns.NameLookColor(row, setting, over)
-		end)
-		-- The line under it: a title (Service NPCs) or a guild (players).
-		local under = info.title or (info.kind == "player" and info.reaction >= 5 and L["Guild"]) or nil
-		if under then
-			local lineSize = tonumber(S("Line2Size")) or 1
-			ns.SetPlateNameFont(sample.line, object, file, size, 0.85 * lineSize * scale, flags)
-			local lineColor = S("Line2Color")
-			if lineColor == "grey" then
-				sample.line:SetTextColor(0.72, 0.72, 0.72)
-			elseif lineColor == "gold" then
-				sample.line:SetTextColor(1, 0.82, 0)
-			else
-				sample.line:SetTextColor(r, g, b)
-			end
-			local brackets = not info.title or db.nameServiceBrackets
-			sample.line:SetText(brackets and ("<" .. under .. ">") or under)
-			sample.line:SetAlpha(tonumber(S("Alpha")) or 1)
-		else
-			sample.line:SetText("")
-		end
+		end, below)
 	end
 
 	-- The scene: a name of each kind, spread over the lake, each in its row's
@@ -10886,11 +11115,15 @@ local function CreateNameStylePanel()
 	-- Glow, Background and Second line. A row's setting left on Inherit takes
 	-- All names', and All names' the game's.
 	stack:Header(content, L["Names"])
-	local TAB_NAMES = { Font = "Text", Size = "Text", Alpha = "Text", Outline = "Text", OutlineColor = "Text",
-		Shadow = "Text", ShadowAlpha = "Text", Colour = "Color", Friends = "Color", Enemies = "Color",
-		Hostile = "Color", Neutral = "Color", Friendly = "Color", Glow = "Glow", Back = "Background",
-		BackAlpha = "Background", Line2Size = "Second line", Line2Color = "Second line",
-		GlowAlpha = "Glow", GlowSize = "Glow", BackBorder = "Background", BackBorderSize = "Background" }
+	-- (Each setting's tab, for a row's button: Own: Name · Behind. 2026-11-17.)
+	local TAB_NAMES = {}
+	for _, setting in ipairs({ "Font", "Size", "Alpha", "Outline", "OutlineColor", "Shadow", "ShadowAlpha", "Colour",
+		"Friends", "Enemies", "Hostile", "Neutral", "Friendly" }) do TAB_NAMES[setting] = "Name" end
+	for setting in pairs(ns.NAME_LOOK_GAME) do
+		if setting:find("^Line2") then TAB_NAMES[setting] = "Second line" end
+	end
+	for _, setting in ipairs({ "Glow", "GlowAlpha", "GlowSize", "GlowAround", "Back", "BackAlpha", "BackBorder",
+		"BackBorderSize", "BackAround" }) do TAB_NAMES[setting] = "Behind" end
 	local OUTLINE_NAMES = { [0] = L["None"], L["Thin"], L["Thick"] }
 	local function Words(setting, value)
 		if setting == "Font" then
@@ -10954,6 +11187,38 @@ local function CreateNameStylePanel()
 			rowButtons[row].pop:SetShown(not rowButtons[row].pop:IsShown())
 			return
 		end
+		local function RowDefault(dbKey)
+			if row == "all" then return ns.DEFAULTS[dbKey] end
+			return ns.NameRowDefault(dbKey)
+		end
+		-- (A row's own value saved, its default as none.)
+		local function Save(setting, value)
+			local dbKey = ns.NameLookKey(row, setting)
+			if value == RowDefault(dbKey) then value = nil end
+			ns.GetDB()[dbKey] = value
+		end
+		local function Own(setting)
+			local value = ns.GetDB()[ns.NameLookKey(row, setting)]
+			return value ~= nil and value ~= "inherit" and value or nil
+		end
+		-- (A color's setting from one of its keys: GlowR -> Glow, OutlineR -> OutlineColor.)
+		local function ColorSetting(key)
+			local base = type(key) == "string" and key:match("^(.-)[RGB]$")
+			if not base then return nil end
+			local setting = base == "Outline" and "OutlineColor" or base
+			return ns.NAME_LOOK_COLORS[setting] and setting or nil
+		end
+		-- (Match the name turned off: the second line starts as a copy of the
+		-- name's letters, so nothing changes till you change it. 2026-11-17.)
+		local LINE2_COPY = { Font = "Line2Font", Outline = "Line2Outline", OutlineColor = "Line2OutlineColor",
+			Shadow = "Line2Shadow", ShadowAlpha = "Line2ShadowAlpha" }
+		local function CopyNameToLine2()
+			for from, into in pairs(LINE2_COPY) do Save(into, (ns.NameLookValue(row, from))) end
+			local r, g, b = ns.NameLookColor(row, "OutlineColor")
+			Save("Line2OutlineColorR", r)
+			Save("Line2OutlineColorG", g)
+			Save("Line2OutlineColorB", b)
+		end
 		local function FieldOf(key)
 			-- (The service titles' own settings, the same for every row.)
 			if key:find("^nameService") then return key end
@@ -10961,34 +11226,77 @@ local function CreateNameStylePanel()
 			RecordKey(content, dbKey)
 			return { get = function()
 				local value = ns.GetDB()[dbKey]
-				if value == nil then
-					if row == "all" then value = ns.DEFAULTS[dbKey] else value = ns.NameRowDefault(dbKey) end
-				end
+				if value == nil then value = RowDefault(dbKey) end
 				return value
 			end, set = function(value)
-				local default = row == "all" and ns.DEFAULTS[dbKey] or ns.NameRowDefault(dbKey)
-				if value == default then value = nil end
+				-- (A color picked for a setting this row hands down: the setting
+				-- becomes the row's own as it is, so the color shows. No Inherit
+				-- buttons since 2026-11-17.)
+				local colorOf = ColorSetting(key)
+				if colorOf and not Own(colorOf) then Save(colorOf, (ns.NameLookValue(row, colorOf))) end
+				if key == "Line2Match" and value == false and ns.NameLookValue(row, "Line2Match") ~= false then
+					CopyNameToLine2()
+				end
+				if value == RowDefault(dbKey) then value = nil end
 				ns.GetDB()[dbKey] = value
 			end }
 		end
 		local function DefaultOf(key)
-			if key:find("^nameService") then return nil end -- (not this row's: never reset with it)
-			local dbKey = ns.NameLookKey(row, key)
-			if row == "all" then return ns.DEFAULTS[dbKey] end
-			return ns.NameRowDefault(dbKey)
+			if type(key) ~= "string" or key:find("^nameService") then return nil end -- (not this row's: never reset with it)
+			return RowDefault(ns.NameLookKey(row, key))
 		end
-		local function Own(setting)
-			local value = ns.GetDB()[ns.NameLookKey(row, setting)]
-			return value ~= nil and value ~= "inherit" and value or nil
-		end
-		local INHERIT = { "inherit", L["Inherit"], row == "all" and L["The name theme's look, else the game's."] or
-			L["Follows the Default row's look, else the game's."] }
+		-- (Fonts: the usual first, General's or the game's.)
+		local USUAL = { "usual", L["General's or the game's"] }
 		local hidden = { Add = function(_, control)
 			control:Hide()
 			return control
 		end }
 		local styleRows = ns.StyleRows(ns.lowHealthKit, content, hidden, Changed, "plateNameStyle", FieldOf)
 		local service = row == "all" or row == "ServiceNPCs" or row:find("^Service") ~= nil
+		-- (Outline and Shadow, the name's (prefix "") or the second line's own
+		-- ("Line2"): a Section each, its parts only while it's on. 2026-11-17.)
+		local function OutlineRows(look, prefix)
+			look.Section(L["Outline"])
+			look.Segments(L["Outline"], prefix .. "Outline", { { 0, L["None"] }, { 1, L["Thin"] }, { 2, L["Thick"] } },
+				L["A border around the letters."], nil, "outline")
+			local outlined = look.Fold(function()
+				return (tonumber((ns.NameLookValue(row, prefix .. "Outline"))) or 0) > 0
+			end)
+			outlined.Segments(L["Color"], prefix .. "OutlineColor", { { "black", L["Black"] },
+				{ "custom", L["Custom"], L["An outline in your own color; costs more with many names up."] } })
+			local keys = prefix == "" and "Outline" or "Line2OutlineColor"
+			outlined.Fold(function() return ns.NameLookValue(row, prefix .. "OutlineColor") == "custom" end)
+				.Chips(L["Its color"], { keys .. "R", keys .. "G", keys .. "B" })
+		end
+		local function ShadowRows(look, prefix)
+			look.Section(L["Shadow"])
+			look.Segments(L["Shadow"], prefix .. "Shadow", { { true, L["On"],
+				L["A dark copy of the letters just behind them, to lift them off the world."] }, { false, L["Off"] } })
+			look.Fold(function() return ns.NameLookValue(row, prefix .. "Shadow") == true end)
+				.Slider(prefix .. "ShadowAlpha", L["Strength"], 0, 100, 5, "%d%%", 100, L["How dark the shadow is."])
+		end
+		-- (What shows, 2026-11-17: round whatever's up, a title shown alone
+		-- too, both lines once your target's name comes in over it.)
+		local AROUND = { { "both", L["What shows"], L["Round whatever shows: the name, the line under it, or both."] },
+			{ "name", L["Name only"], L["Round the name alone; hidden while only its title shows."] } }
+		-- (Service titles' own settings, every row's: Show as Text or Icon, and
+		-- the brackets' two ticks as one pick.)
+		local SERVICE_ICONS = {
+			get = function() return ns.GetDB().nameServiceIcons and true or false end,
+			set = function(value) ns.GetDB().nameServiceIcons = value end,
+		}
+		local SERVICE_BRACKETS = {
+			get = function()
+				local db = ns.GetDB()
+				if not db.nameServiceBrackets then return "never" end
+				return db.nameServiceBracketsWithName and "always" or "alone"
+			end,
+			set = function(value)
+				local db = ns.GetDB()
+				db.nameServiceBrackets = value ~= "never"
+				db.nameServiceBracketsWithName = value == "always"
+			end,
+		}
 		local button, pop = styleRows.Look("", label, {
 			tabs = {
 				default = DefaultOf,
@@ -10997,10 +11305,15 @@ local function CreateNameStylePanel()
 					return Words(key, ParentValue(row, key)), ParentValue(row, key)
 				end,
 				source = function(key)
-					if key:find("^nameService") then return nil end
+					if type(key) ~= "string" or key:find("^nameService") then return nil end
 					return RowSource(row, key)
 				end,
 				resolved = function(key) return ParentValue(row, key) end,
+				-- (A color's chips: the color it gives, wherever it's from.)
+				color = function(keys)
+					local setting = ColorSetting(keys[1])
+					if setting then return ns.NameLookColor(row, setting) end
+				end,
 				copyKind = "nameRow", copyName = label,
 				-- (Start from a theme: a name theme's look in just this row.)
 				themeList = function()
@@ -11029,7 +11342,7 @@ local function CreateNameStylePanel()
 				function holder.Refresh(_, over, note)
 					tag:SetShown(over ~= nil)
 					tag:SetText(note or L["Preview: not saved"])
-					DrawSample(sample, row, over, 1.6 * (holder.zoom or 1))
+					DrawSample(sample, row, over, 1.6 * (holder.zoom or 1), true)
 				end
 				-- (Its name drawn on it, not a frame: zoomed by its own size.)
 				function holder.OnZoom() end
@@ -11037,8 +11350,20 @@ local function CreateNameStylePanel()
 				panels[row] = holder
 				return holder
 			end,
+			-- (Three tabs, 2026-11-17: Name (its letters and colors), Second line
+			-- (the guild or title's, matching the name's or its own) and Behind
+			-- (the glow and band, round the name or both lines). Each tab every
+			-- setting on one page; no Inherit buttons: a heading says where a
+			-- value comes from, Clear hands it back.)
+			groups = {
+				{ "Name", { { "font", "Font" }, { "textSize", "Size" }, { "nameColor", "Color by" },
+					{ "outline", "Outline" }, { "outlineColor", "Outline color" }, { "shadow", "Shadow" } } },
+				{ "Second line", { { "line2", "Second line" } } },
+				{ "Behind", { { "glow", "Glow" }, { "backColor", "Band" } } },
+			},
 			font = function(look)
-				look.Font("Font", L["The names' font."], nil, INHERIT)
+				look.Section(L["Text"])
+				look.Font("Font", L["The names' font."], nil, USUAL)
 			end,
 			textSize = function(look)
 				-- (Up to 400%, 2026-11-16: a target's name can be made to stand out.)
@@ -11049,33 +11374,8 @@ local function CreateNameStylePanel()
 				look.Pair(false)
 			end,
 			textColor = false,
-			outline = function(look)
-				look.Segments(L["Outline"], "Outline", { INHERIT, { 0, L["None"] }, { 1, L["Thin"] }, { 2, L["Thick"] } },
-					L["A border around the letters."], nil, "outline")
-			end,
-			outlineColor = function(look)
-				local function Custom(db) return look.On(db) and Own("OutlineColor") == "custom" end
-				local function Outlined(db)
-					return look.On(db) and (tonumber((ns.NameLookValue(row, "Outline"))) or 0) > 0
-				end
-				-- (Under Outline, indented: its parts, 2026-11-16.)
-				look.Sub(true)
-				look.Segments(L["Outline color"], "OutlineColor", { INHERIT, { "black", L["Black"] },
-					{ "custom", L["Custom"], L["An outline in your own color; costs more with many names up."] } }, nil, Outlined)
-				look.Chips(L["Its color"], { "OutlineR", "OutlineG", "OutlineB" }, nil, Custom)
-				look.Sub(false)
-			end,
-			shadow = function(look)
-				look.Segments(L["Shadow"], "Shadow", { INHERIT, { true, L["Shadow"],
-					L["A dark copy of the letters just behind them, to lift them off the world."] }, { false, L["None"] } })
-				look.Sub(true) -- (under Shadow, indented; half as long, 2026-11-16)
-				look.Pair(true)
-				look.Slider("ShadowAlpha", L["Shadow opacity"], 0, 100, 5, "%d%%", 100, L["How dark the shadow is."],
-					function(db) return look.On(db) and ns.NameLookValue(row, "Shadow") == true end)
-				look.Pair(false)
-				look.Sub(false)
-			end,
 			nameColor = function(look)
+				look.Section(L["Color"])
 				-- (The Default row: no One color or its picker, 2026-11-16: every kind
 				-- of name in one color undoes the rows' own, as the plates' did.)
 				-- (Only the colors this row's names can take, 2026-11-16: an NPC row
@@ -11084,8 +11384,8 @@ local function CreateNameStylePanel()
 				local parts = NAME_COLOR_PARTS[row]
 				-- (How they see you only where names of every reaction share the row,
 				-- 2026-11-16: Default, Your target. A row of one kind of unit has its
-				-- color below; Inherit gives Default's way.)
-				local choices = { INHERIT }
+				-- color below.)
+				local choices = {}
 				if not parts then
 					choices[#choices + 1] = { true, L["How they see you"], L["Red for hostile, yellow for neutral and green for friendly units."] }
 				end
@@ -11099,96 +11399,104 @@ local function CreateNameStylePanel()
 				choices[#choices + 1] = { false, L["The plate's"], L["The plate's own color, white or gray."] }
 				look.Segments(L["Color by"], "Colour", choices)
 				if row ~= "all" and not npcRow then
-					look.Chips(L["Color"], { "ColourR", "ColourG", "ColourB" }, nil,
-						function(db) return look.On(db) and Own("Colour") == "one" end)
+					look.Fold(function() return ns.NameLookValue(row, "Colour") == "one" end)
+						.Chips(L["Its color"], { "ColourR", "ColourG", "ColourB" })
 				end
 				-- (The Default row: Color by alone, 2026-11-16. Each kind's color is
 				-- on its own row; Your target takes them from its kind's.)
 				if row == "all" then return end
-				local function Reacting(db)
+				local reacting = look.Fold(function()
 					local mode = ns.NameLookValue(row, "Colour")
-					return look.On(db) and mode ~= "one" and mode ~= false
-				end
+					return mode ~= "one" and mode ~= false
+				end)
 				if not parts or parts.Friends then
-					look.Segments(L["Friendly players"], "Friends", { INHERIT,
+					reacting.Segments(L["Friendly players"], "Friends", {
 						{ "blue", L["Blue"], L["Blue, as the game's names over their heads."] },
 						{ "class", L["Class colors"], L["Their class's color; also turns on the game's class colors for nameplates."] },
-						{ "white", L["White"] } }, nil, Reacting)
+						{ "white", L["White"] } })
 				end
 				if not parts or parts.Enemies then
-					look.Segments(L["Enemy players"], "Enemies", { INHERIT, { "react", L["Hostile's color"] },
-						{ "class", L["Class colors"] } }, nil, Reacting)
+					reacting.Segments(L["Enemy players"], "Enemies", { { "react", L["Hostile's color"] },
+						{ "class", L["Class colors"] } })
 				end
 				for _, each in ipairs({ { "Hostile", L["Hostile"] }, { "Neutral", L["Neutral"] },
 					{ "Friendly", L["Friendly"] } }) do
 					if not parts or parts[each[1]] then
-						look.Segments(each[2], each[1], { INHERIT, { "game", L["The game's"] }, { "custom", L["Custom"] } },
-							L["NPCs of this reaction in a color of your own."], nil)
-						look.Chips(each[2] .. " " .. L["color"], { each[1] .. "R", each[1] .. "G", each[1] .. "B" }, nil,
-							function(db) return look.On(db) and Own(each[1]) == "custom" end)
+						look.Segments(each[2], each[1], { { "game", L["The game's"] }, { "custom", L["Custom"] } },
+							L["NPCs of this reaction in a color of your own."])
+						look.Fold(function() return ns.NameLookValue(row, each[1]) == "custom" end)
+							.Chips(each[2] .. " " .. L["color"], { each[1] .. "R", each[1] .. "G", each[1] .. "B" })
 					end
 				end
 			end,
+			outline = function(look) OutlineRows(look, "") end,
+			outlineColor = function() end, -- (with Outline, OutlineRows)
+			shadow = function(look) ShadowRows(look, "") end,
 			glow = function(look)
-				look.Segments(L["Glow"], "Glow", { INHERIT, { "none", L["None"] },
-					{ "soft", L["Soft glow"], L["A soft light behind the name."] } })
-				-- (No picker on the Default row, 2026-11-16: one color for every
-				-- name's glow, as One color was. The theme's own still comes through.)
-				if row ~= "all" then
-					look.Chips(L["Glow color"], { "GlowR", "GlowG", "GlowB" }, nil,
-						function(db) return look.On(db) and Own("Glow") == "soft" end)
-				end
-				-- (Its opacity and size, 2026-11-16, under it.)
-				local function Glowing(db) return look.On(db) and ns.NameLookValue(row, "Glow") ~= "none" end
-				look.Sub(true)
-				look.Pair(true)
-				look.Slider("GlowAlpha", L["Opacity"], 10, 100, 5, "%d%%", 100, L["How strong the glow is."], Glowing)
-				look.Slider("GlowSize", L["Size"], 50, 300, 10, "%d%%", 100, L["How far the glow spreads round the name."],
-					Glowing)
-				look.Pair(false)
-				look.Sub(false)
+				look.Section(L["Glow"])
+				look.Segments(L["Glow"], "Glow", { { "none", L["Off"] },
+					{ "soft", L["On"], L["A soft light behind the name."] } })
+				local on = look.Fold(function() return ns.NameLookValue(row, "Glow") ~= "none" end)
+				on.Segments(L["Around"], "GlowAround", AROUND)
+				on.Chips(L["Color"], { "GlowR", "GlowG", "GlowB" })
+				-- (Past 100%: brighter, a second glow over the first. 2026-11-17.)
+				on.Pair(true)
+				on.Slider("GlowAlpha", L["Strength"], 10, 150, 5, "%d%%", 100, L["How strong the glow is."])
+				on.Slider("GlowSize", L["Size"], 50, 300, 10, "%d%%", 100, L["How far the glow spreads round the name."])
+				on.Pair(false)
 			end,
 			backColor = function(look)
-				look.Segments(L["Behind the name"], "Back", { INHERIT, { "none", L["Nothing"] },
-					{ "band", L["Band"], L["A band of color behind the name."] } })
-				local function Banded(db) return look.On(db) and ns.NameLookValue(row, "Back") ~= "none" end
-				if row ~= "all" then -- (as the glow's: none on the Default row)
-					look.Chips(L["Color"], { "BackR", "BackG", "BackB" }, nil,
-						function(db) return look.On(db) and Own("Back") == "band" end)
-				end
-				look.Sub(true)
-				look.Pair(true)
-				look.Slider("BackAlpha", L["Opacity"], 10, 100, 5, "%d%%", 100, L["How see-through the band is."], Banded)
-				look.Pair(false)
+				look.Section(L["Band"])
+				look.Segments(L["Band"], "Back", { { "none", L["Off"] },
+					{ "band", L["On"], L["A band of color behind the name."] } })
+				local on = look.Fold(function() return ns.NameLookValue(row, "Back") ~= "none" end)
+				on.Segments(L["Around"], "BackAround", AROUND)
+				on.Chips(L["Color"], { "BackR", "BackG", "BackB" })
+				on.Pair(true)
+				on.Slider("BackAlpha", L["Strength"], 10, 100, 5, "%d%%", 100, L["How see-through the band is."])
+				on.Pair(false)
 				-- (A border round the band, 2026-11-16: its color and thickness.)
-				look.Segments(L["Border"], "BackBorder", { INHERIT, { "none", L["None"] },
-					{ "line", L["Line"], L["A line round the band."] } }, nil, Banded)
-				local function Edged(db) return Banded(db) and ns.NameLookValue(row, "BackBorder") == "line" end
-				look.Sub(false)
-				look.Sub(true)
-				look.Chips(L["Border color"], { "BackBorderR", "BackBorderG", "BackBorderB" }, nil, Edged)
-				look.Pair(true)
-				look.Slider("BackBorderSize", L["Thickness"], 1, 4, 1, "%d", 1, L["How thick the band's border is, in pixels."],
-					Edged)
-				look.Pair(false)
-				look.Sub(false)
+				on.Segments(L["Border"], "BackBorder", { { "none", L["None"] },
+					{ "line", L["Line"], L["A line round the band."] } })
+				local edged = on.Fold(function() return ns.NameLookValue(row, "BackBorder") == "line" end)
+				edged.Chips(L["Border color"], { "BackBorderR", "BackBorderG", "BackBorderB" })
+				edged.Pair(true)
+				edged.Slider("BackBorderSize", L["Thickness"], 1, 4, 1, "%d", 1, L["How thick the band's border is, in pixels."])
+				edged.Pair(false)
 			end,
 			backAlpha = false,
 			line2 = function(look)
+				-- (Its letters: the name's, or its own once Its own is picked,
+				-- starting as a copy of the name's: FieldOf. 2026-11-17.)
+				look.Segments(L["Letters"], "Line2Match", {
+					{ true, L["Match the name"], L["The name's font, outline and shadow. Size, opacity and color stay this line's own."] },
+					{ false, L["Its own"], L["A font, outline and shadow of its own, starting as the name's."] } })
+				local function Own2() return ns.NameLookValue(row, "Line2Match") == false end
+				look.Section(L["Text"])
+				look.Fold(Own2).Font("Line2Font", L["The second line's font."], nil, USUAL)
+				look.Pair(true)
 				look.Slider("Line2Size", L["Size"], 50, 120, 5, "%d%%", 100,
 					L["The guild or title under the name, next to the name's size."])
-				look.Segments(L["Color"], "Line2Color", { INHERIT, { "name", L["Name's"] }, { "grey", L["Grey"] },
-					{ "gold", L["Gold"] } })
+				look.Slider("Line2Alpha", L["Opacity"], 20, 100, 5, "%d%%", 100, L["How see-through the line under the name is."])
+				look.Pair(false)
+				look.Section(L["Color"])
+				look.Segments(L["Color"], "Line2Color", { { "name", L["Name's"] }, { "grey", L["Grey"] },
+					{ "gold", L["Gold"] }, { "custom", L["Custom"] } })
+				look.Fold(function() return ns.NameLookValue(row, "Line2Color") == "custom" end)
+					.Chips(L["Its color"], { "Line2ColorR", "Line2ColorG", "Line2ColorB" })
+				local own = look.Fold(Own2)
+				OutlineRows(own, "Line2")
+				ShadowRows(own, "Line2")
 				-- (Service NPCs' titles: the same for every row that shows them.)
 				if service then
-					look.Toggle("nameServiceBrackets", L["Brackets round titles"],
-						L["Shows NPC titles with their < > brackets."])
-					look.Toggle("nameServiceBracketsWithName", L["When the name shows too"],
-						L["Keeps the < > on a title shown under its NPC's name."])
-					look.Toggle("nameServiceIcons", L["Icons for titles"],
-						L["An icon in place of a service NPC's title (an anvil for repairs...)."])
-					look.Slider("nameServiceIconScale", L["Icon size"], 50, 200, 5, "%d%%", 100,
-						L["How big the title icons are."], function(db) return look.On(db) and db.nameServiceIcons end)
+					look.Section(L["NPC titles"])
+					look.Segments(L["Show as"], SERVICE_ICONS, { { false, L["Text"] },
+						{ true, L["Icon"], L["An icon in place of a service NPC's title (an anvil for repairs...)."] } })
+					look.Fold(function(db) return db.nameServiceIcons end)
+						.Slider("nameServiceIconScale", L["Icon size"], 50, 200, 5, "%d%%", 100, L["How big the title icons are."])
+					look.Segments(L["Brackets"], SERVICE_BRACKETS, { { "never", L["Never"] },
+						{ "alone", L["Title alone"], L["< > round a title shown without its NPC's name."] },
+						{ "always", L["Always"], L["< > round every title, under the name too."] } })
 				end
 			end,
 		})
@@ -11426,9 +11734,26 @@ do
 			if ns.RefreshTargetArrows then ns.RefreshTargetArrows() end
 			if preview then preview:Refresh() end
 		end
-		-- (Its switch: the marks and their colors on the plates, or none at all.)
+		-- (Its switches, 2026-11-17, as its icon's tabs are laid out: Default's,
+		-- the icon's (the plates' look; off, Smart and Cast Bars too), and
+		-- Smart's own (its rows' marks and colors), under it. Each on a frame
+		-- of its own too, for its tile's dot and right-click; the page's header
+		-- switch is the shown part's: Pick.)
+		local function SwitchChanged()
+			Changed()
+			if ns.RefreshPlateHealthStyle then ns.RefreshPlateHealthStyle() end
+		end
 		local switch = PageSwitch(content, "handlePlateStyle", L["Enable Page"],
-			L["Turns this page's marks and colors on or off."], subtitle, Changed)
+			L["Turns the nameplates' look on or off, Smart and Cast Bars with it."], subtitle, SwitchChanged)
+		local defaultSwitchFrame, smartSwitchFrame = CreateFrame("Frame", nil, content), CreateFrame("Frame", nil, content)
+		for _, each in ipairs({ defaultSwitchFrame, smartSwitchFrame }) do
+			each:SetSize(1, 1)
+			each:SetPoint("TOPLEFT")
+		end
+		PageSwitch(defaultSwitchFrame, "handlePlateStyle", L["Enable Page"],
+			L["Turns the nameplates' look on or off, Smart and Cast Bars with it."], defaultSwitchFrame, SwitchChanged)
+		local smartCheck = PageSwitch(smartSwitchFrame, "plateMarks", L["Enable Page"],
+			L["Turns Smart's marks and colors on or off."], smartSwitchFrame, SwitchChanged)
 		-- (Everything below is made the first time the page is needed: lazyPages.)
 		local function MakeBody()
 			-- (What's on the page before the body: neither part's.)
@@ -11708,11 +12033,20 @@ do
 				end
 				local width, height = self:GetWidth(), self:GetHeight()
 				local used = {}
+				-- (Two plates side by side always inside it: a narrow preview (the
+				-- small sticky one) draws them smaller, each kept off its edges.
+				-- Before, the right-hand ones ran past it and were cut off: /cine
+				-- debug sweep, 2026-11-17.)
+				local plateW = (BAR_W * math.max(1, (plates[1] and plates[1].goal.width) or 1)) + 40 + 28
+				local fit = math.min(1, (width - 12) / (2 * plateW + 8))
 				local function Place(n, spot, kind, who)
 					local plate = plates[n] or MakeSample(n)
 					plate:ClearAllPoints()
-					plate:SetScale(spot[3])
-					plate:SetPoint("CENTER", self, "TOPLEFT", width * spot[1] / spot[3], -height * spot[2] / spot[3])
+					local scale = math.max(0.3, spot[3] * fit)
+					plate:SetScale(scale)
+					local half = plateW * scale / 2
+					local x = math.max(half + 4, math.min(width - half - 4, width * spot[1]))
+					plate:SetPoint("CENTER", self, "TOPLEFT", x / scale, -height * spot[2] / scale)
 					plate:Show()
 					Dress(plate, kind, who)
 					used[n] = true
@@ -13557,12 +13891,14 @@ do
 		local function Pick(i)
 			MakeStyle("its tab picked")
 			if ShowPart then ShowPart(i) end
+			ns.SetPageSwitchKey(content, i == 2 and "plateMarks" or "handlePlateStyle", i == 2 and smartCheck or switch)
 		end
 		canvas.hubTabs = {
 			{ name = "Nameplate Style", icon = "Interface\\Icons\\Ability_Marksmanship", label = "Nameplates",
-				showIn = "plates", onSelect = function() Pick(1) end },
+				showIn = "plates", switchFrame = defaultSwitchFrame, onSelect = function() Pick(1) end },
 			{ name = "Nameplate Marks", icon = "Interface\\Icons\\Ability_Marksmanship", label = "Smart", own = true,
-				tabOf = "Nameplate Style", onSelect = function() Pick(2) end },
+				tabOf = "Nameplate Style", switchFrame = smartSwitchFrame, switchLabel = "Smart",
+				onSelect = function() Pick(2) end },
 		}
 		canvas:Hide()
 		RegisterSubpage(canvas, "Nameplate Style", L["Nameplate Style"])
@@ -13673,7 +14009,7 @@ do
 		-- (The Chat icon's tabs over the title, 2026-11-16: this page's parts,
 		-- the bubbles' pages, then its links: ns.ShowInTabs("chat").)
 		local title = Label(chatPanel, "GameFontNormalLarge", L["Chat"])
-		local outerTabs, ShowOuter = ns.PageTabs(chatPanel, ns.ShowInTabs("chat"), ns.ShowInIndex("chat", "Chat"))
+		local outerTabs, ShowOuter = ns.PageTabs(chatPanel, ns.ShowInTabs("chat"), ns.ShowInIndex("chat", "Chat"), true)
 		title:SetPoint("TOPLEFT", outerTabs, "BOTTOMLEFT", 8, -14)
 		-- (When the chat window shows: its row is at the top of this page, Show in.)
 
@@ -14068,9 +14404,17 @@ local function CreateMinimapPanel()
 		{ L["Keep Open"], L["Where and while what the minimap stays up the whole time."] },
 	}, "Minimap/page", nil, nil, 1, nil, true)
 	local keepHost = partHosts[2]
+	-- (Keep Open's own switch since 2026-11-17, under the Minimap icon's Show
+	-- as Show Advanced's is (Frames.lua's ns.SHOW_IN_CHILDREN): on its tab's
+	-- frame, so its settings grey with it; the page's header switch is its
+	-- while its tab's up.)
+	local keepSwitch = PageSwitch(keepHost, "minimapKeepOpen", L["Enable Page"],
+		L["Turns this tab's minimap settings on or off."], keepHost)
+	keepHost:HookScript("OnShow", function() ns.SetPageSwitchKey(content, "minimapKeepOpen", keepSwitch) end)
+	keepHost:HookScript("OnHide", function() ns.SetPageSwitchKey(content, "handleMinimap", switch) end)
 	ns.ShowInParts(canvas, content, title, "minimap", PickPart, ShowOuter, { label = "Minimap",
 		icon = "Interface\\Icons\\INV_Misc_Map_01", titles = { L["Show Advanced"], L["Keep Open"] },
-		switchLabel = "Show Advanced" })
+		switchLabel = "Show Advanced", switchLabels = { "Show Advanced", "Keep Open" }, switchFrames = { nil, keepHost } })
 	ns.LinkPointer(content, { "minimap" })
 
 	-- Retail's quest waypoint (the marker in the world showing where to go).
@@ -14694,6 +15038,67 @@ local function CreateQuestTrackerPanel()
 	RegisterSubpage(canvas, L["Quest tracker"], L["Quest Tracker"])
 end
 
+-- A tab as a container (the user's rule, 2026-11-17): a switch of its own
+-- over everything on its frame (host), under the page's switch (pageKey):
+-- right-clicking the tab flips it; off, all on it is greyed and its
+-- settings read off (ns.Setting, ns.PageOn and ns.StyleOn walk up through
+-- it: each setting on the frame hung under it, MapTabContainer). key: a
+-- stable name, saved per profile ("tabOn:<page id>:<tab>"), on to start.
+-- A tab that already has a switch of its own (flip, onRightClick) keeps it.
+-- (On ns: this file's main chunk is near Lua's 200 locals.)
+ns.tabContainers = {}
+function ns.TabContainer(tab, host, key, pageKey)
+	if not (tab and host and key and tab.SetFlip) or tab.flipKey or tab.canFlip or pageSwitches[host] then return end
+	if ns.DEFAULTS[key] == nil then ns.DEFAULTS[key] = true end
+	local db = ns.GetDB()
+	if db and db[key] == nil then db[key] = true end
+	PageSwitch(host, key, L["Enable Page"], L["Turns everything on this tab on or off."], host)
+	if pageKey then ns.SetPageMaster({ key }, pageKey) end
+	ns.tabContainers[#ns.tabContainers + 1] = { host = host, key = key, pageKey = pageKey }
+	tab.containerHost = host -- (/cine debug sweep: off, all on it reads off)
+	tab:SetFlip(key)
+	-- (Its settings hung under it once its page is built: next frame, once.)
+	if not ns.tabMapPending then
+		ns.tabMapPending = true
+		C_Timer.After(0, function()
+			ns.tabMapPending = nil
+			ns.MapTabContainers()
+		end)
+	end
+end
+-- Each container's settings (on its frame now: pages adopt theirs late) hung
+-- under its switch, but for one already under another tree's switch (an
+-- icon's tab's, a tab's own): left as it is.
+function ns.MapTabContainers()
+	for _, each in ipairs(ns.tabContainers) do
+		-- (Its page's switch, where its tabs weren't placed from it: the one on
+		-- the frame it's on, made by now.)
+		if not ns.PageSwitchOf(each.key) then
+			local page = pageSwitches[each.host:GetParent() or false]
+			if page and page.key and page.key ~= each.key then ns.SetPageMaster({ each.key }, page.key) end
+		end
+		-- (The switches over it, up to the top: a setting under any of them is
+		-- on its page, so it goes under the tab now. One under another tree's
+		-- (an icon's other tab's) stays.)
+		local above, step = {}, ns.PageSwitchOf(each.key)
+		for _ = 1, 10 do
+			if not step then break end
+			above[step] = true
+			step = ns.PageSwitchOf(step)
+		end
+		local function Walk(frame, depth)
+			if depth > 30 then return end
+			local key = frame.settingKey
+			if type(key) == "string" and key ~= each.key then
+				local now = ns.PageSwitchOf(key)
+				if now == nil or above[now] then ns.SetPageMaster({ key }, each.key) end
+			end
+			for _, child in ipairs({ frame:GetChildren() }) do Walk(child, depth + 1) end
+		end
+		Walk(each.host, 0)
+	end
+end
+
 -- Folder tabs inside a page, under anchor (its switch), as the Cooldown
 -- Manager's and Swing Timer's: list { label, tip } each. Each tab's
 -- settings go on a frame of its own (hosts[i]: build them there), one shown
@@ -14796,6 +15201,21 @@ function ns.PageTabsBelow(content, anchor, list, id, linksTab, groupKey, adoptTa
 		FitContentHeight(content)
 		C_Timer.After(0, function() FitContentHeight(content) end)
 	end
+	-- (Every tab a container: its own switch over all on its frame, under the
+	-- page's (anchor's, its switch), 2026-11-17. Its settings mapped under it
+	-- once they're on it: after Adopt, and as the page shows.)
+	local pageKey = type(anchor) == "table" and type(anchor.settingKey) == "string" and anchor.settingKey or nil
+	-- (Not where its tabs aren't drawn, the parts picked by icons: those
+	-- parts have their switches, Health & Resources', the Minimap's.)
+	for i, tab in ipairs((id and not hidden) and tabFrames or {}) do
+		ns.TabContainer(tab, hosts[i], ("tabOn:%s:%d"):format(id, i), pageKey)
+	end
+	local adopt = Adopt
+	Adopt = function(...)
+		adopt(...)
+		ns.MapTabContainers()
+	end
+	C_Timer.After(0, ns.MapTabContainers)
 	local function Shown()
 		Adopt()
 		SectionState.Restore(picked)
@@ -15656,10 +16076,18 @@ local function CreateCooldownPanel()
 	local base, height
 	panel, groupTabs, ShowTab, base, height = ns.FolderTabs(icons, tabList, function(i)
 		SectionState.Save(picked, GROUP_ORDER[i])
+		ns.SetPageGate(icons, ns.CDM_TABS[GROUP_ORDER[i]]) -- (the list greyed with its bar's tab off)
 		ListSpells()
 		Refresh()
 		FitContentHeight(content)
 	end, nil, GROUP_WIDTH + 8)
+	-- (Each bar's tab a container, 2026-11-17: its own switch; its spells are
+	-- the one list's, greyed by ns.SetPageGate, left shown: ns.CooldownSpellMode.)
+	for i, group in ipairs(GROUP_ORDER) do
+		local holder = CreateFrame("Frame", nil, icons)
+		holder:SetSize(1, 1)
+		ns.TabContainer(groupTabs[i], holder, ns.CDM_TABS[group], "handleCooldowns")
+	end
 	-- (Under Smart set and the Flash style: placed below, once they're made.)
 	panel:SetPoint("TOPLEFT", panelTop, "TOPLEFT")
 	panel:SetWidth(FLASH_X + 64) -- (room for Flash's tick)
@@ -16169,7 +16597,7 @@ local function CreateVisionPanel()
 			local NAME_W, COL_W, HEAD_H, ROW_H, PAD = 100, 110, 30, 26, 8
 			local GRID_W, GRID_H = NAME_W + COL_W * #COLUMNS, HEAD_H + ROW_H * #ROWS
 			local labels, grids = {}, {}
-			local panel, _, ShowTab, base, tabsH
+			local panel, ShowTab, base, tabsH
 			local picked = IsInRaid and IsInRaid() and 2 or 1 -- (the group you're in, to start)
 			local function Pick(i)
 				picked = i
@@ -16251,7 +16679,10 @@ local function CreateVisionPanel()
 			-- the stack as tall as both.
 			local list = {}
 			for g, group in ipairs(GROUPS) do list[g] = { group.text, group.tip } end
-			panel, _, ShowTab, base, tabsH = ns.FolderTabs(content, list, Pick)
+			local rollTabs
+			panel, rollTabs, ShowTab, base, tabsH = ns.FolderTabs(content, list, Pick)
+			-- (Each tab a container over its group's grid, 2026-11-17.)
+			for g, grid in ipairs(grids) do ns.TabContainer(rollTabs[g], grid, "tabOn:Roll Vision:" .. g) end
 			local host = CreateFrame("Frame", nil, content)
 			host:SetSize(GRID_W + PAD * 2, (tabsH or 24) + GRID_H + PAD * 2)
 			stack:Add(host, "label")
@@ -16597,8 +17028,16 @@ local function CreateVisionPanel()
 			plates = TABS[i] == "PLATES"
 			editing = (not plates and TABS[i]) or nil
 			ShowSection()
+			ns.SetPageGate(content, ns.HEAL_VISION_TABS[TABS[i] or "DEFAULT"]) -- (the page greyed with its tab off)
 			Refresh() -- (the tabs too: ownCheck's Refresh)
 		end, 90)
+		-- (Each tab a container, 2026-11-17: its own switch, right-click; its
+		-- settings are the page's controls, greyed by ns.SetPageGate.)
+		for i, role in ipairs(TABS) do
+			local holder = CreateFrame("Frame", nil, content)
+			holder:SetSize(1, 1)
+			ns.TabContainer(tabs[i], holder, ns.HEAL_VISION_TABS[role or "DEFAULT"], "handleHealVision")
+		end
 		panel:SetPoint("TOPLEFT", row, "BOTTOMLEFT", 0, -14 - NOTE_H - TAB_H - 4)
 		-- (On the row, not the panel: the panel's bottom hangs on the rows under them.)
 		base:SetPoint("TOPLEFT", row, "BOTTOMLEFT", 0, -14 - NOTE_H - TAB_H - 4)
@@ -16609,6 +17048,7 @@ local function CreateVisionPanel()
 			for i, role in ipairs(TABS) do
 				if (role or nil) == current then ShowTab(i) end
 			end
+			ns.SetPageGate(content, ns.HEAL_VISION_TABS[current or "DEFAULT"])
 			ownCheck:SetShown(editing ~= nil)
 			local role = ns.PlayerRole()
 			tabNote:SetText(L["Current role:"] .. " " .. (ROLE_ICONS[role] and
@@ -18265,6 +18705,28 @@ for _, each in ipairs({
 	{ action = "CINEMATIC_TOGGLETOOLTIPS", label = L["Toggle tooltip hiding"],
 		tip = L["Turns the Tooltips page on or off (its Enable Page switch)."] },
 }) do KEYBINDS[#KEYBINDS + 1] = each end
+-- Each Keybinds tab a container (2026-11-17): off ("tabOn:Keybinds:<n>"),
+-- the keys on it do nothing (Bindings.xml asks Cinematic_KeyOn; the frame
+-- keys' button asks too). The secure buttons' keys (wheels, quest item,
+-- target the speaker) can't be stopped from Lua: they still work.
+do
+	local tabOf, tab = {}, 0
+	for _, bind in ipairs(KEYBINDS) do
+		if bind.section then tab = tab + 1 end
+		tabOf[bind.action] = tab
+		if bind.clearAll then tabOf.frameKeys = tab end -- (the Frames tab: the key groups')
+	end
+	ns.KEYBIND_TAB_OF = tabOf
+	function ns.KeybindTabKey(action)
+		local n = tabOf[action] or (type(action) == "string" and action:find("^CLICK " .. ns.FRAME_KEY_BUTTON) and tabOf.frameKeys)
+		return n and ("tabOn:Keybinds:%d"):format(n) or nil
+	end
+	function Cinematic_KeyOn(action)
+		local key = ns.KeybindTabKey(action)
+		local db = ns.GetDB()
+		return not (key and db and db[key] == false)
+	end
+end
 local IGNORED_KEYS = {
 	LSHIFT = true, RSHIFT = true, LCTRL = true, RCTRL = true,
 	LALT = true, RALT = true, LMETA = true, RMETA = true, UNKNOWN = true,
@@ -18704,9 +19166,11 @@ local function CreateKeybindsPanel()
 	end
 
 	-- The tabs, as high as their rows, under the title.
-	local list, _, base, height = {}
+	local list, keyTabs, base, height = {}
 	for i, each in ipairs(sections) do list[i] = { each.tab } end
-	panel, _, ShowTab, base, height = ns.FolderTabs(content, list, Pick, nil, SECTION_WIDTH + 8)
+	panel, keyTabs, ShowTab, base, height = ns.FolderTabs(content, list, Pick, nil, SECTION_WIDTH + 8)
+	-- (Each tab a container: off, its keys do nothing, Cinematic_KeyOn.)
+	for i, each in ipairs(sections) do ns.TabContainer(keyTabs[i], each.body, ("tabOn:Keybinds:%d"):format(i)) end
 	panelTop:SetPoint("TOPLEFT", subtitle, "BOTTOMLEFT", 0, -16 - height)
 	panel:SetPoint("TOPLEFT", panelTop, "TOPLEFT")
 	-- (On panelTop, not the panel: the panel's bottom hangs on the rows under them.)
@@ -19558,7 +20022,7 @@ local function CreateMouseoverPanel()
 
 	local title = Label(content, "GameFontNormalLarge", L["Hover Groups"])
 	-- (The Mouse icon's Mouseover groups tab, 2026-11-16: its tabs over the title.)
-	local mouseTabs = ns.PageTabs(content, ns.ShowInTabs("mouse"), ns.ShowInIndex("mouse", "Mouseover groups"))
+	local mouseTabs = ns.PageTabs(content, ns.ShowInTabs("mouse"), ns.ShowInIndex("mouse", "Mouseover groups"), true)
 	title:SetPoint("TOPLEFT", mouseTabs, "BOTTOMLEFT", 8, -14)
 	local subtitle = PageIntro(content, title,
 		L["Frames in the same group come up together when you mouse over any of them."] .. " " ..

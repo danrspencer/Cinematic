@@ -198,6 +198,18 @@ end
 -- once one, follows Strength.)
 local NOT_THEMES = {}
 local themed = {}
+-- Its tabs, each a container (2026-11-17, the user's rule): off, its layer
+-- is off (its opacity 0, its ticks off), under the Vision's switch (not the
+-- Style page's: that one off is the theme as written, not no effect).
+-- (On ns: this file's main chunk is near Lua's 200 locals.)
+ns.VITALS_TABS = { general = "tabOn:Vitals:general", blizzard = "tabOn:Vitals:blizzard",
+	cinematic = "tabOn:Vitals:cinematic", swirl = "tabOn:Vitals:swirl", effect = "tabOn:Vitals:effect" }
+for _, key in pairs(ns.VITALS_TABS) do
+	DEFAULTS[key] = true
+	ns.SetPageMaster({ key }, "lowHealth")
+end
+ns.VITALS_TAB_OFF = { lowHealthGameAlpha = "blizzard", lowHealthBloodAlpha = "cinematic", lowHealthPortalAlpha = "cinematic",
+	lowHealthSparks = "cinematic", lowHealthSwirlAlpha = "swirl", lowHealthDark = "general", lowHealthPulse = "general" }
 local function ThemeLook(base, wanted)
 	wanted = wanted or false
 	local byBase = themed[wanted] or {}
@@ -205,6 +217,11 @@ local function ThemeLook(base, wanted)
 	local proxy = byBase[base]
 	if not proxy then
 		proxy = setmetatable({}, { __index = function(_, key)
+			local tab = ns.VITALS_TAB_OFF[key]
+			if tab and not ns.PageOn(ns.VITALS_TABS[tab]) then
+				local was = base[key]
+				return type(was) == "number" and 0 or (type(was) == "boolean" and false) or was
+			end
 			local value = base[key]
 			local own = wanted and wanted.look and not NOT_THEMES[key] and wanted.look[key]
 			if own ~= nil and not (ns.StyleOn and ns.StyleOn("lowHealthStyle")) then value = own end
@@ -1020,7 +1037,7 @@ local function UseTheme(d, wanted, look)
 	end
 	-- (The game effect: set up for the theme's, or off; none where the client hasn't its files.)
 	if d.effect then
-		local fx = wanted.effect and ns.ScreenEffectById(wanted.effect.id)
+		local fx = wanted.effect and ns.PageOn(ns.VITALS_TABS.effect) and ns.ScreenEffectById(wanted.effect.id)
 		d.effectOn = fx and d.effect:Set(fx, { edge = ns.SCREEN_EFFECT_EDGES[fx.id] }) or false
 		if not d.effectOn then d.effect:Hide() end
 	end
@@ -3475,8 +3492,13 @@ function ns.CreateVitalsStylePanel(kit)
 			section.body.openSection = function() Pick(i) end
 		end
 		tabbed.sections = order
-		local panel, _, show, base = ns.FolderTabs(content, list, Pick)
+		local panel, tabFrames, show, base = ns.FolderTabs(content, list, Pick)
 		tabbed.panel, tabbed.Show = panel, show
+		-- (Each tab a container over its part, its layer off with it: ns.VITALS_TABS.)
+		local names = { "general", "blizzard", "cinematic", "swirl", "effect" }
+		for i, section in ipairs(order) do
+			ns.TabContainer(tabFrames[i], section.body, ns.VITALS_TABS[names[i]], "lowHealth")
+		end
 		base:SetPoint("TOPLEFT", tabbed.top)
 	end
 	-- (What follows from under the panel.)

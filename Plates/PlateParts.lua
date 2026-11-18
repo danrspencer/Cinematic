@@ -540,6 +540,7 @@ local function DressName(text, row)
 		if dress then
 			dress.on = false
 			dress.glow:Hide()
+			if dress.glow2 then dress.glow2:Hide() end
 			dress.back:Hide()
 			for _, edge in ipairs(dress.edges or {}) do edge:Hide() end
 		end
@@ -560,18 +561,35 @@ local function DressName(text, row)
 	local scale = text.GetScale and text:GetScale() or 1
 	if not (Known(scale) and type(scale) == "number") then scale = 1 end
 	width, height = width * scale, height * scale
-	-- (Glow, band and its border: NameRowLook's, as the Name Style preview's.)
+	-- (Glow, band and its border: NameRowLook's, as the Name Style preview's.
+	-- Round the second line too while it shows: PlateGuild.lua, 2026-11-17.)
+	local below = ns.PlateLine2Box and ns.PlateLine2Box(owner)
 	ns.DressNameParts(owner, dress, text, width, height, function(setting) return NameStyle(row, setting) end,
-		function(setting) return ns.NameLookColor(row, setting) end)
+		function(setting) return ns.NameLookColor(row, setting) end, below)
 end
--- (The dress follows its name: shown and faded with it.)
-local function DressShown(text, alpha)
+-- (The glow and band again for a plate whose second line came, went or
+-- changed: PlateGuild.lua.)
+function ns.RedressPlateName(unitFrame)
+	local text = unitFrame and texts[unitFrame]
+	if text and text.cineDress and text.cineDress.on and text:IsShown() then DressName(text, text.nameRow) end
+end
+-- (The dress follows its name: shown and faded with it. A piece round the
+-- second line alone (its title shown without the name: NameRowLook's
+-- followsLine) fades with the line instead, lineAlpha. 2026-11-17.)
+local function DressShown(text, alpha, lineAlpha)
 	local dress = text and text.cineDress
 	if not (dress and dress.on) then return end
 	local pieces = { dress.glow, dress.back }
+	if dress.glow2 and dress.glow2:IsShown() then pieces[#pieces + 1] = dress.glow2 end
 	for _, edge in ipairs(dress.edges or {}) do pieces[#pieces + 1] = edge end
 	for _, piece in ipairs(pieces) do
-		if alpha then piece:SetAlpha(alpha) else piece:Hide() end
+		if not alpha then
+			piece:Hide()
+		elseif piece.followsLine and lineAlpha then
+			piece:SetAlpha(lineAlpha)
+		else
+			piece:SetAlpha(alpha)
+		end
 	end
 end
 
@@ -730,7 +748,9 @@ end
 
 -- Shows or hides our text for a plate, at alpha (nil: hidden), and while
 -- its band swaps, its copy in the old look fading out under it.
-local function OwnName(plate, alpha)
+-- (lineAlpha: how far its second line shows, for a glow or band round the
+-- line alone: DressShown.)
+local function OwnName(plate, alpha, lineAlpha)
 	local unitFrame = plate.UnitFrame
 	local text, ghost = texts[unitFrame], ghosts[unitFrame]
 	local name = unitFrame.name
@@ -760,7 +780,7 @@ local function OwnName(plate, alpha)
 	DrawName(text, name, unit)
 	text:SetAlpha(alpha * into)
 	text:Show()
-	DressShown(text, alpha * into)
+	DressShown(text, alpha * into, lineAlpha and lineAlpha * into)
 	local fill = Fill.texts[text]
 	if fill and fill.bar:IsShown() then
 		fill.bar:SetAlpha(alpha * into) -- (the colored copy fades with the text)
@@ -841,7 +861,7 @@ local function ApplyPlate(plate, personal)
 		nameOpacity = tonumber(NameStyle(ns.NameRowOf(unitFrame, plate.namePlateUnitToken or unitFrame.unit),
 			"Alpha")) or 1
 	end
-	OwnName(plate, ours and nameAlpha > 0 and textAlpha * nameOpacity or nil)
+	OwnName(plate, ours and nameAlpha > 0 and textAlpha * nameOpacity or nil, nameAlpha)
 	-- (A kind with parts of its own: its levels in place of the default ones.)
 	local mine
 	if plate ~= personal and next(kindParts.levels) then
@@ -2881,7 +2901,8 @@ local function RefreshTargetArrow(plate)
 	end
 	local unit = plate.namePlateUnitToken or (plate.UnitFrame and plate.UnitFrame.unit)
 	-- (None while the Style hub's Nameplates page is switched off.)
-	local level = plate ~= PersonalPlate() and ns.StyleOn() and Style("handlePlateStyle") and levels.TargetArrow or 0
+	-- (Smart's rows, their own switch since 2026-11-17, under Default's.)
+	local level = plate ~= PersonalPlate() and ns.StyleOn("plateMarks") and levels.TargetArrow or 0
 	local kind, kinds, hovered, opacity, size
 	if level > 0 then
 		kind, kinds, hovered, opacity, size = PlateLook(plate, unit)
@@ -2935,7 +2956,7 @@ function ns.ReportTargetMarks()
 	end
 	ns.Print(("marks: client %s, combat %s, page %s, Target Indicator row %s, Height %s (no plate %s), target %s"):format(
 		ns.isRetail and "retail" or "forever", tostring(InCombatLockdown()),
-		ns.StyleOn() and Style("handlePlateStyle") and "on" or "off", Num(levels.TargetArrow),
+		ns.StyleOn("plateMarks") and "on" or "off", Num(levels.TargetArrow),
 		tostring(Style("targetArrowY")), tostring(Style("targetArrowBareY")), tostring(UnitExists("target"))))
 	-- (The game's Show Offscreen Nameplates: the elite rules see only plates.)
 	local on, off = ns.OFFSCREEN_PLATE_CVARS, ns.NO_OFFSCREEN_PLATE_CVARS

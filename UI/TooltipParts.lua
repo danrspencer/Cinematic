@@ -26,7 +26,7 @@ local unitLinesCut = false
 -- tooltipFullAfter off, none is.
 local function Cut(part)
 	local db = ns.db
-	if not (db and db.enabled and db.handleTooltips) or (db.tooltipFullAfter or 0) <= 0 then
+	if not (db and db.enabled and db.handleTooltips and not ns.MasterOff("handleTooltips", db)) or (db.tooltipFullAfter or 0) <= 0 then
 		return false
 	end
 	return not db["tooltipShow" .. part .. (revealed and "Later" or "First")]

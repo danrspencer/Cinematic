@@ -243,6 +243,36 @@ local function FitZoneBar(art)
 	zoneBar:SetPoint("TOPLEFT", art, "TOPLEFT", inLeft, 0)
 	zoneBar:SetPoint("BOTTOMRIGHT", art, "BOTTOMRIGHT", -inRight, 0)
 end
+-- (Our panel hangs on the cluster, not on the zone's button: the game hides
+-- that button, or its art, in some places, and the panel stayed up empty.
+-- It shows only while the game's bar would be drawn.)
+local zoneBarOn, zoneBarArt = false, nil
+local function ArtDrawn(art)
+	local ok, visible = pcall(art.IsVisible, art)
+	if not ok or (issecretvalue and issecretvalue(visible)) then return true end
+	return visible and true or false
+end
+local function SyncZoneBar()
+	if not zoneBar then return end
+	zoneBar:SetShown(zoneBarOn and zoneBarArt ~= nil and ArtDrawn(zoneBarArt))
+end
+local zoneHooked = {}
+local function WatchZoneArt(art, button)
+	if zoneHooked[art] then return end
+	zoneHooked[art] = true
+	local function Later() C_Timer.After(0, SyncZoneBar) end
+	for _, method in ipairs({ "Show", "Hide", "SetShown" }) do
+		if type(art[method]) == "function" then hooksecurefunc(art, method, Later) end
+	end
+	-- (The frames it hangs on, up to the cluster: the button and whatever holds it.)
+	local frame, cluster = type(button) == "table" and button or art:GetParent(), _G.MinimapCluster
+	for _ = 1, 4 do
+		if type(frame) ~= "table" or frame == cluster or frame == UIParent or not frame.HookScript then break end
+		frame:HookScript("OnShow", Later)
+		frame:HookScript("OnHide", Later)
+		frame = frame:GetParent()
+	end
+end
 local function DressZoneBar(on)
 	local art, button = ZoneBarArt()
 	if type(art) ~= "table" or not art.GetParent then return end
@@ -263,7 +293,9 @@ local function DressZoneBar(on)
 	end
 	SetHidden(art, on)
 	if not zoneBar then return end
-	zoneBar:SetShown(on)
+	zoneBarOn, zoneBarArt = on, art
+	WatchZoneArt(art, button)
+	SyncZoneBar()
 	if not on then return end
 	FitZoneBar(art)
 	local back, edge = ns.ThemePanel()

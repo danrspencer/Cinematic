@@ -814,6 +814,8 @@ end
 local function TalkOn()
 	return ShoulderOn() and ns.db.shoulderCamTalkTurn and paused ~= "show in" and TalkHere()
 end
+-- (MultiQuestFix.lua: its cover over the game's Accept only while this is on.)
+function ns.ShoulderTalkOn() return TalkOn() and true or false end
 
 -- Who the window's with, only a living creature: a mailbox, a wanted poster,
 -- a chest (their GUIDs say GameObject, or there's no "npc" at all) and the

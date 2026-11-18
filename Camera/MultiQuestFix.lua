@@ -34,8 +34,11 @@ local GIVER_FRESH = 60 -- seconds a gossip's or greeting's count holds for the q
 -- The last Accept through ours: when, and whether a window opened since.
 local accepted = { at = nil, reopened = false }
 
+-- Only with the Shoulder Cam's turn to NPCs on: without it there's no glide
+-- back to hold Accept for, and the cover would just take Accept's hover (a
+-- player, 2026-11-17: it was up for everyone since v2.1.2).
 local function On()
-	return ns.db and ns.db.shoulderCamMultiQuestFix and true or false
+	return ns.db and ns.db.shoulderCamMultiQuestFix and ns.ShoulderTalkOn and ns.ShoulderTalkOn() or false
 end
 
 local function NpcGuid()
@@ -61,6 +64,29 @@ local MACRO_MULTI = "/cleartarget\n/click QuestFrameAcceptButton"
 button:SetAttribute("macrotext", MACRO_MULTI)
 button.mode = "multi"
 button:Hide()
+
+-- The cover takes the mouse, so the game's Accept is lit and pressed from
+-- here, as it would be under the pointer.
+local function GameAccept() return _G.QuestFrameAcceptButton end
+button:SetScript("OnEnter", function()
+	local accept = GameAccept()
+	if accept then pcall(accept.LockHighlight, accept) end
+end)
+button:SetScript("OnLeave", function()
+	local accept = GameAccept()
+	if accept then
+		pcall(accept.UnlockHighlight, accept)
+		pcall(accept.SetButtonState, accept, "NORMAL")
+	end
+end)
+button:HookScript("OnMouseDown", function()
+	local accept = GameAccept()
+	if accept then pcall(accept.SetButtonState, accept, "PUSHED") end
+end)
+button:HookScript("OnMouseUp", function()
+	local accept = GameAccept()
+	if accept then pcall(accept.SetButtonState, accept, "NORMAL") end
+end)
 
 -- Soft target (test 2, user 2026-11-15): does the game's turn keep to the
 -- NPC through the gap if they're your soft interact target? SoftTargetInteract
@@ -117,6 +143,11 @@ end
 local function Uncover(why)
 	if not button:IsShown() or InCombatLockdown() then return end
 	button:Hide()
+	local accept = GameAccept()
+	if accept then
+		pcall(accept.UnlockHighlight, accept)
+		pcall(accept.SetButtonState, accept, "NORMAL")
+	end
 	ns.Log("multiquest", ("cover off the game's Accept (%s); soft target %s"):format(why, SoftState()))
 	-- (The window closes before Accept's PostClick runs: the soft target's
 	-- given back here only if no Accept came with it.)

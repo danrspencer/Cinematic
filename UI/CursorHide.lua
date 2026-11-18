@@ -99,7 +99,7 @@ end
 
 -- Why it can't hide at all now (or nil): yours is wanted.
 local function Blocked(now)
-	if not ns.db.cursorHide then return "off" end
+	if not ns.db.cursorHide or ns.MasterOff("cursorHide") then return "off" end
 	if not ns.lastCinematic then return "CineMode off" end
 	if not RowShows(now) then return "its Show in row is off here" end
 	if GetCursorInfo() ~= nil then return "cursor holding something" end
@@ -215,7 +215,7 @@ end
 local function Apply()
 	if manualAt then
 		ns.SetOnUpdate(driver, Update) -- (the keybind's till it's back)
-	elseif ns.db and ns.db.cursorHide and ns.CursorHideAccepted() then
+	elseif ns.db and ns.db.cursorHide and not ns.MasterOff("cursorHide") and ns.CursorHideAccepted() then
 		ns.SetOnUpdate(driver, Update)
 	else
 		Show("turned off")
@@ -563,7 +563,7 @@ function ns.CreateCursorHidePage(kit)
 	local canvas, content = kit.CreateScrollPage()
 	local title = kit.Label(content, "GameFontNormalLarge", L["Cursor Hide"])
 	-- (The Mouse icon's Cursor Hide tab, 2026-11-16: its tabs over the title.)
-	local mouseTabs = ns.PageTabs(content, ns.ShowInTabs("mouse"), ns.ShowInIndex("mouse", "Cursor Hide"))
+	local mouseTabs = ns.PageTabs(content, ns.ShowInTabs("mouse"), ns.ShowInIndex("mouse", "Cursor Hide"), true)
 	title:SetPoint("TOPLEFT", mouseTabs, "BOTTOMLEFT", 8, -14)
 	local intro = kit.PageIntro(content, title, L["In CineMode, the cursor shrinks or hides until you move the mouse."])
 	local switch = kit.PageSwitch(content, "cursorHide", L["Enable Page"],

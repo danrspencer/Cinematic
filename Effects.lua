@@ -239,7 +239,8 @@ do
 		local keep = ns.chardb or ns.db
 		local ours = keep and keep.cvarsOurs
 		if not ours then return end
-		local wanted = ns.db.enabled and ns.db.handlePlates and (not ns.ProfileChosen or ns.ProfileChosen())
+		local wanted = ns.db.enabled and (ns.db.handlePlates or ns.db.handleNames ~= false)
+			and (not ns.ProfileChosen or ns.ProfileChosen())
 		if not wanted then
 			keep.cvarsBefore, keep.cvarsOurs = nil, nil
 			return
@@ -554,11 +555,13 @@ function ns.UpdateCVars(cinematic, fightStarting)
 		immersive, lingering
 	seen.target, seen.place, seen.enabled, seen.at = target, place, ns.db.enabled, now
 	for _, set in ipairs(CVAR_SETS) do
-		-- (Nameplates page's master switch off: names are left to the game.)
+		-- (The Names icon's switch off (handleNames, its own since 2026-11-17,
+		-- was the Nameplates page's): names are left to the game.)
 		-- (Allow outside CineMode's Nameplates: the names too, CineMode on or off.)
-		-- (Nor while its kind's plates are up: see ns.plates.NamesOnPlates.)
-		local want = (ns.PlatesCinematic(cinematic) and ns.db.handlePlates and not NameKeptHere(set.key, inCombat)
-			and not ns.plates.NamesOnPlates(set.key, inCombat)) or immersive
+		-- (Nor while its kind's plates are up: see ns.plates.NamesOnPlates. Only
+		-- while CineMode handles the plates: with them off, the names do it.)
+		local want = (ns.PlatesCinematic(cinematic) and ns.PageOn("handleNames") and not NameKeptHere(set.key, inCombat)
+			and not (ns.db.handlePlates and ns.plates.NamesOnPlates(set.key, inCombat))) or immersive
 		ns.ApplyCVarSet(set, want or false)
 	end
 	-- (Kept through the Calm Timer after a fight, like the plates.)
@@ -5022,7 +5025,7 @@ end
 -- The Tooltips page's master switch (handleTooltips, off to start with): off,
 -- every tooltip shows as the game has it.
 local function Handling()
-	return ns.db.enabled and ns.db.handleTooltips and true or false
+	return ns.db.enabled and ns.db.handleTooltips and not ns.MasterOff("handleTooltips") and true or false
 end
 
 -- Holding the Show hidden tooltips keybind shows tooltips the page would
@@ -5549,7 +5552,7 @@ end
 -- bottom-right corner follow the cursor instead. (SetDefaultAnchor runs before the tooltip gets its lines.)
 function ns.OnTooltipDefaultAnchor(tooltip, parent)
 	local db = ns.db
-	local mode = db and db.enabled and db.handleTooltips and db.tooltipCursorMode
+	local mode = db and db.enabled and db.handleTooltips and not ns.MasterOff("handleTooltips", db) and db.tooltipCursorMode
 	if mode == "cursor" or (mode == "combat" and (InCombatLockdown() or ns.Flag(UnitAffectingCombat("player")))) then
 		tooltip:SetOwner(parent or UIParent, "ANCHOR_CURSOR")
 	end

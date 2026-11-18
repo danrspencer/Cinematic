@@ -4276,6 +4276,101 @@ STEPS[#STEPS + 1] = function()
 	end
 end
 
+-- (Step 25.)
+STEPS[#STEPS + 1] = function()
+	-- Silver Screen's panels: slightly rounded (frame) in place of the stepped
+	-- corners (deco) (2026-11-17). Where the theme's own deco stands, the new
+	-- one: a deco picked over another theme stays. Once.
+	if not ns.db.reelPanelFrameV1 then
+		local function Move(t)
+			if type(t) == "table" and t.styleTheme == "reel" and t.stylePanel == "deco" then t.stylePanel = "frame" end
+		end
+		Move(ns.db)
+		for _, saved in pairs(ns.db.profiles or {}) do
+			if type(saved) == "table" then
+				Move(saved)
+				Move(saved.settings)
+			end
+		end
+		for _, point in pairs(ns.db.profileResetPoints or {}) do Move(point) end
+		ns.db.reelPanelFrameV1 = true
+	end
+end
+
+-- (Step 26.)
+STEPS[#STEPS + 1] = function()
+	-- Two switches split in two (2026-11-17): Health & Resources' (its PRD
+	-- rows and Cine Mana Bar now prdKeepUp) and the Minimap's (its Keep Open
+	-- tab now minimapKeepOpen). One off before: both its parts off. Once.
+	if not ns.db.switchSplitV1 then
+		local function Split(t)
+			if type(t) ~= "table" then return end
+			if t.personalResources == false and t.prdKeepUp == nil then t.prdKeepUp = false end
+			if t.handleMinimap == false and t.minimapKeepOpen == nil then t.minimapKeepOpen = false end
+		end
+		Split(ns.db)
+		for _, saved in pairs(ns.db.profiles or {}) do
+			if type(saved) == "table" then
+				Split(saved)
+				Split(saved.settings)
+			end
+		end
+		for _, point in pairs(ns.db.profileResetPoints or {}) do Split(point) end
+		ns.db.switchSplitV1 = true
+	end
+end
+
+-- (Step 27.)
+STEPS[#STEPS + 1] = function()
+	-- The tree read off the layout (2026-11-17): three switches each made two.
+	-- Names its own (handleNames, was the Nameplates page's handlePlates);
+	-- Smart its own (plateMarks): handlePlateStyle meant Smart's marks only,
+	-- and is now its icon's, the plates' look too, so one off before is
+	-- Smart off and the look as it was; the unit frames' cast bars their own
+	-- (unitCastStyle, was plateCastStyle). Once.
+	if not ns.db.layoutTreeV1 then
+		local function Split(t)
+			if type(t) ~= "table" then return end
+			if t.handlePlates == false and t.handleNames == nil then t.handleNames = false end
+			if t.handlePlateStyle == false and t.plateMarks == nil then
+				t.plateMarks, t.handlePlateStyle = false, true
+			end
+			if t.plateCastStyle == false and t.unitCastStyle == nil then t.unitCastStyle = false end
+		end
+		Split(ns.db)
+		for _, saved in pairs(ns.db.profiles or {}) do
+			if type(saved) == "table" then
+				Split(saved)
+				Split(saved.settings)
+			end
+		end
+		for _, point in pairs(ns.db.profileResetPoints or {}) do Split(point) end
+		ns.db.layoutTreeV1 = true
+	end
+end
+
+-- (Step 28.)
+STEPS[#STEPS + 1] = function()
+	-- Emote Vision CineMode only (2026-11-17): its Always was the default,
+	-- saved for everyone, and outside CineMode its cards came up in everyday
+	-- play and missed buffs from players with no plate. Everyone to CineMode
+	-- once; Always asks first now. Once.
+	if not ns.db.emoteCineOnlyV1 then
+		local function Move(t)
+			if type(t) == "table" and t.outsideCineEmote == true then t.outsideCineEmote = false end
+		end
+		Move(ns.db)
+		for _, saved in pairs(ns.db.profiles or {}) do
+			if type(saved) == "table" then
+				Move(saved)
+				Move(saved.settings)
+			end
+		end
+		for _, point in pairs(ns.db.profileResetPoints or {}) do Move(point) end
+		ns.db.emoteCineOnlyV1 = true
+	end
+end
+
 -- Runs them all, each on its own: an error is logged and reported (the
 -- addon's error net, Diagnostics.lua), and the steps after it still run.
 function ns.RunMigrations()

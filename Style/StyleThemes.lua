@@ -164,7 +164,7 @@ local THEMES = {
 		line = { 0.6, 0.61, 0.66 }, lineSize = 1,
 		cardColor = { 0.95, 0.95, 0.97 }, cardFont = "bebas",
 		settings = { styleTexture = "reel", styleFont = "barlow", styleOutline = 0, styleShadow = "on",
-			stylePanel = "deco", styleBarShape = "bevel",
+			stylePanel = "frame", styleBarShape = "bevel",
 			questTalkStyle = "dark", rollPanel = "flat", abShape = "square", ufShape = "octagon" },
 	}),
 	Theme({
@@ -537,7 +537,8 @@ end
 -- any can be picked on top of any theme.
 local SHAPES = ART .. "Shapes\\"
 local PANEL_ART = { round = "Round", chamfer = "Chamfer", blade = "Blade", notch = "Notch", sigil = "Sigil",
-	veil = "Veil", deco = "Deco", plate = "Plate", leaf = "Leaf", facet = "Facet", soft = "Soft" }
+	veil = "Veil", deco = "Deco", plate = "Plate", leaf = "Leaf", facet = "Facet", soft = "Soft",
+	frame = "Frame" }
 local BAR_ART = { capsule = "Capsule", chisel = "Chisel", soft = "Soft", bevel = "Bevel" }
 local PORTRAIT_ART = { hex = "Hex", diamond = "Diamond", arch = "Arch", cut = "Cut", eye = "Eye",
 	octagon = "Octagon", shield = "Shield", petal = "Petal", crystal = "Crystal" }

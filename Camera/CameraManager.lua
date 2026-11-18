@@ -155,7 +155,11 @@ function ns.CameraManager(kit, canvas, content, title, intro, switch, helper)
 	local Pick, Menu -- (below)
 
 	-- The folder tabs: General, and the camera's (hidden while none is open).
-	local panel, tabs, ShowTab, base = ns.FolderTabs(content, { { L["General"] }, { "" } }, function(i) Pick(i) end)
+	-- (General holds every camera: its right-click is the page's own switch,
+	-- Enable Cameras, as a tab closing everything in it, 2026-11-17.)
+	local flip = switch and type(switch.settingKey) == "string" and switch.settingKey or nil
+	local panel, tabs, ShowTab, base = ns.FolderTabs(content, { { L["General"], flip = flip }, { "" } },
+		function(i) Pick(i) end)
 	base:SetPoint("TOPLEFT", content, "TOPLEFT", 8, -(ns.FOLDER_TAB_HEIGHT + 16))
 	panel:SetPoint("TOPLEFT", base)
 	panel:SetPoint("RIGHT", content, "RIGHT", -8, 0)

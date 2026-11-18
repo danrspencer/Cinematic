@@ -677,6 +677,29 @@ do
 	table.sort(ns.SHOW_IN_SWITCHES)
 	ns.SetPageMaster(ns.SHOW_IN_SWITCHES, "handleFrames")
 end
+-- The tree, read off the settings' layout (2026-11-17, the user's rule):
+-- each icon its own root switch (its first tab's: Show, Default, Hover
+-- Groups), every other tab on that icon under it. Off, they're off and
+-- greyed (ns.PageOn, ns.Setting, ns.StyleOn and the menus walk every level
+-- up). Two icons, two roots: Names apart from Nameplates. (An icon whose
+-- Show is several sections, Unit Frames' and Party & Raid's: siblings, its
+-- other tabs under the first.) /cine debug sweep checks every icon's.
+ns.SHOW_IN_CHILDREN = {
+	-- (The Interface hub's.)
+	showInUnits = { "personalResources" }, showInPrd = { "prdKeepUp" },
+	showInMinimap = { "handleMinimap", "minimapKeepOpen" }, showInQuests = { "handleQuests" },
+	showInChat = { "handleChat", "handleBubbles" }, showInBuffs = { "handleBuffs" },
+	showInCooldowns = { "handleCooldowns" }, showInSwing = { "handleSwing" },
+	mouseover = { "handleTooltips", "cursorHide" }, handlePlates = { "handlePlateIcons" },
+	-- (The Style hub's: under Enable Style as before, through their icon's.)
+	handlePlateStyle = { "plateMarks", "plateCastStyle" }, ufStyle = { "unitCastStyle" },
+}
+for master, keys in pairs(ns.SHOW_IN_CHILDREN) do
+	ns.SetPageMaster(keys, master)
+	for _, key in ipairs(keys) do
+		if ns.DEFAULTS[key] == nil then ns.DEFAULTS[key] = true end
+	end
+end
 -- Whether a fade group's section is on (its section: its row's, worked out
 -- the first time it's asked). (In a do: the file's main chunk is at Lua's
 -- 200 locals.)
@@ -3357,6 +3380,8 @@ do
 		local now = GetTime()
 		if key == lastKey and now - lastAt < 0.15 then return end
 		lastAt, lastKey = now, key
+		-- (Its Keybinds tab off: the key does nothing. Options.lua)
+		if Cinematic_KeyOn and not Cinematic_KeyOn("CLICK " .. ns.FRAME_KEY_BUTTON .. ":" .. tostring(key)) then return end
 		ns.ToggleFrameKey(key)
 	end)
 end
@@ -8938,7 +8963,21 @@ end
 -- seconds (nil: the default share) and Out of fights (shown when ready out of
 -- fights too, not faded). Set under what it's turned into (from
 -- before settings went by the base) or its base.
+-- The Cooldown Manager page's bar tabs, each a container (2026-11-17): off,
+-- Cinematic leaves that bar's spells shown (no mode of ours).
+ns.CDM_TABS = {}
+for _, group in ipairs({ "essential", "utility", "buffs", "bars", "other", "otherbuffs" }) do
+	ns.CDM_TABS[group] = "tabOn:Cooldown Manager:" .. group
+	ns.DEFAULTS[ns.CDM_TABS[group]] = true
+	ns.SetPageMaster({ ns.CDM_TABS[group] }, "handleCooldowns")
+end
+-- (On ns: this file's main chunk is at Lua's 200 locals.)
+function ns.CdmTabOff(group)
+	local key = group and ns.CDM_TABS[group]
+	return key ~= nil and not ns.PageOn(key)
+end
 function ns.CooldownSpellMode(id, group, sit)
+	if ns.CdmTabOff(group) then return "always", false end
 	if sit == nil then sit = ns.cooldownSitNow end
 	if sit then
 		local mode, from, power, earlyOn, seconds, anyTime = ns.CooldownSitSpellMode(sit, id, group)
@@ -8980,6 +9019,7 @@ end
 -- by spell ID), else its group's. Each goes by whether you're in a fight
 -- only: the game keeps your buffs secret in fights.
 function ns.CooldownBuffMode(id, group, sit)
+	if ns.CdmTabOff(group) then return "always", false end
 	if sit == nil then sit = ns.cooldownSitNow end
 	if sit then
 		local mode, from = ns.CooldownSitBuffMode(sit, id, group)
@@ -12141,6 +12181,9 @@ function ns.UpdateFrames(cinematic, elapsed)
 	-- (The Minimap, Quest tracker, Buffs/debuffs and Cooldown Manager pages'
 	-- extras: none while their page's switch is off.)
 	local minimapPage = ns.PageOn("handleMinimap")
+	-- (Keep Open's own switch since 2026-11-17: what keeps it up the whole
+	-- time; minimapPage's, Show Advanced's, what brings it up a while.)
+	local keepOpenOn = ns.PageOn("minimapKeepOpen")
 	local debuffPeekOn = ns.debuffPeekUntil > now or (debuffHeld and ns.db.debuffPeekUntilGone)
 	events.aura = cinematic and ns.PageOn("handleBuffs") and (buffPeekUntil > now or debuffPeekOn)
 	-- (A debuff peek alone brings up just the debuffs, not the buffs beside
@@ -12164,15 +12207,15 @@ function ns.UpdateFrames(cinematic, elapsed)
 		end
 	end
 	-- (Not on flight paths, Minimap page: no pings, reveals or tracking bring it up then.)
-	local taxiHidesMinimap = minimapPage and ns.db.minimapHideOnTaxi and ns.Flag(ns.OnTaxi())
+	local taxiHidesMinimap = (minimapPage or keepOpenOn) and ns.db.minimapHideOnTaxi and ns.Flag(ns.OnTaxi())
 	events.ping = minimapPage and pingReveal and not taxiHidesMinimap
 	if ns.mmRec then
 		ns.mmRec.keep = (keepForGathering and not trackingPaused and "gathering tracking")
 			or (keepForCreatures and "creature tracking") or nil
 	end
 	-- (Keep open and Reveal, Minimap page: "Except in" is for gathering tracking only.)
-	events.tracking = minimapPage and not taxiHidesMinimap and ((keepForGathering and not trackingPaused) or keepForCreatures
-		or ns.IsMinimapRevealed(now))
+	events.tracking = not taxiHidesMinimap and (keepOpenOn and ((keepForGathering and not trackingPaused) or keepForCreatures)
+		or minimapPage and ns.IsMinimapRevealed(now))
 	events.quest, events.roster = ns.PageOn("handleQuests") and questReveal, rosterReveal
 	events.gamepad = ns.PageOn("handleGamepad") and padReveal
 	if clock then ns.framePassTimes.ev0 = clock() end
@@ -12263,7 +12306,7 @@ function ns.UpdateFrames(cinematic, elapsed)
 	local editingLayout = ns.EditModeActive and ns.EditModeActive() or false
 
 	-- Keep minimap open indoors (Minimap page): see RedrawMinimapWhenShown.
-	local keepIndoors = minimapPage and (ns.db.minimapIndoors and IsIndoors and ns.Flag(IsIndoors())
+	local keepIndoors = keepOpenOn and (ns.db.minimapIndoors and IsIndoors and ns.Flag(IsIndoors())
 		or ns.db.minimapKeepQuest and ns.HasTrackedQuest()
 			-- (Only after progress: 0 is off.)
 			and ((ns.db.minimapKeepQuestFor or 0) <= 0 or now - ns.questActivityAt < ns.db.minimapKeepQuestFor * 60)

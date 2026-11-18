@@ -128,7 +128,9 @@ PANELS = {"Round": panel_round, "Chamfer": panel_chamfer, "Blade": panel_blade, 
           # (Art deco steps, a plate's square-cut corners, a gem's two facets.)
           "Deco": lambda d, s: mirrored([(9, 1), (9, 5), (5, 5), (5, 9), (1, 9)])(d, s),
           "Plate": lambda d, s: mirrored([(7, 1), (7, 7), (1, 7)])(d, s),
-          "Facet": lambda d, s: mirrored([(8, 1), (3, 3), (1, 8)])(d, s)}
+          "Facet": lambda d, s: mirrored([(8, 1), (3, 3), (1, 8)])(d, s),
+          # (A film print's frame: barely rounded.)
+          "Frame": lambda d, s: d.rounded_rectangle((1 * s, 1 * s, 63 * s, 63 * s), radius=3 * s, fill=255)}
 
 
 def panels():
@@ -718,4 +720,6 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    import sys
+    # ("panels": just the panels, Panel<Name>.tga and their Edge.)
+    panels() if sys.argv[1:] == ["panels"] else main()

@@ -161,7 +161,7 @@ local TRIGGER_SETTING = { chat = "chatPeek", whisper = "chatUntilWhisperRead", t
 	aura = "buffPeek", ping = "minimapRevealOnPing", tracking = "minimapKeepOre", quest = "questRevealOnAccept",
 	cooldown = "cooldownWhileRecharging" }
 local TRIGGER_SWITCH = { chat = "handleChat", whisper = "handleChat", typing = "handleChat", aura = "handleBuffs",
-	ping = "handleMinimap", tracking = "handleMinimap", quest = "handleQuests", gamepad = "handleGamepad",
+	ping = "handleMinimap", tracking = "minimapKeepOpen", quest = "handleQuests", gamepad = "handleGamepad",
 	cooldown = "handleCooldowns" }
 local function TriggerSetting(key, row, n)
 	local switch = TRIGGER_SWITCH[key]
@@ -340,7 +340,7 @@ end
 local function AdvancedWaiting(entry, n, out)
 	local db, tick = ns.db, n.tick or NONE
 	local group = entry.group
-	if group == "minimap" and ns.PageOn("handleMinimap") and not db.alwaysShowMinimap then
+	if group == "minimap" and ns.PageOn("minimapKeepOpen") and not db.alwaysShowMinimap then
 		if db.minimapIndoors and not (IsIndoors and ns.Flag(IsIndoors())) then
 			Add(out, "off", L["Keep open: indoors (you're outdoors)"], "Minimap", "minimapIndoors")
 		end

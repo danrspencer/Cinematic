@@ -215,7 +215,8 @@ local function PrintDebugHelp()
 	print("  /cine debug layoutbase - check our layouts made on each of yours (party frames, places kept), saving nothing")
 	print("  /cine debug followhud [setup|undo|update] - the Follow HUD (dev): its pieces, layout and the settings it changed, or set it up, take it off, or make its layout again")
 	print("  /cine debug followtest - one run checking the Follow HUD with each root, across two reloads (dev copy; again to stop)")
-	print("  /cine debug sweep [visual [N]] [seed S] [page words] - one run changing every setting on every page (or N at random, with screenshots) and putting it back, logging errors and settings that don't come back (dev copy)")
+	print("  /cine debug previewwatch [off] - records how the Style previews move and catches one covering a page's rows, with a screenshot (dev copy)")
+	print("  /cine debug sweep [pages] [shots] [visual [N]] [seed S] [page words] - one run opening every page and tab (layout checked) and changing every setting and putting it back (pages: layout only; shots: a screenshot of each; visual N: N settings at random with screenshots) (dev copy)")
 	print("  /cine debug resettest [logout] - one run checking what a reset puts back (layouts, plate settings), or with logout the plate settings going back at logout, across a reload (dev copy)")
 	print("  /cine debug euiswing - one run recording why EllesmereUI's swing timer stays hidden in CineMode (dev copy; again to stop)")
 	print("  /cine debug euicd - one run recording why an icon goes missing from EllesmereUI's cooldown bar (dev copy; again to stop)")
@@ -521,6 +522,9 @@ local function HandleSlash(msg)
 	elseif cmd == "debug" and arg == "followtest" then
 		-- (Dev copy: one run setting up the Follow HUD with each root and checking it, across two reloads, FollowHudTest.lua.)
 		if ns.FollowHudTest then ns.FollowHudTest() else ns.Print("/cine debug followtest is in the dev copy only.") end
+	elseif cmd == "debug" and (arg == "previewwatch" or arg == "previewwatch off") then
+		-- (Dev copy: records how the Style previews move, catching one over a page's rows, PreviewWatch.lua.)
+		if ns.PreviewWatch then ns.PreviewWatch(arg:match("off")) else ns.Print("/cine debug previewwatch is in the dev copy only.") end
 	elseif cmd == "debug" and (arg == "sweep" or arg:find("^sweep ")) then
 		-- (Dev copy: one run through every settings page and setting, Dev/Sweep.lua.)
 		if ns.SettingsSweep then ns.SettingsSweep(arg:match("^sweep%s*(.*)$"))
@@ -1765,6 +1769,9 @@ local function HandleSlash(msg)
 	elseif cmd == "debug" and arg == "platecost" then
 		-- (Dev copy: where plates' cost goes while turning fast, fewer / names-only / stripped plates, PlateCostTest.lua.)
 		if ns.PlateCostTest then ns.PlateCostTest() else ns.Print("/cine debug platecost is in the dev copy only.") end
+	elseif cmd == "debug" and arg == "friendplates" then
+		-- (Dev copy: friendly players' plates held only where rows want them, FriendPlatesTest.lua.)
+		if ns.FriendPlatesTest then ns.FriendPlatesTest() else ns.Print("/cine debug friendplates is in the dev copy only.") end
 	elseif cmd == "debug" and arg:find("^anytime") then
 		-- (Dev copy: one run checking the Cooldown Manager's When ready > Out of fights, ReadyAnyTimeTest.lua.)
 		if ns.ReadyAnyTimeTest then ns.ReadyAnyTimeTest(arg:match("^anytime%s*(.*)$"))

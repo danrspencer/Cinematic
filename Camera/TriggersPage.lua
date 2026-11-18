@@ -673,7 +673,7 @@ function ns.CreateTriggerSettingsPanel(kit)
 	-- Starts (its name, what starts it, Only if), Ends, Timing, Scenes (its
 	-- priority and the scenes using it).
 	local Layout -- (below)
-	local sub, _, ShowSub, subBase, subH = ns.FolderTabs(content, {
+	local sub, subTabs, ShowSub, subBase, subH = ns.FolderTabs(content, {
 		{ L["Starts"], L["Its name, what starts it and its Only if rule."] },
 		{ L["Ends"], L["What ends it: the first of its endings to happen."] },
 		{ L["Timing"], L["A wait before it starts, a least time, a cooldown and a chance."] },
@@ -689,6 +689,26 @@ function ns.CreateTriggerSettingsPanel(kit)
 	local body = CreateFrame("Frame", nil, content)
 	body:SetSize(WIDTH, 1)
 	body:SetPoint("TOPLEFT", subBase, "TOPLEFT", 6, -10)
+	-- (Each tab a container for the trigger shown, 2026-11-17: its own switch
+	-- per trigger, "tabOn:Trigger:<id>:<part>", under the Triggers page's.
+	-- Off: Starts or Scenes, it doesn't fire; Timing, no wait, least time,
+	-- cooldown or chance; Ends, its own endings dropped (it ends as its thing
+	-- does). CustomTriggers.lua's Parse and TryStart. The editor greyed with it.)
+	local PARTS = { "starts", "ends", "timing", "scenes" }
+	local partChecks = {}
+	local function PartKey(libId, i) return ("tabOn:Trigger:%s:%s"):format(libId, PARTS[i]) end
+	local function PartSwitch(key)
+		if not partChecks[key] then
+			local holder = CreateFrame("Frame", nil, content)
+			holder:SetSize(1, 1)
+			partChecks[key] = kit.PageSwitch(holder, key, L["Enable Page"], L["Turns this tab of the trigger on or off."],
+				holder, function() if ns.CustomTriggersChanged then ns.CustomTriggersChanged() end end)
+			ns.SetPageMaster({ key }, "cameraTriggers")
+			ns.DEFAULTS[key] = true -- (on to start; /cine debug sweep: not a leak)
+			if ns.db and ns.db[key] == nil then ns.db[key] = true end
+		end
+		return partChecks[key]
+	end
 
 	-- Lines: a name on the left, controls from LABEL_X; shown(line) says whether
 	-- it shows, and Layout stacks the ones that do. A section's line has a header.
@@ -1122,9 +1142,24 @@ function ns.CreateTriggerSettingsPanel(kit)
 	end
 
 	function Layout()
+		-- (Opened with no trigger picked (the menu, a search): the first of
+		-- ours, so its tabs have a trigger to turn on and off.)
+		if not PAGE.now and ns.BuiltInTriggers then
+			local first = ns.BuiltInTriggers()[1]
+			if first then PAGE.now, PAGE.sub = "b:" .. first.key, 1 end
+		end
 		local id, built = Id(), BuiltIn()
 		if not PAGE.sub then PAGE.sub = 1 end
 		ShowSub(PAGE.sub)
+		-- (Its tabs' switches, this trigger's: ours by its library id too.)
+		local libId = id or (built and ns.OursTriggerId and ns.OursTriggerId(built.key))
+		if libId then
+			for i, tab in ipairs(subTabs) do
+				PartSwitch(PartKey(libId, i))
+				tab:SetFlip(PartKey(libId, i))
+			end
+		end
+		ns.SetPageGate(content, libId and PartKey(libId, PAGE.sub) or nil)
 		if id then
 			local kind, what = Src(id)
 			icon:SetTexture(IconOf(kind, what))

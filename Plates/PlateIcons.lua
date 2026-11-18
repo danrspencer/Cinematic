@@ -41,7 +41,7 @@ function ns.PlateIconWanted(part, cinematic)
 	local key = ROW_KEY[part]
 	if not key then return nil end
 	local db = ns.db
-	if part ~= "TargetArrow" and not db.handlePlateIcons then return false end
+	if part ~= "TargetArrow" and not (db.handlePlateIcons and not ns.MasterOff("handlePlateIcons", db)) then return false end
 	if db[ALWAYS_KEY[part]] then return true end
 	if not cinematic then return false end
 	local now = GetTime()

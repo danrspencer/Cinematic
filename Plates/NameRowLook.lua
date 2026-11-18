@@ -73,12 +73,18 @@ local GAME = {
 	Glow = "none", Back = "none", BackAlpha = 0.6, Line2Size = 1, Line2Color = "name",
 	-- (2026-11-16: the glow's opacity and size; the band's border, its thickness.)
 	GlowAlpha = 0.7, GlowSize = 1, BackBorder = "none", BackBorderSize = 1,
+	-- (2026-11-17, the Name / Second line / Behind panel: the second line's
+	-- own opacity, and its own letters once it stops matching the name; the
+	-- glow and band round the name alone or both lines.)
+	Line2Match = true, Line2Alpha = 1, Line2Font = "usual", Line2Outline = 0, Line2OutlineColor = "black",
+	Line2Shadow = false, Line2ShadowAlpha = 1, GlowAround = "both", BackAround = "both",
 }
 ns.NAME_LOOK_GAME = GAME
 -- The colors, by the setting that picks them, as they start.
 local COLORS = {
 	OutlineColor = { 0, 0, 0 }, Colour = { 1, 1, 1 }, Hostile = { 1, 0.25, 0.2 }, Neutral = { 1, 0.9, 0.3 },
 	Friendly = { 0.4, 1, 0.4 }, Glow = { 1, 0.82, 0 }, Back = { 0, 0, 0 }, BackBorder = { 1, 0.82, 0 },
+	Line2OutlineColor = { 0, 0, 0 }, Line2Color = { 0.72, 0.72, 0.72 },
 }
 ns.NAME_LOOK_COLORS = COLORS
 -- (A color's keys: Outline color's are <prefix>OutlineR..., the rest
@@ -311,28 +317,86 @@ function ns.MigrateNameInherit()
 	db.nameInheritV1 = true
 end
 
+-- The second line's letters as a row has them (the plates' and the Name
+-- Style preview's, 2026-11-17): the name's while it matches the name
+-- (Line2Match), else its own. S(setting): the row's value. Gives { font,
+-- outline, rim (an outline in a color of its own), colorSetting (the rim's:
+-- NameLookColor's), shadow, shadowAlpha, alpha }.
+function ns.NameLine2Look(S)
+	local own = S("Line2Match") == false
+	local prefix = own and "Line2" or ""
+	local outline = tonumber(S(prefix .. "Outline")) or 0
+	return {
+		own = own,
+		font = S(prefix .. "Font"),
+		outline = outline,
+		rim = outline > 0 and S(prefix .. "OutlineColor") == "custom",
+		colorSetting = prefix .. "OutlineColor",
+		shadow = S(prefix .. "Shadow") == true,
+		shadowAlpha = tonumber(S(prefix .. "ShadowAlpha")) or 1,
+		alpha = tonumber(S("Line2Alpha")) or 1,
+	}
+end
+
 -- A name's glow, band and the band's border, placed round its text (the
 -- plates' and the Name Style preview's, 2026-11-16). parts: { glow, back,
 -- edges (four textures, made here) } on owner; S(setting): the row's value;
 -- Color(setting): its r, g, b. width, height: the text's, scaled.
-function ns.DressNameParts(owner, parts, text, width, height, S, Color)
+-- below: the second line under it, { width, height, nameHidden } scaled,
+-- or nil: the glow and band round what shows while GlowAround / BackAround
+-- say so ("both", What shows): both lines, or the line alone while the name
+-- is hidden (a Service NPC's title shown alone; your target's name comes in
+-- over it). A piece round the line alone gets .followsLine: it fades with
+-- the line, not the hidden name (PlateParts' DressShown). 2026-11-17.
+-- (Glow strength past 100%: a second glow over the first, 2026-11-17.)
+function ns.DressNameParts(owner, parts, text, width, height, S, Color, below)
 	local glow, back = S("Glow"), S("Back")
+	-- (Round both lines: as wide as the wider, as tall as both, its middle
+	-- between them. The line hangs 1 under the name. Round the line alone:
+	-- its middle a half name, the gap and a half line down. Gives the box,
+	-- how far down its middle is, the glow's padding and whether it's the
+	-- line's alone.)
+	local function Box(around)
+		if below and around ~= "name" then
+			if below.nameHidden then
+				return below.width, below.height, -(height / 2 + 1 + below.height / 2), below.height, true
+			end
+			return math.max(width, below.width), height + below.height + 1, -(below.height + 1) / 2, height, false
+		end
+		return width, height, 0, height, false
+	end
 	parts.glow:SetShown(glow ~= "none")
+	local strength = tonumber(S("GlowAlpha")) or 0.7
+	if strength > 1 and glow ~= "none" and not parts.glow2 then
+		local layer, sub = parts.glow:GetDrawLayer()
+		parts.glow2 = owner:CreateTexture(nil, layer, nil, sub)
+		parts.glow2:SetTexture(ns.NAME_GLOW)
+		parts.glow2:SetBlendMode("ADD")
+	end
+	if parts.glow2 then parts.glow2:SetShown(glow ~= "none" and strength > 1) end
 	if glow ~= "none" then
 		local r, g, b = Color("Glow")
 		local size = tonumber(S("GlowSize")) or 1
-		parts.glow:SetVertexColor(r, g, b, tonumber(S("GlowAlpha")) or 0.7)
-		parts.glow:ClearAllPoints()
-		parts.glow:SetPoint("CENTER", text, "CENTER", 0, 0)
-		parts.glow:SetSize(width + height * 3 * size, height * 3 * size)
+		local w, h, y, pad, lineOnly = Box(S("GlowAround"))
+		local pieces = { parts.glow }
+		if strength > 1 then pieces[2] = parts.glow2 end
+		for i, piece in ipairs(pieces) do
+			piece:SetVertexColor(r, g, b, i == 1 and math.min(1, strength) or strength - 1)
+			piece:ClearAllPoints()
+			piece:SetPoint("CENTER", text, "CENTER", 0, y)
+			piece:SetSize(w + pad * 3 * size, (h + pad * 2) * size)
+			piece.followsLine = lineOnly
+		end
 	end
 	parts.back:SetShown(back ~= "none")
 	if back ~= "none" then
 		local r, g, b = Color("Back")
+		local w, h, y, _, lineOnly = Box(S("BackAround"))
 		parts.back:SetColorTexture(r, g, b, tonumber(S("BackAlpha")) or 0.6)
 		parts.back:ClearAllPoints()
-		parts.back:SetPoint("CENTER", text, "CENTER", 0, 0)
-		parts.back:SetSize(width + 14, height + 6)
+		parts.back:SetPoint("CENTER", text, "CENTER", 0, y)
+		parts.back:SetSize(w + 14, h + 6)
+		parts.back.followsLine = lineOnly
 	end
 	-- (The band's border: a line round it, its thickness and color.)
 	local edged = back ~= "none" and S("BackBorder") == "line"
@@ -342,6 +406,7 @@ function ns.DressNameParts(owner, parts, text, width, height, S, Color)
 	end
 	for i, edge in ipairs(parts.edges or {}) do
 		edge:SetShown(edged)
+		edge.followsLine = parts.back.followsLine -- (faded with the band)
 		if edged then
 			local r, g, b = Color("BackBorder")
 			local thick = math.max(1, tonumber(S("BackBorderSize")) or 1)

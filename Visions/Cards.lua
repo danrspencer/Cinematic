@@ -404,8 +404,14 @@ end
 
 -- A look setting from source for an event (nil: the base look's): its own,
 -- else its parent's, else the style it starts from's.
+-- An event's Settings, Style or Sounds tab switched off (CardsPage.lua,
+-- 2026-11-17, each tab a container): "settings" (no card), "style" (its
+-- card type's look, none of its own), "sounds" (no sound).
+function ns.CardPartOff(id, part)
+	return id ~= nil and ns.db ~= nil and ns.db[("tabOn:Card:%s:%s"):format(id, part)] == false
+end
 local function Resolve(source, id, field)
-	local event = BY_ID[id]
+	local event = not ns.CardPartOff(id, "style") and BY_ID[id] or nil
 	while event do
 		local value = source[Key(field, event.id)]
 		if value ~= nil and value ~= "default" then return value end
@@ -515,6 +521,7 @@ end
 function ns.CardOn(id)
 	local event = BY_ID[id]
 	if not (event and ns.Setting("cards") and ns.Setting(event.on)) then return false end
+	if ns.CardPartOff(id, "settings") then return false end -- (its Settings tab off)
 	if ns.FeatureYieldedTo("card:" .. id) then return false end -- (another addon's own is on)
 	return not event.needs or ns.CardOn(event.needs)
 end
@@ -527,6 +534,7 @@ function ns.CardAllowed(id, edge)
 	if not event then return false, "no such card" end
 	if not ns.Setting("cards") then return false, "Card Vision is off" end
 	if not ns.Setting(event.on) then return false, event.name .. " is unticked" end
+	if ns.CardPartOff(id, "settings") then return false, event.name .. "'s Settings tab is off" end
 	local other = ns.FeatureYieldReason("card:" .. id)
 	if other then return false, other end
 	if event.needs and not ns.CardOn(event.needs) then return false, BY_ID[event.needs].name .. " is unticked" end
@@ -572,7 +580,10 @@ function Show(card)
 	local look = card.look or ns.CardLook(card.id) -- (look: the Card Types tab's Test, a style's)
 	ns.PlayCard(Screen(), look, UIParent:GetWidth(), UIParent:GetHeight(), 1, card, Next)
 	-- (Its own sound, or its event's rules on the Sounds tab: CombatSoundRules.lua.)
-	if card.sound then pcall(card.sound) elseif ns.PlayCardCueSound then pcall(ns.PlayCardCueSound, card.id) end
+	-- (Not with its Sounds tab off.)
+	if not ns.CardPartOff(card.id, "sounds") then
+		if card.sound then pcall(card.sound) elseif ns.PlayCardCueSound then pcall(ns.PlayCardCueSound, card.id) end
+	end
 end
 
 -- Cards held through a fight (its In a fight: Wait till after), the newest

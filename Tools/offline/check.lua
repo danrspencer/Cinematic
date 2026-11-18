@@ -75,6 +75,9 @@ if arg[1] and not update then
 		if db.chatOwnNoBubble ~= true then Problem("the exception isn't on by default") end
 		local kept = { db.chatPeek, db.handleChat, db.chatHideOwn, db.chatOwnNoBubble, db.chatPeekLinesOnly }
 		local keptGuild, keptChannels = db.chatPeekTypes.guild, db.chatPeekChannels
+		-- (handleChat under Chat's Show under the HUD's since 2026-11-17: all on.)
+		local keptTree = { db.handleFrames, db.showInChat }
+		db.handleFrames, db.showInChat = true, true
 		db.chatPeek, db.handleChat, db.chatHideOwn, db.chatOwnNoBubble = true, true, true, true
 		-- (Whether a line peeks, told by the whole window's peek: no line copies,
 		-- which read the window's lines a frame later.)
@@ -114,6 +117,7 @@ if arg[1] and not update then
 		if not Peeks("CHAT_MSG_WHISPER_INFORM", "Someone") then Problem("a sent whisper hid with Hide your messages off") end
 		db.chatPeek, db.handleChat, db.chatHideOwn, db.chatOwnNoBubble = kept[1], kept[2], kept[3], kept[4]
 		db.chatPeekLinesOnly = kept[5]
+		db.handleFrames, db.showInChat = keptTree[1], keptTree[2]
 		_G.ChatFrame_AddMessageEventFilter = keptFilter
 		ns.chatPeekUntil[frame] = nil
 	end

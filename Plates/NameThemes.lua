@@ -22,7 +22,9 @@ end
 
 -- Themes with a glow behind names (in their ornament's color), and the
 -- flat modern ones with a dark band.
-local GLOW = { fel = true, void = true, glade = true, forge = true }
+-- (Glow off in every main theme for now, 2026-11-17: it read as a blob over
+-- names and titles. Was fel, void, glade, forge. Lantern keeps its own.)
+local GLOW = {}
 
 -- A main theme's names: its small names font (Friz; a slab theme's own, as
 -- the themes do for unit frame names), its reaction colors, a grey second

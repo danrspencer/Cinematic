@@ -1,8 +1,13 @@
 -- /cine debug sweep: one run through every settings page and setting,
 -- checking each works, then putting everything back. Dev copy only.
---   /cine debug sweep [page words]
+--   /cine debug sweep [pages] [shots] [page words]
 --       full: every page opened (a Lua error or a page that won't show is
---       logged), then every setting on them (checkbox, radio pick, slider,
+--       logged), and on each, every folder tab clicked through (tabs in tabs
+--       too, as /cine debug pageshots does), each look measured as
+--       PageShots.lua measures it: words cut off, text over text, text under
+--       a bar (a preview over the rows), parts past the page's right edge.
+--       With "shots", a screenshot of each look (its top: pageshots scrolls).
+--       With "pages", only that: no settings changed. Then every setting on them (checkbox, radio pick, slider,
 --       number box, dropdown) changed as a click would, one step a frame:
 --       a tick flipped, a slider at its min, max and middle, a box a step up
 --       and down, up to 6 of a dropdown's choices, each other radio pick.
@@ -39,10 +44,15 @@ local QUIET = { log = true, sweepLog = true, sweepPending = true, pageTimes = tr
 -- converts its width, a dragged spot becomes your own spot).
 local SETS_OTHERS = { lowHealthTheme = "^lowHealth", prdHealthWidthUnit = "^prdHealthWidthPx$",
 	prdPowerWidthUnit = "^prdPowerWidthPx$", emoteVisionX = "^emoteVisionSpot$", emoteVisionY = "^emoteVisionSpot$" }
+-- CVars Cinematic itself drives as you play, whatever page is open (the
+-- friendly plates where a row shows them or your target is one, the Shoulder
+-- Cam's offset): not counted, not put back, and their held copies
+-- (savedCVars) left as they are, the feature still holding them. 2026-11-17.
+local LIVE_CVARS = { nameplateshowfriendlyplayers = true, test_cameraovershoulder = true }
 -- CVars the game changes as you play: not counted, not put back.
 local function QuietCVar(name)
 	local lower = name:lower()
-	return lower:find("^last") or lower:find("saved") or lower:find("camera") and lower:find("distance")
+	return LIVE_CVARS[lower] or lower:find("^last") or lower:find("saved") or lower:find("camera") and lower:find("distance")
 end
 
 local run
@@ -326,6 +336,7 @@ end
 -- picks of one setting on one line made one entry.
 local function Collect(filter)
 	ns.MakeLazyPages("the sweep")
+	if ns.MapTabContainers then ns.MapTabContainers() end -- (tabs' settings under them, the pages just made too)
 	if ns.RefreshOptions then ns.RefreshOptions() end
 	local pages, list, seen, radios = {}, {}, {}, {}
 	for _, page in ipairs(ns.SettingsPages()) do
@@ -633,20 +644,273 @@ local function QueueVisual(c, index, total)
 	Add(c.id, function() Verify(c) end)
 end
 
--- Every page opened, two frames each.
+-- Every page opened, and its tabs clicked through: each look measured.
+local OPEN_WAIT, TAB_WAIT, MAX_LOOKS = 0.5, 0.3, 30 -- (seconds; looks a page at most)
+local LAYOUT_KINDS = { "words cut off", "text over text", "past the page's right edge", "text under a bar",
+	"text under the style preview" }
+
+local function TabName(tab)
+	local text = tab.label and tab.label.GetText and tab.label:GetText() or (tab.GetText and tab:GetText())
+	text = Plain(text)
+	return text ~= "" and text or ("tab " .. tostring(tab.shotIndex))
+end
+
+-- One look at the page as it shows now (path: the tabs picked).
+local function LookAt(page, entry, path)
+	entry.looks = entry.looks + 1
+	entry.label = path ~= "" and path or "(page)"
+	run.looks = run.looks + 1
+	-- (Measured at the top, and scrolled to the middle and the bottom: a
+	-- sticky preview covers the rows only as they scroll under it, 2026-11-17.)
+	local scroll = page.canvas.scroll
+	local range = scroll and scroll.GetVerticalScrollRange and (tonumber(scroll:GetVerticalScrollRange()) or 0) or 0
+	local spots = range > 40 and { 0, range / 2, range } or { 0 }
+	local seen = {}
+	for n, at in ipairs(spots) do
+		if n > 1 then
+			scroll:SetVerticalScroll(at)
+			coroutine.yield(TAB_WAIT)
+		end
+		local where = n == 1 and "" or (n == 2 and " (scrolled halfway)" or " (scrolled to the bottom)")
+		local found = ns.PageLayoutFindings and { ns.PageLayoutFindings(page.canvas) } or {}
+		for i, list in ipairs(found) do
+			-- (Only what's new scrolled: the same words again aren't.)
+			local fresh = {}
+			for _, words in ipairs(list) do
+				if not seen[i .. words] then
+					seen[i .. words] = true
+					fresh[#fresh + 1] = words
+				end
+			end
+			if #fresh > 0 then
+				Note("WARN", ("%s%s: %s"):format(LAYOUT_KINDS[i] or "?", where, table.concat(fresh, "; ")))
+			end
+		end
+		if run.shots then
+			run.boxAt = GetTime() + 2 -- (the box kept off till the shot's taken)
+			Say(("  %s | %s%s: %s"):format(entry.page, entry.label, where, Shot("look")))
+			-- (The game names shots by the second: two in one, the second's lost.)
+			coroutine.yield(1.1)
+		end
+	end
+	if #spots > 1 then
+		scroll:SetVerticalScroll(0)
+		coroutine.yield(TAB_WAIT)
+	end
+end
+
+-- (Run in a coroutine: yields the seconds to wait, a tab's click to settle.)
+local function Explore(page, entry, visited, path)
+	local canvas = page.canvas
+	local set
+	for _, each in ipairs(ns.PageTabSets and ns.PageTabSets(canvas.content or canvas) or {}) do
+		if not visited[each] then set = each break end
+	end
+	if not set or entry.looks >= MAX_LOOKS then
+		LookAt(page, entry, path)
+		return
+	end
+	local inner = {}
+	for k in pairs(visited) do inner[k] = true end
+	inner[set] = true
+	-- (Every tab must turn its feature on and off by right-click: the user's
+	-- rule, 2026-11-17. Noted once a tab.)
+	run.tabsSeen = run.tabsSeen or {}
+	for _, tab in ipairs(set) do
+		if tab:IsShown() and not run.tabsSeen[tab] then
+			run.tabsSeen[tab] = true
+			local why = not tab.canFlip and "a right-click does nothing"
+				or tab.switchPage and ns.HasPageSwitch and not ns.HasPageSwitch(tab.switchPage)
+				and ("its page, %s, has no switch"):format(tab.switchPage)
+			if why then
+				local label = entry.label
+				entry.label = (path ~= "" and (path .. " > ") or "") .. TabName(tab)
+				Note("WARN", "no right-click on/off: " .. why)
+				entry.label = label
+			end
+			-- (A tab is a container: off, every setting on it reads off. Set off
+			-- a moment, each checked, put back.)
+			if not why and tab.flipKey and tab.containerHost then
+				local db = ns.GetDB()
+				local was = db[tab.flipKey]
+				db[tab.flipKey] = false
+				local still = {}
+				local function Walk(frame, depth)
+					if depth > 30 then return end
+					local key = frame.settingKey
+					if type(key) == "string" and key ~= tab.flipKey and db[key] and ns.Setting(key) and not still[key] then
+						still[key] = true
+						still[#still + 1] = key
+					end
+					for _, child in ipairs({ frame:GetChildren() }) do Walk(child, depth + 1) end
+				end
+				Walk(tab.containerHost, 0)
+				db[tab.flipKey] = was
+				if #still > 0 then
+					local label = entry.label
+					entry.label = (path ~= "" and (path .. " > ") or "") .. TabName(tab)
+					Note("WARN", ("tab off, but %d settings on it still read on: %s"):format(#still,
+						table.concat(still, ", ", 1, math.min(#still, 8))))
+					entry.label = label
+				end
+				run.containersChecked = (run.containersChecked or 0) + 1
+			end
+		end
+	end
+	local was, left = set.picked or 1, false
+	for _, tab in ipairs(set) do
+		if entry.looks >= MAX_LOOKS then break end
+		if tab:IsShown() then
+			local here = path ~= "" and (path .. " > " .. TabName(tab)) or TabName(tab)
+			entry.label = here
+			local ok, err = pcall(tab.Click, tab)
+			if not ok then Note("FAIL", "Lua error clicking the tab: " .. FirstLine(err)) end
+			coroutine.yield(TAB_WAIT)
+			HidePopups()
+			if not canvas:IsVisible() then
+				-- (A tab that opens another page: noted, its page opened again.)
+				Say(("  note: %s | %s opens another page"):format(entry.page, here))
+				left = true
+				pcall(ns.OpenOptions, page.key)
+				coroutine.yield(OPEN_WAIT)
+				break
+			end
+			Explore(page, entry, inner, here)
+		end
+	end
+	if set[was] and not left and canvas:IsVisible() then
+		pcall(set[was].Click, set[was])
+		coroutine.yield(TAB_WAIT)
+	end
+end
+
+-- Every icon's tree, read off the layout (the user's rule, 2026-11-17): an
+-- icon's tabs in one hub, the first its root (an icon whose first tabs are
+-- Show sections, "HUD:...": each of those a root, siblings), every other
+-- tab under a root. Each such tab: a switch of its own (not its root's or
+-- another icon's), hung under its root (Frames.lua's ns.SHOW_IN_CHILDREN),
+-- and with its roots set off it reads off and greyed (put back straight
+-- after). No exceptions.
+local function TreeCheck()
+	if not (ns.ShowInTabNames and ns.PageSwitchKey and ns.PageHub) then return end
+	local db = ns.GetDB()
+	local checked, owner = 0, {}
+	for _, name in ipairs(ns.ShowInTabNames()) do
+		local list = ns.ShowInTabs(name)
+		local hubs, order = {}, {}
+		for _, tab in ipairs(list) do
+			local hub = ns.PageHub(tab[2]) or "?"
+			if not hubs[hub] then
+				hubs[hub] = {}
+				order[#order + 1] = hub
+			end
+			table.insert(hubs[hub], tab)
+		end
+		for _, hub in ipairs(order) do
+			local tabs, roots = hubs[hub], {}
+			local function KeyOf(page)
+				local section = page:match("^HUD:(.+)$")
+				return section and ns.SHOW_IN_SWITCH and ns.SHOW_IN_SWITCH[section] or ns.PageSwitchKey(page)
+			end
+			local i = 1
+			repeat
+				roots[#roots + 1] = KeyOf(tabs[i][2])
+				i = i + 1
+			until not (tabs[i] and tabs[i][2]:find("^HUD:") and tabs[1][2]:find("^HUD:"))
+			local isRoot = {}
+			for _, key in ipairs(roots) do isRoot[key] = true end
+			for j = i, #tabs do
+				local page = tabs[j][2]
+				run.current = { id = "tree", page = ("%s (%s hub)"):format(Plain(list[1][1] and name or name), hub),
+					label = Plain(tabs[j][1]) }
+				local key = KeyOf(page)
+				if not key then
+					Note("WARN", ("tree: no switch of its own (page %s)"):format(page))
+				elseif isRoot[key] then
+					Note("WARN", ("tree: shares its icon's switch %s"):format(key))
+				elseif owner[key] and owner[key] ~= name then
+					Note("WARN", ("tree: shares switch %s with the %s icon"):format(key, owner[key]))
+				else
+					owner[key] = name
+					checked = checked + 1
+					local master, under = key, false
+					for _ = 1, 10 do
+						master = ns.PageSwitchOf(master)
+						if not master then break end
+						if isRoot[master] then under = true break end
+					end
+					if not under then
+						Note("WARN", ("tree: its switch %s isn't under its icon's (%s)"):format(key, table.concat(roots, "/")))
+					else
+						local was = {}
+						for _, root in ipairs(roots) do was[root] = db[root]; db[root] = false end
+						local stillOn, greyed = ns.PageOn(key), ns.PageSwitchOff(page)
+						for _, root in ipairs(roots) do db[root] = was[root] end
+						if stillOn or not greyed then
+							Note("WARN", ("tree: its icon off, but it's %s"):format(stillOn and "still on" or "not greyed"))
+						end
+					end
+				end
+			end
+		end
+	end
+	run.current = nil
+	Say(("  tree: %d icon tabs checked under their icon's switch"):format(checked))
+end
+
 local function QueuePage(page)
 	local name = Plain(page.name or "Cinematic")
-	local entry = { id = "page", page = name, label = "(opening the page)" }
+	local entry = { id = "page", page = name, label = "(opening the page)", looks = 0 }
 	Add(name, function()
 		run.current = entry
 		run.step = "opening"
 		local ok, err = pcall(ns.OpenOptions, page.key)
 		if not ok then Note("FAIL", "Lua error opening: " .. FirstLine(err)) end
-	end)
+	end, OPEN_WAIT)
+	local co
 	Add(name, function()
 		run.current = entry
-		HidePopups()
-		if not page.canvas:IsVisible() then Note("WARN", "page didn't show") end
+		if not co then
+			-- (Once a run: every hub icon a right-click can't turn on and off.)
+			if not run.iconsChecked and ns.HubTilesWithoutSwitch then
+				run.iconsChecked = true
+				ns.Guard(TreeCheck)
+				run.current = { id = "icon", page = "-", label = "-" }
+				for _, each in ipairs(ns.HubTilesWithoutSwitch()) do
+					Note("WARN", ("icon %s > %s: no right-click on/off (no switch)"):format(each.hub, each.label))
+				end
+				run.current = entry -- (the tree check left it unset: this page's own tab notes named nothing)
+			end
+			HidePopups()
+			if not page.canvas:IsVisible() then
+				Note("WARN", "page didn't show")
+				run.opened = run.opened + 1
+				return
+			end
+			co = coroutine.create(function()
+				Explore(page, entry, {}, "")
+				-- (The page's other parts, each an icon of its own sharing its
+				-- canvas (canvas.hubTabs): Nameplate Style's Smart, the HUD's
+				-- sections. Its tab row's skipped as pages of their own, so
+				-- these were never seen: 2026-11-17, the preview over Smart.)
+				for _, part in ipairs(page.canvas.hubTabs or {}) do
+					if part.name and part.name ~= page.key and ns.ShowHubPage then
+						local ok, err = pcall(ns.ShowHubPage, part.name)
+						if not ok then Note("FAIL", ("Lua error opening part %s: %s"):format(part.name, FirstLine(err))) end
+						coroutine.yield(OPEN_WAIT)
+						HidePopups()
+						if page.canvas:IsVisible() then
+							Explore(page, entry, {}, Plain(part.label or part.name))
+						else
+							Say(("  note: %s | part %s didn't show"):format(entry.page, part.name))
+						end
+					end
+				end
+			end)
+		end
+		local ok, wait = coroutine.resume(co)
+		if not ok then Note("FAIL", "sweep's own error looking at the page: " .. FirstLine(wait)) end
+		if ok and coroutine.status(co) ~= "dead" then return true, wait end
 		run.opened = run.opened + 1
 		run.current, run.step = nil, nil
 	end)
@@ -681,10 +945,11 @@ local function Tick()
 		Finish(true)
 		return
 	end
-	local ok, again = pcall(step.fn)
+	local ok, again, wait = pcall(step.fn)
 	if not ok then Note("FAIL", ("sweep's own error at %s: %s"):format(step.name, FirstLine(again))) end
-	if not (ok and again == true) then run.index = run.index + 1 end
-	run.nextAt = now + (step.wait or 0)
+	local repeating = ok and again == true
+	if not repeating then run.index = run.index + 1 end
+	run.nextAt = now + (repeating and (wait or 0) or step.wait or 0)
 	if now - (run.boxAt or 0) > 0.5 then
 		run.boxAt = now
 		Box()
@@ -696,7 +961,20 @@ local function PutAllBack()
 	if run.panel and run.alpha then run.panel:SetAlpha(run.alpha) end
 	local db = ns.GetDB()
 	local leaks = {}
+	-- (The live CVars' held copies: kept as they are now, LIVE_CVARS.)
+	local function KeepLive(k, v)
+		if k ~= "savedCVars" or type(v) ~= "table" or type(db[k]) ~= "table" then return v end
+		local merged = Copy(v)
+		for name in pairs(v) do
+			if LIVE_CVARS[tostring(name):lower()] then merged[name] = nil end
+		end
+		for name, value in pairs(db[k]) do
+			if LIVE_CVARS[tostring(name):lower()] then merged[name] = value end
+		end
+		return merged
+	end
 	for k, v in pairs(run.before) do
+		v = KeepLive(k, v)
 		if not Same(db[k], v) then
 			if not Alike(db[k], v) then leaks[#leaks + 1] = Diff(v, db[k], k) end
 			db[k] = Copy(v)
@@ -704,7 +982,10 @@ local function PutAllBack()
 	end
 	for k in pairs(db) do
 		if not QUIET[k] and run.before[k] == nil then
-			leaks[#leaks + 1] = k
+			-- (A list made the first time its page opened: not a leak.)
+			if type(db[k]) ~= "table" and db[k] ~= false and not Same(db[k], ns.DEFAULTS[k]) then
+				leaks[#leaks + 1] = k
+			end
 			db[k] = nil
 		end
 	end
@@ -754,13 +1035,14 @@ function Finish(done)
 		Say("--- summary ---")
 		for _, name in ipairs(names) do
 			local page = this.pages[name]
-			if page.tested > 0 or page.fails > 0 then
+			if page.tested > 0 or page.fails > 0 or page.warns > 0 then
 				Say(("page %s: %d settings, %d fail, %d warn"):format(name, page.tested, page.fails, page.warns))
 			end
 		end
-		Say(("%s: %d pages opened, %d of %d settings tested, %d fail, %d warn, %.0f sec, seed %d"):format(
-			done and "done" or "stopped", this.opened, this.done, this.total, this.fails, this.warns,
-			GetTime() - this.at, this.seed))
+		Say(("  tab containers checked: %d"):format(this.containersChecked or 0))
+		Say(("%s: %d pages opened (%d looks, tabs clicked through), %d of %d settings tested, %d fail, %d warn, "
+			.. "%.0f sec, seed %d"):format(done and "done" or "stopped", this.opened, this.looks, this.done, this.total,
+			this.fails, this.warns, GetTime() - this.at, this.seed))
 		Watch(false)
 		run = nil
 		ns.PadTestBox(("Sweep %s: %d fail, %d warn. /reload, then say \"check log\"."):format(
@@ -788,7 +1070,7 @@ function ns.SettingsSweep(args)
 		return
 	end
 	if InCombatLockdown() then return ns.Print("not in a fight") end
-	local words, visual, count, seed = {}, false, nil, nil
+	local words, visual, count, seed, pagesOnly, shots = {}, false, nil, nil, false, false
 	local tokens = {}
 	for word in (args or ""):lower():gmatch("%S+") do tokens[#tokens + 1] = word end
 	local i = 1
@@ -796,6 +1078,10 @@ function ns.SettingsSweep(args)
 		local word = tokens[i]
 		if word == "visual" then
 			visual = true
+		elseif word == "pages" then
+			pagesOnly = true
+		elseif word == "shots" then
+			shots = true
 		elseif word == "seed" and tonumber(tokens[i + 1]) then
 			seed = tonumber(tokens[i + 1])
 			i = i + 1
@@ -810,7 +1096,7 @@ function ns.SettingsSweep(args)
 	seed = math.floor(seed or (time() % 100000))
 	CinematicDB.sweepLog = {}
 	run = { at = GetTime(), queue = {}, index = 1, nextAt = 0, fails = 0, warns = 0, done = 0, opened = 0,
-		pages = {}, visual = visual, seed = seed, rnd = Random(seed) }
+		pages = {}, visual = visual, seed = seed, rnd = Random(seed), looks = 0, shots = shots }
 	Watch(true)
 	local pages, controls
 	local ok, err = pcall(function() pages, controls = Collect(filter) end)
@@ -839,7 +1125,7 @@ function ns.SettingsSweep(args)
 	for kind, n in pairs(kinds) do kindList[#kindList + 1] = kind .. " " .. n end
 	table.sort(kindList)
 	Say(("start %s: %s run, %s (game %s), pages %d, settings %d (%s), filter %s, seed %d, CineMode %s, layout %s")
-		:format(date("%Y-%m-%d %H:%M:%S"), visual and "visual" or "full", ns.isRetail and "retail" or tostring(ns.CLIENT),
+		:format(date("%Y-%m-%d %H:%M:%S"), visual and "visual" or pagesOnly and "pages (layout only)" or "full", ns.isRetail and "retail" or tostring(ns.CLIENT),
 		tostring((select(4, GetBuildInfo()))), #pages, #controls, table.concat(kindList, ", "), tostring(filter), seed,
 		tostring(run.cine), tostring(run.layout)))
 	if visual then
@@ -857,11 +1143,15 @@ function ns.SettingsSweep(args)
 		ns.Print(("settings sweep (visual): %d settings, about %d sec, seed %d; type it again to stop"):format(count,
 			count * 6, seed))
 	else
-		run.total = #controls
+		run.total = pagesOnly and 0 or #controls
 		for _, page in ipairs(pages) do QueuePage(page) end
-		for _, c in ipairs(controls) do QueueControl(c) end
-		ns.Print(("settings sweep: %d pages, %d settings, about %d sec; don't touch anything; type it again to stop")
-			:format(#pages, #controls, math.ceil((#pages * 2 + #controls * 3) / math.max(tonumber(GetFramerate()) or 60, 20))))
+		if not pagesOnly then
+			for _, c in ipairs(controls) do QueueControl(c) end
+		end
+		local secs = #pages * (OPEN_WAIT + 4 * TAB_WAIT)
+			+ (pagesOnly and 0 or #controls * 3 / math.max(tonumber(GetFramerate()) or 60, 20))
+		ns.Print(("settings sweep: %d pages%s, about %d sec; don't touch anything; type it again to stop")
+			:format(#pages, pagesOnly and " (layout only)" or (", " .. #controls .. " settings"), math.ceil(secs)))
 	end
 	ns.SetOnUpdate(driver, Tick)
 end

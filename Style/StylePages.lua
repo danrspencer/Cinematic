@@ -146,7 +146,10 @@ function ns.StyleOn(switchKey, db)
 	-- (Live, a page standing aside for another addon's own look: Addon Conflicts' Theirs.)
 	if switchKey and (db == nil or db == ns.db) and ns.StyleSwitchYielded(switchKey) then return false end
 	db = db or ns.db
-	return db and db.styleGeneral and (not switchKey or db[switchKey]) and true or false
+	-- (And every switch it's under, 2026-11-17: an icon's other tabs under its
+	-- first, the Nameplates icon's Smart and Cast Bars under Default.)
+	return db and db.styleGeneral and (not switchKey or (db[switchKey] and not ns.MasterOff(switchKey, db))) and true
+		or false
 end
 
 -- A page's look, read as its code reads the settings: its own while it's
@@ -380,7 +383,7 @@ end
 -- this page's. Gives the panel (its line); the page's title goes under it.
 -- Second, Show(i): another tab picked, for a page that's more than one tab
 -- (Unit Frames' Keep up and Frame Links, one page).
-function ns.PageTabs(content, list, picked)
+function ns.PageTabs(content, list, picked, noPalette)
 	-- (Only the tabs in the picked page's hub, 2026-11-17: an Interface icon's
 	-- list has its frame's Style pages too, now in the Style hub, and a
 	-- Vision's its Style. at: a list index to its tab here, for Show. Just
@@ -431,6 +434,7 @@ function ns.PageTabs(content, list, picked)
 	tabFrames.shotSkip = true -- (each its own page: PageShots.lua shoots those on their own)
 	-- (A right-click flips that tab's page switch: on or off on its tip.)
 	for i, tab in ipairs(tabFrames) do
+		tab.switchPage = list[i][2] -- (/cine debug sweep: its page must have a switch)
 		tab:HookScript("OnEnter", function(self) ns.PageSwitchTip(self, list[i][2]) end)
 	end
 	base:SetPoint("TOPLEFT", content, "TOPLEFT", 8, -(ns.FOLDER_TAB_HEIGHT + 16))
@@ -442,8 +446,10 @@ function ns.PageTabs(content, list, picked)
 	-- (Its frames' Style page, its tab gone to the Style hub: a palette right
 	-- of the last tab, shown and hidden with it. Not on the HUD page, its
 	-- sections' headings have theirs: content.headingStyleIcons. 2026-11-17.)
+	-- (noPalette: none either, the Unit Frames and PRD tabs: the user's call,
+	-- their Show tab's section switch has one, 2026-11-17.)
 	local lastTab = tabFrames[#tabFrames]
-	if stylePage and lastTab and not content.headingStyleIcons then
+	if stylePage and lastTab and not content.headingStyleIcons and not noPalette then
 		ns.StyleIcon(lastTab, lastTab, stylePage)
 	end
 	-- (kept on screen over the page's off card, to reach the other tabs)
@@ -606,6 +612,13 @@ local SHOW_IN_TABS = {
 	},
 }
 -- (has: whether this client has that tab's page; one it hasn't, left out.)
+-- (The lists' names, for /cine debug sweep's check of each icon's tree.)
+function ns.ShowInTabNames()
+	local names = {}
+	for name in pairs(SHOW_IN_TABS) do names[#names + 1] = name end
+	table.sort(names)
+	return names
+end
 function ns.ShowInTabs(key)
 	local L, list = ns.L, {}
 	for _, each in ipairs(SHOW_IN_TABS[key]) do
@@ -640,8 +653,12 @@ function ns.ShowInParts(canvas, _, title, key, PickPart, ShowOuter, spec) -- (_:
 	end
 	canvas.hubTabs = {}
 	for i = 1, parts do
+		-- (spec.switchFrames[i]: a part with a switch of its own (the Minimap's
+		-- Keep Open, 2026-11-17), for its tile's dot, right-click and off card;
+		-- spec.switchLabels[i] its name there.)
 		canvas.hubTabs[i] = { name = list[i + 1][2], icon = spec.icon, label = spec.label, own = i > 1 or nil,
-			switchLabel = spec.switchLabel, onSelect = function() ShowPart(i) end }
+			switchLabel = spec.switchLabels and spec.switchLabels[i] or spec.switchLabel,
+			switchFrame = spec.switchFrames and spec.switchFrames[i] or nil, onSelect = function() ShowPart(i) end }
 	end
 end
 
@@ -686,6 +703,9 @@ function ns.StylePreviewTest(preview, kit, tip, onClick)
 	button:SetScript("OnClick", onClick)
 	button.Refresh = function() end
 	button.pageSwitch = false
+	-- (Not drawn bigger with the preview's screens: its own mark, as a page
+	-- making it after StylePopout's zoom (Vitals Vision) had it zoomed huge.)
+	button.zoomSkip = true
 	kit.AddControl(button)
 	-- (A Pop out button already there moves left of it: StylePopout.)
 	local pop = preview.popButton or (preview:GetParent() and preview:GetParent().popButton)
@@ -799,7 +819,11 @@ local function SlideBack()
 	slid = nil
 	local settings = was.frame
 	local top = settings:GetTop()
-	if InCombatLockdown() or not top or math.abs(top - was.top) > 1 then return end
+	if InCombatLockdown() or not top or math.abs(top - was.top) > 1 then
+		if ns.PreviewTrace then ns.PreviewTrace("slide back skipped", nil, top and was.top and (top - was.top) or "?") end
+		return
+	end
+	if ns.PreviewTrace then ns.PreviewTrace("slide back") end
 	settings:ClearAllPoints()
 	for _, each in ipairs(was.points) do settings:SetPoint(unpack(each)) end
 end
@@ -815,6 +839,7 @@ local function SlideSettings(settings, by) -- (by: in UIParent's units)
 	settings:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", left, top - by / k)
 	settings:SetSize(width, height) -- (one sized by two anchors keeps its size)
 	slid = { frame = settings, points = points, top = top - by / k }
+	if ns.PreviewTrace then ns.PreviewTrace("slide settings down", nil, by) end
 end
 
 -- soft: its page left: the window kept a moment, for the next page's preview
@@ -822,6 +847,7 @@ end
 local function PutBack(soft)
 	local preview = popped
 	if not preview then return end
+	if ns.PreviewTrace then ns.PreviewTrace("put back", preview, soft and "soft" or "") end
 	popped = nil
 	SlideBack()
 	local slot = preview.popSlot
@@ -904,6 +930,7 @@ local function PlaceWindow()
 	local dock = popWindow.dock
 	if type(saved) == "table" and saved.x and saved.y then
 		popWindow:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", saved.x, saved.y)
+		if ns.PreviewTrace then ns.PreviewTrace("window placed", popped, "where you dragged it") end
 		dock:SetIcon("dock")
 		dock.tip = ns.L["Dock the window to the settings again."]
 		return
@@ -927,6 +954,7 @@ local function PlaceWindow()
 		popWindow:SetPoint("TOP", UIParent, "TOP", 0, -60)
 	end
 	popWindow.side = side
+	if ns.PreviewTrace then ns.PreviewTrace("window placed", popped, side or "screen top") end
 	dock:SetIcon("undock")
 	dock.tip = ns.L["Undock: drag the window anywhere."]
 end
@@ -1079,6 +1107,7 @@ function ns.PreviewAside(aside)
 end
 
 local function PopOut(preview)
+	if ns.PreviewTrace then ns.PreviewTrace("pop out", preview) end
 	PutBack()
 	UpdateSticky(preview, true) -- (held at its page's top: back in its spot first)
 	local window = Window()
@@ -1135,6 +1164,9 @@ local function PopOut(preview)
 	PlaceWindow()
 	if preview.Refresh then preview:Refresh() end
 end
+
+-- (Dev: /cine debug previewwatch, Dev/PreviewWatch.lua, reads these.)
+function ns.StylePreviewDebug() return popped, popWindow, slid end
 
 -- Sticky (2026-11-17): a preview on its page stays in sight as you scroll
 -- down. Once its spot goes past the top of the page's view, the preview is
@@ -1271,6 +1303,7 @@ local function Lift(preview, pin)
 	pin.raise = pin.hub:GetFrameLevel() + PIN_RAISE - preview:GetFrameLevel()
 	ShiftLevels(preview, pin.raise)
 	pin.on = true
+	if ns.PreviewTrace then ns.PreviewTrace("sticky lift", preview) end
 end
 
 -- Back in its spot on the page, its room there whole.
@@ -1284,6 +1317,7 @@ local function Drop(preview, pin)
 	Repoint(spot:GetParent(), spot, preview, pin.moved)
 	SetRoom(pin, spot, preview:GetHeight())
 	pin.moved, pin.on = nil, false
+	if ns.PreviewTrace then ns.PreviewTrace("sticky drop", preview) end
 end
 
 -- Where it is at e (0: its spot on the page, 1: the hub's corner), its
@@ -1336,6 +1370,10 @@ UpdateSticky = function(preview, off, snap)
 		can = false
 	end
 	local hold = can and not (ns.db and ns.db.stylePreviewFolded) or false
+	if hold ~= pin.target and ns.PreviewTrace then
+		ns.PreviewTrace("sticky " .. (hold and "hold" or "release"), preview, ("over %.0f, off %s, snap %s"):format(over,
+			tostring(off), tostring(snap)))
+	end
 	pin.target = hold
 	if hold and not pin.on then
 		Lift(preview, pin)
@@ -1399,7 +1437,9 @@ end
 -- open (the page a click opens), tabs ({ label, page } each, as chips),
 -- state (true on, false off, nil: no switch) } each. Gives the frame,
 -- sized to them. The card opens its page; each chip its tab.
-function ns.MakeHubCards(parent, entries, width)
+-- opts.joined (2026-11-17, tabbed groups): no gap, the cards' edges shared
+-- and each row's cards one height, so they read as one grid.
+function ns.MakeHubCards(parent, entries, width, opts)
 	local function Edge(frame, r, g, b)
 		local edges = ns.MakeStyleEdges(frame)
 		function frame.SetEdge(_, er, eg, eb) ns.DressStyleEdges(edges, 1, er, eg, eb, 1) end
@@ -1477,17 +1517,26 @@ function ns.MakeHubCards(parent, entries, width)
 		return card
 	end
 	local holder = CreateFrame("Frame", nil, parent)
-	local GAP = 8
+	local joined = opts and opts.joined
+	local GAP = joined and -1 or 8 -- (joined: overlapping a pixel, one edge between)
 	local cardW = math.floor((width - GAP) / 2)
-	local y, column, rowH = 0, 0, 0
+	local y, column, rowH, row = 0, 0, 0, {}
+	local function EndRow()
+		if joined then
+			for _, each in ipairs(row) do each:SetHeight(rowH) end
+		end
+		y, column, rowH, row = y + rowH + GAP, 0, 0, {}
+	end
 	for _, entry in ipairs(entries) do
 		local card = Card(holder, entry, cardW)
 		card:SetPoint("TOPLEFT", holder, "TOPLEFT", column * (cardW + GAP), -y)
 		rowH = math.max(rowH, card:GetHeight())
+		row[#row + 1] = card
 		column = column + 1
-		if column == 2 then y, column, rowH = y + rowH + GAP, 0, 0 end
+		if column == 2 then EndRow() end
 	end
-	if column > 0 then y = y + rowH end
+	if column > 0 then EndRow() end
+	y = math.max(0, y - GAP)
 	holder:SetSize(width, math.max(y, 1))
 	return holder
 end
@@ -1495,9 +1544,77 @@ end
 -- The cards in groups, each under its name (2026-11-16: the hub's groups,
 -- Interface's Combat, Nameplates and Info, Visions' Combat and World).
 -- groups: { title, entries } each, in order, empty ones left out. Gives the
--- frame, sized to them.
-function ns.MakeHubCardGroups(parent, groups, width)
+-- frame, sized to them. opts.tabs (2026-11-17, the Interface hub's General
+-- page): a folder tab per group instead of its name, one group's cards shown
+-- at a time; opts.picked: the tab to open on, opts.onPick(i) as one's picked
+-- (the holder's height changed by then).
+function ns.MakeHubCardGroups(parent, groups, width, opts)
 	local holder = CreateFrame("Frame", nil, parent)
+	if opts and opts.tabs then
+		local list, sets = {}, {}
+		-- (Each group's tab a container of its cards' pages, 2026-11-17: a
+		-- right-click turns every one of them off, or all on when they're all
+		-- off already; its name greyed while they're all off.)
+		local function Switched(entries)
+			local any, on = false, false
+			for _, entry in ipairs(entries) do
+				if entry.open and ns.HasPageSwitch and ns.HasPageSwitch(entry.open) then
+					any = true
+					on = on or not ns.PageSwitchOff(entry.open)
+				end
+			end
+			return any, on
+		end
+		for _, group in ipairs(groups) do
+			if #group[2] > 0 then
+				local entries = group[2]
+				list[#list + 1] = { group[1], off = function()
+					local any, on = Switched(entries)
+					return any and not on
+				end }
+				sets[#sets + 1] = entries
+			end
+		end
+		local function FlipGroup(i)
+			local entries = sets[i]
+			local any, on = Switched(entries or {})
+			if not any then return end
+			for _, entry in ipairs(entries) do
+				if entry.open and ns.HasPageSwitch(entry.open) and (not ns.PageSwitchOff(entry.open)) == on then
+					ns.FlipPageSwitch(entry.open)
+				end
+			end
+			if ns.RefreshOptions then ns.RefreshOptions() end
+		end
+		if #list == 0 then
+			holder:SetSize(width, 1)
+			return holder
+		end
+		local PAD, TOP = 10, ns.FOLDER_TAB_HEIGHT + 4
+		local cardSets, ShowTab = {}
+		local panel, _, Show, base = ns.FolderTabs(holder, list, function(i) holder.Pick(i) end, nil, nil, FlipGroup)
+		ShowTab = Show
+		base:SetPoint("TOPLEFT", holder, "TOPLEFT", 0, -TOP)
+		panel:SetPoint("TOPLEFT", base)
+		panel:SetWidth(width)
+		for i, entries in ipairs(sets) do
+			local cards = ns.MakeHubCards(panel, entries, width - PAD * 2, { joined = true })
+			cards:SetPoint("TOPLEFT", panel, "TOPLEFT", PAD, -PAD)
+			cards:Hide()
+			cardSets[i] = cards
+		end
+		function holder.Pick(i)
+			if not cardSets[i] then i = 1 end
+			for n, cards in ipairs(cardSets) do cards:SetShown(n == i) end
+			ShowTab(i)
+			local h = cardSets[i]:GetHeight() + PAD * 2
+			panel:SetHeight(h)
+			holder:SetSize(width, TOP + h)
+			if opts.onPick then opts.onPick(i) end
+		end
+		holder.Pick(opts.picked or 1)
+		return holder
+	end
 	local y = 0
 	for _, group in ipairs(groups) do
 		if #group[2] > 0 then
@@ -2405,6 +2522,56 @@ function ns.StyleRows(kit, content, stack, changed, switchKey, fieldOf, panel)
 	function rows.Sub(on) stack.subIndent = on and 16 or nil end
 	-- Sliders after Pair(true) go two to a line, half as wide, till Pair(false).
 	function rows.Pair(on) stack.pairing = on and {} or nil end
+	-- A tabbed Look panel's section: a name in white over a thin line, the
+	-- rows after it its own (Name Style's Text, Outline, Shadow... 2026-11-17).
+	function rows.Section(label)
+		local holder = CreateFrame("Frame", nil, content)
+		holder:SetSize(496, 22)
+		stack:Add(holder, "header")
+		local name = kit.Label(holder, "GameFontHighlight", label)
+		name:SetPoint("BOTTOMLEFT", 0, 5)
+		local rule = holder:CreateTexture(nil, "ARTWORK")
+		rule:SetHeight(1)
+		rule:SetPoint("BOTTOMLEFT", 0, 0)
+		rule:SetPoint("BOTTOMRIGHT", 0, 0)
+		rule:SetColorTexture(1, 1, 1, 0.12)
+		return holder
+	end
+	-- Rows shown only while test(db) says (nothing greyed: a setting that can't
+	-- apply now isn't there, and the rows under it move up). Gives rows of its
+	-- own to make them with. 2026-11-17.
+	function rows.Fold(test)
+		local box = CreateFrame("Frame", nil, content)
+		box:SetSize(496, 1)
+		stack:Add(box, "label")
+		local top = CreateFrame("Frame", nil, box)
+		top:SetSize(1, 1)
+		top:SetPoint("TOPLEFT", 0, 0)
+		local inner = kit.Stack(top, "label")
+		local made = ns.StyleRows(kit, box, inner, changed, switchKey, fieldOf, panel)
+		local tall = 1
+		box.isFold = true
+		box.Refresh = function(self)
+			local open = test(ns.GetDB() or {}) and true or false
+			local want = 0.001
+			if open and inner.last ~= top then
+				local t, b = self:GetTop(), inner.last:GetBottom()
+				if t and b then tall = math.max(1, t - b) end
+				want = tall
+			end
+			self:SetShown(open)
+			if math.abs(self:GetHeight() - want) > 0.5 then
+				self:SetHeight(want)
+				-- (A fold in a fold: the outer one as tall again.)
+				local outer = self:GetParent()
+				if outer and outer.isFold and outer:IsShown() then outer:Refresh() end
+				if panel and panel.resized then panel.resized() end
+			end
+		end
+		box:HookScript("OnShow", function(self) C_Timer.After(0, function() self:Refresh() end) end)
+		kit.AddControl(box)
+		return made
+	end
 
 	-- A row of choices for key, after its name: { value, text, tip } each.
 	-- Gives the last, to put a color swatch after.
@@ -2738,6 +2905,14 @@ function ns.StyleRows(kit, content, stack, changed, switchKey, fieldOf, panel)
 	local function Source(key)
 		if key and panel and panel.source then return panel.source(key) end
 	end
+	-- (A setting left handed down, and what that gives: panel.default and
+	-- panel.resolved's. Only where the panel has both.)
+	local function Inherited(key)
+		if not (key and panel and panel.resolved and panel.default) then return false end
+		local default = panel.default(key)
+		return default ~= nil and Get(key) == default
+	end
+	local function Resolved(key) return panel.resolved(key) end
 	local function TipOn(frame, text)
 		if not text then return end
 		GameTooltip:SetOwner(frame, "ANCHOR_RIGHT")
@@ -2790,7 +2965,9 @@ function ns.StyleRows(kit, content, stack, changed, switchKey, fieldOf, panel)
 		words:SetText(ns.L["Reset"])
 		reset:SetScript("OnEnter", function(self)
 			words:SetTextColor(1, 0.82, 0)
-			TipOn(self, ns.L["This setting back to its usual."])
+			local from = head.from
+			TipOn(self, from and from.own and from.parent and ns.L["Back to %s."]:format(from.parent)
+				or ns.L["This setting back to its usual."])
 		end)
 		reset:SetScript("OnLeave", function()
 			words:SetTextColor(0.6, 0.6, 0.6)
@@ -2815,8 +2992,13 @@ function ns.StyleRows(kit, content, stack, changed, switchKey, fieldOf, panel)
 			-- can't apply and isn't the row's own.)
 			local from = db and Source(key)
 			if from and test and not test(db) and not from.own then from = { text = ns.L["Off"] } end
-			source:SetText(from and from.text or "")
+			-- (Handed down: an arrow up before where from. 2026-11-17: the
+			-- Inherit buttons gone, this says it; Clear hands it back.)
+			source:SetText(from and ((from.own or not from.parent) and from.text or ("|TInterface\\Buttons\\Arrow-Up-Up:12:12:0:-2|t"
+				.. from.text)) or "")
 			if from and from.own then source:SetTextColor(1, 0.82, 0) else source:SetTextColor(0.6, 0.6, 0.6) end
+			head.from = from
+			words:SetText(from and from.own and from.parent and ns.L["Clear"] or ns.L["Reset"])
 		end
 		kit.AddControl(head)
 		return head
@@ -2950,7 +3132,9 @@ function ns.StyleRows(kit, content, stack, changed, switchKey, fieldOf, panel)
 			end
 			tile.drop:SetShown(item.isBar and true or false)
 			-- The picked one in gold.
-			if picked then
+			if picked and grid.handed then
+				ns.DressStyleEdges(tile.edges, 2, 0.6, 0.5, 0.2, 1)
+			elseif picked then
 				ns.DressStyleEdges(tile.edges, 2, 1, 0.82, 0, 1)
 			else
 				ns.DressStyleEdges(tile.edges, 1, 0.24, 0.24, 0.28, 1)
@@ -2960,6 +3144,15 @@ function ns.StyleRows(kit, content, stack, changed, switchKey, fieldOf, panel)
 			local items = (type(list) == "function" and list() or list) or {}
 			local picked = ns.GetDB() and Get(key)
 			if ns.IsGeneralStyle and ns.IsGeneralStyle(picked) then picked = "general" end
+			-- (Handed down: the one it gives, edged dimmer. 2026-11-17.)
+			local handed = ns.GetDB() and Inherited(key) and Resolved(key) or nil
+			if handed ~= nil then
+				local listed = false
+				for _, item in ipairs(items) do listed = listed or item.value == handed end
+				if listed then picked, grid.handed = handed, true else grid.handed = false end
+			else
+				grid.handed = false
+			end
 			local count = #items
 			if count > TILES_SHOWN then
 				for i = TILES_SHOWN, count do
@@ -3109,13 +3302,26 @@ function ns.StyleRows(kit, content, stack, changed, switchKey, fieldOf, panel)
 			end)
 			button.Refresh = function(self)
 				local on = ns.GetDB() and Get(key) == self.value
+				-- (Handed down (a tabbed panel's with panel.resolved): the one it
+				-- gives lit dimmer, no Inherit button. 2026-11-17.)
+				local handed = not on and ns.GetDB() and Inherited(key) and Resolved(key) == self.value
 				if on then
 					local usualText = Usual(key, self.value)
 					head:Set(info[2] .. (usualText and (" · " .. usualText) or ""))
+				elseif handed then
+					head:Set(info[2])
 				end
-				back:SetColorTexture(on and 0.2 or 0.1, on and 0.17 or 0.1, on and 0.08 or 0.12, 0.95)
-				line:SetShown(on and true or false)
-				if on then words:SetTextColor(1, 0.82, 0) else words:SetTextColor(0.85, 0.85, 0.85) end
+				back:SetColorTexture(on and 0.2 or handed and 0.15 or 0.1, on and 0.17 or handed and 0.13 or 0.1,
+					on and 0.08 or handed and 0.09 or 0.12, 0.95)
+				line:SetShown((on or handed) and true or false)
+				line:SetAlpha(handed and 0.4 or 1)
+				if on then
+					words:SetTextColor(1, 0.82, 0)
+				elseif handed then
+					words:SetTextColor(0.8, 0.7, 0.4)
+				else
+					words:SetTextColor(0.85, 0.85, 0.85)
+				end
 			end
 			button:SetScript("OnEnable", function(self) self:SetAlpha(1) end)
 			button:SetScript("OnDisable", function(self) self:SetAlpha(0.4) end)
@@ -3219,6 +3425,12 @@ function ns.StyleRows(kit, content, stack, changed, switchKey, fieldOf, panel)
 		holder:SetSize(ROW_W, 24)
 		stack:Add(holder, "label")
 		local function Now()
+			-- (The color it gives where it's handed down: panel.color(keys).
+			-- Name Style's rows, 2026-11-17.)
+			if panel and panel.color then
+				local r, g, b = panel.color(keys)
+				if r then return r, g, b end
+			end
 			return tonumber(Get(keys[1])) or 1, tonumber(Get(keys[2])) or 1, tonumber(Get(keys[3])) or 1
 		end
 		local function Same(color)
@@ -3484,7 +3696,7 @@ function ns.StyleRows(kit, content, stack, changed, switchKey, fieldOf, panel)
 		local tabbed = spec.tabs
 		local DefaultOf = type(tabbed) == "table" and tabbed.default or function(key) return ns.DEFAULTS[key] end
 		local tabs, pages, current = {}, {}, 1
-		local strip, footer, summary, resetAll
+		local strip, footer, summary, resetAll, pane, body
 		-- (spec.preview(parent, width): the part as it looks now, a frame with
 		-- :Refresh(), between the title and the tabs; drawn again on each change.)
 		local preview = tabbed and spec.preview and spec.preview(pop, 496)
@@ -3546,6 +3758,8 @@ function ns.StyleRows(kit, content, stack, changed, switchKey, fieldOf, panel)
 			source = type(tabbed) == "table" and tabbed.source or nil,
 			-- (What a setting handed on gives, for a slider: spec.tabs.resolved(key).)
 			resolved = type(tabbed) == "table" and tabbed.resolved or nil,
+			-- (A color's chips, the color it gives: spec.tabs.color(keys).)
+			color = type(tabbed) == "table" and tabbed.color or nil,
 		}
 		-- (Every setting the panel counts: those with a default, its row's color
 		-- and paint ticks left out. Known once its pages are made.)
@@ -3727,6 +3941,36 @@ function ns.StyleRows(kit, content, stack, changed, switchKey, fieldOf, panel)
 			reset:SetPoint("LEFT", paste, "RIGHT", 6, 0)
 			reset:SetScript("OnClick", function() resetAll:GetScript("OnClick")(resetAll) end)
 			kit.GreyUnless(reset, function(db) return On(db) and AnyChanged() end)
+			-- (The pages scroll, between the tabs and the footer, where the panel
+			-- would be taller than the screen has room for: the wheel moves them,
+			-- a thin bar at the right says where. 2026-11-17.)
+			pane = CreateFrame("ScrollFrame", nil, pop)
+			pane:SetPoint("TOPLEFT", strip, "BOTTOMLEFT", 0, 0)
+			pane:SetPoint("BOTTOMRIGHT", footer, "TOPRIGHT", 0, 0)
+			body = CreateFrame("Frame", nil, pane)
+			body:SetSize(520, 1)
+			pane:SetScrollChild(body)
+			local thumb = pane:CreateTexture(nil, "OVERLAY")
+			thumb:SetWidth(3)
+			thumb:SetColorTexture(1, 0.82, 0, 0.5)
+			thumb:Hide()
+			local function Thumb()
+				local room, tall = pane:GetHeight(), body:GetHeight()
+				local most = math.max(0, tall - room)
+				thumb:SetShown(most > 1)
+				if most <= 1 then return end
+				local size = math.max(16, room * room / tall)
+				thumb:SetHeight(size)
+				thumb:ClearAllPoints()
+				thumb:SetPoint("TOPRIGHT", pane, "TOPRIGHT", -2, -(room - size) * pane:GetVerticalScroll() / most)
+			end
+			pane.Thumb = Thumb
+			pane:EnableMouseWheel(true)
+			pane:SetScript("OnMouseWheel", function(self, delta)
+				local most = math.max(0, body:GetHeight() - self:GetHeight())
+				self:SetVerticalScroll(math.max(0, math.min(most, self:GetVerticalScroll() - delta * 40)))
+				Thumb()
+			end)
 			summary = kit.Label(footer, ns.LOOK_DIM, "")
 			summary:SetPoint("LEFT", 12, 0)
 			summary:SetPoint("RIGHT", resetAll, "LEFT", -8, 0)
@@ -3735,17 +3979,19 @@ function ns.StyleRows(kit, content, stack, changed, switchKey, fieldOf, panel)
 		end
 
 		local look = not tabbed and ns.StyleRows(kit, pop, popStack, changed, switchKey, fieldOf)
-		for _, group in ipairs(LOOK_GROUPS) do
+		-- (spec.groups: tabs of the part's own in place of LOOK_GROUPS', in the
+		-- same shape. Name Style's rows: Name, Second line, Behind. 2026-11-17.)
+		for _, group in ipairs(spec.groups or LOOK_GROUPS) do
 			local has = false
 			for _, option in ipairs(group[2]) do has = has or (spec[option[1]] and true) end
 			if has then
 				local into, stackNow, lookNow = pop, popStack, look
 				if tabbed then
 					-- (Its page: under the tabs, its own stack, the keys its rows use.)
-					local page = CreateFrame("Frame", nil, pop)
+					local page = CreateFrame("Frame", nil, body)
 					page.recordAs = content
-					page:SetPoint("TOPLEFT", strip, "BOTTOMLEFT", 0, 0)
-					page:SetPoint("RIGHT", pop, "RIGHT")
+					page:SetPoint("TOPLEFT", body, "TOPLEFT", 0, 0)
+					page:SetPoint("RIGHT", body, "RIGHT")
 					page:SetHeight(1)
 					page.keys, page.seen = {}, {}
 					local top = kit.Label(page, "GameFontNormal", "")
@@ -3789,6 +4035,10 @@ function ns.StyleRows(kit, content, stack, changed, switchKey, fieldOf, panel)
 					end
 					tab:SetScript("OnClick", function()
 						current = index
+						-- (The pages' scroll: this page's height, from its top.)
+						if pages[index].tall then body:SetHeight(pages[index].tall + 10) end
+						pane:SetVerticalScroll(0)
+						pane.Thumb()
 						PaintTabs()
 					end)
 					tabs[#tabs + 1] = tab
@@ -3851,6 +4101,7 @@ function ns.StyleRows(kit, content, stack, changed, switchKey, fieldOf, panel)
 		-- (Tabbed: as tall as its tallest page and as wide as its widest, so it
 		-- doesn't jump as tabs change; at least 520 wide.)
 		local function FitTabbed()
+			pane:SetVerticalScroll(0) -- (measured from the top)
 			local top, left, under = pop:GetTop(), pop:GetLeft(), strip:GetBottom()
 			if not (top and left and under) then return end
 			local tallest, right = 0, 0
@@ -3860,7 +4111,10 @@ function ns.StyleRows(kit, content, stack, changed, switchKey, fieldOf, panel)
 			for _, page in ipairs(pages) do
 				page:Show()
 				local bottom = page.stack.last and page.stack.last:GetBottom()
-				if bottom then tallest = math.max(tallest, under - bottom) end
+				if bottom then
+					page.tall = under - bottom
+					tallest = math.max(tallest, page.tall)
+				end
 				for _, child in ipairs({ page:GetChildren() }) do
 					Reach(child)
 					if child.Text or child.text then Reach(child.Text or child.text) end -- (a check's words)
@@ -3871,8 +4125,14 @@ function ns.StyleRows(kit, content, stack, changed, switchKey, fieldOf, panel)
 			PaintTabs() -- (back to the one page shown)
 			local titleRight = heading:GetRight()
 			if titleRight then right = math.max(right, titleRight + 100) end -- (the buttons past the title)
-			pop:SetWidth(math.max(520, right - left + 12))
-			pop:SetHeight(top - under + tallest + 10 + footer:GetHeight())
+			local wide = math.max(520, right - left + 12)
+			pop:SetWidth(wide)
+			body:SetSize(wide, (pages[current] and pages[current].tall or tallest) + 10)
+			-- (No taller than the screen has room for under its top: the pages
+			-- scroll in what's left.)
+			local room = top - 12
+			pop:SetHeight(math.min(room, top - under + tallest + 10 + footer:GetHeight()))
+			pane.Thumb()
 		end
 		refit = function()
 			if pop:IsShown() then FitTabbed() end

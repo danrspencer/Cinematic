@@ -162,7 +162,7 @@ function ns.UpdateManaAfter(cost, bars)
 	local wanted = {}
 	for where, key in pairs(KEYS) do
 		local bar = bars and bars[where]
-		if bar and cost and db and db[key] and ns.PersonalResourcesOn(db) then wanted[#wanted + 1] = bar end
+		if bar and cost and db and db[key] and ns.PersonalResourcesOn(db, "prdmana") then wanted[#wanted + 1] = bar end
 	end
 	local on = #wanted > 0
 	local amountWords, percentWords

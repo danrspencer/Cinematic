@@ -1568,6 +1568,32 @@ function ns.CreateCameraScriptsPanel(kit)
 	end)
 	tabsBase:SetPoint("TOPLEFT", tabsPanel, "TOPLEFT")
 	page.tab = 1
+	-- (Each tab a container for the script shown, 2026-11-17: its own switch
+	-- per script, "tabOn:Script:<id>:script|stops", under the page's. Off:
+	-- Script, it doesn't play; Stop rules, it plays with a new script's rules,
+	-- no haze or Stop button (CameraScripts.lua's Start). The editor greyed.)
+	local PARTS = { "script", "stops" }
+	local partChecks = {}
+	local function PartKey(id, i) return ("tabOn:Script:%s:%s"):format(tostring(id), PARTS[i]) end
+	function page.PartSwitches(id)
+		if id == nil then
+			ns.SetPageGate(content, nil)
+			return
+		end
+		for i, tab in ipairs(tabs) do
+			local key = PartKey(id, i)
+			if not partChecks[key] then
+				local holder = CreateFrame("Frame", nil, content)
+				holder:SetSize(1, 1)
+				partChecks[key] = kit.PageSwitch(holder, key, L["Enable Page"], L["Turns this tab of the script on or off."], holder)
+				ns.SetPageMaster({ key }, "cameraScriptsPage")
+				ns.DEFAULTS[key] = true -- (on to start; /cine debug sweep: not a leak)
+				if ns.db and ns.db[key] == nil then ns.db[key] = true end
+			end
+			tab:SetFlip(key)
+		end
+		ns.SetPageGate(content, PartKey(id, page.tab or 1))
+	end
 	function HideTabs()
 		tabsPanel:Hide()
 		for _, tab in ipairs(tabs) do tab:Hide() end
@@ -1815,6 +1841,7 @@ function ns.CreateCameraScriptsPanel(kit)
 			page.optHeader:Hide()
 			PlaceRuleSettings(nil)
 			HideTabs()
+			if page.PartSwitches then page.PartSwitches(nil) end
 			y = -84
 		else
 			-- (Ours: its name stays ours, Reset in Delete's place once changed.)
@@ -1845,6 +1872,7 @@ function ns.CreateCameraScriptsPanel(kit)
 			tabsPanel:SetPoint("TOPLEFT", COL - 8, y)
 			tabsPanel:SetWidth(WIDTH + 16)
 			ShowTab(page.tab)
+			page.PartSwitches(script.id)
 			local panelTop = y
 			y = y - 12
 			local onScript = page.tab == 1

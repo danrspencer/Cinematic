@@ -22,7 +22,7 @@ end
 -- has no bubble to wait for.)
 function ns.BubbleKindOff(kind)
 	local db = ns.db
-	return db and db.handleBubbles and BUBBLE_ROWS[kind] and OffHere(db, kind) or false
+	return db and db.handleBubbles and not ns.MasterOff("handleBubbles", db) and BUBBLE_ROWS[kind] and OffHere(db, kind) or false
 end
 
 local function ApplyCVars(db)
@@ -670,7 +670,7 @@ local function ShowCopy(inside, state, text, scale, by)
 end
 
 local function LiftText(inside, state)
-	local on = ns.db and ns.db.handleBubbles and ns.db.bubblesOffTop
+	local on = ns.db and ns.db.handleBubbles and not ns.MasterOff("handleBubbles") and ns.db.bubblesOffTop
 	local text = inside.String
 	local top, scale = inside:GetTop(), inside:GetEffectiveScale()
 	if not (Readable(top) and Readable(scale)) or scale <= 0 then
@@ -724,7 +724,7 @@ local function Lift(inside)
 			end
 		end)
 	end
-	local on = ns.db and ns.db.handleBubbles and ns.db.bubblesOffTop
+	local on = ns.db and ns.db.handleBubbles and not ns.MasterOff("handleBubbles") and ns.db.bubblesOffTop
 	if not on then
 		if state.by ~= 0 and state.points then Place(inside, state, 0) end
 		if tracing then Trace(inside, ("inside: page off, top %s"):format(Num(inside:GetTop()))) end

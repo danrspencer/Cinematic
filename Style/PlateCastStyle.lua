@@ -19,6 +19,7 @@ local L = ns.L
 
 local DEFAULTS = ns.DEFAULTS
 DEFAULTS.plateCastStyle = true
+DEFAULTS.unitCastStyle = true -- (the unit frames' cast bars' page, its own since 2026-11-17)
 DEFAULTS.plateCastWidth = 1        -- times the game's, about its middle
 DEFAULTS.plateCastHeight = 1       -- times the game's, its top kept
 DEFAULTS.plateCastPlayerWidth = 1  -- your cast bar's width, times the game's (the You tab, with its own look)
@@ -195,9 +196,19 @@ end
 -- Whether a kind of bar is restyled: the page on, and for any but the
 -- nameplates', its tab's Restyle these bars ticked. (db: the settings to
 -- ask, for the options' tests.)
+-- (Each page's bars by their own switch since 2026-11-17: the nameplates'
+-- plateCastStyle (under the Nameplates style icon), the unit frames'
+-- unitCastStyle (under the Unit Frames style icon). Their shared Default
+-- look is either's while it's on.)
+local function SwitchFor(id)
+	if id == nil then
+		return (ns.StyleOn("unitCastStyle") or not ns.StyleOn("plateCastStyle")) and "unitCastStyle" or "plateCastStyle"
+	end
+	return id == "PLATE" and "plateCastStyle" or "unitCastStyle"
+end
 local function Active(id, db)
 	db = db or ns.db
-	return ns.StyleOn("plateCastStyle", db) and (id == "PLATE" or (db and db["plateCastOn_" .. id])) and true
+	return ns.StyleOn(SwitchFor(id), db) and (id == "PLATE" or (db and db["plateCastOn_" .. id])) and true
 		or false
 end
 
@@ -227,13 +238,13 @@ local function View(id)
 	local view = views[id or "DEFAULT"]
 	if not view then
 		view = setmetatable({}, { __index = function(_, key)
-			local look = ns.StyleLook("plateCastStyle")
+			local look = ns.StyleLook(SwitchFor(id))
 			local db = ns.db
 			if FRAME_LOOK[key] and FrameLooked(id, db) then
 				local value = FRAME_LOOK[key](ns.UnitFrameLook(id))
 				if value ~= nil then return value end
 			end
-			if id and OWN_KEY[key] and db and ns.StyleOn("plateCastStyle") and db["plateCastOwn_" .. id] then
+			if id and OWN_KEY[key] and db and ns.StyleOn(SwitchFor(id)) and db["plateCastOwn_" .. id] then
 				return look[key .. "_" .. id]
 			end
 			return look[key]
@@ -1484,10 +1495,10 @@ local function BuildCastPage(kit, spec)
 		end
 	end
 
-	local switch = kit.PageSwitch(content, "plateCastStyle", L["Enable Page"],
+	local switch = kit.PageSwitch(content, spec.switch, L["Enable Page"],
 		L["On: the cast bars look as this page says; off: the game's own look."], intro, Changed)
 	local stack = kit.Stack(switch, "check")
-	local rows = ns.StyleRows(kit, content, stack, Changed, "plateCastStyle")
+	local rows = ns.StyleRows(kit, content, stack, Changed, spec.switch)
 
 	-- The preview: a cast, a channel and one that can't be interrupted, filling
 	-- again and again, over the Style pages' scene.
@@ -1707,7 +1718,7 @@ local function BuildCastPage(kit, spec)
 	-- own look and is restyled.)
 	local function EditableFor(id)
 		return function(db)
-			return ns.StyleOn("plateCastStyle", db) and (not id or (Active(id, db) and db["plateCastOwn_" .. id]))
+			return ns.StyleOn(spec.switch, db) and (not id or (Active(id, db) and db["plateCastOwn_" .. id]))
 				and true or false
 		end
 	end
@@ -1751,7 +1762,7 @@ local function BuildCastPage(kit, spec)
 			control:Hide()
 			return control
 		end }
-		local looks = ns.StyleRows(kit, content, hidden, Changed, "plateCastStyle", Field)
+		local looks = ns.StyleRows(kit, content, hidden, Changed, spec.switch, Field)
 		local button, pop = looks.Look("", L["Cast bars"] .. ": " .. label, {
 			tabs = {
 				default = function(key) return OWN_KEY[key] and ns.DEFAULTS[key] or nil end,
@@ -1959,7 +1970,7 @@ end
 -- and arena enemies'), with the Default row every cast bar can follow: the
 -- Unit Frames icon's Cast Style tab.
 function ns.CreateUnitCastStylePanel(kit)
-	BuildCastPage(kit, { page = "Unit Cast Style", title = "Cast Style", tabs = "units",
+	BuildCastPage(kit, { page = "Unit Cast Style", title = "Cast Style", tabs = "units", switch = "unitCastStyle",
 		ids = { "PLAYER", "TARGET", "BOSS" }, default = true,
 		intro = L["How the unit frames' cast bars look: yours, your target's and focus's, and the bosses' and arena " ..
 		"enemies'. Each row's These bars picks its look: the game's (they start so), the Default row's, or its own, " ..
@@ -1971,6 +1982,7 @@ end
 -- Default: the unit frames' page's (above).
 function ns.CreatePlateCastStylePanel(kit)
 	BuildCastPage(kit, { page = "Cast Bar Style", title = "Cast Bar Style", tabs = "plates", ids = { "PLATE" },
+		switch = "plateCastStyle",
 		defaultName = L["Default's (Unit Frames)"],
 		intro = L["How the nameplates' cast bars look: the Default row's (on the Unit Frames icon's Cast Style tab), " ..
 		"or their own, set in their Look panel. Whether they show in CineMode: the Nameplates page's Plate parts " ..

@@ -113,7 +113,7 @@ function ns.CreateBubbleStylePanel(kit)
 	speechMove.Refresh = function() end
 	kit.AddControl(speechMove)
 	local function Behind(db)
-		return rows.On(db) and db.handleBubbles and db.chatPeek and db.chatHideBubbled and db.chatSpeechBehind
+		return rows.On(db) and db.handleBubbles and not ns.MasterOff("handleBubbles", db) and db.chatPeek and db.chatHideBubbled and db.chatSpeechBehind
 	end
 	local speechName = rows.Check("speechBehindName", L["Show who said it"],
 		L["Starts each line with the speaker's name."],

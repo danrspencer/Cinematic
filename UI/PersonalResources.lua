@@ -65,9 +65,16 @@ DEFAULTS.prdMana = true             -- a mana bar of ours under them, when mana 
 DEFAULTS.prdManaRecent = 3          -- ...only for this many seconds after you use mana (0: always)
 
 -- Whether the page's switch is on (PersonalMana*.lua ask too).
-function ns.PersonalResourcesOn(db)
+-- (row: the PRD's rows, prd, prdpower, prdmana (and Cine Mana Bar's) and
+-- other addons' power bars ("addon"), go by the PRD icon's switch,
+-- prdKeepUp; the player and pet frames' by personalResources, 2026-11-17.
+-- Each off with its icon's Show too: Frames.lua's ns.SHOW_IN_CHILDREN.)
+local PRD_ROWS = { prd = true, prdpower = true, prdmana = true, addon = true }
+function ns.PersonalResourcesOn(db, row)
 	db = db or ns.db
-	return db ~= nil and db.personalResources ~= false
+	if db == nil then return false end
+	local key = PRD_ROWS[row] and "prdKeepUp" or "personalResources"
+	return db[key] ~= false and not ns.MasterOff(key, db)
 end
 
 -- No change for this long: at rest. (Regeneration ticks every 2 seconds.)
@@ -119,7 +126,7 @@ local ROW_WAIT = {
 }
 function ns.FightHold(row)
 	local wait = ROW_WAIT[row]
-	if not wait or not ns.db[wait[1]] or not ns.PersonalResourcesOn() then
+	if not wait or not ns.db[wait[1]] or not ns.PersonalResourcesOn(nil, row) then
 		return false
 	end
 	local now = GetTime()
@@ -361,14 +368,14 @@ local function PrdWhileDead(setting)
 end
 function ns.KeepYourFrameUp(setting, entry, afterFight, fighting)
 	local db = ns.db
-	if not ns.PersonalResourcesOn(db) or PrdWhileDead(setting) then
-		return false
-	end
 	local pet = ns.PET_FRAMES[entry.name]
 	if not pet and not setting then
 		return false
 	end
 	local row = pet and "petframe" or RowOf(setting, entry)
+	if not ns.PersonalResourcesOn(db, row) or PrdWhileDead(setting) then
+		return false
+	end
 	local healthKey, powerKey = RowKeys(row, entry)
 	local manaBar = ns.PersonalManaShown and ns.PersonalManaShown()
 	local hShare, pShare = ShareNow(db, healthKey, fighting, afterFight), ShareNow(db, powerKey, fighting, afterFight)
@@ -418,8 +425,9 @@ end
 -- health: ThresholdSecret's curve does it). Frames.lua asks, each tick.
 function ns.KeepUpFadeLevel(setting, entry, afterFight, fighting)
 	local db = ns.db
-	if not setting or not ns.PersonalResourcesOn(db) or ns.Flag(UnitIsDeadOrGhost("player")) then return nil end
+	if not setting or ns.Flag(UnitIsDeadOrGhost("player")) then return nil end
 	local row = RowOf(setting, entry)
+	if not ns.PersonalResourcesOn(db, row) then return nil end
 	if row ~= "player" and row ~= "prd" then return nil end
 	local healthKey = RowKeys(row, entry)
 	local start, full = FadeRange(db, healthKey, ShareNow(db, healthKey, fighting, afterFight))
@@ -497,10 +505,11 @@ end
 local secretSpecs = {}
 function ns.ThresholdSecret(setting, entry)
 	local db = ns.db
-	if not setting or ns.NO_SECRET_ALPHA[entry.name] or not ns.PersonalResourcesOn(db) or PrdWhileDead(setting) then
+	if not setting or ns.NO_SECRET_ALPHA[entry.name] or PrdWhileDead(setting) then
 		return false
 	end
 	local row = RowOf(setting, entry)
+	if not ns.PersonalResourcesOn(db, row) then return false end
 	if HeldAtPull(row) then return false end
 	local healthKey, powerKey = RowKeys(row, entry)
 	local manaBar = ns.PersonalManaShown and ns.PersonalManaShown()
@@ -629,7 +638,7 @@ function ns.YourFrameWhy(setting, entry, afterFight, fighting, add)
 	local hShare, hCol = ShareNow(db, healthKey, fighting, afterFight)
 	local pShare, pCol = ShareNow(db, powerKey, fighting, afterFight)
 	local health, power, nfHealth, nfPower = RowRules(row, hShare, pShare)
-	if not ns.PersonalResourcesOn(db) then
+	if not ns.PersonalResourcesOn(db, row) then
 		if health ~= "off" or power ~= "off" then
 			add("off", L["The %s page is off, so its settings don't keep this up"]:format(page), "personalResources")
 		end
@@ -746,11 +755,11 @@ function ns.CreatePersonalResourcesPanel(kit)
 	-- Personal Resources' (the PRD's), only the picked icon's shown.)
 	local title = kit.Label(content, "GameFontNormalLarge", L["Keep up while low"])
 	local hasDisplay = _G.CinematicPersonalPower ~= nil
-	local outerPanel, ShowUnitTab = ns.PageTabs(content, ns.ShowInTabs("units"), ns.ShowInIndex("units", "Personal Resources"))
+	local outerPanel, ShowUnitTab = ns.PageTabs(content, ns.ShowInTabs("units"), ns.ShowInIndex("units", "Personal Resources"), true)
 	local unitSet = content.pageTabs
 	local ShowPrdTab, prdSet
 	if hasDisplay then
-		ShowPrdTab = select(2, ns.PageTabs(content, ns.ShowInTabs("prd"), ns.ShowInIndex("prd", "PRD Keep Up")))
+		ShowPrdTab = select(2, ns.PageTabs(content, ns.ShowInTabs("prd"), ns.ShowInIndex("prd", "PRD Keep Up"), true))
 		prdSet = content.pageTabs
 	end
 	content.pageTabs = unitSet
@@ -758,12 +767,27 @@ function ns.CreatePersonalResourcesPanel(kit)
 	local intro = kit.PageIntro(content, title,
 		L["Brings your hidden player and pet frames back in CineMode while your health or power runs low."])
 	-- (Their look: the Unit Frames icon's Resource Style tab.)
-	local switch = kit.PageSwitch(content, "personalResources", L["Enable Page"],
-		L["Turns this page's player frame, pet frame and resource display settings on or off."], intro, function()
+	local function SwitchChanged()
 		if ns.UpdatePersonalMana then ns.UpdatePersonalMana() end
 		if ns.RefreshPersonalStyle then ns.RefreshPersonalStyle() end
 		if ns.UpdateManaCost then ns.UpdateManaCost() end
-	end)
+	end
+	local switch = kit.PageSwitch(content, "personalResources", L["Enable Page"],
+		L["Turns this page's player frame and pet frame settings on or off."], intro, SwitchChanged)
+	-- (Two switches since 2026-11-17, each under its icon's Show (Frames.lua's
+	-- ns.SHOW_IN_CHILDREN): personalResources the Unit Frames icon's rows,
+	-- prdKeepUp the PRD's rows and Cine Mana Bar. Each on a frame of its own
+	-- too, for its icon's dot and right-click; the page's header switch and
+	-- greying are the shown icon's: SetIcon.)
+	local unitSwitchFrame, prdSwitchFrame = CreateFrame("Frame", nil, content), CreateFrame("Frame", nil, content)
+	for _, each in ipairs({ unitSwitchFrame, prdSwitchFrame }) do
+		each:SetSize(1, 1)
+		each:SetPoint("TOPLEFT")
+	end
+	kit.PageSwitch(unitSwitchFrame, "personalResources", L["Enable Page"],
+		L["Turns this page's player frame and pet frame settings on or off."], unitSwitchFrame, SwitchChanged)
+	local prdCheck = kit.PageSwitch(prdSwitchFrame, "prdKeepUp", L["Enable Page"],
+		L["Turns the personal resource display's keep up and Cine Mana Bar on or off."], prdSwitchFrame, SwitchChanged)
 	-- Its part (Options.lua's ns.PageTabsBelow, its own tabs not drawn: the
 	-- Unit Frames tabs over the title pick it): Keep up. (Its Frame Links,
 	-- the unit frames' and the bars': the Addons hub's Links page, 2026-11-17.)
@@ -787,6 +811,9 @@ function ns.CreatePersonalResourcesPanel(kit)
 			end
 		end
 		content.pageTabs = prd and prdSet or unitSet
+		if ns.SetPageSwitchKey then
+			ns.SetPageSwitchKey(content, prd and "prdKeepUp" or "personalResources", prd and prdCheck or switch)
+		end
 		if unitGrid then unitGrid:SetShown(not prd) end
 		if prdGrid then prdGrid:SetShown(prd) end
 		local grid = prd and prdGrid or unitGrid
@@ -809,13 +836,14 @@ function ns.CreatePersonalResourcesPanel(kit)
 	local ICON = "Interface\\AddOns\\" .. ADDON_NAME .. "\\Textures\\PersonalResources" -- (Media/make_prd_icon.py)
 	canvas.hubTabs = {
 		{ name = "Personal Resources", icon = ICON, label = "Unit Frames", switchLabel = "Keep up while low",
-			onSelect = function() ShowPart(false) end },
+			switchFrame = unitSwitchFrame, onSelect = function() ShowPart(false) end },
 	}
 	-- (The PRD's, under the HUD's Personal Resources icon: tabOf.)
 	if prdSet then
 		local list = canvas.hubTabs
 		list[#list + 1] = { name = "PRD Keep Up", icon = ICON, label = "Personal Resources", own = true,
-			tabOf = "HUD:prd", switchLabel = "Keep up while low", onSelect = function() ShowPart(true) end }
+			tabOf = "HUD:prd", switchLabel = "Keep up while low", switchFrame = prdSwitchFrame,
+			onSelect = function() ShowPart(true) end }
 	end
 	local stack = kit.Stack(switch, "check")
 	local function Tick(key, label, tip, enabledBy)

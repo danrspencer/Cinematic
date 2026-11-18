@@ -65,7 +65,8 @@ end
 -- the plate theme's. Nothing while the Style hub is off.
 function ns.PlateThemeBar()
 	local db = ns.db
-	if not (db and db.styleGeneral) then return nil, "game", 0, 0, 0, 0 end
+	-- (Off with the Nameplates style icon's own switch too, Default's, 2026-11-17.)
+	if not (db and ns.StyleOn("handlePlateStyle", db)) then return nil, "game", 0, 0, 0, 0 end
 	local theme = ns.PlateThemeNow()
 	if not theme then
 		local texture = db.styleTexture

@@ -292,6 +292,11 @@ local function OldOrder(unit)
 end
 
 -- Reads a unit's trigger (again only when it, or the library, changed).
+-- A tab of a trigger's page switched off (TriggersPage.lua, 2026-11-17):
+-- "starts", "ends", "timing" or "scenes".
+local function PartOff(lib, part)
+	return lib ~= nil and ns.db ~= nil and ns.db[("tabOn:Trigger:%s:%s"):format(lib, part)] == false
+end
 local function Parse(unit)
 	local rows = Rows()
 	if not rows then return end
@@ -303,9 +308,13 @@ local function Parse(unit)
 	local lib = tostring(source or ""):match("^t:(Trig%a+)$")
 	local untilText = not lib and (unit.custom and tostring(rows[unit.scene .. ".until"] or "move")
 		or KIND_UNTIL[tostring(source or ""):match("^(%a+):") or ""] or "move") or nil
-	if unit.parsed and unit.parsedAt == ns.triggerLibVersion and unit.untilText == untilText then return end
+	local parts = lib and ((PartOff(lib, "starts") and "s" or "") .. (PartOff(lib, "ends") and "e" or "")
+		.. (PartOff(lib, "timing") and "t" or "") .. (PartOff(lib, "scenes") and "c" or "")) or ""
+	if unit.parsed and unit.parsedAt == ns.triggerLibVersion and unit.untilText == untilText and unit.partsOff == parts then
+		return
+	end
 	unit.source, unit.untilText, unit.parsed, unit.parsedAt = source, untilText, true, ns.triggerLibVersion
-	unit.lib = lib
+	unit.lib, unit.partsOff = lib, parts
 	local src = lib and ns.TriggerField(lib, "src") or source
 	local kind, what = tostring(src or ""):match("^(%a+):(.*)$")
 	unit.kind, unit.what = kind, what and what:lower() or ""
@@ -317,6 +326,8 @@ local function Parse(unit)
 	unit.at = lib and ns.TriggerField(lib, "at") or (phases and phases[1].value) or nil
 	unit.inverted = INVERTED[unit.at or ""] == true
 	unit.ends = lib and ns.TriggerEnds(lib) or OldEnds(untilText)
+	-- (Its Ends tab off: none of its own, it ends as its thing does.)
+	if parts:find("e") then unit.ends = { { kind = "ends" } } end
 	unit.hasEnd, unit.refs, unit.secs = {}, {}, nil
 	for _, each in ipairs(unit.ends) do
 		unit.hasEnd[each.kind] = true
@@ -329,6 +340,8 @@ local function Parse(unit)
 	end
 	unit.delay, unit.hold, unit.cd = Num("delay", 0, 0, 600), Num("hold", 0, 0, 600), Num("cd", 0, 0, 86400)
 	unit.chance = Num("chance", 100, 1, 100)
+	-- (Its Timing tab off: no wait, least time, cooldown or chance.)
+	if parts:find("t") then unit.delay, unit.hold, unit.cd, unit.chance = 0, 0, 0, 100 end
 	unit.rearm = not (lib and ns.TriggerField(lib, "rearm") == "no")
 	local condText = lib and ns.TriggerField(lib, "cond") or nil
 	if type(condText) ~= "string" or not condText:find("%S") then condText = nil end
@@ -411,6 +424,10 @@ end
 local function TryStart(unit, now)
 	if unit.on or unit.pendingAt then return end
 	if ns.db and ns.db.cameraTriggers == false then return end -- (the Triggers page off: none of yours fire)
+	if (unit.partsOff or ""):find("[sc]") then -- (its Starts or Scenes tab off)
+		Skip(unit, L["Its Starts or Scenes tab is off"])
+		return
+	end
 	if unit.cd > 0 and unit.lastStart and now - unit.lastStart < unit.cd then
 		Skip(unit, (L["Cooldown: %d of %d sec left"]):format(math.ceil(unit.cd - (now - unit.lastStart)), unit.cd))
 		return

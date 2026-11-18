@@ -560,8 +560,11 @@ ns.PROFILE_MODULES = {
 			"buffs, Cooldown Manager, swing timer, minimap, quest tracker, tooltips, chat, nameplates and chat " ..
 			"bubbles keep the game's own ways.",
 		apply = function(set)
-			for _, key in ipairs({ "personalResources", "handleBuffs", "handleCooldowns", "handleSwing",
-				"handleMinimap", "handleQuests", "handleTooltips", "handleChat", "handlePlates", "handleBubbles" }) do
+			-- (prdKeepUp and minimapKeepOpen: the halves of personalResources and
+			-- handleMinimap since 2026-11-17, off with them.)
+			for _, key in ipairs({ "personalResources", "prdKeepUp", "handleBuffs", "handleCooldowns", "handleSwing",
+				"handleMinimap", "minimapKeepOpen", "handleQuests", "handleTooltips", "handleChat", "handlePlates", "handleNames",
+				"handleBubbles" }) do
 				set(key, false)
 			end
 		end },

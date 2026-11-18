@@ -867,7 +867,9 @@ DEFAULTS.plateInstanceFriendlyNPCs = "target"
 DEFAULTS.handlePlates = true -- the Nameplates page's master switch (off: the game's own options decide)
 -- The Target Indicator row's look (the Style hub's Nameplates page; see PlateParts).
 -- Its grid's Target row: whether it shows, and its look.
-DEFAULTS.handlePlateStyle = true -- (its page's switch: off, no marks or their colors at all)
+DEFAULTS.handlePlateStyle = true -- (the Nameplates style icon's: its Default look; off, Smart and Cast Bars too)
+DEFAULTS.plateMarks = true -- (Smart's rows, marks and their colors: under handlePlateStyle, 2026-11-17)
+DEFAULTS.handleNames = true -- (the Names icon's Show: CineMode's names over heads, apart from the plates, 2026-11-17)
 DEFAULTS.targetArrowShow = true
 -- "arrow", "chevron", "diamond" (over the plate), "glow" (behind its bar),
 -- "brackets", "carets", "corners" (round it), "underline" or "none"
@@ -1381,6 +1383,12 @@ ns.HEAL_VISION_ROLE_KEYS = { "healVisionTankBelow", "healVisionTankAlpha", "heal
 	"healVisionOfflineAlpha",
 	"healVisionFarAlpha", "healVisionDispel", "healVisionAnyDebuff", "healVisionFadeRange", "healVisionReadyCheck" }
 ns.HEAL_VISION_ROLES = { "TANK", "HEALER", "DAMAGER" }
+-- Its tabs, each a container (2026-11-17, the user's rule): off, Heal Vision
+-- does nothing while it's the one your role goes by (a role on Default's
+-- settings: Default's), and the Nameplates tab's settings are off.
+ns.HEAL_VISION_TABS = { DEFAULT = "tabOn:Heal Vision:1", TANK = "tabOn:Heal Vision:2", HEALER = "tabOn:Heal Vision:3",
+	DAMAGER = "tabOn:Heal Vision:4", PLATES = "tabOn:Heal Vision:5" }
+for _, key in pairs(ns.HEAL_VISION_TABS) do DEFAULTS[key] = true end
 local HEAL_VISION_ROLE_STARTS = {
 	TANK = { healVisionTankBelow = 1, healVisionHealerBelow = 0.95, healVisionShowBelow = 0.95 },
 	HEALER = { healVisionTankBelow = 1, healVisionHealerBelow = 0.95, healVisionShowBelow = 0.95 },
@@ -1429,6 +1437,10 @@ do
 		db = db or ns.db
 		if not db then return false end
 		if not ns.Setting("handleHealVision") then return false end -- (its page's switch, and the Visions')
+		-- (The tab your role goes by off: its role's own, or Default's.)
+		local role = ns.PlayerRole()
+		local tab = ns.HEAL_VISION_TABS[(role and db["healVisionOwn_" .. role]) and role or "DEFAULT"]
+		if tab and not ns.PageOn(tab) then return false end
 		-- (Its rule, edited on its row, decides instead of its ticks.)
 		local facts = ns.RuleFactsNow and ns.RuleFactsNow()
 		local rule = facts and ns.RuleShows("healVision", facts)
@@ -1627,6 +1639,9 @@ end
 function ns.SetPageMaster(keys, master)
 	for _, key in ipairs(keys) do PAGE_SWITCH[key] = master end
 end
+-- (Heal Vision's tabs under its page's switch; its Nameplates tab's settings under that tab.)
+for _, key in pairs(ns.HEAL_VISION_TABS) do PAGE_SWITCH[key] = "handleHealVision" end
+PAGE_SWITCH.plateNameHealthFill, PAGE_SWITCH.healVisionPlates = ns.HEAL_VISION_TABS.PLATES, ns.HEAL_VISION_TABS.PLATES
 -- (No Timers master switch, 2026-11-16: Cooldown Manager and Swing Timer are
 -- tabs of the Timers icon, each with its own; Migrations.lua's step 16.)
 -- Allow outside CineMode (CineMode page): a vision's switch -> its tick there.
@@ -1640,6 +1655,10 @@ local OUTSIDE_CINE = {
 	shoulderCam = "outsideCineShoulder", skyrideCam = "outsideCineSkyride", musicInCinematic = "outsideCineMusic",
 }
 for _, tick in pairs(OUTSIDE_CINE) do DEFAULTS[tick] = true end
+-- (Emote Vision: CineMode only to start with, 2026-11-17. Outside it, cards
+-- come up in everyday play, and a buff's caster with no plate is missed:
+-- CineMode keeps friendly plates for its Buff card. Always asks first.)
+DEFAULTS.outsideCineEmote = false
 ns.OUTSIDE_CINE = OUTSIDE_CINE
 -- And the Camera group's master tick (2026-11-15, on to start with): off, none
 -- of Cinematic's cameras move the view while CineMode is off. A scene whose
@@ -1722,6 +1741,17 @@ function ns.RefreshOutsideCine(force)
 		"RefreshTargetQuestIcon", "UpdateQuestGlow", "RefreshQuestItemButton", "RefreshRollWindow" }) do
 		if ns[name] then ns.Guard(ns[name]) end
 	end
+end
+-- Whether a switch is held off by one it's under, any level up (2026-11-17:
+-- the HUD's General over an icon's Show over that icon's other tabs).
+function ns.MasterOff(key, db)
+	db = db or ns.db
+	local master, steps = PAGE_SWITCH[key], 0
+	while master and steps < 10 do
+		if db and db[master] == false then return true end
+		master, steps = PAGE_SWITCH[master], steps + 1
+	end
+	return false
 end
 -- The switch a setting's page is under, or nil (the options pages grey by it).
 function ns.PageSwitchOf(key)

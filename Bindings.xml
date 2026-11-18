@@ -1,115 +1,115 @@
 <Bindings>
 	<Binding name="CINEMATIC_TOGGLE" header="CINEMATIC_GENERAL" category="Cinematic">
-		Cinematic_ToggleCineMode()
+		if not Cinematic_KeyOn or Cinematic_KeyOn("CINEMATIC_TOGGLE") then Cinematic_ToggleCineMode() end
 	</Binding>
 	<Binding name="CINEMATIC_HIDEUI" category="Cinematic">
-		Cinematic_ToggleUI()
+		if not Cinematic_KeyOn or Cinematic_KeyOn("CINEMATIC_HIDEUI") then Cinematic_ToggleUI() end
 	</Binding>
 	<Binding name="CINEMATIC_SCREENSHOT" category="Cinematic">
-		Cinematic_TakeScreenshot()
+		if not Cinematic_KeyOn or Cinematic_KeyOn("CINEMATIC_SCREENSHOT") then Cinematic_TakeScreenshot() end
 	</Binding>
 	<Binding name="CINEMATIC_TOGGLEEFFECTS" category="Cinematic">
-		Cinematic_ToggleVisualEffects()
+		if not Cinematic_KeyOn or Cinematic_KeyOn("CINEMATIC_TOGGLEEFFECTS") then Cinematic_ToggleVisualEffects() end
 	</Binding>
 	<Binding name="CINEMATIC_TOGGLELETTERBOX" category="Cinematic">
-		Cinematic_ToggleLetterbox()
+		if not Cinematic_KeyOn or Cinematic_KeyOn("CINEMATIC_TOGGLELETTERBOX") then Cinematic_ToggleLetterbox() end
 	</Binding>
 	<Binding name="CINEMATIC_HIDECURSOR" category="Cinematic">
-		Cinematic_HideCursor()
+		if not Cinematic_KeyOn or Cinematic_KeyOn("CINEMATIC_HIDECURSOR") then Cinematic_HideCursor() end
 	</Binding>
 	<Binding name="CINEMATIC_SHOWTOOLTIPS" category="Cinematic" runOnUp="true">
-		Cinematic_ShowTooltips(keystate)
+		if not Cinematic_KeyOn or keystate == "up" or Cinematic_KeyOn("CINEMATIC_SHOWTOOLTIPS") then Cinematic_ShowTooltips(keystate) end
 	</Binding>
 	<Binding name="CINEMATIC_TOGGLETOOLTIPS" category="Cinematic">
-		Cinematic_ToggleTooltips()
+		if not Cinematic_KeyOn or Cinematic_KeyOn("CINEMATIC_TOGGLETOOLTIPS") then Cinematic_ToggleTooltips() end
 	</Binding>
 	<Binding name="CINEMATIC_TOGGLESETTINGS" category="Cinematic">
-		Cinematic_ToggleSettings()
+		if not Cinematic_KeyOn or Cinematic_KeyOn("CINEMATIC_TOGGLESETTINGS") then Cinematic_ToggleSettings() end
 	</Binding>
 	<Binding name="CINEMATIC_KEYMAP" category="Cinematic" runOnUp="true">
-		Cinematic_KeyboardMap(keystate)
+		if not Cinematic_KeyOn or keystate == "up" or Cinematic_KeyOn("CINEMATIC_KEYMAP") then Cinematic_KeyboardMap(keystate) end
 	</Binding>
 	<Binding name="CINEMATIC_RELOAD" category="Cinematic">
-		Cinematic_Reload()
+		if not Cinematic_KeyOn or Cinematic_KeyOn("CINEMATIC_RELOAD") then Cinematic_Reload() end
 	</Binding>
 	<Binding name="CINEMATIC_CAM_IDLE" header="CINEMATIC_CAMERAS" category="Cinematic">
-		Cinematic_StartCam("idle")
+		if not Cinematic_KeyOn or Cinematic_KeyOn("CINEMATIC_CAM_IDLE") then Cinematic_StartCam("idle") end
 	</Binding>
 	<Binding name="CINEMATIC_CAM_COZY" category="Cinematic">
-		Cinematic_StartCam("cozy")
+		if not Cinematic_KeyOn or Cinematic_KeyOn("CINEMATIC_CAM_COZY") then Cinematic_StartCam("cozy") end
 	</Binding>
 	<Binding name="CINEMATIC_CAM_VISTA" category="Cinematic">
-		Cinematic_StartCam("vista")
+		if not Cinematic_KeyOn or Cinematic_KeyOn("CINEMATIC_CAM_VISTA") then Cinematic_StartCam("vista") end
 	</Binding>
 	<Binding name="CINEMATIC_CAM_FISH" category="Cinematic">
-		Cinematic_StartCam("fish")
+		if not Cinematic_KeyOn or Cinematic_KeyOn("CINEMATIC_CAM_FISH") then Cinematic_StartCam("fish") end
 	</Binding>
 	<Binding name="CINEMATIC_CAM_TELE" category="Cinematic">
-		Cinematic_StartCam("tele")
+		if not Cinematic_KeyOn or Cinematic_KeyOn("CINEMATIC_CAM_TELE") then Cinematic_StartCam("tele") end
 	</Binding>
 	<Binding name="CINEMATIC_CAM_WALK" category="Cinematic">
-		Cinematic_StartCam("walk")
+		if not Cinematic_KeyOn or Cinematic_KeyOn("CINEMATIC_CAM_WALK") then Cinematic_StartCam("walk") end
 	</Binding>
 	<Binding name="CINEMATIC_CAM_RUN" category="Cinematic">
-		Cinematic_StartCam("run")
+		if not Cinematic_KeyOn or Cinematic_KeyOn("CINEMATIC_CAM_RUN") then Cinematic_StartCam("run") end
 	</Binding>
 	<Binding name="CINEMATIC_CAM_DEATH" category="Cinematic">
-		Cinematic_StartCam("death")
+		if not Cinematic_KeyOn or Cinematic_KeyOn("CINEMATIC_CAM_DEATH") then Cinematic_StartCam("death") end
 	</Binding>
 	<Binding name="CINEMATIC_STOPCAM" category="Cinematic">
-		Cinematic_StopCamera()
+		if not Cinematic_KeyOn or Cinematic_KeyOn("CINEMATIC_STOPCAM") then Cinematic_StopCamera() end
 	</Binding>
 	<Binding name="CINEMATIC_SHOULDERCAM" category="Cinematic">
-		Cinematic_ToggleShoulderCam()
+		if not Cinematic_KeyOn or Cinematic_KeyOn("CINEMATIC_SHOULDERCAM") then Cinematic_ToggleShoulderCam() end
 	</Binding>
 	<Binding name="CLICK CinematicShoulderSwapButton:LeftButton" category="Cinematic">
 	</Binding>
 	<Binding name="CINEMATIC_CUSTOMTRIGGER1" category="Cinematic">
-		Cinematic_CustomTrigger(1)
+		if not Cinematic_KeyOn or Cinematic_KeyOn("CINEMATIC_CUSTOMTRIGGER1") then Cinematic_CustomTrigger(1) end
 	</Binding>
 	<Binding name="CINEMATIC_CUSTOMTRIGGER2" category="Cinematic">
-		Cinematic_CustomTrigger(2)
+		if not Cinematic_KeyOn or Cinematic_KeyOn("CINEMATIC_CUSTOMTRIGGER2") then Cinematic_CustomTrigger(2) end
 	</Binding>
 	<Binding name="CINEMATIC_CUSTOMTRIGGER3" category="Cinematic">
-		Cinematic_CustomTrigger(3)
+		if not Cinematic_KeyOn or Cinematic_KeyOn("CINEMATIC_CUSTOMTRIGGER3") then Cinematic_CustomTrigger(3) end
 	</Binding>
 	<Binding name="CINEMATIC_CUSTOMTRIGGER4" category="Cinematic">
-		Cinematic_CustomTrigger(4)
+		if not Cinematic_KeyOn or Cinematic_KeyOn("CINEMATIC_CUSTOMTRIGGER4") then Cinematic_CustomTrigger(4) end
 	</Binding>
 	<Binding name="CINEMATIC_CUSTOMTRIGGER5" category="Cinematic">
-		Cinematic_CustomTrigger(5)
+		if not Cinematic_KeyOn or Cinematic_KeyOn("CINEMATIC_CUSTOMTRIGGER5") then Cinematic_CustomTrigger(5) end
 	</Binding>
 	<Binding name="CINEMATIC_VISION_HEAL" header="CINEMATIC_VISIONS" category="Cinematic">
-		Cinematic_ToggleVision("heal")
+		if not Cinematic_KeyOn or Cinematic_KeyOn("CINEMATIC_VISION_HEAL") then Cinematic_ToggleVision("heal") end
 	</Binding>
 	<Binding name="CINEMATIC_VISION_QUEST" category="Cinematic">
-		Cinematic_ToggleVision("quest")
+		if not Cinematic_KeyOn or Cinematic_KeyOn("CINEMATIC_VISION_QUEST") then Cinematic_ToggleVision("quest") end
 	</Binding>
 	<Binding name="CINEMATIC_VISION_DUEL" category="Cinematic">
-		Cinematic_ToggleVision("duel")
+		if not Cinematic_KeyOn or Cinematic_KeyOn("CINEMATIC_VISION_DUEL") then Cinematic_ToggleVision("duel") end
 	</Binding>
 	<Binding name="CINEMATIC_VISION_ROLL" category="Cinematic">
-		Cinematic_ToggleVision("roll")
+		if not Cinematic_KeyOn or Cinematic_KeyOn("CINEMATIC_VISION_ROLL") then Cinematic_ToggleVision("roll") end
 	</Binding>
 	<Binding name="CINEMATIC_VISION_VITALS" category="Cinematic">
-		Cinematic_ToggleVision("vitals")
+		if not Cinematic_KeyOn or Cinematic_KeyOn("CINEMATIC_VISION_VITALS") then Cinematic_ToggleVision("vitals") end
 	</Binding>
 	<Binding name="CINEMATIC_VISION_DAMAGE" category="Cinematic">
-		Cinematic_ToggleVision("damage")
+		if not Cinematic_KeyOn or Cinematic_KeyOn("CINEMATIC_VISION_DAMAGE") then Cinematic_ToggleVision("damage") end
 	</Binding>
 	<Binding name="CINEMATIC_VISION_TELE" category="Cinematic">
-		Cinematic_ToggleVision("tele")
+		if not Cinematic_KeyOn or Cinematic_KeyOn("CINEMATIC_VISION_TELE") then Cinematic_ToggleVision("tele") end
 	</Binding>
 	<Binding name="CINEMATIC_VISION_EMOTE" category="Cinematic">
-		Cinematic_ToggleVision("emote")
+		if not Cinematic_KeyOn or Cinematic_KeyOn("CINEMATIC_VISION_EMOTE") then Cinematic_ToggleVision("emote") end
 	</Binding>
 	<Binding name="CINEMATIC_VISION_CARD" category="Cinematic">
-		Cinematic_ToggleVision("card")
+		if not Cinematic_KeyOn or Cinematic_KeyOn("CINEMATIC_VISION_CARD") then Cinematic_ToggleVision("card") end
 	</Binding>
 	<Binding name="CLICK CinematicMasterWheelButton:LeftButton" header="CINEMATIC_WHEELS" category="Cinematic">
 	</Binding>
 	<Binding name="CINEMATIC_CAMWHEEL" category="Cinematic" runOnUp="true">
-		Cinematic_CameraWheel(keystate)
+		if not Cinematic_KeyOn or keystate == "up" or Cinematic_KeyOn("CINEMATIC_CAMWHEEL") then Cinematic_CameraWheel(keystate) end
 	</Binding>
 	<Binding name="CLICK CinematicMenuWheelButton:LeftButton" category="Cinematic">
 	</Binding>
