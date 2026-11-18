@@ -11,6 +11,9 @@
 local _, ns = ...
 
 ns.CHANGELOG_FEATURES = {
+	{ date = "2026-11-18", page = "Style Themes", title = "Make your own themes",
+		text = "Turn any style theme into one of your own on Style > Themes: give it your colors, save your " ..
+		"changes into it, and share it with friends." },
 	{ date = "2026-11-18", page = "Style Themes", title = "Neon Coast theme",
 		text = "A new style theme: a beach city at dusk, with sunset health bars, clean modern lettering, and names " ..
 		"and damage numbers in sunset colors." },

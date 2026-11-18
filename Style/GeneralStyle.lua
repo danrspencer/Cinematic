@@ -601,7 +601,7 @@ function ns.CreateStyleThemesPanel(kit)
 	-- (The whole look in one pick: StyleThemes.lua.)
 	local themeHeader = stack:Header(content, L["Theme"])
 	stack:Help(content, L["A whole look for the addon that you can still change after you pick it."])
-	stack:Add(ns.MakeThemePicker(kit, content, 480, function() Changed() end), "label")
+	stack:Add(ns.MakeThemePicker(kit, content, 600, function() Changed() end), "label")
 
 	-- (The theme onto the General part, at its top; what's made from here on
 	-- onto Quick Settings, at the end.)

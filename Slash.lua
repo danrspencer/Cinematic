@@ -1765,6 +1765,10 @@ local function HandleSlash(msg)
 		-- (Dev copy: one run on names over heads missing far off, NamesTest.lua.)
 		if ns.NamesTest then ns.NamesTest(arg:match("^namestest%s*(.*)$"))
 		else ns.Print("/cine debug namestest is in the dev copy only.") end
+	elseif cmd == "debug" and arg:find("^mythemes") then
+		-- (Dev copy: one run checking themes of yours on Style > Themes, MyThemesTest.lua.)
+		if ns.MyThemesTest then ns.MyThemesTest(arg:match("^mythemes%s*(.*)$"))
+		else ns.Print("/cine debug mythemes is in the dev copy only.") end
 	elseif cmd == "debug" and arg:find("^release6") then
 		-- (Dev copy: one run checking the style revamp's release 6 and plate theme shapes, StyleSixTest.lua.)
 		if ns.StyleSixTest then ns.StyleSixTest(arg:match("^release6%s*(.*)$"))

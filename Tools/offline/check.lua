@@ -791,6 +791,59 @@ if arg[1] and not update then
 			end
 		end
 	end
+	-- Themes of yours: made from one of ours with your changes, picked shows as
+	-- no change, a color of yours lands, saved changes stay, and a shared one
+	-- comes back the same. Account-wide, so the store's put back after.
+	do
+		local themeDb = ns.GetDB()
+		local before = {}
+		for key, value in pairs(themeDb) do before[key] = value end
+		local savedStore = CinematicDB and CinematicDB.styleMyThemes
+		if CinematicDB then CinematicDB.styleMyThemes = nil end
+		ns.ApplyStyleTheme("forge")
+		themeDb.styleFont = "friz"
+		local key, why = ns.AddMyStyleTheme("forge", "Test forge", true)
+		if not key then
+			print("problem\tYour themes: couldn't add one (" .. tostring(why) .. ")")
+		else
+			ns.ApplyStyleTheme(key)
+			if themeDb.styleTheme ~= key then print("problem\tYour themes: not picked") end
+			if ns.StyleThemeEdited() then print("problem\tYour themes: shows as edited just after a pick") end
+			if themeDb.styleFont ~= "friz" then print("problem\tYour themes: your change didn't go in") end
+			ns.SetMyStyleThemeColor(key, "health", { 0.1, 0.2, 0.3 })
+			if math.abs((themeDb.ufHealthR or 0) - 0.1) > 0.001 then
+				print("problem\tYour themes: health color didn't reach ufHealthR (" .. tostring(themeDb.ufHealthR) .. ")")
+			end
+			themeDb.styleTexture = "flat"
+			if not ns.StyleThemeEdited() then print("problem\tYour themes: a change doesn't show as edited") end
+			ns.SaveMyStyleTheme()
+			if ns.StyleThemeEdited() then print("problem\tYour themes: saved change still shows as edited") end
+			local text = ns.ExportMyStyleTheme(key)
+			local info = text and ns.ReadSharedStyleTheme(text)
+			if not info then
+				print("problem\tYour themes: shared string doesn't read back")
+			else
+				if info.name ~= "Test forge" or info.base ~= "forge" or info.settings.styleTexture ~= "flat"
+					or not info.colors.health or info.skipped ~= 0 then
+					print("problem\tYour themes: shared theme came back different")
+				end
+				local copy = ns.AddSharedStyleTheme(info)
+				local made = copy and ns.StyleThemeByKey(copy)
+				if not made or made.settings.styleTexture ~= "flat" or made.settings.ufHealthR ~= 0.1 then
+					print("problem\tYour themes: imported theme isn't the same")
+				end
+			end
+			ns.DeleteMyStyleTheme(key)
+			if themeDb.styleTheme ~= "forge" then print("problem\tYour themes: deleting the one in use didn't go back to its start") end
+			if ns.StyleThemeByKey(key) then print("problem\tYour themes: still there after Delete") end
+		end
+		if CinematicDB then CinematicDB.styleMyThemes = savedStore end
+		ns.MyStyleThemesChanged() -- (made again from the store put back)
+		for key2 in pairs(themeDb) do
+			if before[key2] == nil then themeDb[key2] = nil end
+		end
+		for key2, value in pairs(before) do themeDb[key2] = value end
+	end
 	-- Plate and name themes: each one's settings are real (NameRowLook's, a
 	-- font and bar texture we have, a border kind), a main theme pick and its
 	-- Undo leave a plate or name theme picked by hand alone, and a part

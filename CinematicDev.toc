@@ -217,6 +217,7 @@ Dev\PartyFlickerTest.lua
 Dev\NamesTest.lua
 Dev\StyleRevampTest.lua
 Dev\StyleSixTest.lua
+Dev\MyThemesTest.lua
 Dev\KeysBarsTest.lua
 Dev\DimNameTest.lua
 Dev\TurnLagTest.lua
