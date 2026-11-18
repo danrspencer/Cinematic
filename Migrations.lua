@@ -1609,6 +1609,14 @@ STEPS[#STEPS + 1] = function()
 		end
 		ns.db.buffPeekCampfireV1 = true
 	end
+	-- Violet Flames added to the ignore list the same way. Once.
+	if not ns.db.buffPeekVioletV1 then
+		local list = ns.db.buffPeekIgnore
+		if type(list) == "string" and not (", " .. list:lower() .. ","):find(",%s*violet flames%s*,") then
+			ns.db.buffPeekIgnore = (list:match("^%s*$") and "" or list .. ", ") .. "Violet Flames"
+		end
+		ns.db.buffPeekVioletV1 = true
+	end
 	-- Heal Vision (Vision page) as its defaults in every profile: its grid
 	-- unticked, the options as the defaults say. Once. (Saved profiles drop
 	-- theirs, to follow their base.)

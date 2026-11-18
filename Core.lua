@@ -242,9 +242,9 @@ local DEFAULTS = {
 	buffPeekTime = 3,           -- seconds they stay up for a buff
 	debuffPeekTime = 3,         -- ...and for a debuff
 	-- Buffs or debuffs that never bring them up (spell IDs or names; 8326/20584:
-	-- Ghost; 1953: Blink; Campfire Nearby: smoke of a nearby fire; the rest
-	-- ns.LUST_DEBUFFS).
-	buffPeekIgnore = "2479, Plainsrunning, 8326, 20584, 57724, 57723, 80354, 95809, 264689, 390435, 1953, Campfire Nearby",
+	-- Ghost; 1953: Blink; Campfire Nearby: smoke of a nearby fire; Violet
+	-- Flames; the rest ns.LUST_DEBUFFS).
+	buffPeekIgnore = "2479, Plainsrunning, 8326, 20584, 57724, 57723, 80354, 95809, 264689, 390435, 1953, Campfire Nearby, Violet Flames",
 	buffHoverPadX = 40,         -- how far beside the buff icons hovering reveals them (UI units)
 	buffHoverPadY = 40,         -- ...and above and below
 	mouseover = true,      -- hovering a faded element reveals it
