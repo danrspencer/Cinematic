@@ -40,7 +40,7 @@ local VISIONS = { label = "Visions", page = "Heal Vision", question = "Which Vis
 	about = "Helpers you tick on: each shows you something only when it matters.", visions = true }
 -- (The Style hub's themes, a row each: StyleThemes.lua. Not a slot: a theme is
 -- its own set of settings, which no slot's choices touch.)
-local THEMES = { label = "Theme", page = "Style General", question = "How should your UI look?",
+local THEMES = { label = "Theme", page = "Style Themes", question = "How should your UI look?",
 	about = "A ready-made look for your frames, bars and fonts, in one click.", themes = true }
 -- What each Vision does, in a line (the vision wheel's list: MarkerWheel.lua).
 local VISION_LINES = {

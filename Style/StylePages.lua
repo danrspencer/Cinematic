@@ -1326,6 +1326,7 @@ local function Drop(preview, pin)
 	preview:SetPoint("TOPLEFT", spot, "TOPLEFT")
 	Repoint(spot:GetParent(), spot, preview, pin.moved)
 	SetRoom(pin, spot, preview:GetHeight())
+	if pin.floor then pin.floor:Hide() end -- (a short page's: its room's back)
 	pin.moved, pin.on = nil, false
 	if ns.PreviewTrace then ns.PreviewTrace("sticky drop", preview) end
 end
@@ -1371,21 +1372,37 @@ UpdateSticky = function(preview, off, snap)
 	local over = (spotTop and viewTop) and spotTop - viewTop or 0
 	local can = not off and popped ~= preview and spot:IsVisible() and over > 0
 		and CornerScale(preview, pin) > 0.1
-	-- (A page too short to scroll past its spot once its room is gone: left
-	-- as it is, not held, or closing the room would pull the scroll back up
-	-- over its spot and put it back. Asked of the page, not of where it's
-	-- scrolled to: one scrolled fast to its bottom is held too, 2026-11-17.)
-	if can and not pin.target
-		and scroll:GetVerticalScrollRange() - preview:GetHeight() <= scroll:GetVerticalScroll() - over + 1 then
-		can = false
-	end
+	-- (A page too short to scroll past its spot once its room is gone:
+	-- closing the room would pull the scroll back up over its spot and put it
+	-- back. Asked of the page, not of where it's scrolled to: one scrolled
+	-- fast to its bottom is held too, 2026-11-17. Such a page was left as it
+	-- is, not held; since 2026-11-18 (Card Vision's Events tab, every type
+	-- shut) it's held too, a floor kept at its bottom as it was, so its
+	-- scroll length stays while the preview's away: room left at its bottom
+	-- then, not the page pulled up.)
+	local short = can and not pin.target
+		and scroll:GetVerticalScrollRange() - preview:GetHeight() <= scroll:GetVerticalScroll() - over + 1
 	local hold = can and not (ns.db and ns.db.stylePreviewFolded) or false
 	if hold ~= pin.target and ns.PreviewTrace then
-		ns.PreviewTrace("sticky " .. (hold and "hold" or "release"), preview, ("over %.0f, off %s, snap %s"):format(over,
-			tostring(off), tostring(snap)))
+		ns.PreviewTrace("sticky " .. (hold and "hold" or "release"), preview, ("over %.0f, off %s, snap %s, short %s")
+			:format(over, tostring(off), tostring(snap), tostring(short)))
 	end
 	pin.target = hold
 	if hold and not pin.on then
+		-- (The floor: a speck on the page where its bottom is now, counted in
+		-- its scroll length, shown while the preview's away.)
+		if short then
+			local child = scroll:GetScrollChild()
+			if child then
+				pin.floor = pin.floor or CreateFrame("Frame", nil, child)
+				pin.floor:SetSize(1, 1)
+				pin.floor:ClearAllPoints()
+				pin.floor:SetPoint("TOPLEFT", child, "TOPLEFT", 0, -math.max(1, child:GetHeight() - 1))
+				pin.floor:Show()
+			end
+		elseif pin.floor then
+			pin.floor:Hide()
+		end
 		Lift(preview, pin)
 		pin.t = 0
 	end
@@ -1409,14 +1426,13 @@ UpdateSticky = function(preview, off, snap)
 end
 
 -- Shown only while the mouse is over the preview (2026-11-17): its Pop out
--- (on the page), zoom and backdrop pick. A light check, only while it shows.
+-- (on the page) and backdrop pick. A light check, only while it shows.
 local function HoverControls(preview)
 	local watch = CreateFrame("Frame", nil, preview)
 	watch.zoomSkip = true
 	local shown, wait = nil, 0
 	local function Set(on)
 		shown = on
-		if preview.zoomButtons then preview.zoomButtons:SetShown(on) end
 		if preview.backButton then preview.backButton:SetShown(on) end
 		if preview.popButton and popped ~= preview then preview.popButton:SetShown(on) end
 	end
@@ -1742,18 +1758,13 @@ local function WidePreview(preview)
 	end)
 end
 
--- Zoom on a preview (2026-11-16): - and + in its bottom right corner. What's
--- in it (each sample frame) drawn bigger or smaller round its own anchor,
--- the scene behind as it is. A preview drawing straight on itself (Name
--- Style's text) reads preview.zoom in its Refresh: preview.OnZoom says so.
--- Kept while the game runs. (Its own buttons and two-point children left be.)
-local ZOOMS = { 0.5, 0.75, 1, 1.25, 1.5, 2, 2.5, 3 }
 -- A preview whose samples take up little of it is drawn bigger to start
 -- with (2026-11-17: the Personal Resource Display's bars were a strip in the
 -- middle; then zoomed in more, the action buttons and nameplates too): up to
 -- FIT_W of its width and FIT_H of its screen's height, at most FIT_MAX
--- times, spread round their middle. Never smaller. Its zoom buttons go on
--- from there (100% is this fit). Its own buttons are zoomSkip.
+-- times, spread round their middle. Never smaller. Its own buttons are
+-- zoomSkip, left be, as are two-point children. (Its - and + zoom buttons
+-- went 2026-11-18: each preview made to look right as it is.)
 local FIT_W, FIT_H, FIT_MAX = 0.85, 0.8, 2
 -- Where a frame's point is, from its bottom left, in its own units.
 local function PointAt(frame, point)
@@ -1762,8 +1773,7 @@ local function PointAt(frame, point)
 	local y = point:find("TOP") and h or point:find("BOTTOM") and 0 or h / 2
 	return x, y
 end
-local function ApplyZoom(preview)
-	local z = preview.zoom or 1
+local function ApplyFit(preview)
 	local list = {}
 	for _, child in ipairs({ preview:GetChildren() }) do
 		if not child.zoomSkip and child:GetNumPoints() <= 1 then
@@ -1812,7 +1822,7 @@ local function ApplyZoom(preview)
 	local cx, cy = l and (l + r) / 2 or 0, b and (b + t) / 2 or 0
 	for _, child in ipairs(list) do
 		local base = child.zoomBase or 1
-		local s = base * z * f
+		local s = base * f
 		local a = child.zoomAnchor
 		if a then
 			local x, y = a[4] * base / s, a[5] * base / s
@@ -1830,73 +1840,25 @@ local function ApplyZoom(preview)
 		child:SetScale(s)
 		child.zoomScale = s
 	end
-	if preview.OnZoom then preview:OnZoom(z) end
 end
--- (A rotating preview's screens: each fitted and zoomed as it's drawn.)
-ns.ApplyPreviewZoom = ApplyZoom
-function ns.AddPreviewZoom(preview)
-	if preview.zoomButtons then return end
-	local function Step(by)
-		local now = preview.zoom or 1
-		local at = 3
-		for i, each in ipairs(ZOOMS) do
-			if math.abs(each - now) < 0.01 then at = i end
-		end
-		preview.zoom = ZOOMS[math.max(1, math.min(#ZOOMS, at + by))]
-		if preview.Refresh then preview:Refresh() else ApplyZoom(preview) end
-		preview.zoomButtons.label:SetText(("%d%%"):format(math.floor(preview.zoom * 100 + 0.5)))
+-- (A rotating preview's screens: each fitted as it's drawn.)
+ns.ApplyPreviewFit = ApplyFit
+-- A preview fitted again after each drawing: its Refresh wrapped, once.
+function ns.AddPreviewFit(preview)
+	if not preview.Refresh or preview.fitWrapped then return end
+	preview.fitWrapped = true
+	local refresh = preview.Refresh
+	preview.Refresh = function(self, ...)
+		local a, b = refresh(self, ...)
+		ApplyFit(self)
+		return a, b
 	end
-	-- (Its Refresh zooms and fits again after it draws: wrapped once, here.)
-	if preview.Refresh and not preview.zoomWrapped then
-		preview.zoomWrapped = true
-		local refresh = preview.Refresh
-		preview.Refresh = function(self, ...)
-			local a, b = refresh(self, ...)
-			ApplyZoom(self)
-			return a, b
-		end
-	end
-	local holder = CreateFrame("Frame", nil, preview)
-	holder.zoomSkip = true
-	holder:SetSize(76, 18)
-	holder:SetPoint("BOTTOMRIGHT", -6, 6)
-	holder:SetFrameLevel(preview:GetFrameLevel() + 30)
-	local function Button(text, by, tip)
-		local button = CreateFrame("Button", nil, holder)
-		button:SetSize(18, 18)
-		local back = button:CreateTexture(nil, "BACKGROUND")
-		back:SetAllPoints()
-		back:SetColorTexture(0, 0, 0, 0.55)
-		local glow = button:CreateTexture(nil, "HIGHLIGHT")
-		glow:SetAllPoints()
-		glow:SetColorTexture(1, 1, 1, 0.12)
-		local words = button:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-		words:SetPoint("CENTER", 0, 1)
-		words:SetText(text)
-		button:SetScript("OnClick", function() Step(by) end)
-		button:SetScript("OnEnter", function(self)
-			GameTooltip:SetOwner(self, "ANCHOR_TOP")
-			GameTooltip:SetText(tip, 1, 1, 1)
-			GameTooltip:Show()
-		end)
-		button:SetScript("OnLeave", function() GameTooltip:Hide() end)
-		return button
-	end
-	local minus = Button("-", -1, ns.L["Zoom out"])
-	local plus = Button("+", 1, ns.L["Zoom in"])
-	plus:SetPoint("RIGHT", 0, 0)
-	local label = holder:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-	label:SetPoint("RIGHT", plus, "LEFT", -3, 0)
-	label:SetText("100%")
-	minus:SetPoint("RIGHT", label, "LEFT", -3, 0)
-	holder.label = label
-	preview.zoomButtons = holder
 end
 
 -- (tooltip: the page's, unused since the buttons are icons with their own.)
 function ns.StylePopout(preview, _, title)
 	WidePreview(preview)
-	ns.AddPreviewZoom(preview) -- (- and + in its corner)
+	ns.AddPreviewFit(preview)
 	local button = IconButton(preview, "pop", ns.L["Pop out: the preview in a window of its own, docked to the settings."])
 	button:SetFrameLevel(preview:GetFrameLevel() + 30)
 	button.zoomSkip = true
@@ -3729,7 +3691,7 @@ function ns.StyleRows(kit, content, stack, changed, switchKey, fieldOf, panel)
 		-- (spec.preview(parent, width): the part as it looks now, a frame with
 		-- :Refresh(), between the title and the tabs; drawn again on each change.)
 		local preview = tabbed and spec.preview and spec.preview(pop, 496)
-		if preview then ns.AddPreviewZoom(preview) end -- (- and + in its corner, 2026-11-16)
+		if preview then ns.AddPreviewFit(preview) end
 		local function Field(key) return fieldOf and fieldOf(key) or key end
 		local function PageChanged(page)
 			for _, key in ipairs(page.keys) do

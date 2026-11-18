@@ -761,7 +761,7 @@ end
 function ns.CreateInterfaceRecolorPanel(kit)
 	local canvas, content = kit.CreateScrollPage()
 	local title = kit.Label(content, "GameFontNormalLarge", L["Interface Recolor"])
-	ns.StyleTabs(content, title, 5) -- (Style General's last tab, 2026-11-16)
+	ns.StyleTabs(content, title, "Interface Recolor") -- (the Themes tab's last, 2026-11-18)
 	local intro = kit.PageIntro(content, title,
 		L["Tints the game's interface in your theme's color."])
 

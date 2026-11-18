@@ -297,7 +297,7 @@ local STEPS = {
 				" (want true, blue, none, none, 0); see the AFTER screenshot (theme strip, scene, rows)"
 		end },
 	{ key = "pages", say = "%d/%d: The settings show the Style hub's PAGES tab. Just watch.",
-		apply = function() Say("  " .. OpenPage("Style Pages")) end,
+		apply = function() Say("  " .. OpenPage("Style General")) end,
 		after = function(note) note.verdict = "see the AFTER screenshot (the Theme column at the right)" end },
 }
 

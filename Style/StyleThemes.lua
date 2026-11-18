@@ -587,7 +587,7 @@ end
 -- any can be picked on top of any theme.
 local SHAPES = ART .. "Shapes\\"
 local PANEL_ART = { round = "Round", chamfer = "Chamfer", blade = "Blade", notch = "Notch", sigil = "Sigil",
-	veil = "Veil", deco = "Deco", plate = "Plate", leaf = "Leaf", facet = "Facet", soft = "Soft",
+	veil = "Veil", plate = "Plate", leaf = "Leaf", facet = "Facet", soft = "Soft",
 	frame = "Frame" }
 local BAR_ART = { capsule = "Capsule", chisel = "Chisel", soft = "Soft", bevel = "Bevel" }
 local PORTRAIT_ART = { hex = "Hex", diamond = "Diamond", arch = "Arch", cut = "Cut", eye = "Eye",
@@ -1321,6 +1321,48 @@ function ns.PlayThemeCard()
 	if not ns.CardTest then return end
 	if ns.CardTestRunning and ns.CardTestRunning("zone") then pcall(ns.CardTest, "zone") end
 	pcall(ns.CardTest, "zone")
+end
+
+-- The theme picked now, for the General tab under its preview (2026-11-18):
+-- its card (each theme's made, the picked one shown), its name ("with your
+-- changes" when edited) and a button to the Themes tab, as its card does.
+function ns.MakeCurrentThemeStrip(kit, parent, width)
+	local holder = CreateFrame("Frame", nil, parent)
+	holder:SetSize(width, CARD_H)
+	local cardW = (width - (PER_ROW - 1) * CARD_GAP) / PER_ROW
+	local function Open() ns.OpenOptions("Style Themes") end
+	local cards = {}
+	for _, theme in ipairs(THEMES) do
+		local card = MakeCard(holder, theme, cardW, Open, kit.Tooltip)
+		card:SetPoint("TOPLEFT")
+		card:Mark(true)
+		card:Hide()
+		cards[theme.key] = card
+	end
+	local label = holder:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+	label:SetPoint("TOPLEFT", holder, "TOPLEFT", cardW + 14, -18)
+	label:SetText(L["Current theme"])
+	local name = holder:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+	name:SetPoint("TOPLEFT", label, "BOTTOMLEFT", 0, -6)
+	name:SetPoint("RIGHT", holder, "RIGHT", 0, 0)
+	name:SetJustifyH("LEFT")
+	name.searchSkip = true
+	local change = ns.PanelButton(holder)
+	change:SetSize(130, 22)
+	change:SetPoint("TOPLEFT", name, "BOTTOMLEFT", 0, -8)
+	change:SetText(L["Change theme"])
+	kit.Tooltip(change, L["Opens the Themes tab."])
+	change:SetScript("OnClick", Open)
+	function holder:Refresh()
+		local db = ns.GetDB()
+		local current = db and db.styleGeneral and BY_KEY[db.styleTheme] or BY_KEY.game
+		for key, card in pairs(cards) do card:SetShown(key == current.key) end
+		name:SetText(ns.StyleThemeEdited() and (L["%s, with your changes"]):format(L[current.name]) or L[current.name])
+	end
+	holder:SetScript("OnShow", holder.Refresh)
+	holder.pageSwitch = false
+	kit.AddControl(holder)
+	return holder
 end
 
 -- kit: the page's. changed: a pick's been made. Gives the picker, with its

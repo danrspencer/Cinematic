@@ -108,7 +108,7 @@ local FRAMES = {
 local PAGES = {
 	{ id = "page-cinemode", name = "CineMode page", group = "Menu", page = "CineMode", pageName = "CineMode" },
 	{ id = "page-general", name = "Style: General page", group = "Menu", page = "Style > General", pageName = "Style General" },
-	{ id = "page-pages", name = "Style: Pages tab", group = "Menu", page = "Style > General > Pages", pageName = "Style Pages" },
+	{ id = "page-themes", name = "Style: Themes tab", group = "Menu", page = "Style > Themes", pageName = "Style Themes" },
 	{ id = "page-overrides", name = "Style: Overrides tab", group = "Menu", page = "Style > General > Overrides", pageName = "Style Overrides" },
 	{ id = "page-tooltip", name = "Interface: Tooltips page", group = "Menu", page = "Style > Interface > Tooltip Style", pageName = "Tooltip Style" },
 	{ id = "page-unit", name = "Interface: Unit Frames page", group = "Menu", page = "Style > Interface > Unit Frame Style", pageName = "Unit Style" },

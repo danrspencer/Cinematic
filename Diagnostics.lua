@@ -753,11 +753,16 @@ function ns.CaptureDebug(command, run)
 		return print(...)
 	end
 	local before = shownCount
+	ns.debugNoCopyWindow = nil
 	local ok, err = pcall(run)
 	_G.print = print
 	local lines = captured
 	captured = nil
-	if #lines >= 3 and shownCount == before then
+	-- (A command that takes screenshots says so, ns.debugNoCopyWindow: the window
+	-- would sit over them. Its lines are in chat and the log still.)
+	local quiet = ns.debugNoCopyWindow
+	ns.debugNoCopyWindow = nil
+	if #lines >= 3 and shownCount == before and not quiet then
 		-- (With the version, game and other addons, for when a player sends it.)
 		local _, build, _, interface = GetBuildInfo()
 		local addons = OtherAddons()

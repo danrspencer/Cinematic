@@ -2722,9 +2722,9 @@ do
 		{ name = "Style", collapse = true, colors = { Interface = { 0.35, 0.6, 0.9 }, Visions = { 0.85, 0.3, 0.25 },
 			Atmosphere = { 0.65, 0.45, 0.9 } }, pages = {
 			{ "Style General", "Interface\\Icons\\INV_Misc_Gear_08", label = "General" },
-			{ "Style Pages", "Interface\\Icons\\INV_Misc_Gear_08", tabOf = "Style General" }, -- (GeneralStyle.lua)
+			{ "Style Themes", "Interface\\Icons\\INV_Misc_Gear_08", tabOf = "Style General" }, -- (GeneralStyle.lua: the theme + Quick Settings)
 			{ "Style Overrides", "Interface\\Icons\\INV_Misc_Gear_08", tabOf = "Style General" }, -- (StyleOverrides.lua)
-			{ "Interface Recolor", "Interface\\Icons\\INV_Misc_Gem_01", tabOf = "Style General" }, -- (InterfaceRecolor.lua: General's last tab)
+			{ "Interface Recolor", "Interface\\Icons\\INV_Misc_Gem_01", tabOf = "Style General" }, -- (InterfaceRecolor.lua: the Themes tab's last)
 			-- (Labels without "Style", 2026-11-17: you're in the Style hub. Ids kept.)
 			-- (Interface: Unit Frames' two looks on one icon, its cast bars a tab.)
 			{ "Unit Style", "Interface\\Icons\\INV_Misc_Head_Human_01", label = "Unit Frames", section = "Interface" },
@@ -3434,7 +3434,8 @@ do
 		card:SetPoint("BOTTOMRIGHT", hub.host)
 		if tabs and tabs.panel.SetIgnoreParentAlpha then
 			if tile.canvas.scroll then tile.canvas.scroll:SetVerticalScroll(0) end
-			card:SetPoint("TOPLEFT", hub.host, "TOPLEFT", 0, -(ns.FOLDER_TAB_HEIGHT + 22))
+			-- (tabs.height: two rows of them, the Style hub's Themes tab.)
+			card:SetPoint("TOPLEFT", hub.host, "TOPLEFT", 0, -(tabs.height or (ns.FOLDER_TAB_HEIGHT + 22)))
 			KeepTabs(tabs, true)
 		else
 			card:SetPoint("TOPLEFT", hub.host)
@@ -11043,8 +11044,7 @@ local function CreateNameStylePanel()
 	scene:HookScript("OnSizeChanged", PlaceSpots)
 	function scene:Refresh()
 		for i, spot in ipairs(SPOTS) do
-			-- (scene.zoom: its - and + (StylePages' AddPreviewZoom); names drawn on it, not frames.)
-			DrawSample(spots[i], spot[1], nil, (spot[1] == "Target" and 1.25 or 1) * sceneScale * (scene.zoom or 1))
+			DrawSample(spots[i], spot[1], nil, (spot[1] == "Target" and 1.25 or 1) * sceneScale)
 		end
 		for _, preview in pairs(panels) do
 			if preview:IsVisible() then preview:Refresh() end
@@ -11347,10 +11347,8 @@ local function CreateNameStylePanel()
 				function holder.Refresh(_, over, note)
 					tag:SetShown(over ~= nil)
 					tag:SetText(note or L["Preview: not saved"])
-					DrawSample(sample, row, over, 1.6 * (holder.zoom or 1), true)
+					DrawSample(sample, row, over, 1.6, true)
 				end
-				-- (Its name drawn on it, not a frame: zoomed by its own size.)
-				function holder.OnZoom() end
 				holder:SetScript("OnShow", function(self) self:Refresh() end)
 				panels[row] = holder
 				return holder
@@ -21061,8 +21059,8 @@ ns.OnLanguage(function()
 	if ns.CreateGeneralStylePanel then -- (GeneralStyle.lua)
 		ns.CreateGeneralStylePanel(ns.lowHealthKit)
 		Lap("CreateGeneralStylePanel")
-		ns.CreateStylePagesPanel(ns.lowHealthKit)
-		Lap("CreateStylePagesPanel")
+		ns.CreateStyleThemesPanel(ns.lowHealthKit)
+		Lap("CreateStyleThemesPanel")
 		ns.CreateStyleOverridesPanel(ns.lowHealthKit)
 		Lap("CreateStyleOverridesPanel")
 	end

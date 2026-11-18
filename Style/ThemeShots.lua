@@ -428,7 +428,8 @@ function ns.ThemeShots(text)
 	ns.Print(("themeshots: %d shots, about %d seconds. Client %s, theme now %s, Style %s, UI scale %.2f, UI alpha %.2f."):format(
 		#steps, math.ceil(#steps * (quick and QUICK_SETTLE + QUICK_AFTER or SETTLE + AFTER)), ns.isRetail and "retail" or "classic", tostring(db.styleTheme),
 		db.styleGeneral and "on" or "off", UIParent:GetEffectiveScale(), UIParent:GetAlpha()))
-	-- (Two lines at most: three open the debug copy window, over the shots.)
+	-- (No debug copy window over the shots: the theme's own log lines print too.)
+	ns.debugNoCopyWindow = true
 	ns.Print(("themeshots: %d nameplate settings held by CineMode, left alone. %s Best beside NPCs, with a target, outside CineMode."):format(
 		held, (_G.SettingsPanel and _G.SettingsPanel:IsShown()) and "" or "Open Style > General first for the menus."))
 	run = {}

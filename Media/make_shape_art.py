@@ -126,7 +126,6 @@ def panel_leaf(d, s):
 PANELS = {"Round": panel_round, "Chamfer": panel_chamfer, "Blade": panel_blade, "Notch": panel_notch,
           "Sigil": panel_sigil, "Veil": panel_veil, "Leaf": panel_leaf, "Soft": panel_soft,
           # (Art deco steps, a plate's square-cut corners, a gem's two facets.)
-          "Deco": lambda d, s: mirrored([(9, 1), (9, 5), (5, 5), (5, 9), (1, 9)])(d, s),
           "Plate": lambda d, s: mirrored([(7, 1), (7, 7), (1, 7)])(d, s),
           "Facet": lambda d, s: mirrored([(8, 1), (3, 3), (1, 8)])(d, s),
           # (A film print's frame: barely rounded.)

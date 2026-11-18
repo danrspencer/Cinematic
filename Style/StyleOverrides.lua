@@ -104,7 +104,7 @@ end
 function ns.CreateStyleOverridesPanel(kit)
 	local canvas, content = kit.CreateScrollPage()
 	local title = kit.Label(content, "GameFontNormalLarge", L["Overrides"])
-	ns.StyleTabs(content, title, 4)
+	ns.StyleTabs(content, title, "Style Overrides")
 	local intro = kit.PageIntro(content, title,
 		L["Hide or show parts of unit frames and nameplates, whatever their Show rows say."])
 	local parts = {} -- (each row, to show its pick again)
@@ -209,7 +209,14 @@ function ns.CreateStyleOverridesPanel(kit)
 	else
 		panelTop:SetPoint("TOPLEFT", intro, "BOTTOMLEFT", 0, -14 - height)
 	end
-	clear:SetPoint("BOTTOMRIGHT", panelTop, "TOPLEFT", NAME_W + 264, 4)
+	-- (Right of the last tab, not at a set spot: the tabs grew past it and it
+	-- sat on Action bars, 2026-11-18.)
+	local lastTab = tabFrames[#tabFrames]
+	if lastTab then
+		clear:SetPoint("BOTTOMLEFT", lastTab, "BOTTOMRIGHT", 12, 0)
+	else
+		clear:SetPoint("BOTTOMRIGHT", panelTop, "TOPLEFT", NAME_W + 264, 4)
+	end
 	panel:SetPoint("TOPLEFT", panelTop, "TOPLEFT")
 	base:SetPoint("TOPLEFT", panelTop, "TOPLEFT")
 	for i, section in ipairs(sections) do

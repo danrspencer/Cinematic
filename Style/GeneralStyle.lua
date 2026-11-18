@@ -1,7 +1,8 @@
--- The Style hub's General page: a switch for every Style page at once (off:
--- each shows the game's look), the settings the pages share (bar texture,
--- font, outline: StylePages.lua's ns.StyleLook), a preview of several pages'
--- parts in turn, and which pages follow it or have a setting of their own.
+-- The Style hub's General tab: a switch for every Style page at once (off:
+-- each shows the game's look) and which pages follow it or have a setting of
+-- their own, a tab per band, under a preview of several pages' parts in turn.
+-- Its Themes tab: the theme and the settings the pages share (bar texture,
+-- font, outline: StylePages.lua's ns.StyleLook).
 
 local _, ns = ...
 local L = ns.L
@@ -186,7 +187,9 @@ local function MakePreview(parent, width, list)
 	count.searchSkip = true
 	local cells = {}
 	for _, info in ipairs(list or CELLS) do
-		local make = ns[info[2]]
+		-- (info.make: a maker of its own, in place of one named on ns: Card
+		-- Vision's, a card type each.)
+		local make = info.make or ns[info[2]]
 		if make then
 			local cell = make(holder, width, info.sized and ns.StylePreviewHeight() or nil)
 			cell:SetScript("OnShow", nil) -- (drawn by holder:Refresh)
@@ -203,14 +206,11 @@ local function MakePreview(parent, width, list)
 					self:SetHeight(height)
 				end
 				ns.RecutStyleScene(self) -- (its shape: the screen's width may have changed too)
-				-- (Its samples grown to fill it when small, at the holder's zoom: StylePages.lua.)
-				if ns.ApplyPreviewZoom then
-					self.zoom = holder.zoom
-					ns.ApplyPreviewZoom(self)
-				end
+				-- (Its samples grown to fill it when small: StylePages.lua.)
+				if ns.ApplyPreviewFit then ns.ApplyPreviewFit(self) end
 			end
 			cell:Hide()
-			cells[#cells + 1] = { frame = cell, name = L[info[1]] }
+			cells[#cells + 1] = { frame = cell, name = L[info[1]], key = info.key }
 		end
 	end
 	local current, waited, fading = 1, 0, nil -- (fading: the one going, under the one coming in)
@@ -234,12 +234,20 @@ local function MakePreview(parent, width, list)
 		local cell = cells[current]
 		if cell then cell.frame:SetAlpha(1) end
 	end
-	local function Step(by)
+	-- (now: straight to it, the one showing gone at once (its card cut, not
+	-- fading under the new one): the arrows and Jump, 2026-11-18.)
+	local function Step(by, now)
 		if #cells < 2 then return end
 		EndFade()
 		local was = current
 		current = (current - 1 + by) % #cells + 1
 		waited = 0
+		if now then
+			cells[was].frame:Hide()
+			cells[current].frame:SetAlpha(1)
+			holder:Refresh()
+			return
+		end
 		-- (The new one over the old, from clear.)
 		local base = holder:GetFrameLevel()
 		cells[was].frame:SetFrameLevel(base + 1)
@@ -247,6 +255,17 @@ local function MakePreview(parent, width, list)
 		cells[current].frame:SetAlpha(0)
 		fading = { index = was, time = 0 }
 		holder:Refresh()
+	end
+	-- Straight to the cell with that key (info.key), fading in as a step
+	-- does; the wait starts again.
+	function holder:Jump(key)
+		for i, cell in ipairs(cells) do
+			if cell.key == key then
+				if i ~= current then Step(i - current, true) end
+				waited = 0
+				return
+			end
+		end
 	end
 	-- (The arrows, in the screen's top right as the other previews' buttons,
 	-- over the pages fading in.)
@@ -260,7 +279,7 @@ local function MakePreview(parent, width, list)
 		arrow:SetNormalTexture(art .. "Up")
 		arrow:SetPushedTexture(art .. "Down")
 		arrow:SetHighlightTexture("Interface\\Buttons\\UI-Common-MouseHilight", "ADD")
-		arrow:SetScript("OnClick", function() Step(side[3]) end)
+		arrow:SetScript("OnClick", function() Step(side[3], true) end)
 		if side[3] < 0 then holder.prevArrow = arrow end
 	end
 	-- (A lock left of them: the screen stays on the one showing, the arrows still step.
@@ -314,7 +333,8 @@ local function MakePreview(parent, width, list)
 	return holder
 end
 
--- A page's rotating preview of the given cells ({ name, maker, sized = }),
+-- A page's rotating preview of the given cells ({ name, maker, sized = },
+-- or make = function(parent, width, height) and key = for holder:Jump),
 -- with Pop out left of its arrows, on the page's stack.
 function ns.MakeStyleJumbotron(kit, content, stack, width, list)
 	local preview = MakePreview(content, width, list)
@@ -349,51 +369,232 @@ local function PageStatus(keys)
 end
 
 
--- General's folder tabs: General, Quick Settings (General's page too, its
--- second part, 2026-11-16), Pages, Overrides and Interface Recolor (picked
--- 1 to 5; Recolor a tab since 2026-11-16). title: the
--- page's, put under them. Gives Show(i), another one picked.
-local function StyleTabs(content, title, picked)
-	local panel, Show = ns.PageTabs(content, {
-		{ L["General"], "Style General", L["The theme, and the switch for every Style page."] },
-		{ L["Quick Settings"], "Style Quick", L["Make a theme your own: fonts, bars, shapes, outline and border."] },
-		{ L["Pages"], "Style Pages", L["Which Style pages follow General, and which have settings of their own."] },
-		{ L["Overrides"], "Style Overrides", L["Hide or show parts of unit frames, nameplates and action bars, whatever their rows say."] },
-		{ L["Interface Recolor"], "Interface Recolor", L["The game's minimap, quest tracker, windows and the rest in your theme's color."] },
-	}, picked)
+-- General's folder tabs (2026-11-18): General (Enable Style, the preview and
+-- which pages follow the theme, a tab for each band) and Themes. Themes has a
+-- row of its own under them: Themes (the picker), Quick Settings, Interface
+-- Recolor and Overrides. page: the page these are on (its English name). title:
+-- the page's, put under them. Gives Show(i), another Themes tab picked (a
+-- page that's more than one of them: Themes and Quick Settings).
+local TOP_TABS = {
+	{ "General", "Style General", "The switch for every Style page, and which pages follow the theme." },
+	{ "Themes", "Style Themes", "The theme, your changes to it, the game's interface in its color, and overrides." },
+}
+local THEME_TABS = {
+	{ "Themes", "Style Themes", "A whole look for the addon in one pick." },
+	{ "Quick Settings", "Style Quick", "Make a theme your own: fonts, bars, shapes, outline and border." },
+	{ "Interface Recolor", "Interface Recolor", "The game's minimap, quest tracker, windows and the rest in your theme's color." },
+	{ "Overrides", "Style Overrides", "Hide or show parts of unit frames, nameplates and action bars, whatever their rows say." },
+}
+local function StyleTabs(content, title, page)
+	local top, sub = 1, nil
+	for i, each in ipairs(TOP_TABS) do
+		if each[2] == page then top = i end
+	end
+	for i, each in ipairs(THEME_TABS) do
+		if each[2] == page then sub = i end
+	end
+	if sub then top = 2 end
+	-- (Themes opens its page even from one of its own tabs: [4].)
+	local list = {}
+	for i, each in ipairs(TOP_TABS) do list[i] = { L[each[1]], each[2], L[each[3]], i == 2 or nil } end
+	local panel = ns.PageTabs(content, list, top)
+	local below = panel
+	local Show = function() end
+	if sub then
+		-- (The Themes row, under the line of the first: each its own hub page as
+		-- the tabs over it, a right-click flipping its switch.)
+		local tabs = {}
+		for i, each in ipairs(THEME_TABS) do
+			tabs[i] = { L[each[1]], L[each[3]], quietOff = true,
+				off = function() return ns.PageSwitchOff and ns.PageSwitchOff(each[2]) or false end }
+		end
+		local current = sub
+		local subPanel, frames, ShowTab, base = ns.FolderTabs(content, tabs, function(i)
+			if i ~= current then ns.ShowHubPage(THEME_TABS[i][2]) end
+		end, nil, nil, function(i) ns.FlipPageSwitch(THEME_TABS[i][2]) end)
+		frames.shotSkip = true
+		for i, tab in ipairs(frames) do
+			tab.switchPage = THEME_TABS[i][2]
+			tab:HookScript("OnEnter", function(self) ns.PageSwitchTip(self, THEME_TABS[i][2]) end)
+		end
+		base:SetPoint("TOPLEFT", panel, "BOTTOMLEFT", 0, -(ns.FOLDER_TAB_HEIGHT + 12))
+		subPanel:SetPoint("TOPLEFT", base)
+		subPanel:SetPoint("RIGHT", content, "RIGHT", -8, 0)
+		subPanel:SetHeight(1)
+		Show = function(i)
+			if not frames[i] then return end
+			current = i
+			ShowTab(i)
+		end
+		Show(sub)
+		-- (Both rows kept over the page's off card, the card under the second;
+		-- the title, dropped, under it too: ns.DropPageHeader.)
+		local tabSet = content.pageTabs
+		local all = {}
+		for _, tab in ipairs(tabSet.frames) do all[#all + 1] = tab end
+		all[#all + 1] = tabSet.panel
+		for _, tab in ipairs(frames) do all[#all + 1] = tab end
+		content.pageTabs = { panel = subPanel, frames = all, height = 2 * ns.FOLDER_TAB_HEIGHT + 34 }
+		below = subPanel
+	end
 	title:ClearAllPoints()
-	title:SetPoint("TOPLEFT", panel, "BOTTOMLEFT", 8, -14)
+	title:SetPoint("TOPLEFT", below, "BOTTOMLEFT", 8, -14)
 	return Show
 end
 
 ns.StyleTabs = StyleTabs -- (StyleOverrides.lua, InterfaceRecolor.lua)
 
+-- The General tab: Enable Style, and the pages list: which pages follow the
+-- theme, a tab for each of the hub's bands (Interface, Visions).
 function ns.CreateGeneralStylePanel(kit)
 	local canvas, content = kit.CreateScrollPage()
 	local title = kit.Label(content, "GameFontNormalLarge", L["General"])
-	local ShowStyleTab = StyleTabs(content, title, 1)
+	StyleTabs(content, title, "Style General")
 	local intro = kit.PageIntro(content, title,
-		L["One switch and shared settings for every Style page."])
-
-	local preview -- (below: drawn again as each setting changes)
+		L["One switch for every Style page, and which pages follow the theme."])
+	local pageRows = {}
 	local function Changed()
 		RefreshAll()
 		ns.ApplyMenuSkin() -- (Style off or on: the theme's menu colors go or come back)
-		if preview then preview:Refresh() end
+		if ns.generalStylePreview then ns.generalStylePreview:Refresh() end
+		for _, row in ipairs(pageRows) do row:Refresh() end
 	end
 
 	local switch = kit.PageSwitch(content, "styleGeneral", L["Enable Style"],
 		L["Turns all Style pages on or off."], intro, Changed)
+
+	-- (Only the pages this client has: one it lacks, like Roll Vision with no
+	-- loot history, never set its defaults. Each band (group) a tab.)
+	local pages, sections = {}, {}
+	for _, page in ipairs(PAGES) do
+		if not page[3][1] or ns.DEFAULTS[page[3][1]] ~= nil then
+			pages[#pages + 1] = page
+			if page.group or not sections[1] then sections[#sections + 1] = { name = page.group or "Interface", list = {} } end
+			local list = sections[#sections].list
+			list[#list + 1] = page
+		end
+	end
+	local tabList = {}
+	for i, section in ipairs(sections) do
+		tabList[i] = { L[section.name], L["Which of these pages follow the theme, and which have settings of their own."] }
+	end
+	-- (The preview over them, as it was: shown on the hub's other tabs too, popped out.)
 	local stack = kit.Stack(switch, "check")
+	local preview = ns.MakeStyleJumbotron(kit, content, stack, 480)
+	ns.generalStylePreview = preview -- (ns.SharePreview; the Themes tab's settings draw it again)
+	-- (The theme picked now under it, StyleThemes.lua: a click opens the Themes tab.)
+	local strip = ns.MakeCurrentThemeStrip(kit, content, 480)
+	stack:Add(strip, "label")
+	local hosts, _, TabsShown = ns.PageTabsBelow(content, strip, tabList, "Style General/pages")
+
+	local ROW_H, HEAD_H = 24, 18
+	for s, section in ipairs(sections) do
+		local host = hosts[s]
+		host:SetSize(524, HEAD_H + #section.list * ROW_H)
+		-- (Over the Theme column, at the left: what its switches do. 2026-11-18.)
+		local reachHead = kit.Label(host, "GameFontNormalSmall", L["Theme"])
+		kit.Tooltip(reachHead, L["When ticked, picking a theme changes this part."])
+		reachHead:SetPoint("TOPLEFT", host, "TOPLEFT", 0, 0)
+		for n, page in ipairs(section.list) do
+			local row = CreateFrame("Frame", nil, host)
+			row:SetSize(520, 22)
+			row:SetPoint("TOPLEFT", host, "TOPLEFT", 0, -HEAD_H - (n - 1) * ROW_H)
+			-- (Its name a button that opens its page, right of the Theme tick.)
+			local open = ns.PanelButton(row)
+			open:SetSize(190, 20)
+			open:SetPoint("LEFT", row, "LEFT", 40, 0)
+			open:SetText(L[page[1]])
+			open:SetScript("OnClick", function() ns.OpenOptions(page[2]) end)
+			kit.Tooltip(open, L["Opens its page."])
+			local status = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+			status:SetPoint("LEFT", open, "RIGHT", 10, 0)
+			status.searchSkip = true
+			-- (Its part's Theme switch, at the left: the same for each page of a part.
+			-- None: an empty cell, Interface Recolor's.)
+			if page.part then
+				local reachKey = "styleThemeReach" .. page.part
+				local reach = kit.Check(row, reachKey, "", L["When ticked, picking a theme changes this part."], function(value)
+					ns.GetDB()[reachKey] = value
+					Changed()
+					kit.Refresh()
+				end)
+				reach:ClearAllPoints()
+				reach:SetPoint("LEFT", row, "LEFT", 4, 0)
+				reach.searchLabel = L[page[1]] .. " - " .. L["Theme"]
+			end
+			local back = ns.PanelButton(row)
+			back:SetSize(100, 20)
+			back:SetPoint("LEFT", status, "RIGHT", 10, 0)
+			back:SetText(L["Use General"])
+			kit.Tooltip(back, L["This page's shared settings back on General, or as the theme set them."])
+			back:SetScript("OnClick", function()
+				local db = ns.GetDB()
+				for _, key in ipairs(page[3]) do
+					local theme = ns.ThemeSetting(key)
+					if theme ~= nil then db[key] = theme else db[key] = ns.DEFAULTS[key] end
+				end
+				Changed()
+				kit.Refresh()
+			end)
+			function row:Refresh()
+				local own, themed = PageStatus(page[3])
+				if #own == 0 then
+					local follows = page.visions and L["Follows Visions Style"] or L["Follows General"]
+					status:SetText(page.fixed and L[page.fixed] or themed and L["From the theme"] or follows)
+					status:SetTextColor(0.6, 0.6, 0.6)
+					back:Hide()
+				else
+					status:SetText(L["Its own:"] .. " " .. table.concat(own, ", "))
+					status:SetTextColor(1, 0.82, 0)
+					back:Show()
+				end
+			end
+			pageRows[#pageRows + 1] = row
+		end
+	end
+
+	-- (Reset page: the pages listed back on General, as the profile has them.)
+	kit.OnReset(content, function()
+		local db, base = ns.GetDB(), ns.ResetBase()
+		for _, page in ipairs(pages) do
+			for _, key in ipairs(page[3]) do db[key] = base[key] end
+		end
+		Changed()
+	end)
+
+	canvas:SetScript("OnShow", kit.PageShown(function()
+		for _, row in ipairs(pageRows) do row:Refresh() end
+		kit.Refresh()
+		TabsShown()
+	end, content))
+	canvas:Hide()
+	kit.RegisterSubpage(canvas, "Style General", L["General"])
+end
+
+-- The Themes tab (2026-11-18: once General's): the theme picker and Quick
+-- Settings, one page, each picked by the Themes row over the title (its
+-- Interface Recolor and Overrides: pages of their own). The preview is General's.
+function ns.CreateStyleThemesPanel(kit)
+	local canvas, content = kit.CreateScrollPage()
+	local title = kit.Label(content, "GameFontNormalLarge", L["Themes"])
+	local ShowStyleTab = StyleTabs(content, title, "Style Themes")
+	local intro = kit.PageIntro(content, title,
+		L["A whole look for the addon, and your changes to it."])
+
+	-- (General's preview drawn again as each setting changes; here too when popped out.)
+	local function Changed()
+		RefreshAll()
+		ns.ApplyMenuSkin()
+		if ns.generalStylePreview then ns.generalStylePreview:Refresh() end
+	end
+
+	local stack = kit.Stack(intro, "label")
 	local rows = ns.StyleRows(kit, content, stack, Changed, "styleGeneral")
 
-	preview = ns.MakeStyleJumbotron(kit, content, stack, 480)
-	ns.generalStylePreview = preview -- (shown on the Style hub's other tabs too: ns.SharePreview)
-
-	-- Two parts (ns.PageTabsBelow, its tabs not drawn: the Style tabs over the
-	-- title pick them): General (the theme) and Quick Settings, each at its top.
-	local hosts, PickPart, TabsShown, AdoptTab = ns.PageTabsBelow(content, preview.stackSpot or preview, {
-		{ L["General"], L["The theme."] },
+	-- Two parts (ns.PageTabsBelow, its tabs not drawn: the Themes row over the
+	-- title picks them): Themes and Quick Settings, each at its top.
+	local hosts, PickPart, TabsShown, AdoptTab = ns.PageTabsBelow(content, intro, {
+		{ L["Themes"], L["The theme."] },
 		{ L["Quick Settings"], L["Make a theme your own."] },
 	}, "Style General/page", nil, nil, 1, nil, true)
 
@@ -425,7 +626,7 @@ function ns.CreateGeneralStylePanel(kit)
 		return { { value = "square", text = L["Square"] }, { value = "round", text = L["Rounded"] },
 			{ value = "chamfer", text = L["Chamfered"] }, { value = "blade", text = L["Blade"] },
 			{ value = "notch", text = L["Notched"] }, { value = "sigil", text = L["Sigil"] },
-			{ value = "veil", text = L["Veil"] }, { value = "deco", text = L["Stepped"] },
+			{ value = "veil", text = L["Veil"] },
 			{ value = "plate", text = L["Plate"] }, { value = "leaf", text = L["Leaf"] },
 			{ value = "facet", text = L["Faceted"] }, { value = "soft", text = L["Soft"] },
 			{ value = "frame", text = L["Slightly rounded"] } }
@@ -480,16 +681,16 @@ function ns.CreateGeneralStylePanel(kit)
 	end
 	quickHeader:ClearAllPoints()
 	quickHeader:SetPoint("TOPLEFT", hosts[2], "TOPLEFT", 0, 0)
-	-- Each part a hub tile: General the Style hub's icon, Quick Settings hidden
-	-- under it (tabOf), both picked by the Style tabs over the title.
+	-- Each part a hub tile, both hidden under the Style hub's icon (tabOf),
+	-- picked by the Themes row over the title.
 	local function ShowPart(i)
 		PickPart(i)
 		ShowStyleTab(i)
 	end
 	canvas.hubTabs = {
-		{ name = "Style General", icon = "Interface\\Icons\\INV_Misc_Gear_08", label = "General",
+		{ name = "Style Themes", icon = "Interface\\Icons\\INV_Misc_Gear_08", label = "Themes",
 			onSelect = function() ShowPart(1) end },
-		{ name = "Style Quick", icon = "Interface\\Icons\\INV_Misc_Gear_08", label = "General", own = true,
+		{ name = "Style Quick", icon = "Interface\\Icons\\INV_Misc_Gear_08", label = "Quick Settings", own = true,
 			tabOf = "Style General", onSelect = function() ShowPart(2) end },
 	}
 
@@ -498,111 +699,6 @@ function ns.CreateGeneralStylePanel(kit)
 		TabsShown()
 	end, content))
 	canvas:Hide()
-	kit.RegisterSubpage(canvas, "Style General", L["General"])
-end
-
--- The Pages tab: which pages follow General, kept off the General tab to keep
--- that one simple.
-function ns.CreateStylePagesPanel(kit)
-	local canvas, content = kit.CreateScrollPage()
-	local title = kit.Label(content, "GameFontNormalLarge", L["Pages"])
-	StyleTabs(content, title, 3)
-	local intro = kit.PageIntro(content, title,
-		L["Pick which pages follow the General page."])
-	local stack = kit.Stack(intro, "label")
-	-- (Over the Theme column: what its switches do.)
-	local reachHead = kit.Label(content, "GameFontNormalSmall", L["Theme"])
-	kit.Tooltip(reachHead, L["When ticked, picking a theme changes this part."])
-	local pageRows = {}
-	local function Changed()
-		RefreshAll()
-		for _, row in ipairs(pageRows) do row:Refresh() end
-	end
-
-	-- (Only the pages this client has: one it lacks, like Roll Vision with no
-	-- loot history, never set its defaults.)
-	local pages = {}
-	for _, page in ipairs(PAGES) do
-		if not page[3][1] or ns.DEFAULTS[page[3][1]] ~= nil then pages[#pages + 1] = page end
-	end
-	for _, page in ipairs(pages) do
-		if page.group then stack:Header(content, L[page.group]) end
-		local row = CreateFrame("Frame", nil, content)
-		row:SetSize(520, 22)
-		stack:Add(row, "label")
-		local open = CreateFrame("Button", nil, row)
-		open:SetSize(160, 22)
-		open:SetPoint("LEFT")
-		local name = open:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-		name:SetPoint("LEFT")
-		name:SetText(L[page[1]])
-		open:SetScript("OnClick", function() ns.OpenOptions(page[2]) end)
-		open:SetScript("OnEnter", function() name:SetTextColor(1, 0.82, 0) end)
-		open:SetScript("OnLeave", function() name:SetTextColor(1, 1, 1) end)
-		local status = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-		status:SetPoint("LEFT", open, "RIGHT", 4, 0)
-		status.searchSkip = true
-		-- (Its part's Theme switch, at the right: the same for each page of a part.)
-		if page.part then
-			local reachKey = "styleThemeReach" .. page.part
-			local reach = kit.Check(row, reachKey, "", L["When ticked, picking a theme changes this part."], function(value)
-				ns.GetDB()[reachKey] = value
-				Changed()
-				kit.Refresh()
-			end)
-			reach:ClearAllPoints()
-			reach:SetPoint("LEFT", row, "LEFT", 494, 0)
-			reach.searchLabel = L[page[1]] .. " - " .. L["Theme"]
-		end
-		local back = ns.PanelButton(row)
-		back:SetSize(100, 20)
-		back:SetPoint("LEFT", status, "RIGHT", 10, 0)
-		back:SetText(L["Use General"])
-		kit.Tooltip(back, L["This page's shared settings back on General, or as the theme set them."])
-		back:SetScript("OnClick", function()
-			local db = ns.GetDB()
-			for _, key in ipairs(page[3]) do
-				local theme = ns.ThemeSetting(key)
-				if theme ~= nil then db[key] = theme else db[key] = ns.DEFAULTS[key] end
-			end
-			Changed()
-			kit.Refresh()
-		end)
-		function row:Refresh()
-			local own, themed = PageStatus(page[3])
-			if #own == 0 then
-				local follows = page.visions and L["Follows Visions Style"] or L["Follows General"]
-				status:SetText(page.fixed and L[page.fixed] or themed and L["From the theme"] or follows)
-				status:SetTextColor(0.6, 0.6, 0.6)
-				back:Hide()
-			else
-				status:SetText(L["Its own:"] .. " " .. table.concat(own, ", "))
-				status:SetTextColor(1, 0.82, 0)
-				back:Show()
-			end
-		end
-		pageRows[#pageRows + 1] = row
-	end
-	if pageRows[1] then
-		reachHead:ClearAllPoints()
-		reachHead:SetPoint("BOTTOMRIGHT", pageRows[1], "TOPRIGHT", 4, 2)
-	end
-
-	-- (Reset page: the pages listed back on General, as the profile has them.)
-	kit.OnReset(content, function()
-		local db, base = ns.GetDB(), ns.ResetBase()
-		for _, page in ipairs(pages) do
-			for _, key in ipairs(page[3]) do db[key] = base[key] end
-		end
-		Changed()
-	end)
-
-	local shown = kit.PageShown(kit.Refresh, content)
-	canvas:SetScript("OnShow", function()
-		for _, row in ipairs(pageRows) do row:Refresh() end
-		shown()
-	end)
-	canvas:Hide()
-	ns.SharePreview(canvas, function() return ns.generalStylePreview end) -- (General's preview here too)
-	kit.RegisterSubpage(canvas, "Style Pages", L["Pages"])
+	ns.SharePreview(canvas, function() return ns.generalStylePreview end) -- (General's preview, popped out, here too)
+	kit.RegisterSubpage(canvas, "Style Themes", L["Themes"])
 end
