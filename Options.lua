@@ -9442,11 +9442,70 @@ local function CreateFishingPanel()
 	stack:Add(Check(content, "hideFishingCastBar", L["Hide the Fishing cast bar"],
 		L["Hides your cast bar while you're fishing."]),
 		"check")
-	local recast = stack:Add(Check(content, "fishRightClickCast", L["Right-click to cast"],
-		L["With a fishing pole equipped, right-click in the world casts Fishing."]), "check")
-	recast:HookScript("OnClick", Refresh) -- grey out / enable the options below
+	-- What casts with a pole equipped: ticks, each its own setting (Camera.lua:
+	-- right-click, the keys bound to the game's Interact with Target and Jump,
+	-- the extra mouse buttons).
+	local CAST_WITH = {
+		{ key = "fishRightClickCast", text = L["Right-click"] },
+		{ key = "fishInteractCast", text = L["Interact key"] },
+		{ key = "fishJumpCast", text = L["Jump key"] },
+		{ key = "fishMouse3Cast", text = L["Middle mouse button"] },
+		{ key = "fishMouse4Cast", text = L["Mouse button 4"] },
+		{ key = "fishMouse5Cast", text = L["Mouse button 5"] },
+	}
+	local CAST_WITH_TIP = L["With a fishing pole equipped, these cast Fishing when nothing is near."]
+	local castLabel = stack:Add(Label(content, "GameFontHighlight", L["Cast with"]), "label")
+	local okMenu, castWith = ns.MenuDropdown(content)
+	if okMenu and castWith and castWith.SetupMenu then
+		castWith:SetWidth(200)
+		-- (Found by its name and key, not the ticks it shows.)
+		castLabel.searchSkip = true
+		castWith.searchLabel = L["Cast with"]
+		castWith.searchEdges = { top = castLabel, bottom = castWith, left = castWith, right = castWith }
+		castWith:SetupMenu(function(_, root)
+			for _, choice in ipairs(CAST_WITH) do
+				root:CreateCheckbox(choice.text,
+					function()
+						local db = ns.GetDB()
+						return db ~= nil and db[choice.key] and true or false
+					end,
+					function()
+						local db = ns.GetDB()
+						db[choice.key] = not db[choice.key]
+						Refresh() -- (grey out / enable the options below)
+						return MenuResponse and MenuResponse.Refresh
+					end)
+			end
+		end)
+		if castWith.SetSelectionText then
+			castWith:SetSelectionText(function()
+				local db, ticked = ns.GetDB(), {}
+				for _, choice in ipairs(CAST_WITH) do
+					if db and db[choice.key] then ticked[#ticked + 1] = choice.text end
+				end
+				return #ticked > 0 and table.concat(ticked, ", ") or L["Off"]
+			end)
+		end
+		castWith.Refresh = function(self) self:GenerateMenu() end
+		castWith.settingKey = "fishRightClickCast" -- (its id for /cine find: the first tick's)
+		controls[#controls + 1] = castWith
+		for _, choice in ipairs(CAST_WITH) do RecordKey(content, choice.key) end
+		stack:Add(castWith, "dropdown")
+		Tooltip(castWith, CAST_WITH_TIP)
+	else
+		for _, choice in ipairs(CAST_WITH) do
+			stack:Add(Check(content, choice.key, choice.text, CAST_WITH_TIP, function(value)
+				ns.GetDB()[choice.key] = value
+				Refresh()
+			end), "check")
+		end
+	end
 	-- (They apply to the gamepad button too.)
-	local function IfRecast(db) return db.fishRightClickCast or (C_GamePad ~= nil and db.fishGamepadCast) end
+	local function IfRecast(db)
+		return db.fishRightClickCast or db.fishInteractCast or db.fishJumpCast
+			or db.fishMouse3Cast or db.fishMouse4Cast or db.fishMouse5Cast
+			or (C_GamePad ~= nil and db.fishGamepadCast)
+	end
 	local delay = stack:Add(Slider(content, "fishRecastDelay", L["Wait after a cast ends"], 0, 3, 0.1,
 		L["%.1f sec"]), "slider")
 	Tooltip(delay, L["How long after a cast ends before right-click casts again."])

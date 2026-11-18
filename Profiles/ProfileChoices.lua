@@ -208,7 +208,7 @@ ns.SLOT_CHOICES = {
 -- and that deleting your own goes back to (else the first).
 -- (The modules every built-in has: the quiet extras that only show for a
 -- moment. Each profile's own come after.)
-local EVERY_PROFILE = { "milestone-cards", "duel-card", "tele-vision", "emote-vision" }
+local EVERY_PROFILE = { "milestone-cards", "duel-card", "tele-vision", "emote-vision", "fishing" }
 local function With(...)
 	local list = {}
 	for _, key in ipairs(EVERY_PROFILE) do list[#list + 1] = key end

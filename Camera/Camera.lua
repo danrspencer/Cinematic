@@ -670,6 +670,26 @@ do
 		local ok = pcall(FindFishKeys)
 		if not ok then wipe(fishKeys) end
 	end
+	-- Interact key casts too: its keys (looked up each pass, as bindings can
+	-- change), and whether the key has something of the game's to do now: the
+	-- soft interact pick (an NPC, a mailbox, a herb), or a target in reach.
+	local interactKeys = {}
+	-- (The extra mouse buttons that can cast: binding key, IsMouseButtonDown name, setting.)
+	local EXTRA_MOUSE = {
+		{ key = "BUTTON3", button = "MiddleButton", setting = "fishMouse3Cast" },
+		{ key = "BUTTON4", button = "Button4", setting = "fishMouse4Cast" },
+		{ key = "BUTTON5", button = "Button5", setting = "fishMouse5Cast" },
+	}
+	local function InteractNear()
+		if ns.Flag(UnitExists("softinteract")) then
+			return true
+		end
+		if ns.Flag(UnitExists("target")) and CheckInteractDistance then
+			local ok, near = pcall(CheckInteractDistance, "target", 3)
+			return not ok or ns.Flag(near)
+		end
+		return false
+	end
 
 	-- For /cine debug fishing.
 	-- (Objects aren't units to UnitExists: their name and GUID are asked
@@ -709,8 +729,13 @@ do
 		local found = {}
 		for key, from in pairs(fishKeys) do found[#found + 1] = key .. " (" .. from .. ")" end
 		table.sort(found)
-		ns.Print(("  keys with Fishing on the bars: %s"):format(
-			#found > 0 and table.concat(found, ", ") or "none"))
+		ns.Print(("  keys with Fishing on the bars: %s | Interact keys: %s (switch=%s, something near=%s)"):format(
+			#found > 0 and table.concat(found, ", ") or "none",
+			table.concat({ GetBindingKey("INTERACTTARGET") }, ", "), tostring(ns.db.fishInteractCast),
+			tostring(InteractNear())))
+		ns.Print(("  Jump keys: %s (switch=%s) | mouse 3/4/5 switches: %s/%s/%s"):format(
+			table.concat({ GetBindingKey("JUMP") }, ", "), tostring(ns.db.fishJumpCast),
+			tostring(ns.db.fishMouse3Cast), tostring(ns.db.fishMouse4Cast), tostring(ns.db.fishMouse5Cast)))
 		ns.Print(("  SoftTargetInteract=%s Range=%s Arc=%s | bound: %s | combat=%s gamepad=%s mouseover=%s"):format(
 			tostring(GetCVar("SoftTargetInteract")), tostring(GetCVar("SoftTargetInteractRange")),
 			tostring(GetCVar("SoftTargetInteractArc")), #keys > 0 and table.concat(keys, " ") or "none",
@@ -1128,8 +1153,52 @@ do
 		end
 		-- The gamepad button: no mouse to be on things, so just the camera or the pole.
 		local padKey = ns.db and ns.db.fishGamepadKey
+		-- Interact key casts too (fishInteractCast): the keys bound to the game's
+		-- Interact with Target cast Fishing while nothing is near to interact
+		-- with (no soft interact pick, no target in reach). Otherwise, and while
+		-- the bobber is out, they're the game's: interact, loot the bobber.
+		wipe(interactKeys)
+		if ns.db and ns.db.fishInteractCast then
+			for _, key in ipairs({ GetBindingKey("INTERACTTARGET") }) do
+				if key ~= "BUTTON2" and key ~= padKey and not fishKeys[key] then interactKeys[key] = true end
+			end
+		end
+		local keyWant = ready and poleEquipped and ((fishCam and settled) or poleReady)
+		if next(interactKeys) then
+			local interactWant = keyWant and not InteractNear()
+			for key in pairs(interactKeys) do
+				if not IsKeyHeld(key) then SetRecast(key, interactWant and "cast") end
+			end
+		end
+		-- Jump key casts too (fishJumpCast): standing still with a pole, the keys
+		-- bound to Jump cast rather than jump (a jump on the run is left alone:
+		-- moving isn't ready). Mouse buttons 3-5 (fishMouse3Cast...) the same,
+		-- but not on something under the mouse, as right-click. With the reel
+		-- switch they reel in while the bobber is out.
+		local function OwnKey(key)
+			return key ~= "BUTTON2" and key ~= padKey and not fishKeys[key] and not interactKeys[key]
+		end
+		local extra = {}
+		if ns.db and ns.db.fishJumpCast then
+			for _, key in ipairs({ GetBindingKey("JUMP") }) do
+				if OwnKey(key) then extra[key] = "jump" end
+			end
+		end
+		for _, mouse in ipairs(EXTRA_MOUSE) do
+			if ns.db and ns.db[mouse.setting] and OwnKey(mouse.key) then extra[mouse.key] = mouse.button end
+		end
+		local mouseFree = (fishCam and not ns.Flag(UnitExists("mouseover"))) or (not fishCam and not MouseOnSomething())
+		for key, kind in pairs(extra) do
+			interactKeys[key] = true -- (kept from the clean-up below)
+			local held = IsKeyHeld(key) or (kind ~= "jump" and IsMouseButtonDown(kind))
+			if not held then
+				local free = kind == "jump" or mouseFree
+				SetRecast(key, (keyWant and free and "cast") or (reel and free and "reel"))
+			end
+		end
 		for key in pairs(bound) do
-			if key ~= "BUTTON2" and key ~= padKey and not fishKeys[key] and not IsKeyHeld(key) then
+			if key ~= "BUTTON2" and key ~= padKey and not fishKeys[key] and not interactKeys[key]
+				and not IsKeyHeld(key) then
 				SetRecast(key, false) -- (another button chosen, or off the bars now)
 			end
 		end

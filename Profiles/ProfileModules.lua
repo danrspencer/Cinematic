@@ -693,6 +693,10 @@ ns.PROFILE_MODULES = {
 		tip = "Emote Vision on: a card shows who buffed you, brought you back or emoted at you, with emotes to " ..
 			"answer in one click.",
 		apply = function(set) set("emoteVision", true) end },
+	{ key = "fishing", name = "Fishing", scope = { "Fishing" },
+		tip = "Fishing on: with a fishing pole equipped, right-click casts Fishing and reels in, and the bite " ..
+			"is easier to hear.",
+		apply = function(set) set("handleFishing", true) end },
 
 	-- The look
 	{ key = "no-letterbox", name = "No letterbox", scope = { "Letterbox/Show in" },
