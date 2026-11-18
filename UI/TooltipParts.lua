@@ -236,6 +236,30 @@ local function IsHintColor(fs)
 	return ok and green
 end
 
+-- Whether a line's colour can't be read (secret, as an enemy's lines in a
+-- dungeon on WoW Forever).
+local function ColorUnreadable(fs)
+	local ok, secret = pcall(function()
+		local r, g, b = fs:GetTextColor()
+		return issecretvalue and (issecretvalue(r) or issecretvalue(g) or issecretvalue(b)) or false
+	end)
+	return not ok or secret
+end
+
+-- Whether the mouse is over a unit frame (one with a readable unit), for a
+-- tooltip whose owner isn't that frame.
+local function FocusUnitFrame()
+	local ok, unit = pcall(function()
+		local focus = GetMouseFoci and GetMouseFoci()[1] or (GetMouseFocus and GetMouseFocus())
+		local u = focus and focus.unit
+		if type(u) ~= "string" or (issecretvalue and issecretvalue(u)) then
+			return nil
+		end
+		return u
+	end)
+	return ok and unit or nil
+end
+
 -- Whether a line's text can't be read (secret).
 local function Unreadable(fs)
 	local ok, secret = pcall(function()
@@ -340,11 +364,15 @@ local function LinesToCut(tooltip, count, unit, object)
 			cut[i] = true
 		end
 	end
-	-- A unit frame's hint whose text can't be read (an enemy target's tooltip
-	-- in a dungeon): the last line, in the hint's green.
+	-- A unit frame's hint whose text can't be read (an enemy target's or
+	-- focus's tooltip in a dungeon): the last line, in the hint's green, or
+	-- with its colour locked too (both secret there: read in game, WoW Forever
+	-- 2026-11-18, so the green check never passed and the hint stayed). A
+	-- world mouseover's tooltip has no hint: it's never cut, as the mouse is
+	-- over no unit frame then.
 	local last = Left(count)
-	if Cut("Hint") and not object and not cut[count] and last and Unreadable(last) and IsHintColor(last)
-		and FrameUnit(tooltip) then
+	if Cut("Hint") and not object and not cut[count] and last and Unreadable(last)
+		and (IsHintColor(last) or ColorUnreadable(last)) and (FrameUnit(tooltip) or FocusUnitFrame()) then
 		cut[count] = true
 	end
 	-- Blank lines left at the bottom once others are cut (the game's spacer
