@@ -19645,9 +19645,10 @@ StaticPopupDialogs.CINEMATIC_ADDON_RESET = {
 	text = L["Reset Cinematic?\n\nReset Settings: every setting goes back to how it was on install, and you start on " ..
 		"the default profile. Nothing you made is deleted: your own profiles, cameras, scripts, themes, rules, " ..
 		"wheels and backups stay, and so do flight times and what Cinematic has learned as you played.\n\n" ..
-		"Reset EVERYTHING: deletes all of it, as on a fresh install.\n\n" ..
-		"Either way the UI reloads, the game settings Cinematic changed go back to yours, and Cinematic's Edit " ..
-		"Mode layouts are deleted so your own comes back."],
+		"Your Edit Mode layouts stay too.\n\n" ..
+		"Reset EVERYTHING: deletes all of it, as on a fresh install, and Cinematic's Edit Mode layouts are " ..
+		"deleted so your own comes back.\n\n" ..
+		"Either way the UI reloads and the game settings Cinematic changed go back to yours."],
 	button1 = L["Reset EVERYTHING"], button2 = CANCEL, button3 = L["Reset Settings"],
 	OnAccept = function() StaticPopup_Show("CINEMATIC_ADDON_RESET_ALL") end,
 	OnAlt = function() ns.ResetAddon(true) end,

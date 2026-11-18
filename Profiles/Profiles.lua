@@ -567,13 +567,14 @@ end
 -- /cine profile), not in ns.SetProfile: code picking one (an import, the
 -- offline checks) goes ahead. After a player's report, 2026-11-17: removing the addon left settings
 -- and layouts they never saw it change. Once per account
--- (db.gameSettingsNoticeSeen; a reset asks again). True: go ahead now.
+-- (db.gameSettingsNoticeSeen; Reset Everything asks again, Reset Settings
+-- keeps it). True: go ahead now.
 function ns.GameSettingsAgreed(after)
 	if ns.ProfileChosen() or ns.db.gameSettingsNoticeSeen then return true end
 	StaticPopupDialogs.CINEMATIC_GAME_SETTINGS_NOTICE = {
 		text = L["To make its features work, Cinematic changes some of your game settings, like nameplates and " ..
-			"names. They go back when you log out. It may also add an Edit Mode layout, which Reset addon on " ..
-			"Cinematic's main settings page deletes, so do that before removing it."],
+			"names. They go back when you log out. It may also add an Edit Mode layout, which Reset EVERYTHING " ..
+			"(Reset addon on Cinematic's main settings page) deletes, so do that before removing it."],
 		button1 = _G.CONTINUE or L["Continue"], button2 = _G.CANCEL or L["Cancel"],
 		OnAccept = function(_, data)
 			ns.db.gameSettingsNoticeSeen = true
@@ -956,8 +957,16 @@ local RESET_PROFILE_KEEPS = {
 -- changes backed up first), and your scripts, wheels, tints, backups and what
 -- the addon learned stay. Without it (Reset Everything): all of it goes.
 function ns.ResetAddon(settingsOnly)
-	-- (Not in a fight: Edit Mode's layouts can't change then.)
-	if ns.ResetLayouts and not ns.ResetLayouts() then
+	-- (Not in a fight: Edit Mode's layouts can't change then, nor the game
+	-- settings put back.) Reset Settings leaves the layouts alone: Cinematic's
+	-- stay, as you may have moved things in them (user's ask, 2026-11-18).
+	local blocked
+	if settingsOnly then
+		blocked = InCombatLockdown()
+	else
+		blocked = ns.ResetLayouts and not ns.ResetLayouts()
+	end
+	if blocked then
 		ns.Print(L["can't reset Cinematic in a fight: try again once it's over"])
 		return
 	end
@@ -1025,6 +1034,8 @@ function ns.ResetAddon(settingsOnly)
 			local v = ns.db[k]
 			if type(v) == "table" and next(v) ~= nil then kept[k] = v end
 		end
+		-- (The first pick's game settings box, seen once: not asked again.)
+		kept.gameSettingsNoticeSeen = ns.db.gameSettingsNoticeSeen or nil
 		-- The once-only updates done (Core.lua's ...V1, ...V2 marks): the kept
 		-- profiles have them already. Without the marks they ran again at the
 		-- reload, writing their old values into the built-ins (the profile came
@@ -1037,9 +1048,16 @@ function ns.ResetAddon(settingsOnly)
 	CinematicDB = next(kept) and kept or nil
 	-- (The character's memory of play stays: places Discovered's card has
 	-- shown, talking heads heard. Not settings, and losing them replays them.)
+	-- Reset Settings: Edit Mode's side too (your own layout to go back to, the
+	-- action bars a layout of ours switched on), as its layouts stay.
 	local char = CinematicCharDB
-	CinematicCharDB = char and (char.cardSeen or char.talkingHeadSeen)
-		and { cardSeen = char.cardSeen, talkingHeadSeen = char.talkingHeadSeen } or nil
+	local keepChar = { cardSeen = true, talkingHeadSeen = true }
+	if settingsOnly then keepChar.layoutOwn, keepChar.layoutBarsOn = true, true end
+	local charKept = {}
+	if type(char) == "table" then
+		for k in pairs(keepChar) do charKept[k] = char[k] end
+	end
+	CinematicCharDB = next(charKept) and charKept or nil
 	ns.db.profiles = {} -- (so logout's ns.SaveProfile writes into nothing kept)
 	ReloadUI()
 end
