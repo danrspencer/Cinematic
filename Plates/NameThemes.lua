@@ -22,7 +22,7 @@ end
 
 -- Themes with a glow behind names (in their ornament's color), and the
 -- flat modern ones with a dark band.
--- (Glow off in every main theme for now, 2026-11-17: it read as a blob over
+-- (Glow off in every main theme since 2026-11-17: it read as a blob over
 -- names and titles. Was fel, void, glade, forge. Lantern keeps its own.)
 local GLOW = {}
 
