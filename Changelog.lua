@@ -11,6 +11,9 @@
 local _, ns = ...
 
 ns.CHANGELOG_FEATURES = {
+	{ date = "2026-11-18", page = "Style Themes", title = "Neon Coast theme",
+		text = "A new style theme: a beach city at dusk, with sunset health bars, clean modern lettering, and names " ..
+		"and damage numbers in sunset colors." },
 	{ date = "2026-11-18", page = "Card Vision", title = "New zone card",
 		text = "The first time you enter a zone like Westfall or Duskwood, its name slams onto the screen in huge " ..
 		"white capitals. Comes with the new Headline style." },
