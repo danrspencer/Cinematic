@@ -250,6 +250,7 @@ local function PrintDebugHelp()
 	if ns.isDev then print("  /cine debug cursorsize [value | cycle | back | cvars [word] | hardware 0/1/back | pic blank/small/red/tiny/off] - the game's Cursor Size setting (cursorSizePreferred): what it is, set it, step through -1 to 4 three seconds each, put yours back, list every game setting with cursor (or the word) in its name, switch the hardware cursor, or show a test picture as the cursor") end
 	print("  /cine debug cursor [log [seconds]] - Cursor Hide: on or off, its method, whether its Show in row is on here, what's holding it back, the turn speeds and camera; log: a record of it all for 30 seconds (or the seconds given), saved by a /reload")
 	print("  /cine debug vitalspage - the lowest shown widgets on the Vitals Style page, to find what stretches its scroll")
+	print("  /cine debug cardpage - the lowest shown widgets on Card Vision's Events tab, its height and scroll (logged)")
 	print("  /cine debug texreel [masks] [shots] [seconds] [from] | pause | off - play the game's full-screen effect textures as a slideshow to record, each with its number, file and name, and the time left; shots takes a screenshot of each; Space skips one, Backspace goes back")
 	print("  /cine debug gameart [off] - test Vitals Vision with the game's own low-health edge in place of the theme's art, in its colors; off for the theme's again")
 	print("  /cine debug death - print what the death camera does on real deaths (again to stop)")
@@ -793,6 +794,8 @@ local function HandleSlash(msg)
 	elseif cmd == "debug" and (arg == "cursor" or arg:match("^cursor ")) then
 		local seconds = arg:match("^cursor log%s*(%d*)")
 		if seconds then ns.CursorHideRecord(seconds) else ns.CursorHideDebug() end
+	elseif cmd == "debug" and arg == "cardpage" then
+		if ns.CardPageDepth then ns.CardPageDepth() else ns.Print("Open Card Vision's Events tab first.") end
 	elseif cmd == "debug" and arg == "vitalspage" then
 		if ns.VitalsPageDepth then ns.VitalsPageDepth() else ns.Print("Open the Vitals Style page first.") end
 	elseif cmd == "debug" and arg == "themecheck" then

@@ -4347,15 +4347,41 @@ STEPS[#STEPS + 1] = function()
 	end
 end
 
--- (Step 28.)
+-- (Step 29.)
 STEPS[#STEPS + 1] = function()
-	-- Emote Vision CineMode only (2026-11-17): its Always was the default,
-	-- saved for everyone, and outside CineMode its cards came up in everyday
-	-- play and missed buffs from players with no plate. Everyone to CineMode
-	-- once; Always asks first now. Once.
-	if not ns.db.emoteCineOnlyV1 then
+	-- The Campfire button (Quality of Life page) is part of Emote Vision's
+	-- campfire card now (2026-11-17): the card's Fire button at the cursor
+	-- (off if the button was), its reach and names the card's (same keys), its
+	-- emotes the card's list; the stand-up once Camp Benefits arrives is a card
+	-- with a Stand button. Once.
+	if not ns.db.campfireCardV1 then
+		local function Clear(t)
+			if type(t) ~= "table" then return end
+			if t.campfireSitButton == false and t.emoteVisionCampfireButton == nil then
+				t.emoteVisionCampfireButton = false
+			end
+			t.campfireSitButton, t.campfireSit, t.campfireKneel, t.campfireLie, t.campfireStandUp =
+				nil, nil, nil, nil, nil
+		end
+		Clear(ns.db)
+		for _, saved in pairs(ns.db.profiles or {}) do
+			if type(saved) == "table" then
+				Clear(saved)
+				Clear(saved.settings)
+			end
+		end
+		for _, point in pairs(ns.db.profileResetPoints or {}) do Clear(point) end
+		ns.db.campfireCardV1 = true
+	end
+end
+
+-- (Step 30.)
+STEPS[#STEPS + 1] = function()
+	-- The Stepped panel shape (deco) is gone (2026-11-18): its jagged corners read
+	-- cheap. A panel on it takes Soft, rounded and plain. Once.
+	if not ns.db.decoPanelGoneV1 then
 		local function Move(t)
-			if type(t) == "table" and t.outsideCineEmote == true then t.outsideCineEmote = false end
+			if type(t) == "table" and t.stylePanel == "deco" then t.stylePanel = "soft" end
 		end
 		Move(ns.db)
 		for _, saved in pairs(ns.db.profiles or {}) do
@@ -4365,7 +4391,45 @@ STEPS[#STEPS + 1] = function()
 			end
 		end
 		for _, point in pairs(ns.db.profileResetPoints or {}) do Move(point) end
-		ns.db.emoteCineOnlyV1 = true
+		-- (And what a theme's Undo or themeshots would put back.)
+		Move(ns.db.styleThemeKept)
+		Move(ns.db.themeShotsKept)
+		ns.db.decoPanelGoneV1 = true
+	end
+	-- Card size, every card bigger or smaller at once, is gone (2026-11-18):
+	-- each card type has its own Size on the Events tab. Yours folded into
+	-- each type's size and each card's own, so they show as big as before.
+	-- Saved profiles too. Once.
+	if not ns.db.cardScaleV1 then
+		local function Fold(t)
+			if type(t) ~= "table" then return end
+			local scale = tonumber(t.cardScale)
+			t.cardScale = nil
+			if not scale or scale <= 0 or math.abs(scale - 1) < 0.001 then return end
+			local function Sized(size)
+				return math.max(14, math.min(140, math.floor((tonumber(size) or 36) * scale + 0.5)))
+			end
+			local base = tonumber(t.cardSize) or DEFAULTS.cardSize or 36
+			for _, style in ipairs(ns.CARD_STYLES or {}) do
+				local key = ns.CardStyleKey("Size", style.id)
+				local own = t[key]
+				local size = (own ~= nil and own ~= "default") and own or style.look.Size or base
+				t[key] = Sized(size)
+			end
+			for _, event in ipairs(ns.CARD_EVENTS or {}) do
+				local key = ns.CardKey("Size", event.id)
+				if tonumber(t[key]) then t[key] = Sized(t[key]) end
+			end
+		end
+		Fold(ns.db)
+		for _, saved in pairs(ns.db.profiles or {}) do
+			if type(saved) == "table" then
+				Fold(saved)
+				Fold(saved.settings)
+			end
+		end
+		for _, point in pairs(ns.db.profileResetPoints or {}) do Fold(point) end
+		ns.db.cardScaleV1 = true
 	end
 end
 

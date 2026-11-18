@@ -38,7 +38,7 @@ local TRACK_FROM = 0.32            -- ...from this much apart (of the text's hei
 local TYPE_EACH = 0.07             -- Typewriter: seconds for each letter
 local SLAM, SLAM_IN = 0.32, 0.12   -- Slam: seconds the words take to shrink onto the screen, and to fade in
 local SLAM_FROM = 1.45             -- ...from this many times their size
-local SLAM_DRIFT = 0.04            -- ...then growing this much more till they've gone, slowly
+local SLAM_DRIFT = 0               -- ...then growing this much more till they've gone (0 since 2026-11-18: they stay still once landed; it read as growing)
 local PULSE_PEAK, PULSE_GONE = 0.12, 0.9
 local CUT_OUT = 0.25               -- a cue cut short (the fight's other edge came first) fades this fast
 local TOAST_GAP = 12               -- a card pushed under Blizzard's toast: this far under its bottom
@@ -856,7 +856,7 @@ local function Draw(cue, whole)
 	end
 	if cue.slam then
 		-- (Slam: the words shrinking onto the screen, eased out; then growing
-		-- a touch, slowly, till they've gone.)
+		-- SLAM_DRIFT more, slowly, till they've gone: none now, still once landed.)
 		local t = math.min(age / SLAM, 1)
 		open = t
 		local grow = 1 + (SLAM_FROM - 1) * (1 - t) ^ 3
@@ -1333,7 +1333,7 @@ do
 	local function Snap()
 		local width, height = UIParent:GetWidth(), UIParent:GetHeight()
 		local db = ns.GetDB()
-		mover:SetSize(width * 0.28, 70 * (tonumber(db.cardScale) or 1))
+		mover:SetSize(width * 0.28, 70)
 		mover:ClearAllPoints()
 		mover:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", (tonumber(db.cardThirdX) or DEFAULTS.cardThirdX) * width,
 			(tonumber(db.cardThirdY) or DEFAULTS.cardThirdY) * height)

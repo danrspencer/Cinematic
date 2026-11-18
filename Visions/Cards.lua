@@ -329,9 +329,9 @@ DEFAULTS.cardBarFallback_combatOut = "screen"
 DEFAULTS.cardPulse_combatIn = 0
 DEFAULTS.cardPulse_combatOut = 0
 
--- All the cards bigger or smaller (their words' size, not a bar's): for a
--- big or wide screen.
-DEFAULTS.cardScale = 1
+-- (cardScale, all the cards bigger or smaller at once, is gone since
+-- 2026-11-18: each card type has its Size on the Events tab, and the update
+-- folded yours into them, Migrations.lua's cardScaleV1.)
 -- Each row's Always (its Show in row's: ns.CINE_SHOW_SETTING), on to start with.
 for _, event in ipairs(EVENTS) do
 	DEFAULTS["cardAlways_" .. event.id] = true
@@ -458,12 +458,12 @@ end
 -- A style's look as the card drawing reads it, for the Card Types tab's preview
 -- (each made once). id: the event whose card it plays (for its icon).
 -- (A field's value as the drawing reads it: the event's icon for "event";
--- sized: times the cards' scale, for a card on the screen.)
+-- sized: times the Visions' text scale, for a card on the screen.)
 local function Drawn(field, value, id, sized)
 	if field == "Icon" and value == "event" then value = BY_ID[id] and BY_ID[id].icon or MAP end
 	if field == "Outline" then value = tonumber(value) or 0 end
 	if sized and field == "Size" then
-		value = (tonumber(value) or 36) * (tonumber(ns.db and ns.db.cardScale) or 1) * ns.VisionTextScale()
+		value = (tonumber(value) or 36) * ns.VisionTextScale()
 	end
 	return value
 end

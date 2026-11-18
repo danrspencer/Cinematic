@@ -1379,6 +1379,16 @@ end
 -- x, dy) puts control on that line, x past the line's name (LABEL_W in).
 -- Gives the list, as tall as its rows and open drawers (anchor what's below to
 -- its bottom), and list:Open(id).
+-- opts (all optional): sections = function() giving { { key, title, ids } ... }
+-- in order, read at each layout: the rows go under the section their id is in
+-- (a row moves as its section changes), each with its title, and under it
+-- header(key, frame), built once for each key on a frame headerH tall, and
+-- empty's words for a section with no rows. item.menu = function(button): a
+-- small arrow on the row, left of the +, that opens it. list:Flash(id) scrolls
+-- to that row and flashes it. collapsible = true: each section's title a bar
+-- that folds it (header, rows) open or shut, all shut to start (page search
+-- and Flash open one), count(n) giving the words after its title, onOpen(key)
+-- called as a click opens one.
 ns.ROW_CHIP = {
 	plain = { 0.18, 0.18, 0.18, 0.8, 0.8, 0.8 },     -- (back r, g, b, then text r, g, b)
 	when = { 0.08, 0.2, 0.35, 0.55, 0.8, 1 },
@@ -1390,46 +1400,199 @@ local LIST_ROW_W, LIST_ROW_H, LIST_ON_X, LIST_NAME_X, LIST_NAME_W, LIST_CHIPS_X,
 	590, 28, 16, 46, 206, 256, 300
 local LIST_DRAWER_X, LIST_LINE_H, LIST_LABEL_W = 20, 34, 62
 ns.ROW_LIST_LABEL_W = LIST_LABEL_W
-function ns.RowList(kit, parent, items)
+function ns.RowList(kit, parent, items, opts)
+	opts = opts or {}
 	local list = CreateFrame("Frame", nil, parent)
 	list:SetSize(LIST_ROW_W, LIST_ROW_H)
-	local rows, drawers, opened, titles = {}, {}, {}, {}
-	local function Layout()
-		local y, lastGroup, g, band = 0, nil, 0, 0
-		for i, item in ipairs(items) do
-			local row, drawer = rows[i], drawers[i]
-			-- (A title over each group's rows, as the emote page's moments: item.group.)
-			if item.group and item.group ~= lastGroup then
-				lastGroup, g, band = item.group, g + 1, 0
-				if g > 1 then y = y + 10 end
-				local title = titles[g] or kit.Label(list, "GameFontNormal", "")
-				titles[g] = title
-				title:SetText(item.group)
-				title:ClearAllPoints()
-				title:SetPoint("TOPLEFT", list, "TOPLEFT", 2, -y)
-				title.searchSkip = true
-				title:Show()
-				y = y + 20
+	local rows, drawers, opened, titles, headers, empties = {}, {}, {}, {}, {}, {}
+	local indexOf = {}
+	for i, item in ipairs(items) do indexOf[item.id] = i end
+	-- The rows in order, each with the title to put over it when it starts a
+	-- group (and that group's key, for its header); with sections, an empty
+	-- section as a false row.
+	local function Order()
+		local order = {}
+		if not opts.sections then
+			local lastGroup
+			for i, item in ipairs(items) do
+				local starts = item.group and item.group ~= lastGroup
+				lastGroup = item.group or lastGroup
+				order[#order + 1] = { i = i, title = starts and item.group or nil }
 			end
-			band = band + 1
-			row:ClearAllPoints()
-			row:SetPoint("TOPLEFT", list, "TOPLEFT", 0, -y)
-			row.band:SetColorTexture(1, 1, 1, band % 2 == 1 and 0.04 or 0)
-			y = y + LIST_ROW_H
-			row.toggle:SetNormalTexture(opened[item.id] and "Interface\\Buttons\\UI-MinusButton-Up"
-				or "Interface\\Buttons\\UI-PlusButton-Up")
-			-- (A closed drawer's settings still count for page search, which opens it.)
-			drawer.searchAlways = true
-			if opened[item.id] then
-				drawer:ClearAllPoints()
-				drawer:SetPoint("TOPLEFT", list, "TOPLEFT", LIST_DRAWER_X, -y)
-				drawer:Show()
-				y = y + drawer:GetHeight() + 4
-			else
-				drawer:Hide()
+			return order
+		end
+		local placed = {}
+		for _, section in ipairs(opts.sections()) do
+			local first, count = true, 0
+			for _, id in ipairs(section.ids) do
+				if indexOf[id] then count = count + 1 end
+			end
+			for _, id in ipairs(section.ids) do
+				local i = indexOf[id]
+				if i and not placed[i] then
+					placed[i] = true
+					order[#order + 1] = { i = i, title = first and section.title or nil, key = first and section.key or nil,
+						section = section.key, count = count }
+					first = false
+				end
+			end
+			if first then
+				order[#order + 1] = { i = false, title = section.title, key = section.key, section = section.key, count = 0 }
 			end
 		end
+		for i in ipairs(items) do
+			if not placed[i] then order[#order + 1] = { i = i } end
+		end
+		return order
+	end
+	local function Header(key)
+		local header = headers[key]
+		if not header then
+			header = CreateFrame("Frame", nil, list)
+			header:SetSize(LIST_ROW_W, opts.headerH or 1)
+			opts.header(key, header)
+			-- (Folded away, its settings still count for page search, which opens it.)
+			header.searchAlways = true
+			header.openSection = function() list:OpenSection(key) end
+			headers[key] = header
+		end
+		return header
+	end
+	-- (opts.collapsible: each section's title a row of its own, a click
+	-- folding it open or shut; every one shut to start. sectionOf: each row's
+	-- section, as last laid out, for Flash and search to open it.)
+	local folded, sectionOf = {}, {}
+	local Layout
+	local function Folded(key)
+		if not (opts.collapsible and key) then return false end
+		if folded[key] == nil then return true end
+		return folded[key]
+	end
+	local function Title(g)
+		local title = titles[g]
+		if title then return title end
+		if not opts.collapsible then
+			title = kit.Label(list, "GameFontNormal", "")
+			title.searchSkip = true
+			titles[g] = title
+			return title
+		end
+		title = CreateFrame("Button", nil, list)
+		title:SetSize(LIST_ROW_W, 24)
+		local back = title:CreateTexture(nil, "BACKGROUND")
+		back:SetAllPoints()
+		back:SetColorTexture(0, 0, 0, 0.35)
+		local hover = title:CreateTexture(nil, "HIGHLIGHT")
+		hover:SetAllPoints()
+		hover:SetColorTexture(1, 1, 1, 0.06)
+		title.mark = title:CreateTexture(nil, "ARTWORK")
+		title.mark:SetSize(14, 14)
+		title.mark:SetPoint("LEFT", 6, 0)
+		title.label = kit.Label(title, "GameFontNormal", "")
+		title.label:SetPoint("LEFT", 26, 0)
+		title.label.searchSkip = true
+		title.count = kit.Label(title, "GameFontDisableSmall", "")
+		title.count:SetPoint("LEFT", title.label, "RIGHT", 8, 0)
+		title.count.searchSkip = true
+		title.searchSkip = true
+		title:SetScript("OnClick", function(self)
+			folded[self.key] = not Folded(self.key)
+			Layout()
+			if not folded[self.key] and opts.onOpen then opts.onOpen(self.key) end
+		end)
+		kit.Tooltip(title, ns.L["Click to show or hide this section."])
+		titles[g] = title
+		return title
+	end
+	function Layout()
+		local y, g, band, e = 0, 0, 0, 0
+		local usedHeaders = {}
+		for _, spot in ipairs(Order()) do
+			local i = spot.i
+			local item, row, drawer = i and items[i], i and rows[i], i and drawers[i]
+			local shut = Folded(spot.section)
+			if item then sectionOf[item.id] = spot.section end
+			-- (A title over each group's rows, as the emote page's moments: item.group.)
+			if spot.title then
+				g, band = g + 1, 0
+				if g > 1 then y = y + (opts.collapsible and 4 or 10) end
+				local title = Title(g)
+				if opts.collapsible then
+					title.key = spot.key
+					title.label:SetText(spot.title)
+					title.count:SetText(opts.count and opts.count(spot.count or 0) or "")
+					title.mark:SetTexture(shut and "Interface\\Buttons\\UI-PlusButton-Up" or "Interface\\Buttons\\UI-MinusButton-Up")
+				else
+					title:SetText(spot.title)
+				end
+				title:ClearAllPoints()
+				title:SetPoint("TOPLEFT", list, "TOPLEFT", opts.collapsible and 0 or 2, -y)
+				title:Show()
+				y = y + (opts.collapsible and 28 or 20)
+				if spot.key and opts.header and not shut then
+					local header = Header(spot.key)
+					usedHeaders[header] = true
+					header:ClearAllPoints()
+					header:SetPoint("TOPLEFT", list, "TOPLEFT", 0, -y)
+					header:Show()
+					y = y + header:GetHeight() + 4
+				end
+			end
+			if not i and not shut then
+				e = e + 1
+				local note = empties[e] or kit.Label(list, "GameFontDisableSmall", "")
+				empties[e] = note
+				note:SetText(opts.empty or "")
+				note:ClearAllPoints()
+				note:SetPoint("TOPLEFT", list, "TOPLEFT", LIST_NAME_X, -y - 4)
+				note.searchSkip = true
+				note:Show()
+				y = y + 20
+			end
+			-- (A closed drawer's settings still count for page search, which opens
+			-- it; a row folded away too.)
+			if i then
+				drawer.searchAlways = true
+				row.searchAlways = true
+			end
+			if i and shut then
+				row:Hide()
+				drawer:Hide()
+			elseif i then
+				band = band + 1
+				row:ClearAllPoints()
+				row:SetPoint("TOPLEFT", list, "TOPLEFT", 0, -y)
+				row:Show()
+				row.band:SetColorTexture(1, 1, 1, band % 2 == 1 and 0.04 or 0)
+				y = y + LIST_ROW_H
+				row.toggle:SetNormalTexture(opened[item.id] and "Interface\\Buttons\\UI-MinusButton-Up"
+					or "Interface\\Buttons\\UI-PlusButton-Up")
+				if opened[item.id] then
+					drawer:ClearAllPoints()
+					drawer:SetPoint("TOPLEFT", list, "TOPLEFT", LIST_DRAWER_X, -y)
+					drawer:Show()
+					y = y + drawer:GetHeight() + 4
+				else
+					drawer:Hide()
+				end
+			end
+		end
+		for t = g + 1, #titles do titles[t]:Hide() end
+		for n = e + 1, #empties do empties[n]:Hide() end
+		for _, header in pairs(headers) do
+			if not usedHeaders[header] then header:Hide() end
+		end
 		list:SetHeight(math.max(y, 1))
+		-- (The page's scroll length fitted to it again: a section or drawer
+		-- shut left empty room at the page's bottom, 2026-11-18.)
+		local fit = ns.GRID_KIT and ns.GRID_KIT.FitContentHeight
+		if fit and list:IsVisible() then fit(parent) end
+	end
+	-- A section folded open (by its key; nothing without opts.collapsible).
+	function list:OpenSection(key)
+		if not (opts.collapsible and key) then return end
+		folded[key] = false
+		Layout()
 	end
 	local function Toggle(id)
 		opened[id] = not opened[id]
@@ -1470,7 +1633,8 @@ function ns.RowList(kit, parent, items)
 		name:SetWordWrap(false)
 		name.searchSkip = true
 		local chips = Place(CreateFrame("Frame", nil, row), LIST_CHIPS_X)
-		chips:SetSize(LIST_CHIPS_W, 16)
+		local chipsW = item.menu and LIST_CHIPS_W - 24 or LIST_CHIPS_W
+		chips:SetSize(chipsW, 16)
 		chips.searchSkip = true
 		chips.pageSwitch = false
 		chips.pool = {}
@@ -1491,7 +1655,7 @@ function ns.RowList(kit, parent, items)
 				end
 				chip.text:SetText(each[1])
 				local width = math.ceil(chip.text:GetStringWidth()) + 10
-				if x + width > LIST_CHIPS_W then break end
+				if x + width > chipsW then break end
 				local color = each[2] or ns.ROW_CHIP.plain
 				chip.back:SetColorTexture(color[1], color[2], color[3], 0.9)
 				chip.text:SetTextColor(color[4], color[5], color[6])
@@ -1523,6 +1687,16 @@ function ns.RowList(kit, parent, items)
 		row.toggle:SetHighlightTexture("Interface\\Buttons\\UI-Common-MouseHilight", "ADD")
 		row.toggle:SetScript("OnClick", function() Toggle(item.id) end)
 		kit.Tooltip(row.toggle, ns.L["Show or hide this row's settings."])
+		if item.menu then
+			local arrow = Place(CreateFrame("Button", nil, row), LIST_ROW_W - 46)
+			arrow:SetSize(18, 18)
+			arrow:SetNormalTexture("Interface\\Buttons\\Arrow-Down-Up")
+			arrow:SetPushedTexture("Interface\\Buttons\\Arrow-Down-Down")
+			arrow:SetHighlightTexture("Interface\\Buttons\\UI-Common-MouseHilight", "ADD")
+			arrow:SetScript("OnClick", function(self) item.menu(self) end)
+			kit.Tooltip(arrow, item.menuTip)
+			row.menuArrow = arrow
+		end
 
 		-- Its drawer: a line each, its name at the left.
 		local lines = item.lines or {}
@@ -1531,9 +1705,15 @@ function ns.RowList(kit, parent, items)
 		drawer:Hide()
 		drawer.openSection = function()
 			opened[item.id] = true
+			if sectionOf[item.id] then folded[sectionOf[item.id]] = false end
 			Layout()
 		end
 		drawers[i] = drawer
+		-- (Its tick found by page search: its section folded open first.)
+		rows[i].openSection = function()
+			if sectionOf[item.id] then folded[sectionOf[item.id]] = false end
+			Layout()
+		end
 		local back = drawer:CreateTexture(nil, "BACKGROUND")
 		back:SetAllPoints()
 		back:SetColorTexture(0, 0, 0, 0.3)
@@ -1553,7 +1733,44 @@ function ns.RowList(kit, parent, items)
 	kit.AddControl(list)
 	function list:Open(id)
 		opened[id] = true
+		if sectionOf[id] then folded[sectionOf[id]] = false end
 		Layout()
+	end
+	-- (As the Scenes page's ns.ShowSceneRow: scrolled to, then a gold flash
+	-- fading; its new section folded open.)
+	function list:Flash(id)
+		local row = rows[indexOf[id] or 0]
+		if not row then return end
+		Layout()
+		if sectionOf[id] and Folded(sectionOf[id]) then
+			folded[sectionOf[id]] = false
+			Layout()
+		end
+		if not row.flash then
+			row.flash = row:CreateTexture(nil, "BACKGROUND", nil, -7)
+			row.flash:SetAllPoints()
+			row.flash:SetColorTexture(1, 0.82, 0, 0.3)
+			local fade = row.flash:CreateAnimationGroup()
+			local alpha = fade:CreateAnimation("Alpha")
+			alpha:SetFromAlpha(1)
+			alpha:SetToAlpha(0)
+			alpha:SetStartDelay(0.4)
+			alpha:SetDuration(1.4)
+			fade:SetScript("OnFinished", function() row.flash:Hide() end)
+			row.flash.fade = fade
+		end
+		C_Timer.After(0.05, function() -- (once the page has fit its height)
+			local content = list:GetParent()
+			local scroll = content and content:GetParent()
+			local top, rowTop = content and content:GetTop(), row:GetTop()
+			if scroll and scroll.SetVerticalScroll and top and rowTop then
+				local range = scroll:GetVerticalScrollRange() or 0
+				scroll:SetVerticalScroll(math.max(0, math.min(range, top - rowTop - 120)))
+			end
+			row.flash:Show()
+			row.flash.fade:Stop()
+			row.flash.fade:Play()
+		end)
 	end
 	Layout()
 	return list

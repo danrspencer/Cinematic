@@ -17,11 +17,12 @@ local NOTE_W = 440
 -- tab shows.
 local CARD = { now = "combatIn", style = "third" }
 
--- The page's tabs, picked 1 or 2. title: the page's, put under them.
+-- The page's tabs, picked 1 to 3. title: the page's, put under them.
 local function CardTabs(content, title, picked)
 	local panel = ns.PageTabs(content, {
 		{ L["Events"], "Card Vision", L["Each event's card on or off, and where it shows."] },
 		{ L["Card Types"], "Card Styles", L["The card types the cards start from: change one for every card using it."] },
+		{ L["Settings"], "Card General", L["Settings for every card."] },
 	}, picked)
 	title:ClearAllPoints()
 	title:SetPoint("TOPLEFT", panel, "BOTTOMLEFT", 8, -14)
@@ -153,23 +154,169 @@ end
 -- it is on your screen, a sliver in the preview): up to CARD_ZOOM times, till
 -- it's half the preview's width or height, as near its middle as the stage
 -- still covering the preview allows.
+-- opts: { zoom, share } in place of those two; loop = true: the card plays
+-- again after it's gone; zoomBy(): the card's size next to how it comes, so
+-- the zoom fits the card as it comes and a bigger one shows bigger;
+-- noCaption = true: no "Preview" in its corner.
 local CARD_ZOOM, CARD_SHARE = 2, 0.5
-function ns.MakeCardPreview(parent, width, fixedH, which, lookOf)
+function ns.MakeCardPreview(parent, width, fixedH, which, lookOf, opts)
+	opts = opts or {}
+	local maxZoom, share = opts.zoom or CARD_ZOOM, opts.share or CARD_SHARE
 	local preview = CreateFrame("Frame", nil, parent)
 	preview:SetSize(width, fixedH or 270)
 	if preview.SetClipsChildren then preview:SetClipsChildren(true) end
-	local stage = CreateFrame("Frame", nil, preview)
+	-- (The lens: the preview's window onto the stage, clipping it. The stage
+	-- zoomed is the screen's size times the zoom, nearly all of it cut off;
+	-- but a scroll frame's length counts what's cut off too (the Events tab's
+	-- jumbotron scrolled 600 past its last row, and let go as it moved to the
+	-- hub's corner, the length coming back with it, 2026-11-18). So on a
+	-- scrolling page the lens is the scroll frame's, not in what it scrolls,
+	-- laid over the preview, its level, alpha and showing kept to the
+	-- preview's; elsewhere (held in the hub's corner, popped out) the
+	-- preview's own.)
+	local lens = CreateFrame("Frame", nil, preview)
+	lens:SetAllPoints(preview)
+	if lens.SetClipsChildren then lens:SetClipsChildren(true) end
+	local stage = CreateFrame("Frame", nil, lens)
 	stage:SetAllPoints()
-	stage:SetFrameLevel(preview:GetFrameLevel() + 2)
-	local caption = preview:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-	caption:SetText(L["Preview"])
-	caption:SetPoint("TOPLEFT", 6, -5)
-	caption.searchSkip = true
+	local function ScrollOf()
+		local each = preview:GetParent()
+		while each and each ~= UIParent do
+			if each.GetObjectType and each:GetObjectType() == "ScrollFrame" then return each end
+			each = each:GetParent()
+		end
+	end
+	-- (A scroll frame cuts off only what it scrolls: the lens goes on a frame
+	-- over its view that cuts off the rest, one for each scroll frame.)
+	local function ViewClip(scroll)
+		local clip = scroll.cardLensClip
+		if not clip then
+			clip = CreateFrame("Frame", nil, scroll)
+			clip:SetAllPoints(scroll)
+			if clip.SetClipsChildren then clip:SetClipsChildren(true) end
+			clip.searchSkip = true
+			scroll.cardLensClip = clip
+		end
+		return clip
+	end
+	-- (The screen's own buttons: its zoomSkip children (arrows, lock, pop out,
+	-- zoom, Test), a jumbotron's (holder.prevArrow: GeneralStyle.lua) or the
+	-- preview's own, listed on it once it has some, as they move off it.)
+	local holder
+	local function Buttons()
+		holder = holder or (preview:GetParent().prevArrow and preview:GetParent() or preview)
+		if not holder.lensButtons or #holder.lensButtons == 0 then
+			holder.lensButtons = {}
+			for _, child in ipairs({ holder:GetChildren() }) do
+				if child.zoomSkip and child ~= preview then table.insert(holder.lensButtons, child) end
+			end
+		end
+		return holder.lensButtons
+	end
+	local function Host()
+		local scroll = ScrollOf()
+		local host = scroll and ViewClip(scroll) or preview
+		if lens:GetParent() ~= host then
+			lens:SetParent(host)
+			lens:ClearAllPoints()
+			lens:SetAllPoints(preview)
+		end
+		if host ~= preview then
+			-- (A clipping frame's children draw at its own level among its
+			-- siblings, whatever theirs: the clip made at the scroll frame's
+			-- level drew the card under the page, the preview's scene over it,
+			-- 2026-11-18. So the clip is kept over the preview; it takes no
+			-- clicks.)
+			local over = preview:GetFrameLevel() + 2
+			if host:GetFrameLevel() < over then host:SetFrameLevel(over) end
+			if host:GetFrameStrata() ~= preview:GetFrameStrata() then host:SetFrameStrata(preview:GetFrameStrata()) end
+			lens:SetFrameStrata(preview:GetFrameStrata())
+			lens:SetFrameLevel(preview:GetFrameLevel() + 2)
+			lens:SetAlpha(preview:GetEffectiveAlpha() / math.max(host:GetEffectiveAlpha(), 0.01))
+			-- (The screen's own buttons (a jumbotron's arrows, lock, pop out and
+			-- zoom: zoomSkip) kept over the card: what a scroll frame scrolls
+			-- draws as one layer, under the clip, so raising them there did
+			-- nothing. They go on the clip too while the lens is on it, over
+			-- it, shown and faded with their screen.)
+			local top = host:GetFrameLevel()
+			local function Deepest(frame, depth)
+				local level = frame:GetFrameLevel()
+				if level > top then top = level end
+				if depth < 4 then
+					for _, child in ipairs({ frame:GetChildren() }) do Deepest(child, depth + 1) end
+				end
+			end
+			Deepest(lens, 0)
+			local buttons = Buttons()
+			if #buttons > 0 then
+				local carrier = holder.lensCarrier
+				if not carrier then
+					carrier = CreateFrame("Frame", nil, host)
+					carrier:SetAllPoints(holder)
+					holder.lensCarrier = carrier
+				end
+				if carrier:GetParent() ~= host then
+					carrier:SetParent(host)
+					carrier:ClearAllPoints()
+					carrier:SetAllPoints(holder)
+				end
+				carrier:SetFrameStrata(preview:GetFrameStrata())
+				if carrier:GetFrameLevel() <= top then carrier:SetFrameLevel(top + 1) end
+				carrier:SetAlpha(holder:GetEffectiveAlpha() / math.max(host:GetEffectiveAlpha(), 0.01))
+				carrier:SetShown(holder:IsVisible())
+				for _, button in ipairs(buttons) do
+					if button:GetParent() ~= carrier then button:SetParent(carrier) end
+					if button:GetFrameLevel() <= carrier:GetFrameLevel() then button:SetFrameLevel(carrier:GetFrameLevel() + 5) end
+				end
+			end
+		else
+			lens:SetFrameLevel(preview:GetFrameLevel() + 2)
+			lens:SetAlpha(1)
+			-- (Its screen's buttons back on it, over the card.)
+			for _, button in ipairs(Buttons()) do
+				if button:GetParent() ~= holder then button:SetParent(holder) end
+				button:SetFrameLevel(holder:GetFrameLevel() + 30)
+			end
+			if holder.lensCarrier then holder.lensCarrier:Hide() end
+		end
+		lens:SetShown(preview:IsVisible())
+	end
+	-- (/cine debug cardpage: where the lens is and how it's drawn.)
+	function preview.LensState()
+		local host = lens:GetParent()
+		local function Box(f)
+			local l, b, w, h = f:GetRect()
+			return l and ("%.0f,%.0f %.0fx%.0f"):format(l, b, w, h) or "none"
+		end
+		return ("lens on %s lvl %d/%s, shown %s visible %s alpha %.2f; host lvl %d/%s; preview lvl %d/%s %s; stage %s x%.2f, %d parts")
+			:format(host == preview and "preview" or "scroll clip", lens:GetFrameLevel(), lens:GetFrameStrata(),
+			tostring(lens:IsShown()), tostring(lens:IsVisible()), lens:GetEffectiveAlpha(), host:GetFrameLevel(),
+			host:GetFrameStrata(), preview:GetFrameLevel(), preview:GetFrameStrata(), Box(preview), Box(stage),
+			stage:GetScale(), select("#", stage:GetChildren()) + select("#", stage:GetRegions()))
+	end
+	-- (Kept up each frame while the preview shows: a jumbotron fades its
+	-- screens in and out, and the sticky preview moves to the hub and back.)
+	local watch = CreateFrame("Frame", nil, preview)
+	watch:SetSize(1, 1)
+	watch:SetScript("OnShow", Host)
+	watch:SetScript("OnHide", function()
+		lens:Hide()
+		-- (Only with the whole screen: the next card's lens shows them again.)
+		if holder and holder.lensCarrier and not holder:IsVisible() then holder.lensCarrier:Hide() end
+	end)
+	ns.SetOnUpdate(watch, Host)
+	if not opts.noCaption then
+		local caption = preview:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+		caption:SetText(L["Preview"])
+		caption:SetPoint("TOPLEFT", 6, -5)
+		caption.searchSkip = true
+	end
 	function preview:Refresh()
 		if not self:IsVisible() then
 			return -- (the kit refreshes every page's controls)
 		end
 		if ns.FitStylePreview(self) then return end -- (resized: it played from there)
+		Host() -- (the lens in place and shown first: the card's measured on it)
 		local screenW, screenH = UIParent:GetWidth(), UIParent:GetHeight()
 		local previewH = fixedH or math.floor(width * screenH / math.max(screenW, 1) + 0.5)
 		self:SetHeight(previewH)
@@ -183,11 +330,26 @@ function ns.MakeCardPreview(parent, width, fixedH, which, lookOf)
 		stage:ClearAllPoints()
 		stage:SetAllPoints()
 		local W = self:GetWidth()
-		ns.PlayCard(stage, look, W, previewH, previewH / math.max(screenH, 1), card)
+		-- (opts.loop: played again a moment after it's gone, while it's on
+		-- screen, so it's there whenever you look; one cut short by a new
+		-- play doesn't call this.)
+		local after
+		if opts.loop then
+			after = function()
+				C_Timer.After(1.2, function()
+					if self:IsVisible() then self:Refresh() end
+				end)
+			end
+		end
+		ns.PlayCard(stage, look, W, previewH, previewH / math.max(screenH, 1), card, after)
 		local l, r, b, t = CardBounds(stage)
 		if not l then return end
-		local f = math.max(1, math.min(CARD_ZOOM, W * CARD_SHARE / math.max(r - l, 1),
-			previewH * CARD_SHARE / math.max(t - b, 1)))
+		local fit = math.min(W * share / math.max(r - l, 1), previewH * share / math.max(t - b, 1))
+		-- (zoomBy's share is the card's size next to how it comes: the fit
+		-- times it is the fit of the card as it comes, so a card made bigger
+		-- shows bigger. Capped after.)
+		if opts.zoomBy then fit = fit * math.max(opts.zoomBy(), 0.05) end
+		local f = math.max(1, math.min(maxZoom, fit))
 		if f <= 1.01 then return end
 		-- (Its top left, down from the preview's, so the card's middle comes as
 		-- near the preview's as can be with no edge of the stage showing.)
@@ -675,12 +837,6 @@ local function BaseName(id)
 	return style and L[style.name] or L["Lower third"]
 end
 
--- The style an event uses, in a few words: the one it starts from, and how
--- many settings it has of its own ("Combat +2").
-local function StyleSummary(id)
-	local names = OwnNames(id)
-	return BaseName(id) .. (#names > 0 and (" +" .. #names) or "")
-end
 
 -- The styles an event can start from, for a dropdown: the ready-made ones,
 -- and for a subzone its zone's first.
@@ -781,10 +937,56 @@ local function TestStops(button, Now)
 	end)
 end
 
--- Events: a row for each event, as the Scenes page's: its tick, name and
--- chips (the style it uses, and where it shows when not everywhere), its
--- settings in a drawer under it (When: its Show in row; Style: the one it
--- starts from, Style, Sounds and Test).
+-- The Events tab's sections, one for each card type (2026-11-18): the nine
+-- families always, in this order, each with a line on where and how it
+-- shows; the other ready-made types only while an event uses them.
+local TYPE_ORDER = { "danger", "respite", "ticker", "milestone", "place", "rare", "triumph", "victory", "death" }
+local TYPE_LINES = {
+	danger = "The top bar's middle, in red: a fight or a threat.",
+	respite = "The top bar's middle, calm: a fight is over.",
+	ticker = "The top bar's left end, small: news as you play.",
+	milestone = "The middle of the screen, in gold: a big moment.",
+	place = "The lower third, pale gold: where you are.",
+	rare = "The middle of the screen, in blue: a rare.",
+	triumph = "The top bar's middle, in gold: a win on the way.",
+	victory = "Across the screen, in gold: a big win.",
+	death = "Across the screen, in red: you died.",
+}
+local function TypeSections()
+	local users, sections, listed = {}, {}, {}
+	for _, event in ipairs(ns.CardEventsGrouped()) do
+		local base = ns.CardBase(event.id)
+		users[base] = users[base] or {}
+		table.insert(users[base], event.id)
+	end
+	local function Add(id, always)
+		local style = ns.CARD_STYLE_BY_ID[id]
+		if listed[id] or not style or not (always or users[id]) then return end
+		listed[id] = true
+		sections[#sections + 1] = { key = id, title = L[style.name], ids = users[id] or {} }
+	end
+	for _, id in ipairs(TYPE_ORDER) do Add(id, true) end
+	for _, style in ipairs(ns.CARD_STYLES) do Add(style.id) end
+	return sections
+end
+-- The card a type's preview and Test play: the first event using it, else
+-- the first that starts in it, else the zone's.
+local function TypeSample(style)
+	local users = ns.CardStyleUsers(style)
+	if users[1] then return users[1].id end
+	for _, event in ipairs(ns.CARD_EVENTS) do
+		if ns.DEFAULTS["cardBase_" .. event.id] == style then return event.id end
+	end
+	return "zone"
+end
+
+-- Events: a section for each card type (TypeSections), its preview zoomed in
+-- on the card, then a row for each event using it, as the Scenes page's: its
+-- tick, name and chips (its own settings over the type, and where it shows
+-- when not everywhere), an arrow to move it to another type, and its settings
+-- in a drawer under it (When: its Show in row; Style: the one it starts from,
+-- Style, Sounds and Test).
+local LIST_W_RIGHT = 500 -- (a type's line's width, in its section)
 function ns.CreateCardsPanel(kit)
 	local canvas, content = kit.CreateScrollPage()
 	local title = kit.Label(content, "GameFontNormalLarge", L["Card Vision"])
@@ -798,15 +1000,21 @@ function ns.CreateCardsPanel(kit)
 		local stack = kit.Stack(switch, "check")
 		kit.RecordKey(content, "cardThirdX") -- (the lower third's spot, moved in Edit Mode: Reset puts it back)
 		kit.RecordKey(content, "cardThirdY")
-		local cardScale = stack:Add(kit.Slider(content, "cardScale", L["Card size"], 50, 200, 5, "%d%%", 100),
-			"slider")
-		kit.Tooltip(cardScale, L["Makes every card bigger or smaller."])
-		stack:Add(kit.Check(content, "cardClearChat", L["Move cards clear of the chat"],
-			L["Moves lower third cards up so they don't cover the chat."]), "check")
 		stack:Header(content, L["Events"])
 		local grid = ns.GRID_KIT
 		local columns = ns.FRAME_COLUMNS
 		local items = {}
+		local rowList
+		-- (An event given another type: its row moves to that section, scrolled
+		-- to and flashed.)
+		local function Moved(id)
+			kit.Refresh()
+			if rowList then rowList:Flash(id) end
+		end
+		local function SetBase(id, value)
+			ns.GetDB()["cardBase_" .. id] = value
+			Moved(id)
+		end
 		for i, event in ipairs(ns.CardEventsGrouped()) do
 			local id, key, alwaysKey = event.id, "card:" .. event.id, "cardAlways_" .. event.id
 			local opts = event.fight and FIGHT_OPTS or STORY_OPTS
@@ -826,10 +1034,25 @@ function ns.CreateCardsPanel(kit)
 				dim = function()
 					return not (ns.GetDB()[event.on] and (not event.needs or ns.GetDB()[ns.CARD_BY_ID[event.needs].on]))
 				end,
+				menuTip = L["Moves this card to another card type."],
+				menu = MenuUtil and MenuUtil.CreateContextMenu and function(button)
+					ns.ContextMenu(button, function(_, root)
+						for _, choice in ipairs(StyleChoices(id)) do
+							root:CreateRadio(choice.text, function() return ns.GetDB()["cardBase_" .. id] == choice.value end,
+								function() SetBase(id, choice.value) end)
+						end
+					end)
+				end or nil,
 				chips = function()
 					local db = ns.GetDB()
 					local own = #OwnNames(id)
-					local list = { { StyleSummary(id), own > 0 and ns.ROW_CHIP.gold or ns.ROW_CHIP.plain } }
+					-- (Its type is its section's title; a chip only for a follower, and
+					-- for its own settings over the type.)
+					local list = {}
+					if event.parent and (db["cardBase_" .. id] or "follow") == "follow" then
+						list[#list + 1] = { BaseName(id), ns.ROW_CHIP.plain }
+					end
+					if own > 0 then list[#list + 1] = { L["+%d own"]:format(own), ns.ROW_CHIP.gold } end
 					local rule = db.frameRules and db.frameRules[key]
 					if type(rule) == "string" and rule:find("%S") then
 						list[#list + 1] = { rule, ns.ROW_CHIP.when }
@@ -858,7 +1081,8 @@ function ns.CreateCardsPanel(kit)
 						}))
 					end },
 					{ name = L["Style"], build = function(drawer, At)
-						local base = kit.Dropdown(drawer, BaseField(id), function() return StyleChoices(id) end, 170)
+						local base = kit.Dropdown(drawer, BaseField(id), function() return StyleChoices(id) end, 170,
+							function() Moved(id) end)
 						if base then
 							At(base)
 							kit.Tooltip(base, L["The card type this card starts from."])
@@ -891,12 +1115,136 @@ function ns.CreateCardsPanel(kit)
 				},
 			}
 		end
-		local list = ns.RowList(kit, content, items)
-		stack:Add(list, "label")
-		stack:Note(content, L["A card type with +2 has two settings of its own over the one it starts from (the Style tab " ..
-			"marks them with gold dots)."], NOTE_W)
+		-- The jumbotron at the top (2026-11-18, in place of a small preview in
+		-- each type's section): one big screen playing each card type's card in
+		-- turn, as the Style hub's General page's (GeneralStyle.lua's
+		-- ns.MakeStyleJumbotron), its arrows and lock with it; opening a type's
+		-- section, or changing its Size, turns it to that type. Zoomed in on the
+		-- card as it comes (up to 6 times, till it's 70% of the screen), so a
+		-- Size changed shows bigger or smaller.
+		local jumbo
+		local function SizeShare(style)
+			local shipped = tonumber(ns.CardStyleRaw(style, "Size", true)) or 36
+			return (tonumber(ns.CardStyleRaw(style, "Size")) or shipped) / math.max(shipped, 1)
+		end
+		local cells, screens = {}, {}
+		for _, section in ipairs(TypeSections()) do
+			local style = section.key
+			cells[#cells + 1] = { section.title, key = style, sized = true, make = function(parent, width, height)
+				screens[#screens + 1] = ns.MakeCardPreview(parent, width, height, function() return TypeSample(style) end,
+					function() return ns.CardStyleLook(style, TypeSample(style)) end,
+					{ zoom = 6, share = 0.7, loop = true, zoomBy = function() return SizeShare(style) end, noCaption = true })
+				return screens[#screens]
+			end }
+		end
+		jumbo = ns.MakeStyleJumbotron(kit, content, stack, 480, cells)
+		jumbo.pageSwitch = false
+		local function Show(style)
+			if not jumbo then return end
+			jumbo:Jump(style)
+			jumbo:Refresh()
+		end
+		-- Each type's header: its line, saying where it shows; Test, Edit and
+		-- its Size (the Card Types tab's Size, 2026-11-18: in place of the one
+		-- Card size for all).
+		local HEADER_H = 100
+		local function TypeHeader(style, header)
+			local sizeKey = ns.CardStyleKey("Size", style)
+			kit.RecordKey(content, sizeKey)
+			local line = kit.Label(header, "GameFontHighlightSmall", L[TYPE_LINES[style] or "A ready-made card type."])
+			line:SetPoint("TOPLEFT", header, "TOPLEFT", 16, -4)
+			line:SetWidth(LIST_W_RIGHT)
+			line:SetJustifyH("LEFT")
+			line.searchSkip = true
+			local test = ns.PanelButton(header)
+			test:SetSize(70, 22)
+			test:SetText(L["Test"])
+			test:SetPoint("TOPLEFT", line, "BOTTOMLEFT", 0, -10)
+			kit.Tooltip(test, L["Plays a card of this type on your screen."])
+			test:SetScript("OnClick", function()
+				Show(style)
+				local id = TypeSample(style)
+				local card = ns.CardSample(id)
+				if id == "zone" and not card.name then card.name = GetRealZoneText and GetRealZoneText() or "Darkshore" end
+				card.look = ns.CardStyleLook(style, id)
+				ns.Cards.Fire(id, card, true)
+			end)
+			local edit = ns.PanelButton(header)
+			edit:SetSize(130, 22)
+			edit:SetText(L["Edit card type"])
+			edit:SetPoint("LEFT", test, "RIGHT", 6, 0)
+			kit.Tooltip(edit, L["Opens the Card Types tab with this type picked."])
+			edit:SetScript("OnClick", function()
+				CARD.style = style
+				-- (In the Style hub since 2026-11-17: ShowHubPage stays in this one.)
+				ns.OpenOptions("Card Styles")
+			end)
+			local size = kit.Slider(header, {
+				key = sizeKey, -- (its id for /cine find: the type's Size)
+				get = function() return tonumber(ns.CardStyleRaw(style, "Size")) or 36 end,
+				set = function(value) ns.GetDB()[sizeKey] = value end,
+			}, L["Size"], 14, 140, 1, "%d", 1, function() Show(style) end)
+			size:SetPoint("TOPLEFT", test, "BOTTOMLEFT", 2, -24)
+			kit.Tooltip(size, L["How big the words are on every card of this type."])
+		end
+		rowList = ns.RowList(kit, content, items, { sections = TypeSections, header = TypeHeader, headerH = HEADER_H,
+			empty = L["No events use this card type."], collapsible = true, onOpen = Show,
+			count = function(n) return n == 1 and L["1 card"] or L["%d cards"]:format(n) end })
+		stack:Add(rowList, "label")
+		stack:Note(content, L["+2 own: the card has two settings of its own over its card type (the Style tab marks " ..
+			"them with gold dots). The arrow on a row moves it to another card type."], NOTE_W)
 
 		canvas:SetScript("OnShow", kit.PageShown(kit.Refresh, content))
+
+		-- (/cine debug cardpage: its height, the scroll, and the lowest shown
+		-- widgets, to find what stretches its scroll: 600 past its last row in
+		-- the game, the sticky jumbotron let go as it fitted again, 2026-11-18.
+		-- Printed and logged.)
+		function ns.CardPageDepth()
+			local top = content:GetTop()
+			if not top then ns.Print("Card Vision: not laid out yet (open its Events tab first)") return end
+			local function Say(text)
+				ns.Print(text)
+				ns.Log("cardpage", text)
+			end
+			local found = {}
+			local function Consider(object, path)
+				if object.IsShown and object:IsShown() and object.GetBottom and object:GetBottom() then
+					found[#found + 1] = { top - object:GetBottom(), path, object }
+				end
+			end
+			local function Named(object)
+				local text = object.GetText and object:GetText()
+				return (object:GetName() or object:GetObjectType()) .. (text and (" '" .. tostring(text):sub(1, 30) .. "'") or "")
+			end
+			for c, child in ipairs({ content:GetChildren() }) do
+				local name = c .. " " .. Named(child)
+				Consider(child, name)
+				if child:IsShown() then
+					for g, grand in ipairs({ child:GetChildren() }) do Consider(grand, name .. " > " .. g .. " " .. Named(grand)) end
+					for _, region in ipairs({ child:GetRegions() }) do Consider(region, name .. " > " .. Named(region)) end
+				end
+			end
+			for _, region in ipairs({ content:GetRegions() }) do Consider(region, Named(region)) end
+			table.sort(found, function(a, b) return a[1] > b[1] end)
+			local scroll = content:GetParent()
+			local pin = jumbo and jumbo.pin
+			Say(("Card Vision: content %.0f tall, list %.0f, scroll %s of %s, view %s; jumbotron on %s %.0fx%.0f, held %s; %d shown")
+				:format(content:GetHeight(), rowList:GetHeight(),
+				scroll.GetVerticalScroll and ("%.0f"):format(scroll:GetVerticalScroll()) or "-",
+				scroll.GetVerticalScrollRange and ("%.0f"):format(scroll:GetVerticalScrollRange()) or "-",
+				scroll.GetHeight and ("%.0f"):format(scroll:GetHeight()) or "-",
+				jumbo and jumbo:GetParent() == content and "page" or "hub", jumbo and jumbo:GetWidth() or 0,
+				jumbo and jumbo:GetHeight() or 0, tostring(pin and pin.on), #found))
+			for _, screen in ipairs(screens) do
+				if screen:IsShown() then Say("  screen: " .. screen.LensState()) end
+			end
+			for i = 1, math.min(10, #found) do
+				local f = found[i]
+				local w, h = f[3]:GetSize()
+				Say(("  %.0f down: %s (%.0f x %.0f)"):format(f[1], f[2], w or 0, h or 0))
+			end
+		end
 	end
 	ns.LazyPageBody(canvas, "Card Vision", MakeBody)
 	canvas:Hide()
@@ -1043,7 +1391,7 @@ function ns.CreateCardStylePanel(kit)
 		kit.Tooltip(edit, L["Opens this card type on the Card Types tab: a change there is for every card using it."])
 		edit:SetScript("OnClick", function()
 			CARD.style = ns.CardBase(CARD.now)
-			ns.ShowHubPage("Card Styles")
+			ns.OpenOptions("Card Styles") -- (another hub's: ShowHubPage stays in this one)
 		end)
 		-- How many it has of its own (each with a gold dot beside it), and all back.
 		OwnLine(kit, content, edit, 12, 110, function() return #OwnNames(CARD.now) end, function(count)
@@ -1524,6 +1872,23 @@ function ns.CreateCardSettingsPanel(kit)
 	canvas:SetScript("OnShow", kit.PageShown(kit.Refresh, content))
 	canvas:Hide()
 	kit.RegisterSubpage(canvas, "Card Settings", L["Card Vision"])
+end
+
+-- Settings (2026-11-18): what's for every card, not one event or type: Move
+-- cards clear of the chat (from the Events tab's top).
+function ns.CreateCardGeneralPanel(kit)
+	local canvas, content = kit.CreateScrollPage()
+	local title = kit.Label(content, "GameFontNormalLarge", L["Card Vision"])
+	CardTabs(content, title, 3)
+	local intro = kit.PageIntro(content, title, L["Settings for every card."])
+	local switch = kit.PageSwitch(content, "cards", L["Enable Page"],
+		L["Turns all cards on or off."], intro)
+	local stack = kit.Stack(switch, "check")
+	stack:Add(kit.Check(content, "cardClearChat", L["Move cards clear of the chat"],
+		L["Moves lower third cards up so they don't cover the chat."]), "check")
+	canvas:SetScript("OnShow", kit.PageShown(kit.Refresh, content))
+	canvas:Hide()
+	kit.RegisterSubpage(canvas, "Card General", L["Card Vision"])
 end
 
 -- Sounds: an event's sounds (opened from its row).
