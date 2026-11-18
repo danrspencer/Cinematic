@@ -786,7 +786,9 @@ STEPS[#STEPS + 1] = function()
 		tooltipShowEnemy = true, tooltipShowFriendly = false, tooltipShowGather = true,
 		tooltipShowQuest = true, tooltipShowInCombat = true, tooltipCombatShowEnemy = true,
 		tooltipCombatShowFriendly = false, tooltipCombatShowElse = false, tooltipReveal = true,
-		tooltipRevealDelay = 1, tooltipWarmTime = 5, tooltipFadeTime = 0.5,
+		tooltipRevealDelay = 1, tooltipWarmTime = 5,
+		-- (Not tooltipFadeTime: a setting again, its being there ran all of
+		-- this at every login and took it, 2026-11-18.)
 	}
 	local function TooltipKindsToHide(t)
 		local any = false
@@ -2539,8 +2541,12 @@ STEPS[#STEPS + 1] = function()
 	for _, row in ipairs(plateRows) do
 		local prefix, open, key = row[1], row[2], row[3]
 		local head = prefix .. "In"
-		if ns.db[head .. "Cities" .. key] then ns.db[open .. key] = true end
-		ns.db[head .. "Cities" .. key] = nil
+		-- (Only till Cities came back as its own column, below: after that
+		-- it's a setting again, and this took it at every login, 2026-11-18.)
+		if not ns.db.citiesApartPlatesV1 then
+			if ns.db[head .. "Cities" .. key] then ns.db[open .. key] = true end
+			ns.db[head .. "Cities" .. key] = nil
+		end
 		if ns.db[head .. "BGs" .. key] == nil and ns.db[head .. "PvP" .. key] ~= nil then
 			ns.db[head .. "BGs" .. key] = ns.db[head .. "PvP" .. key]
 		end
@@ -3647,7 +3653,9 @@ STEPS[#STEPS + 1] = function()
 		"thirdsFraming", "thirdsStrength", "thirdsInterval", "thirdsHold",
 		"taxiThirdsInterval", "taxiThirdsStrength", "taxiThirds", "walkThirds", "runThirds",
 		"idleThirds", "cozyThirds", "vistaThirds", "deathThirds",
-		"delay", "startCinematic", "startCinematicOnReload", "startDelay", "timeOfDayChange", "timeOfDaySound",
+		-- (Not timeOfDayChange: the Time of day card's row since, taken at
+		-- every login till 2026-11-18.)
+		"delay", "startCinematic", "startCinematicOnReload", "startDelay", "timeOfDaySound",
 		"revealOnTarget", "ignoreDeadTarget", "unitBarTexture",
 		"plateHurtMobs", "plateHurtNPCs", "plateHurtOwn", "plateHurtOther", "plateHurtPets",
 		"plateHurtTotems",

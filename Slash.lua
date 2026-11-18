@@ -218,6 +218,7 @@ local function PrintDebugHelp()
 	print("  /cine debug followtest - one run checking the Follow HUD with each root, across two reloads (dev copy; again to stop)")
 	print("  /cine debug previewwatch [off] - records how the Style previews move and catches one covering a page's rows, with a screenshot (dev copy)")
 	print("  /cine debug sweep [pages] [shots] [visual [N]] [seed S] [page words] - one run opening every page and tab (layout checked) and changing every setting and putting it back (pages: layout only; shots: a screenshot of each; visual N: N settings at random with screenshots) (dev copy)")
+	print("  /cine prerelease [quick|guided|skip] - one run before a release: selftest, smoke checks and the settings sweep (quick: pages only), or guided steps you do; compared with the last run (dev copy)")
 	print("  /cine debug resettest [logout] - one run checking what a reset puts back (layouts, plate settings), or with logout the plate settings going back at logout, across a reload (dev copy)")
 	print("  /cine debug euiswing - one run recording why EllesmereUI's swing timer stays hidden in CineMode (dev copy; again to stop)")
 	print("  /cine debug euicd - one run recording why an icon goes missing from EllesmereUI's cooldown bar (dev copy; again to stop)")
@@ -528,6 +529,10 @@ local function HandleSlash(msg)
 	elseif cmd == "debug" and (arg == "previewwatch" or arg == "previewwatch off") then
 		-- (Dev copy: records how the Style previews move, catching one over a page's rows, PreviewWatch.lua.)
 		if ns.PreviewWatch then ns.PreviewWatch(arg:match("off")) else ns.Print("/cine debug previewwatch is in the dev copy only.") end
+	elseif cmd == "prerelease" or (cmd == "debug" and (arg == "prerelease" or arg:find("^prerelease "))) then
+		-- (Dev copy: one run before a release, selftest + smoke checks + sweep, Dev/Prerelease.lua.)
+		if ns.Prerelease then ns.Prerelease(cmd == "prerelease" and arg or arg:match("^prerelease%s*(.*)$"))
+		else ns.Print("/cine prerelease is in the dev copy only.") end
 	elseif cmd == "debug" and (arg == "sweep" or arg:find("^sweep ")) then
 		-- (Dev copy: one run through every settings page and setting, Dev/Sweep.lua.)
 		if ns.SettingsSweep then ns.SettingsSweep(arg:match("^sweep%s*(.*)$"))

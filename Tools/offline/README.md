@@ -16,5 +16,11 @@ looks for `lua5.1`. (Don't put a `lua5.1` stand-in on PATH: Windows asks what to
   It also compares each built-in profile's settings, retired ones too, with `profile-settings-<client>.txt`, so a
   change to a module or a choice shows in every profile it reaches. When that change is meant, run it with
   `--update` to save the new settings, and commit the files with the change.
+- `sweep.lua`: `lua5.1 Tools/offline/sweep.lua <forever|retail>` runs the settings sweep (Dev/Sweep.lua) on the
+  stand-in: every page opened, every setting changed and put back. The stand-in's stubs make FAIL lines of their own,
+  so they're compared with `sweep-baseline-<client>.txt` and only new ones fail it; `--update` saves this run's as
+  the baseline. `SWEEP_DEBUG=1` prints one raw line per erroring code line.
+- `Tools/prerelease.py` (one folder up) runs these checks and the rest side by side before a release, and reads the
+  in-game `/cine prerelease` results from the saved settings.
 - `export.lua`: `lua5.1 Tools/offline/export.lua > profiles.json` writes the options pages and their sections, the
   modules and the built-in profiles as JSON, for mock-ups and the like.

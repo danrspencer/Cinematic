@@ -162,6 +162,10 @@ local function CVars()
 	return list
 end
 
+-- (The game settings now, the ones the game doesn't change as you play:
+-- /cine prerelease compares them before and after its checks.)
+ns.SweepCVars = CVars
+
 local function Layout()
 	local ok, name = pcall(function() return ns.ActiveLayoutName and ns.ActiveLayoutName() end)
 	return ok and name or nil
@@ -1045,7 +1049,12 @@ function Finish(done)
 		ns.PadTestBox(("Sweep %s: %d fail, %d warn. /reload, then say \"check log\"."):format(
 			done and "done" or "stopped", this.fails, this.warns), "", 1, 0.82, 0)
 		ns.Print(("settings sweep %s: %d fail, %d warn"):format(done and "done" or "stopped", this.fails, this.warns))
-		C_Timer.After(15, function() if not run then ns.PadTestBoxHide() end end)
+		if this.onDone then
+			-- (/cine prerelease: it goes on with its own box.)
+			ns.Guard(this.onDone, done, this.fails, this.warns)
+		else
+			C_Timer.After(15, function() if not run then ns.PadTestBoxHide() end end)
+		end
 	end
 	run = nil -- (no more steps or notes while it waits)
 	if InCombatLockdown() then
@@ -1061,7 +1070,9 @@ function Finish(done)
 	end
 end
 
-function ns.SettingsSweep(args)
+-- onDone(finished, fails, warns): called when it ends (/cine prerelease).
+-- Returns true when it started.
+function ns.SettingsSweep(args, onDone)
 	if run then
 		Finish(false)
 		return
@@ -1093,7 +1104,7 @@ function ns.SettingsSweep(args)
 	seed = math.floor(seed or (time() % 100000))
 	CinematicDB.sweepLog = {}
 	run = { at = GetTime(), queue = {}, index = 1, nextAt = 0, fails = 0, warns = 0, done = 0, opened = 0,
-		pages = {}, visual = visual, seed = seed, rnd = Random(seed), looks = 0, shots = shots }
+		pages = {}, visual = visual, seed = seed, rnd = Random(seed), looks = 0, shots = shots, onDone = onDone }
 	Watch(true)
 	local pages, controls
 	local ok, err = pcall(function() pages, controls = Collect(filter) end)
@@ -1151,4 +1162,7 @@ function ns.SettingsSweep(args)
 			:format(#pages, pagesOnly and " (layout only)" or (", " .. #controls .. " settings"), math.ceil(secs)))
 	end
 	ns.SetOnUpdate(driver, Tick)
+	return true
 end
+-- (Running now: /cine prerelease waits on it.)
+function ns.SettingsSweepRunning() return run ~= nil end

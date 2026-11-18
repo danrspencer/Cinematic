@@ -1,0 +1,158 @@
+FAIL - | - | -: Lua error: Profiles/Layouts.lua:#: attempt to compare table with number
+FAIL aggroMarkAlpha | Nameplate Style | Aggro on you Opacity: Lua error setting #: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL aggroMarkBob | Nameplate Style | Aggro on you Moving: Lua error putting it back: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL aggroMarkBob | Nameplate Style | Aggro on you Moving: Lua error setting false: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL aggroMarkColor | Nameplate Style | Aggro on you Color: Lua error putting it back: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL aggroMarkColor | Nameplate Style | Aggro on you Color: Lua error setting: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL aggroMarkOpacity | Nameplate Style | Aggro on you Opacity: Lua error setting #: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL aggroMarkPlateHeight | Nameplate Style | Aggro on you Height: Lua error setting #: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL aggroMarkPlateWidth | Nameplate Style | Aggro on you Width: Lua error setting #: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL aggroMarkShow | Nameplate Style | Aggro on you: Lua error putting it back: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL aggroMarkShow | Nameplate Style | Aggro on you: Lua error setting false: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL aggroMarkSize | Nameplate Style | Aggro on you Size: Lua error setting #: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL aggroMarkStyle | Nameplate Style | Aggro on you Style: Lua error putting it back: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL aggroMarkStyle | Nameplate Style | Aggro on you Style: Lua error setting: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL cards | Card Vision | Enable Page: Lua error putting it back: Style/StylePages.lua:#: stack overflow
+FAIL cards | Card Vision | Enable Page: Lua error setting true: Style/StylePages.lua:#: stack overflow
+FAIL cards | Card Vision | Enable Page: Lua error setting true: Visions/CardsPage.lua:#: stack overflow
+FAIL focusMarkAlpha | Nameplate Style | Focus Opacity: Lua error setting #: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL focusMarkBob | Nameplate Style | Focus Moving: Lua error putting it back: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL focusMarkBob | Nameplate Style | Focus Moving: Lua error setting true: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL focusMarkColor | Nameplate Style | Focus Color: Lua error putting it back: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL focusMarkColor | Nameplate Style | Focus Color: Lua error setting: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL focusMarkOpacity | Nameplate Style | Focus Opacity: Lua error setting #: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL focusMarkPlateHeight | Nameplate Style | Focus Height: Lua error setting #: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL focusMarkPlateWidth | Nameplate Style | Focus Width: Lua error setting #: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL focusMarkShow | Nameplate Style | Focus: Lua error putting it back: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL focusMarkShow | Nameplate Style | Focus: Lua error setting false: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL focusMarkSize | Nameplate Style | Focus Size: Lua error setting #: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL focusMarkStyle | Nameplate Style | Focus Style: Lua error putting it back: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL focusMarkStyle | Nameplate Style | Focus Style: Lua error setting: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL handleBubbles | Chat Bubbles | Enable Page: Lua error setting true: UI/Bubbles.lua:#: attempt to call method 'GetChildren' (a nil value)
+FAIL handlePlateStyle | Nameplate Style | Enable Page: Lua error putting it back: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL handlePlateStyle | Nameplate Style | Enable Page: Lua error setting true: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL mouseoverMarkAlpha | Nameplate Style | Mouseover Opacity: Lua error setting #: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL mouseoverMarkBob | Nameplate Style | Mouseover Moving: Lua error putting it back: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL mouseoverMarkBob | Nameplate Style | Mouseover Moving: Lua error setting true: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL mouseoverMarkColor | Nameplate Style | Mouseover Color: Lua error putting it back: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL mouseoverMarkColor | Nameplate Style | Mouseover Color: Lua error setting: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL mouseoverMarkOpacity | Nameplate Style | Mouseover Opacity: Lua error setting #: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL mouseoverMarkPlateHeight | Nameplate Style | Mouseover Height: Lua error setting #: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL mouseoverMarkPlateWidth | Nameplate Style | Mouseover Width: Lua error setting #: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL mouseoverMarkShow | Nameplate Style | Mouseover: Lua error putting it back: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL mouseoverMarkShow | Nameplate Style | Mouseover: Lua error setting false: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL mouseoverMarkSize | Nameplate Style | Mouseover Size: Lua error setting #: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL mouseoverMarkStyle | Nameplate Style | Mouseover Style: Lua error putting it back: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL mouseoverMarkStyle | Nameplate Style | Mouseover Style: Lua error setting: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL othersMarkAlpha | Nameplate Style | Default Opacity: Lua error setting #: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL othersMarkBob | Nameplate Style | Default Moving: Lua error putting it back: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL othersMarkBob | Nameplate Style | Default Moving: Lua error setting true: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL othersMarkColor | Nameplate Style | Default Color: Lua error putting it back: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL othersMarkColor | Nameplate Style | Default Color: Lua error setting: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL othersMarkOpacity | Nameplate Style | Default Opacity: Lua error setting #: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL othersMarkPlateHeight | Nameplate Style | Default Height: Lua error setting #: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL othersMarkPlateWidth | Nameplate Style | Default Width: Lua error setting #: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL othersMarkShow | Nameplate Style | Default: Lua error putting it back: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL othersMarkShow | Nameplate Style | Default: Lua error setting false: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL othersMarkSize | Nameplate Style | Default Size: Lua error setting #: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL othersMarkStyle | Nameplate Style | Default Style: Lua error putting it back: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL othersMarkStyle | Nameplate Style | Default Style: Lua error setting: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL page | Nameplate Style | (page): Lua error opening part Nameplate Marks: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL plateMarks | Nameplate Style | Enable Page: Lua error putting it back: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL plateMarks | Nameplate Style | Enable Page: Lua error setting false: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL plateNameStyle | Name Style | Enable Page: Lua error setting true: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL plateStyleHeight | Nameplate Style | Height: Lua error setting #: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL plateStyleWidth | Nameplate Style | Width: Lua error setting #: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL profilerPage | Profiler | Enable Page: Lua error setting true: ProfilerPage.lua:#: 'for' limit must be a number
+FAIL questTalkCardSame | Dialogue | Quest card on the bubble's background: Lua error putting it back: Visions/QuestTalk.lua:#: attempt to compare number with table
+FAIL questTalkCardSame | Dialogue | Quest card on the bubble's background: Lua error setting false: Visions/QuestTalk.lua:#: attempt to compare number with table
+FAIL questTalkCardSide | Dialogue | : Lua error putting it back: Visions/QuestTalk.lua:#: attempt to compare number with table
+FAIL questTalkCardSide | Dialogue | : Lua error setting: Visions/QuestTalk.lua:#: attempt to compare number with table
+FAIL questTalkGameButton | Dialogue | "Show the game's window" link: Lua error putting it back: Visions/QuestTalk.lua:#: attempt to compare number with table
+FAIL questTalkGameButton | Dialogue | "Show the game's window" link: Lua error setting false: Visions/QuestTalk.lua:#: attempt to compare number with table
+FAIL questTalkKeys | Dialogue | Number keys and Space: Lua error putting it back: Visions/QuestTalk.lua:#: attempt to compare number with table
+FAIL questTalkKeys | Dialogue | Number keys and Space: Lua error setting false: Visions/QuestTalk.lua:#: attempt to compare number with table
+FAIL questTalkLines | Dialogue | Bubble height: Lua error setting #: Visions/QuestTalk.lua:#: attempt to compare number with table
+FAIL questTalkListY | Dialogue | List height on the screen: Lua error setting #: Visions/QuestTalk.lua:#: attempt to compare number with table
+FAIL questTalkPortrait | Dialogue | The NPC's portrait: Lua error putting it back: Visions/QuestTalk.lua:#: attempt to compare number with table
+FAIL questTalkPortrait | Dialogue | The NPC's portrait: Lua error setting false: Visions/QuestTalk.lua:#: attempt to compare number with table
+FAIL questTalkScale | Dialogue | Scale: Lua error setting #: Visions/QuestTalk.lua:#: attempt to compare number with table
+FAIL questTalkStyled | Dialogue | Enable Page: Lua error putting it back: Visions/QuestTalk.lua:#: attempt to compare number with table
+FAIL questTalkStyled | Dialogue | Enable Page: Lua error setting false: Visions/QuestTalk.lua:#: attempt to compare number with table
+FAIL row:aggroWhen | Nameplate Style | Always: Lua error putting it back: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL row:aggroWhen | Nameplate Style | Always: Lua error setting false: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL row:aggroWhen | Nameplate Style | ticks: Enemy targeted, ...: Lua error putting it back: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL row:aggroWhen | Nameplate Style | ticks: Enemy targeted, ...: Lua error setting #: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL row:aggroWhen | Nameplate Style | ticks: In combat, ...: Lua error putting it back: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL row:aggroWhen | Nameplate Style | ticks: In combat, ...: Lua error setting #: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL row:aggroWhen | Nameplate Style | ticks: Open world, ...: Lua error putting it back: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL row:aggroWhen | Nameplate Style | ticks: Open world, ...: Lua error setting #: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL row:focusWhen | Nameplate Style | Always: Lua error putting it back: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL row:focusWhen | Nameplate Style | Always: Lua error setting false: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL row:focusWhen | Nameplate Style | ticks: Enemy targeted, ...: Lua error putting it back: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL row:focusWhen | Nameplate Style | ticks: Enemy targeted, ...: Lua error setting #: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL row:focusWhen | Nameplate Style | ticks: In combat, ...: Lua error putting it back: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL row:focusWhen | Nameplate Style | ticks: In combat, ...: Lua error setting #: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL row:focusWhen | Nameplate Style | ticks: Open world, ...: Lua error putting it back: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL row:focusWhen | Nameplate Style | ticks: Open world, ...: Lua error setting #: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL row:mouseoverWhen | Nameplate Style | Always: Lua error putting it back: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL row:mouseoverWhen | Nameplate Style | Always: Lua error setting false: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL row:mouseoverWhen | Nameplate Style | ticks: Enemy targeted, ...: Lua error putting it back: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL row:mouseoverWhen | Nameplate Style | ticks: Enemy targeted, ...: Lua error setting #: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL row:mouseoverWhen | Nameplate Style | ticks: In combat, ...: Lua error putting it back: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL row:mouseoverWhen | Nameplate Style | ticks: In combat, ...: Lua error setting #: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL row:mouseoverWhen | Nameplate Style | ticks: Open world, ...: Lua error putting it back: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL row:mouseoverWhen | Nameplate Style | ticks: Open world, ...: Lua error setting #: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL row:othersWhen | Nameplate Style | Always: Lua error putting it back: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL row:othersWhen | Nameplate Style | Always: Lua error setting false: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL row:othersWhen | Nameplate Style | ticks: Enemy targeted, ...: Lua error putting it back: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL row:othersWhen | Nameplate Style | ticks: Enemy targeted, ...: Lua error setting #: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL row:othersWhen | Nameplate Style | ticks: In combat, ...: Lua error putting it back: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL row:othersWhen | Nameplate Style | ticks: In combat, ...: Lua error setting #: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL row:othersWhen | Nameplate Style | ticks: Open world, ...: Lua error putting it back: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL row:othersWhen | Nameplate Style | ticks: Open world, ...: Lua error setting #: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL row:platemark:show | Nameplate Style | Always: Lua error putting it back: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL row:platemark:show | Nameplate Style | Always: Lua error setting true: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL row:platemark:show | Nameplate Style | ticks: BGs & arenas, ...: Lua error putting it back: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL row:platemark:show | Nameplate Style | ticks: BGs & arenas, ...: Lua error setting #: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL row:platemark:show | Nameplate Style | ticks: Enemy targeted, ...: Lua error putting it back: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL row:platemark:show | Nameplate Style | ticks: Enemy targeted, ...: Lua error setting #: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL row:platemark:show | Nameplate Style | ticks: In combat, ...: Lua error putting it back: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL row:platemark:show | Nameplate Style | ticks: In combat, ...: Lua error setting #: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL row:targetWhen | Nameplate Style | Always: Lua error putting it back: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL row:targetWhen | Nameplate Style | Always: Lua error setting false: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL row:targetWhen | Nameplate Style | ticks: Enemy targeted, ...: Lua error putting it back: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL row:targetWhen | Nameplate Style | ticks: Enemy targeted, ...: Lua error setting #: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL row:targetWhen | Nameplate Style | ticks: In combat, ...: Lua error putting it back: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL row:targetWhen | Nameplate Style | ticks: In combat, ...: Lua error setting #: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL row:targetWhen | Nameplate Style | ticks: Open world, ...: Lua error putting it back: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL row:targetWhen | Nameplate Style | ticks: Open world, ...: Lua error setting #: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL targetArrowAlpha | Nameplate Style | Target Opacity: Lua error setting #: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL targetArrowBareY | Nameplate Style | without a plate: Lua error setting #: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL targetArrowBob | Nameplate Style | Target Moving: Lua error putting it back: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL targetArrowBob | Nameplate Style | Target Moving: Lua error setting false: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL targetArrowColor | Nameplate Style | Target Color: Lua error putting it back: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL targetArrowColor | Nameplate Style | Target Color: Lua error setting: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL targetArrowOpacity | Nameplate Style | Target Opacity: Lua error setting #: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL targetArrowPlateHeight | Nameplate Style | Target Height: Lua error setting #: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL targetArrowPlateWidth | Nameplate Style | Target Width: Lua error setting #: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL targetArrowShow | Nameplate Style | Target: Lua error putting it back: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL targetArrowShow | Nameplate Style | Target: Lua error setting false: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL targetArrowSize | Nameplate Style | Target Size: Lua error setting #: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL targetArrowStyle | Nameplate Style | Target Style: Lua error putting it back: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL targetArrowStyle | Nameplate Style | Target Style: Lua error setting: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL targetArrowY | Nameplate Style | Raise with a plate: Lua error setting #: Plates/PlateParts.lua:#: attempt to perform arithmetic on local 'size' (a nil value)
+FAIL visionStyleBorder | Visions Style | : Lua error putting it back: Visions/QuestTalk.lua:#: attempt to compare number with table
+FAIL visionStyleBorder | Visions Style | : Lua error setting: Visions/QuestTalk.lua:#: attempt to compare number with table
+FAIL visionStyleBorderSize | Visions Style | Thickness: Lua error setting #: Visions/QuestTalk.lua:#: attempt to compare number with table
+FAIL visionStyleFont | Visions Style | : Lua error putting it back: Visions/QuestTalk.lua:#: attempt to compare number with table
+FAIL visionStyleFont | Visions Style | : Lua error setting: Visions/QuestTalk.lua:#: attempt to compare number with table
+FAIL visionStyleOutline | Visions Style | : Lua error putting it back: Visions/QuestTalk.lua:#: attempt to compare number with table
+FAIL visionStyleOutline | Visions Style | : Lua error setting #: Visions/QuestTalk.lua:#: attempt to compare number with table
+FAIL visionStyleShadow | Visions Style | Interface Style/The game's/Shadow/None: Lua error putting it back: Visions/QuestTalk.lua:#: attempt to compare number with table
+FAIL visionStyleShadow | Visions Style | Interface Style/The game's/Shadow/None: Lua error setting #: Visions/QuestTalk.lua:#: attempt to compare number with table
+FAIL visionStyleTextSize | Visions Style | Text size: Lua error setting #: Visions/QuestTalk.lua:#: attempt to compare number with table
+FAIL visionStyleTexture | Visions Style | : Lua error putting it back: Visions/QuestTalk.lua:#: attempt to compare number with table
+FAIL visionStyleTexture | Visions Style | : Lua error setting: Visions/QuestTalk.lua:#: attempt to compare number with table
+FAIL visionsStyle | Visions Style | Enable Page: Lua error putting it back: Visions/QuestTalk.lua:#: attempt to compare number with table
+FAIL visionsStyle | Visions Style | Enable Page: Lua error setting false: Visions/QuestTalk.lua:#: attempt to compare number with table

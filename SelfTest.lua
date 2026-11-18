@@ -236,7 +236,7 @@ function ns.SelfTest()
 	local client, interface, build = Client()
 	ns.db.selfTest = ns.db.selfTest or {}
 	local last = ns.db.selfTest[client] and ns.db.selfTest[client].results or {}
-	local results, counts, shown = {}, { ok = 0, failed = 0, changed = 0, skipped = 0, error = 0 }, {}
+	local results, counts, shown, problems = {}, { ok = 0, failed = 0, changed = 0, skipped = 0, error = 0 }, {}, {}
 
 	for _, check in ipairs(CHECKS) do
 		local key = check.group .. ": " .. check.name
@@ -268,6 +268,7 @@ function ns.SelfTest()
 		local line = ("%s: %s%s"):format(key, value or "-", note and (" (" .. note .. ")") or "")
 		ns.Log("selftest", status .. "  " .. line)
 		if status ~= "ok" and status ~= "skipped" then
+			problems[key] = status .. ": " .. ((value or "-") .. (note and (" (" .. note .. ")") or ""))
 			shown[#shown + 1] = ("  |cff%s%s|r %s"):format(COLORS[status], status, line)
 		end
 	end
@@ -281,4 +282,6 @@ function ns.SelfTest()
 	if counts.skipped > 0 then
 		print("  skipped checks need a situation (a target with its nameplate, out of combat): run it again then")
 	end
+	-- (For /cine prerelease: the counts and each line that isn't ok, by its key.)
+	return counts, problems
 end

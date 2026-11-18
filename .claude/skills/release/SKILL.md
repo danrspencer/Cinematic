@@ -41,17 +41,32 @@ Three modes, picked by the first word after /release:
    files are already covered by its folder entries. New `Textures/*.tga` need
    only a /reload in game. Anything that looks like scratch output, ask.
 
-3. **Checks**, on every changed or new `.lua`:
-   - `"$USERPROFILE/bin/luacheck.exe" .` (baseline is 0 warnings).
-   - `python ~/bin/luacompile.py <files...>` (Lua 5.1 load: 200-local cap,
-     syntax). luacheck misses these.
+3. **Checks.** All the offline ones in one go (about 2 minutes; run it in
+   the background, stdin from /dev/null):
+   `python -I Tools/prerelease.py < /dev/null`
+   It runs luacheck, the Lua 5.1 compile of every file, check-toc, the full
+   offline check, the settings sweep on the stand-in game (both clients,
+   against `Tools/offline/sweep-baseline-<client>.txt`), and every
+   once-only update on the user's own saved settings; then it reads the last
+   in-game `/cine prerelease` runs from the saved settings. It must end
+   `prerelease: all passed`. Each FAIL line is a finding.
+   - **In game**: before the review, ask the user to run `/cine prerelease`
+     on Forever and on retail (each in its own code block), /reload, and say
+     "check log"; then `python -I Tools/prerelease.py --game` shows each
+     run's NEW FAIL lines (passed last time, fail now), and
+     `CinematicDB.prereleaseLog` in `CinematicDev.lua` has the whole run.
+     A run older than this release's changes doesn't count; if the user
+     skips it, say so in the review.
+   - A NEW line in an offline sweep: a setting erroring on the stand-in. A
+     real error is a finding; stand-in noise (a stub's nil) is saved with
+     `python -I Tools/offline/run.py Tools/offline/sweep.lua <client> --update`
+     in phase 2, with the user's OK.
    - Lines starting with `(`: check the line before isn't an expression
-     statement (WoW's Lua 5.1 "ambiguous syntax").
-   - Offline checks: the **full run**. This is the only place it runs:
-     GitHub's Checks workflow is manual-only since 2026-11-11 (its package
-     downloads failed too often). Stdin from /dev/null (a few minutes; run it in the background):
+     statement (WoW's Lua 5.1 "ambiguous syntax"). The script doesn't.
+   - The offline check alone, if needed:
      `python -I Tools/offline/run.py Tools/offline/check.lua < /dev/null`
-     It must end `profile modules: 0 problems`. Never the per-client runs
+     (GitHub's Checks workflow is manual-only since 2026-11-11, so this is
+     the only place it runs.) It must end `profile modules: 0 problems`. Never the per-client runs
      (`check.lua forever Cinematic.toc`) instead: they skip the comparison
      against `Tools/offline/profile-settings-<client>.txt`, which is how four
      releases in a row (v2.0.23-v2.0.26) went out red on GitHub.

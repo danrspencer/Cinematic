@@ -232,6 +232,7 @@ Dev\ReadyAnyTimeTest.lua
 Dev\FollowHudTest.lua
 Dev\ResetTest.lua
 Dev\Sweep.lua
+Dev\Prerelease.lua
 Dev\PreviewWatch.lua
 Dev\EuiSwingTest.lua
 Dev\EuiCooldownTest.lua
