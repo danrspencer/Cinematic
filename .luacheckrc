@@ -242,6 +242,8 @@ read_globals = {
 	"MoveViewDownStop",
 	"MoveViewLeftStart",
 	"MoveViewLeftStop",
+	"MoveViewRightStart",
+	"MoveViewRightStop",
 	"MoveViewUpStart",
 	"MoveViewUpStop",
 	"NO",

@@ -407,7 +407,14 @@ local SIGHT_CLEAR = 0.2 -- seconds (the fade itself: the page's Fade time)
 -- had no name at all: a plate takes the game's away. Further out, and in
 -- fights, a name stays up dimmed or not. [plate] = near, and when to ask again.
 -- (On ns: this file's main chunk is near Lua's 200 locals.)
-ns.plateSightNear = { is = {}, at = {} }
+-- left: [guid] = when its plate went with its name showing. Its plate back
+-- within RETURN seconds (the camera turned away and back, 2026-11-18: vendors'
+-- titles blank ~0.5 s on each return) shows its name at once, no wait for
+-- clear sight: it was in sight a moment ago. (Each a table here, not a local:
+-- this file is near Lua's cap of locals.)
+-- back: [plate] = true while its name showed at once that way (for
+-- /cine debug npcnames).
+ns.plateSightNear = { is = {}, at = {}, left = {}, back = {}, RETURN = 1.5, pruneAt = 0 }
 
 -- A name's size (times the plate's) and height at the camera's distance
 -- now; retail's, as the page says. (band: unused, see above.)
@@ -3193,7 +3200,17 @@ watcher:SetScript("OnEvent", function(_, event, unit)
 	-- (A new plate's name starts hidden: see sight.)
 	if event == "NAME_PLATE_UNIT_ADDED" then
 		sight[plate] = not ns.namesTestNoSight and 0 or nil -- (the names test's no sight check step: shown)
-		ns.plateSightNear.is[plate], ns.plateSightNear.at[plate] = nil, nil -- (a new unit: asked again)
+		local near = ns.plateSightNear
+		near.is[plate], near.at[plate], near.back[plate] = nil, nil, nil -- (a new unit: asked again)
+		-- (Back from a moment out of view with its name showing: shown at once.)
+		local okGuid, guid = pcall(UnitGUID, unit)
+		if okGuid and type(guid) == "string" and Known(guid) and near.left[guid] then
+			if GetTime() - near.left[guid] <= near.RETURN then
+				sight[plate] = nil
+				near.back[plate] = true
+			end
+			near.left[guid] = nil
+		end
 		if _G.QuestieLoader then
 			ns.FindQuestieIconSoon(plate)
 		end
@@ -3205,6 +3222,18 @@ watcher:SetScript("OnEvent", function(_, event, unit)
 		end
 	end
 	if event == "NAME_PLATE_UNIT_REMOVED" then
+		-- (Its name showing as it goes: kept a moment for its return. See plateSightNear.)
+		local near, now = ns.plateSightNear, GetTime()
+		if nameShare[plate] and (sight[plate] or 1) > 0.5 then
+			local okGuid, guid = pcall(UnitGUID, unit)
+			if okGuid and type(guid) == "string" and Known(guid) then near.left[guid] = now end
+		end
+		if now >= near.pruneAt then
+			near.pruneAt = now + 10
+			for guid, at in pairs(near.left) do
+				if now - at > near.RETURN then near.left[guid] = nil end
+			end
+		end
 		plateClass[plate], plateRole[plate] = nil, nil
 		kindParts.kinds[plate] = nil
 		bodyShare[plate], nameShare[plate], markShare[plate], textShare[plate] = nil, nil, nil, nil

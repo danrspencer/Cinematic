@@ -511,6 +511,13 @@ function ns.PlateLine2Box(unitFrame)
 	return { width = width * scale, height = height * scale, nameHidden = (textShares[plate] or 1) < 0.5 }
 end
 
+-- The plate's second line (title or guild) while it shows, for the dev
+-- copy's /cine debug npcnames (NpcNamesTest.lua).
+function ns.PlateLine2Text(plate)
+	local line = plate and lines[plate]
+	return line and line:IsShown() and line or nil
+end
+
 local function Refresh(plate)
 	local share = shares[plate] or 0
 	local unitFrame = plate.UnitFrame
