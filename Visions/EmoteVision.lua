@@ -1961,6 +1961,15 @@ local function Buffed(aura, refresh)
 		class = ClassOf(guid, unit), icon = Plain(aura.icon), line = L["gave you %s"]:format(name) })
 end
 
+-- Whether the Buff card could show here now. The game names a buff's caster
+-- only when they're a unit of yours (target, mouseover, group, a plate), so
+-- CineMode keeps friendly players' plates on for it (FriendWants).
+function ns.EmoteBuffWantsPlates()
+	if not (ns.db and ns.Setting("emoteVision") and DB().emoteVisionBuffs) then return false end
+	local ok, here = pcall(ns.RowOnNow, RowKey("Buff"), nil, true)
+	return ok and here and true or false
+end
+
 -- Old clients' auras with no list of the new ones: what's new since last time.
 local seenAuras
 local function ScanOld(silent)
@@ -2841,7 +2850,10 @@ function ns.EmoteVisionDebug()
 	ns.Print(("  aura events %d, last: %s; buffs' end times known %d"):format(auraSeen.events,
 		auraSeen.last or "none", known))
 	ns.Print("  last buff: " .. (lastBuff or "none yet") ..
-		(" (refreshes tracked: %s)"):format(C_UnitAuras and C_UnitAuras.GetAuraDataByAuraInstanceID and "yes" or "no, old client"))
+		(" (refreshes tracked: %s; friendly player plates %s, held for buffs %s)"):format(
+			C_UnitAuras and C_UnitAuras.GetAuraDataByAuraInstanceID and "yes" or "no, old client",
+			tostring(GetCVar("nameplateShowFriendlyPlayers")),
+			tostring(ns.plates and ns.plates.friendWants and ns.plates.friendWants.buffCard)))
 	if lastEcho then
 		ns.Print(("  last button: %s %d s ago; test %s; words only %s; %s; own line caught: %s%s"):format(
 			lastEcho.token, GetTime() - lastEcho.at, tostring(lastEcho.test), tostring(lastEcho.words),

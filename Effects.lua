@@ -4560,6 +4560,9 @@ function ns.plates.FriendWants(suffix)
 		wants.targetNames = ns.plates.FriendRowWanted(rows.target, true, suffix)
 		wants.players = ns.plates.FriendRowWanted(rows.players, true, suffix)
 		wants.groupRows = ns.plates.FriendRowWanted(rows.group, true, suffix)
+		-- (Emote Vision's Buff card: a stranger's buff names its caster only
+		-- through a unit, a plate for most.)
+		wants.buffCard = ns.EmoteBuffWantsPlates and ns.EmoteBuffWantsPlates() or false
 	end
 	-- (Your target a friendly player, or a friendly pet, guardian, totem or minion.)
 	local friendTarget = wants.target and Ask(UnitExists, "target") and Ask(UnitIsFriend, "player", "target")
@@ -4570,7 +4573,8 @@ function ns.plates.FriendWants(suffix)
 	wants.shownMinions = wants.minions or (friendTarget and not player and Ask(UnitPlayerControlled, "target") and true)
 		or false
 	-- (Your group's rows only while you're in one; their bars need the plates.)
-	wants.shownPlayers = wants.players or (wants.groupRows and IsInGroup()) or (playerTarget and true) or false
+	wants.shownPlayers = wants.players or (wants.groupRows and IsInGroup()) or (playerTarget and true)
+		or wants.buffCard or false
 	return wants.shownBody, wants.shownMinions, wants.shownPlayers
 end
 
