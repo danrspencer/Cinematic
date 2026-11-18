@@ -1772,6 +1772,9 @@ local function HandleSlash(msg)
 	elseif cmd == "debug" and arg == "friendplates" then
 		-- (Dev copy: friendly players' plates held only where rows want them, FriendPlatesTest.lua.)
 		if ns.FriendPlatesTest then ns.FriendPlatesTest() else ns.Print("/cine debug friendplates is in the dev copy only.") end
+	elseif cmd == "debug" and arg == "npcnames" then
+		-- (Dev copy: NPC names with no Service NPCs match flashing up as you turn, NpcNamesTest.lua.)
+		if ns.NpcNamesTest then ns.NpcNamesTest() else ns.Print("/cine debug npcnames is in the dev copy only.") end
 	elseif cmd == "debug" and arg:find("^anytime") then
 		-- (Dev copy: one run checking the Cooldown Manager's When ready > Out of fights, ReadyAnyTimeTest.lua.)
 		if ns.ReadyAnyTimeTest then ns.ReadyAnyTimeTest(arg:match("^anytime%s*(.*)$"))

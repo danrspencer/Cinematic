@@ -88,55 +88,100 @@ local function NPCTitle(unit)
 	if okControlled and Known(controlled) and controlled then
 		return false
 	end
-	local ok, title = pcall(function()
+	-- (Its second value: true when read off a second line the game gave, so
+	-- worth saving for its kind of NPC; a missing line could be the game not
+	-- ready yet.)
+	local ok, title, sure = pcall(function()
 		local text
 		if tooltipData then
 			local data = C_TooltipInfo.GetUnit(unit)
 			local line = data and type(data.lines) == "table" and data.lines[2]
 			if not line then
-				return false
+				return false, false
 			end
 			text = line.leftText
 		else
 			text = ScanLine2(unit)
 		end
 		if not Known(text) then
-			return nil
+			return nil, false
 		end
-		if type(text) ~= "string" or text == "" or (LEVEL and text:find(LEVEL, 1, true)) then
-			return false
+		if type(text) ~= "string" or text == "" then
+			return false, false
 		end
-		return "<" .. text .. ">"
+		if LEVEL and text:find(LEVEL, 1, true) then
+			return false, true
+		end
+		return "<" .. text .. ">", true
 	end)
 	if ok then
-		return title
+		return title, sure == true
 	end
-	return nil
+	return nil, false
+end
+
+-- Titles saved between sessions by NPC ID (every Stormwind City Guard shares
+-- one; a GUID is one spawn's, new each respawn), false for none: an NPC's
+-- title hardly ever changes. CinematicDB.npcTitles = { locale, build, count,
+-- titles }, started afresh in another game language or game build (a patch
+-- can rename titles), or past NPC_TITLES_KEPT. Not a setting: profiles
+-- copy ns.DEFAULTS' keys only. (2026-11-18)
+local NPC_TITLES_KEPT = 5000
+local function SavedTitles()
+	local db = ns.db
+	if not db then return nil end
+	local locale = GetLocale and GetLocale() or "?"
+	local build = GetBuildInfo and select(2, GetBuildInfo()) or "?"
+	local store = db.npcTitles
+	if type(store) ~= "table" or store.locale ~= locale or store.build ~= build or type(store.titles) ~= "table"
+		or (tonumber(store.count) or 0) >= NPC_TITLES_KEPT then
+		store = { locale = locale, build = build, count = 0, titles = {} }
+		db.npcTitles = store
+	end
+	return store
+end
+
+-- An NPC's kind (its NPC ID) from its GUID, or nil (players, pets, secret).
+local function NpcID(guid)
+	if type(guid) ~= "string" then return nil end
+	local kind, _, _, _, _, id = strsplit("-", guid)
+	return (kind == "Creature" or kind == "Vehicle") and tonumber(id) or nil
 end
 
 -- A plate's NPC's title (<Innkeeper>), read once per unit it's given (again
 -- in a while if the game wouldn't say). nil for none, or not known yet.
--- (Each unit's title kept by its GUID too, false for none: units coming back
--- into view, turning the camera fast in a crowd, had their tooltip read again
--- each time, about 9 KB of memory a read, 2026-11-15. Let go past TITLES_KEPT.)
+-- (Each unit's title kept too, false for none: units coming back into view,
+-- turning the camera fast in a crowd, had their tooltip read again each time,
+-- about 9 KB of memory a read, 2026-11-15. By NPC ID, saved (SavedTitles);
+-- else, or a title not sure enough to save, by GUID for this session, let go
+-- past TITLES_KEPT.)
 local titleByGuid, titleCount, TITLES_KEPT = {}, 0, 400
 local function PlateTitle(plate, unit)
 	-- (Asked before the plate's new-unit event reaches us: its last unit's forgotten here.)
 	local ok, guid = pcall(UnitGUID, unit)
 	guid = ok and Known(guid) and guid or nil
+	local npc = NpcID(guid)
 	if guid and titleUnit[plate] ~= guid then
-		titles[plate], titleTried[plate], serviceMatch[plate] = titleByGuid[guid], nil, nil
+		local saved = npc and SavedTitles()
+		local title = saved and saved.titles[npc]
+		if title == nil then title = titleByGuid[guid] end
+		titles[plate], titleTried[plate], serviceMatch[plate] = title, nil, nil
 		titleUnit[plate] = guid
 	end
 	if titles[plate] == nil and GetTime() - (titleTried[plate] or -TITLE_RETRY) >= TITLE_RETRY then
-		titles[plate] = NPCTitle(unit)
-		titleTried[plate] = titles[plate] == nil and GetTime() or nil
-		if guid and titles[plate] ~= nil then
+		local title, sure = NPCTitle(unit)
+		titles[plate] = title
+		titleTried[plate] = title == nil and GetTime() or nil
+		local saved = sure and npc and title ~= nil and SavedTitles()
+		if saved then
+			if saved.titles[npc] == nil then saved.count = (tonumber(saved.count) or 0) + 1 end
+			saved.titles[npc] = title
+		elseif guid and title ~= nil then
 			if titleCount >= TITLES_KEPT then
 				wipe(titleByGuid)
 				titleCount = 0
 			end
-			titleByGuid[guid], titleCount = titles[plate], titleCount + 1
+			titleByGuid[guid], titleCount = title, titleCount + 1
 		end
 	end
 	return titles[plate] or nil
@@ -429,9 +474,12 @@ function ns.PlateServiceMatch(plate, unit)
 	if not plate or not unit then
 		return false
 	end
+	-- (Its title first: a plate given a new unit forgets its last one's match
+	-- there. Read before it, a guard on a plate an innkeeper had was kept as
+	-- the innkeeper, his name flashing up till the new-unit event, 2026-11-18.)
+	local title = PlateTitle(plate, unit)
 	local match = serviceMatch[plate]
 	if match == nil then
-		local title = PlateTitle(plate, unit)
 		if title then
 			match = false
 			local otherClass = ns.db.nameServiceClassOnly and OtherClassTitle(title)
@@ -448,7 +496,6 @@ function ns.PlateServiceMatch(plate, unit)
 	if match then
 		-- (Icons ticked: a title without one, Other's, shows the name instead.)
 		if ns.db.nameServiceIcons then
-			local title = PlateTitle(plate, unit)
 			return true, not (title and ServiceIcon(title))
 		end
 		return true, false

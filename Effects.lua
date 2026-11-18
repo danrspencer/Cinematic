@@ -560,7 +560,15 @@ function ns.UpdateCVars(cinematic, fightStarting)
 		-- (Allow outside CineMode's Nameplates: the names too, CineMode on or off.)
 		-- (Nor while its kind's plates are up: see ns.plates.NamesOnPlates. Only
 		-- while CineMode handles the plates: with them off, the names do it.)
-		local want = (ns.PlatesCinematic(cinematic) and ns.PageOn("handleNames") and not NameKeptHere(set.key, inCombat)
+		-- Interactive NPCs' names (vendors, innkeepers...) off wherever CineMode
+		-- keeps the plates on, whatever the rows say: the plates show them, and
+		-- the game's own drew them past plate range too, where nothing fades
+		-- them (an innkeeper 60 yards off, 2026-11-18). Only in dungeons and
+		-- raids, plates locked, do the rows keep them up. (Past the 40 plates up
+		-- at once in a city crowd, a vendor close by has no name: the user's call.)
+		local forcedOff = set.key == "InteractiveNPCs" and ns.PageOn("handleNames") and ns.PlatesForcedHere(cinematic)
+		local want = forcedOff or (ns.PlatesCinematic(cinematic) and ns.PageOn("handleNames")
+			and not NameKeptHere(set.key, inCombat)
 			and not (ns.db.handlePlates and ns.plates.NamesOnPlates(set.key, inCombat))) or immersive
 		ns.ApplyCVarSet(set, want or false)
 	end
