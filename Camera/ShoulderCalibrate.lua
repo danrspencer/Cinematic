@@ -1,6 +1,7 @@
 -- Shoulder Cam calibration (the Calibrate tab on the Shoulder Cam page): how
 -- far an offset moves YOUR model on screen, measured, for the race, sex and
--- form you are now. A model's size factor (ShoulderCam.lua, MEASURED_SCALES)
+-- form you are now, or the mount you're on (keyed mount<ID>, whoever rides
+-- it). A model's size factor (ShoulderCam.lua, MEASURED_SCALES)
 -- is built in for every race and sex and the forms measured so far; one that
 -- looks wrong, or a form nobody's measured yet, is measured here.
 --
@@ -56,7 +57,13 @@ end
 
 -- A key (Race-sex or Race-sex-formN) said for people: "Night Elf Female, Cat
 -- Form", or in two parts (who, then the form or "On foot") for the table.
+local function MountName(id)
+	local ok, name = pcall(function() return C_MountJournal.GetMountInfoByID(id) end)
+	return ok and type(name) == "string" and name or (L["Mount %s"]):format(id)
+end
 local function KeyParts(key)
+	local mount = tonumber(tostring(key):match("^mount(%d+)$"))
+	if mount then return MountName(mount), L["Mount"] end
 	local race, sex, form = tostring(key):match("^(.-)%-(%d)%-form(%d+)$")
 	if not race then race, sex = tostring(key):match("^(.-)%-(%d)$") end
 	if not race then return tostring(key), "" end
@@ -174,7 +181,8 @@ local function Finish(why)
 	local db = ns.db
 	db.shoulderCalibrations = db.shoulderCalibrations or {}
 	db.shoulderCalibrations[done.key] = { factor = factor, spread = tonumber(("%.3f"):format(spread)), readings = #list,
-		good = good, client = ns.CLIENT, when = date("%Y-%m-%d %H:%M"), zoom = ("%.1f"):format(done.held.zoom) }
+		good = good, client = ns.CLIENT, when = date("%Y-%m-%d %H:%M"), zoom = ("%.1f"):format(done.held.zoom),
+		rider = done.rider }
 	-- (Used only when good: a doubtful one is kept to look at, not to go by.)
 	if good then
 		db.shoulderCamScales = db.shoulderCamScales or {}
@@ -282,7 +290,11 @@ end)
 local function CantStart()
 	if run then return L["It's already running."] end
 	if InCombatLockdown() then return L["Not in a fight."] end
-	if IsMounted and ns.Flag(IsMounted()) then return L["Get off your mount first."] end
+	-- (On a mount it measures the mount: standing, on the ground.)
+	if IsMounted and ns.Flag(IsMounted()) then
+		if IsFlying and ns.Flag(IsFlying()) then return L["Land first: stand still on the ground."] end
+		if not (ns.ShoulderMountNow and ns.ShoulderMountNow()) then return L["This mount can't be read here."] end
+	end
 	if UnitExists("target") then return L["Clear your target first (Esc)."] end
 	if not (C_ChatBubbles and C_ChatBubbles.GetAllChatBubbles) then return L["This client can't read chat bubbles."] end
 	-- (Chat bubbles in dungeons, raids and battlegrounds are locked to addons.)
@@ -303,8 +315,9 @@ local function Start()
 	for _, step in ipairs(STEPS) do
 		if not step[2] or step[2] <= farthest then steps[#steps + 1] = step end
 	end
-	local key = ns.ShoulderModelKey and ns.ShoulderModelKey() or "?"
-	run = { key = key, steps = steps, at = 1, readings = {},
+	local key, _, foot, mount = "?", nil, nil, nil
+	if ns.ShoulderModelKey then key, _, foot, mount = ns.ShoulderModelKey() end
+	run = { key = key, rider = mount and foot or nil, steps = steps, at = 1, readings = {},
 		held = { offset = GetCVar(SHOULDER), centered = GetCVar(CENTERED), zoom = Zoom(),
 			bubbles = GetCVar("chatBubbles"), reduce = GetCVar(REDUCE) } }
 	local saved = {}
@@ -365,7 +378,8 @@ end
 ns.ShoulderCalibrateStart = Start
 
 -- Your measurements on one line, to paste to us:
--- CINECAL1 <client> <version> <key>=<factor>/<spread>/<readings>[/redo] ...
+-- CINECAL1 <client> <version> <key>=<factor>/<spread>/<readings>[/redo][/rider] ...
+-- (A mount's key is mount<ID>; its rider, Race-sex, is put last.)
 function ns.ShoulderCalibrationLine()
 	local list = ns.db and ns.db.shoulderCalibrations or {}
 	local keys = {}
@@ -375,8 +389,8 @@ function ns.ShoulderCalibrationLine()
 	for _, key in ipairs(keys) do
 		local c = list[key]
 		if type(c) == "table" and c.factor then
-			parts[#parts + 1] = ("%s=%.2f/%.3f/%d%s"):format(key, c.factor, c.spread or 0, c.readings or 0,
-				c.good and "" or "/redo")
+			parts[#parts + 1] = ("%s=%.2f/%.3f/%d%s%s"):format(key, c.factor, c.spread or 0, c.readings or 0,
+				c.good and "" or "/redo", type(c.rider) == "string" and ("/" .. c.rider) or "")
 		end
 	end
 	if #parts == 0 then return nil end
@@ -402,8 +416,8 @@ function ns.BuildShoulderCalibrateTab(host, kit)
 	top:SetPoint("TOPLEFT", host, "TOPLEFT", 0, 1)
 	local stack = kit.Stack(top, "check")
 	stack:Header(host, L["Calibrate"])
-	stack:Note(host, L["If you sit too far to the side or too close to the middle in a form (or on foot), " ..
-		"calibrate it. Share sends us your numbers so everyone gets them."], 440)
+	stack:Note(host, L["If you sit too far to the side or too close to the middle on foot, in a form or on a " ..
+		"mount, calibrate it (each mount on its own). Share sends us your numbers so everyone gets them."], 440)
 	local now = stack:Add(kit.Label(host, "GameFontNormal", ""), "label")
 	now:SetWidth(440)
 	now:SetJustifyH("LEFT")
@@ -415,7 +429,7 @@ function ns.BuildShoulderCalibrateTab(host, kit)
 	go:SetScript("OnClick", function()
 		if run then ns.ShoulderCalibrateStop() else ns.ShoulderCalibrateAsk() end
 	end)
-	kit.Tooltip(go, L["Measures your current form; stand still for 10 seconds while it says a line in /say."])
+	kit.Tooltip(go, L["Measures your current form or mount; stand still for 10 seconds while it says a line in /say."])
 	local share = CreateFrame("Button", nil, host, "UIPanelButtonTemplate")
 	share:SetSize(150, 24)
 	share:SetText(L["Share"])
@@ -515,6 +529,7 @@ function ns.BuildShoulderCalibrateTab(host, kit)
 	local watch = CreateFrame("Frame", nil, host)
 	watch:RegisterEvent("UPDATE_SHAPESHIFT_FORM")
 	watch:RegisterUnitEvent("UNIT_MODEL_CHANGED", "player")
+	watch:RegisterEvent("PLAYER_MOUNT_DISPLAY_CHANGED")
 	watch:SetScript("OnEvent", function() if host:IsVisible() then C_Timer.After(0.3, Refresh) end end)
 	host:HookScript("OnShow", Refresh)
 end

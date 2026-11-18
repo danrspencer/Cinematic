@@ -278,7 +278,7 @@ local paused -- (PauseReason at the last check, every POLL)
 -- (The cat, the zoomcurve run 2026-11-12, standing still with the elf's
 -- offset held: the elf on 10.8% of the way to the edge, the cat on 20.3%,
 -- so 0.82 x 20.3 / 10.8 = 1.55.)
--- (Mounts change it too: not measured yet.)
+-- (Mounts change it too: each has its own key, MountNow below.)
 -- (Human-3: the offset sweep, Forever, 2026-11-13. Skyborne-2 and -3, Gnome-2 and -3, NightElf-2, Dwarf-3, Human-2, Orc-2 and -3, Scourge-2 and -3, Tauren-2 and -3, Troll-2 and -3: the calibrate run, spreads 0.025 or less. NightElf-3 again, 2026-11-14: 0.88, not the 0.82 read off a recording.)
 local MEASURED_SCALES = { ["Dwarf-2"] = 1, ["Dwarf-3"] = 0.82, ["Skyborne-2"] = 0.88, ["Skyborne-3"] = 0.85, ["Gnome-2"] = 0.90, ["Human-2"] = 0.94, ["Gnome-3"] = 0.84, ["NightElf-2"] = 1.00, ["NightElf-3"] = 0.88, ["Human-3"] = 0.81,
 	["Orc-2"] = 1.23, ["Orc-3"] = 0.96, ["Scourge-2"] = 0.99, ["Scourge-3"] = 0.90, ["Tauren-2"] = 1.68, ["Tauren-3"] = 1.27,
@@ -393,16 +393,60 @@ local function ModelSwapped()
 	if was ~= now then Swapped(was) end
 	ns.Log("shoulder", ("model changed: form %s (was %s)"):format(tostring(shownForm), tostring(was)))
 end
+-- The mount you're on (C_MountJournal's mount ID), or nil. A mount is its own
+-- model with its own factor, keyed "mount<ID>" whoever rides it (user,
+-- 2026-11-18: players calibrate each mount till there's a table of them).
+-- Looked up once per mount-up (the journal's whole list), kept till you get
+-- off or the mount's display changes.
+local mountKnown, mountNow
+local function MountNow()
+	if not (IsMounted and ns.Flag(IsMounted())) then
+		mountKnown, mountNow = false, nil
+		return nil
+	end
+	if mountKnown then return mountNow end
+	mountKnown, mountNow = true, nil
+	if not (C_MountJournal and C_MountJournal.GetMountIDs and C_MountJournal.GetMountInfoByID) then return nil end
+	pcall(function()
+		for _, id in ipairs(C_MountJournal.GetMountIDs()) do
+			local _, _, _, active = C_MountJournal.GetMountInfoByID(id)
+			if ns.Flag(active) then
+				mountNow = id
+				return
+			end
+		end
+	end)
+	ns.Log("shoulder", ("mount: %s"):format(tostring(mountNow or "not found in the journal")))
+	return mountNow
+end
+local mountWatch = CreateFrame("Frame")
+mountWatch:RegisterEvent("PLAYER_MOUNT_DISPLAY_CHANGED")
+mountWatch:SetScript("OnEvent", function() mountKnown = false end)
+ns.ShoulderMountNow = MountNow
+-- Mounts measured so far, mount ID -> factor (built from players' shared
+-- calibrations; none yet).
+local MEASURED_MOUNTS = {}
+
 function ns.ShoulderModelKey()
 	local _, race = UnitRace("player")
 	local foot = ("%s-%s"):format(tostring(race), tostring(UnitSex("player")))
+	local mount = MountNow()
+	if mount then return ("mount%d"):format(mount), nil, foot, mount end
 	local form = ModelForm()
 	return form and ("%s-form%d"):format(foot, form) or foot, form, foot
 end
--- The size factor for a form (nil: on foot), and where it's from.
-local function ScaleOf(form, foot)
-	local key = form and ("%s-form%d"):format(foot, form) or foot
+-- The size factor for a form (nil: on foot) or a mount, and where it's from.
+local function ScaleOf(form, foot, mount)
 	local scales = ns.db and ns.db.shoulderCamScales
+	if mount then
+		local saved = scales and scales[("mount%d"):format(mount)]
+		if type(saved) == "number" and saved > 0.2 then return saved, "measured here" end
+		if MEASURED_MOUNTS[mount] then return MEASURED_MOUNTS[mount], "built in" end
+		-- (Not measured: the rider's on-foot one, as before mounts had keys.)
+		local scale, from = ScaleOf(nil, foot)
+		return scale, ("%s: mount not measured"):format(from)
+	end
+	local key = form and ("%s-form%d"):format(foot, form) or foot
 	local saved = scales and scales[key]
 	if type(saved) == "number" and saved > 0.2 then return saved, "measured here" end
 	if MEASURED_SCALES[key] then return MEASURED_SCALES[key], "built in" end
@@ -439,9 +483,9 @@ end
 -- that day), so a share written up front can't fit it.)
 local SWAP_EARLY_OF = {} -- (form -> share, into it)
 function ns.ShoulderModelScale()
-	local _, form, foot = ns.ShoulderModelKey()
-	local scale, from = ScaleOf(form, foot)
-	if swapBy then
+	local _, form, foot, mount = ns.ShoulderModelKey()
+	local scale, from = ScaleOf(form, foot, mount)
+	if swapBy and not mount then
 		local knobs = ns.shoulderSwap
 		local coming = FormNow()
 		local share = knobs and knobs.early or SWAP_EARLY_OF[coming]
