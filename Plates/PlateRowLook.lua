@@ -688,6 +688,10 @@ function ns.MakePlateRowLookPreview(parent, width, kind)
 		end
 	end
 	holder:SetScript("OnShow", function(self) self:Refresh() end)
+	-- (For a page drawing over the plate, Combat Text Style's numbers: the
+	-- plate, and the unit picked under it, "Hostile", "Friendly"...)
+	holder.plate = plate
+	function holder.SampleKind() return SAMPLES[sampleNow][1] end
 	return holder
 end
 

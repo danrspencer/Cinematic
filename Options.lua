@@ -1166,6 +1166,7 @@ local function Choice(parent, key, value, label, tip)
 		Refresh()
 	end)
 	cb.Refresh = function(self) self:SetChecked(KeyGet(key) == value) end
+	cb.sweepValue = value -- (/cine debug sweep: one of a set of picks, tried as one setting)
 	return cb
 end
 
@@ -1479,7 +1480,11 @@ local function CreateScrollPage(noReset)
 		scroll:SetScript("OnMouseWheel", function(self, delta)
 			local now = self:GetVerticalScroll()
 			local from = (goal and math.abs(now - last) <= 0.5) and goal or now
-			goal = math.max(0, math.min(self:GetVerticalScrollRange(), from - delta * WHEEL_STEP))
+			-- (A page's range can come back secret, a frame on it having held a
+			-- fight's secret value: no glide then, rather than an error each notch.)
+			local range = self:GetVerticalScrollRange()
+			if issecretvalue and issecretvalue(range) then return end
+			goal = math.max(0, math.min(range or 0, from - delta * WHEEL_STEP))
 			last = now
 			ns.SetOnUpdate(glide, Step)
 		end)
@@ -1926,7 +1931,10 @@ local function ShowMatch(entry, onPage)
 		local top, contentTop = entry.edges.top:GetTop(), content:GetTop()
 		if not top or not contentTop then return end
 		local offset = contentTop - top - 40
-		scroll:SetVerticalScroll(math.max(0, math.min(offset, scroll:GetVerticalScrollRange())))
+		local range = scroll:GetVerticalScrollRange()
+		if not (issecretvalue and issecretvalue(range)) then
+			scroll:SetVerticalScroll(math.max(0, math.min(offset, range or 0)))
+		end
 		Highlight(canvas, entry.edges)
 	end)
 end

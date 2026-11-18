@@ -4431,6 +4431,22 @@ STEPS[#STEPS + 1] = function()
 		for _, point in pairs(ns.db.profileResetPoints or {}) do Fold(point) end
 		ns.db.cardScaleV1 = true
 	end
+	-- Combat Text Style's Kill word is off by default now (2026-11-18): off
+	-- for everyone once, saved profiles too; its tab turns it back on.
+	if not ns.db.combatTextKillOffV1 then
+		local function Off(t)
+			if type(t) == "table" and t.combatTextKill ~= nil then t.combatTextKill = false end
+		end
+		ns.db.combatTextKill = false
+		for _, saved in pairs(ns.db.profiles or {}) do
+			if type(saved) == "table" then
+				Off(saved)
+				Off(saved.settings)
+			end
+		end
+		for _, point in pairs(ns.db.profileResetPoints or {}) do Off(point) end
+		ns.db.combatTextKillOffV1 = true
+	end
 end
 
 -- Runs them all, each on its own: an error is logged and reported (the

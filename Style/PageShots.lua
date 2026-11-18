@@ -111,6 +111,9 @@ local function Measure(canvas)
 	end
 	local function walk(frame, depth)
 		if depth > 30 or not ns.Flag(frame:IsVisible()) then return end
+		-- (layoutSkip: drawn over the page on purpose, moving, not laid out:
+		-- Combat Text Style's sample numbers.)
+		if frame.layoutSkip then return end
 		if frame.layoutCover then
 			local l, b, w, h = frame:GetRect()
 			if l and w then covers[#covers + 1] = { frame = frame, l = l, b = b, r = l + w, t = b + h } end

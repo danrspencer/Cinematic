@@ -37,7 +37,11 @@ DEFAULTS.combatTextSchoolColors = false -- spell damage in its school's color (e
 DEFAULTS.combatTextHeals = true       -- heals on friendly plates, in green
 DEFAULTS.combatTextMisses = true      -- Miss, Dodge, Parry, Immune...
 DEFAULTS.combatTextKeepLast = true    -- a dying mob's last numbers finish above the screen's middle (LetGo)
-DEFAULTS.combatTextKill = true        -- "Kill" there when the game sent no number for the killing blow
+DEFAULTS.combatTextKill = false       -- "Kill" there when the game sent no number for the killing blow (off by default since 2026-11-18)
+DEFAULTS.combatTextSpells = true      -- spell hits (yellow)
+DEFAULTS.combatTextSwings = true      -- swings and physical hits (white)
+DEFAULTS.combatTextCrits = true       -- crits drawn as crits (off: as a plain hit)
+DEFAULTS.combatTextCritSpot = "plate" -- "plate": over the plate's bar, as the game's; "above": where hits start, climbing as they do
 
 -- The game's floating text font, read as this file loads: before Core's
 -- ADDON_LOADED blanks it (hideWorldText).
@@ -105,6 +109,56 @@ local function Color(kind, game)
 	return own or game
 end
 
+-- Each text of its own (the page's tabs): whether it shows, and its size,
+-- height, side, climb, time on screen and a color of its own, as
+-- combatText<Name><Setting>. A crit (shown as one) takes the Crit ones.
+local KILL_COLOR = { 1, 0.3, 0.25 }
+ns.COMBAT_TEXTS = {
+	{ kind = "spell", name = "Spell", show = "combatTextSpells", color = SPELL, y = 10 },
+	{ kind = "swing", name = "Swing", show = "combatTextSwings", color = WHITE, y = 10 },
+	{ kind = "crit", name = "Crit", show = "combatTextCrits", color = SPELL, y = 50 },
+	{ kind = "heal", name = "Heal", show = "combatTextHeals", color = HEAL, y = 10 },
+	{ kind = "miss", name = "Miss", show = "combatTextMisses", color = SPELL, y = 0 },
+	{ kind = "kill", name = "Kill", show = "combatTextKill", color = KILL_COLOR, y = 10 },
+}
+local TEXT_OF = {}
+for _, text in ipairs(ns.COMBAT_TEXTS) do
+	TEXT_OF[text.kind] = text
+	local key = "combatText" .. text.name
+	DEFAULTS[key .. "Size"] = 1    -- times the page's size
+	DEFAULTS[key .. "Y"] = text.y or 0 -- pixels up (the player's picks, 2026-11-18: crits 50 up, misses level)
+	DEFAULTS[key .. "X"] = 0       -- pixels right
+	DEFAULTS[key .. "Rise"] = 1    -- times its usual climb
+	DEFAULTS[key .. "Life"] = 1    -- times its usual time on screen
+	DEFAULTS[key .. "Own"] = false -- its own color (below), not the game's (or the theme's)
+	DEFAULTS[key .. "R"], DEFAULTS[key .. "G"], DEFAULTS[key .. "B"] = text.color[1], text.color[2], text.color[3]
+end
+
+-- A setting as it applies: its usual while a switch over it is off (its
+-- tab's, right-clicked off).
+local function Value(key)
+	local db = ns.db
+	if not db or (ns.MasterOff and ns.MasterOff(key, db)) then return DEFAULTS[key] end
+	local value = db[key]
+	if value == nil then return DEFAULTS[key] end
+	return value
+end
+-- Whether a text shows. sample: the page's preview, which plays with the
+-- page off too: its own tick and its tab (right-clicked off) still count.
+local function Shows(text, sample)
+	local db = ns.db
+	if not db then return false end
+	if not sample then return ns.Setting(text.show) and true or false end
+	if db[text.show] == false then return false end
+	local over = ns.PageSwitchOf and ns.PageSwitchOf(text.show)
+	for _ = 1, 10 do
+		if not over then break end
+		if over:find("^tabOn:") and db[over] == false then return false end
+		over = ns.PageSwitchOf(over)
+	end
+	return true
+end
+
 -- The game's words for the hits with no number (its own strings: translated).
 local MISSES = { MISS = true, DODGE = true, PARRY = true, BLOCK = true, RESIST = true, IMMUNE = true,
 	ABSORB = true, EVADE = true, DEFLECT = true, REFLECT = true }
@@ -133,12 +187,15 @@ end
 -- Numbers ---------------------------------------------------------------------
 local holder = CreateFrame("Frame", nil, WorldFrame) -- (shows with the UI hidden, as the game's)
 holder:SetAllPoints()
-local live, spare = {}, {}
+-- (sparePreview: the page preview's own: a number that's held a fight's
+-- secret amount, put in the options page, made its scroll range secret, and
+-- the mouse wheel there errored, 2026-11-18. The two never swap.)
+local live, spare, sparePreview = {}, {}, {}
 
-local function NewNumber()
-	local number = table.remove(spare)
+local function NewNumber(layer)
+	local number = table.remove(layer and sparePreview or spare)
 	if not number then
-		number = CreateFrame("Frame", nil, holder)
+		number = CreateFrame("Frame", nil, layer or holder)
 		number:SetSize(1, 1)
 		-- (The words sit in a frame of their own: its alpha is the amount, so a
 		-- hit of 0 draws nothing. See Spawn.)
@@ -165,7 +222,8 @@ local function Retire(index)
 	number:Hide()
 	number:ClearAllPoints()
 	number.plate, number.unit, number.anchor, number.popping, number.kill = nil, nil, nil, nil, nil
-	spare[#spare + 1] = number
+	local pool = number.onLayer and sparePreview or spare -- (a preview's stays the preview's)
+	pool[#pool + 1] = number
 end
 
 -- Where a plate is on screen, or nil (a client where plates can't be measured).
@@ -199,14 +257,15 @@ end
 local EDGE, EDGE_ALPHA, DROP, SHADOW_ALPHA = 1 / 40, 0.35, 1 / 28, 0.8
 local function SetSize(number, size)
 	local db = ns.db
-	local file = db and db.combatTextFont ~= "game" and ns.StyleFontFile(db.combatTextFont) or GAME_FONT
+	local font = db and Value("combatTextFont")
+	local file = font and font ~= "game" and ns.StyleFontFile(font) or GAME_FONT
 	local text = number.text
 	if not text:SetFont(file, size, "") then
 		file = "Fonts\\FRIZQT__.TTF"
 		text:SetFont(file, size, "")
 	end
 	text:SetShadowOffset(0, 0)
-	local look = db and db.combatTextEdge or "game"
+	local look = db and Value("combatTextEdge") or "game"
 	-- (The game's: the shadow alone, no edge, the player saw side by side;
 	-- "shadow", an older name for it.)
 	local edge = look == "both" or look == "edge"
@@ -312,14 +371,34 @@ local KillWord -- (below)
 
 -- One number over a plate. color: an {r, g, b}; crit: pops big and settles
 -- bigger, lower (over the plate's bar), barely climbing, staying longer.
-local function Spawn(plate, unit, amount, color, crit)
+-- layer: a frame to draw it in instead of the world's (a preview's: the
+-- options window is over the world's frames), at the world's size.
+-- kind: which text it is (ns.COMBAT_TEXTS: "spell", "swing", "heal", "miss",
+-- "kill"): one turned off shows nothing, and its own settings (a crit's,
+-- the Crit ones) place it. Gives the number, or nil.
+local function Spawn(plate, unit, amount, color, crit, layer, kind)
+	local base = TEXT_OF[kind or "spell"] or TEXT_OF.spell
+	if not Shows(base, layer) then return end
+	local critText = TEXT_OF.crit
+	crit = crit and Shows(critText, layer) or false
+	local key = "combatText" .. (crit and critText or base).name
+	-- (Its color: its own; a crit's own over a hit's (a heal's crit keeps the heal's).)
+	local baseKey = "combatText" .. base.name
+	if crit and base.kind ~= "heal" and Value("combatTextCritOwn") then
+		color = { Value("combatTextCritR"), Value("combatTextCritG"), Value("combatTextCritB") }
+	elseif Value(baseKey .. "Own") then
+		color = { Value(baseKey .. "R"), Value(baseKey .. "G"), Value(baseKey .. "B") }
+	end
 	if #live >= MAX_LIVE then Retire(1) end
-	local db = ns.db
 	local now = GetTime()
-	local number = NewNumber()
-	local size = BASE_SIZE * CVarNumber("WorldTextScale_v2", 1) * (db.combatTextSize or 1)
-	-- (its middle where a hit's bottom starts, half a hit above; a crit's lower)
-	local y = START_Y + (db.combatTextHeight or 0) + size / 2 + (crit and CRIT_DROP or 0)
+	local number = NewNumber(layer)
+	local size = BASE_SIZE * CVarNumber("WorldTextScale_v2", 1) * (Value("combatTextSize") or 1)
+		* (Value(key .. "Size") or 1)
+	-- (its middle where a hit's bottom starts, half a hit above; a crit's lower,
+	-- over the plate's bar, unless it's put where hits start)
+	local onBar = crit and Value("combatTextCritSpot") ~= "above"
+	local y = START_Y + (Value("combatTextHeight") or 0) + (Value(key .. "Y") or 0) + size / 2
+		+ (onBar and CRIT_DROP or 0)
 	if crit then size = size * CRIT_SIZE end
 	local text = number.text
 	SetSize(number, size)
@@ -334,13 +413,23 @@ local function Spawn(plate, unit, amount, color, crit)
 	if not Plain(amount) then number.zeroHide = pcall(number.body.SetAlpha, number.body, amount) end
 	local ok, width = pcall(text.GetStringWidth, text)
 	number.width = ok and type(width) == "number" and Plain(width) and width > 0 and width or nil
-	local x = SlotX(plate, now, Width(number, size))
-	number:SetFrameStrata(plate:GetFrameStrata())
-	number:SetFrameLevel(math.min(plate:GetFrameLevel() + 20, 9000))
+	local x = SlotX(plate, now, Width(number, size)) + (Value(key .. "X") or 0)
+	if layer then
+		number.onLayer = true
+		number:SetParent(layer)
+		number:SetScale(holder:GetEffectiveScale() / layer:GetEffectiveScale())
+		number:SetFrameStrata(layer:GetFrameStrata())
+		number:SetFrameLevel(math.min(layer:GetFrameLevel() + 1, 9000))
+	else
+		number:SetFrameStrata(plate:GetFrameStrata())
+		number:SetFrameLevel(math.min(plate:GetFrameLevel() + 20, 9000))
+	end
 	number.plate, number.unit, number.crit, number.size = plate, unit, crit, size
-	number.popping = crit and db.combatTextCritPop and text.SetTextHeight and true or nil
+	number.popping = crit and Value("combatTextCritPop") and text.SetTextHeight and true or nil
+	number.riseBy = (onBar and CRIT_RISE or 1) * (Value(key .. "Rise") or 1)
 	number.start = now
 	number.life = LIFE * math.max(0.3, CVarNumber("WorldTextRampDuration_v2", 1)) * (crit and CRIT_LIFE or 1)
+		* math.max(0.1, Value(key .. "Life") or 1)
 	number.lift = y
 	number.anchor, number.anchorPoint, number.baseX, number.baseY = plate, "TOP", x, y
 	number:ClearAllPoints()
@@ -355,6 +444,7 @@ local function Spawn(plate, unit, amount, color, crit)
 		lastHit[plate] = { at = now, guid = okGuid and Plain(guid) and guid or nil }
 	end
 	RecordSpawn(number, plate, unit, amount, color, crit, size)
+	return number
 end
 
 -- A plate gone (its unit died or went out of range): its numbers stay where
@@ -406,7 +496,7 @@ local function Step()
 			-- leap up from behind the plate, seen at 5 fps on 2026-11-10.)
 			local leap = math.min(1, (now - number.start) / JUMP_TIME)
 			local eased = 1 - (1 - t) ^ EASE
-			local rise = (JUMP * (1 - (1 - leap) ^ 2) + RISE * eased) * (number.crit and CRIT_RISE or 1)
+			local rise = (JUMP * (1 - (1 - leap) ^ 2) + RISE * eased) * (number.riseBy or 1)
 			-- (anchor and start height set at Spawn, or LetGo; the rise on top)
 			number:SetPoint("CENTER", number.anchor, number.anchorPoint, number.baseX, number.baseY + rise)
 			-- A crit's pop: up to POP_PEAK times its size by POP_UP seconds, back
@@ -514,14 +604,15 @@ local swingAt, swingPlate
 local function Mine(hit)
 	if hit.melee then swingAt, swingPlate = hit.at or GetTime(), hit[1] end
 	ns.combatTextWhose.mine = ns.combatTextWhose.mine + 1
-	Spawn(hit[1], hit[2], hit[3], hit[4], hit[5])
+	Spawn(hit[1], hit[2], hit[3], hit[4], hit[5], nil, hit.kind)
 end
 
 -- A hit on a plate: shown now if a line came for it, else held for one.
 -- melee: a swing (a physical hit, or a miss, dodge, parry...).
-local function Claim(plate, unit, amount, color, crit, melee)
-	local hit = { plate, unit, amount, color, crit, melee = melee }
-	if not LogRunning() then return Spawn(plate, unit, amount, color, crit) end
+-- kind: which text (Spawn).
+local function Claim(plate, unit, amount, color, crit, melee, kind)
+	local hit = { plate, unit, amount, color, crit, melee = melee, kind = kind }
+	if not LogRunning() then return Spawn(plate, unit, amount, color, crit, nil, kind) end
 	local now = GetTime()
 	if melee and swingAt == now and swingPlate == plate then
 		Trace(("hit %s (swing) goes with the swing before it"):format(TraceUnit(unit, color, crit)))
@@ -690,7 +781,7 @@ local function OnHit(unit, action, flag, amount, school)
 		if not enemy then return end
 		-- (A plain 0: all of it absorbed, as the game's word.)
 		if Plain(amount) and (amount == 0 or amount == "0") then
-			if db.combatTextMisses then Claim(plate, unit, _G.ABSORB or "Absorb", Color("miss", SPELL), false) end
+			Claim(plate, unit, _G.ABSORB or "Absorb", Color("miss", SPELL), false, nil, "miss")
 			return
 		end
 		local color = Color("spell", SPELL)
@@ -702,14 +793,14 @@ local function OnHit(unit, action, flag, amount, school)
 		end
 		-- (A theme's crit color over the hit's: the game's crits keep theirs.)
 		if crit then color = Color("crit", color) end
-		Claim(plate, unit, amount, color, crit, school == 1)
+		Claim(plate, unit, amount, color, crit, school == 1, school == 1 and "swing" or "spell")
 	elseif action == "HEAL" then
-		if enemy or not db.combatTextHeals then return end
-		Claim(plate, unit, amount, Color("heal", HEAL), crit)
-	elseif MISSES[action] and enemy and db.combatTextMisses then
+		if enemy then return end
+		Claim(plate, unit, amount, Color("heal", HEAL), crit, nil, "heal")
+	elseif MISSES[action] and enemy then
 		local word = _G[action]
 		if not (type(word) == "string" and Plain(word)) then word = action:sub(1, 1) .. action:sub(2):lower() end
-		Claim(plate, unit, word, Color("miss", SPELL), false, true)
+		Claim(plate, unit, word, Color("miss", SPELL), false, true, "miss")
 	end
 end
 
@@ -717,12 +808,11 @@ end
 -- lines, recorded 2026-11-18): the word "Kill", in the crit color, as its mob's plate
 -- goes. A dead enemy you'd hit in the last few seconds, not someone else's,
 -- with no number of ours on it in the last moment (that one moves instead).
-local KILL_COLOR = { 1, 0.3, 0.25 }
 local FIGHTING, JUST = 8, 0.6 -- seconds: since our last number on it; a number that was the killing blow
 KillWord = function(plate, unit)
 	local hit = lastHit[plate]
 	lastHit[plate] = nil
-	if not (hit and On() and ns.db.combatTextKill) then return end
+	if not (hit and On() and Shows(TEXT_OF.kill)) then return end
 	local now = GetTime()
 	if now - hit.at > FIGHTING or now - hit.at < JUST then return end
 	local okGuid, guid = pcall(UnitGUID, unit)
@@ -732,8 +822,9 @@ KillWord = function(plate, unit)
 	local okTap, tapped = pcall(UnitIsTapDenied, unit)
 	if okTap and Plain(tapped) and tapped then return end
 	-- (A hit's size, no pop: as a crit it read far too big, 2026-11-18.)
-	Spawn(plate, nil, ns.L["Kill"], Color("crit", KILL_COLOR), false)
-	live[#live].kill = true
+	local number = Spawn(plate, nil, ns.L["Kill"], Color("crit", KILL_COLOR), false, nil, "kill")
+	if not number then return end
+	number.kill = true
 	if ns.combatTextRecord then ns.combatTextRecord("KILL with no number: the word shown") end
 end
 
@@ -824,14 +915,18 @@ function ns.CombatNumbersToggle()
 end
 
 -- A sample over a frame, for the page's preview: "hit" (a spell's), "white"
--- (a swing's), "crit", "heal" or "miss".
-function ns.CombatTextSample(frame, kind)
+-- (a swing's), "crit", "heal", "healcrit" or "miss". layer: the frame to
+-- draw it in (Spawn).
+function ns.CombatTextSample(frame, kind, layer)
 	local db = ns.db
-	if kind == "miss" then return Spawn(frame, nil, _G.MISS or "Miss", Color("miss", SPELL), false) end
-	if kind == "heal" then return Spawn(frame, nil, "18", Color("heal", HEAL), false) end
+	if kind == "miss" then return Spawn(frame, nil, _G.MISS or "Miss", Color("miss", SPELL), false, layer, "miss") end
+	if kind == "heal" then return Spawn(frame, nil, "18", Color("heal", HEAL), false, layer, "heal") end
+	if kind == "healcrit" then return Spawn(frame, nil, "37", Color("heal", HEAL), true, layer, "heal") end
+	if kind == "kill" then return Spawn(frame, nil, ns.L["Kill"], Color("crit", KILL_COLOR), false, layer, "kill") end
 	local color = kind == "white" and Color("hit", WHITE) or (db.combatTextSchoolColors and SCHOOL[8] or Color("spell", SPELL))
 	if kind == "crit" then color = Color("crit", color) end
-	Spawn(frame, nil, kind == "crit" and "46" or kind == "white" and "11" or "23", color, kind == "crit")
+	Spawn(frame, nil, kind == "crit" and "46" or kind == "white" and "11" or "23", color, kind == "crit", layer,
+		kind == "white" and "swing" or "spell")
 end
 
 -- The page ------------------------------------------------------------------
@@ -867,78 +962,139 @@ function ns.CreateCombatTextStylePanel(kit)
 	local rows = ns.StyleRows(kit, content, stack, Changed, "combatTextStyle")
 	local function Ours(db) return rows.On(db) and db.combatTextNumbers end
 
-	-- The preview: a nameplate of a mob, and Test, which plays a hit, a swing, a
-	-- crit, two landing together and a miss on it with this page's look.
-	local preview = CreateFrame("Frame", nil, content)
-	preview:SetSize(480, 150)
-	local back = preview:CreateTexture(nil, "BACKGROUND")
-	back:SetAllPoints()
-	back:SetColorTexture(0.05, 0.06, 0.08, 0.9)
-	local plate = CreateFrame("Frame", nil, preview)
-	plate:SetSize(140, 30)
-	plate:SetPoint("BOTTOM", 0, 26)
-	local bar = plate:CreateTexture(nil, "ARTWORK")
-	bar:SetPoint("BOTTOMLEFT")
-	bar:SetSize(140, 10)
-	bar:SetColorTexture(0.75, 0.1, 0.1, 1)
-	local name = plate:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-	name:SetPoint("BOTTOM", bar, "TOP", 0, 3)
-	name:SetText(L["Gnarlpine Ambusher"])
-	name:SetTextColor(1, 0.3, 0.2)
+	-- The preview: a nameplate as yours look (the Nameplate Style page's own
+	-- preview: your bar, border, name font and cast bar, over the lake or
+	-- dark, a unit to pick under it), and Test, which plays a hit, a swing, a
+	-- crit, two landing together and a miss on it with this page's look; heals
+	-- on a friendly or your own plate.
+	local preview, plate
+	if ns.MakePlateRowLookPreview then
+		preview = ns.MakePlateRowLookPreview(content, 480, "others")
+		preview:SetHeight(170) -- (room over the plate for the numbers' climb)
+		plate = preview.plate
+		plate:ClearAllPoints()
+		plate:SetPoint("BOTTOM", preview, "BOTTOM", 0, 44 / 1.6) -- (its scale: over the picks and its cast bar)
+	else
+		preview = CreateFrame("Frame", nil, content)
+		preview:SetSize(480, 150)
+		local back = preview:CreateTexture(nil, "BACKGROUND")
+		back:SetAllPoints()
+		back:SetColorTexture(0.05, 0.06, 0.08, 0.9)
+		plate = CreateFrame("Frame", nil, preview)
+		plate:SetSize(140, 30)
+		plate:SetPoint("BOTTOM", 0, 26)
+		local bar = plate:CreateTexture(nil, "ARTWORK")
+		bar:SetPoint("BOTTOMLEFT")
+		bar:SetSize(140, 10)
+		bar:SetColorTexture(0.75, 0.1, 0.1, 1)
+		local name = plate:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+		name:SetPoint("BOTTOM", bar, "TOP", 0, 3)
+		name:SetText(L["Gnarlpine Ambusher"])
+		name:SetTextColor(1, 0.3, 0.2)
+		preview.Refresh = function() end
+	end
 	stack:Add(preview, "label")
 	kit.AddControl(preview)
-	preview.Refresh = function() end
+	-- (The numbers drawn in the page, over the preview (and past its top:
+	-- not in it, which clips), not in the world's frames under the window.)
+	local layer = CreateFrame("Frame", nil, content)
+	layer:SetAllPoints(preview)
+	layer:SetFrameLevel(preview:GetFrameLevel() + 30)
+	layer.layoutSkip = true -- (the sweep's layout check: its numbers fly over the page, not laid out)
+	-- (round: a stopped round's steps still waiting don't play. focus: the
+	-- text whose tab is picked, played alone: its sample's name.)
+	local round, focus = 0, nil
+	local SAMPLE_OF = { spell = "hit", swing = "white", crit = "crit", heal = "heal", miss = "miss", kill = "kill" }
 	local function Play()
-		local steps = { { 0, "hit" }, { 0.5, "white" }, { 1.0, "crit" }, { 1.8, "hit" }, { 1.85, "white" }, { 2.6, "miss" } }
+		local kind = preview.SampleKind and preview.SampleKind()
+		local steps = { { 0, "hit" }, { 0.5, "white" }, { 1.0, "crit" }, { 1.8, "hit" }, { 1.85, "white" },
+			{ 2.6, "miss" }, { 3.2, "kill" } }
+		if focus then
+			steps = { { 0, focus }, { 0.8, focus }, { 1.6, focus }, { 1.65, focus } }
+		elseif kind == "Friendly" or kind == "Player" then
+			steps = { { 0, "heal" }, { 0.6, "heal" }, { 1.2, "healcrit" }, { 2.0, "heal" }, { 2.05, "heal" } }
+		end
+		local this = round
 		for _, step in ipairs(steps) do
 			C_Timer.After(step[1], function()
-				if preview:IsVisible() then ns.CombatTextSample(plate, step[2]) end
+				if this == round and preview:IsVisible() then ns.CombatTextSample(plate, step[2], layer) end
 			end)
 		end
 	end
-	ns.StylePreviewTest(preview, kit, L["Plays a few sample hits on the nameplate."], Play)
+	-- They play again and again while the page shows (a round every few
+	-- seconds), so a change to the look shows at once; Test turns into Stop
+	-- while they do. Opening the page starts them again.
+	local looping, ticker, test
+	local function SetLooping(on)
+		looping = on
+		round = round + 1
+		if ticker then ticker:Cancel() ticker = nil end
+		if test then test:SetText(on and L["Stop"] or L["Test"]) end
+		if on and preview:IsVisible() then
+			Play()
+			ticker = C_Timer.NewTicker(4, function()
+				if looping and preview:IsVisible() then Play() end
+			end)
+		end
+	end
+	test = ns.StylePreviewTest(preview, kit, L["Plays sample hits on the nameplate over and over."],
+		function() SetLooping(not looping) end)
+	preview:HookScript("OnShow", function() SetLooping(true) end)
+	preview:HookScript("OnHide", function()
+		if ticker then ticker:Cancel() ticker = nil end
+		round = round + 1
+	end)
 
-	stack:Header(content, L["Our numbers"])
+	-- Tabs (Options.lua's ns.PageTabsBelow), each a container (right-click
+	-- off: all on it off): General, Look, then a tab per text (ns.COMBAT_TEXTS)
+	-- with whether it shows, its color, size, place, climb and time. Picking
+	-- a text's tab plays that text alone on the preview.
+	local tabList = {
+		{ L["General"], L["Whose numbers show, and the game's own floating text."] },
+		{ L["Look"], L["The numbers' font, size, edge and Y offset."] },
+		{ L["Spells"], L["Your spells' hits."] },
+		{ L["Swings"], L["Your melee and other physical hits."] },
+		{ L["Crits"], L["Your crits: how big, and where."] },
+		{ L["Heals"], L["Your heals on friendly nameplates."] },
+		{ L["Misses"], L["Miss, Dodge, Parry and the like."] },
+		{ L["Kill"], L["The Kill word on a mob you killed."] },
+	}
+	local hosts, _, TabsShown = ns.PageTabsBelow(content, preview, tabList, "Combat Text Style/page", nil, nil, nil,
+		function(i)
+			local text = ns.COMBAT_TEXTS[i - 2]
+			local was = focus
+			focus = text and SAMPLE_OF[text.kind] or nil
+			if focus ~= was and looping then SetLooping(true) end
+		end)
+	-- (What's made on the page from here on goes onto a tab, its heading at the tab's top.)
+	local made = {}
+	local function Mark()
+		for _, object in ipairs({ content:GetChildren() }) do made[object] = true end
+		for _, object in ipairs({ content:GetRegions() }) do made[object] = true end
+	end
+	local function Into(i, header)
+		for _, set in ipairs({ { content:GetChildren() }, { content:GetRegions() } }) do
+			for _, object in ipairs(set) do
+				if not made[object] then
+					made[object] = true
+					object:SetParent(hosts[i])
+				end
+			end
+		end
+		header:ClearAllPoints()
+		header:SetPoint("TOPLEFT", hosts[i], "TOPLEFT", 0, 0)
+	end
+	Mark()
+
+	-- General: our numbers on or off, whose, and the game's own text.
+	local general = stack:Header(content, L["Our numbers"])
 	rows.Check("combatTextNumbers", L["Show your damage and healing over nameplates"],
 		L["Shows your own damage and healing numbers over nameplates."])
-	rows.Check("combatTextHeals", L["Your heals on friends"], L["Heals on friendly nameplates, in green."], Ours)
-	rows.Check("combatTextMisses", L["Misses"], L["Miss, Dodge, Parry, Immune and the like, in the game's words."],
-		Ours)
 	rows.Check("combatTextKeepLast", L["Last hit stays on screen"],
 		L["A dying mob's last number finishes above the middle of the screen."], Ours)
-	rows.Check("combatTextKill", L["Kill"],
-		L["Shows Kill there when the game sends no number for the killing blow."], Ours)
-	rows.Check("combatTextCritPop", L["Crits pop"],
-		L["A crit grows big for a moment and settles a little bigger than a hit, as the game's do."], Ours)
 	rows.Check("combatTextSchoolColors", L["Spells in their school's color"],
 		L["Colors spell numbers by their school, like fire orange."],
 		Ours)
-
-	-- The numbers' look, on the page itself (the Style pages' template,
-	-- StylePages.lua's rows.Look, inline): their font, size, edge and height.
-	stack:Header(content, L["Look"])
-	rows.Look("", L["Our numbers"], {
-		inline = true,
-		tabs = { default = function(key) return ns.DEFAULTS[key] end, source = ns.PageLookSource,
-			copyKind = "combatTextLook", copyName = L["Our numbers"] },
-		font = { "combatTextFont", L["The font for the numbers."],
-			test = Ours }, -- (its list starts with The game's: "game")
-		textSize = function(look)
-			look.Slider("combatTextSize", L["Size"], 50, 200, 5, "%d%%", 100,
-				L["How big the numbers are, next to the game's."], Ours)
-			look.Slider("combatTextHeight", L["Height"], -40, 80, 2, "%d px", nil,
-				L["Moves the numbers up or down."], Ours)
-		end,
-		shadow = function(look)
-			look.Choices(L["Edge:"], "combatTextEdge", {
-				{ "game", L["The game's"], L["A dark shadow up and to the right, no edge."] },
-				{ "both", L["Edge and shadow"], L["A dark edge and the drop shadow."] },
-				{ "edge", L["Dark edge"] },
-				{ "none", L["None"] },
-			}, Ours)
-		end,
-		textColor = false, outline = false, outlineColor = false, -- (their colors: by school; the edge, above)
-	})
 
 	stack:Header(content, L["The game's floating text"])
 	rows.Check("combatTextHideGame", L["Turn off the game's damage and healing numbers"],
@@ -974,7 +1130,76 @@ function ns.CreateCombatTextStylePanel(kit)
 		end
 	end)
 
-	canvas:SetScript("OnShow", kit.PageShown(kit.Refresh, content))
+	Into(1, general)
+
+	-- The numbers' look, on the page itself (the Style pages' template,
+	-- StylePages.lua's rows.Look, inline): their font, size, edge and height.
+	local lookHeader = stack:Header(content, L["Look"])
+	rows.Look("", L["Our numbers"], {
+		inline = true,
+		tabs = { default = function(key) return ns.DEFAULTS[key] end, source = ns.PageLookSource,
+			copyKind = "combatTextLook", copyName = L["Our numbers"] },
+		font = { "combatTextFont", L["The font for the numbers."],
+			test = Ours }, -- (its list starts with The game's: "game")
+		textSize = function(look)
+			look.Slider("combatTextSize", L["Size"], 50, 200, 5, "%d%%", 100,
+				L["How big the numbers are, next to the game's."], Ours)
+			look.Slider("combatTextHeight", L["Y offset"], -40, 80, 2, "%d px", nil,
+				L["Moves the numbers up or down."], Ours)
+		end,
+		shadow = function(look)
+			look.Choices(L["Edge:"], "combatTextEdge", {
+				{ "game", L["The game's"], L["A dark shadow up and to the right, no edge."] },
+				{ "both", L["Edge and shadow"], L["A dark edge and the drop shadow."] },
+				{ "edge", L["Dark edge"] },
+				{ "none", L["None"] },
+			}, Ours)
+		end,
+		textColor = false, outline = false, outlineColor = false, -- (their colors: by school; the edge, above)
+	})
+
+	Into(2, lookHeader)
+
+	-- A text's tab: whether it shows (extra: rows of its own under it), a
+	-- color of its own, and its size, place, climb and time on screen.
+	local function TextTab(i, text, label, tip, extra)
+		local key = "combatText" .. text.name
+		local header = stack:Header(content, tabList[i][1])
+		rows.Check(text.show, label, tip, Ours)
+		local function Shown(db) return Ours(db) and db[text.show] ~= false end
+		if extra then extra(Shown) end
+		local own = rows.Check(key .. "Own", L["Color of its own"], L["Draws it in the color beside it."], Shown)
+		rows.Swatch(own, nil, { key .. "R", key .. "G", key .. "B" }, L["Its color."],
+			function(db) return Shown(db) and db[key .. "Own"] end)
+		rows.Slider(key .. "Size", L["Size"], 50, 300, 5, "%d%%", 100, L["How big it is, next to the Look tab's size."],
+			Shown)
+		rows.Slider(key .. "Y", L["Y offset"], -80, 120, 2, "%d px", nil, L["Moves it up or down."], Shown)
+		rows.Slider(key .. "X", L["X offset"], -150, 150, 2, "%d px", nil, L["Moves it left or right."], Shown)
+		rows.Slider(key .. "Rise", L["Climb"], 0, 300, 10, "%d%%", 100, L["How far it rises, next to its usual."], Shown)
+		rows.Slider(key .. "Life", L["Time on screen"], 30, 300, 10, "%d%%", 100,
+			L["How long it stays, next to its usual."], Shown)
+		Into(i, header)
+	end
+	local TEXT = {}
+	for _, text in ipairs(ns.COMBAT_TEXTS) do TEXT[text.kind] = text end
+	TextTab(3, TEXT.spell, L["Spell hits"], L["Your spells' damage, in yellow."])
+	TextTab(4, TEXT.swing, L["Swings"], L["Your melee and other physical hits, in white."])
+	TextTab(5, TEXT.crit, L["Show crits as crits"], L["Off: a crit looks like a plain hit."], function(Shown)
+		rows.Check("combatTextCritPop", L["Crits pop"],
+			L["A crit grows big for a moment, then settles."], Shown)
+		rows.Choices(L["Where:"], "combatTextCritSpot", {
+			{ "plate", L["Over the bar"], L["Low over the health bar, as the game's."] },
+			{ "above", L["Above, like hits"], L["Where hits start, rising as they do."] },
+		}, Shown)
+	end)
+	TextTab(6, TEXT.heal, L["Your heals on friends"], L["Heals on friendly nameplates, in green."])
+	TextTab(7, TEXT.miss, L["Misses"], L["Miss, Dodge, Parry, Immune and the like, in the game's words."])
+	TextTab(8, TEXT.kill, L["Kill"], L["Shows Kill when the game sends no number for the killing blow."])
+
+	canvas:SetScript("OnShow", kit.PageShown(function()
+		kit.Refresh()
+		TabsShown()
+	end, content))
 	canvas:Hide()
 	kit.RegisterSubpage(canvas, "Combat Text Style", L["Combat Text Style"])
 end
