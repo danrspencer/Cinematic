@@ -66,6 +66,7 @@ Support\TitanPanel.lua
 Support\TomTom.lua
 Support\ShamanPower.lua
 Frames.lua
+UI\QuestStandIn.lua
 UI\CooldownStacks.lua
 UI\CooldownSituations.lua
 Visions\HealVisionFrames.lua
@@ -212,6 +213,7 @@ Dev\MinimapTiles.lua
 Dev\MinimapCopy.lua
 Dev\LowManaTest.lua
 Dev\ThresholdTest.lua
+Dev\QuestFocusTest.lua
 Dev\FlickerTest.lua
 Dev\PartyFlickerTest.lua
 Dev\NamesTest.lua

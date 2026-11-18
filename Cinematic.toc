@@ -75,6 +75,7 @@ Support\TitanPanel.lua
 Support\TomTom.lua
 Support\ShamanPower.lua
 Frames.lua
+UI\QuestStandIn.lua
 UI\CooldownStacks.lua
 UI\CooldownSituations.lua
 Visions\HealVisionFrames.lua

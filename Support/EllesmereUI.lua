@@ -460,7 +460,10 @@ do
 		return found
 	end
 	ns.WhenAddonLoads("EllesmereUIQuestTracker", function()
-		ns.AddQuestFocusTracker(Apply, "EllesmereUI")
+		ns.AddQuestFocusTracker(Apply, "EllesmereUI", function()
+			local tracker = _G.EUI_CustomQuestTracker
+			return type(tracker) == "table" and tracker.IsShown and ns.Flag(tracker:IsShown())
+		end)
 	end)
 end
 

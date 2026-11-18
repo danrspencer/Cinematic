@@ -1777,6 +1777,10 @@ local function HandleSlash(msg)
 		-- (Dev copy: one run logging what sets your target plate's name in a fight, PlateFlickerTest.lua.)
 		if ns.PlateFlickerTest then ns.PlateFlickerTest()
 		else ns.Print("/cine debug plateflicker is in the dev copy only.") end
+	elseif cmd == "debug" and arg:find("^questfocus") then
+		-- (Dev copy: one run recording the Quest tracker's Show just that quest, QuestFocusTest.lua.)
+		if ns.QuestFocusTest then ns.QuestFocusTest(arg:match("^questfocus%s*(.*)$"))
+		else ns.Print("/cine debug questfocus is in the dev copy only.") end
 	elseif cmd == "debug" and arg:find("^dimname") then
 		-- (Dev copy: one run checking the action buttons' Opacity and the target's Name background, DimNameTest.lua.)
 		if ns.DimNameTest then ns.DimNameTest(arg:match("^dimname%s*(.*)$"))

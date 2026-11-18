@@ -204,11 +204,22 @@ end)
 -- timer, or nil; active: just those wanted now). It returns whether it has
 -- any of them, and sets ns.questFocusOthersUp while it has anything faded or
 -- moved, so it's called again till it's all back (Frames.lua).
+-- shown(), if given, says whether that addon's tracker is up now (it keeps
+-- its own list of quests, so quest progress reveals for any quest then).
 ns.QUEST_FOCUS_TRACKERS = {}
 ns.questFocusTrackerNames = {} -- (fn -> the addon's name, for /cine debug framepass)
-function ns.AddQuestFocusTracker(fn, name)
+local trackerShown = {}
+function ns.AddQuestFocusTracker(fn, name, shown)
 	table.insert(ns.QUEST_FOCUS_TRACKERS, fn)
 	ns.questFocusTrackerNames[fn] = name
+	if shown then trackerShown[#trackerShown + 1] = shown end
+end
+function ns.QuestTrackerOfAddonUp()
+	for _, shown in ipairs(trackerShown) do
+		local ok, up = pcall(shown)
+		if ok and up then return true end
+	end
+	return false
 end
 
 -- Parts other addons put on Quest talk's bubble (CinematicQuestTalkBubble),

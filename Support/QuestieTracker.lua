@@ -397,7 +397,7 @@ local function AfterRebuild()
 end
 
 ns.WhenAddonLoads("Questie", function()
-	ns.AddQuestFocusTracker(Apply, "Questie")
+	ns.AddQuestFocusTracker(Apply, "Questie", function() return Shown(_G.Questie_BaseFrame) end)
 	local ok, tracker = pcall(function() return _G.QuestieLoader:ImportModule("QuestieTracker") end)
 	if ok and type(tracker) == "table" and type(tracker.UpdateHeight) == "function" then
 		hooksecurefunc(tracker, "UpdateHeight", MeasureOwnLayout)

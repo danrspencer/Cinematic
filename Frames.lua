@@ -7297,9 +7297,16 @@ do
 			end
 		end
 	end
+	local drawnFocus = {} -- [quest ID] = its block, the shown quests the tracker drew (for their stand-ins)
+	local missingFocus = {} -- (kept, refilled each pass: the shown quests it didn't draw)
+	local function Watched(questID)
+		local watchType = C_QuestLog and C_QuestLog.GetQuestWatchType
+		return not watchType or watchType(questID) ~= nil
+	end
 	local function ApplyFocus(tracker, alpha, timers, active)
-		local found = false
+		local found, sawQuests = false, false
 		wipe(blockAlphas)
+		wipe(drawnFocus)
 		questGaps.Plan(tracker, timers, active)
 		for _, section in ipairs(TrackerSections(tracker)) do
 			if type(section) == "table" and type(section.usedBlocks) == "table" and not IsForbidden(section) then
@@ -7326,6 +7333,7 @@ do
 									blockAlpha = sectionAlpha
 								elseif focus.quests[id] or timers and timers[id] then
 									sectionHas = true
+									drawnFocus[id] = block
 									-- (Drawn up top instead: Close the gaps.)
 									blockAlpha = questGaps.shift[block] and 0 or 1
 									if blockAlpha == 0 then
@@ -7333,6 +7341,7 @@ do
 									end
 								end
 								blockAlphas[block] = blockAlpha
+								sawQuests = sawQuests or not scenarioSection
 								ns.FadeRelative(block, blockAlpha)
 							end
 						end
@@ -7375,7 +7384,7 @@ do
 			end
 		end
 		questGaps.Draw(tracker)
-		return found
+		return found, sawQuests
 	end
 	local function Focus(questID)
 		if not (ns.db and ns.db.questRevealOnlyThat and (type(questID) == "number" or questID == SCENARIO)) then
@@ -7507,6 +7516,10 @@ do
 		focus.timers = timers
 		if focus.on and (showAll or (questRevealUntil <= now and entry.alpha == 0)) then
 			focus.on = false
+			if ns.questFocusRec then
+				ns.questFocusRec("off", showAll and "focus off: shown for something else (hover, fight row, " ..
+					"preview, not CineMode, or Just that quest off)" or "focus off: reveal over")
+			end
 		end
 		local want = (focus.on or timers) and 0 or 1
 		if want == 1 and focus.othersAlpha == 1 and not questGaps.up and not ns.questFocusOthersUp then
@@ -7516,8 +7529,41 @@ do
 		focus.othersAlpha = entry.alpha == 0 and want
 			or ns.Approach(focus.othersAlpha, want, elapsed, want > 0 and ns.FadeInTime() or ns.FadeOutTime())
 		started = ns.framePassTimes and debugprofilestop()
-		local found = ApplyFocus(entry.frame, focus.othersAlpha, timers, want == 0)
+		local found, sawQuests = ApplyFocus(entry.frame, focus.othersAlpha, timers, want == 0)
 		ns.NoteSlowCall("quest tracker focus (game's tracker)", started)
+		-- (A shown quest the tracker had no room to draw: its stand-in,
+		-- QuestStandIn.lua, under the shown ones it did draw.)
+		if ns.QuestStandIn then
+			local missing = wipe(missingFocus)
+			local below
+			if focus.on and want == 0 and sawQuests and not timers then
+				for questID in pairs(focus.quests) do
+					if type(questID) == "number" and not drawnFocus[questID] and Watched(questID) then
+						missing[#missing + 1] = questID
+					end
+				end
+				table.sort(missing)
+				if #missing > 0 then
+					for _, block in pairs(drawnFocus) do
+						local ok, bottom = pcall(function()
+							return block:GetBottom() * block:GetEffectiveScale() + (questGaps.shift[block] or 0)
+						end)
+						if ok and type(bottom) == "number" and not IsSecretValue(bottom) then
+							below = math.min(below or bottom, bottom)
+						end
+					end
+					if below then below = below - 10 * entry.frame:GetEffectiveScale() end
+				end
+			end
+			local drew = ns.QuestStandIn(entry.frame, missing, below)
+			if drew then
+				found = true
+			end
+			if ns.questFocusRec and #missing > 0 then
+				ns.questFocusRec("standin", ("quests %s: %s"):format(table.concat(missing, ","),
+					drew and "drawn" or ("not drawn, " .. tostring(ns.questStandInProblem))))
+			end
+		end
 		-- (Other addons' trackers in its place: AddonSupport.lua.)
 		for _, apply in ipairs(ns.QUEST_FOCUS_TRACKERS) do
 			started = ns.framePassTimes and debugprofilestop()
@@ -7527,13 +7573,43 @@ do
 					started)
 			end
 		end
+		-- (None of its quests in the tracker by then. A tracked quest the
+		-- tracker has no room for (a full one lists only the first 16 or so)
+		-- isn't drawn: with the game's tracker readable (it has quests), the
+		-- reveal ends, the tracker fading back out with the rest still faded,
+		-- instead of the whole tracker coming up for a quest not on it (seen
+		-- 2026-11-18, Forever, 20 tracked). Else, an unknown shape: the lot.)
 		if not found and focus.on and now - focus.since > FOCUS_FIND_TIME then
-			focus.on = false
+			if sawQuests and not timers then
+				if questRevealUntil > now then
+					questRevealUntil = now
+					if ns.questFocusRec then
+						ns.questFocusRec("off", "reveal ended: quests " .. ns.questFocusRecKeys(focus.quests)
+							.. " not drawn in the tracker (no room?)")
+					end
+				end
+			else
+				focus.on = false
+				if ns.questFocusRec then
+					ns.questFocusRec("off", "focus off: none of quests " .. ns.questFocusRecKeys(focus.quests)
+						.. " found in any tracker")
+				end
+			end
+		end
+		if ns.questFocusRec then
+			ns.questFocusRec("tick", ("showAll %s, timers %s, focus %s, want %s, others %.2f, found %s, alpha %.2f"):format(
+				tostring(showAll), tostring(timers ~= nil), tostring(focus.on), tostring(want),
+				focus.othersAlpha or -1, tostring(found), entry.alpha or -1))
 		end
 	end
 	local function Reveal(setting, questID)
 		if ns.db and ns.db[setting] then
+			local alphaBefore = focus.entry and focus.entry.alpha
 			Focus(questID)
+			if ns.questFocusRec then -- (/cine debug questfocus, Dev/QuestFocusTest.lua)
+				ns.questFocusRec("reveal", ("%s quest %s: tracker alpha %s, focus on %s (quests %s)"):format(setting,
+					tostring(questID), tostring(alphaBefore), tostring(focus.on), ns.questFocusRecKeys(focus.quests)))
+			end
 			local hold = ns.HoldTime("mouseoverHold") - ns.FadeOutTime()
 			-- (Override default reveal time, Quest tracker page: up this long instead.)
 			local override = tonumber(ns.HoldTime("questRevealTime")) or 0 -- (0 in camera modes)
@@ -7584,6 +7660,9 @@ do
 	end
 	local ACCEPT_TRACK_WAIT = 0.3 -- (the game tracks it a moment after accepting)
 	questWatcher:SetScript("OnEvent", function(_, event, quest, second)
+		if ns.questFocusRec then
+			ns.questFocusRec("event", ("%s %s %s"):format(event, tostring(quest), tostring(second)))
+		end
 		-- (Older clients give a quest log index: with "Show just that quest",
 		-- the quest log scan below reveals instead, knowing the quest.)
 		local scanReveals = event == "QUEST_WATCH_UPDATE" and not ns.isRetail and ns.db and ns.db.questRevealOnlyThat
@@ -7606,7 +7685,10 @@ do
 	-- QUEST_WATCH_UPDATE misses progress-bar objectives (a percentage going
 	-- up) and some counted ones, so each quest's progress (its counts plus its
 	-- bar's percent) is summed after a quest log update, and a quest whose sum
-	-- went up reveals. A quest seen for the first time doesn't. Any client with
+	-- went up reveals. A quest seen for the first time doesn't, nor one that
+	-- isn't in the tracker (untracked: "Show just that quest" can't find it
+	-- there and so showed the whole tracker), unless another addon's tracker
+	-- is up in the game's place (it keeps its own list). Any client with
 	-- retail's quest log API (retail and Forever).
 	local questLog = C_QuestLog
 	local function IsTrackedID(questID)
@@ -7614,6 +7696,9 @@ do
 			return questLog.GetQuestWatchType(questID) ~= nil
 		end
 		return true
+	end
+	local function InTracker(questID)
+		return IsTrackedID(questID) or (ns.QuestTrackerOfAddonUp and ns.QuestTrackerOfAddonUp())
 	end
 	if questLog and questLog.GetNumQuestLogEntries and questLog.GetInfo and questLog.GetQuestObjectives then
 		local progress, seen, advancedQuests = {}, {}, {}
@@ -7665,7 +7750,13 @@ do
 				end
 			end
 			for _, questID in ipairs(advanced) do
-				Reveal("questRevealOnProgress", questID)
+				if ns.questFocusRec then
+					ns.questFocusRec("scan", ("quest %d moved on: tracked %s, addon tracker up %s"):format(questID,
+						tostring(IsTrackedID(questID)), tostring(ns.QuestTrackerOfAddonUp and ns.QuestTrackerOfAddonUp())))
+				end
+				if InTracker(questID) then
+					Reveal("questRevealOnProgress", questID)
+				end
 			end
 		end
 		local logWatcher = CreateFrame("Frame")
@@ -12528,6 +12619,11 @@ function ns.UpdateFrames(cinematic, elapsed)
 		-- (Show just that quest, Quest tracker page.)
 		if entry.frame == _G.ObjectiveTrackerFrame and entry.group == "quests" then
 			local shownAnyway = not cinematic or hovered[row] or fightingShown or ns.previewRows
+			if ns.questFocusRec then
+				ns.questFocusRec("why", ("cinematic %s, hovered %s, fight row %s, preview %s, triggered %s, " ..
+					"target %s"):format(tostring(cinematic), tostring(hovered[row]), tostring(fightingShown),
+					tostring(ns.previewRows ~= nil), tostring(triggered[row]), tostring(target)))
+			end
 			ns.QuestFocusTick(entry, shownAnyway or not ns.db.questRevealOnlyThat, elapsed,
 				trackerTimerUp and not shownAnyway and (not triggered[row] or (questReveal and ns.db.questRevealOnlyThat)))
 		end
