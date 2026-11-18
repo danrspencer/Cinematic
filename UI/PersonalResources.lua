@@ -648,7 +648,11 @@ function ns.YourFrameWhy(setting, entry, afterFight, fighting, add)
 	-- it's linked to.)
 	local hKey = healthKey and ColumnKey(db, healthKey, hCol)
 	local pKey = powerKey and ColumnKey(db, powerKey, pCol)
-	local function Tag(col, share) return ("%s: %s"):format(COLUMN_NAMES[col], ShareText(share)) end
+	-- (A row with only health or only power has no column for the other: nil.)
+	local function Tag(col, share)
+		if not col then return nil end
+		return ("%s: %s"):format(COLUMN_NAMES[col], ShareText(share))
+	end
 	-- (A column not in play now that would keep it up more: when it would.)
 	local nowCol = fighting and 1 or afterFight and 2 or 3
 	for _, key in ipairs({ healthKey or false, powerKey or false }) do

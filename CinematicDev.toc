@@ -213,6 +213,7 @@ Dev\MinimapCopy.lua
 Dev\LowManaTest.lua
 Dev\ThresholdTest.lua
 Dev\FlickerTest.lua
+Dev\PartyFlickerTest.lua
 Dev\NamesTest.lua
 Dev\StyleRevampTest.lua
 Dev\StyleSixTest.lua
