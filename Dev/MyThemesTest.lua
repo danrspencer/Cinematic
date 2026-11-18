@@ -71,7 +71,8 @@ local function Grid()
 	local parts = Parts()
 	if not parts then return Verdict(false, "no picker made") end
 	local rows, tooWide, shown, sizes = {}, {}, 0, {}
-	for theme, card in pairs(parts.cards) do
+	for _, card in pairs(parts.cards) do
+		local theme = card.theme or ns.StyleThemeByKey("game")
 		if card:IsShown() then
 			shown = shown + 1
 			local top = card:GetTop() and math.floor(card:GetTop() + 0.5) or 0

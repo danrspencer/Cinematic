@@ -1524,6 +1524,24 @@ local function FontOf(theme)
 	return ns.StyleFontFile(theme.cardFont or theme.settings.styleFont) or (_G.GameFontNormal:GetFont())
 end
 
+-- What a card draws of a theme, as one string: one of yours is made again as a
+-- new table on every change to any of yours, so its card is kept while this
+-- stays the same (a frame can't be freed: one per change piled up).
+local function CardLook(theme)
+	if not theme.mine then return theme.key end
+	local parts = { theme.key, tostring(theme.name), tostring(theme.base), tostring(theme.cardFont),
+		tostring(theme.settings.styleFont), tostring(theme.settings.stylePanel) }
+	local function Add(c)
+		parts[#parts + 1] = type(c) == "table" and ("%.3f,%.3f,%.3f"):format(c[1] or 0, c[2] or 0, c[3] or 0) or "-"
+	end
+	for _, c in ipairs(theme.swatch or {}) do Add(c) end
+	Add(theme.line)
+	Add(theme.ornament)
+	Add(theme.panel)
+	Add(theme.menu and theme.menu.accent)
+	return table.concat(parts, "|")
+end
+
 local function MakeCard(parent, theme, width, onPick, Tooltip)
 	local card = CreateFrame("Button", nil, parent)
 	card:SetSize(width, CARD_H)
@@ -1687,14 +1705,19 @@ function ns.MakeCurrentThemeStrip(kit, parent, width)
 	function holder:Refresh()
 		local db = ns.GetDB()
 		local current = db and db.styleGeneral and Find(db.styleTheme) or BY_KEY.game
-		if not cards[current] then
-			local card = MakeCard(holder, current, cardW, Open, kit.Tooltip)
+		-- (By theme key, made again only when what it draws changed: CardLook.)
+		local look = CardLook(current)
+		local card = cards[current.key]
+		if not card or card.look ~= look then
+			if card then card:Hide() end
+			card = MakeCard(holder, current, cardW, Open, kit.Tooltip)
+			card.look = look
 			card:SetPoint("TOPLEFT")
 			card:Mark(true)
-			cards[current] = card
+			cards[current.key] = card
 		end
-		for theme, card in pairs(cards) do card:SetShown(theme == current) end
-		cards[current].FitName()
+		for key, each in pairs(cards) do each:SetShown(key == current.key) end
+		card.FitName()
 		local shown = NameOf(current)
 		name:SetText(ns.StyleThemeEdited() and (L["%s, with your changes"]):format(shown) or shown)
 	end
@@ -2018,16 +2041,24 @@ function ns.MakeThemePicker(kit, parent, width, changed)
 		end)
 	end
 
+	-- (By theme key; made again only when what it draws changed: CardLook.)
 	local function CardOf(theme)
-		local card = cards[theme]
+		local card = cards[theme.key]
+		local look = CardLook(theme)
+		if card and card.look ~= look then
+			card:Hide()
+			card = nil
+		end
 		if not card then
 			card = MakeCard(holder, theme, cardW, Pick, kit.Tooltip)
+			card.look = look
 			card:RegisterForClicks("LeftButtonUp", "RightButtonUp")
 			card:SetScript("OnClick", function(self, button)
-				if button == "RightButton" then Menu(self, theme) else Pick(theme.key) end
+				if button == "RightButton" then Menu(self, self.theme) else Pick(self.theme.key) end
 			end)
-			cards[theme] = card
+			cards[theme.key] = card
 		end
+		card.theme = theme
 		return card
 	end
 
@@ -2076,9 +2107,9 @@ function ns.MakeThemePicker(kit, parent, width, changed)
 		local on = db and db.styleGeneral and true or false
 		local current = db and Find(db.styleTheme) or BY_KEY.game
 		Layout()
-		for theme, card in pairs(cards) do
+		for key, card in pairs(cards) do
 			if card:IsShown() then card.FitName() end
-			card:Mark(theme == current)
+			card:Mark(key == current.key)
 			card:SetEnabled(on)
 			card:SetAlpha(on and 1 or 0.45)
 		end
@@ -2098,6 +2129,8 @@ function ns.MakeThemePicker(kit, parent, width, changed)
 				color = pending[which] or color or { 1, 1, 1 }
 				square.fill:SetColorTexture(color[1], color[2], color[3], 1)
 				square.words:SetFontObject(own and "GameFontHighlightSmall" or "GameFontDisableSmall")
+				-- (Its words again after the swap: else Russian shows as boxes.)
+				square.words:SetText(L[MINE_COLOR_NAMES[which]])
 			end
 		end
 	end
