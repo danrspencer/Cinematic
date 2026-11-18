@@ -12,6 +12,7 @@ local DEFAULTS = ns.DEFAULTS
 
 DEFAULTS.cardLevelUpOn = false
 DEFAULTS.cardDiscoverOn = false
+DEFAULTS.cardNewZoneOn = true -- (a whole new zone as its own big card: only with Discovered ticked)
 DEFAULTS.cardDepartureOn = false
 DEFAULTS.cardDepartureLine = true -- (its progress line as you fly: FlightLine.lua)
 DEFAULTS.cardDepartureLinePlace = "top" -- its bar: "top" or "bottom" (no letterbox up: that edge of the screen)
@@ -121,17 +122,24 @@ end
 local function Wanted()
 	return ns.CardOn("discover") or (ns.db and ns.db.letterboxOnDiscover) or false
 end
-local function Discovered(name, sub)
+-- (A whole zone, New zone's card where it's ticked: its name big, "Discovered"
+-- small over it.)
+local function NewZoneCard(name)
+	return { meta = L["Discovered"], name = name, sub = "" }
+end
+-- whole: the place is a zone (Westfall), not a subzone or an instance.
+local function Discovered(name, sub, whole)
 	-- (30 sec: the game's "Discovered:" line can come seconds after its card.)
 	if name == "" or (name == lastFound and GetTime() - lastFoundAt < 30) then return end
 	lastFound, lastFoundAt = name, GetTime()
-	ns.Log("card", "Discovered: " .. name)
+	ns.Log("card", "Discovered: " .. name .. (whole and " (a zone)" or ""))
 	if ns.AchievementProgress then ns.AchievementProgress.Discovered(name) end
 	if ns.LetterboxOnDiscover then ns.LetterboxOnDiscover() end
 	if not ns.CardOn("discover") then return end
 	ns.Cards.Cut("zone")
 	ns.Cards.Cut("subzone")
-	if ns.Cards.Fire("discover", DiscoverCard(name, sub)) then
+	local big = whole and ns.CardOn("newZone")
+	if ns.Cards.Fire(big and "newZone" or "discover", big and NewZoneCard(name) or DiscoverCard(name, sub)) then
 		shownAt = GetTime()
 		if ns.HideGameDiscovered then ns.HideGameDiscovered() end
 	end
@@ -175,7 +183,7 @@ local function ZoneEntered()
 	if count and count > 0 then new = count <= 1 else new = not first end
 	if new and Wanted() then
 		zoneFoundAt = GetTime()
-		Discovered(zone)
+		Discovered(zone, nil, true)
 	end
 end
 local function InfoLine(text)
@@ -190,7 +198,7 @@ local function InfoLine(text)
 				return
 			end
 			local zone = Zone()
-			Discovered(place, zone ~= place and zone or "")
+			Discovered(place, zone ~= place and zone or "", place == zone and not ns.Flag(IsInInstance()))
 			return
 		end
 	end
@@ -330,7 +338,7 @@ end
 -- place: skipped, and the game's yellow text goes).
 function ns.DiscoverPlace(place, zone)
 	if not ns.CardOn("discover") then return false end
-	Discovered(place, zone ~= place and zone or "")
+	Discovered(place, zone ~= place and zone or "", place == zone and not ns.Flag(IsInInstance()))
 	return GetTime() - shownAt < 1
 end
 -- /cine debug explore: what the game's count says about where you are.
@@ -370,6 +378,10 @@ end
 ns.CardSequences.discover = function()
 	local zone = Zone() ~= "" and Zone() or "Elwynn Forest"
 	return { DiscoverCard(zone), samples.discover(), DiscoverCard(L["The Deadmines"], L["Dungeon"]) }
+end
+samples.newZone = function()
+	local zone = Zone()
+	return NewZoneCard(zone ~= "" and zone or L["Westfall"])
 end
 
 ---------------------------------------------------------------------------

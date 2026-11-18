@@ -215,7 +215,8 @@ end
 local GROUPS = {
 	{ "Place", { "Place" } }, { "Position", { "OffsetX", "OffsetY" } }, { "In the bar", { "Align" } }, { "Letterbox scale", { "BarScale" } },
 	{ "No letterbox", { "BarFallback" } }, { "Style", { "Style" } }, { "Animation", { "Anim" } },
-	{ "Font", { "Font" } }, { "Size", { "Size" } }, { "Outline", { "Outline" } },
+	{ "Font", { "Font" } }, { "Size", { "Size" } }, { "Capitals", { "Caps" } }, { "Word per line", { "Stack" } },
+	{ "Outline", { "Outline" } },
 	{ "Outline color", { "OutlineR", "OutlineG", "OutlineB" } }, { "Shadow", { "Shadow" } },
 	{ "Color", { "R", "G", "B" } }, { "Small lines' font", { "SmallFont" } }, { "Small lines' size", { "SmallSize" } },
 	{ "Small lines' color", { "SmallColor", "SmallR", "SmallG", "SmallB" } },
@@ -526,18 +527,28 @@ local function LookGrid(kit, content, stack, fieldOf, changed, own, icon)
 		{ "banner", L["Banner"], L["Big words across the middle of the screen on a dark band."] },
 	})
 	Dot({ "Animation" })
+	-- (Two rows of them: five buttons on one cut their names short.)
 	Buttons(Name(L["Animation"]), "cardAnim", {
 		{ "fade", L["Fade"], L["The card fades in and out."] },
 		{ "reveal", L["Reveal"], L["The words open out from their middle."] },
 		{ "track", L["Tracking"], L["The letters start spread apart and close up, like a film title."] },
-		{ "type", L["Type"], L["The words appear a letter at a time, as if typed."] },
 	})
+	Buttons(Name(""), "cardAnim", {
+		{ "type", L["Type"], L["The words appear a letter at a time, as if typed."] },
+		{ "slam", L["Slam"], L["The words start big and slam down to size."] },
+	}, nil, (Field() + 2) * 2 / 3 - 1)
 	Dot({ "Font" })
 	Narrow(rows.Font("cardFont", L["Words in Russian, Korean or Chinese keep the game's font, so their letters show."],
 		nil, nil, L["Font"]))
 	Dot({ "Size" })
-	Number("cardSize", L["Size"], 14, 80, 1, "%d", 1,
+	Number("cardSize", L["Size"], 14, 140, 1, "%d", 1,
 		L["How tall the words are."], function(db) return On(db) and not BarUp() end)
+	Dot({ "Capitals" })
+	local caps = Tick("cardCaps", L["Capitals"], L["Shows the words in capital letters."])
+	if caps then caps.noSettingId = true end
+	Dot({ "Word per line" })
+	local stacked = Tick("cardStack", L["Word per line"], L["Puts each word on a line of its own."])
+	if stacked then stacked.noSettingId = true end
 	-- (On its row, its swatch under the row's end, over the Outline's.)
 	local COLOR_NAME = 60
 	at.x, at.y = CELL_RIGHT + CELL_W - 28 - COLOR_NAME, at.y - CELL_ROW
@@ -714,6 +725,9 @@ local TIPS = {
 		"times you died.",
 	discover = "A place new to you: a zone the first time you're there, a subzone as the game says you " ..
 		"discovered it, a dungeon or raid the first time you go in. In place of the Zone or Subzone card.",
+	newZone = "A whole zone new to you (Westfall, Duskwood) gets a card of its own: its name big in the middle of " ..
+		"the screen, in place of Discovered's. Subzones, dungeons and raids stay on Discovered. Only with " ..
+		"Discovered ticked.",
 	departure = "As a flight takes off: where it's taking you, and about how long it takes on a route you've " ..
 		"flown before. With a line along the top or bottom of the screen filling up on the way, if you like.",
 	arrival = "As a flight lands: where it took you, and how long the flight took.",
@@ -1484,7 +1498,7 @@ function ns.CreateCardSettingsPanel(kit)
 		end
 		stack:Note(content, L["Its look is on the Style tab, its sound on the Sounds tab."], NOTE_W)
 	end)
-	for _, id in ipairs({ "cleared", "discover", "arrival", "rested", "levelUp", "achievement", "explore", "almost", "step",
+	for _, id in ipairs({ "cleared", "discover", "newZone", "arrival", "rested", "levelUp", "achievement", "explore", "almost", "step",
 		"reputation", "collect",
 		"profession", "quest", "rare", "battleground", "streak" }) do
 		parts.Part(id, function()

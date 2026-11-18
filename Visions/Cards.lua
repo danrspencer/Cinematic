@@ -79,6 +79,10 @@ local EVENTS = {
 	-- (A notch over Zone's: it cuts in on the card it'd come with.)
 	{ id = "discover", name = "Discovered", on = "cardDiscoverOn", priority = 45,
 		icon = "Interface\\Icons\\INV_Misc_Spyglass_03", parent = "zone", inFight = "show" },
+	-- (Discovered's card for a whole zone new to you, Westfall, Duskwood: big,
+	-- in its own look. Subzones, dungeons and raids stay Discovered's.)
+	{ id = "newZone", name = "New zone", on = "cardNewZoneOn", priority = 45,
+		icon = "Interface\\Icons\\INV_Misc_Map02", parent = "discover", needs = "discover", inFight = "show" },
 	-- (Over Zone's and Subzone's: a city hop crosses subzones as it takes off,
 	-- their cards would keep it waiting till it's dropped.)
 	{ id = "departure", name = "Flight departure", on = "cardDepartureOn", priority = 42,
@@ -143,7 +147,7 @@ ns.CARD_BY_ID = BY_ID
 ns.CARD_GROUPS = {
 	{ name = "Combat", "combatIn", "combatOut", "attack", "streak", "death", "revived" },
 	{ name = "Bosses and rares", "boss", "bossDown", "cleared", "rare", "felled" },
-	{ name = "Places and travel", "zone", "subzone", "discover", "departure", "arrival", "rested" },
+	{ name = "Places and travel", "zone", "subzone", "discover", "newZone", "departure", "arrival", "rested" },
 	{ name = "Your story", "login", "time", "quest" },
 	{ name = "Progress", "levelUp", "achievement", "explore", "almost", "step", "reputation", "collect", "profession" },
 	{ name = "Player vs. player", "duel", "battleground" },
@@ -180,9 +184,11 @@ local FIELDS = {
 	{ "BarScale", { "combatBarScale" }, 0.5 },   -- in a bar: the words' height, a share of the bar's
 	{ "BarFallback", { "combatBarFallback" }, "third" }, -- in a bar with no letterbox up: "bar" (one of its own), "third", "screen", "none" (not shown)
 	{ "Style", { "combatStyle" }, "chapter" },   -- "title", "subtitle", "chapter" or "banner"
-	{ "Anim", { "combatAnim" }, "track" },       -- "fade", "reveal", "track" or "type"
+	{ "Anim", { "combatAnim" }, "track" },       -- "fade", "reveal", "track", "type" or "slam"
 	{ "Font", { "combatFont" }, "general" },     -- QUEST_ITEM_FONTS (general: General's)
 	{ "Size", { "combatSize" }, 36 },            -- the words' height on the screen
+	{ "Caps", { "combatCaps" }, false },         -- the words in capitals
+	{ "Stack", { "combatStack" }, false },       -- ...each word on a line of its own
 	{ "Outline", { "combatOutline" }, -1 },      -- 0 none, 1 thin, 2 thick (-1: General's)
 	{ "OutlineR", { "combatOutlineR" }, 0 },
 	{ "OutlineG", { "combatOutlineG" }, 0 },
@@ -278,6 +284,11 @@ local STYLES = {
 	{ id = "arcade", name = "Arcade", look = { Place = "screen", Style = "title", Font = "skurri", Size = 46,
 		Outline = 2, Pulse = 0.9, IconShow = true, R = 0.94, G = 0.62, B = 0.15, PulseR = 0.94, PulseG = 0.62,
 		PulseB = 0.15 } },
+	-- (A place's name big and plain, as a game's chapter title: heavy white
+	-- capitals, a word to a line, slammed onto the middle of the screen.)
+	{ id = "headline", name = "Headline", look = { Place = "screen", Style = "title", Anim = "slam", Font = "outfitbold",
+		Size = 96, Caps = true, Stack = true, Outline = 0, Shadow = "on", Hold = 3.5, SmallSize = 1.2,
+		R = 0.96, G = 0.96, B = 0.94, PulseR = 0.96, PulseG = 0.96, PulseB = 0.94 } },
 	{ id = "quiet", name = "Quiet", look = { Place = "top", Align = "right", Style = "chapter", BarScale = 0.45,
 		Hold = 2 } },
 }
@@ -289,7 +300,7 @@ ns.CARD_STYLE_BY_ID = STYLE_BY_ID
 -- from).
 local BASES = { combatIn = "danger", combatOut = "respite", attack = "danger", death = "death",
 	levelUp = "milestone", achievement = "milestone", cleared = "milestone", discover = "milestone",
-	quest = "milestone", battleground = "place",
+	newZone = "headline", quest = "milestone", battleground = "place",
 	zone = "place", subzone = "follow", departure = "follow", arrival = "follow", login = "place", boss = "place", duel = "place",
 	time = "milestone",
 	reputation = "ticker", collect = "ticker", explore = "ticker", almost = "ticker", step = "ticker", profession = "ticker", rested = "ticker",

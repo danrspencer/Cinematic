@@ -36,6 +36,9 @@ local LATE_FROM, LATE_FOR = 0.6, 0.6 -- ...a boss card's other lines coming in a
 local TRACK = 1.4                  -- Tracking in: seconds the letters take to close up
 local TRACK_FROM = 0.32            -- ...from this much apart (of the text's height)
 local TYPE_EACH = 0.07             -- Typewriter: seconds for each letter
+local SLAM, SLAM_IN = 0.32, 0.12   -- Slam: seconds the words take to shrink onto the screen, and to fade in
+local SLAM_FROM = 1.45             -- ...from this many times their size
+local SLAM_DRIFT = 0.04            -- ...then growing this much more till they've gone, slowly
 local PULSE_PEAK, PULSE_GONE = 0.12, 0.9
 local CUT_OUT = 0.25               -- a cue cut short (the fight's other edge came first) fades this fast
 local TOAST_GAP = 12               -- a card pushed under Blizzard's toast: this far under its bottom
@@ -198,6 +201,30 @@ local function LayLetters(cue, spacing)
 	end
 end
 
+-- Slam's size: the words and their outline's and worn copies, times scale
+-- (each grows about its own anchor: the words' middle on the screen).
+local function SlamScale(cue, scale)
+	local text = cue.text
+	if not text.SetTextScale then return end
+	text:SetTextScale(scale)
+	for _, rim in ipairs(text.rim) do rim:SetTextScale(scale) end
+	for _, bleed in ipairs(text.bleed) do bleed:SetTextScale(scale) end
+end
+
+-- word in capitals: string.upper only knows A-Z, so the accented Latin
+-- letters (à-þ) and the Russian ones (а-я, ё) too, as UTF-8 bytes.
+local function Capitals(word)
+	word = word:upper()
+	word = word:gsub("\195([\160-\190])", function(c)
+		if c == "\183" then return "\195\183" end -- (÷: no capital)
+		return "\195" .. string.char(c:byte() - 32)
+	end)
+	word = word:gsub("\208([\176-\191])", function(c) return "\208" .. string.char(c:byte() - 32) end)
+	word = word:gsub("\209([\128-\143])", function(c) return "\208" .. string.char(c:byte() + 32) end)
+	return (word:gsub("\209\145", "\208\129"))
+end
+ns.CardCapitals = Capitals
+
 -- Sets up cue for a going in (enter) or coming out, on a screen width x
 -- height; scale: that next to the real screen (the preview's smaller).
 -- boss: a boss card's { name, sub, meta } (the name can be secret: shown,
@@ -213,6 +240,17 @@ local function Setup(cue, look, enter, width, height, scale, boss)
 	end
 	local word = boss and boss.name or ns.CardWords(enter and "combatTextIn" or "combatTextOut")
 	local secret = issecretvalue ~= nil and issecretvalue(word)
+	-- (Capitals, and a word to a line: never for a secret name, which can't
+	-- be read or changed.)
+	local lines = 1
+	if not secret and type(word) == "string" then
+		if look.combatCaps == true then word = Capitals(word) end
+		if look.combatStack == true then
+			word = word:gsub("^%s+", ""):gsub("%s+$", "")
+			local stacked, breaks = word:gsub("%s+", "\n")
+			word, lines = stacked, breaks + 1
+		end
+	end
 	local style, place = look.combatStyle, look.combatPlace
 	-- (A banner: across the middle; a picture always on one, in place of the
 	-- words.)
@@ -287,6 +325,10 @@ local function Setup(cue, look, enter, width, height, scale, boss)
 	end
 	x, y = x + dx, y + dy
 	text:SetPoint(point, cue.over, relative, x, y)
+	-- (A word to a line: the lines lined up on the side the words hang from.)
+	local justify = point:find("LEFT") and "LEFT" or point:find("RIGHT") and "RIGHT" or "CENTER"
+	for _, each in ipairs({ text, unpack(text.rim) }) do each:SetJustifyH(justify) end
+	for _, each in ipairs(text.bleed) do each:SetJustifyH(justify) end
 	text:SetText(word)
 	local outline = OUTLINES[look.combatOutline] or ""
 	local or_, og, ob = look.combatOutlineR or 0, look.combatOutlineG or 0, look.combatOutlineB or 0
@@ -416,15 +458,19 @@ local function Setup(cue, look, enter, width, height, scale, boss)
 	local origin = point:find("LEFT") and "LEFT" or point:find("RIGHT") and "RIGHT" or "CENTER"
 	local pad = size * 0.5
 	clip:SetPoint(origin, text, origin, origin == "LEFT" and -pad or origin == "RIGHT" and pad or 0, 0)
-	clip:SetHeight(size * 2.5)
-	-- (Tracking in and Typewriter need the words' letters: a secret name opens
-	-- as Reveal.)
+	clip:SetHeight(size * (2.5 + lines - 1))
+	-- (Tracking in and Typewriter need the words' letters on one line: a
+	-- secret name, or a word to a line, opens as Reveal. Slam scales the
+	-- words' text: a client without that fades them.)
 	local anim = look.combatAnim
-	if (anim == "track" or anim == "type") and (secret or style == "none") then anim = "reveal" end
+	if (anim == "track" or anim == "type") and (secret or style == "none" or lines > 1) then anim = "reveal" end
+	if anim == "slam" and not text.SetTextScale then anim = "fade" end
 	cue.reveal, cue.track, cue.type = anim == "reveal", anim == "track", anim == "type"
+	cue.slam = anim == "slam" and style ~= "none"
 	cue.clipWidth = width
 	clip:SetWidth((cue.reveal or cue.type) and 1 or width)
-	cue.late, cue.rise = (cue.reveal or cue.track or cue.type) and (subText ~= "" or metaText ~= ""), size * 0.15
+	cue.late, cue.rise = (cue.reveal or cue.track or cue.type or cue.slam) and (subText ~= "" or metaText ~= ""),
+		size * 0.15
 	cue.lateFrom, cue.typeTime = LATE_FROM, 0
 	-- The words' width up to a letter, measured in their own font, so pairs
 	-- keep their kerning.
@@ -496,6 +542,7 @@ local function Setup(cue, look, enter, width, height, scale, boss)
 	text:SetAlpha(cue.tracking and 0 or cue.textAlpha)
 	for _, rim in ipairs(text.rim) do rim:SetAlpha(cue.tracking and 0 or 1) end
 	for _, bleed in ipairs(text.bleed) do bleed:SetAlpha(cue.tracking and 0 or BLEED_ALPHA) end
+	SlamScale(cue, cue.slam and SLAM_FROM or 1)
 	sub:SetAlpha(1)
 	meta:SetAlpha(1)
 	local showIcon = look[enter and "combatIconShowIn" or "combatIconShowOut"] and true or false
@@ -569,7 +616,8 @@ local function Shown(cue, age)
 	local hold = (cue.enter and look.combatHoldIn or look.combatHoldOut) + (cue.typeTime or 0) + (cue.holdExtra or 0)
 	local fadeIn = cue.pictured and PICTURE_IN or cue.banner and BANNER_IN or FADE_IN
 	local fadeOut = cue.pictured and PICTURE_OUT or cue.banner and BANNER_OUT
-		or (cue.reveal or cue.track or cue.type) and REVEAL_OUT or FADE_OUT
+		or (cue.reveal or cue.track or cue.type or cue.slam) and REVEAL_OUT or FADE_OUT
+	if cue.slam and not (cue.pictured or cue.banner) then fadeIn = SLAM_IN end
 	local a
 	if age < fadeIn then
 		a = age / fadeIn
@@ -805,6 +853,15 @@ local function Draw(cue, whole)
 				for _, bleed in ipairs(cue.text.bleed) do bleed:SetAlpha(BLEED_ALPHA) end
 			end
 		end
+	end
+	if cue.slam then
+		-- (Slam: the words shrinking onto the screen, eased out; then growing
+		-- a touch, slowly, till they've gone.)
+		local t = math.min(age / SLAM, 1)
+		open = t
+		local grow = 1 + (SLAM_FROM - 1) * (1 - t) ^ 3
+		if t >= 1 and length > SLAM then grow = 1 + SLAM_DRIFT * math.min((age - SLAM) / (length - SLAM), 1) end
+		SlamScale(cue, grow)
 	end
 	if cue.lineWidth then cue.line:SetWidth(math.max(cue.lineWidth * open, 0.01)) end
 	if cue.late then

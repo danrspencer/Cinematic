@@ -6340,3 +6340,7 @@ L["With a talk window open, Escape clears your target and closes the window in t
 -- What's new: A new Interface hub (Changelog.lua)
 L["A new Interface hub"] = "Un nuevo centro de Interfaz"
 L["Every kind of frame has one icon, with when it shows, what brings it back and how it looks as its tabs, grouped into Heads-up, Overhead and Info."] = "Cada tipo de marco tiene un icono, con cuándo se muestra, qué lo trae de vuelta y cómo se ve en sus pestañas, agrupados en Pantalla, Sobre la cabeza e Información."
+
+-- What's new: New zone card (Changelog.lua)
+L["New zone card"] = "Tarjeta de zona nueva"
+L["The first time you enter a zone like Westfall or Duskwood, its name slams onto the screen in huge white capitals. Comes with the new Headline style."] = "La primera vez que entras en una zona como Páramos de Poniente o Bosque del Ocaso, su nombre cae de golpe en la pantalla en enormes mayúsculas blancas. Llega con el nuevo estilo Titular."

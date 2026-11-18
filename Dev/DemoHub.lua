@@ -462,7 +462,7 @@ local CARDS = {
 	{ "login", "Last time", "2. Town & inn" }, { "time", "Time of day", "5. Scenery & mood" },
 	{ "attack", "Under attack", "2. Town & inn" }, { "duel", "Duel", "4. Questing & combat" },
 	{ "cleared", "Dungeon cleared", "4. Questing & combat" }, { "subzone", "Subzone", "2. Town & inn" },
-	{ "discover", "Discovered", "5. Scenery & mood" }, { "departure", "Flight departure", "5. Scenery & mood" },
+	{ "discover", "Discovered", "5. Scenery & mood" }, { "newZone", "New zone", "5. Scenery & mood" }, { "departure", "Flight departure", "5. Scenery & mood" },
 	{ "arrival", "Flight arrival", "5. Scenery & mood" },
 	{ "rested", "Rested", "2. Town & inn" }, { "levelUp", "Level up", "4. Questing & combat" },
 	{ "achievement", "Achievement", "4. Questing & combat" }, { "explore", "Explore progress", "5. Scenery & mood" },

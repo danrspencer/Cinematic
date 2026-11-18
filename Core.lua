@@ -1623,7 +1623,7 @@ for page, keys in pairs({
 	-- The Cards page's rows (Cards.lua) and the time of day at login.
 	cards = { "combatOnEnter", "combatOnLeave", "cardBossOn", "storyZoneCard", "storyZoneSubzones", "storyRecap",
 		"timeOfDayMessage", "timeOfDayChange", "chatAttackAlert", "cardDuelOn", "cardDeathOn", "cardLevelUpOn",
-		"cardDiscoverOn", "cardDepartureOn", "cardArrivalOn", "cardRestedOn", "cardAchievementOn", "cardExploreOn", "cardAlmostOn", "cardStepOn",
+		"cardDiscoverOn", "cardNewZoneOn", "cardDepartureOn", "cardArrivalOn", "cardRestedOn", "cardAchievementOn", "cardExploreOn", "cardAlmostOn", "cardStepOn",
 		"cardReputationOn", "cardCollectOn",
 		"cardProfessionOn", "cardQuestOn", "cardClearedOn", "cardRareOn", "cardBattlegroundOn", "cardStreakOn",
 		"cardBossDownOn", "cardFelledOn", "cardRevivedOn" },

@@ -11,6 +11,9 @@
 local _, ns = ...
 
 ns.CHANGELOG_FEATURES = {
+	{ date = "2026-11-18", page = "Card Vision", title = "New zone card",
+		text = "The first time you enter a zone like Westfall or Duskwood, its name slams onto the screen in huge " ..
+		"white capitals. Comes with the new Headline style." },
 	{ date = "2026-11-16", page = "Standard Frames", title = "A new Interface hub",
 		text = "Every kind of frame has one icon, with when it shows, what brings it back and how it looks as its " ..
 		"tabs, grouped into Combat, Nameplates and Info." },
