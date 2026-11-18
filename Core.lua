@@ -4183,10 +4183,18 @@ end
 -- (An off saved before this, db.enabled false, still works as it did, and
 -- turning on clears it.)
 function ns.TurnOffCompletely(onCancel)
+	local text = L["Turn Cinematic off completely?\n\nThe game reloads and Cinematic doesn't load at all, " ..
+		"so you can tell whether a problem is ours. Your settings are kept.\n\nTo bring it back, " ..
+		"tick Cinematic in the AddOns list (Game Menu or character select)."]
+	-- (The game's floating text drawn blank now, Hide all floating text: it
+	-- keeps that font till a full restart, our numbers gone with us meanwhile.)
+	local live = ns.db and ns.db.worldTextLive
+	if live == nil then live = ns.blankWorldFont ~= nil end
+	if live then
+		text = text .. "\n\n|cffff8040" .. L["The game's floating text stays hidden until you fully restart the game."] .. "|r"
+	end
 	StaticPopupDialogs.CINEMATIC_TURN_OFF = {
-		text = L["Turn Cinematic off completely?\n\nThe game reloads and Cinematic doesn't load at all, " ..
-			"so you can tell whether a problem is ours. Your settings are kept.\n\nTo bring it back, " ..
-			"tick Cinematic in the AddOns list (Game Menu or character select)."],
+		text = text,
 		button1 = L["Turn off and reload"],
 		button2 = CANCEL,
 		OnAccept = function()

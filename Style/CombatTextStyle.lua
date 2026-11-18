@@ -36,12 +36,27 @@ DEFAULTS.combatTextHeight = 0         -- extra pixels above the plate
 DEFAULTS.combatTextSchoolColors = false -- spell damage in its school's color (else the game's yellow)
 DEFAULTS.combatTextHeals = true       -- heals on friendly plates, in green
 DEFAULTS.combatTextMisses = true      -- Miss, Dodge, Parry, Immune...
+DEFAULTS.combatTextKeepLast = true    -- a dying mob's last numbers finish above the screen's middle (LetGo)
+DEFAULTS.combatTextKill = true        -- "Kill" there when the game sent no number for the killing blow
 
 -- The game's floating text font, read as this file loads: before Core's
 -- ADDON_LOADED blanks it (hideWorldText).
 local GAME_FONT = type(DAMAGE_TEXT_FONT) == "string" and not (issecretvalue and issecretvalue(DAMAGE_TEXT_FONT))
 	and DAMAGE_TEXT_FONT or "Fonts\\FRIZQT__.TTF"
 ns.gameDamageTextFont = GAME_FONT
+
+-- Whether the game is drawing its floating text blank right now: the font it
+-- took at the game's start, kept through /reloads (CinematicDB.worldTextLive,
+-- set on the first login of a game start only). The page's Hide all row says
+-- "restart to apply" while its tick differs from this.
+local liveWatch = CreateFrame("Frame")
+liveWatch:RegisterEvent("PLAYER_ENTERING_WORLD")
+liveWatch:SetScript("OnEvent", function(self, _, isInitialLogin, isReloadingUi)
+	self:UnregisterAllEvents()
+	if ns.db and (isInitialLogin and not isReloadingUi or ns.db.worldTextLive == nil) then
+		ns.db.worldTextLive = ns.blankWorldFont ~= nil
+	end
+end)
 
 -- Matched side by side with the game's on Forever (2026-11-10 video, a mob
 -- at mid range): its numbers ~1.4 times our first 24, starting level with
@@ -81,6 +96,15 @@ local SCHOOL = {
 	[32] = { 0.65, 0.4, 1 },    -- shadow
 	[64] = { 1, 0.5, 0.95 },    -- arcane
 }
+-- A style theme's own colors for its numbers (its combatText list: hit, spell,
+-- heal, crit, miss), else these, the game's. School colors, picked on the page,
+-- win over a theme's spell color.
+local function Color(kind, game)
+	local theme = ns.ActiveStyleTheme and ns.ActiveStyleTheme()
+	local own = theme and theme.combatText and theme.combatText[kind]
+	return own or game
+end
+
 -- The game's words for the hits with no number (its own strings: translated).
 local MISSES = { MISS = true, DODGE = true, PARRY = true, BLOCK = true, RESIST = true, IMMUNE = true,
 	ABSORB = true, EVADE = true, DEFLECT = true, REFLECT = true }
@@ -140,7 +164,7 @@ local function Retire(index)
 	local number = table.remove(live, index)
 	number:Hide()
 	number:ClearAllPoints()
-	number.plate, number.unit, number.anchor, number.popping = nil, nil, nil, nil
+	number.plate, number.unit, number.anchor, number.popping, number.kill = nil, nil, nil, nil, nil
 	spare[#spare + 1] = number
 end
 
@@ -275,11 +299,16 @@ local function RecordSpawn(number, plate, unit, amount, color, crit, size)
 	if not ok then record("DRAWN: could not read it: " .. tostring(err)) end
 	local start = number.start
 	C_Timer.After(0.3, function()
-		if number.start ~= start or number.plate ~= plate then return record("0.3 s on: number already gone") end
+		if number.start ~= start then return record("0.3 s on: number already gone") end
+		if number.plate == false then return record("0.3 s on: its plate went, moved above the screen's middle") end
+		if number.plate ~= plate then return record("0.3 s on: number already gone") end
 		local okLater, errLater = pcall(Stand, "0.3 s on")
 		if not okLater then record("0.3 s on: could not read it: " .. tostring(errLater)) end
 	end)
 end
+
+local lastHit = setmetatable({}, { __mode = "k" }) -- [plate] = { at, guid }: our last number on it
+local KillWord -- (below)
 
 -- One number over a plate. color: an {r, g, b}; crit: pops big and settles
 -- bigger, lower (over the plate's bar), barely climbing, staying longer.
@@ -320,11 +349,23 @@ local function Spawn(plate, unit, amount, color, crit)
 	number:Show()
 	live[#live + 1] = number
 	ns.WakeFeatureLoop(holder)
+	-- (A real hit's time and mob on its plate: a kill with no number, KillWord.)
+	if unit then
+		local okGuid, guid = pcall(UnitGUID, unit)
+		lastHit[plate] = { at = now, guid = okGuid and Plain(guid) and guid or nil }
+	end
 	RecordSpawn(number, plate, unit, amount, color, crit, size)
 end
 
 -- A plate gone (its unit died or went out of range): its numbers stay where
--- it last was, or go if that can't be read.
+-- it last was. Where that can't be read (WoW Forever: neither a plate's place
+-- nor its anchor can, recorded 2026-11-18; left on the gone plate they didn't
+-- show, it's hidden at alpha 0), they move a little above the screen's middle,
+-- where a mob you fight in melee mostly stands, and finish rising there: a
+-- kill's last hit, its plate gone 0.26-0.3 s after it, stays readable.
+local GONE_Y = 60 -- (pixels above the screen's middle)
+-- (Our Last hit stays on screen off: they go, as they used to. The Kill word
+-- always moves: it's for that spot.)
 local function LetGo(plate)
 	local x, y
 	for index = #live, 1, -1 do
@@ -337,12 +378,19 @@ local function LetGo(plate)
 				number:ClearAllPoints()
 				number:SetPoint("CENTER", holder, "BOTTOMLEFT", number.baseX, number.baseY)
 				number.plate = false
-			else
+			elseif not (ns.db.combatTextKeepLast or number.kill) then
 				Retire(index)
+			else
+				number.anchor, number.anchorPoint = holder, "CENTER"
+				number.baseY = GONE_Y
+				number:ClearAllPoints()
+				number:SetPoint("CENTER", holder, "CENTER", number.baseX, number.baseY)
+				number.plate = false
 			end
 		end
 	end
 end
+
 
 -- How far through its life a number is: it climbs almost steadily, slowing
 -- a little (1 - (1 - t) ^ EASE), and fades out from FADE_FROM to its end.
@@ -642,25 +690,51 @@ local function OnHit(unit, action, flag, amount, school)
 		if not enemy then return end
 		-- (A plain 0: all of it absorbed, as the game's word.)
 		if Plain(amount) and (amount == 0 or amount == "0") then
-			if db.combatTextMisses then Claim(plate, unit, _G.ABSORB or "Absorb", SPELL, false) end
+			if db.combatTextMisses then Claim(plate, unit, _G.ABSORB or "Absorb", Color("miss", SPELL), false) end
 			return
 		end
-		local color = SPELL
+		local color = Color("spell", SPELL)
 		school = Plain(school) and tonumber(school) or 1
 		if school == 1 then
-			color = WHITE
+			color = Color("hit", WHITE)
 		elseif db.combatTextSchoolColors then
-			color = SCHOOL[school] or SPELL
+			color = SCHOOL[school] or color
 		end
+		-- (A theme's crit color over the hit's: the game's crits keep theirs.)
+		if crit then color = Color("crit", color) end
 		Claim(plate, unit, amount, color, crit, school == 1)
 	elseif action == "HEAL" then
 		if enemy or not db.combatTextHeals then return end
-		Claim(plate, unit, amount, HEAL, crit)
+		Claim(plate, unit, amount, Color("heal", HEAL), crit)
 	elseif MISSES[action] and enemy and db.combatTextMisses then
 		local word = _G[action]
 		if not (type(word) == "string" and Plain(word)) then word = action:sub(1, 1) .. action:sub(2):lower() end
-		Claim(plate, unit, word, SPELL, false, true)
+		Claim(plate, unit, word, Color("miss", SPELL), false, true)
 	end
+end
+
+-- A kill the game sent no number for (WoW Forever mostly sends only its log
+-- lines, recorded 2026-11-18): the word "Kill", in the crit color, as its mob's plate
+-- goes. A dead enemy you'd hit in the last few seconds, not someone else's,
+-- with no number of ours on it in the last moment (that one moves instead).
+local KILL_COLOR = { 1, 0.3, 0.25 }
+local FIGHTING, JUST = 8, 0.6 -- seconds: since our last number on it; a number that was the killing blow
+KillWord = function(plate, unit)
+	local hit = lastHit[plate]
+	lastHit[plate] = nil
+	if not (hit and On() and ns.db.combatTextKill) then return end
+	local now = GetTime()
+	if now - hit.at > FIGHTING or now - hit.at < JUST then return end
+	local okGuid, guid = pcall(UnitGUID, unit)
+	if not (okGuid and Plain(guid) and guid == hit.guid) then return end
+	local okDead, dead = pcall(UnitIsDead, unit)
+	if not (okDead and Plain(dead) and dead) then return end
+	local okTap, tapped = pcall(UnitIsTapDenied, unit)
+	if okTap and Plain(tapped) and tapped then return end
+	-- (A hit's size, no pop: as a crit it read far too big, 2026-11-18.)
+	Spawn(plate, nil, ns.L["Kill"], Color("crit", KILL_COLOR), false)
+	live[#live].kill = true
+	if ns.combatTextRecord then ns.combatTextRecord("KILL with no number: the word shown") end
 end
 
 -- One listener per plate unit, made as its plate comes.
@@ -705,7 +779,10 @@ driver:SetScript("OnEvent", ns.Profiled("Combat text plates", function(_, event,
 	elseif event == "NAME_PLATE_UNIT_REMOVED" then
 		local get = C_NamePlate and C_NamePlate.GetNamePlateForUnit
 		local ok, plate = pcall(get or error, unit)
-		if ok and plate then LetGo(plate) end
+		if ok and plate then
+			KillWord(plate, unit)
+			LetGo(plate)
+		end
 	end
 end))
 
@@ -750,9 +827,10 @@ end
 -- (a swing's), "crit", "heal" or "miss".
 function ns.CombatTextSample(frame, kind)
 	local db = ns.db
-	if kind == "miss" then return Spawn(frame, nil, _G.MISS or "Miss", SPELL, false) end
-	if kind == "heal" then return Spawn(frame, nil, "18", HEAL, false) end
-	local color = kind == "white" and WHITE or (db.combatTextSchoolColors and SCHOOL[8] or SPELL)
+	if kind == "miss" then return Spawn(frame, nil, _G.MISS or "Miss", Color("miss", SPELL), false) end
+	if kind == "heal" then return Spawn(frame, nil, "18", Color("heal", HEAL), false) end
+	local color = kind == "white" and Color("hit", WHITE) or (db.combatTextSchoolColors and SCHOOL[8] or Color("spell", SPELL))
+	if kind == "crit" then color = Color("crit", color) end
 	Spawn(frame, nil, kind == "crit" and "46" or kind == "white" and "11" or "23", color, kind == "crit")
 end
 
@@ -826,6 +904,10 @@ function ns.CreateCombatTextStylePanel(kit)
 	rows.Check("combatTextHeals", L["Your heals on friends"], L["Heals on friendly nameplates, in green."], Ours)
 	rows.Check("combatTextMisses", L["Misses"], L["Miss, Dodge, Parry, Immune and the like, in the game's words."],
 		Ours)
+	rows.Check("combatTextKeepLast", L["Last hit stays on screen"],
+		L["A dying mob's last number finishes above the middle of the screen."], Ours)
+	rows.Check("combatTextKill", L["Kill"],
+		L["Shows Kill there when the game sends no number for the killing blow."], Ours)
 	rows.Check("combatTextCritPop", L["Crits pop"],
 		L["A crit grows big for a moment and settles a little bigger than a hit, as the game's do."], Ours)
 	rows.Check("combatTextSchoolColors", L["Spells in their school's color"],
@@ -861,9 +943,36 @@ function ns.CreateCombatTextStylePanel(kit)
 	stack:Header(content, L["The game's floating text"])
 	rows.Check("combatTextHideGame", L["Turn off the game's damage and healing numbers"],
 		L["Turns off the game's damage and healing numbers while this page is on."])
-	local all = rows.Check("hideWorldText", L["Hide all the game's floating text, XP too (restart required)"],
+	local allLabel = L["Hide all the game's floating text, XP too"]
+	local all = rows.Check("hideWorldText", allLabel,
 		L["Hides all the game's floating text, XP too; needs a full game restart."])
-	all:HookScript("OnClick", function() StaticPopup_Show("CINEMATIC_WORLD_TEXT_RESTART") end)
+	-- (Its label adds a reminder while the tick isn't what the game draws yet.)
+	local function RestartPending()
+		local db = ns.db or {}
+		local wanted = db.hideWorldText and db.combatTextStyle and db.styleGeneral ~= false and true or false
+		local live = db.worldTextLive
+		if live == nil then live = ns.blankWorldFont ~= nil end
+		return wanted ~= live
+	end
+	local allRefresh = all.Refresh
+	all.Refresh = function(self, ...)
+		if allRefresh then allRefresh(self, ...) end
+		local text = self.Text or self.text
+		if text then
+			text:SetText(RestartPending()
+				and allLabel .. " |cffff8040" .. L["(restart the game to apply)"] .. "|r" or allLabel)
+		end
+	end
+	-- (The restart warning only when it takes one: back to what the game
+	-- draws already, it closes any warning still up instead.)
+	all:HookScript("OnClick", function(self)
+		self:Refresh()
+		if RestartPending() then
+			StaticPopup_Show("CINEMATIC_WORLD_TEXT_RESTART")
+		else
+			StaticPopup_Hide("CINEMATIC_WORLD_TEXT_RESTART")
+		end
+	end)
 
 	canvas:SetScript("OnShow", kit.PageShown(kit.Refresh, content))
 	canvas:Hide()

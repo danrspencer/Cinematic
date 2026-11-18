@@ -279,6 +279,7 @@ read_globals = {
 	"SitStandOrDescendStart",
 	"StaticPopup_FindVisible",
 	"StaticPopup_Show",
+	"StaticPopup_Hide",
 	"StopMusic",
 	"StopSound",
 	"SubZoneTextString",

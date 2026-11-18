@@ -1064,7 +1064,21 @@ do
 			elseif event == "GROUP_ROSTER_UPDATE" then
 				Rec("GROUP: in a group " .. Call(IsInGroup))
 			else
-				Rec((event == "NAME_PLATE_UNIT_ADDED" and "PLATE COMES: " or "PLATE GOES: ") .. Who((...)))
+				-- (And the plate's own anchor, if the game lets it be read: its place on
+				-- screen can't be measured, but where it's pinned might be, for a kill's
+				-- numbers to stay there once the plate goes. 2026-11-18.)
+				local unit = ...
+				local where = "plate anchor: no plate"
+				local okPlate, plate = pcall(C_NamePlate.GetNamePlateForUnit, unit)
+				if okPlate and plate then
+					local okN, count = pcall(plate.GetNumPoints, plate)
+					local okP, point, rel, relPoint, x, y = pcall(plate.GetPoint, plate, 1)
+					local relName = okP and rel and select(2, pcall(rel.GetName, rel)) or nil
+					where = ("plate anchor: points %s, first %s"):format(okN and State(count) or "error",
+						okP and ("%s to %s %s at %s, %s"):format(State(point), State(relName or rel), State(relPoint),
+							State(x), State(y)) or "error")
+				end
+				Rec((event == "NAME_PLATE_UNIT_ADDED" and "PLATE COMES: " or "PLATE GOES: ") .. Who(unit) .. " | " .. where)
 			end
 		end)
 		ns.combatTextRecord = Rec
