@@ -170,7 +170,7 @@ end
 
 local THEMES = {
 	{ key = "game", name = "The game's", tip = "Everything as the game draws it. Each Style page's own defaults.",
-		swatch = { { 0.10, 0.09, 0.08 }, { 1, 0.82, 0 }, { 0, 0.8, 0 }, { 0, 0.45, 1 } }, settings = {} },
+		swatch = { { 0.10, 0.09, 0.08 }, { 1, 0.82, 0 }, { 0, 0.8, 0 }, { 0, 0.45, 1 } }, settings = {}, plain = true },
 	Theme({
 		key = "reel", name = "Silver Screen", unitBars = "brushed",
 		tip = "Black and silver, like an old film print. Thin lines, narrow lettering, nothing in the way of the picture.",
@@ -498,7 +498,7 @@ for _, theme in ipairs(THEMES) do BY_KEY[theme.key] = theme end
 -- settings } } }. Plates and names take its starting theme's.
 -- ---------------------------------------------------------------------------
 
-local MAX_MINE, MAX_MINE_NAME = 20, 24
+local MAX_MINE, MAX_MINE_NAME, MAX_MINE_NOTE = 20, 24, 200
 -- (The colors a theme of yours can have, in the editor's order.)
 local MINE_COLORS = { "accent", "panel", "line", "ornament", "health", "mana", "cast" }
 ns.MY_THEME_COLORS = MINE_COLORS
@@ -519,10 +519,10 @@ local function MineStore(make)
 	return store
 end
 
--- A starting theme: one of ours other than the game's (Silver Screen if not).
+-- A starting theme: one of ours, the game's too (Silver Screen if not).
 local function BaseOf(key)
 	local base = BY_KEY[key]
-	if not base or base.key == "game" or base.mine then return BY_KEY.reel end
+	if not base or base.mine then return BY_KEY.reel end
 	return base
 end
 
@@ -545,6 +545,16 @@ end
 
 local function BuildMine(entry)
 	local base = BaseOf(entry.base)
+	-- (On the game's: nothing of ours to dress, so no colors, only what you saved
+	-- over the game's look. plain: read as the game's wherever that's asked.)
+	if base.key == "game" then
+		local info = { key = "u:" .. entry.id, id = entry.id, name = entry.name, mine = true, base = "game",
+			plain = true, plates = "game", names = "game", swatch = Copy(base.swatch), settings = {}, raw = {} }
+		if type(entry.settings) == "table" then
+			for key, value in pairs(entry.settings) do info.settings[key] = value end
+		end
+		return info
+	end
 	local info = {}
 	for key, value in pairs(base) do
 		if key ~= "settings" and key ~= "raw" then info[key] = Copy(value) end
@@ -617,7 +627,12 @@ end
 -- A theme's name to show: ours in the player's language, yours as you named it.
 local function NameOf(theme) return theme.mine and theme.name or L[theme.name] end
 local function TipOf(theme)
-	if theme.mine then return L["Your theme, started from %s."]:format(L[BY_KEY[theme.base].name]) end
+	if theme.mine then
+		-- (Its description, if you wrote one: ns.SetMyStyleThemeNote.)
+		local entry = EntryOf(theme.key)
+		local note = entry and type(entry.note) == "string" and entry.note ~= "" and entry.note
+		return note or L["Your theme, started from %s."]:format(L[BY_KEY[theme.base].name])
+	end
 	return L[theme.tip]
 end
 ns.StyleThemeName = NameOf
@@ -1360,6 +1375,7 @@ function ns.SaveMyStyleTheme()
 	local entry = db and EntryOf(db.styleTheme)
 	if not entry then return end
 	local edits = EditsOver(Find(db.styleTheme))
+	ns.BackupMyStyleTheme(db.styleTheme, "save") -- (the saved version it replaces)
 	entry.settings = type(entry.settings) == "table" and entry.settings or {}
 	for key, value in pairs(edits) do entry.settings[key] = value end
 	MineChanged()
@@ -1372,6 +1388,136 @@ function ns.RenameMyStyleTheme(key, name)
 	entry.name = name:sub(1, MAX_MINE_NAME)
 	MineChanged()
 	return true
+end
+
+-- A line on what one of yours is for (empty: none, its starting theme said instead).
+function ns.SetMyStyleThemeNote(key, text)
+	local entry = EntryOf(key)
+	if not entry then return end
+	text = type(text) == "string" and text:gsub("[%c|]", ""):match("^%s*(.-)%s*$") or ""
+	entry.note = text ~= "" and text:sub(1, MAX_MINE_NOTE) or nil
+	MineChanged()
+end
+function ns.MyStyleThemeNote(key)
+	local entry = EntryOf(key)
+	return entry and entry.note or nil
+end
+
+-- ---------------------------------------------------------------------------
+-- Backups of yours, for the account as the themes are: a copy (its name,
+-- start, colors, settings and description) just before Save changes and
+-- Delete, and once a day at login when one has changed (Backups.lua's Daily,
+-- as for profiles, with its keep count). CinematicDB.styleThemeBackups[id],
+-- newest first; a deleted one's go to CinematicDB.styleThemesDeleted for 30
+-- days. Restoring adds it as a new theme of yours; the one it came from stays.
+-- ---------------------------------------------------------------------------
+do
+	local DELETED_DAYS, DAY = 30, 24 * 60 * 60
+	local function Store(name)
+		local saved = _G.CinematicDB
+		if type(saved) ~= "table" then return nil end
+		if type(saved[name]) ~= "table" then saved[name] = {} end
+		return saved[name]
+	end
+	local function Keep() return ns.BackupKeep and ns.BackupKeep() or 10 end
+	local function Taken(entry)
+		return { name = entry.name, base = entry.base, note = entry.note,
+			colors = Copy(type(entry.colors) == "table" and entry.colors or {}),
+			settings = Copy(type(entry.settings) == "table" and entry.settings or {}) }
+	end
+	local function Same(a, b)
+		if type(a) ~= "table" or type(b) ~= "table" then return a == b end
+		for k, v in pairs(a) do if not Same(v, b[k]) then return false end end
+		for k in pairs(b) do if a[k] == nil then return false end end
+		return true
+	end
+
+	-- why: "save", "delete" or "daily". None when it's the same as its newest.
+	function ns.BackupMyStyleTheme(key, why)
+		local entry = EntryOf(key)
+		local store = entry and Store("styleThemeBackups")
+		if not store then return end
+		local id = tostring(entry.id)
+		local list = store[id] or {}
+		local copy = Taken(entry)
+		if list[1] and Same(list[1].theme, copy) then return end
+		table.insert(list, 1, { time = time(), version = ns.Version and ns.Version() or "?", why = why, theme = copy })
+		for i = #list, Keep() + 1, -1 do list[i] = nil end
+		store[id] = list
+	end
+	-- Just before Delete: its last copy, and the lot kept as a deleted theme's.
+	function ns.BackupDeletedStyleTheme(key)
+		local entry = EntryOf(key)
+		if not entry then return end
+		ns.BackupMyStyleTheme(key, "delete")
+		local store, id = Store("styleThemeBackups"), tostring(entry.id)
+		local list = store and store[id]
+		if not (list and list[1]) then return end
+		store[id] = nil
+		table.insert(Store("styleThemesDeleted"), 1, { name = entry.name, time = time(), backups = list })
+	end
+
+	-- Each of yours with its backups ({ key, name, backups }), then the deleted ones.
+	function ns.StyleThemeBackups()
+		local out, store = {}, Store("styleThemeBackups") or {}
+		for _, theme in ipairs(ns.MyStyleThemes()) do
+			out[#out + 1] = { key = theme.key, name = theme.name, backups = store[tostring(theme.id)] or {} }
+		end
+		return out, Store("styleThemesDeleted") or {}
+	end
+	ns.STYLE_THEME_DELETED_DAYS = DELETED_DAYS
+
+	-- A copy as a new theme of yours: its key, or nil and why.
+	local function AddCopy(copy, name)
+		local key, why = ns.AddMyStyleTheme(BaseOf(copy.base).key, name)
+		if not key then return nil, why end
+		local entry = EntryOf(key)
+		entry.colors, entry.settings, entry.note = Copy(copy.colors or {}), Copy(copy.settings or {}), copy.note
+		MineChanged()
+		return key
+	end
+	-- A backup of one of yours (key) as a new theme, named with its day.
+	function ns.RestoreStyleThemeBackup(key, i)
+		local entry = EntryOf(key)
+		local store = entry and Store("styleThemeBackups")
+		local backup = store and store[tostring(entry.id)] and store[tostring(entry.id)][i]
+		if not backup then return nil end
+		return AddCopy(backup.theme, L["%s (%s)"]:format(backup.theme.name or entry.name, date("%Y-%m-%d", backup.time)))
+	end
+	-- A deleted one back as it was, with its backups.
+	function ns.RestoreDeletedStyleTheme(i)
+		local deleted = Store("styleThemesDeleted")
+		local gone = deleted and deleted[i]
+		local backup = gone and gone.backups and gone.backups[1]
+		if not backup then return nil end
+		local key, why = AddCopy(backup.theme, gone.name)
+		if not key then return nil, why end
+		table.remove(deleted, i)
+		Store("styleThemeBackups")[tostring(EntryOf(key).id)] = gone.backups
+		return key
+	end
+
+	-- At login (Backups.lua): deleted ones past their time go, and each of
+	-- yours gets the day's copy if it's changed since its newest.
+	function ns.DailyStyleThemeBackups(daily)
+		local deleted = Store("styleThemesDeleted")
+		if not deleted then return end
+		for i = #deleted, 1, -1 do
+			if time() - (deleted[i].time or 0) > DELETED_DAYS * DAY then table.remove(deleted, i) end
+		end
+		local store, keep = Store("styleThemeBackups"), Keep()
+		for _, list in pairs(store) do
+			for i = #list, keep + 1, -1 do list[i] = nil end
+		end
+		if not daily then return end
+		local today = date("%Y-%m-%d")
+		for _, theme in ipairs(ns.MyStyleThemes()) do
+			local list = store[tostring(theme.id)]
+			if not (list and list[1] and date("%Y-%m-%d", list[1].time) == today) then
+				ns.BackupMyStyleTheme(theme.key, "daily")
+			end
+		end
+	end
 end
 
 -- which: one of MY_THEME_COLORS; color nil: back to its starting theme's.
@@ -1403,6 +1549,7 @@ function ns.DeleteMyStyleTheme(key)
 	local entry, at = EntryOf(key)
 	if not entry or not OutOfFights() then return end
 	local base = BaseOf(entry.base).key
+	ns.BackupDeletedStyleTheme(key) -- (kept a while, to bring back: Backups)
 	table.remove(MineStore().list, at)
 	local db = ns.GetDB()
 	if db and db.styleTheme == key then db.styleTheme = base end
@@ -1417,7 +1564,24 @@ function ns.ExportMyStyleTheme(key)
 	local entry = EntryOf(key)
 	if not entry then return nil end
 	return ns.PackShared(SHARE_PREFIX, SHARE_FORMAT, { name = entry.name, base = entry.base,
-		colors = entry.colors, settings = entry.settings, who = UnitName and UnitName("player") or nil })
+		colors = entry.colors, settings = entry.settings, note = entry.note,
+		who = UnitName and UnitName("player") or nil })
+end
+-- Any theme, ours too, as the same line. The one in use goes with your
+-- changes over it (as a profile's Export gives it as it is now).
+function ns.ExportStyleTheme(key)
+	local theme = Find(key)
+	if not theme then return nil end
+	local db = ns.GetDB()
+	local using = db and db.styleGeneral and db.styleTheme == key
+	local entry = theme.mine and EntryOf(key)
+	local settings = entry and Copy(type(entry.settings) == "table" and entry.settings or {}) or {}
+	if using then
+		for each, value in pairs(EditsOver(theme)) do settings[each] = value end
+	end
+	return ns.PackShared(SHARE_PREFIX, SHARE_FORMAT, { name = NameOf(theme),
+		base = entry and entry.base or theme.key, colors = entry and entry.colors or {}, settings = settings,
+		note = entry and entry.note or nil, who = UnitName and UnitName("player") or nil })
 end
 local SHARE_WHY = { empty = "", newer = "This theme is from a newer Cinematic: update it to add this one.",
 	other = "That isn't a theme (they start CINET1:).", broken = "That isn't a whole theme: copy it again, all of it." }
@@ -1428,6 +1592,8 @@ function ns.ReadSharedStyleTheme(text)
 	local info = { name = name ~= "" and name:sub(1, MAX_MINE_NAME) or L["Shared theme"],
 		base = BaseOf(type(data.base) == "string" and data.base or nil).key, colors = {}, settings = {},
 		who = type(data.who) == "string" and data.who:gsub("[%c|]", ""):sub(1, 48) or nil, skipped = 0 }
+	local note = type(data.note) == "string" and data.note:gsub("[%c|]", ""):match("^%s*(.-)%s*$") or ""
+	if note ~= "" then info.note = note:sub(1, MAX_MINE_NOTE) end
 	for _, which in ipairs(MINE_COLORS) do
 		info.colors[which] = Rgb(type(data.colors) == "table" and data.colors[which])
 	end
@@ -1448,7 +1614,7 @@ function ns.AddSharedStyleTheme(info)
 	local key, why = ns.AddMyStyleTheme(info.base, info.name)
 	if not key then return nil, why end
 	local entry = EntryOf(key)
-	entry.colors, entry.settings = info.colors, info.settings
+	entry.colors, entry.settings, entry.note = info.colors, info.settings, info.note
 	MineChanged()
 	return key
 end
@@ -1579,8 +1745,9 @@ local function MakeCard(parent, theme, width, onPick, Tooltip)
 	local color = theme.menu and theme.menu.accent or { 1, 0.82, 0 }
 	card.edges = ns.MakeStyleEdges(card)
 	-- (Its own shape, on a card that has one.)
-	local shape = theme.settings.stylePanel
+	-- (One of yours on the game's look has a panel shape saved but no panel of ours.)
 	local panel = theme.panel
+	local shape = panel and theme.settings.stylePanel
 	if shape then back:Hide() end
 	if theme.corner then
 		for i, spot in ipairs(CORNERS) do
@@ -1622,8 +1789,10 @@ local function MakeCard(parent, theme, width, onPick, Tooltip)
 	card.FitName()
 	name.searchSkip = true
 	local chips = #theme.swatch - 1
+	card.chips = {} -- (the Themes tab puts "(changed)" in their place: MakeThemePicker)
 	for i = 2, #theme.swatch do
 		local chip = card:CreateTexture(nil, "ARTWORK", nil, 1)
+		card.chips[#card.chips + 1] = chip
 		chip:SetSize(16, 5)
 		chip:SetPoint("CENTER", card, "CENTER", (i - 2 - (chips - 1) / 2) * 19, -27)
 		local c = theme.swatch[i]
@@ -1799,6 +1968,54 @@ function ns.MakeThemePicker(kit, parent, width, changed)
 		ns.PlayThemeCard()
 	end
 
+	-- The box under the grids, as on the Profiles page: what the card (or
+	-- button) pointed at is and what a click does, else the theme in use. As
+	-- tall as the longest it can say, so nothing under it moves with the mouse.
+	local MENUS = MenuUtil and MenuUtil.CreateContextMenu and true or false
+	local box = CreateFrame("Frame", nil, holder)
+	box:SetSize(width, 44)
+	local boxBack = box:CreateTexture(nil, "BACKGROUND")
+	boxBack:SetAllPoints()
+	boxBack:SetColorTexture(1, 1, 1, 0.03)
+	local about = box:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+	about:SetPoint("TOPLEFT", 10, -8)
+	about:SetWidth(width - 20)
+	about:SetJustifyH("LEFT")
+	about:SetSpacing(2)
+	about.searchSkip = true -- (it changes with the mouse)
+	local tips = {} -- (every button's, to size the box)
+	local Describe -- (below)
+	local function BoxTip(widget, tip)
+		widget.searchTip = tip
+		tips[#tips + 1] = tip
+		widget:SetScript("OnEnter", function() Describe(tip) end)
+		widget:SetScript("OnLeave", function() Describe() end)
+	end
+	local function Current()
+		local db = ns.GetDB()
+		return db and db.styleGeneral and Find(db.styleTheme) or nil
+	end
+	-- A theme's words: its name, (changed) on the one in use with your
+	-- changes, its line, and what a click does.
+	local function ThemeText(theme)
+		local now = Current()
+		local using = now ~= nil and now.key == theme.key
+		local hint = not using and L["Click to use it."] or nil
+		if MENUS then hint = (hint and hint .. " " or "") .. L["Right-click for more."] end
+		return "|cffffd100" .. NameOf(theme) .. "|r"
+			.. (using and ns.StyleThemeEdited() and "  |cff808080" .. L["(changed)"] .. "|r" or "")
+			.. "   " .. (TipOf(theme) or "")
+			.. (hint and "\n|cff808080" .. hint .. "|r" or "")
+	end
+	function Describe(text)
+		if text then
+			about:SetText(text)
+			return
+		end
+		local now = Current()
+		about:SetText(now and ThemeText(now) or L["Pick a theme to use it."])
+	end
+
 	local builtInHead = holder:CreateFontString(nil, "OVERLAY", "GameFontNormal")
 	builtInHead:SetText(L["Built in"])
 	local mineHead = holder:CreateFontString(nil, "OVERLAY", "GameFontNormal")
@@ -1806,7 +2023,16 @@ function ns.MakeThemePicker(kit, parent, width, changed)
 	local import = ns.PanelButton(holder)
 	import:SetSize(80, 20)
 	import:SetText(L["Import"])
-	kit.Tooltip(import, L["Adds a theme someone shared to yours."])
+	BoxTip(import, L["Adds a theme someone shared to yours."])
+	-- (Beside Import: the theme in use as text, ours too, and the backups of yours.)
+	local export = ns.PanelButton(holder)
+	export:SetSize(80, 20)
+	export:SetText(L["Export"])
+	BoxTip(export, L["Gives the theme you're using, with your changes, as text to share."])
+	local backups = ns.PanelButton(holder)
+	backups:SetSize(90, 20)
+	backups:SetText(L["Backups"])
+	BoxTip(backups, L["Brings back an older copy of a theme of yours, or one you deleted."])
 
 	-- + New theme: a plain card, the plus and its words.
 	local newCard = CreateFrame("Button", nil, holder)
@@ -1824,7 +2050,7 @@ function ns.MakeThemePicker(kit, parent, width, changed)
 	local newWords = newCard:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
 	newWords:SetPoint("TOP", plus, "BOTTOM", 0, -6)
 	newWords:SetText(L["+ New theme"])
-	kit.Tooltip(newCard, L["A theme of your own, made from the one you're using now with your changes."])
+	BoxTip(newCard, L["A theme of your own, made from the one you're using now with your changes."])
 
 	-- Under the grid: the theme's name, Save, Reapply and Undo.
 	local status = holder:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
@@ -1832,7 +2058,7 @@ function ns.MakeThemePicker(kit, parent, width, changed)
 	local undo = ns.PanelButton(holder)
 	undo:SetSize(70, 20)
 	undo:SetText(L["Undo"])
-	kit.Tooltip(undo, L["Your settings as they were before the last theme you picked."])
+	BoxTip(undo, L["Your settings as they were before the last theme you picked."])
 	undo:SetScript("OnClick", function()
 		ns.UndoStyleTheme()
 		Changed()
@@ -1841,7 +2067,7 @@ function ns.MakeThemePicker(kit, parent, width, changed)
 	again:SetSize(110, 20)
 	again:SetPoint("RIGHT", undo, "LEFT", -6, 0)
 	again:SetText(L["Reapply theme"])
-	kit.Tooltip(again, L["Puts every setting back as this theme has it; Undo brings your changes back."])
+	BoxTip(again, L["Puts every setting back as this theme has it; Undo brings your changes back."])
 	again:SetScript("OnClick", function()
 		local db = ns.GetDB()
 		Pick(db and db.styleTheme or "game")
@@ -1850,7 +2076,7 @@ function ns.MakeThemePicker(kit, parent, width, changed)
 	save:SetSize(110, 20)
 	save:SetPoint("RIGHT", again, "LEFT", -6, 0)
 	save:SetText(L["Save changes"])
-	kit.Tooltip(save, L["Saves your changes into this theme of yours."])
+	BoxTip(save, L["Saves your changes into this theme of yours."])
 	save:SetScript("OnClick", function()
 		ns.SaveMyStyleTheme()
 		Changed()
@@ -1878,6 +2104,11 @@ function ns.MakeThemePicker(kit, parent, width, changed)
 	delete:SetSize(70, 20)
 	delete:SetPoint("RIGHT", share, "LEFT", -6, 0)
 	delete:SetText(L["Delete"])
+	local describe = ns.PanelButton(editor)
+	describe:SetSize(96, 20)
+	describe:SetPoint("RIGHT", delete, "LEFT", -6, 0)
+	describe:SetText(L["Description"])
+	kit.Tooltip(describe, L["Write what this theme is for."])
 	local fromLabel = editor:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
 	fromLabel:SetPoint("TOPLEFT", 10, -40)
 	fromLabel:SetText(L["Started from:"])
@@ -1891,17 +2122,15 @@ function ns.MakeThemePicker(kit, parent, width, changed)
 		from:SetWidth(170)
 		from:SetupMenu(function(_, root)
 			for _, theme in ipairs(THEMES) do
-				if theme.key ~= "game" then
-					root:CreateRadio(L[theme.name], function()
-						local mine = Editing()
-						return mine ~= nil and mine.base == theme.key
-					end, function()
-						local mine = Editing()
-						if not mine then return end
-						ns.SetMyStyleThemeBase(mine.key, theme.key)
-						Changed()
-					end)
-				end
+				root:CreateRadio(L[theme.name], function()
+					local mine = Editing()
+					return mine ~= nil and mine.base == theme.key
+				end, function()
+					local mine = Editing()
+					if not mine then return end
+					ns.SetMyStyleThemeBase(mine.key, theme.key)
+					Changed()
+				end)
 			end
 		end)
 		from.Refresh = function(self) self:GenerateMenu() end
@@ -1989,11 +2218,22 @@ function ns.MakeThemePicker(kit, parent, width, changed)
 			timeout = 0, whileDead = true, hideOnEscape = true,
 		}
 	end
+	if ns.NamePopup and not StaticPopupDialogs.CINEMATIC_STYLE_THEME_NOTE then
+		StaticPopupDialogs.CINEMATIC_STYLE_THEME_NOTE = ns.NamePopup(L["Describe the theme:"], function(text, key)
+			ns.SetMyStyleThemeNote(key, text)
+			Changed()
+		end, { initial = function(key) return ns.MyStyleThemeNote(key) or "" end, maxLetters = MAX_MINE_NOTE, width = 360 })
+	end
 	local function Rename(theme) StaticPopup_Show("CINEMATIC_STYLE_THEME_RENAME", nil, nil, theme.key) end
+	local function Note(theme) StaticPopup_Show("CINEMATIC_STYLE_THEME_NOTE", nil, nil, theme.key) end
 	local function Delete(theme) StaticPopup_Show("CINEMATIC_STYLE_THEME_DELETE", theme.name, nil, theme.key) end
+	-- (Ours too, and the one in use with your changes: ExportStyleTheme.)
 	local function Share(theme)
-		local text = ns.ExportMyStyleTheme(theme.key)
-		if text and ns.ShowCameraShare then ns.ShowCameraShare(text, L["Share %s"]:format(theme.name)) end
+		local text = ns.ExportStyleTheme(theme.key)
+		if text and ns.ShowCameraShare then ns.ShowCameraShare(text, L["Share %s"]:format(NameOf(theme))) end
+	end
+	local function Backups(theme)
+		if ns.ShowStyleThemeBackups then ns.ShowStyleThemeBackups(theme and theme.key, Pick) end
 	end
 	local function New(fromKey, withEdits)
 		local key, why = ns.AddMyStyleTheme(fromKey, nil, withEdits)
@@ -2015,11 +2255,20 @@ function ns.MakeThemePicker(kit, parent, width, changed)
 		local mine = Editing()
 		if mine then Share(mine) end
 	end)
+	describe:SetScript("OnClick", function()
+		local mine = Editing()
+		if mine then Note(mine) end
+	end)
+	export:SetScript("OnClick", function()
+		local now = Current()
+		if now then Share(now) end
+	end)
+	backups:SetScript("OnClick", function() Backups(nil) end)
 	newCard:SetScript("OnClick", function()
-		-- (On the game's look there's nothing of ours to start from: Silver Screen, as it comes.)
+		-- (On the game's look: one of yours on the game's, your changes in it.)
 		local db = ns.GetDB()
 		local now = db and db.styleGeneral and Find(db.styleTheme)
-		if now and now.key ~= "game" then New(now.key, true) else New("reel", false) end
+		New(now and now.key or "game", now ~= nil)
 	end)
 	import:SetScript("OnClick", function()
 		if not ns.ShowShareImport then return end
@@ -2045,15 +2294,33 @@ function ns.MakeThemePicker(kit, parent, width, changed)
 	end)
 	local function Menu(card, theme)
 		if not (MenuUtil and MenuUtil.CreateContextMenu) then return end
+		-- (As a profile card's: what's done to a theme, for that one.)
+		local now = Current()
+		local using = now ~= nil and now.key == theme.key
+		local edited = using and ns.StyleThemeEdited()
 		ns.ContextMenu(card, function(_, root)
 			root:CreateTitle(NameOf(theme))
-			root:CreateButton(L["Use"], function() Pick(theme.key) end)
-			if theme.key ~= "game" then
-				root:CreateButton(L["Copy to yours"], function() New(theme.key, false) end)
+			if not using then root:CreateButton(L["Use"], function() Pick(theme.key) end) end
+			root:CreateButton(L["Copy to yours"], function() New(theme.key, false) end)
+			if edited then
+				-- (Your changes: into yours, or a new one of yours from ours; Reset drops them.)
+				if theme.mine then
+					root:CreateButton(L["Save changes"], function()
+						ns.SaveMyStyleTheme()
+						Changed()
+					end)
+				else
+					root:CreateButton(L["Save as a new theme"], function() New(theme.key, true) end)
+				end
+				root:CreateButton(L["Reset"], function() Pick(theme.key) end)
 			end
 			if theme.mine then
 				root:CreateButton(L["Rename"], function() Rename(theme) end)
-				root:CreateButton(L["Share"], function() Share(theme) end)
+				root:CreateButton(L["Description"], function() Note(theme) end)
+			end
+			root:CreateButton(L["Share"], function() Share(theme) end)
+			if theme.mine then
+				root:CreateButton(L["Backups"], function() Backups(theme) end)
 				root:CreateDivider()
 				root:CreateButton("|cffff4040" .. L["Delete"] .. "|r", function() Delete(theme) end)
 			end
@@ -2069,8 +2336,19 @@ function ns.MakeThemePicker(kit, parent, width, changed)
 			card = nil
 		end
 		if not card then
-			card = MakeCard(holder, theme, cardW, Pick, kit.Tooltip)
+			-- (Its words go in the box under the grids, not a tooltip: Describe.)
+			card = MakeCard(holder, theme, cardW, Pick, function(widget, tip) widget.searchTip = tip end)
 			card.look = look
+			card:SetScript("OnEnter", function(self) Describe(ThemeText(self.theme)) end)
+			card:SetScript("OnLeave", function() Describe() end)
+			-- (The one in use with your changes: a quiet tag where its color chips
+			-- are, as a changed profile's card has one. In a corner it ran over the
+			-- chips and a shaped card's edge, Forever 2026-11-18.)
+			card.changedTag = card:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+			card.changedTag:SetPoint("CENTER", card, "CENTER", 0, -27)
+			card.changedTag:SetText(L["(changed)"])
+			card.changedTag.searchSkip = true
+			card.changedTag:Hide()
 			card:RegisterForClicks("LeftButtonUp", "RightButtonUp")
 			card:SetScript("OnClick", function(self, button)
 				if button == "RightButton" then Menu(self, self.theme) else Pick(self.theme.key) end
@@ -2103,6 +2381,25 @@ function ns.MakeThemePicker(kit, parent, width, changed)
 		Place(ns.MyStyleThemes(), mineHead, newCard)
 		import:ClearAllPoints()
 		import:SetPoint("LEFT", mineHead, "RIGHT", 10, 0)
+		export:ClearAllPoints()
+		export:SetPoint("LEFT", import, "RIGHT", 6, 0)
+		backups:ClearAllPoints()
+		backups:SetPoint("LEFT", export, "RIGHT", 6, 0)
+		-- (The box: as tall as the longest it says, in this language.)
+		local tallest = 0
+		for _, theme in ipairs(All()) do
+			about:SetText(ThemeText(theme))
+			tallest = math.max(tallest, about:GetStringHeight() or 0)
+		end
+		for _, tip in ipairs(tips) do
+			about:SetText(tip)
+			tallest = math.max(tallest, about:GetStringHeight() or 0)
+		end
+		box:SetHeight(math.max(44, math.ceil(tallest) + 16))
+		Describe()
+		box:ClearAllPoints()
+		box:SetPoint("TOPLEFT", holder, "TOPLEFT", 0, -y)
+		y = y + box:GetHeight() + 8
 		status:ClearAllPoints()
 		status:SetPoint("TOPLEFT", holder, "TOPLEFT", 0, -(y + 4))
 		undo:ClearAllPoints()
@@ -2111,6 +2408,13 @@ function ns.MakeThemePicker(kit, parent, width, changed)
 		local mine = Editing()
 		editor:SetShown(mine ~= nil)
 		if mine then
+			-- (On the game's look: no colors of ours to give, so no squares and a shorter editor.)
+			colorsLabel:SetShown(not mine.plain)
+			for _, square in pairs(squares) do
+				square:SetShown(not mine.plain)
+				square.words:SetShown(not mine.plain)
+			end
+			editor:SetHeight(mine.plain and 92 or 150)
 			editor:ClearAllPoints()
 			editor:SetPoint("TOPLEFT", holder, "TOPLEFT", 0, -y)
 			y = y + editor:GetHeight() + 6
@@ -2134,7 +2438,13 @@ function ns.MakeThemePicker(kit, parent, width, changed)
 		end
 		newCard:SetEnabled(on)
 		newCard:SetAlpha(on and 1 or 0.45)
+		export:SetEnabled(on)
 		local edited = on and ns.StyleThemeEdited()
+		for key, card in pairs(cards) do
+			local tagged = edited and key == current.key and true or false
+			card.changedTag:SetShown(tagged)
+			for _, chip in ipairs(card.chips or {}) do chip:SetShown(not tagged) end
+		end
 		status:SetText(edited and (L["%s, with your changes"]):format(NameOf(current)) or NameOf(current))
 		again:SetShown(edited and true or false)
 		save:SetShown(edited and current.mine and true or false)
@@ -2163,7 +2473,7 @@ function ns.MakeThemePicker(kit, parent, width, changed)
 	end)
 	-- (Its parts, for the dev copy's test: Dev/MyThemesTest.lua.)
 	holder.testParts = { cards = cards, newCard = newCard, save = save, editor = editor, squares = squares,
-		status = status, cardW = cardW }
+		status = status, cardW = cardW, box = box, about = about, export = export, backups = backups }
 	ns.themePicker = holder
 	holder.pageSwitch = false
 	kit.AddControl(holder)

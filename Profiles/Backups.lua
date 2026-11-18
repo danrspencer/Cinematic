@@ -160,6 +160,8 @@ local function Daily()
 		end
 	end
 	TrimAll()
+	-- (Your themes too, for the account: StyleThemes.lua.)
+	if ns.DailyStyleThemeBackups then ns.DailyStyleThemeBackups(ns.BackupDaily()) end
 	if not ns.BackupDaily() then return end
 	local today = date("%Y-%m-%d")
 	for _, name in ipairs(ns.ProfileNames()) do
@@ -326,6 +328,8 @@ local function CreateWindow()
 	always:SetJustifyH("LEFT")
 	always:SetTextColor(0.6, 0.6, 0.6)
 	always:SetText(L["Always backed up just before Delete and Reset, and the saved version on Save."])
+	window.always = always
+	window.hint = hint
 end
 
 local function GetRow(i)
@@ -349,7 +353,9 @@ end
 
 -- The list as it is now: the profile's backups (or each profile's, under its
 -- name), then deleted profiles.
+local FillThemes -- (below)
 function Fill()
+	if window.themes then return FillThemes() end
 	local db = ns.db
 	local only = window.profile
 	window.title:SetText(only and L["Backups of %s"]:format(ns.ProfileLabel(only)) or L["Backups"])
@@ -436,10 +442,132 @@ function Fill()
 	end
 end
 
+-- The profile window's parts as they are for profiles, or themes.
+local function Mode(themes)
+	window.themes = themes
+	window.keep:SetShown(not themes)
+	window.daily:SetShown(not themes)
+	window.always:ClearAllPoints()
+	window.always:SetPoint("BOTTOMLEFT", 18, 16)
+	-- (No keep slider or daily box for themes: shorter, with no gap where they'd be.)
+	window:SetHeight(themes and 384 or 460)
+	window.always:SetPoint("RIGHT", window, "RIGHT", -16, 0)
+	window.always:SetText(themes
+		and L["Backed up once a day when a theme of yours has changed, and always just before Save changes and Delete."]
+		or L["Always backed up just before Delete and Reset, and the saved version on Save."])
+	window.hint:SetText(themes
+		and L["Newest first. Restoring one adds it as a new theme of yours and uses it; the theme it came from stays as it is."]
+		or L["Newest first. Restoring one adds it as a new profile and switches to it; " ..
+			"the profile it came from stays as it is."])
+end
+
+-- Your themes' backups (one's, or all of them), then deleted ones.
+function FillThemes()
+	local only = window.themeKey
+	local mine, deleted = ns.StyleThemeBackups()
+	local y, n, h, any = 0, 0, 0, false
+	local onlyName
+	local function Next(title, sub, tag, color, onClick)
+		n = n + 1
+		local row = GetRow(n)
+		row:ClearAllPoints()
+		row:SetPoint("TOPLEFT", 0, -y)
+		row:SetPoint("TOPRIGHT", 0, -y)
+		row.title:SetText(title)
+		row.sub:SetText(sub)
+		row.tag:SetText(tag)
+		row.tag:SetTextColor(unpack(color))
+		row.restore:SetScript("OnClick", onClick)
+		row:Show()
+		y = y + ROW_H
+	end
+	local function Restored(key, why)
+		if not key then
+			if why then ns.Print(why) end
+			return
+		end
+		if window.onRestored then window.onRestored(key) end
+		window:Hide()
+	end
+	for _, theme in ipairs(mine) do
+		if not only or theme.key == only then
+			if theme.key == only then onlyName = theme.name end
+			if #theme.backups > 0 then
+				any = true
+				if not only then
+					h = h + 1
+					local header = GetHeader(h)
+					header:SetText(theme.name)
+					header:ClearAllPoints()
+					header:SetPoint("TOPLEFT", 4, -y - (h > 1 and 10 or 4))
+					header:Show()
+					y = y + (h > 1 and 30 or 24)
+				end
+				for i, backup in ipairs(theme.backups) do
+					local tag = backup.why == "delete" and L["Before delete"] or backup.why == "save" and L["Before save"]
+						or L["Daily"]
+					local count = 0
+					for _ in pairs(backup.theme and backup.theme.settings or {}) do count = count + 1 end
+					Next(When(backup.time), L["Version %s, %d settings changed"]:format(backup.version or "?", count),
+						tag, backup.why == "daily" and { 0.6, 0.6, 0.6 } or { 1, 0.65, 0.2 },
+						function() Restored(ns.RestoreStyleThemeBackup(theme.key, i)) end)
+				end
+			end
+		end
+	end
+	window.title:SetText(onlyName and L["Backups of %s"]:format(onlyName) or L["Theme backups"])
+	for i = h + 1, #window.headers do window.headers[i]:Hide() end
+	window.empty:ClearAllPoints()
+	window.empty:SetPoint("TOPLEFT", 4, -y - 6)
+	window.empty:SetPoint("RIGHT", -4, 0)
+	if not any then
+		window.empty:SetText(only and L["None yet. One's taken the first day this theme changes, and just before Save changes and Delete."]
+			or L["None yet. Your own themes are backed up the first day they change, and just before Save changes and Delete."])
+		window.empty:Show()
+		y = y + window.empty:GetStringHeight() + 14
+	else
+		window.empty:Hide()
+	end
+	window.deletedHeader:SetShown(#deleted > 0)
+	if #deleted > 0 then
+		window.deletedHeader:ClearAllPoints()
+		window.deletedHeader:SetPoint("TOPLEFT", 4, -y - 10)
+		y = y + 30
+		local days = ns.STYLE_THEME_DELETED_DAYS or 30
+		for i, entry in ipairs(deleted) do
+			local gone = date("%Y-%m-%d", (entry.time or 0) + days * DAY)
+			Next(entry.name or "?", L["Deleted %s, kept until %s"]:format(date("%Y-%m-%d", entry.time or 0), gone),
+				L["Deleted"], { 1, 0.3, 0.3 }, function() Restored(ns.RestoreDeletedStyleTheme(i)) end)
+		end
+	end
+	for i = n + 1, #window.rows do window.rows[i]:Hide() end
+	window.list:SetHeight(math.max(1, y))
+	local scroll = window.scroll
+	if (scroll:GetWidth() or 0) > 0 then window.list:SetWidth(scroll:GetWidth()) end
+	local bar = scroll.ScrollBar or _G[(scroll:GetName() or "") .. "ScrollBar"]
+	if bar then
+		local fits = y <= (scroll:GetHeight() or 0)
+		bar:SetShown(not fits)
+		if fits then scroll:SetVerticalScroll(0) end
+	end
+end
+
+-- Your themes' backups: key, one's (every one's if none); onRestored(key): a
+-- backup brought back as that new theme (the Themes tab uses it).
+function ns.ShowStyleThemeBackups(key, onRestored)
+	if not ns.db or not ns.StyleThemeBackups then return end
+	if not window then CreateWindow() end
+	Mode(true)
+	window.themeKey, window.onRestored = key, onRestored
+	FillThemes()
+	window:Show()
+end
+
 -- name: whose (every profile's if none).
 function ns.ShowBackups(name)
 	if not ns.db then return end
 	if not window then CreateWindow() end
+	Mode(false)
 	window.profile = name
 	window.refreshing = true
 	window.keep:SetValue(ns.BackupKeep())

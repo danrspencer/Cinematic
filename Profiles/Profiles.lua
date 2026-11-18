@@ -932,6 +932,7 @@ local RESET_KEEPS = {
 	"cameraScripts", "customWheels", -- (your scripts, your own wheels)
 	"zoneTints", "zonePresets", "zoneTintStrength", "timePhaseColors", "timePhaseStrength", -- (tints you picked)
 	"myTints", "myTintNext", -- (tints you made)
+	"styleMyThemes", "styleThemeBackups", "styleThemesDeleted", -- (your themes, for the account: StyleThemes.lua)
 	"extraFrames", -- (frames you added)
 	"cvarsLeftAlone", -- (game settings you kept as yours: the Game Settings page)
 	"devEdits", -- (the dev copy's Module Editor)
