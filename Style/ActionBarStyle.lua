@@ -19,6 +19,7 @@ DEFAULTS.abEdgeSize = 2    -- ...Custom's thickness
 DEFAULTS.abEdgeR, DEFAULTS.abEdgeG, DEFAULTS.abEdgeB = 0.1, 0.1, 0.1
 DEFAULTS.abShape = "game"  -- the shape: "game", "square" or "round"
 DEFAULTS.abSlots = true    -- the game's background on empty slots
+DEFAULTS.abAlpha = 1       -- the buttons' opacity (a player on an HDR monitor found them too bright, 2026-11-18)
 
 local RING = "Interface\\AddOns\\" .. ADDON_NAME .. "\\Textures\\ActionRing" -- (1 to 10: Media/make_action_rings.py)
 local CIRCLE = "Interface\\CHARACTERFRAME\\TempPortraitAlphaMask" -- (a round mask every client has)
@@ -72,8 +73,9 @@ local function Plan()
 	if own and kind == "game" then
 		kind, size, r, g, b = "line", 1, GAME_GRAY, GAME_GRAY, GAME_GRAY
 	end
+	local alpha = tonumber(look.abAlpha) or 1
 	return { own = own, round = own and look.abShape == "round", line = kind == "line", size = size,
-		r = r, g = g, b = b, slots = look.abSlots ~= false }
+		r = r, g = g, b = b, slots = look.abSlots ~= false, alpha = math.max(0.2, math.min(1, alpha)) }
 end
 
 -- The art we've hidden stays hidden: the game sets alpha on it, and on classic
@@ -848,6 +850,37 @@ function ns.RefreshCooldownShape()
 	end
 end
 
+-- Opacity: each button's own alpha, times the page's. On the buttons, not their
+-- bars, so it stacks with CineMode's fade of the bars (Frames.lua) rather than
+-- fighting it. What the game sets on a button is kept as its own and ours put
+-- over it, so a button it hides by alpha stays hidden.
+local opacityNow = 1
+local gameAlpha = setmetatable({}, { __mode = "k" })
+local settingOpacity = false
+local function KeepOpacity(button)
+	if settingOpacity then return end
+	local alpha = button:GetAlpha()
+	if issecretvalue and issecretvalue(alpha) then return end
+	gameAlpha[button] = alpha
+	if opacityNow < 1 then
+		settingOpacity = true
+		button:SetAlpha(alpha * opacityNow)
+		settingOpacity = false
+	end
+end
+local function SetOpacity(button)
+	if gameAlpha[button] == nil then
+		if opacityNow >= 1 then return end -- (nothing's touched until the page asks)
+		local alpha = button:GetAlpha()
+		if issecretvalue and issecretvalue(alpha) then return end
+		gameAlpha[button] = alpha
+		hooksecurefunc(button, "SetAlpha", KeepOpacity)
+	end
+	settingOpacity = true
+	button:SetAlpha(gameAlpha[button] * opacityNow)
+	settingOpacity = false
+end
+
 local waiting = false -- (a change made in a fight: done as it ends)
 function ns.RefreshActionBarStyle()
 	if InCombatLockdown() then
@@ -858,10 +891,13 @@ function ns.RefreshActionBarStyle()
 	if OthersSkinThem() then return end
 	local plan = Plan()
 	roundNow = plan.round and true or false
+	opacityNow = plan.alpha
 	local failed
 	EachButton(function(button)
 		if not (button.IsForbidden and button:IsForbidden()) then
 			local ok, err = pcall(Dress, button, plan)
+			if not ok then failed = err end
+			ok, err = pcall(SetOpacity, button)
 			if not ok then failed = err end
 		end
 	end)
@@ -883,8 +919,9 @@ function ns.ActionBarState()
 	end)
 	local button = _G.ActionButton1
 	local normal = button and button.GetNormalTexture and button:GetNormalTexture()
-	return ("bars: own %s line %s round %s others %s dressed %d/%d normal alpha %s"):format(tostring(plan.own), tostring(plan.line),
-		tostring(plan.round), tostring(OthersSkinThem()), dressed, counted, tostring(normal and normal:GetAlpha()))
+	return ("bars: own %s line %s round %s opacity %s others %s dressed %d/%d normal alpha %s button alpha %s"):format(
+		tostring(plan.own), tostring(plan.line), tostring(plan.round), tostring(plan.alpha), tostring(OthersSkinThem()),
+		dressed, counted, tostring(normal and normal:GetAlpha()), tostring(button and button:GetAlpha()))
 end
 
 -- For the theme shots' log: whether bar 1's first icon can draw.
@@ -1010,7 +1047,10 @@ local function MakePreview(content)
 	end
 	function holder:Refresh()
 		local plan = Plan()
-		for _, button in ipairs(buttons) do pcall(Dress, button, plan) end
+		for _, button in ipairs(buttons) do
+			pcall(Dress, button, plan)
+			button:SetAlpha(plan.alpha)
+		end
 	end
 	holder:SetScript("OnShow", holder.Refresh)
 	return holder
@@ -1061,6 +1101,8 @@ function ns.CreateActionBarStylePanel(kit)
 				{ "round", L["Round"], L["Round icons, with the cooldown sweep and the highlights round too."] },
 			})
 			look.Check("abSlots", L["Empty slot background"], L["Shows the game's background on empty action slots."])
+			look.Slider("abAlpha", L["Opacity"], 20, 100, 5, "%d%%", 100,
+				L["How see-through the action buttons are; lower if they look too bright."])
 		end,
 		border = { "abEdge", L["The outline around each action button."], label = L["Outline:"],
 			opts = { game = true, colored = L["Class color"] } },

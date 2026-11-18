@@ -83,6 +83,8 @@ local KEYS = {
 	ufNameCut = "game",          -- ...too long for its box: "game" (ends in "...") or "first" (FitName)
 	ufPortrait = "game",         -- "game" (their face) or "class" (a player's class icon)
 	ufShape = "game",            -- its shape: "game", "circle", "square", one of StyleThemes.lua's shapes or "none" (not "game": the frame art goes)
+	ufNameBack = "auto",         -- the strip behind the name (target, focus): "auto", "game", "hide" or "custom" (DressNameBack)
+	ufNameBackR = 0.1, ufNameBackG = 0.1, ufNameBackB = 0.1,
 }
 local SHARED = { ufTexture = { "texture", "game" }, ufFont = { "font", "game" }, ufOutline = { "outline", 0 },
 	ufShadow = { "shadow", "game" }, ufBorder = { "border", "game" } }
@@ -780,6 +782,70 @@ local function SetClear(texture, clear)
 	if clear == (kept[texture] or false) then return end
 	kept[texture] = clear or nil
 	texture:SetAlpha(clear and 0 or 1)
+end
+
+-- The colored strip behind the target's and focus's name (retail's
+-- ReputationColor, the other clients' <frame>NameBackground): the game colors
+-- it by how they see you, at each new target. ufNameBack: "auto" (the game's,
+-- hidden with a portrait shape of ours, as the themes do), "game", "hide" or
+-- "custom" (ufNameBackR/G/B, held as the game colors it again). The dark band
+-- behind it is in the frame art, and goes only with it. Asked for by a player,
+-- 2026-11-18.
+local stripTint = setmetatable({}, { __mode = "k" }) -- strip -> { r, g, b } while ours
+local stripGame = setmetatable({}, { __mode = "k" }) -- strip -> the game's last color
+local tinting = false
+local function KeepTint(strip, r, g, b, a)
+	if tinting then return end
+	stripGame[strip] = { r, g, b, a }
+	local tint = stripTint[strip]
+	if tint then
+		tinting = true
+		strip:SetVertexColor(tint[1], tint[2], tint[3])
+		tinting = false
+	end
+end
+local tintHooked = setmetatable({}, { __mode = "k" })
+local function NameStrip(frame)
+	local content = frame.TargetFrameContent
+	local main = content and content.TargetFrameContentMain
+	if main and main.ReputationColor then return main.ReputationColor end
+	local name = frame.GetName and frame:GetName()
+	return name and _G[name .. "NameBackground"] or nil
+end
+-- (For the dev copy's test, DimNameTest.lua: the strip and what we hold on it.)
+function ns.UnitNameStrip(frame)
+	local strip = frame and NameStrip(frame)
+	return strip, strip and kept[strip] or false, strip and stripTint[strip] or nil
+end
+local function DressNameBack(frame, view)
+	local strip = NameStrip(frame)
+	if not (strip and strip.SetVertexColor) then return end
+	local mode = view and view.ufNameBack or "game"
+	if mode == "auto" then mode = view.ufShape ~= "game" and "hide" or "game" end
+	-- (Nothing's touched until the page asks for something.)
+	if mode == "game" and not kept[strip] and not stripTint[strip] then return end
+	SetClear(strip, mode == "hide")
+	if mode == "custom" then
+		if not tintHooked[strip] then
+			tintHooked[strip] = true
+			hooksecurefunc(strip, "SetVertexColor", KeepTint)
+		end
+		-- (The game's color as it is, before ours first goes on: to put back.)
+		if not stripTint[strip] and not stripGame[strip] then stripGame[strip] = { strip:GetVertexColor() } end
+		local tint = { view.ufNameBackR or 0, view.ufNameBackG or 0, view.ufNameBackB or 0 }
+		stripTint[strip] = tint
+		tinting = true
+		strip:SetVertexColor(tint[1], tint[2], tint[3])
+		tinting = false
+	elseif stripTint[strip] then
+		stripTint[strip] = nil
+		local game = stripGame[strip]
+		if game then
+			tinting = true
+			strip:SetVertexColor(game[1], game[2], game[3], game[4])
+			tinting = false
+		end
+	end
 end
 
 local function PortraitMask(frame)
@@ -2067,6 +2133,7 @@ local function DressFrame(info)
 			DressBarText(power, view)
 			DressBarText(second, view)
 			DressName(text, view, unit)
+			DressNameBack(frame, view)
 			FitName(text, view)
 			DressPortrait(portrait, view, unit)
 			DressFrameArt(frame, active)
@@ -2929,6 +2996,18 @@ function ns.CreateUnitStylePanel(kit)
 					}) do list[#list + 1] = { value = each[1], text = each[2], tip = each[3] } end
 					return list
 				end, L["The portrait's shape, in place of the game's frame art."], Editable)
+				-- (Only the target and focus frames have the strip: on their rows and Default's.)
+				if not id or id == "TARGET" or id == "FOCUS" then
+					look.Choices(L["Name background:"], "ufNameBack", {
+						{ "auto", L["Auto"], L["The game's, hidden with a portrait shape of ours."] },
+						{ "game", L["The game's"], L["Colored by how they see you."] },
+						{ "hide", L["Hidden"], L["No colored strip behind the name."] },
+						{ "custom", L["Custom"], L["One color of your own (below)."] },
+					}, Editable)
+					look.Chips(L["Its color"], { "ufNameBackR", "ufNameBackG", "ufNameBackB" },
+						L["The strip's color, for Custom."],
+						function(db) return Editable(db) and ns.StyleKeyGet(FieldFor(id)("ufNameBack")) == "custom" end)
+				end
 			end,
 			border = { "ufBorder", L["The border around each bar: the game's frame or one of ours."], opts = { game = true }, test = Editable },
 		})

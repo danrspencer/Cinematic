@@ -218,6 +218,7 @@ Dev\NamesTest.lua
 Dev\StyleRevampTest.lua
 Dev\StyleSixTest.lua
 Dev\KeysBarsTest.lua
+Dev\DimNameTest.lua
 Dev\TurnLagTest.lua
 Dev\PlateCostTest.lua
 Dev\FriendPlatesTest.lua
