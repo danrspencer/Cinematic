@@ -226,6 +226,7 @@ Dev\Sweep.lua
 Dev\EuiSwingTest.lua
 Dev\EuiCooldownTest.lua
 Dev\BuffFadeTest.lua
+Dev\SpokenTest.lua
 Camera\CameraScriptsPage.lua
 Camera\CameraManager.lua
 Options.lua

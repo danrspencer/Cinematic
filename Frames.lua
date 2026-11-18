@@ -211,7 +211,10 @@ end
 ns.AddOnLoaded = AddOnLoaded
 
 function ns.IsAddonFramesOn(key)
-	return ns.db.addonFrames[key] ~= false
+	local on = ns.db.addonFrames[key]
+	-- (Never switched: faded, unless its row starts with Always on.)
+	if on == nil then return not ns.ADDON_SHOWN_BY_DEFAULT[key] end
+	return on ~= false
 end
 
 -- Groups whose frames set their own alpha (see AddFrame).

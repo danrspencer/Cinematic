@@ -1733,6 +1733,9 @@ local function HandleSlash(msg)
 		-- (Dev copy: one run recording buff pictures left hidden after a "Just the new one" peek, BuffFadeTest.lua.)
 		if ns.BuffFadeTest then ns.BuffFadeTest(arg:match("^bufftest%s*(.*)$")) else
 			ns.Print("/cine debug bufftest is in the dev copy only.") end
+	elseif cmd == "debug" and arg == "spokentest" then
+		-- (Dev copy: one run recording Spoken's narrator windows and portraits, SpokenTest.lua.)
+		if ns.SpokenTest then ns.SpokenTest() else ns.Print("/cine debug spokentest is in the dev copy only.") end
 	elseif cmd == "debug" and arg == "lowmana" then
 		-- (Dev copy: one run recording why low mana doesn't bring your frames up, LowManaTest.lua.)
 		if ns.LowManaTest then ns.LowManaTest() else ns.Print("/cine debug lowmana is in the dev copy only.") end
