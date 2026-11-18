@@ -1773,6 +1773,10 @@ local function HandleSlash(msg)
 		-- (Dev copy: one run checking the style revamp's release 6 and plate theme shapes, StyleSixTest.lua.)
 		if ns.StyleSixTest then ns.StyleSixTest(arg:match("^release6%s*(.*)$"))
 		else ns.Print("/cine debug release6 is in the dev copy only.") end
+	elseif cmd == "debug" and arg == "plateflicker" then
+		-- (Dev copy: one run logging what sets your target plate's name in a fight, PlateFlickerTest.lua.)
+		if ns.PlateFlickerTest then ns.PlateFlickerTest()
+		else ns.Print("/cine debug plateflicker is in the dev copy only.") end
 	elseif cmd == "debug" and arg:find("^dimname") then
 		-- (Dev copy: one run checking the action buttons' Opacity and the target's Name background, DimNameTest.lua.)
 		if ns.DimNameTest then ns.DimNameTest(arg:match("^dimname%s*(.*)$"))

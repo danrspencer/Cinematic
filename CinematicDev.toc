@@ -220,6 +220,7 @@ Dev\StyleSixTest.lua
 Dev\MyThemesTest.lua
 Dev\KeysBarsTest.lua
 Dev\DimNameTest.lua
+Dev\PlateFlickerTest.lua
 Dev\TurnLagTest.lua
 Dev\PlateCostTest.lua
 Dev\FriendPlatesTest.lua

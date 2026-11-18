@@ -1902,6 +1902,19 @@ local function ShowMatch(entry, onPage)
 		C_Timer.After(0.1, function()
 			local header = entry.pageSwitch.header
 			canvas.scroll:SetVerticalScroll(0)
+			-- (A page under tabs has no header switch, ns.DropPageHeader: it's on
+			-- its tab, right-click, StylePages.lua's tab.switchPage. The glow sat
+			-- where the hidden header was, past the tabs, 2026-11-18.)
+			if header and not header:IsVisible() then
+				local function TabOf(frame)
+					if frame.switchPage == entry.page.key and frame:IsVisible() then return frame end
+					for _, child in ipairs({ frame:GetChildren() }) do
+						local found = TabOf(child)
+						if found then return found end
+					end
+				end
+				header = TabOf(canvas.content) or header
+			end
 			if header then Highlight(canvas, { top = header, bottom = header, left = header, right = header }) end
 		end)
 		return
