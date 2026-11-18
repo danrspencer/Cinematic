@@ -20,6 +20,10 @@ local linesCut = false
 -- Whether that cut was a unit's lines (not an object's or item's): the
 -- Show hook cuts again with no readable unit then (see HookTooltipParts).
 local unitLinesCut = false
+-- How many lines the unit's own fill gave (the game's data, before a unit
+-- frame adds its blank line and "<Right click for Frame Settings>" under
+-- it): nil until a unit fill. Lines past it are the frame's.
+local unitFillCount
 
 -- Whether a part (ns.TOOLTIP_PARTS) is taken out now: unticked in the
 -- column for now (On first hover, or After once revealed). With
@@ -365,15 +369,25 @@ local function LinesToCut(tooltip, count, unit, object)
 		end
 	end
 	-- A unit frame's hint whose text can't be read (an enemy target's or
-	-- focus's tooltip in a dungeon): the last line, in the hint's green, or
-	-- with its colour locked too (both secret there: read in game, WoW Forever
-	-- 2026-11-18, so the green check never passed and the hint stayed). A
-	-- world mouseover's tooltip has no hint: it's never cut, as the mouse is
-	-- over no unit frame then.
+	-- focus's tooltip in a dungeon): the last line, in the hint's green. Its
+	-- colour is locked there too (read in game, WoW Forever 2026-11-18), so
+	-- then it goes by place: the frame's own lines come after the unit's
+	-- fill, the blank one and the hint, cut together. (Without that, the
+	-- unit's last line, "Humanoid", was taken for the hint on the fill's own
+	-- pass, and the blank line moved up into its row: an empty strip.) A
+	-- world mouseover's tooltip has no hint: never cut, as the mouse is over
+	-- no unit frame then.
 	local last = Left(count)
 	if Cut("Hint") and not object and not cut[count] and last and Unreadable(last)
-		and (IsHintColor(last) or ColorUnreadable(last)) and (FrameUnit(tooltip) or FocusUnitFrame()) then
-		cut[count] = true
+		and (FrameUnit(tooltip) or FocusUnitFrame()) then
+		if IsHintColor(last) then
+			cut[count] = true
+		elseif ColorUnreadable(last) and unitFillCount and count > unitFillCount then
+			cut[count] = true
+			if count - unitFillCount == 2 then
+				cut[count - 1] = true -- (the game's blank line above the hint)
+			end
+		end
 	end
 	-- Blank lines left at the bottom once others are cut (the game's spacer
 	-- above a unit frame's right-click hint): an empty strip under the last line.
@@ -568,6 +582,14 @@ local function CutLines(tooltip, object)
 		unit = FrameUnit(tooltip)
 	end
 	local cut = LinesToCut(tooltip, count, unit, object)
+	if ns.tooltipWatchCuts then
+		local list = {}
+		for i = 1, count do
+			if cut[i] then list[#list + 1] = i end
+		end
+		ns.Log("chat", ("Watch cut: %d lines, unit %s, cut [%s]"):format(count, tostring(unit),
+			table.concat(list, " ")))
+	end
 	if not next(cut) then
 		return
 	end
@@ -995,6 +1017,8 @@ local function OnUnitTooltip(tooltip)
 	for _, bar in ipairs(bars) do
 		HideBar(bar)
 	end
+	local okCount, count = pcall(tooltip.NumLines, tooltip)
+	unitFillCount = okCount and type(count) == "number" and count or nil
 	if AnyLineCut() then
 		CutWhenShown(tooltip, "unit")
 	end
@@ -1041,12 +1065,40 @@ end
 -- a mob's in the world, isn't the one read: there's time to move onto the
 -- frame wanted. A player's reading caught the wrong one, WoW Forever 2026-11-16.)
 local listParts = false
+
+-- A test step's prompt in big letters mid-screen as well as in chat, for
+-- when chat is hidden (a profile that fades it): on WorldFrame, so a
+-- hidden UI doesn't take it too. Gone after a few seconds.
+local promptFrame
+function ns.TestPrompt(msg, seconds)
+	ns.Print(msg)
+	pcall(function()
+		if not promptFrame then
+			promptFrame = CreateFrame("Frame", nil, WorldFrame)
+			promptFrame:SetFrameStrata("TOOLTIP")
+			promptFrame:SetAllPoints(WorldFrame)
+			promptFrame.text = promptFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalHuge")
+			promptFrame.text:SetPoint("TOP", promptFrame, "TOP", 0, -WorldFrame:GetHeight() * 0.2)
+			promptFrame.text:SetWidth(WorldFrame:GetWidth() * 0.6)
+		end
+		promptFrame.text:SetText(msg)
+		promptFrame:Show()
+		local shown = msg
+		C_Timer.After(seconds or 4, function()
+			if promptFrame.text:GetText() == shown then
+				promptFrame:Hide()
+			end
+		end)
+	end)
+end
+
 function ns.TooltipPartsDebug()
 	listParts = false
-	ns.Print("In 2 seconds, mouse over the thing to check: the next tooltip after that prints its parts.")
+	ns.TestPrompt("Tooltip test: in 2 seconds, mouse over the thing to check", 2)
 	C_Timer.After(2, function()
 		listParts = true
-		ns.Print("Now mouse over it.")
+		ns.tooltipWatchCuts = true
+		ns.TestPrompt("Mouse over it now, and keep still till this says done", 30)
 	end)
 end
 
@@ -1221,6 +1273,36 @@ local function ListParts(tooltip)
 				tostring(ns.QuestieObjectiveMob and ns.QuestieObjectiveMob(unit))))
 		end
 	end)
+	-- And how it changes over the next 4 seconds (the game's refills, the
+	-- After reveal): its height and which rows show, with two screenshots.
+	-- (A gap at the bottom of an enemy target's tooltip in a dungeon came
+	-- after the first reading, which was the right size: WoW Forever 2026-11-18.)
+	local start = GetTime()
+	for step = 1, 16 do
+		C_Timer.After(step * 0.25, function()
+			pcall(function()
+				local rows = {}
+				for i = 1, tooltip:NumLines() do
+					rows[#rows + 1] = Try(function() return ns.Flag(Left(i):IsShown()) and "y" or "n" end)
+				end
+				ns.Print(("Watch +%.2fs: shown %s | owner %s | h %s w %s | lines %s [%s] | cut %s (a unit's %s)"
+					.. " | After look %s | countdown %s"):format(GetTime() - start,
+					Try(function() return ns.Flag(tooltip:IsShown()) end),
+					Try(function() return tooltip:GetOwner():GetDebugName() end),
+					Num0(function() return tooltip:GetHeight() end), Num0(function() return tooltip:GetWidth() end),
+					Try(function() return tooltip:NumLines() end), table.concat(rows, " "),
+					tostring(linesCut), tostring(unitLinesCut), tostring(revealed), tostring(fullTimer ~= nil)))
+			end)
+			if step == 2 or step == 12 then
+				pcall(Screenshot)
+				ns.Print(("Watch: screenshot at +%.2fs"):format(GetTime() - start))
+			end
+			if step == 16 then
+				ns.tooltipWatchCuts = nil
+				ns.TestPrompt("Tooltip test done: /reload and say check log", 6)
+			end
+		end)
+	end
 end
 
 function ns.HookTooltipParts()
@@ -1299,10 +1381,14 @@ function ns.HookTooltipParts()
 		hiddenAt, hiddenAlpha = GetTime(), Alpha(GameTooltip) or (fade and fade.set) or 1
 		StopFade(true)
 		FreeRows()
+		unitFillCount = nil
 	end)
 	-- (And as it's emptied for its next lines, without hiding in between.)
 	if GameTooltip:HasScript("OnTooltipCleared") then
-		GameTooltip:HookScript("OnTooltipCleared", FreeRows)
+		GameTooltip:HookScript("OnTooltipCleared", function()
+			FreeRows()
+			unitFillCount = nil -- (the next unit fill sets it)
+		end)
 	end
 	-- The health bar hides each time it shows.
 	for _, bar in ipairs({ GameTooltipStatusBar or false, GameTooltip.StatusBar or false }) do
