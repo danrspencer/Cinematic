@@ -38,6 +38,7 @@ local TRACK_FROM = 0.32            -- ...from this much apart (of the text's hei
 local TYPE_EACH = 0.07             -- Typewriter: seconds for each letter
 local SLAM, SLAM_IN = 0.32, 0.12   -- Slam: seconds the words take to shrink onto the screen, and to fade in
 local SLAM_FROM = 1.45             -- ...from this many times their size
+local FONT_MAX = 120               -- the game's tallest font (tested, Forever)
 local SLAM_DRIFT = 0               -- ...then growing this much more till they've gone (0 since 2026-11-18: they stay still once landed; it read as growing)
 local PULSE_PEAK, PULSE_GONE = 0.12, 0.9
 local CUT_OUT = 0.25               -- a cue cut short (the fight's other edge came first) fades this fast
@@ -206,6 +207,7 @@ end
 local function SlamScale(cue, scale)
 	local text = cue.text
 	if not text.SetTextScale then return end
+	scale = scale * (cue.textBoost or 1)
 	text:SetTextScale(scale)
 	for _, rim in ipairs(text.rim) do rim:SetTextScale(scale) end
 	for _, bleed in ipairs(text.bleed) do bleed:SetTextScale(scale) end
@@ -333,7 +335,14 @@ local function Setup(cue, look, enter, width, height, scale, boss)
 	local outline = OUTLINES[look.combatOutline] or ""
 	local or_, og, ob = look.combatOutlineR or 0, look.combatOutlineG or 0, look.combatOutlineB or 0
 	local rimmed = outline ~= "" and or_ + og + ob > 0
-	local fontSize = math.floor(size + 0.5)
+	-- (The game draws no font taller than FONT_MAX, tested: 140 and 300 both
+	-- came out 120 high. Bigger: the font at FONT_MAX, the words grown by
+	-- textBoost on top, through their text scale.)
+	local fontSize = math.min(math.floor(size + 0.5), FONT_MAX)
+	cue.textBoost = text.SetTextScale and size > FONT_MAX and size / FONT_MAX or 1
+	-- (The small lines' gaps from the words go no further than at FONT_MAX:
+	-- at 1000 a fifth of the size pushed Discovered off the screen, tested.)
+	local gap = math.min(size, FONT_MAX * scale)
 	ns.SetPlateNameFont(text, GameFontNormalHuge, FontFile(look), fontSize, 1, rimmed and "" or outline)
 	ns.SetTextShadow(text, look.combatShadow)
 	-- (A banner's words a touch see-through, its copies faint: as SetAlpha,
@@ -423,9 +432,9 @@ local function Setup(cue, look, enter, width, height, scale, boss)
 		elseif cue.barSide then
 			cue.subAt = { "LEFT", text, "RIGHT", size * 0.8, 0 }
 		elseif cue.third then
-			cue.subAt = { "TOPLEFT", under, "BOTTOMLEFT", 0, -size * 0.25 }
+			cue.subAt = { "TOPLEFT", under, "BOTTOMLEFT", 0, -gap * 0.25 }
 		else
-			cue.subAt = { "TOP", under, "BOTTOM", 0, -size * 0.25 }
+			cue.subAt = { "TOP", under, "BOTTOM", 0, -gap * 0.25 }
 		end
 		sub:SetPoint(unpack(cue.subAt))
 	end
@@ -446,8 +455,8 @@ local function Setup(cue, look, enter, width, height, scale, boss)
 		meta:SetText(metaText)
 		meta:SetTextColor(metaR, metaG, metaB, 1)
 		meta:SetVertexColor(metaR, metaG, metaB, 1)
-		cue.metaAt = cue.third and { "BOTTOMLEFT", text, "TOPLEFT", 0, size * 0.2 }
-			or { "BOTTOM", text, "TOP", 0, size * 0.2 }
+		cue.metaAt = cue.third and { "BOTTOMLEFT", text, "TOPLEFT", 0, gap * 0.2 }
+			or { "BOTTOM", text, "TOP", 0, gap * 0.2 }
 		meta:SetPoint(unpack(cue.metaAt))
 	end
 	meta:SetShown(metaText ~= "")
@@ -470,7 +479,7 @@ local function Setup(cue, look, enter, width, height, scale, boss)
 	cue.clipWidth = width
 	clip:SetWidth((cue.reveal or cue.type) and 1 or width)
 	cue.late, cue.rise = (cue.reveal or cue.track or cue.type or cue.slam) and (subText ~= "" or metaText ~= ""),
-		size * 0.15
+		gap * 0.15
 	cue.lateFrom, cue.typeTime = LATE_FROM, 0
 	-- The words' width up to a letter, measured in their own font, so pairs
 	-- keep their kerning.
@@ -484,7 +493,7 @@ local function Setup(cue, look, enter, width, height, scale, boss)
 		end
 		measure:SetText(part)
 		ns.SetPlateNameFont(measure, GameFontNormalHuge, FontFile(look), fontSize, 1, flags)
-		return measure:GetStringWidth()
+		return measure:GetStringWidth() * cue.textBoost
 	end
 	-- Typewriter: the window opens from the words' left a letter at a time
 	-- (cue.typeEnds: where each ends), the other lines rising in after.
@@ -525,6 +534,7 @@ local function Setup(cue, look, enter, width, height, scale, boss)
 				letter:ClearAllPoints()
 				letter:SetText(char)
 				ns.SetPlateNameFont(letter, GameFontNormalHuge, FontFile(look), fontSize, 1, flags)
+				if letter.SetTextScale then letter:SetTextScale(cue.textBoost) end
 				ns.SetTextShadow(letter, look.combatShadow)
 				letter:SetTextColor(r, g, b, 1)
 				letter:SetVertexColor(r, g, b, 1)

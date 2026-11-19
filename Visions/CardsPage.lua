@@ -333,11 +333,14 @@ function ns.MakeCardPreview(parent, width, fixedH, which, lookOf, opts)
 		-- (opts.loop: played again a moment after it's gone, while it's on
 		-- screen, so it's there whenever you look; one cut short by a new
 		-- play doesn't call this.)
+		-- (A play started in the wait, by Test or a change, cancels the replay.)
 		local after
 		if opts.loop then
+			self.playId = (self.playId or 0) + 1
+			local playId = self.playId
 			after = function()
 				C_Timer.After(1.2, function()
-					if self:IsVisible() then self:Refresh() end
+					if self.playId == playId and self:IsVisible() then self:Refresh() end
 				end)
 			end
 		end
@@ -351,11 +354,19 @@ function ns.MakeCardPreview(parent, width, fixedH, which, lookOf, opts)
 		if opts.zoomBy then fit = fit * math.max(opts.zoomBy(), 0.05) end
 		local f = math.max(1, math.min(maxZoom, fit))
 		if f <= 1.01 then return end
-		-- (Its top left, down from the preview's, so the card's middle comes as
-		-- near the preview's as can be with no edge of the stage showing.)
-		local cx, cd = (l + r) / 2, previewH - (b + t) / 2
-		local ox = math.max(W - W * f, math.min(0, W / 2 - cx * f))
-		local od = math.max(previewH - previewH * f, math.min(0, previewH / 2 - cd * f))
+		-- (Its top left, down from the preview's. The card's middle stays where
+		-- it is on the screen (2026-11-18: a lower third in the bottom left, not
+		-- pulled to the middle), moved in only as far as keeps it a margin
+		-- inside, its left and top first; no edge of the stage showing.)
+		local function Place(size, near, far)
+			local margin = size * 0.1
+			local o = (near + far) / 2 * (1 - f)
+			o = math.min(o, size - margin - far * f)
+			o = math.max(o, margin - near * f)
+			return math.max(size - size * f, math.min(0, o))
+		end
+		local ox = Place(W, l, r)
+		local od = Place(previewH, previewH - t, previewH - b)
 		stage:ClearAllPoints()
 		stage:SetSize(W, previewH)
 		stage:SetScale(f)
@@ -463,8 +474,9 @@ local function LookGrid(kit, content, stack, fieldOf, changed, own, icon)
 	-- shown while any has a value of its own. only: and while this holds.
 	local function Dot(names, only)
 		local dot = CreateFrame("Button", nil, content)
-		dot:SetSize(9, 9)
-		dot:SetPoint("TOPLEFT", grid, "TOPLEFT", at.x - 12, -(at.y + 7))
+		-- (Clear of the row's name: one 9 wide, 3 off, touched it.)
+		dot:SetSize(7, 7)
+		dot:SetPoint("TOPLEFT", grid, "TOPLEFT", at.x - 13, -(at.y + 8))
 		local mark = dot:CreateTexture(nil, "ARTWORK")
 		mark:SetAllPoints()
 		mark:SetTexture("Interface\\CharacterFrame\\TempPortraitAlphaMask")
@@ -703,7 +715,7 @@ local function LookGrid(kit, content, stack, fieldOf, changed, own, icon)
 	Narrow(rows.Font("cardFont", L["Words in Russian, Korean or Chinese keep the game's font, so their letters show."],
 		nil, nil, L["Font"]))
 	Dot({ "Size" })
-	Number("cardSize", L["Size"], 14, 140, 1, "%d", 1,
+	Number("cardSize", L["Size"], 14, 1000, 1, "%d", 1,
 		L["How tall the words are."], function(db) return On(db) and not BarUp() end)
 	Dot({ "Capitals" })
 	local caps = Tick("cardCaps", L["Capitals"], L["Shows the words in capital letters."])
@@ -815,6 +827,20 @@ end
 -- The preview on these tabs: low, so the settings fit under it. (As the screen
 -- it's the page's width: the words are as big as in a taller one.)
 local CARD_PREVIEW_H = 170
+-- A card's Size next to the size its type comes with: a style's (Card Types),
+-- or with id an event's own (its Card Style tab). The previews zoom in on the
+-- card as it comes and times this, so a Size changed shows bigger or smaller.
+local function CardSizeShare(style, id)
+	if id then style = ns.CardBase(id) end
+	local shipped = tonumber(ns.CardStyleRaw(style, "Size", true)) or 36
+	local size = id and ns.CardValue(id, "Size") or ns.CardStyleRaw(style, "Size")
+	return (tonumber(size) or shipped) / math.max(shipped, 1)
+end
+-- (As the Card Vision Events tab's jumbotron screens: up to 6 times, till the
+-- card's 70% of the screen, no "Preview" in the corner, played again.)
+local function JumboOpts(zoomBy)
+	return { zoom = 6, share = 0.7, loop = true, zoomBy = zoomBy, noCaption = true }
+end
 local function LowPreview(preview)
 	local refresh = preview.Refresh
 	preview.headHeight = CARD_PREVIEW_H - ns.StylePreviewHeight()
@@ -1127,17 +1153,13 @@ function ns.CreateCardsPanel(kit)
 		-- card as it comes (up to 6 times, till it's 70% of the screen), so a
 		-- Size changed shows bigger or smaller.
 		local jumbo
-		local function SizeShare(style)
-			local shipped = tonumber(ns.CardStyleRaw(style, "Size", true)) or 36
-			return (tonumber(ns.CardStyleRaw(style, "Size")) or shipped) / math.max(shipped, 1)
-		end
 		local cells, screens = {}, {}
 		for _, section in ipairs(TypeSections()) do
 			local style = section.key
 			cells[#cells + 1] = { section.title, key = style, sized = true, make = function(parent, width, height)
 				screens[#screens + 1] = ns.MakeCardPreview(parent, width, height, function() return TypeSample(style) end,
 					function() return ns.CardStyleLook(style, TypeSample(style)) end,
-					{ zoom = 6, share = 0.7, loop = true, zoomBy = function() return SizeShare(style) end, noCaption = true })
+					JumboOpts(function() return CardSizeShare(style) end))
 				return screens[#screens]
 			end }
 		end
@@ -1366,7 +1388,8 @@ function ns.CreateCardStylePanel(kit)
 	for _, event in ipairs(ns.CARD_EVENTS) do kit.RecordKey(content, "cardBase_" .. event.id) end
 	local rows = ns.StyleRows(kit, content, stack, Changed, "cards", FieldOf)
 
-	preview = ns.MakeCardPreview(content, 480, CARD_PREVIEW_H, function() return CARD.now end)
+	preview = ns.MakeCardPreview(content, 480, CARD_PREVIEW_H, function() return CARD.now end, nil,
+		JumboOpts(function() return CardSizeShare(nil, CARD.now) end))
 	preview.pageSwitch = false
 	LowPreview(preview)
 	stack:Add(preview, "label")
@@ -1548,7 +1571,8 @@ function ns.CreateCardStylesPanel(kit)
 	kit.AddControl(bar)
 
 	preview = ns.MakeCardPreview(content, 480, CARD_PREVIEW_H, Sample,
-		function() return ns.CardStyleLook(CARD.style, Sample()) end)
+		function() return ns.CardStyleLook(CARD.style, Sample()) end,
+		JumboOpts(function() return CardSizeShare(CARD.style) end))
 	preview.pageSwitch = false
 	LowPreview(preview)
 	stack:Add(preview, "label")
