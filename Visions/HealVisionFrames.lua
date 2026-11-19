@@ -64,22 +64,51 @@ local function Setting(key)
 	return ns.HealVisionSetting(key)
 end
 
+-- Nameplates' own (the Nameplates tab's "Their own settings", on to start
+-- with, 2026-11-19): plates are mostly strangers, who have no role, and the
+-- frames' numbers (Damage < 100%: always) put a bar over everyone. By who
+-- they are instead: your group, other players, pets and minions. No settings
+-- of their own for the rest (the user's call): your target's plate always
+-- shows (targetRaise), the mouse changes nothing (hoverKey false), the
+-- dead's stay hidden (PLATE_KINDS.dead: 0). Numbers in place of setting
+-- keys: Floor reads either.
+local PLATE_KINDS = {}
+do
+	local function Kind(below, alpha)
+		return { below = below, alpha = alpha, targetRaise = 1, hoverKey = false }
+	end
+	PLATE_KINDS.group = Kind("healVisionPlateGroupBelow", "healVisionPlateGroupAlpha")
+	PLATE_KINDS.others = Kind("healVisionPlateOthersBelow", "healVisionPlateOthersAlpha")
+	PLATE_KINDS.pets = Kind("healVisionPlatePetBelow", "healVisionPlatePetAlpha")
+	PLATE_KINDS.dead = { alpha = 0 }
+	local D = ns.DEFAULTS
+	D.healVisionPlateGroupBelow, D.healVisionPlateGroupAlpha = 0.7, 0
+	D.healVisionPlateOthersBelow, D.healVisionPlateOthersAlpha = 0.5, 0
+	D.healVisionPlatePetBelow, D.healVisionPlatePetAlpha = 0.35, 0
+end
+
 local targetKinds = {}
 local function TargetOf(kind)
 	local made = targetKinds[kind]
 	if not made then
-		made = { below = kind.below, alpha = kind.alpha, raise = "healVisionTargetAlpha" }
+		made = { below = kind.below, alpha = kind.alpha, raise = kind.targetRaise or "healVisionTargetAlpha",
+			hoverKey = kind.hoverKey }
 		targetKinds[kind] = made
 	end
 	return made
 end
 
 -- A kind's opacity setting (your target's: see TargetOf).
+-- (A setting's key, or a number standing for one: the plates' own kinds.)
+local function Value(key, default)
+	if type(key) == "number" then return key end
+	return tonumber(Setting(key)) or default
+end
 local function Floor(kind)
-	local floor = tonumber(Setting(kind.alpha)) or 0
-	if kind.raise then floor = math.max(floor, tonumber(Setting(kind.raise)) or 1) end
+	local floor = Value(kind.alpha, 0)
+	if kind.raise then floor = math.max(floor, Value(kind.raise, 1)) end
 	-- (The plate under the mouse: Mouseover, at least. See the plates' HoverOf.)
-	if kind.raiseHover then floor = math.max(floor, tonumber(Setting(kind.raiseHover)) or 0) end
+	if kind.raiseHover then floor = math.max(floor, Value(kind.raiseHover, 0)) end
 	return floor
 end
 
@@ -945,12 +974,27 @@ end
 -- plate on and up (Effects.lua's FriendWants and PlateAlpha), where Heal
 -- Vision's row says (PlatesOn).
 ns.DEFAULTS.healVisionPlates = false
--- The parts it can fade (as the Plate parts grid names them), each with a
--- Don't fade tick: healVisionPlatesKeep<part>. Only the name kept to start with.
+-- The parts it can fade (as the Plate parts grid names them). Which stay up:
+-- KeptPart, by the picker (no menu of its own since 2026-11-19).
 ns.HEAL_PLATE_PARTS = { "Health", "Name", "CastBar", "Buffs", "Debuffs", "RaidMarker", "Level", "Highlight",
 	"Widgets" }
-for _, part in ipairs(ns.HEAL_PLATE_PARTS) do
-	ns.DEFAULTS["healVisionPlatesKeep" .. part] = part == "Name"
+-- Show only while hurt (2026-11-19: one picker in place of the tick): "off",
+-- "names" (the name alone comes and goes, the rest as CineMode has it) or
+-- "plates" (the whole plate comes and goes, as the nameplate style has it).
+-- healVisionPlates stays the on switch, written with it (the picker's; old
+-- profiles with it on and no pick: plates).
+ns.DEFAULTS.healVisionPlatesShow = "off"
+local function PlatesShow()
+	if not ns.Setting("healVisionPlates") then return "off" end
+	local show = ns.Setting("healVisionPlatesShow")
+	return show == "names" and "names" or "plates"
+end
+ns.HealVisionPlatesShow = PlatesShow
+-- Whether a part stays up (not faded by health) on the plates.
+local function KeptPart(part)
+	local show = PlatesShow()
+	if show == "names" then return part ~= "Name" end
+	return false
 end
 -- On here: the tick, where Heal Vision's own row says (its rule to start
 -- with, "not city and not dead": in a city crowd every friendly plate would
@@ -963,7 +1007,7 @@ local function PlatesOn()
 	local now = GetTime()
 	if platesOnAt ~= now then
 		platesOnAt = now
-		platesOnNow = ns.Setting("healVisionPlates") and ns.HealVisionHere and ns.HealVisionHere() and true or false
+		platesOnNow = ns.Setting("healVisionPlates") and ns.HealVisionHere and ns.HealVisionHere(nil, true) and true or false
 	end
 	return platesOnNow
 end
@@ -1003,7 +1047,7 @@ local function PlateLayersOf(unitFrame, keptToo)
 		end
 	end
 	for _, part in ipairs(ns.HEAL_PLATE_PARTS) do
-		keeping = ns.Setting("healVisionPlatesKeep" .. part) and true or false
+		keeping = KeptPart(part)
 		if keptToo or not keeping then
 			for _, frame in ipairs(ns.PlatePartFrames(unitFrame, part)) do
 				if frame.IsObjectType and frame:IsObjectType("Frame") then
@@ -1032,19 +1076,19 @@ end
 local function PlateKindOf(unit)
 	if Plain(UnitIsUnit(unit, "player")) ~= false then return nil end
 	local kind = ns.PlateKind and ns.PlateKind(unit)
-	if kind == "FriendlyMinions" then return PETS end
+	-- (Always the plates' own kinds, by who, since 2026-11-19: the role tabs'
+	-- are the frames'.)
+	if kind == "FriendlyMinions" then return PLATE_KINDS.pets end
 	-- (A friendly NPC only in your group: follower dungeon and delve
 	-- companions, healed like players. Guards, vendors and the rest: not.)
+	local grouped = (UnitInParty and Plain(UnitInParty(unit)) == true)
+		or (UnitInRaid and type(Plain(UnitInRaid(unit))) == "number")
 	if kind == "FriendlyNPCs" then
-		local grouped = (UnitInParty and Plain(UnitInParty(unit)) == true)
-			or (UnitInRaid and type(Plain(UnitInRaid(unit))) == "number")
 		if not grouped then return nil end
 	elseif kind ~= "Friends" then
 		return nil
 	end
-	if Tank(unit) then return TANKS end
-	if Plain(UnitGroupRolesAssigned and UnitGroupRolesAssigned(unit)) == "HEALER" then return HEALERS end
-	return OTHERS
+	return grouped and PLATE_KINDS.group or PLATE_KINDS.others
 end
 
 -- Whether this plate's unit is one Heal Vision fades here: CineMode then
@@ -1083,9 +1127,11 @@ end
 local hoverKinds = {}
 local hoverUnit
 local function HoverOf(kind)
+	if kind.hoverKey == false then return kind end -- (the plates' own kinds: the mouse changes nothing)
 	local made = hoverKinds[kind]
 	if not made then
-		made = { below = kind.below, alpha = kind.alpha, raise = kind.raise, raiseHover = "healVisionMouseoverAlpha" }
+		made = { below = kind.below, alpha = kind.alpha, raise = kind.raise,
+			raiseHover = kind.hoverKey or "healVisionMouseoverAlpha" }
 		hoverKinds[kind] = made
 	end
 	return made
@@ -1140,7 +1186,7 @@ local function UpdatePlate(unit)
 		if kept[layer] then
 			alpha = (level or 1) * own
 		elseif dead then
-			alpha = Shown(0, DEAD) * own
+			alpha = Shown(0, PLATE_KINDS.dead) * own
 		else
 			local fade = ScaledCurve(kind, own)
 			if fade then
@@ -1292,7 +1338,9 @@ function ns.HealVisionPlateInfo(unit)
 	-- plain numbers, where the layers' alphas are secret.)
 	local kind = PlatesOn() and PlateKindOf(unit)
 	info.kind = kind == TANKS and "tanks" or kind == HEALERS and "healers" or kind == OTHERS and "damage"
-		or kind == PETS and "pets" or tostring(kind)
+		or kind == PETS and "pets" or kind == PLATE_KINDS.group and "plates: your group"
+		or kind == PLATE_KINDS.others and "plates: other players" or kind == PLATE_KINDS.pets and "plates: pets"
+		or tostring(kind)
 	local curve = kind and ScaledCurve(kind, 1)
 	if curve and curve.Evaluate then
 		local okFull, full = pcall(curve.Evaluate, curve, 1)
@@ -1321,7 +1369,9 @@ end
 -- each, and what each kind's curve gives at full health (a plain number: 1.0
 -- in, so it can be read).
 function ns.HealVisionPlatesDebug()
-	for _, pair in ipairs({ { "tanks", TANKS }, { "healers", HEALERS }, { "damage", OTHERS }, { "pets", PETS } }) do
+	for _, pair in ipairs({ { "tanks", TANKS }, { "healers", HEALERS }, { "damage", OTHERS }, { "pets", PETS },
+		{ "plates: your group", PLATE_KINDS.group }, { "plates: other players", PLATE_KINDS.others },
+		{ "plates: pets", PLATE_KINDS.pets } }) do
 		local curve = Curve(0, pair[2])
 		local ok, value = false, nil
 		if curve and curve.Evaluate then ok, value = pcall(curve.Evaluate, curve, 1) end
@@ -1331,10 +1381,12 @@ function ns.HealVisionPlatesDebug()
 	end
 	local kept = {}
 	for _, part in ipairs(ns.HEAL_PLATE_PARTS) do
-		if ns.Setting("healVisionPlatesKeep" .. part) then kept[#kept + 1] = part end
+		if KeptPart(part) then kept[#kept + 1] = part end
 	end
-	ns.Print(("heal vision plates: tick %s, page %s, don't fade: %s, fade range %s (Linear curve type %s)"):format(
-		tostring(ns.db and ns.db.healVisionPlates), tostring(ns.Setting("handleHealVision")),
+	ns.Print(("heal vision plates: on %s, show only while hurt %s, their own settings %s, page %s, don't fade: %s, "
+		.. "fade range %s (Linear curve type %s)"):format(
+		tostring(ns.db and ns.db.healVisionPlates), PlatesShow(), "always",
+		tostring(ns.Setting("handleHealVision")),
 		#kept > 0 and table.concat(kept, ", ") or "nothing", tostring(FadeRange()),
 		tostring(Enum.LuaCurveType and Enum.LuaCurveType.Linear)))
 	-- (Plates the game locks from addons, friendly ones in dungeons and raids:

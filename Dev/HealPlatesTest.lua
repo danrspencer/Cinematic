@@ -39,9 +39,9 @@ end
 local function RoleKey(key)
 	local saved = CinematicDB and CinematicDB.healPlatesRestore
 	if saved and saved.keys and saved.keys[key] then return saved.keys[key] end
-	local role = ns.PlayerRole and ns.PlayerRole()
-	if role and ns.db["healVisionOwn_" .. role] then return key .. "_" .. role end
-	return key
+	-- (Plates go by their own table since 2026-11-19: strangers by Other
+	-- players' row, not a role tab.)
+	return key == "healVisionShowBelow" and "healVisionPlateOthersBelow" or "healVisionPlateOthersAlpha"
 end
 local function BelowKey() return RoleKey("healVisionShowBelow") end
 local function AlphaKey() return RoleKey("healVisionMinAlpha") end
@@ -56,6 +56,7 @@ local function PutBack()
 	ns.db[keys.healVisionShowBelow] = saved.below
 	if saved.minAlpha ~= nil then ns.db[keys.healVisionMinAlpha] = saved.minAlpha end
 	for key, value in pairs(saved.keep or {}) do ns.db[key] = value end
+	if saved.show ~= nil then ns.db.healVisionPlatesShow = saved.show end
 	CinematicDB.healPlatesRestore = nil
 	if ns.ApplyHealVisionPlates then ns.ApplyHealVisionPlates() end
 end
@@ -392,28 +393,21 @@ function ns.HealPlatesTest()
 	CinematicDB.healPlatesRestore.below = ns.db[keys.healVisionShowBelow]
 	run = { at = GetTime(), index = 0, pass = 0, fail = 0 }
 	ns.db.healVisionPlates = true
-	-- (Don't fade as it comes, the name only, for the run: with Health ticked
-	-- nothing fades by health, 2026-11-19's first run.)
-	local kept, keep = {}, {}
-	for _, part in ipairs(ns.HEAL_PLATE_PARTS or {}) do
-		local key = "healVisionPlatesKeep" .. part
-		if ns.db[key] then kept[#kept + 1] = part end
-		keep[key] = ns.db[key]
-		ns.db[key] = ns.DEFAULTS[key]
-	end
-	CinematicDB.healPlatesRestore.keep = keep
+	-- (Show only while hurt on Nameplates for the run: the whole plate.)
+	CinematicDB.healPlatesRestore.show = ns.db.healVisionPlatesShow
+	ns.db.healVisionPlatesShow = "plates"
 	-- (Damage's opacity at 0 for the run: healthy bars gone outright, plain
 	-- to see on the screenshots, where the game hides the alphas.)
 	CinematicDB.healPlatesRestore.minAlpha = ns.db[AlphaKey()]
 	ns.db[AlphaKey()] = 0
 	ns.ApplyHealVisionPlates()
 	Say(("start: %s (game %s), Cinematic %s, CineMode %s, in group %s, plates up %d; Heal Vision page %s, tick was %s, "
-		.. "Damage keys %s, line %s opacity %s, fade range %s, your don't fade: %s (Name only for the run)"):format(ns.isRetail and "retail" or "classic",
+		.. "Damage keys %s, line %s opacity %s, fade range %s, show only while hurt %s (Nameplates for the run)"):format(ns.isRetail and "retail" or "classic",
 		tostring((select(4, GetBuildInfo()))), ns.Version and ns.Version() or "?", tostring(ns.lastCinematic),
 		tostring(IsInGroup()), #Plates(), tostring(ns.Setting("handleHealVision")),
 		tostring(CinematicDB.healPlatesRestore.plates), BelowKey() .. "/" .. AlphaKey(), tostring(ns.db[BelowKey()]),
 		tostring(CinematicDB.healPlatesRestore.minAlpha) .. " (0 for the run)", tostring(ns.db.healVisionFadeRange),
-		#kept > 0 and table.concat(kept, ", ") or "nothing"))
+		tostring(CinematicDB.healPlatesRestore.show)))
 	Say("  " .. SetsLine())
 	run.ticker = C_Timer.NewTicker(0.25, function()
 		local ok, err = pcall(Tick)

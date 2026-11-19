@@ -17768,59 +17768,82 @@ local function CreateVisionPanel()
 		local ROLE_TIPS = { TANK = L["Heal Vision's settings while you're a tank."],
 			HEALER = L["Heal Vision's settings while you're a healer."],
 			DAMAGER = L["Heal Vision's settings while you're dealing damage."] }
-		-- (Then the Nameplates tab: not a role's, it holds the Nameplates and
-		-- Names sections instead of the table. plates: it's the one showing.)
-		local TABS = { false, "TANK", "HEALER", "DAMAGER", "PLATES" }
+		-- Two tabs (2026-11-19, the user's call): Unit frames, holding the role
+		-- tabs (Default's and each role's own, smaller folder tabs inside it, as
+		-- the Cards page's), and Nameplates (not a role's: its Nameplates and
+		-- Names sections instead of the table). plates: Nameplates is showing.
+		-- Switches: Unit frames' own (HEAL_VISION_TABS.FRAMES), the role tabs'
+		-- under it; Nameplates' beside it, so frames off leaves plates be.
+		local ROLE_TABS = { false, "TANK", "HEALER", "DAMAGER" }
 		local ROLE_ICONS = { TANK = "0:19:22:41", HEALER = "20:39:1:20", DAMAGER = "20:39:22:41" }
 		local ownCheck, tabNote
 		local plates = false
-		local roleWidgets, plateWidgets = {}, {} -- (shown on the role tabs, or on the Nameplates tab)
+		local roleWidgets, plateWidgets = {}, {} -- (shown on Unit frames, or on the Nameplates tab)
 		local ShowSection -- (below, once both sets are made)
-		-- Folder tabs (ns.FolderTabs), a role's each after Default's.
 		local TAB_H = ns.FOLDER_TAB_HEIGHT
 		local NOTE_H = 20 -- (Current role, over the tabs)
-		local list = {}
-		for i, role in ipairs(TABS) do
-			if role == "PLATES" then
-				list[i] = { L["Nameplates"], L["Heal Vision on friendly nameplates."] }
-			else
-				list[i] = { role and ROLE_NAMES[role] or L["Default"], role and ROLE_TIPS[role]
-					or L["The settings below for every role that uses the default settings."] }
-			end
+		local function Gate()
+			ns.SetPageGate(content, plates and ns.HEAL_VISION_TABS.PLATES or ns.HEAL_VISION_TABS[editing or "DEFAULT"])
 		end
-		local panel, tabs, ShowTab, base = ns.FolderTabs(content, list, function(i)
-			plates = TABS[i] == "PLATES"
-			editing = (not plates and TABS[i]) or nil
+		local panel, topTabs, ShowTop, base = ns.FolderTabs(content, {
+			{ L["Unit Frames"], L["Heal Vision on your party and raid frames."] },
+			{ L["Nameplates"], L["Heal Vision on friendly nameplates."] },
+		}, function(i)
+			plates = i == 2
 			ShowSection()
-			ns.SetPageGate(content, ns.HEAL_VISION_TABS[TABS[i] or "DEFAULT"]) -- (the page greyed with its tab off)
+			Gate() -- (the page greyed with its tab off)
 			Refresh() -- (the tabs too: ownCheck's Refresh)
+		end, 110)
+		local roleList = {}
+		for i, role in ipairs(ROLE_TABS) do
+			roleList[i] = { role and ROLE_NAMES[role] or L["Default"], role and ROLE_TIPS[role]
+				or L["The settings below for every role that uses the default settings."] }
+		end
+		local sub, roleTabs, ShowRole, subBase, subH = ns.FolderTabs(content, roleList, function(i)
+			editing = ROLE_TABS[i] or nil
+			Gate()
+			Refresh()
 		end, 90)
 		-- (Each tab a container, 2026-11-17: its own switch, right-click; its
 		-- settings are the page's controls, greyed by ns.SetPageGate.)
-		for i, role in ipairs(TABS) do
-			local holder = CreateFrame("Frame", nil, content)
-			holder:SetSize(1, 1)
-			ns.TabContainer(tabs[i], holder, ns.HEAL_VISION_TABS[role or "DEFAULT"], "handleHealVision")
+		do
+			local function Holder()
+				local holder = CreateFrame("Frame", nil, content)
+				holder:SetSize(1, 1)
+				return holder
+			end
+			ns.TabContainer(topTabs[1], Holder(), ns.HEAL_VISION_TABS.FRAMES, "handleHealVision")
+			ns.TabContainer(topTabs[2], Holder(), ns.HEAL_VISION_TABS.PLATES, "handleHealVision")
+			for i, role in ipairs(ROLE_TABS) do
+				ns.TabContainer(roleTabs[i], Holder(), ns.HEAL_VISION_TABS[role or "DEFAULT"], ns.HEAL_VISION_TABS.FRAMES)
+			end
 		end
 		panel:SetPoint("TOPLEFT", row, "BOTTOMLEFT", 0, -14 - NOTE_H - TAB_H - 4)
 		-- (On the row, not the panel: the panel's bottom hangs on the rows under them.)
 		base:SetPoint("TOPLEFT", row, "BOTTOMLEFT", 0, -14 - NOTE_H - TAB_H - 4)
+		-- (The role tabs inside it, a line under them, as the Cards page's.)
+		subBase:SetPoint("TOPLEFT", base, "TOPLEFT", 8, -(10 + subH))
+		sub:SetPoint("TOPLEFT", subBase, "TOPLEFT")
+		sub:SetPoint("RIGHT", panel, "RIGHT", -8, 0)
+		sub:SetHeight(1)
+		roleWidgets[#roleWidgets + 1] = sub
+		for _, tab in ipairs(roleTabs) do roleWidgets[#roleWidgets + 1] = tab end
 		local function ShowTabs()
 			local db = ns.GetDB()
 			if not db then return end
-			local current = plates and "PLATES" or editing
-			for i, role in ipairs(TABS) do
-				if (role or nil) == current then ShowTab(i) end
+			ShowTop(plates and 2 or 1)
+			for i, role in ipairs(ROLE_TABS) do
+				if (role or nil) == editing then ShowRole(i) end
 			end
-			ns.SetPageGate(content, ns.HEAL_VISION_TABS[current or "DEFAULT"])
-			ownCheck:SetShown(editing ~= nil)
+			Gate()
+			ownCheck:SetShown(editing ~= nil and not plates)
 			local role = ns.PlayerRole()
 			tabNote:SetText(L["Current role:"] .. " " .. (ROLE_ICONS[role] and
 				"|TInterface\\LFGFrame\\UI-LFG-ICON-PORTRAITROLES:16:16:0:0:64:64:" .. ROLE_ICONS[role] .. "|t"
 				or L["None"]))
 		end
 		tabNote = Label(content, "GameFontHighlight")
-		tabNote:SetPoint("BOTTOMLEFT", tabs[1], "TOPLEFT", 4, 6)
+		tabNote:SetPoint("BOTTOMLEFT", topTabs[1], "TOPLEFT", 4, 6)
 		tabNote.searchSkip = true
 		for _, role in ipairs(ns.HEAL_VISION_ROLES) do RecordKey(content, "healVisionOwn_" .. role) end
 		-- Use default settings: unticked, the role goes by its own values (each kept while ticked).
@@ -17834,12 +17857,16 @@ local function CreateVisionPanel()
 			self:SetChecked(editing and not ns.GetDB()["healVisionOwn_" .. editing] or false)
 			ShowTabs()
 		end
-		ownCheck:SetPoint("TOPLEFT", tabs[1], "BOTTOMLEFT", -2, -10)
+		ownCheck:SetPoint("TOPLEFT", roleTabs[1], "BOTTOMLEFT", -2, -10)
 		GreyUnless(ownCheck, IfAny)
-		-- (Holds the place under the tabs, the check shown or not.)
+		-- (Holds the place under the role tabs, the check shown or not.)
 		local tabsEnd = CreateFrame("Frame", nil, content)
 		tabsEnd:SetSize(1, 26)
-		tabsEnd:SetPoint("TOPLEFT", tabs[1], "BOTTOMLEFT", 0, -10)
+		tabsEnd:SetPoint("TOPLEFT", roleTabs[1], "BOTTOMLEFT", 0, -10)
+		-- (The Nameplates tab's top, inside the panel where the role tabs would be.)
+		local platesTop = CreateFrame("Frame", nil, content)
+		platesTop:SetSize(1, 1)
+		platesTop:SetPoint("TOPLEFT", base, "TOPLEFT", 8, -10)
 
 		local previous = tabsEnd
 		local function Option(key, label, tip, enabled)
@@ -17905,17 +17932,22 @@ local function CreateVisionPanel()
 			return row
 		end
 		-- A box in a column (1: show below, 2: opacity); searchName: what search finds it by.
-		local function Cell(row, column, field, searchName, tip, onChange)
+		-- (grey: the Nameplates tab's own table greys its own way.)
+		local function Cell(row, column, field, searchName, tip, onChange, grey)
 			local line = BoxLine(row)
 			line:SetPoint("LEFT", row, "LEFT", NAME_W + (column - 1) * COLUMN_W, 0)
 			local box = line:Box("", field, 0, 100, 1, "%d%%", 100, tip, onChange or ApplyFrames)
 			box.searchLabel = searchName
-			GreyUnless(box, Editable)
+			GreyUnless(box, grey or Editable)
 			return box
 		end
-		local function Kind(icon, heading, belowKey, belowTip, alphaKey, alphaTip)
-			local row = Row(icon, heading)
-			local belowField, alphaField = Field(belowKey), Field(alphaKey)
+		-- A line of the table: its row (made here unless given), the health box
+		-- and the opacity box. plate: { row, field, grey, apply } for the Nameplates tab's.
+		local function Kind(icon, heading, belowKey, belowTip, alphaKey, alphaTip, plate)
+			local row = plate and plate.row or Row(icon, heading)
+			local MakeField = plate and plate.field or Field
+			local grey, Apply = plate and plate.grey or Editable, plate and plate.apply or ApplyFrames
+			local belowField, alphaField = MakeField(belowKey), MakeField(alphaKey)
 			local below, alpha
 			-- (< 50%, < 100%: any damage at all, saved as 99.9%; Off; Always: BoxLine's ShareBox.)
 			local belowLine = BoxLine(row)
@@ -17926,18 +17958,18 @@ local function CreateVisionPanel()
 					alphaField.set(value / 100)
 					alpha:Refresh()
 				end
-				ApplyFrames()
+				Apply()
 			end, 0.999)
 			below.searchLabel = heading .. ": " .. L["Show below health"]
-			GreyUnless(below, Editable)
+			GreyUnless(below, grey)
 			alpha = Cell(row, 2, alphaField, heading .. ": " .. L["Opacity while hidden"], alphaTip, function(value)
 				-- (Above the health: takes it up too.)
 				if value > Percent(belowField.get(), 0.95) then
 					belowField.set(value / 100)
 					below:Refresh()
 				end
-				ApplyFrames()
-			end)
+				Apply()
+			end, grey)
 		end
 		Kind(ROLE_ICON:format("0:19:22:41"), L["Tanks"], "healVisionTankBelow",
 			L["A tank shows once their health drops below this."],
@@ -17982,74 +18014,110 @@ local function CreateVisionPanel()
 			GreyUnless(check, Editable)
 			roleWidgets[#roleWidgets + 1] = check
 		end
-		-- The Nameplates tab, in the same panel: first Nameplates (friendly
-		-- players' and minions' plates by the role tabs' table:
-		-- HealVisionFrames.lua's plates), then Names (names drawn by their
-		-- plates in CineMode show health: PlateParts.lua's Fill; idea and first
-		-- code: pkecerski). Neither by the grid's places.
+		-- The Nameplates tab, in the same panel: friendly players' and minions'
+		-- plates (HealVisionFrames.lua's plates), by the picker and the plates'
+		-- own table. Not by the grid's places.
 		local barsHead = Label(content, "GameFontNormal", L["Nameplates"])
-		barsHead:SetPoint("TOPLEFT", tabsEnd, "TOPLEFT", 2, -4)
-		local barsCheck = Check(content, "healVisionPlates", L["Health bars only while hurt"],
-			L["Friendly nameplates show their health bar only while they need healing, where Heal Vision is on (not dungeons or raids)."], function(value)
-				ns.GetDB().healVisionPlates = value
-				if ns.ApplyHealVisionPlates then ns.ApplyHealVisionPlates() end
-				Refresh() -- (Don't fade greys with it)
-			end)
-		barsCheck:SetPoint("TOPLEFT", barsHead, "BOTTOMLEFT", -2, -6)
-		GreyUnless(barsCheck, function() return ns.PageSetting("handleHealVision") end)
-
-		-- Don't fade: the parts that stay while the rest fades (a tick menu;
-		-- healVisionPlatesKeep<part>, the name only to start with).
-		local KEEP_NAMES = { Health = L["Health bar"], Name = L["Name"], CastBar = L["Cast bar"], Buffs = L["Buffs"],
-			Debuffs = L["Debuffs"], RaidMarker = L["Raid marker"], Level = L["Level"],
-			Highlight = L["Target highlight"], Widgets = L["Quest/widget icons"] }
-		local keepLabel = Label(content, "GameFontHighlight", L["Don't fade:"])
-		keepLabel:SetPoint("TOPLEFT", barsCheck, "BOTTOMLEFT", 26, -8)
-		local keepButton = ns.GridMenuButton(content, 180)
-		keepButton:SetPoint("LEFT", keepLabel, "RIGHT", 8, 0)
-		local keepEntries = {}
-		for _, part in ipairs(ns.HEAL_PLATE_PARTS or {}) do
-			local key = "healVisionPlatesKeep" .. part
-			RecordKey(content, key)
-			keepEntries[#keepEntries + 1] = { KEEP_NAMES[part] or part,
-				function() return ns.Setting(key) and true or false end,
-				function() ns.GetDB()[key] = not ns.GetDB()[key] end }
-		end
-		keepButton.Refresh = function(self)
-			local names = {}
-			for _, entry in ipairs(keepEntries) do
-				if entry[2]() then names[#names + 1] = entry[1] end
-			end
-			self:SetText(#names == 0 and "|cff808080-|r" or #names == 1 and names[1]
-				or #names == #keepEntries and L["All"] or (L["%d of %d"]):format(#names, #keepEntries))
-		end
-		keepButton:SetScript("OnClick", function(self)
-			ns.TickMenu(self, keepEntries, function()
-				self:Refresh()
-				if ns.ApplyHealVisionPlates then ns.ApplyHealVisionPlates() end
-			end)
+		barsHead:SetPoint("TOPLEFT", platesTop, "TOPLEFT", 2, 0)
+		-- Show only while hurt (2026-11-19: one picker in place of the tick):
+		-- Off, Names or Nameplates (the plate as Nameplate Style has it). It
+		-- writes the on switch (healVisionPlates) with its pick (healVisionPlatesShow).
+		local SHOW_TIP = L["Friendly players' names or nameplates stay faded until they need healing, where Heal Vision is on "
+			.. "(not dungeons or raids)."]
+		local barsCheck = CreateFrame("Frame", nil, content)
+		barsCheck:SetSize(NAME_W + 2 * COLUMN_W, 26)
+		barsCheck:SetPoint("TOPLEFT", barsHead, "BOTTOMLEFT", 0, -6)
+		local showLabel = Label(barsCheck, "GameFontHighlight", L["Show only while hurt"])
+		showLabel:SetPoint("LEFT")
+		showLabel.searchSkip = true
+		local showPicker = Dropdown(content, "healVisionPlatesShow", {
+			{ value = "off", text = L["Off"], tip = L["Heal Vision leaves friendly plates and names alone."] },
+			{ value = "names", text = L["Names"],
+				tip = L["A friendly player's name shows once they're hurt; the rest of their plate stays as it is."] },
+			{ value = "plates", text = L["Nameplates"],
+				tip = L["The whole plate shows once they're hurt, as your nameplate style has it."] },
+		}, 160, function(value)
+			ns.GetDB().healVisionPlates = value ~= "off"
+			if ns.ApplyHealVisionPlates then ns.ApplyHealVisionPlates() end
 		end)
-		Tooltip(keepButton, L["The parts of a nameplate that stay while the rest fades."])
-		GreyUnless(keepButton, function(db) return ns.PageSetting("handleHealVision") and db.healVisionPlates end)
-		controls[#controls + 1] = keepButton -- (refreshed with the page)
-		keepLabel.searchSkip = true
-
-		local namesHead = Label(content, "GameFontNormal", L["Names"])
-		namesHead:SetPoint("TOPLEFT", keepLabel, "BOTTOMLEFT", -24, -18)
-		local fillCheck = Check(content, "plateNameHealthFill", L["Health fill"],
-			L["Names over heads show health like a bar, turning grey as the unit takes damage."], function(value)
-				ns.GetDB().plateNameHealthFill = value
-				if ns.RefreshPlateNameStyle then ns.RefreshPlateNameStyle() end
+		if showPicker then
+			showPicker:SetPoint("LEFT", showLabel, "RIGHT", 12, 0)
+			showPicker.inlineName, showPicker.searchLabel = L["Show only while hurt"], L["Show only while hurt"]
+			showPicker.searchSkip = nil -- (found by its name, not the pick it shows)
+			Tooltip(showPicker, SHOW_TIP)
+			GreyUnless(showPicker, function() return ns.PageSetting("handleHealVision") end)
+			plateWidgets[#plateWidgets + 1] = showPicker
+		else
+			-- (A client without the game's dropdown: the old on/off tick, Nameplates.)
+			local tick = Check(content, "healVisionPlates", L["Show only while hurt"], SHOW_TIP, function(value)
+				ns.GetDB().healVisionPlates = value
+				ns.GetDB().healVisionPlatesShow = value and "plates" or "off"
+				if ns.ApplyHealVisionPlates then ns.ApplyHealVisionPlates() end
 			end)
-		fillCheck:SetPoint("TOPLEFT", namesHead, "BOTTOMLEFT", -2, -6)
-		GreyUnless(fillCheck, function() return ns.PageSetting("handleHealVision") end)
+			tick:SetPoint("LEFT", barsCheck, "LEFT", -2, 0)
+			GreyUnless(tick, function() return ns.PageSetting("handleHealVision") end)
+			showLabel:Hide()
+			plateWidgets[#plateWidgets + 1] = tick
+		end
+		-- The plates' own table (always: plates are mostly strangers, who have
+		-- no role, so by who they are, not the role tabs; HealVisionFrames.lua's
+		-- PLATE_KINDS). Which parts show: the nameplate style's, nothing here.
+		local plateLast
+		do
+			local function ApplyPlates() if ns.ApplyHealVisionPlates then ns.ApplyHealVisionPlates() end end
+			local function PlatesOn(db) return ns.PageSetting("handleHealVision") and db.healVisionPlates end
+			local function PlateField(key)
+				RecordKey(content, key)
+				return { key = key, get = function() return ns.GetDB()[key] end,
+					set = function(value) ns.GetDB()[key] = value end }
+			end
+			local plateHeads = CreateFrame("Frame", nil, content)
+			plateHeads:SetSize(NAME_W + 2 * COLUMN_W, 16)
+			plateHeads:SetPoint("TOPLEFT", barsCheck, "BOTTOMLEFT", 0, -10)
+			for column, text in ipairs({ L["Show below health"], L["Opacity while hidden"] }) do
+				local head = Label(plateHeads, "GameFontNormal", text)
+				head:SetPoint("LEFT", plateHeads, "LEFT", NAME_W + (column - 1) * COLUMN_W, 0)
+				head.searchSkip = true
+			end
+			plateWidgets[#plateWidgets + 1] = plateHeads
+			plateLast = plateHeads
+			local function PlateRow(icon, name, gap)
+				local row = CreateFrame("Frame", nil, content)
+				row:SetSize(NAME_W + 2 * COLUMN_W, 24)
+				row:SetPoint("TOPLEFT", plateLast, "BOTTOMLEFT", 0, -(gap or 2))
+				local label = Label(row, "GameFontHighlight", icon .. " " .. name)
+				label:SetPoint("LEFT")
+				label.searchSkip = true
+				plateLast = row
+				plateWidgets[#plateWidgets + 1] = row
+				return row
+			end
+			local function PlateKind(icon, heading, below, belowTip, alpha, alphaTip)
+				Kind(icon, heading, below, belowTip, alpha, alphaTip,
+					{ row = PlateRow(icon, heading), field = PlateField, grey = PlatesOn, apply = ApplyPlates })
+			end
+			local GROUP_ICON = "|TInterface\\Icons\\INV_Misc_GroupNeedMore:16:16:0:0:64:64:5:59:5:59|t"
+			local PLAYER_ICON = "|TInterface\\Icons\\INV_Misc_GroupLooking:16:16:0:0:64:64:5:59:5:59|t"
+			PlateKind(GROUP_ICON, L["Your group"], "healVisionPlateGroupBelow",
+				L["A group member's plate shows once their health drops below this."],
+				"healVisionPlateGroupAlpha", L["How much of a hidden group member's plate still shows."])
+			PlateKind(PLAYER_ICON, L["Other players"], "healVisionPlateOthersBelow",
+				L["Another player's plate shows once their health drops below this."],
+				"healVisionPlateOthersAlpha", L["How much of a hidden player's plate still shows."])
+			PlateKind(PET_ICON, L["Pets and minions"], "healVisionPlatePetBelow",
+				L["A pet's or minion's plate shows once its health drops below this."],
+				"healVisionPlatePetAlpha", L["How much of a hidden pet's plate still shows."])
+			-- (No target, mouseover or dead rows: your target's plate always
+			-- shows, the mouse changes nothing, the dead's stay hidden.)
+		end
+
 		-- (Where neither can work, at the foot of the tab, under both: tested on
 		-- retail in a follower dungeon, every friendly plate locked from addons;
 		-- Forever locks them too. Names are drawn by those plates.)
 		local lockedNote = Label(content, "GameFontDisableSmall",
 			L["Nameplates and Names don't work in dungeons and raids: the game locks friendly nameplates from " ..
 			"addons there. Heal Vision on your party and raid frames still works there."])
-		lockedNote:SetPoint("TOPLEFT", fillCheck, "BOTTOMLEFT", 2, -14)
+		lockedNote:SetPoint("TOPLEFT", plateLast, "BOTTOMLEFT", 2, -14)
 		lockedNote:SetWidth(NAME_W + 2 * COLUMN_W - 4)
 		lockedNote:SetJustifyH("LEFT")
 		lockedNote.searchSkip = true
@@ -18057,7 +18125,7 @@ local function CreateVisionPanel()
 		local platesEnd = CreateFrame("Frame", nil, content)
 		platesEnd:SetSize(NAME_W + 2 * COLUMN_W, 1)
 		platesEnd:SetPoint("TOPLEFT", lockedNote, "BOTTOMLEFT", -2, 0)
-		for _, widget in ipairs({ barsHead, barsCheck, keepLabel, keepButton, lockedNote, namesHead, fillCheck }) do
+		for _, widget in ipairs({ barsHead, barsCheck, lockedNote }) do
 			plateWidgets[#plateWidgets + 1] = widget
 		end
 
@@ -18065,20 +18133,20 @@ local function CreateVisionPanel()
 		function ShowSection()
 			for _, widget in ipairs(roleWidgets) do widget:SetShown(not plates) end
 			for _, widget in ipairs(plateWidgets) do widget:SetShown(plates) end
+			ownCheck:SetShown(editing ~= nil and not plates)
 			panel:SetPoint("BOTTOMRIGHT", plates and platesEnd or lastRow, "BOTTOMRIGHT", 12, -12)
 		end
 		ShowSection()
 		-- /cine find and the search box: the other tab's set counts too (hidden,
 		-- the search skipped it: /cine find healVisionPlates found nothing,
 		-- 2026-11-19), and finding one picks its tab (ShowMatch's openSection).
-		local PLATES_TAB = #TABS
 		for _, widget in ipairs(roleWidgets) do
 			widget.searchAlways = true
-			widget.openSection = function() if plates then tabs[1]:Click() end end
+			widget.openSection = function() if plates then topTabs[1]:Click() end end
 		end
 		for _, widget in ipairs(plateWidgets) do
 			widget.searchAlways = true
-			widget.openSection = function() if not plates then tabs[PLATES_TAB]:Click() end end
+			widget.openSection = function() if not plates then topTabs[2]:Click() end end
 		end
 	end
 

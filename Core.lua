@@ -1212,7 +1212,6 @@ DEFAULTS.plateNameShadow = "inherit" -- (the game's: off, it barely shows)
 DEFAULTS.plateNameShadowX = 1
 DEFAULTS.plateNameShadowY = -1
 DEFAULTS.plateNameShadowAlpha = "inherit"
-DEFAULTS.plateNameHealthFill = false -- name-only names: the colored part shows the unit's health, the rest grey
 DEFAULTS.questVision = false -- (off in every profile) the Quest Vision page's switch: off, none of the four below works
 -- What of units for a quest objective you haven't finished shows in CineMode
 -- (see Effects), any of: their nameplates, just their names (on their plates),
@@ -1393,9 +1392,12 @@ ns.HEAL_VISION_ROLE_KEYS = { "healVisionTankBelow", "healVisionTankAlpha", "heal
 ns.HEAL_VISION_ROLES = { "TANK", "HEALER", "DAMAGER" }
 -- Its tabs, each a container (2026-11-17, the user's rule): off, Heal Vision
 -- does nothing while it's the one your role goes by (a role on Default's
--- settings: Default's), and the Nameplates tab's settings are off.
+-- settings: Default's), and the Nameplates tab's settings are off. Since
+-- 2026-11-19 the role tabs sit inside a Unit Frames tab (FRAMES: off, no
+-- Heal Vision on frames; its plates go on), beside Nameplates. (The role
+-- tabs and Nameplates kept their keys: players' switches carry over.)
 ns.HEAL_VISION_TABS = { DEFAULT = "tabOn:Heal Vision:1", TANK = "tabOn:Heal Vision:2", HEALER = "tabOn:Heal Vision:3",
-	DAMAGER = "tabOn:Heal Vision:4", PLATES = "tabOn:Heal Vision:5" }
+	DAMAGER = "tabOn:Heal Vision:4", PLATES = "tabOn:Heal Vision:5", FRAMES = "tabOn:Heal Vision:frames" }
 for _, key in pairs(ns.HEAL_VISION_TABS) do DEFAULTS[key] = true end
 local HEAL_VISION_ROLE_STARTS = {
 	TANK = { healVisionTankBelow = 1, healVisionHealerBelow = 0.95, healVisionShowBelow = 0.95 },
@@ -1441,14 +1443,16 @@ do
 
 	-- Whether Heal Vision is on where you are now (in a party or raid or not,
 	-- a healer or not).
-	function ns.HealVisionHere(db)
+	-- (plates: for its nameplates, which the Unit Frames tab's switches don't
+	-- touch: only the page, the rule and the place.)
+	function ns.HealVisionHere(db, plates)
 		db = db or ns.db
 		if not db then return false end
 		if not ns.Setting("handleHealVision") then return false end -- (its page's switch, and the Visions')
-		-- (The tab your role goes by off: its role's own, or Default's.)
+		-- (The tab your role goes by off: its role's own, or Default's; or Unit Frames, over them.)
 		local role = ns.PlayerRole()
 		local tab = ns.HEAL_VISION_TABS[(role and db["healVisionOwn_" .. role]) and role or "DEFAULT"]
-		if tab and not ns.PageOn(tab) then return false end
+		if not plates and tab and not (ns.PageOn(tab) and ns.PageOn(ns.HEAL_VISION_TABS.FRAMES)) then return false end
 		-- (Its rule, edited on its row, decides instead of its ticks.)
 		local facts = ns.RuleFactsNow and ns.RuleFactsNow()
 		local rule = facts and ns.RuleShows("healVision", facts)
@@ -1627,7 +1631,7 @@ for page, keys in pairs({
 	handleHunter = { "hunterRightClickShot", "hunterAmmoSort", "hunterQuiverFill", "petUnhappyShow" },
 	handleAddonSupport = { "questieMoveIcons", "eqolMoveIcons" },
 	duelPlates = { "duelCC", "duelInstants", "duelInstantNames", "duelHideOthers" }, -- Duel Vision's page
-	handleHealVision = { "plateNameHealthFill", "healVisionPlates" }, -- Heal Vision's page: its Names and Nameplates ticks
+	handleHealVision = { "healVisionPlates" }, -- Heal Vision's page: its Nameplates switch
 	-- The Cards page's rows (Cards.lua) and the time of day at login.
 	cards = { "combatOnEnter", "combatOnLeave", "cardBossOn", "storyZoneCard", "storyZoneSubzones", "storyRecap",
 		"timeOfDayMessage", "timeOfDayChange", "chatAttackAlert", "cardDuelOn", "cardDeathOn", "cardLevelUpOn",
@@ -1649,7 +1653,11 @@ function ns.SetPageMaster(keys, master)
 end
 -- (Heal Vision's tabs under its page's switch; its Nameplates tab's settings under that tab.)
 for _, key in pairs(ns.HEAL_VISION_TABS) do PAGE_SWITCH[key] = "handleHealVision" end
-PAGE_SWITCH.plateNameHealthFill, PAGE_SWITCH.healVisionPlates = ns.HEAL_VISION_TABS.PLATES, ns.HEAL_VISION_TABS.PLATES
+-- (The role tabs inside Unit Frames: under its switch.)
+for _, role in ipairs({ "DEFAULT", "TANK", "HEALER", "DAMAGER" }) do
+	PAGE_SWITCH[ns.HEAL_VISION_TABS[role]] = ns.HEAL_VISION_TABS.FRAMES
+end
+PAGE_SWITCH.healVisionPlates = ns.HEAL_VISION_TABS.PLATES
 -- (No Timers master switch, 2026-11-16: Cooldown Manager and Swing Timer are
 -- tabs of the Timers icon, each with its own; Migrations.lua's step 16.)
 -- Allow outside CineMode (CineMode page): a vision's switch -> its tick there.

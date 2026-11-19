@@ -471,7 +471,7 @@ local Fill = { texts = {}, GREY = { 0.45, 0.45, 0.45 } } -- (GREY: the missing h
 
 function Fill.On()
 	-- (Heal Vision page's tick: off with its page switched off, ns.Setting.)
-	return ns.Setting("plateNameHealthFill") and true or false
+	return true -- (always on since 2026-11-19, the user's call: no tick)
 end
 
 -- A text's fill, made the first time it's needed.

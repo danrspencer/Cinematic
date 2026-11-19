@@ -4841,6 +4841,26 @@ STEPS[#STEPS + 1] = function()
 		for _, point in pairs(ns.db.profileResetPoints or {}) do NotAlways(point) end
 		ns.db.emotePlateCardsCitiesV1 = true
 	end
+	-- Heal Vision's Nameplates tick is a picker now, Show only while hurt
+	-- (healVisionPlatesShow: Off, Names or Nameplates). Ticked: Nameplates,
+	-- which goes by Don't fade's ticks as the tick did; unticked stays Off.
+	-- Saved profiles too. Once.
+	if not ns.db.healVisionPlatesShowV1 then
+		local function Pick(t)
+			if type(t) == "table" and t.healVisionPlates and t.healVisionPlatesShow == nil then
+				t.healVisionPlatesShow = "plates"
+			end
+		end
+		Pick(ns.db)
+		for _, saved in pairs(ns.db.profiles or {}) do
+			if type(saved) == "table" then
+				Pick(saved)
+				Pick(saved.settings)
+			end
+		end
+		for _, point in pairs(ns.db.profileResetPoints or {}) do Pick(point) end
+		ns.db.healVisionPlatesShowV1 = true
+	end
 end
 
 -- Runs them all, each on its own: an error is logged and reported (the

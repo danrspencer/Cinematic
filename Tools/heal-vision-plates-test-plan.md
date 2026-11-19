@@ -1,6 +1,6 @@
 # Heal Vision nameplates: test plan
 
-Tick under test: Heal Vision page > Nameplates > **Health bars only while hurt**
+Tick under test: Heal Vision page > Nameplates > **Show friendly nameplates only while hurt**
 (`healVisionPlates`). Code: end of HealVisionFrames.lua.
 
 What the code does (read from the code, not tested): on a friendly player's or
