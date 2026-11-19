@@ -218,6 +218,9 @@ local function PrintDebugHelp()
 	print("  /cine debug followhud [setup|undo|update] - the Follow HUD (dev): its pieces, layout and the settings it changed, or set it up, take it off, or make its layout again")
 	print("  /cine debug followtest - one run checking the Follow HUD with each root, across two reloads (dev copy; again to stop)")
 	print("  /cine debug previewwatch [off] - records how the Style previews move and catches one covering a page's rows, with a screenshot (dev copy)")
+	print("  /cine debug previewmatch [skip|stop] - one run: the cast bar previews next to the game's own bars, compared part by part, with screenshots (dev copy; Tools/preview-match/build.py makes the page)")
+	print("  /cine debug petplate - one run: your pet's nameplate read with CineMode on and off, asleep or hidden and why (dev copy)")
+	print("  /cine debug templates -which of the game's frame templates the Style previews could be built from on this client, logged (dev copy; /reload after)")
 	print("  /cine debug sweep [pages] [shots] [visual [N]] [seed S] [page words] - one run opening every page and tab (layout checked) and changing every setting and putting it back (pages: layout only; shots: a screenshot of each; visual N: N settings at random with screenshots) (dev copy)")
 	print("  /cine prerelease [quick|guided|skip] - one run before a release: selftest, smoke checks and the settings sweep (quick: pages only), or guided steps you do; compared with the last run (dev copy)")
 	print("  /cine debug whysecret - one run checking Why on the player frame while the game sets its opacity by your health (dev copy)")
@@ -534,6 +537,15 @@ local function HandleSlash(msg)
 	elseif cmd == "debug" and arg == "followtest" then
 		-- (Dev copy: one run setting up the Follow HUD with each root and checking it, across two reloads, FollowHudTest.lua.)
 		if ns.FollowHudTest then ns.FollowHudTest() else ns.Print("/cine debug followtest is in the dev copy only.") end
+	elseif cmd == "debug" and (arg == "previewmatch" or arg:match("^previewmatch ")) then
+		-- (Dev copy: the Style previews next to the game's frames, compared, PreviewMatch.lua.)
+		if ns.PreviewMatch then ns.PreviewMatch(arg:match("^previewmatch%s*(.-)$")) else ns.Print("/cine debug previewmatch is in the dev copy only.") end
+	elseif cmd == "debug" and arg == "petplate" then
+		-- (Dev copy: your pet's plate read with CineMode on and off, PetPlateTest.lua.)
+		if ns.PetPlateTest then ns.PetPlateTest() else ns.Print("/cine debug petplate is in the dev copy only.") end
+	elseif cmd == "debug" and arg == "templates" then
+		-- (Dev copy: which game templates the Style previews could be built from, TemplateProbe.lua.)
+		if ns.TemplateProbe then ns.TemplateProbe() else ns.Print("/cine debug templates is in the dev copy only.") end
 	elseif cmd == "debug" and (arg == "previewwatch" or arg == "previewwatch off") then
 		-- (Dev copy: records how the Style previews move, catching one over a page's rows, PreviewWatch.lua.)
 		if ns.PreviewWatch then ns.PreviewWatch(arg:match("off")) else ns.Print("/cine debug previewwatch is in the dev copy only.") end

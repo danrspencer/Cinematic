@@ -256,6 +256,9 @@ Dev\DeathVisionTest.lua
 Dev\Sweep.lua
 Dev\Prerelease.lua
 Dev\PreviewWatch.lua
+Dev\TemplateProbe.lua
+Dev\PreviewMatch.lua
+Dev\PetPlateTest.lua
 Dev\EuiSwingTest.lua
 Dev\AddonTest.lua
 Dev\EuiCooldownTest.lua

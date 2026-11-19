@@ -181,6 +181,7 @@ for _, key in ipairs(BAR_KEYS) do OWN_KEY[key] = true end
 for _, info in ipairs(BARS) do
 	local id = info[1]
 	DEFAULTS["plateCastOwn_" .. id] = false
+	DEFAULTS["plateCastGameAs_" .. id] = false -- (the other kind's game look: GameAs)
 	if id ~= "PLATE" then DEFAULTS["plateCastOn_" .. id] = false end
 	if id == "PLAYER" or id == "TARGET" then DEFAULTS["plateCastFrame_" .. id] = false end -- (the unit frame's look: FrameLooked)
 	for _, key in ipairs(BAR_KEYS) do
@@ -254,11 +255,33 @@ local function View(id)
 	return view
 end
 
+-- A kind of bar in the other kind's game look (These bars' third pick,
+-- 2026-11-19, user): the nameplates' as the unit frames' bars look in the
+-- game ("unit"), the unit frames' as the nameplates' do ("plate"). nil
+-- otherwise. Drawn on the bar by DressAs.
+local function GameAs(id, db)
+	db = db or ns.db
+	if not (id and db and db["plateCastGameAs_" .. id] and Active(id, db)) then return nil end
+	return id == "PLATE" and "unit" or "plate"
+end
+-- (Its look: the game's own settings, and which game look to dress it in.)
+local asLooks = {}
+local function AsLook(which)
+	if not asLooks[which] then
+		asLooks[which] = setmetatable({ plateCastGameAs = which }, { __index = function(_, key)
+			return ns.StyleLook("plateCastStyle", true)[key]
+		end })
+	end
+	return asLooks[which]
+end
+
 -- The look a kind of bar gets now: the game's while it isn't restyled.
 local function Look(id)
 	if id and not Active(id) then
 		return ns.StyleLook("plateCastStyle", true)
 	end
+	local as = GameAs(id)
+	if as then return AsLook(as) end
 	return View(id)
 end
 
@@ -818,6 +841,7 @@ end
 -- Puts the look on a bar (the game's where a setting says the game's). The
 -- preview's bars too (sample: no game fill to put back). sized: a
 -- nameplate's (or a sample of one), sized by the page.
+local DressAs -- (below, with Pin: the other kind's game look)
 local function Apply(bar, look, sample, sized)
 	local state = State(bar)
 	local ours = FILLS[look.plateCastFill]
@@ -876,6 +900,7 @@ local function Apply(bar, look, sample, sized)
 		state.timer:Hide()
 	end
 	Size(bar, state, look, sized)
+	DressAs(bar, state, look.plateCastGameAs, look.plateCastText)
 	state.on = true
 end
 ns.StylePlateCastBar = Apply
@@ -952,6 +977,120 @@ local function Unpin(region)
 		placing = true
 		SetPoints(region, saved.own)
 		placing = false
+	end
+end
+
+-- The other kind's game look on a bar (GameAs), as the game's code lays each
+-- out (Blizzard's CastingBarFrame.xml, SmallCastingBarFrameTemplate, and its
+-- nameplate bar's ApplyStyleAndAnchoring, read 2026-11-19):
+--   unit (on a plate's bar): the unit frames' border round it and the box
+--     under it, the name centered on that box, the icon 20x20 at its left;
+--   plate (on a unit frame's bar): no border nor box, the icon 12x12 (under
+--     the bar at its left on retail, on it on Forever), the name beside it,
+--     the nameplates' font, a thin bright spark.
+-- What it changes on the game's bar is put back when it's turned off: the
+-- name's and icon's anchors (Pin), sizes, the name's justify and font, the
+-- spark's size and blend.
+local AS_FONT = { unit = "SystemFont_Shadow_Small", plate = "SystemFont_NamePlateCastBar" }
+local function Keep(state, region)
+	if not Usable(region) then return end
+	state.asOwn = state.asOwn or {}
+	if state.asOwn[region] then return end
+	local own = {}
+	pcall(function()
+		local w, h = region:GetSize()
+		-- (Only sizes we can read: a plate's are secret in fights.)
+		if Known(w) and Known(h) then own.w, own.h = w, h end
+		if region.GetJustifyH then own.justify = region:GetJustifyH() end
+		if region.GetFontObject then own.font = region:GetFontObject() end
+		if region.GetBlendMode then own.blend = region:GetBlendMode() end
+	end)
+	state.asOwn[region] = own
+end
+local function Resize(region, w, h)
+	if Usable(region) and Known(w) and Known(h) then pcall(region.SetSize, region, w, h) end
+end
+local function SetFontAs(text, which)
+	local object = _G[AS_FONT[which]]
+	if not (object and text.SetFontObject) then return end
+	pcall(text.SetFontObject, text, object)
+	pcall(function() text:SetText(text:GetText()) end) -- (after the font: else boxes in Russian)
+end
+local function Art(bar, state, key, layer, atlas)
+	if not state[key] then
+		state[key] = bar:CreateTexture(nil, layer)
+		pcall(state[key].SetAtlas, state[key], atlas)
+	end
+	return state[key]
+end
+function DressAs(bar, state, which, showText)
+	local text, icon, spark = Part(bar, "Text"), Part(bar, "Icon"), Part(bar, "Spark")
+	if state.as and state.as ~= which then
+		-- (Off, or the other one: the game's own back first.)
+		if state.asBorder then state.asBorder:Hide() end
+		if state.asBox then state.asBox:Hide() end
+		for _, region in ipairs({ text, icon }) do
+			if Usable(region) then Unpin(region) end
+		end
+		for region, own in pairs(state.asOwn or {}) do
+			pcall(function()
+				if own.w and own.h then region:SetSize(own.w, own.h) end
+				if own.justify and region.SetJustifyH then region:SetJustifyH(own.justify) end
+				if own.blend and region.SetBlendMode then region:SetBlendMode(own.blend) end
+				if own.font and region.SetFontObject then
+					region:SetFontObject(own.font)
+					region:SetText(region:GetText())
+				end
+			end)
+		end
+		state.asOwn, state.as = nil, nil
+	end
+	if not which then return end
+	state.as = which
+	for _, region in ipairs({ text, icon, spark }) do Keep(state, region) end
+	if which == "unit" then
+		local border = Art(bar, state, "asBorder", "OVERLAY", "UI-CastingBar-Frame")
+		border:ClearAllPoints()
+		border:SetPoint("TOPLEFT", bar, "TOPLEFT", -1, 2)
+		border:SetPoint("BOTTOMRIGHT", bar, "BOTTOMRIGHT", 1, -2)
+		border:Show()
+		local box = Art(bar, state, "asBox", "BACKGROUND", "UI-CastingBar-TextBox")
+		box:ClearAllPoints()
+		box:SetPoint("TOPLEFT", bar, "TOPLEFT", 0, 0)
+		box:SetPoint("BOTTOMRIGHT", bar, "BOTTOMRIGHT", 0, -12)
+		-- (By the look's name tick: the name's alpha is secret on plates in
+		-- fights, Forever 2026-11-19.)
+		box:SetShown(showText and Usable(text) and true or false)
+		if Usable(text) then
+			Pin(text, { { "TOPLEFT", bar, "TOPLEFT", 0, -8 }, { "TOPRIGHT", bar, "TOPRIGHT", 0, -8 } })
+			pcall(text.SetHeight, text, 16)
+			pcall(text.SetJustifyH, text, "CENTER")
+			SetFontAs(text, which)
+		end
+		if Usable(icon) then
+			Resize(icon, 20, 20)
+			Pin(icon, { { "RIGHT", bar, "LEFT", -2, -5 } })
+		end
+		Resize(spark, 6, 16)
+		if Usable(spark) then pcall(spark.SetBlendMode, spark, "BLEND") end
+	else
+		ShowPart(state, Part(bar, "Border"), false)
+		ShowPart(state, Part(bar, "TextBorder"), false)
+		if Usable(icon) then
+			Resize(icon, 12, 12)
+			if ns.isRetail then
+				Pin(icon, { { "TOPLEFT", bar, "BOTTOMLEFT", 0, -1 } })
+			else
+				Pin(icon, { { "LEFT", bar, "LEFT", 0, 0 } })
+			end
+		end
+		if Usable(text) then
+			Pin(text, { { "LEFT", icon, "RIGHT", 2, 0 } })
+			pcall(text.SetJustifyH, text, "LEFT")
+			SetFontAs(text, which)
+		end
+		Resize(spark, 4, 12)
+		if Usable(spark) then pcall(spark.SetBlendMode, spark, "ADD") end
 	end
 end
 
@@ -1398,14 +1537,20 @@ local function SpellName(id, fallback)
 end
 local SAMPLE_TIME = 2.5 -- seconds a sample cast takes, over and over
 local SAMPLE_W = 140 -- a sample plate's width (the game's are about 258 wide)
--- The game's own fills, retail's atlases (the classic smooth one where
--- there's none).
-local GAME_ATLAS = { cast = "UI-CastingBar-Full-Standard", channel = "UI-CastingBar-Full-Channel",
-	locked = "UI-CastingBar-Full-Uninterruptable" }
+-- The game's own fills while a cast fills (its CastingBarTypeInfo, Forever
+-- and retail: the same atlases on both, read in game 2026-11-19), the classic
+-- smooth one where there's none.
+local GAME_ATLAS = { cast = "ui-castingbar-filling-standard", channel = "ui-castingbar-filling-channel",
+	locked = "ui-castingbar-uninterruptable" }
 local GAME_COLORS = { cast = { 1, 0.7, 0 }, channel = { 0, 1, 0 }, locked = { 0.7, 0.7, 0.7 } }
+local function GameAtlas(kind)
+	local atlas = GAME_ATLAS[kind]
+	return C_Texture and C_Texture.GetAtlasInfo and C_Texture.GetAtlasInfo(atlas) and atlas or nil
+end
 
--- A stand-in for the game's bar: a status bar with its parts by the same names.
-local function MakeSample(parent, info)
+-- The old stand-in for the game's bar, drawn by hand: a status bar with its
+-- parts by the same names. Only where the game's template can't be made.
+local function MakeDrawnSample(parent, info)
 	local bar = CreateFrame("StatusBar", nil, parent)
 	bar:SetSize(SAMPLE_W, 7)
 	bar:SetMinMaxValues(0, 1)
@@ -1454,6 +1599,142 @@ local function MakeSample(parent, info)
 	bar.casting = not info.channel or nil
 	bar.notInterruptible = info.locked or false
 	bar.barType = info.locked and "uninterruptable" or (info.channel and "channel" or "standard")
+	return bar
+end
+
+-- The samples: the game's own cast bars, made from its templates (Preview
+-- Match plan, Tools/preview-match-plan.md: both clients make these clean,
+-- 2026-11-19), so a preview of the game's look is the game's bar, and our
+-- styling dresses it by the same part names as the real ones. Its sizes and
+-- layout as the game's code sets them (Blizzard's CastingBarFrame.xml and
+-- SetLook, its nameplate bar's ApplyStyleAndAnchoring):
+--   player: yours, CastingBarFrameTemplate in its CLASSIC look, 208x11, the
+--     name centered under it on its box, no icon;
+--   unit: target and focus, SmallCastingBarFrameTemplate at 150x10 (as
+--     TargetSpellBarTemplate), the icon at its left, the name under it;
+--   boss: the same at 120x10 (BossSpellBarTemplate);
+--   plate: NamePlateCastingBarTemplate, as wide as a plate's (Forever read
+--     207.5x7.5 in game), its icon and the name as the game places them.
+local SAMPLE_KINDS = {
+	player = { "CastingBarFrameTemplate", 208, 11, look = "CLASSIC" },
+	unit = { "SmallCastingBarFrameTemplate", 150, 10 },
+	boss = { "SmallCastingBarFrameTemplate", 120, 10 },
+	plate = { "NamePlateCastingBarTemplate", 206, ns.isRetail and 10 or 7.5 },
+}
+-- (The parts our styling knows; the rest of the template's effects, its
+-- glows and flakes, hidden: the game shows them only as a cast goes off.)
+local SAMPLE_PARTS = { Background = true, Border = true, TextBorder = true, Text = true, Icon = true,
+	Spark = true, BorderShield = true }
+local function Quiet(bar)
+	pcall(bar.UnregisterAllEvents, bar)
+	for _, script in ipairs({ "OnEvent", "OnUpdate", "OnShow", "OnHide" }) do pcall(bar.SetScript, bar, script, nil) end
+	for key, value in pairs(bar) do
+		if type(key) == "string" and not SAMPLE_PARTS[key] and type(value) == "table" and value ~= bar
+			and value.Hide and value.GetObjectType and value:GetObjectType() ~= "AnimationGroup" then
+			pcall(value.Hide, value)
+		end
+	end
+end
+-- The plate's icon and name as the game's code places them: retail's under
+-- the bar at its left, Forever's on the bar (the old sample's layout,
+-- matched to each client's own plates).
+local function PlacePlateParts(bar)
+	local icon, text, shield = bar.Icon, bar.Text, bar.BorderShield
+	icon:SetSize(12, 12)
+	icon:ClearAllPoints()
+	if ns.isRetail then
+		icon:SetPoint("TOPLEFT", bar, "BOTTOMLEFT", 0, -1)
+	else
+		icon:SetPoint("LEFT", bar, "LEFT", 0, 0)
+	end
+	text:ClearAllPoints()
+	text:SetPoint("LEFT", icon, "RIGHT", 2, 0)
+	-- (Forever's plate name reads CENTER in game, retail's code sets LEFT:
+	-- the Preview Match test, 2026-11-19.)
+	text:SetJustifyH(ns.isRetail and "LEFT" or "CENTER")
+	if shield then
+		shield:SetSize(10, 12)
+		shield:ClearAllPoints()
+		shield:SetPoint("RIGHT", icon, "RIGHT", 0, 0)
+	end
+end
+local sampleCount = 0
+local function MakeSample(parent, info, kind)
+	local spec = SAMPLE_KINDS[kind or "plate"] or SAMPLE_KINDS.plate
+	-- (Named: the templates anchor parts to "$parent", which only finds a
+	-- named bar; unnamed, the game warned "Couldn't find relative frame:
+	-- $parent" and the icon had no place. Forever 2026-11-19.)
+	sampleCount = sampleCount + 1
+	local ok, bar = pcall(CreateFrame, "StatusBar", "CinematicCastSample" .. sampleCount, parent, spec[1])
+	if not (ok and bar and bar.Text and bar.Icon and bar.Spark) then
+		return MakeDrawnSample(parent, info)
+	end
+	if spec.look and bar.SetLook then pcall(bar.SetLook, bar, spec.look) end
+	Quiet(bar)
+	bar:SetSize(spec[2], spec[3])
+	bar:SetMinMaxValues(0, 1)
+	bar:Show()
+	if kind == "plate" then PlacePlateParts(bar) end
+	local art = C_Spell and C_Spell.GetSpellTexture and C_Spell.GetSpellTexture(info[3]) or info[2]
+	bar.Icon:SetTexture(art)
+	-- (Yours shows no icon in the game, nor a plate's that can't be interrupted:
+	-- the shield in its place.)
+	bar.Icon:SetShown(kind ~= "player" and not (kind == "plate" and info.locked))
+	if bar.BorderShield then bar.BorderShield:SetShown(info.locked == true and kind ~= "player") end
+	bar.Text:SetText(SpellName(info[3], info[4]))
+	bar.Text:Show()
+	bar.Spark:Show()
+	-- (Your bar's spark glows on a plain cast: its StandardGlow, trailing
+	-- behind the spark on the filled part, its right edge 2 px short of the
+	-- spark's middle, as read off your real bar in game (Preview Match,
+	-- Forever 2026-11-19: 37x12). Centered on the spark it stuck out past the
+	-- fill and the bar's end.)
+	local glow = bar.StandardGlow
+	if kind == "player" and glow and not info.channel and not info.locked then
+		glow:ClearAllPoints()
+		glow:SetPoint("RIGHT", bar.Spark, "CENTER", -2, 0)
+		glow:Show()
+		bar.glow = glow
+	end
+	local fill = GameAtlas(info.locked and "locked" or (info.channel and "channel" or "cast"))
+	if fill then bar:SetStatusBarTexture(fill) else bar:SetStatusBarTexture(FILLS.smooth) end
+	bar.gameW, bar.fromTemplate, bar.sampleKind = spec[2], spec[1], kind
+	bar.channeling = info.channel or nil
+	bar.casting = not info.channel or nil
+	bar.notInterruptible = info.locked or false
+	bar.barType = info.locked and "uninterruptable" or (info.channel and "channel" or "standard")
+	return bar
+end
+
+-- A sample bar as a look says: the game's fill and colors where it has none.
+-- (The pages' previews and the Preview Match test's, Dev/PreviewMatch.lua.)
+local function DressSample(bar, info, look, sized)
+	if not FILLS[look.plateCastFill] then
+		local kind = info.locked and "locked" or (info.channel and "channel" or "cast")
+		local atlas = GameAtlas(kind)
+		if atlas and bar.SetStatusBarTexture then
+			bar:SetStatusBarTexture(atlas)
+			bar:SetStatusBarColor(1, 1, 1)
+		else
+			bar:SetStatusBarTexture(FILLS.smooth)
+			bar:SetStatusBarColor(unpack(GAME_COLORS[kind]))
+		end
+	end
+	Apply(bar, look, true, sized)
+end
+
+-- Dev copy's Preview Match test: a sample as a page's preview makes it (kind:
+-- player, unit, boss or plate; sample 1 casting, 2 channeling, 3 can't be
+-- interrupted), dressed as row id's look now (:Refresh), stopped at value.
+function ns.MakeCastLookSample(parent, kind, sample, id, value)
+	local info = SAMPLES[sample or 1]
+	local bar = MakeSample(parent, info, kind)
+	function bar:Refresh()
+		DressSample(self, info, Look(id), not id or SizedAs(id, ns.GetDB()))
+		self:SetValue(value or 0.4)
+		self.Spark:SetPoint("CENTER", self, "LEFT", self:GetWidth() * (value or 0.4), 0)
+	end
+	bar:Refresh()
 	return bar
 end
 
@@ -1512,36 +1793,52 @@ local function BuildCastPage(kit, spec)
 	caption:SetPoint("TOPLEFT", 6, -5)
 	caption.searchSkip = true
 	local samples = {}
-	-- Three small plates side by side, as the game lays one out: the health
-	-- bar with the unit's name in it (here what the sample shows), the cast
-	-- bar under it.
+	-- Three samples, each the game's own bar (MakeSample), as the game lays
+	-- it out: on the nameplates' page three plates (the health bar with the
+	-- unit's name in it, the cast bar under it) casting, channeling and
+	-- casting what can't be interrupted; on the unit frames' page yours, your
+	-- target's and a boss's, each under its unit frame's bars and dressed as
+	-- its own row says (2026-11-19: they were three of one made-up bar).
 	-- (Spread over the scene as plates over units, each scaled with however
 	-- big the page makes the preview: in one row at one size they sat close
 	-- together at its top, the rest of it empty.)
+	local units = spec.tabs == "units"
+	local SLOT_IDS = units and { "PLAYER", "TARGET", "BOSS" } or nil
+	local SLOT_KINDS = units and { "player", "unit", "boss" } or { "plate", "plate", "plate" }
 	local SPOTS = { { 0.24, 0.3 }, { 0.5, 0.58 }, { 0.76, 0.3 } }
-	-- (The unit frames' page: taller samples, a mana bar too, so the middle one
-	-- goes lower, clear of the other two. 2026-11-17.)
-	if spec.tabs == "units" then
-		SPOTS = { { 0.25, 0.27 }, { 0.5, 0.74 }, { 0.75, 0.27 } }
+	-- (The unit frames' page: taller samples, a mana bar too; yours at the
+	-- bottom in the middle, as the game has it, the other two above.)
+	if units then
+		SPOTS = { { 0.5, 0.74 }, { 0.25, 0.27 }, { 0.75, 0.27 } }
 		PREVIEW_H = 180
 		preview:SetHeight(PREVIEW_H)
 	end
 	local plates = {}
 	local function PlaceSamples(_, width, height)
 		width, height = width or PREVIEW_W, height or PREVIEW_H
-		local scale = math.max(1, math.min(1.6, width / 340))
+		-- (Plates are as wide as the game's, about 206: the two up top at
+		-- the sides mustn't meet.)
+		local most = units and 1.6 or 0.5 * width / SAMPLE_KINDS.plate[2]
+		local scale = math.max(0.7, math.min(1.6, width / 340, most))
 		for i, plate in ipairs(plates) do
 			plate:SetScale(scale)
 			plate:ClearAllPoints()
 			plate:SetPoint("CENTER", preview, "TOPLEFT", width * SPOTS[i][1] / scale, -height * SPOTS[i][2] / scale)
 		end
 	end
+	local function SlotLabel(i, info)
+		if not units then return L[info[1]] end
+		return L[TAB_NAMES[SLOT_IDS[i]] or SLOT_IDS[i]]
+	end
 	for i, info in ipairs(SAMPLES) do
+		local bar = MakeSample(preview, info, SLOT_KINDS[i])
+		local barW = bar.gameW or SAMPLE_W
 		local plate = CreateFrame("Frame", nil, preview)
-		plate:SetSize(SAMPLE_W, 26)
+		plate:SetSize(barW, 26)
 		plates[i] = plate
+		bar:SetParent(plate)
 		local health = CreateFrame("StatusBar", nil, plate)
-		health:SetSize(SAMPLE_W, 13)
+		health:SetSize(barW, 13)
 		health:SetPoint("TOP", plate, "TOP", 0, 0)
 		health:SetStatusBarTexture(FILLS.flat)
 		health:SetStatusBarColor(0.8, 0.1, 0.1)
@@ -1556,17 +1853,17 @@ local function BuildCastPage(kit, spec)
 		name:SetPoint("RIGHT", -3, 0)
 		name:SetJustifyH("LEFT")
 		name:SetWordWrap(false)
-		name:SetText(L[info[1]])
+		name:SetText(SlotLabel(i, info))
 		name.searchSkip = true
-		local bar = MakeSample(plate, info)
 		bar:SetPoint("TOP", health, "BOTTOM", 0, -2)
 		bar.offset = (i - 1) * 0.3
+		bar.slotId = SLOT_IDS and SLOT_IDS[i] or editing
 		samples[i] = bar
 		-- (The unit frames' page: a unit frame's bars, health and mana, dressed as
 		-- the Unit Frames page says, the cast bar under them: preview:Refresh.)
-		if spec.tabs == "units" then
+		if units then
 			local power = CreateFrame("StatusBar", nil, plate)
-			power:SetSize(SAMPLE_W, 5)
+			power:SetSize(barW, 5)
 			power:SetPoint("TOP", health, "BOTTOM", 0, -2)
 			power:SetMinMaxValues(0, 1)
 			power:SetValue(0.6 + (i - 1) * 0.1)
@@ -1591,29 +1888,13 @@ local function BuildCastPage(kit, spec)
 			return value
 		end })
 	end
-	-- (A sample bar as a look says: the game's fill and colors where it has none.)
-	local function Dress(bar, info, look, sized)
-		if not FILLS[look.plateCastFill] then
-			local kind = info.locked and "locked" or (info.channel and "channel" or "cast")
-			local atlas = ns.isRetail and C_Texture and C_Texture.GetAtlasInfo
-				and C_Texture.GetAtlasInfo(GAME_ATLAS[kind]) and GAME_ATLAS[kind]
-			if atlas and bar.SetStatusBarTexture then
-				bar:SetStatusBarTexture(atlas)
-				bar:SetStatusBarColor(1, 1, 1)
-			else
-				bar:SetStatusBarTexture(FILLS.smooth)
-				bar:SetStatusBarColor(unpack(GAME_COLORS[kind]))
-			end
-		end
-		Apply(bar, look, true, sized)
-	end
-	-- (The row being looked at: the game's look for a kind not restyled.)
+	local Dress = DressSample
 	-- (A sample's unit frame bars as that frame looks, and its cast bar under
 	-- them: right under, in the frame's border, with the Unit frame's look.)
-	local function DressFrameBars(bar, framed)
+	local function DressFrameBars(bar, framed, id)
 		local plate = bar.frameBars
 		if not (plate and ns.UnitFrameLook) then return end
-		local frameId = editing == "TARGET" and "TARGET" or "PLAYER"
+		local frameId = id == "PLAYER" and "PLAYER" or "TARGET"
 		local view = ns.UnitFrameLook(frameId)
 		for _, part in ipairs({ plate.health, plate.power }) do
 			if not ns.SetBarTexture(part, view.ufTexture) then part:SetStatusBarTexture(FILLS.smooth) end
@@ -1628,17 +1909,20 @@ local function BuildCastPage(kit, spec)
 			bar:SetPoint("TOPLEFT", plate.power, "BOTTOMLEFT", room, -PIN_GAP)
 			bar:SetPoint("TOPRIGHT", plate.power, "BOTTOMRIGHT", 0, -PIN_GAP)
 		else
-			bar:SetWidth(SAMPLE_W)
+			bar:SetWidth(bar.gameW or SAMPLE_W)
 			bar:SetPoint("TOP", plate.power, "BOTTOM", 0, -6)
 		end
 		ns.DressCastSkin(bar, framed and frameId or nil)
 	end
+	-- (Each sample as its own row says on the unit frames' page; the
+	-- nameplates' as the row being looked at.)
+	local function SlotId(bar) return units and bar.slotId or editing end
 	function preview:Refresh()
-		local look = Look(editing)
-		local framed = FrameLooked(editing, ns.GetDB())
+		local db = ns.GetDB()
 		for i, bar in ipairs(samples) do
-			Dress(bar, SAMPLES[i], look, not editing or SizedAs(editing, ns.GetDB()))
-			DressFrameBars(bar, framed)
+			local id = SlotId(bar)
+			Dress(bar, SAMPLES[i], Look(id), not id or SizedAs(id, db))
+			DressFrameBars(bar, FrameLooked(id, db), id)
 		end
 	end
 	local started = GetTime()
@@ -1649,10 +1933,14 @@ local function BuildCastPage(kit, spec)
 			bar:SetValue(value)
 			bar.value, bar.maxValue = value * SAMPLE_TIME, SAMPLE_TIME
 			bar.Spark:SetPoint("CENTER", bar, "LEFT", bar:GetWidth() * value, 0)
-			if look.plateCastTimer and states[bar] then UpdateTimer(bar, states[bar]) end
+			-- (The spark's glow trails behind it: not till there's room on the
+			-- bar, else it hangs out past the bar's start.)
+			if bar.glow then bar.glow:SetShown(bar:GetWidth() * value > bar.glow:GetWidth() + 2) end
+			local own = look or Look(SlotId(bar))
+			if own.plateCastTimer and states[bar] then UpdateTimer(bar, states[bar]) end
 		end
 	end
-	ns.SetOnUpdate(preview, function() Fill(samples, Look(editing)) end)
+	ns.SetOnUpdate(preview, function() Fill(samples) end)
 	kit.AddControl(preview)
 
 	-- (Every setting the page has, Default's and each of its kinds', for its Reset.)
@@ -1661,6 +1949,7 @@ local function BuildCastPage(kit, spec)
 	end
 	for _, id in ipairs(spec.ids) do
 		kit.RecordKey(content, "plateCastOwn_" .. id)
+		kit.RecordKey(content, "plateCastGameAs_" .. id)
 		if id ~= "PLATE" then kit.RecordKey(content, "plateCastOn_" .. id) end
 		if FRAME_IDS[id] then kit.RecordKey(content, "plateCastFrame_" .. id) end
 		for _, key in ipairs(BAR_KEYS) do kit.RecordKey(content, key .. "_" .. id) end
@@ -1672,14 +1961,16 @@ local function BuildCastPage(kit, spec)
 		local db = ns.GetDB()
 		if not (db and id) then return nil end
 		if id ~= "PLATE" and not db["plateCastOn_" .. id] then return "game" end
+		if db["plateCastGameAs_" .. id] then return "other" end
 		if FRAME_IDS[id] and db["plateCastFrame_" .. id] then return "frame" end
 		return db["plateCastOwn_" .. id] and "own" or "default"
 	end
 	local function PickLook(id, value)
 		local db = ns.GetDB()
 		if id ~= "PLATE" then db["plateCastOn_" .. id] = value ~= "game" end
+		db["plateCastGameAs_" .. id] = value == "other"
 		if FRAME_IDS[id] then db["plateCastFrame_" .. id] = value == "frame" end
-		if value == "game" then return end
+		if value == "game" or value == "other" then return end
 		if value == "frame" then
 			db["plateCastOwn_" .. id] = false
 			return
@@ -1730,6 +2021,9 @@ local function BuildCastPage(kit, spec)
 			local db = ns.GetDB() or {}
 			local pick = LookPick(id)
 			if pick == "game" then return { text = L["The game's"] } end
+			if pick == "other" then
+				return { text = id == "PLATE" and L["Unit frames' game look"] or L["Nameplates' game look"] }
+			end
 			if pick == "frame" then
 				return { text = FRAME_LOOK[key] and L["Unit frame's"] or L["Default row's"] }
 			end
@@ -1774,7 +2068,9 @@ local function BuildCastPage(kit, spec)
 				local holder = CreateFrame("Frame", nil, parent)
 				holder:SetSize(width, 70)
 				ns.StyleScene(holder, 0.6, 0.85)
-				local bar = MakeSample(holder, SAMPLES[1])
+				local kind = id == "PLATE" and "plate" or id == "PLAYER" and "player" or id == "BOSS" and "boss"
+					or (not id and spec.tabs ~= "units") and "plate" or "unit"
+				local bar = MakeSample(holder, SAMPLES[1], kind)
 				bar:SetScale(1.6)
 				bar:SetPoint("CENTER", holder, "CENTER", 0, 4)
 				local tag = holder:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
@@ -1797,6 +2093,9 @@ local function BuildCastPage(kit, spec)
 				local list = {}
 				if id ~= "PLATE" then
 					list[#list + 1] = { "game", L["The game's"], L["Cinematic leaves these cast bars alone."] }
+					list[#list + 1] = { "other", L["Nameplates'"], L["The game's nameplate cast bar look."] }
+				else
+					list[#list + 1] = { "other", L["Unit frames'"], L["The game's unit frame cast bar look."] }
 				end
 				list[#list + 1] = { "default", L["Default's"], L["They look as the Default row says."] }
 				if FRAME_IDS[id] then
@@ -1807,9 +2106,7 @@ local function BuildCastPage(kit, spec)
 				look.Segments(L["These bars"], { get = function() return LookPick(id) end, set = function(value)
 					PickLook(id, value)
 					editing = id
-				end }, list, FRAME_IDS[id]
-					and L["How these cast bars look: the game's own, the Default row's, the unit frame's, or their own."]
-					or L["How these cast bars look: the game's own, the Default row's, or their own."])
+				end }, list, L["Pick how these cast bars look."])
 			end or nil,
 			texture = { "plateCastFill", L["The bar's fill, including textures other addons share."], label = L["Fill:"], test = Editable,
 				tint = { 1, 0.7, 0 } },
@@ -1994,12 +2291,11 @@ end
 -- the page says (:Refresh), and filling again and again.
 function ns.MakePlateCastSample(parent)
 	local info = SAMPLES[1]
-	local bar = MakeSample(parent, info)
+	local bar = MakeSample(parent, info, "plate")
 	function bar:Refresh()
 		local look = ns.PlateCastLook()
 		if not FILLS[look.plateCastFill] then
-			local atlas = ns.isRetail and C_Texture and C_Texture.GetAtlasInfo
-				and C_Texture.GetAtlasInfo(GAME_ATLAS.cast) and GAME_ATLAS.cast
+			local atlas = GameAtlas("cast")
 			if atlas and self.SetStatusBarTexture then
 				self:SetStatusBarTexture(atlas)
 				self:SetStatusBarColor(1, 1, 1)

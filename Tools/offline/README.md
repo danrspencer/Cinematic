@@ -28,6 +28,9 @@ looks for `lua5.1`. (Don't put a `lua5.1` stand-in on PATH: Windows asks what to
 - `notchgap.lua <forever|retail>`: full-screen effects (ns.CoverWorld: letterbox, tint edges, death screen, Focus,
   low health, teleport) reach up over a Mac's camera notch strip above UIParent, at UI scale 1 and 0.8, and come back
   down when it goes.
+- `castlook.lua <forever|retail>`: a cast bar's These bars pick of the other kind's game look (PlateCastStyle.lua's
+  GameAs/DressAs) on the style lab's real-layout stand-in: put on (border, name, icon as the game lays the other kind
+  out) and taken off again (every anchor, size and justify back).
 - `Tools/prerelease.py` (one folder up) runs these checks and the rest side by side before a release, and reads the
   in-game `/cine prerelease` results from the saved settings.
 - `export.lua`: `lua5.1 Tools/offline/export.lua > profiles.json` writes the options pages and their sections, the

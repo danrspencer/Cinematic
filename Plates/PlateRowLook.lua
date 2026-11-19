@@ -520,6 +520,7 @@ function ns.MakePlateRowLookPreview(parent, width, kind)
 	if cast then
 		cast:SetPoint("TOP", health, "BOTTOM", 0, -3)
 		cast:SetScale(0.75)
+		cast:SetWidth(health:GetWidth() / 0.75) -- (as wide as the plate's bar, under its scale)
 	end
 	local mark = ns.MakeTargetArrow and ns.MakeTargetArrow(health, health)
 

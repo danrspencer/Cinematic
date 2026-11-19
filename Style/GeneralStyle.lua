@@ -109,7 +109,11 @@ function ns.MakeGeneralPlatePreview(parent, width)
 	name.searchSkip = true
 	local own = { name:GetFont() }
 	local cast = ns.MakePlateCastSample and ns.MakePlateCastSample(plate)
-	if cast then cast:SetPoint("TOP", health, "BOTTOM", 0, -3) end
+	-- (As wide as the plate's bar: the game's cast bar spans the plate.)
+	if cast then
+		cast:SetPoint("TOP", health, "BOTTOM", 0, -3)
+		cast:SetWidth(health:GetWidth())
+	end
 	function holder:Refresh()
 		ns.StyleScene(self, 0.55, 0.85)
 		local db = ns.db
