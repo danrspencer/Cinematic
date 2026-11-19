@@ -86,8 +86,9 @@ local NODES = {
 		sample = "27", damage = true },
 	{ id = "spellHoly", parent = "spell", label = "Holy", school = 2, color = { 1, 0.9, 0.5 }, sample = "21", damage = true },
 	{ id = "spellFire", parent = "spell", label = "Fire", school = 4, color = { 1, 0.5, 0.1 }, sample = "24", damage = true },
-	-- (Nature brown since 2026-11-19: green read as a heal, the player's call.)
-	{ id = "spellNature", parent = "spell", label = "Nature", school = 8, color = { 0.72, 0.58, 0.36 }, sample = "19",
+	-- (Nature yellow-green since 2026-11-19: green read as a heal, then brown
+	-- read as Holy's gold, the user's call.)
+	{ id = "spellNature", parent = "spell", label = "Nature", school = 8, color = { 0.6, 0.9, 0.2 }, sample = "19",
 		damage = true },
 	{ id = "spellFrost", parent = "spell", label = "Frost", school = 16, color = { 0.45, 0.85, 1 }, sample = "22", damage = true },
 	{ id = "spellShadow", parent = "spell", label = "Shadow", school = 32, color = { 0.65, 0.4, 1 }, sample = "25", damage = true },

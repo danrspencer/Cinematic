@@ -4747,6 +4747,27 @@ STEPS[#STEPS + 1] = function()
 		for _, point in pairs(ns.db.profileResetPoints or {}) do Off(point) end
 		ns.db.prdKeepUpOffV1 = true
 	end
+	-- Combat text's Nature is yellow-green now (2026-11-19): its brown read as
+	-- Holy's gold. One still brown (or the old green), as we set it, goes
+	-- yellow-green; a color the player picked stays. Saved profiles too. Once.
+	if not ns.db.combatTextNatureLimeV1 then
+		local function Lime(t)
+			if type(t) ~= "table" then return end
+			local r, g, b = t.ct_spellNature_R, t.ct_spellNature_G, t.ct_spellNature_B
+			if (r == 0.72 and g == 0.58 and b == 0.36) or (r == 0.3 and g == 1 and b == 0.3) then
+				t.ct_spellNature_R, t.ct_spellNature_G, t.ct_spellNature_B = 0.6, 0.9, 0.2
+			end
+		end
+		Lime(ns.db)
+		for _, saved in pairs(ns.db.profiles or {}) do
+			if type(saved) == "table" then
+				Lime(saved)
+				Lime(saved.settings)
+			end
+		end
+		for _, point in pairs(ns.db.profileResetPoints or {}) do Lime(point) end
+		ns.db.combatTextNatureLimeV1 = true
+	end
 end
 
 -- Runs them all, each on its own: an error is logged and reported (the
