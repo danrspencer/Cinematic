@@ -9649,7 +9649,8 @@ do
 		local db = ns.db
 		if what == "numbers" then
 			if db.cooldownFollowNumbers then return "game" end
-			return db.cooldownShowNumbers == false and "hide" or "show"
+			-- (Follow off: left to the game, as before the rows came.)
+			return db.cooldownShowNumbers == false and "hide" or "untouched"
 		elseif what == "keybinds" then
 			return db.cooldownKeybinds and true or false
 		elseif what == "notBuff" then
@@ -9870,6 +9871,18 @@ do
 		Hook(cooldown)
 		local group = ns.COOLDOWN_BAR_GROUPS[bar] or ns.COOLDOWN_BUFF_GROUPS[bar]
 		local mode = ns.CooldownRowSetting("numbers", id, group)
+		-- ("untouched": left as the game sets it, and given back what the
+		-- game last set if we'd changed it. A player's report 2026-11-19:
+		-- with Follow off they were forced on, big numbers on blank icons.)
+		if mode == "untouched" then
+			if wants[cooldown] ~= nil then
+				wants[cooldown] = nil
+				applying = true
+				pcall(cooldown.SetHideCountdownNumbers, cooldown, gameHides[cooldown])
+				applying = false
+			end
+			return
+		end
 		local want
 		if mode == "hide" then want = true elseif mode == "show" then want = false else want = not gameShows end
 		wants[cooldown] = want
@@ -9878,11 +9891,14 @@ do
 		applying = false
 	end
 
+	-- (Only the ones we changed: one never changed keeps what the game has.)
 	local function Release()
 		applying = true
 		for cooldown, hide in pairs(gameHides) do
-			wants[cooldown] = nil
-			pcall(cooldown.SetHideCountdownNumbers, cooldown, hide)
+			if wants[cooldown] ~= nil then
+				wants[cooldown] = nil
+				pcall(cooldown.SetHideCountdownNumbers, cooldown, hide)
+			end
 		end
 		applying = false
 	end

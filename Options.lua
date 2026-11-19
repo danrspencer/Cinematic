@@ -16472,6 +16472,7 @@ local function CreateCooldownPanel()
 			values = { "game", "show", "hide" },
 			Text = function(value)
 				if value == "game" then return GameNumbersText() end
+				if value == "untouched" then return L["Left to the game"] end
 				return value == "show" and L["Show"] or L["Hide"]
 			end },
 		keybinds = { label = L["Keybinds"], tip = L["Each spell's keybind on its icon."], values = { true, false },
@@ -16584,6 +16585,11 @@ local function CreateCooldownPanel()
 				Add(part.label, part.tip, function()
 					local list = {}
 					for i, value in ipairs(part.values) do list[i] = { value = value, text = part.Text(value) } end
+					-- (What it has until set, when that's none of the choices: Numbers left to the game.)
+					local base = ns.CooldownRowBase(what)
+					local listed = false
+					for _, value in ipairs(part.values) do listed = listed or value == base end
+					if not listed then table.insert(list, 1, { value = base, text = part.Text(base) }) end
 					return list
 				end, Get, function(value) ns.SetCooldownRow(group, what, value) end)
 			else
