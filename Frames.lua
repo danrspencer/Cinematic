@@ -222,7 +222,10 @@ ns.AddOnLoaded = AddOnLoaded
 
 function ns.IsAddonFramesOn(key)
 	local on = ns.db.addonFrames[key]
-	-- (Never switched: faded, unless its row starts with Always on.)
+	-- (Never switched: a row following another (follows) has that row's
+	-- Always; else faded, unless its row starts with Always on.)
+	local leader = on == nil and ns.ROW_FALLBACK and ns.ROW_FALLBACK["addon:" .. key]
+	if leader then return not ns.IsCineShowOn(leader) end
 	if on == nil then return not ns.ADDON_SHOWN_BY_DEFAULT[key] end
 	return on ~= false
 end
@@ -3064,6 +3067,13 @@ local ROW_FALLBACK = {
 -- (And the raid-style party frames' rows the raid frames'.)
 for raidKey, key in pairs(ns.RAID_STYLE_PARTY) do
 	ROW_FALLBACK[key] = raidKey
+end
+-- (And other addons' rows set to follow a row (follows, AddonSupport.lua):
+-- RestedXP's guide, which stood in for the quest tracker on its row.)
+for _, known in ipairs(ns.ADDON_FRAMES) do
+	if known.follows then
+		ROW_FALLBACK["addon:" .. known.key] = known.follows
+	end
 end
 -- (For the settings: ticking a row gives those that follow it ticks of their own first, GridRows.lua.)
 ns.ROW_FALLBACK = ROW_FALLBACK
@@ -13199,7 +13209,8 @@ do -- (In a do block: the file is near Lua's 200 locals.)
 		for _, known in ipairs(ns.ADDON_FRAMES) do
 			if not db.addonsSeen[known.key] and ns.AddOnInstalled(known.addon) then
 				db.addonsSeen[known.key] = true
-				if not first then
+				-- (A row following another keeps that row's settings till set.)
+				if not first and not known.follows then
 					ApplyAddonDefault(known.key)
 					any = true
 				end

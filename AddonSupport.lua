@@ -18,6 +18,9 @@ local L = ns.L
 -- (see HookOwnAlpha in Frames.lua). loaded: set once its addon has loaded.
 -- shownByDefault: its Always on to start with (left alone till you switch
 -- it), for frames there to be read while they're up (Spoken's subtitles).
+-- follows: a HUD row key whose ticks (Always too) it takes until set
+-- (ns.ROW_FALLBACK), for frames that stood in for a game frame on its row
+-- before getting their own (RestedXP's guide and the Quest tracker row).
 ns.ADDON_FRAMES = {}
 ns.ADDON_SHOWN_BY_DEFAULT = {} -- key -> true, from shownByDefault
 
