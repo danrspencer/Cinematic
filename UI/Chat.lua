@@ -503,15 +503,57 @@ local function Plain(value)
 	return type(value) == "string" and not (issecretvalue and issecretvalue(value))
 end
 
+-- A line's text as it reads on screen: colors, link codes, icons taken out.
+local function StripCodes(s)
+	return (s:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""):gsub("|H.-|h", ""):gsub("|h", "")
+		:gsub("|T.-|t", ""):gsub("|A.-|a", ""))
+end
+
+-- The message's own words between its links: another addon may rewrite a
+-- link (Questie turns [Quest] into [[32+] Quest]), the words stay as typed.
+local function PlainParts(text)
+	local parts = {}
+	for part in (StripCodes(text:gsub("|H.-|h.-|h", "\n")) .. "\n"):gmatch("([^\n]*)\n") do
+		local words = part:match("^%s*(.-)%s*$")
+		if #words >= 2 then parts[#parts + 1] = words end
+	end
+	return parts
+end
+
+-- Whether a window line is the message, read loosely: it has every one of
+-- the message's own words, and is by its author when there's one.
+local function LooseMatch(line, parts, name)
+	local shown = StripCodes(line)
+	if name and not (line:find("|Hplayer:" .. name, 1, true) or shown:find(name, 1, true)) then
+		return false
+	end
+	for _, part in ipairs(parts) do
+		if not shown:find(part, 1, true) then return false end
+	end
+	return true
+end
+
 -- A window's line as it drew it, with its color: the newest of its last
--- lines with text in it (nil if none, or it can't be read).
-local function FindWindowLine(chatFrame, text)
+-- lines with text in it, else (an addon rewrote its links) the newest one by
+-- its author with all its own words (nil if none, or it can't be read).
+local function FindWindowLine(chatFrame, text, author)
 	if not (chatFrame.GetNumMessages and chatFrame.GetMessageInfo) then return nil end
 	local count = chatFrame:GetNumMessages()
 	if not (type(count) == "number" and not (issecretvalue and issecretvalue(count))) then return nil end
-	for i = count, math.max(1, count - LINE_LOOKBACK + 1), -1 do
+	local last = math.max(1, count - LINE_LOOKBACK + 1)
+	for i = count, last, -1 do
 		local line, r, g, b = chatFrame:GetMessageInfo(i)
 		if Plain(line) and line:find(text, 1, true) then
+			return line, r, g, b
+		end
+	end
+	local name = Plain(author) and author:match("^[^-]+") or nil
+	if name == "" then name = nil end
+	local parts = PlainParts(text)
+	if not name and #parts == 0 then return nil end
+	for i = count, last, -1 do
+		local line, r, g, b = chatFrame:GetMessageInfo(i)
+		if Plain(line) and LooseMatch(line, parts, name) then
 			return line, r, g, b
 		end
 	end
@@ -542,10 +584,41 @@ end
 -- Lays our frame over the window (or the panel that draws its lines) with the
 -- window's font and look, before a line goes in. (Font set only when it
 -- changed: set again after lines are in, Russian ones turn to boxes.)
+-- How far in from the window's left and right edges its lines draw (0, 0 if
+-- it can't be read): read off one of its own line font strings.
+local function LineInsets(chatFrame)
+	local fontString = type(chatFrame.visibleLines) == "table" and chatFrame.visibleLines[1]
+	if not (fontString and fontString.GetLeft) then return 0, 0 end
+	local left, right = fontString:GetLeft(), fontString:GetRight()
+	local frameLeft, frameRight = chatFrame:GetLeft(), chatFrame:GetRight()
+	for _, v in ipairs({ left or false, right or false, frameLeft or false, frameRight or false }) do
+		if type(v) ~= "number" or (issecretvalue and issecretvalue(v)) then return 0, 0 end
+	end
+	local scale = fontString:GetEffectiveScale() / chatFrame:GetEffectiveScale()
+	return math.max(0, left * scale - frameLeft), math.max(0, frameRight - right * scale)
+end
+
+-- (Its lines wrap where the window's do: same text width, scale, indent and
+-- spacing, or the copy and the window's own line don't match as they cross.)
 local function DressCopy(copy, chatFrame)
-	local frame, shown = copy.frame, ns.chatPeekPanels[chatFrame] or chatFrame
+	local frame, panel = copy.frame, ns.chatPeekPanels[chatFrame]
+	local shown = panel or chatFrame
 	frame:ClearAllPoints()
-	frame:SetAllPoints(shown)
+	local scale = shown:GetEffectiveScale() / UIParent:GetEffectiveScale()
+	if type(scale) == "number" and scale > 0 and not (issecretvalue and issecretvalue(scale)) then
+		frame:SetScale(scale)
+	end
+	local left, right = 0, 0
+	if not panel then left, right = LineInsets(chatFrame) end
+	frame:SetPoint("TOPLEFT", shown, "TOPLEFT", left, 0)
+	frame:SetPoint("BOTTOMRIGHT", shown, "BOTTOMRIGHT", -right, 0)
+	if chatFrame.GetIndentedWordWrap and frame.SetIndentedWordWrap then
+		frame:SetIndentedWordWrap(ns.Flag(chatFrame:GetIndentedWordWrap()) and true or false)
+	end
+	if chatFrame.GetSpacing and frame.SetSpacing then
+		local spacing = chatFrame:GetSpacing()
+		if type(spacing) == "number" and not (issecretvalue and issecretvalue(spacing)) then frame:SetSpacing(spacing) end
+	end
 	frame:SetFrameStrata(shown:GetFrameStrata())
 	frame:SetFrameLevel(shown:GetFrameLevel() + 5)
 	local file, size, flags = chatFrame:GetFont()
@@ -685,14 +758,14 @@ end
 -- A peek in lines-only mode. formatted: text is the window's line already
 -- (server lines); else it's the message's own text, and the window's line
 -- holding it is looked up once the game has added it (the next frame).
-local function PeekLine(chatFrame, text, formatted)
+local function PeekLine(chatFrame, text, formatted, author)
 	if formatted then
 		local line, r, g, b = FindWindowLine(chatFrame, text) -- (for its color)
 		ShowCopy(chatFrame, line or text, r, g, b, text)
 		return
 	end
 	C_Timer.After(0, function()
-		local line, r, g, b = FindWindowLine(chatFrame, text)
+		local line, r, g, b = FindWindowLine(chatFrame, text, author)
 		if line then
 			ShowCopy(chatFrame, line, r, g, b, text)
 		else
@@ -701,12 +774,13 @@ local function PeekLine(chatFrame, text, formatted)
 	end)
 end
 
--- (text, formatted: the line that peeked, for Show just those messages.)
-PeekWindow = function(chatFrame, text, formatted)
+-- (text, formatted: the line that peeked, for Show just those messages;
+-- author: who sent it, to find it in the window when an addon rewrote it.)
+PeekWindow = function(chatFrame, text, formatted, author)
 	if chatFrame.IsShown and ns.ChatWindowShown(chatFrame) then
 		if text ~= nil and Plain(text) and text ~= "" and ns.ChatPeekLinesOnly()
 				and not (ns.ChatSeen and ns.ChatSeen(chatFrame)) then
-			PeekLine(chatFrame, text, formatted)
+			PeekLine(chatFrame, text, formatted, author)
 			return
 		end
 		local now = GetTime()
@@ -847,7 +921,7 @@ local function SpeakOrPeek(line)
 	end
 	if not (ns.db.handleBubbles and ns.db.chatSpeechBehind and ns.ShowSpeechBehind
 			and ns.ChatWindowShown(chatFrame)) then
-		PeekWindow(chatFrame, line[2])
+		PeekWindow(chatFrame, line[2], nil, line[5])
 	elseif ChatUnseen(chatFrame) then
 		ns.ShowSpeechBehind(line[4], line[5], line[2], line[6])
 		if ns.HideOffScreenBubble then ns.HideOffScreenBubble(line[2]) end
@@ -909,7 +983,7 @@ local function WatchBubbles()
 		elseif now >= line[3] then
 			table.remove(waiting, i)
 			if line[8] then
-				PeekWindow(line[1], line[2]) -- (your own line: chat, not speech from behind you)
+				PeekWindow(line[1], line[2], nil, line[5]) -- (your own line: chat, not speech from behind you)
 			else
 				SpeakOrPeek(line)
 			end
@@ -937,7 +1011,7 @@ local function PeekUnlessBubble(chatFrame, event, text, author, guid)
 			SpeechTrace(("not waiting for a bubble (hide bubbled %s, bubbles CVar %s)"):format(
 				tostring(ns.db.chatHideBubbled), tostring(GetCVar("chatBubbles"))))
 		end
-		PeekWindow(chatFrame, text)
+		PeekWindow(chatFrame, text, nil, author)
 		return
 	end
 	waiting[#waiting + 1] = { chatFrame, text, GetTime() + BUBBLE_WAIT, event, author, guid,
@@ -952,7 +1026,7 @@ local function PeekOwnLine(chatFrame, event, text, author, guid, bubbleCVar)
 	local kind = ns.BUBBLE_KIND_OF and ns.BUBBLE_KIND_OF[event]
 	if bubbleCVar == true or type(text) ~= "string" or (issecretvalue and issecretvalue(text))
 			or not (GetCVarBool and GetCVarBool(bubbleCVar)) or (kind and ns.BubbleKindOff(kind)) then
-		PeekWindow(chatFrame, text)
+		PeekWindow(chatFrame, text, nil, author)
 		return
 	end
 	waiting[#waiting + 1] = { chatFrame, text, GetTime() + BUBBLE_WAIT, event, author, guid,
