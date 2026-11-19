@@ -3287,7 +3287,8 @@ function ns.SetPersonalPlateAlpha(alpha)
 	personalHeld = alpha < 1
 end
 
-local function PlateAlpha(unit, plate)
+local PlateAlphas -- (below: Heal Vision's plates ask it for their kept parts' level)
+local function PlateAlpha(unit, plate, besidesHeal)
 	if plate and plate == PersonalPlate() then
 		return personalAlpha
 	end
@@ -3295,6 +3296,15 @@ local function PlateAlpha(unit, plate)
 		return 0 -- (a plate only Quest Vision's soft targeting gave it: see QuestGlow)
 	end
 	local alpha = KindAlpha(unit)
+	-- (Heal Vision's Nameplates tick: a friendly player's or minion's plate it
+	-- fades stays up whole, its own fade showing the hurt. Its Don't fade
+	-- parts, the name to start with, are given the level the plate has
+	-- without it, so in CineMode the Names rows still decide the name.
+	-- HealVisionFrames.lua.)
+	if not besidesHeal and ns.HealVisionPlateUnit and ns.HealVisionPlateUnit(unit) then
+		if ns.SetHealVisionKeptLevel then ns.SetHealVisionKeptLevel(unit, (PlateAlphas(unit, plate, true))) end
+		return 1
+	end
 	if plate == targetFade.plate and not (unit and IsTarget(unit) and AlwaysShownTarget(unit)) then
 		return alpha -- a frame before the target fade catches up with a new target
 	end
@@ -3341,8 +3351,10 @@ end
 -- Chat Cam's Ultra immersive: 1 with every plate faded out for a conversation.
 local immersiveLevel = 0
 
-local function PlateAlphas(unit, plate)
-	local body = PlateAlpha(unit, plate)
+-- besidesHeal: the plate's level without Heal Vision's hold (its first
+-- return alone, before the Style hub's opacity).
+function PlateAlphas(unit, plate, besidesHeal)
+	local body = PlateAlpha(unit, plate, besidesHeal)
 	local name = 0
 	if body <= 0 and unit and ns.SoftPlateHidden(unit) then
 		-- (A plate only soft targeting gave it: its name stays, as without one.)
@@ -3399,6 +3411,7 @@ local function PlateAlphas(unit, plate)
 	if alpha <= 0 or immersiveLevel >= 1 then
 		return 0, 1, 0, 0, 1
 	end
+	if besidesHeal then return alpha end
 	-- (The Style hub's Nameplates page: its row's Opacity, over the whole plate;
 	-- Chat Cam's Ultra immersive fading every plate out.)
 	local opacity = (ns.PlateStyleOpacity and ns.PlateStyleOpacity(plate) or 1) * (1 - immersiveLevel)
@@ -4584,9 +4597,14 @@ function ns.plates.FriendWants(suffix)
 	wants.shownBody = wants.body or (player and true) or false
 	wants.shownMinions = wants.minions or (friendTarget and not player and Ask(UnitPlayerControlled, "target") and true)
 		or false
+	-- (Heal Vision's Nameplates tick: every friendly player's plate in full,
+	-- faded by their health. Where Heal Vision's row says: HealVisionFrames.lua's PlatesOn.)
+	local healVision = ns.HealVisionPlatesOn and ns.HealVisionPlatesOn() or false
+	wants.shownBody = wants.shownBody or healVision
+	wants.shownMinions = wants.shownMinions or healVision
 	-- (Your group's rows only while you're in one; their bars need the plates.)
 	wants.shownPlayers = wants.players or (wants.groupRows and IsInGroup()) or (playerTarget and true)
-		or wants.plateCards or false
+		or wants.plateCards or healVision or false
 	return wants.shownBody, wants.shownMinions, wants.shownPlayers
 end
 
@@ -4597,8 +4615,39 @@ end
 -- after. Clients without it are left alone.
 ns.OFFSCREEN_PLATE_CVARS = ns.CVarSet("Offscreen plates on", "CineMode, plateShowOffscreen ticked (elite rules)",
 	{ secure = true, playerWins = true, values = { nameplateShowOffscreen = "1" } })
-ns.NO_OFFSCREEN_PLATE_CVARS = ns.CVarSet("Offscreen plates off", "CineMode, plateShowOffscreen unticked",
+ns.NO_OFFSCREEN_PLATE_CVARS = ns.CVarSet("Offscreen plates off", "CineMode, nothing here needs offscreen plates",
 	{ secure = true, playerWins = true, values = { nameplateShowOffscreen = "0" } })
+
+-- Why CineMode holds offscreen plates on here (nil: it doesn't, they're off).
+-- Off unless asked: they cost (the game builds a plate for everyone in range,
+-- not just those in view) and the game's big head names flash as units cross
+-- the screen's edge (Forever, 2026-11-05). On for:
+--   your tick           the Nameplates page's Show Offscreen (elite rules)
+--   Emote Vision        its plate cards (Buff, Guild, Ally, Achievement) where
+--                       their rows show: a buff's caster behind you has a unit
+--                       only through their plate (2026-11-19)
+--   Heal Vision         its Nameplates tick, where its row says: someone hurt
+--                       behind you still counts
+-- Both Visions only where CineMode holds plates (not dungeons and raids,
+-- where friendly plates are the game's), by their own rows: their rule or
+-- City columns decide cities too; and never with an attackable target. While on, the rule word "Plate off screen"
+-- (noplate) only means too far: a target behind you keeps its plate.
+-- (Emote Vision's want: FriendWants', gone over every 10 s, out of fights.)
+function ns.plates.OffscreenWhy(cinematic)
+	if not cinematic then return nil end
+	if ns.db.plateShowOffscreen then return "your Show Offscreen tick" end
+	if not ns.PlatesForcedHere(cinematic) then return nil end
+	-- (Not with an attackable target: a fight's likely coming, and the game
+	-- won't let plate settings change in one (tested 2026-11-19: SetCVar in a
+	-- fight, blocked). Let go now, out of it, the fight's plates are as in
+	-- view only: Combat Text Style's numbers never land on a plate pinned to
+	-- the edge for someone behind you. Jumped with no target: that fight keeps
+	-- them on.)
+	if ns.Flag(UnitExists("target")) and ns.Flag(UnitCanAttack("player", "target")) then return nil end
+	if ns.plates.friendWants.plateCards then return "Emote Vision's cards" end
+	if ns.HealVisionPlatesOn and ns.HealVisionPlatesOn() then return "Heal Vision's nameplates" end
+	return nil
+end
 
 -- Invisible plates still take clicks, so while every plate of a side
 -- (friendly or enemy) is faded out, that side's plates are made unclickable
@@ -4830,8 +4879,10 @@ function ns.UpdatePlates(cinematic, elapsed)
 	platesReleased = false
 	platesActive = cinematic and true or false
 	-- (The one let go first, so yours is what the other saves.)
-	local offscreen = cinematic and ns.db.plateShowOffscreen and true or false
-	local noOffscreen = cinematic and not ns.db.plateShowOffscreen or false
+	-- Offscreen plates: the Nameplates page's tick, or where something needs a
+	-- unit for everyone around you, not only those in view (ns.plates.OffscreenWhy).
+	local offscreen = cinematic and ns.plates.OffscreenWhy(cinematic) ~= nil
+	local noOffscreen = cinematic and not offscreen or false
 	ns.ApplyCVarSet(offscreen and ns.NO_OFFSCREEN_PLATE_CVARS or ns.OFFSCREEN_PLATE_CVARS, false)
 	ns.ApplyCVarSet(ns.OFFSCREEN_PLATE_CVARS, offscreen)
 	ns.ApplyCVarSet(ns.NO_OFFSCREEN_PLATE_CVARS, noOffscreen)

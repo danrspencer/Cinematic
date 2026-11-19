@@ -4586,7 +4586,9 @@ do
 		-- (Your target with no nameplate: behind the camera, off the side or too
 		-- far. The game only makes plates for units in view; a plate CineMode
 		-- fades is still there. Nameplates turned off for its kind count too.
-		-- Plates can't be measured (restricted), so one pinned at the top counts as shown.)
+		-- Plates can't be measured (restricted), so one pinned at the top counts as shown.
+		-- Where CineMode holds offscreen plates on, Effects.lua's OffscreenWhy,
+		-- a target behind you keeps its plate: then it means too far only.)
 		facts.noplate = hasTarget and not targetSelf and C_NamePlate ~= nil
 			and C_NamePlate.GetNamePlateForUnit("target") == nil or false
 		-- (Your target up close, where its plate goes to the top: see TargetWithin.)

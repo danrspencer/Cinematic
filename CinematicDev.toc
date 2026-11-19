@@ -215,6 +215,7 @@ Profiles\Layouts.lua
 Profiles\FollowHud.lua
 Dev\ModuleEditor.lua
 Dev\HeldSettingsPage.lua
+Dev\PlateSwitchesPage.lua
 Dev\DemoHub.lua
 Dev\MinimapTiles.lua
 Dev\MinimapCopy.lua
@@ -244,6 +245,9 @@ Dev\PlateFlickerTest.lua
 Dev\TurnLagTest.lua
 Dev\PlateCostTest.lua
 Dev\FriendPlatesTest.lua
+Dev\HealPlatesTest.lua
+Dev\OffscreenProbe.lua
+Dev\OffscreenHoldTest.lua
 Dev\NpcNamesTest.lua
 Dev\ReadyAnyTimeTest.lua
 Dev\FollowHudTest.lua

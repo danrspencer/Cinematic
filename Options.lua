@@ -3058,6 +3058,7 @@ do
 		-- (The dev copy's own hub: none of its pages are in the release, so neither is it.)
 		{ name = "Dev", pages = {
 			{ "Held Game Settings", "Interface\\Icons\\INV_Gizmo_02", dev = true }, -- (HeldSettingsPage.lua)
+			{ "Plate Switches", "Interface\\Icons\\INV_Misc_Spyglass_03", dev = true }, -- (PlateSwitchesPage.lua)
 			{ "Demo Commands", "Interface\\Icons\\INV_Misc_Film_01", dev = true }, -- (DemoHub.lua)
 			{ "Minimap Copy", "Interface\\Icons\\INV_Misc_Map_01", dev = true }, -- (MinimapCopy.lua)
 		} },
@@ -17989,7 +17990,7 @@ local function CreateVisionPanel()
 		local barsHead = Label(content, "GameFontNormal", L["Nameplates"])
 		barsHead:SetPoint("TOPLEFT", tabsEnd, "TOPLEFT", 2, -4)
 		local barsCheck = Check(content, "healVisionPlates", L["Health bars only while hurt"],
-			L["Friendly nameplates show their health bar only while they need healing, outside dungeons and raids."], function(value)
+			L["Friendly nameplates show their health bar only while they need healing, where Heal Vision is on (not dungeons or raids)."], function(value)
 				ns.GetDB().healVisionPlates = value
 				if ns.ApplyHealVisionPlates then ns.ApplyHealVisionPlates() end
 				Refresh() -- (Don't fade greys with it)
@@ -21965,6 +21966,10 @@ ns.OnLanguage(function()
 	if ns.isDev and ns.CreateHeldSettingsPage then -- (HeldSettingsPage.lua: the Dev hub)
 		ns.CreateHeldSettingsPage(ns.lowHealthKit)
 		Lap("CreateHeldSettingsPage")
+	end
+	if ns.isDev and ns.CreatePlateSwitchesPage then -- (PlateSwitchesPage.lua: the Dev hub)
+		ns.CreatePlateSwitchesPage(ns.lowHealthKit)
+		Lap("CreatePlateSwitchesPage")
 	end
 	if ns.isDev and ns.CreateDemoHubPage then -- (DemoHub.lua: the Dev hub)
 		ns.CreateDemoHubPage(ns.lowHealthKit)

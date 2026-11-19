@@ -941,7 +941,9 @@ end
 -- alpha is noted the first time and the curve scaled by it, so a faint one
 -- (a highlight) never comes back brighter, and given back when let go.
 -- Plates the game locks (friendly ones in dungeons and raids) aren't reachable.
--- In CineMode or not: it's for healing.
+-- In CineMode or not: it's for healing. In CineMode it keeps every friendly
+-- plate on and up (Effects.lua's FriendWants and PlateAlpha), where Heal
+-- Vision's row says (PlatesOn).
 ns.DEFAULTS.healVisionPlates = false
 -- The parts it can fade (as the Plate parts grid names them), each with a
 -- Don't fade tick: healVisionPlatesKeep<part>. Only the name kept to start with.
@@ -950,8 +952,25 @@ ns.HEAL_PLATE_PARTS = { "Health", "Name", "CastBar", "Buffs", "Debuffs", "RaidMa
 for _, part in ipairs(ns.HEAL_PLATE_PARTS) do
 	ns.DEFAULTS["healVisionPlatesKeep" .. part] = part == "Name"
 end
+-- On here: the tick, where Heal Vision's own row says (its rule to start
+-- with, "not city and not dead": in a city crowd every friendly plate would
+-- be built and kept up, in CineMode switched on just for this, Effects.lua's
+-- FriendWants, the lag CineMode stopped in v2.1.14). A player who takes
+-- "not city" out gets it in cities too.
+-- (Asked for every plate in each plate pass: worked out once a frame.)
+local platesOnAt, platesOnNow
+local function PlatesOn()
+	local now = GetTime()
+	if platesOnAt ~= now then
+		platesOnAt = now
+		platesOnNow = ns.Setting("healVisionPlates") and ns.HealVisionHere and ns.HealVisionHere() and true or false
+	end
+	return platesOnNow
+end
+ns.HealVisionPlatesOn = PlatesOn
 local plateLayers = {} -- [nameplate unit] = { [layer] = its own alpha }, the layers faded on its plate
 local plateParts = {} -- [nameplate unit] = { [part] = layers faded } (for /cine debug healplates)
+local plateSeen = {} -- [nameplate unit] = { wanted = [layer] = part, kept = [layer] = true } (ns.HealVisionPlateInfo)
 
 local function Reachable(region)
 	if type(region) ~= "table" or not region.SetAlpha then return false end
@@ -966,19 +985,26 @@ local function PlateFrame(unit)
 	return Reachable(unitFrame) and unitFrame or nil
 end
 
--- The layers to fade on a plate, by part: [layer] = its part; and how many
--- each part has.
-local function PlateLayersOf(unitFrame)
+-- The layers to fade on a plate, by part: [layer] = its part; how many each
+-- part has; and, keptToo, the Don't fade parts' layers as well, in kept
+-- ([layer] = true: given CineMode's level, not the curve).
+local function PlateLayersOf(unitFrame, keptToo)
 	if not ns.PlatePartFrames then return nil end
-	local found, byPart = {}, {}
+	local found, byPart, kept = {}, {}, {}
+	local keeping = false
 	local function Add(layer, part)
 		if Reachable(layer) and not found[layer] then
 			found[layer] = part
-			byPart[part] = (byPart[part] or 0) + 1
+			if keeping then
+				kept[layer] = true
+			else
+				byPart[part] = (byPart[part] or 0) + 1
+			end
 		end
 	end
 	for _, part in ipairs(ns.HEAL_PLATE_PARTS) do
-		if not ns.Setting("healVisionPlatesKeep" .. part) then
+		keeping = ns.Setting("healVisionPlatesKeep" .. part) and true or false
+		if keptToo or not keeping then
 			for _, frame in ipairs(ns.PlatePartFrames(unitFrame, part)) do
 				if frame.IsObjectType and frame:IsObjectType("Frame") then
 					for _, region in ipairs({ frame:GetRegions() }) do Add(region, part) end
@@ -989,7 +1015,16 @@ local function PlateLayersOf(unitFrame)
 			end
 		end
 	end
-	return found, byPart
+	return found, byPart, kept
+end
+
+-- The level the Nameplates page gives a plate Heal Vision holds up (Effects.lua's
+-- PlateAlpha, as it changes): its Don't fade parts get it, so in CineMode
+-- their name still shows only as the Names rows say. [unit] = level.
+local keptLevels = {}
+local function KeptLevel(unit)
+	local level = ns.db and ns.db.handlePlates and keptLevels[unit]
+	return type(level) == "number" and level < 0.999 and level or nil
 end
 
 -- The settings a plate's unit goes by (nil: not one it fades): pets', or a
@@ -1010,6 +1045,13 @@ local function PlateKindOf(unit)
 	if Tank(unit) then return TANKS end
 	if Plain(UnitGroupRolesAssigned and UnitGroupRolesAssigned(unit)) == "HEALER" then return HEALERS end
 	return OTHERS
+end
+
+-- Whether this plate's unit is one Heal Vision fades here: CineMode then
+-- keeps its whole plate up, and the fade alone decides what shows
+-- (Effects.lua's PlateAlpha).
+function ns.HealVisionPlateUnit(unit)
+	return PlatesOn() and type(unit) == "string" and PlateKindOf(unit) ~= nil and PlateFrame(unit) ~= nil
 end
 
 -- A kind's curve as Curve makes it (step 0), its values times a layer's own
@@ -1064,11 +1106,20 @@ end
 
 local function UpdatePlate(unit)
 	local unitFrame = PlateFrame(unit)
-	local kind = unitFrame and ns.Setting("healVisionPlates") and PlateKindOf(unit)
-	local wanted, byPart
-	if kind then wanted, byPart = PlateLayersOf(unitFrame) end
+	local kind = unitFrame and PlatesOn() and PlateKindOf(unit)
+	local wanted, byPart, kept
+	local level = KeptLevel(unit)
+	if kind then wanted, byPart, kept = PlateLayersOf(unitFrame, level ~= nil) end
 	ReleasePlate(unit, wanted)
 	plateParts[unit] = byPart
+	local wasHeld = plateSeen[unit] ~= nil
+	plateSeen[unit] = wanted and { wanted = wanted, kept = kept or {} } or nil
+	-- (Held or let go: the Plate parts grid's levels on it again, full while
+	-- held. PlateParts.lua's ApplyPlate.)
+	if (plateSeen[unit] ~= nil) ~= wasHeld and ns.ApplyPlateNow and C_NamePlate.GetNamePlateForUnit then
+		local ok, plate = pcall(C_NamePlate.GetNamePlateForUnit, unit)
+		if ok and plate then pcall(ns.ApplyPlateNow, plate) end
+	end
 	if not (wanted and next(wanted)) then return end
 	local dead = UnitIsDeadOrGhost and Plain(UnitIsDeadOrGhost(unit)) == true
 	if not dead and IsTarget(unit) then kind = TargetOf(kind) end
@@ -1086,7 +1137,9 @@ local function UpdatePlate(unit)
 			layers[layer] = own
 		end
 		local alpha = own
-		if dead then
+		if kept[layer] then
+			alpha = (level or 1) * own
+		elseif dead then
 			alpha = Shown(0, DEAD) * own
 		else
 			local fade = ScaledCurve(kind, own)
@@ -1097,6 +1150,15 @@ local function UpdatePlate(unit)
 		end
 		if not pcall(layer.SetAlpha, layer, alpha) then pcall(layer.SetAlpha, layer, own) end
 	end
+end
+
+-- (Effects.lua's PlateAlpha, each pass on a plate this holds up: faded again
+-- only when its level moves.)
+function ns.SetHealVisionKeptLevel(unit, level)
+	level = tonumber(level) or 1
+	local was = keptLevels[unit] or 1
+	keptLevels[unit] = level < 0.999 and level or nil
+	if math.abs(was - level) > 0.001 then UpdatePlate(unit) end
 end
 
 local plateWatch = CreateFrame("Frame")
@@ -1126,7 +1188,7 @@ castHolder:Hide()
 
 local function UpdateAllPlates()
 	for unit in pairs(plateLayers) do UpdatePlate(unit) end
-	if not ns.Setting("healVisionPlates") then return end
+	if not PlatesOn() then return end
 	for _, plate in ipairs(C_NamePlate and C_NamePlate.GetNamePlates and C_NamePlate.GetNamePlates() or {}) do
 		local unit = plate.namePlateUnitToken or (plate.UnitFrame and plate.UnitFrame.unit)
 		if type(unit) == "string" and not Secret(unit) then UpdatePlate(unit) end
@@ -1161,6 +1223,8 @@ plateWatch:SetScript("OnEvent", function(_, event, unit)
 	if event == "NAME_PLATE_UNIT_REMOVED" then
 		ReleasePlate(unit) -- (the plate goes back to the game for another unit)
 		plateParts[unit] = nil
+		plateSeen[unit] = nil
+		keptLevels[unit] = nil
 		if hoverUnit == unit then hoverUnit = nil end
 	elseif event == "PLAYER_TARGET_CHANGED" or event == "GROUP_ROSTER_UPDATE" or event == "PLAYER_ROLES_ASSIGNED" then
 		UpdateAllPlates()
@@ -1218,6 +1282,40 @@ plateWatch:HookScript("OnEvent", function(self, event)
 		ns.ApplyHealVisionPlates()
 	end
 end)
+
+-- What it holds on a plate now, for tests (Dev/HealPlatesTest.lua): whether
+-- it fades this unit, the kept parts' level, and per part "faded" or "kept"
+-- with each layer's alpha now ("secret" when the game hides it).
+function ns.HealVisionPlateInfo(unit)
+	local info = { on = PlatesOn(), unit = ns.HealVisionPlateUnit(unit), keptLevel = keptLevels[unit], parts = {} }
+	-- (Its kind, and what that kind's curve gives at full and half health:
+	-- plain numbers, where the layers' alphas are secret.)
+	local kind = PlatesOn() and PlateKindOf(unit)
+	info.kind = kind == TANKS and "tanks" or kind == HEALERS and "healers" or kind == OTHERS and "damage"
+		or kind == PETS and "pets" or tostring(kind)
+	local curve = kind and ScaledCurve(kind, 1)
+	if curve and curve.Evaluate then
+		local okFull, full = pcall(curve.Evaluate, curve, 1)
+		local okHalf, half = pcall(curve.Evaluate, curve, 0.5)
+		info.curve = ("full %s, half %s, line %s"):format(okFull and tostring(full) or "error",
+			okHalf and tostring(half) or "error", tostring(Setting(kind.below)))
+	end
+	local okHealth, health = pcall(UnitHealthPercent, unit)
+	info.health = okHealth and (Secret(health) and "secret" or tostring(health)) or "error"
+	local seen = plateSeen[unit]
+	if not seen then return info end
+	for layer, part in pairs(seen.wanted) do
+		local entry = info.parts[part] or { kept = seen.kept[layer] and true or false, alphas = {}, layers = {} }
+		info.parts[part] = entry
+		entry.layers[#entry.layers + 1] = layer
+		local ok, alpha = pcall(layer.GetAlpha, layer)
+		local okShown, visible = pcall(layer.IsVisible, layer)
+		visible = okShown and Plain(visible) == true
+		entry.alphas[#entry.alphas + 1] = (not ok or Secret(alpha)) and "secret"
+			or ("%.2f%s"):format(tonumber(alpha) or -1, visible and "" or "h")
+	end
+	return info
+end
 
 -- /cine debug healplates: each plate it fades, its parts and how many layers
 -- each, and what each kind's curve gives at full health (a plain number: 1.0

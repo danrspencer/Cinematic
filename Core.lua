@@ -1927,8 +1927,10 @@ end
 ns.RULE_DEFAULTS = {}
 -- The Names grid's Service NPCs row: titles up whenever no camera plays.
 ns.RULE_DEFAULTS["name:ServiceNPCs"] = "not camera"
--- Heal Vision: in dungeons and raids, but not while you're dead (no healing to aim).
-ns.RULE_DEFAULTS.healVision = "(dungeon or raid) and not dead"
+-- Heal Vision: everywhere but cities (crowds: its plates would be every
+-- friendly player's), not while you're dead (no healing to aim). Until
+-- 2026-11-19 dungeons and raids only (Migrations.lua's healVisionWorldRuleV1).
+ns.RULE_DEFAULTS.healVision = "not city and not dead"
 do
 	local OFF_GRID_ROWS, OLD_GRID_DEFAULTS = {}, {}
 
@@ -3040,7 +3042,18 @@ local function CheckHeldCVar(name)
 	if now ~= nil and not SameValue(now, held.value) then
 		heldCVars[name:lower()] = nil
 		ns.db.savedCVars[held.name] = nil
-		ns.Log("cvar", ("%s changed to %s outside the addon: left as is"):format(held.name, tostring(now)))
+		-- (Who: the first file in the stack that isn't the hook's, so a change
+		-- nobody remembers making can be traced: the game's options panel, a
+		-- /run, another addon, a test of ours.)
+		local by = "?"
+		for line in (debugstack and debugstack(3) or ""):gmatch("[^\n]+") do
+			local file = line:match("%[([^%]]+)%]") or line:match("^([^:]+:%d+)")
+			if file and not file:find("Core%.lua") and file ~= "C" and not file:find("^string") then
+				by = line:match("[^/\\]+%]?:%d+") or file
+				break
+			end
+		end
+		ns.Log("cvar", ("%s changed to %s outside the addon: left as is (by %s)"):format(held.name, tostring(now), by))
 	end
 end
 

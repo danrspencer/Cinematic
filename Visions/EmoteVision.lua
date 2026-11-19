@@ -219,7 +219,10 @@ end
 -- same back, and a pretend one for Test.
 local MOMENTS = {
 	{ id = "Buff", on = "emoteVisionBuffs", name = "Someone buffs you", emotes = { "THANK", "BOW", "SALUTE" },
-		outside = true, -- (its Show in row: World and City to start with, not dungeons, raids or battlegrounds)
+		-- (Its Show in row: World to start with. Not cities, where its plates (and
+		-- offscreen plates) for a crowd cost too much, 2026-11-19; not dungeons,
+		-- raids or battlegrounds.)
+		places = { "worldShow" },
 		plates = true, -- (the game names the caster only through a unit: a plate for strangers)
 		tip = "A buff of a minute or more someone else puts on you (Fortitude, Arcane Intellect, a blessing...). " ..
 			"Not heals over time.",
@@ -261,6 +264,7 @@ local MOMENTS = {
 		sample = { name = "Your group", line = "you joined a group", group = true,
 			icon = "Interface\\Icons\\INV_Misc_GroupNeedMore" } },
 	{ id = "Achievement", on = "emoteVisionAchievement", name = "Someone earns an achievement", plates = true,
+		places = { "worldShow", "instanceShow", "bgShow" }, -- (everywhere but cities, as Buff's: plates cost there)
 		emotes = { "CONGRATULATE", "CHEER", "APPLAUD" },
 		near = true, tip = "Someone near you earns an achievement (a stranger, someone in your group or in " ..
 			"your guild).",
@@ -272,11 +276,13 @@ local MOMENTS = {
 			icon = "Interface\\Icons\\INV_Misc_Bone_HumanSkull_01" } },
 	{ id = "Guild", on = "emoteVisionGuild", name = "You run into a guild member", emotes = { "WAVE", "HELLO", "HUG" },
 		plates = true,
+		places = { "worldShow", "instanceShow", "bgShow" }, -- (everywhere but cities, as Buff's: plates cost there)
 		tip = "Someone from your guild (not in your group) comes into view: with friendly nameplates on, as " ..
 			"soon as you see them; otherwise when you mouse over or target them. Once an hour per person.",
 		sample = { name = "Brakka", class = "WARRIOR", line = "is in your guild" } },
 	{ id = "Ally", on = "emoteVisionAlly", name = "You run into a recent ally", emotes = { "WAVE", "HELLO", "SALUTE" },
 		plates = true,
+		places = { "worldShow", "instanceShow", "bgShow" }, -- (everywhere but cities, as Buff's: plates cost there)
 		ally = true,
 		tip = "Someone you grouped with lately (the game's Recent Allies, not in your group now) comes into " ..
 			"view: with friendly nameplates on, as soon as you see them; otherwise when you mouse over or " ..
@@ -391,10 +397,13 @@ local function AlwaysKey(id) return "emoteVisionAlways" .. id end
 for _, moment in ipairs(MOMENTS) do
 	if not moment.soon then
 		local key = RowKey(moment.id)
-		DEFAULTS[AlwaysKey(moment.id)] = not (moment.outside or moment.rule)
+		DEFAULTS[AlwaysKey(moment.id)] = not (moment.outside or moment.rule or moment.places)
 		ns.CINE_SHOW_SETTING[key] = AlwaysKey(moment.id)
 		if moment.rule then
 			ns.RULE_DEFAULTS[key] = moment.rule
+		elseif moment.places then
+			-- (Its own place columns to start with: Migrations.lua's emotePlateCardsCitiesV1.)
+			for _, list in ipairs(moment.places) do ns.LIST_DEFAULTS[list][key] = true end
 		elseif moment.outside then
 			ns.LIST_DEFAULTS.worldShow[key] = true
 			ns.LIST_DEFAULTS.cityShow[key] = true
@@ -2071,7 +2080,24 @@ local function Buffed(aura, refresh)
 		if why ~= "yours" then ns.Log("emote", "buff seen: " .. lastBuff) end
 	end
 	if not (unit and name and type(duration) == "number" and duration >= MIN_BUFF) then
-		return Skip(not unit and "no caster unit" or "under a minute or unreadable")
+		if unit then return Skip("under a minute or unreadable") end
+		-- (A stranger's caster is named only through their plate: whether
+		-- friendly players' plates were on, and why, for /cine log.)
+		local p = ns.plates or {}
+		local plates, friends = 0, 0
+		for _, plate in ipairs(C_NamePlate and C_NamePlate.GetNamePlates and C_NamePlate.GetNamePlates() or {}) do
+			plates = plates + 1
+			local each = plate.namePlateUnitToken
+			if type(each) == "string" and not (issecretvalue and issecretvalue(each)) and ns.Flag(UnitIsPlayer(each))
+				and ns.Flag(UnitIsFriend("player", each)) then
+				friends = friends + 1
+			end
+		end
+		return Skip(("no caster unit (CineMode %s, place %s, cards want plates %s, friendly plates held on %s, "
+			.. "nameplateShowFriendlyPlayers %s, plates up %d, friendly players' %d)"):format(tostring(ns.lastCinematic),
+			tostring(ns.PlateSuffix and ns.PlateSuffix() or "open world"), tostring(ns.EmoteWantsPlates()),
+			tostring(p.FRIEND_PLAYER_CVARS and p.FRIEND_PLAYER_CVARS.active), tostring(GetCVar("nameplateShowFriendlyPlayers")),
+			plates, friends))
 	end
 	if Plain(aura.isHelpful) == false then return Skip("not a buff") end
 	if unit == "player" or unit == "pet" or unit == "vehicle" or ns.Flag(UnitIsUnit(unit, "player")) then
@@ -2108,6 +2134,18 @@ function ns.EmoteWantsPlates()
 		end
 	end
 	return false
+end
+
+-- The cards that need plates, for the dev copy's Plate Switches page: each
+-- one's name, Show row key and whether it's ticked.
+function ns.EmotePlateMoments()
+	local out, db = {}, DB()
+	for _, moment in ipairs(MOMENTS) do
+		if moment.plates then
+			out[#out + 1] = { name = moment.name, key = RowKey(moment.id), on = db and db[moment.on] and true or false }
+		end
+	end
+	return out
 end
 
 -- Old clients' auras with no list of the new ones: what's new since last time.

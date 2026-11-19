@@ -885,8 +885,13 @@ local function ApplyPlate(plate, personal)
 	end
 	-- (Its Nameplate Style row's Look: the level box shown or hidden. PlateRowLook.lua.)
 	local look = plate ~= personal and ns.PlateLookNow and ns.PlateLookNow(plate)
+	-- (A plate Heal Vision holds up: every part at full here, its own fade
+	-- deciding them, one layer down. Else CineMode's column hid the health bar
+	-- of the hurt too, tested 2026-11-19. HealVisionFrames.lua.)
+	local healHeld = plate ~= personal and ns.HealVisionPlateUnit
+		and ns.HealVisionPlateUnit(plate.namePlateUnitToken or unitFrame.unit)
 	for _, part in ipairs(ns.PLATE_PARTS) do
-		local level = plate ~= personal and (mine and mine[part] or levels[part]) or 1
+		local level = (healHeld or plate == personal) and 1 or (mine and mine[part] or levels[part]) or 1
 		if part == "Level" and look and look.level ~= nil then level = look.level and 1 or 0 end
 		if part == "Name" then
 			if ours then

@@ -1888,6 +1888,15 @@ local function HandleSlash(msg)
 	elseif cmd == "debug" and arg == "friendplates" then
 		-- (Dev copy: friendly players' plates held only where rows want them, FriendPlatesTest.lua.)
 		if ns.FriendPlatesTest then ns.FriendPlatesTest() else ns.Print("/cine debug friendplates is in the dev copy only.") end
+	elseif cmd == "debug" and arg == "offhold" then
+		-- (Dev copy: CineMode's smart Show Offscreen hold, OffscreenHoldTest.lua.)
+		if ns.OffscreenHoldTest then ns.OffscreenHoldTest() else ns.Print("/cine debug offhold is in the dev copy only.") end
+	elseif cmd == "debug" and arg == "offscreen" then
+		-- (Dev copy: can an edge-pinned plate be told from one in view, OffscreenProbe.lua.)
+		if ns.OffscreenProbe then ns.OffscreenProbe() else ns.Print("/cine debug offscreen is in the dev copy only.") end
+	elseif cmd == "debug" and arg == "hvplates" then
+		-- (Dev copy: Heal Vision's Nameplates tick in CineMode and cities, HealPlatesTest.lua.)
+		if ns.HealPlatesTest then ns.HealPlatesTest() else ns.Print("/cine debug hvplates is in the dev copy only.") end
 	elseif cmd == "debug" and arg == "npcnames" then
 		-- (Dev copy: NPC names with no Service NPCs match flashing up as you turn, NpcNamesTest.lua.)
 		if ns.NpcNamesTest then ns.NpcNamesTest() else ns.Print("/cine debug npcnames is in the dev copy only.") end

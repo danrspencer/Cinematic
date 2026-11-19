@@ -4795,6 +4795,54 @@ STEPS[#STEPS + 1] = function()
 	end
 end
 
+-- (Step for Heal Vision, 2026-11-19.)
+STEPS[#STEPS + 1] = function()
+	-- Heal Vision's rule to start from was "(dungeon or raid) and not dead":
+	-- out in the world it never came on (its Nameplates tick follows the rule
+	-- now too). It's "not city and not dead": everywhere but cities. A rule
+	-- the player wrote stays. Saved profiles too. Once.
+	if not ns.db.healVisionWorldRuleV1 then
+		local function Widen(t)
+			local rules = type(t) == "table" and t.frameRules
+			if type(rules) == "table" and rules.healVision == "(dungeon or raid) and not dead" then
+				rules.healVision = "not city and not dead"
+			end
+		end
+		Widen(ns.db)
+		for _, saved in pairs(ns.db.profiles or {}) do
+			if type(saved) == "table" then
+				Widen(saved)
+				Widen(saved.settings)
+			end
+		end
+		for _, point in pairs(ns.db.profileResetPoints or {}) do Widen(point) end
+		ns.db.healVisionWorldRuleV1 = true
+	end
+	-- Emote Vision's cards that need plates (Achievement, Guild member, Recent
+	-- ally) started with Always ticked: in cities too, where they held every
+	-- friendly plate on (and offscreen plates now) in a crowd. They start with
+	-- World, Dungeons/raids and Battlegrounds instead (Buff: World, its City
+	-- tick gone from its start; one ticked by the player stays). Always was
+	-- their start, so it goes off. Saved profiles too. Once.
+	if not ns.db.emotePlateCardsCitiesV1 then
+		local function NotAlways(t)
+			if type(t) ~= "table" then return end
+			for _, id in ipairs({ "Achievement", "Guild", "Ally" }) do
+				if t["emoteVisionAlways" .. id] == true then t["emoteVisionAlways" .. id] = false end
+			end
+		end
+		NotAlways(ns.db)
+		for _, saved in pairs(ns.db.profiles or {}) do
+			if type(saved) == "table" then
+				NotAlways(saved)
+				NotAlways(saved.settings)
+			end
+		end
+		for _, point in pairs(ns.db.profileResetPoints or {}) do NotAlways(point) end
+		ns.db.emotePlateCardsCitiesV1 = true
+	end
+end
+
 -- Runs them all, each on its own: an error is logged and reported (the
 -- addon's error net, Diagnostics.lua), and the steps after it still run.
 function ns.RunMigrations()
