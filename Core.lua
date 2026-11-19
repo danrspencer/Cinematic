@@ -1271,8 +1271,11 @@ DEFAULTS.duelInstantNames = false -- and the newest one's name shows above it
 DEFAULTS.duelHideOthers = true -- and none of that while you duel yourself
 DEFAULTS.minimapHelper = true -- Minimap Glow Helper: the minimap button glows and lists the visions and camera in use (see MinimapButton)
 DEFAULTS.handleCooldowns = true -- the Cooldown Manager page's master switch (off: left alone)
+-- (The next four: what a bar's row on the Cooldown Manager page has until
+-- it's set, db.cooldownRowSettings, 2026-11-19; their own boxes gone then.)
 DEFAULTS.cooldownKeybinds = false -- its Show keybinds: each spell's key on its icon (Frames.lua)
 DEFAULTS.cooldownFollowNumbers = true -- its icons' countdown numbers follow the game's Show Numbers for Cooldowns
+DEFAULTS.cooldownShowNumbers = true -- with that off: its icons' countdown numbers shown (false: hidden)
 DEFAULTS.cooldownSpellNotBuff = true -- its icons show the spell's cooldown, not a buff the game puts on them (Frames.lua)
 DEFAULTS.cooldownStacks = true -- stack numbers on tracked buffs of known stacking spells, counted from casts (CooldownStacks.lua)
 -- Its Flash style, for every spell with Flash ticked: how long, and whether
@@ -4443,6 +4446,8 @@ function ns.EnsureTables()
 	ns.db.cooldownAlwaysShow = ns.db.cooldownAlwaysShow or {} -- ...spell ID -> true: Always, whatever its group's
 	ns.db.cooldownGroupDefaults = ns.db.cooldownGroupDefaults or {} -- ...group -> { mode, power, early, anyTime }
 	ns.db.cooldownBuffMode = ns.db.cooldownBuffMode or {} -- ...tracked buff's spell ID -> its own mode
+	-- ...a bar (its group) or spell ID -> { numbers, keybinds, notBuff }: its row's own (Frames.lua's ns.CooldownRowSetting)
+	ns.db.cooldownRowSettings = ns.db.cooldownRowSettings or {}
 	ns.db.cooldownFlashReady = ns.db.cooldownFlashReady or {} -- ...spell ID -> true/false: Flash, its own
 	ns.db.cooldownSituations = ns.db.cooldownSituations or {} -- ...its situations, in order (CooldownSituations.lua)
 	ns.db.cooldownNoBuff = nil -- (a test build's per-spell Only cooldown, not buff)

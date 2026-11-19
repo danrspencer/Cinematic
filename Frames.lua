@@ -8700,17 +8700,20 @@ end
 do
 	local baseOf = {} -- spell shown -> the icon's own spell
 	ns.cooldownChargeSpells = {} -- spell ID -> true: the Cooldown Manager says it has charges
+	ns.cooldownAuraSpells = {} -- spell ID -> true: it shows an aura that isn't on you (a DoT), it says
 	-- (Each icon's info read once per spell it shows: a new table each time.)
 	local noted = setmetatable({}, { __mode = "k" }) -- icon -> the spell it was read for
 	function ns.ForgetCooldownNotes()
 		wipe(noted)
 		wipe(ns.cooldownChargeSpells)
+		wipe(ns.cooldownAuraSpells)
 	end
 	function ns.NoteCooldownIcon(icon, id)
 		if noted[icon] == id then return end
 		noted[icon] = id
 		ns.NoteCooldownBase(icon, id)
 		ns.NoteCooldownCharges(icon, id)
+		ns.NoteCooldownAura(icon, id)
 	end
 	function ns.NoteCooldownBase(icon, id)
 		local info = ns.IconCooldownInfo(icon)
@@ -9305,6 +9308,8 @@ do
 		-- (The Cooldown Manager says it has charges: Lava Burst at full charges
 		-- shows no recharge.)
 		if ns.cooldownChargeSpells[id] then return nil, true end
+		-- (A DoT: its icon shows its time on the target, left to its group.)
+		if ns.cooldownAuraSpells[id] then return nil, true end
 		local ok, base = pcall(GetSpellBaseCooldown or error, id)
 		if not ok or Secret(base) then return nil, false end
 		if type(base) ~= "number" or base > 0 then return nil, true end
@@ -9371,6 +9376,26 @@ do
 		wipe(picks)
 	end
 
+	-- Notes an icon's spell puts an aura somewhere other than on you (a DoT
+	-- on the target), if the Cooldown Manager says (its cooldown info's
+	-- hasAura, and not selfAura): its icon shows the DoT's time, so Smart set
+	-- leaves it to its group (Always), not When it procs (2026-11-19: a
+	-- warlock's Corruption, Bane of Agony and Curses hidden). Secret: unknown.
+	function ns.NoteCooldownAura(icon, id)
+		if ns.cooldownAuraSpells[id] then return end
+		local info = ns.IconCooldownInfo(icon)
+		if type(info) ~= "table" then return end
+		local hasAura, selfAura = info.hasAura, info.selfAura
+		if Secret(hasAura, selfAura) or hasAura ~= true or selfAura == true then return end
+		ns.cooldownAuraSpells[id] = true
+		ns.cooldownAuraSpells[ns.BaseSpell(id)] = true
+		for _, field in ipairs({ "spellID", "overrideSpellID" }) do
+			local other = info[field]
+			if type(other) == "number" and not Secret(other) then ns.cooldownAuraSpells[other] = true end
+		end
+		wipe(picks)
+	end
+
 	-- Smart set's reasons for a spell, for /cine debug cooldowns.
 	function ns.ReportSmartPick(id)
 		local function Show(value)
@@ -9386,8 +9411,9 @@ do
 					Show(info.cooldownDuration))
 			end
 		end
-		print(("    smart set: %s (base cooldown %s, charges %s, manager says charges %s)"):format(
-			tostring(Pick(id)), ok and Show(base) or "?", charges, tostring(ns.cooldownChargeSpells[id] or false)))
+		print(("    smart set: %s (base cooldown %s, charges %s, manager says charges %s, DoT %s)"):format(
+			tostring(Pick(id)), ok and Show(base) or "?", charges, tostring(ns.cooldownChargeSpells[id] or false),
+			tostring(ns.cooldownAuraSpells[id] or false)))
 	end
 end
 
@@ -9477,7 +9503,70 @@ do
 	end
 end
 
--- The Cooldown Manager page's Show keybinds (db.cooldownKeybinds): each
+-- The Cooldown Manager page's row settings (db.cooldownRowSettings,
+-- 2026-11-19): each bar's row and each spell's row opens on settings of its
+-- own for its icons: numbers ("game": as the game's Show Numbers for
+-- Cooldowns, "show", "hide"), keybinds (true/false) and notBuff (Use the
+-- spell's cooldown, not its buff). A spell not set follows its bar's row; a
+-- bar not set, the page's settings from before (db.cooldownFollowNumbers,
+-- cooldownShowNumbers, cooldownKeybinds, cooldownSpellNotBuff: kept as the
+-- base, their boxes gone). Spells by ns.BaseSpell, as their other settings.
+do
+	local function Base(what)
+		local db = ns.db
+		if what == "numbers" then
+			if db.cooldownFollowNumbers then return "game" end
+			return db.cooldownShowNumbers == false and "hide" or "show"
+		elseif what == "keybinds" then
+			return db.cooldownKeybinds and true or false
+		elseif what == "notBuff" then
+			return db.cooldownSpellNotBuff and true or false
+		end
+	end
+	ns.CooldownRowBase = Base
+
+	-- A row's own value (key: a group or a spell ID), nil when it follows.
+	function ns.CooldownRowOwn(key, what)
+		local all = ns.db and ns.db.cooldownRowSettings
+		local own = type(all) == "table" and key ~= nil and all[key]
+		if type(own) == "table" then return own[what] end
+		return nil
+	end
+
+	-- What an icon gets: its spell's own, else its bar's, else the base.
+	function ns.CooldownRowSetting(what, spell, group)
+		if not ns.db then return nil end
+		local value
+		if spell then value = ns.CooldownRowOwn(ns.BaseSpell and ns.BaseSpell(spell) or spell, what) end
+		if value == nil and group then value = ns.CooldownRowOwn(group, what) end
+		if value == nil then value = Base(what) end
+		return value
+	end
+
+	-- (value nil: back to following.)
+	function ns.SetCooldownRow(key, what, value)
+		local db = ns.db
+		db.cooldownRowSettings = db.cooldownRowSettings or {}
+		local all = db.cooldownRowSettings
+		all[key] = all[key] or {}
+		all[key][what] = value
+		if next(all[key]) == nil then all[key] = nil end
+	end
+
+	-- Whether the base or any row gives what a value test likes (watchers
+	-- that only need to run then).
+	function ns.CooldownRowAny(what, test)
+		if not ns.db then return false end
+		test = test or function(value) return value == true end
+		if test(Base(what)) then return true end
+		for _, own in pairs(ns.db.cooldownRowSettings or {}) do
+			if type(own) == "table" and own[what] ~= nil and test(own[what]) then return true end
+		end
+		return false
+	end
+end
+
+-- The Cooldown Manager page's Show keybinds (its rows' keybinds, above): each
 -- spell's key in the top right corner of its icon in the Essential and
 -- Utility bars, as on an action button. The key is the first action bar
 -- button's holding the spell (or a macro casting it) that has one bound,
@@ -9552,10 +9641,10 @@ do
 		return text
 	end
 
-	local function ShowIcon(icon)
+	local function ShowIcon(icon, group)
 		if IsForbidden(icon) then return end
 		local id = ItemSpell(icon) or iconSpell[icon]
-		local key = id and keyOf[id]
+		local key = id and ns.CooldownRowSetting("keybinds", id, group) and keyOf[id]
 		if key then
 			local text = Label(icon)
 			if text then
@@ -9568,19 +9657,20 @@ do
 	end
 
 	local function Update()
-		if not (ns.db.cooldownKeybinds and ns.PageOn("handleCooldowns")) then
+		if not (ns.CooldownRowAny("keybinds") and ns.PageOn("handleCooldowns")) then
 			for _, text in pairs(labels) do text:Hide() end
 			return
 		end
 		if dirty then Rebuild() end
 		for _, name in ipairs(VIEWERS) do
 			local viewer = _G[name]
+			local group = ns.COOLDOWN_BAR_GROUPS[name]
 			local pool = viewer and viewer.itemFramePool
 			if type(pool) == "table" and type(pool.EnumerateActive) == "function" then
-				for icon in pool:EnumerateActive() do ShowIcon(icon) end
+				for icon in pool:EnumerateActive() do ShowIcon(icon, group) end
 			elseif viewer then
 				EachCooldownPart(viewer, 3, function(part, kind)
-					if kind == "item" then ShowIcon(part) end
+					if kind == "item" then ShowIcon(part, group) end
 				end, true)
 			end
 		end
@@ -9608,21 +9698,23 @@ do
 		if not ns.db then return end
 		dirty = true
 		Update()
-		watcher:SetShown(ns.db.cooldownKeybinds and true or false)
+		-- (Running only while some row shows them; Update hid them otherwise.)
+		watcher:SetShown(ns.CooldownRowAny("keybinds"))
 	end
 end
 
--- The Cooldown Manager page's Follow Show Numbers for Cooldowns
--- (db.cooldownFollowNumbers): the countdown on each of its icons shows only
--- with the game's option (Action Bars: CVar countdownForCooldowns) on; the
--- Cooldown Manager draws it either way. Its icons' Cooldown frames are put
--- that way twice a second and kept there (a hook on their
--- SetHideCountdownNumbers: the game sets it again as it refreshes them);
--- off, each gets back what the game last set.
+-- The countdown numbers on the Cooldown Manager's icons, as each one's row
+-- says (its numbers, ns.CooldownRowSetting above): "game", only with the
+-- game's option (Action Bars: CVar countdownForCooldowns) on, as the
+-- Cooldown Manager draws them either way; "show" or "hide", whatever that
+-- says. Its icons' Cooldown frames are put that way twice a second and kept
+-- there (a hook on their SetHideCountdownNumbers: the game sets it again as
+-- it refreshes them); the page off, each gets back what the game last set.
 do
 	local gameHides = setmetatable({}, { __mode = "k" }) -- cooldown -> what the game last set (true: hidden)
-	local applying = false
-	local want -- true: hide them; nil: left to the game
+	local wants = setmetatable({}, { __mode = "k" }) -- cooldown -> what we keep it at (true: hidden)
+	local applying, active = false, false
+	local gameShows = false -- (the game's option, read once each pass)
 
 	local function Hook(cooldown)
 		if gameHides[cooldown] ~= nil then return end
@@ -9630,6 +9722,7 @@ do
 		hooksecurefunc(cooldown, "SetHideCountdownNumbers", function(self, hide)
 			if applying then return end
 			gameHides[self] = hide and true or false
+			local want = wants[self]
 			if want ~= nil and (hide and true or false) ~= want then
 				applying = true
 				pcall(self.SetHideCountdownNumbers, self, want)
@@ -9638,10 +9731,15 @@ do
 		end)
 	end
 
-	local function Apply(icon)
+	local function Apply(icon, id, bar)
 		local cooldown = not IsForbidden(icon) and icon.Cooldown
 		if type(cooldown) ~= "table" or type(cooldown.SetHideCountdownNumbers) ~= "function" then return end
 		Hook(cooldown)
+		local group = ns.COOLDOWN_BAR_GROUPS[bar] or ns.COOLDOWN_BUFF_GROUPS[bar]
+		local mode = ns.CooldownRowSetting("numbers", id, group)
+		local want
+		if mode == "hide" then want = true elseif mode == "show" then want = false else want = not gameShows end
+		wants[cooldown] = want
 		applying = true
 		pcall(cooldown.SetHideCountdownNumbers, cooldown, want)
 		applying = false
@@ -9650,6 +9748,7 @@ do
 	local function Release()
 		applying = true
 		for cooldown, hide in pairs(gameHides) do
+			wants[cooldown] = nil
 			pcall(cooldown.SetHideCountdownNumbers, cooldown, hide)
 		end
 		applying = false
@@ -9657,30 +9756,26 @@ do
 
 	local function Update()
 		if not ns.db then return end
-		local on = ns.db.cooldownFollowNumbers and ns.PageOn("handleCooldowns")
-		local hide = nil
-		if on then
-			local ok, shown = pcall(GetCVarBool, "countdownForCooldowns")
-			hide = not (ok and shown)
-		end
-		if hide == nil then
-			if want ~= nil then
-				want = nil
+		if not ns.PageOn("handleCooldowns") then
+			if active then
+				active = false
 				Release()
 			end
 			return
 		end
-		want = hide
+		active = true
+		local ok, shown = pcall(GetCVarBool, "countdownForCooldowns")
+		gameShows = ok and shown and true or false
 		EachCooldownIcon(Apply, true)
 	end
 
 	local watcher = CreateFrame("Frame")
-	-- (Runs only while Follow Show Numbers is on, or the game's own still
-	-- need putting back, twice a second on a game timer: nothing otherwise.)
+	-- (Runs while the page is on, or the game's own still need putting back,
+	-- twice a second on a game timer: nothing otherwise.)
 	ns.FeatureLoop(watcher, function()
 		Update()
 	end, function()
-		return want ~= nil or (ns.db and ns.db.cooldownFollowNumbers and ns.PageOn("handleCooldowns")) and true or false
+		return active or (ns.db and ns.PageOn("handleCooldowns")) and true or false
 	end, 0.5)
 	watcher:RegisterEvent("CVAR_UPDATE")
 	-- (On the next frame; only for its own setting: a camera script's speed
@@ -10382,8 +10477,11 @@ do
 		return fromAura == true
 	end
 
-	function ns.CooldownNoBuffOn()
-		return ns.db.cooldownSpellNotBuff and true or false
+	-- (Each spell's row, else its bar's: ns.CooldownRowSetting. The bar an
+	-- icon is in kept as it's looked at, for its hooks.)
+	local groupOfIcon = setmetatable({}, { __mode = "k" }) -- icon -> its bar's group
+	function ns.CooldownNoBuffOn(id, group)
+		return ns.CooldownRowSetting("notBuff", id, group) and true or false
 	end
 
 	local function Apply(icon, id)
@@ -10414,7 +10512,7 @@ do
 	end
 
 	local function Handled()
-		return ns.db and ns.CooldownNoBuffOn() and GroupHandled("cooldowns") and ns.PageOn("handleCooldowns")
+		return ns.db and GroupHandled("cooldowns") and ns.PageOn("handleCooldowns")
 	end
 
 	-- (Its tooltip too: the spell's, not the buff's. Put back as the game
@@ -10425,7 +10523,7 @@ do
 		local tip = _G.GameTooltip
 		if not tip or tip:GetOwner() ~= icon then return end
 		local id = ItemSpell(icon) or iconSpell[icon]
-		if not id then return end
+		if not id or not ns.CooldownNoBuffOn(id, groupOfIcon[icon]) then return end
 		applying = true
 		pcall(tip.SetSpellByID, tip, id)
 		applying = false
@@ -10459,7 +10557,7 @@ do
 			end
 			-- (A pooled icon can come back for another spell: asked again.)
 			local id = ItemSpell(icon) or iconSpell[icon]
-			if id and ns.CooldownNoBuffOn(id) then Apply(icon, id) end
+			if id and ns.CooldownNoBuffOn(id, groupOfIcon[icon]) then Apply(icon, id) end
 		end
 		local art, swipe = icon.Icon, icon.Cooldown
 		if type(art) == "table" and type(art.SetTexture) == "function" then
@@ -10472,8 +10570,9 @@ do
 		end
 	end
 
-	function ns.CooldownNoBuff(icon, id)
-		if not ns.CooldownNoBuffOn(id) then return end
+	function ns.CooldownNoBuff(icon, id, group)
+		groupOfIcon[icon] = group
+		if not ns.CooldownNoBuffOn(id, group) then return end
 		Hook(icon)
 		Apply(icon, id)
 	end
@@ -10494,7 +10593,7 @@ local function ReadyTarget(icon, id, bar)
 		end
 		return
 	end
-	ns.CooldownNoBuff(icon, id)
+	ns.CooldownNoBuff(icon, id, ns.COOLDOWN_BAR_GROUPS[bar])
 	local mode, _, power, earlyOn, seconds, anyTime = ns.CooldownSpellMode(id, ns.COOLDOWN_BAR_GROUPS[bar])
 	if mode == "ready" then
 		-- (Out of fights faded, unless its Out of fights is ticked: then as in one.)
@@ -10544,7 +10643,7 @@ function UpdateReadyOnly(elapsed, now)
 		ns.UpdateCooldownSituation()
 		local db = ns.db
 		local any = next(db.cooldownReadyOnly) or next(db.cooldownRechargeOnly) or next(db.cooldownProcOnly)
-			or next(db.cooldownBuffMode) or db.cooldownSpellNotBuff or ns.cooldownSitNow
+			or next(db.cooldownBuffMode) or ns.CooldownRowAny("notBuff") or ns.cooldownSitNow
 		for _, group in pairs(ns.COOLDOWN_BAR_GROUPS) do
 			any = any or ns.CooldownGroupSettings(group) ~= "always"
 		end

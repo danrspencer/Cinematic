@@ -320,14 +320,7 @@ function ns.BuildCooldownSituations(parent, opts)
 	local heading = block:CreateFontString(nil, "OVERLAY", "GameFontNormal")
 	heading:SetPoint("TOPLEFT", block, "TOPLEFT", 0, 0)
 	heading:SetText(L["Situations"])
-	local intro = block:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-	intro:SetPoint("TOPLEFT", heading, "BOTTOMLEFT", 0, -4)
-	intro:SetWidth(WIDTH)
-	intro:SetJustifyH("LEFT")
-	intro:SetText(L["Different spell settings for different places: in a dungeon out of combat, say. A row is used " ..
-		"while you're in one of its places, in its combat; Default when none fits. Each place and combat belongs " ..
-		"to one row at most, so a spot a row above has is greyed in the rows below. Click a row to show its settings " ..
-		"in the tabs below: it changes just what you set there, and the rest follows Default."])
+	-- (Its paragraph under the heading gone, 2026-11-19.)
 
 	-- The Show in rows' look (GridRows.lua): the page's helpers, with the
 	-- row's changes going through Changed here (the page refreshed there).
@@ -612,7 +605,7 @@ function ns.BuildCooldownSituations(parent, opts)
 		local picked = block.View()
 		local using = ns.CooldownSituationNow()
 		local enabled = not opts.Enabled or opts.Enabled()
-		local y = -(heading:GetStringHeight() + 4 + intro:GetStringHeight() + 8)
+		local y = -(heading:GetStringHeight() + 8)
 		columnTop:ClearAllPoints()
 		columnTop:SetPoint("TOPLEFT", block, "TOPLEFT", 0, y)
 		local headingHeight = kit.headingHeight or 24

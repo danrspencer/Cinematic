@@ -4047,7 +4047,8 @@ do
 	ns.PAGE_HUB = { ["Nameplate Marks"] = "Style", ["Nameplate Names"] = "UI Manager",
 		["Unit Frame Links"] = "Addons", ["Chat Links"] = "Addons", ["Buffs Links"] = "Addons",
 		["Minimap Links"] = "Addons", ["Quest Tracker Links"] = "Addons", ["Cooldown Links"] = "Addons",
-		["Swing Links"] = "Addons", ["Minimap Keep Open"] = "UI Manager", ["PRD Keep Up"] = "UI Manager" }
+		["Swing Links"] = "Addons", ["Minimap Keep Open"] = "UI Manager", ["PRD Keep Up"] = "UI Manager",
+		["Cooldown Settings"] = "UI Manager" }
 	function ns.PageHub(name)
 		if type(name) ~= "string" then return nil end
 		if ns.PAGE_HUB[name] then return ns.PAGE_HUB[name] end
@@ -15586,7 +15587,7 @@ local function CreateCooldownPanel()
 	local title = Label(content, "GameFontNormalLarge", L["Cooldown Manager"])
 	-- (The Cooldown Manager icon's Settings tab, its Show in first, 2026-11-17:
 	-- its tabs over the title. The Timers icon's tab before.)
-	local timerTabs = ns.PageTabs(content, ns.ShowInTabs("cdm"), ns.ShowInIndex("cdm", "Cooldown Manager"))
+	local timerTabs, ShowOuter = ns.PageTabs(content, ns.ShowInTabs("cdm"), ns.ShowInIndex("cdm", "Cooldown Manager"))
 	title:SetPoint("TOPLEFT", timerTabs, "BOTTOMLEFT", 8, -14)
 
 	local subtitle = PageIntro(content, title,
@@ -15598,61 +15599,23 @@ local function CreateCooldownPanel()
 		L["Turns this page's Cooldown Manager settings on or off."], subtitle)
 	local function Handled() return ns.PageSetting("handleCooldowns") end
 
-	-- The page's tabs (ns.PageTabsBelow): the spell icons and their
-	-- situations (CDM) and the Cooldown Manager's other settings. (Its Addon
-	-- Frame Links: the Addons hub's Links page since 2026-11-17.)
-	local tabHosts, _, TabsShown = ns.PageTabsBelow(content, handleCheck, {
-		{ L["CDM"], L["Each spell's icon: when it shows, and in which situations."] },
-		{ L["Settings"], L["Staying up while a cooldown recharges, keybinds, numbers and the Flash style."] },
-	}, "Cooldown Manager/page")
+	-- The page's two parts (ns.PageTabsBelow, its tabs not drawn: the icon's
+	-- pick them, on the line over the title since 2026-11-19): the spell icons
+	-- and their situations (CDM) and the Cooldown Manager's other settings.
+	-- (Its Addon Frame Links: the Addons hub's Links page since 2026-11-17.)
+	local tabHosts, PickPart, TabsShown = ns.PageTabsBelow(content, handleCheck, {
+		{ L["CDM"], L["Each bar's and spell's icons: when they show, numbers, keybinds and more."] },
+		{ L["Settings"], L["Smart set, and how icons flash when a cooldown ends."] },
+	}, "Cooldown Manager/page", nil, nil, nil, nil, true)
+	ns.ShowInParts(canvas, content, title, "cdm", PickPart, ShowOuter, { label = "Cooldown Manager",
+		icon = "Interface\\Icons\\Spell_Nature_TimeStop", titles = { L["Cooldown Manager"], L["Cooldown Settings"] },
+		switchLabel = "Cooldown Manager" })
 	ns.LinkPointer(content, { "cooldowns" })
 	local icons, settings = tabHosts[1], tabHosts[2]
 
-	-- Stay up while recharging, each bar's own (Essential's keys also count
-	-- Enhanced Cooldown Manager's bars).
-	local afterCombat = settings
-	for i, bar in ipairs({
-		{ prefix = "cooldown", label = L["Essential: stay up while a cooldown is recharging"],
-			tip = L["Keeps the Cooldown Manager up until every Essential cooldown is ready."] },
-		{ prefix = "cooldownUtility", label = L["Utility: stay up while a cooldown is recharging"],
-			tip = L["Keeps the Cooldown Manager up until every Utility cooldown is ready."] },
-	}) do
-		local whileKey = bar.prefix .. "WhileRecharging"
-		local recharging = Check(settings, whileKey, bar.label, bar.tip)
-		recharging:SetPoint("TOPLEFT", afterCombat, i == 1 and "TOPLEFT" or "BOTTOMLEFT", i == 1 and 0 or -16,
-			i == 1 and 0 or -2)
-		recharging:HookScript("OnClick", Refresh) -- grey out / enable the option below
-		GreyUnless(recharging, function(db) return db.handleCooldowns end)
-
-		afterCombat = Check(settings, bar.prefix .. "AfterCombat", L["Only after combat"],
-			L["Only keeps it up during the Calm Timer after a fight."])
-		afterCombat:SetPoint("TOPLEFT", recharging, "BOTTOMLEFT", 16, -2)
-		GreyUnless(afterCombat, function(db) return db.handleCooldowns and db[whileKey] end)
-	end
-
-	-- Each spell's key on its icon (Frames.lua: ns.ApplyCooldownKeybinds).
-	local keybinds = Check(settings, "cooldownKeybinds", L["Show keybinds"],
-		L["Shows each spell's keybind on its icon."])
-	keybinds:SetPoint("TOPLEFT", afterCombat, "BOTTOMLEFT", -16, -8)
-	keybinds:HookScript("OnClick", function() ns.ApplyCooldownKeybinds() end)
-	GreyUnless(keybinds, function(db) return db.handleCooldowns end)
-	-- Its icons' countdown numbers as the game's option says (Frames.lua: ns.ApplyCooldownNumbers).
-	local numbers = Check(settings, "cooldownFollowNumbers", L["Numbers follow the game's Show Numbers for Cooldowns"],
-		L["Shows cooldown numbers only when the game's Show Numbers for Cooldowns is on."])
-	numbers:SetPoint("TOPLEFT", keybinds, "BOTTOMLEFT", 0, -2)
-	numbers:HookScript("OnClick", function() ns.ApplyCooldownNumbers() end)
-	GreyUnless(numbers, function(db) return db.handleCooldowns end)
-	-- Icons the game turns into a buff show the spell instead (Frames.lua: ns.CooldownNoBuff).
-	local notBuff = Check(settings, "cooldownSpellNotBuff", L["Use the spell's cooldown, not its buff"],
-		L["Icons show the spell's own cooldown instead of its buff."])
-	notBuff:SetPoint("TOPLEFT", numbers, "BOTTOMLEFT", 0, -2)
-	GreyUnless(notBuff, function(db) return db.handleCooldowns end)
-	-- Stack numbers on tracked buffs of known stacking spells (CooldownStacks.lua).
-	local stacks = Check(settings, "cooldownStacks", L["Show stacks and time left on tracked buffs"],
-		L["Shows stacks and time left on tracked buff icons."])
-	stacks:SetPoint("TOPLEFT", notBuff, "BOTTOMLEFT", 0, -2)
-	stacks:HookScript("OnClick", function() ns.ApplyCooldownStacks() end)
-	GreyUnless(stacks, function(db) return db.handleCooldowns end)
+	-- (Its other settings: the Flash style, below. Stay up while recharging,
+	-- keybinds, numbers, Use the spell's cooldown and stacks went into the
+	-- bars' and spells' rows on the CDM tab, 2026-11-19: their + buttons.)
 
 	-- Each spell's icon: always shown (the game's own), only when ready in
 	-- fights, or only while recharging. A row per spell in the Cooldown
@@ -15660,8 +15623,122 @@ local function CreateCooldownPanel()
 	-- set that aren't in it.
 	local readyHeader = Label(icons, "GameFontNormal", L["Spell icons"])
 	readyHeader:SetPoint("TOPLEFT", icons, "TOPLEFT", 2, 0)
-	local readyNote = PageIntro(icons, readyHeader,
-		L["Pick when each spell's icon shows; empty boxes mean %d%% of its cooldown."]:format(ns.READY_EARLY * 100))
+	-- (Its note under it gone, and Smart set and Reset onto the Settings tab, 2026-11-19.)
+	-- Beside it, the game's own Cooldown Manager settings (which spells are in
+	-- which bar), opened from here (2026-11-19). Hidden on a client without it.
+	local gameCDM = ns.PanelButton(icons)
+	gameCDM:SetText(L["Open CDM"])
+	-- (As wide as its name and icon, at the right edge of the spells' panel,
+	-- level with the heading. Made to stand out, 2026-11-19: the Cooldown
+	-- Manager's own icon before its name, a gold edge all round, brighter
+	-- under the pointer; plain, it read as a label.)
+	local gameText = gameCDM.GetFontString and gameCDM:GetFontString()
+	local gameWidth = gameText and gameText:GetStringWidth() or 0
+	gameCDM:SetSize(math.max(gameWidth + 52, 100), 26)
+	gameCDM:SetPoint("RIGHT", icons, "TOPLEFT", 618, -6)
+	do
+		local mark = gameCDM:CreateTexture(nil, "OVERLAY")
+		mark:SetSize(18, 18)
+		mark:SetPoint("LEFT", gameCDM, "LEFT", 6, 0)
+		mark:SetTexture("Interface\\Icons\\Spell_Nature_TimeStop")
+		mark:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+		if gameText then
+			gameText:ClearAllPoints()
+			gameText:SetPoint("LEFT", mark, "RIGHT", 6, 0)
+		end
+		local edges = {}
+		for _, side in ipairs({ { "TOPLEFT", "TOPRIGHT", nil, 1 }, { "BOTTOMLEFT", "BOTTOMRIGHT", nil, 1 },
+			{ "TOPLEFT", "BOTTOMLEFT", 1, nil }, { "TOPRIGHT", "BOTTOMRIGHT", 1, nil } }) do
+			local edge = gameCDM:CreateTexture(nil, "OVERLAY")
+			edge:SetPoint(side[1])
+			edge:SetPoint(side[2])
+			if side[3] then edge:SetWidth(side[3]) else edge:SetHeight(side[4]) end
+			edge:SetColorTexture(1, 0.82, 0, 0.7)
+			edges[#edges + 1] = edge
+		end
+		local function Edge(alpha)
+			for _, edge in ipairs(edges) do edge:SetColorTexture(1, 0.82, 0, alpha) end
+		end
+		gameCDM:HookScript("OnEnter", function() Edge(1) end)
+		gameCDM:HookScript("OnLeave", function() Edge(0.7) end)
+	end
+	gameCDM.searchSkip = true
+	Tooltip(gameCDM, L["Opens the game's own Cooldown Manager settings."])
+	local function GameCDMFrame()
+		if not _G.CooldownViewerSettings and C_AddOns and C_AddOns.LoadAddOn then
+			pcall(C_AddOns.LoadAddOn, "Blizzard_CooldownViewer")
+		end
+		local frame = _G.CooldownViewerSettings
+		return type(frame) == "table" and type(frame.Show) == "function" and frame or nil
+	end
+	-- (Opened docked on the right of the options window, its top level with
+	-- the window's, almost a panel of it: clicked again, or the page closed,
+	-- it closes. Our window: the frame under UIParent that the page is in.)
+	-- Docked only while we opened it, and only until it's dragged: its own
+	-- points kept as we dock it and put back as it closes, so opened from
+	-- anywhere else it's where the game has it. Dragged, it stays where it's
+	-- put (it's the player's spot then, nothing put back).
+	local gameCDMOpened = false
+	local dock = { saved = nil, hooked = false } -- saved: its points before docking
+	local function Undock(frame)
+		local saved = dock.saved
+		dock.saved = nil
+		if not saved then return end
+		pcall(frame.ClearAllPoints, frame)
+		for _, point in ipairs(saved) do pcall(frame.SetPoint, frame, unpack(point)) end
+		-- (It had none: somewhere on screen all the same, not left on nothing.)
+		if #saved == 0 then pcall(frame.SetPoint, frame, "CENTER", UIParent, "CENTER", 0, 0) end
+	end
+	local function HookDock(frame)
+		if dock.hooked then return end
+		dock.hooked = true
+		frame:HookScript("OnHide", function(self)
+			gameCDMOpened = false
+			Undock(self)
+		end)
+		-- (Dragged: its own spot from then on.)
+		if type(frame.StartMoving) == "function" then
+			hooksecurefunc(frame, "StartMoving", function() dock.saved = nil end)
+		end
+	end
+	local function OptionsWindow()
+		local frame = canvas
+		while frame and frame.GetParent and frame:GetParent() and frame:GetParent() ~= UIParent do
+			frame = frame:GetParent()
+		end
+		return frame
+	end
+	gameCDM:SetScript("OnClick", function()
+		local frame = GameCDMFrame()
+		if not frame then return end
+		if frame:IsShown() then
+			pcall(frame.Hide, frame)
+			gameCDMOpened = false
+			return
+		end
+		HookDock(frame)
+		pcall(frame.Show, frame)
+		local window = OptionsWindow()
+		if window and window ~= frame then
+			local saved = {}
+			for i = 1, frame:GetNumPoints() do
+				local ok, point, relativeTo, relativePoint, x, y = pcall(frame.GetPoint, frame, i)
+				if ok and point then saved[#saved + 1] = { point, relativeTo, relativePoint, x, y } end
+			end
+			dock.saved = saved
+			pcall(frame.ClearAllPoints, frame)
+			pcall(frame.SetPoint, frame, "TOPLEFT", window, "TOPRIGHT", 6, -30)
+		end
+		gameCDMOpened = true
+	end)
+	canvas:HookScript("OnHide", function()
+		local frame = gameCDMOpened and _G.CooldownViewerSettings
+		gameCDMOpened = false
+		if frame and frame:IsShown() then pcall(frame.Hide, frame) end
+	end)
+	gameCDM:SetScript("OnShow", function(self)
+		if not GameCDMFrame() then self:Hide() end
+	end)
 	RecordKey(icons, "cooldownReadyOnly") -- (for the page's Reset)
 	RecordKey(icons, "cooldownReadyEarly")
 	RecordKey(icons, "cooldownEarlyOn")
@@ -15675,6 +15752,15 @@ local function CreateCooldownPanel()
 	RecordKey(icons, "cooldownSmartDefaults")
 	RecordKey(icons, "cooldownFlashReady")
 	RecordKey(icons, "cooldownSituations")
+	RecordKey(icons, "cooldownRowSettings") -- (the rows' own settings, opened by their + buttons)
+	for _, key in ipairs({ "cooldownKeybinds", "cooldownFollowNumbers", "cooldownShowNumbers", "cooldownSpellNotBuff" }) do
+		RecordKey(icons, key) -- (what a bar's row has until set)
+	end
+	-- (And what the bars' rows set: Stay up while recharging, Stacks and time left.)
+	for _, key in ipairs({ "cooldownWhileRecharging", "cooldownAfterCombat", "cooldownUtilityWhileRecharging",
+		"cooldownUtilityAfterCombat", "cooldownStacks" }) do
+		RecordKey(icons, key)
+	end
 	-- Columns: the spell, when it shows, (When ready only) its Resources, how
 	-- early it's back and Out of fights, and Flash.
 	-- (Narrower than before Out of fights came: all of it fits the page's width.)
@@ -15946,7 +16032,7 @@ local function CreateCooldownPanel()
 	local function NewRow(access, font)
 		local row = { access = access, font = font }
 		row.name = Label(icons, font, "")
-		row.name:SetWidth(MODE_X - 10)
+		row.name:SetWidth(MODE_X - 26) -- (its + button before it: below)
 		row.name:SetJustifyH("LEFT")
 		row.name:SetWordWrap(false)
 
@@ -16109,7 +16195,7 @@ local function CreateCooldownPanel()
 	local function PlaceRow(row, key, text, y, x)
 		row.key, row.shown = key, true
 		row.name:ClearAllPoints()
-		row.name:SetPoint("TOPLEFT", spellHeading, "BOTTOMLEFT", x or 0, y - 5)
+		row.name:SetPoint("TOPLEFT", spellHeading, "BOTTOMLEFT", (x or 0) + 18, y - 5)
 		row.mode:ClearAllPoints()
 		row.mode:SetPoint("TOPLEFT", spellHeading, "BOTTOMLEFT", MODE_X, y)
 		row.name:SetText(text)
@@ -16127,32 +16213,288 @@ local function CreateCooldownPanel()
 		row.anyTime:Hide()
 		if row.flash then row.flash:Hide() end
 		if row.line then row.line:Hide() end
-		if row.center then row.center:Hide() end
+		if row.toggle then
+			row.toggle:Hide()
+			row.drawer:Hide()
+		end
 	end
 
 	-- A group's heading row: its name in gold, its defaults beside it, and a
 	-- rule under it across the columns; for a bar, its Close the gaps under
 	-- that (db.cooldownGroupDefaults[group].center; not set: ns.COOLDOWN_GROUP_CENTER).
 	local ListSpells
+
+	-- Each row opens (its + button, 2026-11-19) on settings of its own for its
+	-- icons (Frames.lua's ns.CooldownRowSetting): a bar's row for the whole
+	-- bar, a spell's for that spell, Same as bar until set. Not while a
+	-- situation is picked (they're the same in every one), nor for spells not
+	-- in the Cooldown Manager now. (One table: this function's locals are many.)
+	-- (open: the Essential and Buffs bars' rows open to start with, 2026-11-19.)
+	local drawer = { open = { essential = true, buffs = true }, LINE = 42, COL = 290 }
+	local function GameNumbersText()
+		local ok, on = pcall(GetCVarBool, "countdownForCooldowns")
+		return (ok and on) and L["Game's option (on)"] or L["Game's option (off)"]
+	end
+	-- What each part sets: its label, tip, the values it takes and their names.
+	drawer.WHAT = {
+		numbers = { label = L["Numbers"], tip = L["Countdown numbers on the icons."],
+			values = { "game", "show", "hide" },
+			Text = function(value)
+				if value == "game" then return GameNumbersText() end
+				return value == "show" and L["Show"] or L["Hide"]
+			end },
+		keybinds = { label = L["Keybinds"], tip = L["Each spell's keybind on its icon."], values = { true, false },
+			Text = function(value) return value and L["Show"] or L["Hide"] end },
+		notBuff = { label = L["Use the spell's cooldown, not its buff"],
+			tip = L["Shows the spell's own cooldown instead of its buff or DoT."], values = { true, false },
+			Text = function(value) return value and L["On"] or L["Off"] end },
+	}
+	drawer.PARTS = { spell = { "numbers", "keybinds", "notBuff" }, buff = { "numbers" },
+		group = { "numbers", "keybinds", "notBuff" }, buffgroup = { "numbers" } }
+	-- (Stay up while recharging: each spell bar's two keys as one choice.)
+	drawer.RECHARGE = { essential = "cooldown", utility = "cooldownUtility" }
+
+	drawer.toggles = {}
+	function drawer.Changed()
+		ns.ApplyCooldownNumbers()
+		ns.ApplyCooldownKeybinds()
+		Refresh()
+		-- (Each row's dot: whether it now has settings of its own.)
+		for _, toggle in ipairs(drawer.toggles) do
+			if toggle:IsShown() then toggle.Show_() end
+		end
+	end
+
+	-- A dropdown (or, on clients without the modern one, a button stepping
+	-- through the choices): List() its choices, Get() the one picked.
+	function drawer.Pick(parent, List, Get, Set)
+		local ok, dropdown = ns.MenuDropdown(parent)
+		local control
+		if ok and dropdown and dropdown.SetupMenu then
+			dropdown:SetWidth(180)
+			dropdown:SetupMenu(function(_, rootDescription)
+				for _, choice in ipairs(List()) do
+					rootDescription:CreateRadio(choice.text, function() return Get() == choice.value end,
+						function() Set(choice.value) end)
+				end
+			end)
+			control = dropdown
+		else
+			control = ns.PanelButton(parent)
+			control:SetSize(180, 22)
+			control:SetScript("OnClick", function()
+				local list, now = List(), Get()
+				for i, choice in ipairs(list) do
+					if choice.value == now then
+						Set(list[i % #list + 1].value)
+						return
+					end
+				end
+				if list[1] then Set(list[1].value) end
+			end)
+		end
+		control.searchSkip, control.cdmRowPick = true, true -- (cdmRowPick: for offline tests)
+		control.Refresh = function(self)
+			if self.GenerateMenu then
+				self:GenerateMenu()
+			else
+				local now = Get()
+				for _, choice in ipairs(List()) do
+					if choice.value == now then self:SetText(choice.text) end
+				end
+			end
+			if self.SetEnabled then self:SetEnabled(Handled() and true or false) end
+		end
+		controls[#controls + 1] = control
+		return control
+	end
+
+	-- A row's + button and its settings under it. kind: "spell", "buff",
+	-- "group" or "buffgroup"; group: a bar's row's (a spell's is looked up).
+	function drawer.Make(row, kind, group)
+		local frame = CreateFrame("Frame", nil, icons)
+		frame:SetSize(GROUP_WIDTH - 24, 1)
+		-- (A little lighter than the panel, a thin gold edge on its left as
+		-- the folder tabs': part of its row.)
+		local back = frame:CreateTexture(nil, "BACKGROUND")
+		back:SetAllPoints()
+		back:SetColorTexture(1, 1, 1, 0.06)
+		local edge = frame:CreateTexture(nil, "BORDER")
+		edge:SetPoint("TOPLEFT")
+		edge:SetPoint("BOTTOMLEFT")
+		edge:SetWidth(2)
+		edge:SetColorTexture(1, 0.82, 0, 0.6)
+		local count = 0
+		local function Add(label, tip, List, Get, Set)
+			local text = Label(frame, "GameFontNormalSmall", label)
+			text:SetPoint("TOPLEFT", frame, "TOPLEFT", 12 + (count % 2) * drawer.COL,
+				-8 - math.floor(count / 2) * drawer.LINE)
+			local pick = drawer.Pick(frame, List, Get, function(value)
+				Set(value)
+				drawer.Changed()
+			end)
+			pick:SetPoint("TOPLEFT", text, "BOTTOMLEFT", -2, -3)
+			Tooltip(pick, tip)
+			count = count + 1
+		end
+		local function GroupOf()
+			if group then return group end
+			return (kind == "buff" and buffGroupOf or groupOf)[row.key]
+		end
+		for _, what in ipairs(drawer.PARTS[kind]) do
+			local part = drawer.WHAT[what]
+			if group then
+				-- (A bar's: its own, or what it has until set.)
+				local function Get()
+					local own = ns.CooldownRowOwn(group, what)
+					if own == nil then own = ns.CooldownRowBase(what) end
+					return own
+				end
+				Add(part.label, part.tip, function()
+					local list = {}
+					for i, value in ipairs(part.values) do list[i] = { value = value, text = part.Text(value) } end
+					return list
+				end, Get, function(value) ns.SetCooldownRow(group, what, value) end)
+			else
+				Add(part.label, part.tip, function()
+					local list = { { value = "inherit",
+						text = L["Same as bar (%s)"]:format(part.Text(ns.CooldownRowSetting(what, nil, GroupOf()))) } }
+					for _, value in ipairs(part.values) do list[#list + 1] = { value = value, text = part.Text(value) } end
+					return list
+				end, function()
+					if row.key == nil then return "inherit" end
+					local own = ns.CooldownRowOwn(row.key, what)
+					if own == nil then return "inherit" end
+					return own
+				end, function(value)
+					if row.key == nil then return end
+					if value == "inherit" then value = nil end
+					ns.SetCooldownRow(row.key, what, value)
+				end)
+			end
+		end
+		-- Close the gaps (db.cooldownGroupDefaults[group].center; not set:
+		-- ns.COOLDOWN_GROUP_CENTER): the Essential, Utility and Buffs bars'.
+		-- (Default's alone: where the icons sit is the bar's in every situation.)
+		if group and group ~= "bars" then
+			Add(L["Close the gaps (centered)"], group == "buffs" and L["Closes the gaps so the shown buffs sit centered."]
+				or L["Closes the gaps so the shown icons sit centered."], function()
+				return { { value = true, text = L["On"] }, { value = false, text = L["Off"] } }
+			end, function() return ns.CooldownGroupCentered(group) and true or false end, function(value)
+				local all = ns.GetDB().cooldownGroupDefaults
+				all[group] = all[group] or {}
+				all[group].center = value -- (false kept: Utility's is on until set)
+			end)
+		end
+		local prefix = group and drawer.RECHARGE[group]
+		if prefix then
+			local whileKey, afterKey = prefix .. "WhileRecharging", prefix .. "AfterCombat"
+			Add(L["Stay up while a cooldown is recharging"],
+				L["Keeps the Cooldown Manager up until every cooldown in this bar is ready."], function()
+					return { { value = "off", text = L["Off"] }, { value = "on", text = L["On"] },
+						{ value = "after", text = L["Only after combat"] } }
+				end, function()
+					if not KeyGet(whileKey) then return "off" end
+					return KeyGet(afterKey) and "after" or "on"
+				end, function(value)
+					KeyPut(whileKey, value ~= "off")
+					KeyPut(afterKey, value == "after")
+				end)
+		elseif group == "buffs" then
+			Add(L["Stacks and time left"], L["Shows stacks and time left on tracked buff icons."], function()
+				return { { value = true, text = L["Show"] }, { value = false, text = L["Hide"] } }
+			end, function() return KeyGet("cooldownStacks") and true or false end, function(value)
+				KeyPut("cooldownStacks", value)
+				ns.ApplyCooldownStacks()
+			end)
+		end
+		frame:SetHeight(12 + math.ceil(count / 2) * drawer.LINE)
+		frame:Hide()
+		row.drawer = frame
+
+		-- The row's name opens it (no button of its own, 2026-11-19: a column
+		-- of them was too loud): over the name, a faint highlight under the
+		-- pointer, a small gold arrow always before it (bright on hover and open),
+		-- and a gold dot after it while the row has settings of its own.
+		local toggle = CreateFrame("Button", nil, icons)
+		toggle:SetSize(MODE_X - 8, ROW_HEIGHT - 4)
+		toggle.cdmRowToggle = true -- (for offline tests)
+		local hover = toggle:CreateTexture(nil, "HIGHLIGHT")
+		hover:SetAllPoints()
+		hover:SetColorTexture(1, 1, 1, 0.06)
+		local arrow = toggle:CreateTexture(nil, "OVERLAY")
+		arrow:SetSize(12, 12)
+		arrow:SetPoint("LEFT", toggle, "LEFT", 2, 0)
+		arrow:SetTexture("Interface\\ChatFrame\\ChatFrameExpandArrow")
+		arrow:SetVertexColor(1, 0.82, 0, 0.7)
+		arrow:Hide()
+		local dot = toggle:CreateTexture(nil, "OVERLAY")
+		dot:SetSize(5, 5)
+		dot:SetColorTexture(1, 0.82, 0, 1)
+		dot:Hide()
+		toggle.arrow, toggle.dot = arrow, dot
+		function toggle.Show_()
+			local open = row.key ~= nil and drawer.open[row.key]
+			-- (Always there, so it's plain the row opens: muted, bright under
+			-- the pointer and while open. Hover-only, nobody would know, 2026-11-19.)
+			arrow:Show()
+			arrow:SetVertexColor(1, 0.82, 0, (open or toggle:IsMouseOver()) and 1 or 0.55)
+			-- (Down while open: the right arrow turned.)
+			if arrow.SetRotation then arrow:SetRotation(open and -math.pi / 2 or 0) end
+			local own = row.key ~= nil and ns.GetDB().cooldownRowSettings[row.key] ~= nil
+			if own then
+				dot:ClearAllPoints()
+				dot:SetPoint("LEFT", row.name, "LEFT", math.min(row.name:GetStringWidth(), row.name:GetWidth()) + 5, 0)
+			end
+			dot:SetShown(own and true or false)
+		end
+		toggle:SetScript("OnClick", function()
+			if row.key == nil then return end
+			drawer.open[row.key] = not drawer.open[row.key] or nil
+			ListSpells()
+			Refresh()
+			FitContentHeight(content)
+		end)
+		Tooltip(toggle, group and L["Click for this bar's own settings."] or L["Click for this spell's own settings."])
+		toggle:HookScript("OnEnter", toggle.Show_)
+		toggle:HookScript("OnLeave", toggle.Show_)
+		toggle:Hide()
+		row.toggle = toggle
+		drawer.toggles[#drawer.toggles + 1] = toggle
+	end
+
+	-- Its + button by the row's name (top: the row's top), and open, its
+	-- settings at below: the height they take.
+	function drawer.Place(row, top, below, canOpen)
+		local toggle, frame = row.toggle, row.drawer
+		if not toggle then return 0 end
+		canOpen = canOpen and not View()
+		toggle:SetShown(canOpen and true or false)
+		if canOpen then
+			toggle:ClearAllPoints()
+			toggle:SetPoint("TOPLEFT", spellHeading, "BOTTOMLEFT", 0, top)
+			toggle.Show_()
+			if drawer.open[row.key] then
+				frame:ClearAllPoints()
+				frame:SetPoint("TOPLEFT", spellHeading, "BOTTOMLEFT", 12, below)
+				frame:Show()
+				return frame:GetHeight() + 4
+			end
+		end
+		frame:Hide()
+		return 0
+	end
+
 	local function GroupRow(group)
 		if not groupRows[group] then
 			local row = NewRow(BUFF_GROUP[group] and BUFF_GROUP_ACCESS or GROUP, "GameFontNormal")
+			if group ~= "other" and group ~= "otherbuffs" then
+				drawer.Make(row, BUFF_GROUP[group] and "buffgroup" or "group", group)
+			end
 			row.line = icons:CreateTexture(nil, "ARTWORK")
 			row.line:SetColorTexture(1, 0.82, 0, 0.4)
 			row.line:SetSize(GROUP_WIDTH, 1)
-			if group ~= "other" and (not BUFF_GROUP[group] or group == "buffs") then
-				row.center = Check(icons, nil, L["Close the gaps (centered)"], group == "buffs"
-					and L["Closes the gaps so the shown buffs sit centered."]
-					or L["Closes the gaps so the shown icons sit centered."], function(value)
-					-- (Default's alone: where the icons sit is the bar's, in every situation.)
-					local all = ns.GetDB().cooldownGroupDefaults
-					all[group] = all[group] or {}
-					all[group].center = value -- (false kept: Utility's is on until set)
-				end)
-				row.center.Refresh = function(self)
-					self:SetChecked(ns.CooldownGroupCentered(group))
-				end
-			end
+			-- (Its Close the gaps: in its settings, opened by its name, since 2026-11-19.)
 			groupRows[group] = row
 		end
 		return groupRows[group]
@@ -16208,28 +16550,29 @@ local function CreateCooldownPanel()
 		if group then
 			ShowTab(shown)
 			local row = GroupRow(group)
-			PlaceRow(row, group, GROUP_NAMES[group], y - 4)
+			local top = y - 4
+			PlaceRow(row, group, GROUP_NAMES[group], top)
 			row.line:ClearAllPoints()
 			row.line:SetPoint("TOPLEFT", spellHeading, "BOTTOMLEFT", 0, y - 30)
 			row.line:Show()
 			y = y - GROUP_HEIGHT
-			if row.center then
-				row.center:ClearAllPoints()
-				row.center:SetPoint("TOPLEFT", spellHeading, "BOTTOMLEFT", -4, y + 2)
-				row.center:Show()
-				y = y - ROW_HEIGHT
-			end
+			y = y - drawer.Place(row, top, y + 2, true) -- (open: its settings under the rule)
+			-- (Spells not in the Cooldown Manager now have no settings of their own to open.)
+			local canOpen = group ~= "other" and group ~= "otherbuffs"
 			local isBuff = BUFF_GROUP[group]
 			for _, id in ipairs(groupSpells[group]) do
 				local pool = isBuff and buffRows or rows
 				used[pool] = used[pool] + 1
 				local spellRow = pool[used[pool]] or NewRow(isBuff and BUFF or SPELL, "GameFontHighlight")
+				if not spellRow.toggle then drawer.Make(spellRow, isBuff and "buff" or "spell") end
 				pool[used[pool]] = spellRow
 				local okName, name = pcall(GetName, id)
 				local okIcon, icon = pcall(GetIcon, id)
+				local top = y
 				PlaceRow(spellRow, id, ("|T%s:16|t %s"):format(okIcon and icon or 134400,
-					okName and name or L["Spell %d"]:format(id)), y)
+					okName and name or L["Spell %d"]:format(id)), top)
 				y = y - ROW_HEIGHT
+				y = y - drawer.Place(spellRow, top, y + 2, canOpen)
 			end
 		end
 		for pool, count in pairs(used) do
@@ -16276,20 +16619,21 @@ local function CreateCooldownPanel()
 	-- cost (ns.SmartCooldownMode): When ready with Resources for a resource you
 	-- build up (Maelstrom), When it procs for the rest. Off: by their group's
 	-- setting.
-	local smartSet = Check(icons, "cooldownSmartDefaults", L["Smart set"],
+	-- (On the Settings tab, at its top, since 2026-11-19.)
+	local smartSet = Check(settings, "cooldownSmartDefaults", L["Smart set"],
 		L["Sets spells you haven't set yourself based on what they cost."],
 		function(value)
 			KeyPut("cooldownSmartDefaults", value)
 			ListSpells()
 			Refresh()
 		end)
-	smartSet:SetPoint("TOPLEFT", readyNote, "BOTTOMLEFT", -2, -6)
+	smartSet:SetPoint("TOPLEFT", settings, "TOPLEFT", 0, 0)
 	-- Reset: just the spell icons' settings (the page's Reset does the rest too).
 	local SPELL_ICON_KEYS = { cooldownReadyOnly = true, cooldownReadyEarly = true, cooldownEarlyOn = true,
 		cooldownRechargeOnly = true, cooldownNeedsPower = true, cooldownReadyAnyTime = true, cooldownGroupDefaults = true,
 		cooldownProcOnly = true, cooldownAlwaysShow = true, cooldownBuffMode = true, cooldownSmartDefaults = true,
-		cooldownFlashReady = true, cooldownSituations = true }
-	local iconsReset = ns.PanelButton(icons)
+		cooldownFlashReady = true, cooldownSituations = true, cooldownRowSettings = true }
+	local iconsReset = ns.PanelButton(settings)
 	iconsReset:SetSize(60, 20)
 	iconsReset:SetPoint("LEFT", smartSet.Text or smartSet.text or smartSet, "RIGHT", 16, 0)
 	iconsReset:SetText(L["Reset"])
@@ -16306,7 +16650,7 @@ local function CreateCooldownPanel()
 	-- The Flash style, for every spell with Flash ticked (Frames.lua): a
 	-- glow, the icon growing with each beat, a colored border, and how long.
 	local flashLabel = Label(settings, "GameFontHighlight", L["Flash style:"])
-	flashLabel:SetPoint("TOPLEFT", stacks, "BOTTOMLEFT", 2, -18)
+	flashLabel:SetPoint("TOPLEFT", smartSet, "BOTTOMLEFT", 2, -18)
 	local flashGlow = Check(settings, "cooldownFlashGlow", L["Glow"],
 		L["The icon glows bright and dim while it flashes."])
 	flashGlow:SetPoint("LEFT", flashLabel, "RIGHT", 8, 0)
@@ -16367,7 +16711,7 @@ local function CreateCooldownPanel()
 			FitContentHeight(content)
 		end,
 	})
-	sits:SetPoint("TOPLEFT", smartSet, "BOTTOMLEFT", 2, -16)
+	sits:SetPoint("TOPLEFT", readyHeader, "BOTTOMLEFT", 0, -12)
 	controls[#controls + 1] = sits
 	panelTop:SetPoint("TOPLEFT", sits, "BOTTOMLEFT", 0, -12 - height)
 	noSpells:SetPoint("TOPLEFT", sits, "BOTTOMLEFT", 0, -16)

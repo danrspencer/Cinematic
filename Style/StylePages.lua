@@ -571,7 +571,10 @@ local SHOW_IN_TABS = {
 	-- (Out of Timers', 2026-11-17: the HUD page's section, then Options.lua's page.)
 	cdm = {
 		{ "Show", "HUD:cdm", "CineMode hides the Cooldown Manager: pick which bars show, and when." },
-		{ "Settings", "Cooldown Manager", "Each spell's icon, and the Cooldown Manager's other settings." },
+		-- (Its page's two parts on this line since 2026-11-19, tabs under the
+		-- title before: CDM, its spells' icons, and Settings, the rest.)
+		{ "CDM", "Cooldown Manager", "Each bar's and spell's icons: when they show, numbers, keybinds and more." },
+		{ "Settings", "Cooldown Settings", "Smart set, and how icons flash when a cooldown ends." },
 	},
 	swing = {
 		{ "Show", "HUD:swingtimer", "CineMode hides your swing timer: pick when it shows." },
