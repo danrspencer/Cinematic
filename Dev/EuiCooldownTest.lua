@@ -19,11 +19,12 @@
 local addonName, ns = ...
 
 local WAIT = 4 -- seconds to read the box
-local STEPS = {
+local ICON_STEPS = {
 	{ secs = 12, say = "1/3: Stand STILL, OUT OF A FIGHT. Don't cast. Look at EllesmereUI's cooldown bar.", tag = "now" },
 	{ secs = 12, say = "2/3: Still STILL, no casting. (Cinematic's per-spell fades are paused now.)", tag = "paused" },
 	{ secs = 20, say = "3/3: ATTACK a target dummy or an enemy and CAST your spells, the 3rd one too.", tag = "fight" },
 }
+local STEPS = ICON_STEPS -- (the run's steps: these, or the bars run's, below)
 local SPELL_BARS = { EssentialCooldownViewer = "essential", UtilityCooldownViewer = "utility" }
 local EUI_BARS = { "ECME_CDMBar_cooldowns", "ECME_CDMBar_utility" }
 local MAX_LINES = 5000
@@ -276,7 +277,163 @@ local function Finish()
 	C_Timer.After(20, function() if not run then ns.PadTestBoxHide() end end)
 end
 
-function ns.EuiCooldownTest()
+-- /cine debug euicd bars: the whole bars, not single icons (Reddit report
+-- 2026-11-19: "my cooldown manager refused to show on the screen when it was
+-- supposed to", with EllesmereUI). Three timed steps: CineMode off, then on,
+-- out of a fight; then on, in a fight. Each half second when anything
+-- changes: each of EllesmereUI's bars and the game's viewers (shown, alpha,
+-- effective alpha, how many icons), our fade entry for it (group, the alpha
+-- we want and set), and its row's In combat tick. At each step's end, /cine
+-- why's reasons for each bar. Verdicts: a bar hidden where its row says it
+-- shows. Into CinematicDB.euiCdTestLog too.
+local BAR_STEPS = {
+	{ secs = 10, say = "1/3: Stand STILL, OUT OF A FIGHT. CineMode is OFF now.", tag = "off", cine = false },
+	{ secs = 10, say = "2/3: Still OUT OF A FIGHT. CineMode is ON now.", tag = "cine", cine = true },
+	{ secs = 20, say = "3/3: ATTACK a target dummy or an enemy and CAST. CineMode stays ON.", tag = "fight", cine = true },
+}
+-- Each bar and the row that should show it.
+local WHOLE_BARS = {
+	{ "ECME_CDMBar_cooldowns", "addon:euiCooldowns" }, { "ECME_CDMBar_utility", "addon:euiCooldowns" },
+	{ "ECME_CDMBar_buffs", "addon:euiCooldowns" },
+	{ "EssentialCooldownViewer", "cooldowns" }, { "UtilityCooldownViewer", "cooldownsutility" },
+	{ "BuffIconCooldownViewer", "cooldownsbuffs" }, { "BuffBarCooldownViewer", "cooldownsbars" },
+}
+
+local function EntryOf(frame)
+	for _, entry in ipairs(ns.managed) do
+		if entry.frame == frame then return entry end
+	end
+end
+
+local function BarFacts(name, rowKey)
+	local frame = _G[name]
+	if type(frame) ~= "table" then return { name = name, row = rowKey, made = false } end
+	local entry = EntryOf(frame)
+	local icons = 0
+	for _, child in ipairs({ frame:GetChildren() }) do
+		if ns.Flag(Call(child, "IsShown")) then icons = icons + 1 end
+	end
+	return {
+		name = name, row = rowKey, made = true, frame = frame, entry = entry,
+		shown = Call(frame, "IsShown"), visible = Call(frame, "IsVisible"),
+		alpha = Call(frame, "GetAlpha"), effective = Call(frame, "GetEffectiveAlpha"), icons = icons,
+		rowOn = ns.IsCombatShowOn(rowKey),
+	}
+end
+local function BarLine(f)
+	if not f.made then return ("%s (row %s): not made"):format(f.name, f.row) end
+	local e = f.entry
+	return ("%s (row %s, In combat %s): shown %s visible %s alpha %s eff %s, %d icons shown | ours: %s")
+		:format(f.name, f.row, tostring(f.rowOn), Num(f.shown), Num(f.visible), Num(f.alpha), Num(f.effective),
+			f.icons, e and ("group %s want %s set %s"):format(tostring(e.group), Num(e.alpha), Num(e.applied))
+				or "not faded by us")
+end
+
+local function BarsFinish()
+	for _, spec in ipairs(WHOLE_BARS) do
+		local name = spec[1]
+		local off, cine, fight = run.seen.off[name], run.seen.cine[name], run.seen.fight[name]
+		local any = (off and off.icons or 0) + (cine and cine.icons or 0) + (fight and fight.icons or 0)
+		if not (off and off.made) then
+			Verdict(name, nil, "not made: its bar is off or empty")
+		elseif any == 0 then
+			-- (An empty bar is kept at alpha 0: nothing to see either way.)
+			Verdict(name .. ": no icons the whole run", nil, "empty, nothing to tell")
+		else
+			local detail = ("CineMode off %s, on %s, fight %s; row In combat %s"):format(tostring(Seen(off)),
+				tostring(Seen(cine)), tostring(Seen(fight)), tostring(fight and fight.rowOn))
+			if Seen(off) == false then
+				Verdict(name .. ": hidden with CineMode OFF", false, detail)
+			elseif fight and fight.rowOn and Seen(fight) == false then
+				Verdict(name .. ": hidden in the FIGHT though its row's In combat is ticked", false, detail)
+			else
+				Verdict(name .. ": as its row says", Seen(off) ~= nil, detail)
+			end
+		end
+	end
+	run.ticker:Cancel()
+	run = nil
+	ns.PadTestBox("Test done. Type /reload to save it, then say 'check log'.", "", 1, 0.82, 0)
+	C_Timer.After(20, function() if not run then ns.PadTestBoxHide() end end)
+end
+
+local function WhyAll(tag)
+	for _, spec in ipairs(WHOLE_BARS) do
+		local frame = _G[spec[1]]
+		local entry = type(frame) == "table" and EntryOf(frame)
+		if entry then
+			ns.WhyLater(entry, function(ok, status, out)
+				Log(("why %s at %s: %s"):format(spec[1], tag, ok and tostring(status) or ("error " .. tostring(status))))
+				for _, reason in ipairs(ok and out or {}) do
+					Log(("  [%s] %s%s"):format(tostring(reason.state), tostring(reason.text),
+						reason.page and (" (" .. reason.page .. ")") or ""))
+				end
+			end)
+		end
+	end
+end
+
+local function SetCine(want)
+	if (ns.lastCinematic and true or false) ~= want and _G.Cinematic_ToggleCineMode then
+		_G.Cinematic_ToggleCineMode()
+		Log("CineMode turned " .. (want and "ON" or "OFF"))
+	end
+end
+
+local function BarsTest()
+	CinematicDB.euiCdTestLog = {}
+	STEPS = BAR_STEPS
+	run = { step = 1, at = GetTime(), seen = {}, darks = {}, firsts = {}, bars = true }
+	local meta = C_AddOns and C_AddOns.GetAddOnMetadata or GetAddOnMetadata
+	local function Version(addon)
+		local ok, value = pcall(meta, addon, "Version")
+		return ok and tostring(value) or "?"
+	end
+	local _, class = UnitClass("player")
+	Log(("start bars %s: Cinematic %s, game %s, EllesmereUI CDM %s, profile %s, class %s"):format(
+		date("%Y-%m-%d %H:%M"), Version(addonName), tostring((GetBuildInfo())),
+		Version("EllesmereUICooldownManager"), tostring(ns.ActiveProfile and ns.ActiveProfile()), tostring(class)))
+	LogOurSettings()
+	LogEuiSettings()
+	SetCine(false)
+	run.ticker = C_Timer.NewTicker(0.5, function()
+		if not run then return end
+		local step = STEPS[run.step]
+		local into = GetTime() - run.at
+		if into < WAIT then
+			ns.PadTestBox(step.say, ("GET READY: starts in %d"):format(math.ceil(WAIT - into)), 1, 0.82, 0)
+		else
+			ns.PadTestBox(step.say, ("RECORDING: %d sec left"):format(math.ceil(step.secs - into)), 0.2, 1, 0.2)
+		end
+		local facts, lines = {}, {}
+		for _, spec in ipairs(WHOLE_BARS) do
+			local f = BarFacts(spec[1], spec[2])
+			facts[spec[1]] = f
+			lines[#lines + 1] = BarLine(f)
+		end
+		local text = table.concat(lines, "\n")
+		if text ~= run.last then
+			run.last = text
+			Log(("snapshot (combat %s, CineMode %s):"):format(InCombatLockdown() and "yes" or "no",
+				ns.lastCinematic and "on" or "off"))
+			for _, line in ipairs(lines) do Log("  " .. line) end
+		end
+		if into >= step.secs then
+			run.seen[step.tag] = facts
+			WhyAll(step.tag)
+			Shot(step.tag)
+			if run.step >= #STEPS then
+				run.ticker:Cancel()
+				C_Timer.After(0.8, function() if run then BarsFinish() end end)
+				return
+			end
+			run.step, run.at = run.step + 1, GetTime()
+			SetCine(STEPS[run.step].cine)
+		end
+	end)
+end
+
+function ns.EuiCooldownTest(bars)
 	if run then
 		run.ticker:Cancel()
 		run = nil
@@ -291,6 +448,11 @@ function ns.EuiCooldownTest()
 		ns.Print("euicd test: EllesmereUI Cooldown Manager isn't loaded")
 		return
 	end
+	if bars then
+		BarsTest()
+		return
+	end
+	STEPS = ICON_STEPS
 	CinematicDB.euiCdTestLog = {}
 	run = { step = 1, at = GetTime(), seen = {}, darks = {}, firsts = {} }
 	local meta = C_AddOns and C_AddOns.GetAddOnMetadata or GetAddOnMetadata

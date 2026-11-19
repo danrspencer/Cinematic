@@ -223,6 +223,7 @@ local function PrintDebugHelp()
 	print("  /cine debug resettest [logout] - one run checking what a reset puts back (layouts, plate settings), or with logout the plate settings going back at logout, across a reload (dev copy)")
 	print("  /cine debug euiswing - one run recording why EllesmereUI's swing timer stays hidden in CineMode (dev copy; again to stop)")
 	print("  /cine debug euicd - one run recording why an icon goes missing from EllesmereUI's cooldown bar (dev copy; again to stop)")
+	print("  /cine debug euicd bars - one run recording why EllesmereUI's whole cooldown bars stay hidden, CineMode off then on, out of and in a fight (dev copy)")
 	print("  /cine debug layoutexport - save the Edit Mode layout you're on as an export string (in the saved settings: /reload after)")
 	print("  /cine debug ids - every setting's /cine find id, and the controls on the settings pages that have none yet, to copy")
 	print("  /cine debug changed - which settings make the Profiles page say (changed): each with the profile's value and the default")
@@ -544,9 +545,10 @@ local function HandleSlash(msg)
 	elseif cmd == "debug" and arg == "euiswing" then
 		-- (Dev copy: one run recording why EllesmereUI's swing timer stays hidden, EuiSwingTest.lua.)
 		if ns.EuiSwingTest then ns.EuiSwingTest() else ns.Print("/cine debug euiswing is in the dev copy only.") end
-	elseif cmd == "debug" and arg == "euicd" then
-		-- (Dev copy: one run recording why an icon goes missing from EllesmereUI's cooldown bar, EuiCooldownTest.lua.)
-		if ns.EuiCooldownTest then ns.EuiCooldownTest() else ns.Print("/cine debug euicd is in the dev copy only.") end
+	elseif cmd == "debug" and (arg == "euicd" or arg == "euicd bars") then
+		-- (Dev copy: one run recording why an icon goes missing from EllesmereUI's cooldown bar, or with
+		-- "bars" why a whole bar stays hidden in and out of CineMode, EuiCooldownTest.lua.)
+		if ns.EuiCooldownTest then ns.EuiCooldownTest(arg == "euicd bars") else ns.Print("/cine debug euicd is in the dev copy only.") end
 	elseif cmd == "debug" and (arg == "followhud" or arg:find("^followhud%s")) and ns.FollowHudDebug then
 		ns.FollowHudDebug(arg:match("^followhud%s+(%S+)"))
 	elseif cmd == "debug" and arg == "layoutexport" then
