@@ -1991,6 +1991,12 @@ local FOLLOW_GROUPS = {
 	{ key = "shoulderCamFollowBuffBars", frames = { "BuffBarCooldownViewer" } },
 	-- (The proc alerts round the middle (Lava Surge's curves...): not protected.)
 	{ key = "shoulderCamFollowSpellAlerts", frames = { "SpellActivationOverlayFrame" } },
+	-- (The game's loss of control alert, "Feared 1.5 seconds": user, 2026-11-18.)
+	{ key = "shoulderCamFollowLossOfControl", frames = { "LossOfControlFrame" } },
+	-- (The game's floating combat text about you, "-26", "<3 Combo Points>":
+	-- user, 2026-11-18. No frame to move: the game places each message
+	-- itself as it climbs, so it's slid as it's placed, below.)
+	{ key = "shoulderCamFollowCombatText", frames = {} },
 }
 local FOLLOW_EASE = 12     -- how quickly the frames catch up (per second; the game eases over in ~0.3 s)
 local FOLLOW_MAX = 0.3     -- never more than this share of the screen's width
@@ -2232,6 +2238,122 @@ function UpdateFollow()
 	if ns.db and ShoulderOn() and ns.db.shoulderCamFrames or next(followed) then
 		follower:Show()
 	end
+end
+
+-- The game's floating combat text (Blizzard_CombatText, loaded when it's
+-- turned on): each message is a text on its CombatText frame that the game
+-- places again every frame as it climbs, with a secret place in fights (and
+-- a secret text: the amount). Each one's SetPoint is followed, and how it's
+-- then moved is ns.CombatTextFollow.method:
+--   "sum"    put again with the slide added to the game's x, y (not when secret)
+--   "adjust" AdjustPointsOffset by the slide (the game sums it)
+--   "stand"  hung on a stand-in over the game's frame, slid (hid the text: Forever, 2026-11-18)
+--   ("frame" and "table", moving the game's frame or its places, are only tried by /cine debug cttest.)
+-- nil: not moved. "adjust" is the one that works (/cine debug cttest,
+-- Dev/CombatTextTest.lua, Forever 2026-11-18: every place secret even out of
+-- a fight, so "sum" never could; the frame and table ways moved nothing, the
+-- texts hang on WorldFrame and there's no COMBAT_TEXT_LOCATIONS).
+do
+	local hooked, busy = {}, false
+	local follow = { method = "adjust", normal = "adjust", stats = {} }
+	ns.CombatTextFollow = follow
+	function follow.ResetStats()
+		follow.stats = { seen = 0, slid = 0, secret = 0, skipped = 0, err = nil, anchor = nil }
+	end
+	follow.ResetStats()
+	local function Offset()
+		if follow.testShift then return follow.testShift, 0 end
+		local db = ns.db
+		if not (db and db.shoulderCamFrames and db.shoulderCamFollowCombatText) or EditModeOpen() then return 0, 0 end
+		local lift = ((db.shoulderCamFramesHeight or 0) + (db.shoulderCamFollowCombatTextHeight or 0)) * followLift.share
+		return followShift, lift
+	end
+	local function Secret(v) return issecretvalue and issecretvalue(v) end
+	local function AnchorName(to)
+		if to == nil then return "none" end
+		if to == WorldFrame then return "WorldFrame" end
+		if to == UIParent then return "UIParent" end
+		if to == _G.CombatText then return "CombatText" end
+		local ok, name = pcall(function() return to.GetName and to:GetName() end)
+		return ok and name and not Secret(name) and tostring(name) or "other"
+	end
+	-- (One invisible stand-in per frame the game hangs texts on.)
+	local stands = {}
+	local function Stand(over)
+		if type(over) ~= "table" or not over.GetObjectType then return end
+		local stand = stands[over]
+		if not stand then
+			stand = CreateFrame("Frame", nil, UIParent)
+			stand.over = over
+			stands[over] = stand
+		end
+		return stand
+	end
+	local function Slid(text, point, relativeTo, relativePoint, x, y)
+		if busy then return end
+		local stats = follow.stats
+		stats.seen = stats.seen + 1
+		-- (SetPoint(point, x, y): no frame named.)
+		if type(relativeTo) == "number" or Secret(relativeTo) then
+			relativeTo, relativePoint, x, y = nil, nil, relativeTo, relativePoint
+		end
+		stats.anchor = AnchorName(relativeTo)
+		local secret = Secret(x) or Secret(y)
+		if secret then stats.secret = stats.secret + 1 end
+		local method = follow.method
+		if method ~= "sum" and method ~= "adjust" and method ~= "stand" then return end
+		if type(point) ~= "string" then return end
+		local shift, lift = Offset()
+		if math.abs(shift) < 0.5 and math.abs(lift) < 0.5 then return end
+		local scale = UIParent:GetEffectiveScale() / math.max(0.01, text:GetEffectiveScale())
+		local ok, err = true, nil
+		busy = true
+		if method == "sum" then
+			if secret or type(x) ~= "number" or type(y) ~= "number" then
+				stats.skipped = stats.skipped + 1
+				busy = false
+				return
+			end
+			ok, err = pcall(text.SetPoint, text, point, relativeTo or text:GetParent(), relativePoint or point,
+				x + shift * scale, y + lift * scale)
+		elseif method == "adjust" then
+			ok, err = pcall(text.AdjustPointsOffset, text, shift * scale, lift * scale)
+		else
+			local stand = Stand(relativeTo or text:GetParent())
+			if stand then
+				stand:ClearAllPoints()
+				stand:SetPoint("TOPLEFT", stand.over, "TOPLEFT", shift, lift)
+				stand:SetPoint("BOTTOMRIGHT", stand.over, "BOTTOMRIGHT", shift, lift)
+				ok, err = pcall(text.SetPoint, text, point, stand, relativePoint or point, x, y)
+			end
+		end
+		busy = false
+		stats.slid = stats.slid + 1
+		if not ok then stats.err = Secret(err) and "secret" or tostring(err) end
+	end
+	-- (Every text on it, hooked once; looked at again as it loads and as you
+	-- take a hit, for a client that makes more as they're needed.)
+	function follow.HookTexts()
+		local frame = _G.CombatText
+		if type(frame) ~= "table" or not frame.GetRegions then return 0 end
+		local count = 0
+		for _, region in ipairs({ frame:GetRegions() }) do
+			if region.GetObjectType and region:GetObjectType() == "FontString" then
+				count = count + 1
+				if not hooked[region] then
+					hooked[region] = true
+					hooksecurefunc(region, "SetPoint", Slid)
+				end
+			end
+		end
+		return count
+	end
+	function follow.Hooked(region) return hooked[region] or false end
+	local watch = CreateFrame("Frame")
+	watch:RegisterEvent("ADDON_LOADED")
+	watch:RegisterEvent("PLAYER_ENTERING_WORLD")
+	watch:RegisterUnitEvent("UNIT_COMBAT", "player")
+	watch:SetScript("OnEvent", function() ns.Guard(follow.HookTexts) end)
 end
 
 -- For /cine debug shoulder.
@@ -2573,6 +2695,8 @@ function ns.CreateShoulderCamPanel(kit)
 		shoulderCamFollowBuffIcons = L["Tracked buffs: icons"],
 		shoulderCamFollowBuffBars = L["Tracked buffs: bars"],
 		shoulderCamFollowSpellAlerts = L["Spell alerts"],
+		shoulderCamFollowLossOfControl = L["Loss of control"],
+		shoulderCamFollowCombatText = L["Floating combat text"],
 	}
 	local height = fstack:Add(kit.Slider(frames, "shoulderCamFramesHeight", L["Height (all)"], -200, 200, 5, "%+d"),
 		"slider")

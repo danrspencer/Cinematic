@@ -499,6 +499,8 @@ local DEFAULTS = {
 	shoulderCamFollowBuffBars = true,   -- ...and bars
 	shoulderCamFollowSwing = true,      -- ...the swing timers
 	shoulderCamFollowSpellAlerts = true, -- ...the game's proc alerts round the middle (SpellActivationOverlayFrame)
+	shoulderCamFollowLossOfControl = true, -- ...the game's loss of control alert (LossOfControlFrame)
+	shoulderCamFollowCombatText = true, -- ...the game's floating combat text about you (each message as it's placed)
 	shoulderCamFramesStrength = 1, -- ...how far (1 = the worked-out place)
 	shoulderCamFramesHeight = 0, -- ...and lifted this many UI units (all of them), over your shoulder only
 	shoulderCamFollowCastHeight = 0,        -- ...each one's own lift on top (UI units, + up)
@@ -509,6 +511,8 @@ local DEFAULTS = {
 	shoulderCamFollowBuffBarsHeight = 0,
 	shoulderCamFollowSwingHeight = 0,
 	shoulderCamFollowSpellAlertsHeight = 0,
+	shoulderCamFollowLossOfControlHeight = 0,
+	shoulderCamFollowCombatTextHeight = 0,
 	shoulderCamTalkTurn = false, -- (off to start with since 2026-11-17, user) ...the camera turns slowly to whoever you talk to (the game's interact focus, eased in)
 	shoulderCamTalkTurnAlways = false, -- (since 2026-11-16) ...everywhere: its Show in row's Always (off: the row's ticks or rule, "not indoors and not combat" to start with)
 	shoulderCamTalkTime = 3, -- (3 since 2026-11-16, user) ...seconds the turn to your target takes

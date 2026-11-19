@@ -1803,6 +1803,10 @@ local function HandleSlash(msg)
 		-- (Dev copy: one run logging what sets your target plate's name in a fight, PlateFlickerTest.lua.)
 		if ns.PlateFlickerTest then ns.PlateFlickerTest()
 		else ns.Print("/cine debug plateflicker is in the dev copy only.") end
+	elseif cmd == "debug" and arg:find("^cttest") then
+		-- (Dev copy: which way of moving the game's floating combat text works, CombatTextTest.lua.)
+		if ns.CombatTextTest then ns.CombatTextTest(arg:match("^cttest%s*(.*)$"))
+		else ns.Print("/cine debug cttest is in the dev copy only.") end
 	elseif cmd == "debug" and arg:find("^gradtest") then
 		-- (Dev copy: the bar gradients, By health and the pop-up palette in one run, GradientTest.lua.)
 		if ns.GradientTest then ns.GradientTest(arg:match("^gradtest%s*(.*)$"))
