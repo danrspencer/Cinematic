@@ -1925,6 +1925,36 @@ local function BuildSearchIndex(pages)
 			end
 		end
 		walk(page.canvas.content)
+		-- Every id on the page, shown or not (another tab's, a closed block's,
+		-- a row's inside a labeled line, a part's own switch): /cine find
+		-- reaches them all and opens what holds them (ShowMatch). Before, 278
+		-- ids /cine debug ids lists found nothing, 2026-11-19.
+		local function keyWalk(frame)
+			if frame.searchSkip then return end
+			local id = type(frame.settingKey) == "string" and frame.settingKey or nil
+			if frame.RowId then
+				local ok, rowId = pcall(frame.RowId)
+				if ok and type(rowId) == "string" and not keyed["row:" .. rowId] then
+					keyed["row:" .. rowId] = { page = page, text = rowId,
+						edges = { top = frame, bottom = frame, left = frame, right = frame } }
+				end
+			end
+			if id and not keyed[id] then
+				if frame.hiddenSwitch then
+					-- (A part's or tab's own switch, on a frame of its own: that
+					-- part picked, then its tab or the page's header glows.)
+					local host = frame:GetParent()
+					keyed[id] = { page = page, text = L["Enable Page"],
+						pageSwitch = pageSwitches[host] or { key = id },
+						switchHost = host ~= page.canvas.content and host or nil }
+				else
+					keyed[id] = { page = page, text = SearchText(frame.searchLabel) or id,
+						edges = frame.searchEdges or { top = frame, bottom = frame, left = frame, right = frame } }
+				end
+			end
+			for _, child in ipairs({ frame:GetChildren() }) do keyWalk(child) end
+		end
+		keyWalk(page.canvas.content)
 		-- (The page's Enable switch: its checkbox is hidden, the switch drawn
 		-- in the page's header (RegisterPageSwitch), so the walk above never
 		-- reaches it and /cine find handleSwing found nothing, 2026-11-16.)
@@ -2015,8 +2045,36 @@ local function ShowMatch(entry, onPage)
 	-- (A page's Enable switch, in its header: made as the page shows, so
 	-- looked up once it has.)
 	if entry.pageSwitch then
+		-- (A part's or tab's own switch, on its frame: its hub icon picked, or
+		-- its folder tab clicked, or what holds it opened. Its tab glows below.)
+		local host, hostTab = entry.switchHost, nil
+		if host then
+			local function TabFor(frame)
+				if frame.containerHost == host then return frame end
+				for _, child in ipairs({ frame:GetChildren() }) do
+					local found = TabFor(child)
+					if found then return found end
+				end
+			end
+			hostTab = TabFor(canvas)
+			if not (ns.ShowHubTileOfSwitch and ns.ShowHubTileOfSwitch(host)) then
+				if hostTab then
+					hostTab:Click()
+				else
+					local object = host
+					while object do
+						if object.openSection then
+							object.openSection()
+							break
+						end
+						object = object:GetParent()
+					end
+				end
+			end
+		end
 		C_Timer.After(0.1, function()
 			local header = entry.pageSwitch.header
+			if hostTab and hostTab:IsVisible() then header = hostTab end
 			canvas.scroll:SetVerticalScroll(0)
 			-- (A page under tabs has no header switch, ns.DropPageHeader: it's on
 			-- its tab, right-click, StylePages.lua's tab.switchPage. The glow sat
@@ -4082,6 +4140,26 @@ do
 		return tile.hub.name
 	end
 
+	-- The hub icon whose switch is on frame (a part of a shared page with a
+	-- switch of its own: tile.switchFrame, or one of its sub-tabs'), picked,
+	-- for /cine find on that switch. True when there was one.
+	function ns.ShowHubTileOfSwitch(frame)
+		-- (Its own icon first, then an icon over a group holding it.)
+		for pass = 1, 2 do
+			for _, tile in pairs(byName) do
+				local mine = pass == 1 and tile.switchFrame == frame
+				for _, switch in ipairs(pass == 2 and tile.groupSwitches or {}) do
+					if switch.frame == frame then mine = true end
+				end
+				if mine then
+					Select(tile)
+					return true
+				end
+			end
+		end
+		return false
+	end
+
 	-- A hub page shown, from inside the settings (its folder tab: ns.PageTabs).
 	function ns.ShowHubPage(name)
 		return HubTab(name)
@@ -5431,6 +5509,7 @@ local function CreateRevealPanel()
 	end
 	for _, control in ipairs(setAside) do
 		control:Hide()
+		control.searchSkip = true -- (not on any page now: /run CinematicDB.key reaches them)
 	end
 
 	-- (Standard Frames' In combat rows, brought up early.)
@@ -10642,7 +10721,9 @@ local function CreatePlatesPanel()
 						SectionState.Save(block.state, not block.state.open)
 						Relayout()
 					end
-					-- (Search finding a part opens its kind's block.)
+					-- (Search finding a part opens its kind's block; searchAlways:
+					-- closed, its rows still count, 2026-11-19.)
+					box.searchAlways = true
 					box.openSection = function()
 						SectionState.Save(block.state, true)
 						Relayout()
@@ -14164,6 +14245,9 @@ do
 				hosts[i] = CreateFrame("Frame", nil, content)
 				hosts[i]:SetSize(1, 1)
 				hosts[i]:SetPoint(point, relative, relPoint, x, y)
+				-- (Search finding a setting in the other part: its hub icon picked.)
+				local tileName = i == 1 and "Nameplate Style" or "Nameplate Marks"
+				hosts[i].openSection = function() ns.ShowHubPage(tileName) end
 			end
 			local keep = { [preview] = true, [preview.stackSpot or preview] = true, [preview.popSlot or preview] = true }
 			for _, set in ipairs({ { content:GetChildren() }, { content:GetRegions() } }) do
@@ -17351,7 +17435,10 @@ local function CreateVisionPanel()
 			local rollTabs
 			panel, rollTabs, ShowTab, base, tabsH = ns.FolderTabs(content, list, Pick)
 			-- (Each tab a container over its group's grid, 2026-11-17.)
-			for g, grid in ipairs(grids) do ns.TabContainer(rollTabs[g], grid, "tabOn:Roll Vision:" .. g) end
+			for g, grid in ipairs(grids) do
+				ns.TabContainer(rollTabs[g], grid, "tabOn:Roll Vision:" .. g)
+				grid.openSection = function() rollTabs[g]:Click() end -- (a cell found: its tab picked)
+			end
 			local host = CreateFrame("Frame", nil, content)
 			host:SetSize(GRID_W + PAD * 2, (tabsH or 24) + GRID_H + PAD * 2)
 			stack:Add(host, "label")
@@ -17973,6 +18060,18 @@ local function CreateVisionPanel()
 			panel:SetPoint("BOTTOMRIGHT", plates and platesEnd or lastRow, "BOTTOMRIGHT", 12, -12)
 		end
 		ShowSection()
+		-- /cine find and the search box: the other tab's set counts too (hidden,
+		-- the search skipped it: /cine find healVisionPlates found nothing,
+		-- 2026-11-19), and finding one picks its tab (ShowMatch's openSection).
+		local PLATES_TAB = #TABS
+		for _, widget in ipairs(roleWidgets) do
+			widget.searchAlways = true
+			widget.openSection = function() if plates then tabs[1]:Click() end end
+		end
+		for _, widget in ipairs(plateWidgets) do
+			widget.searchAlways = true
+			widget.openSection = function() if not plates then tabs[PLATES_TAB]:Click() end end
+		end
 	end
 
 	canvas:SetScript("OnShow", PageShown(Refresh, content))
@@ -19997,6 +20096,14 @@ function ns.SettingIds()
 		walk(page.canvas.content)
 	end
 	return with, without, missing
+end
+-- The ids /cine find reaches (its search index's keys), for the prerelease
+-- check that every id ns.SettingIds lists is one: a control on a hidden tab
+-- was left out, 2026-11-19.
+function ns.FindableIds()
+	ns.MakeLazyPages("the findable ids")
+	local _, keyed = BuildSearchIndex()
+	return keyed
 end
 function ns.SettingIdsReport()
 	local with, without = ns.SettingIds()

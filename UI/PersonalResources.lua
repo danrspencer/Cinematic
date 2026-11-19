@@ -1105,6 +1105,8 @@ function ns.CreatePersonalResourcesPanel(kit)
 			if not before[object] then
 				prdParts[#prdParts + 1] = object
 				object:Hide()
+				-- (Search finding it from the Unit Frames icon: the PRD's picked.)
+				object.openSection = function() ns.ShowHubPage("PRD Keep Up") end
 			end
 		end
 	end

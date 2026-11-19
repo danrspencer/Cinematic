@@ -295,6 +295,24 @@ Smoke("camera: vista starts and stops, camera back", function(done)
 	end)
 end)
 
+-- Every setting id (/cine debug ids) is one /cine find reaches: a control on a
+-- tab not showing was left out of the search (Heal Vision's Nameplates tab,
+-- /cine find healVisionPlates found nothing, 2026-11-19).
+Smoke("find: every setting id is findable", function()
+	if not (ns.SettingIds and ns.FindableIds) then return "skip", "no ns.FindableIds" end
+	local with = ns.SettingIds()
+	local keyed, lost = ns.FindableIds(), {}
+	for _, line in ipairs(with) do
+		local id, page = line:match("^(%S+) | ([^|]-) |")
+		-- (Only the ids /cine find takes: ns.FindSetting's.)
+		local takes = id and (ns.DEFAULTS[id] ~= nil or id:find("^row:")
+			or (ns.MarkRowDefault and ns.MarkRowDefault(id) ~= nil))
+		if takes and not keyed[id] then lost[#lost + 1] = ("%s (%s)"):format(id, page) end
+	end
+	if #lost > 0 then return "fail", ("%d of %d not found: %s"):format(#lost, #with, List(lost, 6)) end
+	return "pass", #with .. " ids"
+end)
+
 -- Our skinned scroll bars show only while there's something to scroll to: a
 -- test list made short (no bar), tall (bar), short again (no bar), each read a
 -- moment on, once the game has worked out its range.

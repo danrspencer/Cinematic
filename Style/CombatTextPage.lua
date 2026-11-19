@@ -869,6 +869,15 @@ function ns.CreateCombatTextStylePanel(kit)
 		row:SetScript("OnClick", function() Flip(id) end)
 		row.searchLabel = L[node.label]
 		line.frame = row
+		-- (Search finding it inside a folded group: its groups unfolded.)
+		row.openSection = function()
+			local ids, step = {}, node.parent
+			while step do
+				ids[#ids + 1] = step
+				step = CT.NODE[step] and CT.NODE[step].parent
+			end
+			if Unfold then Unfold(ids) end
+		end
 		local x = node.depth * 18
 		-- (A group's + or -.)
 		if node.children then
