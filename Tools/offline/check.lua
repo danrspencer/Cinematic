@@ -848,6 +848,24 @@ if arg[1] and not update then
 			if themeDb.styleTheme ~= "forge" then print("problem\tYour themes: deleting the one in use didn't go back to its start") end
 			if ns.StyleThemeByKey(key) then print("problem\tYour themes: still there after Delete") end
 		end
+		-- (One made on the game's look: started from the game's, your change in it, no colors of ours.)
+		ns.ApplyStyleTheme("game")
+		themeDb.styleFont = "friz"
+		local plainKey = ns.AddMyStyleTheme("game", "Test plain", true)
+		local plain = plainKey and ns.StyleThemeByKey(plainKey)
+		if not (plain and plain.base == "game" and plain.plain and plain.settings.styleFont == "friz") then
+			print("problem\tYour themes: one made on the game's look didn't start from it with your change")
+		else
+			ns.ApplyStyleTheme(plainKey)
+			if themeDb.styleFont ~= "friz" or ns.StyleThemeEdited() then
+				print("problem\tYour themes: one on the game's look doesn't pick as saved")
+			end
+			if ns.ThemePanel() or ns.MenuPalette() or ns.ThemeAccent() then
+				print("problem\tYour themes: one on the game's look gives colors of ours")
+			end
+			ns.DeleteMyStyleTheme(plainKey)
+			if themeDb.styleTheme ~= "game" then print("problem\tYour themes: deleting one on the game's look didn't go back to it") end
+		end
 		if CinematicDB then CinematicDB.styleMyThemes = savedStore end
 		ns.MyStyleThemesChanged() -- (made again from the store put back)
 		for key2 in pairs(themeDb) do

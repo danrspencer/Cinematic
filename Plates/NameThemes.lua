@@ -93,7 +93,7 @@ end
 local function ThemeOf(key)
 	if key == "main" then
 		local main = ns.ActiveStyleTheme and ns.ActiveStyleTheme()
-		if not main or main.key == "game" then return nil end
+		if not main or main.plain then return nil end -- (plain: the game's, or one of yours on it)
 		return ns.NameThemeByKey(main.names or main.key)
 	end
 	return ns.NameThemeByKey(key)
