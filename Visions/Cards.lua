@@ -326,9 +326,11 @@ for _, event in ipairs(EVENTS) do
 end
 DEFAULTS.cardAlign_rested = "center" -- (the Ticker's top bar, in its middle)
 DEFAULTS.cardAlign_streak = "center"
--- (Entering and Leaving combat with no letterbox up: the middle of the screen.)
-DEFAULTS.cardBarFallback_combatIn = "screen"
-DEFAULTS.cardBarFallback_combatOut = "screen"
+-- (Entering and Leaving combat with no letterbox up: not shown, since
+-- 2026-11-19; they were the middle of the screen. Migrations.lua's
+-- combatCardsBarOnlyV1.)
+DEFAULTS.cardBarFallback_combatIn = "none"
+DEFAULTS.cardBarFallback_combatOut = "none"
 -- (...and with no edge pulse: their styles' is left for the other cards on them.)
 DEFAULTS.cardPulse_combatIn = 0
 DEFAULTS.cardPulse_combatOut = 0

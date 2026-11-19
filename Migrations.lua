@@ -4768,6 +4768,28 @@ STEPS[#STEPS + 1] = function()
 		for _, point in pairs(ns.db.profileResetPoints or {}) do Lime(point) end
 		ns.db.combatTextNatureLimeV1 = true
 	end
+	-- Entering and Leaving combat's cards show only with a letterbox up now
+	-- (2026-11-19, Cards.lua: No letterbox Don't show). Theirs still on the
+	-- old Screen center (cardsV12 wrote it in), or following, goes to Don't
+	-- show; another pick stays. Saved profiles too. Once.
+	if not ns.db.combatCardsBarOnlyV1 then
+		local function BarOnly(t)
+			if type(t) ~= "table" then return end
+			for _, id in ipairs({ "combatIn", "combatOut" }) do
+				local key = "cardBarFallback_" .. id
+				if t[key] == "screen" or t[key] == "default" then t[key] = "none" end
+			end
+		end
+		BarOnly(ns.db)
+		for _, saved in pairs(ns.db.profiles or {}) do
+			if type(saved) == "table" then
+				BarOnly(saved)
+				BarOnly(saved.settings)
+			end
+		end
+		for _, point in pairs(ns.db.profileResetPoints or {}) do BarOnly(point) end
+		ns.db.combatCardsBarOnlyV1 = true
+	end
 end
 
 -- (Step for Cursor Hide, 2026-11-19.)
