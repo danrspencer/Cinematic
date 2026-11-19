@@ -458,6 +458,9 @@ local THEMES = {
 		-- (Its own damage numbers, Combat Text Style: on with it, in Outfit Bold and
 		-- the sunset's colors. CombatTextStyle.lua's ns.ThemeCombatColor.)
 		turnsOn = { "combatTextStyle" },
+		-- (Its Death card: "wasted", the crime-sandbox picture. alsoSets, so
+		-- another theme's pick leaves it as it is.)
+		alsoSets = { deathBannerStyle = "wasted" },
 		combatText = { hit = { 1, 0.9, 0.95 }, spell = { 1, 0.76, 0.3 }, heal = { 0.36, 0.94, 0.71 },
 			crit = { 1, 0.31, 0.6 }, miss = { 0.72, 0.65, 1 } },
 		-- (The plates' reaction strip in the same colors: PlateHealthStyle.lua.)
@@ -1126,7 +1129,7 @@ local PART_PATTERNS = {
 	{ "^tooltip", "Panels" }, { "^bubbles", "Panels" },
 	{ "^ab", "Bars" }, { "^styleOver_barArt", "Bars" },
 	{ "^plateCast", "Casts" },
-	{ "^card", "Visions" }, { "^questTalk", "Visions" }, { "^questItem", "Visions" }, { "^roll", "Visions" },
+	{ "^card", "Visions" }, { "^deathBanner", "Visions" }, { "^questTalk", "Visions" }, { "^questItem", "Visions" }, { "^roll", "Visions" },
 	{ "^emote", "Visions" }, { "^damageVision", "Visions" }, { "^visionStyle", "Visions" },
 }
 local partOf = {}
@@ -1228,6 +1231,10 @@ function ns.StyleSnapshot()
 			kept[each] = db[each]
 			if kept[each] == nil then kept[each] = "default" end
 		end
+		for each in pairs(theme.alsoSets or {}) do
+			kept[each] = db[each]
+			if kept[each] == nil then kept[each] = ns.DEFAULTS[each] end
+		end
 	end
 	return kept
 end
@@ -1274,6 +1281,11 @@ function ns.ApplyStyleTheme(key, noUndo)
 	-- you'd turned on yourself stays. Undo puts them back, StyleSnapshot.)
 	for _, each in ipairs(theme.turnsOn or {}) do
 		if Reached(each, db) then db[each] = true end
+	end
+	-- (alsoSets: the same, with a value: Neon Coast's "wasted" Death card. Words
+	-- of your own on it are kept.)
+	for each, value in pairs(theme.alsoSets or {}) do
+		if Reached(each, db) and not (each == "deathBannerStyle" and db[each] == "custom") then db[each] = value end
 	end
 	ShowTheme()
 	return true
