@@ -25,6 +25,9 @@ DEFAULTS.tooltipBarTexture = "general" -- ...its texture: "game" or a texture (n
 DEFAULTS.tooltipBarHeight = 8         -- ...its height
 DEFAULTS.tooltipBarColor = "game"     -- ...its color: "game" (by the unit) or "custom"
 DEFAULTS.tooltipBarR, DEFAULTS.tooltipBarG, DEFAULTS.tooltipBarB = 0, 0.83, 0
+DEFAULTS.tooltipGradient = "off"      -- ...its gradient: "off", "shade" (a darker one of its color) or "on" (tooltipGradR/G/B)
+DEFAULTS.tooltipGradR, DEFAULTS.tooltipGradG, DEFAULTS.tooltipGradB = 0.1, 0.1, 0.1
+DEFAULTS.tooltipGradDir = "right"     -- ...which way: "right" (its color at the left), "left" or "down" (at the top)
 DEFAULTS.tooltipBarGround = 0         -- ...how dark it is behind it, 0 to 1
 
 local function Look()
@@ -220,11 +223,37 @@ local barOwn
 -- (A color of the page's own over the one the game gives it for each unit:
 -- put on again whenever the game sets its own.)
 local barLook, barBusy
-local function BarColor(bar)
+-- (And its gradient, from the color it has (ours, else the game's for the
+-- unit, as set or read; secret: flat), the way the page says. 2026-11-19.)
+local function Known(v) return type(v) == "number" and not (issecretvalue and issecretvalue(v)) end
+local function BarColor(bar, r, g, b)
+	if barBusy then return end
 	local look = barLook
-	if barBusy or not (look and look.tooltipBarColor == "custom") then return end
 	barBusy = true
-	bar:SetStatusBarColor(look.tooltipBarR or 0, look.tooltipBarG or 0.83, look.tooltipBarB or 0)
+	local c
+	if look and look.tooltipBarColor == "custom" then
+		c = { look.tooltipBarR or 0, look.tooltipBarG or 0.83, look.tooltipBarB or 0 }
+		bar:SetStatusBarColor(c[1], c[2], c[3])
+	elseif Known(r) and Known(g) and Known(b) then
+		c = { r, g, b }
+	end
+	local fade = look and ns.UnitStyleFade and ns.UnitStyleFade(look, "tooltip", "tooltipGradDir")
+	local fill = bar:GetStatusBarTexture()
+	-- (Ours: the fill in it, the fade over it. The game's: the fade alone over
+	-- whatever color it gives the unit, read or not: the whole-bar layer
+	-- needs none.)
+	if fade and fill then
+		if look.tooltipBarColor == "custom" and c then
+			ns.UnitStyleSetFade(fill, c[1], c[2], c[3], fade)
+		else
+			ns.UnitStyleFadeOnly(fill, fade)
+		end
+		bar.cineShaded = true
+	elseif bar.cineShaded and fill then
+		bar.cineShaded = nil
+		ns.UnitStyleClearFade(fill)
+		pcall(function() fill:SetVertexColor(bar:GetStatusBarColor()) end)
+	end
 	barBusy = false
 end
 local function DressBar(bar, tooltip, look)
@@ -497,11 +526,14 @@ function ns.MakeTooltipPreview(parent, width)
 			bar:SetStatusBarTexture("Interface\\TargetingFrame\\UI-StatusBar")
 			bar:GetStatusBarTexture():SetDesaturated(false)
 		end
+		local cr, cg, cb = 0, 0.83, 0
 		if look.tooltipBarColor == "custom" then
-			bar:SetStatusBarColor(look.tooltipBarR or 0, look.tooltipBarG or 0.83, look.tooltipBarB or 0)
-		else
-			bar:SetStatusBarColor(0, 0.83, 0)
+			cr, cg, cb = look.tooltipBarR or 0, look.tooltipBarG or 0.83, look.tooltipBarB or 0
 		end
+		bar:SetStatusBarColor(cr, cg, cb)
+		-- (Its gradient, else flat: the color on the fill itself clears one.)
+		local fill, fade = bar:GetStatusBarTexture(), ns.UnitStyleFade(look, "tooltip", "tooltipGradDir")
+		ns.UnitStyleSetFade(fill, cr, cg, cb, fade)
 		bar.cineGround:SetColorTexture(0, 0, 0, tonumber(look.tooltipBarGround) or 0)
 		ns.DressBarShape(bar, bar.cineGround)
 	end
@@ -560,6 +592,20 @@ function ns.CreateTooltipStylePanel(kit)
 			}, BarOn)
 			look.Chips(L["Its color"], { "tooltipBarR", "tooltipBarG", "tooltipBarB" }, L["The health bar's color, for Custom."],
 				function(db) return BarOn(db) and db.tooltipBarColor == "custom" end)
+			-- (Its gradient: from its color to a darker one of it or one of your
+			-- own, and which way. As Unit Frames'.)
+			look.Choices(L["Gradient:"], "tooltipGradient", {
+				{ "off", L["Off"] },
+				{ "shade", L["Darker"], L["It fades to a darker one of its own color, whatever that is."] },
+				{ "on", L["Your color"], L["It fades to the color below."] },
+			}, BarOn)
+			look.Chips(L["Fades to"], { "tooltipGradR", "tooltipGradG", "tooltipGradB" }, L["The color it fades to."],
+				function(db) return BarOn(db) and db.tooltipGradient == "on" end)
+			look.Choices(L["Gradient way:"], "tooltipGradDir", {
+				{ "right", L["Left to right"], L["Its color at the left."] },
+				{ "left", L["Right to left"], L["Its color at the right."] },
+				{ "down", L["Top to bottom"], L["Its color at the top: lit from above."] },
+			}, function(db) return BarOn(db) and db.tooltipGradient ~= "off" end)
 		end,
 		ground = function(look)
 			look.Slider("tooltipBarGround", L["Dark ground"], 0, 100, 5, "%d%%", 100, L["How dark it is behind the bar."],

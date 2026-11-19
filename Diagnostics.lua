@@ -1218,7 +1218,11 @@ do
 	-- game's own (secret) health percent - frame alpha from a number curve
 	-- (blue), and texture colour from a colour curve (red). Both should be gone
 	-- at full health and show below the percent (100: any damage).
-	local window, alphaCurve, colorCurve
+	-- Then a gradient (grad) from a colour curve's colour to black: green at
+	-- full, red when hurt, dark at the right, if the game takes a curve's
+	-- colour in SetGradient (Unit and Raid Frames' By health with a
+	-- gradient, 2026-11-19; flat there where it doesn't).
+	local window, alphaCurve, colorCurve, gradCurve
 	local rows, failed = {}, {}
 	local ROWS_MAX = 10
 
@@ -1253,6 +1257,12 @@ do
 			curve:AddPoint(1, CreateColor(1, 0.2, 0.2, 0))
 			colorCurve = curve
 		end)
+		Try("gradient curve", function()
+			local curve = C_CurveUtil.CreateColorCurve()
+			curve:AddPoint(0, CreateColor(1, 0.15, 0.15, 1))
+			curve:AddPoint(1, CreateColor(0.2, 0.9, 0.3, 1))
+			gradCurve = curve
+		end)
 	end
 
 	local function Row(i)
@@ -1284,6 +1294,10 @@ do
 		row.color:SetSize(40, 14)
 		row.color:SetPoint("LEFT", 252, 0)
 		row.color:SetColorTexture(1, 1, 1, 1)
+		row.grad = row:CreateTexture(nil, "ARTWORK")
+		row.grad:SetSize(44, 14)
+		row.grad:SetPoint("LEFT", 296, 0)
+		row.grad:SetColorTexture(1, 1, 1, 1)
 		rows[i] = row
 		return row
 	end
@@ -1305,6 +1319,11 @@ do
 				row.color:SetVertexColor(UnitHealthPercent(unit, true, colorCurve):GetRGBA())
 			end)
 		end
+		if gradCurve then
+			Try("curve gradient", function()
+				row.grad:SetGradient("HORIZONTAL", UnitHealthPercent(unit, true, gradCurve), CreateColor(0, 0, 0, 1))
+			end)
+		end
 	end
 
 	local function UpdateFade()
@@ -1324,7 +1343,7 @@ do
 
 	local function MakeWindow()
 		window = CreateFrame("Frame", nil, UIParent)
-		window:SetSize(316, 60)
+		window:SetSize(362, 60)
 		window:SetPoint("CENTER", 0, 200)
 		window:SetFrameStrata("HIGH")
 		window:SetMovable(true)
@@ -1346,6 +1365,7 @@ do
 		Head("health", 84)
 		Head("alpha", 208)
 		Head("color", 252)
+		Head("grad", 296)
 		local elapsed = 0
 		ns.SetOnUpdate(window, function(_, delta)
 			elapsed = elapsed + delta
@@ -1370,8 +1390,9 @@ do
 		window:Show()
 		UpdateFade()
 		ns.Print(("healthfade: the blue (frame alpha) and red (color) blocks should be gone at full"
-			.. " health and show below %d%%. Take some damage and watch. Drag to move, run again to close")
-			:format(percent))
+			.. " health and show below %d%%. grad: green to dark at full, redder as health drops (a"
+			.. " 'curve gradient failed' line: the game won't take it). Take some damage and watch."
+			.. " Drag to move, run again to close"):format(percent))
 	end
 
 	-- /cine debug damage [seconds]: does damage taken reach the addon? Listens

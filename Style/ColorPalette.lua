@@ -92,4 +92,213 @@ function palette.Remember(r, g, b)
 	db.colorRecent = list
 end
 
+-- The palette's frames (StylePages' edges and fonts, read when built).
+local function Gold(edges, on) ns.DressStyleEdges(edges, on and 2 or 1, on and 1 or 0, on and 0.82 or 0, 0, 1) end
+palette.Gold = Gold
+local function TipOn(frame, text)
+	if not text then return end
+	GameTooltip:SetOwner(frame, "ANCHOR_RIGHT")
+	GameTooltip:SetText(text, 1, 1, 1, 1, true)
+	GameTooltip:Show()
+end
+palette.TipOn = TipOn
+
+-- A chip: a square of a color, edged. hover(chip, color or nil) as it's
+-- pointed at and left; pick(r, g, b) on a click.
+function palette.Chip(parent, size, hover, pick)
+	local chip = CreateFrame("Button", nil, parent)
+	chip:SetSize(size, size)
+	chip.swatch = chip:CreateTexture(nil, "ARTWORK")
+	chip.swatch:SetPoint("TOPLEFT", 2, -2)
+	chip.swatch:SetPoint("BOTTOMRIGHT", -2, 2)
+	chip.edges = ns.MakeStyleEdges(chip)
+	chip:SetScript("OnEnter", function(self) hover(self, self.color) end)
+	chip:SetScript("OnLeave", function(self)
+		hover(self, nil)
+		GameTooltip:Hide()
+	end)
+	chip:SetScript("OnClick", function(self)
+		local c = self.color
+		if c then pick(c[1], c[2], c[3]) end
+	end)
+	return chip
+end
+function palette.Dress(chip, color)
+	chip.color = color
+	chip.swatch:SetColorTexture(color[1], color[2], color[3], 1)
+end
+
+-- The box: a line with the name of the color pointed at (else the one now),
+-- every family's shades with their names, Recent, and Custom... now() gives
+-- the color now; pick(r, g, b) sets one; custom() opens the color wheel.
+-- box:Refresh(), box:ShowName(color), box.buttons (to grey together).
+function palette.MakeBox(parent, width, now, pick, custom)
+	local box = CreateFrame("Frame", nil, parent)
+	box:SetWidth(width)
+	box.buttons = {}
+	local back = box:CreateTexture(nil, "BACKGROUND")
+	back:SetAllPoints()
+	back:SetColorTexture(0.07, 0.07, 0.08, 0.96)
+	ns.DressStyleEdges(ns.MakeStyleEdges(box), 1, 0.42, 0.33, 0.13, 1)
+	local nameLine = box:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+	nameLine:SetPoint("TOPLEFT", 10, -8)
+	nameLine:SetPoint("RIGHT", -34, 0)
+	nameLine:SetJustifyH("LEFT")
+	nameLine:SetWordWrap(false)
+	function box.ShowName(_, color)
+		if color and color.custom then
+			nameLine:SetText(palette.NameOf(color[1], color[2], color[3]))
+		elseif color then
+			nameLine:SetText(ns.L[color.name] .. "  |cff8c8c8c#" .. color.hex .. "|r")
+		else
+			nameLine:SetText(palette.NameOf(now()))
+		end
+	end
+	local function Hover(_, color) box:ShowName(color) end
+	local function Chip(size)
+		local chip = palette.Chip(box, size, Hover, pick)
+		box.buttons[#box.buttons + 1] = chip
+		return chip
+	end
+	local cells = {}
+	local cellW = math.floor((width - 82) / 5)
+	local y = -28
+	for _, family in ipairs(palette.families) do
+		local name = box:CreateFontString(nil, "OVERLAY", ns.LOOK_DIM)
+		name:SetPoint("TOPLEFT", 10, y - 4)
+		name:SetWidth(60)
+		name:SetJustifyH("LEFT")
+		name:SetWordWrap(false)
+		name:SetText(ns.L[family.name])
+		for i, color in ipairs(family.shades) do
+			-- (A cell: its chip and its name; the whole of it clicks.)
+			local cell = Chip(18)
+			cell:SetPoint("TOPLEFT", 72 + (i - 1) * cellW, y)
+			cell:SetHitRectInsets(0, -(cellW - 22), 0, 0)
+			palette.Dress(cell, color)
+			local words = cell:CreateFontString(nil, "OVERLAY", ns.LOOK_DIM)
+			words:SetPoint("LEFT", cell, "RIGHT", 4, 0)
+			words:SetWidth(cellW - 24)
+			words:SetJustifyH("LEFT")
+			words:SetWordWrap(false)
+			words:SetText(ns.L[color.name])
+			cells[#cells + 1] = cell
+		end
+		y = y - 20
+	end
+	y = y - 6
+	local recentHead = box:CreateFontString(nil, "OVERLAY", ns.LOOK_DIM)
+	recentHead:SetPoint("TOPLEFT", 10, y)
+	recentHead:SetText(ns.L["Recent"])
+	local recentNone = box:CreateFontString(nil, "OVERLAY", ns.LOOK_DIM)
+	recentNone:SetPoint("TOPLEFT", 10, y - 20)
+	recentNone:SetText(ns.L["Colors you pick show here."])
+	local recent = {}
+	for i = 1, RECENT_MAX do
+		local chip = Chip(22)
+		chip:SetPoint("TOPLEFT", 10 + (i - 1) * 28, y - 14)
+		chip:Hide()
+		recent[i] = chip
+	end
+	local button = CreateFrame("Button", nil, box)
+	button:SetSize(90, 22)
+	button:SetPoint("TOPRIGHT", -10, y - 14)
+	ns.DressStyleEdges(ns.MakeStyleEdges(button), 1, 0.5, 0.5, 0.5, 1)
+	local words = button:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+	words:SetPoint("CENTER", 0, 0)
+	words:SetText(ns.L["Custom..."])
+	button:SetScript("OnClick", function() custom() end)
+	button:SetScript("OnEnter", function(self) TipOn(self, ns.L["Pick any color."]) end)
+	button:SetScript("OnLeave", function() GameTooltip:Hide() end)
+	box.buttons[#box.buttons + 1] = button
+	box:SetHeight(-(y - 14) + 22 + 10)
+
+	function box.Refresh()
+		local r, g, b = now()
+		local named = palette.Find(r, g, b)
+		for _, cell in ipairs(cells) do Gold(cell.edges, cell.color == named) end
+		local list = palette.Recent()
+		for i, chip in ipairs(recent) do
+			local each = list[i]
+			if type(each) == "table" and tonumber(each[1]) and tonumber(each[2]) and tonumber(each[3]) then
+				palette.Dress(chip, palette.Find(each[1], each[2], each[3]) or { each[1], each[2], each[3], custom = true })
+				Gold(chip.edges, r and Near(chip.color, r, g, b))
+				chip:Show()
+			else
+				chip:Hide()
+			end
+		end
+		recentNone:SetShown(not list[1])
+		box:ShowName(nil)
+	end
+	return box
+end
+
+-- The pop-up: the box on its own, at the cursor, for a single swatch
+-- (ns.OpenColorPicker, so every swatch that opened the game's color wheel).
+-- A pick applies at once; Custom... closes it and opens the wheel (wheel:
+-- Options' OpenWheel). A click outside it or Esc closes it.
+-- (2026-11-19.)
+local pop
+function palette.IsOpen() return pop and pop:IsShown() or false end
+function palette.Close() if pop then pop:Hide() end end
+function palette.Pop(r, g, b, onChange, wheel)
+	if not pop then
+		pop = CreateFrame("Frame", "CinematicColorPalette", UIParent)
+		pop:SetFrameStrata("FULLSCREEN_DIALOG")
+		pop:SetClampedToScreen(true)
+		pop:EnableMouse(true)
+		pop:Hide()
+		pop.box = palette.MakeBox(pop, 480, function() return pop.r, pop.g, pop.b end, function(nr, ng, nb)
+			pop.r, pop.g, pop.b = nr, ng, nb
+			palette.Remember(nr, ng, nb)
+			pop.onChange(nr, ng, nb)
+			pop.box:Refresh()
+		end, function()
+			local wr, wg, wb, done, open = pop.r, pop.g, pop.b, pop.onChange, pop.wheel
+			pop:Hide()
+			open(wr, wg, wb, function(nr, ng, nb)
+				palette.Remember(nr, ng, nb)
+				done(nr, ng, nb)
+			end)
+		end)
+		pop.box:SetPoint("TOPLEFT", 0, 0)
+		pop:SetSize(480, pop.box:GetHeight())
+		local close = CreateFrame("Button", nil, pop.box, "UIPanelCloseButton")
+		close:SetSize(24, 24)
+		close:SetPoint("TOPRIGHT", 0, 0)
+		close:SetScript("OnClick", function() pop:Hide() end)
+		-- (A click anywhere else: closed. Down, so the click that opened it,
+		-- whose OnClick comes on the way up, never closes it.)
+		pop:SetScript("OnEvent", function(self)
+			if not self:IsMouseOver() then self:Hide() end
+		end)
+		-- (Esc: closed, and kept from the options behind. Keyboard input is
+		-- locked in fights: there, only a click closes it.)
+		pop:SetScript("OnKeyDown", function(self, key)
+			if InCombatLockdown() then return end
+			local esc = key == "ESCAPE"
+			pcall(self.SetPropagateKeyboardInput, self, not esc)
+			if esc then self:Hide() end
+		end)
+		pop:SetScript("OnShow", function(self)
+			self:RegisterEvent("GLOBAL_MOUSE_DOWN")
+			if not InCombatLockdown() then pcall(self.EnableKeyboard, self, true) end
+		end)
+		pop:SetScript("OnHide", function(self)
+			self:UnregisterEvent("GLOBAL_MOUSE_DOWN")
+			if not InCombatLockdown() then pcall(self.EnableKeyboard, self, false) end
+		end)
+	end
+	pop.r, pop.g, pop.b = tonumber(r) or 1, tonumber(g) or 1, tonumber(b) or 1
+	pop.onChange, pop.wheel = onChange, wheel
+	local x, y = GetCursorPosition()
+	local scale = UIParent:GetEffectiveScale()
+	pop:ClearAllPoints()
+	pop:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", x / scale + 12, y / scale - 4)
+	pop.box:Refresh()
+	pop:Show()
+	pop:Raise()
+end
+
 ns.ColorPalette = palette

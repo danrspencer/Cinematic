@@ -6741,8 +6741,8 @@ local function CreateCameraSettingsPanel()
 end
 
 -- Blizzard's colour picker; the setup API changed in newer clients.
--- Also used by the minimap button's menu (ns.OpenColorPicker).
-local function OpenColorPicker(r, g, b, onChange)
+-- (The named palette's Custom... opens it: OpenWheel.)
+local function OpenWheel(r, g, b, onChange)
 	local function apply()
 		onChange(ColorPickerFrame:GetColorRGB())
 	end
@@ -6762,7 +6762,15 @@ local function OpenColorPicker(r, g, b, onChange)
 		ColorPickerFrame:Show()
 	end
 end
+-- A single swatch's color: the named palette popped up at the cursor
+-- (ColorPalette.lua), whose Custom... opens the wheel. Also used by the
+-- minimap button's menu (ns.OpenColorPicker). (2026-11-19: was the wheel.)
+local function OpenColorPicker(r, g, b, onChange)
+	if ns.ColorPalette and ns.ColorPalette.Pop then return ns.ColorPalette.Pop(r, g, b, onChange, OpenWheel) end
+	OpenWheel(r, g, b, onChange)
+end
 ns.OpenColorPicker = OpenColorPicker
+ns.OpenWheel = OpenWheel
 
 -- Sub-page: the visual effects' General tab (the Atmosphere hub's first):
 -- the master switch, the Turn off in grid, the letterbox, vignette, inns,

@@ -75,6 +75,13 @@ local KEYS = {
 	ufBack = 0.5,                -- the dark behind them, with a border of ours
 	ufHealthColor = "game",      -- the health bar: "game", "class" (class or reaction) or "custom"
 	ufHealthR = 0.2, ufHealthG = 0.8, ufHealthB = 0.4,
+	ufHealthMidR = 1, ufHealthMidG = 0.8, ufHealthMidB = 0.1,     -- By health ("health"): its color at half,
+	ufHealthLowR = 0.9, ufHealthLowG = 0.15, ufHealthLowB = 0.15, -- ...and empty (full: ufHealthR/G/B)
+	ufGradient = "off",          -- the health bar's gradient: "off", "shade" (to a darker one of its color) or "on" (to ufGrad's)
+	ufGradR = 0.1, ufGradG = 0.1, ufGradB = 0.1,
+	ufGradDir = "right",         -- ...which way: "right" (its color at the left), "left" or "down" (its color at the top)
+	ufPowerGradient = "off",     -- the power bars' gradient, as ufGradient (the same way, ufGradDir)
+	ufPowerGradR = 0.05, ufPowerGradG = 0.05, ufPowerGradB = 0.2,
 	ufNameColor = "game",        -- the name: "game", "class" (class or reaction), "white" or "theme" (its accent)
 	ufFont = "general",          -- the name's font (ns.QUEST_ITEM_FONTS' names)
 	ufOutline = -1,              -- ...outline: 0 none, 1 thin, 2 thick (-1: General's)
@@ -167,10 +174,266 @@ end
 local function HealthColor(view, unit)
 	if view.ufHealthColor == "class" then
 		return UnitColor(unit)
-	elseif view.ufHealthColor == "custom" then
+	elseif view.ufHealthColor == "custom" or view.ufHealthColor == "health" then
+		-- (By health: its full color, till ByHealth paints it by the curve.)
 		return view.ufHealthR, view.ufHealthG, view.ufHealthB
 	end
 end
+
+-- A bar's gradient (prefix "uf": health, "ufPower": the power bars): what it
+-- fades to, { r, g, b, dir = ... }, or { shade = true, dir = ... } for a
+-- darker one of the bar's own color; nil: off. Raid frames' health too,
+-- through their view (rfGradient). (2026-11-19.)
+-- (Other pages' too, by their own keys: prefix and dirKey, the way's key.
+-- Personal Resources' "prd"/"prdPower" and "prdGradDir".)
+local function Fade(view, prefix, dirKey)
+	prefix = prefix or "uf"
+	local kind = view and view[prefix .. "Gradient"]
+	if kind ~= "on" and kind ~= "shade" then return nil end
+	local dir = view[dirKey or "ufGradDir"]
+	if kind == "shade" then return { shade = true, dir = dir } end
+	return { tonumber(view[prefix .. "GradR"]) or 0.1, tonumber(view[prefix .. "GradG"]) or 0.1,
+		tonumber(view[prefix .. "GradB"]) or 0.1, dir = dir }
+end
+ns.UnitStyleFade = Fade
+
+-- A bar's gradient, laid over the whole bar (2026-11-19: the whole bar, not
+-- just its filled part, so a spot keeps its color as health drops, and a
+-- low bar isn't all fade): a layer of ours across the bar in the fill's art,
+-- shown only where the bar is filled by a mask on the fill's edge (which
+-- moves with the value even when it's secret), fading from clear at the
+-- bar's color's end to fade's color (to black, for Darker). The fill under
+-- it flat in the bar's color. Made out of fights only (raid frames: the
+-- game's secure buttons); none yet in a fight: the fill's own gradient, as
+-- before (just its filled part).
+local SHADE = 0.35 -- (the darker one: its color this much as bright)
+local layers = setmetatable({}, { __mode = "k" }) -- status bar -> its layer
+local function Layer(fill)
+	local bar = fill and fill.GetParent and fill:GetParent()
+	if not (bar and bar.CreateTexture and bar.CreateMaskTexture) then return nil end
+	local layer = layers[bar]
+	if not layer then
+		if InCombatLockdown() then return nil end
+		layer = bar:CreateTexture(nil, "ARTWORK", nil, 7)
+		local mask = bar:CreateMaskTexture()
+		mask:SetTexture("Interface\\Buttons\\WHITE8X8", "CLAMPTOBLACKADDITIVE", "CLAMPTOBLACKADDITIVE")
+		layer:AddMaskTexture(mask)
+		layer.mask = mask
+		layers[bar] = layer
+	end
+	layer:ClearAllPoints()
+	layer:SetAllPoints(bar)
+	layer.mask:ClearAllPoints()
+	layer.mask:SetPoint("TOPLEFT", fill, "TOPLEFT")
+	layer.mask:SetPoint("BOTTOMRIGHT", fill, "BOTTOMRIGHT")
+	-- (The fill's own art, greyed to take the color: its shading kept.)
+	local atlas = fill.GetAtlas and fill:GetAtlas()
+	if atlas then layer:SetAtlas(atlas) else layer:SetTexture(fill:GetTexture()) end
+	if layer.SetDesaturated then layer:SetDesaturated(true) end
+	return layer
+end
+-- (fade on a layer: clear at the bar's color's end, fade's at the other.
+-- Darker multiplies instead: white (no change) to SHADE's grey, the color
+-- under it this much as bright, whatever it is. Black faded in over it came
+-- out far too weak: WoW Forever's personal power bar darkened a third as much
+-- as asked, and only past half way (gradtest, 2026-11-19).
+-- SetGradient's first color: the left, or the bottom.)
+local function Paint(layer, fade)
+	local clear, full
+	if fade.shade then
+		layer:SetColorTexture(1, 1, 1, 1)
+		layer:SetBlendMode("MOD")
+		clear, full = CreateColor(1, 1, 1, 1), CreateColor(SHADE, SHADE, SHADE, 1)
+	else
+		layer:SetBlendMode("BLEND")
+		clear, full = CreateColor(fade[1], fade[2], fade[3], 0), CreateColor(fade[1], fade[2], fade[3], 1)
+	end
+	local ok
+	if fade.dir == "down" then
+		ok = pcall(layer.SetGradient, layer, "VERTICAL", full, clear)
+	elseif fade.dir == "left" then
+		ok = pcall(layer.SetGradient, layer, "HORIZONTAL", full, clear)
+	else
+		ok = pcall(layer.SetGradient, layer, "HORIZONTAL", clear, full)
+	end
+	layer:SetShown(ok and true or false)
+	return ok
+end
+-- The layer off (the bar flat again, or its own color back).
+local function ClearFade(fill)
+	local bar = fill and fill.GetParent and fill:GetParent()
+	local layer = bar and layers[bar]
+	if layer then layer:Hide() end
+end
+ns.UnitStyleClearFade = ClearFade
+-- The layer alone, the fill left in the color it has: for a bar whose color
+-- can't be read (secret: WoW Forever's personal bars, a fight's). The layer
+-- needs no color of the bar's. False where there's no layer to draw.
+-- (2026-11-19: gradtest, the power bar under you stayed flat.)
+local function FadeOnly(fill, fade)
+	local layer = fade and CreateColor and Layer(fill)
+	return layer and Paint(layer, fade) or false
+end
+ns.UnitStyleFadeOnly = FadeOnly
+-- For /cine debug gradtest: a bar's fade layer as text (shown, alpha, its
+-- draw layer and the fill's, the widths of the layer, mask, fill and bar,
+-- what art each has). Each value as read: "secret" where it is.
+function ns.UnitStyleLayerReport(fill)
+	local function T(v)
+		if issecretvalue and issecretvalue(v) then return "secret" end
+		if type(v) == "number" then return ("%.1f"):format(v) end
+		return tostring(v)
+	end
+	local bar = fill and fill.GetParent and fill:GetParent()
+	local layer = bar and layers[bar]
+	local fillLayer, fillSub
+	if fill then fillLayer, fillSub = fill:GetDrawLayer() end
+	local okArt, art = pcall(function() return fill:GetAtlas() or fill:GetTexture() end)
+	local text = ("fill layer %s %s, art %s, width %s, bar %s width %s"):format(T(fillLayer), T(fillSub),
+		okArt and T(art) or "error", T(fill and fill:GetWidth()), T(bar and bar:GetObjectType()), T(bar and bar:GetWidth()))
+	if not layer then return text .. "; no fade layer" end
+	local drawLayer, sub = layer:GetDrawLayer()
+	local okLayerArt, layerArt = pcall(function() return layer:GetAtlas() or layer:GetTexture() end)
+	return text .. ("; fade layer shown %s visible %s alpha %s, layer %s %s, art %s, width %s, mask width %s, masks %s"):format(
+		T(layer:IsShown()), T(layer:IsVisible()), T(layer:GetAlpha()), T(drawLayer), T(sub),
+		okLayerArt and T(layerArt) or "error", T(layer:GetWidth()), T(layer.mask:GetWidth()),
+		T(layer.GetNumMaskTextures and layer:GetNumMaskTextures()))
+end
+
+-- A bar's color with its gradient (fade, Fade's; nil: flat), from r, g, b,
+-- the way fade.dir says: "right" (the bar's color at the left), "left",
+-- "down" (at the top). Flat in r, g, b where there's no fade or it can't be
+-- drawn (false). (Flat: the color on the fill itself, as setting the bar's
+-- color again the same doesn't clear a gradient.)
+local function SetFade(fill, r, g, b, fade)
+	if not (fill and r) then return false end
+	local layer = fade and CreateColor and Layer(fill)
+	if layer then
+		pcall(fill.SetVertexColor, fill, r, g, b, 1)
+		if Paint(layer, fade) then return true end
+	end
+	ClearFade(fill)
+	if not (fade and fill.SetGradient and CreateColor) then
+		pcall(fill.SetVertexColor, fill, r, g, b, 1)
+		return false
+	end
+	local fr, fg, fb
+	if fade.shade then
+		fr, fg, fb = r * SHADE, g * SHADE, b * SHADE
+	else
+		fr, fg, fb = fade[1], fade[2], fade[3]
+	end
+	local own, other = CreateColor(r, g, b, 1), CreateColor(fr, fg, fb, 1)
+	local ok
+	if fade.dir == "down" then
+		ok = pcall(fill.SetGradient, fill, "VERTICAL", other, own)
+	elseif fade.dir == "left" then
+		ok = pcall(fill.SetGradient, fill, "HORIZONTAL", other, own)
+	else
+		ok = pcall(fill.SetGradient, fill, "HORIZONTAL", own, other)
+	end
+	if not ok then pcall(fill.SetVertexColor, fill, r, g, b, 1) end
+	return ok
+end
+ns.UnitStyleSetFade = SetFade
+
+-- By health (ufHealthColor "health"): the health bar's color from its full
+-- one (ufHealthR/G/B) through ufHealthMid's at half to ufHealthLow's when
+-- empty, worked out by the game's color curve from the unit's health, which
+-- is secret in fights (and a group's, always, on Forever): the addon never
+-- sees the number. Shown on WoW Forever, 2026-10-18 (/cine debug healthfade:
+-- SetVertexColor from a color curve's result, party members in a fight).
+-- With a gradient: the curve's color as its first color (a second curve, a
+-- darker one, for Darker); a client that won't take that draws it flat.
+-- (2026-11-19.)
+local CAN_BY_HEALTH = (C_CurveUtil and C_CurveUtil.CreateColorCurve and UnitHealthPercent and CreateColor) and true or false
+ns.CanColorByHealth = CAN_BY_HEALTH
+local healthCurves = {}
+local function HealthCurve(view, scale)
+	scale = scale or 1
+	local points = {
+		{ 0, tonumber(view.ufHealthLowR) or 0.9, tonumber(view.ufHealthLowG) or 0.15, tonumber(view.ufHealthLowB) or 0.15 },
+		{ 0.5, tonumber(view.ufHealthMidR) or 1, tonumber(view.ufHealthMidG) or 0.8, tonumber(view.ufHealthMidB) or 0.1 },
+		{ 1, tonumber(view.ufHealthR) or 0.2, tonumber(view.ufHealthG) or 0.8, tonumber(view.ufHealthB) or 0.4 },
+	}
+	local key = scale
+	for _, p in ipairs(points) do key = key .. (",%.3f,%.3f,%.3f"):format(p[2], p[3], p[4]) end
+	local made = healthCurves[key]
+	if made == nil then
+		local ok, curve = pcall(function()
+			local c = C_CurveUtil.CreateColorCurve()
+			for _, p in ipairs(points) do c:AddPoint(p[1], CreateColor(p[2] * scale, p[3] * scale, p[4] * scale, 1)) end
+			return c
+		end)
+		made = ok and curve or false
+		healthCurves[key] = made
+	end
+	return made or nil
+end
+-- (Counts, for /cine debug gradtest: curve colors made, drawn as a gradient,
+-- drawn flat, failed, and the last error.)
+local byHealthStats = { curve = 0, grad = 0, flat = 0, fail = 0 }
+ns.ByHealthStats = byHealthStats
+-- (The fade on top: the game won't take a curve's color in SetGradient
+-- (WoW Forever, /cine debug gradtest, 2026-11-19: "bad argument #3"), so the
+-- fill is painted flat in it and the whole-bar layer (Layer, Paint) fades
+-- over it, as on any bar with a gradient.)
+-- (Per bar: byHealth once painted by the curve.)
+local healthState = setmetatable({}, { __mode = "k" })
+local function HealthState(bar)
+	local state = healthState[bar]
+	if not state then
+		state = {}
+		healthState[bar] = state
+	end
+	return state
+end
+local function ByHealth(bar, view, unit, fade)
+	if not (CAN_BY_HEALTH and bar and view and view.ufHealthColor == "health" and type(unit) == "string") then return end
+	local fill = bar:GetStatusBarTexture()
+	local curve = fill and HealthCurve(view)
+	if not curve then
+		byHealthStats.fail = byHealthStats.fail + 1
+		byHealthStats.err = "no curve"
+		return
+	end
+	local ok, color = pcall(UnitHealthPercent, unit, true, curve)
+	if not (ok and color) then
+		byHealthStats.fail = byHealthStats.fail + 1
+		byHealthStats.err = ok and "no color" or tostring(color)
+		return
+	end
+	byHealthStats.curve = byHealthStats.curve + 1
+	local flat, err = pcall(function() fill:SetVertexColor(color:GetRGBA()) end)
+	if flat then
+		HealthState(bar).byHealth = true
+		byHealthStats.flat = byHealthStats.flat + 1
+	else
+		byHealthStats.fail = byHealthStats.fail + 1
+		byHealthStats.err = tostring(err)
+	end
+	local layer = fade and flat and CreateColor and Layer(fill)
+	if layer and Paint(layer, fade) then
+		byHealthStats.grad = byHealthStats.grad + 1
+	else
+		if fade then byHealthStats.gradErr = layer and "the layer refused it" or "no layer (in a fight, or none)" end
+		ClearFade(fill)
+	end
+end
+ns.UnitStyleByHealth = ByHealth
+
+-- The same for a preview's bar, whose health is a plain number (0 to 1):
+-- the colors mixed here. Gives r, g, b.
+local function HealthMix(view, value)
+	local low = { tonumber(view.ufHealthLowR) or 0.9, tonumber(view.ufHealthLowG) or 0.15, tonumber(view.ufHealthLowB) or 0.15 }
+	local mid = { tonumber(view.ufHealthMidR) or 1, tonumber(view.ufHealthMidG) or 0.8, tonumber(view.ufHealthMidB) or 0.1 }
+	local full = { tonumber(view.ufHealthR) or 0.2, tonumber(view.ufHealthG) or 0.8, tonumber(view.ufHealthB) or 0.4 }
+	local a, b, t = low, mid, value * 2
+	if value > 0.5 then a, b, t = mid, full, (value - 0.5) * 2 end
+	t = math.max(0, math.min(1, t))
+	return a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t, a[3] + (b[3] - a[3]) * t
+end
+ns.UnitStyleHealthMix = HealthMix
 
 -- A unit's power color, for a fill of ours where the game's power bar is white
 -- (retail and Forever: mana's blue, rage's red... are in the art, per power).
@@ -407,7 +670,8 @@ end
 -- A bar's fill as view says (view nil: the game's); color: its color, or
 -- nil for the game's. tint: a color for our fill where the game's is white
 -- (retail's health bar: its green is in the art, which ours doesn't have).
-local function DressBar(bar, view, r, g, b, tint, under)
+-- fade: the color its gradient fades to (Fade), nil for none.
+local function DressBar(bar, view, r, g, b, tint, under, fade)
 	if not (bar and bar.SetStatusBarTexture) or (bar.IsForbidden and bar:IsForbidden()) then return end
 	local saved = OwnOf(bar)
 	dressing = true
@@ -442,6 +706,47 @@ local function DressBar(bar, view, r, g, b, tint, under)
 			local fill = bar:GetStatusBarTexture()
 			if fill and fill.SetDesaturated then fill:SetDesaturated(false) end
 		end
+	end
+	-- (By health no more: the bar's own color back on its fill, as the curve's
+	-- went on the fill itself and setting the bar's color again the same
+	-- doesn't put it back (seen: gradtest, 2026-11-19). The bar's color handed
+	-- straight on, secret or not; its layer hidden.)
+	local health = healthState[bar]
+	if health and health.byHealth and not (view and view.ufHealthColor == "health") then
+		health.byHealth = nil
+		local now = bar:GetStatusBarTexture()
+		ClearFade(now)
+		if now then pcall(function() now:SetVertexColor(bar:GetStatusBarColor()) end) end
+	end
+	-- (Its gradient: from the color it has (ours, else the game's as read;
+	-- white is the art's green, retail's: tint), left, to fade's. A color
+	-- that can't be read, secret say: left flat.)
+	local fill = bar:GetStatusBarTexture()
+	local from
+	if fade then
+		local fr, fg, fb = r, g, b
+		if not fr then
+			local ok, cr, cg, cb = pcall(bar.GetStatusBarColor, bar)
+			if ok and Readable(cr) and Readable(cg) and Readable(cb) and cr then
+				fr, fg, fb = cr, cg, cb
+				if fr > 0.95 and fg > 0.95 and fb > 0.95 and tint then fr, fg, fb = tint[1], tint[2], tint[3] end
+			end
+		end
+		if fr then from = { fr, fg, fb } end
+	end
+	if from and fill then
+		if fill.SetDesaturated then fill:SetDesaturated(not (saved.ours and full)) end
+		saved.shaded = SetFade(fill, from[1], from[2], from[3], fade) or nil
+		saved.fadeArgs = saved.shaded and { from, fade } or nil
+	elseif fade and fill and FadeOnly(fill, fade) then
+		-- (Its color unread, secret say: the layer alone over the color it has.)
+		saved.shaded, saved.fadeArgs = true, nil
+	elseif saved.shaded then
+		saved.shaded, saved.fadeArgs = nil, nil
+		ClearFade(fill)
+		local c = saved.want or saved.color
+		if fill and c then pcall(fill.SetVertexColor, fill, c[1], c[2], c[3], 1) end
+		if not saved.colored and not saved.ours and fill and fill.SetDesaturated then fill:SetDesaturated(false) end
 	end
 	if view and view.ufBorder ~= "game" or skins[bar] then
 		local skin = Skin(bar)
@@ -487,6 +792,15 @@ local function KeepColor(bar, unit, redress)
 	if not saved then return end
 	local fill = bar:GetStatusBarTexture()
 	if not (fill and fill.GetVertexColor) then return end
+	-- (A gradient of ours: drawn again, as the fill's color read back isn't
+	-- one color to check, and a color set on it flattens it. Cheap.)
+	local args = saved.shaded and saved.fadeArgs
+	if args then
+		dressing = true
+		SetFade(fill, args[1][1], args[1][2], args[1][3], args[2])
+		dressing = false
+		return
+	end
 	local r, g, b, a = fill:GetVertexColor()
 	if not (Readable(r) and Readable(g) and Readable(b)) then return end
 	local want = saved.want
@@ -2112,7 +2426,10 @@ local function DressFrame(info)
 				local vivid = ns.ThemeVivid({ r, g, b })
 				r, g, b = vivid[1], vivid[2], vivid[3]
 			end
-			DressBar(health, view, r, g, b, HEALTH_GREEN)
+			-- (By health draws its own fade, over the curve's color: ByHealth.)
+			local byHealth = view and view.ufHealthColor == "health"
+			DressBar(health, view, r, g, b, HEALTH_GREEN, nil, not byHealth and Fade(view) or nil)
+			ByHealth(health, view, unit, Fade(view))
 			-- (Mana in the theme's color: rage, energy and the rest mean something by theirs.)
 			local mana = view and ns.ThemeMana() or nil
 			local tint = PowerTint(unit)
@@ -2125,7 +2442,7 @@ local function DressFrame(info)
 				local white = c and c[1] > 0.95 and c[2] > 0.95 and c[3] > 0.95
 				if c and not white and not PowerOwnColor(unit, c) then pr, pg, pb = tint[1], tint[2], tint[3] end
 			end
-			DressBar(power, view, pr, pg, pb, tint, health)
+			DressBar(power, view, pr, pg, pb, tint, health, Fade(view, "ufPower"))
 			-- (The player's second power, Elemental's mana say: drawn under the first.)
 			local second = frame == _G.PlayerFrame and _G.AlternatePowerBar or nil
 			DressBar(second, view, mana and mana[1], mana and mana[2], mana and mana[3], MANA_BLUE, health)
@@ -2174,6 +2491,17 @@ local function DressFrame(info)
 				end
 				if health and health.SetStatusBarColor then
 					hooksecurefunc(health, "SetStatusBarColor", function() if not dressing then Dress(info) end end)
+				end
+				-- (By health: its color again as its health changes.)
+				if health and health.SetValue then
+					hooksecurefunc(health, "SetValue", function(self)
+						if dressing or not ns.StyleOn("ufStyle") then return end
+						local now = View(info[1])
+						if now.ufHealthColor ~= "health" then return end
+						dressing = true
+						ByHealth(self, now, frame.unit, Fade(now))
+						dressing = false
+					end)
 				end
 				-- (A power bar's fill and color change with the unit's power: the
 				-- game's newest is what's ours to tint and to put back. It sets
@@ -2539,15 +2867,21 @@ function ns.MakeUnitStylePreview(parent, width, onPick)
 						r, g, b = SampleColor(sample)
 					elseif view.ufHealthColor == "custom" then
 						r, g, b = view.ufHealthR, view.ufHealthG, view.ufHealthB
+					elseif view.ufHealthColor == "health" then
+						local _, most = bar:GetMinMaxValues()
+						r, g, b = HealthMix(view, (most and most > 0) and bar:GetValue() / most or 1)
 					end
 					bar:SetStatusBarColor(r or 0, g or 0.8, b or 0)
+					-- (Its gradient, else flat: the color on the fill itself clears one.)
+					local fill, fade = bar:GetStatusBarTexture(), Fade(view)
+					SetFade(fill, r or 0, g or 0.8, b or 0, fade)
 				else
 					local mana = ns.ThemeMana()
-					if mana and sample.power[1] == 0 and sample.power[3] == 1 then
-						bar:SetStatusBarColor(mana[1], mana[2], mana[3])
-					else
-						bar:SetStatusBarColor(unpack(sample.power))
-					end
+					local pr, pg, pb = unpack(sample.power)
+					if mana and sample.power[1] == 0 and sample.power[3] == 1 then pr, pg, pb = mana[1], mana[2], mana[3] end
+					bar:SetStatusBarColor(pr, pg, pb)
+					local fill, fade = bar:GetStatusBarTexture(), Fade(view, "ufPower")
+					SetFade(fill, pr, pg, pb, fade)
 				end
 				local kind = ns.StyleBorder(view, "ufBorder")
 				bar.game:SetShown(kind == "game")
@@ -2938,15 +3272,55 @@ function ns.CreateUnitStylePanel(kit)
 			end,
 			texture = { "ufTexture", L["The bars' fill, including textures other addons share."], test = Editable, tint = { 0.25, 0.75, 0.3 } },
 			barColor = function(look)
-				look.Choices(L["Health:"], "ufHealthColor", {
+				local healthChoices = {
 					{ "game", L["The game's"] },
 					{ "class", L["Class or reaction"], L["Players in their class color, everyone else red, yellow or " ..
 						"green by how they see you."] },
 					{ "custom", L["Custom"], L["A color of your own (below)."] },
-				}, Editable)
+				}
+				-- (By health: only where the game has color curves.)
+				if ns.CanColorByHealth then
+					healthChoices[#healthChoices + 1] = { "health", L["By health"],
+						L["Its color below at full health, turning to the At half and Empty colors as health drops."] }
+				end
+				look.Choices(L["Health:"], "ufHealthColor", healthChoices, Editable)
+				local function HealthIs(a, b)
+					return function(db)
+						local now = ns.StyleKeyGet(FieldFor(id)("ufHealthColor"))
+						return Editable(db) and (now == a or now == b)
+					end
+				end
 				look.Chips(L["Its color"], { "ufHealthR", "ufHealthG", "ufHealthB" },
-					L["The health bar's color, for Custom."],
-					function(db) return Editable(db) and ns.StyleKeyGet(FieldFor(id)("ufHealthColor")) == "custom" end)
+					L["The health bar's color, for Custom (at full health, for By health)."], HealthIs("custom", "health"))
+				if ns.CanColorByHealth then
+					look.Chips(L["At half"], { "ufHealthMidR", "ufHealthMidG", "ufHealthMidB" },
+						L["Its color at half health, for By health."], HealthIs("health"))
+					look.Chips(L["Empty"], { "ufHealthLowR", "ufHealthLowG", "ufHealthLowB" },
+						L["Its color as health runs out, for By health."], HealthIs("health"))
+				end
+				-- (Its gradient: from its color, whichever, to a darker one of it or
+				-- one of your own; then the power bars', and which way both go.)
+				local field = FieldFor(id)
+				local function Grads(key, what)
+					look.Choices(what, key, {
+						{ "off", L["Off"] },
+						{ "shade", L["Darker"], L["It fades to a darker one of its own color, whatever that is."] },
+						{ "on", L["Your color"], L["It fades to the color below."] },
+					}, Editable)
+					local stem = key:gsub("Gradient$", "Grad")
+					look.Chips(L["Fades to"], { stem .. "R", stem .. "G", stem .. "B" }, L["The color it fades to."],
+						function(db) return Editable(db) and ns.StyleKeyGet(field(key)) == "on" end)
+				end
+				Grads("ufGradient", L["Health gradient:"])
+				Grads("ufPowerGradient", L["Power gradient:"])
+				look.Choices(L["Gradient way:"], "ufGradDir", {
+					{ "right", L["Left to right"], L["Its color at the left."] },
+					{ "left", L["Right to left"], L["Its color at the right."] },
+					{ "down", L["Top to bottom"], L["Its color at the top: lit from above."] },
+				}, function(db)
+					return Editable(db) and (ns.StyleKeyGet(field("ufGradient")) ~= "off"
+						or ns.StyleKeyGet(field("ufPowerGradient")) ~= "off")
+				end)
 			end,
 			ground = function(look)
 				look.Slider("ufBack", L["Background"], 0, 100, 5, "%d%%", 100,

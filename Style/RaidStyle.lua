@@ -26,6 +26,11 @@ local KEYS = {
 	rfGroundR = 0.3, rfGroundG = 0.3, rfGroundB = 0.45,
 	rfHealthColor = "game",      -- the health bar: "game", "class" (class or reaction) or "custom"
 	rfHealthR = 0.2, rfHealthG = 0.8, rfHealthB = 0.4,
+	rfHealthMidR = 1, rfHealthMidG = 0.8, rfHealthMidB = 0.1,     -- By health ("health"): its color at half,
+	rfHealthLowR = 0.9, rfHealthLowG = 0.15, rfHealthLowB = 0.15, -- ...and empty (full: rfHealthR/G/B)
+	rfGradient = "off",          -- the health bar's gradient: "off", "shade" (to a darker one of its color) or "on" (to rfGrad's)
+	rfGradR = 0.1, rfGradG = 0.1, rfGradB = 0.1,
+	rfGradDir = "right",         -- ...which way: "right" (its color at the left), "left" or "down" (its color at the top)
 	rfNameColor = "game",        -- the name: "game", "class" or "white"
 	rfFont = "general",          -- the name's font (ns.QUEST_ITEM_FONTS' names)
 	rfOutline = -1,              -- ...outline: 0 none, 1 thin, 2 thick (-1: General's)
@@ -159,6 +164,7 @@ end
 
 local dressing = false
 local skinned = setmetatable({}, { __mode = "k" }) -- health bar -> true, once it has our border's pieces
+local valueHooked = setmetatable({}, { __mode = "k" }) -- health bar -> true, once By health follows its value
 -- One compact frame as its group's look says.
 local function Dress(frame)
 	if dressing or not frame or (frame.IsForbidden and frame:IsForbidden()) then return end
@@ -175,14 +181,31 @@ local function Dress(frame)
 		local r, g, b
 		if view and view.ufHealthColor == "class" then
 			r, g, b = ns.UnitStyleColor(unit)
-		elseif view and view.ufHealthColor == "custom" then
+		elseif view and (view.ufHealthColor == "custom" or view.ufHealthColor == "health") then
 			r, g, b = view.ufHealthR, view.ufHealthG, view.ufHealthB
 		else
 			-- (Interface Recolor's Health bars row: where this page says the game's.)
 			local theme = ns.RecolorOf and ns.RecolorOf("irRaidHealth")
 			if theme then r, g, b = theme[1], theme[2], theme[3] end
 		end
-		ns.UnitStyleDressBar(health, view, r, g, b)
+		-- (By health draws its own fade, over the curve's color: ByHealth.)
+		local byHealth = view and view.ufHealthColor == "health"
+		ns.UnitStyleDressBar(health, view, r, g, b, nil, nil, not byHealth and ns.UnitStyleFade(view) or nil)
+		ns.UnitStyleByHealth(health, view, unit, ns.UnitStyleFade(view))
+		-- (By health: its color again as its health changes. The frame's
+		-- unit read then: these frames change hands.)
+		if not valueHooked[health] then
+			valueHooked[health] = true
+			hooksecurefunc(health, "SetValue", function(self)
+				if dressing or not ns.StyleOn("rfStyle") then return end
+				local id = GroupOf(frame)
+				local now = id and View(id)
+				if not (now and now.ufHealthColor == "health") then return end
+				dressing = true
+				ns.UnitStyleByHealth(self, now, frame.displayedUnit or frame.unit, ns.UnitStyleFade(now))
+				dressing = false
+			end)
+		end
 		-- (A new fill comes back on the bar's usual layer, over the role icon: the
 		-- game keeps it lower down.)
 		local fill = view and health:GetStatusBarTexture()
@@ -321,6 +344,12 @@ function ns.MakeRaidStylePreview(parent, width, onPick)
 		tile.health:SetPoint("BOTTOMRIGHT", -1, 5)
 		tile.health:SetMinMaxValues(0, 1)
 		tile.health:SetValue(HEALTH[i])
+		-- (Behind the bar, rfBack: the dark our border's skin lays behind the
+		-- bars in game (UnitStyle.lua's DressSkin), over the background.
+		-- 2026-11-19: the preview had none, so its slider seemed to do nothing.)
+		tile.back = tile:CreateTexture(nil, "BACKGROUND", nil, -7)
+		tile.back:SetAllPoints()
+		tile.back:SetColorTexture(0, 0, 0, 1)
 		tile.power = CreateFrame("StatusBar", nil, tile)
 		tile.power:SetPoint("TOPLEFT", tile.health, "BOTTOMLEFT", 0, -1)
 		tile.power:SetPoint("BOTTOMRIGHT", -1, 1)
@@ -352,10 +381,16 @@ function ns.MakeRaidStylePreview(parent, width, onPick)
 			-- (The game's raid frames: health in class colors.)
 			local r, g, b = ClassColor(class)
 			if view.ufHealthColor == "custom" then r, g, b = view.ufHealthR, view.ufHealthG, view.ufHealthB end
+			if view.ufHealthColor == "health" then r, g, b = ns.UnitStyleHealthMix(view, HEALTH[tile.i] or 1) end
 			tile.health:SetStatusBarColor(r, g, b)
+			-- (Its gradient, else flat: the color on the fill itself clears one.)
+			local fill, fade = tile.health:GetStatusBarTexture(), ns.UnitStyleFade(view)
+			ns.UnitStyleSetFade(fill, r, g, b, fade)
 			ns.DressThemeVeil(tile.health, "raid")
 			local kind, size, er, eg, eb = ns.StyleBorder(view, "ufBorder")
 			tile.edge:SetShown(kind == "line" or kind == "game")
+			tile.back:SetShown(kind ~= "game")
+			tile.back:SetAlpha(tonumber(view.ufBack) or 0.5)
 			if kind == "line" then
 				ns.DressStyleEdges(tile.edge, size, er, eg, eb, 1, false)
 			elseif kind == "game" then
@@ -532,13 +567,45 @@ function ns.CreateRaidStylePanel(kit)
 			end,
 			texture = { "rfTexture", L["The health bar's fill, including textures other addons share."], test = Editable, tint = { 0.25, 0.75, 0.3 } },
 			barColor = function(look)
-				look.Choices(L["Health:"], "rfHealthColor", {
+				local healthChoices = {
 					{ "game", L["The game's"], L["As the game's options say (class colors, or green)."] },
 					{ "class", L["Class or reaction"] },
 					{ "custom", L["Custom"], L["A color of your own (below)."] },
+				}
+				-- (By health: only where the game has color curves.)
+				if ns.CanColorByHealth then
+					healthChoices[#healthChoices + 1] = { "health", L["By health"],
+						L["Its color below at full health, turning to the At half and Empty colors as health drops."] }
+				end
+				look.Choices(L["Health:"], "rfHealthColor", healthChoices, Editable)
+				local function HealthIs(a, b)
+					return function(db)
+						local now = ns.StyleKeyGet(Field("rfHealthColor"))
+						return Editable(db) and (now == a or now == b)
+					end
+				end
+				look.Chips(L["Its color"], { "rfHealthR", "rfHealthG", "rfHealthB" },
+					L["The health bar's color, for Custom (at full health, for By health)."], HealthIs("custom", "health"))
+				if ns.CanColorByHealth then
+					look.Chips(L["At half"], { "rfHealthMidR", "rfHealthMidG", "rfHealthMidB" },
+						L["Its color at half health, for By health."], HealthIs("health"))
+					look.Chips(L["Empty"], { "rfHealthLowR", "rfHealthLowG", "rfHealthLowB" },
+						L["Its color as health runs out, for By health."], HealthIs("health"))
+				end
+				-- (Its gradient: from its color, whichever, to a darker one of it or
+				-- one of your own, and which way.)
+				look.Choices(L["Health gradient:"], "rfGradient", {
+					{ "off", L["Off"] },
+					{ "shade", L["Darker"], L["It fades to a darker one of its own color, whatever that is."] },
+					{ "on", L["Your color"], L["It fades to the color below."] },
 				}, Editable)
-				look.Chips(L["Its color"], { "rfHealthR", "rfHealthG", "rfHealthB" }, L["The health bar's color, for Custom."],
-					function(db) return Editable(db) and ns.StyleKeyGet(Field("rfHealthColor")) == "custom" end)
+				look.Chips(L["Fades to"], { "rfGradR", "rfGradG", "rfGradB" }, L["The color it fades to."],
+					function(db) return Editable(db) and ns.StyleKeyGet(Field("rfGradient")) == "on" end)
+				look.Choices(L["Gradient way:"], "rfGradDir", {
+					{ "right", L["Left to right"], L["Its color at the left."] },
+					{ "left", L["Right to left"], L["Its color at the right."] },
+					{ "down", L["Top to bottom"], L["Its color at the top: lit from above."] },
+				}, function(db) return Editable(db) and ns.StyleKeyGet(Field("rfGradient")) ~= "off" end)
 			end,
 			ground = function(look)
 				look.Slider("rfBack", L["Behind the bar"], 0, 100, 5, "%d%%", 100, L["How dark it is behind " ..

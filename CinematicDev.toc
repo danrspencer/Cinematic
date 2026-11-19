@@ -228,6 +228,7 @@ Dev\MyThemesTest.lua
 Dev\KeysBarsTest.lua
 Dev\DimNameTest.lua
 Dev\EmoteFitTest.lua
+Dev\GradientTest.lua
 Dev\PlateFlickerTest.lua
 Dev\TurnLagTest.lua
 Dev\PlateCostTest.lua

@@ -19,6 +19,11 @@ DEFAULTS.prdBorderR, DEFAULTS.prdBorderG, DEFAULTS.prdBorderB = 0, 0, 0 -- ...it
 DEFAULTS.prdBack = 0.5               -- ...the dark behind them, with a border of ours (thin, none)
 DEFAULTS.prdHealthColor = "game"     -- the health bar: "game", "class" or "custom" (prdHealthR/G/B)
 DEFAULTS.prdHealthR, DEFAULTS.prdHealthG, DEFAULTS.prdHealthB = 0.2, 0.8, 0.4
+DEFAULTS.prdGradient = "off"         -- the health bar's gradient: "off", "shade" (a darker one of its color) or "on" (prdGradR/G/B)
+DEFAULTS.prdGradR, DEFAULTS.prdGradG, DEFAULTS.prdGradB = 0.1, 0.1, 0.1
+DEFAULTS.prdPowerGradient = "off"    -- the power bars' (ours for mana too), as prdGradient (prdPowerGradR/G/B)
+DEFAULTS.prdPowerGradR, DEFAULTS.prdPowerGradG, DEFAULTS.prdPowerGradB = 0.05, 0.05, 0.2
+DEFAULTS.prdGradDir = "right"        -- ...which way both go: "right" (its color at the left), "left" or "down" (at the top)
 DEFAULTS.prdHealthHeight = 1         -- the health bar's height, times the game's
 DEFAULTS.prdPowerHeight = 1          -- the power bar's, times the game's
 DEFAULTS.prdHealthWidth = 1          -- the health bar's width, times the game's, about its middle
@@ -390,6 +395,7 @@ local textured = setmetatable({}, { __mode = "k" }) -- bar -> true, while in a f
 local sized = setmetatable({}, { __mode = "k" }) -- holder -> true, while at a height of ours
 local colored = setmetatable({}, { __mode = "k" }) -- bar -> true, while in a color of ours
 local gameColor = setmetatable({}, { __mode = "k" }) -- bar -> { r, g, b }, the game's last
+local secretColor = setmetatable({}, { __mode = "k" }) -- bar -> the game's, read secret: only handed back
 local dressing = false -- (our own setters: not the game's, for the hooks)
 
 -- One bar (and its holder: the frame whose height it takes, and whose
@@ -420,13 +426,19 @@ local function DressBar(bar, holder, look, heightKey, color)
 		if not colored[bar] then
 			colored[bar] = true
 			local r, g, b = bar:GetStatusBarColor()
-			if Plain(r) and Plain(g) and Plain(b) then gameColor[bar] = { r, g, b } end
+			if Plain(r) and Plain(g) and Plain(b) then
+				gameColor[bar] = { r, g, b }
+			else
+				-- (Secret, WoW Forever's: kept as it is, only to hand back. Seen
+				-- 2026-11-19, gradtest: the bar stayed in our color after.)
+				secretColor[bar] = { r, g, b }
+			end
 		end
 		bar:SetStatusBarColor(color[1], color[2], color[3])
 	elseif colored[bar] then
 		colored[bar] = nil
-		local c = gameColor[bar]
-		if c then bar:SetStatusBarColor(c[1], c[2], c[3]) end
+		local c = gameColor[bar] or secretColor[bar]
+		if c then pcall(bar.SetStatusBarColor, bar, c[1], c[2], c[3]) end
 	end
 	-- Its height.
 	-- (Left alone at the game's height unless we'd changed it: Edit Mode's
@@ -470,6 +482,34 @@ local function DressBar(bar, holder, look, heightKey, color)
 	dressing = false
 end
 
+-- A bar's gradient (fade: ns.UnitStyleFade's, nil: flat again), from its
+-- color now: ours, else the game's (kept, else read). The game's art keeps
+-- its own color under it (retail's green health): the gradient tints it.
+-- (2026-11-19.)
+local shaded = setmetatable({}, { __mode = "k" })
+local function Shade(bar, fade, color)
+	local fill = bar and bar:GetStatusBarTexture()
+	if not fill then return end
+	-- (Ours: the fill in it, the fade over it. The game's: the fade alone over
+	-- whatever color it has, read or not: it's secret on WoW Forever, and the
+	-- whole-bar layer needs none. gradtest 2026-11-19: the power bar stayed flat.)
+	if fade and color and ns.UnitStyleSetFade and ns.UnitStyleSetFade(fill, color[1], color[2], color[3], fade) then
+		shaded[bar] = color
+	elseif fade and ns.UnitStyleFadeOnly and ns.UnitStyleFadeOnly(fill, fade) then
+		shaded[bar] = true
+	elseif shaded[bar] then
+		-- (Flat again: the bar's own color on its fill, handed straight on,
+		-- secret or not: never the color it faded from, which may be ours.)
+		shaded[bar] = nil
+		if ns.UnitStyleClearFade then ns.UnitStyleClearFade(fill) end
+		pcall(function() fill:SetVertexColor(bar:GetStatusBarColor()) end)
+	end
+end
+local function Fades(look)
+	if not (look and ns.UnitStyleFade) then return nil, nil end
+	return ns.UnitStyleFade(look, "prd", "prdGradDir"), ns.UnitStyleFade(look, "prdPower", "prdGradDir")
+end
+
 local healthHooked, powerHooked = false, false
 local Apply
 
@@ -489,6 +529,9 @@ function Apply()
 	DressBar(health, holder, look, "prdHealthHeight", r and { r, g, b } or nil)
 	local pr, pg, pb = PowerColor(look)
 	DressBar(power, nil, look, "prdPowerHeight", pr and { pr, pg, pb } or nil)
+	local healthFade, powerFade = Fades(look)
+	Shade(health, healthFade, r and { r, g, b } or nil)
+	Shade(power, powerFade, pr and { pr, pg, pb } or nil)
 	-- (The game's mana fill is blue in its art: grey under our color, so it takes it.)
 	local powerFill = power and power:GetStatusBarTexture()
 	if powerFill and powerFill.SetDesaturated and not textured[power] then powerFill:SetDesaturated(pr ~= nil) end
@@ -500,6 +543,7 @@ function Apply()
 		CopyTrim(power, mana)
 		DressBar(mana, nil, look, "prdManaHeight")
 		ns.ColorPersonalMana(look)
+		Shade(mana, select(2, Fades(look)))
 	end
 	local pieceScale = look and tonumber(look.prdPiecesScale) or 1
 	if pieces and pieces.SetScale and (pieceScale ~= 1 or sized[pieces]) then
@@ -517,11 +561,11 @@ function Apply()
 			local now = ns.StyleOn("prdStyle") and Look()
 			if not now then return end
 			local cr, cg, cb = HealthColor(now)
-			if cr then
-				dressing = true
-				self:SetStatusBarColor(cr, cg, cb)
-				dressing = false
-			end
+			dressing = true
+			if cr then self:SetStatusBarColor(cr, cg, cb) end
+			-- (Its gradient again, from the color it has now.)
+			Shade(self, (Fades(now)), cr and { cr, cg, cb } or nil)
+			dressing = false
 		end)
 	end
 	if power and not powerHooked and power.SetStatusBarColor then
@@ -530,11 +574,10 @@ function Apply()
 			if Plain(cr) and Plain(cg) and Plain(cb) then gameColor[self] = { cr, cg, cb } end
 			local now = ns.StyleOn("prdStyle") and Look()
 			local mr, mg, mb = PowerColor(now)
-			if mr then
-				dressing = true
-				self:SetStatusBarColor(mr, mg, mb)
-				dressing = false
-			end
+			dressing = true
+			if mr then self:SetStatusBarColor(mr, mg, mb) end
+			Shade(self, select(2, Fades(now)), mr and { mr, mg, mb } or nil)
+			dressing = false
 		end)
 	end
 	if power and not powerHooked and power.SetStatusBarTexture then
@@ -682,6 +725,14 @@ function ns.MakePersonalPreview(parent, width)
 		else
 			mana:SetStatusBarColor(unpack(PREVIEW_POWER))
 		end
+		-- (Their gradients, else flat: the color on the fill itself clears one.)
+		local healthFade, powerFade = Fades(look)
+		for _, each in ipairs({ { health, healthFade }, { power, powerFade }, { mana, powerFade } }) do
+			local bar, fade = each[1], each[2]
+			local fill = bar:GetStatusBarTexture()
+			local cr, cg, cb = bar:GetStatusBarColor()
+			ns.UnitStyleSetFade(fill, cr, cg, cb, fade)
+		end
 		local scale = tonumber(look.prdPiecesScale) or 1
 		local cr, cg, cb = ClassColor()
 		for i, dot in ipairs(pieces.dots) do
@@ -768,6 +819,25 @@ function ns.CreatePersonalStylePanel(kit)
 				look.Chips(L["Mana color"], { "prdManaR", "prdManaG", "prdManaB" },
 					L["The mana bar's color, for Custom."], function(db) return ManaOn(db) and db.prdManaColor == "custom" end)
 			end
+			-- (Their gradients: from each bar's color to a darker one of it or
+			-- one of your own, and which way. As Unit Frames'.)
+			local function Grads(key, what)
+				look.Choices(what, key, {
+					{ "off", L["Off"] },
+					{ "shade", L["Darker"], L["It fades to a darker one of its own color, whatever that is."] },
+					{ "on", L["Your color"], L["It fades to the color below."] },
+				})
+				local stem = key:gsub("Gradient$", "Grad")
+				look.Chips(L["Fades to"], { stem .. "R", stem .. "G", stem .. "B" }, L["The color it fades to."],
+					function(db) return rows.On(db) and db[key] == "on" end)
+			end
+			Grads("prdGradient", L["Health gradient:"])
+			Grads("prdPowerGradient", L["Power gradient:"])
+			look.Choices(L["Gradient way:"], "prdGradDir", {
+				{ "right", L["Left to right"], L["Its color at the left."] },
+				{ "left", L["Right to left"], L["Its color at the right."] },
+				{ "down", L["Top to bottom"], L["Its color at the top: lit from above."] },
+			}, function(db) return rows.On(db) and (db.prdGradient ~= "off" or db.prdPowerGradient ~= "off") end)
 		end,
 		ground = function(look)
 			look.Slider("prdBack", L["Background"], 0, 100, 5, "%d%%", 100,
