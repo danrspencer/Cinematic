@@ -627,6 +627,12 @@ local function Explain(entry)
 		return title, "unknown", out, key
 	end
 	local status = n.target >= 1 and "shown" or n.target > 0 and "partly" or "hidden"
+	-- (Faded out by us, but under a Show below share the game won't say: the
+	-- game's curve sets its opacity, which addons can't read (Frames.lua's
+	-- manaSecret). Up as far as that says, not hidden: a player's report
+	-- 2026-11-19, the player frame up while Inspect said HIDDEN.)
+	local secret = status == "hidden" and n.cinematic and entry.manaSecret
+	if secret then status = "partly" end
 	-- (Shown or hidden by its row's key, in CineMode or out: Frames.lua's ns.FrameForced.)
 	local forced = ns.FrameForced and ns.FrameForced(entry)
 	local forcedBy = forced and ns.FrameForcedBy and ns.FrameForcedBy(entry)
@@ -674,6 +680,17 @@ local function Explain(entry)
 		Add(out, "block", L["This swing bar isn't in use"], "Swing timer")
 	end
 	-- What's bringing it up.
+	if secret then
+		local share = math.floor((secret.share or 0) * 100 + 0.5)
+		if secret.health and share >= 100 then -- (Not full's curve, just short of full)
+			Add(out, "on", L["The game sets its opacity by your health (up while it isn't full): addons can't " ..
+				"read your health right now"], "Personal Resources")
+		else
+			Add(out, "on", (secret.health and L["The game sets its opacity by your health (up under %d%%): " ..
+				"addons can't read your health right now"] or L["The game sets its opacity by your power (up " ..
+				"under %d%%): addons can't read your power right now"]):format(share), "Personal Resources")
+		end
+	end
 	if n.hovered then
 		Add(out, "on", L["The mouse is on it, or on a frame in its Hover group"], "Mouseover groups")
 	end
@@ -751,7 +768,7 @@ local function Explain(entry)
 		Add(out, "on", L["Your frame stays up while you recover"], "Personal Resources")
 	end
 	AdvancedNow(entry, n, out)
-	if status == "partly" and not n.listShown and not n.tracking and not n.hovered then
+	if status == "partly" and not secret and not n.listShown and not n.tracking and not n.hovered then
 		Add(out, "on", L["Vitals Vision shows it as far as your health says"], "Vitals Vision")
 	end
 	-- The row's columns: the ones doing it now, then the ones that would.
