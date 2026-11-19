@@ -62,20 +62,21 @@ end
 Check("sample maker there", ns.MakeCastLookSample ~= nil)
 if not ns.MakeCastLookSample then os.exit(1) end
 
--- A target bar in the nameplates' game look, then back.
+-- Your bar in the nameplates' game look, then back (only You has the pick for
+-- now: the target's and bosses' anchors are secret on Forever, AsHeld).
 db.unitCastStyle = true
-db.plateCastOn_TARGET, db.plateCastFrame_TARGET, db.plateCastGameAs_TARGET = true, false, false
-local target = ns.MakeCastLookSample(UIParent, "unit", 2, "TARGET")
+db.plateCastOn_PLAYER, db.plateCastFrame_PLAYER, db.plateCastGameAs_PLAYER = true, false, false
+local target = ns.MakeCastLookSample(UIParent, "unit", 2, "PLAYER")
 target:Refresh()
 local before = Snapshot(target)
-db.plateCastGameAs_TARGET = true
+db.plateCastGameAs_PLAYER = true
 target:Refresh()
 local border = target.Border
 Check("target: border hidden", border and border:GetAlpha() < 0.01, border and border:GetAlpha())
 Check("target: name on the left", target.Text:GetJustifyH() == "LEFT", target.Text:GetJustifyH())
 Check("target: icon 12 wide", math.abs(target.Icon:GetWidth() - 12) < 0.01, target.Icon:GetWidth())
 Check("target: name beside the icon", Points(target.Text):find("LEFT>", 1, true) == 1, Points(target.Text))
-db.plateCastGameAs_TARGET = false
+db.plateCastGameAs_PLAYER = false
 target:Refresh()
 local after = Snapshot(target)
 Check("target back: name justify", after.justify == before.justify, after.justify .. " was " .. before.justify)
@@ -83,6 +84,20 @@ Check("target back: name anchors", after.text == before.text, after.text .. " | 
 Check("target back: icon anchors", after.icon == before.icon, after.icon .. " | was " .. before.icon)
 Check("target back: icon size", math.abs(after.iconW - before.iconW) < 0.01, after.iconW .. " was " .. before.iconW)
 Check("target back: border shown", border and border:GetAlpha() > 0.5, border and border:GetAlpha())
+
+-- A saved Nameplates' pick on the target's row is held back: the game's look.
+db.plateCastOn_TARGET, db.plateCastFrame_TARGET, db.plateCastGameAs_TARGET = true, false, false
+local held = ns.MakeCastLookSample(UIParent, "unit", 1, "TARGET")
+held:Refresh()
+local heldBefore = Snapshot(held)
+db.plateCastGameAs_TARGET = true
+held:Refresh()
+local heldNow = Snapshot(held)
+Check("target: Nameplates' pick held back (name)", heldNow.justify == heldBefore.justify and heldNow.text == heldBefore.text,
+	heldNow.justify .. " " .. heldNow.text)
+Check("target: Nameplates' pick held back (border shown)", held.Border and held.Border:GetAlpha() > 0.5,
+	held.Border and held.Border:GetAlpha())
+db.plateCastGameAs_TARGET = false
 
 -- A nameplate bar in the unit frames' game look, then back.
 db.plateCastStyle = true

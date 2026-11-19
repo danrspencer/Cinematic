@@ -627,7 +627,7 @@ local function SetOther()
 	for _, id in ipairs({ "PLAYER", "TARGET" }) do
 		db["plateCastOn_" .. id] = true
 		db["plateCastFrame_" .. id] = false
-		db["plateCastGameAs_" .. id] = true
+		db["plateCastGameAs_" .. id] = true -- (held back on the target's: AsHeld, PlateCastStyle.lua)
 	end
 	db.plateCastGameAs_PLATE = true
 	if ns.RefreshPlateCastStyle then pcall(ns.RefreshPlateCastStyle) end
@@ -702,8 +702,16 @@ local function OnEvent(_, event, unit)
 			end
 			if phase == "other" then
 				CheckOther("unit", run.facts["other:player"], "your bar")
-				CheckOther("unit", run.facts["other:target"], "target bar")
-				CheckOther("unit", Facts(samples.unit), "target sample")
+				-- (The target's pick is held back for now: its bar keeps the game's
+				-- look, its name centered under it, its box shown.)
+				local target = run.facts["other:target"]
+				if target then
+					Verdict(target.justify == "CENTER" and (target.TextBorder or 1) > 0.01,
+						("target bar's Nameplates' pick held back: name %s, box alpha %s"):format(tostring(target.justify),
+							tostring(target.TextBorder)))
+				else
+					Verdict(nil, "target bar held back: not read")
+				end
 				CheckOther("plate", Facts(samples.plate), "plate sample")
 			end
 			C_Timer.After(AFTER_SHOT, function() if run then PlateStep(step + 1) end end)

@@ -259,9 +259,17 @@ end
 -- 2026-11-19, user): the nameplates' as the unit frames' bars look in the
 -- game ("unit"), the unit frames' as the nameplates' do ("plate"). nil
 -- otherwise. Drawn on the bar by DressAs.
+-- (Not on the target's and bosses' bars yet: on Forever their name's anchors
+-- are secret, so it can't be moved and stayed floating under the bar with
+-- its box gone (Preview Match, 2026-11-19). Their pick stays saved but the
+-- bars show the game's own look till that's done: AsHeld.)
+local AS_OFFERED = { PLATE = true, PLAYER = true }
+local function AsHeld(id, db)
+	return id and not AS_OFFERED[id] and db and db["plateCastGameAs_" .. id] and true or false
+end
 local function GameAs(id, db)
 	db = db or ns.db
-	if not (id and db and db["plateCastGameAs_" .. id] and Active(id, db)) then return nil end
+	if not (id and AS_OFFERED[id] and db and db["plateCastGameAs_" .. id] and Active(id, db)) then return nil end
 	return id == "PLATE" and "unit" or "plate"
 end
 -- (Its look: the game's own settings, and which game look to dress it in.)
@@ -277,7 +285,7 @@ end
 
 -- The look a kind of bar gets now: the game's while it isn't restyled.
 local function Look(id)
-	if id and not Active(id) then
+	if id and (not Active(id) or AsHeld(id, ns.db)) then
 		return ns.StyleLook("plateCastStyle", true)
 	end
 	local as = GameAs(id)
@@ -1965,7 +1973,7 @@ local function BuildCastPage(kit, spec)
 		local db = ns.GetDB()
 		if not (db and id) then return nil end
 		if id ~= "PLATE" and not db["plateCastOn_" .. id] then return "game" end
-		if db["plateCastGameAs_" .. id] then return "other" end
+		if db["plateCastGameAs_" .. id] then return AS_OFFERED[id] and "other" or "game" end
 		if FRAME_IDS[id] and db["plateCastFrame_" .. id] then return "frame" end
 		return db["plateCastOwn_" .. id] and "own" or "default"
 	end
@@ -2097,7 +2105,9 @@ local function BuildCastPage(kit, spec)
 				local list = {}
 				if id ~= "PLATE" then
 					list[#list + 1] = { "game", L["The game's"], L["Cinematic leaves these cast bars alone."] }
-					list[#list + 1] = { "other", L["Nameplates'"], L["The game's nameplate cast bar look."] }
+					if AS_OFFERED[id] then
+						list[#list + 1] = { "other", L["Nameplates'"], L["The game's nameplate cast bar look."] }
+					end
 				else
 					list[#list + 1] = { "other", L["Unit frames'"], L["The game's unit frame cast bar look."] }
 				end
