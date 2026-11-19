@@ -223,6 +223,7 @@ local function PrintDebugHelp()
 	print("  /cine debug whysecret - one run checking Why on the player frame while the game sets its opacity by your health (dev copy)")
 	print("  /cine debug deathtest - one run checking the Death Vision page: its menu, Test, sliders and switch, with screenshots (dev copy)")
 	print("  /cine debug resettest [logout] - one run checking what a reset puts back (layouts, plate settings), or with logout the plate settings going back at logout, across a reload (dev copy)")
+	print("  /cine debug cursortest - one run checking Replace cursor icon: your pick over open ground and the UI, the game's own over a mailbox or an NPC, with on-screen steps and Yes/No (dev copy; again to stop)")
 	print("  /cine debug euiswing - one run recording why EllesmereUI's swing timer stays hidden in CineMode (dev copy; again to stop)")
 	print("  /cine debug solo <Addon> [more] - only that addon (its parts and what it needs) and Cinematic load: turns the rest off and reloads; solo off brings them back (dev copy)")
 	print("  /cine debug addontest <Addon> [quick] - one run testing our support for it: every row hidden and shown, and every frame of it on screen covered or not (dev copy; again to stop)")
@@ -1823,6 +1824,12 @@ local function HandleSlash(msg)
 		-- (Dev copy: which shortened number styles the game gives combat text, NumberStyleTest.lua.)
 		if ns.NumberStyleTest then ns.NumberStyleTest()
 		else ns.Print("/cine debug numbers is in the dev copy only.") end
+	elseif cmd == "debug" and (arg == "cursortest" or arg == "cursortest methods") then
+		-- (Dev copy: one run checking Replace cursor icon, ours vs the game's cursor; methods: which way
+		-- of keeping ours doesn't flash, CursorReplaceTest.lua.)
+		if arg == "cursortest methods" and ns.CursorMethodTest then ns.CursorMethodTest()
+		elseif ns.CursorReplaceTest then ns.CursorReplaceTest()
+		else ns.Print("/cine debug cursortest is in the dev copy only.") end
 	elseif cmd == "debug" and arg == "whosehit" then
 		-- (Dev copy: does anything tell your hits from strangers' with no log lines, WhoseHitTest.lua.)
 		if ns.WhoseHitTest then ns.WhoseHitTest()

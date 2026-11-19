@@ -4770,6 +4770,31 @@ STEPS[#STEPS + 1] = function()
 	end
 end
 
+-- (Step for Cursor Hide, 2026-11-19.)
+STEPS[#STEPS + 1] = function()
+	-- Cursor Hide's three ways (Tiny, Hide completely, Tiny then gone) are
+	-- one now: it hides once the mouse is still, and Replace cursor icon
+	-- swaps in a cursor of your pick till then. Tiny or Tiny, then gone
+	-- becomes Replace cursor icon on (the tiny corner, as before). Saved
+	-- profiles too. Once.
+	if not ns.db.cursorReplaceIconV1 then
+		local function Replace(t)
+			if type(t) ~= "table" then return end
+			if t.cursorHideMethod == "tiny" or t.cursorHideMethod == "both" then t.cursorReplaceIcon = true end
+			t.cursorHideMethod = nil
+		end
+		Replace(ns.db)
+		for _, saved in pairs(ns.db.profiles or {}) do
+			if type(saved) == "table" then
+				Replace(saved)
+				Replace(saved.settings)
+			end
+		end
+		for _, point in pairs(ns.db.profileResetPoints or {}) do Replace(point) end
+		ns.db.cursorReplaceIconV1 = true
+	end
+end
+
 -- Runs them all, each on its own: an error is logged and reported (the
 -- addon's error net, Diagnostics.lua), and the steps after it still run.
 function ns.RunMigrations()

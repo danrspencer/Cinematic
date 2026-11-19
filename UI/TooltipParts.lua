@@ -1071,6 +1071,9 @@ local listParts = false
 -- hidden UI doesn't take it too. Gone after a few seconds.
 local promptFrame
 function ns.TestPrompt(msg, seconds)
+	-- (A test with on-screen steps never gets the Ctrl+C copy window over the
+	-- game: its lines are in chat and the log. The user's rule, 2026-11-19.)
+	ns.debugNoCopyWindow = true
 	ns.Print(msg)
 	pcall(function()
 		if not promptFrame then
