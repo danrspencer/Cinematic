@@ -4675,6 +4675,26 @@ STEPS[#STEPS + 1] = function()
 		for _, point in pairs(ns.db.profileResetPoints or {}) do Split(point) end
 		ns.db.combatTextMissSplitV1 = true
 	end
+	-- By school's Nature is brown now (2026-11-19: green read as a heal): one
+	-- still the old green, as By school set it, goes brown; a color the
+	-- player picked stays. Saved profiles too. Once.
+	if not ns.db.combatTextNatureBrownV1 then
+		local function Brown(t)
+			if type(t) ~= "table" then return end
+			if t.ct_spellNature_R == 0.3 and t.ct_spellNature_G == 1 and t.ct_spellNature_B == 0.3 then
+				t.ct_spellNature_R, t.ct_spellNature_G, t.ct_spellNature_B = 0.72, 0.58, 0.36
+			end
+		end
+		Brown(ns.db)
+		for _, saved in pairs(ns.db.profiles or {}) do
+			if type(saved) == "table" then
+				Brown(saved)
+				Brown(saved.settings)
+			end
+		end
+		for _, point in pairs(ns.db.profileResetPoints or {}) do Brown(point) end
+		ns.db.combatTextNatureBrownV1 = true
+	end
 end
 
 -- Runs them all, each on its own: an error is logged and reported (the

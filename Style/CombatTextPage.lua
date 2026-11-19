@@ -16,7 +16,7 @@ local CT = ns.CombatTexts
 -- A fourth: its cast in seconds (a Fireball's 2.5, an instant's 0), so a
 -- long cast's growing shows (CastSize, CastTime).
 local MIX = { { 0, "spellFire", nil, 2.5 }, { 0.35, "swing" }, { 0.7, "spellFrost", nil, 0 },
-	{ 1.0, "spellCrit", "spellFire", 2.5 },
+	{ 1.0, "spellCrit", "spellFire", 2.5 }, { 1.02, "swing" }, { 1.05, "spellShadow" },
 	{ 1.35, "spellShadow" }, { 1.7, "swingCrit" }, { 2.0, "spellArcane" }, { 2.3, "ability" }, { 2.6, "spellNature" },
 	{ 2.85, "missDodge" }, { 3.1, "spellHoly" }, { 3.4, "spellMissResist" } }
 local HEALS = { { 0, "heal", nil, 2.5 }, { 0.6, "heal", nil, 0 }, { 1.2, "healCrit", nil, 1.5 }, { 2.0, "heal" },
@@ -290,6 +290,8 @@ function ns.CreateCombatTextStylePanel(kit)
 		CT.Field("all", setting).set(on and 0.75 or ns.DEFAULTS[CT.Key("all", setting)])
 	end
 	local function ScaleIs(setting, value) return CT.Get("all", setting) == value end
+	local function PlaceAs(value) ns.GetDB()[CT.Key("all", "Together")] = value end
+	local function PlaceIs(value) return (CT.Value(CT.Key("all", "Together")) or "side") == value end
 	-- By hit kind (2026-11-18): swings smaller (or shorter), spells and heals
 	-- growing with their casts; off, each back to its usual.
 	local KIND = { Size = { "Size", "CastSize" }, Time = { "Time", "CastTime" } }
@@ -339,6 +341,17 @@ function ns.CreateCombatTextStylePanel(kit)
 				end
 				return true
 			end, L["Swings and swing crits are off: switch them back in the table."], { "damage", "swing" } },
+		} },
+		-- (Placement, 2026-11-19: how hits landing together sit, All texts'.)
+		{ L["Placement"], {
+			{ L["Side by side"], L["Side by side, as the game's."], function() PlaceAs(nil) end,
+				function() return PlaceIs("side") end, "", {} },
+			{ L["Stacked"], L["Each one a little higher than the last."], function() PlaceAs("stack") end,
+				function() return PlaceIs("stack") end, "", {} },
+			{ L["On top"], L["All in one spot."], function() PlaceAs("top") end,
+				function() return PlaceIs("top") end, "", {} },
+			{ L["Make room"], L["Crits and your casts in the middle; the rest move aside."], function() PlaceAs("room") end,
+				function() return PlaceIs("room") end, "", {} },
 		} },
 		{ L["Size"], {
 			{ L["The game's"], L["As big as the game's numbers."], function() Scale("Size", false) Kind("Size", false) end,
@@ -555,6 +568,7 @@ function ns.CreateCombatTextStylePanel(kit)
 					{ "side", L["Side by side"], L["Side by side, as the game's."] },
 					{ "stack", L["Stacked"], L["Each one a little higher than the last."] },
 					{ "top", L["On top"], L["All in one spot."] },
+					{ "room", L["Make room"], L["Crits and your casts in the middle; the rest move aside."] },
 				})
 			end,
 			lastHit = id == "all" and function(look)
@@ -658,7 +672,7 @@ function ns.CreateCombatTextStylePanel(kit)
 		Changed()
 		kit.Refresh()
 	end
-	local function RowColor(node) return CT.Color(node.id) end
+	local function RowColor(node) return CT.Color(node.id) end -- (a school's crit: its school's, critOf)
 	for _, node in ipairs(CT.NODES) do
 		local id = node.id
 		local line = { node = node }

@@ -12,6 +12,9 @@
 --
 -- A crit's group is the hit it crits: a fire spell's crit, not set on its
 -- own, looks as Fire does; one of its own looks as Spell crits says.
+-- Spells and abilities' Crits has a row for each school and Abilities
+-- (2026-11-19, the player's call: a fire spell's crit is Fire's color, only
+-- bigger): each is Crits' (its place, motion, crit size), then its hit's.
 --
 -- Spells and abilities are one group (2026-11-18, the player's call: both
 -- are something you cast or press), and each of the two (Swings, Spells and
@@ -83,7 +86,9 @@ local NODES = {
 		sample = "27", damage = true },
 	{ id = "spellHoly", parent = "spell", label = "Holy", school = 2, color = { 1, 0.9, 0.5 }, sample = "21", damage = true },
 	{ id = "spellFire", parent = "spell", label = "Fire", school = 4, color = { 1, 0.5, 0.1 }, sample = "24", damage = true },
-	{ id = "spellNature", parent = "spell", label = "Nature", school = 8, color = { 0.3, 1, 0.3 }, sample = "19", damage = true },
+	-- (Nature brown since 2026-11-19: green read as a heal, the player's call.)
+	{ id = "spellNature", parent = "spell", label = "Nature", school = 8, color = { 0.72, 0.58, 0.36 }, sample = "19",
+		damage = true },
 	{ id = "spellFrost", parent = "spell", label = "Frost", school = 16, color = { 0.45, 0.85, 1 }, sample = "22", damage = true },
 	{ id = "spellShadow", parent = "spell", label = "Shadow", school = 32, color = { 0.65, 0.4, 1 }, sample = "25", damage = true },
 	{ id = "spellArcane", parent = "spell", label = "Arcane", school = 64, color = { 1, 0.5, 0.95 }, sample = "26", damage = true },
@@ -95,6 +100,20 @@ local NODES = {
 		own = { Color = Color(HEAL) }, theme = "heal", sample = "18" },
 	{ id = "healCrit", parent = "heal", label = "Heal crits", tip = "Your heals' crits.", crit = true, sample = "37" },
 }
+-- Crits' rows: one for each hit under Spells and abilities (critOf: the
+-- hit it crits), after Crits.
+do
+	local at
+	for index, node in ipairs(NODES) do
+		if node.id == "spellCrit" then at = index end
+	end
+	for _, of in ipairs({ { "Ability", "ability", "Abilities" }, { "Holy", "spellHoly" }, { "Fire", "spellFire" },
+		{ "Nature", "spellNature" }, { "Frost", "spellFrost" }, { "Shadow", "spellShadow" }, { "Arcane", "spellArcane" } }) do
+		at = at + 1
+		table.insert(NODES, at, { id = "spellCrit" .. of[1], parent = "spellCrit", label = of[3] or of[1], crit = true,
+			critOf = of[2], sample = "46", damage = true })
+	end
+end
 -- Each Misses group's words, in the game's order, after its group: a
 -- swing's (missDodge...), a spell's or ability's (spellMissDodge...).
 -- spellOnly: never a swing's.
@@ -121,7 +140,7 @@ local NODE = {}
 for index, node in ipairs(NODES) do
 	node.index = index
 	NODE[node.id] = node
-	if node.crit then node.own = { Place = CRIT_PLACE, Motion = CRIT_MOTION } end
+	if node.crit and not node.critOf then node.own = { Place = CRIT_PLACE, Motion = CRIT_MOTION } end
 	if node.misses then node.own = { Place = { Y = 0, X = 0, Start = "name" } } end
 end
 CT.NODE = NODE
@@ -196,15 +215,25 @@ local function Saved(id, setting)
 end
 
 -- The text a setting comes from, up to All texts: the first set there, or
--- built in. via: the hit a crit crits (its group in place of its own parent).
+-- built in. via: the hit a crit crits (a crit group's next step in place of
+-- its own parent; a school's crit row: its own hit, critOf).
 local function Parent(id, via)
 	local node = NODE[id]
-	if node.crit and via and NODE[via] then return via end
+	if node.crit and not node.critOf and via and NODE[via] then return via end
 	return node.parent
 end
 CT.Parent = Parent
+-- The next step up, and the via left for the steps after it (a crit group
+-- uses it up).
+local function Up(step, via)
+	local node = NODE[step]
+	local up = Parent(step, via)
+	if node.crit and not node.critOf then via = nil end
+	return up, via
+end
 -- Gives the value and the text it's from ("all" for All texts').
 function CT.Get(id, setting, via)
+	via = via or (NODE[id] and NODE[id].critOf)
 	local step = id
 	for _ = 1, 12 do
 		if not step or step == "all" then break end
@@ -212,8 +241,7 @@ function CT.Get(id, setting, via)
 		if value ~= nil then return value, step end
 		local built = BUILTIN[step] and BUILTIN[step][setting]
 		if built ~= nil then return built, step end
-		step = Parent(step, via)
-		via = nil -- (only a crit's own step goes through its hit)
+		step, via = Up(step, via)
 	end
 	return Value(Key("all", setting)), "all"
 end
@@ -226,12 +254,13 @@ function CT.Usual(id, setting)
 	local built = BUILTIN[id] and BUILTIN[id][setting]
 	if built ~= nil then return built, id end
 	if id == "all" then return DEFAULTS[Key("all", setting)], "all" end
-	return CT.Get(Parent(id), setting)
+	return CT.Get(Parent(id), setting, NODE[id] and NODE[id].critOf)
 end
 
 -- A text's color ({ r, g, b }). via: the hit a crit crits. A built-in
 -- color: the style theme's, if it has one for it.
 function CT.Color(id, via)
+	via = via or (NODE[id] and NODE[id].critOf)
 	local step = id
 	for _ = 1, 12 do
 		local node = step and NODE[step]
@@ -245,8 +274,7 @@ function CT.Color(id, via)
 			return own or { built.R, built.G, built.B }
 		end
 		if step == "all" then return { Value(Key("all", "R")), Value(Key("all", "G")), Value(Key("all", "B")) } end
-		step = Parent(step, via)
-		if NODE[id].crit then via = nil end
+		step, via = Up(step, via)
 	end
 	return SPELL
 end
@@ -273,7 +301,8 @@ function CT.Shows(id, _, sample) -- (_: the hit, unused: a crit has its own swit
 	local child, step = NODE[id], NODE[id].parent
 	for _ = 1, 10 do
 		if not step then break end
-		if not (child.crit or child.misses) and not SwitchOn(Key(step, "Show"), sample) then return false end
+		local own = (child.crit and not child.critOf) or child.misses -- (a crit or Misses group: not its hit's switch)
+		if not own and not SwitchOn(Key(step, "Show"), sample) then return false end
 		child, step = NODE[step], NODE[step].parent
 	end
 	return true

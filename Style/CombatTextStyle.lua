@@ -253,6 +253,89 @@ local function SlotX(plate, now, width)
 	return left - GAP - width / 2
 end
 
+-- Make room (2026-11-19, the player's design): the biggest hits in the
+-- middle, the rest moved aside out of their way. Each number has a rank:
+-- 1 a crit, 2 a hit of something you cast or pressed (a spell or heal with
+-- a cast of yours, an ability), 3 the rest (swings, DoT ticks, procs,
+-- Thorns: no cast waiting for them), 4 a miss. A new one takes the free spot
+-- nearest its middle among the numbers ranked over it (and, ranked 3 or 4,
+-- its own rank's: those sit side by side); then any in its way ranked under
+-- it (and, a crit or a cast's, its own rank's older ones) slide aside, over
+-- SLIDE, each one moved pushing on any in its own way. Overlap is where each
+-- is now: one that's climbed above a new one isn't in its way. Widths are
+-- guessed (an amount in a fight is secret): about three digits.
+local SLIDE = 0.15
+local ROOM_SPREAD = 1.7
+local function Rank(node, cast)
+	if node.crit then return 1 end
+	if node.word then return 4 end
+	if cast ~= nil or node.id == "ability" then return 2 end
+	return 3
+end
+local function BoxW(number) return number.boxW or number.width or (number.size or BASE_SIZE) * ROOM_SPREAD end
+local function RankOf(number) return number.rank or 3 end
+local function Overlap(a, ax, ay, b)
+	return math.abs(ax - b.baseX) < (BoxW(a) + BoxW(b)) / 2 + GAP
+		and math.abs(ay - (b.curY or b.baseY)) < ((a.size or BASE_SIZE) + (b.size or BASE_SIZE)) * 0.45
+end
+local function SlideTo(number, x, now)
+	number.slideFrom = number.shownX or number.baseX
+	number.slideAt = now
+	number.baseX = x
+end
+local roomSide = 1
+local function RoomX(plate, number, y, home, now)
+	local rank = number.rank
+	local others = {}
+	for _, other in ipairs(live) do
+		if other.plate == plate and other ~= number then others[#others + 1] = other end
+	end
+	local function Blocks(other) return RankOf(other) < rank or (rank >= 3 and RankOf(other) == rank) end
+	local function Free(x)
+		for _, other in ipairs(others) do
+			if Blocks(other) and Overlap(number, x, y, other) then return false end
+		end
+		return true
+	end
+	-- (Its middle first, then just past each one in its way, either side.)
+	local spots = { home }
+	for _, other in ipairs(others) do
+		if Blocks(other) then
+			local apart = (BoxW(number) + BoxW(other)) / 2 + GAP + 0.5
+			spots[#spots + 1] = other.baseX + apart
+			spots[#spots + 1] = other.baseX - apart
+		end
+	end
+	roomSide = -roomSide
+	local best
+	for _, x in ipairs(spots) do
+		if Free(x) then
+			local off, was = math.abs(x - home), best and math.abs(best - home)
+			if not best or off < was - 0.5 or (math.abs(off - was) <= 0.5 and (x - home) * roomSide > 0) then best = x end
+		end
+	end
+	best = best or home
+	-- (Then the rest out of its way, and on from each one moved.)
+	local queue, moved, steps = { { number, best, y } }, {}, 0
+	while queue[1] and steps < 16 do
+		steps = steps + 1
+		local mover, mx, my = unpack(table.remove(queue, 1))
+		local mRank = RankOf(mover)
+		for _, other in ipairs(others) do
+			local oRank = RankOf(other)
+			local pushed = oRank > mRank or (oRank == mRank and (mover ~= number or mRank <= 2))
+			if other ~= mover and not moved[other] and pushed and Overlap(mover, mx, my, other) then
+				local side = other.baseX > mx and 1 or other.baseX < mx and -1 or roomSide
+				local x = mx + side * ((BoxW(mover) + BoxW(other)) / 2 + GAP + 0.5)
+				SlideTo(other, x, now)
+				moved[other] = true
+				queue[#queue + 1] = { other, x, other.curY or other.baseY }
+			end
+		end
+	end
+	return best
+end
+
 -- /cine debug combattext running: a number as it's made, and how it stands a
 -- moment later (drawn? where? how see-through?).
 local function Seen(value)
@@ -345,10 +428,18 @@ local function Spawn(plate, unit, amount, id, via, layer, tag, color, cast)
 	if not Plain(amount) then number.zeroHide = pcall(number.body.SetAlpha, number.body, amount) end
 	local ok, width = pcall(text.GetStringWidth, text)
 	number.width = ok and type(width) == "number" and Plain(width) and width > 0 and width or nil
-	-- (Hits landing together: side by side (the game's), stacked up, or on top.)
+	-- (Its rank and room, for Make room: kept whichever way, so a change of
+	-- it while numbers show still finds them.)
+	number.size, number.rank = size, Rank(node, cast)
+	number.boxW = number.width or size * ROOM_SPREAD
+	number.curY, number.slideAt, number.shownX = y, nil, nil
+	-- (Hits landing together: side by side (the game's), stacked up, on top,
+	-- or making room, the biggest in the middle.)
 	local together = Value(CT.Key("all", "Together"))
 	local x = 0
-	if together == "stack" then
+	if together == "room" then
+		x = RoomX(plate, number, y, Get("X") or 0, now) - (Get("X") or 0)
+	elseif together == "stack" then
 		local count = 0
 		for _, other in ipairs(live) do
 			if other.plate == plate and now - other.start < TOGETHER then count = count + 1 end
@@ -412,6 +503,7 @@ local function LetGo(plate)
 		local number = live[index]
 		if number.plate == plate then
 			if x == nil then x, y = PlateSpot(plate) end
+			number.slideAt, number.shownX = nil, nil -- (a slide aside stops where it's headed)
 			if x then
 				number.anchor, number.anchorPoint = holder, "BOTTOMLEFT"
 				number.baseX, number.baseY = x + number.baseX, y + number.lift
@@ -457,8 +549,19 @@ local function Step()
 			elseif move == "arcleft" or move == "arcright" or move == "fan" then
 				dx = (number.side or 1) * ARC * eased * eased * (number.riseBy or 1)
 			end
+			-- (Sliding aside, Make room: from where it was to its new spot, easing.)
+			local x = number.baseX
+			if number.slideAt then
+				local k = (now - number.slideAt) / SLIDE
+				if k >= 1 then
+					number.slideAt = nil
+				else
+					x = number.slideFrom + (number.baseX - number.slideFrom) * (1 - (1 - k) ^ 2)
+				end
+			end
+			number.shownX, number.curY = x, number.baseY + rise
 			-- (anchor and start height set at Spawn, or LetGo; the move on top)
-			number:SetPoint("CENTER", number.anchor, number.anchorPoint, number.baseX + dx, number.baseY + rise)
+			number:SetPoint("CENTER", number.anchor, number.anchorPoint, x + dx, number.baseY + rise)
 			-- A crit's pop: up to POP_PEAK times its size by POP_UP seconds, back
 			-- by POP_DOWN (the text scaled, not re-laid: no wobble), then its own
 			-- font size again, sharp.
@@ -828,8 +931,14 @@ local function HitText(school, ability, glancing)
 	end
 	return CT.SCHOOL_NODE[school] or "spell"
 end
+-- (A spell's or ability's: its school's crit row, Fire's crits; a mixed
+-- school, none of them: Crits itself.)
+local SCHOOL_CRIT = { ability = "spellCritAbility" }
+for _, node in ipairs(CT.NODES) do
+	if node.critOf then SCHOOL_CRIT[node.critOf] = node.id end
+end
 local function CritText(hit)
-	return CRIT_OF[hit] or (hit and hit:find("^spell") and "spellCrit") or "spellCrit"
+	return SCHOOL_CRIT[hit] or CRIT_OF[hit] or "spellCrit"
 end
 
 local flagsSeen = {}
@@ -1023,7 +1132,8 @@ function ns.CombatTextSample(frame, id, layer, via, cast)
 		return Spawn(frame, nil, CT.Word(id), id, via or (node.parent == "spellMiss" and "spell" or "swing"), layer)
 	end
 	if node.sample then
-		return Spawn(frame, nil, node.sample, id, via or SAMPLE_VIA[id] or id, layer, id == "swingGlance" and "GLANCING" or nil,
+		return Spawn(frame, nil, node.sample, id, via or SAMPLE_VIA[id] or node.critOf or id, layer,
+			id == "swingGlance" and "GLANCING" or nil,
 			nil, cast)
 	end
 end
