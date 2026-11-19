@@ -218,6 +218,7 @@ Dev\MinimapTiles.lua
 Dev\MinimapCopy.lua
 Dev\LowManaTest.lua
 Dev\WhyTest.lua
+Dev\AggroTest.lua
 Dev\ThresholdTest.lua
 Dev\FlickerTest.lua
 Dev\PartyFlickerTest.lua

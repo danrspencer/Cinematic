@@ -2155,6 +2155,12 @@ local function HandleSlash(msg)
 		ns.ReportSpellRange()
 	elseif cmd == "debug" and arg == "aggro" then
 		ns.ReportAggroRange()
+	elseif cmd == "debug" and arg == "aggro watch" then
+		ns.WatchAggroRange()
+	elseif cmd == "debug" and (arg == "aggro test" or arg == "aggro clear") then
+		-- (Dev copy: walk-in pulls measured to tune the near aggro guess, AggroTest.lua.)
+		if ns.AggroTest then ns.AggroTest(arg:match("^aggro (%a+)$") == "clear" and "clear" or nil)
+		else ns.Print("/cine debug aggro test is in the dev copy only.") end
 	elseif cmd == "debug" and arg == "textures" then
 		ns.ShowStyleTextures()
 	elseif cmd == "debug" and arg == "xpbar" then

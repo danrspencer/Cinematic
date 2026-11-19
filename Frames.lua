@@ -4213,7 +4213,7 @@ do
 	end
 
 	-- Near aggro range (the Nameplates rows' NearAggro Distance): a living
-	-- hostile (red) NPC not in a fight yet, about near enough to attack you.
+	-- hostile (red) NPC not after you yet, about near enough to attack you.
 	-- No game call gives a mob's aggro radius (looked for 2026-11-16), so it's
 	-- the known rule of thumb: about 20 yards at your level, a yard more for
 	-- each level it's above you and a yard less for each below, 5 to 45 (a
@@ -4229,7 +4229,17 @@ do
 		if not unit or ns.EnemyNPCRank(unit) == nil then return nil end
 		local reaction = Plain(UnitReaction, unit, "player")
 		if type(reaction) ~= "number" or reaction > 3 then return nil end
-		if Plain(UnitAffectingCombat, unit) ~= false then return nil end
+		-- (Not one already after you: the Aggro rows have it. "In combat" alone
+		-- won't do: Forever said true for a Skeletal Fiend near you while you
+		-- were out of combat, 2026-11-18.)
+		-- (Either one the game won't say (secret in fights, or an error):
+		-- nil too, so a mob fighting you never gets the near look.)
+		local okThreat, threat = pcall(UnitThreatSituation, "player", unit)
+		local okOn, onYou = pcall(UnitIsUnit, unit .. "target", "player")
+		local secret = issecretvalue and (issecretvalue(threat) or issecretvalue(onYou))
+		if not okThreat or not okOn or secret or threat ~= nil or onYou == true then
+			return nil
+		end
 		local level = Plain(UnitLevel, unit)
 		local mine = Plain(UnitEffectiveLevel or UnitLevel, "player")
 		if type(level) ~= "number" or type(mine) ~= "number" then return nil end
@@ -4277,14 +4287,101 @@ do
 		if near ~= nil then return near, "interact (short)", 28 end
 		return false, "nothing can say"
 	end
+	-- /cine debug aggro watch: for tuning the guess. Four times a second, each
+	-- red NPC plate's near aggro range turning on or off, and the moment it
+	-- comes after you (threat on you, or you its target), each with about how
+	-- far it was (between the longest attack on your bars that doesn't reach
+	-- and the shortest that does), into /cine log. Again, or 5 minutes: stops.
+	local aggroWatch, aggroWatchUntil, aggroSeen
+	local function AboutYards(unit)
+		local short = 0
+		for i = #farSpells.harmful, 1, -1 do
+			local id = farSpells.harmful[i]
+			local yards = farYards[id] == 0 and 5 or farYards[id]
+			local reaches = SpellReaches(id, unit)
+			if reaches then return short .. "-" .. yards end
+			if reaches == false then short = math.max(short, yards) end
+		end
+		return "past " .. short
+	end
+	local function WatchAggroStep()
+		if GetTime() > aggroWatchUntil then
+			ns.SetOnUpdate(aggroWatch, nil)
+			ns.TestPrompt("Aggro watch stopped (5 minutes). Type /cine log to copy it.", 6)
+			return
+		end
+		LookForRangeSpells()
+		local mine = Plain(UnitEffectiveLevel or UnitLevel, "player")
+		for i = 1, 40 do
+			local unit = "nameplate" .. i
+			local reaction = Plain(UnitExists, unit) and Plain(UnitReaction, unit, "player")
+			if type(reaction) == "number" and reaction <= 3 and ns.EnemyNPCRank(unit) then
+				local guid = Plain(UnitGUID, unit)
+				local key = type(guid) == "string" and guid or unit
+				local seen = aggroSeen[key] or {}
+				aggroSeen[key] = seen
+				local name = Plain(UnitName, unit)
+				local label = ("%s (level %s, you %s)"):format(type(name) == "string" and name or "?",
+					tostring(Plain(UnitLevel, unit)), tostring(mine))
+				local after = Plain(UnitThreatSituation, "player", unit) ~= nil
+					or Plain(UnitIsUnit, unit .. "target", "player") == true
+				if after and not seen.after then
+					ns.Log("aggro", ("%s came after you at about %s yd; near aggro was %s, guessed radius %s"):format(
+						label, AboutYards(unit), tostring(seen.near), tostring(seen.radius)))
+				elseif not after then
+					local near, how, yards = ns.UnitNearAggro(unit)
+					if near ~= seen.near and seen.near ~= nil or near and seen.near == nil then
+						ns.Log("aggro", ("%s near aggro %s at about %s yd (radius %s, by %s%s)"):format(label,
+							near and "on" or "off", AboutYards(unit), tostring(ns.AggroRadius(unit)), tostring(how),
+							yards and ", " .. yards .. " yd" or ""))
+					end
+					seen.near, seen.radius = near, ns.AggroRadius(unit)
+				end
+				seen.after = after
+			end
+		end
+	end
+	function ns.WatchAggroRange()
+		if not aggroWatch then
+			aggroWatch = CreateFrame("Frame")
+		end
+		if aggroWatch:GetScript("OnUpdate") then
+			ns.SetOnUpdate(aggroWatch, nil)
+			ns.TestPrompt("Aggro watch stopped. Type /cine log to copy it.", 6)
+			return
+		end
+		aggroSeen, aggroWatchUntil = {}, GetTime() + 300
+		local wait = 0
+		ns.SetOnUpdate(aggroWatch, function(_, elapsed)
+			wait = wait - elapsed
+			if wait > 0 then return end
+			wait = 0.25
+			WatchAggroStep()
+		end)
+		ns.Log("aggro", ("watch started: game %s, you level %s, in combat %s, %d attacks on your bars"):format(
+			tostring((select(4, GetBuildInfo()))), tostring(Plain(UnitLevel, "player")), tostring(InCombatLockdown()),
+			#farSpells.harmful))
+		ns.TestPrompt("Aggro watch on: walk slowly up to red mobs until they attack. /cine debug aggro watch again stops.", 8)
+	end
+	-- (For Dev/AggroTest.lua: the attacks on your bars, longest first, and
+	-- each one's yards; whether one reaches a unit; the guess's numbers.)
+	function ns.AggroRangeChecks()
+		LookForRangeSpells()
+		return farSpells.harmful, farYards
+	end
+	ns.SpellReachesUnit = SpellReaches
+	ns.InteractDistanceOf = InteractDistance
+	ns.AGGRO_GUESS = { base = AGGRO_BASE, min = AGGRO_MIN, max = AGGRO_MAX, warn = AGGRO_WARN }
 	-- /cine debug aggro: your target's guess, and every enemy plate's.
 	function ns.ReportAggroRange()
 		local function Line(unit)
 			local name = Plain(UnitName, unit)
 			local near, how, yards = ns.UnitNearAggro(unit)
-			return ("%s: level %s, reaction %s, in combat %s, radius %s, near %s (%s%s)"):format(
+			local itsTarget = Plain(UnitName, unit .. "target")
+			return ("%s: level %s, reaction %s, in combat %s, its target %s, threat on you %s, radius %s, near %s (%s%s)"):format(
 				type(name) == "string" and name or "?", tostring(Plain(UnitLevel, unit)),
 				tostring(Plain(UnitReaction, unit, "player")), tostring(Plain(UnitAffectingCombat, unit)),
+				type(itsTarget) == "string" and itsTarget or "none", tostring(Plain(UnitThreatSituation, "player", unit)),
 				tostring(ns.AggroRadius(unit)), tostring(near), tostring(how), yards and ", " .. yards .. " yd" or "")
 		end
 		ns.Print(("aggro: game %s, you level %s (effective %s), in combat %s, harmful spells %d"):format(
