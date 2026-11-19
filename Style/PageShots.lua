@@ -468,6 +468,20 @@ function ns.PageShots(arg)
 		ns.Print("pageshots: no settings pages yet")
 		return
 	end
+	-- (Page words in place of numbers: only the pages whose name has them, as
+	-- the sweep's, "/cine debug pageshots combat text".)
+	if arg ~= "" and not arg:match("^%d") then
+		local kept = {}
+		for _, page in ipairs(pages) do
+			local name = tostring(page.name or ""):lower()
+			if name:find(arg, 1, true) then kept[#kept + 1] = page end
+		end
+		if #kept == 0 then
+			ns.Print("pageshots: no page has \"" .. arg .. "\" in its name")
+			return
+		end
+		pages, arg = kept, ""
+	end
 	local first, last = arg:match("^(%d+)%s*(%d*)$")
 	first = tonumber(first) or 1
 	last = math.min(#pages, tonumber(last) or #pages)

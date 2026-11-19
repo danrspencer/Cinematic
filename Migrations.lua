@@ -4455,6 +4455,226 @@ STEPS[#STEPS + 1] = function()
 		for _, point in pairs(ns.db.profileResetPoints or {}) do Off(point) end
 		ns.db.combatTextKillOffV1 = true
 	end
+	-- Combat Text Style's texts are one tree now (2026-11-18,
+	-- CombatTextTexts.lua): every kind of text its own settings, each its
+	-- group's until changed. From the older ones: the height above the plate,
+	-- school colors, which texts were off, colors of their own, crits' pop,
+	-- misses in the hit's color and what a kill shows; the rest start at the
+	-- tree's (the older per-tab sizes and places were days old, at their
+	-- defaults). Its tabs' on/off ticks start over (there are three now).
+	-- Saved profiles too. Once.
+	if not ns.db.combatTextTreeV1 then
+		local function Tree(t)
+			if type(t) ~= "table" then return end
+			local function Put(id, setting, value)
+				if value ~= nil and t["ct_" .. id .. "_" .. setting] == nil then t["ct_" .. id .. "_" .. setting] = value end
+			end
+			local function Color(from, ids)
+				if t[from .. "Own"] ~= true then return end
+				for _, id in ipairs(ids) do
+					Put(id, "R", t[from .. "R"])
+					Put(id, "G", t[from .. "G"])
+					Put(id, "B", t[from .. "B"])
+				end
+			end
+			local height = tonumber(t.combatTextHeight)
+			if height and height ~= 0 then Put("all", "Y", 10 + height) end
+			if t.combatTextSchoolColors then
+				local SCHOOLS = { spellHoly = { 1, 0.9, 0.5 }, spellFire = { 1, 0.5, 0.1 }, spellNature = { 0.3, 1, 0.3 },
+					spellFrost = { 0.45, 0.85, 1 }, spellShadow = { 0.65, 0.4, 1 }, spellArcane = { 1, 0.5, 0.95 } }
+				for id, color in pairs(SCHOOLS) do
+					Put(id, "R", color[1])
+					Put(id, "G", color[2])
+					Put(id, "B", color[3])
+				end
+			end
+			if t.combatTextHeals == false then Put("heal", "Show", false) end
+			if t.combatTextMisses == false then Put("miss", "Show", false) end
+			if t.combatTextSwings == false then Put("swing", "Show", false) end
+			if t.combatTextSpells == false then
+				Put("spell", "Show", false)
+				Put("ability", "Show", false)
+			end
+			if t.combatTextKill ~= nil then Put("kill", "Show", t.combatTextKill and true or false) end
+			if t.combatTextCritPop == false or t.combatTextSwingCritPop == false then
+				for _, id in ipairs({ "swingCrit", "abilityCrit", "spellCrit", "healCrit" }) do Put(id, "Pop", false) end
+			end
+			Color("combatTextSwing", { "swing" })
+			Color("combatTextSpell", { "spell", "ability" })
+			Color("combatTextHeal", { "heal" })
+			Color("combatTextMiss", { "miss" })
+			Color("combatTextKill", { "kill" })
+			Color("combatTextCrit", { "swingCrit", "abilityCrit", "spellCrit" })
+			Color("combatTextSwingCrit", { "swingCrit" })
+			Color("combatTextSpellCrit", { "spellCrit", "abilityCrit" })
+			Color("combatTextHealCrit", { "healCrit" })
+			if t.combatTextMissMatch == false then Put("miss", "Match", false) end
+			Put("kill", "Shows", t.combatTextKillShows)
+			-- (The older ones gone; their done-flags and the page's own kept.)
+			local gone = { combatTextHeight = true, combatTextSchoolColors = true, combatTextCritPop = true,
+				combatTextCritSpot = true, combatTextMissMatch = true, combatTextKillShows = true, combatTextHeals = true,
+				combatTextMisses = true, combatTextSpells = true, combatTextSwings = true, combatTextCrits = true }
+			-- (And every combatTextSwing..., combatTextKill... of the older tabs: Kill's switch too.)
+			local OLD = { Swing = true, Spell = true, Crit = true, Heal = true, Miss = true, Kill = true }
+			for key in pairs(t) do
+				if type(key) == "string" and not key:find("V%d+$") then
+					-- (And the first tree's part flags and the defaults it wrote out, the
+					-- same day, before it had its own done-flag: a text's look is
+					-- nothing saved now, unless the player set it.)
+					if key:find("^ct_%a+_%a+Own$") then t[key] = nil end
+					local name = key:match("^combatText(%u%l+)")
+					if gone[key] or (name and OLD[name]) or key:find("^tabOn:Combat Text Style/page:") then t[key] = nil end
+				end
+			end
+		end
+		Tree(ns.db)
+		for _, saved in pairs(ns.db.profiles or {}) do
+			if type(saved) == "table" then
+				Tree(saved)
+				Tree(saved.settings)
+			end
+		end
+		for _, point in pairs(ns.db.profileResetPoints or {}) do Tree(point) end
+		ns.db.combatTextTreeV1 = true
+	end
+	-- The tree's first build (2026-11-18, one day) wrote every text's look
+	-- out in full, a part flag each; a text's look is nothing saved now,
+	-- unless set (as the Names rows). Each value that's only what it was
+	-- built with (its own built-in, else up its groups to All texts') goes,
+	-- and the flags and empty words with it; one the player set stays.
+	-- Saved profiles too. Once.
+	if not ns.db.combatTextTreeV2 and ns.CombatTexts then
+		local CT = ns.CombatTexts
+		local function Pure(id, setting)
+			local step = id
+			for _ = 1, 12 do
+				if not step or step == "all" then break end
+				local built = CT.BUILTIN[step] and CT.BUILTIN[step][setting]
+				if built ~= nil then return built end
+				step = CT.NODE[step].parent
+			end
+			return DEFAULTS[CT.Key("all", setting)]
+		end
+		local function Clean(t)
+			if type(t) ~= "table" then return end
+			for _, node in ipairs(CT.NODES) do
+				if node.id ~= "all" then
+					-- (A part whose flag was off: only copies of its group's, then.)
+					for part, list in pairs(CT.PARTS) do
+						local flag = CT.Key(node.id, part .. "Own")
+						for _, setting in ipairs(list) do
+							local key = CT.Key(node.id, setting)
+							if t[key] ~= nil and (t[flag] == false or t[key] == Pure(node.id, setting)) then t[key] = nil end
+						end
+						t[flag] = nil
+					end
+				end
+				if t[CT.Key(node.id, "Word")] == "" then t[CT.Key(node.id, "Word")] = nil end
+			end
+		end
+		Clean(ns.db)
+		for _, saved in pairs(ns.db.profiles or {}) do
+			if type(saved) == "table" then
+				Clean(saved)
+				Clean(saved.settings)
+			end
+		end
+		for _, point in pairs(ns.db.profileResetPoints or {}) do Clean(point) end
+		ns.db.combatTextTreeV2 = true
+	end
+	-- Combat Text Style's Kill text is gone (2026-11-18, the player's call):
+	-- its settings with it. Saved profiles too. Once.
+	if not ns.db.combatTextKillGoneV1 then
+		local function Clear(t)
+			if type(t) ~= "table" then return end
+			for key in pairs(t) do
+				if type(key) == "string" and key:find("^ct_kill_") then t[key] = nil end
+			end
+			t.combatTextKill, t.combatTextKillShows = nil, nil
+		end
+		Clear(ns.db)
+		for _, saved in pairs(ns.db.profiles or {}) do
+			if type(saved) == "table" then
+				Clear(saved)
+				Clear(saved.settings)
+			end
+		end
+		for _, point in pairs(ns.db.profileResetPoints or {}) do Clear(point) end
+		ns.db.combatTextKillGoneV1 = true
+	end
+	-- Misses' In the color of the hit is gone (2026-11-18): a miss with no
+	-- color set takes its hit's, always. Saved profiles too. Once.
+	if not ns.db.combatTextMatchGoneV1 then
+		ns.db.ct_miss_Match = nil
+		for _, saved in pairs(ns.db.profiles or {}) do
+			if type(saved) == "table" then
+				saved.ct_miss_Match = nil
+				if type(saved.settings) == "table" then saved.settings.ct_miss_Match = nil end
+			end
+		end
+		for _, point in pairs(ns.db.profileResetPoints or {}) do
+			if type(point) == "table" then point.ct_miss_Match = nil end
+		end
+		ns.db.combatTextMatchGoneV1 = true
+	end
+	-- Combat Text Style's Crits bigger by is each text's Crit size now
+	-- (2026-11-18), on its Look panel's Text tab: All texts' takes the old
+	-- one. Saved profiles too. Once.
+	if not ns.db.combatTextCritScaleV1 then
+		local function Move(t)
+			if type(t) ~= "table" then return end
+			local old = tonumber(t.ct_all_CritBig)
+			if old and t.ct_all_CritScale == nil then t.ct_all_CritScale = old end
+			t.ct_all_CritBig = nil
+		end
+		Move(ns.db)
+		for _, saved in pairs(ns.db.profiles or {}) do
+			if type(saved) == "table" then
+				Move(saved)
+				Move(saved.settings)
+			end
+		end
+		for _, point in pairs(ns.db.profileResetPoints or {}) do Move(point) end
+		ns.db.combatTextCritScaleV1 = true
+	end
+	-- Combat Text Style's Misses split in two (2026-11-18): Swings' and Spells
+	-- and abilities' (abilities under spells now, their crits Spells and
+	-- abilities' Crits). Resist and Reflect go to the spells' misses; every
+	-- other miss setting is copied to both; Ability crits' settings go to
+	-- Crits where it has none of its own. Saved profiles too. Once.
+	if not ns.db.combatTextMissSplitV1 then
+		local SPELL_ONLY = { Resist = true, Reflect = true }
+		local function Split(t)
+			if type(t) ~= "table" then return end
+			local moves = {}
+			for key, value in pairs(t) do
+				local id, setting
+				if type(key) == "string" then id, setting = key:match("^ct_(%a+)_(%a+)$") end
+				if id == "abilityCrit" then
+					moves[#moves + 1] = { key, setting ~= "Show" and "ct_spellCrit_" .. setting or nil, value, true }
+				elseif id == "miss" then
+					moves[#moves + 1] = { key, "ct_spellMiss_" .. setting, value, false }
+				elseif id and id:match("^miss%u") then
+					local word = id:sub(5)
+					moves[#moves + 1] = { key, "ct_spellMiss" .. word .. "_" .. setting, value, SPELL_ONLY[word] }
+				end
+			end
+			for _, move in ipairs(moves) do
+				local from, to, value, gone = move[1], move[2], move[3], move[4]
+				if to and t[to] == nil then t[to] = value end
+				if gone then t[from] = nil end
+			end
+		end
+		Split(ns.db)
+		for _, saved in pairs(ns.db.profiles or {}) do
+			if type(saved) == "table" then
+				Split(saved)
+				Split(saved.settings)
+			end
+		end
+		for _, point in pairs(ns.db.profileResetPoints or {}) do Split(point) end
+		ns.db.combatTextMissSplitV1 = true
+	end
 end
 
 -- Runs them all, each on its own: an error is logged and reported (the

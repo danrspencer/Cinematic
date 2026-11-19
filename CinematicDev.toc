@@ -173,7 +173,9 @@ Style\PersonalManaText.lua
 Style\PlateCastStyle.lua
 Style\PlateHealthStyle.lua
 Plates\PlateRowLook.lua
+Style\CombatTextTexts.lua
 Style\CombatTextStyle.lua
+Style\CombatTextPage.lua
 Style\UnitStyle.lua
 Style\RaidStyle.lua
 Style\GeneralStyle.lua

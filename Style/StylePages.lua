@@ -968,8 +968,9 @@ local function FitWindow()
 end
 
 -- The popped preview at scale (kept between the smallest and what the screen
--- holds), in the window's top left.
-local function ScalePopped(scale)
+-- holds), in the window's top left. lowest: a smallest of its own (a Look
+-- panel docked under it: PreviewRoomUnder).
+local function ScalePopped(scale, lowest)
 	local width, height = math.max(popped:GetWidth(), 1), math.max(popped:GetHeight(), 1)
 	local most = math.min(UIParent:GetWidth() * 0.95 / width, (UIParent:GetHeight() - 60) / height)
 	-- (Docked: no bigger than its side holds, so it never covers the settings.)
@@ -978,7 +979,7 @@ local function ScalePopped(scale)
 		local _, _, fit = DockSpot(popped)
 		if fit then most = math.min(most, fit) end
 	end
-	local least = math.min(POPOUT_MIN_SCALE, most)
+	local least = math.min(lowest or POPOUT_MIN_SCALE, most)
 	scale = math.max(least, math.min(scale, most))
 	-- (The window's corner can't go past the preview's own smallest and largest.)
 	local minW, minH = width * least + 24, height * least + 42
@@ -1088,6 +1089,34 @@ local function Window()
 	end)
 	popWindow:Hide()
 	return popWindow
+end
+
+-- Room under the popped preview's window for a docked Look panel need high
+-- (2026-11-18, the player's ask: both out at once). Docked beside the
+-- settings only; the preview made smaller (to half its size at most) to make
+-- the room. Gives the window to hang the panel under, or nil: no room, the
+-- preview out of its way as before (PreviewAside).
+local UNDER_LEAST = 0.45
+function ns.PreviewRoomUnder(need)
+	if not (popWindow and popped and popWindow:IsShown() and not popWindow.lookAside) then return end
+	if popWindow.side ~= "right" and popWindow.side ~= "left" then return end
+	local top = popWindow:GetTop()
+	if not top then return end
+	local fits = (top - need - DOCK_GAP * 3 - 42) / math.max(popped:GetHeight(), 1)
+	if fits < UNDER_LEAST then return end
+	ScalePopped(math.min(popScale or POPOUT_SCALE, fits), UNDER_LEAST)
+	FitWindow()
+	popWindow.lookUnder = true
+	return popWindow
+end
+-- The panel under it gone: the preview its own size again.
+function ns.PreviewRoomBack()
+	if not (popWindow and popWindow.lookUnder) then return end
+	popWindow.lookUnder = nil
+	if popped then
+		ScalePopped(popScale or POPOUT_SCALE)
+		FitWindow()
+	end
 end
 
 -- The preview window out of a docked Look panel's way while it's open (they
@@ -4229,17 +4258,29 @@ function ns.StyleRows(kit, content, stack, changed, switchKey, fieldOf, panel)
 			for _, region in ipairs({ pop:GetRegions() }) do Reach(region) end
 			pop:SetWidth(math.max(470, right - left + 12))
 		end
+		-- (Docked: under the popped preview's window when there's room, both
+		-- in sight (2026-11-18); else beside the settings, the preview window
+		-- out of its way till it closes.)
 		local function Place()
 			local spot = LookSpot()
 			pop:ClearAllPoints()
+			local under = not spot and ns.PreviewRoomUnder and ns.PreviewRoomUnder(pop:GetHeight())
+			if pop.underPreview and not under and ns.PreviewRoomBack then ns.PreviewRoomBack() end
+			pop.underPreview = under and true or nil
 			if spot then
 				pop:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", spot.x, spot.y)
 				dock:SetText(ns.L["Dock"])
+			elseif under then
+				pop:SetPoint("TOPLEFT", under, "BOTTOMLEFT", 0, -DOCK_GAP)
+				dock:SetText(ns.L["Pop out"])
 			else
 				local window = canvas
 				while window:GetParent() and window:GetParent() ~= UIParent do window = window:GetParent() end
 				pop:SetPoint("TOPLEFT", window, "TOPRIGHT", 4, 0)
 				dock:SetText(ns.L["Pop out"])
+			end
+			if not under and not inline and pop:IsShown() then
+				ns.PreviewAside(true) -- (the preview window, in the same spot: hidden while this is up)
 			end
 		end
 		dock:SetScript("OnClick", function()
@@ -4252,7 +4293,6 @@ function ns.StyleRows(kit, content, stack, changed, switchKey, fieldOf, panel)
 				if openLook and openLook ~= self then openLook:Hide() end
 				openLook = self
 				Place()
-				ns.PreviewAside(true) -- (the preview window, in the same spot: hidden while this is up)
 			end
 			-- (Titled with where the part is, the page's place dimmed before it:
 			-- known once the page is in its hub, after it's built.)
@@ -4266,7 +4306,11 @@ function ns.StyleRows(kit, content, stack, changed, switchKey, fieldOf, panel)
 			-- blank, every Reset up and the font bar missing, till the page changed.)
 			kit.Refresh()
 			Fit()
-			C_Timer.After(0, Fit)
+			C_Timer.After(0, function()
+				Fit()
+				-- (Under the preview: placed again at its real height, laid out now.)
+				if self.underPreview and self:IsShown() then Place() end
+			end)
 		end)
 		-- (Not while one of its menus or the color picker is open: theirs first.)
 		local function Busy()
@@ -4278,6 +4322,10 @@ function ns.StyleRows(kit, content, stack, changed, switchKey, fieldOf, panel)
 			canvas:HookScript("OnHide", function() pop:Hide() end)
 			-- (Closed, and no other Look panel up in its place: the preview window back.)
 			pop:HookScript("OnHide", function(self)
+				if self.underPreview then
+					self.underPreview = nil
+					if ns.PreviewRoomBack then ns.PreviewRoomBack() end
+				end
 				if openLook == self then
 					openLook = nil
 					ns.PreviewAside(false)
