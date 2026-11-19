@@ -41,6 +41,8 @@ HOME = os.path.expanduser("~")
 OFFLINE_TESTS = [
     ("party flicker (DaylightUI range fade)", "Tools/offline/partyflicker.lua"),
     ("card wait (Rested card behind DaylightUI's zone title)", "Tools/offline/cardwait.lua"),
+    ("Mac notch covers, forever", "Tools/offline/notchgap.lua", "forever"),
+    ("Mac notch covers, retail", "Tools/offline/notchgap.lua", "retail"),
 ]
 
 
@@ -186,8 +188,8 @@ def main():
         jobs.append(Job("offline check (profiles, ids)", lua + ["Tools/offline/check.lua"], judge_check))
         for client in CLIENTS:
             jobs.append(Job("offline sweep, %s" % client, lua + ["Tools/offline/sweep.lua", client], judge_sweep))
-        for name, script in OFFLINE_TESTS:
-            jobs.append(Job(name, lua + [script], judge_test))
+        for name, script, *args in OFFLINE_TESTS:
+            jobs.append(Job(name, lua + [script] + args, judge_test))
         jobs.append(Job("other addons vs our support", [PY, "-I", "Tools/addon-check.py"], judge_addons))
         scratch = tempfile.mkdtemp(prefix="cine-prerelease-")
         for client in CLIENTS:

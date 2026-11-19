@@ -5822,25 +5822,71 @@ function ns.LetterboxTime(look, coming)
 	return coming and ns.FadeOutTime() or ns.FadeInTime()
 end
 
+-- On a Mac with a camera notch the game can move UIParent down under it (a
+-- Graphics option), but the world still draws to the top of the screen. The
+-- gap is that strip, in UIParent's units (0 elsewhere).
+function ns.NotchGap()
+	local scale = UIParent:GetEffectiveScale()
+	local top, uiTop = WorldFrame:GetTop(), UIParent:GetTop()
+	if type(top) ~= "number" or type(uiTop) ~= "number" or type(scale) ~= "number" or scale <= 0 then
+		return 0
+	end
+	local gap = top * WorldFrame:GetEffectiveScale() / scale - uiTop
+	return gap > 0.5 and gap or 0
+end
+
+-- A full-screen effect (tint edges, washes, the letterbox) covers UIParent and
+-- the notch strip above it, so it reaches the screen's top edge. Fitted again
+-- when shown and when the screen or UI scale changes.
+ns.worldCovers = ns.worldCovers or {}
+do
+	function ns.FitWorldCover(frame)
+		local gap = ns.NotchGap()
+		if frame.notchGap and math.abs(gap - frame.notchGap) <= 0.5 then
+			return
+		end
+		frame.notchGap = gap
+		frame:ClearAllPoints()
+		frame:SetPoint("TOPLEFT", UIParent, "TOPLEFT", 0, gap)
+		frame:SetPoint("BOTTOMRIGHT", UIParent, "BOTTOMRIGHT")
+	end
+
+	function ns.CoverWorld(frame)
+		if not ns.worldCovers[frame] then
+			ns.worldCovers[frame] = true
+			frame:HookScript("OnShow", ns.FitWorldCover)
+		end
+		frame.notchGap = nil
+		ns.FitWorldCover(frame)
+	end
+
+	function ns.RefitWorldCovers()
+		for frame in pairs(ns.worldCovers) do
+			ns.FitWorldCover(frame)
+		end
+	end
+
+	-- (No locals here: Effects.lua's main chunk is at Lua's 200 cap.)
+	ns.notchWatch = CreateFrame("Frame")
+	ns.notchWatch:RegisterEvent("PLAYER_ENTERING_WORLD")
+	ns.notchWatch:RegisterEvent("DISPLAY_SIZE_CHANGED")
+	ns.notchWatch:RegisterEvent("UI_SCALE_CHANGED")
+	ns.notchWatch:RegisterEvent("CVAR_UPDATE")
+	ns.notchWatch:SetScript("OnEvent", function()
+		ns.RefitWorldCovers()
+		-- (Again a frame later: the game moves UIParent after these events.)
+		C_Timer.After(0, ns.RefitWorldCovers)
+	end)
+end
+
 function ns.CreateLetterbox()
 	ns.letterbox = CreateFrame("Frame", "CinematicLetterbox", UIParent)
-	ns.letterbox:SetAllPoints(UIParent)
-	-- On a Mac with a camera notch the game moves UIParent down under it, but
-	-- the world still draws to the top of the screen: the bars' frame reaches
-	-- up to the world's top so the top bar sits on the screen's edge.
+	ns.CoverWorld(ns.letterbox)
+	-- (The bars' frame reaches up over the notch strip so the top bar sits on
+	-- the screen's edge; Fit keeps it so while the bars move.)
 	function ns.letterbox:Fit()
-		local scale = UIParent:GetEffectiveScale()
-		local top, uiTop = WorldFrame:GetTop(), UIParent:GetTop()
-		local gap = 0
-		if top and uiTop and scale and scale > 0 then
-			gap = math.max(0, top * WorldFrame:GetEffectiveScale() / scale - uiTop)
-		end
-		if math.abs(gap - (self.gap or 0)) > 0.5 then
-			self.gap = gap
-			self:ClearAllPoints()
-			self:SetPoint("TOPLEFT", UIParent, "TOPLEFT", 0, gap)
-			self:SetPoint("BOTTOMRIGHT", UIParent, "BOTTOMRIGHT")
-		end
+		ns.FitWorldCover(self)
+		self.gap = self.notchGap
 	end
 	ns.letterbox:SetFrameStrata("BACKGROUND")
 	ns.letterbox:SetFrameLevel(2) -- (over the tint and Vitals Vision, Tint.lua)

@@ -25,6 +25,9 @@ looks for `lua5.1`. (Don't put a `lua5.1` stand-in on PATH: Windows asks what to
   An optional .toc argument runs it on other code (a copy with an older Frames.lua, say).
 - `cardwait.lua`: the Rested card waiting while DaylightUI's zone title shows (ns.AddCardWait), on a clock of its
   own: waits, shows once the title's gone, gives up after 8 s, no wait without the title or for other cards.
+- `notchgap.lua <forever|retail>`: full-screen effects (ns.CoverWorld: letterbox, tint edges, death screen, Focus,
+  low health, teleport) reach up over a Mac's camera notch strip above UIParent, at UI scale 1 and 0.8, and come back
+  down when it goes.
 - `Tools/prerelease.py` (one folder up) runs these checks and the rest side by side before a release, and reads the
   in-game `/cine prerelease` results from the saved settings.
 - `export.lua`: `lua5.1 Tools/offline/export.lua > profiles.json` writes the options pages and their sections, the

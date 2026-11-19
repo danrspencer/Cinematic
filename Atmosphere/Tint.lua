@@ -644,7 +644,7 @@ end
 
 local function CreateTint()
 	tintFrame = CreateFrame("Frame", "CinematicTint", UIParent)
-	tintFrame:SetAllPoints(UIParent)
+	ns.CoverWorld(tintFrame)
 	tintFrame:SetFrameStrata("BACKGROUND")
 	tintFrame:SetFrameLevel(0)
 	tintFrame:EnableMouse(false)
@@ -866,7 +866,7 @@ local deathLevel, deathCreep = 0, 0
 
 local function CreateDeathScreen()
 	deathFrame = CreateFrame("Frame", nil, UIParent)
-	deathFrame:SetAllPoints(UIParent)
+	ns.CoverWorld(deathFrame)
 	deathFrame:SetFrameStrata("BACKGROUND")
 	deathFrame:SetFrameLevel(tintFrame:GetFrameLevel()) -- (under the letterbox, like the tint)
 	deathFrame:EnableMouse(false)

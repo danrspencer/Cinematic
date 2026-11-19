@@ -46,7 +46,7 @@ local test -- (the page's pretend cast: { startAt, endsAt, shownAt, quiet })
 
 local function Create()
 	frame = CreateFrame("Frame", nil, UIParent)
-	frame:SetAllPoints(UIParent)
+	ns.CoverWorld(frame)
 	frame:SetFrameStrata("BACKGROUND")
 	frame:SetFrameLevel(2)
 	frame:EnableMouse(false)

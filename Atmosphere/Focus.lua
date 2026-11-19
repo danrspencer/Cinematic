@@ -67,7 +67,7 @@ end
 
 -- Over the world, beside the tint and under the letterbox bars and the UI.
 frame = CreateFrame("Frame", "CinematicFocus", UIParent)
-frame:SetAllPoints(UIParent)
+ns.CoverWorld(frame)
 frame:SetFrameStrata("BACKGROUND")
 frame:SetFrameLevel(0)
 frame:EnableMouse(false)

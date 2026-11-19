@@ -874,7 +874,7 @@ end
 
 local function Create()
 	frame = CreateFrame("Frame", nil, UIParent)
-	frame:SetAllPoints(UIParent)
+	ns.CoverWorld(frame)
 	frame:SetFrameStrata("BACKGROUND")
 	-- (Over the tint, else the zone's color and its vignette dulled the art on
 	-- the screen but not in the preview; under the letterbox.)
