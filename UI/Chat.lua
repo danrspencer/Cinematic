@@ -575,10 +575,31 @@ local function WindowAlpha(chatFrame)
 	if type(alpha) == "number" and not (issecretvalue and issecretvalue(alpha)) then return alpha end
 end
 
+-- How many lines a window has (nil if it can't be read).
+local function WindowCount(chatFrame)
+	if not chatFrame.GetNumMessages then return nil end
+	local count = chatFrame:GetNumMessages()
+	if type(count) == "number" and not (issecretvalue and issecretvalue(count)) then return count end
+end
+
+-- Whether the copy's lines still sit where the window draws its own: no
+-- line came into the window after the last one copied (loot, another
+-- channel) and it's scrolled to the bottom.
+local function CopyLinesUp(chatFrame, copy)
+	local count = WindowCount(chatFrame)
+	if not (count and copy.count == count) then return false end
+	if chatFrame.AtBottom and not ns.Flag(chatFrame:AtBottom()) then return false end
+	return true
+end
+
+local QUICK_FADE = 0.15 -- seconds a copy takes to go when its lines don't match the window's
+
 -- While copies are up: gone once their time is over, or when the window
--- itself comes up (hovered, typed in): they fade out as it fades in, from how
--- far up it was when they showed (copy.base), so its lines and theirs never
--- show over each other.
+-- itself comes up (hovered, typed in). When their lines sit on the window's
+-- own they fade out as it fades in, from how far up it was when they showed
+-- (copy.base), so its lines and theirs cross over each other; when they
+-- don't (a newer line came in under the copied one) they go at once, in a
+-- quick fade, as soon as the window starts coming up.
 local function WatchCopies()
 	local now, any = GetTime(), false
 	for chatFrame, copy in pairs(lineCopies) do
@@ -586,13 +607,21 @@ local function WatchCopies()
 			local alpha = WindowAlpha(chatFrame) or 1
 			local base = copy.base or 0
 			local rise = (alpha - base) / math.max(0.05, 1 - base)
+			local fade = 1 - math.max(0, rise)
+			if not copy.quickFrom and rise > 0.02 and not CopyLinesUp(chatFrame, copy) then
+				copy.quickFrom, copy.quickAlpha = now, copy.frame:GetAlpha()
+			end
+			if copy.quickFrom then
+				fade = math.min(fade, (copy.quickAlpha or 1) * (1 - (now - copy.quickFrom) / QUICK_FADE))
+			end
 			local seen = not ns.ChatPeekLinesOnly() or now >= copy.untilTime
-				or not ns.ChatWindowShown(chatFrame) or rise >= 0.9
+				or not ns.ChatWindowShown(chatFrame) or rise >= 0.9 or fade <= 0
 			if seen then
 				copy.frame:Clear()
 				copy.frame:Hide()
+				copy.quickFrom = nil
 			else
-				copy.frame:SetAlpha(1 - math.max(0, rise))
+				copy.frame:SetAlpha(fade)
 				any = true
 			end
 		end
@@ -639,6 +668,12 @@ local function ShowCopy(chatFrame, line, r, g, b, text)
 	end
 	copy.frame:Show()
 	copy.frame:AddMessage(line, r, g, b)
+	-- (The window's line count once this line is in it: a newer one after
+	-- means the copy no longer sits on the window's lines. Nil when this line
+	-- isn't the window's newest already: another came in the same frame.)
+	local count = WindowCount(chatFrame)
+	local newest = count and count > 0 and chatFrame.GetMessageInfo and chatFrame:GetMessageInfo(count)
+	copy.count = Plain(newest) and newest == line and count or nil
 	ns.SetOnUpdate(copyWatch, OnCopyWatch)
 end
 
@@ -678,6 +713,19 @@ PeekWindow = function(chatFrame, text, formatted)
 		if (ns.chatPeekUntil[chatFrame] or 0) <= now then ns.framesWake = "chat message" end
 		ns.chatPeekUntil[chatFrame] = now + ns.HoldTime("chatPeekTime")
 	end
+end
+
+-- For /cine debug chatreveal (dev copy): peeks a line already in the window,
+-- as a server line does, and reads back its copy's state.
+function ns.ChatTestPeek(chatFrame, line)
+	PeekWindow(chatFrame, line, true)
+end
+function ns.ChatCopyState(chatFrame)
+	local copy = lineCopies[chatFrame]
+	if not copy then return nil end
+	return { shown = copy.frame:IsShown(), alpha = copy.frame:GetAlpha(), quick = copy.quickFrom ~= nil,
+		count = copy.count, windowCount = WindowCount(chatFrame), windowAlpha = WindowAlpha(chatFrame),
+		base = copy.base, linesUp = CopyLinesUp(chatFrame, copy) }
 end
 
 -- Shows a chat window for at least seconds, whatever the Chat page's peek
