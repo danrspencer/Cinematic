@@ -616,10 +616,14 @@ local HOLD = 0.15
 local MELEE_HOLD = 1
 local lines, owed, pending = {}, {}, {} -- times of lines; of hits on you; hits waiting
 local logListening, logTurnedOn
+-- (Whether a line has come at all this session. On retail (12.0.5, 2026-11-19)
+-- none ever came though the log said it was on: every hit waited for one and
+-- was left out, no numbers at all. Till one comes, it's as with no log.)
+local logLines = false
 ns.combatTextWhose = { mine = 0, others = 0 }
 
 local function LogRunning()
-	if not logListening or not (C_CombatLog and C_CombatLog.AreFilteredEventsEnabled) then return false end
+	if not logListening or not logLines or not (C_CombatLog and C_CombatLog.AreFilteredEventsEnabled) then return false end
 	local ok, on = pcall(C_CombatLog.AreFilteredEventsEnabled)
 	return ok and Plain(on) and on == true
 end
@@ -670,10 +674,46 @@ end
 -- swing for 0 and its own hit, with one line between them): the second goes
 -- with the first.
 local swingAt, swingPlate
-local TakeCast -- (below: the cast a spell's hit came from)
+local TakeCast, PeekCast -- (below: the cast a spell's hit came from; whether one waits)
+
+-- In a group or raid (2026-11-19): others' hits in your own schools (five
+-- frost mages on one boss) land in the instants of yours, and the first
+-- took your line: their number shown, yours left out. So there a spell hit
+-- or heal waits HOLD with the others, and each line goes to the likeliest
+-- near it: a cast of yours waiting for it (CAST), on the mob you cast at
+-- (TARGET), a mob your hits in its school landed on lately (MARK: your DoT,
+-- Ignite, a seal, a poison), else any (a line nobody likelier wanted).
+-- Still can't tell: someone's tick in your school, on a mob you're ticking,
+-- in the instant of yours. Swings there: only your target's.
+local group = {
+	CAST = 4, MARK = 2, TARGET = 1,
+	MARK_KEEP = 20, -- seconds a mob stays marked by your hits in a school
+	SAME = 0.05,    -- seconds that count as one instant
+	CAP = 30,       -- hits waiting at most (a raid's pull: the oldest go)
+	pending = {}, marks = {}, markCount = 0,
+}
+function group.On()
+	return ((IsInGroup and IsInGroup()) or (IsInRaid and IsInRaid())) and true or false
+end
+function group.Key(hit)
+	return hit.guid and hit.school and (hit.guid .. ":" .. hit.school) or nil
+end
+function group.Mark(hit, now)
+	local key = group.Key(hit)
+	if not key then return end
+	if not group.marks[key] then group.markCount = group.markCount + 1 end
+	group.marks[key] = now
+	if group.markCount > 200 then
+		for each, at in pairs(group.marks) do
+			if now - at > group.MARK_KEEP then group.marks[each], group.markCount = nil, group.markCount - 1 end
+		end
+	end
+end
+
 local function Mine(hit)
 	if hit.melee then swingAt, swingPlate = hit.at or GetTime(), hit[1] end
 	ns.combatTextWhose.mine = ns.combatTextWhose.mine + 1
+	if hit.school then group.Mark(hit, hit.at or GetTime()) end
 	local cast = hit.school and TakeCast(hit.school, hit.at or GetTime())
 	Spawn(hit[1], hit[2], hit[3], hit.id, hit.via, nil, hit.tag, nil, cast)
 end
@@ -685,12 +725,63 @@ end
 -- (A hit drawn late, its plate back a moment on (TargetHit): matched to the
 -- log as of when it landed, so the wait doesn't leave it out.)
 local claimAt
+
+-- Damage shields (2026-11-19): a frost mage's Blizzard in a dungeon showed a
+-- steady "19" in Nature or Holy, a groupmate's Thorns or Retribution Aura on
+-- the tank, landing in the instant of a Blizzard tick and taking its line.
+-- The game never says which spell hit, only its school, so: a spell hit in a
+-- school your class can't deal ("off-class") counts only when (1) a hit on
+-- you landed with it (a damage shield answers a swing at its wearer, a
+-- cleave's too, and the log credits the wearer), and (2) a line came for it
+-- that none of your own schools' hits took: it waits HOLD, so they go first.
+-- Several at once: no more than the hits on you, mobs targeting you first.
+-- Your wand's shots (Shoot) are yours in any school. No log: (1) alone.
+local off = {
+	-- Schools each class deals (bits: 2 Holy, 4 Fire, 8 Nature, 16 Frost, 32
+	-- Shadow, 64 Arcane; Physical isn't checked). A class not here: all.
+	CLASS = {
+		WARRIOR = 0, ROGUE = 8, HUNTER = 4 + 8 + 64, PALADIN = 2, PRIEST = 2 + 32, SHAMAN = 4 + 8 + 16,
+		MAGE = 4 + 16 + 64, WARLOCK = 4 + 32, DRUID = 8 + 64, DEATHKNIGHT = 16 + 32, MONK = 8,
+		DEMONHUNTER = 4 + 32 + 64 + 2 + 8 + 16, EVOKER = 4 + 8 + 16 + 64,
+	},
+	WINDOW = 0.8,  -- seconds between a hit on you and its shield's hit, either way (untested: the recorder logs the gap)
+	pending = {},  -- off-class hits waiting HOLD
+	youHit = {},   -- times of hits on you, each good for one shield hit
+	wand = {},     -- times of your wand's shots, each good for one hit
+}
+-- Whether your class can deal this school (a mixed school: any part of it).
+function off.Fits(school)
+	if not school or school == 1 then return true end
+	if off.mask == nil then
+		local ok, _, class = pcall(UnitClass, "player")
+		off.mask = ok and Plain(class) and off.CLASS[class] or false
+	end
+	if not off.mask then return true end
+	return bit.band(school, off.mask) ~= 0
+end
+
 local function Claim(plate, unit, amount, id, via, melee, tag, school)
 	local hit = { plate, unit, amount, melee = melee, id = id, via = via, tag = tag, school = school }
 	-- (Your target as it landed: a pet's hit is checked a moment on, and a
 	-- target switched just after it (seen 2026-11-19) left an imp's out.)
 	local okTarget, onTarget = pcall(UnitIsUnit, unit, "target")
 	hit.onTarget = okTarget and Plain(onTarget) and onTarget and true or nil
+	-- (Off-class, a damage's: waits for the hits on you and your own lines.)
+	if school and not melee and CT.Kind(id) ~= "heal" and not off.Fits(school) then
+		local now = claimAt or GetTime()
+		local okYou, onYou = pcall(UnitIsUnit, unit .. "target", "player")
+		hit.at, hit.onYou = now, okYou and Plain(onYou) and onYou and true or nil
+		if ns.combatTextRecord then
+			Trace(("hit %s school %d off-class (on you: %s) waits"):format(tostring(unit), school, tostring(hit.onYou)))
+		end
+		if #off.pending >= group.CAP then
+			table.remove(off.pending, 1)
+			ns.combatTextWhose.others = ns.combatTextWhose.others + 1
+		end
+		off.pending[#off.pending + 1] = hit
+		ns.WakeFeatureLoop(holder)
+		return
+	end
 	local crit = NODE[id] and NODE[id].crit
 	local color = { 1, 1, 1 } -- (for the trace's "white" only)
 	if id ~= "swing" and id ~= "swingCrit" and id ~= "swingGlance" then color = CT.SPELL end
@@ -699,6 +790,41 @@ local function Claim(plate, unit, amount, id, via, melee, tag, school)
 		return Spawn(plate, unit, amount, id, via, nil, tag, nil, cast)
 	end
 	local now = claimAt or GetTime()
+	if group.On() then
+		-- (A swing in a group: your target's only. Its line came 0.3-0.75 s
+		-- before it, too loose to tell whose; abilities' hits (Cleave) still
+		-- go on any mob.)
+		if melee and (via == "swing" or via == "swingGlance") and not hit.onTarget then
+			ns.combatTextWhose.others = ns.combatTextWhose.others + 1
+			if ns.combatTextRecord then Trace(("hit %s (swing) in a group, not your target: left out"):format(tostring(unit))) end
+			return
+		end
+		-- (A spell hit or heal: waits with the others for the lines, scored.)
+		if school and not melee then
+			local okGuid, guid = pcall(UnitGUID, unit)
+			hit.guid = okGuid and Plain(guid) and guid or nil
+			hit.at = now
+			local score, why = 0, {}
+			if PeekCast(school, now) then score, why[#why + 1] = score + group.CAST, "cast" end
+			local key = group.Key(hit)
+			if key and group.marks[key] and now - group.marks[key] <= group.MARK_KEEP then
+				score, why[#why + 1] = score + group.MARK, "mark"
+			end
+			if hit.onTarget then score, why[#why + 1] = score + group.TARGET, "target" end
+			hit.score = score
+			if ns.combatTextRecord then
+				Trace(("hit %s school %d in a group waits, score %d (%s)"):format(tostring(unit), school, score,
+					#why > 0 and table.concat(why, "+") or "nothing"))
+			end
+			if #group.pending >= group.CAP then
+				table.remove(group.pending, 1)
+				ns.combatTextWhose.others = ns.combatTextWhose.others + 1
+			end
+			group.pending[#group.pending + 1] = hit
+			ns.WakeFeatureLoop(holder)
+			return
+		end
+	end
 	if melee and swingAt == now and swingPlate == plate then
 		Trace(("hit %s (swing) goes with the swing before it"):format(TraceUnit(unit, color, crit)))
 		return Mine(hit)
@@ -737,11 +863,20 @@ end
 -- A heal on you or your pet: its line isn't for a plate's hit. Heals alone:
 -- hits and misses on you come with no line (above).
 local ownSeen = {}
-local function OnOwnHit(action)
+local function OnOwnHit(unit, action, school)
 	if not Plain(action) then return end
 	if not ownSeen[action] then
 		ownSeen[action] = true
 		ns.Log("combattext", "first on you: " .. tostring(action))
+	end
+	-- (A physical hit on you: a damage shield of yours may answer it,
+	-- Off-class above. Only physical: shields answer swings, and in a raid
+	-- the boss's spells on you would vouch for everyone's shields.)
+	if action == "WOUND" and unit == "player" and Plain(school) and tonumber(school) == 1 then
+		local now = GetTime()
+		while off.youHit[1] and now - off.youHit[1] > off.WINDOW do table.remove(off.youHit, 1) end
+		if #off.youHit < 8 then off.youHit[#off.youHit + 1] = now end
+		if ns.combatTextRecord then Trace("physical hit on you") end
 	end
 	if action ~= "HEAL" then return end
 	local now = GetTime()
@@ -820,10 +955,113 @@ Unclaimed = function(hit, now)
 	Trace("LEFT OUT")
 	traceDue = traceDue or now + 1
 end
+-- Off-class hits held past HOLD (your own schools' hits have had their
+-- lines): each takes a wand shot of yours, or a hit on you and a line left
+-- over; mobs targeting you first. The rest: someone else's.
+local function TakeTime(list, at, window)
+	for i, t in ipairs(list) do
+		if math.abs(t - at) <= window then
+			table.remove(list, i)
+			return t
+		end
+	end
+end
+local function ResolveOff(now, cutoff)
+	local ripe
+	for i = #off.pending, 1, -1 do
+		local hit = off.pending[i]
+		-- (A hit on you may come after its shield's: wait for it, a little.)
+		if now - hit.at > HOLD and hit.at < cutoff
+			and (now - hit.at > off.WINDOW or #off.youHit > 0 or #off.wand > 0) then
+			ripe = ripe or {}
+			ripe[#ripe + 1] = table.remove(off.pending, i)
+		end
+	end
+	if not ripe then return end
+	table.sort(ripe, function(a, b)
+		if (a.onYou and 1 or 0) ~= (b.onYou and 1 or 0) then return a.onYou and true or false end
+		return a.at < b.at
+	end)
+	local running = LogRunning()
+	for _, hit in ipairs(ripe) do
+		local mine
+		if TakeTime(off.wand, hit.at, PET_WAIT) then
+			mine = "your wand"
+		else
+			local you = TakeTime(off.youHit, hit.at, off.WINDOW)
+			if you and running then
+				Fresh(lines, now, MELEE_HOLD)
+				-- (Its line in its own instant: in a raid lines are left over
+				-- all the time, your hits on mobs with no plate.)
+				if TakeTime(lines, hit.at, group.SAME) then
+					mine = ("a hit on you %+.2f s and a spare line"):format(you - hit.at)
+				else
+					table.insert(off.youHit, 1, you) -- (not this one's: another may have it)
+					table.sort(off.youHit)
+				end
+			elseif you then
+				mine = ("a hit on you %+.2f s (no log)"):format(you - hit.at)
+			end
+		end
+		if mine then
+			Trace("OFF-CLASS, YOURS: " .. mine)
+			-- (A shield's hit came from no cast: it mustn't take one of yours.)
+			if mine ~= "your wand" then hit.school = nil end
+			Mine(hit)
+		else
+			ns.combatTextWhose.others = ns.combatTextWhose.others + 1
+			Trace(("OFF-CLASS LEFT OUT (on you: %s, hits on you waiting: %d)"):format(tostring(hit.onYou), #off.youHit))
+		end
+	end
+end
+-- A group's spell hits and heals (In a group, above), once the oldest has
+-- waited two HOLDs (the hits around it in, their lines too): all that
+-- waited HOLD, likeliest first, each takes the line nearest it within HOLD.
+-- No line: your pet's, or someone else's.
+local function ResolveGroup(now)
+	local oldest
+	for _, hit in ipairs(group.pending) do
+		if not oldest or hit.at < oldest then oldest = hit.at end
+	end
+	if not oldest or now - oldest <= 2 * HOLD then return end
+	local ripe = {}
+	for i = #group.pending, 1, -1 do
+		if now - group.pending[i].at > HOLD then ripe[#ripe + 1] = table.remove(group.pending, i) end
+	end
+	table.sort(ripe, function(a, b)
+		if a.score ~= b.score then return a.score > b.score end
+		return a.at < b.at
+	end)
+	Fresh(lines, now, MELEE_HOLD)
+	local record = ns.combatTextRecord
+	for _, hit in ipairs(ripe) do
+		local best, gap
+		for i, t in ipairs(lines) do
+			local d = math.abs(t - hit.at)
+			if d <= HOLD and (not gap or d < gap) then best, gap = i, d end
+		end
+		if best then
+			table.remove(lines, best)
+			if record then Trace(("GROUP, YOURS: score %d, its line %.2f s off"):format(hit.score, gap)) end
+			Mine(hit)
+		else
+			if record then Trace(("GROUP: score %d found no line"):format(hit.score)) end
+			Unclaimed(hit, now)
+		end
+	end
+end
 -- Hits held past HOLD with no line: your pet's, or someone else's.
 local function DropUnclaimed(now)
 	while pending[1] and now - pending[1].at > HOLD do
 		Unclaimed(table.remove(pending, 1), now)
+	end
+	-- (Your own schools' hits first, then the off-class ones: leftovers.)
+	if group.pending[1] then ResolveGroup(now) end
+	if off.pending[1] then
+		-- (Not one landing with a group hit still waiting: that one's line first.)
+		local cutoff = math.huge
+		for _, hit in ipairs(group.pending) do cutoff = math.min(cutoff, hit.at - HOLD) end
+		ResolveOff(now, cutoff)
 	end
 end
 
@@ -907,6 +1145,8 @@ function ns.RefreshCombatTextStyle()
 	if not On() then
 		for index = #live, 1, -1 do Retire(index) end
 		wipe(pending)
+		wipe(off.pending)
+		wipe(group.pending)
 	end
 end
 
@@ -921,7 +1161,7 @@ end)
 ns.FeatureLoop(holder, function(...)
 	DropUnclaimed(GetTime())
 	Step(...)
-end, function() return #live > 0 or #pending > 0 end)
+end, function() return #live > 0 or #pending > 0 or #off.pending > 0 or #group.pending > 0 end)
 
 -- Hits -------------------------------------------------------------------------
 local function InGroup()
@@ -946,6 +1186,7 @@ end
 -- hit waits that frame out, and is an ability's when a cast of yours (not
 -- the auto attack) came in it.
 local AUTO_ATTACK = 6603
+local WAND_SHOOT = 5019
 local castAt
 -- A spell's cast, for its number's size (CastSize, CastTime: 2026-11-18).
 -- UNIT_COMBAT doesn't say which spell hit, so each cast of yours as it
@@ -960,6 +1201,7 @@ local castStarts = {} -- [spell] = when its cast began
 local casts = {}      -- { at, secs, spell } each, oldest first
 local channel         -- { secs, spell, ends }
 local schoolsOf = {}  -- [spell] = { [school] = hits taken }
+local TakeCastLast    -- { at, school, secs, spell }: the cast the last spell hit took
 local castWatch = CreateFrame("Frame")
 for _, event in ipairs({ "UNIT_SPELLCAST_SUCCEEDED", "UNIT_SPELLCAST_START", "UNIT_SPELLCAST_CHANNEL_START",
 	"UNIT_SPELLCAST_CHANNEL_STOP" }) do
@@ -978,6 +1220,11 @@ castWatch:SetScript("OnEvent", function(_, event, _, _, spell)
 	elseif event == "UNIT_SPELLCAST_CHANNEL_STOP" then
 		if channel then channel.ends = math.min(channel.ends, now + 0.3) end
 	elseif spell ~= AUTO_ATTACK then
+		-- (A wand's shot: its hit is yours in any school, Off-class.)
+		if spell == WAND_SHOOT then
+			while off.wand[1] and now - off.wand[1] > CAST_WAIT do table.remove(off.wand, 1) end
+			if #off.wand < 4 then off.wand[#off.wand + 1] = now end
+		end
 		castAt = now
 		local began = castStarts[spell]
 		castStarts[spell] = nil
@@ -1014,17 +1261,38 @@ TakeCast = function(school, now)
 		if record then record(("cast: a tick of channel %s, %.1f s"):format(tostring(channel.spell), channel.secs)) end
 		return channel.secs
 	end
+	-- (An area spell's other hits, in the instant of the one that took its
+	-- cast: the same cast, 2026-11-19. Before, the first alone grew.)
+	local last = TakeCastLast
+	if last and last.school == school and math.abs(now - last.at) <= group.SAME then
+		if record then record(("cast: spell %s again (an area spell's hits in one instant)"):format(tostring(last.spell))) end
+		return last.secs
+	end
 	while casts[1] and now - casts[1].at > CAST_WAIT do table.remove(casts, 1) end
 	for i, cast in ipairs(casts) do
 		if SchoolFits(cast.spell, school) then
 			table.remove(casts, i)
 			Learn(cast.spell, school)
+			TakeCastLast = { at = now, school = school, secs = cast.secs, spell = cast.spell }
 			if record then record(("cast: spell %s, %.2f s, school %d"):format(tostring(cast.spell), cast.secs, school)) end
 			return cast.secs
 		end
 	end
 	if record then record(("cast: none waiting for school %d (100%%)"):format(school)) end
 	return nil
+end
+-- Whether a cast of yours waits for a hit of this school (TakeCast's, not
+-- taking it): In a group's score.
+PeekCast = function(school, now)
+	school = tonumber(school)
+	if not school then return false end
+	if channel and now <= channel.ends and SchoolFits(channel.spell, school) then return true end
+	local last = TakeCastLast
+	if last and last.school == school and math.abs(now - last.at) <= group.SAME then return true end
+	for _, cast in ipairs(casts) do
+		if now - cast.at <= CAST_WAIT and SchoolFits(cast.spell, school) then return true end
+	end
+	return false
 end
 -- A miss with no school of its own (the game sends misses as physical) while
 -- a long cast of yours waits for its hit: that spell's, the cast used up.
@@ -1265,12 +1533,16 @@ driver:SetScript("OnEvent", ns.Profiled("Combat text plates", function(_, event,
 		local log = CreateFrame("Frame")
 		logListening = pcall(log.RegisterEvent, log, "COMBAT_LOG_MESSAGE")
 		log:SetScript("OnEvent", ns.Profiled("Combat text log", function()
+			if not logLines then
+				logLines = true
+				ns.Log("combattext", "first combat log line: hits are matched to lines from now on")
+			end
 			if On() then OnLine() end
 		end))
 		local own = CreateFrame("Frame")
 		pcall(own.RegisterUnitEvent, own, "UNIT_COMBAT", "player", "pet")
-		own:SetScript("OnEvent", ns.Profiled("Combat text own", function(_, _, _, action)
-			if On() then OnOwnHit(action) end
+		own:SetScript("OnEvent", ns.Profiled("Combat text own", function(_, _, who, action, _, _, school)
+			if On() then OnOwnHit(who, action, school) end
 		end))
 		if C_Timer and C_Timer.NewTicker then C_Timer.NewTicker(2, function() ns.Guard(ns.RefreshCombatTextStyle) end) end
 		ns.RefreshCombatTextStyle()
@@ -1346,10 +1618,10 @@ function ns.CombatTextStateLine()
 	end
 	parts[#parts + 1] = "off=" .. (off[1] and table.concat(off, ",") or "none")
 	parts[#parts + 1] = "own=" .. (own[1] and table.concat(own, ",") or "none")
-	return ("numbers on=%s page on=%s blocked=%s | log listening=%s running=%s turned on by us=%s | shown as yours"
+	return ("numbers on=%s page on=%s blocked=%s | log listening=%s lines came=%s running=%s turned on by us=%s | shown as yours"
 		.. " %d, left out %d, showing now %d, waiting %d | game numbers off=%s | scale=%s ramp=%s | font=%s | %s")
 		:format(tostring(On()), tostring(PageOn()), tostring(ns.combatTextBlocked), tostring(logListening),
-		tostring(LogRunning()), tostring(logTurnedOn), ns.combatTextWhose.mine, ns.combatTextWhose.others, #live,
+		tostring(logLines), tostring(LogRunning()), tostring(logTurnedOn), ns.combatTextWhose.mine, ns.combatTextWhose.others, #live,
 		#pending, tostring(GAME_NUMBERS.active), tostring(CVarNumber("WorldTextScale_v2", 1)),
 		tostring(CVarNumber("WorldTextRampDuration_v2", 1)), tostring(GAME_FONT), table.concat(parts, " "))
 end
@@ -1368,7 +1640,8 @@ function ns.CombatNumbersToggle()
 		ns.combatTextBlocked and (", but held back: " .. ns.combatTextBlocked .. " is loaded") or "",
 		GAME_NUMBERS.active and "off" or "showing", db.hideWorldText and "hidden after a restart" or "showing",
 		tostring(GAME_FONT),
-		LogRunning() and "combat log lines" or (logListening and "log off: all hits count" or "no log on this client"),
+		LogRunning() and "combat log lines" or (logListening and (logLines and "log off: all hits count"
+			or "no log lines have come: all hits count") or "no log on this client"),
 		whose.mine, whose.others)
 	ns.Print(text)
 	ns.Log("combattext", text)
