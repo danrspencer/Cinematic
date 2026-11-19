@@ -5658,6 +5658,7 @@ local function CreateRevealPanel()
 	if Settings and Settings.RegisterCanvasLayoutCategory then
 		category = Settings.RegisterCanvasLayoutCategory(canvas, "Cinematic")
 		Settings.RegisterAddOnCategory(category)
+		ns.settingsCategory = category -- (BlockedLineTest's control step)
 	elseif InterfaceOptions_AddCategory then
 		InterfaceOptions_AddCategory(canvas)
 	end
@@ -19988,6 +19989,33 @@ local MOVED_PAGES = { ["Combat Vision"] = "Card Vision", ["Story Vision"] = "Car
 -- commands that open and read pages (StyleSixTest.lua).
 function ns.SettingsPageCanvas(name) return subpages[name] or (ns.settingsCanvases and ns.settingsCanvases[name]) end
 
+-- Opens the game's settings window at a category (object or id). With the
+-- gamepad UI there (Forever's SmartNavigation), Settings.OpenToCategory also
+-- moves the gamepad cursor into the page (ActivateCategory > FocusContainer >
+-- EnterFocusGroup), which only the game's own code may do: from ours it prints
+-- "Interface action failed because of an AddOn". There the window is shown and
+-- the page picked (SelectCategory, as the category list's click does), which
+-- leaves the gamepad focus alone. Out of combat only (ShowUIPanel).
+function ns.OpenSettingsCategory(target)
+	local panel = SettingsPanel
+	if _G.SmartNavigation and panel and panel.SelectCategory then
+		if type(target) == "number" then
+			target = panel.GetCategory and panel:GetCategory(target) or nil
+		end
+		if target then
+			if not panel:IsShown() then ShowUIPanel(panel) end
+			if not panel:IsShown() then panel:Show() end
+			panel:SelectCategory(target)
+			return
+		end
+	end
+	if Settings and Settings.OpenToCategory then
+		local id = target
+		if type(target) == "table" then id = target.GetID and target:GetID() end
+		if id then Settings.OpenToCategory(id) elseif panel then ShowUIPanel(panel) end
+	end
+end
+
 function ns.OpenOptions(page)
 	page = MOVED_PAGES[page] or page
 	-- (a UI Manager page: that page, then UI Manager open at it)
@@ -20010,8 +20038,7 @@ function ns.OpenOptions(page)
 		return
 	end
 	if category and Settings and Settings.OpenToCategory then
-		local target = line or subpages[page] or category
-		Settings.OpenToCategory(target:GetID())
+		ns.OpenSettingsCategory(line or subpages[page] or category)
 	elseif InterfaceOptionsFrame_OpenToCategory then
 		-- Called twice: the first call can land on the wrong page in old clients.
 		InterfaceOptionsFrame_OpenToCategory(subpages[page] or mainCanvas)

@@ -118,7 +118,7 @@ local function Restore()
 	elseif state.category then
 		Try("the settings", function()
 			if type(state.category) == "number" and Settings and Settings.OpenToCategory then
-				Settings.OpenToCategory(state.category)
+				ns.OpenSettingsCategory(state.category)
 			elseif SettingsPanel then
 				ShowUIPanel(SettingsPanel)
 			elseif InterfaceOptionsFrame then

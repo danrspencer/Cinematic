@@ -8,10 +8,13 @@
 --                "blocked (chat line only)" entry (PASS/FAIL)
 --   3 replay     the line put in chat as chat history restore does at login
 --                (ns.chatRestoring): no entry (PASS/FAIL)
---   4 settings   opens our settings the way our code does (ns.OpenOptions), the
---                known trigger on Forever. The game doesn't block it every
---                time (2026-11-19: no block): none = INFO; a new entry must
---                have Settings or SmartNavigation in its stack (PASS/FAIL)
+--   4 settings   opens our settings the way our code does (ns.OpenOptions), main
+--                page: no blocked line, the page shown. Forever's gamepad UI
+--                once blocked it (OpenToCategory moves the gamepad cursor in,
+--                game code only); now picked with SelectCategory (PASS/FAIL)
+--   5 page       the same at a sub-page, as /reload puts it back (PASS/FAIL)
+--   6 control    the old way (Settings.OpenToCategory from us): how many it
+--                blocks now, to show the trigger was live (INFO)
 -- Into CinematicDB.blockedLineTestLog, a verdict a step, a screenshot a step.
 -- The yellow lines in chat during it are the test's. Run again to stop it.
 -- Dev copy only.
@@ -56,6 +59,36 @@ local function Verdict(ok, text)
 	Say(("  verdict %s: %s"):format(ok and "PASS" or "FAIL", text))
 end
 
+local function CloseSettings()
+	local window = _G.SettingsPanel
+	if window and window:IsShown() and HideUIPanel then pcall(HideUIPanel, window) end
+end
+
+-- A step that opens our settings as our code does (ns.OpenOptions, page or
+-- the main one): no blocked line wanted, and the page on screen (wantShown
+-- given what ns.ShownOptionsPage says).
+local function OpenedStep(title, page, wantShown)
+	return { "settings opened by our code: " .. title, function()
+		CloseSettings()
+		local ok, err = pcall(ns.OpenOptions, page)
+		if not ok then Say("  OpenOptions error: " .. tostring(err)) end
+		return true
+	end, function(hook0, chat0, hook1, chat1)
+		local new = hook1 - hook0 + chat1 - chat0
+		if new > 0 then
+			local _, stack = ns.DevErrorCount(hook1 > hook0 and HOOK or CHAT)
+			if stack then Say("  stack:\n" .. stack) end
+		end
+		local shown = ns.ShownOptionsPage and ns.ShownOptionsPage()
+		Say(("  gamepad UI %s, GamePadEnable %s, page shown %q"):format(_G.SmartNavigation and "there" or "not there",
+			tostring(GetCVar and GetCVar("GamePadEnable")), tostring(shown)))
+		local pageOk = wantShown(shown) and true or false
+		Verdict(new == 0 and pageOk, ("blocked lines +%d (0 wanted), page %s"):format(new,
+			pageOk and "shown" or "NOT shown"))
+		CloseSettings()
+	end }
+end
+
 -- Each step: a title, what it does, and its check (given the counts before).
 local STEPS = {
 	{ "the game's blocked-line function called, 12 calls deep", function()
@@ -92,26 +125,26 @@ local STEPS = {
 	end, function(hook0, chat0, hook1, chat1)
 		Verdict(chat1 == chat0 and hook1 == hook0, ("entries +%d (0 wanted)"):format(chat1 - chat0 + hook1 - hook0))
 	end },
-	{ "settings opened by our code", function()
-		local ok, err = pcall(ns.OpenOptions)
-		if not ok then Say("  OpenOptions error: " .. tostring(err)) end
+	-- (the main page reads "CineMode" on Forever, "" where it isn't a search page)
+	OpenedStep("main page", nil, function(shown) return shown == "" or shown == "CineMode" end),
+	OpenedStep("Card Vision page (as /reload puts it back)", "Card Vision",
+		function(shown) return shown ~= nil and shown ~= "" end),
+	{ "control: the game's own OpenToCategory called by us (the old way)", function()
+		local target = ns.settingsCategory
+		if not (target and Settings and Settings.OpenToCategory) then
+			Say("  no Settings.OpenToCategory on this client: skipped")
+			return true
+		end
+		CloseSettings()
+		-- (our main category, as ns.OpenOptions used to open it)
+		local ok, err = pcall(Settings.OpenToCategory, target:GetID())
+		if not ok then Say("  OpenToCategory error: " .. tostring(err)) end
 		return true
 	end, function(hook0, chat0, hook1, chat1)
 		local new = hook1 - hook0 + chat1 - chat0
-		local _, stack = ns.DevErrorCount(hook1 > hook0 and HOOK or CHAT)
-		local fromSettings = new > 0 and type(stack) == "string"
-			and (stack:find("SmartNavigation") or stack:find("Settings")) and true or false
-		if stack and new > 0 then Say("  stack:\n" .. stack) end
-		if new == 0 then
-			run.info = run.info + 1
-			Say(("  verdict INFO: the game didn't block anything this time (GamePadEnable %s)"):format(
-				tostring(GetCVar and GetCVar("GamePadEnable"))))
-		else
-			Verdict(fromSettings, fromSettings and "caught, stack from the settings"
-				or "caught, but the stack doesn't name the settings")
-		end
-		local window = _G.SettingsPanel
-		if window and window:IsShown() and HideUIPanel then pcall(HideUIPanel, window) end
+		run.info = run.info + 1
+		Say(("  verdict INFO: the old way blocked %d time(s) now (it blocks only while the gamepad cursor is in no focus group)"):format(new))
+		CloseSettings()
 	end },
 }
 
