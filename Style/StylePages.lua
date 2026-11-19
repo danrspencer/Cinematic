@@ -3658,7 +3658,8 @@ function ns.StyleRows(kit, content, stack, changed, switchKey, fieldOf, panel)
 				box:SetPoint("TOPLEFT", 0, -CHIPS.boxTop)
 				for _, button in ipairs(box.buttons) do buttons[#buttons + 1] = button end
 			end
-			holder.Refresh()
+			-- (With a colon: GreyUnless wraps Refresh in one that needs the holder.)
+			holder:Refresh()
 		end)
 		function holder.SetEnabled(_, on)
 			for _, button in ipairs(buttons) do button:SetEnabled(on) end
