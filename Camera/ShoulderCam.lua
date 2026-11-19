@@ -2303,6 +2303,14 @@ do
 		local method = follow.method
 		if method ~= "sum" and method ~= "adjust" and method ~= "stand" then return end
 		if type(point) ~= "string" then return end
+		-- (Never on a secret place: our move taints the text's place, and the
+		-- game then compares its secret bottom with the next message's and
+		-- errors, "compare local 'lowestMessage'", CombatText.lua:364, Forever
+		-- dungeon 2026-11-19. Taint alone is harmless here: no protected call.)
+		if secret then
+			stats.skipped = stats.skipped + 1
+			return
+		end
 		local shift, lift = Offset()
 		if math.abs(shift) < 0.5 and math.abs(lift) < 0.5 then return end
 		local scale = UIParent:GetEffectiveScale() / math.max(0.01, text:GetEffectiveScale())
