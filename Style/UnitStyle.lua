@@ -3440,6 +3440,7 @@ function ns.CreateUnitStylePanel(kit)
 			if not pops[key] then pops[key] = MakePanel(shown, shown and label or L["Default"]) end
 			pops[key]:SetShown(not pops[key]:IsShown())
 		end)
+		button.opensLook = true -- (opens a Look panel: /cine debug lookdock clicks one a page)
 		function button.Refresh(self)
 			local db = ns.GetDB()
 			-- (Party drawn as raid frames: nothing here to dress.)

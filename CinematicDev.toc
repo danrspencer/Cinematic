@@ -232,6 +232,7 @@ Dev\DimNameTest.lua
 Dev\EmoteFitTest.lua
 Dev\UnitDriftTest.lua
 Dev\CombatTextTest.lua
+Dev\LookDockTest.lua
 Dev\GradientTest.lua
 Dev\QuestFocusTest.lua
 Dev\PlateFlickerTest.lua

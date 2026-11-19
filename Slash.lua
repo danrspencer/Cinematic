@@ -1811,6 +1811,10 @@ local function HandleSlash(msg)
 		-- (Dev copy: which way of moving the game's floating combat text works, CombatTextTest.lua.)
 		if ns.CombatTextTest then ns.CombatTextTest(arg:match("^cttest%s*(.*)$"))
 		else ns.Print("/cine debug cttest is in the dev copy only.") end
+	elseif cmd == "debug" and arg == "lookdock" then
+		-- (Dev copy: a Look panel and the popped preview both in sight on every Style page, LookDockTest.lua.)
+		if ns.LookDockTest then ns.LookDockTest()
+		else ns.Print("/cine debug lookdock is in the dev copy only.") end
 	elseif cmd == "debug" and arg:find("^gradtest") then
 		-- (Dev copy: the bar gradients, By health and the pop-up palette in one run, GradientTest.lua.)
 		if ns.GradientTest then ns.GradientTest(arg:match("^gradtest%s*(.*)$"))

@@ -935,6 +935,7 @@ function ns.CreateCombatTextStylePanel(kit)
 		kit.Tooltip(button, id == "all" and L["Every text's look; each row below starts from it."]
 			or L["This text's own look, over the one it's under."])
 		button:SetScript("OnClick", function() OpenRow(id) end)
+		button.opensLook = true -- (opens a Look panel: /cine debug lookdock clicks one a page)
 		function button.Refresh(self)
 			local own = CT.OwnParts(id)
 			local inherits = false

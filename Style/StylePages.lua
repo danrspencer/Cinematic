@@ -853,6 +853,11 @@ local function PutBack(soft)
 	if ns.PreviewTrace then ns.PreviewTrace("put back", preview, soft and "soft" or "") end
 	popped = nil
 	SlideBack()
+	-- (Out of a Look panel's way no more: its next pop out docks as it goes.)
+	if popWindow then popWindow.lookRight, popWindow.lookAside = nil, nil end
+	-- (An open Look panel's own sample back: the preview's on the page now.)
+	local open = ns.LookPanelOpen and ns.LookPanelOpen()
+	if open and open.SampleShown then open.SampleShown(true) end
 	local slot = preview.popSlot
 	-- (Put back with its page still up: the window closed, or Put back:
 	-- not popped again till the page is left.)
@@ -916,9 +921,10 @@ local function DockSpot(preview)
 		-- (The room the settings slid down to the screen's bottom would give.)
 		above = Fit(screenW * 0.95, screenH - top + bottom - DOCK_GAP * 4)
 	end
-	-- (Right first since 2026-11-17: the user's pick; above when it doesn't fit there.)
+	-- (Right first since 2026-11-17: the user's pick; above when it doesn't fit
+	-- there. Not right while a docked Look panel has that spot: PreviewAside.)
 	local beside = Fit(screenW - right - DOCK_GAP * 2, screenH - 60)
-	if beside >= POPOUT_MIN_SCALE then return "right", settings, beside end
+	if beside >= POPOUT_MIN_SCALE and not (popWindow and popWindow.lookRight) then return "right", settings, beside end
 	if above >= POPOUT_MIN_SCALE then return "above", settings, above end
 	beside = Fit(left - DOCK_GAP * 2, screenH - 60)
 	if beside >= POPOUT_MIN_SCALE then return "left", settings, beside end
@@ -1099,7 +1105,7 @@ end
 -- settings only; the preview made smaller (to half its size at most) to make
 -- the room. Gives the window to hang the panel under, or nil: no room, the
 -- preview out of its way as before (PreviewAside).
-local UNDER_LEAST = 0.45
+local UNDER_LEAST = 0.35 -- (0.45 till 2026-11-19: a tall panel found no room, the preview moved off)
 function ns.PreviewRoomUnder(need)
 	if not (popWindow and popped and popWindow:IsShown() and not popWindow.lookAside) then return end
 	if popWindow.side ~= "right" and popWindow.side ~= "left" then return end
@@ -1123,16 +1129,33 @@ function ns.PreviewRoomBack()
 end
 
 -- The preview window out of a docked Look panel's way while it's open (they
--- sit in the same spot beside the settings), back as it closes (2026-11-16).
--- (Docked above the settings it's in no one's way: left up.)
+-- sit in the same spot right of the settings), back as it closes. Moved to
+-- the next spot that holds it, above or left of the settings, so both stay
+-- in sight on every page (the user's ask, 2026-11-19: it used to hide);
+-- hidden only when no other spot holds it. (Above, left or where you
+-- dragged it, it's in no one's way: left up.)
+local function Redock()
+	ScalePopped(popScale or POPOUT_SCALE)
+	FitWindow()
+	PlaceWindow()
+end
 function ns.PreviewAside(aside)
 	if not popWindow then return end
 	if aside then
-		if popWindow:IsShown() and popWindow.side ~= "above" then
+		if not (popped and popWindow:IsShown()) or popWindow.lookRight or popWindow.side ~= "right" then return end
+		popWindow.lookRight = true
+		Redock()
+		if not popWindow.side then
 			popWindow.lookAside = true
 			popWindow:Hide()
 		end
-	elseif popWindow.lookAside then
+		return
+	end
+	if popWindow.lookRight then
+		popWindow.lookRight = nil
+		if popped then Redock() end
+	end
+	if popWindow.lookAside then
 		popWindow.lookAside = nil
 		if popped then popWindow:Show() end
 	end
@@ -1194,6 +1217,12 @@ local function PopOut(preview)
 	window:Show()
 	FitWindow()
 	PlaceWindow()
+	-- (Popped out with a Look panel already docked right of the settings: to
+	-- the next spot, both in sight.)
+	if ns.LookPanelBeside and ns.LookPanelBeside() then ns.PreviewAside(true) end
+	-- (An open Look panel's own sample gone: the popped preview shows it.)
+	local open = ns.LookPanelOpen and ns.LookPanelOpen()
+	if open and open.SampleShown then open.SampleShown(not ns.PreviewWindowShown()) end
 	if preview.Refresh then preview:Refresh() end
 end
 
@@ -1891,6 +1920,9 @@ end
 
 -- (tooltip: the page's, unused since the buttons are icons with their own.)
 function ns.StylePopout(preview, _, title)
+	-- (Every preview that pops out: /cine debug lookdock, Dev/LookDockTest.lua.)
+	ns.STYLE_PREVIEWS = ns.STYLE_PREVIEWS or {}
+	ns.STYLE_PREVIEWS[#ns.STYLE_PREVIEWS + 1] = preview
 	WidePreview(preview)
 	ns.AddPreviewFit(preview)
 	local button = IconButton(preview, "pop", ns.L["Pop out: the preview in a window of its own, docked to the settings."])
@@ -2449,6 +2481,15 @@ ns.LOOK_DIM = LookFont("CinematicLookDim", 0.6, 0.6, 0.6, _G.GameFontDisableSmal
 -- The Look panel shown now (one at a time), and where it was popped out to
 -- (nil: docked beside the settings).
 local openLook
+-- Whether the open Look panel is docked right of the settings (not where you
+-- dragged it, nor under the preview): the popped preview goes elsewhere.
+function ns.LookPanelBeside()
+	return openLook and openLook:IsShown() and openLook.besideSettings and true or false
+end
+-- (The popped preview's window in sight: a Look panel's own sample goes.)
+function ns.PreviewWindowShown() return popped and popWindow and popWindow:IsShown() and true or false end
+-- (The Look panel open now, docked or dragged: /cine debug lookdock.)
+function ns.LookPanelOpen() return openLook and openLook:IsShown() and openLook or nil end
 -- A look copied (Copy look, in a tabbed Look panel): { kind (the panels it
 -- pastes into: spec.tabs.copyKind), from (its row's name), values }.
 local lookClip
@@ -3772,6 +3813,7 @@ function ns.StyleRows(kit, content, stack, changed, switchKey, fieldOf, panel)
 		if inline then button:Hide() else button:SetPoint("LEFT", name, "RIGHT", 4, 0) end
 		button.searchLabel = label
 		kit.Tooltip(button, ns.L["Opens every style setting for this part in a panel beside the settings."])
+		button.opensLook = not inline or nil -- (/cine debug lookdock clicks one a page)
 
 		-- (Docked to the settings window's right, as the camera previewer is;
 		-- popped out, where it was dragged: one place for every Look panel.)
@@ -3798,7 +3840,8 @@ function ns.StyleRows(kit, content, stack, changed, switchKey, fieldOf, panel)
 		pop.recordAs = content -- (its settings are the page's: its Reset puts them back)
 		-- (Every Look panel made, by its title: Tools/style-lab draws one open.)
 		ns.LOOK_PANELS = ns.LOOK_PANELS or {}
-		ns.LOOK_PANELS[#ns.LOOK_PANELS + 1] = { title = title, pop = pop }
+		-- (canvas, inline: its page, for /cine debug lookdock, Dev/LookDockTest.lua.)
+		ns.LOOK_PANELS[#ns.LOOK_PANELS + 1] = { title = title, pop = pop, canvas = canvas, inline = inline }
 		local bg = pop:CreateTexture(nil, "BACKGROUND")
 		bg:SetAllPoints()
 		bg:SetColorTexture(0.05, 0.05, 0.05, 0.97)
@@ -3808,12 +3851,17 @@ function ns.StyleRows(kit, content, stack, changed, switchKey, fieldOf, panel)
 		edge:SetColorTexture(0.4, 0.4, 0.4, 1)
 		local heading = kit.Label(pop, "GameFontHighlightLarge", title)
 		heading:SetPoint("TOPLEFT", 12, -10)
-		local close = ns.SkinClose(CreateFrame("Button", nil, pop, "UIPanelCloseButton"))
-		close:SetPoint("TOPRIGHT", 0, 0)
-		local dock = ns.PanelButton(pop)
-		dock:SetSize(70, 20)
-		dock:SetPoint("TOPRIGHT", -28, -6)
-		kit.Tooltip(dock, ns.L["Pop out to drag the window anywhere, or dock it beside the settings."])
+		-- (Its corner buttons the preview window's own, 2026-11-19, the user's
+		-- ask: Close, and Undock or Dock left of it, as small icons.)
+		local close = IconButton(pop, "close", ns.L["Close"])
+		close:SetPoint("TOPRIGHT", -6, -4)
+		close:SetScript("OnClick", function() pop:Hide() end)
+		local dock = IconButton(pop, "undock", ns.L["Undock: drag the window anywhere."])
+		dock:SetPoint("RIGHT", close, "LEFT", -4, 0)
+		local function DockIcon(docked)
+			dock:SetIcon(docked and "undock" or "dock")
+			dock.tip = docked and ns.L["Undock: drag the window anywhere."] or ns.L["Dock the window to the settings again."]
+		end
 		if inline then
 			close:Hide()
 			dock:Hide()
@@ -3942,11 +3990,11 @@ function ns.StyleRows(kit, content, stack, changed, switchKey, fieldOf, panel)
 				kit.Refresh()
 				PaintTabs()
 			end
-			local last
+			local last, compare
 			-- Hold to compare: held down, the sample without this row's own
 			-- changes (every counted setting as it starts); let go, as it is.
 			if preview then
-				local compare = Tool(ns.L["Hold to compare"], 124,
+				compare = Tool(ns.L["Hold to compare"], 124,
 					ns.L["Hold it down to see the sample without this row's own changes: before, then after."])
 				compare:SetPoint("LEFT", tools, "LEFT", 0, 0)
 				local holding = false
@@ -3996,6 +4044,24 @@ function ns.StyleRows(kit, content, stack, changed, switchKey, fieldOf, panel)
 			end)
 			kit.GreyUnless(copy, On)
 			kit.GreyUnless(paste, function(db) return On(db) and lookClip ~= nil and lookClip.kind == copyKind end)
+			-- The panel's own sample, shown or not: not while the popped
+			-- preview is in sight, or there are two (the user's ask,
+			-- 2026-11-19); Hold to compare goes with it, the tools and tabs
+			-- move up into its room.
+			pop.SampleShown = function(show)
+				if not preview then return end
+				show = show and true or false
+				if pop.sampleShown == show then return end
+				pop.sampleShown = show
+				preview:SetShown(show)
+				local top = show and (36 + preview:GetHeight() + 8) or 36
+				tools:SetPoint("TOPLEFT", pop, "TOPLEFT", 12, -top)
+				strip:SetPoint("TOPLEFT", pop, "TOPLEFT", 0, -(top + 22 + 8))
+				if compare then compare:SetShown(show) end
+				copy:ClearAllPoints()
+				if show and compare then copy:SetPoint("LEFT", compare, "RIGHT", 6, 0) else copy:SetPoint("LEFT", tools, "LEFT", 0, 0) end
+				if refit then refit() end
+			end
 			-- Start from a theme: a theme's look in just this panel (spec.tabs.
 			-- themeLook(theme's key): its { key = value }), to change from there.
 			-- The themes: spec.tabs.themeList() ({ key, name } each), else the
@@ -4307,30 +4373,54 @@ function ns.StyleRows(kit, content, stack, changed, switchKey, fieldOf, panel)
 			for _, region in ipairs({ pop:GetRegions() }) do Reach(region) end
 			pop:SetWidth(math.max(470, right - left + 12))
 		end
-		-- (Docked: under the popped preview's window when there's room, both
-		-- in sight (2026-11-18); else beside the settings, the preview window
-		-- out of its way till it closes.)
+		-- (Docked: under the popped preview's window, the preview made smaller
+		-- for the room, both in sight (2026-11-18; the user's ask again,
+		-- 2026-11-19: the preview docked above the panel); else beside the
+		-- settings, the preview window moved out of its way till it closes.
+		-- Placed again as its size changes: hung under the preview at a height
+		-- from before its Fit, it ran past the screen's bottom and the clamp to
+		-- the screen pushed it up over the preview.)
 		local function Place()
 			local spot = LookSpot()
 			pop:ClearAllPoints()
+			-- (The preview back in its own spot first, room under it looked for from there.)
+			if not spot and not inline and ns.PreviewAside then ns.PreviewAside(false) end
 			local under = not spot and ns.PreviewRoomUnder and ns.PreviewRoomUnder(pop:GetHeight())
 			if pop.underPreview and not under and ns.PreviewRoomBack then ns.PreviewRoomBack() end
 			pop.underPreview = under and true or nil
+			pop.besideSettings = not spot and not under and not inline or nil
 			if spot then
 				pop:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", spot.x, spot.y)
-				dock:SetText(ns.L["Dock"])
+				DockIcon(false)
 			elseif under then
 				pop:SetPoint("TOPLEFT", under, "BOTTOMLEFT", 0, -DOCK_GAP)
-				dock:SetText(ns.L["Pop out"])
+				DockIcon(true)
 			else
 				local window = canvas
 				while window:GetParent() and window:GetParent() ~= UIParent do window = window:GetParent() end
 				pop:SetPoint("TOPLEFT", window, "TOPRIGHT", 4, 0)
-				dock:SetText(ns.L["Pop out"])
+				DockIcon(true)
 			end
-			if not under and not inline and pop:IsShown() then
-				ns.PreviewAside(true) -- (the preview window, in the same spot: hidden while this is up)
+			if pop.besideSettings and pop:IsShown() then
+				ns.PreviewAside(true) -- (the preview window, in the same spot: moved elsewhere while this is up)
+			elseif spot and not inline and pop:IsShown() then
+				ns.PreviewAside(false) -- (this one dragged off: the preview back in its spot)
 			end
+			-- (Its own sample: not while the popped preview is in sight.)
+			if pop.SampleShown then pop.SampleShown(not (ns.PreviewWindowShown and ns.PreviewWindowShown())) end
+		end
+		if not inline then
+			-- (Its height changed (a tab picked, rows shown): placed again a
+			-- frame later, once, so under the preview it still fits.)
+			local queued
+			pop:HookScript("OnSizeChanged", function(self)
+				if queued or not self:IsShown() or LookSpot() then return end
+				queued = true
+				C_Timer.After(0, function()
+					queued = nil
+					if self:IsShown() and not LookSpot() then Place() end
+				end)
+			end)
 		end
 		dock:SetScript("OnClick", function()
 			ns.GetDB().lookPanel = not LookSpot() and { x = pop:GetLeft() + 30, y = pop:GetTop() - 30 } or nil
@@ -4357,8 +4447,9 @@ function ns.StyleRows(kit, content, stack, changed, switchKey, fieldOf, panel)
 			Fit()
 			C_Timer.After(0, function()
 				Fit()
-				-- (Under the preview: placed again at its real height, laid out now.)
-				if self.underPreview and self:IsShown() then Place() end
+				-- (Placed again at its real height, laid out now. Not one on the
+				-- page itself: placing it took it off its page, the page blank.)
+				if not inline and self:IsShown() and not LookSpot() then Place() end
 			end)
 		end)
 		-- (Not while one of its menus or the color picker is open: theirs first.)

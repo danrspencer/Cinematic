@@ -11845,6 +11845,7 @@ local function CreateNameStylePanel()
 		Tooltip(button, row == "all" and L["Every name's look; each row below starts from it."]
 			or L["This kind's own look, over the row it's under."])
 		button:SetScript("OnClick", function() OpenRow(row, info.label) end)
+		button.opensLook = true -- (opens a Look panel: /cine debug lookdock clicks one a page)
 		function button.Refresh(self)
 			local db = ns.GetDB()
 			local tabs, seen = {}, {}

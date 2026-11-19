@@ -1924,6 +1924,7 @@ local function BuildCastPage(kit, spec)
 		button:SetPoint("LEFT", name, "RIGHT", 4, 0)
 		button.searchLabel = label
 		button.pageSwitch = false
+		button.opensLook = true -- (opens a Look panel: /cine debug lookdock clicks one a page)
 		local function OpenLook(shown)
 			editing = shown
 			if preview then preview:Refresh() end
