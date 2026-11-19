@@ -197,6 +197,7 @@ Slash.lua
 SlashComplete.lua
 UI\Why.lua
 UI\WhyPanel.lua
+UI\WhyFeatures.lua
 UI\CursorHide.lua
 QoL\KeyboardMap.lua
 SelfTest.lua
@@ -216,8 +217,8 @@ Dev\DemoHub.lua
 Dev\MinimapTiles.lua
 Dev\MinimapCopy.lua
 Dev\LowManaTest.lua
+Dev\WhyTest.lua
 Dev\ThresholdTest.lua
-Dev\QuestFocusTest.lua
 Dev\FlickerTest.lua
 Dev\PartyFlickerTest.lua
 Dev\ZoneCardTest.lua
@@ -229,6 +230,7 @@ Dev\KeysBarsTest.lua
 Dev\DimNameTest.lua
 Dev\EmoteFitTest.lua
 Dev\GradientTest.lua
+Dev\QuestFocusTest.lua
 Dev\PlateFlickerTest.lua
 Dev\TurnLagTest.lua
 Dev\PlateCostTest.lua

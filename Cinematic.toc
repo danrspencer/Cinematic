@@ -199,6 +199,7 @@ Slash.lua
 SlashComplete.lua
 UI\Why.lua
 UI\WhyPanel.lua
+UI\WhyFeatures.lua
 UI\CursorHide.lua
 QoL\KeyboardMap.lua
 SelfTest.lua

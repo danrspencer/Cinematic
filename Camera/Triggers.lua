@@ -114,11 +114,19 @@ function ns.OursOnNow(key)
 end
 
 local named = {}
+-- The last pick, for the Why window's Cameras tab (WhyFeatures.lua): each
+-- source that named a trigger, in order ({ source, key, camera, order, ok }:
+-- camera nil when its trigger has none here; ok false when held back by its
+-- gate), n of them, the key that won and when. (Kept and refilled, not made
+-- anew: it's asked about 10 times a second.)
+local pickSeen = { n = 0, at = -math.huge }
+ns.triggerPickSeen = pickSeen
 function ns.PickTrigger(state, cameraOf)
 	local now = GetTime()
 	local pickedKey, pickedCamera, winner, winnerOrder
 	wipe(named)
 	local candidates
+	local seenCount = 0
 	for _, source in ipairs(ns.TRIGGER_SOURCES) do
 		local key = source.Key(state)
 		if key and not source.unit then
@@ -127,6 +135,14 @@ function ns.PickTrigger(state, cameraOf)
 			if not episodes[key] then episodes[key] = { since = now } end
 		end
 		local camera = key and cameraOf(key)
+		local seenEntry
+		if key then
+			seenCount = seenCount + 1
+			seenEntry = pickSeen[seenCount] or {}
+			pickSeen[seenCount] = seenEntry
+			seenEntry.source, seenEntry.key, seenEntry.camera, seenEntry.order, seenEntry.ok =
+				source, key, camera, source.order, camera ~= nil
+		end
 		if camera then
 			local order, ok = source.order, true
 			if not source.unit then
@@ -134,6 +150,7 @@ function ns.PickTrigger(state, cameraOf)
 				order = parts.pri or order
 				ok = Gate(key, parts, now)
 			end
+			seenEntry.order, seenEntry.ok = order, ok
 			if ok then
 				if not pickedKey or order < winnerOrder then
 					pickedKey, pickedCamera, winner, winnerOrder = key, camera, source, order
@@ -145,6 +162,7 @@ function ns.PickTrigger(state, cameraOf)
 			end
 		end
 	end
+	pickSeen.n, pickSeen.won, pickSeen.at = seenCount, pickedKey, now
 	-- (Episodes of ours no source names any more: over.)
 	for key in pairs(episodes) do
 		if not named[key] then episodes[key] = nil end

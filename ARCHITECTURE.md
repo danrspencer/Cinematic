@@ -58,6 +58,7 @@ earlier in the TOC. Inside functions that run later, any `ns.X` works.
 | Opening a settings page | `ns.OpenOptions(page)` and `/cine find <id>` | Options.lua |
 | Text the player reads | `ns.L["English text"]` (American spelling) | Locales/ |
 | Why a frame is up | `/cine why`; a new reason needs a line in Explain | Why.lua |
+| Why a feature is on | `/cine why` tabs: ns.WhyProvider (a tab's rows), ns.WhyMoment (Recent) | WhyPanel.lua, WhyFeatures.lua |
 
 ## Areas (one folder each)
 

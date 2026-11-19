@@ -3940,9 +3940,12 @@ function ns.DecideScene(cinematic, now, onTaxi, active)
 	-- (A scene paused by a menu keeps its timer, to carry on as it closes; one
 	-- paused by an NPC's window doesn't: talking to them isn't standing about,
 	-- so the AFK camera doesn't pick up again as their window closes.)
-	if onTaxi or active or (windowHolds and (atNPC or not ns.SceneScriptPlaying())) or movie
-		or (casting and not ns.IsCozy())
-		or (ns.ChatCamActive and ns.ChatCamActive()) then
+	-- (What's holding it, for the Why window's Cameras tab: WhyFeatures.lua.)
+	ns.stillPausedBy = (onTaxi and "taxi") or (active and "active")
+		or (windowHolds and (atNPC or not ns.SceneScriptPlaying()) and (atNPC and "npc" or "window"))
+		or (movie and "movie") or (casting and not ns.IsCozy() and "casting")
+		or (ns.ChatCamActive and ns.ChatCamActive() and "chat") or nil
+	if ns.stillPausedBy then
 		ns.stillSince = nil
 	elseif not ns.stillSince then
 		-- (Every stop starts the timer afresh, auto-run and auto-walk too:

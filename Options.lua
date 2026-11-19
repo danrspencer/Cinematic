@@ -3916,16 +3916,42 @@ do
 			if hub.name == hubName then
 				for _, tile in ipairs(hub.tiles or {}) do
 					-- (on: its page's switch, on or off (held off: off); nil without
-					-- one. A HUD section's is the HUD page's, its icon having no dot.)
-					local switch, on = TileSwitch(tile, true) or TileSwitch(tile), nil
+					-- one. A HUD section's is the HUD page's, its icon having no dot.
+					-- held: on, but one it's under is off. key: its switch's setting.)
+					local switch, on, held = TileSwitch(tile, true) or TileSwitch(tile), nil, nil
 					if tile.groupSwitches and #tile.groupSwitches > 0 then
 						on = not ns.PageSwitchOff(tile.english)
 					elseif switch then
-						local isOn, held = SwitchState(switch)
-						on = isOn and not held
+						local isOn, isHeld = SwitchState(switch)
+						on, held = isOn and not isHeld, isOn and isHeld or nil
 					end
 					list[#list + 1] = { name = tile.english, label = L[tile.label or tile.english],
-						band = tile.band and L[tile.band] or "", texture = tile.icon and tile.icon:GetTexture(), on = on }
+						band = tile.band and L[tile.band] or "", texture = tile.icon and tile.icon:GetTexture(), on = on,
+						held = held, key = switch and switch.key or nil, dev = tile.dev }
+				end
+			end
+		end
+		return list
+	end
+
+	-- Every hub's name, in order (the Why window's coverage check).
+	function ns.HubNames()
+		local list = {}
+		for _, hub in ipairs(HUBS) do list[#list + 1] = hub.name end
+		return list
+	end
+
+	-- A page's tabs that are pages of their own (tabOf: the folder tabs beside
+	-- its own), in order: each one's name, label and its switch (on: nil
+	-- without one), for the Why window's Visions tab.
+	function ns.PageTabsOf(name)
+		local list = {}
+		for _, hub in ipairs(HUBS) do
+			for _, page in ipairs(hub.pages) do
+				if page.tabOf == name and not page.dev then
+					local has = ns.HasPageSwitch(page[1])
+					list[#list + 1] = { name = page[1], label = L[page.label or page[1]],
+						on = has and not ns.PageSwitchOff(page[1]) or (not has and nil) }
 				end
 			end
 		end

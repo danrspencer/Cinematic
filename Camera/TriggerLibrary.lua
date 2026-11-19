@@ -432,6 +432,11 @@ function ns.TriggerLogAdd(what, name, why)
 		why = tostring(why or "") }
 	if #log > LOG_MAX then table.remove(log, 1) end
 	log.version = log.version + 1
+	-- (Held back or beaten: on the Why window's Recent tab too.)
+	if (what == "skipped" or what == "lost") and ns.WhyMoment then
+		ns.WhyMoment("camera", "trigger:" .. tostring(name), tostring(name or "?"),
+			what == "skipped" and ns.L["held back"] or ns.L["lost"], "held", tostring(why or ""), "Trigger Log")
+	end
 end
 function ns.ClearTriggerLog()
 	local log = ns.triggerLog

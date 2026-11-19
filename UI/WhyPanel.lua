@@ -20,15 +20,18 @@ local L = ns.L
 local why = ns.why
 
 local GREEN, GREY, RED = "|cff8fe39a", "|cff9d9585", "|cffff4040"
-local WIDTH, HEIGHT = 480, 620 -- (the window)
+local WIDTH, HEIGHT = 480, 650 -- (the window)
 local TOGGLE_WIDTH = 140 -- (the big CineMode button in the top box)
 local SCROLL_ROOM = 18 -- (the list's scroll bar, right of its rows)
 local ROW_HEIGHT, HEADER_HEIGHT = 38, 24
-local HINT_HEIGHT = 36 -- (three lines' room, so the list's bottom edge stays put)
+local HINT_HEIGHT = 14 -- (one line: the rest is in its tooltip)
 local STATUS_COLOR = {
 	shown = { 0.56, 0.89, 0.60 }, partly = { 1, 0.82, 0 }, hidden = { 0.95, 0.64, 0.64 },
 	idle = { 0.5, 0.5, 0.5 }, unknown = { 0.5, 0.5, 0.5 },
+	-- (The other tabs': on now, ready for its moment, held back, off.)
+	on = { 0.56, 0.89, 0.60 }, ready = { 0.61, 0.78, 0.94 }, held = { 0.94, 0.69, 0.38 }, off = { 0.95, 0.64, 0.64 },
 }
+local STATUS_WORD = { on = "ON NOW", ready = "READY", held = "HELD", off = "OFF" }
 -- The HUD page's sections, in its order, then the rest.
 local SECTIONS = {
 	{ "units", "Unit frames" }, { "prd", "Personal Resource Display" }, { "bars", "Action bars" },
@@ -44,6 +47,75 @@ for i, section in ipairs(SECTIONS) do
 end
 -- (Addons: the rows of other addons' frames, whatever they're doing.)
 local FILTERS = { { "all", "All" }, { "shown", "Showing" }, { "hidden", "Hidden" }, { "addons", "Addons" } }
+-- The tabs: Interface (the frames, as above), each feature's that tells the
+-- window about itself (ns.WhyProvider: Cameras, Cards...), and Recent last.
+-- Each has its own filters, always four.
+local PROVIDER_FILTERS = { { "all", "All" }, { "on", "On now" }, { "ready", "Ready" }, { "off", "Off or held" } }
+local RECENT_FILTERS = { { "all", "All" }, { "card", "Cards" }, { "camera", "Cameras" }, { "missed", "Skipped or held" } }
+local providers = {} -- { id, label, hint, fn }, in the order they came
+-- A tab of its own: fn() gives its sections, in order, each { label, rows },
+-- a row { key, title, status ("on", "ready", "held", "off" or "idle"), label
+-- (its status in words, if not the status's own), reasons ({ state ("on",
+-- "block" or "off"), text, page, setting }), settingsPage, right (a few
+-- words at its right), parts (rows under it while it's open) }. hint: the
+-- line under the list while it's up. into: "interface" puts its sections at
+-- the end of the Interface tab instead of a tab of its own.
+function ns.WhyProvider(id, label, hint, fn, into)
+	for i = #providers, 1, -1 do
+		if providers[i].id == id then table.remove(providers, i) end
+	end
+	providers[#providers + 1] = { id = id, label = label, hint = hint, fn = fn, into = into }
+end
+-- Every tab's provider, for the offline checks (ns.WhyCoverage). (Don't change it.)
+function ns.WhyProviders()
+	return providers
+end
+local function Tabs()
+	local list = { { id = "interface", label = "Interface" } }
+	for _, provider in ipairs(providers) do
+		if not provider.into then list[#list + 1] = provider end
+	end
+	list[#list + 1] = { id = "recent", label = "Recent" }
+	return list
+end
+
+-- Recent: what came and went (a card shown or skipped, a camera starting),
+-- each with why, the newest first when listed. kind: "card" or "camera"; key:
+-- what it's about ("card:zone"); title, outcome ("shown", "skipped"...),
+-- status (as a row's), text (why), page (its settings).
+local MOMENTS_MAX = 80
+local moments = {}
+local MOMENT_MERGE = 30 -- (seconds the newest line takes a repeat of itself)
+function ns.WhyMoment(kind, key, title, outcome, status, text, page)
+	-- (The same again as the newest line, soon after (a trigger's cooldown
+	-- text changes each second): that line gets its text and time, so the
+	-- list isn't filled by one thing.)
+	local last, now = moments[#moments], GetTime()
+	outcome = tostring(outcome or "")
+	if last and last.key == key and last.outcome == outcome and now - last.at < MOMENT_MERGE then
+		last.text, last.status, last.at = text and tostring(text) or nil, status or "idle", now
+		last.clock = date and date("%H:%M:%S") or ""
+		return
+	end
+	moments[#moments + 1] = { kind = kind, key = key, title = tostring(title or "?"), outcome = tostring(outcome or ""),
+		status = status or "idle", text = text and tostring(text) or nil, page = page, at = GetTime(),
+		clock = date and date("%H:%M:%S") or "" }
+	if #moments > MOMENTS_MAX then table.remove(moments, 1) end
+end
+-- The newest about key, or nil (a Cards row's "Last: ...").
+function ns.WhyLastMoment(key)
+	for i = #moments, 1, -1 do
+		if moments[i].key == key then return moments[i] end
+	end
+end
+-- "12 sec ago", "3 min ago".
+local function Ago(at)
+	local seconds = math.max(0, GetTime() - at)
+	if seconds < 60 then return L["%d sec ago"]:format(seconds) end
+	if seconds < 3600 then return L["%d min ago"]:format(seconds / 60) end
+	return L["%d hr ago"]:format(seconds / 3600)
+end
+ns.WhyAgo = Ago
 local INDENT = 18 -- (a part's row, under its frame's)
 -- The HUD rows that are unit frames, whose parts open under them there.
 local UNIT_FRAME = { player = "PlayerFrame", petframe = "PetFrame", target = "TargetFrame", tot = "TargetFrameToT",
@@ -52,11 +124,13 @@ local UNIT_FRAME = { player = "PlayerFrame", petframe = "PetFrame", target = "Ta
 local PART_PARENT = { raid = "raidplayers", party = "party", rsparty = "rspartyplayers" }
 
 local window, flash
+local windowView -- (the window's list, for ns.WhyWindowTab)
 local Fill -- (below)
 
 -- The page's switch, on everywhere to start with. Off: the page, the window
 -- and Inspect are put away, and nothing of theirs runs.
 ns.DEFAULTS.whyPage = true
+ns.DEFAULTS.whySorted = false -- (the Sort by status button)
 local function PageOn()
 	return not (ns.db and ns.db.whyPage == false)
 end
@@ -85,8 +159,14 @@ local function RowPlace(key)
 	return section, place and place.at or 1000, place and place.parent or nil
 end
 
-local function StatusText(status)
+local function StatusText(status, label)
+	if label or STATUS_WORD[status] then
+		local color = STATUS_COLOR[status] or STATUS_COLOR.unknown
+		return ("|cff%02x%02x%02x%s|r"):format(color[1] * 255, color[2] * 255, color[3] * 255,
+			tostring(label or L[STATUS_WORD[status]]):upper())
+	end
 	if status == "idle" then return GREY .. L["NOT ON SCREEN"] .. "|r" end
+	if status == "unknown" or status == nil then return GREY .. L["CAN'T TELL"] .. "|r" end
 	return why.StatusText(status)
 end
 
@@ -189,7 +269,9 @@ end
 
 -- Whether a row is in the list as filtered and searched (a part: by its own name).
 local function Matches(item, words, filter)
-	if not (filter == "all" or (filter == "addons" and item.section == "addons") or filter == item.kind) then
+	if item.filters then
+		if not (filter == "all" or item.filters[filter]) then return false end
+	elseif not (filter == "all" or (filter == "addons" and item.section == "addons") or filter == item.kind) then
 		return false
 	end
 	return words == "" or item.title:lower():find(words, 1, true) ~= nil
@@ -201,10 +283,32 @@ end
 -- the ones the filter or the search asks for); and how many rows, parts too,
 -- are showing, hidden, addons' and in all (before the filter and the search).
 -- revealAll: every row and every part, whatever the view's filter (Copy report's).
-local function Gather(view, revealAll)
+-- Why the game isn't drawing a row's frame, in a few words, where it's plain
+-- (no target, no pet, no group...); else nil.
+local function Exists(unit)
+	return ns.Flag(UnitExists(unit)) and true or false
+end
+local function IdleCause(key)
+	if key == "target" then return not Exists("target") and L["No target"] or nil end
+	if key == "tot" then
+		return (not Exists("target") and L["No target"]) or (not Exists("targettarget") and L["Your target has no target"])
+			or nil
+	end
+	if key == "focus" then return not Exists("focus") and L["No focus"] or nil end
+	if key == "focustot" then
+		return (not Exists("focus") and L["No focus"]) or (not Exists("focustarget") and L["Your focus has no target"])
+			or nil
+	end
+	if key == "petframe" or key == "pet" then return not Exists("pet") and L["No pet out"] or nil end
+	if type(key) == "string" then
+		if key:find("^party") then return not ns.InGroup() and L["You're not in a group"] or nil end
+		if key:find("^raid") then return not ns.InGroup() and L["You're not in a group"] or nil end
+	end
+end
+
+local function InterfaceTops()
 	local order, first = why.RowEntries()
 	why.LookAtRows(order, first)
-	local counts = { all = 0, shown = 0, hidden = 0, addons = 0 }
 	local byKey, tops = {}, {}
 	for _, key in ipairs(order) do
 		local info = first[key]
@@ -212,12 +316,20 @@ local function Gather(view, revealAll)
 		if ok then
 			-- (Not hidden by Cinematic, and not drawn by the game either: no
 			-- target, no group, a bar switched off.)
-			if (status == "shown" or status == "partly") and not info.onScreen then
+			-- (Can't tell, and the game isn't drawing it: not on screen, its own
+			-- reasons saying why, rather than a "?".)
+			if (status == "unknown" or status == nil) and not info.onScreen then
 				status = "idle"
+			elseif (status == "shown" or status == "partly") and not info.onScreen then
+				status = "idle"
+				-- (What the game's missing, where it's known: the line under the row.)
+				local okIdle, cause = pcall(IdleCause, key)
+				cause = okIdle and cause or nil
 				table.insert(reasons, 1, { state = "on",
-					text = L["Cinematic isn't hiding it: the game has nothing to show there right now"] })
-				table.insert(reasons, 2, { state = "on", text = L["For example: no target, no group, or it's switched " ..
-					"off in the game's own options or by another addon"] })
+					text = cause or L["Cinematic isn't hiding it: the game has nothing to show there right now"] })
+				table.insert(reasons, 2, { state = "on", text = cause
+					and L["Cinematic isn't hiding it: the game has nothing to show there right now"]
+					or L["For example: no target, no group, or it's switched off in the game's own options or by another addon"] })
 			end
 			local section, at, parent = RowPlace(key)
 			byKey[key] = { key = key, entry = info.entry, title = tostring(title), status = status, kind = Kind(status),
@@ -282,12 +394,129 @@ local function Gather(view, revealAll)
 		if a.title ~= b.title then return a.title < b.title end
 		return tostring(a.key) < tostring(b.key)
 	end)
+	return tops
+end
+
+-- An item for the list from a provider's row (or a part of one: parent).
+-- (On the Interface tab, its filters' words: on is showing, off is hidden.)
+local INTERFACE_FILTER = { on = "shown", ready = "shown", held = "hidden", off = "hidden" }
+local function ProviderItem(row, section, sectionLabel, at, parent, filterMap)
+	local status = row.status or "idle"
+	local reasons = type(row.reasons) == "table" and row.reasons or {}
+	local filter = (status == "held" or status == "off") and "off" or status
+	if filterMap then filter = filterMap[status] or "none" end
+	local item = { key = tostring(row.key or row.title), title = tostring(row.title or "?"), status = status,
+		label = row.label, reasons = reasons, main = row.main or MainReason(reasons), section = section,
+		sectionLabel = sectionLabel, at = at, wholePage = true, settingsPage = row.settingsPage, right = row.right,
+		parent = parent, filters = { [filter] = true } }
+	if type(row.parts) == "table" and #row.parts > 0 then
+		item.parts, item.partsLabel = {}, row.partsLabel
+		for i, part in ipairs(row.parts) do
+			item.parts[i] = ProviderItem(part, section, sectionLabel, i, item, filterMap)
+		end
+	end
+	return item
+end
+
+-- The Sort button's order: on or showing first, then ready, held, off or
+-- hidden, then not on screen; each kept in the order it had.
+local STATUS_RANK = { on = 1, shown = 1, partly = 1, ready = 2, held = 3, off = 4, hidden = 4, idle = 5 }
+local function ByStatus(items)
+	for i, item in ipairs(items) do item.sortAt = i end
+	table.sort(items, function(a, b)
+		local ra, rb = STATUS_RANK[a.status] or 6, STATUS_RANK[b.status] or 6
+		if ra ~= rb then return ra < rb end
+		return a.sortAt < b.sortAt
+	end)
+end
+-- tops sorted so within each section (a run of the same section), and every
+-- row's parts.
+local function SortTops(tops)
+	local out, run = {}, {}
+	local function Flush()
+		if #run > 0 and not run[1].keepOrder then ByStatus(run) end
+		for _, item in ipairs(run) do
+			if item.parts then ByStatus(item.parts) end
+			out[#out + 1] = item
+		end
+		run = {}
+	end
+	for _, item in ipairs(tops) do
+		if run[1] and run[1].section ~= item.section then Flush() end
+		run[#run + 1] = item
+	end
+	Flush()
+	return out
+end
+
+local function ProviderTops(provider, tops, filterMap)
+	tops = tops or {}
+	local ok, sections = pcall(provider.fn)
+	if not (ok and type(sections) == "table") then
+		if not ok then ns.Log("why", "tab " .. provider.id .. ": " .. tostring(sections)) end
+		return tops
+	end
+	for s, section in ipairs(sections) do
+		local label = L[section.label or provider.label]
+		for i, row in ipairs(section.rows or {}) do
+			local item = ProviderItem(row, provider.id .. ":" .. s, label, i, nil, filterMap)
+			-- (keepOrder: a section read in order, Right now's Camera now over
+			-- its timer: left as it is by the Sort button.)
+			item.keepOrder = section.keepOrder
+			tops[#tops + 1] = item
+		end
+	end
+	return tops
+end
+
+-- Recent's moments as rows, the newest first, each under a heading for its kind.
+local function RecentTops()
+	local tops = {}
+	for i = #moments, 1, -1 do
+		local moment = moments[i]
+		local reasons = {}
+		if moment.text then reasons[1] = { state = moment.status == "on" and "on" or "block", text = moment.text } end
+		reasons[#reasons + 1] = { state = "off", text = L["At %s (%s)"]:format(moment.clock, Ago(moment.at)),
+			page = moment.page }
+		local missed = moment.status == "held" or moment.status == "off"
+		tops[#tops + 1] = { key = "moment:" .. i .. ":" .. tostring(moment.at), title = moment.title,
+			status = moment.status, label = moment.outcome, reasons = reasons, main = reasons[1],
+			section = "recent", sectionLabel = L["Last few minutes"], at = #tops + 1, wholePage = true,
+			settingsPage = moment.page, right = Ago(moment.at),
+			filters = { [moment.kind] = true, missed = missed or nil } }
+	end
+	return tops
+end
+
+-- A view's rows, as its tab has them (its filter and search too), and the counts.
+local function Gather(view, revealAll)
+	local tab = view.tab or "interface"
+	local tops, counts
+	if tab == "interface" then
+		tops, counts = InterfaceTops(), { all = 0, shown = 0, hidden = 0, addons = 0 }
+		for _, provider in ipairs(providers) do
+			if provider.into == "interface" then ProviderTops(provider, tops, INTERFACE_FILTER) end
+		end
+	elseif tab == "recent" then
+		tops, counts = RecentTops(), { all = 0, card = 0, camera = 0, missed = 0 }
+	else
+		tops, counts = {}, { all = 0, on = 0, ready = 0, off = 0 }
+		for _, provider in ipairs(providers) do
+			if provider.id == tab then tops = ProviderTops(provider) end
+		end
+	end
+	-- (The Sort button: by status within each section; not Recent's, newest first.)
+	if view.sorted and tab ~= "recent" then tops = SortTops(tops) end
 	local found = {}
 	local filter = revealAll and "all" or view.filter
 	local words = revealAll and "" or view.search:lower()
 	local narrowed = filter ~= "all" or words ~= ""
 	local function Count(item)
 		counts.all = counts.all + 1
+		if item.filters then
+			for key in pairs(item.filters) do counts[key] = (counts[key] or 0) + 1 end
+			return
+		end
 		if item.kind then counts[item.kind] = counts[item.kind] + 1 end
 		if item.section == "addons" then counts.addons = counts.addons + 1 end
 	end
@@ -314,6 +543,11 @@ end
 
 -- The heading over a row's reasons: those doing it now, then those that would.
 local function HeadingText(status, kind)
+	if STATUS_WORD[status] then
+		if kind == "off" then return L["ALSO"] end
+		return (status == "on" and L["ON BECAUSE"]) or (status == "ready" and L["READY"])
+			or (status == "held" and L["HOLDING IT BACK"]) or L["KEEPING IT OFF"]
+	end
 	if kind == "off" then
 		return status == "hidden" and L["ANY OF THESE WOULD SHOW IT"] or L["NOT SHOWING IT NOW"]
 	end
@@ -343,9 +577,7 @@ local function PointOut(item)
 	end)
 end
 
-local function CopyReport(view)
-	-- (Every row, whatever the list is showing.)
-	local found = Gather(view, true)
+local function CopyReport()
 	local out = {}
 	out[#out + 1] = ("Cinematic %s, %s"):format(ns.Version and ns.Version() or "?",
 		ns.isRetail and "retail" or ("game " .. tostring(select(4, GetBuildInfo()))))
@@ -361,22 +593,32 @@ local function CopyReport(view)
 		out[#out + 1] = ("Calm Timer: %.0f of %.0f sec left%s"):format(calmLeft, calmTotal,
 			full and (", health and power full: ends in %.0f"):format(full) or "")
 	end
-	local section
-	for _, item in ipairs(found) do
-		if item.section ~= section then
-			section = item.section
+	-- (Every tab and every row, whatever the list is showing.)
+	for _, tab in ipairs(Tabs()) do
+		local ok, found = pcall(Gather, { tab = tab.id, filter = "all", search = "" }, true)
+		if ok then
 			out[#out + 1] = ""
-			out[#out + 1] = "== " .. item.sectionLabel .. " =="
-		end
-		local pad = item.parent and "    " or ""
-		out[#out + 1] = ("%s[%s] %s"):format(pad, Bare(StatusText(item.status)), item.title)
-		for _, reason in ipairs(item.reasons) do
-			out[#out + 1] = ("%s    %s %s%s"):format(pad, reason.state == "on" and "+" or (reason.state == "block" and "x") or "-",
-				Bare(reason.text), reason.page and (" (" .. ns.PageLabel(reason.page) .. ")") or "")
+			out[#out + 1] = "#### " .. tab.label:upper() .. " ####"
+			local section
+			for _, item in ipairs(found) do
+				if item.section ~= section then
+					section = item.section
+					out[#out + 1] = ""
+					out[#out + 1] = "== " .. item.sectionLabel .. " =="
+				end
+				local pad = item.parent and "    " or ""
+				out[#out + 1] = ("%s[%s] %s%s"):format(pad, Bare(StatusText(item.status, item.label)), item.title,
+					item.right and ("  (" .. Bare(item.right) .. ")") or "")
+				for _, reason in ipairs(item.reasons) do
+					out[#out + 1] = ("%s    %s %s%s"):format(pad, reason.state == "on" and "+" or (reason.state == "block" and "x") or "-",
+						Bare(reason.text), reason.page and (" (" .. ns.PageLabel(reason.page) .. ")") or "")
+				end
+			end
 		end
 	end
 	ns.ShowReportText(L["Why is it showing? report"], L["Press Ctrl+C to copy this, then paste it to us on Discord " ..
-		"or in a bug report. It lists each row of frames and its parts, whether it's showing, and why."], table.concat(out, "\n"))
+		"or in a bug report. It lists every tab: each row, whether it's showing or on, and why, and what happened lately."],
+		table.concat(out, "\n"))
 end
 
 -- A settings link: its page opened at the setting behind it (setting: its
@@ -555,6 +797,58 @@ local function Header(view, index)
 	return header
 end
 
+-- A tab: its name, a gold line under it and a faint lit back while it's the one open.
+local function MakeTab(view, index)
+	local tab = CreateFrame("Button", nil, view.host)
+	tab:SetHeight(26)
+	tab.back = tab:CreateTexture(nil, "BACKGROUND")
+	tab.back:SetAllPoints()
+	tab.back:SetColorTexture(1, 0.82, 0, 0.07)
+	local glow = tab:CreateTexture(nil, "HIGHLIGHT")
+	glow:SetAllPoints()
+	glow:SetColorTexture(1, 1, 1, 0.05)
+	tab.text = tab:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+	tab.text:SetPoint("CENTER", 0, 1)
+	tab.line = tab:CreateTexture(nil, "OVERLAY")
+	tab.line:SetPoint("BOTTOMLEFT", 6, 0)
+	tab.line:SetPoint("BOTTOMRIGHT", -6, 0)
+	tab.line:SetHeight(2)
+	tab.line:SetColorTexture(1, 0.82, 0, 0.95)
+	tab:SetScript("OnClick", function(self)
+		if view.tab ~= self.id then
+			view.tab, view.filter, view.openKey, view.openParent = self.id, "all", nil, nil
+			view.scroll:SetVerticalScroll(0)
+		end
+		Fill(view)
+	end)
+	view.tabs[index] = tab
+	return tab
+end
+
+-- A filter: a small pill, its count after its name.
+local function MakeChip(view, index)
+	local chip = CreateFrame("Button", nil, view.host)
+	chip:SetHeight(20)
+	chip.back = chip:CreateTexture(nil, "BACKGROUND")
+	chip.back:SetAllPoints()
+	-- (A gold line along its bottom while it's picked.)
+	chip.edge = chip:CreateTexture(nil, "BORDER")
+	chip.edge:SetPoint("BOTTOMLEFT")
+	chip.edge:SetPoint("BOTTOMRIGHT")
+	chip.edge:SetHeight(1)
+	local glow = chip:CreateTexture(nil, "HIGHLIGHT")
+	glow:SetAllPoints()
+	glow:SetColorTexture(1, 1, 1, 0.06)
+	chip.text = chip:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+	chip.text:SetPoint("CENTER", 0, 0)
+	chip:SetScript("OnClick", function(self)
+		view.filter = self.key
+		Fill(view)
+	end)
+	view.filters[index] = chip
+	return chip
+end
+
 function Fill(view)
 	if not (view and PageOn() and ns.Flag(view.host:IsVisible())) then return end
 	local list, detail, width = view.list, view.detail, view.listWidth
@@ -564,8 +858,8 @@ function Fill(view)
 		banner.stripe:SetColorTexture(0.56, 0.89, 0.60)
 		banner.back:SetColorTexture(1, 1, 1, 0.05)
 		banner.title:SetText(L["CineMode is %s"]:format(GREEN .. L["ON"] .. "|r"))
-		banner.text:SetText(L["Cinematic is hiding parts of your interface. Each row below says whether it's " ..
-			"showing right now, and why."])
+		banner.text:SetText(L["Cinematic is hiding parts of your interface and running its cameras and cards. " ..
+			"Each row says what it's doing right now, and why."])
 		banner.page = "CineMode"
 	else
 		local text, page = ns.CineOffReason()
@@ -581,21 +875,72 @@ function Fill(view)
 	banner:SetHeight(math.max(34 + 20, 10 + banner.title:GetStringHeight() + 4 + banner.text:GetStringHeight() + 6
 		+ banner.now:GetStringHeight() + 10))
 
+	-- The tabs, and this tab's filters and line under the list.
+	local tabs = Tabs()
+	local tabWidth = view.width / #tabs
+	local tabInfo
+	for i, tab in ipairs(tabs) do
+		local button = view.tabs[i] or MakeTab(view, i)
+		button.id = tab.id
+		button:ClearAllPoints()
+		button:SetPoint("BOTTOMLEFT", view.tabsAnchor, "BOTTOMLEFT", (i - 1) * tabWidth, 0)
+		button:SetWidth(tabWidth)
+		button.text:SetText(L[tab.label])
+		local chosen = tab.id == view.tab
+		if chosen then tabInfo = tab end
+		button.line:SetShown(chosen)
+		button.back:SetShown(chosen)
+		if chosen then button.text:SetTextColor(1, 0.82, 0) else button.text:SetTextColor(0.72, 0.69, 0.63) end
+		button:Show()
+	end
+	for i = #tabs + 1, #view.tabs do view.tabs[i]:Hide() end
+	if not tabInfo then
+		view.tab, tabInfo = "interface", tabs[1]
+	end
+	local filterList = (view.tab == "interface" and FILTERS) or (view.tab == "recent" and RECENT_FILTERS) or PROVIDER_FILTERS
+	view.hintLong = (view.tab == "interface" and view.hintText) or (view.tab == "recent" and L["Cards shown or " ..
+		"skipped, and the cameras starting and stopping, each with why. The newest first; click one for its settings."])
+		or L[tabInfo.hint or ""]
+	view.hint:SetText((view.tab == "interface" and L["Click a row for its reasons and settings. Not listed? Pick it on screen."])
+		or (view.tab == "recent" and L["Newest first. Click one for why and its settings."])
+		or L["Click a row for its reasons and settings."])
+
+	-- (The Sort button: gold while on; gone on Recent.)
+	local sort = view.sort
+	view.sorted = ns.db.whySorted and true or false -- (both views go by it)
+	sort:SetShown(view.tab ~= "recent")
+	if view.sorted then
+		sort.back:SetColorTexture(1, 0.82, 0, 0.16)
+		sort.text:SetTextColor(1, 0.82, 0)
+		sort.edge:SetColorTexture(1, 0.82, 0, 0.7)
+	else
+		sort.back:SetColorTexture(1, 1, 1, 0.05)
+		sort.text:SetTextColor(0.85, 0.82, 0.76)
+		sort.edge:SetColorTexture(1, 1, 1, 0)
+	end
+
 	local found, counts = Gather(view)
-	for _, button in ipairs(view.filters) do
-		local chosen = button.key == view.filter
-		button:SetText(("%s (%d)"):format(L[button.label], counts[button.key]))
-		if chosen then button:LockHighlight() else button:UnlockHighlight() end
-		local text = button:GetFontString()
-		if text then
-			if chosen then text:SetTextColor(1, 0.82, 0) else text:SetTextColor(1, 1, 1) end
+	for i, chip in ipairs(view.filters) do
+		chip.key, chip.label = filterList[i][1], filterList[i][2]
+		local chosen = chip.key == view.filter
+		local count = counts[chip.key] or 0
+		chip.text:SetText(("%s  |cff%s%d|r"):format(L[chip.label], chosen and "e8c860" or "8a8378", count))
+		chip:SetWidth(chip.text:GetStringWidth() + 22)
+		if chosen then
+			chip.back:SetColorTexture(1, 0.82, 0, 0.16)
+			chip.text:SetTextColor(1, 0.82, 0)
+			chip.edge:SetColorTexture(1, 0.82, 0, 0.7)
+		else
+			chip.back:SetColorTexture(1, 1, 1, 0.05)
+			chip.text:SetTextColor(0.85, 0.82, 0.76)
+			chip.edge:SetColorTexture(1, 1, 1, 0)
 		end
 	end
 
 	local y, rows, headers, section, opened = 0, 0, 0, nil, false
 	-- The Calm Timer, while it runs: a bar of the time left, over the first section.
 	local calmBar = view.calmBar
-	local calmLeft = ns.CalmLeft()
+	local calmLeft = view.tab == "interface" and ns.CalmLeft() or nil
 	calmBar:SetShown(calmLeft ~= nil)
 	if calmLeft then
 		calmBar:ClearAllPoints()
@@ -628,10 +973,11 @@ function Fill(view)
 		row.name:SetWidth(width - 12 - 120 - indent)
 		row.name:SetText(item.title)
 		if item.parent then row.name:SetTextColor(0.9, 0.86, 0.74) else row.name:SetTextColor(1, 0.82, 0) end
-		row.status:SetText(StatusText(item.status))
-		row.reason:SetWidth(width - 12 - 8 - indent - (count > 0 and 70 or 0))
+		row.status:SetText(StatusText(item.status, item.label))
+		local right = (count > 0 and (item.partsLabel or L["%d parts"]):format(count)) or item.right or ""
+		row.reason:SetWidth(width - 12 - 8 - indent - (right ~= "" and 76 or 0))
 		row.reason:SetText(item.main and item.main.text or "")
-		row.parts:SetText(count > 0 and (item.partsLabel or L["%d parts"]):format(count) or "")
+		row.parts:SetText(right)
 		row:ClearAllPoints()
 		row:SetPoint("TOPLEFT", list, "TOPLEFT", 0, -y)
 		row:Show()
@@ -654,7 +1000,10 @@ function Fill(view)
 	if not opened then detail:Hide() end
 	view.empty:SetShown(rows == 0)
 	if rows == 0 then
-		view.empty:SetText((counts.all == 0 and L["Cinematic isn't fading any frames right now: its frame pages " ..
+		view.empty:SetText((view.tab == "recent" and counts.all == 0 and L["Nothing yet. Cards and camera changes " ..
+			"are listed here as they happen, from when you logged in or reloaded."])
+			or (view.tab ~= "interface" and counts.all == 0 and L["Nothing here right now."])
+			or (counts.all == 0 and L["Cinematic isn't fading any frames right now: its frame pages " ..
 			"are off, or it has only just started. Give it a moment."])
 			or (view.search ~= "" and L["Nothing here is called \"%s\"."]:format(view.search))
 			or (view.filter == "addons" and L["No other addon's frames are being faded. Cinematic fades the addons it " ..
@@ -663,8 +1012,9 @@ function Fill(view)
 	end
 	-- (Addons: only those Cinematic fades have a row.)
 	local note = view.note
-	note:SetShown(view.filter == "addons" and rows > 0)
-	if view.filter == "addons" and rows > 0 then
+	local noted = view.tab == "interface" and view.filter == "addons" and rows > 0
+	note:SetShown(noted)
+	if noted then
 		note:ClearAllPoints()
 		note:SetPoint("TOPLEFT", list, "TOPLEFT", 2, -(y + 12))
 		y = y + 12 + note:GetStringHeight()
@@ -677,7 +1027,7 @@ end
 -- before Inspect starts; extra: a button of the view's own, after Copy report
 -- ({ text, width, onClick }).
 local function MakeView(host, onPick, extra)
-	local view = { host = host, filter = "all", search = "", width = 1, listWidth = 1 }
+	local view = { host = host, tab = "interface", tabs = {}, filter = "all", search = "", width = 1, listWidth = 1 }
 
 	-- CineMode on or off, why, and what you're doing: click it for the setting.
 	local banner = CreateFrame("Button", nil, host)
@@ -719,10 +1069,22 @@ local function MakeView(host, onPick, extra)
 	local okBox, box = pcall(CreateFrame, "EditBox", nil, host, "SearchBoxTemplate")
 	if not okBox then box = CreateFrame("EditBox", nil, host, "InputBoxTemplate") end
 	-- (Across the top of the list, the filters under it.)
+	-- (The tabs first, across the whole width, a thin line under them: their
+	-- buttons made and placed by Fill. The search and the filters are the open tab's.)
+	local tabsAnchor = CreateFrame("Frame", nil, host)
+	tabsAnchor:SetPoint("TOPLEFT", banner, "BOTTOMLEFT", 0, -8)
+	tabsAnchor:SetPoint("RIGHT", host, "RIGHT")
+	tabsAnchor:SetHeight(26)
+	local tabsLine = tabsAnchor:CreateTexture(nil, "ARTWORK")
+	tabsLine:SetPoint("BOTTOMLEFT")
+	tabsLine:SetPoint("BOTTOMRIGHT")
+	tabsLine:SetHeight(1)
+	tabsLine:SetColorTexture(1, 1, 1, 0.14)
+	view.tabsAnchor = tabsAnchor
 	box:SetHeight(20)
 	box:SetAutoFocus(false)
-	box:SetPoint("TOPLEFT", banner, "BOTTOMLEFT", 6, -10)
-	box:SetPoint("RIGHT", host, "RIGHT", -8, 0)
+	box:SetPoint("TOPLEFT", tabsAnchor, "BOTTOMLEFT", 6, -10)
+	box:SetPoint("RIGHT", host, "RIGHT", 0, 0)
 	box:HookScript("OnTextChanged", function(self)
 		local text = self:GetText()
 		view.search = type(text) == "string" and text:match("^%s*(.-)%s*$") or ""
@@ -731,22 +1093,48 @@ local function MakeView(host, onPick, extra)
 	box:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
 	box:SetScript("OnEnterPressed", function(self) self:ClearFocus() end)
 	box.searchSkip = true
+	-- (The filters under the search, left to right, each as wide as its words.)
 	view.filters = {}
 	for i, info in ipairs(FILTERS) do
-		local button = ns.PanelButton(host)
-		button:SetSize(106, 22)
-		button.key, button.label = info[1], info[2]
+		local chip = MakeChip(view, i)
+		chip.key, chip.label = info[1], info[2]
 		if i == 1 then
-			button:SetPoint("TOPLEFT", box, "BOTTOMLEFT", -6, -8)
+			chip:SetPoint("TOPLEFT", box, "BOTTOMLEFT", -6, -8)
 		else
-			button:SetPoint("LEFT", view.filters[i - 1], "RIGHT", 4, 0)
+			chip:SetPoint("LEFT", view.filters[i - 1], "RIGHT", 6, 0)
 		end
-		button:SetScript("OnClick", function(self)
-			view.filter = self.key
-			Fill(view)
-		end)
-		view.filters[i] = button
 	end
+	-- Sort, at the row's right end: on, gold, lists each section's rows by
+	-- status (on or showing first, then ready, then off). Kept for next time
+	-- (db.whySorted). Not on Recent, which is newest first.
+	local sort = CreateFrame("Button", nil, host)
+	sort:SetHeight(20)
+	sort:SetPoint("TOPRIGHT", box, "BOTTOMRIGHT", 0, -8)
+	sort.back = sort:CreateTexture(nil, "BACKGROUND")
+	sort.back:SetAllPoints()
+	sort.edge = sort:CreateTexture(nil, "BORDER")
+	sort.edge:SetPoint("BOTTOMLEFT")
+	sort.edge:SetPoint("BOTTOMRIGHT")
+	sort.edge:SetHeight(1)
+	local sortGlow = sort:CreateTexture(nil, "HIGHLIGHT")
+	sortGlow:SetAllPoints()
+	sortGlow:SetColorTexture(1, 1, 1, 0.06)
+	sort.text = sort:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+	sort.text:SetPoint("CENTER")
+	sort.text:SetText(L["Sort by status"])
+	sort:SetWidth(sort.text:GetStringWidth() + 22)
+	sort:SetScript("OnClick", function()
+		if ns.db then ns.db.whySorted = not ns.db.whySorted end
+		Fill(view)
+	end)
+	sort:SetScript("OnEnter", function(self)
+		GameTooltip:SetOwner(self, "ANCHOR_TOP")
+		GameTooltip:SetText(L["Sort by status"], 1, 0.82, 0)
+		GameTooltip:AddLine(L["On first, then ready, then off. Click again for the usual order."], 1, 1, 1, true)
+		GameTooltip:Show()
+	end)
+	sort:SetScript("OnLeave", GameTooltip_Hide)
+	view.sort = sort
 
 	-- At the bottom: Inspect, the report, and how to read the list.
 	local pick = ns.PanelButton(host)
@@ -761,7 +1149,7 @@ local function MakeView(host, onPick, extra)
 	report:SetSize(120, 24)
 	report:SetText(L["Copy report"])
 	report:SetPoint("LEFT", pick, "RIGHT", 8, 0)
-	report:SetScript("OnClick", function() CopyReport(view) end)
+	report:SetScript("OnClick", function() CopyReport() end)
 	if extra then
 		local button = ns.PanelButton(host)
 		button:SetSize(extra[2], 24)
@@ -769,19 +1157,34 @@ local function MakeView(host, onPick, extra)
 		button:SetPoint("LEFT", report, "RIGHT", 8, 0)
 		button:SetScript("OnClick", extra[3])
 	end
-	local hint = host:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-	hint:SetPoint("BOTTOMLEFT", pick, "TOPLEFT", 0, 8)
-	hint:SetPoint("RIGHT", host, "RIGHT")
-	hint:SetHeight(HINT_HEIGHT)
+	-- How to read the list: one short line, the rest in its tooltip (the open tab's).
+	local hintArea = CreateFrame("Frame", nil, host)
+	hintArea:SetPoint("BOTTOMLEFT", pick, "TOPLEFT", 0, 6)
+	hintArea:SetPoint("RIGHT", host, "RIGHT")
+	hintArea:SetHeight(HINT_HEIGHT)
+	hintArea:EnableMouse(true)
+	local hint = hintArea:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+	hint:SetAllPoints()
 	hint:SetJustifyH("LEFT")
-	hint:SetJustifyV("BOTTOM")
-	hint:SetText(L["Click a row for all its reasons and its settings. It keeps itself up to date: start a fight " ..
-		"or target something and watch it change. A frame with parts lists them under it. Not in the list? Pick it on screen."])
+	hint:SetWordWrap(false)
+	hintArea:SetScript("OnEnter", function(self)
+		GameTooltip:SetOwner(self, "ANCHOR_TOP")
+		GameTooltip:SetText(L["How to read it"], 1, 0.82, 0)
+		GameTooltip:AddLine(view.hintLong or "", 1, 1, 1, true)
+		GameTooltip:Show()
+	end)
+	hintArea:SetScript("OnLeave", GameTooltip_Hide)
+	view.hint = hint
+	view.hintText = L["Click a row for all its reasons and its settings. It keeps itself up to date: start a fight " ..
+		"or target something and watch it change. A frame with parts lists them under it. Not in the list? Pick it on screen."]
+	view.hintLong = view.hintText
+	hint:SetText(L["Click a row for its reasons and settings. Not listed? Pick it on screen."])
 
 	local scroll = CreateFrame("ScrollFrame", nil, host, "UIPanelScrollFrameTemplate")
 	if ns.SkinScroll then ns.SkinScroll(scroll) end
 	scroll:SetPoint("TOPLEFT", view.filters[1], "BOTTOMLEFT", 0, -8)
 	scroll:SetPoint("BOTTOMRIGHT", host, "BOTTOMRIGHT", -SCROLL_ROOM, 24 + 8 + HINT_HEIGHT + 8) -- (over the hint and buttons)
+	view.scroll = scroll
 	local list = CreateFrame("Frame", nil, scroll)
 	list:SetSize(1, 1)
 	list.rows, list.headers = {}, {}
@@ -800,27 +1203,29 @@ local function MakeView(host, onPick, extra)
 	-- The Calm Timer bar (placed by Fill, at the list's top while it runs):
 	-- its time left, draining every frame; click it for its setting.
 	local calmBar = CreateFrame("Button", nil, list)
-	calmBar:SetHeight(34)
+	-- (Small: one line of words over a thin line draining, so it doesn't
+	-- outshout the rows.)
+	calmBar:SetHeight(20)
 	calmBar.back = calmBar:CreateTexture(nil, "BACKGROUND")
 	calmBar.back:SetAllPoints()
-	calmBar.back:SetColorTexture(1, 1, 1, 0.05)
+	calmBar.back:SetColorTexture(1, 1, 1, 0.03)
 	local calmGlow = calmBar:CreateTexture(nil, "HIGHLIGHT")
 	calmGlow:SetAllPoints()
 	calmGlow:SetColorTexture(1, 0.82, 0, 0.08)
-	calmBar.label = calmBar:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-	calmBar.label:SetPoint("TOPLEFT", 10, -4)
+	calmBar.label = calmBar:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+	calmBar.label:SetPoint("TOPLEFT", 10, -3)
 	calmBar.label:SetText(L["Calm Timer"])
-	calmBar.left = calmBar:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-	calmBar.left:SetPoint("TOPRIGHT", -8, -4)
+	calmBar.left = calmBar:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+	calmBar.left:SetPoint("TOPRIGHT", -8, -3)
 	calmBar.left:SetJustifyH("RIGHT")
 	calmBar.track = calmBar:CreateTexture(nil, "ARTWORK")
-	calmBar.track:SetPoint("BOTTOMLEFT", 10, 6)
-	calmBar.track:SetHeight(6)
-	calmBar.track:SetColorTexture(0, 0, 0, 0.5)
+	calmBar.track:SetPoint("BOTTOMLEFT", 10, 2)
+	calmBar.track:SetHeight(2)
+	calmBar.track:SetColorTexture(1, 1, 1, 0.08)
 	calmBar.fill = calmBar:CreateTexture(nil, "OVERLAY")
 	calmBar.fill:SetPoint("LEFT", calmBar.track, "LEFT")
-	calmBar.fill:SetHeight(6)
-	calmBar.fill:SetColorTexture(1, 0.82, 0, 0.85)
+	calmBar.fill:SetHeight(2)
+	calmBar.fill:SetColorTexture(1, 0.82, 0, 0.55)
 	calmBar:SetScript("OnClick", function()
 		if not (ns.OpenSettingByKey and ns.OpenSettingByKey("calmTime")) then ns.OpenOptions("CineMode") end
 	end)
@@ -919,10 +1324,22 @@ local function MakeWindow()
 	local host = CreateFrame("Frame", nil, window)
 	host:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -10)
 	host:SetPoint("BOTTOMRIGHT", window, "BOTTOMRIGHT", -16, 14)
-	MakeView(host, function()
+	windowView = MakeView(host, function()
 		window:Hide()
 		ns.whyBackToWindow = true -- (stopped by hand, it comes back here: Why.lua)
 	end)
+end
+
+-- For the dev copy's test run (WhyTest.lua): the window up at a tab (and a
+-- row open), and a tab's rows as Copy report has them.
+function ns.WhyWindowTab(tab, openKey)
+	ns.ShowWhyWindow()
+	if not windowView then return end
+	windowView.tab, windowView.filter, windowView.openKey, windowView.openParent = tab, "all", openKey, nil
+	Fill(windowView)
+end
+function ns.WhyGather(tab)
+	return Gather({ tab = tab, filter = "all", search = "" }, true)
 end
 
 function ns.ShowWhyWindow()
@@ -972,7 +1389,8 @@ function ns.CreateWhyPanel(kit)
 	canvas.content = content
 	local title = kit.Label(content, "GameFontNormalLarge", L["Why Is It Showing?"])
 	title:SetPoint("TOPLEFT", 16, -16)
-	local intro = kit.PageIntro(content, title, L["Every row of frames Cinematic fades, and why each is showing or not."])
+	local intro = kit.PageIntro(content, title, L["Every frame Cinematic fades, its cameras and its cards, and why each is doing what it is right now. " ..
+		"Recent lists what came and went."])
 	local switch = kit.PageSwitch(content, "whyPage", L["Enable Page"],
 		L["Turns this page, the /cine why window and Pick a frame on or off."], intro, SwitchedOff)
 	local host = CreateFrame("Frame", nil, content)

@@ -282,7 +282,17 @@ local function Update()
 	elseif timer then
 		Timer(nil)
 	end
+	-- (Coming up for a real cast: on the Why window's Recent tab.)
+	if not frame:IsShown() and cast ~= test and ns.WhyMoment then
+		ns.WhyMoment("vision", "page:Teleport Vision", L["Teleport Vision"], L["shown"], "on",
+			L["A Hearthstone or teleport cast, with its scene playing"], "Teleport Vision")
+	end
 	frame:Show()
+end
+
+-- Whether it's showing now (the Why window's Visions tab).
+function ns.TeleportVisionShown()
+	return frame ~= nil and frame:IsShown() and true or false
 end
 
 local driver = CreateFrame("Frame")

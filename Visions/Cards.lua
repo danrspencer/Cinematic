@@ -547,18 +547,29 @@ end
 function ns.CardAllowed(id, edge)
 	local event = BY_ID[id]
 	if not event then return false, "no such card" end
-	if not ns.Setting("cards") then return false, "Card Vision is off" end
-	if not ns.Setting(event.on) then return false, event.name .. " is unticked" end
-	if ns.CardPartOff(id, "settings") then return false, event.name .. "'s Settings tab is off" end
+	-- (The second return: what stops it, for the Why window, and whether
+	-- another addon's version is what does: "yield".)
+	if not ns.Setting("cards") then return false, L["Card Vision is off"] end
+	if not ns.Setting(event.on) then return false, L["%s is unticked"]:format(L[event.name]) end
+	if ns.CardPartOff(id, "settings") then return false, L["Card Vision's Settings tab is off"] end
 	local other = ns.FeatureYieldReason("card:" .. id)
-	if other then return false, other end
-	if event.needs and not ns.CardOn(event.needs) then return false, BY_ID[event.needs].name .. " is unticked" end
+	if other then return false, other, "yield" end
+	if event.needs and not ns.CardOn(event.needs) then
+		return false, L["%s is unticked"]:format(L[BY_ID[event.needs].name])
+	end
 	ns.combatEdge = edge
 	local ok, shows = pcall(ns.RowOnNow, ROW .. id, nil, true)
 	ns.combatEdge = nil
-	if not ok then return false, "its Show in row errored" end
-	if not shows then return false, "its Show in row says not now" end
+	if not ok then return false, L["Its Show in row couldn't be read"] end
+	if not shows then return false, L["Its Show in row says not here and now"] end
 	return true
+end
+
+-- A card's moment on the Why window's Recent tab (not a Test button's).
+local function Note(card, outcome, status, text)
+	if card.forced or not ns.WhyMoment then return end
+	local event = BY_ID[card.id]
+	ns.WhyMoment("card", "card:" .. tostring(card.id), L[event and event.name or "Card"], outcome, status, text, "Card Vision")
 end
 
 -- The real cards, one at a time over the whole screen (an overlay, kept with
@@ -588,10 +599,13 @@ local function Next()
 			Show(card)
 			return
 		end
+		Note(card, L["dropped"], "off", L["It waited too long behind other cards"])
 	end
 end
 function Show(card)
 	current = card
+	Note(card, L["shown"], "on", card.afterFight and L["Held through a fight, shown once it was over"]
+		or (card.queuedAt and L["Waited for the card before it to finish"]) or L["Its moment came"])
 	local look = card.look or ns.CardLook(card.id) -- (look: the Card Types tab's Test, a style's)
 	ns.PlayCard(Screen(), look, UIParent:GetWidth(), UIParent:GetHeight(), 1, card, Next)
 	-- (Its own sound, or its event's rules on the Sounds tab: CombatSoundRules.lua.)
@@ -621,7 +635,11 @@ local function Release()
 	local list = {}
 	for id, card in pairs(held) do
 		held[id] = nil
-		if GetTime() - card.heldAt <= HELD_MAX then list[#list + 1] = card end
+		if GetTime() - card.heldAt <= HELD_MAX then
+			list[#list + 1] = card
+		else
+			Note(card, L["dropped"], "off", L["The fight went on too long for it"])
+		end
 	end
 	-- (The most important first, the rest waiting behind it in turn.)
 	table.sort(list, function(a, b) return BY_ID[a.id].priority > BY_ID[b.id].priority end)
@@ -665,10 +683,15 @@ function ns.Cards.Fire(id, card, force)
 		C_Timer.After(delay, function() ns.Cards.Fire(id, card, force) end)
 		return true
 	end
-	if not force and not ns.CardAllowed(id, card.edge) then return false end
-	-- (Something else on screen it would land on: it waits, asked again
-	-- every half second, for at most CARD_WAIT_MAX seconds in all.)
+	card.id, card.forced = id, force and true or nil
 	if not force then
+		local allowed, why, yield = ns.CardAllowed(id, card.edge)
+		if not allowed then
+			Note(card, L["skipped"], yield and "held" or "off", why)
+			return false
+		end
+		-- (Something else on screen it would land on: it waits, asked again
+		-- every half second, for at most CARD_WAIT_MAX seconds in all.)
 		card.waitStart = card.waitStart or GetTime()
 		local waited = GetTime() - card.waitStart
 		if waited < CARD_WAIT_MAX then
@@ -677,6 +700,7 @@ function ns.Cards.Fire(id, card, force)
 				if ok and reason then
 					if not card.waitNoted then
 						card.waitNoted = true
+						Note(card, L["waiting"], "held", reason)
 						ns.Log("card", ("%s waits: %s"):format(id, tostring(reason)))
 					end
 					C_Timer.After(0.5, function() ns.Cards.Fire(id, card, force) end)
@@ -696,15 +720,20 @@ function ns.Cards.Fire(id, card, force)
 		local look = card.look or ns.CardLook(id)
 		if look.combatBarFallback == "none" and (look.combatPlace == "top" or look.combatPlace == "bottom")
 			and not (ns.LetterboxUp and ns.LetterboxUp()) then
+			Note(card, L["skipped"], "off", L["It goes in the letterbox's bar, and no letterbox is up (No letterbox: Don't show)"])
 			return false
 		end
 	end
 	-- (In a fight or just out of one: shown now, held till after, or not at all.)
 	local inFight = not force and not card.afterFight and event.inFight and ns.db["cardFight_" .. id]
 	if inFight and inFight ~= "show" and Unsettled() then
-		if inFight ~= "wait" then return false end
+		if inFight ~= "wait" then
+			Note(card, L["skipped"], "off", L["In a fight: its In a fight is set to Don't show"])
+			return false
+		end
 		card.id, card.heldAt = id, GetTime()
 		held[id] = card
+		Note(card, L["held"], "held", L["In a fight: its In a fight is set to Wait till after"])
 		if not checking then Check() end
 		return true
 	end
@@ -716,6 +745,11 @@ function ns.Cards.Fire(id, card, force)
 			if waiting[i].id == id then table.remove(waiting, i) end
 		end
 		waiting[#waiting + 1] = card
+		card.queuedAt = GetTime()
+		if not card.afterFight then
+			local playing = BY_ID[current.id]
+			Note(card, L["waiting"], "held", L["%s is playing, and it comes first"]:format(L[playing and playing.name or "Card"]))
+		end
 		return true
 	end
 	-- (One playing: it fades out quickly first, then this one shows.)
@@ -729,6 +763,12 @@ function ns.Cards.Fire(id, card, force)
 	end
 	Show(card)
 	return true
+end
+
+-- The card on screen now (or nil) and those waiting behind it, in turn, for
+-- the Why window's Cards tab. (Don't change them.)
+function ns.Cards.Queue()
+	return current, waiting
 end
 
 -- The cards held through a fight now ({ id = card }), and seconds till they

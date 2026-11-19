@@ -56,6 +56,17 @@ if arg[1] and not update then
 			end
 		end
 	end
+	-- The Why window (/cine why, WhyFeatures.lua's ns.WhyCoverage): every tab
+	-- builds, every page and camera it lists has a line on what it's for, and
+	-- every hub is on some tab.
+	do
+		local ok, gaps = pcall(ns.WhyCoverage)
+		if not ok then
+			print("problem\tWhy window: " .. tostring(gaps))
+		else
+			for _, gap in ipairs(gaps) do print("problem\tWhy window: " .. gap) end
+		end
+	end
 	-- Your own lines and Hide your messages' exception (Chat.lua): lines you type
 	-- with no bubble show chat, emotes and loot don't, and it's all off without it.
 	do

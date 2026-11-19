@@ -81,6 +81,8 @@ local function Decide(why, onTick)
 	local scene = ns.DecideScene(ns.lastCinematic, GetTime(), ns.OnTaxi(), ns.IsPlayerActive())
 	stats.decides = stats.decides + 1
 	seen.still = ns.stillSince or false -- (its own change isn't news)
+	-- (A new camera, or none: on the Why window's Recent tab, with what started it.)
+	if scene.cam ~= before and ns.WhyCameraChanged then ns.WhyCameraChanged(before, scene.cam) end
 	if onTick then
 		stats.ticks = stats.ticks + 1
 		-- A change only a tick saw: nothing woke it, up to 0.1 s late.

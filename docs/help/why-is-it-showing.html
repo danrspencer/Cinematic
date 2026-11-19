@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Why Is It Showing</title>
-<meta name="description" content="Click any frame to see why it's showing or hidden, and which settings say so: Inspect and the Why Is It Showing? page.">
+<meta name="description" content="Why a frame, a camera, a card, a Vision or another addon's feature is doing what it is right now, which settings say so, and what just came and went: the Why window, Inspect and the Why Is It Showing? page.">
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="stylesheet" href="../assets/site.css">
 <script src="../assets/site.js" defer></script>
@@ -102,7 +102,7 @@ a.card { text-decoration: none; color: inherit } a.card:hover { border-color: va
     <div class="inner">
       <div class="eyebrow">Help · why is it showing?</div>
       <h1>Why is that on my screen?</h1>
-      <p>One window lists every part of your interface, whether it's showing or hidden right now, why, and which settings say so. Or point at any frame and ask about just that one. No more guessing which tick or rule is keeping your minimap up.</p>
+      <p>One window lists everything Cinematic does: every part of your interface, the camera playing, the cards, the Visions, other addons. It says what each is doing right now, why, and which settings say so, and keeps a list of what just came and went. Or point at any frame and ask about just that one. No more guessing which tick, rule or trigger is behind it.</p>
     </div>
   </div>
   <div class="band"></div>
@@ -114,18 +114,19 @@ a.card { text-decoration: none; color: inherit } a.card:hover { border-color: va
   <section id="window">
     <div class="eyebrow">Start here</div>
     <h2>The Why window</h2>
-    <p>Type <code>/cine why</code>. A window opens that you can drag aside and keep up while you play. It lists every part of the interface Cinematic fades, and says in plain words what each is doing right now.</p>
+    <p>Type <code>/cine why</code>. A window opens that you can drag aside and keep up while you play. Its tabs across the top cover everything Cinematic does (see <a href="#tabs">the tabs</a>), and each row says in plain words what it's doing right now. The first tab, <b>Interface</b>, lists every part of the interface Cinematic fades.</p>
     <dl class="rows">
       <div class="row"><dt>CineMode is on / off</dt><dd>The box at the top. If CineMode is <b>off</b>, Cinematic isn't hiding anything, and the box says what's keeping it off: a fight, a cast, an open window, a place it's turned off in, or the few seconds before it comes back. Click the box to open that setting.</dd></div>
       <div class="row"><dt>Right now you are</dt><dd>What Cinematic sees you doing: in or out of combat, your target, where you are, your group, mounted. These are what the ticks and rules go by.</dd></div>
       <div class="row"><dt>Each row</dt><dd>A part of the interface, as on the Game Frames page, with a colored edge: <b>Showing</b> (green), <b>Hidden</b> (red), <b>Partly shown</b> (gold) or <b>Not on screen</b> (grey), and the main reason under its name.</dd></div>
-      <div class="row"><dt>Not on screen</dt><dd>Cinematic isn't hiding it. The game just has nothing to draw there: no target, no group, or the frame is switched off in the game or by another addon.</dd></div>
+      <div class="row"><dt>Not on screen</dt><dd>Cinematic isn't hiding it. The game just has nothing to draw there, and the row says what's missing where it can: <b>No target</b>, <b>No focus</b>, <b>No pet out</b>, <b>You're not in a group</b>. Otherwise the frame is switched off in the game or by another addon.</dd></div>
       <div class="row"><dt>Click a row</dt><dd>It opens to every reason (see <a href="#card">what they mean</a>). Click a reason to open its setting, <b>Open settings</b> for the row's page, or <b>Show me where it is</b> to flash a gold box on the frame, even one that's faded out.</dd></div>
       <div class="row"><dt>Parts of a frame</dt><dd>A row that says <b>parts</b> opens to them too, each a row of its own under it with its own status and reasons: a unit frame's portrait, name, level, bars, icons and the rest (the rows under each unit frame on the Game Frames page), the raid and party frames' names, role icons, buffs and highlights, and the minimap's header, clock and buttons. Click a part for why it's showing or hidden.</dd></div>
-      <div class="row"><dt>Search and filters</dt><dd>The search box above the list finds a frame or a part by name: type <b>portrait</b> or <b>clock</b>. <b>All</b>, <b>Showing</b> and <b>Hidden</b> filter the list, parts too, each with a count. <b>Addons</b> lists other addons' frames that Cinematic fades.</dd></div>
+      <div class="row"><dt>Search and filters</dt><dd>The search box under the tabs finds a row or a part by name on the tab that's open: type <b>portrait</b> or <b>clock</b>. The filters under it narrow the list, each with a count: on Interface, <b>All</b>, <b>Showing</b>, <b>Hidden</b> and <b>Addons</b> (other addons' frames that Cinematic fades).</dd></div>
       <div class="row"><dt>Rules</dt><dd>A row or part with a rule in place of its ticks shows the rule as its reason, word by word: green words are true now, grey ones aren't.</dd></div>
       <div class="row"><dt>Pick a frame on screen</dt><dd>For anything you can't find in the list: starts Inspect, below. Stopping Inspect brings the window back.</dd></div>
-      <div class="row"><dt>Copy report</dt><dd>The whole list as text, to paste to us on Discord or in a bug report when you're stuck.</dd></div>
+      <div class="row"><dt>Copy report</dt><dd>Every tab as text, Recent too, to paste to us on Discord or in a bug report when you're stuck.</dd></div>
+      <div class="row"><dt>The line at the bottom</dt><dd>A short line on how to read the tab that's open. Point at it for more.</dd></div>
     </dl>
     <p class="note">The list keeps itself up to date. Start a fight, target something or walk into a city with it open and watch the rows change.</p>
     <div class="cmds">
@@ -133,6 +134,19 @@ a.card { text-decoration: none; color: inherit } a.card:hover { border-color: va
     </div>
   </section>
 
+  <section id="tabs">
+    <div class="eyebrow">Not just frames</div>
+    <h2>The tabs</h2>
+    <p>Rows on the other tabs say one of these, each with its color down the row's edge: <b>On now</b> (green), <b>Ready</b> for its moment (blue), <b>Held</b> back by another addon, a fight or CineMode (orange), <b>Off</b> (red), or nothing to show right now (grey). Open a row for every reason, each a link to its setting.</p>
+    <dl class="rows">
+      <div class="row"><dt>Interface</dt><dd>The frames Cinematic fades, as above. At its end: the <b>game settings Cinematic changes</b>, those it's holding now (what for, and to what) and the rest under <b>Not in use now</b>; then <b>Quality of Life</b> and the <b>Wheels</b>, on or off by their switches.</dd></div>
+      <div class="row"><dt>Cameras</dt><dd><b>Camera now</b>: the camera playing and why, then every trigger that's on in its order, which one won, and why the others didn't (ranks lower, no camera set, held back by its own settings). <b>Standing-still timer</b>: how long you've stood still out of its wait, or what's pausing it (a flight, a window, a cast, a cutscene). Then each camera, and the Camera hub's pages (Scenes, Triggers, Skyriding Cam...).</dd></div>
+      <div class="row"><dt>Cards</dt><dd><b>Card now</b>: the card on screen, those waiting their turn and those held through a fight. Then every card: ready if its moment came now, or why not (unticked, its Show in row, another addon's own), its <b>In a fight</b> setting and what it last did.</dd></div>
+      <div class="row"><dt>Visions</dt><dd>Every Vision and Atmosphere page, with its tabs under it: off and which switch did it, on now (low health, an emote card up, a quest giver talking, the letterbox up...), or ready and what it waits for.</dd></div>
+      <div class="row"><dt>Addons</dt><dd>Every loaded addon Cinematic knows: the frames of theirs it fades, the features you pick between on the Conflicts page (whose version is playing, and whether you picked it), and what it does for the rest. Then the addons it leaves alone, under <b>Other addons loaded</b>.</dd></div>
+      <div class="row"><dt>Recent</dt><dd>What came and went since you logged in or reloaded, newest first: cards shown, skipped, held, waiting or dropped, cameras starting and stopping, and your triggers held back or beaten, each with why. The answer to "why didn't my card show?". Its filters: <b>Cards</b>, <b>Cameras</b>, <b>Skipped or held</b>.</dd></div>
+    </dl>
+  </section>
   <section id="inspect">
     <div class="eyebrow">Ask about one frame</div>
     <h2>Inspect</h2>
@@ -174,9 +188,9 @@ a.card { text-decoration: none; color: inherit } a.card:hover { border-color: va
     <p>In the settings, under <b>Help</b>, the <b>Why Is It Showing?</b> page is the same list as the Why window, as wide as the settings window. It updates while it's open.</p>
     <ul class="plain">
       <li>The box at the top says whether CineMode is on, what's keeping it off if it isn't, and what you're doing right now, with a button that turns CineMode on or off.</li>
-      <li><b>All</b>, <b>Showing</b>, <b>Hidden</b> and <b>Addons</b> filter the list, each with a count, and the search box finds a row or a part by name.</li>
+      <li>The same tabs, each with its filters and a count on each, and the search box finds a row or a part by name.</li>
       <li>Click a row for all its reasons, each a link to its setting, plus <b>Open settings</b> and <b>Show me where it is</b>. A frame with parts lists them under it.</li>
-      <li><b>Pick a frame on screen</b> closes the settings and starts Inspect; <b>Copy report</b> gives the whole list as text to send us.</li>
+      <li><b>Pick a frame on screen</b> closes the settings and starts Inspect; <b>Copy report</b> gives every tab as text to send us.</li>
       <li><b>Open as a window</b> closes the settings and opens the Why window.</li>
       <li>Its switch (on to start with) turns the page, the window and Pick a frame on screen off together, for anyone who doesn't want them.</li>
     </ul>
