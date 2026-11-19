@@ -3518,15 +3518,21 @@ function ns.StyleRows(kit, content, stack, changed, switchKey, fieldOf, panel)
 		return slider
 	end
 
-	-- A color (a tabbed Look panel's): the heading, then chips of ready
-	-- colors and one of your own (the color picker), the one it is edged gold.
-	local CHIPS = { { 1, 0.3, 0.23 }, { 1, 0.62, 0.1 }, { 1, 0.88, 0.3 }, { 0.37, 0.88, 0.37 }, { 0.25, 0.78, 0.92 },
-		{ 0.56, 0.49, 1 }, { 1, 0.44, 0.85 }, { 1, 1, 1 } }
+	-- A color (a tabbed Look panel's): the heading with the color's name
+	-- after it, the quick row of named colors, then Palette, which opens the
+	-- named palette under them (ns.ColorPalette: families of shades, your
+	-- recent picks, and Custom for the game's color wheel). The one it is
+	-- edged gold. (2026-11-19: was 8 chips and a + for the wheel.)
+	-- (One local for the sizes: StyleRows is near Lua's 200-local cap.)
+	local CHIPS = { step = 28, cellRow = 20, boxTop = 30 }
 	function rows.Chips(label, keys, tip, test)
-		Heading(label, nil, tip)
+		local palette = ns.ColorPalette
+		local CHIP_STEP, CELL_ROW, BOX_TOP = CHIPS.step, CHIPS.cellRow, CHIPS.boxTop
+		local head = Heading(label, nil, tip)
 		local holder = CreateFrame("Frame", nil, content)
 		holder:SetSize(ROW_W, 24)
 		stack:Add(holder, "label")
+		local open = false
 		local function Now()
 			-- (The color it gives where it's handed down: panel.color(keys).
 			-- Name Style's rows, 2026-11-17.)
@@ -3538,65 +3544,205 @@ function ns.StyleRows(kit, content, stack, changed, switchKey, fieldOf, panel)
 		end
 		local function Same(color)
 			local r, g, b = Now()
-			return math.abs(r - color[1]) < 0.01 and math.abs(g - color[2]) < 0.01 and math.abs(b - color[3]) < 0.01
+			return palette.Near(color, r, g, b)
 		end
 		local function Set(r, g, b)
 			Put(keys[1], r)
 			Put(keys[2], g)
 			Put(keys[3], b)
+			palette.Remember(r, g, b)
 			changed()
 			kit.Refresh()
 		end
-		local chips = {}
-		local function Chip(i)
-			local chip = CreateFrame("Button", nil, holder)
-			chip:SetSize(22, 22)
-			chip:SetPoint("LEFT", (i - 1) * 28, 0)
+		local buttons = {} -- (every chip, cell and button: greyed together)
+		local function Gold(edges, on) ns.DressStyleEdges(edges, on and 2 or 1, on and 1 or 0, on and 0.82 or 0, 0, 1) end
+		-- (Pointed at: its name and hex where the name line is, else the
+		-- color now's.)
+		local nameLine, box, cells, recent, recentNone -- (the box's: built the first time it opens)
+		local function ShowName(color)
+			if not nameLine then return end
+			if color and color.custom then
+				nameLine:SetText(palette.NameOf(color[1], color[2], color[3]))
+			elseif color then
+				nameLine:SetText(ns.L[color.name] .. "  |cff8c8c8c#" .. color.hex .. "|r")
+			else
+				nameLine:SetText(palette.NameOf(Now()))
+			end
+		end
+		local function Chip(parent, size)
+			local chip = CreateFrame("Button", nil, parent)
+			chip:SetSize(size, size)
 			chip.swatch = chip:CreateTexture(nil, "ARTWORK")
 			chip.swatch:SetPoint("TOPLEFT", 2, -2)
 			chip.swatch:SetPoint("BOTTOMRIGHT", -2, 2)
 			chip.edges = ns.MakeStyleEdges(chip)
-			chips[i] = chip
+			chip:SetScript("OnEnter", function(self)
+				ShowName(self.color)
+				-- (The box shut: its name as a tip instead.)
+				if self.color and not (box and box:IsShown()) then TipOn(self, palette.NameOf(self.color[1],
+					self.color[2], self.color[3])) end
+			end)
+			chip:SetScript("OnLeave", function()
+				ShowName(nil)
+				GameTooltip:Hide()
+			end)
+			chip:SetScript("OnClick", function(self)
+				local c = self.color
+				if c then Set(c[1], c[2], c[3]) end
+			end)
+			buttons[#buttons + 1] = chip
 			return chip
 		end
-		for i, color in ipairs(CHIPS) do
-			local chip = Chip(i)
+		local function Dress(chip, color)
+			chip.color = color
 			chip.swatch:SetColorTexture(color[1], color[2], color[3], 1)
-			chip:SetScript("OnClick", function() Set(color[1], color[2], color[3]) end)
 		end
-		-- (Your own: the color now when it's none of these; a + to pick one.)
-		local own = Chip(#CHIPS + 1)
-		-- (Outlined: it shows over any color.)
-		local plus = own:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-		local file, height = plus:GetFont()
-		if file then plus:SetFont(file, height + 2, "OUTLINE") end
-		plus:SetPoint("CENTER", 0, 0)
-		plus:SetText("+")
-		own:SetScript("OnClick", function()
-			local r, g, b = Now()
-			kit.OpenColorPicker(r, g, b, function(nr, ng, nb) Set(nr, ng, nb) end)
-		end)
-		own:SetScript("OnEnter", function(self) TipOn(self, tip or ns.L["Pick any color."]) end)
-		own:SetScript("OnLeave", function() GameTooltip:Hide() end)
+		local quick = {}
+		for i, color in ipairs(palette.quick) do
+			local chip = Chip(holder, 22)
+			chip:SetPoint("TOPLEFT", (i - 1) * CHIP_STEP, -1)
+			Dress(chip, color)
+			quick[i] = chip
+		end
+		-- (Palette: opens the box under the row; gold while open, or while
+		-- the color now is one only the box has.)
+		local more = CreateFrame("Button", nil, holder)
+		more:SetSize(74, 22)
+		more:SetPoint("TOPLEFT", #palette.quick * CHIP_STEP + 4, -1)
+		more.edges = ns.MakeStyleEdges(more)
+		more.text = more:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+		more.text:SetPoint("CENTER", 0, 0)
+		more.text:SetText(ns.L["Palette"])
+		more:SetScript("OnEnter", function(self) TipOn(self, ns.L["Every named color, your recent ones, and Custom."]) end)
+		more:SetScript("OnLeave", function() GameTooltip:Hide() end)
+		buttons[#buttons + 1] = more
+
+		-- The box.
+		local function Build()
+			box = CreateFrame("Frame", nil, holder)
+			box:SetPoint("TOPLEFT", 0, -BOX_TOP)
+			box:SetWidth(ROW_W)
+			local back = box:CreateTexture(nil, "BACKGROUND")
+			back:SetAllPoints()
+			back:SetColorTexture(0.07, 0.07, 0.08, 0.92)
+			ns.DressStyleEdges(ns.MakeStyleEdges(box), 1, 0.42, 0.33, 0.13, 1)
+			nameLine = box:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+			nameLine:SetPoint("TOPLEFT", 10, -8)
+			nameLine:SetPoint("RIGHT", -10, 0)
+			nameLine:SetJustifyH("LEFT")
+			nameLine:SetWordWrap(false)
+			cells = {}
+			local cellW = math.floor((ROW_W - 82) / 5)
+			local y = -28
+			for _, family in ipairs(palette.families) do
+				local name = box:CreateFontString(nil, "OVERLAY", ns.LOOK_DIM)
+				name:SetPoint("TOPLEFT", 10, y - 4)
+				name:SetWidth(60)
+				name:SetJustifyH("LEFT")
+				name:SetWordWrap(false)
+				name:SetText(ns.L[family.name])
+				for i, color in ipairs(family.shades) do
+					-- (A cell: its chip and its name; the whole of it clicks.)
+					local cell = Chip(box, 18)
+					cell:SetPoint("TOPLEFT", 72 + (i - 1) * cellW, y)
+					cell:SetHitRectInsets(0, -(cellW - 22), 0, 0)
+					Dress(cell, color)
+					local words = cell:CreateFontString(nil, "OVERLAY", ns.LOOK_DIM)
+					words:SetPoint("LEFT", cell, "RIGHT", 4, 0)
+					words:SetWidth(cellW - 24)
+					words:SetJustifyH("LEFT")
+					words:SetWordWrap(false)
+					words:SetText(ns.L[color.name])
+					cells[#cells + 1] = cell
+				end
+				y = y - CELL_ROW
+			end
+			y = y - 6
+			local recentHead = box:CreateFontString(nil, "OVERLAY", ns.LOOK_DIM)
+			recentHead:SetPoint("TOPLEFT", 10, y)
+			recentHead:SetText(ns.L["Recent"])
+			recentNone = box:CreateFontString(nil, "OVERLAY", ns.LOOK_DIM)
+			recentNone:SetPoint("TOPLEFT", 10, y - 20)
+			recentNone:SetText(ns.L["Colors you pick show here."])
+			recent = {}
+			for i = 1, 8 do
+				local chip = Chip(box, 22)
+				chip:SetPoint("TOPLEFT", 10 + (i - 1) * CHIP_STEP, y - 14)
+				chip:Hide()
+				recent[i] = chip
+			end
+			-- (Custom: the game's color wheel, starting at the color now.)
+			local custom = CreateFrame("Button", nil, box)
+			custom:SetSize(90, 22)
+			custom:SetPoint("TOPRIGHT", -10, y - 14)
+			custom.edges = ns.MakeStyleEdges(custom)
+			ns.DressStyleEdges(custom.edges, 1, 0.5, 0.5, 0.5, 1)
+			local words = custom:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+			words:SetPoint("CENTER", 0, 0)
+			words:SetText(ns.L["Custom..."])
+			custom:SetScript("OnClick", function()
+				local r, g, b = Now()
+				kit.OpenColorPicker(r, g, b, function(nr, ng, nb) Set(nr, ng, nb) end)
+			end)
+			custom:SetScript("OnEnter", function(self) TipOn(self, tip or ns.L["Pick any color."]) end)
+			custom:SetScript("OnLeave", function() GameTooltip:Hide() end)
+			buttons[#buttons + 1] = custom
+			box:SetHeight(-(y - 14) + 22 + 10)
+			box:SetScript("OnShow", function() ShowName(nil) end)
+		end
+		local function Fit()
+			local tall = open and box and (BOX_TOP + box:GetHeight()) or 24
+			if math.abs(holder:GetHeight() - tall) > 0.5 then
+				holder:SetHeight(tall)
+				if panel and panel.resized then panel.resized() end
+			end
+		end
 		holder.Refresh = function()
 			if not ns.GetDB() then return end
-			local mine = true
-			for i, color in ipairs(CHIPS) do
-				local on = Same(color)
-				mine = mine and not on
-				ns.DressStyleEdges(chips[i].edges, on and 2 or 1, on and 1 or 0, on and 0.82 or 0, 0, 1)
-			end
 			local r, g, b = Now()
-			own.swatch:SetColorTexture(mine and r or 0.15, mine and g or 0.15, mine and b or 0.17, 1)
-			ns.DressStyleEdges(own.edges, mine and 2 or 1, mine and 1 or 0.4, mine and 0.82 or 0.4, mine and 0 or 0.4, 1)
+			local named = palette.Find(r, g, b)
+			head:Set(palette.NameOf(r, g, b))
+			local inQuick = false
+			for _, chip in ipairs(quick) do
+				local on = Same(chip.color)
+				inQuick = inQuick or on
+				Gold(chip.edges, on)
+			end
+			Gold(more.edges, open or not inQuick)
+			more.text:SetTextColor(1, (open or not inQuick) and 0.82 or 1, (open or not inQuick) and 0 or 1)
+			if box then
+				box:SetShown(open)
+				for _, cell in ipairs(cells) do Gold(cell.edges, cell.color == named) end
+				local list = palette.Recent()
+				for i, chip in ipairs(recent) do
+					local each = list[i]
+					if each and tonumber(each[1]) and tonumber(each[2]) and tonumber(each[3]) then
+						local color = palette.Find(each[1], each[2], each[3])
+							or { each[1], each[2], each[3], custom = true }
+						Dress(chip, color)
+						Gold(chip.edges, Same(color))
+						chip:Show()
+					else
+						chip:Hide()
+					end
+				end
+				recentNone:SetShown(not list[1])
+				ShowName(nil)
+			end
+			Fit()
 		end
+		more:SetScript("OnClick", function()
+			open = not open
+			if open and not box then Build() end
+			holder.Refresh()
+		end)
 		function holder.SetEnabled(_, on)
-			for _, chip in ipairs(chips) do chip:SetEnabled(on) end
+			for _, button in ipairs(buttons) do button:SetEnabled(on) end
 			holder:SetAlpha(on and 1 or 0.4)
 		end
 		kit.GreyUnless(holder, test or On)
 		kit.AddControl(holder)
-		return own
+		return more
 	end
 
 	-- A tick (a tabbed Look panel's): a toggle with a box, side by side with

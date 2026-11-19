@@ -139,6 +139,7 @@ Atmosphere\LowHealth.lua
 Atmosphere\VitalsSound.lua
 Atmosphere\TeleportVision.lua
 UI\PersonalResources.lua
+Style\ColorPalette.lua
 Style\StylePages.lua
 Style\MirrorTimerStyle.lua
 Style\StyleThemes.lua
