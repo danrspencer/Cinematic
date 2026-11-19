@@ -13,7 +13,7 @@
 -- answer. Everything goes to /cine log ("numbers").
 local _, ns = ...
 
-local WAIT = 60 -- seconds to wait for a hit
+local WAIT = 180 -- seconds to wait for a hit (60 ran out before a first test's fight, 2026-11-19)
 
 -- The rules: the game's own data shape (FormattingUtil's
 -- NUMBER_ABBREVIATION_DATA: breakpoint, abbreviation, significandDivisor,
@@ -163,5 +163,6 @@ function ns.NumberStyleTest()
 		if not ok then ns.Log("numbers", "error: " .. tostring(err)) end
 	end)
 	C_Timer.After(WAIT, function() if running then Stop("no hit in " .. WAIT .. " s") ns.Print("numbers: no hit came.") end end)
-	ns.TestPrompt("Plain numbers tested.\nNow hit a training dummy (target it first).", 10)
+	ns.TestPrompt("Plain numbers tested.\nNow hit a training dummy (target it first).\n"
+		.. "Waiting up to 3 minutes; don't /reload till the panel shows.", 10)
 end
