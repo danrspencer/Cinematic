@@ -48,7 +48,7 @@ local STEPS = {
 		"of health (a big fall, under 90%), then stand still, mouse away. Your player frame should come up and " ..
 		"STAY up, no blinking, fading out as you near 100%" },
 	{ key = "ghost", length = 30, ghost = true, say = "3/3 GHOST: as a ghost (released), stand still, mouse " ..
-		"away from your frames. Your player frame should stay up, no blinking" },
+		"away from your frames. Your player frame should fade out and STAY down (dead isn't low health)" },
 }
 
 local function Restore()
@@ -135,6 +135,11 @@ local function Verdict(step)
 	local path = step.secretSeen and (step.readableSeen and "health secret part of the time" or "health secret (the fix's path)")
 		or "health readable (the fix's path not reached: try again in a group)"
 	local fight = step.fighting and ", a fight came in (not a fair test)" or ""
+	-- (A ghost: the frame stays down, Show below doesn't count you dead, 2026-11-19.)
+	if step.spec and step.spec.ghost then
+		if step.ups then return ("%s: FAILED, the frame came up %d times as a ghost (%s%s)"):format(step.key, step.ups, path, fight) end
+		return ("%s: PASS, stayed down as a ghost (%s%s), %d screenshots"):format(step.key, path, fight, step.shots or 0)
+	end
 	if not step.ups then
 		return ("%s: FAILED, the frame never came up (%s%s)"):format(step.key, path, fight)
 	end

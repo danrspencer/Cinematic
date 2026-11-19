@@ -366,6 +366,12 @@ end
 local function PrdWhileDead(setting)
 	return setting == "prdWhenNotFull" and ns.Flag(UnitIsDeadOrGhost("player")) and true or false
 end
+-- (Dead or a ghost: your health isn't low, it's gone, so the player frame's
+-- Show below rows don't keep it up (a player's report 2026-11-19: up the
+-- whole ghost walk). Always still does.)
+local function PlayerFrameWhileDead(setting)
+	return setting == "portraitWhenNotFull" and ns.Flag(UnitIsDeadOrGhost("player")) and true or false
+end
 function ns.KeepYourFrameUp(setting, entry, afterFight, fighting)
 	local db = ns.db
 	local pet = ns.PET_FRAMES[entry.name]
@@ -382,6 +388,9 @@ function ns.KeepYourFrameUp(setting, entry, afterFight, fighting)
 	local health, power, nfHealth, nfPower = RowRules(row, hShare, pShare)
 	if health == "always" or power == "always" then
 		return true
+	end
+	if PlayerFrameWhileDead(setting) then
+		return false
 	end
 	-- (Wait at pull: held back at a fight's start, whatever the share.)
 	if fighting and not pet and ns.FightHold(row) then
@@ -505,7 +514,8 @@ end
 local secretSpecs = {}
 function ns.ThresholdSecret(setting, entry)
 	local db = ns.db
-	if not setting or ns.NO_SECRET_ALPHA[entry.name] or PrdWhileDead(setting) then
+	if not setting or ns.NO_SECRET_ALPHA[entry.name] or PrdWhileDead(setting)
+		or PlayerFrameWhileDead(setting) then
 		return false
 	end
 	local row = RowOf(setting, entry)
